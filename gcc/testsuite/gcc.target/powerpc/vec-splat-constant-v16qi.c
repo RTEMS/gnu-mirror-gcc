@@ -10,15 +10,17 @@
 vector unsigned char
 v16qi_const_1 (void)
 {
+  /* VSLTPISB.  */
   return (vector unsigned char) { 1, 1, 1, 1, 1, 1, 1, 1,
-				  1, 1, 1, 1, 1, 1, 1, 1, }; /* VSLTPISB.  */
+				  1, 1, 1, 1, 1, 1, 1, 1, };
 }
 
 vector unsigned char
 v16qi_const_2 (void)
 {
+  /* XXSPLTIW.  */
   return (vector unsigned char) { 1, 2, 3, 4, 1, 2, 3, 4,
-				  1, 2, 3, 4, 1, 2, 3, 4, }; /* XXSPLTIW.  */
+				  1, 2, 3, 4, 1, 2, 3, 4, };
 }
 
 /* { dg-final { scan-assembler-times {\mxxspltiw\M}              1 } } */

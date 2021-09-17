@@ -10,42 +10,48 @@
 vector int
 v4si_const_1 (void)
 {
-  return (vector int) { 1, 1, 1, 1 };			/* VSLTPISW.  */
+  /* VSLTPISW.  */
+  return (vector int) { 1, 1, 1, 1 };
 }
 
 vector int
 v4si_const_126 (void)
 {
-  return (vector int) { 126, 126, 126, 126 };		/* XXSPLTIW.  */
+  /* XXSPLTIW.  */
+  return (vector int) { 126, 126, 126, 126 };
 }
 
 vector int
 v4si_const_1023 (void)
 {
-  return (vector int) { 1023, 1023, 1023, 1023 };	/* XXSPLTIW.  */
+  /* XXSPLTIB/VEXTSB2W.  */
+  return (vector int) { 1023, 1023, 1023, 1023 };
 }
 
 vector int
 v4si_splats_1 (void)
 {
-  return vec_splats (1);				/* VSLTPISW.  */
+  /* VSLTPISW.  */
+  return vec_splats (1);
 }
 
 vector int
 v4si_splats_126 (void)
 {
-  return vec_splats (126);				/* XXSPLTIW.  */
+  /* XXSPLTIB/VEXTSB2W.  */
+  return vec_splats (126);
 }
 
 vector int
 v8hi_splats_1023 (void)
 {
-  return vec_splats (1023);				/* XXSPLTIW.  */
+  /* XXSPLTIW.  */
+  return vec_splats (1023);
 }
 
-/* { dg-final { scan-assembler-times {\mxxspltiw\M}  4 } } */
+/* { dg-final { scan-assembler-times {\mxxspltiw\M}  2 } } */
 /* { dg-final { scan-assembler-times {\mvspltisw\M}  2 } } */
-/* { dg-final { scan-assembler-not   {\mxxspltib\M}    } } */
-/* { dg-final { scan-assembler-not   {\mvextsb2w\M}    } } */
+/* { dg-final { scan-assembler-times {\mxxspltib\M}  2 } } */
+/* { dg-final { scan-assembler-times {\mvextsb2w\M}  2 } } */
 /* { dg-final { scan-assembler-not   {\mlxvx?\M}       } } */
 /* { dg-final { scan-assembler-not   {\mplxv\M}        } } */

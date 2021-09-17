@@ -10,39 +10,45 @@
 vector short
 v8hi_const_1 (void)
 {
-  return (vector short) { 1, 1, 1, 1, 1, 1, 1, 1 };	/* VSLTPISH.  */
+  /* VSLTPISH.  */
+  return (vector short) { 1, 1, 1, 1, 1, 1, 1, 1 };
 }
 
 vector short
 v8hi_const_126 (void)
 {
+  /* XXSPLTIB/VUPKLSB.  */
   return (vector short) { 126, 126, 126, 126,
-			  126, 126, 126, 126 };		/* XXSPLTIW.  */
+			  126, 126, 126, 126 };
 }
 
 vector short
 v8hi_const_1023 (void)
 {
+  /* XXSPLTIB/VUPKLSB.  */
   return (vector short) { 1023, 1023, 1023, 1023,
-			  1023, 1023, 1023, 1023 };	/* XXSPLTIW.  */
+			  1023, 1023, 1023, 1023 };
 }
 
 vector short
 v8hi_splats_1 (void)
 {
-  return vec_splats ((short)1);				/* VSLTPISH.  */
+  /* VSLTPISH.  */
+  return vec_splats ((short)1);
 }
 
 vector short
 v8hi_splats_126 (void)
 {
-  return vec_splats ((short)126);			/* XXSPLTIW.  */
+  /* XXSPLTIB/VUPKLSB.  */
+  return vec_splats ((short)126);
 }
 
 vector short
 v8hi_splats_1023 (void)
 {
-  return vec_splats ((short)1023);			/* XXSPLTIW.  */
+  /* XXSPLTIW.  */
+  return vec_splats ((short)1023);
 }
 
 /* Test that we can optimiza V8HI where all of the even elements are the same
@@ -50,13 +56,14 @@ v8hi_splats_1023 (void)
 vector short
 v8hi_const_1023_1000 (void)
 {
+  /* XXSPLTIW.  */
   return (vector short) { 1023, 1000, 1023, 1000,
-			  1023, 1000, 1023, 1000 };	/* XXSPLTIW.  */
+			  1023, 1000, 1023, 1000 };
 }
 
-/* { dg-final { scan-assembler-times {\mxxspltiw\M}  5 } } */
+/* { dg-final { scan-assembler-times {\mxxspltiw\M}  3 } } */
 /* { dg-final { scan-assembler-times {\mvspltish\M}  2 } } */
-/* { dg-final { scan-assembler-not   {\mxxspltib\M}    } } */
-/* { dg-final { scan-assembler-not   {\mvupklsb\M}     } } */
+/* { dg-final { scan-assembler-times {\mxxspltib\M}  2 } } */
+/* { dg-final { scan-assembler-times {\mvupklsb\M}   2 } } */
 /* { dg-final { scan-assembler-not   {\mlxvx?\M}       } } */
 /* { dg-final { scan-assembler-not   {\mplxv\M}        } } */
