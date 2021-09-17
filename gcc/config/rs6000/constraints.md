@@ -208,25 +208,10 @@
   (and (match_code "const_int")
        (match_test "((- (unsigned HOST_WIDE_INT) ival) + 0x8000) < 0x10000")))
 
-;; DI/SF/DF/V2DI/V2DF scalar or vector constant that can be loaded with XXSPLTIDP
-(define_constraint "eF"
-  "A constant that can be loaded with the XXSPLTIDP instruction."
-  (match_operand 0 "easy_fp_constant_sfmode"))
-
 ;; 34-bit signed integer constant
 (define_constraint "eI"
   "A signed 34-bit integer constant if prefixed instructions are supported."
   (match_operand 0 "cint34_operand"))
-
-;; KF/TF scalar than can be loaded with LXVKQ
-(define_constraint "eQ"
-  "An IEEE 128-bit constant that can be loaded with the LXVKQ instruction."
-  (match_operand 0 "lxvkq_operand"))
-
-;; Vector constant that can be loaded with XXSPLTIW
-(define_constraint "eW"
-  "A vector constant that can be loaded with the XXSPLTIW instruction."
-  (match_operand 0 "easy_vector_constant_splat_word"))
 
 ;; Floating-point constraints.  These two are defined so that insn
 ;; length attributes can be calculated exactly.

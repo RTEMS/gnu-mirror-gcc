@@ -6661,10 +6661,6 @@ init_cumulative_args (CUMULATIVE_ARGS *cum, tree fntype,
 	  && lookup_attribute ("longcall", TYPE_ATTRIBUTES (fntype))
 	  && !lookup_attribute ("shortcall", TYPE_ATTRIBUTES (fntype))))
     cum->call_cookie |= CALL_LONG;
-  /* See if we want to assume all built-in functions are in a shared
-     library.  */
-  else if (TARGET_BUILTIN_SHLIB && fndecl && fndecl_built_in_p (fndecl))
-    cum->call_cookie |= CALL_LONG;
   else if (DEFAULT_ABI != ABI_DARWIN)
     {
       bool is_local = (fndecl
