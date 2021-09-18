@@ -1,3 +1,40 @@
+work069.patch015:
+2021-09-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraint.md (eD): New constraint.
+	* config/rs6000/predicates.md (easy_fp_constant): If the constant
+	can be loaded with XXSPLTI32DX, it is easy.
+	(easy_vector_constant_2insns): New predicate.
+	(easy_vector_constant): If the constant can be loaded with
+	XXSPLTI32DX, it is easy.
+	* config/rs6000/rs6000-protos.h (xxsplti32dx_constant_immediate):
+	New declaration.
+	* config/rs6000/rs6000.c (xxsplti32dx_constant_immediate): New
+	helper function.
+	(output_vec_const_move): If the operand can be loaded with
+	XXSPLTI32DX, split it.
+	(rs6000_output_move_128bit): Likewise.
+	(prefixed_xxsplti_p): Constants loaded with XXSPLTI32DX are
+	prefixed.
+	* config/rs6000/rs6000.md (movsf_hardfloat): Add support for
+	constants loaded with XXSPLTI32DX.
+	(mov<mode>_hardfloat32, FMOVE64 iterator):  Likewise.
+	(mov<mode>_hardfloat64, FMOVE64 iterator): Likewise.
+	(movdi_internal32): Likewise.
+	(movdi_internal64): Likewise.
+	* config/rs6000/rs6000.opt (-mxxsplti32dx): New option.
+	* config/rs6000/vsx.md (UNSPEC_XXSPLTI32DX_CONST): New unspec.
+	(vsx_mov<mode>_64bit): Add support for constants loaded with
+	XXSPLTI32DX.
+	(vsx_mov<mode>_32bit): Likewise.
+	(XXSPLTI32DX): New mode iterator.
+	(splitter for XXSPLTI32DX): Add splitter for constants loaded with
+	XXSPLTI32DX.
+	(xxsplti32dx_<mode>_first): New insns.
+	(xxsplti32dx_<mode>_second): New insns.
+	* doc/md.texi (PowerPC and IBM RS6000 constraints): Document the
+	eD constraint.
+
 work069.patch012:
 2021-09-17  Michael Meissner  <meissner@linux.ibm.com>
 

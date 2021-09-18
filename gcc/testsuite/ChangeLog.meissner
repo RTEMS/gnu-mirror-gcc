@@ -1,3 +1,11 @@
+work069.patch015:
+2021-09-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splat-constant-df-2.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-di-2.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v2df-2.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v2di-2.c: New test.
+
 work069.patch014:
 2021-09-17  Michael Meissner  <meissner@linux.ibm.com>
 
