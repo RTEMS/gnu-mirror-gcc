@@ -213,6 +213,12 @@
   "A 64-bit scalar constant that can be loaded with the XXSPLTIDP instruction."
   (match_operand 0 "easy_fp_constant_64bit_scalar"))
 
+;; DImode, DFmode, V2DImode, V2DFmode constant that can be loaded with 2
+;; XXSPLTI32DX instruction.
+(define_constraint "eD"
+  "A constant that can be loaded with a pair of XXSPLTI32DX instructions."
+  (match_operand 0 "easy_vector_constant_2insns"))
+
 ;; 34-bit signed integer constant
 (define_constraint "eI"
   "A signed 34-bit integer constant if prefixed instructions are supported."

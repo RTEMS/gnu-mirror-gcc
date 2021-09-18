@@ -3333,6 +3333,9 @@ The integer constant zero.
 A constant whose negation is a signed 16-bit constant.
 @end ifset
 
+@item eD
+A constant that can be loaded with a pair of XXSPLTI32DX instructions.
+
 @item eF
 A 64-bit scalar constant that can be loaded with the XXSPLTIDP instruction.
 
