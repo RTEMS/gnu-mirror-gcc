@@ -3348,6 +3348,9 @@ An IEEE 128-bit constant that can be loaded with the LXVKQ instruction.
 @item eV
 A 128-bit vector constant that can be loaded with the XXSPLTIDP instruction.
 
+@item eW
+A vector constant that can be loaded with the XXSPLTIW instruction.
+
 @ifset INTERNALS
 @item G
 A floating point constant that can be loaded into a register with one

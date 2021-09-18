@@ -224,15 +224,15 @@
   "A signed 34-bit integer constant if prefixed instructions are supported."
   (match_operand 0 "cint34_operand"))
 
-;; V2DI/V2DF vector constant that can be loaded with the XXSPLTIDP instruction.
-(define_constraint "eV"
-  "A 128-bit vector constant that can be loaded with the XXSPLTIDP instruction."
-  (match_operand 0 "easy_vector_constant_64bit_element"))
-
 ;; KF/TF scalar than can be loaded with LXVKQ
 (define_constraint "eQ"
   "An IEEE 128-bit constant that can be loaded with the LXVKQ instruction."
   (match_operand 0 "easy_fp_constant_ieee128"))
+
+;; V2DI/V2DF vector constant that can be loaded with the XXSPLTIDP instruction.
+(define_constraint "eV"
+  "A 128-bit vector constant that can be loaded with the XXSPLTIDP instruction."
+  (match_operand 0 "easy_vector_constant_64bit_element"))
 
 ;; Vector constant that can be loaded with XXSPLTIW
 (define_constraint "eW"
