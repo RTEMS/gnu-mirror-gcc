@@ -31,14 +31,13 @@
 )
 
 ; TODO: many more alternatives.
-; TODO: pure-cap.
 (define_insn "*movcadi_aarch64"
   [(set (match_operand:CADI 0 "nonimmediate_operand" "=rk,r,r,m,r,r")
 	(match_operand:CADI 1 "aarch64_mov_operand" "rk,Z,m,r,Usa,Ush"))]
   "TARGET_CAPABILITY_FAKE"
   "@
    mov\\t%0, %1
-   mov\\t%0, 0
+   mov\\t%0, xzr
    ldr\\t%0, %1
    str\\t%1, %0
    adr\\t%0, %c1
@@ -56,11 +55,12 @@
 })
 
 (define_insn "*movcadi_aarch64"
-  [(set (match_operand:CADI 0 "nonimmediate_operand" "=rk,r,m,r,  r")
-	(match_operand:CADI 1 "aarch64_mov_operand" "rk, m,r,Usa,Ush"))]
+  [(set (match_operand:CADI 0 "nonimmediate_operand" "=rk,r,r,m,r  ,r  ")
+	(match_operand:CADI 1 "aarch64_mov_operand"  "rk ,Z,m,r,Usa,Ush"))]
   "TARGET_CAPABILITY_PURE"
   "@
   mov\\t%0, %1
+  mov\\t%x0, xzr
   ldr\\t%0, %1
   str\\t%1, %0
   adr\\t%0, %c1
