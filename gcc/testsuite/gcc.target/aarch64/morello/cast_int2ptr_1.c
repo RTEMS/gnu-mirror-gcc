@@ -1,5 +1,4 @@
 /* { dg-do compile } */
-/* { dg-additional-options "-mfake-capability" } */
 
 /* Conditional expressions.  */
 

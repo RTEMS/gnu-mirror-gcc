@@ -1,7 +1,8 @@
 /* Simple runtest based on gcc.dg/atomic/c11-atomic-exec-3.c.
    Compiled with -march=armv8-a to test no-lse inline fallback routes.  */
 /* { dg-do run { target aarch64*-*-* } } */
-/* { dg-additional-options "-march=armv8-a -std=c11" } */
+/* { dg-additional-options "-march=armv8-a -std=c11" { target { ! cheri_capability_pure } } } */
+/* { dg-additional-options "-std=c11" { target { cheri_capability_pure } } } */
 
 extern void abort (void);
 extern void exit (int);

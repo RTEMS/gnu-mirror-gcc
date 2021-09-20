@@ -10618,6 +10618,10 @@ aarch64_print_operand (FILE *f, rtx x, int code)
 	  asm_fprintf (f, "%wd", INTVAL (x));
 	  break;
 
+	case CONST_NULL:
+	  asm_fprintf (f, "0");
+
+	  break;
 	case CONST:
 	  if (!VECTOR_MODE_P (GET_MODE (x)))
 	    {
