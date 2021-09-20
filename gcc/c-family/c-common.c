@@ -409,7 +409,7 @@ const struct c_common_resword c_common_reswords[] =
   { "__imag__",		RID_IMAGPART,	0 },
   { "__inline",		RID_INLINE,	0 },
   { "__inline__",	RID_INLINE,	0 },
-  { "__intcap_t",	RID_INTCAP,	0 },
+  { "__intcap",		RID_INTCAP,	0 },
   { "__is_abstract",	RID_IS_ABSTRACT, D_CXXONLY },
   { "__is_aggregate",	RID_IS_AGGREGATE, D_CXXONLY },
   { "__is_base_of",	RID_IS_BASE_OF, D_CXXONLY },
@@ -442,7 +442,6 @@ const struct c_common_resword c_common_reswords[] =
   { "__transaction_cancel", RID_TRANSACTION_CANCEL, 0 },
   { "__typeof",		RID_TYPEOF,	0 },
   { "__typeof__",	RID_TYPEOF,	0 },
-  { "__uintcap_t",	RID_UINTCAP,	0 },
   { "__underlying_type", RID_UNDERLYING_TYPE, D_CXXONLY },
   { "__volatile",	RID_VOLATILE,	0 },
   { "__volatile__",	RID_VOLATILE,	0 },
@@ -4117,10 +4116,12 @@ c_common_nodes_and_builtins (void)
   record_builtin_type (RID_MAX, "long unsigned int",
 		       long_unsigned_type_node);
 
+  gcc_assert (!intcap_type_node == !uintcap_type_node);
   if (intcap_type_node)
     {
       record_builtin_type (RID_INTCAP, NULL, intcap_type_node);
-      record_builtin_type (RID_UINTCAP, NULL, uintcap_type_node);
+      lang_hooks.types.register_builtin_type (intcap_type_node, "__intcap_t");
+      lang_hooks.types.register_builtin_type (uintcap_type_node, "__uintcap_t");
     }
 
   for (i = 0; i < NUM_INT_N_ENTS; i ++)

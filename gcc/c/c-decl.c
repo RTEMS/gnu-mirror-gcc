@@ -11151,74 +11151,29 @@ declspecs_add_type (location_t loc, struct c_declspecs *specs,
 	    case RID_INTCAP:
 	      if (specs->long_p)
 		error_at (loc,
-			  ("both %<long%> and %<__intcap_t%> in "
+			  ("both %<long%> and %<__intcap%> in "
 			   "declaration specifiers"));
 	      else if (specs->short_p)
 		error_at (loc,
-			  ("both %<short%> and %<__intcap_t%> in "
-			   "declaration specifiers"));
-	      else if (specs->signed_p)
-		error_at (loc,
-			  ("both %<signed%> and %<__intcap_t%> in "
-			   "declaration specifiers"));
-	      else if (specs->unsigned_p)
-		error_at (loc,
-			  ("both %<unsigned%> and %<__intcap_t%> in "
+			  ("both %<short%> and %<__intcap%> in "
 			   "declaration specifiers"));
 	      else if (specs->complex_p)
 		error_at (loc,
-			  ("both %<complex%> and %<__intcap_t%> in "
+			  ("both %<complex%> and %<__intcap%> in "
 			   "declaration specifiers"));
 	      else if (specs->saturating_p)
 		error_at (loc,
-			  ("both %<_Sat%> and %<__intcap_t%> in "
+			  ("both %<_Sat%> and %<__intcap%> in "
 			   "declaration specifiers"));
 	      else if (intcap_type_node == NULL_TREE)
 		{
 		  error_at (loc,
-			    "%<__intcap_t%> is not supported on this target");
+			    "%<__intcap%> is not supported on this target");
 		  specs->typespec_word = cts_intcap;
 		}
 	      else
 		{
 		  specs->typespec_word = cts_intcap;
-		  specs->locations[cdw_typespec] = loc;
-		}
-	      return specs;
-	    case RID_UINTCAP:
-	      if (specs->long_p)
-		error_at (loc,
-			  ("both %<long%> and %<__uintcap_t%> in "
-			   "declaration specifiers"));
-	      else if (specs->short_p)
-		error_at (loc,
-			  ("both %<short%> and %<__uintcap_t%> in "
-			   "declaration specifiers"));
-	      else if (specs->signed_p)
-		error_at (loc,
-			  ("both %<signed%> and %<__uintcap_t%> in "
-			   "declaration specifiers"));
-	      else if (specs->unsigned_p)
-		error_at (loc,
-			  ("both %<unsigned%> and %<__uintcap_t%> in "
-			   "declaration specifiers"));
-	      else if (specs->complex_p)
-		error_at (loc,
-			  ("both %<complex%> and %<__uintcap_t%> in "
-			   "declaration specifiers"));
-	      else if (specs->saturating_p)
-		error_at (loc,
-			  ("both %<_Sat%> and %<__uintcap_t%> in "
-			   "declaration specifiers"));
-	      else if (uintcap_type_node == NULL_TREE)
-		{
-		  error_at (loc,
-			    "%<__uintcap_t%> is not supported on this target");
-		  specs->typespec_word = cts_uintcap;
-		}
-	      else
-		{
-		  specs->typespec_word = cts_uintcap;
 		  specs->locations[cdw_typespec] = loc;
 		}
 	      return specs;
@@ -11810,22 +11765,14 @@ finish_declspecs (struct c_declspecs *specs)
 	}
       break;
     case cts_intcap:
-      gcc_assert (!specs->long_p && !specs->short_p
-		  && !specs->signed_p && !specs->unsigned_p
-		  && !specs->complex_p);
+      gcc_assert (!specs->long_p && !specs->short_p && !specs->complex_p);
+      gcc_assert (!(specs->signed_p && specs->unsigned_p));
+      gcc_assert (!intcap_type_node == !uintcap_type_node);
       if (intcap_type_node == NULL_TREE)
 	specs->type = integer_type_node;
       else
-	specs->type = intcap_type_node;
-      break;
-    case cts_uintcap:
-      gcc_assert (!specs->long_p && !specs->short_p
-		  && !specs->signed_p && !specs->unsigned_p
-		  && !specs->complex_p);
-      if (uintcap_type_node == NULL_TREE)
-	specs->type = integer_type_node;
-      else
-	specs->type = uintcap_type_node;
+	specs->type = (specs->unsigned_p
+		       ? uintcap_type_node : intcap_type_node);
       break;
     case cts_float:
       gcc_assert (!specs->long_p && !specs->short_p
