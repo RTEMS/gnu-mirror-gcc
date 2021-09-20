@@ -22,9 +22,9 @@ foo (void)
   foo_sc (1, 2, uc); /* { dg-warning "17:pointer targets in passing argument" } */
   foo_sc (1, 2, f); /* { dg-warning "17:passing argument" } */
 #ifdef __GCC_ARM_CAPABILITY_ANY
-  foo_sc (1, 2, (__intcap_t) sc); /* { dg-warning "17:passing argument" } */
+  foo_sc (1, 2, (__intcap_t) sc); /* { dg-warning "17:passing argument" "" { target { aarch64_capability_any } } } */
 #else
-  foo_sc (1, 2, sc); /* { dg-warning "17:passing argument" } */
+  foo_sc (1, 2, sc); /* { dg-warning "17:passing argument" "" { target { ! aarch64_capability_any } } } */
 #endif
   foo_sc (uc, 2, &sc); /* { dg-warning "11:passing argument" } */
   foo_sc (1, 2, csc); /* { dg-warning "17:passing argument" } */

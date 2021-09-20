@@ -765,8 +765,13 @@ static const BYTE aric[] = { 0x61, 0x72, 0x69, 0x63, 0x40, 0x63, 0x6f, 0x64,
  0x65, 0x77, 0x65, 0x61, 0x76, 0x65, 0x72, 0x73, 0x2e, 0x63, 0x6f, 0x6d };
 static CHAR oid_us[] = "2.5.4.6",
             oid_aric[] = "1.2.840.113549.1.9.1";
-static CERT_RDN_ATTR rdnAttrs[] = { { oid_us, 4, { sizeof(us), (LPBYTE)us } },
-                                           { oid_aric, 7, { sizeof(aric), (LPBYTE)aric } } };
+#ifdef __GCC_ARM_CAPABILITY_ANY
+static CERT_RDN_ATTR rdnAttrs[] = { { oid_us, 4, { (__intcap_t) sizeof(us), (LPBYTE)us } },
+                                           { oid_aric, 7, { (__intcap_t) sizeof(aric), (LPBYTE)aric } } };
+#else
+static CERT_RDN_ATTR rdnAttrs[] = { { oid_us, 4, {  sizeof(us), (LPBYTE)us } },
+                                           { oid_aric, 7, {  sizeof(aric), (LPBYTE)aric } } };
+#endif
 static const BYTE encodedRDNAttrs[] = {
 };
 static void test_encodeName(DWORD dwEncoding)
@@ -846,7 +851,11 @@ static void test_decodeName(DWORD dwEncoding)
         static CHAR oid_sur_name[] = "2.5.4.4",
                     oid_common_name[] = "2.5.4.3";
         CERT_RDN_ATTR attrs[] = {
-         { oid_sur_name, 4, { sizeof(surName),
+#ifdef __GCC_ARM_CAPABILITY_ANY
+         { oid_sur_name, 4, { (__intcap_t) sizeof(surName),
+#else
+         { oid_sur_name, 4, {  sizeof(surName),
+#endif
           (BYTE *)commonName } },
         };
     }
@@ -873,7 +882,11 @@ static void test_decodeUnicodeName(DWORD dwEncoding)
                     oid_common_name[] = "2.5.4.3";
         CERT_RDN_ATTR attrs[] = {
          { oid_sur_name, 4,
-         { lstrlenW(commonNameW) * sizeof(WCHAR), (BYTE *)commonNameW } },
+#ifdef __GCC_ARM_CAPABILITY_ANY
+         { (__intcap_t) lstrlenW(commonNameW) * sizeof(WCHAR), (BYTE *)commonNameW } },
+#else
+         {  lstrlenW(commonNameW) * sizeof(WCHAR), (BYTE *)commonNameW } },
+#endif
         };
     }
 }
@@ -1030,7 +1043,11 @@ static void test_decodeBasicConstraints(DWORD dwEncoding)
          0x08000, ((void *)0), (BYTE *)&buf, &bufSize);
         {
             CERT_BASIC_CONSTRAINTS2_INFO *info =
-            (winetest_set_location("encode.c", 1984), 0) ? 0 : winetest_ok(!memcmp(info, &constraints2[i].info, sizeof(*info)),
+#ifdef __GCC_ARM_CAPABILITY_ANY
+            (winetest_set_location("encode.c", 1984), 0) ? (__intcap_t) 0 : (__intcap_t) winetest_ok(!memcmp(info, &constraints2[i].info, sizeof(*info)),
+#else
+            (winetest_set_location("encode.c", 1984), 0) ?  0 :  winetest_ok(!memcmp(info, &constraints2[i].info, sizeof(*info)),
+#endif
              "Unexpected value for item %d\n", i);
         }
     }
@@ -1115,8 +1132,13 @@ struct encodedExtensions
 static BYTE noncrit_ext_data[] = { 0x30,0x06,0x01,0x01,0xff,0x02,0x01,0x01 };
 static CHAR oid_basic_constraints2[] = "2.5.29.19";
 static CERT_EXTENSION nonCriticalExt =
- { oid_basic_constraints2, 0, { 8, noncrit_ext_data } };
-static const struct encodedExtensions exts[] = {
+ { oid_basic_constraints2, 0,
+#ifdef __GCC_ARM_CAPABILITY_ANY
+ { (__intcap_t) 8, noncrit_ext_data } };
+#else
+ {  8, noncrit_ext_data } };
+#endif
+ static const struct encodedExtensions exts[] = {
 };
 static void test_encodeExtensions(DWORD dwEncoding)
 {
@@ -1140,7 +1162,11 @@ static void test_encodeExtensions(DWORD dwEncoding)
                 (winetest_set_location("encode.c", 2410), 0) ? 0 : winetest_ok(!__extension__ ({ size_t __s1_len, __s2_len; (__builtin_constant_p (ext->rgExtension[j].pszObjId) && __builtin_constant_p (exts[i].exts.rgExtension[j].pszObjId) && (__s1_len = strlen (ext->rgExtension[j].pszObjId), __s2_len = strlen (exts[i].exts.rgExtension[j].pszObjId), (!((size_t)(const void *)((ext->rgExtension[j].pszObjId) + 1) - (size_t)(const void *)(ext->rgExtension[j].pszObjId) == 1) || __s1_len >= 4) && (!((size_t)(const void *)((exts[i].exts.rgExtension[j].pszObjId) + 1) - (size_t)(const void *)(exts[i].exts.rgExtension[j].pszObjId) == 1) || __s2_len >= 4)) ? __builtin_strcmp (ext->rgExtension[j].pszObjId, exts[i].exts.rgExtension[j].pszObjId) : (__builtin_constant_p (ext->rgExtension[j].pszObjId) && ((size_t)(const void *)((ext->rgExtension[j].pszObjId) + 1) - (size_t)(const void *)(ext->rgExtension[j].pszObjId) == 1) && (__s1_len = strlen (ext->rgExtension[j].pszObjId), __s1_len < 4) ? (__builtin_constant_p (exts[i].exts.rgExtension[j].pszObjId) && ((size_t)(const void *)((exts[i].exts.rgExtension[j].pszObjId) + 1) - (size_t)(const void *)(exts[i].exts.rgExtension[j].pszObjId) == 1) ? __builtin_strcmp (ext->rgExtension[j].pszObjId, exts[i].exts.rgExtension[j].pszObjId) : (__extension__ ({ __const unsigned char *__s2 = (__const unsigned char *) (__const char *) (exts[i].exts.rgExtension[j].pszObjId); register int __result = (((__const unsigned char *) (__const char *) (ext->rgExtension[j].pszObjId))[0] - __s2[0]); if (__s1_len > 0 && __result == 0) { __result = (((__const unsigned char *) (__const char *) (ext->rgExtension[j].pszObjId))[1] - __s2[1]); if (__s1_len > 1 && __result == 0) { __result = (((__const unsigned char *) (__const char *) (ext->rgExtension[j].pszObjId))[2] - __s2[2]); if (__s1_len > 2 && __result == 0) __result = (((__const unsigned char *) (__const char *) (ext->rgExtension[j].pszObjId))[3] - __s2[3]); } } __result; }))) : (__builtin_constant_p (exts[i].exts.rgExtension[j].pszObjId) && ((size_t)(const void *)((exts[i].exts.rgExtension[j].pszObjId) + 1) - (size_t)(const void *)(exts[i].exts.rgExtension[j].pszObjId) == 1) && (__s2_len = strlen (exts[i].exts.rgExtension[j].pszObjId), __s2_len < 4) ? (__builtin_constant_p (ext->rgExtension[j].pszObjId) && ((size_t)(const void *)((ext->rgExtension[j].pszObjId) + 1) - (size_t)(const void *)(ext->rgExtension[j].pszObjId) == 1) ? __builtin_strcmp (ext->rgExtension[j].pszObjId, exts[i].exts.rgExtension[j].pszObjId) : (__extension__ ({ __const unsigned char *__s1 = (__const unsigned char *) (__const char *) (ext->rgExtension[j].pszObjId); register int __result = __s1[0] - ((__const unsigned char *) (__const char *) (exts[i].exts.rgExtension[j].pszObjId))[0]; if (__s2_len > 0 && __result == 0) { __result = (__s1[1] - ((__const unsigned char *) (__const char *) (exts[i].exts.rgExtension[j].pszObjId))[1]); if (__s2_len > 1 && __result == 0) { __result = (__s1[2] - ((__const unsigned char *) (__const char *) (exts[i].exts.rgExtension[j].pszObjId))[2]); if (__s2_len > 2 && __result == 0) __result = (__s1[3] - ((__const unsigned char *) (__const char *) (exts[i].exts.rgExtension[j].pszObjId))[3]); } } __result; }))) : __builtin_strcmp (ext->rgExtension[j].pszObjId, exts[i].exts.rgExtension[j].pszObjId)))); }),
                  ext->rgExtension[j].pszObjId);
                 (winetest_set_location("encode.c", 2415), 0) ? 0 : winetest_ok(!memcmp(ext->rgExtension[j].Value.pbData,
-                 exts[i].exts.rgExtension[j].Value.cbData),
+#ifdef __GCC_ARM_CAPABILITY_ANY
+                 (__intcap_t) exts[i].exts.rgExtension[j].Value.cbData),
+#else
+                  exts[i].exts.rgExtension[j].Value.cbData),
+#endif
                  "Unexpected value\n");
             }
         }
@@ -1165,8 +1191,13 @@ static CHAR oid_bogus[] = "1.2.3",
             oid_rsa[] = "1.2.840.113549";
 static const struct encodedPublicKey pubKeys[] = {
  { { { oid_rsa, { 0, ((void *)0) } }, { 0, ((void *)0), 0} },
-  { { oid_rsa, { 2, bin72 } }, { sizeof(aKey), (BYTE *)aKey, 0} } },
- { { { oid_rsa, { sizeof(params), (BYTE *)params } }, { sizeof(aKey),
+#ifdef __GCC_ARM_CAPABILITY_ANY
+  { { oid_rsa, { (__intcap_t) 2, bin72 } }, { (__intcap_t) sizeof(aKey), (BYTE *)aKey, 0} } },
+ { { { oid_rsa, { (__intcap_t) sizeof(params), (BYTE *)params } }, { (__intcap_t) sizeof(aKey),
+#else
+  { { oid_rsa, {  2, bin72 } }, {  sizeof(aKey), (BYTE *)aKey, 0} } },
+ { { { oid_rsa, {  sizeof(params), (BYTE *)params } }, {  sizeof(aKey),
+#endif
   (BYTE *)aKey, 0 } } },
 };
 static void test_encodePublicKeyInfo(DWORD dwEncoding)

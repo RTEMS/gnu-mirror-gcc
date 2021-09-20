@@ -12926,7 +12926,7 @@ build_binary_op (location_t location, enum tree_code code,
 
   /* For INTCAP_TYPEs, we dropped the capabilities early on and now need
      to work out where the provenance (if any) should come from.  */
-  if (!capability_type_p (result_type)
+  if (!capability_type_p (TREE_TYPE (ret))
       && TREE_CODE_CLASS (code) != tcc_comparison
       && !boolean_op)
     {
@@ -12957,8 +12957,8 @@ build_binary_op (location_t location, enum tree_code code,
 
       if (intcap)
 	{
-	  tree ic_type = c_common_type (TREE_TYPE (intcap), result_type);
-	  gcc_assert (noncapability_type (ic_type) == result_type);
+	  tree ic_type = c_common_type (TREE_TYPE (intcap), TREE_TYPE (ret));
+	  gcc_assert (TREE_TYPE (ret) == noncapability_type (ic_type));
 	  intcap = convert (ic_type, intcap);
 
 	  /* We can't fold inside REPLACE_ADDRESS_VALUE calls, so ensure

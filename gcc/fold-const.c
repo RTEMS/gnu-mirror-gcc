@@ -8885,6 +8885,17 @@ fold_unary_loc (location_t loc, enum tree_code code, tree type, tree op0)
       return NULL_TREE;
 
     CASE_CONVERT:
+      /*  If we plan to convert to an INTEGER_TYPE and we are given a call to
+	  IFN_REPLACE_ADDRESS_VALUE with an INTEGER_CST on the left hand side,
+	  extract the second operand and recursively call fold_unary_loc to
+	  allow for further folding inside the conversion.  */
+      if (TREE_CODE (type) == INTEGER_TYPE
+	  && TREE_CODE (arg0) == CALL_EXPR
+	  && CALL_EXPR_IFN (arg0) == IFN_REPLACE_ADDRESS_VALUE
+	  && !TREE_SIDE_EFFECTS (CALL_EXPR_ARG (arg0, 0)))
+	return fold_unary_loc (loc, code, type, CALL_EXPR_ARG (arg0, 1));
+      /* Fall through */
+
     case FLOAT_EXPR:
     case FIX_TRUNC_EXPR:
       if (COMPARISON_CLASS_P (op0))
@@ -13574,6 +13585,16 @@ fold_build_replace_address_value_loc (location_t loc, tree c, tree cv)
       && CALL_EXPR_IFN (c) == IFN_REPLACE_ADDRESS_VALUE)
     return fold_build_replace_address_value_loc (loc,
 						 CALL_EXPR_ARG (c, 0), cv);
+  /* If the capability C is an INTEGER_CST or a REPLACE_ADDRESS_VALUE inside
+     a NOP conversion, allow this function to recurse and re-apply the
+     conversion on the result.  */
+  if (TREE_CODE (c) == NOP_EXPR
+      && ((TREE_CODE (TREE_OPERAND (c, 0)) == CALL_EXPR
+	   && CALL_EXPR_IFN (TREE_OPERAND (c, 0)) == IFN_REPLACE_ADDRESS_VALUE
+	   && CALL_EXPR_FN (TREE_OPERAND (c, 0)) == NULL_TREE)
+	 ||  TREE_CODE (TREE_OPERAND (c, 0)) == INTEGER_CST))
+    return convert (TREE_TYPE (c), fold_build_replace_address_value_loc (loc,
+						    TREE_OPERAND (c, 0), cv));
 
   return build_replace_address_value_loc (loc, c, cv);
 }

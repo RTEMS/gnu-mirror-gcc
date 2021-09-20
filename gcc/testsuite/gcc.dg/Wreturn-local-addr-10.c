@@ -39,6 +39,7 @@ static inline void set (struct P *p, struct A* q)
     p->d = 1;
   else
     p->d = (uintptr_t)(q) - (uintptr_t)(p);
+    /* { dg-warning "binary expression on capability types" "" { target { aarch64_capability_any } } .-1 } */
 }
 
 void f (void)

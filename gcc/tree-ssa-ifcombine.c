@@ -180,7 +180,8 @@ static tree
 get_name_for_bit_test (tree candidate)
 {
   /* Skip single-use names in favor of using the name from a
-     non-widening conversion definition.  */
+     non-widening conversion definition. Do not look through
+     conversions from capability types into integers.  */
   if (TREE_CODE (candidate) == SSA_NAME
       && has_single_use (candidate))
     {
@@ -189,7 +190,11 @@ get_name_for_bit_test (tree candidate)
 	  && CONVERT_EXPR_CODE_P (gimple_assign_rhs_code (def_stmt)))
 	{
 	  if (TYPE_PRECISION (TREE_TYPE (candidate))
-	      <= TYPE_PRECISION (TREE_TYPE (gimple_assign_rhs1 (def_stmt))))
+	      <= TYPE_CAP_PRECISION (TREE_TYPE
+				      (gimple_assign_rhs1 (def_stmt)))
+	      && !(capability_type_p (TREE_TYPE
+				       (gimple_assign_rhs1 (def_stmt))))
+)
 	    return gimple_assign_rhs1 (def_stmt);
 	}
     }
@@ -228,13 +233,15 @@ recognize_single_bit_test (gcond *cond, tree *name, tree *bit, bool inv)
       tree orig_name = gimple_assign_rhs1 (stmt);
 
       /* Look through copies and conversions to eventually
-	 find the stmt that computes the shift.  */
+	 find the stmt that computes the shift. Do not look through
+	 conversions from capability types into integers.  */
       stmt = SSA_NAME_DEF_STMT (orig_name);
 
       while (is_gimple_assign (stmt)
 	     && ((CONVERT_EXPR_CODE_P (gimple_assign_rhs_code (stmt))
-		  && (TYPE_PRECISION (TREE_TYPE (gimple_assign_lhs (stmt)))
-		      <= TYPE_PRECISION (TREE_TYPE (gimple_assign_rhs1 (stmt))))
+		  && TYPE_PRECISION (TREE_TYPE (gimple_assign_lhs (stmt)))
+		      <= TYPE_CAP_PRECISION (TREE_TYPE (gimple_assign_rhs1 (stmt)))
+		  && !capability_type_p (TREE_TYPE (gimple_assign_rhs1 (stmt)))
 		  && TREE_CODE (gimple_assign_rhs1 (stmt)) == SSA_NAME)
 		 || gimple_assign_ssa_name_copy_p (stmt)))
 	stmt = SSA_NAME_DEF_STMT (gimple_assign_rhs1 (stmt));

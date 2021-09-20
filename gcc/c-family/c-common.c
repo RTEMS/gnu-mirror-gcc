@@ -7370,9 +7370,9 @@ resolve_overloaded_atomic_exchange (location_t loc, tree function,
   p2 = (*params)[2];
   p3 = (*params)[3];
 
-  /* For capability types we do not want to do any conversions, so simply
-     dereference p1.  We also assume that the types are supported and do not
-     need to be changed to the library generic format.  */
+  /* For capability types we also assume that the types are supported by the
+     underlying architecture and the call does not need to be changed to their
+     library generic format. We only convert them to intcap_type_node.  */
   if (!capability_type_p (TREE_TYPE (TREE_TYPE (p0))))
     {
       /* If not a lock-free size, change to the library generic format.  */
@@ -7389,16 +7389,17 @@ resolve_overloaded_atomic_exchange (location_t loc, tree function,
 
       /* Create pointer to appropriate size.  */
       I_type = builtin_type_for_size (BITS_PER_UNIT * n, 1);
-      I_type_ptr = build_pointer_type (I_type);
-
-      /* Convert object pointer to required type.  */
-      p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
-      /* Convert new value to required type, and dereference it.  */
-      p1 = build_indirect_ref (loc, p1, RO_UNARY_STAR);
-      p1 = build1 (VIEW_CONVERT_EXPR, I_type, p1);
     }
   else
-    p1 = build_indirect_ref (loc, p1, RO_UNARY_STAR);
+    I_type = intcap_type_node;
+
+  I_type_ptr = build_pointer_type (I_type);
+
+  /* Convert object pointer to required type.  */
+  p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
+  /* Convert new value to required type, and dereference it.  */
+  p1 = build_indirect_ref (loc, p1, RO_UNARY_STAR);
+  p1 = build1 (VIEW_CONVERT_EXPR, I_type, p1);
 
   (*params)[0] = p0;
   (*params)[1] = p1;
@@ -7443,9 +7444,9 @@ resolve_overloaded_atomic_compare_exchange (location_t loc, tree function,
   p1 = (*params)[1];
   p2 = (*params)[2];
 
-  /* For capability types we do not want to do any conversions, so simply
-     dereference p2.  We also assume that the types are supported and do not
-     need to be changed to the library generic format.  */
+  /* For capability types we also assume that the types are supported by the
+     underlying architecture and the call does not need to be changed to their
+     library generic format. We only convert them to intcap_type_node.  */
   if (!capability_type_p (TREE_TYPE (TREE_TYPE (p0))))
     {
       /* If not a lock-free size, change to the library generic format.  */
@@ -7473,20 +7474,22 @@ resolve_overloaded_atomic_compare_exchange (location_t loc, tree function,
 
       /* Create pointer to appropriate size.  */
       I_type = builtin_type_for_size (BITS_PER_UNIT * n, 1);
-      I_type_ptr = build_pointer_type (I_type);
 
-      /* Convert object pointer to required type.  */
-      p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
-
-      /* Convert expected pointer to required type.  */
-      p1 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p1);
-
-      /* Convert desired value to required type, and dereference it.  */
-      p2 = build_indirect_ref (loc, p2, RO_UNARY_STAR);
-      p2 = build1 (VIEW_CONVERT_EXPR, I_type, p2);
     }
   else
-    p2 = build_indirect_ref (loc, p2, RO_UNARY_STAR);
+    I_type = intcap_type_node;
+
+  I_type_ptr = build_pointer_type (I_type);
+
+  /* Convert object pointer to required type.  */
+  p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
+
+  /* Convert expected pointer to required type.  */
+  p1 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p1);
+
+  /* Convert desired value to required type, and dereference it.  */
+  p2 = build_indirect_ref (loc, p2, RO_UNARY_STAR);
+  p2 = build1 (VIEW_CONVERT_EXPR, I_type, p2);
 
   (*params)[0] = p0;
   (*params)[1] = p1;
@@ -7529,9 +7532,9 @@ resolve_overloaded_atomic_load (location_t loc, tree function,
   p1 = (*params)[1];
   p2 = (*params)[2];
 
-  /* For capability types we do not want to do any conversions.
-     We also assume that the types are supported and do not
-     need to be changed to the library generic format.  */
+  /* For capability types we also assume that the types are supported by the
+     underlying architecture and the call does not need to be changed to their
+     library generic format. We only convert them to intcap_type_node.  */
   if (!capability_type_p (TREE_TYPE (TREE_TYPE (p0))))
     {
       /* If not a lock-free size, change to the library generic format.  */
@@ -7548,11 +7551,14 @@ resolve_overloaded_atomic_load (location_t loc, tree function,
 
       /* Create pointer to appropriate size.  */
       I_type = builtin_type_for_size (BITS_PER_UNIT * n, 1);
-      I_type_ptr = build_pointer_type (I_type);
-
-      /* Convert object pointer to required type.  */
-      p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
     }
+  else
+    I_type = intcap_type_node;
+
+  I_type_ptr = build_pointer_type (I_type);
+
+  /* Convert object pointer to required type.  */
+  p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
 
   (*params)[0] = p0;
   /* Move memory model to the 2nd position, and end param list.  */
@@ -7595,9 +7601,9 @@ resolve_overloaded_atomic_store (location_t loc, tree function,
   p0 = (*params)[0];
   p1 = (*params)[1];
 
-  /* For capability types we do not want to do any conversions, so simply
-     dereference p1.  We also assume that the types are supported and do not
-     need to be changed to the library generic format.  */
+  /* For capability types we also assume that the types are supported by the
+     underlying architecture and the call does not need to be changed to their
+     library generic format. We only convert them to intcap_type_node.  */
   if (!capability_type_p (TREE_TYPE (TREE_TYPE (p0))))
     {
       /* If not a lock-free size, change to the library generic format.  */
@@ -7614,17 +7620,18 @@ resolve_overloaded_atomic_store (location_t loc, tree function,
 
       /* Create pointer to appropriate size.  */
       I_type = builtin_type_for_size (BITS_PER_UNIT * n, 1);
-      I_type_ptr = build_pointer_type (I_type);
-
-      /* Convert object pointer to required type.  */
-      p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
-
-      /* Convert new value to required type, and dereference it.  */
-      p1 = build_indirect_ref (loc, p1, RO_UNARY_STAR);
-      p1 = build1 (VIEW_CONVERT_EXPR, I_type, p1);
     }
   else
-    p1 = build_indirect_ref (loc, p1, RO_UNARY_STAR);
+    I_type = intcap_type_node;
+
+  I_type_ptr = build_pointer_type (I_type);
+
+  /* Convert object pointer to required type.  */
+  p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
+
+  /* Convert new value to required type, and dereference it.  */
+  p1 = build_indirect_ref (loc, p1, RO_UNARY_STAR);
+  p1 = build1 (VIEW_CONVERT_EXPR, I_type, p1);
 
   (*params)[0] = p0;
   (*params)[1] = p1;
@@ -7635,7 +7642,8 @@ resolve_overloaded_atomic_store (location_t loc, tree function,
   return false;
 }
 
-tree resolve_atomic_fncode_n (tree function, vec<tree, va_gc> *params,
+static tree
+resolve_atomic_fncode_n (tree function, vec<tree, va_gc> *params,
 				  built_in_function orig_code, bool fetch_op)
 {
   enum built_in_function new_code_bt;

@@ -4566,7 +4566,8 @@ initializer_constant_valid_p_1 (tree value, tree endtype, tree *cache)
 	/* MORELLO TODO Just adding this assert in temporarily.  I would be
 	   interested to see any time that this is not the case and hence want
 	   to get alerted.  */
-	gcc_assert (TREE_CODE (ptr) == INTEGER_CST && tree_to_uhwi (ptr) == 0);
+	gcc_assert (TREE_CODE (ptr) == INTEGER_CST
+		    && tree_constant_capability_metadata (ptr) == 0);
 	tree ptr_ret = initializer_constant_valid_p_1 (ptr, endtype, cache);
 	tree addrval_ret = initializer_constant_valid_p_1
 		(addr_value, noncapability_type (endtype), cache);

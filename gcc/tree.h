@@ -6365,6 +6365,15 @@ tree_is_capability_value (const_tree t)
   return t && t != error_mark_node && capability_type_p (TREE_TYPE (t));
 }
 
+inline wide_int
+tree_constant_capability_metadata (const_tree t)
+{
+  gcc_assert (TREE_CODE (t) == INTEGER_CST);
+  return wi::bit_and (wi::to_wide (t, TYPE_CAP_PRECISION (TREE_TYPE(t))),
+		      wi::mask (TYPE_NONCAP_PRECISION (TREE_TYPE(t)), 1,
+				TYPE_CAP_PRECISION (TREE_TYPE(t))));
+}
+
 static inline bool
 capability_args_valid (const_tree type,
 		       tree_code code, const_tree op0)
