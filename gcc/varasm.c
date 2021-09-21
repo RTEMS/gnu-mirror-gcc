@@ -4548,6 +4548,32 @@ narrowing_initializer_constant_valid_p (tree value, tree endtype, tree *cache)
   return NULL_TREE;
 }
 
+/* Helper function for initializer_constant_valid_p_1.
+   This iterates down all the kinds of conversion that we can expect to see in
+   a global initializer for a capability.  The idea is to help check that on
+   all global capabilities with initializers we start at some point with a
+   capabiility that has zero metadata (and hence that all initializers have
+   cleared metadata).
+
+   That should ensure we don't start handling capabilities with non-zero
+   metadata without knowing why & where it comes from.  */
+inline const_tree
+tree_innermost_capability (const_tree t)
+{
+  switch (TREE_CODE (t))
+    {
+    case INTEGER_CST:
+      return t;
+    case NOP_EXPR:
+      return tree_innermost_capability (TREE_OPERAND (t, 0));
+    case CALL_EXPR:
+      gcc_assert (CALL_EXPR_IFN (t) == IFN_REPLACE_ADDRESS_VALUE);
+      return tree_innermost_capability (CALL_EXPR_ARG (t, 0));
+    default:
+      gcc_unreachable ();
+    }
+}
+
 /* Helper function of initializer_constant_valid_p.
    Return nonzero if VALUE is a valid constant-valued expression
    for use in initializing a static variable; one that can be an
@@ -4580,11 +4606,13 @@ initializer_constant_valid_p_1 (tree value, tree endtype, tree *cache)
 		    || CALL_EXPR_IFN (ptr) != IFN_REPLACE_ADDRESS_VALUE);
 	if (TREE_CODE (ptr) == CALL_EXPR)
 	  break;
-	/* MORELLO TODO Just adding this assert in temporarily.  I would be
-	   interested to see any time that this is not the case and hence want
-	   to get alerted.  */
-	gcc_assert (TREE_CODE (ptr) == INTEGER_CST
-		    && tree_constant_capability_metadata (ptr) == 0);
+	/* MORELLO TODO Here we assert that we only ever see capability
+	   initialisers where the metadata is known to be cleared.
+	   Any time this is not the case is likely to be a bug (at least until
+	   we add some feature to do such things).  */
+	const_tree base_cap = tree_innermost_capability (ptr);
+	gcc_assert ((TREE_CODE (base_cap) == INTEGER_CST
+		     && tree_constant_capability_metadata (base_cap) == 0));
 	tree ptr_ret = initializer_constant_valid_p_1 (ptr, endtype, cache);
 	tree addrval_ret = initializer_constant_valid_p_1
 		(addr_value, noncapability_type (endtype), cache);

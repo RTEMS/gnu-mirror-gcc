@@ -13583,8 +13583,11 @@ fold_build_replace_address_value_loc (location_t loc, tree c, tree cv)
     }
   if (TREE_CODE (c) == CALL_EXPR && CALL_EXPR_FN (c) == NULL_TREE
       && CALL_EXPR_IFN (c) == IFN_REPLACE_ADDRESS_VALUE)
-    return fold_build_replace_address_value_loc (loc,
-						 CALL_EXPR_ARG (c, 0), cv);
+    {
+      gcc_assert (TREE_TYPE (c) == TREE_TYPE (CALL_EXPR_ARG (c, 0)));
+      return fold_build_replace_address_value_loc (loc,
+						   CALL_EXPR_ARG (c, 0), cv);
+    }
   /* If the capability C is an INTEGER_CST or a REPLACE_ADDRESS_VALUE inside
      a NOP conversion, allow this function to recurse and re-apply the
      conversion on the result.  */
@@ -13592,7 +13595,9 @@ fold_build_replace_address_value_loc (location_t loc, tree c, tree cv)
       && ((TREE_CODE (TREE_OPERAND (c, 0)) == CALL_EXPR
 	   && CALL_EXPR_IFN (TREE_OPERAND (c, 0)) == IFN_REPLACE_ADDRESS_VALUE
 	   && CALL_EXPR_FN (TREE_OPERAND (c, 0)) == NULL_TREE)
-	 ||  TREE_CODE (TREE_OPERAND (c, 0)) == INTEGER_CST))
+	 ||  TREE_CODE (TREE_OPERAND (c, 0)) == INTEGER_CST)
+      && types_compatible_p (noncapability_type (TREE_TYPE (TREE_OPERAND (c, 0))),
+			     TREE_TYPE (cv)))
     return convert (TREE_TYPE (c), fold_build_replace_address_value_loc (loc,
 						    TREE_OPERAND (c, 0), cv));
 
