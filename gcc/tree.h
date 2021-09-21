@@ -250,6 +250,9 @@ as_internal_fn (combined_fn code)
 #define TREE_CHECK(T, CODE) \
 (tree_check ((T), __FILE__, __LINE__, __FUNCTION__, (CODE)))
 
+#define NONCAP_TYPE_CHECK(T) \
+(noncap_type_check ((T), __FILE__, __LINE__, __FUNCTION__))
+
 #define TREE_NOT_CHECK(T, CODE) \
 (tree_not_check ((T), __FILE__, __LINE__, __FUNCTION__, (CODE)))
 
@@ -402,6 +405,7 @@ extern void omp_clause_range_check_failed (const_tree, const char *, int,
 
 #define CONTAINS_STRUCT_CHECK(T, ENUM)          (T)
 #define TREE_CHECK(T, CODE)			(T)
+#define NONCAP_TYPE_CHECK(T)			(T)
 #define TREE_NOT_CHECK(T, CODE)			(T)
 #define TREE_CHECK2(T, CODE1, CODE2)		(T)
 #define TREE_NOT_CHECK2(T, CODE1, CODE2)	(T)
@@ -410,6 +414,7 @@ extern void omp_clause_range_check_failed (const_tree, const char *, int,
 #define TREE_CHECK4(T, CODE1, CODE2, CODE3, CODE4) (T)
 #define TREE_NOT_CHECK4(T, CODE1, CODE2, CODE3, CODE4) (T)
 #define TREE_CHECK5(T, CODE1, CODE2, CODE3, CODE4, CODE5) (T)
+#define TREE_CHECK6(T, CODE1, CODE2, CODE3, CODE4, CODE5, CODE6) (T)
 #define TREE_NOT_CHECK5(T, CODE1, CODE2, CODE3, CODE4, CODE5) (T)
 #define TREE_CLASS_CHECK(T, CODE)		(T)
 #define TREE_RANGE_CHECK(T, CODE1, CODE2)	(T)
@@ -1984,7 +1989,6 @@ class auto_suppress_location_wrappers
 #define TYPE_SIZE_UNIT(NODE) (TYPE_CHECK (NODE)->type_common.size_unit)
 #define TYPE_POINTER_TO(NODE) (TYPE_CHECK (NODE)->type_common.pointer_to)
 #define TYPE_REFERENCE_TO(NODE) (TYPE_CHECK (NODE)->type_common.reference_to)
-#define NONCAP_TYPE_CHECK(NODE) (noncap_type_check ((NODE), __FILE__, __LINE__, __FUNCTION__))
 #define TYPE_PRECISION(NODE) (NONCAP_TYPE_CHECK (NODE)->type_common.precision)
 #define TYPE_CAP_PRECISION(NODE) (TYPE_CHECK (NODE)->type_common.precision)
 #define TYPE_NONCAP_PRECISION(NODE) (TYPE_CHECK (noncapability_type (NODE))->type_common.precision)
