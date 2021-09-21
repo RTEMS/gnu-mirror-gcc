@@ -60,6 +60,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgrtl.h"
 #include "stringpool.h"
 #include "attribs.h"
+#include "target.h"
 
 /* Enum with reasons why a predictor is ignored.  */
 
@@ -2448,7 +2449,8 @@ expr_expected_value_1 (tree type, tree op0, enum tree_code code,
 	    {
 	      if (predictor)
 		*predictor = PRED_MALLOC_NONNULL;
-	      return boolean_true_node;
+	      return fold_build_replace_address_value (build_zero_cst (type),
+						       boolean_true_node);
 	    }
 
 	  if (DECL_BUILT_IN_CLASS (decl) == BUILT_IN_NORMAL)
@@ -2526,7 +2528,8 @@ expr_expected_value_1 (tree type, tree op0, enum tree_code code,
 	      case BUILT_IN_REALLOC:
 		if (predictor)
 		  *predictor = PRED_MALLOC_NONNULL;
-		return boolean_true_node;
+		return fold_build_replace_address_value (build_zero_cst (type),
+							 boolean_true_node);
 	      default:
 		break;
 	    }
