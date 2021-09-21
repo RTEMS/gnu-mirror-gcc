@@ -7593,7 +7593,7 @@ expand_builtin_thread_pointer (tree exp, rtx target)
       return target;
     }
   error ("%<__builtin_thread_pointer%> is not supported on this target");
-  return const0_rtx;
+  return CONST0_RTX (Pmode);
 }
 
 static void

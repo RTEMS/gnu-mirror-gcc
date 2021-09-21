@@ -7188,8 +7188,8 @@
 )
 
 ;; Named pattern for expanding thread pointer reference.
-(define_expand "get_thread_pointerdi"
-  [(match_operand:DI 0 "register_operand")]
+(define_expand "get_thread_pointer<mode>"
+  [(match_operand:ADDR 0 "register_operand")]
   ""
 {
   rtx tmp = aarch64_load_tp (operands[0]);
