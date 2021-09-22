@@ -3214,6 +3214,16 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
       return 0;
     }
 
+  /* We cannot safely duplicate volatile references in any case.  */
+
+  if ((added_sets_2 && volatile_refs_p (PATTERN (i2)))
+      || (added_sets_1 && volatile_refs_p (PATTERN (i1)))
+      || (added_sets_0 && volatile_refs_p (PATTERN (i0))))
+    {
+      undo_all ();
+      return 0;
+    }
+
   /* Count how many auto_inc expressions there were in the original insns;
      we need to have the same number in the resulting patterns.  */
 
@@ -14381,6 +14391,11 @@ distribute_notes (rtx notes, rtx_insn *from_insn, rtx_insn *i3, rtx_insn *i2,
 	     i2 or i1 for register which were both used and clobbered, so
 	     we keep notes from i2 or i1 if they will turn into REG_DEAD
 	     notes.  */
+
+	  /* If this register is set or clobbered between FROM_INSN and I3,
+	     we should not create a note for it.  */
+	  if (reg_set_between_p (XEXP (note, 0), from_insn, i3))
+	    break;
 
 	  /* If this register is set or clobbered in I3, put the note there
 	     unless there is one already.  */

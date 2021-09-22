@@ -10848,12 +10848,10 @@ rs6000_gimple_fold_mma_builtin (gimple_stmt_iterator *gsi)
   gimple *new_call;
   tree new_decl;
 
-  if (rs6000_builtin_info[fncode + 1].icode == CODE_FOR_nothing)
+  if (fncode == MMA_BUILTIN_DISASSEMBLE_ACC
+      || fncode == VSX_BUILTIN_DISASSEMBLE_PAIR)
     {
       /* This is an MMA disassemble built-in function.  */
-      gcc_assert (fncode == MMA_BUILTIN_DISASSEMBLE_ACC
-		  || fncode == VSX_BUILTIN_DISASSEMBLE_PAIR);
-
       push_gimplify_context (true);
       tree dst_ptr = gimple_call_arg (stmt, 0);
       tree src_ptr = gimple_call_arg (stmt, 1);
@@ -10904,6 +10902,38 @@ rs6000_gimple_fold_mma_builtin (gimple_stmt_iterator *gsi)
 			     build_int_cst (dst_type, index * 16));
 	  gimplify_assign (dst, ref, &new_seq);
 	}
+      pop_gimplify_context (NULL);
+      gsi_replace_with_seq (gsi, new_seq, true);
+      return true;
+    }
+  else if (fncode == VSX_BUILTIN_LXVP)
+    {
+      push_gimplify_context (true);
+      tree offset = gimple_call_arg (stmt, 0);
+      tree ptr = gimple_call_arg (stmt, 1);
+      tree lhs = gimple_call_lhs (stmt);
+      if (TREE_TYPE (TREE_TYPE (ptr)) != vector_pair_type_node)
+	ptr = build1 (VIEW_CONVERT_EXPR,
+		      build_pointer_type (vector_pair_type_node), ptr);
+      tree mem = build_simple_mem_ref (build2 (POINTER_PLUS_EXPR,
+					       TREE_TYPE (ptr), ptr, offset));
+      gimplify_assign (lhs, mem, &new_seq);
+      pop_gimplify_context (NULL);
+      gsi_replace_with_seq (gsi, new_seq, true);
+      return true;
+    }
+  else if (fncode == VSX_BUILTIN_STXVP)
+    {
+      push_gimplify_context (true);
+      tree src = gimple_call_arg (stmt, 0);
+      tree offset = gimple_call_arg (stmt, 1);
+      tree ptr = gimple_call_arg (stmt, 2);
+      if (TREE_TYPE (TREE_TYPE (ptr)) != vector_pair_type_node)
+	ptr = build1 (VIEW_CONVERT_EXPR,
+		      build_pointer_type (vector_pair_type_node), ptr);
+      tree mem = build_simple_mem_ref (build2 (POINTER_PLUS_EXPR,
+					       TREE_TYPE (ptr), ptr, offset));
+      gimplify_assign (mem, src, &new_seq);
       pop_gimplify_context (NULL);
       gsi_replace_with_seq (gsi, new_seq, true);
       return true;
@@ -13201,11 +13231,15 @@ mma_init_builtins (void)
       if (gimple_func)
 	{
 	  gcc_assert (icode == CODE_FOR_nothing);
-	  op[nopnds++] = void_type_node;
 	  /* Some MMA built-ins that are expanded into gimple are converted
 	     into internal MMA built-ins that are expanded into rtl.
 	     The internal built-in follows immediately after this built-in.  */
-	  icode = d[1].icode;
+	  if (d->code != VSX_BUILTIN_LXVP
+	      && d->code != VSX_BUILTIN_STXVP)
+	    {
+	      op[nopnds++] = void_type_node;
+	      icode = d[1].icode;
+	    }
 	}
       else
 	{
@@ -13216,17 +13250,29 @@ mma_init_builtins (void)
 	  gcc_assert (attr_args == insn_data[icode].n_operands - 1);
 	}
 
-      if (icode == CODE_FOR_nothing)
+      if (d->code == MMA_BUILTIN_DISASSEMBLE_ACC
+	  || d->code == VSX_BUILTIN_DISASSEMBLE_PAIR)
 	{
 	  /* This is a disassemble MMA built-in function.  */
-	  gcc_assert (attr_args == RS6000_BTC_BINARY
-		      && (d->code == MMA_BUILTIN_DISASSEMBLE_ACC
-			  || d->code == VSX_BUILTIN_DISASSEMBLE_PAIR));
+	  gcc_assert (attr_args == RS6000_BTC_BINARY);
 	  op[nopnds++] = build_pointer_type (void_type_node);
 	  if (attr & RS6000_BTC_QUAD)
 	    op[nopnds++] = build_pointer_type (vector_quad_type_node);
 	  else
 	    op[nopnds++] = build_pointer_type (vector_pair_type_node);
+	}
+      else if (d->code == VSX_BUILTIN_LXVP)
+	{
+	  op[nopnds++] = vector_pair_type_node;
+	  op[nopnds++] = sizetype;
+	  op[nopnds++] = build_pointer_type (vector_pair_type_node);
+	}
+      else if (d->code == VSX_BUILTIN_STXVP)
+	{
+	  op[nopnds++] = void_type_node;
+	  op[nopnds++] = vector_pair_type_node;
+	  op[nopnds++] = sizetype;
+	  op[nopnds++] = build_pointer_type (vector_pair_type_node);
 	}
       else
 	{
@@ -13593,6 +13639,16 @@ builtin_function_type (machine_mode mode_ret, machine_mode mode_arg0,
     case ALTIVEC_BUILTIN_VSRW:
     case P8V_BUILTIN_VSRD:
       h.uns_p[2] = 1;
+      break;
+
+    case VSX_BUILTIN_LXVP:
+      h.uns_p[0] = 1;
+      h.uns_p[2] = 1;
+      break;
+
+    case VSX_BUILTIN_STXVP:
+      h.uns_p[1] = 1;
+      h.uns_p[3] = 1;
       break;
 
     default:

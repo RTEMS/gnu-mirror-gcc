@@ -770,6 +770,7 @@ Objective-C and Objective-C++ Dialects}.
 -mverbose-cost-dump @gol
 -mpure-code @gol
 -mcmse @gol
+-mfix-cmse-cve-2021-35465 @gol
 -mfdpic}
 
 @emph{AVR Options}
@@ -16994,8 +16995,9 @@ performance of the code.  Permissible values for this option are:
 @samp{cortex-a57}, @samp{cortex-a72}, @samp{cortex-a73}, @samp{cortex-a75},
 @samp{cortex-a76}, @samp{cortex-a76ae}, @samp{cortex-a77},
 @samp{cortex-a65}, @samp{cortex-a65ae}, @samp{cortex-a34},
-@samp{ares}, @samp{exynos-m1}, @samp{emag}, @samp{falkor}, @samp{neoverse-e1},
-@samp{neoverse-n1}, @samp{neoverse-n2}, @samp{neoverse-v1}, @samp{qdf24xx},
+@samp{ares}, @samp{exynos-m1}, @samp{emag}, @samp{falkor},
+@samp{neoverse-e1}, @samp{neoverse-n1}, @samp{neoverse-n2},
+@samp{neoverse-v1}, @samp{neoverse-512tvb}, @samp{qdf24xx},
 @samp{saphira}, @samp{phecda}, @samp{xgene1}, @samp{vulcan}, @samp{octeontx},
 @samp{octeontx81},  @samp{octeontx83},
 @samp{octeontx2}, @samp{octeontx2t98}, @samp{octeontx2t96}
@@ -17014,6 +17016,15 @@ The values @samp{cortex-a57.cortex-a53}, @samp{cortex-a72.cortex-a53},
 @samp{cortex-a73.cortex-a35}, @samp{cortex-a73.cortex-a53},
 @samp{cortex-a75.cortex-a55}, @samp{cortex-a76.cortex-a55} specify that GCC
 should tune for a big.LITTLE system.
+
+The value @samp{neoverse-512tvb} specifies that GCC should tune
+for Neoverse cores that (a) implement SVE and (b) have a total vector
+bandwidth of 512 bits per cycle.  In other words, the option tells GCC to
+tune for Neoverse cores that can execute 4 128-bit Advanced SIMD arithmetic
+instructions a cycle and that can execute an equivalent number of SVE
+arithmetic instructions per cycle (2 for 256-bit SVE, 4 for 128-bit SVE).
+This is more general than tuning for a specific core like Neoverse V1
+but is more specific than the default tuning described below.
 
 Additionally on native AArch64 GNU/Linux systems the value
 @samp{native} tunes performance to the host system.  This option has no effect
@@ -17043,6 +17054,16 @@ the target processor for which to tune for performance (as if
 by @option{-mtune}).  Where this option is used in conjunction
 with @option{-march} or @option{-mtune}, those options take precedence
 over the appropriate part of this option.
+
+@option{-mcpu=neoverse-512tvb} is special in that it does not refer
+to a specific core, but instead refers to all Neoverse cores that
+(a) implement SVE and (b) have a total vector bandwidth of 512 bits
+a cycle.  Unless overridden by @option{-march},
+@option{-mcpu=neoverse-512tvb} generates code that can run on a
+Neoverse V1 core, since Neoverse V1 is the first Neoverse core with
+these properties.  Unless overridden by @option{-mtune},
+@option{-mcpu=neoverse-512tvb} tunes code in the same way as for
+@option{-mtune=neoverse-512tvb}.
 
 @item -moverride=@var{string}
 @opindex moverride
@@ -19235,6 +19256,14 @@ is only available when generating non-pic code for M-profile targets.
 Generate secure code as per the "ARMv8-M Security Extensions: Requirements on
 Development Tools Engineering Specification", which can be found on
 @url{https://developer.arm.com/documentation/ecm0359818/latest/}.
+
+@item -mfix-cmse-cve-2021-35465
+@opindex mfix-cmse-cve-2021-35465
+Mitigate against a potential security issue with the @code{VLLDM} instruction
+in some M-profile devices when using CMSE (CVE-2021-365465).  This option is
+enabled by default when the option @option{-mcpu=} is used with
+@code{cortex-m33}, @code{cortex-m35p} or @code{cortex-m55}.  The option
+@option{-mno-fix-cmse-cve-2021-35465} can be used to disable the mitigation.
 
 @item -mfdpic
 @itemx -mno-fdpic
@@ -27817,10 +27846,11 @@ so @option{-mno-lra} needs to be passed to get old Reload.
 Set the instruction set, register set, and instruction scheduling parameters
 for machine type @var{cpu_type}.  Supported values for @var{cpu_type} are
 @samp{v7}, @samp{cypress}, @samp{v8}, @samp{supersparc}, @samp{hypersparc},
-@samp{leon}, @samp{leon3}, @samp{leon3v7}, @samp{sparclite}, @samp{f930},
-@samp{f934}, @samp{sparclite86x}, @samp{sparclet}, @samp{tsc701}, @samp{v9},
-@samp{ultrasparc}, @samp{ultrasparc3}, @samp{niagara}, @samp{niagara2},
-@samp{niagara3}, @samp{niagara4}, @samp{niagara7} and @samp{m8}.
+@samp{leon}, @samp{leon3}, @samp{leon3v7}, @samp{leon5}, @samp{sparclite},
+@samp{f930}, @samp{f934}, @samp{sparclite86x}, @samp{sparclet}, @samp{tsc701},
+@samp{v9}, @samp{ultrasparc}, @samp{ultrasparc3}, @samp{niagara},
+@samp{niagara2}, @samp{niagara3}, @samp{niagara4}, @samp{niagara7} and
+@samp{m8}.
 
 Native Solaris and GNU/Linux toolchains also support the value @samp{native},
 which selects the best architecture option for the host processor.
@@ -27839,7 +27869,7 @@ implementations.
 cypress, leon3v7
 
 @item v8
-supersparc, hypersparc, leon, leon3
+supersparc, hypersparc, leon, leon3, leon5
 
 @item sparclite
 f930, f934, sparclite86x
@@ -27906,7 +27936,7 @@ The same values for @option{-mcpu=@var{cpu_type}} can be used for
 @option{-mtune=@var{cpu_type}}, but the only useful values are those
 that select a particular CPU implementation.  Those are
 @samp{cypress}, @samp{supersparc}, @samp{hypersparc}, @samp{leon},
-@samp{leon3}, @samp{leon3v7}, @samp{f930}, @samp{f934},
+@samp{leon3}, @samp{leon3v7}, @samp{leon5}, @samp{f930}, @samp{f934},
 @samp{sparclite86x}, @samp{tsc701}, @samp{ultrasparc},
 @samp{ultrasparc3}, @samp{niagara}, @samp{niagara2}, @samp{niagara3},
 @samp{niagara4}, @samp{niagara7} and @samp{m8}.  With native Solaris

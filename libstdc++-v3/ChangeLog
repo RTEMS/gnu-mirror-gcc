@@ -1,3 +1,296 @@
+2021-08-23  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-08-23  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/ranges (basic_istream_view): Add default template
+	argument.
+	* testsuite/std/ranges/istream_view.cc: Check it.
+
+2021-08-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-08-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/100139
+	* doc/xml/manual/status_cxx2020.xml: Add P1739R4 to status table.
+	* doc/html/manual/status.html: Regenerate.
+
+2021-08-17  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2021-08-17  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* testsuite/lib/libstdc++.exp: Avoid illegal argument to verbose,
+	continued.
+
+2021-08-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-08-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/101866
+	* testsuite/experimental/random/randint.cc: Loop and retry if
+	reseed() produces the same sequence.
+
+2021-08-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-07-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/101510
+	* src/c++17/fs_ops.cc (fs::create_directories): Use status
+	instead of symlink_status.
+	* src/filesystem/ops.cc (fs::create_directories): Likewise.
+	* testsuite/27_io/filesystem/operations/create_directories.cc:
+	Check symlink to existing directory.
+	* testsuite/27_io/filesystem/operations/create_directory.cc: Do
+	not test with symlinks on Windows.
+	* testsuite/experimental/filesystem/operations/create_directories.cc:
+	Check symlink to existing directory.
+	* testsuite/experimental/filesystem/operations/create_directory.cc:
+	Do not test with symlinks on Windows.
+
+2021-08-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-07-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/101510
+	* src/c++17/fs_ops.cc (create_dir): Adjust whitespace.
+	* testsuite/27_io/filesystem/operations/create_directory.cc:
+	Test creating directory with name of existing symlink to
+	directory.
+	* testsuite/experimental/filesystem/operations/create_directory.cc:
+	Likewise.
+
+2021-08-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-06-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/101056
+	* libsupc++/compare (compare_partial_order_fallback): Add
+	constraint using reversed parameter order, as per LWG 3465.
+	* testsuite/18_support/comparisons/algorithms/fallback.cc:
+	Adjust expected result.
+
+2021-08-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-06-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	* libsupc++/compare (__decayed_same_as): New helper concept.
+	(strong_order, weak_order, partial_order): Constrain with new
+	concept instead of using static_assert.
+	(compare_strong_order_fallback, compare_weak_order_fallback)
+	(compare_partial_order_fallback): Likewise. Do not deduce return
+	types. Remove redundant if-constexpr checks.
+	* testsuite/18_support/comparisons/algorithms/fallback.cc: New test.
+
+2021-08-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-06-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/100894
+	* include/std/type_traits (__common_ref_impl<X&, Y&>): Only
+	use the type if it's a reference.
+	* testsuite/20_util/common_reference/100894.cc: New test.
+
+2021-07-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-04-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/96657
+	* libsupc++/Makefile.am: Add atomicity.cc here.
+	* src/c++98/Makefile.am: Remove it from here.
+	* libsupc++/Makefile.in: Regenerate.
+	* src/c++98/Makefile.in: Regenerate.
+	* testsuite/18_support/exception_ptr/96657.cc: New test.
+
+2021-07-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-06-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/98842
+	* include/std/optional (operator<=>(const optional<T>& const U&)):
+	Add missing constraint and add workaround for template
+	recursion.
+	* testsuite/20_util/optional/relops/three_way.cc: Check that
+	type without equality comparison cannot be compared when wrapped
+	in std::optional.
+
+2021-07-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-07-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR c++/101361
+	* include/std/string_view (ends_with): Use traits_type::compare
+	directly.
+
+2021-07-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-07-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/101411
+	* include/std/span (as_writable_bytes): Add requires-clause.
+	* testsuite/23_containers/span/101411.cc: New test.
+
+2021-07-06  Avi Kivity  <avi@scylladb.com>
+
+	Backported from master:
+	2021-06-07  Avi Kivity  <avi@scylladb.com>
+
+	PR libstdc++/100900
+	* include/std/ranges (elements_view::__iter_cat::_S_iter_cat):
+	Add missing typename.
+
+2021-06-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-06-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/95833
+	* include/std/numeric (reduce(Iter, Iter, T, BinaryOp)): Replace
+	incorrect static_assert with ones matching the 'Mandates'
+	conditions in the standard.
+	* testsuite/26_numerics/reduce/95833.cc: New test.
+
+2021-06-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/variant (__same_types, __check_visitor_results):
+	Remove.
+
+2021-06-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-05-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/future (promise::set_value): Check for existence
+	of shared state before dereferncing it.
+	(promise::set_exception, promise::set_value_at_thread_exit)
+	(promise::set_exception_at_thread_exit): Likewise.
+	(promise<R&>::set_value, promise<R&>::set_exception)
+	(promise<R&>::set_value_at_thread_exit)
+	(promise<R&>::set_exception_at_thread_exit): Likewise.
+	(promise<void>::set_value, promise<void>::set_exception)
+	(promise<void>::set_value_at_thread_exit)
+	(promise<void>::set_exception_at_thread_exit): Likewise.
+	* testsuite/30_threads/promise/members/at_thread_exit2.cc:
+	Remove unused variable.
+
+2021-06-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-05-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/basic_string.h (basic_string(const CharT*, const A&)):
+	Do not do arithmetic on null pointer.
+
+2021-06-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-05-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/ext/pb_ds/detail/cc_hash_table_map_/cc_ht_map_.hpp
+	(find_key_pointer(key_const_reference, false_type))
+	(find_key_pointer(key_const_reference, true_type)): Do not
+	dereference null pointer.
+
+2021-06-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-05-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/20_util/from_chars/3.cc: Use unsigned type to avoid
+	overflow.
+	* testsuite/24_iterators/reverse_iterator/2.cc: Do not add
+	non-zero value to null pointer.
+	* testsuite/25_algorithms/copy_backward/move_iterators/69478.cc:
+	Use past-the-end iterator for result.
+	* testsuite/25_algorithms/move_backward/69478.cc: Likewise.
+	* testsuite/25_algorithms/move_backward/93872.cc: Likewise.
+
+2021-06-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-05-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/100384
+	* include/std/variant (__get_t): New alias template yielding the
+	return type of std::get<N> on a variant.
+	(__visit_result_t): New alias template yielding the result of
+	std::visit.
+	(__same_types): Move into namespace __detail::__variant.
+	(__check_visitor_results): Likewise. Use __invoke_result_t and
+	__get_t.
+	(__check_visitor_result): Remove.
+	(visit): Use __visit_result_t for return type.
+	* testsuite/20_util/variant/100384.cc: New test.
+
+2021-06-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-04-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/99006
+	* include/bits/shared_ptr.h (allocate_shared): Assert that _Tp
+	is not an array type.
+	* include/bits/shared_ptr_base.h (__allocate_shared): Likewise.
+	* testsuite/20_util/shared_ptr/creation/99006.cc: New test.
+
+2021-06-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-05-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/allocator.h (allocator<void>) [C++20]: Add
+	missing noexcept to constructor. Restore missing POCMA and
+	is_always_equal_traits.
+	* include/bits/memoryfwd.h (allocator_traits): Declare.
+	* include/ext/malloc_allocator.h (malloc_allocator::allocate):
+	Add nodiscard attribute. Add static assertion for LWG 3307.
+	* include/ext/new_allocator.h (new_allocator::allocate): Add
+	static assertion for LWG 3307.
+	* testsuite/20_util/allocator/void.cc: Check that converting
+	constructor is noexcept. Check for propagation traits and
+	size_type and difference_type. Check that pointer and
+	const_pointer are gone in C++20.
+
+2021-06-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-05-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/shared_ptr_base.h (__shared_count(unique_ptr&&)):
+	Initialize a non-reference deleter from an rvalue, as per LWG
+	3548.
+	(__shared_ptr::_UniqCompatible): Add missing constraint.
+	* testsuite/20_util/shared_ptr/cons/lwg3548.cc: New test.
+	* testsuite/20_util/shared_ptr/cons/unique_ptr_deleter.cc: Check
+	constraints.
+
+2021-06-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-06-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/91488
+	* include/bits/basic_string.h (__cpp_lib_constexpr_string): Only
+	define C++20 value when std::is_constant_evaluated is available.
+	* include/bits/char_traits.h (__cpp_lib_constexpr_char_traits):
+	Likewise.
+	(__constant_string_p, __constant_array_p): Give external
+	linkage.
+	* include/std/version (__cpp_lib_constexpr_char_traits)
+	(__cpp_lib_constexpr_string): Only define C++20 values when
+	is_constant_evaluated is available.
+
 2021-06-14  Jonathan Wakely  <jwakely@redhat.com>
 
 	Backported from master:

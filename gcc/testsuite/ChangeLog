@@ -1,3 +1,531 @@
+2021-09-21  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-09-13  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/85130
+	* gfortran.dg/substr_6.f90: Revert commit r8-7574, adding again
+	test that was erroneously considered as illegal.
+
+2021-09-21  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-09-16  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102287
+	* gfortran.dg/intent_out_14.f90: New test.
+
+2021-09-21  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-09-17  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102366
+	* gfortran.dg/pr102366.f90: New test.
+
+2021-09-21  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* lib/target-supports.exp (no_fsanitize_address): Add missing bits.
+	* gcc.dg/pr91441.c: Likewise.
+	* gcc.dg/pr96260.c: Likewise.
+	* gcc.dg/pr96307.c: Likewise.
+	* g++.dg/abi/anon4.C: Likewise.
+
+2021-09-17  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gcc.target/sparc/20210917-1.c: New test.
+
+2021-09-16  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-09-07  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/101327
+	* gfortran.dg/pr101327.f90: New test.
+
+2021-09-16  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-09-09  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/98490
+	* gfortran.dg/bounds_check_23.f90: New test.
+
+2021-09-14  Xionghu Luo  <luoxhu@linux.ibm.com>
+
+	Backported from master:
+	2021-09-07  Xionghu Luo  <luoxhu@linux.ibm.com>
+
+	PR target/97142
+	* gcc.target/powerpc/pr97142.c: New test.
+
+2021-09-10  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2020-12-29  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/97612
+	* gfortran.dg/structure_constructor_17.f90: New test.
+
+2021-09-10  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2021-01-22  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/98565
+	* gfortran.dg/associated_target_7.f90 : New test.
+
+2021-09-10  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2020-12-27  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/97694
+	PR fortran/97723
+	* gfortran.dg/select_rank_5.f90: New test.
+
+2021-09-10  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2021-01-07  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/93701
+	* gfortran.dg/associate_54.f90: New test.
+	* gfortran.dg/associate_55.f90: New test.
+	* gfortran.dg/associate_56.f90: New test.
+
+2021-09-10  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2021-01-27  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/98472
+	* gfortran.dg/elemental_function_5.f90 : New test.
+
+2021-09-10  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2021-04-20  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/100110
+	* gfortran.dg/pdt_31.f03: New test.
+	* gfortran.dg/pdt_26.f03: Reduce 'builtin_malloc' count from 9
+	to 8.
+
+2021-09-06  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-07-12  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/101394
+	* gcc.dg/torture/pr101394.c: New testcase.
+
+2021-09-06  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-07-07  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/101173
+	PR tree-optimization/101280
+	* gcc.dg/torture/pr101173.c: New testcase.
+	* gcc.dg/tree-ssa/loop-interchange-16.c: New file.
+
+2021-09-06  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-06-24  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/101105
+	* gcc.dg/torture/pr101105.c: New testcase.
+
+2021-09-06  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-06-11  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/101009
+	* gcc.dg/torture/pr101009.c: New testcase.
+
+2021-09-03  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2021-08-19  Peter Bergner  <bergner@linux.ibm.com>
+
+	PR target/101849
+	* gcc.target/powerpc/pr101849.c: New test.
+
+2021-09-03  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2021-07-02  Peter Bergner  <bergner@linux.ibm.com>
+
+	* gcc.target/powerpc/mma-builtin-7.c: New test.
+	* gcc.target/powerpc/mma-builtin-8.c: New test.
+
+2021-08-30  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2021-05-06  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/46691
+	PR fortran/99819
+	* gfortran.dg/class_dummy_6.f90: New test.
+	* gfortran.dg/class_dummy_7.f90: New test.
+
+2021-08-28  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2021-04-03  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/99818
+	* gfortran.dg/coarray_48.f90: New test.
+
+2021-08-28  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2021-01-27  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/93924
+	PR fortran/93925
+	* gfortran.dg/proc_ptr_52.f90 : New test.
+
+2021-08-28  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2021-01-08  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/93794
+	* gfortran.dg/deferred_character_35.f90 : New test.
+
+2021-08-28  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2021-03-13  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/99125
+	* gfortran.dg/alloc_deferred_comp_1.f90: New test.
+
+2021-08-27  konglin1  <lingling.kong@intel.com>
+
+	PR target/101472
+	* gcc.target/i386/avx512f-pr101472.c: New test.
+	* gcc.target/i386/avx512vl-pr101472.c: New test.
+
+2021-08-26  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-08-24  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/98411
+	* gfortran.dg/pr98411.f90: Adjust testcase options to restrict to
+	F2008, and verify case of implicit SAVE.
+
+2021-08-25  konglin1  <lingling.kong@intel.com>
+
+	PR target/101471
+	* gcc.target/i386/avx512f-pr101471.c: New test.
+
+2021-08-24  Richard Earnshaw  <rearnsha@arm.com>
+
+	Backported from master:
+	2021-08-24  Richard Earnshaw  <rearnsha@arm.com>
+
+	PR target/102035
+	* gcc.target/arm/cmse/mainline/8_1m/soft/cmse-13a.c: New test.
+	* gcc.target/arm/cmse/mainline/8_1m/soft/cmse-7a.c: Likewise.
+	* gcc.target/arm/cmse/mainline/8_1m/soft/cmse-8a.c: Likewise.
+	* gcc.target/arm/cmse/mainline/8_1m/softfp-sp/cmse-7a.c: Likewise.
+	* gcc.target/arm/cmse/mainline/8_1m/softfp-sp/cmse-8a.c: Likewise.
+	* gcc.target/arm/cmse/mainline/8_1m/softfp/cmse-13a.c: Likewise.
+	* gcc.target/arm/cmse/mainline/8_1m/softfp/cmse-7a.c: Likewise.
+	* gcc.target/arm/cmse/mainline/8_1m/softfp/cmse-8a.c: Likewise.
+
+2021-08-24  Richard Earnshaw  <rearnsha@arm.com>
+
+	Backported from master:
+	2021-08-24  Richard Earnshaw  <rearnsha@arm.com>
+
+	* lib/target-supports.exp (check_effective_target_arm_cmse_hw):
+	New function.
+
+2021-08-24  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-08-23  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/97565
+	* g++.dg/lto/pr97565_0.C: New testcase.
+	* g++.dg/lto/pr97565_1.C: Likewise.
+
+2021-08-23  Christophe Lyon  <christophe.lyon@foss.st.com>
+
+	Backported from master:
+	2021-08-06  Christophe Lyon  <christophe.lyon@foss.st.com>
+
+	PR target/101723
+	* gcc.target/arm/pr69245.c: Make sure to emit code for fn1, fix
+	typo.
+
+2021-08-23  Christophe Lyon  <christophe.lyon@foss.st.com>
+
+	Backported from master:
+	2021-08-06  Christophe Lyon  <christophe.lyon@foss.st.com>
+
+	PR target/101723
+	* gcc.target/arm/attr-neon3.c: Fix typo.
+	* gcc.target/arm/pragma_fpu_attribute_2.c: Fix typo.
+
+2021-08-23  Richard Earnshaw  <rearnsha@arm.com>
+
+	Backported from master:
+	2021-08-05  Richard Earnshaw  <rearnsha@arm.com>
+
+	PR target/101723
+	* gcc.target/arm/cortex-m55-nofp-flag-hard.c: Update expected output.
+	* gcc.target/arm/cortex-m55-nofp-flag-softfp.c: Likewise.
+	* gcc.target/arm/cortex-m55-nofp-nomve-flag-softfp.c: Likewise.
+	* gcc.target/arm/mve/intrinsics/mve_fpu1.c: Convert to dg-do assemble.
+	Add a non-no-op function body.
+	* gcc.target/arm/mve/intrinsics/mve_fpu2.c: Likewise.
+	* gcc.target/arm/attr-neon.c: Tighten scan-assembler tests.
+	* gcc.target/arm/attr-neon2.c: Use -Ofast, convert test to use
+	check-function-bodies.
+	* gcc.target/arm/attr-neon3.c: Likewise.
+	* gcc.target/arm/pr69245.c: Tighten scan-assembler match, but allow
+	multiple instances.
+	* gcc.target/arm/pragma_fpu_attribute.c: Likewise.
+	* gcc.target/arm/pragma_fpu_attribute_2.c: Likewise.
+
+2021-08-19  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2021-08-19  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR testsuite/101969
+	* gcc.dg/pr78213.c: Fix up for '--enable-checking=release' etc.
+
+2021-08-17  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2021-08-17  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* gcc.dg/pr78213.c: Restore testing.
+
+2021-08-17  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2021-04-28  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/100305
+	* gcc.c-torture/compile/pr100305.c: New test.
+
+2021-08-13  Martin Liska  <mliska@suse.cz>
+
+	PR gcov-profile/100788
+	* gcc.dg/pr100788.c: New test.
+
+2021-07-30  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-07-21  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/101514
+	* gfortran.dg/pr101514.f90: New test.
+
+2021-07-30  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-07-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/101536
+	* gfortran.dg/pr101536.f90: New test.
+
+2021-07-29  Bill Schmidt  <wschmidt@linux.ibm.com>
+
+	PR target/101531
+	* gcc.target/powerpc/pr101129.c: Adjust.
+
+2021-07-29  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	Backported from master:
+	2021-07-29  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/96435
+	* gdc.dg/pr96435.d: New test.
+
+2021-07-28  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-07-18  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/101084
+	* gfortran.dg/fmt_nonchar_3.f90: New test.
+
+2021-07-28  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	Backported from master:
+	2021-07-28  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/101640
+	* gdc.dg/pr101640.d: New test.
+
+2021-07-28  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	Backported from master:
+	2021-07-28  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/101490
+	* gdc.dg/pr101490.d: New test.
+	* gdc.test/fail_compilation/fail22144.d: New test.
+
+2021-07-28  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	Backported from master:
+	2021-07-28  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/101441
+	* gdc.test/compilable/b19002.d: New test.
+
+2021-07-28  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	Backported from master:
+	2021-07-28  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/101127
+	* gdc.dg/pr101127a.d: New test.
+	* gdc.dg/pr101127b.d: New test.
+
+2021-07-28  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	Backported from master:
+	2021-07-28  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/101619
+	* gdc.test/fail_compilation/fail7424b.d: Update test.
+	* gdc.test/fail_compilation/fail7424c.d: Update test.
+	* gdc.test/fail_compilation/fail7424d.d: Update test.
+	* gdc.test/fail_compilation/fail7424e.d: Update test.
+	* gdc.test/fail_compilation/fail7424f.d: Update test.
+	* gdc.test/fail_compilation/fail7424g.d: Update test.
+	* gdc.test/fail_compilation/fail7424h.d: Update test.
+	* gdc.test/fail_compilation/fail7424i.d: Update test.
+	* gdc.test/compilable/test22133.d: New test.
+	* gdc.test/fail_compilation/fail22133.d: New test.
+
+2021-07-20  Martin Jambor  <mjambor@suse.cz>
+
+	Backported from master:
+	2021-07-08  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/101066
+	* gcc.dg/ipa/pr101066.c: New test.
+
+2021-07-20  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/100182
+	* gcc.target/i386/pr71245-1.c: Remove.
+	* gcc.target/i386/pr71245-2.c: Ditto.
+
+2021-07-19  Bill Schmidt  <wschmidt@linux.ibm.com>
+
+	PR target/101129
+	* gcc.target/powerpc/pr101129.c: New.
+
+2021-07-16  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-07-14  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/100949
+	* gfortran.dg/pr100949.f90: New test.
+
+2021-07-12  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	Backported from master:
+	2021-07-06  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/100227
+	* gfortran.dg/implied_do_io_7.f90: New test.
+
+2021-07-08  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2021-07-08  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/101087
+	* g++.dg/cpp0x/noexcept70.C: New test.
+
+2021-06-24  Uros Bizjak  <ubizjak@gmail.com>
+
+	Backported from master:
+	2021-06-23  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/101175
+	* gcc.target/i386/pr101175.c: New test.
+
+2021-06-18  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-06-16  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/95501
+	PR fortran/95502
+	* gfortran.dg/pr95502.f90: New test.
+
+2021-06-18  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
+
+	Backported from master:
+	2021-06-18  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
+
+	PR target/100856
+	* gcc.target/arm/acle/pr100856.c: New test.
+	* gcc.target/arm/multilib.exp: Add tests for cde options.
+
+2021-06-18  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
+
+	Backported from master:
+	2021-06-11  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
+
+	PR target/101016
+	* gcc.target/arm/mve/intrinsics/pr101016.c: New test.
+
+2021-06-18  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
+
+	Backported from master:
+	2021-06-11  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
+
+	PR target/99939
+	* gcc.target/arm/cmse/cmse-18.c: Add separate scan-assembler
+	directives check for target is v8.1-m.main+mve or not before
+	comparing the assembly output.
+	* gcc.target/arm/cmse/cmse-20.c: New test.
+
+2021-06-18  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2021-06-14  Peter Bergner  <bergner@linux.ibm.com>
+
+	PR target/100777
+	* gcc.target/powerpc/pr100777.c: New test.
+
+2021-06-18  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2021-06-10  Peter Bergner  <bergner@linux.ibm.com>
+
+	* gcc.target/powerpc/mma-builtin-4.c (__builtin_vsx_build_pair): Add
+	tests.  Update expected counts.
+	* gcc.target/powerpc/mma-builtin-5.c (__builtin_mma_build_acc): Add
+	tests.  Update expected counts.
+
+2021-06-18  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2021-05-31  Peter Bergner  <bergner@linux.ibm.com>
+
+	PR target/99842
+	* g++.target/powerpc/pr99842.C: New.
+
 2021-06-17  Jason Merrill  <jason@redhat.com>
 
 	PR c++/101029

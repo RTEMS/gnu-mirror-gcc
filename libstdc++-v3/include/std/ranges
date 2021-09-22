@@ -951,7 +951,8 @@ namespace views
 	= requires(basic_istream<_CharT, _Traits>& is, _Val& t) { is >> t; };
   } // namespace __detail
 
-  template<movable _Val, typename _CharT, typename _Traits>
+  template<movable _Val, typename _CharT,
+	   typename _Traits = char_traits<_CharT>>
     requires default_initializable<_Val>
       && __detail::__stream_extractable<_Val, _CharT, _Traits>
     class basic_istream_view
@@ -3525,7 +3526,7 @@ namespace views
 	  static auto _S_iter_cat()
 	  {
 	    using _Base = elements_view::_Base<_Const>;
-	    using _Cat = iterator_traits<iterator_t<_Base>>::iterator_category;
+	    using _Cat = typename iterator_traits<iterator_t<_Base>>::iterator_category;
 	    using _Res = decltype((std::get<_Nm>(*std::declval<iterator_t<_Base>>())));
 	    if constexpr (!is_lvalue_reference_v<_Res>)
 	      return input_iterator_tag{};
