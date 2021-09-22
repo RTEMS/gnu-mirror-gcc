@@ -12962,8 +12962,9 @@ build_binary_op (location_t location, enum tree_code code,
 	  intcap = convert (ic_type, intcap);
 
 	  /* We can't fold inside REPLACE_ADDRESS_VALUE calls, so ensure
-	     we've folded the address value expression.  */
+	     we've folded the operands.  */
 	  ret = c_fully_fold (ret, false, NULL);
+	  intcap = c_fully_fold (intcap, false, NULL);
 	  ret = fold_build_replace_address_value_loc (location, intcap, ret);
 	}
 
