@@ -10473,6 +10473,7 @@ aarch64_reg_name (rtx reg, unsigned int delta = 0)
 
 /* Print operand X to file F in a target specific manner according to CODE.
    The acceptable formatting commands given by CODE are:
+     'B':		A capaBility register.
      'c':		An integer or symbol address without a preceding #
 			sign.
      'C':		Take the duplicated element in a vector constant
@@ -10748,26 +10749,38 @@ aarch64_print_operand (FILE *f, rtx x, int code)
       }
       break;
 
+    case 'B':
     case 'w':
     case 'x':
-      if (x == const0_rtx || CONST_NULL_P (x)
-	  || (CONST_DOUBLE_P (x) && aarch64_float_const_zero_rtx_p (x)))
-	{
-	  asm_fprintf (f, "%czr", code);
-	  break;
-	}
+      {
+	/* For fake capability we never actually want to emit c-registers:
+	   having this logic here avoids having to add many special cases in the
+	   patterns.  */
+	if (TARGET_CAPABILITY_FAKE && code == 'B')
+	  code = 'x';
 
-      if (REG_P (x) && GP_REGNUM_P (REGNO (x)))
-	{
-	  asm_fprintf (f, "%c%d", code, REGNO (x) - R0_REGNUM);
-	  break;
-	}
+	const char regch = (code == 'B' ? 'c' : code);
+	const char regs[] = { regch, '\0' };
 
-      if (REG_P (x) && REGNO (x) == SP_REGNUM)
-	{
-	  asm_fprintf (f, "%ssp", code == 'w' ? "w" : "");
-	  break;
-	}
+	if (x == CONST0_RTX (GET_MODE (x))
+	    || (CONST_DOUBLE_P (x) && aarch64_float_const_zero_rtx_p (x)))
+	  {
+	    asm_fprintf (f, "%czr", regch);
+	    break;
+	  }
+
+	if (REG_P (x) && GP_REGNUM_P (REGNO (x)))
+	  {
+	    asm_fprintf (f, "%c%d", regch, REGNO (x) - R0_REGNUM);
+	    break;
+	  }
+
+	if (REG_P (x) && REGNO (x) == SP_REGNUM)
+	  {
+	    asm_fprintf (f, "%ssp", regch == 'x' ? "" : regs);
+	    break;
+	  }
+      }
 
       /* Fall through */
 

@@ -918,12 +918,8 @@
 
 ;; In GPI templates, a string like "%<w>0" will expand to "%w0" in the
 ;; 32-bit version and "%x0" in the 64-bit version.
-;; MORELLO TODO Need to figure out how to handle this iterator for
-;; tlsdesc_small_advsimd_<mode> in pure capability.
-;;   First thing to check is whether that pattern is even what we want for
-;;   purecap, since there may be a different TLS approach for PureCap.
 (define_mode_attr w [(QI "w") (HI "w") (SI "w") (DI "x") (SF "s") (DF "d")
-		     (CADI "")])
+		     (CADI "B")])
 
 ; Similar to the 'w' attribute, but maps DF -> x.  The domain of this
 ; attribute is the DXC[2] iterator.  It is intended to be used with the
