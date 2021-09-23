@@ -19,7 +19,8 @@
 include $(top_srcdir)/d_rules.am
 
 # Make sure GDC can find libdruntime include files
-D_EXTRA_DFLAGS=-nostdinc -I $(srcdir) -I .
+D_EXTRA_DFLAGS=-fpreview=dip1000 -fpreview=fieldwise -fpreview=dtorfields \
+	       -nostdinc -I $(srcdir) -I .
 
 # D flags for compilation
 AM_DFLAGS= \
@@ -119,6 +120,7 @@ endif
 DRUNTIME_DSOURCES_GENERATED = gcc/config.d gcc/libbacktrace.d
 
 ALL_DRUNTIME_SOURCES = $(DRUNTIME_DSOURCES) $(DRUNTIME_CSOURCES) \
+	$(DRUNTIME_DSOURCES_STDCXX) \
 	$(DRUNTIME_SOURCES_CONFIGURED) $(DRUNTIME_DSOURCES_GENERATED)
 
 # Need this library to both be part of libgphobos.a, and installed separately.
@@ -422,4 +424,4 @@ DRUNTIME_DSOURCES_WINDOWS = core/sys/windows/accctrl.d \
 	core/sys/windows/winuser.d core/sys/windows/winver.d \
 	core/sys/windows/wtsapi32.d core/sys/windows/wtypes.d
 
-DRUNTIME_DISOURCES = __entrypoint.di __main.di
+DRUNTIME_DISOURCES = __main.di

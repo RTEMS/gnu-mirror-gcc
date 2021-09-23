@@ -245,7 +245,13 @@ am__objects_1 = core/atomic.lo core/attribute.lo core/bitop.lo \
 	rt/monitor_.lo rt/profilegc.lo rt/sections.lo rt/tlsgc.lo \
 	rt/util/typeinfo.lo rt/util/utility.lo
 am__objects_2 = core/stdc/libgdruntime_la-errno_.lo
-am__objects_3 = core/sys/posix/aio.lo core/sys/posix/arpa/inet.lo \
+am__objects_3 = core/stdcpp/allocator.lo core/stdcpp/array.lo \
+	core/stdcpp/exception.lo core/stdcpp/memory.lo \
+	core/stdcpp/new_.lo core/stdcpp/string.lo \
+	core/stdcpp/string_view.lo core/stdcpp/type_traits.lo \
+	core/stdcpp/typeinfo.lo core/stdcpp/utility.lo \
+	core/stdcpp/vector.lo core/stdcpp/xutility.lo
+am__objects_4 = core/sys/posix/aio.lo core/sys/posix/arpa/inet.lo \
 	core/sys/posix/config.lo core/sys/posix/dirent.lo \
 	core/sys/posix/dlfcn.lo core/sys/posix/fcntl.lo \
 	core/sys/posix/grp.lo core/sys/posix/iconv.lo \
@@ -272,8 +278,8 @@ am__objects_3 = core/sys/posix/aio.lo core/sys/posix/arpa/inet.lo \
 	core/sys/posix/syslog.lo core/sys/posix/termios.lo \
 	core/sys/posix/time.lo core/sys/posix/ucontext.lo \
 	core/sys/posix/unistd.lo core/sys/posix/utime.lo
-@DRUNTIME_OS_POSIX_TRUE@am__objects_4 = $(am__objects_3)
-am__objects_5 = core/sys/darwin/config.lo \
+@DRUNTIME_OS_POSIX_TRUE@am__objects_5 = $(am__objects_4)
+am__objects_6 = core/sys/darwin/config.lo \
 	core/sys/darwin/crt_externs.lo core/sys/darwin/dlfcn.lo \
 	core/sys/darwin/err.lo core/sys/darwin/execinfo.lo \
 	core/sys/darwin/fcntl.lo core/sys/darwin/ifaddrs.lo \
@@ -288,8 +294,8 @@ am__objects_5 = core/sys/darwin/config.lo \
 	core/sys/darwin/sys/attr.lo core/sys/darwin/sys/cdefs.lo \
 	core/sys/darwin/sys/event.lo core/sys/darwin/sys/mman.lo \
 	core/sys/darwin/sys/sysctl.lo
-@DRUNTIME_OS_DARWIN_TRUE@am__objects_6 = $(am__objects_5)
-am__objects_7 = core/sys/dragonflybsd/dlfcn.lo \
+@DRUNTIME_OS_DARWIN_TRUE@am__objects_7 = $(am__objects_6)
+am__objects_8 = core/sys/dragonflybsd/dlfcn.lo \
 	core/sys/dragonflybsd/err.lo core/sys/dragonflybsd/execinfo.lo \
 	core/sys/dragonflybsd/netinet/in_.lo \
 	core/sys/dragonflybsd/pthread_np.lo \
@@ -308,12 +314,12 @@ am__objects_7 = core/sys/dragonflybsd/dlfcn.lo \
 	core/sys/dragonflybsd/sys/socket.lo \
 	core/sys/dragonflybsd/sys/sysctl.lo \
 	core/sys/dragonflybsd/time.lo
-@DRUNTIME_OS_DRAGONFLYBSD_TRUE@am__objects_8 = $(am__objects_7)
-am__objects_9 = core/sys/bionic/err.lo core/sys/bionic/fcntl.lo \
+@DRUNTIME_OS_DRAGONFLYBSD_TRUE@am__objects_9 = $(am__objects_8)
+am__objects_10 = core/sys/bionic/err.lo core/sys/bionic/fcntl.lo \
 	core/sys/bionic/stdlib.lo core/sys/bionic/string.lo \
 	core/sys/bionic/unistd.lo
-@DRUNTIME_OS_ANDROID_TRUE@am__objects_10 = $(am__objects_9)
-am__objects_11 = core/sys/freebsd/config.lo core/sys/freebsd/dlfcn.lo \
+@DRUNTIME_OS_ANDROID_TRUE@am__objects_11 = $(am__objects_10)
+am__objects_12 = core/sys/freebsd/config.lo core/sys/freebsd/dlfcn.lo \
 	core/sys/freebsd/err.lo core/sys/freebsd/execinfo.lo \
 	core/sys/freebsd/netinet/in_.lo core/sys/freebsd/pthread_np.lo \
 	core/sys/freebsd/stdlib.lo core/sys/freebsd/string.lo \
@@ -326,8 +332,8 @@ am__objects_11 = core/sys/freebsd/config.lo core/sys/freebsd/dlfcn.lo \
 	core/sys/freebsd/sys/mman.lo core/sys/freebsd/sys/mount.lo \
 	core/sys/freebsd/sys/sysctl.lo core/sys/freebsd/time.lo \
 	core/sys/freebsd/unistd.lo
-@DRUNTIME_OS_FREEBSD_TRUE@am__objects_12 = $(am__objects_11)
-am__objects_13 = core/sys/netbsd/dlfcn.lo core/sys/netbsd/err.lo \
+@DRUNTIME_OS_FREEBSD_TRUE@am__objects_13 = $(am__objects_12)
+am__objects_14 = core/sys/netbsd/dlfcn.lo core/sys/netbsd/err.lo \
 	core/sys/netbsd/execinfo.lo core/sys/netbsd/stdlib.lo \
 	core/sys/netbsd/string.lo core/sys/netbsd/sys/elf.lo \
 	core/sys/netbsd/sys/elf32.lo core/sys/netbsd/sys/elf64.lo \
@@ -335,8 +341,8 @@ am__objects_13 = core/sys/netbsd/dlfcn.lo core/sys/netbsd/err.lo \
 	core/sys/netbsd/sys/featuretest.lo \
 	core/sys/netbsd/sys/link_elf.lo core/sys/netbsd/sys/mman.lo \
 	core/sys/netbsd/sys/sysctl.lo core/sys/netbsd/time.lo
-@DRUNTIME_OS_NETBSD_TRUE@am__objects_14 = $(am__objects_13)
-am__objects_15 = core/sys/openbsd/dlfcn.lo core/sys/openbsd/err.lo \
+@DRUNTIME_OS_NETBSD_TRUE@am__objects_15 = $(am__objects_14)
+am__objects_16 = core/sys/openbsd/dlfcn.lo core/sys/openbsd/err.lo \
 	core/sys/openbsd/execinfo.lo core/sys/openbsd/stdlib.lo \
 	core/sys/openbsd/string.lo core/sys/openbsd/sys/cdefs.lo \
 	core/sys/openbsd/sys/elf.lo core/sys/openbsd/sys/elf32.lo \
@@ -345,8 +351,8 @@ am__objects_15 = core/sys/openbsd/dlfcn.lo core/sys/openbsd/err.lo \
 	core/sys/openbsd/sys/link_elf.lo core/sys/openbsd/sys/mman.lo \
 	core/sys/openbsd/sys/sysctl.lo core/sys/openbsd/time.lo \
 	core/sys/openbsd/unistd.lo
-@DRUNTIME_OS_OPENBSD_TRUE@am__objects_16 = $(am__objects_15)
-am__objects_17 = core/sys/linux/config.lo core/sys/linux/dlfcn.lo \
+@DRUNTIME_OS_OPENBSD_TRUE@am__objects_17 = $(am__objects_16)
+am__objects_18 = core/sys/linux/config.lo core/sys/linux/dlfcn.lo \
 	core/sys/linux/elf.lo core/sys/linux/epoll.lo \
 	core/sys/linux/err.lo core/sys/linux/errno.lo \
 	core/sys/linux/execinfo.lo core/sys/linux/fcntl.lo \
@@ -364,8 +370,8 @@ am__objects_17 = core/sys/linux/config.lo core/sys/linux/dlfcn.lo \
 	core/sys/linux/termios.lo core/sys/linux/time.lo \
 	core/sys/linux/timerfd.lo core/sys/linux/tipc.lo \
 	core/sys/linux/unistd.lo
-@DRUNTIME_OS_LINUX_TRUE@am__objects_18 = $(am__objects_17)
-am__objects_19 = core/sys/windows/accctrl.lo \
+@DRUNTIME_OS_LINUX_TRUE@am__objects_19 = $(am__objects_18)
+am__objects_20 = core/sys/windows/accctrl.lo \
 	core/sys/windows/aclapi.lo core/sys/windows/aclui.lo \
 	core/sys/windows/basetsd.lo core/sys/windows/basetyps.lo \
 	core/sys/windows/cderr.lo core/sys/windows/cguid.lo \
@@ -450,9 +456,9 @@ am__objects_19 = core/sys/windows/accctrl.lo \
 	core/sys/windows/winsvc.lo core/sys/windows/winuser.lo \
 	core/sys/windows/winver.lo core/sys/windows/wtsapi32.lo \
 	core/sys/windows/wtypes.lo
-@DRUNTIME_OS_MINGW_TRUE@am__objects_20 = $(am__objects_19) \
+@DRUNTIME_OS_MINGW_TRUE@am__objects_21 = $(am__objects_20) \
 @DRUNTIME_OS_MINGW_TRUE@	config/mingw/libgdruntime_la-msvc.lo
-am__objects_21 = core/sys/solaris/dlfcn.lo core/sys/solaris/elf.lo \
+am__objects_22 = core/sys/solaris/dlfcn.lo core/sys/solaris/elf.lo \
 	core/sys/solaris/err.lo core/sys/solaris/execinfo.lo \
 	core/sys/solaris/libelf.lo core/sys/solaris/link.lo \
 	core/sys/solaris/stdlib.lo core/sys/solaris/sys/elf.lo \
@@ -464,48 +470,48 @@ am__objects_21 = core/sys/solaris/dlfcn.lo core/sys/solaris/elf.lo \
 	core/sys/solaris/sys/priocntl.lo \
 	core/sys/solaris/sys/procset.lo core/sys/solaris/sys/types.lo \
 	core/sys/solaris/time.lo
-@DRUNTIME_OS_SOLARIS_TRUE@am__objects_22 = $(am__objects_21)
-@DRUNTIME_CPU_AARCH64_TRUE@am__objects_23 = config/aarch64/libgdruntime_la-switchcontext.lo
-@DRUNTIME_CPU_ARM_TRUE@am__objects_24 = config/arm/libgdruntime_la-switchcontext.lo
-@DRUNTIME_CPU_MIPS_TRUE@am__objects_25 = config/mips/libgdruntime_la-switchcontext.lo
-@DRUNTIME_CPU_POWERPC_TRUE@am__objects_26 = config/powerpc/libgdruntime_la-switchcontext.lo
-@DRUNTIME_CPU_X86_TRUE@@DRUNTIME_OS_MINGW_TRUE@am__objects_27 = config/mingw/libgdruntime_la-switchcontext.lo
-@DRUNTIME_CPU_X86_TRUE@@DRUNTIME_OS_MINGW_FALSE@am__objects_28 = config/x86/libgdruntime_la-switchcontext.lo
-@DRUNTIME_CPU_SYSTEMZ_TRUE@am__objects_29 = config/systemz/libgdruntime_la-get_tls_offset.lo
-@DRUNTIME_CPU_S390_TRUE@am__objects_30 = config/s390/libgdruntime_la-get_tls_offset.lo
-am__objects_31 = $(am__objects_4) $(am__objects_6) $(am__objects_8) \
-	$(am__objects_10) $(am__objects_12) $(am__objects_14) \
-	$(am__objects_16) $(am__objects_18) $(am__objects_20) \
-	$(am__objects_22) $(am__objects_23) $(am__objects_24) \
-	$(am__objects_25) $(am__objects_26) $(am__objects_27) \
-	$(am__objects_28) $(am__objects_29) $(am__objects_30)
-am__objects_32 = gcc/config.lo gcc/libbacktrace.lo
-am__objects_33 = $(am__objects_1) $(am__objects_2) $(am__objects_31) \
-	$(am__objects_32)
-am_libgdruntime_la_OBJECTS = $(am__objects_33)
+@DRUNTIME_OS_SOLARIS_TRUE@am__objects_23 = $(am__objects_22)
+@DRUNTIME_CPU_AARCH64_TRUE@am__objects_24 = config/aarch64/libgdruntime_la-switchcontext.lo
+@DRUNTIME_CPU_ARM_TRUE@am__objects_25 = config/arm/libgdruntime_la-switchcontext.lo
+@DRUNTIME_CPU_MIPS_TRUE@am__objects_26 = config/mips/libgdruntime_la-switchcontext.lo
+@DRUNTIME_CPU_POWERPC_TRUE@am__objects_27 = config/powerpc/libgdruntime_la-switchcontext.lo
+@DRUNTIME_CPU_X86_TRUE@@DRUNTIME_OS_MINGW_TRUE@am__objects_28 = config/mingw/libgdruntime_la-switchcontext.lo
+@DRUNTIME_CPU_X86_TRUE@@DRUNTIME_OS_MINGW_FALSE@am__objects_29 = config/x86/libgdruntime_la-switchcontext.lo
+@DRUNTIME_CPU_SYSTEMZ_TRUE@am__objects_30 = config/systemz/libgdruntime_la-get_tls_offset.lo
+@DRUNTIME_CPU_S390_TRUE@am__objects_31 = config/s390/libgdruntime_la-get_tls_offset.lo
+am__objects_32 = $(am__objects_5) $(am__objects_7) $(am__objects_9) \
+	$(am__objects_11) $(am__objects_13) $(am__objects_15) \
+	$(am__objects_17) $(am__objects_19) $(am__objects_21) \
+	$(am__objects_23) $(am__objects_24) $(am__objects_25) \
+	$(am__objects_26) $(am__objects_27) $(am__objects_28) \
+	$(am__objects_29) $(am__objects_30) $(am__objects_31)
+am__objects_33 = gcc/config.lo gcc/libbacktrace.lo
+am__objects_34 = $(am__objects_1) $(am__objects_2) $(am__objects_3) \
+	$(am__objects_32) $(am__objects_33)
+am_libgdruntime_la_OBJECTS = $(am__objects_34)
 libgdruntime_la_OBJECTS = $(am_libgdruntime_la_OBJECTS)
 am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
-am__objects_34 = core/stdc/libgdruntime_convenience_la-errno_.lo
-@DRUNTIME_OS_MINGW_TRUE@am__objects_35 = $(am__objects_19) \
+am__objects_35 = core/stdc/libgdruntime_convenience_la-errno_.lo
+@DRUNTIME_OS_MINGW_TRUE@am__objects_36 = $(am__objects_20) \
 @DRUNTIME_OS_MINGW_TRUE@	config/mingw/libgdruntime_convenience_la-msvc.lo
-@DRUNTIME_CPU_AARCH64_TRUE@am__objects_36 = config/aarch64/libgdruntime_convenience_la-switchcontext.lo
-@DRUNTIME_CPU_ARM_TRUE@am__objects_37 = config/arm/libgdruntime_convenience_la-switchcontext.lo
-@DRUNTIME_CPU_MIPS_TRUE@am__objects_38 = config/mips/libgdruntime_convenience_la-switchcontext.lo
-@DRUNTIME_CPU_POWERPC_TRUE@am__objects_39 = config/powerpc/libgdruntime_convenience_la-switchcontext.lo
-@DRUNTIME_CPU_X86_TRUE@@DRUNTIME_OS_MINGW_TRUE@am__objects_40 = config/mingw/libgdruntime_convenience_la-switchcontext.lo
-@DRUNTIME_CPU_X86_TRUE@@DRUNTIME_OS_MINGW_FALSE@am__objects_41 = config/x86/libgdruntime_convenience_la-switchcontext.lo
-@DRUNTIME_CPU_SYSTEMZ_TRUE@am__objects_42 = config/systemz/libgdruntime_convenience_la-get_tls_offset.lo
-@DRUNTIME_CPU_S390_TRUE@am__objects_43 = config/s390/libgdruntime_convenience_la-get_tls_offset.lo
-am__objects_44 = $(am__objects_4) $(am__objects_6) $(am__objects_8) \
-	$(am__objects_10) $(am__objects_12) $(am__objects_14) \
-	$(am__objects_16) $(am__objects_18) $(am__objects_35) \
-	$(am__objects_22) $(am__objects_36) $(am__objects_37) \
-	$(am__objects_38) $(am__objects_39) $(am__objects_40) \
-	$(am__objects_41) $(am__objects_42) $(am__objects_43)
-am__objects_45 = $(am__objects_1) $(am__objects_34) $(am__objects_44) \
-	$(am__objects_32)
-am__objects_46 = $(am__objects_45)
-am_libgdruntime_convenience_la_OBJECTS = $(am__objects_46)
+@DRUNTIME_CPU_AARCH64_TRUE@am__objects_37 = config/aarch64/libgdruntime_convenience_la-switchcontext.lo
+@DRUNTIME_CPU_ARM_TRUE@am__objects_38 = config/arm/libgdruntime_convenience_la-switchcontext.lo
+@DRUNTIME_CPU_MIPS_TRUE@am__objects_39 = config/mips/libgdruntime_convenience_la-switchcontext.lo
+@DRUNTIME_CPU_POWERPC_TRUE@am__objects_40 = config/powerpc/libgdruntime_convenience_la-switchcontext.lo
+@DRUNTIME_CPU_X86_TRUE@@DRUNTIME_OS_MINGW_TRUE@am__objects_41 = config/mingw/libgdruntime_convenience_la-switchcontext.lo
+@DRUNTIME_CPU_X86_TRUE@@DRUNTIME_OS_MINGW_FALSE@am__objects_42 = config/x86/libgdruntime_convenience_la-switchcontext.lo
+@DRUNTIME_CPU_SYSTEMZ_TRUE@am__objects_43 = config/systemz/libgdruntime_convenience_la-get_tls_offset.lo
+@DRUNTIME_CPU_S390_TRUE@am__objects_44 = config/s390/libgdruntime_convenience_la-get_tls_offset.lo
+am__objects_45 = $(am__objects_5) $(am__objects_7) $(am__objects_9) \
+	$(am__objects_11) $(am__objects_13) $(am__objects_15) \
+	$(am__objects_17) $(am__objects_19) $(am__objects_36) \
+	$(am__objects_23) $(am__objects_37) $(am__objects_38) \
+	$(am__objects_39) $(am__objects_40) $(am__objects_41) \
+	$(am__objects_42) $(am__objects_43) $(am__objects_44)
+am__objects_46 = $(am__objects_1) $(am__objects_35) $(am__objects_3) \
+	$(am__objects_45) $(am__objects_33)
+am__objects_47 = $(am__objects_46)
+am_libgdruntime_convenience_la_OBJECTS = $(am__objects_47)
 libgdruntime_convenience_la_OBJECTS =  \
 	$(am_libgdruntime_convenience_la_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
@@ -748,7 +754,9 @@ LTDCOMPILE = $(LIBTOOL) --tag=D $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 # Include D build rules
 
 # Make sure GDC can find libdruntime include files
-D_EXTRA_DFLAGS = -nostdinc -I $(srcdir) -I .
+D_EXTRA_DFLAGS = -fpreview=dip1000 -fpreview=fieldwise -fpreview=dtorfields \
+	       -nostdinc -I $(srcdir) -I .
+
 
 # D flags for compilation
 AM_DFLAGS = \
@@ -787,6 +795,7 @@ DRUNTIME_SOURCES_CONFIGURED = $(am__append_1) $(am__append_2) \
 # Generated by configure
 DRUNTIME_DSOURCES_GENERATED = gcc/config.d gcc/libbacktrace.d
 ALL_DRUNTIME_SOURCES = $(DRUNTIME_DSOURCES) $(DRUNTIME_CSOURCES) \
+	$(DRUNTIME_DSOURCES_STDCXX) \
 	$(DRUNTIME_SOURCES_CONFIGURED) $(DRUNTIME_DSOURCES_GENERATED)
 
 
@@ -1079,7 +1088,7 @@ DRUNTIME_DSOURCES_WINDOWS = core/sys/windows/accctrl.d \
 	core/sys/windows/winuser.d core/sys/windows/winver.d \
 	core/sys/windows/wtsapi32.d core/sys/windows/wtypes.d
 
-DRUNTIME_DISOURCES = __entrypoint.di __main.di
+DRUNTIME_DISOURCES = __main.di
 all: all-am
 
 .SUFFIXES:
@@ -1362,6 +1371,21 @@ rt/util/$(am__dirstamp):
 rt/util/typeinfo.lo: rt/util/$(am__dirstamp)
 rt/util/utility.lo: rt/util/$(am__dirstamp)
 core/stdc/libgdruntime_la-errno_.lo: core/stdc/$(am__dirstamp)
+core/stdcpp/$(am__dirstamp):
+	@$(MKDIR_P) core/stdcpp
+	@: > core/stdcpp/$(am__dirstamp)
+core/stdcpp/allocator.lo: core/stdcpp/$(am__dirstamp)
+core/stdcpp/array.lo: core/stdcpp/$(am__dirstamp)
+core/stdcpp/exception.lo: core/stdcpp/$(am__dirstamp)
+core/stdcpp/memory.lo: core/stdcpp/$(am__dirstamp)
+core/stdcpp/new_.lo: core/stdcpp/$(am__dirstamp)
+core/stdcpp/string.lo: core/stdcpp/$(am__dirstamp)
+core/stdcpp/string_view.lo: core/stdcpp/$(am__dirstamp)
+core/stdcpp/type_traits.lo: core/stdcpp/$(am__dirstamp)
+core/stdcpp/typeinfo.lo: core/stdcpp/$(am__dirstamp)
+core/stdcpp/utility.lo: core/stdcpp/$(am__dirstamp)
+core/stdcpp/vector.lo: core/stdcpp/$(am__dirstamp)
+core/stdcpp/xutility.lo: core/stdcpp/$(am__dirstamp)
 core/sys/posix/$(am__dirstamp):
 	@$(MKDIR_P) core/sys/posix
 	@: > core/sys/posix/$(am__dirstamp)
@@ -1967,6 +1991,8 @@ mostlyclean-compile:
 	-rm -f core/internal/util/*.lo
 	-rm -f core/stdc/*.$(OBJEXT)
 	-rm -f core/stdc/*.lo
+	-rm -f core/stdcpp/*.$(OBJEXT)
+	-rm -f core/stdcpp/*.lo
 	-rm -f core/sync/*.$(OBJEXT)
 	-rm -f core/sync/*.lo
 	-rm -f core/sys/bionic/*.$(OBJEXT)
@@ -2143,6 +2169,7 @@ clean-libtool:
 	-rm -rf core/internal/gc/impl/proto/.libs core/internal/gc/impl/proto/_libs
 	-rm -rf core/internal/util/.libs core/internal/util/_libs
 	-rm -rf core/stdc/.libs core/stdc/_libs
+	-rm -rf core/stdcpp/.libs core/stdcpp/_libs
 	-rm -rf core/sync/.libs core/sync/_libs
 	-rm -rf core/sys/bionic/.libs core/sys/bionic/_libs
 	-rm -rf core/sys/darwin/.libs core/sys/darwin/_libs
@@ -2303,6 +2330,7 @@ distclean-generic:
 	-rm -f core/internal/gc/impl/proto/$(am__dirstamp)
 	-rm -f core/internal/util/$(am__dirstamp)
 	-rm -f core/stdc/$(am__dirstamp)
+	-rm -f core/stdcpp/$(am__dirstamp)
 	-rm -f core/sync/$(am__dirstamp)
 	-rm -f core/sys/bionic/$(am__dirstamp)
 	-rm -f core/sys/darwin/$(am__dirstamp)
