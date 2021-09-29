@@ -37,6 +37,9 @@
   UNSPECV_CMPXCHG
   UNSPECV_XCHG
   UNSPECV_LOCK
+  
+  ;; For CMPccXADD support
+  UNSPECV_CMPCCXADD
 ])
 
 (define_expand "sse2_lfence"
@@ -1061,3 +1064,42 @@
 	(any_logic:SWI (match_dup 0) (match_dup 1)))]
   ""
   "lock{%;} %K2<logic>{<imodesuffix>}\t{%1, %0|%0, %1}")
+
+;; CMPCCXADD
+
+(define_insn "@cmpccxadd_<mode>_1"
+  [(set (match_operand:SWI48x 1 "register_operand" "+r")
+	(match_operand:SWI48x 0 "memory_operand" "+m"))
+   (set (match_dup 0)
+	(unspec_volatile:SWI48x
+	  [(match_dup 0)
+	   (match_dup 1)
+	   (match_operand:SWI48x 2 "register_operand" "r")
+	   (match_operand:SI 3 "const_0_to_15_operand" "n")]
+	  UNSPECV_CMPCCXADD))
+   (clobber (reg:CC FLAGS_REG))]
+  "TARGET_CMPCCXADD && TARGET_64BIT"
+{
+  char buf[128];
+  const char *ops = "cmp%sxadd\t{%%2, %%1, %%0|%%0, %%1, %%2}";
+  char const *cc[16] = {"be" ,"b", "le", "l", "nbe", "nb", "nle", "nl",
+			"no", "np", "ns", "nz", "o", "p", "s", "z"};
+
+  snprintf (buf, sizeof (buf), ops, cc[INTVAL (operands[3])]);
+  output_asm_insn (buf, operands);
+  return "";
+})
+
+(define_expand "cmpccxadd_<mode>"
+  [(match_operand:SWI48x 0 "register_operand")
+   (match_operand:SWI48x 1 "memory_operand")
+   (match_operand:SWI48x 2 "register_operand")
+   (match_operand:SWI48x 3 "register_operand")
+   (match_operand:SI 4 "const_0_to_15_operand")]
+ "TARGET_CMPCCXADD && TARGET_64BIT"
+{
+  emit_insn (gen_cmpccxadd_1 (<MODE>mode, operands[1], operands[2],
+			      operands[3], operands[4]));
+  emit_move_insn (operands[0], operands[2]);
+  DONE;
+})
