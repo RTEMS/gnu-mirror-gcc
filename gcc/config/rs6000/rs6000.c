@@ -6946,6 +6946,59 @@ xxspltib_constant_p (rtx op,
   return true;
 }
 
+/* Return the two 32-bit constants to use in the two XXSPLTI32DX instructions
+   via HIGH_PTR and LOW_PTR.  */
+
+void
+xxsplti32dx_constant_immediate (rtx op,
+				machine_mode mode,
+				long *high_ptr,
+				long *low_ptr)
+{
+  gcc_assert (easy_vector_constant_2insns (op, mode));
+
+  if (mode == VOIDmode)
+    mode = GET_MODE (op);
+
+  if (CONST_VECTOR_P (op))
+    {
+      op = CONST_VECTOR_ELT (op, 0);
+      mode = GET_MODE_INNER (mode);
+    }
+
+  else if (GET_CODE (op) == VEC_DUPLICATE)
+    {
+      op = XEXP (op, 0);
+      mode = GET_MODE_INNER (mode);
+    }
+
+  if (CONST_INT_P (op))
+    {
+      HOST_WIDE_INT value = INTVAL (op);
+      *high_ptr = (value >> 32) & 0xffffffff;
+      *low_ptr = value & 0xffffffff;
+      return;
+    }
+
+  else if (CONST_DOUBLE_P (op) && (mode == SFmode || mode == DFmode))
+    {
+      long high_low[2];
+      const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op);
+      REAL_VALUE_TO_TARGET_DOUBLE (*rv, high_low);
+
+      /* The double precision value is laid out in memory order.  We need to
+	 undo this for XXSPLTI32DX.  */
+      if (!BYTES_BIG_ENDIAN)
+	std::swap (high_low[0], high_low[1]);
+
+      *high_ptr = high_low[0] & 0xffffffff;
+      *low_ptr = high_low[1] & 0xffffffff;
+      return;
+    }
+
+  gcc_unreachable ();
+}
+
 /* Return the immediate value used in the XXSPLTIDP instruction.  */
 
 long
@@ -7228,6 +7281,9 @@ output_vec_const_move (rtx *operands)
 	  operands[2] = GEN_INT (lxvkq_constant_immediate (vec, mode));
 	  return "lxvkq %x0,%2";
 	}
+
+      if (easy_vector_constant_2insns (vec, mode))
+	return "#";
 
       if (TARGET_P9_VECTOR
 	  && xxspltib_constant_p (vec, mode, &num_insns, &xxspltib_value))
@@ -14076,6 +14132,9 @@ rs6000_output_move_128bit (rtx operands[])
       operands[2] = GEN_INT (lxvkq_constant_immediate (src, mode));
       return "lxvkq %x0,%2";
     }
+
+  else if (dest_vsx_p && easy_vector_constant_2insns (src, mode))
+    return "#";
 
   else if (dest_regno >= 0
 	   && (CONST_INT_P (src)
@@ -26991,11 +27050,13 @@ prefixed_xxsplti_p (rtx_insn *insn)
     case E_DImode:
     case E_DFmode:
     case E_SFmode:
-      return easy_fp_constant_64bit_scalar (src, mode);
+      return (easy_fp_constant_64bit_scalar (src, mode)
+	      || easy_vector_constant_2insns (src, mode));
 
     case E_V2DImode:
     case E_V2DFmode:
-      return easy_vector_constant_64bit_element (src, mode);
+      return (easy_vector_constant_64bit_element (src, mode)
+	      || easy_vector_constant_2insns (src, mode));
 
     case E_V16QImode:
     case E_V8HImode:
