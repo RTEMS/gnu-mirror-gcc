@@ -1343,6 +1343,9 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
     opts->x_flag_complex_method = 1;
   else if (opts_set->x_flag_cx_fortran_rules)
     opts->x_flag_complex_method = opts->x_flag_default_complex_method;
+
+  if (opts->x_flag_var_tracking_assignments && !opts->x_flag_var_tracking)
+    opts->x_flag_var_tracking = opts->x_flag_var_tracking_assignments = -1;
 }
 
 #define LEFT_COLUMN	27
