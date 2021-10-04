@@ -3339,9 +3339,6 @@ A 64-bit scalar constant that can be loaded with the XXSPLTIDP instruction.
 @item eI
 A signed 34-bit integer constant if prefixed instructions are supported.
 
-@item eQ
-An IEEE 128-bit constant that can be loaded with the LXVKQ instruction.
-
 @item eV
 A 128-bit vector constant that can be loaded with the XXSPLTIDP instruction.
 

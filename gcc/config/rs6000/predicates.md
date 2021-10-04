@@ -606,11 +606,6 @@
   if (easy_fp_constant_64bit_scalar (op, mode))
     return 1;
 
-  /* If we have the ISA 3.1 LXVKQ instruction, see if the constant can be loaded
-     with that instruction.  */
-  if (easy_fp_constant_ieee128 (op, mode))
-    return 1;
-
   /* Otherwise consider floating point constants hard, so that the
      constant gets pushed to memory during the early RTL phases.  This
      has the advantage that double precision constants that can be
@@ -780,79 +775,6 @@
     return false;
 
   return num_insns == 1;
-})
-
-;; Return 1 if the operand is an IEEE 128-bit special constant that can be
-;; loaded with the LXVKQ instruction.
-(define_predicate "easy_fp_constant_ieee128"
-  (match_code "const_double")
-{
-  if (!TARGET_LXVKQ || !TARGET_POWER10 || !TARGET_VSX || !TARGET_FLOAT128_HW)
-    return false;
-
-  if (mode == VOIDmode)
-    mode = GET_MODE (op);
-
-  if (!FLOAT128_IEEE_P (mode))
-    return false;
-
-  if (!CONST_DOUBLE_P (op))
-    return false;
-
-  /* Special values (+/-infinity, -0.0.  */
-  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op);
-  if (real_isinf (rv) || real_isnegzero (rv))
-    return true;
-
-  /* Only recognize the normal NaN.  Do not recognize NaNs with the negative
-     sign, signaling NaNs, or NaNs that have non-zero mantissa.  */
-  if (real_isnan (rv))
-    {
-      long w[4];
-
-      real_to_target (&w[0], rv, mode);
-      return (BYTES_BIG_ENDIAN
-	      ? (w[0] == 0x7fff8000 && w[1] == 0 && w[2] == 0 && w[3] == 0)
-	      : (w[3] == 0x7fff8000 && w[2] == 0 && w[1] == 0 && w[0] == 0));
-    }
-
-  if (real_issignaling_nan (rv))
-    return false;
-
-  /* All of the values generated can be expressed as SFmode values, if it
-     doesn't fit in SFmode, exit.  */
-  if (!exact_real_truncate (SFmode, rv))
-    return false;
-
-  /* The other values are all integers 1..7, and -1..-7.  */
-  if (!real_isinteger (rv, mode))
-    return false;
-
-  HOST_WIDE_INT value = real_to_integer (rv);
-  switch (value)
-    {
-    default:
-      break;
-
-    case 1:
-    case 2:
-    case 3:
-    case 4:
-    case 5:
-    case 6:
-    case 7:
-    case -1:
-    case -2:
-    case -3:
-    case -4:
-    case -5:
-    case -6:
-    case -7:
-      return true;
-    }
-
-  /* We can't load the value with LXVKQ.  */
-  return false;
 })
 
 ;; Return 1 if the operand is a CONST_VECTOR and can be loaded into a
