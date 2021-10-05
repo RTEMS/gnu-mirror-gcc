@@ -601,149 +601,12 @@
   if (TARGET_VSX && op == CONST0_RTX (mode))
     return 1;
 
-  /* If we have the ISA 3.1 XXSPLTIDP instruction, see if the constant can
-     be loaded with that instruction.  */
-  if (easy_fp_constant_64bit_scalar (op, mode))
-    return 1;
-
   /* Otherwise consider floating point constants hard, so that the
      constant gets pushed to memory during the early RTL phases.  This
      has the advantage that double precision constants that can be
      represented in single precision without a loss of precision will
      use single precision loads.  */
    return 0;
-})
-
-;; Return 1 if the operand is a 64-bit scalar constant that can be loaded via
-;; the XXSPLTIDP instruction, which takes a SFmode value and produces a V2DF or
-;; V2DI mode result that is interpretted as a 64-bit scalar.
-(define_predicate "easy_fp_constant_64bit_scalar"
-  (match_code "const_int,const_double")
-{
-  const REAL_VALUE_TYPE *rv;
-  REAL_VALUE_TYPE rv_type;
-
-  /* Can we do the XXSPLTIDP instruction?  */
-  if (!TARGET_XXSPLTIDP || !TARGET_PREFIXED || !TARGET_VSX)
-    return false;
-
-  if (mode == VOIDmode)
-    mode = GET_MODE (op);
-
-  /* Don't return true for 0.0 or 0 since that is easy to create without
-     XXSPLTIDP.  */
-  if (op == CONST0_RTX (mode))
-    return false;
-
-  /* Handle DImode by creating a DF value from it.  */
-  if (CONST_INT_P (op) && (mode == DImode || mode == VOIDmode))
-    {
-      HOST_WIDE_INT df_value = INTVAL (op);
-
-      /* Avoid values that look like DFmode NaN's.  The IEEE 754 64-bit
-         floating format has 1 bit for sign, 11 bits for the exponent,
-         and 52 bits for the mantissa.  NaN values have the exponent set
-         to all 1 bits, and the mantissa non-zero (mantissa == 0 is
-         infinity).  */
-      int df_exponent = (df_value >> 52) & 0x7ff;
-      HOST_WIDE_INT df_mantissa = df_value & HOST_WIDE_INT_C (0x1fffffffffffff);
-
-      if (df_exponent == 0x7ff && df_mantissa != 0)	/* NaN.  */
-	return false;
-
-      /* Avoid values that are DFmode subnormal values.  Subnormal numbers
-         have the exponent all 0 bits, and the mantissa non-zero.  If the
-         value is subnormal, then the hidden bit in the mantissa is not
-         set.  */
-      if (df_exponent == 0 && df_mantissa != 0)		/* subnormal.  */
-	return false;
-
-      long df_words[2];
-      df_words[0] = (df_value >> 32) & 0xffffffff;
-      df_words[1] = df_value & 0xffffffff;
-
-      /* real_from_target takes the target words in  target order.  */
-      if (!BYTES_BIG_ENDIAN)
-	std::swap (df_words[0], df_words[1]);
-
-      real_from_target (&rv_type, df_words, DFmode);
-      rv = &rv_type;
-    }
-
-  /* Handle SFmode/DFmode constants.  Don't allow decimal or IEEE 128-bit
-     binary constants.  */
-  else if (CONST_DOUBLE_P (op) && (mode == SFmode || mode == DFmode))
-    rv = CONST_DOUBLE_REAL_VALUE (op);
-
-  /* We can't handle anything else with the XXSPLTIDP instruction.  */
-  else
-    return false;  
-
-  /* Validate that the number can be stored as a SFmode value.  */
-  if (!exact_real_truncate (SFmode, rv))
-    return false;
-
-  /* Validate that the number is not a SFmode subnormal value (exponent is 0,
-     mantissa field is non-zero) which is undefined for the XXSPLTIDP
-     instruction.  */
-  long sf_value;
-  real_to_target (&sf_value, rv, SFmode);
-
-  /* IEEE 754 32-bit values have 1 bit for the sign, 8 bits for the exponent,
-     and 23 bits for the mantissa.  Subnormal numbers have the exponent all
-     0 bits, and the mantissa non-zero.  */
-  long sf_exponent = (sf_value >> 23) & 0xFF;
-  long sf_mantissa = sf_value & 0x7FFFFF;
-
-  if (sf_exponent == 0 && sf_mantissa != 0)
-    return false;
-
-  return true;
-})
-
-;; Return 1 if the operand is a 64-bit vector constant that can be loaded via
-;; the XXSPLTIDP instruction, which takes a SFmode value and produces a
-;; V2DFmode or V2DI result.
-;;
-;; We cannot combine the scalar and vector cases because otherwise it is
-;; problematical if we assign an appropriate integer constant to a TImode
-;; value.  I.e.
-;;
-;;	(set (reg:TI 32)
-;;	     (const_int 0x8000000000000000))
-;;
-;; Otherwise, the constant would be splatted into the 2 64-bit positions in the
-;; vector register, and not loaded with the upper 64-bits 0, and the constant
-;; in the lower 64-bits.
-
-(define_predicate "easy_vector_constant_64bit_element"
-  (match_code "const_vector,vec_duplicate")
-{
-  /* Can we do the XXSPLTIDP instruction?  */
-  if (!TARGET_XXSPLTIDP || !TARGET_PREFIXED || !TARGET_VSX)
-    return false;
-
-  if (mode == VOIDmode)
-    mode = GET_MODE (op);
-
-  if (mode != V2DFmode && mode != V2DImode)
-    return false;
-
-  if (CONST_VECTOR_P (op))
-    {
-      if (!CONST_VECTOR_DUPLICATE_P (op))
-	return false;
-
-      op = CONST_VECTOR_ELT (op, 0);
-    }
-
-  else if (GET_CODE (op) == VEC_DUPLICATE)
-    op = XEXP (op, 0);
-
-  else
-    return false;
-
-  return easy_fp_constant_64bit_scalar (op, GET_MODE_INNER (mode));
 })
 
 ;; Return 1 if the operand is a constant that can loaded with a XXSPLTIB
@@ -788,9 +651,6 @@
       int num_insns = -1;
 
       if (zero_constant (op, mode) || all_ones_constant (op, mode))
-	return true;
-
-      if (easy_vector_constant_64bit_element (op, mode))
 	return true;
 
       if (TARGET_P9_VECTOR

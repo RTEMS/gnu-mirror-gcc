@@ -6946,60 +6946,6 @@ xxspltib_constant_p (rtx op,
   return true;
 }
 
-/* Return the immediate value used in the XXSPLTIDP instruction.  */
-
-long
-xxspltidp_constant_immediate (rtx op, machine_mode mode)
-{
-  long ret;
-
-  /* Handle vectors.  */
-  if (CONST_VECTOR_P (op))
-    {
-      op = CONST_VECTOR_ELT (op, 0);
-      mode = GET_MODE_INNER (mode);
-    }
-
-  else if (GET_CODE (op) == VEC_DUPLICATE)
-    {
-      op = XEXP (op, 0);
-      mode = GET_MODE (op);
-    }
-
-  gcc_assert (easy_fp_constant_64bit_scalar (op, mode));
-
-  /* Handle DImode/V2DImode by creating a DF value from it and then converting
-     the DFmode value to SFmode.  */
-  if (CONST_INT_P (op))
-    {
-      HOST_WIDE_INT df_value = INTVAL (op);
-      long df_words[2];
-
-      df_words[0] = (df_value >> 32) & 0xffffffff;
-      df_words[1] = df_value & 0xffffffff;
-
-      /* real_to_target takes input in target endian order.  */
-      if (!BYTES_BIG_ENDIAN)
-	std::swap (df_words[0], df_words[1]);
-
-      REAL_VALUE_TYPE r;
-      real_from_target (&r, &df_words[0], DFmode);
-      real_to_target (&ret, &r, SFmode);
-    }
-
-  /* For floating point constants, convert to SFmode.  */
-  else if (CONST_DOUBLE_P (op) && (mode == SFmode || mode == DFmode))
-    {
-      const REAL_VALUE_TYPE *rv = CONST_DOUBLE_REAL_VALUE (op);
-      real_to_target (&ret, rv, SFmode);
-    }
-
-  else
-    gcc_unreachable ();
-
-  return ret;
-}
-
 const char *
 output_vec_const_move (rtx *operands)
 {
@@ -7042,13 +6988,6 @@ output_vec_const_move (rtx *operands)
 
 	  else
 	    gcc_unreachable ();
-	}
-
-      if (easy_fp_constant_64bit_scalar (vec, mode)
-	  || easy_vector_constant_64bit_element (vec, mode))
-	{
-	  operands[2] = GEN_INT (xxspltidp_constant_immediate (vec, mode));
-	  return "xxspltidp %x0,%2";
 	}
 
       if (TARGET_P9_VECTOR
@@ -26783,41 +26722,6 @@ prefixed_paddi_p (rtx_insn *insn)
 					       NON_PREFIXED_DEFAULT);
 
   return (iform == INSN_FORM_PCREL_EXTERNAL || iform == INSN_FORM_PCREL_LOCAL);
-}
-
-/* Whether a permute type instruction is a prefixed XXSPLTI* instruction.
-   This is called from the prefixed attribute processing.  */
-
-bool
-prefixed_xxsplti_p (rtx_insn *insn)
-{
-  rtx set = single_set (insn);
-  if (!set)
-    return false;
-
-  rtx dest = SET_DEST (set);
-  rtx src = SET_SRC (set);
-  machine_mode mode = GET_MODE (dest);
-
-  if (!REG_P (dest) && !SUBREG_P (dest))
-    return false;
-
-  switch (mode)
-    {
-    case E_DImode:
-    case E_DFmode:
-    case E_SFmode:
-      return easy_fp_constant_64bit_scalar (src, mode);
-
-    case E_V2DImode:
-    case E_V2DFmode:
-      return easy_vector_constant_64bit_element (src, mode);
-
-    default:
-      break;
-    }
-
-  return false;
 }
 
 /* Whether the next instruction needs a 'p' prefix issued before the

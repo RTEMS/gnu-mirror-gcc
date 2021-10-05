@@ -3333,14 +3333,8 @@ The integer constant zero.
 A constant whose negation is a signed 16-bit constant.
 @end ifset
 
-@item eF
-A 64-bit scalar constant that can be loaded with the XXSPLTIDP instruction.
-
 @item eI
 A signed 34-bit integer constant if prefixed instructions are supported.
-
-@item eV
-A 128-bit vector constant that can be loaded with the XXSPLTIDP instruction.
 
 @ifset INTERNALS
 @item G
