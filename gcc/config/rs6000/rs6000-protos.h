@@ -32,7 +32,6 @@ extern void init_cumulative_args (CUMULATIVE_ARGS *, tree, rtx, int, int, int,
 
 extern int easy_altivec_constant (rtx, machine_mode);
 extern bool xxspltib_constant_p (rtx, machine_mode, int *, int *);
-extern void xxsplti32dx_constant_immediate (rtx, machine_mode, long *, long *);
 extern long xxspltidp_constant_immediate (rtx, machine_mode);
 extern long xxspltiw_constant_immediate (rtx, machine_mode);
 extern int lxvkq_constant_immediate (rtx, machine_mode);

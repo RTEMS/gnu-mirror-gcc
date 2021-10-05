@@ -611,11 +611,6 @@
   if (easy_fp_constant_ieee128 (op, mode))
     return 1;
 
-  /* If we have the ISA 3.1 XXSPLTI32DX instruction, see if the constant can be
-     loaded with a pair of instructions.  */
-  if (easy_vector_constant_2insns (op, mode))
-    return 1;
-
   /* Otherwise consider floating point constants hard, so that the
      constant gets pushed to memory during the early RTL phases.  This
      has the advantage that double precision constants that can be
@@ -754,60 +749,6 @@
     return false;
 
   return easy_fp_constant_64bit_scalar (op, GET_MODE_INNER (mode));
-})
-
-;; Return 1 if the operand is either a DImode/DFmode scalar constant or
-;; V2DImode/V2DFmode vector constant that needs 2 XXSPLTI32DX instructions to
-;; load the value
-
-(define_predicate "easy_vector_constant_2insns"
-  (match_code "const_vector,vec_duplicate,const_int,const_double")
-{
-  /* Can we do the XXSPLTI32DX instruction?  */
-  if (!TARGET_XXSPLTI32DX || !TARGET_PREFIXED || !TARGET_VSX)
-    return false;
-
-  if (mode == VOIDmode)
-    mode = GET_MODE (op);
-
-  /* Convert vector constant/duplicate into a scalar.  */
-  if (CONST_VECTOR_P (op))
-    {
-      if (!CONST_VECTOR_DUPLICATE_P (op))
-	return false;
-
-      op = CONST_VECTOR_ELT (op, 0);
-      mode = GET_MODE_INNER (mode);
-    }
-
-  else if (GET_CODE (op) == VEC_DUPLICATE)
-    {
-      op = XEXP (op, 0);
-      mode = GET_MODE_INNER (mode);
-    }
-
-  if (GET_MODE_SIZE (mode) > 8)
-    return false;
-
-  /* 0.0 or 0 is easy to generate.  */
-  if (op == CONST0_RTX (mode))
-    return false;
-
-  /* If we can load up the constant in other ways (either a single load
-     constant and a direct move or XXSPLTIDP), don't generate the
-     XXSPLTI32DX.  */
-  if (CONST_INT_P (op))
-    return !(satisfies_constraint_I (op)
-             || satisfies_constraint_L (op)
-             || satisfies_constraint_eI (op)
-             || easy_fp_constant_64bit_scalar (op, mode));
-
-  /* For floating point, if we can use XXSPLTIDP, we don't want to
-     generate XXSPLTI32DX's.  */
-  else if (CONST_DOUBLE_P (op) && (mode == SFmode || mode == DFmode))
-    return !easy_fp_constant_64bit_scalar (op, mode);
-
-  return false;
 })
 
 ;; Return 1 if the operand is a constant that can be loaded with the XXSPLTIW
@@ -1030,9 +971,6 @@
 
       if (easy_vector_constant_splat_word (op, mode))
 	return true;
-
-      if (easy_vector_constant_2insns (op, mode))
-	return 1;
 
       if (TARGET_P9_VECTOR
           && xxspltib_constant_p (op, mode, &num_insns, &value))
