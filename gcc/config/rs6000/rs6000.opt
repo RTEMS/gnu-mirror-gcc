@@ -640,19 +640,6 @@ mprivileged
 Target Var(rs6000_privileged) Init(0)
 Generate code that will run in privileged state.
 
-mxxspltidp
-Target Undocumented Var(TARGET_XXSPLTIDP) Init(1) Save
-Generate (do not generate) XXSPLTIDP instructions.
-
-;; Do not enable at this time.
-mxxspltiw
-Target Undocumented Var(TARGET_XXSPLTIW) Init(0) Save
-Generate (do not generate) XXSPLTIW instructions.
-
-mlxvkq
-Target Undocumented Var(TARGET_LXVKQ) Init(1) Save
-Generate (do not generate) LXVKQ instructions.
-
 -param=rs6000-density-pct-threshold=
 Target Undocumented Joined UInteger Var(rs6000_density_pct_threshold) Init(85) IntegerRange(0, 100) Param
 When costing for loop vectorization, we probably need to penalize the loop body
