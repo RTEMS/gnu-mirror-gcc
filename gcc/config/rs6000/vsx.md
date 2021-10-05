@@ -376,6 +376,7 @@
    UNSPEC_XXSPLTIW
    UNSPEC_XXSPLTIDP
    UNSPEC_XXSPLTI32DX
+   UNSPEC_XXSPLTI32DX_CONST
    UNSPEC_XXBLEND
    UNSPEC_XXPERMX
   ])
@@ -1191,19 +1192,19 @@
 ;; instruction). But generate XXLXOR/XXLORC if it will avoid a register move.
 
 ;;              VSX store  VSX load   VSX move  VSX->GPR   GPR->VSX    LQ (GPR)
-;;              XXSPLTIDP  XXSPLTIW   LXVKQ
+;;              XXSPLTIDP  XXSPLTIW   LXVKQ     XXSPLTI32DX
 ;;              STQ (GPR)  GPR load   GPR store GPR move   XXSPLTIB    VSPLTISW
 ;;              VSX 0/-1   VMX const  GPR const LVX (VMX)  STVX (VMX)
 (define_insn "vsx_mov<mode>_64bit"
   [(set (match_operand:VSX_M 0 "nonimmediate_operand"
                "=ZwO,      wa,        wa,        r,         we,        ?wQ,
-                wa,        wa,        wa,
+                wa,        wa,        wa,        wa,
                 ?&r,       ??r,       ??Y,       <??r>,     wa,        v,
                 ?wa,       v,         <??r>,     wZ,        v")
 
 	(match_operand:VSX_M 1 "input_operand" 
                "wa,        ZwO,       wa,        we,        r,         r,
-                eV,        eW,        eQ,
+                eV,        eW,        eQ,        eD,
                 wQ,        Y,         r,         r,         wE,        jwM,
                 ?jwM,      W,         <nW>,      v,         wZ"))]
 
@@ -1215,44 +1216,44 @@
 }
   [(set_attr "type"
                "vecstore,  vecload,   vecsimple, mtvsr,     mfvsr,     load,
-                vecperm,   vecperm,   vecperm,
+                vecperm,   vecperm,   vecperm,   vecperm,
                 store,     load,      store,     *,         vecsimple, vecsimple,
                 vecsimple, *,         *,         vecstore,  vecload")
    (set_attr "num_insns"
                "*,         *,         *,         2,         *,         2,
-                *,         *,         *,
+                *,         *,         *,         2,
                 2,         2,         2,         2,         *,         *,
                 *,         5,         2,         *,         *")
    (set_attr "max_prefixed_insns"
                "*,         *,         *,         *,         *,         2,
-                *,         *,         *,
+                *,         *,         *,         2,
                 2,         2,         2,         2,         *,         *,
                 *,         *,         *,         *,         *")
    (set_attr "length"
                "*,         *,         *,         8,         *,         8,
-                *,         *,         *,
+                *,         *,         *,         *,
                 8,         8,         8,         8,         *,         *,
                 *,         20,        8,         *,         *")
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
-                p10,       p10,       p10,
+                p10,       p10,       p10,       p10,
                 *,         *,         *,         *,         p9v,       *,
                 <VSisa>,   *,         *,         *,         *")])
 
 ;;              VSX store  VSX load   VSX move   GPR load   GPR store  GPR move
-;;              XXSPLTIDP  XXSPLTIW   LXVKQ
+;;              XXSPLTIDP  XXSPLTIW   LXVKQ      XXSPLTI32DX
 ;;              XXSPLTIB   VSPLTISW   VSX 0/-1   VMX const  GPR const
 ;;              LVX (VMX)  STVX (VMX)
 (define_insn "*vsx_mov<mode>_32bit"
   [(set (match_operand:VSX_M 0 "nonimmediate_operand"
                "=ZwO,      wa,        wa,        ??r,       ??Y,       <??r>,
-                wa,        wa,        wa,
+                wa,        wa,        wa,        wa,
                 wa,        v,         ?wa,       v,         <??r>,
                 wZ,        v")
 
 	(match_operand:VSX_M 1 "input_operand" 
                "wa,        ZwO,       wa,        Y,         r,         r,
-                eV,        eW,        eQ,
+                eV,        eW,        eQ,        eD,
                 wE,        jwM,       ?jwM,      W,         <nW>,
                 v,         wZ"))]
 
@@ -1264,17 +1265,27 @@
 }
   [(set_attr "type"
                "vecstore,  vecload,   vecsimple, load,      store,    *,
-                vecperm,   vecperm,   vecperm,
+                vecperm,   vecperm,   vecperm,   vecperm,
                 vecsimple, vecsimple, vecsimple, *,         *,
                 vecstore,  vecload")
    (set_attr "length"
                "*,         *,         *,         16,        16,        16,
-                *,         *,         *,
+                *,         *,         *,         *,
                 *,         *,         *,         20,        16,
+                *,         *")
+   (set_attr "num_insns"
+               "*,         *,         *,         *,         *,         *,
+                *,         *,         *,         2,
+                *,         *,         *,         *,         *,
+                *,         *")
+   (set_attr "length"
+               "*,         *,         *,         *,         *,         *,
+                *,         *,         *,         2,
+                *,         *,         *,         *,         *,
                 *,         *")
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
-                p10,       p10,       p10,
+                p10,       p10,       p10,       p10,
                 p9v,       *,         <VSisa>,   *,         *,
                 *,         *")])
 
@@ -6569,6 +6580,74 @@
   "xxsplti32dx %x0,%2,%3"
   [(set_attr "type" "vecperm")
    (set_attr "prefixed" "yes")])
+
+;; XXSPLTI32DX used to create 64-bit constants or vector constants where the
+;; even elements match and the odd elements match.
+(define_mode_iterator XXSPLTI32DX [DI SF DF V2DF V2DI])
+
+;; Don't split DImode before register allocation, so that it has a better
+;; chance of winding up in a GPR register.
+(define_split
+  [(set (match_operand:XXSPLTI32DX 0 "vsx_register_operand")
+	(match_operand:XXSPLTI32DX 1 "easy_vector_constant_2insns"))]
+  "TARGET_POWER10 && (reload_completed || <MODE>mode != DImode)"
+  [(set (match_dup 0)
+	(unspec:XXSPLTI32DX [(match_dup 2)
+			     (match_dup 3)] UNSPEC_XXSPLTI32DX_CONST))
+   (set (match_dup 0)
+	(unspec:XXSPLTI32DX [(match_dup 0)
+			     (match_dup 4)
+			     (match_dup 5)] UNSPEC_XXSPLTI32DX_CONST))]
+{
+  long high = 0, low = 0;
+
+  xxsplti32dx_constant_immediate (operands[1], <MODE>mode, &high, &low);
+
+  /* If the low bits are 0 or all 1s, initialize that word first.  This way we
+     can use a smaller XXSPLTIB/XXLXOR/XXLORC instruction instead the first
+     XXSPLTI32DX.  */
+  if (low == 0 || low ==  -1)
+    {
+      operands[2] = const1_rtx;
+      operands[3] = GEN_INT (low);
+      operands[4] = const0_rtx;
+      operands[5] = GEN_INT (high);
+    }
+  else
+    {
+      operands[2] = const0_rtx;
+      operands[3] = GEN_INT (high);
+      operands[4] = const1_rtx;
+      operands[5] = GEN_INT (low);
+    }
+})
+
+;; First word of XXSPLTI32DX
+(define_insn "*xxsplti32dx_<mode>_first"
+  [(set (match_operand:XXSPLTI32DX 0 "vsx_register_operand" "=wa,wa,wa")
+	(unspec:XXSPLTI32DX [(match_operand 1 "u1bit_cint_operand" "n,n,n")
+			     (match_operand 2 "const_int_operand" "O,wM,n")]
+			    UNSPEC_XXSPLTI32DX_CONST))]
+  "TARGET_XXSPLTI32DX"
+  "@
+   xxlxor %x0,%x0,%x0
+   xxlorc %x0,%x0,%x0
+   xxsplti32dx %x0,%1,%2"
+  [(set_attr "type" "veclogical,veclogical,vecperm")
+   (set_attr "prefixed" "*,*,yes")])
+
+;; Second word of XXSPLTI32DX
+(define_insn "*xxsplti32dx_<mode>_second"
+  [(set (match_operand:XXSPLTI32DX 0 "vsx_register_operand" "=wa")
+	(unspec:XXSPLTI32DX [(match_operand:XXSPLTI32DX 1 "vsx_register_operand" "0")
+			     (match_operand 2 "u1bit_cint_operand" "n")
+			     (match_operand 3 "const_int_operand" "n")]
+			    UNSPEC_XXSPLTI32DX_CONST))]
+  "TARGET_XXSPLTI32DX"
+  "xxsplti32dx %x0,%2,%3"
+  [(set_attr "type" "vecperm")
+   (set_attr "prefixed" "yes")])
+
 
 ;; XXBLEND built-in function support
 (define_insn "xxblend_<mode>"
