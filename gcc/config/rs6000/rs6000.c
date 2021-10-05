@@ -7000,6 +7000,96 @@ xxspltidp_constant_immediate (rtx op, machine_mode mode)
   return ret;
 }
 
+/* Return the constant that will go in the LXVKQ instruction.  */
+
+/* LXVKQ immediates.  */
+enum {
+  LXVKQ_ONE		= 1,
+  LXVKQ_TWO		= 2,
+  LXVKQ_THREE		= 3,
+  LXVKQ_FOUR		= 4,
+  LXVKQ_FIVE		= 5,
+  LXVKQ_SIX		= 6,
+  LXVKQ_SEVEN		= 7,
+  LXVKQ_INF		= 8,
+  LXVKQ_NAN		= 9,
+  LXVKQ_NEG_ZERO	= 16,
+  LXVKQ_NEG_ONE		= 17,
+  LXVKQ_NEG_TWO		= 18,
+  LXVKQ_NEG_THREE	= 19,
+  LXVKQ_NEG_FOUR	= 20,
+  LXVKQ_NEG_FIVE	= 21,
+  LXVKQ_NEG_SIX		= 22,
+  LXVKQ_NEG_SEVEN	= 23,
+  LXVKQ_NEG_INF		= 24
+};
+
+int
+lxvkq_constant_immediate (rtx op, machine_mode mode)
+{
+  int ret = -1;
+  gcc_assert (easy_fp_constant_ieee128 (op, mode));
+
+  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op);
+
+  gcc_assert (!real_issignaling_nan (rv));
+
+  /* Special values (infinity, nan, -0.0.  */
+  if (real_isinf (rv))
+    ret = real_isneg (rv) ? LXVKQ_NEG_INF : LXVKQ_INF;
+
+  /* Only recognize the normal NaN.  Do not recognize NaNs with the negative
+     sign, signaling NaNs, or NaNs that have non-zero mantissa.  */
+  else if (real_isnan (rv))
+    {
+      long w[4];
+
+      real_to_target (&w[0], rv, mode);
+      gcc_assert (BYTES_BIG_ENDIAN
+		  ? (w[0] == 0x7fff8000 && w[1] == 0 && w[2] == 0
+		     && w[3] == 0)
+		  : (w[3] == 0x7fff8000 && w[2] == 0 && w[1] == 0
+		     && w[0] == 0));
+
+      ret = LXVKQ_NAN;
+    }
+
+  else if (real_isnegzero (rv))
+    ret = LXVKQ_NEG_ZERO;
+
+  else
+    {
+      HOST_WIDE_INT value = real_to_integer (rv);
+      switch (value)
+	{
+	default:
+	  gcc_unreachable ();
+
+	case 1:
+	case 2:
+	case 3:
+	case 4:
+	case 5:
+	case 6:
+	case 7:
+	  ret = LXVKQ_ONE + (value - 1);
+	  break;
+
+	case -1:
+	case -2:
+	case -3:
+	case -4:
+	case -5:
+	case -6:
+	case -7:
+	  ret = LXVKQ_NEG_ONE + (-value - 1);
+	  break;
+	}
+    }
+
+  return ret;
+}
+
 const char *
 output_vec_const_move (rtx *operands)
 {
@@ -7049,6 +7139,12 @@ output_vec_const_move (rtx *operands)
 	{
 	  operands[2] = GEN_INT (xxspltidp_constant_immediate (vec, mode));
 	  return "xxspltidp %x0,%2";
+	}
+
+      if (easy_fp_constant_ieee128 (vec, mode))
+	{
+	  operands[2] = GEN_INT (lxvkq_constant_immediate (vec, mode));
+	  return "lxvkq %x0,%2";
 	}
 
       if (TARGET_P9_VECTOR
@@ -13893,6 +13989,12 @@ rs6000_output_move_128bit (rtx operands[])
     }
 
   /* Constants.  */
+  else if (dest_vsx_p && easy_fp_constant_ieee128 (src, mode))
+    {
+      operands[2] = GEN_INT (lxvkq_constant_immediate (src, mode));
+      return "lxvkq %x0,%2";
+    }
+
   else if (dest_regno >= 0
 	   && (CONST_INT_P (src)
 	       || CONST_WIDE_INT_P (src)
