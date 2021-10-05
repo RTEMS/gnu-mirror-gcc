@@ -208,10 +208,20 @@
   (and (match_code "const_int")
        (match_test "((- (unsigned HOST_WIDE_INT) ival) + 0x8000) < 0x10000")))
 
+;; DI/SF/DF scalar constant that can be loaded with the XXSPLTIDP instruction.
+(define_constraint "eF"
+  "A 64-bit scalar constant that can be loaded with the XXSPLTIDP instruction."
+  (match_operand 0 "easy_fp_constant_64bit_scalar"))
+
 ;; 34-bit signed integer constant
 (define_constraint "eI"
   "A signed 34-bit integer constant if prefixed instructions are supported."
   (match_operand 0 "cint34_operand"))
+
+;; V2DI/V2DF vector constant that can be loaded with the XXSPLTIDP instruction.
+(define_constraint "eV"
+  "A 128-bit vector constant that can be loaded with the XXSPLTIDP instruction."
+  (match_operand 0 "easy_vector_constant_64bit_element"))
 
 ;; Floating-point constraints.  These two are defined so that insn
 ;; length attributes can be calculated exactly.
