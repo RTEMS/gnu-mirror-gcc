@@ -751,6 +751,104 @@
   return easy_fp_constant_64bit_scalar (op, GET_MODE_INNER (mode));
 })
 
+;; Return 1 if the operand is a constant that can be loaded with the XXSPLTIW
+;; instruction that loads up a 32-bit immediate and splats it into the vector.
+
+(define_predicate "easy_vector_constant_splat_word"
+  (match_code "const_vector")
+{
+  HOST_WIDE_INT value;
+
+  if (!TARGET_PREFIXED || !TARGET_VSX || !TARGET_XXSPLTIW)
+    return false;
+
+  rtx element0 = CONST_VECTOR_ELT (op, 0);
+
+  switch (mode)
+    {
+      /* V4SImode constant vectors that have the same element are can be used
+	 with XXSPLTIW.  */
+    case V4SImode:
+      if (!CONST_VECTOR_DUPLICATE_P (op))
+	return false;
+
+      /* Don't return true if we can use the shorter vspltisw instruction.  */
+      value = INTVAL (element0);
+      return (!EASY_VECTOR_15 (value));
+
+      /* V4SFmode constant vectors that have the same element are
+	 can be used with XXSPLTIW.  */
+    case V4SFmode:
+      if (!CONST_VECTOR_DUPLICATE_P (op))
+	return false;
+
+      /* Don't return true for 0.0f, since that can be created with
+	 xxspltib or xxlxor.  */
+      return (element0 != CONST0_RTX (SFmode));
+
+      /* V8Hmode constant vectors that have the same element are can be used
+	 with XXSPLTIW.  */
+    case V8HImode:
+      if (CONST_VECTOR_DUPLICATE_P (op))
+	{
+	  /* Don't return true if we can use the shorter vspltish instruction.  */
+	  value = INTVAL (element0);
+	  if (EASY_VECTOR_15 (value))
+	    return false;
+
+	  return true;
+	}
+
+      else
+	{
+	  /* Check if all even elements are the same and all odd elements are
+	     the same.  */
+	  rtx element1 = CONST_VECTOR_ELT (op, 1);
+
+	  if (!CONST_INT_P (element1))
+	    return false;
+
+	  for (size_t i = 2; i < GET_MODE_NUNITS (V8HImode); i += 2)
+	    if (!rtx_equal_p (element0, CONST_VECTOR_ELT (op, i))
+		|| !rtx_equal_p (element1, CONST_VECTOR_ELT (op, i + 1)))
+	      return false;
+
+	  return true;
+	}
+
+      /* V16QI constant vectors that have the first four elements identical to
+	 the next set of 4 elements, and so forth can generate XXSPLTIW.  */
+    case V16QImode:
+	{
+	  /* If we can use XXSPLTIB, don't generate XXSPLTIW.  */
+	  if (xxspltib_constant_nosplit (op, mode))
+	    return false;
+
+	  rtx element1 = CONST_VECTOR_ELT (op, 1);
+	  rtx element2 = CONST_VECTOR_ELT (op, 2);
+	  rtx element3 = CONST_VECTOR_ELT (op, 3);
+
+	  if (!CONST_INT_P (element0) || !CONST_INT_P (element1)
+	      || !CONST_INT_P (element2) || !CONST_INT_P (element3))
+	    return false;
+
+	  for (size_t i = 4; i < GET_MODE_NUNITS (V16QImode); i += 4)
+	    if (!rtx_equal_p (element0, CONST_VECTOR_ELT (op, i))
+		|| !rtx_equal_p (element1, CONST_VECTOR_ELT (op, i + 1))
+		|| !rtx_equal_p (element2, CONST_VECTOR_ELT (op, i + 2))
+		|| !rtx_equal_p (element3, CONST_VECTOR_ELT (op, i + 3)))
+	      return false;
+
+	  return true;
+	}
+
+    default:
+      break;
+    }
+
+  return false;
+})
+
 ;; Return 1 if the operand is a constant that can loaded with a XXSPLTIB
 ;; instruction and then a VUPKHSB, VECSB2W or VECSB2D instruction.
 
@@ -869,6 +967,9 @@
 	return true;
 
       if (easy_vector_constant_64bit_element (op, mode))
+	return true;
+
+      if (easy_vector_constant_splat_word (op, mode))
 	return true;
 
       if (TARGET_P9_VECTOR
