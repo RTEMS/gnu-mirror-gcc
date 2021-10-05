@@ -6946,150 +6946,6 @@ xxspltib_constant_p (rtx op,
   return true;
 }
 
-/* Return the immediate value used in the XXSPLTIDP instruction.  */
-
-long
-xxspltidp_constant_immediate (rtx op, machine_mode mode)
-{
-  long ret;
-
-  /* Handle vectors.  */
-  if (CONST_VECTOR_P (op))
-    {
-      op = CONST_VECTOR_ELT (op, 0);
-      mode = GET_MODE_INNER (mode);
-    }
-
-  else if (GET_CODE (op) == VEC_DUPLICATE)
-    {
-      op = XEXP (op, 0);
-      mode = GET_MODE (op);
-    }
-
-  gcc_assert (easy_fp_constant_64bit_scalar (op, mode));
-
-  /* Handle DImode/V2DImode by creating a DF value from it and then converting
-     the DFmode value to SFmode.  */
-  if (CONST_INT_P (op))
-    {
-      HOST_WIDE_INT df_value = INTVAL (op);
-      long df_words[2];
-
-      df_words[0] = (df_value >> 32) & 0xffffffff;
-      df_words[1] = df_value & 0xffffffff;
-
-      /* real_to_target takes input in target endian order.  */
-      if (!BYTES_BIG_ENDIAN)
-	std::swap (df_words[0], df_words[1]);
-
-      REAL_VALUE_TYPE r;
-      real_from_target (&r, &df_words[0], DFmode);
-      real_to_target (&ret, &r, SFmode);
-    }
-
-  /* For floating point constants, convert to SFmode.  */
-  else if (CONST_DOUBLE_P (op) && (mode == SFmode || mode == DFmode))
-    {
-      const REAL_VALUE_TYPE *rv = CONST_DOUBLE_REAL_VALUE (op);
-      real_to_target (&ret, rv, SFmode);
-    }
-
-  else
-    gcc_unreachable ();
-
-  return ret;
-}
-
-/* Return the constant that will go in the LXVKQ instruction.  */
-
-/* LXVKQ immediates.  */
-enum {
-  LXVKQ_ONE		= 1,
-  LXVKQ_TWO		= 2,
-  LXVKQ_THREE		= 3,
-  LXVKQ_FOUR		= 4,
-  LXVKQ_FIVE		= 5,
-  LXVKQ_SIX		= 6,
-  LXVKQ_SEVEN		= 7,
-  LXVKQ_INF		= 8,
-  LXVKQ_NAN		= 9,
-  LXVKQ_NEG_ZERO	= 16,
-  LXVKQ_NEG_ONE		= 17,
-  LXVKQ_NEG_TWO		= 18,
-  LXVKQ_NEG_THREE	= 19,
-  LXVKQ_NEG_FOUR	= 20,
-  LXVKQ_NEG_FIVE	= 21,
-  LXVKQ_NEG_SIX		= 22,
-  LXVKQ_NEG_SEVEN	= 23,
-  LXVKQ_NEG_INF		= 24
-};
-
-int
-lxvkq_constant_immediate (rtx op, machine_mode mode)
-{
-  int ret = -1;
-  gcc_assert (easy_fp_constant_ieee128 (op, mode));
-
-  const struct real_value *rv = CONST_DOUBLE_REAL_VALUE (op);
-
-  gcc_assert (!real_issignaling_nan (rv));
-
-  /* Special values (infinity, nan, -0.0.  */
-  if (real_isinf (rv))
-    ret = real_isneg (rv) ? LXVKQ_NEG_INF : LXVKQ_INF;
-
-  /* Only recognize the normal NaN.  Do not recognize NaNs with the negative
-     sign, signaling NaNs, or NaNs that have non-zero mantissa.  */
-  else if (real_isnan (rv))
-    {
-      long w[4];
-
-      real_to_target (&w[0], rv, mode);
-      gcc_assert (BYTES_BIG_ENDIAN
-		  ? (w[0] == 0x7fff8000 && w[1] == 0 && w[2] == 0
-		     && w[3] == 0)
-		  : (w[3] == 0x7fff8000 && w[2] == 0 && w[1] == 0
-		     && w[0] == 0));
-
-      ret = LXVKQ_NAN;
-    }
-
-  else if (real_isnegzero (rv))
-    ret = LXVKQ_NEG_ZERO;
-
-  else
-    {
-      HOST_WIDE_INT value = real_to_integer (rv);
-      switch (value)
-	{
-	default:
-	  gcc_unreachable ();
-
-	case 1:
-	case 2:
-	case 3:
-	case 4:
-	case 5:
-	case 6:
-	case 7:
-	  ret = LXVKQ_ONE + (value - 1);
-	  break;
-
-	case -1:
-	case -2:
-	case -3:
-	case -4:
-	case -5:
-	case -6:
-	case -7:
-	  ret = LXVKQ_NEG_ONE + (-value - 1);
-	  break;
-	}
-    }
-
-  return ret;
-}
-
 const char *
 output_vec_const_move (rtx *operands)
 {
@@ -7132,19 +6988,6 @@ output_vec_const_move (rtx *operands)
 
 	  else
 	    gcc_unreachable ();
-	}
-
-      if (easy_fp_constant_64bit_scalar (vec, mode)
-	  || easy_vector_constant_64bit_element (vec, mode))
-	{
-	  operands[2] = GEN_INT (xxspltidp_constant_immediate (vec, mode));
-	  return "xxspltidp %x0,%2";
-	}
-
-      if (easy_fp_constant_ieee128 (vec, mode))
-	{
-	  operands[2] = GEN_INT (lxvkq_constant_immediate (vec, mode));
-	  return "lxvkq %x0,%2";
 	}
 
       if (TARGET_P9_VECTOR
@@ -13989,12 +13832,6 @@ rs6000_output_move_128bit (rtx operands[])
     }
 
   /* Constants.  */
-  else if (dest_vsx_p && easy_fp_constant_ieee128 (src, mode))
-    {
-      operands[2] = GEN_INT (lxvkq_constant_immediate (src, mode));
-      return "lxvkq %x0,%2";
-    }
-
   else if (dest_regno >= 0
 	   && (CONST_INT_P (src)
 	       || CONST_WIDE_INT_P (src)
@@ -26885,41 +26722,6 @@ prefixed_paddi_p (rtx_insn *insn)
 					       NON_PREFIXED_DEFAULT);
 
   return (iform == INSN_FORM_PCREL_EXTERNAL || iform == INSN_FORM_PCREL_LOCAL);
-}
-
-/* Whether a permute type instruction is a prefixed XXSPLTI* instruction.
-   This is called from the prefixed attribute processing.  */
-
-bool
-prefixed_xxsplti_p (rtx_insn *insn)
-{
-  rtx set = single_set (insn);
-  if (!set)
-    return false;
-
-  rtx dest = SET_DEST (set);
-  rtx src = SET_SRC (set);
-  machine_mode mode = GET_MODE (dest);
-
-  if (!REG_P (dest) && !SUBREG_P (dest))
-    return false;
-
-  switch (mode)
-    {
-    case E_DImode:
-    case E_DFmode:
-    case E_SFmode:
-      return easy_fp_constant_64bit_scalar (src, mode);
-
-    case E_V2DImode:
-    case E_V2DFmode:
-      return easy_vector_constant_64bit_element (src, mode);
-
-    default:
-      break;
-    }
-
-  return false;
 }
 
 /* Whether the next instruction needs a 'p' prefix issued before the
