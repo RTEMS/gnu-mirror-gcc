@@ -1,3 +1,35 @@
+work070.patch014:
+2021-10-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splat-constant-df-2.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-di-2.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v2df-2.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v2di-2.c: New test.
+
+work070.patch013:
+2021-10-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/vec-splat-constant-v16qi.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v4sf.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v4si.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v8hi.c: New test.
+
+work070.patch012:
+2021-10-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/float128-constant.c: New test.
+
+work070.patch011:
+2021-10-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/pr86731-fwrapv-longlong.c: Update insn
+	regex for power10.
+	* gcc.target/powerpc/vec-splat-constant-df.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-di.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-sf.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v2df.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v2di.c: New test.
+
 2021-10-04   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
