@@ -28,6 +28,10 @@ BASEDIR=$(dirname $0)
 
 chmod +x ${BASEDIR}/init.sh
 ${BASEDIR}/init.sh
+if test $? != 0; then
+  echo "ERROR: Initialization failed"
+  exit -1
+fi
 
 echo "
 ---- READ THIS ---- 

@@ -31,7 +31,7 @@ else
     # Check to make sure the gcc remote URL is the one we're expecting
     gccUrl="$(git config remote.gcc.url)"
     if [[ $gccUrl != "git://gcc.gnu.org/git/gcc.git" ]]; then
-        echo "ERROR: gcc upstream remote was found but it's not pointing to git://gcc.gnu.org/git/gcc.git"
+        echo "ERROR: gcc upstream remote was found but it's not pointing to git://gcc.gnu.org/git/gcc.git. Please delete the local gcc upstream remote before running init again"
         exit -1
     fi
 fi
