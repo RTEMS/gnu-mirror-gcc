@@ -28,9 +28,11 @@ if test $? != 0; then
     echo "Adding gcc upstream remote"
     git remote add gcc git://gcc.gnu.org/git/gcc.git
 else
-    # Check to make sure the gcc remote URL is the one we're expecting
+    # Check if the URL ends with gcc.gnu.org. We don't check for a string explicitly
+    # since some devs may use ssh or other means to connect to the remote
     gccUrl="$(git config remote.gcc.url)"
-    if [[ $gccUrl != "git://gcc.gnu.org/git/gcc.git" ]]; then
+
+    if [[ "$gccUrl" != *"gcc.gnu.org/git/gcc.git" ]]; then
         echo "ERROR: gcc upstream remote was found but it's not pointing to git://gcc.gnu.org/git/gcc.git. Please delete the local gcc upstream remote before running init again"
         exit -1
     fi

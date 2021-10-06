@@ -33,6 +33,11 @@ if test $? != 0; then
   exit -1
 fi
 
+if [[ `git status --porcelain` ]]; then
+  echo "ERROR: You have local changes in your repository. Please stash or push them to a branch before running this script"
+  exit -1
+fi
+
 echo "
 ---- READ THIS ---- 
 When prompted for the 'local name for upstream repository', 
@@ -41,11 +46,12 @@ enter 'gcc'. The other fields can be the default
 "
 
 ${BASEDIR}/../../contrib/gcc-git-customization.sh
-${BASEDIR}/../../contrib/git-fetch-vendor.sh microsoft
+${BASEDIR}/../../contrib/git-fetch-vendor.sh --enable-push microsoft
 git fetch
 git fetch gcc
 git fetch origin
 git fetch vendors/microsoft
 git checkout -b $1 remotes/vendors/microsoft/main
 git merge origin/$2
-git push remotes/vendors/microsoft/main
+git push vendors/microsoft microsoft/main
+
