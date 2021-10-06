@@ -2906,12 +2906,127 @@ aarch64_high_bits_all_ones_p (HOST_WIDE_INT i)
   return exact_log2 (-i) != HOST_WIDE_INT_M1;
 }
 
+/* Helper function for aarch64_morello_get_size_align_req.
+   Finds the alignment we need to round `length` up to so that the Morello
+   capability bounds compression algorithm can precisely represent it.
+
+   In cases where `length` is smaller than 2^14 then there will be no special
+   alignment requirements.  */
+static uint64_t
+aarch64_required_alignment (uint64_t length, bool recursive = false)
+{
+  /* Plus one to account for the specification using a 65 bit length and us
+     using a 64 bit one.  */
+  unsigned num_zeros = clz_hwi (length) + 1;
+  if (num_zeros > 50)
+    return 1;
+
+  uint64_t E = 50 - num_zeros;
+  uint64_t req_alignment = (1ULL << (E+3));
+  /* Rounding up may carry a bit and end up needing a greater alignment.
+     Should only happen once. */
+  uint64_t newlength = ROUND_UP (length, req_alignment);
+  if (newlength != length)
+    {
+      gcc_assert (! recursive);
+      return aarch64_required_alignment (newlength, true);
+    }
+  return req_alignment;
+}
+
+/* Take a length and return a structure containing both the alignment required
+   for such a length and the new length matching that alignment.  The
+   requirement we handle here is what is needed for Morello capabilities to
+   have precise bounds around an object of length `size`.
+
+   The operand and result are in units of *bytes*.  */
+struct align_and_size {
+    uint64_t align;
+    uint64_t size;
+};
+static struct align_and_size
+aarch64_morello_get_size_align_req (uint64_t size)
+{
+  /* size => alignment requirement.
+     alignment requirement => new size
+     new size => different alignment requirement.
+     Can only happen once and that would be done in aarch64_required_alignment.
+     */
+  uint64_t align = aarch64_required_alignment (size);
+  size = ROUND_UP (size, align);
+  gcc_assert (aarch64_required_alignment (size) == align);
+  struct align_and_size ret;
+  ret.align = align;
+  ret.size = size;
+  return ret;
+}
+
+/* This function takes its `size` and `alignment` argument in bytes and
+   returns alignment in the same units.  */
+uint64_t
+aarch64_morello_precise_bounds_align (uint64_t size, uint64_t align,
+				      const_tree decl)
+{
+  if (!TARGET_CAPABILITY_PURE)
+    return align;
+  struct align_and_size required = aarch64_morello_get_size_align_req (size);
+  /* Only avoid extra padding if the user has specifically requested a named
+     section.  Without a named section the user can not know which section the
+     compiler will pick and hence can't be sure what padding will be between
+     objects.  */
+  if (decl && DECL_USER_ALIGN (decl) && DECL_SECTION_NAME (decl)
+      && required.align > align)
+    {
+      warning (OPT_Wcheri_bounds,
+	       "object %qD has cheri alignment overridden by a user-specified one",
+	       decl);
+      return align;
+    }
+  if (decl && DECL_THREAD_LOCAL_P (decl) && required.align > align)
+    {
+      warning (OPT_Wcheri_bounds,
+	       "object %qD has cheri alignment ignored since it is thread local",
+	       decl);
+      return align;
+    }
+  return MAX(required.align, align);
+}
+
+/* Takes a size and alignment in *bytes* and returns the number of extra bytes
+   of padding necessary for Morello capabilities to an object of such size to
+   have precise bounds.  */
+static uint64_t
+aarch64_data_padding_size (uint64_t size, uint64_t align ATTRIBUTE_UNUSED, const_tree decl)
+{
+  if (!TARGET_CAPABILITY_PURE)
+    return 0;
+  struct align_and_size required = aarch64_morello_get_size_align_req (size);
+  /* Only avoid extra padding if the user has specifically requested a named
+     section.  Without a named section the user can not know which section the
+     compiler will pick and hence can't be sure what padding will be between
+     objects.  */
+  if (decl && DECL_USER_ALIGN (decl) && DECL_SECTION_NAME (decl))
+      return 0;
+  /* As in align_variable, TLS space is too precious to waste.  */
+  if (decl && DECL_THREAD_LOCAL_P (decl))
+    return 0;
+  if (required.align > UINT_MAX)
+    return 0;
+  if (required.size > size)
+    return required.size - size;
+  return 0;
+}
+
 /* Implement TARGET_CONSTANT_ALIGNMENT.  Make strings word-aligned so
    that strcpy from constants will be faster.  */
 
 static HOST_WIDE_INT
 aarch64_constant_alignment (const_tree exp, HOST_WIDE_INT align)
 {
+  HOST_WIDE_INT size = int_size_in_bytes (TREE_TYPE (exp));
+  gcc_assert (size != -1);
+  if (TARGET_CAPABILITY_PURE)
+    align = aarch64_morello_precise_bounds_align (size, align, NULL_TREE);
   if (TREE_CODE (exp) == STRING_CST && !optimize_size)
     return MAX (align, BITS_PER_WORD);
   return align;
@@ -24410,12 +24525,48 @@ aarch64_test_loading_full_dump ()
   ASSERT_EQ (SImode, GET_MODE (crtl->return_rtx));
 }
 
+static void
+aarch64_test_morello_alignment ()
+{
+  /* Using a few choice numbers that we know should behave a given way.
+     16383 is the maximum number where we don't need special alignment.
+	It is (1 << 14) - 1
+     Between that number and 32760 we always have alignment requirement of 8.
+     32761 is (1 << 15) - 7.  When this number is rounded up to 8 we carry the
+     bit which makes it 1 << 15.  That means the alignment requirement becomes
+     16.
+     Between that number and (1 << 16) - 15 all numbers should require an
+     alignment of 16.  */
+  ASSERT_EQ (aarch64_required_alignment (16383), 1);
+  ASSERT_EQ (aarch64_required_alignment (16384), 8);
+  ASSERT_EQ (aarch64_required_alignment (16385), 8);
+  ASSERT_EQ (aarch64_required_alignment (32759), 8);
+  ASSERT_EQ (aarch64_required_alignment (32760), 8);
+  ASSERT_EQ (aarch64_required_alignment (32761), 16);
+  ASSERT_EQ (aarch64_required_alignment (32762), 16);
+  ASSERT_EQ (aarch64_required_alignment (32768), 16);
+  ASSERT_EQ (aarch64_required_alignment (32781), 16);
+
+  unsigned nums[9] = {16383, 16384, 16385, 32759, 32760,
+		      32761, 32762, 32768, 32781};
+  struct align_and_size ret;
+  for (int i = 0; i < 9; i++)
+    {
+      unsigned size = nums[i];
+      ret = aarch64_morello_get_size_align_req (size);
+      ASSERT_EQ (aarch64_required_alignment (ret.size), ret.align);
+      ASSERT_EQ (ret.size % ret.align, 0);
+    }
+  return;
+}
+
 /* Run all target-specific selftests.  */
 
 static void
 aarch64_run_selftests (void)
 {
   aarch64_test_loading_full_dump ();
+  aarch64_test_morello_alignment ();
 }
 
 } // namespace selftest
@@ -24879,6 +25030,12 @@ aarch64_libgcc_floating_mode_supported_p
 
 #undef TARGET_CONSTANT_ALIGNMENT
 #define TARGET_CONSTANT_ALIGNMENT aarch64_constant_alignment
+
+#undef TARGET_DATA_PADDING_SIZE
+#define TARGET_DATA_PADDING_SIZE aarch64_data_padding_size
+
+#undef TARGET_DATA_ALIGNMENT
+#define TARGET_DATA_ALIGNMENT aarch64_morello_precise_bounds_align
 
 #undef TARGET_STACK_CLASH_PROTECTION_ALLOCA_PROBE_RANGE
 #define TARGET_STACK_CLASH_PROTECTION_ALLOCA_PROBE_RANGE \

@@ -167,7 +167,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
     {									\
       fprintf ((FILE), "%s", COMMON_ASM_OP);				\
       assemble_name ((FILE), (NAME));					\
-      fprintf ((FILE), "," HOST_WIDE_INT_PRINT_UNSIGNED ",%u\n",		\
+      fprintf ((FILE), "," HOST_WIDE_INT_PRINT_UNSIGNED ",%lu\n",		\
 	       (SIZE), (ALIGN) / BITS_PER_UNIT);			\
     }									\
   while (0)
@@ -341,6 +341,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 	{								\
 	  size_directive_output = 1;					\
 	  size = tree_to_uhwi (DECL_SIZE_UNIT (DECL));			\
+	  size += targetm.data_padding_size (size, DECL_ALIGN_UNIT (DECL), DECL); \
 	  ASM_OUTPUT_SIZE_DIRECTIVE (FILE, NAME, size);			\
 	}								\
 									\
@@ -369,6 +370,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 	{							\
 	  size_directive_output = 1;				\
 	  size = tree_to_uhwi (DECL_SIZE_UNIT (DECL));		\
+	  size += targetm.data_padding_size (size, DECL_ALIGN_UNIT (DECL), DECL); \
 	  ASM_OUTPUT_SIZE_DIRECTIVE (FILE, name, size);		\
 	}							\
     }								\

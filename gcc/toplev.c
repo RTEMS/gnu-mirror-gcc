@@ -551,7 +551,8 @@ compile_file (void)
 				      HOST_WIDE_INT_1U, 8);
 #elif defined ASM_OUTPUT_ALIGNED_COMMON
       ASM_OUTPUT_ALIGNED_COMMON (asm_out_file, "__gnu_lto_slim",
-				 HOST_WIDE_INT_1U, 8);
+				 HOST_WIDE_INT_1U,
+				 (unsigned HOST_WIDE_INT)8);
 #else
       ASM_OUTPUT_COMMON (asm_out_file, "__gnu_lto_slim",
 			 HOST_WIDE_INT_1U,

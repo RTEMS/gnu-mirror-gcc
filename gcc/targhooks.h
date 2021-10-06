@@ -99,6 +99,8 @@ extern tree default_builtin_reciprocal (tree);
 
 extern HOST_WIDE_INT default_static_rtx_alignment (machine_mode);
 extern HOST_WIDE_INT default_constant_alignment (const_tree, HOST_WIDE_INT);
+extern HOST_WIDE_INT default_data_padding_size (unsigned HOST_WIDE_INT,
+						unsigned HOST_WIDE_INT, const_tree);
 extern HOST_WIDE_INT constant_alignment_word_strings (const_tree,
 						      HOST_WIDE_INT);
 extern HOST_WIDE_INT default_vector_alignment (const_tree);

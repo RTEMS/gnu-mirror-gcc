@@ -666,6 +666,8 @@ void aarch64_split_simd_move (rtx, rtx);
 /* Check for a legitimate floating point constant for FMOV.  */
 bool aarch64_float_const_representable_p (rtx);
 
+/* Find alignment required for precise bounds on an object of given type.  */
+uint64_t aarch64_morello_precise_bounds_align (const_tree, uint64_t);
 extern int aarch64_epilogue_uses (int);
 
 #if defined (RTX_CODE)

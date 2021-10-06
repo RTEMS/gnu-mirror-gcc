@@ -3421,6 +3421,44 @@ constants can be done inline.  The function\n\
  default_constant_alignment)
 
 DEFHOOK
+(data_padding_size,
+ "This hook returns the padding required for an object of size @var{size}\n\
+when writing it out to memory.\n\
+The size of the object for accesses is not affected, the compiler emits\n\
+padding of the given amount when emitting this variable.\n\
+\n\
+This hook takes both its arguments in bytes. The default definition returns\n\
+@code{0}.\n\
+\n\
+The typical use of this hook is to add padding to the end of objects on\n\
+a capability architecture to ensure that the bounds of a capability pointing\n\
+to objects do not allow accesses to any neighbouring objects.\n\
+\n\
+A requirement on the implementation of this function is that if @var{decl}\n\
+has a user-specified alignment on a decl which has an associated section\n\
+then this hook must return @code{0}.",
+  unsigned HOST_WIDE_INT, (unsigned HOST_WIDE_INT size,
+			   unsigned HOST_WIDE_INT align, const_tree decl),
+  default_data_padding_size)
+
+DEFHOOK
+(data_alignment,
+ "This hook returns a possibly adjusted alignment to emit for an object of\n\
+size @var{size} when writing it out to memory.\n\
+\n\
+This hook takes its argument in bytes.  The default definition returns the\n\
+alignment given as an argument.\n\
+\n\
+The typical use of this hook is to ensure alignment in order to give precise\n\
+bounds for a capability pointing to the given object on capability systems.\n\
+A requirement on the implementation of this function is that if @var{decl}\n\
+has a user-specified alignment then this hook must not decrease the alignment.",
+ unsigned HOST_WIDE_INT, (unsigned HOST_WIDE_INT size,
+			  unsigned HOST_WIDE_INT align, const_tree decl),
+ default_data_padding_size)
+
+
+DEFHOOK
 (translate_mode_attribute,
  "Define this hook if during mode attribute processing, the port should\n\
 translate machine_mode @var{mode} to another mode.  For example, rs6000's\n\

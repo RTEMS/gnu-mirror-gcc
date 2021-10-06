@@ -125,7 +125,7 @@
 
 /* Align global data.  */
 #define DATA_ALIGNMENT(EXP, ALIGN)			\
-  AARCH64_EXPAND_ALIGNMENT (!optimize_size, EXP, ALIGN)
+    AARCH64_EXPAND_ALIGNMENT (!optimize_size, EXP, ALIGN)
 
 /* Similarly, make sure that objects on the stack are sensibly aligned.  */
 #define LOCAL_ALIGNMENT(EXP, ALIGN)				\

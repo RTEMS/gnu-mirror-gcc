@@ -1149,6 +1149,37 @@ make it all fit in fewer cache lines.
 If the value of this macro has a type, it should be an unsigned type.
 @end defmac
 
+@deftypefn {Target Hook} {unsigned HOST_WIDE_INT} TARGET_DATA_PADDING_SIZE (unsigned HOST_WIDE_INT @var{size}, unsigned HOST_WIDE_INT @var{align}, const_tree @var{decl})
+This hook returns the padding required for an object of size @var{size}
+when writing it out to memory.
+The size of the object for accesses is not affected, the compiler emits
+padding of the given amount when emitting this variable.
+
+This hook takes both its arguments in bytes. The default definition returns
+@code{0}.
+
+The typical use of this hook is to add padding to the end of objects on
+a capability architecture to ensure that the bounds of a capability pointing
+to objects do not allow accesses to any neighbouring objects.
+
+A requirement on the implementation of this function is that if @var{decl}
+has a user-specified alignment on a decl which has an associated section
+then this hook must return @code{0}.
+@end deftypefn
+
+@deftypefn {Target Hook} {unsigned HOST_WIDE_INT} TARGET_DATA_ALIGNMENT (unsigned HOST_WIDE_INT @var{size}, unsigned HOST_WIDE_INT @var{align}, const_tree @var{decl})
+This hook returns a possibly adjusted alignment to emit for an object of
+size @var{size} when writing it out to memory.
+
+This hook takes its argument in bytes.  The default definition returns the
+alignment given as an argument.
+
+The typical use of this hook is to ensure alignment in order to give precise
+bounds for a capability pointing to the given object on capability systems.
+A requirement on the implementation of this function is that if @var{decl}
+has a user-specified alignment then this hook must not decrease the alignment.
+@end deftypefn
+
 @deftypefn {Target Hook} HOST_WIDE_INT TARGET_VECTOR_ALIGNMENT (const_tree @var{type})
 This hook can be used to define the alignment for a vector of type
 @var{type}, in order to comply with a platform ABI.  The default is to

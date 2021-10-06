@@ -1213,6 +1213,23 @@ default_constant_alignment (const_tree, HOST_WIDE_INT align)
   return align;
 }
 
+/* The default implementation of TARGET_DATA_PADDING_SIZE.  */
+unsigned HOST_WIDE_INT
+default_data_padding_size (unsigned HOST_WIDE_INT size ATTRIBUTE_UNUSED,
+			   unsigned HOST_WIDE_INT align ATTRIBUTE_UNUSED,
+			   const_tree decl ATTRIBUTE_UNUSED)
+{
+  return 0;
+}
+
+unsigned HOST_WIDE_INT
+default_data_alignment (unsigned HOST_WIDE_INT size ATTRIBUTE_UNUSED,
+			unsigned HOST_WIDE_INT align,
+			const_tree decl ATTRIBUTE_UNUSED)
+{
+  return align;
+}
+
 /* An implementation of TARGET_CONSTANT_ALIGNMENT that aligns strings
    to at least BITS_PER_WORD but otherwise makes no changes.  */
 

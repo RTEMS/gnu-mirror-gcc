@@ -487,7 +487,9 @@ asm_output_aligned_bss (FILE *file, tree decl ATTRIBUTE_UNUSED,
 			int align)
 {
   switch_to_section (bss_section);
-  ASM_OUTPUT_ALIGN (file, floor_log2 (align / BITS_PER_UNIT));
+  unsigned HOST_WIDE_INT align_used
+    = targetm.data_alignment(size, align / BITS_PER_UNIT, decl);
+  ASM_OUTPUT_ALIGN (file, floor_log2 (align_used));
 #ifdef ASM_DECLARE_OBJECT_NAME
   last_assemble_variable_decl = decl;
   ASM_DECLARE_OBJECT_NAME (file, name, decl);
@@ -495,6 +497,7 @@ asm_output_aligned_bss (FILE *file, tree decl ATTRIBUTE_UNUSED,
   /* Standard thing is just output label for the object.  */
   ASM_OUTPUT_LABEL (file, name);
 #endif /* ASM_DECLARE_OBJECT_NAME */
+  size += targetm.data_padding_size (size, align_used, decl);
   ASM_OUTPUT_SKIP (file, size ? size : 1);
 }
 
@@ -1951,7 +1954,7 @@ assemble_zeros (unsigned HOST_WIDE_INT size)
 /* Assemble an alignment pseudo op for an ALIGN-bit boundary.  */
 
 void
-assemble_align (unsigned int align)
+assemble_align (unsigned HOST_WIDE_INT align)
 {
   if (align > BITS_PER_UNIT)
     {
@@ -1983,6 +1986,24 @@ assemble_string (const char *p, int size)
 }
 
 
+
+/* Handle using targetm.data_alignment hook on an alignment provided in bits.
+   Since the hook takes an alignment provided in bytes we could lose some
+   bit-wise alignment requirement.  This ensures that we maintain the bit-wise
+   alignment if the hook does not increase the alignment requirement.  */
+static unsigned HOST_WIDE_INT
+alignment_pad_from_bits (unsigned HOST_WIDE_INT size,
+			 unsigned HOST_WIDE_INT align_orig,
+			 const_tree decl)
+{
+  unsigned HOST_WIDE_INT align
+    = targetm.data_alignment (size, align_orig/BITS_PER_UNIT, decl);
+  if (align == 1 && align_orig < BITS_PER_UNIT)
+    return align_orig;
+  else
+    return align * BITS_PER_UNIT;
+}
+
 /* A noswitch_section_callback for lcomm_section.  */
 
 static bool
@@ -1991,13 +2012,16 @@ emit_local (tree decl ATTRIBUTE_UNUSED,
 	    unsigned HOST_WIDE_INT size ATTRIBUTE_UNUSED,
 	    unsigned HOST_WIDE_INT rounded ATTRIBUTE_UNUSED)
 {
+#if defined(ASM_OUTPUT_ALIGNED_DECL_LOCAL) || defined(ASM_OUTPUT_ALIGNED_LOCAL)
+  unsigned HOST_WIDE_INT align
+    = alignment_pad_from_bits
+    (size, symtab_node::get (decl)->definition_alignment (), decl);
+#endif
+
 #if defined ASM_OUTPUT_ALIGNED_DECL_LOCAL
-  unsigned int align = symtab_node::get (decl)->definition_alignment ();
-  ASM_OUTPUT_ALIGNED_DECL_LOCAL (asm_out_file, decl, name,
-				 size, align);
+  ASM_OUTPUT_ALIGNED_DECL_LOCAL (asm_out_file, decl, name, size, align);
   return true;
 #elif defined ASM_OUTPUT_ALIGNED_LOCAL
-  unsigned int align = symtab_node::get (decl)->definition_alignment ();
   ASM_OUTPUT_ALIGNED_LOCAL (asm_out_file, name, size, align);
   return true;
 #else
@@ -2015,8 +2039,9 @@ emit_bss (tree decl ATTRIBUTE_UNUSED,
 	  unsigned HOST_WIDE_INT size ATTRIBUTE_UNUSED,
 	  unsigned HOST_WIDE_INT rounded ATTRIBUTE_UNUSED)
 {
-  ASM_OUTPUT_ALIGNED_BSS (asm_out_file, decl, name, size,
-			  get_variable_align (decl));
+  unsigned HOST_WIDE_INT align
+    = alignment_pad_from_bits (size, get_variable_align (decl), decl);
+  ASM_OUTPUT_ALIGNED_BSS (asm_out_file, decl, name, size, align);
   return true;
 }
 #endif
@@ -2029,13 +2054,16 @@ emit_common (tree decl ATTRIBUTE_UNUSED,
 	     unsigned HOST_WIDE_INT size ATTRIBUTE_UNUSED,
 	     unsigned HOST_WIDE_INT rounded ATTRIBUTE_UNUSED)
 {
+#if defined(ASM_OUTPUT_ALIGNED_DECL_LOCAL) || defined(ASM_OUTPUT_ALIGNED_LOCAL)
+  unsigned HOST_WIDE_INT align
+    = alignment_pad_from_bits (size, get_variable_align (decl), decl);
+#endif
+
 #if defined ASM_OUTPUT_ALIGNED_DECL_COMMON
-  ASM_OUTPUT_ALIGNED_DECL_COMMON (asm_out_file, decl, name,
-				  size, get_variable_align (decl));
+  ASM_OUTPUT_ALIGNED_DECL_COMMON (asm_out_file, decl, name, size, align);
   return true;
 #elif defined ASM_OUTPUT_ALIGNED_COMMON
-  ASM_OUTPUT_ALIGNED_COMMON (asm_out_file, name, size,
-			     get_variable_align (decl));
+  ASM_OUTPUT_ALIGNED_COMMON (asm_out_file, name, size, align);
   return true;
 #else
   ASM_OUTPUT_COMMON (asm_out_file, name, size, rounded);
@@ -2070,6 +2098,7 @@ assemble_noswitch_variable (tree decl, const char *name, section *sect,
   unsigned HOST_WIDE_INT size, rounded;
 
   size = tree_to_uhwi (DECL_SIZE_UNIT (decl));
+  size += targetm.data_padding_size (size, align, decl);
   rounded = size;
 
   if ((flag_sanitize & SANITIZE_ADDRESS) && asan_protect_global (decl))
@@ -2111,20 +2140,33 @@ assemble_variable_contents (tree decl, const char *name,
 
   if (!dont_output_data)
     {
+      unsigned HOST_WIDE_INT size = tree_to_uhwi (DECL_SIZE_UNIT (decl));
+      unsigned HOST_WIDE_INT padding
+	= targetm.data_padding_size (size, DECL_ALIGN_UNIT (decl), decl);
       /* Caller is supposed to use varpool_get_constructor when it wants
 	 to output the body.  */
       gcc_assert (!in_lto_p || DECL_INITIAL (decl) != error_mark_node);
       if (DECL_INITIAL (decl)
 	  && DECL_INITIAL (decl) != error_mark_node
 	  && !initializer_zerop (DECL_INITIAL (decl)))
-	/* Output the actual data.  */
-	output_constant (DECL_INITIAL (decl),
-			 tree_to_uhwi (DECL_SIZE_UNIT (decl)),
-			 get_variable_align (decl),
-			 false, merge_strings);
+	/* Output the actual data.
+	   N.b. we use `get_variable_align` here rather than updating it with
+	   targetm.data_align since this parameter to `output_constant` is
+	   the *known alignment* rather than *requested alignment*.
+	   While in this case they are the same (since we always ensure
+	   requested alignment before calling assemble_variable_contents, it
+	   doesn't make a difference and the *known alignment* matches the
+	   DECL_ALIGN idea better.  */
+	output_constant (DECL_INITIAL (decl), size+padding,
+			 get_variable_align (decl), false, merge_strings);
       else
-	/* Leave space for it.  */
-	assemble_zeros (tree_to_uhwi (DECL_SIZE_UNIT (decl)));
+	{
+	  /* Leave space for it.  */
+	  assemble_zeros (size);
+	  /* Have the padding separate just to make it more obvious when
+	     inspecting the assembly.  */
+	  assemble_zeros (padding);
+	}
       targetm.asm_out.decl_end ();
     }
 }
@@ -2255,7 +2297,9 @@ assemble_variable (tree decl, int top_level ATTRIBUTE_UNUSED,
 
   set_mem_align (decl_rtl, DECL_ALIGN (decl));
 
-  align = get_variable_align (decl);
+  gcc_assert (DECL_SIZE_UNIT (decl) && tree_fits_uhwi_p (DECL_SIZE_UNIT (decl)));
+  align = alignment_pad_from_bits (tree_to_uhwi (DECL_SIZE_UNIT (decl)),
+				   get_variable_align (decl), decl);
 
   if (TREE_PUBLIC (decl))
     maybe_assemble_visibility (decl);
@@ -2514,13 +2558,19 @@ assemble_label (FILE *file, const char *name)
   ASM_OUTPUT_LABEL (file, name);
 }
 
+/* Equivalent of the first half of ASM_DECLARE_OBJECT_NAME but for constants.
+   This means that we don't have to worry about types that we don't (yet) know
+   the size of, or of decls that we want declared as "gnu_unique_object".
+   It also means that the interface is simpler to just give the size and name,
+   since we may be emitting a constant that doesn't have an associated DECL.  */
 void
-assemble_object_type_and_size (FILE *file, const char *in_name,
+assemble_object_type_and_size (FILE *file, const char *name,
 			       HOST_WIDE_INT size)
 {
-  const char *name = targetm.strip_name_encoding (in_name);
-  asm_fprintf (file, "\t.type\t%s, %%object\n", name);
-  asm_fprintf (file, "\t.size\t%s, %" PRId64 "\n", name, size);
+  ASM_OUTPUT_TYPE_DIRECTIVE (file, name, "object");
+  if (flag_inhibit_size_directive)
+    return;
+  ASM_OUTPUT_SIZE_DIRECTIVE (file, name, size);
 }
 
 /* Set the symbol_referenced flag for ID.  */
@@ -2628,7 +2678,8 @@ assemble_static_space (unsigned HOST_WIDE_INT size)
 				 BIGGEST_ALIGNMENT);
 #else
 #ifdef ASM_OUTPUT_ALIGNED_LOCAL
-  ASM_OUTPUT_ALIGNED_LOCAL (asm_out_file, name, size, BIGGEST_ALIGNMENT);
+  ASM_OUTPUT_ALIGNED_LOCAL (asm_out_file, name, size,
+			    (unsigned HOST_WIDE_INT)BIGGEST_ALIGNMENT);
 #else
   {
     /* Round size up to multiple of BIGGEST_ALIGNMENT bits
@@ -3355,7 +3406,7 @@ compare_constant (const tree t1, const tree t2)
 /* Return the section into which constant EXP should be placed.  */
 
 static section *
-get_constant_section (tree exp, unsigned int align)
+get_constant_section (tree exp, unsigned HOST_WIDE_INT align)
 {
   return targetm.asm_out.select_section (exp,
 					 compute_reloc_for_constant (exp),
@@ -3564,11 +3615,12 @@ maybe_output_constant_def_contents (struct constant_descriptor_tree *desc,
 
 static void
 assemble_constant_contents (tree exp, const char *label, unsigned int align,
-			    bool merge_strings)
+			    bool merge_strings, const_tree decl)
 {
   HOST_WIDE_INT size;
 
   size = get_constant_size (exp);
+  size += targetm.data_padding_size (size, align, decl);
 
   /* Do any machine/system dependent processing of the constant.  */
   targetm.asm_out.declare_constant_name (asm_out_file, label, exp, size);
@@ -3611,17 +3663,21 @@ output_constant_def_contents (rtx symbol)
     place_block_symbol (symbol);
   else
     {
-      int align = (TREE_CODE (decl) == CONST_DECL
+      unsigned HOST_WIDE_INT align = (TREE_CODE (decl) == CONST_DECL
 		   || (VAR_P (decl) && DECL_IN_CONSTANT_POOL (decl))
 		   ? DECL_ALIGN (decl)
 		   : symtab_node::get (decl)->definition_alignment ());
       section *sect = get_constant_section (exp, align);
       switch_to_section (sect);
-      if (align > BITS_PER_UNIT)
-	ASM_OUTPUT_ALIGN (asm_out_file, floor_log2 (align / BITS_PER_UNIT));
+      align = targetm.data_alignment (get_constant_size (exp),
+				      align / BITS_PER_UNIT,
+				      decl);
+      if (align)
+	ASM_OUTPUT_ALIGN (asm_out_file, floor_log2 (align));
       assemble_constant_contents (exp, XSTR (symbol, 0), align,
 				  (sect->common.flags & SECTION_MERGE)
-				  && (sect->common.flags & SECTION_STRINGS));
+				  && (sect->common.flags & SECTION_STRINGS),
+				  decl);
       if (asan_protected)
 	{
 	  HOST_WIDE_INT size = get_constant_size (exp);
@@ -3984,10 +4040,12 @@ constant_pool_empty_p (void)
 }
 
 /* Worker function for output_constant_pool_1.  Emit assembly for X
-   in MODE with known alignment ALIGN.  */
+   in MODE with known alignment ALIGN.  Emit PADDING zero bytes after the
+   above.  */
 
 static void
-output_constant_pool_2 (fixed_size_mode mode, rtx x, unsigned int align)
+output_constant_pool_2 (fixed_size_mode mode, rtx x, unsigned int align,
+			unsigned int padding)
 {
   switch (GET_MODE_CLASS (mode))
     {
@@ -4035,7 +4093,7 @@ output_constant_pool_2 (fixed_size_mode mode, rtx x, unsigned int align)
 	      if (INTVAL (CONST_VECTOR_ELT (x, i + j)) != 0)
 		value |= 1 << (j * elt_bits);
 	    output_constant_pool_2 (int_mode, gen_int_mode (value, int_mode),
-				    i != 0 ? MIN (align, int_bits) : align);
+				    i != 0 ? MIN (align, int_bits) : align, 0);
 	  }
 	break;
       }
@@ -4056,7 +4114,7 @@ output_constant_pool_2 (fixed_size_mode mode, rtx x, unsigned int align)
 	for (i = 0; i < units; i++)
 	  {
 	    rtx elt = CONST_VECTOR_ELT (x, i);
-	    output_constant_pool_2 (submode, elt, i ? subalign : align);
+	    output_constant_pool_2 (submode, elt, i ? subalign : align, 0);
 	  }
       }
       break;
@@ -4064,6 +4122,7 @@ output_constant_pool_2 (fixed_size_mode mode, rtx x, unsigned int align)
     default:
       gcc_unreachable ();
     }
+  assemble_zeros (padding);
 }
 
 /* Worker function for output_constant_pool.  Emit constant DESC,
@@ -4109,17 +4168,21 @@ output_constant_pool_1 (class constant_descriptor_rtx *desc,
       break;
     }
 
+  uint64_t size = GET_MODE_SIZE (desc->mode);
+  uint64_t align_used = targetm.data_alignment (size, align, NULL_TREE);
+  uint64_t padding = targetm.data_padding_size (size, align_used, NULL_TREE);
+
 #ifdef ASM_OUTPUT_SPECIAL_POOL_ENTRY
   ASM_OUTPUT_SPECIAL_POOL_ENTRY (asm_out_file, x, desc->mode,
-				 align, desc->labelno, done);
+				 align_used, desc->labelno, done);
 #endif
 
-  assemble_align (align);
+  assemble_align (align_used);
 
   /* Output the label.  */
   char buf[42];
   ASM_GENERATE_INTERNAL_LABEL (buf, "LC", desc->labelno);
-  assemble_object_type_and_size (asm_out_file, buf, GET_MODE_SIZE (desc->mode));
+  assemble_object_type_and_size (asm_out_file, buf, size+padding);
   ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, buf);
 
   /* Output the data.
@@ -4127,7 +4190,7 @@ output_constant_pool_1 (class constant_descriptor_rtx *desc,
      as function 'output_constant_pool_1' explicitly passes the alignment as 1
      assuming that the data is already aligned which prevents the generation 
      of fix-up table entries.  */
-  output_constant_pool_2 (desc->mode, x, desc->align);
+  output_constant_pool_2 (desc->mode, x, desc->align, padding);
 
   /* Make sure all constants in SECTION_MERGE and not SECTION_STRINGS
      sections have proper size.  */
@@ -4969,7 +5032,10 @@ check_string_literal (tree string, unsigned HOST_WIDE_INT size)
     return false;
   if (size < (unsigned)len)
     return false;
-  if (mem_size != size)
+  /* Allow the size that we're generating for this object to be greater than
+     the size the object needs.  This is for the case where there is padding in
+     the object from targetm.data_padding_size.  */
+  if (mem_size > size)
     return false;
   return true;
 }
@@ -7666,7 +7732,7 @@ place_block_symbol (rtx symbol)
 {
   unsigned HOST_WIDE_INT size, mask, offset;
   class constant_descriptor_rtx *desc;
-  unsigned int alignment;
+  unsigned HOST_WIDE_INT alignment;
   struct object_block *block;
   tree decl;
 
@@ -7680,6 +7746,10 @@ place_block_symbol (rtx symbol)
       desc = SYMBOL_REF_CONSTANT (symbol);
       alignment = desc->align;
       size = GET_MODE_SIZE (desc->mode);
+      alignment = targetm.data_alignment (size, alignment / BITS_PER_UNIT,
+					  NULL_TREE);
+      size += targetm.data_padding_size (size, alignment, NULL_TREE);
+      alignment *= BITS_PER_UNIT;
     }
   else if (TREE_CONSTANT_POOL_ADDRESS_P (symbol))
     {
@@ -7687,6 +7757,9 @@ place_block_symbol (rtx symbol)
       gcc_checking_assert (DECL_IN_CONSTANT_POOL (decl));
       alignment = DECL_ALIGN (decl);
       size = get_constant_size (DECL_INITIAL (decl));
+      alignment = targetm.data_alignment (size, alignment / BITS_PER_UNIT, decl);
+      size += targetm.data_padding_size (size, alignment, decl);
+      alignment *= BITS_PER_UNIT;
       if ((flag_sanitize & SANITIZE_ADDRESS)
 	  && TREE_CODE (DECL_INITIAL (decl)) == STRING_CST
 	  && asan_protect_global (DECL_INITIAL (decl)))
@@ -7716,6 +7789,9 @@ place_block_symbol (rtx symbol)
 	}
       alignment = get_variable_align (decl);
       size = tree_to_uhwi (DECL_SIZE_UNIT (decl));
+      alignment = targetm.data_alignment (size, alignment / BITS_PER_UNIT, decl);
+      size += targetm.data_padding_size (size, alignment, decl);
+      alignment *= BITS_PER_UNIT;
       if ((flag_sanitize & SANITIZE_ADDRESS)
 	  && asan_protect_global (decl))
 	{
@@ -7858,26 +7934,45 @@ output_object_block (struct object_block *block)
   offset = 0;
   FOR_EACH_VEC_ELT (*block->objects, i, symbol)
     {
+      /* N.B. Here we assert that there is never negative padding necessary.
+	 That implies that we've not made one kind of mistake calculating the
+	 offset into the current object block.
+	 We cast the symbol ref block offset to a long unsigned in this
+	 assertion due to a bug that we have not fixed yet.
+	 This field is signed in the structure so we can represent
+	 "uninitialised" as a negative number.  However, with very large
+	 offsets (e.g. an object after 'large_string' in gcc.dg/strlenopt-55.c)
+	 the offset can end up negative due to integer overflow.  This is a
+	 problem, but not one that is too important, since objects that large
+	 are not expected to be seen very often.
+	 Hence we avoid the overflow problems for this assert in order to help
+	 check for more problematic bugs, but leave them in the rest of the
+	 code.  */
+      gcc_assert ((unsigned HOST_WIDE_INT)SYMBOL_REF_BLOCK_OFFSET (symbol)
+		  >= (unsigned HOST_WIDE_INT)offset);
       /* Move to the object's offset, padding with zeros if necessary.  */
       assemble_zeros (SYMBOL_REF_BLOCK_OFFSET (symbol) - offset);
       offset = SYMBOL_REF_BLOCK_OFFSET (symbol);
       if (CONSTANT_POOL_ADDRESS_P (symbol))
 	{
+	  HOST_WIDE_INT size;
 	  desc = SYMBOL_REF_CONSTANT (symbol);
 	  /* Pass 1 for align as we have already laid out everything in the block.
 	     So aligning shouldn't be necessary.  */
 	  output_constant_pool_1 (desc, 1);
-	  offset += GET_MODE_SIZE (desc->mode);
+	  size = GET_MODE_SIZE (desc->mode);
+	  offset += size;
+	  offset += targetm.data_padding_size (size, desc->align, NULL_TREE);
 	}
       else if (TREE_CONSTANT_POOL_ADDRESS_P (symbol))
 	{
-	  HOST_WIDE_INT size;
 	  decl = SYMBOL_REF_DECL (symbol);
+	  HOST_WIDE_INT size = get_constant_size (DECL_INITIAL (decl));
 	  assemble_constant_contents (DECL_INITIAL (decl), XSTR (symbol, 0),
-				      DECL_ALIGN (decl), false);
+				      DECL_ALIGN (decl), false, decl);
 
-	  size = get_constant_size (DECL_INITIAL (decl));
 	  offset += size;
+	  offset += targetm.data_padding_size (size, DECL_ALIGN_UNIT (decl), decl);
 	  if ((flag_sanitize & SANITIZE_ADDRESS)
 	      && TREE_CODE (DECL_INITIAL (decl)) == STRING_CST
 	      && asan_protect_global (DECL_INITIAL (decl)))
@@ -7894,6 +7989,7 @@ output_object_block (struct object_block *block)
 	  assemble_variable_contents (decl, XSTR (symbol, 0), false, false);
 	  size = tree_to_uhwi (DECL_SIZE_UNIT (decl));
 	  offset += size;
+	  offset += targetm.data_padding_size (size, DECL_ALIGN_UNIT (decl), decl);
 	  if ((flag_sanitize & SANITIZE_ADDRESS)
 	      && asan_protect_global (decl))
 	    {
