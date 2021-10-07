@@ -154,7 +154,6 @@ typedef struct user_fpregs elf_fpregset_t;
 # include <sys/procfs.h>
 #endif
 #include <sys/user.h>
-#include <linux/cyclades.h>
 #include <linux/if_eql.h>
 #include <linux/if_plip.h>
 #include <linux/lp.h>
@@ -454,7 +453,6 @@ unsigned struct_ElfW_Phdr_sz = sizeof(Elf_Phdr);
 
 #if SANITIZER_LINUX && !SANITIZER_ANDROID
   unsigned struct_ax25_parms_struct_sz = sizeof(struct ax25_parms_struct);
-  unsigned struct_cyclades_monitor_sz = sizeof(struct cyclades_monitor);
 #if EV_VERSION > (0x010000)
   unsigned struct_input_keymap_entry_sz = sizeof(struct input_keymap_entry);
 #else
@@ -821,15 +819,6 @@ unsigned struct_ElfW_Phdr_sz = sizeof(Elf_Phdr);
 #endif // SANITIZER_LINUX || SANITIZER_FREEBSD
 
 #if SANITIZER_LINUX && !SANITIZER_ANDROID
-  unsigned IOCTL_CYGETDEFTHRESH = CYGETDEFTHRESH;
-  unsigned IOCTL_CYGETDEFTIMEOUT = CYGETDEFTIMEOUT;
-  unsigned IOCTL_CYGETMON = CYGETMON;
-  unsigned IOCTL_CYGETTHRESH = CYGETTHRESH;
-  unsigned IOCTL_CYGETTIMEOUT = CYGETTIMEOUT;
-  unsigned IOCTL_CYSETDEFTHRESH = CYSETDEFTHRESH;
-  unsigned IOCTL_CYSETDEFTIMEOUT = CYSETDEFTIMEOUT;
-  unsigned IOCTL_CYSETTHRESH = CYSETTHRESH;
-  unsigned IOCTL_CYSETTIMEOUT = CYSETTIMEOUT;
   unsigned IOCTL_EQL_EMANCIPATE = EQL_EMANCIPATE;
   unsigned IOCTL_EQL_ENSLAVE = EQL_ENSLAVE;
   unsigned IOCTL_EQL_GETMASTRCFG = EQL_GETMASTRCFG;
@@ -1147,7 +1136,7 @@ CHECK_SIZE_AND_OFFSET(ipc_perm, cuid);
 CHECK_SIZE_AND_OFFSET(ipc_perm, cgid);
 #if !defined(__aarch64__) || !SANITIZER_LINUX || __GLIBC_PREREQ (2, 21)
 /* On aarch64 glibc 2.20 and earlier provided incorrect mode field.  */
-CHECK_SIZE_AND_OFFSET(ipc_perm, mode);
+//CHECK_SIZE_AND_OFFSET(ipc_perm, mode);
 #endif
 
 CHECK_TYPE_SIZE(shmid_ds);
