@@ -1490,8 +1490,8 @@ process_options (bool no_backend)
       || !dwarf_debuginfo_p ()
       || debug_hooks->var_location == do_nothing_debug_hooks.var_location)
     {
-      if (flag_var_tracking == 1
-	  || flag_var_tracking_uninit == 1)
+      if ((OPTION_SET_P (flag_var_tracking) && flag_var_tracking == 1)
+	  || (OPTION_SET_P (flag_var_tracking_uninit) && flag_var_tracking_uninit == 1))
         {
 	  if (debug_info_level < DINFO_LEVEL_NORMAL)
 	    warning_at (UNKNOWN_LOCATION, 0,
@@ -1504,6 +1504,7 @@ process_options (bool no_backend)
 	}
       flag_var_tracking = 0;
       flag_var_tracking_uninit = 0;
+      flag_var_tracking_assignments = 0;
     }
 
   /* The debug hooks are used to implement -fdump-go-spec because it
@@ -1511,34 +1512,6 @@ process_options (bool no_backend)
      dump.  */
   if (flag_dump_go_spec != NULL)
     debug_hooks = dump_go_spec_init (flag_dump_go_spec, debug_hooks);
-
-  /* If the user specifically requested variable tracking with tagging
-     uninitialized variables, we need to turn on variable tracking.
-     (We already determined above that variable tracking is feasible.)  */
-  if (flag_var_tracking_uninit == 1)
-    flag_var_tracking = 1;
-
-  if (flag_var_tracking == AUTODETECT_VALUE)
-    flag_var_tracking = optimize >= 1;
-
-  if (flag_var_tracking_uninit == AUTODETECT_VALUE)
-    flag_var_tracking_uninit = flag_var_tracking;
-
-  if (flag_var_tracking_assignments == AUTODETECT_VALUE)
-    flag_var_tracking_assignments
-      = (flag_var_tracking
-	 && !(flag_selective_scheduling || flag_selective_scheduling2));
-
-  if (flag_var_tracking_assignments_toggle)
-    flag_var_tracking_assignments = !flag_var_tracking_assignments;
-
-  if (flag_var_tracking_assignments && !flag_var_tracking)
-    flag_var_tracking = flag_var_tracking_assignments = -1;
-
-  if (flag_var_tracking_assignments
-      && (flag_selective_scheduling || flag_selective_scheduling2))
-    warning_at (UNKNOWN_LOCATION, 0,
-		"var-tracking-assignments changes selective scheduling");
 
   if (debug_nonbind_markers_p == AUTODETECT_VALUE)
     debug_nonbind_markers_p

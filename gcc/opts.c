@@ -1353,6 +1353,34 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
     SET_OPTION_IF_UNSET (opts, opts_set, flag_vect_cost_model,
 			 VECT_COST_MODEL_CHEAP);
 
+  /* If the user specifically requested variable tracking with tagging
+     uninitialized variables, we need to turn on variable tracking.
+     (We already determined above that variable tracking is feasible.)  */
+  if (opts->x_flag_var_tracking_uninit == 1)
+    opts->x_flag_var_tracking = 1;
+
+  if (!opts_set->x_flag_var_tracking)
+    opts->x_flag_var_tracking = optimize >= 1;
+
+  if (!opts_set->x_flag_var_tracking_uninit)
+    opts->x_flag_var_tracking_uninit = opts->x_flag_var_tracking;
+
+  if (!opts_set->x_flag_var_tracking_assignments)
+    opts->x_flag_var_tracking_assignments
+      = (opts->x_flag_var_tracking
+	 && !(opts->x_flag_selective_scheduling
+	      || opts->x_flag_selective_scheduling2));
+
+  if (opts->x_flag_var_tracking_assignments_toggle)
+    opts->x_flag_var_tracking_assignments = !opts->x_flag_var_tracking_assignments;
+
+  if (opts->x_flag_var_tracking_assignments && !opts->x_flag_var_tracking)
+    opts->x_flag_var_tracking = opts->x_flag_var_tracking_assignments = -1;
+
+  if (opts->x_flag_var_tracking_assignments
+      && (opts->x_flag_selective_scheduling || opts->x_flag_selective_scheduling2))
+    warning_at (loc, 0,
+		"var-tracking-assignments changes selective scheduling");
 }
 
 #define LEFT_COLUMN	27
