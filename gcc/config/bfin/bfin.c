@@ -1046,7 +1046,7 @@ bfin_load_pic_reg (rtx dest)
   if (local_info_node && local_info_node->local)
     return pic_offset_table_rtx;
       
-  if (global_options_set.x_bfin_library_id)
+  if (OPTION_SET_P (bfin_library_id))
     addr = plus_constant (Pmode, pic_offset_table_rtx,
 			   -4 - bfin_library_id * 4);
   else
@@ -2369,7 +2369,7 @@ bfin_option_override (void)
 #endif
 
   /* Library identification */
-  if (global_options_set.x_bfin_library_id && ! TARGET_ID_SHARED_LIBRARY)
+  if (OPTION_SET_P (bfin_library_id) && ! TARGET_ID_SHARED_LIBRARY)
     error ("%<-mshared-library-id=%> specified without "
 	   "%<-mid-shared-library%>");
 

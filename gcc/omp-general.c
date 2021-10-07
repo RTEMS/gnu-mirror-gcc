@@ -952,7 +952,7 @@ omp_max_vf (void)
       || optimize_debug
       || !flag_tree_loop_optimize
       || (!flag_tree_loop_vectorize
-	  && global_options_set.x_flag_tree_loop_vectorize))
+	  && OPTION_SET_P (flag_tree_loop_vectorize)))
     return 1;
 
   auto_vector_modes modes;

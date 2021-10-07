@@ -4839,7 +4839,7 @@ riscv_option_override (void)
 #endif
 
   if (riscv_stack_protector_guard == SSP_GLOBAL
-      && global_options_set.x_riscv_stack_protector_guard_offset_str)
+      && OPTION_SET_P (riscv_stack_protector_guard_offset_str))
     {
       error ("incompatible options %<-mstack-protector-guard=global%> and "
 	     "%<-mstack-protector-guard-offset=%s%>",
@@ -4847,15 +4847,15 @@ riscv_option_override (void)
     }
 
   if (riscv_stack_protector_guard == SSP_TLS
-      && !(global_options_set.x_riscv_stack_protector_guard_offset_str
-	   && global_options_set.x_riscv_stack_protector_guard_reg_str))
+      && !(OPTION_SET_P (riscv_stack_protector_guard_offset_str)
+	   && OPTION_SET_P (riscv_stack_protector_guard_reg_str)))
     {
       error ("both %<-mstack-protector-guard-offset%> and "
 	     "%<-mstack-protector-guard-reg%> must be used "
 	     "with %<-mstack-protector-guard=sysreg%>");
     }
 
-  if (global_options_set.x_riscv_stack_protector_guard_reg_str)
+  if (OPTION_SET_P (riscv_stack_protector_guard_reg_str))
     {
       const char *str = riscv_stack_protector_guard_reg_str;
       int reg = decode_reg_name (str);
@@ -4867,7 +4867,7 @@ riscv_option_override (void)
       riscv_stack_protector_guard_reg = reg;
     }
 
-  if (global_options_set.x_riscv_stack_protector_guard_offset_str)
+  if (OPTION_SET_P (riscv_stack_protector_guard_offset_str))
     {
       char *end;
       const char *str = riscv_stack_protector_guard_offset_str;

@@ -633,7 +633,7 @@ oacc_xform_loop (gcall *call)
 	  /* If not -fno-tree-loop-vectorize, hint that we want to vectorize
 	     the loop.  */
 	  && (flag_tree_loop_vectorize
-	      || !global_options_set.x_flag_tree_loop_vectorize))
+	      || !OPTION_SET_P (flag_tree_loop_vectorize)))
 	{
 	  basic_block bb = gsi_bb (gsi);
 	  class loop *parent = bb->loop_father;

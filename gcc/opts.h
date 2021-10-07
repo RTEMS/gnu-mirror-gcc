@@ -489,7 +489,6 @@ extern char *gen_command_line_string (cl_decoded_option *options,
 extern char *gen_producer_string (const char *language_string,
 				  cl_decoded_option *options,
 				  unsigned int options_count);
-
 /* Set OPTION in OPTS to VALUE if the option is not set in OPTS_SET.  */
 
 #define SET_OPTION_IF_UNSET(OPTS, OPTS_SET, OPTION, VALUE) \
@@ -499,7 +498,5 @@ extern char *gen_producer_string (const char *language_string,
       (OPTS)->x_ ## OPTION = VALUE; \
   } \
   while (false)
-
-#define OPTION_SET_P(OPTION) global_options_set.x_ ## OPTION
 
 #endif

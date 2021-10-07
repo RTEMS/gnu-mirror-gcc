@@ -1363,7 +1363,7 @@ nios2_option_override (void)
   init_machine_status = &nios2_init_machine_status;
 
   nios2_section_threshold
-    = (global_options_set.x_g_switch_value
+    = (OPTION_SET_P (g_switch_value)
        ? g_switch_value : NIOS2_DEFAULT_GVALUE);
 
   if (nios2_gpopt_option == gpopt_unspecified)

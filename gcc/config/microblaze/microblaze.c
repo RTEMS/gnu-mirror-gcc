@@ -1741,7 +1741,7 @@ microblaze_option_override (void)
   machine_mode mode;
   int ver;
 
-  microblaze_section_threshold = (global_options_set.x_g_switch_value
+  microblaze_section_threshold = (OPTION_SET_P (g_switch_value)
 				  ? g_switch_value
 				  : MICROBLAZE_DEFAULT_GVALUE);
 

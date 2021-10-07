@@ -167,10 +167,10 @@ vxworks_override_options (void)
      dwarf up to certain version.  Default dwarf control to friendly
      values for these.  */
 
-  if (!global_options_set.x_dwarf_strict)
+  if (!OPTION_SET_P (dwarf_strict))
     dwarf_strict = 1;
 
-  if (!global_options_set.x_dwarf_version)
+  if (!OPTION_SET_P (dwarf_version))
     dwarf_version = VXWORKS_DWARF_VERSION_DEFAULT;
 
 }

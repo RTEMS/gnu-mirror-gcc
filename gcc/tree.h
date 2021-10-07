@@ -6546,4 +6546,6 @@ extern unsigned fndecl_dealloc_argno (tree);
    object or pointer.  Otherwise return null.  */
 extern tree get_attr_nonstring_decl (tree, tree * = NULL);
 
+#define OPTION_SET_P(OPTION) global_options_set.x_ ## OPTION
+
 #endif  /* GCC_TREE_H  */

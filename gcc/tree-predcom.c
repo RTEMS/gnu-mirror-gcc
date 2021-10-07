@@ -3492,7 +3492,7 @@ public:
        only if predictive commoning isn't set explicitly, and it
        doesn't allow unrolling.  */
     if (flag_tree_loop_vectorize
-	&& !global_options_set.x_flag_predictive_commoning)
+	&& !OPTION_SET_P (flag_predictive_commoning))
       return true;
 
     return false;

@@ -244,7 +244,7 @@ m32r_init (void)
   m32r_punct_chars['@'] = 1; /* ??? no longer used */
 
   /* Provide default value if not specified.  */
-  if (!global_options_set.x_g_switch_value)
+  if (!OPTION_SET_P (g_switch_value))
     g_switch_value = SDATA_DEFAULT_SIZE;
 }
 
