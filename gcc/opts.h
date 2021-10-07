@@ -500,4 +500,6 @@ extern char *gen_producer_string (const char *language_string,
   } \
   while (false)
 
+#define OPTION_SET_P(OPTION) global_options_set.x_ ## OPTION
+
 #endif
