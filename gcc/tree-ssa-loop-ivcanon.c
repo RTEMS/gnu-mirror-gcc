@@ -1673,3 +1673,60 @@ make_pass_complete_unrolli (gcc::context *ctxt)
 }
 
 
+
+/* Complete unrolling of inner loops.  */
+
+namespace {
+
+const pass_data pass_data_early_complete_unrolli =
+{
+  GIMPLE_PASS, /* type */
+  "early-cunrolli", /* name */
+  OPTGROUP_LOOP, /* optinfo_flags */
+  TV_COMPLETE_UNROLL, /* tv_id */
+  ( PROP_cfg | PROP_ssa ), /* properties_required */
+  0, /* properties_provided */
+  0, /* properties_destroyed */
+  0, /* todo_flags_start */
+  0, /* todo_flags_finish */
+};
+
+class pass_early_complete_unrolli : public gimple_opt_pass
+{
+public:
+  pass_early_complete_unrolli (gcc::context *ctxt)
+    : gimple_opt_pass (pass_data_early_complete_unrolli, ctxt)
+  {}
+
+  /* opt_pass methods: */
+  virtual bool gate (function *) { return optimize >= 2; }
+  virtual unsigned int execute (function *);
+
+}; // class pass_early_complete_unrolli
+
+unsigned int
+pass_early_complete_unrolli::execute (function *fun)
+{
+  unsigned ret = 0;
+
+  loop_optimizer_init (LOOPS_NORMAL | LOOPS_HAVE_RECORDED_EXITS);
+  if (number_of_loops (fun) > 1)
+    {
+      scev_initialize ();
+      ret = tree_unroll_loops_completely (false, false);
+      scev_finalize ();
+    }
+  loop_optimizer_finalize ();
+
+  return ret;
+}
+
+} // anon namespace
+
+gimple_opt_pass *
+make_pass_early_complete_unrolli (gcc::context *ctxt)
+{
+  return new pass_early_complete_unrolli (ctxt);
+}
+
+

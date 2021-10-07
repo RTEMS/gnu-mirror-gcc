@@ -389,6 +389,7 @@ extern gimple_opt_pass *make_pass_simduid_cleanup (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_slp_vectorize (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_complete_unroll (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_complete_unrolli (gcc::context *ctxt);
+extern gimple_opt_pass *make_pass_early_complete_unrolli (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_pre_slp_scalar_cleanup (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_parallelize_loops (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_loop_prefetch (gcc::context *ctxt);
