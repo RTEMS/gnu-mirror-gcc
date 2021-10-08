@@ -616,12 +616,7 @@ private:
 
 	  if (n->contains (*a))
 	    found = true;
-	  else if (a->contains (n))
-	    {
-	      *n = a;
-	      found = true;
-	    }
-	  else if (n->merge (*a, false))
+	  if (!found && n->merge (*a, false))
 	    found = restart = true;
 	  if (found)
 	    {
