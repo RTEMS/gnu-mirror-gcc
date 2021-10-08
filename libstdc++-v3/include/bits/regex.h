@@ -57,6 +57,16 @@ namespace __detail
 
   template<typename, typename, typename, bool>
     class _Executor;
+
+  template<typename _Tp>
+    struct __is_contiguous_iter : false_type { };
+
+  template<typename _Tp>
+    struct __is_contiguous_iter<_Tp*> : true_type { };
+
+  template<typename _Tp, typename _Cont>
+    struct __is_contiguous_iter<__gnu_cxx::__normal_iterator<_Tp*, _Cont>>
+    : true_type { };
 }
 
 _GLIBCXX_BEGIN_NAMESPACE_CXX11
@@ -257,7 +267,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 	  // for details.
 	  typedef std::ctype<char_type> __ctype_type;
 	  const __ctype_type& __fctyp(use_facet<__ctype_type>(_M_locale));
-	  std::vector<char_type> __s(__first, __last);
+	  _GLIBCXX_STD_C::vector<char_type> __s(__first, __last);
 	  __fctyp.tolower(__s.data(), __s.data() + __s.size());
 	  return this->transform(__s.data(), __s.data() + __s.size());
 	}
@@ -414,6 +424,9 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       static constexpr flag_type awk = regex_constants::awk;
       static constexpr flag_type grep = regex_constants::grep;
       static constexpr flag_type egrep = regex_constants::egrep;
+#if __cplusplus >= 201703L || !defined __STRICT_ANSI__
+      static constexpr flag_type multiline = regex_constants::multiline;
+#endif
       ///@}
 
       // [7.8.2] construct/copy/destroy
@@ -421,7 +434,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        * Constructs a basic regular expression that does not match any
        * character sequence.
        */
-      basic_regex()
+      basic_regex() noexcept
       : _M_flags(ECMAScript), _M_loc(), _M_automaton(nullptr)
       { }
 
@@ -438,8 +451,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        */
       explicit
       basic_regex(const _Ch_type* __p, flag_type __f = ECMAScript)
-      : basic_regex(__p, __p + char_traits<_Ch_type>::length(__p), __f)
-      { }
+      { _M_compile(__p, __p + _Rx_traits::length(__p), __f); }
 
       /**
        * @brief Constructs a basic regular expression from the sequence
@@ -455,8 +467,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        */
       basic_regex(const _Ch_type* __p, std::size_t __len,
 		  flag_type __f = ECMAScript)
-      : basic_regex(__p, __p + __len, __f)
-      { }
+      { _M_compile(__p, __p + __len, __f); }
 
       /**
        * @brief Copy-constructs a basic regular expression.
@@ -486,8 +497,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 	basic_regex(const std::basic_string<_Ch_type, _Ch_traits,
 					    _Ch_alloc>& __s,
 		    flag_type __f = ECMAScript)
-	: basic_regex(__s.data(), __s.data() + __s.size(), __f)
-	{ }
+	{ _M_compile(__s.data(), __s.data() + __s.size(), __f); }
 
       /**
        * @brief Constructs a basic regular expression from the range
@@ -505,8 +515,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       template<typename _FwdIter>
 	basic_regex(_FwdIter __first, _FwdIter __last,
 		    flag_type __f = ECMAScript)
-	: basic_regex(std::move(__first), std::move(__last), locale_type(), __f)
-	{ }
+	{ this->assign(__first, __last, __f); }
 
       /**
        * @brief Constructs a basic regular expression from an initializer list.
@@ -517,8 +526,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        * @throws regex_error if @p __l is not a valid regular expression.
        */
       basic_regex(initializer_list<_Ch_type> __l, flag_type __f = ECMAScript)
-      : basic_regex(__l.begin(), __l.end(), __f)
-      { }
+      { _M_compile(__l.begin(), __l.end(), __f); }
 
       /**
        * @brief Destroys a basic regular expression.
@@ -530,15 +538,13 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        * @brief Assigns one regular expression to another.
        */
       basic_regex&
-      operator=(const basic_regex& __rhs)
-      { return this->assign(__rhs); }
+      operator=(const basic_regex&) = default;
 
       /**
        * @brief Move-assigns one regular expression to another.
        */
       basic_regex&
-      operator=(basic_regex&& __rhs) noexcept
-      { return this->assign(std::move(__rhs)); }
+      operator=(basic_regex&&) = default;
 
       /**
        * @brief Replaces a regular expression with a new one constructed from
@@ -561,7 +567,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        */
       basic_regex&
       operator=(initializer_list<_Ch_type> __l)
-      { return this->assign(__l.begin(), __l.end()); }
+      { return this->assign(__l); }
 
       /**
        * @brief Replaces a regular expression with a new one constructed from
@@ -576,30 +582,22 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 
       // [7.8.3] assign
       /**
-       * @brief the real assignment operator.
+       * @brief Assigns one regular expression to another.
        *
        * @param __rhs Another regular expression object.
        */
       basic_regex&
-      assign(const basic_regex& __rhs)
-      {
-	basic_regex __tmp(__rhs);
-	this->swap(__tmp);
-	return *this;
-      }
+      assign(const basic_regex& __rhs) noexcept
+      { return *this = __rhs; }
 
       /**
-       * @brief The move-assignment operator.
+       * @brief Move-assigns one regular expression to another.
        *
        * @param __rhs Another regular expression object.
        */
       basic_regex&
       assign(basic_regex&& __rhs) noexcept
-      {
-	basic_regex __tmp(std::move(__rhs));
-	this->swap(__tmp);
-	return *this;
-      }
+      { return *this = std::move(__rhs); }
 
       /**
        * @brief Assigns a new regular expression to a regex object from a
@@ -616,7 +614,10 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        */
       basic_regex&
       assign(const _Ch_type* __p, flag_type __flags = ECMAScript)
-      { return this->assign(string_type(__p), __flags); }
+      {
+	_M_compile(__p, __p + _Rx_traits::length(__p), __flags);
+	return *this;
+      }
 
       /**
        * @brief Assigns a new regular expression to a regex object from a
@@ -635,7 +636,10 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       // 3296. Inconsistent default argument for basic_regex<>::assign
       basic_regex&
       assign(const _Ch_type* __p, size_t __len, flag_type __flags = ECMAScript)
-      { return this->assign(string_type(__p, __len), __flags); }
+      {
+	_M_compile(__p, __p + __len, __flags);
+	return *this;
+      }
 
       /**
        * @brief Assigns a new regular expression to a regex object from a
@@ -653,8 +657,8 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 	assign(const basic_string<_Ch_type, _Ch_traits, _Alloc>& __s,
 	       flag_type __flags = ECMAScript)
 	{
-	  return this->assign(basic_regex(__s.data(), __s.data() + __s.size(),
-					  _M_loc, __flags));
+	  _M_compile(__s.data(), __s.data() + __s.size(), __flags);
+	  return *this;
 	}
 
       /**
@@ -674,7 +678,21 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 	basic_regex&
 	assign(_InputIterator __first, _InputIterator __last,
 	       flag_type __flags = ECMAScript)
-	{ return this->assign(string_type(__first, __last), __flags); }
+	{
+#if __cplusplus >= 201703L
+	  using _ValT = typename iterator_traits<_InputIterator>::value_type;
+	  if constexpr (__detail::__is_contiguous_iter<_InputIterator>::value
+			&& is_same_v<_ValT, value_type>)
+	    {
+	      const auto __len = __last - __first;
+	      const _Ch_type* __p = std::__to_address(__first);
+	      _M_compile(__p, __p + __len, __flags);
+	    }
+	  else
+#endif
+	  this->assign(string_type(__first, __last), __flags);
+	  return *this;
+	}
 
       /**
        * @brief Assigns a new regular expression to a regex object.
@@ -689,7 +707,10 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        */
       basic_regex&
       assign(initializer_list<_Ch_type> __l, flag_type __flags = ECMAScript)
-      { return this->assign(__l.begin(), __l.end(), __flags); }
+      {
+	_M_compile(__l.begin(), __l.end(), __flags);
+	return *this;
+      }
 
       // [7.8.4] const operations
       /**
@@ -697,7 +718,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        * expression.
        */
       unsigned int
-      mark_count() const
+      mark_count() const noexcept
       {
 	if (_M_automaton)
 	  return _M_automaton->_M_sub_count() - 1;
@@ -709,7 +730,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        * or in the last call to assign().
        */
       flag_type
-      flags() const
+      flags() const noexcept
       { return _M_flags; }
 
       // [7.8.5] locale
@@ -731,7 +752,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *        object.
        */
       locale_type
-      getloc() const
+      getloc() const noexcept
       { return _M_loc; }
 
       // [7.8.6] swap
@@ -741,7 +762,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        * @param __rhs Another regular expression object.
        */
       void
-      swap(basic_regex& __rhs)
+      swap(basic_regex& __rhs) noexcept
       {
 	std::swap(_M_flags, __rhs._M_flags);
 	std::swap(_M_loc, __rhs._M_loc);
@@ -757,13 +778,14 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
     private:
       typedef std::shared_ptr<const __detail::_NFA<_Rx_traits>> _AutomatonPtr;
 
-      template<typename _FwdIter>
-	basic_regex(_FwdIter __first, _FwdIter __last, locale_type __loc,
-		    flag_type __f)
-	: _M_flags(__f), _M_loc(std::move(__loc)),
-	_M_automaton(__detail::__compile_nfa<_Rx_traits>(
-	  std::move(__first), std::move(__last), _M_loc, _M_flags))
-	{ }
+      void
+      _M_compile(const _Ch_type* __first, const _Ch_type* __last,
+		 flag_type __f)
+      {
+	__detail::_Compiler<_Rx_traits> __c(__first, __last, _M_loc, __f);
+	_M_automaton = __c._M_get_nfa();
+	_M_flags = __f;
+      }
 
       template<typename _Bp, typename _Ap, typename _Cp, typename _Rp,
 	__detail::_RegexExecutorPolicy, bool>
@@ -848,7 +870,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
   template<typename _Ch_type, typename _Rx_traits>
     inline void
     swap(basic_regex<_Ch_type, _Rx_traits>& __lhs,
-	 basic_regex<_Ch_type, _Rx_traits>& __rhs)
+	 basic_regex<_Ch_type, _Rx_traits>& __rhs) noexcept
     { __lhs.swap(__rhs); }
 
 
@@ -1697,6 +1719,8 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        * [n+3] suffix
        */
       typedef std::vector<sub_match<_Bi_iter>, _Alloc>     _Base_type;
+      // In debug mode _Base_type is the debug vector, this is the unsafe one:
+      typedef _GLIBCXX_STD_C::vector<sub_match<_Bi_iter>, _Alloc> _Unchecked;
       typedef std::iterator_traits<_Bi_iter>   	   	   __iter_traits;
       typedef regex_constants::match_flag_type		   match_flag_type;
 
@@ -1773,7 +1797,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        * @retval true   The object has a fully-established result state.
        * @retval false  The object is not ready.
        */
-      bool ready() const noexcept { return !_Base_type::empty(); }
+      bool ready() const noexcept { return !_Unchecked::empty(); }
 
       /**
        * @name 28.10.2 Size
@@ -1791,11 +1815,11 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        */
       size_type
       size() const noexcept
-      { return _Base_type::empty() ? 0 : _Base_type::size() - 3; }
+      { return _Unchecked::empty() ? 0 : _Unchecked::size() - 3; }
 
       size_type
       max_size() const noexcept
-      { return _Base_type::max_size() - 3; }
+      { return _Unchecked::max_size() - 3; }
 
       /**
        * @brief Indicates if the %match_results contains no results.
@@ -1869,7 +1893,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       {
 	__glibcxx_assert( ready() );
 	return __sub < size()
-	       ? _Base_type::operator[](__sub)
+	       ? _Unchecked::operator[](__sub)
 	       : _M_unmatched_sub();
       }
 
@@ -2045,7 +2069,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       // (plus additional objects for prefix, suffix and unmatched sub).
       void
       _M_resize(unsigned int __size)
-      { _Base_type::assign(__size + 3, sub_match<_Bi_iter>{}); }
+      { _Unchecked::assign(__size + 3, sub_match<_Bi_iter>{}); }
 
       // Set state to a failed match for the given past-the-end iterator.
       void
@@ -2053,32 +2077,32 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       {
 	sub_match<_Bi_iter> __sm;
 	__sm.first = __sm.second = __end;
-	_Base_type::assign(3, __sm);
+	_Unchecked::assign(3, __sm);
       }
 
       const_reference
       _M_unmatched_sub() const
-      { return _Base_type::operator[](_Base_type::size() - 3); }
+      { return _Unchecked::operator[](_Unchecked::size() - 3); }
 
       sub_match<_Bi_iter>&
       _M_unmatched_sub()
-      { return _Base_type::operator[](_Base_type::size() - 3); }
+      { return _Unchecked::operator[](_Unchecked::size() - 3); }
 
       const_reference
       _M_prefix() const
-      { return _Base_type::operator[](_Base_type::size() - 2); }
+      { return _Unchecked::operator[](_Unchecked::size() - 2); }
 
       sub_match<_Bi_iter>&
       _M_prefix()
-      { return _Base_type::operator[](_Base_type::size() - 2); }
+      { return _Unchecked::operator[](_Unchecked::size() - 2); }
 
       const_reference
       _M_suffix() const
-      { return _Base_type::operator[](_Base_type::size() - 1); }
+      { return _Unchecked::operator[](_Unchecked::size() - 1); }
 
       sub_match<_Bi_iter>&
       _M_suffix()
-      { return _Base_type::operator[](_Base_type::size() - 1); }
+      { return _Unchecked::operator[](_Unchecked::size() - 1); }
 
       _Bi_iter _M_begin;
       /// @endcond

@@ -79,10 +79,11 @@ omp_check_optional_argument (tree decl, bool for_present_check)
   return lang_hooks.decls.omp_check_optional_argument (decl, for_present_check);
 }
 
-/* Return true if DECL is a reference type.  */
+/* True if OpenMP should privatize what this DECL points to rather
+   than the DECL itself.  */
 
 bool
-omp_is_reference (tree decl)
+omp_privatize_by_reference (tree decl)
 {
   return lang_hooks.decls.omp_privatize_by_reference (decl);
 }
@@ -192,6 +193,7 @@ omp_extract_for_data (gomp_for *for_stmt, struct omp_for_data *fd,
 		    == GF_OMP_FOR_KIND_DISTRIBUTE;
   bool taskloop = gimple_omp_for_kind (for_stmt)
 		  == GF_OMP_FOR_KIND_TASKLOOP;
+  bool order_reproducible = false;
   tree iterv, countv;
 
   fd->for_stmt = for_stmt;
@@ -276,10 +278,25 @@ omp_extract_for_data (gomp_for *for_stmt, struct omp_for_data *fd,
 	    && !OMP_CLAUSE__SCANTEMP__CONTROL (t))
 	  fd->have_nonctrl_scantemp = true;
 	break;
+      case OMP_CLAUSE_ORDER:
+	/* FIXME: For OpenMP 5.2 this should change to
+	   if (OMP_CLAUSE_ORDER_REPRODUCIBLE (t))
+	   (with the exception of loop construct but that lowers to
+	   no schedule/dist_schedule clauses currently).  */
+	if (!OMP_CLAUSE_ORDER_UNCONSTRAINED (t))
+	  order_reproducible = true;
       default:
 	break;
       }
 
+  /* For order(reproducible:concurrent) schedule ({dynamic,guided,runtime})
+     we have either the option to expensively remember at runtime how we've
+     distributed work from first loop and reuse that in following loops with
+     the same number of iterations and schedule, or just force static schedule.
+     OpenMP API calls etc. aren't allowed in order(concurrent) bodies so
+     users can't observe it easily anyway.  */
+  if (order_reproducible)
+    fd->sched_kind = OMP_CLAUSE_SCHEDULE_STATIC;
   if (fd->collapse > 1 || fd->tiling)
     fd->loops = loops;
   else
@@ -968,7 +985,7 @@ omp_max_simt_vf (void)
   if (ENABLE_OFFLOADING)
     for (const char *c = getenv ("OFFLOAD_TARGET_NAMES"); c;)
       {
-	if (!strncmp (c, "nvptx", strlen ("nvptx")))
+	if (startswith (c, "nvptx"))
 	  return 32;
 	else if ((c = strchr (c, ':')))
 	  c++;
@@ -2576,6 +2593,7 @@ oacc_verify_routine_clauses (tree fndecl, tree *clauses, location_t loc,
 			     const char *routine_str)
 {
   tree c_level = NULL_TREE;
+  tree c_nohost = NULL_TREE;
   tree c_p = NULL_TREE;
   for (tree c = *clauses; c; c_p = c, c = OMP_CLAUSE_CHAIN (c))
     switch (OMP_CLAUSE_CODE (c))
@@ -2607,6 +2625,10 @@ oacc_verify_routine_clauses (tree fndecl, tree *clauses, location_t loc,
 	    OMP_CLAUSE_CHAIN (c_p) = OMP_CLAUSE_CHAIN (c);
 	    c = c_p;
 	  }
+	break;
+      case OMP_CLAUSE_NOHOST:
+	/* Don't worry about duplicate clauses here.  */
+	c_nohost = c;
 	break;
       default:
 	gcc_unreachable ();
@@ -2642,6 +2664,7 @@ oacc_verify_routine_clauses (tree fndecl, tree *clauses, location_t loc,
 	 this one for compatibility.  */
       /* Collect previous directive's clauses.  */
       tree c_level_p = NULL_TREE;
+      tree c_nohost_p = NULL_TREE;
       for (tree c = TREE_VALUE (attr); c; c = OMP_CLAUSE_CHAIN (c))
 	switch (OMP_CLAUSE_CODE (c))
 	  {
@@ -2651,6 +2674,10 @@ oacc_verify_routine_clauses (tree fndecl, tree *clauses, location_t loc,
 	  case OMP_CLAUSE_SEQ:
 	    gcc_checking_assert (c_level_p == NULL_TREE);
 	    c_level_p = c;
+	    break;
+	  case OMP_CLAUSE_NOHOST:
+	    gcc_checking_assert (c_nohost_p == NULL_TREE);
+	    c_nohost_p = c;
 	    break;
 	  default:
 	    gcc_unreachable ();
@@ -2665,6 +2692,13 @@ oacc_verify_routine_clauses (tree fndecl, tree *clauses, location_t loc,
 	{
 	  c_diag = c_level;
 	  c_diag_p = c_level_p;
+	  goto incompatible;
+	}
+      /* Matching 'nohost' clauses?  */
+      if ((c_nohost == NULL_TREE) != (c_nohost_p == NULL_TREE))
+	{
+	  c_diag = c_nohost;
+	  c_diag_p = c_nohost_p;
 	  goto incompatible;
 	}
       /* Compatible.  */

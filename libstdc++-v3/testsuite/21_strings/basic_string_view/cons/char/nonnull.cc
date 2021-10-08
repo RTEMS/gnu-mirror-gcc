@@ -15,7 +15,7 @@
 // with this library; see the file COPYING3.  If not see
 // <http://www.gnu.org/licenses/>.
 
-// { dg-options "-std=gnu++17 -Wnonnull" }
+// { dg-options "-Wnonnull" }
 // { dg-do compile { target c++17 } }
 
 #include <string_view>
@@ -25,5 +25,5 @@ test01()
 {
   std::string_view s((const char*)nullptr); // { dg-warning "\\\[-Wnonnull" }
   std::string_view t((char*)nullptr);	    // { dg-warning "\\\[-Wnonnull" }
-  std::string_view u(nullptr);		    // { dg-warning "\\\[-Wnonnull" }
+  std::string_view u(nullptr);		    // { dg-error "deleted" }
 }

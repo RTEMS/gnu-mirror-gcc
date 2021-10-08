@@ -747,7 +747,8 @@
 	   constant can be represented in SImode, this is important
 	   for the corner case where operand[1] is INT_MIN.  */
 
-	operands[1] = GEN_INT (trunc_int_for_mode (-INTVAL (operands[1]), SImode));
+	operands[1]
+	  = GEN_INT (trunc_int_for_mode (-UINTVAL (operands[1]), SImode));
 
 	if (!(*insn_data[CODE_FOR_addsi3].operand[2].predicate)
 	      (operands[1], SImode))
@@ -1873,25 +1874,28 @@
 )
 
 (define_insn "*extend<SHORT:mode><GPI:mode>2_aarch64"
-  [(set (match_operand:GPI 0 "register_operand" "=r,r")
-        (sign_extend:GPI (match_operand:SHORT 1 "nonimmediate_operand" "r,m")))]
+  [(set (match_operand:GPI 0 "register_operand" "=r,r,r")
+        (sign_extend:GPI (match_operand:SHORT 1 "nonimmediate_operand" "r,m,w")))]
   ""
   "@
    sxt<SHORT:size>\t%<GPI:w>0, %w1
-   ldrs<SHORT:size>\t%<GPI:w>0, %1"
-  [(set_attr "type" "extend,load_4")]
+   ldrs<SHORT:size>\t%<GPI:w>0, %1
+   smov\t%<GPI:w>0, %1.<SHORT:size>[0]"
+  [(set_attr "type" "extend,load_4,neon_to_gp")
+   (set_attr "arch" "*,*,fp")]
 )
 
 (define_insn "*zero_extend<SHORT:mode><GPI:mode>2_aarch64"
-  [(set (match_operand:GPI 0 "register_operand" "=r,r,w")
-        (zero_extend:GPI (match_operand:SHORT 1 "nonimmediate_operand" "r,m,m")))]
+  [(set (match_operand:GPI 0 "register_operand" "=r,r,w,r")
+        (zero_extend:GPI (match_operand:SHORT 1 "nonimmediate_operand" "r,m,m,w")))]
   ""
   "@
    and\t%<GPI:w>0, %<GPI:w>1, <SHORT:short_mask>
    ldr<SHORT:size>\t%w0, %1
-   ldr\t%<SHORT:size>0, %1"
-  [(set_attr "type" "logic_imm,load_4,f_loads")
-   (set_attr "arch" "*,*,fp")]
+   ldr\t%<SHORT:size>0, %1
+   umov\t%w0, %1.<SHORT:size>[0]"
+  [(set_attr "type" "logic_imm,load_4,f_loads,neon_to_gp")
+   (set_attr "arch" "*,*,fp,fp")]
 )
 
 (define_expand "<optab>qihi2"
@@ -3572,6 +3576,18 @@
   [(set_attr "autodetect_type" "alu_shift_<shift>_op2")]
 )
 
+(define_insn "*neg_asr_si2_extr"
+  [(set (match_operand:SI 0 "register_operand" "=r")
+	(neg:SI (match_operator:SI 4 "subreg_lowpart_operator"
+		  [(sign_extract:DI
+		     (match_operand:DI 1 "register_operand" "r")
+		     (match_operand 3 "aarch64_simd_shift_imm_offset_si" "n")
+		     (match_operand 2 "aarch64_simd_shift_imm_offset_si" "n"))])))]
+  "INTVAL (operands[2]) + INTVAL (operands[3]) == 32"
+  "neg\\t%w0, %w1, asr %2"
+  [(set_attr "autodetect_type" "alu_shift_asr_op2")]
+)
+
 (define_insn "mul<mode>3"
   [(set (match_operand:GPI 0 "register_operand" "=r")
 	(mult:GPI (match_operand:GPI 1 "register_operand" "r")
@@ -4189,15 +4205,15 @@
   [(set_attr "type" "csel")]
 )
 
-(define_insn "csneg3_uxtw_insn"
+(define_insn "*cs<neg_not_cs>3_uxtw_insn4"
   [(set (match_operand:DI 0 "register_operand" "=r")
 	(zero_extend:DI
 	  (if_then_else:SI
 	    (match_operand 1 "aarch64_comparison_operation" "")
-	    (neg:SI (match_operand:SI 2 "register_operand" "r"))
+	    (NEG_NOT:SI (match_operand:SI 2 "register_operand" "r"))
 	    (match_operand:SI 3 "aarch64_reg_or_zero" "rZ"))))]
   ""
-  "csneg\\t%w0, %w3, %w2, %M1"
+  "cs<neg_not_cs>\\t%w0, %w3, %w2, %M1"
   [(set_attr "type" "csel")]
 )
 
@@ -4996,7 +5012,7 @@
     /* (SZ - cnt) % SZ == -cnt % SZ */
     if (CONST_INT_P (operands[2]))
       {
-        operands[2] = GEN_INT ((-INTVAL (operands[2]))
+        operands[2] = GEN_INT ((-UINTVAL (operands[2]))
 			       & (GET_MODE_BITSIZE (<MODE>mode) - 1));
         if (operands[2] == const0_rtx)
           {
@@ -5379,6 +5395,22 @@
 			    (match_operand 3 "const_int_operand" "n")))))]
   "UINTVAL (operands[3]) < 32 &&
    (UINTVAL (operands[3]) + UINTVAL (operands[4]) == 32)"
+  "extr\\t%w0, %w1, %w2, %4"
+  [(set_attr "type" "rotate_imm")]
+)
+
+(define_insn "*extrsi5_insn_di"
+  [(set (match_operand:SI 0 "register_operand" "=r")
+	(ior:SI (ashift:SI (match_operand:SI 1 "register_operand" "r")
+			   (match_operand 3 "const_int_operand" "n"))
+		(match_operator:SI 6 "subreg_lowpart_operator"
+		  [(zero_extract:DI
+		     (match_operand:DI 2 "register_operand" "r")
+		     (match_operand 5 "const_int_operand" "n")
+		     (match_operand 4 "const_int_operand" "n"))])))]
+  "UINTVAL (operands[3]) < 32
+   && UINTVAL (operands[3]) + UINTVAL (operands[4]) == 32
+   && INTVAL (operands[3]) == INTVAL (operands[5])"
   "extr\\t%w0, %w1, %w2, %4"
   [(set_attr "type" "rotate_imm")]
 )

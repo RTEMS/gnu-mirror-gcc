@@ -33,11 +33,10 @@
 
 #if __cplusplus >= 201703L
 
+#include <initializer_list>
 #include <type_traits>
-#include <utility>
 #include <bits/enable_special_members.h>
-#include <bits/functexcept.h>
-#include <bits/move.h>
+#include <bits/exception_defines.h>
 #include <bits/functional_hash.h>
 #include <bits/invoke.h>
 #include <ext/aligned_buffer.h>
@@ -45,6 +44,7 @@
 #include <bits/stl_iterator_base_types.h>
 #include <bits/stl_iterator_base_funcs.h>
 #include <bits/stl_construct.h>
+#include <bits/utility.h> // in_place_index_t
 #if __cplusplus > 201703L
 # include <compare>
 #endif
@@ -71,7 +71,7 @@ namespace __variant
 } // namespace __variant
 } // namespace __detail
 
-#define __cpp_lib_variant 201606L
+#define __cpp_lib_variant 202102L
 
   template<typename... _Types> class tuple;
   template<typename... _Types> class variant;
@@ -201,6 +201,28 @@ namespace __variant
       std::__do_visit<__variant_idx_cookie>(std::forward<_Visitor>(__visitor),
 	  std::forward<_Variants>(__variants)...);
     }
+
+  // The __as function templates implement the exposition-only "as-variant"
+
+  template<typename... _Types>
+    constexpr std::variant<_Types...>&
+    __as(std::variant<_Types...>& __v) noexcept
+    { return __v; }
+
+  template<typename... _Types>
+    constexpr const std::variant<_Types...>&
+    __as(const std::variant<_Types...>& __v) noexcept
+    { return __v; }
+
+  template<typename... _Types>
+    constexpr std::variant<_Types...>&&
+    __as(std::variant<_Types...>&& __v) noexcept
+    { return std::move(__v); }
+
+  template<typename... _Types>
+    constexpr const std::variant<_Types...>&&
+    __as(const std::variant<_Types...>&& __v) noexcept
+    { return std::move(__v); }
 
   // _Uninitialized<T> is guaranteed to be a trivially destructible type,
   // even if T is not.
@@ -463,6 +485,12 @@ namespace __variant
       {
 	if constexpr (__variant::__never_valueless<_Types...>())
 	  return true;
+	// It would be nice if we could just return true for -fno-exceptions.
+	// It's possible (but inadvisable) that a std::variant could become
+	// valueless in a translation unit compiled with -fexceptions and then
+	// be passed to functions compiled with -fno-exceptions. We would need
+	// some #ifdef _GLIBCXX_NO_EXCEPTIONS_GLOBALLY property to elide all
+	// checks for valueless_by_exception().
 	return this->_M_index != static_cast<__index_type>(variant_npos);
       }
 
@@ -1063,6 +1091,29 @@ namespace __variant
 			      std::index_sequence<__indices...>>
     : _Base_dedup<__indices, __poison_hash<remove_const_t<_Types>>>... { };
 
+  // Equivalent to decltype(get<_Np>(as-variant(declval<_Variant>())))
+  template<size_t _Np, typename _Variant,
+      typename _AsV = decltype(__variant::__as(std::declval<_Variant>())),
+      typename _Tp = variant_alternative_t<_Np, remove_reference_t<_AsV>>>
+    using __get_t
+      = __conditional_t<is_lvalue_reference_v<_Variant>, _Tp&, _Tp&&>;
+
+  // Return type of std::visit.
+  template<typename _Visitor, typename... _Variants>
+    using __visit_result_t
+      = invoke_result_t<_Visitor, __get_t<0, _Variants>...>;
+
+  template<typename _Tp, typename... _Types>
+    constexpr inline bool __same_types = (is_same_v<_Tp, _Types> && ...);
+
+  template <typename _Visitor, typename _Variant, size_t... _Idxs>
+    constexpr bool __check_visitor_results(std::index_sequence<_Idxs...>)
+    {
+      return __same_types<
+	invoke_result_t<_Visitor, __get_t<_Idxs, _Variant>>...
+	>;
+    }
+
 } // namespace __variant
 } // namespace __detail
 
@@ -1248,7 +1299,8 @@ namespace __variant
 #endif
 
   template<typename _Visitor, typename... _Variants>
-    constexpr decltype(auto) visit(_Visitor&&, _Variants&&...);
+    constexpr __detail::__variant::__visit_result_t<_Visitor, _Variants...>
+    visit(_Visitor&&, _Variants&&...);
 
   template<typename... _Types>
     inline enable_if_t<(is_move_constructible_v<_Types> && ...)
@@ -1703,56 +1755,119 @@ namespace __variant
       return __detail::__variant::__get<_Np>(std::move(__v));
     }
 
+  /// @cond undocumented
   template<typename _Result_type, typename _Visitor, typename... _Variants>
     constexpr decltype(auto)
     __do_visit(_Visitor&& __visitor, _Variants&&... __variants)
     {
-      constexpr auto& __vtable = __detail::__variant::__gen_vtable<
-	_Result_type, _Visitor&&, _Variants&&...>::_S_vtable;
+      // Get the silly case of visiting no variants out of the way first.
+      if constexpr (sizeof...(_Variants) == 0)
+	return std::forward<_Visitor>(__visitor)();
+      else
+	{
+	  constexpr size_t __max = 11; // "These go to eleven."
 
-      auto __func_ptr = __vtable._M_access(__variants.index()...);
-      return (*__func_ptr)(std::forward<_Visitor>(__visitor),
-			   std::forward<_Variants>(__variants)...);
+	  // The type of the first variant in the pack.
+	  using _V0
+	    = typename __detail::__variant::_Nth_type<0, _Variants...>::type;
+	  // The number of alternatives in that first variant.
+	  constexpr auto __n = variant_size_v<remove_reference_t<_V0>>;
+
+	  if constexpr (sizeof...(_Variants) > 1 || __n > __max)
+	    {
+	      // Use a jump table for the general case.
+	      constexpr auto& __vtable = __detail::__variant::__gen_vtable<
+		_Result_type, _Visitor&&, _Variants&&...>::_S_vtable;
+
+	      auto __func_ptr = __vtable._M_access(__variants.index()...);
+	      return (*__func_ptr)(std::forward<_Visitor>(__visitor),
+				   std::forward<_Variants>(__variants)...);
+	    }
+	  else // We have a single variant with a small number of alternatives.
+	    {
+	      // A name for the first variant in the pack.
+	      _V0& __v0
+		= [](_V0& __v, ...) -> _V0& { return __v; }(__variants...);
+
+	      using __detail::__variant::_Multi_array;
+	      using __detail::__variant::__gen_vtable_impl;
+	      using _Ma = _Multi_array<_Result_type (*)(_Visitor&&, _V0&&)>;
+
+#ifdef _GLIBCXX_DEBUG
+# define _GLIBCXX_VISIT_UNREACHABLE __builtin_trap
+#else
+# define _GLIBCXX_VISIT_UNREACHABLE __builtin_unreachable
+#endif
+
+#define _GLIBCXX_VISIT_CASE(N)						\
+  case N:								\
+  {									\
+    if constexpr (N < __n)						\
+      {									\
+	return __gen_vtable_impl<_Ma, index_sequence<N>>::		\
+	  __visit_invoke(std::forward<_Visitor>(__visitor),		\
+			 std::forward<_V0>(__v0));		\
+      }									\
+    else _GLIBCXX_VISIT_UNREACHABLE();					\
+  }
+
+	      switch (__v0.index())
+		{
+		  _GLIBCXX_VISIT_CASE(0)
+		  _GLIBCXX_VISIT_CASE(1)
+		  _GLIBCXX_VISIT_CASE(2)
+		  _GLIBCXX_VISIT_CASE(3)
+		  _GLIBCXX_VISIT_CASE(4)
+		  _GLIBCXX_VISIT_CASE(5)
+		  _GLIBCXX_VISIT_CASE(6)
+		  _GLIBCXX_VISIT_CASE(7)
+		  _GLIBCXX_VISIT_CASE(8)
+		  _GLIBCXX_VISIT_CASE(9)
+		  _GLIBCXX_VISIT_CASE(10)
+		case variant_npos:
+		  using __detail::__variant::__variant_idx_cookie;
+		  using __detail::__variant::__variant_cookie;
+		  if constexpr (is_same_v<_Result_type, __variant_idx_cookie>
+				|| is_same_v<_Result_type, __variant_cookie>)
+		    {
+		      using _Npos = index_sequence<variant_npos>;
+		      return __gen_vtable_impl<_Ma, _Npos>::
+			__visit_invoke(std::forward<_Visitor>(__visitor),
+				       std::forward<_V0>(__v0));
+		    }
+		  else
+		    _GLIBCXX_VISIT_UNREACHABLE();
+		default:
+		  _GLIBCXX_VISIT_UNREACHABLE();
+		}
+#undef _GLIBCXX_VISIT_CASE
+#undef _GLIBCXX_VISIT_UNREACHABLE
+	    }
+	}
     }
-
-  template<typename _Tp, typename... _Types>
-     constexpr inline bool __same_types = (is_same_v<_Tp, _Types> && ...);
-
-  template <size_t _Idx, typename _Visitor, typename _Variant>
-    decltype(auto)
-    __check_visitor_result(_Visitor&& __vis, _Variant&& __variant)
-    {
-      return std::__invoke(std::forward<_Visitor>(__vis),
-			   std::get<_Idx>(std::forward<_Variant>(__variant)));
-    }
-
-  template <typename _Visitor, typename _Variant, size_t... _Idxs>
-    constexpr bool __check_visitor_results(std::index_sequence<_Idxs...>)
-    {
-      return __same_types<decltype(__check_visitor_result<_Idxs>(
-	std::declval<_Visitor>(),
-	std::declval<_Variant>()))...>;
-    }
-
+  /// @endcond
 
   template<typename _Visitor, typename... _Variants>
-    constexpr decltype(auto)
+    constexpr __detail::__variant::__visit_result_t<_Visitor, _Variants...>
     visit(_Visitor&& __visitor, _Variants&&... __variants)
     {
-      if ((__variants.valueless_by_exception() || ...))
+      namespace __variant = std::__detail::__variant;
+
+      if ((__variant::__as(__variants).valueless_by_exception() || ...))
 	__throw_bad_variant_access("std::visit: variant is valueless");
 
-      using _Result_type = std::invoke_result_t<_Visitor,
-	decltype(std::get<0>(std::declval<_Variants>()))...>;
+      using _Result_type
+	= __detail::__variant::__visit_result_t<_Visitor, _Variants...>;
 
       using _Tag = __detail::__variant::__deduce_visit_result<_Result_type>;
 
       if constexpr (sizeof...(_Variants) == 1)
 	{
-	  constexpr bool __visit_rettypes_match =
-	    __check_visitor_results<_Visitor, _Variants...>(
-	      std::make_index_sequence<
-	        std::variant_size<remove_reference_t<_Variants>...>::value>());
+	  using _Vp = decltype(__variant::__as(std::declval<_Variants>()...));
+
+	  constexpr bool __visit_rettypes_match = __detail::__variant::
+	    __check_visitor_results<_Visitor, _Vp>(
+	      make_index_sequence<variant_size_v<remove_reference_t<_Vp>>>());
 	  if constexpr (!__visit_rettypes_match)
 	    {
 	      static_assert(__visit_rettypes_match,
@@ -1763,12 +1878,12 @@ namespace __variant
 	  else
 	    return std::__do_visit<_Tag>(
 	      std::forward<_Visitor>(__visitor),
-	      std::forward<_Variants>(__variants)...);
+	      static_cast<_Vp>(__variants)...);
 	}
       else
 	return std::__do_visit<_Tag>(
 	  std::forward<_Visitor>(__visitor),
-	  std::forward<_Variants>(__variants)...);
+	  __variant::__as(std::forward<_Variants>(__variants))...);
     }
 
 #if __cplusplus > 201703L
@@ -1776,14 +1891,17 @@ namespace __variant
     constexpr _Res
     visit(_Visitor&& __visitor, _Variants&&... __variants)
     {
-      if ((__variants.valueless_by_exception() || ...))
+      namespace __variant = std::__detail::__variant;
+
+      if ((__variant::__as(__variants).valueless_by_exception() || ...))
 	__throw_bad_variant_access("std::visit<R>: variant is valueless");
 
       return std::__do_visit<_Res>(std::forward<_Visitor>(__visitor),
-				   std::forward<_Variants>(__variants)...);
+	  __variant::__as(std::forward<_Variants>(__variants))...);
     }
 #endif
 
+  /// @cond undocumented
   template<bool, typename... _Types>
     struct __variant_hash_call_base_impl
     {
@@ -1814,6 +1932,7 @@ namespace __variant
     using __variant_hash_call_base =
     __variant_hash_call_base_impl<(__poison_hash<remove_const_t<_Types>>::
 				   __enable_hash_call &&...), _Types...>;
+  /// @endcond
 
   template<typename... _Types>
     struct hash<variant<_Types...>>

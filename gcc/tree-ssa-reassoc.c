@@ -53,6 +53,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "case-cfn-macros.h"
 #include "tree-ssa-reassoc.h"
 #include "tree-ssa-math-opts.h"
+#include "gimple-range.h"
 
 /*  This is a simple global reassociation pass.  It is, in part, based
     on the LLVM pass of the same name (They do some things more/less
@@ -179,6 +180,10 @@ along with GCC; see the file COPYING3.  If not see
    point 3a in the pass header comment.  */
 static bool reassoc_insert_powi_p;
 
+/* Enable biasing ranks of loop accumulators.  We don't want this before
+   vectorization, since it interferes with reduction chains.  */
+static bool reassoc_bias_loop_carried_phi_ranks_p;
+
 /* Statistics */
 static struct
 {
@@ -205,6 +210,10 @@ static int64_t *bb_rank;
 
 /* Operand->rank hashtable.  */
 static hash_map<tree, int64_t> *operand_rank;
+
+/* SSA_NAMEs that are forms of loop accumulators and whose ranks need to be
+   biased.  */
+static auto_bitmap biased_names;
 
 /* Vector of SSA_NAMEs on which after reassociate_bb is done with
    all basic blocks the CFG should be adjusted - basic blocks
@@ -251,6 +260,53 @@ reassoc_remove_stmt (gimple_stmt_iterator *gsi)
    the rank difference between two blocks.  */
 #define PHI_LOOP_BIAS (1 << 15)
 
+/* Return TRUE iff PHI_LOOP_BIAS should be propagated from one of the STMT's
+   operands to the STMT's left-hand side.  The goal is to preserve bias in code
+   like this:
+
+     x_1 = phi(x_0, x_2)
+     a = x_1 | 1
+     b = a ^ 2
+     .MEM = b
+     c = b + d
+     x_2 = c + e
+
+   That is, we need to preserve bias along single-use chains originating from
+   loop-carried phis.  Only GIMPLE_ASSIGNs to SSA_NAMEs are considered to be
+   uses, because only they participate in rank propagation.  */
+static bool
+propagate_bias_p (gimple *stmt)
+{
+  use_operand_p use;
+  imm_use_iterator use_iter;
+  gimple *single_use_stmt = NULL;
+
+  if (TREE_CODE_CLASS (gimple_assign_rhs_code (stmt)) == tcc_reference)
+    return false;
+
+  FOR_EACH_IMM_USE_FAST (use, use_iter, gimple_assign_lhs (stmt))
+    {
+      gimple *current_use_stmt = USE_STMT (use);
+
+      if (is_gimple_assign (current_use_stmt)
+	  && TREE_CODE (gimple_assign_lhs (current_use_stmt)) == SSA_NAME)
+	{
+	  if (single_use_stmt != NULL && single_use_stmt != current_use_stmt)
+	    return false;
+	  single_use_stmt = current_use_stmt;
+	}
+    }
+
+  if (single_use_stmt == NULL)
+    return false;
+
+  if (gimple_bb (stmt)->loop_father
+      != gimple_bb (single_use_stmt)->loop_father)
+    return false;
+
+  return true;
+}
+
 /* Rank assigned to a phi statement.  If STMT is a loop-carried phi of
    an innermost loop, and the phi has only a single use which is inside
    the loop, then the rank is the block rank of the loop latch plus an
@@ -267,6 +323,9 @@ phi_rank (gimple *stmt)
   unsigned i;
   use_operand_p use;
   gimple *use_stmt;
+
+  if (!reassoc_bias_loop_carried_phi_ranks_p)
+    return bb_rank[bb->index];
 
   /* We only care about real loops (those with a latch).  */
   if (!father->latch)
@@ -305,48 +364,26 @@ phi_rank (gimple *stmt)
   return bb_rank[bb->index];
 }
 
-/* If EXP is an SSA_NAME defined by a PHI statement that represents a
-   loop-carried dependence of an innermost loop, return TRUE; else
-   return FALSE.  */
-static bool
-loop_carried_phi (tree exp)
-{
-  gimple *phi_stmt;
-  int64_t block_rank;
-
-  if (TREE_CODE (exp) != SSA_NAME
-      || SSA_NAME_IS_DEFAULT_DEF (exp))
-    return false;
-
-  phi_stmt = SSA_NAME_DEF_STMT (exp);
-
-  if (gimple_code (SSA_NAME_DEF_STMT (exp)) != GIMPLE_PHI)
-    return false;
-
-  /* Non-loop-carried phis have block rank.  Loop-carried phis have
-     an additional bias added in.  If this phi doesn't have block rank,
-     it's biased and should not be propagated.  */
-  block_rank = bb_rank[gimple_bb (phi_stmt)->index];
-
-  if (phi_rank (phi_stmt) != block_rank)
-    return true;
-
-  return false;
-}
-
 /* Return the maximum of RANK and the rank that should be propagated
    from expression OP.  For most operands, this is just the rank of OP.
    For loop-carried phis, the value is zero to avoid undoing the bias
    in favor of the phi.  */
 static int64_t
-propagate_rank (int64_t rank, tree op)
+propagate_rank (int64_t rank, tree op, bool *maybe_biased_p)
 {
   int64_t op_rank;
 
-  if (loop_carried_phi (op))
-    return rank;
-
   op_rank = get_rank (op);
+
+  /* Check whether op is biased after the get_rank () call, since it might have
+     updated biased_names.  */
+  if (TREE_CODE (op) == SSA_NAME
+      && bitmap_bit_p (biased_names, SSA_NAME_VERSION (op)))
+    {
+      if (maybe_biased_p == NULL)
+	return rank;
+      *maybe_biased_p = true;
+    }
 
   return MAX (rank, op_rank);
 }
@@ -425,13 +462,20 @@ get_rank (tree e)
 
       stmt = SSA_NAME_DEF_STMT (e);
       if (gimple_code (stmt) == GIMPLE_PHI)
-	rank = phi_rank (stmt);
+	{
+	  rank = phi_rank (stmt);
+	  if (rank != bb_rank[gimple_bb (stmt)->index])
+	    bitmap_set_bit (biased_names, SSA_NAME_VERSION (e));
+	}
 
       else if (!is_gimple_assign (stmt))
 	rank = bb_rank[gimple_bb (stmt)->index];
 
       else
 	{
+	  bool biased_p = false;
+	  bool *maybe_biased_p = propagate_bias_p (stmt) ? &biased_p : NULL;
+
 	  /* Otherwise, find the maximum rank for the operands.  As an
 	     exception, remove the bias from loop-carried phis when propagating
 	     the rank so that dependent operations are not also biased.  */
@@ -440,9 +484,11 @@ get_rank (tree e)
 	     thus have rank 0.  */
 	  rank = 0;
 	  FOR_EACH_SSA_TREE_OPERAND (op, stmt, iter, SSA_OP_USE)
-	    rank = propagate_rank (rank, op);
+	    rank = propagate_rank (rank, op, maybe_biased_p);
 
 	  rank += 1;
+	  if (biased_p)
+	    bitmap_set_bit (biased_names, SSA_NAME_VERSION (e));
 	}
 
       if (dump_file && (dump_flags & TDF_DETAILS))
@@ -593,6 +639,36 @@ add_repeat_to_ops_vec (vec<operand_entry *> *ops, tree op,
   reassociate_stats.pows_encountered++;
 }
 
+/* Returns true if we can associate the SSA def OP.  */
+
+static bool
+can_reassociate_op_p (tree op)
+{
+  if (TREE_CODE (op) == SSA_NAME && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (op))
+    return false;
+  /* Make sure asm goto outputs do not participate in reassociation since
+     we have no way to find an insertion place after asm goto.  */
+  if (TREE_CODE (op) == SSA_NAME
+      && gimple_code (SSA_NAME_DEF_STMT (op)) == GIMPLE_ASM
+      && gimple_asm_nlabels (as_a <gasm *> (SSA_NAME_DEF_STMT (op))) != 0)
+    return false;
+  return true;
+}
+
+/* Returns true if we can reassociate operations of TYPE.
+   That is for integral or non-saturating fixed-point types, and for
+   floating point type when associative-math is enabled.  */
+
+static bool
+can_reassociate_type_p (tree type)
+{
+  if ((ANY_INTEGRAL_TYPE_P (type) && TYPE_OVERFLOW_WRAPS (type))
+      || NON_SAT_FIXED_POINT_TYPE_P (type)
+      || (flag_associative_math && FLOAT_TYPE_P (type)))
+    return true;
+  return false;
+}
+
 /* Return true if STMT is reassociable operation containing a binary
    operation with tree code CODE, and is inside LOOP.  */
 
@@ -613,12 +689,8 @@ is_reassociable_op (gimple *stmt, enum tree_code code, class loop *loop)
     {
       tree rhs1 = gimple_assign_rhs1 (stmt);
       tree rhs2 = gimple_assign_rhs2 (stmt);
-      if (TREE_CODE (rhs1) == SSA_NAME
-	  && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (rhs1))
-	return false;
-      if (rhs2
-	  && TREE_CODE (rhs2) == SSA_NAME
-	  && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (rhs2))
+      if (!can_reassociate_op_p (rhs1)
+	  || (rhs2 && !can_reassociate_op_p (rhs2)))
 	return false;
       return true;
     }
@@ -1035,7 +1107,7 @@ eliminate_using_constants (enum tree_code opcode,
 	  if (integer_zerop (oelast->op)
 	      || (FLOAT_TYPE_P (type)
 		  && (opcode == PLUS_EXPR || opcode == MINUS_EXPR)
-		  && fold_real_zero_addition_p (type, oelast->op,
+		  && fold_real_zero_addition_p (type, 0, oelast->op,
 						opcode == MINUS_EXPR)))
 	    {
 	      if (ops->length () != 1)
@@ -1446,6 +1518,10 @@ insert_stmt_after (gimple *stmt, gimple *insert_point)
       gsi_insert_after (&gsi, stmt, GSI_NEW_STMT);
       return;
     }
+  else if (gimple_code (insert_point) == GIMPLE_ASM)
+    /* We have no idea where to insert - it depends on where the
+       uses will be placed.  */
+    gcc_unreachable ();
   else
     /* We assume INSERT_POINT is a SSA_NAME_DEF_STMT of some SSA_NAME,
        thus if it must end a basic block, it should be a call that can
@@ -3191,12 +3267,14 @@ optimize_range_tests_to_bit_test (enum tree_code opcode, int first, int length,
 	 amount, then we can merge the entry test in the bit test.  In this
 	 case, if we would need otherwise 2 or more comparisons, then use
 	 the bit test; in the other cases, the threshold is 3 comparisons.  */
-      wide_int min, max;
       bool entry_test_needed;
+      value_range r;
       if (TREE_CODE (exp) == SSA_NAME
-	  && get_range_info (exp, &min, &max) == VR_RANGE
-	  && wi::leu_p (max - min, prec - 1))
+	  && get_range_query (cfun)->range_of_expr (r, exp)
+	  && r.kind () == VR_RANGE
+	  && wi::leu_p (r.upper_bound () - r.lower_bound (), prec - 1))
 	{
+	  wide_int min = r.lower_bound ();
 	  wide_int ilowi = wi::to_wide (lowi);
 	  if (wi::lt_p (min, ilowi, TYPE_SIGN (TREE_TYPE (lowi))))
 	    {
@@ -4453,7 +4531,7 @@ get_ops (tree var, enum tree_code code, vec<operand_entry *> *ops,
    stmts.  */
 
 static tree
-update_ops (tree var, enum tree_code code, vec<operand_entry *> ops,
+update_ops (tree var, enum tree_code code, const vec<operand_entry *> &ops,
 	    unsigned int *pidx, class loop *loop)
 {
   gimple *stmt = SSA_NAME_DEF_STMT (var);
@@ -5000,7 +5078,7 @@ remove_visited_stmt_chain (tree var)
    cases, but it is unlikely to be worth it.  */
 
 static void
-swap_ops_for_binary_stmt (vec<operand_entry *> ops,
+swap_ops_for_binary_stmt (const vec<operand_entry *> &ops,
 			  unsigned int opindex, gimple *stmt)
 {
   operand_entry *oe1, *oe2, *oe3;
@@ -5071,7 +5149,8 @@ insert_stmt_before_use (gimple *stmt, gimple *stmt_to_insert)
 
 static tree
 rewrite_expr_tree (gimple *stmt, enum tree_code rhs_code, unsigned int opindex,
-		   vec<operand_entry *> ops, bool changed, bool next_changed)
+		   const vec<operand_entry *> &ops, bool changed,
+		   bool next_changed)
 {
   tree rhs1 = gimple_assign_rhs1 (stmt);
   tree rhs2 = gimple_assign_rhs2 (stmt);
@@ -5293,7 +5372,7 @@ get_reassociation_width (int ops_num, enum tree_code opc,
 
 static void
 rewrite_expr_tree_parallel (gassign *stmt, int width,
-			    vec<operand_entry *> ops)
+			    const vec<operand_entry *> &ops)
 {
   enum tree_code opcode = gimple_assign_rhs_code (stmt);
   int op_num = ops.length ();
@@ -5883,23 +5962,6 @@ repropagate_negates (void)
     }
 }
 
-/* Returns true if OP is of a type for which we can do reassociation.
-   That is for integral or non-saturating fixed-point types, and for
-   floating point type when associative-math is enabled.  */
-
-static bool
-can_reassociate_p (tree op)
-{
-  tree type = TREE_TYPE (op);
-  if (TREE_CODE (op) == SSA_NAME && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (op))
-    return false;
-  if ((ANY_INTEGRAL_TYPE_P (type) && TYPE_OVERFLOW_WRAPS (type))
-      || NON_SAT_FIXED_POINT_TYPE_P (type)
-      || (flag_associative_math && FLOAT_TYPE_P (type)))
-    return true;
-  return false;
-}
-
 /* Break up subtract operations in block BB.
 
    We do this top down because we don't know whether the subtract is
@@ -5932,14 +5994,15 @@ break_up_subtract_bb (basic_block bb)
       gimple_set_uid (stmt, uid++);
 
       if (!is_gimple_assign (stmt)
-	  || !can_reassociate_p (gimple_assign_lhs (stmt)))
+	  || !can_reassociate_type_p (TREE_TYPE (gimple_assign_lhs (stmt)))
+	  || !can_reassociate_op_p (gimple_assign_lhs (stmt)))
 	continue;
 
       /* Look for simple gimple subtract operations.  */
       if (gimple_assign_rhs_code (stmt) == MINUS_EXPR)
 	{
-	  if (!can_reassociate_p (gimple_assign_rhs1 (stmt))
-	      || !can_reassociate_p (gimple_assign_rhs2 (stmt)))
+	  if (!can_reassociate_op_p (gimple_assign_rhs1 (stmt))
+	      || !can_reassociate_op_p (gimple_assign_rhs2 (stmt)))
 	    continue;
 
 	  /* Check for a subtract used only in an addition.  If this
@@ -5950,7 +6013,7 @@ break_up_subtract_bb (basic_block bb)
 	    break_up_subtract (stmt, &gsi);
 	}
       else if (gimple_assign_rhs_code (stmt) == NEGATE_EXPR
-	       && can_reassociate_p (gimple_assign_rhs1 (stmt)))
+	       && can_reassociate_op_p (gimple_assign_rhs1 (stmt)))
 	plus_negates.safe_push (gimple_assign_lhs (stmt));
     }
   for (son = first_dom_son (CDI_DOMINATORS, bb);
@@ -6543,14 +6606,14 @@ reassociate_bb (basic_block bb)
 
 	  /* For non-bit or min/max operations we can't associate
 	     all types.  Verify that here.  */
-	  if (rhs_code != BIT_IOR_EXPR
-	      && rhs_code != BIT_AND_EXPR
-	      && rhs_code != BIT_XOR_EXPR
-	      && rhs_code != MIN_EXPR
-	      && rhs_code != MAX_EXPR
-	      && (!can_reassociate_p (lhs)
-		  || !can_reassociate_p (rhs1)
-		  || !can_reassociate_p (rhs2)))
+	  if ((rhs_code != BIT_IOR_EXPR
+	       && rhs_code != BIT_AND_EXPR
+	       && rhs_code != BIT_XOR_EXPR
+	       && rhs_code != MIN_EXPR
+	       && rhs_code != MAX_EXPR
+	       && !can_reassociate_type_p (TREE_TYPE (lhs)))
+	      || !can_reassociate_op_p (rhs1)
+	      || !can_reassociate_op_p (rhs2))
 	    continue;
 
 	  if (associative_tree_code (rhs_code))
@@ -6908,6 +6971,7 @@ fini_reassoc (void)
 			    reassociate_stats.pows_created);
 
   delete operand_rank;
+  bitmap_clear (biased_names);
   operand_entry_pool.release ();
   free (bb_rank);
   plus_negates.release ();
@@ -6922,9 +6986,10 @@ fini_reassoc (void)
    optimization of a gimple conditional.  Otherwise returns zero.  */
 
 static unsigned int
-execute_reassoc (bool insert_powi_p)
+execute_reassoc (bool insert_powi_p, bool bias_loop_carried_phi_ranks_p)
 {
   reassoc_insert_powi_p = insert_powi_p;
+  reassoc_bias_loop_carried_phi_ranks_p = bias_loop_carried_phi_ranks_p;
 
   init_reassoc ();
 
@@ -6965,15 +7030,19 @@ public:
     {
       gcc_assert (n == 0);
       insert_powi_p = param;
+      bias_loop_carried_phi_ranks_p = !param;
     }
   virtual bool gate (function *) { return flag_tree_reassoc != 0; }
   virtual unsigned int execute (function *)
-    { return execute_reassoc (insert_powi_p); }
+  {
+    return execute_reassoc (insert_powi_p, bias_loop_carried_phi_ranks_p);
+  }
 
  private:
   /* Enable insertion of __builtin_powi calls during execute_reassoc.  See
      point 3a in the pass header comment.  */
   bool insert_powi_p;
+  bool bias_loop_carried_phi_ranks_p;
 }; // class pass_reassoc
 
 } // anon namespace

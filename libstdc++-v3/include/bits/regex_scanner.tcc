@@ -54,8 +54,7 @@ namespace __detail
 {
   template<typename _CharT>
     _Scanner<_CharT>::
-    _Scanner(typename _Scanner::_IterT __begin,
-	     typename _Scanner::_IterT __end,
+    _Scanner(const _CharT* __begin, const _CharT* __end,
 	     _FlagT __flags, std::locale __loc)
     : _ScannerBase(__flags),
       _M_current(__begin), _M_end(__end),
@@ -98,7 +97,7 @@ namespace __detail
     {
       auto __c = *_M_current++;
 
-      if (std::strchr(_M_spec_char, _M_ctype.narrow(__c, ' ')) == nullptr)
+      if (__builtin_strchr(_M_spec_char, _M_ctype.narrow(__c, ' ')) == nullptr)
 	{
 	  _M_token = _S_token_ord_char;
 	  _M_value.assign(1, __c);
@@ -175,6 +174,16 @@ namespace __detail
 	{
 	  _M_state = _S_state_in_brace;
 	  _M_token = _S_token_interval_begin;
+	}
+      else if (__builtin_expect(__c == _CharT(0), false))
+	{
+	  if (!_M_is_ecma())
+	    {
+	      __throw_regex_error(regex_constants::_S_null,
+		  "Unexpected null character in regular expression");
+	    }
+	  _M_token = _S_token_ord_char;
+	  _M_value.assign(1, __c);
 	}
       else if (__c != ']' && __c != '}')
 	{
@@ -394,7 +403,7 @@ namespace __detail
 			    "Unexpected end of regex when escaping.");
 
       auto __c = *_M_current;
-      auto __pos = std::strchr(_M_spec_char, _M_ctype.narrow(__c, '\0'));
+      auto __pos = __builtin_strchr(_M_spec_char, _M_ctype.narrow(__c, '\0'));
 
       if (__pos != nullptr && *__pos != '\0')
 	{

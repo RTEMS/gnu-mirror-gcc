@@ -54,8 +54,7 @@ static const unsigned HOST_WIDE_INT unknown[4] = {
 
 static tree compute_object_offset (const_tree, const_tree);
 static bool addr_object_size (struct object_size_info *,
-			      const_tree, int, unsigned HOST_WIDE_INT *,
-			      tree * = NULL, tree * = NULL);
+			      const_tree, int, unsigned HOST_WIDE_INT *);
 static unsigned HOST_WIDE_INT alloc_object_size (const gcall *, int);
 static tree pass_through_call (const gcall *);
 static void collect_object_sizes_for (struct object_size_info *, tree);
@@ -209,16 +208,9 @@ decl_init_size (tree decl, bool min)
 
 static bool
 addr_object_size (struct object_size_info *osi, const_tree ptr,
-		  int object_size_type, unsigned HOST_WIDE_INT *psize,
-		  tree *pdecl /* = NULL */, tree *poff /* = NULL */)
+		  int object_size_type, unsigned HOST_WIDE_INT *psize)
 {
   tree pt_var, pt_var_size = NULL_TREE, var_size, bytes;
-
-  tree dummy_decl, dummy_off = size_zero_node;
-  if (!pdecl)
-    pdecl = &dummy_decl;
-  if (!poff)
-    poff = &dummy_off;
 
   gcc_assert (TREE_CODE (ptr) == ADDR_EXPR);
 
@@ -241,7 +233,7 @@ addr_object_size (struct object_size_info *osi, const_tree ptr,
 	  || TREE_CODE (TREE_OPERAND (pt_var, 0)) != SSA_NAME)
 	{
 	  compute_builtin_object_size (TREE_OPERAND (pt_var, 0),
-				       object_size_type & ~1, &sz, pdecl, poff);
+				       object_size_type & ~1, &sz);
 	}
       else
 	{
@@ -259,11 +251,6 @@ addr_object_size (struct object_size_info *osi, const_tree ptr,
 	  offset_int mem_offset;
 	  if (mem_ref_offset (pt_var).is_constant (&mem_offset))
 	    {
-	      if (*poff)
-		*poff = wide_int_to_tree (ptrdiff_type_node,
-					  mem_offset + wi::to_offset (*poff));
-	      else
-		*poff = wide_int_to_tree (ptrdiff_type_node, mem_offset);
 	      offset_int dsz = wi::sub (sz, mem_offset);
 	      if (wi::neg_p (dsz))
 		sz = 0;
@@ -281,7 +268,6 @@ addr_object_size (struct object_size_info *osi, const_tree ptr,
     }
   else if (DECL_P (pt_var))
     {
-      *pdecl = pt_var;
       pt_var_size = decl_init_size (pt_var, object_size_type & 2);
       if (!pt_var_size)
 	return false;
@@ -418,7 +404,6 @@ addr_object_size (struct object_size_info *osi, const_tree ptr,
       bytes = compute_object_offset (TREE_OPERAND (ptr, 0), var);
       if (bytes != error_mark_node)
 	{
-	  *poff = bytes;
 	  if (TREE_CODE (bytes) == INTEGER_CST
 	      && tree_int_cst_lt (var_size, bytes))
 	    bytes = size_zero_node;
@@ -438,7 +423,6 @@ addr_object_size (struct object_size_info *osi, const_tree ptr,
 		bytes2 = size_zero_node;
 	      else
 		bytes2 = size_binop (MINUS_EXPR, pt_var_size, bytes2);
-	      *poff = size_binop (PLUS_EXPR, *poff, bytes2);
 	      bytes = size_binop (MIN_EXPR, bytes, bytes2);
 	    }
 	}
@@ -446,11 +430,7 @@ addr_object_size (struct object_size_info *osi, const_tree ptr,
   else if (!pt_var_size)
     return false;
   else
-    {
-      bytes = pt_var_size;
-      if (!*poff)
-	*poff = size_zero_node;
-    }
+    bytes = pt_var_size;
 
   if (tree_fits_uhwi_p (bytes))
     {
@@ -548,16 +528,9 @@ pass_through_call (const gcall *call)
 
 bool
 compute_builtin_object_size (tree ptr, int object_size_type,
-			     unsigned HOST_WIDE_INT *psize,
-			     tree *pdecl /* = NULL */, tree *poff /* = NULL */)
+			     unsigned HOST_WIDE_INT *psize)
 {
   gcc_assert (object_size_type >= 0 && object_size_type <= 3);
-
-  tree dummy_decl, dummy_off = size_zero_node;
-  if (!pdecl)
-    pdecl = &dummy_decl;
-  if (!poff)
-    poff = &dummy_off;
 
   /* Set to unknown and overwrite just before returning if the size
      could be determined.  */
@@ -567,7 +540,7 @@ compute_builtin_object_size (tree ptr, int object_size_type,
     init_offset_limit ();
 
   if (TREE_CODE (ptr) == ADDR_EXPR)
-    return addr_object_size (NULL, ptr, object_size_type, psize, pdecl, poff);
+    return addr_object_size (NULL, ptr, object_size_type, psize);
 
   if (TREE_CODE (ptr) != SSA_NAME
       || !POINTER_TYPE_P (TREE_TYPE (ptr)))
@@ -592,12 +565,11 @@ compute_builtin_object_size (tree ptr, int object_size_type,
 
 	      if (tree_fits_shwi_p (offset)
 		  && compute_builtin_object_size (ptr, object_size_type,
-						  psize, pdecl, poff))
+						  psize))
 		{
 		  /* Return zero when the offset is out of bounds.  */
 		  unsigned HOST_WIDE_INT off = tree_to_shwi (offset);
 		  *psize = off < *psize ? *psize - off : 0;
-		  *poff = offset;
 		  return true;
 		}
 	    }
@@ -1304,45 +1276,6 @@ fini_object_sizes (void)
     }
 }
 
-
-/* Simple pass to optimize all __builtin_object_size () builtins.  */
-
-namespace {
-
-const pass_data pass_data_object_sizes =
-{
-  GIMPLE_PASS, /* type */
-  "objsz", /* name */
-  OPTGROUP_NONE, /* optinfo_flags */
-  TV_NONE, /* tv_id */
-  ( PROP_cfg | PROP_ssa ), /* properties_required */
-  0, /* properties_provided */
-  0, /* properties_destroyed */
-  0, /* todo_flags_start */
-  0, /* todo_flags_finish */
-};
-
-class pass_object_sizes : public gimple_opt_pass
-{
-public:
-  pass_object_sizes (gcc::context *ctxt)
-    : gimple_opt_pass (pass_data_object_sizes, ctxt), insert_min_max_p (false)
-  {}
-
-  /* opt_pass methods: */
-  opt_pass * clone () { return new pass_object_sizes (m_ctxt); }
-  void set_pass_param (unsigned int n, bool param)
-    {
-      gcc_assert (n == 0);
-      insert_min_max_p = param;
-    }
-  virtual unsigned int execute (function *);
-
- private:
-  /* Determines whether the pass instance creates MIN/MAX_EXPRs.  */
-  bool insert_min_max_p;
-}; // class pass_object_sizes
-
 /* Dummy valueize function.  */
 
 static tree
@@ -1351,8 +1284,8 @@ do_valueize (tree t)
   return t;
 }
 
-unsigned int
-pass_object_sizes::execute (function *fun)
+static unsigned int
+object_sizes_execute (function *fun, bool insert_min_max_p)
 {
   basic_block bb;
   FOR_EACH_BB_FN (bb, fun)
@@ -1453,10 +1386,81 @@ pass_object_sizes::execute (function *fun)
   return 0;
 }
 
+/* Simple pass to optimize all __builtin_object_size () builtins.  */
+
+namespace {
+
+const pass_data pass_data_object_sizes =
+{
+  GIMPLE_PASS, /* type */
+  "objsz", /* name */
+  OPTGROUP_NONE, /* optinfo_flags */
+  TV_NONE, /* tv_id */
+  ( PROP_cfg | PROP_ssa ), /* properties_required */
+  PROP_objsz, /* properties_provided */
+  0, /* properties_destroyed */
+  0, /* todo_flags_start */
+  0, /* todo_flags_finish */
+};
+
+class pass_object_sizes : public gimple_opt_pass
+{
+public:
+  pass_object_sizes (gcc::context *ctxt)
+    : gimple_opt_pass (pass_data_object_sizes, ctxt)
+  {}
+
+  /* opt_pass methods: */
+  opt_pass * clone () { return new pass_object_sizes (m_ctxt); }
+  virtual unsigned int execute (function *fun)
+  {
+    return object_sizes_execute (fun, false);
+  }
+}; // class pass_object_sizes
+
 } // anon namespace
 
 gimple_opt_pass *
 make_pass_object_sizes (gcc::context *ctxt)
 {
   return new pass_object_sizes (ctxt);
+}
+
+/* Early version of pass to optimize all __builtin_object_size () builtins.  */
+
+namespace {
+
+const pass_data pass_data_early_object_sizes =
+{
+  GIMPLE_PASS, /* type */
+  "early_objsz", /* name */
+  OPTGROUP_NONE, /* optinfo_flags */
+  TV_NONE, /* tv_id */
+  ( PROP_cfg | PROP_ssa ), /* properties_required */
+  0, /* properties_provided */
+  0, /* properties_destroyed */
+  0, /* todo_flags_start */
+  0, /* todo_flags_finish */
+};
+
+class pass_early_object_sizes : public gimple_opt_pass
+{
+public:
+  pass_early_object_sizes (gcc::context *ctxt)
+    : gimple_opt_pass (pass_data_early_object_sizes, ctxt)
+  {}
+
+  /* opt_pass methods: */
+  virtual unsigned int execute (function *fun)
+  {
+    return object_sizes_execute (fun, true);
+  }
+}; // class pass_object_sizes
+
+} // anon namespace
+
+gimple_opt_pass *
+make_pass_early_object_sizes (gcc::context *ctxt)
+{
+  return new pass_early_object_sizes (ctxt);
 }

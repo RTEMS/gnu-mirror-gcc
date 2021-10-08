@@ -370,6 +370,8 @@ struct c_declspecs {
   BOOL_BITFIELD explicit_signed_p : 1;
   /* Whether the specifiers include a deprecated typedef.  */
   BOOL_BITFIELD deprecated_p : 1;
+  /* Whether the specifiers include an unavailable typedef.  */
+  BOOL_BITFIELD unavailable_p : 1;
   /* Whether the type defaulted to "int" because there were no type
      specifiers.  */
   BOOL_BITFIELD default_int_p : 1;
@@ -595,7 +597,7 @@ extern void finish_function (location_t = input_location);
 extern tree finish_struct (location_t, tree, tree, tree,
 			   class c_struct_parse_info *);
 extern tree c_simulate_enum_decl (location_t, const char *,
-				  vec<string_int_pair>);
+				  vec<string_int_pair> *);
 extern struct c_arg_info *build_arg_info (void);
 extern struct c_arg_info *get_parm_info (bool, tree);
 extern tree grokfield (location_t, struct c_declarator *,
@@ -744,7 +746,7 @@ extern tree c_finish_expr_stmt (location_t, tree);
 extern tree c_finish_return (location_t, tree, tree);
 extern tree c_finish_bc_stmt (location_t, tree, bool);
 extern tree c_finish_goto_label (location_t, tree);
-extern tree c_finish_goto_ptr (location_t, tree);
+extern tree c_finish_goto_ptr (location_t, c_expr val);
 extern tree c_expr_to_decl (tree, bool *, bool *);
 extern tree c_finish_omp_construct (location_t, enum tree_code, tree, tree);
 extern tree c_finish_oacc_data (location_t, tree, tree);
@@ -759,8 +761,9 @@ extern tree c_finish_omp_clauses (tree, enum c_omp_region_type);
 extern tree c_build_va_arg (location_t, tree, location_t, tree);
 extern tree c_finish_transaction (location_t, tree, int);
 extern bool c_tree_equal (tree, tree);
-extern tree c_build_function_call_vec (location_t, vec<location_t>, tree,
-				       vec<tree, va_gc> *, vec<tree, va_gc> *);
+extern tree c_build_function_call_vec (location_t, const vec<location_t>&,
+				       tree, vec<tree, va_gc> *,
+				       vec<tree, va_gc> *);
 extern tree c_omp_clause_copy_ctor (tree, tree, tree);
 
 /* Set to 0 at beginning of a function definition, set to 1 if

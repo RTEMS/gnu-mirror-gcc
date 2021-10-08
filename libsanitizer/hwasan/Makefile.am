@@ -13,11 +13,13 @@ ACLOCAL_AMFLAGS = -I $(top_srcdir) -I $(top_srcdir)/config
 toolexeclib_LTLIBRARIES = libhwasan.la
 
 hwasan_files = \
+	hwasan_allocation_functions.cpp \
 	hwasan_allocator.cpp \
 	hwasan.cpp \
 	hwasan_dynamic_shadow.cpp \
 	hwasan_exceptions.cpp \
 	hwasan_flags.inc \
+	hwasan_fuchsia.cpp \
 	hwasan_globals.cpp \
 	hwasan_interceptors.cpp \
 	hwasan_interceptors_vfork.S \
@@ -26,7 +28,8 @@ hwasan_files = \
 	hwasan_new_delete.cpp \
 	hwasan_poisoning.cpp \
 	hwasan_report.cpp \
-	hwasan_setjmp.S \
+	hwasan_setjmp_aarch64.S \
+	hwasan_setjmp_x86_64.S \
 	hwasan_tag_mismatch_aarch64.S \
 	hwasan_thread.cpp \
 	hwasan_thread_list.cpp \

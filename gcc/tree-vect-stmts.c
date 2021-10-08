@@ -836,20 +836,24 @@ vect_model_simple_cost (vec_info *,
    one if two-step promotion/demotion is required, and so on.  NCOPIES
    is the number of vector results (and thus number of instructions)
    for the narrowest end of the operation chain.  Each additional
-   step doubles the number of instructions required.  */
+   step doubles the number of instructions required.  If WIDEN_ARITH
+   is true the stmt is doing widening arithmetic.  */
 
 static void
 vect_model_promotion_demotion_cost (stmt_vec_info stmt_info,
 				    enum vect_def_type *dt,
 				    unsigned int ncopies, int pwr,
-				    stmt_vector_for_cost *cost_vec)
+				    stmt_vector_for_cost *cost_vec,
+				    bool widen_arith)
 {
   int i;
   int inside_cost = 0, prologue_cost = 0;
 
   for (i = 0; i < pwr + 1; i++)
     {
-      inside_cost += record_stmt_cost (cost_vec, ncopies, vec_promote_demote,
+      inside_cost += record_stmt_cost (cost_vec, ncopies,
+				       widen_arith
+				       ? vector_stmt : vec_promote_demote,
 				       stmt_info, 0, vect_body);
       ncopies *= 2;
     }
@@ -1022,8 +1026,9 @@ vect_get_store_cost (vec_info *vinfo, stmt_vec_info stmt_info, int ncopies,
 		     stmt_vector_for_cost *body_cost_vec)
 {
   dr_vec_info *dr_info = STMT_VINFO_DR_INFO (stmt_info);
+  tree vectype = STMT_VINFO_VECTYPE (stmt_info);
   int alignment_support_scheme
-    = vect_supportable_dr_alignment (vinfo, dr_info, false);
+    = vect_supportable_dr_alignment (vinfo, dr_info, vectype, false);
 
   switch (alignment_support_scheme)
     {
@@ -1044,7 +1049,7 @@ vect_get_store_cost (vec_info *vinfo, stmt_vec_info stmt_info, int ncopies,
         /* Here, we assign an additional cost for the unaligned store.  */
 	*inside_cost += record_stmt_cost (body_cost_vec, ncopies,
 					  unaligned_store, stmt_info,
-					  DR_MISALIGNMENT (dr_info),
+					  dr_misalignment (dr_info, vectype),
 					  vect_body);
         if (dump_enabled_p ())
           dump_printf_loc (MSG_NOTE, vect_location,
@@ -1080,6 +1085,7 @@ static void
 vect_model_load_cost (vec_info *vinfo,
 		      stmt_vec_info stmt_info, unsigned ncopies, poly_uint64 vf,
 		      vect_memory_access_type memory_access_type,
+		      gather_scatter_info *gs_info,
 		      slp_tree slp_node,
 		      stmt_vector_for_cost *cost_vec)
 {
@@ -1168,9 +1174,17 @@ vect_model_load_cost (vec_info *vinfo,
   if (memory_access_type == VMAT_ELEMENTWISE
       || memory_access_type == VMAT_GATHER_SCATTER)
     {
-      /* N scalar loads plus gathering them into a vector.  */
       tree vectype = STMT_VINFO_VECTYPE (stmt_info);
       unsigned int assumed_nunits = vect_nunits_for_cost (vectype);
+      if (memory_access_type == VMAT_GATHER_SCATTER
+	  && gs_info->ifn == IFN_LAST && !gs_info->decl)
+	/* For emulated gathers N offset vector element extracts
+	   (we assume the scalar scaling and ptr + offset add is consumed by
+	   the load).  */
+	inside_cost += record_stmt_cost (cost_vec, ncopies * assumed_nunits,
+					 vec_to_scalar, stmt_info, 0,
+					 vect_body);
+      /* N scalar loads plus gathering them into a vector.  */
       inside_cost += record_stmt_cost (cost_vec,
 				       ncopies * assumed_nunits,
 				       scalar_load, stmt_info, 0, vect_body);
@@ -1180,7 +1194,9 @@ vect_model_load_cost (vec_info *vinfo,
 			&inside_cost, &prologue_cost, 
 			cost_vec, cost_vec, true);
   if (memory_access_type == VMAT_ELEMENTWISE
-      || memory_access_type == VMAT_STRIDED_SLP)
+      || memory_access_type == VMAT_STRIDED_SLP
+      || (memory_access_type == VMAT_GATHER_SCATTER
+	  && gs_info->ifn == IFN_LAST && !gs_info->decl))
     inside_cost += record_stmt_cost (cost_vec, ncopies, vec_construct,
 				     stmt_info, 0, vect_body);
 
@@ -1201,8 +1217,9 @@ vect_get_load_cost (vec_info *vinfo, stmt_vec_info stmt_info, int ncopies,
 		    bool record_prologue_costs)
 {
   dr_vec_info *dr_info = STMT_VINFO_DR_INFO (stmt_info);
+  tree vectype = STMT_VINFO_VECTYPE (stmt_info);
   int alignment_support_scheme
-    = vect_supportable_dr_alignment (vinfo, dr_info, false);
+    = vect_supportable_dr_alignment (vinfo, dr_info, vectype, false);
 
   switch (alignment_support_scheme)
     {
@@ -1222,7 +1239,7 @@ vect_get_load_cost (vec_info *vinfo, stmt_vec_info stmt_info, int ncopies,
         /* Here, we assign an additional cost for the unaligned load.  */
 	*inside_cost += record_stmt_cost (body_cost_vec, ncopies,
 					  unaligned_load, stmt_info,
-					  DR_MISALIGNMENT (dr_info),
+					  dr_misalignment (dr_info, vectype),
 					  vect_body);
 
         if (dump_enabled_p ())
@@ -1862,7 +1879,8 @@ vect_truncate_gather_scatter_offset (stmt_vec_info stmt_info,
       tree memory_type = TREE_TYPE (DR_REF (dr));
       if (!vect_gather_scatter_fn_p (loop_vinfo, DR_IS_READ (dr), masked_p,
 				     vectype, memory_type, offset_type, scale,
-				     &gs_info->ifn, &gs_info->offset_vectype))
+				     &gs_info->ifn, &gs_info->offset_vectype)
+	  || gs_info->ifn == IFN_LAST)
 	continue;
 
       gs_info->decl = NULL_TREE;
@@ -1897,7 +1915,7 @@ vect_use_strided_gather_scatters_p (stmt_vec_info stmt_info,
 				    gather_scatter_info *gs_info)
 {
   if (!vect_check_gather_scatter (stmt_info, loop_vinfo, gs_info)
-      || gs_info->decl)
+      || gs_info->ifn == IFN_LAST)
     return vect_truncate_gather_scatter_offset (stmt_info, loop_vinfo,
 						masked_p, gs_info);
 
@@ -1968,8 +1986,8 @@ get_negative_load_store_type (vec_info *vinfo,
       return VMAT_ELEMENTWISE;
     }
 
-  alignment_support_scheme = vect_supportable_dr_alignment (vinfo,
-							    dr_info, false);
+  alignment_support_scheme = vect_supportable_dr_alignment (vinfo, dr_info,
+							    vectype, false);
   if (alignment_support_scheme != dr_aligned
       && alignment_support_scheme != dr_unaligned_supported)
     {
@@ -2153,7 +2171,8 @@ get_group_load_store_type (vec_info *vinfo, stmt_vec_info stmt_info,
 	     be a multiple of B and so we are guaranteed to access a
 	     non-gap element in the same B-sized block.  */
 	  if (overrun_p
-	      && gap < (vect_known_alignment_in_bytes (first_dr_info)
+	      && gap < (vect_known_alignment_in_bytes (first_dr_info,
+						       vectype)
 			/ vect_get_scalar_dr_size (first_dr_info)))
 	    overrun_p = false;
 
@@ -2166,8 +2185,8 @@ get_group_load_store_type (vec_info *vinfo, stmt_vec_info stmt_info,
 	  if (overrun_p
 	      && !masked_p
 	      && (((alignment_support_scheme
-		      = vect_supportable_dr_alignment (vinfo,
-						       first_dr_info, false)))
+		      = vect_supportable_dr_alignment (vinfo, first_dr_info,
+						       vectype, false)))
 		   == dr_aligned
 		  || alignment_support_scheme == dr_unaligned_supported)
 	      && known_eq (nunits, (group_size - gap) * 2)
@@ -2224,7 +2243,7 @@ get_group_load_store_type (vec_info *vinfo, stmt_vec_info stmt_info,
 	 same B-sized block.  */
       if (would_overrun_p
 	  && !masked_p
-	  && gap < (vect_known_alignment_in_bytes (first_dr_info)
+	  && gap < (vect_known_alignment_in_bytes (first_dr_info, vectype)
 		    / vect_get_scalar_dr_size (first_dr_info)))
 	would_overrun_p = false;
 
@@ -2278,7 +2297,7 @@ get_group_load_store_type (vec_info *vinfo, stmt_vec_info stmt_info,
     *alignment_support_scheme = dr_unaligned_supported;
   else
     *alignment_support_scheme
-      = vect_supportable_dr_alignment (vinfo, first_dr_info, false);
+      = vect_supportable_dr_alignment (vinfo, first_dr_info, vectype, false);
 
   if (vls_type != VLS_LOAD && first_stmt_info == stmt_info)
     {
@@ -2351,6 +2370,29 @@ get_load_store_type (vec_info  *vinfo, stmt_vec_info stmt_info,
 			     vls_type == VLS_LOAD ? "gather" : "scatter");
 	  return false;
 	}
+      else if (gs_info->ifn == IFN_LAST && !gs_info->decl)
+	{
+	  if (vls_type != VLS_LOAD)
+	    {
+	      if (dump_enabled_p ())
+		dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+				 "unsupported emulated scatter.\n");
+	      return false;
+	    }
+	  else if (!TYPE_VECTOR_SUBPARTS (vectype).is_constant ()
+		   || !TYPE_VECTOR_SUBPARTS
+			 (gs_info->offset_vectype).is_constant ()
+		   || !constant_multiple_p (TYPE_VECTOR_SUBPARTS
+					      (gs_info->offset_vectype),
+					    TYPE_VECTOR_SUBPARTS (vectype)))
+	    {
+	      if (dump_enabled_p ())
+		dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+				 "unsupported vector types for emulated "
+				 "gather.\n");
+	      return false;
+	    }
+	}
       /* Gather-scatter accesses perform only component accesses, alignment
 	 is irrelevant for them.  */
       *alignment_support_scheme = dr_unaligned_supported;
@@ -2396,7 +2438,7 @@ get_load_store_type (vec_info  *vinfo, stmt_vec_info stmt_info,
 	  *alignment_support_scheme
 	    = vect_supportable_dr_alignment (vinfo,
 					     STMT_VINFO_DR_INFO (stmt_info),
-					     false);
+					     vectype, false);
 	}
     }
 
@@ -2439,17 +2481,31 @@ get_load_store_type (vec_info  *vinfo, stmt_vec_info stmt_info,
   return true;
 }
 
-/* Return true if boolean argument MASK is suitable for vectorizing
-   conditional operation STMT_INFO.  When returning true, store the type
-   of the definition in *MASK_DT_OUT and the type of the vectorized mask
-   in *MASK_VECTYPE_OUT.  */
+/* Return true if boolean argument at MASK_INDEX is suitable for vectorizing
+   conditional operation STMT_INFO.  When returning true, store the mask
+   in *MASK, the type of its definition in *MASK_DT_OUT, the type of the
+   vectorized mask in *MASK_VECTYPE_OUT and the SLP node corresponding
+   to the mask in *MASK_NODE if MASK_NODE is not NULL.  */
 
 static bool
-vect_check_scalar_mask (vec_info *vinfo, stmt_vec_info stmt_info, tree mask,
-			vect_def_type *mask_dt_out,
-			tree *mask_vectype_out)
+vect_check_scalar_mask (vec_info *vinfo, stmt_vec_info stmt_info,
+			slp_tree slp_node, unsigned mask_index,
+			tree *mask, slp_tree *mask_node,
+			vect_def_type *mask_dt_out, tree *mask_vectype_out)
 {
-  if (!VECT_SCALAR_BOOLEAN_TYPE_P (TREE_TYPE (mask)))
+  enum vect_def_type mask_dt;
+  tree mask_vectype;
+  slp_tree mask_node_1;
+  if (!vect_is_simple_use (vinfo, stmt_info, slp_node, mask_index,
+			   mask, &mask_node_1, &mask_dt, &mask_vectype))
+    {
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+			 "mask use not simple.\n");
+      return false;
+    }
+
+  if (!VECT_SCALAR_BOOLEAN_TYPE_P (TREE_TYPE (*mask)))
     {
       if (dump_enabled_p ())
 	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
@@ -2457,21 +2513,15 @@ vect_check_scalar_mask (vec_info *vinfo, stmt_vec_info stmt_info, tree mask,
       return false;
     }
 
-  if (TREE_CODE (mask) != SSA_NAME)
+  /* If the caller is not prepared for adjusting an external/constant
+     SLP mask vector type fail.  */
+  if (slp_node
+      && !mask_node
+      && SLP_TREE_DEF_TYPE (mask_node_1) != vect_internal_def)
     {
       if (dump_enabled_p ())
 	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
-			 "mask argument is not an SSA name.\n");
-      return false;
-    }
-
-  enum vect_def_type mask_dt;
-  tree mask_vectype;
-  if (!vect_is_simple_use (mask, vinfo, &mask_dt, &mask_vectype))
-    {
-      if (dump_enabled_p ())
-	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
-			 "mask use not simple.\n");
+			 "SLP mask argument is not vectorized.\n");
       return false;
     }
 
@@ -2501,6 +2551,8 @@ vect_check_scalar_mask (vec_info *vinfo, stmt_vec_info stmt_info, tree mask,
 
   *mask_dt_out = mask_dt;
   *mask_vectype_out = mask_vectype;
+  if (mask_node)
+    *mask_node = mask_node_1;
   return true;
 }
 
@@ -2525,10 +2577,18 @@ vect_check_store_rhs (vec_info *vinfo, stmt_vec_info stmt_info,
       return false;
     }
 
+  unsigned op_no = 0;
+  if (gcall *call = dyn_cast <gcall *> (stmt_info->stmt))
+    {
+      if (gimple_call_internal_p (call)
+	  && internal_store_fn_p (gimple_call_internal_fn (call)))
+	op_no = internal_fn_stored_value_index (gimple_call_internal_fn (call));
+    }
+
   enum vect_def_type rhs_dt;
   tree rhs_vectype;
   slp_tree slp_op;
-  if (!vect_is_simple_use (vinfo, stmt_info, slp_node, 0,
+  if (!vect_is_simple_use (vinfo, stmt_info, slp_node, op_no,
 			   &rhs, &slp_op, &rhs_dt, &rhs_vectype))
     {
       if (dump_enabled_p ())
@@ -2865,11 +2925,10 @@ vect_build_gather_load_calls (vec_info *vinfo, stmt_vec_info stmt_info,
    containing loop.  */
 
 static void
-vect_get_gather_scatter_ops (vec_info *vinfo,
+vect_get_gather_scatter_ops (loop_vec_info loop_vinfo,
 			     class loop *loop, stmt_vec_info stmt_info,
 			     gather_scatter_info *gs_info,
-			     tree *dataref_ptr, vec<tree> *vec_offset,
-			     unsigned ncopies)
+			     tree *dataref_ptr, vec<tree> *vec_offset)
 {
   gimple_seq stmts = NULL;
   *dataref_ptr = force_gimple_operand (gs_info->base, &stmts, true, NULL_TREE);
@@ -2880,8 +2939,10 @@ vect_get_gather_scatter_ops (vec_info *vinfo,
       new_bb = gsi_insert_seq_on_edge_immediate (pe, stmts);
       gcc_assert (!new_bb);
     }
-  vect_get_vec_defs_for_operand (vinfo, stmt_info, ncopies, gs_info->offset,
-				 vec_offset, gs_info->offset_vectype);
+  unsigned ncopies = vect_get_num_copies (loop_vinfo, gs_info->offset_vectype);
+  vect_get_vec_defs_for_operand (loop_vinfo, stmt_info, ncopies,
+				 gs_info->offset, vec_offset,
+				 gs_info->offset_vectype);
 }
 
 /* Prepare to implement a grouped or strided load or store using
@@ -3163,9 +3224,8 @@ vectorizable_call (vec_info *vinfo,
     {
       if ((int) i == mask_opno)
 	{
-	  op = gimple_call_arg (stmt, i);
-	  if (!vect_check_scalar_mask (vinfo,
-				       stmt_info, op, &dt[i], &vectypes[i]))
+	  if (!vect_check_scalar_mask (vinfo, stmt_info, slp_node, mask_opno,
+				       &op, &slp_op[i], &dt[i], &vectypes[i]))
 	    return false;
 	  continue;
 	}
@@ -4437,7 +4497,7 @@ static void
 vect_create_vectorized_demotion_stmts (vec_info *vinfo, vec<tree> *vec_oprnds,
 				       int multi_step_cvt,
 				       stmt_vec_info stmt_info,
-				       vec<tree> vec_dsts,
+				       vec<tree> &vec_dsts,
 				       gimple_stmt_iterator *gsi,
 				       slp_tree slp_node, enum tree_code code)
 {
@@ -4665,6 +4725,10 @@ vectorizable_conversion (vec_info *vinfo,
       && code != WIDEN_LSHIFT_EXPR)
     return false;
 
+  bool widen_arith = (code == WIDEN_PLUS_EXPR
+		      || code == WIDEN_MINUS_EXPR
+		      || code == WIDEN_MULT_EXPR
+		      || code == WIDEN_LSHIFT_EXPR);
   op_type = TREE_CODE_LENGTH (code);
 
   /* Check types of lhs and rhs.  */
@@ -4754,10 +4818,7 @@ vectorizable_conversion (vec_info *vinfo,
   nunits_in = TYPE_VECTOR_SUBPARTS (vectype_in);
   nunits_out = TYPE_VECTOR_SUBPARTS (vectype_out);
   if (known_eq (nunits_out, nunits_in))
-    if (code == WIDEN_MINUS_EXPR
-	|| code == WIDEN_PLUS_EXPR
-	|| code == WIDEN_LSHIFT_EXPR
-	|| code == WIDEN_MULT_EXPR)
+    if (widen_arith)
       modifier = WIDEN;
     else
       modifier = NONE;
@@ -4934,7 +4995,8 @@ vectorizable_conversion (vec_info *vinfo,
 	  unsigned int nvectors
 	    = (slp_node ? SLP_TREE_NUMBER_OF_VEC_STMTS (slp_node) : ncopies);
 	  vect_model_promotion_demotion_cost (stmt_info, dt, nvectors,
-					      multi_step_cvt, cost_vec);
+					      multi_step_cvt, cost_vec,
+					      widen_arith);
 	}
       else
 	{
@@ -4947,7 +5009,8 @@ vectorizable_conversion (vec_info *vinfo,
 	       ? SLP_TREE_NUMBER_OF_VEC_STMTS (slp_node) >> multi_step_cvt
 	       : ncopies * 2);
 	  vect_model_promotion_demotion_cost (stmt_info, dt, nvectors,
-					      multi_step_cvt, cost_vec);
+					      multi_step_cvt, cost_vec,
+					      widen_arith);
 	}
       interm_types.release ();
       return true;
@@ -5617,26 +5680,11 @@ vectorizable_shift (vec_info *vinfo,
       if (dump_enabled_p ())
         dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
                          "op not supported by target.\n");
-      /* Check only during analysis.  */
-      if (maybe_ne (GET_MODE_SIZE (vec_mode), UNITS_PER_WORD)
-	  || (!vec_stmt
-	      && !vect_worthwhile_without_simd_p (vinfo, code)))
-        return false;
-      if (dump_enabled_p ())
-        dump_printf_loc (MSG_NOTE, vect_location,
-                         "proceeding using word mode.\n");
-    }
-
-  /* Worthwhile without SIMD support?  Check only during analysis.  */
-  if (!vec_stmt
-      && !VECTOR_MODE_P (TYPE_MODE (vectype))
-      && !vect_worthwhile_without_simd_p (vinfo, code))
-    {
-      if (dump_enabled_p ())
-        dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
-                         "not worthwhile without SIMD support.\n");
       return false;
     }
+  /* vector lowering cannot optimize vector shifts using word arithmetic.  */
+  if (vect_emulated_vector_p (vectype))
+    return false;
 
   if (!vec_stmt) /* transformation not required.  */
     {
@@ -6022,6 +6070,7 @@ vectorizable_operation (vec_info *vinfo,
 			  != CODE_FOR_nothing);
     }
 
+  bool using_emulated_vectors_p = vect_emulated_vector_p (vectype);
   if (!target_support_p)
     {
       if (dump_enabled_p ())
@@ -6029,21 +6078,19 @@ vectorizable_operation (vec_info *vinfo,
                          "op not supported by target.\n");
       /* Check only during analysis.  */
       if (maybe_ne (GET_MODE_SIZE (vec_mode), UNITS_PER_WORD)
-	  || (!vec_stmt && !vect_worthwhile_without_simd_p (vinfo, code)))
+	  || (!vec_stmt && !vect_can_vectorize_without_simd_p (code)))
         return false;
       if (dump_enabled_p ())
 	dump_printf_loc (MSG_NOTE, vect_location,
                          "proceeding using word mode.\n");
+      using_emulated_vectors_p = true;
     }
 
-  /* Worthwhile without SIMD support?  Check only during analysis.  */
-  if (!VECTOR_MODE_P (vec_mode)
-      && !vec_stmt
-      && !vect_worthwhile_without_simd_p (vinfo, code))
+  if (using_emulated_vectors_p
+      && !vect_can_vectorize_without_simd_p (code))
     {
       if (dump_enabled_p ())
-        dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
-                         "not worthwhile without SIMD support.\n");
+	dump_printf (MSG_NOTE, "using word mode not possible.\n");
       return false;
     }
 
@@ -6091,6 +6138,29 @@ vectorizable_operation (vec_info *vinfo,
       DUMP_VECT_SCOPE ("vectorizable_operation");
       vect_model_simple_cost (vinfo, stmt_info,
 			      ncopies, dt, ndts, slp_node, cost_vec);
+      if (using_emulated_vectors_p)
+	{
+	  /* The above vect_model_simple_cost call handles constants
+	     in the prologue and (mis-)costs one of the stmts as
+	     vector stmt.  See tree-vect-generic.c:do_plus_minus/do_negate
+	     for the actual lowering that will be applied.  */
+	  unsigned n
+	    = slp_node ? SLP_TREE_NUMBER_OF_VEC_STMTS (slp_node) : ncopies;
+	  switch (code)
+	    {
+	    case PLUS_EXPR:
+	      n *= 5;
+	      break;
+	    case MINUS_EXPR:
+	      n *= 6;
+	      break;
+	    case NEGATE_EXPR:
+	      n *= 4;
+	      break;
+	    default:;
+	    }
+	  record_stmt_cost (cost_vec, n, scalar_stmt, stmt_info, 0, vect_body);
+	}
       return true;
     }
 
@@ -7213,13 +7283,10 @@ vectorizable_store (vec_info *vinfo,
 	}
 
       int mask_index = internal_fn_mask_index (ifn);
-      if (mask_index >= 0)
-	{
-	  mask = gimple_call_arg (call, mask_index);
-	  if (!vect_check_scalar_mask (vinfo, stmt_info, mask, &mask_dt,
-				       &mask_vectype))
-	    return false;
-	}
+      if (mask_index >= 0
+	  && !vect_check_scalar_mask (vinfo, stmt_info, slp_node, mask_index,
+				      &mask, NULL, &mask_dt, &mask_vectype))
+	return false;
     }
 
   op = vect_get_store_rhs (stmt_info);
@@ -7843,7 +7910,7 @@ vectorizable_store (vec_info *vinfo,
     alignment_support_scheme = dr_unaligned_supported;
   else
     alignment_support_scheme
-      = vect_supportable_dr_alignment (vinfo, first_dr_info, false);
+      = vect_supportable_dr_alignment (vinfo, first_dr_info, vectype, false);
 
   gcc_assert (alignment_support_scheme);
   vec_loop_masks *loop_masks
@@ -8003,8 +8070,9 @@ vectorizable_store (vec_info *vinfo,
 	    }
 	  else if (STMT_VINFO_GATHER_SCATTER_P (stmt_info))
 	    {
-	      vect_get_gather_scatter_ops (vinfo, loop, stmt_info, &gs_info,
-					   &dataref_ptr, &vec_offsets, ncopies);
+	      vect_get_gather_scatter_ops (loop_vinfo, loop, stmt_info,
+					   &gs_info, &dataref_ptr,
+					   &vec_offsets);
 	      vec_offset = vec_offsets[0];
 	    }
 	  else
@@ -8153,19 +8221,21 @@ vectorizable_store (vec_info *vinfo,
 		vec_oprnd = result_chain[i];
 
 	      align = known_alignment (DR_TARGET_ALIGNMENT (first_dr_info));
-	      if (aligned_access_p (first_dr_info))
+	      if (aligned_access_p (first_dr_info, vectype))
 		misalign = 0;
-	      else if (DR_MISALIGNMENT (first_dr_info) == -1)
+	      else if (dr_misalignment (first_dr_info, vectype)
+		       == DR_MISALIGNMENT_UNKNOWN)
 		{
 		  align = dr_alignment (vect_dr_behavior (vinfo, first_dr_info));
 		  misalign = 0;
 		}
 	      else
-		misalign = DR_MISALIGNMENT (first_dr_info);
+		misalign = dr_misalignment (first_dr_info, vectype);
 	      if (dataref_offset == NULL_TREE
 		  && TREE_CODE (dataref_ptr) == SSA_NAME)
 		set_ptr_info_alignment (get_ptr_info (dataref_ptr), align,
 					misalign);
+	      align = least_bit_hwi (misalign | align);
 
 	      if (memory_access_type == VMAT_CONTIGUOUS_REVERSE)
 		{
@@ -8187,7 +8257,6 @@ vectorizable_store (vec_info *vinfo,
 	      /* Arguments are ready.  Create the new vector stmt.  */
 	      if (final_mask)
 		{
-		  align = least_bit_hwi (misalign | align);
 		  tree ptr = build_int_cst (ref_type, align * BITS_PER_UNIT);
 		  gcall *call
 		    = gimple_build_call_internal (IFN_MASK_STORE, 4,
@@ -8202,7 +8271,6 @@ vectorizable_store (vec_info *vinfo,
 		  tree final_len
 		    = vect_get_loop_len (loop_vinfo, loop_lens,
 					 vec_num * ncopies, vec_num * j + i);
-		  align = least_bit_hwi (misalign | align);
 		  tree ptr = build_int_cst (ref_type, align * BITS_PER_UNIT);
 		  machine_mode vmode = TYPE_MODE (vectype);
 		  opt_machine_mode new_ovmode
@@ -8239,16 +8307,12 @@ vectorizable_store (vec_info *vinfo,
 					  dataref_offset
 					  ? dataref_offset
 					  : build_int_cst (ref_type, 0));
-		  if (aligned_access_p (first_dr_info))
+		  if (aligned_access_p (first_dr_info, vectype))
 		    ;
-		  else if (DR_MISALIGNMENT (first_dr_info) == -1)
-		    TREE_TYPE (data_ref)
-		      = build_aligned_type (TREE_TYPE (data_ref),
-					    align * BITS_PER_UNIT);
 		  else
 		    TREE_TYPE (data_ref)
 		      = build_aligned_type (TREE_TYPE (data_ref),
-					    TYPE_ALIGN (elem_type));
+					    align * BITS_PER_UNIT);
 		  vect_copy_ref_info (data_ref, DR_REF (first_dr_info->dr));
 		  new_stmt = gimple_build_assign (data_ref, vec_oprnd);
 		  vect_finish_stmt_generation (vinfo, stmt_info, new_stmt, gsi);
@@ -8455,17 +8519,6 @@ vectorizable_load (vec_info *vinfo,
   if (!STMT_VINFO_DATA_REF (stmt_info))
     return false;
 
-  /* ???  Alignment analysis for SLP looks at SLP_TREE_SCALAR_STMTS[0]
-     for unpermuted loads but we get passed SLP_TREE_REPRESENTATIVE
-     which can be different when reduction chains were re-ordered.
-     Now that we figured we're a dataref reset stmt_info back to
-     SLP_TREE_SCALAR_STMTS[0].  When we're SLP only things should be
-     refactored in a way to maintain the dr_vec_info pointer for the
-     relevant access explicitely.  */
-  stmt_vec_info orig_stmt_info = stmt_info;
-  if (slp_node)
-    stmt_info = SLP_TREE_SCALAR_STMTS (slp_node)[0];
-
   tree mask = NULL_TREE, mask_vectype = NULL_TREE;
   if (gassign *assign = dyn_cast <gassign *> (stmt_info->stmt))
     {
@@ -8499,13 +8552,13 @@ vectorizable_load (vec_info *vinfo,
 	return false;
 
       int mask_index = internal_fn_mask_index (ifn);
-      if (mask_index >= 0)
-	{
-	  mask = gimple_call_arg (call, mask_index);
-	  if (!vect_check_scalar_mask (vinfo, stmt_info, mask, &mask_dt,
-				       &mask_vectype))
-	    return false;
-	}
+      if (mask_index >= 0
+	  && !vect_check_scalar_mask (vinfo, stmt_info, slp_node,
+				      /* ??? For SLP we only have operands for
+					 the mask operand.  */
+				      slp_node ? 0 : mask_index,
+				      &mask, NULL, &mask_dt, &mask_vectype))
+	return false;
     }
 
   tree vectype = STMT_VINFO_VECTYPE (stmt_info);
@@ -8601,7 +8654,7 @@ vectorizable_load (vec_info *vinfo,
 	      FOR_EACH_VEC_ELT (SLP_TREE_LOAD_PERMUTATION (slp_node), j, k)
 		if (k > maxk)
 		  maxk = k;
-	      tree vectype = STMT_VINFO_VECTYPE (group_info);
+	      tree vectype = SLP_TREE_VECTYPE (slp_node);
 	      if (!TYPE_VECTOR_SUBPARTS (vectype).is_constant (&nunits)
 		  || maxk >= (DR_GROUP_SIZE (group_info) & ~(nunits - 1)))
 		{
@@ -8668,6 +8721,15 @@ vectorizable_load (vec_info *vinfo,
 			     "unsupported access type for masked load.\n");
 	  return false;
 	}
+      else if (memory_access_type == VMAT_GATHER_SCATTER
+	       && gs_info.ifn == IFN_LAST
+	       && !gs_info.decl)
+	{
+	  if (dump_enabled_p ())
+	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+			     "unsupported masked emulated gather.\n");
+	  return false;
+	}
     }
 
   if (!vec_stmt) /* transformation not required.  */
@@ -8699,9 +8761,9 @@ vectorizable_load (vec_info *vinfo,
 	dump_printf_loc (MSG_NOTE, vect_location,
 			 "Vectorizing an unaligned access.\n");
 
-      STMT_VINFO_TYPE (orig_stmt_info) = load_vec_info_type;
+      STMT_VINFO_TYPE (stmt_info) = load_vec_info_type;
       vect_model_load_cost (vinfo, stmt_info, ncopies, vf, memory_access_type,
-			    slp_node, cost_vec);
+			    &gs_info, slp_node, cost_vec);
       return true;
     }
 
@@ -9303,9 +9365,9 @@ vectorizable_load (vec_info *vinfo,
 	    }
 	  else if (STMT_VINFO_GATHER_SCATTER_P (stmt_info))
 	    {
-	      vect_get_gather_scatter_ops (vinfo, loop, stmt_info, &gs_info,
-					   &dataref_ptr, &vec_offsets, ncopies);
-	      vec_offset = vec_offsets[0];
+	      vect_get_gather_scatter_ops (loop_vinfo, loop, stmt_info,
+					   &gs_info, &dataref_ptr,
+					   &vec_offsets);
 	    }
 	  else
 	    dataref_ptr
@@ -9322,9 +9384,7 @@ vectorizable_load (vec_info *vinfo,
 	  if (dataref_offset)
 	    dataref_offset = int_const_binop (PLUS_EXPR, dataref_offset,
 					      bump);
-	  else if (STMT_VINFO_GATHER_SCATTER_P (stmt_info))
-	    vec_offset = vec_offsets[j];
-	  else
+	  else if (!STMT_VINFO_GATHER_SCATTER_P (stmt_info))
 	    dataref_ptr = bump_vector_ptr (vinfo, dataref_ptr, ptr_incr, gsi,
 					   stmt_info, bump);
 	  if (mask)
@@ -9414,8 +9474,11 @@ vectorizable_load (vec_info *vinfo,
 		    unsigned int misalign;
 		    unsigned HOST_WIDE_INT align;
 
-		    if (memory_access_type == VMAT_GATHER_SCATTER)
+		    if (memory_access_type == VMAT_GATHER_SCATTER
+			&& gs_info.ifn != IFN_LAST)
 		      {
+			if (STMT_VINFO_GATHER_SCATTER_P (stmt_info))
+			  vec_offset = vec_offsets[j];
 			tree zero = build_zero_cst (vectype);
 			tree scale = size_int (gs_info.scale);
 			gcall *call;
@@ -9432,30 +9495,85 @@ vectorizable_load (vec_info *vinfo,
 			data_ref = NULL_TREE;
 			break;
 		      }
+		    else if (memory_access_type == VMAT_GATHER_SCATTER)
+		      {
+			/* Emulated gather-scatter.  */
+			gcc_assert (!final_mask);
+			unsigned HOST_WIDE_INT const_nunits
+			  = nunits.to_constant ();
+			unsigned HOST_WIDE_INT const_offset_nunits
+			  = TYPE_VECTOR_SUBPARTS (gs_info.offset_vectype)
+			      .to_constant ();
+			vec<constructor_elt, va_gc> *ctor_elts;
+			vec_alloc (ctor_elts, const_nunits);
+			gimple_seq stmts = NULL;
+			/* We support offset vectors with more elements
+			   than the data vector for now.  */
+			unsigned HOST_WIDE_INT factor
+			  = const_offset_nunits / const_nunits;
+			vec_offset = vec_offsets[j / factor];
+			unsigned elt_offset = (j % factor) * const_nunits;
+			tree idx_type = TREE_TYPE (TREE_TYPE (vec_offset));
+			tree scale = size_int (gs_info.scale);
+			align
+			  = get_object_alignment (DR_REF (first_dr_info->dr));
+			tree ltype = build_aligned_type (TREE_TYPE (vectype),
+							 align);
+			for (unsigned k = 0; k < const_nunits; ++k)
+			  {
+			    tree boff = size_binop (MULT_EXPR,
+						    TYPE_SIZE (idx_type),
+						    bitsize_int
+						      (k + elt_offset));
+			    tree idx = gimple_build (&stmts, BIT_FIELD_REF,
+						     idx_type, vec_offset,
+						     TYPE_SIZE (idx_type),
+						     boff);
+			    idx = gimple_convert (&stmts, sizetype, idx);
+			    idx = gimple_build (&stmts, MULT_EXPR,
+						sizetype, idx, scale);
+			    tree ptr = gimple_build (&stmts, PLUS_EXPR,
+						     TREE_TYPE (dataref_ptr),
+						     dataref_ptr, idx);
+			    ptr = gimple_convert (&stmts, ptr_type_node, ptr);
+			    tree elt = make_ssa_name (TREE_TYPE (vectype));
+			    tree ref = build2 (MEM_REF, ltype, ptr,
+					       build_int_cst (ref_type, 0));
+			    new_stmt = gimple_build_assign (elt, ref);
+			    gimple_seq_add_stmt (&stmts, new_stmt);
+			    CONSTRUCTOR_APPEND_ELT (ctor_elts, NULL_TREE, elt);
+			  }
+			gsi_insert_seq_before (gsi, stmts, GSI_SAME_STMT);
+			new_stmt = gimple_build_assign (NULL_TREE,
+							build_constructor
+							  (vectype, ctor_elts));
+			data_ref = NULL_TREE;
+			break;
+		      }
 
 		    align =
 		      known_alignment (DR_TARGET_ALIGNMENT (first_dr_info));
 		    if (alignment_support_scheme == dr_aligned)
 		      {
-			gcc_assert (aligned_access_p (first_dr_info));
+			gcc_assert (aligned_access_p (first_dr_info, vectype));
 			misalign = 0;
 		      }
-		    else if (DR_MISALIGNMENT (first_dr_info) == -1)
+		    else if (dr_misalignment (first_dr_info, vectype) == -1)
 		      {
 			align = dr_alignment
 			  (vect_dr_behavior (vinfo, first_dr_info));
 			misalign = 0;
 		      }
 		    else
-		      misalign = DR_MISALIGNMENT (first_dr_info);
+		      misalign = dr_misalignment (first_dr_info, vectype);
 		    if (dataref_offset == NULL_TREE
 			&& TREE_CODE (dataref_ptr) == SSA_NAME)
 		      set_ptr_info_alignment (get_ptr_info (dataref_ptr),
 					      align, misalign);
+		    align = least_bit_hwi (misalign | align);
 
 		    if (final_mask)
 		      {
-			align = least_bit_hwi (misalign | align);
 			tree ptr = build_int_cst (ref_type,
 						  align * BITS_PER_UNIT);
 			gcall *call
@@ -9472,7 +9590,6 @@ vectorizable_load (vec_info *vinfo,
 			  = vect_get_loop_len (loop_vinfo, loop_lens,
 					       vec_num * ncopies,
 					       vec_num * j + i);
-			align = least_bit_hwi (misalign | align);
 			tree ptr = build_int_cst (ref_type,
 						  align * BITS_PER_UNIT);
 			gcall *call
@@ -9511,7 +9628,8 @@ vectorizable_load (vec_info *vinfo,
 			unsigned HOST_WIDE_INT gap
 			  = DR_GROUP_GAP (first_stmt_info);
 			unsigned int vect_align
-			  = vect_known_alignment_in_bytes (first_dr_info);
+			  = vect_known_alignment_in_bytes (first_dr_info,
+							   vectype);
 			unsigned int scalar_dr_size
 			  = vect_get_scalar_dr_size (first_dr_info);
 			/* If there's no peeling for gaps but we have a gap
@@ -9548,14 +9666,10 @@ vectorizable_load (vec_info *vinfo,
 			  = fold_build2 (MEM_REF, ltype, dataref_ptr, offset);
 			if (alignment_support_scheme == dr_aligned)
 			  ;
-			else if (DR_MISALIGNMENT (first_dr_info) == -1)
-			  TREE_TYPE (data_ref)
-			    = build_aligned_type (TREE_TYPE (data_ref),
-						  align * BITS_PER_UNIT);
 			else
 			  TREE_TYPE (data_ref)
 			    = build_aligned_type (TREE_TYPE (data_ref),
-						  TYPE_ALIGN (elem_type));
+						  align * BITS_PER_UNIT);
 			if (ltype != vectype)
 			  {
 			    vect_copy_ref_info (data_ref,
@@ -9747,6 +9861,9 @@ vectorizable_load (vec_info *vinfo,
 		  poly_wide_int bump_val
 		    = (wi::to_wide (TYPE_SIZE_UNIT (elem_type))
 		       * group_gap_adj);
+		  if (tree_int_cst_sgn
+			(vect_dr_behavior (vinfo, dr_info)->step) == -1)
+		    bump_val = -bump_val;
 		  tree bump = wide_int_to_tree (sizetype, bump_val);
 		  dataref_ptr = bump_vector_ptr (vinfo, dataref_ptr, ptr_incr,
 						 gsi, stmt_info, bump);
@@ -9760,6 +9877,9 @@ vectorizable_load (vec_info *vinfo,
 	      poly_wide_int bump_val
 		= (wi::to_wide (TYPE_SIZE_UNIT (elem_type))
 		   * group_gap_adj);
+	      if (tree_int_cst_sgn
+		    (vect_dr_behavior (vinfo, dr_info)->step) == -1)
+		bump_val = -bump_val;
 	      tree bump = wide_int_to_tree (sizetype, bump_val);
 	      dataref_ptr = bump_vector_ptr (vinfo, dataref_ptr, ptr_incr, gsi,
 					     stmt_info, bump);
@@ -9772,8 +9892,13 @@ vectorizable_load (vec_info *vinfo,
       if (slp_perm)
         {
 	  unsigned n_perms;
+	  /* For SLP we know we've seen all possible uses of dr_chain so
+	     direct vect_transform_slp_perm_load to DCE the unused parts.
+	     ???  This is a hack to prevent compile-time issues as seen
+	     in PR101120 and friends.  */
 	  bool ok = vect_transform_slp_perm_load (vinfo, slp_node, dr_chain,
-						  gsi, vf, false, &n_perms);
+						  gsi, vf, false, &n_perms,
+						  nullptr, true);
 	  gcc_assert (ok);
         }
       else
@@ -10777,10 +10902,12 @@ vect_analyze_stmt (vec_info *vinfo,
         gcc_unreachable ();
     }
 
+  tree saved_vectype = STMT_VINFO_VECTYPE (stmt_info);
+  if (node)
+    STMT_VINFO_VECTYPE (stmt_info) = SLP_TREE_VECTYPE (node);
+
   if (STMT_VINFO_RELEVANT_P (stmt_info))
     {
-      tree type = gimple_expr_type (stmt_info->stmt);
-      gcc_assert (!VECTOR_MODE_P (TYPE_MODE (type)));
       gcall *call = dyn_cast <gcall *> (stmt_info->stmt);
       gcc_assert (STMT_VINFO_VECTYPE (stmt_info)
 		  || (call && gimple_call_lhs (call) == NULL_TREE));
@@ -10849,6 +10976,9 @@ vect_analyze_stmt (vec_info *vinfo,
 	      || vectorizable_phi (vinfo, stmt_info, NULL, node, cost_vec));
     }
 
+  if (node)
+    STMT_VINFO_VECTYPE (stmt_info) = saved_vectype;
+
   if (!ok)
     return opt_result::failure_at (stmt_info->stmt,
 				   "not vectorized:"
@@ -10886,6 +11016,10 @@ vect_transform_stmt (vec_info *vinfo,
   bool done;
 
   gcc_assert (slp_node || !PURE_SLP_STMT (stmt_info));
+
+  tree saved_vectype = STMT_VINFO_VECTYPE (stmt_info);
+  if (slp_node)
+    STMT_VINFO_VECTYPE (stmt_info) = SLP_TREE_VECTYPE (slp_node);
 
   switch (STMT_VINFO_TYPE (stmt_info))
     {
@@ -11005,16 +11139,19 @@ vect_transform_stmt (vec_info *vinfo,
   if (!slp_node && vec_stmt)
     gcc_assert (STMT_VINFO_VEC_STMTS (stmt_info).exists ());
 
-  if (STMT_VINFO_TYPE (stmt_info) == store_vec_info_type)
-    return is_store;
+  if (STMT_VINFO_TYPE (stmt_info) != store_vec_info_type)
+    {
+      /* Handle stmts whose DEF is used outside the loop-nest that is
+	 being vectorized.  */
+      done = can_vectorize_live_stmts (vinfo, stmt_info, gsi, slp_node,
+				       slp_node_instance, true, NULL);
+      gcc_assert (done);
+    }
 
-  /* Handle stmts whose DEF is used outside the loop-nest that is
-     being vectorized.  */
-  done = can_vectorize_live_stmts (vinfo, stmt_info, gsi, slp_node,
-				   slp_node_instance, true, NULL);
-  gcc_assert (done);
+  if (slp_node)
+    STMT_VINFO_VECTYPE (stmt_info) = saved_vectype;
 
-  return false;
+  return is_store;
 }
 
 
@@ -11336,17 +11473,7 @@ vect_is_simple_use (tree operand, vec_info *vinfo, enum vect_def_type *dt,
 	{
 	  stmt_vinfo = vect_stmt_to_vectorize (stmt_vinfo);
 	  def_stmt = stmt_vinfo->stmt;
-	  switch (gimple_code (def_stmt))
-	    {
-	    case GIMPLE_PHI:
-	    case GIMPLE_ASSIGN:
-	    case GIMPLE_CALL:
-	      *dt = STMT_VINFO_DEF_TYPE (stmt_vinfo);
-	      break;
-	    default:
-	      *dt = vect_unknown_def_type;
-	      break;
-	    }
+	  *dt = STMT_VINFO_DEF_TYPE (stmt_vinfo);
 	  if (def_stmt_info_out)
 	    *def_stmt_info_out = stmt_vinfo;
 	}
@@ -11499,13 +11626,7 @@ vect_is_simple_use (vec_info *vinfo, stmt_vec_info stmt, slp_tree slp_node,
 	    *op = gimple_op (ass, operand + 1);
 	}
       else if (gcall *call = dyn_cast <gcall *> (stmt->stmt))
-	{
-	  if (gimple_call_internal_p (call)
-	      && internal_store_fn_p (gimple_call_internal_fn (call)))
-	    operand = internal_fn_stored_value_index (gimple_call_internal_fn
-									(call));
-	  *op = gimple_call_arg (call, operand);
-	}
+	*op = gimple_call_arg (call, operand);
       else
 	gcc_unreachable ();
       return vect_is_simple_use (*op, vinfo, dt, vectype, def_stmt_info_out);
@@ -11977,22 +12098,29 @@ supportable_narrowing_operation (enum tree_code code,
   return false;
 }
 
-/* Generate and return a statement that sets vector mask MASK such that
-   MASK[I] is true iff J + START_INDEX < END_INDEX for all J <= I.  */
+/* Generate and return a vector mask of MASK_TYPE such that
+   mask[I] is true iff J + START_INDEX < END_INDEX for all J <= I.
+   Add the statements to SEQ.  */
 
-gcall *
-vect_gen_while (tree mask, tree start_index, tree end_index)
+tree
+vect_gen_while (gimple_seq *seq, tree mask_type, tree start_index,
+		tree end_index, const char *name)
 {
   tree cmp_type = TREE_TYPE (start_index);
-  tree mask_type = TREE_TYPE (mask);
   gcc_checking_assert (direct_internal_fn_supported_p (IFN_WHILE_ULT,
 						       cmp_type, mask_type,
 						       OPTIMIZE_FOR_SPEED));
   gcall *call = gimple_build_call_internal (IFN_WHILE_ULT, 3,
 					    start_index, end_index,
 					    build_zero_cst (mask_type));
-  gimple_call_set_lhs (call, mask);
-  return call;
+  tree tmp;
+  if (name)
+    tmp = make_temp_ssa_name (mask_type, NULL, name);
+  else
+    tmp = make_ssa_name (mask_type);
+  gimple_call_set_lhs (call, tmp);
+  gimple_seq_add_stmt (seq, call);
+  return tmp;
 }
 
 /* Generate a vector mask of type MASK_TYPE for which index I is false iff
@@ -12002,9 +12130,7 @@ tree
 vect_gen_while_not (gimple_seq *seq, tree mask_type, tree start_index,
 		    tree end_index)
 {
-  tree tmp = make_ssa_name (mask_type);
-  gcall *call = vect_gen_while (tmp, start_index, end_index);
-  gimple_seq_add_stmt (seq, call);
+  tree tmp = vect_gen_while (seq, mask_type, start_index, end_index);
   return gimple_build (seq, BIT_NOT_EXPR, mask_type, tmp);
 }
 
@@ -12064,11 +12190,6 @@ vect_get_vector_types_for_stmt (vec_info *vinfo, stmt_vec_info stmt_info,
 				     "not vectorized: irregular stmt.%G", stmt);
     }
 
-  if (VECTOR_MODE_P (TYPE_MODE (gimple_expr_type (stmt))))
-    return opt_result::failure_at (stmt,
-				   "not vectorized: vector stmt in loop:%G",
-				   stmt);
-
   tree vectype;
   tree scalar_type = NULL_TREE;
   if (group_size == 0 && STMT_VINFO_VECTYPE (stmt_info))
@@ -12118,6 +12239,12 @@ vect_get_vector_types_for_stmt (vec_info *vinfo, stmt_vec_info stmt_info,
       if (dump_enabled_p ())
 	dump_printf_loc (MSG_NOTE, vect_location, "vectype: %T\n", vectype);
     }
+
+  if (scalar_type && VECTOR_MODE_P (TYPE_MODE (scalar_type)))
+    return opt_result::failure_at (stmt,
+				   "not vectorized: vector stmt in loop:%G",
+				   stmt);
+
   *stmt_vectype_out = vectype;
 
   /* Don't try to compute scalar types if the stmt produces a boolean
@@ -12128,8 +12255,8 @@ vect_get_vector_types_for_stmt (vec_info *vinfo, stmt_vec_info stmt_info,
       /* The number of units is set according to the smallest scalar
 	 type (or the largest vector size, but we only support one
 	 vector size per vectorization).  */
-      HOST_WIDE_INT dummy;
-      scalar_type = vect_get_smallest_scalar_type (stmt_info, &dummy, &dummy);
+      scalar_type = vect_get_smallest_scalar_type (stmt_info,
+						   TREE_TYPE (vectype));
       if (scalar_type != TREE_TYPE (vectype))
 	{
 	  if (dump_enabled_p ())

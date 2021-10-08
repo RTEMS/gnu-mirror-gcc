@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2020, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -23,55 +23,60 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
-with Atree;    use Atree;
-with Checks;   use Checks;
-with Debug;    use Debug;
-with Einfo;    use Einfo;
-with Elists;   use Elists;
-with Errout;   use Errout;
-with Exp_Aggr; use Exp_Aggr;
-with Exp_Atag; use Exp_Atag;
-with Exp_Ch3;  use Exp_Ch3;
-with Exp_Ch6;  use Exp_Ch6;
-with Exp_Ch7;  use Exp_Ch7;
-with Exp_Ch9;  use Exp_Ch9;
-with Exp_Disp; use Exp_Disp;
-with Exp_Fixd; use Exp_Fixd;
-with Exp_Intr; use Exp_Intr;
-with Exp_Pakd; use Exp_Pakd;
-with Exp_Tss;  use Exp_Tss;
-with Exp_Util; use Exp_Util;
-with Freeze;   use Freeze;
-with Inline;   use Inline;
-with Namet;    use Namet;
-with Nlists;   use Nlists;
-with Nmake;    use Nmake;
-with Opt;      use Opt;
-with Par_SCO;  use Par_SCO;
-with Restrict; use Restrict;
-with Rident;   use Rident;
-with Rtsfind;  use Rtsfind;
-with Sem;      use Sem;
-with Sem_Aux;  use Sem_Aux;
-with Sem_Cat;  use Sem_Cat;
-with Sem_Ch3;  use Sem_Ch3;
-with Sem_Ch13; use Sem_Ch13;
-with Sem_Eval; use Sem_Eval;
-with Sem_Res;  use Sem_Res;
-with Sem_Type; use Sem_Type;
-with Sem_Util; use Sem_Util;
-with Sem_Warn; use Sem_Warn;
-with Sinfo;    use Sinfo;
-with Snames;   use Snames;
-with Stand;    use Stand;
-with SCIL_LL;  use SCIL_LL;
-with Targparm; use Targparm;
-with Tbuild;   use Tbuild;
-with Ttypes;   use Ttypes;
-with Uintp;    use Uintp;
-with Urealp;   use Urealp;
-with Validsw;  use Validsw;
-with Warnsw;   use Warnsw;
+with Aspects;        use Aspects;
+with Atree;          use Atree;
+with Checks;         use Checks;
+with Debug;          use Debug;
+with Einfo;          use Einfo;
+with Einfo.Entities; use Einfo.Entities;
+with Einfo.Utils;    use Einfo.Utils;
+with Elists;         use Elists;
+with Errout;         use Errout;
+with Exp_Aggr;       use Exp_Aggr;
+with Exp_Atag;       use Exp_Atag;
+with Exp_Ch3;        use Exp_Ch3;
+with Exp_Ch6;        use Exp_Ch6;
+with Exp_Ch7;        use Exp_Ch7;
+with Exp_Ch9;        use Exp_Ch9;
+with Exp_Disp;       use Exp_Disp;
+with Exp_Fixd;       use Exp_Fixd;
+with Exp_Intr;       use Exp_Intr;
+with Exp_Pakd;       use Exp_Pakd;
+with Exp_Tss;        use Exp_Tss;
+with Exp_Util;       use Exp_Util;
+with Freeze;         use Freeze;
+with Inline;         use Inline;
+with Namet;          use Namet;
+with Nlists;         use Nlists;
+with Nmake;          use Nmake;
+with Opt;            use Opt;
+with Par_SCO;        use Par_SCO;
+with Restrict;       use Restrict;
+with Rident;         use Rident;
+with Rtsfind;        use Rtsfind;
+with Sem;            use Sem;
+with Sem_Aux;        use Sem_Aux;
+with Sem_Cat;        use Sem_Cat;
+with Sem_Ch3;        use Sem_Ch3;
+with Sem_Ch13;       use Sem_Ch13;
+with Sem_Eval;       use Sem_Eval;
+with Sem_Res;        use Sem_Res;
+with Sem_Type;       use Sem_Type;
+with Sem_Util;       use Sem_Util;
+with Sem_Warn;       use Sem_Warn;
+with Sinfo;          use Sinfo;
+with Sinfo.Nodes;    use Sinfo.Nodes;
+with Sinfo.Utils;    use Sinfo.Utils;
+with Snames;         use Snames;
+with Stand;          use Stand;
+with SCIL_LL;        use SCIL_LL;
+with Targparm;       use Targparm;
+with Tbuild;         use Tbuild;
+with Ttypes;         use Ttypes;
+with Uintp;          use Uintp;
+with Urealp;         use Urealp;
+with Validsw;        use Validsw;
+with Warnsw;         use Warnsw;
 
 package body Exp_Ch4 is
 
@@ -172,16 +177,9 @@ package body Exp_Ch4 is
    --  routine is to find the real type by looking up the tree. We also
    --  determine if the operation must be rounded.
 
-   function Has_Inferable_Discriminants (N : Node_Id) return Boolean;
-   --  Ada 2005 (AI-216): A view of an Unchecked_Union object has inferable
-   --  discriminants if it has a constrained nominal type, unless the object
-   --  is a component of an enclosing Unchecked_Union object that is subject
-   --  to a per-object constraint and the enclosing object lacks inferable
-   --  discriminants.
-   --
-   --  An expression of an Unchecked_Union type has inferable discriminants
-   --  if it is either a name of an object with inferable discriminants or a
-   --  qualified expression whose subtype mark denotes a constrained subtype.
+   function Get_Size_For_Range (Lo, Hi : Uint) return Uint;
+   --  Return the size of a small signed integer type covering Lo .. Hi, the
+   --  main goal being to return a size lower than that of standard types.
 
    procedure Insert_Dereference_Action (N : Node_Id);
    --  N is an expression whose type is an access. When the type of the
@@ -618,6 +616,7 @@ package body Exp_Ch4 is
            and then Is_Class_Wide_Type (DesigT)
            and then Tagged_Type_Expansion
            and then not Scope_Suppress.Suppress (Accessibility_Check)
+           and then not No_Dynamic_Accessibility_Checks_Enabled (Ref)
            and then
              (Type_Access_Level (Etype (Exp)) > Type_Access_Level (PtrT)
                or else
@@ -733,8 +732,7 @@ package body Exp_Ch4 is
 
             Append_To (Stmts,
               Make_Raise_Program_Error (Loc,
-                Condition => New_Occurrence_Of (Standard_True, Loc),
-                Reason    => PE_Accessibility_Check_Failed));
+                Reason => PE_Accessibility_Check_Failed));
 
             --  Step 2: Create the accessibility comparison
 
@@ -770,8 +768,7 @@ package body Exp_Ch4 is
             Cond :=
               Make_Op_Gt (Loc,
                 Left_Opnd  => Cond,
-                Right_Opnd =>
-                  Make_Integer_Literal (Loc, Type_Access_Level (PtrT)));
+                Right_Opnd => Accessibility_Level (N, Dynamic_Level));
 
             --  Due to the complexity and side effects of the check, utilize an
             --  if statement instead of the regular Program_Error circuitry.
@@ -1169,6 +1166,9 @@ package body Exp_Ch4 is
          --  secondary stack). In that case, the object will be moved, so we do
          --  want to Adjust. However, if it's a nonlimited build-in-place
          --  function call, Adjust is not wanted.
+         --
+         --  Needs_Finalization (DesigT) can differ from Needs_Finalization (T)
+         --  if one of the two types is class-wide, and the other is not.
 
          if Needs_Finalization (DesigT)
            and then Needs_Finalization (T)
@@ -2253,9 +2253,6 @@ package body Exp_Ch4 is
       LLIB : constant Entity_Id := Base_Type (Standard_Long_Long_Integer);
       --  Entity for Long_Long_Integer'Base
 
-      Check : constant Overflow_Mode_Type := Overflow_Check_Mode;
-      --  Current overflow checking mode
-
       procedure Set_True;
       procedure Set_False;
       --  These procedures rewrite N with an occurrence of Standard_True or
@@ -2284,17 +2281,6 @@ package body Exp_Ch4 is
    --  Start of processing for Expand_Compare_Minimize_Eliminate_Overflow
 
    begin
-      --  Nothing to do unless we have a comparison operator with operands
-      --  that are signed integer types, and we are operating in either
-      --  MINIMIZED or ELIMINATED overflow checking mode.
-
-      if Nkind (N) not in N_Op_Compare
-        or else Check not in Minimized_Or_Eliminated
-        or else not Is_Signed_Integer_Type (Etype (Left_Opnd (N)))
-      then
-         return;
-      end if;
-
       --  OK, this is the case we are interested in. First step is to process
       --  our operands using the Minimize_Eliminate circuitry which applies
       --  this processing to the two operand subtrees.
@@ -2308,7 +2294,7 @@ package body Exp_Ch4 is
       --  We can only do this if we in fact have full range information (which
       --  won't be the case if either operand is bignum at this stage).
 
-      if Llo /= No_Uint and then Rlo /= No_Uint then
+      if Present (Llo) and then Present (Rlo) then
          case N_Op_Compare (Nkind (N)) is
             when N_Op_Eq =>
                if Llo = Lhi and then Rlo = Rhi and then Llo = Rlo then
@@ -3034,16 +3020,6 @@ package body Exp_Ch4 is
 
       if Is_Enumeration_Type (Ityp) then
          Artyp := Standard_Integer;
-
-      --  If index type is Positive, we use the standard unsigned type, to give
-      --  more room on the top of the range, obviating the need for an overflow
-      --  check when creating the upper bound. This is needed to avoid junk
-      --  overflow checks in the common case of String types.
-
-      --  ??? Disabled for now
-
-      --  elsif Istyp = Standard_Positive then
-      --     Artyp := Standard_Unsigned;
 
       --  For modular types, we use a 32-bit modular type for types whose size
       --  is in the range 1-31 bits. For 32-bit unsigned types, we use the
@@ -3803,7 +3779,7 @@ package body Exp_Ch4 is
       --  Bounds in Minimize calls, not used currently
 
       LLIB : constant Entity_Id := Base_Type (Standard_Long_Long_Integer);
-      --  Entity for Long_Long_Integer'Base (Standard should export this???)
+      --  Entity for Long_Long_Integer'Base
 
    begin
       Minimize_Eliminate_Overflows (Lop, Lo, Hi, Top_Level => False);
@@ -4282,7 +4258,7 @@ package body Exp_Ch4 is
             --  larger type for the operands, to prevent spurious constraint
             --  errors on large legal literals of the type.
 
-            if Modulus (Etype (N)) > UI_From_Int (Int (Integer'Last)) then
+            if Modulus (Etype (N)) > Int (Integer'Last) then
                Target_Type := Standard_Long_Long_Integer;
             else
                Target_Type := Standard_Integer;
@@ -4499,10 +4475,6 @@ package body Exp_Ch4 is
          --  are too large, and which in the absence of a check results in
          --  undetected chaos ???
 
-         --  Note in particular that this is a pessimistic estimate in the
-         --  case of packed array types, where an array element might occupy
-         --  just a fraction of a storage element???
-
          declare
             Idx : Node_Id := First_Index (E);
             Len : Node_Id;
@@ -4624,9 +4596,10 @@ package body Exp_Ch4 is
       end if;
 
       --  RM E.2.2(17). We enforce that the expected type of an allocator
-      --  shall not be a remote access-to-class-wide-limited-private type
-
-      --  Why is this being done at expansion time, seems clearly wrong ???
+      --  shall not be a remote access-to-class-wide-limited-private type.
+      --  We probably shouldn't be doing this legality check during expansion,
+      --  but this is only an issue for Annex E users, and is unlikely to be a
+      --  problem in practice.
 
       Validate_Remote_Access_To_Class_Wide_Type (N);
 
@@ -4731,7 +4704,7 @@ package body Exp_Ch4 is
 
             else
                Set_Procedure_To_Call (N,
-                 Find_Prim_Op (Etype (Pool), Name_Allocate));
+                 Find_Storage_Op (Etype (Pool), Name_Allocate));
             end if;
          end if;
       end if;
@@ -5224,8 +5197,8 @@ package body Exp_Ch4 is
                   end if;
 
                   if Restriction_Active (No_Task_Hierarchy) then
-                     Append_To (Args,
-                       New_Occurrence_Of (RTE (RE_Library_Task_Level), Loc));
+                     Append_To
+                       (Args, Make_Integer_Literal (Loc, Library_Task_Level));
                   else
                      Append_To (Args,
                        New_Occurrence_Of
@@ -5308,6 +5281,8 @@ package body Exp_Ch4 is
                         if Ada_Version >= Ada_2005
                           and then
                             Ekind (Etype (Nod)) = E_Anonymous_Access_Type
+                          and then not
+                            No_Dynamic_Accessibility_Checks_Enabled (Nod)
                         then
                            Apply_Accessibility_Check
                              (Nod, Typ, Insert_Node => Nod);
@@ -5568,10 +5543,8 @@ package body Exp_Ch4 is
       if Is_Copy_Type (Typ) then
          Target_Typ := Typ;
 
-         --  ??? Do not perform the optimization when the return statement is
-         --  within a predicate function, as this causes spurious errors. Could
-         --  this be a possible mismatch in handling this case somewhere else
-         --  in semantic analysis?
+         --  Do not perform the optimization when the return statement is
+         --  within a predicate function, as this causes spurious errors.
 
          Optimize_Return_Stmt :=
            Nkind (Par) = N_Simple_Return_Statement and then not In_Predicate;
@@ -5813,15 +5786,14 @@ package body Exp_Ch4 is
 
          --  Avoid processing temporary function results multiple times when
          --  dealing with nested expression_with_actions.
+         --  Similarly, do not process temporary function results in loops.
+         --  This is done by Expand_N_Loop_Statement and Build_Finalizer.
+         --  Note that we used to wrongly return Abandon instead of Skip here:
+         --  this is wrong since it means that we were ignoring lots of
+         --  relevant subsequent statements.
 
-         elsif Nkind (Act) = N_Expression_With_Actions then
-            return Abandon;
-
-         --  Do not process temporary function results in loops. This is done
-         --  by Expand_N_Loop_Statement and Build_Finalizer.
-
-         elsif Nkind (Act) = N_Loop_Statement then
-            return Abandon;
+         elsif Nkind (Act) in N_Expression_With_Actions | N_Loop_Statement then
+            return Skip;
          end if;
 
          return OK;
@@ -5941,9 +5913,14 @@ package body Exp_Ch4 is
    --  Start of processing for Expand_N_If_Expression
 
    begin
-      --  Check for MINIMIZED/ELIMINATED overflow mode
+      --  Check for MINIMIZED/ELIMINATED overflow mode.
+      --  Apply_Arithmetic_Overflow_Check will not deal with Then/Else_Actions
+      --  so skip this step if any actions are present.
 
-      if Minimized_Eliminated_Overflow_Check (N) then
+      if Minimized_Eliminated_Overflow_Check (N)
+        and then No (Then_Actions (N))
+        and then No (Else_Actions (N))
+      then
          Apply_Arithmetic_Overflow_Check (N);
          return;
       end if;
@@ -6277,6 +6254,46 @@ package body Exp_Ch4 is
             return;
          end if;
 
+      --  For the sake of GNATcoverage, generate an intermediate temporary in
+      --  the case where the if-expression is a condition in an outer decision,
+      --  in order to make sure that no branch is shared between the decisions.
+
+      elsif Opt.Suppress_Control_Flow_Optimizations
+        and then Nkind (Original_Node (Parent (N))) in N_Case_Expression
+                                                     | N_Case_Statement
+                                                     | N_If_Expression
+                                                     | N_If_Statement
+                                                     | N_Goto_When_Statement
+                                                     | N_Loop_Statement
+                                                     | N_Return_When_Statement
+                                                     | N_Short_Circuit
+      then
+         declare
+            Cnn  : constant Entity_Id := Make_Temporary (Loc, 'C');
+            Acts : List_Id;
+
+         begin
+            --  Generate:
+            --    do
+            --       Cnn : constant Typ := N;
+            --    in Cnn end
+
+            Acts := New_List (
+              Make_Object_Declaration (Loc,
+                Defining_Identifier => Cnn,
+                Constant_Present    => True,
+                Object_Definition   => New_Occurrence_Of (Typ, Loc),
+                Expression          => Relocate_Node (N)));
+
+            Rewrite (N,
+              Make_Expression_With_Actions (Loc,
+                Expression => New_Occurrence_Of (Cnn, Loc),
+                Actions    => Acts));
+
+            Analyze_And_Resolve (N, Typ);
+            return;
+         end;
+
       --  If no actions then no expansion needed, gigi will handle it using the
       --  same approach as a C conditional expression.
 
@@ -6355,13 +6372,11 @@ package body Exp_Ch4 is
             --  perspective.
 
             if Comes_From_Source (Obj_Ref) then
-
-               --  Recover the actual object reference. There may be more cases
-               --  to consider???
-
                loop
                   if Nkind (Obj_Ref) in
-                       N_Type_Conversion | N_Unchecked_Type_Conversion
+                       N_Type_Conversion |
+                       N_Unchecked_Type_Conversion |
+                       N_Qualified_Expression
                   then
                      Obj_Ref := Expression (Obj_Ref);
                   else
@@ -6425,8 +6440,7 @@ package body Exp_Ch4 is
       --  type, then expand with a separate procedure. Note the use of the
       --  flag No_Minimize_Eliminate to prevent infinite recursion.
 
-      if Overflow_Check_Mode in Minimized_Or_Eliminated
-        and then Is_Signed_Integer_Type (Ltyp)
+      if Minimized_Eliminated_Overflow_Check (Left_Opnd  (N))
         and then not No_Minimize_Eliminate (N)
       then
          Expand_Membership_Minimize_Eliminate_Overflow (N);
@@ -6506,8 +6520,6 @@ package body Exp_Ch4 is
 
          begin
             --  If test is explicit x'First .. x'Last, replace by valid check
-
-            --  Could use some individual comments for this complex test ???
 
             if Is_Scalar_Type (Ltyp)
 
@@ -6915,11 +6927,26 @@ package body Exp_Ch4 is
                      end if;
                   end if;
 
+                  --  When restriction No_Dynamic_Accessibility_Checks is in
+                  --  effect, expand the membership test to a static value
+                  --  since we cannot rely on dynamic levels.
+
+                  if No_Dynamic_Accessibility_Checks_Enabled (Lop) then
+                     if Static_Accessibility_Level
+                          (Lop, Object_Decl_Level)
+                            > Type_Access_Level (Rtyp)
+                     then
+                        Rewrite (N, New_Occurrence_Of (Standard_False, Loc));
+                     else
+                        Rewrite (N, New_Occurrence_Of (Standard_True, Loc));
+                     end if;
+                     Analyze_And_Resolve (N, Restyp);
+
                   --  If a conversion of the anonymous access value to the
                   --  tested type would be illegal, then the result is False.
 
-                  if not Valid_Conversion
-                           (Lop, Rtyp, Lop, Report_Errs => False)
+                  elsif not Valid_Conversion
+                              (Lop, Rtyp, Lop, Report_Errs => False)
                   then
                      Rewrite (N, New_Occurrence_Of (Standard_False, Loc));
                      Analyze_And_Resolve (N, Restyp);
@@ -7075,10 +7102,122 @@ package body Exp_Ch4 is
    --------------------------------
 
    procedure Expand_N_Indexed_Component (N : Node_Id) is
+
+      Wild_Reads_May_Have_Bad_Side_Effects : Boolean
+        renames Validity_Check_Subscripts;
+      --  This Boolean needs to be True if reading from a bad address can
+      --  have a bad side effect (e.g., a segmentation fault that is not
+      --  transformed into a Storage_Error exception, or interactions with
+      --  memory-mapped I/O) that needs to be prevented. This refers to the
+      --  act of reading itself, not to any damage that might be caused later
+      --  by making use of whatever value was read. We assume here that
+      --  Validity_Check_Subscripts meets this requirement, but introduce
+      --  this declaration in order to document this assumption.
+
+      function Is_Renamed_Variable_Name (N : Node_Id) return Boolean;
+      --  Returns True if the given name occurs as part of the renaming
+      --  of a variable. In this case, the indexing operation should be
+      --  treated as a write, rather than a read, with respect to validity
+      --  checking. This is because the renamed variable can later be
+      --  written to.
+
+      function Type_Requires_Subscript_Validity_Checks_For_Reads
+        (Typ : Entity_Id) return Boolean;
+      --  If Wild_Reads_May_Have_Bad_Side_Effects is False and we are indexing
+      --  into an array of characters in order to read an element, it is ok
+      --  if an invalid index value goes undetected. But if it is an array of
+      --  pointers or an array of tasks, the consequences of such a read are
+      --  potentially more severe and so we want to detect an invalid index
+      --  value. This function captures that distinction; this is intended to
+      --  be consistent with the "but does not by itself lead to erroneous
+      --  ... execution" rule of RM 13.9.1(11).
+
+      ------------------------------
+      -- Is_Renamed_Variable_Name --
+      ------------------------------
+
+      function Is_Renamed_Variable_Name (N : Node_Id) return Boolean is
+         Rover : Node_Id := N;
+      begin
+         if Is_Variable (N) then
+            loop
+               declare
+                  Rover_Parent : constant Node_Id := Parent (Rover);
+               begin
+                  case Nkind (Rover_Parent) is
+                     when N_Object_Renaming_Declaration =>
+                        return Rover = Name (Rover_Parent);
+
+                     when N_Indexed_Component
+                        | N_Slice
+                        | N_Selected_Component
+                     =>
+                        exit when Rover /= Prefix (Rover_Parent);
+                        Rover := Rover_Parent;
+
+                     --  No need to check for qualified expressions or type
+                     --  conversions here, mostly because of the Is_Variable
+                     --  test. It is possible to have a view conversion for
+                     --  which Is_Variable yields True and which occurs as
+                     --  part of an object renaming, but only if the type is
+                     --  tagged; in that case this function will not be called.
+
+                     when others =>
+                        exit;
+                  end case;
+               end;
+            end loop;
+         end if;
+         return False;
+      end Is_Renamed_Variable_Name;
+
+      -------------------------------------------------------
+      -- Type_Requires_Subscript_Validity_Checks_For_Reads --
+      -------------------------------------------------------
+
+      function Type_Requires_Subscript_Validity_Checks_For_Reads
+        (Typ : Entity_Id) return Boolean
+      is
+         --  a shorter name for recursive calls
+         function Needs_Check (Typ : Entity_Id) return Boolean renames
+           Type_Requires_Subscript_Validity_Checks_For_Reads;
+      begin
+         if Is_Access_Type (Typ)
+           or else Is_Tagged_Type (Typ)
+           or else Is_Concurrent_Type (Typ)
+           or else (Is_Array_Type (Typ)
+                     and then Needs_Check (Component_Type (Typ)))
+           or else (Is_Scalar_Type (Typ)
+                     and then Has_Aspect (Typ, Aspect_Default_Value))
+         then
+            return True;
+         end if;
+
+         if Is_Record_Type (Typ) then
+            declare
+               Comp : Entity_Id := First_Component_Or_Discriminant (Typ);
+            begin
+               while Present (Comp) loop
+                  if Needs_Check (Etype (Comp)) then
+                     return True;
+                  end if;
+
+                  Next_Component_Or_Discriminant (Comp);
+               end loop;
+            end;
+         end if;
+
+         return False;
+      end Type_Requires_Subscript_Validity_Checks_For_Reads;
+
+      --  Local constants
+
       Loc : constant Source_Ptr := Sloc (N);
       Typ : constant Entity_Id  := Etype (N);
       P   : constant Node_Id    := Prefix (N);
       T   : constant Entity_Id  := Etype (P);
+
+   --  Start of processing for Expand_N_Indexed_Component
 
    begin
       --  A special optimization, if we have an indexed component that is
@@ -7129,11 +7268,67 @@ package body Exp_Ch4 is
 
       --  Generate index and validity checks
 
-      Generate_Index_Checks (N);
+      declare
+         Dims_Checked : Dimension_Set (Dimensions =>
+                                         (if Is_Array_Type (T)
+                                          then Number_Dimensions (T)
+                                          else 1));
+         --  Dims_Checked is used to avoid generating two checks (one in
+         --  Generate_Index_Checks, one in Apply_Subscript_Validity_Checks)
+         --  for the same index value in cases where the index check eliminates
+         --  the need for the validity check. The Is_Array_Type test avoids
+         --  cascading errors.
 
-      if Validity_Checks_On and then Validity_Check_Subscripts then
-         Apply_Subscript_Validity_Checks (N);
-      end if;
+      begin
+         Generate_Index_Checks (N, Checks_Generated => Dims_Checked);
+
+         if Validity_Checks_On
+           and then (Validity_Check_Subscripts
+                      or else Wild_Reads_May_Have_Bad_Side_Effects
+                      or else Type_Requires_Subscript_Validity_Checks_For_Reads
+                                (Typ)
+                      or else Is_Renamed_Variable_Name (N))
+         then
+            if Validity_Check_Subscripts then
+               --  If we index into an array with an uninitialized variable
+               --  and we generate an index check that passes at run time,
+               --  passing that check does not ensure that the variable is
+               --  valid (although it does in the common case where the
+               --  object's subtype matches the index subtype).
+               --  Consider an uninitialized variable with subtype 1 .. 10
+               --  used to index into an array with bounds 1 .. 20 when the
+               --  value of the uninitialized variable happens to be 15.
+               --  The index check will succeed but the variable is invalid.
+               --  If Validity_Check_Subscripts is True then we need to
+               --  ensure validity, so we adjust Dims_Checked accordingly.
+               Dims_Checked.Elements := (others => False);
+
+            elsif Is_Array_Type (T) then
+               --  We are only adding extra validity checks here to
+               --  deal with uninitialized variables (but this includes
+               --  assigning one uninitialized variable to another). Other
+               --  ways of producing invalid objects imply erroneousness, so
+               --  the compiler can do whatever it wants for those cases.
+               --  If an index type has the Default_Value aspect specified,
+               --  then we don't have to worry about the possibility of an
+               --  uninitialized variable, so no need for these extra
+               --  validity checks.
+
+               declare
+                  Idx : Node_Id := First_Index (T);
+               begin
+                  for No_Check_Needed of Dims_Checked.Elements loop
+                     No_Check_Needed := No_Check_Needed
+                       or else Has_Aspect (Etype (Idx), Aspect_Default_Value);
+                     Next_Index (Idx);
+                  end loop;
+               end;
+            end if;
+
+            Apply_Subscript_Validity_Checks
+              (N, No_Check_Needed => Dims_Checked);
+         end if;
+      end;
 
       --  If selecting from an array with atomic components, and atomic sync
       --  is not suppressed for this array type, set atomic sync flag.
@@ -7790,8 +7985,8 @@ package body Exp_Ch4 is
 
          if Is_Unchecked_Union (Op_Type) then
             declare
-               Lhs_Type : constant Node_Id := Etype (L_Exp);
-               Rhs_Type : constant Node_Id := Etype (R_Exp);
+               Lhs_Type : constant Entity_Id := Etype (L_Exp);
+               Rhs_Type : constant Entity_Id := Etype (R_Exp);
 
                Lhs_Discr_Vals : Elist_Id;
                --  List of inferred discriminant values for left operand.
@@ -8113,13 +8308,9 @@ package body Exp_Ch4 is
       function User_Defined_Primitive_Equality_Op
         (Typ : Entity_Id) return Entity_Id
       is
-         Enclosing_Scope : constant Node_Id := Scope (Typ);
+         Enclosing_Scope : constant Entity_Id := Scope (Typ);
          E : Entity_Id;
       begin
-         --  Prune this search by somehow not looking at decls that precede
-         --  the declaration of the first view of Typ (which might be a partial
-         --  view)???
-
          for Private_Entities in Boolean loop
             if Private_Entities then
                if Ekind (Enclosing_Scope) /= E_Package then
@@ -8154,138 +8345,129 @@ package body Exp_Ch4 is
       function Has_Unconstrained_UU_Component
         (Typ : Entity_Id) return Boolean
       is
-         Tdef  : constant Node_Id :=
-                   Type_Definition (Declaration_Node (Base_Type (Typ)));
-         Clist : Node_Id;
-         Vpart : Node_Id;
+         function Unconstrained_UU_In_Component_Declaration
+           (N : Node_Id) return Boolean;
 
-         function Component_Is_Unconstrained_UU
-           (Comp : Node_Id) return Boolean;
-         --  Determines whether the subtype of the component is an
-         --  unconstrained Unchecked_Union.
+         function Unconstrained_UU_In_Component_Items
+           (L : List_Id) return Boolean;
 
-         function Variant_Is_Unconstrained_UU
-           (Variant : Node_Id) return Boolean;
-         --  Determines whether a component of the variant has an unconstrained
-         --  Unchecked_Union subtype.
+         function Unconstrained_UU_In_Component_List
+           (N : Node_Id) return Boolean;
 
-         -----------------------------------
-         -- Component_Is_Unconstrained_UU --
-         -----------------------------------
+         function Unconstrained_UU_In_Variant_Part
+           (N : Node_Id) return Boolean;
+         --  A family of routines that determine whether a particular construct
+         --  of a record type definition contains a subcomponent of an
+         --  unchecked union type whose nominal subtype is unconstrained.
+         --
+         --  Individual routines correspond to the production rules of the Ada
+         --  grammar, as described in the Ada RM (P).
 
-         function Component_Is_Unconstrained_UU
-           (Comp : Node_Id) return Boolean
+         -----------------------------------------------
+         -- Unconstrained_UU_In_Component_Declaration --
+         -----------------------------------------------
+
+         function Unconstrained_UU_In_Component_Declaration
+           (N : Node_Id) return Boolean
          is
+            pragma Assert (Nkind (N) = N_Component_Declaration);
+
+            Sindic : constant Node_Id :=
+                       Subtype_Indication (Component_Definition (N));
          begin
-            if Nkind (Comp) /= N_Component_Declaration then
-               return False;
-            end if;
+            --  If the component declaration includes a subtype indication
+            --  it is not an unchecked_union. Otherwise verify that it carries
+            --  the Unchecked_Union flag and is either a record or a private
+            --  type. A Record_Subtype declared elsewhere does not qualify,
+            --  even if its parent type carries the flag.
 
-            declare
-               Sindic : constant Node_Id :=
-                          Subtype_Indication (Component_Definition (Comp));
+            return Nkind (Sindic) in N_Expanded_Name | N_Identifier
+              and then Is_Unchecked_Union (Base_Type (Etype (Sindic)))
+              and then (Ekind (Entity (Sindic)) in
+                         E_Private_Type | E_Record_Type);
+         end Unconstrained_UU_In_Component_Declaration;
 
-            begin
-               --  Unconstrained nominal type. In the case of a constraint
-               --  present, the node kind would have been N_Subtype_Indication.
+         -----------------------------------------
+         -- Unconstrained_UU_In_Component_Items --
+         -----------------------------------------
 
-               if Nkind (Sindic) = N_Identifier then
-                  return Is_Unchecked_Union (Base_Type (Etype (Sindic)));
+         function Unconstrained_UU_In_Component_Items
+           (L : List_Id) return Boolean
+         is
+            N : Node_Id := First (L);
+         begin
+            while Present (N) loop
+               if Nkind (N) = N_Component_Declaration
+                 and then Unconstrained_UU_In_Component_Declaration (N)
+               then
+                  return True;
                end if;
 
-               return False;
-            end;
-         end Component_Is_Unconstrained_UU;
-
-         ---------------------------------
-         -- Variant_Is_Unconstrained_UU --
-         ---------------------------------
-
-         function Variant_Is_Unconstrained_UU
-           (Variant : Node_Id) return Boolean
-         is
-            Clist : constant Node_Id := Component_List (Variant);
-
-         begin
-            if Is_Empty_List (Component_Items (Clist)) then
-               return False;
-            end if;
-
-            --  We only need to test one component
-
-            declare
-               Comp : Node_Id := First (Component_Items (Clist));
-
-            begin
-               while Present (Comp) loop
-                  if Component_Is_Unconstrained_UU (Comp) then
-                     return True;
-                  end if;
-
-                  Next (Comp);
-               end loop;
-            end;
-
-            --  None of the components withing the variant were of
-            --  unconstrained Unchecked_Union type.
+               Next (N);
+            end loop;
 
             return False;
-         end Variant_Is_Unconstrained_UU;
+         end Unconstrained_UU_In_Component_Items;
+
+         ----------------------------------------
+         -- Unconstrained_UU_In_Component_List --
+         ----------------------------------------
+
+         function Unconstrained_UU_In_Component_List
+           (N : Node_Id) return Boolean
+         is
+            pragma Assert (Nkind (N) = N_Component_List);
+
+            Optional_Variant_Part : Node_Id;
+         begin
+            if Unconstrained_UU_In_Component_Items (Component_Items (N)) then
+               return True;
+            end if;
+
+            Optional_Variant_Part := Variant_Part (N);
+
+            return
+              Present (Optional_Variant_Part)
+              and then
+                Unconstrained_UU_In_Variant_Part (Optional_Variant_Part);
+         end Unconstrained_UU_In_Component_List;
+
+         --------------------------------------
+         -- Unconstrained_UU_In_Variant_Part --
+         --------------------------------------
+
+         function Unconstrained_UU_In_Variant_Part
+           (N : Node_Id) return Boolean
+         is
+            pragma Assert (Nkind (N) = N_Variant_Part);
+
+            Variant : Node_Id := First (Variants (N));
+         begin
+            loop
+               if Unconstrained_UU_In_Component_List (Component_List (Variant))
+               then
+                  return True;
+               end if;
+
+               Next (Variant);
+               exit when No (Variant);
+            end loop;
+
+            return False;
+         end Unconstrained_UU_In_Variant_Part;
+
+         Typ_Def : constant Node_Id :=
+           Type_Definition (Declaration_Node (Base_Type (Typ)));
+
+         Optional_Component_List : constant Node_Id :=
+           Component_List (Typ_Def);
 
       --  Start of processing for Has_Unconstrained_UU_Component
 
       begin
-         if Null_Present (Tdef) then
-            return False;
-         end if;
-
-         Clist := Component_List (Tdef);
-         Vpart := Variant_Part (Clist);
-
-         --  Inspect available components
-
-         if Present (Component_Items (Clist)) then
-            declare
-               Comp : Node_Id := First (Component_Items (Clist));
-
-            begin
-               while Present (Comp) loop
-
-                  --  One component is sufficient
-
-                  if Component_Is_Unconstrained_UU (Comp) then
-                     return True;
-                  end if;
-
-                  Next (Comp);
-               end loop;
-            end;
-         end if;
-
-         --  Inspect available components withing variants
-
-         if Present (Vpart) then
-            declare
-               Variant : Node_Id := First (Variants (Vpart));
-
-            begin
-               while Present (Variant) loop
-
-                  --  One component within a variant is sufficient
-
-                  if Variant_Is_Unconstrained_UU (Variant) then
-                     return True;
-                  end if;
-
-                  Next (Variant);
-               end loop;
-            end;
-         end if;
-
-         --  Neither the available components, nor the components inside the
-         --  variant parts were of an unconstrained Unchecked_Union subtype.
-
-         return False;
+         return Present (Optional_Component_List)
+           and then
+             Unconstrained_UU_In_Component_List (Optional_Component_List);
       end Has_Unconstrained_UU_Component;
 
       --  Local variables
@@ -8343,7 +8525,9 @@ package body Exp_Ch4 is
       --  Deal with overflow checks in MINIMIZED/ELIMINATED mode and if that
       --  means we no longer have a comparison operation, we are all done.
 
-      Expand_Compare_Minimize_Eliminate_Overflow (N);
+      if Minimized_Eliminated_Overflow_Check (Left_Opnd (N)) then
+         Expand_Compare_Minimize_Eliminate_Overflow (N);
+      end if;
 
       if Nkind (N) /= N_Op_Eq then
          return;
@@ -8608,8 +8792,7 @@ package body Exp_Ch4 is
       --  f'Machine (expr) to eliminate surprise from extra precision.
 
       if Is_Floating_Point_Type (Typl)
-        and then Nkind (Original_Node (Lhs)) = N_Attribute_Reference
-        and then Attribute_Name (Original_Node (Lhs)) = Name_Result
+        and then Is_Attribute_Result (Original_Node (Lhs))
       then
          --  Stick in the Typ'Machine call if not already there
 
@@ -9128,15 +9311,12 @@ package body Exp_Ch4 is
       --  overflow), and if there is an infinity generated and a range check
       --  is required, the check will fail anyway.
 
-      --  Historical note: we used to convert everything to Long_Long_Float
-      --  and call a single common routine, but this had the undesirable effect
-      --  of giving different results for small static exponent values and the
-      --  same dynamic values.
-
       else
          pragma Assert (Is_Floating_Point_Type (Rtyp));
 
-         if Rtyp = Standard_Float then
+         --  Short_Float and Float are the same type for GNAT
+
+         if Rtyp = Standard_Short_Float or else Rtyp = Standard_Float then
             Etyp := Standard_Float;
             Rent := RE_Exn_Float;
 
@@ -9154,8 +9334,7 @@ package body Exp_Ch4 is
       --  If we are in the right type, we can call runtime routine directly
 
       if Typ = Etyp
-        and then Rtyp /= Universal_Integer
-        and then Rtyp /= Universal_Real
+        and then not Is_Universal_Numeric_Type (Rtyp)
       then
          Rewrite (N,
            Wrap_MA (
@@ -9201,7 +9380,9 @@ package body Exp_Ch4 is
       --  Deal with overflow checks in MINIMIZED/ELIMINATED mode and if that
       --  means we no longer have a comparison operation, we are all done.
 
-      Expand_Compare_Minimize_Eliminate_Overflow (N);
+      if Minimized_Eliminated_Overflow_Check (Op1) then
+         Expand_Compare_Minimize_Eliminate_Overflow (N);
+      end if;
 
       if Nkind (N) /= N_Op_Ge then
          return;
@@ -9250,7 +9431,9 @@ package body Exp_Ch4 is
       --  Deal with overflow checks in MINIMIZED/ELIMINATED mode and if that
       --  means we no longer have a comparison operation, we are all done.
 
-      Expand_Compare_Minimize_Eliminate_Overflow (N);
+      if Minimized_Eliminated_Overflow_Check (Op1) then
+         Expand_Compare_Minimize_Eliminate_Overflow (N);
+      end if;
 
       if Nkind (N) /= N_Op_Gt then
          return;
@@ -9299,7 +9482,9 @@ package body Exp_Ch4 is
       --  Deal with overflow checks in MINIMIZED/ELIMINATED mode and if that
       --  means we no longer have a comparison operation, we are all done.
 
-      Expand_Compare_Minimize_Eliminate_Overflow (N);
+      if Minimized_Eliminated_Overflow_Check (Op1) then
+         Expand_Compare_Minimize_Eliminate_Overflow (N);
+      end if;
 
       if Nkind (N) /= N_Op_Le then
          return;
@@ -9348,7 +9533,9 @@ package body Exp_Ch4 is
       --  Deal with overflow checks in MINIMIZED/ELIMINATED mode and if that
       --  means we no longer have a comparison operation, we are all done.
 
-      Expand_Compare_Minimize_Eliminate_Overflow (N);
+      if Minimized_Eliminated_Overflow_Check (Op1) then
+         Expand_Compare_Minimize_Eliminate_Overflow (N);
+      end if;
 
       if Nkind (N) /= N_Op_Lt then
          return;
@@ -9667,6 +9854,7 @@ package body Exp_Ch4 is
 
             if ((not ROK) or else (Rlo <= (-1) and then (-1) <= Rhi))
               and then ((not LOK) or else (Llo = LLB))
+              and then not CodePeer_Mode
             then
                Rewrite (N,
                  Make_If_Expression (Loc,
@@ -9942,7 +10130,9 @@ package body Exp_Ch4 is
          --  Deal with overflow checks in MINIMIZED/ELIMINATED mode and if
          --  means we no longer have a /= operation, we are all done.
 
-         Expand_Compare_Minimize_Eliminate_Overflow (N);
+         if Minimized_Eliminated_Overflow_Check (Left_Opnd (N)) then
+            Expand_Compare_Minimize_Eliminate_Overflow (N);
+         end if;
 
          if Nkind (N) /= N_Op_Ne then
             return;
@@ -10431,7 +10621,9 @@ package body Exp_Ch4 is
       --  types and this is really marginal). We will just assume that we need
       --  the test if the left operand can be negative at all.
 
-      if Lneg and Rneg then
+      if (Lneg and Rneg)
+         and then not CodePeer_Mode
+      then
          Rewrite (N,
            Make_If_Expression (Loc,
              Expressions => New_List (
@@ -10890,10 +11082,11 @@ package body Exp_Ch4 is
       Var       : Entity_Id;
 
    begin
-      --  Ensure that the bound variable is properly frozen. We must do
-      --  this before expansion because the expression is about to be
-      --  converted into a loop, and resulting freeze nodes may end up
-      --  in the wrong place in the tree.
+      --  Ensure that the bound variable as well as the type of Name of the
+      --  Iter_Spec if present are properly frozen. We must do this before
+      --  expansion because the expression is about to be converted into a
+      --  loop, and resulting freeze nodes may end up in the wrong place in the
+      --  tree.
 
       if Present (Iter_Spec) then
          Var := Defining_Identifier (Iter_Spec);
@@ -10907,6 +11100,10 @@ package body Exp_Ch4 is
          while Nkind (P) in N_Subexpr loop
             P := Parent (P);
          end loop;
+
+         if Present (Iter_Spec) then
+            Freeze_Before (P, Etype (Name (Iter_Spec)));
+         end if;
 
          Freeze_Before (P, Etype (Var));
       end;
@@ -11363,7 +11560,7 @@ package body Exp_Ch4 is
             then
                Par := Parent (Par);
 
-               --  Any other case is not what we are looking for
+            --  Any other case is not what we are looking for
 
             else
                return False;
@@ -11399,7 +11596,7 @@ package body Exp_Ch4 is
 
       --  Local variables
 
-      Pref     : constant Node_Id := Prefix (N);
+      Pref : constant Node_Id := Prefix (N);
 
    --  Start of processing for Expand_N_Slice
 
@@ -11425,7 +11622,7 @@ package body Exp_Ch4 is
       --       situation correctly in the assignment statement expansion).
 
       --    2. Prefix of indexed component (the slide is optimized away in this
-      --       case, see the start of Expand_N_Slice.)
+      --       case, see the start of Expand_N_Indexed_Component.)
 
       --    3. Object renaming declaration, since we want the name of the
       --       slice, not the value.
@@ -12019,9 +12216,8 @@ package body Exp_Ch4 is
                --  unchecked conversion to the target fixed-point type.
 
                Conv :=
-                 Make_Unchecked_Type_Conversion (Loc,
-                   Subtype_Mark => New_Occurrence_Of (Target_Type, Loc),
-                   Expression   => New_Occurrence_Of (Expr_Id, Loc));
+                 Unchecked_Convert_To
+                   (Target_Type, New_Occurrence_Of (Expr_Id, Loc));
             end;
 
          --  All other conversions
@@ -12273,6 +12469,41 @@ package body Exp_Ch4 is
          end;
       end if;
 
+      --  If the conversion is from Universal_Integer and requires an overflow
+      --  check, try to do an intermediate conversion to a narrower type first
+      --  without overflow check, in order to avoid doing the overflow check
+      --  in Universal_Integer, which can be a very large type.
+
+      if Operand_Type = Universal_Integer and then Do_Overflow_Check (N) then
+         declare
+            Lo, Hi, Siz : Uint;
+            OK          : Boolean;
+            Typ         : Entity_Id;
+
+         begin
+            Determine_Range (Operand, OK, Lo, Hi, Assume_Valid => True);
+
+            if OK then
+               Siz := Get_Size_For_Range (Lo, Hi);
+
+               --  We use the base type instead of the first subtype because
+               --  overflow checks are done in the base type, so this avoids
+               --  the need for useless conversions.
+
+               if Siz < System_Max_Integer_Size then
+                  Typ := Etype (Integer_Type_For (Siz, Uns => False));
+
+                  Convert_To_And_Rewrite (Typ, Operand);
+                  Analyze_And_Resolve
+                    (Operand, Typ, Suppress => Overflow_Check);
+
+                  Analyze_And_Resolve (N, Target_Type);
+                  goto Done;
+               end if;
+            end if;
+         end;
+      end if;
+
       --  Do validity check if validity checking operands
 
       if Validity_Checks_On and Validity_Check_Operands then
@@ -12329,6 +12560,7 @@ package body Exp_Ch4 is
            and then Ekind (Etype (Operand_Acc)) = E_Anonymous_Access_Type
            and then (Nkind (Original_Node (N)) /= N_Attribute_Reference
                       or else Attribute_Name (Original_Node (N)) = Name_Access)
+           and then not No_Dynamic_Accessibility_Checks_Enabled (N)
          then
             if not Comes_From_Source (N)
               and then Nkind (Parent (N)) in N_Function_Call
@@ -12350,10 +12582,16 @@ package body Exp_Ch4 is
          --  an instantiation, otherwise the conversion will already have been
          --  rejected as illegal.
 
-         --  Note: warnings are issued by the analyzer for the instance cases
+         --  Note: warnings are issued by the analyzer for the instance cases,
+         --  and, since we are late in expansion, a check is performed to
+         --  verify that neither the target type nor the operand type are
+         --  internally generated - as this can lead to spurious errors when,
+         --  for example, the operand type is a result of BIP expansion.
 
          elsif In_Instance_Body
            and then Statically_Deeper_Relation_Applies (Target_Type)
+           and then not Is_Internal (Target_Type)
+           and then not Is_Internal (Operand_Type)
            and then
              Type_Access_Level (Operand_Type) > Type_Access_Level (Target_Type)
          then
@@ -12506,10 +12744,7 @@ package body Exp_Ch4 is
                   Conv : Node_Id;
                begin
                   Make_Tag_Check (Class_Wide_Type (Actual_Targ_Typ));
-                  Conv :=
-                    Make_Unchecked_Type_Conversion (Loc,
-                      Subtype_Mark => New_Occurrence_Of (Target_Type, Loc),
-                      Expression   => Relocate_Node (Expression (N)));
+                  Conv := Unchecked_Convert_To (Target_Type, Expression (N));
                   Rewrite (N, Conv);
                   Analyze_And_Resolve (N, Target_Type);
                end;
@@ -12589,6 +12824,13 @@ package body Exp_Ch4 is
          if Is_Constrained (Target_Type) then
             Apply_Length_Check (Operand, Target_Type);
          else
+            --  If the object has an unconstrained array subtype with fixed
+            --  lower bound, then sliding to that bound may be needed.
+
+            if Is_Fixed_Lower_Bound_Array_Subtype (Target_Type) then
+               Expand_Sliding_Conversion (Operand, Target_Type);
+            end if;
+
             Apply_Range_Check (Operand, Target_Type);
          end if;
 
@@ -12667,17 +12909,7 @@ package body Exp_Ch4 is
 
       --  At this stage, either the conversion node has been transformed into
       --  some other equivalent expression, or left as a conversion that can be
-      --  handled by Gigi, in the following cases:
-
-      --    Conversions with no change of representation or type
-
-      --    Numeric conversions involving integer, floating- and fixed-point
-      --    values. Fixed-point values are allowed only if Conversion_OK is
-      --    set, i.e. if the fixed-point values are to be treated as integers.
-
-      --  No other conversions should be passed to Gigi
-
-      --  Check: are these rules stated in sinfo??? if so, why restate here???
+      --  handled by Gigi.
 
       --  The only remaining step is to generate a range check if we still have
       --  a type conversion at this stage and Do_Range_Check is set. Note that
@@ -12742,7 +12974,16 @@ package body Exp_Ch4 is
       --  guard is necessary to prevent infinite recursions when we generate
       --  internal conversions for the purpose of checking predicates.
 
-      if Predicate_Enabled (Target_Type)
+      --  A view conversion of a tagged object is an object and can appear
+      --  in an assignment context, in which case no predicate check applies
+      --  to the now-dead value.
+
+      if Nkind (Parent (N)) = N_Assignment_Statement
+        and then N = Name (Parent (N))
+      then
+         null;
+
+      elsif Predicate_Enabled (Target_Type)
         and then Target_Type /= Operand_Type
         and then Comes_From_Source (N)
       then
@@ -12796,14 +13037,7 @@ package body Exp_Ch4 is
       --  an Assignment_OK indication which must be propagated to the operand.
 
       if Operand_Type = Target_Type then
-
-         --  Code duplicates Expand_N_Unchecked_Expression above, factor???
-
-         if Assignment_OK (N) then
-            Set_Assignment_OK (Operand);
-         end if;
-
-         Rewrite (N, Relocate_Node (Operand));
+         Expand_N_Unchecked_Expression (N);
          return;
       end if;
 
@@ -12833,9 +13067,6 @@ package body Exp_Ch4 is
       if Safe_Unchecked_Type_Conversion (N) then
          return;
       end if;
-
-      --  Otherwise force evaluation unless Assignment_OK flag is set (this
-      --  flag indicates ??? More comments needed here)
 
       if Assignment_OK (N) then
          null;
@@ -13331,83 +13562,53 @@ package body Exp_Ch4 is
       end if;
    end Fixup_Universal_Fixed_Operation;
 
-   ---------------------------------
-   -- Has_Inferable_Discriminants --
-   ---------------------------------
+   ------------------------
+   -- Get_Size_For_Range --
+   ------------------------
 
-   function Has_Inferable_Discriminants (N : Node_Id) return Boolean is
+   function Get_Size_For_Range (Lo, Hi : Uint) return Uint is
 
-      function Prefix_Is_Formal_Parameter (N : Node_Id) return Boolean;
-      --  Determines whether the left-most prefix of a selected component is a
-      --  formal parameter in a subprogram. Assumes N is a selected component.
+      function Is_OK_For_Range (Siz : Uint) return Boolean;
+      --  Return True if a signed integer with given size can cover Lo .. Hi
 
-      --------------------------------
-      -- Prefix_Is_Formal_Parameter --
-      --------------------------------
+      --------------------------
+      -- Is_OK_For_Range --
+      --------------------------
 
-      function Prefix_Is_Formal_Parameter (N : Node_Id) return Boolean is
-         Sel_Comp : Node_Id;
+      function Is_OK_For_Range (Siz : Uint) return Boolean is
+         B : constant Uint := Uint_2 ** (Siz - 1);
 
       begin
-         --  Move to the left-most prefix by climbing up the tree
+         --  Test B = 2 ** (size - 1) (can accommodate -B .. +(B - 1))
 
-         Sel_Comp := N;
-         while Present (Parent (Sel_Comp))
-           and then Nkind (Parent (Sel_Comp)) = N_Selected_Component
-         loop
-            Sel_Comp := Parent (Sel_Comp);
-         end loop;
-
-         return Is_Formal (Entity (Prefix (Sel_Comp)));
-      end Prefix_Is_Formal_Parameter;
-
-   --  Start of processing for Has_Inferable_Discriminants
+         return Lo >= -B and then Hi >= -B and then Lo < B and then Hi < B;
+      end Is_OK_For_Range;
 
    begin
-      --  For selected components, the subtype of the selector must be a
-      --  constrained Unchecked_Union. If the component is subject to a
-      --  per-object constraint, then the enclosing object must have inferable
-      --  discriminants.
+      --  This is (almost always) the size of Integer
 
-      if Nkind (N) = N_Selected_Component then
-         if Has_Per_Object_Constraint (Entity (Selector_Name (N))) then
+      if Is_OK_For_Range (Uint_32) then
+         return Uint_32;
 
-            --  A small hack. If we have a per-object constrained selected
-            --  component of a formal parameter, return True since we do not
-            --  know the actual parameter association yet.
+      --  Check 63
 
-            if Prefix_Is_Formal_Parameter (N) then
-               return True;
+      elsif Is_OK_For_Range (Uint_63) then
+         return Uint_63;
 
-            --  Otherwise, check the enclosing object and the selector
+      --  This is (almost always) the size of Long_Long_Integer
 
-            else
-               return Has_Inferable_Discriminants (Prefix (N))
-                 and then Has_Inferable_Discriminants (Selector_Name (N));
-            end if;
+      elsif Is_OK_For_Range (Uint_64) then
+         return Uint_64;
 
-         --  The call to Has_Inferable_Discriminants will determine whether
-         --  the selector has a constrained Unchecked_Union nominal type.
+      --  Check 127
 
-         else
-            return Has_Inferable_Discriminants (Selector_Name (N));
-         end if;
-
-      --  A qualified expression has inferable discriminants if its subtype
-      --  mark is a constrained Unchecked_Union subtype.
-
-      elsif Nkind (N) = N_Qualified_Expression then
-         return Is_Unchecked_Union (Etype (Subtype_Mark (N)))
-           and then Is_Constrained (Etype (Subtype_Mark (N)));
-
-      --  For all other names, it is sufficient to have a constrained
-      --  Unchecked_Union nominal subtype.
+      elsif Is_OK_For_Range (Uint_127) then
+         return Uint_127;
 
       else
-         return Is_Unchecked_Union (Base_Type (Etype (N)))
-           and then Is_Constrained (Etype (N));
+         return Uint_128;
       end if;
-   end Has_Inferable_Discriminants;
+   end Get_Size_For_Range;
 
    -------------------------------
    -- Insert_Dereference_Action --
@@ -13721,9 +13922,6 @@ package body Exp_Ch4 is
    --  Note that since we are essentially doing this expansion by hand, we
    --  do not need to generate an actual or formal generic part, just the
    --  instantiated function itself.
-
-   --  Perhaps we could have the actual generic available in the run-time,
-   --  obtained by rtsfind, and actually expand a real instantiation ???
 
    function Make_Array_Comparison_Op
      (Typ : Entity_Id;
@@ -14114,9 +14312,15 @@ package body Exp_Ch4 is
 
    function Minimized_Eliminated_Overflow_Check (N : Node_Id) return Boolean is
    begin
+      --  The MINIMIZED mode operates in Long_Long_Integer so we cannot use it
+      --  if the type of the expression is already larger.
+
       return
         Is_Signed_Integer_Type (Etype (N))
-          and then Overflow_Check_Mode in Minimized_Or_Eliminated;
+          and then Overflow_Check_Mode in Minimized_Or_Eliminated
+          and then not (Overflow_Check_Mode = Minimized
+                         and then
+                        Esize (Etype (N)) > Standard_Long_Long_Integer_Size);
    end Minimized_Eliminated_Overflow_Check;
 
    ----------------------------
@@ -14131,58 +14335,6 @@ package body Exp_Ch4 is
       R      : constant Node_Id   := Right_Opnd (N);
       Typ    : constant Entity_Id := Etype (R);
       Tsiz   : constant Uint      := RM_Size (Typ);
-
-      function Get_Size_For_Range (Lo, Hi : Uint) return Uint;
-      --  Return the size of a small signed integer type covering Lo .. Hi.
-      --  The important thing is to return a size lower than that of Typ.
-
-      ------------------------
-      -- Get_Size_For_Range --
-      ------------------------
-
-      function Get_Size_For_Range (Lo, Hi : Uint) return Uint is
-
-         function Is_OK_For_Range (Siz : Uint) return Boolean;
-         --  Return True if a signed integer with given size can cover Lo .. Hi
-
-         --------------------------
-         -- Is_OK_For_Range --
-         --------------------------
-
-         function Is_OK_For_Range (Siz : Uint) return Boolean is
-            B : constant Uint := Uint_2 ** (Siz - 1);
-
-         begin
-            --  Test B = 2 ** (size - 1) (can accommodate -B .. +(B - 1))
-
-            return Lo >= -B and then Hi >= -B and then Lo < B and then Hi < B;
-         end Is_OK_For_Range;
-
-      begin
-         --  This is (almost always) the size of Integer
-
-         if Is_OK_For_Range (Uint_32) then
-            return Uint_32;
-
-         --  If the size of Typ is 64 then check 63
-
-         elsif Tsiz = Uint_64 and then Is_OK_For_Range (Uint_63) then
-            return Uint_63;
-
-         --  This is (almost always) the size of Long_Long_Integer
-
-         elsif Is_OK_For_Range (Uint_64) then
-            return Uint_64;
-
-         --  If the size of Typ is 128 then check 127
-
-         elsif Tsiz = Uint_128 and then Is_OK_For_Range (Uint_127) then
-            return Uint_127;
-
-         else
-            return Uint_128;
-         end if;
-      end Get_Size_For_Range;
 
       --  Local variables
 
@@ -15026,7 +15178,17 @@ package body Exp_Ch4 is
       --       Hook := null;
       --    end if;
 
+      --  Note that the value returned by Find_Hook_Context may be an operator
+      --  node, which is not a list member. We must locate the proper node in
+      --  in the tree after which to insert the finalization code.
+
       else
+         while not Is_List_Member (Fin_Context) loop
+            Fin_Context := Parent (Fin_Context);
+         end loop;
+
+         pragma Assert (Present (Fin_Context));
+
          Insert_Action_After (Fin_Context,
            Make_Implicit_If_Statement (Obj_Decl,
              Condition =>
@@ -15247,7 +15409,7 @@ package body Exp_Ch4 is
           Selector_Name =>
             New_Occurrence_Of (First_Tag_Component (Left_Type), Loc));
 
-      if Is_Class_Wide_Type (Right_Type) or else Is_Interface (Left_Type) then
+      if Is_Class_Wide_Type (Right_Type) then
 
          --  No need to issue a run-time check if we statically know that the
          --  result of this membership test is always true. For example,

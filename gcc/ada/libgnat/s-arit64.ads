@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2020, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -92,5 +92,12 @@ package System.Arith_64 is
       Q, R    : out Int64;
       Round   : Boolean) renames Double_Divide64;
    --  Renamed procedure to preserve compatibility with earlier versions
+
+private
+   --  Make it callable from strub contexts.
+   --  There is a matching setting in trans.c,
+   --  for calls issued by Gigi.
+   pragma Machine_Attribute (Multiply_With_Ovflo_Check64,
+                             "strub", "callable");
 
 end System.Arith_64;

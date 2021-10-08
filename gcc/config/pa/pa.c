@@ -541,6 +541,16 @@ pa_option_override (void)
       write_symbols = NO_DEBUG;
     }
 
+  if (TARGET_64BIT && TARGET_HPUX)
+    {
+      /* DWARF5 is not supported by gdb.  Don't emit DWARF5 unless
+	 specifically selected.  */
+      if (!global_options_set.x_dwarf_strict)
+	dwarf_strict = 1;
+      if (!global_options_set.x_dwarf_version)
+	dwarf_version = 4;
+    }
+
   /* We only support the "big PIC" model now.  And we always generate PIC
      code when in 64bit mode.  */
   if (flag_pic == 1 || TARGET_64BIT)
@@ -9080,9 +9090,7 @@ pa_asm_output_aligned_common (FILE *stream,
   max_common_align = TARGET_64BIT ? 128 : (size >= 4096 ? 256 : 64);
   if (align > max_common_align)
     {
-      warning (0, "alignment (%u) for %s exceeds maximum alignment "
-	       "for global common data.  Using %u",
-	       align / BITS_PER_UNIT, name, max_common_align / BITS_PER_UNIT);
+      /* Alignment exceeds maximum alignment for global common data.  */
       align = max_common_align;
     }
 

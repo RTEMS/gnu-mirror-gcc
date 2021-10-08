@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---            Copyright (C) 2020, Free Software Foundation, Inc.            --
+--            Copyright (C) 2020-2021, Free Software Foundation, Inc.       --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -80,5 +80,12 @@ package System.Arith_128 is
    --  quotient and remainder from a truncating division. If Round is True,
    --  then Q is the rounded quotient. The remainder R is not affected by the
    --  setting of the Round flag.
+
+private
+   --  Make it callable from strub contexts.
+   --  There is a matching setting in trans.c,
+   --  for calls issued by Gigi.
+   pragma Machine_Attribute (Multiply_With_Ovflo_Check128,
+                             "strub", "callable");
 
 end System.Arith_128;

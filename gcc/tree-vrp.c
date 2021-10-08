@@ -21,51 +21,34 @@ along with GCC; see the file COPYING3.  If not see
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "backend.h"
-#include "insn-codes.h"
-#include "rtl.h"
+#include "basic-block.h"
+#include "bitmap.h"
+#include "sbitmap.h"
+#include "options.h"
+#include "dominance.h"
+#include "function.h"
+#include "cfg.h"
 #include "tree.h"
 #include "gimple.h"
-#include "cfghooks.h"
 #include "tree-pass.h"
 #include "ssa.h"
-#include "optabs-tree.h"
 #include "gimple-pretty-print.h"
-#include "flags.h"
 #include "fold-const.h"
-#include "stor-layout.h"
-#include "calls.h"
 #include "cfganal.h"
-#include "gimple-fold.h"
-#include "tree-eh.h"
 #include "gimple-iterator.h"
-#include "gimple-walk.h"
 #include "tree-cfg.h"
 #include "tree-ssa-loop-manip.h"
 #include "tree-ssa-loop-niter.h"
-#include "tree-ssa-loop.h"
 #include "tree-into-ssa.h"
-#include "tree-ssa.h"
 #include "cfgloop.h"
 #include "tree-scalar-evolution.h"
 #include "tree-ssa-propagate.h"
-#include "tree-chrec.h"
-#include "tree-ssa-threadupdate.h"
-#include "tree-ssa-scopedtables.h"
 #include "tree-ssa-threadedge.h"
-#include "omp-general.h"
-#include "target.h"
-#include "case-cfn-macros.h"
-#include "alloc-pool.h"
 #include "domwalk.h"
-#include "tree-cfgcleanup.h"
-#include "stringpool.h"
-#include "attribs.h"
 #include "vr-values.h"
-#include "builtins.h"
-#include "range-op.h"
-#include "value-range-equiv.h"
 #include "gimple-array-bounds.h"
+#include "gimple-range.h"
+#include "gimple-range-path.h"
 
 /* Set of SSA names found live during the RPO traversal of the function
    for still active basic-blocks.  */
@@ -228,7 +211,7 @@ intersect_range_with_nonzero_bits (enum value_range_kind vr_type,
 	  vr_type = VR_RANGE;
 	}
     }
-  if (vr_type == VR_RANGE)
+  if (vr_type == VR_RANGE || vr_type == VR_VARYING)
     {
       *max = wi::round_down_for_mask (*max, nonzero_bits);
 
@@ -406,10 +389,10 @@ compare_values_warnv (tree val1, tree val2, bool *strict_overflow_p)
 	return -2;
 
       if (strict_overflow_p != NULL
-	  /* Symbolic range building sets TREE_NO_WARNING to declare
+	  /* Symbolic range building sets the no-warning bit to declare
 	     that overflow doesn't happen.  */
-	  && (!inv1 || !TREE_NO_WARNING (val1))
-	  && (!inv2 || !TREE_NO_WARNING (val2)))
+	  && (!inv1 || !warning_suppressed_p (val1, OPT_Woverflow))
+	  && (!inv2 || !warning_suppressed_p (val2, OPT_Woverflow)))
 	*strict_overflow_p = true;
 
       if (!inv1)
@@ -432,10 +415,10 @@ compare_values_warnv (tree val1, tree val2, bool *strict_overflow_p)
 	return -2;
 
       if (strict_overflow_p != NULL
-	  /* Symbolic range building sets TREE_NO_WARNING to declare
+	  /* Symbolic range building sets the no-warning bit to declare
 	     that overflow doesn't happen.  */
-	  && (!sym1 || !TREE_NO_WARNING (val1))
-	  && (!sym2 || !TREE_NO_WARNING (val2)))
+	  && (!sym1 || !warning_suppressed_p (val1, OPT_Woverflow))
+	  && (!sym2 || !warning_suppressed_p (val2, OPT_Woverflow)))
 	*strict_overflow_p = true;
 
       const signop sgn = TYPE_SIGN (TREE_TYPE (val1));
@@ -1484,13 +1467,13 @@ register_edge_assert_for_2 (tree name, edge e,
 	}
 
       /* Extract NAME2 from the (optional) sign-changing cast.  */
-      if (gimple_assign_cast_p (def_stmt))
+      if (gassign *ass = dyn_cast <gassign *> (def_stmt))
 	{
-	  if (CONVERT_EXPR_CODE_P (gimple_assign_rhs_code (def_stmt))
-	      && ! TYPE_UNSIGNED (TREE_TYPE (gimple_assign_rhs1 (def_stmt)))
-	      && (TYPE_PRECISION (gimple_expr_type (def_stmt))
-		  == TYPE_PRECISION (TREE_TYPE (gimple_assign_rhs1 (def_stmt)))))
-	    name3 = gimple_assign_rhs1 (def_stmt);
+	  if (CONVERT_EXPR_CODE_P (gimple_assign_rhs_code (ass))
+	      && ! TYPE_UNSIGNED (TREE_TYPE (gimple_assign_rhs1 (ass)))
+	      && (TYPE_PRECISION (TREE_TYPE (gimple_assign_lhs (ass)))
+		  == TYPE_PRECISION (TREE_TYPE (gimple_assign_rhs1 (ass)))))
+	    name3 = gimple_assign_rhs1 (ass);
 	}
 
       /* If name3 is used later, create an ASSERT_EXPR for it.  */
@@ -1717,7 +1700,7 @@ register_edge_assert_for_2 (tree name, edge e,
          simply register the same assert for it.  */
       if (CONVERT_EXPR_CODE_P (rhs_code))
 	{
-	  wide_int rmin, rmax;
+	  value_range vr;
 	  tree rhs1 = gimple_assign_rhs1 (def_stmt);
 	  if (INTEGRAL_TYPE_P (TREE_TYPE (rhs1))
 	      && TREE_CODE (rhs1) == SSA_NAME
@@ -1739,13 +1722,14 @@ register_edge_assert_for_2 (tree name, edge e,
 	      && int_fits_type_p (val, TREE_TYPE (rhs1))
 	      && ((TYPE_PRECISION (TREE_TYPE (name))
 		   > TYPE_PRECISION (TREE_TYPE (rhs1)))
-		  || (get_range_info (rhs1, &rmin, &rmax) == VR_RANGE
+		  || ((get_range_query (cfun)->range_of_expr (vr, rhs1)
+		       && vr.kind () == VR_RANGE)
 		      && wi::fits_to_tree_p
-			   (widest_int::from (rmin,
+			   (widest_int::from (vr.lower_bound (),
 					      TYPE_SIGN (TREE_TYPE (rhs1))),
 			    TREE_TYPE (name))
 		      && wi::fits_to_tree_p
-			   (widest_int::from (rmax,
+			   (widest_int::from (vr.upper_bound (),
 					      TYPE_SIGN (TREE_TYPE (rhs1))),
 			    TREE_TYPE (name)))))
 	    add_assert_info (asserts, rhs1, rhs1,
@@ -2344,37 +2328,6 @@ stmt_interesting_for_vrp (gimple *stmt)
 
   return false;
 }
-
-
-/* Return the LHS of any ASSERT_EXPR where OP appears as the first
-   argument to the ASSERT_EXPR and in which the ASSERT_EXPR dominates
-   BB.  If no such ASSERT_EXPR is found, return OP.  */
-
-static tree
-lhs_of_dominating_assert (tree op, basic_block bb, gimple *stmt)
-{
-  imm_use_iterator imm_iter;
-  gimple *use_stmt;
-  use_operand_p use_p;
-
-  if (TREE_CODE (op) == SSA_NAME)
-    {
-      FOR_EACH_IMM_USE_FAST (use_p, imm_iter, op)
-	{
-	  use_stmt = USE_STMT (use_p);
-	  if (use_stmt != stmt
-	      && gimple_assign_single_p (use_stmt)
-	      && TREE_CODE (gimple_assign_rhs1 (use_stmt)) == ASSERT_EXPR
-	      && TREE_OPERAND (gimple_assign_rhs1 (use_stmt), 0) == op
-	      && dominated_by_p (CDI_DOMINATORS, bb, gimple_bb (use_stmt)))
-	    return gimple_assign_lhs (use_stmt);
-	}
-    }
-  return op;
-}
-
-/* A hack.  */
-static class vr_values *x_vr_values;
 
 /* Searches the case label vector VEC for the index *IDX of the CASE_LABEL
    that includes the value VAL.  The search is restricted to the range
@@ -3339,8 +3292,7 @@ vrp_asserts::find_assert_locations (void)
   /* Pre-seed loop latch liveness from loop header PHI nodes.  Due to
      the order we compute liveness and insert asserts we otherwise
      fail to insert asserts into the loop latch.  */
-  loop_p loop;
-  FOR_EACH_LOOP (loop, 0)
+  for (auto loop : loops_list (cfun, 0))
     {
       i = loop->latch->index;
       unsigned int j = single_succ_edge (loop->latch)->dest_idx;
@@ -4047,7 +3999,7 @@ vrp_prop::finalize ()
   if (dump_file)
     {
       fprintf (dump_file, "\nValue ranges after VRP:\n\n");
-      m_vr_values->dump_all_value_ranges (dump_file);
+      m_vr_values->dump (dump_file);
       fprintf (dump_file, "\n");
     }
 
@@ -4059,7 +4011,7 @@ vrp_prop::finalize ()
 	continue;
 
       const value_range_equiv *vr = m_vr_values->get_value_range (name);
-      if (!name || !vr->constant_p ())
+      if (!name || vr->varying_p () || !vr->constant_p ())
 	continue;
 
       if (POINTER_TYPE_P (TREE_TYPE (name))
@@ -4121,7 +4073,7 @@ vrp_folder::fold_predicate_in (gimple_stmt_iterator *si)
   if (val)
     {
       if (assignment_p)
-        val = fold_convert (gimple_expr_type (stmt), val);
+	val = fold_convert (TREE_TYPE (gimple_assign_lhs (stmt)), val);
 
       if (dump_file)
 	{
@@ -4163,214 +4115,6 @@ vrp_folder::fold_stmt (gimple_stmt_iterator *si)
   return simplifier.simplify (si);
 }
 
-/* Blocks which have more than one predecessor and more than
-   one successor present jump threading opportunities, i.e.,
-   when the block is reached from a specific predecessor, we
-   may be able to determine which of the outgoing edges will
-   be traversed.  When this optimization applies, we are able
-   to avoid conditionals at runtime and we may expose secondary
-   optimization opportunities.
-
-   This class is effectively a driver for the generic jump
-   threading code.  It basically just presents the generic code
-   with edges that may be suitable for jump threading.
-
-   Unlike DOM, we do not iterate VRP if jump threading was successful.
-   While iterating may expose new opportunities for VRP, it is expected
-   those opportunities would be very limited and the compile time cost
-   to expose those opportunities would be significant.
-
-   As jump threading opportunities are discovered, they are registered
-   for later realization.  */
-
-class vrp_jump_threader : public dom_walker
-{
-public:
-  vrp_jump_threader (struct function *, vr_values *);
-  ~vrp_jump_threader ();
-
-  void thread_jumps ()
-  {
-    walk (m_fun->cfg->x_entry_block_ptr);
-  }
-
-private:
-  static tree simplify_stmt (gimple *stmt, gimple *within_stmt,
-			     avail_exprs_stack *, basic_block);
-  virtual edge before_dom_children (basic_block);
-  virtual void after_dom_children (basic_block);
-
-  function *m_fun;
-  vr_values *m_vr_values;
-  const_and_copies *m_const_and_copies;
-  avail_exprs_stack *m_avail_exprs_stack;
-  hash_table<expr_elt_hasher> *m_avail_exprs;
-  gcond *m_dummy_cond;
-};
-
-vrp_jump_threader::vrp_jump_threader (struct function *fun, vr_values *v)
-  : dom_walker (CDI_DOMINATORS, REACHABLE_BLOCKS)
-{
-  /* Ugh.  When substituting values earlier in this pass we can wipe
-     the dominance information.  So rebuild the dominator information
-     as we need it within the jump threading code.  */
-  calculate_dominance_info (CDI_DOMINATORS);
-
-  /* We do not allow VRP information to be used for jump threading
-     across a back edge in the CFG.  Otherwise it becomes too
-     difficult to avoid eliminating loop exit tests.  Of course
-     EDGE_DFS_BACK is not accurate at this time so we have to
-     recompute it.  */
-  mark_dfs_back_edges ();
-
-  /* Allocate our unwinder stack to unwind any temporary equivalences
-     that might be recorded.  */
-  m_const_and_copies = new const_and_copies ();
-
-  m_dummy_cond = NULL;
-  m_fun = fun;
-  m_vr_values = v;
-  m_avail_exprs = new hash_table<expr_elt_hasher> (1024);
-  m_avail_exprs_stack = new avail_exprs_stack (m_avail_exprs);
-}
-
-vrp_jump_threader::~vrp_jump_threader ()
-{
-  /* We do not actually update the CFG or SSA graphs at this point as
-     ASSERT_EXPRs are still in the IL and cfg cleanup code does not
-     yet handle ASSERT_EXPRs gracefully.  */
-  delete m_const_and_copies;
-  delete m_avail_exprs;
-  delete m_avail_exprs_stack;
-}
-
-/* Called before processing dominator children of BB.  We want to look
-   at ASSERT_EXPRs and record information from them in the appropriate
-   tables.
-
-   We could look at other statements here.  It's not seen as likely
-   to significantly increase the jump threads we discover.  */
-
-edge
-vrp_jump_threader::before_dom_children (basic_block bb)
-{
-  gimple_stmt_iterator gsi;
-
-  m_avail_exprs_stack->push_marker ();
-  m_const_and_copies->push_marker ();
-  for (gsi = gsi_start_nondebug_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
-    {
-      gimple *stmt = gsi_stmt (gsi);
-      if (gimple_assign_single_p (stmt)
-         && TREE_CODE (gimple_assign_rhs1 (stmt)) == ASSERT_EXPR)
-	{
-	  tree rhs1 = gimple_assign_rhs1 (stmt);
-	  tree cond = TREE_OPERAND (rhs1, 1);
-	  tree inverted = invert_truthvalue (cond);
-	  vec<cond_equivalence> p;
-	  p.create (3);
-	  record_conditions (&p, cond, inverted);
-	  for (unsigned int i = 0; i < p.length (); i++)
-	    m_avail_exprs_stack->record_cond (&p[i]);
-
-	  tree lhs = gimple_assign_lhs (stmt);
-	  m_const_and_copies->record_const_or_copy (lhs,
-						    TREE_OPERAND (rhs1, 0));
-	  p.release ();
-	  continue;
-	}
-      break;
-    }
-  return NULL;
-}
-
-/* A trivial wrapper so that we can present the generic jump threading
-   code with a simple API for simplifying statements.  STMT is the
-   statement we want to simplify, WITHIN_STMT provides the location
-   for any overflow warnings.
-
-   ?? This should be cleaned up.  There's a virtually identical copy
-   of this function in tree-ssa-dom.c.  */
-
-tree
-vrp_jump_threader::simplify_stmt (gimple *stmt,
-				  gimple *within_stmt,
-				  avail_exprs_stack *avail_exprs_stack,
-				  basic_block bb)
-{
-  /* First see if the conditional is in the hash table.  */
-  tree cached_lhs = avail_exprs_stack->lookup_avail_expr (stmt, false, true);
-  if (cached_lhs && is_gimple_min_invariant (cached_lhs))
-    return cached_lhs;
-
-  class vr_values *vr_values = x_vr_values;
-  if (gcond *cond_stmt = dyn_cast <gcond *> (stmt))
-    {
-      tree op0 = gimple_cond_lhs (cond_stmt);
-      op0 = lhs_of_dominating_assert (op0, bb, stmt);
-
-      tree op1 = gimple_cond_rhs (cond_stmt);
-      op1 = lhs_of_dominating_assert (op1, bb, stmt);
-
-      simplify_using_ranges simplifier (vr_values);
-      return simplifier.vrp_evaluate_conditional (gimple_cond_code (cond_stmt),
-						  op0, op1, within_stmt);
-    }
-
-  if (gswitch *switch_stmt = dyn_cast <gswitch *> (stmt))
-    {
-      tree op = gimple_switch_index (switch_stmt);
-      if (TREE_CODE (op) != SSA_NAME)
-	return NULL_TREE;
-
-      op = lhs_of_dominating_assert (op, bb, stmt);
-
-      const value_range_equiv *vr = vr_values->get_value_range (op);
-      return find_case_label_range (switch_stmt, vr);
-    }
-
-  if (gassign *assign_stmt = dyn_cast <gassign *> (stmt))
-    {
-      tree lhs = gimple_assign_lhs (assign_stmt);
-      if (TREE_CODE (lhs) == SSA_NAME
-	  && (INTEGRAL_TYPE_P (TREE_TYPE (lhs))
-	      || POINTER_TYPE_P (TREE_TYPE (lhs)))
-	  && stmt_interesting_for_vrp (stmt))
-	{
-	  edge dummy_e;
-	  tree dummy_tree;
-	  value_range_equiv new_vr;
-	  vr_values->extract_range_from_stmt (stmt, &dummy_e,
-					      &dummy_tree, &new_vr);
-	  tree singleton;
-	  if (new_vr.singleton_p (&singleton))
-	    return singleton;
-	}
-    }
-
-  return NULL_TREE;
-}
-
-/* Called after processing dominator children of BB.  This is where we
-   actually call into the threader.  */
-void
-vrp_jump_threader::after_dom_children (basic_block bb)
-{
-  if (!m_dummy_cond)
-    m_dummy_cond = gimple_build_cond (NE_EXPR,
-				      integer_zero_node, integer_zero_node,
-				      NULL, NULL);
-
-  x_vr_values = m_vr_values;
-  thread_outgoing_edges (bb, m_dummy_cond, m_const_and_copies,
-			 m_avail_exprs_stack, NULL,
-			 simplify_stmt);
-  x_vr_values = NULL;
-
-  m_avail_exprs_stack->pop_to_marker ();
-  m_const_and_copies->pop_to_marker ();
-}
-
 /* STMT is a conditional at the end of a basic block.
 
    If the conditional is of the form SSA_NAME op constant and the SSA_NAME
@@ -4379,7 +4123,7 @@ vrp_jump_threader::after_dom_children (basic_block bb)
    subsequent passes.  */
 
 static void
-vrp_simplify_cond_using_ranges (vr_values *query, gcond *stmt)
+vrp_simplify_cond_using_ranges (range_query *query, gcond *stmt)
 {
   tree op0 = gimple_cond_lhs (stmt);
   tree op1 = gimple_cond_rhs (stmt);
@@ -4443,6 +4187,27 @@ vrp_simplify_cond_using_ranges (vr_values *query, gcond *stmt)
     }
 }
 
+/* A comparison of an SSA_NAME against a constant where the SSA_NAME
+   was set by a type conversion can often be rewritten to use the RHS
+   of the type conversion.  Do this optimization for all conditionals
+   in FUN.
+
+   However, doing so inhibits jump threading through the comparison.
+   So that transformation is not performed until after jump threading
+   is complete.  */
+
+static void
+simplify_casted_conds (function *fun, range_query *query)
+{
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, fun)
+    {
+      gimple *last = last_stmt (bb);
+      if (last && gimple_code (last) == GIMPLE_COND)
+	vrp_simplify_cond_using_ranges (query, as_a <gcond *> (last));
+    }
+}
+
 /* Main entry point to VRP (Value Range Propagation).  This pass is
    loosely based on J. R. C. Patterson, ``Accurate Static Branch
    Prediction by Value Range Propagation,'' in SIGPLAN Conference on
@@ -4500,8 +4265,6 @@ execute_vrp (struct function *fun, bool warn_array_bounds_p)
   vrp_asserts assert_engine (fun);
   assert_engine.insert_range_assertions ();
 
-  threadedge_initialize_values ();
-
   /* For visiting PHI nodes we need EDGE_DFS_BACK computed.  */
   mark_dfs_back_edges ();
 
@@ -4536,26 +4299,7 @@ execute_vrp (struct function *fun, bool warn_array_bounds_p)
       array_checker.check ();
     }
 
-  /* We must identify jump threading opportunities before we release
-     the datastructures built by VRP.  */
-  vrp_jump_threader threader (fun, &vrp_vr_values);
-  threader.thread_jumps ();
-
-  /* A comparison of an SSA_NAME against a constant where the SSA_NAME
-     was set by a type conversion can often be rewritten to use the
-     RHS of the type conversion.
-
-     However, doing so inhibits jump threading through the comparison.
-     So that transformation is not performed until after jump threading
-     is complete.  */
-  basic_block bb;
-  FOR_EACH_BB_FN (bb, fun)
-    {
-      gimple *last = last_stmt (bb);
-      if (last && gimple_code (last) == GIMPLE_COND)
-	vrp_simplify_cond_using_ranges (&vrp_vr_values,
-					as_a <gcond *> (last));
-    }
+  simplify_casted_conds (fun, &vrp_vr_values);
 
   free_numbers_of_iterations_estimates (fun);
 
@@ -4563,23 +4307,6 @@ execute_vrp (struct function *fun, bool warn_array_bounds_p)
      as finalizing jump threads calls the CFG cleanup code which
      does not properly handle ASSERT_EXPRs.  */
   assert_engine.remove_range_assertions ();
-
-  /* If we exposed any new variables, go ahead and put them into
-     SSA form now, before we handle jump threading.  This simplifies
-     interactions between rewriting of _DECL nodes into SSA form
-     and rewriting SSA_NAME nodes into SSA form after block
-     duplication and CFG manipulation.  */
-  update_ssa (TODO_update_ssa);
-
-  /* We identified all the jump threading opportunities earlier, but could
-     not transform the CFG at that time.  This routine transforms the
-     CFG and arranges for the dominator tree to be rebuilt if necessary.
-
-     Note the SSA graph update will occur during the normal TODO
-     processing by the pass manager.  */
-  thread_through_all_blocks (false);
-
-  threadedge_finalize_values ();
 
   scev_finalize ();
   loop_optimizer_finalize ();
@@ -4631,60 +4358,125 @@ make_pass_vrp (gcc::context *ctxt)
   return new pass_vrp (ctxt);
 }
 
+// This is the dom walker for the hybrid threader.  The reason this is
+// here, as opposed to the generic threading files, is because the
+// other client would be DOM, and they have their own custom walker.
 
-/* Worker for determine_value_range.  */
-
-static void
-determine_value_range_1 (value_range *vr, tree expr)
+class hybrid_threader : public dom_walker
 {
-  if (BINARY_CLASS_P (expr))
-    {
-      value_range vr0, vr1;
-      determine_value_range_1 (&vr0, TREE_OPERAND (expr, 0));
-      determine_value_range_1 (&vr1, TREE_OPERAND (expr, 1));
-      range_fold_binary_expr (vr, TREE_CODE (expr), TREE_TYPE (expr),
-			      &vr0, &vr1);
-    }
-  else if (UNARY_CLASS_P (expr))
-    {
-      value_range vr0;
-      determine_value_range_1 (&vr0, TREE_OPERAND (expr, 0));
-      range_fold_unary_expr (vr, TREE_CODE (expr), TREE_TYPE (expr),
-			     &vr0, TREE_TYPE (TREE_OPERAND (expr, 0)));
-    }
-  else if (TREE_CODE (expr) == INTEGER_CST)
-    vr->set (expr);
-  else
-    {
-      value_range_kind kind;
-      wide_int min, max;
-      /* For SSA names try to extract range info computed by VRP.  Otherwise
-	 fall back to varying.  */
-      if (TREE_CODE (expr) == SSA_NAME
-	  && INTEGRAL_TYPE_P (TREE_TYPE (expr))
-	  && (kind = get_range_info (expr, &min, &max)) != VR_VARYING)
-	vr->set (wide_int_to_tree (TREE_TYPE (expr), min),
-		 wide_int_to_tree (TREE_TYPE (expr), max),
-		 kind);
-      else
-	vr->set_varying (TREE_TYPE (expr));
-    }
+public:
+  hybrid_threader ();
+  ~hybrid_threader ();
+
+  void thread_jumps (function *fun)
+  {
+    walk (fun->cfg->x_entry_block_ptr);
+  }
+  bool thread_through_all_blocks ()
+  {
+    return m_threader->thread_through_all_blocks (false);
+  }
+
+private:
+  edge before_dom_children (basic_block) override;
+  void after_dom_children (basic_block bb) override;
+
+  hybrid_jt_simplifier *m_simplifier;
+  jump_threader *m_threader;
+  jt_state *m_state;
+  gimple_ranger *m_ranger;
+  path_range_query *m_query;
+};
+
+hybrid_threader::hybrid_threader () : dom_walker (CDI_DOMINATORS, REACHABLE_BLOCKS)
+{
+  loop_optimizer_init (LOOPS_NORMAL | LOOPS_HAVE_RECORDED_EXITS);
+  scev_initialize ();
+  calculate_dominance_info (CDI_DOMINATORS);
+  mark_dfs_back_edges ();
+
+  m_ranger = new gimple_ranger;
+  m_query = new path_range_query (*m_ranger, /*resolve=*/true);
+  m_simplifier = new hybrid_jt_simplifier (m_ranger, m_query);
+  m_state = new hybrid_jt_state;
+  m_threader = new jump_threader (m_simplifier, m_state);
 }
 
-/* Compute a value-range for EXPR and set it in *MIN and *MAX.  Return
-   the determined range type.  */
-
-value_range_kind
-determine_value_range (tree expr, wide_int *min, wide_int *max)
+hybrid_threader::~hybrid_threader ()
 {
-  value_range vr;
-  determine_value_range_1 (&vr, expr);
-  if (vr.constant_p ())
-    {
-      *min = wi::to_wide (vr.min ());
-      *max = wi::to_wide (vr.max ());
-      return vr.kind ();
-    }
+  delete m_simplifier;
+  delete m_threader;
+  delete m_state;
+  delete m_ranger;
+  delete m_query;
 
-  return VR_VARYING;
+  scev_finalize ();
+  loop_optimizer_finalize ();
+}
+
+edge
+hybrid_threader::before_dom_children (basic_block bb)
+{
+  gimple_stmt_iterator gsi;
+  int_range<2> r;
+
+  for (gsi = gsi_start_nondebug_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+    {
+      gimple *stmt = gsi_stmt (gsi);
+      m_ranger->range_of_stmt (r, stmt);
+    }
+  return NULL;
+}
+
+void
+hybrid_threader::after_dom_children (basic_block bb)
+{
+  m_threader->thread_outgoing_edges (bb);
+}
+
+static unsigned int
+execute_vrp_threader (function *fun)
+{
+  hybrid_threader threader;
+  threader.thread_jumps (fun);
+  if (threader.thread_through_all_blocks ())
+    return (TODO_cleanup_cfg | TODO_update_ssa);
+  return 0;
+}
+
+namespace {
+
+const pass_data pass_data_vrp_threader =
+{
+  GIMPLE_PASS, /* type */
+  "vrp-thread", /* name */
+  OPTGROUP_NONE, /* optinfo_flags */
+  TV_TREE_VRP_THREADER, /* tv_id */
+  PROP_ssa, /* properties_required */
+  0, /* properties_provided */
+  0, /* properties_destroyed */
+  0, /* todo_flags_start */
+  0 /* todo_flags_finish */
+};
+
+class pass_vrp_threader : public gimple_opt_pass
+{
+public:
+  pass_vrp_threader (gcc::context *ctxt)
+    : gimple_opt_pass (pass_data_vrp_threader, ctxt)
+  {}
+
+  /* opt_pass methods: */
+  opt_pass * clone () { return new pass_vrp_threader (m_ctxt); }
+  virtual bool gate (function *) { return flag_tree_vrp != 0; }
+  virtual unsigned int execute (function *fun)
+    { return execute_vrp_threader (fun); }
+};
+
+} // namespace {
+
+gimple_opt_pass *
+make_pass_vrp_threader (gcc::context *ctxt)
+{
+  return new pass_vrp_threader (ctxt);
 }

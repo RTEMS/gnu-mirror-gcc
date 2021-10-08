@@ -195,9 +195,9 @@ namespace ranges
     requires (_IsMove
 	      ? indirectly_movable<_Iter, _Out>
 	      : indirectly_copyable<_Iter, _Out>)
-    constexpr conditional_t<_IsMove,
-			    move_backward_result<_Iter, _Out>,
-			    copy_backward_result<_Iter, _Out>>
+    constexpr __conditional_t<_IsMove,
+			      move_backward_result<_Iter, _Out>,
+			      copy_backward_result<_Iter, _Out>>
     __copy_or_move_backward(_Iter __first, _Sent __last, _Out __result);
 
   template<bool _IsMove,
@@ -206,9 +206,9 @@ namespace ranges
     requires (_IsMove
 	      ? indirectly_movable<_Iter, _Out>
 	      : indirectly_copyable<_Iter, _Out>)
-    constexpr conditional_t<_IsMove,
-			    move_result<_Iter, _Out>,
-			    copy_result<_Iter, _Out>>
+    constexpr __conditional_t<_IsMove,
+			      move_result<_Iter, _Out>,
+			      copy_result<_Iter, _Out>>
     __copy_or_move(_Iter __first, _Sent __last, _Out __result)
     {
       // TODO: implement more specializations to be at least on par with
@@ -244,7 +244,7 @@ namespace ranges
       else if constexpr (__is_normal_iterator<_Out>)
 	{
 	  auto [__in,__out]
-	    = ranges::__copy_or_move<_IsMove>(__first, __last, __result.base());
+	    = ranges::__copy_or_move<_IsMove>(std::move(__first), __last, __result.base());
 	  return {std::move(__in), decltype(__result){__out}};
 	}
       else if constexpr (sized_sentinel_for<_Sent, _Iter>)
@@ -349,9 +349,9 @@ namespace ranges
     requires (_IsMove
 	      ? indirectly_movable<_Iter, _Out>
 	      : indirectly_copyable<_Iter, _Out>)
-    constexpr conditional_t<_IsMove,
-			    move_backward_result<_Iter, _Out>,
-			    copy_backward_result<_Iter, _Out>>
+    constexpr __conditional_t<_IsMove,
+			      move_backward_result<_Iter, _Out>,
+			      copy_backward_result<_Iter, _Out>>
     __copy_or_move_backward(_Iter __first, _Sent __last, _Out __result)
     {
       // TODO: implement more specializations to be at least on par with

@@ -94,6 +94,45 @@ namespace __detail
       { return std::get<0>(std::forward<_Tp>(__x)); }
   };
 
+  struct _Select2nd
+  {
+    template<typename _Tp>
+      auto
+      operator()(_Tp&& __x) const noexcept
+      -> decltype(std::get<1>(std::forward<_Tp>(__x)))
+      { return std::get<1>(std::forward<_Tp>(__x)); }
+  };
+
+  template<typename _ExKey>
+    struct _NodeBuilder;
+
+  template<>
+    struct _NodeBuilder<_Select1st>
+    {
+      template<typename _Kt, typename _Arg, typename _NodeGenerator>
+	static auto
+	_S_build(_Kt&& __k, _Arg&& __arg, const _NodeGenerator& __node_gen)
+	-> decltype(__node_gen(std::piecewise_construct,
+			       std::forward_as_tuple(std::forward<_Kt>(__k)),
+			       std::forward_as_tuple(_Select2nd{}(
+						std::forward<_Arg>(__arg)))))
+	{
+	  return __node_gen(std::piecewise_construct,
+	    std::forward_as_tuple(std::forward<_Kt>(__k)),
+	    std::forward_as_tuple(_Select2nd{}(std::forward<_Arg>(__arg))));
+	}
+    };
+
+  template<>
+    struct _NodeBuilder<_Identity>
+    {
+      template<typename _Kt, typename _Arg, typename _NodeGenerator>
+	static auto
+	_S_build(_Kt&& __k, _Arg&&, const _NodeGenerator& __node_gen)
+	-> decltype(__node_gen(std::forward<_Kt>(__k)))
+	{ return __node_gen(std::forward<_Kt>(__k)); }
+    };
+
   template<typename _NodeAlloc>
     struct _Hashtable_alloc;
 
@@ -117,9 +156,9 @@ namespace __detail
       ~_ReuseOrAllocNode()
       { _M_h._M_deallocate_nodes(_M_nodes); }
 
-      template<typename _Arg>
+      template<typename... _Args>
 	__node_type*
-	operator()(_Arg&& __arg) const
+	operator()(_Args&&... __args) const
 	{
 	  if (_M_nodes)
 	    {
@@ -131,7 +170,7 @@ namespace __detail
 	      __try
 		{
 		  __node_alloc_traits::construct(__a, __node->_M_valptr(),
-						 std::forward<_Arg>(__arg));
+						 std::forward<_Args>(__args)...);
 		}
 	      __catch(...)
 		{
@@ -140,7 +179,7 @@ namespace __detail
 		}
 	      return __node;
 	    }
-	  return _M_h._M_allocate_node(std::forward<_Arg>(__arg));
+	  return _M_h._M_allocate_node(std::forward<_Args>(__args)...);
 	}
 
     private:
@@ -161,10 +200,10 @@ namespace __detail
       _AllocNode(__hashtable_alloc& __h)
       : _M_h(__h) { }
 
-      template<typename _Arg>
+      template<typename... _Args>
 	__node_type*
-	operator()(_Arg&& __arg) const
-	{ return _M_h._M_allocate_node(std::forward<_Arg>(__arg)); }
+	operator()(_Args&&... __args) const
+	{ return _M_h._M_allocate_node(std::forward<_Args>(__args)...); }
 
     private:
       __hashtable_alloc& _M_h;
@@ -321,15 +360,15 @@ namespace __detail
       using __node_type = typename __base_type::__node_type;
 
     public:
-      typedef _Value					value_type;
-      typedef std::ptrdiff_t				difference_type;
-      typedef std::forward_iterator_tag			iterator_category;
+      using value_type = _Value;
+      using difference_type = std::ptrdiff_t;
+      using iterator_category = std::forward_iterator_tag;
 
-      using pointer = typename std::conditional<__constant_iterators,
-				  const value_type*, value_type*>::type;
+      using pointer = __conditional_t<__constant_iterators,
+				      const value_type*, value_type*>;
 
-      using reference = typename std::conditional<__constant_iterators,
-				  const value_type&, value_type&>::type;
+      using reference = __conditional_t<__constant_iterators,
+					const value_type&, value_type&>;
 
       _Node_iterator() = default;
 
@@ -828,12 +867,13 @@ namespace __detail
       using iterator = _Node_iterator<_Value, __constant_iterators::value,
 				      __hash_cached::value>;
 
-      using const_iterator = _Node_const_iterator<_Value, __constant_iterators::value,
+      using const_iterator = _Node_const_iterator<_Value,
+						  __constant_iterators::value,
 						  __hash_cached::value>;
 
-      using __ireturn_type = typename std::conditional<__unique_keys::value,
-						     std::pair<iterator, bool>,
-						     iterator>::type;
+      using __ireturn_type = __conditional_t<__unique_keys::value,
+					     std::pair<iterator, bool>,
+					     iterator>;
 
       __ireturn_type
       insert(const value_type& __v)
@@ -1123,7 +1163,7 @@ namespace __detail
     struct _Hashtable_ebo_helper<_Nm, _Tp, true>
     : private _Tp
     {
-      _Hashtable_ebo_helper() = default;
+      _Hashtable_ebo_helper() noexcept(noexcept(_Tp())) : _Tp() { }
 
       template<typename _OtherTp>
 	_Hashtable_ebo_helper(_OtherTp&& __tp)
@@ -1149,7 +1189,7 @@ namespace __detail
       _Tp& _M_get() { return _M_tp; }
 
     private:
-      _Tp _M_tp;
+      _Tp _M_tp{};
     };
 
   /**
@@ -1207,6 +1247,7 @@ namespace __detail
       // We need the default constructor for the local iterators and _Hashtable
       // default constructor.
       _Hash_code_base() = default;
+
       _Hash_code_base(const _Hash& __hash) : __ebo_hash(__hash) { }
 
       __hash_code
@@ -1442,15 +1483,13 @@ namespace __detail
       using __hash_code_base = typename __base_type::__hash_code_base;
 
     public:
-      typedef _Value					value_type;
-      typedef typename std::conditional<__constant_iterators,
-					const value_type*, value_type*>::type
-							pointer;
-      typedef typename std::conditional<__constant_iterators,
-					const value_type&, value_type&>::type
-							reference;
-      typedef std::ptrdiff_t				difference_type;
-      typedef std::forward_iterator_tag			iterator_category;
+      using value_type = _Value;
+      using pointer = __conditional_t<__constant_iterators,
+				      const value_type*, value_type*>;
+      using reference = __conditional_t<__constant_iterators,
+					const value_type&, value_type&>;
+      using difference_type = ptrdiff_t;
+      using iterator_category = forward_iterator_tag;
 
       _Local_iterator() = default;
 
@@ -1600,6 +1639,7 @@ namespace __detail
 
     protected:
       _Hashtable_base() = default;
+
       _Hashtable_base(const _Hash& __hash, const _Equal& __eq)
       : __hash_code_base(__hash), _EqualEBO(__eq)
       { }

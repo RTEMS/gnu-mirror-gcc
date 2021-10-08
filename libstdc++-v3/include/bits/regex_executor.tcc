@@ -122,7 +122,7 @@ namespace __detail
 	  _M_has_sol = false;
 	  if (_M_states._M_match_queue.empty())
 	    break;
-	  std::fill_n(_M_states._M_visited_states.get(), _M_nfa.size(), false);
+	  std::fill_n(_M_states._M_visited_states, _M_nfa.size(), false);
 	  auto __old_queue = std::move(_M_states._M_match_queue);
 	  for (auto& __task : __old_queue)
 	    {
@@ -423,7 +423,7 @@ namespace __detail
   template<typename _BiIter, typename _Alloc, typename _TraitsT,
 	   bool __dfs_mode>
     void _Executor<_BiIter, _Alloc, _TraitsT, __dfs_mode>::
-    _M_handle_accept(_Match_mode __match_mode, _StateIdT __i)
+    _M_handle_accept(_Match_mode __match_mode, _StateIdT)
     {
       if (__dfs_mode)
 	{
