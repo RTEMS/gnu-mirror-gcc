@@ -384,6 +384,6 @@ jobs:
       - name: Run the following command to push the merge manually
         run: |
           printf "::warning::Run the following command to create temporary local git branch and push the changes to our vendor branch: \n"
-          printf ".github/scripts/pushMergedVendorBranch.sh <temporary branch> ${mergeBranch}"
+          printf ".github/scripts/pushMergedVendorBranch.sh ${mergeBranch}"
         env:
           mergeBranch: ${{ needs.parse-failures.outputs.newBranchName }}

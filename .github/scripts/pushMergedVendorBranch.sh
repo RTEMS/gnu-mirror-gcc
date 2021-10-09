@@ -50,8 +50,7 @@ ${BASEDIR}/../../contrib/git-fetch-vendor.sh --enable-push microsoft
 git fetch
 git fetch gcc
 git fetch origin
-git fetch vendors/microsoft
-git checkout -b $1 remotes/vendors/microsoft/main
-git merge origin/$2
+git checkout microsoft/main vendors/microsoft/main
+git merge origin/$1
 git push vendors/microsoft microsoft/main
 
