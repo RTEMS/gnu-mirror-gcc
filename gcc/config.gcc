@@ -250,6 +250,8 @@ md_file=
 case ${target} in
   tile*-*-*				\
  | cr16-*-*				\
+ | hppa[12]*-*-hpux10*			\
+ | hppa[12]*-*-hpux11*			\
  )
     if test "x$enable_obsolete" != xyes; then
       echo "*** Configuration ${target} is obsolete." >&2
@@ -1529,7 +1531,6 @@ bpf-*-*)
         use_collect2=no
         extra_headers="bpf-helpers.h"
         use_gcc_stdint=provide
-        extra_headers="coreout.h"
         extra_objs="coreout.o"
         target_gtfiles="$target_gtfiles \$(srcdir)/config/bpf/coreout.c"
         ;;

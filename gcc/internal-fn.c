@@ -2934,6 +2934,36 @@ expand_VEC_CONVERT (internal_fn, gcall *)
   gcc_unreachable ();
 }
 
+/* Expand IFN_RAWMEMCHAR internal function.  */
+
+void
+expand_RAWMEMCHR (internal_fn, gcall *stmt)
+{
+  expand_operand ops[3];
+
+  tree lhs = gimple_call_lhs (stmt);
+  if (!lhs)
+    return;
+  machine_mode lhs_mode = TYPE_MODE (TREE_TYPE (lhs));
+  rtx lhs_rtx = expand_expr (lhs, NULL_RTX, VOIDmode, EXPAND_WRITE);
+  create_output_operand (&ops[0], lhs_rtx, lhs_mode);
+
+  tree mem = gimple_call_arg (stmt, 0);
+  rtx mem_rtx = get_memory_rtx (mem, NULL);
+  create_fixed_operand (&ops[1], mem_rtx);
+
+  tree pattern = gimple_call_arg (stmt, 1);
+  machine_mode mode = TYPE_MODE (TREE_TYPE (pattern));
+  rtx pattern_rtx = expand_normal (pattern);
+  create_input_operand (&ops[2], pattern_rtx, mode);
+
+  insn_code icode = direct_optab_handler (rawmemchr_optab, mode);
+
+  expand_insn (icode, 3, ops);
+  if (!rtx_equal_p (lhs_rtx, ops[0].value))
+    emit_move_insn (lhs_rtx, ops[0].value);
+}
+
 /* Expand the IFN_UNIQUE function according to its first argument.  */
 
 static void
@@ -3015,8 +3045,11 @@ expand_DEFERRED_INIT (internal_fn, gcall *stmt)
     reg_lhs = true;
   else
     {
-      rtx tem = expand_expr (lhs, NULL_RTX, VOIDmode, EXPAND_WRITE);
-      reg_lhs = !MEM_P (tem);
+      tree lhs_base = lhs;
+      while (handled_component_p (lhs_base))
+	lhs_base = TREE_OPERAND (lhs_base, 0);
+      reg_lhs = (mem_ref_refers_to_non_mem_p (lhs_base)
+		 || non_mem_decl_p (lhs_base));
     }
 
   if (!reg_lhs)
@@ -3037,32 +3070,33 @@ expand_DEFERRED_INIT (internal_fn, gcall *stmt)
     }
   else
     {
-      /* If this variable is in a register, use expand_assignment might
-	 generate better code.  */
-      tree init = build_zero_cst (var_type);
-      unsigned HOST_WIDE_INT total_bytes
-	= tree_to_uhwi (TYPE_SIZE_UNIT (var_type));
-
-      if (init_type == AUTO_INIT_PATTERN)
+      /* If this variable is in a register use expand_assignment.  */
+      tree init;
+      if (tree_fits_uhwi_p (var_size)
+	  && (init_type == AUTO_INIT_PATTERN
+	      || !is_gimple_reg_type (var_type))
+	  && int_mode_for_size (tree_to_uhwi (var_size) * BITS_PER_UNIT,
+				0).exists ())
 	{
-	  tree alt_type = NULL_TREE;
-	  if (!can_native_interpret_type_p (var_type))
-	    {
-	      alt_type
-		= lang_hooks.types.type_for_mode (TYPE_MODE (var_type),
-						  TYPE_UNSIGNED (var_type));
-	      gcc_assert (can_native_interpret_type_p (alt_type));
-	    }
-
+	  unsigned HOST_WIDE_INT total_bytes = tree_to_uhwi (var_size);
 	  unsigned char *buf = (unsigned char *) xmalloc (total_bytes);
-	  memset (buf, INIT_PATTERN_VALUE, total_bytes);
-	  init = native_interpret_expr (alt_type ? alt_type : var_type,
-					buf, total_bytes);
-	  gcc_assert (init);
-
-	  if (alt_type)
-	    init = build1 (VIEW_CONVERT_EXPR, var_type, init);
+	  memset (buf, (init_type == AUTO_INIT_PATTERN
+			? INIT_PATTERN_VALUE : 0), total_bytes);
+	  if (can_native_interpret_type_p (var_type))
+	    init = native_interpret_expr (var_type, buf, total_bytes);
+	  else
+	    {
+	      tree itype = build_nonstandard_integer_type
+			     (total_bytes * BITS_PER_UNIT, 1);
+	      wide_int w = wi::from_buffer (buf, total_bytes);
+	      init = wide_int_to_tree (itype, w);
+	      /* Pun the LHS to make sure its type has constant size.  */
+	      lhs = build1 (VIEW_CONVERT_EXPR, itype, lhs);
+	    }
 	}
+      else
+	/* Use zero-init also for variable-length sizes.  */
+	init = build_zero_cst (var_type);
 
       expand_assignment (lhs, init, false);
     }

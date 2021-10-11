@@ -376,9 +376,11 @@ c_finish_omp_atomic (location_t loc, enum tree_code code,
 	return error_mark_node;
       gcc_assert (TREE_CODE (rhs1) == EQ_EXPR);
       tree cmptype = TREE_TYPE (TREE_OPERAND (rhs1, 0));
-      if (SCALAR_FLOAT_TYPE_P (cmptype))
+      if (SCALAR_FLOAT_TYPE_P (cmptype) && !test)
 	{
 	  bool clear_padding = false;
+	  HOST_WIDE_INT non_padding_start = 0;
+	  HOST_WIDE_INT non_padding_end = 0;
 	  if (BITS_PER_UNIT == 8 && CHAR_BIT == 8)
 	    {
 	      HOST_WIDE_INT sz = int_size_in_bytes (cmptype), i;
@@ -392,6 +394,40 @@ c_finish_omp_atomic (location_t loc, enum tree_code code,
 		    clear_padding = true;
 		    break;
 		  }
+	      if (clear_padding && buf[i] == 0)
+		{
+		  /* Try to optimize.  In the common case where
+		     non-padding bits are all continuous and start
+		     and end at a byte boundary, we can just adjust
+		     the memcmp call arguments and don't need to
+		     emit __builtin_clear_padding calls.  */
+		  if (i == 0)
+		    {
+		      for (i = 0; i < sz; i++)
+			if (buf[i] != 0)
+			  break;
+		      if (i < sz && buf[i] == (unsigned char) ~0)
+			{
+			  non_padding_start = i;
+			  for (; i < sz; i++)
+			    if (buf[i] != (unsigned char) ~0)
+			      break;
+			}
+		      else
+			i = 0;
+		    }
+		  if (i != 0)
+		    {
+		      non_padding_end = i;
+		      for (; i < sz; i++)
+			if (buf[i] != 0)
+			  {
+			    non_padding_start = 0;
+			    non_padding_end = 0;
+			    break;
+			  }
+		    }
+		}
 	    }
 	  tree inttype = NULL_TREE;
 	  if (!clear_padding && tree_fits_uhwi_p (TYPE_SIZE (cmptype)))
@@ -428,12 +464,22 @@ c_finish_omp_atomic (location_t loc, enum tree_code code,
 	      tmp2 = build4 (TARGET_EXPR, cmptype, tmp2,
 			     TREE_OPERAND (rhs1, 1), NULL, NULL);
 	      tmp2 = build1 (ADDR_EXPR, pcmptype, tmp2);
+	      if (non_padding_start)
+		{
+		  tmp1 = build2 (POINTER_PLUS_EXPR, pcmptype, tmp1,
+				 size_int (non_padding_start));
+		  tmp2 = build2 (POINTER_PLUS_EXPR, pcmptype, tmp2,
+				 size_int (non_padding_start));
+		}
 	      tree fndecl = builtin_decl_explicit (BUILT_IN_MEMCMP);
 	      rhs1 = build_call_expr_loc (loc, fndecl, 3, tmp1, tmp2,
-					  TYPE_SIZE_UNIT (cmptype));
+					  non_padding_end
+					  ? size_int (non_padding_end
+						      - non_padding_start)
+					  : TYPE_SIZE_UNIT (cmptype));
 	      rhs1 = build2 (EQ_EXPR, boolean_type_node, rhs1,
 			     integer_zero_node);
-	      if (clear_padding)
+	      if (clear_padding && non_padding_end == 0)
 		{
 		  fndecl = builtin_decl_explicit (BUILT_IN_CLEAR_PADDING);
 		  tree cp1 = build_call_expr_loc (loc, fndecl, 1, tmp1);
@@ -443,12 +489,14 @@ c_finish_omp_atomic (location_t loc, enum tree_code code,
 		}
 	    }
 	}
-      if (r)
+      if (r && test)
+	rtmp = rhs1;
+      else if (r)
 	{
-	  tree var = create_tmp_var (boolean_type_node);
+	  tree var = create_tmp_var_raw (boolean_type_node);
 	  DECL_CONTEXT (var) = current_function_decl;
 	  rtmp = build4 (TARGET_EXPR, boolean_type_node, var,
-			 NULL, NULL, NULL);
+			 boolean_false_node, NULL, NULL);
 	  save = in_late_binary_op;
 	  in_late_binary_op = true;
 	  x = build_modify_expr (loc, var, NULL_TREE, NOP_EXPR,
@@ -529,14 +577,11 @@ c_finish_omp_atomic (location_t loc, enum tree_code code,
 	    }
 	}
       if (blhs)
+	x = build3_loc (loc, BIT_FIELD_REF, TREE_TYPE (blhs), x,
+			bitsize_int (bitsize), bitsize_int (bitpos));
+      if (r && !test)
 	{
-	  x = build3_loc (loc, BIT_FIELD_REF, TREE_TYPE (blhs), x,
-			  bitsize_int (bitsize), bitsize_int (bitpos));
-	  type = TREE_TYPE (blhs);
-	}
-      if (r)
-	{
-	  vtmp = create_tmp_var (TREE_TYPE (x));
+	  vtmp = create_tmp_var_raw (TREE_TYPE (x));
 	  DECL_CONTEXT (vtmp) = current_function_decl;
 	}
       else
@@ -545,10 +590,11 @@ c_finish_omp_atomic (location_t loc, enum tree_code code,
 			     loc, x, NULL_TREE);
       if (x == error_mark_node)
 	return error_mark_node;
-      if (r)
+      type = TREE_TYPE (x);
+      if (r && !test)
 	{
-	  vtmp = build4 (TARGET_EXPR, boolean_type_node, vtmp,
-			 NULL, NULL, NULL);
+	  vtmp = build4 (TARGET_EXPR, TREE_TYPE (vtmp), vtmp,
+			 build_zero_cst (TREE_TYPE (vtmp)), NULL, NULL);
 	  gcc_assert (TREE_CODE (x) == MODIFY_EXPR
 		      && TREE_OPERAND (x, 0) == TARGET_EXPR_SLOT (vtmp));
 	  TREE_OPERAND (x, 0) = vtmp;
@@ -2114,14 +2160,35 @@ c_omp_split_clauses (location_t loc, enum tree_code code,
 	    }
 	  s = C_OMP_CLAUSE_SPLIT_PARALLEL;
 	  break;
-	/* order clauses are allowed on for, simd and loop.  */
+	/* order clauses are allowed on distribute, for, simd and loop.  */
 	case OMP_CLAUSE_ORDER:
+	  if ((mask & (OMP_CLAUSE_MASK_1
+		       << PRAGMA_OMP_CLAUSE_DIST_SCHEDULE)) != 0)
+	    {
+	      if (code == OMP_DISTRIBUTE)
+		{
+		  s = C_OMP_CLAUSE_SPLIT_DISTRIBUTE;
+		  break;
+		}
+	      c = build_omp_clause (OMP_CLAUSE_LOCATION (clauses),
+				    OMP_CLAUSE_ORDER);
+	      OMP_CLAUSE_ORDER_UNCONSTRAINED (c)
+		= OMP_CLAUSE_ORDER_UNCONSTRAINED (clauses);
+	      OMP_CLAUSE_ORDER_REPRODUCIBLE (c)
+		= OMP_CLAUSE_ORDER_REPRODUCIBLE (clauses);
+	      OMP_CLAUSE_CHAIN (c) = cclauses[C_OMP_CLAUSE_SPLIT_DISTRIBUTE];
+	      cclauses[C_OMP_CLAUSE_SPLIT_DISTRIBUTE] = c;
+	    }
 	  if ((mask & (OMP_CLAUSE_MASK_1 << PRAGMA_OMP_CLAUSE_SCHEDULE)) != 0)
 	    {
 	      if (code == OMP_SIMD)
 		{
 		  c = build_omp_clause (OMP_CLAUSE_LOCATION (clauses),
 					OMP_CLAUSE_ORDER);
+		  OMP_CLAUSE_ORDER_UNCONSTRAINED (c)
+		    = OMP_CLAUSE_ORDER_UNCONSTRAINED (clauses);
+		  OMP_CLAUSE_ORDER_REPRODUCIBLE (c)
+		    = OMP_CLAUSE_ORDER_REPRODUCIBLE (clauses);
 		  OMP_CLAUSE_CHAIN (c) = cclauses[C_OMP_CLAUSE_SPLIT_FOR];
 		  cclauses[C_OMP_CLAUSE_SPLIT_FOR] = c;
 		  s = C_OMP_CLAUSE_SPLIT_SIMD;
@@ -2494,6 +2561,8 @@ c_omp_split_clauses (location_t loc, enum tree_code code,
 		    = OMP_CLAUSE_DECL (clauses);
 		  OMP_CLAUSE_ALLOCATE_ALLOCATOR (c)
 		    = OMP_CLAUSE_ALLOCATE_ALLOCATOR (clauses);
+		  OMP_CLAUSE_ALLOCATE_ALIGN (c)
+		    = OMP_CLAUSE_ALLOCATE_ALIGN (clauses);
 		  OMP_CLAUSE_CHAIN (c) = cclauses[s];
 		  cclauses[s] = c;
 		  has_dup_allocate = true;

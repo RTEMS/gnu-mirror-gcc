@@ -276,9 +276,9 @@ The OpenMP 4.5 specification is fully supported.
 @item @code{omp_all_memory} reserved locator @tab N @tab
 @item @emph{target_device trait} in OpenMP Context @tab N @tab
 @item @code{target_device} selector set in context selectors @tab N @tab
-@item C/C++'s @code{declare variante} directive: elision support of
+@item C/C++'s @code{declare variant} directive: elision support of
       preprocessed code @tab N @tab
-@item @code{declare variante}: new clauses @code{adjust_args} and
+@item @code{declare variant}: new clauses @code{adjust_args} and
       @code{append_args} @tab N @tab
 @item @code{dispatch} construct @tab N @tab
 @item device-specific ICV settings the environment variables @tab N @tab
@@ -291,7 +291,7 @@ The OpenMP 4.5 specification is fully supported.
 @item @code{strict} modifier in the @code{grainsize} and @code{num_tasks}
       clauses of the taskloop construct @tab Y @tab
 @item @code{align} clause/modifier in @code{allocate} directive/clause
-      and @code{allocator} directive @tab N @tab
+      and @code{allocator} directive @tab P @tab C/C++ on clause only
 @item @code{thread_limit} clause to @code{target} construct @tab N @tab
 @item @code{has_device_addr} clause to @code{target} construct @tab N @tab
 @item iterators in @code{target update} motion clauses and @code{map}
@@ -301,11 +301,11 @@ The OpenMP 4.5 specification is fully supported.
 @item @code{interop} directive @tab N @tab
 @item @code{omp_interop_t} object support in runtime routines @tab N @tab
 @item @code{nowait} clause in @code{taskwait} directive @tab N @tab
-@item Extensions to the @code{atomic} directive @tab N @tab
+@item Extensions to the @code{atomic} directive @tab P @tab C/C++ only
 @item @code{seq_cst} clause on a @code{flush} construct @tab Y @tab
 @item @code{inoutset} argument to the @code{depend} clause @tab N @tab
 @item @code{private} and @code{firstprivate} argument to @code{default}
-      clause in C and C++ @tab N @tab
+      clause in C and C++ @tab Y @tab
 @item @code{present} argument to @code{defaultmap} clause @tab N @tab
 @item @code{omp_set_num_teams}, @code{omp_set_teams_thread_limit},
       @code{omp_get_max_teams}, @code{omp_get_teams_thread_limit} runtime
@@ -315,7 +315,7 @@ The OpenMP 4.5 specification is fully supported.
       runtime routines @tab N @tab
 @item @code{omp_get_mapped_ptr} runtime routine @tab N @tab
 @item @code{omp_calloc}, @code{omp_realloc}, @code{omp_aligned_alloc} and
-      @code{omp_aligned_calloc} runtime routines @tab N @tab
+      @code{omp_aligned_calloc} runtime routines @tab Y @tab
 @item @code{omp_alloctrait_key_t} enum: @code{omp_atv_serialized} added,
       @code{omp_atv_default} changed @tab Y @tab
 @item @code{omp_display_env} runtime routine @tab P
@@ -337,7 +337,10 @@ The OpenMP 4.5 specification is fully supported.
 
 @multitable @columnfractions .60 .10 .25
 @headitem Description @tab Status @tab Comments
-@item Suppport of strictly structured blocks in Fortran @tab N @tab
+@item Support of strictly structured blocks in Fortran @tab N @tab
+@item Support of structured block sequences in C/C++ @tab Y @tab
+@item @code{unconstrained} and @code{reproducible} modifiers on @code{order}
+      clause @tab Y @tab
 @end multitable
 
 

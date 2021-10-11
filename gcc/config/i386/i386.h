@@ -334,6 +334,10 @@ extern unsigned char ix86_tune_features[X86_TUNE_LAST];
 	ix86_tune_features[X86_TUNE_PARTIAL_REG_DEPENDENCY]
 #define TARGET_SSE_PARTIAL_REG_DEPENDENCY \
 	ix86_tune_features[X86_TUNE_SSE_PARTIAL_REG_DEPENDENCY]
+#define TARGET_SSE_PARTIAL_REG_FP_CONVERTS_DEPENDENCY \
+	ix86_tune_features[X86_TUNE_SSE_PARTIAL_REG_FP_CONVERTS_DEPENDENCY]
+#define TARGET_SSE_PARTIAL_REG_CONVERTS_DEPENDENCY \
+	ix86_tune_features[X86_TUNE_SSE_PARTIAL_REG_CONVERTS_DEPENDENCY]
 #define TARGET_SSE_UNALIGNED_LOAD_OPTIMAL \
 	ix86_tune_features[X86_TUNE_SSE_UNALIGNED_LOAD_OPTIMAL]
 #define TARGET_SSE_UNALIGNED_STORE_OPTIMAL \
@@ -1029,7 +1033,8 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
    || (MODE) == TImode)
 
 #define VALID_AVX512FP16_REG_MODE(MODE)					\
-  ((MODE) == V8HFmode || (MODE) == V16HFmode || (MODE) == V32HFmode)
+  ((MODE) == V8HFmode || (MODE) == V16HFmode || (MODE) == V32HFmode	\
+   || (MODE) == V2HFmode)
 
 #define VALID_SSE2_REG_MODE(MODE)					\
   ((MODE) == V16QImode || (MODE) == V8HImode || (MODE) == V2DFmode	\
@@ -1037,7 +1042,8 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
    || (MODE) == V2DImode || (MODE) == DFmode || (MODE) == HFmode)
 
 #define VALID_SSE2_REG_VHF_MODE(MODE)			\
-  (VALID_SSE2_REG_MODE (MODE) || (MODE) == V8HFmode)
+  (VALID_SSE2_REG_MODE (MODE) || (MODE) == V8HFmode	\
+   || (MODE) == V4HFmode || (MODE) == V2HFmode)
 
 #define VALID_SSE_REG_MODE(MODE)					\
   ((MODE) == V1TImode || (MODE) == TImode				\
@@ -1047,10 +1053,12 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 #define VALID_MMX_REG_MODE_3DNOW(MODE) \
   ((MODE) == V2SFmode || (MODE) == SFmode)
 
+/* To match ia32 psABI, V4HFmode should be added here.  */
 #define VALID_MMX_REG_MODE(MODE)					\
   ((MODE) == V1DImode || (MODE) == DImode				\
    || (MODE) == V2SImode || (MODE) == SImode				\
-   || (MODE) == V4HImode || (MODE) == V8QImode)
+   || (MODE) == V4HImode || (MODE) == V8QImode				\
+   || (MODE) == V4HFmode)
 
 #define VALID_MASK_REG_MODE(MODE) ((MODE) == HImode || (MODE) == QImode)
 
@@ -1083,7 +1091,8 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
    || (MODE) == V4DImode || (MODE) == V8SFmode || (MODE) == V4DFmode	\
    || (MODE) == V2TImode || (MODE) == V8DImode || (MODE) == V64QImode	\
    || (MODE) == V16SImode || (MODE) == V32HImode || (MODE) == V8DFmode	\
-   || (MODE) == V16SFmode || VALID_AVX512FP16_REG_MODE (MODE))
+   || (MODE) == V16SFmode || (MODE) == V32HFmode || (MODE) == V16HFmode \
+   || (MODE) == V8HFmode)
 
 #define X87_FLOAT_MODE_P(MODE)	\
   (TARGET_80387 && ((MODE) == SFmode || (MODE) == DFmode || (MODE) == XFmode))
@@ -1101,7 +1110,8 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 
 #define VALID_BCST_MODE_P(MODE)			\
   ((MODE) == SFmode || (MODE) == DFmode		\
-   || (MODE) == SImode || (MODE) == DImode)
+   || (MODE) == SImode || (MODE) == DImode	\
+   || (MODE) == HFmode)
 
 /* It is possible to write patterns to move flags; but until someone
    does it,  */

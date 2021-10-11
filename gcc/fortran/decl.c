@@ -1557,6 +1557,20 @@ gfc_verify_c_interop_param (gfc_symbol *sym)
 		       "CONTIGUOUS attribute as procedure %qs is BIND(C)",
 		       sym->name, &sym->declared_at, sym->ns->proc_name->name);
 
+	  /* Per F2018, C1557, pointer/allocatable dummies to a bind(c)
+	     procedure that are default-initialized are not permitted.  */
+	  if ((sym->attr.pointer || sym->attr.allocatable)
+	      && sym->ts.type == BT_DERIVED
+	      && gfc_has_default_initializer (sym->ts.u.derived))
+	    {
+	      gfc_error ("Default-initialized %s dummy argument %qs "
+			 "at %L is not permitted in BIND(C) procedure %qs",
+			 (sym->attr.pointer ? "pointer" : "allocatable"),
+			 sym->name, &sym->declared_at,
+			 sym->ns->proc_name->name);
+	      retval = false;
+	    }
+
           /* Character strings are only C interoperable if they have a
 	     length of 1.  However, as an argument they are also iteroperable
 	     when passed as descriptor (which requires len=: or len=*).  */
@@ -2214,12 +2228,16 @@ add_init_expr_to_sym (const char *name, gfc_expr **initp, locus *var_locus)
 	  gfc_expr *array;
 	  int n;
 	  if (sym->attr.flavor == FL_PARAMETER
-		&& init->expr_type == EXPR_CONSTANT
-		&& spec_size (sym->as, &size)
-		&& mpz_cmp_si (size, 0) > 0)
+	      && gfc_is_constant_expr (init)
+	      && (init->expr_type == EXPR_CONSTANT
+		  || init->expr_type == EXPR_STRUCTURE)
+	      && spec_size (sym->as, &size)
+	      && mpz_cmp_si (size, 0) > 0)
 	    {
 	      array = gfc_get_array_expr (init->ts.type, init->ts.kind,
 					  &init->where);
+	      if (init->ts.type == BT_DERIVED)
+		array->ts.u.derived = init->ts.u.derived;
 	      for (n = 0; n < (int)mpz_get_si (size); n++)
 		gfc_constructor_append_expr (&array->value.constructor,
 					     n == 0

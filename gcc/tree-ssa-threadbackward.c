@@ -122,7 +122,7 @@ const edge back_threader::UNREACHABLE_EDGE = (edge) -1;
 back_threader::back_threader (bool speed_p)
   : m_registry (param_max_fsm_thread_paths),
     m_profit (speed_p),
-    m_solver (m_ranger)
+    m_solver (m_ranger, /*resolve=*/false)
 {
   m_last_stmt = NULL;
   m_imports = BITMAP_ALLOC (NULL);
@@ -192,7 +192,7 @@ back_threader::find_taken_edge_switch (const vec<basic_block> &path,
   tree name = gimple_switch_index (sw);
   int_range_max r;
 
-  m_solver.precompute_ranges (path, m_imports);
+  m_solver.compute_ranges (path, m_imports);
   m_solver.range_of_expr (r, name, sw);
 
   if (r.undefined_p ())
@@ -216,7 +216,7 @@ back_threader::find_taken_edge_cond (const vec<basic_block> &path,
 {
   int_range_max r;
 
-  m_solver.precompute_ranges (path, m_imports);
+  m_solver.compute_ranges (path, m_imports);
   m_solver.range_of_stmt (r, cond);
 
   if (m_solver.unreachable_path_p ())
@@ -902,15 +902,11 @@ back_threader_registry::register_path (const vec<basic_block> &m_path,
 
       edge e = find_edge (bb1, bb2);
       gcc_assert (e);
-      jump_thread_edge *x
-	= m_lowlevel_registry.allocate_thread_edge (e, EDGE_COPY_SRC_BLOCK);
-      jump_thread_path->safe_push (x);
+      m_lowlevel_registry.push_edge (jump_thread_path, e, EDGE_COPY_SRC_BLOCK);
     }
 
-  jump_thread_edge *x
-    = m_lowlevel_registry.allocate_thread_edge (taken_edge,
-						EDGE_NO_COPY_SRC_BLOCK);
-  jump_thread_path->safe_push (x);
+  m_lowlevel_registry.push_edge (jump_thread_path,
+				 taken_edge, EDGE_NO_COPY_SRC_BLOCK);
 
   if (m_lowlevel_registry.register_jump_thread (jump_thread_path))
     ++m_threaded_paths;
@@ -947,7 +943,7 @@ public:
 bool
 pass_thread_jumps::gate (function *fun ATTRIBUTE_UNUSED)
 {
-  return flag_expensive_optimizations;
+  return flag_thread_jumps && flag_expensive_optimizations;
 }
 
 // Try to thread blocks in FUN.  Return TRUE if any jump thread paths were
@@ -1017,7 +1013,7 @@ public:
 bool
 pass_early_thread_jumps::gate (function *fun ATTRIBUTE_UNUSED)
 {
-  return true;
+  return flag_thread_jumps;
 }
 
 unsigned int

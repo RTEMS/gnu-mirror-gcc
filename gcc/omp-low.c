@@ -1161,14 +1161,17 @@ scan_sharing_clauses (tree clauses, omp_context *ctx)
     if (OMP_CLAUSE_CODE (c) == OMP_CLAUSE_ALLOCATE
 	&& (OMP_CLAUSE_ALLOCATE_ALLOCATOR (c) == NULL_TREE
 	    /* omp_default_mem_alloc is 1 */
-	    || !integer_onep (OMP_CLAUSE_ALLOCATE_ALLOCATOR (c))))
+	    || !integer_onep (OMP_CLAUSE_ALLOCATE_ALLOCATOR (c))
+	    || OMP_CLAUSE_ALLOCATE_ALIGN (c) != NULL_TREE))
       {
 	if (ctx->allocate_map == NULL)
 	  ctx->allocate_map = new hash_map<tree, tree>;
-	ctx->allocate_map->put (OMP_CLAUSE_DECL (c),
-				OMP_CLAUSE_ALLOCATE_ALLOCATOR (c)
-				? OMP_CLAUSE_ALLOCATE_ALLOCATOR (c)
-				: integer_zero_node);
+	tree val = integer_zero_node;
+	if (OMP_CLAUSE_ALLOCATE_ALLOCATOR (c))
+	  val = OMP_CLAUSE_ALLOCATE_ALLOCATOR (c);
+	if (OMP_CLAUSE_ALLOCATE_ALIGN (c))
+	  val = build_tree_list (val, OMP_CLAUSE_ALLOCATE_ALIGN (c));
+	ctx->allocate_map->put (OMP_CLAUSE_DECL (c), val);
       }
 
   for (c = clauses; c; c = OMP_CLAUSE_CHAIN (c))
@@ -3918,8 +3921,12 @@ omp_runtime_api_call (const_tree fndecl)
     {
       /* This array has 3 sections.  First omp_* calls that don't
 	 have any suffixes.  */
-      "omp_alloc",
-      "omp_free",
+      "aligned_alloc",
+      "aligned_calloc",
+      "alloc",
+      "calloc",
+      "free",
+      "realloc",
       "target_alloc",
       "target_associate_ptr",
       "target_disassociate_ptr",
@@ -3946,6 +3953,7 @@ omp_runtime_api_call (const_tree fndecl)
       "get_level",
       "get_max_active_levels",
       "get_max_task_priority",
+      "get_max_teams",
       "get_max_threads",
       "get_nested",
       "get_num_devices",
@@ -3958,6 +3966,7 @@ omp_runtime_api_call (const_tree fndecl)
       "get_proc_bind",
       "get_supported_active_levels",
       "get_team_num",
+      "get_teams_thread_limit",
       "get_thread_limit",
       "get_thread_num",
       "get_wtick",
@@ -3991,8 +4000,10 @@ omp_runtime_api_call (const_tree fndecl)
       "set_dynamic",
       "set_max_active_levels",
       "set_nested",
+      "set_num_teams",
       "set_num_threads",
-      "set_schedule"
+      "set_schedule",
+      "set_teams_thread_limit"
     };
 
   int mode = 0;
@@ -4725,6 +4736,12 @@ lower_private_allocate (tree var, tree new_var, tree &allocator,
       return false;
     }
 
+  unsigned HOST_WIDE_INT ialign = 0;
+  if (TREE_CODE (allocator) == TREE_LIST)
+    {
+      ialign = tree_to_uhwi (TREE_VALUE (allocator));
+      allocator = TREE_PURPOSE (allocator);
+    }
   if (TREE_CODE (allocator) != INTEGER_CST)
     allocator = build_outer_var_ref (allocator, ctx);
   allocator = fold_convert (pointer_sized_int_node, allocator);
@@ -4739,21 +4756,21 @@ lower_private_allocate (tree var, tree new_var, tree &allocator,
   if (TYPE_P (new_var))
     {
       ptr_type = build_pointer_type (new_var);
-      align = build_int_cst (size_type_node, TYPE_ALIGN_UNIT (new_var));
+      ialign = MAX (ialign, TYPE_ALIGN_UNIT (new_var));
     }
   else if (is_ref)
     {
       ptr_type = build_pointer_type (TREE_TYPE (TREE_TYPE (new_var)));
-      align = build_int_cst (size_type_node,
-			     TYPE_ALIGN_UNIT (TREE_TYPE (ptr_type)));
+      ialign = MAX (ialign, TYPE_ALIGN_UNIT (TREE_TYPE (ptr_type)));
     }
   else
     {
       ptr_type = build_pointer_type (TREE_TYPE (new_var));
-      align = build_int_cst (size_type_node, DECL_ALIGN_UNIT (new_var));
+      ialign = MAX (ialign, DECL_ALIGN_UNIT (new_var));
       if (sz == NULL_TREE)
 	sz = fold_convert (size_type_node, DECL_SIZE_UNIT (new_var));
     }
+  align = build_int_cst (size_type_node, ialign);
   if (TREE_CODE (sz) != INTEGER_CST)
     {
       tree szvar = create_tmp_var (size_type_node);
@@ -5707,6 +5724,8 @@ lower_rec_input_clauses (tree clauses, gimple_seq *ilist, gimple_seq *dlist,
 		    if (tree *allocatep = ctx->allocate_map->get (var))
 		      {
 			allocator = *allocatep;
+			if (TREE_CODE (allocator) == TREE_LIST)
+			  allocator = TREE_PURPOSE (allocator);
 			if (TREE_CODE (allocator) != INTEGER_CST)
 			  allocator = build_outer_var_ref (allocator, ctx);
 			allocator = fold_convert (pointer_sized_int_node,
@@ -6025,6 +6044,8 @@ lower_rec_input_clauses (tree clauses, gimple_seq *ilist, gimple_seq *dlist,
 			if (tree *allocatep = ctx->allocate_map->get (var))
 			  {
 			    allocator = *allocatep;
+			    if (TREE_CODE (allocator) == TREE_LIST)
+			      allocator = TREE_PURPOSE (allocator);
 			    if (TREE_CODE (allocator) != INTEGER_CST)
 			      allocator = build_outer_var_ref (allocator, ctx);
 			    allocator = fold_convert (pointer_sized_int_node,
@@ -12070,6 +12091,12 @@ create_task_copyfn (gomp_task *task_stmt, omp_context *ctx)
 	      if (tree *allocatorp = ctx->allocate_map->get (decl))
 		{
 		  tree allocator = *allocatorp;
+		  HOST_WIDE_INT ialign = 0;
+		  if (TREE_CODE (allocator) == TREE_LIST)
+		    {
+		      ialign = tree_to_uhwi (TREE_VALUE (allocator));
+		      allocator = TREE_PURPOSE (allocator);
+		    }
 		  if (TREE_CODE (allocator) != INTEGER_CST)
 		    {
 		      n = splay_tree_lookup (ctx->sfield_map,
@@ -12083,7 +12110,8 @@ create_task_copyfn (gomp_task *task_stmt, omp_context *ctx)
 		  allocator = fold_convert (pointer_sized_int_node, allocator);
 		  tree a = builtin_decl_explicit (BUILT_IN_GOMP_ALLOC);
 		  tree align = build_int_cst (size_type_node,
-					      DECL_ALIGN_UNIT (decl));
+					      MAX (ialign,
+						   DECL_ALIGN_UNIT (decl)));
 		  tree sz = TYPE_SIZE_UNIT (TREE_TYPE (TREE_TYPE (dst)));
 		  tree ptr = build_call_expr_loc (loc, a, 3, align, sz,
 						  allocator);

@@ -195,7 +195,7 @@ void
 fur_depend::register_relation (gimple *s, relation_kind k, tree op1, tree op2)
 {
   if (m_oracle)
-    m_oracle->register_relation (s, k, op1, op2);
+    m_oracle->register_stmt (s, k, op1, op2);
 }
 
 // Register a relation on an edge if there is an oracle.
@@ -204,7 +204,7 @@ void
 fur_depend::register_relation (edge e, relation_kind k, tree op1, tree op2)
 {
   if (m_oracle)
-    m_oracle->register_relation (e, k, op1, op2);
+    m_oracle->register_edge (e, k, op1, op2);
 }
 
 // This version of fur_source will pick a range up from a list of ranges
@@ -360,12 +360,9 @@ adjust_pointer_diff_expr (irange &res, const gimple *diff_stmt)
       && integer_zerop (gimple_call_arg (call, 1)))
     {
       tree max = vrp_val_max (ptrdiff_type_node);
-      wide_int wmax = wi::to_wide (max, TYPE_PRECISION (TREE_TYPE (max)));
-      tree expr_type = gimple_range_type (diff_stmt);
-      tree range_min = build_zero_cst (expr_type);
-      tree range_max = wide_int_to_tree (expr_type, wmax - 1);
-      int_range<2> r (range_min, range_max);
-      res.intersect (r);
+      unsigned prec = TYPE_PRECISION (TREE_TYPE (max));
+      wide_int wmaxm1 = wi::to_wide (max, prec) - 1;
+      res.intersect (wi::zero (prec), wmaxm1);
     }
 }
 
@@ -405,9 +402,8 @@ adjust_imagpart_expr (irange &res, const gimple *stmt)
       tree cst = gimple_assign_rhs1 (def_stmt);
       if (TREE_CODE (cst) == COMPLEX_CST)
 	{
-	  tree imag = TREE_IMAGPART (cst);
-	  int_range<2> tmp (imag, imag);
-	  res.intersect (tmp);
+	  wide_int imag = wi::to_wide (TREE_IMAGPART (cst));
+	  res.intersect (imag, imag);
 	}
     }
 }
@@ -650,8 +646,20 @@ fold_using_range::range_of_range_op (irange &r, gimple *s, fur_source &src)
 		    src.register_relation (s, rel, lhs, op2);
 		}
 	    }
-	  else if (is_a<gcond *> (s))
-	    postfold_gcond_edges (as_a<gcond *> (s), r, src);
+	  // Check for an existing BB, as we maybe asked to fold an
+	  // artificial statement not in the CFG.
+	  else if (is_a<gcond *> (s) && gimple_bb (s))
+	    {
+	      basic_block bb = gimple_bb (s);
+	      edge e0 = EDGE_SUCC (bb, 0);
+	      edge e1 = EDGE_SUCC (bb, 1);
+
+	      if (!single_pred_p (e0->dest))
+		e0 = NULL;
+	      if (!single_pred_p (e1->dest))
+		e1 = NULL;
+	      src.register_outgoing_edges (as_a<gcond *> (s), r, e0, e1);
+	    }
 	}
       else
 	r.set_varying (type);
@@ -760,6 +768,10 @@ fold_using_range::range_of_phi (irange &r, gphi *phi, fur_source &src)
   if (!type)
     return false;
 
+  // Track if all executable arguments are the same.
+  tree single_arg = NULL_TREE;
+  bool seen_arg = false;
+
   // Start with an empty range, unioning in each argument's range.
   r.set_undefined ();
   for (x = 0; x < gimple_phi_num_args (phi); x++)
@@ -767,18 +779,47 @@ fold_using_range::range_of_phi (irange &r, gphi *phi, fur_source &src)
       tree arg = gimple_phi_arg_def (phi, x);
       edge e = gimple_phi_arg_edge (phi, x);
 
-      // Register potential dependencies for stale value tracking.
-      if (gimple_range_ssa_p (arg) && src.gori ())
-	src.gori ()->register_dependency (phi_def, arg);
-
       // Get the range of the argument on its edge.
       src.get_phi_operand (arg_range, arg, e);
-      // If we're recomputing the argument elsewhere, try to refine it.
-      r.union_ (arg_range);
+
+      if (!arg_range.undefined_p ())
+	{
+	  // Register potential dependencies for stale value tracking.
+	  r.union_ (arg_range);
+	  if (gimple_range_ssa_p (arg) && src.gori ())
+	    src.gori ()->register_dependency (phi_def, arg);
+
+	  // Track if all arguments are the same.
+	  if (!seen_arg)
+	    {
+	      seen_arg = true;
+	      single_arg = arg;
+	    }
+	  else if (single_arg != arg)
+	    single_arg = NULL_TREE;
+	}
+
       // Once the value reaches varying, stop looking.
-      if (r.varying_p ())
+      if (r.varying_p () && single_arg == NULL_TREE)
 	break;
     }
+
+    // If the PHI boils down to a single effective argument, look at it.
+    if (single_arg)
+      {
+	// Symbolic arguments are equivalences.
+	if (gimple_range_ssa_p (single_arg))
+	  src.register_relation (phi, EQ_EXPR, phi_def, single_arg);
+	else if (src.get_operand (arg_range, single_arg)
+		 && arg_range.singleton_p ())
+	  {
+	    // Numerical arguments that are a constant can be returned as
+	    // the constant. This can help fold later cases where even this
+	    // constant might have been UNDEFINED via an unreachable edge.
+	    r = arg_range;
+	    return true;
+	  }
+      }
 
   // If SCEV is available, query if this PHI has any knonwn values.
   if (scev_initialized_p () && !POINTER_TYPE_P (TREE_TYPE (phi_def)))
@@ -1313,6 +1354,10 @@ fold_using_range::relation_fold_and_or (irange& lhs_range, gimple *s,
   range_operator *handler1 = gimple_range_handler (SSA_NAME_DEF_STMT (ssa1));
   range_operator *handler2 = gimple_range_handler (SSA_NAME_DEF_STMT (ssa2));
 
+  // If either handler is not present, no relation is found.
+  if (!handler1 || !handler2)
+    return;
+
   int_range<2> bool_one (boolean_true_node, boolean_true_node);
 
   relation_kind relation1 = handler1->op1_op2_relation (bool_one);
@@ -1351,8 +1396,7 @@ fold_using_range::relation_fold_and_or (irange& lhs_range, gimple *s,
 // Register any outgoing edge relations from a conditional branch.
 
 void
-fold_using_range::postfold_gcond_edges (gcond *s, irange& lhs_range,
-					fur_source &src)
+fur_source::register_outgoing_edges (gcond *s, irange &lhs_range, edge e0, edge e1)
 {
   int_range_max r;
   int_range<2> e0_range, e1_range;
@@ -1360,14 +1404,7 @@ fold_using_range::postfold_gcond_edges (gcond *s, irange& lhs_range,
   range_operator *handler;
   basic_block bb = gimple_bb (s);
 
-  // We may get asked to fold an artificial statement not in the CFG.
-  if (!bb)
-    return;
-
-  edge e0 = EDGE_SUCC (bb, 0);
-  if (!single_pred_p (e0->dest))
-    e0 = NULL;
-  else
+  if (e0)
     {
       // If this edge is never taken, ignore it.
       gcond_edge_range (e0_range, e0);
@@ -1377,10 +1414,7 @@ fold_using_range::postfold_gcond_edges (gcond *s, irange& lhs_range,
     }
 
 
-  edge e1 = EDGE_SUCC (bb, 1);
-  if (!single_pred_p (e1->dest))
-    e1 = NULL;
-  else
+  if (e1)
     {
       // If this edge is never taken, ignore it.
       gcond_edge_range (e1_range, e1);
@@ -1389,7 +1423,6 @@ fold_using_range::postfold_gcond_edges (gcond *s, irange& lhs_range,
 	e1 = NULL;
     }
 
-  // At least one edge needs to be single pred.
   if (!e0 && !e1)
     return;
 
@@ -1405,27 +1438,25 @@ fold_using_range::postfold_gcond_edges (gcond *s, irange& lhs_range,
 	{
 	  relation_kind relation = handler->op1_op2_relation (e0_range);
 	  if (relation != VREL_NONE)
-	    src.register_relation (e0, relation, ssa1, ssa2);
+	    register_relation (e0, relation, ssa1, ssa2);
 	}
       if (e1)
 	{
 	  relation_kind relation = handler->op1_op2_relation (e1_range);
 	  if (relation != VREL_NONE)
-	    src.register_relation (e1, relation, ssa1, ssa2);
+	    register_relation (e1, relation, ssa1, ssa2);
 	}
     }
 
   // Outgoing relations of GORI exports require a gori engine.
-  if (!src.gori ())
+  if (!gori ())
     return;
 
-  range_query *q = src.query ();
   // Now look for other relations in the exports.  This will find stmts
   // leading to the condition such as:
   // c_2 = a_4 < b_7
   // if (c_2)
-
-  FOR_EACH_GORI_EXPORT_NAME (*(src.gori ()), bb, name)
+  FOR_EACH_GORI_EXPORT_NAME (*(gori ()), bb, name)
     {
       if (TREE_CODE (TREE_TYPE (name)) != BOOLEAN_TYPE)
 	continue;
@@ -1437,19 +1468,19 @@ fold_using_range::postfold_gcond_edges (gcond *s, irange& lhs_range,
       tree ssa2 = gimple_range_ssa_p (gimple_range_operand2 (stmt));
       if (ssa1 && ssa2)
 	{
-	  if (e0 && src.gori ()->outgoing_edge_range_p (r, e0, name, *q)
+	  if (e0 && gori ()->outgoing_edge_range_p (r, e0, name, *m_query)
 	      && r.singleton_p ())
 	    {
 	      relation_kind relation = handler->op1_op2_relation (r);
 	      if (relation != VREL_NONE)
-		src.register_relation (e0, relation, ssa1, ssa2);
+		register_relation (e0, relation, ssa1, ssa2);
 	    }
-	  if (e1 && src.gori ()->outgoing_edge_range_p (r, e1, name, *q)
+	  if (e1 && gori ()->outgoing_edge_range_p (r, e1, name, *m_query)
 	      && r.singleton_p ())
 	    {
 	      relation_kind relation = handler->op1_op2_relation (r);
 	      if (relation != VREL_NONE)
-		src.register_relation (e1, relation, ssa1, ssa2);
+		register_relation (e1, relation, ssa1, ssa2);
 	    }
 	}
     }

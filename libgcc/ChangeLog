@@ -1,3 +1,50 @@
+2021-10-08  Ian Lance Taylor  <iant@golang.org>
+
+	* config/i386/morestack.S: Use .init_array for constructor if
+	available.
+	* config/rs6000/morestack.S: Likewise.
+	* config/s390/morestack.S: Likewise.
+
+2021-10-03  Patrick McGehearty  <patrick.mcgehearty@oracle.com>
+
+	PR target/101104
+	* libgcc2.c (RMIN2, RMINSCAL, RMAX2):
+	Use more correct values for native IBM 128-bit.
+
+2021-09-28  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/i386/libgcc-darwin.ver: Add Symbols for
+	__cpu_model, __cpu_indicator_init.
+
+2021-09-22  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/i386/sfp-machine.h: Guard Mach-O-specific code
+	using __APPLE__.
+
+2021-09-19  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/t-slibgcc-darwin: Delete unused code.
+
+2021-09-19  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/i386/t-darwin: Add in a vers file for X86-specific
+	symbols.
+	* config/t-darwin: Add the generic symbol maps here...
+	* config/t-slibgcc-darwin: ... removing from here.
+	* config/i386/libgcc-darwin.ver: New file.
+
+2021-09-19  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/i386/t-softfp: Exclude libgcc2 versions of __divhc3
+	and __mulhc3.
+
+2021-09-19  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config.host: Use convenience library for Darwin10
+	unwinder shim.
+	* config/t-darwin: Build Darwin10 unwinder shim as a
+	convenience library.
+
 2021-09-13  Andrew Pinski  <apinski@marvell.com>
 
 	* config.host: Remove m32r-*-linux* and m32rle-*-linux*.
