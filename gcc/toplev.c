@@ -1335,7 +1335,8 @@ process_options (bool no_backend)
   if (!OPTION_SET_P (flag_web))
     flag_web = flag_unroll_loops;
 
-  if (!OPTION_SET_P (flag_rename_registers))
+  /* The option can be turned off in a target.  */
+  if (!OPTION_SET_P (flag_rename_registers) && flag_rename_registers)
     flag_rename_registers = flag_unroll_loops;
 
   if (flag_non_call_exceptions)
