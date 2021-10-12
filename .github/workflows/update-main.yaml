@@ -272,8 +272,11 @@ jobs:
       - name: Merge master SHA and push to our GitHub repo to start run
         run: |
           git checkout -b ${newBranchName}
-          git add .github/*
-          git commit -m "Bring latest scripts from ${BRANCH_REF}"
+          git diff --exit-code --quiet .github/ > /dev/null 2>&1
+          if test $? != 0; then
+            git add .github/*
+            git commit -m "Bring latest scripts from ${BRANCH_REF}"
+          fi
           git fetch gcc master
           git branch -a
           git merge ${masterSHA}
