@@ -1,3 +1,14 @@
+work071.patch001:
+2021-10-12  Michael Meissner  <meissner@the-meissners.org>
+
+	* gcc.target/powerpc/pr86731-fwrapv-longlong.c: Update insn
+	regex for power10.
+	* gcc.target/powerpc/vec-splat-constant-df.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-di.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-sf.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v2df.c: New test.
+	* gcc.target/powerpc/vec-splat-constant-v2di.c: New test.
+
 2021-10-11   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch

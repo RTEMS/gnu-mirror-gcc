@@ -1,3 +1,36 @@
+work071.patch001:
+2021-10-12  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/constraints.md (eD): New constraint.
+	* config/rs6000/predicates.md (easy_fp_constant): Add support for
+	generating XXSPLTIDP.
+	(easy_vector_constant_64bit_element): New predicate.
+	(easy_vector_constant): Add support for generating XXSPLTIDP.
+	* config/rs6000/rs6000-protos.h (xxspltidp_constant_immediate):
+	New declaration.
+	(convert_vector_constant_to_bytes): Likewise.
+	(convert_scalar_64bit_constant_to_bytes): Likewise.
+	(prefixed_xxsplti_p): Likewise.
+	* config/rs6000/rs6000.c (convert_vector_constant_to_bytes): New
+	helper function.
+	(convert_scalar_64bit_constant_to_bytes): Likewise.
+	(xxspltidp_constant_immediate): Likewise.
+	(output_vec_const_move): Add support for XXSPLTIDP.
+	(prefixed_xxsplti_p): New function.
+	* config/rs6000/rs6000.md (prefixed attribute): Add support for
+	insns that generate XXSPLTIDP.
+	(movsf_hardfloat): Add support for XXSPLTIDP.
+	(mov<mode>_hardfloat32, FMOVE64 iterator): Likewise.
+	(mov<mode>_hardfloat64, FMOVE64 iterator): Likewise.
+	(movdi_internal32): Likewise.
+	(movdi_internal64): Likewise.
+	* config/rs6000/rs6000.opt (-mxxspltidp): New debug option.
+	* config/rs6000/vsx.md (XXSPLTIDP): New mode iterator.
+	(xxspltidp_<mode>_internal): New insn.
+	(XXSPLTIDP splitters): New splitters for XXSPLTIDP.
+	* doc/md.texi (PowerPC and IBM RS6000 constraints): Document the
+	eD constraint.
+
 2021-10-11   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
