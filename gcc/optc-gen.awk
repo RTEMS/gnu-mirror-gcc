@@ -118,6 +118,7 @@ for (i = 1; i <= n_headers; i++)
 print "#include " quote "opts.h" quote
 print "#include " quote "intl.h" quote
 print "#include " quote "insn-attr-common.h" quote
+print "#include " quote "sbitmap.h" quote
 print ""
 
 if (n_extra_c_includes > 0) {
@@ -445,6 +446,12 @@ print "  HOST_WIDE_INT value = decoded->value;                               "
 print "  enum opt_code code = (enum opt_code) scode;                         "
 print "                                                                      "
 print "  gcc_assert (decoded->canonical_option_num_elements <= 2);           "
+print "  static auto_sbitmap processed_codes (N_OPTS);                       "
+print "                                                                      "
+print "  if (bitmap_bit_p (processed_codes, code))                           "
+print "    return true;                                                      "
+print "                                                                      "
+print "  bitmap_set_bit (processed_codes, code);                             "
 print "                                                                      "
 print "  switch (code)                                                       "
 print "    {                                                                 "
@@ -479,6 +486,7 @@ for (i = 0; i < n_enabledby; i++) {
 print "    default:    "
 print "      break;    "
 print "    }           "
+print "  bitmap_clear_bit (processed_codes, code); "
 print "  return true;  "
 print "}               "
 
