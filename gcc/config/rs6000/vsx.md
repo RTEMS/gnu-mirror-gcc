@@ -6458,6 +6458,32 @@
   [(set_attr "type" "vecperm")
    (set_attr "prefixed" "yes")])
 
+(define_mode_iterator XXSPLTIDP [DI SF DF V16QI V8HI V4SI V4SF V2DF V2DI])
+
+(define_insn "*xxspltidp_<mode>_internal"
+  [(set (match_operand:XXSPLTIDP 0 "register_operand" "=wa")
+	(unspec:XXSPLTIDP [(match_operand:SI 1 "c32bit_cint_operand" "n")]
+			  UNSPEC_XXSPLTIDP))]
+  "TARGET_POWER10"
+  "xxspltidp %x0,%1"
+  [(set_attr "type" "vecperm")
+   (set_attr "prefixed" "yes")])
+
+;; Generate the XXSPLTIDP instruction to support SFmode, DFmode, and DImode
+;; scalar constants and vector constants that look like DFmode floating point
+;; values where both elements are the same.  The constant has to be expressible
+;; as a SFmode constant that is not a SFmode denormal value.
+(define_split
+  [(set (match_operand:XXSPLTIDP 0 "vsx_register_operand")
+	(match_operand:XXSPLTIDP 1 "easy_vector_constant_64bit_element"))]
+  "TARGET_POWER10"
+  [(set (match_dup 0)
+	(unspec:XXSPLTIDP [(match_dup 2)] UNSPEC_XXSPLTIDP))]
+{
+  long immediate = xxspltidp_constant_immediate (operands[1], <MODE>mode);
+  operands[2] = GEN_INT (immediate);
+  })
+
 ;; XXSPLTI32DX built-in function support
 (define_expand "xxsplti32dx_v4si"
   [(set (match_operand:V4SI 0 "register_operand" "=wa")
