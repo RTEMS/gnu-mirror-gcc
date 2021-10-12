@@ -1350,8 +1350,8 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
   if (opts->x_optimize == 2
       && (opts_set->x_flag_tree_loop_vectorize
 	  || opts_set->x_flag_tree_vectorize))
-    SET_OPTION_IF_UNSET (opts, opts_set, flag_vect_cost_model,
-			 VECT_COST_MODEL_CHEAP);
+    SET_OPTION_IF_UNSET_TYPED (opts, opts_set, flag_vect_cost_model,
+			       VECT_COST_MODEL_CHEAP, vect_cost_model);
 
 }
 
@@ -1903,8 +1903,8 @@ enable_fdo_optimizations (struct gcc_options *opts,
   SET_OPTION_IF_UNSET (opts, opts_set, flag_tree_loop_vectorize, value);
   SET_OPTION_IF_UNSET (opts, opts_set, flag_tree_slp_vectorize, value);
   SET_OPTION_IF_UNSET (opts, opts_set, flag_version_loops_for_strides, value);
-  SET_OPTION_IF_UNSET (opts, opts_set, flag_vect_cost_model,
-		       VECT_COST_MODEL_DYNAMIC);
+  SET_OPTION_IF_UNSET_TYPED (opts, opts_set, flag_vect_cost_model,
+			     VECT_COST_MODEL_DYNAMIC, vect_cost_model);
   SET_OPTION_IF_UNSET (opts, opts_set, flag_tree_loop_distribute_patterns,
 		       value);
   SET_OPTION_IF_UNSET (opts, opts_set, flag_loop_interchange, value);

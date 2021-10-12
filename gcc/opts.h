@@ -492,13 +492,28 @@ extern char *gen_producer_string (const char *language_string,
 
 /* Set OPTION in OPTS to VALUE if the option is not set in OPTS_SET.  */
 
+#define SET_OPTION_IF_UNSET_TYPED(OPTS, OPTS_SET, OPTION, VALUE, TYPE) \
+  do \
+  { \
+    if (!(OPTS_SET)->x_ ## OPTION) \
+    { \
+      (OPTS)->x_ ## OPTION = VALUE; \
+      (OPTS_SET)->x_ ## OPTION = (TYPE)1; \
+    } \
+  } \
+  while (false)
+
 #define SET_OPTION_IF_UNSET(OPTS, OPTS_SET, OPTION, VALUE) \
   do \
   { \
     if (!(OPTS_SET)->x_ ## OPTION) \
+    { \
       (OPTS)->x_ ## OPTION = VALUE; \
+      (OPTS_SET)->x_ ## OPTION = (int)1; \
+    } \
   } \
   while (false)
+
 
 /* Return true if OPTION is set by user in global options.  */
 

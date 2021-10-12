@@ -1950,7 +1950,7 @@ ix86_option_override_internal (bool main_args_p,
     opts->x_ix86_pmode = TARGET_LP64_P (opts->x_ix86_isa_flags)
 			 ? PMODE_DI : PMODE_SI;
 
-  SET_OPTION_IF_UNSET (opts, opts_set, ix86_abi, DEFAULT_ABI);
+  SET_OPTION_IF_UNSET_TYPED (opts, opts_set, ix86_abi, DEFAULT_ABI, calling_abi);
 
   if (opts->x_ix86_abi == MS_ABI && TARGET_X32_P (opts->x_ix86_isa_flags))
     error ("%<-mabi=ms%> not supported with X32 ABI");
