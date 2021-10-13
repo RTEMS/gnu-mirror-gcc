@@ -1,3 +1,32 @@
+work071.patch002:
+2021-10-13  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/predicates.md
+	(easy_vector_constant_64bit_element): Switch to use
+	rs6000_vec_const.
+	* config/rs6000/rs6000-protos.h (xxspltidp_constant_immediate):
+	Delete.
+	(convert_vector_constant_to_bytes): Likewise.
+	(convert_scalar_64bit_constant_to_bytes): Likewise.
+	(prefixed_xxsplti_p): Likewise.
+	(VECTOR_CONST_*): New defines.
+	(rs6000_vec_const): New data structure.
+	(vec_const_to_bytes): New function.
+	(vec_const_use_xxspltidp): New function.
+	* config/rs6000/rs6000.c (convert_vector_constant_to_bytes):
+	Delete.
+	(convert_scalar_64bit_constant_to_bytes): Likewise.
+	(xxspltidp_constant_immediate): Likewise.
+	(output_vec_const_move): Switch to use rs6000_vec_const.
+	(prefixed_xxsplti_p): Likewise.
+	(vec_const_integer): New helper function.
+	(vec_const_floating_point): New helper function.
+	(vec_const_use_xxspltidp): New function.
+	(vec_const_to_bytes): New function.
+	* config/rs6000/vsx.md (XXSPLTIDP splitters): Switch to use
+	rs6000_vec_const.
+
+
 work071.patch001:
 2021-10-12  Michael Meissner  <meissner@the-meissners.org>
 
