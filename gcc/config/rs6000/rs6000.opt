@@ -546,7 +546,7 @@ Target Undocumented Var(rs6000_optimize_swaps) Init(1) Save
 Analyze and remove doubleword swaps from VSX computations.
 
 munroll-only-small-loops
-Target Undocumented Var(unroll_only_small_loops) Init(0) Save
+Target Undocumented Var(unroll_only_small_loops) Init(0) Save EnabledBy(funroll-loops)
 ; Use conservative small loop unrolling.
 
 mpower9-misc
