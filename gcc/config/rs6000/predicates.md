@@ -620,102 +620,17 @@
 (define_predicate "easy_vector_constant_64bit_element"
   (match_code "const_vector,vec_duplicate,const_int,const_double")
 {
-  unsigned char vector_bytes[16];
+  rs6000_vec_const vec_const;
 
   /* Can we do the XXSPLTIDP instruction?  */
   if (!TARGET_XXSPLTIDP || !TARGET_PREFIXED || !TARGET_VSX)
     return false;
 
-  /* We use DImode for integer constants and DFmode for floating point
-     constants, since SFmode scalars are stored as DFmode in the PowerPC.  */
-  if (CONST_INT_P (op) || CONST_DOUBLE_P (op))
-    {
-      if (!convert_scalar_64bit_constant_to_bytes (op, vector_bytes,
-						   sizeof (vector_bytes)))
-	return false;
-
-      /* Change mode to value in the vector register.  */
-      mode = (CONST_INT_P (op)) ? E_DImode : E_DFmode;
-    }
-
-  /* For vector constants, get the whole vector.  */
-  else if (!convert_vector_constant_to_bytes (op, mode, vector_bytes,
-					      sizeof (vector_bytes)))
+  /* Convert the vector constant to bytes.  */
+  if (!vec_const_to_bytes (op, mode, &vec_const))
     return false;
 
-  /* The vector_bytes array has the 8 bytes of the upper and lower constants in
-     big endian order. Convert these into 64-bit constants.  */
-  unsigned HOST_WIDE_INT df_upper = 0, df_lower = 0;
-  for (int i = 0; i < 8; i++)
-    {
-      df_upper = (df_upper << 8) | vector_bytes[i];
-      df_lower = (df_lower << 8) | vector_bytes[i+8];
-    }
-
-  /* Make sure that the two 64-bit segments are the same.  */
-  if (df_upper != df_lower)
-    return false;
-  
-  /* Avoid values that are easy to create with other instructions (0.0 for
-     floating point, and values that can be loaded with XXSPLTIB and sign
-     extension for integer.  */
-  if (op == CONST0_RTX (mode))
-    return false;
-
-  if (INTEGRAL_MODE_P (mode) && IN_RANGE (df_upper, -128, 127))
-    return false;
-
-  /* Avoid values that look like DFmode NaN's.  The IEEE 754 64-bit floating
-     format has 1 bit for sign, 11 bits for the exponent, and 52 bits for the
-     mantissa.  NaN values have the exponent set to all 1 bits, and the
-     mantissa non-zero (mantissa == 0 is infinity).  */
-
-  int df_exponent = (df_upper >> 52) & 0x7ff;
-  HOST_WIDE_INT df_mantissa = df_upper & HOST_WIDE_INT_C (0x1fffffffffffff);
-
-  if (df_exponent == 0x7ff && df_mantissa != 0)		/* NaN.  */
-    return false;
-
-  /* Avoid values that are DFmode subnormal values.  Subnormal numbers have
-     the exponent all 0 bits, and the mantissa non-zero.  If the value is
-     subnormal, then the hidden bit in the mantissa is not set.  */
-  if (df_exponent == 0 && df_mantissa != 0)		/* subnormal.  */
-    return false;
-
-  /* Change the representation to DFmode constant.  */
-  long df_words[2];
-  df_words[0] = (df_upper >> 32) & 0xffffffff;
-  df_words[1] = df_upper & 0xffffffff;
-
-  /* real_from_target takes the target words in  target order.  */
-  if (!BYTES_BIG_ENDIAN)
-    std::swap (df_words[0], df_words[1]);
-
-  REAL_VALUE_TYPE rv_type;
-  real_from_target (&rv_type, df_words, DFmode);
-
-  const REAL_VALUE_TYPE *rv = &rv_type;
-
-  /* Validate that the number can be stored as a SFmode value.  */
-  if (!exact_real_truncate (SFmode, rv))
-    return false;
-
-  /* Validate that the number is not a SFmode subnormal value (exponent is 0,
-     mantissa field is non-zero) which is undefined for the XXSPLTIDP
-     instruction.  */
-  long sf_value;
-  real_to_target (&sf_value, rv, SFmode);
-
-  /* IEEE 754 32-bit values have 1 bit for the sign, 8 bits for the exponent,
-     and 23 bits for the mantissa.  Subnormal numbers have the exponent all
-     0 bits, and the mantissa non-zero.  */
-  long sf_exponent = (sf_value >> 23) & 0xFF;
-  long sf_mantissa = sf_value & 0x7FFFFF;
-
-  if (sf_exponent == 0 && sf_mantissa != 0)
-    return false;
-
-  return true;
+  return vec_const_use_xxspltidp (&vec_const);
 })
 
 ;; Return 1 if the operand is a constant that can loaded with a XXSPLTIB

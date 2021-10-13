@@ -6480,9 +6480,13 @@
   [(set (match_dup 0)
 	(unspec:XXSPLTIDP [(match_dup 2)] UNSPEC_XXSPLTIDP))]
 {
-  long immediate = xxspltidp_constant_immediate (operands[1], <MODE>mode);
-  operands[2] = GEN_INT (immediate);
-  })
+  rs6000_vec_const vec_const;
+  if (!vec_const_to_bytes (operands[1], <MODE>mode, &vec_const)
+      || !vec_const_use_xxspltidp (&vec_const))
+    gcc_unreachable ();
+
+  operands[2] = GEN_INT (vec_const.xxspltidp_immediate);
+})
 
 ;; XXSPLTI32DX built-in function support
 (define_expand "xxsplti32dx_v4si"
