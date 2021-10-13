@@ -1,3 +1,8 @@
+work071.patch003:
+2021-10-13  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/rs6000.c (vec_const_to_bytes): Fix typo.
+
 work071.patch002:
 2021-10-13  Michael Meissner  <meissner@the-meissners.org>
 
