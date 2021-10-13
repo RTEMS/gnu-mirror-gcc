@@ -28869,12 +28869,12 @@ vec_const_to_bytes (rtx op,
     }
 
   /* Pack half words together.  */
-  for (size_t i = 0; i <= VECTOR_CONST_16BIT; i++)
+  for (size_t i = 0; i < VECTOR_CONST_16BIT; i++)
     vec_const->h_words[i] = ((vec_const->bytes[2*i] << 8)
 			     | vec_const->bytes[2*i + 1]);
 
   /* Pack words together.  */
-  for (size_t i = 0; i <= VECTOR_CONST_32BIT; i++)
+  for (size_t i = 0; i < VECTOR_CONST_32BIT; i++)
     {
       unsigned word = 0;
       for (size_t j = 0; j < 4; j++)
@@ -28884,7 +28884,7 @@ vec_const_to_bytes (rtx op,
     }
 
   /* Pack double words together.  */
-  for (size_t i = 0; i <= VECTOR_CONST_64BIT; i++)
+  for (size_t i = 0; i < VECTOR_CONST_64BIT; i++)
     {
       unsigned HOST_WIDE_INT d_word = 0;
       for (size_t j = 0; j < 8; j++)
