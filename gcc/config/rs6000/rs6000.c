@@ -3466,13 +3466,8 @@ rs6000_override_options_after_change (void)
   /* Explicit -funroll-loops turns -munroll-only-small-loops off, and
      turns -frename-registers on.  */
   if ((OPTION_SET_P (flag_unroll_loops) && flag_unroll_loops)
-       || (OPTION_SET_P (flag_unroll_all_loops)
-	   && flag_unroll_all_loops))
+       || (OPTION_SET_P (flag_unroll_all_loops) && flag_unroll_all_loops))
     {
-      if (!OPTION_SET_P (unroll_only_small_loops))
-	unroll_only_small_loops = 0;
-      if (!OPTION_SET_P (flag_rename_registers))
-	flag_rename_registers = 1;
       if (!OPTION_SET_P (flag_cunroll_grow_size))
 	flag_cunroll_grow_size = 1;
     }
