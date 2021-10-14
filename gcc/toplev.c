@@ -1494,6 +1494,7 @@ process_options (bool no_backend)
 	}
       flag_var_tracking = 0;
       flag_var_tracking_uninit = 0;
+      flag_var_tracking_assignments = 0;
     }
 
   /* The debug hooks are used to implement -fdump-go-spec because it
@@ -1501,26 +1502,6 @@ process_options (bool no_backend)
      dump.  */
   if (flag_dump_go_spec != NULL)
     debug_hooks = dump_go_spec_init (flag_dump_go_spec, debug_hooks);
-
-  /* One could use EnabledBy, but it would lead to a circular dependency.  */
-  if (!OPTION_SET_P (flag_var_tracking_uninit))
-     flag_var_tracking_uninit = flag_var_tracking;
-
-  if (!OPTION_SET_P (flag_var_tracking_assignments))
-    flag_var_tracking_assignments
-      = (flag_var_tracking
-	 && !(flag_selective_scheduling || flag_selective_scheduling2));
-
-  if (flag_var_tracking_assignments_toggle)
-    flag_var_tracking_assignments = !flag_var_tracking_assignments;
-
-  if (flag_var_tracking_assignments && !flag_var_tracking)
-    flag_var_tracking = flag_var_tracking_assignments = -1;
-
-  if (flag_var_tracking_assignments
-      && (flag_selective_scheduling || flag_selective_scheduling2))
-    warning_at (UNKNOWN_LOCATION, 0,
-		"var-tracking-assignments changes selective scheduling");
 
   if (!OPTION_SET_P (debug_nonbind_markers_p))
     debug_nonbind_markers_p

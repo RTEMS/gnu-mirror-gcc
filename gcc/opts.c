@@ -1349,6 +1349,25 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
     SET_OPTION_IF_UNSET (opts, opts_set, flag_vect_cost_model,
 			 VECT_COST_MODEL_CHEAP);
 
+  /* One could use EnabledBy, but it would lead to a circular dependency.  */
+  if (!OPTION_SET_P (flag_var_tracking_uninit))
+     flag_var_tracking_uninit = flag_var_tracking;
+
+  if (!OPTION_SET_P (flag_var_tracking_assignments))
+    flag_var_tracking_assignments
+      = (flag_var_tracking
+	 && !(flag_selective_scheduling || flag_selective_scheduling2));
+
+  if (flag_var_tracking_assignments_toggle)
+    flag_var_tracking_assignments = !flag_var_tracking_assignments;
+
+  if (flag_var_tracking_assignments && !flag_var_tracking)
+    flag_var_tracking = flag_var_tracking_assignments = -1;
+
+  if (flag_var_tracking_assignments
+      && (flag_selective_scheduling || flag_selective_scheduling2))
+    warning_at (loc, 0,
+		"var-tracking-assignments changes selective scheduling");
 }
 
 #define LEFT_COLUMN	27

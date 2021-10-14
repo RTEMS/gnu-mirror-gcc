@@ -219,6 +219,7 @@ nvptx_option_override (void)
     flag_toplevel_reorder = 1;
 
   debug_nonbind_markers_p = 0;
+  OPTION_SET_P (debug_nonbind_markers_p) = 1;
 
   /* Set flag_no_common, unless explicitly disabled.  We fake common
      using .weak, and that's not entirely accurate, so avoid it
