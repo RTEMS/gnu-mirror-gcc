@@ -198,6 +198,7 @@ enum non_prefixed_form reg_to_non_prefixed (rtx reg, machine_mode mode);
 extern bool prefixed_load_p (rtx_insn *);
 extern bool prefixed_store_p (rtx_insn *);
 extern bool prefixed_paddi_p (rtx_insn *);
+extern bool prefixed_xxsplti_p (rtx_insn *);
 extern void rs6000_asm_output_opcode (FILE *);
 extern void output_pcrel_opt_reloc (rtx);
 extern void rs6000_final_prescan_insn (rtx_insn *, rtx [], int);
@@ -222,6 +223,31 @@ address_is_prefixed (rtx addr,
   return (iform == INSN_FORM_PREFIXED_NUMERIC
 	  || iform == INSN_FORM_PCREL_LOCAL);
 }
+
+/* Functions and data structures relating to 128-bit vector constants.  All
+   fields are kept in big endian order.  */
+#define VECTOR_CONST_BITS	128
+#define VECTOR_CONST_BYTES	(VECTOR_CONST_BITS / 8)
+#define VECTOR_CONST_16BIT	(VECTOR_CONST_BITS / 16)
+#define VECTOR_CONST_32BIT	(VECTOR_CONST_BITS / 32)
+#define VECTOR_CONST_64BIT	(VECTOR_CONST_BITS / 64)
+
+typedef struct {
+  /* Vector constant as various sized items.  */
+  unsigned char bytes[VECTOR_CONST_BYTES];
+  unsigned short h_words[VECTOR_CONST_16BIT];
+  unsigned int words[VECTOR_CONST_32BIT];
+  unsigned HOST_WIDE_INT d_words[VECTOR_CONST_64BIT];
+  machine_mode orig_mode;		/* Original mode.  */
+  enum rtx_code orig_code;		/* Original rtx code.  */
+  bool is_xxspltidp;			/* Use XXSPLTIDP to load constant.  */
+  machine_mode xxspltidp_mode;		/* Mode to use for XXSPLTIDP.  */
+  unsigned int xxspltidp_immediate;	/* Immediate value for XXSPLTIDP.  */
+  bool is_prefixed;			/* Prefixed instruction used.  */
+} rs6000_vec_const;
+
+extern bool vec_const_to_bytes (rtx, machine_mode, rs6000_vec_const *);
+extern bool vec_const_use_xxspltidp (rs6000_vec_const *);
 #endif /* RTX_CODE */
 
 #ifdef TREE_CODE
