@@ -1,3 +1,8 @@
+work071.patch006:
+2021-10-13  Michael Meissner  <meissner@the-meissners.org>
+
+	* gcc.target/powerpc/float128-constant.c: New test.
+
 work071.patch001:
 2021-10-12  Michael Meissner  <meissner@the-meissners.org>
 

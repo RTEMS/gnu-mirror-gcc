@@ -1,3 +1,43 @@
+work071.patch006:
+2021-10-13  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/constraints.md (eQ): New constraint.
+	* config/rs6000/predicates.md (easy_fp_constant): Add support for
+	generating the LXVKQ instruction.
+	(easy_vector_constant_ieee128): New predicate.
+	(easy_vector_constant): Add support for generating the LXVKQ
+	instruction.
+	* config/rs6000/rs6000-protos.h (rs6000_vec_concat): Add fields
+	for generating LXVKQ.
+	* config/rs6000/rs6000.c (output_vec_const_move): Add support for
+	generating LXVKQ.
+	(vec_const_use_lxvkq): New function.
+	* config/rs6000/rs6000.opt (-mlxvkq): New debug option.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
+	generating LXVKQ.
+	(vsx_mov<mode>_32bit): Likewise.
+	* doc/md.texi (PowerPC and IBM RS6000 constraints): Document the
+	eQ constraint.
+
+work071.patch005:
+2021-10-13  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/predicates.md (easy_fp_constant): Move to using
+	vec_const instead of calling easy_vector_constant_64bit_element.
+	(easy_vector_constant): Likewise.
+	* config/rs6000/rs6000.c (output_vec_const_move): Rework code
+	slightly to improve future patches.
+	(prefixed_xxsplti_p): Likewise.
+	(vec_const_to_bytes): SFmode as a scalar in registers uses the
+	DFmode format.
+
+work071.patch004:
+2021-10-13  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add XXSPLTIDP
+	support.
+	(vsx_mov<mode>_32bit): Likewise.
+
 work071.patch003:
 2021-10-13  Michael Meissner  <meissner@the-meissners.org>
 
