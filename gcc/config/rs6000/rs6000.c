@@ -6991,11 +6991,13 @@ output_vec_const_move (rtx *operands)
 	}
 
       rs6000_vec_const vec_const;
-      if (vec_const_to_bytes (vec, mode, &vec_const)
-	  && vec_const_use_xxspltidp (&vec_const))
+      if (vec_const_to_bytes (vec, mode, &vec_const))
 	{
-	  operands[2] = GEN_INT (vec_const.xxspltidp_immediate);
-	  return "xxspltidp %x0,%2";
+	  if (vec_const_use_xxspltidp (&vec_const))
+	    {
+	      operands[2] = GEN_INT (vec_const.xxspltidp_immediate);
+	      return "xxspltidp %x0,%2";
+	    }
 	}
 
       if (TARGET_P9_VECTOR
@@ -26758,11 +26760,16 @@ prefixed_xxsplti_p (rtx_insn *insn)
     }
 
   rs6000_vec_const vec_const;
-  if (!vec_const_to_bytes (src, mode, &vec_const))
-    return false;
+  if (vec_const_to_bytes (src, mode, &vec_const))
+    {
+      if (vec_const.is_prefixed)
+	return true;
 
-  return (vec_const.is_prefixed
-	  || vec_const_use_xxspltidp (&vec_const));
+      if (vec_const_use_xxspltidp (&vec_const))
+	return true;
+    }
+
+  return false;
 }
 
 /* Whether the next instruction needs a 'p' prefix issued before the
@@ -28820,6 +28827,10 @@ vec_const_to_bytes (rtx op,
       /* Floating point constants.  */
     case CONST_DOUBLE:
       {
+	/* SFmode stored as scalars is stored in DFmode format.  */
+	if (mode == SFmode)
+	  mode = DFmode;
+
 	vec_const_floating_point (op, mode, 0, vec_const);
 
 	/* Splat the constant to the rest of the vector constant structure.  */

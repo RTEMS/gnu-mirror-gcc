@@ -601,9 +601,15 @@
   if (TARGET_VSX && op == CONST0_RTX (mode))
     return 1;
 
-  /* See if the constant can be generated with the XXSPLTIDP instruction.  */
-  if (easy_vector_constant_64bit_element (op, mode))
-    return 1;
+  /* See if the constant can be generated with the ISA 3.1
+     instructions.  */
+  rs6000_vec_const vec_const;
+
+  if (vec_const_to_bytes (op, mode, &vec_const))
+    {
+      if (vec_const_use_xxspltidp (&vec_const))
+	return true;
+    }
 
   /* Otherwise consider floating point constants hard, so that the
      constant gets pushed to memory during the early RTL phases.  This
@@ -681,8 +687,15 @@
           && xxspltib_constant_p (op, mode, &num_insns, &value))
 	return true;
 
-      if (easy_vector_constant_64bit_element (op, mode))
-	return true;
+      /* See if the constant can be generated with the ISA 3.1
+         instructions.  */
+      rs6000_vec_const vec_const;
+
+      if (vec_const_to_bytes (op, mode, &vec_const))
+	{
+	  if (vec_const_use_xxspltidp (&vec_const))
+	    return true;
+	}
 
       return easy_altivec_constant (op, mode);
     }
