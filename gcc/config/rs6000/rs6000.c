@@ -7004,6 +7004,12 @@ output_vec_const_move (rtx *operands)
 	      operands[2] = GEN_INT (vec_const.xxspltidp_immediate);
 	      return "xxspltidp %x0,%2";
 	    }
+
+	  if (vec_const_use_xxspltiw (&vec_const))
+	    {
+	      operands[2] = GEN_INT (vec_const.xxspltiw_immediate);
+	      return "xxspltiw %x0,%2";
+	    }
 	}
 
       if (TARGET_P9_VECTOR
@@ -26773,6 +26779,9 @@ prefixed_xxsplti_p (rtx_insn *insn)
 
       if (vec_const_use_xxspltidp (&vec_const))
 	return true;
+
+      if (vec_const_use_xxspltiw (&vec_const))
+	return true;
     }
 
   return false;
@@ -28788,6 +28797,43 @@ vec_const_use_xxspltidp (rs6000_vec_const *vec_const)
   vec_const->is_prefixed = true;
   vec_const->xxspltidp_immediate = sf_value;
   vec_const->xxspltidp_mode = FLOAT_MODE_P (mode) ? E_DFmode : E_DImode;
+
+  return true;
+}
+
+/* Determine if a vector constant can be loaded with XXSPLTIW.  If so,
+   fill out the fields used to generate the instruction.  */
+
+bool
+vec_const_use_xxspltiw (rs6000_vec_const *vec_const)
+{
+  if (!TARGET_XXSPLTIW || !TARGET_PREFIXED || !TARGET_VSX)
+    return false;
+
+  /* Make sure that each of the 4 32-bit segments are the same.  */
+  unsigned int value = vec_const->words[0];
+  if (value != vec_const->words[1]
+      || value != vec_const->words[2]
+      || value != vec_const->words[3])
+    return false;
+
+  /* Avoid values that are easy to create with other instructions (0.0 for
+     floating point, and values that can be loaded with XXSPLTIB and sign
+     extension for integer.  */
+  if (value == 0)
+    return false;
+
+  machine_mode mode = vec_const->orig_mode;
+  if (mode == VOIDmode)
+    mode = SImode;
+
+  if (!FLOAT_MODE_P (mode) && IN_RANGE (value, -128, 127))
+    return false;
+
+  /* Record the information in the vec_const structure for XXSPLTIW.  */
+  vec_const->is_xxspltiw = true;
+  vec_const->is_prefixed = true;
+  vec_const->xxspltiw_immediate = value;
 
   return true;
 }

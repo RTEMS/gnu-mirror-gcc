@@ -243,6 +243,8 @@ typedef struct {
   bool is_xxspltidp;			/* Use XXSPLTIDP to load constant.  */
   machine_mode xxspltidp_mode;		/* Mode to use for XXSPLTIDP.  */
   unsigned int xxspltidp_immediate;	/* Immediate value for XXSPLTIDP.  */
+  bool is_xxspltiw;			/* Use XXSPLTIDP to load constant.  */
+  unsigned int xxspltiw_immediate;	/* Immediate value for XXSPLTIW.  */
   bool is_lxvkq;			/* LXVKQ can load the constant.  */
   unsigned lxvkq_immediate;		/* Immediate to use with LXVKQ.  */
   bool is_prefixed;			/* Prefixed instruction used.  */
@@ -250,6 +252,7 @@ typedef struct {
 
 extern bool vec_const_to_bytes (rtx, machine_mode, rs6000_vec_const *);
 extern bool vec_const_use_xxspltidp (rs6000_vec_const *);
+extern bool vec_const_use_xxspltiw (rs6000_vec_const *);
 extern bool vec_const_use_lxvkq (rs6000_vec_const *);
 #endif /* RTX_CODE */
 
