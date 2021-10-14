@@ -218,6 +218,11 @@
   "A signed 34-bit integer constant if prefixed instructions are supported."
   (match_operand 0 "cint34_operand"))
 
+;; 128-bit IEEE 128-bit constant
+(define_constraint "eQ"
+  "An IEEE 128-bit constant that can be loaded with the LXVKQ instruction."
+  (match_operand 0 "easy_vector_constant_ieee128"))
+
 ;; Floating-point constraints.  These two are defined so that insn
 ;; length attributes can be calculated exactly.
 
