@@ -1,5 +1,29 @@
-work071.patch012:
-2021-10-13  Michael Meissner  <meissner@the-meissners.org>
+work071.patch023:
+2021-10-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (eW): New constraint.
+	* config/rs6000/predicates.md (easy_fp_constant): Add support for
+	XXSPLTIW.
+	(easy_vector_constant_32bit_element): New predicate.
+	(easy_vector_constant): Add support for XXSPLTIW.
+	* config/rs6000/rs6000-protos.h (rs6000_vec_const): Add fields for
+	XXSPLTIW.
+	(vec_const_use_xxspltiw): New declaration.
+	* config/rs6000/rs6000.c (xxspltib_constant_p): If we can generate
+	XXSPLTIW, don't do XXSPLTIB and sign extend.
+	(output_vec_const_move): Add support for XXSPLTIW.
+	(prefixed_xxsplti_p): Recognize XXSPLTIW instructions as
+	prefixed.
+	(vec_const_use_xxspltiw): New function.
+	* config/rs6000/rs6000.opt (-mxxspltiw): New debug switch.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
+	constants loaded with XXSPLTIW.
+	(vsx_mov<mode>_32bit): Likewise.
+	* doc/md.texi (PowerPC and IBM RS6000 constraints): Document the
+	eW constraint.
+
+work071.patch022:
+2021-10-14  Michael Meissner  <meissner@the-meissners.org>
 
 	* config/rs6000/constraints.md (eQ): New constraint.
 	* config/rs6000/predicates.md (easy_fp_constant): Add support for
@@ -19,8 +43,8 @@ work071.patch012:
 	* doc/md.texi (PowerPC and IBM RS6000 constraints): Document the
 	eQ constraint.
 
-work071.patch011:
-2021-10-13  Michael Meissner  <meissner@the-meissners.org>
+work071.patch021:
+2021-10-14  Michael Meissner  <meissner@the-meissners.org>
 
 	* config/rs6000/constraints.md (eD): New constraint.
 	* config/rs6000/predicates.md (easy_fp_constant): Add support for
@@ -38,7 +62,7 @@ work071.patch011:
 	XXSPLTIDP.
 	(prefixed_xxsplti_p): New function.
 	(vec_const_integer): New helper function.
-	(vec_const_floating_poin): New helper function.
+	(vec_const_floating_point): New helper function.
 	(vec_const_use_xxspltidp): New function.
 	(vec_const_to_bytes): New function.
 	* config/rs6000/rs6000.md (prefixed attribute): Add support for
