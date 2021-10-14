@@ -1192,20 +1192,17 @@
 
 ;;              VSX store  VSX load   VSX move  VSX->GPR   GPR->VSX    LQ (GPR)
 ;;              STQ (GPR)  GPR load   GPR store GPR move   XXSPLTIB    VSPLTISW
-;;              VSX 0/-1   VMX const  GPR const LVX (VMX)  STVX (VMX)  XXLSPLTIDP
-;;              LXVKQ
+;;              VSX 0/-1   VMX const  GPR const LVX (VMX)  STVX (VMX)
 (define_insn "vsx_mov<mode>_64bit"
   [(set (match_operand:VSX_M 0 "nonimmediate_operand"
                "=ZwO,      wa,        wa,        r,         we,        ?wQ,
                 ?&r,       ??r,       ??Y,       <??r>,     wa,        v,
-                ?wa,       v,         <??r>,     wZ,        v,         wa,
-                wa")
+                ?wa,       v,         <??r>,     wZ,        v")
 
 	(match_operand:VSX_M 1 "input_operand" 
                "wa,        ZwO,       wa,        we,        r,         r,
                 wQ,        Y,         r,         r,         wE,        jwM,
-                ?jwM,      W,         <nW>,      v,         wZ,        eD,
-                eQ"))]
+                ?jwM,      W,         <nW>,      v,         wZ"))]
 
   "TARGET_POWERPC64 && VECTOR_MEM_VSX_P (<MODE>mode)
    && (register_operand (operands[0], <MODE>mode) 
@@ -1216,42 +1213,37 @@
   [(set_attr "type"
                "vecstore,  vecload,   vecsimple, mtvsr,     mfvsr,     load,
                 store,     load,      store,     *,         vecsimple, vecsimple,
-                vecsimple, *,         *,         vecstore,  vecload,   vecperm,
-                vecperm")
+                vecsimple, *,         *,         vecstore,  vecload")
    (set_attr "num_insns"
                "*,         *,         *,         2,         *,         2,
                 2,         2,         2,         2,         *,         *,
-                *,         5,         2,         *,         *,         *,
-                *")
+                *,         5,         2,         *,         *")
    (set_attr "max_prefixed_insns"
                "*,         *,         *,         *,         *,         2,
                 2,         2,         2,         2,         *,         *,
-                *,         *,         *,         *,         *,         *,
-                *")
+                *,         *,         *,         *,         *")
    (set_attr "length"
                "*,         *,         *,         8,         *,         8,
                 8,         8,         8,         8,         *,         *,
-                *,         20,        8,         *,         *,         *,
-                *")
+                *,         20,        8,         *,         *")
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
                 *,         *,         *,         *,         p9v,       *,
-                <VSisa>,   *,         *,         *,         *,         p10,
-                p10")])
+                <VSisa>,   *,         *,         *,         *")])
 
 ;;              VSX store  VSX load   VSX move   GPR load   GPR store  GPR move
 ;;              XXSPLTIB   VSPLTISW   VSX 0/-1   VMX const  GPR const
-;;              LVX (VMX)  STVX (VMX) XXSPLTID   LXVKQ
+;;              LVX (VMX)  STVX (VMX)
 (define_insn "*vsx_mov<mode>_32bit"
   [(set (match_operand:VSX_M 0 "nonimmediate_operand"
                "=ZwO,      wa,        wa,        ??r,       ??Y,       <??r>,
                 wa,        v,         ?wa,       v,         <??r>,
-                wZ,        v,         wa,        wa")
+                wZ,        v")
 
 	(match_operand:VSX_M 1 "input_operand" 
                "wa,        ZwO,       wa,        Y,         r,         r,
                 wE,        jwM,       ?jwM,      W,         <nW>,
-                v,         wZ,        eD,        eQ"))]
+                v,         wZ"))]
 
   "!TARGET_POWERPC64 && VECTOR_MEM_VSX_P (<MODE>mode)
    && (register_operand (operands[0], <MODE>mode) 
@@ -1262,15 +1254,15 @@
   [(set_attr "type"
                "vecstore,  vecload,   vecsimple, load,      store,    *,
                 vecsimple, vecsimple, vecsimple, *,         *,
-                vecstore,  vecload,   vecperm,   vecperm")
+                vecstore,  vecload")
    (set_attr "length"
                "*,         *,         *,         16,        16,        16,
                 *,         *,         *,         20,        16,
-                *,         *,         *,         *")
+                *,         *")
    (set_attr "isa"
                "<VSisa>,   <VSisa>,   <VSisa>,   *,         *,         *,
                 p9v,       *,         <VSisa>,   *,         *,
-                *,         *,         p10,       p10")])
+                *,         *")])
 
 ;; Explicit  load/store expanders for the builtin functions
 (define_expand "vsx_load_<mode>"
@@ -6465,36 +6457,6 @@
   "xxspltidp %x0,%1"
   [(set_attr "type" "vecperm")
    (set_attr "prefixed" "yes")])
-
-(define_mode_iterator XXSPLTIDP [DI SF DF V16QI V8HI V4SI V4SF V2DF V2DI])
-
-(define_insn "*xxspltidp_<mode>_internal"
-  [(set (match_operand:XXSPLTIDP 0 "register_operand" "=wa")
-	(unspec:XXSPLTIDP [(match_operand:SI 1 "c32bit_cint_operand" "n")]
-			  UNSPEC_XXSPLTIDP))]
-  "TARGET_POWER10"
-  "xxspltidp %x0,%1"
-  [(set_attr "type" "vecperm")
-   (set_attr "prefixed" "yes")])
-
-;; Generate the XXSPLTIDP instruction to support SFmode, DFmode, and DImode
-;; scalar constants and vector constants that look like DFmode floating point
-;; values where both elements are the same.  The constant has to be expressible
-;; as a SFmode constant that is not a SFmode denormal value.
-(define_split
-  [(set (match_operand:XXSPLTIDP 0 "vsx_register_operand")
-	(match_operand:XXSPLTIDP 1 "easy_vector_constant_64bit_element"))]
-  "TARGET_POWER10"
-  [(set (match_dup 0)
-	(unspec:XXSPLTIDP [(match_dup 2)] UNSPEC_XXSPLTIDP))]
-{
-  rs6000_vec_const vec_const;
-  if (!vec_const_to_bytes (operands[1], <MODE>mode, &vec_const)
-      || !vec_const_use_xxspltidp (&vec_const))
-    gcc_unreachable ();
-
-  operands[2] = GEN_INT (vec_const.xxspltidp_immediate);
-})
 
 ;; XXSPLTI32DX built-in function support
 (define_expand "xxsplti32dx_v4si"
