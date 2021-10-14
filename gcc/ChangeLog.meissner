@@ -1,4 +1,4 @@
-work071.patch006:
+work071.patch012:
 2021-10-13  Michael Meissner  <meissner@the-meissners.org>
 
 	* config/rs6000/constraints.md (eQ): New constraint.
@@ -19,78 +19,28 @@ work071.patch006:
 	* doc/md.texi (PowerPC and IBM RS6000 constraints): Document the
 	eQ constraint.
 
-work071.patch005:
+work071.patch011:
 2021-10-13  Michael Meissner  <meissner@the-meissners.org>
-
-	* config/rs6000/predicates.md (easy_fp_constant): Move to using
-	vec_const instead of calling easy_vector_constant_64bit_element.
-	(easy_vector_constant): Likewise.
-	* config/rs6000/rs6000.c (output_vec_const_move): Rework code
-	slightly to improve future patches.
-	(prefixed_xxsplti_p): Likewise.
-	(vec_const_to_bytes): SFmode as a scalar in registers uses the
-	DFmode format.
-
-work071.patch004:
-2021-10-13  Michael Meissner  <meissner@the-meissners.org>
-
-	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add XXSPLTIDP
-	support.
-	(vsx_mov<mode>_32bit): Likewise.
-
-work071.patch003:
-2021-10-13  Michael Meissner  <meissner@the-meissners.org>
-
-	* config/rs6000/rs6000.c (vec_const_to_bytes): Fix typo.
-
-work071.patch002:
-2021-10-13  Michael Meissner  <meissner@the-meissners.org>
-
-	* config/rs6000/predicates.md
-	(easy_vector_constant_64bit_element): Switch to use
-	rs6000_vec_const.
-	* config/rs6000/rs6000-protos.h (xxspltidp_constant_immediate):
-	Delete.
-	(convert_vector_constant_to_bytes): Likewise.
-	(convert_scalar_64bit_constant_to_bytes): Likewise.
-	(prefixed_xxsplti_p): Likewise.
-	(VECTOR_CONST_*): New defines.
-	(rs6000_vec_const): New data structure.
-	(vec_const_to_bytes): New function.
-	(vec_const_use_xxspltidp): New function.
-	* config/rs6000/rs6000.c (convert_vector_constant_to_bytes):
-	Delete.
-	(convert_scalar_64bit_constant_to_bytes): Likewise.
-	(xxspltidp_constant_immediate): Likewise.
-	(output_vec_const_move): Switch to use rs6000_vec_const.
-	(prefixed_xxsplti_p): Likewise.
-	(vec_const_integer): New helper function.
-	(vec_const_floating_point): New helper function.
-	(vec_const_use_xxspltidp): New function.
-	(vec_const_to_bytes): New function.
-	* config/rs6000/vsx.md (XXSPLTIDP splitters): Switch to use
-	rs6000_vec_const.
-
-
-work071.patch001:
-2021-10-12  Michael Meissner  <meissner@the-meissners.org>
 
 	* config/rs6000/constraints.md (eD): New constraint.
 	* config/rs6000/predicates.md (easy_fp_constant): Add support for
 	generating XXSPLTIDP.
 	(easy_vector_constant_64bit_element): New predicate.
 	(easy_vector_constant): Add support for generating XXSPLTIDP.
-	* config/rs6000/rs6000-protos.h (xxspltidp_constant_immediate):
-	New declaration.
-	(convert_vector_constant_to_bytes): Likewise.
-	(convert_scalar_64bit_constant_to_bytes): Likewise.
-	(prefixed_xxsplti_p): Likewise.
-	* config/rs6000/rs6000.c (convert_vector_constant_to_bytes): New
-	helper function.
-	(convert_scalar_64bit_constant_to_bytes): Likewise.
-	(xxspltidp_constant_immediate): Likewise.
-	(output_vec_const_move): Add support for XXSPLTIDP.
+	* config/rs6000/rs6000-protos.h (prefixed_xxsplti_p): New
+	declaration.
+	(VECTOR_CONST_*): New macros.
+	(rs6000_vec_const): New structure to hold information about vector
+	constants.
+	(vec_const_to_bytes): New function.
+	(vec_const_use_xxspltidp): New function.
+	* config/rs6000/rs6000.c (output_vec_const_move): Add support for
+	XXSPLTIDP.
 	(prefixed_xxsplti_p): New function.
+	(vec_const_integer): New helper function.
+	(vec_const_floating_poin): New helper function.
+	(vec_const_use_xxspltidp): New function.
+	(vec_const_to_bytes): New function.
 	* config/rs6000/rs6000.md (prefixed attribute): Add support for
 	insns that generate XXSPLTIDP.
 	(movsf_hardfloat): Add support for XXSPLTIDP.
@@ -99,7 +49,10 @@ work071.patch001:
 	(movdi_internal32): Likewise.
 	(movdi_internal64): Likewise.
 	* config/rs6000/rs6000.opt (-mxxspltidp): New debug option.
-	* config/rs6000/vsx.md (XXSPLTIDP): New mode iterator.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
+	XXSPLTIDP.
+	(vsx_mov<mode>_32bit): Likewise.
+	(XXSPLTIDP): New mode iterator.
 	(xxspltidp_<mode>_internal): New insn.
 	(XXSPLTIDP splitters): New splitters for XXSPLTIDP.
 	* doc/md.texi (PowerPC and IBM RS6000 constraints): Document the
@@ -108,4 +61,3 @@ work071.patch001:
 2021-10-11   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-
