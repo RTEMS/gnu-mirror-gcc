@@ -609,6 +609,9 @@
     {
       if (vec_const_use_xxspltidp (&vec_const))
 	return true;
+
+      if (vec_const_use_lxvkq (&vec_const))
+	return true;
     }
 
   /* Otherwise consider floating point constants hard, so that the
@@ -637,6 +640,25 @@
     return false;
 
   return vec_const_use_xxspltidp (&vec_const);
+})
+
+;; Return 1 if the operand is a special IEEE 128-bit value that can be loaded
+;; via the LXVKQ instruction.
+
+(define_predicate "easy_vector_constant_ieee128"
+  (match_code "const_vector,vec_duplicate,const_int,const_double")
+{
+  rs6000_vec_const vec_const;
+
+  /* Can we do the LXVKQ instruction?  */
+  if (!TARGET_LXVKQ || !TARGET_PREFIXED || !TARGET_VSX)
+    return false;
+
+  /* Convert the vector constant to bytes.  */
+  if (!vec_const_to_bytes (op, mode, &vec_const))
+    return false;
+
+  return vec_const_use_lxvkq (&vec_const);
 })
 
 ;; Return 1 if the operand is a constant that can loaded with a XXSPLTIB
@@ -694,6 +716,9 @@
       if (vec_const_to_bytes (op, mode, &vec_const))
 	{
 	  if (vec_const_use_xxspltidp (&vec_const))
+	    return true;
+
+	  if (vec_const_use_lxvkq (&vec_const))
 	    return true;
 	}
 
