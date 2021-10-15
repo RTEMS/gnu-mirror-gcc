@@ -1,12 +1,11 @@
-work071.patch023:
-2021-10-14  Michael Meissner  <meissner@linux.ibm.com>
+work071.patch033:
+2021-10-15  Michael Meissner  <meissner@linux.ibm.com>
 
-	* config/rs6000/constraints.md (eW): New constraint.
 	* config/rs6000/predicates.md (easy_fp_constant): Add support for
 	XXSPLTIW.
-	(easy_vector_constant_32bit_element): New predicate.
-	(easy_vector_constant): Add support for XXSPLTIW.
-	* config/rs6000/rs6000-protos.h (rs6000_vec_const): Add fields for
+	(easy_vector_constant_prefixed): Likewise.
+	(easy_vector_constant): Likewise.
+	* config/rs6000/rs6000-protos.h (rs6000_vec_const): Add field for
 	XXSPLTIW.
 	(vec_const_use_xxspltiw): New declaration.
 	* config/rs6000/rs6000.c (xxspltib_constant_p): If we can generate
@@ -16,13 +15,10 @@ work071.patch023:
 	prefixed.
 	(vec_const_use_xxspltiw): New function.
 	* config/rs6000/rs6000.opt (-mxxspltiw): New debug switch.
-	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
-	constants loaded with XXSPLTIW.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Update comment.
 	(vsx_mov<mode>_32bit): Likewise.
-	* doc/md.texi (PowerPC and IBM RS6000 constraints): Document the
-	eW constraint.
 
-work071.patch022:
+work071.patch032:
 2021-10-14  Michael Meissner  <meissner@the-meissners.org>
 
 	* config/rs6000/constraints.md (eQ): New constraint.
@@ -43,13 +39,15 @@ work071.patch022:
 	* doc/md.texi (PowerPC and IBM RS6000 constraints): Document the
 	eQ constraint.
 
-work071.patch021:
+work071.patch031:
 2021-10-14  Michael Meissner  <meissner@the-meissners.org>
 
-	* config/rs6000/constraints.md (eD): New constraint.
+	* config/rs6000/constraints.md (eS): New constraint.
+	(eV): New constraint.
 	* config/rs6000/predicates.md (easy_fp_constant): Add support for
 	generating XXSPLTIDP.
-	(easy_vector_constant_64bit_element): New predicate.
+	(easy_scalar_constant_prefixed): New predicate.
+	(easy_vector_constant_prefixed): New predicate.
 	(easy_vector_constant): Add support for generating XXSPLTIDP.
 	* config/rs6000/rs6000-protos.h (prefixed_xxsplti_p): New
 	declaration.
