@@ -6925,12 +6925,17 @@ xxspltib_constant_p (rtx op,
   else
     return false;
 
-  /* See if we could generate vspltisw/vspltish directly instead of xxspltib +
-     sign extend.  Special case 0/-1 to allow getting any VSX register instead
-     of an Altivec register.  */
-  if ((mode == V4SImode || mode == V8HImode) && !IN_RANGE (value, -1, 0)
-      && EASY_VECTOR_15 (value))
-    return false;
+  /* See if we could generate vspltisw/vspltish/xxspltiw directly instead of
+     xxspltib + sign extend.  Special case 0/-1 to allow getting any VSX
+     register instead of an Altivec register.  */
+  if ((mode == V4SImode || mode == V8HImode) && !IN_RANGE (value, -1, 0))
+    {
+      if (EASY_VECTOR_15 (value))
+	return false;
+
+      if (TARGET_XXSPLTIW && TARGET_PREFIXED && TARGET_VSX)
+	return false;
+    }
 
   /* Return # of instructions and the constant byte for XXSPLTIB.  */
   if (mode == V16QImode)
@@ -7003,6 +7008,52 @@ output_vec_const_move (rtx *operands)
 	    {
 	      operands[2] = GEN_INT (vec_const.xxspltidp_immediate);
 	      return "xxspltidp %x0,%2";
+	    }
+
+	  if (vec_const_use_xxspltiw (&vec_const))
+	    {
+	      HOST_WIDE_INT imm = vec_const.xxspltiw_immediate;
+
+	      /* See if we can generate the shorter VSPLTISB, VSPLTISH, or
+		 VSPLTISW instead of XXSPLTIW.  */
+	      if (dest_vmx_p)
+		{
+		  HOST_WIDE_INT sign_imm
+		    = ((imm & 0xffffffff) ^ 0x80000000) - 0x80000000;
+
+		  if (EASY_VECTOR_15 (sign_imm))
+		    {
+		      operands[2] = GEN_INT (sign_imm);
+		      return "vspltisw %0,%2";
+		    }
+
+		  if (vec_const.bytes[0] == vec_const.bytes[1]
+		      && vec_const.bytes[0] == vec_const.bytes[2]
+		      && vec_const.bytes[0] == vec_const.bytes[3])
+		    {
+		      HOST_WIDE_INT sign_imm8 = ((imm & 0xff) ^ 0x80) - 0x80;
+		      if (EASY_VECTOR_15 (sign_imm8))
+			{
+			  operands[2] = GEN_INT (sign_imm8);
+			  return "vspltisb %0,%2";
+			}
+		    }
+
+		  if (vec_const.h_words[0] == vec_const.h_words[1])
+		    {
+		      HOST_WIDE_INT sign_imm16
+			= ((imm & 0xffff) ^ 0x8000) - 0x8000;
+
+		      if (EASY_VECTOR_15 (sign_imm16))
+			{
+			  operands[2] = GEN_INT (sign_imm16);
+			  return "vspltish %0,%2";
+			}
+		    }
+		}
+
+	      operands[2] = GEN_INT (imm);
+	      return "xxspltiw %x0,%2";
 	    }
 	}
 
@@ -26770,6 +26821,9 @@ prefixed_xxsplti_p (rtx_insn *insn)
     {
       if (vec_const_use_xxspltidp (&vec_const))
 	return true;
+
+      if (vec_const_use_xxspltiw (&vec_const))
+	return true;
     }
 
   return false;
@@ -28780,6 +28834,63 @@ vec_const_use_xxspltidp (rs6000_vec_const *vec_const)
 
   /* Record the information in the vec_const structure for XXSPLTIDP.  */
   vec_const->xxspltidp_immediate = sf_value;
+
+  return true;
+}
+
+/* Determine if a vector constant can be loaded with XXSPLTIW.  If so,
+   fill out the fields used to generate the instruction.  */
+
+bool
+vec_const_use_xxspltiw (rs6000_vec_const *vec_const)
+{
+  if (!TARGET_XXSPLTIW || !TARGET_PREFIXED || !TARGET_VSX)
+    return false;
+
+  /* Make sure that each of the 4 32-bit segments are the same.  */
+  unsigned int value = vec_const->words[0];
+  if (value != vec_const->words[1]
+      || value != vec_const->words[2]
+      || value != vec_const->words[3])
+    return false;
+
+  /* Avoid values that are easy to create with other instructions (0.0 for
+     floating point, and values that can be loaded with VSPLTIW..  */
+  if (value == 0)
+    return false;
+
+  machine_mode mode = vec_const->orig_mode;
+  if (mode == VOIDmode)
+    mode = SImode;
+
+  if (!FLOAT_MODE_P (mode))
+    {
+      /* Can we use VSPLTISW to load the constant?  */
+      int sign_value = ((value & 0xffffffff) ^ 0x80000000) - 0x80000000;
+      if (EASY_VECTOR_15 (sign_value))
+	return false;
+
+      /* Can we use VSPLTISB to load the constant?  */
+      if (vec_const->bytes[0] == vec_const->bytes[1]
+	  && vec_const->bytes[0] == vec_const->bytes[2]
+	  && vec_const->bytes[0] == vec_const->bytes[3])
+	{
+	  int sign_value8 = ((value & 0xff) ^ 0x80) - 0x80;
+	  if (EASY_VECTOR_15 (sign_value8))
+	    return false;
+	}
+
+      /* Can we use VSPLTISH to load the constant?  */
+      if (vec_const->h_words[0] == vec_const->h_words[1])
+	{
+	  int sign_value16 = ((value & 0xffff) ^ 0x8000) - 0x8000;
+	  if (EASY_VECTOR_15 (sign_value16))
+	    return false;
+	}
+    }
+
+  /* Record the immediate in the vec_const structure for XXSPLTIW.  */
+  vec_const->xxspltiw_immediate = value;
 
   return true;
 }
