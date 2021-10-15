@@ -6990,6 +6990,16 @@ output_vec_const_move (rtx *operands)
 	    gcc_unreachable ();
 	}
 
+      rs6000_vec_const vec_const;
+      if (TARGET_POWER10 && vec_const_to_bytes (vec, mode, &vec_const))
+	{
+	  if (vec_const_use_xxspltidp (&vec_const))
+	    {
+	      operands[2] = GEN_INT (vec_const.xxspltidp_immediate);
+	      return "xxspltidp %x0,%2";
+	    }
+	}
+
       if (TARGET_P9_VECTOR
 	  && xxspltib_constant_p (vec, mode, &num_insns, &xxspltib_value))
 	{
@@ -26724,6 +26734,41 @@ prefixed_paddi_p (rtx_insn *insn)
   return (iform == INSN_FORM_PCREL_EXTERNAL || iform == INSN_FORM_PCREL_LOCAL);
 }
 
+/* Whether a permute type instruction is a prefixed XXSPLTI* instruction.
+   This is called from the prefixed attribute processing.  */
+
+bool
+prefixed_xxsplti_p (rtx_insn *insn)
+{
+  rtx set = single_set (insn);
+  if (!set)
+    return false;
+
+  rtx dest = SET_DEST (set);
+  rtx src = SET_SRC (set);
+  machine_mode mode = GET_MODE (dest);
+
+  if (!REG_P (dest) && !SUBREG_P (dest))
+    return false;
+
+  if (GET_CODE (src) == UNSPEC)
+    {
+      int unspec = XINT (src, 1);
+      return (unspec == UNSPEC_XXSPLTIW
+	      || unspec == UNSPEC_XXSPLTIDP
+	      || unspec == UNSPEC_XXSPLTI32DX);
+    }
+
+  rs6000_vec_const vec_const;
+  if (vec_const_to_bytes (src, mode, &vec_const))
+    {
+      if (vec_const_use_xxspltidp (&vec_const))
+	return true;
+    }
+
+  return false;
+}
+
 /* Whether the next instruction needs a 'p' prefix issued before the
    instruction is printed out.  */
 static bool prepend_p_to_next_insn;
@@ -28587,6 +28632,319 @@ rs6000_output_addr_vec_elt (FILE *file, int value)
   fprintf (file, "\n");
 }
 
+
+/* Copy an integer constant to the vector constant structure.  */
+
+static void
+vec_const_integer (rtx op,
+		   machine_mode mode,
+		   size_t byte_num,
+		   rs6000_vec_const *vec_const)
+{
+  unsigned HOST_WIDE_INT uvalue = UINTVAL (op);
+  unsigned bitsize = GET_MODE_BITSIZE (mode);
+
+  for (int shift = bitsize - 8; shift >= 0; shift -= 8)
+    vec_const->bytes[byte_num++] = (uvalue >> shift) & 0xff;
+}
+
+/* Copy an floating point constant to the vector constant structure.  */
+
+static void
+vec_const_floating_point (rtx op,
+			  machine_mode mode,
+			  size_t byte_num,
+			  rs6000_vec_const *vec_const)
+{
+  unsigned bitsize = GET_MODE_BITSIZE (mode);
+  unsigned num_words = bitsize / 32;
+  const REAL_VALUE_TYPE *rtype = CONST_DOUBLE_REAL_VALUE (op);
+  long real_words[VECTOR_CONST_32BIT];
+
+  /* Make sure we don't overflow the real_words array and that it is
+     filled completely.  */
+  gcc_assert (bitsize <= VECTOR_CONST_BITS && (bitsize % 32) == 0);
+
+  real_to_target (real_words, rtype, mode);
+
+  /* Iterate over each 32-bit word in the floating point constant.  The
+     real_to_target function puts out words in endian fashion.  We need
+     to arrange so the words are written in big endian order.  */
+  for (unsigned num = 0; num < num_words; num++)
+    {
+      unsigned endian_num = (BYTES_BIG_ENDIAN
+			     ? num
+			     : num_words - 1 - num);
+
+      unsigned uvalue = real_words[endian_num];
+      for (int shift = 32 - 8; shift >= 0; shift -= 8)
+	vec_const->bytes[byte_num++] = (uvalue >> shift) & 0xff;
+    }
+}
+
+/* Determine if a vector constant can be loaded with XXSPLTIDP.  If so,
+   fill out the fields used to generate the instruction.  */
+
+bool
+vec_const_use_xxspltidp (rs6000_vec_const *vec_const)
+{
+  if (!TARGET_XXSPLTIDP || !TARGET_PREFIXED || !TARGET_VSX)
+    return false;
+
+  /* Make sure that the two 64-bit segments are the same.  */
+  unsigned HOST_WIDE_INT df_upper = vec_const->d_words[0];
+  unsigned HOST_WIDE_INT df_lower = vec_const->d_words[1];
+  if (df_upper != df_lower)
+    return false;
+  
+  /* Avoid 0 since that is easy to generate without using XXSPLTIDP.  */
+  if (df_upper == 0)
+    return false;
+
+  /* Avoid values that look like DFmode NaN's, except for the normal NaN bit
+     pattern and signalling NaN bit pattern.  Recognize infinity and negative
+     infinity.
+
+     The IEEE 754 64-bit floating format has 1 bit for sign, 11 bits for the
+     exponent, and 52 bits for the mantissa (not counting the hidden bit used
+     for normal numbers).  NaN values have the exponent set to all 1 bits, and
+     the mantissa non-zero (mantissa == 0 is infinity).  */
+
+  /* Bit representation of DFmode normal quiet NaN.  */
+#define VECTOR_CONST_DF_NAN	HOST_WIDE_INT_UC (0x7ff8000000000000)
+
+  /* Bit representation of DFmode normal signaling NaN.  */
+#define VECTOR_CONST_DF_NANS	HOST_WIDE_INT_UC (0x7ff4000000000000)
+
+  /* Bit representation of DFmode positive infinity.  */
+#define VECTOR_CONST_DF_INF	HOST_WIDE_INT_UC (0x7ff0000000000000)
+
+  /* Bit representation of DFmode negative infinity.  */
+#define VECTOR_CONST_DF_NEG_INF	HOST_WIDE_INT_UC (0xfff0000000000000)
+
+  if (df_upper != VECTOR_CONST_DF_NAN
+      && df_upper != VECTOR_CONST_DF_NANS
+      && df_upper != VECTOR_CONST_DF_INF
+      && df_upper != VECTOR_CONST_DF_NEG_INF)
+    {
+      int df_exponent = (df_upper >> 52) & 0x7ff;
+      unsigned HOST_WIDE_INT df_mantissa
+	= df_upper & ((HOST_WIDE_INT_1U << 52) - HOST_WIDE_INT_1U);
+
+      if (df_exponent == 0x7ff && df_mantissa != 0)	/* other NaNs.  */
+	return false;
+
+      /* Avoid values that are DFmode subnormal values.  Subnormal numbers have
+	 the exponent all 0 bits, and the mantissa non-zero.  If the value is
+	 subnormal, then the hidden bit in the mantissa is not set.  */
+      if (df_exponent == 0 && df_mantissa != 0)		/* subnormal.  */
+	return false;
+    }
+
+  /* Change the representation to DFmode constant.  */
+  long df_words[2] = { vec_const->words[0], vec_const->words[1] };
+
+  /* real_from_target takes the target words in  target order.  */
+  if (!BYTES_BIG_ENDIAN)
+    std::swap (df_words[0], df_words[1]);
+
+  REAL_VALUE_TYPE rv_type;
+  real_from_target (&rv_type, df_words, DFmode);
+
+  const REAL_VALUE_TYPE *rv = &rv_type;
+
+  /* Validate that the number can be stored as a SFmode value.  */
+  if (!exact_real_truncate (SFmode, rv))
+    return false;
+
+  /* Validate that the number is not a SFmode subnormal value (exponent is 0,
+     mantissa field is non-zero) which is undefined for the XXSPLTIDP
+     instruction.  */
+  long sf_value;
+  real_to_target (&sf_value, rv, SFmode);
+
+  /* IEEE 754 32-bit values have 1 bit for the sign, 8 bits for the exponent,
+     and 23 bits for the mantissa.  Subnormal numbers have the exponent all
+     0 bits, and the mantissa non-zero.  */
+  long sf_exponent = (sf_value >> 23) & 0xFF;
+  long sf_mantissa = sf_value & 0x7FFFFF;
+
+  if (sf_exponent == 0 && sf_mantissa != 0)
+    return false;
+
+  /* Record the information in the vec_const structure for XXSPLTIDP.  */
+  vec_const->xxspltidp_immediate = sf_value;
+
+  return true;
+}
+
+/* Convert a vector constant to an internal structure, breaking it out to
+   bytes, half words, words, and double words.  Return true if we have
+   successfully broken it out.  */
+
+bool
+vec_const_to_bytes (rtx op,
+		    machine_mode mode,
+		    rs6000_vec_const *vec_const)
+{
+  /* Initialize vec const structure.  */
+  memset ((void *)vec_const, 0, sizeof (rs6000_vec_const));
+
+  /* Set up the vector bits.  */
+  switch (GET_CODE (op))
+    {
+      /* Integer constants, default to double word.  */
+    case CONST_INT:
+      {
+	/* Scalars are treated as 64-bit integers.  */
+	if (mode == VOIDmode)
+	  mode = DImode;
+
+	vec_const_integer (op, mode, 0, vec_const);
+
+	/* Splat the constant to the rest of the vector constant structure.  */
+	unsigned size = GET_MODE_SIZE (mode);
+	gcc_assert (size <= VECTOR_CONST_BYTES);
+	gcc_assert ((VECTOR_CONST_BYTES % size) == 0);
+
+	for (size_t splat = size; splat < VECTOR_CONST_BYTES; splat += size)
+	  memcpy ((void *) &vec_const->bytes[splat],
+		  (void *) &vec_const->bytes[0],
+		  size);
+	break;
+      }
+
+      /* Floating point constants.  */
+    case CONST_DOUBLE:
+      {
+	/* Fail if the floating point constant is the wrong mode.  */
+	if (mode == VOIDmode)
+	  mode = GET_MODE (op);
+
+	else if (GET_MODE (op) != mode)
+	  return false;
+
+	/* SFmode stored as scalars are stored in DFmode format.  */
+	if (mode == SFmode)
+	  mode = DFmode;
+
+	vec_const_floating_point (op, mode, 0, vec_const);
+
+	/* Splat the constant to the rest of the vector constant structure.  */
+	unsigned size = GET_MODE_SIZE (mode);
+	gcc_assert (size <= VECTOR_CONST_BYTES);
+	gcc_assert ((VECTOR_CONST_BYTES % size) == 0);
+
+	for (size_t splat = size; splat < VECTOR_CONST_BYTES; splat += size)
+	  memcpy ((void *) &vec_const->bytes[splat],
+		  (void *) &vec_const->bytes[0],
+		  size);
+	break;
+      }
+
+      /* Vector constants, iterate each element.  On little endian systems, we
+	 have to reverse the element numbers.  */
+    case CONST_VECTOR:
+      {
+	/* Fail if the vector constant is the wrong mode.  */
+	if (mode == VOIDmode)
+	  mode = GET_MODE (op);
+
+	else if (GET_MODE (op) != mode)
+	  return false;
+
+	machine_mode ele_mode = GET_MODE_INNER (mode);
+	size_t nunits = GET_MODE_NUNITS (mode);
+	size_t size = GET_MODE_SIZE (ele_mode);
+
+	for (size_t num = 0; num < nunits; num++)
+	  {
+	    rtx ele = (GET_CODE (op) == VEC_DUPLICATE
+		       ? XEXP (op, 0)
+		       : CONST_VECTOR_ELT (op, num));
+	    size_t byte_num = (BYTES_BIG_ENDIAN
+			       ? num
+			       : nunits - 1 - num) * size;
+
+	    if (CONST_INT_P (ele))
+	      vec_const_integer (ele, ele_mode, byte_num, vec_const);
+	    else if (CONST_DOUBLE_P (ele))
+	      vec_const_floating_point (ele, ele_mode, byte_num, vec_const);
+	    else
+	      return false;
+	  }
+
+	break;
+      }
+
+	/* Treat VEC_DUPLICATE of a constant just like a vector constant.  */
+    case VEC_DUPLICATE:
+      {
+	/* Fail if the vector duplicate is the wrong mode.  */
+	if (mode == VOIDmode)
+	  mode = GET_MODE (op);
+
+	else if (GET_MODE (op) != mode)
+	  return false;
+
+	machine_mode ele_mode = GET_MODE_INNER (mode);
+	size_t nunits = GET_MODE_NUNITS (mode);
+	size_t size = GET_MODE_SIZE (ele_mode);
+	rtx ele = XEXP (op, 0);
+
+	if (!CONST_INT_P (ele) && !CONST_DOUBLE_P (ele))
+	  return false;
+
+	for (size_t num = 0; num < nunits; num++)
+	  {
+	    size_t byte_num = num * size;
+
+	    if (CONST_INT_P (ele))
+	      vec_const_integer (ele, ele_mode, byte_num, vec_const);
+	    else
+	      vec_const_floating_point (ele, ele_mode, byte_num, vec_const);
+	  }
+
+	break;
+      }
+
+      /* Any thing else, just return failure.  */
+    default:
+      return false;
+    }
+
+  /* Pack half words together.  */
+  for (size_t i = 0; i < VECTOR_CONST_16BIT; i++)
+    vec_const->h_words[i] = ((vec_const->bytes[2*i] << 8)
+			     | vec_const->bytes[2*i + 1]);
+
+  /* Pack words together.  */
+  for (size_t i = 0; i < VECTOR_CONST_32BIT; i++)
+    {
+      unsigned word = 0;
+      for (size_t j = 0; j < 4; j++)
+	word = (word << 8) | vec_const->bytes[(4*i) + j];
+
+      vec_const->words[i] = word;
+    }
+
+  /* Pack double words together.  */
+  for (size_t i = 0; i < VECTOR_CONST_64BIT; i++)
+    {
+      unsigned HOST_WIDE_INT d_word = 0;
+      for (size_t j = 0; j < 8; j++)
+	d_word = (d_word << 8) | vec_const->bytes[(8*i) + j];
+
+      vec_const->d_words[i] = d_word;
+    }
+
+  /* Remember original mode that the vector/scalar used.  */
+  vec_const->orig_mode = mode;
+
+  return true;
+}
+
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 #include "gt-rs6000.h"

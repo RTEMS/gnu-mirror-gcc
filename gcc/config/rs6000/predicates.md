@@ -601,12 +601,69 @@
   if (TARGET_VSX && op == CONST0_RTX (mode))
     return 1;
 
+  /* Constants that can be generated with ISA 3.1 instructions are easy.  */
+  rs6000_vec_const vec_const;
+
+  if (TARGET_POWER10 && vec_const_to_bytes (op, mode, &vec_const))
+    {
+      if (vec_const_use_xxspltidp (&vec_const))
+	return true;
+    }
+
   /* Otherwise consider floating point constants hard, so that the
      constant gets pushed to memory during the early RTL phases.  This
      has the advantage that double precision constants that can be
      represented in single precision without a loss of precision will
      use single precision loads.  */
    return 0;
+})
+
+;; Return 1 if the operand is a scalar constant that can be loaded to a VSX
+;; register with one prefixed instruction, such as XXSPLTIDP.
+
+(define_predicate "vsx_prefixed_scalar_constant"
+  (match_code "const_int,const_double")
+{
+  rs6000_vec_const vec_const;
+
+  /* Do we have prefixed instructions and VSX registers available?  Is the
+     constant recognized?  */
+  if (!TARGET_PREFIXED || !TARGET_VSX)
+    return false;
+
+  if (!vec_const_to_bytes (op, mode, &vec_const))
+    return false;
+  
+  if (vec_const_use_xxspltidp (&vec_const))
+    return true;
+
+  return false;
+})
+
+;; Return 1 if the operand is a scalar constant that can be loaded to a VSX
+;; register with one prefixed instruction, such as XXSPLTIDP.
+;;
+;; We have to have separate predicates and constraints for scalars and vectors,
+;; otherwise things get messed up with TImode when you try to load very large
+;; integer constants.
+
+(define_predicate "vsx_prefixed_vector_constant"
+  (match_code "const_vector,vec_duplicate")
+{
+  rs6000_vec_const vec_const;
+
+  /* Do we have prefixed instructions and VSX registers available?  Is the
+     constant recognized?  */
+  if (!TARGET_PREFIXED || !TARGET_VSX)
+    return false;
+
+  if (!vec_const_to_bytes (op, mode, &vec_const))
+    return false;
+  
+  if (vec_const_use_xxspltidp (&vec_const))
+    return true;
+
+  return false;
 })
 
 ;; Return 1 if the operand is a constant that can loaded with a XXSPLTIB
@@ -656,6 +713,16 @@
       if (TARGET_P9_VECTOR
           && xxspltib_constant_p (op, mode, &num_insns, &value))
 	return true;
+
+      /* See if the constant can be generated with the ISA 3.1
+         instructions.  */
+      rs6000_vec_const vec_const;
+
+      if (TARGET_POWER10 && vec_const_to_bytes (op, mode, &vec_const))
+	{
+	  if (vec_const_use_xxspltidp (&vec_const))
+	    return true;
+	}
 
       return easy_altivec_constant (op, mode);
     }

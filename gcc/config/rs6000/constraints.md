@@ -213,6 +213,18 @@
   "A signed 34-bit integer constant if prefixed instructions are supported."
   (match_operand 0 "cint34_operand"))
 
+;; A scalar constant that can be loaded into vector registers with one prefixed
+;; instruction such as XXSPLTIDP.
+(define_constraint "eS"
+  "A scalar constant that can be loaded with one prefixed instruction."
+  (match_operand 0 "vsx_prefixed_scalar_constant"))
+
+;; A vector constant that can be loaded into vector registers with one prefixed
+;; instruction such as XXSPLTIDP
+(define_constraint "eV"
+  "A vector constant that can be loaded with one prefixed instruction."
+  (match_operand 0 "vsx_prefixed_vector_constant"))
+
 ;; Floating-point constraints.  These two are defined so that insn
 ;; length attributes can be calculated exactly.
 
