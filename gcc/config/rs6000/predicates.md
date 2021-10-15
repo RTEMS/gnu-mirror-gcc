@@ -611,6 +611,9 @@
 
       if (vec_const_use_xxspltidp (&vec_const))
 	return true;
+
+      if (vec_const_use_xxspltiw (&vec_const))
+	return true;
     }
 
   /* Otherwise consider floating point constants hard, so that the
@@ -644,7 +647,7 @@
 })
 
 ;; Return 1 if the operand is a scalar constant that can be loaded to a VSX
-;; register with one prefixed instruction, such as XXSPLTIDP.
+;; register with one prefixed instruction, such as XXSPLTIDP or XXSPLTIW.
 ;;
 ;; We have to have separate predicates and constraints for scalars and vectors,
 ;; otherwise things get messed up with TImode when you try to load very large
@@ -664,6 +667,9 @@
     return false;
   
   if (vec_const_use_xxspltidp (&vec_const))
+    return true;
+
+  if (vec_const_use_xxspltiw (&vec_const))
     return true;
 
   return false;
@@ -743,6 +749,9 @@
 	    return true;
 
 	  if (vec_const_use_xxspltidp (&vec_const))
+	    return true;
+
+	  if (vec_const_use_xxspltiw (&vec_const))
 	    return true;
 	}
 
