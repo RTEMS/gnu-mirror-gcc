@@ -611,12 +611,6 @@
 
       if (vec_const_use_xxspltidp (&vec_const))
 	return true;
-
-      if (vec_const_use_xxspltiw (&vec_const))
-	return true;
-
-      if (vec_const_use_xxsplti32dx (&vec_const))
-	return true;
     }
 
   /* Otherwise consider floating point constants hard, so that the
@@ -650,29 +644,7 @@
 })
 
 ;; Return 1 if the operand is a scalar constant that can be loaded to a VSX
-;; register with two prefixed instructions, such as XXSPLTI32DX.
-
-(define_predicate "vsx_prefixed_scalar_constant_2insn"
-  (match_code "const_int,const_double")
-{
-  rs6000_vec_const vec_const;
-
-  /* Do we have prefixed instructions and VSX registers available?  Is the
-     constant recognized?  */
-  if (!TARGET_PREFIXED || !TARGET_VSX)
-    return false;
-
-  if (!vec_const_to_bytes (op, mode, &vec_const))
-    return false;
-  
-  if (vec_const_use_xxsplti32dx (&vec_const))
-    return true;
-
-  return false;
-})
-
-;; Return 1 if the operand is a scalar constant that can be loaded to a VSX
-;; register with one prefixed instruction, such as XXSPLTIDP or XXSPLTIW.
+;; register with one prefixed instruction, such as XXSPLTIDP.
 ;;
 ;; We have to have separate predicates and constraints for scalars and vectors,
 ;; otherwise things get messed up with TImode when you try to load very large
@@ -692,55 +664,6 @@
     return false;
   
   if (vec_const_use_xxspltidp (&vec_const))
-    return true;
-
-  if (vec_const_use_xxspltiw (&vec_const))
-    return true;
-
-  return false;
-})
-
-;; Return 1 if the operand is a scalar constant that can be loaded to a VSX
-;; register with two prefixed instructions, such as XXSPLTI32DX.
-;;
-;; We have to have separate predicates and constraints for scalars and vectors,
-;; otherwise things get messed up with TImode when you try to load very large
-;; integer constants.
-
-(define_predicate "vsx_prefixed_vector_constant_2insn"
-  (match_code "const_vector,vec_duplicate")
-{
-  rs6000_vec_const vec_const;
-
-  /* Do we have prefixed instructions and VSX registers available?  Is the
-     constant recognized?  */
-  if (!TARGET_PREFIXED || !TARGET_VSX)
-    return false;
-
-  if (!vec_const_to_bytes (op, mode, &vec_const))
-    return false;
-  
-  if (vec_const_use_xxsplti32dx (&vec_const))
-    return true;
-
-  return false;
-  })
-
-;; Combination of the two prefixed vector constant predicates.
-(define_predicate "vsx_prefixed_constant_2insn"
-  (match_code "const_int,const_double,const_vector,vec_duplicate")
-{
-  rs6000_vec_const vec_const;
-
-  /* Do we have prefixed instructions and VSX registers available?  Is the
-     constant recognized?  */
-  if (!TARGET_PREFIXED || !TARGET_VSX)
-    return false;
-
-  if (!vec_const_to_bytes (op, mode, &vec_const))
-    return false;
-  
-  if (vec_const_use_xxsplti32dx (&vec_const))
     return true;
 
   return false;
@@ -820,12 +743,6 @@
 	    return true;
 
 	  if (vec_const_use_xxspltidp (&vec_const))
-	    return true;
-
-	  if (vec_const_use_xxspltiw (&vec_const))
-	    return true;
-
-	  if (vec_const_use_xxsplti32dx (&vec_const))
 	    return true;
 	}
 
