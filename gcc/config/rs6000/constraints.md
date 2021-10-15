@@ -213,6 +213,18 @@
   "A signed 34-bit integer constant if prefixed instructions are supported."
   (match_operand 0 "cint34_operand"))
 
+;; A scalar constant that can be loaded into vector registers with two prefixed
+;; instructions such as XXSPLTI32DX.
+(define_constraint "eJ"
+  "A scalar constant that can be loaded with two prefixed instructions."
+  (match_operand 0 "vsx_prefixed_scalar_constant_2insn"))
+
+;; A vector constant that can be loaded into vector registers with two prefixed
+;; instructions such as XXSPLTI32DX.
+(define_constraint "eK"
+  "A scalar constant that can be loaded with two prefixed instructions."
+  (match_operand 0 "vsx_prefixed_vector_constant_2insn"))
+
 ;; A scalar constant that can be loaded into vector registers with one prefixed
 ;; instruction such as XXSPLTIDP.
 (define_constraint "eS"

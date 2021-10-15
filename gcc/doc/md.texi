@@ -3336,6 +3336,14 @@ A constant whose negation is a signed 16-bit constant.
 @item eI
 A signed 34-bit integer constant if prefixed instructions are supported.
 
+@item eJ
+A scalar constant that can be loaded with two prefixed instructions to
+a VSX register.
+
+@item eK
+A vector constant that can be loaded with two prefixed instructions to
+a VSX register.
+
 @item eS
 A scalar constant that can be loaded with one prefixed instruction to
 a VSX register.
