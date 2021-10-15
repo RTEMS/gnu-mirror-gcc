@@ -6993,6 +6993,12 @@ output_vec_const_move (rtx *operands)
       rs6000_vec_const vec_const;
       if (TARGET_POWER10 && vec_const_to_bytes (vec, mode, &vec_const))
 	{
+	  if (vec_const_use_lxvkq (&vec_const))
+	    {
+	      operands[2] = GEN_INT (vec_const.lxvkq_immediate);
+	      return "lxvkq %x0,%2";
+	    }
+
 	  if (vec_const_use_xxspltidp (&vec_const))
 	    {
 	      operands[2] = GEN_INT (vec_const.xxspltidp_immediate);
@@ -28775,6 +28781,56 @@ vec_const_use_xxspltidp (rs6000_vec_const *vec_const)
   /* Record the information in the vec_const structure for XXSPLTIDP.  */
   vec_const->xxspltidp_immediate = sf_value;
 
+  return true;
+}
+
+/* Determine if a vector constant can be loaded with LXVKQ.  If so, fill out
+   the fields used to generate the instruction.  */
+
+bool
+vec_const_use_lxvkq (rs6000_vec_const *vec_const)
+{
+  unsigned immediate;
+
+  if (!TARGET_LXVKQ || !TARGET_PREFIXED || !TARGET_VSX)
+    return false;
+
+  /* Verify that all of the bottom 3 words in the constants loaded by the
+     LXVKQ instruction are zero.  */
+  for (size_t i = 1; i < VECTOR_CONST_32BIT; i++)
+    if (vec_const->words[i] != 0)
+      return false;
+
+  /* See if we have a match.  */
+  switch (vec_const->words[0])
+    {
+    case 0x3FFF0000U: immediate = 1;  break;	/* IEEE 128-bit +1.0.  */
+    case 0x40000000U: immediate = 2;  break;	/* IEEE 128-bit +2.0.  */
+    case 0x40008000U: immediate = 3;  break;	/* IEEE 128-bit +3.0.  */
+    case 0x40010000U: immediate = 4;  break;	/* IEEE 128-bit +4.0.  */
+    case 0x40014000U: immediate = 5;  break;	/* IEEE 128-bit +5.0.  */
+    case 0x40018000U: immediate = 6;  break;	/* IEEE 128-bit +6.0.  */
+    case 0x4001C000U: immediate = 7;  break;	/* IEEE 128-bit +7.0.  */
+    case 0x7FFF0000U: immediate = 8;  break;	/* IEEE 128-bit +Infinity.  */
+    case 0x7FFF8000U: immediate = 9;  break;	/* IEEE 128-bit quiet NaN.  */
+    case 0x80000000U: immediate = 16; break;	/* IEEE 128-bit -0.0.  */
+    case 0xBFFF0000U: immediate = 17; break;	/* IEEE 128-bit -1.0.  */
+    case 0xC0000000U: immediate = 18; break;	/* IEEE 128-bit -2.0.  */
+    case 0xC0008000U: immediate = 19; break;	/* IEEE 128-bit -3.0.  */
+    case 0xC0010000U: immediate = 20; break;	/* IEEE 128-bit -4.0.  */
+    case 0xC0014000U: immediate = 21; break;	/* IEEE 128-bit -5.0.  */
+    case 0xC0018000U: immediate = 22; break;	/* IEEE 128-bit -6.0.  */
+    case 0xC001C000U: immediate = 23; break;	/* IEEE 128-bit -7.0.  */
+    case 0xFFFF0000U: immediate = 24; break;	/* IEEE 128-bit -Infinity.  */
+
+      /* anything else cannot be loaded.  */
+    default:
+      return false;
+    }
+
+  /* We can use the LXVKQ instruction, record the immediate needed for the
+     instruction.  */
+  vec_const->lxvkq_immediate = immediate;
   return true;
 }
 
