@@ -4872,7 +4872,7 @@ allocate_struct_function (tree fndecl, bool abstract_p)
      disabled.  The markers make little sense without the variable
      binding annotations among them.  */
   cfun->debug_nonbind_markers = lang_hooks.emits_begin_stmt
-    && MAY_HAVE_DEBUG_MARKER_STMTS;
+    && debug_nonbind_markers_p;
 
   cfun->x_range_query = &global_ranges;
 }
