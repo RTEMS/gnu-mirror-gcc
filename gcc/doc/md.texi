@@ -3336,17 +3336,6 @@ A constant whose negation is a signed 16-bit constant.
 @item eI
 A signed 34-bit integer constant if prefixed instructions are supported.
 
-@item eS
-A scalar constant that can be loaded with one prefixed instruction to
-a VSX register.
-
-@item eV
-A vector constant that can be loaded with one prefixed instruction to
-a VSX register.
-
-@item eQ
-A constant that can be loaded with the LXVKQ instruction.
-
 @ifset INTERNALS
 @item G
 A floating point constant that can be loaded into a register with one
