@@ -249,7 +249,6 @@ typedef struct {
 
 extern bool vec_const_to_bytes (rtx, machine_mode, rs6000_vec_const *);
 extern bool vec_const_use_xxspltidp (rs6000_vec_const *);
-extern bool vec_const_use_xxspltiw (rs6000_vec_const *);
 #endif /* RTX_CODE */
 
 #ifdef TREE_CODE

@@ -644,10 +644,6 @@ mxxspltidp
 Target Undocumented Var(TARGET_XXSPLTIDP) Init(1) Save
 Generate (do not generate) XXSPLTIDP instructions.
 
-mxxspltiw
-Target Undocumented Var(TARGET_XXSPLTIW) Init(1) Save
-Generate (do not generate) XXSPLTIW instructions.
-
 -param=rs6000-density-pct-threshold=
 Target Undocumented Joined UInteger Var(rs6000_density_pct_threshold) Init(85) IntegerRange(0, 100) Param
 When costing for loop vectorization, we probably need to penalize the loop body
