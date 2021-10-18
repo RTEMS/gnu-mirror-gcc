@@ -1698,6 +1698,58 @@ get_fnname_from_decl (tree decl)
   return XSTR (x, 0);
 }
 
+/* Emit the patchable function entry NOPs for function DECL.
+   BEFORE is true if we should emit the nops in front of the function
+   label (i.e. before prologue), or the ones after the function label
+   (part of the prologue).  */
+void
+emit_patchable_function_entry (tree decl, bool before)
+{
+  unsigned short patch_area_size = crtl->patch_area_size;
+  unsigned short patch_area_entry = crtl->patch_area_entry;
+
+  tree patchable_function_entry_attr
+    = lookup_attribute ("patchable_function_entry", DECL_ATTRIBUTES (decl));
+  if (patchable_function_entry_attr)
+    {
+      tree pp_val = TREE_VALUE (patchable_function_entry_attr);
+      tree patchable_function_entry_value1 = TREE_VALUE (pp_val);
+
+      patch_area_size = tree_to_uhwi (patchable_function_entry_value1);
+      patch_area_entry = 0;
+      if (TREE_CHAIN (pp_val) != NULL_TREE)
+	{
+	  tree patchable_function_entry_value2
+	    = TREE_VALUE (TREE_CHAIN (pp_val));
+	  patch_area_entry = tree_to_uhwi (patchable_function_entry_value2);
+	}
+    }
+
+  if (patch_area_entry > patch_area_size)
+    {
+      if (patch_area_size > 0 && before)
+	warning (OPT_Wattributes, "patchable function entry > size");
+      patch_area_entry = 0;
+    }
+
+  if (before)
+    {
+      /* Emit the patching area before the entry label, if any.  */
+      if (patch_area_entry > 0)
+	targetm.asm_out.print_patchable_function_entry (asm_out_file,
+							patch_area_entry, true);
+    }
+  else
+    {
+      /* And the area after the label.  Record it if we haven't done so yet.  */
+      if (patch_area_size > patch_area_entry)
+	targetm.asm_out.print_patchable_function_entry (asm_out_file,
+							patch_area_size
+							- patch_area_entry,
+							patch_area_entry == 0);
+    }
+}
+
 /* Output assembler code for the constant pool of a function and associated
    with defining the name of the function.  DECL describes the function.
    NAME is the function's name.  For the constant pool, we use the current
@@ -1829,37 +1881,7 @@ assemble_start_function (tree decl, const char *fnname)
   if (DECL_PRESERVE_P (decl))
     targetm.asm_out.mark_decl_preserved (fnname);
 
-  unsigned short patch_area_size = crtl->patch_area_size;
-  unsigned short patch_area_entry = crtl->patch_area_entry;
-
-  tree patchable_function_entry_attr
-    = lookup_attribute ("patchable_function_entry", DECL_ATTRIBUTES (decl));
-  if (patchable_function_entry_attr)
-    {
-      tree pp_val = TREE_VALUE (patchable_function_entry_attr);
-      tree patchable_function_entry_value1 = TREE_VALUE (pp_val);
-
-      patch_area_size = tree_to_uhwi (patchable_function_entry_value1);
-      patch_area_entry = 0;
-      if (TREE_CHAIN (pp_val) != NULL_TREE)
-	{
-	  tree patchable_function_entry_value2
-	    = TREE_VALUE (TREE_CHAIN (pp_val));
-	  patch_area_entry = tree_to_uhwi (patchable_function_entry_value2);
-	}
-    }
-
-  if (patch_area_entry > patch_area_size)
-    {
-      if (patch_area_size > 0)
-	warning (OPT_Wattributes, "patchable function entry > size");
-      patch_area_entry = 0;
-    }
-
-  /* Emit the patching area before the entry label, if any.  */
-  if (patch_area_entry > 0)
-    targetm.asm_out.print_patchable_function_entry (asm_out_file,
-						    patch_area_entry, true);
+  emit_patchable_function_entry (decl, true);
 
   /* Do any machine/system dependent processing of the function name.  */
 #ifdef ASM_DECLARE_FUNCTION_NAME
@@ -1868,13 +1890,6 @@ assemble_start_function (tree decl, const char *fnname)
   /* Standard thing is just output label for the function.  */
   ASM_OUTPUT_FUNCTION_LABEL (asm_out_file, fnname, current_function_decl);
 #endif /* ASM_DECLARE_FUNCTION_NAME */
-
-  /* And the area after the label.  Record it if we haven't done so yet.  */
-  if (patch_area_size > patch_area_entry)
-    targetm.asm_out.print_patchable_function_entry (asm_out_file,
-						    patch_area_size
-						    - patch_area_entry,
-						    patch_area_entry == 0);
 
   if (lookup_attribute ("no_split_stack", DECL_ATTRIBUTES (decl)))
     saw_no_split_stack = true;
