@@ -198,7 +198,6 @@ enum non_prefixed_form reg_to_non_prefixed (rtx reg, machine_mode mode);
 extern bool prefixed_load_p (rtx_insn *);
 extern bool prefixed_store_p (rtx_insn *);
 extern bool prefixed_paddi_p (rtx_insn *);
-extern bool prefixed_xxsplti_p (rtx_insn *);
 extern void rs6000_asm_output_opcode (FILE *);
 extern void output_pcrel_opt_reloc (rtx);
 extern void rs6000_final_prescan_insn (rtx_insn *, rtx [], int);
@@ -223,32 +222,6 @@ address_is_prefixed (rtx addr,
   return (iform == INSN_FORM_PREFIXED_NUMERIC
 	  || iform == INSN_FORM_PCREL_LOCAL);
 }
-
-/* Functions and data structures relating to 128-bit vector constants.  All
-   fields are kept in big endian order.  */
-#define VECTOR_CONST_BITS		128
-#define VECTOR_CONST_BYTES		(VECTOR_CONST_BITS / 8)
-#define VECTOR_CONST_HALF_WORDS		(VECTOR_CONST_BITS / 16)
-#define VECTOR_CONST_WORDS		(VECTOR_CONST_BITS / 32)
-#define VECTOR_CONST_DOUBLE_WORDS	(VECTOR_CONST_BITS / 64)
-
-typedef struct {
-  /* Vector constant as various sized items.  */
-  unsigned HOST_WIDE_INT double_words[VECTOR_CONST_DOUBLE_WORDS];
-  unsigned int words[VECTOR_CONST_WORDS];
-  unsigned short half_words[VECTOR_CONST_HALF_WORDS];
-  unsigned char bytes[VECTOR_CONST_BYTES];
-
-  unsigned int xxspltidp_immediate;	/* Immediate value for XXSPLTIDP.  */
-  bool fp_constant_p;			/* Is the constant floating point?  */
-  bool all_double_words_same;		/* Are the double words all equal?  */
-  bool all_words_same;			/* Are the words all equal?  */
-  bool all_half_words_same;		/* Are the halft words all equal?  */
-  bool all_bytes_same;			/* Are the bytes all equal?  */
-} rs6000_vec_const;
-
-extern bool vec_const_to_bytes (rtx, machine_mode, rs6000_vec_const *);
-extern bool vec_const_use_xxspltidp (rs6000_vec_const *);
 #endif /* RTX_CODE */
 
 #ifdef TREE_CODE
