@@ -1745,6 +1745,8 @@ get_some_local_dynamic_name ()
   return 0;
 }
 
+void emit_patchable_function_entry (tree decl, bool before);
+
 /* Output assembler code for the start of a function,
    and initialize some of the variables in this file
    for the new function.  The label for the function and associated
@@ -1780,6 +1782,8 @@ final_start_function (rtx_insn *first, FILE *file,
 
   if (!dwarf2_debug_info_emitted_p (current_function_decl))
     dwarf2out_begin_prologue (0, 0, NULL);
+
+  emit_patchable_function_entry (current_function_decl, false);
 
 #ifdef LEAF_REG_REMAP
   if (crtl->uses_only_leaf_regs)
