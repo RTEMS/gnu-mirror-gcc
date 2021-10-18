@@ -608,6 +608,9 @@
     {
       if (vec_const_use_xxspltidp (&vec_const))
 	return true;
+
+      if (vec_const_use_xxspltiw (&vec_const))
+	return true;
     }
 
   /* Otherwise consider floating point constants hard, so that the
@@ -644,6 +647,14 @@
   if (!vec_const_to_bytes (op, mode, &vec_const))
     return false;
   
+  /* If we can generate the constant with 1-2 Altivec instructions, don't
+      generate a prefixed instruction.  */
+  if (CONST_VECTOR_P (op) && easy_altivec_constant (op, mode))
+    return false;
+	   
+  if (vec_const_use_xxspltiw (&vec_const))
+    return true;
+
   if (vec_const_use_xxspltidp (&vec_const))
     return true;
 
@@ -705,6 +716,9 @@
       if (TARGET_POWER10 && vec_const_to_bytes (op, mode, &vec_const))
 	{
 	  if (vec_const_use_xxspltidp (&vec_const))
+	    return true;
+
+	  if (vec_const_use_xxspltiw (&vec_const))
 	    return true;
 	}
 
