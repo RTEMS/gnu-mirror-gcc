@@ -17624,6 +17624,7 @@ aarch64_process_one_target_attr (char *arg_str)
   bool invert = false;
 
   size_t len = strlen (arg_str);
+  arg_str = strip_whitespaces (arg_str, &len);
 
   if (len == 0)
     {
