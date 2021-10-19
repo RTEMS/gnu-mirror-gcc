@@ -1027,7 +1027,7 @@ vect_get_store_cost (vec_info *vinfo, stmt_vec_info stmt_info, int ncopies,
 {
   dr_vec_info *dr_info = STMT_VINFO_DR_INFO (stmt_info);
   tree vectype = STMT_VINFO_VECTYPE (stmt_info);
-  int alignment_support_scheme
+  dr_alignment_support alignment_support_scheme
     = vect_supportable_dr_alignment (vinfo, dr_info, vectype, false);
 
   switch (alignment_support_scheme)
@@ -1218,7 +1218,7 @@ vect_get_load_cost (vec_info *vinfo, stmt_vec_info stmt_info, int ncopies,
 {
   dr_vec_info *dr_info = STMT_VINFO_DR_INFO (stmt_info);
   tree vectype = STMT_VINFO_VECTYPE (stmt_info);
-  int alignment_support_scheme
+  dr_alignment_support alignment_support_scheme
     = vect_supportable_dr_alignment (vinfo, dr_info, vectype, false);
 
   switch (alignment_support_scheme)
@@ -2791,7 +2791,7 @@ vect_build_gather_load_calls (vec_info *vinfo, stmt_vec_info stmt_info,
   if (mask)
     vect_get_vec_defs_for_operand (vinfo, stmt_info,
 				   modifier == NARROW ? ncopies / 2 : ncopies,
-				   mask, &vec_masks);
+				   mask, &vec_masks, masktype);
   for (int j = 0; j < ncopies; ++j)
     {
       tree op, var;
@@ -7904,14 +7904,6 @@ vectorizable_store (vec_info *vinfo,
   auto_vec<tree> dr_chain (group_size);
   oprnds.create (group_size);
 
-  /* Gather-scatter accesses perform only component accesses, alignment
-     is irrelevant for them.  */
-  if (memory_access_type == VMAT_GATHER_SCATTER)
-    alignment_support_scheme = dr_unaligned_supported;
-  else
-    alignment_support_scheme
-      = vect_supportable_dr_alignment (vinfo, first_dr_info, vectype, false);
-
   gcc_assert (alignment_support_scheme);
   vec_loop_masks *loop_masks
     = (loop_vinfo && LOOP_VINFO_FULLY_MASKED_P (loop_vinfo)
@@ -8221,8 +8213,11 @@ vectorizable_store (vec_info *vinfo,
 		vec_oprnd = result_chain[i];
 
 	      align = known_alignment (DR_TARGET_ALIGNMENT (first_dr_info));
-	      if (aligned_access_p (first_dr_info, vectype))
-		misalign = 0;
+	      if (alignment_support_scheme == dr_aligned)
+		{
+		  gcc_assert (aligned_access_p (first_dr_info, vectype));
+		  misalign = 0;
+		}
 	      else if (dr_misalignment (first_dr_info, vectype)
 		       == DR_MISALIGNMENT_UNKNOWN)
 		{
@@ -8307,8 +8302,8 @@ vectorizable_store (vec_info *vinfo,
 					  dataref_offset
 					  ? dataref_offset
 					  : build_int_cst (ref_type, 0));
-		  if (aligned_access_p (first_dr_info, vectype))
-		    ;
+		  if (alignment_support_scheme == dr_aligned)
+		    gcc_assert (aligned_access_p (first_dr_info, vectype));
 		  else
 		    TREE_TYPE (data_ref)
 		      = build_aligned_type (TREE_TYPE (data_ref),

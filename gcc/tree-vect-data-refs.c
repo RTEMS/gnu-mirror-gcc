@@ -1471,7 +1471,8 @@ vect_peeling_hash_insert (hash_table<peel_info_hasher> *peeling_htab,
   _vect_peel_info **new_slot;
   tree vectype = STMT_VINFO_VECTYPE (dr_info->stmt);
   bool supportable_dr_alignment
-    = vect_supportable_dr_alignment (loop_vinfo, dr_info, vectype, true);
+    = (vect_supportable_dr_alignment (loop_vinfo, dr_info, vectype, true)
+       != dr_unaligned_unsupported);
 
   elem.npeel = npeel;
   slot = peeling_htab->find (&elem);
@@ -1663,7 +1664,7 @@ vect_peeling_supportable (loop_vec_info loop_vinfo, dr_vec_info *dr0_info,
 	= vect_supportable_dr_alignment (loop_vinfo, dr_info, vectype, false);
       SET_DR_MISALIGNMENT (dr_info, save_misalignment);
 
-      if (!supportable_dr_alignment)
+      if (supportable_dr_alignment == dr_unaligned_unsupported)
 	return false;
     }
 
@@ -1999,11 +2000,11 @@ vect_enhance_data_refs_alignment (loop_vec_info loop_vinfo)
 
 	      /* Check for data refs with unsupportable alignment that
 	         can be peeled.  */
-	      if (!supportable_dr_alignment)
-	      {
-		one_dr_unsupportable = true;
-		unsupportable_dr_info = dr_info;
-	      }
+	      if (supportable_dr_alignment == dr_unaligned_unsupported)
+		{
+		  one_dr_unsupportable = true;
+		  unsupportable_dr_info = dr_info;
+		}
 
 	      if (!first_store && DR_IS_WRITE (dr))
 		{
@@ -2236,7 +2237,7 @@ vect_enhance_data_refs_alignment (loop_vec_info loop_vinfo)
         {
           unsigned max_allowed_peel
 	    = param_vect_max_peeling_for_alignment;
-	  if (flag_vect_cost_model <= VECT_COST_MODEL_CHEAP)
+	  if (loop_cost_model (loop) <= VECT_COST_MODEL_CHEAP)
 	    max_allowed_peel = 0;
           if (max_allowed_peel != (unsigned)-1)
             {
@@ -2334,7 +2335,7 @@ vect_enhance_data_refs_alignment (loop_vec_info loop_vinfo)
   do_versioning
     = (optimize_loop_nest_for_speed_p (loop)
        && !loop->inner /* FORNOW */
-       && flag_vect_cost_model > VECT_COST_MODEL_CHEAP);
+       && loop_cost_model (loop) > VECT_COST_MODEL_CHEAP);
 
   if (do_versioning)
     {
@@ -2356,7 +2357,7 @@ vect_enhance_data_refs_alignment (loop_vec_info loop_vinfo)
 	  supportable_dr_alignment
 	    = vect_supportable_dr_alignment (loop_vinfo, dr_info, vectype,
 					     false);
-          if (!supportable_dr_alignment)
+	  if (supportable_dr_alignment == dr_unaligned_unsupported)
             {
 	      if (known_alignment_for_access_p (dr_info, vectype)
                   || LOOP_VINFO_MAY_MISALIGN_STMTS (loop_vinfo).length ()
@@ -3751,7 +3752,9 @@ vect_prune_runtime_alias_test_list (loop_vec_info loop_vinfo)
   unsigned int count = (comp_alias_ddrs.length ()
 			+ check_unequal_addrs.length ());
 
-  if (count && flag_vect_cost_model == VECT_COST_MODEL_VERY_CHEAP)
+  if (count
+      && (loop_cost_model (LOOP_VINFO_LOOP (loop_vinfo))
+	  == VECT_COST_MODEL_VERY_CHEAP))
     return opt_result::failure_at
       (vect_location, "would need a runtime alias check\n");
 
@@ -3760,7 +3763,7 @@ vect_prune_runtime_alias_test_list (loop_vec_info loop_vinfo)
 		     "improved number of alias checks from %d to %d\n",
 		     may_alias_ddrs.length (), count);
   unsigned limit = param_vect_max_version_for_alias_checks;
-  if (flag_simd_cost_model == VECT_COST_MODEL_CHEAP)
+  if (loop_cost_model (LOOP_VINFO_LOOP (loop_vinfo)) == VECT_COST_MODEL_CHEAP)
     limit = param_vect_max_version_for_alias_checks * 6 / 10;
   if (count > limit)
     return opt_result::failure_at
@@ -4783,8 +4786,12 @@ vect_create_addr_base_for_vector_ref (vec_info *vinfo, stmt_vec_info stmt_info,
 
   if (DR_PTR_INFO (dr)
       && TREE_CODE (addr_base) == SSA_NAME
-      && !SSA_NAME_PTR_INFO (addr_base))
-    vect_duplicate_ssa_name_ptr_info (addr_base, dr_info);
+      /* We should only duplicate pointer info to newly created SSA names.  */
+      && SSA_NAME_VAR (addr_base) == dest)
+    {
+      gcc_assert (!SSA_NAME_PTR_INFO (addr_base));
+      vect_duplicate_ssa_name_ptr_info (addr_base, dr_info);
+    }
 
   if (dump_enabled_p ())
     dump_printf_loc (MSG_NOTE, vect_location, "created %T\n", addr_base);
@@ -6714,9 +6721,6 @@ vect_supportable_dr_alignment (vec_info *vinfo, dr_vec_info *dr_info,
 
   if (DR_IS_READ (dr))
     {
-      bool is_packed = false;
-      tree type = (TREE_TYPE (DR_REF (dr)));
-
       if (optab_handler (vec_realign_load_optab, mode) != CODE_FOR_nothing
 	  && (!targetm.vectorize.builtin_mask_for_load
 	      || targetm.vectorize.builtin_mask_for_load ()))
@@ -6738,26 +6742,15 @@ vect_supportable_dr_alignment (vec_info *vinfo, dr_vec_info *dr_info,
 	  else
 	    return dr_explicit_realign_optimized;
 	}
-      if (!known_alignment_for_access_p (dr_info, vectype))
-	is_packed = not_size_aligned (DR_REF (dr));
-
-      if (targetm.vectorize.support_vector_misalignment
-	    (mode, type, dr_misalignment (dr_info, vectype), is_packed))
-	/* Can't software pipeline the loads, but can at least do them.  */
-	return dr_unaligned_supported;
     }
-  else
-    {
-      bool is_packed = false;
-      tree type = (TREE_TYPE (DR_REF (dr)));
 
-      if (!known_alignment_for_access_p (dr_info, vectype))
-	is_packed = not_size_aligned (DR_REF (dr));
-
-     if (targetm.vectorize.support_vector_misalignment
-	   (mode, type, dr_misalignment (dr_info, vectype), is_packed))
-       return dr_unaligned_supported;
-    }
+  bool is_packed = false;
+  tree type = (TREE_TYPE (DR_REF (dr)));
+  if (!known_alignment_for_access_p (dr_info, vectype))
+    is_packed = not_size_aligned (DR_REF (dr));
+  if (targetm.vectorize.support_vector_misalignment
+	(mode, type, dr_misalignment (dr_info, vectype), is_packed))
+    return dr_unaligned_supported;
 
   /* Unsupported.  */
   return dr_unaligned_unsupported;

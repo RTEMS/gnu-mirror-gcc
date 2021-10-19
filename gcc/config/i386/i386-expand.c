@@ -615,6 +615,16 @@ ix86_expand_vector_move (machine_mode mode, rtx operands[])
       return;
     }
 
+  /* If operand0 is a hard register, make operand1 a pseudo.  */
+  if (can_create_pseudo_p ()
+      && !ix86_hardreg_mov_ok (op0, op1))
+    {
+      rtx tmp = gen_reg_rtx (GET_MODE (op0));
+      emit_move_insn (tmp, op1);
+      emit_move_insn (op0, tmp);
+      return;
+    }
+
   /* Make operand1 a register if it isn't already.  */
   if (can_create_pseudo_p ()
       && !register_operand (op0, mode)
@@ -4835,6 +4845,16 @@ ix86_expand_vec_perm (rtx operands[])
   w = GET_MODE_NUNITS (mode);
   e = GET_MODE_UNIT_SIZE (mode);
   gcc_assert (w <= 64);
+
+  /* For HF mode vector, convert it to HI using subreg.  */
+  if (GET_MODE_INNER (mode) == HFmode)
+    {
+      machine_mode orig_mode = mode;
+      mode = mode_for_vector (HImode, w).require ();
+      target = lowpart_subreg (mode, target, orig_mode);
+      op0 = lowpart_subreg (mode, op0, orig_mode);
+      op1 = lowpart_subreg (mode, op1, orig_mode);
+    }
 
   if (TARGET_AVX512F && one_operand_shuffle)
     {
@@ -10877,7 +10897,27 @@ ix86_expand_round_builtin (const struct builtin_description *d,
 
 	  /* If there is no rounding use normal version of the pattern.  */
 	  if (INTVAL (op) == NO_ROUND)
-	    redundant_embed_rnd = 1;
+	    {
+	      /* Skip erasing embedded rounding for below expanders who
+		 generates multiple insns.  In ix86_erase_embedded_rounding
+		 the pattern will be transformed to a single set, and emit_insn
+		 appends the set insead of insert it to chain.  So the insns
+		 emitted inside define_expander would be ignored.  */
+	      switch (icode)
+		{
+		case CODE_FOR_avx512bw_fmaddc_v32hf_mask1_round:
+		case CODE_FOR_avx512bw_fcmaddc_v32hf_mask1_round:
+		case CODE_FOR_avx512fp16_fmaddcsh_v8hf_mask1_round:
+		case CODE_FOR_avx512fp16_fcmaddcsh_v8hf_mask1_round:
+		case CODE_FOR_avx512fp16_fmaddcsh_v8hf_mask3_round:
+		case CODE_FOR_avx512fp16_fcmaddcsh_v8hf_mask3_round:
+		  redundant_embed_rnd = 0;
+		  break;
+		default:
+		  redundant_embed_rnd = 1;
+		  break;
+		}
+	    }
 	}
       else
 	{
@@ -15092,7 +15132,8 @@ ix86_expand_vector_init (bool mmx_ok, rtx target, rtx vals)
 	  rtx ops[2] = { XVECEXP (vals, 0, 0), XVECEXP (vals, 0, 1) };
 	  if (inner_mode == QImode
 	      || inner_mode == HImode
-	      || inner_mode == TImode)
+	      || inner_mode == TImode
+	      || inner_mode == HFmode)
 	    {
 	      unsigned int n_bits = n_elts * GET_MODE_SIZE (inner_mode);
 	      scalar_mode elt_mode = inner_mode == TImode ? DImode : SImode;
@@ -16016,11 +16057,15 @@ ix86_expand_vector_extract (bool mmx_ok, rtx target, rtx vec, int elt)
       /* Let the rtl optimizers know about the zero extension performed.  */
       if (inner_mode == QImode || inner_mode == HImode)
 	{
+	  rtx reg = gen_reg_rtx (SImode);
 	  tmp = gen_rtx_ZERO_EXTEND (SImode, tmp);
-	  target = gen_lowpart (SImode, target);
+	  emit_move_insn (reg, tmp);
+	  tmp = gen_lowpart (inner_mode, reg);
+	  SUBREG_PROMOTED_VAR_P (tmp) = 1;
+	  SUBREG_PROMOTED_SET (tmp, 1);
 	}
 
-      emit_insn (gen_rtx_SET (target, tmp));
+      emit_move_insn (target, tmp);
     }
   else
     {
@@ -16053,6 +16098,11 @@ emit_reduc_half (rtx dest, rtx src, int i)
       break;
     case E_V2DFmode:
       tem = gen_vec_interleave_highv2df (dest, src, src);
+      break;
+    case E_V4QImode:
+      d = gen_reg_rtx (V1SImode);
+      tem = gen_mmx_lshrv1si3 (d, gen_lowpart (V1SImode, src),
+			       GEN_INT (i / 2));
       break;
     case E_V4HImode:
       d = gen_reg_rtx (V1DImode);
@@ -21098,6 +21148,20 @@ ix86_vectorize_vec_perm_const (machine_mode vmode, rtx target, rtx op0,
   unsigned char perm[MAX_VECT_LEN];
   unsigned int i, nelt, which;
   bool two_args;
+
+  /* For HF mode vector, convert it to HI using subreg.  */
+  if (GET_MODE_INNER (vmode) == HFmode)
+    {
+      machine_mode orig_mode = vmode;
+      vmode = mode_for_vector (HImode,
+			       GET_MODE_NUNITS (vmode)).require ();
+      if (target)
+	target = lowpart_subreg (vmode, target, orig_mode);
+      if (op0)
+	op0 = lowpart_subreg (vmode, op0, orig_mode);
+      if (op1)
+	op1 = lowpart_subreg (vmode, op1, orig_mode);
+    }
 
   d.target = target;
   d.op0 = op0;
