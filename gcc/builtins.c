@@ -1166,6 +1166,7 @@ expand_builtin_longjmp (rtx buf_addr, rtx value)
 	  emit_clobber (gen_rtx_MEM (BLKmode, gen_rtx_SCRATCH (VOIDmode)));
 	  emit_clobber (gen_rtx_MEM (BLKmode, hard_frame_pointer_rtx));
 
+	  lab = targetm.adjust_label_expansion (lab);
 	  lab = copy_to_reg (lab);
 
 	  /* Restore the frame pointer and stack pointer.  We must use a
