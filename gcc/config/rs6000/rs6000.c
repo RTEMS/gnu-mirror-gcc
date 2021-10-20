@@ -6939,6 +6939,11 @@ xxspltib_constant_p (rtx op,
   else if (IN_RANGE (value, -1, 0))
     *num_insns_ptr = 1;
 
+  /* If we can generate XXSPLTIW or XXSPLTIDP, don't generate XXSPLTIB and a
+     sign extend operation.  */
+  else if (vsx_prefixed_constant (op, mode))
+    return false;
+
   else
     *num_insns_ptr = 2;
 
@@ -7001,6 +7006,13 @@ output_vec_const_move (rtx *operands)
 		{
 		  operands[2] = GEN_INT (imm);
 		  return "xxspltidp %x0,%2";
+		}
+
+	      imm = constant_generates_xxspltiw (&vsx_const);
+	      if (imm)
+		{
+		  operands[2] = GEN_INT (imm);
+		  return "xxspltiw %x0,%2";
 		}
 	    }
 	}
@@ -26769,6 +26781,9 @@ prefixed_xxsplti_p (rtx_insn *insn)
     {
       if (constant_generates_xxspltidp (&vsx_const))
 	return true;
+
+      if (constant_generates_xxspltiw (&vsx_const))
+	return true;
     }
 
   return false;
@@ -29003,6 +29018,40 @@ constant_generates_xxspltidp (rs6000_const *vsx_const)
 
   /* Return the immediate to be used.  */
   return sf_value;
+}
+
+/* Determine if a vector constant can be loaded with XXSPLTIW.  Return zero if
+   the XXSPLTIW instruction cannot be used.  Otherwise return the immediate
+   value to be used with the XXSPLTIW instruction.  */
+
+unsigned
+constant_generates_xxspltiw (rs6000_const *vsx_const)
+{
+  if (!TARGET_SPLAT_WORD_CONSTANT || !TARGET_PREFIXED || !TARGET_VSX)
+    return 0;
+
+  if (!vsx_const->all_words_same)
+    return 0;
+
+  /* If we can use XXSPLTIB, don't generate XXSPLTIW.  */
+  if (vsx_const->all_bytes_same)
+    return 0;
+
+  /* See if we can use VSPLTISH or VSPLTISW.  */
+  if (vsx_const->all_half_words_same)
+    {
+      unsigned short h_word = vsx_const->half_words[0];
+      short sign_h_word = ((h_word & 0xffff) ^ 0x8000) - 0x8000;
+      if (EASY_VECTOR_15 (sign_h_word))
+	return 0;
+    }
+
+  unsigned int word = vsx_const->words[0];
+  int sign_word = ((word & 0xffffffff) ^ 0x80000000) - 0x80000000;
+  if (EASY_VECTOR_15 (sign_word))
+    return 0;
+
+  return vsx_const->words[0];
 }
 
 
