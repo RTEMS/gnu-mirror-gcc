@@ -198,7 +198,6 @@ enum non_prefixed_form reg_to_non_prefixed (rtx reg, machine_mode mode);
 extern bool prefixed_load_p (rtx_insn *);
 extern bool prefixed_store_p (rtx_insn *);
 extern bool prefixed_paddi_p (rtx_insn *);
-extern bool prefixed_xxsplti_p (rtx_insn *);
 extern void rs6000_asm_output_opcode (FILE *);
 extern void output_pcrel_opt_reloc (rtx);
 extern void rs6000_final_prescan_insn (rtx_insn *, rtx [], int);
@@ -258,8 +257,6 @@ typedef struct {
 
 extern bool constant_to_bytes (rtx, machine_mode, rs6000_const *,
 			       rs6000_const_splat);
-extern unsigned constant_generates_xxspltidp (rs6000_const *);
-extern unsigned constant_generates_xxspltiw (rs6000_const *);
 #endif /* RTX_CODE */
 
 #ifdef TREE_CODE

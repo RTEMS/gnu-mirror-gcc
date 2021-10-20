@@ -6939,11 +6939,6 @@ xxspltib_constant_p (rtx op,
   else if (IN_RANGE (value, -1, 0))
     *num_insns_ptr = 1;
 
-  /* If we can generate XXSPLTIW or XXSPLTIDP, don't generate XXSPLTIB and a
-     sign extend operation.  */
-  else if (vsx_prefixed_constant (op, mode))
-    return false;
-
   else
     *num_insns_ptr = 2;
 
@@ -6993,28 +6988,6 @@ output_vec_const_move (rtx *operands)
 
 	  else
 	    gcc_unreachable ();
-	}
-
-      if (TARGET_PREFIXED)
-	{
-	  rs6000_const vsx_const;
-	  if (constant_to_bytes (vec, mode, &vsx_const,
-				 RS6000_CONST_SPLAT_16_BYTES))
-	    {
-	      unsigned imm = constant_generates_xxspltidp (&vsx_const);
-	      if (imm)
-		{
-		  operands[2] = GEN_INT (imm);
-		  return "xxspltidp %x0,%2";
-		}
-
-	      imm = constant_generates_xxspltiw (&vsx_const);
-	      if (imm)
-		{
-		  operands[2] = GEN_INT (imm);
-		  return "xxspltiw %x0,%2";
-		}
-	    }
 	}
 
       if (TARGET_P9_VECTOR
@@ -26751,44 +26724,6 @@ prefixed_paddi_p (rtx_insn *insn)
   return (iform == INSN_FORM_PCREL_EXTERNAL || iform == INSN_FORM_PCREL_LOCAL);
 }
 
-/* Whether an instruction is a prefixed XXSPLTI* instruction.  This is called
-   from the prefixed attribute processing.  */
-
-bool
-prefixed_xxsplti_p (rtx_insn *insn)
-{
-  rtx set = single_set (insn);
-  if (!set)
-    return false;
-
-  rtx dest = SET_DEST (set);
-  rtx src = SET_SRC (set);
-  machine_mode mode = GET_MODE (dest);
-
-  if (!REG_P (dest) && !SUBREG_P (dest))
-    return false;
-
-  if (GET_CODE (src) == UNSPEC)
-    {
-      int unspec = XINT (src, 1);
-      return (unspec == UNSPEC_XXSPLTIW
-	      || unspec == UNSPEC_XXSPLTIDP
-	      || unspec == UNSPEC_XXSPLTI32DX);
-    }
-
-  rs6000_const vsx_const;
-  if (constant_to_bytes (src, mode, &vsx_const, RS6000_CONST_SPLAT_16_BYTES))
-    {
-      if (constant_generates_xxspltidp (&vsx_const))
-	return true;
-
-      if (constant_generates_xxspltiw (&vsx_const))
-	return true;
-    }
-
-  return false;
-}
-
 /* Whether the next instruction needs a 'p' prefix issued before the
    instruction is printed out.  */
 static bool prepend_p_to_next_insn;
@@ -28915,139 +28850,6 @@ constant_to_bytes (rtx op,
       }
 
   return true;
-}
-
-
-/* Determine if a vector constant can be loaded with XXSPLTIDP.  Return zero if
-   the XXSPLTIDP instruction cannot be used.  Otherwise return the immediate
-   value to be used with the XXSPLTIDP instruction.  */
-
-unsigned
-constant_generates_xxspltidp (rs6000_const *vsx_const)
-{
-  if (!TARGET_SPLAT_FLOAT_CONSTANT || !TARGET_PREFIXED || !TARGET_VSX)
-    return 0;
-
-  /* Make sure that the two 64-bit segments are the same.  */
-  if (!vsx_const->all_double_words_same)
-    return 0;
-
-  /* If the bytes, half words, or words are all the same, don't use XXSPLTIDP.
-     Use a simpler instruction (XXSPLTIB, VSPLTISB, VSPLTISH, or VSPLTISW).  */
-  if (vsx_const->all_bytes_same
-      || vsx_const->all_half_words_same
-      || vsx_const->all_words_same)
-    return 0;
-
-  unsigned HOST_WIDE_INT value = vsx_const->double_words[0];
-
-  /* Avoid values that look like DFmode NaN's, except for the normal NaN bit
-     pattern and the signalling NaN bit pattern.  Recognize infinity and
-     negative infinity.  */
-
-  /* Bit representation of DFmode normal quiet NaN.  */
-#define RS6000_CONST_DF_NAN	HOST_WIDE_INT_UC (0x7ff8000000000000)
-
-  /* Bit representation of DFmode normal signaling NaN.  */
-#define RS6000_CONST_DF_NANS	HOST_WIDE_INT_UC (0x7ff4000000000000)
-
-  /* Bit representation of DFmode positive infinity.  */
-#define RS6000_CONST_DF_INF	HOST_WIDE_INT_UC (0x7ff0000000000000)
-
-  /* Bit representation of DFmode negative infinity.  */
-#define RS6000_CONST_DF_NEG_INF	HOST_WIDE_INT_UC (0xfff0000000000000)
-
-  if (value != RS6000_CONST_DF_NAN
-      && value != RS6000_CONST_DF_NANS
-      && value != RS6000_CONST_DF_INF
-      && value != RS6000_CONST_DF_NEG_INF)
-    {
-      /* The IEEE 754 64-bit floating format has 1 bit for sign, 11 bits for
-	 the exponent, and 52 bits for the mantissa (not counting the hidden
-	 bit used for normal numbers).  NaN values have the exponent set to all
-	 1 bits, and the mantissa non-zero (mantissa == 0 is infinity).  */
-
-      int df_exponent = (value >> 52) & 0x7ff;
-      unsigned HOST_WIDE_INT df_mantissa
-	= value & ((HOST_WIDE_INT_1U << 52) - HOST_WIDE_INT_1U);
-
-      if (df_exponent == 0x7ff && df_mantissa != 0)	/* other NaNs.  */
-	return 0;
-
-      /* Avoid values that are DFmode subnormal values.  Subnormal numbers have
-	 the exponent all 0 bits, and the mantissa non-zero.  If the value is
-	 subnormal, then the hidden bit in the mantissa is not set.  */
-      if (df_exponent == 0 && df_mantissa != 0)		/* subnormal.  */
-	return 0;
-    }
-
-  /* Change the representation to DFmode constant.  */
-  long df_words[2] = { vsx_const->words[0], vsx_const->words[1] };
-
-  /* real_from_target takes the target words in  target order.  */
-  if (!BYTES_BIG_ENDIAN)
-    std::swap (df_words[0], df_words[1]);
-
-  REAL_VALUE_TYPE rv_type;
-  real_from_target (&rv_type, df_words, DFmode);
-
-  const REAL_VALUE_TYPE *rv = &rv_type;
-
-  /* Validate that the number can be stored as a SFmode value.  */
-  if (!exact_real_truncate (SFmode, rv))
-    return 0;
-
-  /* Validate that the number is not a SFmode subnormal value (exponent is 0,
-     mantissa field is non-zero) which is undefined for the XXSPLTIDP
-     instruction.  */
-  long sf_value;
-  real_to_target (&sf_value, rv, SFmode);
-
-  /* IEEE 754 32-bit values have 1 bit for the sign, 8 bits for the exponent,
-     and 23 bits for the mantissa.  Subnormal numbers have the exponent all
-     0 bits, and the mantissa non-zero.  */
-  long sf_exponent = (sf_value >> 23) & 0xFF;
-  long sf_mantissa = sf_value & 0x7FFFFF;
-
-  if (sf_exponent == 0 && sf_mantissa != 0)
-    return 0;
-
-  /* Return the immediate to be used.  */
-  return sf_value;
-}
-
-/* Determine if a vector constant can be loaded with XXSPLTIW.  Return zero if
-   the XXSPLTIW instruction cannot be used.  Otherwise return the immediate
-   value to be used with the XXSPLTIW instruction.  */
-
-unsigned
-constant_generates_xxspltiw (rs6000_const *vsx_const)
-{
-  if (!TARGET_SPLAT_WORD_CONSTANT || !TARGET_PREFIXED || !TARGET_VSX)
-    return 0;
-
-  if (!vsx_const->all_words_same)
-    return 0;
-
-  /* If we can use XXSPLTIB, don't generate XXSPLTIW.  */
-  if (vsx_const->all_bytes_same)
-    return 0;
-
-  /* See if we can use VSPLTISH or VSPLTISW.  */
-  if (vsx_const->all_half_words_same)
-    {
-      unsigned short h_word = vsx_const->half_words[0];
-      short sign_h_word = ((h_word & 0xffff) ^ 0x8000) - 0x8000;
-      if (EASY_VECTOR_15 (sign_h_word))
-	return 0;
-    }
-
-  unsigned int word = vsx_const->words[0];
-  int sign_word = ((word & 0xffffffff) ^ 0x80000000) - 0x80000000;
-  if (EASY_VECTOR_15 (sign_word))
-    return 0;
-
-  return vsx_const->words[0];
 }
 
 
