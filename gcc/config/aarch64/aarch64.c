@@ -11776,7 +11776,8 @@ aarch64_output_casesi (rtx *operands)
   output_asm_insn (patterns[index][0], operands);
   ASM_GENERATE_INTERNAL_LABEL (label, "Lrtx", CODE_LABEL_NUMBER (operands[2]));
   snprintf (buf, sizeof (buf),
-	    "adr\t%%4, %s", targetm.strip_name_encoding (label));
+	    "adr\t%%4, %s%s", targetm.strip_name_encoding (label),
+	     TARGET_CAPABILITY_PURE ? "+1" : "");
   output_asm_insn (buf, operands);
   output_asm_insn (patterns[index][1], operands);
   output_asm_insn ("br\t%3", operands);
