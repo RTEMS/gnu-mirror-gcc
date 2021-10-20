@@ -28587,6 +28587,269 @@ rs6000_output_addr_vec_elt (FILE *file, int value)
   fprintf (file, "\n");
 }
 
+
+/* Copy an integer constant to the constant structure.  */
+
+static void
+constant_integer_to_bytes (rtx op,
+			   machine_mode mode,
+			   size_t byte_num,
+			   rs6000_const *info)
+{
+  unsigned HOST_WIDE_INT uvalue = UINTVAL (op);
+  unsigned bitsize = GET_MODE_BITSIZE (mode);
+
+  for (int shift = bitsize - 8; shift >= 0; shift -= 8)
+    info->bytes[byte_num++] = (uvalue >> shift) & 0xff;
+}
+
+/* Copy an floating point constant to the rs6000 constant structure.  */
+
+static void
+constant_floating_point_to_bytes (rtx op,
+				  machine_mode mode,
+				  size_t byte_num,
+				  rs6000_const *info)
+{
+  unsigned bitsize = GET_MODE_BITSIZE (mode);
+  unsigned num_words = bitsize / 32;
+  const REAL_VALUE_TYPE *rtype = CONST_DOUBLE_REAL_VALUE (op);
+  long real_words[RS6000_CONST_MAX_WORDS];
+
+  /* Make sure we don't overflow the real_words array and that it is
+     filled completely.  */
+  gcc_assert (bitsize <= RS6000_CONST_MAX_BITS && (bitsize % 32) == 0);
+
+  real_to_target (real_words, rtype, mode);
+
+  /* Iterate over each 32-bit word in the floating point constant.  The
+     real_to_target function puts out words in endian fashion.  We need
+     to arrange so the words are written in big endian order.  */
+  for (unsigned num = 0; num < num_words; num++)
+    {
+      unsigned endian_num = (BYTES_BIG_ENDIAN
+			     ? num
+			     : num_words - 1 - num);
+
+      unsigned uvalue = real_words[endian_num];
+      for (int shift = 32 - 8; shift >= 0; shift -= 8)
+	info->bytes[byte_num++] = (uvalue >> shift) & 0xff;
+    }
+
+  /* Mark that this constant involes floating point.  */
+  info->fp_constant_p = true;
+}
+
+/* Convert an RTL constant OP with mode MODE to an internal structure INFO.  Possibly splat the constant to a larger size (SPLAT).
+
+   Break out the constant out to bytes, half words, words, and double words.
+   Return true if we have successfully broken out a constant.
+
+   We handle CONST_INT, CONST_DOUBLE, CONST_VECTOR, and VEC_DUPLICATE of
+   constants.  */
+
+bool
+constant_to_bytes (rtx op,
+		   machine_mode mode,
+		   rs6000_const *info,		
+		   rs6000_const_splat splat)
+{
+  /* Initialize the constant structure.  */
+  memset ((void *)info, 0, sizeof (rs6000_const));
+
+  /* Assume plain integer constants are DImode.  */
+  if (mode == VOIDmode)
+    mode = CONST_INT_P (op) ? DImode : GET_MODE (op);
+
+  if (mode == VOIDmode)
+    return false;
+
+  unsigned size = GET_MODE_SIZE (mode);
+
+  if (size > RS6000_CONST_MAX_BYTES)
+    return false;
+
+  /* Set up the bits.  */
+  switch (GET_CODE (op))
+    {
+      /* Integer constants, default to double word.  */
+    case CONST_INT:
+      {
+	constant_integer_to_bytes (op, mode, 0, info);
+	break;
+      }
+
+      /* Floating point constants.  */
+    case CONST_DOUBLE:
+      {
+	/* Fail if the floating point constant is the wrong mode.  */
+	if (GET_MODE (op) != mode)
+	  return false;
+
+	/* SFmode stored as scalars are stored in DFmode format.  */
+	if (mode == SFmode)
+	  {
+	    mode = DFmode;
+	    size = GET_MODE_SIZE (DFmode);
+	  }
+
+	constant_floating_point_to_bytes (op, mode, 0, info);
+	break;
+      }
+
+      /* Vector constants, iterate each element.  On little endian systems, we
+	 have to reverse the element numbers.  */
+    case CONST_VECTOR:
+      {
+	/* Fail if the vector constant is the wrong mode.  */
+	if (GET_MODE (op) != mode)
+	  return false;
+
+	machine_mode ele_mode = GET_MODE_INNER (mode);
+	size_t ele_size = GET_MODE_SIZE (ele_mode);
+	size_t nunits = GET_MODE_NUNITS (mode);
+
+	for (size_t num = 0; num < nunits; num++)
+	  {
+	    rtx ele = CONST_VECTOR_ELT (op, num);
+	    size_t byte_num = (BYTES_BIG_ENDIAN
+			       ? num
+			       : nunits - 1 - num) * ele_size;
+
+	    if (CONST_INT_P (ele))
+	      constant_integer_to_bytes (ele, ele_mode, byte_num, info);
+	    else if (CONST_DOUBLE_P (ele))
+	      constant_floating_point_to_bytes (ele, ele_mode, byte_num, info);
+	    else
+	      return false;
+	  }
+
+	break;
+      }
+
+	/* Treat VEC_DUPLICATE of a constant just like a vector constant.  */
+    case VEC_DUPLICATE:
+      {
+	/* Fail if the vector duplicate is the wrong mode.  */
+	if (GET_MODE (op) != mode)
+	  return false;
+
+	machine_mode ele_mode = GET_MODE_INNER (mode);
+	size_t ele_size = GET_MODE_SIZE (ele_mode);
+	rtx ele = XEXP (op, 0);
+	size_t nunits = GET_MODE_NUNITS (mode);
+
+	if (!CONST_INT_P (ele) && !CONST_DOUBLE_P (ele))
+	  return false;
+
+	for (size_t num = 0; num < nunits; num++)
+	  {
+	    size_t byte_num = num * ele_size;
+
+	    if (CONST_INT_P (ele))
+	      constant_integer_to_bytes (ele, ele_mode, byte_num, info);
+	    else
+	      constant_floating_point_to_bytes (ele, ele_mode, byte_num, info);
+	  }
+
+	break;
+      }
+
+      /* Any thing else, just return failure.  */
+    default:
+      return false;
+    }
+
+  unsigned total_size = size;
+
+  /* Possibly splat the constant to fill a vector size.  */
+  if (splat == RS6000_CONST_SPLAT_16_BYTES)
+    {
+      if (size < 16)
+	{
+	  total_size = 16;
+	  if ((total_size % size) != 0)
+	    return false;
+
+	  for (size_t offset = size; offset < total_size; offset += size)
+	    memcpy ((void *) &info->bytes[offset],
+		    (void *) &info->bytes[0],
+		    size);
+	}
+    }
+
+  else if (splat != RS6000_CONST_NO_SPLAT)
+    return false;
+
+  /* Remember total/original sizes.  */
+  info->total_size = total_size;
+  info->original_size = size;
+
+  /* Determine if the bytes are all the same.  */
+  unsigned char first_byte = info->bytes[0];
+  info->all_bytes_same = true;
+  for (size_t i = 1; i < total_size; i++)
+    if (first_byte != info->bytes[i])
+      {
+	info->all_bytes_same = false;
+	break;
+      }
+
+  /* Pack half words together & determine if all of the half words are the
+     same.  */
+  for (size_t i = 0; i < total_size; i += 2)
+    info->half_words[i / 2] = ((info->bytes[i] << 8)
+			       | info->bytes[i + 1]);
+
+  unsigned short first_hword = info->half_words[0];
+  info->all_half_words_same = true;
+  for (size_t i = 1; i < total_size / 2; i++)
+    if (first_hword != info->half_words[i])
+      {
+	info->all_half_words_same = false;
+	break;
+      }
+
+  /* Pack words together & determine if all of the words are the same.  */
+  for (size_t i = 0; i < total_size; i += 4)
+    info->words[i / 4] = ((info->bytes[i] << 24)
+			  | (info->bytes[i + 1] << 16)
+			  | (info->bytes[i + 2] << 8)
+			  | info->bytes[i + 3]);
+
+  unsigned int first_word = info->words[0];
+  info->all_words_same = true;
+  for (size_t i = 1; i < total_size / 4; i++)
+    if (first_word != info->words[i])
+      {
+	info->all_words_same = false;
+	break;
+      }
+
+  /* Pack double words together & determine if all of the double words are the
+     same.  */
+  for (size_t i = 0; i < total_size; i += 8)
+    {
+      unsigned HOST_WIDE_INT d_word = 0;
+      for (size_t j = 0; j < 8; j++)
+	d_word = (d_word << 8) | info->bytes[i + j];
+
+      info->double_words[i / 8] = d_word;
+    }
+
+  unsigned HOST_WIDE_INT first_dword = info->double_words[0];
+  info->all_double_words_same = true;
+  for (size_t i = 1; i < total_size / 8; i++)
+    if (first_dword != info->double_words[i])
+      {
+	info->all_double_words_same = false;
+	break;
+      }
+
+  return true;
+}
+
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 #include "gt-rs6000.h"
