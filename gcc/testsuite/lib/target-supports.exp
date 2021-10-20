@@ -537,6 +537,8 @@ proc check_effective_target_trampolines { } {
       return 0
     }
     if { [istarget avr-*-*]
+	 || [istarget aarch64-none-elf]
+	     && [check_effective_target_aarch64_capability_any]
 	 || [istarget msp430-*-*]
 	 || [istarget nvptx-*-*]
 	 || [istarget hppa2.0w-hp-hpux11.23]

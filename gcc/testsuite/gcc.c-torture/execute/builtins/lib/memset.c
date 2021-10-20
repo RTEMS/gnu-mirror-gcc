@@ -3,7 +3,11 @@ extern int inside_main;
 
 __attribute__ ((__noinline__))
 void *
+#ifdef __CHERI_PURE_CAPABILITY__
+test_memset (void *dst, int c, __SIZE_TYPE__ n)
+#else
 memset (void *dst, int c, __SIZE_TYPE__ n)
+#endif
 {
   while (n-- != 0)
     n[(char *) dst] = c;

@@ -34,6 +34,12 @@ if $tracelevel then {
     strace $tracelevel
 }
 
+# The random generator in this testsuite may deliberately underalign
+# capabilities in a packed struct. This is currently not supported.
+if { [check_effective_target_cheri_capability_pure] } then {
+  return
+}
+
 global GCC_UNDER_TEST
 global compat_save_gcc_under_test
 global compat_use_alt

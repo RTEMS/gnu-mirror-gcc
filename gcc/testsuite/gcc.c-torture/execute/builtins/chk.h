@@ -55,7 +55,11 @@
 #undef __builtin_memmove
 #define __builtin_memmove(dst, src, len) memmove (dst, src, len)
 #undef __builtin_memset
+#ifdef __CHERI_PURE_CAPABILITY__
+#define __builtin_memset(dst, val, len) test_memset (dst, val, len)
+#else
 #define __builtin_memset(dst, val, len) memset (dst, val, len)
+#endif
 #undef __builtin_strcpy
 #define __builtin_strcpy(dst, src) strcpy (dst, src)
 #undef __builtin_stpcpy

@@ -1,3 +1,4 @@
+/* { dg-skip-if "Test performs capability-invalidating illegal memory accesses" { cheri_capability_pure } } */
 static char id_space[2] [32 +1];
 typedef short COUNT;
 

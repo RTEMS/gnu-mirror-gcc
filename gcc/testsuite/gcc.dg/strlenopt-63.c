@@ -3,7 +3,9 @@
    Verify that strlen of pointers to char arrays are computed correctly
    (whether folded or not).
    { dg-do run }
-   { dg-options "-O2 -Wall" } */
+   { dg-options "-O2 -Wall" }
+   { dg-skip-if "Test performs illegal out-of-bounds capability memory accesses" { cheri_capability_pure } }
+   */
 
 #include "strlenopt.h"
 

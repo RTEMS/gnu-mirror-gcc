@@ -1,4 +1,5 @@
 /* { dg-do run } */
+/* { dg-skip-if "Test performs capability-invalidating illegal memory accesses" { cheri_capability_pure } } */
 
 extern void abort (void);
 extern void *memcpy(void *, const void *, __SIZE_TYPE__);

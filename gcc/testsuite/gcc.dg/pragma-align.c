@@ -9,7 +9,7 @@ struct {
         long two;
 } defaultalign;
 
-#if defined(__LP64__)
+#if __SIZEOF_LONG__ == 8
 #pragma pack(8)
 #else
 #pragma pack(4)

@@ -33,13 +33,14 @@ int main()
   assert (ucap2 == 100);
   assert (((char*)ucap)[0] == 'a' && ((char*)ucap)[7] == 'h'
 	  && ((char*)ucap)[8] == '\0'); */
-  /* TODO put an `if !pure-cap` clause here, and assert that accesses fail if
-   * on purecap.  */
+#ifndef __CHERI_PURE_CAPABILITY__
   assert (((char*)x)[0] == 'a' && ((char*)x)[4] == 'e'
 	  && ((char*)x)[5] == '\0');
   assert (basicstring[0] == 'a' && basicstring[6] == 'g'
 	  && basicstring[7] == '\0');
   assert (stringval[0] == 'a' && stringval[5] == 'f' && stringval[6] == '\0');
+#endif
+  return 0;
 }
 
 /* TODO Execution test to check everything works properly (i.e. all the

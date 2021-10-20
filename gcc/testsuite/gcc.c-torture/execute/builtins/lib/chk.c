@@ -130,7 +130,11 @@ __memmove_chk (void *dst, const void *src, __SIZE_TYPE__ n, __SIZE_TYPE__ size)
 }
 
 void *
+#ifdef __CHERI_PURE_CAPABILITY__
+test_memset (void *dst, int c, __SIZE_TYPE__ n)
+#else
 memset (void *dst, int c, __SIZE_TYPE__ n)
+#endif
 {
   while (n-- != 0)
     n[(char *) dst] = c;
@@ -155,7 +159,11 @@ __memset_chk (void *dst, int c, __SIZE_TYPE__ n, __SIZE_TYPE__ size)
   ++chk_calls;
   if (n > size)
     __chk_fail ();
+#ifdef __CHERI_PURE_CAPABILITY__
+  return test_memset (dst, c, n);
+#else
   return memset (dst, c, n);
+#endif
 }
 
 char *

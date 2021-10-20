@@ -1,3 +1,4 @@
+/* { dg-skip-if "Test performs capability-invalidating illegal memory accesses" { cheri_capability_pure } } */
 typedef struct
 {
   short a __attribute__ ((aligned (2),packed));

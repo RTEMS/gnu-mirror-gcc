@@ -96,7 +96,11 @@ bcopy (const void *s, void *d, size_t n)
 }
 
 void *
+#ifdef __CHERI_PURE_CAPABILITY__
+test_memset (void *d, int c, size_t n)
+#else
 memset (void *d, int c, size_t n)
+#endif
 {
   void *result = my_memset (d, c, n);
   TEST_ABORT;

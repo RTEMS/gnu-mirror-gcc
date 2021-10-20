@@ -1,5 +1,6 @@
 /* { dg-do run } */
 /* { dg-options "-std=c99" } */
+/* { dg-skip-if "Test performs capability-invalidating illegal memory accesses" { cheri_capability_pure } } */
 
 #include <stdint.h>
 

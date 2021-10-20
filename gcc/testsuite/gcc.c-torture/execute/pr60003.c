@@ -2,9 +2,11 @@
 /* { dg-require-effective-target indirect_jumps } */
 
 extern void abort (void);
-
+#ifdef __GCC_ARM_CAPABILITY_ANY
+__uintcap_t jmp_buf[5];
+#else
 unsigned long long jmp_buf[5];
-
+#endif
 __attribute__((noinline, noclone)) void
 baz (void)
 {

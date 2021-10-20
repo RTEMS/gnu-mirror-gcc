@@ -1,3 +1,4 @@
+/* { dg-skip-if "Test performs capability-invalidating illegal memory accesses" { cheri_capability_pure } } */
 extern void abort (void);
 
 typedef unsigned long my_uintptr_t;

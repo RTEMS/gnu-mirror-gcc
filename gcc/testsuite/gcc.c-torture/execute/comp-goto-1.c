@@ -1,5 +1,6 @@
 /* { dg-require-effective-target label_values } */
 /* { dg-require-stack-size "4000" } */
+/* { dg-skip-if "Test performs capability-invalidating illegal memory accesses" { cheri_capability_pure } } */
 
 #include <stdlib.h>
 
