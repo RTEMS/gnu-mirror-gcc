@@ -7001,7 +7001,14 @@ output_vec_const_move (rtx *operands)
 	  if (constant_to_bytes (vec, mode, &vsx_const,
 				 RS6000_CONST_SPLAT_16_BYTES))
 	    {
-	      unsigned imm = constant_generates_xxspltidp (&vsx_const);
+	      unsigned imm = constant_generates_lxvkq (&vsx_const);
+	      if (imm)
+		{
+		  operands[2] = GEN_INT (imm);
+		  return "lxvkq %x0,%2";
+		}
+
+	      imm = constant_generates_xxspltidp (&vsx_const);
 	      if (imm)
 		{
 		  operands[2] = GEN_INT (imm);
@@ -29052,6 +29059,61 @@ constant_generates_xxspltiw (rs6000_const *vsx_const)
     return 0;
 
   return vsx_const->words[0];
+}
+
+/* Determine if an IEEE 128-bit constant can be loaded with LXVKQ.  Return zero
+   if the LXVKQ instruction cannot be used.  Otherwise return the immediate
+   value to be used with the LXVKQ instruction.  */
+
+unsigned
+constant_generates_lxvkq (rs6000_const *vsx_const)
+{
+  /* Is the instruction supported with power10 code generation, IEEE 128-bit
+     floating point hardware and VSX registers are available.  */
+  if (!TARGET_IEEE128_CONSTANT || !TARGET_FLOAT128_HW || !TARGET_POWER10
+      || !TARGET_VSX)
+    return 0;
+
+  /* Only recognize LXVKQ for 16-byte (4 word) vector constants.  */
+  unsigned total_size = vsx_const->total_size;
+  if (total_size != 16)
+    return 0;
+
+  /* Verify that all of the bottom 3 words in the constants loaded by the
+     LXVKQ instruction are zero.  */
+  if (vsx_const->words[1] != 0
+      || vsx_const->words[2] != 0
+      || vsx_const->words[3] != 0)
+      return 0;
+
+  /* See if we have a match.  */
+  switch (vsx_const->words[0])
+    {
+    case 0x3FFF0000U: return 1;		/* IEEE 128-bit +1.0.  */
+    case 0x40000000U: return 2;		/* IEEE 128-bit +2.0.  */
+    case 0x40008000U: return 3;		/* IEEE 128-bit +3.0.  */
+    case 0x40010000U: return 4;		/* IEEE 128-bit +4.0.  */
+    case 0x40014000U: return 5;		/* IEEE 128-bit +5.0.  */
+    case 0x40018000U: return 6;		/* IEEE 128-bit +6.0.  */
+    case 0x4001C000U: return 7;		/* IEEE 128-bit +7.0.  */
+    case 0x7FFF0000U: return 8;		/* IEEE 128-bit +Infinity.  */
+    case 0x7FFF8000U: return 9;		/* IEEE 128-bit quiet NaN.  */
+    case 0x80000000U: return 16;	/* IEEE 128-bit -0.0.  */
+    case 0xBFFF0000U: return 17;	/* IEEE 128-bit -1.0.  */
+    case 0xC0000000U: return 18;	/* IEEE 128-bit -2.0.  */
+    case 0xC0008000U: return 19;	/* IEEE 128-bit -3.0.  */
+    case 0xC0010000U: return 20;	/* IEEE 128-bit -4.0.  */
+    case 0xC0014000U: return 21;	/* IEEE 128-bit -5.0.  */
+    case 0xC0018000U: return 22;	/* IEEE 128-bit -6.0.  */
+    case 0xC001C000U: return 23;	/* IEEE 128-bit -7.0.  */
+    case 0xFFFF0000U: return 24;	/* IEEE 128-bit -Infinity.  */
+
+      /* anything else cannot be loaded.  */
+    default:
+      break;
+    }
+
+  return 0;
 }
 
 
