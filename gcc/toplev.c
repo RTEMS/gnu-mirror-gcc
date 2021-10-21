@@ -1378,25 +1378,6 @@ process_options (bool no_backend)
 	}
     }
 
-  if (flag_syntax_only)
-    {
-      write_symbols = NO_DEBUG;
-      profile_flag = 0;
-    }
-
-  if (flag_gtoggle)
-    {
-      if (debug_info_level == DINFO_LEVEL_NONE)
-	{
-	  debug_info_level = DINFO_LEVEL_NORMAL;
-
-	  if (write_symbols == NO_DEBUG)
-	    write_symbols = PREFERRED_DEBUGGING_TYPE;
-	}
-      else
-	debug_info_level = DINFO_LEVEL_NONE;
-    }
-
   /* CTF is supported for only C at this time.  */
   if (!lang_GNU_C ()
       && ctf_debug_info_level > CTFINFO_LEVEL_NONE)

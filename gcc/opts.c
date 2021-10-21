@@ -1369,6 +1369,25 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
     warning_at (loc, 0,
 		"var-tracking-assignments changes selective scheduling");
 
+  if (flag_syntax_only)
+    {
+      write_symbols = NO_DEBUG;
+      profile_flag = 0;
+    }
+
+  if (flag_gtoggle)
+    {
+      if (debug_info_level == DINFO_LEVEL_NONE)
+	{
+	  debug_info_level = DINFO_LEVEL_NORMAL;
+
+	  if (write_symbols == NO_DEBUG)
+	    write_symbols = PREFERRED_DEBUGGING_TYPE;
+	}
+      else
+	debug_info_level = DINFO_LEVEL_NONE;
+    }
+
   if (!OPTION_SET_P (debug_nonbind_markers_p))
     debug_nonbind_markers_p
       = (optimize
