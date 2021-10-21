@@ -606,6 +606,9 @@
   if (TARGET_POWER10
       && constant_to_bytes (op, mode, &vsx_const, RS6000_CONST_SPLAT_16_BYTES))
     {
+      if (constant_generates_lxvkq (&vsx_const))
+	return true;
+
       if (constant_generates_xxspltidp (&vsx_const))
 	return true;
 
@@ -660,6 +663,23 @@
   return false;
 })
 
+;; Return 1 if the operand is a special IEEE 128-bit value that can be loaded
+;; via the LXVKQ instruction.
+
+(define_predicate "easy_vector_constant_ieee128"
+  (match_code "const_vector,const_double")
+{
+  rs6000_const vsx_const;
+
+  /* Can we generate the LXVKQ instruction?  */
+  if (!TARGET_IEEE128_CONSTANT || !TARGET_FLOAT128_HW || !TARGET_POWER10
+      || !TARGET_VSX)
+    return false;
+
+  return (constant_to_bytes (op, mode, &vsx_const, RS6000_CONST_NO_SPLAT)
+	  && constant_generates_lxvkq (&vsx_const));
+})
+
 ;; Return 1 if the operand is a constant that can loaded with a XXSPLTIB
 ;; instruction and then a VUPKHSB, VECSB2W or VECSB2D instruction.
 
@@ -710,6 +730,9 @@
       if (TARGET_POWER10
 	  && constant_to_bytes (op, mode, &vsx_const, RS6000_CONST_NO_SPLAT))
 	{
+	  if (constant_generates_lxvkq (&vsx_const))
+	    return true;
+
 	  if (constant_generates_xxspltidp (&vsx_const))
 	    return true;
 
