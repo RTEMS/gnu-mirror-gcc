@@ -608,9 +608,6 @@
     {
       if (constant_generates_xxspltidp (&vsx_const))
 	return true;
-
-      if (constant_generates_xxspltiw (&vsx_const))
-	return true;
     }
 
   /* Otherwise consider floating point constants hard, so that the
@@ -623,7 +620,7 @@
 
 ;; Return 1 if the operand is a 64-bit floating point scalar constant or a
 ;; vector constant that can be loaded to a VSX register with one prefixed
-;; instruction, such as XXSPLTIDP or XXSPLTIW.
+;; instruction, such as XXSPLTIDP.
 ;;
 ;; In addition regular constants, we also recognize constants formed with the
 ;; VEC_DUPLICATE insn from scalar constants.
@@ -652,9 +649,6 @@
     return false;
 
   if (constant_generates_xxspltidp (&vsx_const))
-    return true;
-
-  if (constant_generates_xxspltiw (&vsx_const))
     return true;
 
   return false;
@@ -711,9 +705,6 @@
 	  && constant_to_bytes (op, mode, &vsx_const, RS6000_CONST_NO_SPLAT))
 	{
 	  if (constant_generates_xxspltidp (&vsx_const))
-	    return true;
-
-	  if (constant_generates_xxspltiw (&vsx_const))
 	    return true;
 	}
 
