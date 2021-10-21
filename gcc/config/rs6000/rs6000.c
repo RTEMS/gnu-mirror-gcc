@@ -20625,6 +20625,10 @@ rs6000_ms_bitfield_layout_p (const_tree record_type)
     || lookup_attribute ("ms_struct", TYPE_ATTRIBUTES (record_type));
 }
 
+
+/* Target CASM state used for GGC memory.  */
+static GTY(()) rs6000_asm_out_state *target_casm;
+
 #ifdef USING_ELFOS_H
 
 /* A get_unnamed_section callback, used for switching to toc_section.  */
@@ -20676,9 +20680,6 @@ rs6000_elf_output_toc_section_asm_op (const void *data ATTRIBUTE_UNUSED)
     }
 }
 
-/* Target CASM state used for GGC memory.  */
-rs6000_asm_out_state *target_casm;
-
 /* Initialize ELF sections. */
 
 void
@@ -20700,7 +20701,6 @@ rs6000_elf_asm_init_sections (void)
   rs6000_asm_out_state *target_state
     = new (ggc_alloc<rs6000_asm_out_state> ()) rs6000_asm_out_state ();
   target_state->init_elf_sections ();
-  target_state->init_sections ();
 
   return target_state;
 }
@@ -21440,7 +21440,6 @@ rs6000_xcoff_asm_init_sections (void)
   rs6000_asm_out_state *target_state
     = new (ggc_alloc<rs6000_asm_out_state> ()) rs6000_asm_out_state ();
   target_state->init_xcoff_sections ();
-  target_state->init_sections ();
 
   return target_state;
 }
