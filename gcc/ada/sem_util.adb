@@ -315,7 +315,8 @@ package body Sem_Util is
                --  Ignore transient scopes made during expansion
 
                if Comes_From_Source (Node_Par) then
-                  return Scope_Depth (Encl_Scop) + Master_Lvl_Modifier;
+                  return
+                    Scope_Depth_Default_0 (Encl_Scop) + Master_Lvl_Modifier;
                end if;
 
             --  For a return statement within a function, return
@@ -627,9 +628,9 @@ package body Sem_Util is
             --  caller.
 
             if Is_Explicitly_Aliased (E)
-              and then Level /= Dynamic_Level
-              and then (In_Return_Value (Expr)
-                         or else In_Return_Context)
+              and then (In_Return_Context
+                         or else (Level /= Dynamic_Level
+                                   and then In_Return_Value (Expr)))
             then
                return Make_Level_Literal (Scope_Depth (Standard_Standard));
 
@@ -1137,6 +1138,10 @@ package body Sem_Util is
 
    function Addressable (V : Uint) return Boolean is
    begin
+      if No (V) then
+         return False;
+      end if;
+
       return V = Uint_8  or else
              V = Uint_16 or else
              V = Uint_32 or else
@@ -6589,11 +6594,14 @@ package body Sem_Util is
 
                if Inside_Init_Proc then
                   declare
+                     Init_Proc_Type : constant Entity_Id :=
+                       Etype (First_Formal (Current_Scope_No_Loops));
+
                      Conc_Typ : constant Entity_Id :=
-                                  Corresponding_Concurrent_Type
-                                    (Entity (Parameter_Type (First
-                                      (Parameter_Specifications
-                                        (Parent (Current_Scope))))));
+                       (if Present (Init_Proc_Type)
+                          and then Init_Proc_Type in E_Record_Type_Id
+                        then Corresponding_Concurrent_Type (Init_Proc_Type)
+                        else Empty);
 
                   begin
                      --  Don't complain if the corresponding concurrent type
@@ -8027,8 +8035,7 @@ package body Sem_Util is
 
             if Present (Spec_Id)
               and then Nkind (Unit_Declaration_Node (Spec_Id)) in
-                         N_Generic_Package_Declaration |
-                         N_Generic_Subprogram_Declaration
+                         N_Generic_Declaration
             then
                return Par;
             end if;
@@ -8052,9 +8059,7 @@ package body Sem_Util is
    begin
       Par := Parent (N);
       while Present (Par) loop
-         if Nkind (Par) in N_Generic_Package_Declaration
-                         | N_Generic_Subprogram_Declaration
-         then
+         if Nkind (Par) in N_Generic_Declaration then
             return Par;
 
          elsif Nkind (Par) in N_Package_Body | N_Subprogram_Body then
@@ -8063,9 +8068,7 @@ package body Sem_Util is
             if Present (Spec_Id) then
                Spec_Decl := Unit_Declaration_Node (Spec_Id);
 
-               if Nkind (Spec_Decl) in N_Generic_Package_Declaration
-                                     | N_Generic_Subprogram_Declaration
-               then
+               if Nkind (Spec_Decl) in N_Generic_Declaration then
                   return Spec_Decl;
                end if;
             end if;
@@ -17888,9 +17891,7 @@ package body Sem_Util is
       --  a generic body modifies the Ekind of its spec to allow for recursive
       --  calls.
 
-      return
-        Nkind (Spec_Decl) in N_Generic_Package_Declaration
-                           | N_Generic_Subprogram_Declaration;
+      return Nkind (Spec_Decl) in N_Generic_Declaration;
    end Is_Generic_Declaration_Or_Body;
 
    ---------------------------
@@ -23118,7 +23119,7 @@ package body Sem_Util is
       --  types.
 
       elsif Is_Access_Type (Typ)
-        or else (Consider_IS_NS and then (Is_Scalar_Type (Typ)))
+        or else (Consider_IS_NS and then Is_Scalar_Type (Typ))
       then
          return True;
 

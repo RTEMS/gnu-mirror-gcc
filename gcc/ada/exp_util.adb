@@ -1293,7 +1293,7 @@ package body Exp_Util is
             Adjust_Inherited_Pragma_Sloc (N);
          end if;
 
-         if Nkind (N) in N_Identifier | N_Operator_Symbol
+         if Nkind (N) in N_Identifier | N_Expanded_Name | N_Operator_Symbol
            and then Present (Entity (N))
            and then
              (Is_Formal (Entity (N)) or else Is_Subprogram (Entity (N)))
@@ -4784,7 +4784,8 @@ package body Exp_Util is
       --  record or bit-packed array, then everything is fine, since the back
       --  end can handle these cases correctly.
 
-      elsif Esize (Comp) <= System_Max_Integer_Size
+      elsif Known_Esize (Comp)
+        and then Esize (Comp) <= System_Max_Integer_Size
         and then (Is_Record_Type (UT) or else Is_Bit_Packed_Array (UT))
       then
          return False;
@@ -7619,8 +7620,18 @@ package body Exp_Util is
                | N_Iterated_Component_Association
                | N_Iterated_Element_Association
             =>
-               if Nkind (Parent (P)) = N_Aggregate
-                 and then Present (Loop_Actions (P))
+               if Nkind (Parent (P)) in N_Aggregate | N_Delta_Aggregate
+
+                 --  We must not climb up out of an N_Iterated_xxx_Association
+                 --  because the actions might contain references to the loop
+                 --  parameter. But it turns out that setting the Loop_Actions
+                 --  attribute in the case of an N_Component_Association
+                 --  when the attribute was not already set can lead to
+                 --  (as yet not understood) bugboxes (gcc failures that are
+                 --  presumably due to malformed trees). So we don't do that.
+
+                 and then (Nkind (P) /= N_Component_Association
+                            or else Present (Loop_Actions (P)))
                then
                   if Is_Empty_List (Loop_Actions (P)) then
                      Set_Loop_Actions (P, Ins_Actions);
@@ -7994,10 +8005,8 @@ package body Exp_Util is
    ----------------------
 
    function Inside_Init_Proc return Boolean is
-      Proc : constant Entity_Id := Enclosing_Init_Proc;
-
    begin
-      return Proc /= Empty;
+      return Present (Enclosing_Init_Proc);
    end Inside_Init_Proc;
 
    ----------------------
