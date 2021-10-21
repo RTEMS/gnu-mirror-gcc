@@ -464,9 +464,25 @@ static void
 check_open_files (void)
 {
   int i;
+  int rfd = -1;
+  int wfd = -1;
+
+#define JS_NEEDLE "--jobserver-auth="
+
+  /* Ignore file descriptors provided by jobserver.  */
+  const char *makeflags = getenv ("MAKEFLAGS");
+  if (makeflags != NULL)
+    {
+      const char *n = strstr (makeflags, JS_NEEDLE);
+      if (n != NULL)
+	sscanf (n + strlen (JS_NEEDLE), "%d,%d", &rfd, &wfd);
+    }
 
   for (i = 3; i < 10; i++)
     {
+      if (i == rfd || i == wfd)
+	continue;
+
       if (close (i) == 0)
 	{
 	  fprintf (stderr,
