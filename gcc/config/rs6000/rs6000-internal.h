@@ -191,13 +191,24 @@ extern bool cpu_builtin_p;
 
 struct rs6000_asm_out_state : public asm_out_state
 {
-  /* Default constructor.  */
-  rs6000_asm_out_state ();
+  /* Initialize ELF sections. */
+  void init_elf_sections ();
+
+  /* Initialize XCOFF sections. */
+  void init_xcoff_sections ();
 
   struct
   {
+    /* ELF sections.  */
     section *toc;
     section *sdata2;
+
+    /* XCOFF sections.  */
+    section *read_only_data;
+    section *private_data;
+    section *tls_data;
+    section *tls_private_data;
+    section *read_only_private_data;
   } target_sec;
 };
 

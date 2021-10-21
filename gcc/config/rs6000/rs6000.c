@@ -182,11 +182,6 @@ char toc_label_name[10];
    rs6000_variable_issue hook and returned from rs6000_sched_reorder2.  */
 static short cached_can_issue_more;
 
-static GTY(()) section *read_only_data_section;
-static GTY(()) section *private_data_section;
-static GTY(()) section *tls_data_section;
-static GTY(()) section *tls_private_data_section;
-static GTY(()) section *read_only_private_data_section;
 
 /* Describe the vector unit used for modes.  */
 enum rs6000_vector rs6000_vector_unit[NUM_MACHINE_MODES];
@@ -20681,7 +20676,13 @@ rs6000_elf_output_toc_section_asm_op (const void *data ATTRIBUTE_UNUSED)
     }
 }
 
-rs6000_asm_out_state::rs6000_asm_out_state ()
+/* Target CASM state used for GGC memory.  */
+rs6000_asm_out_state *target_casm;
+
+/* Initialize ELF sections. */
+
+void
+rs6000_asm_out_state::init_elf_sections ()
 {
   target_sec.toc
     = get_unnamed_section (0, rs6000_elf_output_toc_section_asm_op, NULL);
@@ -20691,9 +20692,6 @@ rs6000_asm_out_state::rs6000_asm_out_state ()
 			   SDATA2_SECTION_ASM_OP);
 }
 
-/* Target CASM state used for GGC memory.  */
-rs6000_asm_out_state *target_casm;
-
 /* Implement TARGET_ASM_INIT_SECTIONS.  */
 
 static asm_out_state *
@@ -20701,6 +20699,7 @@ rs6000_elf_asm_init_sections (void)
 {
   rs6000_asm_out_state *target_state
     = new (ggc_alloc<rs6000_asm_out_state> ()) rs6000_asm_out_state ();
+  target_state->init_elf_sections ();
   target_state->init_sections ();
 
   return target_state;
@@ -21399,38 +21398,51 @@ rs6000_xcoff_output_toc_section_asm_op (const void *data ATTRIBUTE_UNUSED)
     fputs ("\t.toc\n", asm_out_file);
 }
 
-/* Implement TARGET_ASM_INIT_SECTIONS.  */
+/* Initialize XCOFF sections. */
 
-static void
-rs6000_xcoff_asm_init_sections (void)
+void
+rs6000_asm_out_state::init_xcoff_sections ()
 {
-  read_only_data_section
+  target_sec.read_only_data
     = get_unnamed_section (0, rs6000_xcoff_output_readonly_section_asm_op,
 			   &xcoff_read_only_section_name);
 
-  private_data_section
+  target_sec.private_data
     = get_unnamed_section (SECTION_WRITE,
 			   rs6000_xcoff_output_readwrite_section_asm_op,
 			   &xcoff_private_data_section_name);
 
-  read_only_private_data_section
+  target_sec.read_only_private_data
     = get_unnamed_section (0, rs6000_xcoff_output_readonly_section_asm_op,
 			   &xcoff_private_rodata_section_name);
 
-  tls_data_section
+  target_sec.tls_data
     = get_unnamed_section (SECTION_TLS,
 			   rs6000_xcoff_output_tls_section_asm_op,
 			   &xcoff_tls_data_section_name);
 
-  tls_private_data_section
+  target_sec.tls_private_data
     = get_unnamed_section (SECTION_TLS,
 			   rs6000_xcoff_output_tls_section_asm_op,
 			   &xcoff_private_data_section_name);
 
-  rs6000_casm->target_sec.toc
+  target_sec.toc
     = get_unnamed_section (0, rs6000_xcoff_output_toc_section_asm_op, NULL);
 
-  casm->sec.readonly_data = read_only_data_section;
+  sec.readonly_data = target_sec.read_only_data;
+}
+
+/* Implement TARGET_ASM_INIT_SECTIONS.  */
+
+static asm_out_state *
+rs6000_xcoff_asm_init_sections (void)
+{
+  rs6000_asm_out_state *target_state
+    = new (ggc_alloc<rs6000_asm_out_state> ()) rs6000_asm_out_state ();
+  target_state->init_xcoff_sections ();
+  target_state->init_sections ();
+
+  return target_state;
 }
 
 static int
@@ -21498,9 +21510,9 @@ rs6000_xcoff_select_section (tree decl, int reloc,
   if (decl_readonly_section (decl, reloc))
     {
       if (TREE_PUBLIC (decl))
-	return read_only_data_section;
+	return rs6000_casm->target_sec.read_only_data;
       else
-	return read_only_private_data_section;
+	return rs6000_casm->target_sec.read_only_private_data;
     }
   else
     {
@@ -21519,7 +21531,7 @@ rs6000_xcoff_select_section (tree decl, int reloc,
 	if (TREE_PUBLIC (decl))
 	return casm->sec.data;
       else
-	return private_data_section;
+	return rs6000_casm->target_sec.private_data;
     }
 }
 
@@ -21544,9 +21556,9 @@ rs6000_xcoff_select_rtx_section (machine_mode mode, rtx x,
 				 unsigned HOST_WIDE_INT align ATTRIBUTE_UNUSED)
 {
   if (ASM_OUTPUT_SPECIAL_POOL_ENTRY_P (x, mode))
-    return rs6000_casm->target_sec.tos;
+    return rs6000_casm->target_sec.toc;
   else
-    return read_only_private_data_section;
+    return rs6000_casm->target_sec.read_only_private_data;
 }
 
 /* Remove any trailing [DS] or the like from the symbol name.  */
@@ -21620,8 +21632,8 @@ rs6000_xcoff_file_start (void)
   output_quoted_string (asm_out_file, main_input_filename);
   fputc ('\n', asm_out_file);
   if (write_symbols != NO_DEBUG)
-    switch_to_section (private_data_section);
-  switch_to_section (rs6000_casm->target_sec.tos);
+    switch_to_section (rs6000_casm->target_sec.private_data);
+  switch_to_section (rs6000_casm->target_sec.toc);
   switch_to_section (casm->sec.text);
   if (profile_flag)
     fprintf (asm_out_file, "\t.extern %s\n", RS6000_MCOUNT);
