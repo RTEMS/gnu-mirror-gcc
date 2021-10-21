@@ -3340,10 +3340,6 @@ A signed 34-bit integer constant if prefixed instructions are supported.
 A scalar floating point constant or a vector constant that can be
 loaded with one prefixed instruction to a VSX register.
 
-@item eQ
-An IEEE 128-bit constant that can be loaded into a VSX register with a
-single instruction.
-
 @ifset INTERNALS
 @item G
 A floating point constant that can be loaded into a register with one
