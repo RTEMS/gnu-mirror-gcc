@@ -6548,79 +6548,101 @@ make_decl_one_only (tree decl, tree comdat_group)
     }
 }
 
-void
-init_varasm_once (void)
+/* Default constructor.  */
+
+asm_out_state::asm_out_state ()
+: out_file (NULL), in_section (NULL),
+  sec ({}), anchor_labelno (0), in_cold_section_p (false)
 {
-  /* Initialize ASM out state.  */
-  casm = new (ggc_alloc<asm_out_state> ()) asm_out_state ();
+  section_htab = hash_table<section_hasher>::create_ggc (31);
 
   object_block_htab = hash_table<object_block_hasher>::create_ggc (31);
   const_desc_htab = hash_table<tree_descriptor_hasher>::create_ggc (1009);
 
   shared_constant_pool = create_constant_pool ();
+}
 
+
+/* Initialize all sections in SEC variable.  */
+void
+asm_out_state::init_sections (void)
+{
 #ifdef TEXT_SECTION_ASM_OP
-  casm->sec.text = get_unnamed_section (SECTION_CODE, output_section_asm_op,
-				      TEXT_SECTION_ASM_OP);
+  sec.text = get_unnamed_section (SECTION_CODE, output_section_asm_op,
+				  TEXT_SECTION_ASM_OP);
 #endif
 
 #ifdef DATA_SECTION_ASM_OP
-  casm->sec.data = get_unnamed_section (SECTION_WRITE, output_section_asm_op,
-					     DATA_SECTION_ASM_OP);
+  sec.data = get_unnamed_section (SECTION_WRITE, output_section_asm_op,
+				  DATA_SECTION_ASM_OP);
 #endif
 
 #ifdef SDATA_SECTION_ASM_OP
-  casm->sec.sdata = get_unnamed_section (SECTION_WRITE, output_section_asm_op,
-				       SDATA_SECTION_ASM_OP);
+  sec.sdata = get_unnamed_section (SECTION_WRITE, output_section_asm_op,
+				   SDATA_SECTION_ASM_OP);
 #endif
 
 #ifdef READONLY_DATA_SECTION_ASM_OP
-  casm->sec.readonly_data = get_unnamed_section (0, output_section_asm_op,
-						      READONLY_DATA_SECTION_ASM_OP);
+  sec.readonly_data = get_unnamed_section (0, output_section_asm_op,
+					   READONLY_DATA_SECTION_ASM_OP);
 #endif
 
 #ifdef CTORS_SECTION_ASM_OP
-  casm->sec.ctors = get_unnamed_section (0, output_section_asm_op,
-				       CTORS_SECTION_ASM_OP);
+  sec.ctors = get_unnamed_section (0, output_section_asm_op,
+				   CTORS_SECTION_ASM_OP);
 #endif
 
 #ifdef DTORS_SECTION_ASM_OP
-  casm->sec.dtors = get_unnamed_section (0, output_section_asm_op,
-				       DTORS_SECTION_ASM_OP);
+  sec.dtors = get_unnamed_section (0, output_section_asm_op,
+				   DTORS_SECTION_ASM_OP);
 #endif
 
 #ifdef BSS_SECTION_ASM_OP
-  casm->sec.bss = get_unnamed_section (SECTION_WRITE | SECTION_BSS,
-					    output_section_asm_op,
-					    BSS_SECTION_ASM_OP);
+  sec.bss = get_unnamed_section (SECTION_WRITE | SECTION_BSS,
+				 output_section_asm_op,
+				 BSS_SECTION_ASM_OP);
 #endif
 
 #ifdef SBSS_SECTION_ASM_OP
-  casm->sec.sbss = get_unnamed_section (SECTION_WRITE | SECTION_BSS,
-				      output_section_asm_op,
-				      SBSS_SECTION_ASM_OP);
+  sec.sbss = get_unnamed_section (SECTION_WRITE | SECTION_BSS,
+				  output_section_asm_op,
+				  SBSS_SECTION_ASM_OP);
 #endif
 
-  casm->sec.tls_comm = get_noswitch_section (SECTION_WRITE | SECTION_BSS
-						  | SECTION_COMMON, emit_tls_common);
-  casm->sec.lcomm = get_noswitch_section (SECTION_WRITE | SECTION_BSS
-					       | SECTION_COMMON, emit_local);
-  casm->sec.comm = get_noswitch_section (SECTION_WRITE | SECTION_BSS
-					      | SECTION_COMMON, emit_common);
+  sec.tls_comm = get_noswitch_section (SECTION_WRITE | SECTION_BSS
+				       | SECTION_COMMON, emit_tls_common);
+  sec.lcomm = get_noswitch_section (SECTION_WRITE | SECTION_BSS
+				    | SECTION_COMMON, emit_local);
+  sec.comm = get_noswitch_section (SECTION_WRITE | SECTION_BSS
+				   | SECTION_COMMON, emit_common);
 
 #if defined ASM_OUTPUT_ALIGNED_BSS
-  casm->sec.bss_noswitch = get_noswitch_section (SECTION_WRITE | SECTION_BSS,
-						      emit_bss);
+  sec.bss_noswitch = get_noswitch_section (SECTION_WRITE | SECTION_BSS,
+					   emit_bss);
 #endif
 
-  targetm.asm_out.init_sections ();
+  if (sec.readonly_data == NULL)
+    sec.readonly_data = sec.text;
+}
 
-  if (casm->sec.readonly_data == NULL)
-    casm->sec.readonly_data = casm->sec.text;
+void
+init_varasm_once (void)
+{
+  casm = targetm.asm_out.init_sections ();
 
 #ifdef ASM_OUTPUT_EXTERNAL
   pending_assemble_externals_set = new hash_set<tree>;
 #endif
+}
+
+/* Default implementation of init_sections target hook.  */
+
+asm_out_state *
+default_init_sections (void)
+{
+  asm_out_state *state = new (ggc_alloc<asm_out_state> ()) asm_out_state ();
+  state->init_sections ();
+  return state;
 }
 
 enum tls_model

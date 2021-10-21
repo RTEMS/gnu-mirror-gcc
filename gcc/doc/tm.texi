@@ -7761,7 +7761,7 @@ readonly data section is used.
 This macro is irrelevant if there is no separate readonly data section.
 @end defmac
 
-@deftypefn {Target Hook} void TARGET_ASM_INIT_SECTIONS (void)
+@deftypefn {Target Hook} {asm_out_state *} TARGET_ASM_INIT_SECTIONS (void)
 Define this hook if you need to do something special to set up the
 @file{varasm.c} sections, or if your target has some special sections
 of its own that you need to create.

@@ -325,11 +325,11 @@ struct section_hasher : ggc_ptr_hash<section>
 
 struct GTY(()) asm_out_state
 {
-  asm_out_state (): out_file (NULL), in_section (NULL),
-    sec ({}), anchor_labelno (0), in_cold_section_p (false)
-  {
-    section_htab = hash_table<section_hasher>::create_ggc (31);
-  }
+  /* Default constructor.  */
+  asm_out_state ();
+
+  /* Initialize all sections in SEC variable.  */
+  void init_sections (void);
 
   /* Assembly output stream.  */
   FILE * GTY((skip)) out_file;
@@ -618,6 +618,7 @@ extern void record_tm_clone_pair (tree, tree);
 extern void finish_tm_clone_pairs (void);
 extern tree get_tm_clone_pair (tree);
 
+extern asm_out_state *default_init_sections (void);
 extern void default_asm_output_source_filename (FILE *, const char *);
 extern void output_file_directive (FILE *, const char *);
 
