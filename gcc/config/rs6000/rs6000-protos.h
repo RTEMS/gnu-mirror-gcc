@@ -198,7 +198,6 @@ enum non_prefixed_form reg_to_non_prefixed (rtx reg, machine_mode mode);
 extern bool prefixed_load_p (rtx_insn *);
 extern bool prefixed_store_p (rtx_insn *);
 extern bool prefixed_paddi_p (rtx_insn *);
-extern bool prefixed_xxsplti_p (rtx_insn *);
 extern void rs6000_asm_output_opcode (FILE *);
 extern void output_pcrel_opt_reloc (rtx);
 extern void rs6000_final_prescan_insn (rtx_insn *, rtx [], int);
@@ -223,44 +222,6 @@ address_is_prefixed (rtx addr,
   return (iform == INSN_FORM_PREFIXED_NUMERIC
 	  || iform == INSN_FORM_PCREL_LOCAL);
 }
-
-/* Functions and data structures relating to constants that are converted to
-   byte, half-word, word, and double-word values.  All fields are kept in big
-   endian order.  */
-#define RS6000_CONST_MAX_BITS		128	/* Largest constant size.  */
-#define RS6000_CONST_MAX_BYTES		(RS6000_CONST_MAX_BITS / 8)
-#define RS6000_CONST_MAX_HALF_WORDS	(RS6000_CONST_MAX_BITS / 16)
-#define RS6000_CONST_MAX_WORDS		(RS6000_CONST_MAX_BITS / 32)
-#define RS6000_CONST_MAX_DOUBLE_WORDS	(RS6000_CONST_MAX_BITS / 64)
-
-/* If the constant is small, whether we will splat the constant to fill a
-   vector.  */
-typedef enum {
-  RS6000_CONST_NO_SPLAT,		/* Do not splat the constant.  */
-  RS6000_CONST_SPLAT_16_BYTES		/* Splat to fill 16-bytes.  */
-} rs6000_const_splat;
-
-typedef struct {
-  /* Constant as various sized items.  */
-  unsigned HOST_WIDE_INT double_words[RS6000_CONST_MAX_DOUBLE_WORDS];
-  unsigned int words[RS6000_CONST_MAX_WORDS];
-  unsigned short half_words[RS6000_CONST_MAX_HALF_WORDS];
-  unsigned char bytes[RS6000_CONST_MAX_BYTES];
-
-  unsigned total_size;			/* Size in bytes of the constant.  */
-  unsigned original_size;		/* Size before a possible splat.  */
-  bool fp_constant_p;			/* Is the constant floating point?  */
-  bool all_double_words_same;		/* Are the double words all equal?  */
-  bool all_words_same;			/* Are the words all equal?  */
-  bool all_half_words_same;		/* Are the halft words all equal?  */
-  bool all_bytes_same;			/* Are the bytes all equal?  */
-} rs6000_const;
-
-extern bool constant_to_bytes (rtx, machine_mode, rs6000_const *,
-			       rs6000_const_splat);
-extern unsigned constant_generates_xxspltidp (rs6000_const *);
-extern unsigned constant_generates_xxspltiw (rs6000_const *);
-extern unsigned constant_generates_lxvkq (rs6000_const *);
 #endif /* RTX_CODE */
 
 #ifdef TREE_CODE
