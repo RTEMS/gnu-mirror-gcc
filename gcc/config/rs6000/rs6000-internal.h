@@ -191,6 +191,9 @@ extern bool cpu_builtin_p;
 
 struct rs6000_asm_out_state : public asm_out_state
 {
+  /* Default constructor.  */
+  rs6000_asm_out_state ();
+
   struct
   {
     section *toc;

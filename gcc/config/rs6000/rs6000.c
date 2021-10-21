@@ -20681,6 +20681,16 @@ rs6000_elf_output_toc_section_asm_op (const void *data ATTRIBUTE_UNUSED)
     }
 }
 
+rs6000_asm_out_state::rs6000_asm_out_state ()
+{
+  target_sec.toc
+    = get_unnamed_section (0, rs6000_elf_output_toc_section_asm_op, NULL);
+
+ target_sec.sdata2
+    = get_unnamed_section (SECTION_WRITE, output_section_asm_op,
+			   SDATA2_SECTION_ASM_OP);
+}
+
 /* Implement TARGET_ASM_INIT_SECTIONS.  */
 
 static asm_out_state *
