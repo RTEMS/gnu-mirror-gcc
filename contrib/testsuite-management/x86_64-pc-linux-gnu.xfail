@@ -221,3 +221,22 @@ FAIL: libgomp.c/scan-22.c scan-tree-dump-times vect "vectorized [2-6] loops" 2
 FAIL: libgomp.graphite/force-parallel-8.c scan-tree-dump-times graphite "5 loops carried no dependency" 1
 UNRESOLVED: g++.dg/tsan/pthread_cond_clockwait.C -O0  compilation failed to produce executable
 UNRESOLVED: g++.dg/tsan/pthread_cond_clockwait.C -O2  compilation failed to produce executable
+FAIL: g++.dg/modules/xtreme-header-5_a.H -std=c++2a (internal compiler error)
+FAIL: g++.dg/modules/xtreme-header-5_a.H -std=c++2a (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header-5_a.H -std=c++2b (internal compiler error)
+FAIL: g++.dg/modules/xtreme-header-5_a.H -std=c++2b (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header-5_a.H module-cmi  (gcm.cache/$srcdir/g++.dg/modules/xtreme-header-5_a.H.gcm)
+FAIL: g++.dg/modules/xtreme-header-5_b.C -std=c++2a (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header-5_b.C -std=c++2b (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header-5_c.C -std=c++2a (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header-5_c.C -std=c++2b (test for excess errors)
+FAIL: g++.dg/warn/Warray-bounds-16.C -std=gnu++14  scan-tree-dump-not optimized "goto"
+FAIL: g++.dg/warn/Warray-bounds-16.C -std=gnu++14 (test for excess errors)
+FAIL: g++.dg/warn/Warray-bounds-16.C -std=gnu++17  scan-tree-dump-not optimized "goto"
+FAIL: g++.dg/warn/Warray-bounds-16.C -std=gnu++17 (test for excess errors)
+FAIL: g++.dg/warn/Warray-bounds-16.C -std=gnu++2a  scan-tree-dump-not optimized "goto"
+FAIL: g++.dg/warn/Warray-bounds-16.C -std=gnu++2a (test for excess errors)
+FAIL: g++.dg/warn/Warray-bounds-16.C -std=gnu++98  scan-tree-dump-not optimized "goto"
+FAIL: g++.dg/warn/Warray-bounds-16.C -std=gnu++98 (test for excess errors)
+FAIL: gcc.dg/guality/pr54200.c -Og -DPREVENT_OPTIMIZATION  line 20 z == 3
+UNRESOLVED: gcc.dg/tree-ssa/ssa-dom-thread-7.c scan-tree-dump-not vrp-thread2 "Jumps threaded"
