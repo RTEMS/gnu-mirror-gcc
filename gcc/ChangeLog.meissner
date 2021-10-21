@@ -1,6 +1,29 @@
+work071.patch054:
+2021-10-20  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/constraints.md (eQ): New constraint.
+	* config/rs6000/predicates.md (easy_fp_constant): Add support for
+	generating the LXVKQ instruction.
+	(easy_vector_constant_ieee128): New predicate.
+	(easy_vector_constant): Add support for generating the LXVKQ
+	instruction.
+	* config/rs6000/rs6000-protos.h (constant_generates_lxvkq): New
+	declaration.
+	* config/rs6000/rs6000.c (output_vec_const_move): Add support for
+	generating LXVKQ.
+	(constant_generates_lxvkq): New function.
+	* config/rs6000/rs6000.opt (-mieee128-constant): New debug
+	option.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
+	generating LXVKQ.
+	(vsx_mov<mode>_32bit): Likewise.
+	* doc/md.texi (PowerPC and IBM RS6000 constraints): Document the
+	eQ constraint.
+
 work071.patch053:
 2021-10-20  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/constraints.md (eP): Update comment.
 	* config/rs6000/predicates.md (easy_fp_constant): Add support for
 	generating XXSPLTIW.
 	(vsx_prefixed_constant): Likewise.
