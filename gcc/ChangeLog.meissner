@@ -1,64 +1,28 @@
-work071.patch043:
-2021-10-18  Michael Meissner  <meissner@the-meissners.org>
-
-	* config/rs6000/constraints.md (eP): New constraint.
-	* config/rs6000/predicates.md (easy_fp_constant): Add support for
-	generating XXSPLTIDP.
-	(vsx_prefixed_constant): New predicate.
-	(easy_vector_constant): Add support for generating XXSPLTIDP.
-	* config/rs6000/rs6000-protos.h (prefixed_xxsplti_p): New
-	declaration.
-	(VECTOR_CONST_*): New macros.
-	(rs6000_vec_const): New structure to hold information about vector
-	constants.
-	(vec_const_to_bytes): New function.
-	(vec_const_use_xxspltidp): New function.
-	* config/rs6000/rs6000.c (output_vec_const_move): Add support for
-	XXSPLTIDP.
-	(prefixed_xxsplti_p): New function.
-	(vec_const_integer): New helper function.
-	(vec_const_floating_point): New helper function.
-	(vec_const_use_xxspltidp): New function.
-	(vec_const_to_bytes): New function.
-	* config/rs6000/rs6000.md (UNSPEC_XXSPLTIDP_CONST): New unspec.
-	(prefixed attribute): Add support for prefixed instructions to load
-	* constants into VSX registers.
-	(movsf_hardfloat): Add support for XXSPLTIDP.
-	(mov<mode>_hardfloat32, FMOVE64 iterator): Likewise.
-	(mov<mode>_hardfloat64, FMOVE64 iterator): Likewise.
-	(xxspltidp_<mode>_internal): New insns.
-	(splitter for VSX prefix constants): New splitters.
-	* config/rs6000/rs6000.opt (-mxxspltidp): New debug option.
-	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
-	XXSPLTIDP.
-	(vsx_mov<mode>_32bit): Likewise.
-	* doc/md.texi (PowerPC and IBM RS6000 constraints): Document the
-	eP constraint.
-
-work071.patch042:
-2021-10-18  Michael Meissner  <meissner@linux.ibm.com>
+work071.patch053:
+2021-10-20  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/predicates.md (easy_fp_constant): Add support for
-	XXSPLTIW.
+	generating XXSPLTIW.
 	(vsx_prefixed_constant): Likewise.
 	(easy_vector_constant): Likewise.
-	* config/rs6000/rs6000-protos.h (vec_const_use_xxspltiw): New
+	* config/rs6000/rs6000-protos.h (constant_generates_xxspltiw): New
 	declaration.
 	* config/rs6000/rs6000.c (xxspltib_constant_p): If we can generate
 	XXSPLTIW, don't do XXSPLTIB and sign extend.
 	(output_vec_const_move): Add support for XXSPLTIW.
 	(prefixed_xxsplti_p): Recognize XXSPLTIW instructions as
 	prefixed.
-	(vec_const_use_xxspltiw): New function.
+	(constant_generates_xxspltiw): New function.
 	* config/rs6000/rs6000.md (UNSPEC_XXSPLTIW_CONST): New unspec.
 	(xxspltiw_<mode>_internal): New insns.
 	(VSX prefixed constant splitter): Add XXSPLTIW support.
-	* config/rs6000/rs6000.opt (-mxxspltiw): New debug switch.
+	* config/rs6000/rs6000.opt (-msplat-word-constant): New debug
+	switch.
 	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Update comment.
 	(vsx_mov<mode>_32bit): Likewise.
 
-work071.patch041:
-2021-10-18  Michael Meissner  <meissner@the-meissners.org>
+work071.patch052:
+2021-10-20  Michael Meissner  <meissner@the-meissners.org>
 
 	* config/rs6000/constraints.md (eP): New constraint.
 	* config/rs6000/predicates.md (easy_fp_constant): Add support for
@@ -67,32 +31,35 @@ work071.patch041:
 	(easy_vector_constant): Add support for generating XXSPLTIDP.
 	* config/rs6000/rs6000-protos.h (prefixed_xxsplti_p): New
 	declaration.
-	(VECTOR_CONST_*): New macros.
-	(rs6000_vec_const): New structure to hold information about vector
-	constants.
-	(vec_const_to_bytes): New function.
-	(vec_const_use_xxspltidp): New function.
-	* config/rs6000/rs6000.c (output_vec_const_move): Add support for
-	XXSPLTIDP.
-	(prefixed_xxsplti_p): New function.
-	(vec_const_integer): New helper function.
-	(vec_const_floating_point): New helper function.
-	(vec_const_use_xxspltidp): New function.
-	(vec_const_to_bytes): New function.
+	(constant_generates_xxspltidp): New declaration.
+	* config/rs6000/rs6000.c (prefixed_xxsplti_p): New function.
+	(constant_generates_xxspltidp): New function.
 	* config/rs6000/rs6000.md (UNSPEC_XXSPLTIDP_CONST): New unspec.
 	(prefixed attribute): Add support for prefixed instructions to load
-	* constants into VSX registers.
+	constants into VSX registers.
 	(movsf_hardfloat): Add support for XXSPLTIDP.
 	(mov<mode>_hardfloat32, FMOVE64 iterator): Likewise.
 	(mov<mode>_hardfloat64, FMOVE64 iterator): Likewise.
 	(xxspltidp_<mode>_internal): New insns.
 	(splitter for VSX prefix constants): New splitters.
-	* config/rs6000/rs6000.opt (-mxxspltidp): New debug option.
+	* config/rs6000/rs6000.opt (-msplat-float-constant): New debug option.
 	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
 	XXSPLTIDP.
 	(vsx_mov<mode>_32bit): Likewise.
 	* doc/md.texi (PowerPC and IBM RS6000 constraints): Document the
 	eP constraint.
+
+work071.patch051:
+2021-10-20  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/rs6000-protos.h (RS6000_CONST_*): New macros.
+	(rs6000_const_splat): New enum type.
+	(rs6000_const): New structure type.
+	(constant_to_bytes): New declaration.
+	* config/rs6000/rs6000.c (constant_integer_to_bytes): New helper
+	function.
+	(constant_floating_point_to_bytes): New helper function.
+	(constant_to_bytes): New function.
 
 2021-10-11   Michael Meissner  <meissner@linux.ibm.com>
 

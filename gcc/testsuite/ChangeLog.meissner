@@ -1,16 +1,5 @@
-work071.patch043:
-2021-10-18  Michael Meissner  <meissner@the-meissners.org>
-
-	* gcc.target/powerpc/pr86731-fwrapv-longlong.c: Update insn
-	regex for power10.
-	* gcc.target/powerpc/vec-splat-constant-df.c: New test.
-	* gcc.target/powerpc/vec-splat-constant-sf.c: New test.
-	* gcc.target/powerpc/vec-splat-constant-v2df.c: New test.
-	* gcc.target/powerpc/vec-splat-constant-v2di.c: New test.
-	* gcc.target/powerpc/vec-splati-runnable.c: Update insn counts.
-
-work071.patch042:
-2021-10-18  Michael Meissner  <meissner@linux.ibm.com>
+work071.patch053:
+2021-10-20  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/vec-splat-constant-v16qi.c: New test.
 	* gcc.target/powerpc/vec-splat-constant-v4sf.c: New test.
@@ -18,8 +7,8 @@ work071.patch042:
 	* gcc.target/powerpc/vec-splat-constant-v8hi.c: New test.
 	* gcc.target/powerpc/vec-splati-runnable.c: Update insn count.
 
-work071.patch041:
-2021-10-18  Michael Meissner  <meissner@the-meissners.org>
+work071.patch052:
+2021-10-20  Michael Meissner  <meissner@the-meissners.org>
 
 	* gcc.target/powerpc/pr86731-fwrapv-longlong.c: Update insn
 	regex for power10.
