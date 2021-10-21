@@ -201,6 +201,8 @@ struct rs6000_asm_out_state : public asm_out_state
   } target_sec;
 };
 
+extern GTY(()) rs6000_asm_out_state *target_casm;
+
 #define rs6000_casm static_cast<rs6000_asm_out_state *> (casm)
 
 #endif

@@ -20691,16 +20691,19 @@ rs6000_asm_out_state::rs6000_asm_out_state ()
 			   SDATA2_SECTION_ASM_OP);
 }
 
+/* Target CASM state used for GGC memory.  */
+rs6000_asm_out_state *target_casm;
+
 /* Implement TARGET_ASM_INIT_SECTIONS.  */
 
 static asm_out_state *
 rs6000_elf_asm_init_sections (void)
 {
-  rs6000_asm_out_state *state
+  rs6000_asm_out_state *target_state
     = new (ggc_alloc<rs6000_asm_out_state> ()) rs6000_asm_out_state ();
-  state->init_sections ();
+  target_state->init_sections ();
 
-  return state;
+  return target_state;
 }
 
 /* Implement TARGET_SELECT_RTX_SECTION.  */
