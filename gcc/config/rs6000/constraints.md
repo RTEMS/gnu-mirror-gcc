@@ -214,7 +214,7 @@
   (match_operand 0 "cint34_operand"))
 
 ;; A SF/DF scalar constant or a vector constant that can be loaded into vector
-;; registers with one prefixed instruction such as XXSPLTIDP.
+;; registers with one prefixed instruction such as XXSPLTIDP or XXSPLTIW.
 (define_constraint "eP"
   "A constant that can be loaded into a VSX register with one prefixed insn."
   (match_operand 0 "vsx_prefixed_constant"))

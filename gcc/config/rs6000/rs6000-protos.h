@@ -259,6 +259,7 @@ typedef struct {
 extern bool constant_to_bytes (rtx, machine_mode, rs6000_const *,
 			       rs6000_const_splat);
 extern unsigned constant_generates_xxspltidp (rs6000_const *);
+extern unsigned constant_generates_xxspltiw (rs6000_const *);
 #endif /* RTX_CODE */
 
 #ifdef TREE_CODE
