@@ -6550,9 +6550,9 @@ make_decl_one_only (tree decl, tree comdat_group)
 
 /* Default constructor.  */
 
-asm_out_state::asm_out_state ()
+asm_out_state::asm_out_state (asm_out_state_type t)
 : out_file (NULL), in_section (NULL),
-  sec ({}), anchor_labelno (0), in_cold_section_p (false)
+  sec ({}), anchor_labelno (0), in_cold_section_p (false), type (t)
 {
   section_htab = hash_table<section_hasher>::create_ggc (31);
 
@@ -6560,13 +6560,7 @@ asm_out_state::asm_out_state ()
   const_desc_htab = hash_table<tree_descriptor_hasher>::create_ggc (1009);
 
   shared_constant_pool = create_constant_pool ();
-}
 
-
-/* Initialize all sections in SEC variable.  */
-void
-asm_out_state::init_sections (void)
-{
 #ifdef TEXT_SECTION_ASM_OP
   sec.text = get_unnamed_section (SECTION_CODE, output_section_asm_op,
 				  TEXT_SECTION_ASM_OP);
@@ -6621,8 +6615,7 @@ asm_out_state::init_sections (void)
 					   emit_bss);
 #endif
 
-  if (sec.readonly_data == NULL)
-    sec.readonly_data = sec.text;
+  sec.readonly_data = sec.text;
 }
 
 void
@@ -6640,9 +6633,7 @@ init_varasm_once (void)
 asm_out_state *
 default_init_sections (void)
 {
-  asm_out_state *state = new (ggc_alloc<asm_out_state> ()) asm_out_state ();
-  state->init_sections ();
-  return state;
+  return new (ggc_alloc<asm_out_state> ()) asm_out_state ();
 }
 
 enum tls_model

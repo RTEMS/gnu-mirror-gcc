@@ -321,15 +321,18 @@ struct section_hasher : ggc_ptr_hash<section>
   static bool equal (section *, const char *);
 };
 
+enum asm_out_state_type
+{
+  DEFAULT,
+  RS6000
+};
+
 /* Assembly output state.  */
 
-struct GTY(()) asm_out_state
+struct GTY((desc ("%h.type"), tag ("DEFAULT"))) asm_out_state
 {
   /* Default constructor.  */
-  asm_out_state ();
-
-  /* Initialize all sections in SEC variable.  */
-  void init_sections (void);
+  asm_out_state (asm_out_state_type t = DEFAULT);
 
   /* Assembly output stream.  */
   FILE * GTY((skip)) out_file;
@@ -379,12 +382,40 @@ struct GTY(()) asm_out_state
   /* True if code for the current function is currently being directed
      at the cold section.  */
   bool in_cold_section_p;
+
+  /* Type used by GGC.  */
+  ENUM_BITFIELD (asm_out_state_type) type : 8;
 };
 
 extern GTY(()) asm_out_state *casm;
 
 /* Helper macro for commonly used accesses.  */
 #define asm_out_file casm->out_file
+
+struct GTY((tag ("RS6000"))) rs6000_asm_out_state : public asm_out_state
+{
+  rs6000_asm_out_state (): asm_out_state (RS6000), target_sec ({}) {}
+
+  /* Initialize ELF sections. */
+  void init_elf_sections ();
+
+  /* Initialize XCOFF sections. */
+  void init_xcoff_sections ();
+
+  struct
+  {
+    /* ELF sections.  */
+    section *toc;
+    section *sdata2;
+
+    /* XCOFF sections.  */
+    section *read_only_data;
+    section *private_data;
+    section *tls_data;
+    section *tls_private_data;
+    section *read_only_private_data;
+  } target_sec;
+};
 
 /* The first global object in the file.  */
 extern const char *first_global_object_name;
