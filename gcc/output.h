@@ -321,18 +321,12 @@ struct section_hasher : ggc_ptr_hash<section>
   static bool equal (section *, const char *);
 };
 
-enum asm_out_state_type
-{
-  DEFAULT,
-  RS6000
-};
-
 /* Assembly output state.  */
 
-struct GTY((desc ("%h.type"), tag ("DEFAULT"))) asm_out_state
+struct GTY(()) asm_out_state
 {
   /* Default constructor.  */
-  asm_out_state (asm_out_state_type t = DEFAULT);
+  asm_out_state ();
 
   /* Assembly output stream.  */
   FILE * GTY((skip)) out_file;
@@ -374,36 +368,9 @@ struct GTY((desc ("%h.type"), tag ("DEFAULT"))) asm_out_state
        The section is set either by the target's init_sections hook or by the
        first call to switch_to_eh_frame_section.  */
     section *eh_frame;
-  } sec;
 
-  /* The next number to use for internal anchor labels.  */
-  int anchor_labelno;
+    /* RS6000 sections.  */
 
-  /* True if code for the current function is currently being directed
-     at the cold section.  */
-  bool in_cold_section_p;
-
-  /* Type used by GGC.  */
-  ENUM_BITFIELD (asm_out_state_type) type : 8;
-};
-
-extern GTY(()) asm_out_state *casm;
-
-/* Helper macro for commonly used accesses.  */
-#define asm_out_file casm->out_file
-
-struct GTY((tag ("RS6000"))) rs6000_asm_out_state : public asm_out_state
-{
-  rs6000_asm_out_state (): asm_out_state (RS6000), target_sec ({}) {}
-
-  /* Initialize ELF sections. */
-  void init_elf_sections ();
-
-  /* Initialize XCOFF sections. */
-  void init_xcoff_sections ();
-
-  struct
-  {
     /* ELF sections.  */
     section *toc;
     section *sdata2;
@@ -414,8 +381,20 @@ struct GTY((tag ("RS6000"))) rs6000_asm_out_state : public asm_out_state
     section *tls_data;
     section *tls_private_data;
     section *read_only_private_data;
-  } target_sec;
+  } sec;
+
+  /* The next number to use for internal anchor labels.  */
+  int anchor_labelno;
+
+  /* True if code for the current function is currently being directed
+     at the cold section.  */
+  bool in_cold_section_p;
 };
+
+extern GTY(()) asm_out_state *casm;
+
+/* Helper macro for commonly used accesses.  */
+#define asm_out_file casm->out_file
 
 /* The first global object in the file.  */
 extern const char *first_global_object_name;

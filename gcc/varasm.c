@@ -6550,9 +6550,9 @@ make_decl_one_only (tree decl, tree comdat_group)
 
 /* Default constructor.  */
 
-asm_out_state::asm_out_state (asm_out_state_type t)
+asm_out_state::asm_out_state ()
 : out_file (NULL), in_section (NULL),
-  sec ({}), anchor_labelno (0), in_cold_section_p (false), type (t)
+  sec ({}), anchor_labelno (0), in_cold_section_p (false)
 {
   section_htab = hash_table<section_hasher>::create_ggc (31);
 

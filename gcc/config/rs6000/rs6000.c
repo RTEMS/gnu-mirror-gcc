@@ -14739,7 +14739,7 @@ rs6000_assemble_integer (rtx x, unsigned int size, int aligned_p)
 	 section.  */
       if (DEFAULT_ABI == ABI_V4
 	  && (TARGET_RELOCATABLE || flag_pic > 1)
-	  && casm->in_section != rs6000_casm->target_sec.toc
+	  && casm->in_section != casm->sec.toc
 	  && !recurse
 	  && !CONST_SCALAR_INT_P (x)
 	  && CONSTANT_P (x))
@@ -20626,9 +20626,6 @@ rs6000_ms_bitfield_layout_p (const_tree record_type)
 }
 
 
-/* Target CASM state used for GGC memory.  */
-static GTY(()) rs6000_asm_out_state *target_casm;
-
 #ifdef USING_ELFOS_H
 
 /* A get_unnamed_section callback, used for switching to toc_section.  */
@@ -20685,10 +20682,10 @@ rs6000_elf_output_toc_section_asm_op (const void *data ATTRIBUTE_UNUSED)
 void
 rs6000_asm_out_state::init_elf_sections ()
 {
-  target_sec.toc
+  sec.toc
     = get_unnamed_section (0, rs6000_elf_output_toc_section_asm_op, NULL);
 
- target_sec.sdata2
+ sec.sdata2
     = get_unnamed_section (SECTION_WRITE, output_section_asm_op,
 			   SDATA2_SECTION_ASM_OP);
 }
@@ -20712,7 +20709,7 @@ rs6000_elf_select_rtx_section (machine_mode mode, rtx x,
 			       unsigned HOST_WIDE_INT align)
 {
   if (ASM_OUTPUT_SPECIAL_POOL_ENTRY_P (x, mode))
-    return rs6000_casm->target_sec.toc;
+    return casm->sec.toc;
   else
     return default_elf_select_rtx_section (mode, x, align);
 }
@@ -21403,30 +21400,30 @@ rs6000_xcoff_output_toc_section_asm_op (const void *data ATTRIBUTE_UNUSED)
 void
 rs6000_asm_out_state::init_xcoff_sections ()
 {
-  target_sec.read_only_data
+  sec.read_only_data
     = get_unnamed_section (0, rs6000_xcoff_output_readonly_section_asm_op,
 			   &xcoff_read_only_section_name);
 
-  target_sec.private_data
+  sec.private_data
     = get_unnamed_section (SECTION_WRITE,
 			   rs6000_xcoff_output_readwrite_section_asm_op,
 			   &xcoff_private_data_section_name);
 
-  target_sec.read_only_private_data
+  sec.read_only_private_data
     = get_unnamed_section (0, rs6000_xcoff_output_readonly_section_asm_op,
 			   &xcoff_private_rodata_section_name);
 
-  target_sec.tls_data
+  sec.tls_data
     = get_unnamed_section (SECTION_TLS,
 			   rs6000_xcoff_output_tls_section_asm_op,
 			   &xcoff_tls_data_section_name);
 
-  target_sec.tls_private_data
+  sec.tls_private_data
     = get_unnamed_section (SECTION_TLS,
 			   rs6000_xcoff_output_tls_section_asm_op,
 			   &xcoff_private_data_section_name);
 
-  target_sec.toc
+  sec.toc
     = get_unnamed_section (0, rs6000_xcoff_output_toc_section_asm_op, NULL);
 
   sec.readonly_data = target_sec.read_only_data;
@@ -21509,9 +21506,9 @@ rs6000_xcoff_select_section (tree decl, int reloc,
   if (decl_readonly_section (decl, reloc))
     {
       if (TREE_PUBLIC (decl))
-	return rs6000_casm->target_sec.read_only_data;
+	return casm->sec.read_only_data;
       else
-	return rs6000_casm->target_sec.read_only_private_data;
+	return casm->sec.read_only_private_data;
     }
   else
     {
@@ -21530,7 +21527,7 @@ rs6000_xcoff_select_section (tree decl, int reloc,
 	if (TREE_PUBLIC (decl))
 	return casm->sec.data;
       else
-	return rs6000_casm->target_sec.private_data;
+	return casm->sec.private_data;
     }
 }
 
@@ -21555,9 +21552,9 @@ rs6000_xcoff_select_rtx_section (machine_mode mode, rtx x,
 				 unsigned HOST_WIDE_INT align ATTRIBUTE_UNUSED)
 {
   if (ASM_OUTPUT_SPECIAL_POOL_ENTRY_P (x, mode))
-    return rs6000_casm->target_sec.toc;
+    return casm->sec.toc;
   else
-    return rs6000_casm->target_sec.read_only_private_data;
+    return casm->sec.read_only_private_data;
 }
 
 /* Remove any trailing [DS] or the like from the symbol name.  */
@@ -21631,8 +21628,8 @@ rs6000_xcoff_file_start (void)
   output_quoted_string (asm_out_file, main_input_filename);
   fputc ('\n', asm_out_file);
   if (write_symbols != NO_DEBUG)
-    switch_to_section (rs6000_casm->target_sec.private_data);
-  switch_to_section (rs6000_casm->target_sec.toc);
+    switch_to_section (casm->sec.private_data);
+  switch_to_section (casm->sec.toc);
   switch_to_section (casm->sec.text);
   if (profile_flag)
     fprintf (asm_out_file, "\t.extern %s\n", RS6000_MCOUNT);
