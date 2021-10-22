@@ -6615,7 +6615,8 @@ asm_out_state::asm_out_state ()
 					   emit_bss);
 #endif
 
-  sec.readonly_data = sec.text;
+  if (sec.readonly_data == NULL)
+    sec.readonly_data = sec.text;
 }
 
 void
