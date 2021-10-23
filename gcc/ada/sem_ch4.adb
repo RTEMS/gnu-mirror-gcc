@@ -2534,6 +2534,7 @@ package body Sem_Ch4 is
               and then Is_Entity_Name (Actual)
               and then Is_Type (Entity (Actual))
               and then Is_Discrete_Type (Entity (Actual))
+              and then not Is_Current_Instance (Actual)
             then
                Replace (N,
                  Make_Slice (Loc,
@@ -2956,46 +2957,22 @@ package body Sem_Ch4 is
       I_F   : Interp_Index;
       T_F   : Entity_Id;
 
+      procedure Analyze_Set_Membership;
+      --  If a set of alternatives is present, analyze each and find the
+      --  common type to which they must all resolve.
+
+      procedure Find_Interpretation;
+      function Find_Interpretation return Boolean;
+      --  Routine and wrapper to find a matching interpretation in case
+      --  of overloading. The wrapper returns True iff a matching
+      --  interpretation is found. Beware, in absence of overloading,
+      --  using this function will break gnat's bootstrapping.
+
       procedure Try_One_Interp (T1 : Entity_Id);
       --  Routine to try one proposed interpretation. Note that the context
       --  of the operation plays no role in resolving the arguments, so that
       --  if there is more than one interpretation of the operands that is
       --  compatible with a membership test, the operation is ambiguous.
-
-      --------------------
-      -- Try_One_Interp --
-      --------------------
-
-      procedure Try_One_Interp (T1 : Entity_Id) is
-      begin
-         if Has_Compatible_Type (R, T1) then
-            if Found
-              and then Base_Type (T1) /= Base_Type (T_F)
-            then
-               It := Disambiguate (L, I_F, Index, Any_Type);
-
-               if It = No_Interp then
-                  Ambiguous_Operands (N);
-                  Set_Etype (L, Any_Type);
-                  return;
-
-               else
-                  T_F := It.Typ;
-               end if;
-
-            else
-               Found := True;
-               T_F   := T1;
-               I_F   := Index;
-            end if;
-
-            Set_Etype (L, T_F);
-         end if;
-      end Try_One_Interp;
-
-      procedure Analyze_Set_Membership;
-      --  If a set of alternatives is present, analyze each and find the
-      --  common type to which they must all resolve.
 
       ----------------------------
       -- Analyze_Set_Membership --
@@ -3095,6 +3072,57 @@ package body Sem_Ch4 is
          end if;
       end Analyze_Set_Membership;
 
+      -------------------------
+      -- Find_Interpretation --
+      -------------------------
+
+      procedure Find_Interpretation is
+      begin
+         Get_First_Interp (L, Index, It);
+         while Present (It.Typ) loop
+            Try_One_Interp (It.Typ);
+            Get_Next_Interp (Index, It);
+         end loop;
+      end Find_Interpretation;
+
+      function Find_Interpretation return Boolean is
+      begin
+         Find_Interpretation;
+
+         return Found;
+      end Find_Interpretation;
+
+      --------------------
+      -- Try_One_Interp --
+      --------------------
+
+      procedure Try_One_Interp (T1 : Entity_Id) is
+      begin
+         if Has_Compatible_Type (R, T1) then
+            if Found
+              and then Base_Type (T1) /= Base_Type (T_F)
+            then
+               It := Disambiguate (L, I_F, Index, Any_Type);
+
+               if It = No_Interp then
+                  Ambiguous_Operands (N);
+                  Set_Etype (L, Any_Type);
+                  return;
+
+               else
+                  T_F := It.Typ;
+               end if;
+
+            else
+               Found := True;
+               T_F   := T1;
+               I_F   := Index;
+            end if;
+
+            Set_Etype (L, T_F);
+         end if;
+      end Try_One_Interp;
+
       Op : Node_Id;
 
    --  Start of processing for Analyze_Membership_Op
@@ -3119,11 +3147,7 @@ package body Sem_Ch4 is
             Try_One_Interp (Etype (L));
 
          else
-            Get_First_Interp (L, Index, It);
-            while Present (It.Typ) loop
-               Try_One_Interp (It.Typ);
-               Get_Next_Interp (Index, It);
-            end loop;
+            Find_Interpretation;
          end if;
 
       --  If not a range, it can be a subtype mark, or else it is a degenerate
@@ -3139,13 +3163,14 @@ package body Sem_Ch4 is
             Find_Type (R);
             Check_Fully_Declared (Entity (R), R);
 
-         elsif Ada_Version >= Ada_2012
-           and then Has_Compatible_Type (R, Etype (L))
+         elsif Ada_Version >= Ada_2012 and then
+           ((Is_Overloaded (L) and then Find_Interpretation) or else
+           (not Is_Overloaded (L) and then Has_Compatible_Type (R, Etype (L))))
          then
             if Nkind (N) = N_In then
-               Op := Make_Op_Eq (Loc, Left_Opnd  => L, Right_Opnd => R);
+               Op := Make_Op_Eq (Loc, Left_Opnd => L, Right_Opnd => R);
             else
-               Op := Make_Op_Ne (Loc, Left_Opnd  => L, Right_Opnd => R);
+               Op := Make_Op_Ne (Loc, Left_Opnd => L, Right_Opnd => R);
             end if;
 
             if Is_Record_Or_Limited_Type (Etype (L)) then
@@ -4274,21 +4299,67 @@ package body Sem_Ch4 is
          Loop_Id := Defining_Identifier (Loop_Parameter_Specification (N));
       end if;
 
-      if Warn_On_Suspicious_Contract
-        and then not Referenced (Loop_Id, Cond)
-        and then not Is_Internal_Name (Chars (Loop_Id))
-      then
-         --  Generating C, this check causes spurious warnings on inlined
-         --  postconditions; we can safely disable it because this check
-         --  was previously performed when analyzing the internally built
-         --  postconditions procedure.
+      declare
+         type Subexpr_Kind is (Full, Conjunct, Disjunct);
 
-         if Modify_Tree_For_C and then In_Inlined_Body then
-            null;
-         else
-            Error_Msg_N ("?T?unused variable &", Loop_Id);
+         procedure Check_Subexpr (Expr : Node_Id; Kind : Subexpr_Kind);
+         --  Check that the quantified variable appears in every sub-expression
+         --  of the quantified expression. If Kind is Full, Expr is the full
+         --  expression. If Kind is Conjunct (resp. Disjunct), Expr is a
+         --  conjunct (resp. disjunct) of the full expression.
+
+         -------------------
+         -- Check_Subexpr --
+         -------------------
+
+         procedure Check_Subexpr (Expr : Node_Id; Kind : Subexpr_Kind) is
+         begin
+            if Nkind (Expr) in N_Op_And | N_And_Then
+              and then Kind /= Disjunct
+            then
+               Check_Subexpr (Left_Opnd (Expr), Conjunct);
+               Check_Subexpr (Right_Opnd (Expr), Conjunct);
+
+            elsif Nkind (Expr) in N_Op_Or | N_Or_Else
+              and then Kind /= Conjunct
+            then
+               Check_Subexpr (Left_Opnd (Expr), Disjunct);
+               Check_Subexpr (Right_Opnd (Expr), Disjunct);
+
+            elsif Kind /= Full
+              and then not Referenced (Loop_Id, Expr)
+            then
+               declare
+                  Sub : constant String :=
+                    (if Kind = Conjunct then "conjunct" else "disjunct");
+               begin
+                  Error_Msg_NE
+                    ("?T?unused variable & in " & Sub, Expr, Loop_Id);
+                  Error_Msg_NE
+                    ("\consider extracting " & Sub & " from quantified "
+                     & "expression", Expr, Loop_Id);
+               end;
+            end if;
+         end Check_Subexpr;
+
+      begin
+         if Warn_On_Suspicious_Contract
+           and then not Is_Internal_Name (Chars (Loop_Id))
+
+           --  Generating C, this check causes spurious warnings on inlined
+           --  postconditions; we can safely disable it because this check
+           --  was previously performed when analyzing the internally built
+           --  postconditions procedure.
+
+           and then not (Modify_Tree_For_C and In_Inlined_Body)
+         then
+            if not Referenced (Loop_Id, Cond) then
+               Error_Msg_N ("?T?unused variable &", Loop_Id);
+            else
+               Check_Subexpr (Cond, Kind => Full);
+            end if;
          end if;
-      end if;
+      end;
 
       --  Diagnose a possible misuse of the SOME existential quantifier. When
       --  we have a quantified expression of the form:
