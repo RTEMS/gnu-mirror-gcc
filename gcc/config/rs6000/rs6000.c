@@ -1787,6 +1787,12 @@ static const struct attribute_spec rs6000_attribute_table[] =
 
 #undef TARGET_INVALID_CONVERSION
 #define TARGET_INVALID_CONVERSION rs6000_invalid_conversion
+
+#undef TARGET_FORTRAN_REAL_KIND_NUMBER
+#define TARGET_FORTRAN_REAL_KIND_NUMBER rs6000_fortran_real_kind_number
+
+#undef TARGET_FORTRAN_REAL_KIND_TYPE
+#define TARGET_FORTRAN_REAL_KIND_TYPE rs6000_fortran_real_kind_type
 
 
 /* Processor table.  */
@@ -28375,6 +28381,71 @@ rs6000_globalize_decl_name (FILE * stream, tree decl)
     }
 }
 #endif
+
+
+
+/* PowerPC support for Fortran KIND support.  Given a MODE, return a kind
+   number to be used for real modes.  If we support IEEE 128-bit, make KIND=16
+   always be IEEE 128-bit, and make KIND=15 be the IBM 128-bit double-double
+   format.  */
+
+static int
+rs6000_fortran_real_kind_number (machine_mode mode)
+{
+  if (TARGET_FLOAT128_TYPE)
+    {
+      /* If long double is IEEE 128-bit, return 16 for long double and 15 for
+	 __ibm128, and ignore the explicit __float128 type.  Otherwise return
+	 15 for long double, 16 for __float128, and ignore __ibm128.  */
+      if (FLOAT128_IEEE_P (TFmode))
+	{
+	  if (mode == TFmode)
+	    return 16;
+	  else if (mode == IFmode)
+	    return 15;
+	}
+      else
+	{
+	  if (mode == KFmode)
+	    return 16;
+	  else if (mode == TFmode)
+	    return 15;
+	}
+    }
+
+  return 0;
+}
+
+/* PowerPC support for Fortran KIND support.  Return a type given a precision
+   that Fortran will handle for kind support.  We don't have to support the
+   standard types.  */
+static tree
+rs6000_fortran_real_kind_type (int precision)
+{
+  if (TARGET_FLOAT128_TYPE)
+    {
+      switch (precision)
+	{
+	case FLOAT_PRECISION_TFmode:
+	  return long_double_type_node;
+
+	case FLOAT_PRECISION_IFmode:
+	  return (FLOAT128_IBM_P (TFmode)
+		  ? long_double_type_node
+		  : ibm128_float_type_node);
+
+	case FLOAT_PRECISION_KFmode:
+	  return (FLOAT128_IEEE_P (TFmode)
+		  ? long_double_type_node
+		  : float128_type_node);
+
+	default:
+	  break;
+	}
+    }
+
+  return NULL_TREE;
+}
 
 
 /* On 64-bit Linux and Freebsd systems, possibly switch the long double library
