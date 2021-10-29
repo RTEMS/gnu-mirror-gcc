@@ -5846,11 +5846,14 @@ aarch64_pass_by_reference_1 (CUMULATIVE_ARGS *pcum,
        shouldn't be asked to pass or return them.  */
     size = GET_MODE_SIZE (arg.mode).to_constant ();
 
+  capability_composite_type capcom = CAPCOM_NONE;
+
   /* Aggregates are passed by reference based on their size.  */
   if (arg.aggregate_type_p ())
     {
       size = int_size_in_bytes (arg.type);
-      switch (aarch64_classify_capability_contents (arg.type))
+      capcom = aarch64_classify_capability_contents (arg.type);
+      switch (capcom)
 	{
 	case CAPCOM_NONE:
 	case CAPCOM_LARGE:
@@ -5867,6 +5870,24 @@ aarch64_pass_by_reference_1 (CUMULATIVE_ARGS *pcum,
 
   /* Variable sized arguments are always returned by reference.  */
   if (size < 0)
+    return true;
+
+  /* Morello B.2 If the argument is anonymous in AAPCS64-cap and the size or
+     alignment of the argument is larger than 16, the argument is copied
+     to memory and the argument is replaced by a capability to the copy.  */
+  if (TARGET_CAPABILITY_PURE
+      && !arg.named
+      && ((size > 16)
+	  || (arg.type && TYPE_ALIGN (arg.type) > (16 * BITS_PER_UNIT))))
+    return true;
+
+  /* Morello B.3 If the argument is anonymous in AAPCS64 and the argument type
+     is a capability or the argument type is a Composite Type which contains
+     capabilities, the argument is copied to memory and the argument is replaced
+     by a pointer to the copy.  */
+  if (TARGET_CAPABILITY_HYBRID
+      && arg.type
+      && (capability_type_p (arg.type) || capcom == CAPCOM_SOME))
     return true;
 
   /* Can this be a candidate to be passed in fp/simd register(s)?  */
@@ -6260,10 +6281,12 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
   tree type = arg.type;
   machine_mode mode = arg.mode;
   int ncrn, nvrn, nregs;
+  unsigned vec_flags;
   bool allocate_ncrn, allocate_nvrn;
   HOST_WIDE_INT size, units_per_reg = UNITS_PER_WORD;
-  bool abi_break;
+  bool abi_break, sve_p;
   bool in_cap_regs = false;
+  pure_scalable_type_info pst_info;
 
   /* We need to do this once per argument.  */
   if (pcum->aapcs_arg_processed)
@@ -6271,7 +6294,29 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
 
   pcum->aapcs_arg_processed = true;
 
-  pure_scalable_type_info pst_info;
+  /* Size in bytes, rounded to the nearest multiple of 8 bytes.  */
+  if (type)
+    size = int_size_in_bytes (type);
+  else
+    /* No frontends can create types with variable-sized modes, so we
+       shouldn't be asked to pass or return them.  */
+    size = GET_MODE_SIZE (mode).to_constant ();
+  HOST_WIDE_INT orig_size = size;
+  size = ROUND_UP (size, UNITS_PER_WORD);
+
+  if (TARGET_CAPABILITY_PURE && !arg.named)
+    {
+      /* Morello C.1 If the argument is Anonymous in AAPCS64-cap and its size is
+	 less than 16 bytes, the size of the argument is set to 16 bytes.
+
+	 Morello C.2 If the argument is Anonymous in AAPCS64-cap the argument is
+	 copied to memory at an offset of (AArgsIdx * 16) into the Anonymous
+	 Argument Memory area.  */
+      gcc_assert (size <= 16);
+      size = 16;
+      goto on_stack;
+    }
+
   if (type && pst_info.analyze_registers (type))
     {
       /* The PCS says that it is invalid to pass an SVE value to an
@@ -6303,8 +6348,8 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
 
   /* Generic vectors that map to full SVE modes with -msve-vector-bits=N
      are passed by reference, not by value.  */
-  unsigned int vec_flags = aarch64_classify_vector_mode (mode);
-  bool sve_p = (vec_flags & VEC_ANY_SVE);
+  vec_flags = aarch64_classify_vector_mode (mode);
+  sve_p = (vec_flags & VEC_ANY_SVE);
   if (sve_p)
     /* Vector types can acquire a partial SVE mode using things like
        __attribute__((vector_size(N))), and this is potentially useful.
@@ -6318,16 +6363,6 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
     gcc_assert (type
 		&& (aarch64_some_values_include_pst_objects_p (type)
 		    || (vec_flags & VEC_PARTIAL)));
-
-  /* Size in bytes, rounded to the nearest multiple of 8 bytes.  */
-  if (type)
-    size = int_size_in_bytes (type);
-  else
-    /* No frontends can create types with variable-sized modes, so we
-       shouldn't be asked to pass or return them.  */
-    size = GET_MODE_SIZE (mode).to_constant ();
-  HOST_WIDE_INT orig_size = size;
-  size = ROUND_UP (size, UNITS_PER_WORD);
 
   allocate_ncrn = (type) ? !(FLOAT_TYPE_P (type)) : !FLOAT_MODE_P (mode);
   allocate_nvrn = aarch64_vfp_is_call_candidate (pcum_v,
@@ -6639,7 +6674,8 @@ aarch64_function_arg_regno_p (unsigned regno)
    8 bytes.  */
 
 static unsigned int
-aarch64_function_arg_boundary (machine_mode mode, const_tree type)
+aarch64_function_arg_boundary (machine_mode mode, const_tree type,
+			       bool named)
 {
   bool abi_break;
   unsigned int alignment = aarch64_function_arg_alignment (mode, type,
@@ -6647,6 +6683,9 @@ aarch64_function_arg_boundary (machine_mode mode, const_tree type)
   if (abi_break & warn_psabi)
     inform (input_location, "parameter passing for argument of type "
 	    "%qT changed in GCC 9.1", type);
+
+  if (TARGET_CAPABILITY_PURE && !named)
+    alignment = MAX (16 * BITS_PER_UNIT, alignment);
 
   return MIN (MAX (alignment, PARM_BOUNDARY), STACK_BOUNDARY);
 }

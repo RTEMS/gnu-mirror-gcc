@@ -5003,7 +5003,7 @@ DEFHOOK
  "This hook returns the alignment boundary, in bits, of an argument\n\
 with the specified mode and type.  The default hook returns\n\
 @code{PARM_BOUNDARY} for all arguments.",
- unsigned int, (machine_mode mode, const_tree type),
+ unsigned int, (machine_mode mode, const_tree type, bool named),
  default_function_arg_boundary)
 
 DEFHOOK

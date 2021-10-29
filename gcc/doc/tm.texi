@@ -4268,7 +4268,7 @@ a three byte aggregate may be passed in the high part of a register if so
 required.
 @end defmac
 
-@deftypefn {Target Hook} {unsigned int} TARGET_FUNCTION_ARG_BOUNDARY (machine_mode @var{mode}, const_tree @var{type})
+@deftypefn {Target Hook} {unsigned int} TARGET_FUNCTION_ARG_BOUNDARY (machine_mode @var{mode}, const_tree @var{type}, bool @var{named})
 This hook returns the alignment boundary, in bits, of an argument
 with the specified mode and type.  The default hook returns
 @code{PARM_BOUNDARY} for all arguments.
