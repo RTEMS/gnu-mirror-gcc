@@ -198,6 +198,11 @@ default_setup_incoming_varargs (cumulative_args_t,
 {
 }
 
+void
+default_handle_outgoing_varargs (rtx, int, rtx *)
+{
+}
+
 /* The default implementation of TARGET_BUILTIN_SETJMP_FRAME_VALUE.  */
 
 rtx

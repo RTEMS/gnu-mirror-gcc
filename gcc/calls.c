@@ -3518,6 +3518,19 @@ update_stack_alignment_for_call (struct locate_and_pad_arg_data *locate)
     crtl->preferred_stack_boundary = locate->boundary;
 }
 
+/* Check if a function is variadic given the TYPE_ARG_TYPES from the
+   FUNCTION_TYPE.  */
+
+static bool
+type_arg_types_variadic_p (tree t)
+{
+  for (; t; t = TREE_CHAIN (t))
+    if (t == void_list_node)
+      return false;
+
+  return true;
+}
+
 /* Generate all the code for a CALL_EXPR exp
    and return an rtx for its value.
    Store the value in TARGET (specified as an rtx) if convenient.
@@ -4378,6 +4391,8 @@ expand_call (tree exp, rtx target, int ignore)
 					      &low_to_save, &high_to_save);
 #endif
 
+      rtx outgoing_varargs = CONST0_RTX (Pmode);
+
       /* Now store (and compute if necessary) all non-register parms.
 	 These come before register parms, since they can require block-moves,
 	 which could clobber the registers used for register parms.
@@ -4413,7 +4428,15 @@ expand_call (tree exp, rtx target, int ignore)
 	      = gen_rtx_EXPR_LIST (TYPE_MODE (TREE_TYPE (args[i].tree_value)),
 				   gen_rtx_USE (VOIDmode, args[i].stack),
 				   call_fusage);
+
+	  if (num_actuals - i == n_named_args + 1 && args[i].stack_slot)
+	    outgoing_varargs = XEXP (args[i].stack_slot, 0);
 	}
+
+      if (type_arg_types && type_arg_types_variadic_p (type_arg_types))
+	targetm.calls.handle_outgoing_varargs (outgoing_varargs,
+					       num_actuals - n_named_args,
+					       &call_fusage);
 
       /* If we have a parm that is passed in registers but not in memory
 	 and whose alignment does not permit a direct copy into registers,

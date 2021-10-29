@@ -3799,6 +3799,8 @@ These machine description macros help implement varargs:
 
 @hook TARGET_SETUP_INCOMING_VARARGS
 
+@hook TARGET_HANDLE_OUTGOING_VARARGS
+
 @hook TARGET_STRICT_ARGUMENT_NAMING
 
 @hook TARGET_CALL_ARGS

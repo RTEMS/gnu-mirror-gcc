@@ -17650,6 +17650,20 @@ aarch64_setup_incoming_varargs (cumulative_args_t cum_v,
 }
 
 static void
+aarch64_handle_outgoing_varargs (rtx aama_addr,
+				 int n_anon_args ATTRIBUTE_UNUSED,
+				 rtx *fusage)
+{
+  if (!TARGET_CAPABILITY_PURE)
+    return;
+
+  /* Morello TODO: emit scbnds with size of (n_anon_args * 16).  */
+  rtx c9 = gen_rtx_REG (CADImode, R9_REGNUM);
+  emit_move_insn (c9, aama_addr);
+  use_reg (fusage, c9);
+}
+
+static void
 aarch64_conditional_register_usage (void)
 {
   int i;
@@ -24944,6 +24958,9 @@ aarch64_libgcc_floating_mode_supported_p
 
 #undef TARGET_SETUP_INCOMING_VARARGS
 #define TARGET_SETUP_INCOMING_VARARGS aarch64_setup_incoming_varargs
+
+#undef TARGET_HANDLE_OUTGOING_VARARGS
+#define TARGET_HANDLE_OUTGOING_VARARGS aarch64_handle_outgoing_varargs
 
 #undef TARGET_STRUCT_VALUE_RTX
 #define TARGET_STRUCT_VALUE_RTX   aarch64_struct_value_rtx

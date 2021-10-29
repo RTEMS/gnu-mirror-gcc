@@ -5311,6 +5311,11 @@ end of the source file.  The hook @code{TARGET_SETUP_INCOMING_VARARGS} should
 not generate any instructions in this case.
 @end deftypefn
 
+@deftypefn {Target Hook} void TARGET_HANDLE_OUTGOING_VARARGS (rtx @var{varargs_addr}, int @var{n_anon_args}, rtx *@var{fusage})
+For anonymous arguments stored on the stack, a hook to allow the target to
+ perform some codegen with a pointer to the outgoing anonymous argument area.
+@end deftypefn
+
 @deftypefn {Target Hook} bool TARGET_STRICT_ARGUMENT_NAMING (cumulative_args_t @var{ca})
 Define this hook to return @code{true} if the location where a function
 argument is passed depends on whether or not it is a named argument.

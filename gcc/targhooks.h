@@ -43,6 +43,7 @@ extern rtx default_expand_builtin_saveregs (void);
 extern void default_setup_incoming_varargs (cumulative_args_t,
 					    const function_arg_info &,
 					    int *, int);
+extern void default_handle_outgoing_varargs (rtx, int, rtx *);
 extern rtx default_builtin_setjmp_frame_value (void);
 extern bool default_pretend_outgoing_varargs_named (cumulative_args_t);
 

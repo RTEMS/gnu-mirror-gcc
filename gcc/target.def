@@ -4706,6 +4706,13 @@ not generate any instructions in this case.",
  default_setup_incoming_varargs)
 
 DEFHOOK
+(handle_outgoing_varargs,
+ "For anonymous arguments stored on the stack, a hook to allow the target to\n\
+ perform some codegen with a pointer to the outgoing anonymous argument area.",
+ void, (rtx varargs_addr, int n_anon_args, rtx *fusage),
+ default_handle_outgoing_varargs)
+
+DEFHOOK
 (load_bounds_for_arg,
  "This hook is used by expand pass to emit insn to load bounds of\n\
 @var{arg} passed in @var{slot}.  Expand pass uses this hook in case\n\
