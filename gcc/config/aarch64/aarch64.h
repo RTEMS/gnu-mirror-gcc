@@ -922,6 +922,8 @@ typedef struct GTY (()) machine_function
   bool reg_is_wrapped_separately[LAST_SAVED_REGNUM];
   /* One entry for each general purpose register.  */
   rtx call_via[SP_REGNUM];
+  /* AAPCS64-cap incoming varargs pseudo.  */
+  rtx purecap_incoming_varargs_reg;
   bool label_is_assembled;
 } machine_function;
 #endif

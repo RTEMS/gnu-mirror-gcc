@@ -6610,9 +6610,23 @@ aarch64_function_arg_advance (cumulative_args_t pcum_v,
     }
 }
 
+static bool
+aarch64_current_function_variadic_p (void)
+{
+  tree t = TREE_TYPE (current_function_decl);
+  for (t = TYPE_ARG_TYPES (t); t; t = TREE_CHAIN (t))
+    if (t == void_list_node)
+      return false;
+
+  return true;
+}
+
 bool
 aarch64_function_arg_regno_p (unsigned regno)
 {
+  if (TARGET_CAPABILITY_PURE && regno == R9_REGNUM)
+    return aarch64_current_function_variadic_p ();
+
   return ((GP_REGNUM_P (regno) && regno < R0_REGNUM + NUM_ARG_REGS)
 	  || (FP_REGNUM_P (regno) && regno < V0_REGNUM + NUM_FP_ARG_REGS));
 }
@@ -17016,6 +17030,10 @@ static GTY(()) tree va_list_type;
 static tree
 aarch64_build_builtin_va_list (void)
 {
+  /* For AAPCS64-cap, va_list is just void*.  */
+  if (TARGET_CAPABILITY_PURE)
+    return ptr_type_node;
+
   tree va_list_name;
   tree f_stack, f_grtop, f_vrtop, f_groff, f_vroff;
 
@@ -17090,6 +17108,14 @@ aarch64_expand_builtin_va_start (tree valist, rtx nextarg ATTRIBUTE_UNUSED)
   int vr_save_area_size = cfun->va_list_fpr_size;
   int vr_offset;
 
+  if (TARGET_CAPABILITY_PURE)
+    {
+      t = make_tree (TREE_TYPE (valist), cfun->machine->purecap_incoming_varargs_reg);
+      t = build2 (MODIFY_EXPR, TREE_TYPE (valist), valist, t);
+      expand_expr (t, const0_rtx, VOIDmode, EXPAND_NORMAL);
+      return;
+    }
+
   cum = &crtl->args.info;
   if (cfun->va_list_gpr_size)
     gr_save_area_size = MIN ((NUM_ARG_REGS - cum->aapcs_ncrn) * UNITS_PER_WORD,
@@ -17161,6 +17187,42 @@ aarch64_expand_builtin_va_start (tree valist, rtx nextarg ATTRIBUTE_UNUSED)
   expand_expr (t, const0_rtx, VOIDmode, EXPAND_NORMAL);
 }
 
+static tree
+aarch64_purecap_gimplify_va_arg_expr (tree ap, tree type, gimple_seq *pre_p)
+{
+  tree t, arg, ap0;
+
+  /* First, save a copy of ap into a temporary.  */
+  arg = ap0 = get_initialized_tmp_var (ap, pre_p, NULL);
+
+  auto type_sz = int_size_in_bytes (type);
+  if (type_sz == -1
+      || type_sz > 16
+      || maybe_gt (TYPE_ALIGN (type), 16U * BITS_PER_UNIT))
+    {
+      /* Indirection: arg = *(void **)arg.  */
+      tree void_star_star = build_pointer_type (TREE_TYPE (ap));
+      t = build2 (MEM_REF, TREE_TYPE (ap),
+		  arg,
+		  build_int_cst (void_star_star, 0));
+
+      arg = get_initialized_tmp_var (t, pre_p, NULL);
+    }
+
+  /* Advance ap: ap = (void**)ap + 1.  */
+  if (type_sz)
+    {
+      t = build2 (POINTER_PLUS_EXPR, TREE_TYPE (ap), ap0,
+		  size_int (int_size_in_bytes (TREE_TYPE (ap))));
+      t = get_initialized_tmp_var (t, pre_p, NULL);
+      gimple_seq_add_stmt (pre_p, gimple_build_assign (ap, t));
+    }
+
+  /* Compute result: *(type *)arg.  */
+  t = build2 (MEM_REF, type, arg, build_int_cst (build_pointer_type (type), 0));
+  return t;
+}
+
 /* Implement TARGET_GIMPLIFY_VA_ARG_EXPR.  */
 
 static tree
@@ -17179,6 +17241,9 @@ aarch64_gimplify_va_arg_expr (tree valist, tree type, gimple_seq *pre_p,
   tree stack, f_top, f_off, off, arg, roundup, on_stack;
   HOST_WIDE_INT size, rsize, adjust, align;
   tree t, u, cond1, cond2;
+
+  if (TARGET_CAPABILITY_PURE)
+    return aarch64_purecap_gimplify_va_arg_expr (valist, type, pre_p);
 
   indirect_p = pass_va_arg_by_reference (type);
   if (indirect_p)
@@ -17439,6 +17504,39 @@ aarch64_setup_incoming_varargs (cumulative_args_t cum_v,
   CUMULATIVE_ARGS local_cum;
   int gr_saved = cfun->va_list_gpr_size;
   int vr_saved = cfun->va_list_fpr_size;
+
+  /* For AAPCS64-cap, the incoming varargs are passed in C9, so to set
+     them up we simply move C9 to a pseudo that we can use to access them in
+     the body of the function.
+
+     The documentation for this hook says "Use [the hook] to store the
+     anonymous register arguments into the stack [...].  Once this is done,
+     you can use the standard implementation of varargs that works for
+     machines that pass all their arguments on the stack."
+
+     Of course, moving C9 to a pseudo does not constitute pushing any
+     arguments to the stack.  So why is this valid?  Note that targets that
+     override gimplify_va_arg_expr and build_builtin_va_list (such as
+     AArch64) are already not using the "standard implementation of
+     varargs", so this constraint does not matter.  Moreover, the code that
+     calls this hook (from calls.c:assign_parms) is precisely the code that
+     moves the hard registers in which the function receives its arguments
+     into pseudos to be used in the function body.  So we are just using
+     this hook as a convenient place to do this for the C9 register used to
+     pass the Anonymous Argument Memory Area for AAPCS64-cap.  */
+  if (TARGET_CAPABILITY_PURE)
+    {
+      if (!no_rtl)
+	{
+	  rtx c9 = gen_rtx_REG (Pmode, R9_REGNUM);
+	  rtx pseudo = gen_reg_rtx (Pmode);
+	  emit_move_insn (pseudo, c9);
+	  cfun->machine->purecap_incoming_varargs_reg = pseudo;
+	}
+
+      cfun->machine->frame.saved_varargs_size = 0;
+      return;
+    }
 
   /* The caller has advanced CUM up to, but not beyond, the last named
      argument.  Advance a local copy of CUM past the last "real" named
