@@ -8187,3 +8187,16 @@ maintainer is familiar with.
 @hook TARGET_MEMTAG_UNTAGGED_POINTER
 
 @hook TARGET_GCOV_TYPE_SIZE
+
+@defmac FORTRAN_USE_LONG_DOUBLE
+Define this macro to return true if Fortran should enable @code{long
+double} support for @code{KIND} processing.  If you do not define this
+macro, Fortran always uses the @code{long double} type.
+@end defmac
+
+@defmac FORTRAN_USE_LONG_DOUBLE
+Define this macro to return true if Fortran should enable
+@code{_Float128} support for @code{KIND} processing.  If you do not
+define this macro, Fortran will enable @code{_Float128} support if the
+quadmath library is built, and the mode @code{TFmode} is enabled.
+@end defmac
