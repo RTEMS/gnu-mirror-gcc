@@ -451,14 +451,6 @@ gfc_init_kinds (void)
 	 useless.  */
       if (!targetm.libgcc_floating_mode_supported_p (mode))
 	continue;
-      if (mode != TYPE_MODE (float_type_node)
-	    && (mode != TYPE_MODE (double_type_node))
-	    && (mode != TYPE_MODE (long_double_type_node))
-#if defined(HAVE_TFmode) && defined(ENABLE_LIBQUADMATH_SUPPORT)
-	    && (mode != TFmode)
-#endif
-	   )
-	continue;
 
       /* Let the kind equal the precision divided by 8, rounding up.  Again,
 	 this insulates the programmer from the underlying byte size.
@@ -480,7 +472,9 @@ gfc_init_kinds (void)
 	 reach this code.
       */
 
-      kind = (GET_MODE_PRECISION (mode) + 7) / 8;
+      kind = targetm.fortran_real_kind_number (mode);
+      if (kind == 0)
+	kind = (GET_MODE_PRECISION (mode) + 7) / 8;
 
       if (kind == 4)
 	saw_r4 = true;
@@ -856,11 +850,25 @@ gfc_build_real_type (gfc_real_info *info)
     info->c_double = 1;
   if (mode_precision == LONG_DOUBLE_TYPE_SIZE)
     info->c_long_double = 1;
-  if (mode_precision != LONG_DOUBLE_TYPE_SIZE && mode_precision == 128)
-    {
+
+#if defined(HAVE_TFmode) && defined(ENABLE_LIBQUADMATH_SUPPORT)
+  if (TYPE_PRECISION (float128_type_node) == mode_precision)
+   {
       /* TODO: see PR101835.  */
       info->c_float128 = 1;
       gfc_real16_is_float128 = true;
+    }
+#endif
+
+  tree type = targetm.fortran_real_kind_type (mode_precision);
+  if (type)
+    {
+      if (type == float128_type_node)
+	{
+	  info->c_float128 = 1;
+	  gfc_real16_is_float128 = true;
+	}
+      return type;
     }
 
   if (TYPE_PRECISION (float_type_node) == mode_precision)
@@ -889,6 +897,8 @@ gfc_build_complex_type (tree scalar_type)
     return complex_double_type_node;
   if (scalar_type == long_double_type_node)
     return complex_long_double_type_node;
+  if (scalar_type == float128_type_node)
+    return complex_float128_type_node;
 
   new_type = make_node (COMPLEX_TYPE);
   TREE_TYPE (new_type) = scalar_type;

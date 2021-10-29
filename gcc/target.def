@@ -7129,6 +7129,26 @@ counters are incremented using atomic operations.  Targets not supporting\n\
 type.",
  HOST_WIDE_INT, (void), default_gcov_type_size)
 
-/* Close the 'struct gcc_target' definition.  */
+DEFHOOK
+(fortran_real_kind_number,
+ "Returns an integer from a @code{MODE} that would be the Fortran kind\n\
+number for target specific modes.  @code{MODE} is a scalar floating point\n\
+mode.  If the mode cannot be represented, a 0 is returned.",
+ int, (machine_mode mode), default_fortran_real_kind_number)
+
+DEFHOOK
+(fortran_real_kind_type,
+ "Returns a floating point scalar type with precision @code{PRECISION} that\n\
+can be used for a Fortran kind type.  If the precision cannot be represented,\n\
+a @code{NULL_TREE} is returned.",
+ tree, (int precision), default_fortran_real_kind_type)
+
+DEFHOOK
+(fortran_real_kind_float128_p,
+ "Returns true if the floating point scalar type with precision\n\
+@code{PRECISION} is an IEEE 128-bit floating point value.",
+ bool, (int precision), default_fortran_real_kind_float128_p)
+
+ /* Close the 'struct gcc_target' definition.  */
 HOOK_VECTOR_END (C90_EMPTY_HACK)
 
