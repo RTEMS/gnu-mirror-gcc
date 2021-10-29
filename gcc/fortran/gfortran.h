@@ -3791,17 +3791,4 @@ bool gfc_is_reallocatable_lhs (gfc_expr *);
 void finish_oacc_declare (gfc_namespace *, gfc_symbol *, bool);
 void gfc_adjust_builtins (void);
 
-/* Whether to enable long double and/or float128 processing.  */
-#ifndef FORTRAN_USE_LONG_DOUBLE
-#define FORTRAN_USE_LONG_DOUBLE		1
-#endif
-
-#ifndef FORTRAN_USE_FLOAT128
-#if defined(HAVE_TFmode) && defined(ENABLE_LIBQUADMATH_SUPPORT)
-#define FORTRAN_USE_FLOAT128		1
-#else
-#define FORTRAN_USE_FLOAT128		0
-#endif
-#endif
-
 #endif /* GCC_GFORTRAN_H  */

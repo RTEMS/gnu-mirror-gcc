@@ -2691,13 +2691,3 @@ while (0)
        rs6000_asm_output_opcode (STREAM);				\
     }									\
   while (0)
-
-/* Whether Fortran should use long double or __float128 for KIND=16.  If we
-   support IEEE 128-bit and long double is not IEEE 128-bit, then use the
-   _Float128 type for KIND=16.  Otherwise use long double.  */
-#undef FORTRAN_USE_FLOAT128
-#define FORTRAN_USE_FLOAT128	(TARGET_FLOAT128_TYPE && !TARGET_IEEEQUAD)
-
-#undef FORTRAN_USE_LONG_DOUBLE
-#define FORTRAN_USE_LONG_DOUBLE	(!FORTRAN_USE_FLOAT128)
-

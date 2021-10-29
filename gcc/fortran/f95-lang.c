@@ -674,11 +674,9 @@ gfc_init_builtin_functions (void)
   tree mfunc_float[6];
   tree mfunc_double[6];
   tree mfunc_longdouble[6];
-  tree mfunc_float128[6];
   tree mfunc_cfloat[6];
   tree mfunc_cdouble[6];
   tree mfunc_clongdouble[6];
-  tree mfunc_cfloat128[6];
   tree func_cfloat_float, func_float_cfloat;
   tree func_cdouble_double, func_double_cdouble;
   tree func_clongdouble_longdouble, func_longdouble_clongdouble;
@@ -693,11 +691,9 @@ gfc_init_builtin_functions (void)
   build_builtin_fntypes (mfunc_float, float_type_node);
   build_builtin_fntypes (mfunc_double, double_type_node);
   build_builtin_fntypes (mfunc_longdouble, long_double_type_node);
-  build_builtin_fntypes (mfunc_float128, float128_type_node);
   build_builtin_fntypes (mfunc_cfloat, complex_float_type_node);
   build_builtin_fntypes (mfunc_cdouble, complex_double_type_node);
   build_builtin_fntypes (mfunc_clongdouble, complex_long_double_type_node);
-  build_builtin_fntypes (mfunc_cfloat128, complex_float128_type_node);
 
   func_cfloat_float = build_function_type_list (float_type_node,
                                                 complex_float_type_node,
@@ -740,8 +736,6 @@ gfc_init_builtin_functions (void)
 
   gfc_define_builtin ("__builtin_roundl", mfunc_longdouble[0], 
 		      BUILT_IN_ROUNDL, "roundl", ATTR_CONST_NOTHROW_LEAF_LIST);
-  gfc_define_builtin ("__builtin_roundf128", mfunc_float128[0], 
-		      BUILT_IN_ROUNDF128, "roundf128", ATTR_CONST_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_round", mfunc_double[0], 
 		      BUILT_IN_ROUND, "round", ATTR_CONST_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_roundf", mfunc_float[0], 
@@ -749,8 +743,6 @@ gfc_init_builtin_functions (void)
 
   gfc_define_builtin ("__builtin_truncl", mfunc_longdouble[0],
 		      BUILT_IN_TRUNCL, "truncl", ATTR_CONST_NOTHROW_LEAF_LIST);
-  gfc_define_builtin ("__builtin_truncf128", mfunc_float128[0],
-		      BUILT_IN_TRUNCF128, "truncl", ATTR_CONST_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_trunc", mfunc_double[0],
 		      BUILT_IN_TRUNC, "trunc", ATTR_CONST_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_truncf", mfunc_float[0],
@@ -758,7 +750,6 @@ gfc_init_builtin_functions (void)
 
   gfc_define_builtin ("__builtin_cabsl", func_clongdouble_longdouble, 
 		      BUILT_IN_CABSL, "cabsl", ATTR_CONST_NOTHROW_LEAF_LIST);
-  /* no __builtin_cabsf128.  */
   gfc_define_builtin ("__builtin_cabs", func_cdouble_double, 
 		      BUILT_IN_CABS, "cabs", ATTR_CONST_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_cabsf", func_cfloat_float, 
@@ -766,9 +757,6 @@ gfc_init_builtin_functions (void)
  
   gfc_define_builtin ("__builtin_copysignl", mfunc_longdouble[1], 
 		      BUILT_IN_COPYSIGNL, "copysignl",
-		      ATTR_CONST_NOTHROW_LEAF_LIST);
-  gfc_define_builtin ("__builtin_copysignf128", mfunc_longdouble[1], 
-		      BUILT_IN_COPYSIGNF128, "copysignf128",
 		      ATTR_CONST_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_copysign", mfunc_double[1], 
 		      BUILT_IN_COPYSIGN, "copysign",
@@ -780,7 +768,6 @@ gfc_init_builtin_functions (void)
   gfc_define_builtin ("__builtin_nextafterl", mfunc_longdouble[1], 
 		      BUILT_IN_NEXTAFTERL, "nextafterl",
 		      ATTR_CONST_NOTHROW_LEAF_LIST);
-  /* no __builtin_nextafterf128.  */
   gfc_define_builtin ("__builtin_nextafter", mfunc_double[1], 
 		      BUILT_IN_NEXTAFTER, "nextafter",
 		      ATTR_CONST_NOTHROW_LEAF_LIST);
@@ -794,8 +781,6 @@ gfc_init_builtin_functions (void)
 
   gfc_define_builtin ("__builtin_rintl", mfunc_longdouble[0], 
 		      BUILT_IN_RINTL, "rintl", attr);
-  gfc_define_builtin ("__builtin_rintf128", mfunc_float128[0], 
-		      BUILT_IN_RINTF128, "rintf128", attr);
   gfc_define_builtin ("__builtin_rint", mfunc_double[0], 
 		      BUILT_IN_RINT, "rint", attr);
   gfc_define_builtin ("__builtin_rintf", mfunc_float[0], 
@@ -803,7 +788,6 @@ gfc_init_builtin_functions (void)
 
   gfc_define_builtin ("__builtin_remainderl", mfunc_longdouble[1], 
 		      BUILT_IN_REMAINDERL, "remainderl", attr);
-  /* no __builtin_remainderf128.  */
   gfc_define_builtin ("__builtin_remainder", mfunc_double[1], 
 		      BUILT_IN_REMAINDER, "remainder", attr);
   gfc_define_builtin ("__builtin_remainderf", mfunc_float[1], 
@@ -811,7 +795,6 @@ gfc_init_builtin_functions (void)
  
   gfc_define_builtin ("__builtin_logbl", mfunc_longdouble[0], 
 		      BUILT_IN_LOGBL, "logbl", ATTR_CONST_NOTHROW_LEAF_LIST);
-  /* no __builtin_logbf128.  */
   gfc_define_builtin ("__builtin_logb", mfunc_double[0], 
 		      BUILT_IN_LOGB, "logb", ATTR_CONST_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_logbf", mfunc_float[0], 
@@ -820,7 +803,6 @@ gfc_init_builtin_functions (void)
 
   gfc_define_builtin ("__builtin_frexpl", mfunc_longdouble[4], 
 		      BUILT_IN_FREXPL, "frexpl", ATTR_NOTHROW_LEAF_LIST);
-  /* no __builtin_frexpf128.  */
   gfc_define_builtin ("__builtin_frexp", mfunc_double[4], 
 		      BUILT_IN_FREXP, "frexp", ATTR_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_frexpf", mfunc_float[4], 
@@ -828,8 +810,6 @@ gfc_init_builtin_functions (void)
  
   gfc_define_builtin ("__builtin_fabsl", mfunc_longdouble[0], 
 		      BUILT_IN_FABSL, "fabsl", ATTR_CONST_NOTHROW_LEAF_LIST);
-  gfc_define_builtin ("__builtin_fabsf128", mfunc_float128[0], 
-		      BUILT_IN_FABSF128, "fabsf128", ATTR_CONST_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_fabs", mfunc_double[0], 
 		      BUILT_IN_FABS, "fabs", ATTR_CONST_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_fabsf", mfunc_float[0], 
@@ -837,7 +817,6 @@ gfc_init_builtin_functions (void)
  
   gfc_define_builtin ("__builtin_scalbnl", mfunc_longdouble[2],
 		      BUILT_IN_SCALBNL, "scalbnl", ATTR_CONST_NOTHROW_LEAF_LIST);
-  /* no __builtin_scalbnf128.  */
   gfc_define_builtin ("__builtin_scalbn", mfunc_double[2],
 		      BUILT_IN_SCALBN, "scalbn", ATTR_CONST_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_scalbnf", mfunc_float[2],
@@ -845,7 +824,6 @@ gfc_init_builtin_functions (void)
  
   gfc_define_builtin ("__builtin_fmodl", mfunc_longdouble[1], 
 		      BUILT_IN_FMODL, "fmodl", ATTR_CONST_NOTHROW_LEAF_LIST);
-  /* no __builtin_fmodf128.  */
   gfc_define_builtin ("__builtin_fmod", mfunc_double[1], 
 		      BUILT_IN_FMOD, "fmod", ATTR_CONST_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_fmodf", mfunc_float[1], 
@@ -894,21 +872,18 @@ gfc_init_builtin_functions (void)
   /* These are used to implement the ** operator.  */
   gfc_define_builtin ("__builtin_powl", mfunc_longdouble[1], 
 		      BUILT_IN_POWL, "powl", ATTR_CONST_NOTHROW_LEAF_LIST);
-  /* no __builtin_powf128.  */
   gfc_define_builtin ("__builtin_pow", mfunc_double[1], 
 		      BUILT_IN_POW, "pow", ATTR_CONST_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_powf", mfunc_float[1], 
 		      BUILT_IN_POWF, "powf", ATTR_CONST_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_cpowl", mfunc_clongdouble[1], 
 		      BUILT_IN_CPOWL, "cpowl", ATTR_CONST_NOTHROW_LEAF_LIST);
-  /* no __builtin_cpowf128.  */
   gfc_define_builtin ("__builtin_cpow", mfunc_cdouble[1], 
 		      BUILT_IN_CPOW, "cpow", ATTR_CONST_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_cpowf", mfunc_cfloat[1], 
 		      BUILT_IN_CPOWF, "cpowf", ATTR_CONST_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_powil", mfunc_longdouble[2],
 		      BUILT_IN_POWIL, "powil", ATTR_CONST_NOTHROW_LEAF_LIST);
-  /* no __builtin_powif128.  */
   gfc_define_builtin ("__builtin_powi", mfunc_double[2],
 		      BUILT_IN_POWI, "powi", ATTR_CONST_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_powif", mfunc_float[2],
@@ -920,7 +895,6 @@ gfc_init_builtin_functions (void)
       gfc_define_builtin ("__builtin_cbrtl", mfunc_longdouble[0],
 			  BUILT_IN_CBRTL, "cbrtl",
 			  ATTR_CONST_NOTHROW_LEAF_LIST);
-      /* no __builtin_cbrtf128.  */
       gfc_define_builtin ("__builtin_cbrt", mfunc_double[0],
 			  BUILT_IN_CBRT, "cbrt",
 			  ATTR_CONST_NOTHROW_LEAF_LIST);
@@ -930,7 +904,6 @@ gfc_init_builtin_functions (void)
       gfc_define_builtin ("__builtin_cexpil", func_longdouble_clongdouble, 
 			  BUILT_IN_CEXPIL, "cexpil",
 			  ATTR_CONST_NOTHROW_LEAF_LIST);
-      /* no __builtin_cexpif128.  */
       gfc_define_builtin ("__builtin_cexpi", func_double_cdouble,
 			  BUILT_IN_CEXPI, "cexpi",
 			  ATTR_CONST_NOTHROW_LEAF_LIST);
@@ -944,7 +917,6 @@ gfc_init_builtin_functions (void)
       gfc_define_builtin ("__builtin_sincosl",
 			  func_longdouble_longdoublep_longdoublep,
 			  BUILT_IN_SINCOSL, "sincosl", ATTR_NOTHROW_LEAF_LIST);
-      /* no __builtin_sincosf128.  */
       gfc_define_builtin ("__builtin_sincos", func_double_doublep_doublep,
 			  BUILT_IN_SINCOS, "sincos", ATTR_NOTHROW_LEAF_LIST);
       gfc_define_builtin ("__builtin_sincosf", func_float_floatp_floatp,

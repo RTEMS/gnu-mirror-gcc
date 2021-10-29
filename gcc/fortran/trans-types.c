@@ -453,10 +453,10 @@ gfc_init_kinds (void)
 	continue;
       if (mode != TYPE_MODE (float_type_node)
 	    && (mode != TYPE_MODE (double_type_node))
-	    && (!FORTRAN_USE_LONG_DOUBLE
-		|| mode != TYPE_MODE (long_double_type_node))
-	    && (!FORTRAN_USE_FLOAT128
-		|| mode != TYPE_MODE (float128_type_node))
+	    && (mode != TYPE_MODE (long_double_type_node))
+#if defined(HAVE_TFmode) && defined(ENABLE_LIBQUADMATH_SUPPORT)
+	    && (mode != TFmode)
+#endif
 	   )
 	continue;
 
@@ -854,14 +854,9 @@ gfc_build_real_type (gfc_real_info *info)
     info->c_float = 1;
   if (mode_precision == DOUBLE_TYPE_SIZE)
     info->c_double = 1;
-  if (FORTRAN_USE_LONG_DOUBLE && mode_precision == LONG_DOUBLE_TYPE_SIZE)
+  if (mode_precision == LONG_DOUBLE_TYPE_SIZE)
     info->c_long_double = 1;
-
-  /* Don't check for just mode_precision == 128 for Float128.  On the PowerPC,
-     there are 3 different 128-bit floating point types (IEEE 128-bit, IBM
-     128-bit, and the default long double, which is either of the other types).
-     The precision is used to differentiate between the types.  */
-  if (FORTRAN_USE_FLOAT128 && IN_RANGE (mode_precision, 126, 128))
+  if (mode_precision != LONG_DOUBLE_TYPE_SIZE && mode_precision == 128)
     {
       /* TODO: see PR101835.  */
       info->c_float128 = 1;
@@ -872,11 +867,8 @@ gfc_build_real_type (gfc_real_info *info)
     return float_type_node;
   if (TYPE_PRECISION (double_type_node) == mode_precision)
     return double_type_node;
-  if (FORTRAN_USE_LONG_DOUBLE
-      && TYPE_PRECISION (long_double_type_node) == mode_precision)
+  if (TYPE_PRECISION (long_double_type_node) == mode_precision)
     return long_double_type_node;
-  if (FORTRAN_USE_FLOAT128 && IN_RANGE (mode_precision, 126, 128))
-    return float128_type_node;
 
   new_type = make_node (REAL_TYPE);
   TYPE_PRECISION (new_type) = mode_precision;
@@ -897,8 +889,6 @@ gfc_build_complex_type (tree scalar_type)
     return complex_double_type_node;
   if (scalar_type == long_double_type_node)
     return complex_long_double_type_node;
-  if (scalar_type == float128_type_node)
-    return complex_float128_type_node;
 
   new_type = make_node (COMPLEX_TYPE);
   TREE_TYPE (new_type) = scalar_type;
