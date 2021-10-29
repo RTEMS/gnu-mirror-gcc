@@ -1,3 +1,13 @@
+work071.patch056:
+2021-10-29  Michael Meissner  <meissner@the-meissners.org>
+
+	* f95-lang.c (gfc_init_builtin_functions): Flesh out more Float128
+	support.
+	* trans-types.c (gfc_init_kinds): Add support for using target
+	hooks to allow the backend to control KIND numbers.
+	(gfc_build_real_type): Likewise.
+	(gfc_build_complex_type): Add support for complex Float128.
+
 2021-10-11   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch

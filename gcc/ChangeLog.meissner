@@ -1,3 +1,24 @@
+work071.patch056:
+2021-10-29  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/rs6000.c (TARGET_FORTRAN_REAL_KIND_NUMBER): Set
+	target hook.
+	(TARGET_FORTRAN_REAL_KIND_TYPE): Likewise.
+	(rs6000_fortran_real_kind_number): New target hook.
+	(rs6000_fortran_real_kind_type): Likewise.
+	* target.def (fortran_real_kind_number): New target hook.
+	(fortran_real_kind_type): Likewise.
+	* targhooks.c (default_fortran_real_kind_number): New default
+	target hooks for Fortran kind support.
+	(default_fortran_real_kind_type): Likewise.
+	* targhooks.c (default_fortran_real_kind_number): New
+	declaration.
+	(default_fortran_real_kind_type): Likewise.
+	* doc/tm.texi.in (TARGET_FORTRAN_REAL_KIND_NUMBER): Document new
+	target hooks.
+	(TARGET_FORTRAN_REAL_KIND_TYPE): Likewise.
+	* doc/tm.texi: Regenerate.
+
 work071.patch054:
 2021-10-20  Michael Meissner  <meissner@the-meissners.org>
 
