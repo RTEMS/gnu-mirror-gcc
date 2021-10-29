@@ -1,3 +1,9 @@
+work071.patch057:
+2021-10-29  Michael Meissner  <meissner@the-meissners.org>
+
+	* trans-types.c (gfc_build_real_type): Rework support to better
+	detect float128 on PowerPC.
+
 work071.patch056:
 2021-10-29  Michael Meissner  <meissner@the-meissners.org>
 

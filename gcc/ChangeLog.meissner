@@ -1,3 +1,18 @@
+work071.patch057:
+2021-10-29  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/rs6000.c (TARGET_FORTRAN_REAL_KIND_FLOAT128_P):
+	Set target hook.
+	(rs6000_fortran_real_kind_float128_p): New target hook.
+	* target.def (fortran_real_kind_float128_p): New target hook.
+	* targhooks.c (default_fortran_real_kind_float128_p): New default
+	target hooks for Fortran kind support.
+	* targhooks.h (default_fortran_real_kind_float128_p): New
+	declaration.
+	* doc/tm.texi.in (TARGET_FORTRAN_REAL_KIND_FLOAT128_P): Document
+	new target hook.
+	* doc/tm.texi: Regenerate.
+
 work071.patch056:
 2021-10-29  Michael Meissner  <meissner@the-meissners.org>
 
