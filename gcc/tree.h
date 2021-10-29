@@ -4225,8 +4225,6 @@ tree_strip_any_location_wrapper (tree exp)
 #define complex_double_type_node	global_trees[TI_COMPLEX_DOUBLE_TYPE]
 #define complex_long_double_type_node	global_trees[TI_COMPLEX_LONG_DOUBLE_TYPE]
 
-#define complex_float128_type_node	global_trees[TI_COMPLEX_FLOAT128_TYPE]
-
 #define COMPLEX_FLOATN_NX_TYPE_NODE(IDX)	global_trees[TI_COMPLEX_FLOATN_NX_TYPE_FIRST + (IDX)]
 
 #define void_type_node			global_trees[TI_VOID_TYPE]

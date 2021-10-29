@@ -304,7 +304,4 @@ extern rtx default_memtag_untagged_pointer (rtx, rtx);
 
 extern HOST_WIDE_INT default_gcov_type_size (void);
 
-extern int default_fortran_real_kind_number (machine_mode);
-extern tree default_fortran_real_kind_type (int);
-extern bool default_fortran_real_kind_float128_p (int);
 #endif /* GCC_TARGHOOKS_H */

@@ -2661,41 +2661,4 @@ default_gcov_type_size (void)
   return TYPE_PRECISION (long_long_integer_type_node) > 32 ? 64 : 32;
 }
 
-/* The default implementation of TARGET_FORTRAN_REAL_KIND_NUMBER.  */
-
-int
-default_fortran_real_kind_number (machine_mode mode ATTRIBUTE_UNUSED)
-{
-#if defined(HAVE_TFmode) && defined(ENABLE_LIBQUADMATH_SUPPORT)
-  if (mode == TFmode)
-    return GET_MODE_SIZE (TFmode);
-#endif
-
-  return 0;
-}
-
-/* The default implementation of TARGET_FORTRAN_REAL_KIND_TYPE.  */
-tree
-default_fortran_real_kind_type (int precision ATTRIBUTE_UNUSED)
-{
-#if defined(HAVE_TFmode) && defined(ENABLE_LIBQUADMATH_SUPPORT)
-  if (precision == TYPE_PRECISION (float128_type_node))
-    return float128_type_node;
-#endif
-
-  return NULL_TREE;
-}
-
-/* The default implementation of TARGET_FORTRAN_REAL_KIND_FLOAT128_p.  */
-bool
-default_fortran_real_kind_float128_p (int precision ATTRIBUTE_UNUSED)
-{
-#if defined(HAVE_TFmode) && defined(ENABLE_LIBQUADMATH_SUPPORT)
-  if (precision == TYPE_PRECISION (float128_type_node))
-    return true;
-#endif
-
-  return false;
-}
-
 #include "gt-targhooks.h"
