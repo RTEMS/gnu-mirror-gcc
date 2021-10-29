@@ -5797,7 +5797,7 @@ store_one_arg (struct arg_data *arg, rtx argblock, int flags,
 	    {
 	      /* stack_slot is negative, but we want to index stack_usage_map
 		 with positive values.  */
-	      if (GET_CODE (XEXP (arg->stack_slot, 0)) == PLUS)
+	      if (any_plus_p (XEXP (arg->stack_slot, 0)))
 		{
 		  rtx offset = XEXP (XEXP (arg->stack_slot, 0), 1);
 		  upper_bound = -rtx_to_poly_int64 (offset) + 1;
@@ -5809,7 +5809,7 @@ store_one_arg (struct arg_data *arg, rtx argblock, int flags,
 	    }
 	  else
 	    {
-	      if (GET_CODE (XEXP (arg->stack_slot, 0)) == PLUS)
+	      if (any_plus_p (XEXP (arg->stack_slot, 0)))
 		{
 		  rtx offset = XEXP (XEXP (arg->stack_slot, 0), 1);
 		  lower_bound = rtx_to_poly_int64 (offset);
