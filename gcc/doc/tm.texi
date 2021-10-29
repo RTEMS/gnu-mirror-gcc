@@ -12620,7 +12620,12 @@ mode.  If the mode cannot be represented, a 0 is returned.
 @end deftypefn
 
 @deftypefn {Target Hook} tree TARGET_FORTRAN_REAL_KIND_TYPE (int @var{precision})
-Returns a type from a @code{PRECISION} that is the precision for a Fortran
-kind type.  @code{MODE} is a scalar floating point mode.  If the mode cannot
-be represented, a @code{NULL_TREE} is returned.
+Returns a floating point scalar type with precision @code{PRECISION} that
+can be used for a Fortran kind type.  If the precision cannot be represented,
+a @code{NULL_TREE} is returned.
+@end deftypefn
+
+@deftypefn {Target Hook} bool TARGET_FORTRAN_REAL_KIND_FLOAT128_P (int @var{precision})
+Returns true if the floating point scalar type with precision
+@code{PRECISION} is an IEEE 128-bit floating point value.
 @end deftypefn

@@ -1793,6 +1793,9 @@ static const struct attribute_spec rs6000_attribute_table[] =
 
 #undef TARGET_FORTRAN_REAL_KIND_TYPE
 #define TARGET_FORTRAN_REAL_KIND_TYPE rs6000_fortran_real_kind_type
+
+#undef TARGET_FORTRAN_REAL_KIND_FLOAT128_P
+#define TARGET_FORTRAN_REAL_KIND_FLOAT128_P rs6000_fortran_real_kind_float128_p
 
 
 /* Processor table.  */
@@ -28438,6 +28441,33 @@ rs6000_fortran_real_kind_type (int precision)
 	  return (FLOAT128_IEEE_P (TFmode)
 		  ? long_double_type_node
 		  : float128_type_node);
+
+	default:
+	  break;
+	}
+    }
+
+  return NULL_TREE;
+}
+
+/* PowerPC support for Fortran KIND support.  Return true given a precision for
+   a floating point scalar type that Fortran will handle for kind support.  We
+   don't have to handle the standard types here.  */
+static bool
+rs6000_fortran_real_kind_float128_p (int precision)
+{
+  if (TARGET_FLOAT128_TYPE)
+    {
+      switch (precision)
+	{
+	case FLOAT_PRECISION_TFmode:
+	  return FLOAT128_IEEE_P (TFmode);
+
+	case FLOAT_PRECISION_IFmode:
+	  return false;
+
+	case FLOAT_PRECISION_KFmode:
+	  return true;
 
 	default:
 	  break;

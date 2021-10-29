@@ -7138,11 +7138,17 @@ mode.  If the mode cannot be represented, a 0 is returned.",
 
 DEFHOOK
 (fortran_real_kind_type,
- "Returns a type from a @code{PRECISION} that is the precision for a Fortran\n\
-kind type.  @code{MODE} is a scalar floating point mode.  If the mode cannot\n\
-be represented, a @code{NULL_TREE} is returned.",
+ "Returns a floating point scalar type with precision @code{PRECISION} that\n\
+can be used for a Fortran kind type.  If the precision cannot be represented,\n\
+a @code{NULL_TREE} is returned.",
  tree, (int precision), default_fortran_real_kind_type)
 
-/* Close the 'struct gcc_target' definition.  */
+DEFHOOK
+(fortran_real_kind_float128_p,
+ "Returns true if the floating point scalar type with precision\n\
+@code{PRECISION} is an IEEE 128-bit floating point value.",
+ bool, (int precision), default_fortran_real_kind_float128_p)
+
+ /* Close the 'struct gcc_target' definition.  */
 HOOK_VECTOR_END (C90_EMPTY_HACK)
 

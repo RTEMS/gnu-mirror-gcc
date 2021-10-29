@@ -848,6 +848,8 @@ gfc_build_real_type (gfc_real_info *info)
     info->c_float = 1;
   if (mode_precision == DOUBLE_TYPE_SIZE)
     info->c_double = 1;
+  if (mode_precision == LONG_DOUBLE_TYPE_SIZE)
+    info->c_long_double = 1;
 
 #if defined(HAVE_TFmode) && defined(ENABLE_LIBQUADMATH_SUPPORT)
   if (TYPE_PRECISION (float128_type_node) == mode_precision)
@@ -858,8 +860,16 @@ gfc_build_real_type (gfc_real_info *info)
     }
 #endif
 
-  if (mode_precision == LONG_DOUBLE_TYPE_SIZE)
-    info->c_long_double = 1;
+  tree type = targetm.fortran_real_kind_type (mode_precision);
+  if (type)
+    {
+      if (type == float128_type_node)
+	{
+	  info->c_float128 = 1;
+	  gfc_real16_is_float128 = true;
+	}
+      return type;
+    }
 
   if (TYPE_PRECISION (float_type_node) == mode_precision)
     return float_type_node;
@@ -867,10 +877,6 @@ gfc_build_real_type (gfc_real_info *info)
     return double_type_node;
   if (TYPE_PRECISION (long_double_type_node) == mode_precision)
     return long_double_type_node;
-
-  tree type = targetm.fortran_real_kind_type (mode_precision);
-  if (type)
-    return type;
 
   new_type = make_node (REAL_TYPE);
   TYPE_PRECISION (new_type) = mode_precision;
