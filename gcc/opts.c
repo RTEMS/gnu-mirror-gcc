@@ -1377,6 +1377,7 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
 
   if (flag_gtoggle)
     {
+      flag_gtoggle = false;
       if (debug_info_level == DINFO_LEVEL_NONE)
 	{
 	  debug_info_level = DINFO_LEVEL_NORMAL;
