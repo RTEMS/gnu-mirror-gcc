@@ -5041,8 +5041,11 @@ build_simple_mem_ref_loc (location_t loc, tree ptr)
 poly_offset_int
 mem_ref_offset (const_tree t)
 {
-  return poly_offset_int::from (wi::to_poly_wide (TREE_OPERAND (t, 1)),
-				SIGNED);
+  if (capability_type_p (TREE_TYPE (TREE_OPERAND (t, 1))))
+    gcc_assert (tree_constant_capability_metadata (TREE_OPERAND (t, 1)) == 0);
+  return poly_offset_int::from (wi::to_poly_wide
+				 (fold_drop_capability (TREE_OPERAND (t, 1))),
+							SIGNED);
 }
 
 /* Return an invariant ADDR_EXPR of type TYPE taking the address of BASE

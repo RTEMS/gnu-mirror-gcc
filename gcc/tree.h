@@ -6373,7 +6373,10 @@ inline wide_int
 tree_constant_capability_metadata (const_tree t)
 {
   gcc_assert (TREE_CODE (t) == INTEGER_CST);
-  return wi::bit_and (wi::to_wide (t, TYPE_CAP_PRECISION (TREE_TYPE(t))),
+  return wi::bit_and (wide_int_storage::from
+		       (wi::to_wide (t, TYPE_NONCAP_PRECISION (TREE_TYPE(t))),
+				     TYPE_CAP_PRECISION (TREE_TYPE(t)),
+				     UNSIGNED),
 		      wi::mask (TYPE_NONCAP_PRECISION (TREE_TYPE(t)), 1,
 				TYPE_CAP_PRECISION (TREE_TYPE(t))));
 }
