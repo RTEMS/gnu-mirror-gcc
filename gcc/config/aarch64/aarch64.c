@@ -8927,7 +8927,7 @@ aarch64_expand_epilogue (bool for_sibcall)
       emit_insn (gen_add2_insn (stack_pointer_rtx, EH_RETURN_STACKADJ_RTX));
     }
 
-  emit_use (gen_rtx_REG (DImode, LR_REGNUM));
+  emit_use (gen_rtx_REG (Pmode, LR_REGNUM));
   if (!for_sibcall)
     emit_jump_insn (ret_rtx);
 }
@@ -8961,7 +8961,7 @@ rtx
 aarch64_eh_return_handler_rtx (void)
 {
   rtx tmp = gen_frame_mem (Pmode,
-    plus_constant (Pmode, hard_frame_pointer_rtx, UNITS_PER_WORD));
+    plus_constant (Pmode, hard_frame_pointer_rtx, GET_MODE_SIZE (Pmode)));
 
   /* Mark the store volatile, so no optimization is permitted to remove it.  */
   MEM_VOLATILE_P (tmp) = true;
