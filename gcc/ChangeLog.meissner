@@ -1,3 +1,57 @@
+work072.patch005:
+2021-11-03  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/rs6000.md (UNSPEC_XXSPLTIDP_CONST): New unspec.
+	(UNSPEC_XXSPLTIW_CONST): New unspec.
+	(movsf_hardfloat): Add support for generating XXSPLTIDP.
+	(mov<mode>_hardfloat32): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(xxspltidp_<mode>_internal): New insns.
+	(xxspltiw_<mode>_internal): New insns.
+	(splitters for SF/DFmode): Add new splitters for XXSPLTIDP.
+
+work072.patch004:
+2021-11-03  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/predicates.md (easy_fp_constant): Add support for
+	generating XXSPLTIDP.
+	(vsx_prefixed_constant): Likewise.
+	(easy_vector_constant): Likewise.
+	* config/rs6000/rs6000-protos.h (constant_generates_xxspltidp):
+	New declaration.
+	* config/rs6000/rs6000.c (output_vec_const_move): Add support for
+	generating XXSPLTIDP.
+	(prefixed_xxsplti_p): Likewise.
+	(constant_generates_xxspltidp): New function.
+	* config/rs6000/rs6000.opt (-msplat-float-constant): New debug option.
+
+work072.patch003:
+2021-11-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (eP): Update comment.
+	* config/rs6000/predicates.md (easy_fp_constant): Add support for
+	generating XXSPLTIW.
+	(vsx_prefixed_constant): New predicate.
+	(easy_vector_constant): Add support for
+	generating XXSPLTIW.
+	* config/rs6000/rs6000-protos.h (prefixed_xxsplti_p): New
+	declaration.
+	(constant_generates_xxspltiw): Likewise.
+	* config/rs6000/rs6000.c (xxspltib_constant_p): If we can generate
+	XXSPLTIW, don't do XXSPLTIB and sign extend.
+	(output_vec_const_move): Add support for XXSPLTIW.
+	(prefixed_xxsplti_p): New function.
+	(constant_generates_xxspltiw): New function.
+	* config/rs6000/rs6000.md (prefixed attribute): Add support to
+	mark XXSPLTI* instructions as being prefixed.
+	* config/rs6000/rs6000.opt (-msplat-word-constant): New debug
+	switch.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Add support for
+	generating XXSPLTIW or XXSPLTIDP.
+	(vsx_mov<mode>_32bit): Likewise.
+	* doc/md.texi (PowerPC and IBM RS6000 constraints): Document the
+	eP constraint.
+
 work072.patch002:
 2021-11-03  Michael Meissner  <meissner@the-meissners.org>
 
