@@ -656,6 +656,9 @@
   if (constant_generates_xxspltiw (&vsx_const))
     return true;
 
+  if (constant_generates_xxspltidp (&vsx_const))
+    return true;
+
   return false;
 })
 
