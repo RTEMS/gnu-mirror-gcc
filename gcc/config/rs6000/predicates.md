@@ -610,6 +610,9 @@
 
       if (constant_generates_xxspltiw (&vsx_const))
 	return true;
+
+      if (constant_generates_xxspltidp (&vsx_const))
+	return true;
     }
 
   /* Otherwise consider floating point constants hard, so that the
@@ -726,6 +729,9 @@
 	    return true;
 
 	  if (constant_generates_xxspltiw (&vsx_const))
+	    return true;
+
+	  if (constant_generates_xxspltidp (&vsx_const))
 	    return true;
 	}
 
