@@ -222,42 +222,6 @@ address_is_prefixed (rtx addr,
   return (iform == INSN_FORM_PREFIXED_NUMERIC
 	  || iform == INSN_FORM_PCREL_LOCAL);
 }
-
-/* Functions and data structures relating to 128-bit constants that are
-   converted to byte, half-word, word, and double-word values.  All fields are
-   kept in big endian order.  We also convert scalar values to 128-bits if they
-   are going to be loaded into vector registers.  */
-#define VECTOR_128BIT_BITS		128
-#define VECTOR_128BIT_BYTES		(128 / 8)
-#define VECTOR_128BIT_HALF_WORDS	(128 / 16)
-#define VECTOR_128BIT_WORDS		(128 / 32)
-#define VECTOR_128BIT_DOUBLE_WORDS	(128 / 64)
-
-/* If the constant is small, whether we will splat the constant to fill a
-   vector.  */
-typedef enum {
-  CONSTANT_NO_SPLAT,			/* Do not splat the constant.  */
-  CONSTANT_SPLAT			/* Splat to fill the constant.  */
-} constant_splat_type;
-
-typedef struct {
-  /* Constant as various sized items.  */
-  unsigned HOST_WIDE_INT double_words[VECTOR_128BIT_DOUBLE_WORDS];
-  unsigned int words[VECTOR_128BIT_WORDS];
-  unsigned short half_words[VECTOR_128BIT_HALF_WORDS];
-  unsigned char bytes[VECTOR_128BIT_BYTES];
-
-  unsigned original_size;		/* Constant size before splat.  */
-  bool fp_constant_p;			/* Is the constant floating point?  */
-  bool all_double_words_same;		/* Are the double words all equal?  */
-  bool all_words_same;			/* Are the words all equal?  */
-  bool all_half_words_same;		/* Are the halft words all equal?  */
-  bool all_bytes_same;			/* Are the bytes all equal?  */
-} vector_128bit_constant_type;
-
-extern bool constant_to_128bit_vector (rtx, machine_mode,
-				       vector_128bit_constant_type *,
-				       constant_splat_type);
 #endif /* RTX_CODE */
 
 #ifdef TREE_CODE
