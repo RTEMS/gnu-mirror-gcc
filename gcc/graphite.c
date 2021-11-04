@@ -462,6 +462,14 @@ graphite_transform_loops (void)
     if (dbg_cnt (graphite_scop))
       {
 	scop->isl_context = ctx;
+
+	/* MORELLO TODO (OPTIMISED): Disabling this optimisation pass after
+	   detecting an optimisation that had an impact on correctness for
+	   Morello and for base AArch64. Details at:
+	   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=103247 .  */
+	if (targetm.capability_mode().exists())
+	  continue;
+
 	if (!build_poly_scop (scop))
 	  continue;
 

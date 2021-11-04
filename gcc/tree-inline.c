@@ -4129,8 +4129,14 @@ estimate_move_cost (tree type, bool ARG_UNUSED (speed_p))
     }
 
   size = int_size_in_bytes (type);
-
-  if (size < 0 || size > MOVE_MAX_PIECES * MOVE_RATIO (speed_p))
+  /* For capability targets MOVE_RATIO is set to zero to disable the
+     move-by-pieces infrastructure and avoid invalidating capabilities, so
+     also take that into account and use a slightly different reasonable
+     calculation to see if the move will result in a memcpy call.  */
+  if (size < 0 || size > (MOVE_RATIO (speed_p) ? MOVE_RATIO (speed_p)
+					       : MOVE_MAX_PIECES
+						 / (speed_p ? 2 : 4))
+			  * MOVE_MAX_PIECES)
     /* Cost of a memcpy call, 3 arguments and the call.  */
     return 4;
   else
