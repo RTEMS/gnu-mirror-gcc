@@ -688,11 +688,6 @@ int omp_target_associate_ptr(
         return 1;
     }
 
-    // An incorrect size is treated as failure
-    if (size < 0) {
-        return 1;
-    }
-    
     // If OpenMP allows wrap-around for device numbers, enable next line
     //Engine& device = mic_engines[device_num % mic_engines_total];
     Engine& device = mic_engines[device_num];
