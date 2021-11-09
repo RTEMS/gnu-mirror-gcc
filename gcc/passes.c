@@ -1906,9 +1906,9 @@ pass_manager::dump_profile_report () const
     dump_file = stderr;
 
   fprintf (dump_file, "Profile consistency report:\n\n");
-  fprintf (dump_file, "                                 |mismatch     |mismatch     |                     |\n");
-  fprintf (dump_file, "Pass name                        |IN    |IN    |OUT   |OUT   |overall              |\n");
-  fprintf (dump_file, "                                 |freq  |count |freq  |count |size      |time      |\n");
+  fprintf (dump_file, "                                     |mismatch     |mismatch     |                     |\n");
+  fprintf (dump_file, "Pass name                            |IN    |IN    |OUT   |OUT   |overall              |\n");
+  fprintf (dump_file, "                                     |freq  |count |freq  |count |size      |time      |\n");
 	   
   for (int i = 1; i < passes_by_id_size; i++)
     if (profile_record[i].run)
@@ -1931,7 +1931,9 @@ pass_manager::dump_profile_report () const
 	    || rel_time_change || rel_size_change)
 	  {
 	    last_reported = i;
-	    fprintf (dump_file, "%-33s", passes_by_id[i]->name);
+
+	    fprintf (dump_file, "%03d.%-33s", passes_by_id[i]->static_pass_number,
+		     passes_by_id[i]->name);
 	    if (profile_record[i].num_mismatched_freq_in != last_freq_in)
 	      fprintf (dump_file, "| %+5i",
 		       profile_record[i].num_mismatched_freq_in
@@ -1980,8 +1982,8 @@ pass_manager::dump_profile_report () const
 	else if (last_reported != i)
 	  {
 	    last_reported = i;
-	    fprintf (dump_file, "%-20s ------------|      |      |      |      |          |          |\n",
-		     passes_by_id[i]->name);
+	    fprintf (dump_file, "%03d.%-20s ------------|      |      |      |      |          |          |\n",
+		     passes_by_id[i]->static_pass_number, passes_by_id[i]->name);
 	  }
 	last_time = profile_record[i].time;
 	last_size = profile_record[i].size;
