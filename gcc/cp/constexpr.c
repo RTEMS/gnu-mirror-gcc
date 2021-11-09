@@ -1831,10 +1831,9 @@ clear_no_implicit_zero (tree ctor)
   if (CONSTRUCTOR_NO_CLEARING (ctor))
     {
       CONSTRUCTOR_NO_CLEARING (ctor) = false;
-      tree elt; unsigned HOST_WIDE_INT idx;
-      FOR_EACH_CONSTRUCTOR_VALUE (CONSTRUCTOR_ELTS (ctor), idx, elt)
-	if (TREE_CODE (elt) == CONSTRUCTOR)
-	  clear_no_implicit_zero (elt);
+      for (auto &e: CONSTRUCTOR_ELTS (ctor))
+	if (TREE_CODE (e.value) == CONSTRUCTOR)
+	  clear_no_implicit_zero (e.value);
     }
 }
 
@@ -2950,7 +2949,7 @@ reduced_constant_expression_p (tree t)
 
     case CONSTRUCTOR:
       /* And we need to handle PTRMEM_CST wrapped in a CONSTRUCTOR.  */
-      tree idx, val, field; unsigned HOST_WIDE_INT i;
+      tree field;
       if (CONSTRUCTOR_NO_CLEARING (t))
 	{
 	  if (TREE_CODE (TREE_TYPE (t)) == VECTOR_TYPE)
@@ -2964,14 +2963,14 @@ reduced_constant_expression_p (tree t)
 	      tree min = TYPE_MIN_VALUE (TYPE_DOMAIN (TREE_TYPE (t)));
 	      tree max = TYPE_MAX_VALUE (TYPE_DOMAIN (TREE_TYPE (t)));
 	      tree cursor = min;
-	      FOR_EACH_CONSTRUCTOR_ELT (CONSTRUCTOR_ELTS (t), i, idx, val)
+	      for (auto &e: CONSTRUCTOR_ELTS (t))
 		{
-		  if (!reduced_constant_expression_p (val))
+		  if (!reduced_constant_expression_p (e.value))
 		    return false;
-		  if (array_index_cmp (cursor, idx) != 0)
+		  if (array_index_cmp (cursor, e.index) != 0)
 		    return false;
-		  if (TREE_CODE (idx) == RANGE_EXPR)
-		    cursor = TREE_OPERAND (idx, 1);
+		  if (TREE_CODE (e.index) == RANGE_EXPR)
+		    cursor = TREE_OPERAND (e.index, 1);
 		  cursor = int_const_binop (PLUS_EXPR, cursor, size_one_node);
 		}
 	      if (find_array_ctor_elt (t, max) == -1)
@@ -2992,14 +2991,14 @@ reduced_constant_expression_p (tree t)
 	}
       else
 	field = NULL_TREE;
-      FOR_EACH_CONSTRUCTOR_ELT (CONSTRUCTOR_ELTS (t), i, idx, val)
+      for (auto &e: CONSTRUCTOR_ELTS (t))
 	{
 	  /* If VAL is null, we're in the middle of initializing this
 	     element.  */
-	  if (!reduced_constant_expression_p (val))
+	  if (!reduced_constant_expression_p (e.value))
 	    return false;
 	  /* Empty class field may or may not have an initializer.  */
-	  for (; field && idx != field;
+	  for (; field && e.index != field;
 	       field = next_initializable_field (DECL_CHAIN (field)))
 	    if (!is_really_empty_class (TREE_TYPE (field),
 					/*ignore_vptr*/false))
@@ -7276,6 +7275,10 @@ find_immediate_fndecl (tree *tp, int */*walk_subtrees*/, void */*data*/)
 {
   if (TREE_CODE (*tp) == FUNCTION_DECL && DECL_IMMEDIATE_FUNCTION_P (*tp))
     return *tp;
+  if (TREE_CODE (*tp) == PTRMEM_CST
+      && TREE_CODE (PTRMEM_CST_MEMBER (*tp)) == FUNCTION_DECL
+      && DECL_IMMEDIATE_FUNCTION_P (PTRMEM_CST_MEMBER (*tp)))
+    return PTRMEM_CST_MEMBER (*tp);
   return NULL_TREE;
 }
 
@@ -7468,12 +7471,8 @@ cxx_eval_outermost_constant_expr (tree t, bool allow_non_constant,
     }
 
   /* Check that immediate invocation does not return an expression referencing
-     any immediate function decls.  They need to be allowed while parsing
-     immediate functions, but can't leak outside of them.  */
-  if (is_consteval
-      && t != r
-      && (current_function_decl == NULL_TREE
-	  || !DECL_IMMEDIATE_FUNCTION_P (current_function_decl)))
+     any immediate function decls.  */
+  if (is_consteval || in_immediate_context ())
     if (tree immediate_fndecl
 	= cp_walk_tree_without_duplicates (&r, find_immediate_fndecl,
 					   NULL))
@@ -8892,13 +8891,18 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
       tmp = boolean_false_node;
     truth:
       {
-	tree op = TREE_OPERAND (t, 0);
-	if (!RECUR (op, rval))
+	tree op0 = TREE_OPERAND (t, 0);
+	tree op1 = TREE_OPERAND (t, 1);
+	if (!RECUR (op0, rval))
 	  return false;
+	if (!(flags & tf_error) && RECUR (op1, rval))
+	  /* When quiet, try to avoid expensive trial evaluation by first
+	     checking potentiality of the second operand.  */
+	  return true;
 	if (!processing_template_decl)
-	  op = cxx_eval_outermost_constant_expr (op, true);
-	if (tree_int_cst_equal (op, tmp))
-	  return RECUR (TREE_OPERAND (t, 1), rval);
+	  op0 = cxx_eval_outermost_constant_expr (op0, true);
+	if (tree_int_cst_equal (op0, tmp))
+	  return (flags & tf_error) ? RECUR (op1, rval) : false;
 	else
 	  return true;
       }
@@ -9107,6 +9111,17 @@ bool
 potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 				 tsubst_flags_t flags)
 {
+  if (flags & tf_error)
+    {
+      /* Check potentiality quietly first, as that could be performed more
+	 efficiently in some cases (currently only for TRUTH_*_EXPR).  If
+	 that fails, replay the check noisily to give errors.  */
+      flags &= ~tf_error;
+      if (potential_constant_expression_1 (t, want_rval, strict, now, flags))
+	return true;
+      flags |= tf_error;
+    }
+
   tree target = NULL_TREE;
   return potential_constant_expression_1 (t, want_rval, strict, now,
 					  flags, &target);
