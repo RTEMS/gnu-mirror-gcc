@@ -210,6 +210,7 @@ protected:
   int_range<2> m_undefined;
   tree m_type;
   irange_allocator *m_irange_allocator;
+  void grow ();
 };
 
 
@@ -229,12 +230,33 @@ sbr_vector::sbr_vector (tree t, irange_allocator *allocator)
   m_undefined.set_undefined ();
 }
 
+void
+sbr_vector::grow ()
+{
+  int curr_bb_size = last_basic_block_for_fn (cfun);
+  gcc_checking_assert (curr_bb_size > m_tab_size);
+
+  int inc = MAX ((curr_bb_size - m_tab_size) * 2, 128);
+  inc = MAX (inc, curr_bb_size / 10);
+  int new_size = inc + curr_bb_size;
+
+  irange **t = (irange **)m_irange_allocator->get_memory (new_size
+							  * sizeof (irange *));
+  memcpy (t, m_tab, m_tab_size * sizeof (irange *));
+  memset (t + m_tab_size, 0, (new_size - m_tab_size) * sizeof (irange *));
+
+  m_tab = t;
+  m_tab_size = new_size;
+}
+
 // Set the range for block BB to be R.
 
 bool
 sbr_vector::set_bb_range (const_basic_block bb, const irange &r)
 {
   irange *m;
+  if (bb->index >= m_tab_size)
+    grow ();
   gcc_checking_assert (bb->index < m_tab_size);
   if (r.varying_p ())
     m = &m_varying;
@@ -252,6 +274,8 @@ sbr_vector::set_bb_range (const_basic_block bb, const irange &r)
 bool
 sbr_vector::get_bb_range (irange &r, const_basic_block bb)
 {
+  if (bb->index >= m_tab_size)
+    grow ();
   gcc_checking_assert (bb->index < m_tab_size);
   irange *m = m_tab[bb->index];
   if (m)
@@ -267,8 +291,9 @@ sbr_vector::get_bb_range (irange &r, const_basic_block bb)
 bool
 sbr_vector::bb_range_p (const_basic_block bb)
 {
-  gcc_checking_assert (bb->index < m_tab_size);
-  return m_tab[bb->index] != NULL;
+  if (bb->index < m_tab_size)
+    return m_tab[bb->index] != NULL;
+  return false;
 }
 
 // This class implements the on entry cache via a sparse bitmap.
