@@ -3175,7 +3175,7 @@ elf_uncompress_lzma_block (const unsigned char *compressed,
   stream_crc = (compressed[off]
 		| (compressed[off + 1] << 8)
 		| (compressed[off + 2] << 16)
-		| (compressed[off + 3] << 24));
+		| ((unsigned)(compressed[off + 3]) << 24));
   if (unlikely (computed_crc != stream_crc))
     {
       elf_uncompress_failed ();
@@ -3788,7 +3788,7 @@ elf_uncompress_lzma (struct backtrace_state *state,
   stream_crc = (compressed[8]
 		| (compressed[9] << 8)
 		| (compressed[10] << 16)
-		| (compressed[11] << 24));
+		| ((unsigned)(compressed[11]) << 24));
   if (unlikely (computed_crc != stream_crc))
     {
       elf_uncompress_failed ();
@@ -3832,7 +3832,7 @@ elf_uncompress_lzma (struct backtrace_state *state,
   stream_crc = (compressed[offset - 4]
 		| (compressed[offset - 3] << 8)
 		| (compressed[offset - 2] << 16)
-		| (compressed[offset - 1] << 24));
+		| ((unsigned)(compressed[offset - 1]) << 24));
   if (unlikely (computed_crc != stream_crc))
     {
       elf_uncompress_failed ();
@@ -3891,7 +3891,7 @@ elf_uncompress_lzma (struct backtrace_state *state,
   stream_crc = (compressed[offset]
 		| (compressed[offset + 1] << 8)
 		| (compressed[offset + 2] << 16)
-		| (compressed[offset + 3] << 24));
+		| ((unsigned)(compressed[offset + 3]) << 24));
   if (unlikely (computed_crc != stream_crc))
     {
       elf_uncompress_failed ();
