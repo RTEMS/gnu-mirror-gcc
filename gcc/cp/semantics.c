@@ -3079,6 +3079,22 @@ finish_unary_op_expr (location_t op_loc, enum tree_code code, cp_expr expr,
   return result;
 }
 
+/* Return true if CONSTRUCTOR EXPR after pack expansion could have no
+   elements.  */
+
+static bool
+maybe_zero_constructor_nelts (tree expr)
+{
+  if (CONSTRUCTOR_NELTS (expr) == 0)
+    return true;
+  if (!processing_template_decl)
+    return false;
+  for (constructor_elt &elt : CONSTRUCTOR_ELTS (expr))
+    if (!PACK_EXPANSION_P (elt.value))
+      return false;
+  return true;
+}
+
 /* Finish a compound-literal expression or C++11 functional cast with aggregate
    initializer.  TYPE is the type to which the CONSTRUCTOR in COMPOUND_LITERAL
    is being cast.  */
@@ -3104,9 +3120,20 @@ finish_compound_literal (tree type, tree compound_literal,
 
   if (!TYPE_OBJ_P (type))
     {
-      if (complain & tf_error)
-	error ("compound literal of non-object type %qT", type);
-      return error_mark_node;
+      /* DR2351 */
+      if (VOID_TYPE_P (type) && CONSTRUCTOR_NELTS (compound_literal) == 0)
+	return void_node;
+      else if (VOID_TYPE_P (type)
+	       && processing_template_decl
+	       && maybe_zero_constructor_nelts (compound_literal))
+	/* If there are only packs in compound_literal, it could
+	   be void{} after pack expansion.  */;
+      else
+	{
+	  if (complain & tf_error)
+	    error ("compound literal of non-object type %qT", type);
+	  return error_mark_node;
+	}
     }
 
   if (template_placeholder_p (type))
@@ -9211,7 +9238,7 @@ handle_omp_for_class_iterator (int i, location_t locus, enum tree_code code,
 		TREE_OPERAND (cond, 1), iter);
       return true;
     }
-  if (!c_omp_check_loop_iv_exprs (locus, orig_declv, i,
+  if (!c_omp_check_loop_iv_exprs (locus, code, orig_declv, i,
 				  TREE_VEC_ELT (declv, i), NULL_TREE,
 				  cond, cp_walk_subtrees))
     return true;
@@ -9597,7 +9624,7 @@ finish_omp_for (location_t locus, enum tree_code code, tree declv,
       tree orig_init;
       FOR_EACH_VEC_ELT (*orig_inits, i, orig_init)
 	if (orig_init
-	    && !c_omp_check_loop_iv_exprs (locus,
+	    && !c_omp_check_loop_iv_exprs (locus, code,
 					   orig_declv ? orig_declv : declv, i,
 					   TREE_VEC_ELT (declv, i), orig_init,
 					   NULL_TREE, cp_walk_subtrees))

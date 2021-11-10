@@ -1,3 +1,311 @@
+2021-11-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/range_access.h (begin(valarray), end(valarray)):
+	Add noexcept.
+
+2021-11-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/tuple (tuple_size_v): Fix pack expansion.
+
+2021-11-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++11/random.cc (__x86_rdrand, __x86_rdseed): Add
+	[[unlikely]] attribute.
+
+2021-11-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++11/random.cc [__powerpc__] (USE_DARN): Define.
+	(__ppc_darn): New function to use POWER9 DARN instruction.
+	(Which): Add 'darn' enumerator.
+	(which_source): Check for __ppc_darn.
+	(random_device::_M_init): Support "darn" and "hw" tokens.
+	(random_device::_M_getentropy): Add darn to switch.
+	* testsuite/26_numerics/random/random_device/cons/token.cc:
+	Check "darn" token.
+	* testsuite/26_numerics/random/random_device/entropy.cc:
+	Likewise.
+
+2021-11-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/lib/gdb-test.exp: Add target selector support to the
+	dg-final directives.
+	* testsuite/libstdc++-prettyprinters/80276.cc: Add xfail for
+	C++20.
+	* testsuite/libstdc++-prettyprinters/libfundts.cc: Likewise.
+	* testsuite/libstdc++-prettyprinters/prettyprinters.exp: Tweak
+	comment.
+
+2021-11-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/103086
+	* python/libstdcxx/v6/printers.py (_tuple_impl_get): New helper
+	for accessing the tuple element stored in a _Tuple_impl node.
+	(tuple_get): New function for accessing a tuple element.
+	(unique_ptr_get): New function for accessing a unique_ptr.
+	(UniquePointerPrinter, StdPathPrinter): Use unique_ptr_get.
+	* python/libstdcxx/v6/xmethods.py (UniquePtrGetWorker): Cast
+	tuple to its base class before accessing _M_head_impl.
+
+2021-11-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/evolution.xml: Document deprecations.
+	* doc/html/*: Regenerate.
+	* libsupc++/exception (unexpected_handler, unexpected)
+	(get_unexpected, set_unexpected): Add deprecated attribute.
+	Do not define without _GLIBCXX_USE_DEPRECATED for C++17 and up.
+	* libsupc++/eh_personality.cc (PERSONALITY_FUNCTION): Disable
+	deprecated warnings.
+	* libsupc++/eh_ptr.cc (std::rethrow_exception): Likewise.
+	* libsupc++/eh_terminate.cc: Likewise.
+	* libsupc++/eh_throw.cc (__cxa_init_primary_exception):
+	Likewise.
+	* libsupc++/unwind-cxx.h (struct __cxa_exception): Use
+	terminate_handler instead of unexpected_handler.
+	(struct __cxa_dependent_exception): Likewise.
+	(__unexpected): Likewise.
+	* testsuite/18_support/headers/exception/synopsis.cc: Add
+	dg-warning for deprecated warning.
+	* testsuite/18_support/exception_ptr/60612-unexpected.cc:
+	Disable deprecated warnings.
+	* testsuite/18_support/set_unexpected.cc: Likewise.
+	* testsuite/18_support/unexpected_handler.cc: Likewise.
+
+2021-11-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/utility.h (__find_uniq_type_in_pack): Move
+	definition to here, ...
+	* include/std/tuple (__find_uniq_type_in_pack): ... from here.
+	* include/std/variant (__detail__variant::__index_of): Remove.
+	(__detail::__variant::__exactly_once): Define using
+	__find_uniq_type_in_pack instead of __index_of.
+	(get<T>, get_if<T>, variant::__index_of): Likewise.
+
+2021-11-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/stl_pair.h (tuple_size_v): Define partial
+	specializations for std::pair.
+	* include/bits/utility.h (_Nth_type): Move definition here
+	and define primary template.
+	(tuple_size_v): Move definition here.
+	* include/std/array (tuple_size_v): Define partial
+	specializations for std::array.
+	* include/std/tuple (tuple_size_v): Move primary template to
+	<bits/utility.h>.  Define partial specializations for
+	std::tuple.
+	(tuple_element): Change definition to use _Nth_type.
+	* include/std/variant (_Nth_type): Move to <bits/utility.h>.
+	(variant_alternative, variant): Adjust qualification of
+	_Nth_type.
+	* testsuite/20_util/tuple/element_access/get_neg.cc: Prune
+	additional errors from _Nth_type.
+
+2021-11-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/variant (__detail::__variant::__emplace): New
+	function template.
+	(_Copy_assign_base::operator=): Reorder conditions to match
+	bulleted list of effects in the standard. Use __emplace instead
+	of _M_reset followed by _Construct.
+	(_Move_assign_base::operator=): Likewise.
+	(__construct_by_index): Remove.
+	(variant::emplace): Use __emplace instead of _M_reset followed
+	by __construct_by_index.
+	(variant::swap): Hoist valueless cases out of visitor. Use
+	__emplace to replace _M_reset followed by _Construct.
+
+2021-11-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/variant (_Nth_type): Define partial
+	specializations to reduce number of instantiations.
+	(variant_size_v): Define partial specializations to avoid
+	instantiations.
+	(variant_alternative): Use _Nth_type. Add static assert.
+	(__tuple_count, __tuple_count_v): Replace with ...
+	(__count): New variable template.
+	(_Variant_union): Add deleted constructor.
+	(variant::__to_type): Use _Nth_type.
+	(variant::emplace): Use _Nth_type. Add deleted overloads for
+	invalid types and indices.
+
+2021-11-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/102912
+	* include/std/variant (_Variant_storage::__index_of): Remove.
+	(__variant_construct_single): Remove.
+	(__variant_construct): Remove.
+	(_Copy_ctor_base::_Copy_ctor_base(const _Copy_ctor_base&)): Do
+	construction directly instead of using __variant_construct.
+	(_Move_ctor_base::_Move_ctor_base(_Move_ctor_base&&)): Likewise.
+	(_Move_ctor_base::_M_destructive_move()): Remove.
+	(_Move_ctor_base::_M_destructive_copy()): Remove.
+	(_Copy_assign_base::operator=(const _Copy_assign_base&)): Do
+	construction directly instead of using _M_destructive_copy.
+	(variant::swap): Do construction directly instead of using
+	_M_destructive_move.
+	* testsuite/20_util/variant/102912.cc: New test.
+
+2021-11-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/66742
+	* include/bits/list.tcc (list::sort): Use mutable iterators for
+	comparisons.
+	* include/bits/stl_list.h (_Scratch_list::_Ptr_cmp): Likewise.
+	* testsuite/23_containers/list/operations/66742.cc: Check
+	non-const comparisons.
+
+2021-11-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/valarray (valarray::valarray()): Add noexcept.
+	(valarray::operator[]): Likewise.
+
+2021-11-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/debug/stl_iterator.h (__valid_range): Add constexpr
+	for C++20. Qualify call to avoid ADL.
+	(__get_distance, __can_advance, __unsafe, __base): Likewise.
+	* testsuite/25_algorithms/move/constexpr.cc: Also check with
+	std::reverse_iterator arguments.
+
+2021-11-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/span (span(Range&&)): Reorder constraints.
+
+2021-11-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/103022
+	* include/std/valarray (begin, end): Do not dereference an empty
+	valarray. Add noexcept and [[nodiscard]].
+	* testsuite/26_numerics/valarray/range_access.cc: Check empty
+	valarray. Check iterator properties. Run as well as compiling.
+	* testsuite/26_numerics/valarray/range_access2.cc: Likewise.
+	* testsuite/26_numerics/valarray/103022.cc: New test.
+
+2021-10-29  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/23_containers/stack/deduction.cc: Fix typo.
+
+2021-10-26  Martin Sebor  <msebor@redhat.com>
+
+	* testsuite/21_strings/basic_string/capacity/1.cc: Also suppress
+	-Wstringop-overread.
+	* testsuite/27_io/filesystem/path/factory/u8path-char8_t.cc: Same.
+
+2021-10-26  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* testsuite/28_regex/basic_regex/84110.cc (test01)
+	[__cpp_exceptions]: Disambiguate extended.
+
+2021-10-26  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* testsuite/17_intro/names.cc [__sun__] (r, x): Undef.
+
+2021-10-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/102894
+	* include/std/any (make_any): Add SFINAE constraint.
+	* testsuite/20_util/any/102894.cc: New test.
+
+2021-10-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/doxygen/stdheader.cc: Refactor. Use C++23. Add new
+	headers.
+	* scripts/run_doxygen: Fix post-processing of #include
+	directives in man pages. Use new xg++ to compile helper program.
+
+2021-10-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/mofunc_impl.h: Add doxygen comments.
+	* include/std/functional: Likewise.
+
+2021-10-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/alloc_traits.h: Suppress doxygen documentation.
+	* include/bits/allocated_ptr.h: Likewise.
+	* include/bits/enable_special_members.h: Likewise.
+	* include/bits/hashtable.h: Likewise.
+	* include/bits/hashtable_policy.h: Likewise.
+	* include/bits/uses_allocator.h: Likewise.
+	* include/bits/node_handle.h: Document node handles and suppress
+	documentation for protected members.
+	* include/std/any: Suppress documentation for implementation
+	details.
+
+2021-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/102358
+	* include/bits/stl_iterator.h (__niter_base): Make constexpr
+	for C++20.
+	(__miter_base): Likewise.
+	* testsuite/25_algorithms/move/constexpr.cc: New test.
+
+2021-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (istream_view): Replace this function
+	template with an alias template as per P2432R1.
+	(wistream_view): Define as per P2432R1.
+	(views::_Istream, views::istream): Likewise.
+	* testsuite/std/ranges/istream_view.cc (test07): New test.
+
+2021-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/ranges_util.h (views::_Drop): Forward declare.
+	(subrange): Befriend views::_Drop.
+	(subrange::_S_store_size): Declare constexpr instead of just
+	const, remove obsolete comment.
+	* include/std/ranges (views::__detail::__is_empty_view): Define.
+	(views::__detail::__is_basic_string_view): Likewise.
+	(views::__detail::__is_subrange): Likewise.
+	(views::__detail::__is_iota_view): Likewise.
+	(views::__detail::__can_take_view): Rename template parm _Tp to _Dp.
+	(views::_Take): Rename template parm _Tp to _Dp, make it non-deducible
+	and fix it to range_difference_t<_Range>.  Implement P1739R4 and
+	LWG 3407 changes.
+	(views::__detail::__can_drop_view): Rename template parm _Tp to _Dp.
+	(views::_Drop): As with views::_Take.
+	(views::_Counted): Implement P1739R4 changes.
+	* include/std/span (__detail::__is_std_span): Rename to ...
+	(__detail::__is_span): ... this and turn it into a variable
+	template.
+	(__detail::__is_std_array): Turn it into a variable template.
+	(span::span): Adjust uses of __is_std_span and __is_std_array
+	accordingly.
+	* testsuite/std/ranges/adaptors/p1739.cc: New test.
+
+2021-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/stl_iterator.h (common_iterator::__arrow_proxy):
+	Make fully constexpr as per LWG 3595.
+	(common_iterator::__postfix_proxy): Likewise.
+
+2021-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (lazy_split_view::base): Add forward_range
+	constraint as per LWG 3591.
+	(lazy_split_view::begin, lazy_split_view::end): Also check
+	simpleness of _Pattern as per LWG 3592.
+	(split_view::base): Relax copyable constraint as per LWG 3590.
+
+2021-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (join_view::__iter_cat::_S_iter_cat): Adjust
+	criteria for returning bidirectional_iterator_tag as per LWG 3535.
+	(join_view::_Iterator::_S_iter_concept): Likewise.
+
+2021-10-21  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/ranges_base.h (viewable_range): Adjust as per
+	LWG 3481.
+	* testsuite/std/ranges/adaptors/all.cc (test07): New test.
+
+2021-10-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/102863
+	* include/std/optional (optional::and_then, optional::transform):
+	Remove requires-clause.
+	* testsuite/20_util/optional/monadic/and_then.cc: Check
+	overload resolution doesn't cause errors.
+	* testsuite/20_util/optional/monadic/transform.cc: Likewise.
+
 2021-10-20  Jonathan Wakely  <jwakely@redhat.com>
 
 	* testsuite/20_util/optional/monadic/transform.cc: Check that

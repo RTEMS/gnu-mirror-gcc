@@ -2203,6 +2203,9 @@ cgraph_node::dump (FILE *f)
     fprintf (f, " %soperator_delete",
 	     DECL_IS_REPLACEABLE_OPERATOR (decl) ? "replaceable_" : "");
 
+  if (DECL_STATIC_CHAIN (decl))
+    fprintf (f, " static_chain");
+
   fprintf (f, "\n");
 
   if (thunk)
