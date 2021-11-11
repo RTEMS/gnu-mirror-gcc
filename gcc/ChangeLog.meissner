@@ -1,3 +1,14 @@
+work072.patch006:
+2021-11-10  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
+	support for -mpower10-fusion-zero-cycle.
+	* config/rs6000/rs6000.md (tablejump<mode>_normal): Likewise.
+	(tablejump<mode>_absolute): Likewise.
+	(tablejump<mode>_insn_zero_cycle): New insn.
+	* config/rs6000/rs6000.opt (-mpower10-fusion-zero-cycle): New
+	debug switch.
+
 work072.patch005:
 2021-11-03  Michael Meissner  <meissner@the-meissners.org>
 
