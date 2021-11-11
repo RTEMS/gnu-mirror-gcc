@@ -4502,6 +4502,12 @@ rs6000_option_override_internal (bool global_init_p)
       && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_ZERO_CYCLE) == 0)
     rs6000_isa_flags |= OPTION_MASK_P10_FUSION_ZERO_CYCLE;
 
+  /* If we enable zero cycle move fusion, also switch to absolute addresses in
+     switch tables.  */
+  if (TARGET_P10_FUSION && TARGET_P10_FUSION_ZERO_CYCLE
+      && !global_options_set.x_rs6000_relative_jumptables)
+    rs6000_relative_jumptables = 0;
+
   /* Turn off vector pair/mma options on non-power10 systems.  */
   else if (!TARGET_POWER10 && TARGET_MMA)
     {
