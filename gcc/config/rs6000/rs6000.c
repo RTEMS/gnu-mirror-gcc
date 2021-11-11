@@ -4469,35 +4469,36 @@ rs6000_option_override_internal (bool global_init_p)
   if (TARGET_POWER10 && (rs6000_isa_flags_explicit & OPTION_MASK_MMA) == 0)
     rs6000_isa_flags |= OPTION_MASK_MMA;
 
-  if (TARGET_POWER10
+  /* Enable power10 tuning if either -mcpu=power10 or -mtune=power10.  */
+  if ((TARGET_POWER10 || rs6000_tune == PROCESSOR_POWER10)
       && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION) == 0)
     rs6000_isa_flags |= OPTION_MASK_P10_FUSION;
 
-  if (TARGET_POWER10 &&
+  if (TARGET_P10_FUSION &&
       (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_LD_CMPI) == 0)
     rs6000_isa_flags |= OPTION_MASK_P10_FUSION_LD_CMPI;
 
-  if (TARGET_POWER10
+  if (TARGET_P10_FUSION
       && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_2LOGICAL) == 0)
     rs6000_isa_flags |= OPTION_MASK_P10_FUSION_2LOGICAL;
 
-  if (TARGET_POWER10
+  if (TARGET_P10_FUSION
       && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_LOGADD) == 0)
     rs6000_isa_flags |= OPTION_MASK_P10_FUSION_LOGADD;
 
-  if (TARGET_POWER10
+  if (TARGET_P10_FUSION
       && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_ADDLOG) == 0)
     rs6000_isa_flags |= OPTION_MASK_P10_FUSION_ADDLOG;
 
-  if (TARGET_POWER10
+  if (TARGET_P10_FUSION
       && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_2ADD) == 0)
     rs6000_isa_flags |= OPTION_MASK_P10_FUSION_2ADD;
 
-  if (TARGET_POWER10
+  if (TARGET_P10_FUSION
       && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_2STORE) == 0)
     rs6000_isa_flags |= OPTION_MASK_P10_FUSION_2STORE;
 
-  if (TARGET_POWER10
+  if (TARGET_P10_FUSION
       && (rs6000_isa_flags_explicit & OPTION_MASK_P10_FUSION_ZERO_CYCLE) == 0)
     rs6000_isa_flags |= OPTION_MASK_P10_FUSION_ZERO_CYCLE;
 
@@ -24292,6 +24293,14 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "power9-misc",		OPTION_MASK_P9_MISC,		false, true  },
   { "power9-vector",		OPTION_MASK_P9_VECTOR,		false, true  },
   { "power10-fusion",		OPTION_MASK_P10_FUSION,		false, true  },
+  { "power10-fusion-ld-cmpi",	OPTION_MASK_P10_FUSION_LD_CMPI,	false, true  },
+  { "power10-fusion-2logical",	OPTION_MASK_P10_FUSION_2LOGICAL,false, true  },
+  { "power10-fusion-logical-add", OPTION_MASK_P10_FUSION_LOGADD,false, true  },
+  { "power10-fusion-add-logical", OPTION_MASK_P10_FUSION_ADDLOG,false, true  },
+  { "power10-fusion-2add",	OPTION_MASK_P10_FUSION_2ADD,	false, true  },
+  { "power10-fusion-2store",	OPTION_MASK_P10_FUSION_2STORE,	false, true  },
+  { "power10-fusion-zero-cycle", OPTION_MASK_P10_FUSION_ZERO_CYCLE,
+								false, true  },
   { "powerpc-gfxopt",		OPTION_MASK_PPC_GFXOPT,		false, true  },
   { "powerpc-gpopt",		OPTION_MASK_PPC_GPOPT,		false, true  },
   { "prefixed",			OPTION_MASK_PREFIXED,		false, true  },
