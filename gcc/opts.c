@@ -2684,6 +2684,7 @@ common_handle_option (struct gcc_options *opts,
 
     case OPT_fdebug_prefix_map_:
     case OPT_ffile_prefix_map_:
+    case OPT_fprofile_prefix_map_:
       /* Deferred.  */
       break;
 
@@ -3597,6 +3598,7 @@ gen_command_line_string (cl_decoded_option *options,
       case OPT_fdebug_prefix_map_:
       case OPT_fmacro_prefix_map_:
       case OPT_ffile_prefix_map_:
+      case OPT_fprofile_prefix_map_:
       case OPT_fcompare_debug:
       case OPT_fchecking:
       case OPT_fchecking_:
