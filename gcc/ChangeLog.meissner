@@ -1,3 +1,12 @@
+work073.patch004:
+2021-11-12  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/rs6000.md (indirect_jump): Support zero cycle
+	moves.
+	(indirect_jump<mode>_zero_cycle): New insns.
+	(tablejump<mode>_insn_zero_cycle): Add fall back alternative if
+	the register already is CTR or LR.
+
 work073.patch003:
 2021-11-11  Michael Meissner  <meissner@the-meissners.org>
 
