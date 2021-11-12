@@ -163,7 +163,7 @@ vec_prefix::calculate_allocation_1 (unsigned alloc, unsigned desired)
     alloc = (alloc * 3 / 2);
 
   /* If this is still too small, set it to the right size. */
-  if (alloc < desired)
+//  if (alloc < desired)
     alloc = desired;
   return alloc;
 }
