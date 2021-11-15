@@ -82,16 +82,19 @@ along with GCC; see the file COPYING3.  If not see
 struct unswitch_predicate
 {
   /* Default constructor.  */
-  unswitch_predicate (tree cond)
-  : condition (cond), range ()
+  unswitch_predicate (gcond *s, tree cond)
+  : stmt (s), condition (cond), true_range (), false_range ()
   {}
 
+  gimple *stmt;
   tree condition;
-  int_range_max range;
+  int_range_max true_range;
+  int_range_max false_range;
 };
 
 static class loop *tree_unswitch_loop (class loop *, basic_block, tree);
-static bool tree_unswitch_single_loop (class loop *, int, gimple_ranger *);
+static bool tree_unswitch_single_loop (class loop *, int, gimple_ranger *,
+				       unswitch_predicate *, bool);
 static unswitch_predicate *tree_may_unswitch_on (basic_block, class loop *,
 						 gimple_ranger *);
 static bool tree_unswitch_outer_loop (class loop *);
@@ -116,7 +119,7 @@ tree_ssa_unswitch_loops (void)
     {
       if (!loop->inner)
 	/* Unswitch innermost loop.  */
-	changed |= tree_unswitch_single_loop (loop, 0, ranger);
+	changed |= tree_unswitch_single_loop (loop, 0, ranger, NULL, false);
       else
 	changed |= tree_unswitch_outer_loop (loop);
     }
@@ -244,8 +247,12 @@ tree_may_unswitch_on (basic_block bb, class loop *loop, gimple_ranger *ranger)
   cond = build2 (gimple_cond_code (stmt), boolean_type_node,
 		 gimple_cond_lhs (stmt), gimple_cond_rhs (stmt));
 
-  unswitch_predicate *predicate = new unswitch_predicate (cond);
-  ranger->range_of_expr (predicate->range, gimple_cond_lhs (stmt), stmt);
+  edge edge_true, edge_false;
+  extract_true_false_edges_from_block (bb, &edge_true, &edge_false);
+
+  unswitch_predicate *predicate = new unswitch_predicate (stmt, cond);
+  ranger->range_on_edge (predicate->true_range, edge_true, gimple_cond_lhs (stmt));
+  ranger->range_on_edge (predicate->false_range, edge_false, gimple_cond_lhs (stmt));
   return predicate;
 }
 
@@ -253,43 +260,37 @@ tree_may_unswitch_on (basic_block bb, class loop *loop, gimple_ranger *ranger)
    Utilize both symbolic expressions and value ranges calculated by Ranger.  */
 
 static tree
-simplify_using_entry_checks (class loop *loop, unswitch_predicate *predicate)
+simplify_using_entry_checks (unswitch_predicate *predicate,
+			     unswitch_predicate *parent_predicate,
+			     bool true_edge)
 {
-  edge e = loop_preheader_edge (loop);
-  tree cond = predicate->condition;
-  gimple *stmt;
+  if (parent_predicate == NULL)
+    return NULL_TREE;
 
-  while (1)
-    {
-      stmt = last_stmt (e->src);
-      if (stmt
-	  && gimple_code (stmt) == GIMPLE_COND
-	  && operand_equal_p (gimple_cond_lhs (stmt),
-			      TREE_OPERAND (cond, 0), 0))
+  gimple *stmt = predicate->stmt;
+  tree cond = parent_predicate->condition;
+
+  if (gimple_code (stmt) == GIMPLE_COND
+      && operand_equal_p (gimple_cond_lhs (stmt),
+			  TREE_OPERAND (cond, 0), 0))
 	{
 	  if (gimple_cond_code (stmt) == TREE_CODE (cond)
 	      && operand_equal_p (gimple_cond_rhs (stmt),
 				  TREE_OPERAND (cond, 1), 0))
-	    return (e->flags & EDGE_TRUE_VALUE
-		    ? boolean_true_node
-		    : boolean_false_node);
+	    return true_edge ? boolean_true_node : boolean_false_node;
 	  else
 	    {
 	      int_range_max r;
-	      if (!predicate->range.undefined_p ()
-		  && fold_range (r, stmt, predicate->range)
+	      irange &parent_range = (true_edge ? parent_predicate->true_range :
+				      parent_predicate->false_range);
+	      if (!parent_range.undefined_p ()
+		  && fold_range (r, stmt, parent_range)
 		  && r.singleton_p ())
-		return r.zero_p () ? boolean_true_node : boolean_false_node;
+		return r.zero_p () ? boolean_false_node : boolean_true_node;
 	    }
 	}
 
-      if (!single_pred_p (e->src))
-	return NULL_TREE;
-
-      e = single_pred_edge (e->src);
-      if (e->src == ENTRY_BLOCK_PTR_FOR_FN (cfun))
-	return NULL_TREE;
-    }
+  return NULL_TREE;
 }
 
 /* Unswitch single LOOP.  NUM is number of unswitchings done; we do not allow
@@ -297,7 +298,8 @@ simplify_using_entry_checks (class loop *loop, unswitch_predicate *predicate)
    grow exponentially.  RANGER is gimple ranger used in this pass.  */
 
 static bool
-tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger)
+tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger,
+			   unswitch_predicate *parent_predicate, bool true_edge)
 {
   basic_block *bbs;
   class loop *nloop;
@@ -366,7 +368,8 @@ tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger)
 	  break;
 	}
 
-      tree folded = simplify_using_entry_checks (loop, predicate);
+      tree folded = simplify_using_entry_checks (predicate,
+						 parent_predicate, true_edge);
       stmt = last_stmt (bbs[i]);
       if (folded != NULL_TREE && integer_nonzerop (folded))
 	{
@@ -471,6 +474,7 @@ tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger)
       if (found == loop->num_nodes)
 	{
 	  free (bbs);
+	  delete predicate;
 	  return changed;
 	}
     }
@@ -485,10 +489,10 @@ tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger)
   initialize_original_copy_tables ();
   /* Unswitch the loop on this condition.  */
   nloop = tree_unswitch_loop (loop, bbs[found], predicate->condition);
-  delete predicate;
   if (!nloop)
     {
       free_original_copy_tables ();
+      delete predicate;
       free (bbs);
       return changed;
     }
@@ -498,8 +502,9 @@ tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger)
   free_original_copy_tables ();
 
   /* Invoke itself on modified loops.  */
-  tree_unswitch_single_loop (nloop, num + 1, ranger);
-  tree_unswitch_single_loop (loop, num + 1, ranger);
+  tree_unswitch_single_loop (nloop, num + 1, ranger, predicate, false);
+  tree_unswitch_single_loop (loop, num + 1, ranger, predicate, true);
+  delete predicate;
   free (bbs);
   return true;
 }
