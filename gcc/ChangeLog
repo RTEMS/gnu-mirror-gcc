@@ -1,3 +1,266 @@
+2021-11-09  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-05-19  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/100672
+	* fold-const.c (fold_negate_expr_1): Use element_precision.
+	(negate_expr_p): Likewise.
+
+2021-11-08  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-08-17  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/101373
+	PR tree-optimization/101868
+	* tree-ssa-pre.c (prune_clobbered_mems): Also prune trapping
+	references when the BB may not return.
+
+2021-11-08  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-08-10  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/101824
+	* tree-nested.c (get_frame_field): Mark the COMPONENT_REF as
+	volatile in case the variable was.
+
+2021-11-08  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2021-10-26  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR tree-optimization/102789
+	* tree-vect-loop-manip.c (vect_update_inits_of_drs): Do not
+	update inits of simd_lane_access.
+
+2021-10-26  Piotr Kubaj  <pkubaj@FreeBSD.org>
+
+	Backported from master:
+	2021-10-16  Piotr Kubaj  <pkubaj@FreeBSD.org>
+
+	* configure.ac: Treat powerpc64*-*-freebsd* the same as
+	powerpc64-*-freebsd*.
+	* configure: Regenerate.
+
+2021-10-24  John David Anglin  <danglin@gcc.gnu.org>
+
+	* config/pa/pa.md: Don't use 'G' constraint in integer move patterns.
+
+2021-10-21  H.J. Lu  <hjl.tools@gmail.com>
+
+	Backported from master:
+	2021-10-21  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/98667
+	* doc/invoke.texi: Document -fcf-protection requires i686 or
+	new.
+
+2021-10-15  John David Anglin  <danglin@gcc.gnu.org>
+
+	* config/pa/pa.md: Consistently use "rG" constraint for copy
+	instruction in move patterns.
+
+2021-10-14  John David Anglin  <danglin@gcc.gnu.org>
+
+	* config/pa/pa.md (cbranchsf4): Disable if TARGET_SOFT_FLOAT.
+	(cbranchdf4): Likewise.
+	Add missing move patterns for TARGET_SOFT_FLOAT.
+
+2021-10-13  John David Anglin  <danglin@gcc.gnu.org>
+
+	* config/pa/pa.md (muldi3): Add support for inlining 64-bit
+	multiplication on 32-bit PA 1.1 and 2.0 targets.
+
+2021-10-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-07-07  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/101173
+	PR tree-optimization/101280
+	* gimple-loop-interchange.cc
+	(tree_loop_interchange::valid_data_dependences): Properly
+	guard all dependence checks with DDR_REVERSED_P or its
+	inverse.
+
+2021-10-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-07-12  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/101394
+	* tree-ssa-pre.c (do_pre_regular_insertion): Avoid inserting
+	copies from abnormals for a full redundancy.
+
+2021-10-13  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/101105
+	* tree-vect-data-refs.c (vect_prune_runtime_alias_test_list):
+	Only ignore steps when they are equal or scalar order is preserved.
+
+2021-10-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-06-14  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/100934
+	* tree-ssa-dom.c (pass_dominator::execute): Properly
+	mark irreducible regions.
+
+2021-10-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-05-11  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/100509
+	* gimple-fold.c (fold_gimple_assign): Only call
+	get_symbol_constant_value on register type symbols.
+
+2021-10-11  Andrew Pinski  <apinski@marvell.com>
+
+	Backported from master:
+	2021-10-11  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/102622
+	* tree-ssa-phiopt.c (conditional_replacement): Set neg
+	to false for one bit signed types.
+
+2021-10-11  Diane Meirowitz  <diane.meirowitz@oracle.com>
+
+	Backported from master:
+	2021-10-11  Diane Meirowitz  <diane.meirowitz@oracle.com>
+
+	* doc/invoke.texi: Add link to UndefinedBehaviorSanitizer
+	documentation, mention UBSAN_OPTIONS, similar to what is done
+	for AddressSanitizer.
+
+2021-09-22  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2021-09-22  Kewen Lin  <linkw@linux.ibm.com>
+
+	* ipa-fnsummary.c (inline_read_section): Unpack a dummy bit
+	to keep consistent with the side of streaming out.
+
+2021-09-17  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR rtl-optimization/102306
+	* combine.c (try_combine): Abort the combination if we are about to
+	duplicate volatile references.
+
+2021-09-08  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-09-08  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR c++/60318
+	* doc/trouble.texi (Copy Assignment): Fix description of
+	behaviour and fix code in example.
+
+2021-08-31  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2021-08-31  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* tree.c (walk_tree_1) <OMP_CLAUSE_TILE>: Handle three operands.
+
+2021-08-25  konglin1  <lingling.kong@intel.com>
+
+	PR target/101471
+	* config/i386/avx512dqintrin.h (_mm512_fpclass_ps_mask): Fix
+	macro define in O0.
+	(_mm512_mask_fpclass_ps_mask): Ditto.
+
+2021-08-23  Richard Earnshaw  <rearnsha@arm.com>
+
+	Backported from master:
+	2021-08-05  Richard Earnshaw  <rearnsha@arm.com>
+
+	PR target/101723
+	* config/arm/arm-cpus.in (quirk_no_asmcpu): New feature bit.
+	(ALL_QUIRKS): Add it.
+	(generic-armv7-a): Add quirk to suppress writing .cpu directive in
+	asm output.
+	* config/arm/arm.c (arm_identify_fpu_from_isa): New variable.
+	(arm_last_printed_arch_string): Delete.
+	(arm_last-printed_fpu_string): Delete.
+	(arm_configure_build_target): If use of floating-point/SIMD is
+	disabled, remove all fp/simd related features from the target ISA.
+	(last_arm_targ_options): New variable.
+	(arm_print_asm_arch_directives): Add new parameters.  Change order
+	of emitted directives and handle all cases here.
+	(arm_file_start): Always call arm_print_asm_arch_directives, move
+	all generation of .arch/.arch_extension here.
+	(arm_file_end): Call arm_print_asm_arch.
+	(arm_declare_function_name): Call arm_print_asm_arch_directives
+	instead of printing .arch/.fpu directives directly.
+
+2021-08-23  Richard Earnshaw  <rearnsha@arm.com>
+
+	Backported from master:
+	2021-08-05  Richard Earnshaw  <rearnsha@arm.com>
+
+	* config/arm/arm.c (arm_configure_build_target): Don't call
+	arm_option_reconfigure_globals.
+	(arm_option_restore): Call arm_option_reconfigure_globals after
+	reconfiguring the target.
+	* config/arm/arm-c.c (arm_pragma_target_parse): Likewise.
+
+2021-08-23  Richard Earnshaw  <rearnsha@arm.com>
+
+	Backported from master:
+	2021-08-05  Richard Earnshaw  <rearnsha@arm.com>
+
+	* config/arm/arm.c (arm_configure_build_target): Ensure the target's
+	arch_name is always set.
+
+2021-08-23  Richard Earnshaw  <rearnsha@arm.com>
+
+	Backported from master:
+	2019-12-11  Richard Earnshaw  <rearnsha@arm.com>
+
+	* config/arm/arm-cpus.in (ALL_SIMD_EXTERNAL): New fgroup.
+	(ALL_SIMD): Use it.
+	(ALL_FPU_EXTERNAL): New fgroup.
+	(ALL_FP): Use it.
+	(cortex-a55, cortex-a75, cortex-a76): Remove redundant
+	+simd from architecture specification.
+	(neoverse-n1, cortex-a75.cortex-a55): Likewise.
+	* config/arm/arm.c (isa_all_fpubits, fpu_bitlist): Rename to ...
+	(isa_all_fpubits_internal, fpu_bitlist_internal): ... these.
+	(isa_all_fpbits): New bitmap.
+	(arm_option_override): Initialize it.
+	(arm_configure_build_target): If the target isa does not have any
+	FP enabled, do not warn about mismatches in FP-related feature bits.
+
+2021-08-19  Richard Earnshaw  <rearnsha@arm.com>
+
+	Backported from master:
+	2021-05-27  Richard Earnshaw  <rearnsha@arm.com>
+
+	PR target/100767
+	* config/arm/arm.c (arm_configure_build_target): Remove parameter
+	opts_set, directly check opts parameters for being non-null.
+	(arm_option_restore): Update call to arm_configure_build_target.
+	(arm_option_override): Likewise.
+	(arm_can_inline_p): Likewise.
+	(arm_valid_target_attribute_tree): Likewise.
+	* config/arm/arm-c.c (arm_pragma_target_parse): Likewise.
+	* config/arm/arm-protos.h (arm_configure_build_target): Adjust
+	prototype.
+
+2021-08-17  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2021-08-03  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* doc/invoke.texi: Document -mtune=neoverse-512tvb and
+	-mcpu=neoverse-512tvb.
+	* config/aarch64/aarch64-cores.def (neoverse-512tvb): New entry.
+	* config/aarch64/aarch64-tune.md: Regenerate.
+
 2021-07-31  Xi Ruoyao  <xry111@mengyan1223.wang>
 
 	Backported from master:

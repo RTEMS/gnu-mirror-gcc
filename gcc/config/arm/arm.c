@@ -78,10 +78,6 @@
 typedef struct minipool_node    Mnode;
 typedef struct minipool_fixup   Mfix;
 
-/* The last .arch and .fpu assembly strings that we printed.  */
-static std::string arm_last_printed_arch_string;
-static std::string arm_last_printed_fpu_string;
-
 void (*arm_lang_output_object_attributes_hook)(void);
 
 struct four_ints
@@ -325,6 +321,7 @@ static unsigned int arm_hard_regno_nregs (unsigned int, machine_mode);
 static bool arm_hard_regno_mode_ok (unsigned int, machine_mode);
 static bool arm_modes_tieable_p (machine_mode, machine_mode);
 static HOST_WIDE_INT arm_constant_alignment (const_tree, HOST_WIDE_INT);
+static const char *arm_identify_fpu_from_isa (sbitmap);
 
 /* Table of machine attributes.  */
 static const struct attribute_spec arm_attribute_table[] =
@@ -2985,7 +2982,7 @@ arm_override_options_after_change (void)
 {
   arm_configure_build_target (&arm_active_target,
 			      TREE_TARGET_OPTION (target_option_default_node),
-			      &global_options_set, false);
+			      false);
 
   arm_override_options_after_change_1 (&global_options);
 }
@@ -3006,8 +3003,8 @@ arm_option_restore (struct gcc_options *opts, struct cl_target_option *ptr)
   opts->x_arm_arch_string = ptr->x_arm_arch_string;
   opts->x_arm_cpu_string = ptr->x_arm_cpu_string;
   opts->x_arm_tune_string = ptr->x_arm_tune_string;
-  arm_configure_build_target (&arm_active_target, ptr, &global_options_set,
-			      false);
+  arm_configure_build_target (&arm_active_target, ptr, false);
+  arm_option_reconfigure_globals ();
 }
 
 /* Reset options between modes that the user has specified.  */
@@ -3115,7 +3112,8 @@ arm_option_override_internal (struct gcc_options *opts,
 #endif
 }
 
-static sbitmap isa_all_fpubits;
+static sbitmap isa_all_fpubits_internal;
+static sbitmap isa_all_fpbits;
 static sbitmap isa_quirkbits;
 
 /* Configure a build target TARGET from the user-specified options OPTS and
@@ -3124,7 +3122,6 @@ static sbitmap isa_quirkbits;
 void
 arm_configure_build_target (struct arm_build_target *target,
 			    struct cl_target_option *opts,
-			    struct gcc_options *opts_set,
 			    bool warn_compatible)
 {
   const cpu_option *arm_selected_tune = NULL;
@@ -3139,7 +3136,7 @@ arm_configure_build_target (struct arm_build_target *target,
   target->core_name = NULL;
   target->arch_name = NULL;
 
-  if (opts_set->x_arm_arch_string)
+  if (opts->x_arm_arch_string)
     {
       arm_selected_arch = arm_parse_arch_option_name (all_architectures,
 						      "-march",
@@ -3147,7 +3144,7 @@ arm_configure_build_target (struct arm_build_target *target,
       arch_opts = strchr (opts->x_arm_arch_string, '+');
     }
 
-  if (opts_set->x_arm_cpu_string)
+  if (opts->x_arm_cpu_string)
     {
       arm_selected_cpu = arm_parse_cpu_option_name (all_cores, "-mcpu",
 						    opts->x_arm_cpu_string);
@@ -3157,7 +3154,7 @@ arm_configure_build_target (struct arm_build_target *target,
 	 options for tuning.  */
     }
 
-  if (opts_set->x_arm_tune_string)
+  if (opts->x_arm_tune_string)
     {
       arm_selected_tune = arm_parse_cpu_option_name (all_cores, "-mtune",
 						     opts->x_arm_tune_string);
@@ -3182,7 +3179,12 @@ arm_configure_build_target (struct arm_build_target *target,
 	  /* Ignore any bits that are quirk bits.  */
 	  bitmap_and_compl (isa_delta, isa_delta, isa_quirkbits);
 	  /* Ignore (for now) any bits that might be set by -mfpu.  */
-	  bitmap_and_compl (isa_delta, isa_delta, isa_all_fpubits);
+	  bitmap_and_compl (isa_delta, isa_delta, isa_all_fpubits_internal);
+
+	  /* And if the target ISA lacks floating point, ignore any
+	     extensions that depend on that.  */
+	  if (!bitmap_bit_p (target->isa, isa_bit_vfpv2))
+	    bitmap_and_compl (isa_delta, isa_delta, isa_all_fpbits);
 
 	  if (!bitmap_empty_p (isa_delta))
 	    {
@@ -3341,9 +3343,14 @@ arm_configure_build_target (struct arm_build_target *target,
       auto_sbitmap fpu_bits (isa_num_bits);
 
       arm_initialize_isa (fpu_bits, arm_selected_fpu->isa_bits);
-      bitmap_and_compl (target->isa, target->isa, isa_all_fpubits);
+      bitmap_and_compl (target->isa, target->isa, isa_all_fpubits_internal);
       bitmap_ior (target->isa, target->isa, fpu_bits);
     }
+
+  /* If we have the soft-float ABI, clear any feature bits relating to use of
+     floating-point operations.  They'll just confuse things later on.  */
+  if (arm_float_abi == ARM_FLOAT_ABI_SOFT)
+    bitmap_and_compl (target->isa, target->isa, isa_all_fpbits);
 
   if (!arm_selected_tune)
     arm_selected_tune = arm_selected_cpu;
@@ -3353,6 +3360,8 @@ arm_configure_build_target (struct arm_build_target *target,
   const cpu_tune *tune_data = &all_tunes[arm_selected_tune - all_cores];
 
   /* Finish initializing the target structure.  */
+  if (!target->arch_name)
+    target->arch_name = arm_selected_arch->common.name;
   target->arch_pp_name = arm_selected_arch->arch;
   target->base_arch = arm_selected_arch->base_arch;
   target->profile = arm_selected_arch->profile;
@@ -3360,23 +3369,26 @@ arm_configure_build_target (struct arm_build_target *target,
   target->tune_flags = tune_data->tune_flags;
   target->tune = tune_data->tune;
   target->tune_core = tune_data->scheduler;
-  arm_option_reconfigure_globals ();
 }
 
 /* Fix up any incompatible options that the user has specified.  */
 static void
 arm_option_override (void)
 {
-  static const enum isa_feature fpu_bitlist[]
+  static const enum isa_feature fpu_bitlist_internal[]
     = { ISA_ALL_FPU_INTERNAL, isa_nobit };
+  static const enum isa_feature fp_bitlist[]
+    = { ISA_ALL_FP, isa_nobit };
   static const enum isa_feature quirk_bitlist[] = { ISA_ALL_QUIRKS, isa_nobit};
   cl_target_option opts;
 
   isa_quirkbits = sbitmap_alloc (isa_num_bits);
   arm_initialize_isa (isa_quirkbits, quirk_bitlist);
 
-  isa_all_fpubits = sbitmap_alloc (isa_num_bits);
-  arm_initialize_isa (isa_all_fpubits, fpu_bitlist);
+  isa_all_fpubits_internal = sbitmap_alloc (isa_num_bits);
+  isa_all_fpbits = sbitmap_alloc (isa_num_bits);
+  arm_initialize_isa (isa_all_fpubits_internal, fpu_bitlist_internal);
+  arm_initialize_isa (isa_all_fpbits, fp_bitlist);
 
   arm_active_target.isa = sbitmap_alloc (isa_num_bits);
 
@@ -3392,8 +3404,7 @@ arm_option_override (void)
     }
 
   cl_target_option_save (&opts, &global_options);
-  arm_configure_build_target (&arm_active_target, &opts, &global_options_set,
-			      true);
+  arm_configure_build_target (&arm_active_target, &opts, true);
 
 #ifdef SUBTARGET_OVERRIDE_OPTIONS
   SUBTARGET_OVERRIDE_OPTIONS;
@@ -26654,20 +26665,65 @@ arm_print_tune_info (void)
 	       (int) current_tune->sched_autopref);
 }
 
+/* The last set of target options used to emit .arch directives, etc.  This
+   could be a function-local static if it were not required to expose it as a
+   root to the garbage collector.  */
+static GTY(()) cl_target_option *last_asm_targ_options = NULL;
+
 /* Print .arch and .arch_extension directives corresponding to the
    current architecture configuration.  */
 static void
-arm_print_asm_arch_directives ()
+arm_print_asm_arch_directives (FILE *stream, cl_target_option *targ_options)
 {
+  arm_build_target build_target;
+  /* If the target options haven't changed since the last time we were called
+     there is nothing to do.  This should be sufficient to suppress the
+     majority of redundant work.  */
+  if (last_asm_targ_options == targ_options)
+    return;
+
+  last_asm_targ_options = targ_options;
+
+  build_target.isa = sbitmap_alloc (isa_num_bits);
+  arm_configure_build_target (&build_target, targ_options, false);
+
+  if (build_target.core_name
+      && !bitmap_bit_p (build_target.isa, isa_bit_quirk_no_asmcpu))
+    {
+      const char* truncated_name
+	= arm_rewrite_selected_cpu (build_target.core_name);
+      asm_fprintf (stream, "\t.cpu %s\n", truncated_name);
+    }
+
   const arch_option *arch
     = arm_parse_arch_option_name (all_architectures, "-march",
-				  arm_active_target.arch_name);
+				  build_target.arch_name);
   auto_sbitmap opt_bits (isa_num_bits);
 
   gcc_assert (arch);
 
-  asm_fprintf (asm_out_file, "\t.arch %s\n", arm_active_target.arch_name);
-  arm_last_printed_arch_string = arm_active_target.arch_name;
+  if (strcmp (build_target.arch_name, "armv7ve") == 0)
+    {
+      /* Keep backward compatability for assemblers which don't support
+	 armv7ve.  Fortunately, none of the following extensions are reset
+	 by a .fpu directive.  */
+      asm_fprintf (stream, "\t.arch armv7-a\n");
+      asm_fprintf (stream, "\t.arch_extension virt\n");
+      asm_fprintf (stream, "\t.arch_extension idiv\n");
+      asm_fprintf (stream, "\t.arch_extension sec\n");
+      asm_fprintf (stream, "\t.arch_extension mp\n");
+    }
+  else
+    asm_fprintf (stream, "\t.arch %s\n", build_target.arch_name);
+
+  /* The .fpu directive will reset any architecture extensions from the
+     assembler that relate to the fp/vector extensions.  So put this out before
+     any .arch_extension directives.  */
+  const char *fpu_name = (TARGET_SOFT_FLOAT
+			  ? "softvfp"
+			  : arm_identify_fpu_from_isa (build_target.isa));
+  asm_fprintf (stream, "\t.fpu %s\n", fpu_name);
+
   if (!arch->common.extensions)
     return;
 
@@ -26679,13 +26735,12 @@ arm_print_asm_arch_directives ()
 	{
 	  arm_initialize_isa (opt_bits, opt->isa_bits);
 
-	  /* If every feature bit of this option is set in the target
-	     ISA specification, print out the option name.  However,
-	     don't print anything if all the bits are part of the
-	     FPU specification.  */
-	  if (bitmap_subset_p (opt_bits, arm_active_target.isa)
-	      && !bitmap_subset_p (opt_bits, isa_all_fpubits))
-	    asm_fprintf (asm_out_file, "\t.arch_extension %s\n", opt->name);
+	  /* If every feature bit of this option is set in the target ISA
+	     specification, print out the option name.  However, don't print
+	     anything if all the bits are part of the FPU specification.  */
+	  if (bitmap_subset_p (opt_bits, build_target.isa)
+	      && !bitmap_subset_p (opt_bits, isa_all_fpubits_internal))
+	    asm_fprintf (stream, "\t.arch_extension %s\n", opt->name);
 	}
     }
 }
@@ -26695,42 +26750,23 @@ arm_file_start (void)
 {
   int val;
 
+  arm_print_asm_arch_directives
+    (asm_out_file, TREE_TARGET_OPTION (target_option_default_node));
+
   if (TARGET_BPABI)
     {
-      /* We don't have a specified CPU.  Use the architecture to
-	 generate the tags.
-
-	 Note: it might be better to do this unconditionally, then the
-	 assembler would not need to know about all new CPU names as
-	 they are added.  */
-      if (!arm_active_target.core_name)
-	{
-	  /* armv7ve doesn't support any extensions.  */
-	  if (strcmp (arm_active_target.arch_name, "armv7ve") == 0)
-	    {
-	      /* Keep backward compatability for assemblers
-		 which don't support armv7ve.  */
-	      asm_fprintf (asm_out_file, "\t.arch armv7-a\n");
-	      asm_fprintf (asm_out_file, "\t.arch_extension virt\n");
-	      asm_fprintf (asm_out_file, "\t.arch_extension idiv\n");
-	      asm_fprintf (asm_out_file, "\t.arch_extension sec\n");
-	      asm_fprintf (asm_out_file, "\t.arch_extension mp\n");
-	      arm_last_printed_arch_string = "armv7ve";
-	    }
-	  else
-	    arm_print_asm_arch_directives ();
-	}
-      else if (strncmp (arm_active_target.core_name, "generic", 7) == 0)
-	{
-	  asm_fprintf (asm_out_file, "\t.arch %s\n",
-		       arm_active_target.core_name + 8);
-	  arm_last_printed_arch_string = arm_active_target.core_name + 8;
-	}
-      else
+      /* If we have a named cpu, but we the assembler does not support that
+	 name via .cpu, put out a cpu name attribute; but don't do this if the
+	 name starts with the fictitious prefix, 'generic'.  */
+      if (arm_active_target.core_name
+	  && bitmap_bit_p (arm_active_target.isa, isa_bit_quirk_no_asmcpu)
+	  && strncmp (arm_active_target.core_name, "generic", 7) != 0)
 	{
 	  const char* truncated_name
 	    = arm_rewrite_selected_cpu (arm_active_target.core_name);
-	  asm_fprintf (asm_out_file, "\t.cpu %s\n", truncated_name);
+	  if (bitmap_bit_p (arm_active_target.isa, isa_bit_quirk_no_asmcpu))
+	    asm_fprintf (asm_out_file, "\t.eabi_attribute 5, \"%s\"\n",
+			 truncated_name);
 	}
 
       if (print_tune_info)
@@ -26797,6 +26833,13 @@ static void
 arm_file_end (void)
 {
   int regno;
+
+  /* Just in case the last function output in the assembler had non-default
+     architecture directives, we force the assembler state back to the default
+     set, so that any 'calculated' build attributes are based on the default
+     options rather than the special options for that function.  */
+  arm_print_asm_arch_directives
+    (asm_out_file, TREE_TARGET_OPTION (target_option_default_node));
 
   if (NEED_INDICATE_EXEC_STACK)
     /* Add .note.GNU-stack.  */
@@ -30938,10 +30981,8 @@ arm_can_inline_p (tree caller, tree callee)
   caller_target.isa = sbitmap_alloc (isa_num_bits);
   callee_target.isa = sbitmap_alloc (isa_num_bits);
 
-  arm_configure_build_target (&caller_target, caller_opts, &global_options_set,
-			      false);
-  arm_configure_build_target (&callee_target, callee_opts, &global_options_set,
-			      false);
+  arm_configure_build_target (&caller_target, caller_opts, false);
+  arm_configure_build_target (&callee_target, callee_opts, false);
   if (!bitmap_subset_p (callee_target.isa, caller_target.isa))
     can_inline = false;
 
@@ -31073,7 +31114,7 @@ arm_valid_target_attribute_tree (tree args, struct gcc_options *opts,
     return NULL_TREE;
 
   cl_target_option_save (&cl_opts, opts);
-  arm_configure_build_target (&arm_active_target, &cl_opts, opts_set, false);
+  arm_configure_build_target (&arm_active_target, &cl_opts, false);
   arm_option_check_internal (opts);
   /* Do any overrides, such as global options arch=xxx.
      We do this since arm_active_target was overridden.  */
@@ -31188,7 +31229,7 @@ arm_identify_fpu_from_isa (sbitmap isa)
   auto_sbitmap fpubits (isa_num_bits);
   auto_sbitmap cand_fpubits (isa_num_bits);
 
-  bitmap_and (fpubits, isa, isa_all_fpubits);
+  bitmap_and (fpubits, isa, isa_all_fpubits_internal);
 
   /* If there are no ISA feature bits relating to the FPU, we must be
      doing soft-float.  */
@@ -31219,44 +31260,7 @@ arm_declare_function_name (FILE *stream, const char *name, tree decl)
     targ_options = TREE_TARGET_OPTION (target_option_current_node);
   gcc_assert (targ_options);
 
-  /* Only update the assembler .arch string if it is distinct from the last
-     such string we printed. arch_to_print is set conditionally in case
-     targ_options->x_arm_arch_string is NULL which can be the case
-     when cc1 is invoked directly without passing -march option.  */
-  std::string arch_to_print;
-  if (targ_options->x_arm_arch_string)
-    arch_to_print = targ_options->x_arm_arch_string;
-
-  if (arch_to_print != arm_last_printed_arch_string)
-    {
-      std::string arch_name
-	= arch_to_print.substr (0, arch_to_print.find ("+"));
-      asm_fprintf (asm_out_file, "\t.arch %s\n", arch_name.c_str ());
-      const arch_option *arch
-	= arm_parse_arch_option_name (all_architectures, "-march",
-				      targ_options->x_arm_arch_string);
-      auto_sbitmap opt_bits (isa_num_bits);
-
-      gcc_assert (arch);
-      if (arch->common.extensions)
-	{
-	  for (const struct cpu_arch_extension *opt = arch->common.extensions;
-	       opt->name != NULL;
-	       opt++)
-	    {
-	      if (!opt->remove)
-		{
-		  arm_initialize_isa (opt_bits, opt->isa_bits);
-		  if (bitmap_subset_p (opt_bits, arm_active_target.isa)
-		      && !bitmap_subset_p (opt_bits, isa_all_fpubits))
-		    asm_fprintf (asm_out_file, "\t.arch_extension %s\n",
-				 opt->name);
-		}
-	     }
-	}
-
-      arm_last_printed_arch_string = arch_to_print;
-    }
+  arm_print_asm_arch_directives (stream, targ_options);
 
   fprintf (stream, "\t.syntax unified\n");
 
@@ -31273,16 +31277,6 @@ arm_declare_function_name (FILE *stream, const char *name, tree decl)
     }
   else
     fprintf (stream, "\t.arm\n");
-
-  std::string fpu_to_print
-    = TARGET_SOFT_FLOAT
-	? "softvfp" : arm_identify_fpu_from_isa (arm_active_target.isa);
-
-  if (fpu_to_print != arm_last_printed_arch_string)
-    {
-      asm_fprintf (asm_out_file, "\t.fpu %s\n", fpu_to_print.c_str ());
-      arm_last_printed_fpu_string = fpu_to_print;
-    }
 
   if (TARGET_POKE_FUNCTION_NAME)
     arm_poke_function_name (stream, (const char *) name);
@@ -31934,28 +31928,28 @@ arm_test_cpu_arch_data (void)
 static void
 arm_test_fpu_data (void)
 {
-  auto_sbitmap isa_all_fpubits (isa_num_bits);
+  auto_sbitmap isa_all_fpubits_internal (isa_num_bits);
   auto_sbitmap fpubits (isa_num_bits);
   auto_sbitmap tmpset (isa_num_bits);
 
-  static const enum isa_feature fpu_bitlist[]
+  static const enum isa_feature fpu_bitlist_internal[]
     = { ISA_ALL_FPU_INTERNAL, isa_nobit };
-  arm_initialize_isa (isa_all_fpubits, fpu_bitlist);
+  arm_initialize_isa (isa_all_fpubits_internal, fpu_bitlist_internal);
 
   for (unsigned int i = 0; i < TARGET_FPU_auto; i++)
   {
     arm_initialize_isa (fpubits, all_fpus[i].isa_bits);
-    bitmap_and_compl (tmpset, isa_all_fpubits, fpubits);
-    bitmap_clear (isa_all_fpubits);
-    bitmap_copy (isa_all_fpubits, tmpset);
+    bitmap_and_compl (tmpset, isa_all_fpubits_internal, fpubits);
+    bitmap_clear (isa_all_fpubits_internal);
+    bitmap_copy (isa_all_fpubits_internal, tmpset);
   }
 
-  if (!bitmap_empty_p (isa_all_fpubits))
+  if (!bitmap_empty_p (isa_all_fpubits_internal))
     {
 	fprintf (stderr, "Error: found feature bits in the ALL_FPU_INTERAL"
 			 " group that are not defined by any FPU.\n"
 			 "       Check your arm-cpus.in.\n");
-	ASSERT_TRUE (bitmap_empty_p (isa_all_fpubits));
+	ASSERT_TRUE (bitmap_empty_p (isa_all_fpubits_internal));
     }
 }
 
