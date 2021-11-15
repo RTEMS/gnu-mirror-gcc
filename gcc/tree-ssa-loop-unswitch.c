@@ -37,6 +37,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-iterator.h"
 #include "cfghooks.h"
 #include "tree-ssa-loop-manip.h"
+#include "tree-pretty-print.h"
+#include "gimple-range.h"
 
 /* This file implements the loop unswitching, i.e. transformation of loops like
 
@@ -74,9 +76,24 @@ along with GCC; see the file COPYING3.  If not see
    tree-ssa-loop-im.c ensures that all the suitable conditions are in this
    shape.  */
 
+/* A tuple that holds GIMPLE condition and value range for an unswitching
+   predicate.  */
+
+struct unswitch_predicate
+{
+  /* Default constructor.  */
+  unswitch_predicate (tree cond)
+  : condition (cond), range ()
+  {}
+
+  tree condition;
+  int_range_max range;
+};
+
 static class loop *tree_unswitch_loop (class loop *, basic_block, tree);
-static bool tree_unswitch_single_loop (class loop *, int);
-static tree tree_may_unswitch_on (basic_block, class loop *);
+static bool tree_unswitch_single_loop (class loop *, int, gimple_ranger *);
+static unswitch_predicate *tree_may_unswitch_on (basic_block, class loop *,
+						 gimple_ranger *);
 static bool tree_unswitch_outer_loop (class loop *);
 static edge find_loop_guard (class loop *);
 static bool empty_bb_without_guard_p (class loop *, basic_block);
@@ -92,15 +109,19 @@ tree_ssa_unswitch_loops (void)
 {
   bool changed = false;
 
+  gimple_ranger *ranger = enable_ranger (cfun);
+
   /* Go through all loops starting from innermost.  */
   for (auto loop : loops_list (cfun, LI_FROM_INNERMOST))
     {
       if (!loop->inner)
 	/* Unswitch innermost loop.  */
-	changed |= tree_unswitch_single_loop (loop, 0);
+	changed |= tree_unswitch_single_loop (loop, 0, ranger);
       else
 	changed |= tree_unswitch_outer_loop (loop);
     }
+
+  disable_ranger (cfun);
 
   if (changed)
     return TODO_cleanup_cfg;
@@ -182,10 +203,11 @@ is_maybe_undefined (const tree name, gimple *stmt, class loop *loop)
 }
 
 /* Checks whether we can unswitch LOOP on condition at end of BB -- one of its
-   basic blocks (for what it means see comments below).  */
+   basic blocks (for what it means see comments below).
+   RANGER is gimple ranger used in this pass.  */
 
-static tree
-tree_may_unswitch_on (basic_block bb, class loop *loop)
+static unswitch_predicate *
+tree_may_unswitch_on (basic_block bb, class loop *loop, gimple_ranger *ranger)
 {
   gimple *last, *def;
   gcond *stmt;
@@ -196,14 +218,14 @@ tree_may_unswitch_on (basic_block bb, class loop *loop)
   /* BB must end in a simple conditional jump.  */
   last = last_stmt (bb);
   if (!last || gimple_code (last) != GIMPLE_COND)
-    return NULL_TREE;
+    return NULL;
   stmt = as_a <gcond *> (last);
 
   /* To keep the things simple, we do not directly remove the conditions,
      but just replace tests with 0 != 0 resp. 1 != 0.  Prevent the infinite
      loop where we would unswitch again on such a condition.  */
   if (gimple_cond_true_p (stmt) || gimple_cond_false_p (stmt))
-    return NULL_TREE;
+    return NULL;
 
   /* Condition must be invariant.  */
   FOR_EACH_SSA_TREE_OPERAND (use, stmt, iter, SSA_OP_USE)
@@ -212,27 +234,29 @@ tree_may_unswitch_on (basic_block bb, class loop *loop)
       def_bb = gimple_bb (def);
       if (def_bb
 	  && flow_bb_inside_loop_p (loop, def_bb))
-	return NULL_TREE;
+	return NULL;
       /* Unswitching on undefined values would introduce undefined
 	 behavior that the original program might never exercise.  */
       if (is_maybe_undefined (use, stmt, loop))
-	return NULL_TREE;
+	return NULL;
     }
 
   cond = build2 (gimple_cond_code (stmt), boolean_type_node,
 		 gimple_cond_lhs (stmt), gimple_cond_rhs (stmt));
 
-  return cond;
+  unswitch_predicate *predicate = new unswitch_predicate (cond);
+  ranger->range_of_expr (predicate->range, gimple_cond_lhs (stmt), stmt);
+  return predicate;
 }
 
-/* Simplifies COND using checks in front of the entry of the LOOP.  Just very
-   simplish (sufficient to prevent us from duplicating loop in unswitching
-   unnecessarily).  */
+/* Simplifies COND using checks in front of the entry of the LOOP.
+   Utilize both symbolic expressions and value ranges calculated by Ranger.  */
 
 static tree
-simplify_using_entry_checks (class loop *loop, tree cond)
+simplify_using_entry_checks (class loop *loop, unswitch_predicate *predicate)
 {
   edge e = loop_preheader_edge (loop);
+  tree cond = predicate->condition;
   gimple *stmt;
 
   while (1)
@@ -240,35 +264,45 @@ simplify_using_entry_checks (class loop *loop, tree cond)
       stmt = last_stmt (e->src);
       if (stmt
 	  && gimple_code (stmt) == GIMPLE_COND
-	  && gimple_cond_code (stmt) == TREE_CODE (cond)
 	  && operand_equal_p (gimple_cond_lhs (stmt),
-			      TREE_OPERAND (cond, 0), 0)
-	  && operand_equal_p (gimple_cond_rhs (stmt),
-			      TREE_OPERAND (cond, 1), 0))
-	return (e->flags & EDGE_TRUE_VALUE
-		? boolean_true_node
-		: boolean_false_node);
+			      TREE_OPERAND (cond, 0), 0))
+	{
+	  if (gimple_cond_code (stmt) == TREE_CODE (cond)
+	      && operand_equal_p (gimple_cond_rhs (stmt),
+				  TREE_OPERAND (cond, 1), 0))
+	    return (e->flags & EDGE_TRUE_VALUE
+		    ? boolean_true_node
+		    : boolean_false_node);
+	  else
+	    {
+	      int_range_max r;
+	      if (!predicate->range.undefined_p ()
+		  && fold_range (r, stmt, predicate->range)
+		  && r.singleton_p ())
+		return r.zero_p () ? boolean_true_node : boolean_false_node;
+	    }
+	}
 
       if (!single_pred_p (e->src))
-	return cond;
+	return NULL_TREE;
 
       e = single_pred_edge (e->src);
       if (e->src == ENTRY_BLOCK_PTR_FOR_FN (cfun))
-	return cond;
+	return NULL_TREE;
     }
 }
 
 /* Unswitch single LOOP.  NUM is number of unswitchings done; we do not allow
    it to grow too much, it is too easy to create example on that the code would
-   grow exponentially.  */
+   grow exponentially.  RANGER is gimple ranger used in this pass.  */
 
 static bool
-tree_unswitch_single_loop (class loop *loop, int num)
+tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger)
 {
   basic_block *bbs;
   class loop *nloop;
   unsigned i, found;
-  tree cond = NULL_TREE;
+  unswitch_predicate *predicate = NULL;
   gimple *stmt;
   bool changed = false;
   HOST_WIDE_INT iterations;
@@ -314,7 +348,7 @@ tree_unswitch_single_loop (class loop *loop, int num)
     {
       /* Find a bb to unswitch on.  */
       for (; i < loop->num_nodes; i++)
-	if ((cond = tree_may_unswitch_on (bbs[i], loop)))
+	if ((predicate = tree_may_unswitch_on (bbs[i], loop, ranger)))
 	  break;
 
       if (i == loop->num_nodes)
@@ -332,20 +366,22 @@ tree_unswitch_single_loop (class loop *loop, int num)
 	  break;
 	}
 
-      cond = simplify_using_entry_checks (loop, cond);
+      tree folded = simplify_using_entry_checks (loop, predicate);
       stmt = last_stmt (bbs[i]);
-      if (integer_nonzerop (cond))
+      if (folded != NULL_TREE && integer_nonzerop (folded))
 	{
 	  /* Remove false path.  */
 	  gimple_cond_set_condition_from_tree (as_a <gcond *> (stmt),
 					       boolean_true_node);
+	  delete predicate;
 	  changed = true;
 	}
-      else if (integer_zerop (cond))
+      else if (folded != NULL_TREE && integer_zerop (folded))
 	{
 	  /* Remove true path.  */
 	  gimple_cond_set_condition_from_tree (as_a <gcond *> (stmt),
 					       boolean_false_node);
+	  delete predicate;
 	  changed = true;
 	}
       /* Do not unswitch too much.  */
@@ -429,7 +465,7 @@ tree_unswitch_single_loop (class loop *loop, int num)
       /* Find a bb to unswitch on.  */
       for (; found < loop->num_nodes; found++)
 	if ((bbs[found]->flags & BB_REACHABLE)
-	    && (cond = tree_may_unswitch_on (bbs[found], loop)))
+	    && (predicate = tree_may_unswitch_on (bbs[found], loop, ranger)))
 	  break;
 
       if (found == loop->num_nodes)
@@ -440,11 +476,16 @@ tree_unswitch_single_loop (class loop *loop, int num)
     }
 
   if (dump_file && (dump_flags & TDF_DETAILS))
-    fprintf (dump_file, ";; Unswitching loop\n");
+    {
+      fprintf (dump_file, ";; Unswitching loop with condition: ");
+      print_generic_expr (dump_file, predicate->condition);
+      fprintf (dump_file, "\n");
+    }
 
   initialize_original_copy_tables ();
   /* Unswitch the loop on this condition.  */
-  nloop = tree_unswitch_loop (loop, bbs[found], cond);
+  nloop = tree_unswitch_loop (loop, bbs[found], predicate->condition);
+  delete predicate;
   if (!nloop)
     {
       free_original_copy_tables ();
@@ -457,8 +498,8 @@ tree_unswitch_single_loop (class loop *loop, int num)
   free_original_copy_tables ();
 
   /* Invoke itself on modified loops.  */
-  tree_unswitch_single_loop (nloop, num + 1);
-  tree_unswitch_single_loop (loop, num + 1);
+  tree_unswitch_single_loop (nloop, num + 1, ranger);
+  tree_unswitch_single_loop (loop, num + 1, ranger);
   free (bbs);
   return true;
 }
