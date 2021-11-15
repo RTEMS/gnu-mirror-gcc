@@ -307,11 +307,10 @@ tree_unswitch_single_loop (class loop *loop, int num)
 	}
     }
 
-  i = 0;
   bbs = get_loop_body (loop);
   found = loop->num_nodes;
 
-  while (1)
+  for (unsigned i = 0; true; i++)
     {
       /* Find a bb to unswitch on.  */
       for (; i < loop->num_nodes; i++)
@@ -351,10 +350,7 @@ tree_unswitch_single_loop (class loop *loop, int num)
 	}
       /* Do not unswitch too much.  */
       else if (num > param_max_unswitch_level)
-	{
-	  i++;
-	  continue;
-	}
+	continue;
       /* In nested tree_unswitch_single_loop first optimize all conditions
 	 using entry checks, then discover still reachable blocks in the
 	 loop and find the condition only among those still reachable bbs.  */
@@ -362,7 +358,6 @@ tree_unswitch_single_loop (class loop *loop, int num)
 	{
 	  if (found == loop->num_nodes)
 	    found = i;
-	  i++;
 	  continue;
 	}
       else
@@ -372,7 +367,6 @@ tree_unswitch_single_loop (class loop *loop, int num)
 	}
 
       update_stmt (stmt);
-      i++;
     }
 
   if (num != 0)
