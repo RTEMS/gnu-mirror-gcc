@@ -366,10 +366,7 @@ tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger,
 	    fprintf (dump_file, ";; Not unswitching anymore, hit max level\n");
 
 	  if (found == loop->num_nodes)
-	    {
-	      free (bbs);
-	      return changed;
-	    }
+	    goto exit;
 	  break;
 	}
 
@@ -382,6 +379,7 @@ tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger,
 	  gimple_cond_set_condition_from_tree (as_a <gcond *> (stmt),
 					       boolean_true_node);
 	  delete predicate;
+	  predicate = NULL;
 	  changed = true;
 	}
       else if (folded != NULL_TREE && integer_zerop (folded))
@@ -390,6 +388,7 @@ tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger,
 	  gimple_cond_set_condition_from_tree (as_a <gcond *> (stmt),
 					       boolean_false_node);
 	  delete predicate;
+	  predicate = NULL;
 	  changed = true;
 	}
       /* Do not unswitch too much.  */
@@ -477,11 +476,7 @@ tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger,
 	  break;
 
       if (found == loop->num_nodes)
-	{
-	  free (bbs);
-	  delete predicate;
-	  return changed;
-	}
+	goto exit;
     }
 
   if (dump_file && (dump_flags & TDF_DETAILS))
@@ -497,9 +492,7 @@ tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger,
   if (!nloop)
     {
       free_original_copy_tables ();
-      delete predicate;
-      free (bbs);
-      return changed;
+      goto exit;
     }
 
   /* Update the SSA form after unswitching.  */
@@ -512,6 +505,11 @@ tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger,
   delete predicate;
   free (bbs);
   return true;
+
+exit:
+  free (bbs);
+  delete predicate;
+  return changed;
 }
 
 /* Unswitch a LOOP w.r. to given basic block UNSWITCH_ON.  We only support
