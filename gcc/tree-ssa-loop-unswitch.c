@@ -244,15 +244,20 @@ tree_may_unswitch_on (basic_block bb, class loop *loop, gimple_ranger *ranger)
 	return NULL;
     }
 
-  cond = build2 (gimple_cond_code (stmt), boolean_type_node,
-		 gimple_cond_lhs (stmt), gimple_cond_rhs (stmt));
+  tree lhs = gimple_cond_lhs (stmt);
+  tree rhs = gimple_cond_rhs (stmt);
 
+  cond = build2 (gimple_cond_code (stmt), boolean_type_node, lhs, rhs);
   edge edge_true, edge_false;
   extract_true_false_edges_from_block (bb, &edge_true, &edge_false);
 
   unswitch_predicate *predicate = new unswitch_predicate (stmt, cond);
-  ranger->range_on_edge (predicate->true_range, edge_true, gimple_cond_lhs (stmt));
-  ranger->range_on_edge (predicate->false_range, edge_false, gimple_cond_lhs (stmt));
+  if (irange::supports_type_p (TREE_TYPE (lhs)))
+    {
+      ranger->range_on_edge (predicate->true_range, edge_true, lhs);
+      ranger->range_on_edge (predicate->false_range, edge_false, rhs);
+    }
+
   return predicate;
 }
 
@@ -278,7 +283,7 @@ simplify_using_entry_checks (unswitch_predicate *predicate,
 	      && operand_equal_p (gimple_cond_rhs (stmt),
 				  TREE_OPERAND (cond, 1), 0))
 	    return true_edge ? boolean_true_node : boolean_false_node;
-	  else
+	  else if (irange::supports_type_p (TREE_TYPE (gimple_cond_lhs (stmt))))
 	    {
 	      int_range_max r;
 	      irange &parent_range = (true_edge ? parent_predicate->true_range :
