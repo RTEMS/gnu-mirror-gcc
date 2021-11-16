@@ -39,6 +39,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa-loop-manip.h"
 #include "tree-pretty-print.h"
 #include "gimple-range.h"
+#include "dbgcnt.h"
 
 /* This file implements the loop unswitching, i.e. transformation of loops like
 
@@ -255,7 +256,7 @@ tree_may_unswitch_on (basic_block bb, class loop *loop, gimple_ranger *ranger)
   if (irange::supports_type_p (TREE_TYPE (lhs)))
     {
       ranger->range_on_edge (predicate->true_range, edge_true, lhs);
-      ranger->range_on_edge (predicate->false_range, edge_false, rhs);
+      ranger->range_on_edge (predicate->false_range, edge_false, lhs);
     }
 
   return predicate;
@@ -478,6 +479,9 @@ tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger,
       if (found == loop->num_nodes)
 	goto exit;
     }
+
+  if (!dbg_cnt (loop_unswitch))
+    goto exit;
 
   if (dump_file && (dump_flags & TDF_DETAILS))
     {
