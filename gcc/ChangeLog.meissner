@@ -1,3 +1,35 @@
+work074.patch03:
+2021-11-15  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Use
+	absolute addresses in switch tables if power10 zero cycle move
+	fusion is enabled.
+
+work074.patch02:
+2021-11-15  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Enable
+	power10 fusion if -mtune=power10.
+	(rs6000_opt_masks): Add power10 fusion options.
+
+work074.patch01:
+2021-11-15  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/rs6000-cpus.def (ISA_3_1_MASKS_SERVER): Add
+	support for -mpower10-fusion-zero-cycle.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal):
+	Likewise.
+	* config/rs6000/rs6000.md (indirect_jump): Support zero cycle
+	moves.
+	(indirect_jump<mode>_zero_cycle): New insns.
+	(tablejump<mode>_normal): Likewise.
+	(tablejump<mode>_absolute): Likewise.
+	(tablejump<mode>_insn_zero_cycle): New insn.
+	* config/rs6000/rs6000.opt (-mpower10-fusion-zero-cycle): New
+	debug switch.
+
+
 2021-11-15   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
