@@ -6141,7 +6141,7 @@ decl_piece_varloc_ptr (rtx piece)
 static rtx_expr_list *
 decl_piece_node (rtx loc_note, HOST_WIDE_INT bitsize, rtx next)
 {
-  if (bitsize > 0 && bitsize <= (int) MAX_MACHINE_MODE)
+  if (bitsize > 0 && bitsize < (int) MAX_MACHINE_MODE)
     return alloc_EXPR_LIST (bitsize, loc_note, next);
   else
     return alloc_EXPR_LIST (0, gen_rtx_CONCAT (VOIDmode,
