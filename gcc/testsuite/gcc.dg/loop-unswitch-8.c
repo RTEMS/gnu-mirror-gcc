@@ -28,4 +28,4 @@ foo(double *a, double *b, double *c, double *d, double *r, int size, int order)
   return 0;
 }
 
-/* { dg-final { scan-tree-dump-times ";; Unswitching loop with condition: order" 1 "unswitch" } } */
+/* { dg-final { scan-tree-dump-times ";; Unswitching loop with condition: order" 3 "unswitch" } } */
