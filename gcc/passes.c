@@ -63,6 +63,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "diagnostic-core.h" /* for fnotice */
 #include "stringpool.h"
 #include "attribs.h"
+#include <cstdio>
 
 using namespace gcc;
 
@@ -2565,6 +2566,11 @@ execute_one_pass (opt_pass *pass)
 
   /* Do it!  */
   todo_after = pass->execute (cfun);
+  if (getenv ("DEBUG") && cfun && cfun->decl)
+    {
+      fprintf (stderr, "=== %s-%d ===\n", pass->name, pass->static_pass_number);
+      debug_function (cfun->decl, TDF_DETAILS);
+    }
 
   if (todo_after & TODO_discard_function)
     {
