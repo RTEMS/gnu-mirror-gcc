@@ -253,7 +253,7 @@ tree_may_unswitch_on (basic_block bb, class loop *loop, gimple_ranger *ranger)
   extract_true_false_edges_from_block (bb, &edge_true, &edge_false);
 
   unswitch_predicate *predicate = new unswitch_predicate (stmt, cond);
-  if (irange::supports_type_p (TREE_TYPE (lhs)))
+  if (irange::supports_type_p (TREE_TYPE (lhs)) && CONSTANT_CLASS_P (rhs))
     {
       ranger->range_on_edge (predicate->true_range, edge_true, lhs);
       predicate->false_range = predicate->true_range;
