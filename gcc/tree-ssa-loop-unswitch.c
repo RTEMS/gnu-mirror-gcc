@@ -256,7 +256,11 @@ tree_may_unswitch_on (basic_block bb, class loop *loop, gimple_ranger *ranger)
   if (irange::supports_type_p (TREE_TYPE (lhs)))
     {
       ranger->range_on_edge (predicate->true_range, edge_true, lhs);
-      ranger->range_on_edge (predicate->false_range, edge_false, lhs);
+      predicate->false_range = predicate->true_range;
+
+      if (!predicate->false_range.varying_p ()
+	  && !predicate->false_range.undefined_p ())
+	predicate->false_range.invert ();
     }
 
   return predicate;
