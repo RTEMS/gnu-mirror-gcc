@@ -208,7 +208,8 @@ is_maybe_undefined (const tree name, gimple *stmt, class loop *loop)
 
 /* Checks whether we can unswitch LOOP on condition at end of BB -- one of its
    basic blocks (for what it means see comments below).
-   RANGER is gimple ranger used in this pass.  */
+   RANGER is gimple ranger used in this pass and unswitch_predicate is returned
+   if there is an opportunity for unswitching.  */
 
 static unswitch_predicate *
 tree_may_unswitch_on (basic_block bb, class loop *loop, gimple_ranger *ranger)
