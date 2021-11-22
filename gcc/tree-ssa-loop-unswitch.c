@@ -303,7 +303,10 @@ simplify_using_entry_checks (unswitch_predicate *predicate,
   return NULL_TREE;
 }
 
-/* Find all unswitching predicates.  */
+/* Find all unswitching predicates for a LOOP that contains BBS.
+   TRUE_EDGE distinguish which PARENT_PREDICATE should be used when
+   asking RANGER infrastructure.  Return unswitch_predicate in the provided
+   CANDIDATES vector.  */
 
 static bool
 find_all_unswitching_predicates (class loop *loop, basic_block *bbs,
@@ -345,6 +348,11 @@ find_all_unswitching_predicates (class loop *loop, basic_block *bbs,
 
   return changed;
 }
+
+/* Evaluate how many instructions will be executed if we unswitch
+   LOOP (with BBS) based on PREDICATE.  TRUE_EDGE distinguishes if
+   we calculate taken or not taken edge when asking RANGER.
+   REACHABLE_FLAG is used for marking of the basic blocks.  */
 
 static unsigned
 evaluate_insns (class loop *loop,  basic_block *bbs,
@@ -420,17 +428,20 @@ evaluate_insns (class loop *loop,  basic_block *bbs,
   return size;
 }
 
+/* Evaluate how many instruction will we have if we unswitch LOOP (with BBS)
+   based on CANDIDATE predicate (using RANGER infrastructure).  */
+
 static unsigned
 evaluate_loop_insns_for_predicate (class loop *loop, basic_block *bbs,
 				   gimple_ranger *ranger,
 				   unswitch_predicate *candidate)
 {
-  auto_bb_flag reachable_true (cfun), reachable_false (cfun);
+  auto_bb_flag reachable_flag (cfun);
 
   unsigned true_loop_cost = evaluate_insns (loop, bbs, candidate, true,
-					    ranger, reachable_true);
+					    ranger, reachable_flag);
   unsigned false_loop_cost = evaluate_insns (loop, bbs, candidate, false,
-					     ranger, reachable_false);
+					     ranger, reachable_flag);
 
   return true_loop_cost + false_loop_cost;
 }
