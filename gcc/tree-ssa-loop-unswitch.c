@@ -334,6 +334,7 @@ find_all_unswitching_predicates (class loop *loop, basic_block *bbs,
 	  else
 	    gimple_cond_set_condition_from_tree (cond, boolean_false_node);
 
+	  update_stmt (cond);
 	  delete predicate;
 	  predicate = NULL;
 	  changed = true;
