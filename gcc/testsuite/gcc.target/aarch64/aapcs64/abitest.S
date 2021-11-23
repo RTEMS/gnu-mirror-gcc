@@ -17,11 +17,11 @@ myfunc:
       mov	c17, csp
       sub	csp,  csp, 544 // 512 for registers and 32 for old csp and lr
 
-      stp	c8, c9, [c17, #-16]! // 480
-      stp	c6, c7, [c17, #-16]! // 448
-      stp	c4, c5, [c17, #-16]! // 416
-      stp	c2, c3, [c17, #-16]! // 384
-      stp	c0, c1, [c17, #-16]! // 352
+      stp	c8, c9, [c17, #-32]! // 480
+      stp	c6, c7, [c17, #-32]! // 448
+      stp	c4, c5, [c17, #-32]! // 416
+      stp	c2, c3, [c17, #-32]! // 384
+      stp	c0, c1, [c17, #-32]! // 352
 
       sub	c17, c17, 8
       st4	{ v4.h, v5.h, v6.h, v7.h }[0], [c17] //344
@@ -55,25 +55,25 @@ myfunc:
       stp	d2, d3, [c17, #-16]! // 16
       stp	d0, d1, [c17, #-16]! //  0
 
-      add	c0, csp,  #16
-      stp	c16, c30, [c17, #-16]!
+      add	c0, csp,  #32
+      stp	c16, c30, [c17, #-32]!
 
-      adrp	c9, which_kind_of_test		// determine the type of test
-      add	c9, c9, :lo12:which_kind_of_test
+      adrp	c9, :got:which_kind_of_test		// determine the type of test
+      ldr	c9, [c9, #:got_lo12:which_kind_of_test]
       ldr	w9, [c9, #0]
       cmp	w9, #1
       bgt	LABEL_TEST_FUNC_RETURN
       bl	testfunc			// parameter passing test or va_arg code gen test
       b		LABEL_RET
 LABEL_TEST_FUNC_RETURN:
-      adrp	c9, testfunc_ptr
-      add	c9, c9, :lo12:testfunc_ptr
+      adrp	c9, :got:testfunc_ptr
+      ldr	c9, [c9, #:got_lo12:testfunc_ptr]
       ldr	c9, [c9, #0]
       blr	c9				// function return value test
-      adrp	c9, saved_return_address
-      add	c9, c9, :lo12:saved_return_address
+      adrp	c9, :got:saved_return_address
+      ldr	c9, [c9, #:got_lo12:saved_return_address]
       ldr	c9, [c9, #0]
-      str	c9, [csp, #8]			// Update the copy of LR reg saved on stack
+      str	c9, [csp, #16]			// Update the copy of LR reg saved on stack
 LABEL_RET:
       ldp	c0, c30, [csp]
       mov	csp, c0

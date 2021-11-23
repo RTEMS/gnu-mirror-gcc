@@ -28,9 +28,9 @@ struct cap_large_struct_t  lc1 = { 13, 14, 15 };
   /* Main point of this test is to check passing cap_overlap_cn_t when NGRN has
      not been filled.  */
   ARG(struct cap_two_cap_t, tc1, C0)
-  ARG(struct cap_overlap_cn_t, ocn1, STACK)
+  PTR(struct cap_overlap_cn_t, ocn1, C2)
   ARG(struct cap_no_overlap_cn_t, cn1, C3)
-  ARG(struct cap_large_struct_t, lc1, STACK+32)
-  LAST_ARG(long long, 0xDEADBEEFCAFEBABELL, X5)
+  PTR(struct cap_large_struct_t, lc1, C5)
+  LAST_ARG(long long, 0xDEADBEEFCAFEBABELL, X6)
 #endif
 

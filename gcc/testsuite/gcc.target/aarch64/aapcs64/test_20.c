@@ -17,6 +17,6 @@
   ARG(double, 6.0, D5)
   ARG(double, 7.0, D6)
   DOTS
-  ANON(_Complex double, 1234.0 + 567.0i, STACK)
-  LAST_ANON(double, -987.0, STACK+16)
+  ANON(_Complex double, 1234.0 + 567.0i, STACK, 0)
+  LAST_ANON(double, -987.0, STACK+16, 16)
 #endif

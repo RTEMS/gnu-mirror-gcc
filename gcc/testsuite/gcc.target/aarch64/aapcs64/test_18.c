@@ -26,7 +26,7 @@ struct z b = { 9.0, 10.0, 11.0, 12.0 };
 #include "abitest.h"
 #else
   ARG(int, 7, W0)
-  PTR(struct y, v, X1)
+  PTR(struct y, v, PTR1)
   ARG(struct z, a, D0)
   ARG(double, 1.0, D4)
   ARG(struct z, b, STACK)

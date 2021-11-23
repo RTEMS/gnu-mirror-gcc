@@ -44,7 +44,7 @@ void init_data ()
 
 #include "abitest.h"
 #else
-  PTR(struct z, a, X0, 0)
+  PTR(struct z, a, PTR0, 0)
   ARG(int, 0xdeadbeef, W1, 1)
   ARG(int, 0xcafebabe, W2, 2)
   ARG(int, 0xdeadbabe, W3, 3)
@@ -52,10 +52,10 @@ void init_data ()
   ARG(int, 0xbeefdead, W5, 5)
   ARG(int, 0xbabecafe, W6, LAST_NAMED_ARG_ID)
   DOTS
-  PTR_ANON(struct z, b, X7, 7)
+  PTR_ANON(struct z, b, PTR7, 7)
   PTR_ANON(struct z, c, STACK, 8)
 #ifndef __AAPCS64_BIG_ENDIAN__
-  ANON(int, 0xbabedead, STACK+8, 9)
+  ANON(int, 0xbabedead, STACK + sizeof (void*), 9)
 #else
   ANON(int, 0xbabedead, STACK+12, 9)
 #endif

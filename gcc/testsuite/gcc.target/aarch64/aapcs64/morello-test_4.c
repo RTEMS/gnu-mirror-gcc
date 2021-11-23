@@ -35,9 +35,9 @@ struct cap_large_struct_t  lc1 = { 13, 14, 15 };
   ARG(struct cap_no_overlap_nc_t, nc1, STACK)
   ARG(struct cap_no_overlap_cn_t, cn1, STACK+32)
   ARG(struct cap_two_cap_t,       tc1, STACK+64)
-  ARG(struct cap_overlap_nc_t,    onc1, STACK+96)
-  ARG(struct cap_overlap_cn_t,    ocn1, STACK+128)
-  ARG(struct cap_large_struct_t,    lc1, STACK+160)
-  LAST_ARG(long long, 0xDEADBEEFCAFEBABELL, STACK+208)
+  PTR(struct cap_overlap_nc_t,    onc1, STACK+96)
+  PTR(struct cap_overlap_cn_t,    ocn1, STACK+112)
+  PTR(struct cap_large_struct_t,    lc1, STACK+128)
+  LAST_ARG(long long, 0xDEADBEEFCAFEBABELL, STACK+144)
 #endif
 

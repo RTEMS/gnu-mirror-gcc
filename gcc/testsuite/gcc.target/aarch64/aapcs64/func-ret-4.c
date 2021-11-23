@@ -22,6 +22,6 @@ FUNC_VAL_CHECK ( 2, _Complex long double, 56789.01234 + 67890.12345i, Q0, flat)
      X8.  */
 FUNC_VAL_CHECK (10, _Complex short , 12345 + 23456i, X0, flat)
 FUNC_VAL_CHECK (11, _Complex int   , 34567 + 45678i, X0, flat)
-FUNC_VAL_CHECK (12, _Complex __int128, 567890 + 678901i, X8, flat)
+FUNC_VAL_CHECK (12, _Complex __int128, 567890 + 678901i, PTR8, flat)
 
 #endif

@@ -82,12 +82,22 @@ void init_data ()
   ANON     (union  hfa_union_t, hfa_union, STACK+48, 5)
   ANON     (struct hfa_ldx3_t , hfa_ldx3 , STACK+64, 6)
   /* Non-H[FV]A passed in general registers or on stack or via reference.  */
-  PTR_ANON (struct non_hfa_fx5_t  , non_hfa_fx5  , X1       , 10)
+  PTR_ANON (struct non_hfa_fx5_t  , non_hfa_fx5  , PTR1       , 10)
   ANON     (struct non_hfa_ffd_t  , non_hfa_ffd  , X2       , 13)
   ANON     (struct non_hfa_ii_t   , non_hfa_ii   , X4       , 14)
   ANON     (struct non_hfa_c_t    , non_hfa_c    , X5       , 15)
   ANON     (struct non_hfa_ffvf2_t, non_hfa_ffvf2, X6       , 16)
   PTR_ANON (struct non_hfa_fffd_t , non_hfa_fffd , STACK+112, 17)
+
+#ifdef __CHERI_PURE_CAPABILITY__
+  PTR_ANON (struct non_hfa_ffs_t  , non_hfa_ffs  , STACK+128, 18)
+  ANON     (struct non_hfa_ffs_2_t, non_hfa_ffs_2, STACK+144, 19)
+  ANON     (union  non_hfa_union_t, non_hfa_union, STACK+160, 20)
+  /* HFA of __fp16 passed on stack, directed __fp16 test is va_arg-10.c.  */
+  ANON     (struct hfa_f16x2_t    , hfa_f16x2    , STACK+168, 21)
+  ANON     (struct hfa_f16x3_t    , hfa_f16x3    , STACK+176, 22)
+  LAST_ANON(int                   , 2            , STACK+184, 30)
+#else
   PTR_ANON (struct non_hfa_ffs_t  , non_hfa_ffs  , STACK+120, 18)
   ANON     (struct non_hfa_ffs_2_t, non_hfa_ffs_2, STACK+128, 19)
   ANON     (union  non_hfa_union_t, non_hfa_union, STACK+144, 20)
@@ -98,5 +108,6 @@ void init_data ()
   LAST_ANON(int                   , 2            , STACK+168, 30)
 #else
   LAST_ANON(int                   , 2            , STACK+172, 30)
+#endif
 #endif
 #endif

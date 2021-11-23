@@ -21,6 +21,6 @@ CTFtype cy = 5.0 + 6.0i;
   ARG       ( TFtype,  x, Q0)
   ARG       (CTFtype, cx, Q1)
   DOTS
-  ANON      (CTFtype, cy, Q3)
-  LAST_ANON ( TFtype,  y, Q5)
+  ANON      (CTFtype, cy, Q3, 0)
+  LAST_ANON ( TFtype,  y, Q5, 16)
 #endif

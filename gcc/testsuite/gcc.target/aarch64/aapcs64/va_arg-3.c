@@ -71,12 +71,21 @@ void init_data ()
   DOTS
   ANON     (struct x0, y0, X0,        1)
   ANON     (struct x1, y1, X1,        2)
-  PTR_ANON (struct x2, y2, X3,        3)
+  PTR_ANON (struct x2, y2, PTR3,      3)
   ANON     (union  x3, y3, X4,        4)
-  PTR_ANON (union  x4, y4, X5,        5)
+  PTR_ANON (union  x4, y4, PTR5,      5)
   ANON     (struct x5, y5, X6,        6)
   ANON     (struct x0, y0, STACK,     7)
   ANON     (struct x1, y1, STACK+8,   8)
+
+#ifdef __CHERI_PURE_CAPABILITY__
+  PTR_ANON (struct x2, y2, STACK+32,  9)
+  ANON	   (union  x3, y3, STACK+48,  10)
+  PTR_ANON (union  x4, y4, STACK+64,  11)
+  ANON	   (int	    ,   1, STACK+80,  12)
+  ANON	   (struct x5, y5, STACK+96,  13)
+  LAST_ANON (int    ,   2, STACK+112, 14)
+#else
   PTR_ANON (struct x2, y2, STACK+24,  9)
   ANON     (union  x3, y3, STACK+32, 10)
   PTR_ANON (union  x4, y4, STACK+40, 11)
@@ -90,5 +99,6 @@ void init_data ()
   LAST_ANON(int      ,  2, STACK+80, 14)
 #else
   LAST_ANON(int      ,  2, STACK+84, 14)
+#endif
 #endif
 #endif

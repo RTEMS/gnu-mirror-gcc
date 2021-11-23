@@ -58,8 +58,48 @@
 								  __VA_ARGS__)
 #define ARG(type,val,offset,...) LAST_ARG_NONFLAT(type, val, offset, \
 						  flat, __VA_ARGS__)
-#define ANON(type,val,offset,...) LAST_ARG(type, val, offset, __VA_ARGS__)
-#define LAST_ANON(type,val,offset,...) LAST_ARG(type, val, offset, __VA_ARGS__)
+
+/* For AAPCS64-cap, we specialise the anonymous argument macros to check that
+   the arguments are passed as expected. The user simply needs to provide the
+   offset into the Anonymous Argument Memory Area at which they expect to find
+   the given argument.
+
+   Note that we don't override the macros for AAPCS64_TEST_STDARG tests: for
+   those tests, the __builtin_va_{start,arg,end} functions are used to extract
+   the variadic arguments and pass them to a non-variadic function, where we
+   simply check that the arguments end up in the expected registers for such a
+   function. Hence, we don't need to extract the incoming variadic arguments
+   manually.  */
+#if defined(__CHERI_PURE_CAPABILITY__) && !defined(AAPCS64_TEST_STDARG)
+
+#define LAST_ANON(type,val,ignored,offset,...)	  \
+{						  \
+  type __x = val;				  \
+  void *ptr = *(void **)(stack + C9) + offset;	  \
+  if (sizeof (type) > 16 || _Alignof (type) > 16) \
+    ptr = *(void **)ptr;			  \
+  if (memcmp (&__x, ptr, sizeof (type)) != 0)	  \
+    abort ();					  \
+}
+
+/* For AAPCS64-cap, treat PTR_ANON as with any other anonymous argument: the
+   PTR-ness only matters for the base PCS. This is because LAST_ANON itself
+   handles any indirection required by AAPCS64-cap automatically, and any
+   arguments that would be indirected in the base PCS are also indirected in
+   AAPCS64-cap.  */
+#define PTR_ANON(type,val,a64_off,c64_off) \
+  LAST_ANON(type, val, a64_off, c64_off)
+
+#else
+
+#define LAST_ANON(type,val,offset,ignored,...) LAST_ARG(type, val, offset, __VA_ARGS__)
+#define PTR_ANON(type, val,offset,ignored,...) PTR(type, val, offset, __VA_ARGS__)
+
+#endif
+
+#define ANON(type,val,a64_off,c64_off,...) \
+  LAST_ANON(type, val, a64_off, c64_off, __VA_ARGS__)
+
 #define ANON_PROMOTED(type,val,type_promoted, val_promoted, offset,...)	\
   ANON(type_promoted, val_promoted, offset, __VA_ARGS__)
 /* Composite larger than 16 bytes is replaced by a pointer to a copy prepared
@@ -71,7 +111,6 @@
   ptr = *(type **)(stack + offset);					\
   if (memcmp (ptr, &val, sizeof (type)) != 0) abort ();			\
 }
-#define PTR_ANON(type, val, offset, ...) PTR(type, val, offset, __VA_ARGS__)
 #define LAST_ANONPTR(type, val, offset, ...) PTR(type, val, offset, __VA_ARGS__)
 #define DOTS
 
@@ -98,10 +137,10 @@
 #define ARG(type,val,offset) LAST_ARG(type, val, offset),
 #define ARG_NONFLAT(type, val, offset, layout) LAST_ARG (type, val, offset),
 #define DOTS ...
-#define ANON(type,val, offset)
-#define LAST_ANON(type,val, offset)
+#define ANON(type,val,a64_off,c64_off)
+#define LAST_ANON(type,val,a64_off,c64_off)
 #define PTR(type, val, offset) LAST_ARG(type, val, offset),
-#define PTR_ANON(type, val, offset)
+#define PTR_ANON(type, val, a64_off, c64_off)
 #define LAST_ANONPTR(type, val, offset)
 
 #endif /* AARCH64_MACRO_DEF_GEN_PARAM_TYPE_LIST */
@@ -130,8 +169,8 @@
 							     offset, \
 							     __VA_ARGS__),
 #define DOTS
-#define LAST_ANON(type,val,offset,...) LAST_ARG(type, val, offset, __VA_ARGS__)
-#define ANON(type,val,offset,...) LAST_ARG(type, val, offset, __VA_ARGS__),
+#define LAST_ANON(type,val,a64_off,c64_off,...) LAST_ARG(type, val, a64_off, __VA_ARGS__)
+#define ANON(type,val,a64_off,c64_off,...) LAST_ARG(type, val, a64_off, __VA_ARGS__),
 #define PTR(type, val,offset,...) LAST_ARG(type, val, offset, __VA_ARGS__),
 #define PTR_ANON(type, val,offset,...) LAST_ARG(type, val, offset, __VA_ARGS__),
 #define LAST_ANONPTR(type, val, offset,...) LAST_ARG(type, val, offset, __VA_ARGS__)

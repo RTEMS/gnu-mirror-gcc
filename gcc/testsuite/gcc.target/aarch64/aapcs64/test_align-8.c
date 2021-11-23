@@ -28,6 +28,6 @@ overaligned a = { 2, 3 };
 #else
   ARG (int, 7, W0)
   /* Alignment should be 8.  */
-  PTR (overaligned, a, X1)
+  PTR (overaligned, a, PTR1)
   LAST_ARG (int, 9, W2)
 #endif

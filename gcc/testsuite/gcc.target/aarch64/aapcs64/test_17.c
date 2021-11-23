@@ -29,9 +29,9 @@ struct z b = { 9.0, 10.0, 11.0, 12.0 };
 #else
   ARG(double, 11.0, D0)
   DOTS
-  ANON(struct z, a, D1)
-  ANON(struct z, b, STACK)
-  ANON(int , 5, W0)
-  ANON(double, f1, STACK+32)
-  LAST_ANON(double, 0.5, STACK+40)
+  ANON(struct z, a, D1, 0)
+  ANON(struct z, b, STACK, 16)
+  ANON(int , 5, W0, 32)
+  ANON(double, f1, STACK+32, 48)
+  LAST_ANON(double, 0.5, STACK+40, 64)
 #endif

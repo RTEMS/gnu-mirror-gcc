@@ -25,7 +25,7 @@ _Complex __int128 complex_qword = 567890 + 678901i;
   /* Complex integral types are passed in general registers or via reference.  */
   ANON     (_Complex short      , (_Complex short) (12345 + 23456i), X1, 10)
   ANON     (_Complex int        , 34567 + 45678i              , X2, 11)
-  PTR_ANON (_Complex __int128   , complex_qword               , X3, 12)
+  PTR_ANON (_Complex __int128   , complex_qword               , PTR3, 12)
 
   LAST_ANON(int                 , 1                           , W4, 20)
 #endif

@@ -37,6 +37,6 @@ void init_data ()
 #include "abitest.h"
 #else
 ARG (float, 123.0f, S0)
-PTR (A, u.a, X0)
+PTR (A, u.a, PTR0)
 LAST_ARG_NONFLAT (int, 0xdeadbeef, X1, i32in64)
 #endif

@@ -28,7 +28,7 @@ union cap_overlap_union_t    n2 = { .uic = 2 };
   ARG(int, 6, X6)
   ARG(int, 7, X7)
   ARG(union cap_no_overlap_union_t, n1, STACK)
-  ARG(union cap_overlap_union_t, n2, STACK+16)
+  PTR(union cap_overlap_union_t, n2, STACK+16)
   ARG(union cap_no_overlap_union_t, n1, STACK+32)
   LAST_ARG(long long, 0xDEADBEEFCAFEBABELL, STACK+48)
 #endif

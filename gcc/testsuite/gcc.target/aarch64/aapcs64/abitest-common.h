@@ -80,8 +80,26 @@
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define STACK  512
+#define PTR0 C0
+#define PTR1 C1
+#define PTR2 C2
+#define PTR3 C3
+#define PTR4 C4
+#define PTR5 C5
+#define PTR6 C6
+#define PTR7 C7
+#define PTR8 C8
 #else
 #define STACK  352
+#define PTR0 X0
+#define PTR1 X1
+#define PTR2 X2
+#define PTR3 X3
+#define PTR4 X4
+#define PTR5 X5
+#define PTR6 X6
+#define PTR7 X7
+#define PTR8 X8
 #endif
 
 /* The type of test.  'myfunc' in abitest.S needs to know which kind of
