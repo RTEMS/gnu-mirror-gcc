@@ -455,7 +455,7 @@ static bool
 tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger,
 			   unswitch_predicate *parent_predicate, bool true_edge)
 {
-  basic_block *bbs;
+  basic_block *bbs = NULL;
   class loop *nloop;
   bool changed = false;
   HOST_WIDE_INT iterations;
@@ -485,14 +485,9 @@ tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger,
 	}
     }
 
-  bbs = get_loop_body (loop);
   auto_vec<unswitch_predicate *> candidates;
-
-  changed = find_all_unswitching_predicates (loop, bbs, true_edge,
-					     parent_predicate, ranger,
-					     candidates);
-
   unswitch_predicate *predicate = NULL;
+
   if (num > param_max_unswitch_level)
     {
       if (dump_file
@@ -501,11 +496,18 @@ tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger,
       goto exit;
     }
 
+  bbs = get_loop_body (loop);
+  changed = find_all_unswitching_predicates (loop, bbs, true_edge,
+					     parent_predicate, ranger,
+					     candidates);
+
   for (auto pred: candidates)
     {
       unsigned cost
 	= evaluate_loop_insns_for_predicate (loop, bbs, ranger, pred);
 
+      /* FIXME: right now we select first candidate, but we can choose
+	 a cheapest (best) one.  */
       if (cost <= (unsigned)param_max_unswitch_insns)
 	{
 	  predicate = pred;
@@ -513,7 +515,7 @@ tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger,
 	}
       else if (dump_file && (dump_flags & TDF_DETAILS))
 	{
-	  fprintf (dump_file, ";; Not unswitching condition, loop too big "
+	  fprintf (dump_file, ";; Not unswitching condition, cost too big "
 		   "(%d insns): ", cost);
 	  print_generic_expr (dump_file, pred->condition);
 	  fprintf (dump_file, "\n");
@@ -527,7 +529,7 @@ tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger,
 
       if (dump_file && (dump_flags & TDF_DETAILS))
 	{
-	  fprintf (dump_file, ";; Unswitching loop with condition: ");
+	  fprintf (dump_file, ";; Unswitching loop on condition: ");
 	  print_generic_expr (dump_file, predicate->condition);
 	  fprintf (dump_file, "\n");
 	}
