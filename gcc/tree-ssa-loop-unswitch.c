@@ -93,11 +93,14 @@ struct unswitch_predicate
   int_range_max false_range;
 };
 
+static vec<vec<unswitch_predicate *>> *bb_predicates = NULL;
+
+static gimple_ranger *ranger = NULL;
+
 static class loop *tree_unswitch_loop (class loop *, basic_block, tree);
-static bool tree_unswitch_single_loop (class loop *, int, gimple_ranger *,
+static bool tree_unswitch_single_loop (class loop *, int,
 				       unswitch_predicate *, bool);
-static unswitch_predicate *tree_may_unswitch_on (basic_block, class loop *,
-						 gimple_ranger *);
+static unswitch_predicate *tree_may_unswitch_on (basic_block, class loop *);
 static bool tree_unswitch_outer_loop (class loop *);
 static edge find_loop_guard (class loop *);
 static bool empty_bb_without_guard_p (class loop *, basic_block);
@@ -107,10 +110,10 @@ static bool check_exit_phi (class loop *);
 static tree get_vop_from_header (class loop *);
 
 static void
-calculate_loop_insns (class loop *loop)
+init_loop_unswitch_info (class loop *loop)
 {
+  /* Calculate instruction count.  */
   basic_block *bbs = get_loop_body (loop);
-
   for (unsigned i = 0; i < loop->num_nodes; i++)
     {
       unsigned insns = 0;
@@ -131,16 +134,22 @@ tree_ssa_unswitch_loops (void)
 {
   bool changed = false;
 
-  gimple_ranger *ranger = enable_ranger (cfun);
+  ranger = enable_ranger (cfun);
 
   /* Go through all loops starting from innermost.  */
   for (auto loop : loops_list (cfun, LI_FROM_INNERMOST))
     {
       if (!loop->inner)
 	{
+	  bb_predicates = new vec<vec<unswitch_predicate *>> ();
+	  bb_predicates->safe_push (vec<unswitch_predicate *> ());
+
 	  /* Unswitch innermost loop.  */
-	  calculate_loop_insns (loop);
-	  changed |= tree_unswitch_single_loop (loop, 0, ranger, NULL, false);
+	  init_loop_unswitch_info (loop);
+	  changed |= tree_unswitch_single_loop (loop, 0, NULL, false);
+
+	  delete bb_predicates;
+	  bb_predicates = NULL;
 	}
       else
 	changed |= tree_unswitch_outer_loop (loop);
@@ -233,7 +242,7 @@ is_maybe_undefined (const tree name, gimple *stmt, class loop *loop)
    if there is an opportunity for unswitching.  */
 
 static unswitch_predicate *
-tree_may_unswitch_on (basic_block bb, class loop *loop, gimple_ranger *ranger)
+tree_may_unswitch_on (basic_block bb, class loop *loop)
 {
   gimple *last, *def;
   gcond *stmt;
@@ -334,7 +343,6 @@ static bool
 find_all_unswitching_predicates (class loop *loop, basic_block *bbs,
 				 bool true_edge,
 				 unswitch_predicate *parent_predicate,
-				 gimple_ranger *ranger,
 				 vec<unswitch_predicate *> &candidates)
 {
   bool changed = false;
@@ -342,8 +350,7 @@ find_all_unswitching_predicates (class loop *loop, basic_block *bbs,
   for (unsigned i = 0; i != loop->num_nodes; i++)
     {
       /* Find a bb to unswitch on.  */
-      unswitch_predicate *predicate = tree_may_unswitch_on (bbs[i], loop,
-							    ranger);
+      unswitch_predicate *predicate = tree_may_unswitch_on (bbs[i], loop);
       if (predicate == NULL)
 	continue;
 
@@ -379,7 +386,7 @@ find_all_unswitching_predicates (class loop *loop, basic_block *bbs,
 static unsigned
 evaluate_insns (class loop *loop,  basic_block *bbs,
 		unswitch_predicate *candidate, bool true_edge,
-		gimple_ranger *ranger, auto_bb_flag &reachable_flag)
+		auto_bb_flag &reachable_flag)
 {
   auto_vec<basic_block> worklist (loop->num_nodes);
   worklist.quick_push (bbs[0]);
@@ -403,7 +410,7 @@ evaluate_insns (class loop *loop,  basic_block *bbs,
 	      else
 		{
 		  unswitch_predicate *predicate
-		    = tree_may_unswitch_on (bb, loop, ranger);
+		    = tree_may_unswitch_on (bb, loop);
 		  if (predicate != NULL)
 		    {
 		      tree folded
@@ -453,15 +460,14 @@ evaluate_insns (class loop *loop,  basic_block *bbs,
 
 static unsigned
 evaluate_loop_insns_for_predicate (class loop *loop, basic_block *bbs,
-				   gimple_ranger *ranger,
 				   unswitch_predicate *candidate)
 {
   auto_bb_flag reachable_flag (cfun);
 
   unsigned true_loop_cost = evaluate_insns (loop, bbs, candidate, true,
-					    ranger, reachable_flag);
+					    reachable_flag);
   unsigned false_loop_cost = evaluate_insns (loop, bbs, candidate, false,
-					     ranger, reachable_flag);
+					     reachable_flag);
 
   return true_loop_cost + false_loop_cost;
 }
@@ -471,7 +477,7 @@ evaluate_loop_insns_for_predicate (class loop *loop, basic_block *bbs,
    grow exponentially.  RANGER is gimple ranger used in this pass.  */
 
 static bool
-tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger,
+tree_unswitch_single_loop (class loop *loop, int num,
 			   unswitch_predicate *parent_predicate, bool true_edge)
 {
   basic_block *bbs = NULL;
@@ -517,13 +523,12 @@ tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger,
 
   bbs = get_loop_body (loop);
   changed = find_all_unswitching_predicates (loop, bbs, true_edge,
-					     parent_predicate, ranger,
-					     candidates);
+					     parent_predicate, candidates);
 
   for (auto pred: candidates)
     {
       unsigned cost
-	= evaluate_loop_insns_for_predicate (loop, bbs, ranger, pred);
+	= evaluate_loop_insns_for_predicate (loop, bbs, pred);
 
       /* FIXME: right now we select first candidate, but we can choose
 	 a cheapest (best) one.  */
@@ -575,8 +580,8 @@ tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger,
       free_original_copy_tables ();
 
       /* Invoke itself on modified loops.  */
-      tree_unswitch_single_loop (nloop, num + 1, ranger, predicate, false);
-      tree_unswitch_single_loop (loop, num + 1, ranger, predicate, true);
+      tree_unswitch_single_loop (nloop, num + 1, predicate, false);
+      tree_unswitch_single_loop (loop, num + 1, predicate, true);
       changed = true;
     }
 
