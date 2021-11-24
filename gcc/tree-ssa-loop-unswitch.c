@@ -647,12 +647,12 @@ tree_unswitch_single_loop (class loop *loop, int num,
       free_original_copy_tables ();
 
       /* Invoke itself on modified loops.  */
-      predicate_path.safe_push (std::make_pair (predicate, true));
+      predicate_path.safe_push (std::make_pair (predicate, false));
       changed |= simplify_loop_version (nloop, predicate_path);
       tree_unswitch_single_loop (nloop, num + 1, predicate_path);
       predicate_path.pop ();
 
-      predicate_path.safe_push (std::make_pair (predicate, false));
+      predicate_path.safe_push (std::make_pair (predicate, true));
       changed |= simplify_loop_version (loop, predicate_path);
       tree_unswitch_single_loop (loop, num + 1, predicate_path);
       predicate_path.pop ();
