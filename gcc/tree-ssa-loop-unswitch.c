@@ -106,6 +106,24 @@ static void hoist_guard (class loop *, edge);
 static bool check_exit_phi (class loop *);
 static tree get_vop_from_header (class loop *);
 
+static void
+calculate_loop_insns (class loop *loop)
+{
+  basic_block *bbs = get_loop_body (loop);
+
+  for (unsigned i = 0; i < loop->num_nodes; i++)
+    {
+      unsigned insns = 0;
+      for (gimple_stmt_iterator gsi = gsi_start_bb (bbs[i]); !gsi_end_p (gsi);
+	   gsi_next (&gsi))
+	insns += estimate_num_insns (gsi_stmt (gsi), &eni_size_weights);
+
+      bbs[i]->aux = (void *)(size_t)insns;
+    }
+
+  free (bbs);
+}
+
 /* Main entry point.  Perform loop unswitching on all suitable loops.  */
 
 unsigned int
@@ -119,8 +137,11 @@ tree_ssa_unswitch_loops (void)
   for (auto loop : loops_list (cfun, LI_FROM_INNERMOST))
     {
       if (!loop->inner)
-	/* Unswitch innermost loop.  */
-	changed |= tree_unswitch_single_loop (loop, 0, ranger, NULL, false);
+	{
+	  /* Unswitch innermost loop.  */
+	  calculate_loop_insns (loop);
+	  changed |= tree_unswitch_single_loop (loop, 0, ranger, NULL, false);
+	}
       else
 	changed |= tree_unswitch_outer_loop (loop);
     }
@@ -418,9 +439,7 @@ evaluate_insns (class loop *loop,  basic_block *bbs,
 
   for (unsigned i = 0; i < loop->num_nodes; i++)
     if (bbs[i]->flags & reachable_flag)
-      for (gimple_stmt_iterator gsi = gsi_start_bb (bbs[i]); !gsi_end_p (gsi);
-	   gsi_next (&gsi))
-	size += estimate_num_insns (gsi_stmt (gsi), &eni_size_weights);
+      size += (size_t)bbs[i]->aux;
 
   /* Clear the flag from basic blocks.  */
   for (unsigned i = 0; i < loop->num_nodes; i++)
@@ -543,6 +562,13 @@ tree_unswitch_single_loop (class loop *loop, int num, gimple_ranger *ranger,
 	  free_original_copy_tables ();
 	  goto exit;
 	}
+
+      /* Copy BB costs.  */
+      basic_block *bbs2 = get_loop_body (nloop);
+      for (unsigned i = 0; i < nloop->num_nodes; i++)
+	bbs2[i]->aux = get_bb_original (bbs2[i])->aux;
+
+      free (bbs2);
 
       /* Update the SSA form after unswitching.  */
       update_ssa (TODO_update_ssa);
