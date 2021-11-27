@@ -388,7 +388,7 @@ print_lambda_vector (FILE * outfile, lambda_vector vector, int n)
   int i;
 
   for (i = 0; i < n; i++)
-    fprintf (outfile, "%3d ", (int)vector[i]);
+    fprintf (outfile, HOST_WIDE_INT_PRINT_DEC " ", vector[i]);
   fprintf (outfile, "\n");
 }
 
@@ -756,6 +756,9 @@ split_constant_offset_1 (tree type, tree op0, enum tree_code code, tree op1,
 
   *var = NULL_TREE;
   *off = NULL_TREE;
+
+  if (INTEGRAL_TYPE_P (type) && TYPE_OVERFLOW_TRAPS (type))
+    return false;
 
   switch (code)
     {
@@ -1370,6 +1373,7 @@ dr_analyze_indices (struct indices *dri, tree ref, edge nest, loop_p loop)
       tree op = TREE_OPERAND (ref, 0);
       tree access_fn = analyze_scalar_evolution (loop, op);
       access_fn = instantiate_scev (nest, loop, access_fn);
+      STRIP_NOPS (access_fn);
       if (TREE_CODE (access_fn) == POLYNOMIAL_CHREC)
 	{
 	  tree memoff = TREE_OPERAND (ref, 1);

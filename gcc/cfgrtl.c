@@ -3001,7 +3001,8 @@ rtl_verify_fallthru (void)
 		{
 		  error ("verify_flow_info: Incorrect fallthru %i->%i",
 			 e->src->index, e->dest->index);
-		  fatal_insn ("wrong insn in the fallthru edge", insn);
+		  error ("wrong insn in the fallthru edge");
+		  debug_rtx (insn);
 		  err = 1;
 		}
 	}
@@ -3540,10 +3541,8 @@ skip_insns_after_block (basic_block bb)
 	    {
 	    case NOTE_INSN_BLOCK_END:
 	      gcc_unreachable ();
-	      continue;
 	    default:
 	      continue;
-	      break;
 	    }
 	  break;
 
@@ -5344,7 +5343,7 @@ struct cfg_hooks cfg_layout_rtl_cfg_hooks = {
   rtl_flow_call_edges_add,
   NULL, /* execute_on_growing_pred */
   NULL, /* execute_on_shrinking_pred */
-  duplicate_loop_to_header_edge, /* duplicate loop for trees */
+  duplicate_loop_body_to_header_edge, /* duplicate loop for trees */
   rtl_lv_add_condition_to_bb, /* lv_add_condition_to_bb */
   NULL, /* lv_adjust_loop_header_phi*/
   rtl_extract_cond_bb_edges, /* extract_cond_bb_edges */

@@ -398,6 +398,47 @@ gimplify_to_rvalue (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
   return t;
 }
 
+/* Like gimplify_arg, but if ORDERED is set (which should be set if
+   any of the arguments this argument is sequenced before has
+   TREE_SIDE_EFFECTS set, make sure expressions with is_gimple_reg_type type
+   are gimplified into SSA_NAME or a fresh temporary and for
+   non-is_gimple_reg_type we don't optimize away TARGET_EXPRs.  */
+
+static enum gimplify_status
+cp_gimplify_arg (tree *arg_p, gimple_seq *pre_p, location_t call_location,
+		 bool ordered)
+{
+  enum gimplify_status t;
+  if (ordered
+      && !is_gimple_reg_type (TREE_TYPE (*arg_p))
+      && TREE_CODE (*arg_p) == TARGET_EXPR)
+    {
+      /* gimplify_arg would strip away the TARGET_EXPR, but
+	 that can mean we don't copy the argument and some following
+	 argument with side-effect could modify it.  */
+      protected_set_expr_location (*arg_p, call_location);
+      return gimplify_expr (arg_p, pre_p, NULL, is_gimple_lvalue, fb_either);
+    }
+  else
+    {
+      t = gimplify_arg (arg_p, pre_p, call_location);
+      if (t == GS_ERROR)
+	return GS_ERROR;
+      else if (ordered
+	       && is_gimple_reg_type (TREE_TYPE (*arg_p))
+	       && is_gimple_variable (*arg_p)
+	       && TREE_CODE (*arg_p) != SSA_NAME
+	       /* No need to force references into register, references
+		  can't be modified.  */
+	       && !TYPE_REF_P (TREE_TYPE (*arg_p))
+	       /* And this can't be modified either.  */
+	       && *arg_p != current_class_ptr)
+	*arg_p = get_initialized_tmp_var (*arg_p, pre_p);
+      return t;
+    }
+
+}
+
 /* Do C++-specific gimplification.  Args are as for gimplify_expr.  */
 
 int
@@ -613,7 +654,8 @@ cp_gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 	  gcc_assert (call_expr_nargs (*expr_p) == 2);
 	  gcc_assert (!CALL_EXPR_ORDERED_ARGS (*expr_p));
 	  enum gimplify_status t
-	    = gimplify_arg (&CALL_EXPR_ARG (*expr_p, 1), pre_p, loc);
+	    = cp_gimplify_arg (&CALL_EXPR_ARG (*expr_p, 1), pre_p, loc,
+			       TREE_SIDE_EFFECTS (CALL_EXPR_ARG (*expr_p, 0)));
 	  if (t == GS_ERROR)
 	    ret = GS_ERROR;
 	}
@@ -622,10 +664,18 @@ cp_gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 	  /* Leave the last argument for gimplify_call_expr, to avoid problems
 	     with __builtin_va_arg_pack().  */
 	  int nargs = call_expr_nargs (*expr_p) - 1;
+	  int last_side_effects_arg = -1;
+	  for (int i = nargs; i > 0; --i)
+	    if (TREE_SIDE_EFFECTS (CALL_EXPR_ARG (*expr_p, i)))
+	      {
+		last_side_effects_arg = i;
+		break;
+	      }
 	  for (int i = 0; i < nargs; ++i)
 	    {
 	      enum gimplify_status t
-		= gimplify_arg (&CALL_EXPR_ARG (*expr_p, i), pre_p, loc);
+		= cp_gimplify_arg (&CALL_EXPR_ARG (*expr_p, i), pre_p, loc,
+				   i < last_side_effects_arg);
 	      if (t == GS_ERROR)
 		ret = GS_ERROR;
 	    }
@@ -639,8 +689,17 @@ cp_gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 	    fntype = TREE_TYPE (fntype);
 	  if (TREE_CODE (fntype) == METHOD_TYPE)
 	    {
+	      int nargs = call_expr_nargs (*expr_p);
+	      bool side_effects = false;
+	      for (int i = 1; i < nargs; ++i)
+		if (TREE_SIDE_EFFECTS (CALL_EXPR_ARG (*expr_p, i)))
+		  {
+		    side_effects = true;
+		    break;
+		  }
 	      enum gimplify_status t
-		= gimplify_arg (&CALL_EXPR_ARG (*expr_p, 0), pre_p, loc);
+		= cp_gimplify_arg (&CALL_EXPR_ARG (*expr_p, 0), pre_p, loc,
+				   side_effects);
 	      if (t == GS_ERROR)
 		ret = GS_ERROR;
 	    }
@@ -841,8 +900,39 @@ struct cp_genericize_data
 static tree
 cp_fold_r (tree *stmt_p, int *walk_subtrees, void *data)
 {
-  tree stmt;
-  enum tree_code code;
+  tree stmt = *stmt_p;
+  enum tree_code code = TREE_CODE (stmt);
+
+  switch (code)
+    {
+    case PTRMEM_CST:
+      if (TREE_CODE (PTRMEM_CST_MEMBER (stmt)) == FUNCTION_DECL
+	  && DECL_IMMEDIATE_FUNCTION_P (PTRMEM_CST_MEMBER (stmt)))
+	{
+	  if (!((hash_set<tree> *) data)->add (stmt))
+	    error_at (PTRMEM_CST_LOCATION (stmt),
+		      "taking address of an immediate function %qD",
+		      PTRMEM_CST_MEMBER (stmt));
+	  stmt = *stmt_p = build_zero_cst (TREE_TYPE (stmt));
+	  break;
+	}
+      break;
+
+    case ADDR_EXPR:
+      if (TREE_CODE (TREE_OPERAND (stmt, 0)) == FUNCTION_DECL
+	  && DECL_IMMEDIATE_FUNCTION_P (TREE_OPERAND (stmt, 0)))
+	{
+	  error_at (EXPR_LOCATION (stmt),
+		    "taking address of an immediate function %qD",
+		    TREE_OPERAND (stmt, 0));
+	  stmt = *stmt_p = build_zero_cst (TREE_TYPE (stmt));
+	  break;
+	}
+      break;
+
+    default:
+      break;
+    }
 
   *stmt_p = stmt = cp_fold (*stmt_p);
 
@@ -858,12 +948,16 @@ cp_fold_r (tree *stmt_p, int *walk_subtrees, void *data)
     }
 
   code = TREE_CODE (stmt);
-  if (code == OMP_FOR || code == OMP_SIMD || code == OMP_DISTRIBUTE
-      || code == OMP_LOOP || code == OMP_TASKLOOP || code == OACC_LOOP)
+  switch (code)
     {
       tree x;
       int i, n;
-
+    case OMP_FOR:
+    case OMP_SIMD:
+    case OMP_DISTRIBUTE:
+    case OMP_LOOP:
+    case OMP_TASKLOOP:
+    case OACC_LOOP:
       cp_walk_tree (&OMP_FOR_BODY (stmt), cp_fold_r, data, NULL);
       cp_walk_tree (&OMP_FOR_CLAUSES (stmt), cp_fold_r, data, NULL);
       cp_walk_tree (&OMP_FOR_INIT (stmt), cp_fold_r, data, NULL);
@@ -902,6 +996,22 @@ cp_fold_r (tree *stmt_p, int *walk_subtrees, void *data)
 	}
       cp_walk_tree (&OMP_FOR_PRE_BODY (stmt), cp_fold_r, data, NULL);
       *walk_subtrees = 0;
+      return NULL;
+
+    case IF_STMT:
+      if (IF_STMT_CONSTEVAL_P (stmt))
+	{
+	  /* Don't walk THEN_CLAUSE (stmt) for consteval if.  IF_COND is always
+	     boolean_false_node.  */
+	  cp_walk_tree (&ELSE_CLAUSE (stmt), cp_fold_r, data, NULL);
+	  cp_walk_tree (&IF_SCOPE (stmt), cp_fold_r, data, NULL);
+	  *walk_subtrees = 0;
+	  return NULL;
+	}
+      break;
+
+    default:
+      break;
     }
 
   return NULL;
@@ -1416,14 +1526,6 @@ cp_genericize_r (tree *stmt_p, int *walk_subtrees, void *data)
 	  * walk_subtrees = 0;
 	  break;
 	}
-
-      if (tree fndecl = cp_get_callee_fndecl_nofold (stmt))
-	if (DECL_IMMEDIATE_FUNCTION_P (fndecl))
-	  {
-	    gcc_assert (source_location_current_p (fndecl));
-	    *stmt_p = cxx_constant_value (stmt);
-	    break;
-	  }
 
       if (!wtd->no_sanitize_p
 	  && sanitize_flags_p ((SANITIZE_NULL
@@ -2569,6 +2671,14 @@ cp_fold (tree x)
       {
 	int sv = optimize, nw = sv;
 	tree callee = get_callee_fndecl (x);
+
+	if (tree fndecl = cp_get_callee_fndecl_nofold (x))
+	  if (DECL_IMMEDIATE_FUNCTION_P (fndecl)
+	      && source_location_current_p (fndecl))
+	    {
+	      x = cxx_constant_value (x);
+	      break;
+	    }
 
 	/* Some built-in function calls will be evaluated at compile-time in
 	   fold ().  Set optimize to 1 when folding __builtin_constant_p inside

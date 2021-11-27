@@ -107,7 +107,7 @@
 # define _GLIBCXX11_DEPRECATED_SUGGEST(ALT)
 #endif
 
-#if defined(__DEPRECATED) && (__cplusplus >= 201403L)
+#if defined(__DEPRECATED) && (__cplusplus >= 201402L)
 # define _GLIBCXX14_DEPRECATED _GLIBCXX_DEPRECATED
 # define _GLIBCXX14_DEPRECATED_SUGGEST(ALT) _GLIBCXX_DEPRECATED_SUGGEST(ALT)
 #else
@@ -123,7 +123,7 @@
 # define _GLIBCXX17_DEPRECATED_SUGGEST(ALT)
 #endif
 
-#if defined(__DEPRECATED) && (__cplusplus > 201703L)
+#if defined(__DEPRECATED) && (__cplusplus >= 202002L)
 # define _GLIBCXX20_DEPRECATED(MSG) [[deprecated(MSG)]]
 # define _GLIBCXX20_DEPRECATED_SUGGEST(ALT) _GLIBCXX_DEPRECATED_SUGGEST(ALT)
 #else
@@ -293,6 +293,15 @@ namespace std
 #if __cplusplus >= 201103L
   typedef decltype(nullptr)	nullptr_t;
 #endif
+
+  // This allows the library to terminate without including all of <exception>
+  // and without making the declaration of std::terminate visible to users.
+  extern "C++" __attribute__ ((__noreturn__, __always_inline__))
+  inline void __terminate() _GLIBCXX_USE_NOEXCEPT
+  {
+    void terminate() _GLIBCXX_USE_NOEXCEPT __attribute__ ((__noreturn__));
+    terminate();
+  }
 }
 
 #define _GLIBCXX_USE_DUAL_ABI
@@ -517,22 +526,17 @@ namespace std
   // Avoid the use of assert, because we're trying to keep the <cassert>
   // include out of the mix.
   extern "C++" _GLIBCXX_NORETURN
-  inline void
-  __replacement_assert(const char* __file, int __line,
-		       const char* __function, const char* __condition)
-  _GLIBCXX_NOEXCEPT
-  {
-    __builtin_printf("%s:%d: %s: Assertion '%s' failed.\n", __file, __line,
-		     __function, __condition);
-    __builtin_abort();
-  }
+  void
+  __glibcxx_assert_fail(const char* __file, int __line,
+			const char* __function, const char* __condition)
+  _GLIBCXX_NOEXCEPT;
 }
-#define __glibcxx_assert_impl(_Condition)			       \
-  if (__builtin_expect(!bool(_Condition), false))		       \
-  {								       \
-    __glibcxx_constexpr_assert(false);				       \
-    std::__replacement_assert(__FILE__, __LINE__, __PRETTY_FUNCTION__, \
-			      #_Condition);			       \
+#define __glibcxx_assert_impl(_Condition)				\
+  if (__builtin_expect(!bool(_Condition), false))			\
+  {									\
+    __glibcxx_constexpr_assert(false);					\
+    std::__glibcxx_assert_fail(__FILE__, __LINE__, __PRETTY_FUNCTION__,	\
+			       #_Condition);				\
   }
 # else // ! VERBOSE_ASSERT
 # define __glibcxx_assert_impl(_Condition)		\
@@ -541,7 +545,7 @@ namespace std
     __glibcxx_constexpr_assert(false);			\
     __builtin_abort();					\
   }
-#endif
+# endif
 #endif
 
 #if defined(_GLIBCXX_ASSERTIONS)

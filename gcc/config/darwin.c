@@ -1059,7 +1059,7 @@ machopic_legitimize_pic_address (rtx orig, machine_mode mode, rtx reg)
 
 int
 machopic_output_data_section_indirection (machopic_indirection **slot,
-					  FILE *asm_out_file)
+					  FILE *out_file)
 {
   machopic_indirection *p = *slot;
 
@@ -1074,7 +1074,7 @@ machopic_output_data_section_indirection (machopic_indirection **slot,
 
   switch_to_section (data_section);
   assemble_align (GET_MODE_ALIGNMENT (Pmode));
-  assemble_label (asm_out_file, ptr_name);
+  assemble_label (out_file, ptr_name);
   assemble_integer (gen_rtx_SYMBOL_REF (Pmode, sym_name),
 		    GET_MODE_SIZE (Pmode),
 		    GET_MODE_ALIGNMENT (Pmode), 1);
@@ -1084,7 +1084,7 @@ machopic_output_data_section_indirection (machopic_indirection **slot,
 
 int
 machopic_output_stub_indirection (machopic_indirection **slot,
-				  FILE *asm_out_file)
+				  FILE *out_file)
 {
   machopic_indirection *p = *slot;
 
@@ -1122,13 +1122,13 @@ machopic_output_stub_indirection (machopic_indirection **slot,
   else
     sprintf (stub, "%s%s", user_label_prefix, ptr_name);
 
-  machopic_output_stub (asm_out_file, sym, stub);
+  machopic_output_stub (out_file, sym, stub);
 
   return 1;
 }
 
 int
-machopic_output_indirection (machopic_indirection **slot, FILE *asm_out_file)
+machopic_output_indirection (machopic_indirection **slot, FILE *out_file)
 {
   machopic_indirection *p = *slot;
 
@@ -1160,18 +1160,18 @@ machopic_output_indirection (machopic_indirection **slot, FILE *asm_out_file)
 	     storage has been allocated.  */
 	  && !TREE_STATIC (decl))
 	{
-	  fputs ("\t.weak_reference ", asm_out_file);
-	  assemble_name (asm_out_file, sym_name);
-	  fputc ('\n', asm_out_file);
+	  fputs ("\t.weak_reference ", out_file);
+	  assemble_name (out_file, sym_name);
+	  fputc ('\n', out_file);
 	}
     }
 
-  assemble_name (asm_out_file, ptr_name);
-  fprintf (asm_out_file, ":\n");
+  assemble_name (out_file, ptr_name);
+  fprintf (out_file, ":\n");
 
-  fprintf (asm_out_file, "\t.indirect_symbol ");
-  assemble_name (asm_out_file, sym_name);
-  fprintf (asm_out_file, "\n");
+  fprintf (out_file, "\t.indirect_symbol ");
+  assemble_name (out_file, sym_name);
+  fprintf (out_file, "\n");
 
   /* Variables that are marked with MACHO_SYMBOL_FLAG_STATIC need to
      have their symbol name instead of 0 in the second entry of
@@ -1191,7 +1191,7 @@ machopic_output_indirection (machopic_indirection **slot, FILE *asm_out_file)
 }
 
 static void
-machopic_finish (FILE *asm_out_file)
+machopic_finish (FILE *out_file)
 {
   if (!machopic_indirections)
     return;
@@ -1199,13 +1199,13 @@ machopic_finish (FILE *asm_out_file)
   /* First output an symbol indirections that have been placed into .data
      (we don't expect these now).  */
   machopic_indirections->traverse_noresize
-    <FILE *, machopic_output_data_section_indirection> (asm_out_file);
+    <FILE *, machopic_output_data_section_indirection> (out_file);
 
   machopic_indirections->traverse_noresize
-    <FILE *, machopic_output_stub_indirection> (asm_out_file);
+    <FILE *, machopic_output_stub_indirection> (out_file);
 
   machopic_indirections->traverse_noresize
-    <FILE *, machopic_output_indirection> (asm_out_file);
+    <FILE *, machopic_output_indirection> (out_file);
 }
 
 int
@@ -3637,30 +3637,6 @@ darwin_fold_builtin (tree fndecl, int n_args, tree *argp,
 void
 darwin_rename_builtins (void)
 {
-  /* The system ___divdc3 routine in libSystem on darwin10 is not
-     accurate to 1ulp, ours is, so we avoid ever using the system name
-     for this routine and instead install a non-conflicting name that
-     is accurate.
-
-     When -ffast-math or -funsafe-math-optimizations is given, we can
-     use the faster version.  */
-  if (!flag_unsafe_math_optimizations)
-    {
-      enum built_in_function dcode
-	= (enum built_in_function)(BUILT_IN_COMPLEX_DIV_MIN
-				   + DCmode - MIN_MODE_COMPLEX_FLOAT);
-      tree fn = builtin_decl_explicit (dcode);
-      /* Fortran and c call TARGET_INIT_BUILTINS and
-	 TARGET_INIT_LIBFUNCS at different times, so we have to put a
-	 call into each to ensure that at least one of them is called
-	 after build_common_builtin_nodes.  A better fix is to add a
-	 new hook to run after build_common_builtin_nodes runs.  */
-      if (fn)
-	set_user_assembler_name (fn, "___ieee_divdc3");
-      fn = builtin_decl_implicit (dcode);
-      if (fn)
-	set_user_assembler_name (fn, "___ieee_divdc3");
-    }
 }
 
 /* Implementation for the TARGET_LIBC_HAS_FUNCTION hook.  */

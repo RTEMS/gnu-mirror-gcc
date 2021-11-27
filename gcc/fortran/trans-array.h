@@ -76,6 +76,8 @@ void gfc_trans_static_array_pointer (gfc_symbol *);
 
 /* Get the procedure interface for a function call.  */
 gfc_symbol *gfc_get_proc_ifc_for_expr (gfc_expr *);
+/* Get the intrinsic symbol for an intrinsic function call.  */
+gfc_intrinsic_sym *gfc_get_intrinsic_for_expr (gfc_expr *);
 /* Generate scalarization information for an expression.  */
 gfc_ss *gfc_walk_expr (gfc_expr *);
 /* Workhorse for gfc_walk_expr.  */
@@ -84,7 +86,8 @@ gfc_ss *gfc_walk_subexpr (gfc_ss *, gfc_expr *);
 gfc_ss *gfc_walk_array_ref (gfc_ss *, gfc_expr *, gfc_ref * ref);
 /* Walk the arguments of an elemental function.  */
 gfc_ss *gfc_walk_elemental_function_args (gfc_ss *, gfc_actual_arglist *,
-					  gfc_symbol *, gfc_ss_type);
+					  gfc_intrinsic_sym *,
+					  gfc_ss_type);
 /* Walk an intrinsic function.  */
 gfc_ss *gfc_walk_intrinsic_function (gfc_ss *, gfc_expr *,
 				     gfc_intrinsic_sym *);
@@ -118,8 +121,6 @@ void gfc_copy_loopinfo_to_se (gfc_se *, gfc_loopinfo *);
 
 /* Marks the start of a scalarized expression, and declares loop variables.  */
 void gfc_start_scalarized_body (gfc_loopinfo *, stmtblock_t *);
-/* Generates one actual loop for a scalarized expression.  */
-void  gfc_trans_scalarized_loop_end (gfc_loopinfo *, int, stmtblock_t *);
 /* Generates the actual loops for a scalarized expression.  */
 void gfc_trans_scalarizing_loops (gfc_loopinfo *, stmtblock_t *);
 /* Mark the end of the main loop body and the start of the copying loop.  */
@@ -137,8 +138,6 @@ tree gfc_build_null_descriptor (tree);
 void gfc_conv_array_ref (gfc_se *, gfc_array_ref *, gfc_expr *, locus *);
 /* Translate a reference to a temporary array.  */
 void gfc_conv_tmp_array_ref (gfc_se * se);
-/* Translate a reference to an array temporary.  */
-void gfc_conv_tmp_ref (gfc_se *);
 
 /* Calculate the overall offset, including subreferences.  */
 void gfc_get_dataptr_offset (stmtblock_t*, tree, tree, tree, bool, gfc_expr*);
@@ -149,8 +148,6 @@ void gfc_conv_expr_descriptor (gfc_se *, gfc_expr *);
 /* Convert an array for passing as an actual function parameter.  */
 void gfc_conv_array_parameter (gfc_se *, gfc_expr *, bool,
 			       const gfc_symbol *, const char *, tree *);
-/* Evaluate and transpose a matrix expression.  */
-void gfc_conv_array_transpose (gfc_se *, gfc_expr *);
 
 /* These work with both descriptors and descriptorless arrays.  */
 tree gfc_conv_array_data (tree);
@@ -160,7 +157,8 @@ tree gfc_conv_array_stride (tree, int);
 tree gfc_conv_array_lbound (tree, int);
 tree gfc_conv_array_ubound (tree, int);
 
-/* Set cobounds of an array.  */
+/* Set (co)bounds of an array.  */
+tree gfc_trans_array_bounds (tree, gfc_symbol *, tree *, stmtblock_t *);
 void gfc_trans_array_cobounds (tree, stmtblock_t *, const gfc_symbol *);
 
 /* Build expressions for accessing components of an array descriptor.  */
@@ -175,6 +173,7 @@ tree gfc_conv_descriptor_dtype (tree);
 tree gfc_conv_descriptor_rank (tree);
 tree gfc_conv_descriptor_elem_len (tree);
 tree gfc_conv_descriptor_attribute (tree);
+tree gfc_conv_descriptor_type (tree);
 tree gfc_get_descriptor_dimension (tree);
 tree gfc_conv_descriptor_stride_get (tree, tree);
 tree gfc_conv_descriptor_lbound_get (tree, tree);
@@ -187,6 +186,18 @@ void gfc_conv_descriptor_span_set (stmtblock_t *, tree, tree);
 void gfc_conv_descriptor_stride_set (stmtblock_t *, tree, tree, tree);
 void gfc_conv_descriptor_lbound_set (stmtblock_t *, tree, tree, tree);
 void gfc_conv_descriptor_ubound_set (stmtblock_t *, tree, tree, tree);
+
+/* CFI descriptor.  */
+tree gfc_get_cfi_desc_base_addr (tree);
+tree gfc_get_cfi_desc_elem_len (tree);
+tree gfc_get_cfi_desc_version (tree);
+tree gfc_get_cfi_desc_rank (tree);
+tree gfc_get_cfi_desc_type (tree);
+tree gfc_get_cfi_desc_attribute (tree);
+tree gfc_get_cfi_dim_lbound (tree, tree);
+tree gfc_get_cfi_dim_extent (tree, tree);
+tree gfc_get_cfi_dim_sm (tree, tree);
+
 
 /* Shift lower bound of descriptor, updating ubound and offset.  */
 void gfc_conv_shift_descriptor_lbound (stmtblock_t*, tree, int, tree);

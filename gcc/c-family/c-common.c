@@ -384,6 +384,7 @@ const struct c_common_resword c_common_reswords[] =
   { "__builtin_convertvector", RID_BUILTIN_CONVERTVECTOR, 0 },
   { "__builtin_has_attribute", RID_BUILTIN_HAS_ATTRIBUTE, 0 },
   { "__builtin_launder", RID_BUILTIN_LAUNDER, D_CXXONLY },
+  { "__builtin_assoc_barrier", RID_BUILTIN_ASSOC_BARRIER, 0 },
   { "__builtin_shuffle", RID_BUILTIN_SHUFFLE, 0 },
   { "__builtin_shufflevector", RID_BUILTIN_SHUFFLEVECTOR, 0 },
   { "__builtin_tgmath", RID_BUILTIN_TGMATH, D_CONLY },
@@ -1739,10 +1740,13 @@ unsafe_conversion_p (tree type, tree expr, tree result, bool check_sign)
 
 /* Convert EXPR to TYPE, warning about conversion problems with constants.
    Invoke this function on every expression that is converted implicitly,
-   i.e. because of language rules and not because of an explicit cast.  */
+   i.e. because of language rules and not because of an explicit cast.
+   INIT_CONST is true if the conversion is for arithmetic types for a static
+   initializer and folding must apply accordingly (discarding floating-point
+   exceptions and assuming the default rounding mode is in effect).  */
 
 tree
-convert_and_check (location_t loc, tree type, tree expr)
+convert_and_check (location_t loc, tree type, tree expr, bool init_const)
 {
   tree result;
   tree expr_for_warning;
@@ -1754,7 +1758,9 @@ convert_and_check (location_t loc, tree type, tree expr)
     {
       tree orig_type = TREE_TYPE (expr);
       expr = TREE_OPERAND (expr, 0);
-      expr_for_warning = convert (orig_type, expr);
+      expr_for_warning = (init_const
+			  ? convert_init (orig_type, expr)
+			  : convert (orig_type, expr));
       if (orig_type == type)
 	return expr_for_warning;
     }
@@ -1764,7 +1770,7 @@ convert_and_check (location_t loc, tree type, tree expr)
   if (TREE_TYPE (expr) == type)
     return expr;
 
-  result = convert (type, expr);
+  result = init_const ? convert_init (type, expr) : convert (type, expr);
 
   if (c_inhibit_evaluation_warnings == 0
       && !TREE_OVERFLOW_P (expr)
@@ -3301,7 +3307,19 @@ pointer_int_sum (location_t loc, enum tree_code resultcode,
 				 TREE_TYPE (result_type)))
     size_exp = integer_one_node;
   else
-    size_exp = size_in_bytes_loc (loc, TREE_TYPE (result_type));
+    {
+      size_exp = size_in_bytes_loc (loc, TREE_TYPE (result_type));
+      /* Wrap the pointer expression in a SAVE_EXPR to make sure it
+	 is evaluated first when the size expression may depend
+	 on it for VM types.  */
+      if (TREE_SIDE_EFFECTS (size_exp)
+	  && TREE_SIDE_EFFECTS (ptrop)
+	  && variably_modified_type_p (TREE_TYPE (ptrop), NULL))
+	{
+	  ptrop = save_expr (ptrop);
+	  size_exp = build2 (COMPOUND_EXPR, TREE_TYPE (intop), ptrop, size_exp);
+	}
+    }
 
   /* We are manipulating pointer values, so we don't need to warn
      about relying on undefined signed overflow.  We disable the
@@ -3395,16 +3413,43 @@ c_wrap_maybe_const (tree expr, bool non_const)
 
 /* Return whether EXPR is a declaration whose address can never be NULL.
    The address of the first struct member could be NULL only if it were
-   accessed through a NULL pointer, and such an access would be invalid.  */
+   accessed through a NULL pointer, and such an access would be invalid.
+   The address of a weak symbol may be null unless it has a definition.  */
 
 bool
 decl_with_nonnull_addr_p (const_tree expr)
 {
-  return (DECL_P (expr)
-	  && (TREE_CODE (expr) == FIELD_DECL
-	      || TREE_CODE (expr) == PARM_DECL
-	      || TREE_CODE (expr) == LABEL_DECL
-	      || !DECL_WEAK (expr)));
+  if (!DECL_P (expr))
+    return false;
+
+  if (TREE_CODE (expr) == FIELD_DECL
+      || TREE_CODE (expr) == PARM_DECL
+      || TREE_CODE (expr) == LABEL_DECL)
+    return true;
+
+  if (!VAR_OR_FUNCTION_DECL_P (expr))
+    return false;
+
+  if (!DECL_WEAK (expr))
+    /* Ordinary (non-weak) symbols have nonnull addresses.  */
+    return true;
+
+  if (DECL_INITIAL (expr) && DECL_INITIAL (expr) != error_mark_node)
+    /* Initialized weak symbols have nonnull addresses.  */
+    return true;
+
+  if (DECL_EXTERNAL (expr) || !TREE_STATIC (expr))
+    /* Uninitialized extern weak symbols and weak symbols with no
+       allocated storage might have a null address.  */
+    return false;
+
+  tree attribs = DECL_ATTRIBUTES (expr);
+  if (lookup_attribute ("weakref", attribs))
+    /* Weakref symbols might have a null address unless their referent
+       is known not to.  Don't bother following weakref targets here.  */
+    return false;
+
+  return true;
 }
 
 /* Prepare expr to be an argument of a TRUTH_NOT_EXPR,
@@ -8208,8 +8253,16 @@ release_tree_vector (vec<tree, va_gc> *vec)
 {
   if (vec != NULL)
     {
-      vec->truncate (0);
-      vec_safe_push (tree_vector_cache, vec);
+      if (vec->allocated () >= 16)
+	/* Don't cache vecs that have expanded more than once.  On a p64
+	   target, vecs double in alloc size with each power of 2 elements, e.g
+	   at 16 elements the alloc increases from 128 to 256 bytes.  */
+	vec_free (vec);
+      else
+	{
+	  vec->truncate (0);
+	  vec_safe_push (tree_vector_cache, vec);
+	}
     }
 }
 

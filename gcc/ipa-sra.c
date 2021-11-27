@@ -85,6 +85,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-streamer.h"
 #include "internal-fn.h"
 #include "symtab-clones.h"
+#include "attribs.h"
 
 static void ipa_sra_summarize_function (cgraph_node *);
 
@@ -616,13 +617,6 @@ ipa_sra_preliminary_function_checks (cgraph_node *node)
       return false;
     }
 
-  if (TYPE_ATTRIBUTES (TREE_TYPE (node->decl)))
-    {
-      if (dump_file)
-	fprintf (dump_file, "Function type has attributes. \n");
-      return false;
-    }
-
   if (DECL_DISREGARD_INLINE_LIMITS (node->decl))
     {
       if (dump_file)
@@ -1005,15 +999,17 @@ ptr_parm_has_nonarg_uses (cgraph_node *node, function *fun, tree parm,
       if (gimple_assign_single_p (stmt))
 	{
 	  tree rhs = gimple_assign_rhs1 (stmt);
-	  while (handled_component_p (rhs))
-	    rhs = TREE_OPERAND (rhs, 0);
-	  if (TREE_CODE (rhs) == MEM_REF
-	      && TREE_OPERAND (rhs, 0) == name
-	      && integer_zerop (TREE_OPERAND (rhs, 1))
-	      && types_compatible_p (TREE_TYPE (rhs),
-				     TREE_TYPE (TREE_TYPE (name)))
-	      && !TREE_THIS_VOLATILE (rhs))
-	    uses_ok++;
+	  if (!TREE_THIS_VOLATILE (rhs))
+	    {
+	      while (handled_component_p (rhs))
+		rhs = TREE_OPERAND (rhs, 0);
+	      if (TREE_CODE (rhs) == MEM_REF
+		  && TREE_OPERAND (rhs, 0) == name
+		  && integer_zerop (TREE_OPERAND (rhs, 1))
+		  && types_compatible_p (TREE_TYPE (rhs),
+					 TREE_TYPE (TREE_TYPE (name))))
+		uses_ok++;
+	    }
 	}
       else if (is_gimple_call (stmt))
 	{
@@ -1047,15 +1043,17 @@ ptr_parm_has_nonarg_uses (cgraph_node *node, function *fun, tree parm,
 		  continue;
 		}
 
-	      while (handled_component_p (arg))
-		arg = TREE_OPERAND (arg, 0);
-	      if (TREE_CODE (arg) == MEM_REF
-		  && TREE_OPERAND (arg, 0) == name
-		  && integer_zerop (TREE_OPERAND (arg, 1))
-		  && types_compatible_p (TREE_TYPE (arg),
-					 TREE_TYPE (TREE_TYPE (name)))
-		  && !TREE_THIS_VOLATILE (arg))
-		uses_ok++;
+	      if (!TREE_THIS_VOLATILE (arg))
+		{
+		  while (handled_component_p (arg))
+		    arg = TREE_OPERAND (arg, 0);
+		  if (TREE_CODE (arg) == MEM_REF
+		      && TREE_OPERAND (arg, 0) == name
+		      && integer_zerop (TREE_OPERAND (arg, 1))
+		      && types_compatible_p (TREE_TYPE (arg),
+					     TREE_TYPE (TREE_TYPE (name))))
+		    uses_ok++;
+		}
 	    }
 	}
 

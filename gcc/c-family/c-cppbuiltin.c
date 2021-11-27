@@ -1073,6 +1073,7 @@ c_cpp_builtins (cpp_reader *pfile)
 	  cpp_define (pfile, "__cpp_size_t_suffix=202011L");
 	  cpp_define (pfile, "__cpp_if_consteval=202106L");
 	  cpp_define (pfile, "__cpp_constexpr=202110L");
+	  cpp_define (pfile, "__cpp_multidimensional_subscript=202110L");
 	}
       if (flag_concepts)
         {
@@ -1111,6 +1112,8 @@ c_cpp_builtins (cpp_reader *pfile)
       if (cxx_dialect >= cxx11 && strcmp (thread_model, "single") != 0)
 	cpp_define (pfile, "__STDCPP_THREADS__=1");
 #endif
+      if (flag_implicit_constexpr)
+	cpp_define (pfile, "__cpp_implicit_constexpr=20211111L");
     }
   /* Note that we define this for C as well, so that we know if
      __attribute__((cleanup)) will interface with EH.  */

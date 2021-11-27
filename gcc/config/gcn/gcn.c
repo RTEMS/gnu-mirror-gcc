@@ -2785,7 +2785,7 @@ move_callee_saved_registers (rtx sp, machine_function *offsets,
 		int start = (regno == VGPR_REGNO (7) ? 64 : 0);
 		int count = MIN (saved_scalars - start, 64);
 		int add_lr = (regno == VGPR_REGNO (6)
-			      && df_regs_ever_live_p (LINK_REGNUM));
+			      && offsets->lr_needs_saving);
 		int lrdest = -1;
 		rtvec seq = rtvec_alloc (count + add_lr);
 
@@ -5226,27 +5226,21 @@ output_file_start (void)
 #ifndef HAVE_GCN_XNACK_FIJI
       use_xnack_attr = false;
 #endif
-#ifndef HAVE_GCN_SRAM_ECC_FIJI
       use_sram_attr = false;
-#endif
       break;
     case PROCESSOR_VEGA10:
       cpu = "gfx900";
 #ifndef HAVE_GCN_XNACK_GFX900
       use_xnack_attr = false;
 #endif
-#ifndef HAVE_GCN_SRAM_ECC_GFX900
       use_sram_attr = false;
-#endif
       break;
     case PROCESSOR_VEGA20:
       cpu = "gfx906";
 #ifndef HAVE_GCN_XNACK_GFX906
       use_xnack_attr = false;
 #endif
-#ifndef HAVE_GCN_SRAM_ECC_GFX906
       use_sram_attr = false;
-#endif
       break;
     case PROCESSOR_GFX908:
       cpu = "gfx908";

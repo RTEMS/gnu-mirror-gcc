@@ -211,6 +211,7 @@ GNATRTL_NONTASKING_OBJS= \
   a-lllwti$(objext) \
   a-lllzti$(objext) \
   a-locale$(objext) \
+  a-nbnbig$(objext) \
   a-nbnbin$(objext) \
   a-nbnbre$(objext) \
   a-ncelfu$(objext) \
@@ -1166,9 +1167,6 @@ ifeq ($(strip $(filter-out powerpc% wrs vxworks vxworksspe vxworks7% vxworks7spe
           s-vxwext.ads<libgnarl/s-vxwext__kernel.ads \
           s-vxwext.adb<libgnarl/s-vxwext__kernel.adb \
           system.ads<libgnat/$(SVX)-$(ARCH_STR)-kernel.ads
-        else
-          LIBGNAT_TARGET_PAIRS += \
-          system.ads<libgnat/system-vxworks-ppc.ads
         endif
       endif
       EXTRA_GNATRTL_NONTASKING_OBJS+=i-vxinco.o i-vxwork.o i-vxwoio.o
@@ -1315,9 +1313,6 @@ ifeq ($(strip $(filter-out %86 x86_64 wrs vxworks vxworks7%,$(target_cpu) $(targ
           s-vxwext.ads<libgnarl/s-vxwext__kernel.ads \
           s-vxwext.adb<libgnarl/s-vxwext__kernel.adb \
           system.ads<libgnat/$(SVX)-x86-kernel.ads
-        else
-          LIBGNAT_TARGET_PAIRS += \
-          system.ads<libgnat/system-vxworks-x86.ads
         endif
       endif
 
@@ -1368,7 +1363,9 @@ ifeq ($(strip $(filter-out aarch64 arm% coff wrs vx%,$(target_cpu) $(target_vend
   g-socthi.ads<libgnat/g-socthi__vxworks.ads \
   g-socthi.adb<libgnat/g-socthi__vxworks.adb \
   g-sopowa.adb<libgnat/g-sopowa__posix.adb \
-  g-stsifd.adb<libgnat/g-stsifd__sockets.adb
+  g-stsifd.adb<libgnat/g-stsifd__sockets.adb \
+  $(ATOMICS_TARGET_PAIRS) \
+  $(ATOMICS_BUILTINS_TARGET_PAIRS)
 
   ifeq ($(strip $(filter-out aarch64, $(target_cpu))),)
     ARCH_STR=aarch64
@@ -2075,6 +2072,13 @@ ifeq ($(strip $(filter-out rtems%,$(target_os))),)
 
   ifeq ($(strip $(filter-out aarch64% riscv%,$(target_cpu))),)
     LIBGNAT_TARGET_PAIRS += a-nallfl.ads<libgnat/a-nallfl__wraplf.ads
+  endif
+
+  # Target CPUs that support atomic primitives
+  ifeq ($(strip $(filter-out aarch64%,$(target_cpu))),)
+     LIBGNAT_TARGET_PAIRS += \
+       $(ATOMICS_TARGET_PAIRS) \
+       $(ATOMICS_BUILTINS_TARGET_PAIRS)
   endif
 endif
 

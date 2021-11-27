@@ -37,16 +37,13 @@ bool
 gimple_range_calc_op1 (irange &r, const gimple *stmt, const irange &lhs_range)
 {
   gcc_checking_assert (gimple_num_ops (stmt) < 3);
-
-  // An empty range is viral.
-  tree type = TREE_TYPE (gimple_range_operand1 (stmt));
+  // Give up on empty ranges.
   if (lhs_range.undefined_p ())
-    {
-      r.set_undefined ();
-      return true;
-    }
+    return false;
+
   // Unary operations require the type of the first operand in the
   // second range position.
+  tree type = TREE_TYPE (gimple_range_operand1 (stmt));
   int_range<2> type_range (type);
   return gimple_range_handler (stmt)->op1_range (r, type, lhs_range,
 						 type_range);
@@ -61,15 +58,23 @@ bool
 gimple_range_calc_op1 (irange &r, const gimple *stmt,
 		       const irange &lhs_range, const irange &op2_range)
 {
+  // Give up on empty ranges.
+  if (lhs_range.undefined_p ())
+    return false;
+
   // Unary operation are allowed to pass a range in for second operand
   // as there are often additional restrictions beyond the type which
   // can be imposed.  See operator_cast::op1_range().
   tree type = TREE_TYPE (gimple_range_operand1 (stmt));
-  // An empty range is viral.
-  if (op2_range.undefined_p () || lhs_range.undefined_p ())
+  // If op2 is undefined, solve as if it is varying.
+  if (op2_range.undefined_p ())
     {
-      r.set_undefined ();
-      return true;
+      // This is sometimes invoked on single operand stmts.
+      if (gimple_num_ops (stmt) < 3)
+	return false;
+      int_range<2> trange (TREE_TYPE (gimple_range_operand2 (stmt)));
+      return gimple_range_handler (stmt)->op1_range (r, type, lhs_range,
+						     trange);
     }
   return gimple_range_handler (stmt)->op1_range (r, type, lhs_range,
 						 op2_range);
@@ -84,12 +89,17 @@ bool
 gimple_range_calc_op2 (irange &r, const gimple *stmt,
 		       const irange &lhs_range, const irange &op1_range)
 {
+  // Give up on empty ranges.
+  if (lhs_range.undefined_p ())
+    return false;
+
   tree type = TREE_TYPE (gimple_range_operand2 (stmt));
-  // An empty range is viral.
-  if (op1_range.undefined_p () || lhs_range.undefined_p ())
+  // If op1 is undefined, solve as if it is varying.
+  if (op1_range.undefined_p ())
     {
-      r.set_undefined ();
-      return true;
+      int_range<2> trange (TREE_TYPE (gimple_range_operand1 (stmt)));
+      return gimple_range_handler (stmt)->op2_range (r, type, lhs_range,
+						     trange);
     }
   return gimple_range_handler (stmt)->op2_range (r, type, lhs_range,
 						 op1_range);
@@ -216,9 +226,6 @@ range_def_chain::get_imports (tree name)
   if (!has_def_chain (name))
     get_def_chain (name);
   bitmap i = m_def_chain[SSA_NAME_VERSION (name)].m_import;
-  // Either this is a default def,  OR imports must be a subset of exports.
-  gcc_checking_assert (!get_def_chain (name) || !i
-		       || !bitmap_intersect_compl_p (i, get_def_chain (name)));
   return i;
 }
 
@@ -324,7 +331,6 @@ range_def_chain::get_def_chain (tree name)
 {
   tree ssa1, ssa2, ssa3;
   unsigned v = SSA_NAME_VERSION (name);
-  bool is_logical = false;
 
   // If it has already been processed, just return the cached value.
   if (has_def_chain (name))
@@ -341,15 +347,6 @@ range_def_chain::get_def_chain (tree name)
   gimple *stmt = SSA_NAME_DEF_STMT (name);
   if (gimple_range_handler (stmt))
     {
-      is_logical = is_gimple_logical_p (stmt);
-      // Terminate the def chains if we see too many cascading logical stmts.
-      if (is_logical)
-	{
-	  if (m_logical_depth == param_ranger_logical_depth)
-	    return NULL;
-	  m_logical_depth++;
-	}
-
       ssa1 = gimple_range_ssa_p (gimple_range_operand1 (stmt));
       ssa2 = gimple_range_ssa_p (gimple_range_operand2 (stmt));
       ssa3 = NULL_TREE;
@@ -369,6 +366,14 @@ range_def_chain::get_def_chain (tree name)
       return NULL;
     }
 
+  // Terminate the def chains if we see too many cascading stmts.
+  if (m_logical_depth == param_ranger_logical_depth)
+    return NULL;
+
+  // Increase the depth if we have a pair of ssa-names.
+  if (ssa1 && ssa2)
+    m_logical_depth++;
+
   register_dependency (name, ssa1, gimple_bb (stmt));
   register_dependency (name, ssa2, gimple_bb (stmt));
   register_dependency (name, ssa3, gimple_bb (stmt));
@@ -376,7 +381,7 @@ range_def_chain::get_def_chain (tree name)
   if (!ssa1 && !ssa2 & !ssa3)
     set_import (m_def_chain[v], name, NULL);
 
-  if (is_logical)
+  if (ssa1 && ssa2)
     m_logical_depth--;
 
   return m_def_chain[v].bm;
@@ -644,7 +649,7 @@ gori_compute::gori_compute (int not_executable_flag)
   // Create a boolean_type true and false range.
   m_bool_zero = int_range<2> (boolean_false_node, boolean_false_node);
   m_bool_one = int_range<2> (boolean_true_node, boolean_true_node);
-  if (dump_file && (param_evrp_mode & EVRP_MODE_GORI))
+  if (dump_file && (param_ranger_debug & RANGER_DEBUG_GORI))
     tracer.enable_trace ();
 }
 

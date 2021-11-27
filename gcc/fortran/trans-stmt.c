@@ -356,24 +356,22 @@ gfc_conv_elemental_dependencies (gfc_se * se, gfc_se * loopse,
 }
 
 
-/* Get the interface symbol for the procedure corresponding to the given call.
-   We can't get the procedure symbol directly as we have to handle the case
-   of (deferred) type-bound procedures.  */
+/* Given an executable statement referring to an intrinsic function call,
+   returns the intrinsic symbol.  */
 
-static gfc_symbol *
-get_proc_ifc_for_call (gfc_code *c)
+static gfc_intrinsic_sym *
+get_intrinsic_for_code (gfc_code *code)
 {
-  gfc_symbol *sym;
+  if (code->op == EXEC_CALL)
+    {
+      gfc_intrinsic_sym * const isym = code->resolved_isym;
+      if (isym)
+	return isym;
+      else
+	return gfc_get_intrinsic_for_expr (code->expr1);
+    }
 
-  gcc_assert (c->op == EXEC_ASSIGN_CALL || c->op == EXEC_CALL);
-
-  sym = gfc_get_proc_ifc_for_expr (c->expr1);
-
-  /* Fall back/last resort try.  */
-  if (sym == NULL)
-    sym = c->resolved_sym;
-
-  return sym;
+  return NULL;
 }
 
 
@@ -402,7 +400,7 @@ gfc_trans_call (gfc_code * code, bool dependency_check,
   ss = gfc_ss_terminator;
   if (code->resolved_sym->attr.elemental)
     ss = gfc_walk_elemental_function_args (ss, code->ext.actual,
-					   get_proc_ifc_for_call (code),
+					   get_intrinsic_for_code (code),
 					   GFC_SS_REFERENCE);
 
   /* MVBITS is inlined but needs the dependency checking found here.  */
@@ -3670,10 +3668,7 @@ gfc_trans_select_rank_cases (gfc_code * code)
   tree tmp;
   tree cond;
   tree low;
-  tree sexpr;
   tree rank;
-  tree rank_minus_one;
-  tree minus_one;
   gfc_se se;
   gfc_se cse;
   stmtblock_t block;
@@ -3687,24 +3682,25 @@ gfc_trans_select_rank_cases (gfc_code * code)
   gfc_conv_expr_descriptor (&se, code->expr1);
   rank = gfc_conv_descriptor_rank (se.expr);
   rank = gfc_evaluate_now (rank, &block);
-  minus_one = build_int_cst (TREE_TYPE (rank), -1);
-  tmp = fold_build2_loc (input_location, MINUS_EXPR,
-			 gfc_array_index_type,
-			 fold_convert (gfc_array_index_type, rank),
-			 build_int_cst (gfc_array_index_type, 1));
-  rank_minus_one = gfc_evaluate_now (tmp, &block);
-  tmp = gfc_conv_descriptor_ubound_get (se.expr, rank_minus_one);
-  cond = fold_build2_loc (input_location, NE_EXPR, logical_type_node,
-			  tmp, build_int_cst (TREE_TYPE (tmp), -1));
-  tmp = fold_build3_loc (input_location, COND_EXPR,
-			 TREE_TYPE (rank), cond,
-			 rank, minus_one);
-  cond = fold_build2_loc (input_location, EQ_EXPR, logical_type_node,
-			  rank, build_int_cst (TREE_TYPE (rank), 0));
-  sexpr = fold_build3_loc (input_location, COND_EXPR,
-			   TREE_TYPE (rank), cond,
-			   rank, tmp);
-  sexpr = gfc_evaluate_now (sexpr, &block);
+  symbol_attribute attr = gfc_expr_attr (code->expr1);
+  if (!attr.pointer && !attr.allocatable)
+    {
+      /* Special case for assumed-rank ('rank(*)', internally -1):
+	 rank = (rank == 0 || ubound[rank-1] != -1) ? rank : -1.  */
+      cond = fold_build2_loc (input_location, EQ_EXPR, logical_type_node,
+			      rank, build_int_cst (TREE_TYPE (rank), 0));
+      tmp = fold_build2_loc (input_location, MINUS_EXPR, gfc_array_index_type,
+			     fold_convert (gfc_array_index_type, rank),
+			     gfc_index_one_node);
+      tmp = gfc_conv_descriptor_ubound_get (se.expr, tmp);
+      tmp = fold_build2_loc (input_location, NE_EXPR, logical_type_node,
+			     tmp, build_int_cst (TREE_TYPE (tmp), -1));
+      cond = fold_build2_loc (input_location, TRUTH_ORIF_EXPR,
+			      logical_type_node, cond, tmp);
+      tmp = fold_build3_loc (input_location, COND_EXPR, TREE_TYPE (rank),
+			     cond, rank, build_int_cst (TREE_TYPE (rank), -1));
+      rank = gfc_evaluate_now (tmp, &block);
+    }
   TREE_USED (code->exit_label) = 0;
 
 repeat:
@@ -3748,8 +3744,8 @@ repeat:
       if (low != NULL_TREE)
 	{
 	  cond = fold_build2_loc (input_location, EQ_EXPR,
-				  TREE_TYPE (sexpr), sexpr,
-				  fold_convert (TREE_TYPE (sexpr), low));
+				  TREE_TYPE (rank), rank,
+				  fold_convert (TREE_TYPE (rank), low));
 	  tmp = fold_build3_loc (input_location, COND_EXPR, void_type_node,
 				 cond, tmp,
 				 build_empty_stmt (input_location));

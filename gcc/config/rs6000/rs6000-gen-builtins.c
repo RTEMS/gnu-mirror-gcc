@@ -1,5 +1,5 @@
 /* Generate built-in function initialization and recognition for Power.
-   Copyright (C) 2020-21 Free Software Foundation, Inc.
+   Copyright (C) 2020-2021 Free Software Foundation, Inc.
    Contributed by Bill Schmidt, IBM <wschmidt@linux.ibm.com>
 
 This file is part of GCC.
@@ -183,10 +183,19 @@ static const char *defines_path;
 /* Position information.  Note that "pos" is zero-indexed, but users
    expect one-indexed column information, so representations of "pos"
    as columns in diagnostic messages must be adjusted.  */
+#define MAXLINES 4
 #define LINELEN 1024
-static char linebuf[LINELEN];
+static char linebuf[LINELEN * MAXLINES];
 static int line;
 static int pos;
+
+/* Escape-newline support.  For readability, we prefer to allow developers
+   to use escape-newline to continue long lines to the next one.  We
+   maintain a buffer of "original" lines here, which are concatenated into
+   linebuf, above, and which can be used to convert the virtual line
+   position "line / pos" into actual line and position information.  */
+static char *lines[MAXLINES];
+static int lastline;
 
 /* Used to determine whether a type can be void (only return types).  */
 enum void_status
@@ -203,6 +212,7 @@ enum bif_stanza
  BSTZ_ALWAYS,
  BSTZ_P5,
  BSTZ_P6,
+ BSTZ_P6_64,
  BSTZ_ALTIVEC,
  BSTZ_CELL,
  BSTZ_VSX,
@@ -236,6 +246,7 @@ static stanza_entry stanza_map[NUMBIFSTANZAS] =
     { "always",		BSTZ_ALWAYS	},
     { "power5",		BSTZ_P5		},
     { "power6",		BSTZ_P6		},
+    { "power6-64",	BSTZ_P6_64	},
     { "altivec",	BSTZ_ALTIVEC	},
     { "cell",		BSTZ_CELL	},
     { "vsx",		BSTZ_VSX	},
@@ -260,6 +271,7 @@ static const char *enable_string[NUMBIFSTANZAS] =
     "ENB_ALWAYS",
     "ENB_P5",
     "ENB_P6",
+    "ENB_P6_64",
     "ENB_ALTIVEC",
     "ENB_CELL",
     "ENB_VSX",
@@ -568,29 +580,63 @@ static typemap type_map[TYPE_MAP_SIZE] =
     { "vp8hi",		"pixel_V8HI" },
   };
 
+/* From a possibly extended line with a virtual position, calculate
+   the current line and character position.  */
+static void
+real_line_pos (int diagpos, int *real_line, int *real_pos)
+{
+  *real_line = line - lastline;
+  *real_pos = diagpos;
+
+  for (int i = 0; i < MAXLINES; i++)
+    {
+      int len = strlen(lines[i]);
+      if (*real_pos <= len)
+	break;
+
+      (*real_line)++;
+      *real_pos -= len - 2;
+    }
+
+  /* Convert from zero-base to one-base for printing.  */
+  (*real_pos)++;
+}
+
 /* Pointer to a diagnostic function.  */
-static void (*diag) (const char *, ...)
-  __attribute__ ((format (printf, 1, 2)));
+static void (*diag) (int, const char *, ...)
+  __attribute__ ((format (printf, 2, 3)));
 
 /* Custom diagnostics.  */
-static void __attribute__ ((format (printf, 1, 2)))
-bif_diag (const char * fmt, ...)
+static void __attribute__ ((format (printf, 2, 3)))
+bif_diag (int diagpos, const char * fmt, ...)
 {
   va_list args;
-  fprintf (stderr, "%s:%d: ", bif_path, line);
+  int real_line, real_pos;
+  real_line_pos (diagpos, &real_line, &real_pos);
+  fprintf (stderr, "%s:%d:%d: ", bif_path, real_line, real_pos);
   va_start (args, fmt);
   vfprintf (stderr, fmt, args);
   va_end (args);
 }
 
-static void __attribute__ ((format (printf, 1, 2)))
-ovld_diag (const char * fmt, ...)
+static void __attribute__ ((format (printf, 2, 3)))
+ovld_diag (int diagpos, const char * fmt, ...)
 {
   va_list args;
-  fprintf (stderr, "%s:%d: ", ovld_path, line);
+  int real_line, real_pos;
+  real_line_pos (diagpos, &real_line, &real_pos);
+  fprintf (stderr, "%s:%d:%d: ", ovld_path, real_line, real_pos);
   va_start (args, fmt);
   vfprintf (stderr, fmt, args);
   va_end (args);
+}
+
+/* Produce a fatal error message.  */
+static void
+fatal (const char *msg)
+{
+  fprintf (stderr, "FATAL: %s\n", msg);
+  abort ();
 }
 
 /* Pass over whitespace (other than a newline, which terminates the scan).  */
@@ -602,7 +648,7 @@ consume_whitespace (void)
 
   if (pos >= LINELEN)
     {
-      diag ("line length overrun at %d.\n", pos);
+      diag (pos, "line length overrun.\n");
       exit (1);
     }
 
@@ -620,8 +666,28 @@ advance_line (FILE *file)
 	return 0;
       line++;
       size_t len = strlen (linebuf);
+
+      /* Escape-newline processing.  */
+      lastline = 0;
+      if (len > 1)
+	{
+	  strcpy (lines[0], linebuf);
+	  while (linebuf[len - 2] == '\\'
+		 && linebuf[len - 1] == '\n')
+	    {
+	      lastline++;
+	      if (lastline == MAXLINES)
+		fatal ("number of supported overflow lines exceeded");
+	      line++;
+	      if (!fgets (lines[lastline], LINELEN, file))
+		fatal ("unexpected end of file");
+	      strcpy (&linebuf[len - 2], lines[lastline]);
+	      len += strlen (lines[lastline]) - 2;
+	    }
+	}
+
       if (linebuf[len - 1] != '\n')
-	(*diag) ("line doesn't terminate with newline\n");
+	fatal ("line doesn't terminate with newline");
       pos = 0;
       consume_whitespace ();
       if (linebuf[pos] != '\n' && linebuf[pos] != ';')
@@ -634,7 +700,7 @@ safe_inc_pos (void)
 {
   if (++pos >= LINELEN)
     {
-      (*diag) ("line length overrun.\n");
+      diag (pos, "line length overrun.\n");
       exit (1);
     }
 }
@@ -651,7 +717,7 @@ match_identifier (void)
 
   if (lastpos >= LINELEN - 1)
     {
-      diag ("line length overrun at %d.\n", lastpos);
+      diag (lastpos, "line length overrun.\n");
       exit (1);
     }
 
@@ -681,7 +747,7 @@ match_integer (void)
 
   if (lastpos >= LINELEN - 1)
     {
-      diag ("line length overrun at %d.\n", lastpos);
+      diag (lastpos, "line length overrun.\n");
       exit (1);
     }
 
@@ -705,16 +771,13 @@ match_to_right_bracket (void)
   while (lastpos < LINELEN - 1 && linebuf[lastpos + 1] != ']')
     {
       if (linebuf[lastpos + 1] == '\n')
-	{
-	  (*diag) ("no ']' found before end of line.\n");
-	  exit (1);
-	}
+	fatal ("no ']' found before end of line.\n");
       ++lastpos;
     }
 
   if (lastpos >= LINELEN - 1)
     {
-      diag ("line length overrun at %d.\n", lastpos);
+      diag (lastpos, "line length overrun.\n");
       exit (1);
     }
 
@@ -740,14 +803,6 @@ handle_pointer (typeinfo *typedata)
     }
 }
 
-/* Produce a fatal error message.  */
-static void
-fatal (const char *msg)
-{
-  fprintf (stderr, "FATAL: %s\n", msg);
-  abort ();
-}
-
 static bif_stanza
 stanza_name_to_stanza (const char *stanza_name)
 {
@@ -771,7 +826,7 @@ match_basetype (typeinfo *typedata)
   char *token = match_identifier ();
   if (!token)
     {
-      (*diag) ("missing base type in return type at column %d\n", pos + 1);
+      diag (pos, "missing base type in return type\n");
       return 0;
     }
 
@@ -825,7 +880,7 @@ match_basetype (typeinfo *typedata)
     typedata->base = BT_IBM128;
   else
     {
-      (*diag) ("unrecognized base type at column %d\n", oldpos + 1);
+      diag (oldpos, "unrecognized base type\n");
       return 0;
     }
 
@@ -845,13 +900,13 @@ match_bracketed_pair (typeinfo *typedata, char open, char close,
       char *x = match_integer ();
       if (x == NULL)
 	{
-	  (*diag) ("malformed integer at column %d.\n", oldpos + 1);
+	  diag (oldpos, "malformed integer.\n");
 	  return 0;
 	}
       consume_whitespace ();
       if (linebuf[pos] != ',')
 	{
-	  (*diag) ("missing comma at column %d.\n", pos + 1);
+	  diag (pos, "missing comma.\n");
 	  return 0;
 	}
       safe_inc_pos ();
@@ -860,7 +915,7 @@ match_bracketed_pair (typeinfo *typedata, char open, char close,
       char *y = match_integer ();
       if (y == NULL)
 	{
-	  (*diag) ("malformed integer at column %d.\n", oldpos + 1);
+	  diag (oldpos, "malformed integer.\n");
 	  return 0;
 	}
       typedata->restr = restr;
@@ -870,7 +925,7 @@ match_bracketed_pair (typeinfo *typedata, char open, char close,
       consume_whitespace ();
       if (linebuf[pos] != close)
 	{
-	  (*diag) ("malformed restriction at column %d.\n", pos + 1);
+	  diag (pos, "malformed restriction.\n");
 	  return 0;
 	}
       safe_inc_pos ();
@@ -905,7 +960,7 @@ match_const_restriction (typeinfo *typedata)
       char *x = match_integer ();
       if (x == NULL)
 	{
-	  (*diag) ("malformed integer at column %d.\n", oldpos + 1);
+	  diag (oldpos, "malformed integer.\n");
 	  return 0;
 	}
       consume_whitespace ();
@@ -918,7 +973,7 @@ match_const_restriction (typeinfo *typedata)
 	}
       else if (linebuf[pos] != ',')
 	{
-	  (*diag) ("malformed restriction at column %d.\n", pos + 1);
+	  diag (pos, "malformed restriction.\n");
 	  return 0;
 	}
       safe_inc_pos ();
@@ -926,7 +981,7 @@ match_const_restriction (typeinfo *typedata)
       char *y = match_integer ();
       if (y == NULL)
 	{
-	  (*diag) ("malformed integer at column %d.\n", oldpos + 1);
+	  diag (oldpos, "malformed integer.\n");
 	  return 0;
 	}
       typedata->restr = RES_RANGE;
@@ -936,7 +991,7 @@ match_const_restriction (typeinfo *typedata)
       consume_whitespace ();
       if (linebuf[pos] != '>')
 	{
-	  (*diag) ("malformed restriction at column %d.\n", pos + 1);
+	  diag (pos, "malformed restriction.\n");
 	  return 0;
 	}
       safe_inc_pos ();
@@ -1217,8 +1272,7 @@ match_type (typeinfo *typedata, int voidok)
 	return 1;
       if (typedata->base != BT_INT)
 	{
-	  (*diag)("'const' at %d requires pointer or integer type",
-		  oldpos + 1);
+	  diag (oldpos, "'const' requires pointer or integer type\n");
 	  return 0;
 	}
       consume_whitespace ();
@@ -1248,7 +1302,7 @@ parse_args (prototype *protoptr)
   consume_whitespace ();
   if (linebuf[pos] != '(')
     {
-      (*diag) ("missing '(' at column %d.\n", pos + 1);
+      diag (pos, "missing '('.\n");
       return PC_PARSEFAIL;
     }
   safe_inc_pos ();
@@ -1266,7 +1320,7 @@ parse_args (prototype *protoptr)
 	  {
 	    if (restr_cnt >= MAXRESTROPNDS)
 	      {
-		(*diag) ("More than two %d operands\n", MAXRESTROPNDS);
+		diag (pos, "More than two %d operands\n", MAXRESTROPNDS);
 		return PC_PARSEFAIL;
 	      }
 	    restr_opnd[restr_cnt] = *nargs + 1;
@@ -1283,20 +1337,20 @@ parse_args (prototype *protoptr)
 	  safe_inc_pos ();
 	else if (linebuf[pos] != ')')
 	  {
-	    (*diag) ("arg not followed by ',' or ')' at column %d.\n",
-		     pos + 1);
+	    diag (pos, "arg not followed by ',' or ')'.\n");
 	    return PC_PARSEFAIL;
 	  }
 
 #ifdef DEBUG
-	(*diag) ("argument type: isvoid = %d, isconst = %d, isvector = %d, "
-		 "issigned = %d, isunsigned = %d, isbool = %d, ispixel = %d, "
-		 "ispointer = %d, base = %d, restr = %d, val1 = \"%s\", "
-		 "val2 = \"%s\", pos = %d.\n",
-		 argtype->isvoid, argtype->isconst, argtype->isvector,
-		 argtype->issigned, argtype->isunsigned, argtype->isbool,
-		 argtype->ispixel, argtype->ispointer, argtype->base,
-		 argtype->restr, argtype->val1, argtype->val2, pos + 1);
+	diag (0,
+	      "argument type: isvoid = %d, isconst = %d, isvector = %d, "
+	      "issigned = %d, isunsigned = %d, isbool = %d, ispixel = %d, "
+	      "ispointer = %d, base = %d, restr = %d, val1 = \"%s\", "
+	      "val2 = \"%s\", pos = %d.\n",
+	      argtype->isvoid, argtype->isconst, argtype->isvector,
+	      argtype->issigned, argtype->isunsigned, argtype->isbool,
+	      argtype->ispixel, argtype->ispointer, argtype->base,
+	      argtype->restr, argtype->val1, argtype->val2, pos + 1);
 #endif
       }
     else
@@ -1306,7 +1360,7 @@ parse_args (prototype *protoptr)
 	pos = oldpos;
 	if (linebuf[pos] != ')')
 	  {
-	    (*diag) ("badly terminated arg list at column %d.\n", pos + 1);
+	    diag (pos, "badly terminated arg list.\n");
 	    return PC_PARSEFAIL;
 	  }
 	safe_inc_pos ();
@@ -1323,7 +1377,7 @@ parse_bif_attrs (attrinfo *attrptr)
   consume_whitespace ();
   if (linebuf[pos] != '{')
     {
-      (*diag) ("missing attribute set at column %d.\n", pos + 1);
+      diag (pos, "missing attribute set.\n");
       return PC_PARSEFAIL;
     }
   safe_inc_pos ();
@@ -1383,7 +1437,7 @@ parse_bif_attrs (attrinfo *attrptr)
 	  attrptr->isendian = 1;
 	else
 	  {
-	    (*diag) ("unknown attribute at column %d.\n", oldpos + 1);
+	    diag (oldpos, "unknown attribute.\n");
 	    return PC_PARSEFAIL;
 	  }
 
@@ -1392,8 +1446,7 @@ parse_bif_attrs (attrinfo *attrptr)
 	  safe_inc_pos ();
 	else if (linebuf[pos] != '}')
 	  {
-	    (*diag) ("arg not followed by ',' or '}' at column %d.\n",
-		     pos + 1);
+	    diag (pos, "arg not followed by ',' or '}'.\n");
 	    return PC_PARSEFAIL;
 	  }
       }
@@ -1402,7 +1455,7 @@ parse_bif_attrs (attrinfo *attrptr)
 	pos = oldpos;
 	if (linebuf[pos] != '}')
 	  {
-	    (*diag) ("badly terminated attr set at column %d.\n", pos + 1);
+	    diag (pos, "badly terminated attr set.\n");
 	    return PC_PARSEFAIL;
 	  }
 	safe_inc_pos ();
@@ -1410,18 +1463,19 @@ parse_bif_attrs (attrinfo *attrptr)
   } while (attrname);
 
 #ifdef DEBUG
-  (*diag) ("attribute set: init = %d, set = %d, extract = %d, nosoft = %d, "
-	   "ldvec = %d, stvec = %d, reve = %d, pred = %d, htm = %d, "
-	   "htmspr = %d, htmcr = %d, mma = %d, quad = %d, pair = %d, "
-	   "mmaint = %d, no32bit = %d, 32bit = %d, cpu = %d, ldstmask = %d, "
-	   "lxvrse = %d, lxvrze = %d, endian = %d.\n",
-	   attrptr->isinit, attrptr->isset, attrptr->isextract,
-	   attrptr->isnosoft, attrptr->isldvec, attrptr->isstvec,
-	   attrptr->isreve, attrptr->ispred, attrptr->ishtm, attrptr->ishtmspr,
-	   attrptr->ishtmcr, attrptr->ismma, attrptr->isquad, attrptr->ispair,
-	   attrptr->ismmaint, attrptr->isno32bit, attrptr->is32bit,
-	   attrptr->iscpu, attrptr->isldstmask, attrptr->islxvrse,
-	   attrptr->islxvrze, attrptr->isendian);
+  diag (0,
+	"attribute set: init = %d, set = %d, extract = %d, nosoft = %d, "
+	"ldvec = %d, stvec = %d, reve = %d, pred = %d, htm = %d, "
+	"htmspr = %d, htmcr = %d, mma = %d, quad = %d, pair = %d, "
+	"mmaint = %d, no32bit = %d, 32bit = %d, cpu = %d, ldstmask = %d, "
+	"lxvrse = %d, lxvrze = %d, endian = %d.\n",
+	attrptr->isinit, attrptr->isset, attrptr->isextract,
+	attrptr->isnosoft, attrptr->isldvec, attrptr->isstvec,
+	attrptr->isreve, attrptr->ispred, attrptr->ishtm, attrptr->ishtmspr,
+	attrptr->ishtmcr, attrptr->ismma, attrptr->isquad, attrptr->ispair,
+	attrptr->ismmaint, attrptr->isno32bit, attrptr->is32bit,
+	attrptr->iscpu, attrptr->isldstmask, attrptr->islxvrse,
+	attrptr->islxvrze, attrptr->isendian);
 #endif
 
   return PC_OK;
@@ -1483,7 +1537,7 @@ complete_vector_type (typeinfo *typeptr, char *buf, int *bufi)
       *bufi += 4;
       break;
     default:
-      (*diag) ("unhandled basetype %d.\n", typeptr->base);
+      diag (pos, "unhandled basetype %d.\n", typeptr->base);
       exit (1);
     }
 }
@@ -1543,7 +1597,7 @@ complete_base_type (typeinfo *typeptr, char *buf, int *bufi)
       memcpy (&buf[*bufi], "if", 2);
       break;
     default:
-      (*diag) ("unhandled basetype %d.\n", typeptr->base);
+      diag (pos, "unhandled basetype %d.\n", typeptr->base);
       exit (1);
     }
 
@@ -1664,20 +1718,20 @@ parse_prototype (prototype *protoptr)
   int success = match_type (ret_type, VOID_OK);
   if (!success)
     {
-      (*diag) ("missing or badly formed return type at column %d.\n",
-	       oldpos + 1);
+      diag (oldpos, "missing or badly formed return type.\n");
       return PC_PARSEFAIL;
     }
 
 #ifdef DEBUG
-  (*diag) ("return type: isvoid = %d, isconst = %d, isvector = %d, "
-	   "issigned = %d, isunsigned = %d, isbool = %d, ispixel = %d, "
-	   "ispointer = %d, base = %d, restr = %d, val1 = \"%s\", "
-	   "val2 = \"%s\", pos = %d.\n",
-	   ret_type->isvoid, ret_type->isconst, ret_type->isvector,
-	   ret_type->issigned, ret_type->isunsigned, ret_type->isbool,
-	   ret_type->ispixel, ret_type->ispointer, ret_type->base,
-	   ret_type->restr, ret_type->val1, ret_type->val2, pos + 1);
+  diag (0,
+	"return type: isvoid = %d, isconst = %d, isvector = %d, "
+	"issigned = %d, isunsigned = %d, isbool = %d, ispixel = %d, "
+	"ispointer = %d, base = %d, restr = %d, val1 = \"%s\", "
+	"val2 = \"%s\", pos = %d.\n",
+	ret_type->isvoid, ret_type->isconst, ret_type->isvector,
+	ret_type->issigned, ret_type->isunsigned, ret_type->isbool,
+	ret_type->ispixel, ret_type->ispointer, ret_type->base,
+	ret_type->restr, ret_type->val1, ret_type->val2, pos + 1);
 #endif
 
   /* Get the bif name.  */
@@ -1686,12 +1740,12 @@ parse_prototype (prototype *protoptr)
   *bifname = match_identifier ();
   if (!*bifname)
     {
-      (*diag) ("missing function name at column %d.\n", oldpos + 1);
+      diag (oldpos, "missing function name.\n");
       return PC_PARSEFAIL;
     }
 
 #ifdef DEBUG
-  (*diag) ("function name is '%s'.\n", *bifname);
+  diag (0, "function name is '%s'.\n", *bifname);
 #endif
 
   /* Process arguments.  */
@@ -1702,14 +1756,14 @@ parse_prototype (prototype *protoptr)
   consume_whitespace ();
   if (linebuf[pos] != ';')
     {
-      (*diag) ("missing semicolon at column %d.\n", pos + 1);
+      diag (pos, "missing semicolon.\n");
       return PC_PARSEFAIL;
     }
   safe_inc_pos ();
   consume_whitespace ();
   if (linebuf[pos] != '\n')
     {
-      (*diag) ("garbage at end of line at column %d.\n", pos + 1);
+      diag (pos, "garbage at end of line.\n");
       return PC_PARSEFAIL;
     }
 
@@ -1729,7 +1783,7 @@ parse_bif_entry (void)
   /* Allocate an entry in the bif table.  */
   if (num_bifs >= MAXBIFS - 1)
     {
-      (*diag) ("too many built-in functions.\n");
+      diag (pos, "too many built-in functions.\n");
       return PC_PARSEFAIL;
     }
 
@@ -1742,7 +1796,7 @@ parse_bif_entry (void)
   char *token = match_identifier ();
   if (!token)
     {
-      (*diag) ("malformed entry at column %d\n", oldpos + 1);
+      diag (oldpos, "malformed entry.\n");
       return PC_PARSEFAIL;
     }
 
@@ -1769,7 +1823,7 @@ parse_bif_entry (void)
   /* Now process line 2.  First up is the builtin id.  */
   if (!advance_line (bif_file))
     {
-      (*diag) ("unexpected EOF.\n");
+      diag (pos, "unexpected EOF.\n");
       return PC_PARSEFAIL;
     }
 
@@ -1779,19 +1833,18 @@ parse_bif_entry (void)
   bifs[curr_bif].idname = match_identifier ();
   if (!bifs[curr_bif].idname)
     {
-      (*diag) ("missing builtin id at column %d.\n", pos + 1);
+      diag (pos, "missing builtin id.\n");
       return PC_PARSEFAIL;
     }
 
 #ifdef DEBUG
-  (*diag) ("ID name is '%s'.\n", bifs[curr_bif].idname);
+  diag (0, "ID name is '%s'.\n", bifs[curr_bif].idname);
 #endif
 
   /* Save the ID in a lookup structure.  */
   if (!rbt_insert (&bif_rbt, bifs[curr_bif].idname))
     {
-      (*diag) ("duplicate function ID '%s' at column %d.\n",
-	       bifs[curr_bif].idname, oldpos + 1);
+      diag (oldpos, "duplicate function ID '%s'.\n", bifs[curr_bif].idname);
       return PC_PARSEFAIL;
     }
 
@@ -1804,7 +1857,7 @@ parse_bif_entry (void)
 
   if (!rbt_insert (&bifo_rbt, buf))
     {
-      (*diag) ("internal error inserting '%s' in bifo_rbt\n", buf);
+      diag (pos, "internal error inserting '%s' in bifo_rbt\n", buf);
       return PC_PARSEFAIL;
     }
 
@@ -1813,12 +1866,12 @@ parse_bif_entry (void)
   bifs[curr_bif].patname = match_identifier ();
   if (!bifs[curr_bif].patname)
     {
-      (*diag) ("missing pattern name at column %d.\n", pos + 1);
+      diag (pos, "missing pattern name.\n");
       return PC_PARSEFAIL;
     }
 
 #ifdef DEBUG
-  (*diag) ("pattern name is '%s'.\n", bifs[curr_bif].patname);
+  diag (0, "pattern name is '%s'.\n", bifs[curr_bif].patname);
 #endif
 
   /* Process attributes.  */
@@ -1836,7 +1889,7 @@ parse_bif_stanza (void)
 
   if (linebuf[pos] != '[')
     {
-      (*diag) ("ill-formed stanza header at column %d.\n", pos + 1);
+      diag (pos, "ill-formed stanza header.\n");
       return PC_PARSEFAIL;
     }
   safe_inc_pos ();
@@ -1844,7 +1897,7 @@ parse_bif_stanza (void)
   const char *stanza_name = match_to_right_bracket ();
   if (!stanza_name)
     {
-      (*diag) ("no expression found in stanza header.\n");
+      diag (pos, "no expression found in stanza header.\n");
       return PC_PARSEFAIL;
     }
 
@@ -1852,7 +1905,7 @@ parse_bif_stanza (void)
 
   if (linebuf[pos] != ']')
     {
-      (*diag) ("ill-formed stanza header at column %d.\n", pos + 1);
+      diag (pos, "ill-formed stanza header.\n");
       return PC_PARSEFAIL;
     }
   safe_inc_pos ();
@@ -1860,7 +1913,7 @@ parse_bif_stanza (void)
   consume_whitespace ();
   if (linebuf[pos] != '\n' && pos != LINELEN - 1)
     {
-      (*diag) ("garbage after stanza header.\n");
+      diag (pos, "garbage after stanza header.\n");
       return PC_PARSEFAIL;
     }
 
@@ -1927,7 +1980,7 @@ parse_ovld_entry (void)
   /* Allocate an entry in the overload table.  */
   if (num_ovlds >= MAXOVLDS - 1)
     {
-      (*diag) ("too many overloads.\n");
+      diag (pos, "too many overloads.\n");
       return PC_PARSEFAIL;
     }
 
@@ -1948,7 +2001,7 @@ parse_ovld_entry (void)
      optional overload id.  */
   if (!advance_line (ovld_file))
     {
-      (*diag) ("unexpected EOF.\n");
+      diag (0, "unexpected EOF.\n");
       return PC_EOFILE;
     }
 
@@ -1960,18 +2013,18 @@ parse_ovld_entry (void)
   ovlds[curr_ovld].ovld_id_name = id;
   if (!id)
     {
-      (*diag) ("missing overload id at column %d.\n", pos + 1);
+      diag (pos, "missing overload id.\n");
       return PC_PARSEFAIL;
     }
 
 #ifdef DEBUG
-  (*diag) ("ID name is '%s'.\n", id);
+  diag (pos, "ID name is '%s'.\n", id);
 #endif
 
   /* The builtin id has to match one from the bif file.  */
   if (!rbt_find (&bif_rbt, id))
     {
-      (*diag) ("builtin ID '%s' not found in bif file.\n", id);
+      diag (pos, "builtin ID '%s' not found in bif file.\n", id);
       return PC_PARSEFAIL;
     }
 
@@ -1989,13 +2042,13 @@ parse_ovld_entry (void)
  /* Save the overload ID in a lookup structure.  */
   if (!rbt_insert (&ovld_rbt, id))
     {
-      (*diag) ("duplicate overload ID '%s' at column %d.\n", id, oldpos + 1);
+      diag (oldpos, "duplicate overload ID '%s'.\n", id);
       return PC_PARSEFAIL;
     }
 
   if (linebuf[pos] != '\n')
     {
-      (*diag) ("garbage at end of line at column %d.\n", pos + 1);
+      diag (pos, "garbage at end of line.\n");
       return PC_PARSEFAIL;
     }
   return PC_OK;
@@ -2012,7 +2065,7 @@ parse_ovld_stanza (void)
 
   if (linebuf[pos] != '[')
     {
-      (*diag) ("ill-formed stanza header at column %d.\n", pos + 1);
+      diag (pos, "ill-formed stanza header.\n");
       return PC_PARSEFAIL;
     }
   safe_inc_pos ();
@@ -2020,7 +2073,7 @@ parse_ovld_stanza (void)
   char *stanza_name = match_identifier ();
   if (!stanza_name)
     {
-      (*diag) ("no identifier found in stanza header.\n");
+      diag (pos, "no identifier found in stanza header.\n");
       return PC_PARSEFAIL;
     }
 
@@ -2028,7 +2081,7 @@ parse_ovld_stanza (void)
      with subsequent overload entries.  */
   if (num_ovld_stanzas >= MAXOVLDSTANZAS)
     {
-      (*diag) ("too many stanza headers.\n");
+      diag (pos, "too many stanza headers.\n");
       return PC_PARSEFAIL;
     }
 
@@ -2039,7 +2092,7 @@ parse_ovld_stanza (void)
   consume_whitespace ();
   if (linebuf[pos] != ',')
     {
-      (*diag) ("missing comma at column %d.\n", pos + 1);
+      diag (pos, "missing comma.\n");
       return PC_PARSEFAIL;
     }
   safe_inc_pos ();
@@ -2048,14 +2101,14 @@ parse_ovld_stanza (void)
   stanza->extern_name = match_identifier ();
   if (!stanza->extern_name)
     {
-      (*diag) ("missing external name at column %d.\n", pos + 1);
+      diag (pos, "missing external name.\n");
       return PC_PARSEFAIL;
     }
 
   consume_whitespace ();
   if (linebuf[pos] != ',')
     {
-      (*diag) ("missing comma at column %d.\n", pos + 1);
+      diag (pos, "missing comma.\n");
       return PC_PARSEFAIL;
     }
   safe_inc_pos ();
@@ -2064,7 +2117,7 @@ parse_ovld_stanza (void)
   stanza->intern_name = match_identifier ();
   if (!stanza->intern_name)
     {
-      (*diag) ("missing internal name at column %d.\n", pos + 1);
+      diag (pos, "missing internal name.\n");
       return PC_PARSEFAIL;
     }
 
@@ -2076,7 +2129,7 @@ parse_ovld_stanza (void)
       stanza->ifdef = match_identifier ();
       if (!stanza->ifdef)
 	{
-	  (*diag) ("missing ifdef token at column %d.\n", pos + 1);
+	  diag (pos, "missing ifdef token.\n");
 	  return PC_PARSEFAIL;
 	}
       consume_whitespace ();
@@ -2086,7 +2139,7 @@ parse_ovld_stanza (void)
 
   if (linebuf[pos] != ']')
     {
-      (*diag) ("ill-formed stanza header at column %d.\n", pos + 1);
+      diag (pos, "ill-formed stanza header.\n");
       return PC_PARSEFAIL;
     }
   safe_inc_pos ();
@@ -2094,7 +2147,7 @@ parse_ovld_stanza (void)
   consume_whitespace ();
   if (linebuf[pos] != '\n' && pos != LINELEN - 1)
     {
-      (*diag) ("garbage after stanza header.\n");
+      diag (pos, "garbage after stanza header.\n");
       return PC_PARSEFAIL;
     }
 
@@ -2177,6 +2230,7 @@ write_decls (void)
   fprintf (header_file, "  ENB_ALWAYS,\n");
   fprintf (header_file, "  ENB_P5,\n");
   fprintf (header_file, "  ENB_P6,\n");
+  fprintf (header_file, "  ENB_P6_64,\n");
   fprintf (header_file, "  ENB_ALTIVEC,\n");
   fprintf (header_file, "  ENB_CELL,\n");
   fprintf (header_file, "  ENB_VSX,\n");
@@ -2942,6 +2996,10 @@ main (int argc, const char **argv)
 	       defines_path);
       exit (1);
     }
+
+  /* Allocate some buffers.  */
+  for (int i = 0; i < MAXLINES; i++)
+    lines[i] = (char *) malloc (LINELEN);
 
   /* Initialize the balanced trees containing built-in function ids,
      overload function ids, and function type declaration ids.  */

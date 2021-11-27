@@ -69,6 +69,7 @@ with Sinfo.Utils;    use Sinfo.Utils;
 with Snames;         use Snames;
 with Stand;          use Stand;
 with Stringt;        use Stringt;
+with Strub;          use Strub;
 with Targparm;       use Targparm;
 with Tbuild;         use Tbuild;
 with Ttypes;         use Ttypes;
@@ -865,9 +866,12 @@ package body Freeze is
                Error_Msg_NE (Size_Too_Small_Message, Size_Clause (T), T);
             end if;
 
-         --  Set size if not set already
+         --  Set size if not set already. Do not set it to Uint_0, because in
+         --  some cases (notably array-of-record), the Component_Size is
+         --  No_Uint, which causes S to be Uint_0. Presumably the RM_Size and
+         --  Component_Size will eventually be set correctly by the back end.
 
-         elsif not Known_RM_Size (T) then
+         elsif not Known_RM_Size (T) and then S /= Uint_0 then
             Set_RM_Size (T, S);
          end if;
       end Set_Small_Size;
@@ -899,8 +903,17 @@ package body Freeze is
             --  String literals always have known size, and we can set it
 
             if Ekind (T) = E_String_Literal_Subtype then
-               Set_Small_Size
-                 (T, Component_Size (T) * String_Literal_Length (T));
+               if Known_Component_Size (T) then
+                  Set_Small_Size
+                    (T, Component_Size (T) * String_Literal_Length (T));
+
+               else
+                  --  The following is wrong, but does what previous versions
+                  --  did. The Component_Size is unknown for the string in a
+                  --  pragma Warnings.
+                  Set_Small_Size (T, Uint_0);
+               end if;
+
                return True;
 
             --  Unconstrained types never have known at compile time size
@@ -932,6 +945,12 @@ package body Freeze is
                Dim   : Uint;
 
             begin
+               --  See comment in Set_Small_Size above
+
+               if No (Size) then
+                  Size := Uint_0;
+               end if;
+
                Index := First_Index (T);
                while Present (Index) loop
                   if Nkind (Index) = N_Range then
@@ -954,7 +973,7 @@ package body Freeze is
                   else
                      Dim := Expr_Value (High) - Expr_Value (Low) + 1;
 
-                     if Dim >= 0 then
+                     if Dim > Uint_0 then
                         Size := Size * Dim;
                      else
                         Size := Uint_0;
@@ -1772,6 +1791,10 @@ package body Freeze is
          return Result;
       end Needs_Wrapper;
 
+      Ifaces_List    : Elist_Id := No_Elist;
+      Ifaces_Listed  : Boolean := False;
+      --  Cache the list of interface operations inherited by R
+
    --  Start of processing for Check_Inherited_Conditions
 
    begin
@@ -1805,11 +1828,10 @@ package body Freeze is
       while Present (Op_Node) loop
          Prim := Node (Op_Node);
 
-         if Present (Overridden_Operation (Prim))
+         Par_Prim := Overridden_Operation (Prim);
+         if Present (Par_Prim)
            and then Comes_From_Source (Prim)
          then
-            Par_Prim := Overridden_Operation (Prim);
-
             --  When the primitive is an LSP wrapper we climb to the parent
             --  primitive that has the inherited contract.
 
@@ -1818,6 +1840,11 @@ package body Freeze is
             then
                Par_Prim := LSP_Subprogram (Par_Prim);
             end if;
+
+            --  Check that overrider and overridden operations have
+            --  the same strub mode.
+
+            Check_Same_Strub_Mode (Prim, Par_Prim);
 
             --  Analyze the contract items of the overridden operation, before
             --  they are rewritten as pragmas.
@@ -1832,6 +1859,54 @@ package body Freeze is
             if GNATprove_Mode then
                Collect_Inherited_Class_Wide_Conditions (Prim);
             end if;
+         end if;
+
+         --  Go over operations inherited from interfaces and check
+         --  them for strub mode compatibility as well.
+
+         if Has_Interfaces (R)
+           and then Is_Dispatching_Operation (Prim)
+           and then Find_Dispatching_Type (Prim) = R
+         then
+            declare
+               Elmt        : Elmt_Id;
+               Iface_Elmt  : Elmt_Id;
+               Iface       : Entity_Id;
+               Iface_Prim  : Entity_Id;
+
+            begin
+               --  Collect the interfaces only once. We haven't
+               --  finished freezing yet, so we can't use the faster
+               --  search from Sem_Disp.Covered_Interface_Primitives.
+
+               if not Ifaces_Listed then
+                  Collect_Interfaces (R, Ifaces_List);
+                  Ifaces_Listed := True;
+               end if;
+
+               Iface_Elmt := First_Elmt (Ifaces_List);
+               while Present (Iface_Elmt) loop
+                  Iface := Node (Iface_Elmt);
+
+                  Elmt := First_Elmt (Primitive_Operations (Iface));
+                  while Present (Elmt) loop
+                     Iface_Prim := Node (Elmt);
+
+                     if Iface_Prim /= Par_Prim
+                       and then Chars (Iface_Prim) = Chars (Prim)
+                       and then Comes_From_Source (Iface_Prim)
+                       and then (Is_Interface_Conformant
+                                   (R, Iface_Prim, Prim))
+                     then
+                        Check_Same_Strub_Mode (Prim, Iface_Prim);
+                     end if;
+
+                     Next_Elmt (Elmt);
+                  end loop;
+
+                  Next_Elmt (Iface_Elmt);
+               end loop;
+            end;
          end if;
 
          Next_Elmt (Op_Node);
@@ -2319,7 +2394,7 @@ package body Freeze is
             --  created for entry parameters must be frozen.
 
             if Ekind (E) = E_Package
-              and then No (Renamed_Object (E))
+              and then No (Renamed_Entity (E))
               and then not Is_Child_Unit (E)
               and then not Is_Frozen (E)
             then
@@ -2484,6 +2559,18 @@ package body Freeze is
          if Is_Subprogram (E) then
             if not Default_Expressions_Processed (E) then
                Process_Default_Expressions (E, After);
+            end if;
+
+            --  Check subprogram renamings for the same strub-mode.
+            --  Avoid rechecking dispatching operations, that's taken
+            --  care of in Check_Inherited_Conditions, that covers
+            --  inherited interface operations.
+
+            Item := Alias (E);
+            if Present (Item)
+              and then not Is_Dispatching_Operation (E)
+            then
+               Check_Same_Strub_Mode (E, Item);
             end if;
 
             if not Has_Completion (E) then
@@ -3353,7 +3440,7 @@ package body Freeze is
 
                            Error_Msg_Uint_1 := Modv;
                            Error_Msg_N
-                             ("?M?2 '*'*^' may have been intended here",
+                             ("?.m?2 '*'*^' may have been intended here",
                               Modulus);
                         end;
                      end if;
@@ -3703,6 +3790,7 @@ package body Freeze is
                      if Has_Pragma_Pack (Arr)
                        and then not Present (Comp_Size_C)
                        and then (Csiz = 7 or else Csiz = 15 or else Csiz = 31)
+                       and then Known_Esize (Base_Type (Ctyp))
                        and then Esize (Base_Type (Ctyp)) = Csiz + 1
                      then
                         Error_Msg_Uint_1 := Csiz;
@@ -6393,7 +6481,7 @@ package body Freeze is
                         then
                            Error_Msg_NE
                              ("useless postcondition, & is marked "
-                              & "No_Return?T?", Exp, E);
+                              & "No_Return?.t?", Exp, E);
                         end if;
                      end if;
 
@@ -6646,7 +6734,7 @@ package body Freeze is
 
                         Dim := Expr_Value (Hi) - Expr_Value (Lo) + 1;
 
-                        if Dim >= 0 then
+                        if Dim > Uint_0 then
                            Num_Elmts := Num_Elmts * Dim;
                         else
                            Num_Elmts := Uint_0;
@@ -6668,9 +6756,12 @@ package body Freeze is
                         if Implicit_Packing then
                            Set_Component_Size (Btyp, Rsiz);
 
-                        --  Otherwise give an error message
+                        --  Otherwise give an error message, except that if the
+                        --  specified Size is zero, there is no need for pragma
+                        --  Pack. Note that size zero is not considered
+                        --  Addressable.
 
-                        else
+                        elsif RM_Size (E) /= Uint_0 then
                            Error_Msg_NE
                              ("size given for& too small", SZ, E);
                            Error_Msg_N -- CODEFIX
@@ -6771,24 +6862,24 @@ package body Freeze is
                   if Sloc (SC) > Sloc (AC) then
                      Loc := SC;
                      Error_Msg_NE
-                       ("?Z?size is not a multiple of alignment for &",
+                       ("?.z?size is not a multiple of alignment for &",
                         Loc, E);
                      Error_Msg_Sloc := Sloc (AC);
                      Error_Msg_Uint_1 := Alignment (E);
-                     Error_Msg_N ("\?Z?alignment of ^ specified #", Loc);
+                     Error_Msg_N ("\?.z?alignment of ^ specified #", Loc);
 
                   else
                      Loc := AC;
                      Error_Msg_NE
-                       ("?Z?size is not a multiple of alignment for &",
+                       ("?.z?size is not a multiple of alignment for &",
                         Loc, E);
                      Error_Msg_Sloc := Sloc (SC);
                      Error_Msg_Uint_1 := RM_Size (E);
-                     Error_Msg_N ("\?Z?size of ^ specified #", Loc);
+                     Error_Msg_N ("\?.z?size of ^ specified #", Loc);
                   end if;
 
                   Error_Msg_Uint_1 := ((RM_Size (E) / Abits) + 1) * Abits;
-                  Error_Msg_N ("\?Z?Object_Size will be increased to ^", Loc);
+                  Error_Msg_N ("\?.z?Object_Size will be increased to ^", Loc);
                end if;
             end;
          end if;
@@ -9478,9 +9569,7 @@ package body Freeze is
          Minsiz : constant Uint := UI_From_Int (Minimum_Size (Typ));
 
       begin
-         if Known_RM_Size (Typ)
-           and then RM_Size (Typ) /= Uint_0
-         then
+         if Known_RM_Size (Typ) then
             if RM_Size (Typ) < Minsiz then
                Error_Msg_Uint_1 := RM_Size (Typ);
                Error_Msg_Uint_2 := Minsiz;

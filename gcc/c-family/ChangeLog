@@ -1,3 +1,147 @@
+2021-11-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/102611
+	* c-opts.c (c_common_post_options): Enable -Wcomma-subscript by
+	default for C++23 regardless of warn_deprecated.
+	* c-cppbuiltin.c (c_cpp_builtins): Predefine
+	__cpp_multidimensional_subscript=202110L for C++23.
+
+2021-11-23  Martin Sebor  <msebor@redhat.com>
+
+	PR middle-end/88232
+	* c.opt: Add -Winfinite-recursion.
+
+2021-11-19  Martin Sebor  <msebor@redhat.com>
+
+	PR c++/33925
+	PR c/102867
+	* c-common.c (decl_with_nonnull_addr_p): Call maybe_nonzero_address
+	and improve handling tof defined symbols.
+
+2021-11-19  Martin Liska  <mliska@suse.cz>
+
+	Revert:
+	2021-11-18  Martin Liska  <mliska@suse.cz>
+
+	* c-gimplify.c (genericize_c_loop): Use option directly.
+
+2021-11-18  Matthias Kretz  <m.kretz@gsi.de>
+
+	* c-common.c (c_common_reswords): Add __builtin_assoc_barrier.
+	* c-common.h (enum rid): Add RID_BUILTIN_ASSOC_BARRIER.
+
+2021-11-18  Martin Liska  <mliska@suse.cz>
+
+	* c-gimplify.c (genericize_c_loop): Use option directly.
+
+2021-11-17  Martin Uecker  <uecker@gcc.gnu.org>
+
+	PR c/91038
+	PR c/29970
+	* c-common.c (pointer_int_sum): Make sure pointer expressions
+	are evaluated first when the size expression depends on for
+	variably-modified types.
+
+2021-11-17  Marek Polacek  <polacek@redhat.com>
+
+	PR preprocessor/103026
+	* c.opt (Wbidi-chars, Wbidi-chars=): New option.
+
+2021-11-16  Jason Merrill  <jason@redhat.com>
+
+	* c-common.c (release_tree_vector): Only cache vecs smaller than
+	16 elements.
+
+2021-11-15  Jason Merrill  <jason@redhat.com>
+
+	* c.opt: Add -fimplicit-constexpr.
+	* c-cppbuiltin.c: Define __cpp_implicit_constexpr.
+	* c-opts.c (c_common_post_options): Disable below C++14.
+
+2021-11-15  Jakub Jelinek  <jakub@redhat.com>
+
+	* c-omp.c (c_omp_split_clauses) <case OMP_CLAUSE_THREAD_LIMIT>:
+	Duplicate to both OMP_TARGET and OMP_TEAMS.
+
+2021-11-10  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/101940
+	* c-pragma.c (handle_pragma_diagnostic): Handle #pragma GCC diagnostic
+	ignored_attributes.
+
+2021-11-09  David Malcolm  <dmalcolm@redhat.com>
+
+	* c-pragma.c (GCC_BAD_AT): New macro.
+	(GCC_BAD2_AT): New macro.
+	(handle_pragma_pack): Use the location of the pertinent token when
+	issuing diagnostics about invalid constants/actions, and trailing
+	junk.
+	(handle_pragma_target): Likewise for non-string "GCC option".
+	(handle_pragma_message): Likewise for trailing junk.
+
+2021-11-03  Joseph Myers  <joseph@codesourcery.com>
+
+	PR c/103031
+	* c-common.c (convert_and_check): Add argument init_const.  Call
+	convert_init if init_const.
+	* c-common.h (convert_and_check): Update prototype.
+	(convert_init): New prototype.
+
+2021-11-01  David Malcolm  <dmalcolm@redhat.com>
+
+	* c-lex.c (c_lex_with_flags): When complaining about non-printable
+	CPP_OTHER tokens, set the "escape on output" flag.
+
+2021-10-27  Jakub Jelinek  <jakub@redhat.com>
+
+	* c-omp.c (c_omp_check_loop_iv_r): Don't clear 3rd bit for
+	POINTER_PLUS_EXPR.
+	(c_omp_check_nonrect_loop_iv): Handle POINTER_PLUS_EXPR.
+	(c_omp_check_loop_iv): Set kind even if the iterator is non-integral.
+
+2021-10-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/102854
+	* c-common.h (c_omp_check_loop_iv_exprs): Add enum tree_code argument.
+	* c-omp.c (c_omp_check_loop_iv_r): For trees other than decls,
+	TREE_VEC, PLUS_EXPR, MINUS_EXPR, MULT_EXPR, POINTER_PLUS_EXPR or
+	conversions temporarily clear the 3rd bit from d->kind while walking
+	subtrees.
+	(c_omp_check_loop_iv_exprs): Add CODE argument.  Or in 4 into data.kind
+	if possibly non-rectangular.
+
+2021-10-21  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/64888
+	* c-omp.c (c_omp_predefined_variable): Return true also for
+	ubsan_create_data created artificial variables.
+
+2021-10-14  Joseph Myers  <joseph@codesourcery.com>
+
+	* c-format.c (printf_length_specs, scanf_length_specs)
+	(print_char_table, scan_char_table): Support DFP formats for C2X.
+	* c-format.h (TEX_D32, TEX_D64, TEX_D128): Remove.
+	(T2X_D32, T2X_D64, T2X_D128): New macros.
+
+2021-10-14  Kwok Cheung Yeung  <kcy@codesourcery.com>
+
+	* c-omp.c (c_omp_check_context_selector): Rename to
+	omp_check_context_selector and move to omp-general.c.
+	(c_omp_mark_declare_variant): Rename to omp_mark_declare_variant and
+	move to omp-general.c.
+
+2021-10-12  Joseph Myers  <joseph@codesourcery.com>
+
+	* c-format.c (print_char_table): Add %b and %B formats.
+	(scan_char_table): Add %b format.
+	* c-format.h (T2X_UI, T2X_UL, T2X_ULL, T2X_US, T2X_UC, T2X_ST)
+	(T2X_UPD, T2X_UIM): New macros.
+
+2021-10-12  Jakub Jelinek  <jakub@redhat.com>
+
+	* c-omp.c (c_finish_omp_atomic): Use
+	clear_padding_type_may_have_padding_p.
+
 2021-10-08  Martin Liska  <mliska@suse.cz>
 
 	* c-opts.c (c_common_post_options): Use new macro

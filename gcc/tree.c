@@ -330,7 +330,7 @@ unsigned const char omp_clause_num_ops[] =
   1, /* OMP_CLAUSE_DIST_SCHEDULE  */
   0, /* OMP_CLAUSE_INBRANCH  */
   0, /* OMP_CLAUSE_NOTINBRANCH  */
-  1, /* OMP_CLAUSE_NUM_TEAMS  */
+  2, /* OMP_CLAUSE_NUM_TEAMS  */
   1, /* OMP_CLAUSE_THREAD_LIMIT  */
   0, /* OMP_CLAUSE_PROC_BIND  */
   1, /* OMP_CLAUSE_SAFELEN  */
@@ -4781,6 +4781,7 @@ stabilize_reference (tree ref)
   TREE_READONLY (result) = TREE_READONLY (ref);
   TREE_SIDE_EFFECTS (result) = TREE_SIDE_EFFECTS (ref);
   TREE_THIS_VOLATILE (result) = TREE_THIS_VOLATILE (ref);
+  protected_set_expr_location (result, EXPR_LOCATION (ref));
 
   return result;
 }
@@ -5278,6 +5279,18 @@ build_decl (location_t loc, enum tree_code code, tree name,
     layout_decl (t, 0);
 
   return t;
+}
+
+/* Create and return a DEBUG_EXPR_DECL node of the given TYPE.  */
+
+tree
+build_debug_expr_decl (tree type)
+{
+  tree vexpr = make_node (DEBUG_EXPR_DECL);
+  DECL_ARTIFICIAL (vexpr) = 1;
+  TREE_TYPE (vexpr) = type;
+  SET_DECL_MODE (vexpr, TYPE_MODE (type));
+  return vexpr;
 }
 
 /* Builds and returns function declaration with NAME and TYPE.  */
@@ -10258,6 +10271,59 @@ uniform_integer_cst_p (tree t)
     }
 
   return NULL_TREE;
+}
+
+/* Checks to see if T is a constant or a constant vector and if each element E
+   adheres to ~E + 1 == pow2 then return ~E otherwise NULL_TREE.  */
+
+tree
+bitmask_inv_cst_vector_p (tree t)
+{
+
+  tree_code code = TREE_CODE (t);
+  tree type = TREE_TYPE (t);
+
+  if (!INTEGRAL_TYPE_P (type)
+      && !VECTOR_INTEGER_TYPE_P (type))
+    return NULL_TREE;
+
+  unsigned HOST_WIDE_INT nelts = 1;
+  tree cst;
+  unsigned int idx = 0;
+  bool uniform = uniform_integer_cst_p (t);
+  tree newtype = unsigned_type_for (type);
+  tree_vector_builder builder;
+  if (code == INTEGER_CST)
+    cst = t;
+  else
+    {
+      if (!VECTOR_CST_NELTS (t).is_constant (&nelts))
+	return NULL_TREE;
+
+      cst = vector_cst_elt (t, 0);
+      builder.new_vector (newtype, nelts, 1);
+    }
+
+  tree ty = unsigned_type_for (TREE_TYPE (cst));
+
+  do {
+    if (idx > 0)
+      cst = vector_cst_elt (t, idx);
+    wide_int icst = wi::to_wide (cst);
+    wide_int inv =  wi::bit_not (icst);
+    icst = wi::add (1, inv);
+    if (wi::popcount (icst) != 1)
+      return NULL_TREE;
+
+    tree newcst = wide_int_to_tree (ty, inv);
+
+    if (uniform)
+      return build_uniform_cst (newtype, newcst);
+
+    builder.quick_push (newcst);
+  } while (++idx < nelts);
+
+  return builder.build ();
 }
 
 /* If VECTOR_CST T has a single nonzero element, return the index of that

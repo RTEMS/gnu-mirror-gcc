@@ -3780,14 +3780,6 @@ These machine description macros help implement varargs:
 
 @hook TARGET_PRETEND_OUTGOING_VARARGS_NAMED
 
-@hook TARGET_LOAD_BOUNDS_FOR_ARG
-
-@hook TARGET_STORE_BOUNDS_FOR_ARG
-
-@hook TARGET_LOAD_RETURNED_BOUNDS
-
-@hook TARGET_STORE_RETURNED_BOUNDS
-
 @node Trampolines
 @section Support for Nested Functions
 @cindex support for nested functions
@@ -4190,13 +4182,7 @@ address;  but often a machine-dependent strategy can generate better code.
 
 @hook TARGET_VECTORIZE_EMPTY_MASK_IS_EXPENSIVE
 
-@hook TARGET_VECTORIZE_INIT_COST
-
-@hook TARGET_VECTORIZE_ADD_STMT_COST
-
-@hook TARGET_VECTORIZE_FINISH_COST
-
-@hook TARGET_VECTORIZE_DESTROY_COST_DATA
+@hook TARGET_VECTORIZE_CREATE_COSTS
 
 @hook TARGET_VECTORIZE_BUILTIN_GATHER
 
@@ -6028,6 +6014,8 @@ encountering an @code{init_priority} attribute.
 @end defmac
 
 @hook TARGET_HAVE_CTORS_DTORS
+
+@hook TARGET_DTORS_FROM_CXA_ATEXIT
 
 @hook TARGET_ASM_CONSTRUCTOR
 

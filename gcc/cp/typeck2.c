@@ -484,6 +484,15 @@ split_nonconstant_init_1 (tree dest, tree init, bool nested)
 	   && TYPE_HAS_NONTRIVIAL_DESTRUCTOR (type))
 	  || vla_type_p (type))
 	{
+	  if (!TYPE_DOMAIN (type)
+	      && TREE_CODE (init) == CONSTRUCTOR
+	      && CONSTRUCTOR_NELTS (init))
+	    {
+	      /* Flexible array.  */
+	      cp_complete_array_type (&type, init, /*default*/true);
+	      dest = build1 (VIEW_CONVERT_EXPR, type, dest);
+	    }
+
 	  /* For an array, we only need/want a single cleanup region rather
 	     than one per element.  */
 	  tree code = build_vec_init (dest, NULL_TREE, init, false, 1,
@@ -892,7 +901,7 @@ check_narrowing (tree type, tree init, tsubst_flags_t complain,
 
   /* Even non-dependent expressions can still have template
      codes like CAST_EXPR, so use *_non_dependent_expr to cope.  */
-  init = fold_non_dependent_expr (init, complain);
+  init = fold_non_dependent_expr (init, complain, /*manifest*/true);
   if (init == error_mark_node)
     return ok;
 
@@ -2192,19 +2201,29 @@ build_functional_cast_1 (location_t loc, tree exp, tree parms,
 
   if (tree anode = type_uses_auto (type))
     {
-      if (!CLASS_PLACEHOLDER_TEMPLATE (anode))
+      tree init;
+      if (CLASS_PLACEHOLDER_TEMPLATE (anode))
+	init = parms;
+      /* C++23 auto(x).  */
+      else if (!AUTO_IS_DECLTYPE (anode)
+	       && list_length (parms) == 1)
+	{
+	  init = TREE_VALUE (parms);
+	  if (cxx_dialect < cxx23)
+	    pedwarn (loc, OPT_Wc__23_extensions,
+		     "%<auto(x)%> only available with "
+		     "%<-std=c++2b%> or %<-std=gnu++2b%>");
+	}
+      else
 	{
 	  if (complain & tf_error)
 	    error_at (loc, "invalid use of %qT", anode);
 	  return error_mark_node;
 	}
-      else
-	{
-	  type = do_auto_deduction (type, parms, anode, complain,
-				    adc_variable_type);
-	  if (type == error_mark_node)
-	    return error_mark_node;
-	}
+      type = do_auto_deduction (type, init, anode, complain,
+				adc_variable_type);
+      if (type == error_mark_node)
+	return error_mark_node;
     }
 
   if (processing_template_decl)

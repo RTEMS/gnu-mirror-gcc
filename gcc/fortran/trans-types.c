@@ -61,7 +61,7 @@ tree pvoid_type_node;
 tree prvoid_type_node;
 tree ppvoid_type_node;
 tree pchar_type_node;
-tree pfunc_type_node;
+static tree pfunc_type_node;
 
 tree logical_type_node;
 tree logical_true_node;
@@ -77,6 +77,7 @@ static GTY(()) tree gfc_desc_dim_type;
 static GTY(()) tree gfc_max_array_element_size;
 static GTY(()) tree gfc_array_descriptor_base[2 * (GFC_MAX_DIMENSIONS+1)];
 static GTY(()) tree gfc_array_descriptor_base_caf[2 * (GFC_MAX_DIMENSIONS+1)];
+static GTY(()) tree gfc_cfi_descriptor_base[2 * (CFI_MAX_RANK + 2)];
 
 /* Arrays for all integral and real kinds.  We'll fill this in at runtime
    after the target has a chance to process command-line options.  */
@@ -132,7 +133,7 @@ int gfc_size_kind;
 int gfc_numeric_storage_size;
 int gfc_character_storage_size;
 
-tree dtype_type_node = NULL_TREE;
+static tree dtype_type_node = NULL_TREE;
 
 
 /* Build the dtype_type_node if necessary.  */
@@ -173,25 +174,6 @@ tree get_dtype_type_node (void)
     }
   return dtype_type_node;
 }
-
-bool
-gfc_check_any_c_kind (gfc_typespec *ts)
-{
-  int i;
-
-  for (i = 0; i < ISOCBINDING_NUMBER; i++)
-    {
-      /* Check for any C interoperable kind for the given type/kind in ts.
-         This can be used after verify_c_interop to make sure that the
-         Fortran kind being used exists in at least some form for C.  */
-      if (c_interop_kinds_table[i].f90_type == ts->type &&
-          c_interop_kinds_table[i].value == ts->kind)
-        return true;
-    }
-
-  return false;
-}
-
 
 static int
 get_real_kind_from_node (tree type)
@@ -1575,8 +1557,9 @@ gfc_get_dtype_rank_type (int rank, tree etype)
 
   field = gfc_advance_chain (TYPE_FIELDS (dtype_type_node),
 			     GFC_DTYPE_RANK);
-  CONSTRUCTOR_APPEND_ELT (v, field,
-			  build_int_cst (TREE_TYPE (field), rank));
+  if (rank >= 0)
+    CONSTRUCTOR_APPEND_ELT (v, field,
+			    build_int_cst (TREE_TYPE (field), rank));
 
   field = gfc_advance_chain (TYPE_FIELDS (dtype_type_node),
 			     GFC_DTYPE_TYPE);
@@ -2244,7 +2227,7 @@ gfc_nonrestricted_type (tree t)
    especially for character and array types.  */
 
 tree
-gfc_sym_type (gfc_symbol * sym)
+gfc_sym_type (gfc_symbol * sym, bool is_bind_c)
 {
   tree type;
   int byref;
@@ -2299,7 +2282,11 @@ gfc_sym_type (gfc_symbol * sym)
   if (!restricted)
     type = gfc_nonrestricted_type (type);
 
-  if (sym->attr.dimension || sym->attr.codimension)
+  /* Dummy argument to a bind(C) procedure.  */
+  if (is_bind_c && is_CFI_desc (sym, NULL))
+    type = gfc_get_cfi_type (sym->attr.dimension ? sym->as->rank : 0,
+			     /* restricted = */ false);
+  else if (sym->attr.dimension || sym->attr.codimension)
     {
       if (gfc_is_nodesc_array (sym))
         {
@@ -2342,7 +2329,8 @@ gfc_sym_type (gfc_symbol * sym)
     {
       /* We must use pointer types for potentially absent variables.  The
 	 optimizers assume a reference type argument is never NULL.  */
-      if (sym->attr.optional
+      if ((sym->ts.type == BT_CLASS && CLASS_DATA (sym)->attr.optional)
+	  || sym->attr.optional
 	  || (sym->ns->proc_name && sym->ns->proc_name->attr.entry_master))
 	type = build_pointer_type (type);
       else
@@ -2463,7 +2451,7 @@ gfc_copy_dt_decls_ifequal (gfc_symbol *from, gfc_symbol *to,
 
 /* Build a tree node for a procedure pointer component.  */
 
-tree
+static tree
 gfc_get_ppc_type (gfc_component* c)
 {
   tree t;
@@ -3007,7 +2995,11 @@ create_fn_spec (gfc_symbol *sym, tree fntype)
 	}
       if (sym->ts.type == BT_CHARACTER)
 	{
-	  spec[spec_len++] = 'R';
+	  if (!sym->ts.u.cl->length
+	      && (sym->attr.allocatable || sym->attr.pointer))
+	    spec[spec_len++] = 'w';
+	  else
+	    spec[spec_len++] = 'R';
 	  spec[spec_len++] = ' ';
 	}
     }
@@ -3131,7 +3123,7 @@ gfc_get_function_type (gfc_symbol * sym, gfc_actual_arglist *actual_args,
 	      type = build_pointer_type (type);
 	    }
 	  else
-	    type = gfc_sym_type (arg);
+	    type = gfc_sym_type (arg, sym->attr.is_bind_c);
 
 	  /* Parameter Passing Convention
 
@@ -3425,10 +3417,8 @@ gfc_get_array_descr_info (const_tree type, struct array_descr_info *info)
   base_decl = GFC_TYPE_ARRAY_BASE_DECL (type, indirect);
   if (!base_decl)
     {
-      base_decl = make_node (DEBUG_EXPR_DECL);
-      DECL_ARTIFICIAL (base_decl) = 1;
-      TREE_TYPE (base_decl) = indirect ? build_pointer_type (ptype) : ptype;
-      SET_DECL_MODE (base_decl, TYPE_MODE (TREE_TYPE (base_decl)));
+      base_decl = build_debug_expr_decl (indirect
+					 ? build_pointer_type (ptype) : ptype);
       GFC_TYPE_ARRAY_BASE_DECL (type, indirect) = base_decl;
     }
   info->base_decl = base_decl;
@@ -3469,8 +3459,8 @@ gfc_get_array_descr_info (const_tree type, struct array_descr_info *info)
       if (!integer_zerop (dtype_off))
 	t = fold_build_pointer_plus (t, rank_off);
 
-      t = build1 (NOP_EXPR, build_pointer_type (gfc_array_index_type), t);
-      t = build1 (INDIRECT_REF, gfc_array_index_type, t);
+      t = build1 (NOP_EXPR, build_pointer_type (TREE_TYPE (field)), t);
+      t = build1 (INDIRECT_REF, TREE_TYPE (field), t);
       info->rank = t;
       t = build0 (PLACEHOLDER_EXPR, TREE_TYPE (dim_off));
       t = size_binop (MULT_EXPR, t, dim_size);
@@ -3720,6 +3710,97 @@ gfc_get_caf_reference_type ()
   TYPE_NAME (reference_type) = get_identifier ("caf_reference_t");
 
   return reference_type;
+}
+
+static tree
+gfc_get_cfi_dim_type ()
+{
+  static tree CFI_dim_t = NULL;
+
+  if (CFI_dim_t)
+    return CFI_dim_t;
+
+  CFI_dim_t = make_node (RECORD_TYPE);
+  TYPE_NAME (CFI_dim_t) = get_identifier ("CFI_dim_t");
+  TYPE_NAMELESS (CFI_dim_t) = 1;
+  tree field;
+  tree *chain = NULL;
+  field = gfc_add_field_to_struct_1 (CFI_dim_t, get_identifier ("lower_bound"),
+				     gfc_array_index_type, &chain);
+  suppress_warning (field);
+  field = gfc_add_field_to_struct_1 (CFI_dim_t, get_identifier ("extent"),
+				     gfc_array_index_type, &chain);
+  suppress_warning (field);
+  field = gfc_add_field_to_struct_1 (CFI_dim_t, get_identifier ("sm"),
+				     gfc_array_index_type, &chain);
+  suppress_warning (field);
+  gfc_finish_type (CFI_dim_t);
+  TYPE_DECL_SUPPRESS_DEBUG (TYPE_STUB_DECL (CFI_dim_t)) = 1;
+  return CFI_dim_t;
+}
+
+
+/* Return the CFI type; use dimen == -1 for dim[] (only for pointers);
+   otherwise dim[dimen] is used.  */
+
+tree
+gfc_get_cfi_type (int dimen, bool restricted)
+{
+  gcc_assert (dimen >= -1 && dimen <= CFI_MAX_RANK);
+
+  int idx = 2*(dimen + 1) + restricted;
+
+  if (gfc_cfi_descriptor_base[idx])
+    return gfc_cfi_descriptor_base[idx];
+
+  /* Build the type node.  */
+  tree CFI_cdesc_t = make_node (RECORD_TYPE);
+  char name[GFC_MAX_SYMBOL_LEN + 1];
+  if (dimen != -1)
+    sprintf (name, "CFI_cdesc_t" GFC_RANK_PRINTF_FORMAT, dimen);
+  TYPE_NAME (CFI_cdesc_t) = get_identifier (dimen < 0 ? "CFI_cdesc_t" : name);
+  TYPE_NAMELESS (CFI_cdesc_t) = 1;
+
+  tree field;
+  tree *chain = NULL;
+  field = gfc_add_field_to_struct_1 (CFI_cdesc_t, get_identifier ("base_addr"),
+				     (restricted ? prvoid_type_node
+						 : ptr_type_node), &chain);
+  suppress_warning (field);
+  field = gfc_add_field_to_struct_1 (CFI_cdesc_t, get_identifier ("elem_len"),
+				     size_type_node, &chain);
+  suppress_warning (field);
+  field = gfc_add_field_to_struct_1 (CFI_cdesc_t, get_identifier ("version"),
+				     integer_type_node, &chain);
+  suppress_warning (field);
+  field = gfc_add_field_to_struct_1 (CFI_cdesc_t, get_identifier ("rank"),
+				     signed_char_type_node, &chain);
+  suppress_warning (field);
+  field = gfc_add_field_to_struct_1 (CFI_cdesc_t, get_identifier ("attribute"),
+				     signed_char_type_node, &chain);
+  suppress_warning (field);
+  field = gfc_add_field_to_struct_1 (CFI_cdesc_t, get_identifier ("type"),
+				     get_typenode_from_name (INT16_TYPE),
+				     &chain);
+  suppress_warning (field);
+
+  if (dimen != 0)
+    {
+      tree range = NULL_TREE;
+      if (dimen > 0)
+	range = gfc_rank_cst[dimen - 1];
+      range = build_range_type (gfc_array_index_type, gfc_index_zero_node,
+				range);
+      tree CFI_dim_t = build_array_type (gfc_get_cfi_dim_type (), range);
+      field = gfc_add_field_to_struct_1 (CFI_cdesc_t, get_identifier ("dim"),
+					 CFI_dim_t, &chain);
+      suppress_warning (field);
+    }
+
+  TYPE_TYPELESS_STORAGE (CFI_cdesc_t) = 1;
+  gfc_finish_type (CFI_cdesc_t);
+  gfc_cfi_descriptor_base[idx] = CFI_cdesc_t;
+  return CFI_cdesc_t;
 }
 
 #include "gt-fortran-trans-types.h"

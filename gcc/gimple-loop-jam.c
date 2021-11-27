@@ -402,10 +402,10 @@ adjust_unroll_factor (class loop *inner, struct data_dependence_relation *ddr,
 	     a >= N, or b > 0, or b is zero and a > 0.  Otherwise the unroll
 	     factor needs to be limited so that the first condition holds.
 	     That may limit the factor down to zero in the worst case.  */
-	  int dist = dist_v[0];
+	  lambda_int dist = dist_v[0];
 	  if (dist < 0)
 	    gcc_unreachable ();
-	  else if ((unsigned)dist >= *unroll)
+	  else if (dist >= (lambda_int)*unroll)
 	    ;
 	  else if (lambda_vector_zerop (dist_v + 1, DDR_NB_LOOPS (ddr) - 1))
 	    {
@@ -593,7 +593,7 @@ tree_loop_unroll_and_jam (void)
 	  todo |= TODO_cleanup_cfg;
 
 	  auto_bitmap exit_bbs;
-	  bitmap_set_bit (exit_bbs, single_dom_exit (outer)->dest->index);
+	  bitmap_set_bit (exit_bbs, single_exit (outer)->dest->index);
 	  todo |= do_rpo_vn (cfun, loop_preheader_edge (outer), exit_bbs);
 	}
 

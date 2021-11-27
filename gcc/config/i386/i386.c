@@ -1567,7 +1567,7 @@ ix86_function_naked (const_tree fn)
 /* Write the extra assembler code needed to declare a function properly.  */
 
 void
-ix86_asm_output_function_label (FILE *asm_out_file, const char *fname,
+ix86_asm_output_function_label (FILE *out_file, const char *fname,
 				tree decl)
 {
   bool is_ms_hook = ix86_function_ms_hook_prologue (decl);
@@ -1581,14 +1581,14 @@ ix86_asm_output_function_label (FILE *asm_out_file, const char *fname,
       unsigned int filler_cc = 0xcccccccc;
 
       for (i = 0; i < filler_count; i += 4)
-        fprintf (asm_out_file, ASM_LONG " %#x\n", filler_cc);
+	fprintf (out_file, ASM_LONG " %#x\n", filler_cc);
     }
 
 #ifdef SUBTARGET_ASM_UNWIND_INIT
-  SUBTARGET_ASM_UNWIND_INIT (asm_out_file);
+  SUBTARGET_ASM_UNWIND_INIT (out_file);
 #endif
 
-  ASM_OUTPUT_LABEL (asm_out_file, fname);
+  ASM_OUTPUT_LABEL (out_file, fname);
 
   /* Output magic byte marker, if hot-patch attribute is set.  */
   if (is_ms_hook)
@@ -1597,14 +1597,14 @@ ix86_asm_output_function_label (FILE *asm_out_file, const char *fname,
 	{
 	  /* leaq [%rsp + 0], %rsp  */
 	  fputs (ASM_BYTE "0x48, 0x8d, 0xa4, 0x24, 0x00, 0x00, 0x00, 0x00\n",
-		 asm_out_file);
+		 out_file);
 	}
       else
 	{
           /* movl.s %edi, %edi
 	     push   %ebp
 	     movl.s %esp, %ebp */
-	  fputs (ASM_BYTE "0x8b, 0xff, 0x55, 0x8b, 0xec\n", asm_out_file);
+	  fputs (ASM_BYTE "0x8b, 0xff, 0x55, 0x8b, 0xec\n", out_file);
 	}
     }
 }
@@ -3665,7 +3665,7 @@ zero_all_vector_registers (HARD_REG_SET need_zeroed_hardregs)
     return NULL;
 
   for (unsigned int regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
-    if ((IN_RANGE (regno, FIRST_SSE_REG, LAST_SSE_REG)
+    if ((LEGACY_SSE_REGNO_P (regno)
 	 || (TARGET_64BIT
 	     && (REX_SSE_REGNO_P (regno)
 		 || (TARGET_AVX512F && EXT_REX_SSE_REGNO_P (regno)))))
@@ -5399,9 +5399,18 @@ ix86_get_ssemov (rtx *operands, unsigned size,
       switch (scalar_mode)
 	{
 	case E_HFmode:
-	  opcode = (misaligned_p
-		    ? (TARGET_AVX512BW ? "vmovdqu16" : "vmovdqu64")
-		    : "vmovdqa64");
+	  if (evex_reg_p)
+	    opcode = (misaligned_p
+		      ? (TARGET_AVX512BW
+			 ? "vmovdqu16"
+			 : "vmovdqu64")
+		      : "vmovdqa64");
+	  else
+	    opcode = (misaligned_p
+		      ? (TARGET_AVX512BW
+			 ? "vmovdqu16"
+			 : "%vmovdqu")
+		      : "%vmovdqa");
 	  break;
 	case E_SFmode:
 	  opcode = misaligned_p ? "%vmovups" : "%vmovaps";
@@ -5724,7 +5733,7 @@ static bool indirect_thunk_needed = false;
 
 /* Bit masks of integer registers, which contain branch target, used
    by call thunk functions.  */
-static int indirect_thunks_used;
+static HARD_REG_SET indirect_thunks_used;
 
 /* True if return thunk function is needed.  */
 static bool indirect_return_needed = false;
@@ -5905,6 +5914,8 @@ output_indirect_thunk (unsigned int regno)
     }
 
   fputs ("\tret\n", asm_out_file);
+  if ((ix86_harden_sls & harden_sls_return))
+    fputs ("\tint3\n", asm_out_file);
 }
 
 /* Output a funtion with a call and return thunk for indirect branch.
@@ -6021,8 +6032,7 @@ ix86_code_end (void)
 
   for (regno = FIRST_REX_INT_REG; regno <= LAST_REX_INT_REG; regno++)
     {
-      unsigned int i = regno - FIRST_REX_INT_REG + LAST_INT_REG + 1;
-      if ((indirect_thunks_used & (1 << i)))
+      if (TEST_HARD_REG_BIT (indirect_thunks_used, regno))
 	output_indirect_thunk_function (indirect_thunk_prefix_none,
 					regno, false);
     }
@@ -6032,7 +6042,7 @@ ix86_code_end (void)
       char name[32];
       tree decl;
 
-      if ((indirect_thunks_used & (1 << regno)))
+      if (TEST_HARD_REG_BIT (indirect_thunks_used, regno))
 	output_indirect_thunk_function (indirect_thunk_prefix_none,
 					regno, false);
 
@@ -6107,7 +6117,7 @@ ix86_code_end (void)
       xops[0] = gen_rtx_REG (Pmode, regno);
       xops[1] = gen_rtx_MEM (Pmode, stack_pointer_rtx);
       output_asm_insn ("mov%z0\t{%1, %0|%0, %1}", xops);
-      output_asm_insn ("%!ret", NULL);
+      fputs ("\tret\n", asm_out_file);
       final_end_function ();
       init_insn_lengths ();
       free_after_compilation (cfun);
@@ -11152,7 +11162,7 @@ legitimize_pic_address (rtx orig, rtx reg)
 	new_rtx = gen_rtx_PLUS (Pmode, pic_offset_table_rtx, new_rtx);
     }
   else if ((GET_CODE (addr) == SYMBOL_REF && SYMBOL_REF_TLS_MODEL (addr) == 0)
-	   /* We can't use @GOTOFF for text labels
+	   /* We can't always use @GOTOFF for text labels
 	      on VxWorks, see gotoff_operand.  */
 	   || (TARGET_VXWORKS_RTP && GET_CODE (addr) == LABEL_REF))
     {
@@ -11181,9 +11191,19 @@ legitimize_pic_address (rtx orig, rtx reg)
 	     from the Global Offset Table (@GOT).  */
 	  new_rtx = gen_rtx_UNSPEC (Pmode, gen_rtvec (1, addr), UNSPEC_GOT);
 	  new_rtx = gen_rtx_CONST (Pmode, new_rtx);
+
 	  if (TARGET_64BIT)
-	    new_rtx = force_reg (Pmode, new_rtx);
-	  new_rtx = gen_rtx_PLUS (Pmode, pic_offset_table_rtx, new_rtx);
+	    new_rtx = copy_to_suggested_reg (new_rtx, reg, Pmode);
+
+	  if (reg != 0)
+	    {
+	      gcc_assert (REG_P (reg));
+	      new_rtx = expand_simple_binop (Pmode, PLUS, pic_offset_table_rtx,
+					     new_rtx, reg, 1, OPTAB_DIRECT);
+	    }
+	  else
+	    new_rtx = gen_rtx_PLUS (Pmode, pic_offset_table_rtx, new_rtx);
+
 	  new_rtx = gen_const_mem (Pmode, new_rtx);
 	  set_mem_alias_set (new_rtx, ix86_GOT_alias_set ());
 	}
@@ -11606,6 +11626,36 @@ legitimize_tls_address (rtx x, enum tls_model model, bool for_mov)
     }
 
   return dest;
+}
+
+/* Return true if the TLS address requires insn using integer registers.
+   It's used to prevent KMOV/VMOV in TLS code sequences which require integer
+   MOV instructions, refer to PR103275.  */
+bool
+ix86_gpr_tls_address_pattern_p (rtx mem)
+{
+  gcc_assert (MEM_P (mem));
+
+  rtx addr = XEXP (mem, 0);
+  subrtx_var_iterator::array_type array;
+  FOR_EACH_SUBRTX_VAR (iter, array, addr, ALL)
+    {
+      rtx op = *iter;
+      if (GET_CODE (op) == UNSPEC)
+	switch (XINT (op, 1))
+	  {
+	  case UNSPEC_GOTNTPOFF:
+	    return true;
+	  case UNSPEC_TPOFF:
+	    if (!TARGET_64BIT)
+	      return true;
+	    break;
+	  default:
+	    break;
+	  }
+    }
+
+  return false;
 }
 
 /* Return true if OP refers to a TLS address.  */
@@ -13921,7 +13971,10 @@ ix86_print_operand_address_as (FILE *file, rtx addr,
 static void
 ix86_print_operand_address (FILE *file, machine_mode /*mode*/, rtx addr)
 {
-  ix86_print_operand_address_as (file, addr, ADDR_SPACE_GENERIC, false);
+  if (this_is_asm_operands && ! address_operand (addr, VOIDmode))
+    output_operand_lossage ("invalid constraints for operand");
+  else
+    ix86_print_operand_address_as (file, addr, ADDR_SPACE_GENERIC, false);
 }
 
 /* Implementation of TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA.  */
@@ -15959,9 +16012,14 @@ ix86_output_jmp_thunk_or_indirect (const char *thunk_name, const int regno)
 {
   if (thunk_name != NULL)
     {
+      if (REX_INT_REGNO_P (regno)
+	  && ix86_indirect_branch_cs_prefix)
+	fprintf (asm_out_file, "\tcs\n");
       fprintf (asm_out_file, "\tjmp\t");
       assemble_name (asm_out_file, thunk_name);
       putc ('\n', asm_out_file);
+      if ((ix86_harden_sls & harden_sls_indirect_branch))
+	fputs ("\tint3\n", asm_out_file);
     }
   else
     output_indirect_thunk (regno);
@@ -15992,12 +16050,8 @@ ix86_output_indirect_branch_via_reg (rtx call_op, bool sibcall_p)
       != indirect_branch_thunk_inline)
     {
       if (cfun->machine->indirect_branch_type == indirect_branch_thunk)
-	{
-	  int i = regno;
-	  if (i >= FIRST_REX_INT_REG)
-	    i -= (FIRST_REX_INT_REG - LAST_INT_REG - 1);
-	  indirect_thunks_used |= 1 << i;
-	}
+	SET_HARD_REG_BIT (indirect_thunks_used, regno);
+
       indirect_thunk_name (thunk_name_buf, regno, need_prefix, false);
       thunk_name = thunk_name_buf;
     }
@@ -16010,6 +16064,9 @@ ix86_output_indirect_branch_via_reg (rtx call_op, bool sibcall_p)
     {
       if (thunk_name != NULL)
 	{
+	  if (REX_INT_REGNO_P (regno)
+	      && ix86_indirect_branch_cs_prefix)
+	    fprintf (asm_out_file, "\tcs\n");
 	  fprintf (asm_out_file, "\tcall\t");
 	  assemble_name (asm_out_file, thunk_name);
 	  putc ('\n', asm_out_file);
@@ -16184,10 +16241,10 @@ ix86_output_indirect_jmp (rtx call_op)
 	gcc_unreachable ();
 
       ix86_output_indirect_branch (call_op, "%0", true);
-      return "";
     }
   else
-    return "%!jmp\t%A0";
+    output_asm_insn ("%!jmp\t%A0", &call_op);
+  return (ix86_harden_sls & harden_sls_indirect_branch) ? "int3" : "";
 }
 
 /* Output return instrumentation for current function if needed.  */
@@ -16255,10 +16312,8 @@ ix86_output_function_return (bool long_p)
       return "";
     }
 
-  if (!long_p)
-    return "%!ret";
-
-  return "rep%; ret";
+  output_asm_insn (long_p ? "rep%; ret" : "ret", nullptr);
+  return (ix86_harden_sls & harden_sls_return) ? "int3" : "";
 }
 
 /* Output indirect function return.  RET_OP is the function return
@@ -16285,7 +16340,7 @@ ix86_output_indirect_function_return (rtx ret_op)
 	  if (need_thunk)
 	    {
 	      indirect_return_via_cx = true;
-	      indirect_thunks_used |= 1 << CX_REG;
+	      SET_HARD_REG_BIT (indirect_thunks_used, CX_REG);
 	    }
 	  fprintf (asm_out_file, "\tjmp\t");
 	  assemble_name (asm_out_file, thunk_name);
@@ -16353,7 +16408,12 @@ ix86_output_call_insn (rtx_insn *insn, rtx call_op)
       if (output_indirect_p && !direct_p)
 	ix86_output_indirect_branch (call_op, xasm, true);
       else
-	output_asm_insn (xasm, &call_op);
+	{
+	  output_asm_insn (xasm, &call_op);
+	  if (!direct_p
+	      && (ix86_harden_sls & harden_sls_indirect_branch))
+	    return "int3";
+	}
       return "";
     }
 
@@ -16992,6 +17052,7 @@ ix86_sched_init_global (FILE *, int, int)
     case PROCESSOR_SANDYBRIDGE:
     case PROCESSOR_HASWELL:
     case PROCESSOR_TREMONT:
+    case PROCESSOR_ALDERLAKE:
     case PROCESSOR_GENERIC:
       /* Do not perform multipass scheduling for pre-reload schedule
          to save compile time.  */
@@ -18893,9 +18954,10 @@ ix86_vectorize_builtin_scatter (const_tree vectype,
    1.0/sqrt.  */
 
 static bool
-use_rsqrt_p ()
+use_rsqrt_p (machine_mode mode)
 {
-  return (TARGET_SSE && TARGET_SSE_MATH
+  return ((mode == HFmode
+	   || (TARGET_SSE && TARGET_SSE_MATH))
 	  && flag_finite_math_only
 	  && !flag_trapping_math
 	  && flag_unsafe_math_optimizations);
@@ -19065,15 +19127,13 @@ ix86_register_priority (int hard_regno)
     return 0;
   if (hard_regno == BP_REG)
     return 1;
-  /* New x86-64 int registers result in bigger code size.  Discourage
-     them.  */
-  if (IN_RANGE (hard_regno, FIRST_REX_INT_REG, LAST_REX_INT_REG))
+  /* New x86-64 int registers result in bigger code size.  Discourage them.  */
+  if (REX_INT_REGNO_P (hard_regno))
     return 2;
-  /* New x86-64 SSE registers result in bigger code size.  Discourage
-     them.  */
-  if (IN_RANGE (hard_regno, FIRST_REX_SSE_REG, LAST_REX_SSE_REG))
+  /* New x86-64 SSE registers result in bigger code size.  Discourage them.  */
+  if (REX_SSE_REGNO_P (hard_regno))
     return 2;
-  if (IN_RANGE (hard_regno, FIRST_EXT_REX_SSE_REG, LAST_EXT_REX_SSE_REG))
+  if (EXT_REX_SSE_REGNO_P (hard_regno))
     return 1;
   /* Usage of AX register results in smaller code.  Prefer it.  */
   if (hard_regno == AX_REG)
@@ -19303,7 +19363,9 @@ ix86_hardreg_mov_ok (rtx dst, rtx src)
   /* Avoid complex sets of likely_spilled hard registers before reload.  */
   if (REG_P (dst) && HARD_REGISTER_P (dst)
       && !REG_P (src) && !MEM_P (src)
-      && !x86_64_immediate_operand (src, GET_MODE (dst))
+      && !(VECTOR_MODE_P (GET_MODE (dst))
+	   ? standard_sse_constant_p (src, GET_MODE (dst))
+	   : x86_64_immediate_operand (src, GET_MODE (dst)))
       && ix86_class_likely_spilled_p (REGNO_REG_CLASS (REGNO (dst)))
       && !reload_completed)
     return false;
@@ -19460,9 +19522,8 @@ ix86_can_change_mode_class (machine_mode from, machine_mode to,
 	 disallow a change to these modes, reload will assume it's ok to
 	 drop the subreg from (subreg:SI (reg:HI 100) 0).  This affects
 	 the vec_dupv4hi pattern.
-	 NB: AVX512FP16 supports vmovw which can load 16bit data to sse
-	 register.  */
-      int mov_size = MAYBE_SSE_CLASS_P (regclass) && TARGET_AVX512FP16 ? 2 : 4;
+	 NB: SSE2 can load 16bit data to sse register via pinsrw.  */
+      int mov_size = MAYBE_SSE_CLASS_P (regclass) && TARGET_SSE2 ? 2 : 4;
       if (GET_MODE_SIZE (from) < mov_size)
 	return false;
     }
@@ -19948,9 +20009,8 @@ ix86_hard_regno_call_part_clobbered (unsigned int abi_id, unsigned int regno,
   /* Special ABI for vzeroupper which only clobber higher part of sse regs.  */
   if (abi_id == ABI_VZEROUPPER)
       return (GET_MODE_SIZE (mode) > 16
-	      && ((TARGET_64BIT
-		   && (IN_RANGE (regno, FIRST_REX_SSE_REG, LAST_REX_SSE_REG)))
-		  || (IN_RANGE (regno, FIRST_SSE_REG, LAST_SSE_REG))));
+	      && ((TARGET_64BIT && REX_SSE_REGNO_P (regno))
+		  || LEGACY_SSE_REGNO_P (regno)));
 
   return SSE_REGNO_P (regno) && GET_MODE_SIZE (mode) > 16;
 }
@@ -20798,6 +20858,13 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
       else
 	*total = cost->sse_op;
       return true;
+
+    case MEM:
+      /* An insn that accesses memory is slightly more expensive
+         than one that does not.  */
+      if (speed)
+        *total += 1;
+      return false;
 
     default:
       return false;
@@ -21967,6 +22034,10 @@ ix86_libgcc_floating_mode_supported_p (scalar_float_mode mode)
 static bool
 ix86_vector_mode_supported_p (machine_mode mode)
 {
+  /* For ia32, scalar TImode isn't supported and so V1TImode shouldn't be
+     either.  */
+  if (!TARGET_64BIT && GET_MODE_INNER (mode) == TImode)
+    return false;
   if (TARGET_SSE && VALID_SSE_REG_MODE (mode))
     return true;
   if (TARGET_SSE2 && VALID_SSE2_REG_MODE (mode))
@@ -22842,26 +22913,30 @@ ix86_noce_conversion_profitable_p (rtx_insn *seq, struct noce_if_info *if_info)
   return default_noce_conversion_profitable_p (seq, if_info);
 }
 
-/* Implement targetm.vectorize.init_cost.  */
-
-static void *
-ix86_init_cost (class loop *, bool)
+/* x86-specific vector costs.  */
+class ix86_vector_costs : public vector_costs
 {
-  unsigned *cost = XNEWVEC (unsigned, 3);
-  cost[vect_prologue] = cost[vect_body] = cost[vect_epilogue] = 0;
-  return cost;
+  using vector_costs::vector_costs;
+
+  unsigned int add_stmt_cost (int count, vect_cost_for_stmt kind,
+			      stmt_vec_info stmt_info, tree vectype,
+			      int misalign,
+			      vect_cost_model_location where) override;
+};
+
+/* Implement targetm.vectorize.create_costs.  */
+
+static vector_costs *
+ix86_vectorize_create_costs (vec_info *vinfo, bool costing_for_scalar)
+{
+  return new ix86_vector_costs (vinfo, costing_for_scalar);
 }
 
-/* Implement targetm.vectorize.add_stmt_cost.  */
-
-static unsigned
-ix86_add_stmt_cost (class vec_info *vinfo, void *data, int count,
-		    enum vect_cost_for_stmt kind,
-		    class _stmt_vec_info *stmt_info, tree vectype,
-		    int misalign,
-		    enum vect_cost_model_location where)
+unsigned
+ix86_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
+				  stmt_vec_info stmt_info, tree vectype,
+				  int misalign, vect_cost_model_location where)
 {
-  unsigned *cost = (unsigned *) data;
   unsigned retval = 0;
   bool scalar_p
     = (kind == scalar_stmt || kind == scalar_load || kind == scalar_store);
@@ -23032,15 +23107,7 @@ ix86_add_stmt_cost (class vec_info *vinfo, void *data, int count,
   /* Statements in an inner loop relative to the loop being
      vectorized are weighted more heavily.  The value here is
      arbitrary and could potentially be improved with analysis.  */
-  if (where == vect_body && stmt_info
-      && stmt_in_inner_loop_p (vinfo, stmt_info))
-    {
-      loop_vec_info loop_vinfo = dyn_cast<loop_vec_info> (vinfo);
-      gcc_assert (loop_vinfo);
-      count *= LOOP_VINFO_INNER_LOOP_COST_FACTOR (loop_vinfo); /* FIXME.  */
-    }
-
-  retval = (unsigned) (count * stmt_cost);
+  retval = adjust_cost_for_freq (stmt_info, where, count * stmt_cost);
 
   /* We need to multiply all vector stmt cost by 1.7 (estimated cost)
      for Silvermont as it has out of order integer pipeline and can execute
@@ -23055,29 +23122,9 @@ ix86_add_stmt_cost (class vec_info *vinfo, void *data, int count,
 	retval = (retval * 17) / 10;
     }
 
-  cost[where] += retval;
+  m_costs[where] += retval;
 
   return retval;
-}
-
-/* Implement targetm.vectorize.finish_cost.  */
-
-static void
-ix86_finish_cost (void *data, unsigned *prologue_cost,
-		  unsigned *body_cost, unsigned *epilogue_cost)
-{
-  unsigned *cost = (unsigned *) data;
-  *prologue_cost = cost[vect_prologue];
-  *body_cost     = cost[vect_body];
-  *epilogue_cost = cost[vect_epilogue];
-}
-
-/* Implement targetm.vectorize.destroy_cost_data.  */
-
-static void
-ix86_destroy_cost_data (void *data)
-{
-  free (data);
 }
 
 /* Validate target specific memory model bits in VAL. */
@@ -23582,29 +23629,27 @@ ix86_optab_supported_p (int op, machine_mode mode1, machine_mode,
       return opt_type == OPTIMIZE_FOR_SPEED;
 
     case rint_optab:
-      if (mode1 == HFmode)
-	return true;
-      else if (SSE_FLOAT_MODE_P (mode1)
-	       && TARGET_SSE_MATH
-	       && !flag_trapping_math
-	       && !TARGET_SSE4_1)
+      if (SSE_FLOAT_MODE_P (mode1)
+	  && TARGET_SSE_MATH
+	  && !flag_trapping_math
+	  && !TARGET_SSE4_1
+	  && mode1 != HFmode)
 	return opt_type == OPTIMIZE_FOR_SPEED;
       return true;
 
     case floor_optab:
     case ceil_optab:
     case btrunc_optab:
-      if (mode1 == HFmode)
-	return true;
-      else if (SSE_FLOAT_MODE_P (mode1)
-	       && TARGET_SSE_MATH
-	       && !flag_trapping_math
-	       && TARGET_SSE4_1)
+      if (((SSE_FLOAT_MODE_P (mode1)
+	    && TARGET_SSE_MATH
+	    && TARGET_SSE4_1)
+	   || mode1 == HFmode)
+	  && !flag_trapping_math)
 	return true;
       return opt_type == OPTIMIZE_FOR_SPEED;
 
     case rsqrt_optab:
-      return opt_type == OPTIMIZE_FOR_SPEED && use_rsqrt_p ();
+      return opt_type == OPTIMIZE_FOR_SPEED && use_rsqrt_p (mode1);
 
     default:
       return true;
@@ -24363,14 +24408,8 @@ ix86_libgcc_floating_mode_supported_p
   ix86_autovectorize_vector_modes
 #undef TARGET_VECTORIZE_GET_MASK_MODE
 #define TARGET_VECTORIZE_GET_MASK_MODE ix86_get_mask_mode
-#undef TARGET_VECTORIZE_INIT_COST
-#define TARGET_VECTORIZE_INIT_COST ix86_init_cost
-#undef TARGET_VECTORIZE_ADD_STMT_COST
-#define TARGET_VECTORIZE_ADD_STMT_COST ix86_add_stmt_cost
-#undef TARGET_VECTORIZE_FINISH_COST
-#define TARGET_VECTORIZE_FINISH_COST ix86_finish_cost
-#undef TARGET_VECTORIZE_DESTROY_COST_DATA
-#define TARGET_VECTORIZE_DESTROY_COST_DATA ix86_destroy_cost_data
+#undef TARGET_VECTORIZE_CREATE_COSTS
+#define TARGET_VECTORIZE_CREATE_COSTS ix86_vectorize_create_costs
 
 #undef TARGET_SET_CURRENT_FUNCTION
 #define TARGET_SET_CURRENT_FUNCTION ix86_set_current_function

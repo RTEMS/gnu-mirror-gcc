@@ -543,7 +543,7 @@ gfc_free_actual_arglist (gfc_actual_arglist *a1)
     {
       a2 = a1->next;
       if (a1->expr)
-      gfc_free_expr (a1->expr);
+	gfc_free_expr (a1->expr);
       free (a1);
       a1 = a2;
     }
@@ -1110,11 +1110,13 @@ is_CFI_desc (gfc_symbol *sym, gfc_expr *e)
 
   if (sym && sym->attr.dummy
       && sym->ns->proc_name->attr.is_bind_c
-      && sym->attr.dimension
       && (sym->attr.pointer
 	  || sym->attr.allocatable
-	  || sym->as->type == AS_ASSUMED_SHAPE
-	  || sym->as->type == AS_ASSUMED_RANK))
+	  || (sym->attr.dimension
+	      && (sym->as->type == AS_ASSUMED_SHAPE
+		  || sym->as->type == AS_ASSUMED_RANK))
+	  || (sym->ts.type == BT_CHARACTER
+	      && (!sym->ts.u.cl || !sym->ts.u.cl->length))))
     return true;
 
 return false;
@@ -2126,6 +2128,8 @@ simplify_parameter_variable (gfc_expr *p, int type)
       if (e == NULL)
 	return false;
 
+      gfc_free_shape (&e->shape, e->rank);
+      e->shape = gfc_copy_shape (p->shape, p->rank);
       e->rank = p->rank;
 
       if (e->ts.type == BT_CHARACTER && p->ts.u.cl)
@@ -2203,7 +2207,8 @@ gfc_simplify_expr (gfc_expr *p, int type)
 	  (p->value.function.isym->id == GFC_ISYM_LBOUND
 	   || p->value.function.isym->id == GFC_ISYM_UBOUND
 	   || p->value.function.isym->id == GFC_ISYM_LCOBOUND
-	   || p->value.function.isym->id == GFC_ISYM_UCOBOUND))
+	   || p->value.function.isym->id == GFC_ISYM_UCOBOUND
+	   || p->value.function.isym->id == GFC_ISYM_SHAPE))
 	ap = ap->next;
 
       for ( ; ap; ap = ap->next)
@@ -4584,21 +4589,12 @@ gfc_check_assign_symbol (gfc_symbol *sym, gfc_component *comp, gfc_expr *rvalue)
   return true;
 }
 
-/* Invoke gfc_build_init_expr to create an initializer expression, but do not
- * require that an expression be built.  */
-
-gfc_expr *
-gfc_build_default_init_expr (gfc_typespec *ts, locus *where)
-{
-  return gfc_build_init_expr (ts, where, false);
-}
-
 /* Build an initializer for a local integer, real, complex, logical, or
    character variable, based on the command line flags finit-local-zero,
    finit-integer=, finit-real=, finit-logical=, and finit-character=.
    With force, an initializer is ALWAYS generated.  */
 
-gfc_expr *
+static gfc_expr *
 gfc_build_init_expr (gfc_typespec *ts, locus *where, bool force)
 {
   gfc_expr *init_expr;
@@ -4755,6 +4751,15 @@ gfc_build_init_expr (gfc_typespec *ts, locus *where, bool force)
   return init_expr;
 }
 
+/* Invoke gfc_build_init_expr to create an initializer expression, but do not
+ * require that an expression be built.  */
+
+gfc_expr *
+gfc_build_default_init_expr (gfc_typespec *ts, locus *where)
+{
+  return gfc_build_init_expr (ts, where, false);
+}
+
 /* Apply an initialization expression to a typespec. Can be used for symbols or
    components. Similar to add_init_expr_to_sym in decl.c; could probably be
    combined with some effort.  */
@@ -4814,7 +4819,7 @@ gfc_apply_init (gfc_typespec *ts, symbol_attribute *attr, gfc_expr *init)
 /* Check whether an expression is a structure constructor and whether it has
    other values than NULL.  */
 
-bool
+static bool
 is_non_empty_structure_constructor (gfc_expr * e)
 {
   if (e->expr_type != EXPR_STRUCTURE)
