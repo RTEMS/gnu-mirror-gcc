@@ -95,10 +95,13 @@ struct unswitch_predicate
   int_range_max false_range;
 };
 
+/* Cache storage for unswitch_predicate belonging to a basic block.  */
 static vec<vec<unswitch_predicate *>> *bb_predicates = NULL;
 
+/* Ranger instance used in the pass.  */
 static gimple_ranger *ranger = NULL;
 
+/* The type represents a predicate path leading to a basic block.  */
 typedef auto_vec<std::pair<unswitch_predicate *, bool>> predicate_vector;
 
 static class loop *tree_unswitch_loop (class loop *, basic_block, tree);
@@ -115,6 +118,8 @@ static void hoist_guard (class loop *, edge);
 static bool check_exit_phi (class loop *);
 static tree get_vop_from_header (class loop *);
 
+/* Return vector of predicates that belong to a basic block.  */
+
 static vec<unswitch_predicate *> &
 get_predicates_for_bb (basic_block bb)
 {
@@ -122,12 +127,16 @@ get_predicates_for_bb (basic_block bb)
   return (*bb_predicates)[last == NULL ? 0 : gimple_uid (last)];
 }
 
+/* Save predicates that belong to a basic block.  */
+
 static void
 set_predicates_for_bb (basic_block bb, vec<unswitch_predicate *> predicates)
 {
   gimple_set_uid (last_stmt (bb), bb_predicates->length ());
   bb_predicates->safe_push (predicates);
 }
+
+/* Initialize LOOP information reused during the unswitching pass.  */
 
 static void
 init_loop_unswitch_info (class loop *loop)
@@ -193,7 +202,9 @@ tree_ssa_unswitch_loops (void)
 	changed |= tree_unswitch_outer_loop (loop);
     }
 
+
   disable_ranger (cfun);
+  clear_aux_for_blocks ();
 
   if (changed)
     return TODO_cleanup_cfg;
@@ -366,7 +377,8 @@ combine_range (predicate_vector &predicate_path, tree index, irange &path_range)
    Utilize both symbolic expressions and value ranges calculated by Ranger.  */
 
 static tree
-simplify_using_entry_checks (gimple *stmt, predicate_vector &predicate_path)
+evaluate_control_stmt_using_entry_checks (gimple *stmt,
+					  predicate_vector &predicate_path)
 {
   if (predicate_path.is_empty ())
     return NULL_TREE;
@@ -415,7 +427,8 @@ simplify_loop_version (class loop *loop, predicate_vector &predicate_path)
 	{
 	  gimple *stmt = last_stmt (bbs[i]);
 
-	  tree folded = simplify_using_entry_checks (stmt, predicate_path);
+	  tree folded = evaluate_control_stmt_using_entry_checks (stmt,
+								  predicate_path);
 	  if (folded != NULL_TREE)
 	    {
 	      /* Remove path.  */
@@ -475,7 +488,8 @@ evaluate_insns (class loop *loop,  basic_block *bbs,
 		  if (predicate != NULL)
 		    {
 		      tree folded
-			= simplify_using_entry_checks (cond, predicate_path);
+			= evaluate_control_stmt_using_entry_checks (cond,
+								    predicate_path);
 		      if (folded == boolean_true_node)
 			flags = EDGE_FALSE_VALUE;
 		      else if (folded == boolean_false_node)
