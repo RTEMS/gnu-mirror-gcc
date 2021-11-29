@@ -106,7 +106,8 @@ typedef auto_vec<std::pair<unswitch_predicate *, bool>> predicate_vector;
 
 static class loop *tree_unswitch_loop (class loop *, basic_block, tree);
 static bool tree_unswitch_single_loop (class loop *, int,
-				       predicate_vector &predicate_path);
+				       predicate_vector &predicate_path,
+				       unsigned budget);
 static void
 find_unswitching_predicates_for_bb (basic_block bb, class loop *loop,
 				    vec<unswitch_predicate *> &candidates);
@@ -136,11 +137,14 @@ set_predicates_for_bb (basic_block bb, vec<unswitch_predicate *> predicates)
   bb_predicates->safe_push (predicates);
 }
 
-/* Initialize LOOP information reused during the unswitching pass.  */
+/* Initialize LOOP information reused during the unswitching pass.
+   Return total number of instructions in the loop.  */
 
-static void
+static unsigned
 init_loop_unswitch_info (class loop *loop)
 {
+  unsigned total_insns = 0;
+
   /* Calculate instruction count.  */
   basic_block *bbs = get_loop_body (loop);
   for (unsigned i = 0; i < loop->num_nodes; i++)
@@ -151,6 +155,7 @@ init_loop_unswitch_info (class loop *loop)
 	insns += estimate_num_insns (gsi_stmt (gsi), &eni_size_weights);
 
       bbs[i]->aux = (void *)(size_t)insns;
+      total_insns += insns;
     }
 
   /* Find all unswitching candidates.  */
@@ -171,6 +176,8 @@ init_loop_unswitch_info (class loop *loop)
     }
 
   free (bbs);
+
+  return total_insns;
 }
 
 /* Main entry point.  Perform loop unswitching on all suitable loops.  */
@@ -191,9 +198,12 @@ tree_ssa_unswitch_loops (void)
 	  bb_predicates->safe_push (vec<unswitch_predicate *> ());
 
 	  /* Unswitch innermost loop.  */
-	  init_loop_unswitch_info (loop);
+	  unsigned int budget
+	    = init_loop_unswitch_info (loop) + param_max_unswitch_insns;
+
 	  predicate_vector predicate_path;
-	  changed |= tree_unswitch_single_loop (loop, 0, predicate_path);
+	  changed |= tree_unswitch_single_loop (loop, 0, predicate_path,
+						budget);
 
 	  delete bb_predicates;
 	  bb_predicates = NULL;
@@ -548,11 +558,12 @@ evaluate_loop_insns_for_predicate (class loop *loop, basic_block *bbs,
 /* Unswitch single LOOP.  NUM is number of unswitchings done; we do not allow
    it to grow too much, it is too easy to create example on that the code would
    grow exponentially.  PREDICATE_PATH contains so far used predicates
-   for unswitching.  */
+   for unswitching.  BUDGET is number of instruction for which we can increase
+   the loop.  */
 
 static bool
 tree_unswitch_single_loop (class loop *loop, int num,
-			   predicate_vector &predicate_path)
+			   predicate_vector &predicate_path, unsigned budget)
 {
   basic_block *bbs = NULL;
   class loop *nloop;
@@ -601,17 +612,17 @@ tree_unswitch_single_loop (class loop *loop, int num,
       vec<unswitch_predicate *> &preds = get_predicates_for_bb (bbs[i]);
       for (auto pred: preds)
 	{
-	  // FIXME: update badget costing
 	  unsigned cost
 	    = evaluate_loop_insns_for_predicate (loop, bbs, predicate_path,
 						 pred);
 
 	  /* FIXME: right now we select first candidate, but we can choose
 	     a cheapest (best) one.  */
-	  if (cost <= (unsigned)param_max_unswitch_insns)
+	  if (cost <= budget)
 	    {
 	      predicate = pred;
 	      bb = bbs[i];
+	      budget -= cost;
 	      break;
 	    }
 	  else if (dump_file && (dump_flags & TDF_DETAILS))
@@ -659,12 +670,12 @@ tree_unswitch_single_loop (class loop *loop, int num,
       /* Invoke itself on modified loops.  */
       predicate_path.safe_push (std::make_pair (predicate, false));
       changed |= simplify_loop_version (nloop, predicate_path);
-      tree_unswitch_single_loop (nloop, num + 1, predicate_path);
+      tree_unswitch_single_loop (nloop, num + 1, predicate_path, budget);
       predicate_path.pop ();
 
       predicate_path.safe_push (std::make_pair (predicate, true));
       changed |= simplify_loop_version (loop, predicate_path);
-      tree_unswitch_single_loop (loop, num + 1, predicate_path);
+      tree_unswitch_single_loop (loop, num + 1, predicate_path, budget);
       predicate_path.pop ();
       changed = true;
     }
