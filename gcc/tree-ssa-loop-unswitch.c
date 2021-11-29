@@ -285,11 +285,9 @@ is_maybe_undefined (const tree name, gimple *stmt, class loop *loop)
   return false;
 }
 
-// FIXME
 /* Checks whether we can unswitch LOOP on condition at end of BB -- one of its
    basic blocks (for what it means see comments below).
-   RANGER is gimple ranger used in this pass and unswitch_predicate is returned
-   if there is an opportunity for unswitching.  */
+   All candidates all filled to the provided vector CANDIDATES.  */
 
 static void
 find_unswitching_predicates_for_bb (basic_block bb, class loop *loop,
@@ -409,10 +407,8 @@ evaluate_control_stmt_using_entry_checks (gimple *stmt,
   return NULL_TREE;
 }
 
-/* Find all unswitching predicates for a LOOP that contains BBS.
-   TRUE_EDGE distinguish which PARENT_PREDICATE should be used when
-   asking RANGER infrastructure.  Return unswitch_predicate in the provided
-   CANDIDATES vector.  */
+/* Simplify LOOP based on PREDICATE_PATH where dead edges are properly
+   marked.  */
 
 static bool
 simplify_loop_version (class loop *loop, predicate_vector &predicate_path)
@@ -450,12 +446,11 @@ simplify_loop_version (class loop *loop, predicate_vector &predicate_path)
 }
 
 /* Evaluate how many instructions will be executed if we unswitch
-   LOOP (with BBS) based on PREDICATE.  TRUE_EDGE distinguishes if
-   we calculate taken or not taken edge when asking RANGER.
+   LOOP (with BBS) based on PREDICATE_PATH.
    REACHABLE_FLAG is used for marking of the basic blocks.  */
 
 static unsigned
-evaluate_insns (class loop *loop,  basic_block *bbs,
+evaluate_insns (class loop *loop, basic_block *bbs,
 		predicate_vector &predicate_path,
 		auto_bb_flag &reachable_flag)
 {
@@ -528,7 +523,7 @@ evaluate_insns (class loop *loop,  basic_block *bbs,
 }
 
 /* Evaluate how many instruction will we have if we unswitch LOOP (with BBS)
-   based on CANDIDATE predicate (using RANGER infrastructure).  */
+   based on PREDICATE predicate (using PREDICATE_PATH).  */
 
 static unsigned
 evaluate_loop_insns_for_predicate (class loop *loop, basic_block *bbs,
@@ -552,7 +547,8 @@ evaluate_loop_insns_for_predicate (class loop *loop, basic_block *bbs,
 
 /* Unswitch single LOOP.  NUM is number of unswitchings done; we do not allow
    it to grow too much, it is too easy to create example on that the code would
-   grow exponentially.  RANGER is gimple ranger used in this pass.  */
+   grow exponentially.  PREDICATE_PATH contains so far used predicates
+   for unswitching.  */
 
 static bool
 tree_unswitch_single_loop (class loop *loop, int num,
