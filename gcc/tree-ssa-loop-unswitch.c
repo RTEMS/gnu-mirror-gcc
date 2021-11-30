@@ -42,8 +42,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-range.h"
 #include "dbgcnt.h"
 
-#include <utility>
-
 /* This file implements the loop unswitching, i.e. transformation of loops like
 
    while (A)
@@ -475,32 +473,30 @@ evaluate_insns (class loop *loop, basic_block *bbs,
       int flags = 0;
       basic_block bb = worklist.pop ();
 
-      if (EDGE_COUNT (bb->succs) == 2)
+      gimple *last = last_stmt (bb);
+      gcond *cond = last != NULL ? dyn_cast<gcond *> (last) : NULL;
+      if (cond != NULL)
 	{
-	  gcond *cond = dyn_cast<gcond *> (last_stmt (bb));
-	  if (cond != NULL)
+	  if (gimple_cond_true_p (cond))
+	    flags = EDGE_FALSE_VALUE;
+	  else if (gimple_cond_false_p (cond))
+	    flags = EDGE_TRUE_VALUE;
+	  else
 	    {
-	      if (gimple_cond_true_p (cond))
-		flags = EDGE_FALSE_VALUE;
-	      else if (gimple_cond_false_p (cond))
-		flags = EDGE_TRUE_VALUE;
-	      else
-		{
-		  // FIXME: works only for gconds
-		  unswitch_predicate *predicate = NULL;
-		  if (!get_predicates_for_bb (bb).is_empty ())
-		    predicate = get_predicates_for_bb (bb)[0];
+	      // FIXME: works only for gconds
+	      unswitch_predicate *predicate = NULL;
+	      if (!get_predicates_for_bb (bb).is_empty ())
+		predicate = get_predicates_for_bb (bb)[0];
 
-		  if (predicate != NULL)
-		    {
-		      tree folded
-			= evaluate_control_stmt_using_entry_checks (cond,
-								    predicate_path);
-		      if (folded == boolean_true_node)
-			flags = EDGE_FALSE_VALUE;
-		      else if (folded == boolean_false_node)
-			flags = EDGE_TRUE_VALUE;
-		    }
+	      if (predicate != NULL)
+		{
+		  tree folded
+		    = evaluate_control_stmt_using_entry_checks (cond,
+								predicate_path);
+		  if (folded == boolean_true_node)
+		    flags = EDGE_FALSE_VALUE;
+		  else if (folded == boolean_false_node)
+		    flags = EDGE_TRUE_VALUE;
 		}
 	    }
 	}
