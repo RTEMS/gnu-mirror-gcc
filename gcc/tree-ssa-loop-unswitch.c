@@ -101,7 +101,8 @@ static vec<vec<unswitch_predicate *>> *bb_predicates = NULL;
 static gimple_ranger *ranger = NULL;
 
 /* The type represents a predicate path leading to a basic block.  */
-typedef auto_vec<std::pair<unswitch_predicate *, bool>> predicate_vector;
+typedef vec<std::pair<unswitch_predicate *, bool>> auto_predicate_vector;
+typedef vec<std::pair<unswitch_predicate *, bool>> predicate_vector;
 
 static class loop *tree_unswitch_loop (class loop *, basic_block, tree);
 static bool tree_unswitch_single_loop (class loop *, int,
@@ -200,7 +201,7 @@ tree_ssa_unswitch_loops (void)
 	  unsigned int budget
 	    = init_loop_unswitch_info (loop) + param_max_unswitch_insns;
 
-	  predicate_vector predicate_path;
+	  auto_predicate_vector predicate_path;
 	  changed |= tree_unswitch_single_loop (loop, 0, predicate_path,
 						budget);
 
