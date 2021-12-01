@@ -355,27 +355,37 @@ find_unswitching_predicates_for_bb (basic_block bb, class loop *loop,
 }
 
 static void
-combine_range (predicate_vector &predicate_path, tree index, irange &path_range)
+merge_last (predicate_vector &predicate_path)
 {
-  bool first = true;
+  unswitch_predicate *last_predicate = predicate_path.last ().first;
 
-  for (auto p: predicate_path)
+  for (int i = predicate_path.length () - 2; i >= 0; i--)
     {
-      unswitch_predicate *predicate = p.first;
-      bool true_edge = p.second;
+      unswitch_predicate *predicate = predicate_path[i].first;
+      bool true_edge = predicate_path[i].second;
 
-      if (operand_equal_p (predicate->lhs, index, 0))
+      if (operand_equal_p (predicate->lhs, last_predicate->lhs, 0))
 	{
 	  irange &other
 	    = true_edge ? predicate->true_range : predicate->false_range;
-	  if (first)
-	    {
-	      first = false;
-	      path_range = other;
-	    }
-	  else
-	    path_range.intersect (other);
+	  last_predicate->true_range.intersect (other);
+	  last_predicate->false_range.intersect (other);
+	  return;
 	}
+    }
+}
+
+void
+find_range_for_lhs (predicate_vector &predicate_path, tree lhs,
+		    int_range_max &range)
+{
+  for (int i = predicate_path.length () - 1; i >= 0; i--)
+    {
+      unswitch_predicate *predicate = predicate_path[i].first;
+      bool true_edge = predicate_path[i].second;
+
+      if (operand_equal_p (predicate->lhs, lhs, 0))
+	range = true_edge ? predicate->true_range : predicate->false_range;
     }
 }
 
@@ -404,7 +414,7 @@ evaluate_control_stmt_using_entry_checks (gimple *stmt,
 	{
 	  int_range_max r;
 	  int_range_max path_range;
-	  combine_range (predicate_path, lhs, path_range);
+	  find_range_for_lhs (predicate_path, lhs, path_range);
 	  if (!path_range.undefined_p ()
 	      && fold_range (r, stmt, path_range)
 	      && r.singleton_p ())
@@ -541,11 +551,13 @@ evaluate_loop_insns_for_predicate (class loop *loop, basic_block *bbs,
   predicate_path.safe_push (std::make_pair (predicate, true));
   unsigned true_loop_cost = evaluate_insns (loop, bbs, predicate_path,
 					    reachable_flag);
+  merge_last (predicate_path);
   predicate_path.pop ();
 
   predicate_path.safe_push (std::make_pair (predicate, false));
   unsigned false_loop_cost = evaluate_insns (loop, bbs, predicate_path,
 					     reachable_flag);
+  merge_last (predicate_path);
   predicate_path.pop ();
 
   return true_loop_cost + false_loop_cost;
@@ -665,11 +677,13 @@ tree_unswitch_single_loop (class loop *loop, int num,
 
       /* Invoke itself on modified loops.  */
       predicate_path.safe_push (std::make_pair (predicate, false));
+      merge_last (predicate_path);
       changed |= simplify_loop_version (nloop, predicate_path);
       tree_unswitch_single_loop (nloop, num + 1, predicate_path, budget);
       predicate_path.pop ();
 
       predicate_path.safe_push (std::make_pair (predicate, true));
+      merge_last (predicate_path);
       changed |= simplify_loop_version (loop, predicate_path);
       tree_unswitch_single_loop (loop, num + 1, predicate_path, budget);
       predicate_path.pop ();
