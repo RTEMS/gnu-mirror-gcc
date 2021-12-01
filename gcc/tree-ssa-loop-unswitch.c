@@ -386,7 +386,10 @@ find_range_for_lhs (predicate_vector &predicate_path, tree lhs,
       bool true_edge = predicate_path[i].second;
 
       if (operand_equal_p (predicate->lhs, lhs, 0))
-	range = true_edge ? predicate->true_range : predicate->false_range;
+	{
+	  range = true_edge ? predicate->true_range : predicate->false_range;
+	  return;
+	}
     }
 }
 
