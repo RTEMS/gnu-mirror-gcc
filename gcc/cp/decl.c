@@ -598,7 +598,7 @@ poplevel (int keep, int reverse, int functionbody)
   tree decl;
   scope_kind kind;
 
-  bool subtime = timevar_cond_start (TV_NAME_LOOKUP);
+  auto_cond_timevar tv (TV_NAME_LOOKUP);
  restart:
 
   block = NULL_TREE;
@@ -830,7 +830,6 @@ poplevel (int keep, int reverse, int functionbody)
   if (kind == sk_cleanup)
     goto restart;
 
-  timevar_cond_stop (TV_NAME_LOOKUP, subtime);
   return block;
 }
 
@@ -909,7 +908,7 @@ static GTY((deletable)) vec<tree, va_gc> *local_entities;
 void
 determine_local_discriminator (tree decl)
 {
-  bool subtime = timevar_cond_start (TV_NAME_LOOKUP);
+  auto_cond_timevar tv (TV_NAME_LOOKUP);
   retrofit_lang_decl (decl);
   tree ctx = DECL_CONTEXT (decl);
   tree name = (TREE_CODE (decl) == TYPE_DECL
@@ -944,8 +943,6 @@ determine_local_discriminator (tree decl)
       local_entities->quick_push (decl);
       local_entities->quick_push (name);
     }
-
-  timevar_cond_stop (TV_NAME_LOOKUP, subtime);
 }
 
 
@@ -1290,6 +1287,12 @@ validate_constexpr_redeclaration (tree old_decl, tree new_decl)
     }
   if (TREE_CODE (old_decl) == FUNCTION_DECL)
     {
+      /* With -fimplicit-constexpr, ignore changes in the constexpr
+	 keyword.  */
+      if (flag_implicit_constexpr
+	  && (DECL_IMMEDIATE_FUNCTION_P (new_decl)
+	      == DECL_IMMEDIATE_FUNCTION_P (old_decl)))
+	return true;
       if (fndecl_built_in_p (old_decl))
 	{
 	  /* Hide a built-in declaration.  */
@@ -3278,6 +3281,8 @@ named_label_hash::equal (const value_type entry, compare_type name)
 static named_label_entry *
 lookup_label_1 (tree id, bool making_local_p)
 {
+  auto_cond_timevar tv (TV_NAME_LOOKUP);
+
   /* You can't use labels at global scope.  */
   if (current_function_decl == NULL_TREE)
     {
@@ -3340,18 +3345,14 @@ lookup_label_1 (tree id, bool making_local_p)
 tree
 lookup_label (tree id)
 {
-  bool subtime = timevar_cond_start (TV_NAME_LOOKUP);
   named_label_entry *ent = lookup_label_1 (id, false);
-  timevar_cond_stop (TV_NAME_LOOKUP, subtime);
   return ent ? ent->label_decl : NULL_TREE;
 }
 
 tree
 declare_local_label (tree id)
 {
-  bool subtime = timevar_cond_start (TV_NAME_LOOKUP);
   named_label_entry *ent = lookup_label_1 (id, true);
-  timevar_cond_stop (TV_NAME_LOOKUP, subtime);
   return ent ? ent->label_decl : NULL_TREE;
 }
 
@@ -3682,9 +3683,11 @@ check_omp_return (void)
 /* Define a label, specifying the location in the source file.
    Return the LABEL_DECL node for the label.  */
 
-static tree
-define_label_1 (location_t location, tree name)
+tree
+define_label (location_t location, tree name)
 {
+  auto_cond_timevar tv (TV_NAME_LOOKUP);
+
   /* After labels, make any new cleanups in the function go into their
      own new (temporary) binding contour.  */
   for (cp_binding_level *p = current_binding_level;
@@ -3717,18 +3720,6 @@ define_label_1 (location_t location, tree name)
 
   return decl;
 }
-
-/* Wrapper for define_label_1.  */
-
-tree
-define_label (location_t location, tree name)
-{
-  bool running = timevar_cond_start (TV_NAME_LOOKUP);
-  tree ret = define_label_1 (location, name);
-  timevar_cond_stop (TV_NAME_LOOKUP, running);
-  return ret;
-}
-
 
 struct cp_switch
 {
@@ -11000,7 +10991,7 @@ compute_array_index_type_loc (location_t name_loc, tree name, tree size,
 				    cp_convert (ssizetype, integer_one_node,
 						complain),
 				    complain);
-	itype = maybe_constant_value (itype);
+	itype = maybe_constant_value (itype, NULL_TREE, true);
       }
 
       if (!TREE_CONSTANT (itype))
@@ -11516,14 +11507,18 @@ grokdeclarator (const cp_declarator *declarator,
   if (initialized == SD_DEFAULTED || initialized == SD_DELETED)
     funcdef_flag = true;
 
-  location_t typespec_loc = smallest_type_location (type_quals,
-						    declspecs->locations);
-  if (typespec_loc == UNKNOWN_LOCATION)
-    typespec_loc = input_location;
-
-  location_t id_loc = declarator ? declarator->id_loc : input_location;
-  if (id_loc == UNKNOWN_LOCATION)
-    id_loc = input_location;
+  location_t typespec_loc = loc_or_input_loc (smallest_type_location
+					      (type_quals,
+					       declspecs->locations));
+  location_t id_loc;
+  location_t init_loc;
+  if (declarator)
+    {
+      id_loc = loc_or_input_loc (declarator->id_loc);
+      init_loc = loc_or_input_loc (declarator->init_loc);
+    }
+  else
+    init_loc = id_loc = input_location;
 
   /* Look inside a declarator for the name being declared
      and get it as a string, for an error message.  */
@@ -14036,7 +14031,7 @@ grokdeclarator (const cp_declarator *declarator,
 		  {
 		    /* An attempt is being made to initialize a non-static
 		       member.  This is new in C++11.  */
-		    maybe_warn_cpp0x (CPP0X_NSDMI);
+		    maybe_warn_cpp0x (CPP0X_NSDMI, init_loc);
 
 		    /* If this has been parsed with static storage class, but
 		       errors forced staticp to be cleared, ensure NSDMI is
@@ -14863,7 +14858,7 @@ grok_special_member_properties (tree decl)
       if (is_list_ctor (decl))
 	TYPE_HAS_LIST_CTOR (class_type) = 1;
 
-      if (DECL_DECLARED_CONSTEXPR_P (decl)
+      if (maybe_constexpr_fn (decl)
 	  && !ctor && !move_fn_p (decl))
 	TYPE_HAS_CONSTEXPR_CTOR (class_type) = 1;
     }
@@ -15145,6 +15140,8 @@ grok_op_properties (tree decl, bool complain)
     case OVL_OP_FLAG_BINARY:
       if (arity != 2)
 	{
+	  if (operator_code == ARRAY_REF && cxx_dialect >= cxx23)
+	    break;
 	  error_at (loc,
 		    methodp
 		    ? G_("%qD must have exactly one argument")
@@ -15493,12 +15490,14 @@ lookup_and_check_tag (enum tag_types tag_code, tree name,
    TEMPLATE_HEADER_P is true when this declaration is preceded by
    a set of template parameters.  */
 
-static tree
-xref_tag_1 (enum tag_types tag_code, tree name,
-            TAG_how how, bool template_header_p)
+tree
+xref_tag (enum tag_types tag_code, tree name,
+	  TAG_how how, bool template_header_p)
 {
   enum tree_code code;
   tree context = NULL_TREE;
+
+  auto_cond_timevar tv (TV_NAME_LOOKUP);
 
   gcc_assert (identifier_p (name));
 
@@ -15646,18 +15645,6 @@ xref_tag_1 (enum tag_types tag_code, tree name,
     }
 
   return t;
-}
-
-/* Wrapper for xref_tag_1.  */
-
-tree
-xref_tag (enum tag_types tag_code, tree name,
-	  TAG_how how, bool template_header_p)
-{
-  bool subtime = timevar_cond_start (TV_NAME_LOOKUP);
-  tree ret = xref_tag_1 (tag_code, name, how, template_header_p);
-  timevar_cond_stop (TV_NAME_LOOKUP, subtime);
-  return ret;
 }
 
 /* Create the binfo hierarchy for REF with (possibly NULL) base list
@@ -17603,7 +17590,8 @@ finish_function (bool inline_p)
   if (!processing_template_decl
       && !cp_function_chain->can_throw
       && !flag_non_call_exceptions
-      && !decl_replaceable_p (fndecl))
+      && !decl_replaceable_p (fndecl,
+			      opt_for_fn (fndecl, flag_semantic_interposition)))
     TREE_NOTHROW (fndecl) = 1;
 
   /* This must come after expand_function_end because cleanups might

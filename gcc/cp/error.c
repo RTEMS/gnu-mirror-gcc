@@ -1686,7 +1686,8 @@ dump_function_decl (cxx_pretty_printer *pp, tree t, int flags)
   exceptions = TYPE_RAISES_EXCEPTIONS (TREE_TYPE (t));
 
   /* Likewise for the constexpr specifier, in case t is a specialization.  */
-  constexpr_p = DECL_DECLARED_CONSTEXPR_P (t);
+  constexpr_p = (DECL_DECLARED_CONSTEXPR_P (t)
+		 && !decl_implicit_constexpr_p (t));
 
   /* Pretty print template instantiations only.  */
   if (DECL_USE_TEMPLATE (t) && DECL_TEMPLATE_INFO (t)
@@ -4427,84 +4428,84 @@ cp_printer (pretty_printer *pp, text_info *text, const char *spec,
 
 /* Warn about the use of C++0x features when appropriate.  */
 void
-maybe_warn_cpp0x (cpp0x_warn_str str)
+maybe_warn_cpp0x (cpp0x_warn_str str, location_t loc/*=input_location*/)
 {
   if (cxx_dialect == cxx98)
     switch (str)
       {
       case CPP0X_INITIALIZER_LISTS:
-	pedwarn (input_location, OPT_Wc__11_extensions,
+	pedwarn (loc, OPT_Wc__11_extensions,
 		 "extended initializer lists "
 		 "only available with %<-std=c++11%> or %<-std=gnu++11%>");
 	break;
       case CPP0X_EXPLICIT_CONVERSION:
-	pedwarn (input_location, OPT_Wc__11_extensions,
+	pedwarn (loc, OPT_Wc__11_extensions,
 		 "explicit conversion operators "
 		 "only available with %<-std=c++11%> or %<-std=gnu++11%>");
 	break;
       case CPP0X_VARIADIC_TEMPLATES:
-	pedwarn (input_location, OPT_Wc__11_extensions,
+	pedwarn (loc, OPT_Wc__11_extensions,
 		 "variadic templates "
 		 "only available with %<-std=c++11%> or %<-std=gnu++11%>");
 	break;
       case CPP0X_LAMBDA_EXPR:
-	pedwarn (input_location, OPT_Wc__11_extensions,
+	pedwarn (loc, OPT_Wc__11_extensions,
 		 "lambda expressions "
 		  "only available with %<-std=c++11%> or %<-std=gnu++11%>");
 	break;
       case CPP0X_AUTO:
-	pedwarn (input_location, OPT_Wc__11_extensions,
+	pedwarn (loc, OPT_Wc__11_extensions,
 		 "C++11 auto only available with %<-std=c++11%> or "
 		 "%<-std=gnu++11%>");
 	break;
       case CPP0X_SCOPED_ENUMS:
-	pedwarn (input_location, OPT_Wc__11_extensions,
+	pedwarn (loc, OPT_Wc__11_extensions,
 		 "scoped enums only available with %<-std=c++11%> or "
 		 "%<-std=gnu++11%>");
 	break;
       case CPP0X_DEFAULTED_DELETED:
-	pedwarn (input_location, OPT_Wc__11_extensions,
+	pedwarn (loc, OPT_Wc__11_extensions,
 		 "defaulted and deleted functions "
 		 "only available with %<-std=c++11%> or %<-std=gnu++11%>");
 	break;
       case CPP0X_INLINE_NAMESPACES:
 	if (pedantic)
-	  pedwarn (input_location, OPT_Wc__11_extensions,
+	  pedwarn (loc, OPT_Wc__11_extensions,
 		   "inline namespaces "
 		   "only available with %<-std=c++11%> or %<-std=gnu++11%>");
 	break;
       case CPP0X_OVERRIDE_CONTROLS:
-	pedwarn (input_location, OPT_Wc__11_extensions,
+	pedwarn (loc, OPT_Wc__11_extensions,
 		 "override controls (override/final) "
 		 "only available with %<-std=c++11%> or %<-std=gnu++11%>");
         break;
       case CPP0X_NSDMI:
-	pedwarn (input_location, OPT_Wc__11_extensions,
+	pedwarn (loc, OPT_Wc__11_extensions,
 		 "non-static data member initializers "
 		 "only available with %<-std=c++11%> or %<-std=gnu++11%>");
         break;
       case CPP0X_USER_DEFINED_LITERALS:
-	pedwarn (input_location, OPT_Wc__11_extensions,
+	pedwarn (loc, OPT_Wc__11_extensions,
 		 "user-defined literals "
 		 "only available with %<-std=c++11%> or %<-std=gnu++11%>");
 	break;
       case CPP0X_DELEGATING_CTORS:
-	pedwarn (input_location, OPT_Wc__11_extensions,
+	pedwarn (loc, OPT_Wc__11_extensions,
 		 "delegating constructors "
 		 "only available with %<-std=c++11%> or %<-std=gnu++11%>");
         break;
       case CPP0X_INHERITING_CTORS:
-	pedwarn (input_location, OPT_Wc__11_extensions,
+	pedwarn (loc, OPT_Wc__11_extensions,
 		 "inheriting constructors "
 		 "only available with %<-std=c++11%> or %<-std=gnu++11%>");
         break;
       case CPP0X_ATTRIBUTES:
-	pedwarn (input_location, OPT_Wc__11_extensions,
+	pedwarn (loc, OPT_Wc__11_extensions,
 		 "C++11 attributes "
 		 "only available with %<-std=c++11%> or %<-std=gnu++11%>");
 	break;
       case CPP0X_REF_QUALIFIER:
-	pedwarn (input_location, OPT_Wc__11_extensions,
+	pedwarn (loc, OPT_Wc__11_extensions,
 		 "ref-qualifiers "
 		 "only available with %<-std=c++11%> or %<-std=gnu++11%>");
 	break;

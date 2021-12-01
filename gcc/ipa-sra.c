@@ -85,6 +85,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-streamer.h"
 #include "internal-fn.h"
 #include "symtab-clones.h"
+#include "attribs.h"
 
 static void ipa_sra_summarize_function (cgraph_node *);
 
@@ -613,13 +614,6 @@ ipa_sra_preliminary_function_checks (cgraph_node *node)
     {
       if (dump_file)
 	fprintf (dump_file, "Function uses stdarg. \n");
-      return false;
-    }
-
-  if (TYPE_ATTRIBUTES (TREE_TYPE (node->decl)))
-    {
-      if (dump_file)
-	fprintf (dump_file, "Function type has attributes. \n");
       return false;
     }
 
@@ -1931,7 +1925,8 @@ scan_function (cgraph_node *node, struct function *fun)
 		if (lhs)
 		  scan_expr_access (lhs, stmt, ISRA_CTX_STORE, bb);
 		int flags = gimple_call_flags (stmt);
-		if ((flags & (ECF_CONST | ECF_PURE)) == 0)
+		if (((flags & (ECF_CONST | ECF_PURE)) == 0)
+		    || (flags & ECF_LOOPING_CONST_OR_PURE))
 		  bitmap_set_bit (final_bbs, bb->index);
 	      }
 	      break;

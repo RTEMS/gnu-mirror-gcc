@@ -946,7 +946,8 @@ c_common_post_options (const char **pfilename)
   /* -Wcomma-subscript is enabled by default in C++20.  */
   SET_OPTION_IF_UNSET (&global_options, &global_options_set,
 		       warn_comma_subscript,
-		       cxx_dialect >= cxx20 && warn_deprecated);
+		       cxx_dialect >= cxx23
+		       || (cxx_dialect == cxx20 && warn_deprecated));
 
   /* -Wvolatile is enabled by default in C++20.  */
   SET_OPTION_IF_UNSET (&global_options, &global_options_set, warn_volatile,
@@ -1052,6 +1053,9 @@ c_common_post_options (const char **pfilename)
       && flag_strong_eval_order == -1)
     flag_strong_eval_order = (cxx_dialect >= cxx17 ? 2 : 1);
 
+  if (flag_implicit_constexpr && cxx_dialect < cxx14)
+    flag_implicit_constexpr = false;
+
   /* Global sized deallocation is new in C++14.  */
   if (flag_sized_deallocation == -1)
     flag_sized_deallocation = (cxx_dialect >= cxx14);
@@ -1105,10 +1109,7 @@ c_common_post_options (const char **pfilename)
 	out_stream = fopen (out_fname, "w");
 
       if (out_stream == NULL)
-	{
-	  fatal_error (input_location, "opening output file %s: %m", out_fname);
-	  return false;
-	}
+	fatal_error (input_location, "opening output file %s: %m", out_fname);
 
       init_pp_output (out_stream);
     }

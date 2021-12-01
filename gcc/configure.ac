@@ -435,6 +435,7 @@ rm -f a.out a.exe b.out
 AC_PROG_CC
 AC_PROG_CXX
 ACX_PROG_GNAT([-I"$srcdir"/ada/libgnat])
+ACX_PROG_GDC([-I"$srcdir"/d])
 
 # Do configure tests with the C++ compiler, since that's what we build with.
 AC_LANG(C++)
@@ -448,6 +449,7 @@ case "$CC" in
 esac
 AC_SUBST(CFLAGS)
 AC_SUBST(CXXFLAGS)
+AC_SUBST(GDCFLAGS)
 
 # Determine PICFLAG for target gnatlib.
 GCC_PICFLAG_FOR_TARGET
@@ -6253,6 +6255,7 @@ if test x"$ld64_flag" = x"yes"; then
 
   # Set defaults for possibly untestable items.
   gcc_cv_ld64_export_dynamic=0
+  gcc_cv_ld64_platform_version=0
 
   if test "$build" = "$host"; then
     darwin_try_test=1
@@ -6274,8 +6277,11 @@ if test x"$ld64_flag" = x"yes"; then
     AC_MSG_CHECKING(ld64 specified version)
     gcc_cv_ld64_major=`echo "$gcc_cv_ld64_version" | sed -e 's/\..*//'`
     AC_MSG_RESULT($gcc_cv_ld64_major)
-   if test "$gcc_cv_ld64_major" -ge 236; then
+    if test "$gcc_cv_ld64_major" -ge 236; then
       gcc_cv_ld64_export_dynamic=1
+    fi
+    if test "$gcc_cv_ld64_major" -ge 512; then
+      gcc_cv_ld64_platform_version=1
     fi
   elif test -x "$gcc_cv_ld" -a "$darwin_try_test" -eq 1; then
     # If the version was not specified, try to find it.
@@ -6291,6 +6297,13 @@ if test x"$ld64_flag" = x"yes"; then
       gcc_cv_ld64_export_dynamic=0
     fi
     AC_MSG_RESULT($gcc_cv_ld64_export_dynamic)
+
+    AC_MSG_CHECKING(linker for -platform_version support)
+    gcc_cv_ld64_platform_version=1
+    if $gcc_cv_ld -platform_version macos 10.5 0.0 < /dev/null 2>&1 | grep 'unknown option' > /dev/null; then
+      gcc_cv_ld64_platform_version=0
+    fi
+    AC_MSG_RESULT($gcc_cv_ld64_platform_version)
   fi
 
   if test x"${gcc_cv_ld64_version}" != x; then
@@ -6300,6 +6313,9 @@ if test x"$ld64_flag" = x"yes"; then
 
   AC_DEFINE_UNQUOTED(LD64_HAS_EXPORT_DYNAMIC, $gcc_cv_ld64_export_dynamic,
   [Define to 1 if ld64 supports '-export_dynamic'.])
+
+  AC_DEFINE_UNQUOTED(LD64_HAS_PLATFORM_VERSION, $gcc_cv_ld64_platform_version,
+  [Define to 1 if ld64 supports '-platform_version'.])
 fi
 
 if test x"$dsymutil_flag" = x"yes"; then
@@ -7025,6 +7041,20 @@ else
   MAINT='#'
 fi
 AC_SUBST(MAINT)dnl
+
+dnl Variables for tags utilities; copied from automake 1.16.4+'s init.m4
+if test -z "$CTAGS"; then
+  CTAGS=ctags
+fi
+AC_SUBST([CTAGS])
+if test -z "$ETAGS"; then
+  ETAGS=etags
+fi
+AC_SUBST([ETAGS])
+if test -z "$CSCOPE"; then
+  CSCOPE=cscope
+fi
+AC_SUBST([CSCOPE])
 
 dnl Whether to prevent multiple front-ends from linking at the same time
 

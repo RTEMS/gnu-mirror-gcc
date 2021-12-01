@@ -210,6 +210,7 @@ protected:
   int_range<2> m_undefined;
   tree m_type;
   irange_allocator *m_irange_allocator;
+  void grow ();
 };
 
 
@@ -229,13 +230,37 @@ sbr_vector::sbr_vector (tree t, irange_allocator *allocator)
   m_undefined.set_undefined ();
 }
 
+// Grow the vector when the CFG has increased in size.
+
+void
+sbr_vector::grow ()
+{
+  int curr_bb_size = last_basic_block_for_fn (cfun);
+  gcc_checking_assert (curr_bb_size > m_tab_size);
+
+  // Increase the max of a)128, b)needed increase * 2, c)10% of current_size.
+  int inc = MAX ((curr_bb_size - m_tab_size) * 2, 128);
+  inc = MAX (inc, curr_bb_size / 10);
+  int new_size = inc + curr_bb_size;
+
+  // Allocate new memory, copy the old vector and clear the new space.
+  irange **t = (irange **)m_irange_allocator->get_memory (new_size
+							  * sizeof (irange *));
+  memcpy (t, m_tab, m_tab_size * sizeof (irange *));
+  memset (t + m_tab_size, 0, (new_size - m_tab_size) * sizeof (irange *));
+
+  m_tab = t;
+  m_tab_size = new_size;
+}
+
 // Set the range for block BB to be R.
 
 bool
 sbr_vector::set_bb_range (const_basic_block bb, const irange &r)
 {
   irange *m;
-  gcc_checking_assert (bb->index < m_tab_size);
+  if (bb->index >= m_tab_size)
+    grow ();
   if (r.varying_p ())
     m = &m_varying;
   else if (r.undefined_p ())
@@ -252,7 +277,8 @@ sbr_vector::set_bb_range (const_basic_block bb, const irange &r)
 bool
 sbr_vector::get_bb_range (irange &r, const_basic_block bb)
 {
-  gcc_checking_assert (bb->index < m_tab_size);
+  if (bb->index >= m_tab_size)
+    return false;
   irange *m = m_tab[bb->index];
   if (m)
     {
@@ -267,8 +293,9 @@ sbr_vector::get_bb_range (irange &r, const_basic_block bb)
 bool
 sbr_vector::bb_range_p (const_basic_block bb)
 {
-  gcc_checking_assert (bb->index < m_tab_size);
-  return m_tab[bb->index] != NULL;
+  if (bb->index < m_tab_size)
+    return m_tab[bb->index] != NULL;
+  return false;
 }
 
 // This class implements the on entry cache via a sparse bitmap.
@@ -624,7 +651,8 @@ ssa_global_cache::clear_global_range (tree name)
 void
 ssa_global_cache::clear ()
 {
-  memset (m_tab.address(), 0, m_tab.length () * sizeof (irange *));
+  if (m_tab.address ())
+    memset (m_tab.address(), 0, m_tab.length () * sizeof (irange *));
 }
 
 // Dump the contents of the global cache to F.
@@ -895,44 +923,45 @@ ranger_cache::dump_bb (FILE *f, basic_block bb)
 }
 
 // Get the global range for NAME, and return in R.  Return false if the
-// global range is not set.
+// global range is not set, and return the legacy global value in R.
 
 bool
 ranger_cache::get_global_range (irange &r, tree name) const
 {
-  return m_globals.get_global_range (r, name);
-}
-
-// Get the global range for NAME, and return in R if the value is not stale.
-// If the range is set, but is stale, mark it current and return false.
-// If it is not set pick up the legacy global value, mark it current, and
-// return false.
-// Note there is always a value returned in R. The return value indicates
-// whether that value is an up-to-date calculated value or not..
-
-bool
-ranger_cache::get_non_stale_global_range (irange &r, tree name)
-{
   if (m_globals.get_global_range (r, name))
-    {
-      // Use this value if the range is constant or current.
-      if (r.singleton_p ()
-	  || m_temporal->current_p (name, m_gori.depend1 (name),
-				    m_gori.depend2 (name)))
-	return true;
-    }
-  else
-    {
-      // Global has never been accessed, so pickup the legacy global value.
-      r = gimple_range_global (name);
-      m_globals.set_global_range (name, r);
-    }
-  // After a stale check failure, mark the value as always current until a
-  // new one is set.
-  m_temporal->set_always_current (name);
+    return true;
+  r = gimple_range_global (name);
   return false;
 }
-//  Set the global range of NAME to R.
+
+// Get the global range for NAME, and return in R.  Return false if the
+// global range is not set, and R will contain the legacy global value.
+// CURRENT_P is set to true if the value was in cache and not stale.
+// Otherwise, set CURRENT_P to false and mark as it always current.
+// If the global cache did not have a value, initialize it as well.
+// After this call, the global cache will have a value.
+
+bool
+ranger_cache::get_global_range (irange &r, tree name, bool &current_p)
+{
+  bool had_global = get_global_range (r, name);
+
+  // If there was a global value, set current flag, otherwise set a value.
+  current_p = false;
+  if (had_global)
+    current_p = r.singleton_p ()
+		|| m_temporal->current_p (name, m_gori.depend1 (name),
+					  m_gori.depend2 (name));
+  else
+    m_globals.set_global_range (name, r);
+
+  // If the existing value was not current, mark it as always current.
+  if (!current_p)
+    m_temporal->set_always_current (name);
+  return current_p;
+}
+
+//  Set the global range of NAME to R and give it a timestamp.
 
 void
 ranger_cache::set_global_range (tree name, const irange &r)

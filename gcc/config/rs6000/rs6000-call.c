@@ -8930,7 +8930,105 @@ rs6000_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
   return build_va_arg_indirect_ref (addr);
 }
 
-/* Builtins.  */
+/* Debug utility to translate a type node to a single textual token.  */
+static
+const char *rs6000_type_string (tree type_node)
+{
+  if (type_node == void_type_node)
+    return "void";
+  else if (type_node == long_integer_type_node)
+    return "long";
+  else if (type_node == long_unsigned_type_node)
+    return "ulong";
+  else if (type_node == long_long_integer_type_node)
+    return "longlong";
+  else if (type_node == long_long_unsigned_type_node)
+    return "ulonglong";
+  else if (type_node == bool_V2DI_type_node)
+    return "vbll";
+  else if (type_node == bool_V4SI_type_node)
+    return "vbi";
+  else if (type_node == bool_V8HI_type_node)
+    return "vbs";
+  else if (type_node == bool_V16QI_type_node)
+    return "vbc";
+  else if (type_node == bool_int_type_node)
+    return "bool";
+  else if (type_node == dfloat64_type_node)
+    return "_Decimal64";
+  else if (type_node == double_type_node)
+    return "double";
+  else if (type_node == intDI_type_node)
+    return "sll";
+  else if (type_node == intHI_type_node)
+    return "ss";
+  else if (type_node == ibm128_float_type_node)
+    return "__ibm128";
+  else if (type_node == opaque_V4SI_type_node)
+    return "opaque";
+  else if (POINTER_TYPE_P (type_node))
+    return "void*";
+  else if (type_node == intQI_type_node || type_node == char_type_node)
+    return "sc";
+  else if (type_node == dfloat32_type_node)
+    return "_Decimal32";
+  else if (type_node == float_type_node)
+    return "float";
+  else if (type_node == intSI_type_node || type_node == integer_type_node)
+    return "si";
+  else if (type_node == dfloat128_type_node)
+    return "_Decimal128";
+  else if (type_node == long_double_type_node)
+    return "longdouble";
+  else if (type_node == intTI_type_node)
+    return "sq";
+  else if (type_node == unsigned_intDI_type_node)
+    return "ull";
+  else if (type_node == unsigned_intHI_type_node)
+    return "us";
+  else if (type_node == unsigned_intQI_type_node)
+    return "uc";
+  else if (type_node == unsigned_intSI_type_node)
+    return "ui";
+  else if (type_node == unsigned_intTI_type_node)
+    return "uq";
+  else if (type_node == unsigned_V1TI_type_node)
+    return "vuq";
+  else if (type_node == unsigned_V2DI_type_node)
+    return "vull";
+  else if (type_node == unsigned_V4SI_type_node)
+    return "vui";
+  else if (type_node == unsigned_V8HI_type_node)
+    return "vus";
+  else if (type_node == unsigned_V16QI_type_node)
+    return "vuc";
+  else if (type_node == V16QI_type_node)
+    return "vsc";
+  else if (type_node == V1TI_type_node)
+    return "vsq";
+  else if (type_node == V2DF_type_node)
+    return "vd";
+  else if (type_node == V2DI_type_node)
+    return "vsll";
+  else if (type_node == V4SF_type_node)
+    return "vf";
+  else if (type_node == V4SI_type_node)
+    return "vsi";
+  else if (type_node == V8HI_type_node)
+    return "vss";
+  else if (type_node == pixel_V8HI_type_node)
+    return "vp";
+  else if (type_node == pcvoid_type_node)
+    return "voidc*";
+  else if (type_node == float128_type_node)
+    return "_Float128";
+  else if (type_node == vector_pair_type_node)
+    return "__vector_pair";
+  else if (type_node == vector_quad_type_node)
+    return "__vector_quad";
+
+  return "unknown";
+}
 
 static void
 def_builtin (const char *name, tree type, enum rs6000_builtins code)
@@ -8960,7 +9058,7 @@ def_builtin (const char *name, tree type, enum rs6000_builtins code)
       /* const function, function only depends on the inputs.  */
       TREE_READONLY (t) = 1;
       TREE_NOTHROW (t) = 1;
-      attr_string = ", const";
+      attr_string = "= const";
     }
   else if ((classify & RS6000_BTC_PURE) != 0)
     {
@@ -8968,7 +9066,7 @@ def_builtin (const char *name, tree type, enum rs6000_builtins code)
 	 external state.  */
       DECL_PURE_P (t) = 1;
       TREE_NOTHROW (t) = 1;
-      attr_string = ", pure";
+      attr_string = "= pure";
     }
   else if ((classify & RS6000_BTC_FP) != 0)
     {
@@ -8982,12 +9080,12 @@ def_builtin (const char *name, tree type, enum rs6000_builtins code)
 	{
 	  DECL_PURE_P (t) = 1;
 	  DECL_IS_NOVOPS (t) = 1;
-	  attr_string = ", fp, pure";
+	  attr_string = "= fp, pure";
 	}
       else
 	{
 	  TREE_READONLY (t) = 1;
-	  attr_string = ", fp, const";
+	  attr_string = "= fp, const";
 	}
     }
   else if ((classify & (RS6000_BTC_QUAD | RS6000_BTC_PAIR)) != 0)
@@ -8997,8 +9095,22 @@ def_builtin (const char *name, tree type, enum rs6000_builtins code)
     gcc_unreachable ();
 
   if (TARGET_DEBUG_BUILTIN)
-    fprintf (stderr, "rs6000_builtin, code = %4d, %s%s\n",
-	     (int)code, name, attr_string);
+    {
+      tree t = TREE_TYPE (type);
+      fprintf (stderr, "%s %s (", rs6000_type_string (t), name);
+      t = TYPE_ARG_TYPES (type);
+      gcc_assert (t);
+
+      while (TREE_VALUE (t) != void_type_node)
+	{
+	  fprintf (stderr, "%s", rs6000_type_string (TREE_VALUE (t)));
+	  t = TREE_CHAIN (t);
+	  gcc_assert (t);
+	  if (TREE_VALUE (t) != void_type_node)
+	    fprintf (stderr, ", ");
+	}
+      fprintf (stderr, "); %s [%4d]\n", attr_string, (int) code);
+    }
 }
 
 static const struct builtin_compatibility bdesc_compat[] =
@@ -11807,6 +11919,10 @@ rs6000_invalid_new_builtin (enum rs6000_gen_builtins fncode)
     case ENB_P6:
       error ("%qs requires the %qs option", name, "-mcpu=power6");
       break;
+    case ENB_P6_64:
+      error ("%qs requires the %qs option and either the %qs or %qs option",
+	     name, "-mcpu=power6", "-m64", "-mpowerpc64");
+      break;
     case ENB_ALTIVEC:
       error ("%qs requires the %qs option", name, "-maltivec");
       break;
@@ -11827,7 +11943,8 @@ rs6000_invalid_new_builtin (enum rs6000_gen_builtins fncode)
       error ("%qs requires the %qs option", name, "-mcpu=power8");
       break;
     case ENB_P8V:
-      error ("%qs requires the %qs option", name, "-mpower8-vector");
+      error ("%qs requires the %qs and %qs options", name, "-mcpu=power8",
+	     "-mvsx");
       break;
     case ENB_P9:
       error ("%qs requires the %qs option", name, "-mcpu=power9");
@@ -11837,7 +11954,8 @@ rs6000_invalid_new_builtin (enum rs6000_gen_builtins fncode)
 	     name, "-mcpu=power9", "-m64", "-mpowerpc64");
       break;
     case ENB_P9V:
-      error ("%qs requires the %qs option", name, "-mpower9-vector");
+      error ("%qs requires the %qs and %qs options", name, "-mcpu=power9",
+	     "-mvsx");
       break;
     case ENB_IEEE128_HW:
       error ("%qs requires ISA 3.0 IEEE 128-bit floating point", name);
@@ -13234,6 +13352,8 @@ rs6000_new_builtin_is_supported (enum rs6000_gen_builtins fncode)
       return TARGET_POPCNTB;
     case ENB_P6:
       return TARGET_CMPB;
+    case ENB_P6_64:
+      return TARGET_CMPB && TARGET_POWERPC64;
     case ENB_P7:
       return TARGET_POPCNTD;
     case ENB_P7_64:
@@ -13790,6 +13910,14 @@ rs6000_gimple_fold_new_builtin (gimple_stmt_iterator *gsi)
     /* flavors of vec_min.  */
     case RS6000_BIF_XVMINDP:
     case RS6000_BIF_XVMINSP:
+    case RS6000_BIF_VMINFP:
+      {
+	lhs = gimple_call_lhs (stmt);
+	tree type = TREE_TYPE (lhs);
+	if (HONOR_NANS (type))
+	  return false;
+	gcc_fallthrough ();
+      }
     case RS6000_BIF_VMINSD:
     case RS6000_BIF_VMINUD:
     case RS6000_BIF_VMINSB:
@@ -13798,7 +13926,6 @@ rs6000_gimple_fold_new_builtin (gimple_stmt_iterator *gsi)
     case RS6000_BIF_VMINUB:
     case RS6000_BIF_VMINUH:
     case RS6000_BIF_VMINUW:
-    case RS6000_BIF_VMINFP:
       arg0 = gimple_call_arg (stmt, 0);
       arg1 = gimple_call_arg (stmt, 1);
       lhs = gimple_call_lhs (stmt);
@@ -13809,6 +13936,14 @@ rs6000_gimple_fold_new_builtin (gimple_stmt_iterator *gsi)
     /* flavors of vec_max.  */
     case RS6000_BIF_XVMAXDP:
     case RS6000_BIF_XVMAXSP:
+    case RS6000_BIF_VMAXFP:
+      {
+	lhs = gimple_call_lhs (stmt);
+	tree type = TREE_TYPE (lhs);
+	if (HONOR_NANS (type))
+	  return false;
+	gcc_fallthrough ();
+      }
     case RS6000_BIF_VMAXSD:
     case RS6000_BIF_VMAXUD:
     case RS6000_BIF_VMAXSB:
@@ -13817,7 +13952,6 @@ rs6000_gimple_fold_new_builtin (gimple_stmt_iterator *gsi)
     case RS6000_BIF_VMAXUB:
     case RS6000_BIF_VMAXUH:
     case RS6000_BIF_VMAXUW:
-    case RS6000_BIF_VMAXFP:
       arg0 = gimple_call_arg (stmt, 0);
       arg1 = gimple_call_arg (stmt, 1);
       lhs = gimple_call_lhs (stmt);
@@ -15045,7 +15179,7 @@ lxvrse_expand_builtin (rtx target, insn_code icode, rtx *op,
 			  gen_rtx_PLUS (Pmode, op[1], op[0]));
     }
 
-  rtx discratch = gen_reg_rtx (DImode);
+  rtx discratch = gen_reg_rtx (V2DImode);
   rtx tiscratch = gen_reg_rtx (TImode);
 
   /* Emit the lxvr*x insn.  */
@@ -15054,20 +15188,31 @@ lxvrse_expand_builtin (rtx target, insn_code icode, rtx *op,
     return 0;
   emit_insn (pat);
 
-  /* Emit a sign extension from QI,HI,WI to double (DI).  */
-  rtx scratch = gen_lowpart (smode, tiscratch);
+  /* Emit a sign extension from V16QI,V8HI,V4SI to V2DI.  */
+  rtx temp1;
   if (icode == CODE_FOR_vsx_lxvrbx)
-    emit_insn (gen_extendqidi2 (discratch, scratch));
+    {
+      temp1  = simplify_gen_subreg (V16QImode, tiscratch, TImode, 0);
+      emit_insn (gen_vsx_sign_extend_qi_v2di (discratch, temp1));
+    }
   else if (icode == CODE_FOR_vsx_lxvrhx)
-    emit_insn (gen_extendhidi2 (discratch, scratch));
+    {
+      temp1  = simplify_gen_subreg (V8HImode, tiscratch, TImode, 0);
+      emit_insn (gen_vsx_sign_extend_hi_v2di (discratch, temp1));
+    }
   else if (icode == CODE_FOR_vsx_lxvrwx)
-    emit_insn (gen_extendsidi2 (discratch, scratch));
-  /*  Assign discratch directly if scratch is already DI.  */
-  if (icode == CODE_FOR_vsx_lxvrdx)
-    discratch = scratch;
+    {
+      temp1  = simplify_gen_subreg (V4SImode, tiscratch, TImode, 0);
+      emit_insn (gen_vsx_sign_extend_si_v2di (discratch, temp1));
+    }
+  else if (icode == CODE_FOR_vsx_lxvrdx)
+    discratch = simplify_gen_subreg (V2DImode, tiscratch, TImode, 0);
+  else
+    gcc_unreachable ();
 
-  /* Emit the sign extension from DI (double) to TI (quad).  */
-  emit_insn (gen_extendditi2 (target, discratch));
+  /* Emit the sign extension from V2DI (double) to TI (quad).  */
+  rtx temp2 = simplify_gen_subreg (TImode, discratch, V2DImode, 0);
+  emit_insn (gen_extendditi2_vector (target, temp2));
 
   return target;
 }
@@ -15558,29 +15703,26 @@ rs6000_expand_new_builtin (tree exp, rtx target,
   bif_enable e = bifaddr->enable;
 
   if (!(e == ENB_ALWAYS
-	|| (e == ENB_P5         && TARGET_POPCNTB)
-	|| (e == ENB_P6         && TARGET_CMPB)
-	|| (e == ENB_ALTIVEC    && TARGET_ALTIVEC)
-	|| (e == ENB_CELL       && TARGET_ALTIVEC
-				&& rs6000_cpu == PROCESSOR_CELL)
-	|| (e == ENB_VSX        && TARGET_VSX)
-	|| (e == ENB_P7         && TARGET_POPCNTD)
-	|| (e == ENB_P7_64      && TARGET_POPCNTD
-				&& TARGET_POWERPC64)
-	|| (e == ENB_P8         && TARGET_DIRECT_MOVE)
-	|| (e == ENB_P8V        && TARGET_P8_VECTOR)
-	|| (e == ENB_P9         && TARGET_MODULO)
-	|| (e == ENB_P9_64      && TARGET_MODULO
-				&& TARGET_POWERPC64)
-	|| (e == ENB_P9V        && TARGET_P9_VECTOR)
+	|| (e == ENB_P5 && TARGET_POPCNTB)
+	|| (e == ENB_P6 && TARGET_CMPB)
+	|| (e == ENB_P6_64 && TARGET_CMPB && TARGET_POWERPC64)
+	|| (e == ENB_ALTIVEC && TARGET_ALTIVEC)
+	|| (e == ENB_CELL && TARGET_ALTIVEC && rs6000_cpu == PROCESSOR_CELL)
+	|| (e == ENB_VSX && TARGET_VSX)
+	|| (e == ENB_P7 && TARGET_POPCNTD)
+	|| (e == ENB_P7_64 && TARGET_POPCNTD && TARGET_POWERPC64)
+	|| (e == ENB_P8 && TARGET_DIRECT_MOVE)
+	|| (e == ENB_P8V && TARGET_P8_VECTOR)
+	|| (e == ENB_P9 && TARGET_MODULO)
+	|| (e == ENB_P9_64 && TARGET_MODULO && TARGET_POWERPC64)
+	|| (e == ENB_P9V && TARGET_P9_VECTOR)
 	|| (e == ENB_IEEE128_HW && TARGET_FLOAT128_HW)
-	|| (e == ENB_DFP        && TARGET_DFP)
-	|| (e == ENB_CRYPTO     && TARGET_CRYPTO)
-	|| (e == ENB_HTM        && TARGET_HTM)
-	|| (e == ENB_P10        && TARGET_POWER10)
-	|| (e == ENB_P10_64     && TARGET_POWER10
-				&& TARGET_POWERPC64)
-	|| (e == ENB_MMA        && TARGET_MMA)))
+	|| (e == ENB_DFP && TARGET_DFP)
+	|| (e == ENB_CRYPTO && TARGET_CRYPTO)
+	|| (e == ENB_HTM && TARGET_HTM)
+	|| (e == ENB_P10 && TARGET_POWER10)
+	|| (e == ENB_P10_64 && TARGET_POWER10 && TARGET_POWERPC64)
+	|| (e == ENB_MMA && TARGET_MMA)))
     {
       rs6000_invalid_new_builtin (fcode);
       return expand_call (exp, target, ignore);
@@ -16272,6 +16414,69 @@ rs6000_init_builtins (void)
   /* Execute the autogenerated initialization code for builtins.  */
   rs6000_init_generated_builtins ();
 
+  if (TARGET_DEBUG_BUILTIN)
+    {
+      fprintf (stderr, "\nAutogenerated built-in functions:\n\n");
+      for (int i = 1; i < (int) RS6000_BIF_MAX; i++)
+	{
+	  bif_enable e = rs6000_builtin_info_x[i].enable;
+	  if (e == ENB_P5 && !TARGET_POPCNTB)
+	    continue;
+	  if (e == ENB_P6 && !TARGET_CMPB)
+	    continue;
+	  if (e == ENB_P6_64 && !(TARGET_CMPB && TARGET_POWERPC64))
+	    continue;
+	  if (e == ENB_ALTIVEC && !TARGET_ALTIVEC)
+	    continue;
+	  if (e == ENB_VSX && !TARGET_VSX)
+	    continue;
+	  if (e == ENB_P7 && !TARGET_POPCNTD)
+	    continue;
+	  if (e == ENB_P7_64 && !(TARGET_POPCNTD && TARGET_POWERPC64))
+	    continue;
+	  if (e == ENB_P8 && !TARGET_DIRECT_MOVE)
+	    continue;
+	  if (e == ENB_P8V && !TARGET_P8_VECTOR)
+	    continue;
+	  if (e == ENB_P9 && !TARGET_MODULO)
+	    continue;
+	  if (e == ENB_P9_64 && !(TARGET_MODULO && TARGET_POWERPC64))
+	    continue;
+	  if (e == ENB_P9V && !TARGET_P9_VECTOR)
+	    continue;
+	  if (e == ENB_IEEE128_HW && !TARGET_FLOAT128_HW)
+	    continue;
+	  if (e == ENB_DFP && !TARGET_DFP)
+	    continue;
+	  if (e == ENB_CRYPTO && !TARGET_CRYPTO)
+	    continue;
+	  if (e == ENB_HTM && !TARGET_HTM)
+	    continue;
+	  if (e == ENB_P10 && !TARGET_POWER10)
+	    continue;
+	  if (e == ENB_P10_64 && !(TARGET_POWER10 && TARGET_POWERPC64))
+	    continue;
+	  if (e == ENB_MMA && !TARGET_MMA)
+	    continue;
+	  tree fntype = rs6000_builtin_info_x[i].fntype;
+	  tree t = TREE_TYPE (fntype);
+	  fprintf (stderr, "%s %s (", rs6000_type_string (t),
+		   rs6000_builtin_info_x[i].bifname);
+	  t = TYPE_ARG_TYPES (fntype);
+	  while (t && TREE_VALUE (t) != void_type_node)
+	    {
+	      fprintf (stderr, "%s",
+		       rs6000_type_string (TREE_VALUE (t)));
+	      t = TREE_CHAIN (t);
+	      if (t && TREE_VALUE (t) != void_type_node)
+		fprintf (stderr, ", ");
+	    }
+	  fprintf (stderr, "); %s [%4d]\n",
+		   rs6000_builtin_info_x[i].attr_string, (int) i);
+	}
+      fprintf (stderr, "\nEnd autogenerated built-in functions.\n\n\n");
+     }
+
   if (new_builtins_are_live)
     {
       altivec_builtin_mask_for_load
@@ -16428,7 +16633,10 @@ rs6000_new_builtin_decl (unsigned code, bool /* initialize_p */)
   return rs6000_builtin_decls_x[code];
 }
 
-/* Returns the rs6000 builtin decl for CODE.  */
+/* Returns the rs6000 builtin decl for CODE.  Note that we don't check
+   the builtin mask here since there could be some #pragma/attribute
+   target functions and the rs6000_builtin_mask could be wrong when
+   this checking happens, though it will be updated properly later.  */
 
 tree
 rs6000_builtin_decl (unsigned code, bool initialize_p ATTRIBUTE_UNUSED)
@@ -16436,17 +16644,8 @@ rs6000_builtin_decl (unsigned code, bool initialize_p ATTRIBUTE_UNUSED)
   if (new_builtins_are_live)
     return rs6000_new_builtin_decl (code, initialize_p);
 
-  HOST_WIDE_INT fnmask;
-
   if (code >= RS6000_BUILTIN_COUNT)
     return error_mark_node;
-
-  fnmask = rs6000_builtin_info[code].mask;
-  if ((fnmask & rs6000_builtin_mask) != fnmask)
-    {
-      rs6000_invalid_builtin ((enum rs6000_builtins)code);
-      return error_mark_node;
-    }
 
   return rs6000_builtin_decls[code];
 }
@@ -16938,6 +17137,14 @@ altivec_init_builtins (void)
 			       ALTIVEC_BUILTIN_MASK_FOR_LOAD,
 			       BUILT_IN_MD, NULL, NULL_TREE);
   TREE_READONLY (decl) = 1;
+  if (TARGET_DEBUG_BUILTIN)
+    {
+      tree arg_type = TREE_VALUE (TYPE_ARG_TYPES (v16qi_ftype_pcvoid));
+      fprintf (stderr, "%s __builtin_altivec_mask_for_load (%s); [%4d]\n",
+	       rs6000_type_string (TREE_TYPE (v16qi_ftype_pcvoid)),
+	       rs6000_type_string (arg_type),
+	       (int) ALTIVEC_BUILTIN_MASK_FOR_LOAD);
+    }
   /* Record the decl. Will be used by rs6000_builtin_mask_for_load.  */
   altivec_builtin_mask_for_load = decl;
 

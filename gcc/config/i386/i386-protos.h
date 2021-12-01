@@ -217,6 +217,8 @@ extern void ix86_move_vector_high_sse_to_mmx (rtx);
 extern void ix86_split_mmx_pack (rtx[], enum rtx_code);
 extern void ix86_split_mmx_punpck (rtx[], bool);
 extern void ix86_expand_avx_vzeroupper (void);
+extern void ix86_expand_atomic_fetch_op_loop (rtx, rtx, rtx, enum rtx_code,
+					      bool, bool);
 
 #ifdef TREE_CODE
 extern void init_cumulative_args (CUMULATIVE_ARGS *, tree, rtx, tree, int);
@@ -241,6 +243,7 @@ extern unsigned int ix86_get_callcvt (const_tree);
 #endif
 
 extern rtx ix86_tls_module_base (void);
+extern bool ix86_gpr_tls_address_pattern_p (rtx);
 extern bool ix86_tls_address_pattern_p (rtx);
 extern rtx ix86_rewrite_tls_address (rtx);
 

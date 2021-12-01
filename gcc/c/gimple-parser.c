@@ -56,13 +56,13 @@ along with GCC; see the file COPYING3.  If not see
 #include "internal-fn.h"
 #include "cfg.h"
 #include "cfghooks.h"
+#include "bitmap.h"
 #include "cfganal.h"
 #include "tree-cfg.h"
 #include "gimple-iterator.h"
 #include "cfgloop.h"
 #include "tree-phinodes.h"
 #include "tree-into-ssa.h"
-#include "bitmap.h"
 
 
 /* GIMPLE parser state.  */
@@ -1698,13 +1698,7 @@ c_parser_gimple_postfix_expression (gimple_parser &parser)
 	    }
 	  break;
 	}
-      else
-	{
-	  c_parser_error (parser, "expected expression");
-	  expr.set_error ();
-	  break;
-	}
-      break;
+      /* Fallthru.  */
     default:
       c_parser_error (parser, "expected expression");
       expr.set_error ();

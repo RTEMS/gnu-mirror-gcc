@@ -2042,7 +2042,6 @@ will_be_nonconstant_expr_predicate (ipa_func_body_info *fbi,
       debug_tree (expr);
       gcc_unreachable ();
     }
-  return false;
 }
 
 
@@ -2934,7 +2933,6 @@ analyze_function_body (struct cgraph_node *node, bool early)
   if (nonconstant_names.exists () && !early)
     {
       ipa_fn_summary *s = ipa_fn_summaries->get (node);
-      class loop *loop;
       unsigned max_loop_predicates = opt_for_fn (node->decl,
 						 param_ipa_max_loop_predicates);
 
@@ -2978,7 +2976,7 @@ analyze_function_body (struct cgraph_node *node, bool early)
       /* To avoid quadratic behavior we analyze stride predicates only
          with respect to the containing loop.  Thus we simply iterate
 	 over all defs in the outermost loop body.  */
-      for (loop = loops_for_fn (cfun)->tree_root->inner;
+      for (class loop *loop = loops_for_fn (cfun)->tree_root->inner;
 	   loop != NULL; loop = loop->next)
 	{
 	  ipa_predicate loop_stride = true;
@@ -3135,10 +3133,38 @@ compute_fn_summary (struct cgraph_node *node, bool early)
        else
 	 info->inlinable = tree_inlinable_function_p (node->decl);
 
-       /* Type attributes can use parameter indices to describe them.  */
-       if (TYPE_ATTRIBUTES (TREE_TYPE (node->decl))
-	   /* Likewise for #pragma omp declare simd functions or functions
-	      with simd attribute.  */
+       bool no_signature = false;
+       /* Type attributes can use parameter indices to describe them.
+	  Special case fn spec since we can safely preserve them in
+	  modref summaries.  */
+       for (tree list = TYPE_ATTRIBUTES (TREE_TYPE (node->decl));
+	    list && !no_signature; list = TREE_CHAIN (list))
+	if (!ipa_param_adjustments::type_attribute_allowed_p
+			(get_attribute_name (list)))
+	   {
+	     if (dump_file)
+		{
+		  fprintf (dump_file, "No signature change:"
+			   " function type has unhandled attribute %s.\n",
+			   IDENTIFIER_POINTER (get_attribute_name (list)));
+		}
+	     no_signature = true;
+	   }
+       for (tree parm = DECL_ARGUMENTS (node->decl);
+	    parm && !no_signature; parm = DECL_CHAIN (parm))
+	 if (variably_modified_type_p (TREE_TYPE (parm), node->decl))
+	   {
+	     if (dump_file)
+		{
+		  fprintf (dump_file, "No signature change:"
+			   " has parameter with variably modified type.\n");
+		}
+	     no_signature = true;
+	   }
+
+       /* Likewise for #pragma omp declare simd functions or functions
+	  with simd attribute.  */
+       if (no_signature
 	   || lookup_attribute ("omp declare simd",
 				DECL_ATTRIBUTES (node->decl)))
 	 node->can_change_signature = false;

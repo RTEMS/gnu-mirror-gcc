@@ -17,7 +17,7 @@
 
 // { dg-options "-std=gnu++2a" }
 // { dg-do compile { target c++2a } }
-// { dg-error "not a function pointer" "" { target *-*-* } 158 }
+// { dg-error "not a function pointer" "" { target *-*-* } 0 }
 
 #include <memory>
 
@@ -32,5 +32,5 @@ struct P
 void test01()
 {
   P p;
-  std::to_address(p); // { dg-error "required from here" }
+  std::to_address(p); // { dg-error "" }
 }

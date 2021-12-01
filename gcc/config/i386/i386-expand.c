@@ -6162,7 +6162,17 @@ static rtx
 ix86_expand_v1ti_to_ti (rtx x)
 {
   rtx result = gen_reg_rtx (TImode);
-  emit_move_insn (result, gen_lowpart (TImode, x));
+  if (TARGET_SSE2)
+    {
+      rtx temp = gen_reg_rtx (V2DImode);
+      emit_move_insn (temp, gen_lowpart (V2DImode, x));
+      rtx lo = gen_lowpart (DImode, result);
+      emit_insn (gen_vec_extractv2didi (lo, temp, const0_rtx));
+      rtx hi = gen_highpart (DImode, result);
+      emit_insn (gen_vec_extractv2didi (hi, temp, const1_rtx));
+    }
+  else
+    emit_move_insn (result, gen_lowpart (TImode, x));
   return result;
 }
 
@@ -23136,6 +23146,87 @@ ix86_expand_divmod_libfunc (rtx libfunc, machine_mode mode,
 				      XEXP (rem, 0), Pmode);
   *quot_p = quot;
   *rem_p = rem;
+}
+
+void ix86_expand_atomic_fetch_op_loop (rtx target, rtx mem, rtx val,
+				       enum rtx_code code, bool after,
+				       bool doubleword)
+{
+  rtx old_reg, new_reg, old_mem, success, oldval, new_mem;
+  rtx_code_label *loop_label, *pause_label, *done_label;
+  machine_mode mode = GET_MODE (target);
+
+  old_reg = gen_reg_rtx (mode);
+  new_reg = old_reg;
+  loop_label = gen_label_rtx ();
+  pause_label = gen_label_rtx ();
+  done_label = gen_label_rtx ();
+  old_mem = copy_to_reg (mem);
+  emit_label (loop_label);
+  emit_move_insn (old_reg, old_mem);
+
+  /* return value for atomic_fetch_op.  */
+  if (!after)
+    emit_move_insn (target, old_reg);
+
+  if (code == NOT)
+    {
+      new_reg = expand_simple_binop (mode, AND, new_reg, val, NULL_RTX,
+				     true, OPTAB_LIB_WIDEN);
+      new_reg = expand_simple_unop (mode, code, new_reg, NULL_RTX, true);
+    }
+  else
+    new_reg = expand_simple_binop (mode, code, new_reg, val, NULL_RTX,
+				   true, OPTAB_LIB_WIDEN);
+
+  /* return value for atomic_op_fetch.  */
+  if (after)
+    emit_move_insn (target, new_reg);
+
+  /* Load memory again inside loop.  */
+  new_mem = copy_to_reg (mem);
+  /* Compare mem value with expected value.  */
+
+  if (doubleword)
+    {
+      machine_mode half_mode = (mode == DImode)? SImode : DImode;
+      rtx low_new_mem = gen_lowpart (half_mode, new_mem);
+      rtx low_old_mem = gen_lowpart (half_mode, old_mem);
+      rtx high_new_mem = gen_highpart (half_mode, new_mem);
+      rtx high_old_mem = gen_highpart (half_mode, old_mem);
+      emit_cmp_and_jump_insns (low_new_mem, low_old_mem, NE, NULL_RTX,
+			       half_mode, 1, pause_label,
+			       profile_probability::guessed_never ());
+      emit_cmp_and_jump_insns (high_new_mem, high_old_mem, NE, NULL_RTX,
+			       half_mode, 1, pause_label,
+			       profile_probability::guessed_never ());
+    }
+  else
+    emit_cmp_and_jump_insns (new_mem, old_mem, NE, NULL_RTX,
+			     GET_MODE (old_mem), 1, pause_label,
+			     profile_probability::guessed_never ());
+
+  success = NULL_RTX;
+  oldval = old_mem;
+  expand_atomic_compare_and_swap (&success, &oldval, mem, old_reg,
+				  new_reg, false, MEMMODEL_SYNC_SEQ_CST,
+				  MEMMODEL_RELAXED);
+  if (oldval != old_mem)
+    emit_move_insn (old_mem, oldval);
+
+  emit_cmp_and_jump_insns (success, const0_rtx, EQ, const0_rtx,
+			   GET_MODE (success), 1, loop_label,
+			   profile_probability::guessed_never ());
+
+  emit_jump_insn (gen_jump (done_label));
+  emit_barrier ();
+
+  /* If mem is not expected, pause and loop back.  */
+  emit_label (pause_label);
+  emit_insn (gen_pause ());
+  emit_jump_insn (gen_jump (loop_label));
+  emit_barrier ();
+  emit_label (done_label);
 }
 
 #include "gt-i386-expand.h"

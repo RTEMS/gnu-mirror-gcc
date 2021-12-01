@@ -1969,9 +1969,6 @@ iterative_hash_template_arg (tree arg, hashval_t val)
 	val = iterative_hash_template_arg (TREE_OPERAND (arg, i), val);
       return val;
     }
-
-  gcc_unreachable ();
-  return 0;
 }
 
 /* Unregister the specialization SPEC as a specialization of TMPL.
@@ -5877,12 +5874,19 @@ push_template_decl (tree decl, bool is_friend)
       if (check_for_bare_parameter_packs (TYPE_RAISES_EXCEPTIONS (type)))
 	TYPE_RAISES_EXCEPTIONS (type) = NULL_TREE;
     }
-  else if (check_for_bare_parameter_packs (is_typedef_decl (decl)
-					   ? DECL_ORIGINAL_TYPE (decl)
-					   : TREE_TYPE (decl)))
+  else
     {
-      TREE_TYPE (decl) = error_mark_node;
-      return error_mark_node;
+      if (check_for_bare_parameter_packs (is_typedef_decl (decl)
+					  ? DECL_ORIGINAL_TYPE (decl)
+					  : TREE_TYPE (decl)))
+	{
+	  TREE_TYPE (decl) = error_mark_node;
+	  return error_mark_node;
+	}
+
+      if (is_partial && VAR_P (decl)
+	  && check_for_bare_parameter_packs (DECL_TI_ARGS (decl)))
+	return error_mark_node;
     }
 
   if (is_partial)
@@ -7260,6 +7264,8 @@ convert_nontype_argument (tree type, tree expr, tsubst_flags_t complain)
   const bool val_dep_p = value_dependent_expression_p (expr);
   if (val_dep_p)
     expr = canonicalize_expr_argument (expr, complain);
+  else
+    STRIP_ANY_LOCATION_WRAPPER (expr);
 
   /* 14.3.2/5: The null pointer{,-to-member} conversion is applied
      to a non-type argument of "nullptr".  */
@@ -10759,6 +10765,11 @@ any_template_parm_r (tree t, void *data)
 	WALK_SUBTREE (TREE_TYPE (t));
       break;
 
+    case CONVERT_EXPR:
+      if (is_dummy_object (t))
+	WALK_SUBTREE (TREE_TYPE (t));
+      break;
+
     default:
       break;
     }
@@ -11698,6 +11709,9 @@ apply_late_template_attributes (tree *decl_p, tree attributes, int attr_flags,
   /* Apply any non-dependent attributes.  */
   *p = nondep;
 
+  if (nondep == attributes)
+    return true;
+
   /* And then any dependent ones.  */
   tree late_attrs = NULL_TREE;
   tree *q = &late_attrs;
@@ -11714,6 +11728,17 @@ apply_late_template_attributes (tree *decl_p, tree attributes, int attr_flags,
       while (*q)
 	q = &TREE_CHAIN (*q);
     }
+
+  /* cplus_decl_attributes can add some attributes implicitly.  For templates,
+     those attributes should have been added already when those templates were
+     parsed, and shouldn't be added based on from which context they are
+     first time instantiated.  */
+  auto o1 = make_temp_override (current_optimize_pragma, NULL_TREE);
+  auto o2 = make_temp_override (optimization_current_node,
+				optimization_default_node);
+  auto o3 = make_temp_override (current_target_pragma, NULL_TREE);
+  auto o4 = make_temp_override (scope_chain->omp_declare_target_attribute,
+				NULL);
 
   cplus_decl_attributes (decl_p, late_attrs, attr_flags);
 
@@ -16984,9 +17009,16 @@ tsubst_copy (tree t, tree args, tsubst_flags_t complain, tree in_decl)
       {
 	tree type = tsubst (TREE_TYPE (t), args, complain, in_decl);
 	tree op0 = tsubst_copy (TREE_OPERAND (t, 0), args, complain, in_decl);
-	r = build1 (code, type, op0);
+	r = build1_loc (EXPR_LOCATION (t), code, type, op0);
 	if (code == ALIGNOF_EXPR)
 	  ALIGNOF_EXPR_STD_P (r) = ALIGNOF_EXPR_STD_P (t);
+	/* For addresses of immediate functions ensure we have EXPR_LOCATION
+	   set for possible later diagnostics.  */
+	if (code == ADDR_EXPR
+	    && EXPR_LOCATION (r) == UNKNOWN_LOCATION
+	    && TREE_CODE (op0) == FUNCTION_DECL
+	    && DECL_IMMEDIATE_FUNCTION_P (op0))
+	  SET_EXPR_LOCATION (r, input_location);
 	return r;
       }
 
@@ -17242,6 +17274,7 @@ tsubst_copy (tree t, tree args, tsubst_flags_t complain, tree in_decl)
     case INTEGER_CST:
     case REAL_CST:
     case COMPLEX_CST:
+    case VECTOR_CST:
       {
 	/* Instantiate any typedefs in the type.  */
 	tree type = tsubst (TREE_TYPE (t), args, complain, in_decl);
@@ -17430,6 +17463,13 @@ tsubst_omp_clauses (tree clauses, enum c_omp_region_type ort,
 	    = tsubst_omp_clause_decl (OMP_CLAUSE_DECL (oc), args, complain,
 				      in_decl, iterator_cache);
 	  break;
+	case OMP_CLAUSE_NUM_TEAMS:
+	  if (OMP_CLAUSE_NUM_TEAMS_LOWER_EXPR (oc))
+	    OMP_CLAUSE_NUM_TEAMS_LOWER_EXPR (nc)
+	      = tsubst_expr (OMP_CLAUSE_NUM_TEAMS_LOWER_EXPR (oc), args,
+			     complain, in_decl,
+			     /*integral_constant_expression_p=*/false);
+	  /* FALLTHRU */
 	case OMP_CLAUSE_TILE:
 	case OMP_CLAUSE_IF:
 	case OMP_CLAUSE_NUM_THREADS:
@@ -17438,7 +17478,6 @@ tsubst_omp_clauses (tree clauses, enum c_omp_region_type ort,
 	case OMP_CLAUSE_FINAL:
 	case OMP_CLAUSE_DEVICE:
 	case OMP_CLAUSE_DIST_SCHEDULE:
-	case OMP_CLAUSE_NUM_TEAMS:
 	case OMP_CLAUSE_THREAD_LIMIT:
 	case OMP_CLAUSE_SAFELEN:
 	case OMP_CLAUSE_SIMDLEN:
@@ -18203,13 +18242,11 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl,
       stmt = finish_co_yield_expr (input_location,
 				   RECUR (TREE_OPERAND (t, 0)));
       RETURN (stmt);
-      break;
 
     case CO_AWAIT_EXPR:
       stmt = finish_co_await_expr (input_location,
 				   RECUR (TREE_OPERAND (t, 0)));
       RETURN (stmt);
-      break;
 
     case EXPR_STMT:
       tmp = RECUR (EXPR_STMT_EXPR (t));
@@ -18941,31 +18978,32 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl,
 	{
 	  tree teams = cp_walk_tree (&stmt, tsubst_find_omp_teams, NULL, NULL);
 	  if (teams)
-	    {
-	      /* For combined target teams, ensure the num_teams and
-		 thread_limit clause expressions are evaluated on the host,
-		 before entering the target construct.  */
-	      tree c;
-	      for (c = OMP_TEAMS_CLAUSES (teams);
-		   c; c = OMP_CLAUSE_CHAIN (c))
-		if ((OMP_CLAUSE_CODE (c) == OMP_CLAUSE_NUM_TEAMS
-		     || OMP_CLAUSE_CODE (c) == OMP_CLAUSE_THREAD_LIMIT)
-		    && TREE_CODE (OMP_CLAUSE_OPERAND (c, 0)) != INTEGER_CST)
-		  {
-		    tree expr = OMP_CLAUSE_OPERAND (c, 0);
-		    expr = force_target_expr (TREE_TYPE (expr), expr, tf_none);
-		    if (expr == error_mark_node)
-		      continue;
-		    tmp = TARGET_EXPR_SLOT (expr);
-		    add_stmt (expr);
-		    OMP_CLAUSE_OPERAND (c, 0) = expr;
-		    tree tc = build_omp_clause (OMP_CLAUSE_LOCATION (c),
-						OMP_CLAUSE_FIRSTPRIVATE);
-		    OMP_CLAUSE_DECL (tc) = tmp;
-		    OMP_CLAUSE_CHAIN (tc) = OMP_TARGET_CLAUSES (t);
-		    OMP_TARGET_CLAUSES (t) = tc;
-		  }
-	    }
+	    /* For combined target teams, ensure the num_teams and
+	       thread_limit clause expressions are evaluated on the host,
+	       before entering the target construct.  */
+	    for (tree c = OMP_TEAMS_CLAUSES (teams);
+		 c; c = OMP_CLAUSE_CHAIN (c))
+	      if (OMP_CLAUSE_CODE (c) == OMP_CLAUSE_NUM_TEAMS
+		  || OMP_CLAUSE_CODE (c) == OMP_CLAUSE_THREAD_LIMIT)
+		for (int i = 0;
+		     i <= (OMP_CLAUSE_CODE (c) == OMP_CLAUSE_NUM_TEAMS); ++i)
+		  if (OMP_CLAUSE_OPERAND (c, i)
+		      && TREE_CODE (OMP_CLAUSE_OPERAND (c, i)) != INTEGER_CST)
+		    {
+		      tree expr = OMP_CLAUSE_OPERAND (c, i);
+		      expr = force_target_expr (TREE_TYPE (expr), expr,
+						tf_none);
+		      if (expr == error_mark_node)
+			continue;
+		      tmp = TARGET_EXPR_SLOT (expr);
+		      add_stmt (expr);
+		      OMP_CLAUSE_OPERAND (c, i) = expr;
+		      tree tc = build_omp_clause (OMP_CLAUSE_LOCATION (c),
+						  OMP_CLAUSE_FIRSTPRIVATE);
+		      OMP_CLAUSE_DECL (tc) = tmp;
+		      OMP_CLAUSE_CHAIN (tc) = OMP_TARGET_CLAUSES (t);
+		      OMP_TARGET_CLAUSES (t) = tc;
+		    }
 	}
       add_stmt (t);
       break;
@@ -19621,6 +19659,49 @@ maybe_fold_fn_template_args (tree fn, tsubst_flags_t complain)
   return fold_targs_r (targs, complain);
 }
 
+/* Helper function for tsubst_copy_and_build CALL_EXPR and ARRAY_REF
+   handling.  */
+
+static void
+tsubst_copy_and_build_call_args (tree t, tree args, tsubst_flags_t complain,
+				 tree in_decl,
+				 bool integral_constant_expression_p,
+				 releasing_vec &call_args)
+{
+  unsigned int nargs = call_expr_nargs (t);
+  for (unsigned int i = 0; i < nargs; ++i)
+    {
+      tree arg = CALL_EXPR_ARG (t, i);
+
+      if (!PACK_EXPANSION_P (arg))
+	vec_safe_push (call_args,
+		       tsubst_copy_and_build (arg, args, complain, in_decl,
+					      /*function_p=*/false,
+					      integral_constant_expression_p));
+      else
+	{
+	  /* Expand the pack expansion and push each entry onto CALL_ARGS.  */
+	  arg = tsubst_pack_expansion (arg, args, complain, in_decl);
+	  if (TREE_CODE (arg) == TREE_VEC)
+	    {
+	      unsigned int len, j;
+
+	      len = TREE_VEC_LENGTH (arg);
+	      for (j = 0; j < len; ++j)
+		{
+		  tree value = TREE_VEC_ELT (arg, j);
+		  if (value != NULL_TREE)
+		    value = convert_from_reference (value);
+		  vec_safe_push (call_args, value);
+		}
+	    }
+	  else
+	    /* A partial substitution.  Add one entry.  */
+	    vec_safe_push (call_args, arg);
+	}
+    }
+}
+
 /* Like tsubst but deals with expressions and performs semantic
    analysis.  FUNCTION_P is true if T is the "F" in "F (ARGS)" or
    "F<TARGS> (ARGS)".  */
@@ -20020,6 +20101,28 @@ tsubst_copy_and_build (tree t,
     case ARRAY_REF:
       op1 = tsubst_non_call_postfix_expression (TREE_OPERAND (t, 0),
 						args, complain, in_decl);
+      if (TREE_CODE (TREE_OPERAND (t, 1)) == CALL_EXPR
+	  && (CALL_EXPR_FN (TREE_OPERAND (t, 1))
+	      == ovl_op_identifier (ARRAY_REF)))
+	{
+	  tree c = TREE_OPERAND (t, 1);
+	  releasing_vec index_exp_list;
+	  tsubst_copy_and_build_call_args (c, args, complain, in_decl,
+					   integral_constant_expression_p,
+					   index_exp_list);
+
+	  tree r;
+	  if (vec_safe_length (index_exp_list) == 1
+	      && !PACK_EXPANSION_P (index_exp_list[0]))
+	    r = grok_array_decl (EXPR_LOCATION (t), op1,
+				 index_exp_list[0], NULL,
+				 complain | decltype_flag);
+	  else
+	    r = grok_array_decl (EXPR_LOCATION (t), op1,
+				 NULL_TREE, &index_exp_list,
+				 complain | decltype_flag);
+	  RETURN (r);
+	}
       RETURN (build_x_array_ref (EXPR_LOCATION (t), op1,
 				 RECUR (TREE_OPERAND (t, 1)),
 				 complain|decltype_flag));
@@ -20228,7 +20331,7 @@ tsubst_copy_and_build (tree t,
     case CALL_EXPR:
       {
 	tree function;
-	unsigned int nargs, i;
+	unsigned int nargs;
 	bool qualified_p;
 	bool koenig_p;
 	tree ret;
@@ -20253,7 +20356,10 @@ tsubst_copy_and_build (tree t,
 					    /*done=*/false,
 					    /*address_p=*/false);
 	  }
-	else if (koenig_p && identifier_p (function))
+	else if (koenig_p
+		 && (identifier_p (function)
+		     || (TREE_CODE (function) == TEMPLATE_ID_EXPR
+			 && identifier_p (TREE_OPERAND (function, 0)))))
 	  {
 	    /* Do nothing; calling tsubst_copy_and_build on an identifier
 	       would incorrectly perform unqualified lookup again.
@@ -20266,6 +20372,12 @@ tsubst_copy_and_build (tree t,
 	       FIXME but doing that causes c++/15272, so we need to stop
 	       using IDENTIFIER_NODE in that situation.  */
 	    qualified_p = false;
+
+	    if (TREE_CODE (function) == TEMPLATE_ID_EXPR)
+	      /* Use tsubst_copy to substitute through the template arguments
+		 of the template-id without performing unqualified lookup of
+		 the template name.  */
+	      function = tsubst_copy (function, args, complain, in_decl);
 	  }
 	else
 	  {
@@ -20302,37 +20414,9 @@ tsubst_copy_and_build (tree t,
 
 	nargs = call_expr_nargs (t);
 	releasing_vec call_args;
-	for (i = 0; i < nargs; ++i)
-	  {
-	    tree arg = CALL_EXPR_ARG (t, i);
-
-	    if (!PACK_EXPANSION_P (arg))
-	      vec_safe_push (call_args, RECUR (CALL_EXPR_ARG (t, i)));
-	    else
-	      {
-		/* Expand the pack expansion and push each entry onto
-		   CALL_ARGS.  */
-		arg = tsubst_pack_expansion (arg, args, complain, in_decl);
-		if (TREE_CODE (arg) == TREE_VEC)
-		  {
-		    unsigned int len, j;
-
-		    len = TREE_VEC_LENGTH (arg);
-		    for (j = 0; j < len; ++j)
-		      {
-			tree value = TREE_VEC_ELT (arg, j);
-			if (value != NULL_TREE)
-			  value = convert_from_reference (value);
-			vec_safe_push (call_args, value);
-		      }
-		  }
-		else
-		  {
-		    /* A partial substitution.  Add one entry.  */
-		    vec_safe_push (call_args, arg);
-		  }
-	      }
-	  }
+	tsubst_copy_and_build_call_args (t, args, complain, in_decl,
+					 integral_constant_expression_p,
+					 call_args);
 
 	/* Stripped-down processing for a call in a thunk.  Specifically, in
 	   the thunk template for a generic lambda.  */
@@ -20411,10 +20495,13 @@ tsubst_copy_and_build (tree t,
 	if (function != NULL_TREE
 	    && (identifier_p (function)
 		|| (TREE_CODE (function) == TEMPLATE_ID_EXPR
-		    && identifier_p (TREE_OPERAND (function, 0))))
+		    && identifier_p (TREE_OPERAND (function, 0))
+		    && !any_dependent_template_arguments_p (TREE_OPERAND
+							    (function, 1))))
 	    && !any_type_dependent_arguments_p (call_args))
 	  {
-	    if (TREE_CODE (function) == TEMPLATE_ID_EXPR)
+	    bool template_id_p = (TREE_CODE (function) == TEMPLATE_ID_EXPR);
+	    if (template_id_p)
 	      function = TREE_OPERAND (function, 0);
 	    if (koenig_p && (complain & tf_warning_or_error))
 	      {
@@ -20429,20 +20516,21 @@ tsubst_copy_and_build (tree t,
 
 		if (unq != function)
 		  {
-		    /* In a lambda fn, we have to be careful to not
-		       introduce new this captures.  Legacy code can't
-		       be using lambdas anyway, so it's ok to be
-		       stricter.  */
-		    bool in_lambda = (current_class_type
-				      && LAMBDA_TYPE_P (current_class_type));
 		    char const *const msg
 		      = G_("%qD was not declared in this scope, "
 			   "and no declarations were found by "
 			   "argument-dependent lookup at the point "
 			   "of instantiation");
 
+		    bool in_lambda = (current_class_type
+				      && LAMBDA_TYPE_P (current_class_type));
+		    /* In a lambda fn, we have to be careful to not
+		       introduce new this captures.  Legacy code can't
+		       be using lambdas anyway, so it's ok to be
+		       stricter.  Be strict with C++20 template-id ADL too.  */
+		    bool strict = in_lambda || template_id_p;
 		    bool diag = true;
-		    if (in_lambda)
+		    if (strict)
 		      error_at (cp_expr_loc_or_input_loc (t),
 				msg, function);
 		    else
@@ -20478,7 +20566,7 @@ tsubst_copy_and_build (tree t,
 			  inform (DECL_SOURCE_LOCATION (fn),
 				  "%qD declared here, later in the "
 				  "translation unit", fn);
-			if (in_lambda)
+			if (strict)
 			  RETURN (error_mark_node);
 		      }
 
@@ -20996,7 +21084,15 @@ tsubst_copy_and_build (tree t,
 	     integral_constant_expression_p));
 
     case PAREN_EXPR:
-      RETURN (finish_parenthesized_expr (RECUR (TREE_OPERAND (t, 0))));
+      if (REF_PARENTHESIZED_P (t))
+	RETURN (finish_parenthesized_expr (RECUR (TREE_OPERAND (t, 0))));
+      else
+	/* Recreate the PAREN_EXPR from __builtin_assoc_barrier.  */
+	{
+	  tree op0 = RECUR (TREE_OPERAND (t, 0));
+	  RETURN (build1_loc (input_location, PAREN_EXPR,
+			      TREE_TYPE (op0), op0));
+	}
 
     case VEC_PERM_EXPR:
       {

@@ -352,6 +352,7 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -796,6 +797,7 @@ uninstall-am:
 
 .PRECIOUS: Makefile
 
+sanitizer_platform_limits_freebsd.lo: AM_CXXFLAGS += -DUSE_SYSTEM_MD5
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

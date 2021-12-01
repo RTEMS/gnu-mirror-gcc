@@ -682,6 +682,7 @@ static const struct default_options default_options_table[] =
     /* -Ofast adds optimizations to -O3.  */
     { OPT_LEVELS_FAST, OPT_ffast_math, NULL, 1 },
     { OPT_LEVELS_FAST, OPT_fallow_store_data_races, NULL, 1 },
+    { OPT_LEVELS_FAST, OPT_fsemantic_interposition, NULL, 0 },
 
     { OPT_LEVELS_NONE, 0, NULL, 0 }
   };
@@ -2609,6 +2610,26 @@ common_handle_option (struct gcc_options *opts,
     case OPT_Ofast:
     case OPT_Og:
       /* Currently handled in a prescan.  */
+      break;
+
+    case OPT_Wattributes_:
+      if (lang_mask == CL_DRIVER)
+	break;
+
+      if (value)
+	{
+	  error_at (loc, "arguments ignored for %<-Wattributes=%>; use "
+		    "%<-Wno-attributes=%> instead");
+	  break;
+	}
+      else if (arg[strlen (arg) - 1] == ',')
+	{
+	  error_at (loc, "trailing %<,%> in arguments for "
+		    "%<-Wno-attributes=%>");
+	  break;
+	}
+
+      add_comma_separated_to_vector (&opts->x_flag_ignored_attributes, arg);
       break;
 
     case OPT_Werror:

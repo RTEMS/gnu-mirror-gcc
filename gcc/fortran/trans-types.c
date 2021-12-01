@@ -3417,10 +3417,8 @@ gfc_get_array_descr_info (const_tree type, struct array_descr_info *info)
   base_decl = GFC_TYPE_ARRAY_BASE_DECL (type, indirect);
   if (!base_decl)
     {
-      base_decl = make_node (DEBUG_EXPR_DECL);
-      DECL_ARTIFICIAL (base_decl) = 1;
-      TREE_TYPE (base_decl) = indirect ? build_pointer_type (ptype) : ptype;
-      SET_DECL_MODE (base_decl, TYPE_MODE (TREE_TYPE (base_decl)));
+      base_decl = build_debug_expr_decl (indirect
+					 ? build_pointer_type (ptype) : ptype);
       GFC_TYPE_ARRAY_BASE_DECL (type, indirect) = base_decl;
     }
   info->base_decl = base_decl;
@@ -3461,8 +3459,8 @@ gfc_get_array_descr_info (const_tree type, struct array_descr_info *info)
       if (!integer_zerop (dtype_off))
 	t = fold_build_pointer_plus (t, rank_off);
 
-      t = build1 (NOP_EXPR, build_pointer_type (gfc_array_index_type), t);
-      t = build1 (INDIRECT_REF, gfc_array_index_type, t);
+      t = build1 (NOP_EXPR, build_pointer_type (TREE_TYPE (field)), t);
+      t = build1 (INDIRECT_REF, TREE_TYPE (field), t);
       info->rank = t;
       t = build0 (PLACEHOLDER_EXPR, TREE_TYPE (dim_off));
       t = size_binop (MULT_EXPR, t, dim_size);

@@ -586,6 +586,7 @@ class region_model
   void impl_call_memcpy (const call_details &cd);
   void impl_call_memset (const call_details &cd);
   void impl_call_realloc (const call_details &cd);
+  void impl_call_strchr (const call_details &cd);
   void impl_call_strcpy (const call_details &cd);
   void impl_call_strlen (const call_details &cd);
   void impl_call_operator_new (const call_details &cd);
@@ -676,8 +677,10 @@ class region_model
 		       region_model_context *ctxt,
 		       rejected_constraint **out);
 
-  const region *create_region_for_heap_alloc (const svalue *size_in_bytes);
-  const region *create_region_for_alloca (const svalue *size_in_bytes);
+  const region *create_region_for_heap_alloc (const svalue *size_in_bytes,
+					      region_model_context *ctxt);
+  const region *create_region_for_alloca (const svalue *size_in_bytes,
+					  region_model_context *ctxt);
 
   tree get_representative_tree (const svalue *sval) const;
   path_var
@@ -703,7 +706,8 @@ class region_model
   }
   const svalue *get_dynamic_extents (const region *reg) const;
   void set_dynamic_extents (const region *reg,
-			    const svalue *size_in_bytes);
+			    const svalue *size_in_bytes,
+			    region_model_context *ctxt);
   void unset_dynamic_extents (const region *reg);
 
   region_model_manager *get_manager () const { return m_mgr; }
@@ -717,7 +721,10 @@ class region_model
 
   bool can_merge_with_p (const region_model &other_model,
 			 const program_point &point,
-			 region_model *out_model) const;
+			 region_model *out_model,
+			 const extrinsic_state *ext_state = NULL,
+			 const program_state *state_a = NULL,
+			 const program_state *state_b = NULL) const;
 
   tree get_fndecl_for_call (const gcall *call,
 			    region_model_context *ctxt);
@@ -791,6 +798,14 @@ class region_model
   const svalue *check_for_poison (const svalue *sval,
 				  tree expr,
 				  region_model_context *ctxt) const;
+
+  void check_dynamic_size_for_taint (enum memory_space mem_space,
+				     const svalue *size_in_bytes,
+				     region_model_context *ctxt) const;
+
+  void check_region_for_taint (const region *reg,
+			       enum access_direction dir,
+			       region_model_context *ctxt) const;
 
   void check_for_writable_region (const region* dest_reg,
 				  region_model_context *ctxt) const;
@@ -891,6 +906,10 @@ class region_model_context
   virtual bool get_malloc_map (sm_state_map **out_smap,
 			       const state_machine **out_sm,
 			       unsigned *out_sm_idx) = 0;
+  /* Likewise for the "taint" state machine.  */
+  virtual bool get_taint_map (sm_state_map **out_smap,
+			      const state_machine **out_sm,
+			      unsigned *out_sm_idx) = 0;
 };
 
 /* A "do nothing" subclass of region_model_context.  */
@@ -935,6 +954,12 @@ public:
   {
     return false;
   }
+  bool get_taint_map (sm_state_map **,
+		      const state_machine **,
+		      unsigned *) OVERRIDE
+  {
+    return false;
+  }
 };
 
 /* A subclass of region_model_context for determining if operations fail
@@ -965,10 +990,15 @@ struct model_merger
   model_merger (const region_model *model_a,
 		const region_model *model_b,
 		const program_point &point,
-		region_model *merged_model)
+		region_model *merged_model,
+		const extrinsic_state *ext_state,
+		const program_state *state_a,
+		const program_state *state_b)
   : m_model_a (model_a), m_model_b (model_b),
     m_point (point),
-    m_merged_model (merged_model)
+    m_merged_model (merged_model),
+    m_ext_state (ext_state),
+    m_state_a (state_a), m_state_b (state_b)
   {
   }
 
@@ -981,10 +1011,16 @@ struct model_merger
     return m_model_a->get_manager ();
   }
 
+  bool mergeable_svalue_p (const svalue *) const;
+
   const region_model *m_model_a;
   const region_model *m_model_b;
   const program_point &m_point;
   region_model *m_merged_model;
+
+  const extrinsic_state *m_ext_state;
+  const program_state *m_state_a;
+  const program_state *m_state_b;
 };
 
 /* A record that can (optionally) be written out when
