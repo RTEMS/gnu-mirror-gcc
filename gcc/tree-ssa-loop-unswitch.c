@@ -132,6 +132,7 @@ static bool used_outside_loop_p (class loop *, tree);
 static void hoist_guard (class loop *, edge);
 static bool check_exit_phi (class loop *);
 static tree get_vop_from_header (class loop *);
+static void clean_up_after_unswitching (const auto_edge_flag &ignored_edge_flag);
 
 /* Return vector of predicates that belong to a basic block.  */
 
@@ -234,9 +235,11 @@ tree_ssa_unswitch_loops (void)
 
   disable_ranger (cfun);
   clear_aux_for_blocks ();
+  clean_up_after_unswitching (ignored_edge_flag);
 
   if (changed)
     return TODO_cleanup_cfg;
+
   return 0;
 }
 
@@ -363,11 +366,9 @@ find_unswitching_predicates_for_bb (basic_block bb, class loop *loop,
       extract_true_false_edges_from_block (bb, &edge_true, &edge_false);
 
       unswitch_predicate *predicate = new unswitch_predicate (cond, lhs);
-      if (irange::supports_type_p (TREE_TYPE (lhs)) && CONSTANT_CLASS_P (rhs))
-	{
-	  ranger->range_on_edge (predicate->true_range, edge_true, lhs);
-	  predicate->init_false_edge ();
-	}
+      ranger->gori().outgoing_edge_range_p (predicate->true_range, edge_true,
+					    lhs, *get_global_range_query  ());
+      predicate->init_false_edge ();
 
       candidates.safe_push (predicate);
     }
@@ -432,11 +433,9 @@ find_unswitching_predicates_for_bb (basic_block bb, class loop *loop,
 	      if (expr != NULL_TREE)
 		{
 		  unswitch_predicate *predicate = new unswitch_predicate (expr, idx, edge_index);
-		  if (irange::supports_type_p (TREE_TYPE (idx)))
-		    {
-		      ranger->range_on_edge (predicate->true_range, e, idx);
-		      predicate->init_false_edge ();
-		    }
+		  ranger->gori().outgoing_edge_range_p (predicate->true_range, e,
+							idx, *get_global_range_query  ());
+		  predicate->init_false_edge ();
 
 		  candidates.safe_push (predicate);
 		}
@@ -531,6 +530,7 @@ evaluate_control_stmt_using_entry_checks (gimple *stmt,
 	{
 	  int_range_max r;
 	  int_range_max path_range;
+
 	  find_range_for_lhs (predicate_path, lhs, path_range);
 	  if (!path_range.undefined_p ()
 	      && fold_range (r, stmt, path_range)
@@ -543,6 +543,8 @@ evaluate_control_stmt_using_entry_checks (gimple *stmt,
       unsigned nlabels = gimple_switch_num_labels (swtch);
       unsigned ignored = 0;
 
+      tree idx = gimple_switch_index (swtch);
+      tree result = NULL_TREE;
       for (unsigned i = 0; i < nlabels; ++i)
 	{
 	  tree lab = gimple_switch_label (swtch, i);
@@ -551,26 +553,27 @@ evaluate_control_stmt_using_entry_checks (gimple *stmt,
 
 	  int_range_max r;
 	  int_range_max path_range;
-	  tree idx = gimple_switch_index (swtch);
+
+	  ranger->gori().outgoing_edge_range_p (r, e,
+						idx, *get_global_range_query  ());
 	  find_range_for_lhs (predicate_path, idx, path_range);
-
-	  int_range_max xx;
-	  fold_range (xx, stmt, e);
-
-	  if (!path_range.undefined_p ()
-	      && fold_range (r, stmt, path_range)
-	      && r.singleton_p ()
-	      && r.zero_p ())
+	  if (!path_range.undefined_p ())
 	    {
-	      ignored_edges->add (e);
-	      ignored++;
+	      r.intersect (path_range);
+	      if (r.undefined_p ())
+		{
+		  ignored_edges->add (e);
+		  ignored++;
+		}
+	      else
+		result = CASE_LOW (lab);
 	    }
 	}
 
       /* Only one edge from the switch is alive.  */
       gcc_checking_assert (ignored + 1 <= nlabels);
       if (ignored + 1 == nlabels)
-	return true_edge ? boolean_true_node : boolean_false_node;
+	return result;
     }
 
   return NULL_TREE;
@@ -1390,6 +1393,52 @@ check_exit_phi (class loop *loop)
 	return false;
     }
   return true;
+}
+
+/* Remove all dead cases from switches that are unswitched.  */
+
+static void
+clean_up_after_unswitching (const auto_edge_flag &ignored_edge_flag)
+{
+  basic_block bb;
+
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      gimple *last = last_stmt (bb);
+      if (gswitch *stmt = safe_dyn_cast <gswitch *> (last))
+	{
+	  unsigned nlabels = gimple_switch_num_labels (stmt);
+	  unsigned index = 1;
+	  for (unsigned i = 1; i < nlabels; ++i)
+	    {
+	      tree lab = gimple_switch_label (stmt, i);
+	      basic_block dest = label_to_block (cfun, CASE_LABEL (lab));
+	      edge e = find_edge (gimple_bb (stmt), dest);
+	      if (e == NULL)
+		; /* The edge is already removed.  */
+	      else if (e->flags & ignored_edge_flag)
+		remove_edge (e);
+	      else
+		{
+		  gimple_switch_set_label (stmt, index, lab);
+		  ++index;
+		}
+	    }
+
+	  if (index != nlabels)
+	    gimple_switch_set_num_labels (stmt, index);
+	}
+    }
+
+  /* Clean up the ignored_edge_flag from edges.  */
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      edge e;
+      edge_iterator ei;
+
+      FOR_EACH_EDGE (e, ei, bb->succs)
+	e->flags &= ~ignored_edge_flag;
+    }
 }
 
 /* Loop unswitching pass.  */
