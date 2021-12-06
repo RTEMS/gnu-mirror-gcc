@@ -428,6 +428,13 @@ public:
 bool
 pass_ipa_comdats::gate (function *)
 {
+  if ((in_lto_p || flag_whole_program) && !flag_incremental_link)
+    /* This is the combination of flags cgraph_externally_visible_p in
+       ipa-visibility.c uses to enable localization of comdat symbols.
+       Do not attempt to undo that by trying to re-insert symbols into
+       comdats without their original visibility information, as it
+       causes assertion failures in lto-partition. */
+    return false;
   return HAVE_COMDAT_GROUP;
 }
 
