@@ -365,9 +365,13 @@ find_unswitching_predicates_for_bb (basic_block bb, class loop *loop,
       extract_true_false_edges_from_block (bb, &edge_true, &edge_false);
 
       unswitch_predicate *predicate = new unswitch_predicate (cond, lhs);
-      ranger->gori().outgoing_edge_range_p (predicate->true_range, edge_true,
-					    lhs, *get_global_range_query  ());
-      predicate->init_false_edge ();
+
+      if (irange::supports_type_p (TREE_TYPE (lhs)))
+	{
+	  ranger->gori().outgoing_edge_range_p (predicate->true_range, edge_true,
+						lhs, *get_global_range_query  ());
+	  predicate->init_false_edge ();
+	}
 
       candidates.safe_push (predicate);
     }
