@@ -87,7 +87,8 @@ struct unswitch_predicate
   /* Default constructor.  */
   unswitch_predicate (tree cond, tree lhs_, int edge_index_ = -1)
   : condition (cond), lhs (lhs_), true_range (), false_range (),
-    edge_index (edge_index_)
+    merged_true_range (), merged_false_range (),
+    edge_index (edge_index_), handled (false)
   {}
 
   inline void
@@ -100,11 +101,19 @@ struct unswitch_predicate
       false_range.invert ();
   }
 
+  inline void
+  copy_merged_ranges ()
+  {
+    merged_true_range = true_range;
+    merged_false_range = false_range;
+  }
+
   tree condition;
   tree lhs;
-  int_range_max true_range;
-  int_range_max false_range;
+  int_range_max true_range, false_range;
+  int_range_max merged_true_range, merged_false_range;
   int edge_index;
+  bool handled;
 };
 
 /* Cache storage for unswitch_predicate belonging to a basic block.  */
@@ -462,15 +471,24 @@ merge_last (predicate_vector &predicate_path)
       if (operand_equal_p (predicate->lhs, last_predicate->lhs, 0))
 	{
 	  irange &other
-	    = true_edge ? predicate->true_range : predicate->false_range;
-	  last_predicate->true_range.intersect (other);
-	  last_predicate->false_range.intersect (other);
+	    = true_edge ? predicate->merged_true_range : predicate->merged_false_range;
+	  last_predicate->merged_true_range.intersect (other);
+	  last_predicate->merged_false_range.intersect (other);
 	  return;
 	}
     }
 }
 
-void
+static void
+add_predicate_to_path (predicate_vector &predicate_path,
+		       unswitch_predicate *predicate, bool true_edge)
+{
+  predicate->copy_merged_ranges ();
+  predicate_path.safe_push (std::make_pair (predicate, true_edge));
+  merge_last (predicate_path);
+}
+
+bool
 find_range_for_lhs (predicate_vector &predicate_path, tree lhs,
 		    int_range_max &range)
 {
@@ -481,10 +499,12 @@ find_range_for_lhs (predicate_vector &predicate_path, tree lhs,
 
       if (operand_equal_p (predicate->lhs, lhs, 0))
 	{
-	  range = true_edge ? predicate->true_range : predicate->false_range;
-	  return;
+	  range = true_edge ? predicate->merged_true_range : predicate->merged_false_range;
+	  return true;
 	}
     }
+
+  return false;
 }
 
 /* Simplifies COND using checks in front of the entry of the LOOP.
@@ -493,10 +513,12 @@ find_range_for_lhs (predicate_vector &predicate_path, tree lhs,
 static tree
 evaluate_control_stmt_using_entry_checks (gimple *stmt,
 					  predicate_vector &predicate_path,
+					  const auto_edge_flag &ignored_edge_flag,
 					  hash_set<edge> *ignored_edges)
 {
   tree lhs = NULL_TREE;
 
+  // FIXME: remove?
   if (predicate_path.is_empty ())
     return NULL_TREE;
 
@@ -535,8 +557,8 @@ evaluate_control_stmt_using_entry_checks (gimple *stmt,
 	  int_range_max r;
 	  int_range_max path_range;
 
-	  find_range_for_lhs (predicate_path, lhs, path_range);
-	  if (!path_range.undefined_p ()
+	  if (find_range_for_lhs (predicate_path, lhs, path_range)
+	      && path_range.undefined_p ()
 	      && fold_range (r, stmt, path_range)
 	      && r.singleton_p ())
 	    return r.zero_p () ? boolean_false_node : boolean_true_node;
@@ -545,38 +567,42 @@ evaluate_control_stmt_using_entry_checks (gimple *stmt,
   else if (swtch != NULL)
     {
       unsigned nlabels = gimple_switch_num_labels (swtch);
-      unsigned ignored = 0;
 
       tree idx = gimple_switch_index (swtch);
+
+      /* Already folded switch.  */
+      if (TREE_CONSTANT (idx))
+	return NULL_TREE;
+
       tree result = NULL_TREE;
       for (unsigned i = 0; i < nlabels; ++i)
 	{
 	  tree lab = gimple_switch_label (swtch, i);
 	  basic_block dest = label_to_block (cfun, CASE_LABEL (lab));
 	  edge e = find_edge (gimple_bb (stmt), dest);
+	  if (e->flags & ignored_edge_flag)
+	    {
+	      ignored_edges->add (e);
+	      continue;
+	    }
 
 	  int_range_max r;
 	  int_range_max path_range;
 
 	  ranger->gori().outgoing_edge_range_p (r, e,
 						idx, *get_global_range_query  ());
-	  find_range_for_lhs (predicate_path, idx, path_range);
-	  if (!path_range.undefined_p ())
+	  if (find_range_for_lhs (predicate_path, idx, path_range))
 	    {
 	      r.intersect (path_range);
 	      if (r.undefined_p ())
-		{
 		  ignored_edges->add (e);
-		  ignored++;
-		}
 	      else
 		result = CASE_LOW (lab);
 	    }
 	}
 
       /* Only one edge from the switch is alive.  */
-      gcc_checking_assert (ignored + 1 <= nlabels);
-      if (ignored + 1 == nlabels)
+      if (ignored_edges->elements () + 1 == EDGE_COUNT (gimple_bb (swtch)->succs))
 	return result;
     }
 
@@ -602,6 +628,7 @@ simplify_loop_version (class loop *loop, predicate_vector &predicate_path,
 	  gimple *stmt = last_stmt (bbs[i]);
 	  tree folded = evaluate_control_stmt_using_entry_checks (stmt,
 								  predicate_path,
+								  ignored_edge_flag,
 								  &ignored_edges);
 
 	  gcond *cond = dyn_cast<gcond *> (stmt);
@@ -622,14 +649,17 @@ simplify_loop_version (class loop *loop, predicate_vector &predicate_path,
 	    }
 	  else if (swtch != NULL)
 	    {
-	      for (int j = predicates.length () - 1; j>= 0; j--)
+	      edge e;
+	      edge_iterator ei;
+	      FOR_EACH_EDGE (e, ei, bbs[i]->succs)
+		if (ignored_edges.contains (e))
+		  e->flags = ignored_edge_flag;
+
+	      for (unsigned j = 0; j < predicates.length (); j++)
 		{
 		  edge e = EDGE_SUCC (bbs[i], predicates[j]->edge_index);
 		  if (ignored_edges.contains (e))
-		    {
-		      e->flags = ignored_edge_flag;
-		      predicates.unordered_remove (j);
-		    }
+		    predicates[j]->handled = true;
 		}
 
 	      if (folded)
@@ -653,7 +683,8 @@ simplify_loop_version (class loop *loop, predicate_vector &predicate_path,
 static unsigned
 evaluate_insns (class loop *loop, basic_block *bbs,
 		predicate_vector &predicate_path,
-		auto_bb_flag &reachable_flag)
+		auto_bb_flag &reachable_flag,
+		const auto_edge_flag &ignored_edge_flag)
 {
   auto_vec<basic_block> worklist (loop->num_nodes);
   worklist.quick_push (bbs[0]);
@@ -681,12 +712,14 @@ evaluate_insns (class loop *loop, basic_block *bbs,
 	      if (!get_predicates_for_bb (bb).is_empty ())
 		evaluate_control_stmt_using_entry_checks (cond,
 							  predicate_path,
+							  ignored_edge_flag,
 							  &ignored_edges);
 	    }
 	}
       else if (swtch != NULL
 	       && !get_predicates_for_bb (bb).is_empty ())
 	evaluate_control_stmt_using_entry_checks (swtch, predicate_path,
+						  ignored_edge_flag,
 						  &ignored_edges);
 
       FOR_EACH_EDGE (e, ei, bb->succs)
@@ -724,20 +757,19 @@ evaluate_insns (class loop *loop, basic_block *bbs,
 static unsigned
 evaluate_loop_insns_for_predicate (class loop *loop, basic_block *bbs,
 				   predicate_vector &predicate_path,
-				   unswitch_predicate *predicate)
+				   unswitch_predicate *predicate,
+				   const auto_edge_flag &ignored_edge_flag)
 {
   auto_bb_flag reachable_flag (cfun);
 
-  predicate_path.safe_push (std::make_pair (predicate, true));
+  add_predicate_to_path (predicate_path, predicate, true);
   unsigned true_loop_cost = evaluate_insns (loop, bbs, predicate_path,
-					    reachable_flag);
-  merge_last (predicate_path);
+					    reachable_flag, ignored_edge_flag);
   predicate_path.pop ();
 
-  predicate_path.safe_push (std::make_pair (predicate, false));
+  add_predicate_to_path (predicate_path, predicate, false);
   unsigned false_loop_cost = evaluate_insns (loop, bbs, predicate_path,
-					     reachable_flag);
-  merge_last (predicate_path);
+					     reachable_flag, ignored_edge_flag);
   predicate_path.pop ();
 
   return true_loop_cost + false_loop_cost;
@@ -805,9 +837,12 @@ tree_unswitch_single_loop (class loop *loop, int num,
       vec<unswitch_predicate *> &preds = get_predicates_for_bb (bbs[i]);
       for (auto pred: preds)
 	{
+	  if (pred->handled)
+	    continue;
+
 	  unsigned cost
 	    = evaluate_loop_insns_for_predicate (loop, bbs, predicate_path,
-						 pred);
+						 pred, ignored_edge_flag);
 
 	  /* FIXME: right now we select first candidate, but we can choose
 	     a cheapest (best) one.  */
@@ -840,6 +875,7 @@ tree_unswitch_single_loop (class loop *loop, int num,
 	  fprintf (dump_file, "\n");
 	}
 
+      predicate->handled = true;
       initialize_original_copy_tables ();
       /* Unswitch the loop on this condition.  */
       nloop = tree_unswitch_loop (loop, bb, predicate->condition);
@@ -861,16 +897,14 @@ tree_unswitch_single_loop (class loop *loop, int num,
       free_original_copy_tables ();
 
       /* Invoke itself on modified loops.  */
-      predicate_path.safe_push (std::make_pair (predicate, false));
-      merge_last (predicate_path);
+      add_predicate_to_path (predicate_path, predicate, false);
       changed |= simplify_loop_version (nloop, predicate_path,
 					ignored_edge_flag);
       tree_unswitch_single_loop (nloop, num + 1, predicate_path, budget,
 				 ignored_edge_flag);
       predicate_path.pop ();
 
-      predicate_path.safe_push (std::make_pair (predicate, true));
-      merge_last (predicate_path);
+      add_predicate_to_path (predicate_path, predicate, true);
       changed |= simplify_loop_version (loop, predicate_path,
 					ignored_edge_flag);
       tree_unswitch_single_loop (loop, num + 1, predicate_path, budget,
