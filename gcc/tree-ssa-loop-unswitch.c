@@ -786,14 +786,17 @@ tree_unswitch_single_loop (class loop *loop, int num,
   bool changed = false;
   HOST_WIDE_INT iterations;
 
+  dump_user_location_t loc (last_stmt (loop->header));
+
   /* Perform initial tests if unswitch is eligible.  */
   if (num == 0)
     {
       /* Do not unswitch in cold regions. */
       if (optimize_loop_for_size_p (loop))
 	{
-	  if (dump_file && (dump_flags & TDF_DETAILS))
-	    fprintf (dump_file, ";; Not unswitching cold loops\n");
+	  if (dump_enabled_p ())
+	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, loc,
+			     "Not unswitching cold loops\n");
 	  return false;
 	}
 
@@ -804,9 +807,10 @@ tree_unswitch_single_loop (class loop *loop, int num,
         iterations = likely_max_loop_iterations_int (loop);
       if (iterations >= 0 && iterations <= 1)
 	{
-	  if (dump_file && (dump_flags & TDF_DETAILS))
-	    fprintf (dump_file, ";; Not unswitching, loop is not expected"
-		     " to iterate\n");
+	  if (dump_enabled_p ())
+	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, loc,
+			 "Not unswitching, loop is not expected"
+			 " to iterate\n");
 	  return false;
 	}
     }
@@ -815,9 +819,9 @@ tree_unswitch_single_loop (class loop *loop, int num,
   basic_block bb = NULL;
   if (num > param_max_unswitch_level)
     {
-      if (dump_file
-	  && (dump_flags & TDF_DETAILS))
-	fprintf (dump_file, ";; Not unswitching anymore, hit max level\n");
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_MISSED_OPTIMIZATION, loc,
+			 "Not unswitching anymore, hit max level\n");
       goto exit;
     }
 
@@ -844,13 +848,10 @@ tree_unswitch_single_loop (class loop *loop, int num,
 	      budget -= cost;
 	      break;
 	    }
-	  else if (dump_file && (dump_flags & TDF_DETAILS))
-	    {
-	      fprintf (dump_file, ";; Not unswitching condition, cost too big "
-		       "(%d insns): ", cost);
-	      print_generic_expr (dump_file, pred->condition);
-	      fprintf (dump_file, "\n");
-	    }
+	  else if (dump_enabled_p ())
+	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, loc,
+			     "Not unswitching condition, cost too big "
+			     "(%d insns)\n", cost);
 	}
     }
 
@@ -859,12 +860,10 @@ tree_unswitch_single_loop (class loop *loop, int num,
       if (!dbg_cnt (loop_unswitch))
 	goto exit;
 
-      if (dump_file && (dump_flags & TDF_DETAILS))
-	{
-	  fprintf (dump_file, ";; Unswitching loop on condition: ");
-	  print_generic_expr (dump_file, predicate->condition);
-	  fprintf (dump_file, "\n");
-	}
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_OPTIMIZED_LOCATIONS, loc,
+			 "Unswitching loop on condition: %T\n",
+			 predicate->condition);
 
       predicate->handled = true;
       initialize_original_copy_tables ();
