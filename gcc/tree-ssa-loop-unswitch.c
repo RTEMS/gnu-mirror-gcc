@@ -554,7 +554,7 @@ evaluate_control_stmt_using_entry_checks (gimple *stmt,
 	  int_range_max path_range;
 
 	  if (find_range_for_lhs (predicate_path, lhs, path_range)
-	      && path_range.undefined_p ()
+	      && !path_range.undefined_p ()
 	      && fold_range (r, stmt, path_range)
 	      && r.singleton_p ())
 	    return r.zero_p () ? boolean_false_node : boolean_true_node;
