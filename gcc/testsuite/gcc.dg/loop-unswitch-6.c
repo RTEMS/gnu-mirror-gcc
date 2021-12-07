@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-O2 -funswitch-loops -fdump-tree-unswitch-details --param=max-unswitch-insns=1000" } */
+/* { dg-options "-O2 -funswitch-loops -fdump-tree-unswitch-optimized --param=max-unswitch-insns=1000" } */
 
 int
 __attribute__((noipa))
@@ -53,8 +53,8 @@ int main()
 
 
 /* Test that we actually unswitched something.  */
-/* { dg-final { scan-tree-dump-times ";; Unswitching loop on condition: order.* <= 0" 1 "unswitch" } } */
-/* { dg-final { scan-tree-dump-times ";; Unswitching loop on condition: order.* == 0" 1 "unswitch" } } */
-/* { dg-final { scan-tree-dump-times ";; Unswitching loop on condition: order.* == 1" 1 "unswitch" } } */
-/* { dg-final { scan-tree-dump-times ";; Unswitching loop on condition: order.* == 2" 1 "unswitch" } } */
-/* { dg-final { scan-tree-dump-times ";; Unswitching loop on condition: order.* == 3" 1 "unswitch" } } */
+/* { dg-final { scan-tree-dump-times "Unswitching loop on condition: order.* <= 0" 1 "unswitch" } } */
+/* { dg-final { scan-tree-dump-times "Unswitching loop on condition: order.* == 0" 1 "unswitch" } } */
+/* { dg-final { scan-tree-dump-times "Unswitching loop on condition: order.* == 1" 1 "unswitch" } } */
+/* { dg-final { scan-tree-dump-times "Unswitching loop on condition: order.* == 2" 1 "unswitch" } } */
+/* { dg-final { scan-tree-dump-times "Unswitching loop on condition: order.* == 3" 1 "unswitch" } } */

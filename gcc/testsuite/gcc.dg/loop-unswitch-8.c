@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-O2 -funswitch-loops -fdump-tree-unswitch-details" } */
+/* { dg-options "-O2 -funswitch-loops -fdump-tree-unswitch-optimized" } */
 
 int
 foo(double *a, double *b, double *c, double *d, double *r, int size, int order)
@@ -28,4 +28,4 @@ foo(double *a, double *b, double *c, double *d, double *r, int size, int order)
   return 0;
 }
 
-/* { dg-final { scan-tree-dump-times ";; Unswitching loop on condition: order" 3 "unswitch" } } */
+/* { dg-final { scan-tree-dump-times "Unswitching loop on condition: order" 3 "unswitch" } } */
