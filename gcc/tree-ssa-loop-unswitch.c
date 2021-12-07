@@ -516,11 +516,7 @@ evaluate_control_stmt_using_entry_checks (gimple *stmt,
 					  const auto_edge_flag &ignored_edge_flag,
 					  hash_set<edge> *ignored_edges)
 {
-  tree lhs = NULL_TREE;
-
-  // FIXME: remove?
-  if (predicate_path.is_empty ())
-    return NULL_TREE;
+  tree lhs;
 
   gcond *condition = dyn_cast<gcond *> (stmt);
   gswitch *swtch = dyn_cast<gswitch *> (stmt);
