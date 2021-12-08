@@ -210,6 +210,7 @@ init_loop_unswitch_info (class loop *loop,
 	set_predicates_for_bb (bbs[i], candidates);
       else
 	{
+	  candidates.release ();
 	  gimple *last = last_stmt (bbs[i]);
 	  if (last != NULL)
 	    gimple_set_uid (last, 0);
@@ -248,7 +249,16 @@ tree_ssa_unswitch_loops (void)
 	  predicate_path.create (8);
 	  changed |= tree_unswitch_single_loop (loop, 0, predicate_path,
 						budget, ignored_edge_flag);
+	  predicate_path.release ();
 
+	  for (auto predlist: bb_predicates)
+	    {
+	      for (auto predicate: predlist)
+		delete predicate;
+	      predlist.release ();
+	    }
+
+	  bb_predicates->release ();
 	  delete bb_predicates;
 	  bb_predicates = NULL;
 	}
