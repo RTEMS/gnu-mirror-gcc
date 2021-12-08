@@ -13479,7 +13479,7 @@ mve_vector_mem_operand (machine_mode mode, rtx op, bool strict)
 	  case E_V4HImode:
 	  case E_V4HFmode:
 	    if (val % 2 == 0 && abs (val) <= 254)
-	      return reg_no <= LAST_LO_REGNUM
+	      return reg_no <= LAST_ARM_REGNUM
 		|| reg_no >= FIRST_PSEUDO_REGISTER;
 	    return FALSE;
 	  case E_V4SImode:
