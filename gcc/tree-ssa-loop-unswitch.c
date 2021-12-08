@@ -91,6 +91,8 @@ struct unswitch_predicate
     edge_index (edge_index_), handled (false)
   {}
 
+  /* Based on true_range, compute inverted range.  */
+
   inline void
   init_false_edge (void)
   {
@@ -101,6 +103,8 @@ struct unswitch_predicate
       false_range.invert ();
   }
 
+  /* Copy ranges for purpose of usage in predicate path.  */
+
   inline void
   copy_merged_ranges ()
   {
@@ -108,11 +112,22 @@ struct unswitch_predicate
     merged_false_range = false_range;
   }
 
+  /* Unswitching expression.  */
   tree condition;
+
+  /* LHS of the expression.  */
   tree lhs;
+
+  /* Initial ranges (when the expression is true/false) for the expression.  */
   int_range_max true_range, false_range;
+
+  /* Modified range that is part of a predicate path.  */
   int_range_max merged_true_range, merged_false_range;
+
+  /* For switch predicates, index of the edge the predicate belongs to.  */
   int edge_index;
+
+  /* True if the predicate was already used for unswitching.  */
   bool handled;
 };
 
@@ -452,6 +467,12 @@ find_unswitching_predicates_for_bb (basic_block bb, class loop *loop,
 		  unswitch_predicate *predicate = new unswitch_predicate (expr, idx, edge_index);
 		  ranger->gori().outgoing_edge_range_p (predicate->true_range, e,
 							idx, *get_global_range_query  ());
+		  /* Huge switches are not supported by Ranger.  */
+		  if (predicate->true_range.undefined_p ())
+		    {
+		      delete predicate;
+		      return;
+		    }
 		  predicate->init_false_edge ();
 
 		  candidates.safe_push (predicate);
