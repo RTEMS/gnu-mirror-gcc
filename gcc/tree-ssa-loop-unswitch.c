@@ -370,6 +370,10 @@ find_unswitching_predicates_for_bb (basic_block bb, class loop *loop,
       tree lhs = gimple_cond_lhs (stmt);
       tree rhs = gimple_cond_rhs (stmt);
 
+      if (TREE_CODE (lhs) != SSA_NAME
+	  || !TREE_CONSTANT (rhs))
+	return;
+
       cond = build2 (gimple_cond_code (stmt), boolean_type_node, lhs, rhs);
       edge edge_true, edge_false;
       extract_true_false_edges_from_block (bb, &edge_true, &edge_false);
