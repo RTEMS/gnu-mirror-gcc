@@ -156,7 +156,7 @@ static bool used_outside_loop_p (class loop *, tree);
 static void hoist_guard (class loop *, edge);
 static bool check_exit_phi (class loop *);
 static tree get_vop_from_header (class loop *);
-static void clean_up_after_unswitching (const auto_edge_flag &ignored_edge_flag);
+static void clean_up_after_unswitching (const auto_edge_flag &);
 
 /* Return vector of predicates that belong to a basic block.  */
 
@@ -397,8 +397,9 @@ find_unswitching_predicates_for_bb (basic_block bb, class loop *loop,
 
       if (irange::supports_type_p (TREE_TYPE (lhs)))
 	{
-	  ranger->gori().outgoing_edge_range_p (predicate->true_range, edge_true,
-						lhs, *get_global_range_query  ());
+	  ranger->gori ().outgoing_edge_range_p (predicate->true_range,
+						 edge_true, lhs,
+						 *get_global_range_query ());
 	  predicate->init_false_edge ();
 	}
 
@@ -420,7 +421,7 @@ find_unswitching_predicates_for_bb (basic_block bb, class loop *loop,
       /* Unswitching on undefined values would introduce undefined
 	 behavior that the original program might never exercise.  */
       if (is_maybe_undefined (idx, stmt, loop))
- 	return;
+	return;
 
       edge e;
       edge_iterator ei;
@@ -464,9 +465,10 @@ find_unswitching_predicates_for_bb (basic_block bb, class loop *loop,
 
 	      if (expr != NULL_TREE)
 		{
-		  unswitch_predicate *predicate = new unswitch_predicate (expr, idx, edge_index);
-		  ranger->gori().outgoing_edge_range_p (predicate->true_range, e,
-							idx, *get_global_range_query  ());
+		  unswitch_predicate *predicate
+		    = new unswitch_predicate (expr, idx, edge_index);
+		  ranger->gori ().outgoing_edge_range_p (predicate->true_range, e,
+							 idx, *get_global_range_query ());
 		  /* Huge switches are not supported by Ranger.  */
 		  if (predicate->true_range.undefined_p ())
 		    {
@@ -483,6 +485,9 @@ find_unswitching_predicates_for_bb (basic_block bb, class loop *loop,
     }
 }
 
+/* Merge ranges for the last item of PREDICATE_PATH with a predicate
+   that shared the same LHS.  */
+
 static void
 merge_last (predicate_vector &predicate_path)
 {
@@ -495,14 +500,16 @@ merge_last (predicate_vector &predicate_path)
 
       if (operand_equal_p (predicate->lhs, last_predicate->lhs, 0))
 	{
-	  irange &other
-	    = true_edge ? predicate->merged_true_range : predicate->merged_false_range;
+	  irange &other = (true_edge ? predicate->merged_true_range
+			   : predicate->merged_false_range);
 	  last_predicate->merged_true_range.intersect (other);
 	  last_predicate->merged_false_range.intersect (other);
 	  return;
 	}
     }
 }
+
+/* Add PREDICATE to PREDICATE_PATH on TRUE_EDGE.  */
 
 static void
 add_predicate_to_path (predicate_vector &predicate_path,
@@ -524,7 +531,8 @@ find_range_for_lhs (predicate_vector &predicate_path, tree lhs,
 
       if (operand_equal_p (predicate->lhs, lhs, 0))
 	{
-	  range = true_edge ? predicate->merged_true_range : predicate->merged_false_range;
+	  range = (true_edge ? predicate->merged_true_range
+		   : predicate->merged_false_range);
 	  return true;
 	}
     }
@@ -609,8 +617,8 @@ evaluate_control_stmt_using_entry_checks (gimple *stmt,
 	  int_range_max r;
 	  int_range_max path_range;
 
-	  ranger->gori().outgoing_edge_range_p (r, e,
-						idx, *get_global_range_query  ());
+	  ranger->gori ().outgoing_edge_range_p (r, e, idx,
+						 *get_global_range_query ());
 	  if (find_range_for_lhs (predicate_path, idx, path_range))
 	    {
 	      r.intersect (path_range);
@@ -622,7 +630,8 @@ evaluate_control_stmt_using_entry_checks (gimple *stmt,
 	}
 
       /* Only one edge from the switch is alive.  */
-      if (ignored_edges->elements () + 1 == EDGE_COUNT (gimple_bb (swtch)->succs))
+      unsigned edge_count = EDGE_COUNT (gimple_bb (swtch)->succs);
+      if (ignored_edges->elements () + 1 == edge_count)
 	return result;
     }
 
