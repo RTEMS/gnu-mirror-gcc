@@ -48,10 +48,12 @@ enum modref_special_parms {
   MODREF_UNKNOWN_PARM = -1,
   MODREF_STATIC_CHAIN_PARM = -2,
   MODREF_RETSLOT_PARM = -3,
+  /* Used for bases that points to memory that escapes from function.  */
+  MODREF_GLOBAL_MEMORY_PARM = -4,
   /* Used in modref_parm_map to tak references which can be removed
      from the summary during summary update since they now points to loca
      memory.  */
-  MODREF_LOCAL_MEMORY_PARM = -4
+  MODREF_LOCAL_MEMORY_PARM = -5
 };
 
 /* Modref record accesses relative to function parameters.
@@ -174,6 +176,7 @@ struct GTY((user)) modref_ref_node
        in the caller.  */
     gcc_checking_assert (a.parm_index >= 0
 			 || a.parm_index == MODREF_STATIC_CHAIN_PARM
+			 || a.parm_index == MODREF_GLOBAL_MEMORY_PARM
 			 || a.parm_index == MODREF_UNKNOWN_PARM);
 
     if (!a.useful_p ())
@@ -580,7 +583,9 @@ struct GTY((user)) modref_tree
 
 		    if (a.parm_index != MODREF_UNKNOWN_PARM && parm_map)
 		      {
-			if (a.parm_index >= (int)parm_map->length ())
+			if (a.parm_index == MODREF_GLOBAL_MEMORY_PARM)
+			  ;
+			else if (a.parm_index >= (int)parm_map->length ())
 			  a.parm_index = MODREF_UNKNOWN_PARM;
 			else
 			  {
@@ -656,7 +661,8 @@ struct GTY((user)) modref_tree
 	    if (ref_node->every_access)
 	      return true;
 	    FOR_EACH_VEC_SAFE_ELT (ref_node->accesses, k, access_node)
-	      if (access_node->parm_index == MODREF_UNKNOWN_PARM)
+	      if (access_node->parm_index == MODREF_UNKNOWN_PARM
+		  || access_node->parm_index == MODREF_GLOBAL_MEMORY_PARM)
 		return true;
 	  }
       }

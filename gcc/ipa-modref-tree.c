@@ -625,7 +625,9 @@ modref_access_node::dump (FILE *out)
 {
   if (parm_index != MODREF_UNKNOWN_PARM)
     {
-      if (parm_index >= 0)
+      if (parm_index == MODREF_GLOBAL_MEMORY_PARM)
+	fprintf (out, " Base in global memory");
+      else if (parm_index >= 0)
 	fprintf (out, " Parm %i", parm_index);
       else if (parm_index == MODREF_STATIC_CHAIN_PARM)
 	fprintf (out, " Static chain");
@@ -655,7 +657,8 @@ modref_access_node::dump (FILE *out)
 tree
 modref_access_node::get_call_arg (const gcall *stmt) const
 {
-  if (parm_index == MODREF_UNKNOWN_PARM)
+  if (parm_index == MODREF_UNKNOWN_PARM
+      || parm_index == MODREF_GLOBAL_MEMORY_PARM)
     return NULL;
   if (parm_index == MODREF_STATIC_CHAIN_PARM)
     return gimple_call_chain (stmt);

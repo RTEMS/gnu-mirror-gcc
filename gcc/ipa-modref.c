@@ -754,7 +754,7 @@ get_modref_function_summary (cgraph_node *func)
      we don't want to return anything, even if we have summary for the target
      function.  */
   enum availability avail;
-  func = func->function_or_virtual_thunk_symbol
+  func = func->ultimate_alias_target
 		 (&avail, current_function_decl ?
 			  cgraph_node::get (current_function_decl) : NULL);
   if (avail <= AVAIL_INTERPOSABLE)
@@ -892,6 +892,8 @@ private:
   bool record_access_p (tree);
   bool record_unknown_load ();
   bool record_unknown_store ();
+  bool record_global_memory_load ();
+  bool record_global_memory_store ();
   bool merge_call_side_effects (gimple *, modref_summary *,
 				cgraph_node *, bool);
   modref_access_node get_access_for_fnspec (gcall *, attr_fnspec &,
@@ -1147,6 +1149,41 @@ modref_access_analysis::record_unknown_store ()
   return changed;
 }
 
+/* Record unknown load from gloal memory.  */
+
+bool
+modref_access_analysis::record_global_memory_load ()
+{
+  bool changed = false;
+  modref_access_node a = {0, -1, -1,
+			  0, MODREF_GLOBAL_MEMORY_PARM, false, 0};
+
+  if (m_summary && !m_summary->loads->every_base)
+    changed |= m_summary->loads->insert (current_function_decl, 0, 0, a, false);
+  if (m_summary_lto && !m_summary_lto->loads->every_base)
+    changed |= m_summary_lto->loads->insert (current_function_decl,
+					     0, 0, a, false);
+  return changed;
+}
+
+/* Record unknown store from gloal memory.  */
+
+bool
+modref_access_analysis::record_global_memory_store ()
+{
+  bool changed = false;
+  modref_access_node a = {0, -1, -1,
+			  0, MODREF_GLOBAL_MEMORY_PARM, false, 0};
+
+  if (m_summary && !m_summary->stores->every_base)
+    changed |= m_summary->stores->insert (current_function_decl,
+					  0, 0, a, false);
+  if (m_summary_lto && !m_summary_lto->stores->every_base)
+    changed |= m_summary_lto->stores->insert (current_function_decl,
+					     0, 0, a, false);
+  return changed;
+}
+
 /* Merge side effects of call STMT to function with CALLEE_SUMMARY.
    Return true if something changed.
    If IGNORE_STORES is true, do not merge stores.
@@ -1349,6 +1386,57 @@ modref_access_analysis::get_access_for_fnspec (gcall *call, attr_fnspec &fnspec,
   return a;
 }
 
+/* Return true if ARG with EAF flags FLAGS can not make any caller's parameter
+   used even if they are not escaped.  */
+
+static bool
+verify_arg (tree arg, int flags)
+{
+  if (flags & EAF_UNUSED)
+    return true;
+  if (!(flags & (EAF_NO_DIRECT_ESCAPE | EAF_NO_INDIRECT_ESCAPE)))
+    return true;
+  if (is_gimple_constant (arg))
+    return true;
+  if (DECL_P (arg) && TREE_READONLY (arg))
+    return true;
+  if (TREE_CODE (arg) == ADDR_EXPR)
+    {
+      tree t = get_base_address (TREE_OPERAND (arg, 0));
+      if (is_gimple_constant (t))
+	return true;
+      if (DECL_P (t)
+	  && (TREE_READONLY (t) || TREE_CODE (t) == FUNCTION_DECL))
+	return true;
+    }
+  return false;
+}
+
+/* Return true if STMT may access memory that is pointed to by parameters
+   of caller and which is not seen as an escape by PTA.  */
+
+static bool
+may_access_nonescaping_parm_p (gcall *call, int callee_ecf_flags)
+{
+  int implicit_flags = false;
+
+  if (ignore_stores_p (current_function_decl, callee_ecf_flags))
+    implicit_flags |= ignore_stores_eaf_flags;
+  if (callee_ecf_flags & ECF_PURE)
+    implicit_flags |= implicit_pure_eaf_flags;
+  if (callee_ecf_flags & (ECF_CONST | ECF_NOVOPS))
+    implicit_flags |= implicit_const_eaf_flags;
+  if (gimple_call_chain (call)
+      && !verify_arg (gimple_call_chain (call),
+		      gimple_call_static_chain_flags (call) | implicit_flags))
+    return true;
+  for (unsigned int i = 0; i < gimple_call_num_args (call); i++)
+    if (!verify_arg (gimple_call_arg (call, i),
+		     gimple_call_arg_flags (call, i) | implicit_flags))
+      return true;
+  return false;
+}
+
 /* Apply side effects of call STMT to CUR_SUMMARY using FNSPEC.
    If IGNORE_STORES is true ignore them.
    Return false if no useful summary can be produced.   */
@@ -1381,14 +1469,28 @@ modref_access_analysis::process_fnspec (gcall *call)
       if (dump_file && gimple_call_builtin_p (call, BUILT_IN_NORMAL))
 	fprintf (dump_file, "      Builtin with no fnspec: %s\n",
 		 IDENTIFIER_POINTER (DECL_NAME (gimple_call_fndecl (call))));
-      record_unknown_load ();
       if (!ignore_stores_p (current_function_decl, flags))
-	record_unknown_store ();
+	{
+	  record_global_memory_store ();
+	  record_global_memory_load ();
+	}
+      else
+	{
+	  if (!may_access_nonescaping_parm_p (call, flags))
+	    record_global_memory_load ();
+	  else
+	    record_unknown_load ();
+	}
       return;
     }
   /* Process fnspec.  */
   if (fnspec.global_memory_read_p ())
-    record_unknown_load ();
+    {
+      if (may_access_nonescaping_parm_p (call, flags))
+	record_unknown_load ();
+      else
+	record_global_memory_load ();
+    }
   else
     {
       for (unsigned int i = 0; i < gimple_call_num_args (call); i++)
@@ -1420,7 +1522,12 @@ modref_access_analysis::process_fnspec (gcall *call)
   if (ignore_stores_p (current_function_decl, flags))
     return;
   if (fnspec.global_memory_written_p ())
-    record_unknown_store ();
+    {
+      if (may_access_nonescaping_parm_p (call, flags))
+	record_unknown_store ();
+      else
+	record_global_memory_store ();
+    }
   else
     {
       for (unsigned int i = 0; i < gimple_call_num_args (call); i++)
@@ -1467,6 +1574,12 @@ modref_access_analysis::analyze_call (gcall *stmt)
   /* Check flags on the function call.  In certain cases, analysis can be
      simplified.  */
   int flags = gimple_call_flags (stmt);
+
+  if (dump_file)
+    {
+      fprintf (dump_file, " - Analyzing call:");
+      print_gimple_stmt (dump_file, stmt, 0);
+    }
 
   if ((flags & (ECF_CONST | ECF_NOVOPS))
       && !(flags & ECF_LOOPING_CONST_OR_PURE))
@@ -4065,7 +4178,7 @@ ignore_edge (struct cgraph_edge *e)
   if (!e->inline_failed)
     return false;
   enum availability avail;
-  cgraph_node *callee = e->callee->function_or_virtual_thunk_symbol
+  cgraph_node *callee = e->callee->ultimate_alias_target
 			  (&avail, e->caller);
 
   return (avail <= AVAIL_INTERPOSABLE
@@ -4088,7 +4201,7 @@ compute_parm_map (cgraph_edge *callee_edge, vec<modref_parm_map> *parm_map)
       class ipa_call_summary *es
 	     = ipa_call_summaries->get (callee_edge);
       cgraph_node *callee
-	 = callee_edge->callee->function_or_virtual_thunk_symbol
+	 = callee_edge->callee->ultimate_alias_target
 			      (NULL, callee_edge->caller);
 
       caller_parms_info
@@ -4578,7 +4691,7 @@ modref_propagate_in_scc (cgraph_node *component_node)
 
 	      /* Get the callee and its summary.  */
 	      enum availability avail;
-	      callee = callee_edge->callee->function_or_virtual_thunk_symbol
+	      callee = callee_edge->callee->ultimate_alias_target
 			 (&avail, cur);
 
 	      /* It is not necessary to re-process calls outside of the
@@ -5021,7 +5134,7 @@ modref_propagate_flags_in_scc (cgraph_node *component_node)
 
 	      /* Get the callee and its summary.  */
 	      enum availability avail;
-	      callee = callee_edge->callee->function_or_virtual_thunk_symbol
+	      callee = callee_edge->callee->ultimate_alias_target
 			 (&avail, cur);
 
 	      /* It is not necessary to re-process calls outside of the
