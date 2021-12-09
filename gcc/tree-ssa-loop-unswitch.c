@@ -893,7 +893,7 @@ tree_unswitch_single_loop (class loop *loop, int num,
 	      break;
 	    }
 	  else if (dump_enabled_p ())
-	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, loc,
+	    dump_printf_loc (MSG_NOTE, loc,
 			     "Not unswitching condition, cost too big "
 			     "(%d insns)\n", cost);
 	}
