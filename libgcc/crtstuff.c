@@ -263,6 +263,34 @@ STATIC func_ptr __DTOR_LIST__[1]
 STATIC EH_FRAME_SECTION_CONST char __EH_FRAME_BEGIN__[]
      __attribute__((section(__LIBGCC_EH_FRAME_SECTION_NAME__), aligned(4)))
      = { };
+# ifdef __CHERI_PURE_CAPABILITY__ && defined (__aarch64__)
+/* MORELLO  __EH_FRAME_BEGIN__ marks the start of the .eh_frame section.
+   The __register_frame_info* functions below pass this to the unwinder so that
+   it knows where to access the dwarf unwinding information from.
+   This is the only capability the unwinder has to take provenance from, which
+   means that the unwinder needs it to span everything that the dwarf exception
+   unwinding information can need.  In order to do this we use PCC bounds.
+   N.b. this is pretty useful in development since PCC gives us executable
+   permissions, which means we can use the landing-pad offset info rather than
+   having to implement both at the same time.  */
+static inline void *
+get_eh_frame_begin (void)
+{
+  void *ret;
+  asm ("adrp  %0, __EH_FRAME_BEGIN__\n\t"
+       "add %0, %0, :lo12:__EH_FRAME_BEGIN__"
+       : "=r" (ret) : );
+  return ret;
+}
+# elif defined (__CHERI_PURE_CAPABILITY__)
+# error libgcc crtstuff not updated for non-Morello capability target.
+# else
+static inline void *
+get_eh_frame_begin (void)
+{
+  return __EH_FRAME_BEGIN__;
+}
+# endif /* __CHERI_PURE_CAPABILITY__ */
 #endif /* USE_EH_FRAME_REGISTRY */
 
 #if USE_TM_CLONE_REGISTRY
@@ -427,10 +455,10 @@ __do_global_dtors_aux (void)
   /* If we used the new __register_frame_info_bases interface,
      make sure that we deregister from the same place.  */
   if (__deregister_frame_info_bases)
-    __deregister_frame_info_bases (__EH_FRAME_BEGIN__);
+    __deregister_frame_info_bases (get_eh_frame_begin ());
 #else
   if (__deregister_frame_info)
-    __deregister_frame_info (__EH_FRAME_BEGIN__);
+    __deregister_frame_info (get_eh_frame_begin ());
 #endif
 #endif
 
@@ -479,10 +507,10 @@ frame_dummy (void)
   tbase = 0;
   CRT_GET_RFIB_DATA (dbase);
   if (__register_frame_info_bases)
-    __register_frame_info_bases (__EH_FRAME_BEGIN__, &object, tbase, dbase);
+    __register_frame_info_bases (get_eh_frame_begin (), &object, tbase, dbase);
 #else
   if (__register_frame_info)
-    __register_frame_info (__EH_FRAME_BEGIN__, &object);
+    __register_frame_info (get_eh_frame_begin (), &object);
 #endif /* CRT_GET_RFIB_DATA */
 #endif /* USE_EH_FRAME_REGISTRY */
 
@@ -569,7 +597,7 @@ __do_global_dtors (void)
 
 #ifdef USE_EH_FRAME_REGISTRY
   if (__deregister_frame_info)
-    __deregister_frame_info (__EH_FRAME_BEGIN__);
+    __deregister_frame_info (get_eh_frame_begin ());
 #endif
 }
 
@@ -584,7 +612,7 @@ __do_global_ctors_1(void)
 #ifdef USE_EH_FRAME_REGISTRY
   static struct object object;
   if (__register_frame_info)
-    __register_frame_info (__EH_FRAME_BEGIN__, &object);
+    __register_frame_info (get_eh_frame_begin (), &object);
 #endif
 
 #if USE_TM_CLONE_REGISTRY
