@@ -66,7 +66,8 @@ aarch64_outside_sigtramp_range (unsigned char *pc)
   if (sigtramp_range_determined < 2)  /* sysctl failed if < 2 */
     return 1;
 
-  return (pc < sigtramp_start || pc >= sigtramp_end);
+  _Unwind_Address pcaddr = __builtin_code_address_from_pointer (pc);
+  return (pcaddr < sigtramp_start || pcaddr >= sigtramp_end);
 }
 
 static _Unwind_Reason_Code

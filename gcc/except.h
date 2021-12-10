@@ -237,6 +237,7 @@ extern rtx expand_builtin_eh_copy_values (tree);
 extern void expand_builtin_unwind_init (void);
 extern rtx expand_builtin_eh_return_data_regno (tree);
 extern rtx expand_builtin_extract_return_addr (tree);
+extern rtx expand_builtin_code_address_from_pointer (tree);
 extern void expand_builtin_init_dwarf_reg_sizes (tree);
 extern rtx expand_builtin_frob_return_addr (tree);
 extern rtx expand_builtin_dwarf_sp_column (void);

@@ -388,7 +388,8 @@ void *
 _Unwind_FindEnclosingFunction (void *pc)
 {
   struct dwarf_eh_bases bases;
-  const struct dwarf_fde *fde = _Unwind_Find_FDE (pc-1, &bases);
+   _Unwind_Address pcaddr = __builtin_code_address_from_pointer (pc);
+  const struct dwarf_fde *fde = _Unwind_Find_FDE (pcaddr-1, &bases);
   if (fde)
     return bases.func;
   else
@@ -981,8 +982,9 @@ execute_cfa_program (const unsigned char *insn_ptr,
      reflected at the point immediately before the call insn.
      In signal frames, return address is after last completed instruction,
      so we add 1 to return address to make the comparison <=.  */
+  _Unwind_Address retaddr = __builtin_code_address_from_pointer (context->ra);
   while (insn_ptr < insn_end
-	 && fs->pc < context->ra + _Unwind_IsSignalFrame (context))
+	 && fs->pc < retaddr + _Unwind_IsSignalFrame (context))
     {
       unsigned char insn = *insn_ptr++;
       _uleb128_t reg, utmp;
@@ -1275,7 +1277,8 @@ uw_frame_state_for (struct _Unwind_Context *context, _Unwind_FrameState *fs)
   if (context->ra == 0)
     return _URC_END_OF_STACK;
 
-  fde = _Unwind_Find_FDE (context->ra + _Unwind_IsSignalFrame (context) - 1,
+  _Unwind_Address retaddr = __builtin_code_address_from_pointer (context->ra);
+  fde = _Unwind_Find_FDE (retaddr + _Unwind_IsSignalFrame (context) - 1,
 			  &context->bases);
   if (fde == NULL)
     {

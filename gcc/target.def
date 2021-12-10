@@ -2136,6 +2136,26 @@ to express such options.  It should return a string containing these options,\n\
 separated by spaces, which the caller will free.\n",
 char *, (void), hook_charptr_void_null)
 
+DEFHOOK
+(code_address_from_pointer,
+ "This hook returns an RTX describing the address of the instruction that\n\
+would be next executed if code were to jump to the valid pointer argument.\n\
+\n\
+Most architectures will not need to implement this, and would benefit from\n\
+specifying @code{MASK_RETURN_ADDR} and @code{RETURN_ADDR_OFFSET} for the\n\
+implementation of @code{__builtin_extract_return_addr} instead.\n\
+\n\
+@code{__builtin_extract_return_addr} is for converting the value that would\n\
+be in the return address register into a correct address that can be used as\n\
+a pointer.\n\
+\n\
+This hook is for converting the value that would be found in the return\n\
+address register into a correct address that *can not* be used as a pointer.\n\
+The difference is significant for capability architectures where pointers may\n\
+be sealed from modification without invalidating the pointer.",
+ rtx, (rtx addr),
+ hook_rtx_rtx_identity)
+
 DEFHOOK_UNDOC
 (eh_return_filter_mode,
  "Return machine mode for filter value.",

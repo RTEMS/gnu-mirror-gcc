@@ -8550,6 +8550,8 @@ expand_builtin (tree exp, rtx target, rtx subtarget, machine_mode mode,
       return expand_builtin_frob_return_addr (CALL_EXPR_ARG (exp, 0));
     case BUILT_IN_EXTRACT_RETURN_ADDR:
       return expand_builtin_extract_return_addr (CALL_EXPR_ARG (exp, 0));
+    case BUILT_IN_CODE_ADDRESS_FROM_POINTER:
+      return expand_builtin_code_address_from_pointer (CALL_EXPR_ARG (exp, 0));
     case BUILT_IN_EH_RETURN:
       expand_builtin_eh_return (CALL_EXPR_ARG (exp, 0),
 				CALL_EXPR_ARG (exp, 1));
@@ -11917,6 +11919,7 @@ is_simple_builtin (tree decl)
       case BUILT_IN_ASSUME_ALIGNED:
       case BUILT_IN_RETURN_ADDRESS:
       case BUILT_IN_EXTRACT_RETURN_ADDR:
+      case BUILT_IN_CODE_ADDRESS_FROM_POINTER:
       case BUILT_IN_FROB_RETURN_ADDR:
       case BUILT_IN_RETURN:
       case BUILT_IN_AGGREGATE_INCOMING_ADDRESS:

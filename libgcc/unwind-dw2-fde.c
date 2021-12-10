@@ -827,7 +827,7 @@ init_object (struct object* ob)
    array.  */
 
 static const fde *
-linear_search_fdes (struct object *ob, const fde *this_fde, void *pc)
+linear_search_fdes (struct object *ob, const fde *this_fde, _Unwind_Address pc)
 {
   const struct dwarf_cie *last_cie = 0;
   int encoding = ob->s.b.encoding;
@@ -897,7 +897,7 @@ linear_search_fdes (struct object *ob, const fde *this_fde, void *pc)
    implementations of increasing complexity.  */
 
 static inline const fde *
-binary_search_unencoded_fdes (struct object *ob, void *pc)
+binary_search_unencoded_fdes (struct object *ob, _Unwind_Address pc)
 {
   struct fde_vector *vec = ob->u.sort;
   size_t lo, hi;
@@ -923,7 +923,7 @@ binary_search_unencoded_fdes (struct object *ob, void *pc)
 }
 
 static inline const fde *
-binary_search_single_encoding_fdes (struct object *ob, void *pc)
+binary_search_single_encoding_fdes (struct object *ob, _Unwind_Address pc)
 {
   struct fde_vector *vec = ob->u.sort;
   int encoding = ob->s.b.encoding;
@@ -953,7 +953,7 @@ binary_search_single_encoding_fdes (struct object *ob, void *pc)
 }
 
 static inline const fde *
-binary_search_mixed_encoding_fdes (struct object *ob, void *pc)
+binary_search_mixed_encoding_fdes (struct object *ob, _Unwind_Address pc)
 {
   struct fde_vector *vec = ob->u.sort;
   size_t lo, hi;
@@ -984,7 +984,7 @@ binary_search_mixed_encoding_fdes (struct object *ob, void *pc)
 }
 
 static const fde *
-search_object (struct object* ob, void *pc)
+search_object (struct object* ob, _Unwind_Address pc)
 {
   /* If the data hasn't been sorted, try to do this now.  We may have
      more memory available than last time we tried.  */
@@ -1028,7 +1028,7 @@ search_object (struct object* ob, void *pc)
 }
 
 const fde *
-_Unwind_Find_FDE (void *pc, struct dwarf_eh_bases *bases)
+_Unwind_Find_FDE (_Unwind_Address pc, struct dwarf_eh_bases *bases)
 {
   struct object *ob;
   const fde *f = NULL;

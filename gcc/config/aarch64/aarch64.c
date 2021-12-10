@@ -24631,6 +24631,19 @@ aarch64_target_capability_mode ()
   return opt_scalar_addr_mode ();
 }
 
+/* Implement TARGET_CODE_ADDRESS_FROM_POINTER hook.  */
+rtx
+aarch64_code_address_from_pointer (rtx x)
+{
+  if (!TARGET_CAPABILITY_PURE)
+    return x;
+  gcc_assert (GET_MODE (x) == Pmode);
+  gcc_assert (HWI_COMPUTABLE_MODE_P (POmode));
+  return expand_and (POmode, drop_capability (x),
+		     gen_int_mode (~((uint64_t)1), POmode),
+		     NULL);
+}
+
 /* Implement TARGET_ADJUST_LABEL_EXPANSION hook.  */
 rtx
 aarch64_adjust_label_expansion (rtx x)
@@ -25255,6 +25268,9 @@ aarch64_libgcc_floating_mode_supported_p
 
 #undef TARGET_CAPABILITY_MODE
 #define TARGET_CAPABILITY_MODE aarch64_target_capability_mode
+
+#undef TARGET_CODE_ADDRESS_FROM_POINTER
+#define TARGET_CODE_ADDRESS_FROM_POINTER aarch64_code_address_from_pointer
 
 #undef TARGET_ADJUST_LABEL_EXPANSION
 #define TARGET_ADJUST_LABEL_EXPANSION aarch64_adjust_label_expansion

@@ -1389,6 +1389,24 @@ You would most commonly define this macro if the @code{allocate_stack}
 pattern needs to support both a 32- and a 64-bit mode.
 @end defmac
 
+@deftypefn {Target Hook} rtx TARGET_CODE_ADDRESS_FROM_POINTER (rtx @var{addr})
+This hook returns an RTX describing the address of the instruction that
+would be next executed if code were to jump to the valid pointer argument.
+
+Most architectures will not need to implement this, and would benefit from
+specifying @code{MASK_RETURN_ADDR} and @code{RETURN_ADDR_OFFSET} for the
+implementation of @code{__builtin_extract_return_addr} instead.
+
+@code{__builtin_extract_return_addr} is for converting the value that would
+be in the return address register into a correct address that can be used as
+a pointer.
+
+This hook is for converting the value that would be found in the return
+address register into a correct address that *can not* be used as a pointer.
+The difference is significant for capability architectures where pointers may
+be sealed from modification without invalidating the pointer.
+@end deftypefn
+
 @deftypefn {Target Hook} scalar_int_mode TARGET_LIBGCC_CMP_RETURN_MODE (void)
 This target hook should return the mode to be used for the return value
 of compare instructions expanded to libgcc calls.  If not defined

@@ -2210,6 +2210,34 @@ expand_builtin_extract_return_addr (tree addr_tree)
   return addr;
 }
 
+/* Given a valid code pointer, return the address of the instruction that
+   jumping to this code pointer would execute next.  For most architectures
+   this would be the same as the original pointer.  One architecture where this
+   would not be the case is the Morello AArch64 architecture where a code
+   pointer may have its LSB set to indicate the execution mode which the
+   instruction should be ran in.
+
+   N.b. this must be separate to __builtin_extract_return_addr since that
+   function is used to extract a real pointer while this builtin is used when
+   the modification can not produce a valid pointer (in the Morello
+   architecture valid addresses may not be valid pointers).  */
+rtx
+expand_builtin_code_address_from_pointer (tree pointer_tree)
+{
+  rtx addr = expand_expr (pointer_tree, NULL_RTX, Pmode, EXPAND_NORMAL);
+  if (GET_MODE (addr) != Pmode
+      && GET_MODE (addr) != VOIDmode)
+    {
+#ifdef POINTERS_EXTEND_UNSIGNED
+      addr = convert_memory_address (Pmode, addr);
+#else
+      addr = convert_to_mode (Pmode, addr, 0);
+#endif
+    }
+
+  return targetm.code_address_from_pointer (addr);
+}
+
 /* Given an actual address in addr_tree, do any necessary encoding
    and return the value to be stored in the return address register or
    stack slot so the epilogue will return to that address.  */

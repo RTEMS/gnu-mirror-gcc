@@ -41,7 +41,13 @@
 #define SVC_0		0xd4000001
 #endif
 
+/* The mechanism of reading the instructions pointed to by our LR can not work
+   for Morello since the CLR provided by the kernel will be sealed.
+   That means we can't read instructions from it.  Which means our
+   determination mechanism can no longer work.  */
+#ifndef __CHERI_PURE_CAPABILITY__
 #define MD_FALLBACK_FRAME_STATE_FOR aarch64_fallback_frame_state
+#endif
 
 static _Unwind_Reason_Code
 aarch64_fallback_frame_state (struct _Unwind_Context *context,

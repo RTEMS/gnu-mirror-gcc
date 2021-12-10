@@ -163,7 +163,8 @@ next_fde (const fde *f)
   return (const fde *) ((const char *) f + f->length + sizeof (f->length));
 }
 
-extern const fde * _Unwind_Find_FDE (void *, struct dwarf_eh_bases *);
+typedef unsigned _Unwind_Address __attribute__((__mode__(__address__)));
+extern const fde * _Unwind_Find_FDE (_Unwind_Address, struct dwarf_eh_bases *);
 
 static inline int
 last_fde (struct object *obj __attribute__ ((__unused__)), const fde *f)

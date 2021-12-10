@@ -1266,6 +1266,8 @@ You would most commonly define this macro if the @code{allocate_stack}
 pattern needs to support both a 32- and a 64-bit mode.
 @end defmac
 
+@hook TARGET_CODE_ADDRESS_FROM_POINTER
+
 @hook TARGET_LIBGCC_CMP_RETURN_MODE
 
 @hook TARGET_LIBGCC_SHIFT_COUNT_MODE
