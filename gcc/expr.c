@@ -2129,10 +2129,36 @@ move_block_to_reg (int regno, rtx x, int nregs, machine_mode mode)
       else
 	delete_insns_since (last);
     }
-
-  for (int i = 0; i < nregs; i++)
+  /* First run all but the final iteration in word_mode.  */
+  for (int i = 0; i < nregs - 1; i++)
     emit_move_insn (gen_rtx_REG (word_mode, regno + i),
 		    operand_subword_force (x, i, mode));
+
+  /* Run the final iteration: For capability argets we need to take care here
+     to not over-read from memory. If the total size to move is greater than
+     the MEM_SIZE, then we have a tail that is smaller than word_mode, so
+     get the remainder and use extract_bit_field to load the tail into the reg.
+     Fot non-capability targets perform a standard move as in the loop
+     above.  */
+  int remainder;
+  poly_int64 q;
+  if (MEM_P (x) && CAPABILITY_MODE_P (GET_MODE (XEXP (x, 0)))
+      && MEM_SIZE_KNOWN_P (x)
+      && maybe_gt (nregs * GET_MODE_SIZE (word_mode), MEM_SIZE (x))
+      && can_div_trunc_p (MEM_SIZE (x), GET_MODE_SIZE (word_mode),
+			  &q, &remainder))
+   {
+      rtx return_reg = gen_rtx_REG (word_mode, regno + nregs - 1);
+      emit_move_insn (return_reg,
+		      extract_bit_field (x, remainder * BITS_PER_UNIT, 0, 0,
+					 0, remainder * BITS_PER_UNIT - 1,
+					 return_reg, word_mode, word_mode, 0,
+					 NULL));
+      return;
+   }
+   else
+    emit_move_insn (gen_rtx_REG (word_mode, regno + nregs - 1),
+		    operand_subword_force (x, nregs - 1, mode));
 }
 
 /* Copy all or part of a BLKmode value X out of registers starting at REGNO.
