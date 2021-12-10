@@ -202,9 +202,9 @@ struct target_regs {
   unsigned char x_hard_regno_nregs[FIRST_PSEUDO_REGISTER][MAX_MACHINE_MODE];
 
   /* For each hard register, the widest mode object that it can contain.
-     This will be a MODE_INT mode if the register can hold integers.  Otherwise
-     it will be a MODE_FLOAT or a MODE_CC mode, whichever is valid for the
-     register.  */
+     This will be a MODE_INT or MODE_CAPABILITY mode if the register can hold
+     integers or capabilities.  Otherwise it will be a MODE_FLOAT or a MODE_CC
+     mode, whichever is valid for the register.  */
   machine_mode x_reg_raw_mode[FIRST_PSEUDO_REGISTER];
 
   /* Vector indexed by machine mode saying whether there are regs of

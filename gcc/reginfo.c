@@ -561,12 +561,20 @@ choose_hard_reg_mode (unsigned int regno ATTRIBUTE_UNUSED,
   unsigned int /* machine_mode */ m;
   machine_mode found_mode = VOIDmode, mode;
 
-  /* We first look for the largest integer mode that can be validly
-     held in REGNO.  If none, we look for the largest floating-point mode.
-     If we still didn't find a valid mode, try CCmode.
+  /* We first look for the largest capability mode that can be validly
+     held in REGNO.  If none, we look for the largest integer mode, then
+     largest floating-point mode.  If we still didn't find a valid mode, try
+     CCmode.
 
      The tests use maybe_gt rather than known_gt because we want (for example)
      N V4SFs to win over plain V4SF even though N might be 1.  */
+  FOR_EACH_MODE_IN_CLASS (mode, MODE_CAPABILITY)
+    if (hard_regno_nregs (regno, mode) == nregs
+	&& targetm.hard_regno_mode_ok (regno, mode)
+	&& (!abi || !abi->clobbers_reg_p (mode, regno))
+	&& maybe_gt (GET_MODE_SIZE (mode), GET_MODE_SIZE (found_mode)))
+      found_mode = mode;
+
   FOR_EACH_MODE_IN_CLASS (mode, MODE_INT)
     if (hard_regno_nregs (regno, mode) == nregs
 	&& targetm.hard_regno_mode_ok (regno, mode)

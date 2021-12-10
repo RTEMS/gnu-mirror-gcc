@@ -625,6 +625,44 @@ extern unsigned aarch64_architecture_version;
 
 #define DWARF2_UNWIND_INFO 1
 
+/* When defining CFI unwinder register information we either choose to
+   represent `c` registers or `x` registers based on the ABI.  For purecap we
+   only represent `c` registers since saving and restoring those saves and
+   restores the entire register value.  For hybrid we only represent `x`
+   registers since those are the only part of the register that the PCS defines
+   as callee-saved.
+
+   DWARF has different register numbers for capability registers to standard
+   registers.  This means that the unwinder sees CFI descriptions of dwarf
+   registers 198-231 when we save and restore the `c` registers.  Rather than
+   add columns in the unwinder table, we re-use the entries that would
+   otherwise be used for the `x` registers.  Since these are not described in
+   purecap code they are not used
+
+   We only want to perform this transformation if it is necessary, so we do not
+   start treating invalid DWARF register numbers as valid ones.  The condition
+   with which to tell this is different whether the macro is being used in the
+   GCC context or in the libgcc context (this macro is used in both).
+   Hence we define one macro for the GCC context which makes a check at runtime
+   whether the user gave us a specific argument, and we define another macro
+   for the libgcc context that does not check anything at runtime but is
+   defined behind a compile-time check.
+
+   N.b. Mapping these `c` registers to the same columns as the `x` registers
+   could still work (as long as the unwinder agrees with this) if both `c` and
+   `x` registers were given unwind info.  This could work because of the same
+   overlapping between `x` and `c` registers that GCC relies on elsewhere.  */
+#ifdef IN_LIBGCC2
+#ifdef __CHERI_PURE_CAPABILITY__
+#define DWARF_REG_TO_UNWIND_COLUMN(REGNO) \
+  ((REGNO) >= 198 && (REGNO) <= 230) ? (REGNO) - 198 : (REGNO)
+#endif
+#else
+#define DWARF_REG_TO_UNWIND_COLUMN(REGNO) \
+  (TARGET_CAPABILITY_PURE && (REGNO) >= 198 && (REGNO) <= 230) \
+      ? (REGNO) - 198 : (REGNO)
+#endif
+
 /* Use R0 through R3 to pass exception handling information.  */
 #define EH_RETURN_DATA_REGNO(N) \
   ((N) < 4 ? ((unsigned int) R0_REGNUM + (N)) : INVALID_REGNUM)

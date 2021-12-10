@@ -531,6 +531,16 @@ static _Unwind_CapWord
 execute_stack_op (const unsigned char *op_ptr, const unsigned char *op_end,
 		  struct _Unwind_Context *context, _Unwind_CapWord initial)
 {
+  /* N.b. We make no account for capability architectures which unwind past
+     frames in both non-capabiilty mode and capability mode.  I.e. frames which
+     only work with (and hence only record) changes to non-capability registers
+     and frames which directly work with capability registers.
+
+     For such targets we would need to adjust the size of object that we read
+     into the DWARF stack depending on the frame -- for some frames we would
+     want to read an address-sized object, for others we woud want to read a
+     capability-sized object.  */
+
   _Unwind_CapWord stack[64];	/* ??? Assume this is enough.  */
   int stack_elt;
 
