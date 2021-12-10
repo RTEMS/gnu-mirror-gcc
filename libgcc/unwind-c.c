@@ -128,7 +128,8 @@ PERSONALITY_FUNCTION (int version,
 {
   lsda_header_info info;
   const unsigned char *language_specific_data, *p;
-  _Unwind_Ptr landing_pad, ip;
+  _Unwind_Ptr landing_pad, ip_ptr;
+  _Unwind_Address ip;
   int ip_before_insn = 0;
 
 #ifdef __ARM_EABI_UNWINDER__
@@ -139,8 +140,8 @@ PERSONALITY_FUNCTION (int version,
      function and LSDA pointers.  The ARM implementation caches these in
      the exception header (UCB).  To avoid rewriting everything we make a
      virtual scratch register point at the UCB.  */
-  ip = (_Unwind_Ptr) ue_header;
-  _Unwind_SetGR (context, UNWIND_POINTER_REG, ip);
+  ip_ptr = (_Unwind_Ptr) ue_header;
+  _Unwind_SetGR (context, UNWIND_POINTER_REG, ip_ptr);
 #else
   if (version != 1)
     return _URC_FATAL_PHASE1_ERROR;
@@ -160,10 +161,17 @@ PERSONALITY_FUNCTION (int version,
   /* Parse the LSDA header.  */
   p = parse_lsda_header (context, language_specific_data, &info);
 #ifdef HAVE_GETIPINFO
-  ip = _Unwind_GetIPInfo (context, &ip_before_insn);
+  ip_ptr = _Unwind_GetIPInfo (context, &ip_before_insn);
 #else
-  ip = _Unwind_GetIP (context);
+  ip_ptr = _Unwind_GetIP (context);
 #endif
+
+#ifdef __USING_SJLJ_EXCEPTIONS__
+  ip = (_Unwind_Address) ip_ptr;
+#else
+  ip = __builtin_code_address_from_pointer (ip_ptr);
+#endif
+
   if (! ip_before_insn)
     --ip;
   landing_pad = 0;
