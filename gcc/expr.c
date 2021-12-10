@@ -1718,11 +1718,17 @@ emit_block_move_hints (rtx x, rtx y, rtx size, enum block_op_methods method,
     }
   else if (might_overlap)
     *is_move_done = false;
-  else if (targetm.capability_mode().exists())
+  /* For targets that use capabilities and if the alignment is greater than or
+     equal to the alignment of capability_mode(), stop here and do not attempt
+     the below call to emit_block_move_via_loop, because it is not safe if any
+     capabilities are within the BLK data.
+     This is still safe for smaller alignments, because an alignment less than
+     natural capability alignment means that the struct does not contain any
+     capabilities, or, if it does, these are are focibly underaligned (in e.g.
+     a packed struct) and thus invalid and not dereferenceable.  */
+  else if (targetm.capability_mode().exists()
+	  && align >= get_mode_alignment (targetm.capability_mode().require()))
     {
-      /* For targets that use capabilities stop here and do not attempt the
-	 below call to emit_block_move_via_loop, because it is not safe if
-	 capabilities are within the BLK data.  */
 	if (is_move_done)
 	  *is_move_done = false;
 	return retval;
@@ -1744,8 +1750,11 @@ emit_block_move (rtx x, rtx y, rtx size, enum block_op_methods method)
     min = max = UINTVAL (size);
   else
     max = GET_MODE_MASK (GET_MODE (size));
-  return emit_block_move_hints (x, y, size, method, 0, -1,
-				min, max, max);
+  bool done = false;
+  rtx tmp = emit_block_move_hints (x, y, size, method, 0, -1,
+				   min, max, max, false, &done, false);
+  gcc_assert (done);
+  return tmp;
 }
 
 /* A subroutine of emit_block_move.  Returns true if calling the
@@ -1917,8 +1926,8 @@ emit_block_move_via_loop (rtx x, rtx y, rtx size,
 {
   rtx_code_label *cmp_label, *top_label;
   rtx iter, x_addr, y_addr, tmp;
-  machine_mode x_addr_mode = get_address_mode (x);
-  machine_mode y_addr_mode = get_address_mode (y);
+  scalar_addr_mode x_addr_mode = get_address_mode (x);
+  scalar_addr_mode y_addr_mode = get_address_mode (y);
   machine_mode iter_mode;
 
   iter_mode = GET_MODE (size);
@@ -1926,8 +1935,8 @@ emit_block_move_via_loop (rtx x, rtx y, rtx size,
     iter_mode = word_mode;
 
   gcc_assert (!CAPABILITY_MODE_P (iter_mode)
-	      && !CAPABILITY_MODE_P (x_addr_mode)
-	      && !CAPABILITY_MODE_P (y_addr_mode)
+	      && !CAPABILITY_MODE_P (GET_MODE (x))
+	      && !CAPABILITY_MODE_P (GET_MODE (y))
 	      && !CAPABILITY_MODE_P (GET_MODE (size)));
 
   top_label = gen_label_rtx ();
@@ -1943,12 +1952,14 @@ emit_block_move_via_loop (rtx x, rtx y, rtx size,
   emit_jump (cmp_label);
   emit_label (top_label);
 
-  tmp = convert_modes (x_addr_mode, iter_mode, iter, true);
-  x_addr = simplify_gen_binary (PLUS, x_addr_mode, x_addr, tmp);
+  tmp = convert_modes (noncapability_mode (x_addr_mode),
+		       iter_mode, iter, true);
+  x_addr = gen_pointer_plus (x_addr_mode, x_addr, tmp);
 
   if (x_addr_mode != y_addr_mode)
-    tmp = convert_modes (y_addr_mode, iter_mode, iter, true);
-  y_addr = simplify_gen_binary (PLUS, y_addr_mode, y_addr, tmp);
+    tmp = convert_modes (noncapability_mode (y_addr_mode),
+			 iter_mode, iter, true);
+  y_addr = gen_pointer_plus (y_addr_mode, y_addr, tmp);
 
   x = change_address (x, QImode, x_addr);
   y = change_address (y, QImode, y_addr);
