@@ -63,8 +63,11 @@ typedef struct
     } cfa_how;
   } regs;
 
-  /* The PC described by the current frame state.  */
-  void *pc;
+  /* The PC described by the current frame state.
+     This is read from the CFA data or FDE pc range.  Hence on capability
+     architectures it is an address rather than a pointer.  For non-capability
+     architectures _Unwind_Address is the same as a pointer.  */
+  _Unwind_Address pc;
 
   /* The information we care about from the CIE/FDE.  */
   _Unwind_Personality_Fn personality;

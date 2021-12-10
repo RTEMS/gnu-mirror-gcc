@@ -683,8 +683,8 @@ classify_object_over_fdes (struct object *ob, const fde *this_fde)
 	continue;
 
       count += 1;
-      if ((void *) pc_begin < ob->pc_begin)
-	ob->pc_begin = (void *) pc_begin;
+      if (pc_begin < ob->pc_begin)
+	ob->pc_begin = pc_begin;
     }
 
   return count;
@@ -727,7 +727,8 @@ add_fdes (struct object *ob, struct fde_accumulator *accu, const fde *this_fde)
 	}
       else
 	{
-	  _Unwind_Ptr pc_begin, mask;
+	  _Unwind_Ptr pc_begin;
+	  _Unwind_Address mask;
 
 	  read_encoded_value_with_base (encoding, base, this_fde->pc_begin,
 					&pc_begin);
@@ -835,7 +836,7 @@ linear_search_fdes (struct object *ob, const fde *this_fde, void *pc)
   for (; ! last_fde (ob, this_fde); this_fde = next_fde (this_fde))
     {
       const struct dwarf_cie *this_cie;
-      _Unwind_Address pc_begin, pc_range;
+      _Unwind_Ptr pc_begin, pc_range;
 
       /* Skip CIEs.  */
       if (this_fde->CIE_delta == 0)
@@ -933,7 +934,7 @@ binary_search_single_encoding_fdes (struct object *ob, void *pc)
     {
       size_t i = (lo + hi) / 2;
       const fde *f = vec->array[i];
-      _Unwind_Address pc_begin, pc_range;
+      _Unwind_Ptr pc_begin, pc_range;
       const unsigned char *p;
 
       p = read_encoded_value_with_base (encoding, base, f->pc_begin,
@@ -961,7 +962,7 @@ binary_search_mixed_encoding_fdes (struct object *ob, void *pc)
     {
       size_t i = (lo + hi) / 2;
       const fde *f = vec->array[i];
-      _Unwind_Address pc_begin, pc_range;
+      _Unwind_Ptr pc_begin, pc_range;
       const unsigned char *p;
       int encoding;
 
@@ -1095,7 +1096,7 @@ _Unwind_Find_FDE (void *pc, struct dwarf_eh_bases *bases)
 	encoding = get_fde_encoding (f);
       read_encoded_value_with_base (encoding, base_from_object (encoding, ob),
 				    f->pc_begin, &func);
-      bases->func = (void *) func;
+      bases->func = func;
     }
 
   return f;

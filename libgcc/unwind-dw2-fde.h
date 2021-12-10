@@ -137,7 +137,7 @@ struct dwarf_cie
   sword CIE_id;
   ubyte version;
   unsigned char augmentation[];
-} __attribute__ ((packed, aligned (__alignof__ (void *))));
+} __attribute__ ((packed, aligned (__alignof__ (uaddr))));
 
 /* The first few fields of an FDE.  */
 struct dwarf_fde
@@ -145,7 +145,7 @@ struct dwarf_fde
   uword length;
   sword CIE_delta;
   unsigned char pc_begin[];
-} __attribute__ ((packed, aligned (__alignof__ (void *))));
+} __attribute__ ((packed, aligned (__alignof__ (uaddr))));
 
 typedef struct dwarf_fde fde;
 

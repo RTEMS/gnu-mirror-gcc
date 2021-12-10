@@ -46,7 +46,9 @@ extern "C" {
 /* @@@ The IA-64 ABI uses uint64 throughout.  Most places this is
    inefficient for 32-bit and smaller machines.  */
 typedef unsigned _Unwind_Word __attribute__((__mode__(__unwind_word__)));
+typedef __UINTPTR_TYPE__ _Unwind_CapWord;
 typedef signed _Unwind_Sword __attribute__((__mode__(__unwind_word__)));
+typedef __INTPTR_TYPE__ _Unwind_CapSword;
 #if defined(__ia64__) && defined(__hpux__)
 typedef unsigned _Unwind_Ptr __attribute__((__mode__(__word__)));
 typedef unsigned _Unwind_Address __attribute__((__mode__(__word__)));
@@ -95,10 +97,10 @@ struct _Unwind_Exception
   _Unwind_Exception_Cleanup_Fn exception_cleanup;
 
 #if !defined (__USING_SJLJ_EXCEPTIONS__) && defined (__SEH__)
-  _Unwind_Word private_[6];
+  _Unwind_CapWord private_[6];
 #else
-  _Unwind_Word private_1;
-  _Unwind_Word private_2;
+  _Unwind_CapWord private_1;
+  _Unwind_CapWord private_2;
 #endif
 
   /* @@@ The IA-64 ABI says that this structure must be double-word aligned.
@@ -169,15 +171,15 @@ _Unwind_Backtrace (_Unwind_Trace_Fn, void *);
    the unwind library and the personality routine and landing pad.  Only
    selected registers may be manipulated.  */
 
-extern _Unwind_Word _Unwind_GetGR (struct _Unwind_Context *, int);
-extern void _Unwind_SetGR (struct _Unwind_Context *, int, _Unwind_Word);
+extern _Unwind_CapWord _Unwind_GetGR (struct _Unwind_Context *, int);
+extern void _Unwind_SetGR (struct _Unwind_Context *, int, _Unwind_CapWord);
 
 extern _Unwind_Ptr _Unwind_GetIP (struct _Unwind_Context *);
 extern _Unwind_Ptr _Unwind_GetIPInfo (struct _Unwind_Context *, int *);
 extern void _Unwind_SetIP (struct _Unwind_Context *, _Unwind_Ptr);
 
 /* @@@ Retrieve the CFA of the given context.  */
-extern _Unwind_Word _Unwind_GetCFA (struct _Unwind_Context *);
+extern _Unwind_CapWord _Unwind_GetCFA (struct _Unwind_Context *);
 
 extern void *_Unwind_GetLanguageSpecificData (struct _Unwind_Context *);
 
