@@ -593,6 +593,15 @@ execute_stack_op (const unsigned char *op_ptr, const unsigned char *op_end,
 	  break;
 
 	case DW_OP_addr:
+	  /* For capability architectures this is likely wrong.  The `op_ptr`
+	     will be unaligned, and the `.eh_frame` section is usually
+	     read-only (so the runtime will be unable to perform a relocation
+	     in it to give us a valid capability).
+	     Not much we can do here for such invalid Morello debug
+	     information.  Since this is somewhat experimental we crash rather
+	     than try to carry on.  If it gets seen by our users we'll look
+	     into why GCC is emitting such a directive.  The `read_pointer`
+	     call crashes for us.  */
 	  result = (_Unwind_CapWord) (_Unwind_Ptr) read_pointer (op_ptr);
 	  op_ptr += sizeof (void *);
 	  break;
@@ -853,8 +862,23 @@ execute_stack_op (const unsigned char *op_ptr, const unsigned char *op_end,
 	case DW_OP_gt:
 	case DW_OP_ne:
 	  {
-	    /* Binary operations.  */
-	    _Unwind_CapWord first, second;
+	    /* Binary operations.
+	       N.B. for capabilities this raises the question of where
+	       provenance should come from.  In this respect producer and
+	       consumer should both agree.
+
+	       This is not going to actually be a problem, for now we just
+	       choose the second item on the stack to take provenance from to
+	       avoid compiler warnings.
+
+	       MORELLO TODO Sort this out.
+		 While it would be nice to specify this, as it stands GCC does
+		 not emit unwind information which would end up here for
+		 Morello, and the unwind information it emits that ends up here
+		 for non-Morello architectures is done in the order that would
+		 satisfy the provenance choice above.  */
+	    _Unwind_CapWord second;
+	    _Unwind_Word first;
 	    gcc_assert (stack_elt >= 2);
 	    stack_elt -= 2;
 

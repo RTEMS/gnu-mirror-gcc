@@ -3341,6 +3341,13 @@ output_cfi (dw_cfi_ref cfi, dw_fde_ref fde, int for_eh)
 	case DW_CFA_def_cfa_expression:
 	case DW_CFA_expression:
 	case DW_CFA_val_expression:
+	  /* MORELLO Note that these expressions require the *first* operand
+	     put onto the stack to be where we want to take provenance from.
+	     It happens that this is already the case for all ways that we can
+	     get here.  However, it is still a new requirement that is very
+	     tricky to maintain given that most targets will not know about the
+	     requirement and we have nothing alerting us if the requirement is
+	     broken  */
 	  output_cfa_loc (cfi, for_eh);
 	  break;
 
@@ -3457,6 +3464,12 @@ output_cfi_directive (FILE *f, dw_cfi_ref cfi)
     case DW_CFA_def_cfa_expression:
     case DW_CFA_expression:
     case DW_CFA_val_expression:
+      /* MORELLO Note that these expressions require the *first* operand put
+	 onto the stack to be where we want to take provenance from.  It
+	 happens that this is already the case for all ways that we can get
+	 here.  However, it is still a new requirement that is very tricky to
+	 maintain given that most targets will not know about the requirement
+	 and we have nothing alerting us if the requirement is broken  */
       if (f != asm_out_file)
 	{
 	  fprintf (f, "\t.cfi_%scfa_%sexpression ...\n",
