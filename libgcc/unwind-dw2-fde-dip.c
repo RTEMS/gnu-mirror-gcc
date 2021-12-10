@@ -178,6 +178,7 @@ _Unwind_IteratePhdrCallback (struct dl_phdr_info *info, size_t size, void *ptr)
   struct object ob;
   _Unwind_Ptr pc_low = 0, pc_high = 0;
 
+  /* MORELLO TODO Update types here dlpi_addr should hold uintptr_t.  */
   struct ext_dl_phdr_info
     {
       ElfW(Addr) dlpi_addr;

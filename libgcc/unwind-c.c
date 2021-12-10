@@ -204,6 +204,8 @@ PERSONALITY_FUNCTION (int version,
     {
       _Unwind_Ptr cs_start, cs_len, cs_lp;
       _uleb128_t cs_action;
+      /* MORELLO TODO
+	 This is where we should handle the LSDA information.  */
 
       /* Note that all call-site encodings are "absolute" displacements.  */
       p = read_encoded_value (0, info.call_site_encoding, p, &cs_start);
@@ -217,7 +219,19 @@ PERSONALITY_FUNCTION (int version,
       else if (ip < info.Start + cs_start + cs_len)
 	{
 	  if (cs_lp)
-	    landing_pad = info.LPStart + cs_lp;
+	    {
+	      landing_pad = info.LPStart + cs_lp;
+#  ifdef __CHERI_PURE_CAPABILITY__
+	      /* MORELLO TODO temporary hack to use unmodified landing pad
+		 information.  The landing pad we calculate does not have the
+		 LSB set.  When we eventually implement the specified landing
+		 pad Morello information we'll be given a capability which
+		 correctly has the LSB set (and for that matter will be sealed,
+		 and will not be an offset from LPStart but a capability
+		 directly etc).  */
+	      landing_pad += 1;
+#  endif
+	    }
 	  goto found_something;
 	}
     }
