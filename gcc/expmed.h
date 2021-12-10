@@ -740,7 +740,8 @@ extern rtx expand_divmod (int, enum tree_code, machine_mode, rtx, rtx,
 extern void store_bit_field (rtx, poly_uint64, poly_uint64,
 			     poly_uint64, poly_uint64,
 			     machine_mode, rtx, bool);
-extern rtx extract_bit_field (rtx, poly_uint64, poly_uint64, int, rtx,
+extern rtx extract_bit_field (rtx, poly_uint64, poly_uint64, int,
+			      poly_uint64, poly_uint64, rtx,
 			      machine_mode, machine_mode, bool, rtx *);
 extern rtx extract_low_bits (machine_mode, machine_mode, rtx);
 extern rtx expand_mult (machine_mode, rtx, rtx, rtx, int, bool = false);

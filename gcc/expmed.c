@@ -71,18 +71,21 @@ static void store_split_bit_field (rtx, opt_scalar_int_mode,
 				   rtx, scalar_int_mode, bool);
 static rtx extract_integral_bit_field (rtx, opt_scalar_int_mode,
 				       unsigned HOST_WIDE_INT,
-				       unsigned HOST_WIDE_INT, int, rtx,
+				       unsigned HOST_WIDE_INT,
+				       poly_uint64, poly_uint64, int, rtx,
 				       machine_mode, machine_mode, bool, bool);
 static rtx extract_fixed_bit_field (machine_mode, rtx, opt_scalar_int_mode,
 				    unsigned HOST_WIDE_INT,
-				    unsigned HOST_WIDE_INT, rtx, int, bool);
+				    unsigned HOST_WIDE_INT, poly_uint64,
+				    poly_uint64, rtx, int, bool);
 static rtx extract_fixed_bit_field_1 (machine_mode, rtx, scalar_int_mode,
 				      unsigned HOST_WIDE_INT,
 				      unsigned HOST_WIDE_INT, rtx, int, bool);
 static rtx lshift_value (machine_mode, unsigned HOST_WIDE_INT, int);
 static rtx extract_split_bit_field (rtx, opt_scalar_int_mode,
 				    unsigned HOST_WIDE_INT,
-				    unsigned HOST_WIDE_INT, int, bool);
+				    unsigned HOST_WIDE_INT, poly_uint64,
+				    poly_uint64, int, bool);
 static void do_cmp_and_jump (rtx, rtx, enum rtx_code, machine_mode, rtx_code_label *);
 static rtx expand_smod_pow2 (scalar_int_mode, rtx, HOST_WIDE_INT);
 static rtx expand_sdiv_pow2 (scalar_int_mode, rtx, HOST_WIDE_INT);
@@ -975,8 +978,9 @@ store_integral_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 	  rtx value_word
 	    = fieldmode == BLKmode
 	      ? extract_bit_field (value, new_bitsize, wordnum * BITS_PER_WORD,
-				   1, NULL_RTX, word_mode, word_mode, false,
-				   NULL)
+				   1, wordnum * BITS_PER_WORD, bitregion_end,
+				   NULL_RTX, word_mode, word_mode,
+				   false, NULL)
 	      : operand_subword_force (value, wordnum, value_mode);
 
 	  if (!store_bit_field_1 (op0, new_bitsize,
@@ -1421,6 +1425,7 @@ store_split_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 	    part = extract_fixed_bit_field (word_mode, value, value_mode,
 					    thissize,
 					    bitsize - bitsdone - thissize,
+					    bitregion_start, bitregion_end,
 					    NULL_RTX, 1, false);
 	  else
 	    /* The args are chosen so that the last part includes the
@@ -1429,6 +1434,7 @@ store_split_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 	    part = extract_fixed_bit_field (word_mode, value, value_mode,
 					    thissize,
 					    total_bits - bitsize + bitsdone,
+					    bitregion_start, bitregion_end,
 					    NULL_RTX, 1, false);
 	}
       else
@@ -1443,11 +1449,13 @@ store_split_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 	    part = extract_fixed_bit_field (word_mode, value, value_mode,
 					    thissize,
 					    total_bits - bitsdone - thissize,
+					    bitregion_start, bitregion_end,
 					    NULL_RTX, 1, false);
 	  else
 	    part = extract_fixed_bit_field (word_mode, value, value_mode,
-					    thissize, bitsdone, NULL_RTX,
-					    1, false);
+					    thissize, bitsdone,
+					    bitregion_start, bitregion_end,
+					    NULL_RTX, 1, false);
 	}
 
       /* If OP0 is a register, then handle OFFSET here.  */
@@ -1616,6 +1624,7 @@ extract_bit_field_as_subreg (machine_mode mode, rtx op0,
 
 static rtx
 extract_bit_field_1 (rtx str_rtx, poly_uint64 bitsize, poly_uint64 bitnum,
+		     poly_uint64 bitregion_start, poly_uint64 bitregion_end,
 		     int unsignedp, rtx target, machine_mode mode,
 		     machine_mode tmode, bool reverse, bool fallback_p,
 		     rtx *alt_rtl)
@@ -1845,7 +1854,8 @@ extract_bit_field_1 (rtx str_rtx, poly_uint64 bitsize, poly_uint64 bitnum,
 
   /* From here on we need to be looking at a fixed-size insertion.  */
   return extract_integral_bit_field (op0, op0_mode, bitsize.to_constant (),
-				     bitnum.to_constant (), unsignedp,
+				     bitnum.to_constant (), bitregion_start,
+				     bitregion_end, unsignedp,
 				     target, mode, tmode, reverse, fallback_p);
 }
 
@@ -1857,7 +1867,9 @@ extract_bit_field_1 (rtx str_rtx, poly_uint64 bitsize, poly_uint64 bitnum,
 static rtx
 extract_integral_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 			    unsigned HOST_WIDE_INT bitsize,
-			    unsigned HOST_WIDE_INT bitnum, int unsignedp,
+			    unsigned HOST_WIDE_INT bitnum,
+			    poly_uint64 bitregion_start,
+			    poly_uint64 bitregion_end, int unsignedp,
 			    rtx target, machine_mode mode, machine_mode tmode,
 			    bool reverse, bool fallback_p)
 {
@@ -1909,7 +1921,8 @@ extract_integral_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 	  rtx result_part
 	    = extract_bit_field_1 (op0, MIN (BITS_PER_WORD,
 					     bitsize - i * BITS_PER_WORD),
-				   bitnum + bit_offset, 1, target_part,
+				   bitnum + bit_offset, bitregion_start,
+				   bitregion_end, 1, target_part,
 				   mode, word_mode, reverse, fallback_p, NULL);
 
 	  gcc_assert (target_part);
@@ -1958,6 +1971,7 @@ extract_integral_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 	  if (!fallback_p)
 	    return NULL_RTX;
 	  target = extract_split_bit_field (op0, op0_mode, bitsize, bitnum,
+					    bitregion_start, bitregion_end,
 					    unsignedp, reverse);
 	  return convert_extracted_bit_field (target, mode, tmode, unsignedp);
 	}
@@ -2009,11 +2023,13 @@ extract_integral_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 	 bitfield from that.  */
       unsigned HOST_WIDE_INT bitpos;
       rtx xop0 = adjust_bit_field_mem_for_reg (pattern, op0, bitsize, bitnum,
-					       0, 0, tmode, &bitpos);
+					       bitregion_start, bitregion_end,
+					       tmode, &bitpos);
       if (xop0)
 	{
 	  xop0 = copy_to_reg (xop0);
 	  rtx result = extract_bit_field_1 (xop0, bitsize, bitpos,
+					    bitregion_start, bitregion_end,
 					    unsignedp, target,
 					    mode, tmode, reverse, false, NULL);
 	  if (result)
@@ -2034,7 +2050,8 @@ extract_integral_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
     int_mode = int_mode_for_mode (mode).require ();
 
   target = extract_fixed_bit_field (int_mode, op0, op0_mode, bitsize,
-				    bitnum, target, unsignedp, reverse);
+				    bitnum, bitregion_start, bitregion_end,
+				    target, unsignedp, reverse);
 
   /* Complex values must be reversed piecewise, so we need to undo the global
      reversal, convert to the complex mode and reverse again.  */
@@ -2073,7 +2090,8 @@ extract_integral_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 
 rtx
 extract_bit_field (rtx str_rtx, poly_uint64 bitsize, poly_uint64 bitnum,
-		   int unsignedp, rtx target, machine_mode mode,
+		   int unsignedp, poly_uint64 bitregion_start,
+		   poly_uint64 bitregion_end, rtx target, machine_mode mode,
 		   machine_mode tmode, bool reverse, rtx *alt_rtl)
 {
   machine_mode mode1;
@@ -2092,7 +2110,7 @@ extract_bit_field (rtx str_rtx, poly_uint64 bitsize, poly_uint64 bitnum,
       && bitnum.is_constant (&ibitnum)
       && is_a <scalar_int_mode> (mode1, &int_mode)
       && strict_volatile_bitfield_p (str_rtx, ibitsize, ibitnum,
-				     int_mode, 0, 0))
+				     int_mode, bitregion_start, bitregion_end))
     {
       /* Extraction of a full INT_MODE value can be done with a simple load.
 	 We know here that the field can be accessed with one single
@@ -2112,11 +2130,38 @@ extract_bit_field (rtx str_rtx, poly_uint64 bitsize, poly_uint64 bitnum,
 				      &ibitnum);
       gcc_assert (ibitnum + ibitsize <= GET_MODE_BITSIZE (int_mode));
       str_rtx = copy_to_reg (str_rtx);
-      return extract_bit_field_1 (str_rtx, ibitsize, ibitnum, unsignedp,
+      return extract_bit_field_1 (str_rtx, ibitsize, ibitnum, bitregion_start,
+				  bitregion_end, unsignedp,
 				  target, mode, tmode, reverse, true, alt_rtl);
     }
 
-  return extract_bit_field_1 (str_rtx, bitsize, bitnum, unsignedp,
+  /* If bitregion_start has been set to a value, then we are compiling for a
+     target that limits memory accesses to tight bounds so we must not touch
+     bits outside the bit region.  Adjust the address to start at the beginning of the
+     bit region.  */
+  if (MEM_P (str_rtx) && maybe_ne (bitregion_start, 0U))
+    {
+      scalar_int_mode best_mode;
+      machine_mode addr_mode = VOIDmode;
+
+      poly_uint64 offset = exact_div (bitregion_start, BITS_PER_UNIT);
+      bitnum -= bitregion_start;
+      poly_int64 size = bits_to_bytes_round_up (bitnum + bitsize);
+      bitregion_end -= bitregion_start;
+      bitregion_start = 0;
+      if (bitsize.is_constant (&ibitsize)
+	  && bitnum.is_constant (&ibitnum)
+	  && get_best_mode (ibitsize, ibitnum,
+			    bitregion_start, bitregion_end,
+			    MEM_ALIGN (str_rtx), INT_MAX,
+			    MEM_VOLATILE_P (str_rtx), &best_mode))
+	addr_mode = best_mode;
+      str_rtx = adjust_bitfield_address_size (str_rtx, addr_mode,
+					      offset, size);
+    }
+
+  return extract_bit_field_1 (str_rtx, bitsize, bitnum, bitregion_start,
+			      bitregion_end, unsignedp,
 			      target, mode, tmode, reverse, true, alt_rtl);
 }
 
@@ -2135,17 +2180,27 @@ static rtx
 extract_fixed_bit_field (machine_mode tmode, rtx op0,
 			 opt_scalar_int_mode op0_mode,
 			 unsigned HOST_WIDE_INT bitsize,
-			 unsigned HOST_WIDE_INT bitnum, rtx target,
+			 unsigned HOST_WIDE_INT bitnum,
+			 poly_uint64 bitregion_start,
+			 poly_uint64 bitregion_end, rtx target,
 			 int unsignedp, bool reverse)
 {
   scalar_int_mode mode;
   if (MEM_P (op0))
     {
-      if (!get_best_mode (bitsize, bitnum, 0, 0, MEM_ALIGN (op0),
-			  BITS_PER_WORD, MEM_VOLATILE_P (op0), &mode))
+      unsigned int max_bitsize = BITS_PER_WORD;
+      scalar_int_mode imode;
+      if (op0_mode.exists (&imode) && GET_MODE_BITSIZE (imode) < max_bitsize
+	  && maybe_ne (bitregion_end, 0U))
+	max_bitsize = GET_MODE_BITSIZE (imode);
+
+      if (!get_best_mode (bitsize, bitnum, bitregion_start, bitregion_end,
+			  MEM_ALIGN (op0), max_bitsize, MEM_VOLATILE_P (op0),
+			  &mode))
 	/* The only way this should occur is if the field spans word
 	   boundaries.  */
 	return extract_split_bit_field (op0, op0_mode, bitsize, bitnum,
+					bitregion_start, bitregion_end,
 					unsignedp, reverse);
 
       op0 = narrow_bit_field_mem (op0, mode, bitsize, bitnum, &bitnum);
@@ -2263,7 +2318,10 @@ lshift_value (machine_mode mode, unsigned HOST_WIDE_INT value,
 static rtx
 extract_split_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 			 unsigned HOST_WIDE_INT bitsize,
-			 unsigned HOST_WIDE_INT bitpos, int unsignedp,
+			 unsigned HOST_WIDE_INT bitpos,
+			 poly_uint64 bitregion_start,
+			 poly_uint64 bitregion_end,
+			 int unsignedp,
 			 bool reverse)
 {
   unsigned int unit;
@@ -2278,6 +2336,13 @@ extract_split_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
   else
     unit = MIN (MEM_ALIGN (op0), BITS_PER_WORD);
 
+  /* For capability targets, if OP0 is a memory with a mode,
+     then UNIT must not be larger than OP0's mode as well.
+     Otherwise, extract_fixed_bit_field will call us
+     again, and we will mutually recurse forever.  */
+  if (MEM_P (op0) && op0_mode.exists () && maybe_ne (bitregion_end, 0U))
+    unit = MIN (unit, GET_MODE_BITSIZE (op0_mode.require ()));
+
   while (bitsdone < bitsize)
     {
       unsigned HOST_WIDE_INT thissize;
@@ -2287,6 +2352,19 @@ extract_split_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 
       offset = (bitpos + bitsdone) / unit;
       thispos = (bitpos + bitsdone) % unit;
+
+      /* For capability targets the region of bytes we can read is restricted
+	 by the capability bounds, so we must decrease UNIT close to the end
+	 of the region as needed.  */
+      if (maybe_ne (bitregion_end, 0U)
+	  && unit > BITS_PER_UNIT
+	  && maybe_gt (bitpos + bitsdone - thispos + unit, bitregion_end + 1)
+	  && !REG_P (op0)
+	  && (GET_CODE (op0) != SUBREG || !REG_P (SUBREG_REG (op0))))
+	{
+	  unit = unit / 2;
+	  continue;
+	}
 
       /* THISSIZE must not overrun a word boundary.  Otherwise,
 	 extract_fixed_bit_field will call us again, and we will mutually
@@ -2309,7 +2387,8 @@ extract_split_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 	 OFFSET is in UNITs, and UNIT is in bits.  */
       part = extract_fixed_bit_field (word_mode, op0_piece, op0_piece_mode,
 				      thissize, offset * unit + thispos,
-				      0, 1, reverse);
+				      bitregion_start, bitregion_end,
+				      NULL_RTX, 1, reverse);
       bitsdone += thissize;
 
       /* Shift this part into place for the result.  */

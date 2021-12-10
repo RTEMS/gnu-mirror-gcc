@@ -1192,7 +1192,7 @@ store_unaligned_arguments_into_pseudos (struct arg_data *args, int num_actuals)
 	    int bitsize = MIN (bytes * BITS_PER_UNIT, BITS_PER_WORD);
 
 	    args[i].aligned_regs[j] = reg;
-	    word = extract_bit_field (word, bitsize, 0, 1, NULL_RTX,
+	    word = extract_bit_field (word, bitsize, 0, 1, 0, 0, NULL_RTX,
 				      word_mode, word_mode, false, NULL);
 
 	    /* There is no need to restrict this code to loading items
@@ -3130,8 +3130,8 @@ load_register_parameters (struct arg_data *args, int num_actuals,
 		  rtx dest = gen_rtx_REG (word_mode, REGNO (reg) + nregs - 1);
 		  unsigned int bitoff = (nregs - 1) * BITS_PER_WORD;
 		  unsigned int bitsize = const_size * BITS_PER_UNIT - bitoff;
-		  rtx x = extract_bit_field (mem, bitsize, bitoff, 1, dest,
-					     word_mode, word_mode, false,
+		  rtx x = extract_bit_field (mem, bitsize, bitoff, 1, 0, 0,
+					     dest, word_mode, word_mode, false,
 					     NULL);
 		  if (BYTES_BIG_ENDIAN)
 		    x = expand_shift (LSHIFT_EXPR, word_mode, x,

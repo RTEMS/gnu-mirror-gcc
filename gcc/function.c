@@ -3322,7 +3322,7 @@ assign_parm_setup_reg (struct assign_parm_data_all *all, tree parm,
       else
 	rtl = parmreg = extract_bit_field (validated_mem,
 			GET_MODE_BITSIZE (promoted_nominal_mode), 0,
-			unsignedp, parmreg,
+			unsignedp, 0, 0, parmreg,
 			promoted_nominal_mode, VOIDmode, false, NULL);
     }
   else

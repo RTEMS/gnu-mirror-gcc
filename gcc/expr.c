@@ -2288,6 +2288,8 @@ emit_group_load_1 (rtx *tmps, rtx dst, rtx orig_src, tree type,
       poly_int64 bytepos = rtx_to_poly_int64 (XEXP (XVECEXP (dst, 0, i), 1));
       poly_int64 bytelen = GET_MODE_SIZE (mode);
       poly_int64 shift = 0;
+      poly_int64 bitregion_start = 0;
+      poly_int64 bitregion_end = 0;
 
       /* Handle trailing fragments that run over the size of the struct.
 	 It's the target's responsibility to make sure that the fragment
@@ -2308,7 +2310,12 @@ emit_group_load_1 (rtx *tmps, rtx dst, rtx orig_src, tree type,
 	      )
 	    shift = (bytelen - (ssize - bytepos)) * BITS_PER_UNIT;
 	  bytelen = ssize - bytepos;
-	  gcc_assert (maybe_gt (bytelen, 0));
+	  if (MEM_P (orig_src)
+	      && CAPABILITY_MODE_P (GET_MODE (XEXP (orig_src, 0))))
+	  {
+	    bitregion_start = bytepos * BITS_PER_UNIT;
+	    bitregion_end = (bytepos + bytelen) * BITS_PER_UNIT - 1;
+	  }
 	}
 
       /* If we won't be loading directly from memory, protect the real source
@@ -2364,8 +2371,9 @@ emit_group_load_1 (rtx *tmps, rtx dst, rtx orig_src, tree type,
 		      && (!REG_P (tmps[i]) || GET_MODE (tmps[i]) != mode)))
 		tmps[i] = extract_bit_field (tmps[i], bytelen * BITS_PER_UNIT,
 					     subpos * BITS_PER_UNIT,
-					     1, NULL_RTX, mode, mode, false,
-					     NULL);
+					     1, bitregion_start, bitregion_end,
+					     NULL_RTX, mode, mode,
+					     false, NULL);
 	    }
 	  else
 	    {
@@ -2375,8 +2383,9 @@ emit_group_load_1 (rtx *tmps, rtx dst, rtx orig_src, tree type,
 	      mem = assign_stack_temp (GET_MODE (src), slen);
 	      emit_move_insn (mem, src);
 	      tmps[i] = extract_bit_field (mem, bytelen * BITS_PER_UNIT,
-					   0, 1, NULL_RTX, mode, mode, false,
-					   NULL);
+					   0, 1, bitregion_start, bitregion_end,
+					   NULL_RTX, mode, mode,
+					   false, NULL);
 	    }
 	}
       /* FIXME: A SIMD parallel will eventually lead to a subreg of a
@@ -2416,8 +2425,9 @@ emit_group_load_1 (rtx *tmps, rtx dst, rtx orig_src, tree type,
 	tmps[i] = src;
       else
 	tmps[i] = extract_bit_field (src, bytelen * BITS_PER_UNIT,
-				     bytepos * BITS_PER_UNIT, 1, NULL_RTX,
-				     mode, mode, false, NULL);
+				     bytepos * BITS_PER_UNIT, 1,
+				     bitregion_start, bitregion_end,
+				     NULL_RTX, mode, mode, false, NULL);
 
       if (maybe_ne (shift, 0))
 	tmps[i] = expand_shift (LSHIFT_EXPR, mode, tmps[i],
@@ -2881,7 +2891,7 @@ copy_blkmode_from_reg (rtx target, rtx srcreg, tree type)
 	 bitpos for the destination store (left justified).  */
       store_bit_field (dst, bitsize, bitpos % BITS_PER_WORD, 0, 0, copy_mode,
 		       extract_bit_field (src, bitsize,
-					  xbitpos % BITS_PER_WORD, 1,
+					  xbitpos % BITS_PER_WORD, 1, 0, 0,
 					  NULL_RTX, copy_mode, copy_mode,
 					  false, NULL),
 		       false);
@@ -2983,7 +2993,7 @@ copy_blkmode_to_reg (machine_mode mode_in, tree src)
       store_bit_field (dst_word, bitsize, xbitpos % BITS_PER_WORD,
 		       0, 0, word_mode,
 		       extract_bit_field (src_word, bitsize,
-					  bitpos % BITS_PER_WORD, 1,
+					  bitpos % BITS_PER_WORD, 1, 0, 0,
 					  NULL_RTX, word_mode, word_mode,
 					  false, NULL),
 		       false);
@@ -3433,7 +3443,7 @@ read_complex_part (rtx cplx, bool imag_p)
     }
 
   return extract_bit_field (cplx, ibitsize, imag_p ? ibitsize : 0,
-			    true, NULL_RTX, imode, imode, false, NULL);
+			    true, 0, 0, NULL_RTX, imode, imode, false, NULL);
 }
 
 /* A subroutine of emit_move_insn_1.  Yet another lowpart generator.
@@ -7380,7 +7390,8 @@ store_field (rtx target, poly_int64 bitsize, poly_int64 bitpos,
       if (GET_MODE (temp) == BLKmode && known_le (bitsize, BITS_PER_WORD))
 	{
 	  temp_mode = smallest_int_mode_for_size (bitsize);
-	  temp = extract_bit_field (temp, bitsize, 0, 1, NULL_RTX, temp_mode,
+	  temp = extract_bit_field (temp, bitsize, 0, 1, bitregion_start,
+				    bitregion_end, NULL_RTX, temp_mode,
 				    temp_mode, false, NULL);
 	}
 
@@ -8697,7 +8708,7 @@ expand_misaligned_mem_ref (rtx temp, machine_mode mode, int unsignedp,
     }
   else if (targetm.slow_unaligned_access (mode, align))
     temp = extract_bit_field (temp, GET_MODE_BITSIZE (mode),
-			      0, unsignedp, target,
+			      0, unsignedp, 0, 0, target,
 			      mode, mode, false, alt_rtl);
   return temp;
 }
@@ -11025,6 +11036,8 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 				 &unsignedp, &reversep, &volatilep);
 	rtx orig_op0, memloc;
 	bool clear_mem_expr = false;
+      poly_uint64 bitregion_start = 0;
+      poly_uint64 bitregion_end = 0;
 
 	/* If we got back the original object, something is wrong.  Perhaps
 	   we are evaluating an expression too early.  In any event, don't
@@ -11045,6 +11058,24 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 			      VOIDmode,
 			      modifier == EXPAND_SUM ? EXPAND_NORMAL : modifier,
 			      NULL, true);
+
+      /* For capability targets there is a need to limit the memory access to
+	 the bounds of the struct or union.  For bit fields in a struct use
+	 get_bit_range and for other cases fall back to a sensible alternative
+	 based on MEM_SIZE.  This needs to be done here, before
+	 op0 gets modified in a way that increases the MEM_SIZE.  */
+      if (MEM_P (op0) && CAPABILITY_MODE_P (GET_MODE (XEXP (op0, 0)))
+	  && TREE_CODE (exp) == COMPONENT_REF
+	  && DECL_BIT_FIELD_TYPE (TREE_OPERAND (exp, 1))
+	  && DECL_BIT_FIELD_REPRESENTATIVE (TREE_OPERAND (exp, 1)))
+	get_bit_range (&bitregion_start, &bitregion_end, exp, &bitpos,
+		       &offset);
+      else if (MEM_P (op0) && MEM_SIZE_KNOWN_P (op0)
+	       && CAPABILITY_MODE_P (GET_MODE (XEXP (op0, 0))))
+	{
+	  bitregion_start = force_align_down (bitpos, BITS_PER_UNIT);
+	  bitregion_end = MEM_SIZE (op0) * BITS_PER_UNIT - 1;
+	}
 
 	/* If the field has a mode, we want to access it in the
 	   field's mode, not the computed mode.
@@ -11194,6 +11225,9 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 		&& MEM_ALIGN (op0) >= GET_MODE_ALIGNMENT (mode1))
 	      {
 		op0 = adjust_address (op0, mode1, bytepos);
+		bitregion_start = 0;
+		if (known_ge (bitregion_end, poly_uint64 (bitpos)))
+		  bitregion_end -= bitpos;
 		bitpos = 0;
 	      }
 
@@ -11328,6 +11362,7 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 
 	    gcc_checking_assert (known_ge (bitpos, 0));
 	    op0 = extract_bit_field (op0, bitsize, bitpos, unsignedp,
+				     bitregion_start, bitregion_end,
 				     (modifier == EXPAND_STACK_PARM
 				      ? NULL_RTX : target),
 				     ext_mode, ext_mode, reversep, alt_rtl);
@@ -11566,7 +11601,7 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
       /* If the output type is a bit-field type, do an extraction.  */
       else if (reduce_bit_field)
 	return extract_bit_field (op0, TYPE_PRECISION (type), 0,
-				  TYPE_UNSIGNED (type), NULL_RTX,
+				  TYPE_UNSIGNED (type), 0, 0, NULL_RTX,
 				  mode, mode, false, NULL);
       /* As a last resort, spill op0 to memory, and reload it in a
 	 different mode.  */
