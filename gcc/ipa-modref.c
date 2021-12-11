@@ -869,6 +869,76 @@ parm_map_for_ptr (tree op)
   return parm_map;
 }
 
+/* Return true if ARG with EAF flags FLAGS can not make any caller's parameter
+   used even if they are not escaped.  */
+
+static bool
+verify_arg (tree arg, int flags, bool use_escape, bool load)
+{
+  if (flags & EAF_UNUSED)
+    return true;
+  if (load && (flags & EAF_NO_DIRECT_READ))
+    return true;
+  if (!load
+      && (flags & (EAF_NO_DIRECT_CLOBBER | EAF_NO_INDIRECT_CLOBBER))
+	  == (EAF_NO_DIRECT_CLOBBER | EAF_NO_INDIRECT_CLOBBER))
+    return true;
+  if (use_escape && !(flags & (EAF_NO_DIRECT_ESCAPE | EAF_NO_INDIRECT_ESCAPE)))
+    return true;
+  if (is_gimple_constant (arg))
+    return true;
+  if (DECL_P (arg) && TREE_READONLY (arg))
+    return true;
+  if (TREE_CODE (arg) == ADDR_EXPR)
+    {
+      tree t = get_base_address (TREE_OPERAND (arg, 0));
+      if (is_gimple_constant (t))
+	return true;
+      if (DECL_P (t)
+	  && (TREE_READONLY (t) || TREE_CODE (t) == FUNCTION_DECL))
+	return true;
+    }
+  return false;
+}
+
+/* Return true if STMT may access memory that is pointed to by parameters
+   of caller and which is not seen as an escape by PTA.  */
+
+static bool
+may_access_nonescaping_parm_p (gcall *call, int callee_ecf_flags,
+			       bool use_escape, bool load)
+{
+  int implicit_flags = 0;
+  tree callee = gimple_call_fndecl (call);
+
+  /* Do not use escape info when it may get imroved: that is when we
+     run in IPA mode, or call is indirect (and may be promoted to direct)
+     or call is recursive.  */
+  if (!callee)
+    use_escape = false;
+  else if (recursive_call_p (current_function_decl, callee))
+    use_escape = false;
+
+  if (ignore_stores_p (current_function_decl, callee_ecf_flags))
+    implicit_flags |= ignore_stores_eaf_flags;
+  if (callee_ecf_flags & ECF_PURE)
+    implicit_flags |= implicit_pure_eaf_flags;
+  if (callee_ecf_flags & (ECF_CONST | ECF_NOVOPS))
+    implicit_flags |= implicit_const_eaf_flags;
+  if (gimple_call_chain (call)
+      && !verify_arg (gimple_call_chain (call),
+		      gimple_call_static_chain_flags (call) | implicit_flags,
+		      use_escape, load))
+    return true;
+  for (unsigned int i = 0; i < gimple_call_num_args (call); i++)
+    if (!verify_arg (gimple_call_arg (call, i),
+		     gimple_call_arg_flags (call, i) | implicit_flags,
+		     use_escape, load))
+      return true;
+  return false;
+}
+
+
 /* Analyze memory accesses (loads, stores and kills) performed
    by the function.  Set also side_effects, calls_interposable
    and nondeterminism flags.  */
@@ -1195,7 +1265,8 @@ modref_access_analysis::merge_call_side_effects
 	 (gimple *stmt, modref_summary *callee_summary,
 	  cgraph_node *callee_node, bool record_adjustments)
 {
-  int flags = gimple_call_flags (stmt);
+  gcall *call = as_a <gcall *> (stmt);
+  int flags = gimple_call_flags (call);
 
   /* Nothing to do for non-looping cont functions.  */
   if ((flags & (ECF_CONST | ECF_NOVOPS))
@@ -1258,10 +1329,10 @@ modref_access_analysis::merge_call_side_effects
     fprintf (dump_file, "   Parm map:");
 
   auto_vec <modref_parm_map, 32> parm_map;
-  parm_map.safe_grow_cleared (gimple_call_num_args (stmt), true);
-  for (unsigned i = 0; i < gimple_call_num_args (stmt); i++)
+  parm_map.safe_grow_cleared (gimple_call_num_args (call), true);
+  for (unsigned i = 0; i < gimple_call_num_args (call); i++)
     {
-      parm_map[i] = parm_map_for_ptr (gimple_call_arg (stmt, i));
+      parm_map[i] = parm_map_for_ptr (gimple_call_arg (call, i));
       if (dump_file)
 	{
 	  fprintf (dump_file, " %i", parm_map[i].parm_index);
@@ -1275,9 +1346,9 @@ modref_access_analysis::merge_call_side_effects
     }
 
   modref_parm_map chain_map;
-  if (gimple_call_chain (stmt))
+  if (gimple_call_chain (call))
     {
-      chain_map = parm_map_for_ptr (gimple_call_chain (stmt));
+      chain_map = parm_map_for_ptr (gimple_call_chain (call));
       if (dump_file)
 	{
 	  fprintf (dump_file, "static chain %i", chain_map.parm_index);
@@ -1297,7 +1368,7 @@ modref_access_analysis::merge_call_side_effects
   if (m_always_executed
       && callee_summary->kills.length ()
       && (!cfun->can_throw_non_call_exceptions
-	  || !stmt_could_throw_p (cfun, stmt)))
+	  || !stmt_could_throw_p (cfun, call)))
     {
       /* Watch for self recursive updates.  */
       auto_vec<modref_access_node, 32> saved_kills;
@@ -1330,14 +1401,18 @@ modref_access_analysis::merge_call_side_effects
   changed |= m_summary->loads->merge (current_function_decl,
 				      callee_summary->loads,
 				      &parm_map, &chain_map,
-				      record_adjustments);
+				      record_adjustments,
+				      !may_access_nonescaping_parm_p
+					 (call, flags, !m_ipa, true));
   /* Merge in stores.  */
   if (!ignore_stores_p (current_function_decl, flags))
     {
       changed |= m_summary->stores->merge (current_function_decl,
 					   callee_summary->stores,
 					   &parm_map, &chain_map,
-					   record_adjustments);
+					   record_adjustments,
+					   !may_access_nonescaping_parm_p
+					       (call, flags, !m_ipa, false));
       if (!m_summary->writes_errno
 	  && callee_summary->writes_errno)
 	{
@@ -1385,58 +1460,6 @@ modref_access_analysis::get_access_for_fnspec (gcall *call, attr_fnspec &fnspec,
     }
   return a;
 }
-
-/* Return true if ARG with EAF flags FLAGS can not make any caller's parameter
-   used even if they are not escaped.  */
-
-static bool
-verify_arg (tree arg, int flags)
-{
-  if (flags & EAF_UNUSED)
-    return true;
-  if (!(flags & (EAF_NO_DIRECT_ESCAPE | EAF_NO_INDIRECT_ESCAPE)))
-    return true;
-  if (is_gimple_constant (arg))
-    return true;
-  if (DECL_P (arg) && TREE_READONLY (arg))
-    return true;
-  if (TREE_CODE (arg) == ADDR_EXPR)
-    {
-      tree t = get_base_address (TREE_OPERAND (arg, 0));
-      if (is_gimple_constant (t))
-	return true;
-      if (DECL_P (t)
-	  && (TREE_READONLY (t) || TREE_CODE (t) == FUNCTION_DECL))
-	return true;
-    }
-  return false;
-}
-
-/* Return true if STMT may access memory that is pointed to by parameters
-   of caller and which is not seen as an escape by PTA.  */
-
-static bool
-may_access_nonescaping_parm_p (gcall *call, int callee_ecf_flags)
-{
-  int implicit_flags = false;
-
-  if (ignore_stores_p (current_function_decl, callee_ecf_flags))
-    implicit_flags |= ignore_stores_eaf_flags;
-  if (callee_ecf_flags & ECF_PURE)
-    implicit_flags |= implicit_pure_eaf_flags;
-  if (callee_ecf_flags & (ECF_CONST | ECF_NOVOPS))
-    implicit_flags |= implicit_const_eaf_flags;
-  if (gimple_call_chain (call)
-      && !verify_arg (gimple_call_chain (call),
-		      gimple_call_static_chain_flags (call) | implicit_flags))
-    return true;
-  for (unsigned int i = 0; i < gimple_call_num_args (call); i++)
-    if (!verify_arg (gimple_call_arg (call, i),
-		     gimple_call_arg_flags (call, i) | implicit_flags))
-      return true;
-  return false;
-}
-
 /* Apply side effects of call STMT to CUR_SUMMARY using FNSPEC.
    If IGNORE_STORES is true ignore them.
    Return false if no useful summary can be produced.   */
@@ -1471,12 +1494,18 @@ modref_access_analysis::process_fnspec (gcall *call)
 		 IDENTIFIER_POINTER (DECL_NAME (gimple_call_fndecl (call))));
       if (!ignore_stores_p (current_function_decl, flags))
 	{
-	  record_global_memory_store ();
-	  record_global_memory_load ();
+	  if (!may_access_nonescaping_parm_p (call, flags, !m_ipa, false))
+	    record_global_memory_store ();
+	  else
+	    record_unknown_store ();
+	  if (!may_access_nonescaping_parm_p (call, flags, !m_ipa, true))
+	    record_global_memory_load ();
+	  else
+	    record_unknown_load ();
 	}
       else
 	{
-	  if (!may_access_nonescaping_parm_p (call, flags))
+	  if (!may_access_nonescaping_parm_p (call, flags, !m_ipa, true))
 	    record_global_memory_load ();
 	  else
 	    record_unknown_load ();
@@ -1486,7 +1515,7 @@ modref_access_analysis::process_fnspec (gcall *call)
   /* Process fnspec.  */
   if (fnspec.global_memory_read_p ())
     {
-      if (may_access_nonescaping_parm_p (call, flags))
+      if (may_access_nonescaping_parm_p (call, flags, !m_ipa, true))
 	record_unknown_load ();
       else
 	record_global_memory_load ();
@@ -1523,7 +1552,7 @@ modref_access_analysis::process_fnspec (gcall *call)
     return;
   if (fnspec.global_memory_written_p ())
     {
-      if (may_access_nonescaping_parm_p (call, flags))
+      if (may_access_nonescaping_parm_p (call, flags, !m_ipa, false))
 	record_unknown_store ();
       else
 	record_global_memory_store ();

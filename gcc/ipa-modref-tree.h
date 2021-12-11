@@ -88,6 +88,7 @@ struct GTY(()) modref_access_node
   bool useful_for_kill_p () const
     {
       return parm_offset_known && parm_index != MODREF_UNKNOWN_PARM
+	     && parm_index != MODREF_GLOBAL_MEMORY_PARM
 	     && parm_index != MODREF_RETSLOT_PARM && known_size_p (size)
 	     && known_eq (max_size, size);
     }
@@ -526,7 +527,8 @@ struct GTY((user)) modref_tree
 	      unsigned int max_accesses,
 	      modref_tree <T> *other, vec <modref_parm_map> *parm_map,
 	      modref_parm_map *static_chain_map,
-	      bool record_accesses)
+	      bool record_accesses,
+	      bool promote_unknown_to_global = false)
   {
     if (!other || every_base)
       return false;
@@ -581,11 +583,11 @@ struct GTY((user)) modref_tree
 		  {
 		    modref_access_node a = *access_node;
 
-		    if (a.parm_index != MODREF_UNKNOWN_PARM && parm_map)
+		    if (a.parm_index != MODREF_UNKNOWN_PARM
+			&& a.parm_index != MODREF_GLOBAL_MEMORY_PARM
+			&& parm_map)
 		      {
-			if (a.parm_index == MODREF_GLOBAL_MEMORY_PARM)
-			  ;
-			else if (a.parm_index >= (int)parm_map->length ())
+			if (a.parm_index >= (int)parm_map->length ())
 			  a.parm_index = MODREF_UNKNOWN_PARM;
 			else
 			  {
@@ -600,6 +602,9 @@ struct GTY((user)) modref_tree
 			    a.parm_index = m.parm_index;
 			  }
 		      }
+		    if (a.parm_index == MODREF_UNKNOWN_PARM
+			&& promote_unknown_to_global)
+		      a.parm_index = MODREF_GLOBAL_MEMORY_PARM;
 		    changed |= insert (max_bases, max_refs, max_accesses,
 				       base_node->base, ref_node->ref,
 				       a, record_accesses);
@@ -618,12 +623,14 @@ struct GTY((user)) modref_tree
   bool merge (tree fndecl,
 	      modref_tree <T> *other, vec <modref_parm_map> *parm_map,
 	      modref_parm_map *static_chain_map,
-	      bool record_accesses)
+	      bool record_accesses,
+	      bool promote_unknown_to_global = false)
   {
      return merge (opt_for_fn (fndecl, param_modref_max_bases),
 		   opt_for_fn (fndecl, param_modref_max_refs),
 		   opt_for_fn (fndecl, param_modref_max_accesses),
-		   other, parm_map, static_chain_map, record_accesses);
+		   other, parm_map, static_chain_map, record_accesses,
+		   promote_unknown_to_global);
   }
 
   /* Copy OTHER to THIS.  */
