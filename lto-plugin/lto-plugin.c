@@ -185,7 +185,7 @@ static char **output_files = NULL;
 static unsigned int num_output_files = 0;
 
 static char **lto_wrapper_argv;
-static int lto_wrapper_num_args;
+static unsigned lto_wrapper_num_args;
 
 static char **pass_through_items = NULL;
 static unsigned int num_pass_through_items;
@@ -363,9 +363,9 @@ translate (char *data, char *end, struct plugin_symtab *out)
      the algorithm is O(1) now. */
 
   len = (end - data)/8 + out->nsyms + 1;
-  syms = xrealloc (out->syms, len * sizeof (struct ld_plugin_symbol));
-  aux = xrealloc (out->aux, len * sizeof (struct sym_aux));
-  
+  syms = XRESIZEVEC (struct ld_plugin_symbol, out->syms, len);
+  aux = XRESIZEVEC (struct sym_aux, out->aux, len);
+
   for (n = out->nsyms; data < end; n++) 
     { 
       aux[n].id = out->id; 
@@ -414,13 +414,11 @@ parse_symtab_extension (char *data, char *end, struct plugin_symtab *out)
 static void
 free_1 (struct plugin_file_info *files, unsigned num_files)
 {
-  unsigned int i;
-  for (i = 0; i < num_files; i++)
+  for (unsigned i = 0; i < num_files; i++)
     {
       struct plugin_file_info *info = &files[i];
       struct plugin_symtab *symtab = &info->symtab;
-      unsigned int j;
-      for (j = 0; j < symtab->nsyms; j++)
+      for (int j = 0; j < symtab->nsyms; j++)
 	{
 	  struct ld_plugin_symbol *s = &symtab->syms[j];
 	  free (s->name);
@@ -470,9 +468,7 @@ free_2 (void)
 static void
 dump_symtab (FILE *f, struct plugin_symtab *symtab)
 {
-  unsigned j;
-
-  for (j = 0; j < symtab->nsyms; j++)
+  for (int j = 0; j < symtab->nsyms; j++)
     {
       uint32_t slot = symtab->aux[j].slot;
       unsigned int resolution = symtab->syms[j].resolution;
@@ -502,7 +498,7 @@ finish_conflict_resolution (struct plugin_symtab *symtab,
     { 
       char resolution = LDPR_UNKNOWN;
 
-      if (symtab->aux[i].next_conflict == -1)
+      if (symtab->aux[i].next_conflict == -1U)
 	continue;
 
       switch (symtab->syms[i].def) 
@@ -591,7 +587,7 @@ add_output_files (FILE *f)
   for (;;)
     {
       const unsigned piece = 32;
-      char *buf, *s = xmalloc (piece);
+      char *buf, *s = XNEWVEC (char, piece);
       size_t len;
 
       buf = s;
@@ -604,15 +600,14 @@ cont:
       len = strlen (s);
       if (s[len - 1] != '\n')
 	{
-	  s = xrealloc (s, len + piece);
+	  s = XRESIZEVEC (char, s, len + piece);
 	  buf = s + len;
 	  goto cont;
 	}
       s[len - 1] = '\0';
 
       num_output_files++;
-      output_files
-	= xrealloc (output_files, num_output_files * sizeof (char *));
+      output_files = XRESIZEVEC (char *, output_files, num_output_files);
       output_files[num_output_files - 1] = s;
       add_input_file (output_files[num_output_files - 1]);
     }
@@ -962,8 +957,8 @@ resolve_conflicts (struct plugin_symtab *t, struct plugin_symtab *conflicts)
   int outlen;
 
   outlen = t->nsyms;
-  conflicts->syms = xmalloc (sizeof (struct ld_plugin_symbol) * outlen);
-  conflicts->aux = xmalloc (sizeof (struct sym_aux) * outlen);
+  conflicts->syms = XNEWVEC (struct ld_plugin_symbol, outlen);
+  conflicts->aux = XNEWVEC (struct sym_aux, outlen);
 
   /* Move all duplicate symbols into the auxiliary conflicts table. */
   out = 0;
@@ -1027,7 +1022,7 @@ static int
 process_symtab (void *data, const char *name, off_t offset, off_t length)
 {
   struct plugin_objfile *obj = (struct plugin_objfile *)data;
-  char *s;
+  const char *s;
   char *secdatastart, *secdata;
 
   if (!startswith (name, ".gnu.lto_.symtab"))
@@ -1036,7 +1031,7 @@ process_symtab (void *data, const char *name, off_t offset, off_t length)
   s = strrchr (name, '.');
   if (s)
     sscanf (s, ".%" PRI_LL "x", &obj->out->id);
-  secdata = secdatastart = xmalloc (length);
+  secdata = secdatastart = XNEWVEC (char, length);
   offset += obj->file->offset;
   if (offset != lseek (obj->file->fd, offset, SEEK_SET))
     goto err;
@@ -1079,7 +1074,7 @@ process_symtab_extension (void *data, const char *name, off_t offset,
 			  off_t length)
 {
   struct plugin_objfile *obj = (struct plugin_objfile *)data;
-  char *s;
+  const char *s;
   char *secdatastart, *secdata;
 
   if (!startswith (name, ".gnu.lto_.ext_symtab"))
@@ -1088,7 +1083,7 @@ process_symtab_extension (void *data, const char *name, off_t offset,
   s = strrchr (name, '.');
   if (s)
     sscanf (s, ".%" PRI_LL "x", &obj->out->id);
-  secdata = secdatastart = xmalloc (length);
+  secdata = secdatastart = XNEWVEC (char, length);
   offset += obj->file->offset;
   if (offset != lseek (obj->file->fd, offset, SEEK_SET))
     goto err;
@@ -1231,9 +1226,8 @@ claim_file_handler (const struct ld_plugin_input_file *file, int *claimed)
       check (status == LDPS_OK, LDPL_FATAL, "could not add symbols");
 
       num_claimed_files++;
-      claimed_files =
-	xrealloc (claimed_files,
-		  num_claimed_files * sizeof (struct plugin_file_info));
+      claimed_files = XRESIZEVEC (struct plugin_file_info,
+				  claimed_files, num_claimed_files);
       claimed_files[num_claimed_files - 1] = lto_file;
 
       *claimed = 1;
@@ -1242,7 +1236,7 @@ claim_file_handler (const struct ld_plugin_input_file *file, int *claimed)
   if (offload_files == NULL)
     {
       /* Add dummy item to the start of the list.  */
-      offload_files = xmalloc (sizeof (struct plugin_offload_file));
+      offload_files = XNEW (struct plugin_offload_file);
       offload_files->name = NULL;
       offload_files->next = NULL;
       offload_files_last = offload_files;
@@ -1260,8 +1254,7 @@ claim_file_handler (const struct ld_plugin_input_file *file, int *claimed)
 	 order after recompilation and linking, otherwise host and target tables
 	 with addresses wouldn't match.  If a static library contains both LTO
 	 and non-LTO objects, ld and gold link them in a different order.  */
-      struct plugin_offload_file *ofld
-	= xmalloc (sizeof (struct plugin_offload_file));
+      struct plugin_offload_file *ofld = XNEW (struct plugin_offload_file);
       ofld->name = lto_file.name;
       ofld->next = NULL;
 
@@ -1338,8 +1331,8 @@ process_option (const char *option)
   else if (startswith (option, "-pass-through="))
     {
       num_pass_through_items++;
-      pass_through_items = xrealloc (pass_through_items,
-				     num_pass_through_items * sizeof (char *));
+      pass_through_items = XRESIZEVEC (char *, pass_through_items,
+				       num_pass_through_items);
       pass_through_items[num_pass_through_items - 1] =
           xstrdup (option + strlen ("-pass-through="));
     }
@@ -1512,7 +1505,7 @@ onload (struct ld_plugin_tv *tv)
 	     find an odd number of them), and it copies characters
 	     that are escaped or not otherwise skipped.  */
 	  int len = p - start - ticks - escapes + 1;
-	  char *q = xmalloc (len);
+	  char *q = XNEWVEC (char, len);
 	  link_output_name = q;
 	  int oddticks = (ticks % 2);
 	  ticks += oddticks;
