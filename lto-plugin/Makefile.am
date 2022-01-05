@@ -11,14 +11,14 @@ AM_CPPFLAGS = -I$(top_srcdir)/../include $(DEFS)
 AM_CFLAGS = @ac_lto_plugin_warn_cflags@ $(CET_HOST_FLAGS)
 AM_LDFLAGS = @ac_lto_plugin_ldflags@
 AM_LIBTOOLFLAGS = --tag=disable-static
-override CFLAGS := $(filter-out -fsanitize=address -fsanitize=hwaddress,$(CFLAGS))
-override LDFLAGS := $(filter-out -fsanitize=address -fsanitize=hwaddress,$(LDFLAGS))
+override CXXFLAGS := $(filter-out -fsanitize=address -fsanitize=hwaddress,$(CXXFLAGS))
+override LDFLAGS := $(filter-out -fsanitize=address -fsanitize=hwaddress,$(LDFLAGS)) -lstdc++
 
 libexecsub_LTLIBRARIES = liblto_plugin.la
 gcc_build_dir = @gcc_build_dir@
 in_gcc_libs = $(foreach lib, $(libexecsub_LTLIBRARIES), $(gcc_build_dir)/$(lib))
 
-liblto_plugin_la_SOURCES = lto-plugin.c
+liblto_plugin_la_SOURCES = lto-plugin.cc
 # Note that we intentionally override the bindir supplied by ACX_LT_HOST_FLAGS.
 liblto_plugin_la_LDFLAGS = $(AM_LDFLAGS) \
 	$(lt_host_flags) -module -avoid-version -bindir $(libexecsubdir) \
@@ -39,7 +39,7 @@ liblto_plugin_la_DEPENDENCIES = \
 	$(if $(wildcard $(libiberty_pic)),$(libiberty_pic),))
 LTLDFLAGS = $(shell $(SHELL) $(top_srcdir)/../libtool-ldflags $(LDFLAGS))
 liblto_plugin_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(liblto_plugin_la_LDFLAGS) $(LTLDFLAGS) -o $@
 
 all-local: $(in_gcc_libs)

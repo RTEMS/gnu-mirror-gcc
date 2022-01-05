@@ -10,6 +10,7 @@ AC_ARG_WITH(libiberty,
 AC_SUBST(with_libiberty)
 AC_USE_SYSTEM_EXTENSIONS
 AC_PROG_CC
+AC_PROG_CXX
 AC_SYS_LARGEFILE
 ACX_PROG_CC_WARNING_OPTS([-Wall], [ac_lto_plugin_warn_cflags])
 

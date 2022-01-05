@@ -64,7 +64,11 @@ along with this program; see the file COPYING3.  If not see
 #ifndef WEXITSTATUS
 #define WEXITSTATUS(S) (((S) & 0xff00) >> 8)
 #endif
+
+/* Defined in string.h */
+#define HAVE_DECL_BASENAME 1
 #include <libiberty.h>
+
 #include <hashtab.h>
 #include "../gcc/lto/common.h"
 #include "simple-object.h"
@@ -1368,6 +1372,10 @@ process_option (const char *option)
   verbose = verbose || debug;
 }
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Called by gold after loading the plugin. TV is the transfer vector. */
 
 enum ld_plugin_status
@@ -1540,3 +1548,7 @@ onload (struct ld_plugin_tv *tv)
 
   return LDPS_OK;
 }
+
+#ifdef __cplusplus
+}
+#endif
