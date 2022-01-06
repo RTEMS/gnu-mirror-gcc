@@ -74,6 +74,8 @@ along with this program; see the file COPYING3.  If not see
 #include "simple-object.h"
 #include "plugin-api.h"
 
+#include <vector>
+
 /* We need to use I64 instead of ll width-specifier on native Windows.
    The reason for this is that older MS-runtimes don't support the ll.  */
 #ifdef __MINGW32__
@@ -170,8 +172,7 @@ static ld_plugin_add_input_library add_input_library;
 static ld_plugin_message message;
 static ld_plugin_add_symbols add_symbols, add_symbols_v2;
 
-static struct plugin_file_info *claimed_files = NULL;
-static unsigned int num_claimed_files = 0;
+static std::vector<plugin_file_info> claimed_files;
 static unsigned int non_claimed_files = 0;
 
 /* List of files with offloading.  */
@@ -416,11 +417,11 @@ parse_symtab_extension (char *data, char *end, struct plugin_symtab *out)
    resolution. */
 
 static void
-free_1 (struct plugin_file_info *files, unsigned num_files)
+free_claimed_files ()
 {
-  for (unsigned i = 0; i < num_files; i++)
+  for (unsigned i = 0; i < claimed_files.size (); i++)
     {
-      struct plugin_file_info *info = &files[i];
+      struct plugin_file_info *info = &claimed_files[i];
       struct plugin_symtab *symtab = &info->symtab;
       for (int j = 0; j < symtab->nsyms; j++)
 	{
@@ -439,7 +440,7 @@ static void
 free_2 (void)
 {
   unsigned int i;
-  for (i = 0; i < num_claimed_files; i++)
+  for (i = 0; i < claimed_files.size (); i++)
     {
       struct plugin_file_info *info = &claimed_files[i];
       struct plugin_symtab *symtab = &info->symtab;
@@ -451,9 +452,7 @@ free_2 (void)
     free (output_files[i]);
   free (output_files);
 
-  free (claimed_files);
-  claimed_files = NULL;
-  num_claimed_files = 0;
+  claimed_files.clear ();
 
   while (offload_files)
     {
@@ -554,9 +553,9 @@ write_resolution (void)
   f = fopen (resolution_file, "w");
   check (f, LDPL_FATAL, "could not open file");
 
-  fprintf (f, "%d\n", num_claimed_files);
+  fprintf (f, "%d\n", claimed_files.size ());
 
-  for (i = 0; i < num_claimed_files; i++)
+  for (i = 0; i < claimed_files.size (); i++)
     {
       struct plugin_file_info *info = &claimed_files[i];
       struct plugin_symtab *symtab = &info->symtab;
@@ -712,7 +711,7 @@ static void
 use_original_files (void)
 {
   unsigned i;
-  for (i = 0; i < num_claimed_files; i++)
+  for (i = 0; i < claimed_files.size (); i++)
     {
       struct plugin_file_info *info = &claimed_files[i];
       add_input_file (info->name);
@@ -726,13 +725,13 @@ static enum ld_plugin_status
 all_symbols_read_handler (void)
 {
   const unsigned num_lto_args
-    = num_claimed_files + lto_wrapper_num_args + 2
+    = claimed_files.size () + lto_wrapper_num_args + 2
       + !linker_output_known + !linker_output_auto_nolto_rel;
   unsigned i;
   char **lto_argv;
   const char *linker_output_str = NULL;
   const char **lto_arg_ptr;
-  if (num_claimed_files + num_offload_files == 0)
+  if (claimed_files.size () + num_offload_files == 0)
     return LDPS_OK;
 
   if (nop)
@@ -754,8 +753,7 @@ all_symbols_read_handler (void)
   assert (lto_wrapper_argv);
 
   write_resolution ();
-
-  free_1 (claimed_files, num_claimed_files);
+  free_claimed_files ();
 
   for (i = 0; i < lto_wrapper_num_args; i++)
     *lto_arg_ptr++ = lto_wrapper_argv[i];
@@ -821,7 +819,7 @@ all_symbols_read_handler (void)
       *lto_arg_ptr++ = arg;
     }
 
-  for (i = 0; i < num_claimed_files; i++)
+  for (i = 0; i < claimed_files.size (); i++)
     {
       struct plugin_file_info *info = &claimed_files[i];
 
@@ -1229,11 +1227,7 @@ claim_file_handler (const struct ld_plugin_input_file *file, int *claimed)
 			      lto_file.symtab.syms);
       check (status == LDPS_OK, LDPL_FATAL, "could not add symbols");
 
-      num_claimed_files++;
-      claimed_files = XRESIZEVEC (struct plugin_file_info,
-				  claimed_files, num_claimed_files);
-      claimed_files[num_claimed_files - 1] = lto_file;
-
+      claimed_files.push_back (lto_file);
       *claimed = 1;
     }
 
