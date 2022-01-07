@@ -1,3 +1,4 @@
+work075 patch #1
 2022-01-05  Michael Meissner  <meissner@the-meissners.org>
 
 	* config/rs6000/rs6000.c (rs6000_option_override_internal): Remove
