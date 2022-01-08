@@ -999,6 +999,8 @@ region_model::on_stmt_pre (const gimple *stmt,
 	  impl_call_analyzer_describe (call, ctxt);
 	else if (is_special_named_call_p (call, "__analyzer_dump_capacity", 1))
 	  impl_call_analyzer_dump_capacity (call, ctxt);
+	else if (is_special_named_call_p (call, "__analyzer_dump_escaped", 0))
+	  impl_call_analyzer_dump_escaped (call);
 	else if (is_special_named_call_p (call, "__analyzer_dump_path", 0))
 	  {
 	    /* Handle the builtin "__analyzer_dump_path" by queuing a
@@ -3962,6 +3964,13 @@ rejected_ranges_constraint::dump_to_pp (pretty_printer *pp) const
 }
 
 /* class engine.  */
+
+/* engine's ctor.  */
+
+engine::engine (logger *logger)
+: m_mgr (logger)
+{
+}
 
 /* Dump the managed objects by class to LOGGER, and the per-class totals.  */
 

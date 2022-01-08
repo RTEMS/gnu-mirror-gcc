@@ -240,7 +240,7 @@ namespace ana {
 class region_model_manager
 {
 public:
-  region_model_manager ();
+  region_model_manager (logger *logger = NULL);
   ~region_model_manager ();
 
   /* svalue consolidation.  */
@@ -335,6 +335,8 @@ public:
   void enable_complexity_check (void) { m_check_complexity = true; }
   void disable_complexity_check (void) { m_check_complexity = false; }
 
+  logger *get_logger () const { return m_logger; }
+
 private:
   bool too_complex_p (const complexity &c) const;
   bool reject_if_too_complex (svalue *sval);
@@ -357,6 +359,8 @@ private:
 						       tree cst, const svalue *arg1);
   const svalue *maybe_fold_asm_output_svalue (tree type,
 					      const vec<const svalue *> &inputs);
+
+  logger *m_logger;
 
   unsigned m_next_region_id;
   root_region m_root_region;
@@ -573,6 +577,7 @@ class region_model
 				    region_model_context *ctxt);
   void impl_call_analyzer_dump_capacity (const gcall *call,
 					 region_model_context *ctxt);
+  void impl_call_analyzer_dump_escaped (const gcall *call);
   void impl_call_analyzer_eval (const gcall *call,
 				region_model_context *ctxt);
   void impl_call_builtin_expect (const call_details &cd);
@@ -1079,6 +1084,7 @@ private:
 class engine
 {
 public:
+  engine (logger *logger = NULL);
   region_model_manager *get_model_manager () { return &m_mgr; }
 
   void log_stats (logger *logger) const;
