@@ -542,7 +542,7 @@ __gnat_error_handler (int sig, siginfo_t *si ATTRIBUTE_UNUSED, void *ucontext)
 	 before the faulting address is accessible.  Unfortunately, Linux
 	 seems to have no way of giving us the faulting address.
 
-	 In old versions of init.c, we had a test of the page before the
+	 In old versions of init.cc, we had a test of the page before the
 	 stack pointer:
 
 	   ((volatile char *)
@@ -1237,7 +1237,7 @@ __gnat_handle_vms_condition (int *sigargs, void *mechargs)
   if (__gnat_resignal_p (sigargs [1]))
     return SS$_RESIGNAL;
 #ifndef IN_RTS
-  /* toplev.c handles this for compiler.  */
+  /* toplev.cc handles this for compiler.  */
   if (sigargs [1] == SS$_HPARITH)
     return SS$_RESIGNAL;
 #endif
@@ -2879,7 +2879,7 @@ __gnat_adjust_context_for_raise (int signo ATTRIBUTE_UNUSED,
   /* We used to compensate here for the raised from call vs raised from signal
      exception discrepancy with the GCC ZCX scheme, but this now can be dealt
      with generically in the unwinder (see GCC PR other/26208).  This however
-     requires the use of the _Unwind_GetIPInfo routine in raise-gcc.c, which
+     requires the use of the _Unwind_GetIPInfo routine in raise-gcc.cc, which
      is predicated on the definition of HAVE_GETIPINFO at compile time.  Only
      the VMS ports still do the compensation described in the few lines below.
 

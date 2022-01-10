@@ -37,7 +37,7 @@
 
 /* Note: If USER_LABEL_PREFIX or LOCAL_LABEL_PREFIX are changed,
    make sure that this change is reflected in the function
-   coff_arm_is_local_label_name() in bfd/coff-arm.c.  */
+   coff_arm_is_local_label_name() in bfd/coff-arm.cc.  */
 #ifndef REGISTER_PREFIX
 #define REGISTER_PREFIX 	""
 #endif

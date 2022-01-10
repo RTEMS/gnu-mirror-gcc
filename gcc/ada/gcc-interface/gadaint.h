@@ -23,7 +23,7 @@
  *                                                                          *
  ****************************************************************************/
 
-/* This file contains the declarations of adaint.c material used in gigi.
+/* This file contains the declarations of adaint.cc material used in gigi.
    It should be used in lieu of adaint.h in gigi because the latter drags
    a lot of stuff on Windows and this pollutes the namespace of macros.  */
 

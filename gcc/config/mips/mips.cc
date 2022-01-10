@@ -4456,7 +4456,7 @@ mips_rtx_costs (rtx x, machine_mode mode, int outer_code,
 	  /* It is our responsibility to make division by a power of 2
 	     as cheap as 2 register additions if we want the division
 	     expanders to be used for such operations; see the setting
-	     of sdiv_pow2_cheap in optabs.c.  Using (D)DIV for MIPS16
+	     of sdiv_pow2_cheap in optabs.cc.  Using (D)DIV for MIPS16
 	     should always produce shorter code than using
 	     expand_sdiv2_pow2.  */
 	  if (TARGET_MIPS16
@@ -9466,7 +9466,7 @@ mips_output_filename (FILE *stream, const char *name)
       output_quoted_string (stream, name);
       putc ('\n', stream);
     }
-  /* If we are emitting stabs, let dbxout.c handle this (except for
+  /* If we are emitting stabs, let dbxout.cc handle this (except for
      the mips_output_filename_first_time case).  */
   else if (write_symbols == DBX_DEBUG)
     return;
@@ -11799,7 +11799,7 @@ mips_output_function_prologue (FILE *file)
       && crtl->args.info.fp_code != 0)
     mips16_build_function_stub ();
 
-  /* Get the function name the same way that toplev.c does before calling
+  /* Get the function name the same way that toplev.cc does before calling
      assemble_start_function.  This is needed so that the name used here
      exactly matches the name used in ASM_DECLARE_FUNCTION_NAME.  */
   fnname = XSTR (XEXP (DECL_RTL (current_function_decl), 0), 0);
@@ -11897,7 +11897,7 @@ mips_output_function_epilogue (FILE *)
       mips_pop_asm_switch (&mips_noreorder);
     }
 
-  /* Get the function name the same way that toplev.c does before calling
+  /* Get the function name the same way that toplev.cc does before calling
      assemble_start_function.  This is needed so that the name used here
      exactly matches the name used in ASM_DECLARE_FUNCTION_NAME.  */
   fnname = XSTR (XEXP (DECL_RTL (current_function_decl), 0), 0);
@@ -19620,7 +19620,7 @@ mips_output_mi_thunk (FILE *file, tree thunk_fndecl ATTRIBUTE_UNUSED,
     }
 
   /* Run just enough of rest_of_compilation.  This sequence was
-     "borrowed" from alpha.c.  */
+     "borrowed" from alpha.cc.  */
   insn = get_insns ();
   split_all_insns_noflow ();
   mips16_lay_out_constants (true);
@@ -19921,7 +19921,7 @@ mips_option_override (void)
 			       : MIPS_DEFAULT_GVALUE);
 
   /* The following code determines the architecture and register size.
-     Similar code was added to GAS 2.14 (see tc-mips.c:md_after_parse_args()).
+     Similar code was added to GAS 2.14 (see tc-mips.cc:md_after_parse_args()).
      The GAS and GCC code should be kept in sync as much as possible.  */
 
   if (OPTION_SET_P (mips_arch_option))

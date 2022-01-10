@@ -49,7 +49,7 @@
 #elif defined (__vxworks) && defined (__RTP__)
 # include <wait.h>
 #elif defined (__Lynx__)
-  /* ??? See comment in adaint.c.  */
+  /* ??? See comment in adaint.cc.  */
 # define GCC_RESOURCE_H
 # include <sys/wait.h>
 #elif defined (__PikeOS__)

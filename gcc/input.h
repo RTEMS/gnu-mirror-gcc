@@ -269,7 +269,7 @@ class GTY(()) string_concat_db
   static location_t get_key_loc (location_t loc);
 
   /* For the fields to be private, we must grant access to the
-     generated code in gtype-desc.c.  */
+     generated code in gtype-desc.cc.  */
 
   friend void ::gt_ggc_mx_string_concat_db (void *x_p);
   friend void ::gt_pch_nx_string_concat_db (void *x_p);

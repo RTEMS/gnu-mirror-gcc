@@ -307,7 +307,7 @@ copy_early_debug_info (const char *infile, const char *outfile)
   int err;
 
   /* The simple_object code can handle extracting the debug sections.
-     This code is based on that in lto-wrapper.c.  */
+     This code is based on that in lto-wrapper.cc.  */
   int infd = open (infile, O_RDONLY | O_BINARY);
   if (infd == -1)
     return false;
@@ -591,7 +591,7 @@ process_asm (FILE *in, FILE *out, FILE *cfile)
 	{
 	  state = IN_VARS;
 
-	  /* Add a global symbol to allow plugin-gcn.c to locate the table
+	  /* Add a global symbol to allow plugin-gcn.cc to locate the table
 	     at runtime.  It can't use the "offload_var_table.N" emitted by
 	     the compiler because a) they're not global, and b) there's one
 	     for each input file combined into the binary.  */

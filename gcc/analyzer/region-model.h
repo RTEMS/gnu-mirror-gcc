@@ -474,7 +474,7 @@ private:
 struct append_ssa_names_cb_data;
 
 /* Helper class for handling calls to functions with known behavior.
-   Implemented in region-model-impl-calls.c.  */
+   Implemented in region-model-impl-calls.cc.  */
 
 class call_details
 {

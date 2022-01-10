@@ -40,7 +40,7 @@ from metadata by using ``objdump``:
 
 .. code-block:: bash
 
-   $ objdump -p testsuite/jit/test-extra-options.c.exe | tail -n 8
+   $ objdump -p testsuite/jit/test-extra-options.cc.exe | tail -n 8
 
    Version References:
      required from libgccjit.so.0:

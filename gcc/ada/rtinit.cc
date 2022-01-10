@@ -355,7 +355,7 @@ __gnat_runtime_initialize (int install_handler)
    __gnat_init_float ();
 
    /* Initialize the critical section and event handle for the win32_wait()
-      implementation, see adaint.c */
+      implementation, see adaint.cc */
 
    InitializeCriticalSection (&ProcListCS);
    ProcListEvt = CreateEvent (NULL, FALSE, FALSE, NULL);

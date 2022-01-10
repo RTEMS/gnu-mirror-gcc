@@ -25890,14 +25890,14 @@ package body ada_main is
       --  initialization using a standard library routine which
       --  sets up signal handling and performs any other
       --  required setup. The routine can be found in file
-      --  a-init.c.
+      --  a-init.cc.
 
       procedure initialize;
       pragma Import (C, initialize, "__gnat_initialize");
 
       --  The finalize routine performs low level system
       --  finalization using a standard library routine. The
-      --  routine is found in file a-final.c and in the standard
+      --  routine is found in file a-final.cc and in the standard
       --  distribution is a dummy routine that does nothing, so
       --  really this is a hook for special user finalization.
 

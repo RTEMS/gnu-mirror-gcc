@@ -490,7 +490,7 @@ enum libcall_fn
    without finishing any decls or types.  */
 extern bool doing_semantic_analysis_p;
 
-/* In d-attribs.c.  */
+/* In d-attribs.cc.  */
 extern tree insert_type_attribute (tree, const char *, tree = NULL_TREE);
 extern tree insert_decl_attribute (tree, const char *, tree = NULL_TREE);
 extern void apply_user_attributes (Dsymbol *, tree);

@@ -1,4 +1,4 @@
-/* d-attribs.c -- D attributes handling.
+/* d-attribs.cc -- D attributes handling.
    Copyright (C) 2015-2022 Free Software Foundation, Inc.
 
 GCC is free software; you can redistribute it and/or modify

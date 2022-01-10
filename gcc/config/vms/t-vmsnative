@@ -21,13 +21,13 @@ version:=$(shell echo $(BASEVER_c) | sed -e 's/\./_/g')
 
 # Wrappers around native VMS tools for ld and ar.
 
-vms-ld.o: $(srcdir)/config/vms/vms-ld.c
+vms-ld.o: $(srcdir)/config/vms/vms-ld.cc
 	$(CC) -c $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $< $(OUTPUT_OPTION)
 
 ld$(exeext): vms-ld.o $(LIBIBERTY)
 	$(CC) -o $@ vms-ld.o $(LIBIBERTY)
 
-vms-ar.o: $(srcdir)/config/vms/vms-ar.c
+vms-ar.o: $(srcdir)/config/vms/vms-ar.cc
 	$(CC) -c $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $< $(OUTPUT_OPTION)
 
 ar$(exeext): vms-ar.o $(LIBIBERTY)

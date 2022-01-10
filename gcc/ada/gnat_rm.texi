@@ -22918,7 +22918,7 @@ package Interfaces.C_Streams is
       return FILEs;
   -- Note: to maintain target independence, use
   -- text_translation_required, a boolean variable defined in
-  -- a-sysdep.c to deal with the target dependent text
+  -- a-sysdep.cc to deal with the target dependent text
   -- translation requirement.  If this variable is set,
   -- then  b/t should be appended to the standard mode
   -- argument to set the text translation mode off or on
