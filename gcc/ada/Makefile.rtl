@@ -2870,7 +2870,7 @@ LIBGNAT_OBJS = adadecode.o adaint.o argv.o aux-io.o 			\
 #  GNAT_RTL_SRCS.  Right now we count on being able to build GNATRTL_OBJS
 #  from ADA_INCLUDE_SRCS.
 
-LIBGNAT_SRCS = $(patsubst %.o,%.c,$(LIBGNAT_OBJS))			\
+LIBGNAT_SRCS = $(patsubst %.o,%.cc,$(LIBGNAT_OBJS))			\
   adadecode.h adaint.h env.h gsocket.h raise.h standard.ads.h		\
   runtime.h $(EXTRA_LIBGNAT_SRCS)
 
