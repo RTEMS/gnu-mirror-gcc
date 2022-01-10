@@ -111,7 +111,7 @@ package Interfaces.C_Streams is
       encoding : System.CRTL.Filename_Encoding := System.CRTL.UTF8)
      return FILEs renames System.CRTL.fopen;
    --  Note: to maintain target independence, use text_translation_required,
-   --  a boolean variable defined in sysdep.c to deal with the target
+   --  a boolean variable defined in sysdep.cc to deal with the target
    --  dependent text translation requirement. If this variable is set,
    --  then b/t should be appended to the standard mode argument to set
    --  the text translation mode off or on as required.
@@ -243,7 +243,7 @@ package Interfaces.C_Streams is
    --  This encoding is system dependent and only used on Windows systems.
    --
    --  Note that modifications to Content_Encoding must be synchronized with
-   --  sysdep.c:__gnat_set_mode.
+   --  sysdep.cc:__gnat_set_mode.
 
    subtype Text_Content_Encoding
      is Content_Encoding range Default_Text .. U16text;

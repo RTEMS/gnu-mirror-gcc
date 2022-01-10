@@ -8207,7 +8207,7 @@ gfc_resolve_omp_parallel_blocks (gfc_code *code, gfc_namespace *ns)
 }
 
 
-/* Save and clear openmp.c private state.  */
+/* Save and clear openmp.cc private state.  */
 
 void
 gfc_omp_save_and_clear_state (struct gfc_omp_saved_state *state)
@@ -8221,7 +8221,7 @@ gfc_omp_save_and_clear_state (struct gfc_omp_saved_state *state)
 }
 
 
-/* Restore openmp.c private state from the saved state.  */
+/* Restore openmp.cc private state from the saved state.  */
 
 void
 gfc_omp_restore_state (struct gfc_omp_saved_state *state)

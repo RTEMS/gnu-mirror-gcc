@@ -2279,7 +2279,7 @@ public:
      The line_table_test must be first, since the cpp_reader_ptr
      uses it.
      The cpp_reader must be cleaned up *after* the temp_source_file
-     since the filenames in input.c's input cache are owned by the
+     since the filenames in input.cc's input cache are owned by the
      cpp_reader; in particular, when ~temp_source_file evicts the
      filename the filenames must still be alive.  */
   line_table_test m_ltt;
@@ -3264,7 +3264,7 @@ test_lexer_string_locations_concatenation_1 (const line_table_case &case_)
   ASSERT_STREQ ("0123456789", (const char *)dst_string.text);
   free (const_cast <unsigned char *> (dst_string.text));
 
-  /* Simulate c-lex.c's lex_string in order to record concatenation.  */
+  /* Simulate c-lex.cc's lex_string in order to record concatenation.  */
   test.m_concats.record_string_concatenation (2, input_locs);
 
   location_t initial_loc = input_locs[0];
@@ -3316,7 +3316,7 @@ test_lexer_string_locations_concatenation_2 (const line_table_case &case_)
   ASSERT_STREQ ("0123456789", (const char *)dst_string.text);
   free (const_cast <unsigned char *> (dst_string.text));
 
-  /* Simulate c-lex.c's lex_string in order to record concatenation.  */
+  /* Simulate c-lex.cc's lex_string in order to record concatenation.  */
   test.m_concats.record_string_concatenation (5, input_locs);
 
   location_t initial_loc = input_locs[0];
@@ -3390,7 +3390,7 @@ test_lexer_string_locations_concatenation_3 (const line_table_case &case_)
   ASSERT_STREQ ("0123456789", (const char *)dst_string.text);
   free (const_cast <unsigned char *> (dst_string.text));
 
-  /* Simulate c-lex.c's lex_string in order to record concatenation.  */
+  /* Simulate c-lex.cc's lex_string in order to record concatenation.  */
   test.m_concats.record_string_concatenation (4, input_locs);
 
   location_t initial_loc = input_locs[0];
@@ -3479,7 +3479,7 @@ test_lexer_string_locations_stringified_macro_argument
      __builtin_printf (a, 0.5);
                        ^
 
-   when c-format.c erroneously used the indicated one-character
+   when c-format.cc erroneously used the indicated one-character
    location as the format string location, leading to a read past the
    end of a string buffer in cpp_interpret_string_1.  */
 
