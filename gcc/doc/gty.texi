@@ -1,4 +1,4 @@
-@c Copyright (C) 2002-2021 Free Software Foundation, Inc.
+@c Copyright (C) 2002-2022 Free Software Foundation, Inc.
 @c This is part of the GCC manual.
 @c For copying conditions, see the file gcc.texi.
 
@@ -483,7 +483,7 @@ void gt_pch_nx (my_struct *p)
 void gt_pch_nx (my_struct *p, gt_pointer_operator op, void *cookie)
 @{
   /* For every field 'fld', call the given pointer operator.  */
-  op (&(tp->fld), cookie);
+  op (&(tp->fld), NULL, cookie);
 @}
 @end smallexample
 
@@ -536,7 +536,7 @@ void gt_pch_nx (TP<T *> *tp, gt_pointer_operator op, void *cookie)
 @{
   /* For every field 'fld' of 'tp' with type 'T *', call the given
      pointer operator.  */
-  op (&(tp->fld), cookie);
+  op (&(tp->fld), NULL, cookie);
 @}
 
 template<typename T>

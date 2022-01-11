@@ -1,5 +1,5 @@
 /* Routines for manipulation of expression nodes.
-   Copyright (C) 2000-2021 Free Software Foundation, Inc.
+   Copyright (C) 2000-2022 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of GCC.
@@ -4343,6 +4343,7 @@ gfc_check_pointer_assign (gfc_expr *lvalue, gfc_expr *rvalue,
     {
       gfc_symbol *sym;
       bool target;
+      gfc_ref *ref;
 
       if (gfc_is_size_zero_array (rvalue))
 	{
@@ -4371,6 +4372,39 @@ gfc_check_pointer_assign (gfc_expr *lvalue, gfc_expr *rvalue,
 		     "does not have the TARGET attribute at %L",
 		     &rvalue->where);
 	  return false;
+	}
+
+      for (ref = rvalue->ref; ref; ref = ref->next)
+	{
+	  switch (ref->type)
+	    {
+	    case REF_ARRAY:
+	      for (int n = 0; n < ref->u.ar.dimen; n++)
+		if (!gfc_is_constant_expr (ref->u.ar.start[n])
+		    || !gfc_is_constant_expr (ref->u.ar.end[n])
+		    || !gfc_is_constant_expr (ref->u.ar.stride[n]))
+		  {
+		    gfc_error ("Every subscript of target specification "
+			       "at %L must be a constant expression",
+			       &ref->u.ar.where);
+		    return false;
+		  }
+	      break;
+
+	    case REF_SUBSTRING:
+	      if (!gfc_is_constant_expr (ref->u.ss.start)
+		  || !gfc_is_constant_expr (ref->u.ss.end))
+		{
+		  gfc_error ("Substring starting and ending points of target "
+			     "specification at %L must be constant expressions",
+			     &ref->u.ss.start->where);
+		  return false;
+		}
+	      break;
+
+	    default:
+	      break;
+	    }
 	}
     }
   else
@@ -5166,7 +5200,8 @@ gfc_get_variable_expr (gfc_symtree *var)
 
   if (var->n.sym->attr.flavor != FL_PROCEDURE
       && ((var->n.sym->as != NULL && var->n.sym->ts.type != BT_CLASS)
-	   || (var->n.sym->ts.type == BT_CLASS && CLASS_DATA (var->n.sym)
+	   || (var->n.sym->ts.type == BT_CLASS && var->n.sym->ts.u.derived
+	       && CLASS_DATA (var->n.sym)
 	       && CLASS_DATA (var->n.sym)->as)))
     {
       e->rank = var->n.sym->ts.type == BT_CLASS
@@ -5882,8 +5917,16 @@ gfc_is_simply_contiguous (gfc_expr *expr, bool strict, bool permit_element)
 
   if (expr->expr_type == EXPR_FUNCTION)
     {
-      if (expr->value.function.esym)
-	return expr->value.function.esym->result->attr.contiguous;
+      if (expr->value.function.isym)
+	/* TRANSPOSE is the only intrinsic that may return a
+	   non-contiguous array.  It's treated as a special case in
+	   gfc_conv_expr_descriptor too.  */
+	return (expr->value.function.isym->id != GFC_ISYM_TRANSPOSE);
+      else if (expr->value.function.esym)
+	/* Only a pointer to an array without the contiguous attribute
+	   can be non-contiguous as a result value.  */
+	return (expr->value.function.esym->result->attr.contiguous
+		|| !expr->value.function.esym->result->attr.pointer);
       else
 	{
 	  /* Type-bound procedures.  */
@@ -6254,10 +6297,13 @@ gfc_check_vardef_context (gfc_expr* e, bool pointer, bool alloc_obj,
     {
       if (ptr_component && ref->type == REF_COMPONENT)
 	check_intentin = false;
-      if (ref->type == REF_COMPONENT && ref->u.c.component->attr.pointer)
+      if (ref->type == REF_COMPONENT)
 	{
-	  ptr_component = true;
-	  if (!pointer)
+	  gfc_component *comp = ref->u.c.component;
+	  ptr_component = (comp->ts.type == BT_CLASS && comp->attr.class_ok)
+			? CLASS_DATA (comp)->attr.class_pointer
+			: comp->attr.pointer;
+	  if (ptr_component && !pointer)
 	    check_intentin = false;
 	}
       if (ref->type == REF_INQUIRY

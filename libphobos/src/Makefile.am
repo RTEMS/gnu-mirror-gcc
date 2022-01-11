@@ -1,5 +1,5 @@
 ## Makefile for the Phobos standard library.
-## Copyright (C) 2012-2021 Free Software Foundation, Inc.
+## Copyright (C) 2012-2022 Free Software Foundation, Inc.
 ##
 ## GCC is free software; you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -19,8 +19,9 @@
 include $(top_srcdir)/d_rules.am
 
 # Make sure GDC can find libdruntime and libphobos include files
-D_EXTRA_DFLAGS=-fpreview=dip1000 -fpreview=dtorfields -nostdinc -I $(srcdir) \
-	-I $(top_srcdir)/libdruntime -I ../libdruntime -I .
+D_EXTRA_DFLAGS=-fpreview=dip1000 -fpreview=dtorfields -fpreview=fieldwise \
+	-nostdinc -I $(srcdir) -I $(top_srcdir)/libdruntime \
+	-I ../libdruntime -I .
 
 # D flags for compilation
 AM_DFLAGS= \

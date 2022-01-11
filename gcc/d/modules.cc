@@ -1,5 +1,5 @@
 /* modules.cc -- D module initialization and termination.
-   Copyright (C) 2013-2021 Free Software Foundation, Inc.
+   Copyright (C) 2013-2022 Free Software Foundation, Inc.
 
 GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -145,7 +145,7 @@ get_internal_fn (tree ident, const Visibility &visibility)
   fd->loc = Loc (mod->srcfile.toChars (), 1, 0);
   fd->parent = mod;
   fd->visibility = visibility;
-  fd->semanticRun = PASSsemantic3done;
+  fd->semanticRun = PASS::semantic3done;
 
   return fd;
 }

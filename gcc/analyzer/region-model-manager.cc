@@ -1,5 +1,5 @@
 /* Consolidation of svalues and regions.
-   Copyright (C) 2020-2021 Free Software Foundation, Inc.
+   Copyright (C) 2020-2022 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -66,8 +66,9 @@ namespace ana {
 
 /* region_model_manager's ctor.  */
 
-region_model_manager::region_model_manager ()
-: m_next_region_id (0),
+region_model_manager::region_model_manager (logger *logger)
+: m_logger (logger),
+  m_next_region_id (0),
   m_root_region (alloc_region_id ()),
   m_stack_region (alloc_region_id (), &m_root_region),
   m_heap_region (alloc_region_id (), &m_root_region),

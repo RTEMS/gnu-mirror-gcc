@@ -1,5 +1,5 @@
 /* Expand builtin functions.
-   Copyright (C) 1988-2021 Free Software Foundation, Inc.
+   Copyright (C) 1988-2022 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -178,7 +178,7 @@ static rtx expand_builtin_memory_chk (tree, rtx, machine_mode,
 				      enum built_in_function);
 static void maybe_emit_chk_warning (tree, enum built_in_function);
 static void maybe_emit_sprintf_chk_warning (tree, enum built_in_function);
-static tree fold_builtin_object_size (tree, tree);
+static tree fold_builtin_object_size (tree, tree, enum built_in_function);
 
 unsigned HOST_WIDE_INT target_newline;
 unsigned HOST_WIDE_INT target_percent;
@@ -3963,7 +3963,8 @@ try_store_by_multiple_pieces (rtx to, rtx len, unsigned int ctz_len,
   else if (max_len == min_len)
     blksize = max_len;
   else
-    gcc_unreachable ();
+    /* Huh, max_len < min_len?  Punt.  See pr100843.c.  */
+    return false;
   if (min_len >= blksize)
     {
       min_len -= blksize;
@@ -4002,7 +4003,7 @@ try_store_by_multiple_pieces (rtx to, rtx len, unsigned int ctz_len,
       constfundata = &valc;
     }
 
-  rtx ptr = copy_addr_to_reg (convert_to_mode (ptr_mode, XEXP (to, 0), 0));
+  rtx ptr = copy_addr_to_reg (XEXP (to, 0));
   rtx rem = copy_to_mode_reg (ptr_mode, convert_to_mode (ptr_mode, len, 0));
   to = replace_equiv_address (to, ptr);
   set_mem_align (to, align);
@@ -5790,35 +5791,22 @@ expand_builtin_sync_lock_release (machine_mode mode, tree exp)
 static enum memmodel
 get_memmodel (tree exp)
 {
-  rtx op;
-  unsigned HOST_WIDE_INT val;
-  location_t loc
-    = expansion_point_location_if_in_system_header (input_location);
-
   /* If the parameter is not a constant, it's a run time value so we'll just
      convert it to MEMMODEL_SEQ_CST to avoid annoying runtime checking.  */
   if (TREE_CODE (exp) != INTEGER_CST)
     return MEMMODEL_SEQ_CST;
 
-  op = expand_normal (exp);
+  rtx op = expand_normal (exp);
 
-  val = INTVAL (op);
+  unsigned HOST_WIDE_INT val = INTVAL (op);
   if (targetm.memmodel_check)
     val = targetm.memmodel_check (val);
   else if (val & ~MEMMODEL_MASK)
-    {
-      warning_at (loc, OPT_Winvalid_memory_model,
-		  "unknown architecture specifier in memory model to builtin");
-      return MEMMODEL_SEQ_CST;
-    }
+    return MEMMODEL_SEQ_CST;
 
   /* Should never see a user explicit SYNC memodel model, so >= LAST works. */
   if (memmodel_base (val) >= MEMMODEL_LAST)
-    {
-      warning_at (loc, OPT_Winvalid_memory_model,
-		  "invalid memory model argument to builtin");
-      return MEMMODEL_SEQ_CST;
-    }
+    return MEMMODEL_SEQ_CST;
 
   /* Workaround for Bugzilla 59448. GCC doesn't track consume properly, so
      be conservative and promote consume to acquire.  */
@@ -5865,28 +5853,17 @@ expand_builtin_atomic_compare_exchange (machine_mode mode, tree exp,
 {
   rtx expect, desired, mem, oldval;
   rtx_code_label *label;
-  enum memmodel success, failure;
   tree weak;
   bool is_weak;
-  location_t loc
-    = expansion_point_location_if_in_system_header (input_location);
 
-  success = get_memmodel (CALL_EXPR_ARG (exp, 4));
-  failure = get_memmodel (CALL_EXPR_ARG (exp, 5));
+  memmodel success = get_memmodel (CALL_EXPR_ARG (exp, 4));
+  memmodel failure = get_memmodel (CALL_EXPR_ARG (exp, 5));
 
   if (failure > success)
-    {
-      warning_at (loc, OPT_Winvalid_memory_model,
-		  "failure memory model cannot be stronger than success "
-		  "memory model for %<__atomic_compare_exchange%>");
-      success = MEMMODEL_SEQ_CST;
-    }
+    success = MEMMODEL_SEQ_CST;
  
   if (is_mm_release (failure) || is_mm_acq_rel (failure))
     {
-      warning_at (loc, OPT_Winvalid_memory_model,
-		  "invalid failure memory model for "
-		  "%<__atomic_compare_exchange%>");
       failure = MEMMODEL_SEQ_CST;
       success = MEMMODEL_SEQ_CST;
     }
@@ -5991,29 +5968,15 @@ expand_ifn_atomic_compare_exchange (gcall *call)
   int size = tree_to_shwi (gimple_call_arg (call, 3)) & 255;
   gcc_assert (size == 1 || size == 2 || size == 4 || size == 8 || size == 16);
   machine_mode mode = int_mode_for_size (BITS_PER_UNIT * size, 0).require ();
-  rtx expect, desired, mem, oldval, boolret;
-  enum memmodel success, failure;
-  tree lhs;
-  bool is_weak;
-  location_t loc
-    = expansion_point_location_if_in_system_header (gimple_location (call));
 
-  success = get_memmodel (gimple_call_arg (call, 4));
-  failure = get_memmodel (gimple_call_arg (call, 5));
+  memmodel success = get_memmodel (gimple_call_arg (call, 4));
+  memmodel failure = get_memmodel (gimple_call_arg (call, 5));
 
   if (failure > success)
-    {
-      warning_at (loc, OPT_Winvalid_memory_model,
-		  "failure memory model cannot be stronger than success "
-		  "memory model for %<__atomic_compare_exchange%>");
-      success = MEMMODEL_SEQ_CST;
-    }
+    success = MEMMODEL_SEQ_CST;
 
   if (is_mm_release (failure) || is_mm_acq_rel (failure))
     {
-      warning_at (loc, OPT_Winvalid_memory_model,
-		  "invalid failure memory model for "
-		  "%<__atomic_compare_exchange%>");
       failure = MEMMODEL_SEQ_CST;
       success = MEMMODEL_SEQ_CST;
     }
@@ -6025,15 +5988,15 @@ expand_ifn_atomic_compare_exchange (gcall *call)
     }
 
   /* Expand the operands.  */
-  mem = get_builtin_sync_mem (gimple_call_arg (call, 0), mode);
+  rtx mem = get_builtin_sync_mem (gimple_call_arg (call, 0), mode);
 
-  expect = expand_expr_force_mode (gimple_call_arg (call, 1), mode);
-  desired = expand_expr_force_mode (gimple_call_arg (call, 2), mode);
+  rtx expect = expand_expr_force_mode (gimple_call_arg (call, 1), mode);
+  rtx desired = expand_expr_force_mode (gimple_call_arg (call, 2), mode);
 
-  is_weak = (tree_to_shwi (gimple_call_arg (call, 3)) & 256) != 0;
+  bool is_weak = (tree_to_shwi (gimple_call_arg (call, 3)) & 256) != 0;
 
-  boolret = NULL;
-  oldval = NULL;
+  rtx boolret = NULL;
+  rtx oldval = NULL;
 
   if (!expand_atomic_compare_and_swap (&boolret, &oldval, mem, expect, desired,
 				       is_weak, success, failure))
@@ -6042,7 +6005,7 @@ expand_ifn_atomic_compare_exchange (gcall *call)
       return;
     }
 
-  lhs = gimple_call_lhs (call);
+  tree lhs = gimple_call_lhs (call);
   if (lhs)
     {
       rtx target = expand_expr (lhs, NULL_RTX, VOIDmode, EXPAND_WRITE);
@@ -6061,24 +6024,15 @@ expand_ifn_atomic_compare_exchange (gcall *call)
 static rtx
 expand_builtin_atomic_load (machine_mode mode, tree exp, rtx target)
 {
-  rtx mem;
-  enum memmodel model;
-
-  model = get_memmodel (CALL_EXPR_ARG (exp, 1));
+  memmodel model = get_memmodel (CALL_EXPR_ARG (exp, 1));
   if (is_mm_release (model) || is_mm_acq_rel (model))
-    {
-      location_t loc
-	= expansion_point_location_if_in_system_header (input_location);
-      warning_at (loc, OPT_Winvalid_memory_model,
-		  "invalid memory model for %<__atomic_load%>");
-      model = MEMMODEL_SEQ_CST;
-    }
+    model = MEMMODEL_SEQ_CST;
 
   if (!flag_inline_atomics)
     return NULL_RTX;
 
   /* Expand the operand.  */
-  mem = get_builtin_sync_mem (CALL_EXPR_ARG (exp, 0), mode);
+  rtx mem = get_builtin_sync_mem (CALL_EXPR_ARG (exp, 0), mode);
 
   return expand_atomic_load (target, mem, model);
 }
@@ -6092,26 +6046,17 @@ expand_builtin_atomic_load (machine_mode mode, tree exp, rtx target)
 static rtx
 expand_builtin_atomic_store (machine_mode mode, tree exp)
 {
-  rtx mem, val;
-  enum memmodel model;
-
-  model = get_memmodel (CALL_EXPR_ARG (exp, 2));
+  memmodel model = get_memmodel (CALL_EXPR_ARG (exp, 2));
   if (!(is_mm_relaxed (model) || is_mm_seq_cst (model)
 	|| is_mm_release (model)))
-    {
-      location_t loc
-	= expansion_point_location_if_in_system_header (input_location);
-      warning_at (loc, OPT_Winvalid_memory_model,
-		  "invalid memory model for %<__atomic_store%>");
-      model = MEMMODEL_SEQ_CST;
-    }
+    model = MEMMODEL_SEQ_CST;
 
   if (!flag_inline_atomics)
     return NULL_RTX;
 
   /* Expand the operands.  */
-  mem = get_builtin_sync_mem (CALL_EXPR_ARG (exp, 0), mode);
-  val = expand_expr_force_mode (CALL_EXPR_ARG (exp, 1), mode);
+  rtx mem = get_builtin_sync_mem (CALL_EXPR_ARG (exp, 0), mode);
+  rtx val = expand_expr_force_mode (CALL_EXPR_ARG (exp, 1), mode);
 
   return expand_atomic_store (mem, val, model, false);
 }
@@ -6275,6 +6220,93 @@ expand_ifn_atomic_bit_test_and (gcall *call)
     emit_move_insn (target, result);
 }
 
+/* Expand IFN_ATOMIC_*_FETCH_CMP_0 internal function.  */
+
+void
+expand_ifn_atomic_op_fetch_cmp_0 (gcall *call)
+{
+  tree cmp = gimple_call_arg (call, 0);
+  tree ptr = gimple_call_arg (call, 1);
+  tree arg = gimple_call_arg (call, 2);
+  tree lhs = gimple_call_lhs (call);
+  enum memmodel model = MEMMODEL_SYNC_SEQ_CST;
+  machine_mode mode = TYPE_MODE (TREE_TYPE (cmp));
+  optab optab;
+  rtx_code code;
+  class expand_operand ops[5];
+
+  gcc_assert (flag_inline_atomics);
+
+  if (gimple_call_num_args (call) == 4)
+    model = get_memmodel (gimple_call_arg (call, 3));
+
+  rtx mem = get_builtin_sync_mem (ptr, mode);
+  rtx op = expand_expr_force_mode (arg, mode);
+
+  switch (gimple_call_internal_fn (call))
+    {
+    case IFN_ATOMIC_ADD_FETCH_CMP_0:
+      code = PLUS;
+      optab = atomic_add_fetch_cmp_0_optab;
+      break;
+    case IFN_ATOMIC_SUB_FETCH_CMP_0:
+      code = MINUS;
+      optab = atomic_sub_fetch_cmp_0_optab;
+      break;
+    case IFN_ATOMIC_AND_FETCH_CMP_0:
+      code = AND;
+      optab = atomic_and_fetch_cmp_0_optab;
+      break;
+    case IFN_ATOMIC_OR_FETCH_CMP_0:
+      code = IOR;
+      optab = atomic_or_fetch_cmp_0_optab;
+      break;
+    case IFN_ATOMIC_XOR_FETCH_CMP_0:
+      code = XOR;
+      optab = atomic_xor_fetch_cmp_0_optab;
+      break;
+    default:
+      gcc_unreachable ();
+    }
+
+  enum rtx_code comp = UNKNOWN;
+  switch (tree_to_uhwi (cmp))
+    {
+    case ATOMIC_OP_FETCH_CMP_0_EQ: comp = EQ; break;
+    case ATOMIC_OP_FETCH_CMP_0_NE: comp = NE; break;
+    case ATOMIC_OP_FETCH_CMP_0_GT: comp = GT; break;
+    case ATOMIC_OP_FETCH_CMP_0_GE: comp = GE; break;
+    case ATOMIC_OP_FETCH_CMP_0_LT: comp = LT; break;
+    case ATOMIC_OP_FETCH_CMP_0_LE: comp = LE; break;
+    default: gcc_unreachable ();
+    }
+
+  rtx target;
+  if (lhs == NULL_TREE)
+    target = gen_reg_rtx (TYPE_MODE (boolean_type_node));
+  else
+    target = expand_expr (lhs, NULL_RTX, VOIDmode, EXPAND_WRITE);
+  enum insn_code icode = direct_optab_handler (optab, mode);
+  gcc_assert (icode != CODE_FOR_nothing);
+  create_output_operand (&ops[0], target, TYPE_MODE (boolean_type_node));
+  create_fixed_operand (&ops[1], mem);
+  create_convert_operand_to (&ops[2], op, mode, true);
+  create_integer_operand (&ops[3], model);
+  create_integer_operand (&ops[4], comp);
+  if (maybe_expand_insn (icode, 5, ops))
+    return;
+
+  rtx result = expand_atomic_fetch_op (gen_reg_rtx (mode), mem, op,
+				       code, model, true);
+  if (lhs)
+    {
+      result = emit_store_flag_force (target, comp, result, const0_rtx, mode,
+				      0, 1);
+      if (result != target)
+	emit_move_insn (target, result);
+    }
+}
+
 /* Expand an atomic clear operation.
 	void _atomic_clear (BOOL *obj, enum memmodel)
    EXP is the call expression.  */
@@ -6282,29 +6314,19 @@ expand_ifn_atomic_bit_test_and (gcall *call)
 static rtx
 expand_builtin_atomic_clear (tree exp) 
 {
-  machine_mode mode;
-  rtx mem, ret;
-  enum memmodel model;
-
-  mode = int_mode_for_size (BOOL_TYPE_SIZE, 0).require ();
-  mem = get_builtin_sync_mem (CALL_EXPR_ARG (exp, 0), mode);
-  model = get_memmodel (CALL_EXPR_ARG (exp, 1));
+  machine_mode mode = int_mode_for_size (BOOL_TYPE_SIZE, 0).require ();
+  rtx mem = get_builtin_sync_mem (CALL_EXPR_ARG (exp, 0), mode);
+  memmodel model = get_memmodel (CALL_EXPR_ARG (exp, 1));
 
   if (is_mm_consume (model) || is_mm_acquire (model) || is_mm_acq_rel (model))
-    {
-      location_t loc
-	= expansion_point_location_if_in_system_header (input_location);
-      warning_at (loc, OPT_Winvalid_memory_model,
-		  "invalid memory model for %<__atomic_store%>");
-      model = MEMMODEL_SEQ_CST;
-    }
+    model = MEMMODEL_SEQ_CST;
 
   /* Try issuing an __atomic_store, and allow fallback to __sync_lock_release.
      Failing that, a store is issued by __atomic_store.  The only way this can
      fail is if the bool type is larger than a word size.  Unlikely, but
      handle it anyway for completeness.  Assume a single threaded model since
      there is no atomic support in this case, and no barriers are required.  */
-  ret = expand_atomic_store (mem, const0_rtx, model, true);
+  rtx ret = expand_atomic_store (mem, const0_rtx, model, true);
   if (!ret)
     emit_move_insn (mem, const0_rtx);
   return const0_rtx;
@@ -7908,6 +7930,7 @@ expand_builtin (tree exp, rtx target, rtx subtarget, machine_mode mode,
       return const0_rtx;
 
     case BUILT_IN_OBJECT_SIZE:
+    case BUILT_IN_DYNAMIC_OBJECT_SIZE:
       return expand_builtin_object_size (exp);
 
     case BUILT_IN_MEMCPY_CHK:
@@ -9314,7 +9337,8 @@ fold_builtin_2 (location_t loc, tree expr, tree fndecl, tree arg0, tree arg1)
       break;
 
     case BUILT_IN_OBJECT_SIZE:
-      return fold_builtin_object_size (arg0, arg1);
+    case BUILT_IN_DYNAMIC_OBJECT_SIZE:
+      return fold_builtin_object_size (arg0, arg1, fcode);
 
     case BUILT_IN_ATOMIC_ALWAYS_LOCK_FREE:
       return fold_builtin_atomic_always_lock_free (arg0, arg1);
@@ -10252,9 +10276,9 @@ maybe_emit_sprintf_chk_warning (tree exp, enum built_in_function fcode)
    if possible.  */
 
 static tree
-fold_builtin_object_size (tree ptr, tree ost)
+fold_builtin_object_size (tree ptr, tree ost, enum built_in_function fcode)
 {
-  unsigned HOST_WIDE_INT bytes;
+  tree bytes;
   int object_size_type;
 
   if (!validate_arg (ptr, POINTER_TYPE)
@@ -10276,11 +10300,14 @@ fold_builtin_object_size (tree ptr, tree ost)
   if (TREE_SIDE_EFFECTS (ptr))
     return build_int_cst_type (size_type_node, object_size_type < 2 ? -1 : 0);
 
+  if (fcode == BUILT_IN_DYNAMIC_OBJECT_SIZE)
+    object_size_type |= OST_DYNAMIC;
+
   if (TREE_CODE (ptr) == ADDR_EXPR)
     {
       compute_builtin_object_size (ptr, object_size_type, &bytes);
-      if (wi::fits_to_tree_p (bytes, size_type_node))
-	return build_int_cstu (size_type_node, bytes);
+      if (int_fits_type_p (bytes, size_type_node))
+	return fold_convert (size_type_node, bytes);
     }
   else if (TREE_CODE (ptr) == SSA_NAME)
     {
@@ -10288,8 +10315,8 @@ fold_builtin_object_size (tree ptr, tree ost)
        later.  Maybe subsequent passes will help determining
        it.  */
       if (compute_builtin_object_size (ptr, object_size_type, &bytes)
-	  && wi::fits_to_tree_p (bytes, size_type_node))
-	return build_int_cstu (size_type_node, bytes);
+	  && int_fits_type_p (bytes, size_type_node))
+	return fold_convert (size_type_node, bytes);
     }
 
   return NULL_TREE;

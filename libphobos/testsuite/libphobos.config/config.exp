@@ -1,4 +1,4 @@
-# Copyright (C) 2021 Free Software Foundation, Inc.
+# Copyright (C) 2021-2022 Free Software Foundation, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@ set dg-output-text [list]
 set config_test_list [list \
     { test19433 "--DRT-dont-eat-me" 0 } \
     { test20459 "foo bar -- --DRT-gcopts=profile:1" 0 } \
+    { test22523 "-- --DRT-testmode=run-main" 0 } \
 ]
 
 # Initialize dg.

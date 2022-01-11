@@ -1,5 +1,5 @@
 /* Language-dependent node constructors for parse phase of GNU compiler.
-   Copyright (C) 1987-2021 Free Software Foundation, Inc.
+   Copyright (C) 1987-2022 Free Software Foundation, Inc.
    Hacked by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GCC.
@@ -737,12 +737,12 @@ build_cplus_new (tree type, tree init, tsubst_flags_t complain)
    intialization as a proxy for the full array initialization to get things
    marked as used and any appropriate diagnostics.
 
-   Since we're deferring building the actual constructor calls until
-   gimplification time, we need to build one now and throw it away so
-   that the relevant constructor gets mark_used before cgraph decides
-   what functions are needed.  Here we assume that init is either
-   NULL_TREE, void_type_node (indicating value-initialization), or
-   another array to copy.  */
+   This used to be necessary because we were deferring building the actual
+   constructor calls until gimplification time; now we only do it to set
+   VEC_INIT_EXPR_IS_CONSTEXPR.
+
+   We assume that init is either NULL_TREE, void_type_node (indicating
+   value-initialization), or another array to copy.  */
 
 static tree
 build_vec_init_elt (tree type, tree init, tsubst_flags_t complain)
@@ -756,13 +756,11 @@ build_vec_init_elt (tree type, tree init, tsubst_flags_t complain)
   else if (init == void_type_node)
     return build_value_init (inner_type, complain);
 
-  gcc_assert (init == NULL_TREE
-	      || (same_type_ignoring_top_level_qualifiers_p
-		  (type, TREE_TYPE (init))));
-
   releasing_vec argvec;
-  if (init)
+  if (init && !BRACE_ENCLOSED_INITIALIZER_P (init))
     {
+      gcc_assert (same_type_ignoring_top_level_qualifiers_p
+		  (type, TREE_TYPE (init)));
       tree init_type = strip_array_types (TREE_TYPE (init));
       tree dummy = build_dummy_object (init_type);
       if (!lvalue_p (init))
@@ -788,25 +786,25 @@ build_vec_init_elt (tree type, tree init, tsubst_flags_t complain)
 tree
 build_vec_init_expr (tree type, tree init, tsubst_flags_t complain)
 {
-  tree slot;
-  bool value_init = false;
+  if (init && TREE_CODE (init) == VEC_INIT_EXPR)
+    return init;
+
   tree elt_init;
-  if (init && TREE_CODE (init) == CONSTRUCTOR)
-    {
-      gcc_assert (!BRACE_ENCLOSED_INITIALIZER_P (init));
-      /* We built any needed constructor calls in digest_init.  */
-      elt_init = init;
-    }
+  if (init && TREE_CODE (init) == CONSTRUCTOR
+      && !BRACE_ENCLOSED_INITIALIZER_P (init))
+    /* We built any needed constructor calls in digest_init.  */
+    elt_init = init;
   else
     elt_init = build_vec_init_elt (type, init, complain);
 
+  bool value_init = false;
   if (init == void_type_node)
     {
       value_init = true;
       init = NULL_TREE;
     }
 
-  slot = build_local_temp (type);
+  tree slot = build_local_temp (type);
   init = build2 (VEC_INIT_EXPR, type, slot, init);
   TREE_SIDE_EFFECTS (init) = true;
   SET_EXPR_LOCATION (init, input_location);
@@ -817,6 +815,24 @@ build_vec_init_expr (tree type, tree init, tsubst_flags_t complain)
   VEC_INIT_EXPR_VALUE_INIT (init) = value_init;
 
   return init;
+}
+
+/* Call build_vec_init to expand VEC_INIT into TARGET (for which NULL_TREE
+   means VEC_INIT_EXPR_SLOT).  */
+
+tree
+expand_vec_init_expr (tree target, tree vec_init, tsubst_flags_t complain,
+		      vec<tree,va_gc> **flags)
+{
+  iloc_sentinel ils = EXPR_LOCATION (vec_init);
+
+  if (!target)
+    target = VEC_INIT_EXPR_SLOT (vec_init);
+  tree init = VEC_INIT_EXPR_INIT (vec_init);
+  int from_array = (init && TREE_CODE (TREE_TYPE (init)) == ARRAY_TYPE);
+  return build_vec_init (target, NULL_TREE, init,
+			 VEC_INIT_EXPR_VALUE_INIT (vec_init),
+			 from_array, complain, flags);
 }
 
 /* Give a helpful diagnostic for a non-constexpr VEC_INIT_EXPR in a context
@@ -839,7 +855,8 @@ diagnose_non_constexpr_vec_init (tree expr)
 tree
 build_array_copy (tree init)
 {
-  return build_vec_init_expr (TREE_TYPE (init), init, tf_warning_or_error);
+  return get_target_expr (build_vec_init_expr
+			  (TREE_TYPE (init), init, tf_warning_or_error));
 }
 
 /* Build a TARGET_EXPR using INIT to initialize a new temporary of the
@@ -3577,11 +3594,6 @@ build_min_non_dep (enum tree_code code, tree non_dep, ...)
   for (i = 0; i < length; i++)
     TREE_OPERAND (t, i) = va_arg (p, tree);
 
-  if (code == COMPOUND_EXPR && TREE_CODE (non_dep) != COMPOUND_EXPR)
-    /* This should not be considered a COMPOUND_EXPR, because it
-       resolves to an overload.  */
-    COMPOUND_EXPR_OVERLOADED (t) = 1;
-
   va_end (p);
   return convert_from_reference (t);
 }
@@ -4376,8 +4388,9 @@ maybe_warn_parm_abi (tree t, location_t loc)
 			"the calling convention for %qT, which was "
 			"accidentally changed in 8.1", t);
       else
-	w = warning_at (loc, OPT_Wabi, "%<-fabi-version=12%> (GCC 8.1) accident"
-			"ally changes the calling convention for %qT", t);
+	w = warning_at (loc, OPT_Wabi, "%<-fabi-version=12%> (GCC 8.1) "
+			"accidentally changes the calling convention for %qT",
+			t);
       if (w)
 	inform (location_of (t), " declared here");
       return;
@@ -5979,8 +5992,6 @@ cp_free_lang_data (tree t)
       DECL_EXTERNAL (t) = 1;
       TREE_STATIC (t) = 0;
     }
-  if (TREE_CODE (t) == FUNCTION_DECL)
-    discard_operator_bindings (t);
   if (TREE_CODE (t) == NAMESPACE_DECL)
     /* We do not need the leftover chaining of namespaces from the
        binding level.  */

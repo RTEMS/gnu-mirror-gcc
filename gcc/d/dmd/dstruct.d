@@ -3,9 +3,9 @@
  *
  * Specification: $(LINK2 https://dlang.org/spec/struct.html, Structs, Unions)
  *
- * Copyright:   Copyright (C) 1999-2021 by The D Language Foundation, All Rights Reserved
- * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
- * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
+ * Copyright:   Copyright (C) 1999-2022 by The D Language Foundation, All Rights Reserved
+ * Authors:     $(LINK2 https://www.digitalmars.com, Walter Bright)
+ * License:     $(LINK2 https://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/dstruct.d, _dstruct.d)
  * Documentation:  https://dlang.org/phobos/dmd_dstruct.html
  * Coverage:    https://codecov.io/gh/dlang/dmd/src/master/src/dmd/dstruct.d
@@ -16,6 +16,7 @@ module dmd.dstruct;
 import dmd.aggregate;
 import dmd.arraytypes;
 import dmd.astenums;
+import dmd.attrib;
 import dmd.declaration;
 import dmd.dmodule;
 import dmd.dscope;
@@ -127,7 +128,7 @@ extern (C++) void semanticTypeInfo(Scope* sc, Type t)
          */
         if (!sd.members)
             return; // opaque struct
-        if (!sd.xeq && !sd.xcmp && !sd.postblit && !sd.dtor && !sd.xhash && !search_toString(sd))
+        if (!sd.xeq && !sd.xcmp && !sd.postblit && !sd.tidtor && !sd.xhash && !search_toString(sd))
             return; // none of TypeInfo-specific members
 
         // If the struct is in a non-root module, run semantic3 to get
@@ -232,7 +233,7 @@ extern (C++) class StructDeclaration : AggregateDeclaration
         }
     }
 
-    static StructDeclaration create(Loc loc, Identifier id, bool inObject)
+    static StructDeclaration create(const ref Loc loc, Identifier id, bool inObject)
     {
         return new StructDeclaration(loc, id, inObject);
     }
@@ -297,22 +298,46 @@ extern (C++) class StructDeclaration : AggregateDeclaration
             return;
         }
 
-        // 0 sized struct's are set to 1 byte
         if (structsize == 0)
         {
             hasNoFields = true;
             alignsize = 1;
-            if (classKind != classKind.c) // C gets a struct size of 0
-                structsize = 1;
+
+            // A fine mess of what size a zero sized struct should be
+            final switch (classKind)
+            {
+                case ClassKind.d:
+                case ClassKind.cpp:
+                    structsize = 1;
+                    break;
+
+                case ClassKind.c:
+                case ClassKind.objc:
+                    if (target.c.bitFieldStyle == TargetC.BitFieldStyle.MS)
+                    {
+                        /* Undocumented MS behavior for:
+                         *   struct S { int :0; };
+                         */
+                        structsize = 4;
+                    }
+                    else if (target.c.bitFieldStyle == TargetC.BitFieldStyle.DM)
+                    {
+                        structsize = 0;
+                        alignsize = 0;
+                    }
+                    else
+                        structsize = 0;
+                    break;
+            }
         }
 
         // Round struct size up to next alignsize boundary.
         // This will ensure that arrays of structs will get their internals
         // aligned properly.
-        if (alignment == STRUCTALIGN_DEFAULT)
+        if (alignment.isDefault() || alignment.isPack())
             structsize = (structsize + alignsize - 1) & ~(alignsize - 1);
         else
-            structsize = (structsize + alignment - 1) & ~(alignment - 1);
+            structsize = (structsize + alignment.get() - 1) & ~(alignment.get() - 1);
 
         sizeok = Sizeok.done;
 
@@ -497,14 +522,14 @@ private bool _isZeroInit(Expression exp)
 {
     switch (exp.op)
     {
-        case TOK.int64:
+        case EXP.int64:
             return exp.toInteger() == 0;
 
-        case TOK.null_:
-        case TOK.false_:
+        case EXP.null_:
+        case EXP.false_:
             return true;
 
-        case TOK.structLiteral:
+        case EXP.structLiteral:
         {
             auto sle = cast(StructLiteralExp) exp;
             foreach (i; 0 .. sle.sd.fields.dim)
@@ -521,7 +546,7 @@ private bool _isZeroInit(Expression exp)
             return true;
         }
 
-        case TOK.arrayLiteral:
+        case EXP.arrayLiteral:
         {
             auto ale = cast(ArrayLiteralExp)exp;
 
@@ -541,7 +566,7 @@ private bool _isZeroInit(Expression exp)
             return true;
         }
 
-        case TOK.string_:
+        case EXP.string_:
         {
             StringExp se = cast(StringExp)exp;
 
@@ -556,14 +581,14 @@ private bool _isZeroInit(Expression exp)
             return true;
         }
 
-        case TOK.vector:
+        case EXP.vector:
         {
             auto ve = cast(VectorExp) exp;
             return _isZeroInit(ve.e1);
         }
 
-        case TOK.float64:
-        case TOK.complex80:
+        case EXP.float64:
+        case EXP.complex80:
         {
             import dmd.root.ctfloat : CTFloat;
             return (exp.toReal()      is CTFloat.zero) &&

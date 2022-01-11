@@ -1,5 +1,5 @@
 ; lang.opt -- Options for the D front end.
-; Copyright (C) 2006-2021 Free Software Foundation, Inc.
+; Copyright (C) 2006-2022 Free Software Foundation, Inc.
 ;
 ; GCC is free software; you can redistribute it and/or modify it under
 ; the terms of the GNU General Public License as published by the Free
@@ -380,10 +380,6 @@ fpreview=inclusiveincontracts
 D RejectNegative
 Implement 'in' contracts of overridden methods to be a superset of parent contract.
 
-fpreview=intpromote
-D RejectNegative
-Use C-style integral promotion for unary '+', '-' and '~'.
-
 fpreview=nosharedaccess
 D RejectNegative
 Disable access to shared memory objects.
@@ -412,6 +408,10 @@ frevert=dtorfields
 D RejectNegative
 Don't destruct fields of partially constructed objects.
 
+frevert=intpromote
+D RejectNegative
+Use C-style integral promotion for unary '+', '-' and '~'.
+
 frevert=markdown
 D RejectNegative
 Disable Markdown replacements in Ddoc.
@@ -435,6 +435,10 @@ List information on all D language transitions.
 ftransition=field
 D RejectNegative
 List all non-mutable fields which occupy an object instance.
+
+ftransition=in
+D RejectNegative
+List all usages of 'in' on parameter.
 
 ftransition=nogc
 D RejectNegative

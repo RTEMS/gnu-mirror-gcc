@@ -1,4 +1,4 @@
-.. Copyright (C) 2015-2021 Free Software Foundation, Inc.
+.. Copyright (C) 2015-2022 Free Software Foundation, Inc.
    Originally contributed by David Malcolm <dmalcolm@redhat.com>
 
    This is free software: you can redistribute it and/or modify it
@@ -13,7 +13,7 @@
 
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see
-   <http://www.gnu.org/licenses/>.
+   <https://www.gnu.org/licenses/>.
 
 .. default-domain:: c
 
@@ -284,3 +284,21 @@ entrypoints:
   * :func:`gcc_jit_struct_get_field`
 
   * :func:`gcc_jit_struct_get_field_count`
+
+.. _LIBGCCJIT_ABI_17:
+
+``LIBGCCJIT_ABI_17``
+-----------------------
+``LIBGCCJIT_ABI_17`` covers the addition of an API entrypoint to set the
+thread-local storage model of a variable:
+
+  * :func:`gcc_jit_lvalue_set_tls_model`
+
+.. _LIBGCCJIT_ABI_18:
+
+``LIBGCCJIT_ABI_18``
+-----------------------
+``LIBGCCJIT_ABI_18`` covers the addition of an API entrypoint to set the link
+section of a variable:
+
+  * :func:`gcc_jit_lvalue_set_link_section`

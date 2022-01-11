@@ -1,5 +1,5 @@
 /* Subroutines used for code generation on IBM S/390 and zSeries
-   Copyright (C) 1999-2021 Free Software Foundation, Inc.
+   Copyright (C) 1999-2022 Free Software Foundation, Inc.
    Contributed by Hartmut Penner (hpenner@de.ibm.com) and
                   Ulrich Weigand (uweigand@de.ibm.com) and
                   Andreas Krebbel (Andreas.Krebbel@de.ibm.com).
@@ -15926,7 +15926,7 @@ s390_valid_target_attribute_inner_p (tree args,
 	  new_opts_set->x_target_flags |= mask;
 	}
 
-      else if (cl_options[opt].var_type == CLVC_BOOLEAN)
+      else if (cl_options[opt].var_type == CLVC_INTEGER)
 	{
 	  int value;
 

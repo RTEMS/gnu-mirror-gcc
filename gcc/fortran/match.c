@@ -1,5 +1,5 @@
 /* Matching subroutines in all sizes, shapes and colors.
-   Copyright (C) 2000-2021 Free Software Foundation, Inc.
+   Copyright (C) 2000-2022 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of GCC.
@@ -6075,8 +6075,30 @@ match_case_selector (gfc_case **cp)
 	  m = gfc_match_init_expr (&c->high);
 	  if (m == MATCH_ERROR)
 	    goto cleanup;
+	  if (m == MATCH_YES
+	      && c->high->ts.type != BT_LOGICAL
+	      && c->high->ts.type != BT_INTEGER
+	      && c->high->ts.type != BT_CHARACTER)
+	    {
+	      gfc_error ("Expression in CASE selector at %L cannot be %s",
+			 &c->high->where, gfc_typename (c->high));
+	      goto cleanup;
+	    }
 	  /* MATCH_NO is fine.  It's OK if nothing is there!  */
 	}
+    }
+
+  if (c->low && c->low->rank != 0)
+    {
+      gfc_error ("Expression in CASE selector at %L must be scalar",
+		 &c->low->where);
+      goto cleanup;
+    }
+  if (c->high && c->high->rank != 0)
+    {
+      gfc_error ("Expression in CASE selector at %L must be scalar",
+		 &c->high->where);
+      goto cleanup;
     }
 
   *cp = c;
@@ -6341,7 +6363,8 @@ select_type_set_tmp (gfc_typespec *ts)
       sym = tmp->n.sym;
       gfc_add_type (sym, ts, NULL);
 
-      if (selector->ts.type == BT_CLASS && selector->attr.class_ok)
+      if (selector->ts.type == BT_CLASS && selector->attr.class_ok
+	  && selector->ts.u.derived && CLASS_DATA (selector))
 	{
 	  sym->attr.pointer
 		= CLASS_DATA (selector)->attr.class_pointer;

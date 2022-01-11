@@ -1,5 +1,5 @@
 /* Compiler driver program that can handle many languages.
-   Copyright (C) 1987-2021 Free Software Foundation, Inc.
+   Copyright (C) 1987-2022 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -4017,26 +4017,25 @@ check_offload_target_name (const char *target, ptrdiff_t len)
       memcpy (cand, OFFLOAD_TARGETS, olen);
       for (c = strtok (cand, ","); c; c = strtok (NULL, ","))
 	candidates.safe_push (c);
+      candidates.safe_push ("default");
+      candidates.safe_push ("disable");
 
       char *target2 = XALLOCAVEC (char, len + 1);
       memcpy (target2, target, len);
       target2[len] = '\0';
 
-      error ("GCC is not configured to support %qs as offload target", target2);
+      error ("GCC is not configured to support %qs as %<-foffload=%> argument",
+	     target2);
 
-      if (candidates.is_empty ())
-	inform (UNKNOWN_LOCATION, "no offloading targets configured");
+      char *s;
+      const char *hint = candidates_list_and_hint (target2, s, candidates);
+      if (hint)
+	inform (UNKNOWN_LOCATION,
+		"valid %<-foffload=%> arguments are: %s; "
+		"did you mean %qs?", s, hint);
       else
-	{
-	  char *s;
-	  const char *hint = candidates_list_and_hint (target2, s, candidates);
-	  if (hint)
-	    inform (UNKNOWN_LOCATION,
-		    "valid offload targets are: %s; did you mean %qs?", s, hint);
-	  else
-	    inform (UNKNOWN_LOCATION, "valid offload targets are: %s", s);
-	  XDELETEVEC (s);
-	}
+	inform (UNKNOWN_LOCATION, "valid %<-foffload=%> arguments are: %s", s);
+      XDELETEVEC (s);
       return false;
     }
   return true;
@@ -4283,6 +4282,10 @@ driver_handle_option (struct gcc_options *opts,
        use_ld = ".gold";
        break;
 
+    case OPT_fuse_ld_mold:
+       use_ld = ".mold";
+       break;
+
     case OPT_fcompare_debug_second:
       compare_debug_second = 1;
       break;
@@ -4489,7 +4492,9 @@ driver_handle_option (struct gcc_options *opts,
     case OPT__sysroot_:
       target_system_root = arg;
       target_system_root_changed = 1;
-      do_save = false;
+      /* Saving this option is useful to let self-specs decide to
+	 provide a default one.  */
+      do_save = true;
       break;
 
     case OPT_time_:
@@ -8773,7 +8778,7 @@ driver::maybe_print_and_exit () const
     {
       printf (_("%s %s%s\n"), progname, pkgversion_string,
 	      version_string);
-      printf ("Copyright %s 2021 Free Software Foundation, Inc.\n",
+      printf ("Copyright %s 2022 Free Software Foundation, Inc.\n",
 	      _("(C)"));
       fputs (_("This is free software; see the source for copying conditions.  There is NO\n\
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"),

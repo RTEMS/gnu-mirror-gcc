@@ -1,6 +1,6 @@
 // Components for manipulating sequences of characters -*- C++ -*-
 
-// Copyright (C) 1997-2021 Free Software Foundation, Inc.
+// Copyright (C) 1997-2022 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -766,7 +766,8 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  @param  __n   The number of characters to copy from __t.
        *  @param  __a   Allocator to use.
        */
-      template<typename _Tp, typename = _If_sv<_Tp, void>>
+      template<typename _Tp,
+	       typename = enable_if_t<is_convertible_v<const _Tp&, __sv_type>>>
 	_GLIBCXX20_CONSTEXPR
 	basic_string(const _Tp& __t, size_type __pos, size_type __n,
 		     const _Alloc& __a = _Alloc())
@@ -1382,7 +1383,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       _GLIBCXX20_CONSTEXPR
       basic_string&
       append(const basic_string& __str)
-      { return _M_append(__str._M_data(), __str.size()); }
+      { return this->append(__str._M_data(), __str.size()); }
 
       /**
        *  @brief  Append a substring.
@@ -1400,9 +1401,9 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       _GLIBCXX20_CONSTEXPR
       basic_string&
       append(const basic_string& __str, size_type __pos, size_type __n = npos)
-      { return _M_append(__str._M_data()
-			 + __str._M_check(__pos, "basic_string::append"),
-			 __str._M_limit(__pos, __n)); }
+      { return this->append(__str._M_data()
+			    + __str._M_check(__pos, "basic_string::append"),
+			    __str._M_limit(__pos, __n)); }
 
       /**
        *  @brief  Append a C substring.

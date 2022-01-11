@@ -29,10 +29,7 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
-pragma Compiler_Unit_Warning;
-
-with System;                 use System;
-with System.Unsigned_Types;  use System.Unsigned_Types;
+with System.Unsigned_Types; use System.Unsigned_Types;
 
 with Ada.Exceptions;         use Ada.Exceptions;
 with Ada.Unchecked_Conversion;

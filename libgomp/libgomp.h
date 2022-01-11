@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2021 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2022 Free Software Foundation, Inc.
    Contributed by Richard Henderson <rth@redhat.com>.
 
    This file is part of the GNU Offloading and Multi Processing Library
@@ -1283,7 +1283,7 @@ extern uintptr_t gomp_map_val (struct target_mem_desc *, void **, size_t);
 extern void gomp_attach_pointer (struct gomp_device_descr *,
 				 struct goacc_asyncqueue *, splay_tree,
 				 splay_tree_key, uintptr_t, size_t,
-				 struct gomp_coalesce_buf *);
+				 struct gomp_coalesce_buf *, bool);
 extern void gomp_detach_pointer (struct gomp_device_descr *,
 				 struct goacc_asyncqueue *, splay_tree_key,
 				 uintptr_t, bool, struct gomp_coalesce_buf *);

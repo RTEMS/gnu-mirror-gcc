@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2021 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2022 Free Software Foundation, Inc.
    Contributed by Andy Vaught and Janne Blomqvist
 
 This file is part of the GNU Fortran runtime library (libgfortran).
@@ -527,7 +527,7 @@ st_flush (st_parameter_filepos *fpp)
     }
   else
     /* FLUSH on unconnected unit is illegal: F95 std., 9.3.5. */ 
-    generate_error (&fpp->common, LIBERROR_BAD_OPTION,
+    generate_error (&fpp->common, -LIBERROR_BAD_UNIT,
 			"Specified UNIT in FLUSH is not connected");
 
   if (needs_unlock)

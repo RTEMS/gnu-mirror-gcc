@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2021 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2022 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of the GNU Fortran runtime library (libgfortran).
@@ -26,7 +26,6 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #include <string.h>
 #include <strings.h>
-#include <ctype.h>
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -91,7 +90,7 @@ init_integer (variable * v)
     return;
 
   for (q = p; *q; q++)
-    if (!isdigit (*q) && (p != q || *q != '-'))
+    if (!safe_isdigit (*q) && (p != q || *q != '-'))
       return;
 
   *v->var = atoi (p);
@@ -344,7 +343,7 @@ static int
 match_integer (void)
 {
   unit_num = 0;
-  while (isdigit (*p))
+  while (safe_isdigit (*p))
     unit_num = unit_num * 10 + (*p++ - '0');
   return INTEGER;
 }

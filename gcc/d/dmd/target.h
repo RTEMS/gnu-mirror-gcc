@@ -1,10 +1,10 @@
 
 /* Compiler implementation of the D programming language
- * Copyright (C) 2013-2021 by The D Language Foundation, All Rights Reserved
+ * Copyright (C) 2013-2022 by The D Language Foundation, All Rights Reserved
  * written by Iain Buclaw
- * http://www.digitalmars.com
+ * https://www.digitalmars.com
  * Distributed under the Boost Software License, Version 1.0.
- * http://www.boost.org/LICENSE_1_0.txt
+ * https://www.boost.org/LICENSE_1_0.txt
  * https://github.com/dlang/dmd/blob/master/src/dmd/target.h
  */
 
@@ -26,7 +26,7 @@ class Type;
 class TypeTuple;
 class TypeFunction;
 
-enum class CPU
+enum class CPU : unsigned char
 {
     x87,
     mmx,
@@ -63,12 +63,14 @@ struct TargetC
     enum class BitFieldStyle : unsigned char
     {
         Unspecified,
-        Dm_Ms,                // Digital Mars and Microsoft C compilers
+        DM,                   // Digital Mars 32 bit C compiler
+        MS,                   // Microsoft 32 and 64 bit C compilers
                               // https://docs.microsoft.com/en-us/cpp/c-language/c-bit-fields?view=msvc-160
                               // https://docs.microsoft.com/en-us/cpp/cpp/cpp-bit-fields?view=msvc-160
         Gcc_Clang,            // gcc and clang
     };
 
+    uint8_t crtDestructorsSupported; // Not all platforms support crt_destructor
     uint8_t longsize;            // size of a C 'long' or 'unsigned long' type
     uint8_t long_doublesize;     // size of a C 'long double'
     uint8_t wchar_tsize;         // size of a C 'wchar_t' type
@@ -193,7 +195,7 @@ public:
     unsigned fieldalign(Type *type);
     Type *va_listType(const Loc &loc, Scope *sc);  // get type of va_list
     int isVectorTypeSupported(int sz, Type *type);
-    bool isVectorOpSupported(Type *type, unsigned op, Type *t2 = NULL);
+    bool isVectorOpSupported(Type *type, EXP op, Type *t2 = NULL);
     // ABI and backend.
     LINK systemLinkage();
     TypeTuple *toArgTypes(Type *t);

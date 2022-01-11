@@ -1,6 +1,6 @@
 /* Get common system includes and various definitions and declarations based
    on autoconf macros.
-   Copyright (C) 1998-2021 Free Software Foundation, Inc.
+   Copyright (C) 1998-2022 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -737,12 +737,10 @@ extern int vsnprintf (char *, size_t, const char *, va_list);
 
 /* Some of the headers included by <memory> can use "abort" within a
    namespace, e.g. "_VSTD::abort();", which fails after we use the
-   preprocessor to redefine "abort" as "fancy_abort" below.
-   Given that unique-ptr.h can use "free", we need to do this after "free"
-   is declared but before "abort" is overridden.  */
+   preprocessor to redefine "abort" as "fancy_abort" below.  */
 
-#ifdef INCLUDE_UNIQUE_PTR
-# include "unique-ptr.h"
+#ifdef INCLUDE_MEMORY
+# include <memory>
 #endif
 
 #ifdef INCLUDE_MALLOC_H

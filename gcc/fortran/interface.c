@@ -1,5 +1,5 @@
 /* Deal with interfaces.
-   Copyright (C) 2000-2021 Free Software Foundation, Inc.
+   Copyright (C) 2000-2022 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of GCC.
@@ -2237,7 +2237,11 @@ argument_rank_mismatch (const char *name, locus *where,
     }
   else
     {
-      gcc_assert (rank2 != -1);
+      if (rank2 == -1)
+	/* This is an assumed rank-actual passed to a function without
+	   an explicit interface, which is already diagnosed in
+	   gfc_procedure_use.  */
+	return;
       if (rank1 == 0)
 	gfc_error_opt (0, "Rank mismatch between actual argument at %L "
 		       "and actual argument at %L (scalar and rank-%d)",

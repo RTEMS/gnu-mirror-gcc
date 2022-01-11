@@ -1,7 +1,7 @@
 # configure.ac for GCC
 # Process this file with autoconf to generate a configuration script.
 
-# Copyright (C) 1997-2021 Free Software Foundation, Inc.
+# Copyright (C) 1997-2022 Free Software Foundation, Inc.
 
 #This file is part of GCC.
 
@@ -4692,7 +4692,7 @@ foo:	nop
 	;;
     esac
     case $target_os in
-       darwin2[[0-9]]* | darwin19*)
+       darwin2* | darwin19*)
         gcc_GAS_CHECK_FEATURE([llvm assembler x86-pad-for-align option],
           gcc_cv_as_mllvm_x86_pad_for_align,
           [-mllvm -x86-pad-for-align=false], [.text],,

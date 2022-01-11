@@ -1,5 +1,5 @@
 /* Process declarations and variables for C++ compiler.
-   Copyright (C) 1988-2021 Free Software Foundation, Inc.
+   Copyright (C) 1988-2022 Free Software Foundation, Inc.
    Hacked by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GCC.
@@ -417,7 +417,8 @@ grok_array_decl (location_t loc, tree array_expr, tree index_exp,
     {
       if (index_exp)
 	expr = build_new_op (loc, ARRAY_REF, LOOKUP_NORMAL, array_expr,
-			     index_exp, NULL_TREE, &overload, complain);
+			     index_exp, NULL_TREE, NULL_TREE,
+			     &overload, complain);
       else if ((*index_exp_list)->is_empty ())
 	expr = build_op_subscript (loc, array_expr, index_exp_list, &overload,
 				   complain);
@@ -431,7 +432,7 @@ grok_array_decl (location_t loc, tree array_expr, tree index_exp,
 							 tf_none);
 	      if (idx != error_mark_node)
 		expr = build_new_op (loc, ARRAY_REF, LOOKUP_NORMAL, array_expr,
-				     idx, NULL_TREE, &overload,
+				     idx, NULL_TREE, NULL_TREE, &overload,
 				     complain & tf_decltype);
 	      if (expr == error_mark_node)
 		{
@@ -5271,6 +5272,7 @@ c_parse_final_cleanups (void)
 	  if (!DECL_EXTERNAL (decl)
 	      && decl_needed_p (decl)
 	      && !TREE_ASM_WRITTEN (decl)
+	      && !DECL_IMMEDIATE_FUNCTION_P (decl)
 	      && !node->definition)
 	    {
 	      /* We will output the function; no longer consider it in this

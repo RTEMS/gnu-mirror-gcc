@@ -29,13 +29,10 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
-pragma Compiler_Unit_Warning;
-
 with Ada.IO_Exceptions;        use Ada.IO_Exceptions;
 with Ada.Streams;              use Ada.Streams;
 with Ada.Unchecked_Conversion;
 
-with System;                   use System;
 with System.Storage_Elements;  use System.Storage_Elements;
 with System.Stream_Attributes;
 

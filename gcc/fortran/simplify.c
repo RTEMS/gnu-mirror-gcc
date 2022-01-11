@@ -1,5 +1,5 @@
 /* Simplify intrinsic functions at compile-time.
-   Copyright (C) 2000-2021 Free Software Foundation, Inc.
+   Copyright (C) 2000-2022 Free Software Foundation, Inc.
    Contributed by Andy Vaught & Katherine Holcomb
 
 This file is part of GCC.
@@ -4878,6 +4878,9 @@ gfc_simplify_maskr (gfc_expr *i, gfc_expr *kind_arg)
   bool fail = gfc_extract_int (i, &arg);
   gcc_assert (!fail);
 
+  if (!gfc_check_mask (i, kind_arg))
+    return &gfc_bad_expr;
+
   result = gfc_get_constant_expr (BT_INTEGER, kind, &i->where);
 
   /* MASKR(n) = 2^n - 1 */
@@ -4908,6 +4911,9 @@ gfc_simplify_maskl (gfc_expr *i, gfc_expr *kind_arg)
 
   bool fail = gfc_extract_int (i, &arg);
   gcc_assert (!fail);
+
+  if (!gfc_check_mask (i, kind_arg))
+    return &gfc_bad_expr;
 
   result = gfc_get_constant_expr (BT_INTEGER, kind, &i->where);
 
@@ -5096,6 +5102,7 @@ min_max_choose (gfc_expr *arg, gfc_expr *extremum, int sign, bool back_val)
 static gfc_expr *
 simplify_min_max (gfc_expr *expr, int sign)
 {
+  int tmp1, tmp2;
   gfc_actual_arglist *arg, *last, *extremum;
   gfc_expr *tmp, *ret;
   const char *fname;
@@ -5140,7 +5147,16 @@ simplify_min_max (gfc_expr *expr, int sign)
   if ((tmp->ts.type != BT_INTEGER || tmp->ts.kind != gfc_integer_4_kind)
       && (strcmp (fname, "min1") == 0 || strcmp (fname, "max1") == 0))
     {
+      /* Explicit conversion, turn off -Wconversion and -Wconversion-extra
+	 warnings.  */
+      tmp1 = warn_conversion;
+      tmp2 = warn_conversion_extra;
+      warn_conversion = warn_conversion_extra = 0;
+
       ret = gfc_convert_constant (tmp, BT_INTEGER, gfc_integer_4_kind);
+
+      warn_conversion = tmp1;
+      warn_conversion_extra = tmp2;
     }
   else if ((tmp->ts.type != BT_REAL || tmp->ts.kind != gfc_real_4_kind)
 	   && (strcmp (fname, "amin0") == 0 || strcmp (fname, "amax0") == 0))

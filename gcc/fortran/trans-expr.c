@@ -1,5 +1,5 @@
 /* Expression translation
-   Copyright (C) 2002-2021 Free Software Foundation, Inc.
+   Copyright (C) 2002-2022 Free Software Foundation, Inc.
    Contributed by Paul Brook <paul@nowt.org>
    and Steven Bosscher <s.bosscher@student.tudelft.nl>
 
@@ -41,6 +41,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "trans-stmt.h"
 #include "dependency.h"
 #include "gimplify.h"
+#include "tm.h"		/* For CHAR_TYPE_SIZE.  */
 
 
 /* Calculate the number of characters in a string.  */
@@ -49,10 +50,10 @@ static tree
 gfc_get_character_len (tree type)
 {
   tree len;
-  
+
   gcc_assert (type && TREE_CODE (type) == ARRAY_TYPE
 	      && TYPE_STRING_FLAG (type));
-  
+
   len = TYPE_MAX_VALUE (TYPE_DOMAIN (type));
   len = (len) ? (len) : (integer_zero_node);
   return fold_convert (gfc_charlen_type_node, len);
@@ -66,10 +67,10 @@ tree
 gfc_get_character_len_in_bytes (tree type)
 {
   tree tmp, len;
-  
+
   gcc_assert (type && TREE_CODE (type) == ARRAY_TYPE
 	      && TYPE_STRING_FLAG (type));
-  
+
   tmp = TYPE_SIZE_UNIT (TREE_TYPE (type));
   tmp = (tmp && !integer_zerop (tmp))
     ? (fold_convert (gfc_charlen_type_node, tmp)) : (NULL_TREE);
@@ -3972,63 +3973,50 @@ gfc_string_to_single_character (tree len, tree str, int kind)
 }
 
 
-void
-gfc_conv_scalar_char_value (gfc_symbol *sym, gfc_se *se, gfc_expr **expr)
+static void
+conv_scalar_char_value (gfc_symbol *sym, gfc_se *se, gfc_expr **expr)
 {
+  gcc_assert (expr);
 
+  /* We used to modify the tree here. Now it is done earlier in
+     the front-end, so we only check it here to avoid regressions.  */
   if (sym->backend_decl)
     {
-      /* This becomes the nominal_type in
-	 function.c:assign_parm_find_data_types.  */
-      TREE_TYPE (sym->backend_decl) = unsigned_char_type_node;
-      /* This becomes the passed_type in
-	 function.c:assign_parm_find_data_types.  C promotes char to
-	 integer for argument passing.  */
-      DECL_ARG_TYPE (sym->backend_decl) = unsigned_type_node;
-
-      DECL_BY_REFERENCE (sym->backend_decl) = 0;
+      gcc_assert (TREE_CODE (TREE_TYPE (sym->backend_decl)) == INTEGER_TYPE);
+      gcc_assert (TYPE_UNSIGNED (TREE_TYPE (sym->backend_decl)) == 1);
+      gcc_assert (TYPE_PRECISION (TREE_TYPE (sym->backend_decl)) == CHAR_TYPE_SIZE);
+      gcc_assert (DECL_BY_REFERENCE (sym->backend_decl) == 0);
     }
 
-  if (expr != NULL)
+  /* If we have a constant character expression, make it into an
+      integer of type C char.  */
+  if ((*expr)->expr_type == EXPR_CONSTANT)
     {
-      /* If we have a constant character expression, make it into an
-	 integer.  */
-      if ((*expr)->expr_type == EXPR_CONSTANT)
-        {
-	  gfc_typespec ts;
-          gfc_clear_ts (&ts);
+      gfc_typespec ts;
+      gfc_clear_ts (&ts);
 
-	  *expr = gfc_get_int_expr (gfc_default_integer_kind, NULL,
-				    (int)(*expr)->value.character.string[0]);
-	  if ((*expr)->ts.kind != gfc_c_int_kind)
-	    {
-  	      /* The expr needs to be compatible with a C int.  If the
-		 conversion fails, then the 2 causes an ICE.  */
-	      ts.type = BT_INTEGER;
-	      ts.kind = gfc_c_int_kind;
-	      gfc_convert_type (*expr, &ts, 2);
-	    }
+      *expr = gfc_get_int_expr (gfc_default_character_kind, NULL,
+				(*expr)->value.character.string[0]);
+    }
+  else if (se != NULL && (*expr)->expr_type == EXPR_VARIABLE)
+    {
+      if ((*expr)->ref == NULL)
+	{
+	  se->expr = gfc_string_to_single_character
+	    (build_int_cst (integer_type_node, 1),
+	      gfc_build_addr_expr (gfc_get_pchar_type ((*expr)->ts.kind),
+				  gfc_get_symbol_decl
+				  ((*expr)->symtree->n.sym)),
+	      (*expr)->ts.kind);
 	}
-      else if (se != NULL && (*expr)->expr_type == EXPR_VARIABLE)
-        {
-	  if ((*expr)->ref == NULL)
-	    {
-	      se->expr = gfc_string_to_single_character
-		(build_int_cst (integer_type_node, 1),
-		 gfc_build_addr_expr (gfc_get_pchar_type ((*expr)->ts.kind),
-				      gfc_get_symbol_decl
-				      ((*expr)->symtree->n.sym)),
-		 (*expr)->ts.kind);
-	    }
-	  else
-	    {
-	      gfc_conv_variable (se, *expr);
-	      se->expr = gfc_string_to_single_character
-		(build_int_cst (integer_type_node, 1),
-		 gfc_build_addr_expr (gfc_get_pchar_type ((*expr)->ts.kind),
-				      se->expr),
-		 (*expr)->ts.kind);
-	    }
+      else
+	{
+	  gfc_conv_variable (se, *expr);
+	  se->expr = gfc_string_to_single_character
+	    (build_int_cst (integer_type_node, 1),
+	      gfc_build_addr_expr (gfc_get_pchar_type ((*expr)->ts.kind),
+				  se->expr),
+	      (*expr)->ts.kind);
 	}
     }
 }
@@ -5548,13 +5536,17 @@ gfc_conv_gfc_desc_to_cfi_desc (gfc_se *parmse, gfc_expr *e, gfc_symbol *fsym)
     {
       /* If the actual argument can be noncontiguous, copy-in/out is required,
 	 if the dummy has either the CONTIGUOUS attribute or is an assumed-
-	 length assumed-length/assumed-size CHARACTER array.  */
+	 length assumed-length/assumed-size CHARACTER array.  This only
+	 applies if the actual argument is a "variable"; if it's some
+	 non-lvalue expression, we are going to evaluate it to a
+	 temporary below anyway.  */
       se.force_no_tmp = 1;
       if ((fsym->attr.contiguous
 	   || (fsym->ts.type == BT_CHARACTER && !fsym->ts.u.cl->length
 	       && (fsym->as->type == AS_ASSUMED_SIZE
 		   || fsym->as->type == AS_EXPLICIT)))
-	  && !gfc_is_simply_contiguous (e, false, true))
+	  && !gfc_is_simply_contiguous (e, false, true)
+	  && gfc_expr_is_variable (e))
 	{
 	  bool optional = fsym->attr.optional;
 	  fsym->attr.optional = 0;
@@ -5638,6 +5630,16 @@ gfc_conv_gfc_desc_to_cfi_desc (gfc_se *parmse, gfc_expr *e, gfc_symbol *fsym)
 	  itype = CFI_type_other;  // FIXME: Or CFI_type_cptr ?
 	  break;
 	case BT_CLASS:
+	  if (UNLIMITED_POLY (e) && fsym->ts.type == BT_ASSUMED)
+	    {
+	      // F2017: 7.3.2.2: "An entity that is declared using the TYPE(*)
+	      // type specifier is assumed-type and is an unlimited polymorphic
+	      //  entity." The actual argument _data component is passed.
+	      itype = CFI_type_other;  // FIXME: Or CFI_type_cptr ?
+	      break;
+	    }
+	  else
+	    gcc_unreachable ();
 	case BT_PROCEDURE:
 	case BT_HOLLERITH:
 	case BT_UNION:
@@ -6341,7 +6343,7 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 		      && fsym->ns->proc_name->attr.is_bind_c)
 		    {
 		      parmse.expr = NULL;
-		      gfc_conv_scalar_char_value (fsym, &parmse, &e);
+		      conv_scalar_char_value (fsym, &parmse, &e);
 		      if (parmse.expr == NULL)
 			gfc_conv_expr (&parmse, e);
 		    }
@@ -6853,6 +6855,8 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 					     fsym->attr.pointer);
 		}
 	      else
+		/* This is where we introduce a temporary to store the
+		   result of a non-lvalue array expression.  */
 		gfc_conv_array_parameter (&parmse, e, nodesc_arg, fsym,
 					  sym->name, NULL);
 

@@ -1,5 +1,5 @@
 /* Subroutines shared by all languages that are variants of C.
-   Copyright (C) 1992-2021 Free Software Foundation, Inc.
+   Copyright (C) 1992-2022 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1243,6 +1243,13 @@ c_build_shufflevector (location_t loc, tree v0, tree v1,
       tree lpartt = build_vector_type (TREE_TYPE (ret_type), mask.length ());
       ret = build3_loc (loc, BIT_FIELD_REF,
 			lpartt, ret, TYPE_SIZE (lpartt), bitsize_zero_node);
+      /* Wrap the lowpart operation in a TARGET_EXPR so it gets a separate
+	 temporary during gimplification.  See PR101530 for cases where
+	 we'd otherwise end up with non-toplevel BIT_FIELD_REFs.  */
+      tree tem = create_tmp_var_raw (lpartt);
+      DECL_CONTEXT (tem) = current_function_decl;
+      ret = build4 (TARGET_EXPR, lpartt, tem, ret, NULL_TREE, NULL_TREE);
+      TREE_SIDE_EFFECTS (ret) = 1;
     }
 
   if (!c_dialect_cxx () && !wrap)
@@ -3308,6 +3315,8 @@ pointer_int_sum (location_t loc, enum tree_code resultcode,
     size_exp = integer_one_node;
   else
     {
+      if (!complain && !COMPLETE_TYPE_P (TREE_TYPE (result_type)))
+	return error_mark_node;
       size_exp = size_in_bytes_loc (loc, TREE_TYPE (result_type));
       /* Wrap the pointer expression in a SAVE_EXPR to make sure it
 	 is evaluated first when the size expression may depend

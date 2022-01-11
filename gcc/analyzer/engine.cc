@@ -1,5 +1,5 @@
 /* The analysis "engine".
-   Copyright (C) 2019-2021 Free Software Foundation, Inc.
+   Copyright (C) 2019-2022 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -19,7 +19,7 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
-#define INCLUDE_UNIQUE_PTR
+#define INCLUDE_MEMORY
 #include "system.h"
 #include "coretypes.h"
 #include "tree.h"
@@ -5329,7 +5329,7 @@ impl_run_checkers (logger *logger)
   FOR_EACH_FUNCTION_WITH_GIMPLE_BODY (node)
     node->get_untransformed_body ();
 
-  engine eng;
+  engine eng (logger);
 
   /* Create the supergraph.  */
   supergraph sg (logger);

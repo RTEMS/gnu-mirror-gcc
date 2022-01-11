@@ -1,5 +1,5 @@
 /* Functions related to invoking -*- C++ -*- methods and overloaded functions.
-   Copyright (C) 1987-2021 Free Software Foundation, Inc.
+   Copyright (C) 1987-2022 Free Software Foundation, Inc.
    Contributed by Michael Tiemann (tiemann@cygnus.com) and
    modified by Brendan Kehoe (brendan@cygnus.com).
 
@@ -6285,12 +6285,17 @@ op_is_ordered (tree_code code)
 
 /* Subroutine of build_new_op: Add to CANDIDATES all candidates for the
    operator indicated by CODE/CODE2.  This function calls itself recursively to
-   handle C++20 rewritten comparison operator candidates.  */
+   handle C++20 rewritten comparison operator candidates.
+
+   LOOKUPS, if non-NULL, is the set of pertinent namespace-scope operator
+   overloads to consider.  This parameter is used when instantiating a
+   dependent operator expression and has the same structure as
+   DEPENDENT_OPERATOR_TYPE_SAVED_LOOKUPS.  */
 
 static tree
 add_operator_candidates (z_candidate **candidates,
 			 tree_code code, tree_code code2,
-			 vec<tree, va_gc> *arglist,
+			 vec<tree, va_gc> *arglist, tree lookups,
 			 int flags, tsubst_flags_t complain)
 {
   z_candidate *start_candidates = *candidates;
@@ -6326,7 +6331,15 @@ add_operator_candidates (z_candidate **candidates,
      consider.  */
   if (!memonly)
     {
-      tree fns = lookup_name (fnname, LOOK_where::BLOCK_NAMESPACE);
+      tree fns;
+      if (!lookups)
+	fns = lookup_name (fnname, LOOK_where::BLOCK_NAMESPACE);
+      /* If LOOKUPS is non-NULL, then we're instantiating a dependent operator
+	 expression, and LOOKUPS is the result of stage 1 name lookup.  */
+      else if (tree found = purpose_member (fnname, lookups))
+	fns = TREE_VALUE (found);
+      else
+	fns = NULL_TREE;
       fns = lookup_arg_dependent (fnname, fns, arglist);
       add_candidates (fns, NULL_TREE, arglist, NULL_TREE,
 		      NULL_TREE, false, NULL_TREE, NULL_TREE,
@@ -6429,7 +6442,7 @@ add_operator_candidates (z_candidate **candidates,
 	  if (rewrite_code != code)
 	    /* Add rewritten candidates in same order.  */
 	    add_operator_candidates (candidates, rewrite_code, ERROR_MARK,
-				     arglist, flags, complain);
+				     arglist, lookups, flags, complain);
 
 	  z_candidate *save_cand = *candidates;
 
@@ -6439,7 +6452,7 @@ add_operator_candidates (z_candidate **candidates,
 	  revlist->quick_push ((*arglist)[1]);
 	  revlist->quick_push ((*arglist)[0]);
 	  add_operator_candidates (candidates, rewrite_code, ERROR_MARK,
-				   revlist, flags, complain);
+				   revlist, lookups, flags, complain);
 
 	  /* Release the vec if we didn't add a candidate that uses it.  */
 	  for (z_candidate *c = *candidates; c != save_cand; c = c->next)
@@ -6457,17 +6470,16 @@ add_operator_candidates (z_candidate **candidates,
 
 tree
 build_new_op (const op_location_t &loc, enum tree_code code, int flags,
-	      tree arg1, tree arg2, tree arg3, tree *overload,
-	      tsubst_flags_t complain)
+	      tree arg1, tree arg2, tree arg3, tree lookups,
+	      tree *overload, tsubst_flags_t complain)
 {
   struct z_candidate *candidates = 0, *cand;
-  vec<tree, va_gc> *arglist;
+  releasing_vec arglist;
   tree result = NULL_TREE;
   bool result_valid_p = false;
   enum tree_code code2 = ERROR_MARK;
   enum tree_code code_orig_arg1 = ERROR_MARK;
   enum tree_code code_orig_arg2 = ERROR_MARK;
-  conversion *conv;
   void *p;
   bool strict_p;
   bool any_viable_p;
@@ -6543,7 +6555,6 @@ build_new_op (const op_location_t &loc, enum tree_code code, int flags,
       arg2_type = integer_type_node;
     }
 
-  vec_alloc (arglist, 3);
   arglist->quick_push (arg1);
   if (arg2 != NULL_TREE)
     arglist->quick_push (arg2);
@@ -6554,7 +6565,7 @@ build_new_op (const op_location_t &loc, enum tree_code code, int flags,
   p = conversion_obstack_alloc (0);
 
   result = add_operator_candidates (&candidates, code, code2, arglist,
-				    flags, complain);
+				    lookups, flags, complain);
   if (result == error_mark_node)
     goto user_defined_result_ready;
 
@@ -6610,7 +6621,7 @@ build_new_op (const op_location_t &loc, enum tree_code code, int flags,
 	  else
 	    code = PREDECREMENT_EXPR;
 	  result = build_new_op (loc, code, flags, arg1, NULL_TREE,
-				 NULL_TREE, overload, complain);
+				 NULL_TREE, lookups, overload, complain);
 	  break;
 
 	  /* The caller will deal with these.  */
@@ -6767,7 +6778,7 @@ build_new_op (const op_location_t &loc, enum tree_code code, int flags,
 		    warning_sentinel ws (warn_zero_as_null_pointer_constant);
 		    result = build_new_op (loc, code,
 					   LOOKUP_NORMAL|LOOKUP_REWRITTEN,
-					   lhs, rhs, NULL_TREE,
+					   lhs, rhs, NULL_TREE, lookups,
 					   NULL, complain);
 		  }
 		  break;
@@ -6814,7 +6825,7 @@ build_new_op (const op_location_t &loc, enum tree_code code, int flags,
 	     corresponding parameters of the selected operation function,
 	     except that the second standard conversion sequence of a
 	     user-defined conversion sequence (12.3.3.1.2) is not applied."  */
-	  conv = cand->convs[0];
+	  conversion *conv = cand->convs[0];
 	  if (conv->user_conv_p)
 	    {
 	      conv = strip_standard_conversion (conv);
@@ -7256,6 +7267,8 @@ build_op_delete_call (enum tree_code code, tree addr, tree size,
   tree oaddr = addr;
   addr = cp_convert (ptr_type_node, addr, complain);
 
+  tree excluded_destroying = NULL_TREE;
+
   if (placement)
     {
       /* "A declaration of a placement deallocation function matches the
@@ -7341,6 +7354,15 @@ build_op_delete_call (enum tree_code code, tree addr, tree size,
 	dealloc_info di_elt;
 	if (usual_deallocation_fn_p (elt, &di_elt))
 	  {
+	    /* If we're called for an EH cleanup in a new-expression, we can't
+	       use a destroying delete; the exception was thrown before the
+	       object was constructed.  */
+	    if (alloc_fn && di_elt.destroying)
+	      {
+		excluded_destroying = elt;
+		continue;
+	      }
+
 	    if (!fn)
 	      {
 		fn = elt;
@@ -7488,6 +7510,14 @@ build_op_delete_call (enum tree_code code, tree addr, tree size,
       return ret;
     }
 
+  /* If there's only a destroying delete that we can't use because the
+     object isn't constructed yet, and we used global new, use global
+     delete as well.  */
+  if (excluded_destroying
+      && DECL_NAMESPACE_SCOPE_P (alloc_fn))
+    return build_op_delete_call (code, addr, size, true, placement,
+				 alloc_fn, complain);
+
   /* [expr.new]
 
      If no unambiguous matching deallocation function can be found,
@@ -7497,8 +7527,16 @@ build_op_delete_call (enum tree_code code, tree addr, tree size,
     {
       if ((complain & tf_warning)
 	  && !placement)
-	warning (0, "no corresponding deallocation function for %qD",
-		 alloc_fn);
+	{
+	  bool w = warning (0,
+			    "no corresponding deallocation function for %qD",
+			    alloc_fn);
+	  if (w && excluded_destroying)
+	    inform (DECL_SOURCE_LOCATION (excluded_destroying), "destroying "
+		    "delete %qD cannot be used to release the allocated memory"
+		    " if the initialization throws because the object is not "
+		    "constructed yet", excluded_destroying);
+	}
       return NULL_TREE;
     }
 
@@ -11152,6 +11190,34 @@ build_new_method_call (tree instance, tree fns, vec<tree, va_gc> **args,
 	}
       if (INDIRECT_REF_P (call))
 	call = TREE_OPERAND (call, 0);
+
+      /* Prune all but the selected function from the original overload
+	 set so that we can avoid some duplicate work at instantiation time.  */
+      if (really_overloaded_fn (fns))
+	{
+	  if (DECL_TEMPLATE_INFO (fn)
+	      && DECL_MEMBER_TEMPLATE_P (DECL_TI_TEMPLATE (fn))
+	      && dependent_type_p (DECL_CONTEXT (fn)))
+	    {
+	      /* FIXME: We're not prepared to fully instantiate "inside-out"
+		 partial instantiations such as A<T>::f<int>().  So instead
+		 use the selected template, not the specialization.  */
+
+	      if (OVL_SINGLE_P (fns))
+		/* If the original overload set consists of a single function
+		   template, this isn't beneficial.  */
+		goto skip_prune;
+
+	      fn = ovl_make (DECL_TI_TEMPLATE (fn));
+	      if (template_only)
+		fn = lookup_template_function (fn, explicit_targs);
+	    }
+	  orig_fns = copy_node (orig_fns);
+	  BASELINK_FUNCTIONS (orig_fns) = fn;
+	  BASELINK_FUNCTIONS_MAYBE_INCOMPLETE_P (orig_fns) = true;
+	}
+
+skip_prune:
       call = (build_min_non_dep_call_vec
 	      (call,
 	       build_min (COMPONENT_REF, TREE_TYPE (CALL_EXPR_FN (call)),
@@ -11879,7 +11945,7 @@ joust_maybe_elide_copy (z_candidate *&cand)
 /* True if the defining declarations of the two candidates have equivalent
    parameters.  */
 
-bool
+static bool
 cand_parms_match (z_candidate *c1, z_candidate *c2)
 {
   tree fn1 = c1->fn;
@@ -11901,8 +11967,19 @@ cand_parms_match (z_candidate *c1, z_candidate *c2)
       fn1 = DECL_TEMPLATE_RESULT (t1);
       fn2 = DECL_TEMPLATE_RESULT (t2);
     }
-  return compparms (TYPE_ARG_TYPES (TREE_TYPE (fn1)),
-		    TYPE_ARG_TYPES (TREE_TYPE (fn2)));
+  tree parms1 = TYPE_ARG_TYPES (TREE_TYPE (fn1));
+  tree parms2 = TYPE_ARG_TYPES (TREE_TYPE (fn2));
+  if (DECL_FUNCTION_MEMBER_P (fn1)
+      && DECL_FUNCTION_MEMBER_P (fn2)
+      && (DECL_NONSTATIC_MEMBER_FUNCTION_P (fn1)
+	  != DECL_NONSTATIC_MEMBER_FUNCTION_P (fn2)))
+    {
+      /* Ignore 'this' when comparing the parameters of a static member
+	 function with those of a non-static one.  */
+      parms1 = skip_artificial_parms_for (fn1, parms1);
+      parms2 = skip_artificial_parms_for (fn2, parms2);
+    }
+  return compparms (parms1, parms2);
 }
 
 /* Compare two candidates for overloading as described in

@@ -1,5 +1,5 @@
 /* Convert tree expression to rtl instructions, for GNU compiler.
-   Copyright (C) 1988-2021 Free Software Foundation, Inc.
+   Copyright (C) 1988-2022 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -3929,7 +3929,7 @@ emit_move_multi_word (machine_mode mode, rtx x, rtx y)
      hard regs shouldn't appear here except as return values.
      We never want to emit such a clobber after reload.  */
   if (x != y
-      && ! (reload_in_progress || reload_completed)
+      && ! (lra_in_progress || reload_in_progress || reload_completed)
       && need_clobber != 0)
     emit_clobber (x);
 
@@ -10340,7 +10340,6 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
   enum tree_code code = TREE_CODE (exp);
   rtx subtarget, original_target;
   int ignore;
-  tree context;
   bool reduce_bit_field;
   location_t loc = EXPR_LOCATION (exp);
   struct separate_ops ops;
@@ -10579,14 +10578,16 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
       /* Variables inherited from containing functions should have
 	 been lowered by this point.  */
       if (exp)
-	context = decl_function_context (exp);
-      gcc_assert (!exp
-		  || SCOPE_FILE_SCOPE_P (context)
-		  || context == current_function_decl
-		  || TREE_STATIC (exp)
-		  || DECL_EXTERNAL (exp)
-		  /* ??? C++ creates functions that are not TREE_STATIC.  */
-		  || TREE_CODE (exp) == FUNCTION_DECL);
+	{
+	  tree context = decl_function_context (exp);
+	  gcc_assert (SCOPE_FILE_SCOPE_P (context)
+		      || context == current_function_decl
+		      || TREE_STATIC (exp)
+		      || DECL_EXTERNAL (exp)
+		      /* ??? C++ creates functions that are not
+			 TREE_STATIC.  */
+		      || TREE_CODE (exp) == FUNCTION_DECL);
+	}
 
       /* This is the case of an array whose size is to be determined
 	 from its initializer, while the initializer is still being parsed.

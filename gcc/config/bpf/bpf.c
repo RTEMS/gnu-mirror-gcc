@@ -1,5 +1,5 @@
 /* Subroutines used for code generation for eBPF.
-   Copyright (C) 2019-2021 Free Software Foundation, Inc.
+   Copyright (C) 2019-2022 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1482,7 +1482,7 @@ handle_attr_preserve (function *fn)
 		      && TREE_CODE (TREE_OPERAND (expr, 0)) == SSA_NAME)
 		    {
 		      gimple *def_stmt = SSA_NAME_DEF_STMT (TREE_OPERAND (expr, 0));
-		      if (is_gimple_assign (def_stmt))
+		      if (def_stmt && is_gimple_assign (def_stmt))
 			expr = gimple_assign_rhs1 (def_stmt);
 		    }
 

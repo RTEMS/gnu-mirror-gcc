@@ -1,5 +1,5 @@
 /* Primary expression subroutines
-   Copyright (C) 2000-2021 Free Software Foundation, Inc.
+   Copyright (C) 2000-2022 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of GCC.
@@ -2151,6 +2151,7 @@ gfc_match_varspec (gfc_expr *primary, int equiv_flag, bool sub_flag,
 	  && !(gfc_matching_procptr_assignment
 	       && sym->attr.flavor == FL_PROCEDURE))
       || (sym->ts.type == BT_CLASS && sym->attr.class_ok
+	  && sym->ts.u.derived && CLASS_DATA (sym)
 	  && (CLASS_DATA (sym)->attr.dimension
 	      || CLASS_DATA (sym)->attr.codimension)))
     {

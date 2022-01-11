@@ -1,5 +1,5 @@
 /* Target definitions for Darwin (Mac OS X) systems.
-   Copyright (C) 1989-2021 Free Software Foundation, Inc.
+   Copyright (C) 1989-2022 Free Software Foundation, Inc.
    Contributed by Apple Computer Inc.
 
 This file is part of GCC.
@@ -42,6 +42,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #define DARWIN_X86 0
 #define DARWIN_PPC 0
+
+#define OBJECT_FORMAT_MACHO 1
 
 /* Suppress g++ attempt to link in the math library automatically. */
 #define MATH_LIBRARY ""
@@ -268,11 +270,6 @@ extern GTY(()) int darwin_ms_struct;
   "%{unexported_symbols_list*:\
      -Xlinker -unexported_symbols_list -Xlinker %*} \
      %<unexported_symbols_list*",					\
-  "%{!weak_reference_mismatches*:\
-     %:version-compare(< 10.5 asm_macosx_version_min= -Xlinker) \
- %:version-compare(< 10.5 asm_macosx_version_min= -weak_reference_mismatches) \
-     %:version-compare(< 10.5 asm_macosx_version_min= -Xlinker) \
-     %:version-compare(< 10.5 asm_macosx_version_min= non-weak)}",	\
   "%{weak_reference_mismatches*:\
     -Xlinker -weak_reference_mismatches -Xlinker %*} \
     %<weak_reference_mismatches*",					\
@@ -288,13 +285,17 @@ extern GTY(()) int darwin_ms_struct;
 #define DARWIN_RDYNAMIC "%{rdynamic:%nrdynamic is not supported}"
 #endif
 
-/* FIXME: we should check that the linker supports the -pie and -no_pie.
+/* Code built with mdynamic-no-pic does not support PIE/PIC, so  we disallow
+   these combinations; we also ensure that the no_pie option is passed to
+   ld64 on system versions that default to PIE when mdynamic-no-pic is given.
+   FIXME: we should check that the linker supports the -pie and -no_pie.
    options.  */
 #define DARWIN_PIE_SPEC \
 "%{pie|fpie|fPIE:\
    %{mdynamic-no-pic: \
      %n'-mdynamic-no-pic' overrides '-pie', '-fpie' or '-fPIE'; \
-     :%:version-compare(>= 10.5 mmacosx-version-min= -pie) }} "
+     :%:version-compare(>= 10.5 mmacosx-version-min= -pie) }; \
+   mdynamic-no-pic:%:version-compare(>= 10.7 mmacosx-version-min= -no_pie) } "
 
 #define DARWIN_NOPIE_SPEC \
 "%{no-pie|fno-pie|fno-PIE: \
@@ -872,13 +873,12 @@ int darwin_label_is_anonymous_local_objc_name (const char *name);
   if ((LOG) != 0)			\
     fprintf (FILE, "\t%s\t%d\n", ALIGN_ASM_OP, (LOG))
 
-/* The maximum alignment which the object file format can support in
-   bits.  For Mach-O, this is 2^15 bytes.  */
+/* The maximum alignment which the object file format can support in bits
+   which depends on the OS version and whether the object is a common
+   variable.  */
 
 #undef	MAX_OFILE_ALIGNMENT
-#define MAX_OFILE_ALIGNMENT (0x8000 * 8)
-
-#define L2_MAX_OFILE_ALIGNMENT 15
+#define MAX_OFILE_ALIGNMENT ((1U << L2_MAX_OFILE_ALIGNMENT) * 8U)
 
 /*  These are the three variants that emit referenced blank space.  */
 #define ASM_OUTPUT_ALIGNED_BSS(FILE, DECL, NAME, SIZE, ALIGN)		\

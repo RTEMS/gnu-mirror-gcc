@@ -798,7 +798,7 @@ else static if (hasExecinfo) private class DefaultTraceInfo : Throwable.TraceInf
         enum CALL_INSTRUCTION_SIZE = 1;
 
         static if (__traits(compiles, backtrace((void**).init, int.init)))
-            numframes = backtrace(this.callstack.ptr, MAXFRAMES);
+            numframes = cast(int) backtrace(this.callstack.ptr, MAXFRAMES);
         // Backtrace succeeded, adjust the frame to point to the caller
         if (numframes >= 2)
             foreach (ref elem; this.callstack)
@@ -848,6 +848,7 @@ else static if (hasExecinfo) private class DefaultTraceInfo : Throwable.TraceInf
         version (linux) enum enableDwarf = true;
         else version (FreeBSD) enum enableDwarf = true;
         else version (DragonFlyBSD) enum enableDwarf = true;
+        else version (OpenBSD) enum enableDwarf = true;
         else version (Darwin) enum enableDwarf = true;
         else enum enableDwarf = false;
 

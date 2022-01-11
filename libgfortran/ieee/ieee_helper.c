@@ -1,5 +1,5 @@
 /* Helper functions in C for IEEE modules
-   Copyright (C) 2013-2021 Free Software Foundation, Inc.
+   Copyright (C) 2013-2022 Free Software Foundation, Inc.
    Contributed by Francois-Xavier Coudert <fxcoudert@gcc.gnu.org>
 
 This file is part of the GNU Fortran runtime library (libgfortran).
@@ -25,6 +25,15 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #include "libgfortran.h"
 
+
+/* Check support for issignaling macro.
+   TODO: In the future, provide fallback implementations for IEEE types,
+   because many libc's do not have issignaling yet.  */
+#ifndef issignaling
+# define issignaling(X) 0
+#endif
+
+
 /* Prototypes.  */
 
 extern int ieee_class_helper_4 (GFC_REAL_4 *);
@@ -47,11 +56,22 @@ internal_proto(ieee_class_helper_16);
    correspond to the hidden arguments of the IEEE_CLASS_TYPE
    derived-type of IEEE_ARITHMETIC.  */
 
-enum { IEEE_OTHER_VALUE = 0, IEEE_SIGNALING_NAN, IEEE_QUIET_NAN,
-  IEEE_NEGATIVE_INF, IEEE_NEGATIVE_NORMAL, IEEE_NEGATIVE_DENORMAL,
-  IEEE_NEGATIVE_ZERO, IEEE_POSITIVE_ZERO, IEEE_POSITIVE_DENORMAL,
-  IEEE_POSITIVE_NORMAL, IEEE_POSITIVE_INF, IEEE_SUBNORMAL,
-  IEEE_NEGATIVE_SUBNORMAL, IEEE_POSITIVE_SUBNORMAL };
+enum {
+  IEEE_OTHER_VALUE = 0,
+  IEEE_SIGNALING_NAN,
+  IEEE_QUIET_NAN,
+  IEEE_NEGATIVE_INF,
+  IEEE_NEGATIVE_NORMAL,
+  IEEE_NEGATIVE_DENORMAL,
+  IEEE_NEGATIVE_SUBNORMAL = IEEE_NEGATIVE_DENORMAL,
+  IEEE_NEGATIVE_ZERO,
+  IEEE_POSITIVE_ZERO,
+  IEEE_POSITIVE_DENORMAL,
+  IEEE_POSITIVE_SUBNORMAL = IEEE_POSITIVE_DENORMAL,
+  IEEE_POSITIVE_NORMAL,
+  IEEE_POSITIVE_INF
+};
+
 
 #define CLASSMACRO(TYPE) \
   int ieee_class_helper_ ## TYPE (GFC_REAL_ ## TYPE *value) \
@@ -75,8 +95,10 @@ enum { IEEE_OTHER_VALUE = 0, IEEE_SIGNALING_NAN, IEEE_QUIET_NAN,
  \
     if (res == IEEE_QUIET_NAN) \
     { \
-      /* TODO: Handle signaling NaNs  */ \
-      return res; \
+      if (issignaling (*value)) \
+	return IEEE_SIGNALING_NAN; \
+      else \
+	return IEEE_QUIET_NAN; \
     } \
  \
     return res; \

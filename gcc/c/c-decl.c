@@ -1,5 +1,5 @@
 /* Process declarations and variables for C compiler.
-   Copyright (C) 1988-2021 Free Software Foundation, Inc.
+   Copyright (C) 1988-2022 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -26,7 +26,7 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "config.h"
 #define INCLUDE_STRING
-#define INCLUDE_UNIQUE_PTR
+#define INCLUDE_MEMORY
 #include "system.h"
 #include "coretypes.h"
 #include "target.h"
@@ -4643,7 +4643,7 @@ c_warn_unused_attributes (tree attrs)
 	 constraint violation.  */
       pedwarn (input_location, OPT_Wattributes, "%qE attribute ignored",
 	       get_attribute_name (t));
-    else
+    else if (!attribute_ignored_p (t))
       warning (OPT_Wattributes, "%qE attribute ignored",
 	       get_attribute_name (t));
 }
@@ -9040,8 +9040,8 @@ resort_field_decl_cmp (const void *x_p, const void *y_p)
   {
     tree d1 = DECL_NAME (*x);
     tree d2 = DECL_NAME (*y);
-    resort_data.new_value (&d1, resort_data.cookie);
-    resort_data.new_value (&d2, resort_data.cookie);
+    resort_data.new_value (&d1, &d1, resort_data.cookie);
+    resort_data.new_value (&d2, &d2, resort_data.cookie);
     if (d1 < d2)
       return -1;
   }

@@ -1,5 +1,5 @@
 ;; Predicate definitions for IA-32 and x86-64.
-;; Copyright (C) 2004-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2004-2022 Free Software Foundation, Inc.
 ;;
 ;; This file is part of GCC.
 ;;
@@ -1841,6 +1841,19 @@
   else
     return false;
 
+  return true;
+})
+
+;; Return true if OP is a const vector with duplicate value.
+(define_predicate "const_vector_duplicate_operand"
+  (match_code "const_vector")
+{
+  rtx elt = XVECEXP (op, 0, 0);
+  int i, nelt = XVECLEN (op, 0);
+
+  for (i = 1; i < nelt; ++i)
+    if (!rtx_equal_p (elt, XVECEXP (op, 0, i)))
+      return false;
   return true;
 })
 

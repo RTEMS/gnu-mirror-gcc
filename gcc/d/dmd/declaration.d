@@ -2,9 +2,9 @@
  * Miscellaneous declarations, including typedef, alias, variable declarations including the
  * implicit this declaration, type tuples, ClassInfo, ModuleInfo and various TypeInfos.
  *
- * Copyright:   Copyright (C) 1999-2021 by The D Language Foundation, All Rights Reserved
- * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
- * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
+ * Copyright:   Copyright (C) 1999-2022 by The D Language Foundation, All Rights Reserved
+ * Authors:     $(LINK2 https://www.digitalmars.com, Walter Bright)
+ * License:     $(LINK2 https://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/declaration.d, _declaration.d)
  * Documentation:  https://dlang.org/phobos/dmd_declaration.html
  * Coverage:    https://codecov.io/gh/dlang/dmd/src/master/src/dmd/declaration.d
@@ -16,6 +16,7 @@ import core.stdc.stdio;
 import dmd.aggregate;
 import dmd.arraytypes;
 import dmd.astenums;
+import dmd.attrib;
 import dmd.ctorflow;
 import dmd.dclass;
 import dmd.delegatize;
@@ -34,7 +35,7 @@ import dmd.init;
 import dmd.initsem;
 import dmd.intrange;
 import dmd.mtype;
-import dmd.root.outbuffer;
+import dmd.common.outbuffer;
 import dmd.root.rootobject;
 import dmd.target;
 import dmd.tokens;
@@ -93,7 +94,7 @@ bool modifyFieldVar(Loc loc, Scope* sc, VarDeclaration var, Expression e1)
             ((fd.isCtorDeclaration() && var.isField()) ||
              (fd.isStaticCtorDeclaration() && !var.isField())) &&
             fd.toParentDecl() == var.toParent2() &&
-            (!e1 || e1.op == TOK.this_))
+            (!e1 || e1.op == EXP.this_))
         {
             bool result = true;
 
@@ -249,7 +250,10 @@ extern (C++) abstract class Declaration : Dsymbol
     override final d_uns64 size(const ref Loc loc)
     {
         assert(type);
-        return type.size();
+        const sz = type.size();
+        if (sz == SIZE_INVALID)
+            errors = true;
+        return sz;
     }
 
     /**
@@ -370,7 +374,7 @@ extern (C++) abstract class Declaration : Dsymbol
             }
         }
 
-        if (e1 && e1.op == TOK.this_ && isField())
+        if (e1 && e1.op == EXP.this_ && isField())
         {
             VarDeclaration vthis = (cast(ThisExp)e1).var;
             for (Scope* scx = sc; scx; scx = scx.enclosing)
@@ -384,7 +388,7 @@ extern (C++) abstract class Declaration : Dsymbol
             }
         }
 
-        if (v && (isCtorinit() || isField()))
+        if (v && (v.isCtorinit() || isField()))
         {
             // It's only modifiable if inside the right constructor
             if ((storage_class & (STC.foreach_ | STC.ref_)) == (STC.foreach_ | STC.ref_))
@@ -431,11 +435,6 @@ extern (C++) abstract class Declaration : Dsymbol
     bool isCodeseg() const pure nothrow @nogc @safe
     {
         return false;
-    }
-
-    final bool isCtorinit() const pure nothrow @nogc @safe
-    {
-        return (storage_class & STC.ctorinit) != 0;
     }
 
     final bool isFinal() const pure nothrow @nogc @safe
@@ -654,7 +653,7 @@ extern (C++) final class TupleDeclaration : Declaration
             if (o.dyncast() == DYNCAST.expression)
             {
                 Expression e = cast(Expression)o;
-                if (e.op == TOK.dSymbol)
+                if (e.op == EXP.dSymbol)
                 {
                     DsymbolExp ve = cast(DsymbolExp)e;
                     Declaration d = ve.s.isDeclaration();
@@ -705,7 +704,7 @@ extern (C++) final class AliasDeclaration : Declaration
         assert(s);
     }
 
-    static AliasDeclaration create(Loc loc, Identifier id, Type type)
+    static AliasDeclaration create(const ref Loc loc, Identifier id, Type type)
     {
         return new AliasDeclaration(loc, id, type);
     }
@@ -1061,6 +1060,7 @@ extern (C++) class VarDeclaration : Declaration
     bool ctorinit;                  // it has been initialized in a ctor
     bool iscatchvar;                // this is the exception object variable in catch() clause
     bool isowner;                   // this is an Owner, despite it being `scope`
+    bool setInCtorOnly;             // field can only be set in a constructor, as it is const or immutable
 
     // Both these mean the var is not rebindable once assigned,
     // and the destructor gets run when it goes out of scope
@@ -1130,7 +1130,7 @@ extern (C++) class VarDeclaration : Declaration
                 RootObject o = (*v2.objects)[i];
                 assert(o.dyncast() == DYNCAST.expression);
                 Expression e = cast(Expression)o;
-                assert(e.op == TOK.dSymbol);
+                assert(e.op == EXP.dSymbol);
                 DsymbolExp se = cast(DsymbolExp)e;
                 se.s.setFieldOffset(ad, fieldState, isunion);
             }
@@ -1192,14 +1192,7 @@ extern (C++) class VarDeclaration : Declaration
         /* If coming after a bit field in progress,
          * advance past the field
          */
-        if (fieldState.inFlight)
-        {
-            fieldState.inFlight = false;
-            if (0 && target.os & Target.OS.Posix)
-                fieldState.offset += (fieldState.bitOffset + 7) / 8;
-            else if (0 &&target.os == Target.OS.Windows)
-                fieldState.offset += fieldState.fieldSize;
-        }
+        fieldState.inFlight = false;
 
         const sz = t.size(loc);
         assert(sz != SIZE_INVALID && sz < uint.max);
@@ -1254,6 +1247,11 @@ extern (C++) class VarDeclaration : Declaration
         if (visibility.kind == Visibility.Kind.export_ && !_init && (storage_class & STC.static_ || parent.isModule()))
             return true;
         return false;
+    }
+
+    final bool isCtorinit() const pure nothrow @nogc @safe
+    {
+        return setInCtorOnly;
     }
 
     /*******************************
@@ -1613,7 +1611,7 @@ extern (C++) class VarDeclaration : Declaration
             ExpInitializer ez = _init.isExpInitializer();
             assert(ez);
             Expression e = ez.exp;
-            if (e.op == TOK.construct || e.op == TOK.blit)
+            if (e.op == EXP.construct || e.op == EXP.blit)
                 e = (cast(AssignExp)e).e2;
             return lambdaCheckForNestedRef(e, sc);
         }
@@ -1676,11 +1674,11 @@ extern (C++) class VarDeclaration : Declaration
         assert(this.loc != Loc.initial);
         assert(v.loc != Loc.initial);
 
-        if (auto ld = this.loc.linnum - v.loc.linnum)
-            return ld < 0;
+        if (this.loc.linnum != v.loc.linnum)
+            return this.loc.linnum < v.loc.linnum;
 
-        if (auto cd = this.loc.charnum - v.loc.charnum)
-            return cd < 0;
+        if (this.loc.charnum != v.loc.charnum)
+            return this.loc.charnum < v.loc.charnum;
 
         // Default fallback
         return this.sequenceNumber < v.sequenceNumber;
@@ -1743,13 +1741,23 @@ extern (C++) class BitFieldDeclaration : VarDeclaration
 
     override final void setFieldOffset(AggregateDeclaration ad, ref FieldState fieldState, bool isunion)
     {
-        //printf("BitFieldDeclaration::setFieldOffset(ad = %s) %s\n", ad.toChars(), toChars());
+        //printf("BitFieldDeclaration::setFieldOffset(ad: %s, field: %s)\n", ad.toChars(), toChars());
+        static void print(const ref FieldState fieldState)
+        {
+            printf("FieldState.offset      = %d bytes\n",   fieldState.offset);
+            printf("          .fieldOffset = %d bytes\n",   fieldState.fieldOffset);
+            printf("          .bitOffset   = %d bits\n",    fieldState.bitOffset);
+            printf("          .fieldSize   = %d bytes\n",   fieldState.fieldSize);
+            printf("          .inFlight    = %d\n\n", fieldState.inFlight);
+        }
+        //print(fieldState);
 
         Type t = type.toBasetype();
+        const bool anon = isAnonymous();
 
         // List in ad.fields. Even if the type is error, it's necessary to avoid
         // pointless error diagnostic "more initializers than fields" on struct literal.
-        if (!isAnonymous())
+        if (!anon)
             ad.fields.push(this);
 
         if (t.ty == Terror)
@@ -1760,17 +1768,36 @@ extern (C++) class BitFieldDeclaration : VarDeclaration
         uint memsize = cast(uint)sz;                // size of member
         uint memalignsize = target.fieldalign(t);   // size of member for alignment purposes
 
-        if (fieldWidth == 0 && !isAnonymous())
+        if (fieldWidth == 0 && !anon)
             error(loc, "named bit fields cannot have 0 width");
         if (fieldWidth > memsize * 8)
             error(loc, "bit field width %d is larger than type", fieldWidth);
 
+        const style = target.c.bitFieldStyle;
+
         void startNewField()
         {
+            uint alignsize;
+            if (style == TargetC.BitFieldStyle.Gcc_Clang)
+            {
+                if (fieldWidth > 32)
+                    alignsize = memalignsize;
+                else if (fieldWidth > 16)
+                    alignsize = 4;
+                else if (fieldWidth > 8)
+                    alignsize = 2;
+                else
+                    alignsize = 1;
+            }
+            else
+                alignsize = memsize; // not memalignsize
+
+            uint dummy;
             offset = AggregateDeclaration.placeField(
                 &fieldState.offset,
-                memsize, memalignsize, alignment,
-                &ad.structsize, &ad.alignsize,
+                memsize, alignsize, alignment,
+                &ad.structsize,
+                (anon && style == TargetC.BitFieldStyle.Gcc_Clang) ? &dummy : &ad.alignsize,
                 isunion);
 
             fieldState.inFlight = true;
@@ -1779,19 +1806,92 @@ extern (C++) class BitFieldDeclaration : VarDeclaration
             fieldState.fieldSize = memsize;
         }
 
-        if (!fieldState.inFlight || fieldWidth == 0)
+        if (style == TargetC.BitFieldStyle.Gcc_Clang)
+        {
+            if (fieldWidth == 0)
+            {
+                if (!isunion)
+                {
+                    // Use type of zero width field to align to next field
+                    fieldState.offset = (fieldState.offset + memalignsize - 1) & ~(memalignsize - 1);
+                    ad.structsize = fieldState.offset;
+                }
+
+                fieldState.inFlight = false;
+                return;
+            }
+
+            if (ad.alignsize == 0)
+                ad.alignsize = 1;
+            if (!anon &&
+                  ad.alignsize < memalignsize)
+                ad.alignsize = memalignsize;
+        }
+        else if (style == TargetC.BitFieldStyle.MS)
+        {
+            if (ad.alignsize == 0)
+                ad.alignsize = 1;
+            if (fieldWidth == 0)
+            {
+                if (fieldState.inFlight && !isunion)
+                {
+                    // documentation says align to next int
+                    //const alsz = cast(uint)Type.tint32.size();
+                    const alsz = memsize; // but it really does this
+                    fieldState.offset = (fieldState.offset + alsz - 1) & ~(alsz - 1);
+                    ad.structsize = fieldState.offset;
+                }
+
+                fieldState.inFlight = false;
+                return;
+            }
+        }
+        else if (style == TargetC.BitFieldStyle.DM)
+        {
+            if (anon && fieldWidth && (!fieldState.inFlight || fieldState.bitOffset == 0))
+                return;  // this probably should be a bug in DMC
+            if (ad.alignsize == 0)
+                ad.alignsize = 1;
+            if (fieldWidth == 0)
+            {
+                if (fieldState.inFlight && !isunion)
+                {
+                    const alsz = memsize;
+                    fieldState.offset = (fieldState.offset + alsz - 1) & ~(alsz - 1);
+                    ad.structsize = fieldState.offset;
+                }
+
+                fieldState.inFlight = false;
+                return;
+            }
+        }
+
+        if (!fieldState.inFlight)
         {
             startNewField();
         }
-
-        if (0 && target.os & Target.OS.Posix)
+        else if (style == TargetC.BitFieldStyle.Gcc_Clang)
         {
-            if ((fieldState.offset%4 * 8) + fieldState.bitOffset + fieldWidth > int.sizeof * 8)
+            if (fieldState.bitOffset + fieldWidth > memsize * 8)
             {
+                //printf("start1 fieldState.bitOffset:%u fieldWidth:%u memsize:%u\n", fieldState.bitOffset, fieldWidth, memsize);
                 startNewField();
             }
+            else
+            {
+                // if alignment boundary is crossed
+                uint start = fieldState.fieldOffset * 8 + fieldState.bitOffset;
+                uint end   = start + fieldWidth;
+                //printf("%s start: %d end: %d memalignsize: %d\n", ad.toChars(), start, end, memalignsize);
+                if (start / (memalignsize * 8) != (end - 1) / (memalignsize * 8))
+                {
+                    //printf("alignment is crossed\n");
+                    startNewField();
+                }
+            }
         }
-        else if (1 || target.os == Target.OS.Windows)
+        else if (style == TargetC.BitFieldStyle.DM ||
+                 style == TargetC.BitFieldStyle.MS)
         {
             if (memsize != fieldState.fieldSize ||
                 fieldState.bitOffset + fieldWidth > fieldState.fieldSize * 8)
@@ -1799,22 +1899,29 @@ extern (C++) class BitFieldDeclaration : VarDeclaration
                 startNewField();
             }
         }
+        else
+            assert(0);
 
         offset = fieldState.fieldOffset;
         bitOffset = fieldState.bitOffset;
-        if (0 && target.os & Target.OS.Posix)
-        {
-            while (bitOffset > memsize * 8)
-            {
-                bitOffset -= 8;
-                offset += 1;
-            }
-        }
 
-        //fieldState.fieldSize = memsize;
+        const pastField = bitOffset + fieldWidth;
+        if (style == TargetC.BitFieldStyle.Gcc_Clang)
+        {
+            auto size = (pastField + 7) / 8;
+            fieldState.fieldSize = size;
+            //printf(" offset: %d, size: %d\n", offset, size);
+            ad.structsize = offset + size;
+        }
+        else
+            fieldState.fieldSize = memsize;
+        //printf("at end: ad.structsize = %d\n", cast(int)ad.structsize);
+        //print(fieldState);
+
         if (!isunion)
         {
-            fieldState.bitOffset += fieldWidth;
+            fieldState.offset = offset + fieldState.fieldSize;
+            fieldState.bitOffset = pastField;
         }
 
         //printf("\t%s: memalignsize = %d\n", toChars(), memalignsize);
@@ -1827,9 +1934,9 @@ extern (C++) class BitFieldDeclaration : VarDeclaration
  */
 extern (C++) final class SymbolDeclaration : Declaration
 {
-    StructDeclaration dsym;
+    AggregateDeclaration dsym;
 
-    extern (D) this(const ref Loc loc, StructDeclaration dsym)
+    extern (D) this(const ref Loc loc, AggregateDeclaration dsym)
     {
         super(loc, dsym.ident);
         this.dsym = dsym;
@@ -1861,7 +1968,7 @@ extern (C++) class TypeInfoDeclaration : VarDeclaration
         storage_class = STC.static_ | STC.gshared;
         visibility = Visibility(Visibility.Kind.public_);
         linkage = LINK.c;
-        alignment = target.ptrsize;
+        alignment.set(target.ptrsize);
     }
 
     static TypeInfoDeclaration create(Type tinfo)

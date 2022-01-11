@@ -1,5 +1,5 @@
 /* Command line option handling.
-   Copyright (C) 2002-2021 Free Software Foundation, Inc.
+   Copyright (C) 2002-2022 Free Software Foundation, Inc.
    Contributed by Neil Booth.
 
 This file is part of GCC.
@@ -723,7 +723,7 @@ default_options_optimization (struct gcc_options *opts,
 	      const int optimize_val = integral_argument (opt->arg);
 	      if (optimize_val == -1)
 		error_at (loc, "argument to %<-O%> should be a non-negative "
-			       "integer, %<g%>, %<s%> or %<fast%>");
+			       "integer, %<g%>, %<s%>, %<z%> or %<fast%>");
 	      else
 		{
 		  opts->x_optimize = optimize_val;
@@ -738,6 +738,15 @@ default_options_optimization (struct gcc_options *opts,
 
 	case OPT_Os:
 	  opts->x_optimize_size = 1;
+
+	  /* Optimizing for size forces optimize to be 2.  */
+	  opts->x_optimize = 2;
+	  opts->x_optimize_fast = 0;
+	  opts->x_optimize_debug = 0;
+	  break;
+
+	case OPT_Oz:
+	  opts->x_optimize_size = 2;
 
 	  /* Optimizing for size forces optimize to be 2.  */
 	  opts->x_optimize = 2;
@@ -1005,8 +1014,6 @@ void
 finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
 		location_t loc)
 {
-  enum unwind_info_type ui_except;
-
   if (opts->x_dump_base_name
       && ! opts->x_dump_base_name_prefixed)
     {
@@ -1106,61 +1113,6 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
       opts->x_warn_inline = 0;
       opts->x_flag_no_inline = 1;
     }
-
-  /* The optimization to partition hot and cold basic blocks into separate
-     sections of the .o and executable files does not work (currently)
-     with exception handling.  This is because there is no support for
-     generating unwind info.  If opts->x_flag_exceptions is turned on
-     we need to turn off the partitioning optimization.  */
-
-  ui_except = targetm_common.except_unwind_info (opts);
-
-  if (opts->x_flag_exceptions
-      && opts->x_flag_reorder_blocks_and_partition
-      && (ui_except == UI_SJLJ || ui_except >= UI_TARGET))
-    {
-      if (opts_set->x_flag_reorder_blocks_and_partition)
-        inform (loc,
-		"%<-freorder-blocks-and-partition%> does not work "
-		"with exceptions on this architecture");
-      opts->x_flag_reorder_blocks_and_partition = 0;
-      opts->x_flag_reorder_blocks = 1;
-    }
-
-  /* If user requested unwind info, then turn off the partitioning
-     optimization.  */
-
-  if (opts->x_flag_unwind_tables
-      && !targetm_common.unwind_tables_default
-      && opts->x_flag_reorder_blocks_and_partition
-      && (ui_except == UI_SJLJ || ui_except >= UI_TARGET))
-    {
-      if (opts_set->x_flag_reorder_blocks_and_partition)
-        inform (loc,
-		"%<-freorder-blocks-and-partition%> does not support "
-		"unwind info on this architecture");
-      opts->x_flag_reorder_blocks_and_partition = 0;
-      opts->x_flag_reorder_blocks = 1;
-    }
-
-  /* If the target requested unwind info, then turn off the partitioning
-     optimization with a different message.  Likewise, if the target does not
-     support named sections.  */
-
-  if (opts->x_flag_reorder_blocks_and_partition
-      && (!targetm_common.have_named_sections
-	  || (opts->x_flag_unwind_tables
-	      && targetm_common.unwind_tables_default
-	      && (ui_except == UI_SJLJ || ui_except >= UI_TARGET))))
-    {
-      if (opts_set->x_flag_reorder_blocks_and_partition)
-        inform (loc,
-		"%<-freorder-blocks-and-partition%> does not work "
-		"on this architecture");
-      opts->x_flag_reorder_blocks_and_partition = 0;
-      opts->x_flag_reorder_blocks = 1;
-    }
-
 
   /* Pipelining of outer loops is only possible when general pipelining
      capabilities are requested.  */
@@ -1397,6 +1349,74 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
 	 && debug_info_level >= DINFO_LEVEL_NORMAL
 	 && dwarf_debuginfo_p ()
 	 && !(flag_selective_scheduling || flag_selective_scheduling2));
+
+  diagnose_options (opts, opts_set, loc);
+}
+
+/* The function diagnoses incompatible combinations for provided options
+   (OPTS and OPTS_SET) at a given LOCation.  The function is called both
+   when command line is parsed (after the target optimization hook) and
+   when an optimize/target attribute (or pragma) is used.  */
+
+void diagnose_options (gcc_options *opts, gcc_options *opts_set,
+		       location_t loc)
+{
+  /* The optimization to partition hot and cold basic blocks into separate
+     sections of the .o and executable files does not work (currently)
+     with exception handling.  This is because there is no support for
+     generating unwind info.  If opts->x_flag_exceptions is turned on
+     we need to turn off the partitioning optimization.  */
+
+  enum unwind_info_type ui_except
+    = targetm_common.except_unwind_info (opts);
+
+  if (opts->x_flag_exceptions
+      && opts->x_flag_reorder_blocks_and_partition
+      && (ui_except == UI_SJLJ || ui_except >= UI_TARGET))
+    {
+      if (opts_set->x_flag_reorder_blocks_and_partition)
+	inform (loc,
+		"%<-freorder-blocks-and-partition%> does not work "
+		"with exceptions on this architecture");
+      opts->x_flag_reorder_blocks_and_partition = 0;
+      opts->x_flag_reorder_blocks = 1;
+    }
+
+  /* If user requested unwind info, then turn off the partitioning
+     optimization.  */
+
+  if (opts->x_flag_unwind_tables
+      && !targetm_common.unwind_tables_default
+      && opts->x_flag_reorder_blocks_and_partition
+      && (ui_except == UI_SJLJ || ui_except >= UI_TARGET))
+    {
+      if (opts_set->x_flag_reorder_blocks_and_partition)
+	inform (loc,
+		"%<-freorder-blocks-and-partition%> does not support "
+		"unwind info on this architecture");
+      opts->x_flag_reorder_blocks_and_partition = 0;
+      opts->x_flag_reorder_blocks = 1;
+    }
+
+  /* If the target requested unwind info, then turn off the partitioning
+     optimization with a different message.  Likewise, if the target does not
+     support named sections.  */
+
+  if (opts->x_flag_reorder_blocks_and_partition
+      && (!targetm_common.have_named_sections
+	  || (opts->x_flag_unwind_tables
+	      && targetm_common.unwind_tables_default
+	      && (ui_except == UI_SJLJ || ui_except >= UI_TARGET))))
+    {
+      if (opts_set->x_flag_reorder_blocks_and_partition)
+	inform (loc,
+		"%<-freorder-blocks-and-partition%> does not work "
+		"on this architecture");
+      opts->x_flag_reorder_blocks_and_partition = 0;
+      opts->x_flag_reorder_blocks = 1;
+    }
+
+
 }
 
 #define LEFT_COLUMN	27
@@ -2609,6 +2629,7 @@ common_handle_option (struct gcc_options *opts,
     case OPT_Os:
     case OPT_Ofast:
     case OPT_Og:
+    case OPT_Oz:
       /* Currently handled in a prescan.  */
       break;
 
@@ -3084,6 +3105,7 @@ common_handle_option (struct gcc_options *opts,
     case OPT_fuse_ld_bfd:
     case OPT_fuse_ld_gold:
     case OPT_fuse_ld_lld:
+    case OPT_fuse_ld_mold:
     case OPT_fuse_linker_plugin:
       /* No-op. Used by the driver and passed to us because it starts with f.*/
       break;

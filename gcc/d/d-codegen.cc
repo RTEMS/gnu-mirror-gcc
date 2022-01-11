@@ -1,5 +1,5 @@
 /* d-codegen.cc --  Code generation and routines for manipulation of GCC trees.
-   Copyright (C) 2006-2021 Free Software Foundation, Inc.
+   Copyright (C) 2006-2022 Free Software Foundation, Inc.
 
 GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -2140,6 +2140,7 @@ d_build_call (TypeFunction *tf, tree callable, tree object,
   /* Build the argument list for the call.  */
   vec <tree, va_gc> *args = NULL;
   tree saved_args = NULL_TREE;
+  bool noreturn_call = false;
 
   /* If this is a delegate call or a nested function being called as
      a delegate, the object should not be NULL.  */
@@ -2153,9 +2154,9 @@ d_build_call (TypeFunction *tf, tree callable, tree object,
 	{
 	Lagain:
 	  Expression *arg = (*arguments)[i];
-	  gcc_assert (arg->op != TOKtuple);
+	  gcc_assert (arg->op != EXP::tuple);
 
-	  if (arg->op == TOKcomma)
+	  if (arg->op == EXP::comma)
 	    {
 	      CommaExp *ce = arg->isCommaExp ();
 	      tree tce = build_expr (ce->e1);
@@ -2165,9 +2166,9 @@ d_build_call (TypeFunction *tf, tree callable, tree object,
 	    }
 	}
 
-      size_t nparams = tf->parameterList.length ();
+      const size_t nparams = tf->parameterList.length ();
       /* if _arguments[] is the first argument.  */
-      size_t varargs = tf->isDstyleVariadic ();
+      const size_t varargs = tf->isDstyleVariadic ();
 
       /* Assumes arguments->length <= formal_args->length if (!tf->varargs).  */
       for (size_t i = 0; i < arguments->length; ++i)
@@ -2199,12 +2200,17 @@ d_build_call (TypeFunction *tf, tree callable, tree object,
 	      /* Nested structs also have ADDRESSABLE set, but if the type has
 		 neither a copy constructor nor a destructor available, then we
 		 need to take care of copying its value before passing it.  */
-	      if (arg->op == TOKstructliteral || (!sd->postblit && !sd->dtor))
+	      if (arg->op == EXP::structLiteral || (!sd->postblit && !sd->dtor))
 		targ = force_target_expr (targ);
 
 	      targ = convert (build_reference_type (TREE_TYPE (targ)),
 			      build_address (targ));
 	    }
+
+  	  /* Type `noreturn` is a terminator, as no other arguments can possibly
+  	     be evaluated after it.  */
+  	  if (TREE_TYPE (targ) == noreturn_type_node)
+	    noreturn_call = true;
 
 	  vec_safe_push (args, targ);
 	}
@@ -2217,12 +2223,26 @@ d_build_call (TypeFunction *tf, tree callable, tree object,
       saved_args = compound_expr (callee, saved_args);
     }
 
+  /* If we saw a `noreturn` parameter, any unreachable argument evaluations
+     after it are discarded, as well as the function call itself.  */
+  if (noreturn_call)
+    {
+      if (TREE_SIDE_EFFECTS (callee))
+	saved_args = compound_expr (callee, saved_args);
+
+      tree arg;
+      unsigned int ix;
+
+      FOR_EACH_VEC_SAFE_ELT (args, ix, arg)
+	saved_args = compound_expr (saved_args, arg);
+
+      /* Add a stub result type for the expression.  */
+      tree result = build_zero_cst (TREE_TYPE (ctype));
+      return compound_expr (saved_args, result);
+    }
+
   tree result = build_call_vec (TREE_TYPE (ctype), callee, args);
   SET_EXPR_LOCATION (result, input_location);
-
-  /* Enforce left to right evaluation.  */
-  if (tf->linkage == LINK::d)
-    CALL_EXPR_ARGS_ORDERED (result) = 1;
 
   result = maybe_expand_intrinsic (result);
 
@@ -2295,6 +2315,10 @@ build_vthis_function (tree basetype, tree type)
   tree argtypes = tree_cons (NULL_TREE, build_pointer_type (basetype),
 			     TYPE_ARG_TYPES (type));
   tree fntype = build_function_type (TREE_TYPE (type), argtypes);
+
+  /* Copy volatile qualifiers from the original function type.  */
+  if (TYPE_QUALS (type) & TYPE_QUAL_VOLATILE)
+    fntype = build_qualified_type (fntype, TYPE_QUAL_VOLATILE);
 
   if (RECORD_OR_UNION_TYPE_P (basetype))
     TYPE_METHOD_BASETYPE (fntype) = TYPE_MAIN_VARIANT (basetype);

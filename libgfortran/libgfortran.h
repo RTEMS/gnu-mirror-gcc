@@ -1,5 +1,5 @@
 /* Common declarations for all of libgfortran.
-   Copyright (C) 2002-2021 Free Software Foundation, Inc.
+   Copyright (C) 2002-2022 Free Software Foundation, Inc.
    Contributed by Paul Brook <paul@nowt.org>, and
    Andy Vaught <andy@xena.eas.asu.edu>
 
@@ -39,6 +39,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 /* config.h MUST be first because it can affect system headers.  */
 #include "config.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -101,6 +102,20 @@ typedef off_t gfc_offset;
 #ifndef NULL
 #define NULL (void *) 0
 #endif
+
+
+/* These functions from <ctype.h> should only be used on values that can be
+   represented as unsigned char, otherwise the behavior is undefined.
+   Some targets have a char type that is signed, so we cast the argument
+   to unsigned char. See:
+     https://gcc.gnu.org/bugzilla/show_bug.cgi?id=95177
+     https://wiki.sei.cmu.edu/confluence/x/BNcxBQ
+ */
+
+#define safe_isalnum(x) isalnum((unsigned char) (x))
+#define safe_isdigit(x) isdigit((unsigned char) (x))
+#define safe_tolower(x) tolower((unsigned char) (x))
+#define safe_toupper(x) toupper((unsigned char) (x))
 
 
 /* The following macros can be used to annotate conditions which are likely or
@@ -695,7 +710,7 @@ internal_proto(show_backtrace);
 #define GFC_LARGEST_BUF (sizeof (GFC_INTEGER_LARGEST))
 #endif
 
-#define GFC_ITOA_BUF_SIZE (sizeof (GFC_INTEGER_LARGEST) * 3 + 2)
+#define GFC_ITOA_BUF_SIZE (sizeof (GFC_INTEGER_LARGEST) * 3 + 1)
 #define GFC_XTOA_BUF_SIZE (GFC_LARGEST_BUF * 2 + 1)
 #define GFC_OTOA_BUF_SIZE (GFC_LARGEST_BUF * 3 + 1)
 #define GFC_BTOA_BUF_SIZE (GFC_LARGEST_BUF * 8 + 1)
@@ -722,9 +737,6 @@ internal_proto(estr_writev);
 extern int st_printf (const char *, ...)
   __attribute__((format (gfc_printf, 1, 2)));
 internal_proto(st_printf);
-
-extern const char *gfc_xtoa (GFC_UINTEGER_LARGEST, char *, size_t);
-internal_proto(gfc_xtoa);
 
 extern _Noreturn void os_error (const char *);
 iexport_proto(os_error);
@@ -881,7 +893,7 @@ internal_proto(fc_strdup);
 extern char *fc_strdup_notrim(const char *, gfc_charlen_type);
 internal_proto(fc_strdup_notrim);
 
-extern const char *gfc_itoa(GFC_INTEGER_LARGEST, char *, size_t);
+extern const char *gfc_itoa(GFC_UINTEGER_LARGEST, char *, size_t);
 internal_proto(gfc_itoa);
 
 /* io/intrinsics.c */

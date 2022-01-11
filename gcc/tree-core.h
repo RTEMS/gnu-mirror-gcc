@@ -1,5 +1,5 @@
 /* Core data structures for the 'tree' type.
-   Copyright (C) 1989-2021 Free Software Foundation, Inc.
+   Copyright (C) 1989-2022 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -2077,7 +2077,9 @@ struct attribute_spec {
   /* The minimum length of the list of arguments of the attribute.  */
   int min_length;
   /* The maximum length of the list of arguments of the attribute
-     (-1 for no maximum).  */
+     (-1 for no maximum).  It can also be -2 for fake attributes
+     created for the sake of -Wno-attributes; in that case, we
+     should skip the balanced token sequence when parsing the attribute.  */
   int max_length;
   /* Whether this attribute requires a DECL.  If it does, it will be passed
      from types of DECLs, function return types and array element types to

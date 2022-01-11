@@ -15,9 +15,9 @@
  * - $(LINK2 https://github.com/ldc-developers/ldc, LDC repository)
  * - $(LINK2 https://github.com/D-Programming-GDC/gcc, GDC repository)
  *
- * Copyright:   Copyright (C) 1999-2021 by The D Language Foundation, All Rights Reserved
- * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
- * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
+ * Copyright:   Copyright (C) 1999-2022 by The D Language Foundation, All Rights Reserved
+ * Authors:     $(LINK2 https://www.digitalmars.com, Walter Bright)
+ * License:     $(LINK2 https://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/target.d, _target.d)
  * Documentation:  https://dlang.org/phobos/dmd_target.html
  * Coverage:    https://codecov.io/gh/dlang/dmd/src/master/src/dmd/target.d
@@ -27,7 +27,7 @@ module dmd.target;
 
 import dmd.globals : Param;
 
-enum CPU
+enum CPU : ubyte
 {
     x87,
     mmx,
@@ -66,6 +66,7 @@ extern (C++) struct Target
     import dmd.mtype : Type, TypeFunction, TypeTuple;
     import dmd.root.ctfloat : real_t;
     import dmd.statement : Statement;
+    import dmd.tokens : EXP;
 
     /// Bit decoding of the Target.OS
     enum OS : ubyte
@@ -73,7 +74,7 @@ extern (C++) struct Target
         /* These are mutually exclusive; one and only one is set.
          * Match spelling and casing of corresponding version identifiers
          */
-        Freestanding = 0,
+        none         = 0,
         linux        = 1,
         Windows      = 2,
         OSX          = 4,
@@ -213,7 +214,7 @@ extern (C++) struct Target
      * Returns:
      *      true if the operation is supported or type is not a vector
      */
-    extern (C++) bool isVectorOpSupported(Type type, uint op, Type t2 = null);
+    extern (C++) bool isVectorOpSupported(Type type, EXP op, Type t2 = null);
 
     /**
      * Default system linkage for the target.
@@ -316,12 +317,13 @@ struct TargetC
     enum BitFieldStyle : ubyte
     {
         Unspecified,
-        Dm_Ms,                /// Digital Mars and Microsoft C compilers
+        DM,                   /// Digital Mars 32 bit C compiler
+        MS,                   /// Microsoft 32 and 64 bit C compilers
                               /// https://docs.microsoft.com/en-us/cpp/c-language/c-bit-fields?view=msvc-160
                               /// https://docs.microsoft.com/en-us/cpp/cpp/cpp-bit-fields?view=msvc-160
         Gcc_Clang,            /// gcc and clang
     }
-
+    bool  crtDestructorsSupported = true; /// Not all platforms support crt_destructor
     ubyte longsize;           /// size of a C `long` or `unsigned long` type
     ubyte long_doublesize;    /// size of a C `long double`
     ubyte wchar_tsize;        /// size of a C `wchar_t` type

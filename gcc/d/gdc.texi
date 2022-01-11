@@ -12,7 +12,7 @@
 @include gcc-common.texi
 
 @c Copyright years for this manual.
-@set copyrights-d 2006-2021
+@set copyrights-d 2006-2022
 
 @copying
 @c man begin COPYRIGHT
@@ -66,7 +66,7 @@ This manual describes how to use @command{gdc}, the GNU compiler for
 the D programming language.  This manual is specifically about
 @command{gdc}.  For more information about the D programming
 language in general, including language specifications and standard
-package documentation, see @uref{http://dlang.org/}.
+package documentation, see @uref{https://dlang.org/}.
 
 @menu
 * Copying::                     The GNU General Public License.
@@ -267,21 +267,29 @@ Sets the C++ name mangling compatibility to the version identified by
 @table @samp
 @item c++98
 @item c++03
-Sets @code{__traits(getTargetInfo "cppStd")} to @code{199711}.
+Sets @code{__traits(getTargetInfo, "cppStd")} to @code{199711}.
 @item c++11
-Sets @code{__traits(getTargetInfo "cppStd")} to @code{201103}.
+Sets @code{__traits(getTargetInfo, "cppStd")} to @code{201103}.
 @item c++14
-Sets @code{__traits(getTargetInfo "cppStd")} to @code{201402}.
+Sets @code{__traits(getTargetInfo, "cppStd")} to @code{201402}.
 @item c++17
-Sets @code{__traits(getTargetInfo "cppStd")} to @code{201703}.
+Sets @code{__traits(getTargetInfo, "cppStd")} to @code{201703}.
+This is the default.
 @item c++20
-Sets @code{__traits(getTargetInfo "cppStd")} to @code{202002}.
+Sets @code{__traits(getTargetInfo, "cppStd")} to @code{202002}.
 @end table
 
 @item -fno-invariants
 @cindex @option{-finvariants}
 @cindex @option{-fno-invariants}
 Turns off code generation for class @code{invariant} contracts.
+
+@item -fmain
+@cindex @option{-fmain}
+Generates a default @code{main()} function when compiling.  This is useful when
+unittesting a library, as it enables running the unittests in a library without
+having to manually define an entry-point function.  This option does nothing
+when @code{main} is already defined in user code.
 
 @item -fno-moduleinfo
 @cindex @option{-fmoduleinfo}
@@ -318,14 +326,14 @@ values are supported:
 @item all
 Turns on all upcoming D language features.
 @item dip1000
-Implements @uref{http://wiki.dlang.org/DIP1000} (Scoped pointers).
+Implements @uref{https://wiki.dlang.org/DIP1000} (Scoped pointers).
 @item dip1008
-Implements @uref{http://wiki.dlang.org/DIP1008} (Allow exceptions in
+Implements @uref{https://wiki.dlang.org/DIP1008} (Allow exceptions in
 @code{@@nogc} code).
 @item dip1021
-Implements @uref{http://wiki.dlang.org/DIP1021} (Mutable function arguments).
+Implements @uref{https://wiki.dlang.org/DIP1021} (Mutable function arguments).
 @item dip25
-Implements @uref{http://wiki.dlang.org/DIP25} (Sealed references).
+Implements @uref{https://wiki.dlang.org/DIP25} (Sealed references).
 @item dtorfields
 Turns on generation for destructing fields of partially constructed objects.
 @item fieldwise
@@ -375,7 +383,7 @@ are supported:
 @item all
 Turns off all revertable D language features.
 @item dip25
-Reverts @uref{http://wiki.dlang.org/DIP25} (Sealed references).
+Reverts @uref{https://wiki.dlang.org/DIP25} (Sealed references).
 @item dtorfields
 Turns off generation for destructing fields of partially constructed objects.
 @item markdown
@@ -742,6 +750,8 @@ List information on all D language transitions.
 List all usages of complex or imaginary types.
 @item field
 List all non-mutable fields which occupy an object instance.
+@item in
+List all usages of @code{in} on parameter.
 @item nogc
 List all hidden GC allocations.
 @item templates

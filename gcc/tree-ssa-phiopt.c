@@ -1,5 +1,5 @@
 /* Optimization of PHI nodes by converting them into straightline code.
-   Copyright (C) 2004-2021 Free Software Foundation, Inc.
+   Copyright (C) 2004-2022 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -900,6 +900,8 @@ gimple_simplify_phiopt (bool early_p, tree type, gimple *comp_stmt,
 	  result = maybe_push_res_to_seq (&op, &seq1);
 	  if (result)
 	    {
+	      if (loc != UNKNOWN_LOCATION)
+		annotate_all_with_location (seq1, loc);
 	      gimple_seq_add_seq_without_update (seq, seq1);
 	      return result;
 	    }
@@ -929,6 +931,8 @@ gimple_simplify_phiopt (bool early_p, tree type, gimple *comp_stmt,
 	  result = maybe_push_res_to_seq (&op1, &seq1);
 	  if (result)
 	    {
+	      if (loc != UNKNOWN_LOCATION)
+		annotate_all_with_location (seq1, loc);
 	      gimple_seq_add_seq_without_update (seq, seq1);
 	      return result;
 	    }
