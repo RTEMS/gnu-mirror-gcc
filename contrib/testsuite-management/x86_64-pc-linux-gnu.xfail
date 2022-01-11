@@ -243,3 +243,24 @@ UNRESOLVED: gcc.dg/tree-ssa/ssa-dom-thread-7.c scan-tree-dump-not vrp-thread2 "J
 XPASS: gcc.dg/guality/ipa-sra-1.c -O0  line 15 k == 3
 XPASS: gcc.dg/guality/ipa-sra-1.c -O1  -DPREVENT_OPTIMIZATION  line 15 k == 3
 XPASS: gcc.dg/guality/ipa-sra-1.c -Og -DPREVENT_OPTIMIZATION  line 15 k == 3
+FAIL: g++.dg/vect/pr92595.cc -std=c++14 (internal compiler error: in operator[], at vec.h:889)
+FAIL: g++.dg/vect/pr92595.cc -std=c++14 (test for excess errors)
+FAIL: g++.dg/vect/pr92595.cc -std=c++17 (internal compiler error: in operator[], at vec.h:889)
+FAIL: g++.dg/vect/pr92595.cc -std=c++17 (test for excess errors)
+FAIL: g++.dg/vect/pr92595.cc -std=c++2a (internal compiler error: in operator[], at vec.h:889)
+FAIL: g++.dg/vect/pr92595.cc -std=c++2a (test for excess errors)
+FAIL: gcc.dg/guality/pr43051-1.c -O3 -fomit-frame-pointer -funroll-loops -fpeel-loops -ftracer -finline-functions  -DPREVENT_OPTIMIZATION  line 34 c == &a[0]
+FAIL: gcc.dg/guality/pr43051-1.c -O3 -fomit-frame-pointer -funroll-loops -fpeel-loops -ftracer -finline-functions  -DPREVENT_OPTIMIZATION  line 39 c == &a[0]
+FAIL: gcc.dg/vect/vect-tail-nomask-1.c -flto -ffat-lto-objects  scan-tree-dump-times vect "LOOP EPILOGUE VECTORIZED \\(MODE=V16QI\\)" 2
+FAIL: gcc.dg/vect/vect-tail-nomask-1.c scan-tree-dump-times vect "LOOP EPILOGUE VECTORIZED \\(MODE=V16QI\\)" 2
+FAIL: gcc.target/i386/pr88531-1b.c scan-assembler-times vgatherqpd 4
+FAIL: gcc.target/i386/pr88531-1b.c scan-assembler-times vmulpd 4
+FAIL: gcc.target/i386/pr88531-1c.c scan-assembler-times vgatherqpd 4
+FAIL: gcc.target/i386/pr88531-1c.c scan-assembler-times vmulpd 4
+FAIL: gcc.target/i386/pr88531-2b.c scan-assembler-times vmulps 2
+FAIL: gcc.target/i386/pr88531-2c.c scan-assembler-times vmulps 2
+FAIL: gcc.target/i386/pr94494.c (internal compiler error: in operator[], at vec.h:889)
+FAIL: gcc.target/i386/pr94494.c (test for excess errors)
+FAIL: gcc.target/i386/vect-reduc-1.c scan-assembler-times padd 5
+FAIL: gcc.target/i386/vect-reduc-1.c scan-tree-dump vect "LOOP EPILOGUE VECTORIZED"
+FAIL: maintainers-verify.sh 
