@@ -1,3 +1,10 @@
+work075 patch #4
+2022-01-11  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/rs6000.c (TARGET_IEEEQUAD_DEFAULT): If the
+	compiler used to build this compiler defaults long double to IEEE
+	128-bit, then make it the default for the target.
+
 work075 patch #1
 2022-01-05  Michael Meissner  <meissner@the-meissners.org>
 
