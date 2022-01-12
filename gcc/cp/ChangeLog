@@ -1,3 +1,64 @@
+2022-01-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/101597
+	* class.c (build_vfn_ref): Build OBJ_TYPE_REF with INTEGER_CST
+	OBJ_TYPE_REF_TOKEN with type equal to OBJ_TYPE_REF_OBJECT type.
+	* error.c (resolve_virtual_fun_from_obj_type_ref): Use type of
+	OBJ_TYPE_REF_TOKEN rather than type of OBJ_TYPE_REF_OBJECT as
+	obj_type.
+
+2022-01-11  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/103831
+	* call.c (build_new_method_call): Consider dependent bases only
+	if 'this' is available.
+
+2022-01-11  Olivier Hainque  <hainque@adacore.com>
+
+	* decl.c (cxx_init_decl_processing): Move code possibly
+	altering flag_weak before code testing it.
+
+2022-01-10  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/103879
+	* constexpr.c (cxx_fold_indirect_ref): Split out object/offset
+	canonicalization step into a local lambda.  Strengthen it to
+	absorb more components at position 0.  Use it before both calls
+	to cxx_fold_indirect_ref_1.
+
+2022-01-10  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/103783
+	* call.c (cand_parms_match): Skip over 'this' when given one
+	static and one non-static member function.
+
+2022-01-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/103912
+	* semantics.c (expand_or_defer_fn): For immediate functions, set
+	node->body_removed to true and clear analyzed, definition and
+	force_output.
+	* decl2.c (c_parse_final_cleanups): Ignore immediate functions for
+	expand_or_defer_fn.
+
+2022-01-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/89074
+	* constexpr.c (cxx_maybe_fold_addr_pointer_plus): New function.
+	(cxx_eval_binary_expression): Use it.
+
+2022-01-08  Jason Merrill  <jason@redhat.com>
+
+	PR c++/103946
+	* init.c (build_vec_init): Remove assert.
+	* tree.c (build_vec_init_expr): Likewise.
+
+2022-01-08  Jason Merrill  <jason@redhat.com>
+
+	PR c++/100588
+	* call.c (build_op_delete_call): Ignore destroying delete
+	if alloc_fn.
+
 2022-01-07  Jason Merrill  <jason@redhat.com>
 
 	PR c++/20040
