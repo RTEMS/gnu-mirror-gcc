@@ -210,9 +210,13 @@ def DownloadBuildArtifact():
         gccBuildArtifactID = FindGccBuildArtifact(globals.configObj.runID, globals.configObj.accessToken)
 
     # TODO: Support downloading build artifact without a config object setup so the script can be used outside of workflows by developers
-    filename = DownloadArtifact(gccBuildArtifactID)
-    res = subprocess.run('mv ' + filename + '/* ../objdir -f ',
+    filename = DownloadArtifact(gccBuildArtifactID) + "/objdir.tar.gz"
+    res = subprocess.run('tar -xzf ' + filename + ' -m -C ..',
         shell=True, check=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
-    logger.info("mv cmd output = " + str(res.stdout, 'utf-8'))
+    logger.info("tar cmd output = " + str(res.stdout, 'utf-8'))
 
+    res = subprocess.run('rm ' +  filename,
+        shell=True, check=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+    logger.info("rm cmd output = " + str(res.stdout, 'utf-8'))

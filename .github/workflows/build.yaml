@@ -78,11 +78,11 @@ jobs:
         with: 
           configjson: ${{ steps.setupconfig.outputs.configJson }}
 
-      - name: Move objdir to be in repo so it can be uploaded
-        run: mv ../objdir objdir
+      - name: Compress and archive objdir so that it can be uploaded
+        run: tar -czf objdir.tar.gz ../objdir
 
       - name: Upload build output
         uses: actions/upload-artifact@v2
         with:
           name: gccBuild
-          path: objdir
+          path: objdir.tar.gz
