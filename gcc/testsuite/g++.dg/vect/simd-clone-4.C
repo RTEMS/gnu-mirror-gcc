@@ -5,7 +5,7 @@
 #include "../../gcc.dg/vect/tree-vect.h"
 
 #ifdef ONE_FILE
-#include "simd-clone-5.cc"
+#include "simd-clone-5.C"
 #else
 #include "simd-clone-4.h"
 #endif
