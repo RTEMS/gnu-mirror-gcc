@@ -846,6 +846,7 @@ _loop_vec_info::_loop_vec_info (class loop *loop_in, vec_info_shared *shared)
     can_use_partial_vectors_p (param_vect_partial_vector_usage != 0),
     using_partial_vectors_p (false),
     epil_using_partial_vectors_p (false),
+    partial_load_store_bias (0),
     peeling_for_gaps (false),
     peeling_for_niter (false),
     no_data_dependencies (false),
@@ -1164,6 +1165,31 @@ vect_verify_loop_lens (loop_vec_info loop_vinfo)
 {
   if (LOOP_VINFO_LENS (loop_vinfo).is_empty ())
     return false;
+
+  machine_mode len_load_mode = get_len_load_store_mode
+    (loop_vinfo->vector_mode, true).require ();
+  machine_mode len_store_mode = get_len_load_store_mode
+    (loop_vinfo->vector_mode, false).require ();
+
+  signed char partial_load_bias = internal_len_load_store_bias
+    (IFN_LEN_LOAD, len_load_mode);
+
+  signed char partial_store_bias = internal_len_load_store_bias
+    (IFN_LEN_STORE, len_store_mode);
+
+  gcc_assert (partial_load_bias == partial_store_bias);
+
+  if (partial_load_bias == VECT_PARTIAL_BIAS_UNSUPPORTED)
+    return false;
+
+  /* If the backend requires a bias of -1 for LEN_LOAD, we must not emit
+     len_loads with a length of zero.  In order to avoid that we prohibit
+     more than one loop length here.  */
+  if (partial_load_bias == -1
+      && LOOP_VINFO_LENS (loop_vinfo).length () > 1)
+    return false;
+
+  LOOP_VINFO_PARTIAL_LOAD_STORE_BIAS (loop_vinfo) = partial_load_bias;
 
   unsigned int max_nitems_per_iter = 1;
   unsigned int i;
@@ -3026,7 +3052,8 @@ vect_analyze_loop (class loop *loop, vec_info_shared *shared)
   vector_modes[0] = autodetected_vector_mode;
   mode_i = 0;
 
-  bool supports_partial_vectors = partial_vectors_supported_p ();
+  bool supports_partial_vectors =
+    partial_vectors_supported_p () && param_vect_partial_vector_usage != 0;
   poly_uint64 first_vinfo_vf = LOOP_VINFO_VECT_FACTOR (first_loop_vinfo);
 
   while (1)
@@ -4076,6 +4103,8 @@ vect_estimate_min_profitable_iters (loop_vec_info loop_vinfo,
 	 here.  */
 
       bool niters_known_p = LOOP_VINFO_NITERS_KNOWN_P (loop_vinfo);
+      signed char partial_load_store_bias
+	= LOOP_VINFO_PARTIAL_LOAD_STORE_BIAS (loop_vinfo);
       bool need_iterate_p
 	= (!LOOP_VINFO_EPILOGUE_P (loop_vinfo)
 	   && !vect_known_niters_smaller_than_vf (loop_vinfo));
@@ -4107,6 +4136,11 @@ vect_estimate_min_profitable_iters (loop_vec_info loop_vinfo,
 	    /* Need to set up lengths in prologue, only one MIN required
 	       for each since start index is zero.  */
 	    prologue_stmts += num_vectors;
+
+	    /* If we have a non-zero partial load bias, we need one PLUS
+	       to adjust the load length.  */
+	    if (partial_load_store_bias != 0)
+	      body_stmts += 1;
 
 	    /* Each may need two MINs and one MINUS to update lengths in body
 	       for next iteration.  */
@@ -9158,6 +9192,8 @@ vect_get_loop_len (loop_vec_info loop_vinfo, vec_loop_lens *lens,
 		   unsigned int nvectors, unsigned int index)
 {
   rgroup_controls *rgl = &(*lens)[nvectors - 1];
+  bool use_bias_adjusted_len =
+    LOOP_VINFO_PARTIAL_LOAD_STORE_BIAS (loop_vinfo) != 0;
 
   /* Populate the rgroup's len array, if this is the first time we've
      used it.  */
@@ -9168,15 +9204,28 @@ vect_get_loop_len (loop_vec_info loop_vinfo, vec_loop_lens *lens,
 	{
 	  tree len_type = LOOP_VINFO_RGROUP_COMPARE_TYPE (loop_vinfo);
 	  gcc_assert (len_type != NULL_TREE);
+
 	  tree len = make_temp_ssa_name (len_type, NULL, "loop_len");
 
 	  /* Provide a dummy definition until the real one is available.  */
 	  SSA_NAME_DEF_STMT (len) = gimple_build_nop ();
 	  rgl->controls[i] = len;
+
+	  if (use_bias_adjusted_len)
+	    {
+	      gcc_assert (i == 0);
+	      tree adjusted_len =
+		make_temp_ssa_name (len_type, NULL, "adjusted_loop_len");
+	      SSA_NAME_DEF_STMT (adjusted_len) = gimple_build_nop ();
+	      rgl->bias_adjusted_ctrl = adjusted_len;
+	    }
 	}
     }
 
-  return rgl->controls[index];
+  if (use_bias_adjusted_len)
+    return rgl->bias_adjusted_ctrl;
+  else
+    return rgl->controls[index];
 }
 
 /* Scale profiling counters by estimation for LOOP which is vectorized
