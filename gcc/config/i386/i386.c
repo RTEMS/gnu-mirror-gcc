@@ -10335,23 +10335,18 @@ legitimate_pic_address_disp_p (rtx disp)
 	      if (is_imported_p (op0))
 		return true;
 
-	      if (SYMBOL_REF_FAR_ADDR_P (op0)
-		  || !SYMBOL_REF_LOCAL_P (op0))
+	      if (SYMBOL_REF_FAR_ADDR_P (op0) || !SYMBOL_REF_LOCAL_P (op0))
 		break;
 
-	      /* Function-symbols need to be resolved only for
-	         large-model.
-	         For the small-model we don't need to resolve anything
-	         here.  */
+	      /* Non-external-weak function symbols need to be resolved only
+		 for the large model.  Non-external symbols don't need to be
+		 resolved for large and medium models.  For the small model,
+		 we don't need to resolve anything here.  */
 	      if ((ix86_cmodel != CM_LARGE_PIC
-	           && SYMBOL_REF_FUNCTION_P (op0))
+		   && SYMBOL_REF_FUNCTION_P (op0)
+		   && !(SYMBOL_REF_EXTERNAL_P (op0) && SYMBOL_REF_WEAK (op0)))
+		  || !SYMBOL_REF_EXTERNAL_P (op0)
 		  || ix86_cmodel == CM_SMALL_PIC)
-		return true;
-	      /* Non-external symbols don't need to be resolved for
-	         large, and medium-model.  */
-	      if ((ix86_cmodel == CM_LARGE_PIC
-		   || ix86_cmodel == CM_MEDIUM_PIC)
-		  && !SYMBOL_REF_EXTERNAL_P (op0))
 		return true;
 	    }
 	  else if (!SYMBOL_REF_FAR_ADDR_P (op0)
@@ -13482,7 +13477,10 @@ ix86_print_operand_address_as (FILE *file, rtx addr,
 static void
 ix86_print_operand_address (FILE *file, machine_mode /*mode*/, rtx addr)
 {
-  ix86_print_operand_address_as (file, addr, ADDR_SPACE_GENERIC, false);
+  if (this_is_asm_operands && ! address_operand (addr, VOIDmode))
+    output_operand_lossage ("invalid constraints for operand");
+  else
+    ix86_print_operand_address_as (file, addr, ADDR_SPACE_GENERIC, false);
 }
 
 /* Implementation of TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA.  */
@@ -15853,8 +15851,10 @@ ix86_output_call_insn (rtx_insn *insn, rtx call_op)
 	    break;
 
 	  /* If we get to the epilogue note, prevent a catch region from
-	     being adjacent to the standard epilogue sequence.  If non-
-	     call-exceptions, we'll have done this during epilogue emission. */
+	     being adjacent to the standard epilogue sequence.  Note that,
+	     if non-call exceptions are enabled, we already did it during
+	     epilogue expansion, or else, if the insn can throw internally,
+	     we already did it during the reorg pass.  */
 	  if (NOTE_P (i) && NOTE_KIND (i) == NOTE_INSN_EPILOGUE_BEG
 	      && !flag_non_call_exceptions
 	      && !can_throw_internal (insn))

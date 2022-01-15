@@ -1,3 +1,369 @@
+2022-01-14  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/lto25.adb: New test.
+	* gnat.dg/opt96.adb: Likewise.
+	* gnat.dg/opt96_pkg.ads, gnat.dg/opt96_pkg.adb: New helper.
+
+2022-01-13  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-29  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102332
+	* gfortran.dg/pr102332.f90: New test.
+
+2022-01-12  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-11-26  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97953
+	* gcc.dg/pr97953.c: New testcase.
+
+2022-01-07  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-05-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/100551
+	* gfortran.dg/pr100551.f90: New test.
+
+2021-12-27  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-10  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103418
+	* gfortran.dg/move_alloc_8.f90: Adjust error messages.
+	* gfortran.dg/pointer_intent_9.f90: New test.
+
+2021-12-27  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-14  Harald Anlauf  <anlauf@gmx.de>
+
+	PR libfortran/103634
+	* gfortran.dg/intrinsic_pack_6.f90: New test.
+
+2021-12-27  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-22  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103778
+	* gfortran.dg/illegal_boz_arg_3.f90: New test.
+
+2021-12-27  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-11-18  Harald Anlauf  <anlauf@gmx.de>
+		    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/101329
+	* gfortran.dg/pr101329.f90: New test.
+
+2021-12-19  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-07  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103588
+	* gfortran.dg/pr103588.f90: New test.
+
+2021-12-19  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-03  Harald Anlauf  <anlauf@gmx.de>
+		    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/103505
+	* gfortran.dg/pr103505.f90: New test.
+
+2021-12-19  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-18  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103412
+	* gfortran.dg/illegal_boz_arg_2.f90: New test.
+
+2021-12-17  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-08  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103610
+	* gfortran.dg/shape_11.f90: New test.
+
+2021-12-16  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-11  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103606
+	* gfortran.dg/pr103606.f90: New test.
+
+2021-12-16  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-14  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103717
+	* gfortran.dg/do_check_19.f90: New test.
+
+2021-12-15  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2021-11-30  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/102347
+	* gcc.target/powerpc/pr102347.c: New test.
+
+2021-12-11  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-11-30  Harald Anlauf  <anlauf@gmx.de>
+
+	* gfortran.dg/array_constructor_54.f90: New test.
+
+2021-12-11  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-10-14  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102717
+	* gfortran.dg/reshape_shape_2.f90: New test.
+
+2021-12-11  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-11-26  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103411
+	* gfortran.dg/pr68153.f90: Adjust test to improved check.
+	* gfortran.dg/reshape_7.f90: Likewise.
+	* gfortran.dg/reshape_9.f90: New test.
+
+2021-12-10  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-07  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103607
+	* gfortran.dg/pr103607.f90: New test.
+
+2021-11-26  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-11-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103392
+	* gfortran.dg/bound_simplification_7.f90: New test.
+
+2021-11-25  Jan Hubicka  <jh@suse.cz>
+
+	Backported from master:
+	2021-11-20  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR ipa/103052
+	* gcc.c-torture/execute/pr103052.c: New test.
+
+2021-11-23  Bill Schmidt  <wschmidt@linux.ibm.com>
+
+	PR target/101985
+	* gcc.target/powerpc/pr101985-1.c: New.
+	* gcc.target/powerpc/pr101985-2.c: New.
+
+2021-11-22  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-11-21  Harald Anlauf  <anlauf@gmx.de>
+		    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/99061
+	* gfortran.dg/dec_math_5.f90: New test.
+
+2021-11-22  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	Backported from master:
+	2021-11-19  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	* gcc.target/s390/20211119.c: New test.
+
+2021-11-13  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-10-26  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102816
+	* gfortran.dg/pr102816.f90: New test.
+
+2021-11-13  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-10-15  Harald Anlauf  <anlauf@gmx.de>
+		    Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/102685
+	* gfortran.dg/derived_constructor_char_1.f90: Fix invalid code.
+	* gfortran.dg/pr70931.f90: Likewise.
+	* gfortran.dg/transfer_simplify_2.f90: Likewise.
+	* gfortran.dg/pr102685.f90: New test.
+
+2021-11-13  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-11-06  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102715
+	* gfortran.dg/pr68019.f90: Adjust error message.
+	* gfortran.dg/pr102715.f90: New test.
+
+2021-11-13  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-11-05  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102817
+	* gfortran.dg/pr102817.f90: New test.
+
+2021-11-13  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-10-10  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/99348
+	PR fortran/102521
+	* gfortran.dg/parameter_array_init_8.f90: New test.
+
+2021-11-09  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-10-13  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/102714
+	* gcc.dg/ipa/pr102714.c: New testcase.
+
+2021-11-09  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-05-19  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/100672
+	* gcc.dg/torture/pr100672.c: New testcase.
+
+2021-11-09  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/100253
+	* g++.dg/pr100253.C: New testcase.
+
+2021-11-03  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	PR rtl-optimization/102842
+	* g++.target/arm/pr102842.C: New test.
+
+2021-11-02  Martin Jambor  <mjambor@suse.cz>
+
+	Backported from master:
+	2021-10-21  Martin Jambor  <mjambor@suse.cz>
+
+	PR tree-optimization/102505
+	* g++.dg/torture/pr102505.C: New test.
+
+2021-10-27  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/102761
+	* gcc.target/i386/pr102761.c: New test.
+
+2021-10-23  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-10-14  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102716
+	* gfortran.dg/shape_10.f90: New test.
+
+2021-10-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-08-25  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/102046
+	* gcc.dg/vect/pr102046.c: New testcase.
+
+2021-10-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-08-17  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/101925
+	* gcc.dg/sso-16.c: New testcase.
+
+2021-10-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-08-17  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/101373
+	PR tree-optimization/101868
+	* gcc.dg/lto/pr101868_0.c: New testcase.
+	* gcc.dg/lto/pr101868_1.c: Likewise.
+	* gcc.dg/lto/pr101868_2.c: Likewise.
+	* gcc.dg/lto/pr101868_3.c: Likewise.
+
+2021-10-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-08-10  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/101824
+	* gcc.dg/tree-ssa/pr101824.c: New testcase.
+
+2021-10-11  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/102622
+	* gcc.c-torture/execute/bitfld-10.c: New test.
+
+2021-10-05  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-09-30  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102458
+	* gfortran.dg/pr102458b.f90: New test.
+
+2021-10-05  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-10-03  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102458
+	* gfortran.dg/pr102458.f90: New test.
+
+2021-10-03  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backported from master:
+	2021-07-19  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR c++/95520
+	* g++.dg/coroutines/pr95520.C: New test.
+
+2021-09-30  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-09-13  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/82314
+	* gfortran.dg/pr82314.f90: New test.
+
+2021-09-30  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-09-29  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102520
+	* gfortran.dg/pr102520.f90: New test.
+
 2021-09-21  Harald Anlauf  <anlauf@gmx.de>
 
 	Backported from master:

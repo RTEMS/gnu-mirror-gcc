@@ -1,3 +1,278 @@
+2022-01-14  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* ipa-param-manipulation.c (ipa_dump_adjusted_parameters): Dump
+	reverse flag as "reverse" for the sake of consistency.
+	* ipa-sra.c: Fix copyright year.
+	(ipa_sra_function_summaries::duplicate): Copy the reverse flag.
+	(dump_isra_access): Tweak dump line.
+	(isra_write_node_summary): Write the reverse flag.
+	(isra_read_node_info): Read it.
+	(pull_accesses_from_callee): Test its consistency and copy it.
+
+2022-01-12  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-11-26  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97953
+	* gimple-ssa-evrp-analyze.c
+	(evrp_range_analyzer::record_ranges_from_incoming_edge): Make
+	sure the condition post-dominates the SSA definition before
+	recording into SSA_NAME_RANGE_INFO.
+
+2022-01-10  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR target/103465
+	* coretypes.h (unwind_info_type): Swap UI_SEH and UI_TARGET.
+
+2021-12-16  Martin Liska  <mliska@suse.cz>
+
+	Backported from master:
+	2021-12-15  Martin Liska  <mliska@suse.cz>
+
+	PR target/103661
+	* config/i386/i386-builtins.c (fold_builtin_cpu): Compare to 0
+	as API expects that non-zero values are returned (do that
+	it mask == 31).
+	For "avx512vbmi2" argument, we return now 1 << 31, which is a
+	negative integer value.
+
+2021-12-15  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2021-11-30  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/102347
+	* config/rs6000/rs6000-call.c (rs6000_builtin_decl): Remove builtin mask
+	check.
+
+2021-12-01  Martin Jambor  <mjambor@suse.cz>
+
+	Backported from master:
+	2021-11-30  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/103267
+	* ipa-sra.c (scan_function): Also check ECF_LOOPING_CONST_OR_PURE flag.
+
+2021-11-30  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR target/103274
+	* config/i386/i386.c (ix86_output_call_insn): Beef up comment about
+	nops emitted with SEH.
+	* config/i386/winnt.c (i386_pe_seh_unwind_emit): When switching to
+	the cold section, emit a nop before the directive if the previous
+	active instruction is a call.
+
+2021-11-25  Jan Hubicka  <jh@suse.cz>
+
+	Backported from master:
+	2021-11-20  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR ipa/103052
+	* ipa-pure-const.c (propagate_pure_const): Fix merging of loping flag.
+
+2021-11-23  Bill Schmidt  <wschmidt@linux.ibm.com>
+
+	PR target/101985
+	* config/rs6000/altivec.h (vec_cpsgn): Swap operand order.
+
+2021-11-22  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	Backported from master:
+	2021-11-19  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	* config/s390/s390.md (define_peephole2): Variable insn points
+	to the first matched insn.  Use peep2_next_insn(1) to refer to
+	the second matched insn.
+
+2021-11-15  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2021-11-11  Kewen Lin  <linkw@linux.ibm.com>
+
+	* doc/invoke.texi: Change references to "future cpu" to "power10",
+	"-mcpu=future" to "-mcpu=power10".  Adjust words for float128.
+
+2021-11-09  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-10-13  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/102714
+	* ipa-sra.c (ptr_parm_has_nonarg_uses): Fix volatileness
+	check.
+
+2021-11-09  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-05-19  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/100672
+	* fold-const.c (fold_negate_expr_1): Use element_precision.
+	(negate_expr_p): Likewise.
+
+2021-11-09  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/100253
+	* tree-vect-stmts.c (vectorizable_load): Do not assume
+	element alignment when DR_MISALIGNMENT is -1.
+	(vectorizable_store): Likewise.
+
+2021-11-08  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2021-10-26  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR tree-optimization/102789
+	* tree-vect-loop-manip.c (vect_update_inits_of_drs): Do not
+	update inits of simd_lane_access.
+
+2021-11-03  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	PR rtl-optimization/102842
+	* lra-constraints.c (match_reload): Ignore out in checking values
+	of outs.
+	(curr_insn_transform): Collect outputs before doing reloads of operands.
+
+2021-11-02  Martin Jambor  <mjambor@suse.cz>
+
+	Backported from master:
+	2021-10-21  Martin Jambor  <mjambor@suse.cz>
+
+	PR tree-optimization/102505
+	* tree-sra.c (totally_scalarize_subtree): Check that the
+	encountered field fits within the acces we would like to put it
+	in.
+
+2021-10-28  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* doc/invoke.texi (%X): Remove obsolete reference to -Wl.
+
+2021-10-27  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/102761
+	* config/i386/i386.c (ix86_print_operand_address):
+	Error out for non-address_operand asm operands.
+
+2021-10-26  Piotr Kubaj  <pkubaj@FreeBSD.org>
+
+	Backported from master:
+	2021-10-16  Piotr Kubaj  <pkubaj@FreeBSD.org>
+
+	* configure.ac: Treat powerpc64*-*-freebsd* the same as
+	powerpc64-*-freebsd*.
+	* configure: Regenerate.
+
+2021-10-24  John David Anglin  <danglin@gcc.gnu.org>
+
+	* config/pa/pa.md: Don't use 'G' constraint in integer move patterns.
+
+2021-10-21  H.J. Lu  <hjl.tools@gmail.com>
+
+	Backported from master:
+	2021-10-21  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/98667
+	* doc/invoke.texi: Document -fcf-protection requires i686 or
+	new.
+
+2021-10-15  John David Anglin  <danglin@gcc.gnu.org>
+
+	* config/pa/pa.md: Consistently use "rG" constraint for copy
+	instruction in move patterns.
+
+2021-10-14  John David Anglin  <danglin@gcc.gnu.org>
+
+	* config/pa/pa.md (cbranchsf4): Disable if TARGET_SOFT_FLOAT.
+	(cbranchdf4): Likewise.
+	Add missing move patterns for TARGET_SOFT_FLOAT.
+
+2021-10-13  John David Anglin  <danglin@gcc.gnu.org>
+
+	* config/pa/pa.md (muldi3): Add support for inlining 64-bit
+	multiplication on 32-bit PA 1.1 and 2.0 targets.
+
+2021-10-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-08-25  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/102046
+	* tree-vect-slp.c (vect_build_slp_tree_2): Conservatively
+	update ->any_pattern when swapping operands.
+
+2021-10-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-08-17  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/101925
+	* tree-ssa-sccvn.c (copy_reference_ops_from_ref): Set
+	reverse on COMPONENT_REF and ARRAY_REF according to
+	what reverse_storage_order_for_component_p does.
+	(vn_reference_eq): Compare reversed on reference ops.
+	(reverse_storage_order_for_component_p): New overload.
+	(vn_reference_lookup_3): Check reverse_storage_order_for_component_p
+	on the reference looked up.
+
+2021-10-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-08-17  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/101373
+	PR tree-optimization/101868
+	* tree-ssa-pre.c (prune_clobbered_mems): Also prune trapping
+	references when the BB may not return.
+
+2021-10-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-08-10  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/101824
+	* tree-nested.c (get_frame_field): Mark the COMPONENT_REF as
+	volatile in case the variable was.
+
+2021-10-12  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR target/102588
+	* config/sparc/sparc-modes.def (OI): New integer mode.
+
+2021-10-11  Diane Meirowitz  <diane.meirowitz@oracle.com>
+
+	Backported from master:
+	2021-10-11  Diane Meirowitz  <diane.meirowitz@oracle.com>
+
+	* doc/invoke.texi: Add link to UndefinedBehaviorSanitizer
+	documentation, mention UBSAN_OPTIONS, similar to what is done
+	for AddressSanitizer.
+
+2021-10-11  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/102622
+	* tree-ssa-phiopt.c (conditional_replacement): Set neg
+	to false for one bit signed types.
+
+2021-10-01  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* explow.c: Include langhooks.h.
+	(set_stack_check_libfunc): Build a proper function type.
+
+2021-10-01  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR c++/64697
+	* config/i386/i386.c (legitimate_pic_address_disp_p): For PE-COFF do
+	not return true for external weak function symbols in medium model.
+
+2021-09-22  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2021-09-22  Kewen Lin  <linkw@linux.ibm.com>
+
+	* ipa-fnsummary.c (inline_read_section): Unpack a dummy bit
+	to keep consistent with the side of streaming out.
+
 2021-09-21  Segher Boessenkool  <segher@kernel.crashing.org>
 
 	Backported from master:

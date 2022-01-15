@@ -1,3 +1,286 @@
+2022-01-13  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-29  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102332
+	* expr.c (gfc_get_variable_expr): Avoid NULL pointer dereferences
+	during handling of errors with invalid uses of CLASS variables.
+	* match.c (select_type_set_tmp): Likewise.
+	* primary.c (gfc_match_varspec): Likewise.
+	* resolve.c (resolve_variable): Likewise.
+	(resolve_select_type): Likewise.
+
+2022-01-07  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-05-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/100551
+	* trans-expr.c (gfc_conv_procedure_call): Adjust check for
+	implicit conversion of actual argument to an unlimited polymorphic
+	procedure argument.
+
+2021-12-27  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-10  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103418
+	* check.c (variable_check): Replace previous check of procedure
+	dummy arguments with INTENT(IN) attribute when passed to intrinsic
+	procedures by gfc_check_vardef_context.
+	* expr.c (gfc_check_vardef_context): Correct check of INTENT(IN)
+	dummy arguments for the case of sub-components of a CLASS pointer.
+
+2021-12-27  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-22  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103778
+	* check.c (is_c_interoperable): A BOZ literal constant is not
+	interoperable.
+
+2021-12-27  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-11-18  Harald Anlauf  <anlauf@gmx.de>
+		    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/101329
+	* check.c (is_c_interoperable): Reject NULL() as it is not
+	interoperable.
+
+2021-12-19  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-07  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103588
+	* array.c (gfc_ref_dimen_size): Do not generate internal error on
+	failed simplification of stride expression; just return failure.
+
+2021-12-19  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-03  Harald Anlauf  <anlauf@gmx.de>
+		    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/103505
+	* array.c (match_array_element_spec): Try to simplify array
+	element specifications to improve early checking.
+	* expr.c (gfc_try_simplify_expr): New.  Try simplification of an
+	expression via gfc_simplify_expr.  When an error occurs, roll
+	back.
+	* gfortran.h (gfc_try_simplify_expr): Declare it.
+
+2021-12-19  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-18  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103412
+	* check.c (gfc_check_sizeof): Reject BOZ type argument.
+
+2021-12-17  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-08  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103610
+	* array.c (spec_dimen_size): Fix simplification of SHAPE:
+	dimensions must be non-negative.
+
+2021-12-16  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-11  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103606
+	* resolve.c (resolve_fl_procedure): Do not access CLASS components
+	before class container has been built.
+
+2021-12-16  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-14  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103717
+	* frontend-passes.c (doloop_code): Prevent NULL pointer
+	dereference when checking for passing a do-loop variable to a
+	contained procedure with an interface mismatch.
+
+2021-12-11  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-11-30  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102787
+	* array.c (expand_constructor): When encountering a constant array
+	expression or array section within a constructor, simplify it to
+	enable better expansion.
+
+2021-12-11  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-10-14  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102717
+	* simplify.c (gfc_simplify_reshape): Replace assert by error
+	message for negative elements in SHAPE array.
+
+2021-12-11  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-11-26  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103411
+	* check.c (gfc_check_reshape): Improve check of size of source
+	array for the RESHAPE intrinsic against the given shape when pad
+	is not given, and shape is a parameter.  Try other simplifications
+	of shape.
+
+2021-12-10  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-07  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103607
+	* frontend-passes.c (do_subscript): Ensure that array bounds are
+	of type INTEGER before performing checks on array subscripts.
+
+2021-11-26  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-11-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103392
+	* simplify.c (simplify_bound): Do not try to simplify
+	LBOUND/UBOUND for arrays with POINTER or ALLOCATABLE attribute.
+
+2021-11-22  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-11-21  Harald Anlauf  <anlauf@gmx.de>
+		    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/99061
+	* trans-intrinsic.c (gfc_lookup_intrinsic): Helper function for
+	looking up gfortran builtin intrinsics.
+	(gfc_conv_intrinsic_atrigd): Use it.
+	(gfc_conv_intrinsic_cotan): Likewise.
+	(gfc_conv_intrinsic_cotand): Likewise.
+	(gfc_conv_intrinsic_atan2d): Likewise.
+
+2021-11-13  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-11-10  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103137
+	PR fortran/103138
+	* check.c (gfc_check_shape): Avoid NULL pointer dereference on
+	missing ref.
+	* simplify.c (gfc_simplify_cshift): Avoid NULL pointer dereference
+	when shape not set.
+	(gfc_simplify_transpose): Likewise.
+
+2021-11-13  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-10-26  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102816
+	* resolve.c (resolve_structure_cons): Reject invalid array spec of
+	a DT component referenced in a structure constructor.
+
+2021-11-13  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-10-15  Harald Anlauf  <anlauf@gmx.de>
+		    Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/102685
+	* decl.c (match_clist_expr): Set rank/shape of clist initializer
+	to match LHS.
+	* resolve.c (resolve_structure_cons): In a structure constructor,
+	compare shapes of array components against declared shape.
+
+2021-11-13  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-11-06  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102715
+	* decl.c (add_init_expr_to_sym): Reject rank mismatch between
+	array and its initializer.
+
+2021-11-13  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-11-05  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102817
+	* expr.c (simplify_parameter_variable): Copy shape of referenced
+	subobject when simplifying.
+
+2021-11-13  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-10-10  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/99348
+	PR fortran/102521
+	* decl.c (add_init_expr_to_sym): Extend initialization of
+	parameter arrays from scalars to handle derived types.
+
+2021-10-23  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-10-14  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102716
+	* check.c (gfc_check_shape): Reorder checks so that invalid KIND
+	arguments can be detected.
+
+2021-10-05  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-09-30  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102458
+	* simplify.c (simplify_size): Resolve expressions used in array
+	specifications so that SIZE can be simplified.
+
+2021-10-05  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-10-03  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102458
+	* expr.c (is_non_constant_intrinsic): Check for intrinsics
+	excluded in constant expressions (F2018:10.1.12).
+	(gfc_is_constant_expr): Use that check.
+
+2021-09-30  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-09-13  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/82314
+	* decl.c (add_init_expr_to_sym): For proper initialization of
+	array-valued named constants the array bounds need to be
+	simplified before adding the initializer.
+
+2021-09-30  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-09-29  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102520
+	* array.c (expand_constructor): Do not dereference NULL pointer.
+
 2021-09-21  Harald Anlauf  <anlauf@gmx.de>
 
 	Backported from master:
