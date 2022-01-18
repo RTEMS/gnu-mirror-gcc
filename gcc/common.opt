@@ -574,6 +574,11 @@ Wcheri-bounds
 Common Var(warn_cheri_bounds) Init(1) Warning
 Warn when an object can not be aligned to ensure non-overlapping bounds.
 
+Wcheri-provenance
+Common Init(1) Warning
+Warn when an expression has ambiguous pointer provenance or will be known
+invalid.
+
 Wattribute-warning
 Common Var(warn_attribute_warning) Init(1) Warning
 Warn about uses of __attribute__((warning)) declarations.

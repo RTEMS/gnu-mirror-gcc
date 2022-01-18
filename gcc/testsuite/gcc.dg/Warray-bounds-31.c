@@ -245,4 +245,4 @@ void narrow_ptr_index_range (void)
 
   p = S7 + SR (4, 6);
   T (p[5]);                   /* { dg-warning "array subscript \\\[9, 11] is outside array bounds of .char\\\[8]." } */
-}
+} /* { dg-warning "offset is outside of .* capability from which it is offset" "" { target *-*-* } } */

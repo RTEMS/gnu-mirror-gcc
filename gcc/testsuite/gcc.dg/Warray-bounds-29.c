@@ -147,4 +147,4 @@ void test_wide (void)
   T (p4[-2]);
   T (p4[-1]);
   T (p4[ 0]);                 /* { dg-warning "array subscript \\\[4, 8] is outside array bounds of .\[a-z \]+\\\[4]." } */
-}
+} /* { dg-warning "offset is outside of .* capability from which it is offset" "" { target *-*-* } } */

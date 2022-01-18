@@ -17,4 +17,4 @@ foo (int i)
   printf ("%d\n" + 10);		/* { dg-warning "not a string" "too large addend" } */
   printf ("%d\n" - 1, i);	/* { dg-warning "not a string" "minus constant" } */
   printf ("%d\n" + -1, i);	/* { dg-warning "not a string" "negative addend" } */
-}
+} /* { dg-warning "offset is outside of .* capability from which it is offset" "" { target *-*-* } } */

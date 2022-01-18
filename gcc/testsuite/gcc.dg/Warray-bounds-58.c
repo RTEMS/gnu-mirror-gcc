@@ -78,4 +78,4 @@ void fax_static (void)
   sink (strlen (ax3.a + 3));
   sink (strlen (ax3.a + 4));    // { dg-warning "\\\[-Warray-bounds" "pr93514" { xfail *-*-* } }
   sink (strlen (ax3.a + 5));    // { dg-warning "\\\[-Warray-bounds" }
-}
+} /* { dg-warning "offset is outside of .* capability from which it is offset" "" { target *-*-* } } */

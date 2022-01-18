@@ -20223,17 +20223,49 @@ aarch64_print_patchable_function_entry (FILE *file,
   default_print_patchable_function_entry (file, patch_area_size, record_p);
 }
 
+static bool
+cap_offset_known_outside_bounds (rtx label, rtx maybe_constant, tree *declp,
+				 unsigned HOST_WIDE_INT *offp)
+{
+  if (!CONST_INT_P (maybe_constant))
+    return false;
+  HOST_WIDE_INT off = INTVAL (maybe_constant);
+  machine_mode mode = GET_MODE (label);
+
+  if (POINTER_PLUS_P (label))
+    return cap_offset_known_outside_bounds
+      (XEXP (label, 0),
+       plus_constant (mode, XEXP (label, 1), off),
+       declp, offp);
+
+  if (!SYMBOL_REF_P (label) || !SYMBOL_REF_DECL (label))
+    return false;
+  tree decl = SYMBOL_REF_DECL (label);
+  if (DECL_SIZE_UNIT (decl)
+      && (off < 0
+	  || (unsigned HOST_WIDE_INT)off > tree_to_uhwi (DECL_SIZE_UNIT (decl))))
+    {
+      *declp = decl;
+      *offp = off;
+      return true;
+    }
+  return false;
+}
+
 /* Implement ASM_OUTPUT_CAPABILITY.  */
 bool
 aarch64_asm_output_capability (rtx x, unsigned int size, int aligned_p)
 {
+  /* Capability loads must be aligned on Morello, so we must emit an aligned
+     capability.  This is automatically done by the assembler if we're using
+     `capinit` or `chericap`, but when we emit an integer we need to manually
+     do that.  */
+  aligned_p = aligned_p || !TARGET_CAPABILITY_FAKE;
   if (CONST_NULL_P (x))
     {
       if (size == 16)
 	{
-	  if (aligned_p)
-	    fputs ("\t.p2align\t4\n", asm_out_file);
-
+	  fputs ("\t.p2align\t4\n", asm_out_file);
 	  fputs ("\t.zero\t16\n", asm_out_file);
 	  return true;
 	}
@@ -20274,17 +20306,45 @@ aarch64_asm_output_capability (rtx x, unsigned int size, int aligned_p)
       && CONST_NULL_P (XEXP (x, 0))
       && size == 16)
     {
-      if (aligned_p)
-	fputs ("\t.p2align\t4\n", asm_out_file);
-
+      fputs ("\t.p2align\t4\n", asm_out_file);
       ret = targetm.asm_out.integer (XEXP (x, 1), 8, 0);
       return ret && targetm.asm_out.integer (const0_rtx, 8, 0);
     }
 
-  fputs ("\t.capinit\t", asm_out_file);
-  output_addr_const (asm_out_file, x);
-  fputc ('\n', asm_out_file);
-  ret = targetm.asm_out.integer (const0_rtx, offset_size, aligned_p);
+  tree warning_decl;
+  unsigned HOST_WIDE_INT warning_offset;
+  if (GET_CODE (x) == POINTER_PLUS
+      && cap_offset_known_outside_bounds (XEXP (x, 0), XEXP (x, 1),
+					  &warning_decl, &warning_offset))
+    {
+      /* MORELLO TODO Would be nice to improve this diagnostic somehow.
+	 One problem is that we can tell we have an issue here but we don't
+	 have the information about what these things represent to the user
+	 hence we give something that is a little unclear.
+	 Another problem is that we repeat the same warning if the rest of the
+	 compiler has decided to output the same constant plus offset in
+	 different places.  This doesn't seem like too bad to worry about right
+	 now.  */
+      if (warning (OPT_Wcheri_provenance,
+	       "%qld offset is outside of %qD capability from which it is offset",
+	       warning_offset, warning_decl))
+	inform (UNKNOWN_LOCATION,
+		"-O1 -Warray-bounds may provide a more precise diagnostic");
+      /* If we know the offset is outside of the bounds of this label, avoid
+	 requesting a capability for it.  This would cause a linker error since
+	 the linker refuses to generate such invalid-by-definition
+	 capabilities.  */
+      fputs ("\t.p2align\t4\n", asm_out_file);
+      ret = targetm.asm_out.integer (drop_capability (x), offset_size, aligned_p);
+    }
+  else
+    {
+      fputs ("\t.capinit\t", asm_out_file);
+      output_addr_const (asm_out_file, x);
+      fputc ('\n', asm_out_file);
+      ret = targetm.asm_out.integer (const0_rtx, offset_size, aligned_p);
+    }
+
   return ret && targetm.asm_out.integer (const0_rtx, offset_size, aligned_p);
 }
 

@@ -9,4 +9,4 @@ __do_global_ctors_aux (void)
   func_ptr *p;
   for (p = __CTOR_END__ - 1; *p != (func_ptr) -1; p--)
     (*p) ();
-}
+} /* { dg-warning "offset is outside of .* capability from which it is offset" "" { target *-*-* } } */
