@@ -210,7 +210,17 @@ PERSONALITY_FUNCTION (int version,
       /* Note that all call-site encodings are "absolute" displacements.  */
       p = read_encoded_value (0, info.call_site_encoding, p, &cs_start);
       p = read_encoded_value (0, info.call_site_encoding, p, &cs_len);
+#  ifdef __CHERI_PURE_CAPABILITY__
+      unsigned marker = 0;
+      /* Single uleb128 value as the capability marker.  */
+      p = read_encoded_value (0, DW_EH_PE_uleb128, p, &marker);
+      /* 8 byte value indicating the offset from said 8 byte value.
+	 Could use DW_EH_PE_indirect except that the offset is zero if there is
+	 no landing pad.  */
+      p = read_encoded_value (0, DW_EH_PE_pcrel | DW_EH_PE_udata8, p, &cs_lp);
+#  else
       p = read_encoded_value (0, info.call_site_encoding, p, &cs_lp);
+#  endif
       p = read_uleb128 (p, &cs_action);
 
       /* The table is sorted, so if we've passed the ip, stop.  */
@@ -220,16 +230,10 @@ PERSONALITY_FUNCTION (int version,
 	{
 	  if (cs_lp)
 	    {
-	      landing_pad = info.LPStart + cs_lp;
 #  ifdef __CHERI_PURE_CAPABILITY__
-	      /* MORELLO TODO temporary hack to use unmodified landing pad
-		 information.  The landing pad we calculate does not have the
-		 LSB set.  When we eventually implement the specified landing
-		 pad Morello information we'll be given a capability which
-		 correctly has the LSB set (and for that matter will be sealed,
-		 and will not be an offset from LPStart but a capability
-		 directly etc).  */
-	      landing_pad += 1;
+	      landing_pad = *(_Unwind_Ptr *)cs_lp;
+#  else
+	      landing_pad = info.LPStart + cs_lp;
 #  endif
 	    }
 	  goto found_something;
