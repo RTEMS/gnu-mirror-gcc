@@ -26,7 +26,7 @@ label2:
 }
 
 /* Ensure that we initialise labels in the constant pool with the correct form.  */
-/* { dg-final { scan-assembler {capinit\tfun\+\(\(\.L\d\+1\)-fun\)} { target cheri_capability_pure } } } */
+/* { dg-final { scan-assembler {capinit\tfun\+\(\(\.L\d\+\(1\)\)-fun\)} { target cheri_capability_pure } } } */
 
 /* Ensure that we load labels directly with the LSB set.  */
-/* { dg-final { scan-assembler {adrp[^\n]*\.L\d\+1} { target cheri_capability_pure } } } */
+/* { dg-final { scan-assembler {adrp[^\n]*\.L\d\+\(1\)} { target cheri_capability_pure } } } */

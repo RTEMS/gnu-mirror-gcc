@@ -4171,8 +4171,14 @@ output_addr_const (FILE *file, rtx x)
 	  output_addr_const (file, XEXP (x, 0));
 	  if (!CONST_INT_P (XEXP (x, 1))
 	      || INTVAL (XEXP (x, 1)) >= 0)
-	    fprintf (file, "+");
-	  output_addr_const (file, XEXP (x, 1));
+	    {
+	      fprintf (file, "+");
+	      fputs (targetm.asm_out.open_paren, file);
+	      output_addr_const (file, XEXP (x, 1));
+	      fputs (targetm.asm_out.close_paren, file);
+	    }
+	  else
+	    output_addr_const (file, XEXP (x, 1));
 	}
       break;
 

@@ -222,6 +222,7 @@ static int dw2_size_of_call_site_table (int);
 static int sjlj_size_of_call_site_table (void);
 static void dw2_output_call_site_table (int, int);
 static void sjlj_output_call_site_table (void);
+static void switch_to_exception_section (const char * );
 
 
 void
@@ -2896,7 +2897,57 @@ dw2_output_call_site_table (int cs_format, int section)
 					"region %d start", i);
 	  dw2_asm_output_delta_uleb128 (reg_end_lab, reg_start_lab,
 					"length");
-	  if (cs->landing_pad)
+	  /* For capability targets we use an alternate schema for the call
+	     site table.  */
+	  if (targetm.capability_mode().exists()
+	      && targetm.capability_mode().require() == Pmode
+	      && cs->landing_pad)
+	    {
+	      char reg_cap_offs_lab[32];
+
+	      /* First create SYMBOL_REFs to the function name, the label at
+		 the start of the function, and the landing pad label.  */
+	      const char * name = ggc_strdup (current_function_name());
+	      rtx named_function_symbol = gen_rtx_SYMBOL_REF (Pmode, name);
+	      SYMBOL_REF_FLAGS (named_function_symbol) = SYMBOL_FLAG_LOCAL;
+
+	      rtx function_start_symbol = gen_rtx_SYMBOL_REF (Pmode, begin);
+	      SYMBOL_REF_FLAGS (function_start_symbol) = SYMBOL_FLAG_LOCAL;
+	      rtx landing_pad_symbol = gen_rtx_SYMBOL_REF (Pmode,
+							   landing_pad_lab);
+	      SYMBOL_REF_FLAGS (landing_pad_symbol) = SYMBOL_FLAG_LOCAL;
+
+	      /* Then output the capability marker value. */
+	      dw2_asm_output_data_uleb128 (0xd, "landing pad capability marker");
+	      /* Then generate a label at the current location in the call
+		 site table.  */
+	      char cap_lab[32];
+	      ASM_GENERATE_INTERNAL_LABEL (reg_cap_offs_lab, "Llpoff",
+					   call_site_base + i);
+	      ASM_OUTPUT_LABEL (asm_out_file, reg_cap_offs_lab);
+	      /* Then switch to the relocatable RO data section, build the
+		 capability as a POINTER_PLUS and output the capability.  */
+	      switch_to_section (get_named_section (NULL, ".data.rel.ro",
+						    0));
+	      ASM_GENERATE_INTERNAL_LABEL (cap_lab, "Llpcap",
+					   call_site_base + i);
+	      ASM_OUTPUT_LABEL (asm_out_file, cap_lab);
+	      rtx offset = gen_rtx_MINUS
+			     (POmode,
+			      drop_capability (landing_pad_symbol),
+			      drop_capability (function_start_symbol));
+	      rtx landing_pad_capability
+		    = gen_pointer_plus (Pmode, named_function_symbol, offset);
+	      assemble_capability (landing_pad_capability, POINTER_SIZE_UNITS,
+				   POINTER_SIZE, 1);
+	      /* Finally, switch back to the call site table section and output
+		 the offset between the current location and the location we
+		 just placed the capability in.  */
+	      switch_to_exception_section (name);
+	      dw2_asm_output_delta (8, cap_lab, reg_cap_offs_lab,
+				    "landing pad");
+	    }
+	  else if (cs->landing_pad)
 	    dw2_asm_output_delta_uleb128 (landing_pad_lab, begin,
 					  "landing pad");
 	  else
