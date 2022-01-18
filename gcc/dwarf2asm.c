@@ -970,6 +970,10 @@ dw2_output_indirect_constant_1 (const char *sym, tree id)
   DECL_INITIAL (decl) = build_fold_addr_expr (decl);
   TREE_READONLY (decl) = 1;
   TREE_STATIC (decl) = 1;
+  /* Setting the constant flags here makes sure these get put into RO sections
+     later on in `categorize_decl_for_section`.  */
+  TREE_CONSTANT (decl) = 1;
+  TREE_CONSTANT (DECL_INITIAL (decl)) = 1;
 
   if (TREE_PUBLIC (id))
     {
