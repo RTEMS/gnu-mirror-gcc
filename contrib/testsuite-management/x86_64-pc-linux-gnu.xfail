@@ -264,3 +264,14 @@ FAIL: gcc.target/i386/pr94494.c (test for excess errors)
 FAIL: gcc.target/i386/vect-reduc-1.c scan-assembler-times padd 5
 FAIL: gcc.target/i386/vect-reduc-1.c scan-tree-dump vect "LOOP EPILOGUE VECTORIZED"
 FAIL: maintainers-verify.sh 
+ERROR: g++.dg/gcov/gcov-17.C : error executing dg-final: can't read "script": no such variable
+ERROR: g++.dg/gcov/pr98273.C : error executing dg-final: can't read "script": no such variable
+FAIL: g++.dg/asan/asan_test.C -O2  (test for excess errors)
+FAIL: g++.dg/cpp0x/constexpr-compare2.C -std=c++14 (test for excess errors)
+FAIL: g++.dg/cpp0x/constexpr-compare2.C -std=c++17 (test for excess errors)
+FAIL: g++.dg/cpp0x/constexpr-compare2.C -std=c++20 (test for excess errors)
+FAIL: g++.dg/warn/pr104025.C -std=gnu++14 (test for excess errors)
+FAIL: g++.dg/warn/pr104025.C -std=gnu++17 (test for excess errors)
+FAIL: g++.dg/warn/pr104025.C -std=gnu++20 (test for excess errors)
+FAIL: g++.dg/warn/pr104025.C -std=gnu++98 (test for excess errors)
+UNRESOLVED: g++.dg/asan/asan_test.C -O2  compilation failed to produce executable
