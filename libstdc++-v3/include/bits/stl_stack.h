@@ -1,6 +1,6 @@
 // Stack implementation -*- C++ -*-
 
-// Copyright (C) 2001-2021 Free Software Foundation, Inc.
+// Copyright (C) 2001-2022 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -322,7 +322,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     -> stack<typename _Container::value_type, _Container>;
 
 #ifdef __cpp_lib_adaptor_iterator_pair_constructor
-  template<typename _InputIterator, typename _Allocator,
+  template<typename _InputIterator,
 	   typename _ValT
 	     = typename iterator_traits<_InputIterator>::value_type,
 	   typename = _RequireInputIter<_InputIterator>>

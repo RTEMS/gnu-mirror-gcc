@@ -1,5 +1,5 @@
 /* Tree SCC value numbering
-   Copyright (C) 2007-2021 Free Software Foundation, Inc.
+   Copyright (C) 2007-2022 Free Software Foundation, Inc.
    Contributed by Daniel Berlin <dberlin@dberlin.org>
 
    This file is part of GCC.
@@ -21,8 +21,8 @@
 #ifndef TREE_SSA_SCCVN_H
 #define TREE_SSA_SCCVN_H
 
-/* In tree-ssa-sccvn.c  */
-bool expressions_equal_p (tree, tree);
+/* In tree-ssa-sccvn.cc  */
+bool expressions_equal_p (tree, tree, bool = true);
 
 
 /* TOP of the VN lattice.  */

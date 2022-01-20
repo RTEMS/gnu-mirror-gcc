@@ -1,5 +1,5 @@
 /* Header file for the value range relational processing.
-   Copyright (C) 2020-2021 Free Software Foundation, Inc.
+   Copyright (C) 2020-2022 Free Software Foundation, Inc.
    Contributed by Andrew MacLeod <amacleod@redhat.com>
 
 This file is part of GCC.
@@ -877,19 +877,26 @@ relation_oracle::register_edge (edge e, relation_kind k, tree op1, tree op2)
 void
 dom_oracle::register_relation (basic_block bb, relation_kind k, tree op1,
 			       tree op2)
-{  // Equivalencies are handled by the equivalence oracle.
+{
+  // If the 2 ssa_names are the same, do nothing.  An equivalence is implied,
+  // and no other relation makes sense.
+  if (op1 == op2)
+    return;
+
+  // Equivalencies are handled by the equivalence oracle.
   if (k == EQ_EXPR)
     equiv_oracle::register_relation (bb, k, op1, op2);
   else
     {
       relation_chain *ptr = set_one_relation (bb, k, op1, op2);
-      register_transitives (bb, *ptr);
+      if (ptr)
+	register_transitives (bb, *ptr);
     }
 }
 
 // Register relation K between OP! and OP2 in block BB.
 // This creates the record and searches for existing records in the dominator
-// tree to merge with.
+// tree to merge with.  Return the record, or NULL if no record was created.
 
 relation_chain *
 dom_oracle::set_one_relation (basic_block bb, relation_kind k, tree op1,
@@ -934,6 +941,13 @@ dom_oracle::set_one_relation (basic_block bb, relation_kind k, tree op1,
     }
   else
     {
+      if (m_relations[bbi].m_num_relations >= param_relation_block_limit)
+	{
+	  if (dump_file && (dump_flags & TDF_DETAILS))
+	    fprintf (dump_file, "  Not registered due to bb being full\n");
+	  return NULL;
+	}
+      m_relations[bbi].m_num_relations++;
       // Check for an existing relation further up the DOM chain.
       // By including dominating relations, The first one found in any search
       // will be the aggregate of all the previous ones.
@@ -1034,7 +1048,8 @@ dom_oracle::register_transitives (basic_block root_bb,
 	  value_relation nr (relation.kind (), r1, r2);
 	  if (nr.apply_transitive (*ptr))
 	    {
-	      set_one_relation (root_bb, nr.kind (), nr.op1 (), nr.op2 ());
+	      if (!set_one_relation (root_bb, nr.kind (), nr.op1 (), nr.op2 ()))
+		return;
 	      if (dump_file && (dump_flags & TDF_DETAILS))
 		{
 		  fprintf (dump_file, "   Registering transitive relation ");
@@ -1229,6 +1244,7 @@ path_oracle::path_oracle (relation_oracle *oracle)
   m_equiv.m_next = NULL;
   m_relations.m_names = BITMAP_ALLOC (&m_bitmaps);
   m_relations.m_head = NULL;
+  m_killed_defs = BITMAP_ALLOC (&m_bitmaps);
 }
 
 path_oracle::~path_oracle ()
@@ -1285,6 +1301,61 @@ path_oracle::register_equiv (basic_block bb, tree ssa1, tree ssa2)
   bitmap_ior_into (m_equiv.m_names, b);
 }
 
+// Register killing definition of an SSA_NAME.
+
+void
+path_oracle::killing_def (tree ssa)
+{
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    {
+      fprintf (dump_file, " Registering killing_def (path_oracle) ");
+      print_generic_expr (dump_file, ssa, TDF_SLIM);
+      fprintf (dump_file, "\n");
+    }
+
+  unsigned v = SSA_NAME_VERSION (ssa);
+
+  bitmap_set_bit (m_killed_defs, v);
+
+  // Walk the equivalency list and remove SSA from any equivalencies.
+  if (bitmap_bit_p (m_equiv.m_names, v))
+    {
+      for (equiv_chain *ptr = m_equiv.m_next; ptr; ptr = ptr->m_next)
+	if (bitmap_bit_p (ptr->m_names, v))
+	  bitmap_clear_bit (ptr->m_names, v);
+    }
+  else
+    bitmap_set_bit (m_equiv.m_names, v);
+
+  // Now add an equivalency with itself so we don't look to the root oracle.
+  bitmap b = BITMAP_ALLOC (&m_bitmaps);
+  bitmap_set_bit (b, v);
+  equiv_chain *ptr = (equiv_chain *) obstack_alloc (&m_chain_obstack,
+						    sizeof (equiv_chain));
+  ptr->m_names = b;
+  ptr->m_bb = NULL;
+  ptr->m_next = m_equiv.m_next;
+  m_equiv.m_next = ptr;
+
+  // Walk the relation list and remove SSA from any relations.
+  if (!bitmap_bit_p (m_relations.m_names, v))
+    return;
+
+  bitmap_clear_bit (m_relations.m_names, v);
+  relation_chain **prev = &(m_relations.m_head);
+  relation_chain *next = NULL;
+  for (relation_chain *ptr = m_relations.m_head; ptr; ptr = next)
+    {
+      gcc_checking_assert (*prev == ptr);
+      next = ptr->m_next;
+      if (SSA_NAME_VERSION (ptr->op1 ()) == v
+	  || SSA_NAME_VERSION (ptr->op2 ()) == v)
+	*prev = ptr->m_next;
+      else
+	prev = &(ptr->m_next);
+    }
+}
+
 // Register relation K between SSA1 and SSA2, resolving unknowns by
 // querying from BB.
 
@@ -1329,6 +1400,12 @@ path_oracle::query_relation (basic_block bb, const_bitmap b1, const_bitmap b2)
     return EQ_EXPR;
 
   relation_kind k = m_relations.find_relation (b1, b2);
+
+  // Do not look at the root oracle for names that have been killed
+  // along the path.
+  if (bitmap_intersect_p (m_killed_defs, b1)
+      || bitmap_intersect_p (m_killed_defs, b2))
+    return k;
 
   if (k == VREL_NONE && m_root)
     k = m_root->query_relation (bb, b1, b2);
@@ -1380,10 +1457,14 @@ void
 path_oracle::dump (FILE *f) const
 {
   equiv_chain *ptr = m_equiv.m_next;
+  relation_chain *ptr2 = m_relations.m_head;
+
+  if (ptr || ptr2)
+    fprintf (f, "\npath_oracle:\n");
+
   for (; ptr; ptr = ptr->m_next)
     ptr->dump (f);
 
-  relation_chain *ptr2 = m_relations.m_head;
   for (; ptr2; ptr2 = ptr2->m_next)
     {
       fprintf (f, "Relational : ");

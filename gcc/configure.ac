@@ -1,7 +1,7 @@
 # configure.ac for GCC
 # Process this file with autoconf to generate a configuration script.
 
-# Copyright (C) 1997-2021 Free Software Foundation, Inc.
+# Copyright (C) 1997-2022 Free Software Foundation, Inc.
 
 #This file is part of GCC.
 
@@ -24,7 +24,7 @@
 # --------------------------------
 
 AC_INIT
-AC_CONFIG_SRCDIR(tree.c)
+AC_CONFIG_SRCDIR(tree.cc)
 AC_CONFIG_HEADER(auto-host.h:config.in)
 
 gcc_version=`cat $srcdir/BASE-VER`
@@ -435,6 +435,7 @@ rm -f a.out a.exe b.out
 AC_PROG_CC
 AC_PROG_CXX
 ACX_PROG_GNAT([-I"$srcdir"/ada/libgnat])
+ACX_PROG_GDC([-I"$srcdir"/d])
 
 # Do configure tests with the C++ compiler, since that's what we build with.
 AC_LANG(C++)
@@ -448,6 +449,7 @@ case "$CC" in
 esac
 AC_SUBST(CFLAGS)
 AC_SUBST(CXXFLAGS)
+AC_SUBST(GDCFLAGS)
 
 # Determine PICFLAG for target gnatlib.
 GCC_PICFLAG_FOR_TARGET
@@ -463,6 +465,20 @@ AC_PROG_CPP
 AC_C_INLINE
 
 AC_SYS_LARGEFILE
+AC_CHECK_SIZEOF(ino_t)
+AC_CHECK_SIZEOF(dev_t)
+
+# Select the right stat being able to handle 64bit inodes, if needed.
+if test "$enable_largefile" != no; then
+  case "$host, $build" in
+    *-*-aix*,*|*,*-*-aix*)
+      if test "$ac_cv_sizeof_ino_t" == "4" -a "$ac_cv_sizeof_dev_t" == 4; then
+	AC_DEFINE(HOST_STAT_FOR_64BIT_INODES, stat64x,
+	  [Define which stat syscall is able to handle 64bit indodes.])
+      fi;;
+  esac
+fi
+
 
 # sizeof(char) is 1 by definition.
 AC_CHECK_SIZEOF(void *)
@@ -557,11 +573,11 @@ AS_IF([test $enable_build_format_warnings = no],
       [wf_opt=-Wno-format],[wf_opt=])
 ACX_PROG_CXX_WARNING_OPTS(
 	m4_quote(m4_do([-W -Wall -Wno-narrowing -Wwrite-strings ],
-		       [-Wcast-qual -Wno-error=format-diag $wf_opt])),
+		       [-Wcast-qual $wf_opt])),
 		       [loose_warn])
 ACX_PROG_CC_WARNING_OPTS(
 	m4_quote(m4_do([-Wstrict-prototypes -Wmissing-prototypes ],
-	 	       [-Wno-error=format-diag])), [c_loose_warn])
+		       [])), [c_loose_warn])
 ACX_PROG_CXX_WARNING_OPTS(
 	m4_quote(m4_do([-Wmissing-format-attribute ],
 		       [-Woverloaded-virtual])), [strict_warn])
@@ -1169,7 +1185,7 @@ if test "x$enable_offload_defaulted" = xyes; then
 fi
 
 AC_ARG_WITH(multilib-list,
-[AS_HELP_STRING([--with-multilib-list], [select multilibs (AArch64, ARM, OR1K, RISC-V, SH and x86-64 only)])],
+[AS_HELP_STRING([--with-multilib-list], [select multilibs (AArch64, ARM, AVR, OR1K, RISC-V, SH and x86-64 only)])],
 :,
 with_multilib_list=default)
 
@@ -1186,7 +1202,7 @@ AC_PROG_MAKE_SET
 
 # Find some useful tools
 AC_PROG_AWK
-# We need awk to create options.c and options.h.
+# We need awk to create options.cc and options.h.
 # Bail out if it's missing.
 case ${AWK} in
   "") AC_MSG_ERROR([can't build without awk, bailing out]) ;;
@@ -1601,7 +1617,7 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 
 # On AIX 5.2, <ldfcn.h> conflicts with <fcntl.h>, as both define incompatible
 # FREAD and FWRITE macros.  Fortunately, for GCC's single usage of ldgetname
-# in collect2.c, <fcntl.h> isn't visible, but the configure test below needs
+# in collect2.cc, <fcntl.h> isn't visible, but the configure test below needs
 # to undef these macros to get the correct value for HAVE_DECL_LDGETNAME.
 gcc_AC_CHECK_DECLS(ldgetname, , ,[
 #include "ansidecl.h"
@@ -1822,7 +1838,7 @@ if test x$md_file = x
 then md_file=$cpu_type/$cpu_type.md; fi
 
 if test x$out_file = x
-then out_file=$cpu_type/$cpu_type.c; fi
+then out_file=$cpu_type/$cpu_type.cc; fi
 
 if test x"$tmake_file" = x
 then tmake_file=$cpu_type/t-$cpu_type
@@ -2065,7 +2081,7 @@ else
 	CC="${CC_FOR_BUILD}" CFLAGS="${CFLAGS_FOR_BUILD}" \
 	CXX="${CXX_FOR_BUILD}" CXXFLAGS="${CXXFLAGS_FOR_BUILD}" \
 	LD="${LD_FOR_BUILD}" LDFLAGS="${LDFLAGS_FOR_BUILD}" \
-	GMPINC="" CPPFLAGS="${CPPFLAGS} -DGENERATOR_FILE" \
+	GMPINC="" CPPFLAGS="${CPPFLAGS_FOR_BUILD} -DGENERATOR_FILE" \
 	${realsrcdir}/configure \
 		--enable-languages=${enable_languages-all} \
 		${enable_obsolete+--enable-obsolete="$enable_obsolete"} \
@@ -2292,8 +2308,8 @@ do
 done
 tmake_file="${tmake_file_}${omp_device_property_tmake_file}"
 
-out_object_file=`basename $out_file .c`.o
-common_out_object_file=`basename $common_out_file .c`.o
+out_object_file=`basename $out_file .cc`.o
+common_out_object_file=`basename $common_out_file .cc`.o
 
 tm_file_list="options.h"
 tm_include_list="options.h insn-constants.h"
@@ -4690,7 +4706,7 @@ foo:	nop
 	;;
     esac
     case $target_os in
-       darwin2[[0-9]]* | darwin19*)
+       darwin2* | darwin19*)
         gcc_GAS_CHECK_FEATURE([llvm assembler x86-pad-for-align option],
           gcc_cv_as_mllvm_x86_pad_for_align,
           [-mllvm -x86-pad-for-align=false], [.text],,
@@ -6253,6 +6269,7 @@ if test x"$ld64_flag" = x"yes"; then
 
   # Set defaults for possibly untestable items.
   gcc_cv_ld64_export_dynamic=0
+  gcc_cv_ld64_platform_version=0
 
   if test "$build" = "$host"; then
     darwin_try_test=1
@@ -6274,8 +6291,11 @@ if test x"$ld64_flag" = x"yes"; then
     AC_MSG_CHECKING(ld64 specified version)
     gcc_cv_ld64_major=`echo "$gcc_cv_ld64_version" | sed -e 's/\..*//'`
     AC_MSG_RESULT($gcc_cv_ld64_major)
-   if test "$gcc_cv_ld64_major" -ge 236; then
+    if test "$gcc_cv_ld64_major" -ge 236; then
       gcc_cv_ld64_export_dynamic=1
+    fi
+    if test "$gcc_cv_ld64_major" -ge 512; then
+      gcc_cv_ld64_platform_version=1
     fi
   elif test -x "$gcc_cv_ld" -a "$darwin_try_test" -eq 1; then
     # If the version was not specified, try to find it.
@@ -6291,6 +6311,13 @@ if test x"$ld64_flag" = x"yes"; then
       gcc_cv_ld64_export_dynamic=0
     fi
     AC_MSG_RESULT($gcc_cv_ld64_export_dynamic)
+
+    AC_MSG_CHECKING(linker for -platform_version support)
+    gcc_cv_ld64_platform_version=1
+    if $gcc_cv_ld -platform_version macos 10.5 0.0 < /dev/null 2>&1 | grep 'unknown option' > /dev/null; then
+      gcc_cv_ld64_platform_version=0
+    fi
+    AC_MSG_RESULT($gcc_cv_ld64_platform_version)
   fi
 
   if test x"${gcc_cv_ld64_version}" != x; then
@@ -6300,6 +6327,9 @@ if test x"$ld64_flag" = x"yes"; then
 
   AC_DEFINE_UNQUOTED(LD64_HAS_EXPORT_DYNAMIC, $gcc_cv_ld64_export_dynamic,
   [Define to 1 if ld64 supports '-export_dynamic'.])
+
+  AC_DEFINE_UNQUOTED(LD64_HAS_PLATFORM_VERSION, $gcc_cv_ld64_platform_version,
+  [Define to 1 if ld64 supports '-platform_version'.])
 fi
 
 if test x"$dsymutil_flag" = x"yes"; then
@@ -6947,6 +6977,9 @@ fi
 # Check if the target LIBC handles PT_GNU_STACK.
 gcc_cv_libc_gnustack=unknown
 case "$target" in
+  mips*-*-linux-musl*)
+    gcc_cv_libc_gnustack=yes
+    ;;
   mips*-*-linux*)
     GCC_GLIBC_VERSION_GTE_IFELSE([2], [31], [gcc_cv_libc_gnustack=yes], )
     ;;
@@ -7025,6 +7058,20 @@ else
   MAINT='#'
 fi
 AC_SUBST(MAINT)dnl
+
+dnl Variables for tags utilities; copied from automake 1.16.4+'s init.m4
+if test -z "$CTAGS"; then
+  CTAGS=ctags
+fi
+AC_SUBST([CTAGS])
+if test -z "$ETAGS"; then
+  ETAGS=etags
+fi
+AC_SUBST([ETAGS])
+if test -z "$CSCOPE"; then
+  CSCOPE=cscope
+fi
+AC_SUBST([CSCOPE])
 
 dnl Whether to prevent multiple front-ends from linking at the same time
 
@@ -7218,8 +7265,8 @@ done
 rm -f Make-hooks
 touch Make-hooks
 target_list="all.cross start.encap rest.encap tags \
-	install-common install-man install-info install-pdf install-html dvi \
-	pdf html uninstall info man srcextra srcman srcinfo \
+	install-common install-man install-info install-dvi install-pdf \
+	install-html dvi pdf html uninstall info man srcextra srcman srcinfo \
 	mostlyclean clean distclean maintainer-clean install-plugin"
 
 for t in $target_list
@@ -7523,7 +7570,7 @@ AC_DEFINE_UNQUOTED(DIAGNOSTICS_URLS_DEFAULT, $DIAGNOSTICS_URLS_DEFAULT,
 		   [The default for -fdiagnostics-urls option])
 
 # Generate gcc-driver-name.h containing GCC_DRIVER_NAME for the benefit
-# of jit/jit-playback.c.
+# of jit/jit-playback.cc.
 gcc_driver_version=`eval "${get_gcc_base_ver} $srcdir/BASE-VER"`
 echo "gcc_driver_version: ${gcc_driver_version}"
 cat > gcc-driver-name.h <<EOF

@@ -2,7 +2,7 @@
    MMU, using ELF at the compiler level but possibly FLT for final
    linked executables and shared libraries in some no-MMU cases, and
    possibly with a choice of libc implementations.
-   Copyright (C) 1995-2021 Free Software Foundation, Inc.
+   Copyright (C) 1995-2022 Free Software Foundation, Inc.
    Contributed by Eric Youngdale.
    Modified for stabs-in-ELF by H.J. Lu (hjl@lucon.org).
 
@@ -126,7 +126,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define TARGET_HAS_BIONIC (OPTION_BIONIC)
 
 /* musl avoids problematic includes by rearranging the include directories.
- * Unfortunately, this is mostly duplicated from cppdefault.c */
+ * Unfortunately, this is mostly duplicated from cppdefault.cc */
 #if DEFAULT_LIBC == LIBC_MUSL
 #define INCLUDE_DEFAULTS_MUSL_GPP			\
     { GPLUSPLUS_INCLUDE_DIR, "G++", 1, 1,		\
@@ -200,7 +200,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #if (DEFAULT_LIBC == LIBC_UCLIBC) && defined (SINGLE_LIBC) /* uClinux */
 /* This is a *uclinux* target.  We don't define below macros to normal linux
    versions, because doing so would require *uclinux* targets to include
-   linux.c, linux-protos.h, linux.opt, etc.  We could, alternatively, add
+   linux.cc, linux-protos.h, linux.opt, etc.  We could, alternatively, add
    these files to *uclinux* targets, but that would only pollute option list
    (add -mglibc, etc.) without adding any useful support.  */
 

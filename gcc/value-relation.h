@@ -1,5 +1,5 @@
 /* Header file for the value range relational processing.
-   Copyright (C) 2020-2021 Free Software Foundation, Inc.
+   Copyright (C) 2020-2022 Free Software Foundation, Inc.
    Contributed by Andrew MacLeod <amacleod@redhat.com>
 
 This file is part of GCC.
@@ -157,6 +157,7 @@ class relation_chain_head
 public:
   bitmap m_names;		// ssa_names with relations in this block.
   class relation_chain *m_head; // List of relations in block.
+  int m_num_relations;		// Number of relations in block.
   relation_kind find_relation (const_bitmap b1, const_bitmap b2) const;
 };
 
@@ -222,6 +223,7 @@ public:
   ~path_oracle ();
   const_bitmap equiv_set (tree, basic_block);
   void register_relation (basic_block, relation_kind, tree, tree);
+  void killing_def (tree);
   relation_kind query_relation (basic_block, tree, tree);
   relation_kind query_relation (basic_block, const_bitmap, const_bitmap);
   void reset_path ();
@@ -232,6 +234,7 @@ private:
   equiv_chain m_equiv;
   relation_chain_head m_relations;
   relation_oracle *m_root;
+  bitmap m_killed_defs;
 
   bitmap_obstack m_bitmaps;
   struct obstack m_chain_obstack;

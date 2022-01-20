@@ -1,5 +1,5 @@
 ;;- Machine description for Blackfin for GNU compiler
-;;  Copyright (C) 2005-2021 Free Software Foundation, Inc.
+;;  Copyright (C) 2005-2022 Free Software Foundation, Inc.
 ;;  Contributed by Analog Devices.
 
 ;; This file is part of GCC.
@@ -1959,7 +1959,8 @@
 		   (plus:SI (match_dup 0)
 			    (const_int -1)))
 	      (unspec [(const_int 0)] UNSPEC_LSETUP_END)
-	      (clobber (match_dup 2))])] ; match_scratch
+	      (clobber (match_dup 2))
+	      (clobber (reg:BI REG_CC))])] ; match_scratch
   ""
 {
   /* The loop optimizer doesn't check the predicates... */
@@ -1979,7 +1980,8 @@
 	(plus (match_dup 2)
 	      (const_int -1)))
    (unspec [(const_int 0)] UNSPEC_LSETUP_END)
-   (clobber (match_scratch:SI 3 "=X,&r,&r"))]
+   (clobber (match_scratch:SI 3 "=X,&r,&r"))
+   (clobber (reg:BI REG_CC))]
   ""
   "@
    /* loop end %0 %l1 */
@@ -1997,7 +1999,8 @@
 	(plus (match_dup 0)
 	      (const_int -1)))
    (unspec [(const_int 0)] UNSPEC_LSETUP_END)
-   (clobber (match_scratch:SI 2))]
+   (clobber (match_scratch:SI 2))
+   (clobber (reg:BI REG_CC))]
   "memory_operand (operands[0], SImode) || splitting_loops"
   [(set (match_dup 2) (match_dup 0))
    (set (match_dup 2) (plus:SI (match_dup 2) (const_int -1)))
@@ -3018,19 +3021,6 @@
 (define_insn "addsubv2hi3"
   [(set (match_operand:V2HI 0 "register_operand" "=d")
 	(vec_concat:V2HI
-	 (plus:HI (vec_select:HI (match_operand:V2HI 1 "register_operand" "d")
-				 (parallel [(const_int 0)]))
-		  (vec_select:HI (match_operand:V2HI 2 "register_operand" "d")
-				 (parallel [(const_int 0)])))
-	 (minus:HI (vec_select:HI (match_dup 1) (parallel [(const_int 1)]))
-		   (vec_select:HI (match_dup 2) (parallel [(const_int 1)])))))]
-  ""
-  "%0 = %1 +|- %2%!"
-  [(set_attr "type" "dsp32")])
-
-(define_insn "subaddv2hi3"
-  [(set (match_operand:V2HI 0 "register_operand" "=d")
-	(vec_concat:V2HI
 	 (minus:HI (vec_select:HI (match_operand:V2HI 1 "register_operand" "d")
 				  (parallel [(const_int 0)]))
 		   (vec_select:HI (match_operand:V2HI 2 "register_operand" "d")
@@ -3038,23 +3028,23 @@
 	 (plus:HI (vec_select:HI (match_dup 1) (parallel [(const_int 1)]))
 		  (vec_select:HI (match_dup 2) (parallel [(const_int 1)])))))]
   ""
+  "%0 = %1 +|- %2%!"
+  [(set_attr "type" "dsp32")])
+
+(define_insn "subaddv2hi3"
+  [(set (match_operand:V2HI 0 "register_operand" "=d")
+	(vec_concat:V2HI
+	 (plus:HI (vec_select:HI (match_operand:V2HI 1 "register_operand" "d")
+				 (parallel [(const_int 0)]))
+		  (vec_select:HI (match_operand:V2HI 2 "register_operand" "d")
+				 (parallel [(const_int 0)])))
+	 (minus:HI (vec_select:HI (match_dup 1) (parallel [(const_int 1)]))
+		   (vec_select:HI (match_dup 2) (parallel [(const_int 1)])))))]
+  ""
   "%0 = %1 -|+ %2%!"
   [(set_attr "type" "dsp32")])
 
 (define_insn "ssaddsubv2hi3"
-  [(set (match_operand:V2HI 0 "register_operand" "=d")
-	(vec_concat:V2HI
-	 (ss_plus:HI (vec_select:HI (match_operand:V2HI 1 "register_operand" "d")
-				    (parallel [(const_int 0)]))
-		     (vec_select:HI (match_operand:V2HI 2 "register_operand" "d")
-				    (parallel [(const_int 0)])))
-	 (ss_minus:HI (vec_select:HI (match_dup 1) (parallel [(const_int 1)]))
-		      (vec_select:HI (match_dup 2) (parallel [(const_int 1)])))))]
-  ""
-  "%0 = %1 +|- %2 (S)%!"
-  [(set_attr "type" "dsp32")])
-
-(define_insn "sssubaddv2hi3"
   [(set (match_operand:V2HI 0 "register_operand" "=d")
 	(vec_concat:V2HI
 	 (ss_minus:HI (vec_select:HI (match_operand:V2HI 1 "register_operand" "d")
@@ -3063,6 +3053,19 @@
 				     (parallel [(const_int 0)])))
 	 (ss_plus:HI (vec_select:HI (match_dup 1) (parallel [(const_int 1)]))
 		     (vec_select:HI (match_dup 2) (parallel [(const_int 1)])))))]
+  ""
+  "%0 = %1 +|- %2 (S)%!"
+  [(set_attr "type" "dsp32")])
+
+(define_insn "sssubaddv2hi3"
+  [(set (match_operand:V2HI 0 "register_operand" "=d")
+	(vec_concat:V2HI
+	 (ss_plus:HI (vec_select:HI (match_operand:V2HI 1 "register_operand" "d")
+				    (parallel [(const_int 0)]))
+		     (vec_select:HI (match_operand:V2HI 2 "register_operand" "d")
+				    (parallel [(const_int 0)])))
+	 (ss_minus:HI (vec_select:HI (match_dup 1) (parallel [(const_int 1)]))
+		      (vec_select:HI (match_dup 2) (parallel [(const_int 1)])))))]
   ""
   "%0 = %1 -|+ %2 (S)%!"
   [(set_attr "type" "dsp32")])

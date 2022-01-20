@@ -791,8 +791,7 @@ Type::are_convertible(const Type* lhs, const Type* rhs, std::string* reason)
 
   // The types are convertible if they have identical underlying
   // types, ignoring struct field tags.
-  if ((lhs->named_type() != NULL || rhs->named_type() != NULL)
-      && Type::are_identical(lhs->base(), rhs->base(), 0, reason))
+  if (Type::are_identical(lhs->base(), rhs->base(), 0, reason))
     return true;
 
   // The types are convertible if they are both unnamed pointer types
@@ -6454,9 +6453,18 @@ get_backend_struct_fields(Gogo* gogo, Struct_type* type, bool use_placeholder,
 			     ? p->type()->get_backend_placeholder(gogo)
 			     : p->type()->get_backend(gogo));
       (*bfields)[i].location = p->location();
-      lastsize = gogo->backend()->type_size((*bfields)[i].btype);
-      if (lastsize != 0)
-        saw_nonzero = true;
+      int64_t size = gogo->backend()->type_size((*bfields)[i].btype);
+      if (size != 0)
+	saw_nonzero = true;
+
+      if (size > 0 || !Gogo::is_sink_name(p->field_name()))
+	lastsize = size;
+      else
+	{
+	  // There is an unreferenceable field of zero size.  This
+	  // doesn't affect whether we may need zero padding, so leave
+	  // lastsize unchanged.
+	}
     }
   go_assert(i == fields->size());
   if (saw_nonzero && lastsize == 0 && !type->is_results_struct())

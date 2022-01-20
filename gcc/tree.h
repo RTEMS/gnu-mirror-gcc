@@ -1,5 +1,5 @@
 /* Definitions for the ubiquitous 'tree' type for GNU compilers.
-   Copyright (C) 1989-2021 Free Software Foundation, Inc.
+   Copyright (C) 1989-2022 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1689,6 +1689,11 @@ class auto_suppress_location_wrappers
    map clause.  */
 #define OMP_CLAUSE_MAP_IMPLICIT(NODE) \
   (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_MAP)->base.default_def_flag)
+/* Nonzero if this map clause is to be indicated to the runtime as 'implicit',
+   due to being created through implicit data-mapping rules in the middle-end.
+   NOTE: this is different than OMP_CLAUSE_MAP_IMPLICIT.  */
+#define OMP_CLAUSE_MAP_RUNTIME_IMPLICIT_P(NODE) \
+  (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_MAP)->base.deprecated_flag)
 
 /* True on an OMP_CLAUSE_USE_DEVICE_PTR with an OpenACC 'if_present'
    clause.  */
@@ -1803,8 +1808,11 @@ class auto_suppress_location_wrappers
 #define OMP_CLAUSE_ALLOCATE_COMBINED(NODE) \
   (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_ALLOCATE)->base.public_flag)
 
-#define OMP_CLAUSE_NUM_TEAMS_EXPR(NODE) \
+#define OMP_CLAUSE_NUM_TEAMS_UPPER_EXPR(NODE) \
   OMP_CLAUSE_OPERAND (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_NUM_TEAMS), 0)
+
+#define OMP_CLAUSE_NUM_TEAMS_LOWER_EXPR(NODE) \
+  OMP_CLAUSE_OPERAND (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_NUM_TEAMS), 1)
 
 #define OMP_CLAUSE_THREAD_LIMIT_EXPR(NODE) \
   OMP_CLAUSE_OPERAND (OMP_CLAUSE_SUBCODE_CHECK (NODE, \
@@ -2320,13 +2328,13 @@ extern tree vector_element_bits_tree (const_tree);
    hooks are responsible for consistently using only a specific
    macro.  */
 
-/* Symtab field as an integer.  Used by stabs generator in dbxout.c to
+/* Symtab field as an integer.  Used by stabs generator in dbxout.cc to
    hold the type's number in the generated stabs.  */
 #define TYPE_SYMTAB_ADDRESS(NODE) \
   (TYPE_CHECK (NODE)->type_common.symtab.address)
 
 /* Symtab field as a pointer to a DWARF DIE.  Used by DWARF generator
-   in dwarf2out.c to point to the DIE generated for the type.  */
+   in dwarf2out.cc to point to the DIE generated for the type.  */
 #define TYPE_SYMTAB_DIE(NODE) \
   (TYPE_CHECK (NODE)->type_common.symtab.die)
 
@@ -4567,6 +4575,7 @@ extern tree build_tree_list (tree, tree CXX_MEM_STAT_INFO);
 extern tree build_tree_list_vec (const vec<tree, va_gc> * CXX_MEM_STAT_INFO);
 extern tree build_decl (location_t, enum tree_code,
 			tree, tree CXX_MEM_STAT_INFO);
+extern tree build_debug_expr_decl (tree type);
 extern tree build_fn_decl (const char *, tree);
 extern tree build_translation_unit_decl (tree);
 extern tree build_block (tree, tree, tree, tree);
@@ -4731,7 +4740,7 @@ poly_int_tree_p (const_tree t, poly_uint64_pod *value)
   return false;
 }
 
-/* From expmed.c.  Since rtl.h is included after tree.h, we can't
+/* From expmed.cc.  Since rtl.h is included after tree.h, we can't
    put the prototype here.  Rtl.h does declare the prototype if
    tree.h had been included.  */
 
@@ -4912,6 +4921,11 @@ extern bool integer_minus_onep (const_tree);
    exactly one bit 1.  */
 
 extern bool integer_pow2p (const_tree);
+
+/* Checks to see if T is a constant or a constant vector and if each element E
+   adheres to ~E + 1 == pow2 then return ~E otherwise NULL_TREE.  */
+
+extern tree bitmask_inv_cst_vector_p (tree);
 
 /* integer_nonzerop (tree x) is nonzero if X is an integer constant
    with a nonzero value.  */
@@ -5096,8 +5110,6 @@ reverse_storage_order_for_component_p (tree t)
     default:
       return false;
     }
-
-  gcc_unreachable ();
 }
 
 /* Return true if T is a storage order barrier, i.e. a VIEW_CONVERT_EXPR
@@ -5206,7 +5218,7 @@ inlined_function_outer_scope_p (const_tree block)
        (TREE = function_args_iter_cond (&(ITER))) != NULL_TREE;		\
        function_args_iter_next (&(ITER)))
 
-/* In tree.c */
+/* In tree.cc */
 extern unsigned crc32_unsigned_n (unsigned, unsigned, unsigned);
 extern unsigned crc32_string (unsigned, const char *);
 inline unsigned
@@ -5491,7 +5503,7 @@ tree_code_for_canonical_type_merging (enum tree_code code)
 /* Return ture if get_alias_set care about TYPE_CANONICAL of given type.
    We don't define the types for pointers, arrays and vectors.  The reason is
    that pointers are handled specially: ptr_type_node accesses conflict with
-   accesses to all other pointers.  This is done by alias.c.
+   accesses to all other pointers.  This is done by alias.cc.
    Because alias sets of arrays and vectors are the same as types of their
    elements, we can't compute canonical type either.  Otherwise we could go
    form void *[10] to int *[10] (because they are equivalent for canonical type

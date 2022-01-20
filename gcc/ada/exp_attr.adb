@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2022, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -67,6 +67,7 @@ with Sinfo.Utils;    use Sinfo.Utils;
 with Snames;         use Snames;
 with Stand;          use Stand;
 with Stringt;        use Stringt;
+with Strub;          use Strub;
 with Tbuild;         use Tbuild;
 with Ttypes;         use Ttypes;
 with Uintp;          use Uintp;
@@ -403,8 +404,6 @@ package body Exp_Attr is
               Parameter_Specifications => New_List (
                 Make_Parameter_Specification (Loc,
                   Defining_Identifier => Obj_Id,
-                  In_Present          => True,
-                  Out_Present         => False,
                   Parameter_Type      => New_Occurrence_Of (Formal_Typ, Loc))),
               Result_Definition        =>
                 New_Occurrence_Of (Standard_Boolean, Loc)),
@@ -2162,6 +2161,7 @@ package body Exp_Attr is
 
                   begin
                      Subp_Typ := Create_Itype (E_Subprogram_Type, N);
+                     Copy_Strub_Mode (Subp_Typ, Subp);
                      Set_Etype (Subp_Typ, Etype (Subp));
                      Set_Returns_By_Ref (Subp_Typ, Returns_By_Ref (Subp));
 
@@ -3784,7 +3784,7 @@ package body Exp_Attr is
       --------------
 
       when Attribute_From_Any => From_Any : declare
-         Decls  : constant List_Id   := New_List;
+         Decls : constant List_Id := New_List;
 
       begin
          Rewrite (N,
@@ -3898,8 +3898,8 @@ package body Exp_Attr is
          if Ptyp = Standard_Exception_Type then
             Id_Kind := RTE (RE_Exception_Id);
 
-            if Present (Renamed_Object (Entity (Pref))) then
-               Set_Entity (Pref, Renamed_Object (Entity (Pref)));
+            if Present (Renamed_Entity (Entity (Pref))) then
+               Set_Entity (Pref, Renamed_Entity (Entity (Pref)));
             end if;
 
             Rewrite (N,
@@ -6294,7 +6294,7 @@ package body Exp_Attr is
                --  size. This applies to both types and objects. The size of an
                --  object can be specified in the following ways:
 
-               --    An explicit size object is given for an object
+               --    An explicit size clause is given for an object
                --    A component size is specified for an indexed component
                --    A component clause is specified for a selected component
                --    The object is a component of a packed composite object
@@ -6310,7 +6310,7 @@ package body Exp_Attr is
                                 or else Is_Packed (Etype (Prefix (Pref)))))
                  or else
                    (Nkind (Pref) = N_Indexed_Component
-                     and then (Component_Size (Etype (Prefix (Pref))) /= 0
+                     and then (Known_Component_Size (Etype (Prefix (Pref)))
                                 or else Is_Packed (Etype (Prefix (Pref)))))
                then
                   Set_Attribute_Name (N, Name_Size);
@@ -7970,7 +7970,6 @@ package body Exp_Attr is
       elsif Id = Attribute_Size
         and then Is_Entity_Name (Pref)
         and then Is_Object (Entity (Pref))
-        and then Known_Esize (Entity (Pref))
         and then Known_Static_Esize (Entity (Pref))
       then
          Siz := Esize (Entity (Pref));

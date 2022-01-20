@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2022, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -248,7 +248,7 @@ package body Sem_Aggr is
    --  The procedure works by recursively checking each nested aggregate.
    --  Specifically, after checking a sub-aggregate nested at the i-th level
    --  we recursively check all the subaggregates at the i+1-st level (if any).
-   --  Note that for aggregates analysis and resolution go hand in hand.
+   --  Note that aggregates analysis and resolution go hand in hand.
    --  Aggregate analysis has been delayed up to here and it is done while
    --  resolving the aggregate.
    --
@@ -891,7 +891,7 @@ package body Sem_Aggr is
 
       --  Ada 2005 (AI-287): Limited aggregates allowed
 
-      --  In an instance, ignore aggregate subcomponents tnat may be limited,
+      --  In an instance, ignore aggregate subcomponents that may be limited,
       --  because they originate in view conflicts. If the original aggregate
       --  is legal and the actuals are legal, the aggregate itself is legal.
 
@@ -918,6 +918,12 @@ package body Sem_Aggr is
         and then Ekind (Typ) /= E_Record_Type
         and then Ada_Version >= Ada_2022
       then
+         --  Check for Ada 2022 and () aggregate.
+
+         if not Is_Homogeneous_Aggregate (N) then
+            Error_Msg_N ("container aggregate must use '['], not ()", N);
+         end if;
+
          Resolve_Container_Aggregate (N, Typ);
 
       elsif Is_Record_Type (Typ) then
@@ -1790,6 +1796,22 @@ package body Sem_Aggr is
         and then not Null_Record_Present (N)
       then
          return False;
+      end if;
+
+      --  Disable the warning for GNAT Mode to allow for easier transition.
+
+      if Ada_Version >= Ada_2022
+        and then Warn_On_Obsolescent_Feature
+        and then not GNAT_Mode
+        and then not Is_Homogeneous_Aggregate (N)
+        and then not Is_Enum_Array_Aggregate (N)
+        and then Is_Parenthesis_Aggregate (N)
+        and then Nkind (Parent (N)) /= N_Qualified_Expression
+        and then Comes_From_Source (N)
+      then
+         Error_Msg_N
+           ("?j?array aggregate using () is an" &
+              " obsolescent syntax, use '['] instead", N);
       end if;
 
       --  STEP 1: make sure the aggregate is correctly formatted
@@ -3384,9 +3406,8 @@ package body Sem_Aggr is
       function Nested_In (V1 : Node_Id; V2 : Node_Id) return Boolean;
       --  Determine whether variant V1 is within variant V2
 
-      function Variant_Depth (N : Node_Id) return Integer;
-      --  Determine the distance of a variant to the enclosing type
-      --  declaration.
+      function Variant_Depth (N : Node_Id) return Natural;
+      --  Determine the distance of a variant to the enclosing type declaration
 
       --------------------
       --  Check_Variant --
@@ -3492,8 +3513,8 @@ package body Sem_Aggr is
       -- Variant_Depth --
       -------------------
 
-      function Variant_Depth (N : Node_Id) return Integer is
-         Depth : Integer;
+      function Variant_Depth (N : Node_Id) return Natural is
+         Depth : Natural;
          Par   : Node_Id;
 
       begin
@@ -3546,7 +3567,19 @@ package body Sem_Aggr is
          end loop;
 
          pragma Assert (Present (Comp_Type));
-         Analyze_And_Resolve (Expression (Assoc), Comp_Type);
+
+         --  A record_component_association in record_delta_aggregate shall not
+         --  use the box compound delimiter <> rather than an expression; see
+         --  RM 4.3.1(17.3/5).
+
+         pragma Assert (Present (Expression (Assoc)) xor Box_Present (Assoc));
+
+         if Box_Present (Assoc) then
+            Error_Msg_N
+              ("'<'> in record delta aggregate is not allowed", Assoc);
+         else
+            Analyze_And_Resolve (Expression (Assoc), Comp_Type);
+         end if;
          Next (Assoc);
       end loop;
    end Resolve_Delta_Record_Aggregate;
