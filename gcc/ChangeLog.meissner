@@ -1,3 +1,9 @@
+work076 patch #5
+2022-01-20  Michael Meissner  <meissner@the-meissners.org>
+
+	* opts-global.cc (handle_common_deferred_options): Add %< and %>
+	quoting.
+
 work076 patch #4
 2022-01-20  Michael Meissner  <meissner@the-meissners.org>
 
