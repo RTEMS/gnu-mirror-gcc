@@ -26661,9 +26661,7 @@ static bool prepend_p_to_next_insn;
 
 /* Define FINAL_PRESCAN_INSN if some processing needs to be done before
    outputting the assembler code.  On the PowerPC, we remember if the current
-   insn is a prefixed insn where we need to emit a 'p' before the insn.  We do
-   not do this for permute type operations (such as XXSPLTIW or XXSPLTIDP),
-   since those operations do not have a non-prefixed format.
+   insn is a prefixed insn where we need to emit a 'p' before the insn.
 
    In addition, if the insn is part of a PC-relative reference to an external
    label optimization, this is recorded also.  */
@@ -26672,8 +26670,7 @@ rs6000_final_prescan_insn (rtx_insn *insn, rtx [], int)
 {
   prepend_p_to_next_insn = (get_attr_maybe_prefixed (insn)
 			    == MAYBE_PREFIXED_YES
-			    && get_attr_prefixed (insn) == PREFIXED_YES
-			    && get_attr_type (insn) != TYPE_VECPERM);
+			    && get_attr_prefixed (insn) == PREFIXED_YES);
   return;
 }
 
