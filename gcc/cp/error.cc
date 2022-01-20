@@ -768,6 +768,11 @@ class_key_or_enum_as_string (tree t)
     return "struct";
 }
 
+#if __GNUC__ >= 10
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-diag"
+#endif
+
 /* Print out a class declaration T under the control of FLAGS,
    in the form `class foo'.  */
 
@@ -850,6 +855,10 @@ dump_aggr_type (cxx_pretty_printer *pp, tree t, int flags)
 			 !CLASSTYPE_USE_TEMPLATE (t),
 			 flags & ~TFF_TEMPLATE_HEADER);
 }
+
+#if __GNUC__ >= 10
+#pragma GCC diagnostic pop
+#endif
 
 /* Dump into the obstack the initial part of the output for a given type.
    This is necessary when dealing with things like functions returning
