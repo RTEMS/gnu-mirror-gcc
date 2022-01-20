@@ -1,3 +1,11 @@
+work076 patch #4
+2022-01-20  Michael Meissner  <meissner@the-meissners.org>
+
+	PR target/104136
+	* gcc/config/vsx.md (vsx_mov<mode>_64bit): Explicitly set the
+	prefixed attribute for xxspltiw and xxspltidp instructions.
+	(vsx_mov<mode>_32bit): Likewise.
+
 work076 patch #3
 2022-01-20  Michael Meissner  <meissner@the-meissners.org>
 
