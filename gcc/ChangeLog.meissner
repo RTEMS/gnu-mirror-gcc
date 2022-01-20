@@ -1,3 +1,20 @@
+work076 patch #3
+2022-01-20  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/rs6000.cc (TARGET_IEEEQUAD_DEFAULT): If the
+	compiler used to build the current compiler defaults to IEEE
+	128-bit long double,  make that the default for this build.
+
+work076 patch #1
+2022-01-20   Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/104136
+	* config/rs6000/rs6000.cc (rs6000_final_prescan_insn): Do not
+	prepend a 'p' for xxspltiw and xxspltidp.
+	* config/rs6000/rs6000.md (maybe_prefixed): Indicate that vector
+	permute instructions might be prefixed.
+
+
 2022-01-19   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch

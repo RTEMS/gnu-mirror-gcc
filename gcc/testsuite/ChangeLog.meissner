@@ -1,3 +1,10 @@
+work076 patch #2
+2022-01-20  Michael Meissner  <meissner@the-meissners.org>
+
+	PR testsuite/103763
+	* gcc.target/powerpc/fold-vec-splat-floatdouble.c: Fix insn regex
+	on power10.
+
 2022-01-19   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
