@@ -1,13 +1,21 @@
-work076 patch #6
-2022-01-20  Michael Meissner  <meissner@the-meissners.org>
+work076 patch #7
+2022-01-21  Michael Meissner  <meissner@the-meissners.org>
 
+	PR target/104136
 	* config/rs6000/rs6000-protos.h (prefixed_xxsplti_p): Delete.
-	* config/rs6000/rs6000.c (prefixed_xxsplti_p): Delete.
-	* config/rs6000/rs6000.md (prefixed attribute): Do not check for
-	xxspltiw or xxspltidp instructions.
-	(mov<mode>_hardfloat32): Explicitly set the prefixed attribute
-	when we will be loading a constant with xxspltiw or xxspltidp.
+	* config/rs6000/rs6000.cc (prefixed_xxsplti_p): Delete.
+	* config/rs6000/rs6000.md (prefixed attribute): Delete section
+	that sets the prefixed attribute for xxspltiw, xxspltidp, and
+	xxsplti32dx instructions.
+	(movsf_hardfloat): Explicitly set the prefixed attribute
+	when xxspltiw and xxspltidp instructions are generated.
+	(mov<mode>_hardfloat32): Likewise.
 	(mov<mode>_hardfloat64): Likewise.
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Explicitly set the
+	prefixed attribute for xxspltiw and xxspltidp instructions.
+	(vsx_mov<mode>_32bit): Likewise.
+
+work076 patch #6 was reverted
 
 work076 patch #5
 2022-01-20  Michael Meissner  <meissner@the-meissners.org>
@@ -15,13 +23,7 @@ work076 patch #5
 	* opts-global.cc (handle_common_deferred_options): Add %< and %>
 	quoting.
 
-work076 patch #4
-2022-01-20  Michael Meissner  <meissner@the-meissners.org>
-
-	PR target/104136
-	* gcc/config/vsx.md (vsx_mov<mode>_64bit): Explicitly set the
-	prefixed attribute for xxspltiw and xxspltidp instructions.
-	(vsx_mov<mode>_32bit): Likewise.
+work076 patch #4 was reverted
 
 work076 patch #3
 2022-01-20  Michael Meissner  <meissner@the-meissners.org>
@@ -30,7 +32,7 @@ work076 patch #3
 	compiler used to build the current compiler defaults to IEEE
 	128-bit long double,  make that the default for this build.
 
-work076 patch #1 reverted.
+work076 patch #1 was reverted.
 
 2022-01-19   Michael Meissner  <meissner@linux.ibm.com>
 
