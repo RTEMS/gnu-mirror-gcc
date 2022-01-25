@@ -1,3 +1,39 @@
+2022-01-24  Jakub Jelinek  <jakub@redhat.com>
+
+	* lang.opt (fconvert=): Add EnumSet property and mention also
+	r16_ieee and r16_ibm arguments.
+	(big-endian, little-endian, native, swap): Add Set(1) property.
+	(r16_ieee, r16_ibm): New EnumValue entries with Set(2) property.
+	* trans-types.cc (gfc_init_kinds): Emit gfc_fatal_error for
+	-fconvert=r16_ieee or -fconvert=r16_ibm when R16_IEEE <=> R16_IBM
+	conversions aren't supported.
+
+2022-01-22  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/104127
+	* simplify.cc (gfc_simplify_transfer): Ensure that the result
+	typespec is set up for TRANSFER with MOLD of type CHARACTER
+	including character length even if the result is a zero-sized
+	array.
+
+2022-01-20  Sandra Loosemore  <sandra@codesourcery.com>
+
+	PR fortran/103695
+	PR fortran/102621
+	* gfortran.h (struct gfc_namespace) Add omp_affinity_iterator
+	field.
+	* dump-parse-tree.cc (show_iterator): Use it.
+	* openmp.cc (gfc_match_iterator): Likewise.
+	(resolve_omp_clauses): Likewise.
+	* trans-decl.cc (gfc_finish_var_decl): Likewise.
+	* trans-openmp.cc (handle_iterator): Likewise.
+
+2022-01-18  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103692
+	* array.cc (gfc_expand_constructor): Handle zero-sized array
+	constructors.
+
 2022-01-17  Martin Liska  <mliska@suse.cz>
 
 	* check.cc (gfc_check_all_any): Rename .c names to .cc.

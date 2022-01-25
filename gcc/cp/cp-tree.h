@@ -6599,6 +6599,7 @@ extern tree strip_top_quals			(tree);
 extern bool reference_related_p			(tree, tree);
 extern bool reference_compatible_p		(tree, tree);
 extern int remaining_arguments			(tree);
+extern tree build_implicit_conv_flags		(tree, tree, int);
 extern tree perform_implicit_conversion		(tree, tree, tsubst_flags_t);
 extern tree perform_implicit_conversion_flags	(tree, tree, tsubst_flags_t, int);
 extern tree build_converted_constant_expr	(tree, tree, tsubst_flags_t);
@@ -8641,8 +8642,8 @@ namespace selftest {
 
   /* Declarations for specific families of tests within cp,
      by source file, in alphabetical order.  */
-  extern void cp_pt_c_tests ();
-  extern void cp_tree_c_tests (void);
+  extern void cp_pt_cc_tests ();
+  extern void cp_tree_cc_tests (void);
 } // namespace selftest
 #endif /* #if CHECKING_P */
 

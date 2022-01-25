@@ -7089,7 +7089,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 
 loose_warn=
 save_CXXFLAGS="$CXXFLAGS"
-for real_option in -W -Wall -Wno-narrowing -Wwrite-strings -Wcast-qual -Wno-error=format-diag $wf_opt; do
+for real_option in -W -Wall -Wno-narrowing -Wwrite-strings -Wcast-qual $wf_opt; do
   # Do the check with the no- prefix removed since gcc silently
   # accepts any -Wno-* option on purpose
   case $real_option in
@@ -7147,7 +7147,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 c_loose_warn=
 save_CFLAGS="$CFLAGS"
-for real_option in -Wstrict-prototypes -Wmissing-prototypes -Wno-error=format-diag; do
+for real_option in -Wstrict-prototypes -Wmissing-prototypes ; do
   # Do the check with the no- prefix removed since gcc silently
   # accepts any -Wno-* option on purpose
   case $real_option in
@@ -23236,6 +23236,20 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ld_is_gold" >&5
 $as_echo "$ld_is_gold" >&6; }
 
+# Check to see if we are using mold instead of ld
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether we are using mold" >&5
+$as_echo_n "checking whether we are using mold... " >&6; }
+ld_is_mold=no
+if test x$gcc_cv_ld != x; then
+  if $gcc_cv_ld --version 2>/dev/null | sed 1q \
+     | grep "mold" > /dev/null; then
+    ld_is_mold=yes
+  fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ld_is_mold" >&5
+$as_echo "$ld_is_mold" >&6; }
+
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking gold linker with split stack support as non default" >&5
 $as_echo_n "checking gold linker with split stack support as non default... " >&6; }
 # Check to see if default ld is not gold, but gold is
@@ -24117,6 +24131,8 @@ else
 else
   gcc_cv_ld_hidden=yes
   if test x"$ld_is_gold" = xyes; then
+    :
+  elif test x"$ld_is_mold" = xyes; then
     :
   elif echo "$ld_ver" | grep GNU > /dev/null; then
     if test 0"$ld_date" -lt 20020404; then
@@ -25196,6 +25212,8 @@ $as_echo "$gcc_cv_as_comdat_group_group" >&6; }
  fi
 fi
 if test x"$ld_is_gold" = xyes; then
+  comdat_group=yes
+elif test x"$ld_is_mold" = xyes; then
   comdat_group=yes
 elif test $in_tree_ld = yes ; then
   comdat_group=no

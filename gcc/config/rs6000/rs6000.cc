@@ -121,21 +121,8 @@ int dot_symbols;
    of this machine mode.  */
 scalar_int_mode rs6000_pmode;
 
-#if TARGET_ELF
-/* Note whether IEEE 128-bit floating point was passed or returned, either as
-   the __float128/_Float128 explicit type, or when long double is IEEE 128-bit
-   floating point.  We changed the default C++ mangling for these types and we
-   may want to generate a weak alias of the old mangling (U10__float128) to the
-   new mangling (u9__ieee128).  */
-bool rs6000_passes_ieee128 = false;
-#endif
-
 /* Track use of r13 in 64bit AIX TLS.  */
 static bool xcoff_tls_exec_model_detected = false;
-
-/* Generate the manged name (i.e. U10__float128) used in GCC 8.1, and not the
-   name used in current releases (i.e. u9__ieee128).  */
-static bool ieee128_mangling_gcc_8_1;
 
 /* Width in bits of a pointer.  */
 unsigned rs6000_pointer_size;
@@ -1764,11 +1751,6 @@ static const struct attribute_spec rs6000_attribute_table[] =
 
 #undef TARGET_STARTING_FRAME_OFFSET
 #define TARGET_STARTING_FRAME_OFFSET rs6000_starting_frame_offset
-
-#if TARGET_ELF && RS6000_WEAK
-#undef TARGET_ASM_GLOBALIZE_DECL_NAME
-#define TARGET_ASM_GLOBALIZE_DECL_NAME rs6000_globalize_decl_name
-#endif
 
 #undef TARGET_SETJMP_PRESERVES_NONVOLATILE_REGS_P
 #define TARGET_SETJMP_PRESERVES_NONVOLATILE_REGS_P hook_bool_void_true
@@ -5935,6 +5917,34 @@ const char *rs6000_machine;
 const char *
 rs6000_machine_from_flags (void)
 {
+  /* For some CPUs, the machine cannot be determined by ISA flags.  We have to
+     check them first.  */
+  switch (rs6000_cpu)
+    {
+    case PROCESSOR_PPC8540:
+    case PROCESSOR_PPC8548:
+      return "e500";
+
+    case PROCESSOR_PPCE300C2:
+    case PROCESSOR_PPCE300C3:
+      return "e300";
+
+    case PROCESSOR_PPCE500MC:
+      return "e500mc";
+
+    case PROCESSOR_PPCE500MC64:
+      return "e500mc64";
+
+    case PROCESSOR_PPCE5500:
+      return "e5500";
+
+    case PROCESSOR_PPCE6500:
+      return "e6500";
+
+    default:
+      break;
+    }
+
   HOST_WIDE_INT flags = rs6000_isa_flags;
 
   /* Disable the flags that should never influence the .machine selection.  */
@@ -16345,10 +16355,10 @@ rs6000_emit_minmax (rtx dest, enum rtx_code code, rtx op0, rtx op1)
     c = GEU;
 
   if (code == SMAX || code == UMAX)
-    target = emit_conditional_move (dest, c, op0, op1, mode,
+    target = emit_conditional_move (dest, { c, op0, op1, mode },
 				    op0, op1, mode, 0);
   else
-    target = emit_conditional_move (dest, c, op0, op1, mode,
+    target = emit_conditional_move (dest, { c, op0, op1, mode },
 				    op1, op0, mode, 0);
   gcc_assert (target);
   if (target != dest)
@@ -20234,7 +20244,7 @@ rs6000_mangle_type (const_tree type)
   if (SCALAR_FLOAT_TYPE_P (type) && FLOAT128_IBM_P (TYPE_MODE (type)))
     return "g";
   if (SCALAR_FLOAT_TYPE_P (type) && FLOAT128_IEEE_P (TYPE_MODE (type)))
-    return ieee128_mangling_gcc_8_1 ? "U10__float128" : "u9__ieee128";
+    return "u9__ieee128";
 
   if (type == vector_pair_type_node)
     return "u13__vector_pair";
@@ -22758,7 +22768,7 @@ rs6000_emit_swsqrt (rtx dst, rtx src, bool recip)
 
       if (mode == SFmode)
 	{
-	  rtx target = emit_conditional_move (e, GT, src, zero, mode,
+	  rtx target = emit_conditional_move (e, { GT, src, zero, mode },
 					      e, zero, mode, 0);
 	  if (target != e)
 	    emit_move_insn (e, target);
@@ -25071,7 +25081,7 @@ rs6000_get_function_versions_dispatcher (void *decl)
   else
     {
       error_at (DECL_SOURCE_LOCATION (default_node->decl),
-		"multiversioning needs ifunc which is not supported "
+		"multiversioning needs %<ifunc%> which is not supported "
 		"on this target");
     }
 #endif
@@ -26596,44 +26606,6 @@ prefixed_paddi_p (rtx_insn *insn)
 					       NON_PREFIXED_DEFAULT);
 
   return (iform == INSN_FORM_PCREL_EXTERNAL || iform == INSN_FORM_PCREL_LOCAL);
-}
-
-/* Whether an instruction is a prefixed XXSPLTI* instruction.  This is called
-   from the prefixed attribute processing.  */
-
-bool
-prefixed_xxsplti_p (rtx_insn *insn)
-{
-  rtx set = single_set (insn);
-  if (!set)
-    return false;
-
-  rtx dest = SET_DEST (set);
-  rtx src = SET_SRC (set);
-  machine_mode mode = GET_MODE (dest);
-
-  if (!REG_P (dest) && !SUBREG_P (dest))
-    return false;
-
-  if (GET_CODE (src) == UNSPEC)
-    {
-      int unspec = XINT (src, 1);
-      return (unspec == UNSPEC_XXSPLTIW
-	      || unspec == UNSPEC_XXSPLTIDP
-	      || unspec == UNSPEC_XXSPLTI32DX);
-    }
-
-  vec_const_128bit_type vsx_const;
-  if (vec_const_128bit_to_bytes (src, mode, &vsx_const))
-    {
-      if (constant_generates_xxspltiw (&vsx_const))
-	return true;
-
-      if (constant_generates_xxspltidp (&vsx_const))
-	return true;
-    }
-
-  return false;
 }
 
 /* Whether the next instruction needs a 'p' prefix issued before the
@@ -28186,39 +28158,6 @@ rs6000_starting_frame_offset (void)
 }
 
 
-/* Create an alias for a mangled name where we have changed the mangling (in
-   GCC 8.1, we used U10__float128, and now we use u9__ieee128).  This is called
-   via the target hook TARGET_ASM_GLOBALIZE_DECL_NAME.  */
-
-#if TARGET_ELF && RS6000_WEAK
-static void
-rs6000_globalize_decl_name (FILE * stream, tree decl)
-{
-  const char *name = XSTR (XEXP (DECL_RTL (decl), 0), 0);
-
-  targetm.asm_out.globalize_label (stream, name);
-
-  if (rs6000_passes_ieee128 && name[0] == '_' && name[1] == 'Z')
-    {
-      tree save_asm_name = DECL_ASSEMBLER_NAME (decl);
-      const char *old_name;
-
-      ieee128_mangling_gcc_8_1 = true;
-      lang_hooks.set_decl_assembler_name (decl);
-      old_name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
-      SET_DECL_ASSEMBLER_NAME (decl, save_asm_name);
-      ieee128_mangling_gcc_8_1 = false;
-
-      if (strcmp (name, old_name) != 0)
-	{
-	  fprintf (stream, "\t.weak %s\n", old_name);
-	  fprintf (stream, "\t.set %s,%s\n", old_name, name);
-	}
-    }
-}
-#endif
-
-
 /* On 64-bit Linux and Freebsd systems, possibly switch the long double library
    function names from <foo>l to <foo>f128 if the default long double type is
    IEEE 128-bit.  Typically, with the C and C++ languages, the standard math.h

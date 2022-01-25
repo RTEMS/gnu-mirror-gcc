@@ -1531,7 +1531,7 @@ check_format_info (function_format_info *info, tree params,
   format_ctx.arglocs = arglocs;
 
   check_function_arguments_recurse (check_format_arg, &format_ctx,
-				    format_tree, arg_num);
+				    format_tree, arg_num, OPT_Wformat_);
 
   location_t loc = format_ctx.res->format_string_loc;
 
@@ -5424,7 +5424,7 @@ test_type_mismatch_range_labels ()
 /* Run all of the selftests within this file.  */
 
 void
-c_format_c_tests ()
+c_format_cc_tests ()
 {
   test_get_modifier_for_format_len ();
   test_get_format_for_type_printf ();

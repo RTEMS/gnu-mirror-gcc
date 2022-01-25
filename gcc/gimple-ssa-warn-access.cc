@@ -3953,15 +3953,14 @@ pass_waccess::warn_invalid_pointer (tree ref, gimple *use_stmt,
 			    "may be used")
 		       : G_("using dangling pointer %qE to an unnamed "
 			    "temporary")),
-		      ref, var))
+		      ref))
       || (!ref
 	  && warning_at (use_loc, OPT_Wdangling_pointer_,
 			 (maybe
 			  ? G_("dangling pointer to an unnamed temporary "
 			       "may be used")
 			  : G_("using a dangling pointer to an unnamed "
-			       "temporary")),
-			 var)))
+			       "temporary")))))
     {
       inform (DECL_SOURCE_LOCATION (var),
 	      "unnamed temporary defined here");
@@ -4082,7 +4081,9 @@ pointers_related_p (gimple *stmt, tree p, tree q, pointer_query &qry)
   access_ref pref, qref;
   if (!qry.get_ref (p, stmt, &pref, 0)
       || !qry.get_ref (q, stmt, &qref, 0))
-    return true;
+    /* GET_REF() only rarely fails.  When it does, it's likely because
+       it involves a self-referential PHI.  Return a conservative result.  */
+    return false;
 
   return pref.ref == qref.ref;
 }
@@ -4231,6 +4232,11 @@ pass_waccess::check_call (gcall *stmt)
 {
   if (gimple_call_builtin_p (stmt, BUILT_IN_NORMAL))
     check_builtin (stmt);
+
+  /* .ASAN_MARK doesn't access any vars, only modifies shadow memory.  */
+  if (gimple_call_internal_p (stmt)
+      && gimple_call_internal_fn (stmt) == IFN_ASAN_MARK)
+    return;
 
   if (!m_early_checks_p)
     if (tree callee = gimple_call_fndecl (stmt))
