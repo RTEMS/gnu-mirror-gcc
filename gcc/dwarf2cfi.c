@@ -158,6 +158,7 @@ struct dw_trace_info
   bool args_size_defined_for_eh;
 };
 
+static inline unsigned dwf_regno (const_rtx reg);
 
 /* Hashtable helpers.  */
 
@@ -237,7 +238,7 @@ static unsigned dw_frame_pointer_regnum;
 rtx
 expand_builtin_dwarf_sp_column (void)
 {
-  unsigned int dwarf_regnum = DWARF_FRAME_REGNUM (STACK_POINTER_REGNUM);
+  unsigned int dwarf_regnum = dwf_regno (stack_pointer_rtx);
   return GEN_INT (DWARF2_FRAME_REG_OUT (dwarf_regnum, 1));
 }
 
@@ -279,7 +280,7 @@ void init_one_dwarf_reg_size (int regno, machine_mode regmode,
 			      rtx table, machine_mode slotmode,
 			      init_one_dwarf_reg_state *init_state)
 {
-  const unsigned int dnum = DWARF_FRAME_REGNUM (regno);
+  const unsigned int dnum = DWARF_FRAME_REGNUM (regno, regmode);
   const unsigned int rnum = DWARF2_FRAME_REG_OUT (dnum, 1);
   const unsigned int dcol = DWARF_REG_TO_UNWIND_COLUMN (rnum);
   
@@ -288,10 +289,10 @@ void init_one_dwarf_reg_size (int regno, machine_mode regmode,
 
   init_state->processed_regno[regno] = true;
 
-  if (rnum >= DWARF_FRAME_REGISTERS)
+  if (dcol >= DWARF_FRAME_REGISTERS)
     return;
 
-  if (dnum == DWARF_FRAME_RETURN_COLUMN)
+  if (dcol == DWARF_FRAME_RETURN_COLUMN)
     {
       if (regmode == VOIDmode)
 	return;
@@ -1015,7 +1016,7 @@ static inline unsigned
 dwf_regno (const_rtx reg)
 {
   gcc_assert (REGNO (reg) < FIRST_PSEUDO_REGISTER);
-  return DWARF_FRAME_REGNUM (REGNO (reg));
+  return DWARF_FRAME_REGNUM (REGNO (reg), GET_MODE (reg));
 }
 
 /* Compare X and Y for equivalence.  The inputs may be REGs or PC_RTX.  */
@@ -3053,7 +3054,7 @@ create_cie_data (void)
   dw_cfa_location loc;
   dw_trace_info cie_trace;
 
-  dw_stack_pointer_regnum = DWARF_FRAME_REGNUM (STACK_POINTER_REGNUM);
+  dw_stack_pointer_regnum = dwf_regno (stack_pointer_rtx);
 
   memset (&cie_trace, 0, sizeof (cie_trace));
   cur_trace = &cie_trace;
@@ -3111,8 +3112,8 @@ create_cie_data (void)
 static unsigned int
 execute_dwarf2_frame (void)
 {
-  /* Different HARD_FRAME_POINTER_REGNUM might coexist in the same file.  */
-  dw_frame_pointer_regnum = DWARF_FRAME_REGNUM (HARD_FRAME_POINTER_REGNUM);
+  /* Initialise dw_frame_pointer_regnum for this file.  */
+  dw_frame_pointer_regnum = dwf_regno (hard_frame_pointer_rtx);
 
   /* The first time we're called, compute the incoming frame state.  */
   if (cie_cfi_vec == NULL)

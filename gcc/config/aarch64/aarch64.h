@@ -613,15 +613,15 @@ extern unsigned aarch64_architecture_version;
    DWARF_ALT_FRAME_RETURN_COLUMN.  */
 #define DWARF_FRAME_REGISTERS           (DWARF_ALT_FRAME_RETURN_COLUMN + 1)
 
-
-#define DBX_REGISTER_NUMBER(REGNO)	aarch64_dbx_register_number (REGNO)
+#define DBX_REGISTER_NUMBER(REGNO, MODE)   \
+  aarch64_dbx_register_number (REGNO, MODE)
 /* Provide a definition of DWARF_FRAME_REGNUM here so that fallback unwinders
    can use DWARF_ALT_FRAME_RETURN_COLUMN defined below.  This is just the same
    as the default definition in dwarf2out.c.  */
 #undef DWARF_FRAME_REGNUM
-#define DWARF_FRAME_REGNUM(REGNO)	DBX_REGISTER_NUMBER (REGNO)
+#define DWARF_FRAME_REGNUM(REGNO, MODE)	DBX_REGISTER_NUMBER (REGNO, MODE)
 
-#define DWARF_FRAME_RETURN_COLUMN	DWARF_FRAME_REGNUM (LR_REGNUM)
+#define DWARF_FRAME_RETURN_COLUMN  DWARF_FRAME_REGNUM (LR_REGNUM, VOIDmode)
 
 #define DWARF2_UNWIND_INFO 1
 
@@ -685,7 +685,7 @@ extern unsigned aarch64_architecture_version;
   aarch64_asm_output_external (STR, DECL, NAME)
 
 /* Output assembly strings after .cfi_startproc is emitted.  */
-#define ASM_POST_CFI_STARTPROC  aarch64_post_cfi_startproc
+#define ASM_DO_CFI_STARTPROC  aarch64_do_cfi_startproc
 
 /* For EH returns X4 contains the stack adjustment.  */
 #define EH_RETURN_STACKADJ_RTX	gen_rtx_REG (POmode, R4_REGNUM)

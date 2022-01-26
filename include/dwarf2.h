@@ -324,6 +324,7 @@ enum dwarf_location_list_entry_type
 #define DW_CHILDREN_yes		     0x01
 
 #define DW_ADDR_none		0
+#define DW_ADDR_capability	1
 
 /* Source language names and codes.  */
 enum dwarf_source_language

@@ -110,15 +110,15 @@ this function will be given that code, so it must be handled by this hook.",
 
 /* Assembly strings required after the .cfi_startproc label.  */
 DEFHOOK
-(post_cfi_startproc,
-  "This target hook is used to emit assembly strings required by the target\n\
-after the .cfi_startproc directive.  The first argument is the file stream to\n\
+(do_cfi_startproc,
+  "This target hook is used to emit any assembly strings required by the target\n\
+for the .cfi_startproc directive.  The first argument is the file stream to\n\
 write the strings to and the second argument is the function\'s declaration.  The\n\
-expected use is to add more .cfi_* directives.\n\
+expected use is to add more or non-standard .cfi_* directives.\n\
 \n\
-The default is to not output any assembly strings.",
+The default is to output a single \".cfi_startproc\"",
   void, (FILE *, tree),
-  hook_void_FILEptr_tree)
+  default_do_cfi_startproc)
 
 /* Notify the backend that we have completed emitting the data for a
    decl.  */
@@ -3273,6 +3273,18 @@ DEFHOOK
  not support capabilities then this should return an empty\n\
  opt_scalar_addr_mode.  This is the default.",
  opt_scalar_addr_mode, (), default_capability_mode)
+
+/* Disambiguate with errno.  */
+DEFHOOK
+(capabilities_in_hardware,
+ "\
+A target hook that is used to distinguish between different ABIs for\n\
+capability architectures. This hook returns true if the target hardware\n\
+supports capabilities.\n\
+Currently only implemented for Arm Morello, where it returns true for the\n\
+PureCap and Hybrid AAPCS ABIs, but false in \"fake-capability\" compilation.\
+",
+ bool, (void), hook_bool_void_false)
 
 /* Machine specific adjustments when expanding a label.  */
 DEFHOOK

@@ -470,7 +470,7 @@ const unsigned int AARCH64_BUILTIN_SHIFT = 1;
 /* Mask that selects the aarch64_builtin_class part of a function code.  */
 const unsigned int AARCH64_BUILTIN_CLASS = (1 << AARCH64_BUILTIN_SHIFT) - 1;
 
-void aarch64_post_cfi_startproc (void);
+void aarch64_do_cfi_startproc (void);
 poly_int64 aarch64_initial_elimination_offset (unsigned, unsigned);
 int aarch64_get_condition_code (rtx);
 bool aarch64_address_valid_for_prefetch_p (rtx, bool);
@@ -594,7 +594,7 @@ rtx aarch64_simd_vect_par_cnst_half (machine_mode, int, bool);
 rtx aarch64_gen_stepped_int_parallel (unsigned int, int, int);
 bool aarch64_stepped_int_parallel_p (rtx, int);
 rtx aarch64_tls_get_addr (void);
-unsigned aarch64_dbx_register_number (unsigned);
+unsigned aarch64_dbx_register_number (unsigned, machine_mode);
 unsigned aarch64_trampoline_size (void);
 void aarch64_asm_output_labelref (FILE *, const char *);
 void aarch64_cpu_cpp_builtins (cpp_reader *);

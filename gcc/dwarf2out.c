@@ -286,6 +286,8 @@ static GTY(()) bool do_eh_frame = false;
 /* .debug_rnglists next index.  */
 static unsigned int rnglist_idx;
 
+static unsigned int dbx_reg_number (const_rtx);
+
 /* Data and reference forms for relocatable data.  */
 #define DW_FORM_data (DWARF_OFFSET_SIZE == 8 ? DW_FORM_data8 : DW_FORM_data4)
 #define DW_FORM_ref (DWARF_OFFSET_SIZE == 8 ? DW_FORM_ref8 : DW_FORM_ref4)
@@ -970,14 +972,7 @@ dwarf2out_do_cfi_startproc (bool second)
   int enc;
   rtx ref;
 
-  /* MORELLO TODO
-     Need to tell whether the current function is targetting purecap or not and
-     emit a `.cfi_startproc purecap` if it is.  Since we need to distinguish
-     between purecap and fake-capability in other places too this is starting
-     to look like something we need a hook for.  */
-  fprintf (asm_out_file, "\t.cfi_startproc\n");
-
-  targetm.asm_out.post_cfi_startproc (asm_out_file, current_function_decl);
+  targetm.asm_out.do_cfi_startproc (asm_out_file, current_function_decl);
 
   /* .cfi_personality and .cfi_lsda are only relevant to DWARF2
      eh unwinders.  */
@@ -2764,7 +2759,7 @@ build_cfa_aligned_loc (dw_cfa_location *cfa,
 {
   struct dw_loc_descr_node *head;
   unsigned int dwarf_fp
-    = DWARF_FRAME_REGNUM (HARD_FRAME_POINTER_REGNUM);
+    = dbx_reg_number (hard_frame_pointer_rtx);
 
   /* When CFA is defined as FP+OFFSET, emulate stack alignment.  */
   if (cfa->reg == HARD_FRAME_POINTER_REGNUM && cfa->indirect == 0)
@@ -3781,7 +3776,6 @@ static int decl_quals (const_tree);
 static dw_die_ref modified_type_die (tree, int, bool, dw_die_ref);
 static dw_die_ref generic_parameter_die (tree, tree, bool, dw_die_ref);
 static dw_die_ref template_parameter_pack_die (tree, tree, dw_die_ref);
-static unsigned int dbx_reg_number (const_rtx);
 static void add_loc_descr_op_piece (dw_loc_descr_ref *, int);
 static dw_loc_descr_ref reg_loc_descriptor (rtx, enum var_init_status);
 static dw_loc_descr_ref one_reg_loc_descriptor (unsigned int,
@@ -12877,6 +12871,8 @@ base_type_die (tree type, bool reverse)
       break;
 
     case INTCAP_TYPE:
+      gcc_assert (targetm.capability_mode().exists()
+		  && targetm.capabilities_in_hardware());
       if (TYPE_UNSIGNED (type))
 	encoding = DW_ATE_CHERI_unsigned_intcap;
       else
@@ -12976,12 +12972,15 @@ is_base_type (tree type)
 {
   switch (TREE_CODE (type))
     {
-    /* MORELLO TODO Need to say "yes" for INTCAP_TYPE if not targetting at fake-capability.
-	Looks like we may need a way to distinguish the overall target (unless
-	would never have fake-capability and pure capability functionality in the same
-	compiler).  */
+    /* For Capability Architectures that support an INTCAP_TYPE we need to
+       distinguish between "true" capability compilation and the "fake"
+       capability mode supported for Arm Morello.  */
     case INTCAP_TYPE:
-      return 0;
+      if (targetm.capability_mode().exists()
+	  && targetm.capabilities_in_hardware())
+	return 1;
+      else
+	return 0;
 
     case INTEGER_TYPE:
     case REAL_TYPE:
@@ -13420,24 +13419,31 @@ modified_type_die (tree type, int cv_quals, bool reverse,
       item_type = TREE_TYPE (type);
 
       addr_space_t as = TYPE_ADDR_SPACE (item_type);
-      /* MORELLO TODO
-	 This seems to be somewhere we would want to emit the
-	 DW_AT_address_class of DW_ADDR_capability for capability pointer types.  */
+      int action = 0;
       if (!ADDR_SPACE_GENERIC_P (as))
+	action = targetm.addr_space.debug (as);
+      /* For Capability architectures we want to set a  DW_AT_address_class
+	 of DW_ADDR_capability (encoded as 0x1) for capability pointer
+	 types.  */
+      if (capability_type_p (type) && targetm.capabilities_in_hardware())
 	{
-	  int action = targetm.addr_space.debug (as);
-	  if (action >= 0)
-	    {
-	      /* Positive values indicate an address_class.  */
-	      add_AT_unsigned (mod_type_die, DW_AT_address_class, action);
-	    }
-	  else
-	    {
-	      /* Negative values indicate an (inverted) segment base reg.  */
-	      dw_loc_descr_ref d
-		= one_reg_loc_descriptor (~action, VAR_INIT_STATUS_INITIALIZED);
-	      add_AT_loc (mod_type_die, DW_AT_segment, d);
-	    }
+	  /* For all known capability architectures the above address space
+	     hook is expected to have returned 0, so assert for that and then
+	     set the DW_AT_address_class value to 1 for DW_ADDR_capability.  */
+	  gcc_assert (action == 0);
+	  action = 1;
+	}
+      if (action > 0)
+	{
+	  /* Positive values indicate an address_class.  */
+	  add_AT_unsigned (mod_type_die, DW_AT_address_class, action);
+	}
+      else if (action < 0)
+	{
+	  /* Negative values indicate an (inverted) segment base reg.  */
+	  dw_loc_descr_ref d
+	    = one_reg_loc_descriptor (~action, VAR_INIT_STATUS_INITIALIZED);
+	  add_AT_loc (mod_type_die, DW_AT_segment, d);
 	}
     }
   else if (code == INTEGER_TYPE
@@ -13490,9 +13496,17 @@ modified_type_die (tree type, int cv_quals, bool reverse,
 	      return lookup_type_die (t);
 	  return lookup_type_die (type);
 	}
-      else if (TREE_CODE (type) == INTCAP_TYPE /* && MORELLO TODO is fake-capability */)
-	return modified_type_die (TREE_TYPE (type), cv_quals, reverse,
-				  context_die);
+      /* For CHERI "fake-capability" mode we look into the TREE_TYPE.
+	 For Purecap and Hybrid, INTCAPs are a base_type, so they have already
+	 been handled above, because is_base_type(type) is true.  */
+      else if (TREE_CODE (type) == INTCAP_TYPE)
+	{
+	  gcc_assert (targetm.capability_mode().exists()
+		      && !targetm.capabilities_in_hardware());
+	  return modified_type_die (TREE_TYPE (type), cv_quals, reverse,
+				    context_die);
+	}
+
       else if (TREE_CODE (type) != VECTOR_TYPE
 	       && TREE_CODE (type) != ARRAY_TYPE)
 	return lookup_type_die (type_main_variant (type));
@@ -13768,8 +13782,7 @@ dbx_reg_number (const_rtx rtl)
     }
 #endif
 
-  regno = DBX_REGISTER_NUMBER (regno);
-  gcc_assert (regno != INVALID_REGNUM);
+  regno = DBX_REGISTER_NUMBER (regno, GET_MODE (rtl));
   return regno;
 }
 
@@ -13883,7 +13896,8 @@ multiple_reg_loc_descriptor (rtx rtl, rtx regs,
 	}
 #endif
 
-      gcc_assert ((unsigned) DBX_REGISTER_NUMBER (reg) == dbx_reg_number (rtl));
+      gcc_assert ((unsigned) DBX_REGISTER_NUMBER (reg, GET_MODE (rtl))
+		   == dbx_reg_number (rtl));
       nregs = REG_NREGS (rtl);
 
       /* At present we only track constant-sized pieces.  */
@@ -13896,7 +13910,7 @@ multiple_reg_loc_descriptor (rtx rtl, rtx regs,
 	{
 	  dw_loc_descr_ref t;
 
-	  t = one_reg_loc_descriptor (DBX_REGISTER_NUMBER (reg),
+	  t = one_reg_loc_descriptor (dbx_reg_number (rtl),
 				      VAR_INIT_STATUS_INITIALIZED);
 	  add_loc_descr (&loc_result, t);
 	  add_loc_descr_op_piece (&loc_result, size);
@@ -14367,11 +14381,6 @@ based_loc_descr (rtx reg, poly_int64 offset,
   unsigned int regno;
   dw_loc_descr_ref result;
   dw_fde_ref fde = cfun->fde;
-  /* MORELLO TODO
-     Need to handle choosing between dwarf registers based on mode.
-     Capability registers have a different number than non-capability
-     registers, and the backend does not as yet get told about that.  */
-
   /* We only use "frame base" when we're sure we're talking about the
      post-prologue local stack frame.  We do this by *not* running
      register elimination until this point, and recognizing the special
@@ -14400,9 +14409,10 @@ based_loc_descr (rtx reg, poly_int64 offset,
 	      && reg == frame_pointer_rtx)
 	    {
 	      int base_reg
-		= DWARF_FRAME_REGNUM ((fde && fde->drap_reg != INVALID_REGNUM)
-				      ? HARD_FRAME_POINTER_REGNUM
-				      : REGNO (elim));
+		= dbx_reg_number ((fde && fde->drap_reg != INVALID_REGNUM)
+				      ? hard_frame_pointer_rtx
+				      : elim);
+
 	      return new_reg_loc_descr (base_reg, offset);
 	    }
 
@@ -14429,7 +14439,7 @@ based_loc_descr (rtx reg, poly_int64 offset,
 	regno = (unsigned) leaf_reg;
     }
 #endif
-  regno = DWARF_FRAME_REGNUM (regno);
+  regno = dbx_reg_number (reg);
 
   HOST_WIDE_INT const_offset;
   if (!optimize && fde
@@ -15898,9 +15908,6 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 				      VOIDmode, VAR_INIT_STATUS_INITIALIZED);
 	  else
 	    {
-	      /* MORELLO TODO For purecap need to choose capability registers
-	       * when the value is a capability.  Hence dbx_regnum will need to be updated.
-	       * */
               unsigned int dbx_regnum = dbx_reg_number (ENTRY_VALUE_EXP (rtl));
 	      if (dbx_regnum == IGNORED_DWARF_REGNUM)
 		return NULL;
@@ -22153,7 +22160,7 @@ gen_enumeration_type_die (tree type, dw_die_ref context_die)
 {
   dw_die_ref type_die = lookup_type_die (type);
   dw_die_ref orig_type_die = type_die;
-
+  gcc_assert (!capability_type_p (type));
   if (type_die == NULL)
     {
       type_die = new_die (DW_TAG_enumeration_type,
@@ -25731,25 +25738,24 @@ gen_type_die_with_usage (tree type, dw_die_ref context_die,
 	 type is recursive.  Recursive types are possible in Ada.  */
       /* ??? We could perhaps do this for all types before the switch
 	 statement.  */
-      TREE_ASM_WRITTEN (type) = 1;
-
-      /* fallthrough */
-    /* MORELLO TODO
-       When emitting debug information for `fake-cap`, selecting the TREE_TYPE
-	of an INTCAP_TYPE is exactly what we want.  For pure capability we need to emit
-	a DWA_ATE_CHERI_signed_intcap or DWA_ATE_CHERI_unsigned_intcap base type node
-	instead.
-
-	That node is not available on a standard AArch64 linux distro, so we
-	want to avoid using it for `fake-capability`.  Hence this bit needs an `if:
-	(fake-capability)` clause of some sort.  See the comments in
-	dwarf2out_do_cfi_startproc and is_base_type for other places this is needed.
-	*/
-    case INTCAP_TYPE:
       /* For these types, all that is required is that we output a DIE (or a
 	 set of DIEs) to represent the "basis" type.  */
+      TREE_ASM_WRITTEN (type) = 1;
       gen_type_die_with_usage (TREE_TYPE (type), context_die,
 			       DINFO_USAGE_IND_USE);
+      break;
+    case INTCAP_TYPE:
+    /* For Capability Architectures with an INTCAP_TYPE we need to distinguish
+       between "true" capability compilation and the "fake" capability mode
+       supported for Arm Morello.
+       For "fake capability" compilation we simply select the TREE_TYPE	of the
+       INTCAP_TYPE.
+       For pure capability we instead need to emit one of the new base type
+       nodes DWA_ATE_CHERI_signed_intcap or DWA_ATE_CHERI_unsigned_intcap.  */
+      if (targetm.capability_mode().exists()
+	  && !targetm.capabilities_in_hardware())
+	gen_type_die_with_usage (TREE_TYPE (type), context_die,
+				 DINFO_USAGE_IND_USE);
       break;
 
     case OFFSET_TYPE:

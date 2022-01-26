@@ -7590,6 +7590,13 @@ default_emit_except_table_label (FILE * stream ATTRIBUTE_UNUSED)
 {
 }
 
+/* Default function to output a ".cfi_startproc" directive.  */
+void
+default_do_cfi_startproc (FILE *f, tree ignored ATTRIBUTE_UNUSED)
+{
+  asm_fprintf (f, "\t.cfi_startproc\n");
+}
+
 /* This is how to output an internal numbered label where PREFIX is
    the class of label and LABELNO is the number within the class.  */
 

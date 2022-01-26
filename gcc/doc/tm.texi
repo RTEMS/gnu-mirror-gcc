@@ -8272,6 +8272,14 @@ Most targets do not need to implement this hook.  The default returns
 AArch64 needs to set the LSB of labels depending on the processor state.
 @end deftypefn
 
+@deftypefn {Target Hook} bool TARGET_CAPABILITIES_IN_HARDWARE (void)
+A target hook that is used to distinguish between different ABIs for
+capability architectures. This hook returns true if the target hardware
+supports capabilities.
+Currently only implemented for Arm Morello, where it returns true for the
+PureCap and Hybrid AAPCS ABIs, but false in "fake-capability" compilation.
+@end deftypefn
+
 @deftypefn {Target Hook} void TARGET_ASM_DECL_END (void)
 Define this hook if the target assembler requires a special marker to
 terminate an initialized variable declaration.
@@ -9621,13 +9629,13 @@ If this macro is not defined, nothing special is output at the end of
 the jump-table.
 @end defmac
 
-@deftypefn {Target Hook} void TARGET_ASM_POST_CFI_STARTPROC (FILE *@var{}, @var{tree})
-This target hook is used to emit assembly strings required by the target
-after the .cfi_startproc directive.  The first argument is the file stream to
+@deftypefn {Target Hook} void TARGET_ASM_DO_CFI_STARTPROC (FILE *@var{}, @var{tree})
+This target hook is used to emit any assembly strings required by the target
+for the .cfi_startproc directive.  The first argument is the file stream to
 write the strings to and the second argument is the function's declaration.  The
-expected use is to add more .cfi_* directives.
+expected use is to add more or non-standard .cfi_* directives.
 
-The default is to not output any assembly strings.
+The default is to output a single ".cfi_startproc"
 @end deftypefn
 
 @deftypefn {Target Hook} void TARGET_ASM_EMIT_UNWIND_LABEL (FILE *@var{stream}, tree @var{decl}, int @var{for_eh}, int @var{empty})

@@ -5236,6 +5236,8 @@ It must not be modified by command-line option processing.
 
 @hook TARGET_ADJUST_LABEL_EXPANSION
 
+@hook TARGET_CAPABILITIES_IN_HARDWARE
+
 @hook TARGET_ASM_DECL_END
 
 @hook TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA
@@ -6477,7 +6479,7 @@ If this macro is not defined, nothing special is output at the end of
 the jump-table.
 @end defmac
 
-@hook TARGET_ASM_POST_CFI_STARTPROC
+@hook TARGET_ASM_DO_CFI_STARTPROC
 
 @hook TARGET_ASM_EMIT_UNWIND_LABEL
 

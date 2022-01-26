@@ -2194,10 +2194,18 @@ aarch64_reassociation_width (unsigned opc, machine_mode mode)
 
 /* Provide a mapping from gcc register numbers to dwarf register numbers.  */
 unsigned
-aarch64_dbx_register_number (unsigned regno)
+aarch64_dbx_register_number (unsigned regno, machine_mode mode)
 {
+  /* For Morello capabilities we use a separate set of DWARF registers
+     in the range of 198-228 (for the c0-c30 GP registers).  */
    if (GP_REGNUM_P (regno))
-     return AARCH64_DWARF_R0 + regno - R0_REGNUM;
+     return (CAPABILITY_MODE_P (mode) ? 198 : 0)
+	      + AARCH64_DWARF_R0 + regno - R0_REGNUM;
+    /* MORELLO TODO:
+    I believe we do not need to do anything here for the PCC (r230) or the
+    DDC (r231). IIUC we'll never get here with those and if in the future we
+    want to generate debug information for operations that use the DDC, that
+    will probably have to be bespoke.  */
    else if (regno == SP_REGNUM)
      return AARCH64_DWARF_SP;
    else if (FP_REGNUM_P (regno))
@@ -20384,8 +20392,14 @@ aarch64_asm_output_external (FILE *stream, tree decl, const char* name)
    function with the B key.  */
 
 void
-aarch64_post_cfi_startproc (FILE *f, tree ignored ATTRIBUTE_UNUSED)
+aarch64_do_cfi_startproc (FILE *f, tree ignored ATTRIBUTE_UNUSED)
 {
+  /* For the CHERI Purecap ABI we need to emit a `.cfi_startproc purecap`.  */
+  if (TARGET_CAPABILITY_PURE)
+    asm_fprintf (f, "\t.cfi_startproc purecap\n");
+  else
+    asm_fprintf (f, "\t.cfi_startproc\n");
+
   if (cfun->machine->frame.laid_out && aarch64_return_address_signing_enabled ()
       && aarch64_ra_sign_key == AARCH64_KEY_B)
 	asm_fprintf (f, "\t.cfi_b_key_frame\n");
@@ -24726,6 +24740,15 @@ aarch64_adjust_label_expansion (rtx x)
   return x;
 }
 
+bool
+aarch64_capabilities_in_hardware (void)
+{
+  if (TARGET_CAPABILITY_PURE || TARGET_CAPABILITY_HYBRID)
+    return true;
+  else
+    return false;
+}
+
 /* Target-specific selftests.  */
 
 #if CHECKING_P
@@ -25321,8 +25344,8 @@ aarch64_libgcc_floating_mode_supported_p
 #define TARGET_RUN_TARGET_SELFTESTS selftest::aarch64_run_selftests
 #endif /* #if CHECKING_P */
 
-#undef TARGET_ASM_POST_CFI_STARTPROC
-#define TARGET_ASM_POST_CFI_STARTPROC aarch64_post_cfi_startproc
+#undef TARGET_ASM_DO_CFI_STARTPROC
+#define TARGET_ASM_DO_CFI_STARTPROC aarch64_do_cfi_startproc
 
 #undef TARGET_STRICT_ARGUMENT_NAMING
 #define TARGET_STRICT_ARGUMENT_NAMING hook_bool_CUMULATIVE_ARGS_true
@@ -25344,6 +25367,9 @@ aarch64_libgcc_floating_mode_supported_p
 
 #undef TARGET_ADJUST_LABEL_EXPANSION
 #define TARGET_ADJUST_LABEL_EXPANSION aarch64_adjust_label_expansion
+
+#undef TARGET_CAPABILITIES_IN_HARDWARE
+#define TARGET_CAPABILITIES_IN_HARDWARE aarch64_capabilities_in_hardware
 
 #undef TARGET_ASM_DECLARE_CONSTANT_NAME
 #define TARGET_ASM_DECLARE_CONSTANT_NAME aarch64_declare_constant_name
