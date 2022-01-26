@@ -6403,6 +6403,14 @@ capability_args_valid (const_tree type,
     CASE_CONVERT:
       {
 	gcc_assert (type && rhs_type);
+
+	/* Allow "dummy objects" for the C++ frontend as a special case.  See
+	   cp/tree.c:build_dummy_object.  */
+	if (code == CONVERT_EXPR
+	    && op0 == void_node
+	    && TREE_CODE (type) == POINTER_TYPE)
+	  return true;
+
 	/* Any conversions *to* a capability type must be from some type with
 	   the same capability mode.  There is no valid method to convert from
 	   a given hardware capability mode to another.  */
