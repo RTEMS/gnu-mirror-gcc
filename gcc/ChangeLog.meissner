@@ -1,3 +1,10 @@
+work077, patch #1:
+2022-01-26  Michael Meissner  <meissner@the-meissners.org>
+
+	* config/rs6000/rs6000.cc (TARGET_IEEEQUAD_DEFAULT): If the
+	compiler used to build the current compiler defaults to IEEE
+	128-bit long double,  make that the default for this build.
+
 2022-01-26   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
