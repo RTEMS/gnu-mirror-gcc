@@ -91,12 +91,20 @@
      explicitly redefine TARGET_IEEEQUAD and TARGET_IEEEQUAD_DEFAULT to 0, so
      those systems will not pick up this default.  This needs to be after all
      of the include files, so that POWERPC_LINUX and POWERPC_FREEBSD are
-     properly defined.  */
+     properly defined.
+
+     If we are being built by a compiler that uses IEEE 128-bit as the default
+     long double and no explicit long double format was selected, then also
+     default long double to IEEE 128-bit.  */
 #ifndef TARGET_IEEEQUAD_DEFAULT
 #if !defined (POWERPC_LINUX) && !defined (POWERPC_FREEBSD)
 #define TARGET_IEEEQUAD_DEFAULT 1
 #else
+#ifdef __LONG_DOUBLE_IEEE128__
+#define TARGET_IEEEQUAD_DEFAULT 1
+#else
 #define TARGET_IEEEQUAD_DEFAULT 0
+#endif
 #endif
 #endif
 
