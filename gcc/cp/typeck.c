@@ -5230,6 +5230,9 @@ cp_build_binary_op (const op_location_t &location,
 				       type0));
 	}
 
+      /* Comparisons should always be done on the address value, not on the
+	 capability.  */
+      result_type = noncapability_type (result_type);
       break;
 
     case MAX_EXPR:
@@ -5382,6 +5385,9 @@ cp_build_binary_op (const op_location_t &location,
 	  instrument_expr = build_call_expr_loc (location, tt, 2, op0, op1);
 	}
 
+      /* Comparisons should always be done on the address value, not on
+	 capabilities.  */
+      result_type = noncapability_type (result_type);
       break;
 
     case UNORDERED_EXPR:
@@ -6702,7 +6708,7 @@ cp_build_unary_op (enum tree_code code, tree xarg, bool noconvert,
 	    ? build_one_cst (argtype)
 	    : integer_one_node;
 
-	inc = cp_convert (argtype, inc, complain);
+	inc = cp_convert (noncapability_type (argtype), inc, complain);
 
 	/* If 'arg' is an Objective-C PROPERTY_REF expression, then we
 	   need to ask Objective-C to build the increment or decrement

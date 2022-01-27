@@ -680,6 +680,7 @@ convert_to_integer_1 (tree type, tree expr, bool dofold)
     case INTCAP_TYPE:
     case POINTER_TYPE:
     case REFERENCE_TYPE:
+    case NULLPTR_TYPE:
       if (integer_zerop (expr)
 	  && !TREE_OVERFLOW (tree_strip_any_location_wrapper (expr)))
 	return build_int_cst (type, 0);
