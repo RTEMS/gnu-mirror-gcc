@@ -1,3 +1,9 @@
+work077, patch #2:
+2022-01-28  Michael Meissner  <meissner@the-meissners.org>
+
+	PR target/104253
+	* gcc.target/powerpc/pr104253.c: New test.
+
 2022-01-26   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch

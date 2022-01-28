@@ -1,5 +1,5 @@
 work077, patch #2:
-2022-01-27  Michael Meissner  <meissner@the-meissners.org>
+2022-01-28  Michael Meissner  <meissner@the-meissners.org>
 	PR target/104253
 	* config/rs6000/rs6000.cc (TARGET_IEEEQUAD_DEFAULT): If the
 	compiler used to build the current compiler defaults to IEEE
