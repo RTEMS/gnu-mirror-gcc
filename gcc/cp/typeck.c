@@ -8299,7 +8299,7 @@ cp_build_c_cast (location_t loc, tree type, tree expr,
   if (TYPE_PTR_P (type)
       && TREE_CODE (TREE_TYPE (value)) == INTEGER_TYPE
       /* Casting to an integer of smaller size is an error detected elsewhere.  */
-      && TYPE_PRECISION (type) > TYPE_PRECISION (TREE_TYPE (value))
+      && TYPE_NONCAP_PRECISION (type) > TYPE_PRECISION (TREE_TYPE (value))
       /* Don't warn about converting any constant.  */
       && !TREE_CONSTANT (value))
     warning_at (loc, OPT_Wint_to_pointer_cast, 
