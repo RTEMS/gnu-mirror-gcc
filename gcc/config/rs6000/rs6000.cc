@@ -11106,12 +11106,30 @@ init_float128_ibm (machine_mode mode)
      names.  */
   if (mode == IFmode)
     {
+      set_conv_libfunc (sext_optab, mode, SFmode, "__extendsftf2");
+      set_conv_libfunc (sext_optab, mode, DFmode, "__extenddftf2");
+      set_conv_libfunc (trunc_optab, SFmode, mode, "__trunctfsf2");
+      set_conv_libfunc (trunc_optab, DFmode, mode, "__trunctfdf2");
+
+      set_conv_libfunc (sext_optab, mode, IFmode, "__trunctftf2");
+      set_conv_libfunc (trunc_optab, IFmode, mode, "__extendtftf2");
+
       set_conv_libfunc (sext_optab, mode, SDmode, "__dpd_extendsdtf");
       set_conv_libfunc (sext_optab, mode, DDmode, "__dpd_extendddtf");
       set_conv_libfunc (trunc_optab, mode, TDmode, "__dpd_trunctdtf");
       set_conv_libfunc (trunc_optab, SDmode, mode, "__dpd_trunctfsd");
       set_conv_libfunc (trunc_optab, DDmode, mode, "__dpd_trunctfdd");
       set_conv_libfunc (sext_optab, TDmode, mode, "__dpd_extendtftd");
+
+      set_conv_libfunc (sfix_optab, SImode, mode, "__fixtfsi");
+      set_conv_libfunc (ufix_optab, SImode, mode, "__fixunstfsi");
+      set_conv_libfunc (sfix_optab, DImode, mode, "__fixtfdi");
+      set_conv_libfunc (ufix_optab, DImode, mode, "__fixunstfdi");
+
+      set_conv_libfunc (sfloat_optab, mode, SImode, "__floatsitf");
+      set_conv_libfunc (ufloat_optab, mode, SImode, "__floatunsitf");
+      set_conv_libfunc (sfloat_optab, mode, DImode, "__floatditf");
+      set_conv_libfunc (ufloat_optab, mode, DImode, "__floatunditf");
 
       if (TARGET_POWERPC64)
 	{
