@@ -1627,7 +1627,14 @@ build_stub_object (tree reftype)
 {
   if (!TYPE_REF_P (reftype))
     reftype = cp_build_reference_type (reftype, /*rval*/true);
-  tree stub = build1 (CONVERT_EXPR, reftype, integer_one_node);
+
+  tree one = integer_one_node;
+
+  /* For purecap, we must explicitly null-derive the capability.  */
+  if (capability_type_p (reftype))
+    one = fold_build_pointer_plus (null_pointer_node, one);
+
+  tree stub = build1 (CONVERT_EXPR, reftype, one);
   return convert_from_reference (stub);
 }
 

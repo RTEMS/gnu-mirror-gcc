@@ -10209,7 +10209,9 @@ build_rtti_vtbl_entries (tree binfo, vtbl_init_data* vid)
   if (flag_rtti)
     decl = build_address (get_tinfo_decl (t));
   else
-    decl = integer_zero_node;
+    decl = capability_type_p (vfunc_ptr_type_node)
+      ? null_pointer_node
+      : integer_zero_node;
 
   /* Convert the declaration to a type that can be stored in the
      vtable.  */
@@ -10219,6 +10221,9 @@ build_rtti_vtbl_entries (tree binfo, vtbl_init_data* vid)
   /* Add the offset-to-top entry.  It comes earlier in the vtable than
      the typeinfo entry.  Convert the offset to look like a
      function pointer, so that we can put it in the vtable.  */
+  if (capability_type_p (vfunc_ptr_type_node))
+    offset = fold_build_pointer_plus (null_pointer_node, offset);
+
   init = build_nop (vfunc_ptr_type_node, offset);
   CONSTRUCTOR_APPEND_ELT (vid->inits, NULL_TREE, init);
 }
