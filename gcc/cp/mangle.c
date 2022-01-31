@@ -2122,6 +2122,7 @@ write_type (tree type)
 	    case VOID_TYPE:
 	    case BOOLEAN_TYPE:
 	    case INTEGER_TYPE:  /* Includes wchar_t.  */
+	    case INTCAP_TYPE:
 	    case REAL_TYPE:
 	    case FIXED_POINT_TYPE:
 	      {
@@ -2539,6 +2540,15 @@ write_builtin_type (tree type)
 		}
 	    }
 	}
+      break;
+
+    case INTCAP_TYPE:
+      {
+	write_char ('u');
+	const char *s = TYPE_UNSIGNED (type) ? "__uintcap_t" : "__intcap_t";
+	write_unsigned_number (strlen (s));
+	write_string (s);
+      }
       break;
 
     case REAL_TYPE:

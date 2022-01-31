@@ -11552,15 +11552,16 @@ grokdeclarator (const cp_declarator *declarator,
 	  richloc.add_range (declspecs->locations[ds_short]);
 	  error_at (&richloc, "%<long%> and %<short%> specified together");
 	}
-      else if (TREE_CODE (type) != INTEGER_TYPE
+      else if ((TREE_CODE (type) != INTEGER_TYPE && !INTCAP_TYPE_P (type))
 	       || type == char8_type_node
 	       || type == char16_type_node
 	       || type == char32_type_node
 	       || ((long_p || short_p)
-		   && (explicit_char || explicit_intN)))
+		   && (explicit_char || explicit_intN || INTCAP_TYPE_P (type))))
 	error_at (loc, "%qs specified with %qT", key, type);
       else if (!explicit_int && !defaulted_int
-	       && !explicit_char && !explicit_intN)
+	       && !explicit_char && !explicit_intN
+	       && !INTCAP_TYPE_P (type))
 	{
 	  if (typedef_decl)
 	    {
@@ -11608,7 +11609,9 @@ grokdeclarator (const cp_declarator *declarator,
 	  && TREE_CODE (type) == INTEGER_TYPE
 	  && !same_type_p (TYPE_MAIN_VARIANT (type), wchar_type_node)))
     {
-      if (explicit_intN)
+      if (type == intcap_type_node)
+	type = uintcap_type_node;
+      else if (explicit_intN)
 	type = int_n_trees[declspecs->int_n_idx].unsigned_type;
       else if (longlong)
 	type = long_long_unsigned_type_node;

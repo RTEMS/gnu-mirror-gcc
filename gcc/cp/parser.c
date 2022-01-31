@@ -1016,6 +1016,7 @@ cp_keyword_starts_decl_specifier_p (enum rid keyword)
     case RID_FLOAT:
     case RID_DOUBLE:
     case RID_VOID:
+    case RID_INTCAP:
       /* GNU extensions.  */
     case RID_ATTRIBUTE:
     case RID_TYPEOF:
@@ -18008,6 +18009,11 @@ cp_parser_simple_type_specifier (cp_parser* parser,
 	    decl_specs->int_n_alt = true;
 	}
       type = int_n_trees [idx].signed_type;
+      break;
+    case RID_INTCAP:
+      if (!intcap_type_node)
+	break;
+      type = intcap_type_node;
       break;
     case RID_LONG:
       if (decl_specs)

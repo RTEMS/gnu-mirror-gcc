@@ -527,6 +527,7 @@ dump_type (cxx_pretty_printer *pp, tree t, int flags)
       break;
 
     case INTEGER_TYPE:
+    case INTCAP_TYPE:
     case REAL_TYPE:
     case VOID_TYPE:
     case BOOLEAN_TYPE:
@@ -862,6 +863,7 @@ dump_type_prefix (cxx_pretty_printer *pp, tree t, int flags)
     case ENUMERAL_TYPE:
     case IDENTIFIER_NODE:
     case INTEGER_TYPE:
+    case INTCAP_TYPE:
     case BOOLEAN_TYPE:
     case REAL_TYPE:
     case RECORD_TYPE:
@@ -982,6 +984,7 @@ dump_type_suffix (cxx_pretty_printer *pp, tree t, int flags)
     case ENUMERAL_TYPE:
     case IDENTIFIER_NODE:
     case INTEGER_TYPE:
+    case INTCAP_TYPE:
     case BOOLEAN_TYPE:
     case REAL_TYPE:
     case RECORD_TYPE:
