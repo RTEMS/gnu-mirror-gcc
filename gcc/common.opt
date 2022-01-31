@@ -1771,7 +1771,7 @@ Common Var(flag_harden_conditional_branches) Optimization
 Harden conditional branches by checking reversed conditions.
 
 fharden-control-flow-redundancy
-Common Var(flag_harden_control_flow_redundancy) Optimization
+Common Var(flag_harden_control_flow_redundancy) Init(-1) Optimization
 Harden control flow by recording and checking execution paths.
 
 ; Nonzero means ignore `#ident' directives.  0 means handle them.
