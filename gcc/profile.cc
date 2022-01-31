@@ -69,6 +69,9 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "profile.h"
 
+int find_conditions (basic_block, basic_block, basic_block*, int*, int);
+int instrument_decisions (basic_block*, int, int);
+
 /* Map from BBs/edges to gcov counters.  */
 vec<gcov_type> bb_gcov_counts;
 hash_map<edge,gcov_type> *edge_gcov_counts;
@@ -100,6 +103,7 @@ static int total_num_passes;
 static int total_num_times_called;
 static int total_hist_br_prob[20];
 static int total_num_branches;
+static int total_num_conds;
 
 /* Forward declarations.  */
 static void find_spanning_tree (struct edge_list *);
@@ -1512,13 +1516,47 @@ branch_prob (bool thunk)
 
   remove_fake_edges ();
 
+  if (profile_condition_flag || profile_arc_flag)
+      gimple_init_gcov_profiler ();
+
+  if (profile_condition_flag)
+  {
+    basic_block entry = ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb;
+    basic_block exit  = EXIT_BLOCK_PTR_FOR_FN (cfun);
+
+    // find_conditions () expect memory up front, see that function for details
+    const int max_blocks = 5 * n_basic_blocks_for_fn (cfun);
+    auto_vec<basic_block> blocks (max_blocks);
+    blocks.quick_grow (max_blocks);
+
+    const int max_sizes = n_basic_blocks_for_fn (cfun) + 1;
+    auto_vec<int> sizes (max_sizes);
+    sizes.quick_grow (max_sizes);
+
+    int nconds = find_conditions
+        (entry, exit, blocks.address (), sizes.address (), max_blocks);
+    total_num_conds += nconds;
+
+    if (nconds > 0 && coverage_counter_alloc (GCOV_COUNTER_CONDS, 2 * nconds))
+    {
+      gcov_position_t offset = gcov_write_tag (GCOV_TAG_CONDS);
+      for (int i = 0; i < nconds; ++i)
+      {
+        int idx = sizes[i];
+        int len = sizes[i + 1] - idx;
+        int terms = instrument_decisions (blocks.address () + idx, len, i);
+        gcov_write_unsigned (blocks[idx]->index);
+        gcov_write_unsigned (terms);
+      }
+      gcov_write_length (offset);
+    }
+  }
+
   /* For each edge not on the spanning tree, add counting code.  */
   if (profile_arc_flag
       && coverage_counter_alloc (GCOV_COUNTER_ARCS, num_instrumented))
     {
       unsigned n_instrumented;
-
-      gimple_init_gcov_profiler ();
 
       n_instrumented = instrument_edges (el);
 
@@ -1526,15 +1564,15 @@ branch_prob (bool thunk)
 
       if (flag_profile_values)
 	instrument_values (values);
-
-      /* Commit changes done by instrumentation.  */
-      gsi_commit_edge_inserts ();
     }
 
   free_aux_for_edges ();
 
   values.release ();
   free_edge_list (el);
+  /* Commit changes done by instrumentation.  */
+  gsi_commit_edge_inserts ();
+
   coverage_end_function (lineno_checksum, cfg_checksum);
   if (flag_branch_probabilities
       && (profile_status_for_fn (cfun) == PROFILE_READ))
@@ -1664,6 +1702,7 @@ init_branch_prob (void)
   total_num_passes = 0;
   total_num_times_called = 0;
   total_num_branches = 0;
+  total_num_conds = 0;
   for (i = 0; i < 20; i++)
     total_hist_br_prob[i] = 0;
 }
@@ -1703,5 +1742,7 @@ end_branch_prob (void)
 		     (total_hist_br_prob[i] + total_hist_br_prob[19-i]) * 100
 		     / total_num_branches, 5*i, 5*i+5);
 	}
+      fprintf (dump_file, "Total number of conditions: %d\n",
+	       total_num_conds);
     }
 }
