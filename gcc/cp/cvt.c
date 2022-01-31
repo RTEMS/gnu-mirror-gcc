@@ -42,6 +42,21 @@ static tree build_type_conversion (tree, tree);
 static tree build_up_reference (tree, tree, int, tree, tsubst_flags_t);
 static void diagnose_ref_binding (location_t, tree, tree, tree);
 
+static tree
+cp_cap_from_noncap (tree type, tree expr, tsubst_flags_t complain)
+{
+  gcc_assert (capability_type_p (type)
+	      && !capability_type_p (TREE_TYPE (expr)));
+
+  if (TREE_TYPE (expr) != noncapability_type (type))
+    expr = cp_convert (noncapability_type (type), expr, complain);
+
+  location_t loc = EXPR_LOCATION (expr);
+  return fold_build_replace_address_value_loc (loc,
+					       build_int_cst (type, 0),
+					       expr);
+}
+
 /* Change of width--truncation and extension of integers or reals--
    is represented with NOP_EXPR.  Proper functioning of many things
    assumes that no other conversions can be NOP_EXPRs.
@@ -230,6 +245,9 @@ cp_convert_to_pointer (tree type, tree expr, bool dofold,
 
   if (INTEGRAL_CODE_P (form))
     {
+      if (capability_type_p (type))
+	return cp_cap_from_noncap (type, expr, complain);
+
       if (TYPE_PRECISION (intype) == POINTER_SIZE)
 	return build1 (CONVERT_EXPR, type, expr);
       expr = cp_convert (c_common_type_for_size (POINTER_SIZE, 0), expr,
@@ -877,6 +895,13 @@ ocp_convert (tree type, tree expr, int convtype, int flags,
 
       /* Ignore any integer overflow caused by the conversion.  */
       return ignore_overflows (converted, e);
+    }
+  if (INTCAP_TYPE_P (type))
+    {
+      if (!capability_type_p (TREE_TYPE (e)))
+	return cp_cap_from_noncap (type, e, complain);
+      else
+	return convert_to_intcap_maybe_fold (type, e, dofold);
     }
   if (INDIRECT_TYPE_P (type) || TYPE_PTRMEM_P (type))
     return cp_convert_to_pointer (type, e, dofold, complain);

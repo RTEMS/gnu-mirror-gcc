@@ -7885,10 +7885,10 @@ build_reinterpret_cast_1 (location_t loc, tree type, tree expr,
      hold it. ... A value of type std::nullptr_t can be converted to
      an integral type; the conversion has the same meaning and
      validity as a conversion of (void*)0 to the integral type.  */
-  if (CP_INTEGRAL_TYPE_P (type)
+  if ((CP_INTEGRAL_TYPE_P (type) || INTCAP_TYPE_P (type))
       && (TYPE_PTR_P (intype) || NULLPTR_TYPE_P (intype)))
     {
-      if (TYPE_PRECISION (type) < TYPE_PRECISION (intype))
+      if (TYPE_NONCAP_PRECISION (type) < TYPE_NONCAP_PRECISION (intype))
         {
           if (complain & tf_error)
             permerror (loc, "cast from %qH to %qI loses precision",

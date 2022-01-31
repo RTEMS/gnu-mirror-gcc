@@ -4195,7 +4195,8 @@ more_aggr_init_expr_args_p (const aggr_init_expr_arg_iterator *iter)
    || ARITHMETIC_TYPE_P (TYPE)			\
    || TYPE_PTR_P (TYPE)				\
    || TYPE_PTRMEMFUNC_P (TYPE)                  \
-   || NULLPTR_TYPE_P (TYPE))
+   || NULLPTR_TYPE_P (TYPE)			\
+   || INTCAP_TYPE_P (TYPE))
 
 /* Determines whether this type is a C++0x scoped enumeration
    type. Scoped enumerations types are introduced via "enum class" or

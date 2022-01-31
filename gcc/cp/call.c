@@ -1482,7 +1482,7 @@ standard_conversion (tree to, tree from, tree expr, bool c_cast_p,
   /* We don't check for ENUMERAL_TYPE here because there are no standard
      conversions to enum type.  */
   /* As an extension, allow conversion to complex type.  */
-  else if (ARITHMETIC_TYPE_P (to))
+  else if (ARITHMETIC_TYPE_P (to) || INTCAP_TYPE_P (to))
     {
       if (! (INTEGRAL_CODE_P (fcode)
 	     || (fcode == REAL_TYPE && !(flags & LOOKUP_NO_NON_INTEGRAL)))
