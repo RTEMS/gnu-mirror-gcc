@@ -646,7 +646,7 @@ can_early_inline_edge_p (struct cgraph_edge *e)
 			 "  edge not inlinable: not in SSA form\n");
       return false;
     }
-  else if (profile_arc_flag
+  else if ((profile_arc_flag || profile_condition_flag)
 	   && ((lookup_attribute ("no_profile_instrument_function",
 				 DECL_ATTRIBUTES (caller->decl)) == NULL_TREE)
 	       != (lookup_attribute ("no_profile_instrument_function",

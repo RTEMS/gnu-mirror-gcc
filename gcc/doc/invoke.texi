@@ -595,6 +595,7 @@ Objective-C and Objective-C++ Dialects}.
 @item Program Instrumentation Options
 @xref{Instrumentation Options,,Program Instrumentation Options}.
 @gccoptlist{-p  -pg  -fprofile-arcs  --coverage  -ftest-coverage @gol
+-fprofile-conditions @gol
 -fprofile-abs-path @gol
 -fprofile-dir=@var{path}  -fprofile-generate  -fprofile-generate=@var{path} @gol
 -fprofile-info-section  -fprofile-info-section=@var{name} @gol
@@ -6030,6 +6031,13 @@ By default, this warning is enabled and is treated as an
 error.  @option{-Wno-coverage-invalid-line-number} can be used to disable the
 warning or @option{-Wno-error=coverage-invalid-line-number} can be used to
 disable the error.
+
+@item -Wno-coverage-too-many-conditions
+@opindex Wno-coverage-too-many-conditions
+@opindex Wcoverage-too-many-conditions
+Warn in case a condition have too many terms and GCC gives up coverage.
+Coverage is given up when there are more terms in the conditional than there
+are bits in a @code{gcov_type_unsigned}.  This warning is enabled by default.
 
 @item -Wno-cpp @r{(C, Objective-C, C++, Objective-C++ and Fortran only)}
 @opindex Wno-cpp
@@ -15324,6 +15332,13 @@ E.g. @code{gcc a.c b.c -o binary} would generate @file{binary-a.gcda} and
 
 @xref{Cross-profiling}.
 
+@item -fprofile-conditions
+@opindex fprofile-conditions
+Add code so that program conditions are instrumented.  During execution the
+program records what terms in a conditional contributes to a decision.  The
+data may be used to verify that all terms in a booleans are tested and have an
+effect on the outcome of a condition.
+
 @cindex @command{gcov}
 @item --coverage
 @opindex coverage
@@ -15383,6 +15398,10 @@ compiler adds code to count the number of times that these arcs are
 executed.  When an arc is the only exit or only entrance to a block, the
 instrumentation code can be added to the block; otherwise, a new basic
 block must be created to hold the instrumentation code.
+
+With @option{-fprofile-conditions}, for each conditional in your program GCC
+creates a bitset and records the boolean values that have an independent effect
+on the outcome of that expression.
 
 @need 2000
 @item -ftest-coverage
