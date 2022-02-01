@@ -89,21 +89,7 @@ So instead we use the macro below and test it against specific values.  */
 # endif
 #endif
 
-#else	/* Not ANSI C.  */
-
-#define PTR		char *
-
-/* some systems define these in header files for non-ansi mode */
-#undef const
-#undef volatile
-#undef signed
-#undef inline
-#define const
-#define volatile
-#define signed
-#define inline
-
-#endif	/* ANSI C.  */
+#endif
 
 /* Define macros for some gcc attributes.  This permits us to use the
    macros freely, and know that they will come into play for the
