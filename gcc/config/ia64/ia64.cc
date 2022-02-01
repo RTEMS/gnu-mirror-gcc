@@ -6213,11 +6213,8 @@ ia64_safe_type (rtx_insn *insn)
    If a predicate register is written by an AND.ORCM we set WRITTEN_BY_AND
    to true; if it was written by an OR.ANDCM we set WRITTEN_BY_OR to true.  */
 
-#if GCC_VERSION >= 4000
 #define RWS_FIELD_TYPE __extension__ unsigned short
-#else
-#define RWS_FIELD_TYPE unsigned int
-#endif
+
 struct reg_write_state
 {
   RWS_FIELD_TYPE write_count : 2;

@@ -163,9 +163,7 @@ env_manager::restore ()
 }
 
 /* Forbid other uses of getenv and putenv.  */
-#if (GCC_VERSION >= 3000)
 #pragma GCC poison getenv putenv
-#endif
 
 
 

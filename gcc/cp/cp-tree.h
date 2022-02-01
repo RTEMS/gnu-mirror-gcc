@@ -631,7 +631,7 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
 #define BOUND_TEMPLATE_TEMPLATE_PARM_TYPE_CHECK(NODE) \
   TREE_CHECK(NODE,BOUND_TEMPLATE_TEMPLATE_PARM)
 
-#if defined ENABLE_TREE_CHECKING && (GCC_VERSION >= 2007)
+#if defined ENABLE_TREE_CHECKING
 
 /* Returns t iff the node can have a TEMPLATE_INFO field.  */
 
@@ -2989,7 +2989,7 @@ struct GTY(()) lang_decl {
 #define STRIP_TEMPLATE(NODE) \
   (TREE_CODE (NODE) == TEMPLATE_DECL ? DECL_TEMPLATE_RESULT (NODE) : NODE)
 
-#if defined ENABLE_TREE_CHECKING && (GCC_VERSION >= 2007)
+#if defined ENABLE_TREE_CHECKING
 
 #define LANG_DECL_MIN_CHECK(NODE) __extension__			\
 ({ struct lang_decl *lt = DECL_LANG_SPECIFIC (NODE);		\

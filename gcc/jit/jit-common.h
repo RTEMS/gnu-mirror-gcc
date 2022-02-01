@@ -29,11 +29,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-iterator.h"
 
 #ifdef GCC_VERSION
-#if GCC_VERSION >= 4001
 #define GNU_PRINTF(M, N) __attribute__ ((format (gnu_printf, (M), (N))))
-#else
-#define GNU_PRINTF(M, N)
-#endif
 #endif
 
 const int NUM_GCC_JIT_TYPES = GCC_JIT_TYPE_INT128_T + 1;

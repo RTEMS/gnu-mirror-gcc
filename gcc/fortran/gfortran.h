@@ -1072,11 +1072,7 @@ typedef struct
 
 /* In order for the "gfc" format checking to work correctly, you must
    have declared a typedef locus first.  */
-#if GCC_VERSION >= 4001
 #define ATTRIBUTE_GCC_GFC(m, n) __attribute__ ((__format__ (__gcc_gfc__, m, n))) ATTRIBUTE_NONNULL(m)
-#else
-#define ATTRIBUTE_GCC_GFC(m, n) ATTRIBUTE_NONNULL(m)
-#endif
 
 
 /* Suppress error messages or re-enable them.  */

@@ -133,9 +133,7 @@ int vms_file_stats_name (const char *, long long *, long *, char *, int *);
    totally replaced in this file; make sure it stays that way.  */
 #undef DWARF2_UNWIND_INFO
 #undef DWARF2_FRAME_INFO
-#if (GCC_VERSION >= 3000)
- #pragma GCC poison DWARF2_UNWIND_INFO DWARF2_FRAME_INFO
-#endif
+#pragma GCC poison DWARF2_UNWIND_INFO DWARF2_FRAME_INFO
 
 /* The size of the target's pointer type.  */
 #ifndef PTR_SIZE
@@ -3370,10 +3368,8 @@ bool
 dwarf2out_default_as_loc_support (void)
 {
   return DWARF2_ASM_LINE_DEBUG_INFO;
-#if (GCC_VERSION >= 3000)
-# undef DWARF2_ASM_LINE_DEBUG_INFO
-# pragma GCC poison DWARF2_ASM_LINE_DEBUG_INFO
-#endif
+#undef DWARF2_ASM_LINE_DEBUG_INFO
+#pragma GCC poison DWARF2_ASM_LINE_DEBUG_INFO
 }
 
 /* Return true if GCC configure detected assembler support for views
@@ -3383,10 +3379,8 @@ bool
 dwarf2out_default_as_locview_support (void)
 {
   return DWARF2_ASM_VIEW_DEBUG_INFO;
-#if (GCC_VERSION >= 3000)
-# undef DWARF2_ASM_VIEW_DEBUG_INFO
-# pragma GCC poison DWARF2_ASM_VIEW_DEBUG_INFO
-#endif
+#undef DWARF2_ASM_VIEW_DEBUG_INFO
+#pragma GCC poison DWARF2_ASM_VIEW_DEBUG_INFO
 }
 
 /* A bit is set in ZERO_VIEW_P if we are using the assembler-supported

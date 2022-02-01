@@ -545,12 +545,8 @@ complex_mode::includes_p (machine_mode m)
 ALWAYS_INLINE poly_uint16
 mode_to_bytes (machine_mode mode)
 {
-#if GCC_VERSION >= 4001
   return (__builtin_constant_p (mode)
 	  ? mode_size_inline (mode) : mode_size[mode]);
-#else
-  return mode_size[mode];
-#endif
 }
 
 /* Return the base GET_MODE_BITSIZE value for MODE.  */
@@ -574,13 +570,9 @@ mode_to_precision (machine_mode mode)
 ALWAYS_INLINE scalar_mode
 mode_to_inner (machine_mode mode)
 {
-#if GCC_VERSION >= 4001
   return scalar_mode::from_int (__builtin_constant_p (mode)
 				? mode_inner_inline (mode)
 				: mode_inner[mode]);
-#else
-  return scalar_mode::from_int (mode_inner[mode]);
-#endif
 }
 
 /* Return the base GET_MODE_UNIT_SIZE value for MODE.  */
@@ -588,12 +580,8 @@ mode_to_inner (machine_mode mode)
 ALWAYS_INLINE unsigned char
 mode_to_unit_size (machine_mode mode)
 {
-#if GCC_VERSION >= 4001
   return (__builtin_constant_p (mode)
 	  ? mode_unit_size_inline (mode) : mode_unit_size[mode]);
-#else
-  return mode_unit_size[mode];
-#endif
 }
 
 /* Return the base GET_MODE_UNIT_PRECISION value for MODE.  */
@@ -601,12 +589,8 @@ mode_to_unit_size (machine_mode mode)
 ALWAYS_INLINE unsigned short
 mode_to_unit_precision (machine_mode mode)
 {
-#if GCC_VERSION >= 4001
   return (__builtin_constant_p (mode)
 	  ? mode_unit_precision_inline (mode) : mode_unit_precision[mode]);
-#else
-  return mode_unit_precision[mode];
-#endif
 }
 
 /* Return the base GET_MODE_NUNITS value for MODE.  */
@@ -614,12 +598,8 @@ mode_to_unit_precision (machine_mode mode)
 ALWAYS_INLINE poly_uint16
 mode_to_nunits (machine_mode mode)
 {
-#if GCC_VERSION >= 4001
   return (__builtin_constant_p (mode)
 	  ? mode_nunits_inline (mode) : mode_nunits[mode]);
-#else
-  return mode_nunits[mode];
-#endif
 }
 
 /* Get the size in bytes of an object of mode MODE.  */

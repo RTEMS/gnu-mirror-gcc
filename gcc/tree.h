@@ -246,7 +246,7 @@ as_internal_fn (combined_fn code)
 
 /* When checking is enabled, errors will be generated if a tree node
    is accessed incorrectly. The macros die with a fatal error.  */
-#if defined ENABLE_TREE_CHECKING && (GCC_VERSION >= 2007)
+#ifdef ENABLE_TREE_CHECKING
 
 #define TREE_CHECK(T, CODE) \
 (tree_check ((T), __FILE__, __LINE__, __FUNCTION__, (CODE)))
@@ -2831,16 +2831,12 @@ extern void decl_value_expr_insert (tree, tree);
 /* The DECL_RTL for NODE, if it is set, or NULL, if it is not set.  */
 #define DECL_RTL_IF_SET(NODE) (DECL_RTL_SET_P (NODE) ? DECL_RTL (NODE) : NULL)
 
-#if (GCC_VERSION >= 2007)
 #define DECL_RTL_KNOWN_SET(decl) __extension__				\
 ({  tree const __d = (decl);						\
     gcc_checking_assert (DECL_RTL_SET_P (__d));				\
     /* Dereference it so the compiler knows it can't be NULL even	\
        without assertion checking.  */					\
     &*DECL_RTL_IF_SET (__d); })
-#else
-#define DECL_RTL_KNOWN_SET(decl) (&*DECL_RTL_IF_SET (decl))
-#endif
 
 /* In VAR_DECL and PARM_DECL nodes, nonzero means declared `register'.  */
 #define DECL_REGISTER(NODE) (DECL_WRTL_CHECK (NODE)->decl_common.decl_flag_0)
@@ -3448,7 +3444,7 @@ extern tree build_target_option_node (struct gcc_options *opts,
 
 extern void prepare_target_option_nodes_for_pch (void);
 
-#if defined ENABLE_TREE_CHECKING && (GCC_VERSION >= 2007)
+#ifdef ENABLE_TREE_CHECKING
 
 inline tree
 tree_check (tree __t, const char *__f, int __l, const char *__g, tree_code __c)
@@ -3663,10 +3659,8 @@ tree_int_cst_elt_check (tree __t, int __i,
 
 /* Workaround -Wstrict-overflow false positive during profiledbootstrap.  */
 
-# if GCC_VERSION >= 4006
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstrict-overflow"
-#endif
 
 inline tree *
 tree_vec_elt_check (tree __t, int __i,
@@ -3679,9 +3673,7 @@ tree_vec_elt_check (tree __t, int __i,
   return &CONST_CAST_TREE (__t)->vec.a[__i];
 }
 
-# if GCC_VERSION >= 4006
 #pragma GCC diagnostic pop
-#endif
 
 inline tree *
 omp_clause_elt_check (tree __t, int __i,
@@ -3889,10 +3881,8 @@ non_type_check (const_tree __t, const char *__f, int __l, const char *__g)
   return __t;
 }
 
-# if GCC_VERSION >= 4006
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstrict-overflow"
-#endif
 
 inline const_tree *
 tree_vec_elt_check (const_tree __t, int __i,
@@ -3906,9 +3896,7 @@ tree_vec_elt_check (const_tree __t, int __i,
   //return &__t->vec.a[__i];
 }
 
-# if GCC_VERSION >= 4006
 #pragma GCC diagnostic pop
-#endif
 
 inline const_tree *
 omp_clause_elt_check (const_tree __t, int __i,
@@ -3945,7 +3933,7 @@ tree_operand_length (const_tree node)
     return TREE_CODE_LENGTH (TREE_CODE (node));
 }
 
-#if defined ENABLE_TREE_CHECKING && (GCC_VERSION >= 2007)
+#ifdef ENABLE_TREE_CHECKING
 
 /* Special checks for TREE_OPERANDs.  */
 inline tree *
@@ -4679,7 +4667,7 @@ extern unsigned HOST_WIDE_INT tree_to_uhwi (const_tree)
   ATTRIBUTE_NONNULL (1) ATTRIBUTE_PURE;
 extern poly_uint64 tree_to_poly_uint64 (const_tree)
   ATTRIBUTE_NONNULL (1) ATTRIBUTE_PURE;
-#if !defined ENABLE_TREE_CHECKING && (GCC_VERSION >= 4003)
+#ifndef ENABLE_TREE_CHECKING
 extern inline __attribute__ ((__gnu_inline__)) HOST_WIDE_INT
 tree_to_shwi (const_tree t)
 {

@@ -60,11 +60,7 @@ extern const char *trim_filename (const char *);
 /* None of these functions are suitable for ATTRIBUTE_PRINTF, because
    each language front end can extend them with its own set of format
    specifiers.  We must use custom format checks.  */
-#if (CHECKING_P && GCC_VERSION >= 4001) || GCC_VERSION == BUILDING_GCC_VERSION
 #define ATTRIBUTE_GCC_DIAG(m, n) __attribute__ ((__format__ (GCC_DIAG_STYLE, m, n))) ATTRIBUTE_NONNULL(m)
-#else
-#define ATTRIBUTE_GCC_DIAG(m, n) ATTRIBUTE_NONNULL(m)
-#endif
 extern void internal_error (const char *, ...) ATTRIBUTE_GCC_DIAG(1,2)
      ATTRIBUTE_NORETURN;
 extern void internal_error_no_backtrace (const char *, ...)

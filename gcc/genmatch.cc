@@ -70,9 +70,7 @@ linemap_client_expand_location_to_spelling_point (location_t loc,
 }
 
 static bool
-#if GCC_VERSION >= 4001
 __attribute__((format (printf, 5, 0)))
-#endif
 diagnostic_cb (cpp_reader *, enum cpp_diagnostic_level errtype,
 	       enum cpp_warning_reason, rich_location *richloc,
 	       const char *msg, va_list *ap)
@@ -115,9 +113,7 @@ notfound:
 }
 
 static void
-#if GCC_VERSION >= 4001
 __attribute__((format (printf, 2, 3)))
-#endif
 fatal_at (const cpp_token *tk, const char *msg, ...)
 {
   rich_location richloc (line_table, tk->src_loc);
@@ -128,9 +124,7 @@ fatal_at (const cpp_token *tk, const char *msg, ...)
 }
 
 static void
-#if GCC_VERSION >= 4001
 __attribute__((format (printf, 2, 3)))
-#endif
 fatal_at (location_t loc, const char *msg, ...)
 {
   rich_location richloc (line_table, loc);
@@ -141,9 +135,7 @@ fatal_at (location_t loc, const char *msg, ...)
 }
 
 static void
-#if GCC_VERSION >= 4001
 __attribute__((format (printf, 2, 3)))
-#endif
 warning_at (const cpp_token *tk, const char *msg, ...)
 {
   rich_location richloc (line_table, tk->src_loc);
@@ -154,9 +146,7 @@ warning_at (const cpp_token *tk, const char *msg, ...)
 }
 
 static void
-#if GCC_VERSION >= 4001
 __attribute__((format (printf, 2, 3)))
-#endif
 warning_at (location_t loc, const char *msg, ...)
 {
   rich_location richloc (line_table, loc);
@@ -169,9 +159,7 @@ warning_at (location_t loc, const char *msg, ...)
 /* Like fprintf, but print INDENT spaces at the beginning.  */
 
 static void
-#if GCC_VERSION >= 4001
 __attribute__((format (printf, 3, 4)))
-#endif
 fprintf_indent (FILE *f, unsigned int indent, const char *format, ...)
 {
   va_list ap;

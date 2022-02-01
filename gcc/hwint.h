@@ -28,18 +28,16 @@
 #define HOST_LONG_LONG_FORMAT "ll"
 #endif
 
-/* If HAVE_LONG_LONG and SIZEOF_LONG_LONG aren't defined, but
-   GCC_VERSION >= 3000, assume this is the second or later stage of a
+/* If HAVE_LONG_LONG and SIZEOF_LONG_LONG aren't defined
+   assume this is the second or later stage of a
    bootstrap, we do have long long, and it's 64 bits.  (This is
    required by C99; we do have some ports that violate that assumption
    but they're all cross-compile-only.)  Just in case, force a
    constraint violation if that assumption is incorrect.  */
 #if !defined HAVE_LONG_LONG
-# if GCC_VERSION >= 3000
-#  define HAVE_LONG_LONG 1
-#  define SIZEOF_LONG_LONG 8
+# define HAVE_LONG_LONG 1
+# define SIZEOF_LONG_LONG 8
 extern char sizeof_long_long_must_be_8[sizeof (long long) == 8 ? 1 : -1];
-# endif
 #endif
 
 #ifdef HAVE_LONG_LONG
@@ -160,26 +158,6 @@ pow2p_hwi (unsigned HOST_WIDE_INT x)
   return x && pow2_or_zerop (x);
 }
 
-#if GCC_VERSION < 3004
-
-extern int clz_hwi (unsigned HOST_WIDE_INT x);
-extern int ctz_hwi (unsigned HOST_WIDE_INT x);
-extern int ffs_hwi (unsigned HOST_WIDE_INT x);
-
-/* Return the number of set bits in X.  */
-extern int popcount_hwi (unsigned HOST_WIDE_INT x);
-
-/* Return log2, or -1 if not exact.  */
-extern int exact_log2                  (unsigned HOST_WIDE_INT);
-
-/* Return floor of log2, with -1 for zero.  */
-extern int floor_log2                  (unsigned HOST_WIDE_INT);
-
-/* Return the smallest n such that 2**n >= X.  */
-extern int ceil_log2			(unsigned HOST_WIDE_INT);
-
-#else /* GCC_VERSION >= 3004 */
-
 /* For convenience, define 0 -> word_size.  */
 static inline int
 clz_hwi (unsigned HOST_WIDE_INT x)
@@ -250,8 +228,6 @@ exact_log2 (unsigned HOST_WIDE_INT x)
 {
   return pow2p_hwi (x) ? ctz_hwi (x) : -1;
 }
-
-#endif /* GCC_VERSION >= 3004 */
 
 #define HOST_WIDE_INT_MIN (HOST_WIDE_INT) \
   (HOST_WIDE_INT_1U << (HOST_BITS_PER_WIDE_INT - 1))

@@ -8771,7 +8771,7 @@ get_file_function_name (const char *type)
   return get_identifier (buf);
 }
 
-#if defined ENABLE_TREE_CHECKING && (GCC_VERSION >= 2007)
+#ifdef ENABLE_TREE_CHECKING
 
 /* Complain that the tree code of NODE does not match the expected 0
    terminated list of trailing codes. The trailing code list can be

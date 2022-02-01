@@ -375,33 +375,6 @@ bitmap_bit_in_range_p (const_sbitmap bmap, unsigned int start, unsigned int end)
   return (bmap->elms[start_word] & mask) != 0;
 }
 
-#if GCC_VERSION < 3400
-/* Table of number of set bits in a character, indexed by value of char.  */
-static const unsigned char popcount_table[] =
-{
-    0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,
-    1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,
-    1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,
-    2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,
-    1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,
-    2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,
-    2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,
-    3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,4,5,5,6,5,6,6,7,5,6,6,7,6,7,7,8,
-};
-
-static unsigned long
-sbitmap_popcount (SBITMAP_ELT_TYPE a)
-{
-  unsigned long ret = 0;
-  unsigned i;
-
-  /* Just do this the table way for now  */
-  for (i = 0; i < HOST_BITS_PER_WIDEST_FAST_INT; i += 8)
-    ret += popcount_table[(a >> i) & 0xff];
-  return ret;
-}
-#endif
-
 /* Count and return the number of bits set in the bitmap BMAP.  */
 
 unsigned int
@@ -411,16 +384,12 @@ bitmap_count_bits (const_sbitmap bmap)
   for (unsigned int i = 0; i < bmap->size; i++)
     if (bmap->elms[i])
       {
-#if GCC_VERSION < 3400
-	count += sbitmap_popcount (bmap->elms[i]);
-#else
-# if HOST_BITS_PER_WIDEST_FAST_INT == HOST_BITS_PER_LONG
+#if HOST_BITS_PER_WIDEST_FAST_INT == HOST_BITS_PER_LONG
 	count += __builtin_popcountl (bmap->elms[i]);
-# elif HOST_BITS_PER_WIDEST_FAST_INT == HOST_BITS_PER_LONGLONG
+#elif HOST_BITS_PER_WIDEST_FAST_INT == HOST_BITS_PER_LONGLONG
 	count += __builtin_popcountll (bmap->elms[i]);
-# else
+#else
 	count += __builtin_popcount (bmap->elms[i]);
-# endif
 #endif
       }
   return count;

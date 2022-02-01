@@ -404,7 +404,7 @@ int_mem_offset (const_rtx mem)
   return 0;
 }
 
-#if CHECKING_P && (GCC_VERSION >= 2007)
+#if CHECKING_P
 
 /* Access VAR's Ith part's offset, checking that it's not a one-part
    variable.  */

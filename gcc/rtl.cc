@@ -869,7 +869,7 @@ dump_rtx_statistics (void)
   fprintf (stderr, "-----------------------------------------------\n");
 }
 
-#if defined ENABLE_RTL_CHECKING && (GCC_VERSION >= 2007)
+#ifdef ENABLE_RTL_CHECKING
 
 /* Disable warnings about missing quoting in GCC diagnostics for
    the internal_error calls.  Their format strings deliberately don't

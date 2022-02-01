@@ -1081,33 +1081,6 @@ bitmap_get_aligned_chunk (const_bitmap head, unsigned int chunk,
   return (ptr->bits[word_num] >> bit_num) & max_value;
 }
 
-#if GCC_VERSION < 3400
-/* Table of number of set bits in a character, indexed by value of char.  */
-static const unsigned char popcount_table[] =
-{
-    0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,
-    1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,
-    1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,
-    2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,
-    1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,
-    2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,
-    2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,
-    3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,4,5,5,6,5,6,6,7,5,6,6,7,6,7,7,8,
-};
-
-static unsigned long
-bitmap_popcount (BITMAP_WORD a)
-{
-  unsigned long ret = 0;
-  unsigned i;
-
-  /* Just do this the table way for now  */
-  for (i = 0; i < BITMAP_WORD_BITS; i+= 8)
-    ret += popcount_table[(a >> i) & 0xff];
-  return ret;
-}
-#endif
-
 /* Count and return the number of bits set in the bitmap word BITS.  */
 static unsigned long
 bitmap_count_bits_in_word (const BITMAP_WORD *bits)
@@ -1116,13 +1089,9 @@ bitmap_count_bits_in_word (const BITMAP_WORD *bits)
 
   for (unsigned ix = 0; ix != BITMAP_ELEMENT_WORDS; ix++)
     {
-#if GCC_VERSION >= 3400
       /* Note that popcountl matches BITMAP_WORD in type, so the actual size
 	 of BITMAP_WORD is not material.  */
       count += __builtin_popcountl (bits[ix]);
-#else
-      count += bitmap_popcount (bits[ix]);
-#endif
     }
   return count;
 }
@@ -1201,13 +1170,9 @@ bitmap_single_bit_set_p (const_bitmap a)
 
   for (ix = 0; ix != BITMAP_ELEMENT_WORDS; ix++)
     {
-#if GCC_VERSION >= 3400
       /* Note that popcountl matches BITMAP_WORD in type, so the actual size
 	 of BITMAP_WORD is not material.  */
       count += __builtin_popcountl (elt->bits[ix]);
-#else
-      count += bitmap_popcount (elt->bits[ix]);
-#endif
       if (count > 1)
 	return false;
     }
@@ -1244,31 +1209,9 @@ bitmap_first_set_bit (const_bitmap a)
  found_bit:
   bit_no += ix * BITMAP_WORD_BITS;
 
-#if GCC_VERSION >= 3004
   gcc_assert (sizeof (long) == sizeof (word));
   bit_no += __builtin_ctzl (word);
-#else
-  /* Binary search for the first set bit.  */
-#if BITMAP_WORD_BITS > 64
-#error "Fill out the table."
-#endif
-#if BITMAP_WORD_BITS > 32
-  if (!(word & 0xffffffff))
-    word >>= 32, bit_no += 32;
-#endif
-  if (!(word & 0xffff))
-    word >>= 16, bit_no += 16;
-  if (!(word & 0xff))
-    word >>= 8, bit_no += 8;
-  if (!(word & 0xf))
-    word >>= 4, bit_no += 4;
-  if (!(word & 0x3))
-    word >>= 2, bit_no += 2;
-  if (!(word & 0x1))
-    word >>= 1, bit_no += 1;
 
- gcc_checking_assert (word & 1);
-#endif
  return bit_no;
 }
 
@@ -1302,22 +1245,8 @@ bitmap_last_set_bit (const_bitmap a)
   gcc_assert (elt->bits[ix] != 0);
  found_bit:
   bit_no += ix * BITMAP_WORD_BITS;
-#if GCC_VERSION >= 3004
   gcc_assert (sizeof (long) == sizeof (word));
   bit_no += BITMAP_WORD_BITS - __builtin_clzl (word) - 1;
-#else
-  /* Hopefully this is a twos-complement host...  */
-  BITMAP_WORD x = word;
-  x |= (x >> 1);
-  x |= (x >> 2);
-  x |= (x >> 4);
-  x |= (x >> 8);
-  x |= (x >> 16);
-#if BITMAP_WORD_BITS > 32
-  x |= (x >> 32);
-#endif
-  bit_no += bitmap_popcount (x) - 1;
-#endif
 
   return bit_no;
 }

@@ -1076,7 +1076,7 @@ is_a_helper <rtx_note *>::test (rtx_insn *insn)
 
 /* General accessor macros for accessing the fields of an rtx.  */
 
-#if defined ENABLE_RTL_CHECKING && (GCC_VERSION >= 2007)
+#if defined ENABLE_RTL_CHECKING
 /* The bit with a star outside the statement expr and an & inside is
    so that N can be evaluated only once.  */
 #define RTL_CHECK1(RTX, N, C1) __extension__				\
@@ -1257,7 +1257,7 @@ extern void rtvec_check_failed_bounds (const_rtvec, int, const char *, int,
 /* Access an individual rtx flag, with no checking of any kind.  */
 #define RTX_FLAG(RTX, FLAG)	((RTX)->FLAG)
 
-#if defined ENABLE_RTL_FLAG_CHECKING && (GCC_VERSION >= 2007)
+#if defined ENABLE_RTL_FLAG_CHECKING
 #define RTL_FLAG_CHECK1(NAME, RTX, C1) __extension__			\
 ({ __typeof (RTX) const _rtx = (RTX);					\
    if (GET_CODE (_rtx) != C1)						\
@@ -1823,7 +1823,7 @@ enum label_kind
   LABEL_WEAK_ENTRY	/* alternate entry point, exported as weak symbol */
 };
 
-#if defined ENABLE_RTL_FLAG_CHECKING && (GCC_VERSION > 2007)
+#if defined ENABLE_RTL_FLAG_CHECKING
 
 /* Retrieve the kind of LABEL.  */
 #define LABEL_KIND(LABEL) __extension__					\

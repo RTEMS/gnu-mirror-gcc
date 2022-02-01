@@ -2586,9 +2586,7 @@ typedef struct GTY(()) machine_function
 
 #define TARGET_SUPPORTS_WIDE_INT 1
 
-#if (GCC_VERSION >= 3000)
 #pragma GCC poison TARGET_FLOAT128 OPTION_MASK_FLOAT128 MASK_FLOAT128
-#endif
 
 /* Whether a given VALUE is a valid 16 or 34-bit signed integer.  */
 #define SIGNED_INTEGER_NBIT_P(VALUE, N)					\

@@ -291,7 +291,7 @@ output_insn_data (void)
 	break;
       }
 
-  printf ("#if GCC_VERSION >= 2007\n__extension__\n#endif\n");
+  printf ("\n__extension__\n");
   printf ("\nconst struct insn_data_d insn_data[] = \n{\n");
 
   for (d = idata; d; d = d->next)

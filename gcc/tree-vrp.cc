@@ -2955,12 +2955,7 @@ vrp_asserts::find_switch_asserts (basic_block bb, gswitch *last)
   edge e;
   struct case_info *ci;
   size_t n = gimple_switch_num_labels (last);
-#if GCC_VERSION >= 4000
   unsigned int idx;
-#else
-  /* Work around GCC 3.4 bug (PR 37086).  */
-  volatile unsigned int idx;
-#endif
 
   bsi = gsi_for_stmt (last);
   op = gimple_switch_index (last);

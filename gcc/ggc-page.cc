@@ -568,11 +568,7 @@ push_by_depth (page_entry *p, unsigned long *s)
   G.save_in_use[G.by_depth_in_use++] = s;
 }
 
-#if (GCC_VERSION < 3001)
-#define prefetch(X) ((void) X)
-#else
 #define prefetch(X) __builtin_prefetch (X)
-#endif
 
 #define save_in_use_p_i(__i) \
   (G.save_in_use[__i])
@@ -1340,12 +1336,7 @@ ggc_internal_alloc (size_t size, void (*f)(void *), size_t s, size_t n
 	  while (~entry->in_use_p[word] == 0)
 	    ++word;
 
-#if GCC_VERSION >= 3004
 	  bit = __builtin_ctzl (~entry->in_use_p[word]);
-#else
-	  while ((entry->in_use_p[word] >> bit) & 1)
-	    ++bit;
-#endif
 
 	  hint = word * HOST_BITS_PER_LONG + bit;
 	}

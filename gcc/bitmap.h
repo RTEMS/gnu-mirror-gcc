@@ -708,20 +708,10 @@ bmp_iter_next (bitmap_iterator *bi, unsigned *bit_no)
 static inline void
 bmp_iter_next_bit (bitmap_iterator * bi, unsigned *bit_no)
 {
-#if (GCC_VERSION >= 3004)
-  {
-    unsigned int n = __builtin_ctzl (bi->bits);
-    gcc_assert (sizeof (unsigned long) == sizeof (BITMAP_WORD));
-    bi->bits >>= n;
-    *bit_no += n;
-  }
-#else
-  while (!(bi->bits & 1))
-    {
-      bi->bits >>= 1;
-      *bit_no += 1;
-    }
-#endif
+  unsigned int n = __builtin_ctzl (bi->bits);
+  gcc_assert (sizeof (unsigned long) == sizeof (BITMAP_WORD));
+  bi->bits >>= n;
+  *bit_no += n;
 }
 
 /* Advance to the next nonzero bit of a single bitmap, we will have

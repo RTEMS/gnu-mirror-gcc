@@ -295,10 +295,8 @@ va_heap::reserve (vec<T, va_heap, vl_embed> *&v, unsigned reserve, bool exact
 }
 
 
-#if GCC_VERSION >= 4007
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wfree-nonheap-object"
-#endif
 
 /* Free the heap space allocated for vector V.  */
 
@@ -317,9 +315,7 @@ va_heap::release (vec<T, va_heap, vl_embed> *&v)
   v = NULL;
 }
 
-#if GCC_VERSION >= 4007
 #pragma GCC diagnostic pop
-#endif
 
 /* Allocator type for GC vectors.  Notice that we need the structure
    declaration even if GC is not enabled.  */
@@ -2349,8 +2345,6 @@ make_array_slice (T *base, unsigned int size)
   return array_slice<T> (base, size);
 }
 
-#if (GCC_VERSION >= 3000)
-# pragma GCC poison m_vec m_vecpfx m_vecdata
-#endif
+#pragma GCC poison m_vec m_vecpfx m_vecdata
 
 #endif // GCC_VEC_H

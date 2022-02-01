@@ -45,9 +45,7 @@ along with GCC; see the file COPYING3.  If not see
    totally replaced in this file; make sure it stays that way.  */
 #undef DWARF2_UNWIND_INFO
 #undef DWARF2_FRAME_INFO
-#if (GCC_VERSION >= 3000)
- #pragma GCC poison DWARF2_UNWIND_INFO DWARF2_FRAME_INFO
-#endif
+#pragma GCC poison DWARF2_UNWIND_INFO DWARF2_FRAME_INFO
 
 #ifndef INCOMING_RETURN_ADDR_RTX
 #define INCOMING_RETURN_ADDR_RTX  (gcc_unreachable (), NULL_RTX)

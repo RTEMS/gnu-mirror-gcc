@@ -6129,7 +6129,7 @@ cp_tree_c_finish_parsing ()
   deleted_copy_types = NULL;
 }
 
-#if defined ENABLE_TREE_CHECKING && (GCC_VERSION >= 2007)
+#if defined ENABLE_TREE_CHECKING
 /* Complain that some language-specific thing hanging off a tree
    node has been accessed improperly.  */
 

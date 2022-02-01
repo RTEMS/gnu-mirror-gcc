@@ -374,11 +374,7 @@ extern void pp_separate_with (pretty_printer *, char);
 
 /* This header may be included before diagnostics-core.h, hence the duplicate
    definitions to allow for GCC-specific formats.  */
-#if GCC_VERSION >= 3005
 #define ATTRIBUTE_GCC_PPDIAG(m, n) __attribute__ ((__format__ (GCC_PPDIAG_STYLE, m ,n))) ATTRIBUTE_NONNULL(m)
-#else
-#define ATTRIBUTE_GCC_PPDIAG(m, n) ATTRIBUTE_NONNULL(m)
-#endif
 extern void pp_printf (pretty_printer *, const char *, ...)
      ATTRIBUTE_GCC_PPDIAG(2,3);
 

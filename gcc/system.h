@@ -596,17 +596,15 @@ extern int vsnprintf (char *, size_t, const char *, va_list);
 #ifdef __cplusplus
 #define HAVE_DESIGNATED_INITIALIZERS 0
 #else
-#define HAVE_DESIGNATED_INITIALIZERS \
-  ((GCC_VERSION >= 2007) || (__STDC_VERSION__ >= 199901L))
+#define HAVE_DESIGNATED_INITIALIZERS 1
 #endif
 #endif
 
 #if !defined(HAVE_DESIGNATED_UNION_INITIALIZERS)
 #ifdef __cplusplus
-#define HAVE_DESIGNATED_UNION_INITIALIZERS (GCC_VERSION >= 4007)
+#define HAVE_DESIGNATED_UNION_INITIALIZERS 1
 #else
-#define HAVE_DESIGNATED_UNION_INITIALIZERS \
-  ((GCC_VERSION >= 2007) || (__STDC_VERSION__ >= 199901L))
+#define HAVE_DESIGNATED_UNION_INITIALIZERS 1
 #endif
 #endif
 
@@ -722,20 +720,6 @@ extern int vsnprintf (char *, size_t, const char *, va_list);
 #define offsetof(TYPE, MEMBER)	((size_t) &((TYPE *) 0)->MEMBER)
 #endif
 
-/* Various error reporting routines want to use __FUNCTION__.  */
-#if (GCC_VERSION < 2007)
-#ifndef __FUNCTION__
-#define __FUNCTION__ "?"
-#endif /* ! __FUNCTION__ */
-#endif
-
-/* __builtin_expect(A, B) evaluates to A, but notifies the compiler that
-   the most likely value of A is B.  This feature was added at some point
-   between 2.95 and 3.0.  Let's use 3.0 as the lower bound for now.  */
-#if (GCC_VERSION < 3000)
-#define __builtin_expect(a, b) (a)
-#endif
-
 /* Some of the headers included by <memory> can use "abort" within a
    namespace, e.g. "_VSTD::abort();", which fails after we use the
    preprocessor to redefine "abort" as "fancy_abort" below.  */
@@ -781,12 +765,9 @@ extern void fancy_abort (const char *, int, const char *)
 #if ENABLE_ASSERT_CHECKING
 #define gcc_assert(EXPR) 						\
    ((void)(!(EXPR) ? fancy_abort (__FILE__, __LINE__, __FUNCTION__), 0 : 0))
-#elif (GCC_VERSION >= 4005)
+#else
 #define gcc_assert(EXPR) 						\
   ((void)(__builtin_expect (!(EXPR), 0) ? __builtin_unreachable (), 0 : 0))
-#else
-/* Include EXPR, so that unused variable warnings do not occur.  */
-#define gcc_assert(EXPR) ((void)(0 && (EXPR)))
 #endif
 
 #if CHECKING_P
@@ -796,21 +777,13 @@ extern void fancy_abort (const char *, int, const char *)
 #define gcc_checking_assert(EXPR) ((void)(0 && (EXPR)))
 #endif
 
-#if GCC_VERSION >= 4000
 #define ALWAYS_INLINE inline __attribute__ ((always_inline))
-#else
-#define ALWAYS_INLINE inline
-#endif
 
-#if GCC_VERSION >= 3004
 #define WARN_UNUSED_RESULT __attribute__ ((__warn_unused_result__))
-#else
-#define WARN_UNUSED_RESULT
-#endif
 
 /* Use gcc_unreachable() to mark unreachable locations (like an
    unreachable default case of a switch.  Do not use gcc_assert(0).  */
-#if (GCC_VERSION >= 4005) && !ENABLE_ASSERT_CHECKING
+#if !ENABLE_ASSERT_CHECKING
 #define gcc_unreachable() __builtin_unreachable ()
 #else
 #define gcc_unreachable() (fancy_abort (__FILE__, __LINE__, __FUNCTION__))
@@ -826,11 +799,7 @@ extern void fancy_abort (const char *, int, const char *)
 # define gcc_fallthrough()
 #endif
 
-#if GCC_VERSION >= 3001
 #define STATIC_CONSTANT_P(X) (__builtin_constant_p (X) && (X))
-#else
-#define STATIC_CONSTANT_P(X) (false && (X))
-#endif
 
 /* static_assert (COND, MESSAGE) is available in C++11 onwards.  */
 #if __cplusplus >= 201103L
@@ -871,12 +840,6 @@ extern void fancy_abort (const char *, int, const char *)
 /* Some compilers do not allow the use of unsigned char in bitfields.  */
 #define BOOL_BITFIELD unsigned int
 
-/* GCC older than 4.4 have broken C++ value initialization handling, see
-   PR11309, PR30111, PR33916, PR82939 and PR84405 for more details.  */
-#if GCC_VERSION > 0 && GCC_VERSION < 4004 && !defined(__clang__)
-# define BROKEN_VALUE_INITIALIZATION
-#endif
-
 /* As the last action in this file, we poison the identifiers that
    shouldn't be used.  Note, luckily gcc-3.0's token-based integrated
    preprocessor won't trip on poisoned identifiers that arrive from
@@ -898,8 +861,6 @@ extern void fancy_abort (const char *, int, const char *)
 #define malloc xmalloc
 #define realloc xrealloc
 #endif
-
-#if (GCC_VERSION >= 3000)
 
 /* Note autoconf checks for prototype declarations and includes
    system.h while doing so.  Only poison these tokens if actually
@@ -1130,8 +1091,6 @@ extern void fancy_abort (const char *, int, const char *)
    'if (flag_checking)', or with CHECKING_P macro.  */
 #pragma GCC poison ENABLE_CHECKING
 
-#endif /* GCC >= 3.0 */
-
 /* This macro allows casting away const-ness to pass -Wcast-qual
    warnings.  DO NOT USE THIS UNLESS YOU REALLY HAVE TO!  It should
    only be used in certain specific cases.  One valid case is where
@@ -1151,7 +1110,7 @@ extern void fancy_abort (const char *, int, const char *)
 #ifdef __cplusplus
 #define CONST_CAST2(TOTYPE,FROMTYPE,X) (const_cast<TOTYPE> (X))
 #else
-#if defined(__GNUC__) && GCC_VERSION > 4000
+#ifdef __GNUC__
 /* GCC 4.0.x has a bug where it may ICE on this expression,
    so does GCC 3.4.x (PR17436).  */
 #define CONST_CAST2(TOTYPE,FROMTYPE,X) ((__extension__(union {FROMTYPE _q; TOTYPE _nq;})(X))._nq)
@@ -1182,12 +1141,8 @@ helper_const_non_const_cast (const char *p)
 
 /* Activate certain diagnostics as warnings (not errors via the
    -Werror flag).  */
-#if GCC_VERSION >= 4003
-/* If asserts are disabled, activate -Wuninitialized as a warning (not
-   an error/-Werror).  */
 #ifndef ENABLE_ASSERT_CHECKING
 #pragma GCC diagnostic warning "-Wuninitialized"
-#endif
 #endif
 
 #ifdef ENABLE_VALGRIND_ANNOTATIONS
@@ -1229,13 +1184,8 @@ helper_const_non_const_cast (const char *p)
 
 /* In LTO -fwhole-program build we still want to keep the debug functions available
    for debugger.  Mark them as used to prevent removal.  */
-#if (GCC_VERSION > 4000)
 #define DEBUG_FUNCTION __attribute__ ((__used__))
 #define DEBUG_VARIABLE __attribute__ ((__used__))
-#else
-#define DEBUG_FUNCTION
-#define DEBUG_VARIABLE
-#endif
 
 /* General macro to extract bit Y of X.  */
 #define TEST_BIT(X, Y) (((X) >> (Y)) & 1)

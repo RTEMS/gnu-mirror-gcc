@@ -1399,13 +1399,13 @@ emit_insn_modes_inline_h (void)
 #ifndef GCC_INSN_MODES_INLINE_H\n\
 #define GCC_INSN_MODES_INLINE_H");
 
-  puts ("\n#if !defined (USED_FOR_TARGET) && GCC_VERSION >= 4001\n");
+  puts ("\n#if !defined (USED_FOR_TARGET)\n");
   emit_mode_size_inline ();
   emit_mode_nunits_inline ();
   emit_mode_inner_inline ();
   emit_mode_unit_size_inline ();
   emit_mode_unit_precision_inline ();
-  puts ("#endif /* GCC_VERSION >= 4001 */");
+  puts ("#endif");
 
   puts ("\
 \n\

@@ -170,11 +170,7 @@ template<typename T>
 inline bool
 need_finalization_p ()
 {
-#if GCC_VERSION >= 4003
   return !__has_trivial_destructor (T);
-#else
-  return true;
-#endif
 }
 
 template<typename T>

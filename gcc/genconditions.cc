@@ -58,7 +58,6 @@ write_header (void)
 /* It is necessary, but not entirely safe, to include the headers below\n\
    in a generator program.  As a defensive measure, don't do so when the\n\
    table isn't going to have anything in it.  */\n\
-#if GCC_VERSION >= 3001\n\
 \n\
 /* Do not allow checking to confuse the issue.  */\n\
 #undef CHECKING_P\n\
@@ -108,8 +107,7 @@ write_header (void)
 extern rtx_insn *insn;\n\
 extern rtx ins1;\n\
 extern rtx operands[];\n\
-\n\
-#endif /* gcc >= 3.0.1 */\n");
+\n");
 }
 
 /* Write out one entry in the conditions table, using the data pointed
@@ -170,12 +168,11 @@ struct c_test\n\
    vary at run time.  It works in 3.0.1 and later; 3.0 only when not\n\
    optimizing.  */\n\
 \n\
-#if GCC_VERSION >= 3001\n\
 static const struct c_test insn_conditions[] = {\n");
 
   traverse_c_tests (write_one_condition, 0);
 
-  puts ("  { nullptr, -1 }\n};\n#endif /* gcc >= 3.0.1 */\n");
+  puts ("  { nullptr, -1 }\n};\n");
 }
 
 /* Emit code which will convert the C-format table to a
@@ -191,7 +188,6 @@ write_writer (void)
 	"  unsigned int i;\n"
         "  const char *p;\n"
         "  puts (\"(define_conditions [\");\n"
-	"#if GCC_VERSION >= 3001\n"
 	"  for (i = 0; i < ARRAY_SIZE (insn_conditions) - 1; i++)\n"
 	"    {\n"
 	"      printf (\"  (%d \\\"\", insn_conditions[i].value);\n"
@@ -207,7 +203,6 @@ write_writer (void)
 	"        }\n"
         "      puts (\"\\\")\");\n"
         "    }\n"
-	"#endif /* gcc >= 3.0.1 */\n"
 	"  puts (\"])\");\n"
         "  fflush (stdout);\n"
         "return ferror (stdout) != 0 ? FATAL_EXIT_CODE : SUCCESS_EXIT_CODE;\n"
