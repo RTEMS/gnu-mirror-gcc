@@ -6975,26 +6975,7 @@ on 64-bit PowerPC VSX Linux systems])
     with_long_double_format=""
     ;;
 esac],
-  [gcc_cv_powerpc_ieee_long_double=no
-   case "$target" in
-     powerpc*-*-linux*)
-       # If --with-long-double format is not set, check to see whether the host
-       # compiler defaults to it.
-     AC_MSG_CHECKING(if PowerPC target defaults to IEEE 128-bit long double)
-     AC_EGREP_CPP(IEEE_LONG_DOUBLE,[
-#if defined(_ARCH_PPC) && defined(__LONG_DOUBLE_IEEE128__)
-IEEE_LONG_DOUBLE
-#endif
-        ],
-        [gcc_cv_powerpc_ieee_long_double=yes],
-        [gcc_cv_powerpc_ieee_long_double=no])
-     AC_MSG_RESULT($gcc_cv_powerpc_ieee_long_double)
-     if test x$gcc_cv_powerpc_ieee_long_double = xyes; then
-       AC_DEFINE(TARGET_POWERPC_IEEE_128BIT_LONG_DOUBLE, 1,
-         [Define if long double is IEEE 128-bit on PowerPC systems by default])
-     fi
-     ;;
-   esac])
+  [])
 
 # Check if the target LIBC supports exporting the AT_PLATFORM and AT_HWCAP
 # values in the TCB.  Currently, only GLIBC 2.23 and later support this.
