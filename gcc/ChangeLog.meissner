@@ -1,5 +1,5 @@
 work077, patch #3:
-2022-02-01  Michael Meissner  <meissner@the-meissners.org>
+2022-02-02  Michael Meissner  <meissner@the-meissners.org>
 
 	* config.in (TARGET_POWERPC_IEEE_128BIT_LONG_DOUBLE): New
 	configure option.
