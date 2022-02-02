@@ -1,3 +1,16 @@
+work077, patch #3:
+2022-02-01  Michael Meissner  <meissner@the-meissners.org>
+
+	* config.in (TARGET_POWERPC_IEEE_128BIT_LONG_DOUBLE): New
+	configure option.
+	* config/rs6000/rs6000.cc (TARGET_IEEEQUAD_DEFAULT): If the host
+	compiler used IEEE 128-bit long doubles and the long double format
+	was not specified with configuration switches, set the long double
+	format to IEEE 128-bit.
+	* configure.ac (TARGET_POWERPC_IEEE_128BIT_LONG_DOUBLE): Set as 1
+	if the host compiler used IEEE 128-bit long doubles.
+	* configure: Regenerate.
+
 work077, patch #2:
 2022-01-28  Michael Meissner  <meissner@the-meissners.org>
 	PR target/104253
@@ -5,12 +18,7 @@ work077, patch #2:
 	compiler used to build the current compiler defaults to IEEE
 	128-bit long double,  make that the default for this build.
 
-work077, patch #1:
-2022-01-26  Michael Meissner  <meissner@the-meissners.org>
-
-	* config/rs6000/rs6000.cc (TARGET_IEEEQUAD_DEFAULT): If the
-	compiler used to build the current compiler defaults to IEEE
-	128-bit long double,  make that the default for this build.
+work077, patch #1 was reverted:
 
 2022-01-26   Michael Meissner  <meissner@linux.ibm.com>
 
