@@ -2732,3 +2732,7 @@
 #undef vfork
 #endif
 
+/* Define if long double is IEEE 128-bit on PowerPC systems by default.  */
+#ifndef USED_FOR_TARGET
+#define TARGET_POWERPC_IEEE_128BIT_LONG_DOUBLE
+#endif
