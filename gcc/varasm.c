@@ -2098,7 +2098,7 @@ assemble_noswitch_variable (tree decl, const char *name, section *sect,
   unsigned HOST_WIDE_INT size, rounded;
 
   size = tree_to_uhwi (DECL_SIZE_UNIT (decl));
-  size += targetm.data_padding_size (size, align, decl);
+  size += targetm.data_padding_size (size, align / BITS_PER_UNIT, decl);
   rounded = size;
 
   if ((flag_sanitize & SANITIZE_ADDRESS) && asan_protect_global (decl))
@@ -3620,7 +3620,7 @@ assemble_constant_contents (tree exp, const char *label, unsigned int align,
   HOST_WIDE_INT size;
 
   size = get_constant_size (exp);
-  size += targetm.data_padding_size (size, align, decl);
+  size += targetm.data_padding_size (size, align / BITS_PER_UNIT, decl);
 
   /* Do any machine/system dependent processing of the constant.  */
   targetm.asm_out.declare_constant_name (asm_out_file, label, exp, size);
@@ -3669,11 +3669,9 @@ output_constant_def_contents (rtx symbol)
 		   : symtab_node::get (decl)->definition_alignment ());
       section *sect = get_constant_section (exp, align);
       switch_to_section (sect);
-      align = targetm.data_alignment (get_constant_size (exp),
-				      align / BITS_PER_UNIT,
-				      decl);
+      align = alignment_pad_from_bits (get_constant_size (exp), align, decl);
       if (align)
-	ASM_OUTPUT_ALIGN (asm_out_file, floor_log2 (align));
+	ASM_OUTPUT_ALIGN (asm_out_file, floor_log2 (align/BITS_PER_UNIT));
       assemble_constant_contents (exp, XSTR (symbol, 0), align,
 				  (sect->common.flags & SECTION_MERGE)
 				  && (sect->common.flags & SECTION_STRINGS),
@@ -4169,8 +4167,10 @@ output_constant_pool_1 (class constant_descriptor_rtx *desc,
     }
 
   uint64_t size = GET_MODE_SIZE (desc->mode);
-  uint64_t align_used = targetm.data_alignment (size, align, NULL_TREE);
-  uint64_t padding = targetm.data_padding_size (size, align_used, NULL_TREE);
+  uint64_t align_used = alignment_pad_from_bits (size, align, NULL_TREE);
+  uint64_t padding = targetm.data_padding_size (size,
+						align_used / BITS_PER_UNIT,
+						NULL_TREE);
 
 #ifdef ASM_OUTPUT_SPECIAL_POOL_ENTRY
   ASM_OUTPUT_SPECIAL_POOL_ENTRY (asm_out_file, x, desc->mode,
@@ -7746,10 +7746,9 @@ place_block_symbol (rtx symbol)
       desc = SYMBOL_REF_CONSTANT (symbol);
       alignment = desc->align;
       size = GET_MODE_SIZE (desc->mode);
-      alignment = targetm.data_alignment (size, alignment / BITS_PER_UNIT,
-					  NULL_TREE);
-      size += targetm.data_padding_size (size, alignment, NULL_TREE);
-      alignment *= BITS_PER_UNIT;
+      alignment = alignment_pad_from_bits (size, alignment, NULL_TREE);
+      size += targetm.data_padding_size (size, alignment / BITS_PER_UNIT,
+					 NULL_TREE);
     }
   else if (TREE_CONSTANT_POOL_ADDRESS_P (symbol))
     {
@@ -7757,9 +7756,9 @@ place_block_symbol (rtx symbol)
       gcc_checking_assert (DECL_IN_CONSTANT_POOL (decl));
       alignment = DECL_ALIGN (decl);
       size = get_constant_size (DECL_INITIAL (decl));
-      alignment = targetm.data_alignment (size, alignment / BITS_PER_UNIT, decl);
-      size += targetm.data_padding_size (size, alignment, decl);
-      alignment *= BITS_PER_UNIT;
+      alignment = alignment_pad_from_bits (size, alignment, decl);
+      size += targetm.data_padding_size (size, alignment / BITS_PER_UNIT,
+					 decl);
       if ((flag_sanitize & SANITIZE_ADDRESS)
 	  && TREE_CODE (DECL_INITIAL (decl)) == STRING_CST
 	  && asan_protect_global (DECL_INITIAL (decl)))
@@ -7789,9 +7788,9 @@ place_block_symbol (rtx symbol)
 	}
       alignment = get_variable_align (decl);
       size = tree_to_uhwi (DECL_SIZE_UNIT (decl));
-      alignment = targetm.data_alignment (size, alignment / BITS_PER_UNIT, decl);
-      size += targetm.data_padding_size (size, alignment, decl);
-      alignment *= BITS_PER_UNIT;
+      alignment = alignment_pad_from_bits (size, alignment, decl);
+      size += targetm.data_padding_size (size, alignment / BITS_PER_UNIT,
+					 decl);
       if ((flag_sanitize & SANITIZE_ADDRESS)
 	  && asan_protect_global (decl))
 	{

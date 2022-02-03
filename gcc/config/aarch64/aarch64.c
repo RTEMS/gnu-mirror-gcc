@@ -20256,16 +20256,12 @@ cap_offset_known_outside_bounds (rtx label, rtx maybe_constant, tree *declp,
 bool
 aarch64_asm_output_capability (rtx x, unsigned int size, int aligned_p)
 {
-  /* Capability loads must be aligned on Morello, so we must emit an aligned
-     capability.  This is automatically done by the assembler if we're using
-     `capinit` or `chericap`, but when we emit an integer we need to manually
-     do that.  */
-  aligned_p = aligned_p || !TARGET_CAPABILITY_FAKE;
   if (CONST_NULL_P (x))
     {
       if (size == 16)
 	{
-	  fputs ("\t.p2align\t4\n", asm_out_file);
+	  if (aligned_p)
+	    fputs ("\t.p2align\t4\n", asm_out_file);
 	  fputs ("\t.zero\t16\n", asm_out_file);
 	  return true;
 	}
@@ -20306,7 +20302,8 @@ aarch64_asm_output_capability (rtx x, unsigned int size, int aligned_p)
       && CONST_NULL_P (XEXP (x, 0))
       && size == 16)
     {
-      fputs ("\t.p2align\t4\n", asm_out_file);
+      if (aligned_p)
+	fputs ("\t.p2align\t4\n", asm_out_file);
       ret = targetm.asm_out.integer (XEXP (x, 1), 8, 0);
       return ret && targetm.asm_out.integer (const0_rtx, 8, 0);
     }
@@ -20334,8 +20331,17 @@ aarch64_asm_output_capability (rtx x, unsigned int size, int aligned_p)
 	 requesting a capability for it.  This would cause a linker error since
 	 the linker refuses to generate such invalid-by-definition
 	 capabilities.  */
-      fputs ("\t.p2align\t4\n", asm_out_file);
+      if (aligned_p)
+	fputs ("\t.p2align\t4\n", asm_out_file);
       ret = targetm.asm_out.integer (drop_capability (x), offset_size, aligned_p);
+    }
+  else if (! aligned_p)
+    {
+      /* If we want to emit a capability but it is not aligned, we can't use
+	 the `capinit` or `chericap` directives since they include alignment to
+	 a capability boundary.  */
+      ret = targetm.asm_out.integer (drop_capability (x), offset_size,
+				     aligned_p);
     }
   else
     {
