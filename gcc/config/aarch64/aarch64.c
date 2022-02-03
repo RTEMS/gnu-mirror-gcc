@@ -18319,8 +18319,12 @@ static const char *
 aarch64_mangle_type (const_tree type)
 {
   /* The AArch64 ABI documents say that "__va_list" has to be
-     mangled as if it is in the "std" namespace.  */
-  if (lang_hooks.types_compatible_p (CONST_CAST_TREE (type), va_list_type))
+     mangled as if it is in the "std" namespace.
+
+     Note that for purecap Morello, va_list_type is just void* and is
+     mangled accordingly.  */
+  if (!TARGET_CAPABILITY_PURE
+      && lang_hooks.types_compatible_p (CONST_CAST_TREE (type), va_list_type))
     return "St9__va_list";
 
   /* Half-precision floating point types.  */
