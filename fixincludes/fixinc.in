@@ -258,12 +258,23 @@ then echo "All directories (including links to directories):"
      echo $all_dirs
 fi
 
-for file in $all_dirs; do
-  rm -rf $LIB/$file
-  if [ ! -d $LIB/$file ]
-  then mkdir $LIB/$file
-  fi
-done
+ARG_MAX=`getconf ARG_MAX 2>/dev/null`
+LENGTH=`expr length "$all_dirs" + 10`
+
+if test -n "$ARG_MAX" && test $LENGTH -lt $ARG_MAX
+then
+  cd $LIB
+  mkdir -p $all_dirs
+  cd ..
+else
+  for file in $all_dirs; do
+    rm -rf $LIB/$file
+    if [ ! -d $LIB/$file ]
+    then mkdir $LIB/$file
+    fi
+  done
+fi
+
 mkdir $LIB/root
 
 # # # # # # # # # # # # # # # # # # # # #
