@@ -223,7 +223,9 @@ libgcov-util.o-warn = -Wno-error
 libgcov-driver-tool.o-warn = -Wno-error
 libgcov-merge-tool.o-warn = -Wno-error
 gimple-match.o-warn = -Wno-unused
+gimple-match-lto.o-warn = -Wno-unused
 generic-match.o-warn = -Wno-unused
+generic-match-lto.o-warn = -Wno-unused
 dfp.o-warn = -Wno-strict-aliasing
 
 # All warnings have to be shut off in stage1 if the compiler used then
@@ -1297,12 +1299,10 @@ ANALYZER_OBJS = \
 # will build them sooner, because they are large and otherwise tend to be
 # the last objects to finish building.
 OBJS = \
-	gimple-match.o \
-	generic-match.o \
+	common-base.a \
 	insn-attrtab.o \
 	insn-automata.o \
 	insn-dfatab.o \
-	insn-emit.o \
 	insn-extract.o \
 	insn-latencytab.o \
 	insn-modes.o \
@@ -1310,7 +1310,6 @@ OBJS = \
 	insn-output.o \
 	insn-peep.o \
 	insn-preds.o \
-	insn-recog.o \
 	insn-enums.o \
 	ggc-page.o \
 	adjust-alignment.o \
@@ -2649,8 +2648,8 @@ s-tm-texi: build/genhooks$(build_exeext) $(srcdir)/doc/tm.texi.in
 	  false; \
 	fi
 
-gimple-match.cc: s-match gimple-match-head.cc ; @true
-generic-match.cc: s-match generic-match-head.cc ; @true
+gimple-match.cc: s-match gimple-match-head.cc insn-attr-common.h ; @true
+generic-match.cc: s-match generic-match-head.cc insn-attr-common.h ; @true
 
 s-match: build/genmatch$(build_exeext) $(srcdir)/match.pd cfn-operators.pd
 	$(RUN_GEN) build/genmatch$(build_exeext) --gimple $(srcdir)/match.pd \
@@ -2662,6 +2661,32 @@ s-match: build/genmatch$(build_exeext) $(srcdir)/match.pd cfn-operators.pd
 	$(SHELL) $(srcdir)/../move-if-change tmp-generic-match.cc \
 	    					generic-match.cc
 	$(STAMP) s-match
+
+ifdef PARTIAL_LTO
+LTO_LINKER_FLAGS = -flto=auto --param=lto-partitions=`nproc` -flinker-output=nolto-rel -r
+LTO_FLAGS = -flto
+
+gimple-match-lto.o: gimple-match.cc $(TARGET_H) $(generated_files)
+	$(COMPILE) $< $(LTO_FLAGS)
+generic-match-lto.o: generic-match.cc $(TARGET_H) $(generated_files)
+	$(COMPILE) $< $(LTO_FLAGS)
+insn-recog-lto.o: insn-recog.cc
+	$(COMPILE) $< $(LTO_FLAGS)
+insn-emit-lto.o: insn-emit.cc
+	$(COMPILE) $< $(LTO_FLAGS)
+
+common-base.a: gimple-match-lto.o generic-match-lto.o insn-recog-lto.o insn-emit-lto.o
+	-rm -rf $@
+	$(LINKER) $^ $(LTO_LINKER_FLAGS) -o common-base.o
+	$(AR) $(AR_FLAGS)T $@ common-base.o
+else
+insn-recog.o: insn-recog.cc insn-attr-common.h
+insn-emit.o: insn-emit.cc insn-attr-common.h
+
+common-base.a: gimple-match.o generic-match.o insn-recog.o insn-emit.o
+	-rm -rf $@
+	$(AR) $(AR_FLAGS)T $@ $^
+endif
 
 GTFILES = $(CPPLIB_H) $(srcdir)/input.h $(srcdir)/coretypes.h \
   $(host_xm_file_list) \
