@@ -31473,39 +31473,6 @@ on 64-bit PowerPC VSX Linux systems" "$LINENO" 5
     with_long_double_format=""
     ;;
 esac
-else
-  gcc_cv_powerpc_ieee_long_double=no
-   case "$target" in
-     powerpc*-*-linux*)
-       # If --with-long-double format is not set, check to see whether the host
-       # compiler defaults to it.
-     { $as_echo "$as_me:${as_lineno-$LINENO}: checking if PowerPC target defaults to IEEE 128-bit long double" >&5
-$as_echo_n "checking if PowerPC target defaults to IEEE 128-bit long double... " >&6; }
-     cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-#if defined(_ARCH_PPC) && defined(__LONG_DOUBLE_IEEE128__)
-IEEE_LDBL
-#endif
-
-_ACEOF
-if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
-  $EGREP "IEEE_LDBL" >/dev/null 2>&1; then :
-  gcc_cv_powerpc_ieee_long_double=yes
-else
-  gcc_cv_powerpc_ieee_long_double=no
-fi
-rm -f conftest*
-
-     { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_powerpc_ieee_long_double" >&5
-$as_echo "$gcc_cv_powerpc_ieee_long_double" >&6; }
-     if test x$gcc_cv_powerpc_ieee_long_double = xyes; then
-
-$as_echo "#define TARGET_POWERPC_IEEE_128BIT_LONG_DOUBLE 1" >>confdefs.h
-
-     fi
-     ;;
-   esac
 fi
 
 
