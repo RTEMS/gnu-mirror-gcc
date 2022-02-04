@@ -15509,7 +15509,7 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
   if (mode != GET_MODE (rtl) && GET_MODE (rtl) != VOIDmode)
     return NULL;
 
-  scalar_addr_mode addr_mode, inner_addr_mode;
+  scalar_addr_mode addr_mode, inner_addr_mode, outer_addr_mode;
   scalar_int_mode int_mode = BImode, inner_mode, op1_mode;
   switch (GET_CODE (rtl))
     {
@@ -15539,12 +15539,12 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
     case TRUNCATE:
       if (inner == NULL_RTX)
         inner = XEXP (rtl, 0);
-      gcc_assert(! CAPABILITY_MODE_P (mode));
-      if (is_a <scalar_int_mode> (mode, &int_mode)
+
+      if (is_a <scalar_addr_mode> (mode, &outer_addr_mode)
 	  && is_a <scalar_addr_mode> (GET_MODE (inner), &inner_addr_mode)
-	  && (GET_MODE_SIZE (int_mode) <= DWARF2_ADDR_SIZE
+	  && (GET_NONCAP_MODE_SIZE (outer_addr_mode) <= DWARF2_ADDR_SIZE
 #ifdef POINTERS_EXTEND_UNSIGNED
-	      || (int_mode == Pmode && mem_mode != VOIDmode)
+	      || (outer_addr_mode == Pmode && mem_mode != VOIDmode)
 #endif
 	     )
 	  && GET_NONCAP_MODE_SIZE (inner_addr_mode) <= DWARF2_ADDR_SIZE)
@@ -15554,6 +15554,7 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 					       mem_mode, initialized);
 	  break;
 	}
+      gcc_assert(! CAPABILITY_MODE_P (mode));
       if (dwarf_strict && dwarf_version < 5)
 	break;
       if (is_a <scalar_int_mode> (mode, &int_mode)

@@ -11586,7 +11586,8 @@ aarch64_return_addr_rtx (void)
      be signed or not.  */
   rtx lr = gen_rtx_REG (Pmode, LR_REGNUM);
   emit_move_insn (lr, val);
-  emit_insn (GEN_FCN (CODE_FOR_xpaclri) ());
+  if (!TARGET_MORELLO)
+    emit_insn (GEN_FCN (CODE_FOR_xpaclri) ());
   return lr;
 }
 

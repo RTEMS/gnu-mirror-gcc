@@ -30,6 +30,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "memmodel.h"
 #include "emit-rtl.h"
 #include "rtl-iter.h"
+#include "tm_p.h"
+#include "target.h"
 
 /* gen_lowpart_no_emit hook implementation for DEBUG_INSNs.  In DEBUG_INSNs,
    all lowpart SUBREGs are valid, despite what the machine requires for
@@ -686,10 +688,13 @@ dead_debug_insert_temp (struct dead_debug_local *debug, unsigned int uregno,
 	    breg = NULL;
 	  /* Ok, it's the same (hardware) REG, but with a different
 	     mode, so SUBREG it.  */
-	  else
+	  else if (REG_CAN_CHANGE_MODE_P (REGNO (reg), GET_MODE (dest),
+					  GET_MODE (reg)))
 	    breg = debug_lowpart_subreg (GET_MODE (reg),
 					 cleanup_auto_inc_dec (src, VOIDmode),
 					 GET_MODE (dest));
+	  else
+	    breg = NULL;
 	}
       else if (GET_CODE (dest) == SUBREG)
 	{
