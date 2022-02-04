@@ -9041,6 +9041,10 @@ fi
 for dir in $configdirs $build_configdirs $target_configdirs ; do
   dirname=`echo $dir | sed -e s/target-//g -e s/build-//g -e s/-/_/g`
   varname=`echo $dirname | sed -e s/+/_/g`
+  # Skip --disable-fixincludes, it is handled in gcc/configure
+  if eval test x${varname} "=" xfixincludes ; then
+    continue
+  fi
   if eval test x\${enable_${varname}} "=" xno ; then
     noconfigdirs="$noconfigdirs $dir"
   fi
