@@ -282,9 +282,11 @@ cp_common_type (tree t1, tree t2)
 
   /* FIXME: Attributes.  */
   gcc_assert (ARITHMETIC_TYPE_P (t1)
+	      || INTCAP_TYPE_P (t1)
 	      || VECTOR_TYPE_P (t1)
 	      || UNSCOPED_ENUM_P (t1));
   gcc_assert (ARITHMETIC_TYPE_P (t2)
+	      || INTCAP_TYPE_P (t2)
 	      || VECTOR_TYPE_P (t2)
 	      || UNSCOPED_ENUM_P (t2));
 
@@ -322,6 +324,29 @@ cp_common_type (tree t1, tree t2)
     return build_type_attribute_variant (t1, attributes);
   if (code2 == REAL_TYPE && code1 != REAL_TYPE)
     return build_type_attribute_variant (t2, attributes);
+
+  /* INTCAP_TYPEs out-rank all other integer types.  */
+  if ((code1 == INTCAP_TYPE && code2 != INTCAP_TYPE)
+      || (code2 == INTCAP_TYPE && code1 != INTCAP_TYPE))
+    {
+      tree t_intcap = (code1 == INTCAP_TYPE) ? t1 : t2;
+      tree t_int = (t_intcap == t1) ? t2 : t1;
+      gcc_assert (INTEGRAL_TYPE_P (t_int));
+
+      /* Note that the intcap always out-ranks the integer type, the only
+	 interesting case is therefore when the intcap is signed, the integer is
+	 unsigned, and the intcap cannot represent all values of the integer
+	 type.
+
+	 [expr.arith.conv] (1.5.5) - Otherwise, both operands shall be converted
+	 to the unsigned integer type corresponding to the type of the operand
+	 with the signed integer type.  */
+      if (!TYPE_UNSIGNED (t_intcap) && TYPE_UNSIGNED (t_int)
+	  && TYPE_NONCAP_PRECISION (t_intcap) <= TYPE_PRECISION (t_int))
+	return uintcap_type_node;
+      else
+	return t_intcap;
+    }
 
   /* Both real or both integers; use the one with greater precision.  */
   if (TYPE_PRECISION (t1) > TYPE_PRECISION (t2))
@@ -4538,6 +4563,11 @@ cp_build_binary_op (const op_location_t &location,
   STRIP_TYPE_NOPS (op0);
   STRIP_TYPE_NOPS (op1);
 
+  if (INTCAP_TYPE_P (TREE_TYPE (op0)))
+    op0 = drop_capability (op0);
+  if (INTCAP_TYPE_P (TREE_TYPE (op1)))
+    op1 = drop_capability (op1);
+
   /* DTRT if one side is an overloaded function, but complain about it.  */
   if (type_unknown_p (op0))
     {
@@ -5530,7 +5560,19 @@ cp_build_binary_op (const op_location_t &location,
       /* Since the middle-end checks the type when doing a build2, we
 	 need to build the tree in pieces.  This built tree will never
 	 get out of the front-end as we replace it when instantiating
-	 the template.  */
+	 the template.
+
+	 For capabilities, we must make sure that result_type and the
+	 operands at a minimum agree on their capability-ness to avoid
+	 tripping the capability_args_valid check.  */
+      if (!capability_type_p (result_type))
+	{
+	  if (capability_type_p (TREE_TYPE (op0)))
+	    op0 = drop_capability (op0);
+	  if (capability_type_p (TREE_TYPE (op1)))
+	    op1 = drop_capability (op1);
+	}
+
       tree tmp = build2 (resultcode,
 			 build_type ? build_type : result_type,
 			 NULL_TREE, op1);
@@ -5777,6 +5819,59 @@ cp_build_binary_op (const op_location_t &location,
   result = build2_loc (location, resultcode, build_type, op0, op1);
   if (final_type != 0)
     result = cp_convert (final_type, result, complain);
+
+  /* For INTCAP_TYPEs, we dropped the capabilities early on and now need
+     to work out where the provenance (if any) should come from.  */
+  if (!capability_type_p (TREE_TYPE (result))
+      && TREE_CODE_CLASS (code) != tcc_comparison
+      && result_type != boolean_type_node)
+    {
+      tree orig_type0 = TREE_TYPE (orig_op0);
+      tree orig_type1 = TREE_TYPE (orig_op1);
+
+      bool ic0 = INTCAP_TYPE_P (orig_type0);
+      bool ic1 = INTCAP_TYPE_P (orig_type1);
+
+      /* These flags are set if we need an intcap result type because of
+	 either the left or right operand respectively.  */
+      bool need_ic0 = ic0 && code1 == INTEGER_TYPE;
+      bool need_ic1 = ic1 && !doing_shift && code0 == INTEGER_TYPE;
+
+      bool prov0 = need_ic0
+	&& !lookup_attribute ("cheri_no_provenance",
+			      TYPE_ATTRIBUTES (orig_type0));
+      bool prov1 = need_ic1
+	&& !lookup_attribute ("cheri_no_provenance",
+			      TYPE_ATTRIBUTES (orig_type1));
+
+      tree intcap = nullptr;
+      if (prov0)
+	intcap = orig_op0;
+      else if (prov1)
+	intcap = orig_op1;
+      else if (need_ic0)
+	intcap = build_int_cst (orig_type0, 0);
+      else if (need_ic1)
+	intcap = build_int_cst (orig_type1, 0);
+
+      if (intcap)
+	{
+	  tree ic_type = cp_common_type (TREE_TYPE (intcap),
+					 TREE_TYPE (result));
+	  gcc_assert (TREE_TYPE (result) == noncapability_type (ic_type));
+	  intcap = cp_convert (ic_type, intcap, complain);
+	  result = fold_build_replace_address_value_loc (location,
+							 intcap,
+							 result);
+	}
+
+      if (prov0 && prov1)
+	warning_at (location, OPT_Wcheri_provenance,
+		    "binary expression on capability types %qT and %qT; "
+		    "it is not clear which should be the source of provenance; "
+		    "currently provenance is inherited from the left-hand side",
+		    orig_type0, orig_type1);
+    }
 
   if (instrument_expr != NULL)
     result = build2 (COMPOUND_EXPR, TREE_TYPE (result),
