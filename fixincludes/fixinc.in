@@ -63,6 +63,12 @@ else
   esac
 fi
 
+if test "x$ENABLE_FIX_INCLUDES" = "xno"
+then
+  echo "Skipping fixincludes"
+  exit 0
+fi
+
 # Define what target system we're fixing.
 #
 if test -r ./Makefile; then

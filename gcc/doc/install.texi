@@ -2371,6 +2371,13 @@ For a native build and cross compiles that have target headers, the option's
 default is derived from glibc's behavior. When glibc clamps float_t to double,
 GCC follows and enables the option. For other cross compiles, the default is
 disabled.
+
+@item --enable-fix-include
+@itemx --disable-fix-include
+
+Enable fixing of system header files. GCC needs to install corrected versions
+of some system header files. This is because most target systems have
+some header files that won’t work with GCC unless they are changed.
 @end table
 
 @subheading Cross-Compiler-Specific Options

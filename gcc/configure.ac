@@ -842,6 +842,12 @@ gather_stats=`if test $enable_gather_detailed_mem_stats != no; then echo 1; else
 AC_DEFINE_UNQUOTED(GATHER_STATISTICS, $gather_stats,
 [Define to enable detailed memory allocation stats gathering.])
 
+AC_ARG_ENABLE(fix-includes,
+[AS_HELP_STRING([--disable-fix-includes],
+		[skip fixing of includes])], [],
+[enable_fix_includes=yes])
+AC_SUBST(enable_fix_includes)
+
 AC_ARG_ENABLE(valgrind-annotations,
 [AS_HELP_STRING([--enable-valgrind-annotations],
 		[enable valgrind runtime interaction])], [],

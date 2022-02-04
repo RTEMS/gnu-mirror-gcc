@@ -401,6 +401,8 @@ PLUGINLIBS = @pluginlibs@
 
 enable_plugin = @enable_plugin@
 
+enable_fix_includes = @enable_fix_includes@
+
 # On MinGW plugin installation involves installing import libraries.
 ifeq ($(enable_plugin),yes)
   plugin_implib := $(if $(strip $(filter mingw%,$(host_os))),yes,no)
@@ -3248,8 +3250,8 @@ stmp-fixinc: gsyslimits.h macro_list fixinc_list \
 	    chmod a+rx $${fix_dir} || true; \
 	    (TARGET_MACHINE='$(target)'; srcdir=`cd $(srcdir); ${PWD_COMMAND}`; \
 	      SHELL='$(SHELL)'; MACRO_LIST=`${PWD_COMMAND}`/macro_list ; \
-	      gcc_dir=`${PWD_COMMAND}` ; \
-	      export TARGET_MACHINE srcdir SHELL MACRO_LIST && \
+	      gcc_dir=`${PWD_COMMAND}` ; ENABLE_FIX_INCLUDES=${enable_fix_includes} \
+	      export TARGET_MACHINE srcdir SHELL MACRO_LIST ENABLE_FIX_INCLUDES && \
 	      cd $(build_objdir)/fixincludes && \
 	      $(SHELL) ./fixinc.sh "$${gcc_dir}/$${fix_dir}" \
 	        $(BUILD_SYSTEM_HEADER_DIR) $(OTHER_FIXINCLUDES_DIRS) ); \
