@@ -4110,8 +4110,10 @@ build_vec_delete_1 (location_t loc, tree base, tree maxindex, tree type,
     body = integer_zero_node;
 
   /* Outermost wrapper: If pointer is null, punt.  */
-  tree cond = build2_loc (loc, NE_EXPR, boolean_type_node, base,
-			  fold_convert (TREE_TYPE (base), nullptr_node));
+  tree cond = build2_loc (loc, NE_EXPR, boolean_type_node,
+			  drop_capability (base),
+			  fold_convert (noncapability_type (TREE_TYPE (base)),
+					nullptr_node));
   /* This is a compiler generated comparison, don't emit
      e.g. -Wnonnull-compare warning for it.  */
   TREE_NO_WARNING (cond) = 1;
