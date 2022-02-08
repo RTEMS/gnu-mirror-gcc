@@ -2907,7 +2907,7 @@ dw2_output_call_site_table (int cs_format, int section)
 
 	      /* First create SYMBOL_REFs to the function name, the label at
 		 the start of the function, and the landing pad label.  */
-	      const char * name = ggc_strdup (current_function_name());
+	      const char * name = get_fnname_from_decl (current_function_decl);
 	      rtx named_function_symbol = gen_rtx_SYMBOL_REF (Pmode, name);
 	      SYMBOL_REF_FLAGS (named_function_symbol) = SYMBOL_FLAG_LOCAL;
 
