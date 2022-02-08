@@ -25278,6 +25278,14 @@ rs6000_can_inline_p (tree caller, tree callee)
 	      callee_isa &= ~OPTION_MASK_HTM;
 	      explicit_isa &= ~OPTION_MASK_HTM;
 	    }
+
+	  /* Power9 and power10 do not set power8-fusion.  If the callee was
+	     explicitly compiled for power8, and the caller was power9 or
+	     power10, ignore the power8-fusion bits if it was set by
+	     default.  */
+	  if ((caller_isa & OPTION_MASK_P8_FUSION) == 0
+	      && (explicit_isa & OPTION_MASK_P8_FUSION) == 0)
+	    callee_isa &= ~OPTION_MASK_P8_FUSION;
 	}
 
       /* The callee's options must be a subset of the caller's options, i.e.
