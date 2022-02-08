@@ -1,3 +1,18 @@
+Work078, patch #2:
+2022-02-08  Michael Meissner  <meissner@the-meissners.org>
+
+	PR target/104253
+	* config/rs6000/rs6000.cc (init_float128_ibm): Use the TF names
+	for builtin conversions between __ibm128 and DImode when long
+	double uses the IEEE 128-bit format.
+
+Work078, patch #1:
+2022-02-08   Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/102059
+	* config/rs6000/rs6000.cc (rs6000_can_inline_p): Don't test for
+	power8-fusion if the caller was power9 or power10.
+
 2022-02-08   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
