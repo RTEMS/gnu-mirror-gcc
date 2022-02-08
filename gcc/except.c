@@ -2897,9 +2897,15 @@ dw2_output_call_site_table (int cs_format, int section)
 					"region %d start", i);
 	  dw2_asm_output_delta_uleb128 (reg_end_lab, reg_start_lab,
 					"length");
-	  /* For capability targets we use an alternate schema for the call
-	     site table.  */
+
+	  /* For pure-capability targets we can't use constant integer values,
+	     instead we need to use valid capabilities. This is done with a
+	     capability-aware table layout that and constant addres
+	     capabilities that get placed in the RELRO section. The table
+	     entries then contain a capability marker value and an offset from
+	     the table entry address to the capability in RELRO.  */
 	  if (targetm.capability_mode().exists()
+	      && targetm.capabilities_in_hardware()
 	      && targetm.capability_mode().require() == Pmode
 	      && cs->landing_pad)
 	    {
