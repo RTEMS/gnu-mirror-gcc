@@ -7995,7 +7995,8 @@ build_reinterpret_cast_1 (location_t loc, tree type, tree expr,
   /* [expr.reinterpret.cast]
      A value of integral or enumeration type can be explicitly
      converted to a pointer.  */
-  else if (TYPE_PTR_P (type) && INTEGRAL_OR_ENUMERATION_TYPE_P (intype))
+  else if (TYPE_PTR_P (type) && (INTEGRAL_OR_ENUMERATION_TYPE_P (intype)
+				 || INTCAP_TYPE_P (intype)))
     /* OK */
     ;
   else if ((INTEGRAL_OR_ENUMERATION_TYPE_P (type)

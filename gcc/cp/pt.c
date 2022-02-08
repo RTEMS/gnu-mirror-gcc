@@ -15333,6 +15333,7 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
     case BOOLEAN_TYPE:
     case NULLPTR_TYPE:
     case LANG_TYPE:
+    case INTCAP_TYPE:
       return t;
 
     case INTEGER_TYPE:

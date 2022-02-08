@@ -243,6 +243,9 @@ cp_convert_to_pointer (tree type, tree expr, bool dofold,
       return error_mark_node;
     }
 
+  if (form == INTCAP_TYPE)
+    return convert_to_pointer_maybe_fold (type, expr, dofold);
+
   if (INTEGRAL_CODE_P (form))
     {
       if (capability_type_p (type))

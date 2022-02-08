@@ -545,12 +545,12 @@ null_ptr_cst_p (tree t)
       /* Core issue 903 says only literal 0 is a null pointer constant.  */
       if (TREE_CODE (t) == INTEGER_CST
 	  && !TREE_OVERFLOW (t)
-	  && TREE_CODE (type) == INTEGER_TYPE
+	  && (TREE_CODE (type) == INTEGER_TYPE || INTCAP_TYPE_P (type))
 	  && integer_zerop (t)
 	  && !char_type_p (type))
 	return true;
     }
-  else if (CP_INTEGRAL_TYPE_P (type))
+  else if (CP_INTEGRAL_TYPE_P (type) || INTCAP_TYPE_P (type))
     {
       t = fold_non_dependent_expr (t, tf_none);
       STRIP_NOPS (t);
@@ -1485,6 +1485,7 @@ standard_conversion (tree to, tree from, tree expr, bool c_cast_p,
   else if (ARITHMETIC_TYPE_P (to) || INTCAP_TYPE_P (to))
     {
       if (! (INTEGRAL_CODE_P (fcode)
+	     || fcode == INTCAP_TYPE
 	     || (fcode == REAL_TYPE && !(flags & LOOKUP_NO_NON_INTEGRAL)))
           || SCOPED_ENUM_P (from))
 	return NULL;
