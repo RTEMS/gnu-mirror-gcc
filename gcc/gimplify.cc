@@ -1475,7 +1475,7 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
 	      && !is_gimple_reg (t)
 	      && flag_stack_reuse != SR_NONE)
 	    {
-	      tree clobber = build_clobber (TREE_TYPE (t));
+	      tree clobber = build_clobber (TREE_TYPE (t), CLOBBER_EOL);
 	      gimple *clobber_stmt;
 	      clobber_stmt = gimple_build_assign (t, clobber);
 	      gimple_set_location (clobber_stmt, end_locus);
@@ -6981,7 +6981,7 @@ gimplify_target_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 	{
 	  if (flag_stack_reuse == SR_ALL)
 	    {
-	      tree clobber = build_clobber (TREE_TYPE (temp));
+	      tree clobber = build_clobber (TREE_TYPE (temp), CLOBBER_EOL);
 	      clobber = build2 (MODIFY_EXPR, TREE_TYPE (temp), temp, clobber);
 	      gimple_push_cleanup (temp, clobber, false, pre_p, true);
 	    }
@@ -9552,7 +9552,10 @@ gimplify_scan_omp_clauses (tree *list_p, gimple_seq *pre_p,
 			  == REFERENCE_TYPE))
 		    decl = TREE_OPERAND (decl, 0);
 		}
-	      if (decl != orig_decl && DECL_P (decl) && indir_p)
+	      if (decl != orig_decl && DECL_P (decl) && indir_p
+		  && (TREE_CODE (TREE_TYPE (decl)) == POINTER_TYPE
+		      || (decl_ref
+			  && TREE_CODE (TREE_TYPE (decl_ref)) == POINTER_TYPE)))
 		{
 		  gomp_map_kind k
 		    = ((code == OACC_EXIT_DATA || code == OMP_TARGET_EXIT_DATA)

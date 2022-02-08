@@ -1,3 +1,35 @@
+2022-01-31  Pierre-Marie de Rodat  <derodat@adacore.com>
+
+	* doc/share/conf.py: Remove spurious call to ".decode()".
+
+2022-01-31  Arnaud Charlet  <charlet@adacore.com>
+
+	PR ada/104027
+	* gnat1drv.adb (Gnat1drv): Only call Exit_Program when not
+	generating code, otherwise instead go to End_Of_Program.
+
+2022-01-28  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR ada/104258
+	* exp_ch4.adb (Narrow_Large_Operation): Also copy the entity, if
+	any, when rewriting the operator node.
+
+2022-01-19  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR ada/103538
+	* gcc-interface/Makefile.in (target_cpu): Set to x32 for
+	x86_64-linux-gnux32.
+
+2022-01-19  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR ada/103538
+	* Makefile.rtl (LIBGNAT_TARGET_PAIRS): Add
+	$(TRASYM_DWARF_UNIX_PAIRS),
+	s-tsmona.adb<libgnat/s-tsmona__linux.adb,
+	$(GNATRTL_128BIT_PAIRS).
+	(EXTRA_GNATRTL_NONTASKING_OBJS): Add $(TRASYM_DWARF_UNIX_OBJS)
+	and $(GNATRTL_128BIT_OBJS).
+
 2022-01-18  Martin Liska  <mliska@suse.cz>
 
 	* adaint.c: Revert filename changes in comments.

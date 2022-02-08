@@ -804,7 +804,7 @@ vect_get_and_check_slp_defs (vec_info *vinfo, unsigned char swap,
 /* Return true if call statements CALL1 and CALL2 are similar enough
    to be combined into the same SLP group.  */
 
-static bool
+bool
 compatible_calls_p (gcall *call1, gcall *call2)
 {
   unsigned int nargs = gimple_call_num_args (call1);
@@ -1926,8 +1926,17 @@ vect_build_slp_tree_2 (vec_info *vinfo, slp_tree node,
 	      if (dt == vect_constant_def
 		  || dt == vect_external_def)
 		{
-		  /* We can always build those.  Might want to sort last
-		     or defer building.  */
+		  /* Check whether we can build the invariant.  If we can't
+		     we never will be able to.  */
+		  tree type = TREE_TYPE (chains[0][n].op);
+		  if (!GET_MODE_SIZE (vinfo->vector_mode).is_constant ()
+		      && (TREE_CODE (type) == BOOLEAN_TYPE
+			  || !can_duplicate_and_interleave_p (vinfo, group_size,
+							      type)))
+		    {
+		      matches[0] = false;
+		      goto out;
+		    }
 		  vec<tree> ops;
 		  ops.create (group_size);
 		  for (lane = 0; lane < group_size; ++lane)
@@ -2907,6 +2916,7 @@ optimize_load_redistribution (scalar_stmts_to_slp_tree_map_t *bst_map,
 static bool
 vect_match_slp_patterns_2 (slp_tree *ref_node, vec_info *vinfo,
 			   slp_tree_to_load_perm_map_t *perm_cache,
+			   slp_compat_nodes_map_t *compat_cache,
 			   hash_set<slp_tree> *visited)
 {
   unsigned i;
@@ -2918,11 +2928,13 @@ vect_match_slp_patterns_2 (slp_tree *ref_node, vec_info *vinfo,
   slp_tree child;
   FOR_EACH_VEC_ELT (SLP_TREE_CHILDREN (node), i, child)
     found_p |= vect_match_slp_patterns_2 (&SLP_TREE_CHILDREN (node)[i],
-					  vinfo, perm_cache, visited);
+					  vinfo, perm_cache, compat_cache,
+					  visited);
 
   for (unsigned x = 0; x < num__slp_patterns; x++)
     {
-      vect_pattern *pattern = slp_patterns[x] (perm_cache, ref_node);
+      vect_pattern *pattern
+	= slp_patterns[x] (perm_cache, compat_cache, ref_node);
       if (pattern)
 	{
 	  pattern->build (vinfo);
@@ -2943,7 +2955,8 @@ vect_match_slp_patterns_2 (slp_tree *ref_node, vec_info *vinfo,
 static bool
 vect_match_slp_patterns (slp_instance instance, vec_info *vinfo,
 			 hash_set<slp_tree> *visited,
-			 slp_tree_to_load_perm_map_t *perm_cache)
+			 slp_tree_to_load_perm_map_t *perm_cache,
+			 slp_compat_nodes_map_t *compat_cache)
 {
   DUMP_VECT_SCOPE ("vect_match_slp_patterns");
   slp_tree *ref_node = &SLP_INSTANCE_TREE (instance);
@@ -2953,7 +2966,8 @@ vect_match_slp_patterns (slp_instance instance, vec_info *vinfo,
 		     "Analyzing SLP tree %p for patterns\n",
 		     SLP_INSTANCE_TREE (instance));
 
-  return vect_match_slp_patterns_2 (ref_node, vinfo, perm_cache, visited);
+  return vect_match_slp_patterns_2 (ref_node, vinfo, perm_cache, compat_cache,
+				    visited);
 }
 
 /* STMT_INFO is a store group of size GROUP_SIZE that we are considering
@@ -3437,12 +3451,14 @@ vect_analyze_slp (vec_info *vinfo, unsigned max_tree_size)
 
   hash_set<slp_tree> visited_patterns;
   slp_tree_to_load_perm_map_t perm_cache;
+  slp_compat_nodes_map_t compat_cache;
 
   /* See if any patterns can be found in the SLP tree.  */
   bool pattern_found = false;
   FOR_EACH_VEC_ELT (LOOP_VINFO_SLP_INSTANCES (vinfo), i, instance)
     pattern_found |= vect_match_slp_patterns (instance, vinfo,
-					      &visited_patterns, &perm_cache);
+					      &visited_patterns, &perm_cache,
+					      &compat_cache);
 
   /* If any were found optimize permutations of loads.  */
   if (pattern_found)
@@ -5897,9 +5913,8 @@ vect_slp_region (vec<basic_block> bbs, vec<data_reference_p> datarefs,
 	      profitable_subgraphs.safe_push (instance);
 	    }
 
-	  /* When we're vectorizing an if-converted loop body with the
-	     very-cheap cost model make sure we vectorized all if-converted
-	     code.  */
+	  /* When we're vectorizing an if-converted loop body make sure
+	     we vectorized all if-converted code.  */
 	  if (!profitable_subgraphs.is_empty ()
 	      && orig_loop)
 	    {
@@ -5915,7 +5930,7 @@ vect_slp_region (vec<basic_block> bbs, vec<data_reference_p> datarefs,
 		      gimple_set_visited (gsi_stmt (gsi), false);
 		      continue;
 		    }
-		  if (flag_vect_cost_model != VECT_COST_MODEL_VERY_CHEAP)
+		  if (flag_vect_cost_model == VECT_COST_MODEL_UNLIMITED)
 		    continue;
 
 		  if (gassign *ass = dyn_cast <gassign *> (gsi_stmt (gsi)))

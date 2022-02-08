@@ -1352,18 +1352,14 @@ splice_template_attributes (tree *attr_p, tree decl)
   return late_attrs;
 }
 
-/* Remove any late attributes from the list in ATTR_P and attach them to
-   DECL_P.  */
+/* Attach any LATE_ATTRS to DECL_P, after the non-dependent attributes have
+   been applied by a previous call to decl_attributes.  */
 
 static void
-save_template_attributes (tree *attr_p, tree *decl_p, int flags)
+save_template_attributes (tree late_attrs, tree *decl_p, int flags)
 {
   tree *q;
 
-  if (attr_p && *attr_p == error_mark_node)
-    return;
-
-  tree late_attrs = splice_template_attributes (attr_p, *decl_p);
   if (!late_attrs)
     return;
 
@@ -1666,12 +1662,12 @@ cplus_decl_attributes (tree *decl, tree attributes, int flags)
 	}
     }
 
+  tree late_attrs = NULL_TREE;
   if (processing_template_decl)
     {
       if (check_for_bare_parameter_packs (attributes))
 	return;
-
-      save_template_attributes (&attributes, decl, flags);
+      late_attrs = splice_template_attributes (&attributes, *decl);
     }
 
   cp_check_const_attributes (attributes);
@@ -1716,6 +1712,9 @@ cplus_decl_attributes (tree *decl, tree attributes, int flags)
       tree last_decl = find_last_decl (*decl);
       decl_attributes (decl, attributes, flags, last_decl);
     }
+
+  if (late_attrs)
+    save_template_attributes (late_attrs, decl, flags);
 
   /* Propagate deprecation out to the template.  */
   if (TREE_DEPRECATED (*decl))
@@ -5773,26 +5772,34 @@ mark_used (tree decl, tsubst_flags_t complain)
   if (TREE_CODE (decl) == CONST_DECL)
     used_types_insert (DECL_CONTEXT (decl));
 
-  if (TREE_CODE (decl) == FUNCTION_DECL
-      && !maybe_instantiate_noexcept (decl, complain))
-    return false;
-
-  if (TREE_CODE (decl) == FUNCTION_DECL
-      && DECL_DELETED_FN (decl))
+  if (TREE_CODE (decl) == FUNCTION_DECL)
     {
-      if (DECL_ARTIFICIAL (decl)
-	  && DECL_CONV_FN_P (decl)
-	  && LAMBDA_TYPE_P (DECL_CONTEXT (decl)))
-	/* We mark a lambda conversion op as deleted if we can't
-	   generate it properly; see maybe_add_lambda_conv_op.  */
-	sorry ("converting lambda that uses %<...%> to function pointer");
-      else if (complain & tf_error)
+      if (DECL_MAYBE_DELETED (decl))
 	{
-	  error ("use of deleted function %qD", decl);
-	  if (!maybe_explain_implicit_delete (decl))
-	    inform (DECL_SOURCE_LOCATION (decl), "declared here");
+	  ++function_depth;
+	  maybe_synthesize_method (decl);
+	  --function_depth;
 	}
-      return false;
+
+      if (DECL_DELETED_FN (decl))
+	{
+	  if (DECL_ARTIFICIAL (decl)
+	      && DECL_CONV_FN_P (decl)
+	      && LAMBDA_TYPE_P (DECL_CONTEXT (decl)))
+	    /* We mark a lambda conversion op as deleted if we can't
+	       generate it properly; see maybe_add_lambda_conv_op.  */
+	    sorry ("converting lambda that uses %<...%> to function pointer");
+	  else if (complain & tf_error)
+	    {
+	      error ("use of deleted function %qD", decl);
+	      if (!maybe_explain_implicit_delete (decl))
+		inform (DECL_SOURCE_LOCATION (decl), "declared here");
+	    }
+	  return false;
+	}
+
+      if (!maybe_instantiate_noexcept (decl, complain))
+	return false;
     }
 
   if (VAR_OR_FUNCTION_DECL_P (decl) && DECL_LOCAL_DECL_P (decl))

@@ -3004,6 +3004,12 @@ vect_analyze_loop (class loop *loop, vec_info_shared *shared)
   unsigned int mode_i = 0;
   unsigned HOST_WIDE_INT simdlen = loop->simdlen;
 
+  /* Keep track of the VF for each mode.  Initialize all to 0 which indicates
+     a mode has not been analyzed.  */
+  auto_vec<poly_uint64, 8> cached_vf_per_mode;
+  for (unsigned i = 0; i < vector_modes.length (); ++i)
+    cached_vf_per_mode.safe_push (0);
+
   /* First determine the main loop vectorization mode, either the first
      one that works, starting with auto-detecting the vector mode and then
      following the targets order of preference, or the one with the
@@ -3011,6 +3017,10 @@ vect_analyze_loop (class loop *loop, vec_info_shared *shared)
   while (1)
     {
       bool fatal;
+      unsigned int last_mode_i = mode_i;
+      /* Set cached VF to -1 prior to analysis, which indicates a mode has
+	 failed.  */
+      cached_vf_per_mode[last_mode_i] = -1;
       opt_loop_vec_info loop_vinfo
 	= vect_analyze_loop_1 (loop, shared, &loop_form_info,
 			       NULL, vector_modes, mode_i,
@@ -3020,6 +3030,12 @@ vect_analyze_loop (class loop *loop, vec_info_shared *shared)
 
       if (loop_vinfo)
 	{
+	  /*  Analyzis has been successful so update the VF value.  The
+	      VF should always be a multiple of unroll_factor and we want to
+	      capture the original VF here.  */
+	  cached_vf_per_mode[last_mode_i]
+	    = exact_div (LOOP_VINFO_VECT_FACTOR (loop_vinfo),
+			 loop_vinfo->suggested_unroll_factor);
 	  /* Once we hit the desired simdlen for the first time,
 	     discard any previous attempts.  */
 	  if (simdlen
@@ -3100,12 +3116,10 @@ vect_analyze_loop (class loop *loop, vec_info_shared *shared)
     {
       /* If the target does not support partial vectors we can shorten the
 	 number of modes to analyze for the epilogue as we know we can't pick a
-	 mode that has at least as many NUNITS as the main loop's vectorization
-	 factor, since that would imply the epilogue's vectorization factor
-	 would be at least as high as the main loop's and we would be
-	 vectorizing for more scalar iterations than there would be left.  */
+	 mode that would lead to a VF at least as big as the
+	 FIRST_VINFO_VF.  */
       if (!supports_partial_vectors
-	  && maybe_ge (GET_MODE_NUNITS (vector_modes[mode_i]), first_vinfo_vf))
+	  && maybe_ge (cached_vf_per_mode[mode_i], first_vinfo_vf))
 	{
 	  mode_i++;
 	  if (mode_i == vector_modes.length ())
@@ -4979,9 +4993,22 @@ vect_find_reusable_accumulator (loop_vec_info loop_vinfo,
   /* Handle the case where we can reduce wider vectors to narrower ones.  */
   tree vectype = STMT_VINFO_VECTYPE (reduc_info);
   tree old_vectype = TREE_TYPE (accumulator->reduc_input);
+  unsigned HOST_WIDE_INT m;
   if (!constant_multiple_p (TYPE_VECTOR_SUBPARTS (old_vectype),
-			    TYPE_VECTOR_SUBPARTS (vectype)))
+			    TYPE_VECTOR_SUBPARTS (vectype), &m))
     return false;
+  /* Check the intermediate vector types are available.  */
+  while (m > 2)
+    {
+      m /= 2;
+      tree intermediate_vectype = get_related_vectype_for_scalar_type
+	(TYPE_MODE (vectype), TREE_TYPE (vectype),
+	 exact_div (TYPE_VECTOR_SUBPARTS (old_vectype), m));
+      if (!intermediate_vectype
+	  || !directly_supported_p (STMT_VINFO_REDUC_CODE (reduc_info),
+				    intermediate_vectype))
+	return false;
+    }
 
   /* Non-SLP reductions might apply an adjustment after the reduction
      operation, in order to simplify the initialization of the accumulator.

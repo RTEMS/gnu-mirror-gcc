@@ -3413,7 +3413,10 @@ cxx_eval_binary_expression (const constexpr_ctx *ctx, tree t,
       if (ctx->manifestly_const_eval
 	  && (flag_constexpr_fp_except
 	      || TREE_CODE (type) != REAL_TYPE))
-	r = fold_binary_initializer_loc (loc, code, type, lhs, rhs);
+	{
+	  auto ofcc = make_temp_override (folding_cxx_constexpr, true);
+	  r = fold_binary_initializer_loc (loc, code, type, lhs, rhs);
+	}
       else
 	r = fold_binary_loc (loc, code, type, lhs, rhs);
     }
@@ -4657,6 +4660,13 @@ init_subob_ctx (const constexpr_ctx *ctx, constexpr_ctx &new_ctx,
   tree type = initialized_type (value);
   if (!AGGREGATE_TYPE_P (type) && !VECTOR_TYPE_P (type))
     /* A non-aggregate member doesn't get its own CONSTRUCTOR.  */
+    return;
+  if (VECTOR_TYPE_P (type)
+      && VECTOR_TYPE_P (TREE_TYPE (ctx->ctor))
+      && index == NULL_TREE)
+    /* A vector inside of a vector CONSTRUCTOR, e.g. when a larger
+       vector is constructed from smaller vectors, doesn't get its own
+       CONSTRUCTOR either.  */
     return;
 
   /* The sub-aggregate initializer might contain a placeholder;

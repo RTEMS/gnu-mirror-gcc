@@ -6017,6 +6017,11 @@ maybe_deduce_size_from_array_init (tree decl, tree init)
 		return;
 	      if (!check_array_designated_initializer (ce, i))
 		failure = 1;
+	      /* If an un-designated initializer is type-dependent, we can't
+		 check brace elision yet.  */
+	      if (ce->index == NULL_TREE
+		  && type_dependent_expression_p (ce->value))
+		return;
 	    }
 	}
 
@@ -6569,16 +6574,22 @@ reshape_init_class (tree type, reshape_iter *d, bool first_initializer_p,
 	  tree ictx = DECL_CONTEXT (field);
 	  if (!same_type_ignoring_top_level_qualifiers_p (ictx, type))
 	    {
-	      gcc_assert (ANON_AGGR_TYPE_P (ictx));
 	      /* Find the anon aggr that is a direct member of TYPE.  */
-	      while (true)
+	      while (ANON_AGGR_TYPE_P (ictx))
 		{
 		  tree cctx = TYPE_CONTEXT (ictx);
 		  if (same_type_ignoring_top_level_qualifiers_p (cctx, type))
-		    break;
+		    goto found;
 		  ictx = cctx;
 		}
-	      /* And then the TYPE member with that anon aggr type.  */
+
+	      /* Not found, e.g. FIELD is a member of a base class.  */
+	      if (complain & tf_error)
+		error ("%qD is not a direct member of %qT", field, type);
+	      return error_mark_node;
+
+	    found:
+	      /* Now find the TYPE member with that anon aggr type.  */
 	      tree aafield = TYPE_FIELDS (type);
 	      for (; aafield; aafield = TREE_CHAIN (aafield))
 		if (TREE_TYPE (aafield) == ictx)
@@ -6811,6 +6822,7 @@ reshape_init_r (tree type, reshape_iter *d, tree first_initializer_p,
     {
       tree str_init = init;
       tree stripped_str_init = stripped_init;
+      reshape_iter stripd = {};
 
       /* Strip one level of braces if and only if they enclose a single
 	 element (as allowed by [dcl.init.string]).  */
@@ -6818,7 +6830,8 @@ reshape_init_r (tree type, reshape_iter *d, tree first_initializer_p,
 	  && TREE_CODE (stripped_str_init) == CONSTRUCTOR
 	  && CONSTRUCTOR_NELTS (stripped_str_init) == 1)
 	{
-	  str_init = (*CONSTRUCTOR_ELTS (stripped_str_init))[0].value;
+	  stripd.cur = CONSTRUCTOR_ELT (stripped_str_init, 0);
+	  str_init = stripd.cur->value;
 	  stripped_str_init = tree_strip_any_location_wrapper (str_init);
 	}
 
@@ -6827,7 +6840,8 @@ reshape_init_r (tree type, reshape_iter *d, tree first_initializer_p,
 	 array types (one value per array element).  */
       if (TREE_CODE (stripped_str_init) == STRING_CST)
 	{
-	  if (has_designator_problem (d, complain))
+	  if ((first_initializer_p && has_designator_problem (d, complain))
+	      || (stripd.cur && has_designator_problem (&stripd, complain)))
 	    return error_mark_node;
 	  d->cur++;
 	  return str_init;
@@ -7229,7 +7243,12 @@ check_initializer (tree decl, tree init, int flags, vec<tree, va_gc> **cleanups)
 	      /* In C++20, the call to build_aggr_init could have created
 		 an INIT_EXPR with a CONSTRUCTOR as the RHS to handle
 		 A(1, 2).  */
-	      init = TREE_OPERAND (init_code, 1);
+	      tree rhs = TREE_OPERAND (init_code, 1);
+	      if (processing_template_decl && TREE_CODE (rhs) == TARGET_EXPR)
+		/* Avoid leaking TARGET_EXPR into template trees.  */
+		rhs = build_implicit_conv_flags (type, init, flags);
+	      init = rhs;
+
 	      init_code = NULL_TREE;
 	      /* Don't call digest_init; it's unnecessary and will complain
 		 about aggregate initialization of non-aggregate classes.  */
@@ -7944,9 +7963,19 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
       enum auto_deduction_context adc = adc_variable_type;
       if (VAR_P (decl) && DECL_DECOMPOSITION_P (decl))
 	adc = adc_decomp_type;
+      tree outer_targs = NULL_TREE;
+      if (PLACEHOLDER_TYPE_CONSTRAINTS_INFO (auto_node)
+	  && VAR_P (decl)
+	  && DECL_LANG_SPECIFIC (decl)
+	  && DECL_TEMPLATE_INFO (decl)
+	  && !DECL_FUNCTION_SCOPE_P (decl))
+	/* The outer template arguments might be needed for satisfaction.
+	   (For function scope variables, do_auto_deduction will obtain the
+	   outer template arguments from current_function_decl.)  */
+	outer_targs = DECL_TI_ARGS (decl);
       type = TREE_TYPE (decl) = do_auto_deduction (type, d_init, auto_node,
 						   tf_warning_or_error, adc,
-						   NULL_TREE, flags);
+						   outer_targs, flags);
       if (type == error_mark_node)
 	return;
       if (TREE_CODE (type) == FUNCTION_TYPE)
@@ -8089,7 +8118,7 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
       else
 	{
 	  gcc_assert (!DECL_PRETTY_FUNCTION_P (decl));
-	  /* Deduce array size even if the initializer is dependent.  */
+	  /* Try to deduce array size.  */
 	  maybe_deduce_size_from_array_init (decl, init);
 	  /* And complain about multiple initializers.  */
 	  if (init && TREE_CODE (init) == TREE_LIST && TREE_CHAIN (init)
@@ -9544,22 +9573,12 @@ cp_complete_array_type (tree *ptype, tree initial_value, bool do_default)
   if (initial_value)
     {
       /* An array of character type can be initialized from a
-	 brace-enclosed string constant.
-
-	 FIXME: this code is duplicated from reshape_init. Probably
-	 we should just call reshape_init here?  */
+	 brace-enclosed string constant so call reshape_init to
+	 remove the optional braces from a braced string literal.  */
       if (char_type_p (TYPE_MAIN_VARIANT (TREE_TYPE (*ptype)))
-	  && TREE_CODE (initial_value) == CONSTRUCTOR
-	  && !vec_safe_is_empty (CONSTRUCTOR_ELTS (initial_value)))
-	{
-	  vec<constructor_elt, va_gc> *v = CONSTRUCTOR_ELTS (initial_value);
-	  tree value = (*v)[0].value;
-	  STRIP_ANY_LOCATION_WRAPPER (value);
-
-	  if (TREE_CODE (value) == STRING_CST
-	      && v->length () == 1)
-	    initial_value = value;
-	}
+	  && BRACE_ENCLOSED_INITIALIZER_P (initial_value))
+	initial_value = reshape_init (*ptype, initial_value,
+				      tf_warning_or_error);
 
       /* If any of the elements are parameter packs, we can't actually
 	 complete this type now because the array size is dependent.  */
@@ -11084,6 +11103,18 @@ create_array_type_for_decl (tree name, tree type, tree size, location_t loc)
   if (type == error_mark_node || size == error_mark_node)
     return error_mark_node;
 
+  /* [dcl.type.class.deduct] prohibits forming an array of placeholder
+     for a deduced class type.  */
+  if (template_placeholder_p (type))
+    {
+      if (name)
+	error_at (loc, "%qD declared as array of template placeholder "
+		  "type %qT", name, type);
+      else
+	error ("creating array of template placeholder type %qT", type);
+      return error_mark_node;
+    }
+
   /* If there are some types which cannot be array elements,
      issue an error-message and return.  */
   switch (TREE_CODE (type))
@@ -11144,8 +11175,16 @@ create_array_type_for_decl (tree name, tree type, tree size, location_t loc)
 
   /* Figure out the index type for the array.  */
   if (size)
-    itype = compute_array_index_type_loc (loc, name, size,
-					  tf_warning_or_error);
+    {
+      itype = compute_array_index_type_loc (loc, name, size,
+					    tf_warning_or_error);
+      if (type_uses_auto (type)
+	  && variably_modified_type_p (itype, /*fn=*/NULL_TREE))
+	{
+	  sorry_at (loc, "variable-length array of %<auto%>");
+	  return error_mark_node;
+	}
+    }
 
   return build_cplus_array_type (type, itype);
 }
@@ -12647,11 +12686,11 @@ grokdeclarator (const cp_declarator *declarator,
 		if (!tmpl)
 		  if (tree late_auto = type_uses_auto (late_return_type))
 		    tmpl = CLASS_PLACEHOLDER_TEMPLATE (late_auto);
-		if (tmpl && funcdecl_p)
+		if (tmpl)
 		  {
-		    if (!dguide_name_p (unqualified_id))
+		    if (!funcdecl_p || !dguide_name_p (unqualified_id))
 		      {
-			error_at (declarator->id_loc, "deduced class "
+			error_at (typespec_loc, "deduced class "
 				  "type %qD in function return type",
 				  DECL_NAME (tmpl));
 			inform (DECL_SOURCE_LOCATION (tmpl),
@@ -17312,6 +17351,7 @@ finish_constructor_body (void)
       add_stmt (build_stmt (input_location, LABEL_EXPR, cdtor_label));
 
       val = DECL_ARGUMENTS (current_function_decl);
+      suppress_warning (val, OPT_Wuse_after_free);
       val = build2 (MODIFY_EXPR, TREE_TYPE (val),
 		    DECL_RESULT (current_function_decl), val);
       /* Return the address of the object.  */
@@ -17405,6 +17445,7 @@ finish_destructor_body (void)
       tree val;
 
       val = DECL_ARGUMENTS (current_function_decl);
+      suppress_warning (val, OPT_Wuse_after_free);
       val = build2 (MODIFY_EXPR, TREE_TYPE (val),
 		    DECL_RESULT (current_function_decl), val);
       /* Return the address of the object.  */

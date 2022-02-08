@@ -557,8 +557,7 @@ bool
 is_local_temp (tree decl)
 {
   return (VAR_P (decl) && DECL_ARTIFICIAL (decl)
-	  && !TREE_STATIC (decl)
-	  && DECL_FUNCTION_SCOPE_P (decl));
+	  && !TREE_STATIC (decl));
 }
 
 /* Set various status flags when building an AGGR_INIT_EXPR object T.  */
@@ -786,8 +785,8 @@ build_vec_init_elt (tree type, tree init, tsubst_flags_t complain)
 tree
 build_vec_init_expr (tree type, tree init, tsubst_flags_t complain)
 {
-  if (init && TREE_CODE (init) == VEC_INIT_EXPR)
-    return init;
+  if (tree vi = get_vec_init_expr (init))
+    return vi;
 
   tree elt_init;
   if (init && TREE_CODE (init) == CONSTRUCTOR
@@ -2804,8 +2803,9 @@ fixup_deferred_exception_variants (tree type, tree raises)
 
   /* Though sucky, this walk will process the canonical variants
      first.  */
+  tree prev = NULL_TREE;
   for (tree variant = TYPE_MAIN_VARIANT (type);
-       variant; variant = TYPE_NEXT_VARIANT (variant))
+       variant; prev = variant, variant = TYPE_NEXT_VARIANT (variant))
     if (TYPE_RAISES_EXCEPTIONS (variant) == original)
       {
 	gcc_checking_assert (variant != TYPE_MAIN_VARIANT (type));
@@ -2815,21 +2815,34 @@ fixup_deferred_exception_variants (tree type, tree raises)
 	    cp_cv_quals var_quals = TYPE_QUALS (variant);
 	    cp_ref_qualifier rqual = type_memfn_rqual (variant);
 
+	    /* If VARIANT would become a dup (cp_check_qualified_type-wise)
+	       of an existing variant in the variant list of TYPE after its
+	       exception specification has been parsed, elide it.  Otherwise,
+	       build_cp_fntype_variant could use it, leading to "canonical
+	       types differ for identical types."  */
 	    tree v = TYPE_MAIN_VARIANT (type);
 	    for (; v; v = TYPE_NEXT_VARIANT (v))
-	      if (TYPE_CANONICAL (v) == v
-		  && cp_check_qualified_type (v, variant, var_quals,
-					      rqual, cr, false))
-		break;
+	      if (cp_check_qualified_type (v, variant, var_quals,
+					   rqual, cr, false))
+		{
+		  /* The main variant will not match V, so PREV will never
+		     be null.  */
+		  TYPE_NEXT_VARIANT (prev) = TYPE_NEXT_VARIANT (variant);
+		  break;
+		}
 	    TYPE_RAISES_EXCEPTIONS (variant) = raises;
 
 	    if (!v)
 	      v = build_cp_fntype_variant (TYPE_CANONICAL (variant),
 					   rqual, cr, false);
-	    TYPE_CANONICAL (variant) = v;
+	    TYPE_CANONICAL (variant) = TYPE_CANONICAL (v);
 	  }
 	else
 	  TYPE_RAISES_EXCEPTIONS (variant) = raises;
+
+	if (!TYPE_DEPENDENT_P (variant))
+	  /* We no longer know that it's not type-dependent.  */
+	  TYPE_DEPENDENT_P_VALID (variant) = false;
       }
 }
 
@@ -3652,6 +3665,8 @@ build_min_non_dep_op_overload (enum tree_code op,
   nargs = call_expr_nargs (non_dep);
 
   expected_nargs = cp_tree_code_length (op);
+  if (TREE_CODE (TREE_TYPE (overload)) == METHOD_TYPE)
+    expected_nargs -= 1;
   if ((op == POSTINCREMENT_EXPR
        || op == POSTDECREMENT_EXPR)
       /* With -fpermissive non_dep could be operator++().  */
@@ -3678,7 +3693,7 @@ build_min_non_dep_op_overload (enum tree_code op,
       tree method = build_baselink (binfo, binfo, overload, NULL_TREE);
       fn = build_min (COMPONENT_REF, TREE_TYPE (overload),
 		      object, method, NULL_TREE);
-      for (int i = 1; i < nargs; i++)
+      for (int i = 0; i < nargs; i++)
 	{
 	  tree arg = va_arg (p, tree);
 	  vec_safe_push (args, arg);
@@ -3714,7 +3729,6 @@ build_min_non_dep_op_overload (tree non_dep, tree overload, tree object,
   tree method = build_baselink (binfo, binfo, overload, NULL_TREE);
   tree fn = build_min (COMPONENT_REF, TREE_TYPE (overload),
 		       object, method, NULL_TREE);
-  nargs--;
   gcc_assert (vec_safe_length (args) == nargs);
 
   tree call = build_min_non_dep_call_vec (non_dep, fn, args);
@@ -6167,7 +6181,7 @@ test_lvalue_kind ()
 /* Run all of the selftests within this file.  */
 
 void
-cp_tree_c_tests ()
+cp_tree_cc_tests ()
 {
   test_lvalue_kind ();
 }

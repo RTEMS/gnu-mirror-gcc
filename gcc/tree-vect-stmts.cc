@@ -3444,7 +3444,9 @@ vectorizable_call (vec_info *vinfo,
     {
       if (slp_node)
 	for (i = 0; i < nargs; ++i)
-	  if (!vect_maybe_update_slp_op_vectype (slp_op[i], vectype_in))
+	  if (!vect_maybe_update_slp_op_vectype (slp_op[i],
+						 vectypes[i]
+						 ? vectypes[i] : vectype_in))
 	    {
 	      if (dump_enabled_p ())
 		dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
@@ -12124,6 +12126,7 @@ supportable_narrowing_operation (enum tree_code code,
   tree intermediate_type, prev_type;
   machine_mode intermediate_mode, prev_mode;
   int i;
+  unsigned HOST_WIDE_INT n_elts;
   bool uns;
 
   *multi_step_cvt = 0;
@@ -12133,8 +12136,9 @@ supportable_narrowing_operation (enum tree_code code,
       c1 = VEC_PACK_TRUNC_EXPR;
       if (VECTOR_BOOLEAN_TYPE_P (narrow_vectype)
 	  && VECTOR_BOOLEAN_TYPE_P (vectype)
-	  && TYPE_MODE (narrow_vectype) == TYPE_MODE (vectype)
-	  && SCALAR_INT_MODE_P (TYPE_MODE (vectype)))
+	  && SCALAR_INT_MODE_P (TYPE_MODE (vectype))
+	  && TYPE_VECTOR_SUBPARTS (vectype).is_constant (&n_elts)
+	  && n_elts < BITS_PER_UNIT)
 	optab1 = vec_pack_sbool_trunc_optab;
       else
 	optab1 = optab_for_tree_code (c1, vectype, optab_default);
@@ -12225,8 +12229,9 @@ supportable_narrowing_operation (enum tree_code code,
 	  = lang_hooks.types.type_for_mode (intermediate_mode, uns);
       if (VECTOR_BOOLEAN_TYPE_P (intermediate_type)
 	  && VECTOR_BOOLEAN_TYPE_P (prev_type)
-	  && intermediate_mode == prev_mode
-	  && SCALAR_INT_MODE_P (prev_mode))
+	  && SCALAR_INT_MODE_P (prev_mode)
+	  && TYPE_VECTOR_SUBPARTS (intermediate_type).is_constant (&n_elts)
+	  && n_elts < BITS_PER_UNIT)
 	interm_optab = vec_pack_sbool_trunc_optab;
       else
 	interm_optab

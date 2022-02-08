@@ -9204,11 +9204,6 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
      errors will be deferred until the template is instantiated.  */
   if (processing_template_decl)
     {
-      tree expr, addr;
-      tree return_type;
-      const tree *argarray;
-      unsigned int nargs;
-
       if (undeduced_auto_decl (fn))
 	mark_used (fn, complain);
       else
@@ -9216,32 +9211,27 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	   See PR80598.  */
 	TREE_USED (fn) = 1;
 
-      return_type = TREE_TYPE (TREE_TYPE (fn));
-      nargs = vec_safe_length (args);
+      tree return_type = TREE_TYPE (TREE_TYPE (fn));
+      tree callee;
       if (first_arg == NULL_TREE)
-	argarray = args->address ();
+	{
+	  callee = build_addr_func (fn, complain);
+	  if (callee == error_mark_node)
+	    return error_mark_node;
+	}
       else
 	{
-	  tree *alcarray;
-	  unsigned int ix;
-	  tree arg;
-
-	  ++nargs;
-	  alcarray = XALLOCAVEC (tree, nargs);
-	  alcarray[0] = build_this (first_arg);
-	  FOR_EACH_VEC_SAFE_ELT (args, ix, arg)
-	    alcarray[ix + 1] = arg;
-	  argarray = alcarray;
+	  tree binfo = TYPE_BINFO (TREE_TYPE (first_arg));
+	  callee = build_baselink (binfo, binfo, fn, NULL_TREE);
+	  callee = build_min (COMPONENT_REF, TREE_TYPE (fn),
+			      first_arg, callee, NULL_TREE);
 	}
 
-      addr = build_addr_func (fn, complain);
-      if (addr == error_mark_node)
-	return error_mark_node;
-      expr = build_call_array_loc (input_location, return_type,
-				   addr, nargs, argarray);
+      tree expr = build_call_vec (return_type, callee, args);
+      SET_EXPR_LOCATION (expr, input_location);
       if (TREE_THIS_VOLATILE (fn) && cfun)
 	current_function_returns_abnormally = 1;
-      if (immediate_invocation_p (fn, nargs))
+      if (immediate_invocation_p (fn, vec_safe_length (args)))
 	{
 	  tree obj_arg = NULL_TREE, exprimm = expr;
 	  if (DECL_CONSTRUCTOR_P (fn))
@@ -9789,7 +9779,10 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	   && DECL_OVERLOADED_OPERATOR_IS (fn, NOP_EXPR)
 	   && trivial_fn_p (fn))
     {
-      tree to = cp_build_fold_indirect_ref (argarray[0]);
+      /* Don't use cp_build_fold_indirect_ref, op= returns an lvalue even if
+	 the object argument isn't one.  */
+      tree to = cp_build_indirect_ref (input_location, argarray[0],
+				       RO_ARROW, complain);
       tree type = TREE_TYPE (to);
       tree as_base = CLASSTYPE_AS_BASE (type);
       tree arg = argarray[1];
@@ -12638,6 +12631,25 @@ can_convert_arg_bad (tree to, tree from, tree arg, int flags,
   return t != NULL;
 }
 
+/* Return an IMPLICIT_CONV_EXPR from EXPR to TYPE with bits set from overload
+   resolution FLAGS.  */
+
+tree
+build_implicit_conv_flags (tree type, tree expr, int flags)
+{
+  /* In a template, we are only concerned about determining the
+     type of non-dependent expressions, so we do not have to
+     perform the actual conversion.  But for initializers, we
+     need to be able to perform it at instantiation
+     (or instantiate_non_dependent_expr) time.  */
+  expr = build1 (IMPLICIT_CONV_EXPR, type, expr);
+  if (!(flags & LOOKUP_ONLYCONVERTING))
+    IMPLICIT_CONV_EXPR_DIRECT_INIT (expr) = true;
+  if (flags & LOOKUP_NO_NARROWING)
+    IMPLICIT_CONV_EXPR_BRACED_INIT (expr) = true;
+  return expr;
+}
+
 /* Convert EXPR to TYPE.  Return the converted expression.
 
    Note that we allow bad conversions here because by the time we get to
@@ -12674,18 +12686,7 @@ perform_implicit_conversion_flags (tree type, tree expr,
       expr = error_mark_node;
     }
   else if (processing_template_decl && conv->kind != ck_identity)
-    {
-      /* In a template, we are only concerned about determining the
-	 type of non-dependent expressions, so we do not have to
-	 perform the actual conversion.  But for initializers, we
-	 need to be able to perform it at instantiation
-	 (or instantiate_non_dependent_expr) time.  */
-      expr = build1 (IMPLICIT_CONV_EXPR, type, expr);
-      if (!(flags & LOOKUP_ONLYCONVERTING))
-	IMPLICIT_CONV_EXPR_DIRECT_INIT (expr) = true;
-      if (flags & LOOKUP_NO_NARROWING)
-	IMPLICIT_CONV_EXPR_BRACED_INIT (expr) = true;
-    }
+    expr = build_implicit_conv_flags (type, expr, flags);
   else
     {
       /* Give a conversion call the same location as expr.  */

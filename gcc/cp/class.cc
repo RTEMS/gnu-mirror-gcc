@@ -6414,8 +6414,8 @@ end_of_class (tree t, eoc_mode mode)
       {
 	if (mode == eoc_nv_or_dsize)
 	  /* For dsize, don't count trailing empty bases.  */
-	  offset = size_binop (PLUS_EXPR, BINFO_OFFSET (binfo),
-			       CLASSTYPE_SIZE_UNIT (BINFO_TYPE (binfo)));
+	  offset = size_binop (PLUS_EXPR, BINFO_OFFSET (base_binfo),
+			       CLASSTYPE_SIZE_UNIT (BINFO_TYPE (base_binfo)));
 	else
 	  offset = end_of_base (base_binfo);
 	if (tree_int_cst_lt (result, offset))
@@ -7766,6 +7766,8 @@ finish_struct (tree t, tree attributes)
 		ok = true;
 	    }
 	}
+      /* It also cannot be a union.  */
+      ok &= NON_UNION_CLASS_TYPE_P (t);
       if (!ok)
 	fatal_error (input_location, "definition of %qD does not match "
 		     "%<#include <initializer_list>%>", TYPE_NAME (t));

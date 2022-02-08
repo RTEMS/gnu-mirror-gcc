@@ -1308,7 +1308,8 @@ struct saved_token_sentinel
   void rollback ()
   {
     cp_lexer_rollback_tokens (lexer);
-    cp_lexer_set_source_position (lexer);
+    cp_lexer_set_source_position_from_token
+      (cp_lexer_previous_token (lexer));
     mode = STS_DONOTHING;
   }
   ~saved_token_sentinel ()
@@ -18573,7 +18574,7 @@ cp_parser_template_name (cp_parser* parser,
 			: parser->context->object_type);
 	  if (scope && TYPE_P (scope)
 	      && (!CLASS_TYPE_P (scope)
-		  || (check_dependency_p && dependent_type_p (scope))))
+		  || (check_dependency_p && dependent_scope_p (scope))))
 	    {
 	      /* We're optimizing away the call to cp_parser_lookup_name, but
 		 we still need to do this.  */
@@ -18666,9 +18667,9 @@ cp_parser_template_name (cp_parser* parser,
 	    found = true;
 	}
 
-      /* "in a type-only context" */
+      /* "that follows the keyword template"..."in a type-only context" */
       if (!found && scope
-	  && tag_type != none_type
+	  && (template_keyword_p || tag_type != none_type)
 	  && dependentish_scope_p (scope)
 	  && cp_parser_nth_token_starts_template_argument_list_p (parser, 1))
 	found = true;
@@ -18679,7 +18680,8 @@ cp_parser_template_name (cp_parser* parser,
 	  cp_parser_error (parser, "expected template-name");
 	  return error_mark_node;
 	}
-      else if (decl == error_mark_node)
+      else if ((!DECL_P (decl) && !is_overloaded_fn (decl))
+	       || TREE_CODE (decl) == USING_DECL)
 	/* Repeat the lookup at instantiation time.  */
 	decl = identifier;
     }
@@ -21144,7 +21146,16 @@ cp_parser_enumerator_definition (cp_parser* parser, tree type)
 
   /* If we are processing a template, make sure the initializer of the
      enumerator doesn't contain any bare template parameter pack.  */
-  if (check_for_bare_parameter_packs (value))
+  if (current_lambda_expr ())
+    {
+      /* In a lambda it should work, but doesn't currently.  */
+      if (uses_parameter_packs (value))
+	{
+	  sorry ("unexpanded parameter pack in enumerator in lambda");
+	  value = error_mark_node;
+	}
+    }
+  else if (check_for_bare_parameter_packs (value))
     value = error_mark_node;
 
   /* Create the enumerator.  */
@@ -26533,7 +26544,7 @@ cp_parser_class_head (cp_parser* parser,
     }
   else if (nested_name_specifier)
     {
-      tree class_type;
+      type = TREE_TYPE (type);
 
       /* Given:
 
@@ -26543,31 +26554,27 @@ cp_parser_class_head (cp_parser* parser,
 	 we will get a TYPENAME_TYPE when processing the definition of
 	 `S::T'.  We need to resolve it to the actual type before we
 	 try to define it.  */
-      if (TREE_CODE (TREE_TYPE (type)) == TYPENAME_TYPE)
+      if (TREE_CODE (type) == TYPENAME_TYPE)
 	{
-	  class_type = resolve_typename_type (TREE_TYPE (type),
-					      /*only_current_p=*/false);
-	  if (TREE_CODE (class_type) != TYPENAME_TYPE)
-	    type = TYPE_NAME (class_type);
-	  else
+	  type = resolve_typename_type (type, /*only_current_p=*/false);
+	  if (TREE_CODE (type) == TYPENAME_TYPE)
 	    {
 	      cp_parser_error (parser, "could not resolve typename type");
 	      type = error_mark_node;
 	    }
 	}
 
-      if (maybe_process_partial_specialization (TREE_TYPE (type))
-	  == error_mark_node)
+      type = maybe_process_partial_specialization (type);
+      if (type == error_mark_node)
 	{
 	  type = NULL_TREE;
 	  goto done;
 	}
 
-      class_type = current_class_type;
       /* Enter the scope indicated by the nested-name-specifier.  */
       pushed_scope = push_scope (nested_name_specifier);
       /* Get the canonical version of this type.  */
-      type = TYPE_MAIN_DECL (TREE_TYPE (type));
+      type = TYPE_MAIN_DECL (type);
       /* Call push_template_decl if it seems like we should be defining a
 	 template either from the template headers or the type we're
 	 defining, so that we diagnose both extra and missing headers.  */
@@ -26626,6 +26633,14 @@ cp_parser_class_head (cp_parser* parser,
 
   if (type)
     {
+      if (current_lambda_expr ()
+	  && uses_parameter_packs (attributes))
+	{
+	  /* In a lambda this should work, but doesn't currently.  */
+	  sorry ("unexpanded parameter pack in local class in lambda");
+	  attributes = NULL_TREE;
+	}
+
       /* Apply attributes now, before any use of the class as a template
 	 argument in its base list.  */
       cplus_decl_attributes (&type, attributes, (int)ATTR_FLAG_TYPE_IN_PLACE);

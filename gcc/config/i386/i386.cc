@@ -7400,7 +7400,8 @@ find_drap_reg (void)
 	 register in such case.  */
       if (DECL_STATIC_CHAIN (decl)
 	  || cfun->machine->no_caller_saved_registers
-	  || crtl->tail_call_emit)
+	  || crtl->tail_call_emit
+	  || crtl->calls_eh_return)
 	return DI_REG;
 
       /* Reuse static chain register if it isn't used for parameter
@@ -18710,7 +18711,7 @@ ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 				    gimple_call_arg (stmt, n_args - 1)))
 	break;
       arg2 = gimple_call_arg (stmt, 2);
-      if (TREE_CODE (arg2) == INTEGER_CST)
+      if (TREE_CODE (arg2) == INTEGER_CST && gimple_call_lhs (stmt))
 	{
 	  unsigned HOST_WIDE_INT shuffle_mask = TREE_INT_CST_LOW (arg2);
 	  /* Check valid imm, refer to gcc.target/i386/testimm-10.c.  */
