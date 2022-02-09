@@ -5242,7 +5242,8 @@ cp_build_binary_op (const op_location_t &location,
 	      e1 = cp_build_binary_op (location,
 				       TRUTH_ORIF_EXPR, e1, e2, complain);
 	    }
-	  e2 = build2 (EQ_EXPR, boolean_type_node, pfn0, pfn1);
+	  e2 = build2 (EQ_EXPR, boolean_type_node,
+		       drop_capability (pfn0), drop_capability (pfn1));
 	  e = cp_build_binary_op (location,
 				  TRUTH_ANDIF_EXPR, e2, e1, complain);
 	  if (code == EQ_EXPR)
