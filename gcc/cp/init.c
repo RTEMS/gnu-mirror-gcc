@@ -4033,8 +4033,8 @@ build_vec_delete_1 (location_t loc, tree base, tree maxindex, tree type,
   TREE_SIDE_EFFECTS (controller) = 1;
 
   body = build1 (EXIT_EXPR, void_type_node,
-		 build2 (EQ_EXPR, boolean_type_node, tbase,
-			 fold_convert (ptype, base)));
+		 build2 (EQ_EXPR, boolean_type_node, drop_capability (tbase),
+			 fold_convert (noncapability_type (ptype), base)));
   tmp = fold_build1_loc (loc, NEGATE_EXPR, sizetype, size_exp);
   tmp = fold_build_pointer_plus (tbase, tmp);
   tmp = cp_build_modify_expr (loc, tbase, NOP_EXPR, tmp, complain);
