@@ -1612,13 +1612,12 @@ static void
 valueize_refs_1 (vec<vn_reference_op_s> *orig, bool *valueized_anything,
 		 bool with_avail = false)
 {
-  vn_reference_op_t vro;
-  unsigned int i;
-
   *valueized_anything = false;
 
-  FOR_EACH_VEC_ELT (*orig, i, vro)
+  for (unsigned i = 0; i < orig->length (); ++i)
     {
+re_valueize:
+      vn_reference_op_t vro = &(*orig)[i];
       if (vro->opcode == SSA_NAME
 	  || (vro->op0 && TREE_CODE (vro->op0) == SSA_NAME))
 	{
@@ -1666,7 +1665,11 @@ valueize_refs_1 (vec<vn_reference_op_s> *orig, bool *valueized_anything,
 	       && (*orig)[i - 1].opcode == MEM_REF)
 	{
 	  if (vn_reference_maybe_forwprop_address (orig, &i))
-	    *valueized_anything = true;
+	    {
+	      *valueized_anything = true;
+	      /* Re-valueize the current operand.  */
+	      goto re_valueize;
+	    }
 	}
       /* If it transforms a non-constant ARRAY_REF into a constant
 	 one, adjust the constant offset.  */
@@ -3797,6 +3800,7 @@ vn_reference_insert_pieces (tree vuse, alias_set_type set,
   if (result && TREE_CODE (result) == SSA_NAME)
     result = SSA_VAL (result);
   vr1->result = result;
+  vr1->result_vdef = NULL_TREE;
 
   slot = valid_info->references->find_slot_with_hash (vr1, vr1->hashcode,
 						      INSERT);
@@ -6392,7 +6396,7 @@ eliminate_dom_walker::eliminate_stmt (basic_block b, gimple_stmt_iterator *gsi)
 	   at the definition are also available at uses.  */
 	sprime = eliminate_avail (gimple_bb (SSA_NAME_DEF_STMT (use)), use);
       if (sprime && sprime != use
-	  && may_propagate_copy (use, sprime)
+	  && may_propagate_copy (use, sprime, true)
 	  /* We substitute into debug stmts to avoid excessive
 	     debug temporaries created by removed stmts, but we need
 	     to avoid doing so for inserted sprimes as we never want

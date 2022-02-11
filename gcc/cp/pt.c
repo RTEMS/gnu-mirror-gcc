@@ -2207,7 +2207,8 @@ determine_specialization (tree template_id,
       targs = coerce_template_parms (parms, explicit_targs, fns,
 				     tf_warning_or_error,
 				     /*req_all*/true, /*use_defarg*/true);
-      if (targs != error_mark_node)
+      if (targs != error_mark_node
+	  && constraints_satisfied_p (fns, targs))
         templates = tree_cons (targs, fns, templates);
     }
   else for (lkp_iterator iter (fns); iter; ++iter)
@@ -3819,6 +3820,7 @@ expand_integer_pack (tree call, tree args, tsubst_flags_t complain,
     }
   else
     {
+      hi = instantiate_non_dependent_expr_sfinae (hi, complain);
       hi = cxx_constant_value (hi);
       int len = valid_constant_size_p (hi) ? tree_to_shwi (hi) : -1;
 
@@ -8224,8 +8226,10 @@ is_compatible_template_arg (tree parm, tree arg)
     {
       tree aparms = DECL_INNERMOST_TEMPLATE_PARMS (arg);
       new_args = template_parms_level_to_args (aparms);
+      ++processing_template_decl;
       parm_cons = tsubst_constraint_info (parm_cons, new_args,
 					  tf_none, NULL_TREE);
+      --processing_template_decl;
       if (parm_cons == error_mark_node)
         return false;
     }
@@ -8514,7 +8518,8 @@ convert_template_argument (tree parm,
 	   can happen in the context of -fnew-ttp-matching.  */;
       else if (tree a = type_uses_auto (t))
 	{
-	  t = do_auto_deduction (t, arg, a, complain, adc_unify, args);
+	  t = do_auto_deduction (t, arg, a, complain, adc_unify, args,
+				 LOOKUP_IMPLICIT);
 	  if (t == error_mark_node)
 	    return error_mark_node;
 	}
@@ -10749,6 +10754,11 @@ any_template_parm_r (tree t, void *data)
     case IDENTIFIER_NODE:
       if (IDENTIFIER_CONV_OP_P (t))
 	/* The conversion-type-id of a conversion operator may be dependent.  */
+	WALK_SUBTREE (TREE_TYPE (t));
+      break;
+
+    case CONVERT_EXPR:
+      if (is_dummy_object (t))
 	WALK_SUBTREE (TREE_TYPE (t));
       break;
 
@@ -20307,7 +20317,9 @@ tsubst_copy_and_build (tree t,
 	if (function != NULL_TREE
 	    && (identifier_p (function)
 		|| (TREE_CODE (function) == TEMPLATE_ID_EXPR
-		    && identifier_p (TREE_OPERAND (function, 0))))
+		    && identifier_p (TREE_OPERAND (function, 0))
+		    && !any_dependent_template_arguments_p (TREE_OPERAND
+							    (function, 1))))
 	    && !any_type_dependent_arguments_p (call_args))
 	  {
 	    if (TREE_CODE (function) == TEMPLATE_ID_EXPR)
@@ -27059,7 +27071,8 @@ value_dependent_expression_p (tree expression)
       }
 
     case TEMPLATE_ID_EXPR:
-      return concept_definition_p (TREE_OPERAND (expression, 0));
+      return concept_definition_p (TREE_OPERAND (expression, 0))
+	&& any_dependent_template_arguments_p (TREE_OPERAND (expression, 1));
 
     case CONSTRUCTOR:
       {
@@ -27465,18 +27478,6 @@ instantiation_dependent_r (tree *tp, int *walk_subtrees,
       /* Treat requires-expressions as dependent. */
     case REQUIRES_EXPR:
       return *tp;
-
-    case CALL_EXPR:
-      /* Treat concept checks as dependent. */
-      if (concept_check_p (*tp))
-        return *tp;
-      break;
-
-    case TEMPLATE_ID_EXPR:
-      /* Treat concept checks as dependent.  */
-      if (concept_check_p (*tp))
-	return *tp;
-      break;
 
     case CONSTRUCTOR:
       if (CONSTRUCTOR_IS_DEPENDENT (*tp))
@@ -28351,7 +28352,7 @@ static int
 extract_autos_r (tree t, void *data)
 {
   hash_table<auto_hash> &hash = *(hash_table<auto_hash>*)data;
-  if (is_auto (t))
+  if (is_auto (t) && !template_placeholder_p (t))
     {
       /* All the autos were built with index 0; fix that up now.  */
       tree *p = hash.find_slot (t, INSERT);
@@ -28385,10 +28386,8 @@ extract_autos (tree type)
   for_each_template_parm (type, extract_autos_r, &hash, &visited, true);
 
   tree tree_vec = make_tree_vec (hash.elements());
-  for (hash_table<auto_hash>::iterator iter = hash.begin();
-       iter != hash.end(); ++iter)
+  for (tree elt : hash)
     {
-      tree elt = *iter;
       unsigned i = TEMPLATE_PARM_IDX (TEMPLATE_TYPE_PARM_INDEX (elt));
       TREE_VEC_ELT (tree_vec, i)
 	= build_tree_list (NULL_TREE, TYPE_NAME (elt));
@@ -28826,12 +28825,7 @@ collect_ctor_idx_types (tree ctor, tree list, tree elt = NULL_TREE)
     {
       tree ftype = elt ? elt : TREE_TYPE (idx);
       if (BRACE_ENCLOSED_INITIALIZER_P (val)
-	  && CONSTRUCTOR_NELTS (val)
-	  /* As in reshape_init_r, a non-aggregate or array-of-dependent-bound
-	     type gets a single initializer.  */
-	  && CP_AGGREGATE_TYPE_P (ftype)
-	  && !(TREE_CODE (ftype) == ARRAY_TYPE
-	       && uses_template_parms (TYPE_DOMAIN (ftype))))
+	  && CONSTRUCTOR_BRACES_ELIDED_P (val))
 	{
 	  tree subelt = NULL_TREE;
 	  if (TREE_CODE (ftype) == ARRAY_TYPE)
@@ -29613,19 +29607,6 @@ do_auto_deduction (tree type, tree init, tree auto_node,
 	return error_mark_node;
       targs = make_tree_vec (1);
       TREE_VEC_ELT (targs, 0) = deduced;
-      /* FIXME: These errors ought to be diagnosed at parse time. */
-      if (type != auto_node)
-	{
-          if (complain & tf_error)
-	    error ("%qT as type rather than plain %<decltype(auto)%>", type);
-	  return error_mark_node;
-	}
-      else if (TYPE_QUALS (type) != TYPE_UNQUALIFIED)
-	{
-	  if (complain & tf_error)
-	    error ("%<decltype(auto)%> cannot be cv-qualified");
-	  return error_mark_node;
-	}
     }
   else
     {
@@ -29635,7 +29616,7 @@ do_auto_deduction (tree type, tree init, tree auto_node,
       tree parms = build_tree_list (NULL_TREE, type);
       tree tparms;
 
-      if (flag_concepts)
+      if (flag_concepts_ts)
 	tparms = extract_autos (type);
       else
 	{
@@ -29823,7 +29804,7 @@ type_uses_auto (tree type)
 {
   if (type == NULL_TREE)
     return NULL_TREE;
-  else if (flag_concepts)
+  else if (flag_concepts_ts)
     {
       /* The Concepts TS allows multiple autos in one type-specifier; just
 	 return the first one we find, do_auto_deduction will collect all of
@@ -29846,6 +29827,11 @@ type_uses_auto (tree type)
 bool
 check_auto_in_tmpl_args (tree tmpl, tree args)
 {
+  if (!flag_concepts_ts)
+    /* Only the concepts TS allows 'auto' as a type-id; it'd otherwise
+       have already been rejected by the parser more generally.  */
+    return false;
+
   /* If there were previous errors, nevermind.  */
   if (!args || TREE_CODE (args) != TREE_VEC)
     return false;
@@ -29855,11 +29841,10 @@ check_auto_in_tmpl_args (tree tmpl, tree args)
      We'll only be able to tell during template substitution, so we
      expect to be called again then.  If concepts are enabled and we
      know we have a type, we're ok.  */
-  if (flag_concepts
-      && (identifier_p (tmpl)
-	  || (DECL_P (tmpl)
-	      &&  (DECL_TYPE_TEMPLATE_P (tmpl)
-		   || DECL_TEMPLATE_TEMPLATE_PARM_P (tmpl)))))
+  if (identifier_p (tmpl)
+      || (DECL_P (tmpl)
+	  &&  (DECL_TYPE_TEMPLATE_P (tmpl)
+	       || DECL_TEMPLATE_TEMPLATE_PARM_P (tmpl))))
     return false;
 
   /* Quickly search for any occurrences of auto; usually there won't

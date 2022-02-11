@@ -11023,10 +11023,12 @@ cp_parser_lambda_introducer (cp_parser* parser, tree lambda_expr)
       if (cp_lexer_next_token_is_keyword (parser->lexer, RID_THIS))
 	{
 	  location_t loc = cp_lexer_peek_token (parser->lexer)->location;
-	  if (cxx_dialect < cxx20
+	  if (cxx_dialect < cxx20 && pedantic
 	      && LAMBDA_EXPR_DEFAULT_CAPTURE_MODE (lambda_expr) == CPLD_COPY)
-	    pedwarn (loc, 0, "explicit by-copy capture of %<this%> redundant "
-		     "with by-copy capture default");
+	    pedwarn (loc, 0,
+		     "explicit by-copy capture of %<this%> "
+		     "with by-copy capture default only available with "
+		     "%<-std=c++20%> or %<-std=gnu++20%>");
 	  cp_lexer_consume_token (parser->lexer);
 	  if (LAMBDA_EXPR_THIS_CAPTURE (lambda_expr))
 	    pedwarn (input_location, 0,
@@ -15052,7 +15054,7 @@ cp_parser_decl_specifier_seq (cp_parser* parser,
       if (found_decl_spec
 	  && (flags & CP_PARSER_FLAGS_ONLY_TYPE_OR_CONSTEXPR)
 	  && token->keyword != RID_CONSTEXPR)
-	error ("%<decl-specifier%> invalid in condition");
+	error ("%qD invalid in condition", ridpointers[token->keyword]);
 
       if (found_decl_spec
 	  && (flags & CP_PARSER_FLAGS_ONLY_MUTABLE_OR_CONSTEXPR)
@@ -18766,7 +18768,7 @@ cp_parser_simple_type_specifier (cp_parser* parser,
 	  else if (!flag_concepts)
 	    pedwarn (token->location, 0,
 		     "use of %<auto%> in parameter declaration "
-		     "only available with %<-fconcepts-ts%>");
+		     "only available with %<-std=c++20%> or %<-fconcepts%>");
 	}
       else
 	type = make_auto ();
@@ -19108,7 +19110,7 @@ cp_parser_simple_type_specifier (cp_parser* parser,
   Note that the Concepts TS allows the auto or decltype(auto) to be
   omitted in a constrained-type-specifier.  */
 
-tree
+static tree
 cp_parser_placeholder_type_specifier (cp_parser *parser, location_t loc,
 				      tree tmpl, bool tentative)
 {
@@ -19124,7 +19126,7 @@ cp_parser_placeholder_type_specifier (cp_parser *parser, location_t loc,
       args = TREE_OPERAND (tmpl, 1);
       tmpl = TREE_OPERAND (tmpl, 0);
     }
-  if (args == NULL_TREE)
+  else
     /* A concept-name with no arguments can't be an expression.  */
     tentative = false;
 
@@ -19162,8 +19164,11 @@ cp_parser_placeholder_type_specifier (cp_parser *parser, location_t loc,
       if (!flag_concepts_ts
 	  || !processing_template_parmlist)
 	{
-	  error_at (loc, "%qE does not constrain a type", DECL_NAME (con));
-	  inform (DECL_SOURCE_LOCATION (con), "concept defined here");
+	  if (!tentative)
+	    {
+	      error_at (loc, "%qE does not constrain a type", DECL_NAME (con));
+	      inform (DECL_SOURCE_LOCATION (con), "concept defined here");
+	    }
 	  return error_mark_node;
 	}
     }
@@ -32432,7 +32437,7 @@ class_decl_loc_t::diag_mismatched_tags (tree type_decl)
   class_decl_loc_t *cdlguide = this;
 
   tree type = TREE_TYPE (type_decl);
-  if (CLASSTYPE_IMPLICIT_INSTANTIATION (type))
+  if (CLASS_TYPE_P (type) && CLASSTYPE_IMPLICIT_INSTANTIATION (type))
     {
       /* For implicit instantiations of a primary template look up
 	 the primary or partial specialization and use it as
@@ -42359,7 +42364,8 @@ cp_parser_oacc_declare (cp_parser *parser, cp_token *pragma_tok)
 	       dependent local extern variable decls are as rare as
 	       hen's teeth.  */
 	    if (auto alias = DECL_LOCAL_DECL_ALIAS (decl))
-	      decl = alias;
+	      if (alias != error_mark_node)
+		decl = alias;
 
 	  if (OMP_CLAUSE_MAP_KIND (t) == GOMP_MAP_LINK)
 	    id = get_identifier ("omp declare target link");
@@ -43310,6 +43316,71 @@ cp_parser_late_parsing_omp_declare_simd (cp_parser *parser, tree attrs)
   return attrs;
 }
 
+/* Helper for cp_parser_omp_declare_target, handle one to or link clause
+   on #pragma omp declare target.  Return false if errors were reported.  */
+
+static bool
+handle_omp_declare_target_clause (tree c, tree t, int device_type)
+{
+  tree at1 = lookup_attribute ("omp declare target", DECL_ATTRIBUTES (t));
+  tree at2 = lookup_attribute ("omp declare target link", DECL_ATTRIBUTES (t));
+  tree id;
+  if (OMP_CLAUSE_CODE (c) == OMP_CLAUSE_LINK)
+    {
+      id = get_identifier ("omp declare target link");
+      std::swap (at1, at2);
+    }
+  else
+    id = get_identifier ("omp declare target");
+  if (at2)
+    {
+      error_at (OMP_CLAUSE_LOCATION (c),
+		"%qD specified both in declare target %<link%> and %<to%>"
+		" clauses", t);
+      return false;
+    }
+  if (!at1)
+    {
+      DECL_ATTRIBUTES (t) = tree_cons (id, NULL_TREE, DECL_ATTRIBUTES (t));
+      if (TREE_CODE (t) != FUNCTION_DECL && !is_global_var (t))
+	return true;
+
+      symtab_node *node = symtab_node::get (t);
+      if (node != NULL)
+	{
+	  node->offloadable = 1;
+	  if (ENABLE_OFFLOADING)
+	    {
+	      g->have_offload = true;
+	      if (is_a <varpool_node *> (node))
+		vec_safe_push (offload_vars, t);
+	    }
+	}
+    }
+  if (TREE_CODE (t) != FUNCTION_DECL)
+    return true;
+  if ((device_type & OMP_CLAUSE_DEVICE_TYPE_HOST) != 0)
+    {
+      tree at3 = lookup_attribute ("omp declare target host",
+				   DECL_ATTRIBUTES (t));
+      if (at3 == NULL_TREE)
+	{
+	  id = get_identifier ("omp declare target host");
+	  DECL_ATTRIBUTES (t) = tree_cons (id, NULL_TREE, DECL_ATTRIBUTES (t));
+	}
+    }
+  if ((device_type & OMP_CLAUSE_DEVICE_TYPE_NOHOST) != 0)
+    {
+      tree at3 = lookup_attribute ("omp declare target nohost",
+				   DECL_ATTRIBUTES (t));
+      if (at3 == NULL_TREE)
+	{
+	  id = get_identifier ("omp declare target nohost");
+	  DECL_ATTRIBUTES (t) = tree_cons (id, NULL_TREE, DECL_ATTRIBUTES (t));
+	}
+    }
+  return true;
+}
 
 /* OpenMP 4.0:
    # pragma omp declare target new-line
@@ -43356,67 +43427,17 @@ cp_parser_omp_declare_target (cp_parser *parser, cp_token *pragma_tok)
     {
       if (OMP_CLAUSE_CODE (c) == OMP_CLAUSE_DEVICE_TYPE)
 	continue;
-      tree t = OMP_CLAUSE_DECL (c), id;
-      tree at1 = lookup_attribute ("omp declare target", DECL_ATTRIBUTES (t));
-      tree at2 = lookup_attribute ("omp declare target link",
-				   DECL_ATTRIBUTES (t));
+      tree t = OMP_CLAUSE_DECL (c);
       only_device_type = false;
-      if (OMP_CLAUSE_CODE (c) == OMP_CLAUSE_LINK)
-	{
-	  id = get_identifier ("omp declare target link");
-	  std::swap (at1, at2);
-	}
-      else
-	id = get_identifier ("omp declare target");
-      if (at2)
-	{
-	  error_at (OMP_CLAUSE_LOCATION (c),
-		    "%qD specified both in declare target %<link%> and %<to%>"
-		    " clauses", t);
-	  continue;
-	}
-      if (!at1)
-	{
-	  DECL_ATTRIBUTES (t) = tree_cons (id, NULL_TREE, DECL_ATTRIBUTES (t));
-	  if (TREE_CODE (t) != FUNCTION_DECL && !is_global_var (t))
-	    continue;
-
-	  symtab_node *node = symtab_node::get (t);
-	  if (node != NULL)
-	    {
-	      node->offloadable = 1;
-	      if (ENABLE_OFFLOADING)
-		{
-		  g->have_offload = true;
-		  if (is_a <varpool_node *> (node))
-		    vec_safe_push (offload_vars, t);
-		}
-	    }
-	}
-      if (TREE_CODE (t) != FUNCTION_DECL)
+      if (!handle_omp_declare_target_clause (c, t, device_type))
 	continue;
-      if ((device_type & OMP_CLAUSE_DEVICE_TYPE_HOST) != 0)
-	{
-	  tree at3 = lookup_attribute ("omp declare target host",
-				       DECL_ATTRIBUTES (t));
-	  if (at3 == NULL_TREE)
-	    {
-	      id = get_identifier ("omp declare target host");
-	      DECL_ATTRIBUTES (t)
-		= tree_cons (id, NULL_TREE, DECL_ATTRIBUTES (t));
-	    }
-	}
-      if ((device_type & OMP_CLAUSE_DEVICE_TYPE_NOHOST) != 0)
-	{
-	  tree at3 = lookup_attribute ("omp declare target nohost",
-				       DECL_ATTRIBUTES (t));
-	  if (at3 == NULL_TREE)
-	    {
-	      id = get_identifier ("omp declare target nohost");
-	      DECL_ATTRIBUTES (t)
-		= tree_cons (id, NULL_TREE, DECL_ATTRIBUTES (t));
-	    }
-	}
+      if (VAR_OR_FUNCTION_DECL_P (t)
+	  && DECL_LOCAL_DECL_P (t)
+	  && DECL_LANG_SPECIFIC (t)
+	  && DECL_LOCAL_DECL_ALIAS (t)
+	  && DECL_LOCAL_DECL_ALIAS (t) != error_mark_node)
+	handle_omp_declare_target_clause (c, DECL_LOCAL_DECL_ALIAS (t),
+					  device_type);
     }
   if (device_type && only_device_type)
     warning_at (OMP_CLAUSE_LOCATION (clauses), 0,
