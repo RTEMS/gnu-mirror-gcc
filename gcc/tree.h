@@ -6366,7 +6366,10 @@ fndecl_built_in_p (const_tree node, built_in_function name)
 static inline bool
 tree_is_capability_value (const_tree t)
 {
-  return t && t != error_mark_node && capability_type_p (TREE_TYPE (t));
+  return t
+    && t != error_mark_node
+    && !TYPE_P (t)
+    && capability_type_p (TREE_TYPE (t));
 }
 
 inline wide_int
