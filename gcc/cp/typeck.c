@@ -6022,9 +6022,7 @@ pointer_diff (location_t loc, tree op0, tree op1, tree ptrtype,
      ptrdiff_type to support differences larger than half the address
      space, cast the pointers to some larger integer type and do the
      computations in that type.  */
-  if (TYPE_PRECISION (inttype) > calc_precision
-      || capability_type_p (TREE_TYPE (op0))
-      || capability_type_p (TREE_TYPE (op1)))
+  if (TYPE_PRECISION (inttype) > calc_precision)
     op0 = cp_build_binary_op (loc,
 			      MINUS_EXPR,
 			      cp_convert (inttype, op0, complain),
