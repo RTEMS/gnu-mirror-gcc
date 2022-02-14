@@ -144,6 +144,8 @@ gimple_build_vector (gimple_seq *seq, tree_vector_builder *builder)
   return gimple_build_vector (seq, UNKNOWN_LOCATION, builder);
 }
 
+extern tree gimple_drop_capability (gimple_seq *, tree);
+
 extern bool gimple_stmt_nonnegative_warnv_p (gimple *, bool *, int = 0);
 extern bool gimple_stmt_integer_valued_real_p (gimple *, int = 0);
 

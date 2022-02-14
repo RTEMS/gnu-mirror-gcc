@@ -38,6 +38,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-eh.h"
 #include "gimplify.h"
 #include "gimple-iterator.h"
+#include "gimple-fold.h"
 #include "tree-cfg.h"
 #include "gimple-pretty-print.h"
 #include "dumpfile.h"
@@ -1310,11 +1311,15 @@ gimple_ic (gcall *icall_stmt, struct cgraph_node *direct_call,
   gsi = gsi_for_stmt (icall_stmt);
 
   tree ptr_address_type = noncapability_type (ptr_type_node);
-  tmp0 = make_temp_ssa_name (ptr_address_type, NULL, "PROF");
+  tmp0 = make_temp_ssa_name (ptr_type_node, NULL, "PROF");
   tmp1 = make_temp_ssa_name (ptr_address_type, NULL, "PROF");
-  tmp = fold_drop_capability (unshare_expr (gimple_call_fn (icall_stmt)));
+  tmp = unshare_expr (gimple_call_fn (icall_stmt));
   load_stmt = gimple_build_assign (tmp0, tmp);
   gsi_insert_before (&gsi, load_stmt, GSI_SAME_STMT);
+
+  gimple_seq seq = NULL;
+  tmp0 = gimple_drop_capability (&seq, tmp0);
+  gsi_insert_seq_before (&gsi, seq, GSI_SAME_STMT);
 
   tmp = fold_convert (ptr_address_type, build_addr (direct_call->decl));
   load_stmt = gimple_build_assign (tmp1, tmp);

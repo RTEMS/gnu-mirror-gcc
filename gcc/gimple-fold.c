@@ -7793,6 +7793,14 @@ gimple_build (gimple_seq *seq, location_t loc, combined_fn fn,
   return res;
 }
 
+tree
+gimple_drop_capability (gimple_seq *seq, tree op0)
+{
+  return gimple_convert (seq,
+			 noncapability_type (TREE_TYPE (op0)),
+			 op0);
+}
+
 /* Build the conversion (TYPE) OP with a result of type TYPE
    with location LOC if such conversion is neccesary in GIMPLE,
    simplifying it first.
