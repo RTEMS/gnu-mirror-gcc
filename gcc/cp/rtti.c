@@ -536,8 +536,10 @@ get_typeid (tree type, tsubst_flags_t complain)
 static tree
 ifnonnull (tree test, tree result, tsubst_flags_t complain)
 {
-  tree cond = build2 (NE_EXPR, boolean_type_node, test,
-		      cp_convert (TREE_TYPE (test), nullptr_node, complain));
+  tree cond = build2 (NE_EXPR, boolean_type_node,
+		      drop_capability (test),
+		      cp_convert (noncapability_type (TREE_TYPE (test)),
+				  nullptr_node, complain));
   /* This is a compiler generated comparison, don't emit
      e.g. -Wnonnull-compare warning for it.  */
   TREE_NO_WARNING (cond) = 1;
