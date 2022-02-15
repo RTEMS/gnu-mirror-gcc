@@ -10015,6 +10015,9 @@ build_vbase_offset_vtbl_entries (tree binfo, vtbl_init_data* vid)
       delta = size_diffop_loc (input_location,
 			   BINFO_OFFSET (b), BINFO_OFFSET (non_primary_binfo));
 
+      if (capability_type_p (vtable_entry_type))
+	delta = fold_build_pointer_plus (null_pointer_node, delta);
+
       CONSTRUCTOR_APPEND_ELT (vid->inits, NULL_TREE,
 			      fold_build1_loc (input_location, NOP_EXPR,
 					       vtable_entry_type, delta));
@@ -10175,6 +10178,11 @@ add_vcall_offset (tree orig_fn, tree binfo, vtbl_init_data *vid)
 	  vcall_offset = size_diffop_loc (input_location,
 				      BINFO_OFFSET (base),
 				      BINFO_OFFSET (vid->binfo));
+
+	  if (capability_type_p (vtable_entry_type))
+	    vcall_offset = fold_build_pointer_plus (null_pointer_node,
+						    vcall_offset);
+
 	  vcall_offset = fold_build1_loc (input_location,
 				      NOP_EXPR, vtable_entry_type,
 				      vcall_offset);
