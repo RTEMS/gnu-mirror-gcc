@@ -3598,7 +3598,7 @@ c_common_truthvalue_conversion (location_t location, tree expr)
       return build_binary_op (location, NE_EXPR, expr, fixed_zero_node, true);
     }
   else
-    return build_binary_op (location, NE_EXPR, fold_drop_capability (expr),
+    return build_binary_op (location, NE_EXPR, drop_capability (expr),
 			    integer_zero_node, true);
 
  ret:

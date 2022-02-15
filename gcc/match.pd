@@ -4455,7 +4455,8 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 	    || cmp == NE_EXPR
 	    || cmp == EQ_EXPR)
 	&& !(POINTER_TYPE_P (TREE_TYPE (@00))
-	     || INTCAP_TYPE_P (TREE_TYPE (@00))))
+	     || INTCAP_TYPE_P (TREE_TYPE (@00))
+	     || TREE_CODE (TREE_TYPE (@00)) == NULLPTR_TYPE))
     /* ???  The special-casing of INTEGER_CST conversion was in the original
        code and here to avoid a spurious overflow flag on the resulting
        constant which fold_convert produces.  */

@@ -3639,9 +3639,10 @@ verify_gimple_assign_unary (gassign *stmt)
 		&& TREE_CODE (rhs1_type) == OFFSET_TYPE))
 	  return false;
 
-	/* Only allow conversions from INTCAP_TYPE to integral type if there is
-	   no sign or zero extension involved.  */
-	if (INTCAP_TYPE_P (rhs1_type) && INTEGRAL_TYPE_P (lhs_type)
+	/* Only allow conversions from INTCAP_TYPE or NULLPTR_TYPE to
+	   integral type if there is no sign or zero extension involved.  */
+	if ((INTCAP_TYPE_P (rhs1_type) || TREE_CODE (rhs1_type) == NULLPTR_TYPE)
+	    && INTEGRAL_TYPE_P (lhs_type)
 	    && (TYPE_PRECISION (lhs_type) <= TYPE_NONCAP_PRECISION (rhs1_type)))
 	  return false;
 
