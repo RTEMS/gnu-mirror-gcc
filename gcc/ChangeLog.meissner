@@ -1,3 +1,11 @@
+Work078, patch #3:
+2022-02-15  Michael Meissner  <meissner@the-meissners.org>
+
+	PR target/99708
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
+	__SIZEOF_FLOAT128__ and __SIZEOF_IBM128__ if we have float128
+	support.
+
 Work078, patch #2:
 2022-02-08  Michael Meissner  <meissner@the-meissners.org>
 
