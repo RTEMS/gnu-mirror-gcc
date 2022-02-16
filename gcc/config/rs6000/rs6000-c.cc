@@ -581,17 +581,9 @@ rs6000_target_modify_macros (bool define_p, HOST_WIDE_INT flags,
     {
       rs6000_define_or_undefine_macro (define_p, "__FLOAT128__");
       if (define_p)
-	{
-	  rs6000_define_or_undefine_macro (true, "__float128=__ieee128");
-	  rs6000_define_or_undefine_macro (true, "__SIZEOF_FLOAT128__=16");
-	  rs6000_define_or_undefine_macro (true, "__SIZEOF_IBM128__=16");
-	}
+	rs6000_define_or_undefine_macro (true, "__float128=__ieee128");
       else
-	{
-	  rs6000_define_or_undefine_macro (false, "__float128");
-	  rs6000_define_or_undefine_macro (false, "__SIZEOF_FLOAT128__");
-	  rs6000_define_or_undefine_macro (false, "__SIZEOF_IBM128__");
-	}
+	rs6000_define_or_undefine_macro (false, "__float128");
     }
   /* OPTION_MASK_FLOAT128_HARDWARE can be turned on if -mcpu=power9 is used or
      via the target attribute/pragma.  */
