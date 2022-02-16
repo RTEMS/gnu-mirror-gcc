@@ -622,8 +622,13 @@ rs6000_cpu_cpp_builtins (cpp_reader *pfile)
     builtin_define ("__RSQRTE__");
   if (TARGET_FRSQRTES)
     builtin_define ("__RSQRTEF__");
+  if (ibm128_float_type_node)
+    builtin_define ("__SIZEOF_IBM128__=16");
   if (TARGET_FLOAT128_TYPE)
-    builtin_define ("__FLOAT128_TYPE__");
+    {
+      builtin_define ("__FLOAT128_TYPE__");
+      builtin_define ("__SIZEOF_FLOAT128__=16");
+    }
 #ifdef TARGET_LIBC_PROVIDES_HWCAP_IN_TCB
   builtin_define ("__BUILTIN_CPU_SUPPORTS__");
 #endif
