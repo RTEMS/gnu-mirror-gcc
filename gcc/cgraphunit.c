@@ -2136,8 +2136,13 @@ cgraph_node::expand_thunk (bool output_asm_thunks, bool force_gimple_thunk)
 		  add_bb_to_loop (else_bb, bb->loop_father);
 		  remove_edge (single_succ_edge (bb));
 		  true_label = gimple_block_label (then_bb);
-		  stmt = gimple_build_cond (NE_EXPR, restmp,
-					    build_zero_cst (TREE_TYPE (restmp)),
+
+		  gimple_seq seq = NULL;
+		  tree res_cmp = gimple_drop_capability (&seq, restmp);
+		  gsi_insert_seq_after(&bsi, seq, GSI_NEW_STMT);
+
+		  stmt = gimple_build_cond (NE_EXPR, res_cmp,
+					    build_zero_cst (TREE_TYPE (res_cmp)),
 					    NULL_TREE, NULL_TREE);
 		  gsi_insert_after (&bsi, stmt, GSI_NEW_STMT);
 		  e = make_edge (bb, then_bb, EDGE_TRUE_VALUE);
