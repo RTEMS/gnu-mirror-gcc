@@ -9255,7 +9255,11 @@ expand_ptrmemfunc_cst (tree cst, tree *delta, tree *pfn)
 	  gcc_unreachable ();
 	}
 
-      *pfn = fold_convert (TYPE_PTRMEMFUNC_FN_TYPE (type), *pfn);
+      tree ty = TYPE_PTRMEMFUNC_FN_TYPE (type);
+      if (capability_type_p (ty))
+	*pfn = fold_build_pointer_plus (null_pointer_node, *pfn);
+
+      *pfn = fold_convert (ty, *pfn);
     }
 }
 
