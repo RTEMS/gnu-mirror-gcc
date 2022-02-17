@@ -5825,6 +5825,7 @@ cp_build_binary_op (const op_location_t &location,
      to work out where the provenance (if any) should come from.  */
   if (!capability_type_p (TREE_TYPE (result))
       && TREE_CODE_CLASS (code) != tcc_comparison
+      && code != SPACESHIP_EXPR
       && result_type != boolean_type_node)
     {
       tree orig_type0 = TREE_TYPE (orig_op0);
