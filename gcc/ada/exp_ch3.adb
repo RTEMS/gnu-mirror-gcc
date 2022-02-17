@@ -7536,6 +7536,7 @@ package body Exp_Ch3 is
             elsif Comes_From_Source (N)
               and then Is_Discrete_Type (Typ)
               and then Expr_Known_Valid (Expr)
+              and then Safe_To_Capture_Value (N, Def_Id)
             then
                Set_Is_Known_Valid (Def_Id);
 
@@ -7566,7 +7567,9 @@ package body Exp_Ch3 is
               and then not Is_Generic_Type (Etype (Def_Id))
             then
                Ensure_Valid (Expr);
-               Set_Is_Known_Valid (Def_Id);
+               if Safe_To_Capture_Value (N, Def_Id) then
+                  Set_Is_Known_Valid (Def_Id);
+               end if;
             end if;
          end if;
 
