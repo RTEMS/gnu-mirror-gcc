@@ -3,8 +3,8 @@ Work078, patch #4:
 
 	PR target/104256
 	* config/rs6000/rs6000.cc (rs6000_emit_int_cmove): Don't do
-	integer conditional moves if the test involves floating point
-	comparisons that can't easily be reversed.
+	integer conditional moves if the test needs to be reversed and
+	there isn't a direct reverse comparison.
 
 Work078, patch #3:
 2022-02-16  Michael Meissner  <meissner@the-meissners.org>
