@@ -1,3 +1,9 @@
+Work078, patch #4:
+2022-02-17  Michael Meissner  <meissner@the-meissners.org>
+
+	PR target/104256
+	* gcc.target/powerpc/ppc-fortran/pr104254.f90: New test.
+
 Work078, patch #3:
 2022-02-16  Michael Meissner  <meissner@the-meissners.org>
 
