@@ -16174,39 +16174,41 @@ rs6000_emit_int_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
 {
   rtx condition_rtx, cr;
   machine_mode mode = GET_MODE (dest);
-  enum rtx_code cond_code;
   rtx (*isel_func) (rtx, rtx, rtx, rtx, rtx);
   bool signedp;
 
   if (mode != SImode && (!TARGET_POWERPC64 || mode != DImode))
     return false;
 
+  /* Swap the comparison if isel can't handle it directly.  Don't generate int
+     cmoves if we can't swap the condition code due to NaNs.  */
+  enum rtx_code op_code = GET_CODE (op);
+  if (op_code != LT && op_code != GT && op_code != LTU && op_code != GTU
+      && op_code != EQ)
+    {
+      if (!COMPARISON_P (op))
+	return false;
+
+      enum rtx_code rev_code = reverse_condition (op_code);
+      if (rev_code == UNKNOWN)
+	return false;
+
+      std::swap (false_cond, true_cond);
+      op = gen_rtx_fmt_ee (rev_code, GET_MODE (op),
+			   XEXP (op, 0),
+			   XEXP (op, 1));
+    }
+
   /* We still have to do the compare, because isel doesn't do a
      compare, it just looks at the CRx bits set by a previous compare
      instruction.  */
   condition_rtx = rs6000_generate_compare (op, mode);
-  cond_code = GET_CODE (condition_rtx);
   cr = XEXP (condition_rtx, 0);
   signedp = GET_MODE (cr) == CCmode;
 
   isel_func = (mode == SImode
 	       ? (signedp ? gen_isel_signed_si : gen_isel_unsigned_si)
 	       : (signedp ? gen_isel_signed_di : gen_isel_unsigned_di));
-
-  switch (cond_code)
-    {
-    case LT: case GT: case LTU: case GTU: case EQ:
-      /* isel handles these directly.  */
-      break;
-
-    default:
-      /* We need to swap the sense of the comparison.  */
-      {
-	std::swap (false_cond, true_cond);
-	PUT_CODE (condition_rtx, reverse_condition (cond_code));
-      }
-      break;
-    }
 
   false_cond = force_reg (mode, false_cond);
   if (true_cond != const0_rtx)
