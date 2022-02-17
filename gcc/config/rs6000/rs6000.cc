@@ -16181,15 +16181,6 @@ rs6000_emit_int_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
   if (mode != SImode && (!TARGET_POWERPC64 || mode != DImode))
     return false;
 
-  /* Don't do int cmoves for IEEE comparisons.  The rs6000_generate_compare
-     function will eventually raise an exception because the mode used is
-     CCmode (due to this being an int cmove), but you can only do these
-     comparsions with CCFP mode.  */
-  enum rtx_code op_code = GET_CODE (op);
-  if (op_code == ORDERED || op_code == UNORDERED || op_code == UNEQ || op_code == LTGT
-      || op_code == UNGT || op_code == UNLT || op_code == UNGE || op_code == UNLE)
-    return false;
-					
   /* We still have to do the compare, because isel doesn't do a
      compare, it just looks at the CRx bits set by a previous compare
      instruction.  */
