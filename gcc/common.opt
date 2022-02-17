@@ -1770,6 +1770,10 @@ fharden-conditional-branches
 Common Var(flag_harden_conditional_branches) Optimization
 Harden conditional branches by checking reversed conditions.
 
+fharden-control-flow-redundancy
+Common Var(flag_harden_control_flow_redundancy) Optimization
+Harden control flow by recording and checking execution paths.
+
 ; Nonzero means ignore `#ident' directives.  0 means handle them.
 ; Generate position-independent code for executables if possible
 ; On SVR4 targets, it also controls whether or not to emit a

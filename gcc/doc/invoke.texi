@@ -607,6 +607,7 @@ Objective-C and Objective-C++ Dialects}.
 -fsanitize-undefined-trap-on-error  -fbounds-check @gol
 -fcf-protection=@r{[}full@r{|}branch@r{|}return@r{|}none@r{|}check@r{]} @gol
 -fharden-compares -fharden-conditional-branches @gol
+-fharden-control-flow-redundancy @gol
 -fstack-protector  -fstack-protector-all  -fstack-protector-strong @gol
 -fstack-protector-explicit  -fstack-check @gol
 -fstack-limit-register=@var{reg}  -fstack-limit-symbol=@var{sym} @gol
@@ -14674,6 +14675,16 @@ A value of zero can be used to lift
 the bound.  A variable whose value is unknown at compilation time and
 defined outside a SCoP is a parameter of the SCoP.
 
+@item hardcfr-max-blocks
+Disable @option{-fharden-control-flow-redundancy} for functions with a
+larger number of blocks than the specified value.  Zero removes any
+limit.
+
+@item hardcfr-max-inline-blocks
+Force @option{-fharden-control-flow-redundancy} to use out-of-line
+checking for functions with a larger number of basic blocks than the
+specified value.
+
 @item loop-block-tile-size
 Loop blocking or strip mining transforms, enabled with
 @option{-floop-block} or @option{-floop-strip-mine}, strip mine each
@@ -16079,6 +16090,14 @@ optimizations, emit extra code to compute and verify the reversed
 condition, and to call @code{__builtin_trap} if the result is
 unexpected.  Use with @samp{-fharden-compares} to cover all
 conditionals.
+
+@item -fharden-control-flow-redundancy
+@opindex fharden-control-flow-redundancy
+Emit extra code to set booleans when entering basic blocks, and to
+verify, at function exits, that they amount to an execution path that is
+consistent with the control flow graph, trapping otherwise.  Tuning
+options @option{--param hardcfr-max-blocks} and @option{--param
+hardcfr-max-inline-blocks} are available.
 
 @item -fstack-protector
 @opindex fstack-protector
