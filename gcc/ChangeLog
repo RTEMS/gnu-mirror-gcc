@@ -1,3 +1,166 @@
+2022-02-17  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-11-15  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/103237
+	* tree-vect-loop.c (vect_is_simple_reduction): Fail for
+	double reductions with multiple inner loop LC PHI nodes.
+
+2022-02-17  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-11-22  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/103181
+	PR middle-end/103248
+	* tree-eh.c (operation_could_trap_helper_p): Properly
+	check vector constants for a zero element for integer
+	division.  Separate floating point and integer division code.
+	Properly handle fixed-point RDIV_EXPR.
+
+2022-02-17  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-11-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/102798
+	* tree-vect-data-refs.c (vect_create_addr_base_for_vector_ref):
+	Only copy points-to info to newly generated SSA names.
+
+2022-02-17  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-10-15  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/102762
+	* tree-inline.c (copy_bb): Avoid underflowing nargs.
+
+2022-02-17  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-06-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/100923
+	* tree-ssa-sccvn.c (valueize_refs_1): Take a pointer to
+	the operand vector to be valueized.
+	(valueize_refs): Likewise.
+	(valueize_shared_reference_ops_from_ref): Adjust.
+	(valueize_shared_reference_ops_from_call): Likewise.
+	(vn_reference_lookup_3): Likewise.
+	(vn_reference_lookup_pieces): Likewise.  Re-valueize
+	with honoring availability when we are about to create
+	the ao_ref and valueized before.
+	(vn_reference_lookup): Likewise.
+	(vn_reference_insert_pieces): Adjust.
+
+2022-02-17  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-06-22  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/101158
+	* tree-vect-slp.c (vect_build_slp_tree_1): Move same operand
+	checking after checking for matching operation.
+
+2022-02-15  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2022-02-07  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/103627
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Move the
+	hunk affecting VSX and ALTIVEC to appropriate place.
+
+2022-02-15  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2022-02-07  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/103627
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Disable
+	MMA if !TARGET_VSX.
+
+2022-02-14  Maciej W. Rozycki  <macro@embecosm.com>
+
+	Backported from master:
+	2022-02-08  Maciej W. Rozycki  <macro@embecosm.com>
+
+	* config/riscv/t-riscv (riscv-sr.o): Add $(TM_H) dependency.
+
+2022-02-13  Alan Modra  <amodra@gmail.com>
+
+	Backported from master:
+	2020-10-01  Alan Modra  <amodra@gmail.com>
+
+	* config/rs6000/ppc-asm.h: Support __PCREL__ code.
+
+2022-02-10  Uros Bizjak  <ubizjak@gmail.com>
+
+	Backported from master:
+	2022-02-10  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/104469
+	* config/i386/sse.md (vec_unpacks_float_lo_v4si):
+	Change operand 1 constraint to register_operand.
+
+2022-02-09  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/104458
+	* config/i386/i386-expand.c (ix86_split_idivmod):
+	Force operands[2] and operands[3] into a register..
+
+2022-02-09  liuhongt  <hongtao.liu@intel.com>
+
+	PR target/104451
+	* config/i386/sse.md (<insn><mode>3): lowpart_subreg
+	operands[2] from SImode to QImode.
+
+2022-02-03  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	PR target/104090
+	* config/rs6000/rs6000.c (rs6000_machine_from_flags): Use also
+	rs6000_cpu.
+
+2022-02-02  Xi Ruoyao  <xry111@mengyan1223.wang>
+
+	Backported from master:
+	2022-02-01  Xi Ruoyao  <xry111@mengyan1223.wang>
+
+	PR middle-end/95115
+	* fold-const.c (const_binop): Do not fold NaN result from
+	  non-NaN operands.
+
+2022-01-15  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2021-11-16  Peter Bergner  <bergner@linux.ibm.com>
+
+	PR target/102976
+	* config/rs6000/mma.md (*vsx_assemble_pair): Add early-clobber for
+	output operand.
+	(*mma_assemble_acc): Likewise.
+
+2022-01-15  Peter Bergner  <bergner@linux.ibm.com>
+
+	* config/rs6000/mma.md (UNSPEC_VSX_ASSEMBLE): New unspec.
+	(vsx_assemble_pair): Use mma_assemble_input_operand.
+	Expand into UNSPEC_VSX_ASSEMBLE wrapper.
+	(*vsx_assemble_pair): New define_insn_and_split.
+	* config/rs6000/rs6000.c (rs6000_split_multireg_move): Handle
+	UNSPEC_VSX_ASSEMBLE.
+
+2022-01-15  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2021-09-14  Peter Bergner  <bergner@linux.ibm.com>
+
+	* config/rs6000/mma.md (unspecv): Add UNSPECV_MMA_XXSETACCZ.
+	(*movpxi): Remove 'O' alternative.
+	(mma_xxsetaccz): Change to define_insn.  Use UNSPECV_MMA_XXSETACCZ.
+	Add comment.
+	* config/rs6000/rs6000.c (rs6000_rtx_costs): Handle UNSPEC_VOLATILE.
+
 2022-01-14  Eric Botcazou  <ebotcazou@adacore.com>
 
 	* ipa-param-manipulation.c (ipa_dump_adjusted_parameters): Dump

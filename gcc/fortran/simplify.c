@@ -2540,6 +2540,9 @@ gfc_simplify_eoshift (gfc_expr *array, gfc_expr *shift, gfc_expr *boundary,
   if (arraysize == 0)
     goto final;
 
+  if (array->shape == NULL)
+    goto final;
+
   arrayvec = XCNEWVEC (gfc_expr *, arraysize);
   array_ctor = gfc_constructor_first (array->value.constructor);
   for (i = 0; i < arraysize; i++)
@@ -8051,7 +8054,18 @@ gfc_simplify_transfer (gfc_expr *source, gfc_expr *mold, gfc_expr *size)
      set even for array expressions, in order to pass this information into
      gfc_target_interpret_expr.  */
   if (result->ts.type == BT_CHARACTER && gfc_is_constant_expr (mold_element))
-    result->value.character.length = mold_element->value.character.length;
+    {
+      result->value.character.length = mold_element->value.character.length;
+
+      /* Let the typespec of the result inherit the string length.
+	 This is crucial if a resulting array has size zero.  */
+      if (mold_element->ts.u.cl->length)
+	result->ts.u.cl->length = gfc_copy_expr (mold_element->ts.u.cl->length);
+      else
+	result->ts.u.cl->length =
+	  gfc_get_int_expr (gfc_charlen_int_kind, NULL,
+			    mold_element->value.character.length);
+    }
 
   /* Set the number of elements in the result, and determine its size.  */
 

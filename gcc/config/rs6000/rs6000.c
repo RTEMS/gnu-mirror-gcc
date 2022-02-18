@@ -3815,6 +3815,15 @@ rs6000_option_override_internal (bool global_init_p)
   else if (TARGET_ALTIVEC)
     rs6000_isa_flags |= (OPTION_MASK_PPC_GFXOPT & ~ignore_masks);
 
+  /* Disable VSX and Altivec silently if the user switched cpus to power7 in a
+     target attribute or pragma which automatically enables both options,
+     unless the altivec ABI was set.  This is set by default for 64-bit, but
+     not for 32-bit.  Don't move this before the above code using ignore_masks,
+     since it can reset the cleared VSX/ALTIVEC flag again.  */
+  if (main_target_opt && !main_target_opt->x_rs6000_altivec_abi)
+    rs6000_isa_flags &= ~((OPTION_MASK_VSX | OPTION_MASK_ALTIVEC)
+			  & ~rs6000_isa_flags_explicit);
+
   if (TARGET_CRYPTO && !TARGET_ALTIVEC)
     {
       if (rs6000_isa_flags_explicit & OPTION_MASK_CRYPTO)
@@ -4209,18 +4218,6 @@ rs6000_option_override_internal (bool global_init_p)
 	}
     }
 
-  /* Disable VSX and Altivec silently if the user switched cpus to power7 in a
-     target attribute or pragma which automatically enables both options,
-     unless the altivec ABI was set.  This is set by default for 64-bit, but
-     not for 32-bit.  */
-  if (main_target_opt != NULL && !main_target_opt->x_rs6000_altivec_abi)
-    {
-      TARGET_FLOAT128_TYPE = 0;
-      rs6000_isa_flags &= ~((OPTION_MASK_VSX | OPTION_MASK_ALTIVEC
-			     | OPTION_MASK_FLOAT128_KEYWORD)
-			    & ~rs6000_isa_flags_explicit);
-    }
-
   /* Enable Altivec ABI for AIX -maltivec.  */
   if (TARGET_XCOFF && (TARGET_ALTIVEC || TARGET_VSX))
     {
@@ -4308,6 +4305,16 @@ rs6000_option_override_internal (bool global_init_p)
       if ((rs6000_isa_flags_explicit & OPTION_MASK_MMA) != 0)
 	error ("%qs requires %qs", "-mmma", "-mcpu=power10");
 
+      rs6000_isa_flags &= ~OPTION_MASK_MMA;
+    }
+
+  /* MMA requires SIMD support as ISA 3.1 claims and our implementation
+     such as "*movoo" uses vector pair access which use VSX registers.
+     So make MMA require VSX support here.  */
+  if (TARGET_MMA && !TARGET_VSX)
+    {
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_MMA) != 0)
+	error ("%qs requires %qs", "-mmma", "-mvsx");
       rs6000_isa_flags &= ~OPTION_MASK_MMA;
     }
 
@@ -5547,6 +5554,34 @@ const char *rs6000_machine;
 const char *
 rs6000_machine_from_flags (void)
 {
+  /* For some CPUs, the machine cannot be determined by ISA flags.  We have to
+     check them first.  */
+  switch (rs6000_cpu)
+    {
+    case PROCESSOR_PPC8540:
+    case PROCESSOR_PPC8548:
+      return "e500";
+
+    case PROCESSOR_PPCE300C2:
+    case PROCESSOR_PPCE300C3:
+      return "e300";
+
+    case PROCESSOR_PPCE500MC:
+      return "e500mc";
+
+    case PROCESSOR_PPCE500MC64:
+      return "e500mc64";
+
+    case PROCESSOR_PPCE5500:
+      return "e5500";
+
+    case PROCESSOR_PPCE6500:
+      return "e6500";
+
+    default:
+      break;
+    }
+
   HOST_WIDE_INT flags = rs6000_isa_flags;
 
   /* Disable the flags that should never influence the .machine selection.  */

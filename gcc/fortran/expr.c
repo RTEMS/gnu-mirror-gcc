@@ -2216,10 +2216,9 @@ gfc_simplify_expr (gfc_expr *p, int type)
 	  && gfc_intrinsic_func_interface (p, 1) == MATCH_ERROR)
 	return false;
 
-      if (p->expr_type == EXPR_FUNCTION)
+      if (p->symtree && (p->value.function.isym || p->ts.type == BT_UNKNOWN))
 	{
-	  if (p->symtree)
-	    isym = gfc_find_function (p->symtree->n.sym->name);
+	  isym = gfc_find_function (p->symtree->n.sym->name);
 	  if (isym && isym->elemental)
 	    scalarize_intrinsic_call (p, false);
 	}
@@ -4334,6 +4333,7 @@ gfc_check_pointer_assign (gfc_expr *lvalue, gfc_expr *rvalue,
     {
       gfc_symbol *sym;
       bool target;
+      gfc_ref *ref;
 
       if (gfc_is_size_zero_array (rvalue))
 	{
@@ -4362,6 +4362,39 @@ gfc_check_pointer_assign (gfc_expr *lvalue, gfc_expr *rvalue,
 		     "does not have the TARGET attribute at %L",
 		     &rvalue->where);
 	  return false;
+	}
+
+      for (ref = rvalue->ref; ref; ref = ref->next)
+	{
+	  switch (ref->type)
+	    {
+	    case REF_ARRAY:
+	      for (int n = 0; n < ref->u.ar.dimen; n++)
+		if (!gfc_is_constant_expr (ref->u.ar.start[n])
+		    || !gfc_is_constant_expr (ref->u.ar.end[n])
+		    || !gfc_is_constant_expr (ref->u.ar.stride[n]))
+		  {
+		    gfc_error ("Every subscript of target specification "
+			       "at %L must be a constant expression",
+			       &ref->u.ar.where);
+		    return false;
+		  }
+	      break;
+
+	    case REF_SUBSTRING:
+	      if (!gfc_is_constant_expr (ref->u.ss.start)
+		  || !gfc_is_constant_expr (ref->u.ss.end))
+		{
+		  gfc_error ("Substring starting and ending points of target "
+			     "specification at %L must be constant expressions",
+			     &ref->u.ss.start->where);
+		  return false;
+		}
+	      break;
+
+	    default:
+	      break;
+	    }
 	}
     }
   else

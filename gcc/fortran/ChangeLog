@@ -1,3 +1,93 @@
+2022-02-04  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-02-03  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/104311
+	* check.c (gfc_calculate_transfer_sizes): Checks for case when
+	storage size of SOURCE is greater than zero while the storage size
+	of MOLD is zero and MOLD is an array shall not depend on SIZE.
+
+2022-02-02  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-02-01  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/104331
+	* simplify.c (gfc_simplify_eoshift): Avoid NULL pointer
+	dereference when shape is not set.
+
+2022-01-29  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-01-15  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/83079
+	* target-memory.c (gfc_interpret_character): Result length is
+	in bytes and thus depends on the character kind.
+	* trans-intrinsic.c (gfc_conv_intrinsic_transfer): Compute correct
+	string length for the result of the TRANSFER intrinsic and for
+	temporaries for the different character kinds.
+
+2022-01-29  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-01-22  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/104127
+	* simplify.c (gfc_simplify_transfer): Ensure that the result
+	typespec is set up for TRANSFER with MOLD of type CHARACTER
+	including character length even if the result is a zero-sized
+	array.
+
+2022-01-26  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-01-25  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/104227
+	* check.c (gfc_calculate_transfer_sizes): Fix checking of arrays
+	passed as MOLD argument to the TRANSFER intrinsic for having
+	storage size zero.
+
+2022-01-25  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-01-09  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/101762
+	* expr.c (gfc_check_pointer_assign): For pointer initialization
+	targets, check that subscripts and substring indices in
+	specifications are constant expressions.
+
+2022-01-25  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-01-13  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/67804
+	* primary.c (gfc_match_structure_constructor): Recover from errors
+	that occurred while checking for a valid structure constructor in
+	a DATA statement.
+
+2022-01-21  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-01-14  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103782
+	* expr.c (gfc_simplify_expr): Adjust logic for when to scalarize a
+	call of an intrinsic which may have been overloaded.
+
+2022-01-20  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-01-18  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103692
+	* array.c (gfc_expand_constructor): Handle zero-sized array
+	constructors.
+
 2022-01-13  Harald Anlauf  <anlauf@gmx.de>
 
 	Backported from master:
