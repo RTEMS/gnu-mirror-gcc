@@ -1,3 +1,110 @@
+2022-02-17  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-11-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/102798
+	* tree-vect-data-refs.c (vect_create_addr_base_for_vector_ref):
+	Only copy points-to info to newly generated SSA names.
+
+2022-02-17  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-11-22  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/103181
+	PR middle-end/103248
+	* tree-eh.c (operation_could_trap_helper_p): Properly
+	check vector constants for a zero element for integer
+	division.  Separate floating point and integer division code.
+	Properly handle fixed-point RDIV_EXPR.
+
+2022-02-17  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2021-11-15  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/103237
+	* tree-vect-loop.c (vect_is_simple_reduction): Fail for
+	double reductions with multiple inner loop LC PHI nodes.
+
+2022-02-10  Uros Bizjak  <ubizjak@gmail.com>
+
+	Backported from master:
+	2022-02-10  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/104469
+	* config/i386/sse.md (vec_unpacks_float_lo_v4si):
+	Change operand 1 constraint to register_operand.
+
+2022-02-09  liuhongt  <hongtao.liu@intel.com>
+
+	PR target/104451
+	* config/i386/sse.md (<insn><mode>3): lowpart_subreg
+	operands[2] from SImode to QImode.
+
+2022-01-12  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2020-11-26  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/97953
+	* gimple-ssa-evrp-analyze.c
+	(evrp_range_analyzer::record_ranges_from_incoming_edge): Make
+	sure the condition post-dominates the SSA definition before
+	recording into SSA_NAME_RANGE_INFO.
+
+2022-01-10  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR target/103465
+	* coretypes.h (unwind_info_type): Swap UI_SEH and UI_TARGET.
+
+2022-01-10  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* doc/invoke.texi (%X): Remove obsolete reference to -Wl.
+
+2021-12-27  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR target/100985
+	* config/aarch64/arm_acle.h: Remove unclosed extern "C" block.
+
+2021-12-15  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2021-11-30  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/102347
+	* config/rs6000/rs6000.c (rs6000_builtin_decl): Remove builtin mask
+	check.
+
+2021-12-01  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/103267
+	* tree-sra.c (scan_function): Also check ECF_LOOPING_CONST_OR_PURE
+	flag.
+
+2021-11-25  Jan Hubicka  <jh@suse.cz>
+
+	Backported from master:
+	2021-11-20  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR ipa/103052
+	* ipa-pure-const.c (propagate_pure_const): Fix merging of loping flag.
+
+2021-11-23  Bill Schmidt  <wschmidt@linux.ibm.com>
+
+	PR target/101985
+	* config/rs6000/altivec.h (vec_cpsgn): Swap operand order.
+
+2021-11-22  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	Backported from master:
+	2021-11-19  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	* config/s390/s390.md (define_peephole2): Variable insn points
+	to the first matched insn.  Use peep2_next_insn(1) to refer to
+	the second matched insn.
+
 2021-11-09  Richard Biener  <rguenther@suse.de>
 
 	Backported from master:

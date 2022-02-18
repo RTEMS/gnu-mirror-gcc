@@ -1,3 +1,98 @@
+2022-02-04  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-02-03  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/104311
+	* check.c (gfc_calculate_transfer_sizes): Checks for case when
+	storage size of SOURCE is greater than zero while the storage size
+	of MOLD is zero and MOLD is an array shall not depend on SIZE.
+
+2022-01-29  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-01-22  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/104127
+	* simplify.c (gfc_simplify_transfer): Ensure that the result
+	typespec is set up for TRANSFER with MOLD of type CHARACTER
+	including character length even if the result is a zero-sized
+	array.
+
+2022-01-26  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-01-25  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/104227
+	* check.c (gfc_calculate_transfer_sizes): Fix checking of arrays
+	passed as MOLD argument to the TRANSFER intrinsic for having
+	storage size zero.
+
+2022-01-23  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-01-14  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103782
+	* expr.c (gfc_simplify_expr): Adjust logic for when to scalarize a
+	call of an intrinsic which may have been overloaded.
+
+2021-12-19  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-07  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103588
+	* array.c (gfc_ref_dimen_size): Do not generate internal error on
+	failed simplification of stride expression; just return failure.
+
+2021-12-17  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-08  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103610
+	* array.c (spec_dimen_size): Fix simplification of SHAPE:
+	dimensions must be non-negative.
+
+2021-12-16  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-11  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103606
+	* resolve.c (resolve_fl_procedure): Do not access CLASS components
+	before class container has been built.
+
+2021-12-16  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-14  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103717
+	* frontend-passes.c (doloop_code): Prevent NULL pointer
+	dereference when checking for passing a do-loop variable to a
+	contained procedure with an interface mismatch.
+
+2021-12-10  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-12-07  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103607
+	* frontend-passes.c (do_subscript): Ensure that array bounds are
+	of type INTEGER before performing checks on array subscripts.
+
+2021-11-26  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2021-11-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103392
+	* simplify.c (simplify_bound): Do not try to simplify
+	LBOUND/UBOUND for arrays with POINTER or ALLOCATABLE attribute.
+
 2021-09-30  Harald Anlauf  <anlauf@gmx.de>
 
 	Backported from master:
