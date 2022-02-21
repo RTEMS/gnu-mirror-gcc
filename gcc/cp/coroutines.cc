@@ -3891,7 +3891,7 @@ coro_rewrite_function_body (location_t fn_start, tree fnbody,
 		       resume_fn_ptr_type);
   DECL_ARTIFICIAL (resume_fn_field) = true;
   tree zero_resume
-    = build1 (CONVERT_EXPR, resume_fn_ptr_type, integer_zero_node);
+    = build1 (CONVERT_EXPR, resume_fn_ptr_type, null_pointer_node);
   zero_resume
     = build2 (INIT_EXPR, resume_fn_ptr_type, resume_fn_field, zero_resume);
   finish_expr_stmt (zero_resume);
@@ -4180,7 +4180,7 @@ morph_fn_to_coro (tree orig, tree *resumer, tree *destroyer)
   /* The decl_expr for the coro frame pointer, initialize to zero so that we
      can pass it to the IFN_CO_FRAME (since there's no way to pass a type,
      directly apparently).  This avoids a "used uninitialized" warning.  */
-  tree zeroinit = build1 (CONVERT_EXPR, coro_frame_ptr, integer_zero_node);
+  tree zeroinit = build1 (CONVERT_EXPR, coro_frame_ptr, null_pointer_node);
   DECL_INITIAL (coro_fp) = zeroinit;
   add_decl_expr (coro_fp);
 
