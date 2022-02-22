@@ -5641,8 +5641,10 @@ warns that an unrecognized option is present.
 
 The effectiveness of some warnings depends on optimizations also being
 enabled. For example @option{-Wsuggest-final-types} is more effective
-with link-time optimization and @option{-Wmaybe-uninitialized} does not
-warn at all unless optimization is enabled.
+with link-time optimization and some instances of other warnings may
+not be issued at all unless optimization is enabled.  While optimization
+in general improves the efficacy of control and data flow sensitive
+warnings, in some cases it may also cause false positives.
 
 @table @gcctabopt
 @item -Wpedantic
@@ -7691,20 +7693,22 @@ void f (char c, int i)
 @itemx -Warray-bounds=@var{n}
 @opindex Wno-array-bounds
 @opindex Warray-bounds
-This option is only active when @option{-ftree-vrp} is active
-(default for @option{-O2} and above). It warns about subscripts to arrays
-that are always out of bounds. This warning is enabled by @option{-Wall}.
+Warn about out of bounds subscripts or offsets into arrays.  This warning
+is enabled by @option{-Wall}.  It is more effective when @option{-ftree-vrp}
+is active (the default for @option{-O2} and above) but a subset of instances
+are issued even without optimization.
 
 @table @gcctabopt
 @item -Warray-bounds=1
-This is the warning level of @option{-Warray-bounds} and is enabled
+This is the default warning level of @option{-Warray-bounds} and is enabled
 by @option{-Wall}; higher levels are not, and must be explicitly requested.
 
 @item -Warray-bounds=2
-This warning level also warns about out of bounds access for
-arrays at the end of a struct and for arrays accessed through
-pointers. This warning level may give a larger number of
-false positives and is deactivated by default.
+This warning level also warns about out of bounds accesses to trailing
+struct members of one-element array types (@pxref{Zero Length}) and about
+the intermediate results of pointer arithmetic that may yield out of bounds
+values.  This warning level may give a larger number of false positives and
+is deactivated by default.
 @end table
 
 @item -Warray-compare
@@ -15615,6 +15619,36 @@ Note: By default the check is disabled at run time.  To enable it,
 add @code{detect_invalid_pointer_pairs=2} to the environment variable
 @env{ASAN_OPTIONS}. Using @code{detect_invalid_pointer_pairs=1} detects
 invalid operation only when both pointers are non-null.
+
+@item -fsanitize=shadow-call-stack
+@opindex fsanitize=shadow-call-stack
+Enable ShadowCallStack, a security enhancement mechanism used to protect
+programs against return address overwrites (e.g. stack buffer overflows.)
+It works by saving a function's return address to a separately allocated
+shadow call stack in the function prologue and restoring the return address
+from the shadow call stack in the function epilogue.  Instrumentation only
+occurs in functions that need to save the return address to the stack.
+
+Currently it only supports the aarch64 platform.  It is specifically
+designed for linux kernels that enable the CONFIG_SHADOW_CALL_STACK option.
+For the user space programs, runtime support is not currently provided
+in libc and libgcc.  Users who want to use this feature in user space need
+to provide their own support for the runtime.  It should be noted that
+this may cause the ABI rules to be broken.
+
+On aarch64, the instrumentation makes use of the platform register @code{x18}.
+This generally means that any code that may run on the same thread as code
+compiled with ShadowCallStack must be compiled with the flag
+@option{-ffixed-x18}, otherwise functions compiled without
+@option{-ffixed-x18} might clobber @code{x18} and so corrupt the shadow
+stack pointer.
+
+Also, because there is no userspace runtime support, code compiled with
+ShadowCallStack cannot use exception handling.  Use @option{-fno-exceptions}
+to turn off exceptions.
+
+See @uref{https://clang.llvm.org/docs/ShadowCallStack.html} for more
+details.
 
 @item -fsanitize=thread
 @opindex fsanitize=thread
