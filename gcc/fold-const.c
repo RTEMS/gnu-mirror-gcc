@@ -12474,10 +12474,15 @@ fold_ternary_loc (location_t loc, enum tree_code code, tree type,
 	  && integer_onep (op2)
 	  && !VECTOR_TYPE_P (type)
 	  && truth_value_p (TREE_CODE (arg0)))
-	return pedantic_non_lvalue_loc (loc,
-				    fold_convert_loc (loc, type,
-					      invert_truthvalue_loc (loc,
-								     arg0)));
+	{
+	  tem = fold_convert_loc (loc, noncapability_type (type),
+				  invert_truthvalue_loc (loc, arg0));
+	  if (capability_type_p (type))
+	    tem = fold_build_replace_address_value_loc (loc,
+							build_int_cst (type, 0),
+							tem);
+	  return pedantic_non_lvalue_loc (loc, tem);
+	}
 
       /* A < 0 ? <sign bit of A> : 0 is simply (A & <sign bit of A>).  */
       if (TREE_CODE (arg0) == LT_EXPR
