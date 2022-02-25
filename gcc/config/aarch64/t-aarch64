@@ -159,10 +159,21 @@ aarch64-bti-insert.o: $(srcdir)/config/aarch64/aarch64-bti-insert.c \
 		$(srcdir)/config/aarch64/aarch64-bti-insert.c
 
 comma=,
-MULTILIB_OPTIONS    = $(subst $(comma),/, $(patsubst %, mabi=%, $(subst $(comma),$(comma)mabi=,$(TM_MULTILIB_CONFIG)))) march=morello+c64
-MULTILIB_EXCEPTIONS = mabi=*lp*/march=morello+c64
-MULTILIB_EXCEPTIONS += mabi=purecap
-MULTILIB_EXCEPTIONS += march=morello+c64
+MULTILIB_OPTIONS    = $(subst $(comma),/, $(patsubst %, mabi=%, $(subst $(comma),$(comma)mabi=,$(TM_MULTILIB_CONFIG)))) march=morello+c64 march=morello+c64+nolse
+MULTILIB_REQUIRED   = mabi=ilp32
+MULTILIB_REQUIRED   += mabi=lp64
+MULTILIB_REQUIRED   += mabi=purecap/march=morello+c64
+# MORELLO TODO This is a bit of an ugly approach.  We want to say "ignore any
+# extra architecture extensions other than the +c64 extension when deciding
+# which multilib to use".  This statement below says "the option
+# `march=morello+c64+nolse` is the same as the option `march=morello+c64`".
+# Those statements are not the same.
+#
+# The approach I expect would be best would be to add something like Srinaths
+# patch for Arm to ignore the `cdecp` arguments (see commit f58d03b5d).  That
+# would take a while and we're still working out the building stuff so we're
+# leaving it for now.
+MULTILIB_REUSE      = mabi.purecap/march.morello+c64=mabi.purecap/march.morello+c64+nolse
 MULTILIB_DIRNAMES   = $(subst $(comma), ,$(TM_MULTILIB_CONFIG))
 
 insn-conditions.md: s-check-sve-md

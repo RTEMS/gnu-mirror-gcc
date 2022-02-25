@@ -382,7 +382,7 @@ else
   dirout=`echo ${combo} | sed -e 's/=/-/g'`
 fi
 # Remove the leading and trailing slashes.
-dirout=`echo ${dirout} | sed -e 's|^/||' -e 's|/*:/*|:|' -e 's|/$||g'`
+dirout=`echo ${dirout} | sed -e 's|^/*||' -e 's|/*:/*|:|' -e 's|/*$||g'`
 
 # Use the OS directory names rather than the option names.
 if [ -n "${toosdirnames}" ]; then
