@@ -2650,7 +2650,7 @@ static bool
 aarch64_hard_regno_mode_ok (unsigned regno, machine_mode mode)
 {
   if (mode == CADImode)
-    return GP_REGNUM_P (regno);
+    return aarch64_regno_ok_for_base_p (regno, true);
 
   if (GET_MODE_CLASS (mode) == MODE_CC)
     return regno == CC_REGNUM;
