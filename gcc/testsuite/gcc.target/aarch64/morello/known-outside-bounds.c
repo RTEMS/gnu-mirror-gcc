@@ -4,5 +4,5 @@ const char *
 foo ()
 {
   return myvar;
-} /* { dg-warning "offset is outside of .* capability from which it is offset" "" { target *-*-* } } */
+} /* { dg-warning "offset is outside of .* capability from which it is offset" "" { target { *-*-* && cheri_capability_pure } } } */
 

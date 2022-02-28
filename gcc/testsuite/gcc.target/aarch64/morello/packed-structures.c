@@ -1,3 +1,4 @@
+/* { dg-additional-options "-Wno-if-not-aligned" } */
 /*
    This file is for testing the PCS implementation on packed structures.
 

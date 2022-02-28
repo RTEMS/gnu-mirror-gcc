@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
+typedef __UINTPTR_TYPE__ uintptr_t;
 #define NUM_INTERNAL_CALLS 20
 bool check_performed = false;
 static bool in_func (void *, size_t);
@@ -41,17 +42,7 @@ static int ptr_compare (const void *, const void *);
 static void sort_function_pointers ();
 int main (int, char**);
 
-static uintptr_t function_pointers[] = {
-    &in_func,
-    &trace_function,
-    &unwind_stop,
-    &unwind_cleanup,
-    &test_unwinder,
-    &foo,
-    &ptr_compare,
-    &sort_function_pointers,
-    &main
-};
+static uintptr_t function_pointers[9] = { 0 };
 static int foo_index = -1;
 static int main_index = -1;
 
@@ -277,6 +268,15 @@ static int ptr_compare (const void *a, const void *b)
 
 static void sort_function_pointers ()
 {
+  function_pointers[0] = &in_func;
+  function_pointers[1] = &trace_function;
+  function_pointers[2] = &unwind_stop;
+  function_pointers[3] = &unwind_cleanup;
+  function_pointers[4] = &test_unwinder;
+  function_pointers[5] = &foo;
+  function_pointers[6] = &ptr_compare;
+  function_pointers[7] = &sort_function_pointers;
+  function_pointers[8] = &main;
   size_t num_funcs = sizeof(function_pointers)/sizeof(function_pointers[0]);
   qsort (function_pointers, num_funcs, sizeof(void *), ptr_compare);
   for (size_t i = 0; i < num_funcs; ++i) {
