@@ -1374,8 +1374,10 @@ process_option (const char *option)
   verbose = verbose || debug;
 }
 
-/* Called by gold after loading the plugin. TV is the transfer vector. */
+#define xstr(s) str(s)
+#define str(s) #s
 
+/* Called by gold after loading the plugin. TV is the transfer vector. */
 enum ld_plugin_status
 onload (struct ld_plugin_tv *tv)
 {
@@ -1430,6 +1432,9 @@ onload (struct ld_plugin_tv *tv)
 	case LDPT_OUTPUT_NAME:
 	  /* We only use this to make user-friendly temp file names.  */
 	  link_output_name = p->tv_u.tv_string;
+	  break;
+	case LDPT_PLUGIN_VERSION:
+	  p->tv_u.tv_plugin_version ("GCC " xstr (GCC_COMPILER_VERSION));
 	  break;
 	default:
 	  break;

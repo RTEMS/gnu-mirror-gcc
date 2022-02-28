@@ -19,6 +19,7 @@ gcc_build_dir = @gcc_build_dir@
 in_gcc_libs = $(foreach lib, $(libexecsub_LTLIBRARIES), $(gcc_build_dir)/$(lib))
 
 liblto_plugin_la_SOURCES = lto-plugin.c
+liblto_plugin_la_CFLAGS = -DGCC_COMPILER_VERSION=${gcc_version}
 # Note that we intentionally override the bindir supplied by ACX_LT_HOST_FLAGS.
 liblto_plugin_la_LDFLAGS = $(AM_LDFLAGS) \
 	$(lt_host_flags) -module -avoid-version -bindir $(libexecsubdir) \

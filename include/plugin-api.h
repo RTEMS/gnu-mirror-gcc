@@ -475,6 +475,13 @@ enum ld_plugin_status
 (*ld_plugin_get_wrap_symbols) (uint64_t *num_symbols,
                                const char ***wrap_symbol_list);
 
+/* The linker's interface for registering the "plugin_version" handler.
+   This handler is called directly after onload and provides identifier
+   and version of a compiler plug-in (e.g. GCC 12.0.1 20220228).  */
+
+typedef
+void (*ld_plugin_version) (const char *version);
+
 enum ld_plugin_level
 {
   LDPL_INFO,
@@ -520,7 +527,8 @@ enum ld_plugin_tag
   LDPT_GET_INPUT_SECTION_SIZE = 30,
   LDPT_REGISTER_NEW_INPUT_HOOK = 31,
   LDPT_GET_WRAP_SYMBOLS = 32,
-  LDPT_ADD_SYMBOLS_V2 = 33
+  LDPT_ADD_SYMBOLS_V2 = 33,
+  LDPT_PLUGIN_VERSION = 34,
 };
 
 /* The plugin transfer vector.  */
@@ -556,6 +564,7 @@ struct ld_plugin_tv
     ld_plugin_get_input_section_size tv_get_input_section_size;
     ld_plugin_register_new_input tv_register_new_input;
     ld_plugin_get_wrap_symbols tv_get_wrap_symbols;
+    ld_plugin_version tv_plugin_version;
   } tv_u;
 };
 
