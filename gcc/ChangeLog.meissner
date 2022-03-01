@@ -1,0 +1,19 @@
+2022-02-25   Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/104698
+	* config/rs6000/vsx.md (mtvsrdd_diti_w1): Delete.
+	(extendditi2): Replace with code to deal with both GPR registers
+	and with altivec registers.
+
+2022-02-25   Michael Meissner  <meissner@linux.ibm.com>
+
+	Rebase to d81cbbdd9a9 98007f77f9f.
+
+2022-02-23   Michael Meissner  <meissner@linux.ibm.com>
+
+	Rebase to 35705d80a18 8003403a1c2.
+
+2022-02-21   Michael Meissner  <meissner@linux.ibm.com>
+
+	Clone branch
+
