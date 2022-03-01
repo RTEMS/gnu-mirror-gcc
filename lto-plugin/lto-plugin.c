@@ -1574,3 +1574,8 @@ onload (struct ld_plugin_tv *tv)
 
   return LDPS_OK;
 }
+
+/* The following symbols are used for dynamic detection of plug-in features
+   from linker side.  */
+
+bool supports_get_symbols_v4;
