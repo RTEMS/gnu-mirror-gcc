@@ -1,7 +1,14 @@
 work079, patch #2:
 2022-03-01   Michael Meissner  <meissner@linux.ibm.com>
 
-	* ChangeLog.meissner: Update.
+	PR target/103109
+	* config/rs6000/rs6000.md (su_int32): New code attribute.
+	(<u>mul<mode><dmode>3): Convert into define_insn_and_split.
+	(maddld<mode>4): Add generator function.
+	(<u>mulditi3_<u>adddi3): New insn.
+	(<u>mulditi3_add_const): New insn.
+	(addti3): Convert into define_insn_and_split.
+	(subti3): Likewise.
 
 2022-02-28   Michael Meissner  <meissner@linux.ibm.com>
 
