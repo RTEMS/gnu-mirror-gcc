@@ -13612,6 +13612,78 @@ long_double_as_float128 (tree type)
   return NULL_TREE;
 }
 
+/* BTF support. Given a tree T, which may be a decl or a type, process any
+   "btf_decl_tag" attributes on T, provided in ATTR. Construct
+   DW_TAG_GNU_annotation DIEs appropriately as children of TARGET, usually
+   the DIE for T.  */
+
+static void
+gen_btf_decl_tag_dies (tree t, dw_die_ref target)
+{
+  dw_die_ref die;
+  tree attr;
+
+  if (t == NULL_TREE || !target)
+    return;
+
+  if (TYPE_P (t))
+    attr = lookup_attribute ("btf_decl_tag", TYPE_ATTRIBUTES (t));
+  else if (DECL_P (t))
+    attr = lookup_attribute ("btf_decl_tag", DECL_ATTRIBUTES (t));
+  else
+    /* This is an error.  */
+    gcc_unreachable ();
+
+  while (attr != NULL_TREE)
+    {
+      die = new_die (DW_TAG_GNU_annotation, target, t);
+      add_name_attribute (die, IDENTIFIER_POINTER (get_attribute_name (attr)));
+      add_AT_string (die, DW_AT_const_value,
+		     TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (attr))));
+      attr = TREE_CHAIN (attr);
+    }
+
+  /* Strip the decl tag attribute to avoid creating multiple copies if we hit
+     this tree node again in some recursive call.  */
+  if (TYPE_P (t))
+    TYPE_ATTRIBUTES (t) =
+      remove_attribute ("btf_decl_tag", TYPE_ATTRIBUTES (t));
+  else if (DECL_P (t))
+    DECL_ATTRIBUTES (t) =
+      remove_attribute ("btf_decl_tag", DECL_ATTRIBUTES (t));
+}
+
+/* BTF support. Given a tree TYPE, process any "btf_type_tag" attributes on
+   TYPE. Construct DW_TAG_GNU_annotation DIEs appropriately as children of
+   TARGET, usually the DIE for TYPE.  */
+
+static void
+gen_btf_type_tag_dies (tree type, dw_die_ref target)
+{
+  dw_die_ref die;
+  tree attr;
+
+  if (type == NULL_TREE || !target)
+    return;
+
+  gcc_assert (TYPE_P (type));
+
+  attr = lookup_attribute ("btf_type_tag", TYPE_ATTRIBUTES (type));
+  while (attr != NULL_TREE)
+    {
+      die = new_die (DW_TAG_GNU_annotation, target, type);
+      add_name_attribute (die, IDENTIFIER_POINTER (get_attribute_name (attr)));
+      add_AT_string (die, DW_AT_const_value,
+		     TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (attr))));
+      attr = TREE_CHAIN (attr);
+    }
+
+  /* Strip the type tag attribute to avoid creating multiple copies if we hit
+     this type again in some recursive call.  */
+  TYPE_ATTRIBUTES (type) =
+    remove_attribute ("btf_type_tag", TYPE_ATTRIBUTES (type));
+}
+
 /* Given a pointer to an arbitrary ..._TYPE tree node, return a debugging
    entry that chains the modifiers specified by CV_QUALS in front of the
    given type.  REVERSE is true if the type is to be interpreted in the
@@ -14009,6 +14081,10 @@ modified_type_die (tree type, int cv_quals, bool reverse,
   add_gnat_descriptive_type_attribute (mod_type_die, type, context_die);
   if (TYPE_ARTIFICIAL (type))
     add_AT_flag (mod_type_die, DW_AT_artificial, 1);
+
+  /* BTF support. Handle any "btf_type_tag" attributes on the type.  */
+  if (btf_debuginfo_p ())
+    gen_btf_type_tag_dies (type, mod_type_die);
 
   return mod_type_die;
 }
@@ -23006,6 +23082,10 @@ gen_formal_parameter_die (tree node, tree origin, bool emit_name_p,
       gcc_unreachable ();
     }
 
+  /* BTF Support */
+  if (btf_debuginfo_p ())
+    gen_btf_decl_tag_dies (node, parm_die);
+
   return parm_die;
 }
 
@@ -26084,6 +26164,10 @@ gen_typedef_die (tree decl, dw_die_ref context_die)
 
   if (get_AT (type_die, DW_AT_name))
     add_pubtype (decl, type_die);
+
+  /* BTF: handle attribute btf_decl_tag which may appear on the typedef.  */
+  if (btf_debuginfo_p ())
+    gen_btf_decl_tag_dies (decl, type_die);
 }
 
 /* Generate a DIE for a struct, class, enum or union type.  */
@@ -26396,6 +26480,20 @@ gen_type_die (tree type, dw_die_ref context_die)
 	  dw_die_ref die = lookup_type_die (type);
 	  if (die)
 	    check_die (die);
+	}
+
+      /* BTF support. Handle any "btf_type_tag" or "btf_decl_tag" attributes
+	 on the type, constructing annotation DIEs as appropriate.  */
+      if (btf_debuginfo_p ())
+	{
+	  dw_die_ref die = lookup_type_die (type);
+	  if (die)
+	    {
+	      gen_btf_type_tag_dies (type, die);
+
+	      /* decl tags may also be attached to a type.  */
+	      gen_btf_decl_tag_dies (type, die);
+	    }
 	}
     }
 }
@@ -27152,6 +27250,10 @@ gen_decl_die (tree decl, tree origin, struct vlr_context *ctx,
       gcc_assert ((int)TREE_CODE (decl) > NUM_TREE_CODES);
       break;
     }
+
+  /* BTF: handle attribute btf_decl_tag.  */
+  if (btf_debuginfo_p ())
+    gen_btf_decl_tag_dies (decl, lookup_decl_die (decl));
 
   return NULL;
 }
