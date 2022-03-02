@@ -176,6 +176,9 @@ static tree handle_signed_bool_precision_attribute (tree *, tree, tree, int,
 static tree handle_retain_attribute (tree *, tree, tree, int, bool *);
 static tree handle_fd_arg_attribute (tree *, tree, tree, int, bool *);
 
+static tree handle_btf_decl_tag_attribute (tree *, tree, tree, int, bool *);
+static tree handle_btf_type_tag_attribute (tree *, tree, tree, int, bool *);
+
 /* Helper to define attribute exclusions.  */
 #define ATTR_EXCL(name, function, type, variable)	\
   { name, function, type, variable }
@@ -565,6 +568,12 @@ const struct attribute_spec c_common_attribute_table[] =
             handle_fd_arg_attribute, NULL},
   { "fd_arg_write",       1, 1, false, true, true, false,
             handle_fd_arg_attribute, NULL},         
+
+  { "btf_type_tag",           1, 1, false, true, false, false,
+			      handle_btf_type_tag_attribute, NULL },
+  { "btf_decl_tag",           1, 1, false, false, false, false,
+			      handle_btf_decl_tag_attribute, NULL },
+
   { NULL,                     0, 0, false, false, false, false, NULL, NULL }
 };
 
@@ -5917,6 +5926,42 @@ handle_tainted_args_attribute (tree *node, tree name, tree, int,
     }
 
   *no_add_attrs = false; /* OK */
+
+  return NULL_TREE;
+}
+
+/* Handle a "btf_decl_tag" attribute; arguments as in
+   struct attribute_spec.handler.   */
+
+static tree
+handle_btf_decl_tag_attribute (tree *, tree name, tree args, int,
+			       bool *no_add_attrs)
+{
+  if (!args)
+    *no_add_attrs = true;
+  else if (TREE_CODE (TREE_VALUE (args)) != STRING_CST)
+    {
+      error ("%qE attribute requires a string", name);
+      *no_add_attrs = true;
+    }
+
+  return NULL_TREE;
+}
+
+/* Handle a "btf_type_tag" attribute; arguments as in
+   struct attribute_spec.handler.   */
+
+static tree
+handle_btf_type_tag_attribute (tree *, tree name, tree args, int,
+			       bool *no_add_attrs)
+{
+  if (!args)
+    *no_add_attrs = true;
+  else if (TREE_CODE (TREE_VALUE (args)) != STRING_CST)
+    {
+      error ("%qE attribute requires a string", name);
+      *no_add_attrs = true;
+    }
 
   return NULL_TREE;
 }
