@@ -136,6 +136,8 @@ get_btf_kind (uint32_t ctf_kind)
     case CTF_K_VOLATILE: return BTF_KIND_VOLATILE;
     case CTF_K_CONST:    return BTF_KIND_CONST;
     case CTF_K_RESTRICT: return BTF_KIND_RESTRICT;
+    case CTF_K_TYPE_TAG: return BTF_KIND_TYPE_TAG;
+    case CTF_K_DECL_TAG: return BTF_KIND_DECL_TAG;
     default:;
     }
   return BTF_KIND_UNKN;
@@ -201,6 +203,7 @@ btf_calc_num_vbytes (ctf_dtdef_ref dtd)
     case BTF_KIND_CONST:
     case BTF_KIND_RESTRICT:
     case BTF_KIND_FUNC:
+    case BTF_KIND_TYPE_TAG:
     /* These kinds have no vlen data.  */
       break;
 
@@ -236,6 +239,10 @@ btf_calc_num_vbytes (ctf_dtdef_ref dtd)
 
     case BTF_KIND_DATASEC:
       vlen_bytes += vlen * sizeof (struct btf_var_secinfo);
+      break;
+
+    case BTF_KIND_DECL_TAG:
+      vlen_bytes += sizeof (struct btf_decl_tag);
       break;
 
     default:
@@ -637,6 +644,22 @@ btf_asm_type (ctf_container_ref ctfc, ctf_dtdef_ref dtd)
       dw2_asm_output_data (4, dtd->dtd_data.ctti_size, "btt_size: %uB",
 			   dtd->dtd_data.ctti_size);
       return;
+    case BTF_KIND_DECL_TAG:
+      {
+	/* A decl tag might refer to (be the child DIE of) a variable. Try to
+	   lookup the parent DIE's CTF variable, and if it exists point to the
+	   corresponding BTF variable. This is an odd construction - we have a
+	   'type' which refers to a variable, rather than the reverse.  */
+	dw_die_ref parent = dw_get_die_parent (dtd->dtd_key);
+	ctf_dvdef_ref dvd = ctf_dvd_lookup (ctfc, parent);
+	if (dvd)
+	  {
+	    unsigned int var_id =
+	      *(btf_var_ids->get (dvd)) + num_types_added + 1;
+	    dw2_asm_output_data (4, var_id, "btt_type");
+	    return;
+	  }
+      }
     default:
       break;
     }
@@ -956,6 +979,11 @@ output_asm_btf_vlen_bytes (ctf_container_ref ctfc, ctf_dtdef_ref dtd)
 	 and btf_asm_datasec_type. There should be no BTF_KIND_DATASEC types
 	 at this point.  */
       gcc_unreachable ();
+
+    case BTF_KIND_DECL_TAG:
+      dw2_asm_output_data (4, dtd->dtd_u.dtu_btfnote.component_idx,
+			   "decltag_compidx");
+      break;
 
     default:
       /* All other BTF type kinds have no variable length data.  */
