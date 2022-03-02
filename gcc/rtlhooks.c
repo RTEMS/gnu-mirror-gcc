@@ -112,22 +112,10 @@ gen_lowpart_if_possible (machine_mode mode, rtx x)
 
   if (result)
     return result;
-  else if (MEM_P (x))
-    {
-      /* This is the only other case we handle.  */
-      poly_int64 offset = byte_lowpart_offset (mode, GET_MODE (x));
-      rtx new_rtx = adjust_address_nv (x, mode, offset);
-      if (! memory_address_addr_space_p (mode, XEXP (new_rtx, 0),
-					 MEM_ADDR_SPACE (x)))
-	return 0;
 
-      return new_rtx;
-    }
-  else if (mode != GET_MODE (x) && GET_MODE (x) != VOIDmode && !SUBREG_P (x)
-	   && validate_subreg (mode, GET_MODE (x), x,
-			       subreg_lowpart_offset (mode, GET_MODE (x))))
-    return gen_lowpart_SUBREG (mode, x);
-  else
-    return 0;
+  if (GET_MODE (x) != VOIDmode)
+    return lowpart_subreg (mode, x, GET_MODE (x));
+
+  return 0;
 }
 
