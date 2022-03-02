@@ -5235,6 +5235,14 @@ dw_get_die_sib (dw_die_ref die)
   return die->die_sib;
 }
 
+/* Return a reference to the parent of a given DIE.  */
+
+dw_die_ref
+dw_get_die_parent (dw_die_ref die)
+{
+  return die->die_parent;
+}
+
 /* Add an address constant attribute value to a DIE.  When using
    dwarf_split_debug_info, address attributes in dies destined for the
    final executable should be direct references--setting the parameter
