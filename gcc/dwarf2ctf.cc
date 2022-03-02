@@ -511,7 +511,7 @@ gen_ctf_modifier_type (ctf_container_ref ctfc, dw_die_ref modifier)
   gcc_assert (kind != CTF_K_MAX);
   /* Now register the modifier itself.  */
   if (!ctf_type_exists (ctfc, modifier, &modifier_type_id))
-    modifier_type_id = ctf_add_reftype (ctfc, CTF_ADD_ROOT,
+    modifier_type_id = ctf_add_reftype (ctfc, CTF_ADD_ROOT, NULL,
 					qual_type_id, kind,
 					modifier);
 

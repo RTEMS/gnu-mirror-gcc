@@ -107,6 +107,9 @@ ctf_dtu_d_union_selector (ctf_dtdef_ref ctftype)
       return CTF_DTU_D_ARGUMENTS;
     case CTF_K_SLICE:
       return CTF_DTU_D_SLICE;
+    case CTF_K_DECL_TAG:
+    case CTF_K_TYPE_TAG:
+      return CTF_DTU_D_BTFNOTE;
     default:
       /* The largest member as default.  */
       return CTF_DTU_D_ARRAY;
@@ -428,15 +431,15 @@ ctf_add_encoded (ctf_container_ref ctfc, uint32_t flag, const char * name,
 }
 
 ctf_id_t
-ctf_add_reftype (ctf_container_ref ctfc, uint32_t flag, ctf_id_t ref,
-		 uint32_t kind, dw_die_ref die)
+ctf_add_reftype (ctf_container_ref ctfc, uint32_t flag, const char * name,
+		 ctf_id_t ref, uint32_t kind, dw_die_ref die)
 {
   ctf_dtdef_ref dtd;
   ctf_id_t type;
 
   gcc_assert (ref <= CTF_MAX_TYPE);
 
-  type = ctf_add_generic (ctfc, flag, NULL, &dtd, die);
+  type = ctf_add_generic (ctfc, flag, name, &dtd, die);
   dtd->dtd_data.ctti_info = CTF_TYPE_INFO (kind, flag, 0);
   /* Caller of this API must guarantee that a CTF type with id = ref already
      exists.  This will also be validated for us at link-time.  */
@@ -548,7 +551,7 @@ ctf_id_t
 ctf_add_pointer (ctf_container_ref ctfc, uint32_t flag, ctf_id_t ref,
 		 dw_die_ref die)
 {
-  return (ctf_add_reftype (ctfc, flag, ref, CTF_K_POINTER, die));
+  return (ctf_add_reftype (ctfc, flag, NULL, ref, CTF_K_POINTER, die));
 }
 
 ctf_id_t

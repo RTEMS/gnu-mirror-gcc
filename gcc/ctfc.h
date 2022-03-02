@@ -35,6 +35,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "dwarf2ctf.h"
 #include "ctf.h"
 #include "btf.h"
+#include "ctf-int.h"
 
 /* Invalid CTF type ID definition.  */
 
@@ -151,6 +152,13 @@ typedef struct GTY (()) ctf_func_arg
 
 #define ctf_farg_list_next(elem) ((ctf_func_arg_t *)((elem)->farg_next))
 
+/* BTF support: a BTF type tag or decl tag.  */
+
+typedef struct GTY (()) ctf_btf_annotation
+{
+  uint32_t component_idx;
+} ctf_btf_annotation_t;
+
 /* Type definition for CTF generation.  */
 
 struct GTY ((for_user)) ctf_dtdef
@@ -174,6 +182,8 @@ struct GTY ((for_user)) ctf_dtdef
     ctf_func_arg_t * GTY ((tag ("CTF_DTU_D_ARGUMENTS"))) dtu_argv;
     /* slice.  */
     ctf_sliceinfo_t GTY ((tag ("CTF_DTU_D_SLICE"))) dtu_slice;
+    /* btf annotation.  */
+    ctf_btf_annotation_t GTY ((tag ("CTF_DTU_D_BTFNOTE"))) dtu_btfnote;
   } dtd_u;
 };
 
@@ -213,7 +223,8 @@ enum ctf_dtu_d_union_enum {
   CTF_DTU_D_ARRAY,
   CTF_DTU_D_ENCODING,
   CTF_DTU_D_ARGUMENTS,
-  CTF_DTU_D_SLICE
+  CTF_DTU_D_SLICE,
+  CTF_DTU_D_BTFNOTE
 };
 
 enum ctf_dtu_d_union_enum
@@ -403,8 +414,8 @@ extern bool ctf_dvd_ignore_lookup (const ctf_container_ref ctfc,
 extern const char * ctf_add_string (ctf_container_ref, const char *,
 				    uint32_t *, int);
 
-extern ctf_id_t ctf_add_reftype (ctf_container_ref, uint32_t, ctf_id_t,
-				 uint32_t, dw_die_ref);
+extern ctf_id_t ctf_add_reftype (ctf_container_ref, uint32_t, const char *,
+				 ctf_id_t, uint32_t, dw_die_ref);
 extern ctf_id_t ctf_add_enum (ctf_container_ref, uint32_t, const char *,
 			      HOST_WIDE_INT, dw_die_ref);
 extern ctf_id_t ctf_add_slice (ctf_container_ref, uint32_t, ctf_id_t,
