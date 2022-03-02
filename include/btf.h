@@ -69,7 +69,7 @@ struct btf_type
 
   /* SIZE is used by INT, ENUM, STRUCT, UNION, DATASEC kinds.
      TYPE is used by PTR, TYPEDEF, VOLATILE, CONST, RESTRICT, FUNC,
-     FUNC_PROTO and VAR kinds.  */
+     FUNC_PROTO, VAR and DECL_TAG kinds.  */
   union
   {
     uint32_t size;	/* Size of the entire type, in bytes.  */
@@ -109,7 +109,9 @@ struct btf_type
 #define BTF_KIND_VAR		14	/* Variable.  */
 #define BTF_KIND_DATASEC	15	/* Section such as .bss or .data.  */
 #define BTF_KIND_FLOAT		16	/* Floating point.  */
-#define BTF_KIND_MAX		BTF_KIND_FLOAT
+#define BTF_KIND_DECL_TAG	17	/* Decl Tag.  */
+#define BTF_KIND_TYPE_TAG	18	/* Type Tag.  */
+#define BTF_KIND_MAX		BTF_KIND_TYPE_TAG
 #define NR_BTF_KINDS		(BTF_KIND_MAX + 1)
 
 /* For some BTF_KINDs, struct btf_type is immediately followed by
@@ -188,6 +190,17 @@ struct btf_var_secinfo
   uint32_t type;	/* Type of variable.  */
   uint32_t offset;	/* In-section offset of variable (in bytes).  */
   uint32_t size;	/* Size (in bytes) of variable.  */
+};
+
+/* BTF_KIND_DECL_TAG is followed by a single struct btf_decl_tag, which
+   describes the tag location:
+   - If component_idx == -1, then the tag is applied to a struct, union,
+     variable or function.
+   - Otherwise it is applied to a struct/union member or function argument
+     with the given given index numbered 0..vlen-1.  */
+struct btf_decl_tag
+{
+  int32_t component_idx;
 };
 
 #ifdef	__cplusplus
