@@ -1602,7 +1602,7 @@
    (set (match_operand:SX2 2 "register_operand" "=r,w")
 	(match_operand:SX2 3 "memory_operand" "m,m"))]
    "rtx_equal_p (XEXP (operands[3], 0),
-		 plus_constant (Pmode,
+		 plus_constant (mem_address_mode (operands[1]),
 				XEXP (operands[1], 0),
 				GET_MODE_SIZE (<SX:MODE>mode)))"
   "@
@@ -1619,7 +1619,7 @@
    (set (match_operand:DXC2 2 "register_operand" "=r,w")
 	(match_operand:DXC2 3 "memory_operand" "m,m"))]
    "rtx_equal_p (XEXP (operands[3], 0),
-		 plus_constant (Pmode,
+		 plus_constant (mem_address_mode (operands[1]),
 				XEXP (operands[1], 0),
 				GET_MODE_SIZE (<DXC:MODE>mode)))"
   "@
@@ -1636,7 +1636,7 @@
 	(match_operand:TF 3 "memory_operand" "m"))]
    "TARGET_SIMD
     && rtx_equal_p (XEXP (operands[3], 0),
-		    plus_constant (Pmode,
+		    plus_constant (mem_address_mode (operands[1]),
 				   XEXP (operands[1], 0),
 				   GET_MODE_SIZE (TFmode)))"
   "ldp\\t%q0, %q2, %z1"
@@ -1652,7 +1652,7 @@
    (set (match_operand:SX2 2 "memory_operand" "=m,m")
 	(match_operand:SX2 3 "aarch64_reg_zero_or_fp_zero" "rYZ,w"))]
    "rtx_equal_p (XEXP (operands[2], 0),
-		 plus_constant (Pmode,
+		 plus_constant (mem_address_mode (operands[0]),
 				XEXP (operands[0], 0),
 				GET_MODE_SIZE (<SX:MODE>mode)))"
   "@
@@ -1669,7 +1669,7 @@
    (set (match_operand:DXC2 2 "memory_operand" "=m,m")
 	(match_operand:DXC2 3 "aarch64_reg_zero_or_fp_zero" "rYZ,w"))]
    "rtx_equal_p (XEXP (operands[2], 0),
-		 plus_constant (Pmode,
+		 plus_constant (mem_address_mode (operands[0]),
 				XEXP (operands[0], 0),
 				GET_MODE_SIZE (<DXC:MODE>mode)))"
   "@
@@ -1686,7 +1686,7 @@
 	(match_operand:TF 3 "register_operand" "w"))]
    "TARGET_SIMD &&
     rtx_equal_p (XEXP (operands[2], 0),
-		 plus_constant (Pmode,
+		 plus_constant (mem_address_mode (operands[0]),
 				XEXP (operands[0], 0),
 				GET_MODE_SIZE (TFmode)))"
   "stp\\t%q1, %q3, %z0"
@@ -1832,7 +1832,7 @@
    (set (match_operand:DI 2 "register_operand" "=r")
 	(sign_extend:DI (match_operand:SI 3 "memory_operand" "m")))]
   "rtx_equal_p (XEXP (operands[3], 0),
-		plus_constant (Pmode,
+		plus_constant (mem_address_mode (operands[1]),
 			       XEXP (operands[1], 0),
 			       GET_MODE_SIZE (SImode)))"
   "ldpsw\\t%0, %2, %z1"
@@ -1860,7 +1860,7 @@
    (set (match_operand:DI 2 "register_operand" "=r,w")
 	(zero_extend:DI (match_operand:SI 3 "memory_operand" "m,m")))]
   "rtx_equal_p (XEXP (operands[3], 0),
-		plus_constant (Pmode,
+		plus_constant (mem_address_mode (operands[1]),
 			       XEXP (operands[1], 0),
 			       GET_MODE_SIZE (SImode)))"
   "@

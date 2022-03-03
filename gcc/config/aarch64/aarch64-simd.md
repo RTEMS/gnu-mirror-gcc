@@ -184,7 +184,7 @@
 	(match_operand:DREG2 3 "memory_operand" "m"))]
   "TARGET_SIMD
    && rtx_equal_p (XEXP (operands[3], 0),
-		   plus_constant (Pmode,
+		   plus_constant (mem_address_mode (operands[1]),
 				  XEXP (operands[1], 0),
 				  GET_MODE_SIZE (<DREG:MODE>mode)))"
   "ldp\\t%d0, %d2, %z1"
@@ -198,7 +198,7 @@
 	(match_operand:DREG2 3 "register_operand" "w"))]
   "TARGET_SIMD
    && rtx_equal_p (XEXP (operands[2], 0),
-		   plus_constant (Pmode,
+		   plus_constant (mem_address_mode (operands[0]),
 				  XEXP (operands[0], 0),
 				  GET_MODE_SIZE (<DREG:MODE>mode)))"
   "stp\\t%d1, %d3, %z0"
@@ -212,9 +212,9 @@
 	(match_operand:VQ2 3 "memory_operand" "m"))]
   "TARGET_SIMD
     && rtx_equal_p (XEXP (operands[3], 0),
-		    plus_constant (Pmode,
-			       XEXP (operands[1], 0),
-			       GET_MODE_SIZE (<VQ:MODE>mode)))"
+		    plus_constant (mem_address_mode (operands[1]),
+				   XEXP (operands[1], 0),
+				   GET_MODE_SIZE (<VQ:MODE>mode)))"
   "ldp\\t%q0, %q2, %z1"
   [(set_attr "type" "neon_ldp_q")]
 )
@@ -225,7 +225,7 @@
    (set (match_operand:VQ2 2 "memory_operand" "=m")
 	(match_operand:VQ2 3 "register_operand" "w"))]
   "TARGET_SIMD && rtx_equal_p (XEXP (operands[2], 0),
-		plus_constant (Pmode,
+		plus_constant (mem_address_mode (operands[0]),
 			       XEXP (operands[0], 0),
 			       GET_MODE_SIZE (<VQ:MODE>mode)))"
   "stp\\t%q1, %q3, %z0"
@@ -3279,7 +3279,7 @@
 	   (match_operand:VDC 2 "memory_operand" "m")))]
   "TARGET_SIMD && !STRICT_ALIGNMENT
    && rtx_equal_p (XEXP (operands[2], 0),
-		   plus_constant (Pmode,
+		   plus_constant (mem_address_mode (operands[1]),
 				  XEXP (operands[1], 0),
 				  GET_MODE_SIZE (<MODE>mode)))"
   "ldr\\t%q0, %1"

@@ -19688,7 +19688,7 @@ aarch64_expand_vector_init (rtx target, rtx vals)
 		  && memory_operand (x1, inner_mode)
 		  && !STRICT_ALIGNMENT
 		  && rtx_equal_p (XEXP (x1, 0),
-				  plus_constant (Pmode,
+				  plus_constant (mem_address_mode (x0),
 						 XEXP (x0, 0),
 						 GET_MODE_SIZE (inner_mode))))
 		{
