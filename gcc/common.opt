@@ -1227,6 +1227,10 @@ Choose to do some fake hybrid capability stuff.
 This is largely in order to explore whether using hybrid capabilities will
 cause a lot of problems or not.
 
+ffake-hybrid-init=
+Common Joined RejectNegative UInteger Var(flag_fake_hybrid_init) Init(INT_MAX)
+Use a round-robin counter for -ffake-hybrid and specify its initial value.
+
 fdebug-prefix-map=
 Common Joined RejectNegative Var(common_deferred_options) Defer
 -fdebug-prefix-map=<old>=<new>	Map one directory name to another in debug information.

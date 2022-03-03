@@ -5970,6 +5970,26 @@ smallest_type_quals_location (const location_t *locations,
   return loc;
 }
 
+/* Return true if -ffake-hybrid says that we should automatically
+   modify a piece of code.  */
+
+static bool
+test_fake_hybrid (void)
+{
+  static int fake_hybrid_counter;
+
+  if (!flag_fake_hybrid)
+    return false;
+
+  if (flag_fake_hybrid_init < flag_fake_hybrid)
+    {
+      int count = flag_fake_hybrid_init + fake_hybrid_counter++;
+      return (count % flag_fake_hybrid) == 0;
+    }
+
+  return (rand() % flag_fake_hybrid) == 0;
+}
+
 /* Given declspecs and a declarator,
    determine the name and type of the object declared
    and construct a ..._DECL node for it.
@@ -6983,8 +7003,7 @@ grokdeclarator (const struct c_declarator *declarator,
 	    type_quals = declarator->u.pointer_quals;
 
 	    declarator = declarator->declarator;
-	    if (flag_fake_hybrid
-		&& (rand() % flag_fake_hybrid) == 0)
+	    if (test_fake_hybrid ())
 	      {
 		capability_levels_in_declarator++;
 		tree attr_name = get_identifier ("cheri_capability");

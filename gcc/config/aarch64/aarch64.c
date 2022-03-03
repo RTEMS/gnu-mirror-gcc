@@ -15157,8 +15157,8 @@ aarch64_override_options_internal (struct gcc_options *opts)
 	  error ("MORELLO TODO OpenACC has not been implemented for Morello");
   if (!flag_inline_atomics && TARGET_CAPABILITY_ANY)
 	  error ("MORELLO TODO -fno-inline-atomics has not been implemented for Morello");
-  if (flag_fake_hybrid)
-	  srand(get_random_seed(false));
+  if (flag_fake_hybrid >= flag_fake_hybrid_init)
+    srand (get_random_seed (false));
 
   if (TARGET_CAPABILITY_ANY && TARGET_SVE)
     error ("SVE is not supported with capabilities");
