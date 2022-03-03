@@ -1,3 +1,21 @@
+work079, patch #4:
+2022-03-02   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+	PR target/103109
+	* gcc.target/powerpc/pr103109.c: New test.
+
+work079, patch #3:
+2022-03-02   Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/104698
+	* gcc.target/powerpc/pr104698-1.c: New test.
+	* gcc.target/powerpc/pr104698-2.c: New test.
+
+2022-03-02   Michael Meissner  <meissner@linux.ibm.com>
+
+	Rebase to 8f1243ed62a 042fc77d5dc
+
 2022-02-28   Michael Meissner  <meissner@linux.ibm.com>
 
 	Rebase to b6298e5b75a 03418e431cc

@@ -1,30 +1,48 @@
-work079, patch #2:
-2022-03-01   Michael Meissner  <meissner@linux.ibm.com>
+work079, patch #4:
+2022-03-02   Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/103109
 	* config/rs6000/rs6000.md (su_int32): New code attribute.
-	(<u>mul<mode><dmode>3): Convert into define_insn_and_split.
+	(<u>mul<mode><dmode>3): Convert from define_expand to
+	define_insn_and_split.
 	(maddld<mode>4): Add generator function.
 	(<u>mulditi3_<u>adddi3): New insn.
 	(<u>mulditi3_add_const): New insn.
-	(addti3): Convert into define_insn_and_split.
+	(<u>mulditi3_<u>adddi3_upper): New insn.
+	(addti3): Convert from define_expand to define_insn_and_split.
 	(subti3): Likewise.
+	* config/rs6000/vsx.md (extendditi2): Allow on power9 systems.
+	Add isa attribute for the stuff that needs power10 support.
+	(zero_extendditi2): New insn.
 
-2022-02-28   Michael Meissner  <meissner@linux.ibm.com>
-
-	Rebase to b6298e5b75a 03418e431cc
-
-2022-02-28   Michael Meissner  <meissner@linux.ibm.com>
-
-	Rebase to b6298e5b75a 03418e431cc
-
-work079, patch #1:
-2022-02-25   Michael Meissner  <meissner@linux.ibm.com>
+work079, patch #3
+2022-03-02   Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/104698
 	* config/rs6000/vsx.md (mtvsrdd_diti_w1): Delete.
-	(extendditi2): Replace with code to deal with both GPR registers
-	and with altivec registers.
+	(extendditi2): Convert from define_expand to
+	define_insn_and_split.  Replace with code to deal with both GPR
+	registers and with altivec registers.
+
+2022-03-02   Michael Meissner  <meissner@linux.ibm.com>
+
+	Rebase to 8f1243ed62a 042fc77d5dc
+
+2022-02-28   Michael Meissner  <meissner@linux.ibm.com>
+
+	Rebase to b6298e5b75a 03418e431cc
+
+2022-02-28   Michael Meissner  <meissner@linux.ibm.com>
+
+	Rebase to b6298e5b75a 03418e431cc
+
+work079, patch #2:
+
+	Patch reverted.
+
+work079, patch #1:
+
+	Patch reverted.
 
 2022-02-25   Michael Meissner  <meissner@linux.ibm.com>
 
