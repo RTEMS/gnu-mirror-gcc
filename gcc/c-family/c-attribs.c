@@ -804,11 +804,8 @@ handle_cheri_capability_attribute (tree *node, tree ARG_UNUSED (name),
 {
   *no_add_attrs = true;
 
-  opt_scalar_addr_mode opt_cap_mode = targetm.capability_mode ();
-  if (opt_cap_mode.exists ())
+  if (targetm.capability_mode ().exists ())
     {
-      scalar_addr_mode cap_mode = opt_cap_mode.require();
-
       /* Scan down the tree *node and find how many
 	 POINTER_TYPE_P nodes there are in the chain.  */
       int capability_pointer_depth = 1, c = 1;
@@ -860,15 +857,16 @@ handle_cheri_capability_attribute (tree *node, tree ARG_UNUSED (name),
 	treetoedit = &TREE_TYPE (*treetoedit);
       gcc_assert (TREE_CODE (*treetoedit) == POINTER_TYPE);
 
+      tree attrs = tree_cons (get_identifier ("cheri_capability"), NULL_TREE,
+			      TYPE_ATTRIBUTES (*treetoedit));
+
       /* Call build_pointer_type_for_mode to create a Capability Pointer
       to whatever is being referenced by (*treetoedit).  Then use
       build_type_attribute_qual_variant to reapply the qualifiers and
       attributes of the original pointer type.  */
-      (*treetoedit) = build_type_attribute_qual_variant
-		      (build_pointer_type_for_mode (TREE_TYPE (*treetoedit),
-						    cap_mode, true),
-					TYPE_ATTRIBUTES (*treetoedit),
-					TYPE_QUALS (*treetoedit));
+      auto quals = TYPE_QUALS (*treetoedit);
+      (*treetoedit) = build_type_attribute_qual_variant (*treetoedit, attrs,
+							 quals);
     }
   else
     error ("__capability attribute is not supported for this architecture");

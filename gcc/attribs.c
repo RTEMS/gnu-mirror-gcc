@@ -1151,7 +1151,23 @@ build_type_attribute_qual_variant (tree otype, tree attribute, int quals)
 
       tree dtype = ntype = build_distinct_type_copy (ttype);
 
+      gcc_assert (ntype == TYPE_MAIN_VARIANT (ntype));
       TYPE_ATTRIBUTES (ntype) = attribute;
+      if (POINTER_TYPE_P (ntype)
+	  && !capability_type_p (ptr_type_node))
+	{
+	  bool old_cap = capability_type_p (ttype);
+	  bool new_cap = lookup_attribute ("cheri_capability", attribute);
+	  if (old_cap != new_cap)
+	    {
+	      auto as = TYPE_ADDR_SPACE (TREE_TYPE (ntype));
+	      auto mode = targetm.addr_space.pointer_mode (as, new_cap);
+	      SET_TYPE_MODE (ntype, mode);
+	      /* Force the size to be recomputed.  */
+	      TYPE_SIZE (ntype) = NULL_TREE;
+	      layout_type (ntype);
+	    }
+	}
 
       hashval_t hash = type_hash_canon_hash (ntype);
       ntype = type_hash_canon (hash, ntype);
@@ -1351,6 +1367,9 @@ comp_type_attributes (const_tree type1, const_tree type2)
     return 0;
   if ((lookup_attribute ("nocf_check", TYPE_ATTRIBUTES (type1)) != NULL)
       ^ (lookup_attribute ("nocf_check", TYPE_ATTRIBUTES (type2)) != NULL))
+    return 0;
+  if (bool (lookup_attribute ("cheri_capability", TYPE_ATTRIBUTES (type1)))
+      != bool (lookup_attribute ("cheri_capability", TYPE_ATTRIBUTES (type2))))
     return 0;
   /* As some type combinations - like default calling-convention - might
      be compatible, we have to call the target hook to get the final result.  */
