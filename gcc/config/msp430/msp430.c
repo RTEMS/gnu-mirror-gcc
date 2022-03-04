@@ -450,7 +450,7 @@ msp430_initial_elimination_offset (int from, int to)
 #define TARGET_ADDR_SPACE_ADDRESS_MODE msp430_addr_space_pointer_mode
 
 static scalar_addr_mode
-msp430_addr_space_pointer_mode (addr_space_t addrspace)
+msp430_addr_space_pointer_mode (addr_space_t addrspace, bool = false)
 {
   switch (addrspace)
     {

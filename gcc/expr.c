@@ -6041,9 +6041,10 @@ store_expr (tree exp, rtx target, int call_param_p,
 			      ? BLOCK_OP_CALL_PARM : BLOCK_OP_NORMAL));
 	  else
 	    {
-	      machine_mode pointer_mode
-		= targetm.addr_space.pointer_mode (MEM_ADDR_SPACE (target));
-	      const scalar_addr_mode address_mode = mem_address_mode (target);
+	      const auto address_mode = mem_address_mode (target);
+	      const auto as = MEM_ADDR_SPACE (target);
+	      const auto pointer_mode
+		= address_mode_to_pointer_mode (address_mode, as);
 	      const auto om = offset_mode (address_mode);
 
 	      /* Compute the size of the data to copy from the string.  */
@@ -8381,8 +8382,8 @@ expand_expr_addr_expr (tree exp, rtx target, machine_mode tmode,
   if (POINTER_TYPE_P (TREE_TYPE (exp)))
     {
       as = TYPE_ADDR_SPACE (TREE_TYPE (TREE_TYPE (exp)));
-      address_mode = targetm.addr_space.address_mode (as);
-      pointer_mode = targetm.addr_space.pointer_mode (as);
+      address_mode = pointer_address_mode (TREE_TYPE (exp));
+      pointer_mode = SCALAR_ADDR_TYPE_MODE (TREE_TYPE (exp));
     }
 
   /* We can get called with some Weird Things if the user does silliness
@@ -10598,7 +10599,7 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 	  /* Writing into CONST_DECL is always invalid, but handle it
 	     gracefully.  */
 	  addr_space_t as = TYPE_ADDR_SPACE (TREE_TYPE (exp));
-	  scalar_addr_mode address_mode = targetm.addr_space.address_mode (as);
+	  scalar_addr_mode address_mode = unqualified_address_mode (as);
 	  op0 = expand_expr_addr_expr_1 (exp, NULL_RTX, address_mode,
 					 EXPAND_NORMAL, as);
 	  op0 = memory_address_addr_space (mode, op0, as);
@@ -10739,10 +10740,10 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
     case MEM_REF:
       {
 	const bool reverse = REF_REVERSE_STORAGE_ORDER (exp);
-	addr_space_t as
-	  = TYPE_ADDR_SPACE (TREE_TYPE (TREE_TYPE (TREE_OPERAND (exp, 0))));
 	machine_mode address_mode;
 	tree base = TREE_OPERAND (exp, 0);
+	tree base_type = TREE_TYPE (base);
+	addr_space_t as = TYPE_ADDR_SPACE (TREE_TYPE (base_type));
 	gimple *def_stmt;
 	unsigned align;
 	/* Handle expansion of non-aliased memory with non-BLKmode.  That
@@ -10787,7 +10788,7 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 	    REF_REVERSE_STORAGE_ORDER (exp) = reverse;
 	    return expand_expr (exp, target, tmode, modifier);
 	  }
-	address_mode = targetm.addr_space.address_mode (as);
+	address_mode = pointer_address_mode (base_type);
 	if ((def_stmt = get_def_for_expr (base, BIT_AND_EXPR)))
 	  {
 	    tree mask = gimple_assign_rhs2 (def_stmt);

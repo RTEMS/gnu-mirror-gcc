@@ -2418,10 +2418,6 @@ adjust_address_1 (rtx memref, machine_mode mode, poly_int64 offset,
   scalar_addr_mode address_mode;
   class mem_attrs attrs (*get_mem_attrs (memref)), *defattrs;
   unsigned HOST_WIDE_INT max_align;
-#ifdef POINTERS_EXTEND_UNSIGNED
-  scalar_addr_mode pointer_mode
-    = targetm.addr_space.pointer_mode (attrs.addrspace);
-#endif
 
   /* VOIDmode means no mode change for change_address_1.  */
   if (mode == VOIDmode)
@@ -2450,6 +2446,10 @@ adjust_address_1 (rtx memref, machine_mode mode, poly_int64 offset,
      range of the target address space.  */
   address_mode = mem_address_mode (memref);
   offset = trunc_int_for_mode (offset, offset_mode (address_mode));
+#ifdef POINTERS_EXTEND_UNSIGNED
+  auto pointer_mode = address_mode_to_pointer_mode (address_mode,
+						    attrs.addrspace);
+#endif
 
   if (adjust_address)
     {

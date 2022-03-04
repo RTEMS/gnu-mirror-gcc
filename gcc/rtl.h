@@ -4568,7 +4568,32 @@ word_register_operation_p (const_rtx x)
       return true;
     }
 }
-    
+
+/* Return true if the address of memory reference MEM has a capability
+   mode.  */
+
+inline bool
+has_capability_address (rtx mem)
+{
+  auto mode = mem_address_mode (mem);
+  return CAPABILITY_MODE_P (mode);
+}
+
+/* Return true if address value X is a capability.  Assume VOIDmode Xs
+   have Pmode.
+
+   It is better to use has_capability_address for existing MEMs, since it
+   takes the address space into account.  */
+
+inline bool
+is_capability_address (rtx x)
+{
+  machine_mode mode = GET_MODE (x);
+  if (mode == VOIDmode)
+    mode = Pmode;
+  return CAPABILITY_MODE_P (mode);
+}
+
 /* gtype-desc.c.  */
 extern void gt_ggc_mx (rtx &);
 extern void gt_pch_nx (rtx &);

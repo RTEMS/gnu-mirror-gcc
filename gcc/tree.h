@@ -2019,6 +2019,10 @@ extern tree fold_drop_capability (tree);
 extern tree build_replace_address_value_loc (location_t, tree, tree);
 extern bool valid_capability_code_p (tree_code);
 
+extern scalar_addr_mode pointer_address_mode (const_tree);
+extern scalar_addr_mode unqualified_address_mode (const_tree);
+extern scalar_addr_mode unqualified_pointer_mode (const_tree);
+
 extern machine_mode element_mode (const_tree);
 extern machine_mode vector_type_mode (const_tree);
 extern unsigned int vector_element_bits (const_tree);

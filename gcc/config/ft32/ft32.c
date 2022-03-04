@@ -789,22 +789,6 @@ ft32_valid_pointer_mode (scalar_addr_mode mode)
   return 0;
 }
 
-#undef TARGET_ADDR_SPACE_POINTER_MODE
-#define TARGET_ADDR_SPACE_POINTER_MODE ft32_addr_space_pointer_mode
-static scalar_addr_mode
-ft32_addr_space_pointer_mode (addr_space_t addrspace ATTRIBUTE_UNUSED)
-{
-  return Pmode;
-}
-
-#undef TARGET_ADDR_SPACE_ADDRESS_MODE
-#define TARGET_ADDR_SPACE_ADDRESS_MODE ft32_addr_space_address_mode
-static scalar_addr_mode
-ft32_addr_space_address_mode (addr_space_t addrspace ATTRIBUTE_UNUSED)
-{
-  return Pmode;
-}
-
 #undef TARGET_ADDR_SPACE_SUBSET_P
 #define TARGET_ADDR_SPACE_SUBSET_P ft32_addr_space_subset_p
 static bool

@@ -369,8 +369,8 @@ convert_memory_address_addr_space_1 (scalar_addr_mode to_mode ATTRIBUTE_UNUSED,
      (they're not just simply bits ...).  */
   gcc_assert (! CAPABILITY_MODE_P (to_mode));
 
-  pointer_mode = targetm.addr_space.pointer_mode (as);
-  address_mode = targetm.addr_space.address_mode (as);
+  pointer_mode = unqualified_pointer_mode (as);
+  address_mode = unqualified_address_mode (as);
   from_mode = to_mode == pointer_mode ? address_mode : pointer_mode;
   /* Just assert that the input is as it should be  (X is a memory address in
      the previous mode).  */
@@ -481,7 +481,8 @@ rtx
 memory_address_addr_space (machine_mode mode, rtx x, addr_space_t as)
 {
   rtx oldx = x;
-  scalar_addr_mode address_mode = targetm.addr_space.address_mode (as);
+  bool is_cap = is_capability_address (x);
+  scalar_addr_mode address_mode = targetm.addr_space.address_mode (as, is_cap);
 
   x = convert_memory_address_addr_space (address_mode, x, as);
 
@@ -902,8 +903,7 @@ promote_mode (const_tree type ATTRIBUTE_UNUSED, machine_mode mode,
     case REFERENCE_TYPE:
     case POINTER_TYPE:
       *punsignedp = POINTERS_EXTEND_UNSIGNED;
-      return targetm.addr_space.address_mode
-	       (TYPE_ADDR_SPACE (TREE_TYPE (type)));
+      return pointer_address_mode (type);
 #endif
 
     default:

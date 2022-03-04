@@ -7893,6 +7893,44 @@ operation_no_trapping_overflow (tree type, enum tree_code code)
     }
 }
 
+/* Return the address mode (i.e. Pmode-like mode) associated with
+   pointer type TYPE.  */
+
+scalar_addr_mode
+pointer_address_mode (const_tree type)
+{
+  if (type == error_mark_node)
+    return unqualified_pointer_mode (addr_space_t (ADDR_SPACE_GENERIC));
+
+  gcc_assert (POINTER_TYPE_P (type));
+  return targetm.addr_space.address_mode (TYPE_ADDR_SPACE (TREE_TYPE (type)),
+					  capability_type_p (type));
+}
+
+/* Return the address mode (i.e. Pmode-like mode) for an unqualified
+   pointer to TO_TYPE.  */
+
+scalar_addr_mode
+unqualified_address_mode (const_tree to_type)
+{
+  if (to_type == error_mark_node)
+    return unqualified_pointer_mode (addr_space_t (ADDR_SPACE_GENERIC));
+
+  return unqualified_address_mode (TYPE_ADDR_SPACE (to_type));
+}
+
+/* Return the pointer mode (i.e. ptr_mode-like mode) for an unqualified
+   pointer to TO_TYPE.  */
+
+scalar_addr_mode
+unqualified_pointer_mode (const_tree to_type)
+{
+  if (to_type == error_mark_node)
+    return unqualified_pointer_mode (addr_space_t (ADDR_SPACE_GENERIC));
+
+  return unqualified_pointer_mode (TYPE_ADDR_SPACE (to_type));
+}
+
 /* Constructors for pointer, array, function, and intcap types.
    (RECORD_TYPE, UNION_TYPE and ENUMERAL_TYPE nodes are
    constructed by language-dependent code, not here.)  */
@@ -8028,9 +8066,7 @@ build_pointer_type_for_mode (tree to_type, machine_mode mode,
 tree
 build_pointer_type (tree to_type)
 {
-  addr_space_t as = to_type == error_mark_node? ADDR_SPACE_GENERIC
-					      : TYPE_ADDR_SPACE (to_type);
-  machine_mode pointer_mode = targetm.addr_space.pointer_mode (as);
+  auto pointer_mode = unqualified_pointer_mode (to_type);
   return build_pointer_type_for_mode (to_type, pointer_mode, false);
 }
 
@@ -8115,9 +8151,7 @@ build_reference_type_for_mode (tree to_type, machine_mode mode,
 tree
 build_reference_type (tree to_type)
 {
-  addr_space_t as = to_type == error_mark_node? ADDR_SPACE_GENERIC
-					      : TYPE_ADDR_SPACE (to_type);
-  machine_mode pointer_mode = targetm.addr_space.pointer_mode (as);
+  auto pointer_mode = unqualified_pointer_mode (to_type);
   return build_reference_type_for_mode (to_type, pointer_mode, false);
 }
 

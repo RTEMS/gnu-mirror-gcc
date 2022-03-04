@@ -192,8 +192,9 @@ rtx
 addr_for_mem_ref (struct mem_address *addr, addr_space_t as,
 		  bool really_expand)
 {
-  scalar_addr_mode address_mode = targetm.addr_space.address_mode (as);
-  scalar_addr_mode pointer_mode = targetm.addr_space.pointer_mode (as);
+  bool is_cap = addr->is_capability ();
+  scalar_addr_mode address_mode = targetm.addr_space.address_mode (as, is_cap);
+  scalar_addr_mode pointer_mode = targetm.addr_space.pointer_mode (as, is_cap);
   rtx address, sym, bse, idx, st, off;
   struct mem_addr_template *templ;
 
@@ -578,7 +579,7 @@ multiplier_allowed_in_address_p (HOST_WIDE_INT ratio, machine_mode mode,
   valid_mult = valid_mult_list[data_index];
   if (!valid_mult)
     {
-      machine_mode address_mode = targetm.addr_space.address_mode (as);
+      machine_mode address_mode = unqualified_address_mode (as);
       machine_mode addr_mode = noncapability_mode (address_mode);
       rtx reg1 = gen_raw_REG (addr_mode, LAST_VIRTUAL_REGISTER + 1);
       rtx reg2 = gen_raw_REG (address_mode, LAST_VIRTUAL_REGISTER + 2);
@@ -648,7 +649,7 @@ most_expensive_mult_to_index (tree type, struct mem_address *parts,
      be nice to check.
      */
   addr_space_t as = TYPE_ADDR_SPACE (type);
-  machine_mode address_mode = offset_mode (targetm.addr_space.address_mode (as));
+  machine_mode address_mode = offset_mode (unqualified_address_mode (as));
   HOST_WIDE_INT coef;
   unsigned best_mult_cost = 0, acost;
   tree mult_elt = NULL_TREE, elt;
@@ -1253,6 +1254,20 @@ dump_mem_address (FILE *file, struct mem_address *parts)
       print_generic_expr (file, parts->offset, TDF_SLIM);
       fprintf (file, "\n");
     }
+}
+
+/* Return true if the address has a capability type.  */
+
+bool
+mem_address::is_capability () const
+{
+  if (symbol)
+    return tree_is_capability_value (symbol);
+
+  if (base && POINTER_TYPE_P (TREE_TYPE (base)))
+    return tree_is_capability_value (base);
+
+  return CAPABILITY_MODE_P (ptr_mode);
 }
 
 #include "gt-tree-ssa-address.h"

@@ -1170,9 +1170,8 @@ find_inc (bool first_try)
 		     we are going to increment the result of the add insn.
 		     For this trick to be correct, the result reg of
 		     the inc must be a valid addressing reg.  */
-		  addr_space_t as = MEM_ADDR_SPACE (*mem_insn.mem_loc);
 		  if (GET_MODE (inc_insn.reg_res)
-		      != targetm.addr_space.address_mode (as))
+		      != mem_address_mode (*mem_insn.mem_loc))
 		    {
 		      if (dump_file)
 			fprintf (dump_file, "base reg mode failure.\n");
@@ -1221,9 +1220,8 @@ find_inc (bool first_try)
 	{
 	  /* For this trick to be correct, the result reg of the inc
 	     must be a valid addressing reg.  */
-	  addr_space_t as = MEM_ADDR_SPACE (*mem_insn.mem_loc);
 	  if (GET_MODE (inc_insn.reg_res)
-	      != targetm.addr_space.address_mode (as))
+	      != mem_address_mode (*mem_insn.mem_loc))
 	    {
 	      if (dump_file)
 		fprintf (dump_file, "base reg mode failure.\n");

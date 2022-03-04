@@ -292,6 +292,34 @@ estimated_poly_value (poly_int64 x)
     return targetm.estimated_poly_value (x);
 }
 
+/* Return the mode of an unqualified address in address space AS.
+   The mode is a capability whenever Pmode is a capability.  */
+
+inline scalar_addr_mode
+unqualified_address_mode (addr_space_t as)
+{
+  return targetm.addr_space.address_mode (as, CAPABILITY_MODE_P (Pmode));
+}
+
+/* Return the mode of an unqualified pointer in address space AS.
+   The mode is a capability whenever ptr_mode is a capability.  */
+
+inline scalar_addr_mode
+unqualified_pointer_mode (addr_space_t as)
+{
+  return targetm.addr_space.pointer_mode (as, CAPABILITY_MODE_P (ptr_mode));
+}
+
+/* Convert address mode ADDRESS_MODE to the corresponding pointer mode,
+   given that the address is in address space AS.  */
+
+inline scalar_addr_mode
+address_mode_to_pointer_mode (scalar_addr_mode address_mode, addr_space_t as)
+{
+  bool is_capability = CAPABILITY_MODE_P (address_mode);
+  return targetm.addr_space.pointer_mode (as, is_capability);
+}
+
 #ifdef GCC_TM_H
 
 #ifndef CUMULATIVE_ARGS_MAGIC

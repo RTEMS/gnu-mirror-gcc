@@ -3310,8 +3310,12 @@ DEFHOOK
 (pointer_mode,
  "Define this to return the machine mode to use for pointers to\n\
 @var{address_space} if the target supports named address spaces.\n\
-The default version of this hook returns @code{ptr_mode}.",
- scalar_addr_mode, (addr_space_t address_space),
+@var{is_capability} is true if the pointer should be a capability or\n\
+false if the pointer should be a normal integer.\n\
+\n\
+The default version of this hook returns @code{TARGET_CAPABILITY_MODE}\n\
+when @var{is_capability} is true and @code{ptr_mode} otherwise.",
+ scalar_addr_mode, (addr_space_t address_space, bool is_capability),
  default_addr_space_pointer_mode)
 
 /* MODE to use for an address in another address space.  */
@@ -3319,8 +3323,12 @@ DEFHOOK
 (address_mode,
  "Define this to return the machine mode to use for addresses in\n\
 @var{address_space} if the target supports named address spaces.\n\
-The default version of this hook returns @code{Pmode}.",
- scalar_addr_mode, (addr_space_t address_space),
+@var{is_capability} is true if the address should be a capability or\n\
+false if the address should be a normal integer.\n\
+\n\
+The default version of this hook returns @code{TARGET_CAPABILITY_MODE}\n\
+when @var{is_capability} is true and @code{Pmode} otherwise.",
+ scalar_addr_mode, (addr_space_t address_space, bool is_capability),
  default_addr_space_address_mode)
 
 /* True if MODE is valid for a pointer in __attribute__((mode("MODE")))

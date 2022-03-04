@@ -196,8 +196,8 @@ extern bool default_target_can_inline_p (tree, tree);
 extern bool default_valid_pointer_mode (scalar_addr_mode);
 extern bool default_ref_may_alias_errno (class ao_ref *);
 extern opt_scalar_addr_mode default_capability_mode ();
-extern scalar_addr_mode default_addr_space_pointer_mode (addr_space_t);
-extern scalar_addr_mode default_addr_space_address_mode (addr_space_t);
+extern scalar_addr_mode default_addr_space_pointer_mode (addr_space_t, bool);
+extern scalar_addr_mode default_addr_space_address_mode (addr_space_t, bool);
 extern bool default_addr_space_valid_pointer_mode (scalar_addr_mode,
 						   addr_space_t);
 extern bool default_addr_space_legitimate_address_p (machine_mode, rtx,

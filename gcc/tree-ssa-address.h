@@ -25,6 +25,8 @@ along with GCC; see the file COPYING3.  If not see
 struct mem_address
 {
   tree symbol, base, index, step, offset;
+
+  bool is_capability () const;
 };
 
 extern rtx addr_for_mem_ref (struct mem_address *, addr_space_t, bool);

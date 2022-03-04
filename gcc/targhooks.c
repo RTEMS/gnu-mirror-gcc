@@ -1461,8 +1461,12 @@ default_capability_mode ()
    defaulting to ptr_mode for all address spaces.  */
 
 scalar_addr_mode
-default_addr_space_pointer_mode (addr_space_t addrspace ATTRIBUTE_UNUSED)
+default_addr_space_pointer_mode (addr_space_t, bool is_capability)
 {
+  if (is_capability)
+    return targetm.capability_mode ().require ();
+
+  gcc_assert (!CAPABILITY_MODE_P (ptr_mode));
   return ptr_mode;
 }
 
@@ -1470,8 +1474,12 @@ default_addr_space_pointer_mode (addr_space_t addrspace ATTRIBUTE_UNUSED)
    defaulting to Pmode for all address spaces.  */
 
 scalar_addr_mode
-default_addr_space_address_mode (addr_space_t addrspace ATTRIBUTE_UNUSED)
+default_addr_space_address_mode (addr_space_t, bool is_capability)
 {
+  if (is_capability)
+    return targetm.capability_mode ().require ();
+
+  gcc_assert (!CAPABILITY_MODE_P (Pmode));
   return Pmode;
 }
 

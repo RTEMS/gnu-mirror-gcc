@@ -6655,10 +6655,13 @@ static rtx
 get_builtin_sync_mem (tree loc, machine_mode mode)
 {
   rtx addr, mem;
-  int addr_space = TYPE_ADDR_SPACE (POINTER_TYPE_P (TREE_TYPE (loc))
-				    ? TREE_TYPE (TREE_TYPE (loc))
-				    : TREE_TYPE (loc));
-  scalar_addr_mode addr_mode = targetm.addr_space.address_mode (addr_space);
+  tree loc_type = TREE_TYPE (loc);
+  int addr_space = TYPE_ADDR_SPACE (POINTER_TYPE_P (loc_type)
+				    ? TREE_TYPE (loc_type)
+				    : loc_type);
+  scalar_addr_mode addr_mode = (POINTER_TYPE_P (loc_type)
+				? pointer_address_mode (loc_type)
+				: unqualified_address_mode (loc_type));
 
   addr = expand_expr (loc, NULL_RTX, addr_mode, EXPAND_SUM);
   addr = convert_memory_address (addr_mode, addr);

@@ -1061,7 +1061,7 @@ rl78_hl_b_c_addr_p (rtx op)
 #define TARGET_ADDR_SPACE_ADDRESS_MODE rl78_addr_space_address_mode
 
 static scalar_addr_mode
-rl78_addr_space_address_mode (addr_space_t addrspace)
+rl78_addr_space_address_mode (addr_space_t addrspace, bool = false)
 {
   switch (addrspace)
     {
@@ -1101,7 +1101,7 @@ rl78_far_p (rtx x)
 #define TARGET_ADDR_SPACE_POINTER_MODE rl78_addr_space_pointer_mode
 
 static scalar_addr_mode
-rl78_addr_space_pointer_mode (addr_space_t addrspace)
+rl78_addr_space_pointer_mode (addr_space_t addrspace, bool = false)
 {
   switch (addrspace)
     {

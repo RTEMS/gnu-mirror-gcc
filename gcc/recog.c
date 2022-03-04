@@ -1948,7 +1948,7 @@ offsettable_address_addr_space_p (int strictp, machine_mode mode, rtx y,
 
   auto address_mode = get_address_mode (y, as);
 #ifdef POINTERS_EXTEND_UNSIGNED
-  machine_mode pointer_mode = targetm.addr_space.pointer_mode (as);
+  auto pointer_mode = address_mode_to_pointer_mode (address_mode, as);
 #endif
 
   /* ??? How much offset does an offsettable BLKmode reference need?

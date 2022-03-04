@@ -2608,9 +2608,10 @@ addr_offset_valid_p (struct iv_use *use, poly_int64 offset)
   addr = (*addr_list)[list_index];
   if (!addr)
     {
-      addr_mode = targetm.addr_space.address_mode (as);
+      bool is_capability = tree_is_capability_value (use->iv->base);
+      addr_mode = targetm.addr_space.address_mode (as, is_capability);
       reg = gen_raw_REG (addr_mode, LAST_VIRTUAL_REGISTER + 1);
-      rtx_code code = CAPABILITY_MODE_P (addr_mode) ? POINTER_PLUS : PLUS;
+      rtx_code code = is_capability ? POINTER_PLUS : PLUS;
       addr = gen_rtx_fmt_ee (code, addr_mode, reg, NULL_RTX);
       (*addr_list)[list_index] = addr;
     }
@@ -3738,7 +3739,7 @@ static rtx
 produce_memory_decl_rtl (tree obj, int *regno)
 {
   addr_space_t as = TYPE_ADDR_SPACE (TREE_TYPE (obj));
-  machine_mode address_mode = targetm.addr_space.address_mode (as);
+  machine_mode address_mode = unqualified_address_mode (as);
   rtx x;
 
   gcc_assert (obj);

@@ -4054,8 +4054,9 @@ convert_debug_memory_address (scalar_addr_mode mode, rtx x,
 			      addr_space_t as)
 {
 #ifndef POINTERS_EXTEND_UNSIGNED
+  bool is_cap = is_capability_address (x);
   gcc_assert (mode == Pmode
-	      || mode == targetm.addr_space.address_mode (as));
+	      || mode == targetm.addr_space.address_mode (as, is_cap));
   gcc_assert (GET_MODE (x) == mode || GET_MODE (x) == VOIDmode);
 #else
   rtx temp;
@@ -4510,8 +4511,8 @@ expand_debug_expr (tree exp)
 
       as = TYPE_ADDR_SPACE (TREE_TYPE (TREE_TYPE (TREE_OPERAND (exp, 0))));
 
-      op0 = convert_debug_memory_address (targetm.addr_space.address_mode (as),
-					  op0, as);
+      addr_mode = pointer_address_mode (TREE_TYPE (TREE_OPERAND (exp, 0)));
+      op0 = convert_debug_memory_address (addr_mode, op0, as);
       if (op0 == NULL_RTX)
 	return NULL;
 
@@ -4535,8 +4536,8 @@ expand_debug_expr (tree exp)
 	return NULL;
 
       as = TYPE_ADDR_SPACE (TREE_TYPE (TREE_TYPE (TREE_OPERAND (exp, 0))));
-      op0 = convert_debug_memory_address (targetm.addr_space.address_mode (as),
-					  op0, as);
+      addr_mode = pointer_address_mode (TREE_TYPE (TREE_OPERAND (exp, 0)));
+      op0 = convert_debug_memory_address (addr_mode, op0, as);
       if (op0 == NULL_RTX)
 	return NULL;
 

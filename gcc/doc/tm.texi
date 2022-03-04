@@ -10970,16 +10970,24 @@ named address space #1:
 c_register_addr_space ("__ea", ADDR_SPACE_EA);
 @end smallexample
 
-@deftypefn {Target Hook} scalar_addr_mode TARGET_ADDR_SPACE_POINTER_MODE (addr_space_t @var{address_space})
+@deftypefn {Target Hook} scalar_addr_mode TARGET_ADDR_SPACE_POINTER_MODE (addr_space_t @var{address_space}, bool @var{is_capability})
 Define this to return the machine mode to use for pointers to
 @var{address_space} if the target supports named address spaces.
-The default version of this hook returns @code{ptr_mode}.
+@var{is_capability} is true if the pointer should be a capability or
+false if the pointer should be a normal integer.
+
+The default version of this hook returns @code{TARGET_CAPABILITY_MODE}
+when @var{is_capability} is true and @code{ptr_mode} otherwise.
 @end deftypefn
 
-@deftypefn {Target Hook} scalar_addr_mode TARGET_ADDR_SPACE_ADDRESS_MODE (addr_space_t @var{address_space})
+@deftypefn {Target Hook} scalar_addr_mode TARGET_ADDR_SPACE_ADDRESS_MODE (addr_space_t @var{address_space}, bool @var{is_capability})
 Define this to return the machine mode to use for addresses in
 @var{address_space} if the target supports named address spaces.
-The default version of this hook returns @code{Pmode}.
+@var{is_capability} is true if the address should be a capability or
+false if the address should be a normal integer.
+
+The default version of this hook returns @code{TARGET_CAPABILITY_MODE}
+when @var{is_capability} is true and @code{Pmode} otherwise.
 @end deftypefn
 
 @deftypefn {Target Hook} bool TARGET_ADDR_SPACE_VALID_POINTER_MODE (scalar_addr_mode @var{mode}, addr_space_t @var{as})

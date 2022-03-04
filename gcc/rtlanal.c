@@ -5970,7 +5970,7 @@ get_address_mode (const_rtx addr, addr_space_t as)
   auto mode = GET_MODE (addr);
   if (mode != VOIDmode)
     return as_a <scalar_addr_mode> (mode);
-  return targetm.addr_space.address_mode (as);
+  return unqualified_address_mode (as);
 }
 
 /* Return the mode of MEM's address.  */

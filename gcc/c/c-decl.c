@@ -642,9 +642,8 @@ c_build_pointer_type (tree to_type)
   addr_space_t as = to_type == error_mark_node? ADDR_SPACE_GENERIC
 					      : TYPE_ADDR_SPACE (to_type);
   machine_mode pointer_mode;
-
   if (as != ADDR_SPACE_GENERIC || c_default_pointer_mode == VOIDmode)
-    pointer_mode = targetm.addr_space.pointer_mode (as);
+    pointer_mode = unqualified_pointer_mode (to_type);
   else
     pointer_mode = c_default_pointer_mode;
   return build_pointer_type_for_mode (to_type, pointer_mode, false);
