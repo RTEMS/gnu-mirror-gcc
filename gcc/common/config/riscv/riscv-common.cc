@@ -1247,6 +1247,8 @@ static const riscv_ext_flag_table_t riscv_ext_flag_table[] =
   {"svinval", &gcc_options::x_riscv_sv_subext, MASK_SVINVAL},
   {"svnapot", &gcc_options::x_riscv_sv_subext, MASK_SVNAPOT},
 
+  {"xventanacondops", &gcc_options::x_riscv_xventanacondops, MASK_XVENTANACONDOPS},
+
   {NULL, NULL, 0}
 };
 
