@@ -2307,6 +2307,20 @@ riscv_rtx_costs (rtx x, machine_mode mode, int outer_code, int opno ATTRIBUTE_UN
       return false;
 
     case AND:
+      /* vt.maskc/vt.maskcn for XVentanaCondOps */
+      if (TARGET_XVENTANACONDOPS && mode == word_mode
+	  && GET_CODE (XEXP (x, 0)) == NEG)
+	{
+	  rtx inner = XEXP (XEXP (x, 0), 0);
+
+	  if ((GET_CODE (inner) == EQ || GET_CODE (inner) == NE)
+	      && CONST_INT_P (XEXP (inner, 1))
+	      && INTVAL (XEXP (inner, 1)) == 0)
+	    {
+	      *total = COSTS_N_INSNS (1);
+	      return true;
+	    }
+	}
       /* slli.uw pattern for zba.  */
       if (TARGET_ZBA && TARGET_64BIT && mode == DImode
 	  && GET_CODE (XEXP (x, 0)) == ASHIFT)
