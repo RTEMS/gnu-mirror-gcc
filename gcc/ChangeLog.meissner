@@ -1,3 +1,13 @@
+work080, patch #1:
+2022-03-04   Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/104698
+	* config/rs6000/vsx.md (UNSPEC_MTVSRD_DITI_W1): Delete.
+	(mtvsrdd_diti_w1): Delete.
+	(extendditi2): Convert from define_expand to
+	define_insn_and_split.  Replace with code to deal with both GPR
+	registers and with altivec registers.
+
 2022-03-04   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch

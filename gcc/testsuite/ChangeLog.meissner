@@ -1,3 +1,10 @@
+work080, patch #1:
+2022-03-04   Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/104698
+	* gcc.target/powerpc/pr104698-1.c: New test.
+	* gcc.target/powerpc/pr104698-2.c: New test.
+
 2022-03-04   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
