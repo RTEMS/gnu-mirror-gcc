@@ -1,3 +1,65 @@
+2022-03-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/c++config (__glibcxx_assert_fail): Add visibility
+	attribute.
+	(__terminate): Likewise.
+
+2022-03-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	* libsupc++/compare (strong_order::_S_fp_cmp): Move typedef
+	inside #if condition.
+
+2022-03-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/104748
+	* testsuite/std/ranges/adaptors/all.cc: Use non-debug vector for
+	constexpr test.
+
+2022-03-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/17_intro/names.cc (func): Undef on AIX.
+
+2022-03-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/96526
+	* libsupc++/compare (strong_order): Add missing support for
+	floating-point types.
+	* testsuite/18_support/comparisons/algorithms/strong_order_floats.cc:
+	New test.
+
+2022-03-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR middle-end/103984
+	* include/bits/regex_compiler.h (_BracketMatcher::_M_char): Use
+	default member initializer.
+
+2022-02-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/104602
+	* include/std/source_location (source_location::current): Use
+	deduced type of __builtin_source_location().
+
+2022-02-22  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/ranges_base.h (__detail::__is_initializer_list):
+	Define.
+	(viewable_range): Adjust as per P2415R2.
+	* include/bits/ranges_cmp.h (__cpp_lib_ranges): Adjust value.
+	* include/std/ranges (owning_view): Define as per P2415R2.
+	(enable_borrowed_range<owning_view>): Likewise.
+	(views::__detail::__can_subrange): Replace with ...
+	(views::__detail::__can_owning_view): ... this.
+	(views::_All::_S_noexcept): Sync with operator().
+	(views::_All::operator()): Use owning_view instead of subrange
+	as per P2415R2.
+	* include/std/version (__cpp_lib_ranges): Adjust value.
+	* testsuite/std/ranges/adaptors/all.cc (test06): Adjust now that
+	views::all uses owning_view instead of subrange.
+	(test08): New test.
+	* testsuite/std/ranges/adaptors/lazy_split.cc (test09): Adjust
+	now that rvalue non-view non-borrowed ranges are viewable.
+	* testsuite/std/ranges/adaptors/split.cc (test06): Likewise.
+
 2022-02-17  Jonathan Wakely  <jwakely@redhat.com>
 
 	PR libstdc++/104559
