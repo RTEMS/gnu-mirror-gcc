@@ -82,7 +82,7 @@ lowparts_p (rtx x, machine_mode mx, rtx y, machine_mode my)
     return CONST_INT_P (right) && INTVAL (left) == INTVAL (right);
 
   if (!REG_P (left) || !REG_P (right))
-    return false;
+    return left == right;
   else if (!HARD_REGISTER_P (left) || !HARD_REGISTER_P (right))
     return REGNO (left) == REGNO (right);
   else
@@ -4469,6 +4469,14 @@ simplify_binary_operation_1 (enum rtx_code code, machine_mode mode,
 					mode, op0, GEN_INT (align_const));
 	}
 
+      if (GET_CODE (op1) == PLUS
+	  && lowparts_p (op0, mode, XEXP (op1, 0), om))
+	{
+	  return simplify_gen_binary (POINTER_PLUS,
+				      mode,
+				      op0, XEXP (op1, 1));
+	}
+
       return 0;
     }
 
@@ -8314,6 +8322,23 @@ test_replace_address_value_simplifications ()
 
       /* TODO: test case with side effects?  */
     }
+
+  /* (replace_address_value:M C (plus:OM C.CV X))
+     --> (pointer_plus:M C X)
+
+     Test it with SYMBOL_REFs here, as that is our motivating case.  */
+  rtx sym = gen_rtx_SYMBOL_REF (cm, "x");
+  x = simplify_gen_binary (REPLACE_ADDRESS_VALUE,
+			   cm,
+			   sym,
+			   gen_rtx_PLUS (om,
+					 drop_capability (sym),
+					 constm1_rtx));
+  if (GET_CODE (x) == CONST)
+    x = XEXP (x, 0);
+  ASSERT_EQ (GET_CODE (x), POINTER_PLUS);
+  ASSERT_EQ (XEXP (x, 0), sym);
+  ASSERT_EQ (XEXP (x, 1), constm1_rtx);
 }
 
 static void

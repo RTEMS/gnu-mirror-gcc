@@ -4626,6 +4626,7 @@ tree_innermost_capability (const_tree t)
   switch (TREE_CODE (t))
     {
     case INTEGER_CST:
+    case ADDR_EXPR:
       return t;
     case NOP_EXPR:
       return tree_innermost_capability (TREE_OPERAND (t, 0));
@@ -4669,18 +4670,34 @@ initializer_constant_valid_p_1 (tree value, tree endtype, tree *cache)
 		    || CALL_EXPR_IFN (ptr) != IFN_REPLACE_ADDRESS_VALUE);
 	if (TREE_CODE (ptr) == CALL_EXPR)
 	  break;
-	/* MORELLO TODO Here we assert that we only ever see capability
-	   initialisers where the metadata is known to be cleared.
-	   Any time this is not the case is likely to be a bug (at least until
-	   we add some feature to do such things).  */
+
 	const_tree base_cap = tree_innermost_capability (ptr);
-	gcc_assert ((TREE_CODE (base_cap) == INTEGER_CST
-		     && tree_constant_capability_metadata (base_cap) == 0));
+
 	tree ptr_ret = initializer_constant_valid_p_1 (ptr, endtype, cache);
 	tree addrval_ret = initializer_constant_valid_p_1
 		(addr_value, noncapability_type (endtype), cache);
-	/* Return value doesn't matter beyond what the comment above mentions.
-	 * */
+
+	/* Handle cases like:
+	   (__intcap)&x + INTEGER_CST
+	   with IR like:
+	   .REPLACE_ADDRESS_VALUE (&x, (long)&x + INTEGER_CST)
+	   which later get expanded to POINTER_PLUS.  */
+	if (TREE_CODE (base_cap) == ADDR_EXPR)
+	  {
+	    tree av_addr = addr_value;
+	    if (TREE_CODE (av_addr) == PLUS_EXPR)
+	      av_addr = TREE_OPERAND (av_addr, 0);
+
+	    if (TREE_CODE (av_addr) == NOP_EXPR)
+	      av_addr = TREE_OPERAND (av_addr, 0);
+
+	    if (av_addr != base_cap)
+	      return 0;
+	  }
+	else
+	  gcc_assert ((TREE_CODE (base_cap) == INTEGER_CST
+		       && tree_constant_capability_metadata (base_cap) == 0));
+
 	if (ptr_ret == null_pointer_node && addrval_ret == null_pointer_node)
 	  return null_pointer_node;
 	if (ptr_ret && addrval_ret)
