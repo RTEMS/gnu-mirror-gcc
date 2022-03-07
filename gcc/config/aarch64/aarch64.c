@@ -7422,6 +7422,13 @@ aarch64_layout_frame (void)
   frame.laid_out = true;
 }
 
+/* Implementation of TARGET_UNWIND_WORD_MODE.  */
+scalar_addr_mode
+aarch64_unwind_word_mode (void)
+{
+  return Pmode;
+}
+
 /* Return true if the register REGNO is saved on entry to
    the current function.  */
 
@@ -25374,6 +25381,9 @@ aarch64_libgcc_floating_mode_supported_p
 
 #undef TARGET_ASM_DECLARE_CONSTANT_NAME
 #define TARGET_ASM_DECLARE_CONSTANT_NAME aarch64_declare_constant_name
+
+#undef TARGET_UNWIND_WORD_MODE
+#define TARGET_UNWIND_WORD_MODE		aarch64_unwind_word_mode
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

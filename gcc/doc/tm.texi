@@ -1421,7 +1421,7 @@ of shift instructions expanded to libgcc calls.  If not defined
 targets.
 @end deftypefn
 
-@deftypefn {Target Hook} scalar_int_mode TARGET_UNWIND_WORD_MODE (void)
+@deftypefn {Target Hook} scalar_addr_mode TARGET_UNWIND_WORD_MODE (void)
 Return machine mode to be used for @code{_Unwind_Word} type.
 The default is to use @code{word_mode}.
 @end deftypefn

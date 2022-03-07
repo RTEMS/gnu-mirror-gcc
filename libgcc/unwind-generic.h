@@ -45,22 +45,17 @@ extern "C" {
 
 /* @@@ The IA-64 ABI uses uint64 throughout.  Most places this is
    inefficient for 32-bit and smaller machines.  */
-#ifdef __CHERI_PURE_CAPABILITY__
-typedef __UINTPTR_TYPE__ _Unwind_Word;
-typedef __INTPTR_TYPE__ _Unwind_Sword;
-#else
 typedef unsigned _Unwind_Word __attribute__((__mode__(__unwind_word__)));
 typedef signed _Unwind_Sword __attribute__((__mode__(__unwind_word__)));
-#endif
 
 #if defined(__ia64__) && defined(__hpux__)
 typedef unsigned _Unwind_Ptr __attribute__((__mode__(__word__)));
 typedef unsigned _Unwind_Address __attribute__((__mode__(__word__)));
 #else
-typedef __UINTPTR_TYPE__ _Unwind_Ptr;
 typedef unsigned _Unwind_Address __attribute__((__mode__(__address__)));
+typedef unsigned _Unwind_Ptr __attribute__((__mode__(__pointer__)));
 #endif
-typedef __UINTPTR_TYPE__ _Unwind_Internal_Ptr;
+typedef unsigned _Unwind_Internal_Ptr __attribute__((__mode__(__pointer__)));
 
 /* @@@ The IA-64 ABI uses a 64-bit word to identify the producer and
    consumer of an exception.  We'll go along with this for now even on

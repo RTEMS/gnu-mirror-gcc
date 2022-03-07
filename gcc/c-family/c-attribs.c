@@ -1853,6 +1853,8 @@ handle_mode_attribute (tree *node, tree name, tree args,
 	mode = targetm.libgcc_shift_count_mode ();
       else if (!strcmp (p, "unwind_word"))
 	mode = targetm.unwind_word_mode ();
+      else if (!strcmp (p, "unwind_word_addr"))
+	mode = offset_mode (targetm.unwind_word_mode ());
       else
 	for (j = 0; j < NUM_MACHINE_MODES; j++)
 	  if (!strcmp (p, GET_MODE_NAME (j)))
@@ -1993,7 +1995,9 @@ handle_mode_attribute (tree *node, tree name, tree args,
 	}
       else if (VECTOR_MODE_P (mode)
 	       ? TREE_CODE (type) != TREE_CODE (TREE_TYPE (typefm))
-	       : TREE_CODE (type) != TREE_CODE (typefm))
+	       : TREE_CODE (type) != TREE_CODE (typefm)
+	       && ! (TREE_CODE (type) == INTEGER_TYPE
+		     && INTCAP_TYPE_P (typefm)))
 	{
 	  error ("mode %qs applied to inappropriate type", p);
 	  return NULL_TREE;

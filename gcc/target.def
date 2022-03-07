@@ -2159,7 +2159,7 @@ be sealed from modification without invalidating the pointer.",
 DEFHOOK_UNDOC
 (eh_return_filter_mode,
  "Return machine mode for filter value.",
- scalar_int_mode, (void),
+ scalar_addr_mode, (void),
  default_eh_return_filter_mode)
 
 /* Return machine mode for libgcc expanded cmp instructions.  */
@@ -2187,7 +2187,7 @@ DEFHOOK
 (unwind_word_mode,
  "Return machine mode to be used for @code{_Unwind_Word} type.\n\
 The default is to use @code{word_mode}.",
- scalar_int_mode, (void),
+ scalar_addr_mode, (void),
  default_unwind_word_mode)
 
 /* Given two decls, merge their attributes and return the result.  */

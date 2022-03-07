@@ -2266,7 +2266,7 @@ c_common_type_for_mode (machine_mode mode, int unsignedp)
       else
 	{
 	  gcc_assert (is_a <scalar_addr_mode> (mode));
-	  return unsignedp ? uintcap_type_node : intcap_type_node;
+	  return build_intcap_type_for_mode (mode, unsignedp);
 	}
     }
 

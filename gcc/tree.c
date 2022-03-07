@@ -7902,6 +7902,24 @@ tree
 build_intcap_type_for_mode (machine_mode mode, int unsignedp)
 {
   gcc_assert (CAPABILITY_MODE_P (mode));
+
+  /* There is currently no target which has more than one capability mode.
+     Because of this, cacheing INTCAP_TYPE's is easy, there are only two kinds.
+     If/when a target with more than one capability mode is built this cacheing
+     mechanism should trigger an ICE and be easy enough to spot as a change to
+     make.
+     We need to cache since otherwise comparisons of types don't work as
+     expected (since we check the type pointer itself).  */
+  if (unsignedp && uintcap_type_node != NULL)
+    {
+      gcc_assert (TYPE_MODE (uintcap_type_node) == mode);
+      return uintcap_type_node;
+    }
+  if (!unsignedp && intcap_type_node != NULL)
+    {
+      gcc_assert (TYPE_MODE (intcap_type_node) == mode);
+      return intcap_type_node;
+    }
   tree t = make_node (INTCAP_TYPE);
   SET_TYPE_MODE (t, mode);
   TYPE_UNSIGNED (t) = !!unsignedp;
@@ -7921,6 +7939,25 @@ build_intcap_type_for_mode (machine_mode mode, int unsignedp)
      Then later use the type precision to set the min and max values.  */
   set_min_and_max_values_for_integral_type
 	  (t, TYPE_CAP_PRECISION (t), unsignedp ? UNSIGNED : SIGNED);
+
+  /* N.b. this is somewhat superfluous, since the time this function is called
+     from `build_common_tree_nodes` will be the first time this function is
+     called (since that is called from the language initialisation code), and
+     `build_common_tree_nodes` assigns the result of this function to the
+     global_trees elements `uintcap_type_node` and `intcap_type_node`.
+
+     That said, it's nice to have the cacheing in this function itself rather
+     than outside of it since otherwise this function has unnecessary
+     dependencies on how it gets called.
+     Given that, and the fact that there's no harm in the superfluous
+     double-assignment we simply ensure the assignment is done in this function
+     and in `build_common_tree_nodes`.  The assignment in
+     `build_common_tree_nodes` makes it clearer what's happening there, so we
+     leave it.  */
+  if (unsignedp)
+    uintcap_type_node = t;
+  else
+    intcap_type_node = t;
 
   return t;
 }
@@ -10378,8 +10415,15 @@ build_common_tree_nodes (bool signed_char)
   if (opt_cap_mode.exists())
     {
       scalar_addr_mode cap_mode = opt_cap_mode.require();
-      intcap_type_node = build_intcap_type_for_mode (cap_mode, 0);
-      uintcap_type_node = build_intcap_type_for_mode (cap_mode, 1);
+      /* `build_intcap_type_for_mode` caches its return values in
+	 `uintcap_type_node` and `intcap_type_node`, so we don't need to do the
+	 assignment here.  We *do* need to ensure that those nodes are set by
+	 the time this function returns, since they are used by other code
+	 without calling `build_intcap_type_for_mode`.  */
+      gcc_assert (build_intcap_type_for_mode (cap_mode, 0)
+		  == intcap_type_node);
+      gcc_assert (build_intcap_type_for_mode (cap_mode, 1)
+		  == uintcap_type_node);
     }
 
   /* Fill in the rest of the sized types.  Reuse existing type nodes
