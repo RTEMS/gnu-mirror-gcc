@@ -211,7 +211,7 @@ PERSONALITY_FUNCTION (int version,
       p = read_encoded_value (0, info.call_site_encoding, p, &cs_start);
       p = read_encoded_value (0, info.call_site_encoding, p, &cs_len);
 #  ifdef __CHERI_PURE_CAPABILITY__
-      unsigned marker = 0;
+      _Unwind_Ptr marker = 0;
       /* Single uleb128 value as the capability marker.  */
       p = read_encoded_value (0, DW_EH_PE_uleb128, p, &marker);
       /* 8 byte value indicating the offset from said 8 byte value.
@@ -224,7 +224,7 @@ PERSONALITY_FUNCTION (int version,
       p = read_uleb128 (p, &cs_action);
 
       /* The table is sorted, so if we've passed the ip, stop.  */
-      if (ip < info.Start + cs_start)
+      if (ip < info.Start + (_Unwind_Address)cs_start)
 	p = info.action_table;
       else if (ip < info.Start + (_Unwind_Address)cs_start + (_Unwind_Address)cs_len)
 	{

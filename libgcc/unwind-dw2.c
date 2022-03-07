@@ -825,7 +825,7 @@ execute_stack_op (const unsigned char *op_ptr, const unsigned char *op_end,
 	      break;
 
 	    case DW_OP_abs:
-	      if ((_Unwind_Sword) result < 0)
+	      if ((_Unwind_CapSword) result < 0)
 		result = -result;
 	      break;
 	    case DW_OP_neg:
@@ -891,7 +891,7 @@ execute_stack_op (const unsigned char *op_ptr, const unsigned char *op_end,
 		result = second & first;
 		break;
 	      case DW_OP_div:
-		result = (_Unwind_CapSword) second / (_Unwind_CapSword) first;
+		result = (_Unwind_CapSword) second / (_Unwind_Sword) first;
 		break;
 	      case DW_OP_minus:
 		result = second - first;
@@ -1039,11 +1039,11 @@ execute_cfa_program (const unsigned char *insn_ptr,
 	{
 	case DW_CFA_set_loc:
 	  {
-	    _Unwind_Address pc;
+	    _Unwind_Ptr pc;
 
 	    insn_ptr = read_encoded_value (context, fs->fde_encoding,
 					   insn_ptr, &pc);
-	    fs->pc = pc;
+	    fs->pc = (_Unwind_Address)pc;
 	  }
 	  break;
 
