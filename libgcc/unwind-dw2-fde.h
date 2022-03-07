@@ -166,7 +166,7 @@ next_fde (const fde *f)
 typedef unsigned _Unwind_Address __attribute__((__mode__(__address__)));
 typedef unsigned _Unwind_WordAddr __attribute__((__mode__(__unwind_word__)));
 typedef signed _Unwind_SwordAddr __attribute__((__mode__(__unwind_word__)));
-extern const fde * _Unwind_Find_FDE (_Unwind_Address, struct dwarf_eh_bases *);
+extern const fde * _Unwind_Find_FDE (void *, struct dwarf_eh_bases *);
 
 static inline int
 last_fde (struct object *obj __attribute__ ((__unused__)), const fde *f)

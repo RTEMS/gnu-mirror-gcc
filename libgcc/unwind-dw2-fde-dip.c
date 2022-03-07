@@ -90,7 +90,7 @@
 # define __RELOC_POINTER(ptr, base) ((ptr) + (base))
 #endif
 
-static const fde * _Unwind_Find_registered_FDE (_Unwind_Address pc, struct dwarf_eh_bases *bases);
+static const fde * _Unwind_Find_registered_FDE (void *pc, struct dwarf_eh_bases *bases);
 
 #define _Unwind_Find_FDE _Unwind_Find_registered_FDE
 #include "unwind-dw2-fde.c"
@@ -451,7 +451,7 @@ _Unwind_IteratePhdrCallback (struct dl_phdr_info *info, size_t size, void *ptr)
 }
 
 const fde *
-_Unwind_Find_FDE (_Unwind_Address pc, struct dwarf_eh_bases *bases)
+_Unwind_Find_FDE (void *pc, struct dwarf_eh_bases *bases)
 {
   struct unw_eh_callback_data data;
   const fde *ret;

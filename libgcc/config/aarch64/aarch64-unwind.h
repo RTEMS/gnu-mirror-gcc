@@ -38,8 +38,8 @@ aarch64_cie_signed_with_b_key (struct _Unwind_Context *context)
   /* MORELLO  Do not want to adjust for the LSB here since context->bases.func
      is initialised using the address read from the FDE, which does not have
      this LSB set.  */
-  const struct dwarf_fde *fde
-    = _Unwind_Find_FDE ((_Unwind_Address)context->bases.func, &context->bases);
+  const struct dwarf_fde *fde = _Unwind_Find_FDE (context->bases.func,
+						  &context->bases);
   if (fde != NULL)
     {
       const struct dwarf_cie *cie = get_cie (fde);

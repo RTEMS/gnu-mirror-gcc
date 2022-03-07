@@ -389,7 +389,8 @@ _Unwind_FindEnclosingFunction (void *pc)
 {
   struct dwarf_eh_bases bases;
    _Unwind_Address pcaddr = __builtin_code_address_from_pointer (pc);
-  const struct dwarf_fde *fde = _Unwind_Find_FDE (pcaddr-1, &bases);
+  const struct dwarf_fde *fde
+    = _Unwind_Find_FDE ((void *)(_Unwind_Ptr)(pcaddr-1), &bases);
   if (fde)
     return bases.func;
   else
@@ -1308,8 +1309,9 @@ uw_frame_state_for (struct _Unwind_Context *context, _Unwind_FrameState *fs)
     return _URC_END_OF_STACK;
 
   _Unwind_Address retaddr = __builtin_code_address_from_pointer (context->ra);
-  fde = _Unwind_Find_FDE (retaddr + _Unwind_IsSignalFrame (context) - 1,
-			  &context->bases);
+  void *retptr = (void *)(_Unwind_Ptr)(retaddr
+				       + _Unwind_IsSignalFrame (context) - 1);
+  fde = _Unwind_Find_FDE (retptr, &context->bases);
   if (fde == NULL)
     {
 #ifdef MD_FALLBACK_FRAME_STATE_FOR

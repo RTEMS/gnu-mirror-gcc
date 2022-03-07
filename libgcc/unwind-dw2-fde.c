@@ -1033,8 +1033,9 @@ search_object (struct object* ob, _Unwind_Address pc)
 }
 
 const fde *
-_Unwind_Find_FDE (_Unwind_Address pc, struct dwarf_eh_bases *bases)
+_Unwind_Find_FDE (void *pc, struct dwarf_eh_bases *bases)
 {
+  _Unwind_Address pcaddr = (_Unwind_Address) pc;
   struct object *ob;
   const fde *f = NULL;
 
@@ -1058,9 +1059,9 @@ _Unwind_Find_FDE (_Unwind_Address pc, struct dwarf_eh_bases *bases)
      containing the pc.  Note that pc_begin is sorted descending, and
      we expect objects to be non-overlapping.  */
   for (ob = seen_objects; ob; ob = ob->next)
-    if (pc >= (_Unwind_Address)ob->pc_begin)
+    if (pc >= ob->pc_begin)
       {
-	f = search_object (ob, pc);
+	f = search_object (ob, pcaddr);
 	if (f)
 	  goto fini;
 	break;
@@ -1072,7 +1073,7 @@ _Unwind_Find_FDE (_Unwind_Address pc, struct dwarf_eh_bases *bases)
       struct object **p;
 
       unseen_objects = ob->next;
-      f = search_object (ob, pc);
+      f = search_object (ob, pcaddr);
 
       /* Insert the object into the classified list.  */
       for (p = &seen_objects; *p ; p = &(*p)->next)
