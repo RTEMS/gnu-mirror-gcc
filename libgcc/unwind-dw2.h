@@ -64,9 +64,12 @@ typedef struct
   } regs;
 
   /* The PC described by the current frame state.
-     This is read from the CFA data or FDE pc range.  Hence on capability
-     architectures it is an address rather than a pointer.  For non-capability
-     architectures _Unwind_Address is the same as a pointer.  */
+     This is read from the CFA data or FDE pc range.  On capability
+     architectures it can be a pointer, but will never be an executable pointer
+     (since reading from the DWARF information can only have the permissions of
+     the capability we use for a base, and we never use an executable
+     capability for such a base).  For non-capability architectures
+     _Unwind_Address is the same as a pointer.  */
   _Unwind_Address pc;
 
   /* The information we care about from the CIE/FDE.  */

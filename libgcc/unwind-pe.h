@@ -184,6 +184,12 @@ static const unsigned char *
 read_encoded_value_with_base (unsigned char encoding, _Unwind_Ptr base,
 			      const unsigned char *p, _Unwind_Ptr *val)
 {
+  /* This structure can not hold capabilities since it is not aligned.
+     That is just fine, since (in the ABI's supported currently) capabilities
+     are never directly embedded in DWARF information so that the eh_frame
+     section can be read-only.  */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wif-not-aligned"
   union unaligned
     {
       void *ptr;
@@ -194,6 +200,7 @@ read_encoded_value_with_base (unsigned char encoding, _Unwind_Ptr base,
       signed s4 __attribute__ ((mode (SI)));
       signed s8 __attribute__ ((mode (DI)));
     } __attribute__((__packed__));
+#pragma GCC diagnostic pop
 
   const union unaligned *u = (const union unaligned *) p;
   _Unwind_Internal_Ptr result;

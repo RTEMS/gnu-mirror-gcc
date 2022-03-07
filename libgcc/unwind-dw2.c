@@ -1316,7 +1316,7 @@ uw_frame_state_for (struct _Unwind_Context *context, _Unwind_FrameState *fs)
 #endif
     }
 
-  fs->pc = context->bases.func;
+  fs->pc = (_Unwind_Address)context->bases.func;
 
   cie = get_cie (fde);
   insn = extract_cie_info (cie, context, fs);

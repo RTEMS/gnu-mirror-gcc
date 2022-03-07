@@ -668,6 +668,7 @@ classify_object_over_fdes (struct object *ob, const fde *this_fde)
 
       read_encoded_value_with_base (encoding, base, this_fde->pc_begin,
 				    &pc_begin);
+      _Unwind_Address pc_begin_addr = (_Unwind_Address)pc_begin;
 
       /* Take care to ignore link-once functions that were removed.
 	 In these cases, the function address will be NULL, but if
@@ -679,12 +680,12 @@ classify_object_over_fdes (struct object *ob, const fde *this_fde)
       else
 	mask = -1;
 
-      if ((pc_begin & mask) == 0)
+      if ((pc_begin_addr & mask) == 0)
 	continue;
 
       count += 1;
-      if (pc_begin < ob->pc_begin)
-	ob->pc_begin = pc_begin;
+      if (pc_begin_addr < (_Unwind_Address)ob->pc_begin)
+	ob->pc_begin = (void *) pc_begin;
     }
 
   return count;
@@ -911,7 +912,7 @@ binary_search_unencoded_fdes (struct object *ob, _Unwind_Address pc)
       memcpy (&pc_begin, (const void * const *) f->pc_begin, sizeof (void *));
       memcpy (&pc_range, (const uaddr *) f->pc_begin + 1, sizeof (uaddr));
 
-      if (pc < pc_begin)
+      if ((_Unwind_Address)pc < pc_begin)
 	hi = i;
       else if (pc >= pc_begin + pc_range)
 	lo = i + 1;

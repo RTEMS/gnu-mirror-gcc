@@ -169,7 +169,7 @@ PERSONALITY_FUNCTION (int version,
 #ifdef __USING_SJLJ_EXCEPTIONS__
   ip = (_Unwind_Address) ip_ptr;
 #else
-  ip = __builtin_code_address_from_pointer (ip_ptr);
+  ip = __builtin_code_address_from_pointer ((void*)ip_ptr);
 #endif
 
   if (! ip_before_insn)
@@ -226,7 +226,7 @@ PERSONALITY_FUNCTION (int version,
       /* The table is sorted, so if we've passed the ip, stop.  */
       if (ip < info.Start + cs_start)
 	p = info.action_table;
-      else if (ip < info.Start + cs_start + cs_len)
+      else if (ip < info.Start + (_Unwind_Address)cs_start + (_Unwind_Address)cs_len)
 	{
 	  if (cs_lp)
 	    {

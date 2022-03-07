@@ -32,6 +32,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 typedef unsigned int word __attribute__((mode(word)));
 typedef __UINTPTR_TYPE__ pointer;
+typedef unsigned address_t __attribute__((mode(address)));
 
 struct __emutls_object
 {
@@ -111,7 +112,7 @@ emutls_alloc (struct __emutls_object *obj)
       if (ptr == NULL)
 	abort ();
       ret = (void *) (((pointer) (ptr + sizeof (void *) + obj->align - 1))
-		      & ~(pointer)(obj->align - 1));
+		      & ~(address_t)(obj->align - 1));
       ((void **) ret)[-1] = ptr;
     }
 

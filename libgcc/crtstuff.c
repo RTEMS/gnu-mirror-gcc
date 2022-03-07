@@ -263,7 +263,7 @@ STATIC func_ptr __DTOR_LIST__[1]
 STATIC EH_FRAME_SECTION_CONST char __EH_FRAME_BEGIN__[]
      __attribute__((section(__LIBGCC_EH_FRAME_SECTION_NAME__), aligned(4)))
      = { };
-# ifdef __CHERI_PURE_CAPABILITY__ && defined (__aarch64__)
+# if defined (__CHERI_PURE_CAPABILITY__) && defined (__aarch64__)
 /* MORELLO  __EH_FRAME_BEGIN__ marks the start of the .eh_frame section.
    The __register_frame_info* functions below pass this to the unwinder so that
    it knows where to access the dwarf unwinding information from.
@@ -273,19 +273,19 @@ STATIC EH_FRAME_SECTION_CONST char __EH_FRAME_BEGIN__[]
    N.b. this is pretty useful in development since PCC gives us executable
    permissions, which means we can use the landing-pad offset info rather than
    having to implement both at the same time.  */
-static inline void *
+static inline EH_FRAME_SECTION_CONST void *
 get_eh_frame_begin (void)
 {
   void *ret;
-  asm ("adrp  %0, __EH_FRAME_BEGIN__\n\t"
-       "add %0, %0, :lo12:__EH_FRAME_BEGIN__"
-       : "=r" (ret) : );
+  asm ("adrp  %0, %1\n\t"
+       "add %0, %0, :lo12:%1"
+       : "=r" (ret) : "S" (__EH_FRAME_BEGIN__));
   return ret;
 }
 # elif defined (__CHERI_PURE_CAPABILITY__)
 # error libgcc crtstuff not updated for non-Morello capability target.
 # else
-static inline void *
+static inline EH_FRAME_SECTION_CONST void *
 get_eh_frame_begin (void)
 {
   return __EH_FRAME_BEGIN__;
