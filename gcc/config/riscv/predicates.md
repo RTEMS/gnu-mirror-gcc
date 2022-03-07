@@ -204,6 +204,18 @@
 (define_predicate "equality_operator"
   (match_code "eq,ne"))
 
+(define_predicate "anyge_operator"
+  (match_code "ge,geu"))
+
+(define_predicate "anygt_operator"
+  (match_code "gt,gtu"))
+
+(define_predicate "anyle_operator"
+  (match_code "le,leu"))
+
+(define_predicate "anylt_operator"
+  (match_code "lt,ltu"))
+
 (define_predicate "order_operator"
   (match_code "eq,ne,lt,ltu,le,leu,ge,geu,gt,gtu"))
 

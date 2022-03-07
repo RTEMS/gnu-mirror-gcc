@@ -2647,6 +2647,19 @@
   [(set_attr "type" "slt")
    (set_attr "mode" "<X:MODE>")])
 
+(define_split
+  [(set (match_operand:GPR 0 "register_operand")
+	(match_operator:GPR 1 "anyle_operator"
+	       [(match_operand:X 2 "register_operand")
+		(match_operand:X 3 "register_operand")]))]
+  "TARGET_XVENTANACONDOPS"
+  [(set (match_dup 0) (match_dup 4))
+   (set (match_dup 0) (eq:GPR (match_dup 0) (const_int 0)))]
+ {
+  operands[4] = gen_rtx_fmt_ee (GET_CODE (operands[1]) == LE ? LT : LTU,
+				<GPR:MODE>mode, operands[3], operands[2]);
+ })
+
 (define_insn "*slt<u>_<X:mode><GPR:mode>"
   [(set (match_operand:GPR           0 "register_operand" "= r")
 	(any_lt:GPR (match_operand:X 1 "register_operand" "  r")
@@ -2667,6 +2680,19 @@
 }
   [(set_attr "type" "slt")
    (set_attr "mode" "<X:MODE>")])
+
+(define_split
+  [(set (match_operand:GPR 0 "register_operand")
+	(match_operator:GPR 1 "anyge_operator"
+	       [(match_operand:X 2 "register_operand")
+		(match_operand:X 3 "register_operand")]))]
+  "TARGET_XVENTANACONDOPS"
+  [(set (match_dup 0) (match_dup 4))
+   (set (match_dup 0) (eq:GPR (match_dup 0) (const_int 0)))]
+{
+  operands[4] = gen_rtx_fmt_ee (GET_CODE (operands[1]) == GE ? LT : LTU,
+				<GPR:MODE>mode, operands[2], operands[3]);
+})
 
 ;;
 ;;  ....................
