@@ -1,3 +1,9 @@
+work080, patch #2:
+2022-03-07   Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/103109
+	* gcc.target/powerpc/pr103109.c: New test.
+
 work080, patch #1:
 2022-03-04   Michael Meissner  <meissner@linux.ibm.com>
 

@@ -1,3 +1,26 @@
+work080, patch #3:
+2022-03-07   Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (addti3): Generate vadduqm on power8.
+	(subti3): Generate vsubuqm on power8.
+
+work080, patch #2:
+2022-03-07   Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/103109
+	* config/rs6000/rs6000.md (su_int32): New code attribute.
+	(<u>mul<mode><dmode>3): Convert from define_expand to
+	define_insn_and_split.
+	(maddld<mode>4): Add generator function.
+	(<u>mulditi3_<u>adddi3): New insn.
+	(<u>mulditi3_add_const): New insn.
+	(<u>mulditi3_<u>adddi3_upper): New insn.
+	(addti3): Convert from define_expand to define_insn_and_split.
+	(subti3): Likewise.
+	* config/rs6000/vsx.md (extendditi2): Allow on power9 systems.
+	Add isa attribute for the stuff that needs power10 support.
+	(zero_extendditi2): New insn.
+
 work080, patch #1:
 2022-03-04   Michael Meissner  <meissner@linux.ibm.com>
 
