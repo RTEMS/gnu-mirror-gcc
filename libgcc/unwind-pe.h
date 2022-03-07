@@ -286,7 +286,7 @@ read_encoded_value_with_base (unsigned char encoding, _Unwind_Ptr base,
 	    }
 #else
 	  result = ((encoding & 0x70) == DW_EH_PE_pcrel
-		     ? (_Unwind_Internal_Ptr) u : base) + (_Unwind_Word)result;
+		     ? (_Unwind_Internal_Ptr) u : base) + (_Unwind_Address)result;
 	  if (encoding & DW_EH_PE_indirect)
 	    result = *(_Unwind_Internal_Ptr *) result;
 #endif

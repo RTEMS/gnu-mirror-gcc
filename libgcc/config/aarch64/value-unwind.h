@@ -20,7 +20,7 @@
 
 /* Define this macro if the target stores register values as _Unwind_Word
    type in unwind context.  Only enable it for ilp32.  */
-#if defined __aarch64__ && !defined __LP64__
+#if defined __aarch64__ && !defined __LP64__ && !defined __CHERI_PURE_CAPABILITY__
 # define REG_VALUE_IN_UNWIND_CONTEXT
 #endif
 

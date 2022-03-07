@@ -119,7 +119,7 @@ aarch64_fallback_frame_state (struct _Unwind_Context *context,
 
 	  for (i = 0; i < AARCH64_DWARF_NUMBER_V; i++)
 	    {
-	      _Unwind_Sword offset;
+	      _Unwind_SwordAddr offset;
 
 	      fs->regs.reg[AARCH64_DWARF_V0 + i].how = REG_SAVED_OFFSET;
 

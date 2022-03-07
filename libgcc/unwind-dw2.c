@@ -133,17 +133,17 @@ struct _Unwind_Context
   void *lsda;
   struct dwarf_eh_bases bases;
   /* Signal frame context.  */
-#define SIGNAL_FRAME_BIT ((~(_Unwind_Word) 0 >> 1) + 1)
+#define SIGNAL_FRAME_BIT ((~(_Unwind_WordAddr) 0 >> 1) + 1)
   /* Context which has version/args_size/by_value fields.  */
-#define EXTENDED_CONTEXT_BIT ((~(_Unwind_Word) 0 >> 2) + 1)
+#define EXTENDED_CONTEXT_BIT ((~(_Unwind_WordAddr) 0 >> 2) + 1)
   /* Bit reserved on AArch64, return address has been signed with A or B
      key.  */
-#define RA_SIGNED_BIT ((~(_Unwind_Word) 0 >> 3) + 1)
-  _Unwind_Word flags;
+#define RA_SIGNED_BIT ((~(_Unwind_WordAddr) 0 >> 3) + 1)
+  _Unwind_WordAddr flags;
   /* 0 for now, can be increased when further fields are added to
      struct _Unwind_Context.  */
-  _Unwind_Word version;
-  _Unwind_Word args_size;
+  _Unwind_WordAddr version;
+  _Unwind_WordAddr args_size;
   char by_value[__LIBGCC_DWARF_FRAME_REGISTERS__+1];
 };
 
@@ -195,7 +195,7 @@ read_8u (const void *p) { const union unaligned *up = p; return up->u8; }
 static inline unsigned long
 read_8s (const void *p) { const union unaligned *up = p; return up->s8; }
 
-static inline _Unwind_Word
+static inline _Bool
 _Unwind_IsSignalFrame (struct _Unwind_Context *context)
 {
   return (context->flags & SIGNAL_FRAME_BIT) ? 1 : 0;
@@ -210,7 +210,7 @@ _Unwind_SetSignalFrame (struct _Unwind_Context *context, int val)
     context->flags &= ~SIGNAL_FRAME_BIT;
 }
 
-static inline _Unwind_Word
+static inline _Bool
 _Unwind_IsExtendedContext (struct _Unwind_Context *context)
 {
   return (ASSUME_EXTENDED_UNWIND_CONTEXT
@@ -447,15 +447,15 @@ extract_cie_info (const struct dwarf_cie *cie, struct _Unwind_Context *context,
   /* Immediately following this are the code and
      data alignment and return address column.  */
   p = read_uleb128 (p, &utmp);
-  fs->code_align = (_Unwind_Word)utmp;
+  fs->code_align = (_Unwind_WordAddr)utmp;
   p = read_sleb128 (p, &stmp);
-  fs->data_align = (_Unwind_Sword)stmp;
+  fs->data_align = (_Unwind_SwordAddr)stmp;
   if (cie->version == 1)
     fs->retaddr_column = *p++;
   else
     {
       p = read_uleb128 (p, &utmp);
-      fs->retaddr_column = (_Unwind_Word)utmp;
+      fs->retaddr_column = (_Unwind_Reg)utmp;
     }
   fs->lsda_encoding = DW_EH_PE_omit;
 
@@ -732,7 +732,7 @@ execute_stack_op (const unsigned char *op_ptr, const unsigned char *op_end,
 	case DW_OP_bregx:
 	  op_ptr = read_uleb128 (op_ptr, &reg);
 	  op_ptr = read_sleb128 (op_ptr, &offset);
-	  result = _Unwind_GetGR (context, reg) + (_Unwind_Word)offset;
+	  result = _Unwind_GetGR (context, reg) + (_Unwind_WordAddr)offset;
 	  break;
 
 	case DW_OP_dup:
@@ -836,7 +836,7 @@ execute_stack_op (const unsigned char *op_ptr, const unsigned char *op_end,
 	      break;
 	    case DW_OP_plus_uconst:
 	      op_ptr = read_uleb128 (op_ptr, &utmp);
-	      result += (_Unwind_Word)utmp;
+	      result += (_Unwind_WordAddr)utmp;
 	      break;
 
 	    default:
@@ -878,7 +878,7 @@ execute_stack_op (const unsigned char *op_ptr, const unsigned char *op_end,
 		 for non-Morello architectures is done in the order that would
 		 satisfy the provenance choice above.  */
 	    _Unwind_CapWord second;
-	    _Unwind_Word first;
+	    _Unwind_WordAddr first;
 	    gcc_assert (stack_elt >= 2);
 	    stack_elt -= 2;
 
@@ -891,7 +891,7 @@ execute_stack_op (const unsigned char *op_ptr, const unsigned char *op_end,
 		result = second & first;
 		break;
 	      case DW_OP_div:
-		result = (_Unwind_CapSword) second / (_Unwind_Sword) first;
+		result = (_Unwind_CapSword) second / (_Unwind_SwordAddr) first;
 		break;
 	      case DW_OP_minus:
 		result = second - first;
@@ -921,22 +921,28 @@ execute_stack_op (const unsigned char *op_ptr, const unsigned char *op_end,
 		result = second ^ first;
 		break;
 	      case DW_OP_le:
-		result = (_Unwind_Sword) second <= (_Unwind_Sword) first;
+		result
+		  = (_Unwind_SwordAddr) second <= (_Unwind_SwordAddr) first;
 		break;
 	      case DW_OP_ge:
-		result = (_Unwind_Sword) second >= (_Unwind_Sword) first;
+		result
+		  = (_Unwind_SwordAddr) second >= (_Unwind_SwordAddr) first;
 		break;
 	      case DW_OP_eq:
-		result = (_Unwind_Sword) second == (_Unwind_Sword) first;
+		result
+		  = (_Unwind_SwordAddr) second == (_Unwind_SwordAddr) first;
 		break;
 	      case DW_OP_lt:
-		result = (_Unwind_Sword) second < (_Unwind_Sword) first;
+		result
+		  = (_Unwind_SwordAddr) second < (_Unwind_SwordAddr) first;
 		break;
 	      case DW_OP_gt:
-		result = (_Unwind_Sword) second > (_Unwind_Sword) first;
+		result
+		  = (_Unwind_SwordAddr) second > (_Unwind_SwordAddr) first;
 		break;
 	      case DW_OP_ne:
-		result = (_Unwind_Sword) second != (_Unwind_Sword) first;
+		result
+		  = (_Unwind_SwordAddr) second != (_Unwind_SwordAddr) first;
 		break;
 
 	      default:
@@ -1107,7 +1113,7 @@ execute_cfa_program (const unsigned char *insn_ptr,
 	    if (UNWIND_COLUMN_IN_RANGE (reg))
 	      {
 	        fs->regs.reg[reg].how = REG_SAVED_REG;
-	        fs->regs.reg[reg].loc.reg = (_Unwind_Word)reg2;
+		fs->regs.reg[reg].loc.reg = (_Unwind_Reg)reg2;
 	      }
 	  }
 	  break;
@@ -1139,15 +1145,15 @@ execute_cfa_program (const unsigned char *insn_ptr,
 
 	case DW_CFA_def_cfa:
 	  insn_ptr = read_uleb128 (insn_ptr, &utmp);
-	  fs->regs.cfa_reg = (_Unwind_Word)utmp;
+	  fs->regs.cfa_reg = (_Unwind_Reg)utmp;
 	  insn_ptr = read_uleb128 (insn_ptr, &utmp);
-	  fs->regs.cfa_offset = (_Unwind_Word)utmp;
+	  fs->regs.cfa_offset = (_Unwind_WordAddr)utmp;
 	  fs->regs.cfa_how = CFA_REG_OFFSET;
 	  break;
 
 	case DW_CFA_def_cfa_register:
 	  insn_ptr = read_uleb128 (insn_ptr, &utmp);
-	  fs->regs.cfa_reg = (_Unwind_Word)utmp;
+	  fs->regs.cfa_reg = (_Unwind_Reg)utmp;
 	  fs->regs.cfa_how = CFA_REG_OFFSET;
 	  break;
 
@@ -1191,7 +1197,7 @@ execute_cfa_program (const unsigned char *insn_ptr,
 
 	case DW_CFA_def_cfa_sf:
 	  insn_ptr = read_uleb128 (insn_ptr, &utmp);
-	  fs->regs.cfa_reg = (_Unwind_Word)utmp;
+	  fs->regs.cfa_reg = (_Unwind_Reg)utmp;
 	  insn_ptr = read_sleb128 (insn_ptr, &stmp);
 	  fs->regs.cfa_offset = (_Unwind_Sword)stmp;
 	  fs->regs.cfa_how = CFA_REG_OFFSET;
@@ -1259,7 +1265,7 @@ execute_cfa_program (const unsigned char *insn_ptr,
 
 	case DW_CFA_GNU_args_size:
 	  insn_ptr = read_uleb128 (insn_ptr, &utmp);
-	  context->args_size = (_Unwind_Word)utmp;
+	  context->args_size = (_Unwind_WordAddr)utmp;
 	  break;
 
 	case DW_CFA_GNU_negative_offset_extended:
@@ -1267,7 +1273,7 @@ execute_cfa_program (const unsigned char *insn_ptr,
 	     older PowerPC code.  */
 	  insn_ptr = read_uleb128 (insn_ptr, &reg);
 	  insn_ptr = read_uleb128 (insn_ptr, &utmp);
-	  offset = (_Unwind_Word) utmp * fs->data_align;
+	  offset = (_Unwind_WordAddr) utmp * fs->data_align;
 	  reg = DWARF_REG_TO_UNWIND_COLUMN (reg);
 	  if (UNWIND_COLUMN_IN_RANGE (reg))
 	    {
@@ -1419,7 +1425,7 @@ __frame_state_for (void *pc_target, struct frame_state *state_in)
   return state_in;
 }
 
-typedef union { _Unwind_Ptr ptr; _Unwind_Word word; } _Unwind_SpTmp;
+typedef union { _Unwind_Ptr ptr; _Unwind_WordAddr word; } _Unwind_SpTmp;
 
 static inline void
 _Unwind_SetSpColumn (struct _Unwind_Context *context, void *cfa,

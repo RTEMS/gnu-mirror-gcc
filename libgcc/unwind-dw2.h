@@ -22,6 +22,7 @@
    see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    <http://www.gnu.org/licenses/>.  */
 
+typedef unsigned int _Unwind_Reg;
 /* The result of interpreting the frame unwind info for a frame.
    This is all symbolic at this point, as none of the values can
    be resolved until the target pc is located.  */
@@ -33,8 +34,8 @@ typedef struct
   {
     struct {
       union {
-	_Unwind_Word reg;
-	_Unwind_Sword offset;
+	_Unwind_Reg reg;
+	_Unwind_SwordAddr offset;
 	const unsigned char *exp;
       } loc;
       enum {
@@ -53,8 +54,8 @@ typedef struct
 
     /* The CFA can be described in terms of a reg+offset or a
        location expression.  */
-    _Unwind_Sword cfa_offset;
-    _Unwind_Word cfa_reg;
+    _Unwind_SwordAddr cfa_offset;
+    _Unwind_Reg cfa_reg;
     const unsigned char *cfa_exp;
     enum {
       CFA_UNSET,
@@ -74,9 +75,9 @@ typedef struct
 
   /* The information we care about from the CIE/FDE.  */
   _Unwind_Personality_Fn personality;
-  _Unwind_Sword data_align;
-  _Unwind_Word code_align;
-  _Unwind_Word retaddr_column;
+  _Unwind_SwordAddr data_align;
+  _Unwind_WordAddr code_align;
+  _Unwind_Reg retaddr_column;
   unsigned char fde_encoding;
   unsigned char lsda_encoding;
   unsigned char saw_z;
