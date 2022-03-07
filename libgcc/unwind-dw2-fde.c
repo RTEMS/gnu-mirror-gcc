@@ -361,9 +361,9 @@ static int
 fde_unencoded_compare (struct object *ob __attribute__((unused)),
 		       const fde *x, const fde *y)
 {
-  _Unwind_Ptr x_ptr, y_ptr;
-  memcpy (&x_ptr, x->pc_begin, sizeof (_Unwind_Ptr));
-  memcpy (&y_ptr, y->pc_begin, sizeof (_Unwind_Ptr));
+  _Unwind_Address x_ptr, y_ptr;
+  memcpy (&x_ptr, x->pc_begin, sizeof (_Unwind_Address));
+  memcpy (&y_ptr, y->pc_begin, sizeof (_Unwind_Address));
 
   if (x_ptr > y_ptr)
     return 1;
@@ -721,8 +721,8 @@ add_fdes (struct object *ob, struct fde_accumulator *accu, const fde *this_fde)
 
       if (encoding == DW_EH_PE_absptr)
 	{
-	  _Unwind_Ptr ptr;
-	  memcpy (&ptr, this_fde->pc_begin, sizeof (_Unwind_Ptr));
+	  _Unwind_Address ptr;
+	  memcpy (&ptr, this_fde->pc_begin, sizeof (_Unwind_Address));
 	  if (ptr == 0)
 	    continue;
 	}
@@ -866,7 +866,7 @@ linear_search_fdes (struct object *ob, const fde *this_fde, _Unwind_Address pc)
 	}
       else
 	{
-	  _Unwind_Ptr mask;
+	  _Unwind_Address mask;
 	  const unsigned char *p;
 
 	  p = read_encoded_value_with_base (encoding, base,
@@ -876,9 +876,13 @@ linear_search_fdes (struct object *ob, const fde *this_fde, _Unwind_Address pc)
 	  /* Take care to ignore link-once functions that were removed.
 	     In these cases, the function address will be NULL, but if
 	     the encoding is smaller than a pointer a true NULL may not
-	     be representable.  Assume 0 in the representable bits is NULL.  */
+	     be representable.  Assume 0 in the representable bits is NULL.
+
+	     For capability targets we must check against the size of an
+	     address, since the size of a pointer includes metadata which does
+	     not determine whether the pointer is NULL or not.  */
 	  mask = size_of_encoded_value (encoding);
-	  if (mask < sizeof (void *))
+	  if (mask < sizeof (_Unwind_Address))
 	    mask = (((_Unwind_Ptr) 1) << (mask << 3)) - 1;
 	  else
 	    mask = -1;
@@ -887,7 +891,7 @@ linear_search_fdes (struct object *ob, const fde *this_fde, _Unwind_Address pc)
 	    continue;
 	}
 
-      if ((_Unwind_Ptr) pc - pc_begin < pc_range)
+      if (pc - (_Unwind_Address)pc_begin < (_Unwind_Address)pc_range)
 	return this_fde;
     }
 
@@ -907,12 +911,12 @@ binary_search_unencoded_fdes (struct object *ob, _Unwind_Address pc)
     {
       size_t i = (lo + hi) / 2;
       const fde *const f = vec->array[i];
-      void *pc_begin;
+      uaddr pc_begin;
       uaddr pc_range;
-      memcpy (&pc_begin, (const void * const *) f->pc_begin, sizeof (void *));
+      memcpy (&pc_begin, (const uaddr *) f->pc_begin, sizeof (uaddr));
       memcpy (&pc_range, (const uaddr *) f->pc_begin + 1, sizeof (uaddr));
 
-      if ((_Unwind_Address)pc < pc_begin)
+      if (pc < pc_begin)
 	hi = i;
       else if (pc >= pc_begin + pc_range)
 	lo = i + 1;
@@ -944,7 +948,7 @@ binary_search_single_encoding_fdes (struct object *ob, _Unwind_Address pc)
 
       if ((_Unwind_Address) pc < pc_begin)
 	hi = i;
-      else if ((_Unwind_Address) pc >= pc_begin + pc_range)
+      else if ((_Unwind_Address) pc >= pc_begin + (_Unwind_Address)pc_range)
 	lo = i + 1;
       else
 	return f;
@@ -975,7 +979,7 @@ binary_search_mixed_encoding_fdes (struct object *ob, _Unwind_Address pc)
 
       if ((_Unwind_Address) pc < pc_begin)
 	hi = i;
-      else if ((_Unwind_Address) pc >= pc_begin + pc_range)
+      else if ((_Unwind_Address) pc >= pc_begin + (_Unwind_Address)pc_range)
 	lo = i + 1;
       else
 	return f;
@@ -996,7 +1000,7 @@ search_object (struct object* ob, _Unwind_Address pc)
       /* Despite the above comment, the normal reason to get here is
 	 that we've not processed this object before.  A quick range
 	 check is in order.  */
-      if (pc < ob->pc_begin)
+      if (pc < (_Unwind_Address)ob->pc_begin)
 	return NULL;
     }
 
@@ -1054,7 +1058,7 @@ _Unwind_Find_FDE (_Unwind_Address pc, struct dwarf_eh_bases *bases)
      containing the pc.  Note that pc_begin is sorted descending, and
      we expect objects to be non-overlapping.  */
   for (ob = seen_objects; ob; ob = ob->next)
-    if (pc >= ob->pc_begin)
+    if (pc >= (_Unwind_Address)ob->pc_begin)
       {
 	f = search_object (ob, pc);
 	if (f)
@@ -1097,7 +1101,7 @@ _Unwind_Find_FDE (_Unwind_Address pc, struct dwarf_eh_bases *bases)
 	encoding = get_fde_encoding (f);
       read_encoded_value_with_base (encoding, base_from_object (encoding, ob),
 				    f->pc_begin, &func);
-      bases->func = func;
+      bases->func = (void *) func;
     }
 
   return f;
