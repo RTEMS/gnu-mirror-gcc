@@ -2199,7 +2199,7 @@ aarch64_dbx_register_number (unsigned regno, machine_mode mode)
   /* For Morello capabilities we use a separate set of DWARF registers
      in the range of 198-228 (for the c0-c30 GP registers).  */
    if (GP_REGNUM_P (regno))
-     return (CAPABILITY_MODE_P (mode) ? 198 : 0)
+     return ((CAPABILITY_MODE_P (mode) && !TARGET_CAPABILITY_FAKE) ? 198 : 0)
 	      + AARCH64_DWARF_R0 + regno - R0_REGNUM;
     /* MORELLO TODO:
     I believe we do not need to do anything here for the PCC (r230) or the
