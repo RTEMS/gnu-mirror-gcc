@@ -2650,7 +2650,7 @@ static bool
 aarch64_hard_regno_mode_ok (unsigned regno, machine_mode mode)
 {
   if (mode == CADImode)
-    return aarch64_regno_ok_for_base_p (regno, true);
+    return TARGET_CAPABILITY_ANY && aarch64_regno_ok_for_base_p (regno, true);
 
   if (GET_MODE_CLASS (mode) == MODE_CC)
     return regno == CC_REGNUM;
@@ -24757,6 +24757,19 @@ aarch64_capabilities_in_hardware (void)
     return false;
 }
 
+/* Implement the TARGET_DWARF_FRAME_REG_MODE target hook. This only has an
+   impact in Hybrid Capability Morello compilation, where the default
+   raw_reg_mode returned would still be CADImode, but we want to use DImode
+   to only save x registers in the unwind tables.  */
+machine_mode
+aarch64_dwarf_frame_reg_mode (int regno)
+{
+  if (TARGET_CAPABILITY_HYBRID)
+    return noncapability_mode (default_dwarf_frame_reg_mode (regno));
+  else
+    return default_dwarf_frame_reg_mode (regno);
+}
+
 /* Target-specific selftests.  */
 
 #if CHECKING_P
@@ -25369,6 +25382,9 @@ aarch64_libgcc_floating_mode_supported_p
 
 #undef TARGET_CAPABILITY_MODE
 #define TARGET_CAPABILITY_MODE aarch64_target_capability_mode
+
+#undef TARGET_DWARF_FRAME_REG_MODE
+#define TARGET_DWARF_FRAME_REG_MODE aarch64_dwarf_frame_reg_mode
 
 #undef TARGET_CODE_ADDRESS_FROM_POINTER
 #define TARGET_CODE_ADDRESS_FROM_POINTER aarch64_code_address_from_pointer
