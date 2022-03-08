@@ -5031,11 +5031,14 @@
 ;;
 ;; If the register allocator prefers to use Altivec registers on power10,
 ;; generate the vextsd2q instruction.
+;;
+;; We also need the GPR code for power9 so that we can optimize to use the
+;; multiply-add instructions.
 (define_insn_and_split "extendditi2"
   [(set (match_operand:TI 0 "register_operand" "=r,r,v,v,v")
 	(sign_extend:TI (match_operand:DI 1 "input_operand" "r,m,r,wa,Z")))
    (clobber (reg:DI CA_REGNO))]
-  "TARGET_POWERPC64 && TARGET_POWER10"
+  "TARGET_POWERPC64 && TARGET_MADDLD"
   "#"
   "&& reload_completed"
   [(pc)]
@@ -5052,10 +5055,7 @@
       rtx dest_lo = gen_lowpart (DImode, dest);
 
       emit_move_insn (dest_lo, src);
-      /* In case src is a MEM, we have to use the destination, which is a
-         register, instead of re-using the source.  */
-      rtx src2 = (REG_P (src) || SUBREG_P (src)) ? src : dest_lo;
-      emit_insn (gen_ashrdi3 (dest_hi, src2, GEN_INT (63)));
+      emit_insn (gen_ashrdi3 (dest_hi, dest_lo, GEN_INT (63)));
       DONE;
     }
 
@@ -5082,7 +5082,7 @@
     gcc_unreachable ();
 }
   [(set_attr "length" "8")
-   (set_attr "type" "shift,load,vecmove,vecperm,load")])
+   (set_attr "isa" "p9,p9,p10,p10,p10")])
 
 ;; Sign extend 64-bit value in TI reg, word 1, to 128-bit value in TI reg
 (define_insn "extendditi2_vector"
@@ -5093,6 +5093,54 @@
   "vextsd2q %0,%1"
   [(set_attr "type" "vecexts")])
 
+;; Zero extend DImode to TImode when the result is in GPRs or VSX registers.
+(define_insn_and_split "zero_extendditi2"
+  [(set (match_operand:TI 0 "register_operand" "=r,r,wa,wa,wa")
+	(zero_extend:TI (match_operand:DI 1 "input_operand" "r,m,r,wa,Z")))
+   (clobber (match_scratch:DI 2 "=X,X,r,wa,X"))]
+  "TARGET_POWERPC64 && TARGET_MADDLD"
+  "#"
+  "&& reload_completed"
+  [(pc)]
+{
+  rtx dest = operands[0];
+  rtx src = operands[1];
+  rtx tmp = operands[2];
+  int dest_regno = reg_or_subregno (dest);
+
+  /* Handle conversion to GPR registers.  Load up the low part and then load
+     0 to clear the upper part.  */
+  if (INT_REGNO_P (dest_regno))
+    {
+      rtx dest_hi = gen_highpart (DImode, dest);
+      rtx dest_lo = gen_lowpart (DImode, dest);
+
+      emit_move_insn (dest_lo, src);
+      emit_move_insn (dest_hi, const0_rtx);
+      DONE;
+    }
+
+  /* For conversion to a VSX register, generate either a load rightmost
+     double word instruction, or do a CONCAT operation with the upper word
+     set to 0.  */
+  else if (VSX_REGNO_P (dest_regno))
+    {
+      if (MEM_P (src))
+	emit_insn (gen_vsx_lxvrdx (dest, src));
+      else
+	{
+	  rtx dest_v2di = gen_rtx_REG (V2DImode, dest_regno);
+          emit_move_insn (tmp, const0_rtx);
+	  emit_insn (gen_vsx_concat_v2di (dest_v2di, tmp, src));
+	}
+      DONE;
+    }
+
+  else
+    gcc_unreachable ();
+}
+  [(set_attr "length" "8")
+   (set_attr "isa" "p9,p9,p9v,p9v,p10")])
 
 ;; ISA 3.0 Binary Floating-Point Support
 
