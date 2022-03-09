@@ -4043,37 +4043,17 @@ rs6000_option_override_internal (bool global_init_p)
   /* Enable power8 fusion if we are tuning for power8, even if we aren't
      generating power8 instructions.  Power9 does not optimize power8 fusion
      cases.  */
-  if (!(rs6000_isa_flags_explicit & OPTION_MASK_P8_FUSION))
-    {
-      if (processor_target_table[tune_index].processor == PROCESSOR_POWER8)
-	rs6000_isa_flags |= OPTION_MASK_P8_FUSION;
-      else
-	rs6000_isa_flags &= ~OPTION_MASK_P8_FUSION;
-    }
-
-  /* Setting additional fusion flags turns on base fusion.  */
-  if (!TARGET_P8_FUSION && TARGET_P8_FUSION_SIGN)
-    {
-      if (rs6000_isa_flags_explicit & OPTION_MASK_P8_FUSION)
-	{
-	  if (TARGET_P8_FUSION_SIGN)
-	    error ("%qs requires %qs", "-mpower8-fusion-sign",
-		   "-mpower8-fusion");
-
-	  rs6000_isa_flags &= ~OPTION_MASK_P8_FUSION;
-	}
-      else
-	rs6000_isa_flags |= OPTION_MASK_P8_FUSION;
-    }
+  if (!OPTION_SET_P (TARGET_P8_FUSION))
+    TARGET_P8_FUSION = (processor_target_table[tune_index].processor
+			== PROCESSOR_POWER8);
 
   /* Power8 does not fuse sign extended loads with the addis.  If we are
      optimizing at high levels for speed, convert a sign extended load into a
      zero extending load, and an explicit sign extension.  */
-  if (TARGET_P8_FUSION
-      && !(rs6000_isa_flags_explicit & OPTION_MASK_P8_FUSION_SIGN)
-      && optimize_function_for_speed_p (cfun)
-      && optimize >= 3)
-    rs6000_isa_flags |= OPTION_MASK_P8_FUSION_SIGN;
+  if (!OPTION_SET_P (TARGET_P8_FUSION_SIGN))
+    TARGET_P8_FUSION_SIGN = (TARGET_P8_FUSION
+			     && optimize_function_for_speed_p (cfun)
+			     && optimize >= 3);
 
   /* ISA 3.0 vector instructions include ISA 2.07.  */
   if (TARGET_P9_VECTOR && !TARGET_P8_VECTOR)
@@ -23983,8 +23963,6 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "pcrel-opt",		OPTION_MASK_PCREL_OPT,		false, true  },
   { "popcntb",			OPTION_MASK_POPCNTB,		false, true  },
   { "popcntd",			OPTION_MASK_POPCNTD,		false, true  },
-  { "power8-fusion",		OPTION_MASK_P8_FUSION,		false, true  },
-  { "power8-fusion-sign",	OPTION_MASK_P8_FUSION_SIGN,	false, true  },
   { "power8-vector",		OPTION_MASK_P8_VECTOR,		false, true  },
   { "power9-minmax",		OPTION_MASK_P9_MINMAX,		false, true  },
   { "power9-misc",		OPTION_MASK_P9_MISC,		false, true  },

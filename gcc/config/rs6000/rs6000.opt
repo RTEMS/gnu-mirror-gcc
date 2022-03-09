@@ -475,11 +475,11 @@ mvsx-timode
 Target RejectNegative Undocumented Ignore
 
 mpower8-fusion
-Target Mask(P8_FUSION) Var(rs6000_isa_flags)
+Target Var(TARGET_P8_FUSION)
 Fuse certain integer operations together for better performance on power8.
 
 mpower8-fusion-sign
-Target Undocumented Mask(P8_FUSION_SIGN) Var(rs6000_isa_flags)
+Target Undocumented Var(TARGET_P8_FUSION_SIGN)
 Allow sign extension in fusion operations.
 
 mpower8-vector
