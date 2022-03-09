@@ -1,6 +1,6 @@
 /* { dg-lto-do link } */
 /* { dg-skip-if "power10 and above only" { ! { power10_ok } } } */
-/* { dg-lto-options { "-O2 -mdejagnu-cpu=power8 -mno-power8-fusion -flto -fdump-ipa-inline" } } */
+/* { dg-lto-options { "-O2 -mdejagnu-cpu=power8 -flto -fdump-ipa-inline" } } */
 
 int
 foo1 (int *b)

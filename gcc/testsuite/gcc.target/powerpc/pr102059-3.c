@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-O2 -mdejagnu-cpu=power8 -mno-power8-fusion -fdump-tree-einline-optimized" } */
+/* { dg-options "-O2 -mdejagnu-cpu=power8 -fdump-tree-einline-optimized" } */
 
 /* Like pr102059-1.c, to verify the inlining still happens
    even without always_inline attribute.  */
