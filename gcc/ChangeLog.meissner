@@ -35,46 +35,7 @@ gcc/testsuite/
 	PR target/102059
 	* gcc.target/powerpc/pr102059-4.c: New test.
 
-========== Work081, patch #1
-
-Optimize multiply/add of DImode extended to TImode.
-
-On power9 and power10 systems, we have instructions that support doing
-64-bit integers converted to 128-bit integers and producing 128-bit
-results.  This patch adds support to generate these instructions.
-
-Previously we had define_expands to handle conversion of the 64-bit extend
-to 128-bit and multiply.  This patch changes these define_expands to
-define_insn_and_split and then it provides combiner patterns to generate
-thes multiply/add instructions.
-
-To support using this optimization on power9, we extend the sign extend
-DImode to TImode to also run on power9 (added for PR target/104698).
-
-We add support for doing an unsigned DImode to TImode conversion.  We need
-these conversions to exist on power9 so that the combiner can properly
-combine the extend, multiply, and add instructions.
-
-2022-03-08   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-	PR target/103109
-	* config/rs6000/rs6000.md (su_int32): New code attribute.
-	(<u>mul<mode><dmode>3): Convert from define_expand to
-	define_insn_and_split.
-	(maddld<mode>4): Add generator function.
-	(<u>mulditi3_<u>adddi3): New insn.
-	(<u>mulditi3_add_const): New insn.
-	(<u>mulditi3_<u>adddi3_upper): New insn.
-	(addti3): Convert from define_expand to define_insn_and_split.
-	(subti3): Likewise.
-	* config/rs6000/vsx.md (extendditi2): Allow on power9 systems.
-	Add isa attribute for the stuff that needs power10 support.
-	(zero_extendditi2): New insn.
-
-gcc/testsuite/
-	PR target/103109
-	* gcc.target/powerpc/pr103109.c: New test.
+========== Work081, patch #1 was reverted.
 
 ========== Work081, creation
 
