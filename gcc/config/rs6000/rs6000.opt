@@ -474,19 +474,13 @@ Save the TOC in the prologue for indirect calls rather than inline.
 mvsx-timode
 Target RejectNegative Undocumented Ignore
 
-# The -mpower8-fusion and -mpower8-fusion-sign options existed in the past, but
-# they have been removed.
-mno-power8-fusion
-Target RejectNegative Undocumented Ignore
-
 mpower8-fusion
-Target RejectNegative Undocumented WarnRemoved
-
-mno-power8-fusion-sign
-Target RejectNegative Undocumented Ignore
+Target Mask(P8_FUSION) Var(rs6000_isa_flags)
+Fuse certain integer operations together for better performance on power8.
 
 mpower8-fusion-sign
-Target RejectNegative Undocumented WarnRemoved
+Target Undocumented Mask(P8_FUSION_SIGN) Var(rs6000_isa_flags)
+Allow sign extension in fusion operations.
 
 mpower8-vector
 Target Mask(P8_VECTOR) Var(rs6000_isa_flags)
