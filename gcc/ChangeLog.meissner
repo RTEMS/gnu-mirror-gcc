@@ -1,3 +1,83 @@
+========== Work081, patch #2
+
+Allow power10/power9 to inline explicit power8 functions
+
+The power8 fusion support was set automatically when -mcpu=power8 or
+-mtune=power8 was used, and it was cleared for other cpu's.  However, if
+you used the target attribute or target #pragma to change the default cpu
+type or tuning, you would get an error that a target specifiction option
+mismatch occurred.
+
+This code moves the power8 fusion option and power8 fusion sign option
+support from being option flags to being a separate option variables.
+This means the code in can_inline_p will not complain about an option
+mismatch.  If the user did not explicitly set these options, they will be
+set automatically if we are tuning for power8.
+
+2022-03-08   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	PR target/102059
+	* config/rs6000/rs6000-cpus.def (OTHER_FUSION_MASKS): Delete.
+	(ISA_3_0_MASKS_SERVER): Don't clear the fusion masks.
+	(POWERPC_MASKS): Remove OPTION_MASK_P8_FUSION.
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal):
+	Change how power8 fusion options are set from being an option mask
+	to being separate variables.
+	(rs6000_opt_masks): Remove -mpower8-fusion and
+	-mpower8-fusion-sign.
+	* config/rs6000/rs6000.h (MASK_P8_FUSION): Delete.
+	* config/rs6000/rs6000.opt (-mpower8-fusion): Change from being an
+	option mask to being a separate variable.
+	(-mpower8-fusion-sign): Likewise.
+
+gcc/testsuite/
+	PR target/102059
+	* gcc.target/powerpc/pr102059-4.c: New test.
+
+========== Work081, patch #1
+
+Optimize multiply/add of DImode extended to TImode.
+
+On power9 and power10 systems, we have instructions that support doing
+64-bit integers converted to 128-bit integers and producing 128-bit
+results.  This patch adds support to generate these instructions.
+
+Previously we had define_expands to handle conversion of the 64-bit extend
+to 128-bit and multiply.  This patch changes these define_expands to
+define_insn_and_split and then it provides combiner patterns to generate
+thes multiply/add instructions.
+
+To support using this optimization on power9, we extend the sign extend
+DImode to TImode to also run on power9 (added for PR target/104698).
+
+We add support for doing an unsigned DImode to TImode conversion.  We need
+these conversions to exist on power9 so that the combiner can properly
+combine the extend, multiply, and add instructions.
+
+2022-03-08   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	PR target/103109
+	* config/rs6000/rs6000.md (su_int32): New code attribute.
+	(<u>mul<mode><dmode>3): Convert from define_expand to
+	define_insn_and_split.
+	(maddld<mode>4): Add generator function.
+	(<u>mulditi3_<u>adddi3): New insn.
+	(<u>mulditi3_add_const): New insn.
+	(<u>mulditi3_<u>adddi3_upper): New insn.
+	(addti3): Convert from define_expand to define_insn_and_split.
+	(subti3): Likewise.
+	* config/rs6000/vsx.md (extendditi2): Allow on power9 systems.
+	Add isa attribute for the stuff that needs power10 support.
+	(zero_extendditi2): New insn.
+
+gcc/testsuite/
+	PR target/103109
+	* gcc.target/powerpc/pr103109.c: New test.
+
+========== Work081, creation
+
 2022-03-08   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
