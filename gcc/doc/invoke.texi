@@ -1255,8 +1255,7 @@ See RS/6000 and PowerPC Options.
 -mveclibabi=@var{type}  -mfriz  -mno-friz @gol
 -mpointers-to-nested-functions  -mno-pointers-to-nested-functions @gol
 -msave-toc-indirect  -mno-save-toc-indirect @gol
--mpower8-fusion  -mno-mpower8-fusion  -mpower8-vector  -mno-power8-vector @gol
--mcrypto  -mno-crypto  -mhtm  -mno-htm @gol
+-mpower8-vector  -mno-power8-vector -mcrypto  -mno-crypto  -mhtm  -mno-htm @gol
 -mquad-memory  -mno-quad-memory @gol
 -mquad-memory-atomic  -mno-quad-memory-atomic @gol
 -mcompat-align-parm  -mno-compat-align-parm @gol
@@ -28080,7 +28079,7 @@ following options:
 -mpopcntb  -mpopcntd  -mpowerpc64 @gol
 -mpowerpc-gpopt  -mpowerpc-gfxopt @gol
 -mmulhw  -mdlmzb  -mmfpgpr  -mvsx @gol
--mcrypto  -mhtm  -mpower8-fusion  -mpower8-vector @gol
+-mcrypto  -mhtm  -mpower8-vector @gol
 -mquad-memory  -mquad-memory-atomic  -mfloat128 @gol
 -mfloat128-hardware -mprefixed -mpcrel -mmma @gol
 -mrop-protect}
@@ -28194,14 +28193,6 @@ access to the cryptographic instructions that were added in version
 Enable (disable) the use of the built-in functions that allow direct
 access to the Hardware Transactional Memory (HTM) instructions that
 were added in version 2.07 of the PowerPC ISA.
-
-@item -mpower8-fusion
-@itemx -mno-power8-fusion
-@opindex mpower8-fusion
-@opindex mno-power8-fusion
-Generate code that keeps (does not keeps) some integer operations
-adjacent so that the instructions can be fused together on power8 and
-later processors.
 
 @item -mpower8-vector
 @itemx -mno-power8-vector
