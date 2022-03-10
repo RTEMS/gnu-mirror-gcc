@@ -1988,6 +1988,8 @@ emit_block_op_via_libcall (enum built_in_function fncode, rtx dst, rtx src,
 {
   rtx dst_addr, src_addr;
   tree call_expr, dst_tree, src_tree, size_tree;
+  machine_mode src_mode = mem_address_mode (src);
+  machine_mode dst_mode = mem_address_mode (dst);
   machine_mode size_mode;
 
   /* Since dst and src are passed to a libcall, mark the corresponding
@@ -1999,13 +2001,58 @@ emit_block_op_via_libcall (enum built_in_function fncode, rtx dst, rtx src,
   if (src_expr)
     mark_addressable (src_expr);
 
-  dst_addr = copy_addr_to_reg (XEXP (dst, 0));
-  dst_addr = convert_memory_address (ptr_mode, dst_addr);
-  dst_tree = make_tree (ptr_type_node, dst_addr);
+  scalar_addr_mode addr_mode = Pmode;
+  scalar_addr_mode pointer_mode = ptr_mode;
+  tree pointer_type_node = ptr_type_node;
+  rtx dst_tmp = XEXP (dst, 0);
+  rtx src_tmp = XEXP (src, 0);
 
-  src_addr = copy_addr_to_reg (XEXP (src, 0));
-  src_addr = convert_memory_address (ptr_mode, src_addr);
-  src_tree = make_tree (ptr_type_node, src_addr);
+  if (fncode == BUILT_IN_MEMCPY_C
+      || fncode == BUILT_IN_MEMCMP_C
+      || fncode == BUILT_IN_MEMMOVE_C)
+    {
+      /* We are in hybrid capability mode, and at least one of the pointers to
+	 this memory call is a `__capability` pointer.  This means that we can
+	 not use the standard library versions, but must use the `_c` versions
+	 instead.  Those `_c` versions will use the capability metadata given
+	 in the `__capability` pointer, which means that the permissions and
+	 bounds on that capability will be respected.
+
+	 If there is only one __capability pointer then we need to make a
+	 capability from the non-capability pointer to match the library
+	 function interface.  This should be made from the general data
+	 capability as that is the way that said non-capability pointer will be
+	 accessed.  */
+      addr_mode = targetm.addr_space.address_mode
+			    (addr_space_t (ADDR_SPACE_GENERIC), true);
+      pointer_mode = targetm.addr_space.pointer_mode
+			    (addr_space_t (ADDR_SPACE_GENERIC), true);
+      pointer_type_node = cap_ptr_type_node;
+
+      rtx tmp_ddc = gen_reg_rtx (addr_mode);
+      targetm.gen_cap_global_data_get (tmp_ddc);
+
+      /* Only use these functions when we need to handle capabilities and those
+	 capabilities are not the standard capability type.  */
+      gcc_assert (src_mode == pointer_mode || dst_mode == pointer_mode);
+      gcc_assert (targetm.capability_mode ().exists ()
+		  && targetm.capability_mode ().require () != Pmode);
+
+      if (! CAPABILITY_MODE_P (src_mode))
+	src_tmp = simplify_gen_binary (REPLACE_ADDRESS_VALUE,
+				       addr_mode, tmp_ddc, src_tmp);
+      if (! CAPABILITY_MODE_P (dst_mode))
+	dst_tmp = simplify_gen_binary (REPLACE_ADDRESS_VALUE,
+				       addr_mode, tmp_ddc, dst_tmp);
+    }
+
+  dst_addr = copy_to_mode_reg (addr_mode, dst_tmp);
+  dst_addr = convert_memory_address (pointer_mode, dst_addr);
+  dst_tree = make_tree (pointer_type_node, dst_addr);
+
+  src_addr = copy_to_mode_reg (addr_mode, src_tmp);
+  src_addr = convert_memory_address (pointer_mode, src_addr);
+  src_tree = make_tree (pointer_type_node, src_addr);
 
   size_mode = TYPE_MODE (sizetype);
   size = convert_to_mode (size_mode, size, 1);

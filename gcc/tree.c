@@ -10478,21 +10478,6 @@ build_common_tree_nodes (bool signed_char)
 	gcc_unreachable ();
     }
 
-  opt_scalar_addr_mode opt_cap_mode = targetm.capability_mode();
-  if (opt_cap_mode.exists())
-    {
-      scalar_addr_mode cap_mode = opt_cap_mode.require();
-      /* `build_intcap_type_for_mode` caches its return values in
-	 `uintcap_type_node` and `intcap_type_node`, so we don't need to do the
-	 assignment here.  We *do* need to ensure that those nodes are set by
-	 the time this function returns, since they are used by other code
-	 without calling `build_intcap_type_for_mode`.  */
-      gcc_assert (build_intcap_type_for_mode (cap_mode, 0)
-		  == intcap_type_node);
-      gcc_assert (build_intcap_type_for_mode (cap_mode, 1)
-		  == uintcap_type_node);
-    }
-
   /* Fill in the rest of the sized types.  Reuse existing type nodes
      when possible.  */
   intQI_type_node = make_or_reuse_type (GET_MODE_BITSIZE (QImode), 0);
@@ -10566,6 +10551,26 @@ build_common_tree_nodes (bool signed_char)
     builtin_structptr_types[i].node = builtin_structptr_types[i].base;
 
   pointer_sized_int_node = build_nonstandard_integer_type (POINTER_SIZE, 1);
+
+  opt_scalar_addr_mode opt_cap_mode = targetm.capability_mode();
+  if (opt_cap_mode.exists())
+    {
+      scalar_addr_mode cap_mode = opt_cap_mode.require();
+      /* `build_intcap_type_for_mode` caches its return values in
+	 `uintcap_type_node` and `intcap_type_node`, so we don't need to do the
+	 assignment here.  We *do* need to ensure that those nodes are set by
+	 the time this function returns, since they are used by other code
+	 without calling `build_intcap_type_for_mode`.  */
+      gcc_assert (build_intcap_type_for_mode (cap_mode, 0)
+		  == intcap_type_node);
+      gcc_assert (build_intcap_type_for_mode (cap_mode, 1)
+		  == uintcap_type_node);
+      cap_ptr_type_node = build_pointer_type_for_mode (void_type_node,
+						       cap_mode, false);
+      cap_const_ptr_type_node
+	= build_pointer_type_for_mode
+	      (build_type_variant (void_type_node, 1, 0), cap_mode, false);
+    }
 
   float_type_node = make_node (REAL_TYPE);
   TYPE_PRECISION (float_type_node) = FLOAT_TYPE_SIZE;

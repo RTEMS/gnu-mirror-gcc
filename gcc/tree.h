@@ -4201,6 +4201,11 @@ tree_strip_any_location_wrapper (tree exp)
 /* Capability integer types.  */
 #define intcap_type_node		global_trees[TI_INTCAP_TYPE]
 #define uintcap_type_node		global_trees[TI_UINTCAP_TYPE]
+/* Capability pointer type.  Only different to ptr_type_node in Hybrid.  */
+#define cap_ptr_type_node		global_trees[TI_CAP_PTR_TYPE]
+/* Capability const pointer type.  Different from const_ptr_type_node in Hybrid
+   by having a capability mode.  */
+#define cap_const_ptr_type_node		global_trees[TI_CAP_CONST_PTR_TYPE]
 /* The C type `size_t'.  */
 #define size_type_node                  global_trees[TI_SIZE_TYPE]
 #define pid_type_node                   global_trees[TI_PID_TYPE]

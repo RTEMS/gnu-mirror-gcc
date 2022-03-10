@@ -75,23 +75,36 @@ extern rtx convert_modes (machine_mode, machine_mode, rtx, int);
 extern rtx emit_block_op_via_libcall (enum built_in_function, rtx, rtx, rtx,
 				      bool);
 
+/* The _C versions of memcpy, memcpy, and memmove are only defined when they
+   should be preferred over the non-_C versions if at least one of the
+   arguments is a capability.  This is essentially when we are compiling for a
+   hybrid capability target. */
+#define MAYBE_CAP_VERSION(fncode) \
+  (builtin_decl_explicit_p (fncode##_C) \
+   && (CAPABILITY_MODE_P (GET_MODE (XEXP (src, 0))) \
+       || CAPABILITY_MODE_P (GET_MODE (XEXP (dst, 0))))) \
+    ? fncode##_C : fncode
 static inline rtx
 emit_block_copy_via_libcall (rtx dst, rtx src, rtx size, bool tailcall = false)
 {
-  return emit_block_op_via_libcall (BUILT_IN_MEMCPY, dst, src, size, tailcall);
+  return emit_block_op_via_libcall (MAYBE_CAP_VERSION (BUILT_IN_MEMCPY),
+				    dst, src, size, tailcall);
 }
 
 static inline rtx
 emit_block_move_via_libcall (rtx dst, rtx src, rtx size, bool tailcall = false)
 {
-  return emit_block_op_via_libcall (BUILT_IN_MEMMOVE, dst, src, size, tailcall);
+  return emit_block_op_via_libcall (MAYBE_CAP_VERSION (BUILT_IN_MEMMOVE),
+				    dst, src, size, tailcall);
 }
 
 static inline rtx
 emit_block_comp_via_libcall (rtx dst, rtx src, rtx size, bool tailcall = false)
 {
-  return emit_block_op_via_libcall (BUILT_IN_MEMCMP, dst, src, size, tailcall);
+  return emit_block_op_via_libcall (MAYBE_CAP_VERSION (BUILT_IN_MEMCMP),
+				    dst, src, size, tailcall);
 }
+#undef MAYBE_CAP_VERSION
 
 /* Emit code to move a block Y to a block X.  */
 enum block_op_methods
