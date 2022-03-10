@@ -226,10 +226,10 @@ default_pretend_outgoing_varargs_named (cumulative_args_t ca ATTRIBUTE_UNUSED)
 	  != default_setup_incoming_varargs);
 }
 
-scalar_addr_mode
+scalar_int_mode
 default_eh_return_filter_mode (void)
 {
-  return targetm.unwind_word_mode ();
+  return offset_mode (targetm.unwind_word_mode ());
 }
 
 scalar_int_mode

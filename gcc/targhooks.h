@@ -47,7 +47,7 @@ extern void default_handle_outgoing_varargs (rtx, int, rtx *);
 extern rtx default_builtin_setjmp_frame_value (void);
 extern bool default_pretend_outgoing_varargs_named (cumulative_args_t);
 
-extern scalar_addr_mode default_eh_return_filter_mode (void);
+extern scalar_int_mode default_eh_return_filter_mode (void);
 extern scalar_int_mode default_libgcc_cmp_return_mode (void);
 extern scalar_int_mode default_libgcc_shift_count_mode (void);
 extern scalar_addr_mode default_unwind_word_mode (void);

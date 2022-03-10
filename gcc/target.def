@@ -2159,7 +2159,7 @@ be sealed from modification without invalidating the pointer.",
 DEFHOOK_UNDOC
 (eh_return_filter_mode,
  "Return machine mode for filter value.",
- scalar_addr_mode, (void),
+ scalar_int_mode, (void),
  default_eh_return_filter_mode)
 
 /* Return machine mode for libgcc expanded cmp instructions.  */
