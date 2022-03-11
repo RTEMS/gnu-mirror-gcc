@@ -1,3 +1,13 @@
+========== Work081, patch #5
+Allow extendditi2 on power9
+
+2022-03-11   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	PR target/103109
+	* config/rs6000/vsx.md (extendditi2): Allow extendidti2 to run on
+	a power9 system.
+
 ========== Work081, patch #4
 Fix DImode to TImode sign extend issue
 
