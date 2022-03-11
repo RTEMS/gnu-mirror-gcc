@@ -5031,11 +5031,14 @@
 ;;
 ;; If the register allocator prefers to use Altivec registers on power10,
 ;; generate the vextsd2q instruction.
+;;
+;; We also need the GPR code for power9 so that we can optimize to use the
+;; multiply-add instructions.
 (define_insn_and_split "extendditi2"
   [(set (match_operand:TI 0 "register_operand" "=r,r,v,v,v")
 	(sign_extend:TI (match_operand:DI 1 "input_operand" "r,m,b,wa,Z")))
    (clobber (reg:DI CA_REGNO))]
-  "TARGET_POWERPC64 && TARGET_POWER10"
+  "TARGET_POWERPC64 && TARGET_MADDLD"
   "#"
   "&& reload_completed"
   [(pc)]
@@ -5082,7 +5085,8 @@
     gcc_unreachable ();
 }
   [(set_attr "length" "8")
-   (set_attr "type" "shift,load,vecmove,vecperm,load")])
+   (set_attr "type" "shift,load,vecmove,vecperm,load")
+   (set_attr "isa" "p9,p9,p10,p10,p10")])
 
 ;; Sign extend 64-bit value in TI reg, word 1, to 128-bit value in TI reg
 (define_insn "extendditi2_vector"
