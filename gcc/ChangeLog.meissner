@@ -1,3 +1,32 @@
+========== Work081, patch #4
+Fix DImode to TImode sign extend issue
+
+PR target/104868 had had an issue where my code that updated the DImode to
+TImode sign extension for power10 failed.  In looking at the failure
+message, the reason is when extendditi2 tries to split the insn, it
+generates an insn that does not satisfy its constraints:
+
+	(set (reg:V2DI 65 1)
+	     (vec_duplicate:V2DI (reg:DI 0)))
+
+The reason is vsx_splat_v2di does not allow GPR register 0 when the will
+be generating a mtvsrdd instruction.  In the definition of the mtvsrdd
+instruction, if the RA register is 0, it means clear the upper 64 bits of
+the vector instead of moving register GPR 0 to those bits.
+
+When I wrote the extendditi2 pattern, I forgot that mtvsrdd had that
+behavior so I used a 'r' constraint instead of 'b'.  In the rare case
+where the value is in GPR register 0, this split will fail.
+
+This patch uses the right constraint for extendditi2.
+
+2022-03-10   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	PR target/104868
+	* config/rs6000/vsx.md (extendditi2): Use a 'b' constraint when
+	moving from a GPR register to an Altivec register.
+
 ========== Work081, patch #3
 
 Make power8-fusion depend only on tuning for power8.
