@@ -2926,8 +2926,6 @@ vrp_insert::find_assert_locations_in_bb (basic_block bb)
       /* See if we can derive an assertion for any of STMT's operands.  */
       FOR_EACH_SSA_TREE_OPERAND (op, stmt, i, SSA_OP_USE)
 	{
-	  if (capability_type_p (TREE_TYPE (op)))
-	    continue;
 	  tree value;
 	  enum tree_code comp_code;
 
@@ -2966,13 +2964,16 @@ vrp_insert::find_assert_locations_in_bb (basic_block bb)
 		      /* Note we want to register the assert for the
 			 operand of the NOP_EXPR after SI, not after the
 			 conversion.  */
-		      if (live.live_on_block_p (t, bb))
+		      if (live.live_on_block_p (t, bb)
+			  && !capability_type_p (TREE_TYPE (t)))
 			register_new_assert_for (t, t, comp_code, value,
 						 bb, NULL, si);
 		    }
 		}
 
-	      register_new_assert_for (op, op, comp_code, value, bb, NULL, si);
+	      if (!capability_type_p (TREE_TYPE (op)))
+		register_new_assert_for (op, op, comp_code, value,
+					 bb, NULL, si);
 	    }
 	}
 
