@@ -164,3 +164,22 @@
     DONE;
   }
 )
+
+(define_insn "aarch64_cap_offset_get"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+        (unspec:DI [(match_operand:CADI 1 "register_operand" "rk")]
+            UNSPEC_CHERI_OFFSET_GET))
+  ]
+  "TARGET_MORELLO"
+  "gcoff\\t%0, %1"
+)
+
+(define_insn "aarch64_cap_offset_set"
+  [(set (match_operand:CADI 0 "register_operand" "=rk")
+        (unspec:CADI [(match_operand:CADI 1 "register_operand" "rk")
+          (match_operand:DI 2 "register_operand" "r")]
+            UNSPEC_CHERI_OFFSET_SET))
+     ]
+  "TARGET_MORELLO"
+  "scoff\\t%0, %1, %2"
+)

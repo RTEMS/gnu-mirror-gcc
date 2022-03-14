@@ -484,6 +484,8 @@ enum aarch64_builtins
   AARCH64_MORELLO_BUILTIN_BOUNDS_SET_EXACT,
   AARCH64_MORELLO_BUILTIN_GLOBAL_DATA_GET,
   AARCH64_MORELLO_BUILTIN_LENGTH_GET,
+  AARCH64_MORELLO_BUILTIN_OFFSET_GET,
+  AARCH64_MORELLO_BUILTIN_OFFSET_SET,
   AARCH64_MORELLO_BUILTIN_PERMS_AND,
   AARCH64_MORELLO_BUILTIN_REPR_ALIGNMENT_MASK,
   AARCH64_MORELLO_BUILTIN_ROUND_REPR_LEN,
@@ -1448,7 +1450,7 @@ aarch64_init_morello_builtins (void)
   tree const_cap_type_node = build_pointer_type_for_mode (const_void, CADImode,
                                                     true);
 
-  morello_builtins_data data[10] = {
+  morello_builtins_data data[12] = {
     {"__builtin_cheri_address_set",
      AARCH64_MORELLO_BUILTIN_ADDRESS_SET,
      build_function_type_list (cap_type_node, cap_type_node, morello_vaddr_t,
@@ -1470,6 +1472,13 @@ aarch64_init_morello_builtins (void)
     {"__builtin_cheri_length_get",
      AARCH64_MORELLO_BUILTIN_LENGTH_GET,
      build_function_type_list (size_type_node, cap_type_node, NULL_TREE)},
+    {"__builtin_cheri_offset_get",
+     AARCH64_MORELLO_BUILTIN_OFFSET_GET,
+     build_function_type_list (size_type_node, cap_type_node, NULL_TREE)},
+    {"__builtin_cheri_offset_set",
+     AARCH64_MORELLO_BUILTIN_OFFSET_SET,
+     build_function_type_list (cap_type_node, cap_type_node, size_type_node,
+                               NULL_TREE)},
     {"__builtin_cheri_perms_and",
      AARCH64_MORELLO_BUILTIN_PERMS_AND,
      build_function_type_list (cap_type_node, cap_type_node, size_type_node,
@@ -2194,6 +2203,24 @@ aarch64_expand_morello_builtin (tree exp, rtx target, int fcode)
         expand_insn (CODE_FOR_aarch64_cap_length_get, 2, ops);
         return ops[0].value;
       }
+    case AARCH64_MORELLO_BUILTIN_OFFSET_GET:
+      {
+        rtx op0 = expand_normal (CALL_EXPR_ARG (exp, 0));
+        create_output_operand (&ops[0], target, DImode);
+        create_input_operand (&ops[1], op0, CADImode);
+        expand_insn (CODE_FOR_aarch64_cap_offset_get, 2, ops);
+        return ops[0].value;
+      }
+    case AARCH64_MORELLO_BUILTIN_OFFSET_SET:
+      {
+        rtx op0 = expand_normal (CALL_EXPR_ARG (exp, 0));
+        rtx op1 = expand_normal (CALL_EXPR_ARG (exp, 1));
+        create_output_operand (&ops[0], target, CADImode);
+        create_input_operand (&ops[1], op0, CADImode);
+        create_input_operand (&ops[2], op1, DImode);
+        expand_insn (CODE_FOR_aarch64_cap_offset_set, 3, ops);
+        return ops[0].value;
+      }
     case AARCH64_MORELLO_BUILTIN_PERMS_AND:
       {
         rtx op0 = expand_normal (CALL_EXPR_ARG (exp, 0));
@@ -2349,6 +2376,8 @@ aarch64_general_expand_builtin (unsigned int fcode, tree exp, rtx target,
     case AARCH64_MORELLO_BUILTIN_BOUNDS_SET_EXACT:
     case AARCH64_MORELLO_BUILTIN_GLOBAL_DATA_GET:
     case AARCH64_MORELLO_BUILTIN_LENGTH_GET:
+    case AARCH64_MORELLO_BUILTIN_OFFSET_GET:
+    case AARCH64_MORELLO_BUILTIN_OFFSET_SET:
     case AARCH64_MORELLO_BUILTIN_PERMS_AND:
     case AARCH64_MORELLO_BUILTIN_REPR_ALIGNMENT_MASK:
     case AARCH64_MORELLO_BUILTIN_ROUND_REPR_LEN:
