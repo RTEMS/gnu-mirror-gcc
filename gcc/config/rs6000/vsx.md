@@ -5035,8 +5035,9 @@
 ;; We also need the GPR code for power9 so that we can optimize to use the
 ;; multiply-add instructions.
 (define_insn_and_split "extendditi2"
-  [(set (match_operand:TI 0 "register_operand" "=r,r,v,v,v")
-	(sign_extend:TI (match_operand:DI 1 "input_operand" "r,m,b,wa,Z")))
+  [(set (match_operand:TI 0 "register_operand"              "=r,r,wa,v,v")
+	(sign_extend:TI (match_operand:DI 1 "input_operand"  "r,m,b, v,Z")))
+   (clobber (match_scratch:DI 2                            "=&X,X,r, X,X"))
    (clobber (reg:DI CA_REGNO))]
   "TARGET_POWERPC64 && TARGET_MADDLD"
   "#"
@@ -5046,10 +5047,27 @@
   rtx dest = operands[0];
   rtx src = operands[1];
   int dest_regno = reg_or_subregno (dest);
+  int src_regno = ((REG_P (src) || SUBREG_P (src))
+		   ? reg_or_subregno (src)
+		   : -1);
+
+  /* If we are converting from a GPR to a vector register, do the sign
+     extension in a scratch GPR register, and then do the mtvsrdd.  */
+  if (VSX_REGNO_P (dest_regno) && INT_REGNO_P (src_regno))
+    {
+      rtx tmp = operands[2];
+      rtx dest_v2di = gen_rtx_REG (V2DImode, dest_regno);
+      emit_insn (gen_ashrdi3 (tmp, src, GEN_INT (63)));
+      if (BYTES_BIG_ENDIAN)
+	emit_insn (gen_vsx_concat_v2di (dest_v2di, tmp, src));
+      else
+	emit_insn (gen_vsx_concat_v2di (dest_v2di, src, tmp));
+      DONE;
+    }
 
   /* Handle conversion to GPR registers.  Load up the low part and then do
      a sign extension to the upper part.  */
-  if (INT_REGNO_P (dest_regno))
+  else if (INT_REGNO_P (dest_regno))
     {
       rtx dest_hi = gen_highpart (DImode, dest);
       rtx dest_lo = gen_lowpart (DImode, dest);
@@ -5085,8 +5103,8 @@
     gcc_unreachable ();
 }
   [(set_attr "length" "8")
-   (set_attr "type" "shift,load,vecmove,vecperm,load")
-   (set_attr "isa" "p9,p9,p10,p10,p10")])
+   (set_attr "type" "shift,load,mtvsr,vecperm,load")
+   (set_attr "isa" "p9,p9,p9,p10,p10")])
 
 ;; Sign extend 64-bit value in TI reg, word 1, to 128-bit value in TI reg
 (define_insn "extendditi2_vector"
