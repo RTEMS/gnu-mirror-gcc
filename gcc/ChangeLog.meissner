@@ -1,20 +1,22 @@
 ========== Work081, patch #8
 Add zero_extendditi2.
 
-2022-03-14   Michael Meissner  <meissner@linux.ibm.com>
+2022-03-15   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 	* config/rs6000/vsx.md (zero_extendditi2): New insn.
 
-
 ========== Work081, patch #7
 Optimize extendditi2 GPR to VSX register.
 
-2022-03-12   Michael Meissner  <meissner@linux.ibm.com>
+2022-03-15   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 	* config/rs6000/vsx.md (extendditi2): Optimize extendditi2 GPR to
 	VSX register.
+
+gcc/testsuite/
+	* gcc.target/powerpc/pr104698-2.c: Update instruction counts.
 
 ========== Work081, patch #6
 Improve extendditi2
