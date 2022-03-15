@@ -184,7 +184,7 @@ ifeq ($(findstring purecap,$(MULTILIB_OPTIONS)), purecap)
 MULTILIB_REUSE      = mabi.purecap/march.morello+c64=mabi.purecap/march.morello+c64+nolse
 endif
 
-MULTILIB_DIRNAMES   = $(subst $(comma), ,$(TM_MULTILIB_CONFIG))
+MULTILIB_DIRNAMES   = $(subst $(comma), ,$(TM_MULTILIB_CONFIG)) c64 c64-nolse
 
 insn-conditions.md: s-check-sve-md
 s-check-sve-md: $(srcdir)/config/aarch64/check-sve-md.awk \
