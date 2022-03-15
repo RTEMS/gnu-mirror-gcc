@@ -11,7 +11,7 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 import os
-import subprocess
+import time
 import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
@@ -22,11 +22,10 @@ sys.setrecursionlimit(2000)
 
 # The full version, including alpha/beta/rc tags
 
-# FIXME
 folder = os.path.dirname(os.path.realpath(__file__))
-gcc_srcdir = os.path.join(folder, './objdir')
+gcc_srcdir = os.path.join(folder, '..', 'gcc')
 
-def __read_file(name):
+def read_file(name):
     path = os.path.join(gcc_srcdir, name)
     if os.path.exists(path):
         return open(path).read().strip()
@@ -34,22 +33,15 @@ def __read_file(name):
         return ''
 
 
-def __get_git_revision():
-    try:
-        r = subprocess.check_output('git rev-parse --short HEAD', shell=True, encoding='utf8',
-                                    stderr=subprocess.DEVNULL)
-        return r.strip()
-    except subprocess.CalledProcessError:
-        return None
+gcc_BASEVER = read_file('BASE-VER')
+gcc_DEVPHASE = read_file('DEV-PHASE')
+gcc_DATESTAMP = read_file('DATESTAMP')
+gcc_REVISION = read_file('REVISION')
 
+VERSION_PACKAGE = os.getenv('VERSION_PACKAGE')
+BUGURL = os.getenv('BUGURL')
 
-gcc_BASEVER = __read_file('BASE-VER')
-gcc_DEVPHASE = __read_file('DEV-PHASE')
-gcc_DATESTAMP = __read_file('DATESTAMP')
-gcc_REVISION = __read_file('REVISION')
-
-VERSION_PACKAGE = os.getenv('VERSION_PACKAGE', '(GCC)')
-BUGURL = os.getenv('BUGURL', 'https://gcc.gnu.org/bugs/')
+YEAR = time.strftime('%Y')
 
 # The short X.Y version.
 version = gcc_BASEVER
@@ -70,10 +62,14 @@ needs_sphinx = '4.5'
 
 rst_epilog = '''
 .. |gcc_version| replace:: %s
-.. |package_version| replace:: %s
-.. |bugurl| replace:: %s
-.. |needs_sphinx| replace:: %s
-''' % (gcc_BASEVER, VERSION_PACKAGE, BUGURL, needs_sphinx)
+.. |needs_sphinx| replace:: %s\n
+''' % (gcc_BASEVER, needs_sphinx)
+
+if BUGURL:
+    rst_epilog += '.. |bugurl| replace:: %s\n' % BUGURL
+
+if VERSION_PACKAGE:
+    rst_epilog += '.. |package_version| replace:: %s\n' % VERSION_PACKAGE
 
 # -- General configuration ---------------------------------------------------
 
@@ -116,18 +112,14 @@ html_theme_options = {
     'navigation_with_keys': True
 }
 
-html_logo = '../logo.svg'
+html_logo = os.path.join(folder, 'logo.svg')
 
-html_favicon = '../favicon.ico'
+html_favicon = os.path.join(folder, 'favicon.ico')
 
 html_last_updated_fmt = ''
 
-html_context = {
-    'commit': __get_git_revision ()
-}
-
 html_static_path = [
-    '../_static'
+    os.path.join(folder, '_static')
 ]
 
 html_css_files = [
@@ -140,12 +132,17 @@ man_pages = []
 # FIXME: handle WARNINGs: unknown option issues and cross refs
 suppress_warnings = [
     'ref.option',
+    'ref.ref'
 ]
+
+# RTD template requires at least Sphinx 1.6
+# sphinx-build -j auto is supported since 1.7
+needs_sphinx = '1.7'
 
 # Use xelatex by default
 latex_engine = 'xelatex'
 
-latex_logo = '../logo.pdf'
+latex_logo = os.path.join(folder, 'logo.pdf')
 
 # TODO: Remove once xindy works in an openSUSE container
 latex_use_xindy = False
@@ -175,7 +172,7 @@ option_parse_variable_part = True
 
 # Cross manual reference mapping
 intersphinx_mapping = {}
-for manual in ['cpp', 'cppinternals', 'gfortran', 'gcc', 'gccgo', 'gccint', 'gdc',
+for manual in ['cpp', 'cppinternals', 'fortran', 'gcc', 'gccgo', 'gccint', 'gdc',
                'gfc-internals', 'gnat-style', 'gnat_rm', 'gnat_ugn', 'install',
                'libgccjit', 'libgomp', 'libiberty', 'libitm', 'libquadmath']:
-    intersphinx_mapping[manual] = (f'https://splichal.eu/scripts/sphinx/{manual}/_build/html/', None)
+    intersphinx_mapping[manual] = (f'https://gcc.gnu.org/onlinedocs/{manual}/', None)
