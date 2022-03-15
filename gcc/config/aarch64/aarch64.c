@@ -11388,16 +11388,25 @@ aarch64_regno_regclass (unsigned regno)
 
 static HOST_WIDE_INT
 aarch64_anchor_offset (HOST_WIDE_INT offset, HOST_WIDE_INT size,
-		       machine_mode mode)
+		       machine_mode mode, bool cap)
 {
+  /* If the base is a capability, punt on negative offsets for now to
+     avoid invalidating the capability: we could potentially add some
+     round-towards-zero behaviour for negative offsets later on.  */
+  if (cap && offset < 0)
+    return 0;
+
   /* Does it look like we'll need a 16-byte load/store-pair operation?  */
   if (size > 16)
-    return (offset + 0x400) & ~0x7f0;
+    return cap ? (offset & ~0x3f0) : ((offset + 0x400) & ~0x7f0);
 
   /* For offsets that aren't a multiple of the access size, the limit is
      -256...255.  */
   if (offset & (size - 1))
     {
+      if (cap)
+	return offset & ((mode == BLKmode) ? ~0x1ff : ~0xff);
+
       /* BLKmode typically uses LDP of X-registers.  */
       if (mode == BLKmode)
 	return (offset + 512) & ~0x3ff;
@@ -11409,7 +11418,7 @@ aarch64_anchor_offset (HOST_WIDE_INT offset, HOST_WIDE_INT size,
     return 0;
 
   if (mode == TImode || mode == TFmode)
-    return (offset + 0x100) & ~0x1ff;
+    return cap ? (offset & ~0xff) : ((offset + 0x100) & ~0x1ff);
 
   /* Use 12-bit offset by access size.  */
   return offset & (~0xfff * size);
@@ -11470,8 +11479,11 @@ aarch64_legitimize_address (rtx x, rtx /* orig_x  */, machine_mode mode)
       HOST_WIDE_INT size;
       if (GET_MODE_SIZE (mode).is_constant (&size))
 	{
-	  HOST_WIDE_INT base_offset = aarch64_anchor_offset (offset, size,
-							     mode);
+	  bool cap = CAPABILITY_MODE_P (GET_MODE (base));
+	  HOST_WIDE_INT base_offset = aarch64_anchor_offset (offset,
+							     size,
+							     mode,
+							     cap);
 	  if (base_offset != 0)
 	    {
 	      base = plus_constant (Pmode, base, base_offset);
