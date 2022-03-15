@@ -5035,12 +5035,10 @@
 ;; We also need the GPR code for power9 so that we can optimize to use the
 ;; multiply-add instructions.
 (define_insn_and_split "extendditi2"
-  [(set (match_operand:TI 0 "register_operand" "=r, wa, v, r, v")
-	(sign_extend:TI
-	 (match_operand:DI 1 "input_operand"    "r, b,  v, m, Z")))
-   (clobber (match_scratch:DI 2               "=&X, r,  X, X, X"))
+  [(set (match_operand:TI 0 "register_operand" "=r,r,v,v,v")
+	(sign_extend:TI (match_operand:DI 1 "input_operand" "r,m,b,wa,Z")))
    (clobber (reg:DI CA_REGNO))]
-  "TARGET_POWERPC64 && TARGET_P9_VECTOR"
+  "TARGET_POWERPC64 && TARGET_MADDLD"
   "#"
   "&& reload_completed"
   [(pc)]
@@ -5059,56 +5057,36 @@
       emit_move_insn (dest_lo, src);
       /* In case src is a MEM, we have to use the destination, which is a
          register, instead of re-using the source.  */
-      rtx src2 = int_reg_operand (src, DImode) ? src : dest_lo;
+      rtx src2 = (REG_P (src) || SUBREG_P (src)) ? src : dest_lo;
       emit_insn (gen_ashrdi3 (dest_hi, src2, GEN_INT (63)));
       DONE;
     }
 
-  /* For memory, use lxvrdx to load the value into the bottom of the
-     register and do the sign extension.  */
-  else if (ALTIVEC_REGNO_P (dest_regno) && MEM_P (src))
+  /* For conversion to an Altivec register, generate either a splat operation
+     or a load rightmost double word instruction.  Both instructions gets the
+     DImode value into the lower 64 bits, and then do the vextsd2q
+     instruction.  */
+
+  else if (ALTIVEC_REGNO_P (dest_regno))
     {
-      emit_insn (gen_vsx_lxvrdx (dest, src));
+      if (MEM_P (src))
+	emit_insn (gen_vsx_lxvrdx (dest, src));
+      else
+	{
+	  rtx dest_v2di = gen_rtx_REG (V2DImode, dest_regno);
+	  emit_insn (gen_vsx_splat_v2di (dest_v2di, src));
+	}
+
       emit_insn (gen_extendditi2_vector (dest, dest));
       DONE;
     }
 
   else
-    {  
-      int src_regno = reg_or_subregno (src);
-
-      /* If we are converting from a GPR to a vector register, do the
-         sign extension in a scratch GPR register, and then do the
-         mtvsrdd.  */
-      if (VSX_REGNO_P (dest_regno) && INT_REGNO_P (src_regno))
-	{
-	  rtx tmp = operands[2];
-	  rtx dest_v2di = gen_rtx_REG (V2DImode, dest_regno);
-	  emit_insn (gen_ashrdi3 (tmp, src, GEN_INT (63)));
-	  if (BYTES_BIG_ENDIAN)
-	    emit_insn (gen_vsx_concat_v2di (dest_v2di, tmp, src));
-	  else
-	    emit_insn (gen_vsx_concat_v2di (dest_v2di, src, tmp));
-	  DONE;
-	}
-
-     /* For conversion to an Altivec register, generate a splat operation to
-         to get the value in the bottom 64-bits.  */
-      else if (ALTIVEC_REGNO_P (dest_regno) && ALTIVEC_REGNO_P (src_regno))
-	{
-	  rtx dest_v2di = gen_rtx_REG (V2DImode, dest_regno);
-	  emit_insn (gen_vsx_splat_v2di (dest_v2di, src));
-	  emit_insn (gen_extendditi2_vector (dest, dest));
-	  DONE;
-	}
-
-      else
-	gcc_unreachable ();
-    }
+    gcc_unreachable ();
 }
   [(set_attr "length" "8")
-   (set_attr "type" "shift,mtvsr,vecperm,load,vecload")
-   (set_attr "isa"  "*,    *,    p10,    *,   p10")])
+   (set_attr "type" "shift,load,vecmove,vecperm,load")
+   (set_attr "isa" "p9,p9,p10,p10,p10")])
 
 ;; Sign extend 64-bit value in TI reg, word 1, to 128-bit value in TI reg
 (define_insn "extendditi2_vector"
@@ -5118,57 +5096,6 @@
   "TARGET_POWER10"
   "vextsd2q %0,%1"
   [(set_attr "type" "vecexts")])
-
-;; Zero extend DImode to TImode when the result is in GPRs or VSX registers.
-(define_insn_and_split "zero_extendditi2"
-  [(set (match_operand:TI 0 "gpc_reg_operand"  "=r, r,  wa, wa")
-	(zero_extend:TI
-	 (match_operand:DI 1 "gpc_reg_operand"  "r, wa, r,  wa")))
-   (clobber (match_scratch:DI 2               "=&X, X,  X,  wa"))]
-  "TARGET_POWERPC64 && TARGET_P9_VECTOR"
-  "@
-   #
-   #
-   mtvsrdd %x0,0,%1
-   #"
-  "&& reload_completed
-   && (int_reg_operand (operands[0], TImode)
-       || vsx_register_operand (operands[1], DImode))"
-  [(pc)]
-{
-  rtx dest = operands[0];
-  rtx src = operands[1];
-  int dest_regno = reg_or_subregno (dest);
-
-  /* Handle conversion to GPR registers.  Load up the low part and then load
-     0 to clear the upper part.  */
-  if (INT_REGNO_P (dest_regno))
-    {
-      rtx dest_hi = gen_highpart (DImode, dest);
-      rtx dest_lo = gen_lowpart (DImode, dest);
-
-      emit_move_insn (dest_lo, src);
-      emit_move_insn (dest_hi, const0_rtx);
-      DONE;
-    }
-
-  /* For conversion to a VSX register from a VSX register, do a CONCAT
-     operation with the upper word set to 0.  */
-  else if (VSX_REGNO_P (dest_regno))
-    {
-      rtx tmp = operands[2];
-      rtx dest_v2di = gen_rtx_REG (V2DImode, dest_regno);
-
-      emit_move_insn (tmp, const0_rtx);
-      emit_insn (gen_vsx_concat_v2di (dest_v2di, tmp, src));
-      DONE;
-    }
-
-  else
-    gcc_unreachable ();
-}
-  [(set_attr "length" "8,8,*,8")
-   (set_attr "type" "*,mfvsr,mtvsr,vecperm")])
 
 
 ;; ISA 3.0 Binary Floating-Point Support
