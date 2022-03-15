@@ -267,7 +267,7 @@ Sphinx version |needs_sphinx| (or later)
   Necessary to build HTML, PDF or EPUB documentation. See more in
   :ref:`gccint:building_documentation`.
 
-  Necessary for running :command:`make html` or :command:`make latexpdf` to
+  Necessary for running :command:`make html` or :command:`make pdf` to
   create printable documentation in HTML or PDF format.
 
   Necessary to build GCC documentation during development because the

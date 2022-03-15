@@ -219,7 +219,7 @@ standard rule in :samp:`gcc/Makefile.in` to the variable
   version of :command:`sphinx` is available, so does not need to check
   for this, and should fail if an error occurs.
 
-``latexpdf``
+``pdf``
   Build PDF documentation for the front end, in the build directory.
 
 ``html``

@@ -117,8 +117,8 @@ gcc@gcc.gnu.org detailing how the information should be changed.
 If you find a bug, please report it following the
 `bug reporting guidelines <https://gcc.gnu.org/bugs/>`_.
 
-If you want to print the GCC manuals, do :samp:`cd {objdir}; make
-latexpdf`.  You will need to have Sphinx (version at least |needs_sphinx|)
+If you want to print the GCC manuals, do :samp:`cd {objdir}; make pdf`
+You will need to have Sphinx (version at least |needs_sphinx|)
 and XeLaTex installed.
 You can also `buy printed manuals from the
 Free Software Foundation <https://shop.fsf.org/>`_, though such manuals may not be for the most
