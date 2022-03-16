@@ -5223,9 +5223,7 @@ find_reloads_address (machine_mode mode, rtx *memrefloc, rtx ad,
      into a register.  */
   if (CONSTANT_P (ad) && ! strict_memory_address_addr_space_p (mode, ad, as))
     {
-      machine_mode address_mode = GET_MODE (ad);
-      if (address_mode == VOIDmode)
-	address_mode = targetm.addr_space.address_mode (as);
+      machine_mode address_mode = get_address_mode (ad, as);
 
       /* If AD is an address in the constant pool, the MEM rtx may be shared.
 	 Unshare it so we can safely alter it.  */

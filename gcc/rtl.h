@@ -3559,7 +3559,8 @@ inline bool any_plus_p (const_rtx x)
   return GET_CODE (x) == PLUS || GET_CODE (x) == POINTER_PLUS;
 }
 
-extern scalar_addr_mode mem_address_mode (rtx mem);
+extern scalar_addr_mode mem_address_mode (const_rtx);
+extern scalar_addr_mode get_address_mode (const_rtx, addr_space_t);
 extern int rtx_addr_can_trap_p (const_rtx);
 extern bool nonzero_address_p (const_rtx);
 extern int rtx_unstable_p (const_rtx);

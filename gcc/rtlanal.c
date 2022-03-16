@@ -5962,18 +5962,24 @@ low_bitmask_len (machine_mode mode, unsigned HOST_WIDE_INT m)
   return exact_log2 (m + 1);
 }
 
+/* Return the mode of ADDR, which is an address in address space AS.  */
+
+scalar_addr_mode
+get_address_mode (const_rtx addr, addr_space_t as)
+{
+  auto mode = GET_MODE (addr);
+  if (mode != VOIDmode)
+    return as_a <scalar_addr_mode> (mode);
+  return targetm.addr_space.address_mode (as);
+}
+
 /* Return the mode of MEM's address.  */
 
 scalar_addr_mode
-mem_address_mode (rtx mem)
+mem_address_mode (const_rtx mem)
 {
-  machine_mode mode;
-
   gcc_assert (MEM_P (mem));
-  mode = GET_MODE (XEXP (mem, 0));
-  if (mode != VOIDmode)
-    return as_a <scalar_addr_mode> (mode);
-  return targetm.addr_space.address_mode (MEM_ADDR_SPACE (mem));
+  return get_address_mode (XEXP (mem, 0), MEM_ADDR_SPACE (mem));
 }
 
 /* Split up a CONST_DOUBLE or integer constant rtx

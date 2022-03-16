@@ -1946,9 +1946,7 @@ offsettable_address_addr_space_p (int strictp, machine_mode mode, rtx y,
   if (mode_dependent_address_p (y, as))
     return 0;
 
-  machine_mode address_mode = GET_MODE (y);
-  if (address_mode == VOIDmode)
-    address_mode = targetm.addr_space.address_mode (as);
+  auto address_mode = get_address_mode (y, as);
 #ifdef POINTERS_EXTEND_UNSIGNED
   machine_mode pointer_mode = targetm.addr_space.pointer_mode (as);
 #endif
