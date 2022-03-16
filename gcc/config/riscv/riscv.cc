@@ -233,6 +233,7 @@ enum riscv_fusion_pairs
   RISCV_FUSE_AUIPC_ADDI = (1 << 5),
   RISCV_FUSE_LUI_LD = (1 << 6),
   RISCV_FUSE_AUIPC_LD = (1 << 7),
+  RISCV_FUSE_LDPREINCREMENT = (1 << 8),
 };
 
 /* Costs of various operations on the different architectures.  */
@@ -5927,6 +5928,23 @@ riscv_macro_fusion_pair_p (rtx_insn *prev, rtx_insn *curr)
 	  && GET_CODE (SET_SRC (prev_set)) == PLUS
 	  && REG_P (XEXP (SET_SRC (prev_set), 0))
 	  && REG_P (XEXP (SET_SRC (prev_set), 1)))
+	return true;
+    }
+
+    if (simple_sets_p && riscv_fusion_enabled_p (RISCV_FUSE_LDPREINCREMENT))
+    {
+      /* We are trying to match the following:
+	   prev (add) == (set (reg:DI rS)
+			      (plus:DI (reg:DI rS) (const_int))
+	   curr (ld)  == (set (reg:DI rD)
+			      (mem:DI (reg:DI rS))) */
+
+      if (MEM_P (SET_SRC (curr_set))
+	  && REG_P (XEXP (SET_SRC (curr_set), 0))
+	  && REGNO (XEXP (SET_SRC (curr_set), 0)) == REGNO (SET_DEST (prev_set))
+	  && GET_CODE (SET_SRC (prev_set)) == PLUS
+	  && REG_P (XEXP (SET_SRC (prev_set), 0))
+	  && CONST_INT_P (XEXP (SET_SRC (prev_set), 1)))
 	return true;
     }
 

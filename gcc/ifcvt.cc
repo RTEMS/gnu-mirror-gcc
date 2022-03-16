@@ -97,6 +97,7 @@ static int find_if_case_2 (basic_block, edge, edge);
 static int dead_or_predicable (basic_block, basic_block, basic_block,
 			       edge, int);
 static void noce_emit_move_insn (rtx, rtx);
+static rtx_insn *noce_emit_insn (rtx);
 static rtx_insn *block_has_only_trap (basic_block);
 static void need_cmov_or_rewire (basic_block, hash_set<rtx_insn *> *,
 				 hash_map<rtx_insn *, int> *);
@@ -787,6 +788,9 @@ static rtx noce_get_alt_condition (struct noce_if_info *, rtx, rtx_insn **);
 static int noce_try_minmax (struct noce_if_info *);
 static int noce_try_abs (struct noce_if_info *);
 static int noce_try_sign_mask (struct noce_if_info *);
+static rtx noce_emit_condzero (struct noce_if_info *, rtx, bool = false);
+static int noce_try_condzero (struct noce_if_info *);
+static int noce_try_condzero_arith (struct noce_if_info *);
 
 /* Return the comparison code for reversed condition for IF_INFO,
    or UNKNOWN if reversing the condition is not possible.  */
@@ -1660,6 +1664,214 @@ noce_try_addcc (struct noce_if_info *if_info)
 	  end_sequence ();
 	}
     }
+
+  return FALSE;
+}
+
+/* Helper to noce_try_condzero: cond ? a : 0. */
+static rtx
+noce_emit_condzero (struct noce_if_info *if_info, rtx a, bool reverse)
+{
+  /* The canonical form for a conditional-zero-or-value is:
+       (set (match_operand 0 "register_operand" "=r")
+	    (and (neg (eq_or_ne (match_operand 1 "register_operand" "r")
+				(const_int 0)))
+		 (match_operand 2 "register_operand" "r")))
+   */
+
+  machine_mode opmode = GET_MODE (if_info->x);
+  enum rtx_code code = GET_CODE (if_info->cond);
+  rtx cond;
+  rtx op_a = XEXP (if_info->cond, 0);
+  rtx op_b = XEXP (if_info->cond, 1);
+
+  /* If it is not a EQ/NE comparison against const0_rtx, canonicalize
+     by first synthesizing a truth-value and then building a NE
+     condition around it. */
+  if ((code != EQ && code != NE) || XEXP (if_info->cond, 1) != const0_rtx)
+    {
+      rtx tmp = gen_reg_rtx (opmode);
+
+      start_sequence ();
+      cond = gen_rtx_fmt_ee (code, opmode, op_a, op_b);
+      if (!noce_emit_insn (gen_rtx_SET (tmp, cond)))
+	{
+	  end_sequence ();
+
+	  /* If we can't emit this pattern, try to reverse it and
+	     invert the polarity of the second test. */
+	  start_sequence ();
+	  cond = gen_rtx_fmt_ee (reverse_condition (code), opmode, op_a, op_b);
+	  if (!noce_emit_insn (gen_rtx_SET (tmp, cond))) {
+	    end_sequence ();
+	    return NULL_RTX;
+	  }
+
+	  /* We have recovered by reversing the first comparison,
+	     so we need change the second one around as well... */
+	  reverse = !reverse;
+	}
+      rtx_insn *seq = get_insns ();
+      end_sequence ();
+      emit_insn (seq);
+
+      /* Set up the second comparison that will be embedded in the
+	 canonical conditional-zero-or-value RTX. */
+      code = NE;
+      op_a = tmp;
+      op_b = const0_rtx;
+    }
+
+  cond = gen_rtx_fmt_ee (reverse ? reverse_condition (code) : code,
+			 opmode, op_a, op_b);
+
+  /* Build (and (neg (eq_or_ne ... const0_rtx)) (reg <a>)) */
+  rtx target = gen_reg_rtx (opmode);
+  rtx czero = gen_rtx_AND (opmode, gen_rtx_NEG (opmode, cond), a);
+  noce_emit_move_insn (target, czero);
+
+  return target;
+}
+
+/* Use a conditional-zero instruction for "if (test) x = 0;", if available. */
+static int
+noce_try_condzero (struct noce_if_info *if_info)
+{
+  rtx target;
+  rtx_insn *seq;
+  int reversep = 0;
+  /* Keep local copies of the constituent elements of if_info, as we
+     may be changing them.  We are not allowed to modify if_info
+     though, as we may fail in this function and can't leave different
+     semantics behind for the next functions.  */
+  rtx a = if_info->a;
+  rtx b = if_info->b;
+  rtx x = if_info->x;
+  rtx cond = if_info->cond;
+  enum rtx_code code = GET_CODE (cond);
+  rtx cond_arg0 = XEXP (cond, 0);
+  rtx cond_arg1 = XEXP (cond, 1);
+  rtx orig_b = NULL_RTX;
+
+  if (!noce_simple_bbs (if_info))
+    return FALSE;
+
+  /* We may encounter the form "(b != 0) ? b : a", which can be
+     simplified to "b | ((b != 0) ? 0 : a)".  */
+  if (code == NE && cond_arg1 == const0_rtx &&
+      REG_P (b) && rtx_equal_p (b, cond_arg0))
+    {
+      orig_b = b;
+      b = const0_rtx;
+    }
+
+  /* We may encounter the form "(b == 0) ? b : a", which can be
+     simplied to "(b == 0) ? 0 : a".  */
+  if (code == EQ && cond_arg1 == const0_rtx &&
+      REG_P (b) && rtx_equal_p (b, cond_arg0))
+    {
+      b = const0_rtx;
+    }
+
+  start_sequence ();
+
+  if ((a == const0_rtx && (REG_P (b) || rtx_equal_p (b, x)))
+      || ((reversep = (noce_reversed_cond_code (if_info) != UNKNOWN))
+	  && b == const0_rtx && (REG_P (a) || rtx_equal_p (a, x))))
+    {
+      target = noce_emit_condzero(if_info, reversep ? a : b, reversep);
+
+      /* Handle the case where we replace b in "(b != 0) ? b : a" with
+	 with const0_rtx to then emit "b | ((b != 0) ? 0 : a)".  */
+      if (orig_b && target)
+	target = expand_simple_binop (GET_MODE (x), IOR, orig_b,
+				      target, x, 0, OPTAB_WIDEN);
+
+      if (target)
+	{
+	  if (target != if_info->x)
+	    noce_emit_move_insn (if_info->x, target);
+
+	  seq = end_ifcvt_sequence (if_info);
+	  if (!seq || !targetm.noce_conversion_profitable_p (seq, if_info))
+	    return FALSE;
+
+	  emit_insn_before_setloc (seq, if_info->jump,
+				   INSN_LOCATION (if_info->insn_a));
+	  if_info->transform_name = "noce_try_condzero";
+
+	  return TRUE;
+	}
+    }
+
+  end_sequence ();
+
+  return FALSE;
+}
+
+/* Convert "if (test) x op= a;" to a branchless sequence using the
+   canonical form for a conditional-zero. */
+static int
+noce_try_condzero_arith (struct noce_if_info *if_info)
+{
+  rtx target;
+  rtx_insn *seq;
+  rtx_code op = GET_CODE (if_info->a);
+  const rtx arg0 = XEXP (if_info->a, 0);
+  const rtx arg1 = XEXP (if_info->a, 1);
+
+  if (!noce_simple_bbs (if_info))
+    return FALSE;
+
+  /* Check for no else condition.  */
+  if (!rtx_equal_p (if_info->x, if_info->b))
+    return FALSE;
+
+  if (op != PLUS && op != MINUS && op != IOR && op != XOR &&
+      op != ASHIFT && op != ASHIFTRT && op != LSHIFTRT && op != AND)
+    return FALSE;
+
+  if (!rtx_equal_p (if_info->x, arg0))
+    return FALSE;
+
+  start_sequence ();
+
+  target = noce_emit_condzero(if_info, arg1, op != AND ? true : false);
+
+  if (target)
+    {
+      rtx op1 = if_info->x;
+      
+      if (op == AND)
+	{
+	  /* Emit "tmp = x & val;" followed by "tmp |= !cond ? x : 0;" */
+	  op1 = expand_simple_binop (GET_MODE (if_info->x), AND, op1,
+				     arg1, NULL_RTX, 0, OPTAB_WIDEN);
+	  op = IOR;
+	}
+
+      if (op1)
+	target = expand_simple_binop (GET_MODE (if_info->x), op, op1,
+				      target, if_info->x, 0, OPTAB_WIDEN);
+    }
+
+  if (target)
+    {
+      if (target != if_info->x)
+	noce_emit_move_insn (if_info->x, target);
+
+      seq = end_ifcvt_sequence (if_info);
+      if (!seq || !targetm.noce_conversion_profitable_p (seq, if_info))
+	return FALSE;
+
+      emit_insn_before_setloc(seq, if_info->jump,
+			      INSN_LOCATION(if_info->insn_a));
+      if_info->transform_name = "noce_try_condzero_arith";
+
+      return TRUE;
+    }
+
+  end_sequence ();
 
   return FALSE;
 }
@@ -3967,7 +4179,11 @@ noce_process_if_block (struct noce_if_info *if_info)
     {
       if (noce_try_addcc (if_info))
 	goto success;
+      if (noce_try_condzero (if_info))
+	goto success;
       if (noce_try_store_flag_mask (if_info))
+	goto success;
+      if (noce_try_condzero_arith (if_info))
 	goto success;
       if (HAVE_conditional_move
 	  && noce_try_cmove_arith (if_info))
