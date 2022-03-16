@@ -164,8 +164,13 @@ lower_coro_builtin (gimple_stmt_iterator *gsi, bool *handled_ops_p,
 	tree d_ptr_tmp = make_ssa_name (ptr_type_node);
 	gassign *get_dptr = gimple_build_assign (d_ptr_tmp, indirect);
 	gsi_insert_before (gsi, get_dptr, GSI_SAME_STMT);
+
+	gimple_seq seq = NULL;
+	d_ptr_tmp = gimple_drop_capability (&seq, d_ptr_tmp);
+	gsi_insert_seq_before (gsi, seq, GSI_SAME_STMT);
+
 	tree done = fold_build2 (EQ_EXPR, boolean_type_node, d_ptr_tmp,
-				 null_pointer_node);
+				 fold_drop_capability (null_pointer_node));
 	gassign *get_res = gimple_build_assign (lhs, done);
 	gsi_replace (gsi, get_res, true);
 	*handled_ops_p = true;

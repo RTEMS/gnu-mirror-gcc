@@ -4356,8 +4356,11 @@ morph_fn_to_coro (tree orig, tree *resumer, tree *destroyer)
 
       gcc_checking_assert (same_type_p (fn_return_type, TREE_TYPE (grooaf)));
       tree if_stmt = begin_if_stmt ();
-      tree cond = build1 (CONVERT_EXPR, coro_frame_ptr, integer_zero_node);
-      cond = build2 (EQ_EXPR, boolean_type_node, coro_fp, cond);
+      tree coro_fp_addr = drop_capability (coro_fp);
+      tree cond = build2 (EQ_EXPR,
+			  boolean_type_node,
+			  coro_fp_addr,
+			  build_zero_cst (TREE_TYPE (coro_fp_addr)));
       finish_if_stmt_cond (cond, if_stmt);
       if (VOID_TYPE_P (fn_return_type))
 	{
