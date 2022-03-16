@@ -4971,7 +4971,7 @@ find_split_point (rtx *loc, rtx_insn *insn, bool set_src)
       if (HAVE_lo_sum && (GET_CODE (XEXP (x, 0)) == CONST
 			  || GET_CODE (XEXP (x, 0)) == SYMBOL_REF))
 	{
-	  machine_mode address_mode = get_address_mode (x);
+	  machine_mode address_mode = mem_address_mode (x);
 
 	  SUBST (XEXP (x, 0),
 		 gen_rtx_LO_SUM (address_mode,

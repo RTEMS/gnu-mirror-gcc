@@ -15731,7 +15731,7 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
 	  }
       }
       mem_loc_result = mem_loc_descriptor (XEXP (rtl, 0),
-					   get_address_mode (rtl), mode,
+					   mem_address_mode (rtl), mode,
 					   VAR_INIT_STATUS_INITIALIZED);
       if (mem_loc_result == NULL)
 	mem_loc_result = tls_mem_loc_descriptor (rtl);
@@ -16727,7 +16727,7 @@ loc_descriptor (rtx rtl, machine_mode mode,
       break;
 
     case MEM:
-      loc_result = mem_loc_descriptor (XEXP (rtl, 0), get_address_mode (rtl),
+      loc_result = mem_loc_descriptor (XEXP (rtl, 0), mem_address_mode (rtl),
 				       GET_MODE (rtl), initialized);
       if (loc_result == NULL)
 	loc_result = tls_mem_loc_descriptor (rtl);
@@ -17048,7 +17048,7 @@ dw_loc_list_1 (tree loc, rtx varloc, int want_address,
 	  if (MEM_P (varloc))
 	    {
 	      rtx addr = XEXP (varloc, 0);
-	      descr = mem_loc_descriptor (addr, get_address_mode (varloc),
+	      descr = mem_loc_descriptor (addr, mem_address_mode (varloc),
 					  mode, initialized);
 	      if (descr)
 		have_address = 1;
@@ -17577,7 +17577,7 @@ cst_pool_loc_descr (tree loc)
 			"CST value in contant pool but not marked.");
       return 0;
     }
-  return mem_loc_descriptor (XEXP (rtl, 0), get_address_mode (rtl),
+  return mem_loc_descriptor (XEXP (rtl, 0), mem_address_mode (rtl),
 			     GET_MODE (rtl), VAR_INIT_STATUS_INITIALIZED);
 }
 
@@ -18559,7 +18559,7 @@ loc_list_from_tree_1 (tree loc, int want_address,
 		if (MEM_P (rtl))
 		  {
 		    mem_mode = mode;
-		    mode = get_address_mode (rtl);
+		    mode = mem_address_mode (rtl);
 		    rtl = XEXP (rtl, 0);
 		    have_address = 1;
 		  }
@@ -20156,7 +20156,7 @@ rtl_for_decl_location (tree decl)
 	       && known_lt (GET_MODE_SIZE (TYPE_MODE (TREE_TYPE (decl))),
 			    UNITS_PER_WORD))
 	{
-	  machine_mode addr_mode = get_address_mode (rtl);
+	  machine_mode addr_mode = mem_address_mode (rtl);
 	  poly_int64 offset = (UNITS_PER_WORD
 			       - GET_MODE_SIZE (TYPE_MODE (TREE_TYPE (decl))));
 
@@ -20169,7 +20169,7 @@ rtl_for_decl_location (tree decl)
 	   && MEM_P (rtl)
 	   && GET_MODE (rtl) != TYPE_MODE (TREE_TYPE (decl)))
     {
-      machine_mode addr_mode = get_address_mode (rtl);
+      machine_mode addr_mode = mem_address_mode (rtl);
       poly_int64 offset = byte_lowpart_offset (TYPE_MODE (TREE_TYPE (decl)),
 					       GET_MODE (rtl));
 
@@ -23514,7 +23514,7 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
 		    {
 		      rtx mem = XEXP (XEXP (arg, 0), 0);
 		      reg = mem_loc_descriptor (XEXP (mem, 0),
-						get_address_mode (mem),
+						mem_address_mode (mem),
 						GET_MODE (mem),
 						VAR_INIT_STATUS_INITIALIZED);
 		    }

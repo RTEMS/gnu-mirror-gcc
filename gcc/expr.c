@@ -985,7 +985,7 @@ pieces_addr::decide_autoinc (machine_mode ARG_UNUSED (mode), bool reverse,
   bool use_postinc = (m_is_load
 		      ? USE_LOAD_POST_INCREMENT (mode)
 		      : USE_STORE_POST_INCREMENT (mode));
-  machine_mode addr_mode = get_address_mode (m_obj);
+  machine_mode addr_mode = mem_address_mode (m_obj);
 
   if (use_predec && reverse)
     {
@@ -1926,8 +1926,8 @@ emit_block_move_via_loop (rtx x, rtx y, rtx size,
 {
   rtx_code_label *cmp_label, *top_label;
   rtx iter, x_addr, y_addr, tmp;
-  scalar_addr_mode x_addr_mode = get_address_mode (x);
-  scalar_addr_mode y_addr_mode = get_address_mode (y);
+  scalar_addr_mode x_addr_mode = mem_address_mode (x);
+  scalar_addr_mode y_addr_mode = mem_address_mode (y);
   machine_mode iter_mode;
 
   iter_mode = GET_MODE (size);
@@ -5347,7 +5347,7 @@ expand_assignment (tree to, tree from, bool nontemporal)
 	    }
 
 	  offset_rtx = expand_expr (offset, NULL_RTX, VOIDmode, EXPAND_SUM);
-	  om = offset_mode (get_address_mode (to_rtx));
+	  om = offset_mode (mem_address_mode (to_rtx));
 	  if (GET_MODE (offset_rtx) != om)
 	    {
 		/* We cannot be sure that the RTL in offset_rtx is valid outside
@@ -6043,7 +6043,7 @@ store_expr (tree exp, rtx target, int call_param_p,
 	    {
 	      machine_mode pointer_mode
 		= targetm.addr_space.pointer_mode (MEM_ADDR_SPACE (target));
-	      const scalar_addr_mode address_mode = get_address_mode (target);
+	      const scalar_addr_mode address_mode = mem_address_mode (target);
 	      const auto om = offset_mode (address_mode);
 
 	      /* Compute the size of the data to copy from the string.  */
@@ -11205,7 +11205,7 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 
 	    gcc_assert (MEM_P (op0));
 
-	    off_mode = offset_mode (get_address_mode (op0));
+	    off_mode = offset_mode (mem_address_mode (op0));
 	    if (GET_MODE (offset_rtx) != off_mode)
 	      {
 		/* We cannot be sure that the RTL in offset_rtx is valid outside

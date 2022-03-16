@@ -1119,7 +1119,7 @@ canon_address (rtx mem,
 	       poly_int64 *offset,
 	       cselib_val **base)
 {
-  machine_mode address_mode = get_address_mode (mem);
+  machine_mode address_mode = mem_address_mode (mem);
   rtx mem_address = XEXP (mem, 0);
   rtx expanded_address, address;
   int expanded;
@@ -1526,7 +1526,7 @@ record_store (rtx body, bb_info_t bb_info)
       mem_addr = group->canon_base_addr;
     }
   if (maybe_ne (offset, 0))
-    mem_addr = plus_constant (get_address_mode (mem), mem_addr, offset);
+    mem_addr = plus_constant (mem_address_mode (mem), mem_addr, offset);
 
   while (ptr)
     {
@@ -2217,7 +2217,7 @@ check_mem_read_rtx (rtx *loc, bb_info_t bb_info)
       mem_addr = group->canon_base_addr;
     }
   if (maybe_ne (offset, 0))
-    mem_addr = plus_constant (get_address_mode (mem), mem_addr, offset);
+    mem_addr = plus_constant (mem_address_mode (mem), mem_addr, offset);
 
   if (group_id >= 0)
     {

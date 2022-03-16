@@ -2918,7 +2918,7 @@ cselib_record_sets (rtx_insn *insn)
 	  sets[i].src_elt = cselib_lookup (src, GET_MODE (dest), 1, VOIDmode);
 	  if (MEM_P (dest))
 	    {
-	      machine_mode address_mode = get_address_mode (dest);
+	      machine_mode address_mode = mem_address_mode (dest);
 
 	      sets[i].dest_addr_elt = cselib_lookup (XEXP (dest, 0),
 						     address_mode, 1,

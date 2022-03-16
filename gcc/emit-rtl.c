@@ -2448,7 +2448,7 @@ adjust_address_1 (rtx memref, machine_mode mode, poly_int64 offset,
 
   /* Convert a possibly large offset to a signed value within the
      range of the target address space.  */
-  address_mode = get_address_mode (memref);
+  address_mode = mem_address_mode (memref);
   offset = trunc_int_for_mode (offset, offset_mode (address_mode));
 
   if (adjust_address)
@@ -2567,7 +2567,7 @@ offset_address (rtx memref, rtx offset, unsigned HOST_WIDE_INT pow2)
   class mem_attrs *defattrs;
 
   mem_attrs attrs (*get_mem_attrs (memref));
-  address_mode = get_address_mode (memref);
+  address_mode = mem_address_mode (memref);
   new_rtx = gen_pointer_plus (address_mode, addr, offset);
 
   /* At this point we don't know _why_ the address is invalid.  It

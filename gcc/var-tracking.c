@@ -5485,7 +5485,7 @@ replace_expr_with_values (rtx loc)
   else if (MEM_P (loc))
     {
       cselib_val *addr = cselib_lookup (XEXP (loc, 0),
-					get_address_mode (loc), 0,
+					mem_address_mode (loc), 0,
 					GET_MODE (loc));
       if (addr)
 	return replace_equiv_address_nv (loc, addr->val_rtx);
@@ -5548,7 +5548,7 @@ use_type (rtx loc, struct count_use_info *cui, machine_mode *modep)
 	      if (REG_P (loc)
 		  || (find_use_val (loc, GET_MODE (loc), cui)
 		      && cselib_lookup (XEXP (loc, 0),
-					get_address_mode (loc), 0,
+					mem_address_mode (loc), 0,
 					GET_MODE (loc))))
 		return MO_VAL_SET;
 	    }
@@ -5711,7 +5711,7 @@ add_uses (rtx loc, struct count_use_info *cui)
 	      && !MEM_P (XEXP (vloc, 0)))
 	    {
 	      rtx mloc = vloc;
-	      machine_mode address_mode = get_address_mode (mloc);
+	      machine_mode address_mode = mem_address_mode (mloc);
 	      cselib_val *val
 		= cselib_lookup (XEXP (mloc, 0), address_mode, 0,
 				 GET_MODE (mloc));
@@ -5776,7 +5776,7 @@ add_uses (rtx loc, struct count_use_info *cui)
 	      && !MEM_P (XEXP (oloc, 0)))
 	    {
 	      rtx mloc = oloc;
-	      machine_mode address_mode = get_address_mode (mloc);
+	      machine_mode address_mode = mem_address_mode (mloc);
 	      cselib_val *val
 		= cselib_lookup (XEXP (mloc, 0), address_mode, 0,
 				 GET_MODE (mloc));
@@ -6053,7 +6053,7 @@ add_stores (rtx loc, const_rtx expr, void *cuip)
 	  && !MEM_P (XEXP (loc, 0)))
 	{
 	  rtx mloc = loc;
-	  machine_mode address_mode = get_address_mode (mloc);
+	  machine_mode address_mode = mem_address_mode (mloc);
 	  cselib_val *val = cselib_lookup (XEXP (mloc, 0),
 					   address_mode, 0,
 					   GET_MODE (mloc));

@@ -2057,7 +2057,7 @@ noce_try_cmove_arith (struct noce_if_info *if_info)
       && MEM_P (a) && MEM_P (b)
       && MEM_ADDR_SPACE (a) == MEM_ADDR_SPACE (b))
     {
-      machine_mode address_mode = get_address_mode (a);
+      machine_mode address_mode = mem_address_mode (a);
 
       a = XEXP (a, 0);
       b = XEXP (b, 0);

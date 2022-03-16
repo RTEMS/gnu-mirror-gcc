@@ -1014,7 +1014,7 @@ debug_mem_addr_value (rtx x)
   machine_mode address_mode;
 
   gcc_assert (MEM_P (x));
-  address_mode = get_address_mode (x);
+  address_mode = mem_address_mode (x);
 
   t = shallow_copy_rtx (x);
   if (cselib_lookup (XEXP (t, 0), address_mode, 0, GET_MODE (t)))

@@ -1314,7 +1314,7 @@ dwarf2out_frame_debug_cfa_expression (rtx set)
   cfi->dw_cfi_opc = DW_CFA_expression;
   cfi->dw_cfi_oprnd1.dw_cfi_reg_num = regno;
   cfi->dw_cfi_oprnd2.dw_cfi_loc
-    = mem_loc_descriptor (XEXP (dest, 0), get_address_mode (dest),
+    = mem_loc_descriptor (XEXP (dest, 0), mem_address_mode (dest),
 			  GET_MODE (dest), VAR_INIT_STATUS_INITIALIZED);
 
   /* ??? We'd like to use queue_reg_save, were the interface different,

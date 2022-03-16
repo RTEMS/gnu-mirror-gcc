@@ -5965,7 +5965,7 @@ low_bitmask_len (machine_mode mode, unsigned HOST_WIDE_INT m)
 /* Return the mode of MEM's address.  */
 
 scalar_addr_mode
-get_address_mode (rtx mem)
+mem_address_mode (rtx mem)
 {
   machine_mode mode;
 

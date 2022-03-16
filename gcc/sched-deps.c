@@ -2466,7 +2466,7 @@ sched_analyze_1 (class deps_desc *deps, rtx x, rtx_insn *insn)
 
       if (sched_deps_info->use_cselib)
 	{
-	  machine_mode address_mode = get_address_mode (dest);
+	  machine_mode address_mode = mem_address_mode (dest);
 
 	  t = shallow_copy_rtx (dest);
 	  cselib_lookup_from_insn (XEXP (t, 0), address_mode, 1,
@@ -2628,7 +2628,7 @@ sched_analyze_2 (class deps_desc *deps, rtx x, rtx_insn *insn)
 
 	if (sched_deps_info->use_cselib)
 	  {
-	    machine_mode address_mode = get_address_mode (t);
+	    machine_mode address_mode = mem_address_mode (t);
 
 	    t = shallow_copy_rtx (t);
 	    cselib_lookup_from_insn (XEXP (t, 0), address_mode, 1,
