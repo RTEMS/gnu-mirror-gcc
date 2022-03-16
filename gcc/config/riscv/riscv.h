@@ -946,6 +946,24 @@ typedef struct {
   fprintf (STREAM, "\t.word\t%sL%d-%sL%d\n",				\
 	   LOCAL_LABEL_PREFIX, VALUE, LOCAL_LABEL_PREFIX, REL)
 
+#ifdef HAVE_GAS_MAX_SKIP_P2ALIGN
+/* Support for -falign-* switches.  Use .p2align to ensure that code
+   sections are padded with NOP instructions, rather than zeros.  */
+#define ASM_OUTPUT_MAX_SKIP_ALIGN(FILE, LOG, MAX_SKIP)		\
+  do								\
+    {								\
+      if ((LOG) != 0)						\
+	{							\
+	  if ((MAX_SKIP) == 0)					\
+	    fprintf ((FILE), "\t.p2align %d\n", (int) (LOG));	\
+	  else							\
+	    fprintf ((FILE), "\t.p2align %d,,%d\n",		\
+		     (int) (LOG), (int) (MAX_SKIP));		\
+	}							\
+    } while (0)
+
+#endif /* HAVE_GAS_MAX_SKIP_P2ALIGN */
+
 /* This is how to output an assembler line
    that says to advance the location counter
    to a multiple of 2**LOG bytes.  */
