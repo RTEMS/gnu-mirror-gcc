@@ -35,6 +35,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gomp-constants.h"
 #include "gimple.h"
 #include "fold-const.h"
+#include "target.h"
 
 /* Disable warnings about quoting issues in the pp_xxx calls below
    that (intentionally) don't follow GCC diagnostic conventions.  */
@@ -1798,7 +1799,13 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
 
     case POINTER_TYPE:
     case REFERENCE_TYPE:
-      str = (TREE_CODE (node) == POINTER_TYPE ? "*" : "&");
+      if (targetm.capability_mode ().exists ()
+	  && targetm.capability_mode ().require () != Pmode
+	  && capability_type_p (node))
+	str = (TREE_CODE (node) == POINTER_TYPE
+	       ? "* __capability" : "& __capability");
+      else
+	str = (TREE_CODE (node) == POINTER_TYPE ? "*" : "&");
 
       if (TREE_TYPE (node) == NULL)
         {
