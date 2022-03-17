@@ -24777,6 +24777,24 @@ aarch64_capabilities_in_hardware (void)
     return false;
 }
 
+/* Implement TARGET_VALID_POINTER_MODE hook.  */
+bool
+aarch64_valid_pointer_mode (scalar_addr_mode mode)
+{
+  /* For Hybrid Morello we support two valid pointer modes:
+      - DImode == Pmode == ptr_mode for all normal integer pointers.
+      - CADImode forcapability  pointers.
+     In order to return "valid" on both of them, we check against the
+     offset mode.  */
+  if (TARGET_CAPABILITY_HYBRID)
+    {
+      scalar_addr_mode omode = offset_mode (mode);
+      return (omode == Pmode || omode == ptr_mode);
+    }
+  else
+    return (mode == Pmode || mode == ptr_mode);
+}
+
 /* Implement the TARGET_DWARF_FRAME_REG_MODE target hook. This only has an
    impact in Hybrid Capability Morello compilation, where the default
    raw_reg_mode returned would still be CADImode, but we want to use DImode
@@ -25417,6 +25435,9 @@ aarch64_libgcc_floating_mode_supported_p
 
 #undef TARGET_ASM_DECLARE_CONSTANT_NAME
 #define TARGET_ASM_DECLARE_CONSTANT_NAME aarch64_declare_constant_name
+
+#undef TARGET_VALID_POINTER_MODE
+#define TARGET_VALID_POINTER_MODE aarch64_valid_pointer_mode
 
 #undef TARGET_UNWIND_WORD_MODE
 #define TARGET_UNWIND_WORD_MODE		aarch64_unwind_word_mode
