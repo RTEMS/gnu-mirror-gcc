@@ -4987,6 +4987,9 @@ lvalue_p (const_tree ref)
     case BIND_EXPR:
       return TREE_CODE (TREE_TYPE (ref)) == ARRAY_TYPE;
 
+    case MEM_REF:
+      return true;
+
     default:
       return false;
     }

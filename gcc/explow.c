@@ -374,9 +374,26 @@ convert_memory_address_addr_space_1 (scalar_addr_mode to_mode ATTRIBUTE_UNUSED,
 	      || GET_CODE (x) == SYMBOL_REF
 	      || GET_CODE (x) == CONST);
 
-  pointer_mode = unqualified_pointer_mode (as);
-  address_mode = unqualified_address_mode (as);
-  from_mode = to_mode == pointer_mode ? address_mode : pointer_mode;
+  /* ??? All this complication is because (a) X could be a CONST_INT
+     and (b) the caller doesn't tell us what mode X has.  So the assumption
+     appears to be that, if the caller has asked for a conversion, the current
+     CONST_INT must be the "other" mode from TO_MODE.  However, the early out
+     above proves that this assumption is false.
+
+     It would be good to clean this up and pass X's mode in all cases.
+     However, the current imprecision doesn't affect capability modes,
+     which are never CONST_INT.  So handle them specially for now.  */
+  if (CAPABILITY_MODE_P (GET_MODE (x)))
+    {
+      from_mode = as_a<scalar_addr_mode> (GET_MODE (x));
+      gcc_assert (targetm.valid_pointer_mode (from_mode));
+    }
+  else
+    {
+      pointer_mode = unqualified_pointer_mode (as);
+      address_mode = unqualified_address_mode (as);
+      from_mode = to_mode == pointer_mode ? address_mode : pointer_mode;
+    }
   /* Just assert that the input is as it should be  (X is a memory address in
      the previous mode).  */
   switch (GET_CODE (x))
