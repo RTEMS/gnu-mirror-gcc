@@ -993,6 +993,14 @@ restructure_reference (tree *pbase, tree *poffset, widest_int *pindex,
   t1 = TREE_OPERAND (base, 0);
   c1 = widest_int::from (mem_offset, SIGNED);
   type = TREE_TYPE (TREE_OPERAND (base, 1));
+  /* MORELLO TODO HYBRID
+   *  When splitting these MEM_REF's out we currently use the type of the
+   *  offset rather than the type of the base pointer.  If the base pointer and
+   *  offset types differ in their capability nature then these types are not
+   *  interchangeable.  There is probably a way around this, but it's a simple
+   *  and safe solution to avoid the optimisation in that case.  */
+  if (!types_compatible_p (type, TREE_TYPE (t1)))
+    return false;
 
   mult_op0 = TREE_OPERAND (offset, 0);
   c3 = wi::to_widest (TREE_OPERAND (offset, 1));
