@@ -857,7 +857,7 @@ handle_cheri_capability_attribute (tree *node, tree ARG_UNUSED (name),
 	 POINTER_TYPE_P.  */
       tree *treetoedit = node;
       for (int i = 1; i < capability_pointer_depth; i++)
-	treetoedit = &TREE_TYPE (*node);
+	treetoedit = &TREE_TYPE (*treetoedit);
       gcc_assert (TREE_CODE (*treetoedit) == POINTER_TYPE);
 
       /* Call build_pointer_type_for_mode to create a Capability Pointer
