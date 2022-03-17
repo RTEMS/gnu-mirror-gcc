@@ -172,6 +172,9 @@ int rtl_dump_and_exit
 Variable
 int flag_print_asm_name
 
+Variable
+int flag_fake_hybrid
+
 ; Name of top-level original source file (what was input to cpp).
 ; This comes from the #-command at the beginning of the actual input.
 ; If there isn't any there, then this is the cc1 input file name.
@@ -1217,6 +1220,12 @@ List all available debugging counters with their limits and counts.
 fdbg-cnt=
 Common RejectNegative Joined Var(common_deferred_options) Defer
 -fdbg-cnt=<counter>[:<lower_limit1>-]<upper_limit1>[:<lower_limit2>-<upper_limit2>:...][,<counter>:...]	Set the debug counter limit.
+
+ffake-hybrid=
+Common Joined RejectNegative UInteger Var(flag_fake_hybrid) Init(0)
+Choose to do some fake hybrid capability stuff.
+This is largely in order to explore whether using hybrid capabilities will
+cause a lot of problems or not.
 
 fdebug-prefix-map=
 Common Joined RejectNegative Var(common_deferred_options) Defer

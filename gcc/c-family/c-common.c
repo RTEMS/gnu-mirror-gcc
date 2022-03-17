@@ -2679,6 +2679,26 @@ c_common_cap_from_noncap (tree type, tree expr)
   return ret;
 }
 
+/* Generate a cast from a non-capability pointer to a capability pointer.
+   As above, this cast will necessarily create a pointer that does not have
+   valid metadata.  */
+tree
+c_common_cap_from_ptr (tree type, tree ptr_expr)
+{
+  gcc_assert (POINTER_TYPE_P (TREE_TYPE (ptr_expr))
+	      && capability_type_p (type));
+   /* MORELLO TODO address spaces.
+   * Need to do special handling for capabilities, but also need to do special
+   * handling for address spaces, capability handling is usually done in
+   * frontend while address space handling is usually done in generic code
+   * `convert_to_pointer_1`.  */
+  gcc_assert (TYPE_ADDR_SPACE (TREE_TYPE (type))
+		  == TYPE_ADDR_SPACE (TREE_TYPE (TREE_TYPE (ptr_expr))));
+  tree int_expr = convert (noncapability_type (type), ptr_expr);
+  return c_common_cap_from_noncap (type, int_expr);
+}
+
+
 /* Build a bit-field integer type for the given WIDTH and UNSIGNEDP.  */
 
 tree

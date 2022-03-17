@@ -861,6 +861,7 @@ extern tree c_common_unsigned_type (tree);
 extern tree c_common_signed_type (tree);
 extern tree c_common_signed_or_unsigned_type (int, tree);
 extern tree c_common_cap_from_noncap (tree, tree);
+extern tree c_common_cap_from_ptr (tree, tree);
 extern void c_common_init_ts (void);
 extern tree c_build_bitfield_integer_type (unsigned HOST_WIDE_INT, int);
 extern enum conversion_safety unsafe_conversion_p (tree, tree, tree, bool);

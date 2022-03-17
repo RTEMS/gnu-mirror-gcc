@@ -145,6 +145,9 @@ convert (tree type, tree expr)
     case REFERENCE_TYPE:
       if (capability_type_p (type) && TREE_CODE (TREE_TYPE (e)) == INTEGER_TYPE)
 	ret = c_common_cap_from_noncap (type, e);
+      else if (capability_type_p (type) && !capability_type_p (TREE_TYPE (e))
+	       && POINTER_TYPE_P (TREE_TYPE (e)))
+	ret = c_common_cap_from_ptr (type, e);
       else
 	ret = convert_to_pointer (type, e);
       goto maybe_fold;

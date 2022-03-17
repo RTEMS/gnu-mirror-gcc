@@ -6984,6 +6984,15 @@ grokdeclarator (const struct c_declarator *declarator,
 	    type_quals = declarator->u.pointer_quals;
 
 	    declarator = declarator->declarator;
+	    if (flag_fake_hybrid
+		&& (rand() % flag_fake_hybrid) == 0)
+	      {
+		capability_levels_in_declarator++;
+		tree attr_name = get_identifier ("cheri_capability");
+		// tree attr_args = tree_cons (NULL_TREE, NULL_TREE, NULL_TREE);
+		tree new_attrs = tree_cons (attr_name, NULL_TREE, returned_attrs);
+		returned_attrs = decl_attributes (&type, new_attrs, ATTR_FLAG_CHERI_INNER_APPLY);
+	      }
 	    break;
 	  }
 	default:
