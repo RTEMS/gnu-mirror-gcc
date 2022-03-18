@@ -1233,6 +1233,7 @@ odr_types_equivalent_p (tree t1, tree t2, bool warn, bool *warned,
 
   /* Non-aggregate types can be handled cheaply.  */
   if (INTEGRAL_TYPE_P (t1)
+      || INTCAP_TYPE_P (t1)
       || SCALAR_FLOAT_TYPE_P (t1)
       || FIXED_POINT_TYPE_P (t1)
       || TREE_CODE (t1) == VECTOR_TYPE
@@ -1240,7 +1241,7 @@ odr_types_equivalent_p (tree t1, tree t2, bool warn, bool *warned,
       || TREE_CODE (t1) == OFFSET_TYPE
       || POINTER_TYPE_P (t1))
     {
-      if (TYPE_PRECISION (t1) != TYPE_PRECISION (t2))
+      if (TYPE_CAP_PRECISION (t1) != TYPE_CAP_PRECISION (t2))
 	{
 	  warn_odr (t1, t2, NULL, NULL, warn, warned,
 		    G_("a type with different precision is defined "
