@@ -5121,6 +5121,61 @@
   "vextsd2q %0,%1"
   [(set_attr "type" "vecexts")])
 
+;; Zero extend DImode to TImode when the result is in GPRs or VSX registers.
+;; If we are on a power10, the combiner will create the lxvrdx pattern if
+;; the value is being loaded from memory.
+(define_insn_and_split "zero_extendditi2"
+  [(set (match_operand:TI 0 "gpc_reg_operand"  "=r, r,  wa, wa")
+	(zero_extend:TI
+	 (match_operand:DI 1 "gpc_reg_operand"  "r, wa, r,  wa")))
+   (clobber (match_scratch:DI 2                "=X, X,  X,  &wa"))]
+  "TARGET_POWERPC64 && TARGET_P9_VECTOR"
+  "@
+   #
+   #
+   mtvsrdd %x0,0,%1
+   #"
+  "&& reload_completed
+   && (int_reg_operand (operands[0], TImode)
+       || vsx_register_operand (operands[1], DImode))"
+  [(pc)]
+{
+  rtx dest = operands[0];
+  rtx src = operands[1];
+  int dest_regno = reg_or_subregno (dest);
+
+  /* Handle conversion to GPR registers.  Load up the low part and then load
+     0 to clear the upper part.  */
+  if (INT_REGNO_P (dest_regno))
+    {
+      rtx dest_hi = gen_highpart (DImode, dest);
+      rtx dest_lo = gen_lowpart (DImode, dest);
+
+      emit_move_insn (dest_lo, src);
+      emit_move_insn (dest_hi, const0_rtx);
+      DONE;
+    }
+
+  /* For conversion to a VSX register from a VSX register, do a CONCAT
+     operation with the upper word set to 0.  */
+  else if (VSX_REGNO_P (dest_regno))
+    {
+      rtx tmp = operands[2];
+      rtx dest_v2di = gen_rtx_REG (V2DImode, dest_regno);
+
+      emit_move_insn (tmp, const0_rtx);
+      if (BYTES_BIG_ENDIAN)
+	emit_insn (gen_vsx_concat_v2di (dest_v2di, tmp, src));
+      else
+	emit_insn (gen_vsx_concat_v2di (dest_v2di, src, tmp));
+      DONE;
+    }
+
+  else
+    gcc_unreachable ();
+}
+  [(set_attr "length" "8,8,*,8")
+   (set_attr "type" "*,mfvsr,mtvsr,vecperm")])
 
 ;; ISA 3.0 Binary Floating-Point Support
 
