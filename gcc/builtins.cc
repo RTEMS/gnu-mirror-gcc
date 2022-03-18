@@ -1282,18 +1282,18 @@ expand_builtin_update_setjmp_buf (rtx buf_addr)
 static void
 expand_builtin_prefetch (tree exp)
 {
-  tree arg0, arg1, arg2;
+  tree arg0, arg1, arg2, arg3;
   int nargs;
-  rtx op0, op1, op2;
+  rtx op0, op1, op2, op3;
 
   if (!validate_arglist (exp, POINTER_TYPE, 0))
     return;
 
   arg0 = CALL_EXPR_ARG (exp, 0);
 
-  /* Arguments 1 and 2 are optional; argument 1 (read/write) defaults to
-     zero (read) and argument 2 (locality) defaults to 3 (high degree of
-     locality).  */
+  /* Arguments 1, 2, 3 are optional; argument 1 (read/write) defaults to
+     zero (read); argument 2 (locality) defaults to 3 (high degree of
+     locality); argument 3 (cache type) defaults to 1 (data).  */
   nargs = call_expr_nargs (exp);
   if (nargs > 1)
     arg1 = CALL_EXPR_ARG (exp, 1);
@@ -1303,6 +1303,10 @@ expand_builtin_prefetch (tree exp)
     arg2 = CALL_EXPR_ARG (exp, 2);
   else
     arg2 = integer_three_node;
+  if (nargs > 3)
+    arg3 = CALL_EXPR_ARG (exp, 3);
+  else
+    arg3 = integer_one_node;
 
   /* Argument 0 is an address.  */
   op0 = expand_expr (arg0, NULL_RTX, Pmode, EXPAND_NORMAL);
@@ -1336,14 +1340,30 @@ expand_builtin_prefetch (tree exp)
       op2 = const0_rtx;
     }
 
+  /* Argument 3 (cache type) must be a compile-time constant int.  */
+  if (TREE_CODE (arg3) != INTEGER_CST)
+    {
+      error ("fourth argument to %<__builtin_prefetch%> must be a constant");
+      arg3 = integer_one_node;
+    }
+  op3 = expand_normal (arg3);
+  /* Argument 3 must be either zero or one.  */
+  if (INTVAL (op3) != 0 && INTVAL (op3) != 1)
+    {
+      warning (0, "invalid fourth argument to %<__builtin_prefetch%>;"
+	" using 1");
+      op3 = const1_rtx;
+    }
+
   if (targetm.have_prefetch ())
     {
-      class expand_operand ops[3];
+      class expand_operand ops[4];
 
       create_address_operand (&ops[0], op0);
       create_integer_operand (&ops[1], INTVAL (op1));
       create_integer_operand (&ops[2], INTVAL (op2));
-      if (maybe_expand_insn (targetm.code_for_prefetch, 3, ops))
+      create_integer_operand (&ops[3], INTVAL (op3));
+      if (maybe_expand_insn (targetm.code_for_prefetch, 4, ops))
 	return;
     }
 

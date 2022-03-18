@@ -5255,14 +5255,22 @@ archs4x, archs4xd"
 (define_expand "prefetch"
   [(prefetch (match_operand:SI 0 "address_operand" "")
 	     (match_operand:SI 1 "const_int_operand" "")
-	     (match_operand:SI 2 "const_int_operand" ""))]
+	     (match_operand:SI 2 "const_int_operand" "")
+	     (match_operand:SI 3 "const_int_operand" ""))]
   "TARGET_HS"
-  "")
+  {
+    if (INTVAL (operands[3]) == 0)
+    {
+      warning (0, "instruction prefetch is not supported; using data prefetch");
+      operands[3] = const1_rtx;
+    }
+  })
 
 (define_insn "prefetch_1"
   [(prefetch (match_operand:SI 0 "register_operand" "r")
 	     (match_operand:SI 1 "const_int_operand" "n")
-	     (match_operand:SI 2 "const_int_operand" "n"))]
+	     (match_operand:SI 2 "const_int_operand" "n")
+	     (const_int 1))]
   "TARGET_HS"
   {
    if (INTVAL (operands[1]))
@@ -5277,7 +5285,8 @@ archs4x, archs4xd"
   [(prefetch (plus:SI (match_operand:SI 0 "register_operand" "r,r,r")
 		      (match_operand:SI 1 "nonmemory_operand" "r,Cm2,Cal"))
 	     (match_operand:SI 2 "const_int_operand" "n,n,n")
-	     (match_operand:SI 3 "const_int_operand" "n,n,n"))]
+	     (match_operand:SI 3 "const_int_operand" "n,n,n")
+	     (const_int 1))]
   "TARGET_HS"
   {
    if (INTVAL (operands[2]))
@@ -5291,7 +5300,8 @@ archs4x, archs4xd"
 (define_insn "prefetch_3"
   [(prefetch (match_operand:SI 0 "address_operand" "p")
 	     (match_operand:SI 1 "const_int_operand" "n")
-	     (match_operand:SI 2 "const_int_operand" "n"))]
+	     (match_operand:SI 2 "const_int_operand" "n")
+	     (const_int 1))]
   "TARGET_HS"
   {
    operands[0] = gen_rtx_MEM (SImode, operands[0]);

@@ -818,10 +818,25 @@
   [(set_attr "type" "no_insn")]
 )
 
-(define_insn "prefetch"
+(define_expand "prefetch"
+  [(prefetch (match_operand:DI 0 "aarch64_prefetch_operand")
+            (match_operand:QI 1 "const_int_operand")
+            (match_operand:QI 2 "const_int_operand")
+	    (match_operand:QI 3 "const_int_operand"))]
+  ""
+  {
+    if (INTVAL (operands[3]) == 0)
+    {
+      warning (0, "instruction prefetch is not yet implemented; using data prefetch");
+      operands[3] = const1_rtx;
+    }
+  })
+
+(define_insn "*prefetch"
   [(prefetch (match_operand:DI 0 "aarch64_prefetch_operand" "Dp")
             (match_operand:QI 1 "const_int_operand" "")
-            (match_operand:QI 2 "const_int_operand" ""))]
+            (match_operand:QI 2 "const_int_operand" "")
+	    (const_int 1))]
   ""
   {
     const char * pftype[2][4] =

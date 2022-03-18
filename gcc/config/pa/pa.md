@@ -10201,9 +10201,16 @@ add,l %2,%3,%3\;bv,n %%r0(%3)"
 (define_expand "prefetch"
   [(match_operand 0 "address_operand" "")
    (match_operand 1 "const_int_operand" "")
-   (match_operand 2 "const_int_operand" "")]
+   (match_operand 2 "const_int_operand" "")
+   (match_operand 3 "const_int_operand" "")]
   "TARGET_PA_20"
 {
+  if (INTVAL (operands[3]) == 0)
+  {
+    warning (0, "instruction prefetch is not supported; using data prefetch");
+    operands[3] = const1_rtx;
+  }
+
   operands[0] = copy_addr_to_reg (operands[0]);
   emit_insn (gen_prefetch_20 (operands[0], operands[1], operands[2]));
   DONE;
@@ -10212,7 +10219,8 @@ add,l %2,%3,%3\;bv,n %%r0(%3)"
 (define_insn "prefetch_20"
   [(prefetch (match_operand 0 "pmode_register_operand" "r")
 	     (match_operand:SI 1 "const_int_operand" "n")
-	     (match_operand:SI 2 "const_int_operand" "n"))]
+	     (match_operand:SI 2 "const_int_operand" "n")
+	     (const_int 1))]
   "TARGET_PA_20"
 {
   /* The SL cache-control completer indicates good spatial locality but

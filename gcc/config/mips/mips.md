@@ -7227,10 +7227,25 @@
 ;;
 
 
-(define_insn "prefetch"
+(define_expand "prefetch"
+  [(prefetch (match_operand:QI 0 "address_operand")
+	     (match_operand 1 "const_int_operand")
+	     (match_operand 2 "const_int_operand")
+	     (match_operand 3 "const_int_operand"))]
+  "ISA_HAS_PREFETCH && TARGET_EXPLICIT_RELOCS"
+{
+  if (INTVAL (operands[3]) == 0)
+  {
+    warning (0, "instruction prefetch is not supported; using data prefetch");
+    operands[3] = const1_rtx;
+  }
+})
+
+(define_insn "*prefetch"
   [(prefetch (match_operand:QI 0 "address_operand" "ZD")
 	     (match_operand 1 "const_int_operand" "n")
-	     (match_operand 2 "const_int_operand" "n"))]
+	     (match_operand 2 "const_int_operand" "n")
+	     (const_int 1))]
   "ISA_HAS_PREFETCH && TARGET_EXPLICIT_RELOCS"
 {
   if (TARGET_LOONGSON_2EF || TARGET_LOONGSON_EXT)
@@ -7257,7 +7272,8 @@
   [(prefetch (plus:P (match_operand:P 0 "register_operand" "d")
 		     (match_operand:P 1 "register_operand" "d"))
 	     (match_operand 2 "const_int_operand" "n")
-	     (match_operand 3 "const_int_operand" "n"))]
+	     (match_operand 3 "const_int_operand" "n")
+	     (const_int 1))]
   "ISA_HAS_PREFETCHX && TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT"
 {
   if (TARGET_LOONGSON_EXT)

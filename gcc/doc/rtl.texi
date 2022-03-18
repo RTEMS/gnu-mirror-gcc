@@ -3454,7 +3454,7 @@ position of @var{base}, @var{min} and @var{max} to the containing insn
 and of @var{min} and @var{max} to @var{base}.  See rtl.def for details.
 
 @findex prefetch
-@item (prefetch:@var{m} @var{addr} @var{rw} @var{locality})
+@item (prefetch:@var{m} @var{addr} @var{rw} @var{locality} @var{cache})
 Represents prefetch of memory at address @var{addr}.
 Operand @var{rw} is 1 if the prefetch is for data to be written, 0 otherwise;
 targets that do not support write prefetches should treat this as a normal
@@ -3462,6 +3462,10 @@ prefetch.
 Operand @var{locality} specifies the amount of temporal locality; 0 if there
 is none or 1, 2, or 3 for increasing levels of temporal locality;
 targets that do not support locality hints should ignore this.
+Operand @var{cache} is 1 if the prefetch is prefetching data, 0 for prefetching
+instruction;
+targets that do not support instruction prefetch should treat all as data
+prefetch.
 
 This insn is used to minimize cache-miss latency by moving data into a
 cache before it is accessed.  It should use only non-faulting data prefetch

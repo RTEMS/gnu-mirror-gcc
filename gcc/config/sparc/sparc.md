@@ -7816,9 +7816,16 @@ visl")
 (define_expand "prefetch"
   [(match_operand 0 "address_operand" "")
    (match_operand 1 "const_int_operand" "")
-   (match_operand 2 "const_int_operand" "")]
+   (match_operand 2 "const_int_operand" "")
+   (match_operand 3 "const_int_operand" "")]
   "TARGET_V9"
 {
+  if (INTVAL (operands[3]) == 0)
+  {
+    warning (0, "instruction prefetch is not supported; using data prefetch");
+    operands[3] = const1_rtx;
+  }
+
   if (TARGET_ARCH64)
     emit_insn (gen_prefetch_64 (operands[0], operands[1], operands[2]));
   else
@@ -7829,7 +7836,8 @@ visl")
 (define_insn "prefetch_64"
   [(prefetch (match_operand:DI 0 "address_operand" "p")
 	     (match_operand:DI 1 "const_int_operand" "n")
-	     (match_operand:DI 2 "const_int_operand" "n"))]
+	     (match_operand:DI 2 "const_int_operand" "n")
+	     (const_int 1))]
   ""
 {
   static const char * const prefetch_instr[2][2] = {
@@ -7855,7 +7863,8 @@ visl")
 (define_insn "prefetch_32"
   [(prefetch (match_operand:SI 0 "address_operand" "p")
 	     (match_operand:SI 1 "const_int_operand" "n")
-	     (match_operand:SI 2 "const_int_operand" "n"))]
+	     (match_operand:SI 2 "const_int_operand" "n")
+	     (const_int 1))]
   ""
 {
   static const char * const prefetch_instr[2][2] = {

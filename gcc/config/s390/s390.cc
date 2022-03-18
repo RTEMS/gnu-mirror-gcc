@@ -5697,13 +5697,13 @@ s390_expand_cpymem (rtx dst, rtx src, rtx len)
 
 	  /* Issue a read prefetch for the +3 cache line.  */
 	  prefetch = gen_prefetch (gen_rtx_PLUS (Pmode, src_addr, GEN_INT (768)),
-				   const0_rtx, const0_rtx);
+				   const0_rtx, const0_rtx, const1_rtx);
 	  PREFETCH_SCHEDULE_BARRIER_P (prefetch) = true;
 	  emit_insn (prefetch);
 
 	  /* Issue a write prefetch for the +3 cache line.  */
 	  prefetch = gen_prefetch (gen_rtx_PLUS (Pmode, dst_addr, GEN_INT (768)),
-				   const1_rtx, const0_rtx);
+				   const1_rtx, const0_rtx, const1_rtx);
 	  PREFETCH_SCHEDULE_BARRIER_P (prefetch) = true;
 	  emit_insn (prefetch);
 	}
@@ -5872,7 +5872,7 @@ s390_expand_setmem (rtx dst, rtx len, rtx val)
 	  /* Issue a write prefetch.  */
 	  rtx distance = GEN_INT (TARGET_SETMEM_PREFETCH_DISTANCE);
 	  rtx prefetch = gen_prefetch (gen_rtx_PLUS (Pmode, dst_addr, distance),
-				       const1_rtx, const0_rtx);
+				       const1_rtx, const0_rtx, const1_rtx);
 	  emit_insn (prefetch);
 	  PREFETCH_SCHEDULE_BARRIER_P (prefetch) = true;
 	}
@@ -5999,13 +5999,13 @@ s390_expand_cmpmem (rtx target, rtx op0, rtx op1, rtx len)
 
 	  /* Issue a read prefetch for the +2 cache line of operand 1.  */
 	  prefetch = gen_prefetch (gen_rtx_PLUS (Pmode, addr0, GEN_INT (512)),
-				   const0_rtx, const0_rtx);
+				   const0_rtx, const0_rtx, const1_rtx);
 	  emit_insn (prefetch);
 	  PREFETCH_SCHEDULE_BARRIER_P (prefetch) = true;
 
 	  /* Issue a read prefetch for the +2 cache line of operand 2.  */
 	  prefetch = gen_prefetch (gen_rtx_PLUS (Pmode, addr1, GEN_INT (512)),
-				   const0_rtx, const0_rtx);
+				   const0_rtx, const0_rtx, const1_rtx);
 	  emit_insn (prefetch);
 	  PREFETCH_SCHEDULE_BARRIER_P (prefetch) = true;
 	}

@@ -10928,13 +10928,22 @@
 (define_expand "prefetch"
   [(prefetch (match_operand 0 "address_operand" "")
 	     (match_operand:SI 1 "const_int_operand" "")
-	     (match_operand:SI 2 "const_int_operand" ""))]
-  "(TARGET_SH2A || TARGET_SH3) && !TARGET_VXWORKS_RTP")
+	     (match_operand:SI 2 "const_int_operand" "")
+	     (match_operand:SI 3 "const_int_operand" ""))]
+  "(TARGET_SH2A || TARGET_SH3) && !TARGET_VXWORKS_RTP"
+{
+  if (INTVAL (operands[3]) == 0)
+  {
+    warning (0, "instruction prefetch is not supported; using data prefetch");
+    operands[3] = const1_rtx;
+  }
+})
 
 (define_insn "*prefetch"
   [(prefetch (match_operand:SI 0 "register_operand" "r")
 	     (match_operand:SI 1 "const_int_operand" "n")
-	     (match_operand:SI 2 "const_int_operand" "n"))]
+	     (match_operand:SI 2 "const_int_operand" "n")
+	     (const_int 1))]
   "(TARGET_SH2A || TARGET_SH3) && ! TARGET_VXWORKS_RTP"
   "pref	@%0"
   [(set_attr "type" "other")])

@@ -5176,10 +5176,25 @@
 ;;
 ;; On EV6, these become official prefetch instructions.
 
-(define_insn "prefetch"
+(define_expand "prefetch"
+  [(prefetch (match_operand:DI 0 "address_operand")
+	     (match_operand:DI 1 "const_int_operand")
+	     (match_operand:DI 2 "const_int_operand")
+	     (match_operand:DI 3 "const_int_operand"))]
+  "TARGET_FIXUP_EV5_PREFETCH || alpha_cpu == PROCESSOR_EV6"
+{
+  if (INTVAL (operands[3]) == 0)
+  {
+    warning (0, "instruction prefetch is not supported; using data prefetch");
+    operands[3] = const1_rtx;
+  }
+})
+
+(define_insn "*prefetch"
   [(prefetch (match_operand:DI 0 "address_operand" "p")
 	     (match_operand:DI 1 "const_int_operand" "n")
-	     (match_operand:DI 2 "const_int_operand" "n"))]
+	     (match_operand:DI 2 "const_int_operand" "n")
+	     (const_int 1))]
   "TARGET_FIXUP_EV5_PREFETCH || alpha_cpu == PROCESSOR_EV6"
 {
   /* Interpret "no temporal locality" as this data should be evicted once

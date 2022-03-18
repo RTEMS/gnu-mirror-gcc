@@ -7631,7 +7631,8 @@
   [(prefetch (unspec:SI [(match_operand:SI 0 "register_operand" "r")]
 			UNSPEC_PREFETCH0)
 	     (const_int 0)
-	     (const_int 0))]
+	     (const_int 0)
+	     (const_int 1))]
   ""
   "dcpl %0, gr0, #0"
   [(set_attr "length" "4")])
@@ -7640,7 +7641,8 @@
   [(prefetch (unspec:SI [(match_operand:SI 0 "register_operand" "r")]
 			UNSPEC_PREFETCH)
 	     (const_int 0)
-	     (const_int 0))]
+	     (const_int 0)
+	     (const_int 1))]
   "TARGET_FR500_FR550_BUILTINS"
   "nop.p\\n\\tnldub @(%0, gr0), gr0"
   [(set_attr "length" "8")])

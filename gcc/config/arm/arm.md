@@ -12206,10 +12206,25 @@
 
 ;; V5E instructions.
 
-(define_insn "prefetch"
+(define_expand "prefetch"
+  [(prefetch (match_operand:SI 0 "address_operand")
+	     (match_operand:SI 1 "")
+	     (match_operand:SI 2 "")
+	     (match_operand:SI 3 ""))]
+  "TARGET_32BIT && arm_arch5te"
+  {
+    if (INTVAL (operands[3]) == 0)
+    {
+      warning (0, "instruction prefetch is not yet implemented; using data prefetch");
+      operands[3] = const1_rtx;
+    }
+  })
+
+(define_insn "*prefetch"
   [(prefetch (match_operand:SI 0 "address_operand" "p")
 	     (match_operand:SI 1 "" "")
-	     (match_operand:SI 2 "" ""))]
+	     (match_operand:SI 2 "" "")
+	     (const_int 1))]
   "TARGET_32BIT && arm_arch5te"
   "pld\\t%a0"
   [(set_attr "type" "load_4")]

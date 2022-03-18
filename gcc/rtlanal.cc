@@ -6196,7 +6196,7 @@ setup_reg_subrtx_bounds (unsigned int code)
   while (format[i] == 'e');
   rtx_all_subrtx_bounds[code].count = i - rtx_all_subrtx_bounds[code].start;
   /* rtl-iter.h relies on this.  */
-  gcc_checking_assert (rtx_all_subrtx_bounds[code].count <= 3);
+  gcc_checking_assert (rtx_all_subrtx_bounds[code].count <= 4);
 
   for (; format[i]; ++i)
     if (format[i] == 'E' || format[i] == 'V' || format[i] == 'e')

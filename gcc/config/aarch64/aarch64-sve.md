@@ -1944,7 +1944,8 @@
 		(match_operand:DI 2 "const_int_operand")]
 	       UNSPEC_SVE_PREFETCH)
 	     (match_operand:DI 3 "const_int_operand")
-	     (match_operand:DI 4 "const_int_operand"))]
+	     (match_operand:DI 4 "const_int_operand")
+	     (const_int 1))]
   "TARGET_SVE"
   {
     operands[1] = gen_rtx_MEM (<MODE>mode, operands[1]);
@@ -1984,7 +1985,8 @@
 		(match_operand:DI 6 "const_int_operand")]
 	       UNSPEC_SVE_PREFETCH_GATHER)
 	     (match_operand:DI 7 "const_int_operand")
-	     (match_operand:DI 8 "const_int_operand"))]
+	     (match_operand:DI 8 "const_int_operand")
+	     (const_int 1))]
   "TARGET_SVE"
   {
     static const char *const insns[][2] = {
@@ -2013,7 +2015,8 @@
 		(match_operand:DI 6 "const_int_operand")]
 	       UNSPEC_SVE_PREFETCH_GATHER)
 	     (match_operand:DI 7 "const_int_operand")
-	     (match_operand:DI 8 "const_int_operand"))]
+	     (match_operand:DI 8 "const_int_operand")
+	     (const_int 1))]
   "TARGET_SVE"
   {
     static const char *const insns[][2] = {
@@ -2044,7 +2047,8 @@
 		(match_operand:DI 6 "const_int_operand")]
 	       UNSPEC_SVE_PREFETCH_GATHER)
 	     (match_operand:DI 7 "const_int_operand")
-	     (match_operand:DI 8 "const_int_operand"))]
+	     (match_operand:DI 8 "const_int_operand")
+	     (const_int 1))]
   "TARGET_SVE"
   {
     static const char *const insns[][2] = {
@@ -2074,7 +2078,8 @@
 		(match_operand:DI 6 "const_int_operand")]
 	       UNSPEC_SVE_PREFETCH_GATHER)
 	     (match_operand:DI 7 "const_int_operand")
-	     (match_operand:DI 8 "const_int_operand"))]
+	     (match_operand:DI 8 "const_int_operand")
+	     (const_int 1))]
   "TARGET_SVE"
   {
     static const char *const insns[][2] = {

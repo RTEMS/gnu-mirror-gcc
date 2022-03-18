@@ -277,10 +277,11 @@ DEF_RTL_EXPR(ADDR_DIFF_VEC, "addr_diff_vec", "eEee0", RTX_EXTRA)
    Operand 3 is the level of temporal locality; 0 means there is no
    temporal locality and 1, 2, and 3 are for increasing levels of temporal
    locality.
+   Operand 4 is 1 for prefetch data, 0 for prefetch instrction.
 
-   The attributes specified by operands 2 and 3 are ignored for targets
+   The attributes specified by operands 2, 3 and 4 are ignored for targets
    whose prefetch instructions do not support them.  */
-DEF_RTL_EXPR(PREFETCH, "prefetch", "eee", RTX_EXTRA)
+DEF_RTL_EXPR(PREFETCH, "prefetch", "eeee", RTX_EXTRA)
 
 /* ----------------------------------------------------------------------
    At the top level of an instruction (perhaps under PARALLEL).
