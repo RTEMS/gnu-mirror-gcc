@@ -30,6 +30,58 @@
   sub\\t%0, %1, #%n2"
 )
 
+(define_insn "*pointer_plus_lsl_cadi"
+  [(set (match_operand:CADI 0 "register_operand" "=r")
+	(pointer_plus:CADI
+	  (match_operand:CADI 1 "register_operand" "r")
+	  (ashift:DI (match_operand:DI 2 "register_operand" "r")
+		     (match_operand:QI 3 "aarch64_imm3"))))]
+  "TARGET_CAPABILITY_ANY"
+  "add\\t%0, %1, %2, lsl %3"
+  [(set_attr "type" "alu_shift_imm")]
+)
+
+(define_insn "*pointer_plus_<optab><ALLX:mode>_cadi"
+  [(set (match_operand:CADI 0 "register_operand" "=rk")
+	(pointer_plus:CADI
+	  (match_operand:CADI 1 "register_operand" "r")
+	  (ANY_EXTEND:DI (match_operand:ALLX 2 "register_operand" "r"))))]
+  "TARGET_CAPABILITY_ANY"
+  "add\t%0, %1, %w2, <su>xt<ALLX:size>"
+  [(set_attr "type" "alu_ext")]
+)
+
+(define_insn "*pointer_plus_<optab><ALLX:mode>_lsl_cadi"
+  [(set (match_operand:CADI 0 "register_operand" "=rk")
+	(pointer_plus:CADI
+	  (match_operand:CADI 1 "register_operand" "r")
+	  (ashift:DI
+	    (ANY_EXTEND:DI
+	      (match_operand:ALLX 2 "register_operand" "r"))
+	    (match_operand 3 "aarch64_imm3"))))]
+  "TARGET_CAPABILITY_ANY"
+  "add\t%0, %1, %w2, <su>xt<ALLX:size> %3"
+  [(set_attr "type" "alu_ext")]
+)
+
+(define_insn "*pointer_plus_and_lsl_cadi"
+  [(set (match_operand:CADI 0 "register_operand" "=rk")
+	(pointer_plus:CADI
+	  (match_operand:CADI 1 "register_operand" "r")
+	  (and:DI
+	    (ashift:DI (match_operand:DI 2 "register_operand" "r")
+		       (match_operand 3 "aarch64_imm3"))
+	    (match_operand:DI 4 "const_int_operand"))))]
+  "TARGET_CAPABILITY_ANY
+   && aarch64_uxt_size (INTVAL (operands[3]), INTVAL (operands[4])) != 0"
+  {
+    operands[4] = GEN_INT (aarch64_uxt_size (INTVAL (operands[3]),
+					     INTVAL (operands[4])));
+    return "add\t%0, %1, %w2, uxt%e4 %3";
+  }
+  [(set_attr "type" "alu_ext")]
+)
+
 ; TODO: many more alternatives.
 (define_insn "*movcadi_aarch64"
   [(set (match_operand:CADI 0 "nonimmediate_operand" "=rk,r,r,m,r,r")
