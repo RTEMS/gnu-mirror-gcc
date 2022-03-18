@@ -52,9 +52,12 @@ cp_cap_from_noncap (tree type, tree expr, tsubst_flags_t complain)
     expr = cp_convert (noncapability_type (type), expr, complain);
 
   location_t loc = EXPR_LOCATION (expr);
-  return fold_build_replace_address_value_loc (loc,
-					       build_int_cst (type, 0),
-					       expr);
+  tree result
+    = fold_build_replace_address_value_loc (loc,
+					    build_int_cst (type, 0),
+					    expr);
+
+  return preserve_any_location_wrapper (result, expr);
 }
 
 /* Change of width--truncation and extension of integers or reals--

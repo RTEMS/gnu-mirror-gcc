@@ -13576,6 +13576,12 @@ fold_build_replace_address_value_loc (location_t loc, tree c, tree cv)
   gcc_assert (INTEGRAL_TYPE_P (TREE_TYPE (cv))
 	      && TYPE_PRECISION (TREE_TYPE (cv))
 		<= TYPE_PRECISION (noncapability_type (TREE_TYPE (c))));
+
+  tree orig_c = c;
+  tree orig_cv = cv;
+  STRIP_ANY_LOCATION_WRAPPER (c);
+  STRIP_ANY_LOCATION_WRAPPER (cv);
+
   if (TREE_CODE (c) == INTEGER_CST && TREE_CODE (cv) == INTEGER_CST)
     {
       tree cap_type = TREE_TYPE (c);
@@ -13602,7 +13608,7 @@ fold_build_replace_address_value_loc (location_t loc, tree c, tree cv)
     {
       gcc_assert (TREE_TYPE (c) == TREE_TYPE (CALL_EXPR_ARG (c, 0)));
       return fold_build_replace_address_value_loc (loc,
-						   CALL_EXPR_ARG (c, 0), cv);
+						   CALL_EXPR_ARG (c, 0), orig_cv);
     }
   /* If the capability C is an INTEGER_CST or a REPLACE_ADDRESS_VALUE inside
      a NOP conversion, allow this function to recurse and re-apply the
@@ -13615,9 +13621,9 @@ fold_build_replace_address_value_loc (location_t loc, tree c, tree cv)
       && types_compatible_p (noncapability_type (TREE_TYPE (TREE_OPERAND (c, 0))),
 			     TREE_TYPE (cv)))
     return convert (TREE_TYPE (c), fold_build_replace_address_value_loc (loc,
-						    TREE_OPERAND (c, 0), cv));
+						    TREE_OPERAND (c, 0), orig_cv));
 
-  return build_replace_address_value_loc (loc, c, cv);
+  return build_replace_address_value_loc (loc, orig_c, orig_cv);
 }
 
 tree
