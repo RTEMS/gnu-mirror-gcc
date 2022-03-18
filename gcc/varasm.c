@@ -5219,7 +5219,9 @@ output_constant (tree exp, unsigned HOST_WIDE_INT size, unsigned int align,
       cst = expand_expr (exp, NULL_RTX, VOIDmode, EXPAND_INITIALIZER);
       if (reverse)
 	cst = flip_storage_order (TYPE_MODE (TREE_TYPE (exp)), cst);
-      if (!assemble_integer (cst, MIN (size, thissize), align, 0))
+      if (code == NULLPTR_TYPE)
+	assemble_pointer (cst);
+      else if (!assemble_integer (cst, MIN (size, thissize), align, 0))
 	error ("initializer for integer/fixed-point value is too complicated");
       break;
 
