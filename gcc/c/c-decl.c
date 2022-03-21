@@ -5001,37 +5001,6 @@ c_decl_attributes (tree *node, tree attributes, int flags)
   return decl_attributes (node, attributes, flags, last_decl);
 }
 
-static void
-verify_cheri_capability_attribute_use (tree type,
-				       int indirection_levels_in_declarator,
-				       int capability_levels_in_declarator)
-{
-  /* Check the contents of the declspecs->type to detect the base type's level
-     of pointer indirection.  */
-  int indirection_levels_in_type = 0;
-  while (type)
-    {
-      if (TREE_CODE (type) == POINTER_TYPE)
-	indirection_levels_in_type++;
-      type = TREE_TYPE (type);
-    }
-
-  /* Error as ambigous if:
-	There are more than 2 unmatch pointer indirections to the right
-	of the __capability attribute.
-     or:
-	The actual type given contains 2 or more pointer indirections.  */
-  if ((indirection_levels_in_declarator
-	    - capability_levels_in_declarator  >= 2
-	   && indirection_levels_in_type == 0)
-	 || indirection_levels_in_type >=2)
-    error_at (input_location, "use of __capability is ambiguous");
-  else if (indirection_levels_in_type == 0)
-    warning_at (input_location, OPT_Wdeprecated_declarations,
-		"use of __capability before the pointer type "
-		"is deprecated");
-}
-
 /* Decode a declarator in an ordinary declaration or data definition.
    This is called as soon as the type information and variable name
    have been parsed, before parsing the initializer if any.
@@ -6066,8 +6035,6 @@ grokdeclarator (const struct c_declarator *declarator,
   bool expr_const_operands_dummy;
   enum c_declarator_kind first_non_attr_kind;
   unsigned int alignas_align = 0;
-  int indirection_levels_in_declarator = 0;
-  int capability_levels_in_declarator = 0;
 
   if (TREE_CODE (type) == ERROR_MARK)
     return error_mark_node;
@@ -6346,6 +6313,19 @@ grokdeclarator (const struct c_declarator *declarator,
 	}
     }
 
+  /* Check if the cheri_capability attribute is in decl_attrs. If it is, then
+     we have a deprecated use of the __capability type attribute before the
+     `*` pointer indirection.  For now, this is still supported.  */
+  bool deprecated_capability_attribute_use = false;
+  int deprecated_capability_uses = 0;
+  if (lookup_attribute ("cheri_capability", *decl_attrs))
+    {
+      deprecated_capability_attribute_use = true;
+      /* Remove the __capability attribute from the decl attributes.  */
+      (*decl_attrs) = remove_attribute ("cheri_capability",
+					*decl_attrs);
+    }
+
   /* Now figure out the structure of the declarator proper.
      Descend through it, creating more complex types, until we reach
      the declared identifier (or NULL_TREE, in an absolute declarator).
@@ -6356,8 +6336,53 @@ grokdeclarator (const struct c_declarator *declarator,
      form and then the qualified form is created with
      TYPE_MAIN_VARIANT pointing to the unqualified form.  */
 
-  while (declarator && declarator->kind != cdk_id)
+  for (;;)
     {
+      /* For capability architectures that use the __capability attribute,
+	 we need an additional check at the start to process the "deprecated"
+	 use of the attribute before a `*`.  In that case, the type attribute
+	 is part of decl_attrs, not in the declarator, so it would not be
+	 processed by this loop as a cdk_attrs.  Hence, it needs to be
+	 applied separately.  */
+      if (deprecated_capability_attribute_use
+	  && POINTER_TYPE_P (type)
+	  && (!declarator || declarator->kind != cdk_attrs))
+	{
+
+	  /* When encoutering the first valid POINTER_TYPE, attempt to apply
+	     the __capability attribute.  */
+	  if (deprecated_capability_uses == 0)
+	    {
+	      /* Silently discard the attribute if the POINTER_TYPE is already
+		 a capability.  This happens when it has already been turned
+		 into a capability by a valid use of the attribute, e.g.:
+		 `int __capability * __capability x;  */
+	      if (!capability_type_p (type))
+		{
+		  tree attr_name = get_identifier ("cheri_capability");
+		  tree new_attrs = tree_cons (attr_name, NULL_TREE,
+					  returned_attrs);
+		  returned_attrs = decl_attributes (&type, new_attrs, 0);
+		}
+	      deprecated_capability_uses = 1;
+
+	      /* Raise the "deprecated declaration" warning, but only if the
+	      original type was not a POINTER_TYPE_P typedef and regardless of
+	      if  the attribute was applied or skipped.  */
+	      if (!POINTER_TYPE_P (declspecs->type))
+		warning_at (input_location, OPT_Wdeprecated_declarations,
+			    "use of %<__capability%> before the pointer type "
+			    "is deprecated");
+	    }
+	    /* On later iterations, simply count the number of non-capability
+	       POINTER_TYPEs.  */
+	    else if (!capability_type_p (type))
+	      deprecated_capability_uses++;
+	}
+
+      if (!declarator || declarator->kind == cdk_id)
+	break;
+
       if (type == error_mark_node)
 	{
 	  declarator = declarator->declarator;
@@ -6423,11 +6448,6 @@ grokdeclarator (const struct c_declarator *declarator,
 		  attr_flags |= (int) ATTR_FLAG_ARRAY_NEXT;
 	      }
 
-	    if (lookup_attribute ("cheri_capability", attrs))
-	    {
-	       capability_levels_in_declarator++;
-	       attr_flags |= (int) ATTR_FLAG_CHERI_INNER_APPLY;
-	    }
 	    attrs = c_warn_type_attributes (attrs);
 	    returned_attrs = decl_attributes (&type,
 					      chainon (returned_attrs, attrs),
@@ -6917,7 +6937,6 @@ grokdeclarator (const struct c_declarator *declarator,
 	  }
 	case cdk_pointer:
 	  {
-	    indirection_levels_in_declarator++;
 	    /* Merge any constancy or volatility into the target type
 	       for the pointer.  */
 	    if ((type_quals & TYPE_QUAL_ATOMIC)
@@ -7005,11 +7024,10 @@ grokdeclarator (const struct c_declarator *declarator,
 	    declarator = declarator->declarator;
 	    if (test_fake_hybrid ())
 	      {
-		capability_levels_in_declarator++;
 		tree attr_name = get_identifier ("cheri_capability");
 		// tree attr_args = tree_cons (NULL_TREE, NULL_TREE, NULL_TREE);
 		tree new_attrs = tree_cons (attr_name, NULL_TREE, returned_attrs);
-		returned_attrs = decl_attributes (&type, new_attrs, ATTR_FLAG_CHERI_INNER_APPLY);
+		returned_attrs = decl_attributes (&type, new_attrs, 0);
 	      }
 	    break;
 	  }
@@ -7018,16 +7036,24 @@ grokdeclarator (const struct c_declarator *declarator,
 	}
     }
 
-  /* If one of initial the decl_attrs given is the cheri_capability attribute,
-     verify for unambiguous use of the attribute.  */
-  if (lookup_attribute ("cheri_capability", *decl_attrs))
-    verify_cheri_capability_attribute_use (declspecs->type,
-					   indirection_levels_in_declarator,
-					   capability_levels_in_declarator);
+  /* If after the above loop we get here and haven't applied the "deprecated"
+     __capability attribute then it was either on a POINTER_TYPE_P where all
+     indirection levels were already capabilities, or on a non-pointer type,
+     in which case raise an error.  */
+  if (deprecated_capability_attribute_use
+      && deprecated_capability_uses == 0)
+    error_at (input_location, "%<__capability%> only applies to pointers");
 
-  *decl_attrs = chainon (returned_attrs, *decl_attrs);
-  *decl_attrs = chainon (decl_id_attrs, *decl_attrs);
-
+  /* If we had been given a `deprecated_capability_attribute_use` and applied
+     it to the decl, but:
+      - There are more than 1 `*` non-pointer indirections to the right of the
+	__capability attribute.
+      - The original type was not a POINTER_TYPE_P typedef (if it was,
+	the __capability would apply inside the typedef).  */
+  if (deprecated_capability_attribute_use
+      && deprecated_capability_uses > 1
+      && !POINTER_TYPE_P (declspecs->type))
+    error_at (input_location, "use of %<__capability%> is ambiguous");
   /* Now TYPE has the actual type, apart from any qualifiers in
      TYPE_QUALS.  */
 

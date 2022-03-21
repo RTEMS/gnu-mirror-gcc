@@ -2201,7 +2201,7 @@ c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
 	  if (lookup_attribute ("cheri_capability", postfix_attrs))
 	    {
 	      error_at (here,
-			"__capability type specifier must"
+			"%<__capability%> type specifier must"
 			" precede the declarator");
 	      c_parser_skip_to_end_of_block_or_statement (parser);
 	      return;
@@ -3657,7 +3657,7 @@ c_parser_struct_declaration (c_parser *parser)
 	    postfix_attrs = c_parser_gnu_attributes (parser);
 
 	  if (lookup_attribute ("cheri_capability", postfix_attrs))
-	    c_parser_error (parser, "__capability type specifier must"
+	    c_parser_error (parser, "%<__capability%> type specifier must"
 				    " precede the declarator");
 
 	  d = grokfield (c_parser_peek_token (parser)->location,
@@ -4433,7 +4433,7 @@ c_parser_parameter_declaration (c_parser *parser, tree attrs,
 
   if (lookup_attribute ("cheri_capability", postfix_attrs))
     {
-      error ("__capability type specifier must"
+      error ("%<__capability%> type specifier must"
 	     " precede the declarator");
       c_parser_skip_to_end_of_parameter (parser);
       return NULL;

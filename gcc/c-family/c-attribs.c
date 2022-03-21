@@ -798,78 +798,30 @@ handle_cheri_no_provenance_attribute (tree *node, tree name,
 }
 
 static tree
-handle_cheri_capability_attribute (tree *node, tree ARG_UNUSED (name),
-				   tree ARG_UNUSED (args),
-				   int flags, bool *no_add_attrs)
+handle_cheri_capability_attribute (tree *node, tree, tree, int,
+				   bool *no_add_attrs)
 {
   *no_add_attrs = true;
 
-  if (targetm.capability_mode ().exists ())
+  if (!targetm.capability_mode ().exists ())
+    error_at (input_location, "%<__capability%> attribute is not supported for"
+			      "this architecture");
+  else if (TREE_CODE (*node) != POINTER_TYPE)
+    error_at (input_location, "%<__capability%> only applies to pointers");
+  else if (!capability_type_p (*node))
     {
-      /* Scan down the tree *node and find how many
-	 POINTER_TYPE_P nodes there are in the chain.  */
-      int capability_pointer_depth = 1, c = 1;
-      tree temp_tree = *node;
+      /* MORELLO TODO: Here we could also use POINTER_TYPE_P, but that also
+	 includes REFERENCE_TYPE which would then need a call to
+	 `build_reference_type_for_mode`. I have not included this for now
+	 but it may be needed in the future for C++ frontend support.  */
+      tree attrs = tree_cons (get_identifier ("cheri_capability"),
+				  NULL_TREE, TYPE_ATTRIBUTES (*node));
 
-      bool found = false;
-      while (temp_tree)
-	{
-	  /* MORELLO TODO: Here we could also use POINTER_TYPE_P, but that also
-	     includes REFERENCE_TYPE which would then need a call to
-	     `build_reference_type_for_mode`. I have not included this for now
-	     but it may be needed in the future for C++ frontend support.  */
-	  if (TREE_CODE (temp_tree) == POINTER_TYPE)
-	    {
-	      /* Find at what pointer depth we want to apply the __capability
-		 attribute and store it in capability_pointer_depth:
-		 1) If given flag ATTR_FLAG_CHERI_INNER_APPLY, that
-		    depth is the always the deepest one in the chain (always
-		    update capability_pointer_depth from counter c).
-		 2) If no ATTR_FLAG_CHERI_INNER_APPLY flag has been given,
-		    apply to the first first POINTER_TYPE in the chain.  */
-	      if (flags & ATTR_FLAG_CHERI_INNER_APPLY)
-		{
-		  capability_pointer_depth = c;
-		  found = true;
-		}
-	      else
-		{
-		  if (found == false)
-		    capability_pointer_depth = c;
-		  found = true;
-		}
-	    }
-	  c++;
-	  temp_tree = TREE_TYPE (temp_tree);
-	}
-
-      if (!found)
-	{
-	  error_at (input_location, "__capability only applies to pointers");
-	  return NULL_TREE;
-	}
-
-      /* Now get a pointer to the tree in the *node chain given by
-	 capability_pointer_depth and assert that it is correctly a
-	 POINTER_TYPE_P.  */
-      tree *treetoedit = node;
-      for (int i = 1; i < capability_pointer_depth; i++)
-	treetoedit = &TREE_TYPE (*treetoedit);
-      gcc_assert (TREE_CODE (*treetoedit) == POINTER_TYPE);
-
-      tree attrs = tree_cons (get_identifier ("cheri_capability"), NULL_TREE,
-			      TYPE_ATTRIBUTES (*treetoedit));
-
-      /* Call build_pointer_type_for_mode to create a Capability Pointer
-      to whatever is being referenced by (*treetoedit).  Then use
-      build_type_attribute_qual_variant to reapply the qualifiers and
-      attributes of the original pointer type.  */
-      auto quals = TYPE_QUALS (*treetoedit);
-      (*treetoedit) = build_type_attribute_qual_variant (*treetoedit, attrs,
-							 quals);
+      /* Use build_type_attribute_qual_variant to reapply the
+	 qualifiers and attributes of the original pointer type.  */
+      auto quals = TYPE_QUALS (*node);
+      (*node) = build_type_attribute_qual_variant (*node, attrs, quals);
     }
-  else
-    error ("__capability attribute is not supported for this architecture");
 
   return NULL_TREE;
 }

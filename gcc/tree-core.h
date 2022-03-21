@@ -865,7 +865,6 @@ enum attribute_flags {
   ATTR_FLAG_BUILT_IN = 16,
   /* A given attribute has been parsed as a C++-11 attribute.  */
   ATTR_FLAG_CXX11 = 32,
-  ATTR_FLAG_CHERI_INNER_APPLY = 64
 };
 
 /* Types used to represent sizes.  */

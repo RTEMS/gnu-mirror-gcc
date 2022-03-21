@@ -1,11 +1,11 @@
-/* { dg-do run { target aarch64*-*-* } } */
+/* { dg-do compile { target aarch64*-*-* } } */
 /* { dg-additional-options "-Wno-declaration-after-statement" } */
 
 #include <stdio.h>
 
-char* __capability stringpointer = "abcdef";
 
 char * __capability returncapabilitytest () {
+  char* __capability stringpointer = "abcdef";
   char *__capability arraystart;
   arraystart  = stringpointer;
   return arraystart;
@@ -33,6 +33,8 @@ int** __capability var11;
 int * __capability * __capability var12;
 int * __capability *var13;
 void * __capability * __capability var14, ** __capability var15;
+int * __capability *__capability * __capability var24;
+int **** __capability var25;
 
 /* Putting int* in a typedef...  */
 typedef int* intptr;
@@ -44,8 +46,13 @@ intptr* __capability *  var20;
 intptr __capability **  var21;
 intptr __capability ** __capability var22;
 intptr __capability *__capability * __capability var23;
-int * __capability *__capability * __capability var24;
-int **** __capability var25;
+
+/* Putting int* in a typedef should also support the "deprecated" use.  */
+__capability intptr z13;
+__capability intptr __capability z14;
+__capability intptr * __capability z15;
+__capability intptr *z16;
+__capability intptr ***z17;
 
 /* Putting int*__capability in a typedef...  */
 typedef int * __capability intptr2;
@@ -84,6 +91,8 @@ char *__attribute__((__cheri_capability__, __used__)) attrtestvar4;
 /* And a quick runtime test.  */
 int main()
 {
+  char* __capability stringpointer = "abcdef";
+
   /* Simple pass a capability address to a function.  */
   passcapabilitytest (stringpointer);
 
