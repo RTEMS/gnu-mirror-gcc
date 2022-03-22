@@ -1973,7 +1973,7 @@ cxx_eval_dynamic_cast_fn (const constexpr_ctx *ctx, tree call,
 	      }
 	    *non_constant_p = true;
 	  }
-	return integer_zero_node;
+	return null_pointer_node;
       }
 
   /* [class.cdtor] When a dynamic_cast is used in a constructor ...
@@ -2020,7 +2020,7 @@ cxx_eval_dynamic_cast_fn (const constexpr_ctx *ctx, tree call,
 		}
 	      *non_constant_p = true;
 	    }
-	  return integer_zero_node;
+	  return null_pointer_node;
 	}
       else if (t)
 	/* The result points to the TYPE object.  */
@@ -2050,7 +2050,7 @@ cxx_eval_dynamic_cast_fn (const constexpr_ctx *ctx, tree call,
 	    }
 	  *non_constant_p = true;
 	}
-      return integer_zero_node;
+      return null_pointer_node;
     }
   else
     gcc_assert (obj);
@@ -2076,7 +2076,7 @@ cxx_eval_dynamic_cast_fn (const constexpr_ctx *ctx, tree call,
 	    }
 	  *non_constant_p = true;
 	}
-      return integer_zero_node;
+      return null_pointer_node;
     }
   /* If so, return the TYPE subobject of the most derived object.  */
   obj = convert_to_base_statically (obj, binfo);
@@ -2173,6 +2173,19 @@ cxx_eval_thunk_call (const constexpr_ctx *ctx, tree t, tree thunk_fndecl,
 
   return cxx_eval_constant_expression (ctx, new_call, lval,
 				       non_constant_p, overflow_p);
+}
+
+static bool
+cxx_dynamic_cast_call_p (tree t)
+{
+  if (TREE_CODE (t) != CALL_EXPR)
+    return false;
+
+  tree fn = get_function_named_in_call (t);
+  if (!fn)
+    return false;
+
+  return cxx_dynamic_cast_fn_p (fn);
 }
 
 /* Subroutine of cxx_eval_constant_expression.
@@ -6318,7 +6331,11 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 		  {
 		    tree from = TREE_TYPE (op);
 
-		    if (!can_convert (type, from, tf_none))
+		    /* Don't diagnose the conversion of a null pointer from
+		       evaluating calls to dynamic_cast: null pointer means the
+		       dynamic_cast failed; this will be diagnosed later.  */
+		    if (!cxx_dynamic_cast_call_p (oldop)
+			&& !can_convert (type, from, tf_none))
 		      {
 			if (!ctx->quiet)
 			  error_at (loc,
