@@ -1,3 +1,102 @@
+==================== Work082, patch #4:
+
+Optimize multiply/add of DImode extended to TImode.
+
+On power9 and power10 systems, we have instructions that support doing
+64-bit integers converted to 128-bit integers and producing 128-bit
+results.  This patch adds support to generate these instructions.
+
+Previously we had define_expands to handle conversion of the 64-bit extend
+to 128-bit and multiply.  This patch changes these define_expands to
+define_insn_and_split and then it provides combiner patterns to generate
+thes multiply/add instructions.
+
+To support using this optimization on power9, we extend the sign extend
+DImode to TImode to also run on power9 (added for PR target/104698).
+
+We add support for doing an unsigned DImode to TImode conversion.  We need
+these conversions to exist on power9 so that the combiner can properly
+combine the extend, multiply, and add instructions.
+
+2022-03-22   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	PR target/103109
+	* config/rs6000/rs6000.md (su_int32): New code attribute.
+	(<u>mul<mode><dmode>3): Convert from define_expand to
+	define_insn_and_split.
+	(maddld<mode>4): Add generator function.
+	(<u>mulditi3_<u>adddi3): New insn.
+	(<u>mulditi3_add_const): New insn.
+	(<u>mulditi3_<u>adddi3_upper): New insn.
+
+gcc/testsuite/
+	PR target/103109
+	* gcc.target/powerpc/pr103109.c: New test.
+
+
+==================== Work082, patch #3:
+
+Make addti3/subti3 be define_insn_and_split, instead of define_expand
+
+This patch makes addti3 and subti3 be define_insn_and_split instead of
+define_expand.  This patch will be a building block to support in a future
+patch PR target/103109 which wants to optimize 128-bit some integer
+multiply-add combinations to use the power9 maddld, maddhd, maddhdu
+instructions.  In order to support recognizing the multiply and add
+combination, we need to keep the addti3 and subti3 as complete insns
+through the combiner phase.
+
+2022-03-18   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/rs6000.md (addti3): Don't immediate expand the
+	insn, delay expansion until the split passes.
+	(subti3): Likewise.
+
+==================== Work082, patch #2:
+
+Add zero_extendditi2 for power9.
+
+This patch provides a zero_extendditi2 pattern for power9 and power10.  On
+power8 and previous systems, the generic machine indepenent code will be
+used.  This patch will be a building block to support in a future patch PR
+target/103109 which wants to optimize 128-bit some integer multiply-add
+combinations to use the power9 maddld, maddhd, maddhdu instructions.
+
+2022-03-18   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/vsx.md (zero_extendditi2): New insn.
+
+==================== Work082, patch #1:
+
+Improve extendditi2 on PowerPC.
+
+This patch allows using extenditi2 on power9 systems as well as power10
+systems.  On power8 and previous systems, the generic machine indepenent
+code will be used.  This patch will be a building block to support in a
+future patch PR target/103109 which wants to optimize 128-bit some integer
+multiply-add combinations to use the power9 maddld, maddhd, maddhdu
+instructions.
+
+This patch improves code generation when extending a GPR to a vector
+register by generating the sign extend part in a GPR register before
+moving the value over to the vector register with the mtvsrdd
+instruction.
+
+2022-03-18   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/vsx.md (extendditi2): Add power9 support.  Improve
+	code generation when doing direct moves.
+
+gcc/testsuite/
+	* gcc.target/powerpc/pr104698-2.c: Update insn counts.
+
+
+==================== Initial:
+
 2022-03-17   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
