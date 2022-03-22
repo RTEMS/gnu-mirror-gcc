@@ -3090,7 +3090,11 @@ cxx_eval_binary_expression (const constexpr_ctx *ctx, tree t,
     }
 
   if (r == NULL_TREE)
-    r = fold_binary_loc (loc, code, type, lhs, rhs);
+    {
+      tree t_lhs = genericize_implicit_conv_expr (lhs);
+      tree t_rhs = genericize_implicit_conv_expr (rhs);
+      r = fold_binary_loc (loc, code, type, t_lhs, t_rhs);
+    }
 
   if (r == NULL_TREE)
     {
@@ -6259,6 +6263,7 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 	}
       /* FALLTHROUGH.  */
     case CONVERT_EXPR:
+    case IMPLICIT_CONV_EXPR:
     case VIEW_CONVERT_EXPR:
     case UNARY_PLUS_EXPR:
       {
@@ -7408,8 +7413,30 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 		  "%qE with type %qT", t, TREE_TYPE (t));
       return false;
     }
+
   if (CONSTANT_CLASS_P (t))
-    return true;
+    {
+      /* Usually non-constant expression such as (int *)1 are caught when
+	 handling CONVERT_EXPR, but for capabilities we can't form a
+	 CONVERT_EXPR from a non-capability type, so we must detect the direct
+	 form of the constant.  */
+      tree ty = TREE_TYPE (t);
+      if (capability_type_p (ty) && INDIRECT_TYPE_P (ty))
+	{
+	  gcc_assert (TREE_CODE (t) == INTEGER_CST);
+	  if (!integer_zerop (t))
+	    {
+	      if (flags & tf_error)
+		error_at (loc,
+			  "value %qE of type %qT is not a constant expression",
+			  t,
+			  ty);
+	      return false;
+	    }
+	}
+
+      return true;
+    }
   if (CODE_CONTAINS_STRUCT (TREE_CODE (t), TS_TYPED)
       && TREE_TYPE (t) == error_mark_node)
     return false;

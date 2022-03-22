@@ -4539,6 +4539,10 @@ cp_build_binary_op (const op_location_t &location,
   /* Tree holding instrumentation expression.  */
   tree instrument_expr = NULL_TREE;
 
+  /* Capability result type: remembers the result type before
+     calling noncapability_type on it.  */
+  tree cap_result_type = NULL_TREE;
+
   /* Apply default conversions.  */
   op0 = resolve_nondeduced_context (orig_op0, complain);
   op1 = resolve_nondeduced_context (orig_op1, complain);
@@ -5264,6 +5268,7 @@ cp_build_binary_op (const op_location_t &location,
 
       /* Comparisons should always be done on the address value, not on the
 	 capability.  */
+      cap_result_type = result_type;
       result_type = noncapability_type (result_type);
       break;
 
@@ -5419,6 +5424,7 @@ cp_build_binary_op (const op_location_t &location,
 
       /* Comparisons should always be done on the address value, not on
 	 capabilities.  */
+      cap_result_type = result_type;
       result_type = noncapability_type (result_type);
       break;
 
@@ -5761,9 +5767,21 @@ cp_build_binary_op (const op_location_t &location,
     {
       warning_sentinel w (warn_sign_conversion, short_compare);
       if (!same_type_p (TREE_TYPE (op0), result_type))
-	op0 = cp_convert_and_check (result_type, op0, complain);
+	{
+	  op0 = cp_convert_and_check (result_type, op0, complain);
+	  if (CONVERT_EXPR_P (op0)
+	      && cap_result_type
+	      && result_type != cap_result_type)
+	    TREE_SET_CODE (op0, IMPLICIT_CONV_EXPR);
+	}
       if (!same_type_p (TREE_TYPE (op1), result_type))
-	op1 = cp_convert_and_check (result_type, op1, complain);
+	{
+	  op1 = cp_convert_and_check (result_type, op1, complain);
+	  if (CONVERT_EXPR_P (op1)
+	      && cap_result_type
+	      && result_type != cap_result_type)
+	    TREE_SET_CODE (op1, IMPLICIT_CONV_EXPR);
+	}
 
       if (op0 == error_mark_node || op1 == error_mark_node)
 	return error_mark_node;

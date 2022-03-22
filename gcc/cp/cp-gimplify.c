@@ -1664,6 +1664,10 @@ cp_genericize_r (tree *stmt_p, int *walk_subtrees, void *data)
       *stmt_p = genericize_spaceship (*stmt_p);
       break;
 
+    case IMPLICIT_CONV_EXPR:
+      *stmt_p = genericize_implicit_conv_expr (*stmt_p);
+      break;
+
     case OMP_DISTRIBUTE:
       /* Need to explicitly instantiate copy ctors on class iterators of
 	 composite distribute parallel for.  */
@@ -1977,6 +1981,17 @@ cp_maybe_instrument_return (tree fndecl)
     }
 
   append_to_statement_list (t, p);
+}
+
+tree
+genericize_implicit_conv_expr (tree t)
+{
+  if (TREE_CODE (t) == IMPLICIT_CONV_EXPR
+      && !capability_type_p (TREE_TYPE (t))
+      && capability_type_p (TREE_TYPE (TREE_OPERAND (t, 0))))
+    return fold_build1 (CONVERT_EXPR, TREE_TYPE (t), TREE_OPERAND (t, 0));
+
+  return t;
 }
 
 void
@@ -2752,6 +2767,20 @@ cp_fold (tree x)
 	}
       else
 	x = fold (x);
+
+      if (x == org_x
+	  && (TREE_CODE (op0) == IMPLICIT_CONV_EXPR
+	      || TREE_CODE (op1) == IMPLICIT_CONV_EXPR))
+	{
+	  /* Opportunistically see if we can fold without
+	     the IMPLICIT_CONV_EXPRs if the first fold failed.  */
+	  tree t_op0 = genericize_implicit_conv_expr (op0);
+	  tree t_op1 = genericize_implicit_conv_expr (op1);
+	  tree t_x = build2_loc (loc, code, TREE_TYPE (x), t_op0, t_op1);
+	  tree tem = fold (t_x);
+	  if (tem != t_x)
+	    x = tem;
+	}
 
       /* This is only needed for -Wnonnull-compare and only if
 	 TREE_NO_WARNING (org_x), but to avoid that option affecting code
