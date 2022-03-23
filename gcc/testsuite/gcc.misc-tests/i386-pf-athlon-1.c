@@ -29,3 +29,5 @@ int main ()
 /* { dg-final { scan-assembler "prefetchw" } } */
 /* { dg-final { scan-assembler "prefetchnta" } } */
 /* { dg-final { scan-assembler "prefetcht" } } */
+/* { dg-final { scan-assembler-not "prefetchit0" } } */
+/* { dg-final { scan-assembler-not "prefetchit1" } } */

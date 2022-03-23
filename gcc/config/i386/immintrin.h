@@ -134,6 +134,8 @@
 
 #include <amxbf16intrin.h>
 
+#include <prfchiintrin.h>
+
 #include <prfchwintrin.h>
 
 #include <keylockerintrin.h>
