@@ -1,18 +1,4 @@
-==================== Work082, patch #8:
-Improve vsx_splat_<mode>_reg
-
-In looking at PR target/99293, I noticed that the code in
-vsx_splat_<mode>_reg used "vecmove" as the "type" insn attribute when the
-"mtvsrdd" is generated.  It should use "mfvsr".  I also added a "p9v" isa
-attribute for that alternative.
-
-2022-03-23   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-	PR target/99392
-	* config/rs6000/rs6000.md (vsx_splat_<mode>_reg): Use the correct
-	insn type attribute.  Add "p9v" isa attribute as needed.
-
+==================== Work082, patch #8 (reverted):
 
 ==================== Work082, patch #7:
 Improve vsx_extract_<mode>
