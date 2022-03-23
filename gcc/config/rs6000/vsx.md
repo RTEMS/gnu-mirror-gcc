@@ -3397,27 +3397,46 @@
 ;; Optimize cases were we can do a simple or direct move.
 ;; Or see if we can avoid doing the move at all
 
+;; There are some unresolved problems with reload that show up if an Altivec
+;; register was picked.  Limit the scalar value to FPRs for now.
+
 (define_insn "vsx_extract_<mode>"
-  [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=wa, wa, r,  r")
+  [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=d, d,  wr, wr")
 	(vec_select:<VS_scalar>
-	 (match_operand:VSX_D 1 "gpc_reg_operand"       "wa, wa, wa, wa")
+	 (match_operand:VSX_D 1 "gpc_reg_operand"      "wa, wa, wa, wa")
 	 (parallel
-	  [(match_operand:QI 2 "const_0_to_1_operand"   "wD, n,  wD, n")])))]
+	  [(match_operand:QI 2 "const_0_to_1_operand"  "wD, n,  wD, n")])))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
 {
   int element = INTVAL (operands[2]);
-  int op0_regno = reg_or_subregno (operands[0]);
-  int op1_regno = reg_or_subregno (operands[1]);
+  int op0_regno = REGNO (operands[0]);
+  int op1_regno = REGNO (operands[1]);
   int fldDM;
 
   gcc_assert (IN_RANGE (element, 0, 1));
   gcc_assert (VSX_REGNO_P (op1_regno));
 
   if (element == VECTOR_ELEMENT_SCALAR_64BIT)
-    return "#";
+    {
+      if (op0_regno == op1_regno)
+	return ASM_COMMENT_START " vec_extract to same register";
 
-  if (INT_REGNO_P (op0_regno) && TARGET_P9_VECTOR && TARGET_POWERPC64
-      && TARGET_DIRECT_MOVE)
+      else if (INT_REGNO_P (op0_regno) && TARGET_DIRECT_MOVE
+	       && TARGET_POWERPC64)
+	return "mfvsrd %0,%x1";
+
+      else if (FP_REGNO_P (op0_regno) && FP_REGNO_P (op1_regno))
+	return "fmr %0,%1";
+
+      else if (VSX_REGNO_P (op0_regno))
+	return "xxlor %x0,%x1,%x1";
+
+      else
+	gcc_unreachable ();
+    }
+
+  else if (element == VECTOR_ELEMENT_MFVSRLD_64BIT && INT_REGNO_P (op0_regno)
+	   && TARGET_P9_VECTOR && TARGET_POWERPC64 && TARGET_DIRECT_MOVE)
     return "mfvsrld %0,%x1";
 
   else if (VSX_REGNO_P (op0_regno))
@@ -3432,20 +3451,8 @@
   else
     gcc_unreachable ();
 }
-  [(set_attr "type" "*,vecperm,mfvsr,mfvsr")
+  [(set_attr "type" "veclogical,mfvsr,mfvsr,vecperm")
    (set_attr "isa" "*,*,p8v,p9v")])
-
-;; Convert extracting the element in the upper 64-bit bits to just a move.
-(define_split
-  [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand")
-	(vec_select:<VS_scalar>
-	 (match_operand:VSX_D 1 "gpc_reg_operand")
-	 (parallel [(match_operand:QI 2 "vsx_scalar_64bit")])))]
-  "VECTOR_MEM_VSX_P (<MODE>mode) && reload_completed"
-  [(set (match_dup 0) (match_dup 3))]
-{
-  operands[3] = gen_rtx_REG (<VS_scalar>mode, reg_or_subregno (operands[1]));
-})
 
 ;; Optimize extracting a single scalar element from memory.
 (define_insn_and_split "*vsx_extract_<P:mode>_<VSX_D:mode>_load"

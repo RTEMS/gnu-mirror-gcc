@@ -1,31 +1,6 @@
 ==================== Work082, patch #8 (reverted):
 
-==================== Work082, patch #7:
-Improve vsx_extract_<mode>
-
-In looking at PR target/99293, I noticed that the code in
-vsx_extract_<mode> could be improved.
-
-When the element being extracted is the element in the upper 64-bits, we
-should do an insn_split to convert this to a simple move.  This would
-allow the post reload passes to eliminate the move completely.
-
-The code was written before we moved to LRA for register allocation and it
-restricted the target register to just traditional floating point
-registers.  I have changed this to target any VSX register.
-
-The insn type attribute was incorrect in that it used "mfvsr" instead of
-"vecperm" when a xxpermdi would be generated.  Also, when a "mvfsrld"
-would be generated, the type should be "mfvsr".
-
-2022-03-23   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-	PR target/99392
-	* config/rs6000/rs6000.md (vsx_extract_<mode>): Split extracts
-	that are just a move to being a move insn.  Use the correct insn
-	type for the alternatives.
-	(insn splitter for vsx_extract_<mode>): Add new splitter.
+==================== Work082, patch #7 (reverted):
 
 ==================== Work082, patch #6:
 Optimize vec_splats of constant vec_extract for V2DI/V2DF.
