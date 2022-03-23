@@ -40,6 +40,12 @@
   
   ;; For CMPccXADD support
   UNSPECV_CMPCCXADD
+
+  ;; For RAOINT support
+  UNSPECV_AADD
+  UNSPECV_AAND
+  UNSPECV_AOR
+  UNSPECV_AXOR
 ])
 
 (define_expand "sse2_lfence"
@@ -1103,3 +1109,24 @@
   emit_move_insn (operands[0], operands[2]);
   DONE;
 })
+
+;; RAO-INT
+(define_int_iterator RAOINTOP
+  [UNSPECV_AADD UNSPECV_AAND
+   UNSPECV_AOR UNSPECV_AXOR])
+
+(define_int_attr raointop
+  [(UNSPECV_AADD "add")
+   (UNSPECV_AAND "and")
+   (UNSPECV_AOR "or")
+   (UNSPECV_AXOR "xor")])
+
+(define_insn "rao_a<raointop><mode>"
+ [(set (match_operand:SWI48 0 "memory_operand" "+m")
+       (unspec_volatile:SWI48
+	 [(match_dup 0)
+	  (match_operand:SWI48 1 "register_operand" "r")]
+       RAOINTOP))]
+ "TARGET_RAOINT"
+ "a<raointop>\t{%1, %0|%0, %1}"
+  [(set_attr "mode" "<MODE>")])
