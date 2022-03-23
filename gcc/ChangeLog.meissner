@@ -1,3 +1,20 @@
+==================== Work082, patch #5:
+Generate vadduqm and vsubuqm for TImode add/subtract
+
+If the TImode variable is in an Altivec register instead of a GPR
+register, then generate vadduqm and vsubuqm instead of having to move the
+value to the GPR registers and doing the add and subtract with carry
+instructions.  To do this, we have to delay the splitting of the addition
+and subtraction until after register allocation.
+
+2022-03-22   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/rs6000.md (addti3): Generate vadduqm if we are
+	using the Altivec registers.
+	(subti3): Generate vsubuqm if we using the Altivec registers.
+	(negti3): New insn.
+
 ==================== Work082, patch #4:
 
 Optimize multiply/add of DImode extended to TImode.
@@ -47,10 +64,10 @@ instructions.  In order to support recognizing the multiply and add
 combination, we need to keep the addti3 and subti3 as complete insns
 through the combiner phase.
 
-2022-03-18   Michael Meissner  <meissner@linux.ibm.com>
+2022-03-22   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
-	* config/rs6000/rs6000.md (addti3): Don't immediate expand the
+	* config/rs6000/rs6000.md (addti3): Don't immediately expand the
 	insn, delay expansion until the split passes.
 	(subti3): Likewise.
 
