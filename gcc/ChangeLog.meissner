@@ -1,3 +1,52 @@
+==================== Work082, patch #6:
+Optimize vec_splats of constant vec_extract for V2DI/V2DF.
+
+In PR target/99293, it was pointed out that doing:
+
+	vector long long dest0, dest1, src;
+	/* ... */
+	dest0 = vec_splats (vec_extract (src, 0));
+	dest1 = vec_splats (vec_extract (src, 1));
+
+would generate slower code.
+
+It generates the following code on power8:
+
+	;; vec_splats (vec_extract (src, 0))
+	xxpermdi 0,34,34,3
+	xxpermdi 34,0,0,0
+
+	;; vec_splats (vec_extract (src, 1))
+	xxlor 0,34,34
+	xxpermdi 34,0,0,0
+
+However on power9 and power10 it generates:
+
+	;; vec_splats (vec_extract (src, 0))
+	mfvsld 3,34
+	mtvsrdd 34,9,9
+
+	;; vec_splats (vec_extract (src, 1))
+	mfvsrd 9,34
+	mtvsrdd 34,9,9
+
+This is due to the power9 having the mfvsrld instruction which can extract
+either 64-bit element into a GPR.
+
+However in this case, it is better to have a single combiner pattern that
+can generate a single xxpermdi, instead of 2 insnsn.
+
+2022-03-23   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	PR target/99392
+	* config/rs6000/vsx.md (vsx_splat_const_extract_<mode>): New
+	insn.
+
+gcc/testsuite:
+	PR target/99392
+	* gcc.target/powerpc/pr99293.c: New test.
+
 ==================== Work082, patch #5:
 Generate vadduqm and vsubuqm for TImode add/subtract
 
