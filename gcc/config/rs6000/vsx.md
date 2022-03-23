@@ -4580,7 +4580,8 @@
   "@
    xxpermdi %x0,%x1,%x1,0
    mtvsrdd %x0,%1,%1"
-  [(set_attr "type" "vecperm,vecmove")])
+  [(set_attr "type" "vecperm,mtvsr")
+   (set_attr "isa" "*,p9v")])
 
 (define_insn "vsx_splat_<mode>_mem"
   [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
