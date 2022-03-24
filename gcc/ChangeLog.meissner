@@ -1,3 +1,111 @@
+==================== Work083, patch #4:
+
+Allow vsx_extract_<mode> to use Altivec registers
+
+In looking at PR target/99293, I noticed that the vsx_extract_<mode>
+pattern for V2DImode and V2DFmode only allowed traditional floating point
+registers, and it did not allow Altivec registers.  The original code was
+written a few years ago when we used the old register allocator, and
+support for scalar floating point in Altivec registers was just being
+added to GCC.
+
+2022-03-24   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	PR target/99392
+	* config/rs6000/rs6000.md (vsx_extract_<mode>): Allow destination
+	to be an Altivec register.
+
+==================== Work083, patch #1:
+
+Make vsx_extract_<mode> use correct insn attributes.
+
+In looking at PR target/99293, I noticed that the insn "type" attribute is
+incorrect for the vsx_extract_<mode> insns.  In particular:
+
+    1)	Simple vector register move should be vecsimple (alternative 1);
+    2)	Xxpermdi should be vecperm (alternative 2); (and)
+    3)	Mfvsrld should be mfvsr (alternative 4).
+
+This patch fixes those attributes.
+
+2022-03-24   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	PR target/99392
+	* config/rs6000/rs6000.md (vsx_extract_<mode>): Use the correct
+	insn type for the alternatives.
+
+==================== Work083, patch #1:
+
+Make vsx_splat_<mode>_reg use correct insn attributes.
+
+In looking at PR target/99293, I noticed that the code in
+vsx_splat_<mode>_reg used "vecmove" as the "type" insn attribute when the
+"mtvsrdd" is generated.  It should use "mfvsr".  I also added a "p9v" isa
+attribute for that alternative.
+
+2022-03-23   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	PR target/99392
+	* config/rs6000/rs6000.md (vsx_splat_<mode>_reg): Use the correct
+	insn type attribute.  Add "p9v" isa attribute for generating the
+	mtvsrdd instruction.
+
+==================== Work083, patch #1:
+
+Optimize vec_splats of constant vec_extract for V2DI/V2DF.
+
+In PR target/99293, it was pointed out that doing:
+
+	vector long long dest0, dest1, src;
+	/* ... */
+	dest0 = vec_splats (vec_extract (src, 0));
+	dest1 = vec_splats (vec_extract (src, 1));
+
+would generate slower code.
+
+It generates the following code on power8:
+
+	;; vec_splats (vec_extract (src, 0))
+	xxpermdi 0,34,34,3
+	xxpermdi 34,0,0,0
+
+	;; vec_splats (vec_extract (src, 1))
+	xxlor 0,34,34
+	xxpermdi 34,0,0,0
+
+However on power9 and power10 it generates:
+
+	;; vec_splats (vec_extract (src, 0))
+	mfvsld 3,34
+	mtvsrdd 34,9,9
+
+	;; vec_splats (vec_extract (src, 1))
+	mfvsrd 9,34
+	mtvsrdd 34,9,9
+
+This is due to the power9 having the mfvsrld instruction which can extract
+either 64-bit element into a GPR.
+
+However in this case, it is better to have a single combiner pattern that
+can generate a single xxpermdi, instead of doing 2 insnsns (the extract
+and then the concat).
+
+2022-03-24   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	PR target/99392
+	* config/rs6000/vsx.md (vsx_splat_const_extract_<mode>): New
+	combiner insn.
+
+gcc/testsuite:
+	PR target/99392
+	* gcc.target/powerpc/pr99293.c: New test.
+
+==================== Baseline
+
 2022-03-24   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
