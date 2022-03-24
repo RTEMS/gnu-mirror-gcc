@@ -23,7 +23,7 @@ Make vsx_extract_<mode> use correct insn attributes.
 In looking at PR target/99293, I noticed that the insn "type" attribute is
 incorrect for the vsx_extract_<mode> insns.  In particular:
 
-    1)	Simple vector register move should be vecsimple (alternative 1);
+    1)	Simple vector register move should be vecmove (alternative 1);
     2)	Xxpermdi should be vecperm (alternative 2); (and)
     3)	Mfvsrld should be mfvsr (alternative 4).
 
