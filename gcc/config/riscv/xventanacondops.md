@@ -78,3 +78,48 @@
   operands[6] = gen_rtx_fmt_ee (GET_CODE (operands[1]) == LE ? GT : GTU,
 				<X:MODE>mode, operands[2], operands[3]);
 })
+
+;; Users might use explicit arithmetic operations to create a mask and
+;; then and it, in a sequence like
+;;    cond = (bits >> SHIFT) & 1;
+;;    mask = ~(cond - 1);
+;;    val &= mask;
+;; which will present as a single-bit sign-extract in the combiner.
+;;
+;; This will give rise to any of the following cases:
+;; - with Zbs and XVentanaCondOps: bexti + vt.maskc
+;; - with XVentanaCondOps (but w/o Zbs):
+;;   - andi + vt.maskc, if the mask is representable in the immediate
+;;                      (which requires extra care due to the immediate
+;;                       being sign-extended)
+;;   - slli + srli + and
+;; - otherwise: slli + srli + and
+
+;; With Zbb, we have bexti for all possible bits...
+(define_split
+  [(set (match_operand:X 0 "register_operand")
+	(and:X (sign_extract:X (match_operand:X 1 "register_operand")
+			       (const_int 1)
+			       (match_operand 2 "immediate_operand"))
+	       (match_operand:X 3 "register_operand")))
+   (clobber (match_operand:X 4 "register_operand"))]
+  "TARGET_XVENTANACONDOPS && TARGET_ZBS"
+  [(set (match_dup 4) (zero_extract:X (match_dup 1) (const_int 1) (match_dup 2)))
+   (set (match_dup 0) (and:X (neg:X (ne:X (match_dup 4) (const_int 0)))
+			     (match_dup 3)))])
+
+;; ...whereas RV64I only allows us access to bits 0..10 in a single andi.
+(define_split
+  [(set (match_operand:X 0 "register_operand")
+	(and:X (sign_extract:X (match_operand:X 1 "register_operand")
+			       (const_int 1)
+			       (match_operand 2 "immediate_operand"))
+	       (match_operand:X 3 "register_operand")))
+   (clobber (match_operand:X 4 "register_operand"))]
+  "TARGET_XVENTANACONDOPS && !TARGET_ZBS && (UINTVAL (operands[2]) < 11)"
+  [(set (match_dup 4) (and:X (match_dup 1) (match_dup 2)))
+   (set (match_dup 0) (and:X (neg:X (ne:X (match_dup 4) (const_int 0)))
+			     (match_dup 3)))]
+{
+  operands[2] = GEN_INT(1 << UINTVAL(operands[2]));
+})

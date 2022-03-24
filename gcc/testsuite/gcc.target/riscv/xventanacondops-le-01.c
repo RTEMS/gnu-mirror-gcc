@@ -4,7 +4,7 @@
 
 long long sink (long long);
 
-long long lt3 (long long a, long long b)
+long long le1 (long long a, long long b)
 {
   if (a <= b)
     b = 0;
