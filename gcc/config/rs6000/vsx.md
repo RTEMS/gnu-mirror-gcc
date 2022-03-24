@@ -3451,7 +3451,7 @@
   else
     gcc_unreachable ();
 }
-  [(set_attr "type" "veclogical,mfvsr,mfvsr,vecperm")
+  [(set_attr "type" "vecsimple,vecperm,mfvsr,mfvsr")
    (set_attr "isa" "*,*,p8v,p9v")])
 
 ;; Optimize extracting a single scalar element from memory.
