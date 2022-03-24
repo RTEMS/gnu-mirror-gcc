@@ -4616,6 +4616,25 @@
   [(set_attr "type" "vecperm")
    (set_attr "isa" "p8v,*")])
 
+;; Optimize SPLAT of an extract from a V2DF/V2DI vector with a constant element
+;; PR target/99293
+(define_insn "*vsx_splat_const_extract_<mode>"
+  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
+	(vec_duplicate:VSX_D
+	 (vec_select:<VS_scalar>
+	  (match_operand:VSX_D 1 "vsx_register_operand" "wa")
+	  (parallel [(match_operand 2 "const_0_to_1_operand" "n")]))))]
+  "VECTOR_MEM_VSX_P (<MODE>mode)"
+{
+  int which_word = INTVAL (operands[2]);
+  if (!BYTES_BIG_ENDIAN)
+    which_word = 1 - which_word;
+
+  operands[3] = GEN_INT (which_word ? 3 : 0);
+  return "xxpermdi %x0,%x1,%x1,%3";
+}
+  [(set_attr "type" "vecperm")])
+
 ;; V4SF splat (ISA 3.0)
 (define_insn_and_split "vsx_splat_v4sf"
   [(set (match_operand:V4SF 0 "vsx_register_operand" "=wa,wa,wa")
