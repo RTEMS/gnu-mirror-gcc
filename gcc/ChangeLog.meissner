@@ -1,3 +1,20 @@
+==================== Work082, patch #11:
+Allow vsx_extract_<mode> to use Altivec registers
+
+In looking at PR target/99293, I noticed that the vsx_extract_<mode>
+pattern for V2DImode and V2DFmode only allowed traditional floating point
+registers, and it did not allow Altivec registers.  The original code was
+written a few years ago when we used the old register allocator, and
+support for scalar floating point in Altivec registers was just being
+added to GCC.
+
+2022-03-24   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	PR target/99392
+	* config/rs6000/rs6000.md (vsx_extract_<mode>): Allow destination
+	to be an Altivec register.
+
 ==================== Work082, patch #10:
 Improve vsx_extract_<mode>
 
