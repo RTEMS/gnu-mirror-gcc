@@ -1,3 +1,16 @@
+==================== Work082, patch #10:
+Improve vsx_extract_<mode>
+
+In looking at PR target/99293, I noticed that the insn "type" attribute is
+incorrect.  This patch fixes those attributes.
+
+2022-03-23   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	PR target/99392
+	* config/rs6000/rs6000.md (vsx_extract_<mode>): Use the correct
+	insn type for the alternatives.
+
 ==================== Work082, patch #9 (reverted):
 
 ==================== Work082, patch #8:
