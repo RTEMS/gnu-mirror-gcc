@@ -1204,7 +1204,7 @@ binding_cluster::validate () const
 /* Return a new json::object of the form
    {"escaped": true/false,
     "touched": true/false,
-    "map" : object for the the binding_map.  */
+    "map" : object for the binding_map.  */
 
 json::object *
 binding_cluster::to_json () const
@@ -1823,7 +1823,8 @@ binding_cluster::make_unknown_relative_to (const binding_cluster *other,
 	{
 	  const region *base_reg
 	    = region_sval->get_pointee ()->get_base_region ();
-	  if (!base_reg->symbolic_for_unknown_ptr_p ())
+	  if (base_reg->tracked_p ()
+	      && !base_reg->symbolic_for_unknown_ptr_p ())
 	    {
 	      binding_cluster *c = out_store->get_or_create_cluster (base_reg);
 	      c->mark_as_escaped ();
@@ -1892,7 +1893,7 @@ binding_cluster::redundant_p () const
 	  && !m_touched);
 }
 
-/* Add PV to OUT_PVS, casting it to TYPE if if is not already of that type.  */
+/* Add PV to OUT_PVS, casting it to TYPE if it is not already of that type.  */
 
 static void
 append_pathvar_with_type (path_var pv,
@@ -2032,7 +2033,8 @@ store::store ()
 /* store's copy ctor.  */
 
 store::store (const store &other)
-: m_called_unknown_fn (other.m_called_unknown_fn)
+: m_cluster_map (other.m_cluster_map.elements ()),
+  m_called_unknown_fn (other.m_called_unknown_fn)
 {
   for (cluster_map_t::iterator iter = other.m_cluster_map.begin ();
        iter != other.m_cluster_map.end ();
@@ -2383,10 +2385,16 @@ store::set_value (store_manager *mgr, const region *lhs_reg,
 	  mark_as_escaped (ptr_base_reg);
 	}
     }
-  else
+  else if (lhs_base_reg->tracked_p ())
     {
       lhs_cluster = get_or_create_cluster (lhs_base_reg);
       lhs_cluster->bind (mgr, lhs_reg, rhs_sval);
+    }
+  else
+    {
+      /* Reject attempting to bind values into an untracked region;
+	 merely invalidate values below.  */
+      lhs_cluster = NULL;
     }
 
   /* Bindings to a cluster can affect other clusters if a symbolic
@@ -2563,7 +2571,8 @@ void
 store::fill_region (store_manager *mgr, const region *reg, const svalue *sval)
 {
   const region *base_reg = reg->get_base_region ();
-  if (base_reg->symbolic_for_unknown_ptr_p ())
+  if (base_reg->symbolic_for_unknown_ptr_p ()
+      || !base_reg->tracked_p ())
     return;
   binding_cluster *cluster = get_or_create_cluster (base_reg);
   cluster->fill_region (mgr, reg, sval);
@@ -2586,7 +2595,8 @@ store::mark_region_as_unknown (store_manager *mgr, const region *reg,
 			       uncertainty_t *uncertainty)
 {
   const region *base_reg = reg->get_base_region ();
-  if (base_reg->symbolic_for_unknown_ptr_p ())
+  if (base_reg->symbolic_for_unknown_ptr_p ()
+      || !base_reg->tracked_p ())
     return;
   binding_cluster *cluster = get_or_create_cluster (base_reg);
   cluster->mark_region_as_unknown (mgr, reg, uncertainty);
@@ -2652,6 +2662,9 @@ store::get_or_create_cluster (const region *base_reg)
 
   /* We shouldn't create clusters for dereferencing an UNKNOWN ptr.  */
   gcc_assert (!base_reg->symbolic_for_unknown_ptr_p ());
+
+  /* We shouldn't create clusters for base regions that aren't trackable.  */
+  gcc_assert (base_reg->tracked_p ());
 
   if (binding_cluster **slot = m_cluster_map.get (base_reg))
     return *slot;
@@ -2741,7 +2754,8 @@ store::mark_as_escaped (const region *base_reg)
   gcc_assert (base_reg);
   gcc_assert (base_reg->get_base_region () == base_reg);
 
-  if (base_reg->symbolic_for_unknown_ptr_p ())
+  if (base_reg->symbolic_for_unknown_ptr_p ()
+      || !base_reg->tracked_p ())
     return;
 
   binding_cluster *cluster = get_or_create_cluster (base_reg);

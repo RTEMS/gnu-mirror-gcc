@@ -1288,15 +1288,19 @@ resolve_structure_cons (gfc_expr *expr, int init)
 	}
     }
 
-  cons = gfc_constructor_first (expr->value.constructor);
-
   /* A constructor may have references if it is the result of substituting a
      parameter variable.  In this case we just pull out the component we
      want.  */
   if (expr->ref)
     comp = expr->ref->u.c.sym->components;
-  else
+  else if ((expr->ts.type == BT_DERIVED || expr->ts.type == BT_CLASS
+	    || expr->ts.type == BT_UNION)
+	   && expr->ts.u.derived)
     comp = expr->ts.u.derived->components;
+  else
+    return false;
+
+  cons = gfc_constructor_first (expr->value.constructor);
 
   for (; comp && cons; comp = comp->next, cons = gfc_constructor_next (cons))
     {
@@ -1472,6 +1476,8 @@ resolve_structure_cons (gfc_expr *expr, int init)
 		  t = false;
 		  break;
 		};
+	      if (cons->expr->shape == NULL)
+		continue;
 	      mpz_set_ui (len, 1);
 	      mpz_add (len, len, comp->as->upper[n]->value.integer);
 	      mpz_sub (len, len, comp->as->lower[n]->value.integer);
@@ -9226,8 +9232,7 @@ resolve_assoc_var (gfc_symbol* sym, bool resolve_target)
       if (!sym->ts.u.cl)
 	sym->ts.u.cl = target->ts.u.cl;
 
-      if (sym->ts.deferred && target->expr_type == EXPR_VARIABLE
-	  && target->symtree->n.sym->attr.dummy
+      if (sym->ts.deferred
 	  && sym->ts.u.cl == target->ts.u.cl)
 	{
 	  sym->ts.u.cl = gfc_new_charlen (sym->ns, NULL);
@@ -9246,8 +9251,11 @@ resolve_assoc_var (gfc_symbol* sym, bool resolve_target)
 		|| sym->ts.u.cl->length->expr_type != EXPR_CONSTANT)
 		&& target->expr_type != EXPR_VARIABLE)
 	{
-	  sym->ts.u.cl = gfc_new_charlen (sym->ns, NULL);
-	  sym->ts.deferred = 1;
+	  if (!sym->ts.deferred)
+	    {
+	      sym->ts.u.cl = gfc_new_charlen (sym->ns, NULL);
+	      sym->ts.deferred = 1;
+	    }
 
 	  /* This is reset in trans-stmt.cc after the assignment
 	     of the target expression to the associate name.  */
@@ -11534,7 +11542,7 @@ generate_component_assignments (gfc_code **code, gfc_namespace *ns)
 	  || comp1->attr.proc_pointer)
 	continue;
 
-      /* Make an assigment for this component.  */
+      /* Make an assignment for this component.  */
       this_code = build_assignment (EXEC_ASSIGN,
 				    (*code)->expr1, (*code)->expr2,
 				    comp1, comp2, (*code)->loc);
@@ -11943,8 +11951,17 @@ start:
 	case EXEC_END_NESTED_BLOCK:
 	case EXEC_CYCLE:
 	case EXEC_PAUSE:
+	  break;
+
 	case EXEC_STOP:
 	case EXEC_ERROR_STOP:
+	  if (code->expr2 != NULL
+	      && (code->expr2->ts.type != BT_LOGICAL
+		  || code->expr2->rank != 0))
+	    gfc_error ("QUIET specifier at %L must be a scalar LOGICAL",
+		       &code->expr2->where);
+	  break;
+
 	case EXEC_EXIT:
 	case EXEC_CONTINUE:
 	case EXEC_DT_END:

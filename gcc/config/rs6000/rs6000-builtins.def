@@ -138,6 +138,7 @@
 ;   lxvrze   Needs special handling for load-rightmost, zero-extended
 ;   endian   Needs special handling for endianness
 ;   ibmld    Restrict usage to the case when TFmode is IBM-128
+;   ibm128   Restrict usage to the case where __ibm128 is supported or if ibmld
 ;
 ; Each attribute corresponds to extra processing required when
 ; the built-in is expanded.  All such special processing should
@@ -234,13 +235,13 @@
     MTFSF rs6000_mtfsf {}
 
   const __ibm128 __builtin_pack_ibm128 (double, double);
-    PACK_IF packif {}
+    PACK_IF packif {ibm128}
 
   void __builtin_set_fpscr_rn (const int[0,3]);
     SET_FPSCR_RN rs6000_set_fpscr_rn {}
 
   const double __builtin_unpack_ibm128 (__ibm128, const int<1>);
-    UNPACK_IF unpackif {}
+    UNPACK_IF unpackif {ibm128}
 
 ; This is redundant with __builtin_unpack_ibm128, as it requires long
 ; double to be __ibm128.  Should probably be deprecated.
@@ -3387,25 +3388,25 @@
   const vull __builtin_altivec_vpextd (vull, vull);
     VPEXTD vpextd {}
 
-  const vull __builtin_altivec_vreplace_un_uv2di (vull, unsigned long long, \
-                                                  const int<4>);
+  const vuc __builtin_altivec_vreplace_un_uv2di (vull, unsigned long long, \
+                                                 const int<4>);
     VREPLACE_UN_UV2DI vreplace_un_v2di {}
 
-  const vui __builtin_altivec_vreplace_un_uv4si (vui, unsigned int, \
+  const vuc __builtin_altivec_vreplace_un_uv4si (vui, unsigned int, \
                                                  const int<4>);
     VREPLACE_UN_UV4SI vreplace_un_v4si {}
 
-  const vd __builtin_altivec_vreplace_un_v2df (vd, double, const int<4>);
+  const vuc __builtin_altivec_vreplace_un_v2df (vd, double, const int<4>);
     VREPLACE_UN_V2DF vreplace_un_v2df {}
 
-  const vsll __builtin_altivec_vreplace_un_v2di (vsll, signed long long, \
-                                                 const int<4>);
+  const vuc __builtin_altivec_vreplace_un_v2di (vsll, signed long long, \
+                                                const int<4>);
     VREPLACE_UN_V2DI vreplace_un_v2di {}
 
-  const vf __builtin_altivec_vreplace_un_v4sf (vf, float, const int<4>);
+  const vuc __builtin_altivec_vreplace_un_v4sf (vf, float, const int<4>);
     VREPLACE_UN_V4SF vreplace_un_v4sf {}
 
-  const vsi __builtin_altivec_vreplace_un_v4si (vsi, signed int, const int<4>);
+  const vuc __builtin_altivec_vreplace_un_v4si (vsi, signed int, const int<4>);
     VREPLACE_UN_V4SI vreplace_un_v4si {}
 
   const vull __builtin_altivec_vreplace_uv2di (vull, unsigned long long, \
@@ -3496,6 +3497,9 @@
 
   const signed int __builtin_altivec_vstrihr_p (vss);
     VSTRIHR_P vstrir_p_v8hi {}
+
+  const vuq __builtin_vsx_vmsumcud (vull, vull, vuq);
+    VMSUMCUD vmsumcud {}
 
   const signed int __builtin_vsx_xvtlsbb_all_ones (vsc);
     XVTLSBB_ONES xvtlsbbo {}

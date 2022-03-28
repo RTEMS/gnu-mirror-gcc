@@ -342,6 +342,9 @@ enum omp_clause_code {
      OpenMP clause: map ({alloc:,to:,from:,tofrom:,}variable-list).  */
   OMP_CLAUSE_MAP,
 
+  /* OpenMP clause: has_device_addr (variable-list).  */
+  OMP_CLAUSE_HAS_DEVICE_ADDR,
+
   /* Internal structure to hold OpenACC cache directive's variable-list.
      #pragma acc cache (variable-list).  */
   OMP_CLAUSE__CACHE_,
@@ -1151,6 +1154,9 @@ struct GTY(()) tree_base {
 
        PREDICT_EXPR_OUTCOME in
 	   PREDICT_EXPR
+
+       OMP_CLAUSE_MAP_DECL_MAKE_ADDRESSABLE in
+	   OMP_CLAUSE
 
    static_flag:
 
@@ -2277,6 +2283,7 @@ extern const char * built_in_names[(int) END_BUILTINS];
 /* Number of operands and names for each OMP_CLAUSE node.  */
 extern unsigned const char omp_clause_num_ops[];
 extern const char * const omp_clause_code_name[];
+extern const char *user_omp_clause_code_name (tree, bool);
 
 /* A vector of all translation-units.  */
 extern GTY (()) vec<tree, va_gc> *all_translation_units;

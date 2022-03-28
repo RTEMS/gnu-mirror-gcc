@@ -59,6 +59,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "analyzer/store.h"
 #include "analyzer/region.h"
 #include "analyzer/region-model.h"
+#include "analyzer/sm.h"
+#include "analyzer/program-state.h"
 
 #if ENABLE_ANALYZER
 
@@ -539,6 +541,34 @@ region::get_relative_concrete_offset (bit_offset_t *) const
   return false;
 }
 
+/* Attempt to get the position and size of this region expressed as a
+   concrete range of bytes relative to its parent.
+   If successful, return true and write to *OUT.
+   Otherwise return false.  */
+
+bool
+region::get_relative_concrete_byte_range (byte_range *out) const
+{
+  /* We must have a concrete offset relative to the parent.  */
+  bit_offset_t rel_bit_offset;
+  if (!get_relative_concrete_offset (&rel_bit_offset))
+    return false;
+  /* ...which must be a whole number of bytes.  */
+  if (rel_bit_offset % BITS_PER_UNIT != 0)
+    return false;
+  byte_offset_t start_byte_offset = rel_bit_offset / BITS_PER_UNIT;
+
+  /* We must have a concrete size, which must be a whole number
+     of bytes.  */
+  byte_size_t num_bytes;
+  if (!get_byte_size (&num_bytes))
+    return false;
+
+  /* Success.  */
+  *out = byte_range (start_byte_offset, num_bytes);
+  return true;
+}
+
 /* Dump a description of this region to stderr.  */
 
 DEBUG_FUNCTION void
@@ -814,13 +844,49 @@ frame_region::dump_to_pp (pretty_printer *pp, bool simple) const
 
 const decl_region *
 frame_region::get_region_for_local (region_model_manager *mgr,
-				    tree expr) const
+				    tree expr,
+				    const region_model_context *ctxt) const
 {
-  // TODO: could also check that VAR_DECLs are locals
-  gcc_assert (TREE_CODE (expr) == PARM_DECL
-	      || TREE_CODE (expr) == VAR_DECL
-	      || TREE_CODE (expr) == SSA_NAME
-	      || TREE_CODE (expr) == RESULT_DECL);
+  if (CHECKING_P)
+    {
+      /* Verify that EXPR is a local or SSA name, and that it's for the
+	 correct function for this stack frame.  */
+      gcc_assert (TREE_CODE (expr) == PARM_DECL
+		  || TREE_CODE (expr) == VAR_DECL
+		  || TREE_CODE (expr) == SSA_NAME
+		  || TREE_CODE (expr) == RESULT_DECL);
+      switch (TREE_CODE (expr))
+	{
+	default:
+	  gcc_unreachable ();
+	case VAR_DECL:
+	  gcc_assert (!is_global_var (expr));
+	  /* Fall through.  */
+	case PARM_DECL:
+	case RESULT_DECL:
+	  gcc_assert (DECL_CONTEXT (expr) == m_fun->decl);
+	  break;
+	case SSA_NAME:
+	  {
+	    if (tree var = SSA_NAME_VAR (expr))
+	      {
+		if (DECL_P (var))
+		  gcc_assert (DECL_CONTEXT (var) == m_fun->decl);
+	      }
+	    else if (ctxt)
+	      if (const extrinsic_state *ext_state = ctxt->get_ext_state ())
+		if (const supergraph *sg
+		    = ext_state->get_engine ()->get_supergraph ())
+		  {
+		    const gimple *def_stmt = SSA_NAME_DEF_STMT (expr);
+		    const supernode *snode
+		      = sg->get_supernode_for_stmt (def_stmt);
+		    gcc_assert (snode->get_function () == m_fun);
+		  }
+	  }
+	  break;
+	}
+    }
 
   /* Ideally we'd use mutable here.  */
   map_t &mutable_locals = const_cast <map_t &> (m_locals);
@@ -1099,6 +1165,94 @@ decl_region::get_svalue_for_initializer (region_model_manager *mgr) const
   /* Reuse the get_rvalue logic from region_model.  */
   region_model m (mgr);
   return m.get_rvalue (path_var (init, 0), NULL);
+}
+
+/* Subroutine of symnode_requires_tracking_p; return true if REF
+   within CONTEXT_FNDECL might imply that we should be tracking the
+   value of a decl.  */
+
+static bool
+ipa_ref_requires_tracking (const ipa_ref *ref, tree context_fndecl)
+{
+  /* If we have a load/store/alias of the symbol, then we'll track
+     the decl's value.  */
+  if (ref->use != IPA_REF_ADDR)
+    return true;
+
+  if (ref->stmt == NULL)
+    return true;
+
+  switch (ref->stmt->code)
+    {
+    default:
+      return true;
+    case GIMPLE_CALL:
+      {
+	cgraph_node *context_cnode = cgraph_node::get (context_fndecl);
+	cgraph_edge *edge = context_cnode->get_edge (ref->stmt);
+	if (!edge)
+	  return true;
+	if (edge->callee == NULL)
+	  return true; /* e.g. call through function ptr.  */
+	if (edge->callee->definition)
+	  return true;
+	/* If we get here, then this ref is a pointer passed to
+	   a function we don't have the definition for.  */
+	return false;
+      }
+      break;
+    case GIMPLE_ASM:
+      {
+	const gasm *asm_stmt = as_a <const gasm *> (ref->stmt);
+	if (gimple_asm_noutputs (asm_stmt) > 0)
+	  return true;
+	if (gimple_asm_nclobbers (asm_stmt) > 0)
+	  return true;
+	/* If we get here, then this ref is the decl being passed
+	   by pointer to asm with no outputs.  */
+	return false;
+      }
+      break;
+    }
+}
+
+/* Determine if the decl for SYMNODE should have binding_clusters
+   in our state objects; return false to optimize away tracking
+   certain decls in our state objects, as an optimization.  */
+
+static bool
+symnode_requires_tracking_p (symtab_node *symnode)
+{
+  gcc_assert (symnode);
+  if (symnode->externally_visible)
+    return true;
+  tree context_fndecl = DECL_CONTEXT (symnode->decl);
+  if (context_fndecl == NULL)
+    return true;
+  if (TREE_CODE (context_fndecl) != FUNCTION_DECL)
+    return true;
+  for (auto ref : symnode->ref_list.referring)
+    if (ipa_ref_requires_tracking (ref, context_fndecl))
+      return true;
+
+  /* If we get here, then we don't have uses of this decl that require
+     tracking; we never read from it or write to it explicitly.  */
+  return false;
+}
+
+/* Subroutine of decl_region ctor: determine whether this decl_region
+   can have binding_clusters; return false to optimize away tracking
+   of certain decls in our state objects, as an optimization.  */
+
+bool
+decl_region::calc_tracked_p (tree decl)
+{
+  /* Precondition of symtab_node::get.  */
+  if (TREE_CODE (decl) == VAR_DECL
+      && (TREE_STATIC (decl) || DECL_EXTERNAL (decl) || in_lto_p))
+    if (symtab_node *symnode = symtab_node::get (decl))
+      return symnode_requires_tracking_p (symnode);
+  return true;
 }
 
 /* class field_region : public region.  */

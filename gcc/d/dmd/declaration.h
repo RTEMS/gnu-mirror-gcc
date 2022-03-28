@@ -71,7 +71,6 @@ struct IntRange;
     #define STCnodtor             0x10000000ULL    /// do not run destructor
     #define STCnothrow            0x20000000ULL    /// `nothrow` meaning never throws exceptions
     #define STCpure               0x40000000ULL    /// `pure` function
-    #define STCtls                0x80000000ULL    /// thread local
 
     #define STCalias              0x100000000ULL    /// `alias` parameter
     #define STCshared             0x200000000ULL    /// accessible from multiple threads
@@ -119,10 +118,11 @@ public:
     LINK linkage;
     short inuse;                // used to detect cycles
     uint8_t adFlags;
+    Symbol* isym;               // import version of csym
     DString mangleOverride;     // overridden symbol with pragma(mangle, "...")
 
     const char *kind() const;
-    d_uns64 size(const Loc &loc);
+    uinteger_t size(const Loc &loc);
 
     Dsymbol *search(const Loc &loc, Identifier *ident, int flags = SearchLocalsOnly);
 
@@ -248,7 +248,6 @@ public:
     bool isowner;               // this is an Owner, despite it being `scope`
     bool setInCtorOnly;         // field can only be set in a constructor, as it is const or immutable
     bool onstack;               // it is a class that was allocated on the stack
-    bool mynew;                 // it is a class new'd with custom operator new
     char canassign;             // it can be assigned to
     bool overlapped;            // if it is a field and has overlapping
     bool overlapUnsafe;         // if it is an overlapping field and the overlaps are unsafe

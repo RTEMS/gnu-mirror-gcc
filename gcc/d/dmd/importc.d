@@ -159,7 +159,8 @@ Expression carraySemantic(ArrayExp ae, Scope* sc)
     if (t1.isTypeDArray() || t1.isTypeSArray())
     {
         e2 = e2.expressionSemantic(sc).arrayFuncConv(sc);
-        return new IndexExp(ae.loc, e1, e2).expressionSemantic(sc);
+        // C doesn't do array bounds checking, so `true` turns it off
+        return new IndexExp(ae.loc, e1, e2, true).expressionSemantic(sc);
     }
 
     e1 = e1.arrayFuncConv(sc);   // e1 might still be a function call
@@ -167,7 +168,7 @@ Expression carraySemantic(ArrayExp ae, Scope* sc)
     auto t2 = e2.type.toBasetype();
     if (t2.isTypeDArray() || t2.isTypeSArray())
     {
-        return new IndexExp(ae.loc, e2, e1).expressionSemantic(sc); // swap operands
+        return new IndexExp(ae.loc, e2, e1, true).expressionSemantic(sc); // swap operands
     }
 
     e2 = e2.arrayFuncConv(sc);
@@ -260,3 +261,60 @@ Expression castCallAmbiguity(Expression e, Scope* sc)
     }
 }
 
+/********************************************
+ * Implement the C11 notion of function equivalence,
+ * which allows prototyped functions to match K+R functions,
+ * even though they are different.
+ * Params:
+ *      tf1 = type of first function
+ *      tf2 = type of second function
+ * Returns:
+ *      true if C11 considers them equivalent
+ */
+
+bool cFuncEquivalence(TypeFunction tf1, TypeFunction tf2)
+{
+    //printf("cFuncEquivalence()\n  %s\n  %s\n", tf1.toChars(), tf2.toChars());
+    if (tf1.equals(tf2))
+        return true;
+
+    if (tf1.linkage != tf2.linkage)
+        return false;
+
+    // Allow func(void) to match func()
+    if (tf1.parameterList.length == 0 && tf2.parameterList.length == 0)
+        return true;
+
+    if (!tf1.nextOf().equals(tf2.nextOf()))
+        return false;   // function return types don't match
+
+    if (tf1.parameterList.length != tf2.parameterList.length)
+        return false;
+
+    if (!tf1.parameterList.hasIdentifierList && !tf2.parameterList.hasIdentifierList) // if both are prototyped
+    {
+        if (tf1.parameterList.varargs != tf2.parameterList.varargs)
+            return false;
+    }
+
+    foreach (i, fparam ; tf1.parameterList)
+    {
+        Type t1 = fparam.type;
+        Type t2 = tf2.parameterList[i].type;
+
+        /* Strip off head const.
+         * Not sure if this is C11, but other compilers treat
+         * `void fn(int)` and `fn(const int x)`
+         * as equivalent.
+         */
+        t1 = t1.mutableOf();
+        t2 = t2.mutableOf();
+
+        if (!t1.equals(t2))
+            return false;
+    }
+
+    //printf("t1: %s\n", tf1.toChars());
+    //printf("t2: %s\n", tf2.toChars());
+    return true;
+}

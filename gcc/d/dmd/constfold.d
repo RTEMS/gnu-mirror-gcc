@@ -120,15 +120,10 @@ UnionExp Not(Type type, Expression e1)
 {
     UnionExp ue = void;
     Loc loc = e1.loc;
+    // BUG: Should be replaced with e1.toBool().get(), but this is apparently
+    //      executed for some expressions that cannot be const-folded
+    //      To be fixed in another PR
     emplaceExp!(IntegerExp)(&ue, loc, e1.toBool().hasValue(false) ? 1 : 0, type);
-    return ue;
-}
-
-private UnionExp Bool(Type type, Expression e1)
-{
-    UnionExp ue = void;
-    Loc loc = e1.loc;
-    emplaceExp!(IntegerExp)(&ue, loc, e1.toBool().hasValue(true) ? 1 : 0, type);
     return ue;
 }
 
@@ -624,31 +619,31 @@ UnionExp Shr(const ref Loc loc, Type type, Expression e1, Expression e2)
     switch (e1.type.toBasetype().ty)
     {
     case Tint8:
-        value = cast(d_int8)value >> count;
+        value = cast(byte)value >> count;
         break;
     case Tuns8:
     case Tchar:
-        value = cast(d_uns8)value >> count;
+        value = cast(ubyte)value >> count;
         break;
     case Tint16:
-        value = cast(d_int16)value >> count;
+        value = cast(short)value >> count;
         break;
     case Tuns16:
     case Twchar:
-        value = cast(d_uns16)value >> count;
+        value = cast(ushort)value >> count;
         break;
     case Tint32:
-        value = cast(d_int32)value >> count;
+        value = cast(int)value >> count;
         break;
     case Tuns32:
     case Tdchar:
-        value = cast(d_uns32)value >> count;
+        value = cast(uint)value >> count;
         break;
     case Tint64:
-        value = cast(d_int64)value >> count;
+        value = cast(long)value >> count;
         break;
     case Tuns64:
-        value = cast(d_uns64)value >> count;
+        value = cast(ulong)value >> count;
         break;
     case Terror:
         emplaceExp!(ErrorExp)(&ue);
@@ -832,9 +827,9 @@ UnionExp Equal(EXP op, const ref Loc loc, Type type, Expression e1, Expression e
         else
         {
             cmp = 1; // if dim1 winds up being 0
-            for (size_t i = 0; i < dim1; i++)
+            foreach (i; 0 .. dim1)
             {
-                uinteger_t c = es1.charAt(i);
+                uinteger_t c = es1.getCodeUnit(i);
                 auto ee2 = es2[i];
                 if (ee2.isConst() != 1)
                 {
@@ -1093,19 +1088,14 @@ UnionExp Cast(const ref Loc loc, Type type, Type to, Expression e1)
     }
     else if (tb.ty == Tbool)
     {
-        bool val = void;
         const opt = e1.toBool();
-        if (opt.hasValue(true))
-            val = true;
-        else if (opt.hasValue(false))
-            val = false;
-        else
+        if (opt.isEmpty())
         {
             cantExp(ue);
             return ue;
         }
 
-        emplaceExp!(IntegerExp)(&ue, loc, val, type);
+        emplaceExp!(IntegerExp)(&ue, loc, opt.get(), type);
     }
     else if (type.isintegral())
     {
@@ -1116,31 +1106,31 @@ UnionExp Cast(const ref Loc loc, Type type, Type to, Expression e1)
             switch (typeb.ty)
             {
             case Tint8:
-                result = cast(d_int8)cast(sinteger_t)r;
+                result = cast(byte)cast(sinteger_t)r;
                 break;
             case Tchar:
             case Tuns8:
-                result = cast(d_uns8)cast(dinteger_t)r;
+                result = cast(ubyte)cast(dinteger_t)r;
                 break;
             case Tint16:
-                result = cast(d_int16)cast(sinteger_t)r;
+                result = cast(short)cast(sinteger_t)r;
                 break;
             case Twchar:
             case Tuns16:
-                result = cast(d_uns16)cast(dinteger_t)r;
+                result = cast(ushort)cast(dinteger_t)r;
                 break;
             case Tint32:
-                result = cast(d_int32)r;
+                result = cast(int)r;
                 break;
             case Tdchar:
             case Tuns32:
-                result = cast(d_uns32)r;
+                result = cast(uint)r;
                 break;
             case Tint64:
-                result = cast(d_int64)r;
+                result = cast(long)r;
                 break;
             case Tuns64:
-                result = cast(d_uns64)r;
+                result = cast(ulong)r;
                 break;
             default:
                 assert(0);
@@ -1240,7 +1230,7 @@ UnionExp ArrayLength(Type type, Expression e1)
 
 /* Also return EXP.cantExpression if this fails
  */
-UnionExp Index(Type type, Expression e1, Expression e2)
+UnionExp Index(Type type, Expression e1, Expression e2, bool indexIsInBounds)
 {
     UnionExp ue = void;
     Loc loc = e1.loc;
@@ -1257,7 +1247,7 @@ UnionExp Index(Type type, Expression e1, Expression e2)
         }
         else
         {
-            emplaceExp!(IntegerExp)(&ue, loc, es1.charAt(i), type);
+            emplaceExp!(IntegerExp)(&ue, loc, es1.getCodeUnit(cast(size_t) i), type);
         }
     }
     else if (e1.type.toBasetype().ty == Tsarray && e2.op == EXP.int64)
@@ -1265,8 +1255,9 @@ UnionExp Index(Type type, Expression e1, Expression e2)
         TypeSArray tsa = cast(TypeSArray)e1.type.toBasetype();
         uinteger_t length = tsa.dim.toInteger();
         uinteger_t i = e2.toInteger();
-        if (i >= length)
+        if (i >= length && (e1.op == EXP.arrayLiteral || !indexIsInBounds))
         {
+            // C code only checks bounds if an ArrayLiteralExp
             e1.error("array index %llu is out of bounds `%s[0 .. %llu]`", i, e1.toChars(), length);
             emplaceExp!(ErrorExp)(&ue);
         }
@@ -1357,14 +1348,6 @@ UnionExp Slice(Type type, Expression e1, Expression lwr, Expression upr)
         }
     }
 
-    static bool sliceBoundsCheck(uinteger_t lwr, uinteger_t upr, uinteger_t newlwr, uinteger_t newupr) pure
-    {
-        assert(lwr <= upr);
-        return !(newlwr <= newupr &&
-                 lwr <= newlwr &&
-                 newupr <= upr);
-    }
-
     if (e1.op == EXP.string_ && lwr.op == EXP.int64 && upr.op == EXP.int64)
     {
         StringExp es1 = cast(StringExp)e1;
@@ -1402,6 +1385,16 @@ UnionExp Slice(Type type, Expression e1, Expression lwr, Expression upr)
     else
         cantExp(ue);
     return ue;
+}
+
+/* Check whether slice `[newlwr .. newupr]` is in the range `[lwr .. upr]`
+ */
+bool sliceBoundsCheck(uinteger_t lwr, uinteger_t upr, uinteger_t newlwr, uinteger_t newupr) pure
+{
+    assert(lwr <= upr);
+    return !(newlwr <= newupr &&
+             lwr <= newlwr &&
+             newupr <= upr);
 }
 
 /* Set a slice of char/integer array literal 'existingAE' from a string 'newval'.

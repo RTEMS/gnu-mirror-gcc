@@ -1080,6 +1080,7 @@ extern void omp_clause_range_check_failed (const_tree, const char *, int,
 
 /* Define fields and accessors for some special-purpose tree nodes.  */
 
+/* As with STRING_CST, in C terms this is sizeof, not strlen.  */
 #define IDENTIFIER_LENGTH(NODE) \
   (IDENTIFIER_NODE_CHECK (NODE)->identifier.id.len)
 #define IDENTIFIER_POINTER(NODE) \
@@ -1698,6 +1699,11 @@ class auto_suppress_location_wrappers
    NOTE: this is different than OMP_CLAUSE_MAP_IMPLICIT.  */
 #define OMP_CLAUSE_MAP_RUNTIME_IMPLICIT_P(NODE) \
   (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_MAP)->base.deprecated_flag)
+
+/* Flag that 'OMP_CLAUSE_DECL (NODE)' is to be made addressable during OMP
+   lowering.  */
+#define OMP_CLAUSE_MAP_DECL_MAKE_ADDRESSABLE(NODE) \
+  (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_MAP)->base.addressable_flag)
 
 /* True on an OMP_CLAUSE_USE_DEVICE_PTR with an OpenACC 'if_present'
    clause.  */
@@ -6578,5 +6584,7 @@ extern unsigned fndecl_dealloc_argno (tree);
    if nonnull, set the second argument to the referenced enclosing
    object or pointer.  Otherwise return null.  */
 extern tree get_attr_nonstring_decl (tree, tree * = NULL);
+
+extern int get_target_clone_attr_len (tree);
 
 #endif  /* GCC_TREE_H  */
