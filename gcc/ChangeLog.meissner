@@ -1,6 +1,13 @@
-==================== Work084, patch #1:
+==================== Work084, patch #2:
 
 Optimize vec_splats of constant vec_extract for V2DI/V2DF, PR target 99293.
+
+This is version 2 of the patch.  The original patch was:
+
+| Date: Mon, 28 Mar 2022 12:26:02 -0400
+| Subject: [PATCH 1/4] Optimize vec_splats of constant vec_extract for V2DI/V2DF, PR target 99293.
+| Message-ID: <YkHhmvwSJF7DUDhJ@toto.the-meissners.org>
+| https://gcc.gnu.org/pipermail/gcc-patches/2022-March/592420.html
 
 In PR target/99293, it was pointed out that doing:
 
@@ -44,15 +51,16 @@ out in a previous version of the patch, the combiner already tries doing
 creating a (vec_duplicate (vec_select ...)) pattern, but we didn't provide
 one.
 
-I rewrote the existing pattern vsx_xxspltd_<mode> to have a VEC_DUPLCIATE
-so that the case would match for the PR instead of using UNSPEC.
+This patch reworks vsx_xxspltd_<mode> for V2DImode and V2DFmode so that it
+no longer uses an UNSPEC.  Instead it uses VEC_DUPLICATE, which the
+combiner checks for.
 
 I have built Spec 2017 with this patch installed, and the cam4_r benchmark
-is the only benchmark that generated different code.  On a power9, I did
-not notice any significant changes in the runtime of cam4_r.
+is the only benchmark that generated different code (3 mfvsrld/mtvsrdd
+pairs of instructions were replaced with xxpermdi).
 
-I have built bootstrap versions on the following systems.  There were no
-regressions in the runs:
+I have built bootstrap versions on the following systems and I have run
+the regression tests.  There were no regressions in the runs:
 
 	Power9 little endian, --with-cpu=power9
 	Power10 little endian, --with-cpu=power10
@@ -61,7 +69,7 @@ regressions in the runs:
 Can I install this into the trunk?  After a burn-in period, can I backport
 and install this into GCC 11 and GCC 10 branches?
 
-2022-03-28   Michael Meissner  <meissner@linux.ibm.com>
+2022-03-29   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 	PR target/99293
@@ -75,10 +83,7 @@ gcc/testsuite:
 	* gcc.target/powerpc/builtins-1.c: Update insn count.
 	* gcc.target/powerpc/pr99293.c: New test.
 
-2022-03-28   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-	* ChangeLog.meissner: Update.
+==================== Work084, patch #1 (reverted):
 
 ==================== Work084, branch start
 
