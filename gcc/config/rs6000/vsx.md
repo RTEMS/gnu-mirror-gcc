@@ -296,6 +296,7 @@
    UNSPEC_VSX_XXPERM
 
    UNSPEC_VSX_XXSPLTW
+   UNSPEC_VSX_XXSPLTD
    UNSPEC_VSX_DIVSD
    UNSPEC_VSX_DIVUD
    UNSPEC_VSX_DIVSQ
@@ -3088,25 +3089,6 @@
 }
   [(set_attr "type" "vecperm")])
 
-;; Combiner patterns to allow creating XXPERMDI's to access either double
-;; word element in a vector register when used with VEC_DUPLICATE..
-(define_insn "*vsx_dup_<mode>_1"
-  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
-	(vec_duplicate:VSX_D
-	 (vec_select:<VS_scalar>
-	  (match_operand:VSX_D 1 "gpc_reg_operand" "wa")
-	  (parallel [(match_operand:QI 2 "const_0_to_1_operand" "n")]))))]
-  "VECTOR_MEM_VSX_P (<MODE>mode)"
-{
-  HOST_WIDE_INT dword = INTVAL (operands[2]);
-  if (!BYTES_BIG_ENDIAN)
-    dword = !dword;
-
-  operands[3] = GEN_INT (3*dword);
-  return "xxpermdi %x0,%x1,%x1,%3";
-}
-  [(set_attr "type" "vecperm")])
-
 ;; Special purpose concat using xxpermdi to glue two single precision values
 ;; together, relying on the fact that internally scalar floats are represented
 ;; as doubles.  This is used to initialize a V4SF vector with 4 floats
@@ -4694,18 +4676,16 @@
 ;; V2DF/V2DI splat for use by vec_splat builtin
 (define_insn "vsx_xxspltd_<mode>"
   [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
-	(vec_duplicate:VSX_D
-	 (vec_select:<VS_scalar>
-	  (match_operand:VSX_D 1 "gpc_reg_operand" "wa")
-	  (parallel [(match_operand:QI 2 "const_0_to_1_operand" "i")]))))]
+        (unspec:VSX_D [(match_operand:VSX_D 1 "vsx_register_operand" "wa")
+	               (match_operand:QI 2 "u5bit_cint_operand" "i")]
+                      UNSPEC_VSX_XXSPLTD))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
 {
-  HOST_WIDE_INT dword = INTVAL (operands[2]);
-  if (!BYTES_BIG_ENDIAN)
-    dword = !dword;
-
-  operands[3] = GEN_INT (3*dword);
-  return "xxpermdi %x0,%x1,%x1,%3";
+  if ((BYTES_BIG_ENDIAN && INTVAL (operands[2]) == 0)
+      || (!BYTES_BIG_ENDIAN && INTVAL (operands[2]) == 1))
+    return "xxpermdi %x0,%x1,%x1,0";
+  else
+    return "xxpermdi %x0,%x1,%x1,3";
 }
   [(set_attr "type" "vecperm")])
 
