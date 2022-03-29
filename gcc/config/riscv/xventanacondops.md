@@ -123,3 +123,13 @@
 {
   operands[2] = GEN_INT(1 << UINTVAL(operands[2]));
 })
+
+(define_split
+  [(set (match_operand:X 0 "register_operand")
+	(neg:X (eq:X (zero_extract:X (match_operand:X 1 "register_operand")
+				     (const_int 1)
+				     (match_operand 2 "immediate_operand"))
+		     (const_int 0))))]
+  "!TARGET_XVENTANACONDOPS && TARGET_ZBS"
+  [(set (match_dup 0) (zero_extract:X (match_dup 1) (const_int 1) (match_dup 2)))
+   (set (match_dup 0) (plus:X (match_dup 0) (const_int -1)))])
