@@ -1,12 +1,87 @@
 ==================== Work084, patch #1:
-Update ChangeLog.meissner.
+
+Optimize vec_splats of constant vec_extract for V2DI/V2DF, PR target 99293.
+
+In PR target/99293, it was pointed out that doing:
+
+	vector long long dest0, dest1, src;
+	/* ... */
+	dest0 = vec_splats (vec_extract (src, 0));
+	dest1 = vec_splats (vec_extract (src, 1));
+
+would generate slower code.
+
+It generates the following code on power8:
+
+	;; vec_splats (vec_extract (src, 0))
+	xxpermdi 0,34,34,3
+	xxpermdi 34,0,0,0
+
+	;; vec_splats (vec_extract (src, 1))
+	xxlor 0,34,34
+	xxpermdi 34,0,0,0
+
+However on power9 and power10 it generates:
+
+	;; vec_splats (vec_extract (src, 0))
+	mfvsld 3,34
+	mtvsrdd 34,9,9
+
+	;; vec_splats (vec_extract (src, 1))
+	mfvsrd 9,34
+	mtvsrdd 34,9,9
+
+This is due to the power9 having the mfvsrld instruction which can extract
+either 64-bit element into a GPR.  While there are alternatives for both
+vector registers and GPR registers, the register allocator prefers to put
+DImode into GPR registers.
+
+However in this case, it is better to have a single combiner pattern that
+can generate a single xxpermdi, instead of doing 2 insnsns (the extract
+and then the concat).  This is particularly true if the two operations are
+move from vector register and move to vector register.  As Segher pointed
+out in a previous version of the patch, the combiner already tries doing
+creating a (vec_duplicate (vec_select ...)) pattern, but we didn't provide
+one.
+
+I rewrote the existing pattern vsx_xxspltd_<mode> to have a VEC_DUPLCIATE
+so that the case would match for the PR instead of using UNSPEC.
+
+I have built Spec 2017 with this patch installed, and the cam4_r benchmark
+is the only benchmark that generated different code.  On a power9, I did
+not notice any significant changes in the runtime of cam4_r.
+
+I have built bootstrap versions on the following systems.  There were no
+regressions in the runs:
+
+	Power9 little endian, --with-cpu=power9
+	Power10 little endian, --with-cpu=power10
+	Power8 big endian, --with-cpu=power8 (both 32-bit & 64-bit tests)
+
+Can I install this into the trunk?  After a burn-in period, can I backport
+and install this into GCC 11 and GCC 10 branches?
+
+2022-03-28   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	PR target/99293
+	* config/rs6000/rs6000-p8swap.cc (rtx_is_swappable_p): Remove
+	UNSPEC_VSX_XXSPLTD case.
+	* config/rs6000/vsx.md (UNSPEC_VSX_XXSPLTD): Delete.
+	(vsx_xxspltd_<mode>): Rewrite to use VEC_DUPLICATE.
+
+gcc/testsuite:
+	PR target/99293
+	* gcc.target/powerpc/builtins-1.c: Update insn count.
+	* gcc.target/powerpc/pr99293.c: New test.
 
 2022-03-28   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 	* ChangeLog.meissner: Update.
 
+==================== Work084, branch start
+
 2022-03-28   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-
