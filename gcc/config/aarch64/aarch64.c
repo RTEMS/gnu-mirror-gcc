@@ -9747,23 +9747,71 @@ aarch64_classify_address (struct aarch64_address_info *info,
   bool alt_base_p = (TARGET_CAPABILITY_HYBRID
 		     && CAPABILITY_MODE_P (GET_MODE (x)));
 
-  /* On BE, we use load/store pair for all large int mode load/stores.
-     TI/TFmode may also use a load/store pair.  */
   bool advsimd_struct_p = (vec_flags == (VEC_ADVSIMD | VEC_STRUCT));
-  bool load_store_pair_p = (type == ADDR_QUERY_LDP_STP
-			    || type == ADDR_QUERY_LDP_STP_N
-			    || mode == TImode
-			    || mode == TFmode
-			    || (BYTES_BIG_ENDIAN && advsimd_struct_p));
 
-  /* If we are dealing with ADDR_QUERY_LDP_STP_N that means the incoming mode
-     corresponds to the actual size of the memory being loaded/stored and the
-     mode of the corresponding addressing mode is half of that.  */
-  if (type == ADDR_QUERY_LDP_STP_N
-      && known_eq (GET_MODE_SIZE (mode), 16))
-    mode = DFmode;
+  /* Classify the access as up to two of the following:
 
-  bool allow_reg_index_p = (!load_store_pair_p
+     - a sequence of LDPs or STPs
+     - a single LDR or STR
+
+     The LDR/STR can overlap the LDPs/STPs or come after them.
+
+     If LDP_STP_MODE is not VOIDmode, require a sequence of NUM_LDP_STP
+     pairs, with each loaded or stored register having mode LDP_STP_MODE.
+
+     If LDR_STR_MODE is not VOIDmode, require a valid LDR/STR of that
+     mode at offset LDR_STR_OFFSET from the start of MODE.  */
+  machine_mode ldp_stp_mode = VOIDmode;
+  machine_mode ldr_str_mode = VOIDmode;
+  unsigned int num_ldp_stp = 1;
+  poly_int64 ldr_str_offset = 0;
+  if (type == ADDR_QUERY_LDP_STP)
+    {
+      if (known_eq (GET_MODE_SIZE (mode), 4)
+	  || known_eq (GET_MODE_SIZE (mode), 8)
+	  || known_eq (GET_MODE_SIZE (mode), 16))
+	ldp_stp_mode = mode;
+      else
+	return false;
+    }
+  /* If we are dealing with ADDR_QUERY_LDP_STP_N that means the
+     incoming mode corresponds to the actual size of the memory
+     being loaded/stored and the mode of the corresponding
+     addressing mode is half of that.  */
+  else if (type == ADDR_QUERY_LDP_STP_N)
+    {
+      if (known_eq (GET_MODE_SIZE (mode), 16))
+	ldp_stp_mode = DFmode;
+      else
+	return false;
+    }
+  /* TImode and TFmode values are allowed in both pairs of X
+     registers and individual Q registers.  The available
+     address modes are:
+     X,X: 7-bit signed scaled offset
+     Q:   9-bit signed offset
+     We conservatively require an offset representable in either mode.  */
+  else if (mode == TImode || mode == TFmode)
+    {
+      ldp_stp_mode = DImode;
+      ldr_str_mode = mode;
+    }
+  /* On BE, we use load/store pair for multi-vector load/stores.  */
+  else if (BYTES_BIG_ENDIAN && advsimd_struct_p)
+    {
+      ldp_stp_mode = V16QImode;
+      if (known_eq (GET_MODE_SIZE (mode), GET_MODE_SIZE (V16QImode) * 3))
+	{
+	  ldr_str_mode = V16QImode;
+	  ldr_str_offset = GET_MODE_SIZE (V16QImode) * 2;
+	}
+      else if (known_eq (GET_MODE_SIZE (mode), GET_MODE_SIZE (V16QImode) * 4))
+	num_ldp_stp = 2;
+    }
+  else
+    ldr_str_mode = mode;
+
+  bool allow_reg_index_p = (ldp_stp_mode == VOIDmode
 			    && (known_lt (GET_MODE_SIZE (mode), 16)
 				|| mode == CADImode
 				|| vec_flags == VEC_ADVSIMD
@@ -9778,12 +9826,23 @@ aarch64_classify_address (struct aarch64_address_info *info,
       && (code != REG && code != PLUS))
     return false;
 
-  /* On LE, for AdvSIMD, don't support anything other than POST_INC or
-     REG addressing.  */
-  if (advsimd_struct_p
-      && !BYTES_BIG_ENDIAN
-      && (code != POST_INC && code != REG))
-    return false;
+  if (advsimd_struct_p)
+    {
+      if (GET_RTX_CLASS (code) == RTX_AUTOINC)
+	{
+	  /* LD[234] and ST[234] only support post-increment addressing.
+	     The big-endian movci and movxi patterns do not support *any*
+	     pre/post-modify addressing, but we want to allow them in
+	     "m" so that ivopts can use them to optimize gimple
+	     LD[34]/ST[34] operations.  */
+	  if (code != POST_INC)
+	    return false;
+	}
+      /* On LE, for AdvSIMD, don't support anything other than POST_INC or
+	 REG addressing.  */
+      else if (!BYTES_BIG_ENDIAN && code != REG)
+	return false;
+    }
 
   /* For Morello: Exit early if the address is not in Pmode. This blocks all
      CONST_INTs and other non-capability SCALAR_ADDR_MODE_P types.  */
@@ -9832,50 +9891,24 @@ aarch64_classify_address (struct aarch64_address_info *info,
 	  info->offset = op1;
 	  info->const_offset = offset;
 
-	  /* TImode and TFmode values are allowed in both pairs of X
-	     registers and individual Q registers.  The available
-	     address modes are:
-	     X,X: 7-bit signed scaled offset
-	     Q:   9-bit signed offset
-	     We conservatively require an offset representable in either mode.
-	     When performing the check for pairs of X registers i.e.  LDP/STP
-	     pass down DImode since that is the natural size of the LDP/STP
-	     instruction memory accesses.  */
-	  if ((mode == TImode || mode == TFmode)
-	      && !aarch64_offset_7bit_signed_scaled_p (DImode, offset))
+	  if (ldp_stp_mode != VOIDmode)
+	    /* Test that each LDP/STP pair fits a signed 7-bit offset
+	       range, scaled by the size of the individual registers.  */
+	    for (unsigned int i = 0; i < num_ldp_stp; ++i)
+	      {
+		auto suboffset = offset + i * GET_MODE_SIZE (ldp_stp_mode) * 2;
+		if (!aarch64_offset_7bit_signed_scaled_p (ldp_stp_mode,
+							  suboffset))
+		  return false;
+	      }
+
+	  if (ldr_str_mode != VOIDmode
+	      && !aarch64_valid_ldr_str_offset_p (ldr_str_mode, alt_base_p,
+						  offset + ldr_str_offset,
+						  type))
 	    return false;
 
-	  /* A 7bit offset check because OImode will emit a ldp/stp
-	     instruction (only big endian will get here).
-	     For ldp/stp instructions, the offset is scaled for the size of a
-	     single element of the pair.  */
-	  if (mode == OImode)
-	    return aarch64_offset_7bit_signed_scaled_p (TImode, offset);
-
-	  /* Three 9/12 bit offsets checks because CImode will emit three
-	     ldr/str instructions (only big endian will get here).  */
-	  if (mode == CImode)
-	    return (aarch64_offset_7bit_signed_scaled_p (TImode, offset)
-		    && (aarch64_offset_9bit_signed_unscaled_p (V16QImode,
-							       offset + 32)
-			|| offset_12bit_unsigned_scaled_p (V16QImode,
-							   offset + 32)));
-
-	  /* Two 7bit offsets checks because XImode will emit two ldp/stp
-	     instructions (only big endian will get here).  */
-	  if (mode == XImode)
-	    return (aarch64_offset_7bit_signed_scaled_p (TImode, offset)
-		    && aarch64_offset_7bit_signed_scaled_p (TImode,
-							    offset + 32));
-
-	  if (load_store_pair_p)
-	    return ((known_eq (GET_MODE_SIZE (mode), 4)
-		     || known_eq (GET_MODE_SIZE (mode), 8)
-		     || known_eq (GET_MODE_SIZE (mode), 16))
-		    && aarch64_offset_7bit_signed_scaled_p (mode, offset));
-
-	  return aarch64_valid_ldr_str_offset_p (mode, alt_base_p, offset,
-						 type);
+	  return true;
 	}
 
       if (allow_reg_index_p)
@@ -9918,24 +9951,22 @@ aarch64_classify_address (struct aarch64_address_info *info,
 	  info->offset = XEXP (XEXP (x, 1), 1);
 	  info->const_offset = offset;
 
-	  /* TImode and TFmode values are allowed in both pairs of X
-	     registers and individual Q registers.  The available
-	     address modes are:
-	     X,X: 7-bit signed scaled offset
-	     Q:   9-bit signed offset
-	     We conservatively require an offset representable in either mode.
-	   */
-	  if (mode == TImode || mode == TFmode)
-	    return (aarch64_offset_7bit_signed_scaled_p (mode, offset)
-		    && aarch64_offset_9bit_signed_unscaled_p (mode, offset));
+	  if (ldp_stp_mode != VOIDmode)
+	    {
+	      gcc_assert (num_ldp_stp == 1);
+	      if (!aarch64_offset_7bit_signed_scaled_p (ldp_stp_mode, offset))
+		return false;
+	    }
 
-	  if (load_store_pair_p)
-	    return ((known_eq (GET_MODE_SIZE (mode), 4)
-		     || known_eq (GET_MODE_SIZE (mode), 8)
-		     || known_eq (GET_MODE_SIZE (mode), 16))
-		    && aarch64_offset_7bit_signed_scaled_p (mode, offset));
-	  else
-	    return aarch64_offset_9bit_signed_unscaled_p (mode, offset);
+	  if (ldr_str_mode != VOIDmode)
+	    {
+	      gcc_assert (known_eq (ldr_str_offset, 0));
+	      if (!aarch64_offset_9bit_signed_unscaled_p (ldr_str_mode,
+							  offset))
+		return false;
+	    }
+
+	  return true;
 	}
       return false;
 
@@ -9946,7 +9977,7 @@ aarch64_classify_address (struct aarch64_address_info *info,
          for SI mode or larger.  */
       info->type = ADDRESS_SYMBOLIC;
 
-      if (!load_store_pair_p
+      if (ldp_stp_mode == VOIDmode
 	  && GET_MODE_SIZE (mode).is_constant (&const_size)
 	  && const_size >= 4)
 	{
