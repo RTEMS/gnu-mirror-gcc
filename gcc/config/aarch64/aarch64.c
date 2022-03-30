@@ -9811,6 +9811,9 @@ aarch64_classify_address (struct aarch64_address_info *info,
   else
     ldr_str_mode = mode;
 
+  if (alt_base_p && ldp_stp_mode != VOIDmode)
+    return false;
+
   bool allow_reg_index_p = (ldp_stp_mode == VOIDmode
 			    && (known_lt (GET_MODE_SIZE (mode), 16)
 				|| mode == CADImode
@@ -23304,7 +23307,7 @@ extract_base_offset_in_addr (rtx mem, rtx *base, rtx *offset)
       return true;
     }
 
-  if (GET_CODE (addr) == PLUS
+  if (any_plus_p (addr)
       && REG_P (XEXP (addr, 0)) && CONST_INT_P (XEXP (addr, 1)))
     {
       *base = XEXP (addr, 0);
@@ -23692,6 +23695,12 @@ aarch64_operands_adjust_ok_for_ldpstp (rtx *operands, bool load,
       if (MEM_VOLATILE_P (mem[i]))
 	return false;
 
+      /* The addres must use a normal rather than an alternative
+	 base register.  */
+      if (TARGET_CAPABILITY_HYBRID
+	  && CAPABILITY_MODE_P (mem_address_mode (mem[i])))
+	return false;
+
       /* Check if the addresses are in the form of [base+offset].  */
       extract_base_offset_in_addr (mem[i], base + i, offset + i);
       if (base[i] == NULL_RTX || offset[i] == NULL_RTX)
@@ -23864,13 +23873,15 @@ aarch64_gen_adjusted_ldpstp (rtx *operands, bool load,
       || new_off_3 > stp_off_upper_limit || new_off_3 < stp_off_lower_limit)
     return false;
 
-  replace_equiv_address_nv (mem_1, plus_constant (Pmode, operands[8],
+  auto addr_mode = mem_address_mode (mem_1);
+  rtx new_base = gen_rtx_REG (addr_mode, REGNO (operands[8]));
+  replace_equiv_address_nv (mem_1, plus_constant (addr_mode, new_base,
 						  new_off_1), true);
-  replace_equiv_address_nv (mem_2, plus_constant (Pmode, operands[8],
+  replace_equiv_address_nv (mem_2, plus_constant (addr_mode, new_base,
 						  new_off_1 + msize), true);
-  replace_equiv_address_nv (mem_3, plus_constant (Pmode, operands[8],
+  replace_equiv_address_nv (mem_3, plus_constant (addr_mode, new_base,
 						  new_off_3), true);
-  replace_equiv_address_nv (mem_4, plus_constant (Pmode, operands[8],
+  replace_equiv_address_nv (mem_4, plus_constant (addr_mode, new_base,
 						  new_off_3 + msize), true);
 
   if (!aarch64_mem_pair_operand (mem_1, mode)
@@ -23916,7 +23927,8 @@ aarch64_gen_adjusted_ldpstp (rtx *operands, bool load,
     }
 
   /* Emit adjusting instruction.  */
-  emit_insn (gen_rtx_SET (operands[8], plus_constant (DImode, base, base_off)));
+  emit_insn (gen_rtx_SET (new_base, plus_constant (addr_mode,
+						   base, base_off)));
   /* Emit ldp/stp instructions.  */
   t1 = gen_rtx_SET (operands[0], operands[1]);
   t2 = gen_rtx_SET (operands[2], operands[3]);
