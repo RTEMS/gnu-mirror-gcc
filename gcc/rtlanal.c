@@ -3383,6 +3383,7 @@ computed_jump_p (const rtx_insn *insn)
 static int
 for_each_inc_dec_find_inc_dec (rtx mem, for_each_inc_dec_fn fn, void *data)
 {
+  auto addr_mode = mem_address_mode (mem);
   rtx x = XEXP (mem, 0);
   switch (GET_CODE (x))
     {
@@ -3391,7 +3392,7 @@ for_each_inc_dec_find_inc_dec (rtx mem, for_each_inc_dec_fn fn, void *data)
       {
 	poly_int64 size = GET_MODE_SIZE (GET_MODE (mem));
 	rtx r1 = XEXP (x, 0);
-	rtx c = gen_int_mode (size, GET_MODE (r1));
+	rtx c = gen_int_mode (size, offset_mode (addr_mode));
 	return fn (mem, x, r1, r1, c, data);
       }
 
@@ -3400,7 +3401,7 @@ for_each_inc_dec_find_inc_dec (rtx mem, for_each_inc_dec_fn fn, void *data)
       {
 	poly_int64 size = GET_MODE_SIZE (GET_MODE (mem));
 	rtx r1 = XEXP (x, 0);
-	rtx c = gen_int_mode (-size, GET_MODE (r1));
+	rtx c = gen_int_mode (-size, offset_mode (addr_mode));
 	return fn (mem, x, r1, r1, c, data);
       }
 

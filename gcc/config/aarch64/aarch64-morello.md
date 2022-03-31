@@ -149,7 +149,7 @@
    mov\\t%0, %1
    mov\\t%0, xzr
    ldr\\t%0, %1
-   str\\t%1, %0
+   str\\t%x1, %0
    adr\\t%0, %c1
    adrp\\t%0, %A1"
 )

@@ -448,6 +448,16 @@ move_dead_notes (rtx_insn *to_insn, rtx_insn *from_insn, rtx pattern)
     }
 }
 
+/* Add address offset DELTA_REG to base address BASE_REG, both of which
+   are known to be registers.  */
+
+static rtx
+plus_reg (rtx base_reg, rtx delta_reg)
+{
+  return gen_pointer_plus (as_a<scalar_addr_mode> (GET_MODE (base_reg)),
+			   base_reg, delta_reg);
+}
+
 /* Change mem_insn.mem_loc so that uses NEW_ADDR which has an
    increment of INC_REG.  To have reached this point, the change is a
    legitimate one from a dataflow point of view.  The only questions
@@ -543,8 +553,7 @@ attempt_change (rtx new_addr, rtx inc_reg)
       if (reg_next_debug_use && reg_next_debug_use[regno]
 	  && BLOCK_FOR_INSN (reg_next_debug_use[regno]) == bb)
 	{
-	  rtx adjres = gen_rtx_PLUS (GET_MODE (inc_insn.reg_res),
-				     inc_insn.reg_res, inc_insn.reg1);
+	  rtx adjres = plus_reg (inc_insn.reg_res, inc_insn.reg1);
 	  if (dump_file)
 	    fprintf (dump_file, "adjusting debug insns\n");
 	  propagate_for_debug (PREV_INSN (reg_next_debug_use[regno]),
@@ -574,7 +583,11 @@ attempt_change (rtx new_addr, rtx inc_reg)
     case FORM_POST_INC:
       regno = REGNO (inc_insn.reg_res);
       if (reg_next_debug_use && reg_next_debug_use[regno]
-	  && BLOCK_FOR_INSN (reg_next_debug_use[regno]) == bb)
+	  && BLOCK_FOR_INSN (reg_next_debug_use[regno]) == bb
+	  /* Currently no capability target supports pre/post subtraction
+	     of a register, so we don't need to find a valid representation
+	     of it.  */
+	  && !CAPABILITY_MODE_P (GET_MODE (inc_insn.reg_res)))
 	{
 	  rtx adjres = gen_rtx_MINUS (GET_MODE (inc_insn.reg_res),
 				      inc_insn.reg_res, inc_insn.reg1);
@@ -597,8 +610,7 @@ attempt_change (rtx new_addr, rtx inc_reg)
       if (reg_next_debug_use && reg_next_debug_use[regno]
 	  && BLOCK_FOR_INSN (reg_next_debug_use[regno]) == bb)
 	{
-	  rtx adjres = gen_rtx_PLUS (GET_MODE (inc_insn.reg_res),
-				     inc_insn.reg_res, inc_insn.reg1);
+	  rtx adjres = plus_reg (inc_insn.reg_res, inc_insn.reg1);
 	  if (dump_file)
 	    fprintf (dump_file, "adjusting debug insns\n");
 	  propagate_for_debug (PREV_INSN (reg_next_debug_use[regno]),
@@ -778,9 +790,8 @@ try_merge (void)
 	fprintf (dump_file, "trying DISP_PRE\n");
       return attempt_change (gen_rtx_PRE_MODIFY (reg_mode,
 						 inc_reg,
-						 gen_rtx_PLUS (reg_mode,
-							       inc_reg,
-							       inc_insn.reg1)),
+						 plus_reg (inc_reg,
+							   inc_insn.reg1)),
 			     inc_reg);
 
     case DISP_POST:          /* con++   */
@@ -788,9 +799,8 @@ try_merge (void)
 	fprintf (dump_file, "trying POST_DISP\n");
       return attempt_change (gen_rtx_POST_MODIFY (reg_mode,
 						  inc_reg,
-						  gen_rtx_PLUS (reg_mode,
-								inc_reg,
-								inc_insn.reg1)),
+						  plus_reg (inc_reg,
+							    inc_insn.reg1)),
 			     inc_reg);
 
     case REG_PRE:            /* ++reg   */
@@ -798,9 +808,8 @@ try_merge (void)
 	fprintf (dump_file, "trying PRE_REG\n");
       return attempt_change (gen_rtx_PRE_MODIFY (reg_mode,
 						 inc_reg,
-						 gen_rtx_PLUS (reg_mode,
-							       inc_reg,
-							       inc_insn.reg1)),
+						 plus_reg (inc_reg,
+							   inc_insn.reg1)),
 			     inc_reg);
 
     case REG_POST:            /* reg++   */
@@ -808,9 +817,8 @@ try_merge (void)
 	fprintf (dump_file, "trying POST_REG\n");
       return attempt_change (gen_rtx_POST_MODIFY (reg_mode,
 						  inc_reg,
-						  gen_rtx_PLUS (reg_mode,
-								inc_reg,
-								inc_insn.reg1)),
+						  plus_reg (inc_reg,
+							    inc_insn.reg1)),
 			     inc_reg);
     }
 }
@@ -856,7 +864,7 @@ parse_add_or_inc (rtx_insn *insn, bool before_mem)
   if (!REG_P (SET_DEST (pat)))
     return false;
 
-  if ((GET_CODE (SET_SRC (pat)) != PLUS)
+  if (!any_plus_p (SET_SRC (pat))
       && (GET_CODE (SET_SRC (pat)) != MINUS))
     return false;
 
@@ -882,7 +890,7 @@ parse_add_or_inc (rtx_insn *insn, bool before_mem)
     {
       /* Process a = b + c where c is a const.  */
       inc_insn.reg1_is_const = true;
-      if (GET_CODE (SET_SRC (pat)) == PLUS)
+      if (any_plus_p (SET_SRC (pat)))
 	{
 	  inc_insn.reg1 = XEXP (SET_SRC (pat), 1);
 	  inc_insn.reg1_val = INTVAL (inc_insn.reg1);
@@ -896,7 +904,7 @@ parse_add_or_inc (rtx_insn *insn, bool before_mem)
     }
   else if ((HAVE_PRE_MODIFY_REG || HAVE_POST_MODIFY_REG)
 	   && (REG_P (XEXP (SET_SRC (pat), 1)))
-	   && GET_CODE (SET_SRC (pat)) == PLUS)
+	   && any_plus_p (SET_SRC (pat)))
     {
       /* Process a = b + c where c is a reg.  */
       inc_insn.reg1 = XEXP (SET_SRC (pat), 1);
@@ -965,7 +973,7 @@ find_address (rtx *address_of_x, rtx findreg)
       return -1;
     }
   if (code == MEM && findreg == inc_insn.reg_res
-      && GET_CODE (XEXP (x, 0)) == PLUS
+      && any_plus_p (XEXP (x, 0))
       && rtx_equal_p (XEXP (XEXP (x, 0), 0), inc_insn.reg_res))
     {
       rtx b = XEXP (XEXP (x, 0), 1);
@@ -1355,7 +1363,8 @@ find_mem (rtx *address_of_x)
       if (find_inc (true))
 	return true;
     }
-  if (code == MEM && GET_CODE (XEXP (x, 0)) == PLUS
+  if (code == MEM
+      && any_plus_p (XEXP (x, 0))
       && REG_P (XEXP (XEXP (x, 0), 0)))
     {
       rtx reg1 = XEXP (XEXP (x, 0), 1);

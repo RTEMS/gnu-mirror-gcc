@@ -17,6 +17,13 @@
 #define m254 -254
 #define m252 -252
 #define m248 -248
+#define m129 -129
+#define m128 -128
+#define m65 -65
+#define m64 -64
+#define m33 -33
+#define m32 -32
+#define m17 -17
 #define m16 -16
 #define m8 -8
 #define m4 -4
@@ -93,4 +100,30 @@
     ptrdiff_t byte_index = (ptrdiff_t) index * SCALE;			\
     TYPE *CAP ptr = (TYPE *CAP) (base + byte_index);			\
     *ptr = 0;								\
+  }
+
+#define PRE_MODIFY_OFFSET(TYPE, OFFSET)					\
+  void									\
+  pre_modify_##TYPE##_##OFFSET (TYPE *CAP ptr, TYPE *CAP end, TYPE x)	\
+  {									\
+    do									\
+      {									\
+        ptr += OFFSET;							\
+	*ptr = x;							\
+	x += 1;								\
+      }									\
+    while (ptr != end);							\
+  }
+
+#define POST_MODIFY_OFFSET(TYPE, OFFSET)				\
+  void									\
+  post_modify_##TYPE##_##OFFSET (TYPE *CAP ptr, TYPE *CAP end, TYPE x)	\
+  {									\
+    do									\
+      {									\
+	*ptr = x;							\
+        ptr += OFFSET;							\
+	x += 1;								\
+      }									\
+    while (ptr != end);							\
   }

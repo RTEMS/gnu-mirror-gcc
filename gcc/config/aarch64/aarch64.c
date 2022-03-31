@@ -9813,6 +9813,10 @@ aarch64_classify_address (struct aarch64_address_info *info,
 				 && (FLOAT_MODE_P (mode)
 				     || VECTOR_MODE_P (mode))));
 
+  /* There are no alternative-base pre-modify or post-modify forms.  */
+  if (alt_base_p && GET_RTX_CLASS (code) == RTX_AUTOINC)
+    return false;
+
   /* For SVE, only accept [Rn], [Rn, Rm, LSL #shift] and
      [Rn, #offset, MUL VL].  */
   if ((vec_flags & (VEC_SVE_DATA | VEC_SVE_PRED)) != 0
@@ -9954,8 +9958,12 @@ aarch64_classify_address (struct aarch64_address_info *info,
 	  if (ldr_str_mode != VOIDmode)
 	    {
 	      gcc_assert (known_eq (ldr_str_offset, 0));
-	      if (!aarch64_offset_9bit_signed_unscaled_p (ldr_str_mode,
-							  offset))
+	      /* The pre/post-modify forms of LDR/STR Cn require a
+		 multiple of 16.  */
+	      if (TARGET_MORELLO && ldr_str_mode == CADImode
+		  ? !offset_9bit_signed_scaled_p (ldr_str_mode, offset)
+		  : !aarch64_offset_9bit_signed_unscaled_p (ldr_str_mode,
+							    offset))
 		return false;
 	    }
 
