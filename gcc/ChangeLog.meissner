@@ -1,3 +1,18 @@
+==================== Work084, patch #4:
+
+Add zero_extendditi2.
+
+This pattern adds zero_extendditi2 so that if we are extending DImode to
+TImode, and we want the result in a vector register, the compiler can
+generate MTVSRDDD.  In addition, on power10, it can generate LXVRDX if it
+is loading the value from memory and wanting to use it in a vector
+register.
+
+2022-03-31   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/vsx.md (zero_extendditi2): New insn.
+
 ==================== Work084, patch #3:
 
 Replace UNSPEC with RTL code for extendditi2.
