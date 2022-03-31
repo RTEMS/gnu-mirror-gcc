@@ -1461,7 +1461,8 @@ standard_conversion (tree to, tree from, tree expr, bool c_cast_p,
 	  || UNSCOPED_ENUM_P (from)
 	  || fcode == POINTER_TYPE
 	  || TYPE_PTRMEM_P (from)
-	  || NULLPTR_TYPE_P (from))
+	  || NULLPTR_TYPE_P (from)
+	  || INTCAP_TYPE_P (from))
 	{
 	  conv = build_conv (ck_std, to, conv);
 	  if (fcode == POINTER_TYPE
