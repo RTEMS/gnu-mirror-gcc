@@ -1,3 +1,27 @@
+==================== Work084, patch #5:
+
+Add zero_extendditi2.  Improve lxvr*x code generation.
+
+This pattern adds zero_extendditi2 so that if we are extending DImode to
+TImode, and we want the result in a vector register, the compiler can
+generate MTVSRDDD.
+
+In addition the patterns for generating lxvr{b,h,w,d}x and stxvr{b,h,w,d}x
+were tuned to allow loading to gpr registers and storing from gpr
+registers.  This prevents needlessly doing direct moves to get the value
+into the vector registers if the gpr register was already selected.
+
+2022-04-01   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/vsx.md (vsx_lxvr<wd>x): Add support for loading to
+	GPR registers.
+	(vsx_stxvr<wd>x): Add support for storing from GPR registers.
+	(zero_extendditi2): New insn.
+
+gcc/testsuite/
+	* gcc.target/powerpc/zero-extend-di-ti.c: New test.
+
 ==================== Work084, patch #4:
 
 Add zero_extendditi2.
