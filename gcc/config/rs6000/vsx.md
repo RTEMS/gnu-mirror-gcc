@@ -5019,58 +5019,6 @@
   DONE;
 })
 
-;; Zero extend DI to TI.  If we don't have the MTVSRDD instruction (and LXVRDX
-;; in the case of power10), we use the machine independent code.  If we are
-;; loading up GPRs, we fall back to the old code.
-(define_insn_and_split "zero_extendditi2"
-  [(set (match_operand:TI 0 "register_operand"              "=r,r,r, wa,wa,wa")
-	(zero_extend:TI (match_operand:DI 1 "input_operand"  "r,m,wa,r, Z, wa")))
-   (clobber (match_scratch:DI 2                             "=X,X,X, X, X, &wa"))]
-  "TARGET_POWERPC64 && TARGET_POWER10"
-  "@
-   #
-   #
-   #
-   mtvsrdd %x0,0,%1
-   lxvrdx %x0,%y1
-   #"
-  "&& reload_completed
-   && (int_reg_operand (operands[0], TImode)
-       || vsx_register_operand (operands[1], DImode))"
-  [(pc)]
-{
-  rtx dest = operands[0];
-  rtx src = operands[1];
-  int dest_regno = reg_or_subregno (dest);
-
-  /* Handle conversion to GPR registers.  Load up the low part and then do
-     a sign extension to the upper part.  */
-  if (INT_REGNO_P (dest_regno))
-    {
-      rtx dest_hi = gen_highpart (DImode, dest);
-      rtx dest_lo = gen_lowpart (DImode, dest);
-
-      emit_move_insn (dest_lo, src);
-      emit_move_insn (dest_hi, const0_rtx);
-      DONE;
-    }
-
-  /* For settomg a VSX register from another VSX register, clear a scratch
-     register, and use XXPERMDI to shift the value into the lower 64-bits.  */
-  rtx dest_v2di = gen_rtx_REG (V2DImode, dest_regno);
-  rtx zero = operands[2];
-
-  emit_move_insn (zero, const0_rtx);
-  if (BYTES_BIG_ENDIAN)
-    emit_insn (gen_vsx_concat_v2di (dest_v2di, zero, src));
-  else
-    emit_insn (gen_vsx_concat_v2di (dest_v2di, src, zero));
-  DONE;
-}
-  [(set_attr "type"   "integer,load,mfvsr,vecmove,vecload,vecperm")
-   (set_attr "isa"    "*,      *,   *,    *,      p10,    *")
-   (set_attr "length" "8,      8,   8,    *,      *,      8")])
-
 ;; Sign extend DI to TI.  We provide both GPR targets and Altivec targets on
 ;; power10.  On earlier systems, the machine independent code will generate a
 ;; shift left to sign extend the 64-bit value to 128-bit.
