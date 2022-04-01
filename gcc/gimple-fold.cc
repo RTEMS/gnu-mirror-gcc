@@ -67,8 +67,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-vector-builder.h"
 #include "tree-ssa-strlen.h"
 #include "varasm.h"
-#include "memmodel.h"
-#include "optabs.h"
 #include "internal-fn.h"
 
 enum strlen_range_kind {
@@ -962,17 +960,14 @@ gimple_fold_builtin_memory_op (gimple_stmt_iterator *gsi,
 	= build_int_cst (build_pointer_type_for_mode (char_type_node,
 						      ptr_mode, true), 0);
 
-      /* If we can perform the copy efficiently with first doing all loads and
-	 then all stores inline it that way.  Currently efficiently means that
-	 we can load all the memory with a single set operation and that the
-	 total size is less than MOVE_MAX * MOVE_RATIO.  */
+      /* If we can perform the copy efficiently with first doing all loads
+         and then all stores inline it that way.  Currently efficiently
+	 means that we can load all the memory into a single integer
+	 register which is what MOVE_MAX gives us.  */
       src_align = get_pointer_alignment (src);
       dest_align = get_pointer_alignment (dest);
       if (tree_fits_uhwi_p (len)
-	  && (compare_tree_int
-	      (len, (MOVE_MAX
-		     * MOVE_RATIO (optimize_function_for_size_p (cfun))))
-	      <= 0)
+	  && compare_tree_int (len, MOVE_MAX) <= 0
 	  /* FIXME: Don't transform copies from strings with known length.
 	     Until GCC 9 this prevented a case in gcc.dg/strlenopt-8.c
 	     from being handled, and the case was XFAILed for that reason.
@@ -1006,7 +1001,6 @@ gimple_fold_builtin_memory_op (gimple_stmt_iterator *gsi,
 	      scalar_int_mode mode;
 	      if (int_mode_for_size (ilen * 8, 0).exists (&mode)
 		  && GET_MODE_SIZE (mode) * BITS_PER_UNIT == ilen * 8
-		  && have_insn_for (SET, mode)
 		  /* If the destination pointer is not aligned we must be able
 		     to emit an unaligned store.  */
 		  && (dest_align >= GET_MODE_ALIGNMENT (mode)
@@ -1039,6 +1033,7 @@ gimple_fold_builtin_memory_op (gimple_stmt_iterator *gsi,
 							  new_stmt);
 			  gimple_assign_set_lhs (new_stmt, srcmem);
 			  gimple_set_vuse (new_stmt, gimple_vuse (stmt));
+			  gimple_set_location (new_stmt, loc);
 			  gsi_insert_before (gsi, new_stmt, GSI_SAME_STMT);
 			}
 		      if (dest_align < GET_MODE_ALIGNMENT (mode))
@@ -1254,7 +1249,11 @@ gimple_fold_builtin_memory_op (gimple_stmt_iterator *gsi,
 	    srcvar = fold_build2 (MEM_REF, desttype, src, off0);
 	  else
 	    {
-	      if (STRICT_ALIGNMENT)
+	      enum machine_mode mode = TYPE_MODE (desttype);
+	      if ((mode == BLKmode && STRICT_ALIGNMENT)
+		  || (targetm.slow_unaligned_access (mode, src_align)
+		      && (optab_handler (movmisalign_optab, mode)
+			  == CODE_FOR_nothing)))
 		return false;
 	      srctype = build_aligned_type (TYPE_MAIN_VARIANT (desttype),
 					    src_align);
@@ -1267,7 +1266,11 @@ gimple_fold_builtin_memory_op (gimple_stmt_iterator *gsi,
 	    destvar = fold_build2 (MEM_REF, srctype, dest, off0);
 	  else
 	    {
-	      if (STRICT_ALIGNMENT)
+	      enum machine_mode mode = TYPE_MODE (srctype);
+	      if ((mode == BLKmode && STRICT_ALIGNMENT)
+		  || (targetm.slow_unaligned_access (mode, dest_align)
+		      && (optab_handler (movmisalign_optab, mode)
+			  == CODE_FOR_nothing)))
 		return false;
 	      desttype = build_aligned_type (TYPE_MAIN_VARIANT (srctype),
 					     dest_align);

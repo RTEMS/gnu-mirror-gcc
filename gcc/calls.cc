@@ -201,7 +201,8 @@ mark_stack_region_used (poly_uint64 lower_bound, poly_uint64 upper_bound)
 {
   unsigned HOST_WIDE_INT const_lower, const_upper;
   const_lower = constant_lower_bound (lower_bound);
-  if (upper_bound.is_constant (&const_upper))
+  if (upper_bound.is_constant (&const_upper)
+      && const_upper <= highest_outgoing_arg_in_use)
     for (unsigned HOST_WIDE_INT i = const_lower; i < const_upper; ++i)
       stack_usage_map[i] = 1;
   else
@@ -3068,6 +3069,7 @@ expand_call (tree exp, rtx target, int ignore)
   for (pass = try_tail_call ? 0 : 1; pass < 2; pass++)
     {
       int sibcall_failure = 0;
+      bool normal_failure = false;
       /* We want to emit any pending stack adjustments before the tail
 	 recursion "call".  That way we know any adjustment after the tail
 	 recursion call can be ignored if we indeed use the tail
@@ -3447,6 +3449,11 @@ expand_call (tree exp, rtx target, int ignore)
 		  >= (1 << (HOST_BITS_PER_INT - 2)))
 	        {
 	          sorry ("passing too large argument on stack");
+		  /* Don't worry about stack clean-up.  */
+		  if (pass == 0)
+		    sibcall_failure = 1;
+		  else
+		    normal_failure = true;
 		  continue;
 		}
 
@@ -3903,9 +3910,12 @@ expand_call (tree exp, rtx target, int ignore)
 
 	  /* Verify that we've deallocated all the stack we used.  */
 	  gcc_assert ((flags & ECF_NORETURN)
+		      || normal_failure
 		      || known_eq (old_stack_allocated,
 				   stack_pointer_delta
 				   - pending_stack_adjust));
+	  if (normal_failure)
+	    normal_call_insns = NULL;
 	}
 
       /* If something prevents making this a sibling call,

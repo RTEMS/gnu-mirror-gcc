@@ -13993,6 +13993,11 @@ bits that are padding bits for all the union members.
 This built-in-function is useful if the padding bits of an object might
 have intederminate values and the object representation needs to be
 bitwise compared to some other object, for example for atomic operations.
+
+For C++, @var{ptr} argument type should be pointer to trivially-copyable
+type, unless the argument is address of a variable or parameter, because
+otherwise it isn't known if the type isn't just a base class whose padding
+bits are reused or laid out differently in a derived class.
 @end deftypefn
 
 @deftypefn {Built-in Function} @var{type} __builtin_bit_cast (@var{type}, @var{arg})
@@ -25139,7 +25144,7 @@ Requires: @code{type} shall be a complete type, (possibly cv-qualified)
 
 @item __has_trivial_assign (type)
 If @code{type} is @code{const}- qualified or is a reference type then
-the trait is @code{false}.  Otherwise if @code{__is_pod (type)} is
+the trait is @code{false}.  Otherwise if @code{__is_trivial (type)} is
 @code{true} then the trait is @code{true}, else if @code{type} is
 a cv-qualified class or union type with a trivial copy assignment
 ([class.copy]) then the trait is @code{true}, else it is @code{false}.
@@ -25147,7 +25152,7 @@ Requires: @code{type} shall be a complete type, (possibly cv-qualified)
 @code{void}, or an array of unknown bound.
 
 @item __has_trivial_copy (type)
-If @code{__is_pod (type)} is @code{true} or @code{type} is a reference
+If @code{__is_trivial (type)} is @code{true} or @code{type} is a reference
 type then the trait is @code{true}, else if @code{type} is a cv class
 or union type with a trivial copy constructor ([class.copy]) then the trait
 is @code{true}, else it is @code{false}.  Requires: @code{type} shall be
@@ -25155,7 +25160,7 @@ a complete type, (possibly cv-qualified) @code{void}, or an array of unknown
 bound.
 
 @item __has_trivial_constructor (type)
-If @code{__is_pod (type)} is @code{true} then the trait is @code{true},
+If @code{__is_trivial (type)} is @code{true} then the trait is @code{true},
 else if @code{type} is a cv-qualified class or union type (or array thereof)
 with a trivial default constructor ([class.ctor]) then the trait is @code{true},
 else it is @code{false}.
@@ -25163,7 +25168,7 @@ Requires: @code{type} shall be a complete type, (possibly cv-qualified)
 @code{void}, or an array of unknown bound.
 
 @item __has_trivial_destructor (type)
-If @code{__is_pod (type)} is @code{true} or @code{type} is a reference type
+If @code{__is_trivial (type)} is @code{true} or @code{type} is a reference type
 then the trait is @code{true}, else if @code{type} is a cv class or union
 type (or array thereof) with a trivial destructor ([class.dtor]) then
 the trait is @code{true}, else it is @code{false}.

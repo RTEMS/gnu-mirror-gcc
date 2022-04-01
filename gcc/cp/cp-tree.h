@@ -466,6 +466,7 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
       IMPLICIT_CONV_EXPR_NONTYPE_ARG (in IMPLICIT_CONV_EXPR)
       BASELINK_FUNCTIONS_MAYBE_INCOMPLETE_P (in BASELINK)
       BIND_EXPR_VEC_DTOR (in BIND_EXPR)
+      ATOMIC_CONSTR_EXPR_FROM_CONCEPT_P (in ATOMIC_CONSTR)
    2: IDENTIFIER_KIND_BIT_2 (in IDENTIFIER_NODE)
       ICS_THIS_FLAG (in _CONV)
       DECL_INITIALIZED_BY_CONSTANT_EXPRESSION_P (in VAR_DECL)
@@ -1678,6 +1679,11 @@ check_constraint_info (tree t)
    Used only in satisfy_atom and in the satisfaction cache.  */
 #define ATOMIC_CONSTR_MAP_INSTANTIATED_P(NODE) \
   TREE_LANG_FLAG_0 (ATOMIC_CONSTR_CHECK (NODE))
+
+/* Whether the expression for this atomic constraint belongs to a
+   concept definition.  */
+#define ATOMIC_CONSTR_EXPR_FROM_CONCEPT_P(NODE) \
+  TREE_LANG_FLAG_1 (ATOMIC_CONSTR_CHECK (NODE))
 
 /* The expression of an atomic constraint. */
 #define ATOMIC_CONSTR_EXPR(NODE) \
@@ -5557,6 +5563,8 @@ enum tsubst_flags {
 				(build_target_expr and friends) */
   tf_norm = 1 << 11,		 /* Build diagnostic information during
 				    constraint normalization.  */
+  tf_tst_ok = 1 << 12,		 /* Allow a typename-specifier to name
+				    a template (C++17 or later).  */
   /* Convenient substitution flags combinations.  */
   tf_warning_or_error = tf_warning | tf_error
 };
@@ -6669,6 +6677,7 @@ extern tree build_vfn_ref			(tree, tree);
 extern tree get_vtable_decl			(tree, int);
 extern bool add_method				(tree, tree, bool);
 extern tree declared_access			(tree);
+extern bool maybe_push_used_methods		(tree);
 extern tree currently_open_class		(tree);
 extern tree currently_open_derived_class	(tree);
 extern tree outermost_open_class		(void);
@@ -6711,6 +6720,7 @@ extern tree in_class_defaulted_default_constructor (tree);
 extern bool user_provided_p			(tree);
 extern bool type_has_user_provided_constructor  (tree);
 extern bool type_has_non_user_provided_default_constructor (tree);
+extern bool type_has_default_ctor_to_be_synthesized (tree);
 extern bool vbase_has_user_provided_move_assign (tree);
 extern tree default_init_uninitialized_part (tree);
 extern bool trivial_default_constructor_is_constexpr (tree);
@@ -6787,6 +6797,7 @@ extern void note_iteration_stmt_body_end	(bool);
 extern void determine_local_discriminator	(tree);
 extern int decls_match				(tree, tree, bool = true);
 extern bool maybe_version_functions		(tree, tree, bool);
+extern bool merge_default_template_args		(tree, tree, bool);
 extern tree duplicate_decls			(tree, tree,
 						 bool hiding = false,
 						 bool was_hidden = false);
@@ -7036,6 +7047,7 @@ extern void emit_mem_initializers		(tree);
 extern tree build_aggr_init			(tree, tree, int,
                                                  tsubst_flags_t);
 extern int is_class_type			(tree, int);
+extern bool is_copy_initialization		(tree);
 extern tree build_zero_init			(tree, tree, bool);
 extern tree build_value_init			(tree, tsubst_flags_t);
 extern tree build_value_init_noctor		(tree, tsubst_flags_t);
@@ -8231,6 +8243,7 @@ extern tree fold_builtin_source_location	(location_t);
 
 /* in name-lookup.cc */
 extern tree strip_using_decl                    (tree);
+extern void diagnose_name_conflict		(tree, tree);
 
 /* Tell the binding oracle what kind of binding we are looking for.  */
 
@@ -8313,7 +8326,6 @@ extern tree evaluate_requires_expr		(tree);
 extern tree tsubst_constraint                   (tree, tree, tsubst_flags_t, tree);
 extern tree tsubst_constraint_info              (tree, tree, tsubst_flags_t, tree);
 extern tree tsubst_parameter_mapping		(tree, tree, tsubst_flags_t, tree);
-extern tree get_mapped_args			(tree);
 
 struct processing_constraint_expression_sentinel
 {
@@ -8403,7 +8415,7 @@ extern bool require_constant_expression (tree);
 extern bool require_rvalue_constant_expression (tree);
 extern bool require_potential_rvalue_constant_expression (tree);
 extern tree cxx_constant_value			(tree, tree = NULL_TREE);
-extern tree cxx_constant_value_sfinae		(tree, tsubst_flags_t);
+extern tree cxx_constant_value_sfinae		(tree, tree, tsubst_flags_t);
 extern void cxx_constant_dtor			(tree, tree);
 extern tree cxx_constant_init			(tree, tree = NULL_TREE);
 extern tree maybe_constant_value		(tree, tree = NULL_TREE, bool = false);

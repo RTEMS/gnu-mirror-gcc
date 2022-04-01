@@ -72,10 +72,15 @@ import dmd.typesem;
 import dmd.visitor;
 
 enum LOGSEMANTIC = false;
+
 void emplaceExp(T : Expression, Args...)(void* p, Args args)
 {
-    scope tmp = new T(args);
-    memcpy(p, cast(void*)tmp, __traits(classInstanceSize, T));
+    static if (__VERSION__ < 2099)
+        const init = typeid(T).initializer;
+    else
+        const init = __traits(initSymbol, T);
+    p[0 .. __traits(classInstanceSize, T)] = init[];
+    (cast(T)p).__ctor(args);
 }
 
 void emplaceExp(T : UnionExp)(T* p, Expression e)
@@ -1792,7 +1797,7 @@ extern (C++) final class IntegerExp : Expression
     {
         super(Loc.initial, EXP.int64, __traits(classInstanceSize, IntegerExp));
         this.type = Type.tint32;
-        this.value = cast(d_int32)value;
+        this.value = cast(int)value;
     }
 
     static IntegerExp create(const ref Loc loc, dinteger_t value, Type type)
@@ -1833,8 +1838,8 @@ extern (C++) final class IntegerExp : Expression
         const val = normalize(ty, value);
         value = val;
         return (ty == Tuns64)
-            ? real_t(cast(d_uns64)val)
-            : real_t(cast(d_int64)val);
+            ? real_t(cast(ulong)val)
+            : real_t(cast(long)val);
     }
 
     override real_t toImaginary()
@@ -1890,38 +1895,38 @@ extern (C++) final class IntegerExp : Expression
             break;
 
         case Tint8:
-            result = cast(d_int8)value;
+            result = cast(byte)value;
             break;
 
         case Tchar:
         case Tuns8:
-            result = cast(d_uns8)value;
+            result = cast(ubyte)value;
             break;
 
         case Tint16:
-            result = cast(d_int16)value;
+            result = cast(short)value;
             break;
 
         case Twchar:
         case Tuns16:
-            result = cast(d_uns16)value;
+            result = cast(ushort)value;
             break;
 
         case Tint32:
-            result = cast(d_int32)value;
+            result = cast(int)value;
             break;
 
         case Tdchar:
         case Tuns32:
-            result = cast(d_uns32)value;
+            result = cast(uint)value;
             break;
 
         case Tint64:
-            result = cast(d_int64)value;
+            result = cast(long)value;
             break;
 
         case Tuns64:
-            result = cast(d_uns64)value;
+            result = cast(ulong)value;
             break;
 
         case Tpointer:
@@ -5828,6 +5833,13 @@ extern (C++) final class IndexExp : BinExp
     extern (D) this(const ref Loc loc, Expression e1, Expression e2)
     {
         super(loc, EXP.index, __traits(classInstanceSize, IndexExp), e1, e2);
+        //printf("IndexExp::IndexExp('%s')\n", toChars());
+    }
+
+    extern (D) this(const ref Loc loc, Expression e1, Expression e2, bool indexIsInBounds)
+    {
+        super(loc, EXP.index, __traits(classInstanceSize, IndexExp), e1, e2);
+        this.indexIsInBounds = indexIsInBounds;
         //printf("IndexExp::IndexExp('%s')\n", toChars());
     }
 

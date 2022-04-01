@@ -2250,9 +2250,9 @@ last_stmt_in_scope (gimple *stmt)
     }
 }
 
-/* Collect interesting labels in LABELS and return the statement preceding
-   another case label, or a user-defined label.  Store a location useful
-   to give warnings at *PREVLOC (usually the location of the returned
+/* Collect labels that may fall through into LABELS and return the statement
+   preceding another case label, or a user-defined label.  Store a location
+   useful to give warnings at *PREVLOC (usually the location of the returned
    statement or of its surrounding scope).  */
 
 static gimple *
@@ -2331,8 +2331,12 @@ collect_fallthrough_labels (gimple_stmt_iterator *gsi_p,
 	  if (gsi_end_p (*gsi_p))
 	    break;
 
-	  struct label_entry l = { false_lab, if_loc };
-	  labels->safe_push (l);
+	  /* A dead label can't fall through.  */
+	  if (!UNUSED_LABEL_P (false_lab))
+	    {
+	      struct label_entry l = { false_lab, if_loc };
+	      labels->safe_push (l);
+	    }
 
 	  /* Go to the last statement of the then branch.  */
 	  gsi_prev (gsi_p);
@@ -2359,6 +2363,17 @@ collect_fallthrough_labels (gimple_stmt_iterator *gsi_p,
 		  labels->safe_push (l);
 		}
 	    }
+	  /* This case is about
+	      if (1 != 0) goto <D.2022>; else goto <D.2023>;
+	      <D.2022>:
+	      n = n + 1; // #1
+	      <D.2023>:  // #2
+	      <D.1988>:  // #3
+	     where #2 is UNUSED_LABEL_P and we want to warn about #1 falling
+	     through to #3.  So set PREV to #1.  */
+	  else if (UNUSED_LABEL_P (false_lab))
+	    prev = gsi_stmt (*gsi_p);
+
 	  /* And move back.  */
 	  gsi_next (gsi_p);
 	}
@@ -4461,9 +4476,19 @@ gimplify_cond_expr (tree *expr_p, gimple_seq *pre_p, fallback_t fallback)
       if (TREE_OPERAND (expr, 1) == NULL_TREE
 	  && !have_else_clause_p
 	  && TREE_OPERAND (expr, 2) != NULL_TREE)
-	label_cont = label_true;
+	{
+	  /* For if (0) {} else { code; } tell -Wimplicit-fallthrough
+	     handling that label_cont == label_true can be only reached
+	     through fallthrough from { code; }.  */
+	  if (integer_zerop (COND_EXPR_COND (expr)))
+	    UNUSED_LABEL_P (label_true) = 1;
+	  label_cont = label_true;
+	}
       else
 	{
+	  bool then_side_effects
+	    = (TREE_OPERAND (expr, 1)
+	       && TREE_SIDE_EFFECTS (TREE_OPERAND (expr, 1)));
 	  gimplify_seq_add_stmt (&seq, gimple_build_label (label_true));
 	  have_then_clause_p = gimplify_stmt (&TREE_OPERAND (expr, 1), &seq);
 	  /* For if (...) { code; } else {} or
@@ -4476,6 +4501,16 @@ gimplify_cond_expr (tree *expr_p, gimple_seq *pre_p, fallback_t fallback)
 	    {
 	      gimple *g;
 	      label_cont = create_artificial_label (UNKNOWN_LOCATION);
+
+	      /* For if (0) { non-side-effect-code } else { code }
+		 tell -Wimplicit-fallthrough handling that label_cont can
+		 be only reached through fallthrough from { code }.  */
+	      if (integer_zerop (COND_EXPR_COND (expr)))
+		{
+		  UNUSED_LABEL_P (label_true) = 1;
+		  if (!then_side_effects)
+		    UNUSED_LABEL_P (label_cont) = 1;
+		}
 
 	      g = gimple_build_goto (label_cont);
 
@@ -4493,6 +4528,13 @@ gimplify_cond_expr (tree *expr_p, gimple_seq *pre_p, fallback_t fallback)
     }
   if (!have_else_clause_p)
     {
+      /* For if (1) { code } or if (1) { code } else { non-side-effect-code }
+	 tell -Wimplicit-fallthrough handling that label_false can be only
+	 reached through fallthrough from { code }.  */
+      if (integer_nonzerop (COND_EXPR_COND (expr))
+	  && (TREE_OPERAND (expr, 2) == NULL_TREE
+	      || !TREE_SIDE_EFFECTS (TREE_OPERAND (expr, 2))))
+	UNUSED_LABEL_P (label_false) = 1;
       gimplify_seq_add_stmt (&seq, gimple_build_label (label_false));
       have_else_clause_p = gimplify_stmt (&TREE_OPERAND (expr, 2), &seq);
     }
@@ -6997,17 +7039,17 @@ gimplify_target_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 
   if (init)
     {
-      tree cleanup = NULL_TREE;
+      gimple_seq init_pre_p = NULL;
 
       /* TARGET_EXPR temps aren't part of the enclosing block, so add it
 	 to the temps list.  Handle also variable length TARGET_EXPRs.  */
       if (!poly_int_tree_p (DECL_SIZE (temp)))
 	{
 	  if (!TYPE_SIZES_GIMPLIFIED (TREE_TYPE (temp)))
-	    gimplify_type_sizes (TREE_TYPE (temp), pre_p);
+	    gimplify_type_sizes (TREE_TYPE (temp), &init_pre_p);
 	  /* FIXME: this is correct only when the size of the type does
 	     not depend on expressions evaluated in init.  */
-	  gimplify_vla_decl (temp, pre_p);
+	  gimplify_vla_decl (temp, &init_pre_p);
 	}
       else
 	{
@@ -7022,12 +7064,14 @@ gimplify_target_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
       /* If TARGET_EXPR_INITIAL is void, then the mere evaluation of the
 	 expression is supposed to initialize the slot.  */
       if (VOID_TYPE_P (TREE_TYPE (init)))
-	ret = gimplify_expr (&init, pre_p, post_p, is_gimple_stmt, fb_none);
+	ret = gimplify_expr (&init, &init_pre_p, post_p, is_gimple_stmt,
+			     fb_none);
       else
 	{
 	  tree init_expr = build2 (INIT_EXPR, void_type_node, temp, init);
 	  init = init_expr;
-	  ret = gimplify_expr (&init, pre_p, post_p, is_gimple_stmt, fb_none);
+	  ret = gimplify_expr (&init, &init_pre_p, post_p, is_gimple_stmt,
+			       fb_none);
 	  init = NULL;
 	  ggc_free (init_expr);
 	}
@@ -7037,18 +7081,9 @@ gimplify_target_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 	  TARGET_EXPR_INITIAL (targ) = NULL_TREE;
 	  return GS_ERROR;
 	}
-      if (init)
-	gimplify_and_add (init, pre_p);
 
-      /* If needed, push the cleanup for the temp.  */
-      if (TARGET_EXPR_CLEANUP (targ))
-	{
-	  if (CLEANUP_EH_ONLY (targ))
-	    gimple_push_cleanup (temp, TARGET_EXPR_CLEANUP (targ),
-				 CLEANUP_EH_ONLY (targ), pre_p);
-	  else
-	    cleanup = TARGET_EXPR_CLEANUP (targ);
-	}
+      if (init)
+	gimplify_and_add (init, &init_pre_p);
 
       /* Add a clobber for the temporary going out of scope, like
 	 gimplify_bind_expr.  */
@@ -7079,8 +7114,13 @@ gimplify_target_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 		}
 	    }
 	}
-      if (cleanup)
-	gimple_push_cleanup (temp, cleanup, false, pre_p);
+
+      gimple_seq_add_seq (pre_p, init_pre_p);
+
+      /* If needed, push the cleanup for the temp.  */
+      if (TARGET_EXPR_CLEANUP (targ))
+	gimple_push_cleanup (temp, TARGET_EXPR_CLEANUP (targ),
+			     CLEANUP_EH_ONLY (targ), pre_p);
 
       /* Only expand this once.  */
       TREE_OPERAND (targ, 3) = init;
@@ -13360,9 +13400,11 @@ gimplify_omp_for (tree *expr_p, gimple_seq *pre_p)
       *gtask_clauses_ptr = NULL_TREE;
       *gforo_clauses_ptr = NULL_TREE;
       BITMAP_FREE (lastprivate_uids);
+      gimple_set_location (gfor, input_location);
       g = gimple_build_bind (NULL_TREE, gfor, NULL_TREE);
       g = gimple_build_omp_task (g, task_clauses, NULL_TREE, NULL_TREE,
 				 NULL_TREE, NULL_TREE, NULL_TREE);
+      gimple_set_location (g, input_location);
       gimple_omp_task_set_taskloop_p (g, true);
       g = gimple_build_bind (NULL_TREE, g, NULL_TREE);
       gomp_for *gforo

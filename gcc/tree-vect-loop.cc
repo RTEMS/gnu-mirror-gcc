@@ -5271,9 +5271,17 @@ vect_create_epilog_for_reduction (loop_vec_info loop_vinfo,
     /* All statements produce live-out values.  */
     live_out_stmts = SLP_TREE_SCALAR_STMTS (slp_node);
   else if (slp_node)
-    /* The last statement in the reduction chain produces the live-out
-       value.  */
-    single_live_out_stmt[0] = SLP_TREE_SCALAR_STMTS (slp_node)[group_size - 1];
+    {
+      /* The last statement in the reduction chain produces the live-out
+	 value.  Note SLP optimization can shuffle scalar stmts to
+	 optimize permutations so we have to search for the last stmt.  */
+      for (k = 0; k < group_size; ++k)
+	if (!REDUC_GROUP_NEXT_ELEMENT (SLP_TREE_SCALAR_STMTS (slp_node)[k]))
+	  {
+	    single_live_out_stmt[0] = SLP_TREE_SCALAR_STMTS (slp_node)[k];
+	    break;
+	  }
+    }
 
   unsigned vec_num;
   int ncopies;
@@ -5466,7 +5474,8 @@ vect_create_epilog_for_reduction (loop_vec_info loop_vinfo,
   
   scalar_dest = gimple_get_lhs (orig_stmt_info->stmt);
   scalar_type = TREE_TYPE (scalar_dest);
-  scalar_results.create (group_size); 
+  scalar_results.truncate (0);
+  scalar_results.reserve_exact (group_size);
   new_scalar_dest = vect_create_destination_var (scalar_dest, NULL);
   bitsize = TYPE_SIZE (scalar_type);
 
@@ -8172,6 +8181,14 @@ vectorizable_induction (loop_vec_info loop_vinfo,
 	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
 			 "SLP induction not supported for variable-length"
 			 " vectors.\n");
+      return false;
+    }
+
+  if (FLOAT_TYPE_P (vectype) && !param_vect_induction_float)
+    {
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+			 "floating point induction vectorization disabled\n");
       return false;
     }
 

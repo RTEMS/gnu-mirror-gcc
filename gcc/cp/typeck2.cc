@@ -1433,10 +1433,15 @@ massage_init_elt (tree type, tree init, int nested, int flags,
     new_flags |= LOOKUP_AGGREGATE_PAREN_INIT;
   init = digest_init_r (type, init, nested ? 2 : 1, new_flags, complain);
   /* When we defer constant folding within a statement, we may want to
-     defer this folding as well.  */
-  tree t = fold_non_dependent_init (init, complain);
-  if (TREE_CONSTANT (t))
-    init = t;
+     defer this folding as well.  Don't call this on CONSTRUCTORs because
+     their elements have already been folded, and we must avoid folding
+     the result of get_nsdmi.  */
+  if (TREE_CODE (init) != CONSTRUCTOR)
+    {
+      tree t = fold_non_dependent_init (init, complain);
+      if (TREE_CONSTANT (t))
+	init = t;
+    }
   return init;
 }
 
@@ -2308,7 +2313,13 @@ build_functional_cast_1 (location_t loc, tree exp, tree parms,
 	       && list_length (parms) == 1)
 	{
 	  init = TREE_VALUE (parms);
-	  if (cxx_dialect < cxx23)
+	  if (is_constrained_auto (anode))
+	    {
+	      if (complain & tf_error)
+		error_at (loc, "%<auto(x)%> cannot be constrained");
+	      return error_mark_node;
+	    }
+	  else if (cxx_dialect < cxx23)
 	    pedwarn (loc, OPT_Wc__23_extensions,
 		     "%<auto(x)%> only available with "
 		     "%<-std=c++2b%> or %<-std=gnu++2b%>");

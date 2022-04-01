@@ -180,6 +180,15 @@ struct _d_dynamicArray final
 `);
     }
 
+    // prevent trailing newlines
+    version (Windows)
+        while (buf.length >= 4 && buf[$-4..$] == "\r\n\r\n")
+            buf.remove(buf.length - 2, 2);
+    else
+        while (buf.length >= 2 && buf[$-2..$] == "\n\n")
+            buf.remove(buf.length - 1, 1);
+
+
     if (global.params.cxxhdrname is null)
     {
         // Write to stdout; assume it succeeds
@@ -851,7 +860,7 @@ public:
             origType = vd.originalType;
         scope(exit) origType = null;
 
-        if (!vd.alignment.isDefault())
+        if (!vd.alignment.isDefault() && !vd.alignment.isUnknown())
         {
             buf.printf("// Ignoring var %s alignment %d", vd.toChars(), vd.alignment.get());
             buf.writenl();
@@ -931,17 +940,12 @@ public:
             return;
         }
 
-        if (vd.storage_class & (AST.STC.static_ | AST.STC.extern_ | AST.STC.tls | AST.STC.gshared) ||
+        if (vd.storage_class & (AST.STC.static_ | AST.STC.extern_ | AST.STC.gshared) ||
         vd.parent && vd.parent.isModule())
         {
             if (vd.linkage != LINK.c && vd.linkage != LINK.cpp && !(tdparent && (this.linkage == LINK.c || this.linkage == LINK.cpp)))
             {
                 ignored("variable %s because of linkage", vd.toPrettyChars());
-                return;
-            }
-            if (vd.storage_class & AST.STC.tls)
-            {
-                ignored("variable %s because of thread-local storage", vd.toPrettyChars());
                 return;
             }
             if (!isSupportedType(type))
@@ -1925,6 +1929,8 @@ public:
                 buf.writestring("unsigned long long");
             else if (ed.ident == DMDType.c_long_double)
                 buf.writestring("long double");
+            else if (ed.ident == DMDType.c_char)
+                buf.writestring("char");
             else if (ed.ident == DMDType.c_wchar_t)
                 buf.writestring("wchar_t");
             else if (ed.ident == DMDType.c_complex_float)
@@ -2672,6 +2678,18 @@ public:
     {
         if (vd._init && !vd._init.isVoidInitializer())
             return AST.initializerToExpression(vd._init);
+        else if (auto ts = vd.type.isTypeStruct())
+        {
+            if (!ts.sym.noDefaultCtor && !ts.sym.isUnionDeclaration())
+            {
+                // Generate a call to the default constructor that we've generated.
+                auto sle = new AST.StructLiteralExp(Loc.initial, ts.sym, new AST.Expressions(0));
+                sle.type = vd.type;
+                return sle;
+            }
+            else
+                return vd.type.defaultInitLiteral(Loc.initial);
+        }
         else
             return vd.type.defaultInitLiteral(Loc.initial);
     }
@@ -2962,6 +2980,7 @@ struct DMDType
     __gshared Identifier c_longlong;
     __gshared Identifier c_ulonglong;
     __gshared Identifier c_long_double;
+    __gshared Identifier c_char;
     __gshared Identifier c_wchar_t;
     __gshared Identifier c_complex_float;
     __gshared Identifier c_complex_double;
@@ -2975,6 +2994,7 @@ struct DMDType
         c_ulonglong     = Identifier.idPool("__c_ulonglong");
         c_long_double   = Identifier.idPool("__c_long_double");
         c_wchar_t       = Identifier.idPool("__c_wchar_t");
+        c_char          = Identifier.idPool("__c_char");
         c_complex_float  = Identifier.idPool("__c_complex_float");
         c_complex_double = Identifier.idPool("__c_complex_double");
         c_complex_real = Identifier.idPool("__c_complex_real");

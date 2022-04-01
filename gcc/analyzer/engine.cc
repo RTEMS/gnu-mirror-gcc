@@ -129,17 +129,24 @@ impl_region_model_context::warn (pending_diagnostic *d)
       return false;
     }
   if (m_eg)
-    {
-      m_eg->get_diagnostic_manager ().add_diagnostic
-	(m_enode_for_diag, m_enode_for_diag->get_supernode (),
-	 m_stmt, m_stmt_finder, d);
-      return true;
-    }
+    return m_eg->get_diagnostic_manager ().add_diagnostic
+      (m_enode_for_diag, m_enode_for_diag->get_supernode (),
+       m_stmt, m_stmt_finder, d);
   else
     {
       delete d;
       return false;
     }
+}
+
+void
+impl_region_model_context::add_note (pending_note *pn)
+{
+  LOG_FUNC (get_logger ());
+  if (m_eg)
+    m_eg->get_diagnostic_manager ().add_note (pn);
+  else
+    delete pn;
 }
 
 void
@@ -1516,10 +1523,15 @@ public:
     m_setjmp_point (setjmp_point), m_stack_pop_event (NULL)
   {}
 
+  int get_controlling_option () const FINAL OVERRIDE
+  {
+    return OPT_Wanalyzer_stale_setjmp_buffer;
+  }
+
   bool emit (rich_location *richloc) FINAL OVERRIDE
   {
     return warning_at
-      (richloc, OPT_Wanalyzer_stale_setjmp_buffer,
+      (richloc, get_controlling_option (),
        "%qs called after enclosing function of %qs has returned",
        get_user_facing_name (m_longjmp_call),
        get_user_facing_name (m_setjmp_call));
@@ -5705,15 +5717,15 @@ impl_run_checkers (logger *logger)
   FOR_EACH_FUNCTION_WITH_GIMPLE_BODY (node)
     node->get_untransformed_body ();
 
-  engine eng (logger);
-
   /* Create the supergraph.  */
   supergraph sg (logger);
+
+  engine eng (&sg, logger);
 
   state_purge_map *purge_map = NULL;
 
   if (flag_analyzer_state_purge)
-    purge_map = new state_purge_map (sg, logger);
+    purge_map = new state_purge_map (sg, eng.get_model_manager (), logger);
 
   if (flag_dump_analyzer_supergraph)
     {
@@ -5798,6 +5810,9 @@ impl_run_checkers (logger *logger)
 
   if (flag_dump_analyzer_json)
     dump_analyzer_json (sg, eg);
+
+  if (flag_dump_analyzer_untracked)
+    eng.get_model_manager ()->dump_untracked_regions ();
 
   delete purge_map;
 }

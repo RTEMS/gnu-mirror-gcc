@@ -30,7 +30,7 @@ import dmd.tokens;
 
 /***********************************************************
  */
-class Parser(AST) : Lexer
+class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
 {
     AST.ModuleDeclaration* md;
 
@@ -1263,7 +1263,7 @@ class Parser(AST) : Lexer
         }
 
         checkConflictSTCGroup(STC.const_ | STC.immutable_ | STC.manifest);
-        checkConflictSTCGroup(STC.gshared | STC.shared_ | STC.tls);
+        checkConflictSTCGroup(STC.gshared | STC.shared_);
         checkConflictSTCGroup!true(STC.safeGroup);
 
         return orig;
@@ -1971,7 +1971,6 @@ class Parser(AST) : Lexer
         case TOK.wcharLiteral:
         case TOK.dcharLiteral:
         case TOK.string_:
-        case TOK.hexadecimalString:
         case TOK.file:
         case TOK.fileFullPath:
         case TOK.line:
@@ -5623,7 +5622,6 @@ LagainStc:
         case TOK.true_:
         case TOK.false_:
         case TOK.string_:
-        case TOK.hexadecimalString:
         case TOK.leftParenthesis:
         case TOK.cast_:
         case TOK.mul:
@@ -7106,7 +7104,6 @@ LagainStc:
                     case TOK.wcharLiteral:
                     case TOK.dcharLiteral:
                     case TOK.string_:
-                    case TOK.hexadecimalString:
                     case TOK.file:
                     case TOK.fileFullPath:
                     case TOK.line:
@@ -7987,7 +7984,6 @@ LagainStc:
             break;
 
         case TOK.string_:
-        case TOK.hexadecimalString:
             {
                 // cat adjacent strings
                 auto s = token.ustring;
@@ -7997,7 +7993,7 @@ LagainStc:
                 {
                     const prev = token;
                     nextToken();
-                    if (token.value == TOK.string_ || token.value == TOK.hexadecimalString)
+                    if (token.value == TOK.string_)
                     {
                         if (token.postfix)
                         {
@@ -9603,5 +9599,3 @@ private bool writeMixin(const(char)[] s, ref Loc loc)
 
     return true;
 }
-
-

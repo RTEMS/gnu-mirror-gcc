@@ -787,6 +787,12 @@ extern void omp_clause_range_check_failed (const_tree, const char *, int,
 #define SWITCH_BREAK_LABEL_P(NODE) \
   (LABEL_DECL_CHECK (NODE)->base.protected_flag)
 
+/* Set on label that is known not to be jumped to, it can be only
+   reached by falling through from previous statements.
+   This is used to implement -Wimplicit-fallthrough.  */
+#define UNUSED_LABEL_P(NODE) \
+  (LABEL_DECL_CHECK (NODE)->base.default_def_flag)
+
 /* Nonzero means this expression is volatile in the C sense:
    its address should be of type `volatile WHATEVER *'.
    In other words, the declared item is volatile qualified.
@@ -1080,6 +1086,7 @@ extern void omp_clause_range_check_failed (const_tree, const char *, int,
 
 /* Define fields and accessors for some special-purpose tree nodes.  */
 
+/* As with STRING_CST, in C terms this is sizeof, not strlen.  */
 #define IDENTIFIER_LENGTH(NODE) \
   (IDENTIFIER_NODE_CHECK (NODE)->identifier.id.len)
 #define IDENTIFIER_POINTER(NODE) \

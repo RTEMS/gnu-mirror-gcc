@@ -808,6 +808,11 @@ gfc_omp_clause_copy_ctor (tree clause, tree dest, tree src)
   gcc_assert (OMP_CLAUSE_CODE (clause) == OMP_CLAUSE_FIRSTPRIVATE
 	      || OMP_CLAUSE_CODE (clause) == OMP_CLAUSE_LINEAR);
 
+  /* Privatize pointer, only; cf. gfc_omp_predetermined_sharing. */
+  if (DECL_P (OMP_CLAUSE_DECL (clause))
+      && GFC_DECL_ASSOCIATE_VAR_P (OMP_CLAUSE_DECL (clause)))
+    return build2 (MODIFY_EXPR, TREE_TYPE (dest), dest, src);
+
   if (DECL_ARTIFICIAL (OMP_CLAUSE_DECL (clause))
       && DECL_LANG_SPECIFIC (OMP_CLAUSE_DECL (clause))
       && GFC_DECL_SAVED_DESCRIPTOR (OMP_CLAUSE_DECL (clause)))
@@ -1321,6 +1326,11 @@ gfc_omp_clause_dtor (tree clause, tree decl)
   tree type = TREE_TYPE (decl), tem;
   tree decl_type = TREE_TYPE (OMP_CLAUSE_DECL (clause));
 
+  /* Only pointer was privatized; cf. gfc_omp_clause_copy_ctor. */
+  if (DECL_P (OMP_CLAUSE_DECL (clause))
+      && GFC_DECL_ASSOCIATE_VAR_P (OMP_CLAUSE_DECL (clause)))
+    return NULL_TREE;
+
   if (DECL_ARTIFICIAL (OMP_CLAUSE_DECL (clause))
       && DECL_LANG_SPECIFIC (OMP_CLAUSE_DECL (clause))
       && GFC_DECL_SAVED_DESCRIPTOR (OMP_CLAUSE_DECL (clause)))
@@ -1597,7 +1607,8 @@ gfc_omp_finish_clause (tree c, gimple_seq *pre_p, bool openacc)
       tree size = create_tmp_var (gfc_array_index_type);
       tree elemsz = TYPE_SIZE_UNIT (gfc_get_element_type (type));
       elemsz = fold_convert (gfc_array_index_type, elemsz);
-      if (GFC_TYPE_ARRAY_AKIND (type) == GFC_ARRAY_POINTER
+      if (GFC_TYPE_ARRAY_AKIND (type) == GFC_ARRAY_ALLOCATABLE
+	  || GFC_TYPE_ARRAY_AKIND (type) == GFC_ARRAY_POINTER
 	  || GFC_TYPE_ARRAY_AKIND (type) == GFC_ARRAY_POINTER_CONT)
 	{
 	  stmtblock_t cond_block;
@@ -3208,7 +3219,8 @@ gfc_trans_omp_clauses (stmtblock_t *block, gfc_omp_clauses *clauses,
 
 		      /* We have to check for n->sym->attr.dimension because
 			 of scalar coarrays.  */
-		      if (n->sym->attr.pointer && n->sym->attr.dimension)
+		      if ((n->sym->attr.pointer || n->sym->attr.allocatable)
+			  && n->sym->attr.dimension)
 			{
 			  stmtblock_t cond_block;
 			  tree size

@@ -12254,10 +12254,22 @@ mips_expand_prologue (void)
 	      /* Insert the RIPL into our copy of SR (k1) as the new IPL.  */
 	      if (!cfun->machine->keep_interrupts_masked_p
 		  && cfun->machine->int_mask == INT_MASK_EIC)
-		emit_insn (gen_insvsi (gen_rtx_REG (SImode, K1_REG_NUM),
-				       GEN_INT (6),
+		{
+		  emit_insn (gen_insvsi (gen_rtx_REG (SImode, K1_REG_NUM),
+				       TARGET_MCU ? GEN_INT (7) : GEN_INT (6),
 				       GEN_INT (SR_IPL),
 				       gen_rtx_REG (SImode, K0_REG_NUM)));
+		  if (TARGET_MCU)
+		    {
+		      emit_insn (gen_lshrsi3 (gen_rtx_REG (SImode, K0_REG_NUM),
+					gen_rtx_REG (SImode, K0_REG_NUM),
+					GEN_INT (7)));
+		      emit_insn (gen_insvsi (gen_rtx_REG (SImode, K1_REG_NUM),
+				       GEN_INT (1),
+				       GEN_INT (SR_IPL+8),
+				       gen_rtx_REG (SImode, K0_REG_NUM)));
+		    }
+		}
 
 	      /* Clear all interrupt mask bits up to and including the
 		 handler's interrupt line.  */
@@ -19974,6 +19986,13 @@ mips_option_override (void)
 	target_flags |= MASK_64BIT;
     }
 
+  /* -fsanitize=address needs to turn on -fasynchronous-unwind-tables in
+     order for tracebacks to be complete but not if any
+     -fasynchronous-unwind-table were already specified.  */
+  if (flag_sanitize & SANITIZE_USER_ADDRESS
+      && !global_options_set.x_flag_asynchronous_unwind_tables)
+    flag_asynchronous_unwind_tables = 1;
+
   if ((target_flags_explicit & MASK_FLOAT64) != 0)
     {
       if (mips_isa_rev >= 6 && !TARGET_FLOAT64)
@@ -22591,7 +22610,7 @@ mips_constant_alignment (const_tree exp, HOST_WIDE_INT align)
 static unsigned HOST_WIDE_INT
 mips_asan_shadow_offset (void)
 {
-  return 0x0aaa0000;
+  return SUBTARGET_SHADOW_OFFSET;
 }
 
 /* Implement TARGET_STARTING_FRAME_OFFSET.  See mips_compute_frame_info

@@ -55,7 +55,7 @@ import dmd.visitor;
 enum LOGDOTEXP = 0;         // log ::dotExp()
 enum LOGDEFAULTINIT = 0;    // log ::defaultInit()
 
-enum SIZE_INVALID = (~cast(d_uns64)0);   // error return from size() functions
+enum SIZE_INVALID = (~cast(uinteger_t)0);   // error return from size() functions
 
 
 /***************************
@@ -887,12 +887,12 @@ extern (C++) abstract class Type : ASTNode
         stringtable = stringtable.init;
     }
 
-    final d_uns64 size()
+    final uinteger_t size()
     {
         return size(Loc.initial);
     }
 
-    d_uns64 size(const ref Loc loc)
+    uinteger_t size(const ref Loc loc)
     {
         error(loc, "no size for type `%s`", toChars());
         return SIZE_INVALID;
@@ -2770,7 +2770,7 @@ extern (C++) final class TypeError : Type
         return this;
     }
 
-    override d_uns64 size(const ref Loc loc)
+    override uinteger_t size(const ref Loc loc)
     {
         return SIZE_INVALID;
     }
@@ -3237,7 +3237,7 @@ extern (C++) final class TypeBasic : Type
         return this;
     }
 
-    override d_uns64 size(const ref Loc loc) const
+    override uinteger_t size(const ref Loc loc) const
     {
         uint size;
         //printf("TypeBasic::size()\n");
@@ -3411,8 +3411,8 @@ extern (C++) final class TypeBasic : Type
             // If converting from integral to integral
             if (tob.flags & TFlags.integral)
             {
-                d_uns64 sz = size(Loc.initial);
-                d_uns64 tosz = tob.size(Loc.initial);
+                const sz = size(Loc.initial);
+                const tosz = tob.size(Loc.initial);
 
                 /* Can't convert to smaller size
                  */
@@ -3512,7 +3512,7 @@ extern (C++) final class TypeVector : Type
         return new TypeVector(basetype.syntaxCopy());
     }
 
-    override d_uns64 size(const ref Loc loc)
+    override uinteger_t size(const ref Loc loc)
     {
         return basetype.size();
     }
@@ -3661,7 +3661,7 @@ extern (C++) final class TypeSArray : TypeArray
         return dim.isIntegerExp() && dim.isIntegerExp().getInteger() == 0;
     }
 
-    override d_uns64 size(const ref Loc loc)
+    override uinteger_t size(const ref Loc loc)
     {
         //printf("TypeSArray::size()\n");
         const n = numberOfElems(loc);
@@ -3860,7 +3860,7 @@ extern (C++) final class TypeDArray : TypeArray
         return result;
     }
 
-    override d_uns64 size(const ref Loc loc) const
+    override uinteger_t size(const ref Loc loc) const
     {
         //printf("TypeDArray::size()\n");
         return target.ptrsize * 2;
@@ -3964,7 +3964,7 @@ extern (C++) final class TypeAArray : TypeArray
         return result;
     }
 
-    override d_uns64 size(const ref Loc loc) const
+    override uinteger_t size(const ref Loc loc) const
     {
         return target.ptrsize;
     }
@@ -4056,7 +4056,7 @@ extern (C++) final class TypePointer : TypeNext
         return result;
     }
 
-    override d_uns64 size(const ref Loc loc) const
+    override uinteger_t size(const ref Loc loc) const
     {
         return target.ptrsize;
     }
@@ -4159,7 +4159,7 @@ extern (C++) final class TypeReference : TypeNext
         return result;
     }
 
-    override d_uns64 size(const ref Loc loc) const
+    override uinteger_t size(const ref Loc loc) const
     {
         return target.ptrsize;
     }
@@ -4214,6 +4214,7 @@ extern (C++) final class TypeFunction : TypeNext
         inoutParam      = 0x0400, // inout on the parameters
         inoutQual       = 0x0800, // inout on the qualifier
         isctor          = 0x1000, // the function is a constructor
+        isreturnscope   = 0x2000, // `this` is returned by value
     }
 
     LINK linkage;               // calling convention
@@ -4247,6 +4248,8 @@ extern (C++) final class TypeFunction : TypeNext
             this.isref = true;
         if (stc & STC.return_)
             this.isreturn = true;
+        if (stc & STC.returnScope)
+            this.isreturnscope = true;
         if (stc & STC.returninferred)
             this.isreturninferred = true;
         if (stc & STC.scope_)
@@ -4285,6 +4288,7 @@ extern (C++) final class TypeFunction : TypeNext
         t.isproperty = isproperty;
         t.isref = isref;
         t.isreturn = isreturn;
+        t.isreturnscope = isreturnscope;
         t.isScopeQual = isScopeQual;
         t.isreturninferred = isreturninferred;
         t.isscopeinferred = isscopeinferred;
@@ -4507,6 +4511,7 @@ extern (C++) final class TypeFunction : TypeNext
             tf.isproperty = t.isproperty;
             tf.isref = t.isref;
             tf.isreturn = t.isreturn;
+            tf.isreturnscope = t.isreturnscope;
             tf.isScopeQual = t.isScopeQual;
             tf.isreturninferred = t.isreturninferred;
             tf.isscopeinferred = t.isscopeinferred;
@@ -4573,6 +4578,7 @@ extern (C++) final class TypeFunction : TypeNext
         t.isproperty = isproperty;
         t.isref = isref;
         t.isreturn = isreturn;
+        t.isreturnscope = isreturnscope;
         t.isScopeQual = isScopeQual;
         t.isreturninferred = isreturninferred;
         t.isscopeinferred = isscopeinferred;
@@ -4590,8 +4596,10 @@ extern (C++) final class TypeFunction : TypeNext
         if (global.gag && !global.params.showGaggedErrors)
             return null;
         // show qualification when toChars() is the same but types are different
-        auto at = arg.type.toChars();
-        bool qual = !arg.type.equals(par.type) && strcmp(at, par.type.toChars()) == 0;
+        // https://issues.dlang.org/show_bug.cgi?id=19948
+        // when comparing the type with strcmp, we need to drop the qualifier
+        auto at = arg.type.mutableOf().toChars();
+        bool qual = !arg.type.equals(par.type) && strcmp(at, par.type.mutableOf().toChars()) == 0;
         if (qual)
             at = arg.type.toPrettyChars(true);
         OutBuffer buf;
@@ -4839,7 +4847,7 @@ extern (C++) final class TypeFunction : TypeNext
                             // Need to make this a rvalue through a temporary
                             m = MATCH.convert;
                         }
-                        else if (!global.params.rvalueRefParam ||
+                        else if (global.params.rvalueRefParam != FeatureState.enabled ||
                                  p.storageClass & STC.out_ ||
                                  !arg.type.isCopyable())  // can't copy to temp for ref parameter
                         {
@@ -5136,6 +5144,18 @@ extern (C++) final class TypeFunction : TypeNext
         else funcFlags &= ~FunctionFlag.isreturn;
     }
 
+    /// set or get if the function has the `returnscope` attribute
+    bool isreturnscope() const pure nothrow @safe @nogc
+    {
+        return (funcFlags & FunctionFlag.isreturnscope) != 0;
+    }
+    /// ditto
+    void isreturnscope(bool v) pure nothrow @safe @nogc
+    {
+        if (v) funcFlags |= FunctionFlag.isreturnscope;
+        else funcFlags &= ~FunctionFlag.isreturnscope;
+    }
+
     /// set or get if the function has the `scope` attribute
     bool isScopeQual() const pure nothrow @safe @nogc
     {
@@ -5310,7 +5330,7 @@ extern (C++) final class TypeDelegate : TypeNext
         return t;
     }
 
-    override d_uns64 size(const ref Loc loc) const
+    override uinteger_t size(const ref Loc loc) const
     {
         return target.ptrsize * 2;
     }
@@ -5417,7 +5437,7 @@ extern (C++) final class TypeTraits : Type
         v.visit(this);
     }
 
-    override d_uns64 size(const ref Loc loc)
+    override uinteger_t size(const ref Loc loc)
     {
         return SIZE_INVALID;
     }
@@ -5544,7 +5564,7 @@ extern (C++) abstract class TypeQualified : Type
         idents.push(e);
     }
 
-    override d_uns64 size(const ref Loc loc)
+    override uinteger_t size(const ref Loc loc)
     {
         error(this.loc, "size of type `%s` is not known", toChars());
         return SIZE_INVALID;
@@ -5699,7 +5719,7 @@ extern (C++) final class TypeTypeof : TypeQualified
         return s;
     }
 
-    override d_uns64 size(const ref Loc loc)
+    override uinteger_t size(const ref Loc loc)
     {
         if (exp.type)
             return exp.type.size(loc);
@@ -5774,7 +5794,7 @@ extern (C++) final class TypeStruct : Type
         return "struct";
     }
 
-    override d_uns64 size(const ref Loc loc)
+    override uinteger_t size(const ref Loc loc)
     {
         return sym.size(loc);
     }
@@ -6130,7 +6150,7 @@ extern (C++) final class TypeEnum : Type
         return this;
     }
 
-    override d_uns64 size(const ref Loc loc)
+    override uinteger_t size(const ref Loc loc)
     {
         return sym.getMemtype(loc).size(loc);
     }
@@ -6297,7 +6317,7 @@ extern (C++) final class TypeClass : Type
         return "class";
     }
 
-    override d_uns64 size(const ref Loc loc) const
+    override uinteger_t size(const ref Loc loc) const
     {
         return target.ptrsize;
     }
@@ -6384,7 +6404,7 @@ extern (C++) final class TypeClass : Type
         /* Conversion derived to const(base)
          */
         int offset = 0;
-        if (to.isBaseOf(this, &offset) && MODimplicitConv(mod, to.mod))
+        if (to.isBaseOf(this, &offset) && offset == 0 && MODimplicitConv(mod, to.mod))
         {
             // Disallow:
             //  derived to base
@@ -6700,7 +6720,7 @@ extern (C++) final class TypeNull : Type
         return true;
     }
 
-    override d_uns64 size(const ref Loc loc) const
+    override uinteger_t size(const ref Loc loc) const
     {
         return tvoidptr.size(loc);
     }
@@ -6759,7 +6779,7 @@ extern (C++) final class TypeNoreturn : Type
         return true;  // bottom type can be implicitly converted to any other type
     }
 
-    override d_uns64 size(const ref Loc loc) const
+    override uinteger_t size(const ref Loc loc) const
     {
         return 0;
     }

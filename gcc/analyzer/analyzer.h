@@ -70,6 +70,7 @@ class region;
   class string_region;
   class bit_range_region;
 class region_model_manager;
+class conjured_purge;
 struct model_merger;
 class store_manager;
 class store;
@@ -85,6 +86,7 @@ class bounded_ranges;
 class bounded_ranges_manager;
 
 class pending_diagnostic;
+class pending_note;
 class state_change_event;
 class checker_path;
 class extrinsic_state;
@@ -102,6 +104,7 @@ class exploded_path;
 class analysis_plan;
 class state_purge_map;
 class state_purge_per_ssa_name;
+class state_purge_per_decl;
 class state_change;
 class rewind_info_t;
 
