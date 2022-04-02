@@ -6,26 +6,33 @@
 /* { dg-do compile { target { ! power10_hw } } } */
 /* { dg-require-effective-target power10_ok } */
 /* { dg-require-effective-target int128 } */
-/* { dg-options "-mdejagnu-cpu=power10 -O2 -save-temps" } */
+
+/* Deliberately set optization to zero for this test to confirm
+   the lxvr*x instruction is generated. At higher optimization levels
+   the instruction we are looking for is sometimes replaced by other
+   load instructions.  */
+/* { dg-options "-mdejagnu-cpu=power10 -O0 -save-temps" } */
 
 /* { dg-final { scan-assembler-times {\mlxvrhx\M} 2 } } */
 
 #define NUM_VEC_ELEMS 8
 #define ITERS 16
 
-/* Codegen at time of writing is a single lxvrwx for the zero extended test,
-   and a lxvrwx + vexts* sign extension instructions for the sign extended
-   test.
+/*
+Codegen at time of writing uses lxvrhx for the zero
+extension test and lhax,mtvsrdd,vextsd2q for the
+sign extended test.
 
-	0000000000000000 <test_sign_extended_load>:
-	   0:   5b 18 44 7c     lxvrhx  vs34,r4,r3
-	   4:   02 16 59 10     vextsh2d v2,v2
-	   8:   02 16 5b 10     vextsd2q v2,v2
-	   c:   20 00 80 4e     blr
+0000000010001810 <test_sign_extended_load>:
+    10001810:	ae 1a 24 7d 	lhax    r9,r4,r3
+    10001814:	67 4b 40 7c 	mtvsrdd vs34,0,r9
+    10001818:	02 16 5b 10 	vextsd2q v2,v2
+    1000181c:	20 00 80 4e 	blr
 
-	0000000000000020 <test_zero_extended_unsigned_load>:
-	  20:   5b 18 44 7c     lxvrhx  vs34,r4,r3
-	  24:   20 00 80 4e     blr  */
+0000000010001830 <test_zero_extended_unsigned_load>:
+    10001830:	5b 18 44 7c 	lxvrhx  vs34,r4,r3
+    10001834:	20 00 80 4e 	blr
+*/
 
 #include <altivec.h>
 #include <stdio.h>

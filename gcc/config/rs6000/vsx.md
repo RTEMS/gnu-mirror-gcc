@@ -1315,32 +1315,14 @@
     }
 })
 
-;; Load rightmost element from load_data using lxvrbx, lxvrhx, lxvrwx, lxvrdx.
-;; Support TImode being in a GPR register to prevent generating lvxr{d,w,b}x
-;; and then two direct moves if we ultimately need the value in a GPR register.
-(define_insn_and_split "vsx_lxvr<wd>x"
-  [(set (match_operand:TI 0 "register_operand" "=r,wa")
-	(zero_extend:TI (match_operand:INT_ISA3  1 "memory_operand" "m,Z")))]
-  "TARGET_POWERPC64 && TARGET_POWER10"
-  "@
-   #
-   lxvr<wd>x %x0,%y1"
-  "&& reload_completed && int_reg_operand (operands[0], TImode)"
-  [(set (match_dup 2) (match_dup 3))
-   (set (match_dup 4) (const_int 0))]
-{
-  rtx op0 = operands[0];
-  rtx op1 = operands[1];
-
-  operands[2] = gen_lowpart (DImode, op0);
-  operands[3] = (<MODE>mode == DImode
-		 ? op1
-		 : gen_rtx_ZERO_EXTEND (DImode, op1));
-
-  operands[4] = gen_highpart (DImode, op0);
-}
-  [(set_attr "type" "load,vecload")
-   (set_attr "num_insns" "2,*")])
+;; Load rightmost element from load_data
+;; using lxvrbx, lxvrhx, lxvrwx, lxvrdx.
+(define_insn "vsx_lxvr<wd>x"
+  [(set (match_operand:TI 0 "vsx_register_operand" "=wa")
+	(zero_extend:TI (match_operand:INT_ISA3  1 "memory_operand" "Z")))]
+  "TARGET_POWER10"
+  "lxvr<wd>x %x0,%y1"
+  [(set_attr "type" "vecload")])
 
 ;; Store rightmost element into store_data
 ;; using stxvrbx, stxvrhx, strvxwx, strvxdx.
@@ -5036,54 +5018,6 @@
      emit_insn (gen_vsx_sign_extend_si_v2di(operands[0], operands[1]));
   DONE;
 })
-
-;; Zero extend DI to TI.  If we don't have the MTVSRDD instruction (and LXVRDX
-;; in the case of power10), we use the machine independent code.  If we are
-;; loading up GPRs, we fall back to the old code.
-(define_insn_and_split "zero_extendditi2"
-  [(set (match_operand:TI 0 "register_operand"                 "=r,r, wa,&wa")
-	(zero_extend:TI (match_operand:DI 1 "register_operand"  "r,wa,r,  wa")))]
-  "TARGET_POWERPC64 && TARGET_P9_VECTOR"
-  "@
-   #
-   #
-   mtvsrdd %x0,0,%1
-   #"
-  "&& reload_completed
-   && (int_reg_operand (operands[0], TImode)
-       || vsx_register_operand (operands[1], DImode))"
-  [(pc)]
-{
-  rtx dest = operands[0];
-  rtx src = operands[1];
-  int dest_regno = reg_or_subregno (dest);
-
-  /* Handle conversion to GPR registers.  Load up the low part and then do
-     zero out the upper part.  */
-  if (INT_REGNO_P (dest_regno))
-    {
-      rtx dest_hi = gen_highpart (DImode, dest);
-      rtx dest_lo = gen_lowpart (DImode, dest);
-
-      emit_move_insn (dest_lo, src);
-      emit_move_insn (dest_hi, const0_rtx);
-      DONE;
-    }
-
-  /* For settomg a VSX register from another VSX register, clear the result
-     register, and use XXPERMDI to shift the value into the lower 64-bits.  */
-  rtx dest_v2di = gen_rtx_REG (V2DImode, dest_regno);
-  rtx dest_di = gen_rtx_REG (DImode, dest_regno);
-
-  emit_move_insn (dest_v2di, CONST0_RTX (V2DImode));
-  if (BYTES_BIG_ENDIAN)
-    emit_insn (gen_vsx_concat_v2di (dest_v2di, dest_di, src));
-  else
-    emit_insn (gen_vsx_concat_v2di (dest_v2di, src, dest_di));
-  DONE;
-}
-  [(set_attr "type"   "integer,mfvsr,vecmove,vecperm")
-   (set_attr "length" "8,      8,    *,      8")])
 
 ;; Sign extend DI to TI.  We provide both GPR targets and Altivec targets on
 ;; power10.  On earlier systems, the machine independent code will generate a
