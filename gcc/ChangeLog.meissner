@@ -20,6 +20,9 @@ gcc/
 	(zero_extendditi2): New insn.
 
 gcc/testsuite/
+	* gcc.target/powerpc/vsx-load-element-extend-int.c: Use -O2
+	instead of -O0 and update insn counts.
+	* gcc.target/powerpc/vsx-load-element-extend-short.c: Likewise.
 	* gcc.target/powerpc/zero-extend-di-ti.c: New test.
 
 ==================== Work084, patch #4:
