@@ -486,12 +486,15 @@ enum aarch64_builtins
   AARCH64_MORELLO_BUILTIN_CAP_BUILD,
   AARCH64_MORELLO_BUILTIN_CAP_TYPE_COPY,
   AARCH64_MORELLO_BUILTIN_COND_SEAL,
+  AARCH64_MORELLO_BUILTIN_COPY_FROM_HIGH,
+  AARCH64_MORELLO_BUILTIN_COPY_TO_HIGH,
   AARCH64_MORELLO_BUILTIN_EQUAL_EXACT,
   AARCH64_MORELLO_BUILTIN_FLAGS_GET,
   AARCH64_MORELLO_BUILTIN_FLAGS_SET,
   AARCH64_MORELLO_BUILTIN_GLOBAL_DATA_GET,
   AARCH64_MORELLO_BUILTIN_LENGTH_GET,
   AARCH64_MORELLO_BUILTIN_OFFSET_GET,
+  AARCH64_MORELLO_BUILTIN_OFFSET_INC,
   AARCH64_MORELLO_BUILTIN_OFFSET_SET,
   AARCH64_MORELLO_BUILTIN_PC_GET,
   AARCH64_MORELLO_BUILTIN_PERMS_AND,
@@ -1496,6 +1499,14 @@ aarch64_init_morello_builtins (void)
      AARCH64_MORELLO_BUILTIN_COND_SEAL,
      build_function_type_list (cap_type_node, cap_type_node,
                                cap_type_node, NULL_TREE)},
+    {"__builtin_cheri_copy_from_high",
+     AARCH64_MORELLO_BUILTIN_COPY_FROM_HIGH,
+     build_function_type_list (size_type_node, cap_type_node,
+                               NULL_TREE)},
+    {"__builtin_cheri_copy_to_high",
+     AARCH64_MORELLO_BUILTIN_COPY_TO_HIGH,
+     build_function_type_list (cap_type_node, cap_type_node,
+                               size_type_node, NULL_TREE)},
     {"__builtin_cheri_equal_exact",
      AARCH64_MORELLO_BUILTIN_EQUAL_EXACT,
      build_function_type_list (boolean_type_node, cap_type_node,
@@ -1517,6 +1528,10 @@ aarch64_init_morello_builtins (void)
     {"__builtin_cheri_offset_get",
      AARCH64_MORELLO_BUILTIN_OFFSET_GET,
      build_function_type_list (size_type_node, cap_type_node, NULL_TREE)},
+    {"__builtin_cheri_offset_increment",
+     AARCH64_MORELLO_BUILTIN_OFFSET_INC,
+     build_function_type_list (cap_type_node, cap_type_node, size_type_node,
+                               NULL_TREE)},
     {"__builtin_cheri_offset_set",
      AARCH64_MORELLO_BUILTIN_OFFSET_SET,
      build_function_type_list (cap_type_node, cap_type_node, size_type_node,
@@ -2303,6 +2318,24 @@ aarch64_expand_morello_builtin (tree exp, rtx target, int fcode)
         expand_insn (CODE_FOR_aarch64_cap_cond_seal, 3, ops);
         return ops[0].value;
       }
+    case AARCH64_MORELLO_BUILTIN_COPY_FROM_HIGH:
+      {
+        rtx op0 = expand_normal (CALL_EXPR_ARG (exp, 0));
+        create_output_operand (&ops[0], target, DImode);
+        create_input_operand (&ops[1], op0, CADImode);
+        expand_insn (CODE_FOR_aarch64_cap_copy_from_high, 2, ops);
+        return ops[0].value;
+      }
+    case AARCH64_MORELLO_BUILTIN_COPY_TO_HIGH:
+      {
+        rtx op0 = expand_normal (CALL_EXPR_ARG (exp, 0));
+        rtx op1 = expand_normal (CALL_EXPR_ARG (exp, 1));
+        create_output_operand (&ops[0], target, CADImode);
+        create_input_operand (&ops[1], op0, CADImode);
+        create_input_operand (&ops[2], op1, DImode);
+        expand_insn (CODE_FOR_aarch64_cap_copy_to_high, 3, ops);
+        return ops[0].value;
+      }
     case AARCH64_MORELLO_BUILTIN_EQUAL_EXACT:
       {
         rtx op0 = expand_normal (CALL_EXPR_ARG (exp, 0));
@@ -2352,6 +2385,16 @@ aarch64_expand_morello_builtin (tree exp, rtx target, int fcode)
         create_input_operand (&ops[1], op0, CADImode);
         expand_insn (CODE_FOR_aarch64_cap_offset_get, 2, ops);
         return ops[0].value;
+      }
+    case AARCH64_MORELLO_BUILTIN_OFFSET_INC:
+      {
+        rtx op0 = expand_normal (CALL_EXPR_ARG (exp, 0));
+        rtx op1 = expand_normal (CALL_EXPR_ARG (exp, 1));
+        scalar_addr_mode mode = as_a <scalar_addr_mode> (GET_MODE (target));
+        rtx expand_plus = expand_pointer_plus (mode, op0, op1, target, 1,
+                                               OPTAB_WIDEN);
+        emit_move_insn (target, expand_plus);
+        return expand_plus;
       }
     case AARCH64_MORELLO_BUILTIN_OFFSET_SET:
       {
@@ -2594,11 +2637,14 @@ aarch64_general_expand_builtin (unsigned int fcode, tree exp, rtx target,
     case AARCH64_MORELLO_BUILTIN_CAP_BUILD:
     case AARCH64_MORELLO_BUILTIN_CAP_TYPE_COPY:
     case AARCH64_MORELLO_BUILTIN_COND_SEAL:
+    case AARCH64_MORELLO_BUILTIN_COPY_FROM_HIGH:
+    case AARCH64_MORELLO_BUILTIN_COPY_TO_HIGH:
     case AARCH64_MORELLO_BUILTIN_EQUAL_EXACT:
     case AARCH64_MORELLO_BUILTIN_FLAGS_GET:
     case AARCH64_MORELLO_BUILTIN_FLAGS_SET:
     case AARCH64_MORELLO_BUILTIN_GLOBAL_DATA_GET:
     case AARCH64_MORELLO_BUILTIN_LENGTH_GET:
+    case AARCH64_MORELLO_BUILTIN_OFFSET_INC:
     case AARCH64_MORELLO_BUILTIN_OFFSET_GET:
     case AARCH64_MORELLO_BUILTIN_OFFSET_SET:
     case AARCH64_MORELLO_BUILTIN_PC_GET:

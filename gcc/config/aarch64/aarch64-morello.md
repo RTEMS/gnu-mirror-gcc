@@ -363,3 +363,22 @@
   "TARGET_MORELLO"
   "unseal\\t%0, %1, %2"
 )
+
+(define_insn "aarch64_cap_copy_to_high"
+  [(set (match_operand:CADI 0 "register_operand" "=rk")
+        (unspec:CADI [(match_operand:CADI 1 "register_operand" "r")
+          (match_operand:DI 2 "register_operand" "r")]
+            UNSPEC_CHERI_COPY_TO_HIGH))
+  ]
+  "TARGET_MORELLO"
+  "cthi\\t%0, %1, %2"
+)
+
+(define_insn "aarch64_cap_copy_from_high"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+        (unspec:DI [(match_operand:CADI 1 "register_operand" "rk")]
+            UNSPEC_CHERI_COPY_TO_HIGH))
+  ]
+  "TARGET_MORELLO"
+  "cfhi\\t%0, %1"
+)
