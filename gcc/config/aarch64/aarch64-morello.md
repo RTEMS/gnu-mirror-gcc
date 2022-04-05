@@ -240,3 +240,126 @@
   "TARGET_MORELLO"
   "cpytype\\t%0, %1, %2"
 )
+
+(define_insn "aarch64_cap_bit_equality"
+  [(set (reg:CC_Z CC_REGNUM)
+        (unspec:CC_Z [(match_operand:CADI 0 "register_operand" "=rk")
+                    (match_operand:CADI 1 "register_operand" "r")]
+          UNSPEC_CHERI_BIT_EQ)
+        )]
+  "TARGET_MORELLO"
+  "chkeq\\t%0, %1"
+)
+
+(define_expand "aarch64_cap_equal_exact"
+  [(match_operand:SI 0 "register_operand")
+   (match_operand:CADI 1 "register_operand")
+   (match_operand:CADI 2 "register_operand")]
+  "TARGET_MORELLO"
+  {
+    rtx chkeq = gen_aarch64_cap_bit_equality (operands[1], operands[2]);
+    rtx cc = SET_DEST (chkeq);
+    emit_insn (chkeq);
+    rtx compare = gen_rtx_EQ (GET_MODE (operands[0]), cc, const0_rtx);
+    emit_insn (gen_rtx_SET (operands[0], compare));
+    DONE;
+  }
+)
+
+(define_insn "aarch64_cap_flags_set"
+  [(set (match_operand:CADI 0 "register_operand" "=rk")
+        (unspec:CADI [(match_operand:CADI 1 "register_operand" "rk")
+          (match_operand:DI 2 "register_operand" "r")]
+            UNSPEC_CHERI_FLAGS_SET))
+     ]
+  "TARGET_MORELLO"
+  "scflgs\\t%0, %1, %2"
+)
+
+(define_insn "aarch64_cap_flags_get"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+        (unspec:DI [(match_operand:CADI 1 "register_operand" "rk")]
+            UNSPEC_CHERI_FLAGS_GET))
+  ]
+  "TARGET_MORELLO"
+  "gcflgs\\t%0, %1"
+)
+
+(define_insn "aarch64_cap_perms_get"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+        (unspec:DI [(match_operand:CADI 1 "register_operand" "rk")]
+            UNSPEC_CHERI_PERMS_GET))
+  ]
+  "TARGET_MORELLO"
+  "gcperm\\t%0, %1"
+)
+
+(define_insn "aarch64_cap_pc_get"
+  [(set (match_operand:CADI 0 "register_operand" "=r")
+        (unspec_volatile:CADI [(const_int 0)]
+            UNSPECV_CHERI_PC_GET))]
+  "TARGET_MORELLO"
+  "adr\\t%0, #0"
+)
+
+(define_insn "aarch64_cap_seal_entry"
+  [(set (match_operand:CADI 0 "register_operand" "=r")
+        (unspec:CADI [(match_operand:CADI 1 "register_operand" "r")]
+            UNSPEC_CHERI_SEAL_ENTRY))
+  ]
+  "TARGET_MORELLO"
+  "seal\\t%0, %1, rb"
+)
+
+(define_insn "aarch64_cap_sealed_get"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+        (unspec:DI [(match_operand:CADI 1 "register_operand" "rk")]
+            UNSPEC_CHERI_SEALED_GET))
+  ]
+  "TARGET_MORELLO"
+  "gcseal\\t%0, %1"
+)
+
+(define_insn "aarch64_cap_subset_of"
+  [(set (reg:CC_N CC_REGNUM)
+        (unspec:CC_N [(match_operand:CADI 0 "register_operand" "=rk")
+                    (match_operand:CADI 1 "register_operand" "rk")]
+          UNSPEC_CHERI_SUBSET_TEST)
+        )]
+  "TARGET_MORELLO"
+  "chkss\\t%0, %1"
+)
+
+(define_expand "aarch64_cap_subset_test"
+  [(match_operand:SI 0 "register_operand")
+   (match_operand:CADI 1 "register_operand")
+   (match_operand:CADI 2 "register_operand")]
+  "TARGET_MORELLO"
+  {
+    rtx chkss = gen_aarch64_cap_subset_of (operands[1], operands[2]);
+    rtx cc = SET_DEST (chkss);
+    emit_insn (chkss);
+    rtx compare = gen_rtx_LT (GET_MODE (operands[0]), cc, const0_rtx);
+    emit_insn (gen_rtx_SET (operands[0], compare));
+    DONE;
+  }
+)
+
+(define_insn "aarch64_cap_type_get"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+        (unspec:DI [(match_operand:CADI 1 "register_operand" "rk")]
+            UNSPEC_CHERI_TYPE_GET))
+  ]
+  "TARGET_MORELLO"
+  "gctype\\t%0, %1"
+)
+
+(define_insn "aarch64_cap_unseal"
+  [(set (match_operand:CADI 0 "register_operand" "=r")
+        (unspec:CADI [(match_operand:CADI 1 "register_operand" "r")
+          (match_operand:CADI 2 "register_operand" "r")]
+            UNSPEC_CHERI_UNSEAL))
+     ]
+  "TARGET_MORELLO"
+  "unseal\\t%0, %1, %2"
+)

@@ -10467,6 +10467,15 @@ aarch64_get_condition_code_1 (machine_mode mode, enum rtx_code comp_code)
 	}
       break;
 
+    case E_CC_Nmode:
+      switch (comp_code)
+	{
+	case GE: return AARCH64_PL;
+	case LT: return AARCH64_MI;
+	default: return -1;
+	}
+
+      break;
     case E_CC_Zmode:
       switch (comp_code)
 	{
