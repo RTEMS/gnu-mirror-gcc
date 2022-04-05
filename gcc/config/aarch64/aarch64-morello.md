@@ -183,3 +183,60 @@
   "TARGET_MORELLO"
   "scoff\\t%0, %1, %2"
 )
+
+(define_insn "aarch64_cap_address_get"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+        (unspec:DI [(match_operand:CADI 1 "register_operand" "rk")]
+            UNSPEC_CHERI_ADDR_GET))
+  ]
+  "TARGET_MORELLO"
+  "gcvalue\\t%0, %1"
+)
+
+(define_insn "aarch64_cap_tag_get"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+        (unspec:DI [(match_operand:CADI 1 "register_operand" "rk")]
+            UNSPEC_CHERI_TAG_GET))
+  ]
+  "TARGET_MORELLO"
+  "gctag\\t%0, %1"
+)
+
+(define_insn "aarch64_cap_tag_clear"
+  [(set (match_operand:CADI 0 "register_operand" "=rk")
+        (unspec:CADI [(match_operand:CADI 1 "register_operand" "rk")]
+            UNSPEC_CHERI_TAG_CLEAR))
+  ]
+  "TARGET_MORELLO"
+  "clrtag\\t%0, %1"
+)
+
+(define_insn "aarch64_cap_build"
+  [(set (match_operand:CADI 0 "register_operand" "=rk")
+        (unspec:CADI [(match_operand:CADI 1 "register_operand" "rk")
+          (match_operand:CADI 2 "register_operand" "rk")]
+            UNSPEC_CHERI_CAP_BUILD))
+     ]
+  "TARGET_MORELLO"
+  "build\\t%0, %2, %1"
+)
+
+(define_insn "aarch64_cap_cond_seal"
+  [(set (match_operand:CADI 0 "register_operand" "=rk")
+        (unspec:CADI [(match_operand:CADI 1 "register_operand" "rk")
+          (match_operand:CADI 2 "register_operand" "rk")]
+            UNSPEC_CHERI_COND_SEAL))
+     ]
+  "TARGET_MORELLO"
+  "cseal\\t%0, %1, %2"
+)
+
+(define_insn "aarch64_cap_type_copy"
+  [(set (match_operand:CADI 0 "register_operand" "=r")
+        (unspec:CADI [(match_operand:CADI 1 "register_operand" "r")
+          (match_operand:CADI 2 "register_operand" "r")]
+            UNSPEC_CHERI_CAP_TYPE_COPY))
+     ]
+  "TARGET_MORELLO"
+  "cpytype\\t%0, %1, %2"
+)
