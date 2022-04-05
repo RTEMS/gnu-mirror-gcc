@@ -1,3 +1,58 @@
+==================== Work084, patch #7:
+Optimize multiply/add of DImode extended to TImode.
+
+On power9 and power10 systems, we have instructions that support doing
+64-bit integers converted to 128-bit integers and producing 128-bit
+results.  This patch adds support to generate these instructions.
+
+Previously GCC had define_expands to handle conversion of the 64-bit
+extend to 128-bit and multiply.  This patch changes these define_expands
+to define_insn_and_split and then it provides combiner patterns to
+generate thes multiply/add instructions.
+
+To support using this optimization on power9, this patch extend the sign
+extend DImode to TImode to also run on power9 (added for PR
+target/104698).
+
+This patch needs the previous patch to add unsigned DImode to TImode
+conversion so that the combiner can combine the extend, multiply, and add
+instructions.
+
+
+2022-04-05   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	PR target/103109
+	* config/rs6000/rs6000.md (su_int32): New code attribute.
+	(<u>mul<mode><dmode>3): Convert from define_expand to
+	define_insn_and_split.
+	(maddld<mode>4): Add generator function.
+	(<u>mulditi3_<u>adddi3): New insn.
+	(<u>mulditi3_add_const): New insn.
+	(<u>mulditi3_<u>adddi3_upper): New insn.
+
+gcc/testsuite/
+	PR target/103109
+	* gcc.target/powerpc/pr103109.c: New test.
+
+==================== Work084, patch #6:
+Make addti3/subti3 be define_insn_and_split, instead of define_expand
+
+This patch makes addti3 and subti3 be define_insn_and_split instead of
+define_expand.  This patch will be a building block to support in a future
+patch PR target/103109 which wants to optimize 128-bit some integer
+multiply-add combinations to use the power9 maddld, maddhd, maddhdu
+instructions.  In order to support recognizing the multiply and add
+combination, we need to keep the addti3 and subti3 as complete insns
+through the combiner phase.
+
+2022-04-05   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/rs6000.md (addti3): Don't immediately expand the
+	insn, delay expansion until the split passes.
+	(subti3): Likewise.
+
 ==================== Work084, patch #5:
 
 Add zero_extendditi2.  Improve lxvr*x code generation.
