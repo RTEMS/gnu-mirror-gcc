@@ -62,8 +62,6 @@ typedef __UINTPTR_TYPE__ uintcap_t;
 #endif
 #endif
 
-/* MORELLO TODO Currently disabled until GCC has implemented CHERI builtins.  */
-#if 0
 #define __CHERI_GET(__name, __type, __get, __default)            \
   static inline __type                                                        \
   cheri_##__name##__get(void * __capability __cap)                              \
@@ -326,8 +324,6 @@ __cheri_low_bits_clear(__UINTPTR_TYPE__ ptr, __SIZE_TYPE__ bits_mask) {
 #undef __CHERI_ACCESSOR
 #undef __CHERI_GET
 #undef __CHERI_SET
-
-#endif  /* if 0  (commenting out parts that GCC can't yet use). */
 
 #undef __cheri_bool
 #undef __IF_CAPS
