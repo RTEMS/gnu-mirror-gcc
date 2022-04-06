@@ -5648,6 +5648,7 @@ bool
 cast_valid_in_integral_constant_expression_p (tree type)
 {
   return (INTEGRAL_OR_ENUMERATION_TYPE_P (type)
+	  || INTCAP_TYPE_P (type)
 	  || cxx_dialect >= cxx11
 	  || dependent_type_p (type)
 	  || type == error_mark_node);

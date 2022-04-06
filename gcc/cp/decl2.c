@@ -1118,7 +1118,8 @@ grokbitfield (const cp_declarator *declarator,
     {
       /* The width must be an integer type.  */
       if (!type_dependent_expression_p (width)
-	  && !INTEGRAL_OR_UNSCOPED_ENUMERATION_TYPE_P (TREE_TYPE (width)))
+	  && !INTEGRAL_OR_UNSCOPED_ENUMERATION_TYPE_P (TREE_TYPE (width))
+	  && !INTCAP_TYPE_P (TREE_TYPE (width)))
 	error ("width of bit-field %qD has non-integral type %qT", value,
 	       TREE_TYPE (width));
       else

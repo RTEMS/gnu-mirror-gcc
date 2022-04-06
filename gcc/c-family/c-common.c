@@ -2073,7 +2073,7 @@ check_case_value (location_t loc, tree value)
 
   if (TREE_CODE (value) == INTEGER_CST)
     /* Promote char or short to int.  */
-    value = perform_integral_promotions (value);
+    value = perform_integral_promotions (drop_intcap (value));
   else if (value != error_mark_node)
     {
       error_at (loc, "case label does not reduce to an integer constant");

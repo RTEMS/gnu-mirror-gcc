@@ -1424,7 +1424,7 @@ force_fit_type (tree type, const poly_wide_int_ref &cst,
 	  || overflowable < 0
 	  || (overflowable > 0 && sign == SIGNED))
 	{
-	  poly_wide_int tmp = poly_wide_int::from (cst, TYPE_PRECISION (type),
+	  poly_wide_int tmp = poly_wide_int::from (cst, TYPE_CAP_PRECISION (type),
 						   sign);
 	  tree t;
 	  if (tmp.is_constant ())

@@ -3400,6 +3400,8 @@ check_bitfield_decl (tree field)
       w = cxx_constant_value (w);
       input_location = loc;
 
+      w = drop_intcap (w);
+
       if (TREE_CODE (w) != INTEGER_CST)
 	{
 	  error ("bit-field %q+D width not an integer constant", field);

@@ -1661,6 +1661,31 @@ cx_error_context (void)
   return r;
 }
 
+/* REPLACE_ADDRESS_VALUE can be used to perform an integer to pointer
+   conversion.  Some such conversions are not valid in a constexpr context, so
+   we need to make sure to detect them.  */
+static tree
+cxx_finish_replace_address_value (const constexpr_ctx *ctx,
+				  tree t,
+				  tree op0, tree op1, bool *non_constant_p)
+{
+  location_t loc = cp_expr_loc_or_input_loc (t);
+
+  if (TYPE_PTR_P (TREE_TYPE (op0)) && !integer_zerop (op1))
+    {
+      gcc_assert (integer_zerop (op0));
+      if (!ctx->quiet)
+	error_at (loc,
+		  "%<reinterpret_cast<%T>(%E)%> is not "
+		  "a constant expression",
+		  TREE_TYPE (op0), op1);
+      *non_constant_p = true;
+      return t;
+    }
+
+  return fold_build_replace_address_value_loc (loc, op0, op1);
+}
+
 /* Evaluate a call T to a GCC internal function when possible and return
    the evaluated result or, under the control of CTX, give an error, set
    NON_CONSTANT_P, and return the unevaluated call T otherwise.  */
@@ -1708,6 +1733,9 @@ cxx_eval_internal_function (const constexpr_ctx *ctx, tree t,
 	  }
       }
 
+    case IFN_REPLACE_ADDRESS_VALUE:
+      break;
+
     default:
       if (!ctx->quiet)
 	error_at (cp_expr_loc_or_input_loc (t),
@@ -1726,6 +1754,11 @@ cxx_eval_internal_function (const constexpr_ctx *ctx, tree t,
   if (TREE_CODE (arg0) == INTEGER_CST && TREE_CODE (arg1) == INTEGER_CST)
     {
       location_t loc = cp_expr_loc_or_input_loc (t);
+
+      if (CALL_EXPR_IFN (t) == IFN_REPLACE_ADDRESS_VALUE)
+	return cxx_finish_replace_address_value (ctx, t, arg0, arg1,
+						 non_constant_p);
+
       tree type = TREE_TYPE (TREE_TYPE (t));
       tree result = fold_binary_loc (loc, opcode, type,
 				     fold_convert_loc (loc, type, arg0),
@@ -7546,6 +7579,7 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 		case IFN_MUL_OVERFLOW:
 		case IFN_LAUNDER:
 		case IFN_VEC_CONVERT:
+		case IFN_REPLACE_ADDRESS_VALUE:
 		  bail = false;
 		  break;
 
