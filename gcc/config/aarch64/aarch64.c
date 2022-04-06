@@ -5896,6 +5896,7 @@ aarch64_pass_by_reference_1 (CUMULATIVE_ARGS *pcum,
      by a pointer to the copy.  */
   if (TARGET_CAPABILITY_HYBRID
       && arg.type
+      && !arg.named
       && (capability_type_p (arg.type) || capcom == CAPCOM_SOME))
     return true;
 
