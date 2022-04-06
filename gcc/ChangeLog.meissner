@@ -1,3 +1,28 @@
+==================== Work086, patch #1:
+
+Disable float128 tests on VxWorks.
+
+In PR target/104253, it was pointed out the that test case added as part
+of fixing the PR does not work on VxWorks because float128 is not
+supported on that system.  I have modified the three tests for float128 so
+that they are manually excluded on VxWorks systems.  In looking at the
+code, I also added checks in check_effective_target_ppc_ieee128_ok to
+disable the systems that will never support VSX instructions which are
+required for float128 support (eabi, eabispe, darwin).
+
+2022-04-06   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+	PR target/104253
+	* lib/target-supports.exp (check_ppc_float128_sw_available): Do
+	not run float128 tests on VxWorks.
+	(check_ppc_float128_hw_available): Likewise.
+	(check_effective_target_ppc_ieee128_ok): Do not run float128 tests
+	on VxWorks.  Also disable systems that do not support VSX
+	instructions.
+
+==================== Work086, branch head:
+
 2022-04-06   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
