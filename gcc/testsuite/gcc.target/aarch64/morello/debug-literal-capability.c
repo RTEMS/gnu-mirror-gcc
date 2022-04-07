@@ -1,6 +1,7 @@
 /* { dg-do assemble } */
 /* { dg-additional-options "-Wno-int-to-pointer-cast" } */
 extern int *val;
+int other(int *);
 __attribute__ ((noinline))
 int foo(int *x)
 {

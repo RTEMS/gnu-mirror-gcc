@@ -41,7 +41,7 @@ set-torture-options "$C_TORTURE_OPTIONS"
 
 # Main loop.
 gcc-dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/*.\[cCS\]]] \
-    "" "$capability_flags -ansi"
+    "" "$capability_flags"
 
 torture-finish
 # All done.

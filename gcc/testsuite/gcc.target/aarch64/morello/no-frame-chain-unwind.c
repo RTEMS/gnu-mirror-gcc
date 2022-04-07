@@ -1,5 +1,5 @@
 /* { dg-do run } */
-/* { dg-additional-options "-fomit-frame-pointer -fasynchronous-unwind-tables -Wno-int-conversion -std=gnu99" } */
+/* { dg-additional-options "-fomit-frame-pointer -fasynchronous-unwind-tables -Wno-int-conversion" } */
 
 /* Testing the unwinder for PureCap when there is no frame chain.
    This tests the following:

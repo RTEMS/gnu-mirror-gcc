@@ -1,5 +1,5 @@
 /* { dg-do assemble } */
-/* { dg-additional-options "-std=gnu11 -save-temps" } */
+/* { dg-additional-options "-save-temps" } */
 /* { dg-final { check-function-bodies "**" ""  { {-O[123s]} } } } */
 /* { dg-skip-if "" { *-*-* } { "*" } { "-mfake-capability" } }  */
 

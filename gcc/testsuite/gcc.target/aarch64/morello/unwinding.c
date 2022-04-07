@@ -1,5 +1,5 @@
 /* { dg-do run } */
-/* { dg-additional-options "-fasynchronous-unwind-tables -Wno-int-conversion -std=gnu99" } */
+/* { dg-additional-options "-fasynchronous-unwind-tables -Wno-int-conversion" } */
 /* { dg-skip-if "" { *-*-* } { "-fomit-frame-pointer" } { "" } }  */
 
 /* Testing the unwinder for PureCap.
