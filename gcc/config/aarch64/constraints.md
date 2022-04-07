@@ -373,6 +373,12 @@
    LD[234] and ST[234] patterns)."
   (match_operand 0 "aarch64_sve_struct_memory_operand"))
 
+(define_memory_constraint "UAu"
+  "@internal
+   Either a general memory operand with a normal base register or
+   a memory operand suitable for alternative-base forms of LDUR"
+  (match_operand 0 "aarch64_ldr_or_alt_ldur_operand"))
+
 (define_constraint "Ufc"
   "A floating point constant which can be used with an\
    FMOV immediate operation."

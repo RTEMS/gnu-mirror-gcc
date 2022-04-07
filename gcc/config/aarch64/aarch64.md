@@ -1207,8 +1207,8 @@
 )
 
 (define_insn "*mov<mode>_aarch64"
-  [(set (match_operand:SHORT 0 "nonimmediate_operand" "=r,r,    w,r  ,r,w, m,m,r,w,w")
-	(match_operand:SHORT 1 "aarch64_mov_operand"  " r,M,D<hq>,Usv,m,m,rZ,w,w,r,w"))]
+  [(set (match_operand:SHORT 0 "nonimmediate_operand" "=r,r,    w,  r,r,  w, m,UAu,r,w,w")
+	(match_operand:SHORT 1 "aarch64_mov_operand"  " r,M,D<hq>,Usv,m,UAu,rZ,  w,w,r,w"))]
   "(register_operand (operands[0], <MODE>mode)
     || aarch64_reg_or_zero (operands[1], <MODE>mode))"
 {
@@ -1272,8 +1272,8 @@
 )
 
 (define_insn_and_split "*movsi_aarch64"
-  [(set (match_operand:SI 0 "nonimmediate_operand" "=r,k,r,r,r,r, r,w, m, m,  r,  r, w,r,w, w")
-	(match_operand:SI 1 "aarch64_mov_operand"  " r,r,k,M,n,Usv,m,m,rZ,w,Usa,Ush,rZ,w,w,Ds"))]
+  [(set (match_operand:SI 0 "nonimmediate_operand" "=r,k,r,r,r,  r,r,  w, m,UAu,  r,  r, w,r,w, w")
+	(match_operand:SI 1 "aarch64_mov_operand"  " r,r,k,M,n,Usv,m,UAu,rZ,  w,Usa,Ush,rZ,w,w,Ds"))]
   "(register_operand (operands[0], SImode)
     || aarch64_reg_or_zero (operands[1], SImode))"
   "@
@@ -1307,8 +1307,8 @@
 )
 
 (define_insn_and_split "*movdi_aarch64"
-  [(set (match_operand:DI 0 "nonimmediate_operand" "=r,k,r,r,r,r,r, r,w, m,m,  r,  r, w,r,w, w")
-	(match_operand:DI 1 "aarch64_mov_operand"  " r,r,k,N,M,n,Usv,m,m,rZ,w,Usa,Ush,rZ,w,w,Dd"))]
+  [(set (match_operand:DI 0 "nonimmediate_operand" "=r,k,r,r,r,r,  r,r,  w, m,UAu,  r,  r, w,r,w, w")
+	(match_operand:DI 1 "aarch64_mov_operand"  " r,r,k,N,M,n,Usv,m,UAu,rZ,  w,Usa,Ush,rZ,w,w,Dd"))]
   "(register_operand (operands[0], DImode)
     || aarch64_reg_or_zero (operands[1], DImode))"
   "@

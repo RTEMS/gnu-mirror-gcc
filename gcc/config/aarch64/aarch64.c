@@ -7935,6 +7935,17 @@ offset_9bit_signed_scaled_p (machine_mode mode, poly_int64 offset)
 	  && IN_RANGE (multiple, -256, 255));
 }
 
+/* Return true if OFFSET is an unsigned 9-bit value multiplied by the size
+   of MODE.  */
+
+static inline bool
+offset_9bit_unsigned_scaled_p (machine_mode mode, poly_int64 offset)
+{
+  HOST_WIDE_INT multiple;
+  return (constant_multiple_p (offset, GET_MODE_SIZE (mode), &multiple)
+	  && IN_RANGE (multiple, 0, 511));
+}
+
 /* Return true if OFFSET is an unsigned 12-bit value multiplied by the size
    of MODE.  */
 
@@ -9654,6 +9665,25 @@ aarch64_classify_address (struct aarch64_address_info *info,
   unsigned int vec_flags = aarch64_classify_vector_mode (mode);
   vec_flags &= ~VEC_PARTIAL;
 
+  /* Whether we're using "alternative" rather than "normal" base registers,
+     i.e. Cn bases outside C64 or Xn bases within C64.  (We currently don't
+     support the latter.)
+
+     The GPR and FP/SIMD ranges for alternative bases are different from
+     each other.  Here we enforce the GPR range for integer modes and the
+     FP/SIMD range for floating-point and vector modes.  This means that
+     GPR loads and stores miss out on some addressing modes for floats, but:
+
+     - Such loads and stores are rare.
+
+     - We want ivopts and other gimple passes to optimize for the FPR range.
+
+     - Advertizing extra modes for GPRs might encourage the RTL passes
+       to load and store via GPR temporaries instead of reloading the
+       address.  This would lead to unnecessary cross-file moves.  */
+  bool alt_base_p = (TARGET_CAPABILITY_HYBRID
+		     && CAPABILITY_MODE_P (GET_MODE (x)));
+
   /* On BE, we use load/store pair for all large int mode load/stores.
      TI/TFmode may also use a load/store pair.  */
   bool advsimd_struct_p = (vec_flags == (VEC_ADVSIMD | VEC_STRUCT));
@@ -9674,7 +9704,10 @@ aarch64_classify_address (struct aarch64_address_info *info,
 			    && (known_lt (GET_MODE_SIZE (mode), 16)
 				|| mode == CADImode
 				|| vec_flags == VEC_ADVSIMD
-				|| vec_flags & VEC_SVE_DATA));
+				|| vec_flags & VEC_SVE_DATA)
+			    && !(alt_base_p
+				 && (FLOAT_MODE_P (mode)
+				     || VECTOR_MODE_P (mode))));
 
   /* For SVE, only accept [Rn], [Rn, Rm, LSL #shift] and
      [Rn, #offset, MUL VL].  */
@@ -9698,6 +9731,7 @@ aarch64_classify_address (struct aarch64_address_info *info,
   gcc_checking_assert (GET_MODE (x) == VOIDmode
 		       || SCALAR_ADDR_MODE_P (GET_MODE (x)));
 
+  info->alt_base_p = alt_base_p;
   switch (code)
     {
     case REG:
@@ -9800,9 +9834,30 @@ aarch64_classify_address (struct aarch64_address_info *info,
 		     || known_eq (GET_MODE_SIZE (mode), 8)
 		     || known_eq (GET_MODE_SIZE (mode), 16))
 		    && aarch64_offset_7bit_signed_scaled_p (mode, offset));
-	  else
-	    return (aarch64_offset_9bit_signed_unscaled_p (mode, offset)
-		    || offset_12bit_unsigned_scaled_p (mode, offset));
+
+	  /* Match LDUR forms, which exist for all remaining
+	     (access mode x base mode) combinations.  */
+	  if (aarch64_offset_9bit_signed_unscaled_p (mode, offset))
+	    return true;
+
+	  if (alt_base_p)
+	    switch (mode)
+	      {
+	      case E_QImode:
+	      case E_SImode:
+	      case E_DImode:
+	      case E_CADImode:
+		/* LDRB Wn, LDR Wn, LDR Xn and LDR Cn.  */
+		return offset_9bit_unsigned_scaled_p (mode, offset);
+
+	      default:
+		/* There is no immediate form of LDRH Wn.  Similarly for
+		   FP/SIMD versions of LDR, which take precedence over
+		   the GPR forms when dealing with FP and vector modes.  */
+		return false;
+	      }
+
+	  return offset_12bit_unsigned_scaled_p (mode, offset);
 	}
 
       if (allow_reg_index_p)
@@ -11468,6 +11523,7 @@ aarch64_legitimize_address (rtx x, rtx /* orig_x  */, machine_mode mode)
 
   if (any_plus_p (x) && CONST_INT_P (XEXP (x, 1)))
     {
+      auto addr_mode = as_a<scalar_addr_mode> (GET_MODE (x));
       rtx base = XEXP (x, 0);
       rtx offset_rtx = XEXP (x, 1);
       HOST_WIDE_INT offset = INTVAL (offset_rtx);
@@ -11516,9 +11572,9 @@ aarch64_legitimize_address (rtx x, rtx /* orig_x  */, machine_mode mode)
 							     cap);
 	  if (base_offset != 0)
 	    {
-	      base = plus_constant (Pmode, base, base_offset);
+	      base = plus_constant (addr_mode, base, base_offset);
 	      base = force_operand (base, NULL_RTX);
-	      return plus_constant (Pmode, base, offset - base_offset);
+	      return plus_constant (addr_mode, base, offset - base_offset);
 	    }
 	}
     }
@@ -19251,6 +19307,26 @@ rtx
 aarch64_endian_lane_rtx (machine_mode mode, unsigned int n)
 {
   return gen_int_mode (ENDIAN_LANE_N (GET_MODE_NUNITS (mode), n), SImode);
+}
+
+/* Return true if X is either:
+
+   - a valid normal-base memory address for an LDR of mode MODE
+   - a valid alternative-base memory address for an LDUR of mode MODE.  */
+
+bool
+aarch64_ldr_or_alt_ldur_address_p (machine_mode mode, rtx x)
+{
+  struct aarch64_address_info addr;
+
+  if (!aarch64_classify_address (&addr, x, mode, false))
+    return false;
+
+  if (!addr.alt_base_p)
+    return true;
+
+  return (addr.type == ADDRESS_REG_IMM
+	  && aarch64_offset_9bit_signed_unscaled_p (mode, addr.const_offset));
 }
 
 /* Return TRUE if OP is a valid vector addressing mode.  */
