@@ -2318,12 +2318,10 @@ proc check_ppc_mma_hw_available { } {
 proc check_ppc_float128_sw_available { } {
     return [check_cached_effective_target ppc_float128_sw_available {
 	# Some simulators are known to not support VSX/power8/power9
-	# instructions. For now, disable on Darwin.  Disable on VxWorks as
-	# well.
+	# instructions.	For now, disable on Darwin.
 	if { [istarget powerpc-*-eabi]
 	     || [istarget powerpc*-*-eabispe]
-	     || [istarget *-*-darwin*]
-	     || [istarget *-*-vxworks]} {
+	     || [istarget *-*-darwin*]} {
 	    expr 0
 	} else {
 	    set options "-mfloat128 -mvsx"
@@ -2346,11 +2344,10 @@ proc check_ppc_float128_sw_available { } {
 proc check_ppc_float128_hw_available { } {
     return [check_cached_effective_target ppc_float128_hw_available {
 	# Some simulators are known to not support VSX/power8/power9
-	# instructions.	For now, disable on Darwin and VxWorks.
+	# instructions.	For now, disable on Darwin.
 	if { [istarget powerpc-*-eabi]
 	     || [istarget powerpc*-*-eabispe]
-	     || [istarget *-*-darwin*]
-	     || [istarget *-*-vxworks]} {
+	     || [istarget *-*-darwin*]} {
 	    expr 0
 	} else {
 	    set options "-mfloat128 -mvsx -mfloat128-hardware -mpower9-vector"
@@ -2373,12 +2370,8 @@ proc check_ppc_float128_hw_available { } {
 # See if the __ieee128 keyword is understood.
 proc check_effective_target_ppc_ieee128_ok { } {
     return [check_cached_effective_target ppc_ieee128_ok {
-	# disable on AIX, Darwin, VxWorks and targets that don't support VSX.
-	if { [istarget *-*-aix*]
-	     || [istarget powerpc-*-eabi]
-	     || [istarget powerpc*-*-eabispe]
-	     || [istarget *-*-darwin*]
-	     || [istarget *-*-vxworks]} {
+	# disable on AIX.
+	if { [istarget *-*-aix*] } {
 	    expr 0
 	} else {
 	    set options "-mfloat128"
