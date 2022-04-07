@@ -6426,15 +6426,15 @@ capability_args_valid (const_tree type,
 		|| (TYPE_MODE (type) != TYPE_MODE (rhs_type))))
 	  return false;
 
-	/* Any conversions *from* a capability type must be either to
-	   another capability type of the same machine mode, to an
-	   integral type with precision less than or equal to that of
-	   the value of a given capability, or to void_type_node.  The
-	   first case is handled by the above clause, while we handle
-	   the other cases here.  */
+	/* Any conversions *from* a capability type must be either to another
+	   capability type of the same machine mode, to an integral type or
+	   non-capability pointer type with a precision less than or equal to
+	   the precision of the value of a given capability, or to
+	   void_type_node.  The first case is handled by the above clause,
+	   while we handle the other cases here.  */
 	if (capability_type_p (rhs_type)
 	    && !capability_type_p (type)
-	    && (!INTEGRAL_TYPE_P (type)
+	    && (!(INTEGRAL_TYPE_P (type) || POINTER_TYPE_P (type))
 		|| (TYPE_PRECISION (type) > TYPE_NONCAP_PRECISION (rhs_type)))
 	    && type != void_type_node)
 	  return false;
