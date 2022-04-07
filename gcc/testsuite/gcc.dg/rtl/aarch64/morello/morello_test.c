@@ -1,5 +1,5 @@
 /* { dg-do compile { target aarch64-*-* } } */
-/* { dg-options "-march=morello -mfake-capability" } */
+/* { dg-options "-mfake-capability" { target { ! aarch64_capability_any } } } */
 
 int __RTL (startwith ("final")) f1 ()
 {

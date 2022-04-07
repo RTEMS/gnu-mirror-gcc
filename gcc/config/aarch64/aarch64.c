@@ -15105,6 +15105,20 @@ aarch64_override_options_internal (struct gcc_options *opts)
   aarch64_tune_params = *(selected_tune->tune);
   aarch64_architecture_version = selected_arch->architecture_version;
 
+  /* We need the extension to be defined so that it gets passed down to the
+     assembler.  The assembler uses the architecture and extension to decide
+     what state the processor should be in (which also defines some parts of
+     the ABI like whether symbol values should have their lowest bit set).
+     If we want to generate purecap code we will need the processor to be in
+     the C64 state.  */
+  if (opts->x_aarch64_abi == AARCH64_ABI_MORELLO_PURECAP
+      && !AARCH64_ISA_C64)
+    {
+      error ("%<-mabi=purecap%> requires the %<+c64%> extension");
+      aarch64_isa_flags |= AARCH64_FL_C64;
+    }
+
+  aarch64_cap = AARCH64_CAPABILITY_NONE;
   if (AARCH64_ISA_C64 || selected_arch->arch == AARCH64_ARCH_MORELLO)
     {
       switch (opts->x_aarch64_abi)
@@ -15113,6 +15127,7 @@ aarch64_override_options_internal (struct gcc_options *opts)
 	    error ("cannot use %<-mabi=ilp32%> with the Morello architecture");
 	    break;
 	  case AARCH64_ABI_MORELLO_PURECAP:
+	    gcc_assert (AARCH64_ISA_C64);
 	    aarch64_cap = AARCH64_CAPABILITY_PURE;
 	    break;
 	  case AARCH64_ABI_LP64:
@@ -15124,29 +15139,17 @@ aarch64_override_options_internal (struct gcc_options *opts)
     }
   else
     {
-      if (opts->x_aarch64_abi == AARCH64_ABI_MORELLO_PURECAP)
-	error ("must use %<-march=morello%> or the %<+c64%> extension "
-	       "when selecting the Morello %<-mabi=purecap%> ABI option");
-      else
-	aarch64_cap = AARCH64_CAPABILITY_NONE;
+      gcc_assert (opts->x_aarch64_abi == AARCH64_ABI_ILP32
+		  || opts->x_aarch64_abi == AARCH64_ABI_LP64);
+      if (aarch64_using_fake_capability)
+	{
+	  if (opts->x_aarch64_abi == AARCH64_ABI_ILP32)
+	    error ("cannot use %<-mfake-capability%> and %<-mabi=ilp32%>"
+		   " together");
+	  else
+	    aarch64_cap = AARCH64_CAPABILITY_FAKE;
+	}
     }
-
-  /*  We need the extension to be defined so that it gets passed down to the
-      assembler.  The assembler uses the architecture and extension to decide
-      what state the processor should be in (which also defines some parts of
-      the ABI like whether symbol values should have their lowest bit set).
-      If we want to generate purecap code we will need the processor to be in
-      the C64 state.  */
-  if (aarch64_cap == AARCH64_CAPABILITY_PURE
-      && ! AARCH64_ISA_C64)
-    error ("%<-mabi=purecap%> requires the %<+c64%> extension");
-
-  if (aarch64_using_fake_capability)
-    aarch64_cap = AARCH64_CAPABILITY_FAKE;
-
-  if (aarch64_using_fake_capability
-      && opts->x_aarch64_abi == AARCH64_ABI_ILP32)
-    error ("Can not use fake_capability and %<-mabi=ilp32%> together");
 
   if (TARGET_CAPABILITY_ANY && opts->x_flag_sanitize)
     /* At the moment we're disabling this.
@@ -15158,11 +15161,11 @@ aarch64_override_options_internal (struct gcc_options *opts)
      * come back to it later.  */
     error ("MORELLO TODO Disabling sanitizers on Morello for now");
   if (opts->x_flag_openmp && TARGET_CAPABILITY_ANY)
-	  error ("MORELLO TODO OpenMP has not been implemented for Morello");
+    error ("MORELLO TODO OpenMP has not been implemented for Morello");
   if (opts->x_flag_openacc && TARGET_CAPABILITY_ANY)
-	  error ("MORELLO TODO OpenACC has not been implemented for Morello");
+    error ("MORELLO TODO OpenACC has not been implemented for Morello");
   if (!flag_inline_atomics && TARGET_CAPABILITY_ANY)
-	  error ("MORELLO TODO -fno-inline-atomics has not been implemented for Morello");
+    error ("MORELLO TODO -fno-inline-atomics has not been implemented for Morello");
   if (flag_fake_hybrid >= flag_fake_hybrid_init)
     srand (get_random_seed (false));
 
