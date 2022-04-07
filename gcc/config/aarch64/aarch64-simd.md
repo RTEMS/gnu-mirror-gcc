@@ -103,9 +103,9 @@
 
 (define_insn "*aarch64_simd_mov<VDMOV:mode>"
   [(set (match_operand:VDMOV 0 "nonimmediate_operand"
-		"=w, m,  m,  w, ?r, ?w, ?r, w")
+		"=w, m,  m,  w, ?r, ?w, ?r, ?r,  ?m, w")
 	(match_operand:VDMOV 1 "general_operand"
-		"m,  Dz, w,  w,  w,  r,  r, Dn"))]
+		"m,  Dz, w,  w,  w,  r,  r,  m, rYZ, Dn"))]
   "TARGET_SIMD
    && (register_operand (operands[0], <MODE>mode)
        || aarch64_simd_reg_or_zero (operands[1], <MODE>mode))"
@@ -119,14 +119,16 @@
      case 4: return "umov\t%0, %1.d[0]";
      case 5: return "fmov\t%d0, %1";
      case 6: return "mov\t%0, %1";
-     case 7:
+     case 7: return "ldr\t%x0, %1";
+     case 8: return "str\t%x1, %0";
+     case 9:
 	return aarch64_output_simd_mov_immediate (operands[1], 64);
      default: gcc_unreachable ();
      }
 }
   [(set_attr "type" "neon_load1_1reg<q>, store_8, neon_store1_1reg<q>,\
 		     neon_logic<q>, neon_to_gp<q>, f_mcr,\
-		     mov_reg, neon_move<q>")]
+		     mov_reg, load_8, store_8, neon_move<q>")]
 )
 
 (define_insn "*aarch64_simd_mov<VQMOV:mode>"
