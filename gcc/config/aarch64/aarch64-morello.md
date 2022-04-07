@@ -107,14 +107,14 @@
 })
 
 (define_insn "*movcadi_aarch64"
-  [(set (match_operand:CADI 0 "nonimmediate_operand" "=rk,r,r,m,r  ,r  ")
-	(match_operand:CADI 1 "aarch64_mov_operand"  "rk ,Z,m,r,Usa,Ush"))]
-  "TARGET_CAPABILITY_PURE"
+  [(set (match_operand:CADI 0 "nonimmediate_operand" "=rk,r,r,m, r  ,r  ")
+	(match_operand:CADI 1 "aarch64_mov_operand"  "rk ,Z,m,rZ,Usa,Ush"))]
+  "TARGET_MORELLO"
   "@
   mov\\t%0, %1
   mov\\t%x0, xzr
   ldr\\t%0, %1
-  str\\t%1, %0
+  str\\t%B1, %0
   adr\\t%0, %c1
   adrp\\t%0, %A1"
 )
