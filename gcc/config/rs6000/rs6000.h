@@ -504,6 +504,19 @@ extern int rs6000_vector_align[];
 #define TARGET_MINMAX	(TARGET_HARD_FLOAT && TARGET_PPC_GFXOPT		\
 			 && (TARGET_P9_MINMAX || !flag_trapping_math))
 
+/* Power8 has special fusion operations that are enabled if we are tuning for
+   power8.  This used to be settable with an option (-mpower8-fusion), but that
+   option has been removed.  */
+#define TARGET_P8_FUSION	(rs6000_tune == PROCESSOR_POWER8)
+
+/* Power8 fusion does not fuse loads with sign extends.  If we are doing higher
+   optimization levels, split loads with sign extension to loads with zero
+   extension and an explicit sign extend operation, so that the zero extending
+   load can be fused.  */
+#define TARGET_P8_FUSION_SIGN	(TARGET_P8_FUSION			\
+				 && optimize_function_for_speed_p (cfun) \
+				 && optimize >= 3)
+
 /* In switching from using target_flags to using rs6000_isa_flags, the options
    machinery creates OPTION_MASK_<xxx> instead of MASK_<xxx>.  For now map
    OPTION_MASK_<xxx> back into MASK_<xxx>.  */
@@ -517,7 +530,6 @@ extern int rs6000_vector_align[];
 #define MASK_FLOAT128_KEYWORD		OPTION_MASK_FLOAT128_KEYWORD
 #define MASK_FLOAT128_HW		OPTION_MASK_FLOAT128_HW
 #define MASK_FPRND			OPTION_MASK_FPRND
-#define MASK_P8_FUSION			OPTION_MASK_P8_FUSION
 #define MASK_HARD_FLOAT			OPTION_MASK_HARD_FLOAT
 #define MASK_HTM			OPTION_MASK_HTM
 #define MASK_ISEL			OPTION_MASK_ISEL
