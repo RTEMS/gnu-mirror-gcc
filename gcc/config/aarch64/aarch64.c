@@ -9619,6 +9619,66 @@ aarch64_classify_index (struct aarch64_address_info *info, rtx x,
   return false;
 }
 
+/* Return true if REG + OFFSET is a valid addressing mode for mode MODE.
+   ALT_BASE_P is true if REG is an "alternative" base register and false
+   if it is a normal base register.  TYPE is the type of address being
+   queried.  */
+
+static bool
+aarch64_valid_ldr_str_offset_p (machine_mode mode, bool alt_base_p,
+				poly_int64 offset,
+				aarch64_addr_query_type type)
+{
+  unsigned int vec_flags = aarch64_classify_vector_mode (mode);
+
+  /* Make "m" use the LD1 offset range for SVE data modes, so
+     that pre-RTL optimizers like ivopts will work to that
+     instead of the wider LDR/STR range.  */
+  if (vec_flags == VEC_SVE_DATA)
+    return (type == ADDR_QUERY_M
+	    ? offset_4bit_signed_scaled_p (mode, offset)
+	    : offset_9bit_signed_scaled_p (mode, offset));
+
+  if (vec_flags == (VEC_SVE_DATA | VEC_STRUCT))
+    {
+      poly_int64 end_offset = (offset
+			       + GET_MODE_SIZE (mode)
+			       - BYTES_PER_SVE_VECTOR);
+      return (type == ADDR_QUERY_M
+	      ? offset_4bit_signed_scaled_p (mode, offset)
+	      : (offset_9bit_signed_scaled_p (SVE_BYTE_MODE, offset)
+		 && offset_9bit_signed_scaled_p (SVE_BYTE_MODE,
+						 end_offset)));
+    }
+
+  if (vec_flags == VEC_SVE_PRED)
+    return offset_9bit_signed_scaled_p (mode, offset);
+
+  /* Match LDUR forms, which exist for all remaining
+     (access mode x base mode) combinations.  */
+  if (aarch64_offset_9bit_signed_unscaled_p (mode, offset))
+    return true;
+
+  if (alt_base_p)
+    switch (mode)
+      {
+      case E_QImode:
+      case E_SImode:
+      case E_DImode:
+      case E_CADImode:
+	/* LDRB Wn, LDR Wn, LDR Xn and LDR Cn.  */
+	return offset_9bit_unsigned_scaled_p (mode, offset);
+
+      default:
+	/* There is no immediate form of LDRH Wn.  Similarly for
+	   FP/SIMD versions of LDR, which take precedence over
+	   the GPR forms when dealing with FP and vector modes.  */
+	return false;
+      }
+
+  return offset_12bit_unsigned_scaled_p (mode, offset);
+}
+
 /* Return true if MODE is one of the modes for which we
    support LDP/STP operations.  */
 
@@ -9781,10 +9841,9 @@ aarch64_classify_address (struct aarch64_address_info *info,
 	     When performing the check for pairs of X registers i.e.  LDP/STP
 	     pass down DImode since that is the natural size of the LDP/STP
 	     instruction memory accesses.  */
-	  if (mode == TImode || mode == TFmode)
-	    return (aarch64_offset_7bit_signed_scaled_p (DImode, offset)
-		    && (aarch64_offset_9bit_signed_unscaled_p (mode, offset)
-			|| offset_12bit_unsigned_scaled_p (mode, offset)));
+	  if ((mode == TImode || mode == TFmode)
+	      && !aarch64_offset_7bit_signed_scaled_p (DImode, offset))
+	    return false;
 
 	  /* A 7bit offset check because OImode will emit a ldp/stp
 	     instruction (only big endian will get here).
@@ -9809,58 +9868,14 @@ aarch64_classify_address (struct aarch64_address_info *info,
 		    && aarch64_offset_7bit_signed_scaled_p (TImode,
 							    offset + 32));
 
-	  /* Make "m" use the LD1 offset range for SVE data modes, so
-	     that pre-RTL optimizers like ivopts will work to that
-	     instead of the wider LDR/STR range.  */
-	  if (vec_flags == VEC_SVE_DATA)
-	    return (type == ADDR_QUERY_M
-		    ? offset_4bit_signed_scaled_p (mode, offset)
-		    : offset_9bit_signed_scaled_p (mode, offset));
-
-	  if (vec_flags == (VEC_SVE_DATA | VEC_STRUCT))
-	    {
-	      poly_int64 end_offset = (offset
-				       + GET_MODE_SIZE (mode)
-				       - BYTES_PER_SVE_VECTOR);
-	      return (type == ADDR_QUERY_M
-		      ? offset_4bit_signed_scaled_p (mode, offset)
-		      : (offset_9bit_signed_scaled_p (SVE_BYTE_MODE, offset)
-			 && offset_9bit_signed_scaled_p (SVE_BYTE_MODE,
-							 end_offset)));
-	    }
-
-	  if (vec_flags == VEC_SVE_PRED)
-	    return offset_9bit_signed_scaled_p (mode, offset);
-
 	  if (load_store_pair_p)
 	    return ((known_eq (GET_MODE_SIZE (mode), 4)
 		     || known_eq (GET_MODE_SIZE (mode), 8)
 		     || known_eq (GET_MODE_SIZE (mode), 16))
 		    && aarch64_offset_7bit_signed_scaled_p (mode, offset));
 
-	  /* Match LDUR forms, which exist for all remaining
-	     (access mode x base mode) combinations.  */
-	  if (aarch64_offset_9bit_signed_unscaled_p (mode, offset))
-	    return true;
-
-	  if (alt_base_p)
-	    switch (mode)
-	      {
-	      case E_QImode:
-	      case E_SImode:
-	      case E_DImode:
-	      case E_CADImode:
-		/* LDRB Wn, LDR Wn, LDR Xn and LDR Cn.  */
-		return offset_9bit_unsigned_scaled_p (mode, offset);
-
-	      default:
-		/* There is no immediate form of LDRH Wn.  Similarly for
-		   FP/SIMD versions of LDR, which take precedence over
-		   the GPR forms when dealing with FP and vector modes.  */
-		return false;
-	      }
-
-	  return offset_12bit_unsigned_scaled_p (mode, offset);
+	  return aarch64_valid_ldr_str_offset_p (mode, alt_base_p, offset,
+						 type);
 	}
 
       if (allow_reg_index_p)
