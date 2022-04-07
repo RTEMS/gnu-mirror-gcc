@@ -2592,6 +2592,18 @@ aarch64_vectorize_related_mode (machine_mode vector_mode,
   return default_vectorize_related_mode (vector_mode, element_mode, nunits);
 }
 
+/* Return true if MODE is a valid mode for MEM addresses.  */
+
+static bool
+aarch64_mem_addr_mode_p (machine_mode mode)
+{
+  if (!CAPABILITY_MODE_P (Pmode) && mode == VOIDmode)
+    return true;
+  if (TARGET_CAPABILITY_HYBRID)
+    return noncapability_mode (mode) == Pmode;
+  return mode == Pmode;
+}
+
 /* Implement TARGET_PREFERRED_ELSE_VALUE.  For binary operations,
    prefer to use the first arithmetic operand as the else value if
    the else value doesn't matter, since that exactly matches the SVE
@@ -9672,8 +9684,9 @@ aarch64_classify_address (struct aarch64_address_info *info,
     return false;
 
   /* For Morello: Exit early if the address is not in Pmode. This blocks all
-  CONST_INTs and other non-capability SCALAR_ADDR_MODE_P types.  */
-  if (aarch64_cap != AARCH64_CAPABILITY_NONE && GET_MODE (x) != Pmode)
+     CONST_INTs and other non-capability SCALAR_ADDR_MODE_P types.  */
+  if (TARGET_CAPABILITY_ANY
+      && !aarch64_mem_addr_mode_p (GET_MODE (x)))
     return false;
 
   gcc_checking_assert (GET_MODE (x) == VOIDmode
@@ -11216,8 +11229,8 @@ aarch64_print_address_internal (FILE *f, machine_mode mode, rtx x,
   unsigned int size, vec_flags;
 
   /* Check all addresses are Pmode - including ILP32.  */
-  if (GET_MODE (x) != Pmode
-      && (TARGET_CAPABILITY_ANY
+  if (!aarch64_mem_addr_mode_p (GET_MODE (x))
+      && (CAPABILITY_MODE_P (Pmode)
 	  || !CONST_INT_P (x)
 	  || trunc_int_for_mode (INTVAL (x), POmode) != INTVAL (x)))
     {
@@ -19239,8 +19252,10 @@ aarch64_endian_lane_rtx (machine_mode mode, unsigned int n)
 bool
 aarch64_simd_mem_operand_p (rtx op)
 {
-  return MEM_P (op) && (GET_CODE (XEXP (op, 0)) == POST_INC
-			|| REG_P (XEXP (op, 0)));
+  return (MEM_P (op)
+	  && (GET_CODE (XEXP (op, 0)) == POST_INC
+	      || REG_P (XEXP (op, 0)))
+	  && aarch64_mem_addr_mode_p (GET_MODE (XEXP (op, 0))));
 }
 
 /* Return true if OP is a valid MEM operand for an SVE LD1R instruction.  */
