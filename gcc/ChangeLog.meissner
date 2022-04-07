@@ -1,3 +1,65 @@
+==================== Work086, patch #4:
+
+Eliminate power8 fusion options, use power8 tuning, PR target/102059
+
+The power8 fusion support used to be set automatically when -mcpu=power8 or
+-mtune=power8 was used, and it was cleared for other cpu's.  However, if you
+used the target attribute or target #pragma to change the default cpu type or
+tuning, you would get an error that a target specifiction option mismatch
+occurred.
+
+This occurred because the rs6000_can_inline_p function just compares the ISA
+bits between the called inline function and the caller.  If the ISA flags of
+the called function is not a subset of the ISA flags of the caller, we won't do
+the inlinging.  When a power9 or power10 function inlines a function that is
+explicitly compiled for power8, the power8 function has the power8 fusion bits
+set and the power9 or power10 functions do not have the fusion bits set.
+
+This code removes the -mpower8-fusion option.  It also removes the
+undocumented -mpower8-fusion-sign option.  It only enables power8 fusion
+if we are tuning for a power8.  Power8 sign fusion is only enabled if we
+are tuning for a power8 and we have -O3 optimization or higher.
+
+I left the -mno-power8-fusion in rs6000.opt and made it so it doesn't
+issue a warning.  If the user explicitly used -mpower8-fusion, then they
+will get a warning that the swtich has been removed.
+
+Similarly, I left in the pragma target and attribute target support for
+power8-fusion, but using it doesn't do anything now.  This is because I
+believe the customer who encountered this problem now is explicitly
+setting the no-power8-fusion option in the pragma or attribute to avoid
+the warning.
+
+2022-04-07   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	PR target/102059
+	* config/rs6000/rs6000-cpus.def (OTHER_FUSION_MASKS): Delete.
+	(ISA_3_0_MASKS_SERVER): Don't clear the fusion masks.
+	(POWERPC_MASKS): Remove OPTION_MASK_P8_FUSION.
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal):
+	Delete code that set the power8 fusion options automatically.
+	(rs6000_opt_masks): Allow #pragma target and attribute target to set
+	power8-fusion, but these no longer represent an option that the
+	user can set.
+	(rs6000_print_options_internal): Skip printing nop options.
+	* config/rs6000/rs6000.h (TARGET_P8_FUSION): New macro.
+	(TARGET_P8_FUSION_SIGN): Likewise.
+	(MASK_P8_FUSION): Delete.
+	* config/rs6000/rs6000.opt (-mpower8-fusion): Recognize the option but
+	ignore the no form and warn that the option was removed for the regular
+	form.
+	(-mpower8-fusion-sign): Warn that the option has been removed.
+	* doc/invoke.texi (RS/6000 and PowerPC Options): Delete
+	-mpower8-fusion.
+
+gcc/testsuite/
+	PR target/102059
+	* gcc.dg/lto/pr102059-1_0.c: Remove -mno-power8-fusion.
+	* gcc.dg/lto/pr102059-2_0.c: Likewise.
+	* gcc.target/powerpc/pr102059-3.c: Likewise.
+	* gcc.target/powerpc/pr102059-4.c: New test.
+
 ==================== Work086, patch #3:
 
 Replace UNSPEC with RTL code for extendditi2.
