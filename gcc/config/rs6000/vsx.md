@@ -358,7 +358,6 @@
    UNSPEC_VSX_FIRST_MISMATCH_EOS_INDEX
    UNSPEC_XXGENPCV
    UNSPEC_MTVSBM
-   UNSPEC_EXTENDDITI2
    UNSPEC_VCNTMB
    UNSPEC_VEXPAND
    UNSPEC_VEXTRACT
@@ -5083,10 +5082,25 @@
    (set_attr "type" "shift,load,vecmove,vecperm,load")])
 
 ;; Sign extend 64-bit value in TI reg, word 1, to 128-bit value in TI reg
-(define_insn "extendditi2_vector"
+(define_expand "extendditi2_vector"
+  [(use (match_operand:TI 0 "gpc_reg_operand"))
+   (use (match_operand:TI 1 "gpc_reg_operand"))]
+  "TARGET_POWER10"
+{
+  rtx dest = operands[0];
+  rtx src_v2di = gen_lowpart (V2DImode, operands[1]);
+  rtx element = GEN_INT (VECTOR_ELEMENT_SCALAR_64BIT);
+
+  emit_insn (gen_extendditi2_vector2 (dest, src_v2di, element));
+  DONE;
+})
+
+(define_insn "extendditi2_vector2"
   [(set (match_operand:TI 0 "gpc_reg_operand" "=v")
-	(unspec:TI [(match_operand:TI 1 "gpc_reg_operand" "v")]
-		     UNSPEC_EXTENDDITI2))]
+	(sign_extend:TI
+	 (vec_select:DI
+	  (match_operand:V2DI 1 "gpc_reg_operand" "v")
+	  (parallel [(match_operand 2 "vsx_scalar_64bit" "wD")]))))]
   "TARGET_POWER10"
   "vextsd2q %0,%1"
   [(set_attr "type" "vecexts")])
