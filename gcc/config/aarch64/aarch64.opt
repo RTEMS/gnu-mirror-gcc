@@ -155,9 +155,6 @@ Enum(aarch64_abi) String(lp64) Value(AARCH64_ABI_LP64)
 EnumValue
 Enum(aarch64_abi) String(purecap) Value(AARCH64_ABI_MORELLO_PURECAP)
 
-EnumValue
-Enum(aarch64_abi) String(hybrid) Value(AARCH64_ABI_MORELLO_HYBRID)
-
 mfake-capability
 Target Var(aarch64_using_fake_capability, 1) Init(0)
 Determine whether we use the internal fake capability representation.

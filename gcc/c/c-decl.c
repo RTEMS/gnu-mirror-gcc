@@ -5978,7 +5978,7 @@ test_fake_hybrid (void)
 {
   static int fake_hybrid_counter;
 
-  if (!flag_fake_hybrid)
+  if (!flag_fake_hybrid || !targetm.capability_mode ().exists ())
     return false;
 
   if (flag_fake_hybrid_init < flag_fake_hybrid)

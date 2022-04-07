@@ -15105,26 +15105,32 @@ aarch64_override_options_internal (struct gcc_options *opts)
   aarch64_tune_params = *(selected_tune->tune);
   aarch64_architecture_version = selected_arch->architecture_version;
 
-  /* MORELLO TODO.
-     Currently just using the standard LP64 ABI rather than propogating the
-     alternate ABI's across the backend.  */
-  if (opts->x_aarch64_abi > AARCH64_ABI_ILP32)
+  if (AARCH64_ISA_C64 || selected_arch->arch == AARCH64_ARCH_MORELLO)
     {
-      if (selected_arch->arch != AARCH64_ARCH_MORELLO)
-	error ("must use %<-march=morello%> when selecting a morello ABI");
       switch (opts->x_aarch64_abi)
 	{
-	case AARCH64_ABI_MORELLO_HYBRID:
-	  aarch64_cap = AARCH64_CAPABILITY_HYBRID;
-	  break;
-	case AARCH64_ABI_MORELLO_PURECAP:
-	  aarch64_cap = AARCH64_CAPABILITY_PURE;
-	  break;
-	default:
-	  gcc_unreachable ();
+	  case AARCH64_ABI_ILP32:
+	    error ("cannot use %<-mabi=ilp32%> with the Morello architecture");
+	    break;
+	  case AARCH64_ABI_MORELLO_PURECAP:
+	    aarch64_cap = AARCH64_CAPABILITY_PURE;
+	    break;
+	  case AARCH64_ABI_LP64:
+	    aarch64_cap = AARCH64_CAPABILITY_HYBRID;
+	    break;
+	  default:
+	    gcc_unreachable ();
 	}
-      opts->x_aarch64_abi = AARCH64_ABI_LP64;
     }
+  else
+    {
+      if (opts->x_aarch64_abi == AARCH64_ABI_MORELLO_PURECAP)
+	error ("must use %<-march=morello%> or the %<+c64%> extension "
+	       "when selecting the Morello %<-mabi=purecap%> ABI option");
+      else
+	aarch64_cap = AARCH64_CAPABILITY_NONE;
+    }
+
   /*  We need the extension to be defined so that it gets passed down to the
       assembler.  The assembler uses the architecture and extension to decide
       what state the processor should be in (which also defines some parts of

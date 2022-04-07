@@ -977,15 +977,14 @@ enum aarch64_abi_type
      etc, but allows us to use a more convenient separation of ideas in the
      backend.  */
   AARCH64_ABI_MORELLO_PURECAP = 2,
-  AARCH64_ABI_MORELLO_HYBRID = 3,
-  AARCH64_ABI_MORELLO_FAKE = 4
+  AARCH64_ABI_MORELLO_FAKE = 3
 };
 
 #ifndef AARCH64_ABI_DEFAULT
 #define AARCH64_ABI_DEFAULT AARCH64_ABI_LP64
 #endif
 
-#define TARGET_ILP32	(aarch64_abi & AARCH64_ABI_ILP32)
+#define TARGET_ILP32	(aarch64_abi == AARCH64_ABI_ILP32)
 
 enum aarch64_capability {
     AARCH64_CAPABILITY_NONE,

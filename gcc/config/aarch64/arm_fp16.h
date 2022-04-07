@@ -32,7 +32,7 @@
 #pragma GCC push_options
 
 #ifdef __ARM_FEATURE_C64
-#pragma GCC target ("arch=morello+c64+fp16")
+#pragma GCC target ("arch=armv8.2-a+c64+fp16")
 #else
 #pragma GCC target ("arch=armv8.2-a+fp16")
 #endif

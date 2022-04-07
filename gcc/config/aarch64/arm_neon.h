@@ -32214,7 +32214,7 @@ __INTERLEAVE_LIST (zip)
 #pragma GCC push_options
 
 #ifdef __ARM_FEATURE_C64
-#pragma GCC target ("arch=morello+c64+fp16")
+#pragma GCC target ("arch=armv8.2-a+c64+fp16")
 #else
 #pragma GCC target ("arch=armv8.2-a+fp16")
 #endif
@@ -33382,7 +33382,7 @@ vminnmvq_f16 (float16x8_t __a)
 #pragma GCC push_options
 
 #ifdef __ARM_FEATURE_C64
-#pragma GCC target ("arch=morello+c64")
+#pragma GCC target ("arch=armv8.2-a+c64+dotprod")
 #else
 #pragma GCC target ("arch=armv8.2-a+dotprod")
 #endif
@@ -33478,7 +33478,7 @@ vdotq_laneq_s32 (int32x4_t __r, int8x16_t __a, int8x16_t __b, const int __index)
 #pragma GCC push_options
 
 #ifdef __ARM_FEATURE_C64
-#pragma GCC target ("arch=morello+c64+sm4")
+#pragma GCC target ("arch=armv8.2-a+c64+sm4")
 #else
 #pragma GCC target ("arch=armv8.2-a+sm4")
 #endif
@@ -33550,7 +33550,7 @@ vsm4ekeyq_u32 (uint32x4_t __a, uint32x4_t __b)
 #pragma GCC push_options
 
 #ifdef __ARM_FEATURE_C64
-#pragma GCC target ("arch=morello+c64+sha3")
+#pragma GCC target ("arch=armv8.2-a+c64+sha3")
 #else
 #pragma GCC target ("arch=armv8.2-a+sha3")
 #endif
@@ -34196,7 +34196,7 @@ vcmlaq_rot270_laneq_f32 (float32x4_t __r, float32x4_t __a, float32x4_t __b,
 #pragma GCC push_options
 
 #ifdef __ARM_FEATURE_C64
-#pragma GCC target ("arch=morello+c64+fp16fml")
+#pragma GCC target ("arch=armv8.2-a+c64+fp16fml")
 #else
 #pragma GCC target ("arch=armv8.2-a+fp16fml")
 #endif
@@ -34515,7 +34515,7 @@ vrnd64xq_f64 (float64x2_t __a)
 #pragma GCC push_options
 
 #ifdef __ARM_FEATURE_C64
-#pragma GCC target ("arch=morello+c64+bf16")
+#pragma GCC target ("arch=armv8.2-a+c64+bf16")
 #else
 #pragma GCC target ("arch=armv8.2-a+bf16")
 #endif
@@ -35598,7 +35598,7 @@ vcvtq_high_bf16_f32 (bfloat16x8_t __inactive, float32x4_t __a)
 #pragma GCC push_options
 
 #ifdef __ARM_FEATURE_C64
-#pragma GCC target ("arch=morello+c64+i8mm")
+#pragma GCC target ("arch=armv8.2-a+c64+i8mm")
 #else
 #pragma GCC target ("arch=armv8.2-a+i8mm")
 #endif
