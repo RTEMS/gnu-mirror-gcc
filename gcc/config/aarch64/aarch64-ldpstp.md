@@ -19,11 +19,11 @@
 ;; <http://www.gnu.org/licenses/>.
 
 (define_peephole2
-  [(set (match_operand:GPI 0 "register_operand" "")
-	(match_operand:GPI 1 "memory_operand" ""))
-   (set (match_operand:GPI 2 "register_operand" "")
-	(match_operand:GPI 3 "memory_operand" ""))]
-  "aarch64_operands_ok_for_ldpstp (operands, true, <MODE>mode)"
+  [(set (match_operand 0 "register_operand" "")
+	(match_operand 1 "memory_operand" ""))
+   (set (match_operand 2 "register_operand" "")
+	(match_operand 3 "memory_operand" ""))]
+  "aarch64_operands_ok_for_ldpstp (operands, true)"
   [(parallel [(set (match_dup 0) (match_dup 1))
 	      (set (match_dup 2) (match_dup 3))])]
 {
@@ -31,96 +31,16 @@
 })
 
 (define_peephole2
-  [(set (match_operand:GPI 0 "memory_operand" "")
-	(match_operand:GPI 1 "aarch64_reg_or_zero" ""))
-   (set (match_operand:GPI 2 "memory_operand" "")
-	(match_operand:GPI 3 "aarch64_reg_or_zero" ""))]
-  "aarch64_operands_ok_for_ldpstp (operands, false, <MODE>mode)"
+  [(set (match_operand 0 "memory_operand" "")
+	(match_operand 1 "aarch64_simd_reg_or_zero" ""))
+   (set (match_operand 2 "memory_operand" "")
+	(match_operand 3 "aarch64_simd_reg_or_zero" ""))]
+  "aarch64_operands_ok_for_ldpstp (operands, false)"
   [(parallel [(set (match_dup 0) (match_dup 1))
 	      (set (match_dup 2) (match_dup 3))])]
 {
   aarch64_swap_ldrstr_operands (operands, false);
 })
-
-(define_peephole2
-  [(set (match_operand:GPF 0 "register_operand" "")
-	(match_operand:GPF 1 "memory_operand" ""))
-   (set (match_operand:GPF 2 "register_operand" "")
-	(match_operand:GPF 3 "memory_operand" ""))]
-  "aarch64_operands_ok_for_ldpstp (operands, true, <MODE>mode)"
-  [(parallel [(set (match_dup 0) (match_dup 1))
-	      (set (match_dup 2) (match_dup 3))])]
-{
-  aarch64_swap_ldrstr_operands (operands, true);
-})
-
-(define_peephole2
-  [(set (match_operand:GPF 0 "memory_operand" "")
-	(match_operand:GPF 1 "aarch64_reg_or_fp_zero" ""))
-   (set (match_operand:GPF 2 "memory_operand" "")
-	(match_operand:GPF 3 "aarch64_reg_or_fp_zero" ""))]
-  "aarch64_operands_ok_for_ldpstp (operands, false, <MODE>mode)"
-  [(parallel [(set (match_dup 0) (match_dup 1))
-	      (set (match_dup 2) (match_dup 3))])]
-{
-  aarch64_swap_ldrstr_operands (operands, false);
-})
-
-(define_peephole2
-  [(set (match_operand:DREG 0 "register_operand" "")
-	(match_operand:DREG 1 "memory_operand" ""))
-   (set (match_operand:DREG2 2 "register_operand" "")
-	(match_operand:DREG2 3 "memory_operand" ""))]
-  "aarch64_operands_ok_for_ldpstp (operands, true, <DREG:MODE>mode)"
-  [(parallel [(set (match_dup 0) (match_dup 1))
-	      (set (match_dup 2) (match_dup 3))])]
-{
-  aarch64_swap_ldrstr_operands (operands, true);
-})
-
-(define_peephole2
-  [(set (match_operand:DREG 0 "memory_operand" "")
-	(match_operand:DREG 1 "register_operand" ""))
-   (set (match_operand:DREG2 2 "memory_operand" "")
-	(match_operand:DREG2 3 "register_operand" ""))]
-  "TARGET_SIMD
-   && aarch64_operands_ok_for_ldpstp (operands, false, <DREG:MODE>mode)"
-  [(parallel [(set (match_dup 0) (match_dup 1))
-	      (set (match_dup 2) (match_dup 3))])]
-{
-  aarch64_swap_ldrstr_operands (operands, false);
-})
-
-(define_peephole2
-  [(set (match_operand:VQ 0 "register_operand" "")
-	(match_operand:VQ 1 "memory_operand" ""))
-   (set (match_operand:VQ2 2 "register_operand" "")
-	(match_operand:VQ2 3 "memory_operand" ""))]
-  "TARGET_SIMD
-   && aarch64_operands_ok_for_ldpstp (operands, true, <VQ:MODE>mode)
-   && (aarch64_tune_params.extra_tuning_flags
-	& AARCH64_EXTRA_TUNE_NO_LDP_STP_QREGS) == 0"
-  [(parallel [(set (match_dup 0) (match_dup 1))
-	      (set (match_dup 2) (match_dup 3))])]
-{
-  aarch64_swap_ldrstr_operands (operands, true);
-})
-
-(define_peephole2
-  [(set (match_operand:VQ 0 "memory_operand" "")
-	(match_operand:VQ 1 "register_operand" ""))
-   (set (match_operand:VQ2 2 "memory_operand" "")
-	(match_operand:VQ2 3 "register_operand" ""))]
-  "TARGET_SIMD
-   && aarch64_operands_ok_for_ldpstp (operands, false, <VQ:MODE>mode)
-   && (aarch64_tune_params.extra_tuning_flags
-	& AARCH64_EXTRA_TUNE_NO_LDP_STP_QREGS) == 0"
-  [(parallel [(set (match_dup 0) (match_dup 1))
-	      (set (match_dup 2) (match_dup 3))])]
-{
-  aarch64_swap_ldrstr_operands (operands, false);
-})
-
 
 ;; Handle sign/zero extended consecutive load/store.
 
@@ -129,7 +49,7 @@
 	(sign_extend:DI (match_operand:SI 1 "memory_operand" "")))
    (set (match_operand:DI 2 "register_operand" "")
 	(sign_extend:DI (match_operand:SI 3 "memory_operand" "")))]
-  "aarch64_operands_ok_for_ldpstp (operands, true, SImode)"
+  "aarch64_operands_ok_for_ldpstp (operands, true)"
   [(parallel [(set (match_dup 0) (sign_extend:DI (match_dup 1)))
 	      (set (match_dup 2) (sign_extend:DI (match_dup 3)))])]
 {
@@ -141,33 +61,11 @@
 	(zero_extend:DI (match_operand:SI 1 "memory_operand" "")))
    (set (match_operand:DI 2 "register_operand" "")
 	(zero_extend:DI (match_operand:SI 3 "memory_operand" "")))]
-  "aarch64_operands_ok_for_ldpstp (operands, true, SImode)"
+  "aarch64_operands_ok_for_ldpstp (operands, true)"
   [(parallel [(set (match_dup 0) (zero_extend:DI (match_dup 1)))
 	      (set (match_dup 2) (zero_extend:DI (match_dup 3)))])]
 {
   aarch64_swap_ldrstr_operands (operands, true);
-})
-
-;; Handle storing of a floating point zero with integer data.
-;; This handles cases like:
-;;   struct pair { int a; float b; }
-;;
-;;   p->a = 1;
-;;   p->b = 0.0;
-;;
-;; We can match modes that won't work for a stp instruction
-;; as aarch64_operands_ok_for_ldpstp checks that the modes are
-;; compatible.
-(define_peephole2
-  [(set (match_operand:DSX 0 "memory_operand" "")
-	(match_operand:DSX 1 "aarch64_reg_zero_or_fp_zero" ""))
-   (set (match_operand:<FCVT_TARGET> 2 "memory_operand" "")
-	(match_operand:<FCVT_TARGET> 3 "aarch64_reg_zero_or_fp_zero" ""))]
-  "aarch64_operands_ok_for_ldpstp (operands, false, <V_INT_EQUIV>mode)"
-  [(parallel [(set (match_dup 0) (match_dup 1))
-	      (set (match_dup 2) (match_dup 3))])]
-{
-  aarch64_swap_ldrstr_operands (operands, false);
 })
 
 ;; Handle consecutive load/store whose offset is out of the range

@@ -26,4 +26,4 @@ TEST_TYPE (uint32x4_t)
 /* { dg-final { scan-assembler-times {\tstp\ts[0-9]+,} 1 } } */
 /* { dg-final { scan-assembler-times {\tstp\td[0-9]+,} 2 } } */
 /* { dg-final { scan-assembler-times {\tstp\tq[0-9]+,} 2 } } */
-/* { dg-final { scan-assembler-times {\tstp\t[wx]zr,} 4 } } */
+/* { dg-final { scan-assembler-times {\tstp\t[wx]zr,} 5 } } */

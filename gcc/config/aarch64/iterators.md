@@ -101,12 +101,6 @@
 ;; Double vector modes suitable for moving.  Includes BFmode.
 (define_mode_iterator VDMOV [V8QI V4HI V4HF V4BF V2SI V2SF])
 
-;; All modes stored in registers d0-d31.
-(define_mode_iterator DREG [V8QI V4HI V4HF V2SI V2SF DF])
-
-;; Copy of the above.
-(define_mode_iterator DREG2 [V8QI V4HI V4HF V2SI V2SF DF])
-
 ;; All modes suitable to store/load pair (2 elements) using STP/LDP.
 (define_mode_iterator VP_2E [V2SI V2SF V2DI V2DF])
 
@@ -118,9 +112,6 @@
 
 ;; Quad vector modes.
 (define_mode_iterator VQ [V16QI V8HI V4SI V2DI V8HF V4SF V2DF V8BF])
-
-;; Copy of the above.
-(define_mode_iterator VQ2 [V16QI V8HI V4SI V2DI V8HF V8BF V4SF V2DF])
 
 ;; Quad vector modes suitable for moving.  Includes BFmode.
 (define_mode_iterator VQMOV [V16QI V8HI V4SI V2DI V8HF V8BF V4SF V2DF])
@@ -314,21 +305,23 @@
 ;; Duplicate of the above
 (define_mode_iterator DX2 [DI DF])
 
-;; Double scalar modes + CADImode
-(define_mode_iterator DXC [DI DF CADI])
-
-;; Duplicate of the above
-(define_mode_iterator DXC2 [DI DF CADI])
-
 ;; Single scalar modes
 (define_mode_iterator SX [SI SF])
 
 ;; Duplicate of the above
 (define_mode_iterator SX2 [SI SF])
 
-;; Single and double integer and float modes
-(define_mode_iterator DSX [DF DI SF SI])
+;; 64-bit modes + CADImode (which has 64 bits for -mfake-capability).
+(define_mode_iterator ANY_DC [V8QI V4HI V4HF V4BF V2SI V2SF DI DF V1DF CADI])
 
+;; Duplicate of the above.
+(define_mode_iterator ANY_DC2 [V8QI V4HI V4HF V4BF V2SI V2SF DI DF V1DF CADI])
+
+;; 128-bit modes (excluding CADImode).
+(define_mode_iterator ANY_Q [V16QI V8HI V8HF V8BF V4SI V4SF V2DI V2DF TI TF])
+
+;; Duplicate of the above.
+(define_mode_iterator ANY_Q2 [V16QI V8HI V8HF V8BF V4SI V4SF V2DI V2DF TI TF])
 
 ;; Modes available for Advanced SIMD <f>mul lane operations.
 (define_mode_iterator VMUL [V4HI V8HI V2SI V4SI
@@ -921,14 +914,12 @@
 (define_mode_attr w [(QI "w") (HI "w") (SI "w") (DI "x") (SF "s") (DF "d")
 		     (CADI "B")])
 
-; Similar to the 'w' attribute, but maps DF -> x.  The domain of this
-; attribute is the DXC[2] iterator.  It is intended to be used with the
-; store_pair_dw_<DXC:mode><DXC2:mode> pattern which implements an
-; optimization whereby (const_double:DF 0.0) is stored to two
-; consecutive doubles using:
-; stp xzr, xzr [addr].  Hence, the pattern accepts (const_double 0.0) in
-; the GPR alternative.
-(define_mode_attr dxc_gpr [(DI "x") (DF "x") (CADI "")])
+;; Used with ANY_DC[2] to print a GPR.  Only CADI is a special case.
+(define_mode_attr dxc_gpr [(V8QI "x")
+			   (V4HI "x") (V4HF "x") (V4BF "x")
+			   (V2SI "x") (V2SF "x")
+			   (DI "x") (DF "x") (V1DF "x")
+			   (CADI "B")])
 
 ;; The size of access, in bytes.
 ;; Morello TODO: this is right for fake capabilities but wrong for PureCap.

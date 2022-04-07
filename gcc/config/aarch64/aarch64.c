@@ -7588,12 +7588,7 @@ static rtx
 aarch64_gen_store_pair (machine_mode mode, rtx mem1, rtx reg1, rtx mem2,
 			rtx reg2)
 {
-  if (mode == E_V4SImode)
-    return gen_vec_store_pairv4siv4si (mem1, reg1, mem2, reg2);
-  else if (mode == E_TFmode)
-    return gen_store_pair_dw_tftf (mem1, reg1, mem2, reg2);
-  else
-    return gen_store_pair_dw (mode, mode, mem1, reg1, mem2, reg2);
+  return gen_store_pair (mode, mode, mem1, reg1, mem2, reg2);
 }
 
 /* Generate and regurn a load pair isntruction of mode MODE to load register
@@ -7603,12 +7598,7 @@ static rtx
 aarch64_gen_load_pair (machine_mode mode, rtx reg1, rtx mem1, rtx reg2,
 		       rtx mem2)
 {
-  if (mode == E_V4SImode)
-    return gen_load_pairv4siv4si (reg1, mem1, reg2, mem2);
-  else if (mode == E_TFmode)
-    return gen_load_pair_dw_tftf (reg1, mem1, reg2, mem2);
-  else
-    return gen_load_pair_dw (mode, mode, reg1, mem1, reg2, mem2);
+  return gen_load_pair (mode, mode, reg1, mem1, reg2, mem2);
 }
 
 /* Return TRUE if return address signing should be enabled for the current
@@ -23452,12 +23442,10 @@ aarch64_sched_adjust_priority (rtx_insn *insn, int priority)
 }
 
 /* Given OPERANDS of consecutive load/store, check if we can merge
-   them into ldp/stp.  LOAD is true if they are load instructions.
-   MODE is the mode of memory operands.  */
+   them into ldp/stp.  LOAD is true if they are load instructions.  */
 
 bool
-aarch64_operands_ok_for_ldpstp (rtx *operands, bool load,
-				machine_mode mode)
+aarch64_operands_ok_for_ldpstp (rtx *operands, bool load)
 {
   HOST_WIDE_INT offval_1, offval_2, msize;
   enum reg_class rclass_1, rclass_2;
@@ -23479,6 +23467,45 @@ aarch64_operands_ok_for_ldpstp (rtx *operands, bool load,
       mem_2 = operands[2];
       reg_1 = operands[1];
       reg_2 = operands[3];
+    }
+
+  /* The two accesses must be the same size.  */
+  machine_mode mode = GET_MODE (mem_1);
+  if (maybe_ne (GET_MODE_SIZE (mode), GET_MODE_SIZE (GET_MODE (mem_2))))
+    return false;
+
+  /* Check for valid LDP/STP register sizes.  */
+  if (!GET_MODE_SIZE (mode).is_constant (&msize)
+      || !(msize == 4 || msize == 8 || msize == 16))
+    return false;
+
+  /* Check if the registers are of same class.  */
+  if (REG_P (reg_1) && FP_REGNUM_P (REGNO (reg_1)))
+    rclass_1 = FP_REGS;
+  else
+    rclass_1 = GENERAL_REGS;
+
+  if (REG_P (reg_2) && FP_REGNUM_P (REGNO (reg_2)))
+    rclass_2 = FP_REGS;
+  else
+    rclass_2 = GENERAL_REGS;
+
+  if (rclass_1 != rclass_2)
+    return false;
+
+  if (msize == 16)
+    {
+      /* Vector LDPs and STPs must use floating-point registers.  */
+      if (rclass_1 != FP_REGS)
+	return false;
+
+      /* Respect the -mtune preference about whether to form vector
+	 LDPs and STPs.
+
+	 ??? Traditionally we've done this even when optimizing for size.  */
+      if (aarch64_tune_params.extra_tuning_flags
+	  & AARCH64_EXTRA_TUNE_NO_LDP_STP_QREGS)
+	return false;
     }
 
   /* The mems cannot be volatile.  */
@@ -23506,15 +23533,8 @@ aarch64_operands_ok_for_ldpstp (rtx *operands, bool load,
   if (!rtx_equal_p (base_1, base_2))
     return false;
 
-  /* The operands must be of the same size.  */
-  gcc_assert (known_eq (GET_MODE_SIZE (GET_MODE (mem_1)),
-			 GET_MODE_SIZE (GET_MODE (mem_2))));
-
   offval_1 = INTVAL (offset_1);
   offval_2 = INTVAL (offset_2);
-  /* We should only be trying this for fixed-sized modes.  There is no
-     SVE LDP/STP instruction.  */
-  msize = GET_MODE_SIZE (mode).to_constant ();
   /* Check if the offsets are consecutive.  */
   if (offval_1 != (offval_2 + msize) && offval_2 != (offval_1 + msize))
     return false;
@@ -23535,20 +23555,6 @@ aarch64_operands_ok_for_ldpstp (rtx *operands, bool load,
      peephole.  */
   if (!aarch64_mem_pair_operand (mem_1, GET_MODE (mem_1))
        && !aarch64_mem_pair_operand (mem_2, GET_MODE (mem_2)))
-    return false;
-
-  if (REG_P (reg_1) && FP_REGNUM_P (REGNO (reg_1)))
-    rclass_1 = FP_REGS;
-  else
-    rclass_1 = GENERAL_REGS;
-
-  if (REG_P (reg_2) && FP_REGNUM_P (REGNO (reg_2)))
-    rclass_2 = FP_REGS;
-  else
-    rclass_2 = GENERAL_REGS;
-
-  /* Check if the registers are of same class.  */
-  if (rclass_1 != rclass_2)
     return false;
 
   return true;

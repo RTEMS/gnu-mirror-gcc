@@ -1596,7 +1596,7 @@
 
 ;; Operands 1 and 3 are tied together by the final condition; so we allow
 ;; fairly lax checking on the second memory operation.
-(define_insn "load_pair_sw_<SX:mode><SX2:mode>"
+(define_insn "@load_pair_<SX:mode><SX2:mode>"
   [(set (match_operand:SX 0 "register_operand" "=r,w")
 	(match_operand:SX 1 "aarch64_mem_pair_operand" "Ump,Ump"))
    (set (match_operand:SX2 2 "register_operand" "=r,w")
@@ -1612,16 +1612,22 @@
    (set_attr "arch" "*,fp")]
 )
 
-;; Storing different modes that can still be merged
-(define_insn "@load_pair_dw_<DXC:mode><DXC2:mode>"
-  [(set (match_operand:DXC 0 "register_operand" "=r,w")
-	(match_operand:DXC 1 "aarch64_mem_pair_operand" "Ump,Ump"))
-   (set (match_operand:DXC2 2 "register_operand" "=r,w")
-	(match_operand:DXC2 3 "memory_operand" "m,m"))]
-   "rtx_equal_p (XEXP (operands[3], 0),
-		 plus_constant (mem_address_mode (operands[1]),
-				XEXP (operands[1], 0),
-				GET_MODE_SIZE (<DXC:MODE>mode)))"
+;; This pattern handles all 64-bit modes + CADI, which is a 64-bit mode
+;; for -mfake-capability and a 128-bit mode for "real" capabilities.
+;; A 64-bit CADI can be paired with other 64-bit modes whereas a 128-bit
+;; CADI can only be paired with another CADI.  We therefore need to check
+;; that the sizes of the modes are equal.
+(define_insn "@load_pair_<ANY_DC:mode><ANY_DC2:mode>"
+  [(set (match_operand:ANY_DC 0 "register_operand" "=r,w")
+	(match_operand:ANY_DC 1 "aarch64_mem_pair_operand" "Ump,Ump"))
+   (set (match_operand:ANY_DC2 2 "register_operand" "=r,w")
+	(match_operand:ANY_DC2 3 "memory_operand" "m,m"))]
+  "known_eq (GET_MODE_SIZE (<ANY_DC:MODE>mode),
+	     GET_MODE_SIZE (<ANY_DC2:MODE>mode))
+   && rtx_equal_p (XEXP (operands[3], 0),
+		   plus_constant (mem_address_mode (operands[1]),
+				  XEXP (operands[1], 0),
+				  GET_MODE_SIZE (<ANY_DC:MODE>mode)))"
   "@
    ldp\\t%0, %2, %z1
    ldp\\t%d0, %d2, %z1"
@@ -1629,16 +1635,16 @@
    (set_attr "arch" "*,fp")]
 )
 
-(define_insn "load_pair_dw_tftf"
-  [(set (match_operand:TF 0 "register_operand" "=w")
-	(match_operand:TF 1 "aarch64_mem_pair_operand" "Ump"))
-   (set (match_operand:TF 2 "register_operand" "=w")
-	(match_operand:TF 3 "memory_operand" "m"))]
+(define_insn "@load_pair_<ANY_Q:mode><ANY_Q2:mode>"
+  [(set (match_operand:ANY_Q 0 "register_operand" "=w")
+	(match_operand:ANY_Q 1 "aarch64_mem_pair_operand" "Ump"))
+   (set (match_operand:ANY_Q2 2 "register_operand" "=w")
+	(match_operand:ANY_Q2 3 "memory_operand" "m"))]
    "TARGET_SIMD
     && rtx_equal_p (XEXP (operands[3], 0),
 		    plus_constant (mem_address_mode (operands[1]),
 				   XEXP (operands[1], 0),
-				   GET_MODE_SIZE (TFmode)))"
+				   GET_MODE_SIZE (<ANY_Q:MODE>mode)))"
   "ldp\\t%q0, %q2, %z1"
   [(set_attr "type" "neon_ldp_q")
    (set_attr "fp" "yes")]
@@ -1646,7 +1652,7 @@
 
 ;; Operands 0 and 2 are tied together by the final condition; so we allow
 ;; fairly lax checking on the second memory operation.
-(define_insn "store_pair_sw_<SX:mode><SX2:mode>"
+(define_insn "@store_pair_<SX:mode><SX2:mode>"
   [(set (match_operand:SX 0 "aarch64_mem_pair_operand" "=Ump,Ump")
 	(match_operand:SX 1 "aarch64_reg_zero_or_fp_zero" "rYZ,w"))
    (set (match_operand:SX2 2 "memory_operand" "=m,m")
@@ -1662,33 +1668,39 @@
    (set_attr "arch" "*,fp")]
 )
 
-;; Storing different modes that can still be merged
-(define_insn "@store_pair_dw_<DXC:mode><DXC2:mode>"
-  [(set (match_operand:DXC 0 "aarch64_mem_pair_operand" "=Ump,Ump")
-	(match_operand:DXC 1 "aarch64_reg_zero_or_fp_zero" "rYZ,w"))
-   (set (match_operand:DXC2 2 "memory_operand" "=m,m")
-	(match_operand:DXC2 3 "aarch64_reg_zero_or_fp_zero" "rYZ,w"))]
-   "rtx_equal_p (XEXP (operands[2], 0),
-		 plus_constant (mem_address_mode (operands[0]),
-				XEXP (operands[0], 0),
-				GET_MODE_SIZE (<DXC:MODE>mode)))"
+;; This pattern handles all 64-bit modes + CADI, which is a 64-bit mode
+;; for -mfake-capability and a 128-bit mode for "real" capabilities.
+;; A 64-bit CADI can be paired with other 64-bit modes whereas a 128-bit
+;; CADI can only be paired with another CADI.  We therefore need to check
+;; that the sizes of the modes are equal.
+(define_insn "@store_pair_<ANY_DC:mode><ANY_DC2:mode>"
+  [(set (match_operand:ANY_DC 0 "aarch64_mem_pair_operand" "=Ump,Ump")
+	(match_operand:ANY_DC 1 "aarch64_simd_reg_or_zero" "rYZ,w"))
+   (set (match_operand:ANY_DC2 2 "memory_operand" "=m,m")
+	(match_operand:ANY_DC2 3 "aarch64_simd_reg_or_zero" "rYZ,w"))]
+  "known_eq (GET_MODE_SIZE (<ANY_DC:MODE>mode),
+	     GET_MODE_SIZE (<ANY_DC2:MODE>mode))
+   && rtx_equal_p (XEXP (operands[2], 0),
+		   plus_constant (mem_address_mode (operands[0]),
+				  XEXP (operands[0], 0),
+				  GET_MODE_SIZE (<ANY_DC:MODE>mode)))"
   "@
-   stp\\t%<DXC:dxc_gpr>1, %<DXC2:dxc_gpr>3, %z0
+   stp\\t%<ANY_DC:dxc_gpr>1, %<ANY_DC2:dxc_gpr>3, %z0
    stp\\t%d1, %d3, %z0"
   [(set_attr "type" "store_16,neon_store1_2reg")
    (set_attr "arch" "*,fp")]
 )
 
-(define_insn "store_pair_dw_tftf"
-  [(set (match_operand:TF 0 "aarch64_mem_pair_operand" "=Ump")
-	(match_operand:TF 1 "register_operand" "w"))
-   (set (match_operand:TF 2 "memory_operand" "=m")
-	(match_operand:TF 3 "register_operand" "w"))]
+(define_insn "@store_pair_<ANY_Q:mode><ANY_Q2:mode>"
+  [(set (match_operand:ANY_Q 0 "aarch64_mem_pair_operand" "=Ump")
+	(match_operand:ANY_Q 1 "register_operand" "w"))
+   (set (match_operand:ANY_Q2 2 "memory_operand" "=m")
+	(match_operand:ANY_Q2 3 "register_operand" "w"))]
    "TARGET_SIMD &&
     rtx_equal_p (XEXP (operands[2], 0),
 		 plus_constant (mem_address_mode (operands[0]),
 				XEXP (operands[0], 0),
-				GET_MODE_SIZE (TFmode)))"
+				GET_MODE_SIZE (<ANY_Q2:MODE>mode)))"
   "stp\\t%q1, %q3, %z0"
   [(set_attr "type" "neon_stp_q")
    (set_attr "fp" "yes")]
