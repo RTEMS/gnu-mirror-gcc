@@ -12902,6 +12902,10 @@ aarch64_rtx_costs (rtx x, machine_mode mode, int outer ATTRIBUTE_UNUSED,
 	}
       return false;
 
+    case CONST_NULL:
+      *cost = 0;
+      return true;
+
     case CONST_INT:
       /* If an instruction can incorporate a constant within the
 	 instruction, the instruction's expression avoids calling
@@ -23493,7 +23497,9 @@ aarch64_operands_ok_for_ldpstp (rtx *operands, bool load)
   if (rclass_1 != rclass_2)
     return false;
 
-  if (msize == 16)
+  bool both_cap = (GET_MODE (mem_1) == CADImode
+		   && GET_MODE (mem_2) == CADImode);
+  if (msize == 16 && !both_cap)
     {
       /* Vector LDPs and STPs must use floating-point registers.  */
       if (rclass_1 != FP_REGS)
@@ -23700,6 +23706,7 @@ aarch64_operands_adjust_ok_for_ldpstp (rtx *operands, bool load)
   if (!MEM_P (mem[0]) || aarch64_mem_pair_operand (mem[0], mode))
     return false;
 
+  bool all_cap = true;
   for (int i = 0; i < num_insns; i++)
     {
       /* The mems cannot be volatile.  */
@@ -23720,6 +23727,8 @@ aarch64_operands_adjust_ok_for_ldpstp (rtx *operands, bool load)
       extract_base_offset_in_addr (mem[i], base + i, offset + i);
       if (base[i] == NULL_RTX || offset[i] == NULL_RTX)
 	return false;
+
+      all_cap &= (GET_MODE (mem[i]) == CADImode);
     }
 
   /* Check if the registers are of same class.  */
@@ -23738,7 +23747,7 @@ aarch64_operands_adjust_ok_for_ldpstp (rtx *operands, bool load)
 	  return false;
       }
 
-  if (msize == 16)
+  if (msize == 16 && !all_cap)
     {
       /* Vector LDPs and STPs must use floating-point registers.  */
       if (rclass != FP_REGS)

@@ -4,6 +4,8 @@
 
 #include <arm_neon.h>
 
+typedef __uintcap_t uintcap_t;
+
 #define TEST_TYPE(TYPE)				\
   void						\
   test_##TYPE (TYPE *ptr, TYPE a, TYPE b)	\
@@ -16,14 +18,15 @@
 
 TEST_TYPE (uint32_t)
 TEST_TYPE (uint64_t)
+TEST_TYPE (uintcap_t);
 TEST_TYPE (float)
 TEST_TYPE (double)
 TEST_TYPE (uint32x2_t)
 TEST_TYPE (uint32x4_t)
 
 /* { dg-final { scan-assembler-times {\tstp\tw[0-9]+,} 1 } } */
-/* { dg-final { scan-assembler-times {\tstp\tx[0-9]+,} 1 } } */
+/* { dg-final { scan-assembler-times {\tstp\t[xc][0-9]+,} 2 } } */
 /* { dg-final { scan-assembler-times {\tstp\ts[0-9]+,} 1 } } */
 /* { dg-final { scan-assembler-times {\tstp\td[0-9]+,} 2 } } */
 /* { dg-final { scan-assembler-times {\tstp\tq[0-9]+,} 2 } } */
-/* { dg-final { scan-assembler-times {\tstp\t[wx]zr,} 5 } } */
+/* { dg-final { scan-assembler-times {\tstp\t[wxc]zr,} 6 } } */

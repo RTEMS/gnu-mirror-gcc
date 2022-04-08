@@ -4,6 +4,8 @@
 
 #include <arm_neon.h>
 
+typedef __uintcap_t uintcap_t;
+
 #define TEST_TYPE(TYPE)					\
   void							\
   test_##TYPE (TYPE *__capability ptr, TYPE a, TYPE b)	\
@@ -16,6 +18,7 @@
 
 TEST_TYPE (uint32_t)
 TEST_TYPE (uint64_t)
+TEST_TYPE (uintcap_t);
 TEST_TYPE (float)
 TEST_TYPE (double)
 TEST_TYPE (uint32x2_t)

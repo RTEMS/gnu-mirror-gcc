@@ -492,7 +492,7 @@
        (match_test "op == CONST1_RTX (GET_MODE (op))")))
 
 (define_predicate "aarch64_simd_or_scalar_imm_zero"
-  (and (match_code "const_int,const_double,const,const_vector")
+  (and (match_code "const_int,const_double,const,const_vector,const_null")
        (match_test "op == CONST0_RTX (GET_MODE (op))")))
 
 (define_predicate "aarch64_simd_imm_minus_one"
@@ -500,7 +500,8 @@
        (match_test "op == CONSTM1_RTX (GET_MODE (op))")))
 
 (define_predicate "aarch64_simd_reg_or_zero"
-  (and (match_code "reg,subreg,const_int,const_double,const,const_vector")
+  (and (match_code "reg,subreg,const_int,const_double,const,const_vector,
+		    const_null")
        (ior (match_operand 0 "register_operand")
 	    (match_test "op == const0_rtx")
 	    (match_operand 0 "aarch64_simd_or_scalar_imm_zero"))))

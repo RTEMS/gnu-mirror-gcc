@@ -143,7 +143,7 @@
 ; TODO: many more alternatives.
 (define_insn "*movcadi_aarch64"
   [(set (match_operand:CADI 0 "nonimmediate_operand" "=rk,r,r,m,r,r")
-	(match_operand:CADI 1 "aarch64_mov_operand" "rk,Z,m,r,Usa,Ush"))]
+	(match_operand:CADI 1 "aarch64_mov_operand" "rk,Z,m,rZ,Usa,Ush"))]
   "TARGET_CAPABILITY_FAKE"
   "@
    mov\\t%0, %1
