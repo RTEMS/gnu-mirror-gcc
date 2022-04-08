@@ -26,3 +26,5 @@ MULTILIB_OSDIRNAMES = mabi.lp64=../lib64$(call if_multiarch,:aarch64$(AARCH_BE)-
 MULTIARCH_DIRNAME = $(call if_multiarch,aarch64$(AARCH_BE)-linux-gnu)
 
 MULTILIB_OSDIRNAMES += mabi.ilp32=../libilp32$(call if_multiarch,:aarch64$(AARCH_BE)-linux-gnu_ilp32)
+
+MULTILIB_OSDIRNAMES += mabi.purecap/march.morello+c64=../lib64c$(call if_multiarch,:aarch64$(AARCH_BE)-linux-gnu_purecap)
