@@ -383,6 +383,12 @@
    A general memory operand with a normal base register"
   (match_operand 0 "aarch64_normal_base_mem_operand"))
 
+(define_memory_constraint "UAt"
+  "@internal
+   A TI memory operand with an alternative base register"
+  (and (match_code "mem")
+       (match_test "aarch64_alt_base_address_p (TImode, XEXP (op, 0))")))
+
 (define_memory_constraint "UAu"
   "@internal
    Either a general memory operand with a normal base register or

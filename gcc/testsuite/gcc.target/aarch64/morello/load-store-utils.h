@@ -77,7 +77,7 @@
   store_zero_##TYPE##_##OFFSET (char *CAP base)				\
   {									\
     TYPE *CAP ptr = (TYPE *CAP) (base + OFFSET);			\
-    *ptr = 0;								\
+    *ptr = (TYPE) { 0 };						\
   }
 
 #define STORE_REG_INDEX(REG, TYPE, INDEX_TYPE, SCALE)			\
@@ -99,7 +99,7 @@
   {									\
     ptrdiff_t byte_index = (ptrdiff_t) index * SCALE;			\
     TYPE *CAP ptr = (TYPE *CAP) (base + byte_index);			\
-    *ptr = 0;								\
+    *ptr = (TYPE) { 0 };						\
   }
 
 #define PRE_MODIFY_OFFSET(TYPE, OFFSET)					\

@@ -133,9 +133,9 @@
 
 (define_insn "*aarch64_simd_mov<VQMOV:mode>"
   [(set (match_operand:VQMOV 0 "nonimmediate_operand"
-		"=w, Umn,  m,  w, ?r, ?w, ?r, w")
+		"=w, Umn,  m,  w, ?r, ?w, ?r, ?UAt, w")
 	(match_operand:VQMOV 1 "general_operand"
-		"m,  Dz, w,  w,  w,  r,  r, Dn"))]
+		"m,  Dz,   w,  w,  w,  r,  r,   Dz, Dn"))]
   "TARGET_SIMD
    && (register_operand (operands[0], <MODE>mode)
        || aarch64_simd_reg_or_zero (operands[1], <MODE>mode))"
@@ -153,8 +153,9 @@
     case 4:
     case 5:
     case 6:
-	return "#";
     case 7:
+	return "#";
+    case 8:
 	return aarch64_output_simd_mov_immediate (operands[1], 128);
     default:
 	gcc_unreachable ();
@@ -162,8 +163,8 @@
 }
   [(set_attr "type" "neon_load1_1reg<q>, store_16, neon_store1_1reg<q>,\
 		     neon_logic<q>, multiple, multiple,\
-		     multiple, neon_move<q>")
-   (set_attr "length" "4,4,4,4,8,8,8,4")]
+		     multiple, store_16, neon_move<q>")
+   (set_attr "length" "4,4,4,4,8,8,8,8,4")]
 )
 
 ;; When storing lane zero we can use the normal STR and its more permissive
