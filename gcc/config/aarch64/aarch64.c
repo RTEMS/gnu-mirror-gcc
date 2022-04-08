@@ -19183,6 +19183,9 @@ aarch64_mov_operand_p (rtx x, machine_mode mode)
   if (CONST_INT_P (x))
     return true;
 
+  if (CONST_WIDE_INT_P (x))
+    return mode == TImode && aarch64_mov128_immediate (x);
+
   if (CONST_NULL_P (x))
     return true;
 

@@ -328,22 +328,16 @@
 
 (define_predicate "aarch64_mov_operand"
   (and (match_code "reg,subreg,mem,const,const_int,symbol_ref,label_ref,high,
-		    const_poly_int,const_vector,const_null")
+		    const_poly_int,const_vector,const_null,const_wide_int")
        (ior (match_operand 0 "register_operand")
 	    (ior (match_operand 0 "memory_operand")
 		 (match_test "aarch64_mov_operand_p (op, mode)")))))
 
 (define_predicate "aarch64_nonmemory_operand"
   (and (match_code "reg,subreg,const,const_int,symbol_ref,label_ref,high,
-		    const_poly_int,const_vector")
+		    const_poly_int,const_vector,const_wide_int")
        (ior (match_operand 0 "register_operand")
 	    (match_test "aarch64_mov_operand_p (op, mode)"))))
-
-(define_predicate "aarch64_movti_operand"
-  (ior (match_operand 0 "register_operand")
-       (match_operand 0 "memory_operand")
-       (and (match_operand 0 "const_scalar_int_operand")
-	    (match_test "aarch64_mov128_immediate (op)"))))
 
 (define_predicate "aarch64_reg_or_imm"
   (ior (match_operand 0 "register_operand")
