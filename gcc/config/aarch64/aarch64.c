@@ -20899,11 +20899,11 @@ aarch64_split_atomic_op (enum rtx_code code, rtx old_out, rtx new_out, rtx mem,
   machine_mode arith_mode, subreg_mode;
   switch (mode)
     {
-      case DImode:
+      case E_DImode:
 	arith_mode = DImode;
 	subreg_mode = DImode;
 	break;
-      case CADImode:
+      case E_CADImode:
 	arith_mode = DImode;
 	subreg_mode = CADImode;
 	break;
