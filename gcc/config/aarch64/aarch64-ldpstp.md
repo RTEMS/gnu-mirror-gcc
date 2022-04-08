@@ -75,39 +75,19 @@
 
 (define_peephole2
   [(match_scratch:DI 8 "r")
-   (set (match_operand:GPI 0 "register_operand" "")
-	(match_operand:GPI 1 "memory_operand" ""))
-   (set (match_operand:GPI 2 "register_operand" "")
-	(match_operand:GPI 3 "memory_operand" ""))
-   (set (match_operand:GPI 4 "register_operand" "")
-	(match_operand:GPI 5 "memory_operand" ""))
-   (set (match_operand:GPI 6 "register_operand" "")
-	(match_operand:GPI 7 "memory_operand" ""))
+   (set (match_operand 0 "register_operand" "")
+	(match_operand 1 "memory_operand" ""))
+   (set (match_operand 2 "register_operand" "")
+	(match_operand 3 "memory_operand" ""))
+   (set (match_operand 4 "register_operand" "")
+	(match_operand 5 "memory_operand" ""))
+   (set (match_operand 6 "register_operand" "")
+	(match_operand 7 "memory_operand" ""))
    (match_dup 8)]
-  "aarch64_operands_adjust_ok_for_ldpstp (operands, true, <MODE>mode)"
+  "aarch64_operands_adjust_ok_for_ldpstp (operands, true)"
   [(const_int 0)]
 {
-  if (aarch64_gen_adjusted_ldpstp (operands, true, <MODE>mode, UNKNOWN))
-    DONE;
-  else
-    FAIL;
-})
-
-(define_peephole2
-  [(match_scratch:DI 8 "r")
-   (set (match_operand:GPF 0 "register_operand" "")
-	(match_operand:GPF 1 "memory_operand" ""))
-   (set (match_operand:GPF 2 "register_operand" "")
-	(match_operand:GPF 3 "memory_operand" ""))
-   (set (match_operand:GPF 4 "register_operand" "")
-	(match_operand:GPF 5 "memory_operand" ""))
-   (set (match_operand:GPF 6 "register_operand" "")
-	(match_operand:GPF 7 "memory_operand" ""))
-   (match_dup 8)]
-  "aarch64_operands_adjust_ok_for_ldpstp (operands, true, <MODE>mode)"
-  [(const_int 0)]
-{
-  if (aarch64_gen_adjusted_ldpstp (operands, true, <MODE>mode, UNKNOWN))
+  if (aarch64_gen_adjusted_ldpstp (operands, true, UNKNOWN))
     DONE;
   else
     FAIL;
@@ -124,10 +104,10 @@
    (set (match_operand:DI 6 "register_operand" "")
 	(sign_extend:DI (match_operand:SI 7 "memory_operand" "")))
    (match_dup 8)]
-  "aarch64_operands_adjust_ok_for_ldpstp (operands, true, SImode)"
+  "aarch64_operands_adjust_ok_for_ldpstp (operands, true)"
   [(const_int 0)]
 {
-  if (aarch64_gen_adjusted_ldpstp (operands, true, SImode, SIGN_EXTEND))
+  if (aarch64_gen_adjusted_ldpstp (operands, true, SIGN_EXTEND))
     DONE;
   else
     FAIL;
@@ -144,10 +124,10 @@
    (set (match_operand:DI 6 "register_operand" "")
 	(zero_extend:DI (match_operand:SI 7 "memory_operand" "")))
    (match_dup 8)]
-  "aarch64_operands_adjust_ok_for_ldpstp (operands, true, SImode)"
+  "aarch64_operands_adjust_ok_for_ldpstp (operands, true)"
   [(const_int 0)]
 {
-  if (aarch64_gen_adjusted_ldpstp (operands, true, SImode, ZERO_EXTEND))
+  if (aarch64_gen_adjusted_ldpstp (operands, true, ZERO_EXTEND))
     DONE;
   else
     FAIL;
@@ -155,81 +135,19 @@
 
 (define_peephole2
   [(match_scratch:DI 8 "r")
-   (set (match_operand:GPI 0 "memory_operand" "")
-	(match_operand:GPI 1 "aarch64_reg_or_zero" ""))
-   (set (match_operand:GPI 2 "memory_operand" "")
-	(match_operand:GPI 3 "aarch64_reg_or_zero" ""))
-   (set (match_operand:GPI 4 "memory_operand" "")
-	(match_operand:GPI 5 "aarch64_reg_or_zero" ""))
-   (set (match_operand:GPI 6 "memory_operand" "")
-	(match_operand:GPI 7 "aarch64_reg_or_zero" ""))
+   (set (match_operand 0 "memory_operand" "")
+	(match_operand 1 "aarch64_simd_reg_or_zero" ""))
+   (set (match_operand 2 "memory_operand" "")
+	(match_operand 3 "aarch64_simd_reg_or_zero" ""))
+   (set (match_operand 4 "memory_operand" "")
+	(match_operand 5 "aarch64_simd_reg_or_zero" ""))
+   (set (match_operand 6 "memory_operand" "")
+	(match_operand 7 "aarch64_simd_reg_or_zero" ""))
    (match_dup 8)]
-  "aarch64_operands_adjust_ok_for_ldpstp (operands, false, <MODE>mode)"
+  "aarch64_operands_adjust_ok_for_ldpstp (operands, false)"
   [(const_int 0)]
 {
-  if (aarch64_gen_adjusted_ldpstp (operands, false, <MODE>mode, UNKNOWN))
-    DONE;
-  else
-    FAIL;
-})
-
-(define_peephole2
-  [(match_scratch:DI 8 "r")
-   (set (match_operand:GPF 0 "memory_operand" "")
-	(match_operand:GPF 1 "aarch64_reg_or_fp_zero" ""))
-   (set (match_operand:GPF 2 "memory_operand" "")
-	(match_operand:GPF 3 "aarch64_reg_or_fp_zero" ""))
-   (set (match_operand:GPF 4 "memory_operand" "")
-	(match_operand:GPF 5 "aarch64_reg_or_fp_zero" ""))
-   (set (match_operand:GPF 6 "memory_operand" "")
-	(match_operand:GPF 7 "aarch64_reg_or_fp_zero" ""))
-   (match_dup 8)]
-  "aarch64_operands_adjust_ok_for_ldpstp (operands, false, <MODE>mode)"
-  [(const_int 0)]
-{
-  if (aarch64_gen_adjusted_ldpstp (operands, false, <MODE>mode, UNKNOWN))
-    DONE;
-  else
-    FAIL;
-})
-
-(define_peephole2
-  [(match_scratch:DI 8 "r")
-   (set (match_operand:VP_2E 0 "memory_operand" "")
-        (match_operand:VP_2E 1 "aarch64_reg_or_zero" ""))
-   (set (match_operand:VP_2E 2 "memory_operand" "")
-        (match_operand:VP_2E 3 "aarch64_reg_or_zero" ""))
-   (set (match_operand:VP_2E 4 "memory_operand" "")
-        (match_operand:VP_2E 5 "aarch64_reg_or_zero" ""))
-   (set (match_operand:VP_2E 6 "memory_operand" "")
-        (match_operand:VP_2E 7 "aarch64_reg_or_zero" ""))
-   (match_dup 8)]
-  "TARGET_SIMD
-   && aarch64_operands_adjust_ok_for_ldpstp (operands, false, <MODE>mode)"
-  [(const_int 0)]
-{
-  if (aarch64_gen_adjusted_ldpstp (operands, false, <MODE>mode, UNKNOWN))
-    DONE;
-  else
-    FAIL;
-})
-
-(define_peephole2
-  [(match_scratch:DI 8 "r")
-   (set (match_operand:VP_2E 0 "register_operand" "")
-        (match_operand:VP_2E 1 "memory_operand" ""))
-   (set (match_operand:VP_2E 2 "register_operand" "")
-        (match_operand:VP_2E 3 "memory_operand" ""))
-   (set (match_operand:VP_2E 4 "register_operand" "")
-        (match_operand:VP_2E 5 "memory_operand" ""))
-   (set (match_operand:VP_2E 6 "register_operand" "")
-        (match_operand:VP_2E 7 "memory_operand" ""))
-   (match_dup 8)]
-  "TARGET_SIMD
-   && aarch64_operands_adjust_ok_for_ldpstp (operands, true, <MODE>mode)"
-  [(const_int 0)]
-{
-  if (aarch64_gen_adjusted_ldpstp (operands, true, <MODE>mode, UNKNOWN))
+  if (aarch64_gen_adjusted_ldpstp (operands, false, UNKNOWN))
     DONE;
   else
     FAIL;

@@ -23640,7 +23640,7 @@ aarch64_ldrstr_offset_compare (const void *x, const void *y)
 
 /* Given OPERANDS of consecutive load/store, check if we can merge
    them into ldp/stp by adjusting the offset.  LOAD is true if they
-   are load instructions.  MODE is the mode of memory operands.
+   are load instructions.
 
    Given below consecutive stores:
 
@@ -23660,8 +23660,7 @@ aarch64_ldrstr_offset_compare (const void *x, const void *y)
    the scratch register is avaliable.  */
 
 bool
-aarch64_operands_adjust_ok_for_ldpstp (rtx *operands, bool load,
-				       machine_mode mode)
+aarch64_operands_adjust_ok_for_ldpstp (rtx *operands, bool load)
 {
   const int num_insns = 4;
   enum reg_class rclass;
@@ -23691,6 +23690,12 @@ aarch64_operands_adjust_ok_for_ldpstp (rtx *operands, bool load,
 	reg[i] = operands[2 * i + 1];
       }
 
+  /* Check for valid LDP/STP register sizes.  */
+  machine_mode mode = GET_MODE (mem[0]);
+  if (!GET_MODE_SIZE (mode).is_constant (&msize)
+      || !(msize == 4 || msize == 8 || msize == 16))
+    return false;
+
   /* Skip if memory operand is by itself valid for ldp/stp.  */
   if (!MEM_P (mem[0]) || aarch64_mem_pair_operand (mem[0], mode))
     return false;
@@ -23699,6 +23704,10 @@ aarch64_operands_adjust_ok_for_ldpstp (rtx *operands, bool load,
     {
       /* The mems cannot be volatile.  */
       if (MEM_VOLATILE_P (mem[i]))
+	return false;
+
+      /* The accesses must be the same size.  */
+      if (maybe_ne (GET_MODE_SIZE (mode), GET_MODE_SIZE (GET_MODE (mem[i]))))
 	return false;
 
       /* The addres must use a normal rather than an alternative
@@ -23729,6 +23738,21 @@ aarch64_operands_adjust_ok_for_ldpstp (rtx *operands, bool load,
 	  return false;
       }
 
+  if (msize == 16)
+    {
+      /* Vector LDPs and STPs must use floating-point registers.  */
+      if (rclass != FP_REGS)
+	return false;
+
+      /* Respect the -mtune preference about whether to form vector
+	 LDPs and STPs.
+
+	 ??? Traditionally we've done this even when optimizing for size.  */
+      if (aarch64_tune_params.extra_tuning_flags
+	  & AARCH64_EXTRA_TUNE_NO_LDP_STP_QREGS)
+	return false;
+    }
+
   /* Only the last register in the order in which they occur
      may be clobbered by the load.  */
   if (rclass == GENERAL_REGS && load)
@@ -23743,8 +23767,6 @@ aarch64_operands_adjust_ok_for_ldpstp (rtx *operands, bool load,
 
   for (int i = 0; i < num_insns; i++)
     offvals[i] = INTVAL (offset[i]);
-
-  msize = GET_MODE_SIZE (mode).to_constant ();
 
   /* Check if the offsets can be put in the right order to do a ldp/stp.  */
   qsort (offvals, num_insns, sizeof (HOST_WIDE_INT),
@@ -23778,13 +23800,11 @@ aarch64_operands_adjust_ok_for_ldpstp (rtx *operands, bool load,
 /* Given OPERANDS of consecutive load/store, this function pairs them
    into LDP/STP after adjusting the offset.  It depends on the fact
    that the operands can be sorted so the offsets are correct for STP.
-   MODE is the mode of memory operands.  CODE is the rtl operator
-   which should be applied to all memory operands, it's SIGN_EXTEND,
-   ZERO_EXTEND or UNKNOWN.  */
+   CODE is the rtl operator which should be applied to all memory
+   operands, it's SIGN_EXTEND, ZERO_EXTEND or UNKNOWN.  */
 
 bool
-aarch64_gen_adjusted_ldpstp (rtx *operands, bool load,
-			     machine_mode mode, RTX_CODE code)
+aarch64_gen_adjusted_ldpstp (rtx *operands, bool load, RTX_CODE code)
 {
   rtx base, offset_1, offset_3, t1, t2;
   rtx mem_1, mem_2, mem_3, mem_4;
@@ -23823,7 +23843,7 @@ aarch64_gen_adjusted_ldpstp (rtx *operands, bool load,
 	      && offset_3 != NULL_RTX);
 
   /* Adjust offset so it can fit in LDP/STP instruction.  */
-  msize = GET_MODE_SIZE (mode).to_constant();
+  msize = GET_MODE_SIZE (GET_MODE (mem_1)).to_constant();
   stp_off_upper_limit = msize * (0x40 - 1);
   stp_off_lower_limit = - msize * 0x40;
 
@@ -23890,8 +23910,8 @@ aarch64_gen_adjusted_ldpstp (rtx *operands, bool load,
   replace_equiv_address_nv (mem_4, plus_constant (addr_mode, new_base,
 						  new_off_3 + msize), true);
 
-  if (!aarch64_mem_pair_operand (mem_1, mode)
-      || !aarch64_mem_pair_operand (mem_3, mode))
+  if (!aarch64_mem_pair_operand (mem_1, GET_MODE (mem_1))
+      || !aarch64_mem_pair_operand (mem_3, GET_MODE (mem_3)))
     return false;
 
   if (code == ZERO_EXTEND)
