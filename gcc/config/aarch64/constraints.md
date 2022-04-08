@@ -373,6 +373,16 @@
    LD[234] and ST[234] patterns)."
   (match_operand 0 "aarch64_sve_struct_memory_operand"))
 
+(define_memory_constraint "UAa"
+  "@internal
+   A general memory operand with an alternative base register"
+  (match_operand 0 "aarch64_alt_base_mem_operand"))
+
+(define_memory_constraint "UAn"
+  "@internal
+   A general memory operand with a normal base register"
+  (match_operand 0 "aarch64_normal_base_mem_operand"))
+
 (define_memory_constraint "UAu"
   "@internal
    Either a general memory operand with a normal base register or

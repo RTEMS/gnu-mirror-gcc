@@ -250,6 +250,16 @@
        (match_test "INTVAL (op) != 0
 		    && (unsigned) exact_log2 (INTVAL (op)) < 64")))
 
+(define_predicate "aarch64_alt_base_mem_operand"
+  (and (match_code "mem")
+       (match_test "aarch64_alt_base_address_p (GET_MODE (op),
+						XEXP (op, 0))")))
+
+(define_predicate "aarch64_normal_base_mem_operand"
+  (and (match_code "mem")
+       (match_test "aarch64_normal_base_address_p (GET_MODE (op),
+						   XEXP (op, 0))")))
+
 (define_predicate "aarch64_ldr_or_alt_ldur_operand"
   (and (match_code "mem")
        (match_test "aarch64_ldr_or_alt_ldur_address_p (GET_MODE (op),

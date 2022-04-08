@@ -1392,9 +1392,9 @@
 
 (define_insn "*movti_aarch64"
   [(set (match_operand:TI 0
-	 "nonimmediate_operand" "=   r,w, r,w,r,m,m,w,m")
+	 "nonimmediate_operand" "=   r,w, r,w,  r,UAn,UAn,  r,UAa,w,m")
 	(match_operand:TI 1
-	 "aarch64_mov_operand"  " rUti,r, w,w,m,r,Z,m,w"))]
+	 "aarch64_mov_operand"  " rUti,r, w,w,UAn,  r,  Z,UAa, rZ,m,w"))]
   "(register_operand (operands[0], TImode)
     || aarch64_reg_or_zero (operands[1], TImode))"
   "@
@@ -1405,21 +1405,23 @@
    ldp\\t%0, %H0, %1
    stp\\t%1, %H1, %0
    stp\\txzr, xzr, %0
+   #
+   #
    ldr\\t%q0, %1
    str\\t%q1, %0"
   [(set_attr "type" "multiple,f_mcr,f_mrc,neon_logic_q, \
 		             load_16,store_16,store_16,\
+		             load_16,store_16,\
                              load_16,store_16")
-   (set_attr "length" "8,8,8,4,4,4,4,4,4")
-   (set_attr "arch" "*,*,*,simd,*,*,*,fp,fp")]
+   (set_attr "length" "8,8,8,4,4,4,4,8,8,4,4")
+   (set_attr "arch" "*,*,*,simd,*,*,*,*,*,fp,fp")]
 )
 
-;; Split a TImode register-register or register-immediate move into
-;; its component DImode pieces, taking care to handle overlapping
-;; source and dest registers.
+;; Split a TImode GPR move into its component DImode pieces, taking
+;; care to handle overlapping source and dest registers.
 (define_split
-   [(set (match_operand:TI 0 "register_operand" "")
-	 (match_operand:TI 1 "aarch64_reg_or_imm" ""))]
+   [(set (match_operand:TI 0 "nonimmediate_operand" "")
+	 (match_operand:TI 1 "aarch64_mov_operand" ""))]
   "reload_completed && aarch64_split_128bit_move_p (operands[0], operands[1])"
   [(const_int 0)]
 {

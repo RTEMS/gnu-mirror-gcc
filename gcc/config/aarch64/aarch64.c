@@ -3689,10 +3689,13 @@ aarch64_split_128bit_move (rtx dst, rtx src)
 	}
     }
 
-  dst_lo = gen_lowpart (word_mode, dst);
-  dst_hi = gen_highpart (word_mode, dst);
-  src_lo = gen_lowpart (word_mode, src);
-  src_hi = gen_highpart_mode (word_mode, mode, src);
+  auto lo_offset = subreg_lowpart_offset (word_mode, mode);
+  auto hi_offset = subreg_highpart_offset (word_mode, mode);
+
+  dst_lo = simplify_gen_subreg (word_mode, dst, mode, lo_offset);
+  dst_hi = simplify_gen_subreg (word_mode, dst, mode, hi_offset);
+  src_lo = simplify_gen_subreg (word_mode, src, mode, lo_offset);
+  src_hi = simplify_gen_subreg (word_mode, src, mode, hi_offset);
 
   /* At most one pairing may overlap.  */
   if (reg_overlap_mentioned_p (dst_lo, src_hi))
@@ -3710,8 +3713,24 @@ aarch64_split_128bit_move (rtx dst, rtx src)
 bool
 aarch64_split_128bit_move_p (rtx dst, rtx src)
 {
-  return (! REG_P (src)
-	  || ! (FP_REGNUM_P (REGNO (dst)) && FP_REGNUM_P (REGNO (src))));
+  machine_mode mode = GET_MODE (dst);
+
+  if (REG_P (dst)
+      && GP_REGNUM_P (REGNO (dst))
+      && !aarch64_normal_base_mem_operand (src, mode))
+    return true;
+
+  if (REG_P (src)
+      && GP_REGNUM_P (REGNO (src))
+      && !aarch64_normal_base_mem_operand (dst, mode))
+    return true;
+
+  if (src == CONST0_RTX (mode)
+      && MEM_P (dst)
+      && !aarch64_normal_base_mem_operand (dst, mode))
+    return true;
+
+  return false;
 }
 
 /* Split a complex SIMD combine.  */
@@ -9739,10 +9758,11 @@ aarch64_classify_address (struct aarch64_address_info *info,
 
   bool advsimd_struct_p = (vec_flags == (VEC_ADVSIMD | VEC_STRUCT));
 
-  /* Classify the access as up to two of the following:
+  /* Classify the access as up to three of the following:
 
      - a sequence of LDPs or STPs
      - a single LDR or STR
+     - a sequence of LDRs or STRs, splitting the full access
 
      The LDR/STR can overlap the LDPs/STPs or come after them.
 
@@ -9750,9 +9770,13 @@ aarch64_classify_address (struct aarch64_address_info *info,
      pairs, with each loaded or stored register having mode LDP_STP_MODE.
 
      If LDR_STR_MODE is not VOIDmode, require a valid LDR/STR of that
-     mode at offset LDR_STR_OFFSET from the start of MODE.  */
+     mode at offset LDR_STR_OFFSET from the start of MODE.
+
+     If SPLIT_MODE is not VOIDmode, require a valid LDR/STR sequence
+     of that mode, with the sequence covering the whole of MODE.  */
   machine_mode ldp_stp_mode = VOIDmode;
   machine_mode ldr_str_mode = VOIDmode;
+  machine_mode split_mode = VOIDmode;
   unsigned int num_ldp_stp = 1;
   poly_int64 ldr_str_offset = 0;
   if (type == ADDR_QUERY_LDP_STP)
@@ -9783,7 +9807,10 @@ aarch64_classify_address (struct aarch64_address_info *info,
      We conservatively require an offset representable in either mode.  */
   else if (mode == TImode || mode == TFmode)
     {
-      ldp_stp_mode = DImode;
+      if (alt_base_p)
+	split_mode = DImode;
+      else
+	ldp_stp_mode = DImode;
       ldr_str_mode = mode;
     }
   /* On BE, we use load/store pair for multi-vector load/stores.  */
@@ -9805,6 +9832,7 @@ aarch64_classify_address (struct aarch64_address_info *info,
     return false;
 
   bool allow_reg_index_p = (ldp_stp_mode == VOIDmode
+			    && split_mode == VOIDmode
 			    && (known_lt (GET_MODE_SIZE (mode), 16)
 				|| mode == CADImode
 				|| vec_flags == VEC_ADVSIMD
@@ -9898,6 +9926,20 @@ aarch64_classify_address (struct aarch64_address_info *info,
 							  suboffset))
 		  return false;
 	      }
+
+	  if (split_mode != VOIDmode)
+	    {
+	      unsigned int num_split
+		= exact_div (GET_MODE_SIZE (mode),
+			     GET_MODE_SIZE (split_mode)).to_constant ();
+	      for (unsigned int i = 0; i < num_split; ++i)
+		{
+		  auto suboffset = offset + i * GET_MODE_SIZE (split_mode);
+		  if (!aarch64_valid_ldr_str_offset_p (split_mode, alt_base_p,
+						       suboffset, type))
+		    return false;
+		}
+	    }
 
 	  if (ldr_str_mode != VOIDmode
 	      && !aarch64_valid_ldr_str_offset_p (ldr_str_mode, alt_base_p,
@@ -19364,6 +19406,26 @@ rtx
 aarch64_endian_lane_rtx (machine_mode mode, unsigned int n)
 {
   return gen_int_mode (ENDIAN_LANE_N (GET_MODE_NUNITS (mode), n), SImode);
+}
+
+/* Return true if X is a valid address for mode MODE and if it has
+   an alternative base register.  */
+
+bool
+aarch64_alt_base_address_p (machine_mode mode, rtx x)
+{
+  struct aarch64_address_info addr;
+  return aarch64_classify_address (&addr, x, mode, false) && addr.alt_base_p;
+}
+
+/* Return true if X is a valid address for mode MODE and if it has
+   a normal (as opposed to alternative) base register.  */
+
+bool
+aarch64_normal_base_address_p (machine_mode mode, rtx x)
+{
+  struct aarch64_address_info addr;
+  return aarch64_classify_address (&addr, x, mode, false) && !addr.alt_base_p;
 }
 
 /* Return true if X is either:
