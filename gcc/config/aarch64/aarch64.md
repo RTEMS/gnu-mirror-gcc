@@ -1544,9 +1544,9 @@
 
 (define_insn "*movtf_aarch64"
   [(set (match_operand:TF 0
-	 "nonimmediate_operand" "=w,?&r,w ,?r,w,?w,w,m,?r,m ,m")
+	 "nonimmediate_operand" "=w,?&r,w ,?r,w,?w,w,m, ?r,UAn,UAn, ?r,UAa,UAa")
 	(match_operand:TF 1
-	 "general_operand"      " w,?r, ?r,w ,Y,Y ,m,w,m ,?r,Y"))]
+	 "general_operand"      " w,?r, ?r,w ,Y,Y ,m,w,UAn, ?r,  Y,UAa, ?r,  Y"))]
   "TARGET_FLOAT && (register_operand (operands[0], TFmode)
     || aarch64_reg_or_fp_zero (operands[1], TFmode))"
   "@
@@ -1560,16 +1560,20 @@
    str\\t%q1, %0
    ldp\\t%0, %H0, %1
    stp\\t%1, %H1, %0
-   stp\\txzr, xzr, %0"
+   stp\\txzr, xzr, %0
+   #
+   #
+   #"
   [(set_attr "type" "logic_reg,multiple,f_mcr,f_mrc,neon_move_q,f_mcr,\
-                     f_loadd,f_stored,load_16,store_16,store_16")
-   (set_attr "length" "4,8,8,8,4,4,4,4,4,4,4")
-   (set_attr "arch" "simd,*,*,*,simd,*,*,*,*,*,*")]
+		     f_loadd,f_stored,load_16,store_16,store_16,
+		     load_16,store_16,store_16")
+   (set_attr "length" "4,8,8,8,4,4,4,4,4,4,4,8,8,8")
+   (set_attr "arch" "simd,*,*,*,simd,*,*,*,*,*,*,*,*,*")]
 )
 
 (define_split
-   [(set (match_operand:TF 0 "register_operand" "")
-	 (match_operand:TF 1 "aarch64_reg_or_imm" ""))]
+   [(set (match_operand:TF 0 "nonimmediate_operand" "")
+	 (match_operand:TF 1 "general_operand" ""))]
   "reload_completed && aarch64_split_128bit_move_p (operands[0], operands[1])"
   [(const_int 0)]
   {

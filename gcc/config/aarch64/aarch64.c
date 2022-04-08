@@ -3663,6 +3663,9 @@ aarch64_split_128bit_move (rtx dst, rtx src)
   gcc_assert (!(side_effects_p (src) || side_effects_p (dst)));
   gcc_assert (mode == GET_MODE (src) || GET_MODE (src) == VOIDmode);
 
+  if (aarch64_float_const_zero_rtx_p (src))
+    src = CONST0_RTX (mode);
+
   if (REG_P (dst) && REG_P (src))
     {
       int src_regno = REGNO (src);
@@ -3725,7 +3728,7 @@ aarch64_split_128bit_move_p (rtx dst, rtx src)
       && !aarch64_normal_base_mem_operand (dst, mode))
     return true;
 
-  if (src == CONST0_RTX (mode)
+  if ((src == CONST0_RTX (mode) || aarch64_float_const_zero_rtx_p (src))
       && MEM_P (dst)
       && !aarch64_normal_base_mem_operand (dst, mode))
     return true;
@@ -10311,7 +10314,7 @@ aarch64_float_const_rtx_p (rtx x)
 bool
 aarch64_float_const_zero_rtx_p (rtx x)
 {
-  if (GET_MODE (x) == VOIDmode)
+  if (GET_CODE (x) != CONST_DOUBLE)
     return false;
 
   if (REAL_VALUE_MINUS_ZERO (*CONST_DOUBLE_REAL_VALUE (x)))
