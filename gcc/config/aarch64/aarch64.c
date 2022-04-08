@@ -2604,6 +2604,17 @@ aarch64_mem_addr_mode_p (machine_mode mode)
   return mode == Pmode;
 }
 
+/* Return true if MODE is the mode of "normal" (as opposed to alternative)
+   base registers.  */
+
+static bool
+aarch64_normal_base_mode_p (machine_mode mode)
+{
+  if (!CAPABILITY_MODE_P (Pmode) && mode == VOIDmode)
+    return true;
+  return mode == Pmode;
+}
+
 /* Implement TARGET_PREFERRED_ELSE_VALUE.  For binary operations,
    prefer to use the first arithmetic operand as the else value if
    the else value doesn't matter, since that exactly matches the SVE
@@ -9801,6 +9812,10 @@ aarch64_classify_address (struct aarch64_address_info *info,
 	ldp_stp_mode = DImode;
       ldr_str_mode = mode;
     }
+  /* There are no alternative-base forms of multi-register LD1 and ST1,
+     so we need to split structure moves into individual LDRs and STRs.  */
+  else if (alt_base_p && advsimd_struct_p)
+    split_mode = V16QImode;
   /* On BE, we use load/store pair for multi-vector load/stores.  */
   else if (BYTES_BIG_ENDIAN && advsimd_struct_p)
     {
@@ -9851,9 +9866,9 @@ aarch64_classify_address (struct aarch64_address_info *info,
 	  if (code != POST_INC)
 	    return false;
 	}
-      /* On LE, for AdvSIMD, don't support anything other than POST_INC or
-	 REG addressing.  */
-      else if (!BYTES_BIG_ENDIAN && code != REG)
+      /* Don't support anything other than POST_INC or REG addressing if
+	 we can use LD1 and ST1.  */
+      else if (!alt_base_p && !BYTES_BIG_ENDIAN && code != REG)
 	return false;
     }
 
@@ -19447,7 +19462,7 @@ aarch64_simd_mem_operand_p (rtx op)
   return (MEM_P (op)
 	  && (GET_CODE (XEXP (op, 0)) == POST_INC
 	      || REG_P (XEXP (op, 0)))
-	  && aarch64_mem_addr_mode_p (GET_MODE (XEXP (op, 0))));
+	  && aarch64_normal_base_mode_p (mem_address_mode (op)));
 }
 
 /* Return true if OP is a valid MEM operand for an SVE LD1R instruction.  */
@@ -23783,8 +23798,7 @@ aarch64_operands_adjust_ok_for_ldpstp (rtx *operands, bool load)
 
       /* The addres must use a normal rather than an alternative
 	 base register.  */
-      if (TARGET_CAPABILITY_HYBRID
-	  && CAPABILITY_MODE_P (mem_address_mode (mem[i])))
+      if (!aarch64_normal_base_mode_p (mem_address_mode (mem[i])))
 	return false;
 
       /* Check if the addresses are in the form of [base+offset].  */

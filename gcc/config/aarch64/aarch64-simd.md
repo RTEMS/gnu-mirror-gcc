@@ -5334,18 +5334,22 @@
 )
 
 (define_insn "*aarch64_mov<mode>"
-  [(set (match_operand:VSTRUCT 0 "aarch64_simd_nonimmediate_operand" "=w,Utv,w")
-	(match_operand:VSTRUCT 1 "aarch64_simd_general_operand" " w,w,Utv"))]
+  [(set (match_operand:VSTRUCT 0 "nonimmediate_operand" "=w,Utv,w,UAa,w")
+	(match_operand:VSTRUCT 1 "general_operand" " w,w,Utv,w,UAa"))]
   "TARGET_SIMD && !BYTES_BIG_ENDIAN
    && (register_operand (operands[0], <MODE>mode)
        || register_operand (operands[1], <MODE>mode))"
   "@
    #
    st1\\t{%S1.16b - %<Vendreg>1.16b}, %0
-   ld1\\t{%S0.16b - %<Vendreg>0.16b}, %1"
-  [(set_attr "type" "multiple,neon_store<nregs>_<nregs>reg_q,\
+   ld1\\t{%S0.16b - %<Vendreg>0.16b}, %1
+   #
+   #"
+  [(set_attr "type" "multiple,neon_store<nregs>_<nregs>reg_q,
+		     neon_load<nregs>_<nregs>reg_q,
+		     neon_store<nregs>_<nregs>reg_q,
 		     neon_load<nregs>_<nregs>reg_q")
-   (set_attr "length" "<insn_count>,4,4")]
+   (set_attr "length" "<insn_count>,4,4,<insn_count>,<insn_count>")]
 )
 
 (define_insn "aarch64_be_ld1<mode>"
@@ -5402,6 +5406,26 @@
   [(set_attr "type" "multiple")
    (set_attr "length" "16,4,4")]
 )
+
+(define_split
+  [(set (match_operand:VSTRUCT 0 "nonimmediate_operand")
+	(match_operand:VSTRUCT 1 "general_operand"))]
+  "TARGET_SIMD
+   && reload_completed
+   && (aarch64_alt_base_mem_operand (operands[0], <MODE>mode)
+       || aarch64_alt_base_mem_operand (operands[1], <MODE>mode))"
+  [(const_int 0)]
+{
+  for (unsigned int i = 0; i < <insn_count> / 4; ++i)
+    {
+      machine_mode new_mode = V16QImode;
+      auto byte = i * GET_MODE_SIZE (new_mode);
+      rtx dst = simplify_gen_subreg (new_mode, operands[0], <MODE>mode, byte);
+      rtx src = simplify_gen_subreg (new_mode, operands[1], <MODE>mode, byte);
+      emit_move_insn (dst, src);
+    }
+  DONE;
+})
 
 (define_split
   [(set (match_operand:OI 0 "register_operand")
