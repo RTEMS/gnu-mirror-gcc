@@ -6795,9 +6795,9 @@
 ;; after or during reload as we don't want these patterns to start
 ;; kicking in during the combiner.
 
-(define_insn "@aarch64_movdi_<mode>low"
+(define_insn "aarch64_movdi_tilow"
   [(set (match_operand:DI 0 "register_operand" "=r")
-	(zero_extract:DI (match_operand:TX 1 "register_operand" "w")
+	(zero_extract:DI (match_operand:TI 1 "register_operand" "w")
 			 (const_int 64) (const_int 0)))]
   "TARGET_FLOAT && (reload_completed || reload_in_progress)"
   "fmov\\t%x0, %d1"
@@ -6805,9 +6805,9 @@
    (set_attr "length" "4")
   ])
 
-(define_insn "@aarch64_movdi_<mode>high"
+(define_insn "aarch64_movdi_tihigh"
   [(set (match_operand:DI 0 "register_operand" "=r")
-	(zero_extract:DI (match_operand:TX 1 "register_operand" "w")
+	(zero_extract:DI (match_operand:TI 1 "register_operand" "w")
 			 (const_int 64) (const_int 64)))]
   "TARGET_FLOAT && (reload_completed || reload_in_progress)"
   "fmov\\t%x0, %1.d[1]"
@@ -6815,19 +6815,19 @@
    (set_attr "length" "4")
   ])
 
-(define_insn "@aarch64_mov<mode>high_di"
-  [(set (zero_extract:TX (match_operand:TX 0 "register_operand" "+w")
+(define_insn "aarch64_movtihigh_di"
+  [(set (zero_extract:TI (match_operand:TI 0 "register_operand" "+w")
                          (const_int 64) (const_int 64))
-        (zero_extend:TX (match_operand:DI 1 "register_operand" "r")))]
+        (zero_extend:TI (match_operand:DI 1 "register_operand" "r")))]
   "TARGET_FLOAT && (reload_completed || reload_in_progress)"
   "fmov\\t%0.d[1], %x1"
   [(set_attr "type" "f_mcr")
    (set_attr "length" "4")
   ])
 
-(define_insn "@aarch64_mov<mode>low_di"
-  [(set (match_operand:TX 0 "register_operand" "=w")
-        (zero_extend:TX (match_operand:DI 1 "register_operand" "r")))]
+(define_insn "aarch64_movtilow_di"
+  [(set (match_operand:TI 0 "register_operand" "=w")
+        (zero_extend:TI (match_operand:DI 1 "register_operand" "r")))]
   "TARGET_FLOAT && (reload_completed || reload_in_progress)"
   "fmov\\t%d0, %x1"
   [(set_attr "type" "f_mcr")

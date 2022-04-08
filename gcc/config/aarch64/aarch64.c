@@ -3674,20 +3674,22 @@ aarch64_split_128bit_move (rtx dst, rtx src)
       /* Handle FP <-> GP regs.  */
       if (FP_REGNUM_P (dst_regno) && GP_REGNUM_P (src_regno))
 	{
-	  src_lo = gen_lowpart (word_mode, src);
-	  src_hi = gen_highpart (word_mode, src);
+	  src_lo = gen_lowpart (DImode, src);
+	  src_hi = gen_highpart (DImode, src);
+	  dst = gen_lowpart (TImode, dst);
 
-	  emit_insn (gen_aarch64_movlow_di (mode, dst, src_lo));
-	  emit_insn (gen_aarch64_movhigh_di (mode, dst, src_hi));
+	  emit_insn (gen_aarch64_movtilow_di (dst, src_lo));
+	  emit_insn (gen_aarch64_movtihigh_di (dst, src_hi));
 	  return;
 	}
       else if (GP_REGNUM_P (dst_regno) && FP_REGNUM_P (src_regno))
 	{
-	  dst_lo = gen_lowpart (word_mode, dst);
-	  dst_hi = gen_highpart (word_mode, dst);
+	  dst_lo = gen_lowpart (DImode, dst);
+	  dst_hi = gen_highpart (DImode, dst);
+	  src = gen_lowpart (TImode, src);
 
-	  emit_insn (gen_aarch64_movdi_low (mode, dst_lo, src));
-	  emit_insn (gen_aarch64_movdi_high (mode, dst_hi, src));
+	  emit_insn (gen_aarch64_movdi_tilow (dst_lo, src));
+	  emit_insn (gen_aarch64_movdi_tihigh (dst_hi, src));
 	  return;
 	}
     }
