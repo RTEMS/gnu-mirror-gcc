@@ -1417,11 +1417,11 @@
    (set_attr "arch" "*,*,*,simd,*,*,*,*,*,fp,fp")]
 )
 
-;; Split a TImode GPR move into its component DImode pieces, taking
+;; Split a 128-bit GPR move into its component DImode pieces, taking
 ;; care to handle overlapping source and dest registers.
 (define_split
-   [(set (match_operand:TI 0 "nonimmediate_operand" "")
-	 (match_operand:TI 1 "aarch64_mov_operand" ""))]
+   [(set (match_operand:ANY_Q 0 "nonimmediate_operand" "")
+	 (match_operand:ANY_Q 1 "aarch64_mov_operand" ""))]
   "reload_completed && aarch64_split_128bit_move_p (operands[0], operands[1])"
   [(const_int 0)]
 {
@@ -1569,17 +1569,6 @@
 		     load_16,store_16,store_16")
    (set_attr "length" "4,8,8,8,4,4,4,4,4,4,4,8,8,8")
    (set_attr "arch" "simd,*,*,*,simd,*,*,*,*,*,*,*,*,*")]
-)
-
-(define_split
-   [(set (match_operand:TF 0 "nonimmediate_operand" "")
-	 (match_operand:TF 1 "general_operand" ""))]
-  "reload_completed && aarch64_split_128bit_move_p (operands[0], operands[1])"
-  [(const_int 0)]
-  {
-    aarch64_split_128bit_move (operands[0], operands[1]);
-    DONE;
-  }
 )
 
 ;; 0 is dst

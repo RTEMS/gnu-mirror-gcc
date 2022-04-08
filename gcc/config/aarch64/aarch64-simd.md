@@ -179,62 +179,6 @@
   [(set_attr "type" "neon_store1_1reg<q>")]
 )
 
-(define_split
-  [(set (match_operand:VQMOV 0 "register_operand" "")
-      (match_operand:VQMOV 1 "register_operand" ""))]
-  "TARGET_SIMD && reload_completed
-   && GP_REGNUM_P (REGNO (operands[0]))
-   && GP_REGNUM_P (REGNO (operands[1]))"
-  [(const_int 0)]
-{
-  aarch64_simd_emit_reg_reg_move (operands, DImode, 2);
-  DONE;
-})
-
-(define_split
-  [(set (match_operand:VQMOV 0 "register_operand" "")
-        (match_operand:VQMOV 1 "register_operand" ""))]
-  "TARGET_SIMD && reload_completed
-   && ((FP_REGNUM_P (REGNO (operands[0])) && GP_REGNUM_P (REGNO (operands[1])))
-       || (GP_REGNUM_P (REGNO (operands[0])) && FP_REGNUM_P (REGNO (operands[1]))))"
-  [(const_int 0)]
-{
-  aarch64_split_simd_move (operands[0], operands[1]);
-  DONE;
-})
-
-(define_expand "@aarch64_split_simd_mov<mode>"
-  [(set (match_operand:VQMOV 0)
-        (match_operand:VQMOV 1))]
-  "TARGET_SIMD"
-  {
-    rtx dst = operands[0];
-    rtx src = operands[1];
-
-    if (GP_REGNUM_P (REGNO (src)))
-      {
-        rtx src_low_part = gen_lowpart (<VHALF>mode, src);
-        rtx src_high_part = gen_highpart (<VHALF>mode, src);
-
-        emit_insn
-          (gen_move_lo_quad_<mode> (dst, src_low_part));
-        emit_insn
-          (gen_move_hi_quad_<mode> (dst, src_high_part));
-      }
-
-    else
-      {
-        rtx dst_low_part = gen_lowpart (<VHALF>mode, dst);
-        rtx dst_high_part = gen_highpart (<VHALF>mode, dst);
-	rtx lo = aarch64_simd_vect_par_cnst_half (<MODE>mode, <nunits>, false);
-	rtx hi = aarch64_simd_vect_par_cnst_half (<MODE>mode, <nunits>, true);
-        emit_insn (gen_aarch64_get_half<mode> (dst_low_part, src, lo));
-        emit_insn (gen_aarch64_get_half<mode> (dst_high_part, src, hi));
-      }
-    DONE;
-  }
-)
-
 (define_expand "aarch64_get_half<mode>"
   [(set (match_operand:<VHALF> 0 "register_operand")
         (vec_select:<VHALF>

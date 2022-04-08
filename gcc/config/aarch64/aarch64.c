@@ -3659,7 +3659,7 @@ aarch64_split_128bit_move (rtx dst, rtx src)
 
   machine_mode mode = GET_MODE (dst);
 
-  gcc_assert (mode == TImode || mode == TFmode);
+  gcc_assert (known_eq (GET_MODE_SIZE (mode), 16));
   gcc_assert (!(side_effects_p (src) || side_effects_p (dst)));
   gcc_assert (mode == GET_MODE (src) || GET_MODE (src) == VOIDmode);
 
@@ -3753,23 +3753,6 @@ aarch64_split_simd_combine (rtx dst, rtx src1, rtx src2)
 
   emit_insn (gen_aarch64_simd_combine (src_mode, dst, src1, src2));
   return;
-}
-
-/* Split a complex SIMD move.  */
-
-void
-aarch64_split_simd_move (rtx dst, rtx src)
-{
-  machine_mode src_mode = GET_MODE (src);
-  machine_mode dst_mode = GET_MODE (dst);
-
-  gcc_assert (VECTOR_MODE_P (dst_mode));
-
-  if (REG_P (dst) && REG_P (src))
-    {
-      gcc_assert (VECTOR_MODE_P (src_mode));
-      emit_insn (gen_aarch64_split_simd_mov (src_mode, dst, src));
-    }
 }
 
 bool
@@ -19235,6 +19218,9 @@ aarch64_mov_operand_p (rtx x, machine_mode mode)
 
   if (CONST_NULL_P (x))
     return true;
+
+  if (CONST_DOUBLE_P (x))
+    return aarch64_float_const_zero_rtx_p (x);
 
   if (VECTOR_MODE_P (GET_MODE (x)))
     {
