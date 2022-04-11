@@ -1219,7 +1219,7 @@ constant_pointer_difference (tree p1, tree p2)
 	      off = size_binop (PLUS_EXPR, off, gimple_assign_rhs2 (stmt));
 	      p = gimple_assign_rhs1 (stmt);
 	    }
-	  else if (code == ADDR_EXPR || CONVERT_EXPR_CODE_P (code))
+	  else if (ADDR_EXPR_CODE_P (code) || CONVERT_EXPR_CODE_P (code))
 	    p = gimple_assign_rhs1 (stmt);
 	  else
 	    break;
@@ -2773,7 +2773,7 @@ pass_forwprop::execute (function *fun)
 
 	  /* If this statement sets an SSA_NAME to an address,
 	     try to propagate the address into the uses of the SSA_NAME.  */
-	  if ((code == ADDR_EXPR
+	  if ((ADDR_EXPR_CODE_P (code)
 	       /* Handle pointer conversions on invariant addresses
 		  as well, as this is valid gimple.  */
 	       || (CONVERT_EXPR_CODE_P (code)

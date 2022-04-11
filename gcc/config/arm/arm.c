@@ -33262,7 +33262,7 @@ static const char *
 arm_invalid_unary_op (int op, const_tree type)
 {
   /* Reject all single-operand operations on BFmode except for &.  */
-  if (element_mode (type) == BFmode && op != ADDR_EXPR)
+  if (element_mode (type) == BFmode && !ADDR_EXPR_CODE_P (op))
     return N_("operation not permitted on type %<bfloat16_t%>");
 
   /* Operation allowed.  */

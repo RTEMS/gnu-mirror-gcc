@@ -12070,7 +12070,7 @@ constant_byte_string (tree arg, tree *ptr_offset, tree *mem_size, tree *decl,
 
       tree rhs1 = gimple_assign_rhs1 (stmt);
       tree_code code = gimple_assign_rhs_code (stmt);
-      if (code == ADDR_EXPR)
+      if (ADDR_EXPR_CODE_P (code))
 	return string_constant (rhs1, ptr_offset, mem_size, decl);
       else if (code != POINTER_PLUS_EXPR)
 	return NULL_TREE;

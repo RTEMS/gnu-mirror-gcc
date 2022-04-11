@@ -11255,7 +11255,7 @@ ia64_invalid_unary_op (int op, const_tree type)
   /* Reject operations on __fpreg other than unary + or &.  */
   if (TYPE_MODE (type) == RFmode
       && op != CONVERT_EXPR
-      && op != ADDR_EXPR)
+      && !ADDR_EXPR_CODE_P (op))
     return N_("invalid operation on %<__fpreg%>");
   return NULL;
 }

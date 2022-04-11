@@ -120,7 +120,7 @@ copy_self_referential_tree_r (tree *tp, int *walk_subtrees, void *data)
     }
 
   /* This is the pattern built in ada/make_aligning_type.  */
-  else if (code == ADDR_EXPR
+  else if (ADDR_EXPR_CODE_P (code)
 	   && TREE_CODE (TREE_OPERAND (*tp, 0)) == PLACEHOLDER_EXPR)
     {
       *walk_subtrees = 0;

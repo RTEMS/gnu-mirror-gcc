@@ -2271,7 +2271,7 @@ get_gimple_rhs_num_ops (enum tree_code code)
    : ((SYM) == CONSTRUCTOR						    \
       || (SYM) == OBJ_TYPE_REF						    \
       || (SYM) == ASSERT_EXPR						    \
-      || (SYM) == ADDR_EXPR						    \
+      || ADDR_EXPR_CODE_P (SYM)						    \
       || (SYM) == WITH_SIZE_EXPR					    \
       || (SYM) == SSA_NAME) ? GIMPLE_SINGLE_RHS				    \
    : GIMPLE_INVALID_RHS),

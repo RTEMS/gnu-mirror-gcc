@@ -2083,7 +2083,7 @@ expand_simple_operations (tree expr, tree stop, hash_map<tree, tree> &cache)
 
       if (code == SSA_NAME)
 	return expand_simple_operations (e, stop, cache);
-      else if (code == ADDR_EXPR)
+      else if (ADDR_EXPR_CODE_P (code))
 	{
 	  poly_int64 offset;
 	  tree base = get_addr_base_and_unit_offset (TREE_OPERAND (e, 0),
@@ -2899,7 +2899,7 @@ chain_of_csts_start (class loop *loop, tree x)
   code = gimple_assign_rhs_code (stmt);
   if (gimple_references_memory_p (stmt)
       || TREE_CODE_CLASS (code) == tcc_reference
-      || (code == ADDR_EXPR
+      || (ADDR_EXPR_CODE_P (code)
 	  && !is_gimple_min_invariant (gimple_assign_rhs1 (stmt))))
     return NULL;
 

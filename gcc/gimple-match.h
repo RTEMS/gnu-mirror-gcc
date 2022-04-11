@@ -327,7 +327,7 @@ gimple_simplified_result_is_gimple_val (const gimple_match_op *op)
 {
   return (op->code.is_tree_code ()
 	  && (TREE_CODE_LENGTH ((tree_code) op->code) == 0
-	      || ((tree_code) op->code) == ADDR_EXPR)
+	      || ADDR_EXPR_CODE_P (op->code))
 	  && is_gimple_val (op->ops[0]));
 }
 

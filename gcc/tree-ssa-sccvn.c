@@ -554,7 +554,7 @@ vn_get_stmt_kind (gimple *stmt)
 		return VN_CONSTANT;
 
 	      default:
-		if (code == ADDR_EXPR)
+		if (ADDR_EXPR_CODE_P (code))
 		  return (is_gimple_min_invariant (rhs1)
 			  ? VN_CONSTANT : VN_REFERENCE);
 		else if (code == CONSTRUCTOR)
@@ -655,7 +655,7 @@ vn_reference_compute_hash (const vn_reference_t vr1)
     {
       if (vro->opcode == MEM_REF)
 	deref = true;
-      else if (vro->opcode != ADDR_EXPR)
+      else if (!ADDR_EXPR_CODE_P (vro->opcode))
 	deref = false;
       if (maybe_ne (vro->off, -1))
 	{
@@ -670,7 +670,7 @@ vn_reference_compute_hash (const vn_reference_t vr1)
 	    hstate.add_poly_int (off);
 	  off = -1;
 	  if (deref
-	      && vro->opcode == ADDR_EXPR)
+	      && ADDR_EXPR_CODE_P (vro->opcode))
 	    {
 	      if (vro->op0)
 		{
@@ -761,7 +761,7 @@ vn_reference_eq (const_vn_reference_t const vr1, const_vn_reference_t const vr2)
 	}
       if (maybe_ne (off1, off2))
 	return false;
-      if (deref1 && vro1->opcode == ADDR_EXPR)
+      if (deref1 && ADDR_EXPR_CODE_P (vro1->opcode))
 	{
 	  memset (&tem1, 0, sizeof (tem1));
 	  tem1.op0 = TREE_OPERAND (vro1->op0, 0);
@@ -770,7 +770,7 @@ vn_reference_eq (const_vn_reference_t const vr1, const_vn_reference_t const vr2)
 	  vro1 = &tem1;
 	  deref1 = false;
 	}
-      if (deref2 && vro2->opcode == ADDR_EXPR)
+      if (deref2 && ADDR_EXPR_CODE_P (vro2->opcode))
 	{
 	  memset (&tem2, 0, sizeof (tem2));
 	  tem2.op0 = TREE_OPERAND (vro2->op0, 0);
@@ -1267,7 +1267,7 @@ vn_reference_maybe_forwprop_address (vec<vn_reference_op_s> *ops,
 	return changed;
 
       code = gimple_assign_rhs_code (def_stmt);
-      if (code != ADDR_EXPR
+      if (!ADDR_EXPR_CODE_P (code)
 	  && code != POINTER_PLUS_EXPR)
 	return changed;
 
@@ -1276,7 +1276,7 @@ vn_reference_maybe_forwprop_address (vec<vn_reference_op_s> *ops,
       /* The only thing we have to do is from &OBJ.foo.bar add the offset
 	 from .foo.bar to the preceding MEM_REF offset and replace the
 	 address with &OBJ.  */
-      if (code == ADDR_EXPR)
+      if (ADDR_EXPR_CODE_P (code))
 	{
 	  tree addr, addr_base;
 	  poly_int64 addr_offset;
@@ -1395,12 +1395,12 @@ fully_constant_vn_reference_p (vn_reference_t ref)
       if (operands.length () > 2)
 	arg1 = &operands[2];
       if (TREE_CODE_CLASS (arg0->opcode) == tcc_constant
-	  || (arg0->opcode == ADDR_EXPR
+	  || (ADDR_EXPR_CODE_P (arg0->opcode)
 	      && is_gimple_min_invariant (arg0->op0)))
 	anyconst = true;
       if (arg1
 	  && (TREE_CODE_CLASS (arg1->opcode) == tcc_constant
-	      || (arg1->opcode == ADDR_EXPR
+	      || (ADDR_EXPR_CODE_P (arg1->opcode)
 		  && is_gimple_min_invariant (arg1->op0))))
 	anyconst = true;
       if (anyconst)
@@ -1458,7 +1458,7 @@ fully_constant_vn_reference_p (vn_reference_t ref)
       if (TREE_CODE_CLASS (base->opcode) == tcc_constant)
 	ctor = base->op0;
       else if (base->opcode == MEM_REF
-	       && base[1].opcode == ADDR_EXPR
+	       && ADDR_EXPR_CODE_P (base[1].opcode)
 	       && (TREE_CODE (TREE_OPERAND (base[1].op0, 0)) == VAR_DECL
 		   || TREE_CODE (TREE_OPERAND (base[1].op0, 0)) == CONST_DECL
 		   || TREE_CODE (TREE_OPERAND (base[1].op0, 0)) == STRING_CST))

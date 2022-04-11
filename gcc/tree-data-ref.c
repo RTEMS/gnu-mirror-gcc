@@ -711,7 +711,7 @@ split_constant_offset_1 (tree type, tree op0, enum tree_code code, tree op1,
 		|| subcode == PLUS_EXPR
 		|| subcode == MINUS_EXPR
 		|| subcode == MULT_EXPR
-		|| subcode == ADDR_EXPR
+		|| ADDR_EXPR_CODE_P (subcode)
 		|| CONVERT_EXPR_CODE_P (subcode)))
 	  {
 	    use_cache = true;

@@ -2368,7 +2368,7 @@ get_origin_and_offset (tree x, HOST_WIDE_INT *fldoff, HOST_WIDE_INT *off)
 	if (is_gimple_assign (def))
 	  {
 	    tree_code code = gimple_assign_rhs_code (def);
-	    if (code == ADDR_EXPR)
+	    if (ADDR_EXPR_CODE_P (code))
 	      {
 		x = gimple_assign_rhs1 (def);
 		return get_origin_and_offset (x, fldoff, off);

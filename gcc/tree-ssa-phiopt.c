@@ -872,7 +872,7 @@ static bool
 jump_function_from_stmt (tree *arg, gimple *stmt)
 {
   enum tree_code code = gimple_assign_rhs_code (stmt);
-  if (code == ADDR_EXPR)
+  if (ADDR_EXPR_CODE_P (code))
     {
       /* For arg = &p->i transform it to p, if possible.  */
       tree rhs1 = gimple_assign_rhs1 (stmt);

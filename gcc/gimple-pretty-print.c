@@ -387,7 +387,7 @@ dump_unary_rhs (pretty_printer *buffer, const gassign *gs, int spc,
 	  || TREE_CODE_CLASS (rhs_code) == tcc_constant
 	  || TREE_CODE_CLASS (rhs_code) == tcc_reference
 	  || rhs_code == SSA_NAME
-	  || rhs_code == ADDR_EXPR
+	  || ADDR_EXPR_CODE_P (rhs_code)
 	  || rhs_code == CONSTRUCTOR)
 	{
 	  dump_generic_node (buffer, rhs, spc, flags, false);

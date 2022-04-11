@@ -350,7 +350,7 @@ maybe_warn_operand (ao_ref &ref, gimple *stmt, tree lhs, tree rhs,
 	    break;
 
 	  tree_code code = gimple_assign_rhs_code (def_stmt);
-	  if (code != ADDR_EXPR && code != POINTER_PLUS_EXPR)
+	  if (!ADDR_EXPR_CODE_P (code) && code != POINTER_PLUS_EXPR)
 	    break;
 
 	  base = gimple_assign_rhs1 (def_stmt);

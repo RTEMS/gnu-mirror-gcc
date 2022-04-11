@@ -30,7 +30,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "hash-set.h"
 #include "is-a.h"
 
-
 /* Stubs for GGC referenced through instantiations triggered by hash-map.  */
 void *ggc_internal_cleared_alloc (size_t, void (*)(void *),
 				  size_t, size_t MEM_STAT_DECL)
@@ -253,6 +252,13 @@ enum combined_fn {
 };
 
 #include "case-cfn-macros.h"
+
+/* Return true if CODE takes the address of an object.  */
+static inline bool
+ADDR_EXPR_CODE_P (tree_code code)
+{
+  return code == ADDR_EXPR;
+}
 
 /* Return true if CODE represents a commutative tree code.  Otherwise
    return false.  */
@@ -538,7 +544,7 @@ add_operator (enum tree_code code, const char *id,
       && !(code == SSA_NAME))
     return;
   /* Treat ADDR_EXPR as atom, thus don't allow matching its operand.  */
-  if (code == ADDR_EXPR)
+  if (ADDR_EXPR_CODE_P (code))
     nargs = 0;
   operator_id *op = new operator_id (code, id, nargs, tcc);
   id_base **slot = operators->find_slot_with_hash (op, op->hashval, INSERT);

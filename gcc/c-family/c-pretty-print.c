@@ -1765,7 +1765,8 @@ c_pretty_printer::unary_expression (tree e)
     case TRUTH_NOT_EXPR:
     case CONJ_EXPR:
       /* String literal are used by address.  */
-      if (code == ADDR_EXPR && TREE_CODE (TREE_OPERAND (e, 0)) != STRING_CST)
+      if (ADDR_EXPR_CODE_P (code)
+	  && TREE_CODE (TREE_OPERAND (e, 0)) != STRING_CST)
 	pp_ampersand (this);
       else if (code == INDIRECT_REF)
 	{

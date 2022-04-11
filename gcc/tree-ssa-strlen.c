@@ -415,7 +415,7 @@ get_stridx (tree exp, wide_int offrng[2] = NULL, const vr_values *rvals = NULL)
 	  tree_code rhs_code = gimple_assign_rhs_code (def_stmt);
 	  tree ptr, off;
 
-	  if (rhs_code == ADDR_EXPR)
+	  if (ADDR_EXPR_CODE_P (rhs_code))
 	    {
 	      /* Handle indices/offsets into VLAs which are implemented
 	         as pointers to arrays.  */

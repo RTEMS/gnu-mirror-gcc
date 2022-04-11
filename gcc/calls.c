@@ -1522,7 +1522,7 @@ get_attr_nonstring_decl (tree expr, tree *ref)
       if (is_gimple_assign (def))
 	{
 	  tree_code code = gimple_assign_rhs_code (def);
-	  if (code == ADDR_EXPR
+	  if (ADDR_EXPR_CODE_P (code)
 	      || code == COMPONENT_REF
 	      || code == VAR_DECL)
 	    decl = gimple_assign_rhs1 (def);

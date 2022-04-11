@@ -174,7 +174,7 @@ va_list_counter_bump (struct stdarg_info *si, tree counter, tree rhs,
 	  continue;
 	}
 
-      if (rhs_code == ADDR_EXPR 
+      if (ADDR_EXPR_CODE_P (rhs_code)
 	  && TREE_CODE (TREE_OPERAND (rhs1, 0)) == MEM_REF
 	  && TREE_CODE (TREE_OPERAND (TREE_OPERAND (rhs1, 0), 0)) == SSA_NAME
 	  && tree_fits_uhwi_p (TREE_OPERAND (TREE_OPERAND (rhs1, 0), 1)))
@@ -241,7 +241,7 @@ va_list_counter_bump (struct stdarg_info *si, tree counter, tree rhs,
 	  continue;
 	}
 
-      if (rhs_code == ADDR_EXPR 
+      if (ADDR_EXPR_CODE_P (rhs_code)
 	  && TREE_CODE (TREE_OPERAND (rhs1, 0)) == MEM_REF
 	  && TREE_CODE (TREE_OPERAND (TREE_OPERAND (rhs1, 0), 0)) == SSA_NAME
 	  && tree_fits_uhwi_p (TREE_OPERAND (TREE_OPERAND (rhs1, 0), 1)))
@@ -626,7 +626,7 @@ check_all_va_list_escapes (struct stdarg_info *si)
 					   DECL_UID (lhs) + num_ssa_names))
 			continue;
 		    }
-		  else if (rhs_code == ADDR_EXPR
+		  else if (ADDR_EXPR_CODE_P (rhs_code)
 			   && TREE_CODE (TREE_OPERAND (rhs, 0)) == MEM_REF
 			   && TREE_OPERAND (TREE_OPERAND (rhs, 0), 0) == use)
 		    {

@@ -4021,7 +4021,7 @@ cp_parser_make_indirect_declarator (enum tree_code code, tree class_type,
     else
       return make_ptrmem_declarator (cv_qualifiers, class_type,
 				     target, attributes);
-  else if (code == ADDR_EXPR && class_type == NULL_TREE)
+  else if (ADDR_EXPR_CODE_P (code) && class_type == NULL_TREE)
     return make_reference_declarator (cv_qualifiers, target,
 				      false, attributes);
   else if (code == NON_LVALUE_EXPR && class_type == NULL_TREE)
@@ -8555,7 +8555,7 @@ cp_parser_unary_expression (cp_parser *parser, cp_id_kind * pidk,
       /* Parse the cast-expression.  */
       cast_expression
 	= cp_parser_cast_expression (parser,
-				     unary_operator == ADDR_EXPR,
+				     ADDR_EXPR_CODE_P (unary_operator),
 				     /*cast_p=*/false,
 				     /*decltype*/false,
 				     pidk);

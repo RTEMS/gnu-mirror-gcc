@@ -1095,7 +1095,7 @@ determine_base_object_1 (tree *tp, int *walk_subtrees, void *wdata)
 {
   tree_code code = TREE_CODE (*tp);
   tree obj = NULL_TREE;
-  if (code == ADDR_EXPR)
+  if (ADDR_EXPR_CODE_P (code))
     {
       tree base = get_base_address (TREE_OPERAND (*tp, 0));
       if (!base)

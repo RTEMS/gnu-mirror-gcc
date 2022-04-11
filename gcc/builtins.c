@@ -4192,7 +4192,7 @@ compute_objsize (tree ptr, int ostype, access_ref *pref,
 	  pref->offrng[0] += orng[0];
 	  pref->offrng[1] += orng[1];
 	}
-      else if (code != ADDR_EXPR)
+      else if (!ADDR_EXPR_CODE_P (code))
 	return false;
 
       return compute_objsize (ptr, ostype, pref, visited, rvals);

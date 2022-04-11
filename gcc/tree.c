@@ -4072,7 +4072,7 @@ find_placeholder_in_expr (tree exp, vec<tree> *refs)
 
       case tcc_expression:
 	/* This is the pattern built in ada/make_aligning_type.  */
-	if (code == ADDR_EXPR
+	if (ADDR_EXPR_CODE_P (code)
 	    && TREE_CODE (TREE_OPERAND (exp, 0)) == PLACEHOLDER_EXPR)
 	  {
 	    push_without_duplicates (exp, refs);

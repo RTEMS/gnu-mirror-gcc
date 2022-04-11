@@ -4408,7 +4408,7 @@ build_unary_op (location_t location, enum tree_code code, tree xarg,
   if (int_operands)
     arg = remove_c_maybe_const_expr (arg);
 
-  if (code != ADDR_EXPR)
+  if (!ADDR_EXPR_CODE_P (code))
     arg = require_complete_type (location, arg);
 
   if (TREE_CODE (TREE_TYPE (arg)) == INTCAP_TYPE)

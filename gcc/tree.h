@@ -470,6 +470,13 @@ extern void omp_clause_range_check_failed (const_tree, const char *, int,
    used in hash tables which are saved to a PCH.  */
 #define TREE_HASH(NODE) ((size_t) (NODE) & 0777777)
 
+/* Return true if CODE takes the address of an object.  */
+static inline bool
+ADDR_EXPR_CODE_P (tree_code code)
+{
+  return code == ADDR_EXPR;
+}
+
 /* Tests if CODE is a conversion expr (NOP_EXPR or CONVERT_EXPR).  */
 #define CONVERT_EXPR_CODE_P(CODE)				\
   ((CODE) == NOP_EXPR || (CODE) == CONVERT_EXPR)

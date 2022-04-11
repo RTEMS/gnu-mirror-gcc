@@ -477,7 +477,7 @@ is_addr_local (gimple *return_stmt, tree exp, locmap_t *plocmap,
 		  ptr2 = gimple_assign_rhs2 (def_stmt);
 		  nargs = 2;
 		}
-	      else if (code == ADDR_EXPR
+	      else if (ADDR_EXPR_CODE_P (code)
 		       || code == NOP_EXPR
 		       || code == POINTER_PLUS_EXPR)
 		/* Leave NARGS at zero and let the recursive call set it.  */

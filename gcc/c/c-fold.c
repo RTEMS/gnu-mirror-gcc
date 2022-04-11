@@ -479,7 +479,7 @@ c_fully_fold_internal (tree expr, bool in_init, bool *maybe_const_operands,
       /* ??? Cope with user tricks that amount to offsetof.  The middle-end is
 	 not prepared to deal with them if they occur in initializers.  */
       if (op0 != orig_op0
-	  && code == ADDR_EXPR
+	  && ADDR_EXPR_CODE_P (code)
 	  && (op1 = get_base_address (op0)) != NULL_TREE
 	  && INDIRECT_REF_P (op1)
 	  && TREE_CONSTANT (TREE_OPERAND (op1, 0)))

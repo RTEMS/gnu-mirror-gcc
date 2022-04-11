@@ -778,7 +778,7 @@ malloc_state_machine::on_stmt (sm_context *sm_ctxt,
   if (const gassign *assign_stmt = dyn_cast <const gassign *> (stmt))
     {
       enum tree_code op = gimple_assign_rhs_code (assign_stmt);
-      if (op == ADDR_EXPR)
+      if (ADDR_EXPR_CODE_P (op))
 	{
 	  tree lhs = gimple_assign_lhs (assign_stmt);
 	  if (lhs)

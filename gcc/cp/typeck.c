@@ -2397,7 +2397,7 @@ string_conv_p (const_tree totype, const_tree exp, int warn)
    unary_complex_lvalue, but we needed it to deal with `a = (d == c) ? b : c'
    expressions, where we're dealing with aggregates.  But now it's again only
    called from unary_complex_lvalue.  The case (in particular) that led to
-   this was with CODE == ADDR_EXPR, since it's not an lvalue when we'd
+   this was with ADDR_EXPR_CODE_P (CODE), since it's not an lvalue when we'd
    get it there.  */
 
 static tree
@@ -6097,7 +6097,7 @@ build_x_unary_op (location_t loc, enum tree_code code, cp_expr xarg,
      "operator &".)  However, if the type is a template
      specialization, we must complete the type at this point so that
      an overloaded "operator &" will be available if required.  */
-  if (code == ADDR_EXPR
+  if (ADDR_EXPR_CODE_P (code)
       && TREE_CODE (xarg) != TEMPLATE_ID_EXPR
       && ((CLASS_TYPE_P (TREE_TYPE (xarg))
 	   && !COMPLETE_TYPE_P (complete_type (TREE_TYPE (xarg))))
@@ -6107,7 +6107,7 @@ build_x_unary_op (location_t loc, enum tree_code code, cp_expr xarg,
     exp = build_new_op (loc, code, LOOKUP_NORMAL, xarg, NULL_TREE,
 			NULL_TREE, &overload, complain);
 
-  if (!exp && code == ADDR_EXPR)
+  if (!exp && ADDR_EXPR_CODE_P (code))
     {
       if (is_overloaded_fn (xarg))
 	{
@@ -6955,7 +6955,7 @@ unary_complex_lvalue (enum tree_code code, tree arg)
       || TREE_CODE (arg) == PREDECREMENT_EXPR)
     return unary_complex_lvalue (code, genericize_compound_lvalue (arg));
 
-  if (code != ADDR_EXPR)
+  if (!ADDR_EXPR_CODE_P (code))
     return NULL_TREE;
 
   /* Handle (a = b) used as an "lvalue" for `&'.  */

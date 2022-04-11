@@ -1244,7 +1244,7 @@ eliminated_by_inlining_prob (ipa_func_body_info *fbi, gimple *stmt)
          Assume that half of statements goes away.  */
       if (CONVERT_EXPR_CODE_P (rhs_code)
 	  || rhs_code == VIEW_CONVERT_EXPR
-	  || rhs_code == ADDR_EXPR
+	  || ADDR_EXPR_CODE_P (rhs_code)
 	  || gimple_assign_rhs_class (stmt) == GIMPLE_SINGLE_RHS)
 	{
 	  tree rhs = gimple_assign_rhs1 (stmt);
