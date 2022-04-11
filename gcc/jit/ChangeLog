@@ -1,3 +1,28 @@
+2022-04-06  David Malcolm  <dmalcolm@redhat.com>
+
+	PR jit/102824
+	* docs/_build/texinfo/factorial.png: Move to...
+	* docs/_build/texinfo/libgccjit-figures/factorial.png: ...here.
+	* docs/_build/texinfo/factorial1.png: Move to...
+	* docs/_build/texinfo/libgccjit-figures/factorial1.png: ...here.
+	* docs/_build/texinfo/sum-of-squares.png: Move to...
+	* docs/_build/texinfo/libgccjit-figures/sum-of-squares.png: ...here.
+	* docs/_build/texinfo/sum-of-squares1.png: Move to...
+	* docs/_build/texinfo/libgccjit-figures/sum-of-squares1.png: ...here.
+
+2022-04-01  David Malcolm  <dmalcolm@redhat.com>
+
+	* docs/topics/expressions.rst: Fix formatting.
+	* docs/topics/types.rst: Likewise.
+	* docs/_build/texinfo/libgccjit.texi: Regenerate
+
+2022-04-01  Petter Tomner  <tomner@kth.se>
+
+	* docs/topics/compatibility.rst: Add 19 tag
+	* docs/topics/compilation.rst: Linking
+	* docs/topics/contexts.rst: Linking example
+	* docs/topics/expressions.rst: Fix formatting and dropped 's'
+
 2022-03-07  Jakub Jelinek  <jakub@redhat.com>
 
 	* libgccjit.h: Fix up duplicated word issue in a comment.

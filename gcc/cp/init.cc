@@ -2811,6 +2811,11 @@ warn_placement_new_too_small (tree type, tree nelts, tree size, tree oper)
   if (!objsize)
     return;
 
+  /* We can only draw conclusions if ref.deref == -1,
+     i.e. oper is the address of the object.  */
+  if (ref.deref != -1)
+    return;
+
   offset_int bytes_avail = wi::to_offset (objsize);
   offset_int bytes_need;
 
@@ -4908,10 +4913,9 @@ build_vec_init (tree base, tree maxindex, tree init,
   /* Now make the result have the correct type.  */
   if (TREE_CODE (atype) == ARRAY_TYPE)
     {
-      atype = build_pointer_type (atype);
+      atype = build_reference_type (atype);
       stmt_expr = build1 (NOP_EXPR, atype, stmt_expr);
-      stmt_expr = cp_build_fold_indirect_ref (stmt_expr);
-      suppress_warning (stmt_expr /* What warning? */);
+      stmt_expr = convert_from_reference (stmt_expr);
     }
 
   return stmt_expr;
