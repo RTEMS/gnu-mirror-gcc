@@ -353,7 +353,7 @@
 
 (define_insn "aarch64_cap_bit_equality"
   [(set (reg:CC_Z CC_REGNUM)
-        (unspec:CC_Z [(match_operand:CADI 0 "register_operand" "=rk")
+        (unspec:CC_Z [(match_operand:CADI 0 "register_operand" "rk")
                     (match_operand:CADI 1 "register_operand" "r")]
           UNSPEC_CHERI_BIT_EQ)
         )]
@@ -432,7 +432,7 @@
 
 (define_insn "aarch64_cap_subset_of"
   [(set (reg:CC_N CC_REGNUM)
-        (unspec:CC_N [(match_operand:CADI 0 "register_operand" "=rk")
+        (unspec:CC_N [(match_operand:CADI 0 "register_operand" "rk")
                     (match_operand:CADI 1 "register_operand" "rk")]
           UNSPEC_CHERI_SUBSET_TEST)
         )]
