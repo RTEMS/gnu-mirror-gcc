@@ -3772,8 +3772,7 @@ vect_check_gather_scatter (stmt_vec_info stmt_info, loop_vec_info loop_vinfo,
       && !expr_invariant_in_loop_p (loop, TREE_OPERAND (base, 0)))
     {
       gimple *def_stmt = SSA_NAME_DEF_STMT (TREE_OPERAND (base, 0));
-      if (is_gimple_assign (def_stmt)
-	  && gimple_assign_rhs_code (def_stmt) == ADDR_EXPR)
+      if (gimple_addr_expr_p (def_stmt))
 	base = TREE_OPERAND (gimple_assign_rhs1 (def_stmt), 0);
     }
 

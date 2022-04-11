@@ -1841,8 +1841,7 @@ maybe_set_strlen_range (tree lhs, tree src, tree bound)
   if (TREE_CODE (src) == SSA_NAME)
     {
       gimple *def = SSA_NAME_DEF_STMT (src);
-      if (is_gimple_assign (def)
-	  && gimple_assign_rhs_code (def) == ADDR_EXPR)
+      if (gimple_addr_expr_p (def))
 	src = gimple_assign_rhs1 (def);
     }
 

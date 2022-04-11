@@ -883,7 +883,7 @@ plus_stmt_object_size (struct object_size_info *osi, tree var, gimple *stmt)
       op0 = gimple_assign_rhs1 (stmt);
       op1 = gimple_assign_rhs2 (stmt);
     }
-  else if (gimple_assign_rhs_code (stmt) == ADDR_EXPR)
+  else if (gimple_addr_expr_p (stmt))
     {
       tree rhs = TREE_OPERAND (gimple_assign_rhs1 (stmt), 0);
       gcc_assert (TREE_CODE (rhs) == MEM_REF);
@@ -1043,7 +1043,7 @@ collect_object_sizes_for (struct object_size_info *osi, tree var)
       {
 	tree rhs = gimple_assign_rhs1 (stmt);
         if (gimple_assign_rhs_code (stmt) == POINTER_PLUS_EXPR
-	    || (gimple_assign_rhs_code (stmt) == ADDR_EXPR
+	    || (gimple_addr_expr_p (stmt)
 		&& TREE_CODE (TREE_OPERAND (rhs, 0)) == MEM_REF))
           reexamine = plus_stmt_object_size (osi, var, stmt);
 	else if (gimple_assign_rhs_code (stmt) == COND_EXPR)

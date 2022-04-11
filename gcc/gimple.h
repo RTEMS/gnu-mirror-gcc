@@ -2803,6 +2803,23 @@ gimple_assign_rhs_code (const gimple *gs)
   return gimple_assign_rhs_code (ass);
 }
 
+/* Return true if ASSIGN takes the address of an object.  If so, the object
+   is given by gimple_assign_rhs1 (ASSIGN).  */
+
+static inline bool
+gimple_addr_expr_p (const gassign *assign)
+{
+  return ADDR_EXPR_CODE_P (gimple_assign_rhs_code (assign));
+}
+
+/* Likewise for general gimple statements.  */
+
+static inline bool
+gimple_addr_expr_p (const gimple *gs)
+{
+  return (is_gimple_assign (gs)
+	  && gimple_addr_expr_p (as_a<const gassign *> (gs)));
+}
 
 /* Set CODE to be the code for the expression computed on the RHS of
    assignment S.  */

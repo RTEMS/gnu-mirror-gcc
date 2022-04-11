@@ -716,8 +716,7 @@ ao_ref_init_from_ptr_and_size (ao_ref *ref, tree ptr, tree size)
   if (TREE_CODE (ptr) == SSA_NAME)
     {
       gimple *stmt = SSA_NAME_DEF_STMT (ptr);
-      if (gimple_assign_single_p (stmt)
-	  && gimple_assign_rhs_code (stmt) == ADDR_EXPR)
+      if (gimple_addr_expr_p (stmt))
 	ptr = gimple_assign_rhs1 (stmt);
       else if (is_gimple_assign (stmt)
 	       && gimple_assign_rhs_code (stmt) == POINTER_PLUS_EXPR

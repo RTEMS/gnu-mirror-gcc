@@ -364,8 +364,7 @@ vr_values::vrp_stmt_computes_nonzero (gimple *stmt)
 
   /* If we have an expression of the form &X->a, then the expression
      is nonnull if X is nonnull.  */
-  if (is_gimple_assign (stmt)
-      && gimple_assign_rhs_code (stmt) == ADDR_EXPR)
+  if (gimple_addr_expr_p (stmt))
     {
       tree expr = gimple_assign_rhs1 (stmt);
       poly_int64 bitsize, bitpos;

@@ -2642,8 +2642,7 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
 		  || TREE_OPERAND (base, 0) != ref2))
 	    {
 	      gimple *def_stmt = SSA_NAME_DEF_STMT (ref2);
-	      if (gimple_assign_single_p (def_stmt)
-		  && gimple_assign_rhs_code (def_stmt) == ADDR_EXPR)
+	      if (gimple_addr_expr_p (def_stmt))
 		ref2 = gimple_assign_rhs1 (def_stmt);
 	    }
 	}
@@ -3270,8 +3269,7 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
 	  if (TREE_CODE (lhs) == SSA_NAME)
 	    {
 	      gimple *def_stmt = SSA_NAME_DEF_STMT (lhs);
-	      if (gimple_assign_single_p (def_stmt)
-		  && gimple_assign_rhs_code (def_stmt) == ADDR_EXPR)
+	      if (gimple_addr_expr_p (def_stmt))
 		lhs = gimple_assign_rhs1 (def_stmt);
 	    }
 	}

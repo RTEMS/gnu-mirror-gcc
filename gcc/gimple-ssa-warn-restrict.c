@@ -403,9 +403,7 @@ builtin_memref::set_base_and_offset (tree expr)
     {
       /* Try to tease the offset out of the pointer.  */
       gimple *stmt = SSA_NAME_DEF_STMT (expr);
-      if (!base
-	  && gimple_assign_single_p (stmt)
-	  && gimple_assign_rhs_code (stmt) == ADDR_EXPR)
+      if (!base && gimple_addr_expr_p (stmt))
 	expr = gimple_assign_rhs1 (stmt);
       else if (is_gimple_assign (stmt))
 	{

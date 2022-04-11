@@ -82,8 +82,7 @@ pass_laddress::execute (function *fun)
       for (gimple_stmt_iterator gsi = gsi_start_bb (bb); !gsi_end_p (gsi);)
 	{
 	  gimple *stmt = gsi_stmt (gsi);
-	  if (!is_gimple_assign (stmt)
-	      || gimple_assign_rhs_code (stmt) != ADDR_EXPR
+	  if (!gimple_addr_expr_p (stmt)
 	      || is_gimple_invariant_address (gimple_assign_rhs1 (stmt)))
 	    {
 	      gsi_next (&gsi);

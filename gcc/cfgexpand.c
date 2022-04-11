@@ -2653,7 +2653,7 @@ expand_call_stmt (gcall *stmt)
       if (builtin_p
 	  && TREE_CODE (arg) == SSA_NAME
 	  && (def = get_gimple_for_ssa_name (arg))
-	  && gimple_assign_rhs_code (def) == ADDR_EXPR)
+	  && gimple_addr_expr_p (def))
 	arg = gimple_assign_rhs1 (def);
       CALL_EXPR_ARG (exp, i) = arg;
     }

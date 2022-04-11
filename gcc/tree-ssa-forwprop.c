@@ -3092,9 +3092,7 @@ pass_forwprop::execute (function *fun)
 		  substituted_p = true;
 		}
 	    }
-	  if (substituted_p
-	      && is_gimple_assign (stmt)
-	      && gimple_assign_rhs_code (stmt) == ADDR_EXPR)
+	  if (substituted_p && gimple_addr_expr_p (stmt))
 	    recompute_tree_invariant_for_addr_expr (gimple_assign_rhs1 (stmt));
 
 	  bool changed;
