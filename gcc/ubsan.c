@@ -1392,7 +1392,7 @@ static void
 instrument_null (gimple_stmt_iterator gsi, tree t, bool is_lhs)
 {
   /* Handle also e.g. &s->i.  */
-  if (TREE_CODE (t) == ADDR_EXPR)
+  if (ADDR_EXPR_P (t))
     t = TREE_OPERAND (t, 0);
   tree base = get_base_address (t);
   if (base != NULL_TREE
@@ -1422,7 +1422,7 @@ maybe_instrument_pointer_overflow (gimple_stmt_iterator *gsi, tree t)
     return;
 
   /* Handle also e.g. &s->i.  */
-  if (TREE_CODE (t) == ADDR_EXPR)
+  if (ADDR_EXPR_P (t))
     t = TREE_OPERAND (t, 0);
 
   if (!handled_component_p (t) && TREE_CODE (t) != MEM_REF)
@@ -1460,7 +1460,7 @@ maybe_instrument_pointer_overflow (gimple_stmt_iterator *gsi, tree t)
   else if (TREE_CODE (inner) == MEM_REF)
     {
       base = TREE_OPERAND (inner, 0);
-      if (TREE_CODE (base) == ADDR_EXPR
+      if (ADDR_EXPR_P (base)
 	  && DECL_P (TREE_OPERAND (base, 0))
 	  && !TREE_ADDRESSABLE (TREE_OPERAND (base, 0))
 	  && !is_global_var (TREE_OPERAND (base, 0)))

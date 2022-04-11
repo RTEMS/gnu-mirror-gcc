@@ -1160,7 +1160,7 @@ expand_omp_regimplify_p (tree *tp, int *walk_subtrees, void *)
   if (VAR_P (t) && DECL_HAS_VALUE_EXPR_P (t))
     return t;
 
-  if (TREE_CODE (t) == ADDR_EXPR)
+  if (ADDR_EXPR_P (t))
     recompute_tree_invariant_for_addr_expr (t);
 
   *walk_subtrees = !TYPE_P (t) && !DECL_P (t);
@@ -1293,7 +1293,7 @@ expand_omp_taskreg (struct omp_region *region)
 		  /* We're ignore the subcode because we're
 		     effectively doing a STRIP_NOPS.  */
 
-		  if (TREE_CODE (arg) == ADDR_EXPR
+		  if (ADDR_EXPR_P (arg)
 		      && (TREE_OPERAND (arg, 0)
 			  == gimple_omp_taskreg_data_arg (entry_stmt)))
 		    {
@@ -9010,7 +9010,7 @@ expand_omp_target (struct omp_region *region)
 		  /* We're ignoring the subcode because we're
 		     effectively doing a STRIP_NOPS.  */
 
-		  if (TREE_CODE (arg) == ADDR_EXPR
+		  if (ADDR_EXPR_P (arg)
 		      && TREE_OPERAND (arg, 0) == sender)
 		    {
 		      tgtcopy_stmt = stmt;

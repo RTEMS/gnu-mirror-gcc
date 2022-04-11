@@ -78,7 +78,7 @@ constant_for_folding (tree t)
 {
   return (CONSTANT_CLASS_P (t)
 	  /* The following is only interesting to string builtins.  */
-	  || (TREE_CODE (t) == ADDR_EXPR
+	  || (ADDR_EXPR_P (t)
 	      && TREE_CODE (TREE_OPERAND (t, 0)) == STRING_CST));
 }
 
@@ -1024,7 +1024,7 @@ gimple_simplify (gimple *stmt, gimple_match_op *res_op, gimple_seq *seq,
 		return false;
 
 	      fn = do_valueize (fn, top_valueize, valueized);
-	      if (TREE_CODE (fn) != ADDR_EXPR
+	      if (!ADDR_EXPR_P (fn)
 		  || TREE_CODE (TREE_OPERAND (fn, 0)) != FUNCTION_DECL)
 		return false;
 

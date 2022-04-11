@@ -6203,7 +6203,7 @@ scan_operand_equal_p (tree ref1, tree ref2)
 	  gimple *def_stmt = SSA_NAME_DEF_STMT (TREE_OPERAND (base[i], 0));
 	  if (is_gimple_assign (def_stmt)
 	      && gimple_assign_rhs_code (def_stmt) == POINTER_PLUS_EXPR
-	      && TREE_CODE (gimple_assign_rhs1 (def_stmt)) == ADDR_EXPR
+	      && ADDR_EXPR_P (gimple_assign_rhs1 (def_stmt))
 	      && TREE_CODE (gimple_assign_rhs2 (def_stmt)) == SSA_NAME)
 	    {
 	      if (maybe_ne (mem_ref_offset (base[i]), 0))
@@ -6375,7 +6375,7 @@ check_scan_store (vec_info *vinfo, stmt_vec_info stmt_info, tree vectype,
   if (slp
       || mask
       || memory_access_type != VMAT_CONTIGUOUS
-      || TREE_CODE (DR_BASE_ADDRESS (dr_info->dr)) != ADDR_EXPR
+      || !ADDR_EXPR_P (DR_BASE_ADDRESS (dr_info->dr))
       || !VAR_P (TREE_OPERAND (DR_BASE_ADDRESS (dr_info->dr), 0))
       || loop_vinfo == NULL
       || LOOP_VINFO_FULLY_MASKED_P (loop_vinfo)
@@ -6595,7 +6595,7 @@ check_scan_store (vec_info *vinfo, stmt_vec_info stmt_info, tree vectype,
   if (STMT_VINFO_SIMD_LANE_ACCESS_P (stmt_info) == 4 && inscan_var_store)
     {
       dr_vec_info *load1_dr_info = STMT_VINFO_DR_INFO (load1_stmt_info);
-      if (TREE_CODE (DR_BASE_ADDRESS (load1_dr_info->dr)) != ADDR_EXPR
+      if (!ADDR_EXPR_P (DR_BASE_ADDRESS (load1_dr_info->dr))
 	  || !VAR_P (TREE_OPERAND (DR_BASE_ADDRESS (load1_dr_info->dr), 0)))
 	goto fail;
       tree var1 = TREE_OPERAND (DR_BASE_ADDRESS (load1_dr_info->dr), 0);
@@ -6653,7 +6653,7 @@ check_scan_store (vec_info *vinfo, stmt_vec_info stmt_info, tree vectype,
   else if (STMT_VINFO_SIMD_LANE_ACCESS_P (stmt_info) == 4)
     {
       dr_vec_info *load2_dr_info = STMT_VINFO_DR_INFO (load2_stmt_info);
-      if (TREE_CODE (DR_BASE_ADDRESS (load2_dr_info->dr)) != ADDR_EXPR
+      if (!ADDR_EXPR_P (DR_BASE_ADDRESS (load2_dr_info->dr))
 	  || !VAR_P (TREE_OPERAND (DR_BASE_ADDRESS (load2_dr_info->dr), 0)))
 	goto fail;
       var3 = TREE_OPERAND (DR_BASE_ADDRESS (load2_dr_info->dr), 0);
@@ -6665,7 +6665,7 @@ check_scan_store (vec_info *vinfo, stmt_vec_info stmt_info, tree vectype,
     }
 
   dr_vec_info *other_dr_info = STMT_VINFO_DR_INFO (other_store_stmt_info);
-  if (TREE_CODE (DR_BASE_ADDRESS (other_dr_info->dr)) != ADDR_EXPR
+  if (!ADDR_EXPR_P (DR_BASE_ADDRESS (other_dr_info->dr))
       || !VAR_P (TREE_OPERAND (DR_BASE_ADDRESS (other_dr_info->dr), 0)))
     goto fail;
 
@@ -7883,7 +7883,7 @@ vectorizable_store (vec_info *vinfo,
 	    = STMT_VINFO_SIMD_LANE_ACCESS_P (stmt_info) != 0;
 	  if (simd_lane_access_p
 	      && !loop_masks
-	      && TREE_CODE (DR_BASE_ADDRESS (first_dr_info->dr)) == ADDR_EXPR
+	      && ADDR_EXPR_P (DR_BASE_ADDRESS (first_dr_info->dr))
 	      && VAR_P (TREE_OPERAND (DR_BASE_ADDRESS (first_dr_info->dr), 0))
 	      && integer_zerop (get_dr_vinfo_offset (vinfo, first_dr_info))
 	      && integer_zerop (DR_INIT (first_dr_info->dr))
@@ -9143,7 +9143,7 @@ vectorizable_load (vec_info *vinfo,
 	  bool simd_lane_access_p
 	    = STMT_VINFO_SIMD_LANE_ACCESS_P (stmt_info) != 0;
 	  if (simd_lane_access_p
-	      && TREE_CODE (DR_BASE_ADDRESS (first_dr_info->dr)) == ADDR_EXPR
+	      && ADDR_EXPR_P (DR_BASE_ADDRESS (first_dr_info->dr))
 	      && VAR_P (TREE_OPERAND (DR_BASE_ADDRESS (first_dr_info->dr), 0))
 	      && integer_zerop (get_dr_vinfo_offset (vinfo, first_dr_info))
 	      && integer_zerop (DR_INIT (first_dr_info->dr))

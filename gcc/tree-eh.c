@@ -2692,7 +2692,7 @@ tree_could_trap_p (tree expr)
 
     case TARGET_MEM_REF:
     case MEM_REF:
-      if (TREE_CODE (TREE_OPERAND (expr, 0)) == ADDR_EXPR
+      if (ADDR_EXPR_P (TREE_OPERAND (expr, 0))
 	  && tree_could_trap_p (TREE_OPERAND (TREE_OPERAND (expr, 0), 0)))
 	return true;
       if (TREE_THIS_NOTRAP (expr))
@@ -2702,7 +2702,7 @@ tree_could_trap_p (tree expr)
       if (code == TARGET_MEM_REF
 	  && (TMR_INDEX (expr) || TMR_INDEX2 (expr)))
 	return true;
-      if (TREE_CODE (TREE_OPERAND (expr, 0)) == ADDR_EXPR)
+      if (ADDR_EXPR_P (TREE_OPERAND (expr, 0)))
 	{
 	  tree base = TREE_OPERAND (TREE_OPERAND (expr, 0), 0);
 	  poly_offset_int off = mem_ref_offset (expr);

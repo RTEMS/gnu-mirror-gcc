@@ -466,7 +466,7 @@ check_va_list_escapes (struct stdarg_info *si, tree lhs, tree rhs)
       if (! bitmap_bit_p (si->va_list_escape_vars, SSA_NAME_VERSION (rhs)))
 	return;
     }
-  else if (TREE_CODE (rhs) == ADDR_EXPR
+  else if (ADDR_EXPR_P (rhs)
 	   && TREE_CODE (TREE_OPERAND (rhs, 0)) == MEM_REF
 	   && TREE_CODE (TREE_OPERAND (TREE_OPERAND (rhs, 0), 0)) == SSA_NAME)
     {
@@ -713,7 +713,7 @@ optimize_va_list_gpr_fpr_size (function *fun)
 	  si.va_start_count++;
 	  ap = gimple_call_arg (stmt, 0);
 
-	  if (TREE_CODE (ap) != ADDR_EXPR)
+	  if (!ADDR_EXPR_P (ap))
 	    {
 	      va_list_escapes = true;
 	      break;

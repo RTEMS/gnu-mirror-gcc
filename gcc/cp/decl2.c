@@ -1894,7 +1894,7 @@ mark_vtable_entries (tree decl, vec<tree> &consteval_vtables)
 
       STRIP_NOPS (fnaddr);
 
-      if (TREE_CODE (fnaddr) != ADDR_EXPR
+      if (!ADDR_EXPR_P (fnaddr)
 	  && TREE_CODE (fnaddr) != FDESC_EXPR)
 	/* This entry is an offset: a virtual base class offset, a
 	   virtual call offset, an RTTI offset, etc.  */

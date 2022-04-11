@@ -2714,7 +2714,7 @@ canonicalize_addr_expr (tree *expr_p)
 
   /* We simplify only conversions from an ADDR_EXPR to a pointer type.  */
   if (!POINTER_TYPE_P (TREE_TYPE (expr))
-      || TREE_CODE (addr_expr) != ADDR_EXPR)
+      || !ADDR_EXPR_P (addr_expr))
     return;
 
   /* The addr_expr type should be a pointer to an array.  */
@@ -2778,7 +2778,7 @@ gimplify_conversion (tree *expr_p)
 
       /* If a NOP conversion is changing a pointer to array of foo
 	 to a pointer to foo, embed that change in the ADDR_EXPR.  */
-      else if (TREE_CODE (sub) == ADDR_EXPR)
+      else if (ADDR_EXPR_P (sub))
 	canonicalize_addr_expr (expr_p);
     }
 
@@ -6462,7 +6462,7 @@ gimplify_asm_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 	      while (handled_component_p (x))
 		x = TREE_OPERAND (x, 0);
 	      if (TREE_CODE (x) == MEM_REF
-		  && TREE_CODE (TREE_OPERAND (x, 0)) == ADDR_EXPR)
+		  && ADDR_EXPR_P (TREE_OPERAND (x, 0)))
 		x = TREE_OPERAND (TREE_OPERAND (x, 0), 0);
 	      if ((VAR_P (x)
 		   || TREE_CODE (x) == PARM_DECL
@@ -8627,7 +8627,7 @@ gimplify_scan_omp_clauses (tree *list_p, gimple_seq *pre_p,
 		    }
 		  decl = TREE_OPERAND (decl, 0);
 		}
-	      if (TREE_CODE (decl) == ADDR_EXPR
+	      if (ADDR_EXPR_P (decl)
 		  || TREE_CODE (decl) == INDIRECT_REF)
 		decl = TREE_OPERAND (decl, 0);
 	    }
@@ -9498,13 +9498,11 @@ gimplify_scan_omp_clauses (tree *list_p, gimple_seq *pre_p,
 	      && (OMP_CLAUSE_CODE (c) != OMP_CLAUSE_REDUCTION
 		  || decl == OMP_CLAUSE_DECL (c)
 		  || (TREE_CODE (OMP_CLAUSE_DECL (c)) == MEM_REF
-		      && (TREE_CODE (TREE_OPERAND (OMP_CLAUSE_DECL (c), 0))
-			  == ADDR_EXPR
+		      && (ADDR_EXPR_P (TREE_OPERAND (OMP_CLAUSE_DECL (c), 0))
 			  || (TREE_CODE (TREE_OPERAND (OMP_CLAUSE_DECL (c), 0))
 			      == POINTER_PLUS_EXPR
-			      && (TREE_CODE (TREE_OPERAND (TREE_OPERAND
-						(OMP_CLAUSE_DECL (c), 0), 0))
-				  == ADDR_EXPR)))))
+			      && ADDR_EXPR_P (TREE_OPERAND (TREE_OPERAND
+					(OMP_CLAUSE_DECL (c), 0), 0))))))
 	      && omp_check_private (ctx, decl, false))
 	    {
 	      error ("%s variable %qE is private in outer context",
@@ -9822,7 +9820,7 @@ omp_find_stores_op (tree *tp, int *walk_subtrees, void *data)
       if (handled_component_p (op))
 	op = TREE_OPERAND (op, 0);
       else if ((TREE_CODE (op) == MEM_REF || TREE_CODE (op) == TARGET_MEM_REF)
-	       && TREE_CODE (TREE_OPERAND (op, 0)) == ADDR_EXPR)
+	       && ADDR_EXPR_P (TREE_OPERAND (op, 0)))
 	op = TREE_OPERAND (TREE_OPERAND (op, 0), 0);
       else
 	break;
@@ -13087,11 +13085,11 @@ goa_lhs_expr_p (tree expr, tree addr)
 	}
       if (expr == addr)
 	return true;
-      return (TREE_CODE (addr) == ADDR_EXPR
-	      && TREE_CODE (expr) == ADDR_EXPR
+      return (ADDR_EXPR_P (addr)
+	      && ADDR_EXPR_P (expr)
 	      && TREE_OPERAND (addr, 0) == TREE_OPERAND (expr, 0));
     }
-  if (TREE_CODE (addr) == ADDR_EXPR && expr == TREE_OPERAND (addr, 0))
+  if (ADDR_EXPR_P (addr) && expr == TREE_OPERAND (addr, 0))
     return true;
   return false;
 }

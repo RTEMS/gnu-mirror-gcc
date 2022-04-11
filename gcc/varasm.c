@@ -1564,7 +1564,7 @@ assemble_asm (tree string)
   const char *p;
   app_enable ();
 
-  if (TREE_CODE (string) == ADDR_EXPR)
+  if (ADDR_EXPR_P (string))
     string = TREE_OPERAND (string, 0);
 
   p = TREE_STRING_POINTER (string);
@@ -3009,15 +3009,14 @@ decode_addr_const (tree exp, class addr_const *value)
 	  target = TREE_OPERAND (target, 0);
 	}
       else if (TREE_CODE (target) == MEM_REF
-	       && TREE_CODE (TREE_OPERAND (target, 0)) == ADDR_EXPR)
+	       && ADDR_EXPR_P (TREE_OPERAND (target, 0)))
 	{
 	  offset += mem_ref_offset (target).force_shwi ();
 	  target = TREE_OPERAND (TREE_OPERAND (target, 0), 0);
 	}
       else if (TREE_CODE (target) == INDIRECT_REF
 	       && TREE_CODE (TREE_OPERAND (target, 0)) == NOP_EXPR
-	       && TREE_CODE (TREE_OPERAND (TREE_OPERAND (target, 0), 0))
-		  == ADDR_EXPR)
+	       && ADDR_EXPR_P (TREE_OPERAND (TREE_OPERAND (target, 0), 0)))
 	target = TREE_OPERAND (TREE_OPERAND (TREE_OPERAND (target, 0), 0), 0);
       else
 	break;
@@ -4385,7 +4384,7 @@ compute_reloc_for_constant (tree exp)
 	;
 
       if (TREE_CODE (tem) == MEM_REF
-	  && TREE_CODE (TREE_OPERAND (tem, 0)) == ADDR_EXPR)
+	  && ADDR_EXPR_P (TREE_OPERAND (tem, 0)))
 	{
 	  reloc = compute_reloc_for_constant (TREE_OPERAND (tem, 0));
 	  break;
@@ -4677,7 +4676,7 @@ initializer_constant_valid_p_1 (tree value, tree endtype, tree *cache)
 	   with IR like:
 	   .REPLACE_ADDRESS_VALUE (&x, (long)&x + INTEGER_CST)
 	   which later get expanded to POINTER_PLUS.  */
-	if (TREE_CODE (base_cap) == ADDR_EXPR)
+	if (ADDR_EXPR_P (base_cap))
 	  {
 	    tree av_addr = addr_value;
 	    if (TREE_CODE (av_addr) == PLUS_EXPR)
@@ -5124,7 +5123,7 @@ output_constant (tree exp, unsigned HOST_WIDE_INT size, unsigned int align,
       /* If what we're left with is the address of something, we can
 	 convert the address to the final type and output it that
 	 way.  */
-      if (TREE_CODE (exp) == ADDR_EXPR)
+      if (ADDR_EXPR_P (exp))
 	exp = build1 (ADDR_EXPR, saved_type, TREE_OPERAND (exp, 0));
       /* Likewise for constant ints.  */
       else if (TREE_CODE (exp) == INTEGER_CST)
@@ -5188,7 +5187,7 @@ output_constant (tree exp, unsigned HOST_WIDE_INT size, unsigned int align,
 	{
 	  rtx cap = expand_expr (exp, NULL_RTX, VOIDmode, EXPAND_INITIALIZER);
 
-	  if (TREE_CODE (exp) == ADDR_EXPR
+	  if (ADDR_EXPR_P (exp)
 	      && TREE_CODE (TREE_OPERAND (exp, 0)) == LABEL_DECL)
 	    {
 	      /* For a pointer to a label, we need to rewrite the expression

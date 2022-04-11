@@ -596,7 +596,7 @@ var_is_used_for_virtual_call_p (tree lhs, int *mem_ref_depth,
       else if (is_gimple_assign (stmt2))
         {
 	  tree rhs = gimple_assign_rhs1 (stmt2);
-	  if (TREE_CODE (rhs) == ADDR_EXPR
+	  if (ADDR_EXPR_P (rhs)
 	      || TREE_CODE (rhs) == MEM_REF)
 	    *mem_ref_depth = *mem_ref_depth + 1;
 	  
@@ -605,7 +605,7 @@ var_is_used_for_virtual_call_p (tree lhs, int *mem_ref_depth,
 	      while (TREE_CODE (TREE_OPERAND (rhs, 0)) == COMPONENT_REF)
 		rhs = TREE_OPERAND (rhs, 0);
 
-	      if (TREE_CODE (TREE_OPERAND (rhs, 0)) == ADDR_EXPR
+	      if (ADDR_EXPR_P (TREE_OPERAND (rhs, 0))
 		  || TREE_CODE (TREE_OPERAND (rhs, 0)) == MEM_REF)
 		*mem_ref_depth = *mem_ref_depth + 1;
 	    }

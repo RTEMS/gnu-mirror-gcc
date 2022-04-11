@@ -861,7 +861,7 @@ canonicalize_base_object_address (tree addr)
   if (!POINTER_TYPE_P (TREE_TYPE (addr)))
     return orig;
 
-  if (TREE_CODE (addr) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (addr))
     return addr;
 
   return build_fold_addr_expr (TREE_OPERAND (addr, 0));
@@ -5795,7 +5795,7 @@ get_base_for_alignment (tree addr, unsigned int *max_alignment)
   if (base)
     return base;
 
-  if (TREE_CODE (addr) == ADDR_EXPR)
+  if (ADDR_EXPR_P (addr))
     addr = TREE_OPERAND (addr, 0);
   *max_alignment = MAX_OFILE_ALIGNMENT / BITS_PER_UNIT;
   return addr;

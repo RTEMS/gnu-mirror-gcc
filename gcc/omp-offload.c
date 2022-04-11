@@ -2001,7 +2001,7 @@ ompdevlow_adjust_simt_enter (gimple_stmt_iterator *gsi, bool *regimplify)
       tree *argp = gimple_call_arg_ptr (enter_stmt, i);
       if (*argp == null_pointer_node)
 	continue;
-      gcc_assert (TREE_CODE (*argp) == ADDR_EXPR
+      gcc_assert (ADDR_EXPR_P (*argp)
 		  && VAR_P (TREE_OPERAND (*argp, 0)));
       tree var = TREE_OPERAND (*argp, 0);
 

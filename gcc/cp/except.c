@@ -1051,7 +1051,7 @@ check_noexcept_r (tree *tp, int * /*walk_subtrees*/, void * /*data*/)
       type = TREE_TYPE (type);
 
       STRIP_NOPS (fn);
-      if (TREE_CODE (fn) == ADDR_EXPR)
+      if (ADDR_EXPR_P (fn))
 	fn = TREE_OPERAND (fn, 0);
       if (TREE_CODE (fn) == FUNCTION_DECL)
 	{

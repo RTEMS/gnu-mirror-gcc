@@ -3285,7 +3285,7 @@ write_expression (tree expr)
 	 argument with reference type, we create an ADDR_EXPR to show
 	 the fact that the entity's address has been taken.  But, we
 	 don't actually want to output a mangling code for the `&'.  */
-      if (TREE_CODE (expr) == ADDR_EXPR
+      if (ADDR_EXPR_P (expr)
 	  && TREE_TYPE (expr)
 	  && TYPE_REF_P (TREE_TYPE (expr)))
 	{
@@ -3360,7 +3360,7 @@ write_expression (tree expr)
 	  {
 	    tree fn = CALL_EXPR_FN (expr);
 
-	    if (TREE_CODE (fn) == ADDR_EXPR)
+	    if (ADDR_EXPR_P (fn))
 	      fn = TREE_OPERAND (fn, 0);
 
 	    /* Mangle a dependent name as the name, not whatever happens to
@@ -3592,7 +3592,7 @@ write_template_arg (tree node)
       /* Template parameters can be of reference type. To maintain
 	 internal consistency, such arguments use a conversion from
 	 address of object to reference type.  */
-      gcc_assert (TREE_CODE (TREE_OPERAND (node, 0)) == ADDR_EXPR);
+      gcc_assert (ADDR_EXPR_P (TREE_OPERAND (node, 0)));
       node = TREE_OPERAND (TREE_OPERAND (node, 0), 0);
     }
 

@@ -427,7 +427,7 @@ static bool
 is_addr_local (gimple *return_stmt, tree exp, locmap_t *plocmap,
 	       hash_set<gphi *> *visited)
 {
-  if (TREE_CODE (exp) == ADDR_EXPR)
+  if (ADDR_EXPR_P (exp))
     {
       tree baseaddr = get_base_address (TREE_OPERAND (exp, 0));
       if (TREE_CODE (baseaddr) == MEM_REF)

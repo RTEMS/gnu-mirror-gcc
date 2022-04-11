@@ -872,7 +872,7 @@ brig_to_generic::write_globals ()
 
 	  decl_call = CALL_EXPR_FN (decl_call);
 	  STRIP_NOPS (decl_call);
-	  if (TREE_CODE (decl_call) == ADDR_EXPR
+	  if (ADDR_EXPR_P (decl_call)
 	      && TREE_CODE (TREE_OPERAND (decl_call, 0)) == FUNCTION_DECL)
 	    TREE_OPERAND (decl_call, 0) = brig_function->m_func_decl;
 	}

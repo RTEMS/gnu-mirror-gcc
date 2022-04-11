@@ -2331,7 +2331,7 @@ get_origin_and_offset (tree x, HOST_WIDE_INT *fldoff, HOST_WIDE_INT *off)
       if (off)
 	{
 	  tree xtype
-	    = (TREE_CODE (x) == ADDR_EXPR
+	    = (ADDR_EXPR_P (x)
 	       ? TREE_TYPE (TREE_OPERAND (x, 0)) : TREE_TYPE (TREE_TYPE (x)));
 
 	  /* The byte offset of the most basic struct member the byte

@@ -3680,7 +3680,7 @@ gfc_string_to_single_character (tree len, tree str, int kind)
     }
 
   if (kind == 1
-      && TREE_CODE (str) == ADDR_EXPR
+      && ADDR_EXPR_P (str)
       && TREE_CODE (TREE_OPERAND (str, 0)) == ARRAY_REF
       && TREE_CODE (TREE_OPERAND (TREE_OPERAND (str, 0), 0)) == STRING_CST
       && array_ref_low_bound (TREE_OPERAND (str, 0))
@@ -3778,7 +3778,7 @@ static int
 gfc_optimize_len_trim (tree len, tree str, int kind)
 {
   if (kind == 1
-      && TREE_CODE (str) == ADDR_EXPR
+      && ADDR_EXPR_P (str)
       && TREE_CODE (TREE_OPERAND (str, 0)) == ARRAY_REF
       && TREE_CODE (TREE_OPERAND (TREE_OPERAND (str, 0), 0)) == STRING_CST
       && array_ref_low_bound (TREE_OPERAND (str, 0))
@@ -6053,7 +6053,7 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 		      && fsym->ts.type != BT_CLASS && e->expr_type != EXPR_NULL)
 		    {
 		      tmp = parmse.expr;
-		      if (TREE_CODE (tmp) == ADDR_EXPR)
+		      if (ADDR_EXPR_P (tmp))
 			tmp = build_fold_indirect_ref_loc (input_location, tmp);
 		      parmse.expr = gfc_conv_scalar_to_descriptor (&parmse, tmp,
 								   fsym->attr);

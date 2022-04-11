@@ -7723,7 +7723,7 @@ fixed_type_or_null (tree instance, int *nonnull, int *cdtorp)
     case POINTER_PLUS_EXPR:
     case PLUS_EXPR:
     case MINUS_EXPR:
-      if (TREE_CODE (TREE_OPERAND (instance, 0)) == ADDR_EXPR)
+      if (ADDR_EXPR_P (TREE_OPERAND (instance, 0)))
 	return RECUR (TREE_OPERAND (instance, 0));
       if (TREE_CODE (TREE_OPERAND (instance, 1)) == INTEGER_CST)
 	/* Propagate nonnull.  */
@@ -8580,7 +8580,7 @@ instantiate_type (tree lhstype, tree rhs, tsubst_flags_t complain)
 
   /* There are only a few kinds of expressions that may have a type
      dependent on overload resolution.  */
-  gcc_assert (TREE_CODE (rhs) == ADDR_EXPR
+  gcc_assert (ADDR_EXPR_P (rhs)
 	      || TREE_CODE (rhs) == COMPONENT_REF
 	      || is_overloaded_fn (rhs)
 	      || (flag_ms_extensions && TREE_CODE (rhs) == FUNCTION_DECL));
@@ -8845,7 +8845,7 @@ get_vtbl_decl_for_binfo (tree binfo)
   decl = BINFO_VTABLE (binfo);
   if (decl && TREE_CODE (decl) == POINTER_PLUS_EXPR)
     {
-      gcc_assert (TREE_CODE (TREE_OPERAND (decl, 0)) == ADDR_EXPR);
+      gcc_assert (ADDR_EXPR_P (TREE_OPERAND (decl, 0)));
       decl = TREE_OPERAND (TREE_OPERAND (decl, 0), 0);
     }
   if (decl)

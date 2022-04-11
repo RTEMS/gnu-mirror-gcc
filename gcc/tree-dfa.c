@@ -589,7 +589,7 @@ get_ref_base_and_extent (tree exp, poly_int64_pod *poffset,
 	case TARGET_MEM_REF:
 	  /* Via the variable index or index2 we can reach the
 	     whole object.  Still hand back the decl here.  */
-	  if (TREE_CODE (TMR_BASE (exp)) == ADDR_EXPR
+	  if (ADDR_EXPR_P (TMR_BASE (exp))
 	      && (TMR_INDEX (exp) || TMR_INDEX2 (exp)))
 	    {
 	      exp = TREE_OPERAND (TMR_BASE (exp), 0);
@@ -619,7 +619,7 @@ get_ref_base_and_extent (tree exp, poly_int64_pod *poffset,
 	    maxsize = -1;
 
 	  /* Hand back the decl for MEM[&decl, off].  */
-	  if (TREE_CODE (TREE_OPERAND (exp, 0)) == ADDR_EXPR)
+	  if (ADDR_EXPR_P (TREE_OPERAND (exp, 0)))
 	    {
 	      if (integer_zerop (TREE_OPERAND (exp, 1)))
 		exp = TREE_OPERAND (TREE_OPERAND (exp, 0), 0);
@@ -846,7 +846,7 @@ get_addr_base_and_unit_offset_1 (tree exp, poly_int64_pod *poffset,
 	      base = (*valueize) (base);
 
 	    /* Hand back the decl for MEM[&decl, off].  */
-	    if (TREE_CODE (base) == ADDR_EXPR)
+	    if (ADDR_EXPR_P (base))
 	      {
 		if (!integer_zerop (TREE_OPERAND (exp, 1)))
 		  {
@@ -866,7 +866,7 @@ get_addr_base_and_unit_offset_1 (tree exp, poly_int64_pod *poffset,
 	      base = (*valueize) (base);
 
 	    /* Hand back the decl for MEM[&decl, off].  */
-	    if (TREE_CODE (base) == ADDR_EXPR)
+	    if (ADDR_EXPR_P (base))
 	      {
 		if (TMR_INDEX (exp) || TMR_INDEX2 (exp))
 		  return NULL_TREE;

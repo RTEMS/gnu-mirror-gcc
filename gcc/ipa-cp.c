@@ -428,7 +428,7 @@ ipcp_lattice<valtype>::is_single_const ()
 static void
 print_ipcp_constant_value (FILE * f, tree v)
 {
-  if (TREE_CODE (v) == ADDR_EXPR
+  if (ADDR_EXPR_P (v)
       && TREE_CODE (TREE_OPERAND (v, 0)) == CONST_DECL)
     {
       fprintf (f, "& ");
@@ -1353,7 +1353,7 @@ static tree
 ipa_get_jf_ancestor_result (struct ipa_jump_func *jfunc, tree input)
 {
   gcc_checking_assert (TREE_CODE (input) != TREE_BINFO);
-  if (TREE_CODE (input) == ADDR_EXPR)
+  if (ADDR_EXPR_P (input))
     {
       gcc_checking_assert (is_gimple_ip_invariant_address (input));
       poly_int64 off = ipa_get_jf_ancestor_offset (jfunc);
@@ -1752,8 +1752,8 @@ values_equal_for_ipcp_p (tree x, tree y)
   if (x == y)
     return true;
 
-  if (TREE_CODE (x) ==  ADDR_EXPR
-      && TREE_CODE (y) ==  ADDR_EXPR
+  if (ADDR_EXPR_P (x)
+      && ADDR_EXPR_P (y)
       && TREE_CODE (TREE_OPERAND (x, 0)) == CONST_DECL
       && TREE_CODE (TREE_OPERAND (y, 0)) == CONST_DECL)
     return operand_equal_p (DECL_INITIAL (TREE_OPERAND (x, 0)),
@@ -2992,7 +2992,7 @@ ipa_get_indirect_edge_target_1 (struct cgraph_edge *ie,
 	t = known_csts[param_index];
 
       if (t
-	  && TREE_CODE (t) == ADDR_EXPR
+	  && ADDR_EXPR_P (t)
 	  && TREE_CODE (TREE_OPERAND (t, 0)) == FUNCTION_DECL)
 	return TREE_OPERAND (t, 0);
       else

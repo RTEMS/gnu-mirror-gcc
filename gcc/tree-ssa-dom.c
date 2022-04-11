@@ -1718,7 +1718,7 @@ record_equivalences_from_stmt (gimple *stmt, int may_optimize_p,
   /* Make sure we can propagate &x + CST.  */
   if (lhs_code == SSA_NAME
       && gimple_assign_rhs_code (stmt) == POINTER_PLUS_EXPR
-      && TREE_CODE (gimple_assign_rhs1 (stmt)) == ADDR_EXPR
+      && ADDR_EXPR_P (gimple_assign_rhs1 (stmt))
       && TREE_CODE (gimple_assign_rhs2 (stmt)) == INTEGER_CST)
     {
       tree op0 = gimple_assign_rhs1 (stmt);
@@ -2045,7 +2045,7 @@ dom_opt_dom_walker::optimize_stmt (basic_block bb, gimple_stmt_iterator *si,
         /* This should never be an ADDR_EXPR.  */
         rhs = gimple_switch_index (swtch_stmt);
 
-      if (rhs && TREE_CODE (rhs) == ADDR_EXPR)
+      if (rhs && ADDR_EXPR_P (rhs))
         recompute_tree_invariant_for_addr_expr (rhs);
 
       /* Indicate that maybe_clean_or_replace_eh_stmt needs to be called,

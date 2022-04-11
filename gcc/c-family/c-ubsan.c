@@ -429,7 +429,7 @@ ubsan_maybe_instrument_reference_or_call (location_t loc, tree op, tree ptype,
     }
   else
     {
-      if (sanitize_flags_p (SANITIZE_NULL) && TREE_CODE (op) == ADDR_EXPR)
+      if (sanitize_flags_p (SANITIZE_NULL) && ADDR_EXPR_P (op))
 	{
 	  bool strict_overflow_p = false;
 	  /* tree_single_nonzero_warnv_p will not return true for non-weak

@@ -641,7 +641,7 @@ is_gimple_address (const_tree t)
 {
   tree op;
 
-  if (TREE_CODE (t) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (t))
     return false;
 
   op = TREE_OPERAND (t, 0);
@@ -682,7 +682,7 @@ is_gimple_invariant_address (const_tree t)
 {
   const_tree op;
 
-  if (TREE_CODE (t) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (t))
     return false;
 
   op = strip_invariant_refs (TREE_OPERAND (t, 0));
@@ -692,7 +692,7 @@ is_gimple_invariant_address (const_tree t)
   if (TREE_CODE (op) == MEM_REF)
     {
       const_tree op0 = TREE_OPERAND (op, 0);
-      return (TREE_CODE (op0) == ADDR_EXPR
+      return (ADDR_EXPR_P (op0)
 	      && (CONSTANT_CLASS_P (TREE_OPERAND (op0, 0))
 		  || decl_address_invariant_p (TREE_OPERAND (op0, 0))));
     }
@@ -708,7 +708,7 @@ is_gimple_ip_invariant_address (const_tree t)
 {
   const_tree op;
 
-  if (TREE_CODE (t) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (t))
     return false;
 
   op = strip_invariant_refs (TREE_OPERAND (t, 0));
@@ -718,7 +718,7 @@ is_gimple_ip_invariant_address (const_tree t)
   if (TREE_CODE (op) == MEM_REF)
     {
       const_tree op0 = TREE_OPERAND (op, 0);
-      return (TREE_CODE (op0) == ADDR_EXPR
+      return (ADDR_EXPR_P (op0)
 	      && (CONSTANT_CLASS_P (TREE_OPERAND (op0, 0))
 		  || decl_address_ip_invariant_p (TREE_OPERAND (op0, 0))));
     }
@@ -732,7 +732,7 @@ is_gimple_ip_invariant_address (const_tree t)
 bool
 is_gimple_min_invariant (const_tree t)
 {
-  if (TREE_CODE (t) == ADDR_EXPR)
+  if (ADDR_EXPR_P (t))
     return is_gimple_invariant_address (t);
 
   return is_gimple_constant (t);
@@ -744,7 +744,7 @@ is_gimple_min_invariant (const_tree t)
 bool
 is_gimple_ip_invariant (const_tree t)
 {
-  if (TREE_CODE (t) == ADDR_EXPR)
+  if (ADDR_EXPR_P (t))
     return is_gimple_ip_invariant_address (t);
 
   return is_gimple_constant (t);
@@ -846,7 +846,7 @@ is_gimple_mem_ref_addr (tree t)
 {
   return (is_gimple_reg (t)
 	  || TREE_CODE (t) == INTEGER_CST
-	  || (TREE_CODE (t) == ADDR_EXPR
+	  || (ADDR_EXPR_P (t)
 	      && (CONSTANT_CLASS_P (TREE_OPERAND (t, 0))
 		  || decl_address_invariant_p (TREE_OPERAND (t, 0)))));
 }
@@ -911,7 +911,7 @@ mark_addressable (tree x)
   while (handled_component_p (x))
     x = TREE_OPERAND (x, 0);
   if (TREE_CODE (x) == MEM_REF
-      && TREE_CODE (TREE_OPERAND (x, 0)) == ADDR_EXPR)
+      && ADDR_EXPR_P (TREE_OPERAND (x, 0)))
     x = TREE_OPERAND (TREE_OPERAND (x, 0), 0);
   if (!VAR_P (x)
       && TREE_CODE (x) != PARM_DECL

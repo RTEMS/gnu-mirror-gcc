@@ -2008,7 +2008,7 @@ replace_uses_by (tree name, tree val)
 		/* Operands may be empty here.  For example, the labels
 		   of a GIMPLE_COND are nulled out following the creation
 		   of the corresponding CFG edges.  */
-		if (op && TREE_CODE (op) == ADDR_EXPR)
+		if (op && ADDR_EXPR_P (op))
 		  recompute_tree_invariant_for_addr_expr (op);
 	      }
 
@@ -2354,7 +2354,7 @@ find_taken_edge (basic_block bb, tree val)
          appear inside an ADDR_EXPR, but we also allow the LABEL_REF to
          appear inside a LABEL_EXPR just to be safe.  */
       if (val
-	  && (TREE_CODE (val) == ADDR_EXPR || TREE_CODE (val) == LABEL_EXPR)
+	  && (ADDR_EXPR_P (val) || TREE_CODE (val) == LABEL_EXPR)
 	  && TREE_CODE (TREE_OPERAND (val, 0)) == LABEL_DECL)
 	return find_taken_edge_computed_goto (bb, TREE_OPERAND (val, 0));
     }
@@ -3236,7 +3236,7 @@ verify_types_in_gimple_reference (tree expr, bool require_lvalue)
   if (TREE_CODE (expr) == MEM_REF)
     {
       if (!is_gimple_mem_ref_addr (TREE_OPERAND (expr, 0))
-	  || (TREE_CODE (TREE_OPERAND (expr, 0)) == ADDR_EXPR
+	  || (ADDR_EXPR_P (TREE_OPERAND (expr, 0))
 	      && verify_address (TREE_OPERAND (expr, 0), false)))
 	{
 	  error ("invalid address operand in %qs", code_name);
@@ -3262,7 +3262,7 @@ verify_types_in_gimple_reference (tree expr, bool require_lvalue)
     {
       if (!TMR_BASE (expr)
 	  || !is_gimple_mem_ref_addr (TMR_BASE (expr))
-	  || (TREE_CODE (TMR_BASE (expr)) == ADDR_EXPR
+	  || (ADDR_EXPR_P (TMR_BASE (expr))
 	      && verify_address (TMR_BASE (expr), false)))
 	{
 	  error ("invalid address operand in %qs", code_name);
@@ -6324,7 +6324,7 @@ gimple_duplicate_bb (basic_block bb, copy_bb_data *id)
 	    tree op = gimple_op (copy, i);
 	    if (!op)
 	      continue;
-	    if (TREE_CODE (op) == ADDR_EXPR
+	    if (ADDR_EXPR_P (op)
 		|| TREE_CODE (op) == WITH_SIZE_EXPR)
 	      op = TREE_OPERAND (op, 0);
 	    while (handled_component_p (op))
@@ -6906,7 +6906,7 @@ move_stmt_op (tree *tp, int *walk_subtrees, void *data)
 	     addresses but unshare_expr copies them anyways.  Make sure
 	     to unshare before adjusting the block in place - we do not
 	     always see a copy here.  */
-	  if (TREE_CODE (t) == ADDR_EXPR
+	  if (ADDR_EXPR_P (t)
 	      && is_gimple_min_invariant (t))
 	    *tp = t = unshare_expr (t);
 	  TREE_SET_BLOCK (t, p->new_block);

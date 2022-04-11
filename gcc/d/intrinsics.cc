@@ -422,7 +422,7 @@ expand_intrinsic_rotate (intrinsic_code intrinsic, tree callexp)
     {
       tree callee = CALL_EXPR_FN (callexp);
 
-      if (TREE_CODE (callee) == ADDR_EXPR)
+      if (ADDR_EXPR_P (callee))
 	callee = TREE_OPERAND (callee, 0);
 
       /* Retrieve from the encoded template instantation.  */
@@ -553,7 +553,7 @@ expand_intrinsic_vaarg (tree callexp)
 	parmn = build_deref (parmn);
       else
 	{
-	  gcc_assert (TREE_CODE (parmn) == ADDR_EXPR);
+	  gcc_assert (ADDR_EXPR_P (parmn));
 	  parmn = TREE_OPERAND (parmn, 0);
 	}
 
@@ -590,14 +590,14 @@ expand_intrinsic_vastart (tree callexp)
   /* The va_list argument should already have its address taken.  The second
      argument, however, is inout and that needs to be fixed to prevent a
      warning.  Could be casting, so need to check type too?  */
-  gcc_assert (TREE_CODE (ap) == ADDR_EXPR
+  gcc_assert (ADDR_EXPR_P (ap)
 	      || (TREE_CODE (ap) == PARM_DECL
 		  && POINTER_TYPE_P (TREE_TYPE (ap))));
 
   /* Assuming nobody tries to change the return type.  */
   if (TREE_CODE (parmn) != PARM_DECL)
     {
-      gcc_assert (TREE_CODE (parmn) == ADDR_EXPR);
+      gcc_assert (ADDR_EXPR_P (parmn));
       parmn = TREE_OPERAND (parmn, 0);
     }
 
@@ -759,7 +759,7 @@ maybe_expand_intrinsic (tree callexp)
 {
   tree callee = CALL_EXPR_FN (callexp);
 
-  if (TREE_CODE (callee) == ADDR_EXPR)
+  if (ADDR_EXPR_P (callee))
     callee = TREE_OPERAND (callee, 0);
 
   if (TREE_CODE (callee) != FUNCTION_DECL)

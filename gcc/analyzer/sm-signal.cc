@@ -336,7 +336,7 @@ signal_state_machine::on_stmt (sm_context *sm_ctxt,
 	  if (is_named_call_p (callee_fndecl, "signal", call, 2))
 	    {
 	      tree handler = gimple_call_arg (call, 1);
-	      if (TREE_CODE (handler) == ADDR_EXPR
+	      if (ADDR_EXPR_P (handler)
 		  && TREE_CODE (TREE_OPERAND (handler, 0)) == FUNCTION_DECL)
 		{
 		  tree fndecl = TREE_OPERAND (handler, 0);

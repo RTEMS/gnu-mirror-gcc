@@ -4526,7 +4526,7 @@ expand_debug_expr (tree exp)
       return op0;
 
     case TARGET_MEM_REF:
-      if (TREE_CODE (TMR_BASE (exp)) == ADDR_EXPR
+      if (ADDR_EXPR_P (TMR_BASE (exp))
 	  && !DECL_RTL_SET_P (TREE_OPERAND (TMR_BASE (exp), 0)))
 	return NULL;
 
@@ -5021,8 +5021,7 @@ expand_debug_expr (tree exp)
 	    }
 
 	  if (TREE_CODE (TREE_OPERAND (exp, 0)) == MEM_REF
-	      && TREE_CODE (TREE_OPERAND (TREE_OPERAND (exp, 0), 0))
-		 == ADDR_EXPR)
+	      && ADDR_EXPR_P (TREE_OPERAND (TREE_OPERAND (exp, 0), 0)))
 	    {
 	      op0 = expand_debug_expr (TREE_OPERAND (TREE_OPERAND (exp, 0),
 						     0));

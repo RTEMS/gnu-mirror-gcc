@@ -913,7 +913,7 @@ name_lookup::adl_expr (tree expr)
       return;
     }
 
-  if (TREE_CODE (expr) == ADDR_EXPR)
+  if (ADDR_EXPR_P (expr))
     expr = TREE_OPERAND (expr, 0);
   if (TREE_CODE (expr) == COMPONENT_REF
       || TREE_CODE (expr) == OFFSET_REF)

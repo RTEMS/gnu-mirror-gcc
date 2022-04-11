@@ -3077,7 +3077,7 @@ output_ttype (tree type, int tt_format, int tt_format_size)
 	 paths below go through assemble_integer, which would take
 	 care of this for us.  */
       STRIP_NOPS (type);
-      if (TREE_CODE (type) == ADDR_EXPR)
+      if (ADDR_EXPR_P (type))
 	{
 	  type = TREE_OPERAND (type, 0);
 	  if (VAR_P (type))

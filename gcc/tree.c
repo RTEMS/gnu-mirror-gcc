@@ -4648,7 +4648,7 @@ recompute_tree_invariant_for_addr_expr (tree t)
   tree node;
   bool tc = true, se = false;
 
-  gcc_assert (TREE_CODE (t) == ADDR_EXPR);
+  gcc_assert (ADDR_EXPR_P (t));
 
   /* We started out assuming this address is both invariant and constant, but
      does not have side effects.  Now go down any handled components and see if
@@ -4876,7 +4876,7 @@ build2 (enum tree_code code, tree tt, tree arg0, tree arg1 MEM_STAT_DECL)
   TREE_SIDE_EFFECTS (t) = side_effects;
   if (code == MEM_REF)
     {
-      if (arg0 && TREE_CODE (arg0) == ADDR_EXPR)
+      if (arg0 && ADDR_EXPR_P (arg0))
 	{
 	  tree o = TREE_OPERAND (arg0, 0);
 	  TREE_READONLY (t) = TREE_READONLY (o);
@@ -4989,7 +4989,7 @@ build5 (enum tree_code code, tree tt, tree arg0, tree arg1,
   TREE_SIDE_EFFECTS (t) = side_effects;
   if (code == TARGET_MEM_REF)
     {
-      if (arg0 && TREE_CODE (arg0) == ADDR_EXPR)
+      if (arg0 && ADDR_EXPR_P (arg0))
 	{
 	  tree o = TREE_OPERAND (arg0, 0);
 	  TREE_READONLY (t) = TREE_READONLY (o);
@@ -5015,7 +5015,7 @@ build_simple_mem_ref_loc (location_t loc, tree ptr)
   tree tem;
   /* For convenience allow addresses that collapse to a simple base
      and offset.  */
-  if (TREE_CODE (ptr) == ADDR_EXPR
+  if (ADDR_EXPR_P (ptr)
       && (handled_component_p (TREE_OPERAND (ptr, 0))
 	  || TREE_CODE (TREE_OPERAND (ptr, 0)) == MEM_REF))
     {
@@ -9595,7 +9595,7 @@ get_callee_fndecl (const_tree call)
 
   /* If the address is just `&f' for some function `f', then we know
      that `f' is being called.  */
-  if (TREE_CODE (addr) == ADDR_EXPR
+  if (ADDR_EXPR_P (addr)
       && TREE_CODE (TREE_OPERAND (addr, 0)) == FUNCTION_DECL)
     return TREE_OPERAND (addr, 0);
 
@@ -11351,7 +11351,7 @@ initializer_zerop (const_tree init, bool *nonzero /* = NULL */)
     case MEM_REF:
       {
 	tree arg = TREE_OPERAND (init, 0);
-	if (TREE_CODE (arg) != ADDR_EXPR)
+	if (!ADDR_EXPR_P (arg))
 	  return false;
 	tree offset = TREE_OPERAND (init, 1);
 	if (TREE_CODE (offset) != INTEGER_CST
@@ -13613,7 +13613,7 @@ get_base_address (tree t)
 
   if ((TREE_CODE (t) == MEM_REF
        || TREE_CODE (t) == TARGET_MEM_REF)
-      && TREE_CODE (TREE_OPERAND (t, 0)) == ADDR_EXPR)
+      && ADDR_EXPR_P (TREE_OPERAND (t, 0)))
     t = TREE_OPERAND (TREE_OPERAND (t, 0), 0);
 
   /* ???  Either the alias oracle or all callers need to properly deal
@@ -13714,7 +13714,7 @@ array_at_struct_end_p (tree ref)
   else if (TREE_CODE (ref) == MEM_REF)
     {
       tree arg = TREE_OPERAND (ref, 0);
-      if (TREE_CODE (arg) == ADDR_EXPR)
+      if (ADDR_EXPR_P (arg))
 	arg = TREE_OPERAND (arg, 0);
       tree argtype = TREE_TYPE (arg);
       if (TREE_CODE (argtype) == RECORD_TYPE)
@@ -13784,7 +13784,7 @@ array_at_struct_end_p (tree ref)
     return true;
 
   if (TREE_CODE (ref) == MEM_REF
-      && TREE_CODE (TREE_OPERAND (ref, 0)) == ADDR_EXPR)
+      && ADDR_EXPR_P (TREE_OPERAND (ref, 0)))
     ref = TREE_OPERAND (TREE_OPERAND (ref, 0), 0);
 
   /* If the reference is based on a declared entity, the size of the array

@@ -449,7 +449,7 @@ check_and_record_registered_pairs (tree vtable_decl, tree vptr_address,
   bool inserted_something = false;
 
 
-  if (TREE_CODE (vptr_address) == ADDR_EXPR
+  if (ADDR_EXPR_P (vptr_address)
       && TREE_CODE (TREE_OPERAND (vptr_address, 0)) == MEM_REF)
     vptr_address = TREE_OPERAND (vptr_address, 0);
 
@@ -544,7 +544,7 @@ register_construction_vtables (tree base_class, tree record_type,
 
                   while (value
                          && TREE_OPERAND (value, 0)
-                         && TREE_CODE (TREE_OPERAND (value, 0)) == ADDR_EXPR)
+                         && ADDR_EXPR_P (TREE_OPERAND (value, 0)))
                     value = TREE_OPERAND (value, 0);
 
                   /* The VAR_DECL for the vtable should be the first
@@ -870,7 +870,7 @@ output_set_info (tree record_type, vec<tree> vtbl_ptr_array)
           tree arg0 = TREE_OPERAND (vtbl_ptr_array[i], 0);
           tree arg1 = TREE_OPERAND (vtbl_ptr_array[i], 1);
 
-          if (TREE_CODE (arg0) == ADDR_EXPR)
+          if (ADDR_EXPR_P (arg0))
             arg0 = TREE_OPERAND (arg0, 0);
 
 	  if (VAR_P (arg0))

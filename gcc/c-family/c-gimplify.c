@@ -84,7 +84,7 @@ ubsan_walk_array_refs_r (tree *tp, int *walk_subtrees, void *data)
 	}
       walk_tree (&BIND_EXPR_BODY (*tp), ubsan_walk_array_refs_r, pset, pset);
     }
-  else if (TREE_CODE (*tp) == ADDR_EXPR
+  else if (ADDR_EXPR_P (*tp)
 	   && TREE_CODE (TREE_OPERAND (*tp, 0)) == ARRAY_REF)
     {
       ubsan_maybe_instrument_array_ref (&TREE_OPERAND (*tp, 0), true);

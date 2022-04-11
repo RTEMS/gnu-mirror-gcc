@@ -1028,7 +1028,7 @@ cp_get_fndecl_from_callee (tree fn, bool fold /* = true */)
   if (fold)
     fn = maybe_constant_init (fn);
   STRIP_NOPS (fn);
-  if (TREE_CODE (fn) == ADDR_EXPR
+  if (ADDR_EXPR_P (fn)
       || TREE_CODE (fn) == FDESC_EXPR)
     fn = TREE_OPERAND (fn, 0);
   if (TREE_CODE (fn) == FUNCTION_DECL)
@@ -1503,7 +1503,7 @@ convert_to_void (tree expr, impl_conv_void implicit, tsubst_flags_t complain)
   {
     tree probe = expr;
 
-    if (TREE_CODE (probe) == ADDR_EXPR)
+    if (ADDR_EXPR_P (probe))
       probe = TREE_OPERAND (expr, 0);
     if (type_unknown_p (probe))
       {
@@ -1731,7 +1731,7 @@ convert_force (tree type, tree expr, int convtype, tsubst_flags_t complain)
     return convert_to_pointer_force (type, e, complain);
 
   /* From typeck.c convert_for_assignment */
-  if (((TYPE_PTR_P (TREE_TYPE (e)) && TREE_CODE (e) == ADDR_EXPR
+  if (((TYPE_PTR_P (TREE_TYPE (e)) && ADDR_EXPR_P (e)
 	&& TREE_CODE (TREE_TYPE (TREE_TYPE (e))) == METHOD_TYPE)
        || integer_zerop (e)
        || TYPE_PTRMEMFUNC_P (TREE_TYPE (e)))

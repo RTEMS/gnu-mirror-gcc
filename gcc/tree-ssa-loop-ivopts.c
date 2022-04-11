@@ -1191,7 +1191,7 @@ alloc_iv (struct ivopts_data *data, tree base, tree step,
        2) Duplicate candidates won't be created for bases in different
 	  forms, like &a[0] and &a.  */
   STRIP_NOPS (expr);
-  if ((TREE_CODE (expr) == ADDR_EXPR && !DECL_P (TREE_OPERAND (expr, 0)))
+  if ((ADDR_EXPR_P (expr) && !DECL_P (TREE_OPERAND (expr, 0)))
       || contain_complex_addr_expr (expr))
     {
       aff_tree comb;
@@ -2381,7 +2381,7 @@ find_interesting_uses_address (struct ivopts_data *data, gimple *stmt,
 
       /* Substituting bases of IVs into the base expression might
 	 have caused folding opportunities.  */
-      if (TREE_CODE (base) == ADDR_EXPR)
+      if (ADDR_EXPR_P (base))
 	{
 	  tree *ref = &TREE_OPERAND (base, 0);
 	  while (handled_component_p (*ref))
@@ -4355,7 +4355,7 @@ force_expr_to_var_cost (tree expr, bool speed)
       if (poly_int_tree_p (expr))
 	return comp_cost (integer_cost [speed], 0);
 
-      if (TREE_CODE (expr) == ADDR_EXPR)
+      if (ADDR_EXPR_P (expr))
 	{
 	  tree obj = TREE_OPERAND (expr, 0);
 

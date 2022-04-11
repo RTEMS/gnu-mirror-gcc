@@ -366,7 +366,7 @@ array_bounds_checker::check_mem_ref (location_t location, tree ref,
 	offrange[1] = arrbounds[1];
     }
 
-  if (TREE_CODE (arg) == ADDR_EXPR)
+  if (ADDR_EXPR_P (arg))
     {
       arg = TREE_OPERAND (arg, 0);
       if (TREE_CODE (arg) != STRING_CST
@@ -543,7 +543,7 @@ array_bounds_checker::check_addr_expr (location_t location, tree t)
   while (handled_component_p (t) || TREE_CODE (t) == MEM_REF);
 
   if (TREE_CODE (t) != MEM_REF
-      || TREE_CODE (TREE_OPERAND (t, 0)) != ADDR_EXPR
+      || !ADDR_EXPR_P (TREE_OPERAND (t, 0))
       || TREE_NO_WARNING (t))
     return;
 
@@ -634,7 +634,7 @@ array_bounds_checker::check_array_bounds (tree *tp, int *walk_subtree,
   else if (TREE_CODE (t) == MEM_REF)
     warned = checker->check_mem_ref (location, t,
 				     false /*ignore_off_by_one*/);
-  else if (TREE_CODE (t) == ADDR_EXPR)
+  else if (ADDR_EXPR_P (t))
     {
       checker->check_addr_expr (location, t);
       *walk_subtree = FALSE;

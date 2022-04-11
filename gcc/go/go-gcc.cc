@@ -2102,7 +2102,7 @@ Gcc_backend::call_expression(Bfunction*, // containing fcn for call
     }
 
   tree fndecl = fn;
-  if (TREE_CODE(fndecl) == ADDR_EXPR)
+  if (ADDR_EXPR_P(fndecl))
     fndecl = TREE_OPERAND(fndecl, 0);
 
   // This is to support builtin math functions when using 80387 math.

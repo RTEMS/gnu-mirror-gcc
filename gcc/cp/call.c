@@ -8359,7 +8359,7 @@ bool
 unsafe_return_slot_p (tree t)
 {
   STRIP_NOPS (t);
-  if (TREE_CODE (t) == ADDR_EXPR)
+  if (ADDR_EXPR_P (t))
     t = TREE_OPERAND (t, 0);
   if (TREE_CODE (t) == COMPONENT_REF)
     t = TREE_OPERAND (t, 1);
@@ -8550,7 +8550,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	    {
 	      tree addr = TREE_OPERAND (obj_arg, 0);
 	      STRIP_NOPS (addr);
-	      if (TREE_CODE (addr) == ADDR_EXPR)
+	      if (ADDR_EXPR_P (addr))
 		{
 		  tree typeo = TREE_TYPE (obj_arg);
 		  tree typei = TREE_TYPE (TREE_OPERAND (addr, 0));
@@ -8918,7 +8918,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	{
 	  /* For -Wformat undo the implicit passing by hidden reference
 	     done by convert_arg_to_ellipsis.  */
-	  if (TREE_CODE (argarray[j]) == ADDR_EXPR
+	  if (ADDR_EXPR_P (argarray[j])
 	      && TYPE_REF_P (TREE_TYPE (argarray[j])))
 	    fargs[j] = TREE_OPERAND (argarray[j], 0);
 	  else
@@ -8983,7 +8983,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	      && !TYPE_REF_P (TREE_TYPE (targ)))
 	     || TREE_CODE (targ) == NON_LVALUE_EXPR)
 	targ = TREE_OPERAND (targ, 0);
-      if (TREE_CODE (targ) == ADDR_EXPR)
+      if (ADDR_EXPR_P (targ))
 	{
 	  targ = TREE_OPERAND (targ, 0);
 	  if (!same_type_ignoring_top_level_qualifiers_p
@@ -9168,7 +9168,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
       if (TREE_CODE (c) == CALL_EXPR)
 	TREE_NO_WARNING (c) = 1;
     }
-  if (TREE_CODE (fn) == ADDR_EXPR)
+  if (ADDR_EXPR_P (fn))
     {
       tree fndecl = STRIP_TEMPLATE (TREE_OPERAND (fn, 0));
       if (TREE_CODE (fndecl) == FUNCTION_DECL
@@ -9192,7 +9192,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	    {
 	      tree addr = TREE_OPERAND (obj_arg, 0);
 	      STRIP_NOPS (addr);
-	      if (TREE_CODE (addr) == ADDR_EXPR)
+	      if (ADDR_EXPR_P (addr))
 		{
 		  tree typeo = TREE_TYPE (obj_arg);
 		  tree typei = TREE_TYPE (TREE_OPERAND (addr, 0));
@@ -12367,7 +12367,7 @@ extend_ref_init_temps_1 (tree decl, tree init, vec<tree, va_gc> **cleanups,
 	}
       return init;
     }
-  if (TREE_CODE (sub) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (sub))
     return init;
   /* Deal with binding to a subobject.  */
   for (p = &TREE_OPERAND (sub, 0);

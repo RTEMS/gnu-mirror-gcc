@@ -8578,7 +8578,7 @@ pointer_to_zero_sized_aggr_p (tree t)
 bool
 reject_gcc_builtin (const_tree expr, location_t loc /* = UNKNOWN_LOCATION */)
 {
-  if (TREE_CODE (expr) == ADDR_EXPR)
+  if (ADDR_EXPR_P (expr))
     expr = TREE_OPERAND (expr, 0);
 
   STRIP_ANY_LOCATION_WRAPPER (expr);

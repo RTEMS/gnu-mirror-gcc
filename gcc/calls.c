@@ -1531,7 +1531,7 @@ get_attr_nonstring_decl (tree expr, tree *ref)
 	var = SSA_NAME_VAR (decl);
     }
 
-  if (TREE_CODE (decl) == ADDR_EXPR)
+  if (ADDR_EXPR_P (decl))
     decl = TREE_OPERAND (decl, 0);
 
   /* To simplify calling code, store the referenced DECL regardless of
@@ -1742,7 +1742,7 @@ maybe_warn_nonstring_arg (tree fndecl, tree exp)
 	continue;
 
       tree callarg = CALL_EXPR_ARG (exp, argno);
-      if (TREE_CODE (callarg) == ADDR_EXPR)
+      if (ADDR_EXPR_P (callarg))
 	callarg = TREE_OPERAND (callarg, 0);
 
       /* See if the destination is declared with attribute "nonstring".  */

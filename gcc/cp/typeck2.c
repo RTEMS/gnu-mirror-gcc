@@ -573,7 +573,7 @@ cxx_incomplete_type_diagnostic (location_t loc, const_tree value,
       gcc_assert (type == unknown_type_node);
       if (value && TREE_CODE (value) == COMPONENT_REF)
 	goto bad_member;
-      else if (value && TREE_CODE (value) == ADDR_EXPR)
+      else if (value && ADDR_EXPR_P (value))
 	emit_diagnostic (diag_kind, loc, 0,
 			 "address of overloaded function with no contextual "
 			 "type information");

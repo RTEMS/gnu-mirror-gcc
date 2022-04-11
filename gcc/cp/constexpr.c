@@ -387,7 +387,7 @@ build_data_member_initialization (tree t, vec<constructor_elt, va_gc> **vec)
     {
       tree op = member;
       STRIP_NOPS (op);
-      if (TREE_CODE (op) == ADDR_EXPR)
+      if (ADDR_EXPR_P (op))
 	{
 	  gcc_assert (same_type_ignoring_top_level_qualifiers_p
 		      (TREE_TYPE (TREE_TYPE (op)),
@@ -409,7 +409,7 @@ build_data_member_initialization (tree t, vec<constructor_elt, va_gc> **vec)
 	  gcc_assert (is_empty_class (TREE_TYPE (TREE_TYPE (member))));
 	}
     }
-  if (TREE_CODE (member) == ADDR_EXPR)
+  if (ADDR_EXPR_P (member))
     member = TREE_OPERAND (member, 0);
   if (TREE_CODE (member) == COMPONENT_REF)
     {
@@ -663,7 +663,7 @@ static tree
 get_function_named_in_call (tree t)
 {
   tree fun = cp_get_callee (t);
-  if (fun && TREE_CODE (fun) == ADDR_EXPR
+  if (fun && ADDR_EXPR_P (fun)
       && TREE_CODE (TREE_OPERAND (fun, 0)) == FUNCTION_DECL)
     fun = TREE_OPERAND (fun, 0);
   return fun;
@@ -1374,7 +1374,7 @@ cxx_eval_builtin_function_call (const constexpr_ctx *ctx, tree t, tree fun,
       if (strop)
 	{
 	  STRIP_NOPS (arg);
-	  if (TREE_CODE (arg) == ADDR_EXPR)
+	  if (ADDR_EXPR_P (arg))
 	    arg = TREE_OPERAND (arg, 0);
 	  else
 	    strop = false;
@@ -1457,7 +1457,7 @@ cxx_eval_builtin_function_call (const constexpr_ctx *ctx, tree t, tree fun,
       STRIP_NOPS (new_call);
       if (TREE_CODE (new_call) == POINTER_PLUS_EXPR)
 	TREE_OPERAND (new_call, 0) = op;
-      else if (TREE_CODE (new_call) == ADDR_EXPR)
+      else if (ADDR_EXPR_P (new_call))
 	new_call = op;
     }
 
@@ -1603,7 +1603,7 @@ cxx_bind_parameters_in_call (const constexpr_ctx *ctx, tree t,
 	    {
 	      tree addr = arg;
 	      STRIP_NOPS (addr);
-	      if (TREE_CODE (addr) == ADDR_EXPR)
+	      if (ADDR_EXPR_P (addr))
 		{
 		  tree obj = TREE_OPERAND (addr, 0);
 		  while (TREE_CODE (obj) == COMPONENT_REF
@@ -1857,7 +1857,7 @@ extract_obj_from_addr_offset (tree expr)
   if (TREE_CODE (expr) == POINTER_PLUS_EXPR)
     expr = TREE_OPERAND (expr, 0);
   STRIP_NOPS (expr);
-  if (TREE_CODE (expr) == ADDR_EXPR)
+  if (ADDR_EXPR_P (expr))
     expr = TREE_OPERAND (expr, 0);
   return expr;
 }
@@ -1932,7 +1932,7 @@ cxx_eval_dynamic_cast_fn (const constexpr_ctx *ctx, tree call,
   location_t loc = cp_expr_loc_or_input_loc (call);
 
   /* Get the target type of the dynamic_cast.  */
-  gcc_assert (TREE_CODE (type) == ADDR_EXPR);
+  gcc_assert (ADDR_EXPR_P (type));
   type = TREE_OPERAND (type, 0);
   type = TREE_TYPE (DECL_NAME (type));
 
@@ -2205,7 +2205,7 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 					  /*lval*/false, non_constant_p,
 					  overflow_p);
       STRIP_NOPS (fun);
-      if (TREE_CODE (fun) == ADDR_EXPR)
+      if (ADDR_EXPR_P (fun))
 	fun = TREE_OPERAND (fun, 0);
       /* For TARGET_VTABLE_USES_DESCRIPTORS targets, there is no
 	 indirection, the called expression is a pointer into the
@@ -2213,7 +2213,7 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 	 FUNCTION_DECL from there.  */
       else if (TARGET_VTABLE_USES_DESCRIPTORS
 	       && TREE_CODE (fun) == POINTER_PLUS_EXPR
-	       && TREE_CODE (TREE_OPERAND (fun, 0)) == ADDR_EXPR
+	       && ADDR_EXPR_P (TREE_OPERAND (fun, 0))
 	       && TREE_CODE (TREE_OPERAND (fun, 1)) == INTEGER_CST)
 	{
 	  tree d = TREE_OPERAND (TREE_OPERAND (fun, 0), 0);
@@ -2293,7 +2293,7 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 	  else
 	    {
 	      STRIP_NOPS (arg0);
-	      if (TREE_CODE (arg0) == ADDR_EXPR
+	      if (ADDR_EXPR_P (arg0)
 		  && VAR_P (TREE_OPERAND (arg0, 0)))
 		{
 		  tree var = TREE_OPERAND (arg0, 0);
@@ -2471,7 +2471,7 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 	 to cxx_bind_parameters_in_call.  */
       new_obj = TREE_VEC_ELT (new_call.bindings, 0);
       STRIP_NOPS (new_obj);
-      if (TREE_CODE (new_obj) == ADDR_EXPR)
+      if (ADDR_EXPR_P (new_obj))
 	new_obj = TREE_OPERAND (new_obj, 0);
 
       if (ctx->call && ctx->call->fundef
@@ -2479,7 +2479,7 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 	{
 	  tree cur_obj = TREE_VEC_ELT (ctx->call->bindings, 0);
 	  STRIP_NOPS (cur_obj);
-	  if (TREE_CODE (cur_obj) == ADDR_EXPR)
+	  if (ADDR_EXPR_P (cur_obj))
 	    cur_obj = TREE_OPERAND (cur_obj, 0);
 	  if (new_obj == cur_obj)
 	    /* We're calling the target constructor of a delegating
@@ -2965,7 +2965,7 @@ cxx_fold_pointer_plus_expression (const constexpr_ctx *ctx, tree t,
 				  bool *overflow_p)
 {
   STRIP_NOPS (lhs);
-  if (TREE_CODE (lhs) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (lhs))
     return NULL_TREE;
 
   lhs = TREE_OPERAND (lhs, 0);
@@ -4435,7 +4435,7 @@ cxx_fold_indirect_ref (location_t loc, tree type, tree op0, bool *empty_base)
   if (!INDIRECT_TYPE_P (subtype))
     return NULL_TREE;
 
-  if (TREE_CODE (sub) == ADDR_EXPR)
+  if (ADDR_EXPR_P (sub))
     {
       tree op = TREE_OPERAND (sub, 0);
       tree optype = TREE_TYPE (op);
@@ -4462,7 +4462,7 @@ cxx_fold_indirect_ref (location_t loc, tree type, tree op0, bool *empty_base)
       tree op01 = TREE_OPERAND (sub, 1);
 
       STRIP_NOPS (op00);
-      if (TREE_CODE (op00) == ADDR_EXPR)
+      if (ADDR_EXPR_P (op00))
 	return cxx_fold_indirect_ref_1 (loc, type, TREE_OPERAND (op00, 0),
 					tree_to_uhwi (op01), empty_base);
     }
@@ -4536,7 +4536,7 @@ cxx_eval_indirect_ref (const constexpr_ctx *ctx, tree t,
 	     something we should have been able to fold.  */
 	  tree sub = op0;
 	  STRIP_NOPS (sub);
-	  if (TREE_CODE (sub) == ADDR_EXPR)
+	  if (ADDR_EXPR_P (sub))
 	    {
 	      gcc_assert (!similar_type_p
 			  (TREE_TYPE (TREE_TYPE (sub)), TREE_TYPE (t)));
@@ -6008,7 +6008,7 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 	gcc_checking_assert (TREE_CODE (op) != CONSTRUCTOR);
 	/* This function does more aggressive folding than fold itself.  */
 	r = build_fold_addr_expr_with_type (op, TREE_TYPE (t));
-	if (TREE_CODE (r) == ADDR_EXPR && TREE_OPERAND (r, 0) == oldop)
+	if (ADDR_EXPR_P (r) && TREE_OPERAND (r, 0) == oldop)
 	  {
 	    ggc_free (r);
 	    return t;
@@ -6342,7 +6342,7 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 	if (INDIRECT_TYPE_P (type)
 	    && TREE_CODE (op) == NOP_EXPR
 	    && TREE_TYPE (op) == ptr_type_node
-	    && TREE_CODE (TREE_OPERAND (op, 0)) == ADDR_EXPR
+	    && ADDR_EXPR_P (TREE_OPERAND (op, 0))
 	    && VAR_P (TREE_OPERAND (TREE_OPERAND (op, 0), 0))
 	    && DECL_NAME (TREE_OPERAND (TREE_OPERAND (op, 0),
 					0)) == heap_uninit_identifier)
@@ -6876,7 +6876,7 @@ cxx_eval_outermost_constant_expr (tree t, bool allow_non_constant,
 	 it to be set if it is invariant address, even when it is not
 	 a valid C++ constant expression.  Wrap it with a NOP_EXPR
 	 instead.  */
-      if (EXPR_P (r) && TREE_CODE (r) != ADDR_EXPR)
+      if (EXPR_P (r) && !ADDR_EXPR_P (r))
 	r = copy_node (r);
       else if (TREE_CODE (r) == CONSTRUCTOR)
 	r = build1 (VIEW_CONVERT_EXPR, TREE_TYPE (r), r);

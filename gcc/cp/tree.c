@@ -629,7 +629,7 @@ build_aggr_init_expr (tree type, tree init)
   if (fn == NULL_TREE)
     return convert (type, init);
 
-  is_ctor = (TREE_CODE (fn) == ADDR_EXPR
+  is_ctor = (ADDR_EXPR_P (fn)
 	     && TREE_CODE (TREE_OPERAND (fn, 0)) == FUNCTION_DECL
 	     && DECL_CONSTRUCTOR_P (TREE_OPERAND (fn, 0)));
 

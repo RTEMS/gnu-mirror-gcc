@@ -266,7 +266,7 @@ c_finish_omp_atomic (location_t loc, enum tree_code code,
     addr = save_expr (addr);
   if (!test
       && TREE_CODE (addr) != SAVE_EXPR
-      && (TREE_CODE (addr) != ADDR_EXPR
+      && (!ADDR_EXPR_P (addr)
 	  || !VAR_P (TREE_OPERAND (addr, 0))))
     {
       /* Make sure LHS is simple enough so that goa_lhs_expr_p can recognize

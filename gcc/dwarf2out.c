@@ -6257,7 +6257,7 @@ add_var_loc_to_decl (tree decl, rtx loc_note, const char *label, var_loc_view vi
       tree realdecl = DECL_DEBUG_EXPR (decl);
       if (handled_component_p (realdecl)
 	  || (TREE_CODE (realdecl) == MEM_REF
-	      && TREE_CODE (TREE_OPERAND (realdecl, 0)) == ADDR_EXPR))
+	      && ADDR_EXPR_P (TREE_OPERAND (realdecl, 0))))
 	{
 	  bool reverse;
 	  tree innerdecl = get_ref_base_and_extent_hwi (realdecl, &bitpos,
@@ -30283,7 +30283,7 @@ optimize_location_into_implicit_ptr (dw_die_ref die, tree decl)
       init = TREE_OPERAND (init, 0);
       STRIP_NOPS (init);
     }
-  if (TREE_CODE (init) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (init))
     return;
   if ((TREE_CODE (TREE_OPERAND (init, 0)) == STRING_CST
        && !TREE_ASM_WRITTEN (TREE_OPERAND (init, 0)))

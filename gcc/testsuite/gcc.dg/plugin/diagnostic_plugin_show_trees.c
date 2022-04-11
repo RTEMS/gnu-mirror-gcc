@@ -80,7 +80,7 @@ cb_walk_tree_fn (tree * tp, int * walk_subtrees,
 
   tree call_expr = *tp;
   tree fn = CALL_EXPR_FN (call_expr);
-  if (TREE_CODE (fn) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (fn))
     return NULL_TREE;
   fn = TREE_OPERAND (fn, 0);
   if (TREE_CODE (fn) != FUNCTION_DECL)

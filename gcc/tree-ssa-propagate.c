@@ -1213,7 +1213,7 @@ substitute_and_fold_dom_walker::before_dom_children (basic_block bb)
 	    {
 	      tree rhs = gimple_assign_rhs1 (stmt);
 
-	      if (TREE_CODE (rhs) == ADDR_EXPR)
+	      if (ADDR_EXPR_P (rhs))
 		recompute_tree_invariant_for_addr_expr (rhs);
 	    }
 

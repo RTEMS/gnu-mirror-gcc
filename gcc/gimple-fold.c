@@ -225,7 +225,7 @@ canonicalize_constructor_val (tree cval, tree from_decl)
 					fold_convert_for_mem_ref (ptr_type_node,
 						      TREE_OPERAND (cval, 1))));
     }
-  if (TREE_CODE (cval) == ADDR_EXPR)
+  if (ADDR_EXPR_P (cval))
     {
       tree base = NULL_TREE;
       if (TREE_CODE (TREE_OPERAND (cval, 0)) == COMPOUND_LITERAL_EXPR)
@@ -402,7 +402,7 @@ fold_gimple_assign (gimple_stmt_iterator *si)
 	      }
 	  }
 
-	else if (TREE_CODE (rhs) == ADDR_EXPR)
+	else if (ADDR_EXPR_P (rhs))
 	  {
 	    tree ref = TREE_OPERAND (rhs, 0);
 	    tree tem = maybe_fold_reference (ref, true);
@@ -657,7 +657,7 @@ var_decl_component_p (tree var)
     inner = TREE_OPERAND (inner, 0);
   return (DECL_P (inner)
 	  || (TREE_CODE (inner) == MEM_REF
-	      && TREE_CODE (TREE_OPERAND (inner, 0)) == ADDR_EXPR));
+	      && ADDR_EXPR_P (TREE_OPERAND (inner, 0))));
 }
 
 /* Return TRUE if the SIZE argument, representing the size of an
@@ -892,8 +892,8 @@ gimple_fold_builtin_memory_op (gimple_stmt_iterator *gsi,
 	    }
 
 	  /* If *src and *dest can't overlap, optimize into memcpy as well.  */
-	  if (TREE_CODE (src) == ADDR_EXPR
-	      && TREE_CODE (dest) == ADDR_EXPR)
+	  if (ADDR_EXPR_P (src)
+	      && ADDR_EXPR_P (dest))
 	    {
 	      tree src_base, dest_base, fn;
 	      poly_int64 src_offset = 0, dest_offset = 0;
@@ -1026,14 +1026,14 @@ gimple_fold_builtin_memory_op (gimple_stmt_iterator *gsi,
 	 string store.  */
       destvar = NULL_TREE;
       srcvar = NULL_TREE;
-      if (TREE_CODE (dest) == ADDR_EXPR
+      if (ADDR_EXPR_P (dest)
 	  && var_decl_component_p (TREE_OPERAND (dest, 0))
 	  && tree_int_cst_equal (TYPE_SIZE_UNIT (desttype), len)
 	  && dest_align >= TYPE_ALIGN (desttype)
 	  && (is_gimple_reg_type (desttype)
 	      || src_align >= TYPE_ALIGN (desttype)))
 	destvar = fold_build2 (MEM_REF, desttype, dest, off0);
-      else if (TREE_CODE (src) == ADDR_EXPR
+      else if (ADDR_EXPR_P (src)
 	       && var_decl_component_p (TREE_OPERAND (src, 0))
 	       && tree_int_cst_equal (TYPE_SIZE_UNIT (srctype), len)
 	       && src_align >= TYPE_ALIGN (srctype)
@@ -1266,7 +1266,7 @@ gimple_fold_builtin_memset (gimple_stmt_iterator *gsi, tree c, tree len)
 
   tree dest = gimple_call_arg (stmt, 0);
   tree var = dest;
-  if (TREE_CODE (var) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (var))
     return false;
 
   var = TREE_OPERAND (var, 0);
@@ -1349,7 +1349,7 @@ get_range_strlen_tree (tree arg, bitmap *visited, strlen_range_kind rkind,
   bool tight_bound = false;
 
   /* We can end up with &(*iftmp_1)[0] here as well, so handle it.  */
-  if (TREE_CODE (arg) == ADDR_EXPR
+  if (ADDR_EXPR_P (arg)
       && TREE_CODE (TREE_OPERAND (arg, 0)) == ARRAY_REF)
     {
       tree op = TREE_OPERAND (arg, 0);
@@ -1408,7 +1408,7 @@ get_range_strlen_tree (tree arg, bitmap *visited, strlen_range_kind rkind,
 
   if (!val && rkind == SRK_LENRANGE)
     {
-      if (TREE_CODE (arg) == ADDR_EXPR)
+      if (ADDR_EXPR_P (arg))
 	return get_range_strlen (TREE_OPERAND (arg, 0), visited, rkind,
 				 pdata, eltsize);
 
@@ -1487,7 +1487,7 @@ get_range_strlen_tree (tree arg, bitmap *visited, strlen_range_kind rkind,
       else if (TREE_CODE (arg) == MEM_REF
 	       && TREE_CODE (TREE_TYPE (arg)) == ARRAY_TYPE
 	       && TREE_CODE (TREE_TYPE (TREE_TYPE (arg))) == INTEGER_TYPE
-	       && TREE_CODE (TREE_OPERAND (arg, 0)) == ADDR_EXPR)
+	       && ADDR_EXPR_P (TREE_OPERAND (arg, 0)))
 	{
 	  /* Handle a MEM_REF into a DECL accessing an array of integers,
 	     being conservative about references to extern structures with
@@ -4192,7 +4192,7 @@ optimize_atomic_compare_exchange_p (gimple *stmt)
     }
 
   tree expected = gimple_call_arg (stmt, 1);
-  if (TREE_CODE (expected) != ADDR_EXPR
+  if (!ADDR_EXPR_P (expected)
       || !SSA_VAR_P (TREE_OPERAND (expected, 0)))
     return false;
 
@@ -4893,7 +4893,7 @@ maybe_canonicalize_mem_ref_addr (tree *t, bool is_debug = false)
   bool res = false;
   tree *orig_t = t;
 
-  if (TREE_CODE (*t) == ADDR_EXPR)
+  if (ADDR_EXPR_P (*t))
     t = &TREE_OPERAND (*t, 0);
 
   /* The C and C++ frontends use an ARRAY_REF for indexing with their
@@ -4943,7 +4943,7 @@ maybe_canonicalize_mem_ref_addr (tree *t, bool is_debug = false)
       || TREE_CODE (*t) == TARGET_MEM_REF)
     {
       tree addr = TREE_OPERAND (*t, 0);
-      if (TREE_CODE (addr) == ADDR_EXPR
+      if (ADDR_EXPR_P (addr)
 	  && (TREE_CODE (TREE_OPERAND (addr, 0)) == MEM_REF
 	      || handled_component_p (TREE_OPERAND (addr, 0))))
 	{
@@ -4971,7 +4971,7 @@ maybe_canonicalize_mem_ref_addr (tree *t, bool is_debug = false)
   /* Canonicalize back MEM_REFs to plain reference trees if the object
      accessed is a decl that has the same access semantics as the MEM_REF.  */
   if (TREE_CODE (*t) == MEM_REF
-      && TREE_CODE (TREE_OPERAND (*t, 0)) == ADDR_EXPR
+      && ADDR_EXPR_P (TREE_OPERAND (*t, 0))
       && integer_zerop (TREE_OPERAND (*t, 1))
       && MR_DEPENDENCE_CLIQUE (*t) == 0)
     {
@@ -4996,7 +4996,7 @@ maybe_canonicalize_mem_ref_addr (tree *t, bool is_debug = false)
 	}
     }
 
-  else if (TREE_CODE (*orig_t) == ADDR_EXPR
+  else if (ADDR_EXPR_P (*orig_t)
 	   && TREE_CODE (*t) == MEM_REF
 	   && TREE_CODE (TREE_OPERAND (*t, 0)) == INTEGER_CST)
     {
@@ -5061,7 +5061,7 @@ fold_stmt_1 (gimple_stmt_iterator *gsi, bool inplace, tree (*valueize) (tree))
 	{
 	  tree *rhs = gimple_assign_rhs1_ptr (stmt);
 	  if ((REFERENCE_CLASS_P (*rhs)
-	       || TREE_CODE (*rhs) == ADDR_EXPR)
+	       || ADDR_EXPR_P (*rhs))
 	      && maybe_canonicalize_mem_ref_addr (rhs))
 	    changed = true;
 	  tree *lhs = gimple_assign_lhs_ptr (stmt);
@@ -5123,7 +5123,7 @@ fold_stmt_1 (gimple_stmt_iterator *gsi, bool inplace, tree (*valueize) (tree))
 	    tree link = gimple_asm_input_op (asm_stmt, i);
 	    tree op = TREE_VALUE (link);
 	    if ((REFERENCE_CLASS_P (op)
-		 || TREE_CODE (op) == ADDR_EXPR)
+		 || ADDR_EXPR_P (op))
 		&& maybe_canonicalize_mem_ref_addr (&TREE_VALUE (link)))
 	      changed = true;
 	  }
@@ -5135,7 +5135,7 @@ fold_stmt_1 (gimple_stmt_iterator *gsi, bool inplace, tree (*valueize) (tree))
 	  tree *val = gimple_debug_bind_get_value_ptr (stmt);
 	  if (*val
 	      && (REFERENCE_CLASS_P (*val)
-		  || TREE_CODE (*val) == ADDR_EXPR)
+		  || ADDR_EXPR_P (*val))
 	      && maybe_canonicalize_mem_ref_addr (val, true))
 	    changed = true;
 	}
@@ -5304,7 +5304,7 @@ fold_stmt_1 (gimple_stmt_iterator *gsi, bool inplace, tree (*valueize) (tree))
 		}
 	    }
 	  else if (val
-		   && TREE_CODE (val) == ADDR_EXPR)
+		   && ADDR_EXPR_P (val))
 	    {
 	      tree ref = TREE_OPERAND (val, 0);
 	      tree tem = maybe_fold_reference (ref, false);
@@ -6404,7 +6404,7 @@ gimple_fold_stmt_to_constant_1 (gimple *stmt, tree (*valueize) (tree),
                 }
 	      /* Handle propagating invariant addresses into address
 		 operations.  */
-	      else if (TREE_CODE (rhs) == ADDR_EXPR
+	      else if (ADDR_EXPR_P (rhs)
 		       && !is_gimple_min_invariant (rhs))
 		{
 		  poly_int64 offset = 0;
@@ -6475,7 +6475,7 @@ gimple_fold_stmt_to_constant_1 (gimple *stmt, tree (*valueize) (tree),
 			   && TREE_CODE (TREE_OPERAND (rhs, 0)) == SSA_NAME)
 		    {
 		      tree val = (*valueize) (TREE_OPERAND (rhs, 0));
-		      if (TREE_CODE (val) == ADDR_EXPR
+		      if (ADDR_EXPR_P (val)
 			  && is_gimple_min_invariant (val))
 			{
 			  tree tem = fold_build2 (MEM_REF, TREE_TYPE (rhs),
@@ -6502,7 +6502,7 @@ gimple_fold_stmt_to_constant_1 (gimple *stmt, tree (*valueize) (tree),
 	      {
 		tree op0 = (*valueize) (gimple_assign_rhs1 (stmt));
 		tree op1 = (*valueize) (gimple_assign_rhs2 (stmt));
-		if (TREE_CODE (op0) == ADDR_EXPR
+		if (ADDR_EXPR_P (op0)
 		    && TREE_CODE (op1) == INTEGER_CST)
 		  {
 		    tree off = fold_convert_for_mem_ref (ptr_type_node, op1);
@@ -6618,7 +6618,7 @@ gimple_fold_stmt_to_constant_1 (gimple *stmt, tree (*valueize) (tree),
 	  }
 
 	fn = (*valueize) (gimple_call_fn (stmt));
-	if (TREE_CODE (fn) == ADDR_EXPR
+	if (ADDR_EXPR_P (fn)
 	    && TREE_CODE (TREE_OPERAND (fn, 0)) == FUNCTION_DECL
 	    && fndecl_built_in_p (TREE_OPERAND (fn, 0))
 	    && gimple_builtin_call_types_compatible_p (stmt,
@@ -6690,7 +6690,7 @@ get_base_constructor (tree base, poly_int64_pod *bit_offset,
       if (valueize
 	  && TREE_CODE (TREE_OPERAND (base, 0)) == SSA_NAME)
 	base = valueize (TREE_OPERAND (base, 0));
-      if (!base || TREE_CODE (base) != ADDR_EXPR)
+      if (!base || !ADDR_EXPR_P (base))
         return NULL_TREE;
       base = TREE_OPERAND (base, 0);
     }
@@ -7368,7 +7368,7 @@ gimple_get_virt_method_for_vtable (HOST_WIDE_INT token,
      the virtual table and pick up a constant or RTTI info pointer.
      In any case the call is undefined.  */
   if (!fn
-      || (TREE_CODE (fn) != ADDR_EXPR && TREE_CODE (fn) != FDESC_EXPR)
+      || (!ADDR_EXPR_P (fn) && TREE_CODE (fn) != FDESC_EXPR)
       || TREE_CODE (TREE_OPERAND (fn, 0)) != FUNCTION_DECL)
     fn = builtin_decl_implicit (BUILT_IN_UNREACHABLE);
   else
@@ -7446,7 +7446,7 @@ gimple_fold_indirect_ref (tree t)
       || TYPE_REF_CAN_ALIAS_ALL (ptype))
     return NULL_TREE;
 
-  if (TREE_CODE (sub) == ADDR_EXPR)
+  if (ADDR_EXPR_P (sub))
     {
       tree op = TREE_OPERAND (sub, 0);
       tree optype = TREE_TYPE (op);
@@ -7492,7 +7492,7 @@ gimple_fold_indirect_ref (tree t)
       addrtype = TREE_TYPE (addr);
 
       /* ((foo*)&vectorfoo)[1] -> BIT_FIELD_REF<vectorfoo,...> */
-      if (TREE_CODE (addr) == ADDR_EXPR
+      if (ADDR_EXPR_P (addr)
 	  && TREE_CODE (TREE_TYPE (addrtype)) == VECTOR_TYPE
 	  && useless_type_conversion_p (type, TREE_TYPE (TREE_TYPE (addrtype)))
 	  && tree_fits_uhwi_p (off))
@@ -7510,7 +7510,7 @@ gimple_fold_indirect_ref (tree t)
 	}
 
       /* ((foo*)&complexfoo)[1] -> __imag__ complexfoo */
-      if (TREE_CODE (addr) == ADDR_EXPR
+      if (ADDR_EXPR_P (addr)
 	  && TREE_CODE (TREE_TYPE (addrtype)) == COMPLEX_TYPE
 	  && useless_type_conversion_p (type, TREE_TYPE (TREE_TYPE (addrtype))))
         {
@@ -7520,7 +7520,7 @@ gimple_fold_indirect_ref (tree t)
         }
 
       /* *(p + CST) -> MEM_REF <p, CST>.  */
-      if (TREE_CODE (addr) != ADDR_EXPR
+      if (!ADDR_EXPR_P (addr)
 	  || DECL_P (TREE_OPERAND (addr, 0)))
 	return fold_build2 (MEM_REF, type,
 			    addr,

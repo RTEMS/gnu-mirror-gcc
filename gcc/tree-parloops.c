@@ -1359,7 +1359,7 @@ eliminate_local_variables_1 (tree *tp, int *walk_subtrees, void *data)
       return NULL_TREE;
     }
 
-  if (TREE_CODE (t) == ADDR_EXPR)
+  if (ADDR_EXPR_P (t))
     {
       /* ADDR_EXPR may appear in two contexts:
 	 -- as a gimple operand, when the address taken is a function invariant
@@ -3622,7 +3622,7 @@ loop_has_phi_with_address_arg (class loop *loop)
 	for (j = 0; j < gimple_phi_num_args (phi); j++)
 	  {
 	    tree arg = gimple_phi_arg_def (phi, j);
-	    if (TREE_CODE (arg) == ADDR_EXPR)
+	    if (ADDR_EXPR_P (arg))
 	      {
 		/* This should be handled by eliminate_local_variables, but that
 		   function currently ignores phis.  */

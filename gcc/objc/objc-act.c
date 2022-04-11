@@ -5202,7 +5202,7 @@ receiver_is_class_object (tree receiver, int self, int super)
      to silence the warnings.  */
   if (TREE_CODE (receiver) == CALL_EXPR
       && (exp = CALL_EXPR_FN (receiver))
-      && TREE_CODE (exp) == ADDR_EXPR
+      && ADDR_EXPR_P (exp)
       && (exp = TREE_OPERAND (exp, 0))
       && TREE_CODE (exp) == FUNCTION_DECL
       /* For some reason, we sometimes wind up with multiple FUNCTION_DECL
@@ -5214,7 +5214,7 @@ receiver_is_class_object (tree receiver, int self, int super)
       && (arg = CALL_EXPR_ARG (receiver, 0)))
     {
       STRIP_NOPS (arg);
-      if (TREE_CODE (arg) == ADDR_EXPR
+      if (ADDR_EXPR_P (arg)
 	  && (arg = TREE_OPERAND (arg, 0))
 	  && TREE_CODE (arg) == STRING_CST)
 	/* Finally, we have the class name.  */
@@ -9436,7 +9436,7 @@ tree
 objc_rewrite_function_call (tree function, tree first_param)
 {
   if (TREE_CODE (function) == NOP_EXPR
-      && TREE_CODE (TREE_OPERAND (function, 0)) == ADDR_EXPR
+      && ADDR_EXPR_P (TREE_OPERAND (function, 0))
       && TREE_CODE (TREE_OPERAND (TREE_OPERAND (function, 0), 0))
 	 == FUNCTION_DECL)
     {
@@ -9510,7 +9510,7 @@ objc_gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 	 of a function in OBJ_TYPE_REF_EXPR (presumably objc_msgSend
 	 or one of its cousins).  */
     case OBJ_TYPE_REF:
-      if (TREE_CODE (OBJ_TYPE_REF_EXPR (*expr_p)) == ADDR_EXPR
+      if (ADDR_EXPR_P (OBJ_TYPE_REF_EXPR (*expr_p))
 	  && TREE_CODE (TREE_OPERAND (OBJ_TYPE_REF_EXPR (*expr_p), 0))
 	  == FUNCTION_DECL)
 	{

@@ -194,7 +194,7 @@ ptr_deref_may_alias_decl_p (tree ptr, tree decl)
 
   /* Anything we do not explicilty handle aliases.  */
   if ((TREE_CODE (ptr) != SSA_NAME
-       && TREE_CODE (ptr) != ADDR_EXPR
+       && !ADDR_EXPR_P (ptr)
        && TREE_CODE (ptr) != POINTER_PLUS_EXPR)
       || !POINTER_TYPE_P (TREE_TYPE (ptr))
       || (!VAR_P (decl)
@@ -215,7 +215,7 @@ ptr_deref_may_alias_decl_p (tree ptr, tree decl)
 
   /* ADDR_EXPR pointers either just offset another pointer or directly
      specify the pointed-to set.  */
-  if (TREE_CODE (ptr) == ADDR_EXPR)
+  if (ADDR_EXPR_P (ptr))
     {
       tree base = get_base_address (TREE_OPERAND (ptr, 0));
       if (base
@@ -281,7 +281,7 @@ ptr_derefs_may_alias_p (tree ptr1, tree ptr2)
 
   /* ADDR_EXPR pointers either just offset another pointer or directly
      specify the pointed-to set.  */
-  if (TREE_CODE (ptr1) == ADDR_EXPR)
+  if (ADDR_EXPR_P (ptr1))
     {
       tree base = get_base_address (TREE_OPERAND (ptr1, 0));
       if (base
@@ -294,7 +294,7 @@ ptr_derefs_may_alias_p (tree ptr1, tree ptr2)
       else
 	return true;
     }
-  if (TREE_CODE (ptr2) == ADDR_EXPR)
+  if (ADDR_EXPR_P (ptr2))
     {
       tree base = get_base_address (TREE_OPERAND (ptr2, 0));
       if (base
@@ -363,7 +363,7 @@ ptrs_compare_unequal (tree ptr1, tree ptr2)
      in the points-to sets.  */
   tree obj1 = NULL_TREE;
   tree obj2 = NULL_TREE;
-  if (TREE_CODE (ptr1) == ADDR_EXPR)
+  if (ADDR_EXPR_P (ptr1))
     {
       tree tem = get_base_address (TREE_OPERAND (ptr1, 0));
       if (! tem)
@@ -375,7 +375,7 @@ ptrs_compare_unequal (tree ptr1, tree ptr2)
       else if (TREE_CODE (tem) == MEM_REF)
 	ptr1 = TREE_OPERAND (tem, 0);
     }
-  if (TREE_CODE (ptr2) == ADDR_EXPR)
+  if (ADDR_EXPR_P (ptr2))
     {
       tree tem = get_base_address (TREE_OPERAND (ptr2, 0));
       if (! tem)
@@ -728,7 +728,7 @@ ao_ref_init_from_ptr_and_size (ao_ref *ref, tree ptr, tree size)
 	}
     }
 
-  if (TREE_CODE (ptr) == ADDR_EXPR)
+  if (ADDR_EXPR_P (ptr))
     {
       ref->base = get_addr_base_and_unit_offset (TREE_OPERAND (ptr, 0), &t);
       if (ref->base)
@@ -2216,12 +2216,12 @@ refs_may_alias_p_2 (ao_ref *ref1, ao_ref *ref2, bool tbaa_p)
   if (TREE_CODE (base1) == SSA_NAME
       || TREE_CODE (base1) == CONST_DECL
       || TREE_CODE (base1) == CONSTRUCTOR
-      || TREE_CODE (base1) == ADDR_EXPR
+      || ADDR_EXPR_P (base1)
       || CONSTANT_CLASS_P (base1)
       || TREE_CODE (base2) == SSA_NAME
       || TREE_CODE (base2) == CONST_DECL
       || TREE_CODE (base2) == CONSTRUCTOR
-      || TREE_CODE (base2) == ADDR_EXPR
+      || ADDR_EXPR_P (base2)
       || CONSTANT_CLASS_P (base2))
     return false;
 
@@ -3426,7 +3426,7 @@ stmt_kills_ref_p (gimple *stmt, ao_ref *ref)
 	  case BUILT_IN_VA_END:
 	    {
 	      tree ptr = gimple_call_arg (stmt, 0);
-	      if (TREE_CODE (ptr) == ADDR_EXPR)
+	      if (ADDR_EXPR_P (ptr))
 		{
 		  tree base = ao_ref_base (ref);
 		  if (TREE_OPERAND (ptr, 0) == base)

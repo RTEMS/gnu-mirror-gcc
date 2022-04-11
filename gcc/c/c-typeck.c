@@ -2583,7 +2583,7 @@ build_indirect_ref (location_t loc, tree ptr, ref_operator errstring)
 	      TREE_NO_WARNING (pointer) = 1;
 	}
 
-      if (TREE_CODE (pointer) == ADDR_EXPR
+      if (ADDR_EXPR_P (pointer)
 	  && (TREE_TYPE (TREE_OPERAND (pointer, 0))
 	      == TREE_TYPE (type)))
 	{
@@ -3134,7 +3134,7 @@ build_function_call_vec (location_t loc, vec<location_t> arg_loc,
   /* Check that the function is called through a compatible prototype.
      If it is not, warn.  */
   if (CONVERT_EXPR_P (function)
-      && TREE_CODE (tem = TREE_OPERAND (function, 0)) == ADDR_EXPR
+      && ADDR_EXPR_P (tem = TREE_OPERAND (function, 0))
       && TREE_CODE (tem = TREE_OPERAND (tem, 0)) == FUNCTION_DECL
       && !comptypes (fntype, TREE_TYPE (tem)))
     {
@@ -3453,7 +3453,7 @@ convert_arguments (location_t loc, vec<location_t> arg_loc, tree typelist,
 
   /* Change pointer to function to the function itself for
      diagnostics.  */
-  if (TREE_CODE (function) == ADDR_EXPR
+  if (ADDR_EXPR_P (function)
       && TREE_CODE (TREE_OPERAND (function, 0)) == FUNCTION_DECL)
     function = TREE_OPERAND (function, 0);
 
@@ -3647,7 +3647,7 @@ convert_arguments (location_t loc, vec<location_t> arg_loc, tree typelist,
 	  error (invalid_func_diag);
 	  return -1;
 	}
-      else if (TREE_CODE (val) == ADDR_EXPR && reject_gcc_builtin (val))
+      else if (ADDR_EXPR_P (val) && reject_gcc_builtin (val))
 	{
 	  return -1;
 	}
@@ -5149,7 +5149,7 @@ type_or_builtin_type (tree expr, tree *bltin = NULL)
   *bltin = NULL_TREE;
 
   tree type = TREE_TYPE (expr);
-  if (TREE_CODE (expr) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (expr))
     return type;
 
   tree oper = TREE_OPERAND (expr, 0);
@@ -6117,7 +6117,7 @@ c_cast_expr (location_t loc, struct c_type_name *type_name, tree expr)
   type = groktypename (type_name, &type_expr, &type_expr_const);
   warn_strict_prototypes = saved_wsp;
 
-  if (TREE_CODE (expr) == ADDR_EXPR && !VOID_TYPE_P (type)
+  if (ADDR_EXPR_P (expr) && !VOID_TYPE_P (type)
       && reject_gcc_builtin (expr))
     return error_mark_node;
 
@@ -6718,7 +6718,7 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
       tree selector;
       /* Change pointer to function to the function itself for
 	 diagnostics.  */
-      if (TREE_CODE (function) == ADDR_EXPR
+      if (ADDR_EXPR_P (function)
 	  && TREE_CODE (TREE_OPERAND (function, 0)) == FUNCTION_DECL)
 	function = TREE_OPERAND (function, 0);
 
@@ -11470,7 +11470,7 @@ c_process_expr_stmt (location_t loc, tree expr)
     exprv = TREE_OPERAND (exprv, 0);
   if (DECL_P (exprv)
       || handled_component_p (exprv)
-      || TREE_CODE (exprv) == ADDR_EXPR)
+      || ADDR_EXPR_P (exprv))
     mark_exp_read (exprv);
 
   /* If the expression is not of a type to which we cannot assign a line
@@ -12353,7 +12353,7 @@ build_binary_op (location_t location, enum tree_code code,
 	short_compare = 1;
       else if (code0 == POINTER_TYPE && null_pointer_constant_p (orig_op1))
 	{
-	  if (TREE_CODE (op0) == ADDR_EXPR
+	  if (ADDR_EXPR_P (op0)
 	      && decl_with_nonnull_addr_p (TREE_OPERAND (op0, 0))
 	      && !from_macro_expansion_at (location))
 	    {
@@ -12374,7 +12374,7 @@ build_binary_op (location_t location, enum tree_code code,
 	}
       else if (code1 == POINTER_TYPE && null_pointer_constant_p (orig_op0))
 	{
-	  if (TREE_CODE (op1) == ADDR_EXPR
+	  if (ADDR_EXPR_P (op1)
 	      && decl_with_nonnull_addr_p (TREE_OPERAND (op1, 0))
 	      && !from_macro_expansion_at (location))
 	    {
@@ -14492,7 +14492,7 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	      t = TREE_OPERAND (t, 0);
 	      if (TREE_CODE (t) == POINTER_PLUS_EXPR)
 		t = TREE_OPERAND (t, 0);
-	      if (TREE_CODE (t) == ADDR_EXPR)
+	      if (ADDR_EXPR_P (t))
 		t = TREE_OPERAND (t, 0);
 	    }
 	  goto check_dup_generic_t;

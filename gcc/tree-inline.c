@@ -1169,7 +1169,7 @@ remap_gimple_op_r (tree *tp, int *walk_subtrees, void *data)
 	  TREE_OPERAND (*tp, 1) = TREE_OPERAND (*tp, 3);
 	  TREE_OPERAND (*tp, 3) = NULL_TREE;
 	}
-      else if (TREE_CODE (*tp) == ADDR_EXPR)
+      else if (ADDR_EXPR_P (*tp))
 	{
 	  /* Variable substitution need not be simple.  In particular,
 	     the MEM_REF substitution above.  Make sure that
@@ -1354,7 +1354,7 @@ copy_tree_body_r (tree *tp, int *walk_subtrees, void *data)
 	      if (! *tp)
 	        {
 		  type = remap_type (type, id);
-		  if (TREE_CODE (ptr) == ADDR_EXPR && !id->do_not_fold)
+		  if (ADDR_EXPR_P (ptr) && !id->do_not_fold)
 		    {
 		      *tp
 		        = fold_indirect_ref_1 (EXPR_LOCATION (ptr), type, ptr);
@@ -1448,7 +1448,7 @@ copy_tree_body_r (tree *tp, int *walk_subtrees, void *data)
       /* Variable substitution need not be simple.  In particular, the
 	 INDIRECT_REF substitution above.  Make sure that TREE_CONSTANT
 	 and friends are up-to-date.  */
-      else if (TREE_CODE (*tp) == ADDR_EXPR)
+      else if (ADDR_EXPR_P (*tp))
 	{
 	  int invariant = is_gimple_min_invariant (*tp);
 	  walk_tree (&TREE_OPERAND (*tp, 0), copy_tree_body_r, id, NULL);
@@ -3304,7 +3304,7 @@ self_inlining_addr_expr (tree value, tree fn)
 {
   tree var;
 
-  if (TREE_CODE (value) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (value))
     return false;
 
   var = get_base_address (TREE_OPERAND (value, 0));

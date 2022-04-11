@@ -954,7 +954,7 @@ dump_gimple_call (pretty_printer *buffer, const gcall *gs, int spc,
     return;
 
   /* Dump the arguments of _ITM_beginTransaction sanely.  */
-  if (TREE_CODE (fn) == ADDR_EXPR)
+  if (ADDR_EXPR_P (fn))
     fn = TREE_OPERAND (fn, 0);
   if (TREE_CODE (fn) == FUNCTION_DECL && decl_is_tm_clone (fn))
     pp_string (buffer, " [tm-clone]");

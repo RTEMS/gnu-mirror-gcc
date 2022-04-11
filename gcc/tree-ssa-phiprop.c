@@ -189,7 +189,7 @@ phiprop_insert_phi (basic_block bb, gphi *phi, gimple *use_stmt,
       else
 	{
 	  tree rhs = gimple_assign_rhs1 (use_stmt);
-	  gcc_assert (TREE_CODE (old_arg) == ADDR_EXPR);
+	  gcc_assert (ADDR_EXPR_P (old_arg));
 	  if (TREE_CODE (res) == SSA_NAME)
 	    new_var = make_ssa_name (TREE_TYPE (rhs));
 	  else
@@ -295,7 +295,7 @@ propagate_with_phi (basic_block bb, gphi *phi, struct phiprop_d *phivn,
 	    return false;
 	  arg = gimple_assign_rhs1 (def_stmt);
 	}
-      if (TREE_CODE (arg) != ADDR_EXPR
+      if (!ADDR_EXPR_P (arg)
 	  && !(TREE_CODE (arg) == SSA_NAME
 	       && SSA_NAME_VERSION (arg) < n
 	       && phivn[SSA_NAME_VERSION (arg)].value != NULL_TREE

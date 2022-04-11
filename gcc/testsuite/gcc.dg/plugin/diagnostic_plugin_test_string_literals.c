@@ -127,7 +127,7 @@ test_string_literals (gimple *stmt)
   /* We expect an ADDR_EXPR with a STRING_CST inside it for the
      initial arg.  */
   tree t_addr_string = gimple_call_arg (call, 0);
-  if (TREE_CODE (t_addr_string) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (t_addr_string))
     {
       error_at (call->location, "string literal required for arg 1");
       return;

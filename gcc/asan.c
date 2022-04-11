@@ -3237,7 +3237,7 @@ asan_expand_mark_ifn (gimple_stmt_iterator *iter)
   bool is_poison = ((asan_mark_flags)flag) == ASAN_MARK_POISON;
 
   tree base = gimple_call_arg (g, 1);
-  gcc_checking_assert (TREE_CODE (base) == ADDR_EXPR);
+  gcc_checking_assert (ADDR_EXPR_P (base));
   tree decl = TREE_OPERAND (base, 0);
 
   /* For a nested function, we can have: ASAN_MARK (2, &FRAME.2.fp_input, 4) */

@@ -3282,7 +3282,7 @@ get_constraint_for_component_ref (tree t, vec<ce_s> *results,
      VIEW_CONVERT_EXPR <>(&foobar) or things like a
      BIT_FIELD_REF <&MEM[(void *)&b + 4B], ...>.  So for
      symbolic constants simply give up.  */
-  if (TREE_CODE (t) == ADDR_EXPR)
+  if (ADDR_EXPR_P (t))
     {
       constraint_expr result;
       result.type = SCALAR;
@@ -4647,7 +4647,7 @@ find_func_aliases_for_builtin_call (struct function *fn, gcall *t)
 	  if (in_ipa_mode)
 	    {
 	      varinfo_t nfi = NULL;
-	      gcc_assert (TREE_CODE (nfunc) == ADDR_EXPR);
+	      gcc_assert (ADDR_EXPR_P (nfunc));
 	      nfi = lookup_vi_for_tree (TREE_OPERAND (nfunc, 0));
 	      if (nfi)
 		{
@@ -4800,7 +4800,7 @@ find_func_aliases_for_builtin_call (struct function *fn, gcall *t)
 		}
 
 	      tree fnarg = gimple_call_arg (t, fnpos);
-	      gcc_assert (TREE_CODE (fnarg) == ADDR_EXPR);
+	      gcc_assert (ADDR_EXPR_P (fnarg));
 	      tree fndecl = TREE_OPERAND (fnarg, 0);
 	      if (fndecl_maybe_in_other_partition (fndecl))
 		/* Fallthru to general call handling.  */
@@ -5202,7 +5202,7 @@ find_func_clobbers (struct function *fn, gimple *origt)
 	   && !auto_var_in_fn_p (tem, fn->decl))
 	  || INDIRECT_REF_P (tem)
 	  || (TREE_CODE (tem) == MEM_REF
-	      && !(TREE_CODE (TREE_OPERAND (tem, 0)) == ADDR_EXPR
+	      && !(ADDR_EXPR_P (TREE_OPERAND (tem, 0))
 		   && auto_var_in_fn_p
 		        (TREE_OPERAND (TREE_OPERAND (tem, 0), 0), fn->decl))))
 	{
@@ -5231,7 +5231,7 @@ find_func_clobbers (struct function *fn, gimple *origt)
 	   && !auto_var_in_fn_p (tem, fn->decl))
 	  || INDIRECT_REF_P (tem)
 	  || (TREE_CODE (tem) == MEM_REF
-	      && !(TREE_CODE (TREE_OPERAND (tem, 0)) == ADDR_EXPR
+	      && !(ADDR_EXPR_P (TREE_OPERAND (tem, 0))
 		   && auto_var_in_fn_p
 		        (TREE_OPERAND (TREE_OPERAND (tem, 0), 0), fn->decl))))
 	{
@@ -5382,7 +5382,7 @@ find_func_clobbers (struct function *fn, gimple *origt)
 		}
 
 	      tree fnarg = gimple_call_arg (t, fnpos);
-	      gcc_assert (TREE_CODE (fnarg) == ADDR_EXPR);
+	      gcc_assert (ADDR_EXPR_P (fnarg));
 	      tree fndecl = TREE_OPERAND (fnarg, 0);
 	      if (fndecl_maybe_in_other_partition (fndecl))
 		/* Fallthru to general call handling.  */

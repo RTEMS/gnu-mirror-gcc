@@ -785,7 +785,7 @@ build_load_modify_store (tree dest, tree src, Node_Id gnat_node)
 	      /* Find out the loaded object.  */
 	      if (TREE_CODE (t) == NOP_EXPR)
 		t = TREE_OPERAND (t, 0);
-	      if (TREE_CODE (t) == ADDR_EXPR)
+	      if (ADDR_EXPR_P (t))
 		obj = TREE_OPERAND (t, 0);
 	      else
 		obj = build1 (INDIRECT_REF, type, t);
@@ -1572,7 +1572,7 @@ build_unary_op (enum tree_code op_code, tree result_type, tree operand)
 	  }
 
 	/* If we are dereferencing an ADDR_EXPR, return its operand.  */
-	else if (TREE_CODE (operand) == ADDR_EXPR)
+	else if (ADDR_EXPR_P (operand))
 	  result = TREE_OPERAND (operand, 0);
 
 	/* Otherwise, build and fold the indirect reference.  */
@@ -2775,7 +2775,7 @@ gnat_rewrite_reference (tree ref, rewrite_fn func, void *data, tree *init)
 	tree t = CALL_EXPR_ARG (ref, 0);
 	if (TREE_CODE (t) == NOP_EXPR)
 	  t = TREE_OPERAND (t, 0);
-	if (TREE_CODE (t) == ADDR_EXPR)
+	if (ADDR_EXPR_P (t))
 	  t = build1 (ADDR_EXPR, TREE_TYPE (t),
 		      gnat_rewrite_reference (TREE_OPERAND (t, 0), func, data,
 					      init));

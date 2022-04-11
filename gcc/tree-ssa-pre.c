@@ -2472,7 +2472,7 @@ create_component_ref_by_pieces_1 (basic_block block, vn_reference_t ref,
 	if (!baseop)
 	  return NULL_TREE;
 	tree offset = currop->op0;
-	if (TREE_CODE (baseop) == ADDR_EXPR
+	if (ADDR_EXPR_P (baseop)
 	    && handled_component_p (TREE_OPERAND (baseop, 0)))
 	  {
 	    poly_int64 off;

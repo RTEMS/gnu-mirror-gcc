@@ -142,7 +142,7 @@ output_gimple_stmt (struct output_block *ob, struct function *fn, gimple *stmt)
 	  if (!flag_wpa && op && (i || !is_gimple_debug (stmt)))
 	    {
 	      basep = &op;
-	      if (TREE_CODE (*basep) == ADDR_EXPR)
+	      if (ADDR_EXPR_P (*basep))
 		basep = &TREE_OPERAND (*basep, 0);
 	      while (handled_component_p (*basep))
 		basep = &TREE_OPERAND (*basep, 0);

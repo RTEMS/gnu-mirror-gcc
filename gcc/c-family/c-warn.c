@@ -698,7 +698,7 @@ strict_aliasing_warning (location_t loc, tree type, tree expr)
       || TYPE_REF_CAN_ALIAS_ALL (type))
     return false;
 
-  if ((warn_strict_aliasing > 1) && TREE_CODE (expr) == ADDR_EXPR
+  if ((warn_strict_aliasing > 1) && ADDR_EXPR_P (expr)
       && (DECL_P (TREE_OPERAND (expr, 0))
 	  || handled_component_p (TREE_OPERAND (expr, 0))))
     {
@@ -877,7 +877,7 @@ sizeof_pointer_memaccess_warning (location_t *sizeof_arg_loc, tree callee,
       if (strop && !cmp && fncode != BUILT_IN_STRNDUP && src)
 	{
 	  tem = tree_strip_nop_conversions (src);
-	  if (TREE_CODE (tem) == ADDR_EXPR)
+	  if (ADDR_EXPR_P (tem))
 	    tem = TREE_OPERAND (tem, 0);
 
 	  /* Avoid diagnosing sizeof SRC when SRC is declared with
@@ -887,7 +887,7 @@ sizeof_pointer_memaccess_warning (location_t *sizeof_arg_loc, tree callee,
 	    return;
 
 	  tree d = tree_strip_nop_conversions (dest);
-	  if (TREE_CODE (d) == ADDR_EXPR)
+	  if (ADDR_EXPR_P (d))
 	    d = TREE_OPERAND (d, 0);
 
 	  tree dstsz = TYPE_SIZE_UNIT (TREE_TYPE (d));
@@ -927,7 +927,7 @@ sizeof_pointer_memaccess_warning (location_t *sizeof_arg_loc, tree callee,
 	  && operand_equal_p (dest, sizeof_arg[idx], 0)
 	  && comp_types (TREE_TYPE (dest), type))
 	{
-	  if (TREE_CODE (sizeof_arg[idx]) == ADDR_EXPR && !strop)
+	  if (ADDR_EXPR_P (sizeof_arg[idx]) && !strop)
 	    warning_at (loc, OPT_Wsizeof_pointer_memaccess,
 			"argument to %<sizeof%> in %qD call is the same "
 			"expression as the destination; did you mean to "
@@ -967,7 +967,7 @@ sizeof_pointer_memaccess_warning (location_t *sizeof_arg_loc, tree callee,
 	  && operand_equal_p (src, sizeof_arg[idx], 0)
 	  && comp_types (TREE_TYPE (src), type))
 	{
-	  if (TREE_CODE (sizeof_arg[idx]) == ADDR_EXPR && !strop)
+	  if (ADDR_EXPR_P (sizeof_arg[idx]) && !strop)
 	    warning_at (loc, OPT_Wsizeof_pointer_memaccess,
 			"argument to %<sizeof%> in %qD call is the same "
 			"expression as the source; did you mean to "
@@ -1007,7 +1007,7 @@ sizeof_pointer_memaccess_warning (location_t *sizeof_arg_loc, tree callee,
 	  && operand_equal_p (dest, sizeof_arg[idx], 0)
 	  && comp_types (TREE_TYPE (dest), type))
 	{
-	  if (TREE_CODE (sizeof_arg[idx]) == ADDR_EXPR && !strop)
+	  if (ADDR_EXPR_P (sizeof_arg[idx]) && !strop)
 	    warning_at (loc, OPT_Wsizeof_pointer_memaccess,
 			"argument to %<sizeof%> in %qD call is the same "
 			"expression as the first source; did you mean to "
@@ -1047,7 +1047,7 @@ sizeof_pointer_memaccess_warning (location_t *sizeof_arg_loc, tree callee,
 	  && operand_equal_p (src, sizeof_arg[idx], 0)
 	  && comp_types (TREE_TYPE (src), type))
 	{
-	  if (TREE_CODE (sizeof_arg[idx]) == ADDR_EXPR && !strop)
+	  if (ADDR_EXPR_P (sizeof_arg[idx]) && !strop)
 	    warning_at (loc, OPT_Wsizeof_pointer_memaccess,
 			"argument to %<sizeof%> in %qD call is the same "
 			"expression as the second source; did you mean to "
@@ -2181,7 +2181,7 @@ warn_for_memset (location_t loc, tree arg0, tree arg2,
   if (warn_memset_elt_size && TREE_CODE (arg2) == INTEGER_CST)
     {
       STRIP_NOPS (arg0);
-      if (TREE_CODE (arg0) == ADDR_EXPR)
+      if (ADDR_EXPR_P (arg0))
 	arg0 = TREE_OPERAND (arg0, 0);
       tree type = TREE_TYPE (arg0);
       if (type != NULL_TREE && TREE_CODE (type) == ARRAY_TYPE)
@@ -2936,7 +2936,7 @@ check_address_or_pointer_of_packed_member (tree type, tree rhs)
       indirect = true;
     }
 
-  if (TREE_CODE (rhs) == ADDR_EXPR)
+  if (ADDR_EXPR_P (rhs))
     {
       rhs = TREE_OPERAND (rhs, 0);
       rvalue = indirect;

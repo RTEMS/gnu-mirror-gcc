@@ -483,7 +483,7 @@ maybe_optimize_ubsan_ptr_ifn (sanopt_ctx *ctx, gimple *stmt)
     return true;
 
   tree base = ptr;
-  if (TREE_CODE (base) == ADDR_EXPR)
+  if (ADDR_EXPR_P (base))
     {
       base = TREE_OPERAND (base, 0);
 

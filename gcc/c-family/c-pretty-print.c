@@ -1786,7 +1786,7 @@ c_pretty_printer::unary_expression (tree e)
       break;
 
     case MEM_REF:
-      if (TREE_CODE (TREE_OPERAND (e, 0)) == ADDR_EXPR
+      if (ADDR_EXPR_P (TREE_OPERAND (e, 0))
 	  && integer_zerop (TREE_OPERAND (e, 1)))
 	expression (TREE_OPERAND (TREE_OPERAND (e, 0), 0));
       else

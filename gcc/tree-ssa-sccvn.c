@@ -872,7 +872,7 @@ copy_reference_ops_from_ref (tree ref, vec<vn_reference_op_s> *result)
 		       __builtin_object_size had a chance to run
 		       (checking cfun->after_inlining does the
 		       trick here).  */
-		    if (TREE_CODE (orig) != ADDR_EXPR
+		    if (!ADDR_EXPR_P (orig)
 			|| maybe_ne (off, 0)
 			|| cfun->after_inlining)
 		      off.to_shwi (&temp.off);
@@ -969,7 +969,7 @@ copy_reference_ops_from_ref (tree ref, vec<vn_reference_op_s> *result)
       if (REFERENCE_CLASS_P (ref)
 	  || TREE_CODE (ref) == MODIFY_EXPR
 	  || TREE_CODE (ref) == WITH_SIZE_EXPR
-	  || (TREE_CODE (ref) == ADDR_EXPR
+	  || (ADDR_EXPR_P (ref)
 	      && !is_gimple_min_invariant (ref)))
 	ref = TREE_OPERAND (ref, 0);
       else
@@ -1364,7 +1364,7 @@ vn_reference_maybe_forwprop_address (vec<vn_reference_op_s> *ops,
   while (TREE_CODE (op->op0) == SSA_NAME);
 
   /* Fold a remaining *&.  */
-  if (TREE_CODE (op->op0) == ADDR_EXPR)
+  if (ADDR_EXPR_P (op->op0))
     vn_reference_fold_indirect (ops, i_p);
 
   return changed;
@@ -1383,7 +1383,7 @@ fully_constant_vn_reference_p (vn_reference_t ref)
      a call to a builtin function with at most two arguments.  */
   op = &operands[0];
   if (op->opcode == CALL_EXPR
-      && TREE_CODE (op->op0) == ADDR_EXPR
+      && ADDR_EXPR_P (op->op0)
       && TREE_CODE (TREE_OPERAND (op->op0, 0)) == FUNCTION_DECL
       && fndecl_built_in_p (TREE_OPERAND (op->op0, 0))
       && operands.length () >= 2
@@ -1566,7 +1566,7 @@ valueize_refs_1 (vec<vn_reference_op_s> orig, bool *valueized_anything,
 	 a preceding indirect reference.  */
       if (i > 0
 	  && vro->op0
-	  && TREE_CODE (vro->op0) == ADDR_EXPR
+	  && ADDR_EXPR_P (vro->op0)
 	  && orig[i - 1].opcode == MEM_REF)
 	{
 	  if (vn_reference_fold_indirect (&orig, &i))
@@ -2627,7 +2627,7 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
       && (poly_int_tree_p (gimple_call_arg (def_stmt, 2))
 	  || (TREE_CODE (gimple_call_arg (def_stmt, 2)) == SSA_NAME
 	      && poly_int_tree_p (SSA_VAL (gimple_call_arg (def_stmt, 2)))))
-      && (TREE_CODE (gimple_call_arg (def_stmt, 0)) == ADDR_EXPR
+      && (ADDR_EXPR_P (gimple_call_arg (def_stmt, 0))
 	  || TREE_CODE (gimple_call_arg (def_stmt, 0)) == SSA_NAME))
     {
       tree base2;
@@ -2647,7 +2647,7 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
 		ref2 = gimple_assign_rhs1 (def_stmt);
 	    }
 	}
-      if (TREE_CODE (ref2) == ADDR_EXPR)
+      if (ADDR_EXPR_P (ref2))
 	{
 	  ref2 = TREE_OPERAND (ref2, 0);
 	  base2 = get_ref_base_and_extent (ref2, &offset2, &size2, &maxsize2,
@@ -3237,9 +3237,9 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
 	       || gimple_call_builtin_p (def_stmt, BUILT_IN_MEMPCPY_CHK)
 	       || gimple_call_builtin_p (def_stmt, BUILT_IN_MEMMOVE)
 	       || gimple_call_builtin_p (def_stmt, BUILT_IN_MEMMOVE_CHK))
-	   && (TREE_CODE (gimple_call_arg (def_stmt, 0)) == ADDR_EXPR
+	   && (ADDR_EXPR_P (gimple_call_arg (def_stmt, 0))
 	       || TREE_CODE (gimple_call_arg (def_stmt, 0)) == SSA_NAME)
-	   && (TREE_CODE (gimple_call_arg (def_stmt, 1)) == ADDR_EXPR
+	   && (ADDR_EXPR_P (gimple_call_arg (def_stmt, 1))
 	       || TREE_CODE (gimple_call_arg (def_stmt, 1)) == SSA_NAME)
 	   && (poly_int_tree_p (gimple_call_arg (def_stmt, 2), &copy_size)
 	       || (TREE_CODE (gimple_call_arg (def_stmt, 2)) == SSA_NAME
@@ -3275,7 +3275,7 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
 		lhs = gimple_assign_rhs1 (def_stmt);
 	    }
 	}
-      if (TREE_CODE (lhs) == ADDR_EXPR)
+      if (ADDR_EXPR_P (lhs))
 	{
 	  if (AGGREGATE_TYPE_P (TREE_TYPE (TREE_TYPE (lhs)))
 	      && TYPE_REVERSE_STORAGE_ORDER (TREE_TYPE (TREE_TYPE (lhs))))
@@ -3298,7 +3298,7 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
 	    return (void *)-1;
 	}
       if (TREE_CODE (lhs) != SSA_NAME
-	  && TREE_CODE (lhs) != ADDR_EXPR)
+	  && !ADDR_EXPR_P (lhs))
 	return (void *)-1;
 
       /* Extract a pointer base and an offset for the source.  */
@@ -3306,7 +3306,7 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
       rhs_offset = 0;
       if (TREE_CODE (rhs) == SSA_NAME)
 	rhs = vn_valueize (rhs);
-      if (TREE_CODE (rhs) == ADDR_EXPR)
+      if (ADDR_EXPR_P (rhs))
 	{
 	  if (AGGREGATE_TYPE_P (TREE_TYPE (TREE_TYPE (rhs)))
 	      && TYPE_REVERSE_STORAGE_ORDER (TREE_TYPE (TREE_TYPE (rhs))))
@@ -3329,7 +3329,7 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
 	}
       if (TREE_CODE (rhs) == SSA_NAME)
 	rhs = SSA_VAL (rhs);
-      else if (TREE_CODE (rhs) != ADDR_EXPR)
+      else if (!ADDR_EXPR_P (rhs))
 	return (void *)-1;
 
       /* The bases of the destination and the references have to agree.  */
@@ -3341,7 +3341,7 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
 	  at += mem_offset;
 	}
       else if (!DECL_P (base)
-	       || TREE_CODE (lhs) != ADDR_EXPR
+	       || !ADDR_EXPR_P (lhs)
 	       || TREE_OPERAND (lhs, 0) != base)
 	return (void *)-1;
 
@@ -4591,8 +4591,8 @@ set_and_exit:
          does not reliably detect ADDR_EXPRs as equal.  We know we are only
 	 getting invariant gimple addresses here, so can use
 	 get_addr_base_and_unit_offset to do this comparison.  */
-      && !(TREE_CODE (currval) == ADDR_EXPR
-	   && TREE_CODE (to) == ADDR_EXPR
+      && !(ADDR_EXPR_P (currval)
+	   && ADDR_EXPR_P (to)
 	   && (get_addr_base_and_unit_offset (TREE_OPERAND (currval, 0), &coff)
 	       == get_addr_base_and_unit_offset (TREE_OPERAND (to, 0), &toff))
 	   && known_eq (coff, toff)))
@@ -4879,7 +4879,7 @@ visit_reference_op_call (tree lhs, gcall *stmt)
 	  if (fn && TREE_CODE (fn) == SSA_NAME)
 	    {
 	      fn = SSA_VAL (fn);
-	      if (TREE_CODE (fn) == ADDR_EXPR
+	      if (ADDR_EXPR_P (fn)
 		  && TREE_CODE (TREE_OPERAND (fn, 0)) == FUNCTION_DECL
 		  && (flags_from_decl_or_type (TREE_OPERAND (fn, 0))
 		      & (ECF_CONST | ECF_PURE)))
@@ -5156,8 +5156,8 @@ visit_phi (gimple *phi, bool *inserted, bool backedges_varying_p)
 	    /* We know we're arriving only with invariant addresses here,
 	       try harder comparing them.  We can do some caching here
 	       which we cannot do in expressions_equal_p.  */
-	    if (TREE_CODE (def) == ADDR_EXPR
-		&& TREE_CODE (sameval) == ADDR_EXPR
+	    if (ADDR_EXPR_P (def)
+		&& ADDR_EXPR_P (sameval)
 		&& sameval_base != (void *)-1)
 	      {
 		if (!sameval_base)
@@ -5436,7 +5436,7 @@ visit_stmt (gimple *stmt, bool backedges_varying_p = false)
       if (fn && TREE_CODE (fn) == SSA_NAME)
 	{
 	  fn = SSA_VAL (fn);
-	  if (TREE_CODE (fn) == ADDR_EXPR
+	  if (ADDR_EXPR_P (fn)
 	      && TREE_CODE (TREE_OPERAND (fn, 0)) == FUNCTION_DECL)
 	    extra_fnflags = flags_from_decl_or_type (TREE_OPERAND (fn, 0));
 	}
@@ -6210,7 +6210,7 @@ eliminate_dom_walker::eliminate_stmt (basic_block b, gimple_stmt_iterator *gsi)
       /* If a formerly non-invariant ADDR_EXPR is turned into an
 	 invariant one it was on a separate stmt.  */
       if (gimple_assign_single_p (stmt)
-	  && TREE_CODE (gimple_assign_rhs1 (stmt)) == ADDR_EXPR)
+	  && ADDR_EXPR_P (gimple_assign_rhs1 (stmt)))
 	recompute_tree_invariant_for_addr_expr (gimple_assign_rhs1 (stmt));
       gimple_stmt_iterator prev = *gsi;
       gsi_prev (&prev);

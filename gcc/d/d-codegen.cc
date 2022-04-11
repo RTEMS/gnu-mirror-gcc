@@ -689,7 +689,7 @@ build_address (tree exp)
   d_mark_addressable (exp);
   exp = build_fold_addr_expr_with_type_loc (input_location, exp, ptrtype);
 
-  if (TREE_CODE (exp) == ADDR_EXPR)
+  if (ADDR_EXPR_P (exp))
     TREE_NO_TRAMPOLINE (exp) = 1;
 
   return compound_expr (init, exp);
@@ -834,7 +834,7 @@ build_memset_call (tree ptr, tree num)
 {
   if (num == NULL_TREE)
     {
-      gcc_assert (TREE_CODE (ptr) != ADDR_EXPR);
+      gcc_assert (!ADDR_EXPR_P (ptr));
       num = TYPE_SIZE_UNIT (TREE_TYPE (ptr));
       ptr = build_address (ptr);
     }
@@ -1396,7 +1396,7 @@ build_vconvert (tree type, tree exp)
 static void
 warn_for_null_address (tree arg)
 {
-  if (TREE_CODE (arg) == ADDR_EXPR
+  if (ADDR_EXPR_P (arg)
       && decl_with_nonnull_addr_p (TREE_OPERAND (arg, 0)))
     warning (OPT_Waddress,
 	     "the address of %qD will never be %<null%>",
@@ -1572,7 +1572,7 @@ build_deref (tree exp)
 
   gcc_assert (POINTER_TYPE_P (TREE_TYPE (exp)));
 
-  if (TREE_CODE (exp) == ADDR_EXPR)
+  if (ADDR_EXPR_P (exp))
     exp = TREE_OPERAND (exp, 0);
   else
     exp = build_fold_indirect_ref (exp);

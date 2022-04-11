@@ -162,7 +162,7 @@ input_gimple_stmt (class lto_input_block *ib, class data_in *data_in,
 	    continue;
 
 	  opp = gimple_op_ptr (stmt, i);
-	  if (TREE_CODE (*opp) == ADDR_EXPR)
+	  if (ADDR_EXPR_P (*opp))
 	    opp = &TREE_OPERAND (*opp, 0);
 	  while (handled_component_p (*opp))
 	    opp = &TREE_OPERAND (*opp, 0);
@@ -171,7 +171,7 @@ input_gimple_stmt (class lto_input_block *ib, class data_in *data_in,
 	     here if the prevailing decl allows for this.
 	     ???  Maybe we should simply fold all stmts.  */
 	  if (TREE_CODE (*opp) == MEM_REF
-	      && TREE_CODE (TREE_OPERAND (*opp, 0)) == ADDR_EXPR
+	      && ADDR_EXPR_P (TREE_OPERAND (*opp, 0))
 	      && integer_zerop (TREE_OPERAND (*opp, 1))
 	      && (TREE_THIS_VOLATILE (*opp)
 		  == TREE_THIS_VOLATILE

@@ -445,7 +445,7 @@ builtin_memref::set_base_and_offset (tree expr)
 	}
     }
 
-  if (TREE_CODE (expr) == ADDR_EXPR)
+  if (ADDR_EXPR_P (expr))
     expr = TREE_OPERAND (expr, 0);
 
   /* Stash the reference for offset validation.  */

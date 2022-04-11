@@ -1495,7 +1495,7 @@ dump_mem_ref (pretty_printer *pp, tree node, int spc, dump_flags_t flags)
 	   && (!(flags & TDF_ALIAS)
 	       || MR_DEPENDENCE_CLIQUE (node) == 0))
     {
-      if (TREE_CODE (TREE_OPERAND (node, 0)) != ADDR_EXPR)
+      if (!ADDR_EXPR_P (TREE_OPERAND (node, 0)))
 	{
 	  /* Enclose pointers to arrays in parentheses.  */
 	  tree op0 = TREE_OPERAND (node, 0);
@@ -1872,7 +1872,7 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
 
 	pp_string (pp, "MEM[");
 
-	if (TREE_CODE (TMR_BASE (node)) == ADDR_EXPR)
+	if (ADDR_EXPR_P (TMR_BASE (node)))
 	  {
 	    pp_string (pp, sep);
 	    sep = ", ";
@@ -2232,7 +2232,7 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
       if (op0
 	  && (TREE_CODE (op0) == INDIRECT_REF
 	      || (TREE_CODE (op0) == MEM_REF
-		  && TREE_CODE (TREE_OPERAND (op0, 0)) != ADDR_EXPR
+		  && !ADDR_EXPR_P (TREE_OPERAND (op0, 0))
 		  && integer_zerop (TREE_OPERAND (op0, 1))
 		  /* Dump the types of INTEGER_CSTs explicitly, for we
 		     can't infer them and MEM_ATTR caching will share
@@ -2418,7 +2418,7 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
 	      }
             if (is_array_init)
 	      curidx += 1;
-	    if (val && TREE_CODE (val) == ADDR_EXPR)
+	    if (val && ADDR_EXPR_P (val))
 	      if (TREE_CODE (TREE_OPERAND (val, 0)) == FUNCTION_DECL)
 		val = TREE_OPERAND (val, 0);
 	    if (val && TREE_CODE (val) == FUNCTION_DECL)
@@ -2765,7 +2765,7 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
     case PREDECREMENT_EXPR:
     case PREINCREMENT_EXPR:
     case INDIRECT_REF:
-      if (TREE_CODE (node) == ADDR_EXPR
+      if (ADDR_EXPR_P (node)
 	  && (TREE_CODE (TREE_OPERAND (node, 0)) == STRING_CST
 	      || TREE_CODE (TREE_OPERAND (node, 0)) == FUNCTION_DECL))
 	;	/* Do not output '&' for strings and function pointers.  */

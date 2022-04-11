@@ -2785,7 +2785,7 @@ create_var_decl (tree name, tree asm_name, tree type, tree init,
       if (TREE_CODE (inner) == COMPOUND_EXPR)
 	inner = TREE_OPERAND (inner, 1);
       inner = remove_conversions (inner, true);
-      if (TREE_CODE (inner) == ADDR_EXPR
+      if (ADDR_EXPR_P (inner)
 	  && ((TREE_CODE (TREE_OPERAND (inner, 0)) == CALL_EXPR
 	       && !call_is_atomic_load (TREE_OPERAND (inner, 0)))
 	      || (TREE_CODE (TREE_OPERAND (inner, 0)) == VAR_DECL

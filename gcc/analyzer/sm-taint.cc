@@ -213,7 +213,7 @@ taint_state_machine::on_stmt (sm_context *sm_ctxt,
 
 	    /* Dereference an ADDR_EXPR.  */
 	    // TODO: should the engine do this?
-	    if (TREE_CODE (arg) == ADDR_EXPR)
+	    if (ADDR_EXPR_P (arg))
 	      sm_ctxt->on_transition (node, stmt, TREE_OPERAND (arg, 0),
 				      m_start, m_tainted);
 	    return true;

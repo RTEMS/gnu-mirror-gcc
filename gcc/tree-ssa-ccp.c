@@ -598,7 +598,7 @@ get_value_from_alignment (tree expr)
   unsigned HOST_WIDE_INT bitpos;
   unsigned int align;
 
-  gcc_assert (TREE_CODE (expr) == ADDR_EXPR);
+  gcc_assert (ADDR_EXPR_P (expr));
 
   get_pointer_alignment_1 (expr, &align, &bitpos);
   val.mask = wi::bit_and_not
@@ -639,7 +639,7 @@ get_value_for_expr (tree expr, bool for_bits_p)
       if (for_bits_p
 	  && val.lattice_val == CONSTANT)
 	{
-	  if (TREE_CODE (val.value) == ADDR_EXPR)
+	  if (ADDR_EXPR_P (val.value))
 	    val = get_value_from_alignment (val.value);
 	  else if (TREE_CODE (val.value) != INTEGER_CST)
 	    {
@@ -666,7 +666,7 @@ get_value_for_expr (tree expr, bool for_bits_p)
       val.mask = 0;
       canonicalize_value (&val);
     }
-  else if (TREE_CODE (expr) == ADDR_EXPR)
+  else if (ADDR_EXPR_P (expr))
     val = get_value_from_alignment (expr);
   else
     {
@@ -1096,15 +1096,15 @@ ccp_lattice_meet (ccp_prop_value_t *val1, ccp_prop_value_t *val2)
     }
   else if (val1->lattice_val == CONSTANT
 	   && val2->lattice_val == CONSTANT
-	   && (TREE_CODE (val1->value) == ADDR_EXPR
-	       || TREE_CODE (val2->value) == ADDR_EXPR))
+	   && (ADDR_EXPR_P (val1->value)
+	       || ADDR_EXPR_P (val2->value)))
     {
       /* When not equal addresses are involved try meeting for
 	 alignment.  */
       ccp_prop_value_t tem = *val2;
-      if (TREE_CODE (val1->value) == ADDR_EXPR)
+      if (ADDR_EXPR_P (val1->value))
 	*val1 = get_value_for_expr (val1->value, true);
-      if (TREE_CODE (val2->value) == ADDR_EXPR)
+      if (ADDR_EXPR_P (val2->value))
 	tem = get_value_for_expr (val2->value, true);
       ccp_lattice_meet (val1, &tem);
     }
@@ -3163,7 +3163,7 @@ optimize_memcpy (gimple_stmt_iterator *gsip, tree dest, tree src, tree len)
       && !gimple_clobber_p (defstmt))
     src2 = gimple_assign_lhs (defstmt);
   else if (gimple_call_builtin_p (defstmt, BUILT_IN_MEMSET)
-	   && TREE_CODE (gimple_call_arg (defstmt, 0)) == ADDR_EXPR
+	   && ADDR_EXPR_P (gimple_call_arg (defstmt, 0))
 	   && TREE_CODE (gimple_call_arg (defstmt, 1)) == INTEGER_CST)
     {
       src2 = TREE_OPERAND (gimple_call_arg (defstmt, 0), 0);
@@ -3433,8 +3433,8 @@ pass_fold_builtins::execute (function *fun)
 
 		case BUILT_IN_MEMCPY:
 		  if (gimple_call_builtin_p (stmt, BUILT_IN_NORMAL)
-		      && TREE_CODE (gimple_call_arg (stmt, 0)) == ADDR_EXPR
-		      && TREE_CODE (gimple_call_arg (stmt, 1)) == ADDR_EXPR
+		      && ADDR_EXPR_P (gimple_call_arg (stmt, 0))
+		      && ADDR_EXPR_P (gimple_call_arg (stmt, 1))
 		      && TREE_CODE (gimple_call_arg (stmt, 2)) == INTEGER_CST)
 		    {
 		      tree dest = TREE_OPERAND (gimple_call_arg (stmt, 0), 0);

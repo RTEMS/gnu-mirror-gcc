@@ -191,7 +191,7 @@ self_referential_size (tree size)
 	  subst = ref;
 	}
       /* This is the pattern built in ada/make_aligning_type.  */
-      else if (TREE_CODE (ref) == ADDR_EXPR)
+      else if (ADDR_EXPR_P (ref))
         subst = ref;
       /* Default case: the component reference.  */
       else

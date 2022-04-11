@@ -527,7 +527,7 @@ get_stridx (tree exp, wide_int offrng[2] = NULL, const vr_values *rvals = NULL)
       return last_idx;
     }
 
-  if (TREE_CODE (exp) == ADDR_EXPR)
+  if (ADDR_EXPR_P (exp))
     {
       int idx = get_addr_stridx (TREE_OPERAND (exp, 0), exp, NULL);
       if (idx != 0)
@@ -641,7 +641,7 @@ new_stridx (tree exp)
       ssa_ver_to_stridx[SSA_NAME_VERSION (exp)] = idx;
       return idx;
     }
-  if (TREE_CODE (exp) == ADDR_EXPR)
+  if (ADDR_EXPR_P (exp))
     {
       int *pidx = addr_stridxptr (TREE_OPERAND (exp, 0));
       if (pidx != NULL)
@@ -1126,7 +1126,7 @@ get_range_strlen_dynamic (tree src, c_strlen_data *pdata, bitmap *visited,
 	    pdata->minlen = build_zero_cst (size_type_node);
 
 	  tree base = si->ptr;
-	  if (TREE_CODE (base) == ADDR_EXPR)
+	  if (ADDR_EXPR_P (base))
 	    base = TREE_OPERAND (base, 0);
 
 	  HOST_WIDE_INT off;
@@ -1565,7 +1565,7 @@ find_equal_ptrs (tree ptr, int idx)
 	    return;
 	  if (TREE_CODE (ptr) == SSA_NAME)
 	    break;
-	  if (TREE_CODE (ptr) != ADDR_EXPR)
+	  if (!ADDR_EXPR_P (ptr))
 	    return;
 	  /* FALLTHRU */
 	case ADDR_EXPR:
@@ -1849,7 +1849,7 @@ maybe_set_strlen_range (tree lhs, tree src, tree bound)
      one to its beginning is positive.  */
   wide_int max = wi::to_wide (TYPE_MAX_VALUE (ptrdiff_type_node)) - 2;
 
-  if (TREE_CODE (src) == ADDR_EXPR)
+  if (ADDR_EXPR_P (src))
     {
       /* The last array member of a struct can be bigger than its size
 	 suggests if it's treated as a poor-man's flexible array member.  */
@@ -3071,7 +3071,7 @@ maybe_diag_stxncpy_trunc (gimple_stmt_iterator gsi, tree src, tree cnt)
 
   tree dst = gimple_call_arg (stmt, 0);
   tree dstdecl = dst;
-  if (TREE_CODE (dstdecl) == ADDR_EXPR)
+  if (ADDR_EXPR_P (dstdecl))
     dstdecl = TREE_OPERAND (dstdecl, 0);
 
   tree ref = NULL_TREE;
@@ -3082,7 +3082,7 @@ maybe_diag_stxncpy_trunc (gimple_stmt_iterator gsi, tree src, tree cnt)
 	 for possible truncation (if the truncation is certain SIDX
 	 is non-zero).  */
       tree srcdecl = gimple_call_arg (stmt, 1);
-      if (TREE_CODE (srcdecl) == ADDR_EXPR)
+      if (ADDR_EXPR_P (srcdecl))
 	srcdecl = TREE_OPERAND (srcdecl, 0);
       if (get_attr_nonstring_decl (srcdecl, &ref))
 	return false;
@@ -4899,7 +4899,7 @@ count_nonzero_bytes_addr (tree exp, unsigned HOST_WIDE_INT offset,
       return true;
     }
 
-  if (TREE_CODE (exp) == ADDR_EXPR)
+  if (ADDR_EXPR_P (exp))
     return count_nonzero_bytes (TREE_OPERAND (exp, 0), offset, nbytes,
 				lenrange, nulterm, allnul, allnonnul, rvals,
 				snlim);

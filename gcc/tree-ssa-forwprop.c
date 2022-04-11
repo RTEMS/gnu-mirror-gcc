@@ -646,7 +646,7 @@ tidy_after_forward_propagate_addr (gimple *stmt)
   if (maybe_clean_or_replace_eh_stmt (stmt, stmt))
     bitmap_set_bit (to_purge, gimple_bb (stmt)->index);
 
-  if (TREE_CODE (gimple_assign_rhs1 (stmt)) == ADDR_EXPR)
+  if (ADDR_EXPR_P (gimple_assign_rhs1 (stmt)))
      recompute_tree_invariant_for_addr_expr (gimple_assign_rhs1 (stmt));
 }
 
@@ -670,7 +670,7 @@ forward_propagate_addr_expr_1 (tree name, tree def_rhs,
   enum tree_code rhs_code;
   bool res = true;
 
-  gcc_assert (TREE_CODE (def_rhs) == ADDR_EXPR);
+  gcc_assert (ADDR_EXPR_P (def_rhs));
 
   lhs = gimple_assign_lhs (use_stmt);
   rhs_code = gimple_assign_rhs_code (use_stmt);
@@ -848,7 +848,7 @@ forward_propagate_addr_expr_1 (tree name, tree def_rhs,
   /* Strip away any outer COMPONENT_REF, ARRAY_REF or ADDR_EXPR
      nodes from the RHS.  */
   tree *rhsp = gimple_assign_rhs1_ptr (use_stmt);
-  if (TREE_CODE (*rhsp) == ADDR_EXPR)
+  if (ADDR_EXPR_P (*rhsp))
     rhsp = &TREE_OPERAND (*rhsp, 0);
   while (handled_component_p (*rhsp))
     rhsp = &TREE_OPERAND (*rhsp, 0);
@@ -1176,7 +1176,7 @@ constant_pointer_difference (tree p1, tree p2)
 	{
 	  if (!POINTER_TYPE_P (TREE_TYPE (p)))
 	    break;
-	  if (TREE_CODE (p) == ADDR_EXPR)
+	  if (ADDR_EXPR_P (p))
 	    {
 	      tree q = TREE_OPERAND (p, 0);
 	      poly_int64 offset;
@@ -2777,7 +2777,7 @@ pass_forwprop::execute (function *fun)
 	       /* Handle pointer conversions on invariant addresses
 		  as well, as this is valid gimple.  */
 	       || (CONVERT_EXPR_CODE_P (code)
-		   && TREE_CODE (rhs) == ADDR_EXPR
+		   && ADDR_EXPR_P (rhs)
 		   && POINTER_TYPE_P (TREE_TYPE (lhs))))
 	      && TREE_CODE (TREE_OPERAND (rhs, 0)) != TARGET_MEM_REF)
 	    {

@@ -354,7 +354,7 @@ maybe_warn_operand (ao_ref &ref, gimple *stmt, tree lhs, tree rhs,
 	    break;
 
 	  base = gimple_assign_rhs1 (def_stmt);
-	  if (TREE_CODE (base) == ADDR_EXPR)
+	  if (ADDR_EXPR_P (base))
 	    base = TREE_OPERAND (base, 0);
 
 	  if (DECL_P (base)
@@ -390,7 +390,7 @@ maybe_warn_operand (ao_ref &ref, gimple *stmt, tree lhs, tree rhs,
     return NULL_TREE;
 
   /* Strip the address-of expression from arrays passed to functions. */
-  if (TREE_CODE (rhs) == ADDR_EXPR)
+  if (ADDR_EXPR_P (rhs))
     rhs = TREE_OPERAND (rhs, 0);
 
   /* Check again since RHS may have changed above.  */

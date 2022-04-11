@@ -669,7 +669,7 @@ ipa_param_adjustments::modify_call (gcall *stmt,
       tree off;
       bool deref_base = false;
       unsigned int deref_align = 0;
-      if (TREE_CODE (base) != ADDR_EXPR
+      if (!ADDR_EXPR_P (base)
 	  && is_gimple_reg_type (TREE_TYPE (base)))
 	{
 	  /* Detect type mismatches in calls in invalid programs and make a
@@ -682,7 +682,7 @@ ipa_param_adjustments::modify_call (gcall *stmt,
       else
 	{
 	  bool addrof;
-	  if (TREE_CODE (base) == ADDR_EXPR)
+	  if (ADDR_EXPR_P (base))
 	    {
 	      base = TREE_OPERAND (base, 0);
 	      addrof = true;

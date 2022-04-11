@@ -3594,7 +3594,7 @@ darwin_build_constant_cfstring (tree str)
 
   STRIP_NOPS (str);
 
-  if (TREE_CODE (str) == ADDR_EXPR)
+  if (ADDR_EXPR_P (str))
     str = TREE_OPERAND (str, 0);
 
   if (TREE_CODE (str) != STRING_CST)
@@ -3689,7 +3689,7 @@ darwin_cfstring_p (tree str)
 
   STRIP_NOPS (str);
 
-  if (TREE_CODE (str) == ADDR_EXPR)
+  if (ADDR_EXPR_P (str))
     str = TREE_OPERAND (str, 0);
 
   if (TREE_CODE (str) != STRING_CST)

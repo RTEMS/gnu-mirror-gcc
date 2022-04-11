@@ -1264,7 +1264,7 @@ eliminated_by_inlining_prob (ipa_func_body_info *fbi, gimple *stmt)
 	    rhs_free = true;
 	  /* Match expressions of form &this->field. Those will most likely
 	     combine with something upstream after inlining.  */
-	  else if (TREE_CODE (inner_rhs) == ADDR_EXPR)
+	  else if (ADDR_EXPR_P (inner_rhs))
 	    {
 	      tree op = get_base_address (TREE_OPERAND (inner_rhs, 0));
 	      if (TREE_CODE (op) == PARM_DECL)

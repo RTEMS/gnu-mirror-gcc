@@ -241,10 +241,10 @@ warn_self_assign (gimple *stmt)
              ADDR_EXPR trees. In this case, just remove the address-taken
              operator before we compare the lhs and rhs.  */
           lhs = gimple_call_arg (stmt, 0);
-          if (TREE_CODE (lhs) == ADDR_EXPR)
+          if (ADDR_EXPR_P (lhs))
             lhs = TREE_OPERAND (lhs, 0);
           rhs = gimple_call_arg (stmt, 1);
-          if (TREE_CODE (rhs) == ADDR_EXPR)
+          if (ADDR_EXPR_P (rhs))
             rhs = TREE_OPERAND (rhs, 0);
 
           compare_and_warn (stmt, lhs, rhs);

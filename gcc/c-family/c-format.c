@@ -1689,7 +1689,7 @@ check_format_arg (void *ctx, tree format_tree,
 	}
       offset = int_cst_value (arg1);
     }
-  if (TREE_CODE (format_tree) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (format_tree))
     {
       res->number_non_literal++;
       return;
@@ -4155,7 +4155,7 @@ check_format_types (const substring_loc &fmt_loc,
 		warning (OPT_Wformat_, "reading through null pointer "
 			 "(argument %d)", arg_num);
 
-	      if (cur_param != 0 && TREE_CODE (cur_param) == ADDR_EXPR)
+	      if (cur_param != 0 && ADDR_EXPR_P (cur_param))
 		cur_param = TREE_OPERAND (cur_param, 0);
 	      else
 		cur_param = 0;

@@ -2987,7 +2987,7 @@ gfc_conv_ss_descriptor (stmtblock_t * block, gfc_ss * ss, int base)
 	 analysis by pulling the expressions for elemental array indices
 	 inside the loop.  */
       if (!(DECL_P (tmp)
-	    || (TREE_CODE (tmp) == ADDR_EXPR
+	    || (ADDR_EXPR_P (tmp)
 		&& DECL_P (TREE_OPERAND (tmp, 0)))))
 	tmp = gfc_evaluate_now (tmp, block);
       info->data = tmp;

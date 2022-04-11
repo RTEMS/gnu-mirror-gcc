@@ -666,7 +666,7 @@ build_dynamic_cast_1 (location_t loc, tree type, tree expr,
       if (tc == POINTER_TYPE && VOID_TYPE_P (TREE_TYPE (type)))
 	{
 	  /* if b is an object, dynamic_cast<void *>(&b) == (void *)&b.  */
-	  if (TREE_CODE (expr) == ADDR_EXPR
+	  if (ADDR_EXPR_P (expr)
 	      && VAR_P (TREE_OPERAND (expr, 0))
 	      && TREE_CODE (TREE_TYPE (TREE_OPERAND (expr, 0))) == RECORD_TYPE)
 	    return build1 (NOP_EXPR, type, expr);
@@ -704,7 +704,7 @@ build_dynamic_cast_1 (location_t loc, tree type, tree expr,
 		}
 	    }
 	  /* Ditto for dynamic_cast<D*>(&b).  */
-	  else if (TREE_CODE (expr) == ADDR_EXPR)
+	  else if (ADDR_EXPR_P (expr))
 	    {
 	      tree op = TREE_OPERAND (expr, 0);
 	      if (VAR_P (op)

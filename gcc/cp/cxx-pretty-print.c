@@ -544,7 +544,7 @@ cxx_pretty_printer::postfix_expression (tree t)
 	bool skipfirst = false;
 	tree arg;
 
-	if (TREE_CODE (fun) == ADDR_EXPR)
+	if (ADDR_EXPR_P (fun))
 	  fun = TREE_OPERAND (fun, 0);
 
 	/* In templates, where there is no way to tell whether a given
@@ -564,7 +564,7 @@ cxx_pretty_printer::postfix_expression (tree t)
 	    while (TREE_CODE (object) == NOP_EXPR)
 	      object = TREE_OPERAND (object, 0);
 
-	    if (TREE_CODE (object) == ADDR_EXPR)
+	    if (ADDR_EXPR_P (object))
 	      object = TREE_OPERAND (object, 0);
 
 	    if (!TYPE_PTR_P (TREE_TYPE (object)))

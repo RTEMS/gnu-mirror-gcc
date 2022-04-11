@@ -1070,7 +1070,7 @@ contains_vce_or_bfcref_p (const_tree ref, bool *type_changing_p = NULL)
 
   if (!type_changing_p
       || TREE_CODE (ref) != MEM_REF
-      || TREE_CODE (TREE_OPERAND (ref, 0)) != ADDR_EXPR)
+      || !ADDR_EXPR_P (TREE_OPERAND (ref, 0)))
     return false;
 
   tree mem = TREE_OPERAND (TREE_OPERAND (ref, 0), 0);
@@ -1140,7 +1140,7 @@ build_access_from_expr_1 (tree expr, gimple *stmt, bool write)
   switch (TREE_CODE (expr))
     {
     case MEM_REF:
-      if (TREE_CODE (TREE_OPERAND (expr, 0)) != ADDR_EXPR)
+      if (!ADDR_EXPR_P (TREE_OPERAND (expr, 0)))
 	return NULL;
       /* fall through */
     case VAR_DECL:
@@ -2246,7 +2246,7 @@ create_access_replacement (struct access *access, tree reg_type = NULL_TREE)
 	      fail = true;
 	    break;
 	  case MEM_REF:
-	    if (TREE_CODE (TREE_OPERAND (d, 0)) != ADDR_EXPR)
+	    if (!ADDR_EXPR_P (TREE_OPERAND (d, 0)))
 	      fail = true;
 	    else
 	      d = TREE_OPERAND (d, 0);

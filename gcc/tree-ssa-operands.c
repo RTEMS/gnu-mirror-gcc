@@ -631,7 +631,7 @@ mark_address_taken (tree ref)
       if (DECL_P (var))
 	TREE_ADDRESSABLE (var) = 1;
       else if (TREE_CODE (var) == MEM_REF
-	       && TREE_CODE (TREE_OPERAND (var, 0)) == ADDR_EXPR
+	       && ADDR_EXPR_P (TREE_OPERAND (var, 0))
 	       && DECL_P (TREE_OPERAND (TREE_OPERAND (var, 0), 0)))
 	TREE_ADDRESSABLE (TREE_OPERAND (TREE_OPERAND (var, 0), 0)) = 1;
     }

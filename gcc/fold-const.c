@@ -3110,13 +3110,13 @@ operand_compare::operand_equal_p (const_tree arg0, const_tree arg1,
 	     TBAA reasons.  */
 	  if (TREE_CODE (arg0) == MEM_REF
 	      && DECL_P (arg1)
-	      && TREE_CODE (TREE_OPERAND (arg0, 0)) == ADDR_EXPR
+	      && ADDR_EXPR_P (TREE_OPERAND (arg0, 0))
 	      && TREE_OPERAND (TREE_OPERAND (arg0, 0), 0) == arg1
 	      && integer_zerop (TREE_OPERAND (arg0, 1)))
 	    return true;
 	  else if (TREE_CODE (arg1) == MEM_REF
 		   && DECL_P (arg0)
-		   && TREE_CODE (TREE_OPERAND (arg1, 0)) == ADDR_EXPR
+		   && ADDR_EXPR_P (TREE_OPERAND (arg1, 0))
 		   && TREE_OPERAND (TREE_OPERAND (arg1, 0), 0) == arg0
 		   && integer_zerop (TREE_OPERAND (arg1, 1)))
 	    return true;
@@ -3812,7 +3812,7 @@ operand_compare::hash_operand (const_tree t, inchash::hash &hstate,
       /* For OEP_ADDRESS_OF, hash MEM_EXPR[&decl, 0] the same as decl.  */
       else if (code == MEM_REF
 	       && (flags & OEP_ADDRESS_OF) != 0
-	       && TREE_CODE (TREE_OPERAND (t, 0)) == ADDR_EXPR
+	       && ADDR_EXPR_P (TREE_OPERAND (t, 0))
 	       && DECL_P (TREE_OPERAND (TREE_OPERAND (t, 0), 0))
 	       && integer_zerop (TREE_OPERAND (t, 1)))
 	hash_operand (TREE_OPERAND (TREE_OPERAND (t, 0), 0),
@@ -8920,7 +8920,7 @@ fold_unary_loc (location_t loc, enum tree_code code, tree type, tree op0)
       /* Handle (T *)&A.B.C for A being of type T and B and C
 	 living at offset zero.  This occurs frequently in
 	 C++ upcasting and then accessing the base.  */
-      if (TREE_CODE (op0) == ADDR_EXPR
+      if (ADDR_EXPR_P (op0)
 	  && POINTER_TYPE_P (type)
 	  && handled_component_p (TREE_OPERAND (op0, 0)))
         {
@@ -9130,7 +9130,7 @@ fold_unary_loc (location_t loc, enum tree_code code, tree type, tree op0)
 
     case INDIRECT_REF:
       /* Fold *&X to X if X is an lvalue.  */
-      if (TREE_CODE (op0) == ADDR_EXPR)
+      if (ADDR_EXPR_P (op0))
 	{
 	  tree op00 = TREE_OPERAND (op0, 0);
 	  if ((VAR_P (op00)
@@ -9472,7 +9472,7 @@ pointer_may_wrap_p (tree base, tree offset, poly_int64 bitpos)
 
   /* We can do slightly better for SIZE if we have an ADDR_EXPR of an
      array.  */
-  if (TREE_CODE (base) == ADDR_EXPR
+  if (ADDR_EXPR_P (base)
       && poly_int_tree_p (TYPE_SIZE_UNIT (TREE_TYPE (TREE_OPERAND (base, 0))),
 			  &size)
       && maybe_ne (size, 0U)
@@ -9530,8 +9530,8 @@ fold_comparison (location_t loc, enum tree_code code, tree type,
      This requires at least one operand being an ADDR_EXPR or a
      POINTER_PLUS_EXPR to do more than the operand_equal_p test below.  */
   if (POINTER_TYPE_P (TREE_TYPE (arg0))
-      && (TREE_CODE (arg0) == ADDR_EXPR
-	  || TREE_CODE (arg1) == ADDR_EXPR
+      && (ADDR_EXPR_P (arg0)
+	  || ADDR_EXPR_P (arg1)
 	  || TREE_CODE (arg0) == POINTER_PLUS_EXPR
 	  || TREE_CODE (arg1) == POINTER_PLUS_EXPR))
     {
@@ -9546,7 +9546,7 @@ fold_comparison (location_t loc, enum tree_code code, tree type,
 	 off the base object if possible.  indirect_baseN will be true
 	 if baseN is not an address but refers to the object itself.  */
       base0 = arg0;
-      if (TREE_CODE (arg0) == ADDR_EXPR)
+      if (ADDR_EXPR_P (arg0))
 	{
 	  base0
 	    = get_inner_reference (TREE_OPERAND (arg0, 0),
@@ -9561,7 +9561,7 @@ fold_comparison (location_t loc, enum tree_code code, tree type,
 	{
 	  base0 = TREE_OPERAND (arg0, 0);
 	  STRIP_SIGN_NOPS (base0);
-	  if (TREE_CODE (base0) == ADDR_EXPR)
+	  if (ADDR_EXPR_P (base0))
 	    {
 	      base0
 		= get_inner_reference (TREE_OPERAND (base0, 0),
@@ -9589,7 +9589,7 @@ fold_comparison (location_t loc, enum tree_code code, tree type,
 	}
 
       base1 = arg1;
-      if (TREE_CODE (arg1) == ADDR_EXPR)
+      if (ADDR_EXPR_P (arg1))
 	{
 	  base1
 	    = get_inner_reference (TREE_OPERAND (arg1, 0),
@@ -9604,7 +9604,7 @@ fold_comparison (location_t loc, enum tree_code code, tree type,
 	{
 	  base1 = TREE_OPERAND (arg1, 0);
 	  STRIP_SIGN_NOPS (base1);
-	  if (TREE_CODE (base1) == ADDR_EXPR)
+	  if (ADDR_EXPR_P (base1))
 	    {
 	      base1
 		= get_inner_reference (TREE_OPERAND (base1, 0),
@@ -10473,7 +10473,7 @@ fold_binary_loc (location_t loc, enum tree_code code, tree type,
     {
     case MEM_REF:
       /* MEM[&MEM[p, CST1], CST2] -> MEM[p, CST1 + CST2].  */
-      if (TREE_CODE (arg0) == ADDR_EXPR
+      if (ADDR_EXPR_P (arg0)
 	  && TREE_CODE (TREE_OPERAND (arg0, 0)) == MEM_REF)
 	{
 	  tree iref = TREE_OPERAND (arg0, 0);
@@ -10482,7 +10482,7 @@ fold_binary_loc (location_t loc, enum tree_code code, tree type,
 	}
 
       /* MEM[&a.b, CST2] -> MEM[&a, offsetof (a, b) + CST2].  */
-      if (TREE_CODE (arg0) == ADDR_EXPR
+      if (ADDR_EXPR_P (arg0)
 	  && handled_component_p (TREE_OPERAND (arg0, 0)))
 	{
 	  tree base;
@@ -10969,9 +10969,9 @@ fold_binary_loc (location_t loc, enum tree_code code, tree type,
     case POINTER_DIFF_EXPR:
     case MINUS_EXPR:
       /* Fold &a[i] - &a[j] to i-j.  */
-      if (TREE_CODE (arg0) == ADDR_EXPR
+      if (ADDR_EXPR_P (arg0)
 	  && TREE_CODE (TREE_OPERAND (arg0, 0)) == ARRAY_REF
-	  && TREE_CODE (arg1) == ADDR_EXPR
+	  && ADDR_EXPR_P (arg1)
 	  && TREE_CODE (TREE_OPERAND (arg1, 0)) == ARRAY_REF)
         {
 	  tree tem = fold_addr_of_array_ref_difference (loc, type,
@@ -15225,7 +15225,7 @@ fold_indirect_ref_1 (location_t loc, tree type, tree op0)
       || TYPE_REF_CAN_ALIAS_ALL (TREE_TYPE (op0)))
     return NULL_TREE;
 
-  if (TREE_CODE (sub) == ADDR_EXPR)
+  if (ADDR_EXPR_P (sub))
     {
       tree op = TREE_OPERAND (sub, 0);
       tree optype = TREE_TYPE (op);
@@ -15280,7 +15280,7 @@ fold_indirect_ref_1 (location_t loc, tree type, tree op0)
       tree op01 = TREE_OPERAND (sub, 1);
 
       STRIP_NOPS (op00);
-      if (TREE_CODE (op00) == ADDR_EXPR)
+      if (ADDR_EXPR_P (op00))
 	{
 	  tree op00type;
 	  op00 = TREE_OPERAND (op00, 0);
@@ -15562,7 +15562,7 @@ split_address_to_core_and_offset (tree exp,
   poly_int64 bitsize;
   location_t loc = EXPR_LOCATION (exp);
 
-  if (TREE_CODE (exp) == ADDR_EXPR)
+  if (ADDR_EXPR_P (exp))
     {
       core = get_inner_reference (TREE_OPERAND (exp, 0), &bitsize, pbitpos,
 				  poffset, &mode, &unsignedp, &reversep,

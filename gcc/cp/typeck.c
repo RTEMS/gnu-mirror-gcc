@@ -2373,7 +2373,7 @@ string_conv_p (const_tree totype, const_tree exp, int warn)
       if (!same_type_p (TREE_TYPE (exp), t))
 	return 0;
       STRIP_NOPS (exp);
-      if (TREE_CODE (exp) != ADDR_EXPR
+      if (!ADDR_EXPR_P (exp)
 	  || TREE_CODE (TREE_OPERAND (exp, 0)) != STRING_CST)
 	return 0;
     }
@@ -3434,7 +3434,7 @@ cp_build_indirect_ref_1 (location_t loc, tree ptr, ref_operator errorstring,
             error_at (loc, "%qT is not a pointer-to-object type", type);
 	  return error_mark_node;
 	}
-      else if (do_fold && TREE_CODE (pointer) == ADDR_EXPR
+      else if (do_fold && ADDR_EXPR_P (pointer)
 	       && same_type_p (t, TREE_TYPE (TREE_OPERAND (pointer, 0))))
 	/* The POINTER was something like `&x'.  We simplify `*&x' to
 	   `x'.  */
@@ -4434,7 +4434,7 @@ warn_for_null_address (location_t location, tree op, tsubst_flags_t complain)
 
   tree cop = fold_for_warn (op);
 
-  if (TREE_CODE (cop) == ADDR_EXPR
+  if (ADDR_EXPR_P (cop)
       && decl_with_nonnull_addr_p (TREE_OPERAND (cop, 0))
       && !TREE_NO_WARNING (cop))
     warning_at (location, OPT_Waddress, "the address of %qD will never "
@@ -5173,7 +5173,7 @@ cp_build_binary_op (const op_location_t &location,
 	  pfn0 = pfn_from_ptrmemfunc (op0);
 	  pfn0 = cp_fully_fold (pfn0);
 	  /* Avoid -Waddress warnings (c++/64877).  */
-	  if (TREE_CODE (pfn0) == ADDR_EXPR)
+	  if (ADDR_EXPR_P (pfn0))
 	    TREE_NO_WARNING (pfn0) = 1;
 	  pfn1 = pfn_from_ptrmemfunc (op1);
 	  pfn1 = cp_fully_fold (pfn1);
@@ -6180,7 +6180,7 @@ build_x_unary_op (location_t loc, enum tree_code code, cp_expr xarg,
       exp = build_min_non_dep (code, exp, orig_expr,
 			       /*For {PRE,POST}{INC,DEC}REMENT_EXPR*/NULL_TREE);
     }
-  if (TREE_CODE (exp) == ADDR_EXPR)
+  if (ADDR_EXPR_P (exp))
     PTRMEM_OK_P (exp) = ptrmem;
   return exp;
 }
@@ -6258,7 +6258,7 @@ build_address (tree t)
   gcc_checking_assert (TREE_CODE (t) != CONSTRUCTOR
 		       || processing_template_decl);
   t = build_fold_addr_expr_loc (EXPR_LOCATION (t), t);
-  if (TREE_CODE (t) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (t))
     t = rvalue (t);
   return t;
 }
@@ -9682,7 +9682,7 @@ maybe_warn_about_returning_address_of_local (tree retval, location_t loc)
       return maybe_warn_about_returning_address_of_local (arg, loc);
     }
 
-  if (TREE_CODE (whats_returned) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (whats_returned))
     return false;
   whats_returned = TREE_OPERAND (whats_returned, 0);
 
@@ -9938,7 +9938,7 @@ maybe_warn_pessimizing_move (tree retval, tree functype)
 	  if (TREE_CODE (arg) != NOP_EXPR)
 	    return;
 	  arg = TREE_OPERAND (arg, 0);
-	  if (TREE_CODE (arg) != ADDR_EXPR)
+	  if (!ADDR_EXPR_P (arg))
 	    return;
 	  arg = TREE_OPERAND (arg, 0);
 	  arg = convert_from_reference (arg);

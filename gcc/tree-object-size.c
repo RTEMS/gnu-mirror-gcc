@@ -156,7 +156,7 @@ compute_object_offset (const_tree expr, const_tree var)
       break;
 
     case MEM_REF:
-      gcc_assert (TREE_CODE (TREE_OPERAND (expr, 0)) == ADDR_EXPR);
+      gcc_assert (ADDR_EXPR_P (TREE_OPERAND (expr, 0)));
       return wide_int_to_tree (sizetype, mem_ref_offset (expr));
 
     default:
@@ -220,7 +220,7 @@ addr_object_size (struct object_size_info *osi, const_tree ptr,
   if (!poff)
     poff = &dummy_off;
 
-  gcc_assert (TREE_CODE (ptr) == ADDR_EXPR);
+  gcc_assert (ADDR_EXPR_P (ptr));
 
   /* Set to unknown and overwrite just before returning if the size
      could be determined.  */
@@ -566,7 +566,7 @@ compute_builtin_object_size (tree ptr, int object_size_type,
   if (! offset_limit)
     init_offset_limit ();
 
-  if (TREE_CODE (ptr) == ADDR_EXPR)
+  if (ADDR_EXPR_P (ptr))
     return addr_object_size (NULL, ptr, object_size_type, psize, pdecl, poff);
 
   if (TREE_CODE (ptr) != SSA_NAME
@@ -743,7 +743,7 @@ expr_object_size (struct object_size_info *osi, tree ptr, tree value)
   gcc_assert (TREE_CODE (value) != SSA_NAME
 	      || !POINTER_TYPE_P (TREE_TYPE (value)));
 
-  if (TREE_CODE (value) == ADDR_EXPR)
+  if (ADDR_EXPR_P (value))
     addr_object_size (osi, value, object_size_type, &bytes);
   else
     bytes = unknown[object_size_type];
@@ -899,7 +899,7 @@ plus_stmt_object_size (struct object_size_info *osi, tree var, gimple *stmt)
   /* Handle PTR + OFFSET here.  */
   if (TREE_CODE (op1) == INTEGER_CST
       && (TREE_CODE (op0) == SSA_NAME
-	  || TREE_CODE (op0) == ADDR_EXPR))
+	  || ADDR_EXPR_P (op0)))
     {
       if (! tree_fits_uhwi_p (op1))
 	bytes = unknown[object_size_type];
@@ -1381,7 +1381,7 @@ pass_object_sizes::execute (function *fun)
 		  tree ptr = gimple_call_arg (call, 0);
 		  tree lhs = gimple_call_lhs (call);
 		  if ((object_size_type == 1 || object_size_type == 3)
-		      && (TREE_CODE (ptr) == ADDR_EXPR
+		      && (ADDR_EXPR_P (ptr)
 			  || TREE_CODE (ptr) == SSA_NAME)
 		      && lhs)
 		    {

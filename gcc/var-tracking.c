@@ -5233,7 +5233,7 @@ track_expr_p (tree expr, bool need_rtl)
 	{
 	  if (handled_component_p (realdecl)
 	      || (TREE_CODE (realdecl) == MEM_REF
-		  && TREE_CODE (TREE_OPERAND (realdecl, 0)) == ADDR_EXPR))
+		  && ADDR_EXPR_P (TREE_OPERAND (realdecl, 0))))
 	    {
 	      HOST_WIDE_INT bitsize, bitpos;
 	      bool reverse;

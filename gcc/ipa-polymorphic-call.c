@@ -766,7 +766,7 @@ ipa_polymorphic_call_context::set_by_invariant (tree cst,
   off = 0;
   clear_outer_type (otr_type);
 
-  if (TREE_CODE (cst) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (cst))
     return false;
 
   cst = TREE_OPERAND (cst, 0);
@@ -896,7 +896,7 @@ ipa_polymorphic_call_context::ipa_polymorphic_call_context (tree fndecl,
   while (true)
     {
       base_pointer = walk_ssa_copies (base_pointer, &visited);
-      if (TREE_CODE (base_pointer) == ADDR_EXPR)
+      if (ADDR_EXPR_P (base_pointer))
 	{
 	  HOST_WIDE_INT offset2, size;
 	  bool reverse;
@@ -1443,7 +1443,7 @@ check_stmt_for_type_change (ao_ref *ao ATTRIBUTE_UNUSED, tree vdef, void *data)
 	  }
 
 	/* See if THIS parameter seems like instance pointer.  */
-	if (TREE_CODE (op) == ADDR_EXPR)
+	if (ADDR_EXPR_P (op))
 	  {
 	    HOST_WIDE_INT size;
 	    op = get_ref_base_and_extent_hwi (TREE_OPERAND (op, 0),

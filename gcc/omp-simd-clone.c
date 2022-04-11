@@ -839,7 +839,7 @@ ipa_simd_modify_stmt_ops (tree *tp, int *walk_subtrees, void *data)
   struct walk_stmt_info *wi = (struct walk_stmt_info *) data;
   struct modify_stmt_info *info = (struct modify_stmt_info *) wi->info;
   tree *orig_tp = tp;
-  if (TREE_CODE (*tp) == ADDR_EXPR)
+  if (ADDR_EXPR_P (*tp))
     tp = &TREE_OPERAND (*tp, 0);
 
   if (TREE_CODE (*tp) == BIT_FIELD_REF
@@ -885,7 +885,7 @@ ipa_simd_modify_stmt_ops (tree *tp, int *walk_subtrees, void *data)
     {
       if (gimple_code (info->stmt) == GIMPLE_PHI
 	  && pbr
-	  && TREE_CODE (*orig_tp) == ADDR_EXPR
+	  && ADDR_EXPR_P (*orig_tp)
 	  && TREE_CODE (TREE_OPERAND (*orig_tp, 0)) == PARM_DECL
 	  && pbr->dummy)
 	{
@@ -920,7 +920,7 @@ ipa_simd_modify_stmt_ops (tree *tp, int *walk_subtrees, void *data)
 	    gsi = gsi_after_labels (single_succ (ENTRY_BLOCK_PTR_FOR_FN (cfun)));
 	  /* Cache SSA_NAME for next time.  */
 	  if (pbr
-	      && TREE_CODE (*orig_tp) == ADDR_EXPR
+	      && ADDR_EXPR_P (*orig_tp)
 	      && TREE_CODE (TREE_OPERAND (*orig_tp, 0)) == PARM_DECL)
 	    {
 	      gcc_assert (!pbr->dummy);

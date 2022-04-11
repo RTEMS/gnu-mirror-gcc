@@ -2465,7 +2465,7 @@ expand_call_mem_ref (tree type, gcall *stmt, int index)
 	tmp = gimple_assign_rhs1 (def);
     }
 
-  if (TREE_CODE (tmp) == ADDR_EXPR)
+  if (ADDR_EXPR_P (tmp))
     {
       tree mem = TREE_OPERAND (tmp, 0);
       if (TREE_CODE (mem) == TARGET_MEM_REF

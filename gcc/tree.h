@@ -477,6 +477,10 @@ ADDR_EXPR_CODE_P (tree_code code)
   return code == ADDR_EXPR;
 }
 
+/* Test if EXP takes the address of an object.  If so, the object
+   is TREE_OPERAND (EXP, 0).  */
+#define ADDR_EXPR_P(EXP) ADDR_EXPR_CODE_P (TREE_CODE (EXP))
+
 /* Tests if CODE is a conversion expr (NOP_EXPR or CONVERT_EXPR).  */
 #define CONVERT_EXPR_CODE_P(CODE)				\
   ((CODE) == NOP_EXPR || (CODE) == CONVERT_EXPR)

@@ -4150,7 +4150,7 @@ gfc_trans_omp_atomic (gfc_code *code)
 
   lhsaddr = save_expr (lhsaddr);
   if (TREE_CODE (lhsaddr) != SAVE_EXPR
-      && (TREE_CODE (lhsaddr) != ADDR_EXPR
+      && (!ADDR_EXPR_P (lhsaddr)
 	  || !VAR_P (TREE_OPERAND (lhsaddr, 0))))
     {
       /* Make sure LHS is simple enough so that goa_lhs_expr_p can recognize

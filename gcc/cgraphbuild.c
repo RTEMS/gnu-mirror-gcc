@@ -111,7 +111,7 @@ record_type_list (cgraph_node *node, tree list)
       if (TYPE_P (type))
 	type = lookup_type_for_runtime (type);
       STRIP_NOPS (type);
-      if (TREE_CODE (type) == ADDR_EXPR)
+      if (ADDR_EXPR_P (type))
 	{
 	  type = TREE_OPERAND (type, 0);
 	  if (VAR_P (type))

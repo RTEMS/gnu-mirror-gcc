@@ -1914,7 +1914,7 @@ maybe_undo_parenthesized_ref (tree t)
 	     || TREE_CODE (t) == NOP_EXPR)
 	t = TREE_OPERAND (t, 0);
 
-      gcc_assert (TREE_CODE (t) == ADDR_EXPR
+      gcc_assert (ADDR_EXPR_P (t)
 		  || TREE_CODE (t) == STATIC_CAST_EXPR);
       t = TREE_OPERAND (t, 0);
     }
@@ -2579,7 +2579,7 @@ finish_call_expr (tree fn, vec<tree, va_gc> **args, bool disallow_virtual,
     }
 
   /* Per 13.3.1.1, '(&f)(...)' is the same as '(f)(...)'.  */
-  if (TREE_CODE (fn) == ADDR_EXPR
+  if (ADDR_EXPR_P (fn)
       && TREE_CODE (TREE_OPERAND (fn, 0)) == OVERLOAD)
     fn = TREE_OPERAND (fn, 0);
 
@@ -6449,7 +6449,7 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 		  t = TREE_OPERAND (t, 0);
 		  if (TREE_CODE (t) == POINTER_PLUS_EXPR)
 		    t = TREE_OPERAND (t, 0);
-		  if (TREE_CODE (t) == ADDR_EXPR
+		  if (ADDR_EXPR_P (t)
 		      || INDIRECT_REF_P (t))
 		    t = TREE_OPERAND (t, 0);
 		}

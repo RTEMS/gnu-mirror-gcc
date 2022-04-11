@@ -321,7 +321,7 @@ ipa_print_node_jump_functions_for_edge (FILE *f, struct cgraph_edge *cs)
 	  tree val = jump_func->value.constant.value;
 	  fprintf (f, "CONST: ");
 	  print_generic_expr (f, val);
-	  if (TREE_CODE (val) == ADDR_EXPR
+	  if (ADDR_EXPR_P (val)
 	      && TREE_CODE (TREE_OPERAND (val, 0)) == CONST_DECL)
 	    {
 	      fprintf (f, " -> ");
@@ -538,7 +538,7 @@ ipa_set_jf_constant (struct ipa_jump_func *jfunc, tree constant,
   jfunc->type = IPA_JF_CONST;
   jfunc->value.constant.value = unshare_expr_without_location (constant);
 
-  if (TREE_CODE (constant) == ADDR_EXPR
+  if (ADDR_EXPR_P (constant)
       && TREE_CODE (TREE_OPERAND (constant, 0)) == FUNCTION_DECL)
     {
       struct ipa_cst_ref_desc *rdesc;
@@ -1338,7 +1338,7 @@ compute_complex_assign_jump_func (struct ipa_func_body_info *fbi,
       return;
     }
 
-  if (TREE_CODE (op1) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (op1))
     return;
   op1 = TREE_OPERAND (op1, 0);
   if (TREE_CODE (TREE_TYPE (op1)) != RECORD_TYPE)
@@ -1385,7 +1385,7 @@ get_ancestor_addr_info (gimple *assign, tree *obj_p, HOST_WIDE_INT *offset)
     return NULL_TREE;
   expr = gimple_assign_rhs1 (assign);
 
-  if (TREE_CODE (expr) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (expr))
     return NULL_TREE;
   expr = TREE_OPERAND (expr, 0);
   obj = expr;
@@ -1879,7 +1879,7 @@ determine_known_aggregate_parts (struct ipa_func_body_info *fbi,
 	  arg_size = tree_to_uhwi (type_size);
 	  ao_ref_init_from_ptr_and_size (&r, arg_base, NULL_TREE);
 	}
-      else if (TREE_CODE (arg) == ADDR_EXPR)
+      else if (ADDR_EXPR_P (arg))
 	{
 	  bool reverse;
 
@@ -2327,7 +2327,7 @@ ipa_get_stmt_member_ptr_load_param (gimple *stmt, bool use_delta,
   if (TREE_CODE (rhs) != MEM_REF)
     return NULL_TREE;
   rec = TREE_OPERAND (rhs, 0);
-  if (TREE_CODE (rec) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (rec))
     return NULL_TREE;
   rec = TREE_OPERAND (rec, 0);
   if (TREE_CODE (rec) != PARM_DECL
@@ -3176,7 +3176,7 @@ ipa_make_edge_direct_to_target (struct cgraph_edge *ie, tree target,
   struct cgraph_node *callee;
   bool unreachable = false;
 
-  if (TREE_CODE (target) == ADDR_EXPR)
+  if (ADDR_EXPR_P (target))
     target = TREE_OPERAND (target, 0);
   if (TREE_CODE (target) != FUNCTION_DECL)
     {
@@ -3414,7 +3414,7 @@ ipa_find_agg_cst_from_init (tree scalar, HOST_WIDE_INT offset, bool by_ref)
 {
   if (by_ref)
     {
-      if (TREE_CODE (scalar) != ADDR_EXPR)
+      if (!ADDR_EXPR_P (scalar))
 	return NULL;
       scalar = TREE_OPERAND (scalar, 0);
     }
@@ -3520,7 +3520,7 @@ cgraph_node_for_jfunc (struct ipa_jump_func *jfunc)
 {
   gcc_checking_assert (jfunc->type == IPA_JF_CONST);
   tree cst = ipa_get_jf_constant (jfunc);
-  if (TREE_CODE (cst) != ADDR_EXPR
+  if (!ADDR_EXPR_P (cst)
       || TREE_CODE (TREE_OPERAND (cst, 0)) != FUNCTION_DECL)
     return NULL;
 
@@ -3966,7 +3966,7 @@ propagate_controlled_uses (struct cgraph_edge *cs)
 	      struct ipa_ref *ref;
 	      tree t = new_root_info->known_csts[src_idx];
 
-	      if (t && TREE_CODE (t) == ADDR_EXPR
+	      if (t && ADDR_EXPR_P (t)
 		  && TREE_CODE (TREE_OPERAND (t, 0)) == FUNCTION_DECL
 		  && (n = cgraph_node::get (TREE_OPERAND (t, 0)))
 		  && (ref = new_root->find_reference (n, NULL, 0)))
@@ -3990,7 +3990,7 @@ propagate_controlled_uses (struct cgraph_edge *cs)
 	    {
 	      tree cst = ipa_get_jf_constant (jf);
 	      struct cgraph_node *n;
-	      gcc_checking_assert (TREE_CODE (cst) == ADDR_EXPR
+	      gcc_checking_assert (ADDR_EXPR_P (cst)
 				   && TREE_CODE (TREE_OPERAND (cst, 0))
 				   == FUNCTION_DECL);
 	      n = cgraph_node::get (TREE_OPERAND (cst, 0));
@@ -4493,7 +4493,7 @@ ipa_write_jump_function (struct output_block *ob,
   /* ADDR_EXPRs are very comon IP invariants; save some streamer data
      as well as WPA memory by handling them specially.  */
   if (jump_func->type == IPA_JF_CONST
-      && TREE_CODE (jump_func->value.constant.value) == ADDR_EXPR)
+      && ADDR_EXPR_P (jump_func->value.constant.value))
     flag = 1;
 
   streamer_write_uhwi (ob, jump_func->type * 2 + flag);

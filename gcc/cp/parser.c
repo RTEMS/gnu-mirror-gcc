@@ -42387,7 +42387,7 @@ cp_parser_omp_declare_reduction_exprs (tree fndecl, cp_parser *parser)
 	  tree arg;
 	  FOR_EACH_VEC_SAFE_ELT (args, i, arg)
 	    if (arg == omp_priv
-		|| (TREE_CODE (arg) == ADDR_EXPR
+		|| (ADDR_EXPR_P (arg)
 		    && TREE_OPERAND (arg, 0) == omp_priv))
 	      break;
 	  cp_parser_abort_tentative_parse (parser);

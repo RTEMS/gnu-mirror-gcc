@@ -163,11 +163,11 @@ extract_ops_from_tree (tree expr, enum tree_code *code, tree *op0,
 static inline tree
 gimple_call_addr_fndecl (const_tree fn)
 {
-  if (fn && TREE_CODE (fn) == ADDR_EXPR)
+  if (fn && ADDR_EXPR_P (fn))
     {
       tree fndecl = TREE_OPERAND (fn, 0);
       if (TREE_CODE (fndecl) == MEM_REF
-	  && TREE_CODE (TREE_OPERAND (fndecl, 0)) == ADDR_EXPR
+	  && ADDR_EXPR_P (TREE_OPERAND (fndecl, 0))
 	  && integer_zerop (TREE_OPERAND (fndecl, 1)))
 	fndecl = TREE_OPERAND (TREE_OPERAND (fndecl, 0), 0);
       if (TREE_CODE (fndecl) == FUNCTION_DECL)

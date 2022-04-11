@@ -2178,7 +2178,7 @@ dump_expr (cxx_pretty_printer *pp, tree t, int flags)
       {
 	tree fn = NULL_TREE;
 
-	if (TREE_CODE (AGGR_INIT_EXPR_FN (t)) == ADDR_EXPR)
+	if (ADDR_EXPR_P (AGGR_INIT_EXPR_FN (t)))
 	  fn = TREE_OPERAND (AGGR_INIT_EXPR_FN (t), 0);
 
 	if (fn && TREE_CODE (fn) == FUNCTION_DECL)
@@ -2207,7 +2207,7 @@ dump_expr (cxx_pretty_printer *pp, tree t, int flags)
 	    break;
 	  }
 
-	if (TREE_CODE (fn) == ADDR_EXPR)
+	if (ADDR_EXPR_P (fn))
 	  fn = TREE_OPERAND (fn, 0);
 
 	/* Nobody is interested in seeing the guts of vcalls.  */
@@ -2219,7 +2219,7 @@ dump_expr (cxx_pretty_printer *pp, tree t, int flags)
 	    && call_expr_nargs (t))
 	  {
 	    tree ob = CALL_EXPR_ARG (t, 0);
-	    if (TREE_CODE (ob) == ADDR_EXPR)
+	    if (ADDR_EXPR_P (ob))
 	      {
 		dump_expr (pp, TREE_OPERAND (ob, 0),
                            flags | TFF_EXPR_IN_PARENS);
@@ -2375,7 +2375,7 @@ dump_expr (cxx_pretty_printer *pp, tree t, int flags)
       break;
 
     case MEM_REF:
-      if (TREE_CODE (TREE_OPERAND (t, 0)) == ADDR_EXPR
+      if (ADDR_EXPR_P (TREE_OPERAND (t, 0))
 	  && integer_zerop (TREE_OPERAND (t, 1)))
 	dump_expr (pp, TREE_OPERAND (TREE_OPERAND (t, 0), 0), flags);
       else
@@ -2462,7 +2462,7 @@ dump_expr (cxx_pretty_printer *pp, tree t, int flags)
 	    if (TYPE_REF_P (ttype))
 	      {
 		STRIP_NOPS (op);
-		if (TREE_CODE (op) == ADDR_EXPR)
+		if (ADDR_EXPR_P (op))
 		  dump_expr (pp, TREE_OPERAND (op, 0), flags);
 		else
 		  dump_unary_op (pp, "*", t, flags);

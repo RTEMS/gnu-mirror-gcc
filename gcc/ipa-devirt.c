@@ -2818,9 +2818,9 @@ vtable_pointer_value_to_vtable (const_tree t, tree *v,
      In the case of virtual inheritance, the virtual tables may
      be nested, i.e. the offset may be different from 16 and we may
      need to dive into the type representation.  */
-  if (TREE_CODE (t) == ADDR_EXPR
+  if (ADDR_EXPR_P (t)
       && TREE_CODE (TREE_OPERAND (t, 0)) == MEM_REF
-      && TREE_CODE (TREE_OPERAND (TREE_OPERAND (t, 0), 0)) == ADDR_EXPR
+      && ADDR_EXPR_P (TREE_OPERAND (TREE_OPERAND (t, 0), 0))
       && TREE_CODE (TREE_OPERAND (TREE_OPERAND (t, 0), 1)) == INTEGER_CST
       && (TREE_CODE (TREE_OPERAND (TREE_OPERAND (TREE_OPERAND (t, 0), 0), 0))
 	  == VAR_DECL)
@@ -2843,7 +2843,7 @@ vtable_pointer_value_to_vtable (const_tree t, tree *v,
   else
     *offset = 0;
 
-  if (TREE_CODE (t) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (t))
     return false;
   *v = TREE_OPERAND (t, 0);
   return true;

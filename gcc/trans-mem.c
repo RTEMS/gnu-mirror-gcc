@@ -231,7 +231,7 @@ is_tm_irrevocable (tree x)
 
   /* A call to the irrevocable builtin is by definition,
      irrevocable.  */
-  if (TREE_CODE (x) == ADDR_EXPR)
+  if (ADDR_EXPR_P (x))
     x = TREE_OPERAND (x, 0);
   if (TREE_CODE (x) == FUNCTION_DECL
       && fndecl_built_in_p (x, BUILT_IN_TM_IRREVOCABLE))
@@ -651,7 +651,7 @@ diagnose_tm_1 (gimple_stmt_iterator *gsi, bool *handled_ops_p,
 	    bool is_safe, direct_call_p;
 	    tree replacement;
 
-	    if (TREE_CODE (fn) == ADDR_EXPR
+	    if (ADDR_EXPR_P (fn)
 		&& TREE_CODE (TREE_OPERAND (fn, 0)) == FUNCTION_DECL)
 	      {
 		direct_call_p = true;
@@ -706,7 +706,7 @@ diagnose_tm_1 (gimple_stmt_iterator *gsi, bool *handled_ops_p,
 
 	    if (!is_safe)
 	      {
-		if (TREE_CODE (fn) == ADDR_EXPR)
+		if (ADDR_EXPR_P (fn))
 		  fn = TREE_OPERAND (fn, 0);
 		if (d->block_flags & DIAG_TM_SAFE)
 		  {
@@ -1531,7 +1531,7 @@ requires_barrier (basic_block entry_block, tree x, gimple *stmt)
       }
 
     case TARGET_MEM_REF:
-      if (TREE_CODE (TMR_BASE (x)) != ADDR_EXPR)
+      if (!ADDR_EXPR_P (TMR_BASE (x)))
 	return true;
       x = TREE_OPERAND (TMR_BASE (x), 0);
       if (TREE_CODE (x) == PARM_DECL)
@@ -3443,7 +3443,7 @@ tm_memop_hasher::hash (const tm_memop *mem)
   tree addr = mem->addr;
   /* We drill down to the SSA_NAME/DECL for the hash, but equality is
      actually done with operand_equal_p (see tm_memop_eq).  */
-  if (TREE_CODE (addr) == ADDR_EXPR)
+  if (ADDR_EXPR_P (addr))
     addr = TREE_OPERAND (addr, 0);
   return iterative_hash_expr (addr, 0);
 }
@@ -3906,7 +3906,7 @@ tm_memopt_transform_stmt (unsigned int offset,
 			  gimple_stmt_iterator *gsi)
 {
   tree fn = gimple_call_fn (stmt);
-  gcc_assert (TREE_CODE (fn) == ADDR_EXPR);
+  gcc_assert (ADDR_EXPR_P (fn));
   TREE_OPERAND (fn, 0)
     = builtin_decl_explicit ((enum built_in_function)
 			     (DECL_FUNCTION_CODE (TREE_OPERAND (fn, 0))
@@ -4387,7 +4387,7 @@ ipa_tm_scan_irr_block (basic_block bb)
 	    /* For direct function calls, go ahead and check for replacement
 	       functions, or transitive irrevocable functions.  For indirect
 	       functions, we'll ask the runtime.  */
-	    if (TREE_CODE (fn) == ADDR_EXPR)
+	    if (ADDR_EXPR_P (fn))
 	      {
 		struct tm_ipa_cg_data *d;
 		struct cgraph_node *node;
@@ -5074,7 +5074,7 @@ ipa_tm_insert_gettmclone_call (struct cgraph_node *node,
 
   old_fn = gimple_call_fn (stmt);
 
-  if (TREE_CODE (old_fn) == ADDR_EXPR)
+  if (ADDR_EXPR_P (old_fn))
     {
       tree fndecl = TREE_OPERAND (old_fn, 0);
       tree clone = get_tm_clone_pair (fndecl);

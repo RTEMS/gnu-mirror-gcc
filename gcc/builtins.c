@@ -424,7 +424,7 @@ get_pointer_alignment_1 (tree exp, unsigned int *alignp,
 {
   STRIP_NOPS (exp);
 
-  if (TREE_CODE (exp) == ADDR_EXPR)
+  if (ADDR_EXPR_P (exp))
     return get_object_alignment_2 (TREE_OPERAND (exp, 0),
 				   alignp, bitposp, true);
   else if (TREE_CODE (exp) == POINTER_PLUS_EXPR)
@@ -1505,7 +1505,7 @@ get_memory_rtx (tree exp, tree len)
      unknown-sized access to that one.  */
   if (is_gimple_mem_ref_addr (TREE_OPERAND (exp, 0)))
     set_mem_attributes (mem, exp, 0);
-  else if (TREE_CODE (TREE_OPERAND (exp, 0)) == ADDR_EXPR
+  else if (ADDR_EXPR_P (TREE_OPERAND (exp, 0))
 	   && (exp = get_base_address (TREE_OPERAND (TREE_OPERAND (exp, 0),
 						     0))))
     {
@@ -4005,7 +4005,7 @@ static bool
 compute_objsize (tree ptr, int ostype, access_ref *pref,
 		 bitmap *visited, const vr_values *rvals /* = NULL */)
 {
-  const bool addr = TREE_CODE (ptr) == ADDR_EXPR;
+  const bool addr = ADDR_EXPR_P (ptr);
   if (addr)
     ptr = TREE_OPERAND (ptr, 0);
 
@@ -4200,7 +4200,7 @@ compute_objsize (tree ptr, int ostype, access_ref *pref,
 
   tree type = TREE_TYPE (ptr);
   type = TYPE_MAIN_VARIANT (type);
-  if (TREE_CODE (ptr) == ADDR_EXPR)
+  if (ADDR_EXPR_P (ptr))
     ptr = TREE_OPERAND (ptr, 0);
 
   if (TREE_CODE (type) == ARRAY_TYPE
@@ -6322,7 +6322,7 @@ expand_builtin_init_trampoline (tree exp, bool onstack)
   /* If ONSTACK, the TRAMP argument should be the address of a field
      within the local function's FRAME decl.  Either way, let's see if
      we can fill in the MEM_ATTRs for this memory.  */
-  if (TREE_CODE (t_tramp) == ADDR_EXPR)
+  if (ADDR_EXPR_P (t_tramp))
     set_mem_attributes (m_tramp, TREE_OPERAND (t_tramp, 0), true);
 
   /* Creator of a heap trampoline is responsible for making sure the
@@ -6338,7 +6338,7 @@ expand_builtin_init_trampoline (tree exp, bool onstack)
 
   /* The FUNC argument should be the address of the nested function.
      Extract the actual function decl to pass to the hook.  */
-  gcc_assert (TREE_CODE (t_func) == ADDR_EXPR);
+  gcc_assert (ADDR_EXPR_P (t_func));
   t_func = TREE_OPERAND (t_func, 0);
   gcc_assert (TREE_CODE (t_func) == FUNCTION_DECL);
 
@@ -9229,7 +9229,7 @@ fold_builtin_constant_p (tree arg)
       || (TREE_CODE (arg) == CONSTRUCTOR
 	  && TREE_CONSTANT (arg)))
     return integer_one_node;
-  if (TREE_CODE (arg) == ADDR_EXPR)
+  if (ADDR_EXPR_P (arg))
     {
        tree op = TREE_OPERAND (arg, 0);
        if (TREE_CODE (op) == STRING_CST
@@ -9346,7 +9346,7 @@ fold_builtin_expect (location_t loc, tree arg0, tree arg1, tree arg2,
      constant or the address of a non-weak symbol.  */
   inner = inner_arg0;
   STRIP_NOPS (inner);
-  if (TREE_CODE (inner) == ADDR_EXPR)
+  if (ADDR_EXPR_P (inner))
     {
       do
 	{
@@ -10702,7 +10702,7 @@ fold_builtin_call_array (location_t loc, tree,
 			 int n,
 			 tree *argarray)
 {
-  if (TREE_CODE (fn) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (fn))
     return NULL_TREE;
 
   tree fndecl = TREE_OPERAND (fn, 0);
@@ -10837,7 +10837,7 @@ readonly_data_expr (tree exp)
 {
   STRIP_NOPS (exp);
 
-  if (TREE_CODE (exp) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (exp))
     return false;
 
   exp = get_base_address (TREE_OPERAND (exp, 0));
@@ -11423,7 +11423,7 @@ maybe_emit_free_warning (tree exp)
   tree arg = CALL_EXPR_ARG (exp, 0);
 
   STRIP_NOPS (arg);
-  if (TREE_CODE (arg) != ADDR_EXPR)
+  if (!ADDR_EXPR_P (arg))
     return;
 
   arg = get_base_address (TREE_OPERAND (arg, 0));
@@ -11466,7 +11466,7 @@ fold_builtin_object_size (tree ptr, tree ost)
   if (TREE_SIDE_EFFECTS (ptr))
     return build_int_cst_type (size_type_node, object_size_type < 2 ? -1 : 0);
 
-  if (TREE_CODE (ptr) == ADDR_EXPR)
+  if (ADDR_EXPR_P (ptr))
     {
       compute_builtin_object_size (ptr, object_size_type, &bytes);
       if (wi::fits_to_tree_p (bytes, size_type_node))

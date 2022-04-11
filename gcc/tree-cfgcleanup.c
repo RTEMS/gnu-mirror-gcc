@@ -252,7 +252,7 @@ cleanup_control_flow_bb (basic_block bb)
       retval |= cleanup_control_expr_graph (bb, gsi);
     }
   else if (gimple_code (stmt) == GIMPLE_GOTO
-	   && TREE_CODE (gimple_goto_dest (stmt)) == ADDR_EXPR
+	   && ADDR_EXPR_P (gimple_goto_dest (stmt))
 	   && (TREE_CODE (TREE_OPERAND (gimple_goto_dest (stmt), 0))
 	       == LABEL_DECL))
     {
@@ -806,7 +806,7 @@ maybe_dead_abnormal_edge_p (edge e)
 	return false;
 
       tree arg = gimple_call_arg (gsi_stmt (gsi), 0);
-      if (TREE_CODE (arg) != ADDR_EXPR || TREE_OPERAND (arg, 0) != target)
+      if (!ADDR_EXPR_P (arg) || TREE_OPERAND (arg, 0) != target)
 	return false;
     }
   return true;
@@ -831,7 +831,7 @@ builtin_setjmp_setup_bb (basic_block bb)
     return NULL;
 
   tree arg = gimple_call_arg (gsi_stmt (gsi), 1);
-  if (TREE_CODE (arg) != ADDR_EXPR
+  if (!ADDR_EXPR_P (arg)
       || TREE_CODE (TREE_OPERAND (arg, 0)) != LABEL_DECL)
     return NULL;
 

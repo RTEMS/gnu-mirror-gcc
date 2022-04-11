@@ -1209,7 +1209,7 @@ convert_nonlocal_omp_clauses (tree *pclauses, struct walk_stmt_info *wi)
 	      if (TREE_CODE (*pdecl) == POINTER_PLUS_EXPR)
 		pdecl = &TREE_OPERAND (*pdecl, 0);
 	      if (TREE_CODE (*pdecl) == INDIRECT_REF
-		  || TREE_CODE (*pdecl) == ADDR_EXPR)
+		  || ADDR_EXPR_P (*pdecl))
 		pdecl = &TREE_OPERAND (*pdecl, 0);
 	    }
 	  goto do_decl_clause;
@@ -1907,7 +1907,7 @@ convert_local_reference_op (tree *tp, int *walk_subtrees, void *data)
       /* We need to re-fold the MEM_REF as component references as
 	 part of a ADDR_EXPR address are not allowed.  But we cannot
 	 fold here, as the chain record type is not yet finalized.  */
-      if (TREE_CODE (TREE_OPERAND (t, 0)) == ADDR_EXPR
+      if (ADDR_EXPR_P (TREE_OPERAND (t, 0))
 	  && !DECL_P (TREE_OPERAND (TREE_OPERAND (t, 0), 0)))
 	info->mem_refs->add (tp);
       wi->val_only = save_val_only;
@@ -1967,7 +1967,7 @@ convert_local_omp_clauses (tree *pclauses, struct walk_stmt_info *wi)
 	      if (TREE_CODE (*pdecl) == POINTER_PLUS_EXPR)
 		pdecl = &TREE_OPERAND (*pdecl, 0);
 	      if (TREE_CODE (*pdecl) == INDIRECT_REF
-		  || TREE_CODE (*pdecl) == ADDR_EXPR)
+		  || ADDR_EXPR_P (*pdecl))
 		pdecl = &TREE_OPERAND (*pdecl, 0);
 	    }
 	  goto do_decl_clause;

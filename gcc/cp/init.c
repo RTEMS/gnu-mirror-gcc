@@ -2637,7 +2637,7 @@ warn_placement_new_too_small (tree type, tree nelts, tree size, tree oper)
 
   if (TREE_CODE (oper) == TARGET_EXPR)
     oper = TREE_OPERAND (oper, 1);
-  else if (TREE_CODE (oper) == ADDR_EXPR)
+  else if (ADDR_EXPR_P (oper))
     {
       addr_expr = true;
       oper = TREE_OPERAND (oper, 0);

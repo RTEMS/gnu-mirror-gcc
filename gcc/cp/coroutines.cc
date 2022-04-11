@@ -848,7 +848,7 @@ build_co_await (location_t loc, tree a, suspend_point_kind suspend_kind)
 	    {
 	      e_proxy = CALL_EXPR_ARG (e_proxy, 0);
 	      STRIP_NOPS (e_proxy);
-	      gcc_checking_assert (TREE_CODE (e_proxy) == ADDR_EXPR);
+	      gcc_checking_assert (ADDR_EXPR_P (e_proxy));
 	      e_proxy = TREE_OPERAND (e_proxy, 0);
 	    }
 	}

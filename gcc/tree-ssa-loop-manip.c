@@ -111,7 +111,7 @@ create_iv (tree base, tree step, tree var, class loop *loop,
     }
   if (POINTER_TYPE_P (TREE_TYPE (base)))
     {
-      if (TREE_CODE (base) == ADDR_EXPR)
+      if (ADDR_EXPR_P (base))
 	mark_addressable (TREE_OPERAND (base, 0));
       step = convert_to_ptrofftype (step);
       if (incr_op == MINUS_EXPR)

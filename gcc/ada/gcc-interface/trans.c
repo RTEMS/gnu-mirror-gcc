@@ -1794,7 +1794,7 @@ Attribute_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, int attribute)
 	{
 	  gnu_expr = remove_conversions (gnu_result, false);
 
-	  if (TREE_CODE (gnu_expr) == ADDR_EXPR)
+	  if (ADDR_EXPR_P (gnu_expr))
 	    TREE_NO_TRAMPOLINE (gnu_expr) = TREE_CONSTANT (gnu_expr) = 1;
 
 	  /* On targets for which function symbols denote a descriptor, the
@@ -1822,7 +1822,7 @@ Attribute_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, int attribute)
 	 a useful warning with -Wtrampolines.  */
       else if (FUNC_OR_METHOD_TYPE_P (TREE_TYPE (gnu_prefix))
 	       && (gnu_expr = remove_conversions (gnu_result, false))
-	       && TREE_CODE (gnu_expr) == ADDR_EXPR
+	       && ADDR_EXPR_P (gnu_expr)
 	       && decl_function_context (TREE_OPERAND (gnu_expr, 0)))
 	{
 	  set_expr_location_from_node (gnu_expr, gnat_node);
@@ -8728,7 +8728,7 @@ gnat_gimplify_expr (tree *expr_p, gimple_seq *pre_p,
 		tree t = CALL_EXPR_ARG (inner, 0);
 		if (TREE_CODE (t) == NOP_EXPR)
 		  t = TREE_OPERAND (t, 0);
-		if (TREE_CODE (t) == ADDR_EXPR)
+		if (ADDR_EXPR_P (t))
 		  TREE_OPERAND (op, 0) = TREE_OPERAND (t, 0);
 		else
 		  TREE_OPERAND (op, 0) = build_fold_indirect_ref (t);

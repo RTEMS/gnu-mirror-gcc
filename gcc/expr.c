@@ -5201,7 +5201,7 @@ mem_ref_refers_to_non_mem_p (tree ref)
     {
       tree addr = TREE_OPERAND (ref, 0);
 
-      if (TREE_CODE (addr) != ADDR_EXPR)
+      if (!ADDR_EXPR_P (addr))
 	return false;
 
       base = TREE_OPERAND (addr, 0);
@@ -5856,7 +5856,7 @@ store_expr (tree exp, rtx target, int call_param_p,
     }
   else if ((TREE_CODE (exp) == STRING_CST
 	    || (TREE_CODE (exp) == MEM_REF
-		&& TREE_CODE (TREE_OPERAND (exp, 0)) == ADDR_EXPR
+		&& ADDR_EXPR_P (TREE_OPERAND (exp, 0))
 		&& TREE_CODE (TREE_OPERAND (TREE_OPERAND (exp, 0), 0))
 		   == STRING_CST
 		&& integer_zerop (TREE_OPERAND (exp, 1))))
@@ -7272,7 +7272,7 @@ store_field (rtx target, poly_int64 bitsize, poly_int64 bitpos,
          decl we must use bitfield operations.  */
       || (known_size_p (bitsize)
 	  && TREE_CODE (exp) == MEM_REF
-	  && TREE_CODE (TREE_OPERAND (exp, 0)) == ADDR_EXPR
+	  && ADDR_EXPR_P (TREE_OPERAND (exp, 0))
 	  && DECL_P (TREE_OPERAND (TREE_OPERAND (exp, 0), 0))
 	  && !TREE_ADDRESSABLE (TREE_OPERAND (TREE_OPERAND (exp, 0), 0))
 	  && DECL_MODE (TREE_OPERAND (TREE_OPERAND (exp, 0), 0)) != BLKmode))
@@ -7591,7 +7591,7 @@ get_inner_reference (tree exp, poly_int64_pod *pbitsize,
 
 	case MEM_REF:
 	  /* Hand back the decl for MEM[&decl, off].  */
-	  if (TREE_CODE (TREE_OPERAND (exp, 0)) == ADDR_EXPR)
+	  if (ADDR_EXPR_P (TREE_OPERAND (exp, 0)))
 	    {
 	      tree off = TREE_OPERAND (exp, 1);
 	      if (!integer_zerop (off))
@@ -11860,7 +11860,7 @@ is_aligning_offset (const_tree offset, const_tree exp)
     offset = TREE_OPERAND (offset, 0);
 
   /* This must now be the address of EXP.  */
-  return TREE_CODE (offset) == ADDR_EXPR && TREE_OPERAND (offset, 0) == exp;
+  return ADDR_EXPR_P (offset) && TREE_OPERAND (offset, 0) == exp;
 }
 
 /* If EXPR is a constant initializer (either an expression or CONSTRUCTOR),
@@ -11998,7 +11998,7 @@ constant_byte_string (tree arg, tree *ptr_offset, tree *mem_size, tree *decl,
 
   poly_int64 base_off = 0;
 
-  if (TREE_CODE (arg) == ADDR_EXPR)
+  if (ADDR_EXPR_P (arg))
     {
       arg = TREE_OPERAND (arg, 0);
       tree ref = arg;

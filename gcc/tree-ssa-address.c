@@ -401,7 +401,7 @@ create_mem_ref_raw (tree type, tree alias_ptr_type, struct mem_address *addr,
      ???  As IVOPTs does not follow restrictions to where the base
      pointer may point to create a MEM_REF only if we know that
      base is valid.  */
-  if ((TREE_CODE (base) == ADDR_EXPR || TREE_CODE (base) == INTEGER_CST)
+  if ((ADDR_EXPR_P (base) || TREE_CODE (base) == INTEGER_CST)
       && (!index2 || integer_zerop (index2))
       && (!addr->index || integer_zerop (addr->index)))
     return fold_build2 (MEM_REF, type, base, addr->offset);
@@ -435,7 +435,7 @@ move_fixed_address_to_symbol (struct mem_address *parts, aff_tree *addr)
 	continue;
 
       val = addr->elts[i].val;
-      if (TREE_CODE (val) == ADDR_EXPR
+      if (ADDR_EXPR_P (val)
 	  && fixed_address_object_p (TREE_OPERAND (val, 0)))
 	break;
     }
@@ -1006,7 +1006,7 @@ create_mem_ref (gimple_stmt_iterator *gsi, tree type, aff_tree *addr,
 void
 get_address_description (tree op, struct mem_address *addr)
 {
-  if (TREE_CODE (TMR_BASE (op)) == ADDR_EXPR)
+  if (ADDR_EXPR_P (TMR_BASE (op)))
     {
       addr->symbol = TMR_BASE (op);
       addr->base = TMR_INDEX2 (op);

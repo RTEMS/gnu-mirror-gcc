@@ -21060,7 +21060,7 @@ c_parser_omp_declare_reduction (c_parser *parser, enum pragma_context context)
 		    {
 		      tree a = CALL_EXPR_ARG (c, j);
 		      STRIP_NOPS (a);
-		      if (TREE_CODE (a) == ADDR_EXPR
+		      if (ADDR_EXPR_P (a)
 			  && TREE_OPERAND (a, 0) == omp_priv)
 			break;
 		    }

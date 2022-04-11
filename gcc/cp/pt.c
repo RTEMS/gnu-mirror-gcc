@@ -6564,7 +6564,7 @@ convert_nontype_argument_function (tree type, tree expr,
     goto accept;
 
   fn_no_ptr = strip_fnptr_conv (fn);
-  if (TREE_CODE (fn_no_ptr) == ADDR_EXPR)
+  if (ADDR_EXPR_P (fn_no_ptr))
     fn_no_ptr = TREE_OPERAND (fn_no_ptr, 0);
   if (BASELINK_P (fn_no_ptr))
     fn_no_ptr = BASELINK_FUNCTIONS (fn_no_ptr);
@@ -6646,7 +6646,7 @@ check_valid_ptrmem_cst_expr (tree type, tree expr,
   if (cxx_dialect >= cxx11 && null_member_pointer_value_p (expr))
     return true;
   if (processing_template_decl
-      && TREE_CODE (expr) == ADDR_EXPR
+      && ADDR_EXPR_P (expr)
       && TREE_CODE (TREE_OPERAND (expr, 0)) == OFFSET_REF)
     return true;
   if (complain & tf_error)
@@ -7268,7 +7268,7 @@ convert_nontype_argument (tree type, tree expr, tsubst_flags_t complain)
 	     and this is not folded by convert_from_reference.  */
 	  tree addr = TREE_OPERAND (probe, 0);
 	  if (TYPE_REF_P (probe_type)
-	      && TREE_CODE (addr) == ADDR_EXPR
+	      && ADDR_EXPR_P (addr)
 	      && TYPE_PTR_P (TREE_TYPE (addr))
 	      && (same_type_ignoring_top_level_qualifiers_p
 		  (TREE_TYPE (probe_type),
@@ -7354,7 +7354,7 @@ convert_nontype_argument (tree type, tree expr, tsubst_flags_t complain)
 	{
 	  tree probe = expr;
 	  STRIP_NOPS (probe);
-	  if (TREE_CODE (probe) == ADDR_EXPR
+	  if (ADDR_EXPR_P (probe)
 	      && TYPE_PTR_P (TREE_TYPE (probe)))
 	    {
 	      expr = probe;
@@ -7381,7 +7381,7 @@ convert_nontype_argument (tree type, tree expr, tsubst_flags_t complain)
 	;
       else if (cxx_dialect >= cxx11 && integer_zerop (expr))
 	/* Null pointer values are OK in C++11.  */;
-      else if (TREE_CODE (expr) != ADDR_EXPR
+      else if (!ADDR_EXPR_P (expr)
 	       && !INDIRECT_TYPE_P (expr_type))
 	/* Other values, like integer constants, might be valid
 	   non-type arguments of some other type.  */
@@ -7492,7 +7492,7 @@ convert_nontype_argument (tree type, tree expr, tsubst_flags_t complain)
      (_over.over_).  */
   else if (TYPE_REFFN_P (type))
     {
-      if (TREE_CODE (expr) == ADDR_EXPR)
+      if (ADDR_EXPR_P (expr))
 	{
 	  if (complain & tf_error)
 	    {
@@ -19866,7 +19866,7 @@ tsubst_copy_and_build (tree t,
 	    else
 	      qualified_p = false;
 
-	    if (TREE_CODE (function) == ADDR_EXPR
+	    if (ADDR_EXPR_P (function)
 		&& TREE_CODE (TREE_OPERAND (function, 0)) == FUNCTION_DECL)
 	      /* Avoid error about taking the address of a constructor.  */
 	      function = TREE_OPERAND (function, 0);
@@ -22156,7 +22156,7 @@ resolve_overloaded_unification (tree tparms,
   tree goodfn = NULL_TREE;
   bool addr_p;
 
-  if (TREE_CODE (arg) == ADDR_EXPR)
+  if (ADDR_EXPR_P (arg))
     {
       arg = TREE_OPERAND (arg, 0);
       addr_p = true;
@@ -22299,7 +22299,7 @@ resolve_nondeduced_context (tree orig_expr, tsubst_flags_t complain)
   offset = NULL_TREE;
   baselink = NULL_TREE;
 
-  if (TREE_CODE (expr) == ADDR_EXPR)
+  if (ADDR_EXPR_P (expr))
     {
       expr = TREE_OPERAND (expr, 0);
       addr = true;
@@ -23769,7 +23769,7 @@ unify (tree tparms, tree targs, tree parm, tree arg, int strict,
 	{
 	  tree sub = TREE_OPERAND (arg, 0);
 	  STRIP_NOPS (sub);
-	  if (TREE_CODE (sub) == ADDR_EXPR)
+	  if (ADDR_EXPR_P (sub))
 	    arg = TREE_OPERAND (sub, 0);
 	}
       /* Now use the normal expression code to check whether they match.  */
@@ -26734,7 +26734,7 @@ value_dependent_expression_p (tree expression)
 	       look through it in potential_constant_expression.  */
 	    if (i == 0 && fn && DECL_DECLARED_CONSTEXPR_P (fn)
 		&& DECL_NONSTATIC_MEMBER_FUNCTION_P (fn)
-		&& TREE_CODE (op) == ADDR_EXPR)
+		&& ADDR_EXPR_P (op))
 	      op = TREE_OPERAND (op, 0);
 	    if (value_dependent_expression_p (op))
 	      return true;
@@ -26983,7 +26983,7 @@ type_dependent_expression_p (tree expression)
 
   if (TREE_TYPE (expression) == unknown_type_node)
     {
-      if (TREE_CODE (expression) == ADDR_EXPR)
+      if (ADDR_EXPR_P (expression))
 	return type_dependent_expression_p (TREE_OPERAND (expression, 0));
       if (TREE_CODE (expression) == COMPONENT_REF
 	  || TREE_CODE (expression) == OFFSET_REF)
@@ -27703,7 +27703,7 @@ build_non_dependent_expr (tree expr)
   inner_expr = expr;
   if (TREE_CODE (inner_expr) == STMT_EXPR)
     inner_expr = stmt_expr_value_expr (inner_expr);
-  if (TREE_CODE (inner_expr) == ADDR_EXPR)
+  if (ADDR_EXPR_P (inner_expr))
     inner_expr = TREE_OPERAND (inner_expr, 0);
   if (TREE_CODE (inner_expr) == COMPONENT_REF)
     inner_expr = TREE_OPERAND (inner_expr, 1);

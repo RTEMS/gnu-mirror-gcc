@@ -6471,7 +6471,7 @@ constructor_address_p (tree gnu_expr)
 	 || TREE_CODE (gnu_expr) == NON_LVALUE_EXPR)
     gnu_expr = TREE_OPERAND (gnu_expr, 0);
 
-  return (TREE_CODE (gnu_expr) == ADDR_EXPR
+  return (ADDR_EXPR_P (gnu_expr)
 	  && TREE_CODE (TREE_OPERAND (gnu_expr, 0)) == CONSTRUCTOR);
 }
 

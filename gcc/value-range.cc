@@ -693,8 +693,8 @@ irange::normalize_addresses ()
 
   if (!range_includes_zero_p (this))
     {
-      gcc_checking_assert (TREE_CODE (min ()) == ADDR_EXPR
-			   || TREE_CODE (max ()) == ADDR_EXPR);
+      gcc_checking_assert (ADDR_EXPR_P (min ())
+			   || ADDR_EXPR_P (max ()));
       set_nonzero (type ());
       return;
     }

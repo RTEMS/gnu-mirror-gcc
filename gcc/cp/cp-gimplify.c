@@ -1779,7 +1779,7 @@ cp_genericize_r (tree *stmt_p, int *walk_subtrees, void *data)
 	      && TREE_CODE (TREE_TYPE (TREE_TYPE (fn))) == METHOD_TYPE)
 	    {
 	      bool is_ctor
-		= TREE_CODE (fn) == ADDR_EXPR
+		= ADDR_EXPR_P (fn)
 		  && TREE_CODE (TREE_OPERAND (fn, 0)) == FUNCTION_DECL
 		  && DECL_CONSTRUCTOR_P (TREE_OPERAND (fn, 0));
 	      if (sanitize_flags_p (SANITIZE_NULL | SANITIZE_ALIGNMENT))

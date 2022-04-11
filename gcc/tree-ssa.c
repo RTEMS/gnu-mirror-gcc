@@ -994,7 +994,7 @@ verify_phi_args (gphi *phi, basic_block bb, basic_block *definition_block)
 			     op_p, phi, e->flags & EDGE_ABNORMAL, NULL);
 	}
 
-      if (TREE_CODE (op) == ADDR_EXPR)
+      if (ADDR_EXPR_P (op))
 	{
 	  tree base = TREE_OPERAND (op, 0);
 	  while (handled_component_p (base))
@@ -1362,7 +1362,7 @@ maybe_rewrite_mem_ref_base (tree *tp, bitmap suitable_for_renaming)
   while (handled_component_p (*tp))
     tp = &TREE_OPERAND (*tp, 0);
   if (TREE_CODE (*tp) == MEM_REF
-      && TREE_CODE (TREE_OPERAND (*tp, 0)) == ADDR_EXPR
+      && ADDR_EXPR_P (TREE_OPERAND (*tp, 0))
       && (sym = TREE_OPERAND (TREE_OPERAND (*tp, 0), 0))
       && DECL_P (sym)
       && !TREE_ADDRESSABLE (sym)
@@ -1445,7 +1445,7 @@ non_rewritable_mem_ref_base (tree ref)
   /* But watch out for MEM_REFs we cannot lower to a
      VIEW_CONVERT_EXPR or a BIT_FIELD_REF.  */
   if (TREE_CODE (base) == MEM_REF
-      && TREE_CODE (TREE_OPERAND (base, 0)) == ADDR_EXPR)
+      && ADDR_EXPR_P (TREE_OPERAND (base, 0)))
     {
       tree decl = TREE_OPERAND (TREE_OPERAND (base, 0), 0);
       if (! DECL_P (decl))
@@ -1511,7 +1511,7 @@ non_rewritable_lvalue_p (tree lhs)
   /* ???  The following could be relaxed allowing component
      references that do not change the access size.  */
   if (TREE_CODE (lhs) == MEM_REF
-      && TREE_CODE (TREE_OPERAND (lhs, 0)) == ADDR_EXPR)
+      && ADDR_EXPR_P (TREE_OPERAND (lhs, 0)))
     {
       tree decl = TREE_OPERAND (TREE_OPERAND (lhs, 0), 0);
 
@@ -1663,7 +1663,7 @@ is_asan_mark_p (gimple *stmt)
     return false;
 
   tree addr = get_base_address (gimple_call_arg (stmt, 1));
-  if (TREE_CODE (addr) == ADDR_EXPR
+  if (ADDR_EXPR_P (addr)
       && VAR_P (TREE_OPERAND (addr, 0)))
     {
       tree var = TREE_OPERAND (addr, 0);
@@ -1801,7 +1801,7 @@ execute_update_addresses_taken (void)
 	  for (i = 0; i < gimple_phi_num_args (phi); i++)
 	    {
 	      tree op = PHI_ARG_DEF (phi, i), var;
-	      if (TREE_CODE (op) == ADDR_EXPR
+	      if (ADDR_EXPR_P (op)
 		  && (var = get_base_address (TREE_OPERAND (op, 0))) != NULL
 		  && DECL_P (var))
 		bitmap_set_bit (addresses_taken, DECL_UID (var));
@@ -1909,7 +1909,7 @@ execute_update_addresses_taken (void)
 		/* Rewrite a vector insert using a MEM_REF on the LHS
 		   into a BIT_INSERT_EXPR.  */
 		if (TREE_CODE (lhs) == MEM_REF
-		    && TREE_CODE (TREE_OPERAND (lhs, 0)) == ADDR_EXPR
+		    && ADDR_EXPR_P (TREE_OPERAND (lhs, 0))
 		    && (sym = TREE_OPERAND (TREE_OPERAND (lhs, 0), 0))
 		    && DECL_P (sym)
 		    && bitmap_bit_p (suitable_for_renaming, DECL_UID (sym))
@@ -1970,7 +1970,7 @@ execute_update_addresses_taken (void)
 		while (TREE_CODE (lhs) == VIEW_CONVERT_EXPR)
 		  lhs = TREE_OPERAND (lhs, 0);
 		if (TREE_CODE (lhs) == MEM_REF
-		    && TREE_CODE (TREE_OPERAND (lhs, 0)) == ADDR_EXPR
+		    && ADDR_EXPR_P (TREE_OPERAND (lhs, 0))
 		    && integer_zerop (TREE_OPERAND (lhs, 1))
 		    && (sym = TREE_OPERAND (TREE_OPERAND (lhs, 0), 0))
 		    && DECL_P (sym)
@@ -2051,7 +2051,7 @@ execute_update_addresses_taken (void)
 		      tree *argp = gimple_call_arg_ptr (stmt, i);
 		      if (*argp == null_pointer_node)
 			continue;
-		      gcc_assert (TREE_CODE (*argp) == ADDR_EXPR
+		      gcc_assert (ADDR_EXPR_P (*argp)
 				  && VAR_P (TREE_OPERAND (*argp, 0)));
 		      tree var = TREE_OPERAND (*argp, 0);
 		      if (bitmap_bit_p (suitable_for_renaming, DECL_UID (var)))

@@ -9808,7 +9808,7 @@ mma_expand_builtin (tree exp, rtx target, bool *expandedp)
 
       rtx opnd;
       insn_op = &insn_data[icode].operand[nopnds];
-      if (TREE_CODE (arg) == ADDR_EXPR
+      if (ADDR_EXPR_P (arg)
 	  && MEM_P (DECL_RTL (TREE_OPERAND (arg, 0))))
 	opnd = DECL_RTL (TREE_OPERAND (arg, 0));
       else

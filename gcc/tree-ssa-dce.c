@@ -465,7 +465,7 @@ ref_may_be_aliased (tree ref)
   while (handled_component_p (ref))
     ref = TREE_OPERAND (ref, 0);
   if (TREE_CODE (ref) == MEM_REF
-      && TREE_CODE (TREE_OPERAND (ref, 0)) == ADDR_EXPR)
+      && ADDR_EXPR_P (TREE_OPERAND (ref, 0)))
     ref = TREE_OPERAND (TREE_OPERAND (ref, 0), 0);
   return !(DECL_P (ref)
 	   && !may_be_aliased (ref));

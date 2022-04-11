@@ -2574,7 +2574,7 @@ handle_copy_attribute (tree *node, tree name, tree args,
 
   /* Consider address-of expressions in the attribute argument
      as requests to copy from the referenced entity.  */
-  if (TREE_CODE (ref) == ADDR_EXPR)
+  if (ADDR_EXPR_P (ref))
     ref = TREE_OPERAND (ref, 0);
 
   do
@@ -4072,7 +4072,7 @@ handle_access_attribute (tree *node, tree name, tree args,
   if (TREE_CODE (access_mode) == CALL_EXPR)
     {
       access_mode = CALL_EXPR_FN (access_mode);
-      if (TREE_CODE (access_mode) != ADDR_EXPR)
+      if (!ADDR_EXPR_P (access_mode))
 	{
 	  error ("attribute %qE invalid mode", name);
 	  return NULL_TREE;
