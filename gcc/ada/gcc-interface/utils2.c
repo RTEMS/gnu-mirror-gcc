@@ -705,7 +705,7 @@ build_atomic_load (tree src, bool sync)
   fncode = (int) BUILT_IN_ATOMIC_LOAD_N + exact_log2 (size) + 1;
   t = builtin_decl_implicit ((enum built_in_function) fncode);
 
-  addr = build_unary_op (ADDR_EXPR, ptr_type, src);
+  addr = build_unary_op (unqualified_addr_expr (), ptr_type, src);
   val = build_call_expr (t, 2, addr, mem_model);
 
   /* First reinterpret the loaded bits in the original type of the load,
@@ -753,7 +753,7 @@ build_atomic_store (tree dest, tree src, bool sync)
   else
     src = convert (TREE_TYPE (dest), src);
   src = fold_build1 (VIEW_CONVERT_EXPR, int_type, src);
-  addr = build_unary_op (ADDR_EXPR, ptr_type, dest);
+  addr = build_unary_op (unqualified_addr_expr (), ptr_type, dest);
 
   return build_call_expr (t, 3, addr, src, mem_model);
 }
@@ -1416,7 +1416,7 @@ build_unary_op (enum tree_code op_code, tree result_type, tree operand)
 	      || (TREE_CODE (TREE_OPERAND (operand, 1)) == VAR_DECL
 		  && DECL_RETURN_VALUE_P (TREE_OPERAND (operand, 1))))
 	    {
-	      result = build_unary_op (ADDR_EXPR, result_type,
+	      result = build_unary_op (unqualified_addr_expr (), result_type,
 				       TREE_OPERAND (operand, 1));
 	      result = build2 (COMPOUND_EXPR, TREE_TYPE (result),
 			       TREE_OPERAND (operand, 0), result);
@@ -1459,7 +1459,7 @@ build_unary_op (enum tree_code op_code, tree result_type, tree operand)
 
 	      /* Take the address of INNER, convert it to a pointer to our type
 		 and add the offset.  */
-	      inner = build_unary_op (ADDR_EXPR,
+	      inner = build_unary_op (unqualified_addr_expr (),
 				      build_pointer_type (TREE_TYPE (operand)),
 				      inner);
 	      result = build_binary_op (POINTER_PLUS_EXPR, TREE_TYPE (inner),
@@ -1475,7 +1475,7 @@ build_unary_op (enum tree_code op_code, tree result_type, tree operand)
 	  if (TYPE_IS_PADDING_P (type))
 	    {
 	      result
-		= build_unary_op (ADDR_EXPR,
+		= build_unary_op (unqualified_addr_expr (),
 				  build_pointer_type (TREE_TYPE (operand)),
 				  CONSTRUCTOR_ELT (operand, 0)->value);
 	      break;
@@ -1485,7 +1485,7 @@ build_unary_op (enum tree_code op_code, tree result_type, tree operand)
 	case NOP_EXPR:
 	  if (AGGREGATE_TYPE_P (type)
 	      && AGGREGATE_TYPE_P (TREE_TYPE (TREE_OPERAND (operand, 0))))
-	    return build_unary_op (ADDR_EXPR, result_type,
+	    return build_unary_op (unqualified_addr_expr (), result_type,
 				   TREE_OPERAND (operand, 0));
 
 	  /* ... fallthru ... */
@@ -1500,7 +1500,7 @@ build_unary_op (enum tree_code op_code, tree result_type, tree operand)
 	      || (TYPE_MODE (type) != BLKmode
 		  && (TYPE_MODE (type)
 		      == TYPE_MODE (TREE_TYPE (TREE_OPERAND (operand, 0))))))
-	    return build_unary_op (ADDR_EXPR,
+	    return build_unary_op (unqualified_addr_expr (),
 				   (result_type ? result_type
 				    : build_pointer_type (type)),
 				   TREE_OPERAND (operand, 0));
@@ -1706,8 +1706,10 @@ build_cond_expr (tree result_type, tree condition_operand,
       || CONTAINS_PLACEHOLDER_P (TYPE_SIZE (result_type)))
     {
       result_type = build_pointer_type (result_type);
-      true_operand = build_unary_op (ADDR_EXPR, result_type, true_operand);
-      false_operand = build_unary_op (ADDR_EXPR, result_type, false_operand);
+      true_operand = build_unary_op (unqualified_addr_expr (),
+				     result_type, true_operand);
+      false_operand = build_unary_op (unqualified_addr_expr (),
+				      result_type, false_operand);
       addr_p = true;
     }
 
@@ -1746,7 +1748,8 @@ build_compound_expr (tree result_type, tree stmt_operand, tree expr_operand)
       || CONTAINS_PLACEHOLDER_P (TYPE_SIZE (result_type)))
     {
       result_type = build_pointer_type (result_type);
-      expr_operand = build_unary_op (ADDR_EXPR, result_type, expr_operand);
+      expr_operand = build_unary_op (unqualified_addr_expr (),
+				     result_type, expr_operand);
       addr_p = true;
     }
 
@@ -1796,8 +1799,8 @@ build_goto_raise (Entity_Id gnat_label, int msg)
 	= gnat_to_gnu_entity (Get_RT_Exception_Entity (msg), NULL_TREE, false);
       tree gnu_call
 	= build_call_n_expr (gnu_local_raise, 1,
-			     build_unary_op (ADDR_EXPR, NULL_TREE,
-					     gnu_exception_entity));
+			     build_unary_op (unqualified_addr_expr (),
+					     NULL_TREE, gnu_exception_entity));
       gnu_result
 	= build2 (COMPOUND_EXPR, void_type_node, gnu_call, gnu_result);
     }
@@ -2133,7 +2136,8 @@ build_call_alloc_dealloc_proc (tree gnu_obj, tree gnu_size, tree gnu_type,
       tree gnu_size_type = gnat_to_gnu_type (gnat_size_type);
 
       tree gnu_pool = gnat_to_gnu (gnat_pool);
-      tree gnu_pool_addr = build_unary_op (ADDR_EXPR, NULL_TREE, gnu_pool);
+      tree gnu_pool_addr = build_unary_op (unqualified_addr_expr (),
+					   NULL_TREE, gnu_pool);
       tree gnu_align = size_int (TYPE_ALIGN (gnu_type) / BITS_PER_UNIT);
 
       gnu_size = convert (gnu_size_type, gnu_size);
@@ -2218,7 +2222,8 @@ maybe_wrap_malloc (tree data_size, tree data_type, Node_Id gnat_node)
 			       false);
 
       tree aligning_field_addr
-        = build_unary_op (ADDR_EXPR, NULL_TREE, aligning_field);
+        = build_unary_op (unqualified_addr_expr (),
+			  NULL_TREE, aligning_field);
 
       /* Then arrange to store the allocator's return value ahead
 	 and return.  */
@@ -2610,7 +2615,8 @@ gnat_protect_expr (tree exp)
   /* Otherwise reference, protect the address and dereference.  */
   return
     build_unary_op (INDIRECT_REF, type,
-		    save_expr (build_unary_op (ADDR_EXPR, NULL_TREE, exp)));
+		    save_expr (build_unary_op (unqualified_addr_expr (),
+					       NULL_TREE, exp)));
 }
 
 /* This is equivalent to stabilize_reference_1 in tree.c but we take an extra

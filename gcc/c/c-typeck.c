@@ -1942,7 +1942,7 @@ array_to_pointer_conversion (location_t loc, tree exp)
 		    "is ill-formed in C++");
     }
 
-  adr = build_unary_op (loc, ADDR_EXPR, exp, true);
+  adr = build_unary_op (loc, unqualified_addr_expr (), exp, true);
   return convert (ptrtype, adr);
 }
 
@@ -1959,7 +1959,7 @@ function_to_pointer_conversion (location_t loc, tree exp)
   if (TREE_NO_WARNING (orig_exp))
     TREE_NO_WARNING (exp) = 1;
 
-  return build_unary_op (loc, ADDR_EXPR, exp, false);
+  return build_unary_op (loc, unqualified_addr_expr (), exp, false);
 }
 
 /* Mark EXP as read, not just set, for set but not used -Wunused
@@ -2106,7 +2106,8 @@ convert_lvalue_to_rvalue (location_t loc, struct c_expr exp,
       vec<tree, va_gc> *params;
       tree nonatomic_type, tmp, tmp_addr, fndecl, func_call;
       tree expr_type = TREE_TYPE (exp.value);
-      tree expr_addr = build_unary_op (loc, ADDR_EXPR, exp.value, false);
+      tree expr_addr = build_unary_op (loc, unqualified_addr_expr (),
+				       exp.value, false);
       tree seq_cst = build_int_cst (integer_type_node, MEMMODEL_SEQ_CST);
 
       gcc_assert (TYPE_ATOMIC (expr_type));
@@ -2119,7 +2120,7 @@ convert_lvalue_to_rvalue (location_t loc, struct c_expr exp,
 	 create the VAL temp variable to hold the RHS.  */
       nonatomic_type = build_qualified_type (expr_type, TYPE_UNQUALIFIED);
       tmp = create_tmp_var_raw (nonatomic_type);
-      tmp_addr = build_unary_op (loc, ADDR_EXPR, tmp, false);
+      tmp_addr = build_unary_op (loc, unqualified_addr_expr (), tmp, false);
       TREE_ADDRESSABLE (tmp) = 1;
       TREE_NO_WARNING (tmp) = 1;
 
@@ -4089,7 +4090,7 @@ build_atomic_assign (location_t loc, tree lhs, enum tree_code modifycode,
   tree loop_label, loop_decl, done_label, done_decl;
 
   tree lhs_type = TREE_TYPE (lhs);
-  tree lhs_addr = build_unary_op (loc, ADDR_EXPR, lhs, false);
+  tree lhs_addr = build_unary_op (loc, unqualified_addr_expr (), lhs, false);
   tree seq_cst = build_int_cst (integer_type_node, MEMMODEL_SEQ_CST);
   tree rhs_semantic_type = TREE_TYPE (rhs);
   tree nonatomic_rhs_semantic_type;
@@ -4139,7 +4140,7 @@ build_atomic_assign (location_t loc, tree lhs, enum tree_code modifycode,
   if (modifycode == NOP_EXPR)
     {
       /* Build __atomic_store (&lhs, &val, SEQ_CST)  */
-      rhs = build_unary_op (loc, ADDR_EXPR, val, false);
+      rhs = build_unary_op (loc, unqualified_addr_expr (), val, false);
       fndecl = builtin_decl_explicit (BUILT_IN_ATOMIC_STORE);
       params->quick_push (lhs_addr);
       params->quick_push (rhs);
@@ -4244,12 +4245,12 @@ build_atomic_assign (location_t loc, tree lhs, enum tree_code modifycode,
 cas_loop:
   /* Create the variables and labels required for the op= form.  */
   old = create_tmp_var_raw (nonatomic_lhs_type);
-  old_addr = build_unary_op (loc, ADDR_EXPR, old, false);
+  old_addr = build_unary_op (loc, unqualified_addr_expr (), old, false);
   TREE_ADDRESSABLE (old) = 1;
   TREE_NO_WARNING (old) = 1;
 
   newval = create_tmp_var_raw (nonatomic_lhs_type);
-  newval_addr = build_unary_op (loc, ADDR_EXPR, newval, false);
+  newval_addr = build_unary_op (loc, unqualified_addr_expr (), newval, false);
   TREE_ADDRESSABLE (newval) = 1;
   TREE_NO_WARNING (newval) = 1;
 
@@ -14844,7 +14845,8 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	    }
 	  if (!remove)
 	    {
-	      tree addr = build_unary_op (OMP_CLAUSE_LOCATION (c), ADDR_EXPR,
+	      tree addr = build_unary_op (OMP_CLAUSE_LOCATION (c),
+					  unqualified_addr_expr (),
 					  t, false);
 	      if (addr == error_mark_node)
 		remove = true;

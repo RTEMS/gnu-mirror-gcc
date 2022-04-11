@@ -5548,7 +5548,8 @@ finish_decl (tree decl, location_t init_loc, tree init,
 	  vec<tree, va_gc> *v;
 
 	  /* Build "cleanup(&decl)" for the destructor.  */
-	  cleanup = build_unary_op (input_location, ADDR_EXPR, decl, false);
+	  cleanup = build_unary_op (input_location, unqualified_addr_expr (),
+				    decl, false);
 	  vec_alloc (v, 1);
 	  v->quick_push (cleanup);
 	  cleanup = c_build_function_call_vec (DECL_SOURCE_LOCATION (decl),

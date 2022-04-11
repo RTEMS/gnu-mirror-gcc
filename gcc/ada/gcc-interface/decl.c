@@ -1142,7 +1142,8 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 		    const_flag = true;
 		    volatile_flag = false;
 
-		    gnu_expr = build_unary_op (ADDR_EXPR, gnu_type, gnu_expr);
+		    gnu_expr = build_unary_op (unqualified_addr_expr (),
+					       gnu_type, gnu_expr);
 
 		    create_var_decl (gnu_entity_name, gnu_ext_name,
 				     TREE_TYPE (gnu_expr), gnu_expr,
@@ -1154,7 +1155,8 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 
 		/* Otherwise, instantiate the SAVE_EXPRs if needed.  */
 		else if (TREE_SIDE_EFFECTS (gnu_expr))
-		  add_stmt (build_unary_op (ADDR_EXPR, NULL_TREE, gnu_expr));
+		  add_stmt (build_unary_op (unqualified_addr_expr (),
+					    NULL_TREE, gnu_expr));
 
 		break;
 	      }
@@ -1432,7 +1434,7 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 	    gnu_type = build_reference_type (gnu_type);
 	    gnu_expr
 	      = build_unary_op
-		(ADDR_EXPR, NULL_TREE,
+		(unqualified_addr_expr (), NULL_TREE,
 		 build_component_ref (gnu_new_var, TYPE_FIELDS (gnu_new_type),
 				      false));
 	    TREE_CONSTANT (gnu_expr) = 1;
@@ -1481,7 +1483,8 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 				      volatile_flag, true,
 				      debug_info_p && definition,
 				      NULL, gnat_entity);
-		gnu_expr = build_unary_op (ADDR_EXPR, NULL_TREE, gnu_unc_var);
+		gnu_expr = build_unary_op (unqualified_addr_expr (),
+					   NULL_TREE, gnu_unc_var);
 		TREE_CONSTANT (gnu_expr) = 1;
 
 		used_by_ref = true;
@@ -1617,7 +1620,8 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
 					 STACK_CHECK_MAX_VAR_SIZE) > 0)))
 	  add_stmt_with_node (build_call_n_expr
 			      (update_setjmp_buf_decl, 1,
-			       build_unary_op (ADDR_EXPR, NULL_TREE,
+			       build_unary_op (unqualified_addr_expr (),
+					       NULL_TREE,
 					       get_block_jmpbuf_decl ())),
 			      gnat_entity);
 

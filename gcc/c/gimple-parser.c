@@ -1085,7 +1085,7 @@ c_parser_gimple_unary_expression (gimple_parser &parser)
       c_parser_consume_token (parser);
       op = c_parser_gimple_postfix_expression (parser);
       mark_exp_read (op.value);
-      return parser_build_unary_op (op_loc, ADDR_EXPR, op);
+      return parser_build_unary_op (op_loc, unqualified_addr_expr (), op);
     case CPP_MULT:
       {
 	c_parser_consume_token (parser);

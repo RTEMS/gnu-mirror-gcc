@@ -8240,7 +8240,7 @@ c_parser_unary_expression (c_parser *parser)
       c_parser_consume_token (parser);
       op = c_parser_cast_expression (parser, NULL);
       mark_exp_read (op.value);
-      return parser_build_unary_op (op_loc, ADDR_EXPR, op);
+      return parser_build_unary_op (op_loc, unqualified_addr_expr (), op);
     case CPP_MULT:
       {
 	c_parser_consume_token (parser);
@@ -17874,7 +17874,8 @@ c_parser_omp_depobj (c_parser *parser)
 	}
       else
 	{
-	  tree addr = build_unary_op (EXPR_LOC_OR_LOC (depobj, loc), ADDR_EXPR,
+	  tree addr = build_unary_op (EXPR_LOC_OR_LOC (depobj, loc),
+				      unqualified_addr_expr (),
 				      depobj, false);
 	  if (addr == error_mark_node)
 	    depobj = error_mark_node;

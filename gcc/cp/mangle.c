@@ -2940,7 +2940,7 @@ write_expression (tree expr)
      nodes.  */
   if (code == PTRMEM_CST)
     {
-      expr = build_nt (ADDR_EXPR,
+      expr = build_nt (unqualified_addr_expr (),
 		       build_qualified_name (/*type=*/NULL_TREE,
 					     PTRMEM_CST_CLASS (expr),
 					     PTRMEM_CST_MEMBER (expr),

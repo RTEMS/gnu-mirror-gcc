@@ -2567,7 +2567,7 @@ build_class_member_access_expr (cp_expr object, tree member,
      `(*(a ?  &b : &c)).x', and so on.  A COND_EXPR is only an lvalue
      in the front end; only _DECLs and _REFs are lvalues in the back end.  */
   {
-    tree temp = unary_complex_lvalue (ADDR_EXPR, object);
+    tree temp = unary_complex_lvalue (unqualified_addr_expr (), object);
     if (temp)
       {
 	temp = cp_build_fold_indirect_ref (temp);
@@ -6409,7 +6409,7 @@ cp_build_addr_expr_1 (tree arg, bool strict_lvalue, tsubst_flags_t complain)
 
   /* Handle complex lvalues (when permitted)
      by reduction to simpler cases.  */
-  val = unary_complex_lvalue (ADDR_EXPR, arg);
+  val = unary_complex_lvalue (unqualified_addr_expr (), arg);
   if (val != 0)
     return val;
 

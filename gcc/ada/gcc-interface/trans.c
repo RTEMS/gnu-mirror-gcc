@@ -1741,7 +1741,8 @@ Attribute_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, int attribute)
 	     later if a static chain is requested).  */
 	  if (!build_descriptor)
 	    {
-	      gnu_result = build_unary_op (ADDR_EXPR, NULL_TREE, gnu_prefix);
+	      gnu_result = build_unary_op (unqualified_addr_expr (),
+					   NULL_TREE, gnu_prefix);
 	      gnu_result = fold_convert (build_pointer_type (gnu_result_type),
 					 gnu_result);
 	      gnu_result = build1 (INDIRECT_REF, gnu_result_type, gnu_result);
@@ -1785,7 +1786,7 @@ Attribute_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, int attribute)
 	= build_unary_op (((attribute == Attr_Address
 			    || attribute == Attr_Unrestricted_Access)
 			   && !Must_Be_Byte_Aligned (gnat_node))
-			  ? ATTR_ADDR_EXPR : ADDR_EXPR,
+			  ? ATTR_ADDR_EXPR : unqualified_addr_expr (),
 			  gnu_result_type, gnu_prefix);
 
       /* For 'Code_Address, find an inner ADDR_EXPR and mark it so that we
@@ -4119,7 +4120,8 @@ Subprogram_Body_to_gnu (Node_Id gnat_node)
 			   1, integer_zero_node);
       t = build_call_n_expr (unhandled_except_decl, 1, t);
 
-      etype = build_unary_op (ADDR_EXPR, NULL_TREE, unhandled_others_decl);
+      etype = build_unary_op (unqualified_addr_expr (),
+			      NULL_TREE, unhandled_others_decl);
       etype = tree_cons (NULL_TREE, etype, NULL_TREE);
 
       t = build2 (CATCH_EXPR, void_type_node, etype, t);
@@ -4821,7 +4823,8 @@ Call_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, tree gnu_target,
 	  /* Take the address of the object and convert to the proper pointer
 	     type.  */
 	  gnu_formal_type = TREE_TYPE (gnu_formal);
-	  gnu_actual = build_unary_op (ADDR_EXPR, gnu_formal_type, gnu_actual);
+	  gnu_actual = build_unary_op (unqualified_addr_expr (),
+				       gnu_formal_type, gnu_actual);
 	}
 
       /* Then see if the parameter is an array passed to a foreign convention
@@ -4838,7 +4841,8 @@ Call_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, tree gnu_target,
 	     getting the wrong address.  Neither approach is exactly correct,
 	     but this is the most likely to work in all cases.  */
 	  gnu_formal_type = TREE_TYPE (gnu_formal);
-	  gnu_actual = build_unary_op (ADDR_EXPR, gnu_formal_type, gnu_actual);
+	  gnu_actual = build_unary_op (unqualified_addr_expr (),
+				       gnu_formal_type, gnu_actual);
 	}
 
       /* Then see if the parameter is passed by copy.  */
@@ -4888,7 +4892,8 @@ Call_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, tree gnu_target,
 	      gnu_formal_type = TREE_TYPE (gnu_formal_type);
 	      gnu_formal_type = build_pointer_type (gnu_formal_type);
 	      gnu_actual
-		= build_unary_op (ADDR_EXPR, gnu_formal_type, gnu_actual);
+		= build_unary_op (unqualified_addr_expr (),
+				  gnu_formal_type, gnu_actual);
 	    }
 
 	  /* Fat pointers are passed as thin pointers.  */
@@ -4908,7 +4913,8 @@ Call_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, tree gnu_target,
 	    {
 	      gnu_formal_type = build_reference_type (gnu_formal_type);
 	      gnu_actual
-		= build_unary_op (ADDR_EXPR, gnu_formal_type, gnu_actual);
+		= build_unary_op (unqualified_addr_expr (),
+				  gnu_formal_type, gnu_actual);
 	    }
 
 	  /* Otherwise pass by copy after applying default C promotions.  */
@@ -4940,7 +4946,8 @@ Call_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, tree gnu_target,
 
 	  if (TREE_SIDE_EFFECTS (gnu_name))
 	    {
-	      tree addr = build_unary_op (ADDR_EXPR, NULL_TREE, gnu_name);
+	      tree addr = build_unary_op (unqualified_addr_expr (),
+					  NULL_TREE, gnu_name);
 	      append_to_statement_list (addr, &gnu_stmt_list);
 	    }
 
@@ -4983,8 +4990,8 @@ Call_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, tree gnu_target,
       gnu_call
         = build_call_array_loc (UNKNOWN_LOCATION,
 				gnu_result_type,
-				build_unary_op (ADDR_EXPR, NULL_TREE,
-						gnu_subprog),
+				build_unary_op (unqualified_addr_expr (),
+						NULL_TREE, gnu_subprog),
 				gnu_actual_vec.length (),
 			        gnu_actual_vec.begin ());
       CALL_EXPR_BY_DESCRIPTOR (gnu_call) = by_descriptor;
@@ -5333,7 +5340,8 @@ Handled_Sequence_Of_Statements_to_gnu (Node_Id gnat_node)
   if (fe_sjlj_eh)
     {
       gnu_expr = build_call_n_expr (set_jmpbuf_decl, 1,
-				    build_unary_op (ADDR_EXPR, NULL_TREE,
+				    build_unary_op (unqualified_addr_expr (),
+						    NULL_TREE,
 						    gnu_jmpbuf_decl));
       set_expr_location_from_node (gnu_expr, gnat_node);
       add_stmt (gnu_expr);
@@ -5422,8 +5430,8 @@ Handled_Sequence_Of_Statements_to_gnu (Node_Id gnat_node)
       gnu_result = build3 (COND_EXPR, void_type_node,
 			   (build_call_n_expr
 			    (setjmp_decl, 1,
-			     build_unary_op (ADDR_EXPR, NULL_TREE,
-					     gnu_jmpbuf_decl))),
+			     build_unary_op (unqualified_addr_expr (),
+					     NULL_TREE, gnu_jmpbuf_decl))),
 			   gnu_handler, gnu_inner_block);
     }
   else if (gcc_eh)
@@ -5526,7 +5534,8 @@ Exception_Handler_to_gnu_fe_sjlj (Node_Id gnat_node)
 	      (EQ_EXPR, boolean_type_node,
 	       gnu_except_ptr_stack->last (),
 	       convert (TREE_TYPE (gnu_except_ptr_stack->last ()),
-			build_unary_op (ADDR_EXPR, NULL_TREE, gnu_expr)));
+			build_unary_op (unqualified_addr_expr (),
+					NULL_TREE, gnu_expr)));
 }
       else
 	gcc_unreachable ();
@@ -5591,7 +5600,8 @@ Exception_Handler_to_gnu_gcc (Node_Id gnat_node)
       if (Nkind (gnat_temp) == N_Others_Choice)
 	{
 	  gnu_expr = All_Others (gnat_temp) ? all_others_decl : others_decl;
-	  gnu_etype = build_unary_op (ADDR_EXPR, NULL_TREE, gnu_expr);
+	  gnu_etype = build_unary_op (unqualified_addr_expr (),
+				      NULL_TREE, gnu_expr);
 	}
       else if (Nkind (gnat_temp) == N_Identifier
 	       || Nkind (gnat_temp) == N_Expanded_Name)
@@ -5604,7 +5614,8 @@ Exception_Handler_to_gnu_gcc (Node_Id gnat_node)
 	    gnat_ex_id = Renamed_Object (gnat_ex_id);
 
 	  gnu_expr = gnat_to_gnu_entity (gnat_ex_id, NULL_TREE, false);
-	  gnu_etype = build_unary_op (ADDR_EXPR, NULL_TREE, gnu_expr);
+	  gnu_etype = build_unary_op (unqualified_addr_expr (),
+				      NULL_TREE, gnu_expr);
 	}
       else
 	gcc_unreachable ();
@@ -5681,7 +5692,8 @@ Exception_Handler_to_gnu_gcc (Node_Id gnat_node)
       /* CODE: __gnat_set_exception_parameter (&choice_param, EXPTR); */
       add_stmt (build_call_n_expr
 		(set_exception_parameter_decl, 2,
-		 build_unary_op (ADDR_EXPR, NULL_TREE, gnu_param),
+		 build_unary_op (unqualified_addr_expr (),
+				 NULL_TREE, gnu_param),
 		 gnu_incoming_exc_ptr));
     }
 
@@ -6773,7 +6785,8 @@ gnat_to_gnu (Node_Id gnat_node)
     case N_Reference:
       /* Like 'Access as far as we are concerned.  */
       gnu_result = gnat_to_gnu (Prefix (gnat_node));
-      gnu_result = build_unary_op (ADDR_EXPR, NULL_TREE, gnu_result);
+      gnu_result = build_unary_op (unqualified_addr_expr (),
+				   NULL_TREE, gnu_result);
       gnu_result_type = get_unpadded_type (Etype (gnat_node));
       break;
 
@@ -6888,7 +6901,8 @@ gnat_to_gnu (Node_Id gnat_node)
       if (TARGET_VTABLE_USES_DESCRIPTORS
 	  && TREE_TYPE (gnu_expr) == fdesc_type_node
 	  && POINTER_TYPE_P (gnu_result_type))
-	gnu_expr = build_unary_op (ADDR_EXPR, NULL_TREE, gnu_expr);
+	gnu_expr = build_unary_op (unqualified_addr_expr (),
+				   NULL_TREE, gnu_expr);
 
       gnu_result = unchecked_convert (gnu_result_type, gnu_expr,
 				      No_Truncation (gnat_node));
@@ -7456,7 +7470,8 @@ gnat_to_gnu (Node_Id gnat_node)
 	       to the return value.  */
 	    if (TYPE_RETURN_BY_DIRECT_REF_P (gnu_subprog_type)
 		|| By_Ref (gnat_node))
-	      gnu_ret_val = build_unary_op (ADDR_EXPR, NULL_TREE, gnu_ret_val);
+	      gnu_ret_val = build_unary_op (unqualified_addr_expr (),
+					    NULL_TREE, gnu_ret_val);
 
 	    /* Otherwise, if it returns an unconstrained array, we have to
 	       allocate a new version of the result and return it.  */
@@ -8048,7 +8063,7 @@ gnat_to_gnu (Node_Id gnat_node)
 	     for this is that we need to have a fat pointer someplace in order
 	     to properly compute the size.  */
 	  if (TYPE_IS_THIN_POINTER_P (TREE_TYPE (gnu_ptr)))
-	    gnu_ptr = build_unary_op (ADDR_EXPR, NULL_TREE,
+	    gnu_ptr = build_unary_op (unqualified_addr_expr (), NULL_TREE,
 				      build_unary_op (INDIRECT_REF, NULL_TREE,
 						      gnu_ptr));
 

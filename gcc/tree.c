@@ -14195,6 +14195,15 @@ addr_expr_code (const_tree res_type)
   return ADDR_EXPR;
 }
 
+/* Return the *ADDR_EXPR code that should be used if the type of the
+   result is an unqualified pointer, as for ptr_type_node.  */
+
+tree_code
+unqualified_addr_expr ()
+{
+  return CAPABILITY_MODE_P (Pmode) ? CAP_ADDR_EXPR : NONCAP_ADDR_EXPR;
+}
+
 /* Return the machine mode of T.  For vectors, returns the mode of the
    inner type.  The main use case is to feed the result to HONOR_NANS,
    avoiding the BLKmode that a direct TYPE_MODE (T) might return.  */

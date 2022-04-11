@@ -1484,7 +1484,7 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 
       innerptrtype = build_pointer_type (arg1_inner_type);
 
-      stmt = build_unary_op (loc, ADDR_EXPR, stmt, 0);
+      stmt = build_unary_op (loc, unqualified_addr_expr (), stmt, 0);
       stmt = convert (innerptrtype, stmt);
       stmt = build_binary_op (loc, PLUS_EXPR, stmt, arg2, 1);
       stmt = build_indirect_ref (loc, stmt, RO_NULL);
@@ -1596,7 +1596,7 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 
       innerptrtype = build_pointer_type (arg1_inner_type);
 
-      stmt = build_unary_op (loc, ADDR_EXPR, stmt, 0);
+      stmt = build_unary_op (loc, unqualified_addr_expr (), stmt, 0);
       stmt = convert (innerptrtype, stmt);
       stmt = build_binary_op (loc, PLUS_EXPR, stmt, arg2, 1);
       stmt = build_indirect_ref (loc, stmt, RO_NULL);

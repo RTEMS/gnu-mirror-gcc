@@ -817,7 +817,8 @@ gnat_get_array_descr_info (const_tree const_type,
 	 pointers are shifted).  */
       tree placeholder_expr = build0 (PLACEHOLDER_EXPR, type);
       tree placeholder_addr
-	= build_unary_op (ADDR_EXPR, NULL_TREE, placeholder_expr);
+	= build_unary_op (unqualified_addr_expr (), NULL_TREE,
+			  placeholder_expr);
 
       tree bounds_field = TYPE_FIELDS (type);
       tree bounds_type = TREE_TYPE (bounds_field);

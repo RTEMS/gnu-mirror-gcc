@@ -1718,7 +1718,8 @@ reference_accessor_p (tree init_expr, tree field_decl, tree field_type,
 
   tree field_pointer_type = build_pointer_type (field_type);
   tree addr_expr = STRIP_NOPS (TREE_OPERAND (init_expr, 1));
-  if (!matches_code_and_type_p (addr_expr, ADDR_EXPR, field_pointer_type))
+  if (!matches_code_and_type_p (addr_expr, unqualified_addr_expr (),
+				field_pointer_type))
     return false;
 
   tree component_ref = STRIP_NOPS (TREE_OPERAND (addr_expr, 0));

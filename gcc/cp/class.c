@@ -550,7 +550,7 @@ build_simple_base_path (tree expr, tree binfo)
 	 into `(*(a ?  &b : &c)).x', and so on.  A COND_EXPR is only
 	 an lvalue in the front end; only _DECLs and _REFs are lvalues
 	 in the back end.  */
-      temp = unary_complex_lvalue (ADDR_EXPR, expr);
+      temp = unary_complex_lvalue (unqualified_addr_expr (), expr);
       if (temp)
 	expr = cp_build_fold_indirect_ref (temp);
 

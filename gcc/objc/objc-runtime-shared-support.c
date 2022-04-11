@@ -324,7 +324,8 @@ add_objc_string (tree ident, string_section section)
       if (TREE_VALUE (*chain) == ident)
 	return convert (string_type_node,
 			build_unary_op (input_location,
-					ADDR_EXPR, TREE_PURPOSE (*chain), 1));
+					unqualified_addr_expr (),
+					TREE_PURPOSE (*chain), 1));
 
       chain = &TREE_CHAIN (*chain);
     }
@@ -337,7 +338,8 @@ add_objc_string (tree ident, string_section section)
   *chain = tree_cons (decl, ident, NULL_TREE);
 
   return convert (string_type_node,
-		  build_unary_op (input_location, ADDR_EXPR, decl, 1));
+		  build_unary_op (input_location, unqualified_addr_expr (),
+				  decl, 1));
 }
 
 /* --- shared metadata routines --- */
@@ -390,7 +392,7 @@ build_dispatch_table_initializer (tree type, tree entries)
 					       meth_var_types));
 
       expr = convert (ptr_type_node,
-		      build_unary_op (input_location, ADDR_EXPR,
+		      build_unary_op (input_location, unqualified_addr_expr (),
 				      METHOD_DEFINITION (entries), 1));
       CONSTRUCTOR_APPEND_ELT (elems, NULL_TREE, expr);
 
@@ -459,8 +461,8 @@ init_module_descriptor (tree type, long vers)
   ltyp = build_pointer_type (xref_tag (RECORD_TYPE,
 				       get_identifier (UTAG_SYMTAB)));
   if (UOBJC_SYMBOLS_decl)
-    expr = convert (ltyp, build_unary_op (loc,
-			   ADDR_EXPR, UOBJC_SYMBOLS_decl, 0));
+    expr = convert (ltyp, build_unary_op (loc, unqualified_addr_expr (),
+					  UOBJC_SYMBOLS_decl, 0));
   else
     expr = convert (ltyp, null_pointer_node);
   CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, expr);

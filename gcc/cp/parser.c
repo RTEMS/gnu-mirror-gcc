@@ -8655,7 +8655,7 @@ cp_parser_unary_operator (cp_token* token)
       return INDIRECT_REF;
 
     case CPP_AND:
-      return ADDR_EXPR;
+      return unqualified_addr_expr ();
 
     case CPP_PLUS:
       return UNARY_PLUS_EXPR;
@@ -17455,8 +17455,8 @@ cp_parser_template_argument (cp_parser* parser)
 	  if (cp_parser_parse_definitely (parser))
 	    {
 	      if (address_p)
-		argument = build_x_unary_op (loc, ADDR_EXPR, argument,
-					     tf_warning_or_error);
+		argument = build_x_unary_op (loc, unqualified_addr_expr (),
+					     argument, tf_warning_or_error);
 	      else
 		argument = convert_from_reference (argument);
 	      return argument;
@@ -21855,7 +21855,7 @@ cp_parser_ptr_operator (cp_parser* parser,
   if (token->type == CPP_MULT)
     code = INDIRECT_REF;
   else if (token->type == CPP_AND)
-    code = ADDR_EXPR;
+    code = unqualified_addr_expr ();
   else if ((cxx_dialect != cxx98) &&
 	   token->type == CPP_AND_AND) /* C++0x only */
     code = NON_LVALUE_EXPR;

@@ -912,7 +912,8 @@ next_runtime_abi_01_get_protocol_reference (location_t loc, tree p)
   if (!PROTOCOL_FORWARD_DECL (p))
     PROTOCOL_FORWARD_DECL (p) = next_runtime_abi_01_protocol_decl (p);
 
-  expr = build_unary_op (loc, ADDR_EXPR, PROTOCOL_FORWARD_DECL (p), 0);
+  expr = build_unary_op (loc, unqualified_addr_expr (),
+			 PROTOCOL_FORWARD_DECL (p), 0);
   return convert (objc_protocol_type, expr);
 }
 
@@ -1013,11 +1014,13 @@ next_runtime_abi_01_build_const_string_constructor (location_t loc, tree string,
   /* NeXT:   (NSConstantString *) & ((__builtin_ObjCString) { isa, string, length })   */
   fields = TYPE_FIELDS (internal_const_str_type);
   CONSTRUCTOR_APPEND_ELT (v, fields,
-			  build_unary_op (loc, ADDR_EXPR, string_class_decl, 0));
+			  build_unary_op (loc, unqualified_addr_expr (),
+					  string_class_decl, 0));
 
   fields = DECL_CHAIN (fields);
   CONSTRUCTOR_APPEND_ELT (v, fields,
-			  build_unary_op (loc, ADDR_EXPR, string, 1));
+			  build_unary_op (loc, unqualified_addr_expr (),
+					  string, 1));
 
   /* ??? check if this should be long.  */
   fields = DECL_CHAIN (fields);
@@ -1210,7 +1213,8 @@ generate_v1_objc_protocol_extension (tree proto_interface,
   /* struct objc_method_list *optional_instance_methods; */
   if (opt_instance_meth)
     expr = convert (objc_method_list_ptr,
-		    build_unary_op (loc, ADDR_EXPR, opt_instance_meth, 0));
+		    build_unary_op (loc, unqualified_addr_expr (),
+				    opt_instance_meth, 0));
   else
     expr = convert (objc_method_list_ptr, null_pointer_node);
 
@@ -1219,7 +1223,8 @@ generate_v1_objc_protocol_extension (tree proto_interface,
   /* struct objc_method_list *optional_class_methods; */
   if (opt_class_meth)
     expr = convert (objc_method_list_ptr,
-		    build_unary_op (loc, ADDR_EXPR, opt_class_meth, 0));
+		    build_unary_op (loc, unqualified_addr_expr (),
+				    opt_class_meth, 0));
   else
     expr = convert (objc_method_list_ptr, null_pointer_node);
 
@@ -1227,7 +1232,8 @@ generate_v1_objc_protocol_extension (tree proto_interface,
   /* struct objc_prop_list *instance_properties; */
   if (instance_props)
       expr = convert (objc_prop_list_ptr,
-		      build_unary_op (loc, ADDR_EXPR, instance_props, 0));
+		      build_unary_op (loc, unqualified_addr_expr (),
+				      instance_props, 0));
   else
     expr = convert (objc_prop_list_ptr, null_pointer_node);
 
@@ -1404,7 +1410,7 @@ generate_v1_protocol_list (tree i_or_p, tree klass_ctxt)
 	{
 	  tree fwref = PROTOCOL_FORWARD_DECL (pval);
 	  location_t loc = DECL_SOURCE_LOCATION (fwref) ;
-	  e = build_unary_op (loc, ADDR_EXPR, fwref, 0);
+	  e = build_unary_op (loc, unqualified_addr_expr (), fwref, 0);
           CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, e);
 	}
     }
@@ -1461,7 +1467,8 @@ build_v1_protocol_initializer (tree type, tree protocol_name, tree protocol_list
   /* Instead of jamming the protocol version number into the isa, we pass
      either a pointer to the protocol extension - or NULL.  */
   if (protocol_ext)
-    expr = convert (ttyp, build_unary_op (loc, ADDR_EXPR, protocol_ext, 0));
+    expr = convert (ttyp, build_unary_op (loc, unqualified_addr_expr (),
+					  protocol_ext, 0));
   else
     expr = convert (ttyp, null_pointer_node);
 
@@ -1471,13 +1478,15 @@ build_v1_protocol_initializer (tree type, tree protocol_name, tree protocol_list
 
   ttyp = objc_method_proto_list_ptr;
   if (inst_methods)
-    expr = convert (ttyp, build_unary_op (loc, ADDR_EXPR, inst_methods, 0));
+    expr = convert (ttyp, build_unary_op (loc, unqualified_addr_expr (),
+					  inst_methods, 0));
   else
     expr = convert (ttyp, null_pointer_node);
   CONSTRUCTOR_APPEND_ELT (inits, NULL_TREE, expr);
 
   if (class_methods)
-    expr = convert (ttyp, build_unary_op (loc, ADDR_EXPR, class_methods, 0));
+    expr = convert (ttyp, build_unary_op (loc, unqualified_addr_expr (),
+					  class_methods, 0));
   else
     expr = convert (ttyp, null_pointer_node);
   CONSTRUCTOR_APPEND_ELT (inits, NULL_TREE, expr);
@@ -1622,7 +1631,8 @@ generate_v1_protocols (void)
 	build_pointer_type (build_pointer_type (objc_protocol_template));
       if (refs_decl)
 	refs_expr = convert (refs_type,
-			     build_unary_op (loc, ADDR_EXPR, refs_decl, 0));
+			     build_unary_op (loc, unqualified_addr_expr (),
+					     refs_decl, 0));
       else
         refs_expr = convert (refs_type, null_pointer_node);
 
@@ -1704,13 +1714,15 @@ build_v1_category_initializer (tree type, tree cat_name, tree class_name,
 
   ltyp = objc_method_list_ptr;
   if (inst_methods)
-    expr = convert (ltyp, build_unary_op (loc, ADDR_EXPR, inst_methods, 0));
+    expr = convert (ltyp, build_unary_op (loc, unqualified_addr_expr (),
+					  inst_methods, 0));
   else
     expr = convert (ltyp, null_pointer_node);
   CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, expr);
 
   if (class_methods)
-    expr = convert (ltyp, build_unary_op (loc, ADDR_EXPR, class_methods, 0));
+    expr = convert (ltyp, build_unary_op (loc, unqualified_addr_expr (),
+					  class_methods, 0));
   else
     expr = convert (ltyp, null_pointer_node);
   CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, expr);
@@ -1718,7 +1730,8 @@ build_v1_category_initializer (tree type, tree cat_name, tree class_name,
   /* protocol_list = */
   ltyp = build_pointer_type (build_pointer_type (objc_protocol_template));
   if (protocol_list)
-    expr = convert (ltyp, build_unary_op (loc, ADDR_EXPR, protocol_list, 0));
+    expr = convert (ltyp, build_unary_op (loc, unqualified_addr_expr (),
+					  protocol_list, 0));
   else
     expr = convert (ltyp, null_pointer_node);
   CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, expr);
@@ -1730,7 +1743,8 @@ build_v1_category_initializer (tree type, tree cat_name, tree class_name,
       CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, expr);
       ltyp = objc_prop_list_ptr;
       if (property_list)
-	expr = convert (ltyp, build_unary_op (loc, ADDR_EXPR, property_list, 0));
+	expr = convert (ltyp, build_unary_op (loc, unqualified_addr_expr (),
+					      property_list, 0));
       else
 	expr = convert (ltyp, null_pointer_node);
       CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, expr);
@@ -1840,7 +1854,8 @@ generate_objc_class_ext (tree property_list, tree context)
   /* struct _prop_list_t *properties; */
   ltyp = objc_prop_list_ptr;
   if (property_list)
-     expr = convert (ltyp, build_unary_op (loc, ADDR_EXPR, property_list, 0));
+     expr = convert (ltyp, build_unary_op (loc, unqualified_addr_expr (),
+					   property_list, 0));
   else
     expr = convert (ltyp, null_pointer_node);
   CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, expr);
@@ -1911,7 +1926,8 @@ build_v1_shared_structure_initializer (tree type, tree isa, tree super,
   /* objc_ivar_list = */
   ltyp = objc_ivar_list_ptr;
   if (ivar_list)
-    expr = convert (ltyp, build_unary_op (loc, ADDR_EXPR, ivar_list, 0));
+    expr = convert (ltyp, build_unary_op (loc, unqualified_addr_expr (),
+					  ivar_list, 0));
   else
     expr = convert (ltyp, null_pointer_node);
   CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, expr);
@@ -1919,7 +1935,8 @@ build_v1_shared_structure_initializer (tree type, tree isa, tree super,
   /* objc_method_list = */
   ltyp = objc_method_list_ptr;
   if (dispatch_table)
-    expr = convert (ltyp, build_unary_op (loc, ADDR_EXPR, dispatch_table, 0));
+    expr = convert (ltyp, build_unary_op (loc, unqualified_addr_expr (),
+					  dispatch_table, 0));
   else
     expr = convert (ltyp, null_pointer_node);
   CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, expr);
@@ -1932,7 +1949,8 @@ build_v1_shared_structure_initializer (tree type, tree isa, tree super,
   /* protocol_list = */
   ltyp = build_pointer_type (build_pointer_type (objc_protocol_template));
   if (protocol_list)
-    expr = convert (ltyp, build_unary_op (loc, ADDR_EXPR,  protocol_list, 0));
+    expr = convert (ltyp, build_unary_op (loc, unqualified_addr_expr (),
+					  protocol_list, 0));
   else
     expr = convert (ltyp, null_pointer_node);
   CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, expr);
@@ -1946,7 +1964,8 @@ build_v1_shared_structure_initializer (tree type, tree isa, tree super,
 	build_objc_class_ext_template ();
       ltyp = build_pointer_type (objc_class_ext_template);
       if (class_ext)
-	expr = convert (ltyp, build_unary_op (loc, ADDR_EXPR, class_ext, 0));
+	expr = convert (ltyp, build_unary_op (loc, unqualified_addr_expr (),
+					      class_ext, 0));
       else
 	expr = convert (ltyp, null_pointer_node);
       CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, expr);
@@ -2119,7 +2138,7 @@ generate_v1_class_structs (struct imp_entry *impent)
 
   initlist = build_v1_shared_structure_initializer
 		(TREE_TYPE (class_decl),
-		build_unary_op (loc, ADDR_EXPR, meta_decl, 0),
+		build_unary_op (loc, unqualified_addr_expr (), meta_decl, 0),
 		super_expr, name_expr,
 		convert (integer_type_node,
 			 TYPE_SIZE_UNIT (CLASS_STATIC_TEMPLATE (impent->imp_template))),
@@ -2149,8 +2168,8 @@ init_def_list (tree type)
 	if (TREE_CODE (impent->imp_context) == CLASS_IMPLEMENTATION_TYPE)
 	  {
 	    loc = DECL_SOURCE_LOCATION (impent->class_decl);
-	    expr = build_unary_op (loc,
-				   ADDR_EXPR, impent->class_decl, 0);
+	    expr = build_unary_op (loc, unqualified_addr_expr (),
+				   impent->class_decl, 0);
 	    CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, expr);
 	  }
       }
@@ -2161,8 +2180,8 @@ init_def_list (tree type)
 	if (TREE_CODE (impent->imp_context) == CATEGORY_IMPLEMENTATION_TYPE)
 	  {
 	    loc = DECL_SOURCE_LOCATION (impent->class_decl);
-	    expr = build_unary_op (loc,
-				   ADDR_EXPR, impent->class_decl, 0);
+	    expr = build_unary_op (loc, unqualified_addr_expr (),
+				   impent->class_decl, 0);
 	    CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, expr);
 	  }
       }

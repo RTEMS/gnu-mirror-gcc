@@ -922,7 +922,7 @@ copy_reference_ops_from_ref (tree ref, vec<vn_reference_op_s> *result)
 	  temp.op0 = build_int_cst (build_pointer_type (TREE_TYPE (ref)), 0);
 	  temp.off = 0;
 	  result->safe_push (temp);
-	  temp.opcode = ADDR_EXPR;
+	  temp.opcode = unqualified_addr_expr ();
 	  temp.op0 = build_addr_expr (TREE_TYPE (temp.op0), ref);
 	  temp.type = TREE_TYPE (temp.op0);
 	  temp.off = -1;

@@ -941,7 +941,8 @@ make_aligning_type (tree type, unsigned int align, tree size,
   tree record = build0 (PLACEHOLDER_EXPR, record_type);
 
   tree record_addr_st
-    = convert (sizetype, build_unary_op (ADDR_EXPR, NULL_TREE, record));
+    = convert (sizetype, build_unary_op (unqualified_addr_expr (),
+					 NULL_TREE, record));
 
   /* The diagram below summarizes the shape of what we manipulate:
 
@@ -4371,7 +4372,8 @@ convert_to_fat_pointer (tree type, tree expr)
 	     empty constructor.  The middle-end will fill it in with zeros.  */
 	  t = build_constructor (template_type, NULL);
 	  TREE_CONSTANT (t) = TREE_STATIC (t) = 1;
-	  null_bounds = build_unary_op (ADDR_EXPR, NULL_TREE, t);
+	  null_bounds = build_unary_op (unqualified_addr_expr (),
+					NULL_TREE, t);
 	  SET_TYPE_NULL_BOUNDS (ptr_template_type, null_bounds);
 	}
 
@@ -4413,9 +4415,9 @@ convert_to_fat_pointer (tree type, tree expr)
 	{
 	  expr = build_unary_op (INDIRECT_REF, NULL_TREE, expr);
 	  template_addr
-	    = build_unary_op (ADDR_EXPR, NULL_TREE,
+	    = build_unary_op (unqualified_addr_expr (), NULL_TREE,
 			      build_component_ref (expr, field, false));
-	  expr = build_unary_op (ADDR_EXPR, NULL_TREE,
+	  expr = build_unary_op (unqualified_addr_expr (), NULL_TREE,
 				 build_component_ref (expr, DECL_CHAIN (field),
 						      false));
 	}
@@ -4424,7 +4426,7 @@ convert_to_fat_pointer (tree type, tree expr)
   /* Otherwise, build the constructor for the template.  */
   else
     template_addr
-      = build_unary_op (ADDR_EXPR, NULL_TREE,
+      = build_unary_op (unqualified_addr_expr (), NULL_TREE,
 			build_template (template_type, TREE_TYPE (etype),
 					expr));
 
@@ -5024,7 +5026,7 @@ convert (tree type, tree expr)
 	  build_unary_op
 	    (INDIRECT_REF, NULL_TREE,
 	     convert_to_fat_pointer (TREE_TYPE (type),
-				     build_unary_op (ADDR_EXPR,
+				     build_unary_op (unqualified_addr_expr (),
 						     NULL_TREE, expr)));
 
       /* Do something very similar for converting one unconstrained
@@ -5033,7 +5035,7 @@ convert (tree type, tree expr)
 	return
 	  build_unary_op (INDIRECT_REF, NULL_TREE,
 			  convert (TREE_TYPE (type),
-				   build_unary_op (ADDR_EXPR,
+				   build_unary_op (unqualified_addr_expr (),
 						   NULL_TREE, expr)));
       else
 	gcc_unreachable ();
@@ -5524,8 +5526,8 @@ unchecked_convert (tree type, tree expr, bool notrunc_p)
   else if (ecode == code && code == UNCONSTRAINED_ARRAY_TYPE)
     expr = build_unary_op (INDIRECT_REF, NULL_TREE,
 			   build1 (VIEW_CONVERT_EXPR, TREE_TYPE (type),
-				   build_unary_op (ADDR_EXPR, NULL_TREE,
-						   expr)));
+				   build_unary_op (unqualified_addr_expr (),
+						   NULL_TREE, expr)));
 
   /* Another special case is when we are converting to a vector type from its
      representative array type; this a regular conversion.  */

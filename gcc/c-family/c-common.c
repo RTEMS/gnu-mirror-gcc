@@ -3426,7 +3426,7 @@ c_common_truthvalue_conversion (location_t location, tree expr)
 	     : truthvalue_false_node;
 
     case FUNCTION_DECL:
-      expr = build_unary_op (location, ADDR_EXPR, expr, false);
+      expr = build_unary_op (location, unqualified_addr_expr (), expr, false);
       goto addr_expr;
 
     CASE_ADDR_EXPR:

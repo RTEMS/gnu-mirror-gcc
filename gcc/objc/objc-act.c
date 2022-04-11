@@ -3220,8 +3220,8 @@ objc_build_string_object (tree string)
     }
 
   addr = convert (build_pointer_type (constant_string_type),
-		  build_unary_op (input_location,
-				  ADDR_EXPR, desc->constructor, 1));
+		  build_unary_op (input_location, unqualified_addr_expr (),
+				  desc->constructor, 1));
 
   return addr;
 }
@@ -3576,7 +3576,8 @@ objc_build_ivar_assignment (tree outervar, tree lhs, tree rhs)
        : objc_assign_ivar_decl);
 
   offs = convert (integer_type_node, build_unary_op (input_location,
-						     ADDR_EXPR, offs, 0));
+						     unqualified_addr_expr (),
+						     offs, 0));
   offs = fold (offs);
   func_params = tree_cons (NULL_TREE,
 	convert (objc_object_type, rhs),
@@ -3593,7 +3594,8 @@ objc_build_global_assignment (tree lhs, tree rhs)
   tree func_params = tree_cons (NULL_TREE,
 	convert (objc_object_type, rhs),
 	    tree_cons (NULL_TREE, convert (build_pointer_type (objc_object_type),
-		      build_unary_op (input_location, ADDR_EXPR, lhs, 0)),
+		      build_unary_op (input_location, unqualified_addr_expr (),
+				      lhs, 0)),
 		    NULL_TREE));
 
   return build_function_call (input_location,
@@ -3606,7 +3608,8 @@ objc_build_strong_cast_assignment (tree lhs, tree rhs)
   tree func_params = tree_cons (NULL_TREE,
 	convert (objc_object_type, rhs),
 	    tree_cons (NULL_TREE, convert (build_pointer_type (objc_object_type),
-		      build_unary_op (input_location, ADDR_EXPR, lhs, 0)),
+		      build_unary_op (input_location, unqualified_addr_expr (),
+				      lhs, 0)),
 		    NULL_TREE));
 
   return build_function_call (input_location,
@@ -7315,7 +7318,8 @@ objc_synthesize_getter (tree klass, tree class_methods ATTRIBUTE_UNUSED, tree pr
 	     tree_cons /* &__objc_property_temp_decl */
 	     /* Warning: note that using build_fold_addr_expr_loc()
 		here causes invalid code to be generated.  */
-	     (NULL_TREE, build_unary_op (location, ADDR_EXPR, objc_property_temp_decl, 0),
+	     (NULL_TREE, build_unary_op (location, unqualified_addr_expr (),
+					 objc_property_temp_decl, 0),
 	      tree_cons /* &(self->PROPERTY_IVAR_NAME); */
 	      (NULL_TREE, build_fold_addr_expr_loc (location,
 						    objc_lookup_ivar
@@ -8847,8 +8851,8 @@ get_super_receiver (void)
       super_expr_list = build_compound_expr (input_location,
 					     super_expr_list, super_expr);
 
-      super_expr = build_unary_op (input_location,
-				   ADDR_EXPR, UOBJC_SUPER_decl, 0);
+      super_expr = build_unary_op (input_location, unqualified_addr_expr (),
+				   UOBJC_SUPER_decl, 0);
       super_expr_list = build_compound_expr (input_location,
 					     super_expr_list, super_expr);
 

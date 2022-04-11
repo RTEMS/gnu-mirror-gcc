@@ -2715,7 +2715,7 @@ plugin_build_unary_expr (cc1_plugin::connection *self,
       opcode = NEGATE_EXPR;
       break;
     case CHARS2 ('a', 'd'): // operator & (unary)
-      opcode = ADDR_EXPR;
+      opcode = unqualified_addr_expr ();
       break;
     case CHARS2 ('d', 'e'): // operator * (unary)
       opcode = INDIRECT_REF;

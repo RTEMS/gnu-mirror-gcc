@@ -19527,7 +19527,7 @@ tsubst_copy_and_build (tree t,
       else
 	op1 = tsubst_non_call_postfix_expression (op1, args, complain,
 						  in_decl);
-      RETURN (build_x_unary_op (input_location, ADDR_EXPR, op1,
+      RETURN (build_x_unary_op (input_location, unqualified_addr_expr (), op1,
 				complain|decltype_flag));
 
     case PLUS_EXPR:
