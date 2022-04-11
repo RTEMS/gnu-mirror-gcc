@@ -2992,12 +2992,14 @@ verify_address (tree t, bool verify_addressable)
 
   if (old_constant != new_constant)
     {
-      error ("constant not recomputed when %<ADDR_EXPR%> changed");
+      error ("constant not recomputed when %qs changed",
+	     get_tree_code_name (TREE_CODE (t)));
       return true;
     }
   if (old_side_effects != new_side_effects)
     {
-      error ("side effects not recomputed when %<ADDR_EXPR%> changed");
+      error ("side effects not recomputed when %qs changed",
+	     get_tree_code_name (TREE_CODE (t)));
       return true;
     }
 
