@@ -6414,8 +6414,9 @@ gfc_trans_auto_array_allocation (tree decl, gfc_symbol * sym,
       tmp = fold_build1_loc (input_location, DECL_EXPR,
 			     TREE_TYPE (space), space);
       gfc_add_expr_to_block (&init, tmp);
-      addr = fold_build1_loc (gfc_get_location (&sym->declared_at),
-			      ADDR_EXPR, TREE_TYPE (decl), space);
+      addr = build_fold_addr_expr_with_type_loc
+	       (gfc_get_location (&sym->declared_at),
+		space, TREE_TYPE (decl));
       gfc_add_modify (&init, decl, addr);
       gfc_add_init_cleanup (block, gfc_finish_block (&init), NULL_TREE);
       tmp = NULL_TREE;

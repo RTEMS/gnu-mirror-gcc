@@ -5718,7 +5718,7 @@ stabilize_va_list_loc (location_t loc, tree valist, int needs_lvalue)
 	  if (! TREE_SIDE_EFFECTS (valist))
 	    return valist;
 
-	  valist = fold_build1_loc (loc, ADDR_EXPR, pt, valist);
+	  valist = build_fold_addr_expr_with_type_loc (loc, valist, pt);
 	  TREE_SIDE_EFFECTS (valist) = 1;
 	}
 

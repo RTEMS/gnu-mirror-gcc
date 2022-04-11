@@ -300,7 +300,7 @@ gfc_build_addr_expr (tree type, tree t)
       tree base = get_base_address (t);
       if (base && DECL_P (base))
         TREE_ADDRESSABLE (base) = 1;
-      t = fold_build1_loc (input_location, ADDR_EXPR, natural_type, t);
+      t = build_fold_addr_expr_with_type_loc (input_location, t, natural_type);
     }
 
   if (type && natural_type != type)
@@ -517,9 +517,9 @@ trans_runtime_error_vararg (tree errorfunc, locus* where, const char* msgid,
 
   loc = where ? gfc_get_location (where) : input_location;
   tmp = fold_build_call_array_loc (loc, TREE_TYPE (fntype),
-				   fold_build1_loc (loc, ADDR_EXPR,
-					     build_pointer_type (fntype),
-					     errorfunc),
+				   build_fold_addr_expr_with_type_loc
+				     (loc, errorfunc,
+				      build_pointer_type (fntype)),
 				   nargs + 2, argarray);
   gfc_add_expr_to_block (&block, tmp);
 

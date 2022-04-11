@@ -7518,7 +7518,8 @@ rewrite_use_address (struct ivopts_data *data,
 
   if (use->type == USE_PTR_ADDRESS)
     {
-      ref = fold_build1 (ADDR_EXPR, build_pointer_type (use->mem_type), ref);
+      tree ptr_type = build_pointer_type (use->mem_type);
+      ref = build_fold_addr_expr_with_type (ref, ptr_type);
       ref = fold_convert (get_use_type (use), ref);
       ref = force_gimple_operand_gsi (&bsi, ref, true, NULL_TREE,
 				      true, GSI_SAME_STMT);
