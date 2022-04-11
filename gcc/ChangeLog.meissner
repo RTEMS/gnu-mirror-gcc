@@ -1,3 +1,53 @@
+==================== Work086, patch #6:
+
+Add zero_extendditi2.  Improve lxvr*x code generation.
+
+This pattern adds zero_extendditi2 so that if we are extending DImode to
+TImode, and we want the result in a vector register, the compiler can
+generate MTVSRDDD.
+
+In addition the patterns for generating lxvr{b,h,w,d}x were tuned to allow
+loading to gpr registers.  This prevents needlessly doing direct moves to
+get the value into the vector registers if the gpr register was already
+selected.
+
+In updating the insn counts for two tests due to these changes, I noticed
+the tests were done at -O0.  I changed this so that the tests are now done
+at the normal -O2 optimization level.
+
+2022-04-11   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/vsx.md (vsx_lxvr<wd>x): Add support for loading to
+	GPR registers.
+	(vsx_stxvr<wd>x): Add support for storing from GPR registers.
+	(zero_extendditi2): New insn.
+
+gcc/testsuite/
+	* gcc.target/powerpc/vsx-load-element-extend-int.c: Use -O2
+	instead of -O0 and update insn counts.
+	* gcc.target/powerpc/vsx-load-element-extend-short.c: Likewise.
+	* gcc.target/powerpc/zero-extend-di-ti.c: New test.
+
+==================== Work086, patch #5:
+
+Make addti3/subti3 be define_insn_and_split, instead of define_expand
+
+This patch makes addti3 and subti3 be define_insn_and_split instead of
+define_expand.  This patch will be a building block to support in a future
+patch PR target/103109 which wants to optimize 128-bit some integer
+multiply-add combinations to use the power9 maddld, maddhd, maddhdu
+instructions.  In order to support recognizing the multiply and add
+combination, we need to keep the addti3 and subti3 as complete insns
+through the combiner phase.
+
+2022-04-11   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/rs6000.md (addti3): Don't immediately expand the
+	insn.  Delay expansion until the split passes.
+	(subti3): Likewise.
+
 ==================== Work086, patch #4:
 
 Eliminate power8 fusion options, use power8 tuning, PR target/102059
