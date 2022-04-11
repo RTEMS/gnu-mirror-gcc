@@ -4434,7 +4434,7 @@ extern tree build5 (enum tree_code, tree, tree, tree, tree, tree,
 		    tree CXX_MEM_STAT_INFO);
 extern tree build_addr_expr (tree, tree CXX_MEM_STAT_INFO);
 
-/* _loc versions of build[1-5].  */
+/* _loc versions of build[1-5] and build_addr_expr.  */
 
 static inline tree
 build1_loc (location_t loc, enum tree_code code, tree type,
@@ -4482,6 +4482,15 @@ build5_loc (location_t loc, enum tree_code code, tree type, tree arg0,
 {
   tree t = build5 (code, type, arg0, arg1, arg2, arg3,
 			arg4 PASS_MEM_STAT);
+  if (CAN_HAVE_LOCATION_P (t))
+    SET_EXPR_LOCATION (t, loc);
+  return t;
+}
+
+static inline tree
+build_addr_expr_loc (location_t loc, tree type, tree op CXX_MEM_STAT_INFO)
+{
+  tree t = build_addr_expr (type, op PASS_MEM_STAT);
   if (CAN_HAVE_LOCATION_P (t))
     SET_EXPR_LOCATION (t, loc);
   return t;

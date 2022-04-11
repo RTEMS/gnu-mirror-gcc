@@ -945,13 +945,14 @@ forward_propagate_addr_expr_1 (tree name, tree def_rhs,
   /* Optimize &x[C1] p+ C2 to  &x p+ C3 with C3 = C1 * element_size + C2.  */
   if (TREE_CODE (rhs2) == INTEGER_CST)
     {
-      tree new_rhs = build1_loc (gimple_location (use_stmt),
-				 ADDR_EXPR, TREE_TYPE (def_rhs),
-				 fold_build2 (MEM_REF,
-					      TREE_TYPE (TREE_TYPE (def_rhs)),
-					      unshare_expr (def_rhs),
-					      fold_convert (ptr_type_node,
-							    rhs2)));
+      tree new_rhs = build_addr_expr_loc
+		       (gimple_location (use_stmt),
+			TREE_TYPE (def_rhs),
+			fold_build2 (MEM_REF,
+				     TREE_TYPE (TREE_TYPE (def_rhs)),
+				     unshare_expr (def_rhs),
+				     fold_convert (ptr_type_node,
+						   rhs2)));
       gimple_assign_set_rhs_from_tree (use_stmt_gsi, new_rhs);
       use_stmt = gsi_stmt (*use_stmt_gsi);
       update_stmt (use_stmt);
@@ -2805,13 +2806,14 @@ pass_forwprop::execute (function *fun)
 		     instead of building new trees here.  */
 		  && forward_propagate_addr_expr
 		       (lhs,
-			build1_loc (gimple_location (stmt),
-				    ADDR_EXPR, TREE_TYPE (rhs),
-				    fold_build2 (MEM_REF,
-						 TREE_TYPE (TREE_TYPE (rhs)),
-						 rhs,
-						 fold_convert_for_mem_ref
-						   (ptr_type_node, off))),
+			build_addr_expr_loc
+			  (gimple_location (stmt),
+			   TREE_TYPE (rhs),
+			   fold_build2 (MEM_REF,
+					TREE_TYPE (TREE_TYPE (rhs)),
+					rhs,
+					fold_convert_for_mem_ref
+					  (ptr_type_node, off))),
 			true))
 		{
 		  fwprop_invalidate_lattice (gimple_get_lhs (stmt));

@@ -8749,7 +8749,7 @@ build_fold_addr_expr_with_type_loc (location_t loc, tree t, tree ptrtype)
 	t = fold_convert_loc (loc, ptrtype, t);
     }
   else
-    t = build1_loc (loc, ADDR_EXPR, ptrtype, t);
+    t = build_addr_expr_loc (loc, ptrtype, t);
 
   return t;
 }

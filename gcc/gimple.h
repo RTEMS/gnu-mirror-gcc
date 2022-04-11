@@ -3135,8 +3135,9 @@ static inline void
 gimple_call_set_fndecl (gcall *gs, tree decl)
 {
   gcc_gimple_checking_assert (!gimple_call_internal_p (gs));
-  gs->op[1] = build1_loc (gimple_location (gs), ADDR_EXPR,
-			  build_pointer_type (TREE_TYPE (decl)), decl);
+  gs->op[1] = build_addr_expr_loc (gimple_location (gs),
+				   build_pointer_type (TREE_TYPE (decl)),
+				   decl);
 }
 
 static inline void

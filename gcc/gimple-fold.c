@@ -218,12 +218,13 @@ canonicalize_constructor_val (tree cval, tree from_decl)
     {
       tree ptr = TREE_OPERAND (cval, 0);
       if (is_gimple_min_invariant (ptr))
-	cval = build1_loc (EXPR_LOCATION (cval),
-			   ADDR_EXPR, TREE_TYPE (ptr),
-			   fold_build2 (MEM_REF, TREE_TYPE (TREE_TYPE (ptr)),
-					ptr,
-					fold_convert_for_mem_ref (ptr_type_node,
-						      TREE_OPERAND (cval, 1))));
+	cval = build_addr_expr_loc
+		 (EXPR_LOCATION (cval),
+		  TREE_TYPE (ptr),
+		  fold_build2 (MEM_REF, TREE_TYPE (TREE_TYPE (ptr)), ptr,
+			       fold_convert_for_mem_ref
+				 (ptr_type_node,
+				  TREE_OPERAND (cval, 1))));
     }
   if (ADDR_EXPR_P (cval))
     {
@@ -6506,8 +6507,8 @@ gimple_fold_stmt_to_constant_1 (gimple *stmt, tree (*valueize) (tree),
 		    && TREE_CODE (op1) == INTEGER_CST)
 		  {
 		    tree off = fold_convert_for_mem_ref (ptr_type_node, op1);
-		    return build1_loc
-			(loc, ADDR_EXPR, TREE_TYPE (op0),
+		    return build_addr_expr_loc
+			(loc, TREE_TYPE (op0),
 			 fold_build2 (MEM_REF,
 				      TREE_TYPE (TREE_TYPE (op0)),
 				      unshare_expr (op0), off));
