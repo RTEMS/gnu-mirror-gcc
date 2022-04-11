@@ -441,7 +441,7 @@ tree_to_aff_combination (tree expr, tree type, aff_tree *comb)
 	}
       break;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       /* Handle &MEM[ptr + CST] which is equivalent to POINTER_PLUS_EXPR.  */
       if (TREE_CODE (TREE_OPERAND (expr, 0)) == MEM_REF)
 	{
@@ -813,7 +813,7 @@ aff_combination_expand (aff_tree *comb ATTRIBUTE_UNUSED,
 				     fold_convert (TREE_TYPE (name),
 						   gimple_assign_rhs1 (def)));
 	      break;
-	    case ADDR_EXPR:
+	    CASE_ADDR_EXPR:
 	    case INTEGER_CST:
 	    case POLY_INT_CST:
 	      tree_to_aff_combination (gimple_assign_rhs1 (def),

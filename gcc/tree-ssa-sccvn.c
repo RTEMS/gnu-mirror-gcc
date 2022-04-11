@@ -938,7 +938,7 @@ copy_reference_ops_from_ref (tree ref, vec<vn_reference_op_s> *result)
 	case SSA_NAME:
 	  temp.op0 = ref;
 	  break;
-	case ADDR_EXPR:
+	CASE_ADDR_EXPR:
 	  if (is_gimple_min_invariant (ref))
 	    {
 	      temp.op0 = ref;
@@ -1025,7 +1025,7 @@ ao_ref_init_from_vn_reference (ao_ref *ref,
 	{
 	/* These may be in the reference ops, but we cannot do anything
 	   sensible with them here.  */
-	case ADDR_EXPR:
+	CASE_ADDR_EXPR:
 	  /* Apart from ADDR_EXPR arguments to MEM_REF.  */
 	  if (base != NULL_TREE
 	      && TREE_CODE (base) == MEM_REF
@@ -5638,7 +5638,7 @@ vn_reference_may_trap (vn_reference_t ref)
     case MODIFY_EXPR:
     case CALL_EXPR:
       /* We do not handle calls.  */
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       /* And toplevel address computations never trap.  */
       return false;
     default:;
@@ -5669,7 +5669,7 @@ vn_reference_may_trap (vn_reference_t ref)
 	/* The following are the address bases.  */
 	case SSA_NAME:
 	  return true;
-	case ADDR_EXPR:
+	CASE_ADDR_EXPR:
 	  if (op->op0)
 	    return tree_could_trap_p (TREE_OPERAND (op->op0, 0));
 	  return false;

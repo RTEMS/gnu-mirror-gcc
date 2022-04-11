@@ -8580,7 +8580,7 @@ cp_parser_unary_expression (cp_parser *parser, cp_id_kind * pidk,
           expression.set_location (loc);
 	  break;
 
-	case ADDR_EXPR:
+	CASE_ADDR_EXPR:
 	   non_constant_p = NIC_ADDR;
 	  /* Fall through.  */
 	case BIT_NOT_EXPR:

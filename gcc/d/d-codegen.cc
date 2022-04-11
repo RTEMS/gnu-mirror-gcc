@@ -703,7 +703,7 @@ d_mark_addressable (tree exp)
 {
   switch (TREE_CODE (exp))
     {
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case COMPONENT_REF:
     case ARRAY_REF:
     case REALPART_EXPR:
@@ -758,7 +758,7 @@ d_mark_used (tree exp)
     case IMAGPART_EXPR:
     case NOP_EXPR:
     case CONVERT_EXPR:
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       d_mark_used (TREE_OPERAND (exp, 0));
       break;
 
@@ -794,7 +794,7 @@ d_mark_read (tree exp)
     case IMAGPART_EXPR:
     case NOP_EXPR:
     case CONVERT_EXPR:
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       d_mark_read (TREE_OPERAND (exp, 0));
       break;
 

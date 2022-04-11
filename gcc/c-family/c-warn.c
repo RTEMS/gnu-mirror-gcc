@@ -3054,7 +3054,7 @@ check_and_warn_address_or_pointer_of_packed_member (tree type, tree rhs)
 	{
 	  switch (TREE_CODE (rhs))
 	    {
-	    case ADDR_EXPR:
+	    CASE_ADDR_EXPR:
 	      /* Address is taken.   */
 	    case PARM_DECL:
 	    case VAR_DECL:

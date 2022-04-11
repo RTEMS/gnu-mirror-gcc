@@ -195,7 +195,7 @@ d_gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
     case MODIFY_EXPR:
       return d_gimplify_modify_expr (expr_p, pre_p, post_p);
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       return d_gimplify_addr_expr (expr_p);
 
     case CALL_EXPR:

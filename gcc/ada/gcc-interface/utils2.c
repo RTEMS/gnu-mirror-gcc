@@ -167,7 +167,7 @@ known_alignment (tree exp)
       this_alignment = known_alignment (TREE_OPERAND (exp, 1));
       break;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       if (DECL_P (TREE_OPERAND (exp, 0)))
 	this_alignment = DECL_ALIGN (TREE_OPERAND (exp, 0));
       else
@@ -1368,7 +1368,7 @@ build_unary_op (enum tree_code op_code, tree result_type, tree operand)
       break;
 
     case ATTR_ADDR_EXPR:
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       switch (TREE_CODE (operand))
 	{
 	case INDIRECT_REF:
@@ -2467,7 +2467,7 @@ gnat_mark_addressable (tree t)
   while (true)
     switch (TREE_CODE (t))
       {
-      case ADDR_EXPR:
+      CASE_ADDR_EXPR:
       case COMPONENT_REF:
       case ARRAY_REF:
       case ARRAY_RANGE_REF:

@@ -3204,7 +3204,7 @@ operand_compare::operand_equal_p (const_tree arg0, const_tree arg1,
 			      TREE_STRING_POINTER (arg1),
 			      TREE_STRING_LENGTH (arg0)));
 
-      case ADDR_EXPR:
+      CASE_ADDR_EXPR:
 	gcc_checking_assert (!(flags & OEP_ADDRESS_OF));
 	return operand_equal_p (TREE_OPERAND (arg0, 0), TREE_OPERAND (arg1, 0),
 				flags | OEP_ADDRESS_OF
@@ -3404,7 +3404,7 @@ operand_compare::operand_equal_p (const_tree arg0, const_tree arg1,
     case tcc_expression:
       switch (TREE_CODE (arg0))
 	{
-	case ADDR_EXPR:
+	CASE_ADDR_EXPR:
 	  /* Be sure we pass right ADDRESS_OF flag.  */
 	  gcc_checking_assert (!(flags & OEP_ADDRESS_OF));
 	  return operand_equal_p (TREE_OPERAND (arg0, 0),
@@ -3829,7 +3829,7 @@ operand_compare::hash_operand (const_tree t, inchash::hash &hstate,
 
 	  switch (code)
 	    {
-	    case ADDR_EXPR:
+	    CASE_ADDR_EXPR:
 	      gcc_checking_assert (!(flags & OEP_ADDRESS_OF));
 	      flags |= OEP_ADDRESS_OF;
 	      sflags = flags;
@@ -10224,7 +10224,7 @@ tree_expr_nonzero_warnv_p (tree t, bool *strict_overflow_p)
     case CONSTRUCTOR:
     case OBJ_TYPE_REF:
     case ASSERT_EXPR:
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case WITH_SIZE_EXPR:
     case SSA_NAME:
       return tree_single_nonzero_warnv_p (t, strict_overflow_p);
@@ -14332,7 +14332,7 @@ tree_expr_nonnegative_warnv_p (tree t, bool *strict_overflow_p, int depth)
     case CONSTRUCTOR:
     case OBJ_TYPE_REF:
     case ASSERT_EXPR:
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case WITH_SIZE_EXPR:
     case SSA_NAME:
       return tree_single_nonnegative_warnv_p (t, strict_overflow_p, depth);
@@ -14527,7 +14527,7 @@ tree_single_nonzero_warnv_p (tree t, bool *strict_overflow_p)
     case INTEGER_CST:
       return !integer_zerop (t);
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       {
 	tree base = TREE_OPERAND (t, 0);
 

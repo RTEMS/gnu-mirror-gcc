@@ -641,7 +641,7 @@ symtab_node::maybe_create_reference (tree val, gimple *stmt)
     case VAR_DECL:
       use_type = IPA_REF_LOAD;
       break;
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       use_type = IPA_REF_ADDR;
       break;
     default:

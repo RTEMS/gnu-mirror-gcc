@@ -370,7 +370,7 @@ mark_exp_read (tree exp)
     case REALPART_EXPR:
     case IMAGPART_EXPR:
     CASE_CONVERT:
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case INDIRECT_REF:
     case FLOAT_EXPR:
     case NON_DEPENDENT_EXPR:

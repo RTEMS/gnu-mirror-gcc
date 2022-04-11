@@ -140,7 +140,7 @@ d_truthvalue_conversion (tree expr)
 	     ? boolean_true_node
 	     : boolean_false_node;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       /* If we are taking the address of a decl that can never be null,
 	 then the return result is always true.  */
       if (decl_with_nonnull_addr_p (TREE_OPERAND (expr, 0)))

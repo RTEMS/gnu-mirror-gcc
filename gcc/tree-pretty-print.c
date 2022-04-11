@@ -2761,7 +2761,7 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
     case NEGATE_EXPR:
     case BIT_NOT_EXPR:
     case TRUTH_NOT_EXPR:
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case PREDECREMENT_EXPR:
     case PREINCREMENT_EXPR:
     case INDIRECT_REF:
@@ -3994,7 +3994,7 @@ op_code_prio (enum tree_code code)
     case PREDECREMENT_EXPR:
     case NEGATE_EXPR:
     case INDIRECT_REF:
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case FLOAT_EXPR:
     CASE_CONVERT:
     case FIX_TRUNC_EXPR:
@@ -4072,7 +4072,7 @@ op_symbol_code (enum tree_code code)
     case BIT_XOR_EXPR:
       return "^";
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case BIT_AND_EXPR:
       return "&";
 
@@ -4236,7 +4236,7 @@ print_call_name (pretty_printer *pp, tree node, dump_flags_t flags)
       dump_function_name (pp, op0, flags);
       break;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case INDIRECT_REF:
     CASE_CONVERT:
       op0 = TREE_OPERAND (op0, 0);

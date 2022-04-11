@@ -2293,7 +2293,7 @@ get_origin_and_offset (tree x, HOST_WIDE_INT *fldoff, HOST_WIDE_INT *off)
 
   switch (TREE_CODE (x))
     {
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       x = TREE_OPERAND (x, 0);
       return get_origin_and_offset (x, fldoff, off);
 

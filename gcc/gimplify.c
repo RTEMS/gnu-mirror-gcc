@@ -13703,7 +13703,7 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 	    break;
 	  }
 
-	case ADDR_EXPR:
+	CASE_ADDR_EXPR:
 	  ret = gimplify_addr_expr (expr_p, pre_p, post_p);
 	  break;
 

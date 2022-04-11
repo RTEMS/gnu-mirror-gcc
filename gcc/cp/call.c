@@ -3192,7 +3192,7 @@ add_builtin_candidates (struct z_candidate **candidates, enum tree_code code,
 	 boolean_type_node, args, argtypes, flags, complain);
       return;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case COMPOUND_EXPR:
     case COMPONENT_REF:
     case CO_AWAIT_EXPR:
@@ -6216,7 +6216,7 @@ build_new_op_1 (const op_location_t &loc, enum tree_code code, int flags,
   switch (code)
     {
     case COMPOUND_EXPR:
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       /* For these, the built-in candidates set is empty
 	 [over.match.oper]/3.  We don't want non-strict matches
 	 because exact matches are always possible with built-in
@@ -6269,7 +6269,7 @@ build_new_op_1 (const op_location_t &loc, enum tree_code code, int flags,
 	  break;
 
 	  /* The caller will deal with these.  */
-	case ADDR_EXPR:
+	CASE_ADDR_EXPR:
 	case COMPOUND_EXPR:
 	case COMPONENT_REF:
 	case CO_AWAIT_EXPR:
@@ -6579,7 +6579,7 @@ build_new_op_1 (const op_location_t &loc, enum tree_code code, int flags,
                                     arg2, complain);
 
       /* The caller will deal with these.  */
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case COMPONENT_REF:
     case COMPOUND_EXPR:
       return NULL_TREE;

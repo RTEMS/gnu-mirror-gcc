@@ -793,7 +793,7 @@ likely_value (gimple *stmt)
 	     the undefined operand may be promoted.  */
 	  return UNDEFINED;
 
-	case ADDR_EXPR:
+	CASE_ADDR_EXPR:
 	  /* If any part of an address is UNDEFINED, like the index
 	     of an ARRAY_EXPR, then treat the result as UNDEFINED.  */
 	  return UNDEFINED;

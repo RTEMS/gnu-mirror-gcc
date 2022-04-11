@@ -2917,7 +2917,7 @@ tree_ctz (const_tree expr)
       return MIN (ret1, ret2);
     case COMPOUND_EXPR:
       return tree_ctz (TREE_OPERAND (expr, 1));
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       ret1 = get_pointer_alignment (CONST_CAST_TREE (expr));
       if (ret1 > BITS_PER_UNIT)
 	{
@@ -3624,7 +3624,7 @@ tree_invariant_p_1 (tree t)
     case SAVE_EXPR:
       return true;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       op = TREE_OPERAND (t, 0);
       while (handled_component_p (op))
 	{
@@ -4782,7 +4782,7 @@ build1 (enum tree_code code, tree type, tree node MEM_STAT_DECL)
       TREE_READONLY (t) = 0;
       break;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       if (node)
 	recompute_tree_invariant_for_addr_expr (t);
       break;
@@ -12661,7 +12661,7 @@ get_name (tree t)
     {
       switch (TREE_CODE (stripped_decl))
 	{
-	case ADDR_EXPR:
+	CASE_ADDR_EXPR:
 	  return get_name (TREE_OPERAND (stripped_decl, 0));
 	default:
 	  return NULL;

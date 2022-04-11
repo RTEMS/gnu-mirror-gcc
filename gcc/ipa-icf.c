@@ -1764,7 +1764,7 @@ sem_variable::equals (tree t1, tree t2)
 			          && known_eq (wi::to_poly_offset (y1),
 					       wi::to_poly_offset (y2)));
       }
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case FDESC_EXPR:
       {
 	tree op1 = TREE_OPERAND (t1, 0);

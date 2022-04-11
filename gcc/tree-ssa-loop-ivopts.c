@@ -1163,7 +1163,7 @@ contain_complex_addr_expr (tree expr)
       res |= contain_complex_addr_expr (TREE_OPERAND (expr, 1));
       break;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       return (!DECL_P (TREE_OPERAND (expr, 0)));
 
     default:
@@ -2899,7 +2899,7 @@ strip_offset_1 (tree expr, bool inside_addr, bool top_compref,
       }
       break;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       op0 = TREE_OPERAND (expr, 0);
       op0 = strip_offset_1 (op0, true, true, &off0);
       *offset += off0;
@@ -3774,7 +3774,7 @@ prepare_decl_rtl (tree *expr_p, int *ws, void *data)
 
   switch (TREE_CODE (*expr_p))
     {
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       for (expr_p = &TREE_OPERAND (*expr_p, 0);
 	   handled_component_p (*expr_p);
 	   expr_p = &TREE_OPERAND (*expr_p, 0))

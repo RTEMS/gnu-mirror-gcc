@@ -1093,7 +1093,7 @@ convert_nonlocal_reference_op (tree *tp, int *walk_subtrees, void *data)
         FORCED_LABEL (t) = 1;
       break;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       {
 	bool save_val_only = wi->val_only;
 
@@ -1836,7 +1836,7 @@ convert_local_reference_op (tree *tp, int *walk_subtrees, void *data)
 	}
       break;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       save_val_only = wi->val_only;
       wi->val_only = false;
       wi->is_lhs = false;
@@ -2588,7 +2588,7 @@ convert_tramp_reference_op (tree *tp, int *walk_subtrees, void *data)
   *walk_subtrees = 0;
   switch (TREE_CODE (t))
     {
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       /* Build
 	   T.1 = &CHAIN->tramp;
 	   T.2 = __builtin_adjust_trampoline (T.1);

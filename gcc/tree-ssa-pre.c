@@ -2520,7 +2520,7 @@ create_component_ref_by_pieces_1 (basic_block block, vn_reference_t ref,
 	return genop;
       }
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       if (currop->op0)
 	{
 	  gcc_assert (is_gimple_min_invariant (currop->op0));

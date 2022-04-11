@@ -1980,7 +1980,7 @@ mark_exp_read (tree exp)
     case REALPART_EXPR:
     case IMAGPART_EXPR:
     CASE_CONVERT:
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case VIEW_CONVERT_EXPR:
       mark_exp_read (TREE_OPERAND (exp, 0));
       break;
@@ -4415,7 +4415,7 @@ build_unary_op (location_t location, enum tree_code code, tree xarg,
     {
       switch (code)
 	{
-	case ADDR_EXPR:
+	CASE_ADDR_EXPR:
 	case PREINCREMENT_EXPR:
 	case POSTINCREMENT_EXPR:
 	case PREDECREMENT_EXPR:
@@ -4795,7 +4795,7 @@ build_unary_op (location_t location, enum tree_code code, tree xarg,
 	goto return_build_unary_op;
       }
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       /* Note that this operation never does default_conversion.  */
 
       /* The operand of unary '&' must be an lvalue (which excludes
@@ -5054,7 +5054,7 @@ c_mark_addressable (tree exp, bool array_ref_p)
 	  return true;
 	/* FALLTHRU */
       case COMPONENT_REF:
-      case ADDR_EXPR:
+      CASE_ADDR_EXPR:
       case ARRAY_REF:
       case REALPART_EXPR:
       case IMAGPART_EXPR:
@@ -10990,7 +10990,7 @@ c_finish_return (location_t loc, tree retval, tree origtype)
 		continue;
 	      }
 
-	    case ADDR_EXPR:
+	    CASE_ADDR_EXPR:
 	      inner = TREE_OPERAND (inner, 0);
 
 	      while (REFERENCE_CLASS_P (inner)

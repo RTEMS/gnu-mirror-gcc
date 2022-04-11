@@ -463,7 +463,7 @@ lower_emutls_1 (tree *ptr, int *walk_subtrees, void *cb_data)
 
   switch (TREE_CODE (t))
     {
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       /* If this is not a straight-forward "&var", but rather something
 	 like "&var.a", then we may need special handling.  */
       if (TREE_CODE (TREE_OPERAND (t, 0)) != VAR_DECL)

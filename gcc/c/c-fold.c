@@ -447,7 +447,7 @@ c_fully_fold_internal (tree expr, bool in_init, bool *maybe_const_operands,
 	}
       goto out;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       op0_lval = true;
       goto unary;
     case REALPART_EXPR:

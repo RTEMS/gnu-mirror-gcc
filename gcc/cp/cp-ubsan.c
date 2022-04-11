@@ -203,7 +203,7 @@ cp_ubsan_check_member_access_r (tree *stmt_p, int *walk_subtrees, void *data)
     = (cp_ubsan_check_member_access_data *) data;
   switch (TREE_CODE (stmt))
     {
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       t = TREE_OPERAND (stmt, 0);
       while ((TREE_CODE (t) == MEM_REF || INDIRECT_REF_P (t))
 	     && ADDR_EXPR_P (TREE_OPERAND (t, 0)))

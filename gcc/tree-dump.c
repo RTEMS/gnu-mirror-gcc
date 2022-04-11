@@ -558,7 +558,7 @@ dequeue_and_dump (dump_info_p di)
       break;
 
     case TRUTH_NOT_EXPR:
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case INDIRECT_REF:
     case CLEANUP_POINT_EXPR:
     case VIEW_CONVERT_EXPR:

@@ -2439,7 +2439,7 @@ pa_reloc_needed (tree exp)
 
   switch (TREE_CODE (exp))
     {
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       return 1;
 
     case POINTER_PLUS_EXPR:

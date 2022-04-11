@@ -4988,7 +4988,7 @@ expand_debug_expr (tree exp)
 	  return gen_rtx_CONCAT (mode, re, im);
 	}
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       op0 = expand_debug_expr (TREE_OPERAND (exp, 0));
       if (!op0 || !MEM_P (op0))
 	{

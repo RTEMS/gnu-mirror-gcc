@@ -1300,7 +1300,7 @@ cp_genericize_r (tree *stmt_p, int *walk_subtrees, void *data)
 
   switch (TREE_CODE (stmt))
     {
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       if (is_invisiref_parm (TREE_OPERAND (stmt, 0)))
 	{
 	  /* If in an OpenMP context, note var uses.  */
@@ -2620,7 +2620,7 @@ cp_fold (tree x)
 	}
       goto unary;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       loc = EXPR_LOCATION (x);
       op0 = cp_fold_maybe_rvalue (TREE_OPERAND (x, 0), false);
 

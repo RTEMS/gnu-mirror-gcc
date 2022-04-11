@@ -626,7 +626,7 @@ for_each_index (tree *addr_p, bool (*cbck) (tree, tree *, void *), void *data)
 	case CONSTRUCTOR:
 	  return true;
 
-	case ADDR_EXPR:
+	CASE_ADDR_EXPR:
 	  gcc_assert (is_gimple_min_invariant (*addr_p));
 	  return true;
 
@@ -690,7 +690,7 @@ gen_lsm_tmp_name (tree ref)
       lsm_tmp_name_add ("_");
       break;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       gen_lsm_tmp_name (TREE_OPERAND (ref, 0));
       break;
 

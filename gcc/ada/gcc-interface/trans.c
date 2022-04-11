@@ -8703,7 +8703,7 @@ gnat_gimplify_expr (tree *expr_p, gimple_seq *pre_p,
       *expr_p = TREE_OPERAND (*expr_p, 0);
       return GS_OK;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       op = TREE_OPERAND (expr, 0);
 
       /* If we are taking the address of a constant CONSTRUCTOR, make sure it
@@ -9840,7 +9840,7 @@ addressable_p (tree gnu_expr, tree gnu_type)
       return TREE_STATIC (gnu_expr) ? true : false;
 
     case NULL_EXPR:
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case SAVE_EXPR:
     case CALL_EXPR:
     case PLUS_EXPR:

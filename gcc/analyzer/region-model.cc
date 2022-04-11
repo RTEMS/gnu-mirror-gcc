@@ -418,7 +418,7 @@ region_model::get_gassign_result (const gassign *assign,
 	set_value (lvalue (LHS), rvalue (EXPR))
        for various EXPR.
        We already have the lvalue for the LHS above, as "lhs_reg".  */
-    case ADDR_EXPR: /* LHS = &RHS;  */
+    CASE_ADDR_EXPR: /* LHS = &RHS;  */
     case BIT_FIELD_REF:
     case COMPONENT_REF: /* LHS = op0.op1;  */
     case MEM_REF:
@@ -1098,7 +1098,7 @@ region_model::get_rvalue_1 (path_var pv, region_model_context *ctxt)
     default:
       return m_mgr->get_or_create_unknown_svalue (TREE_TYPE (pv.m_tree));
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       {
 	/* "&EXPR".  */
 	tree expr = pv.m_tree;

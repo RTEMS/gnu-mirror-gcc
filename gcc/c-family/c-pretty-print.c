@@ -1673,7 +1673,7 @@ c_pretty_printer::postfix_expression (tree e)
       pp_c_right_paren (this);
       break;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       if (TREE_CODE (TREE_OPERAND (e, 0)) == FUNCTION_DECL)
 	{
           id_expression (TREE_OPERAND (e, 0));
@@ -1758,7 +1758,7 @@ c_pretty_printer::unary_expression (tree e)
       unary_expression (TREE_OPERAND (e, 0));
       break;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case INDIRECT_REF:
     case NEGATE_EXPR:
     case BIT_NOT_EXPR:
@@ -2245,7 +2245,7 @@ c_pretty_printer::expression (tree e)
       break;
 
     case CONJ_EXPR:
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case INDIRECT_REF:
     case MEM_REF:
     case NEGATE_EXPR:

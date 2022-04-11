@@ -3145,7 +3145,7 @@ const_hash_1 (const tree exp)
 	return hi;
       }
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       if (CONSTANT_CLASS_P (TREE_OPERAND (exp, 0)))
        return const_hash_1 (TREE_OPERAND (exp, 0));
 
@@ -3345,7 +3345,7 @@ compare_constant (const tree t1, const tree t2)
 	return 1;
       }
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case FDESC_EXPR:
       {
 	class addr_const value1, value2;
@@ -4374,7 +4374,7 @@ compute_reloc_for_constant (tree exp)
 
   switch (TREE_CODE (exp))
     {
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case FDESC_EXPR:
       /* Go inside any operations that get_inner_reference can handle and see
 	 if what's inside is a constant: no need to do anything here for
@@ -4456,7 +4456,7 @@ output_addressed_constants (tree exp, int defer)
 	break;
       }
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case FDESC_EXPR:
       /* Go inside any operations that get_inner_reference can handle and see
 	 if what's inside is a constant: no need to do anything here for
@@ -4620,7 +4620,7 @@ tree_innermost_capability (const_tree t)
   switch (TREE_CODE (t))
     {
     case INTEGER_CST:
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       return t;
     case NOP_EXPR:
       return tree_innermost_capability (TREE_OPERAND (t, 0));
@@ -4750,7 +4750,7 @@ initializer_constant_valid_p_1 (tree value, tree endtype, tree *cache)
     case COMPLEX_CST:
       return null_pointer_node;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case FDESC_EXPR:
       {
 	tree op0 = staticp (TREE_OPERAND (value, 0));

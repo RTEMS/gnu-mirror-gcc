@@ -492,7 +492,7 @@ valid_gimple_rhs_p (tree expr)
     case tcc_expression:
       switch (code)
         {
-        case ADDR_EXPR:
+        CASE_ADDR_EXPR:
           {
 	    tree t;
 	    if (is_gimple_min_invariant (expr))

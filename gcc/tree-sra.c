@@ -1521,7 +1521,7 @@ make_fancy_name_1 (tree expr)
       obstack_grow (&name_obstack, buffer, strlen (buffer));
       break;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       make_fancy_name_1 (TREE_OPERAND (expr, 0));
       break;
 

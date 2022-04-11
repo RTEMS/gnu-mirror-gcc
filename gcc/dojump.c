@@ -414,7 +414,7 @@ do_jump (tree exp, rtx_code_label *if_false_label,
 
 #if 0
       /* This is not true with #pragma weak  */
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       /* The address of something can never be zero.  */
       if (if_true_label)
         emit_jump (if_true_label);

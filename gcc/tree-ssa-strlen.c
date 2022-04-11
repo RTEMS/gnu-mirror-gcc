@@ -1567,8 +1567,10 @@ find_equal_ptrs (tree ptr, int idx)
 	    break;
 	  if (!ADDR_EXPR_P (ptr))
 	    return;
-	  /* FALLTHRU */
-	case ADDR_EXPR:
+	  goto addr_expr;
+
+	CASE_ADDR_EXPR:
+	addr_expr:
 	  {
 	    int *pidx = addr_stridxptr (TREE_OPERAND (ptr, 0));
 	    if (pidx != NULL && *pidx == 0)

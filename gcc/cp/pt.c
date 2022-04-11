@@ -6946,7 +6946,7 @@ invalid_tparm_referent_p (tree type, tree expr, tsubst_flags_t complain)
       }
       break;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       {
 	tree decl = TREE_OPERAND (expr, 0);
 
@@ -16033,7 +16033,7 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
     case NEGATE_EXPR:
     case NOP_EXPR:
     case INDIRECT_REF:
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case CALL_EXPR:
     case ARRAY_REF:
     case SCOPE_REF:
@@ -16754,7 +16754,7 @@ tsubst_copy (tree t, tree args, tsubst_flags_t complain, tree in_decl)
     case NEGATE_EXPR:
     case TRUTH_NOT_EXPR:
     case BIT_NOT_EXPR:
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case UNARY_PLUS_EXPR:      /* Unary + */
     case ALIGNOF_EXPR:
     case AT_ENCODE_EXPR:
@@ -19516,7 +19516,7 @@ tsubst_copy_and_build (tree t,
     case FIX_TRUNC_EXPR:
       gcc_unreachable ();
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       op1 = TREE_OPERAND (t, 0);
       if (TREE_CODE (op1) == LABEL_DECL)
 	RETURN (finish_label_address_expr (DECL_NAME (op1),
@@ -26703,7 +26703,7 @@ value_dependent_expression_p (tree expression)
       return ((value_dependent_expression_p (TREE_OPERAND (expression, 0)))
 	      || (value_dependent_expression_p (TREE_OPERAND (expression, 1))));
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       {
 	tree op = TREE_OPERAND (expression, 0);
 	return (value_dependent_expression_p (op)

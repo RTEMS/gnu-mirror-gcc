@@ -1284,7 +1284,7 @@ mark_addressable (location *loc)
 	    return false;
 	  }
 	/* fallthrough */
-      case ADDR_EXPR:
+      CASE_ADDR_EXPR:
       case ARRAY_REF:
       case REALPART_EXPR:
       case IMAGPART_EXPR:

@@ -782,7 +782,7 @@ operands_scanner::get_expr_operands (tree *expr_p, int flags)
 
   switch (code)
     {
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       /* Taking the address of a variable does not represent a
 	 reference to it, but the fact that the statement takes its
 	 address will be of interest to some passes (e.g. alias

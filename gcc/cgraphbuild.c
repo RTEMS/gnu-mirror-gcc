@@ -65,7 +65,7 @@ record_reference (tree *tp, int *walk_subtrees, void *data)
       break;
 
     case FDESC_EXPR:
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       /* Record dereferences to the functions.  This makes the
 	 functions reachable unconditionally.  */
       decl = get_base_var (*tp);

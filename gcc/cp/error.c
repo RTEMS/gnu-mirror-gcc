@@ -2340,7 +2340,7 @@ dump_expr (cxx_pretty_printer *pp, tree t, int flags)
       dump_unary_op (pp, "+", t, flags);
       break;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       if (TREE_CODE (TREE_OPERAND (t, 0)) == FUNCTION_DECL
 	  || TREE_CODE (TREE_OPERAND (t, 0)) == STRING_CST
 	  /* An ADDR_EXPR can have reference type.  In that case, we

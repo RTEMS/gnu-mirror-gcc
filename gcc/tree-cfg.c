@@ -4490,7 +4490,7 @@ verify_gimple_assign_single (gassign *stmt)
   /* Special codes we cannot handle via their class.  */
   switch (rhs_code)
     {
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       {
 	tree op = TREE_OPERAND (rhs1, 0);
 	if (!is_gimple_addressable (op))

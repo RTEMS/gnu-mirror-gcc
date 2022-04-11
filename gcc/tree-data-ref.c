@@ -639,7 +639,7 @@ split_constant_offset_1 (tree type, tree op0, enum tree_code code, tree op1,
       *off = size_binop (MULT_EXPR, off0, fold_convert (ssizetype, op1));
       return true;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       {
 	tree base, poffset;
 	poly_int64 pbitsize, pbitpos, pbytepos;

@@ -7962,7 +7962,7 @@ safe_from_p (const_rtx x, tree exp, int top_p)
 
       switch (TREE_CODE (exp))
 	{
-	case ADDR_EXPR:
+	CASE_ADDR_EXPR:
 	  /* If the operand is static or we are static, we can't conflict.
 	     Likewise if we don't conflict with the operand at all.  */
 	  if (staticp (TREE_OPERAND (exp, 0))
@@ -11732,7 +11732,7 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 	return const0_rtx;
       }
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       return expand_expr_addr_expr (exp, target, tmode, modifier);
 
     case REALPART_EXPR:

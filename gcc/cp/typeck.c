@@ -6871,7 +6871,7 @@ cp_build_unary_op (enum tree_code code, tree xarg, bool noconvert,
 	return val;
       }
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       /* Note that this operation never does default_conversion
 	 regardless of NOCONVERT.  */
       return cp_build_addr_expr (arg, complain);
@@ -7023,12 +7023,14 @@ cxx_mark_addressable (tree exp, bool array_ref_p)
 	    && TREE_CODE (TREE_TYPE (x)) == ARRAY_TYPE
 	    && VECTOR_TYPE_P (TREE_TYPE (TREE_OPERAND (x, 0))))
 	  return true;
-	/* FALLTHRU */
-      case ADDR_EXPR:
+	goto addr_expr;
+
+      CASE_ADDR_EXPR:
       case COMPONENT_REF:
       case ARRAY_REF:
       case REALPART_EXPR:
       case IMAGPART_EXPR:
+      addr_expr:
 	x = TREE_OPERAND (x, 0);
 	break;
 

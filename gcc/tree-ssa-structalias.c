@@ -3526,7 +3526,7 @@ get_constraint_for_1 (tree t, vec<ce_s> *results, bool address_p,
       {
 	switch (TREE_CODE (t))
 	  {
-	  case ADDR_EXPR:
+	  CASE_ADDR_EXPR:
 	    get_constraint_for_address_of (TREE_OPERAND (t, 0), results);
 	    return;
 	  default:;

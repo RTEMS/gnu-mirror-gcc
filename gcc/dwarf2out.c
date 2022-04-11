@@ -18369,7 +18369,7 @@ loc_list_from_tree_1 (tree loc, int want_address,
       /* There are no opcodes for these operations.  */
       return 0;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       /* If we already want an address, see if there is INDIRECT_REF inside
          e.g. for &this->field.  */
       if (want_address)

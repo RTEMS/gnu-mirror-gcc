@@ -5996,7 +5996,7 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 				 non_constant_p, overflow_p);
       break;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       {
 	tree oldop = TREE_OPERAND (t, 0);
 	tree op = cxx_eval_constant_expression (ctx, oldop,
@@ -7697,7 +7697,7 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
       t = TREE_OPERAND (t, 0);
       goto handle_addr_expr;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       /* -- a unary operator & that is applied to an lvalue that
             designates an object with thread or automatic storage
             duration;  */

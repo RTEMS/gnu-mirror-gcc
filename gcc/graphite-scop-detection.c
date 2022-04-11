@@ -896,7 +896,7 @@ scop_detection::graphite_can_represent_scev (sese_l scop, tree scev)
 	return false;
       return graphite_can_represent_scev (scop, CHREC_LEFT (scev));
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       /* We cannot encode addresses for ISL.  */
       return false;
 
@@ -1155,7 +1155,7 @@ scan_tree_for_params (sese_info_p s, tree e)
       break;
 
     case INTEGER_CST:
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     case REAL_CST:
     case COMPLEX_CST:
     case VECTOR_CST:

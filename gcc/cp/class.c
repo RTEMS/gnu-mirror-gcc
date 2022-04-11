@@ -7734,7 +7734,7 @@ fixed_type_or_null (tree instance, int *nonnull, int *cdtorp)
     CASE_CONVERT:
       return RECUR (TREE_OPERAND (instance, 0));
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       instance = TREE_OPERAND (instance, 0);
       if (nonnull)
 	{
@@ -8635,7 +8635,7 @@ instantiate_type (tree lhstype, tree rhs, tsubst_flags_t complain)
 						/*explicit_targs=*/NULL_TREE,
 						access_path);
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
     {
       if (PTRMEM_OK_P (rhs))
 	complain |= tf_ptrmem_ok;

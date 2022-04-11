@@ -1254,7 +1254,7 @@ tail_recurse:
       /* This assignment is under the form "a_1 = 7".  */
       return t_false;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       {
 	/* Handle &MEM[ptr + CST] which is equivalent to POINTER_PLUS_EXPR.  */
 	if (TREE_CODE (TREE_OPERAND (rhs0, 0)) != MEM_REF)
@@ -1662,7 +1662,7 @@ interpret_rhs_expr (class loop *loop, gimple *at_stmt,
 
   switch (code)
     {
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       if (TREE_CODE (TREE_OPERAND (rhs1, 0)) == MEM_REF
 	  || handled_component_p (TREE_OPERAND (rhs1, 0)))
         {
@@ -2686,7 +2686,7 @@ instantiate_scev_r (edge instantiate_below,
 				   TREE_OPERAND (chrec, 0),
 				   fold_conversions, size_expr);
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       if (is_gimple_min_invariant (chrec))
 	return chrec;
       /* Fallthru.  */

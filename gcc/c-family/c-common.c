@@ -1991,7 +1991,7 @@ verify_tree (tree x, struct tlist **pbefore_sp, struct tlist **pno_sp,
 	return;
       }
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
       x = TREE_OPERAND (x, 0);
       if (DECL_P (x))
 	return;
@@ -3427,9 +3427,10 @@ c_common_truthvalue_conversion (location_t location, tree expr)
 
     case FUNCTION_DECL:
       expr = build_unary_op (location, ADDR_EXPR, expr, false);
-      /* Fall through.  */
+      goto addr_expr;
 
-    case ADDR_EXPR:
+    CASE_ADDR_EXPR:
+    addr_expr:
       {
  	tree inner = TREE_OPERAND (expr, 0);
 	if (decl_with_nonnull_addr_p (inner))
