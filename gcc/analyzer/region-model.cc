@@ -1881,7 +1881,7 @@ region_model::get_representative_path_var (const svalue *sval,
       const region *reg = ptr_sval->get_pointee ();
       if (path_var pv = get_representative_path_var (reg, visited))
 	return path_var (build1 (ADDR_EXPR,
-				 TREE_TYPE (sval->get_type ()),
+				 sval->get_type (),
 				 pv.m_tree),
 			 pv.m_stack_depth);
     }
