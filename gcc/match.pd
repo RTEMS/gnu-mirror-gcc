@@ -110,6 +110,8 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 		   TYPE_VECTOR_SUBPARTS (TREE_TYPE (@0)))
       && tree_nop_conversion_p (TREE_TYPE (type), TREE_TYPE (TREE_TYPE (@0))))))
 
+(match (any_addr) (ADDR_EXPR))
+
 /* Transform likes of (char) ABS_EXPR <(int) x> into (char) ABSU_EXPR <x>
    ABSU_EXPR returns unsigned absolute value of the operand and the operand
    of the ABSU_EXPR will have the corresponding signed type.  */
@@ -1923,26 +1925,26 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 
 /* Try folding difference of addresses.  */
 (simplify
- (minus (convert ADDR_EXPR@0) (convert @1))
+ (minus (convert any_addr@0) (convert @1))
  (if (tree_nop_conversion_p (type, TREE_TYPE (@0)))
   (with { poly_int64 diff; }
    (if (ptr_difference_const (@0, @1, &diff))
     { build_int_cst_type (type, diff); }))))
 (simplify
- (minus (convert @0) (convert ADDR_EXPR@1))
+ (minus (convert @0) (convert any_addr@1))
  (if (tree_nop_conversion_p (type, TREE_TYPE (@0)))
   (with { poly_int64 diff; }
    (if (ptr_difference_const (@0, @1, &diff))
     { build_int_cst_type (type, diff); }))))
 (simplify
- (pointer_diff (convert?@2 ADDR_EXPR@0) (convert1?@3 @1))
+ (pointer_diff (convert?@2 any_addr@0) (convert1?@3 @1))
  (if (tree_nop_conversion_p (TREE_TYPE(@2), TREE_TYPE (@0))
       && tree_nop_conversion_p (TREE_TYPE(@3), TREE_TYPE (@1)))
   (with { poly_int64 diff; }
    (if (ptr_difference_const (@0, @1, &diff))
     { build_int_cst_type (type, diff); }))))
 (simplify
- (pointer_diff (convert?@2 @0) (convert1?@3 ADDR_EXPR@1))
+ (pointer_diff (convert?@2 @0) (convert1?@3 any_addr@1))
  (if (tree_nop_conversion_p (TREE_TYPE(@2), TREE_TYPE (@0))
       && tree_nop_conversion_p (TREE_TYPE(@3), TREE_TYPE (@1)))
   (with { poly_int64 diff; }
@@ -4502,7 +4504,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 (for cmp (eq ne)
  (simplify
   /* SSA names are canonicalized to 2nd place.  */
-  (cmp addr@0 SSA_NAME@1)
+  (cmp any_addr@0 SSA_NAME@1)
   (with
    { poly_int64 off; tree base; }
    /* A local variable can never be pointed to by
@@ -4554,7 +4556,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
    (cmp @0 (bit_xor @1 (convert @2)))))
 
  (simplify
-  (cmp (convert? addr@0) integer_zerop)
+  (cmp (convert? any_addr@0) integer_zerop)
   (if (tree_single_nonzero_warnv_p (@0, NULL))
    { constant_boolean_node (cmp == NE_EXPR, type); }))
 
@@ -4651,7 +4653,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
    enough to make fold_stmt not regress when not dispatching to fold_binary.  */
 (for cmp (simple_comparison)
  (simplify
-  (cmp (convert1?@2 addr@0) (convert2? addr@1))
+  (cmp (convert1?@2 any_addr@0) (convert2? any_addr@1))
   (with
    {
      poly_int64 off0, off1;
