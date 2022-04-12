@@ -257,7 +257,7 @@ enum combined_fn {
 static inline bool
 ADDR_EXPR_CODE_P (tree_code code)
 {
-  return code == ADDR_EXPR;
+  return code == NONCAP_ADDR_EXPR;
 }
 
 /* Return true if CODE represents a commutative tree code.  Otherwise

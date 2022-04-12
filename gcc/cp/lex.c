@@ -90,7 +90,9 @@ ovl_op_info_t ovl_op_info[2][OVL_OP_MAX] =
       {NULL_TREE, NAME, MANGLING, CODE, OVL_OP_##CODE, FLAGS},
 #define OPERATOR_TRANSITION }, {			\
       {NULL_TREE, NULL, NULL, ERROR_MARK, OVL_OP_ERROR_MARK, 0},
+#define ADDR_EXPR NONCAP_ADDR_EXPR
 #include "operators.def"
+#undef ADDR_EXPR
     }
   };
 unsigned char ovl_op_mapping[MAX_TREE_CODES];
@@ -162,6 +164,8 @@ init_operators (void)
   for (unsigned ix = OVL_OP_MAX; --ix;)
     {
       ovl_op_info_t *op_ptr = &ovl_op_info[false][ix];
+      if (ADDR_EXPR_CODE_P (op_ptr->tree_code))
+	op_ptr->tree_code = unqualified_addr_expr ();
 
       if (op_ptr->name)
 	{
@@ -192,6 +196,8 @@ init_operators (void)
 	}
 
       ovl_op_info_t *as_ptr = &ovl_op_info[true][ix];
+      if (ADDR_EXPR_CODE_P (as_ptr->tree_code))
+	as_ptr->tree_code = unqualified_addr_expr ();
       if (as_ptr->name)
 	{
 	  /* These will be placed at the start of the array, move to

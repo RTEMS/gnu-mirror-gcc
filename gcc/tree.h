@@ -474,7 +474,7 @@ extern void omp_clause_range_check_failed (const_tree, const char *, int,
 static inline bool
 ADDR_EXPR_CODE_P (tree_code code)
 {
-  return code == ADDR_EXPR;
+  return code == NONCAP_ADDR_EXPR;
 }
 
 /* Test if EXP takes the address of an object.  If so, the object
@@ -483,7 +483,7 @@ ADDR_EXPR_CODE_P (tree_code code)
 
 /* Case statements for codes that satisfy ADDR_EXPR_CODE_P.  */
 #define CASE_ADDR_EXPR \
-  case ADDR_EXPR
+  case NONCAP_ADDR_EXPR
 
 /* Tests if CODE is a conversion expr (NOP_EXPR or CONVERT_EXPR).  */
 #define CONVERT_EXPR_CODE_P(CODE)				\
@@ -702,8 +702,9 @@ ADDR_EXPR_CODE_P (tree_code code)
    In a CONSTRUCTOR, nonzero means allocate static storage.  */
 #define TREE_STATIC(NODE) ((NODE)->base.static_flag)
 
-/* In an ADDR_EXPR, nonzero means do not use a trampoline.  */
-#define TREE_NO_TRAMPOLINE(NODE) (ADDR_EXPR_CHECK (NODE)->base.static_flag)
+/* In an *ADDR_EXPR, nonzero means do not use a trampoline.  */
+#define TREE_NO_TRAMPOLINE(NODE) \
+  (NONCAP_ADDR_EXPR_CHECK (NODE)->base.static_flag)
 
 /* In a TARGET_EXPR or WITH_CLEANUP_EXPR, means that the pertinent cleanup
    should only be executed if an exception is thrown, not on normal exit
@@ -1009,10 +1010,10 @@ ADDR_EXPR_CODE_P (tree_code code)
 #define REF_REVERSE_STORAGE_ORDER(NODE) \
   (TREE_CHECK2 (NODE, BIT_FIELD_REF, MEM_REF)->base.default_def_flag)
 
-  /* In an ADDR_EXPR, indicates that this is a pointer to nested function
+/* In an *ADDR_EXPR, indicates that this is a pointer to nested function
    represented by a descriptor instead of a trampoline.  */
 #define FUNC_ADDR_BY_DESCRIPTOR(NODE) \
-  (TREE_CHECK (NODE, ADDR_EXPR)->base.default_def_flag)
+  (TREE_CHECK (NODE, NONCAP_ADDR_EXPR)->base.default_def_flag)
 
 /* In a CALL_EXPR, indicates that this is an indirect call for which
    pointers to nested function are descriptors instead of trampolines.  */

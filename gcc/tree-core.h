@@ -1106,7 +1106,7 @@ struct GTY(()) tree_base {
            CONSTRUCTOR
 
        TREE_NO_TRAMPOLINE in
-           ADDR_EXPR
+           NONCAP_ADDR_EXPR
 
        BINFO_VIRTUAL_P in
            TREE_BINFO
@@ -1370,7 +1370,7 @@ struct GTY(()) tree_base {
            BIT_FIELD_REF, MEM_REF
 
        FUNC_ADDR_BY_DESCRIPTOR in
-           ADDR_EXPR
+           NONCAP_ADDR_EXPR
 
        CALL_EXPR_BY_DESCRIPTOR in
            CALL_EXPR

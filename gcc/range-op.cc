@@ -3234,7 +3234,7 @@ integral_table::integral_table ()
   set (ABS_EXPR, op_abs);
   set (ABSU_EXPR, op_absu);
   set (NEGATE_EXPR, op_negate);
-  set (ADDR_EXPR, op_addr);
+  set (NONCAP_ADDR_EXPR, op_addr);
 }
 
 // Instantiate a range op table for pointer operations.
@@ -3260,7 +3260,7 @@ pointer_table::pointer_table ()
   set (GT_EXPR, op_gt);
   set (GE_EXPR, op_ge);
   set (SSA_NAME, op_identity);
-  set (ADDR_EXPR, op_addr);
+  set (NONCAP_ADDR_EXPR, op_addr);
   set (NOP_EXPR, op_convert);
   set (CONVERT_EXPR, op_convert);
 

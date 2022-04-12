@@ -868,9 +868,10 @@ DEFTREECODE (COMPOUND_LITERAL_EXPR, "compound_literal_expr", tcc_expression, 1)
    will be replaced by the temporary variable that holds the value.  */
 DEFTREECODE (SAVE_EXPR, "save_expr", tcc_expression, 1)
 
-/* & in C.  Value is the address at which the operand's value resides.
-   Operand may have any mode.  Result mode is Pmode.  */
-DEFTREECODE (ADDR_EXPR, "addr_expr", tcc_expression, 1)
+/* & in C, returning a non-capability type.  Value is the address at
+   which the operand's value resides.  Operand may have any mode.
+   Result mode is a valid non-capability pointer mode.  */
+DEFTREECODE (NONCAP_ADDR_EXPR, "noncap_addr_expr", tcc_expression, 1)
 
 /* Operand0 is a function constant; result is part N of a function
    descriptor of type ptr_mode.  */

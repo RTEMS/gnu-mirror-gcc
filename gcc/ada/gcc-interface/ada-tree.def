@@ -52,9 +52,9 @@ DEFTREECODE (MINUS_NOMOD_EXPR, "minus_nomod_expr", tcc_binary, 2)
    used internally to describe fixed point types scale factors.  */
 DEFTREECODE (POWER_EXPR, "power_expr", tcc_binary, 2)
 
-/* Same as ADDR_EXPR, except that if the operand represents a bit field,
-   return the address of the byte containing the bit.  This is used
-   for the Address attribute and never shows up in the tree.  */
+/* Same as NONCAP_ADDR_EXPR, except that if the operand represents
+   a bit field, return the address of the byte containing the bit.
+   This is used for the Address attribute and never shows up in the tree.  */
 DEFTREECODE (ATTR_ADDR_EXPR, "attr_addr_expr", tcc_reference, 1)
 
 /* Here are the tree codes for the statement types known to Ada.  These
