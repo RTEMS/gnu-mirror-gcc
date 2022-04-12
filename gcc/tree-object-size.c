@@ -203,7 +203,7 @@ decl_init_size (tree decl, bool min)
   return size;
 }
 
-/* Compute __builtin_object_size for PTR, which is a ADDR_EXPR.
+/* Compute __builtin_object_size for PTR, which is an *ADDR_EXPR.
    OBJECT_SIZE_TYPE is the second argument from __builtin_object_size.
    If unknown, return unknown[object_size_type].  */
 
@@ -909,7 +909,7 @@ plus_stmt_object_size (struct object_size_info *osi, tree var, gimple *stmt)
 	{
 	  unsigned HOST_WIDE_INT off = tree_to_uhwi (op1);
 
-          /* op0 will be ADDR_EXPR here.  */
+          /* op0 will be *ADDR_EXPR here.  */
 	  addr_object_size (osi, op0, object_size_type, &bytes);
 	  if (bytes == unknown[object_size_type])
 	    ;
@@ -975,7 +975,7 @@ cond_expr_object_size (struct object_size_info *osi, tree var, gimple *stmt)
 }
 
 /* Compute object sizes for VAR.
-   For ADDR_EXPR an object size is the number of remaining bytes
+   For *ADDR_EXPR an object size is the number of remaining bytes
    to the end of the object (where what is considered an object depends on
    OSI->object_size_type).
    For allocation GIMPLE_CALL like malloc or calloc object size is the size
@@ -985,7 +985,7 @@ cond_expr_object_size (struct object_size_info *osi, tree var, gimple *stmt)
    If the constant is bigger than the number of remaining bytes until the
    end of the object, object size is 0, but if it is instead a pointer
    subtraction, object size is unknown[object_size_type].
-   To differentiate addition from subtraction, ADDR_EXPR returns
+   To differentiate addition from subtraction, *ADDR_EXPR returns
    unknown[object_size_type] for all objects bigger than half of the address
    space, and constants less than half of the address space are considered
    addition, while bigger constants subtraction.

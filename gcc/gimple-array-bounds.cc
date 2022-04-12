@@ -51,7 +51,7 @@ array_bounds_checker::get_value_range (const_tree op)
    subscript is a constant, check if it is outside valid range.  If
    the array subscript is a RANGE, warn if it is non-overlapping with
    valid range.  IGNORE_OFF_BY_ONE is true if the ARRAY_REF is inside
-   a ADDR_EXPR.  Returns true if a warning has been issued.  */
+   an *ADDR_EXPR.  Returns true if a warning has been issued.  */
 
 bool
 array_bounds_checker::check_array_ref (location_t location, tree ref,
@@ -247,7 +247,7 @@ array_bounds_checker::check_array_ref (location_t location, tree ref,
    subscript is a constant, check if it is outside valid range.
    If the array subscript is a RANGE, warn if it is non-overlapping
    with valid range.
-   IGNORE_OFF_BY_ONE is true if the MEM_REF is inside an ADDR_EXPR
+   IGNORE_OFF_BY_ONE is true if the MEM_REF is inside an *ADDR_EXPR
    (used to allow one-past-the-end indices for code that takes
    the address of the just-past-the-end element of an array).
    Returns true if a warning has been issued.  */

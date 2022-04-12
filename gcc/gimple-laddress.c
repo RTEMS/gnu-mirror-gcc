@@ -89,7 +89,7 @@ pass_laddress::execute (function *fun)
 	      continue;
 	    }
 
-	  /* Lower ADDR_EXPR assignments:
+	  /* Lower *ADDR_EXPR assignments:
 	       _4 = &b[i_9];
 	     into
 	       _1 = (sizetype) i_9;

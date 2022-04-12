@@ -21824,7 +21824,7 @@ cp_parser_direct_declarator (cp_parser* parser,
      & cv-qualifier-seq [opt]
 
    Returns INDIRECT_REF if a pointer, or pointer-to-member, was used.
-   Returns ADDR_EXPR if a reference was used, or NON_LVALUE_EXPR for
+   Returns *ADDR_EXPR if a reference was used, or NON_LVALUE_EXPR for
    an rvalue reference. In the case of a pointer-to-member, *TYPE is
    filled in with the TYPE containing the member.  *CV_QUALS is
    filled in with the cv-qualifier-seq, or TYPE_UNQUALIFIED, if there

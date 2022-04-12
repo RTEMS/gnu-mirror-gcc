@@ -1590,7 +1590,7 @@ merge_dllimport_decl_attributes (tree old, tree new_tree)
 	  warning (0, "%q+D redeclared without dllimport attribute "
 		   "after being referenced with dll linkage", new_tree);
 	  /* If we have used a variable's address with dllimport linkage,
-	      keep the old DECL_DLLIMPORT_P flag: the ADDR_EXPR using the
+	      keep the old DECL_DLLIMPORT_P flag: the *ADDR_EXPR using the
 	      decl may already have had TREE_CONSTANT computed.
 	      We still remove the attribute so that assembler code refers
 	      to '&foo rather than '_imp__foo'.  */

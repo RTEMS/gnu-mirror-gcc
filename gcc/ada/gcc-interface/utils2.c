@@ -1571,7 +1571,7 @@ build_unary_op (enum tree_code op_code, tree result_type, tree operand)
 	      = TYPE_READONLY (TYPE_UNCONSTRAINED_ARRAY (type));
 	  }
 
-	/* If we are dereferencing an ADDR_EXPR, return its operand.  */
+	/* If we are dereferencing an *ADDR_EXPR, return its operand.  */
 	else if (ADDR_EXPR_P (operand))
 	  result = TREE_OPERAND (operand, 0);
 

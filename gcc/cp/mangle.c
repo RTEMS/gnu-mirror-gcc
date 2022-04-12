@@ -3282,7 +3282,7 @@ write_expression (tree expr)
       const char *name;
 
       /* When we bind a variable or function to a non-type template
-	 argument with reference type, we create an ADDR_EXPR to show
+	 argument with reference type, we create an *ADDR_EXPR to show
 	 the fact that the entity's address has been taken.  But, we
 	 don't actually want to output a mangling code for the `&'.  */
       if (ADDR_EXPR_P (expr)

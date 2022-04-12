@@ -4437,7 +4437,7 @@ compute_reloc_for_constant (tree exp)
 
 /* Find all the constants whose addresses are referenced inside of EXP,
    and make sure assembler code with a label has been output for each one.
-   Indicate whether an ADDR_EXPR has been encountered.  */
+   Indicate whether an *ADDR_EXPR has been encountered.  */
 
 static void
 output_addressed_constants (tree exp, int defer)

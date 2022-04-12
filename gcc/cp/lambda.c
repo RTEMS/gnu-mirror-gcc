@@ -433,7 +433,7 @@ build_capture_proxy (tree member, tree init)
       if (DECL_VLA_CAPTURE_P (member))
 	{
 	  init = CONSTRUCTOR_ELT (init, 0)->value;
-	  init = TREE_OPERAND (init, 0); // Strip ADDR_EXPR.
+	  init = TREE_OPERAND (init, 0); // Strip *ADDR_EXPR.
 	  init = TREE_OPERAND (init, 0); // Strip ARRAY_REF.
 	}
       else

@@ -289,7 +289,7 @@ ubsan_instrument_return (location_t loc)
    that gets expanded in the sanopt pass, and make an array dimension
    of it.  ARRAY is the array, *INDEX is an index to the array.
    Return NULL_TREE if no instrumentation is emitted.
-   IGNORE_OFF_BY_ONE is true if the ARRAY_REF is inside a ADDR_EXPR.  */
+   IGNORE_OFF_BY_ONE is true if the ARRAY_REF is inside an *ADDR_EXPR.  */
 
 tree
 ubsan_instrument_bounds (location_t loc, tree array, tree *index,
@@ -375,7 +375,7 @@ ubsan_array_ref_instrumented_p (const_tree t)
 }
 
 /* Instrument an ARRAY_REF, if it hasn't already been instrumented.
-   IGNORE_OFF_BY_ONE is true if the ARRAY_REF is inside a ADDR_EXPR.  */
+   IGNORE_OFF_BY_ONE is true if the ARRAY_REF is inside an *ADDR_EXPR.  */
 
 void
 ubsan_maybe_instrument_array_ref (tree *expr_p, bool ignore_off_by_one)

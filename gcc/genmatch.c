@@ -543,7 +543,7 @@ add_operator (enum tree_code code, const char *id,
       /* Allow SSA_NAME as predicate operator.  */
       && !(code == SSA_NAME))
     return;
-  /* Treat ADDR_EXPR as atom, thus don't allow matching its operand.  */
+  /* Treat *ADDR_EXPR as atom, thus don't allow matching its operand.  */
   if (ADDR_EXPR_CODE_P (code))
     nargs = 0;
   operator_id *op = new operator_id (code, id, nargs, tcc);
@@ -2183,7 +2183,7 @@ capture_info::walk_match (operand *o, unsigned toplevel_arg,
       if (c->what
 	  && (e = dyn_cast <expr *> (c->what)))
 	{
-	  /* Zero-operand expression captures like ADDR_EXPR@0 are
+	  /* Zero-operand expression captures like *ADDR_EXPR@0 are
 	     similar as predicates -- if they are not mentioned in
 	     the result we have to force them to have no side-effects.  */
 	  if (e->ops.length () != 0)

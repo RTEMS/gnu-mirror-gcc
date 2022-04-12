@@ -1146,7 +1146,7 @@ asan_init_shadow_ptr_types (void)
   initialize_sanitizer_builtins ();
 }
 
-/* Create ADDR_EXPR of STRING_CST with the PP pretty printer text.  */
+/* Create *ADDR_EXPR of STRING_CST with the PP pretty printer text.  */
 
 static tree
 asan_pp_string (pretty_printer *pp)

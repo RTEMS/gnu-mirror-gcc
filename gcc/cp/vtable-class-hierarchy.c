@@ -540,7 +540,7 @@ register_construction_vtables (tree base_class, tree record_type,
                 {
                   tree value = ce->value;
 
-                  /* Search for the ADDR_EXPR operand within the value.  */
+                  /* Search for the *ADDR_EXPR operand within the value.  */
 
                   while (value
                          && TREE_OPERAND (value, 0)
@@ -548,7 +548,7 @@ register_construction_vtables (tree base_class, tree record_type,
                     value = TREE_OPERAND (value, 0);
 
                   /* The VAR_DECL for the vtable should be the first
-                     argument of the ADDR_EXPR, which is the first
+                     argument of the *ADDR_EXPR, which is the first
                      argument of value.*/
 
                   if (TREE_OPERAND (value, 0))

@@ -2270,7 +2270,7 @@ may_be_nonaddressable_p (tree expr)
     case VIEW_CONVERT_EXPR:
       /* This kind of view-conversions may wrap non-addressable objects
 	 and make them look addressable.  After some processing the
-	 non-addressability may be uncovered again, causing ADDR_EXPRs
+	 non-addressability may be uncovered again, causing *ADDR_EXPRs
 	 of inappropriate objects to be built.  */
       if (is_gimple_reg (TREE_OPERAND (expr, 0))
 	  || !is_gimple_addressable (TREE_OPERAND (expr, 0)))
@@ -2937,7 +2937,7 @@ strip_offset_1 (tree expr, bool inside_addr, bool top_compref,
     TREE_OPERAND (expr, 1) = op1;
 
   /* Inside address, we might strip the top level component references,
-     thus changing type of the expression.  Handling of ADDR_EXPR
+     thus changing type of the expression.  Handling of *ADDR_EXPR
      will fix that.  */
   expr = fold_convert (orig_type, expr);
 

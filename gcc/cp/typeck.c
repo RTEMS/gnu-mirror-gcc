@@ -3379,7 +3379,7 @@ cp_strict_aliasing_warning (location_t loc, tree type, tree expr)
 }
 
 /* The implementation of the above, and of indirection implied by other
-   constructs.  If DO_FOLD is true, fold away INDIRECT_REF of ADDR_EXPR.  */
+   constructs.  If DO_FOLD is true, fold away INDIRECT_REF of *ADDR_EXPR.  */
 
 static tree
 cp_build_indirect_ref_1 (location_t loc, tree ptr, ref_operator errorstring,
@@ -6247,7 +6247,7 @@ condition_conversion (tree expr)
 }
 
 /* Returns the address of T.  This function will fold away
-   ADDR_EXPR of INDIRECT_REF.  This is only for low-level usage;
+   *ADDR_EXPR of INDIRECT_REF.  This is only for low-level usage;
    most places should use cp_build_addr_expr instead.  */
 
 tree
@@ -6470,7 +6470,7 @@ cp_build_addr_expr_1 (tree arg, bool strict_lvalue, tsubst_flags_t complain)
     }
 
   /* In a template, we are processing a non-dependent expression
-     so we can just form an ADDR_EXPR with the correct type.  */
+     so we can just form an *ADDR_EXPR with the correct type.  */
   if (processing_template_decl || TREE_CODE (arg) != COMPONENT_REF)
     {
       tree stripped_arg = tree_strip_any_location_wrapper (arg);
@@ -6557,7 +6557,7 @@ tree
 cp_build_unary_op (enum tree_code code, tree xarg, bool noconvert,
                    tsubst_flags_t complain)
 {
-  /* No default_conversion here.  It causes trouble for ADDR_EXPR.  */
+  /* No default_conversion here.  It causes trouble for *ADDR_EXPR.  */
   tree arg = xarg;
   location_t location = cp_expr_loc_or_input_loc (arg);
   tree argtype = 0;

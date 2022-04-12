@@ -2695,7 +2695,7 @@ canonicalize_component_ref (tree *expr_p)
 }
 
 /* If a NOP conversion is changing a pointer to array of foo to a pointer
-   to foo, embed that change in the ADDR_EXPR by converting
+   to foo, embed that change in the *ADDR_EXPR by converting
       T array[U];
       (T *)&array
    ==>
@@ -2712,7 +2712,7 @@ canonicalize_addr_expr (tree *expr_p)
   tree addr_expr = TREE_OPERAND (expr, 0);
   tree datype, ddatype, pddatype;
 
-  /* We simplify only conversions from an ADDR_EXPR to a pointer type.  */
+  /* We simplify only conversions from an *ADDR_EXPR to a pointer type.  */
   if (!POINTER_TYPE_P (TREE_TYPE (expr))
       || !ADDR_EXPR_P (addr_expr))
     return;
@@ -2777,7 +2777,7 @@ gimplify_conversion (tree *expr_p)
 	canonicalize_component_ref (&TREE_OPERAND (*expr_p, 0));
 
       /* If a NOP conversion is changing a pointer to array of foo
-	 to a pointer to foo, embed that change in the ADDR_EXPR.  */
+	 to a pointer to foo, embed that change in the *ADDR_EXPR.  */
       else if (ADDR_EXPR_P (sub))
 	canonicalize_addr_expr (expr_p);
     }
@@ -6079,7 +6079,7 @@ gimplify_save_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
   return ret;
 }
 
-/* Rewrite the ADDR_EXPR node pointed to by EXPR_P
+/* Rewrite the *ADDR_EXPR node pointed to by EXPR_P
 
       unary_expr
 	      : ...
@@ -6109,8 +6109,8 @@ gimplify_addr_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 	 expressions may be generated internally by the compiler (e.g.,
 	 builtins like __builtin_va_end).  */
       /* Caution: the silent array decomposition semantics we allow for
-	 ADDR_EXPR means we can't always discard the pair.  */
-      /* Gimplification of the ADDR_EXPR operand may drop
+	 *ADDR_EXPR means we can't always discard the pair.  */
+      /* Gimplification of the *ADDR_EXPR operand may drop
 	 cv-qualification conversions, so make sure we add them if
 	 needed.  */
       {
@@ -6127,13 +6127,13 @@ gimplify_addr_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 
     case VIEW_CONVERT_EXPR:
       /* Take the address of our operand and then convert it to the type of
-	 this ADDR_EXPR.
+	 this *ADDR_EXPR.
 
 	 ??? The interactions of VIEW_CONVERT_EXPR and aliasing is not at
 	 all clear.  The impact of this transformation is even less clear.  */
 
       /* If the operand is a useless conversion, look through it.  Doing so
-	 guarantees that the ADDR_EXPR and its operand will remain of the
+	 guarantees that the *ADDR_EXPR and its operand will remain of the
 	 same type.  */
       if (tree_ssa_useless_type_conversion (TREE_OPERAND (op0, 0)))
 	op0 = TREE_OPERAND (op0, 0);
@@ -6185,8 +6185,8 @@ gimplify_addr_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 
       mark_addressable (TREE_OPERAND (expr, 0));
 
-      /* The FEs may end up building ADDR_EXPRs early on a decl with
-	 an incomplete type.  Re-build ADDR_EXPRs in canonical form
+      /* The FEs may end up building *ADDR_EXPRs early on a decl with
+	 an incomplete type.  Re-build *ADDR_EXPRs in canonical form
 	 here.  */
       if (!types_compatible_p (TREE_TYPE (op0), TREE_TYPE (TREE_TYPE (expr))))
 	*expr_p = build_fold_addr_expr (op0);
@@ -6194,7 +6194,7 @@ gimplify_addr_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
       /* Make sure TREE_CONSTANT and TREE_SIDE_EFFECTS are set properly.  */
       recompute_tree_invariant_for_addr_expr (*expr_p);
 
-      /* If we re-built the ADDR_EXPR add a conversion to the original type
+      /* If we re-built the *ADDR_EXPR add a conversion to the original type
          if required.  */
       if (!useless_type_conversion_p (TREE_TYPE (expr), TREE_TYPE (*expr_p)))
 	*expr_p = fold_convert (TREE_TYPE (expr), *expr_p);
@@ -13840,10 +13840,10 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 	  break;
 
 	case CONST_DECL:
-	  /* If we require an lvalue, such as for ADDR_EXPR, retain the
+	  /* If we require an lvalue, such as for *ADDR_EXPR, retain the
 	     CONST_DECL node.  Otherwise the decl is replaceable by its
 	     value.  */
-	  /* ??? Should be == fb_lvalue, but ADDR_EXPR passes fb_either.  */
+	  /* ??? Should be == fb_lvalue, but *ADDR_EXPR passes fb_either.  */
 	  if (fallback & fb_lvalue)
 	    ret = GS_ALL_DONE;
 	  else

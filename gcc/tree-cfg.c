@@ -1998,7 +1998,7 @@ replace_uses_by (tree name, tree val)
 	  size_t i;
 
 	  /* FIXME.  It shouldn't be required to keep TREE_CONSTANT
-	     on ADDR_EXPRs up-to-date on GIMPLE.  Propagation will
+	     on *ADDR_EXPRs up-to-date on GIMPLE.  Propagation will
 	     only change sth from non-invariant to invariant, and only
 	     when propagating constants.  */
 	  if (is_gimple_min_invariant (val))
@@ -2351,7 +2351,7 @@ find_taken_edge (basic_block bb, tree val)
 	 not a label then we cannot construct a proper CFG.
 
          It may be the case that we only need to allow the LABEL_REF to
-         appear inside an ADDR_EXPR, but we also allow the LABEL_REF to
+         appear inside an *ADDR_EXPR, but we also allow the LABEL_REF to
          appear inside a LABEL_EXPR just to be safe.  */
       if (val
 	  && (ADDR_EXPR_P (val) || TREE_CODE (val) == LABEL_EXPR)
@@ -4761,7 +4761,7 @@ verify_gimple_goto (ggoto *stmt)
   tree dest = gimple_goto_dest (stmt);
 
   /* ???  We have two canonical forms of direct goto destinations, a
-     bare LABEL_DECL and an ADDR_EXPR of a LABEL_DECL.  */
+     bare LABEL_DECL and an *ADDR_EXPR of a LABEL_DECL.  */
   if (TREE_CODE (dest) != LABEL_DECL
       && (!is_gimple_val (dest)
 	  || !POINTER_TYPE_P (TREE_TYPE (dest))))

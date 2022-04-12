@@ -7158,7 +7158,7 @@ convert_nontype_argument (tree type, tree expr, tsubst_flags_t complain)
       return NULL_TREE;
     }
 
-  /* Add the ADDR_EXPR now for the benefit of
+  /* Add the *ADDR_EXPR now for the benefit of
      value_dependent_expression_p.  */
   if (TYPE_PTROBV_P (type)
       && TREE_CODE (TREE_TYPE (expr)) == ARRAY_TYPE)
@@ -7248,7 +7248,7 @@ convert_nontype_argument (tree type, tree expr, tsubst_flags_t complain)
     expr = mark_rvalue_use (expr);
 
   /* HACK: Due to double coercion, we can get a
-     NOP_EXPR<REFERENCE_TYPE>(ADDR_EXPR<POINTER_TYPE> (arg)) here,
+     NOP_EXPR<REFERENCE_TYPE>(*ADDR_EXPR<POINTER_TYPE> (arg)) here,
      which is the tree that we built on the first call (see
      below when coercing to reference to object or to reference to
      function). We just strip everything and get to the arg.
@@ -7347,9 +7347,9 @@ convert_nontype_argument (tree type, tree expr, tsubst_flags_t complain)
     {
       tree decayed = expr;
 
-      /* Look through any NOP_EXPRs around an ADDR_EXPR, whether they come from
-	 decay_conversion or an explicit cast.  If it's a problematic cast,
-	 we'll complain about it below.  */
+      /* Look through any NOP_EXPRs around an *ADDR_EXPR, whether they
+	 come from decay_conversion or an explicit cast.  If it's a
+	 problematic cast, we'll complain about it below.  */
       if (TREE_CODE (expr) == NOP_EXPR)
 	{
 	  tree probe = expr;
@@ -26729,7 +26729,7 @@ value_dependent_expression_p (tree expression)
 	  {
 	    tree op = CALL_EXPR_ARG (expression, i);
 	    /* In a call to a constexpr member function, look through the
-	       implicit ADDR_EXPR on the object argument so that it doesn't
+	       implicit *ADDR_EXPR on the object argument so that it doesn't
 	       cause the call to be considered value-dependent.  We also
 	       look through it in potential_constant_expression.  */
 	    if (i == 0 && fn && DECL_DECLARED_CONSTEXPR_P (fn)

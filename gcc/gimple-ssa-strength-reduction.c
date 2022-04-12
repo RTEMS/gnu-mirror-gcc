@@ -1791,7 +1791,7 @@ find_candidates_dom_walker::before_dom_children (basic_block bb)
 	      break;
 
 	    /* Possible future opportunity: rhs1 of a ptr+ can be
-	       an ADDR_EXPR.  */
+	       an *ADDR_EXPR.  */
 	    case POINTER_PLUS_EXPR:
 	    case MINUS_EXPR:
 	      rhs2 = gimple_assign_rhs2 (gs);

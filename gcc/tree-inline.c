@@ -1127,7 +1127,7 @@ remap_gimple_op_r (tree *tp, int *walk_subtrees, void *data)
       if (TREE_CODE (*tp) == MEM_REF && !id->do_not_fold)
 	{
 	  /* We need to re-canonicalize MEM_REFs from inline substitutions
-	     that can happen when a pointer argument is an ADDR_EXPR.
+	     that can happen when a pointer argument is an *ADDR_EXPR.
 	     Recurse here manually to allow that.  */
 	  tree ptr = TREE_OPERAND (*tp, 0);
 	  tree type = remap_type (TREE_TYPE (*tp), id);
@@ -1336,13 +1336,13 @@ copy_tree_body_r (tree *tp, int *walk_subtrees, void *data)
       else if (TREE_CODE (*tp) == INDIRECT_REF)
 	{
 	  /* Get rid of *& from inline substitutions that can happen when a
-	     pointer argument is an ADDR_EXPR.  */
+	     pointer argument is an *ADDR_EXPR.  */
 	  tree decl = TREE_OPERAND (*tp, 0);
 	  tree *n = id->decl_map->get (decl);
 	  if (n)
 	    {
-	      /* If we happen to get an ADDR_EXPR in n->value, strip
-	         it manually here as we'll eventually get ADDR_EXPRs
+	      /* If we happen to get an *ADDR_EXPR in n->value, strip
+	         it manually here as we'll eventually get *ADDR_EXPRs
 		 which lie about their types pointed to.  In this case
 		 build_fold_indirect_ref wouldn't strip the INDIRECT_REF,
 		 but we absolutely rely on that.  As fold_indirect_ref
@@ -1386,7 +1386,7 @@ copy_tree_body_r (tree *tp, int *walk_subtrees, void *data)
       else if (TREE_CODE (*tp) == MEM_REF && !id->do_not_fold)
 	{
 	  /* We need to re-canonicalize MEM_REFs from inline substitutions
-	     that can happen when a pointer argument is an ADDR_EXPR.
+	     that can happen when a pointer argument is an *ADDR_EXPR.
 	     Recurse here manually to allow that.  */
 	  tree ptr = TREE_OPERAND (*tp, 0);
 	  tree type = remap_type (TREE_TYPE (*tp), id);
@@ -1454,7 +1454,7 @@ copy_tree_body_r (tree *tp, int *walk_subtrees, void *data)
 	  walk_tree (&TREE_OPERAND (*tp, 0), copy_tree_body_r, id, NULL);
 
 	  /* Handle the case where we substituted an INDIRECT_REF
-	     into the operand of the ADDR_EXPR.  */
+	     into the operand of the *ADDR_EXPR.  */
 	  if (TREE_CODE (TREE_OPERAND (*tp, 0)) == INDIRECT_REF
 	      && !id->do_not_fold)
 	    {
@@ -3296,7 +3296,7 @@ copy_body (copy_body_data *id,
   return body;
 }
 
-/* Return true if VALUE is an ADDR_EXPR of an automatic variable
+/* Return true if VALUE is an *ADDR_EXPR of an automatic variable
    defined in function FN, or of a data member thereof.  */
 
 static bool
@@ -3461,7 +3461,7 @@ setup_one_parameter (copy_body_data *id, tree p, tree value, tree fn,
       if (is_gimple_min_invariant (value)
 	  && useless_type_conversion_p (TREE_TYPE (p),
 						 TREE_TYPE (value))
-	  /* We have to be very careful about ADDR_EXPR.  Make sure
+	  /* We have to be very careful about *ADDR_EXPR.  Make sure
 	     the base variable isn't a local variable of the inlined
 	     function, e.g., when doing recursive inlining, direct or
 	     mutually-recursive or whatever, which is why we don't

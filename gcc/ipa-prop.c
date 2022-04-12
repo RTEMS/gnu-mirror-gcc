@@ -1372,7 +1372,7 @@ compute_complex_assign_jump_func (struct ipa_func_body_info *fbi,
    parameter.  Return NULL_TREE if it looks otherwise.  If case of success, the
    whole MEM_REF expression is returned and the offset calculated from any
    handled components and the MEM_REF itself is stored into *OFFSET.  The whole
-   RHS stripped off the ADDR_EXPR is stored into *OBJ_P.  */
+   RHS stripped off the *ADDR_EXPR is stored into *OBJ_P.  */
 
 static tree
 get_ancestor_addr_info (gimple *assign, tree *obj_p, HOST_WIDE_INT *offset)
@@ -4490,7 +4490,7 @@ ipa_write_jump_function (struct output_block *ob,
   int i, count;
   int flag = 0;
 
-  /* ADDR_EXPRs are very comon IP invariants; save some streamer data
+  /* *ADDR_EXPRs are very comon IP invariants; save some streamer data
      as well as WPA memory by handling them specially.  */
   if (jump_func->type == IPA_JF_CONST
       && ADDR_EXPR_P (jump_func->value.constant.value))

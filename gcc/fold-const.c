@@ -3072,7 +3072,7 @@ operand_compare::operand_equal_p (const_tree arg0, const_tree arg1,
       STRIP_NOPS (arg1);
     }
 #if 0
-  /* FIXME: Fortran FE currently produce ADDR_EXPR of NOP_EXPR. Enable the
+  /* FIXME: Fortran FE currently produce *ADDR_EXPR of NOP_EXPR. Enable the
      sanity check once the issue is solved.  */
   else
     /* Addresses of conversions and SSA_NAMEs (and many other things)
@@ -9470,7 +9470,7 @@ pointer_may_wrap_p (tree base, tree offset, poly_int64 bitpos)
   if (known_le (total_hwi, size))
     return false;
 
-  /* We can do slightly better for SIZE if we have an ADDR_EXPR of an
+  /* We can do slightly better for SIZE if we have an *ADDR_EXPR of an
      array.  */
   if (ADDR_EXPR_P (base)
       && poly_int_tree_p (TYPE_SIZE_UNIT (TREE_TYPE (TREE_OPERAND (base, 0))),
@@ -9527,7 +9527,7 @@ fold_comparison (location_t loc, enum tree_code code, tree type,
 
   /* For comparisons of pointers we can decompose it to a compile time
      comparison of the base objects and the offsets into the object.
-     This requires at least one operand being an ADDR_EXPR or a
+     This requires at least one operand being an *ADDR_EXPR or a
      POINTER_PLUS_EXPR to do more than the operand_equal_p test below.  */
   if (POINTER_TYPE_P (TREE_TYPE (arg0))
       && (ADDR_EXPR_P (arg0)
@@ -9541,7 +9541,7 @@ fold_comparison (location_t loc, enum tree_code code, tree type,
       int volatilep, reversep, unsignedp;
       bool indirect_base0 = false, indirect_base1 = false;
 
-      /* Get base and offset for the access.  Strip ADDR_EXPR for
+      /* Get base and offset for the access.  Strip *ADDR_EXPR for
 	 get_inner_reference, but put it back by stripping INDIRECT_REF
 	 off the base object if possible.  indirect_baseN will be true
 	 if baseN is not an address but refers to the object itself.  */

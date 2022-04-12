@@ -613,7 +613,7 @@ tree gfc_get_extern_function_decl (gfc_symbol *,
 /* Return the decl for a function.  */
 tree gfc_get_function_decl (gfc_symbol *);
 
-/* Build an ADDR_EXPR.  */
+/* Build an *ADDR_EXPR.  */
 tree gfc_build_addr_expr (tree, tree);
 
 /* Build an ARRAY_REF.  */

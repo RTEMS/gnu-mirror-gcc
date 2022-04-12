@@ -126,7 +126,7 @@ along with GCC; see the file COPYING3.  If not see
    a statement, we put it back on the worklist to examine on the next
    iteration of the main loop.
 
-   A second class of propagation opportunities arises for ADDR_EXPR
+   A second class of propagation opportunities arises for *ADDR_EXPR
    nodes.
 
      ptr = &x->y->z;
@@ -636,7 +636,7 @@ forward_propagate_into_cond (gimple_stmt_iterator *gsi_p)
   return 0;
 }
 
-/* We've just substituted an ADDR_EXPR into stmt.  Update all the
+/* We've just substituted an *ADDR_EXPR into stmt.  Update all the
    relevant data structures to match.  */
 
 static void
@@ -651,10 +651,10 @@ tidy_after_forward_propagate_addr (gimple *stmt)
 }
 
 /* NAME is a SSA_NAME representing DEF_RHS which is of the form
-   ADDR_EXPR <whatever>.
+   *ADDR_EXPR <whatever>.
 
-   Try to forward propagate the ADDR_EXPR into the use USE_STMT.
-   Often this will allow for removal of an ADDR_EXPR and INDIRECT_REF
+   Try to forward propagate the *ADDR_EXPR into the use USE_STMT.
+   Often this will allow for removal of an *ADDR_EXPR and INDIRECT_REF
    node or for recovery of array indexing from pointer arithmetic.
 
    Return true if the propagation was successful (the propagation can
@@ -756,14 +756,14 @@ forward_propagate_addr_expr_1 (tree name, tree def_rhs,
     }
 
   /* Now strip away any outer COMPONENT_REF/ARRAY_REF nodes from the LHS.
-     ADDR_EXPR will not appear on the LHS.  */
+     *ADDR_EXPR will not appear on the LHS.  */
   tree *lhsp = gimple_assign_lhs_ptr (use_stmt);
   while (handled_component_p (*lhsp))
     lhsp = &TREE_OPERAND (*lhsp, 0);
   lhs = *lhsp;
 
   /* Now see if the LHS node is a MEM_REF using NAME.  If so,
-     propagate the ADDR_EXPR into the use of NAME and fold the result.  */
+     propagate the *ADDR_EXPR into the use of NAME and fold the result.  */
   if (TREE_CODE (lhs) == MEM_REF
       && TREE_OPERAND (lhs, 0) == name)
     {
@@ -845,7 +845,7 @@ forward_propagate_addr_expr_1 (tree name, tree def_rhs,
 	res = false;
     }
 
-  /* Strip away any outer COMPONENT_REF, ARRAY_REF or ADDR_EXPR
+  /* Strip away any outer COMPONENT_REF, ARRAY_REF or *ADDR_EXPR
      nodes from the RHS.  */
   tree *rhsp = gimple_assign_rhs1_ptr (use_stmt);
   if (ADDR_EXPR_P (*rhsp))
@@ -855,7 +855,7 @@ forward_propagate_addr_expr_1 (tree name, tree def_rhs,
   rhs = *rhsp;
 
   /* Now see if the RHS node is a MEM_REF using NAME.  If so,
-     propagate the ADDR_EXPR into the use of NAME and fold the result.  */
+     propagate the *ADDR_EXPR into the use of NAME and fold the result.  */
   if (TREE_CODE (rhs) == MEM_REF
       && TREE_OPERAND (rhs, 0) == name)
     {
@@ -924,7 +924,7 @@ forward_propagate_addr_expr_1 (tree name, tree def_rhs,
 	}
     }
 
-  /* If the use of the ADDR_EXPR is not a POINTER_PLUS_EXPR, there
+  /* If the use of the *ADDR_EXPR is not a POINTER_PLUS_EXPR, there
      is nothing to do. */
   if (gimple_assign_rhs_code (use_stmt) != POINTER_PLUS_EXPR
       || gimple_assign_rhs1 (use_stmt) != name)
@@ -963,10 +963,10 @@ forward_propagate_addr_expr_1 (tree name, tree def_rhs,
   return false;
 }
 
-/* STMT is a statement of the form SSA_NAME = ADDR_EXPR <whatever>.
+/* STMT is a statement of the form SSA_NAME = *ADDR_EXPR <whatever>.
 
-   Try to forward propagate the ADDR_EXPR into all uses of the SSA_NAME.
-   Often this will allow for removal of an ADDR_EXPR and INDIRECT_REF
+   Try to forward propagate the *ADDR_EXPR into all uses of the SSA_NAME.
+   Often this will allow for removal of an *ADDR_EXPR and INDIRECT_REF
    node or for recovery of array indexing from pointer arithmetic.
 
    PARENT_SINGLE_USE_P tells if, when in a recursive invocation, NAME was
@@ -1169,8 +1169,8 @@ constant_pointer_difference (tree p1, tree p2)
       enum tree_code code;
 
       /* For each of p1 and p2 we need to iterate at least
-	 twice, to handle ADDR_EXPR directly in p1/p2,
-	 SSA_NAME with ADDR_EXPR or POINTER_PLUS_EXPR etc.
+	 twice, to handle *ADDR_EXPR directly in p1/p2,
+	 SSA_NAME with *ADDR_EXPR or POINTER_PLUS_EXPR etc.
 	 on definition's stmt RHS.  Iterate a few extra times.  */
       j = 0;
       do

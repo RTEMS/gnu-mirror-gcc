@@ -18388,7 +18388,7 @@ loc_list_from_tree_1 (tree loc, int want_address,
       else
 	{
 	  if (want_address)
-	    expansion_failed (loc, NULL_RTX, "need address of ADDR_EXPR");
+	    expansion_failed (loc, NULL_RTX, "need address of *ADDR_EXPR");
 	  return NULL;
 	}
       break;
@@ -30270,8 +30270,8 @@ optimize_location_into_implicit_ptr (dw_die_ref die, tree decl)
     return;
   if (dwarf_strict && dwarf_version < 5)
     return;
-  /* If init is ADDR_EXPR or POINTER_PLUS_EXPR of ADDR_EXPR,
-     and ADDR_EXPR refers to a decl that has DW_AT_location or
+  /* If init is *ADDR_EXPR or POINTER_PLUS_EXPR of *ADDR_EXPR,
+     and *ADDR_EXPR refers to a decl that has DW_AT_location or
      DW_AT_const_value (but isn't addressable, otherwise
      resolving the original DW_OP_addr wouldn't fail), see if
      we can add DW_OP_implicit_pointer.  */

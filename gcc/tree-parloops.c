@@ -1361,7 +1361,7 @@ eliminate_local_variables_1 (tree *tp, int *walk_subtrees, void *data)
 
   if (ADDR_EXPR_P (t))
     {
-      /* ADDR_EXPR may appear in two contexts:
+      /* *ADDR_EXPR may appear in two contexts:
 	 -- as a gimple operand, when the address taken is a function invariant
 	 -- as gimple rhs, when the resulting address in not a function
 	    invariant
@@ -3605,7 +3605,7 @@ try_create_reduction_list (loop_p loop,
   return true;
 }
 
-/* Return true if LOOP contains phis with ADDR_EXPR in args.  */
+/* Return true if LOOP contains phis with *ADDR_EXPR in args.  */
 
 static bool
 loop_has_phi_with_address_arg (class loop *loop)

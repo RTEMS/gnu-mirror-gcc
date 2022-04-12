@@ -566,7 +566,7 @@ unshare_strinfo_vec (void)
   (*stridx_to_strinfo)[0] = NULL;
 }
 
-/* Attempt to create a string index for exp, ADDR_EXPR's operand.
+/* Attempt to create a string index for exp, an *ADDR_EXPR's operand.
    Return a pointer to the location where the string index can
    be stored (if 0) or is stored, or NULL if this can't be tracked.  */
 
@@ -654,7 +654,7 @@ new_stridx (tree exp)
   return 0;
 }
 
-/* Like new_stridx, but for ADDR_EXPR's operand instead.  */
+/* Like new_stridx, but for an *ADDR_EXPR's operand instead.  */
 
 static int
 new_addr_stridx (tree exp)
@@ -4635,7 +4635,7 @@ count_nonzero_bytes_addr (tree, unsigned HOST_WIDE_INT, unsigned HOST_WIDE_INT,
    Sets *NULTERM if the representation contains a zero byte, and sets
    *ALLNUL if all the bytes are zero.
    OFFSET and NBYTES are the offset into the representation and
-   the size of the access to it determined from an ADDR_EXPR (i.e.,
+   the size of the access to it determined from an *ADDR_EXPR (i.e.,
    a pointer) or MEM_REF or zero for other expressions.
    Uses RVALS to determine range information.
    Avoids recursing deeper than the limits in SNLIM allow.
@@ -4743,7 +4743,7 @@ count_nonzero_bytes (tree exp, unsigned HOST_WIDE_INT offset,
 	return false;
 
       if (!nbytes)
-	/* If NBYTES hasn't been determined earlier, either from ADDR_EXPR
+	/* If NBYTES hasn't been determined earlier, either from *ADDR_EXPR
 	   (i.e., it's the size of a pointer), or from MEM_REF (as the size
 	   of the access), set it here to the size of the string, including
 	   all internal and trailing nuls if the string has any.  */

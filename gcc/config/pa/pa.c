@@ -2429,7 +2429,7 @@ pa_emit_move_sequence (rtx *operands, machine_mode mode, rtx scratch_reg)
   return 0;
 }
 
-/* Examine EXP and return nonzero if it contains an ADDR_EXPR (meaning
+/* Examine EXP and return nonzero if it contains an *ADDR_EXPR (meaning
    it will need a link/runtime reloc).  */
 
 int

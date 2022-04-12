@@ -8571,7 +8571,7 @@ pointer_to_zero_sized_aggr_p (tree t)
 }
 
 /* For an EXPR of a FUNCTION_TYPE that references a GCC built-in function
-   with no library fallback or for an ADDR_EXPR whose operand is such type
+   with no library fallback or for an *ADDR_EXPR whose operand is such type
    issues an error pointing to the location LOC.
    Returns true when the expression has been diagnosed and false
    otherwise.  */

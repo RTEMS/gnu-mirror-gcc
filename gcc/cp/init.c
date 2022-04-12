@@ -2597,7 +2597,7 @@ warn_placement_new_too_small (tree type, tree nelts, tree size, tree oper)
   /* True when the size of the entire destination object should be used
      to compute the possibly optimistic estimate of the available space.  */
   bool use_obj_size = false;
-  /* True when the reference to the destination buffer is an ADDR_EXPR.  */
+  /* True when the reference to the destination buffer is an *ADDR_EXPR.  */
   bool addr_expr = false;
 
   STRIP_NOPS (oper);

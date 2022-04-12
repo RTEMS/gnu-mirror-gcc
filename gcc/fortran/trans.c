@@ -263,7 +263,7 @@ gfc_finish_block (stmtblock_t * stmtblock)
 }
 
 
-/* Build an ADDR_EXPR and cast the result to TYPE.  If TYPE is NULL, the
+/* Build an *ADDR_EXPR and cast the result to TYPE.  If TYPE is NULL, the
    natural type is used.  */
 
 tree

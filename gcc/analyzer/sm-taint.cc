@@ -211,7 +211,7 @@ taint_state_machine::on_stmt (sm_context *sm_ctxt,
 
 	    sm_ctxt->on_transition (node, stmt, arg, m_start, m_tainted);
 
-	    /* Dereference an ADDR_EXPR.  */
+	    /* Dereference an *ADDR_EXPR.  */
 	    // TODO: should the engine do this?
 	    if (ADDR_EXPR_P (arg))
 	      sm_ctxt->on_transition (node, stmt, TREE_OPERAND (arg, 0),

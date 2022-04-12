@@ -117,7 +117,7 @@ test_inlining (gimple *stmt)
   if (!call)
     return;
 
-  /* We expect an ADDR_EXPR with a STRING_CST inside it for the
+  /* We expect an *ADDR_EXPR with a STRING_CST inside it for the
      initial arg.  */
   tree t_addr_string = gimple_call_arg (call, 0);
   if (!ADDR_EXPR_P (t_addr_string))

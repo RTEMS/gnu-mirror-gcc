@@ -1446,7 +1446,7 @@ new_block (const char *name)
   return result;
 }
 
-/* Construct a playback::rvalue instance wrapping an ADDR_EXPR for
+/* Construct a playback::rvalue instance wrapping an *ADDR_EXPR for
    this playback::function.  */
 
 playback::rvalue *

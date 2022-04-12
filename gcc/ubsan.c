@@ -343,10 +343,10 @@ get_ubsan_type_info_for_type (tree type)
    ubsan_ids[1] for Lubsan_data labels.  */
 static GTY(()) unsigned int ubsan_ids[2];
 
-/* Helper routine that returns ADDR_EXPR of a VAR_DECL of a type
+/* Helper routine that returns *ADDR_EXPR of a VAR_DECL of a type
    descriptor.  It first looks into the hash table; if not found,
    create the VAR_DECL, put it into the hash table and return the
-   ADDR_EXPR of it.  TYPE describes a particular type.  PSTYLE is
+   *ADDR_EXPR of it.  TYPE describes a particular type.  PSTYLE is
    an enum controlling how we want to print the type.  */
 
 tree

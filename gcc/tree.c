@@ -3503,7 +3503,7 @@ staticp (tree arg)
       gcc_assert (TREE_CODE (TREE_OPERAND (arg, 1)) == FIELD_DECL);
 
       /* If we are referencing a bitfield, we can't evaluate an
-	 ADDR_EXPR at compile time and so it isn't a constant.  */
+	 *ADDR_EXPR at compile time and so it isn't a constant.  */
       if (DECL_BIT_FIELD (TREE_OPERAND (arg, 1)))
 	return NULL;
 
@@ -4640,7 +4640,7 @@ stabilize_reference (tree ref)
 /* Low-level constructors for expressions.  */
 
 /* A helper function for build1 and constant folders.  Set TREE_CONSTANT,
-   and TREE_SIDE_EFFECTS for an ADDR_EXPR.  */
+   and TREE_SIDE_EFFECTS for an *ADDR_EXPR.  */
 
 void
 recompute_tree_invariant_for_addr_expr (tree t)
@@ -5057,7 +5057,7 @@ mem_ref_offset (const_tree t)
 							SIGNED);
 }
 
-/* Return an invariant ADDR_EXPR of type TYPE taking the address of BASE
+/* Return an invariant *ADDR_EXPR of type TYPE taking the address of BASE
    offsetted by OFFSET units.  */
 
 tree
@@ -11853,7 +11853,7 @@ build_alloca_call_expr (tree size, unsigned int align, HOST_WIDE_INT max_size)
 
 /* Create a new constant string literal of type ELTYPE[SIZE] (or LEN
    if SIZE == -1) and return a tree node representing char* pointer to
-   it as an ADDR_EXPR (ARRAY_REF (ELTYPE, ...)).  When STR is nonnull
+   it as an *ADDR_EXPR (ARRAY_REF (ELTYPE, ...)).  When STR is nonnull
    the STRING_CST value is the LEN bytes at STR (the representation
    of the string, which may be wide).  Otherwise it's all zeros.  */
 

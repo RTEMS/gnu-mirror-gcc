@@ -392,7 +392,7 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
       COMPOUND_EXPR_OVERLOADED (in COMPOUND_EXPR).
       CLEANUP_P (in TRY_BLOCK)
       AGGR_INIT_VIA_CTOR_P (in AGGR_INIT_EXPR)
-      PTRMEM_OK_P (in ADDR_EXPR, OFFSET_REF, SCOPE_REF)
+      PTRMEM_OK_P (in *ADDR_EXPR, OFFSET_REF, SCOPE_REF)
       PAREN_STRING_LITERAL_P (in STRING_CST)
       CP_DECL_THREAD_LOCAL_P (in VAR_DECL)
       KOENIG_LOOKUP_P (in CALL_EXPR)
@@ -4945,7 +4945,7 @@ more_aggr_init_expr_args_p (const aggr_init_expr_arg_iterator *iter)
 
    A thunk is an alternate entry point for an ordinary FUNCTION_DECL.
    The address of the ordinary FUNCTION_DECL is given by the
-   DECL_INITIAL, which is always an ADDR_EXPR whose operand is a
+   DECL_INITIAL, which is always an *ADDR_EXPR whose operand is a
    FUNCTION_DECL.  The job of the thunk is to either adjust the this
    pointer before transferring control to the FUNCTION_DECL, or call
    FUNCTION_DECL and then adjust the result value. Note, the result

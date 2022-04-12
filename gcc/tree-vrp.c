@@ -3224,7 +3224,7 @@ vrp_insert::compare_assert_loc (const void *pa, const void *pb)
 
   hashval_t ha, hb;
 
-  /* E.g. if a->val is ADDR_EXPR of a VAR_DECL, iterative_hash_expr
+  /* E.g. if a->val is *ADDR_EXPR of a VAR_DECL, iterative_hash_expr
      uses DECL_UID of the VAR_DECL, so sorting might differ between
      -g and -g0.  When doing the removal of redundant assert exprs
      and commonization to successors, this does not matter, but for

@@ -213,7 +213,7 @@ ptr_deref_may_alias_decl_p (tree ptr, tree decl)
       return ptr_deref_may_alias_decl_p (ptr, decl);
     }
 
-  /* ADDR_EXPR pointers either just offset another pointer or directly
+  /* *ADDR_EXPR pointers either just offset another pointer or directly
      specify the pointed-to set.  */
   if (ADDR_EXPR_P (ptr))
     {
@@ -279,7 +279,7 @@ ptr_derefs_may_alias_p (tree ptr1, tree ptr2)
       return ptr_derefs_may_alias_p (ptr1, ptr2);
     }
 
-  /* ADDR_EXPR pointers either just offset another pointer or directly
+  /* *ADDR_EXPR pointers either just offset another pointer or directly
      specify the pointed-to set.  */
   if (ADDR_EXPR_P (ptr1))
     {

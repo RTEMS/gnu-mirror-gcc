@@ -4383,9 +4383,9 @@ intcap_increment (location_t loc, tree_code code, tree arg)
 /* Construct and perhaps optimize a tree representation
    for a unary operation.  CODE, a tree_code, specifies the operation
    and XARG is the operand.
-   For any CODE other than ADDR_EXPR, NOCONVERT suppresses the default
+   For any CODE other than *ADDR_EXPR, NOCONVERT suppresses the default
    promotions (such as from short to int).
-   For ADDR_EXPR, the default promotions are not applied; NOCONVERT allows
+   For *ADDR_EXPR, the default promotions are not applied; NOCONVERT allows
    non-lvalues; this is only used to handle conversion of non-lvalue arrays
    to pointers in C99.
 
@@ -4395,7 +4395,7 @@ tree
 build_unary_op (location_t location, enum tree_code code, tree xarg,
 		bool noconvert)
 {
-  /* No default_conversion here.  It causes trouble for ADDR_EXPR.  */
+  /* No default_conversion here.  It causes trouble for *ADDR_EXPR.  */
   tree arg = xarg;
   tree argtype = NULL_TREE;
   enum tree_code typecode;

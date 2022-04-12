@@ -8195,7 +8195,7 @@ expand_expr_addr_expr_1 (tree exp, rtx target, scalar_addr_mode tmode,
      we have to use output_constant_def since we can't call force_const_mem
      at top level.  */
   /* ??? This should be considered a front-end bug.  We should not be
-     generating ADDR_EXPR of something that isn't an LVALUE.  The only
+     generating *ADDR_EXPR of something that isn't an LVALUE.  The only
      exception here is STRING_CST.  */
   if (CONSTANT_CLASS_P (exp))
     {
@@ -8362,7 +8362,7 @@ expand_expr_addr_expr_1 (tree exp, rtx target, scalar_addr_mode tmode,
   return result;
 }
 
-/* A subroutine of expand_expr.  Evaluate EXP, which is an ADDR_EXPR.
+/* A subroutine of expand_expr.  Evaluate EXP, which is an *ADDR_EXPR.
    The TARGET, TMODE and MODIFIER arguments are as for expand_expr.  */
 
 static rtx
@@ -12209,7 +12209,7 @@ constant_byte_string (tree arg, tree *ptr_offset, tree *mem_size, tree *decl,
 	{
 	  /* Construct a string literal with elements of INITTYPE and
 	     the representation above.  Then strip
-	     the ADDR_EXPR (ARRAY_REF (...)) around the STRING_CST.  */
+	     the *ADDR_EXPR (ARRAY_REF (...)) around the STRING_CST.  */
 	  init = build_string_literal (len, (char *)charbuf, inittype);
 	  init = TREE_OPERAND (TREE_OPERAND (init, 0), 0);
 	}

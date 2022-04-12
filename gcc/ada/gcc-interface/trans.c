@@ -1789,7 +1789,7 @@ Attribute_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, int attribute)
 			  ? ATTR_ADDR_EXPR : unqualified_addr_expr (),
 			  gnu_result_type, gnu_prefix);
 
-      /* For 'Code_Address, find an inner ADDR_EXPR and mark it so that we
+      /* For 'Code_Address, find an inner *ADDR_EXPR and mark it so that we
 	 don't try to build a trampoline.  */
       if (attribute == Attr_Code_Address)
 	{
@@ -1819,7 +1819,7 @@ Attribute_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, int attribute)
 		    gnat_node);
 
       /* For other address attributes applied to a nested function,
-	 find an inner ADDR_EXPR and annotate it so that we can issue
+	 find an inner *ADDR_EXPR and annotate it so that we can issue
 	 a useful warning with -Wtrampolines.  */
       else if (FUNC_OR_METHOD_TYPE_P (TREE_TYPE (gnu_prefix))
 	       && (gnu_expr = remove_conversions (gnu_result, false))
@@ -1832,7 +1832,7 @@ Attribute_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, int attribute)
 	  check_inlining_for_nested_subprog (TREE_OPERAND (gnu_expr, 0));
 
 	  /* Moreover, for 'Access or 'Unrestricted_Access with non-
-	     foreign-compatible representation, mark the ADDR_EXPR so
+	     foreign-compatible representation, mark the *ADDR_EXPR so
 	     that we can build a descriptor instead of a trampoline.  */
 	  if ((attribute == Attr_Access
 	       || attribute == Attr_Unrestricted_Access)
@@ -4836,7 +4836,7 @@ Call_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, tree gnu_target,
 
 	  /* Take the address of the object and convert to the proper pointer
 	     type.  We'd like to actually compute the address of the beginning
-	     of the array using an ADDR_EXPR of an ARRAY_REF, but there's a
+	     of the array using an *ADDR_EXPR of an ARRAY_REF, but there's a
 	     possibility that the ARRAY_REF might return a constant and we'd be
 	     getting the wrong address.  Neither approach is exactly correct,
 	     but this is the most likely to work in all cases.  */
@@ -9776,7 +9776,7 @@ convert_with_check (Entity_Id gnat_type, tree gnu_expr, bool overflow_p,
      - the address of a bit-field reference is supposed to be never
        taken; the compiler (generally) will stop on such a construct,
      - any other tree is addressable if it is formally addressable,
-       i.e. if it is formally allowed to be the operand of ADDR_EXPR.
+       i.e. if it is formally allowed to be the operand of *ADDR_EXPR.
 
    In Ada, the viewpoint is the opposite one: nothing is addressable
    at the language level unless explicitly declared so.  This means
@@ -9786,7 +9786,7 @@ convert_with_check (Entity_Id gnat_type, tree gnu_expr, bool overflow_p,
    representing references to non-addressable objects are addressable.
 
    In the first case, Ada is effectively equivalent to C and handing
-   down the direct result of applying ADDR_EXPR to these trees to the
+   down the direct result of applying *ADDR_EXPR to these trees to the
    middle-end works flawlessly.  In the second case, Ada cannot afford
    to consider the program as erroneous if the address of trees that
    are not addressable is requested for technical reasons, unlike C;

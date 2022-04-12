@@ -1368,8 +1368,8 @@ cxx_eval_builtin_function_call (const constexpr_ctx *ctx, tree t, tree fun,
       tree arg = CALL_EXPR_ARG (t, i);
       tree oarg = arg;
 
-      /* To handle string built-ins we need to pass ADDR_EXPR<STRING_CST> since
-	 expand_builtin doesn't know how to look in the values table.  */
+      /* To handle string built-ins we need to pass *ADDR_EXPR<STRING_CST>
+	 since expand_builtin doesn't know how to look in the values table.  */
       bool strop = i < strops;
       if (strop)
 	{
@@ -4409,7 +4409,7 @@ cxx_fold_indirect_ref_1 (location_t loc, tree type, tree op,
    match.  We want to be less strict for simple *& folding; if we have a
    non-const temporary that we access through a const pointer, that should
    work.  We handle this here rather than change fold_indirect_ref_1
-   because we're dealing with things like ADDR_EXPR of INTEGER_CST which
+   because we're dealing with things like *ADDR_EXPR of INTEGER_CST which
    don't really make sense outside of constant expression evaluation.  Also
    we want to allow folding to COMPONENT_REF, which could cause trouble
    with TBAA in fold_indirect_ref_1.  */
@@ -6872,7 +6872,7 @@ cxx_eval_outermost_constant_expr (tree t, bool allow_non_constant,
 	return cxx_eval_outermost_constant_expr (t, true, strict,
 						 false, false, object);
       /* This isn't actually constant, so unset TREE_CONSTANT.
-	 Don't clear TREE_CONSTANT on ADDR_EXPR, as the middle-end requires
+	 Don't clear TREE_CONSTANT on *ADDR_EXPR, as the middle-end requires
 	 it to be set if it is invariant address, even when it is not
 	 a valid C++ constant expression.  Wrap it with a NOP_EXPR
 	 instead.  */
@@ -7253,7 +7253,7 @@ cxx_constant_init (tree t, tree decl)
 }
 
 #if 0
-/* FIXME see ADDR_EXPR section in potential_constant_expression_1.  */
+/* FIXME see *ADDR_EXPR section in potential_constant_expression_1.  */
 /* Return true if the object referred to by REF has automatic or thread
    local storage.  */
 
@@ -7693,7 +7693,7 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
       }
 
     case ADDRESSOF_EXPR:
-      /* This is like ADDR_EXPR, except it won't form pointer-to-member.  */
+      /* This is like *ADDR_EXPR, except it won't form pointer-to-member.  */
       t = TREE_OPERAND (t, 0);
       goto handle_addr_expr;
 

@@ -12625,7 +12625,7 @@ lower_omp_regimplify_p (tree *tp, int *walk_subtrees,
     return t;
 
   /* If a global variable has been privatized, TREE_CONSTANT on
-     ADDR_EXPR might be wrong.  */
+     *ADDR_EXPR might be wrong.  */
   if (data == NULL && ADDR_EXPR_P (t))
     recompute_tree_invariant_for_addr_expr (t);
 

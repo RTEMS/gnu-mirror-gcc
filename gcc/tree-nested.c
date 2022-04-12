@@ -1905,7 +1905,7 @@ convert_local_reference_op (tree *tp, int *walk_subtrees, void *data)
       walk_tree (&TREE_OPERAND (t, 0), convert_local_reference_op,
 		 wi, NULL);
       /* We need to re-fold the MEM_REF as component references as
-	 part of a ADDR_EXPR address are not allowed.  But we cannot
+	 part of an *ADDR_EXPR address are not allowed.  But we cannot
 	 fold here, as the chain record type is not yet finalized.  */
       if (ADDR_EXPR_P (TREE_OPERAND (t, 0))
 	  && !DECL_P (TREE_OPERAND (TREE_OPERAND (t, 0), 0)))

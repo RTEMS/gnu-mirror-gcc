@@ -124,7 +124,7 @@ test_string_literals (gimple *stmt)
   if (!call)
     return;
 
-  /* We expect an ADDR_EXPR with a STRING_CST inside it for the
+  /* We expect an *ADDR_EXPR with a STRING_CST inside it for the
      initial arg.  */
   tree t_addr_string = gimple_call_arg (call, 0);
   if (!ADDR_EXPR_P (t_addr_string))
@@ -164,7 +164,7 @@ test_string_literals (gimple *stmt)
     }
   int end_idx = TREE_INT_CST_LOW (t_end_idx);
 
-  /* A STRING_CST doesn't have a location, but the ADDR_EXPR does.  */
+  /* A STRING_CST doesn't have a location, but the *ADDR_EXPR does.  */
   location_t strloc = EXPR_LOCATION (t_addr_string);
   location_t loc;
   substring_loc substr_loc (strloc, TREE_TYPE (t_string),

@@ -99,7 +99,7 @@ d_gimplify_modify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
   return GS_UNHANDLED;
 }
 
-/* Gimplify an ADDR_EXPR node.  */
+/* Gimplify an *ADDR_EXPR node.  */
 
 static gimplify_status
 d_gimplify_addr_expr (tree *expr_p)

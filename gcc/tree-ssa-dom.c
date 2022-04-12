@@ -2043,7 +2043,7 @@ dom_opt_dom_walker::optimize_stmt (basic_block bb, gimple_stmt_iterator *si,
       else if (gimple_code (stmt) == GIMPLE_GOTO)
         rhs = gimple_goto_dest (stmt);
       else if (gswitch *swtch_stmt = dyn_cast <gswitch *> (stmt))
-        /* This should never be an ADDR_EXPR.  */
+        /* This should never be an *ADDR_EXPR.  */
         rhs = gimple_switch_index (swtch_stmt);
 
       if (rhs && ADDR_EXPR_P (rhs))

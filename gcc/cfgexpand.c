@@ -2723,7 +2723,7 @@ expand_call_stmt (gcall *stmt)
 
 /* Generate RTL for an asm statement (explicit assembler code).
    STRING is a STRING_CST node containing the assembler code text,
-   or an ADDR_EXPR containing a STRING_CST.  VOL nonzero means the
+   or an *ADDR_EXPR containing a STRING_CST.  VOL nonzero means the
    insn is volatile; don't optimize it.  */
 
 static void

@@ -83,8 +83,8 @@ along with GCC; see the file COPYING3.  If not see
 #define opf_def 	(1 << 0)
 
 /* No virtual operands should be created in the expression.  This is used
-   when traversing ADDR_EXPR nodes which have different semantics than
-   other expressions.  Inside an ADDR_EXPR node, the only operands that we
+   when traversing *ADDR_EXPR nodes which have different semantics than
+   other expressions.  Inside an *ADDR_EXPR node, the only operands that we
    need to consider are indices into arrays.  For instance, &a.b[i] should
    generate a USE of 'i' but it should not generate a VUSE for 'a' nor a
    VUSE for 'b'.  */
@@ -561,7 +561,7 @@ operands_scanner::add_virtual_operand (int flags)
 {
   /* Add virtual operands to the stmt, unless the caller has specifically
      requested not to do that (used when adding operands inside an
-     ADDR_EXPR expression).  */
+     *ADDR_EXPR expression).  */
   if (flags & opf_no_vops)
     return;
 

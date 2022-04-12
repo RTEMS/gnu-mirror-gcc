@@ -1026,7 +1026,7 @@ ao_ref_init_from_vn_reference (ao_ref *ref,
 	/* These may be in the reference ops, but we cannot do anything
 	   sensible with them here.  */
 	CASE_ADDR_EXPR:
-	  /* Apart from ADDR_EXPR arguments to MEM_REF.  */
+	  /* Apart from *ADDR_EXPR arguments to MEM_REF.  */
 	  if (base != NULL_TREE
 	      && TREE_CODE (base) == MEM_REF
 	      && op->op0
@@ -4586,7 +4586,7 @@ set_and_exit:
 	   && TREE_CODE (to) == SSA_NAME
 	   && ssa_undefined_value_p (to, false))
       /* ???  For addresses involving volatile objects or types operand_equal_p
-         does not reliably detect ADDR_EXPRs as equal.  We know we are only
+         does not reliably detect *ADDR_EXPRs as equal.  We know we are only
 	 getting invariant gimple addresses here, so can use
 	 get_addr_base_and_unit_offset to do this comparison.  */
       && !(ADDR_EXPR_P (currval)
@@ -6205,7 +6205,7 @@ eliminate_dom_walker::eliminate_stmt (basic_block b, gimple_stmt_iterator *gsi)
   gimple *old_stmt = stmt;
   if (modified)
     {
-      /* If a formerly non-invariant ADDR_EXPR is turned into an
+      /* If a formerly non-invariant *ADDR_EXPR is turned into an
 	 invariant one it was on a separate stmt.  */
       if (gimple_assign_single_p (stmt)
 	  && ADDR_EXPR_P (gimple_assign_rhs1 (stmt)))

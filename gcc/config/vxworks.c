@@ -94,7 +94,7 @@ vxworks_emutls_var_fields (tree type, tree *name)
 
 /* Return the CONSTRUCTOR to initialize an emulated TLS control
    object.  VAR is the control object.  DECL is the TLS object itself
-   and TMPL_ADDR is the address (an ADDR_EXPR) of the initializer for
+   and TMPL_ADDR is the address (an *ADDR_EXPR) of the initializer for
    that object.  */
 
 static tree

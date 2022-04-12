@@ -772,7 +772,7 @@ malloc_state_machine::on_stmt (sm_context *sm_ctxt,
 
   /* If we have "LHS = &EXPR;" and EXPR is something other than a MEM_REF,
      transition LHS from start to non_heap.
-     Doing it for ADDR_EXPR(MEM_REF()) is likely wrong, and can lead to
+     Doing it for *ADDR_EXPR(MEM_REF()) is likely wrong, and can lead to
      unbounded chains of unmergeable sm-state on pointer arithmetic in loops
      when optimization is enabled.  */
   if (const gassign *assign_stmt = dyn_cast <const gassign *> (stmt))

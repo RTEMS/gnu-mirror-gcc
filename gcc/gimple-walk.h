@@ -56,7 +56,7 @@ struct walk_stmt_info
      sub-expressions of a statement.  For instance, when walking the
      statement 'foo (&var)', the flag VAL_ONLY will initially be set
      to true, however, when walking &var, the operand of that
-     ADDR_EXPR does not need to be a GIMPLE value.  */
+     *ADDR_EXPR does not need to be a GIMPLE value.  */
   BOOL_BITFIELD val_only : 1;
 
   /* True if we are currently walking the LHS of an assignment.  */
