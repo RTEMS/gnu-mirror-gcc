@@ -1190,6 +1190,7 @@ the others being multipliers that are applied to the runtime parameters.
 @node Storage References
 @subsection References to storage
 @tindex NONCAP_ADDR_EXPR
+@tindex CAP_ADDR_EXPR
 @tindex INDIRECT_REF
 @tindex MEM_REF
 @tindex ARRAY_REF
@@ -1236,13 +1237,17 @@ is preserved for the purposes of the RTL alias analysis.  The seventh
 argument is a tag representing the results of tree level alias analysis.
 
 @item NONCAP_ADDR_EXPR
-These nodes are used to represent the address of an object.  (These
-expressions will always have pointer or reference type.)  The operand may
-be another expression, or it may be a declaration.
+@itemx CAP_ADDR_EXPR
+These nodes are used to represent the address of an object.
+The operand may be another expression, or it may be a declaration.
+
+These expressions alway have a pointer or reference type.  For
+@code{CAP_ADDR_EXPR} this type is a capability type whereas for
+@code{NONCAP_ADDR_EXPR} it is a non-capability type.
 
 As an extension, GCC allows users to take the address of a label.  In
-this case, the operand of the @code{NONCAP_ADDR_EXPR} will be a
-@code{LABEL_DECL}.  The type of such an expression is @code{void*}.
+this case, the operand of the @code{NONCAP_ADDR_EXPR} or @code{CAP_ADDR_EXPR}
+will be a @code{LABEL_DECL}.  The type of such an expression is @code{void*}.
 
 If the object addressed is not an lvalue, a temporary is created, and
 the address of the temporary is used.

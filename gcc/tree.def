@@ -873,6 +873,9 @@ DEFTREECODE (SAVE_EXPR, "save_expr", tcc_expression, 1)
    Result mode is a valid non-capability pointer mode.  */
 DEFTREECODE (NONCAP_ADDR_EXPR, "noncap_addr_expr", tcc_expression, 1)
 
+/* Likewise, but returning a capability type.  */
+DEFTREECODE (CAP_ADDR_EXPR, "cap_addr_expr", tcc_expression, 1)
+
 /* Operand0 is a function constant; result is part N of a function
    descriptor of type ptr_mode.  */
 DEFTREECODE (FDESC_EXPR, "fdesc_expr", tcc_expression, 2)

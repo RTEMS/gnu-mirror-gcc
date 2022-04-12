@@ -798,8 +798,9 @@ global variable but not of a local one).
 @end deftypefn
 
 @deftypefn {GIMPLE function} bool is_gimple_ip_invariant_address (tree t)
-Return true if t is a @code{NONCAP_ADDR_EXPR} that does not change once the
-program is running (and which is valid in all functions).
+Return true if t is a @code{NONCAP_ADDR_EXPR} or @code{CAP_ADDR_EXPR} that
+does not change once the program is running (and which is valid in all
+functions).
 @end deftypefn
 
 

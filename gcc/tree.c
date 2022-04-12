@@ -14190,9 +14190,8 @@ addr_expr_code (const_tree res_type)
 #else
   if (!POINTER_TYPE_P (res_type))
     res_type = ptr_type_node;
-  (void) res_type;
 #endif
-  return NONCAP_ADDR_EXPR;
+  return capability_type_p (res_type) ? CAP_ADDR_EXPR : NONCAP_ADDR_EXPR;
 }
 
 /* Return the *ADDR_EXPR code that should be used if the type of the
@@ -16322,6 +16321,7 @@ test_fold_drop_capability (void)
 	- TARGET_EXPR
 	- COND_EXPR
 	- NONCAP_ADDR_EXPR
+	- CAP_ADDR_EXPR
 	- PREDECREMENT_EXPR
 	- PREINCREMENT_EXPR
 	- POSTDECREMENT_EXPR
