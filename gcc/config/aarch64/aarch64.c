@@ -6698,22 +6698,11 @@ aarch64_function_arg_advance (cumulative_args_t pcum_v,
     }
 }
 
-static bool
-aarch64_current_function_variadic_p (void)
-{
-  tree t = TREE_TYPE (current_function_decl);
-  for (t = TYPE_ARG_TYPES (t); t; t = TREE_CHAIN (t))
-    if (t == void_list_node)
-      return false;
-
-  return true;
-}
-
 bool
 aarch64_function_arg_regno_p (unsigned regno)
 {
   if (TARGET_CAPABILITY_PURE && regno == R9_REGNUM)
-    return aarch64_current_function_variadic_p ();
+    return true;
 
   return ((GP_REGNUM_P (regno) && regno < R0_REGNUM + NUM_ARG_REGS)
 	  || (FP_REGNUM_P (regno) && regno < V0_REGNUM + NUM_FP_ARG_REGS));
