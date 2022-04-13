@@ -10059,16 +10059,9 @@ aarch64_classify_address (struct aarch64_address_info *info,
 
       if (ldp_stp_mode == VOIDmode
 	  && GET_MODE_SIZE (mode).is_constant (&const_size)
-	  && const_size >= 4)
-	{
-	  rtx sym, addend;
-
-	  split_const (x, &sym, &addend);
-	  return (GET_CODE (sym) == LABEL_REF
-		   || (GET_CODE (sym) == SYMBOL_REF
-		       && aarch64_pcrelative_literal_loads
-		       && aarch64_function_literal_pool_address_p (x)));
-	}
+	  && const_size >= 4
+	  && aarch64_classify_symbolic_expression (x) == SYMBOL_TINY_ABSOLUTE)
+	return true;
       return false;
 
     case LO_SUM:
@@ -10910,12 +10903,14 @@ aarch64_print_operand (FILE *f, rtx x, int code)
 	  break;
 
 	case SYMBOL_REF:
+	case LABEL_REF:
 	  output_addr_const (f, x);
 	  break;
 
 	case CONST:
 	  if (any_plus_p (XEXP (x, 0))
-	      && GET_CODE (XEXP (XEXP (x, 0), 0)) == SYMBOL_REF)
+	      && (GET_CODE (XEXP (XEXP (x, 0), 0)) == SYMBOL_REF
+		  || GET_CODE (XEXP (XEXP (x, 0), 0)) == LABEL_REF))
 	    {
 	      output_addr_const (f, x);
 	      break;
@@ -17115,6 +17110,13 @@ aarch64_classify_symbol (rtx x, HOST_WIDE_INT offset)
       if (aarch64_sym_indirectly_accessed_p (x))
 	return aarch64_classify_capability_symbol (x, offset);
 
+      /* -mpc-relative-literal-loads tells us to assume that all (function)
+	 constant pool entries will be within the range of PC-relative LDR,
+	 which means that they must also be in range of ADR.  */
+      if (aarch64_pcrelative_literal_loads
+	  && aarch64_function_literal_pool_address_p (x))
+	return SYMBOL_TINY_ABSOLUTE;
+
       switch (aarch64_cmodel)
 	{
 	case AARCH64_CMODEL_TINY:
@@ -17165,8 +17167,7 @@ aarch64_classify_symbol (rtx x, HOST_WIDE_INT offset)
 	  /* This is alright even in PIC code as the constant
 	     pool reference is always PC relative and within
 	     the same translation unit.  */
-	  if (!aarch64_pcrelative_literal_loads
-	      && aarch64_function_literal_pool_address_p (x))
+	  if (aarch64_function_literal_pool_address_p (x))
 	    return SYMBOL_SMALL_ABSOLUTE;
 	  else
 	    return SYMBOL_FORCE_TO_MEM;
