@@ -5568,7 +5568,7 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
 	     we need to expand the literal pool access carefully.
 	     This is something that needs to be done in a number
 	     of places, so could well live as a separate function.  */
-	  if (!aarch64_pcrelative_literal_loads)
+	  if (!memory_operand (mem, ptr_mode))
 	    {
 	      gcc_assert (can_create_pseudo_p ());
 	      if (TARGET_CAPABILITY_PURE && SYMBOL_REF_P (base))
