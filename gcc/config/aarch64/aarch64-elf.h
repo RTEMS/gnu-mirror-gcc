@@ -114,6 +114,9 @@
 #elif TARGET_DATA_MODEL == 2
 #define ABI_SPEC  "-mabi=ilp32"
 #define MULTILIB_DEFAULTS { "mabi=ilp32" }
+#elif TARGET_DATA_MODEL == 3
+#define ABI_SPEC  "-mabi=purecap %{!march:-march=morello+c64}"
+#define MULTILIB_DEFAULTS { "mabi=purecap/march=morello+c64" }
 #else
 #error "Unknown or undefined TARGET_DATA_MODEL!"
 #endif

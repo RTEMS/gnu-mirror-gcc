@@ -597,20 +597,38 @@ aarch64*-*-*)
 	case ${with_abi} in
 	"")
 		if test "x$with_multilib_list" = xilp32; then
-			tm_file="aarch64/biarchilp32.h ${tm_file}"
+			default_abi=ilp32
+		elif test "x$with_multilib_list" = xpurecap; then
+			default_abi=purecap
 		else
-			tm_file="aarch64/biarchlp64.h ${tm_file}"
+			default_abi=lp64
 		fi
 		;;
+	ilp32|lp64|purecap)
+		default_abi=$with_abi
+		;;
+	*)
+		echo "Unknown ABI used in --with-abi=$with_abi"
+		exit 1
+	esac
+
+	case $default_abi in
 	ilp32)
 		tm_file="aarch64/biarchilp32.h ${tm_file}"
 		;;
 	lp64)
 		tm_file="aarch64/biarchlp64.h ${tm_file}"
 		;;
-	*)
-		echo "Unknown ABI used in --with-abi=$with_abi"
-		exit 1
+	purecap)
+		case ${with_arch} in
+		morello+c64*)
+			tm_file="aarch64/biarchpurecap.h ${tm_file}"
+			;;
+		*)
+			echo "purecap default abi requires --with-arch=morello+c64"
+			exit 1
+			;;
+		esac
 	esac
 	;;
 i[34567]86-*-*)
@@ -1098,7 +1116,7 @@ aarch64*-*-linux*)
 	if test "$aarch64_multilibs" = "default"; then
 		# TODO: turn on ILP32 multilib build after its support is mature.
 		# aarch64_multilibs="lp64,ilp32"
-		aarch64_multilibs="lp64"
+		aarch64_multilibs=$default_abi
 	fi
 	aarch64_multilibs=`echo $aarch64_multilibs | sed -e 's/,/ /g'`
 	for aarch64_multilib in ${aarch64_multilibs}; do
