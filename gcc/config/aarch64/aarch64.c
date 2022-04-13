@@ -5456,8 +5456,10 @@ aarch64_expand_sve_const_pred (rtx target, rtx_vector_builder &builder)
 static bool
 aarch64_sym_indirectly_accessed_p (const_rtx sym)
 {
-  return TARGET_CAPABILITY_PURE && SYMBOL_REF_P (sym)
-    && !SYMBOL_REF_INDIRECTION_P (sym) && !SYMBOL_REF_ANCHOR_P (sym);
+  return (TARGET_CAPABILITY_PURE
+	  && SYMBOL_REF_P (sym)
+	  && !CONSTANT_POOL_ADDRESS_P (sym)
+	  && !SYMBOL_REF_ANCHOR_P (sym));
 }
 
 /* Return true if the provided symbol_ref will not get emitted as a variable
