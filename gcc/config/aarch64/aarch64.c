@@ -5537,11 +5537,12 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
 	}
 
       sty = aarch64_classify_symbol (base, const_offset);
+      scalar_addr_mode mem_mode = TARGET_ILP32 ? ptr_mode : addr_mode;
       switch (sty)
 	{
 	case SYMBOL_FORCE_TO_MEM:
 	  if (const_offset != 0
-	      && targetm.cannot_force_const_mem (addr_mode, imm))
+	      && targetm.cannot_force_const_mem (mem_mode, imm))
 	    {
 	      gcc_assert (can_create_pseudo_p ());
 	      base = aarch64_force_temporary (addr_mode, dest, base);
@@ -5550,7 +5551,7 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
 	      return;
 	    }
 
-	  mem = force_const_mem (ptr_mode, imm);
+	  mem = force_const_mem (mem_mode, imm);
 	  if (TARGET_CAPABILITY_PURE && SYMBOL_REF_P (base))
 	    {
 	      /* Mark the symbol created by `force_const_mem` as one into the
@@ -5570,7 +5571,7 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
 	     we need to expand the literal pool access carefully.
 	     This is something that needs to be done in a number
 	     of places, so could well live as a separate function.  */
-	  if (!memory_operand (mem, ptr_mode))
+	  if (!memory_operand (mem, mem_mode))
 	    {
 	      gcc_assert (can_create_pseudo_p ());
 	      if (TARGET_CAPABILITY_PURE && SYMBOL_REF_P (base))
@@ -5605,10 +5606,10 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
 		  if (ptr_mode != Pmode)
 		    base = convert_memory_address (Pmode, base);
 		}
-	      mem = gen_rtx_MEM (ptr_mode, base);
+	      mem = gen_rtx_MEM (mem_mode, base);
 	    }
 
-	  if (addr_mode != ptr_mode)
+	  if (addr_mode != mem_mode)
 	    mem = gen_rtx_ZERO_EXTEND (addr_mode, mem);
 
 	  emit_insn (gen_rtx_SET (dest, mem));
@@ -9366,7 +9367,7 @@ aarch64_cannot_force_const_mem (machine_mode mode ATTRIBUTE_UNUSED, rtx x)
       else
 	/* Avoid generating a 64-bit relocation in ILP32; leave
 	   to aarch64_expand_mov_immediate to handle it properly.  */
-	return mode != ptr_mode;
+	return TARGET_ILP32 && mode != ptr_mode;
     }
 
   return aarch64_tls_referenced_p (x);
@@ -17109,6 +17110,12 @@ aarch64_classify_symbol (rtx x, HOST_WIDE_INT offset)
 	 table or through the GOT.  */
       if (aarch64_sym_indirectly_accessed_p (x))
 	return aarch64_classify_capability_symbol (x, offset);
+
+      /* In hybrid mode, the only way of loading a constant capability is
+	 to force it into a (.data.rel.ro*) constant pool entry.  Unlike
+	 for pure capabilities, the GOT option is not available.  */
+      if (CAPABILITY_MODE_P (GET_MODE (x)) && !CAPABILITY_MODE_P (Pmode))
+	return SYMBOL_FORCE_TO_MEM;
 
       /* -mpc-relative-literal-loads tells us to assume that all (function)
 	 constant pool entries will be within the range of PC-relative LDR,

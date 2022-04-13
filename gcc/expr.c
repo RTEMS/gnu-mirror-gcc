@@ -8178,18 +8178,25 @@ expand_expr_constant (tree exp, int defer, enum expand_modifier modifier)
   return mem;
 }
 
-/* A subroutine of expand_expr_addr_expr.  Evaluate the address of EXP.
-   The TARGET, TMODE and MODIFIER arguments are as for expand_expr.  */
+/* A subroutine of expand_expr_addr_expr.  Evaluate the address of EXP
+   using code ADDR_CODE.  The TARGET, TMODE and MODIFIER arguments are
+   as for expand_expr.  */
 
 static rtx
-expand_expr_addr_expr_1 (tree exp, rtx target, scalar_addr_mode tmode,
-		         enum expand_modifier modifier, addr_space_t as)
+expand_expr_addr_expr_1 (tree_code addr_code, tree exp, rtx target,
+			 scalar_addr_mode tmode,
+			 enum expand_modifier modifier, addr_space_t as)
 {
   rtx result, subtarget;
   tree inner, offset;
   poly_int64 bitsize, bitpos;
   int unsignedp, reversep, volatilep = 0;
   machine_mode mode1;
+
+  /* Detect if we're creating a capability pointer in an environment
+     where that isn't the default behavior.  */
+  bool force_capability = (addr_code == CAP_ADDR_EXPR
+			   && !CAPABILITY_MODE_P (Pmode));
 
   /* If we are taking the address of a constant and are at the top level,
      we have to use output_constant_def since we can't call force_const_mem
@@ -8256,7 +8263,8 @@ expand_expr_addr_expr_1 (tree exp, rtx target, scalar_addr_mode tmode,
 	 the initializers aren't gimplified.  */
       if (COMPOUND_LITERAL_EXPR_DECL (exp)
 	  && TREE_STATIC (COMPOUND_LITERAL_EXPR_DECL (exp)))
-	return expand_expr_addr_expr_1 (COMPOUND_LITERAL_EXPR_DECL (exp),
+	return expand_expr_addr_expr_1 (addr_code,
+					COMPOUND_LITERAL_EXPR_DECL (exp),
 					target, tmode, modifier, as);
       /* FALLTHRU */
     default:
@@ -8271,8 +8279,13 @@ expand_expr_addr_expr_1 (tree exp, rtx target, scalar_addr_mode tmode,
 	  || TREE_CODE (exp) == CONSTRUCTOR
 	  || TREE_CODE (exp) == COMPOUND_LITERAL_EXPR)
 	{
+	  /* If we want a capability pointer, and if normal pointers are
+	     not capabilities, try harder to preserve the structure of
+	     the original address.  In particular, don't try to rewrite
+	     the address to use (Pmode) section anchors.  */
 	  result = expand_expr (exp, target, tmode,
 				modifier == EXPAND_INITIALIZER
+				|| force_capability
 				? EXPAND_INITIALIZER : EXPAND_CONST_ADDRESS);
 
 	  /* If the DECL isn't in memory, then the DECL wasn't properly
@@ -8281,6 +8294,11 @@ expand_expr_addr_expr_1 (tree exp, rtx target, scalar_addr_mode tmode,
 
 	  gcc_assert (MEM_P (result));
 	  result = XEXP (result, 0);
+
+	  /* Convert a non-capability constant address to a capability
+	     while we still have its original form.  */
+	  if (force_capability)
+	    result = convert_memory_address_addr_space (tmode, result, as);
 
 	  /* ??? Is this needed anymore?  */
 	  if (DECL_P (exp))
@@ -8317,7 +8335,8 @@ expand_expr_addr_expr_1 (tree exp, rtx target, scalar_addr_mode tmode,
       SET_TYPE_ALIGN (TREE_TYPE (inner), TYPE_ALIGN (TREE_TYPE (exp)));
       TYPE_USER_ALIGN (TREE_TYPE (inner)) = 1;
     }
-  result = expand_expr_addr_expr_1 (inner, subtarget, tmode, modifier, as);
+  result = expand_expr_addr_expr_1 (addr_code, inner, subtarget, tmode,
+				    modifier, as);
 
   if (offset)
     {
@@ -8393,8 +8412,8 @@ expand_expr_addr_expr (tree exp, rtx target, machine_mode tmode,
 				? pointer_mode
 				: address_mode);
 
-  result = expand_expr_addr_expr_1 (TREE_OPERAND (exp, 0), target,
-				    new_tmode, modifier, as);
+  result = expand_expr_addr_expr_1 (TREE_CODE (exp), TREE_OPERAND (exp, 0),
+				    target, new_tmode, modifier, as);
 
   /* Despite expand_expr claims concerning ignoring TMODE when not
      strictly convenient, stuff breaks if we don't honor it.  Note
@@ -10600,7 +10619,8 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 	     gracefully.  */
 	  addr_space_t as = TYPE_ADDR_SPACE (TREE_TYPE (exp));
 	  scalar_addr_mode address_mode = unqualified_address_mode (as);
-	  op0 = expand_expr_addr_expr_1 (exp, NULL_RTX, address_mode,
+	  op0 = expand_expr_addr_expr_1 (unqualified_addr_expr (), exp,
+					 NULL_RTX, address_mode,
 					 EXPAND_NORMAL, as);
 	  op0 = memory_address_addr_space (mode, op0, as);
 	  temp = gen_rtx_MEM (mode, op0);

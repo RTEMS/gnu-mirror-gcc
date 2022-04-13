@@ -363,11 +363,16 @@ convert_memory_address_addr_space_1 (scalar_addr_mode to_mode ATTRIBUTE_UNUSED,
   /* If X already has the right mode, just return it.  */
   if (GET_MODE (x) == to_mode)
     return x;
-  /* We can't convert a mode to a capability mode.
+  /* Non-capability symbolic constants can be re-expressed as capability
+     constants simply by (recursively) changing the mode.  However,
+     we can't convert an arbitrary runtime value to a capability mode.
      Even if the from_mode was a capability mode there is no general way to
      handle that since we don't know what the extra bits contain in each case
      (they're not just simply bits ...).  */
-  gcc_assert (! CAPABILITY_MODE_P (to_mode));
+  gcc_assert (! CAPABILITY_MODE_P (to_mode)
+	      || GET_CODE (x) == LABEL_REF
+	      || GET_CODE (x) == SYMBOL_REF
+	      || GET_CODE (x) == CONST);
 
   pointer_mode = unqualified_pointer_mode (as);
   address_mode = unqualified_address_mode (as);
