@@ -1534,12 +1534,19 @@ cp_check_const_attributes (tree attributes)
   for (attr = attributes; attr; attr = TREE_CHAIN (attr))
     {
       tree arg;
+      /* As we implement alignas using gnu::aligned attribute and
+	 alignas argument is a constant expression, force manifestly
+	 constant evaluation of aligned attribute argument.  */
+      bool manifestly_const_eval
+	= is_attribute_p ("aligned", get_attribute_name (attr));
       for (arg = TREE_VALUE (attr); arg && TREE_CODE (arg) == TREE_LIST;
 	   arg = TREE_CHAIN (arg))
 	{
 	  tree expr = TREE_VALUE (arg);
 	  if (EXPR_P (expr))
-	    TREE_VALUE (arg) = fold_non_dependent_expr (expr);
+	    TREE_VALUE (arg)
+	      = fold_non_dependent_expr (expr, tf_warning_or_error,
+					 manifestly_const_eval);
 	}
     }
 }
@@ -1637,8 +1644,16 @@ find_last_decl (tree decl)
 	  if (TREE_CODE (*iter) == OVERLOAD)
 	    continue;
 
-	  if (decls_match (decl, *iter, /*record_decls=*/false))
-	    return *iter;
+	  tree d = *iter;
+
+	  /* We can't compare versions in the middle of processing the
+	     attribute that has the version.  */
+	  if (TREE_CODE (d) == FUNCTION_DECL
+	      && DECL_FUNCTION_VERSIONED (d))
+	    return NULL_TREE;
+
+	  if (decls_match (decl, d, /*record_decls=*/false))
+	    return d;
 	}
       return NULL_TREE;
     }

@@ -6985,6 +6985,15 @@ build_reference_type (tree to_type)
   (HOST_BITS_PER_WIDE_INT > 64 ? HOST_BITS_PER_WIDE_INT : 64)
 static GTY(()) tree nonstandard_integer_type_cache[2 * MAX_INT_CACHED_PREC + 2];
 
+static void
+clear_nonstandard_integer_type_cache (void)
+{
+  for (size_t i = 0 ; i < 2 * MAX_INT_CACHED_PREC + 2 ; i++)
+  {
+    nonstandard_integer_type_cache[i] = NULL;
+  }
+}
+
 /* Builds a signed or unsigned integer type of precision PRECISION.
    Used for C bitfields whose precision does not match that of
    built-in target types.  */
@@ -8418,8 +8427,12 @@ tree_builtin_call_types_compatible_p (const_tree call, tree fndecl)
     if (tree decl = builtin_decl_explicit (DECL_FUNCTION_CODE (fndecl)))
       fndecl = decl;
 
-  if (TYPE_MAIN_VARIANT (TREE_TYPE (call))
-      != TYPE_MAIN_VARIANT (TREE_TYPE (TREE_TYPE (fndecl))))
+  bool gimple_form = (cfun && (cfun->curr_properties & PROP_gimple)) != 0;
+  if (gimple_form
+      ? !useless_type_conversion_p (TREE_TYPE (call),
+				    TREE_TYPE (TREE_TYPE (fndecl)))
+      : (TYPE_MAIN_VARIANT (TREE_TYPE (call))
+	 != TYPE_MAIN_VARIANT (TREE_TYPE (TREE_TYPE (fndecl)))))
     return false;
 
   tree targs = TYPE_ARG_TYPES (TREE_TYPE (fndecl));
@@ -8431,12 +8444,15 @@ tree_builtin_call_types_compatible_p (const_tree call, tree fndecl)
 	return true;
       tree arg = CALL_EXPR_ARG (call, i);
       tree type = TREE_VALUE (targs);
-      if (TYPE_MAIN_VARIANT (type) != TYPE_MAIN_VARIANT (TREE_TYPE (arg)))
+      if (gimple_form
+	  ? !useless_type_conversion_p (type, TREE_TYPE (arg))
+	  : TYPE_MAIN_VARIANT (type) != TYPE_MAIN_VARIANT (TREE_TYPE (arg)))
 	{
 	  /* For pointer arguments be more forgiving, e.g. due to
 	     FILE * vs. fileptr_type_node, or say char * vs. const char *
 	     differences etc.  */
-	  if (POINTER_TYPE_P (type)
+	  if (!gimple_form
+	      && POINTER_TYPE_P (type)
 	      && POINTER_TYPE_P (TREE_TYPE (arg))
 	      && tree_nop_conversion_p (type, TREE_TYPE (arg)))
 	    continue;
@@ -8448,8 +8464,11 @@ tree_builtin_call_types_compatible_p (const_tree call, tree fndecl)
 	      && INTEGRAL_TYPE_P (TREE_TYPE (arg))
 	      && !TYPE_UNSIGNED (TREE_TYPE (arg))
 	      && targetm.calls.promote_prototypes (TREE_TYPE (fndecl))
-	      && tree_nop_conversion_p (integer_type_node,
-					TREE_TYPE (arg)))
+	      && (gimple_form
+		  ? useless_type_conversion_p (integer_type_node,
+					       TREE_TYPE (arg))
+		  : tree_nop_conversion_p (integer_type_node,
+					   TREE_TYPE (arg))))
 	    continue;
 	  return false;
 	}
@@ -12961,6 +12980,8 @@ component_ref_size (tree ref, special_array_member *sam /* = NULL */)
      to struct types with flexible array members.  */
   if (memsize)
     {
+      if (!tree_fits_poly_int64_p (memsize))
+	return NULL_TREE;
       poly_int64 memsz64 = memsize ? tree_to_poly_int64 (memsize) : 0;
       if (known_lt (baseoff, memsz64))
 	{
@@ -14671,6 +14692,12 @@ get_target_clone_attr_len (tree arglist)
   if (argnum <= 1)
     return -1;
   return str_len_sum;
+}
+
+void
+tree_cc_finalize (void)
+{
+  clear_nonstandard_integer_type_cache ();
 }
 
 #if CHECKING_P
