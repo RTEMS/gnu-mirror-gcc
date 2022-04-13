@@ -22606,7 +22606,8 @@ aarch64_modes_tieable_p (machine_mode mode1, machine_mode mode2)
 static rtx
 aarch64_move_pointer (rtx pointer, poly_int64 amount)
 {
-  rtx next = plus_constant (Pmode, XEXP (pointer, 0), amount);
+  rtx next = plus_constant (mem_address_mode (pointer),
+			    XEXP (pointer, 0), amount);
 
   return adjust_automodify_address (pointer, GET_MODE (pointer),
 				    next, amount);
@@ -22695,10 +22696,10 @@ aarch64_expand_cpymem (rtx *operands)
   if (((n / 16) + (n % 16 ? 2 : 0)) > max_num_moves)
     return false;
 
-  base = copy_to_mode_reg (Pmode, XEXP (dst, 0));
+  base = copy_to_mode_reg (mem_address_mode (dst), XEXP (dst, 0));
   dst = adjust_automodify_address (dst, VOIDmode, base, 0);
 
-  base = copy_to_mode_reg (Pmode, XEXP (src, 0));
+  base = copy_to_mode_reg (mem_address_mode (src), XEXP (src, 0));
   src = adjust_automodify_address (src, VOIDmode, base, 0);
 
   /* Convert n to bits to make the rest of the code simpler.  */
