@@ -762,6 +762,7 @@ c_parser_gimple_statement (gimple_parser &parser, gimple_seq *seq)
 	tree id = c_parser_peek_token (parser)->value;
 	if (strcmp (IDENTIFIER_POINTER (id), "__ABS") == 0
 	    || strcmp (IDENTIFIER_POINTER (id), "__ABSU") == 0
+	    || strcmp (IDENTIFIER_POINTER (id), "__CAP_ADDR") == 0
 	    || strcmp (IDENTIFIER_POINTER (id), "__MIN") == 0
 	    || strcmp (IDENTIFIER_POINTER (id), "__MAX") == 0
 	    || strcmp (IDENTIFIER_POINTER (id), "__BIT_INSERT") == 0
@@ -1150,6 +1151,12 @@ c_parser_gimple_unary_expression (gimple_parser &parser)
 	      c_parser_consume_token (parser);
 	      op = c_parser_gimple_postfix_expression (parser);
 	      return parser_build_unary_op (op_loc, ABSU_EXPR, op);
+	    }
+	  else if (strcmp (IDENTIFIER_POINTER (id), "__CAP_ADDR") == 0)
+	    {
+	      c_parser_consume_token (parser);
+	      op = c_parser_gimple_postfix_expression (parser);
+	      return parser_build_unary_op (op_loc, CAP_ADDR_EXPR, op);
 	    }
 	  else if (strcmp (IDENTIFIER_POINTER (id), "__MIN") == 0)
 	    return c_parser_gimple_parentized_binary_expression (parser,

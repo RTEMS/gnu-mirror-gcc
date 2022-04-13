@@ -4899,7 +4899,7 @@ build_unary_op (location_t location, enum tree_code code, tree xarg,
       gcc_assert (TREE_CODE (arg) != COMPONENT_REF
 		  || !DECL_C_BIT_FIELD (TREE_OPERAND (arg, 1)));
 
-      argtype = build_pointer_type (argtype);
+      argtype = addr_expr_type (code, argtype);
 
       /* ??? Cope with user tricks that amount to offsetof.  Delete this
 	 when we have proper support for integer constant expressions.  */

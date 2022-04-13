@@ -8079,6 +8079,19 @@ build_pointer_type (tree to_type)
   return build_pointer_type_for_mode (to_type, pointer_mode, false);
 }
 
+/* Return the pointer type produced by using *ADDR_EXPR code CODE
+   to take the address of an object of type OP_TYPE.  */
+
+tree
+addr_expr_type (tree_code code, tree op_type)
+{
+  gcc_assert (ADDR_EXPR_CODE_P (code) && TYPE_P (op_type));
+  auto as = TYPE_ADDR_SPACE (op_type);
+  bool is_capability = (code == CAP_ADDR_EXPR);
+  auto ptr_mode = targetm.addr_space.pointer_mode (as, is_capability);
+  return build_pointer_type_for_mode (op_type, ptr_mode, false);
+}
+
 /* Build REPLACE_ADDRESS_VALUE internal function.  This represents replacing
    the value of a pointer with something else.  It is different to a simple
    assignment since it works with pointers represented by capabilities and not

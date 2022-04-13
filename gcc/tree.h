@@ -4578,6 +4578,7 @@ extern tree unsigned_type_for (tree);
 extern tree truth_type_for (tree);
 extern tree build_pointer_type_for_mode (tree, machine_mode, bool);
 extern tree build_pointer_type (tree);
+extern tree addr_expr_type (tree_code, tree);
 extern tree build_intcap_type_for_mode (machine_mode, int);
 extern tree build_reference_type_for_mode (tree, machine_mode, bool);
 extern tree build_reference_type (tree);
