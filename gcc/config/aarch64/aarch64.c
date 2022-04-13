@@ -9716,6 +9716,38 @@ virt_or_elim_regno_p (unsigned regno)
 	  || regno == ARG_POINTER_REGNUM);
 }
 
+/* If X is nonnull, return true if we can use a per-function constant
+   pool for constant X.  If X is null, return true if we can use a
+   per-function constant pool for constants that don't need runtime
+   relocation; that is, return true if there is some constant X
+   that would satisfy the X-is-nonnull condition.
+
+   Constant pools are per function only when PC relative literal loads
+   are enabled or we are using the large memory model.  */
+
+static bool
+aarch64_can_use_per_function_literal_pools_p (const_rtx x)
+{
+  /* Real capabilities aren't link-time constants, so putting one in the
+     text section would require the text segment to be load-time writable.  */
+  if (!TARGET_CAPABILITY_FAKE && x && CAPABILITY_MODE_P (GET_MODE (x)))
+    return false;
+
+  return (aarch64_pcrelative_literal_loads
+	  || aarch64_cmodel == AARCH64_CMODEL_LARGE);
+}
+
+/* Return true if X is the address of something in a per-function
+   literal pool.  */
+
+static bool
+aarch64_function_literal_pool_address_p (const_rtx x)
+{
+  if (!CONSTANT_POOL_ADDRESS_P (x))
+    return false;
+  return aarch64_can_use_per_function_literal_pools_p (get_pool_constant (x));
+}
+
 /* Return true if X is a valid address of type TYPE for machine mode MODE.
    If it is, fill in INFO appropriately.  STRICT_P is true if
    REG_OK_STRICT is in effect.  */
@@ -10034,25 +10066,8 @@ aarch64_classify_address (struct aarch64_address_info *info,
 	  split_const (x, &sym, &addend);
 	  return (GET_CODE (sym) == LABEL_REF
 		   || (GET_CODE (sym) == SYMBOL_REF
-		       && CONSTANT_POOL_ADDRESS_P (sym)
 		       && aarch64_pcrelative_literal_loads
-		       /* Disallow direct loading of symbols in pure capability
-			  unless that symbol is already an indirection symbol.
-			  Disallow other symbols since we always want to
-			  enforce indirection.
-
-			  Allow indirection symbols since while this function
-			  is used in many places where such a direct symbol
-			  could not be used for PureCap ABI, these are also
-			  places a direct symbol could not be used in the
-			  instruction for stock AArch64.
-
-			  The only place we belive that this would end up
-			  getting used is in the Usa alternative of
-			  movcadi_aarch64 patterns, where we would use an `adr`
-			  with it.  We believe this is valid.  */
-		       && (!TARGET_CAPABILITY_PURE
-			   || SYMBOL_REF_INDIRECTION_P (sym))));
+		       && aarch64_function_literal_pool_address_p (x)));
 	}
       return false;
 
@@ -12068,17 +12083,6 @@ aarch64_uxt_size (int shift, HOST_WIDE_INT mask)
   return 0;
 }
 
-/* Constant pools are per function only when PC relative
-   literal loads are true or we are in the large memory
-   model.  */
-
-static inline bool
-aarch64_can_use_per_function_literal_pools_p (void)
-{
-  return (aarch64_pcrelative_literal_loads
-	  || aarch64_cmodel == AARCH64_CMODEL_LARGE);
-}
-
 static bool
 aarch64_use_blocks_for_constant_p (machine_mode, const_rtx x)
 {
@@ -12089,7 +12093,7 @@ aarch64_use_blocks_for_constant_p (machine_mode, const_rtx x)
 		&& SYMBOL_REF_ANCHOR_P (x)));
   /* We can't use blocks for constants when we're using a per-function
      constant pool.  */
-  return !aarch64_can_use_per_function_literal_pools_p ();
+  return !aarch64_can_use_per_function_literal_pools_p (x);
 }
 
 static bool
@@ -12141,7 +12145,7 @@ aarch64_select_rtx_section (machine_mode mode,
 			    rtx x,
 			    unsigned HOST_WIDE_INT align)
 {
-  if (aarch64_can_use_per_function_literal_pools_p ())
+  if (aarch64_can_use_per_function_literal_pools_p (x))
     return function_section (current_function_decl);
 
   return default_elf_select_rtx_section (mode, x, align);
@@ -12155,7 +12159,7 @@ aarch64_asm_output_pool_epilogue (FILE *f, const char *, tree,
   /* When using per-function literal pools, we must ensure that any code
      section is aligned to the minimal instruction length, lest we get
      errors from the assembler re "unaligned instructions".  */
-  if ((offset & 3) && aarch64_can_use_per_function_literal_pools_p ())
+  if ((offset & 3) && aarch64_can_use_per_function_literal_pools_p (NULL_RTX))
     ASM_OUTPUT_ALIGN (f, 2);
 }
 
@@ -17161,7 +17165,8 @@ aarch64_classify_symbol (rtx x, HOST_WIDE_INT offset)
 	  /* This is alright even in PIC code as the constant
 	     pool reference is always PC relative and within
 	     the same translation unit.  */
-	  if (!aarch64_pcrelative_literal_loads && CONSTANT_POOL_ADDRESS_P (x))
+	  if (!aarch64_pcrelative_literal_loads
+	      && aarch64_function_literal_pool_address_p (x))
 	    return SYMBOL_SMALL_ABSOLUTE;
 	  else
 	    return SYMBOL_FORCE_TO_MEM;
