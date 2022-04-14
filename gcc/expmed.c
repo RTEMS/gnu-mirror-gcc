@@ -6494,6 +6494,9 @@ test_capability_expand ()
   rtx_insn * __attribute__ ((__unused__)) basic_move
     = gen_move_insn (x0, CONST0_RTX (CADImode));
 
+  /* with_recorded_insn_emits seems to depend on this.  */
+  init_emit ();
+
   /* N.B. The below doesn't actually have any automatic checking.
      I've just used GDB to attach to the compiler when it's running the
      selftests and viewed the data directly to ensure everything makes sense.
