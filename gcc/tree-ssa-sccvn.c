@@ -923,7 +923,7 @@ copy_reference_ops_from_ref (tree ref, vec<vn_reference_op_s> *result)
 	  temp.off = 0;
 	  result->safe_push (temp);
 	  temp.opcode = ADDR_EXPR;
-	  temp.op0 = build1 (ADDR_EXPR, TREE_TYPE (temp.op0), ref);
+	  temp.op0 = build_addr_expr (TREE_TYPE (temp.op0), ref);
 	  temp.type = TREE_TYPE (temp.op0);
 	  temp.off = -1;
 	  break;

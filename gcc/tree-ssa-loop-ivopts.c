@@ -4319,8 +4319,7 @@ force_expr_to_var_cost (tree expr, bool speed)
       x = produce_memory_decl_rtl (var, NULL);
       SET_DECL_RTL (var, x);
 
-      addr = build1 (ADDR_EXPR, type, var);
-
+      addr = build_addr_expr (type, var);
 
       for (i = 0; i < 2; i++)
 	{

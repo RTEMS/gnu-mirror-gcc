@@ -801,7 +801,7 @@ insert_call_to_register_set (tree class_name,
   relayout_decl (array_arg);
   varpool_node::finalize_decl (array_arg);
 
-  arg3 = build1 (ADDR_EXPR, TYPE_POINTER_TO (TREE_TYPE (array_arg)), array_arg);
+  arg3 = build_addr_expr (TYPE_POINTER_TO (TREE_TYPE (array_arg)), array_arg);
 
   TREE_TYPE (arg3) = build_pointer_type (TREE_TYPE (array_arg));
 
@@ -923,7 +923,7 @@ register_all_pairs (tree body)
         str1 = build_string_from_id (DECL_NAME (base_ptr_var_decl));
 
       new_type = build_pointer_type (TREE_TYPE (base_ptr_var_decl));
-      arg1 = build1 (ADDR_EXPR, new_type, base_ptr_var_decl);
+      arg1 = build_addr_expr (new_type, base_ptr_var_decl);
 
       /* We need a fresh vector for each iteration.  */
       if (vtbl_ptr_array)

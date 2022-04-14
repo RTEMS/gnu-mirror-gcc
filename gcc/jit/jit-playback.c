@@ -685,7 +685,7 @@ new_string_literal (const char *value)
   /* Convert to (const char*), loosely based on
      c/c-typeck.c: array_to_pointer_conversion,
      by taking address of start of string.  */
-  tree t_addr = build1 (ADDR_EXPR, m_const_char_ptr, t_str);
+  tree t_addr = build_addr_expr (m_const_char_ptr, t_str);
 
   return new rvalue (this, t_addr);
 }
@@ -983,7 +983,7 @@ new_call (location *loc,
 
   tree fntype = TREE_TYPE (fndecl);
 
-  tree fn = build1 (ADDR_EXPR, build_pointer_type (fntype), fndecl);
+  tree fn = build_addr_expr (build_pointer_type (fntype), fndecl);
 
   return build_call (loc, fn, args, require_tail_call);
 }
@@ -1320,7 +1320,7 @@ get_address (location *loc)
   tree t_lvalue = as_tree ();
   tree t_thistype = TREE_TYPE (t_lvalue);
   tree t_ptrtype = build_pointer_type (t_thistype);
-  tree ptr = build1 (ADDR_EXPR, t_ptrtype, t_lvalue);
+  tree ptr = build_addr_expr (t_ptrtype, t_lvalue);
   if (loc)
     get_context ()->set_tree_location (ptr, loc);
   if (mark_addressable (loc))
@@ -1454,7 +1454,7 @@ playback::function::get_address (location *loc)
 {
   tree t_fndecl = as_fndecl ();
   tree t_fntype = TREE_TYPE (t_fndecl);
-  tree t_fnptr = build1 (ADDR_EXPR, build_pointer_type (t_fntype), t_fndecl);
+  tree t_fnptr = build_addr_expr (build_pointer_type (t_fntype), t_fndecl);
   if (loc)
     m_ctxt->set_tree_location (t_fnptr, loc);
   return new rvalue (m_ctxt, t_fnptr);

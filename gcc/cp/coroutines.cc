@@ -4391,7 +4391,7 @@ morph_fn_to_coro (tree orig, tree *resumer, tree *destroyer)
 
   /* Put the resumer and destroyer functions in.  */
 
-  tree actor_addr = build1 (ADDR_EXPR, act_des_fn_ptr, actor);
+  tree actor_addr = build_addr_expr (act_des_fn_ptr, actor);
   tree resume_m
     = lookup_member (coro_frame_type, resume_name,
 		     /*protect=*/1, /*want_type=*/0, tf_warning_or_error);
@@ -4401,7 +4401,7 @@ morph_fn_to_coro (tree orig, tree *resumer, tree *destroyer)
   r = coro_build_cvt_void_expr_stmt (r, fn_start);
   add_stmt (r);
 
-  tree destroy_addr = build1 (ADDR_EXPR, act_des_fn_ptr, destroy);
+  tree destroy_addr = build_addr_expr (act_des_fn_ptr, destroy);
   tree destroy_m
     = lookup_member (coro_frame_type, destroy_name,
 		     /*protect=*/1, /*want_type=*/0, tf_warning_or_error);

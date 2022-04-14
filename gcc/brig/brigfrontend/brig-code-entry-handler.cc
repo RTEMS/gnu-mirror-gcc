@@ -356,11 +356,11 @@ brig_code_entry_handler::build_address_operand
 		    = build4 (ARRAY_REF, TREE_TYPE (TREE_TYPE (arg_var_decl)),
 			      arg_var_decl, integer_zero_node, NULL_TREE,
 			      NULL_TREE);
-		  symbol_base = build1 (ADDR_EXPR, ptype, element_zero);
+		  symbol_base = build_addr_expr (ptype, element_zero);
 		}
 	    }
 	  else
-	    symbol_base = build1 (ADDR_EXPR, ptype, arg_var_decl);
+	    symbol_base = build_addr_expr (ptype, arg_var_decl);
 	}
       else
 	{
@@ -381,7 +381,7 @@ brig_code_entry_handler::build_address_operand
 	      gcc_assert (global_var_decl != NULL_TREE);
 
 	      tree ptype = build_pointer_type (instr_type);
-	      symbol_base = build1 (ADDR_EXPR, ptype, global_var_decl);
+	      symbol_base = build_addr_expr (ptype, global_var_decl);
 	    }
 	}
     }

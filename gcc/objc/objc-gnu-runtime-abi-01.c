@@ -1772,7 +1772,7 @@ handle_class_ref (tree chain)
 
   /* Make a decl for the address.  */
   sprintf (string, "__objc_class_ref_%s", name);
-  exp = build1 (ADDR_EXPR, string_type_node, decl);
+  exp = build_addr_expr (string_type_node, decl);
   decl = build_decl (input_location,
 		     VAR_DECL, get_identifier (string), string_type_node);
   TREE_STATIC (decl) = 1;

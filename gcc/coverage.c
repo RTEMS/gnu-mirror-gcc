@@ -845,7 +845,7 @@ build_fn_info (const struct coverage_data *data, tree type, tree key)
 
   /* key */
   CONSTRUCTOR_APPEND_ELT (v1, fields,
-			  build1 (ADDR_EXPR, TREE_TYPE (fields), key));
+			  build_addr_expr (TREE_TYPE (fields), key));
   fields = DECL_CHAIN (fields);
   
   /* ident */
@@ -999,8 +999,8 @@ build_info (tree info_type, tree fn_ary)
   TREE_TYPE (filename_string) = build_array_type
     (char_type_node, build_index_type (size_int (da_file_name_len)));
   CONSTRUCTOR_APPEND_ELT (v1, info_fields,
-			  build1 (ADDR_EXPR, TREE_TYPE (info_fields),
-				  filename_string));
+			  build_addr_expr (TREE_TYPE (info_fields),
+					   filename_string));
   info_fields = DECL_CHAIN (info_fields);
 
   /* merge fn array -- NULL slots indicate unmeasured counters */
@@ -1021,7 +1021,7 @@ build_info (tree info_type, tree fn_ary)
 	  TREE_NOTHROW (merge_fn) = 1;
 	  /* Initialize assembler name so we can stream out. */
 	  DECL_ASSEMBLER_NAME (merge_fn);
-	  ptr = build1 (ADDR_EXPR, merge_fn_type, merge_fn);
+	  ptr = build_addr_expr (merge_fn_type, merge_fn);
 	}
       CONSTRUCTOR_APPEND_ELT (v2, NULL, ptr);
     }
@@ -1038,7 +1038,7 @@ build_info (tree info_type, tree fn_ary)
 
   /* functions */
   CONSTRUCTOR_APPEND_ELT (v1, info_fields,
-			  build1 (ADDR_EXPR, TREE_TYPE (info_fields), fn_ary));
+			  build_addr_expr (TREE_TYPE (info_fields), fn_ary));
   info_fields = DECL_CHAIN (info_fields);
 
   gcc_assert (!info_fields);
@@ -1171,7 +1171,7 @@ coverage_obj_fn (vec<constructor_elt, va_gc> *ctor, tree fn,
   varpool_node::finalize_decl (var);
       
   CONSTRUCTOR_APPEND_ELT (ctor, NULL,
-			  build1 (ADDR_EXPR, gcov_fn_info_ptr_type, var));
+			  build_addr_expr (gcov_fn_info_ptr_type, var));
   return ctor;
 }
 

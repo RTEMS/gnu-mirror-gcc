@@ -735,7 +735,7 @@ forward_propagate_addr_expr_1 (tree name, tree def_rhs,
       if (TREE_CODE (new_def_rhs) == MEM_REF
 	  && !is_gimple_mem_ref_addr (TREE_OPERAND (new_def_rhs, 0)))
 	return false;
-      new_def_rhs = build1 (ADDR_EXPR, TREE_TYPE (rhs), new_def_rhs);
+      new_def_rhs = build_addr_expr (TREE_TYPE (rhs), new_def_rhs);
 
       /* Recurse.  If we could propagate into all uses of lhs do not
 	 bother to replace into the current use but just pretend we did.  */

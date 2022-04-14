@@ -2552,7 +2552,7 @@ wrap_refs (tree *tp, int *ws, void *)
       tree decl = TREE_OPERAND (t, 0);
       tree ptrtype = build_pointer_type (TREE_TYPE (decl));
       TREE_OPERAND (t, 0) = build2 (MEM_REF, TREE_TYPE (decl),
-				    build1 (ADDR_EXPR, ptrtype, decl),
+				    build_addr_expr (ptrtype, decl),
 				    build_int_cst (ptrtype, 0));
       TREE_THIS_VOLATILE (TREE_OPERAND (t, 0)) = TREE_THIS_VOLATILE (decl);
       *ws = 0;

@@ -6347,7 +6347,7 @@ cp_build_addr_expr_1 (tree arg, bool strict_lvalue, tsubst_flags_t complain)
      address of a function is a no-op, so just return the
      argument.  */
   if (type_unknown_p (arg))
-    return build1 (ADDR_EXPR, unknown_type_node, arg);
+    return build_addr_expr (unknown_type_node, arg);
 
   if (TREE_CODE (arg) == OFFSET_REF)
     /* We want a pointer to member; bypass all the code for actually taking
@@ -6988,7 +6988,7 @@ unary_complex_lvalue (enum tree_code code, tree arg)
 	  targ = arg;
 	else
 	  targ = build_cplus_new (TREE_TYPE (arg), arg, tf_warning_or_error);
-	return build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (arg)), targ);
+	return build_addr_expr (build_pointer_type (TREE_TYPE (arg)), targ);
       }
 
     if (TREE_CODE (arg) == SAVE_EXPR && INDIRECT_REF_P (targ))

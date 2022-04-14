@@ -10492,7 +10492,7 @@ fold_binary_loc (location_t loc, enum tree_code code, tree type,
 	  if (!base)
 	    return NULL_TREE;
 	  return fold_build2 (MEM_REF, type,
-			      build1 (ADDR_EXPR, TREE_TYPE (arg0), base),
+			      build_addr_expr (TREE_TYPE (arg0), base),
 			      maybe_cap_int_const_binop (PLUS_EXPR, arg1, size_int (coffset)));
 	}
 

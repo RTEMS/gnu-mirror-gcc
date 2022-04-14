@@ -2634,7 +2634,7 @@ expand_builtin_cexpi (tree exp, rtx target)
       top2 = make_tree (build_pointer_type (TREE_TYPE (arg)), op2a);
 
       /* Make sure not to fold the sincos call again.  */
-      call = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (fn)), fn);
+      call = build_addr_expr (build_pointer_type (TREE_TYPE (fn)), fn);
       expand_normal (build_call_nary (TREE_TYPE (TREE_TYPE (fn)),
 				      call, 3, arg, top1, top2));
     }
@@ -2675,7 +2675,7 @@ expand_builtin_cexpi (tree exp, rtx target)
 			  build_real (type, dconst0), arg);
 
       /* Make sure not to fold the cexp call again.  */
-      call = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (fn)), fn);
+      call = build_addr_expr (build_pointer_type (TREE_TYPE (fn)), fn);
       return expand_expr (build_call_nary (ctype, call, 1, narg),
 			  target, VOIDmode, EXPAND_NORMAL);
     }
@@ -2697,7 +2697,7 @@ build_call_nofold_loc (location_t loc, tree fndecl, int n, ...)
 {
   va_list ap;
   tree fntype = TREE_TYPE (fndecl);
-  tree fn = build1 (ADDR_EXPR, build_pointer_type (fntype), fndecl);
+  tree fn = build_addr_expr (build_pointer_type (fntype), fndecl);
 
   va_start (ap, n);
   fn = build_call_valist (TREE_TYPE (fntype), fn, n, ap);
@@ -7027,8 +7027,8 @@ expand_ifn_atomic_compare_exchange_into_call (gcall *call, machine_mode mode)
   if (expd != x)
     emit_move_insn (x, expd);
   tree v = make_tree (TREE_TYPE (expected), x);
-  vec->quick_push (build1 (ADDR_EXPR,
-			   build_pointer_type (TREE_TYPE (expected)), v));
+  vec->quick_push (build_addr_expr
+		     (build_pointer_type (TREE_TYPE (expected)), v));
   vec->quick_push (gimple_call_arg (call, 2));
   /* Skip the boolean weak parameter.  */
   for (z = 4; z < 6; z++)
@@ -7040,8 +7040,7 @@ expand_ifn_atomic_compare_exchange_into_call (gcall *call, machine_mode mode)
     = (built_in_function) ((int) BUILT_IN_ATOMIC_COMPARE_EXCHANGE_1
 			   + bytes_log2);
   tree fndecl = builtin_decl_explicit (fncode);
-  tree fn = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (fndecl)),
-		    fndecl);
+  tree fn = build_addr_expr (build_pointer_type (TREE_TYPE (fndecl)), fndecl);
   tree exp = build_call_vec (boolean_type_node, fn, vec);
   tree lhs = gimple_call_lhs (call);
   rtx boolret = expand_call (exp, NULL_RTX, lhs == NULL_TREE);

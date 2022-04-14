@@ -1480,8 +1480,7 @@ maybe_instrument_pointer_overflow (gimple_stmt_iterator *gsi, tree t)
 
   tree base_addr = base;
   if (decl_p)
-    base_addr = build1 (ADDR_EXPR,
-			build_pointer_type (TREE_TYPE (base)), base);
+    base_addr = build_addr_expr (build_pointer_type (TREE_TYPE (base)), base);
   t = offset;
   if (maybe_ne (bytepos, 0))
     {
@@ -2114,7 +2113,7 @@ instrument_object_size (gimple_stmt_iterator *gsi, tree t, bool is_lhs)
     base = TREE_OPERAND (inner, 0);
   else
     return;
-  tree ptr = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (t)), t);
+  tree ptr = build_addr_expr (build_pointer_type (TREE_TYPE (t)), t);
 
   while (TREE_CODE (base) == SSA_NAME)
     {
@@ -2143,8 +2142,7 @@ instrument_object_size (gimple_stmt_iterator *gsi, tree t, bool is_lhs)
   tree base_addr = base;
   gimple *bos_stmt = NULL;
   if (decl_p)
-    base_addr = build1 (ADDR_EXPR,
-			build_pointer_type (TREE_TYPE (base)), base);
+    base_addr = build_addr_expr (build_pointer_type (TREE_TYPE (base)), base);
   unsigned HOST_WIDE_INT size;
   if (compute_builtin_object_size (base_addr, 0, &size))
     sizet = build_int_cst (sizetype, size);

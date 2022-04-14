@@ -3115,7 +3115,7 @@ my_build_string_pointer (int len, const char *str)
 {
   tree string = my_build_string (len, str);
   tree ptrtype = build_pointer_type (TREE_TYPE (TREE_TYPE (string)));
-  return build1 (ADDR_EXPR, ptrtype, string);
+  return build_addr_expr (ptrtype, string);
 }
 
 hashval_t

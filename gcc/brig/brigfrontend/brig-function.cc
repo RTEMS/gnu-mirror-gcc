@@ -712,7 +712,7 @@ brig_function::emit_launcher_and_metadata ()
   else
     push_cfun (DECL_STRUCT_FUNCTION (launcher));
 
-  tree kernel_func_ptr = build1 (ADDR_EXPR, ptr_type_node, m_func_decl);
+  tree kernel_func_ptr = build_addr_expr (ptr_type_node, m_func_decl);
 
   tree phsail_launch_kernel_call;
 

@@ -2034,6 +2034,7 @@ extern tree fold_drop_capability (tree);
 extern tree build_replace_address_value_loc (location_t, tree, tree);
 extern tree build_cap_global_data_get_loc (location_t, tree);
 extern bool valid_capability_code_p (tree_code);
+extern tree_code addr_expr_code (const_tree);
 
 extern scalar_addr_mode pointer_address_mode (const_tree);
 extern scalar_addr_mode unqualified_address_mode (const_tree);
@@ -4431,6 +4432,7 @@ extern tree build4 (enum tree_code, tree, tree, tree, tree,
 		    tree CXX_MEM_STAT_INFO);
 extern tree build5 (enum tree_code, tree, tree, tree, tree, tree,
 		    tree CXX_MEM_STAT_INFO);
+extern tree build_addr_expr (tree, tree CXX_MEM_STAT_INFO);
 
 /* _loc versions of build[1-5].  */
 

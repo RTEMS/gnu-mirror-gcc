@@ -5004,6 +5004,15 @@ build5 (enum tree_code code, tree tt, tree arg0, tree arg1,
   return t;
 }
 
+/* Build a tree that takes the address of OP, producing a pointer or
+   reference of type TYPE.  */
+
+tree
+build_addr_expr (tree type, tree op CXX_MEM_STAT_INFO)
+{
+  return build1 (addr_expr_code (type), type, op PASS_MEM_STAT);
+}
+
 /* Build a simple MEM_REF tree with the sematics of a plain INDIRECT_REF
    on the pointer PTR.  */
 
@@ -5057,7 +5066,7 @@ build_invariant_address (tree type, tree base, poly_int64 offset)
   tree ref = fold_build2 (MEM_REF, TREE_TYPE (type),
 			  build_fold_addr_expr (base),
 			  build_int_cst (ptr_type_node, offset));
-  tree addr = build1 (ADDR_EXPR, type, ref);
+  tree addr = build_addr_expr (type, ref);
   recompute_tree_invariant_for_addr_expr (addr);
   return addr;
 }
@@ -11688,7 +11697,7 @@ tree
 build_call_expr_loc_array (location_t loc, tree fndecl, int n, tree *argarray)
 {
   tree fntype = TREE_TYPE (fndecl);
-  tree fn = build1 (ADDR_EXPR, build_pointer_type (fntype), fndecl);
+  tree fn = build_addr_expr (build_pointer_type (fntype), fndecl);
  
   return fold_build_call_array_loc (loc, TREE_TYPE (fntype), fn, n, argarray);
 }
@@ -11867,9 +11876,9 @@ build_string_literal (unsigned len, const char *str /* = NULL */,
   TREE_STATIC (t) = 1;
 
   type = build_pointer_type (eltype);
-  t = build1 (ADDR_EXPR, type,
-	      build4 (ARRAY_REF, eltype,
-		      t, integer_zero_node, NULL_TREE, NULL_TREE));
+  t = build_addr_expr (type,
+		       build4 (ARRAY_REF, eltype,
+			       t, integer_zero_node, NULL_TREE, NULL_TREE));
   return t;
 }
 
@@ -14166,6 +14175,24 @@ valid_capability_code_p (tree_code tc)
       default:
 	return true;
     }
+}
+
+/* Return the *ADDR_EXPR code that should be used if the type of the
+   result is required to be RES_TYPE.  */
+
+tree_code
+addr_expr_code (const_tree res_type)
+{
+  /* MORELLO TODO: We should be able to assert this, but further changes
+     are needed elsewhere first.  */
+#if 0
+  gcc_assert (POINTER_TYPE_P (res_type));
+#else
+  if (!POINTER_TYPE_P (res_type))
+    res_type = ptr_type_node;
+  (void) res_type;
+#endif
+  return ADDR_EXPR;
 }
 
 /* Return the machine mode of T.  For vectors, returns the mode of the

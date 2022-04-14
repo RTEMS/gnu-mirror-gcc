@@ -4670,7 +4670,7 @@ build_va_arg (location_t loc, tree expr, tree type)
       /* Take the address, to get '&ap'.  Note that &ap is not a va_list
 	 type.  */
       mark_addressable (expr);
-      expr = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (expr)), expr);
+      expr = build_addr_expr (build_pointer_type (TREE_TYPE (expr)), expr);
 
       return build_va_arg_1 (loc, type, expr);
     }
@@ -4732,8 +4732,8 @@ build_va_arg (location_t loc, tree expr, tree type)
       /* Take the address, to get '&ap'.  Make sure it's a pointer to array
 	 elem type.  */
       mark_addressable (expr);
-      expr = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (canon_va_type)),
-		     expr);
+      expr = build_addr_expr (build_pointer_type (TREE_TYPE (canon_va_type)),
+			      expr);
 
       /* Verify that &ap is still recognized as having va_list type.  */
       tree canon_expr_type
@@ -5171,7 +5171,7 @@ finish_label_address_expr (tree label, location_t loc)
   else
     {
       TREE_USED (label) = 1;
-      result = build1 (ADDR_EXPR, ptr_type_node, label);
+      result = build_addr_expr (ptr_type_node, label);
       /* The current function is not necessarily uninlinable.
 	 Computed gotos are incompatible with inlining, but the value
 	 here could be used only in a diagnostic, for example.  */

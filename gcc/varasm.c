@@ -5124,7 +5124,7 @@ output_constant (tree exp, unsigned HOST_WIDE_INT size, unsigned int align,
 	 convert the address to the final type and output it that
 	 way.  */
       if (ADDR_EXPR_P (exp))
-	exp = build1 (ADDR_EXPR, saved_type, TREE_OPERAND (exp, 0));
+	exp = build_addr_expr (saved_type, TREE_OPERAND (exp, 0));
       /* Likewise for constant ints.  */
       else if (TREE_CODE (exp) == INTEGER_CST)
 	exp = fold_convert (saved_type, exp);

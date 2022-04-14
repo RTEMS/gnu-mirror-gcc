@@ -2741,7 +2741,7 @@ canonicalize_addr_expr (tree *expr_p)
   *expr_p = build4 (ARRAY_REF, ddatype, TREE_OPERAND (addr_expr, 0),
 		    TYPE_MIN_VALUE (TYPE_DOMAIN (datype)),
 		    NULL_TREE, NULL_TREE);
-  *expr_p = build1 (ADDR_EXPR, pddatype, *expr_p);
+  *expr_p = build_addr_expr (pddatype, *expr_p);
 
   /* We can have stripped a required restrict qualifier above.  */
   if (!useless_type_conversion_p (TREE_TYPE (expr), TREE_TYPE (*expr_p)))
@@ -3400,7 +3400,7 @@ gimplify_call_expr (tree *expr_p, gimple_seq *pre_p, bool want_value)
     {
       tree variant = omp_resolve_declare_variant (fndecl);
       if (variant != fndecl)
-	CALL_EXPR_FN (*expr_p) = build1 (ADDR_EXPR, fnptrtype, variant);
+	CALL_EXPR_FN (*expr_p) = build_addr_expr (fnptrtype, variant);
     }
 
   /* There is a sequence point before the call, so any side effects in

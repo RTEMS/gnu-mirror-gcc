@@ -4910,7 +4910,7 @@ build_unary_op (location_t location, enum tree_code code, tree xarg,
 	  goto return_build_unary_op;
 	}
 
-      val = build1 (ADDR_EXPR, argtype, arg);
+      val = build_addr_expr (argtype, arg);
 
       ret = val;
       goto return_build_unary_op;
@@ -6945,7 +6945,7 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 	}
       if (!c_mark_addressable (rhs))
 	return error_mark_node;
-      rhs = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (rhs)), rhs);
+      rhs = build_addr_expr (build_pointer_type (TREE_TYPE (rhs)), rhs);
       SET_EXPR_LOCATION (rhs, location);
 
       rhs = convert_for_assignment (location, expr_loc,

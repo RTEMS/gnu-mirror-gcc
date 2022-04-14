@@ -5113,7 +5113,7 @@ expand_call_inline (basic_block bb, gimple *stmt, copy_body_data *id,
       for (tree *pvar = vars->begin (); pvar != vars->end (); pvar++)
 	{
 	  tree ptrtype = build_pointer_type (TREE_TYPE (*pvar));
-	  newargs.quick_push (build1 (ADDR_EXPR, ptrtype, *pvar));
+	  newargs.quick_push (build_addr_expr (ptrtype, *pvar));
 	}
       gcall *g = gimple_build_call_internal_vec (IFN_GOMP_SIMT_ENTER, newargs);
       gimple_call_set_lhs (g, gimple_call_lhs (simtenter_stmt));

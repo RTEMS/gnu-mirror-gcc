@@ -3333,7 +3333,7 @@ build_atomic_load_byte (tree src, HOST_WIDE_INT model)
   fncode = BUILT_IN_ATOMIC_LOAD_N + exact_log2 (size) + 1;
   t = builtin_decl_implicit ((enum built_in_function) fncode);
 
-  addr = build1 (ADDR_EXPR, ptr_type, src);
+  addr = build_addr_expr (ptr_type, src);
   val = build_call_expr (t, 2, addr, mem_model);
   return val;
 }
@@ -3348,9 +3348,8 @@ get_guard_bits (tree guard)
     {
       /* We only set the first byte of the guard, in order to leave room
 	 for a mutex in the high-order bits.  */
-      guard = build1 (ADDR_EXPR,
-		      build_pointer_type (TREE_TYPE (guard)),
-		      guard);
+      guard = build_addr_expr (build_pointer_type (TREE_TYPE (guard)),
+			       guard);
       guard = build1 (NOP_EXPR,
 		      build_pointer_type (char_type_node),
 		      guard);

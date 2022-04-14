@@ -93,7 +93,7 @@ brig_branch_inst_handler::operator () (const BrigBase *base)
 		  tree element_zero
 		    = build4 (ARRAY_REF, etype, var, integer_zero_node,
 			      NULL_TREE, NULL_TREE);
-		  var = build1 (ADDR_EXPR, ptype, element_zero);
+		  var = build_addr_expr (ptype, element_zero);
 		}
 
 	      gcc_assert (var != NULL_TREE);

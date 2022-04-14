@@ -1769,7 +1769,7 @@ build_call_n_expr (tree fndecl, int n, ...)
 {
   va_list ap;
   tree fntype = TREE_TYPE (fndecl);
-  tree fn = build1 (ADDR_EXPR, build_pointer_type (fntype), fndecl);
+  tree fn = build_addr_expr (build_pointer_type (fntype), fndecl);
 
   va_start (ap, n);
   fn = build_call_valist (TREE_TYPE (fntype), fn, n, ap);
@@ -1867,9 +1867,8 @@ build_call_raise (int msg, Node_Id gnat_node, char kind)
 
   return
     build_call_n_expr (fndecl, 2,
-		       build1 (ADDR_EXPR,
-			       build_pointer_type (char_type_node),
-			       filename),
+		       build_addr_expr (build_pointer_type (char_type_node),
+					filename),
 		       line);
 }
 
@@ -1891,9 +1890,8 @@ build_call_raise_column (int msg, Node_Id gnat_node, char kind)
 
   return
     build_call_n_expr (fndecl, 3,
-		       build1 (ADDR_EXPR,
-			       build_pointer_type (char_type_node),
-			       filename),
+		       build_addr_expr (build_pointer_type (char_type_node),
+					filename),
 		       line, col);
 }
 
@@ -1916,9 +1914,8 @@ build_call_raise_range (int msg, Node_Id gnat_node, char kind,
 
   return
     build_call_n_expr (fndecl, 6,
-		       build1 (ADDR_EXPR,
-			       build_pointer_type (char_type_node),
-			       filename),
+		       build_addr_expr (build_pointer_type (char_type_node),
+					filename),
 		       line, col,
 		       convert (integer_type_node, index),
 		       convert (integer_type_node, first),
@@ -2776,9 +2773,10 @@ gnat_rewrite_reference (tree ref, rewrite_fn func, void *data, tree *init)
 	if (TREE_CODE (t) == NOP_EXPR)
 	  t = TREE_OPERAND (t, 0);
 	if (ADDR_EXPR_P (t))
-	  t = build1 (ADDR_EXPR, TREE_TYPE (t),
-		      gnat_rewrite_reference (TREE_OPERAND (t, 0), func, data,
-					      init));
+	  t = build_addr_expr
+		(TREE_TYPE (t),
+		 gnat_rewrite_reference (TREE_OPERAND (t, 0), func, data,
+					 init));
 	else
 	  t = func (t, data);
 	t = fold_convert (TREE_TYPE (CALL_EXPR_ARG (ref, 0)), t);

@@ -1159,7 +1159,7 @@ asan_pp_string (pretty_printer *pp)
 			build_index_type (size_int (len)));
   TREE_READONLY (ret) = 1;
   TREE_STATIC (ret) = 1;
-  return build1 (ADDR_EXPR, shadow_ptr_types[0], ret);
+  return build_addr_expr (shadow_ptr_types[0], ret);
 }
 
 /* Clear shadow memory at SHADOW_MEM, LEN bytes.  Can't call a library call here

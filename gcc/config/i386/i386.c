@@ -4439,7 +4439,7 @@ ix86_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
 	  tree temp = create_tmp_var (type, "va_arg_tmp");
 
 	  /* addr = &temp; */
-	  t = build1 (ADDR_EXPR, build_pointer_type (type), temp);
+	  t = build_addr_expr (build_pointer_type (type), temp);
 	  gimplify_assign (addr, t, pre_p);
 
 	  for (i = 0; i < XVECLEN (container, 0); i++)
@@ -22309,7 +22309,7 @@ ix86_atomic_assign_expand_fenv (tree *hold, tree *clear, tree *update)
       tree fenv_var = create_tmp_var_raw (fenv_type);
       TREE_ADDRESSABLE (fenv_var) = 1;
       tree fenv_ptr = build_pointer_type (fenv_type);
-      tree fenv_addr = build1 (ADDR_EXPR, fenv_ptr, fenv_var);
+      tree fenv_addr = build_addr_expr (fenv_ptr, fenv_var);
       fenv_addr = fold_convert (ptr_type_node, fenv_addr);
       tree fnstenv = get_ix86_builtin (IX86_BUILTIN_FNSTENV);
       tree fldenv = get_ix86_builtin (IX86_BUILTIN_FLDENV);

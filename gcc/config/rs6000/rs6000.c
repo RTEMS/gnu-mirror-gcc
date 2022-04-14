@@ -26420,9 +26420,10 @@ rs6000_atomic_assign_expand_fenv (tree *hold, tree *clear, tree *update)
 
       tree fenv_var = create_tmp_var_raw (double_type_node);
       TREE_ADDRESSABLE (fenv_var) = 1;
-      tree fenv_addr = build1 (ADDR_EXPR, double_ptr_type_node,
-			       build4 (TARGET_EXPR, double_type_node, fenv_var,
-				       void_node, NULL_TREE, NULL_TREE));
+      tree fenv_addr = build_addr_expr
+			 (double_ptr_type_node,
+			  build4 (TARGET_EXPR, double_type_node, fenv_var,
+				  void_node, NULL_TREE, NULL_TREE));
 
       *hold = build_call_expr (atomic_hold_decl, 1, fenv_addr);
       *clear = build_call_expr (atomic_clear_decl, 0);

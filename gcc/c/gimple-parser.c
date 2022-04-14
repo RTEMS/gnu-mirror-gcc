@@ -1625,7 +1625,7 @@ c_parser_gimple_postfix_expression (gimple_parser &parser)
 		      return expr;
 		    }
 		  if (addr_p)
-		    val = build1 (ADDR_EXPR, type, val);
+		    val = build_addr_expr (type, val);
 		  if (neg_p)
 		    {
 		      val = const_unop (NEGATE_EXPR, TREE_TYPE (val), val);

@@ -765,7 +765,7 @@ build_throw (location_t loc, tree exp)
 	    {
 	      cxx_mark_addressable (dtor_fn);
 	      /* Pretend it's a normal function.  */
-	      cleanup = build1 (ADDR_EXPR, cleanup_type, dtor_fn);
+	      cleanup = build_addr_expr (cleanup_type, dtor_fn);
 	    }
 	}
       if (cleanup == NULL_TREE)

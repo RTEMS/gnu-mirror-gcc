@@ -153,7 +153,7 @@ output_gimple_stmt (struct output_block *ob, struct function *fn, gimple *stmt)
 		  bool volatilep = TREE_THIS_VOLATILE (*basep);
 		  tree ptrtype = build_pointer_type (TREE_TYPE (*basep));
 		  *basep = build2 (MEM_REF, TREE_TYPE (*basep),
-				   build1 (ADDR_EXPR, ptrtype, *basep),
+				   build_addr_expr (ptrtype, *basep),
 				   build_int_cst (ptrtype, 0));
 		  TREE_THIS_VOLATILE (*basep) = volatilep;
 		}

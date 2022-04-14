@@ -4149,7 +4149,7 @@ lower_rec_simd_input_clauses (tree new_var, omp_context *ctx,
       TREE_ADDRESSABLE (ivar) = 1;
       DECL_ATTRIBUTES (ivar) = tree_cons (get_identifier ("omp simt private"),
 					  NULL, DECL_ATTRIBUTES (ivar));
-      sctx->simt_eargs.safe_push (build1 (ADDR_EXPR, ptype, ivar));
+      sctx->simt_eargs.safe_push (build_addr_expr (ptype, ivar));
       tree clobber = build_clobber (type);
       gimple *g = gimple_build_assign (ivar, clobber);
       gimple_seq_add_stmt (&sctx->simt_dlist, g);

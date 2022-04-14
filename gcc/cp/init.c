@@ -1405,7 +1405,7 @@ build_vtbl_address (tree binfo)
   /* Now compute the address to use when initializing the vptr.  */
   vtbl = unshare_expr (BINFO_VTABLE (binfo_for));
   if (VAR_P (vtbl))
-    vtbl = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (vtbl)), vtbl);
+    vtbl = build_addr_expr (build_pointer_type (TREE_TYPE (vtbl)), vtbl);
 
   return vtbl;
 }

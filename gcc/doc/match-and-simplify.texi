@@ -210,10 +210,10 @@ Captures can also be used for capturing results of sub-expressions.
     off += tree_to_uhwi (@@1);
     /* Now with that we should be able to simply write
        (addr (mem_ref (addr @@base) (plus @@off @@1)))  */
-    build1 (ADDR_EXPR, type,
-            build2 (MEM_REF, TREE_TYPE (TREE_TYPE (@@2)),
-                    build_fold_addr_expr (base),
-                    build_int_cst (ptr_type_node, off)));
+    build_addr_expr (type,
+		     build2 (MEM_REF, TREE_TYPE (TREE_TYPE (@@2)),
+			     build_fold_addr_expr (base),
+			     build_int_cst (ptr_type_node, off)));
   @})
 #endif
 @end smallexample

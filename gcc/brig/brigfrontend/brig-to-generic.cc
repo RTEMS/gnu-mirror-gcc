@@ -485,7 +485,7 @@ brig_to_generic::add_global_variable (const std::string &name, tree var_decl)
     return;
 
   tree ptype = build_pointer_type (TREE_TYPE (var_decl));
-  tree var_addr = build1 (ADDR_EXPR, ptype, var_decl);
+  tree var_addr = build_addr_expr (ptype, var_decl);
 
   DECL_INITIAL (host_def_var) = var_addr;
   TREE_PUBLIC (host_def_var) = 1;

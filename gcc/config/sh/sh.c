@@ -7740,7 +7740,7 @@ sh_gimplify_va_arg_expr (tree valist, tree type, gimple_seq *pre_p,
 	  tree cmp;
 	  bool is_double = size == 8 && TREE_CODE (eff_type) == REAL_TYPE;
 
-	  tmp = build1 (ADDR_EXPR, pptr_type_node, unshare_expr (next_fp));
+	  tmp = build_addr_expr (pptr_type_node, unshare_expr (next_fp));
 	  gimplify_assign (unshare_expr (addr), tmp, pre_p);
 
 	  gimplify_assign (unshare_expr (next_fp_tmp), valist, pre_p);
@@ -7795,7 +7795,7 @@ sh_gimplify_va_arg_expr (tree valist, tree type, gimple_seq *pre_p,
 	  tmp = build1 (LABEL_EXPR, void_type_node, unshare_expr (lab_false));
 	  gimplify_and_add (tmp, pre_p);
 
-	  tmp = build1 (ADDR_EXPR, pptr_type_node, unshare_expr (next_stack));
+	  tmp = build_addr_expr (pptr_type_node, unshare_expr (next_stack));
 	  gimplify_assign (unshare_expr (addr), tmp, pre_p);
 	  gimplify_assign (unshare_expr (next_fp_tmp),
 			   unshare_expr (valist), pre_p);
@@ -7815,7 +7815,7 @@ sh_gimplify_va_arg_expr (tree valist, tree type, gimple_seq *pre_p,
 			NULL_TREE);
 	  gimplify_and_add (tmp, pre_p);
 
-	  tmp = build1 (ADDR_EXPR, pptr_type_node, unshare_expr (next_o));
+	  tmp = build_addr_expr (pptr_type_node, unshare_expr (next_o));
 	  gimplify_assign (unshare_expr (addr), tmp, pre_p);
 
 	  tmp = build1 (GOTO_EXPR, void_type_node, unshare_expr (lab_over));
@@ -7828,7 +7828,7 @@ sh_gimplify_va_arg_expr (tree valist, tree type, gimple_seq *pre_p,
 	    gimplify_assign (unshare_expr (next_o),
 			     unshare_expr (next_o_limit), pre_p);
 
-	  tmp = build1 (ADDR_EXPR, pptr_type_node, unshare_expr (next_stack));
+	  tmp = build_addr_expr (pptr_type_node, unshare_expr (next_stack));
 	  gimplify_assign (unshare_expr (addr), tmp, pre_p);
 	}
 

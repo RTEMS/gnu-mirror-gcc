@@ -544,7 +544,7 @@ maybe_optimize_ubsan_ptr_ifn (sanopt_ctx *ctx, gimple *stmt)
 	  bool sign_expr_offset = !wi::neg_p (expr_offset);
 
 	  tree base_addr
-	    = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (base)), base);
+	    = build_addr_expr (build_pointer_type (TREE_TYPE (base)), base);
 
 	  bool add = false;
 	  if (sign_cur_offset == sign_expr_offset)

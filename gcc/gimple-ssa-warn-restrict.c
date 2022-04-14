@@ -758,7 +758,7 @@ builtin_access::builtin_access (gimple *call, builtin_memref &dst,
     {
       addr = dst.base;
       if (!POINTER_TYPE_P (TREE_TYPE (addr)))
-	addr = build1 (ADDR_EXPR, (TREE_TYPE (addr)), addr);
+	addr = build_addr_expr (TREE_TYPE (addr), addr);
 
       if (tree dstsize = compute_objsize (addr, ostype))
 	dst.basesize = wi::to_offset (dstsize);
@@ -772,7 +772,7 @@ builtin_access::builtin_access (gimple *call, builtin_memref &dst,
     {
       addr = src.base;
       if (!POINTER_TYPE_P (TREE_TYPE (addr)))
-	addr = build1 (ADDR_EXPR, (TREE_TYPE (addr)), addr);
+	addr = build_addr_expr (TREE_TYPE (addr), addr);
 
       if (tree srcsize = compute_objsize (addr, ostype))
 	src.basesize = wi::to_offset (srcsize);

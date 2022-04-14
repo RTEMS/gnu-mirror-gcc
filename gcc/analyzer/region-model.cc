@@ -1880,9 +1880,7 @@ region_model::get_representative_path_var (const svalue *sval,
     {
       const region *reg = ptr_sval->get_pointee ();
       if (path_var pv = get_representative_path_var (reg, visited))
-	return path_var (build1 (ADDR_EXPR,
-				 sval->get_type (),
-				 pv.m_tree),
+	return path_var (build_addr_expr (sval->get_type (), pv.m_tree),
 			 pv.m_stack_depth);
     }
 
@@ -3761,8 +3759,8 @@ test_state_merging ()
   tree z = build_global_decl ("z", integer_type_node);
   tree p = build_global_decl ("p", ptr_type_node);
 
-  tree addr_of_y = build1 (ADDR_EXPR, ptr_type_node, y);
-  tree addr_of_z = build1 (ADDR_EXPR, ptr_type_node, z);
+  tree addr_of_y = build_addr_expr (ptr_type_node, y);
+  tree addr_of_z = build_addr_expr (ptr_type_node, z);
 
   auto_vec <tree> param_types;
   tree test_fndecl = make_fndecl (integer_type_node, "test_fn", param_types);
@@ -3772,7 +3770,7 @@ test_state_merging ()
   tree a = build_decl (UNKNOWN_LOCATION, PARM_DECL,
 		       get_identifier ("a"),
 		       integer_type_node);
-  tree addr_of_a = build1 (ADDR_EXPR, ptr_type_node, a);
+  tree addr_of_a = build_addr_expr (ptr_type_node, a);
 
   /* Param "q", a pointer.  */
   tree q = build_decl (UNKNOWN_LOCATION, PARM_DECL,
@@ -4485,7 +4483,7 @@ test_mem_ref ()
   tree p = build_global_decl ("p", int_star);
 
   tree int_17 = build_int_cst (integer_type_node, 17);
-  tree addr_of_x = build1 (ADDR_EXPR, int_star, x);
+  tree addr_of_x = build_addr_expr (int_star, x);
   tree offset_0 = build_int_cst (integer_type_node, 0);
   tree star_p = build2 (MEM_REF, integer_type_node, p, offset_0);
 

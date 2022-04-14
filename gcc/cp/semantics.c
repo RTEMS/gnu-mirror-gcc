@@ -4368,7 +4368,7 @@ simplify_aggr_init_expr (tree *tp)
 	 slot.  */
       cxx_mark_addressable (slot);
       CALL_EXPR_ARG (call_expr, 0) =
-	build1 (ADDR_EXPR, build_pointer_type (type), slot);
+	build_addr_expr (build_pointer_type (type), slot);
     }
   else if (style == arg)
     {

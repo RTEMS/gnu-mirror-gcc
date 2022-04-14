@@ -8004,7 +8004,7 @@ convert_arg_to_ellipsis (tree arg, tsubst_flags_t complain)
 		     "passing objects of non-trivially-copyable "
 		     "type %q#T through %<...%> is conditionally supported",
 		     arg_type);
-	  return build1 (ADDR_EXPR, build_reference_type (arg_type), arg);
+	  return build_addr_expr (build_reference_type (arg_type), arg);
 	}
       /* Build up a real lvalue-to-rvalue conversion in case the
 	 copy constructor is trivial but not callable.  */
@@ -8211,7 +8211,7 @@ convert_for_arg_passing (tree type, tree val, tsubst_flags_t complain)
     ;
   /* Pass classes with copy ctors by invisible reference.  */
   else if (TREE_ADDRESSABLE (type))
-    val = build1 (ADDR_EXPR, build_reference_type (type), val);
+    val = build_addr_expr (build_reference_type (type), val);
   else if (targetm.calls.promote_prototypes (NULL_TREE)
 	   && INTEGRAL_TYPE_P (type)
 	   && COMPLETE_TYPE_P (type)

@@ -3635,8 +3635,8 @@ darwin_build_constant_cfstring (tree str)
       /* isa *. */
       field = TYPE_FIELDS (ccfstring_type_node);
       CONSTRUCTOR_APPEND_ELT(v, NULL_TREE,
-			     build1 (ADDR_EXPR,  TREE_TYPE (field),
-				     cfstring_class_reference));
+			     build_addr_expr (TREE_TYPE (field),
+					      cfstring_class_reference));
       /* flags */
       field = DECL_CHAIN (field);
       CONSTRUCTOR_APPEND_ELT(v, NULL_TREE,
@@ -3644,7 +3644,7 @@ darwin_build_constant_cfstring (tree str)
       /* string *. */
       field = DECL_CHAIN (field);
       CONSTRUCTOR_APPEND_ELT(v, NULL_TREE,
-			     build1 (ADDR_EXPR, TREE_TYPE (field), str));
+			     build_addr_expr (TREE_TYPE (field), str));
       /* length */
       field = DECL_CHAIN (field);
       CONSTRUCTOR_APPEND_ELT(v, NULL_TREE,
@@ -3673,7 +3673,7 @@ darwin_build_constant_cfstring (tree str)
       desc->constructor = var;
     }
 
-  addr = build1 (ADDR_EXPR, pccfstring_type_node, desc->constructor);
+  addr = build_addr_expr (pccfstring_type_node, desc->constructor);
   TREE_CONSTANT (addr) = 1;
 
   return addr;

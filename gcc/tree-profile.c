@@ -526,8 +526,8 @@ gimple_gen_time_profiler (unsigned tag)
     {
       tree ptr = make_temp_ssa_name (build_pointer_type (type), NULL,
 				     "time_profiler_counter_ptr");
-      tree addr = build1 (ADDR_EXPR, TREE_TYPE (ptr),
-			  tree_time_profiler_counter);
+      tree addr = build_addr_expr (TREE_TYPE (ptr),
+				   tree_time_profiler_counter);
       gassign *assign = gimple_build_assign (ptr, NOP_EXPR, addr);
       gsi_insert_before (&gsi, assign, GSI_NEW_STMT);
       tree f = builtin_decl_explicit (LONG_LONG_TYPE_SIZE > 32

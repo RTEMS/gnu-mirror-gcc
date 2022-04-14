@@ -731,10 +731,10 @@ verify_bb_vtables (basic_block bb)
 
                       call_stmt = gimple_build_call
                                      (verify_vtbl_ptr_fndecl, 4,
-                                      build1 (ADDR_EXPR,
-                                                TYPE_POINTER_TO
-                                                  (TREE_TYPE (vtbl_var_decl)),
-                                              vtbl_var_decl),
+                                      build_addr_expr
+                                        (TYPE_POINTER_TO
+                                           (TREE_TYPE (vtbl_var_decl)),
+                                         vtbl_var_decl),
                                       lhs,
                                       build_string_literal
                                                   (len1 + 1,
@@ -747,10 +747,10 @@ verify_bb_vtables (basic_block bb)
                   else
                     call_stmt = gimple_build_call
                                      (verify_vtbl_ptr_fndecl, 2,
-                                      build1 (ADDR_EXPR,
-                                                TYPE_POINTER_TO
-                                                  (TREE_TYPE (vtbl_var_decl)),
-                                                 vtbl_var_decl),
+                                      build_addr_expr
+                                        (TYPE_POINTER_TO
+                                           (TREE_TYPE (vtbl_var_decl)),
+                                         vtbl_var_decl),
                                       lhs);
 
 
