@@ -2017,6 +2017,7 @@ extern tree noncapability_type (tree);
 extern const_tree noncapability_type (const_tree);
 extern tree fold_drop_capability (tree);
 extern tree build_replace_address_value_loc (location_t, tree, tree);
+extern tree build_cap_global_data_get_loc (location_t, tree);
 extern bool valid_capability_code_p (tree_code);
 
 extern scalar_addr_mode pointer_address_mode (const_tree);

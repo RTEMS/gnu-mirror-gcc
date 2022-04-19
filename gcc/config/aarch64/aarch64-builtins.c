@@ -2367,7 +2367,7 @@ aarch64_expand_morello_builtin (tree exp, rtx target, int fcode)
     case AARCH64_MORELLO_BUILTIN_GLOBAL_DATA_GET:
       {
         create_output_operand (&ops[0], target, CADImode);
-        expand_insn (CODE_FOR_aarch64_cap_global_data_get, 1, ops);
+	expand_insn (CODE_FOR_cap_global_data_get, 1, ops);
         return ops[0].value;
       }
     case AARCH64_MORELLO_BUILTIN_LENGTH_GET:

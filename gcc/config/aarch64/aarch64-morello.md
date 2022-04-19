@@ -255,7 +255,7 @@
   "clrperm\\t%0, %1, %2"
 )
 
-(define_insn "aarch64_cap_global_data_get"
+(define_insn "cap_global_data_get"
   [(set (match_operand:CADI 0 "register_operand" "=rk")
         (unspec:CADI [(const_int 0)]
             UNSPEC_CHERI_GLOBAL_DATA_GET))]

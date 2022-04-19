@@ -6862,6 +6862,12 @@ with @code{__builtin_apply} is stored; operand 1 is a @code{parallel}
 expression where each element is a @code{set} expression that indicates
 the restoring of a function return value from the result block.
 
+@cindex @code{cap_global_data_get} instruction pattern
+@item @samp{cap_global_data_get}
+An instruction that is used on capability architectures that have the concept
+of a global default capability to be used in integer to capability conversions.
+This expands the CAP_GLOBAL_DATA_GET internal function to RTL.
+
 @cindex @code{nop} instruction pattern
 @item @samp{nop}
 No-op instruction.  This instruction pattern name should always be defined

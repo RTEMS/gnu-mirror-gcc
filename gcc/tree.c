@@ -8088,6 +8088,17 @@ build_replace_address_value_loc (location_t loc, tree c, tree cv)
 				       2, c, cv);
 }
 
+/* Build a CAP_GLOBAL_DATA_GET internal function.  This function is used
+   exclusively in capability architectures which support multiple machine modes
+   for pointers accessing memory and require a default global capability to be
+   used on non-capability -> capability conversions.  */
+
+tree
+build_cap_global_data_get_loc (location_t loc, tree type)
+{
+  return build_call_expr_internal_loc (loc, IFN_CAP_GLOBAL_DATA_GET, type, 0);
+}
+
 /* Same as build_pointer_type_for_mode, but for REFERENCE_TYPE.  */
 
 tree

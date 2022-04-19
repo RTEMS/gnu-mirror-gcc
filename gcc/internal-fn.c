@@ -3023,6 +3023,22 @@ expand_REPLACE_ADDRESS_VALUE (internal_fn, gcall *gc)
     emit_move_insn (target, ret);
 }
 
+
+/* Expand CAP_GLOBAL_DATA_GET internal function.
+   This takes no parameters and returns only the value of the target's default
+   global capability.  */
+
+static void
+expand_CAP_GLOBAL_DATA_GET (internal_fn, gcall *gc)
+{
+  tree result = gimple_call_lhs (gc);
+  /* Has no side-effects, hence if return value not used just return now.  */
+  gcc_assert (result);
+  gcc_assert (targetm.have_cap_global_data_get ());
+  rtx target = expand_expr (result, NULL_RTX, VOIDmode, EXPAND_WRITE);
+  emit_insn (targetm.gen_cap_global_data_get (target));
+}
+
 /* Expand a NOP.  */
 
 static void

@@ -2674,14 +2674,12 @@ c_common_cap_from_noncap (tree type, tree expr)
     expr = c_fully_fold (expr, false, NULL);
 
   location_t loc = EXPR_LOCATION (expr);
-  tree ret = fold_build_replace_address_value_loc (loc, build_int_cst (type, 0),
-						   expr);
-  return ret;
+  return fold_build_replace_address_value_loc (loc, build_int_cst (type, 0),
+					       expr);
 }
 
 /* Generate a cast from a non-capability pointer to a capability pointer.
-   As above, this cast will necessarily create a pointer that does not have
-   valid metadata.  */
+   For Hybrid CHERI this will DDC-derive the capability.  */
 tree
 c_common_cap_from_ptr (tree type, tree ptr_expr)
 {
@@ -2695,7 +2693,15 @@ c_common_cap_from_ptr (tree type, tree ptr_expr)
   gcc_assert (TYPE_ADDR_SPACE (TREE_TYPE (type))
 		  == TYPE_ADDR_SPACE (TREE_TYPE (TREE_TYPE (ptr_expr))));
   tree int_expr = convert (noncapability_type (type), ptr_expr);
-  return c_common_cap_from_noncap (type, int_expr);
+
+  if (!c_dialect_cxx ())
+    int_expr = c_fully_fold (int_expr, false, NULL);
+
+  location_t loc = EXPR_LOCATION (int_expr);
+  tree ret = fold_build_replace_address_value_loc
+	       (loc, build_cap_global_data_get_loc (loc, type), int_expr);
+
+  return ret;
 }
 
 
