@@ -106,6 +106,25 @@ reachable_at_most_once (basic_block va_arg_bb, basic_block va_start_bb)
   return ret;
 }
 
+/* Check if EXP has the form &MEM(SSA_NAME + uhwi) and if it can be folded
+   to POINTER_PLUS_EXPR<SSA_NAME, uhwi>.  Return the inner MEM_REF if so,
+   otherwise return null.  */
+
+static tree
+foldable_addr_mem_expr (tree exp)
+{
+  if (ADDR_EXPR_P (exp)
+      && TREE_CODE (TREE_OPERAND (exp, 0)) == MEM_REF)
+    {
+      tree mem = TREE_OPERAND (exp, 0);
+      if (TREE_CODE (TREE_OPERAND (mem, 0)) == SSA_NAME
+	  && tree_fits_uhwi_p (TREE_OPERAND (mem, 1))
+	  && useless_type_conversion_p (TREE_TYPE (TREE_OPERAND (mem, 0)),
+					TREE_TYPE (exp)))
+	return mem;
+    }
+  return NULL_TREE;
+}
 
 /* For statement COUNTER = RHS, if RHS is COUNTER + constant,
    return constant, otherwise return HOST_WIDE_INT_M1U.
@@ -174,13 +193,10 @@ va_list_counter_bump (struct stdarg_info *si, tree counter, tree rhs,
 	  continue;
 	}
 
-      if (ADDR_EXPR_CODE_P (rhs_code)
-	  && TREE_CODE (TREE_OPERAND (rhs1, 0)) == MEM_REF
-	  && TREE_CODE (TREE_OPERAND (TREE_OPERAND (rhs1, 0), 0)) == SSA_NAME
-	  && tree_fits_uhwi_p (TREE_OPERAND (TREE_OPERAND (rhs1, 0), 1)))
+      if (tree mem = foldable_addr_mem_expr (rhs1))
 	{
-	  ret += tree_to_uhwi (TREE_OPERAND (TREE_OPERAND (rhs1, 0), 1));
-	  lhs = TREE_OPERAND (TREE_OPERAND (rhs1, 0), 0);
+	  ret += tree_to_uhwi (TREE_OPERAND (mem, 1));
+	  lhs = TREE_OPERAND (mem, 0);
 	  continue;
 	}
 
@@ -241,13 +257,10 @@ va_list_counter_bump (struct stdarg_info *si, tree counter, tree rhs,
 	  continue;
 	}
 
-      if (ADDR_EXPR_CODE_P (rhs_code)
-	  && TREE_CODE (TREE_OPERAND (rhs1, 0)) == MEM_REF
-	  && TREE_CODE (TREE_OPERAND (TREE_OPERAND (rhs1, 0), 0)) == SSA_NAME
-	  && tree_fits_uhwi_p (TREE_OPERAND (TREE_OPERAND (rhs1, 0), 1)))
+      if (tree mem = foldable_addr_mem_expr (rhs1))
 	{
-	  val -= tree_to_uhwi (TREE_OPERAND (TREE_OPERAND (rhs1, 0), 1));
-	  lhs = TREE_OPERAND (TREE_OPERAND (rhs1, 0), 0);
+	  val -= tree_to_uhwi (TREE_OPERAND (mem, 1));
+	  lhs = TREE_OPERAND (mem, 0);
 	  continue;
 	}
 

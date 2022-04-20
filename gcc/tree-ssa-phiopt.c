@@ -881,6 +881,8 @@ jump_function_from_stmt (tree *arg, gimple *stmt)
 						&offset);
       if (tem
 	  && TREE_CODE (tem) == MEM_REF
+	  && useless_type_conversion_p (TREE_TYPE (TREE_OPERAND (tem, 0)),
+					TREE_TYPE (*arg))
 	  && known_eq (mem_ref_offset (tem) + offset, 0))
 	{
 	  *arg = TREE_OPERAND (tem, 0);

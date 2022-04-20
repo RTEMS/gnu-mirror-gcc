@@ -1324,9 +1324,14 @@ vn_reference_maybe_forwprop_address (vec<vn_reference_op_s> *ops,
 								    0))))
 	    return changed;
 
+	  tree mem_base = TREE_OPERAND (addr_base, 0);
+	  if (!useless_type_conversion_p (TREE_TYPE (mem_base),
+					  TREE_TYPE (addr)))
+	    return changed;
+
 	  off += addr_offset;
 	  off += mem_ref_offset (addr_base);
-	  op->op0 = TREE_OPERAND (addr_base, 0);
+	  op->op0 = mem_base;
 	}
       else
 	{
