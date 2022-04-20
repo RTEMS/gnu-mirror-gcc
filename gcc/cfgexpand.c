@@ -4066,19 +4066,30 @@ convert_debug_memory_address (scalar_addr_mode mode, rtx x,
   if (GET_MODE (x) == mode || GET_MODE (x) == VOIDmode)
     return x;
 
-  /* We can't convert a mode to a capability mode.
-     However, in debug expressions this doesn't really matter since the
-     pointer will not actually be used for dereferencing.
-     MORELLO TODO
-      We're adding this line here just to alert us when we try and convert to a
-      capability mode, but it's probably better to do something like just use
-      the noncapability_mode since I guess that will be all the debugger can
-      use.  */
-  gcc_assert (! CAPABILITY_MODE_P (mode));
-
   /* X must have some form of address mode already.  */
   scalar_addr_mode xmode = as_a <scalar_addr_mode> (GET_MODE (x));
-  if (GET_MODE_PRECISION (mode) < GET_MODE_PRECISION (xmode))
+  if (CAPABILITY_MODE_P (mode) && !CAPABILITY_MODE_P (xmode))
+    {
+      /* The debug information can't (and doesn't need to) add valid
+	 metadata to a non-capability pointer.  It just needs to specify
+	 the capability value.  However, the rtl we create here still has
+	 to be type-correct, so wrap the capability value in a
+
+	   (pointer_plus (const_null) VALUE)
+
+	 We can optimize this scaffolding away when outputting the
+	 information.
+
+	 Note that consumers of the debug information are expected
+	 to perform address arithmetic in the precision of offset_mode (mode)
+	 rather than in the precision of mode, so that there is no problem
+	 with excess precision.  */
+      rtx off = convert_debug_memory_address (offset_mode (mode), x, as);
+      x = gen_pointer_plus (mode, CONST0_RTX (mode), off);
+      if (CONSTANT_P (off))
+	x = gen_rtx_CONST (mode, x);
+    }
+  else if (GET_MODE_PRECISION (mode) < GET_MODE_PRECISION (xmode))
     x = lowpart_subreg (mode, x, xmode);
   else if (POINTERS_EXTEND_UNSIGNED > 0)
     x = gen_rtx_ZERO_EXTEND (mode, x);

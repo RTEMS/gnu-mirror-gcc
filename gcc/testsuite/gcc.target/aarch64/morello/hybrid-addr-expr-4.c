@@ -1,5 +1,5 @@
 /* { dg-do assemble } */
-/* { dg-additional-options "-mcmodel=small -fPIC -fgimple -g0 -save-temps" } */
+/* { dg-additional-options "-mcmodel=small -fPIC -fgimple -save-temps" } */
 /* { dg-final { check-function-bodies "**" "" } } */
 /* { dg-skip-if "" { *-*-* } { "-O0" "-mabi=purecap" "-mfake-capability" } { "" } }  */
 
