@@ -2089,7 +2089,9 @@ expand_simple_operations (tree expr, tree stop, hash_map<tree, tree> &cache)
 	  tree base = get_addr_base_and_unit_offset (TREE_OPERAND (e, 0),
 						     &offset);
 	  if (base
-	      && TREE_CODE (base) == MEM_REF)
+	      && TREE_CODE (base) == MEM_REF
+	      && useless_type_conversion_p (TREE_TYPE (TREE_OPERAND (base, 0)),
+					    TREE_TYPE (expr)))
 	    {
 	      ee = expand_simple_operations (TREE_OPERAND (base, 0), stop,
 					     cache);
