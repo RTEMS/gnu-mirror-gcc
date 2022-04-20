@@ -19476,7 +19476,7 @@ aarch64_simd_mem_operand_p (rtx op)
 {
   return (MEM_P (op)
 	  && (GET_CODE (XEXP (op, 0)) == POST_INC
-	      || REG_P (XEXP (op, 0)))
+	      || aarch64_base_register_rtx_p (XEXP (op, 0), false))
 	  && aarch64_normal_base_mode_p (mem_address_mode (op)));
 }
 
