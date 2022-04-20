@@ -687,6 +687,7 @@ extern tree build_component_ref (location_t, tree, tree, location_t);
 extern tree build_array_ref (location_t, tree, tree);
 extern tree build_external_ref (location_t, tree, bool, tree *);
 extern void pop_maybe_used (bool);
+extern tree_code c_addr_expr_code_for_arg (tree);
 extern struct c_expr c_expr_sizeof_expr (location_t, struct c_expr);
 extern struct c_expr c_expr_sizeof_type (location_t, struct c_type_name *);
 extern struct c_expr parser_build_unary_op (location_t, enum tree_code,
@@ -694,6 +695,7 @@ extern struct c_expr parser_build_unary_op (location_t, enum tree_code,
 extern struct c_expr parser_build_binary_op (location_t,
     					     enum tree_code, struct c_expr,
 					     struct c_expr);
+extern tree c_build_addr_expr (location_t, tree, bool);
 extern tree build_conditional_expr (location_t, tree, bool, tree, tree,
 				    location_t, tree, tree, location_t);
 extern tree build_compound_expr (location_t, tree, tree);

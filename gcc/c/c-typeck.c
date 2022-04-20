@@ -1925,7 +1925,7 @@ array_to_pointer_conversion (location_t loc, tree exp)
   if (TREE_NO_WARNING (orig_exp))
     TREE_NO_WARNING (exp) = 1;
 
-  ptrtype = build_pointer_type (restype);
+  ptrtype = addr_expr_type (c_addr_expr_code_for_arg (exp), restype);
 
   if (INDIRECT_REF_P (exp))
     return convert (ptrtype, TREE_OPERAND (exp, 0));
@@ -1942,7 +1942,7 @@ array_to_pointer_conversion (location_t loc, tree exp)
 		    "is ill-formed in C++");
     }
 
-  adr = build_unary_op (loc, unqualified_addr_expr (), exp, true);
+  adr = c_build_addr_expr (loc, exp, true);
   return convert (ptrtype, adr);
 }
 
@@ -1959,7 +1959,7 @@ function_to_pointer_conversion (location_t loc, tree exp)
   if (TREE_NO_WARNING (orig_exp))
     TREE_NO_WARNING (exp) = 1;
 
-  return build_unary_op (loc, unqualified_addr_expr (), exp, false);
+  return c_build_addr_expr (loc, exp, false);
 }
 
 /* Mark EXP as read, not just set, for set but not used -Wunused
@@ -2106,8 +2106,7 @@ convert_lvalue_to_rvalue (location_t loc, struct c_expr exp,
       vec<tree, va_gc> *params;
       tree nonatomic_type, tmp, tmp_addr, fndecl, func_call;
       tree expr_type = TREE_TYPE (exp.value);
-      tree expr_addr = build_unary_op (loc, unqualified_addr_expr (),
-				       exp.value, false);
+      tree expr_addr = c_build_addr_expr (loc, exp.value, false);
       tree seq_cst = build_int_cst (integer_type_node, MEMMODEL_SEQ_CST);
 
       gcc_assert (TYPE_ATOMIC (expr_type));
@@ -2120,7 +2119,7 @@ convert_lvalue_to_rvalue (location_t loc, struct c_expr exp,
 	 create the VAL temp variable to hold the RHS.  */
       nonatomic_type = build_qualified_type (expr_type, TYPE_UNQUALIFIED);
       tmp = create_tmp_var_raw (nonatomic_type);
-      tmp_addr = build_unary_op (loc, unqualified_addr_expr (), tmp, false);
+      tmp_addr = c_build_addr_expr (loc, tmp, false);
       TREE_ADDRESSABLE (tmp) = 1;
       TREE_NO_WARNING (tmp) = 1;
 
@@ -4090,7 +4089,7 @@ build_atomic_assign (location_t loc, tree lhs, enum tree_code modifycode,
   tree loop_label, loop_decl, done_label, done_decl;
 
   tree lhs_type = TREE_TYPE (lhs);
-  tree lhs_addr = build_unary_op (loc, unqualified_addr_expr (), lhs, false);
+  tree lhs_addr = c_build_addr_expr (loc, lhs, false);
   tree seq_cst = build_int_cst (integer_type_node, MEMMODEL_SEQ_CST);
   tree rhs_semantic_type = TREE_TYPE (rhs);
   tree nonatomic_rhs_semantic_type;
@@ -4140,7 +4139,7 @@ build_atomic_assign (location_t loc, tree lhs, enum tree_code modifycode,
   if (modifycode == NOP_EXPR)
     {
       /* Build __atomic_store (&lhs, &val, SEQ_CST)  */
-      rhs = build_unary_op (loc, unqualified_addr_expr (), val, false);
+      rhs = c_build_addr_expr (loc, val, false);
       fndecl = builtin_decl_explicit (BUILT_IN_ATOMIC_STORE);
       params->quick_push (lhs_addr);
       params->quick_push (rhs);
@@ -4245,12 +4244,12 @@ build_atomic_assign (location_t loc, tree lhs, enum tree_code modifycode,
 cas_loop:
   /* Create the variables and labels required for the op= form.  */
   old = create_tmp_var_raw (nonatomic_lhs_type);
-  old_addr = build_unary_op (loc, unqualified_addr_expr (), old, false);
+  old_addr = c_build_addr_expr (loc, old, false);
   TREE_ADDRESSABLE (old) = 1;
   TREE_NO_WARNING (old) = 1;
 
   newval = create_tmp_var_raw (nonatomic_lhs_type);
-  newval_addr = build_unary_op (loc, unqualified_addr_expr (), newval, false);
+  newval_addr = c_build_addr_expr (loc, newval, false);
   TREE_ADDRESSABLE (newval) = 1;
   TREE_NO_WARNING (newval) = 1;
 
@@ -4961,6 +4960,8 @@ lvalue_p (const_tree ref)
 {
   const enum tree_code code = TREE_CODE (ref);
 
+  /* Changes to this switch statement should also be reflected in
+     c_addr_expr_code_for_arg.  */
   switch (code)
     {
     case REALPART_EXPR:
@@ -4993,6 +4994,60 @@ lvalue_p (const_tree ref)
     default:
       return false;
     }
+}
+
+/* If ARG is an lvalue, return the address-of operator for &ARG,
+   otherwise return the default address-of operator.  */
+
+tree_code
+c_addr_expr_code_for_arg (tree arg)
+{
+  /* This switch statement is based on the structure of the one in lvalue_p.
+     The idea is to peel off component references in an lvalue until we
+     find the first pointer-derived access.  The operator should then be
+     CAP_ADDR_EXPR if that pointer is a capability and NONCAP_ADDR_EXPR
+     otherwise.
+
+     If there are no pointer accesses (e.g. because the base of the access
+     is a constant or decl) then we should instead use the operator for
+     general pointers, given by unqualified_addr_expr.  */
+  switch (TREE_CODE (arg))
+    {
+    case REALPART_EXPR:
+    case IMAGPART_EXPR:
+    case COMPONENT_REF:
+      return c_addr_expr_code_for_arg (TREE_OPERAND (arg, 0));
+
+    case C_MAYBE_CONST_EXPR:
+      return c_addr_expr_code_for_arg (TREE_OPERAND (arg, 1));
+
+    case INDIRECT_REF:
+      /* Base the choice of operator on whether the pointer is a
+	 capability.  */
+      return addr_expr_code (TREE_TYPE (TREE_OPERAND (arg, 0)));
+
+    case ARRAY_REF:
+      /* As for INDIRECT_REF if the index is applied to a pointer base.
+	 Recurse if the index is instead applied to a true array.  */
+      if (TREE_CODE (TREE_TYPE (TREE_OPERAND (arg, 0))) == ARRAY_TYPE)
+	return c_addr_expr_code_for_arg (TREE_OPERAND (arg, 0));
+      return addr_expr_code (TREE_TYPE (TREE_OPERAND (arg, 0)));
+
+    default:
+      /* For now, this includes gimple MEM_REFs, on the basis that
+	 (a) gimple allows __CAP_ADDR to be specified directly and
+	 (b) gimple isn't supposed to be user-friendly.  */
+      return unqualified_addr_expr ();
+    }
+}
+
+/* Like build_unary_op, but specifically for the operation &ARG.  */
+
+tree
+c_build_addr_expr (location_t location, tree arg, bool noconvert)
+{
+  return build_unary_op (location, c_addr_expr_code_for_arg (arg),
+			 arg, noconvert);
 }
 
 /* Give a warning for storing in something that is read-only in GCC
@@ -14848,9 +14903,8 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	    }
 	  if (!remove)
 	    {
-	      tree addr = build_unary_op (OMP_CLAUSE_LOCATION (c),
-					  unqualified_addr_expr (),
-					  t, false);
+	      tree addr = c_build_addr_expr (OMP_CLAUSE_LOCATION (c),
+					     t, false);
 	      if (addr == error_mark_node)
 		remove = true;
 	      else

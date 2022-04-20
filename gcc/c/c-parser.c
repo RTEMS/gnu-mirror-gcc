@@ -8237,10 +8237,13 @@ c_parser_unary_expression (c_parser *parser)
       op = default_function_array_read_conversion (exp_loc, op);
       return parser_build_unary_op (op_loc, PREDECREMENT_EXPR, op);
     case CPP_AND:
-      c_parser_consume_token (parser);
-      op = c_parser_cast_expression (parser, NULL);
-      mark_exp_read (op.value);
-      return parser_build_unary_op (op_loc, unqualified_addr_expr (), op);
+      {
+	c_parser_consume_token (parser);
+	op = c_parser_cast_expression (parser, NULL);
+	mark_exp_read (op.value);
+	tree_code code = c_addr_expr_code_for_arg (op.value);
+	return parser_build_unary_op (op_loc, code, op);
+      }
     case CPP_MULT:
       {
 	c_parser_consume_token (parser);
@@ -17874,9 +17877,8 @@ c_parser_omp_depobj (c_parser *parser)
 	}
       else
 	{
-	  tree addr = build_unary_op (EXPR_LOC_OR_LOC (depobj, loc),
-				      unqualified_addr_expr (),
-				      depobj, false);
+	  tree addr = c_build_addr_expr (EXPR_LOC_OR_LOC (depobj, loc),
+					 depobj, false);
 	  if (addr == error_mark_node)
 	    depobj = error_mark_node;
 	  else
