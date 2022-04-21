@@ -8764,6 +8764,17 @@ build_fold_addr_expr_loc (location_t loc, tree t)
   return build_fold_addr_expr_with_type_loc (loc, t, ptrtype);
 }
 
+/* Build an expression for the address of T, calculated by *ADDR_EXPR
+   code ADDR_EXPR.  */
+
+tree
+build_fold_addr_expr_loc (location_t loc, tree_code addr_expr, tree t)
+{
+  tree ptrtype = addr_expr_type (addr_expr, TREE_TYPE (t));
+
+  return build_fold_addr_expr_with_type_loc (loc, t, ptrtype);
+}
+
 /* Fold a unary expression of code CODE and type TYPE with operand
    OP0.  Return the folded expression if folding is successful.
    Otherwise, return NULL_TREE.  */

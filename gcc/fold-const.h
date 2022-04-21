@@ -122,9 +122,18 @@ extern bool wide_int_binop (wide_int &res, enum tree_code,
 			    const wide_int &arg1, const wide_int &arg2,
 			    signop, wi::overflow_type *);
 extern tree int_const_binop (enum tree_code, const_tree, const_tree, int = 1);
-#define build_fold_addr_expr(T)\
-        build_fold_addr_expr_loc (UNKNOWN_LOCATION, (T))
 extern tree build_fold_addr_expr_loc (location_t, tree);
+inline tree
+build_fold_addr_expr (tree op)
+{
+  return build_fold_addr_expr_loc (UNKNOWN_LOCATION, op);
+}
+extern tree build_fold_addr_expr_loc (location_t, tree_code, tree);
+inline tree
+build_fold_addr_expr (tree_code addr_expr, tree op)
+{
+  return build_fold_addr_expr_loc (UNKNOWN_LOCATION, addr_expr, op);
+}
 #define build_fold_addr_expr_with_type(T,TYPE)\
         build_fold_addr_expr_with_type_loc (UNKNOWN_LOCATION, (T), TYPE)
 extern tree build_fold_addr_expr_with_type_loc (location_t, tree, tree);

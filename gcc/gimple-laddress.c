@@ -110,11 +110,12 @@ pass_laddress::execute (function *fun)
 	  poly_int64 bytepos = exact_div (bitpos, BITS_PER_UNIT);
 	  if (offset != NULL_TREE)
 	    {
+	      tree_code addr_expr = gimple_assign_rhs_code (stmt);
 	      if (maybe_ne (bytepos, 0))
 		offset = size_binop (PLUS_EXPR, offset, size_int (bytepos));
 	      offset = force_gimple_operand_gsi (&gsi, offset, true, NULL,
 						 true, GSI_SAME_STMT);
-	      base = build_fold_addr_expr (base);
+	      base = build_fold_addr_expr (addr_expr, base);
 	      base = force_gimple_operand_gsi (&gsi, base, true, NULL,
 					       true, GSI_SAME_STMT);
 	      gimple *g = gimple_build_assign (gimple_assign_lhs (stmt),
