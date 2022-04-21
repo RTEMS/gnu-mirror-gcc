@@ -1,4 +1,26 @@
+==================== work086 patch #2:
+
+Add -mstore-vector-pair and -mno-store-vector-pair.
+
+2022-04-21   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/mma.md (movoo): Delete.
+	(movoo_stxvp): New insn for -mstore-vector-pair.
+	(movoo_no_stxvp): New insn for -mno-store-vector-pair.
+	(movxo): Delete.
+	(movxo_stxvp): New insn for -mstore-vector-pair.
+	(movxo_no_stxvp): New insn for -mno-store-vector-pair.
+	* config/rs6000/rs6000.opt (-mstore-vector-pair): New option.
+	* doc/invoke.texi (RS/6000 & PowerPC Options): Document
+	-mstore-vector-pair and -mno-store-vector-pair.
+
+gcc/testsuite/
+	* gcc.target/powerpc/p10-store-vector-pair-1.c: New test.
+	* gcc.target/powerpc/p10-store-vector-pair-2.c: New test.
+
 ==================== work086 patch #1:
+
 Eliminate power8 fusion options, use power8 tuning, PR target/102059
 
 This is V4 of the patch.  Compared to V3 of the patch, GCC will just
