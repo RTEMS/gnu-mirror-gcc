@@ -78,5 +78,5 @@ store_quad_static (__vector_quad *p)
   sq = *p;			/* 2x lxvp, 2x stxvp.  */
 }
 
-/* { dg-final { scan-assembler {\mp?vstxvpx?\M}  } } */
+/* { dg-final { scan-assembler {\mp?stxvpx?\M}  } } */
 
