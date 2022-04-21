@@ -1275,7 +1275,7 @@ See RS/6000 and PowerPC Options.
 -mstack-protector-guard=@var{guard} -mstack-protector-guard-reg=@var{reg} @gol
 -mstack-protector-guard-offset=@var{offset} -mprefixed -mno-prefixed @gol
 -mpcrel -mno-pcrel -mmma -mno-mmma -mrop-protect -mno-rop-protect @gol
--mprivileged -mno-privileged}
+-mprivileged -mno-privileged -mstore-vector-pair -mno-store-vector-pair}
 
 @emph{RX Options}
 @gccoptlist{-m64bit-doubles  -m32bit-doubles  -fpu  -nofpu@gol
@@ -29359,6 +29359,12 @@ Generate (do not generate) code that will run in privileged state.
 @opindex no-block-ops-unaligned-vsx
 Generate (do not generate) unaligned vsx loads and stores for
 inline expansion of @code{memcpy} and @code{memmove}.
+
+@item -mstore-vector-pair
+@itemx -mno-store-vector-pair
+@opindex mstore-vector-pair
+@opindex mno-store-vector-pair
+Generate (do not generate) code that uses the store vector pair instructions.
 @end table
 
 @node RX Options

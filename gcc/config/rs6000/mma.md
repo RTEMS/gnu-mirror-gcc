@@ -274,10 +274,12 @@
   DONE;
 })
 
-(define_insn_and_split "*movoo"
+;; Possibly generate store vector pair instructions or split them to two
+;; separate store vector instructions.
+(define_insn_and_split "*movoo_stxvp"
   [(set (match_operand:OO 0 "nonimmediate_operand" "=wa,m,wa")
 	(match_operand:OO 1 "input_operand" "m,wa,wa"))]
-  "TARGET_MMA
+  "TARGET_MMA && TARGET_STORE_VECTOR_PAIR
    && (gpc_reg_operand (operands[0], OOmode)
        || gpc_reg_operand (operands[1], OOmode))"
   "@
@@ -295,6 +297,27 @@
    (set_attr "size" "256")
    (set_attr "length" "*,*,8")])
 
+(define_insn_and_split "*movoo_no_stxvp"
+  [(set (match_operand:OO 0 "nonimmediate_operand" "=wa,oQ,wa")
+	(match_operand:OO 1 "input_operand" "m,wa,wa"))]
+  "TARGET_MMA && !TARGET_STORE_VECTOR_PAIR
+   && (gpc_reg_operand (operands[0], OOmode)
+       || gpc_reg_operand (operands[1], OOmode))"
+  "@
+   lxvp%X1 %x0,%1
+   #
+   #"
+  "&& reload_completed && !MEM_P (operands[1])"
+  [(const_int 0)]
+{
+  rs6000_split_multireg_move (operands[0], operands[1]);
+  DONE;
+}
+  [(set_attr "type" "vecload,vecstore,veclogical")
+   (set_attr "size" "256")
+   (set_attr "length" "*,8,8")
+   (set_attr "max_prefixed_insns" "*,2,*")])
+
 
 ;; Vector quad support.  XOmode can only live in FPRs.
 (define_expand "movxo"
@@ -306,10 +329,12 @@
   DONE;
 })
 
-(define_insn_and_split "*movxo"
+;; Possibly generate store vector pair instructions or split them to two
+;; separate store vector instructions.
+(define_insn_and_split "*movxo_stxvp"
   [(set (match_operand:XO 0 "nonimmediate_operand" "=d,m,d")
 	(match_operand:XO 1 "input_operand" "m,d,d"))]
-  "TARGET_MMA
+  "TARGET_MMA && TARGET_STORE_VECTOR_PAIR
    && (gpc_reg_operand (operands[0], XOmode)
        || gpc_reg_operand (operands[1], XOmode))"
   "@
@@ -325,6 +350,26 @@
   [(set_attr "type" "vecload,vecstore,veclogical")
    (set_attr "length" "*,*,16")
    (set_attr "max_prefixed_insns" "2,2,*")])
+
+(define_insn_and_split "*movxo_no_stxvp"
+  [(set (match_operand:XO 0 "nonimmediate_operand" "=d,m,d")
+	(match_operand:XO 1 "input_operand" "m,d,d"))]
+  "TARGET_MMA && !TARGET_STORE_VECTOR_PAIR
+   && (gpc_reg_operand (operands[0], XOmode)
+       || gpc_reg_operand (operands[1], XOmode))"
+  "@
+   #
+   #
+   #"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  rs6000_split_multireg_move (operands[0], operands[1]);
+  DONE;
+}
+  [(set_attr "type" "vecload,vecstore,veclogical")
+   (set_attr "length" "*,*,16")
+   (set_attr "max_prefixed_insns" "2,4,*")])
 
 (define_expand "vsx_assemble_pair"
   [(match_operand:OO 0 "vsx_register_operand")
