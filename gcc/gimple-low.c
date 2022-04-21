@@ -879,9 +879,10 @@ lower_builtin_posix_memalign (gimple_stmt_iterator *gsi)
   tree ptr = create_tmp_reg (ptr_type_node);
   if (ADDR_EXPR_P (pptr))
     {
+      tree_code addr_expr = TREE_CODE (pptr);
       tree tem = create_tmp_var (ptr_type_node);
       TREE_ADDRESSABLE (tem) = 1;
-      gimple_call_set_arg (call, 0, build_fold_addr_expr (tem));
+      gimple_call_set_arg (call, 0, build_fold_addr_expr (addr_expr, tem));
       stmt = gimple_build_assign (ptr, tem);
     }
   else

@@ -2483,7 +2483,7 @@ create_component_ref_by_pieces_1 (basic_block block, vn_reference_t ref,
 	    offset = int_const_binop (PLUS_EXPR, offset,
 				      build_int_cst (TREE_TYPE (offset),
 						     off));
-	    baseop = build_fold_addr_expr (base);
+	    baseop = build_fold_addr_expr (TREE_CODE (baseop), base);
 	  }
 	genop = build2 (MEM_REF, currop->type, baseop, offset);
 	MR_DEPENDENCE_CLIQUE (genop) = currop->clique;

@@ -256,7 +256,7 @@ canonicalize_constructor_val (tree cval, tree from_decl)
 	}
       /* Fixup types in global initializers.  */
       if (TREE_TYPE (TREE_TYPE (cval)) != TREE_TYPE (TREE_OPERAND (cval, 0)))
-	cval = build_fold_addr_expr (TREE_OPERAND (cval, 0));
+	cval = build_fold_addr_expr (TREE_CODE (cval), TREE_OPERAND (cval, 0));
 
       if (!useless_type_conversion_p (TREE_TYPE (orig_cval), TREE_TYPE (cval)))
 	cval = fold_convert (TREE_TYPE (orig_cval), cval);
@@ -4959,7 +4959,7 @@ maybe_canonicalize_mem_ref_addr (tree *t, bool is_debug = false)
 	      gcc_unreachable ();
 	    }
 
-	  TREE_OPERAND (*t, 0) = build_fold_addr_expr (base);
+	  TREE_OPERAND (*t, 0) = build_fold_addr_expr (TREE_CODE (addr), base);
 	  TREE_OPERAND (*t, 1) = maybe_cap_int_const_binop (PLUS_EXPR,
 							   TREE_OPERAND (*t, 1),
 							   size_int (coffset));

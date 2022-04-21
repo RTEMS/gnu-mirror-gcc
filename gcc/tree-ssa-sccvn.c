@@ -3296,7 +3296,7 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
 	      lhs_offset += mem_offset;
 	    }
 	  else if (DECL_P (tem))
-	    lhs = build_fold_addr_expr (tem);
+	    lhs = build_fold_addr_expr (TREE_CODE (lhs), tem);
 	  else
 	    return (void *)-1;
 	}
@@ -3326,7 +3326,7 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
 	    }
 	  else if (DECL_P (tem)
 		   || TREE_CODE (tem) == STRING_CST)
-	    rhs = build_fold_addr_expr (tem);
+	    rhs = build_fold_addr_expr (TREE_CODE (rhs), tem);
 	  else
 	    return (void *)-1;
 	}

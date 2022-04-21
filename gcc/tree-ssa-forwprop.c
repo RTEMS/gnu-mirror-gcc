@@ -672,6 +672,7 @@ forward_propagate_addr_expr_1 (tree name, tree def_rhs,
 
   gcc_assert (ADDR_EXPR_P (def_rhs));
 
+  tree_code addr_expr = TREE_CODE (def_rhs);
   lhs = gimple_assign_lhs (use_stmt);
   rhs_code = gimple_assign_rhs_code (use_stmt);
   rhs = gimple_assign_rhs1 (use_stmt);
@@ -782,7 +783,7 @@ forward_propagate_addr_expr_1 (tree name, tree def_rhs,
 	      new_ptr = TREE_OPERAND (def_rhs_base, 0);
 	    }
 	  else
-	    new_ptr = build_fold_addr_expr (def_rhs_base);
+	    new_ptr = build_fold_addr_expr (addr_expr, def_rhs_base);
 	  TREE_OPERAND (lhs, 0) = new_ptr;
 	  TREE_OPERAND (lhs, 1)
 	    = wide_int_to_tree (TREE_TYPE (TREE_OPERAND (lhs, 1)), off);
@@ -819,7 +820,7 @@ forward_propagate_addr_expr_1 (tree name, tree def_rhs,
 	    }
 	  else
 	    {
-	      new_base = build_fold_addr_expr (*def_rhs_basep);
+	      new_base = build_fold_addr_expr (addr_expr, *def_rhs_basep);
 	      new_offset = TREE_OPERAND (lhs, 1);
 	    }
 	  *def_rhs_basep = build2 (MEM_REF, TREE_TYPE (*def_rhs_basep),
@@ -873,7 +874,7 @@ forward_propagate_addr_expr_1 (tree name, tree def_rhs,
 	      new_ptr = TREE_OPERAND (def_rhs_base, 0);
 	    }
 	  else
-	    new_ptr = build_fold_addr_expr (def_rhs_base);
+	    new_ptr = build_fold_addr_expr (addr_expr, def_rhs_base);
 	  TREE_OPERAND (rhs, 0) = new_ptr;
 	  TREE_OPERAND (rhs, 1)
 	    = wide_int_to_tree (TREE_TYPE (TREE_OPERAND (rhs, 1)), off);
@@ -905,7 +906,7 @@ forward_propagate_addr_expr_1 (tree name, tree def_rhs,
 	    }
 	  else
 	    {
-	      new_base = build_fold_addr_expr (*def_rhs_basep);
+	      new_base = build_fold_addr_expr (addr_expr, *def_rhs_basep);
 	      new_offset = TREE_OPERAND (rhs, 1);
 	    }
 	  *def_rhs_basep = build2 (MEM_REF, TREE_TYPE (*def_rhs_basep),

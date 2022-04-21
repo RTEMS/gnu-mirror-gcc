@@ -653,7 +653,7 @@ split_constant_offset_1 (tree type, tree op0, enum tree_code code, tree op1,
 
 	if (!multiple_p (pbitpos, BITS_PER_UNIT, &pbytepos))
 	  return false;
-	base = build_fold_addr_expr (base);
+	base = build_fold_addr_expr (code, base);
 	off0 = ssize_int (pbytepos);
 
 	if (poffset)
@@ -864,7 +864,7 @@ canonicalize_base_object_address (tree addr)
   if (!ADDR_EXPR_P (addr))
     return addr;
 
-  return build_fold_addr_expr (TREE_OPERAND (addr, 0));
+  return build_fold_addr_expr (TREE_CODE (addr), TREE_OPERAND (addr, 0));
 }
 
 /* Analyze the behavior of memory reference REF within STMT.

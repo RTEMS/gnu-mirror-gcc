@@ -464,7 +464,7 @@ tree_to_aff_combination (tree expr, tree type, aff_tree *comb)
 	  core = TREE_OPERAND (core, 0);
 	}
       else
-	core = build_fold_addr_expr (core);
+	core = build_fold_addr_expr (code, core);
 
       if (ADDR_EXPR_P (core))
 	aff_combination_add_elt (comb, core, 1);

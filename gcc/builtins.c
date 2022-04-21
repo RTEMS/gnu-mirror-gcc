@@ -1503,13 +1503,13 @@ get_memory_rtx (tree exp, tree len)
   /* If the MEM_REF has no acceptable address, try to get the base object
      from the original address we got, and build an all-aliasing
      unknown-sized access to that one.  */
-  if (is_gimple_mem_ref_addr (TREE_OPERAND (exp, 0)))
+  tree mem_ref_addr = TREE_OPERAND (exp, 0);
+  if (is_gimple_mem_ref_addr (mem_ref_addr))
     set_mem_attributes (mem, exp, 0);
-  else if (ADDR_EXPR_P (TREE_OPERAND (exp, 0))
-	   && (exp = get_base_address (TREE_OPERAND (TREE_OPERAND (exp, 0),
-						     0))))
+  else if (ADDR_EXPR_P (mem_ref_addr)
+	   && (exp = get_base_address (TREE_OPERAND (mem_ref_addr, 0))))
     {
-      exp = build_fold_addr_expr (exp);
+      exp = build_fold_addr_expr (TREE_CODE (mem_ref_addr), exp);
       exp = fold_build2 (MEM_REF,
 			 build_array_type (char_type_node,
 					   build_range_type (sizetype,

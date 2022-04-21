@@ -5028,6 +5028,7 @@ build_simple_mem_ref_loc (location_t loc, tree ptr)
       && (handled_component_p (TREE_OPERAND (ptr, 0))
 	  || TREE_CODE (TREE_OPERAND (ptr, 0)) == MEM_REF))
     {
+      tree_code addr_expr = TREE_CODE (ptr);
       ptr = get_addr_base_and_unit_offset (TREE_OPERAND (ptr, 0), &offset);
       gcc_assert (ptr);
       if (TREE_CODE (ptr) == MEM_REF)
@@ -5036,7 +5037,7 @@ build_simple_mem_ref_loc (location_t loc, tree ptr)
 	  ptr = TREE_OPERAND (ptr, 0);
 	}
       else
-	ptr = build_fold_addr_expr (ptr);
+	ptr = build_fold_addr_expr (addr_expr, ptr);
       gcc_assert (is_gimple_reg (ptr) || is_gimple_min_invariant (ptr));
     }
   tem = build2 (MEM_REF, TREE_TYPE (ptype),

@@ -1101,7 +1101,7 @@ determine_base_object_1 (tree *tp, int *walk_subtrees, void *wdata)
       if (!base)
 	obj = *tp;
       else if (TREE_CODE (base) != MEM_REF)
-	obj = fold_convert (ptr_type_node, build_fold_addr_expr (base));
+	obj = fold_convert (ptr_type_node, build_fold_addr_expr (code, base));
     }
   else if (code == SSA_NAME && POINTER_TYPE_P (TREE_TYPE (*tp)))
 	obj = fold_convert (ptr_type_node, *tp);
@@ -2907,7 +2907,7 @@ strip_offset_1 (tree expr, bool inside_addr, bool top_compref,
       if (op0 == TREE_OPERAND (expr, 0))
 	return orig_expr;
 
-      expr = build_fold_addr_expr (op0);
+      expr = build_fold_addr_expr (code, op0);
       return fold_convert (orig_type, expr);
 
     case MEM_REF:
