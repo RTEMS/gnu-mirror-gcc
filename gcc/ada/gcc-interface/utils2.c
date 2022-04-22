@@ -694,7 +694,6 @@ build_atomic_load (tree src, bool sync)
   tree orig_src = src;
   tree t, addr, val;
   unsigned int size;
-  int fncode;
 
   /* Remove conversions to get the address of the underlying object.  */
   src = remove_conversions (src, false);
@@ -702,8 +701,7 @@ build_atomic_load (tree src, bool sync)
   if (size == 0)
     return orig_src;
 
-  fncode = (int) BUILT_IN_ATOMIC_LOAD_N + exact_log2 (size) + 1;
-  t = builtin_decl_implicit ((enum built_in_function) fncode);
+  t = builtin_decl_implicit (builtin_sync_code (BUILT_IN_ATOMIC_LOAD_N, size));
 
   addr = build_unary_op (unqualified_addr_expr (), ptr_type, src);
   val = build_call_expr (t, 2, addr, mem_model);
@@ -730,7 +728,6 @@ build_atomic_store (tree dest, tree src, bool sync)
   tree orig_dest = dest;
   tree t, int_type, addr;
   unsigned int size;
-  int fncode;
 
   /* Remove conversions to get the address of the underlying object.  */
   dest = remove_conversions (dest, false);
@@ -738,8 +735,8 @@ build_atomic_store (tree dest, tree src, bool sync)
   if (size == 0)
     return build_binary_op (MODIFY_EXPR, NULL_TREE, orig_dest, src);
 
-  fncode = (int) BUILT_IN_ATOMIC_STORE_N + exact_log2 (size) + 1;
-  t = builtin_decl_implicit ((enum built_in_function) fncode);
+  auto fncode = builtin_sync_code (BUILT_IN_ATOMIC_STORE_N, size);
+  t = builtin_decl_implicit (fncode);
   int_type = gnat_type_for_size (BITS_PER_UNIT * size, 1);
 
   /* First convert the bits to be stored to the original type of the store,

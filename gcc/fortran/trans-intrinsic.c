@@ -40,6 +40,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "trans-types.h"
 #include "trans-array.h"
 #include "dependency.h"	/* For CAF array alias analysis.  */
+#include "builtins.h"
+
 /* Only for gfc_trans_assign and gfc_trans_pointer_assign.  */
 
 /* This maps Fortran intrinsic math functions to external library or GCC
@@ -11358,9 +11360,7 @@ conv_intrinsic_atomic_op (gfc_code *code)
     }
 
   tmp = TREE_TYPE (TREE_TYPE (atom));
-  fn = (built_in_function) ((int) fn
-			    + exact_log2 (tree_to_uhwi (TYPE_SIZE_UNIT (tmp)))
-			    + 1);
+  fn = builtin_sync_code (fn, tree_to_uhwi (TYPE_SIZE_UNIT (tmp)));
   tree itype = TREE_TYPE (TREE_TYPE (atom));
   tmp = builtin_decl_explicit (fn);
 
@@ -11482,9 +11482,8 @@ conv_intrinsic_atomic_ref (gfc_code *code)
     }
 
   tmp = TREE_TYPE (TREE_TYPE (atom));
-  fn = (built_in_function) ((int) BUILT_IN_ATOMIC_LOAD_N
-			    + exact_log2 (tree_to_uhwi (TYPE_SIZE_UNIT (tmp)))
-			    + 1);
+  fn = builtin_sync_code (BUILT_IN_ATOMIC_LOAD_N,
+			  tree_to_uhwi (TYPE_SIZE_UNIT (tmp)));
   tmp = builtin_decl_explicit (fn);
   tmp = build_call_expr_loc (input_location, tmp, 2, atom,
 			     build_int_cst (integer_type_node,
@@ -11608,9 +11607,8 @@ conv_intrinsic_atomic_cas (gfc_code *code)
     }
 
   tmp = TREE_TYPE (TREE_TYPE (atom));
-  fn = (built_in_function) ((int) BUILT_IN_ATOMIC_COMPARE_EXCHANGE_N
-			    + exact_log2 (tree_to_uhwi (TYPE_SIZE_UNIT (tmp)))
-			    + 1);
+  fn = builtin_sync_code (BUILT_IN_ATOMIC_COMPARE_EXCHANGE_N,
+			  tree_to_uhwi (TYPE_SIZE_UNIT (tmp)));
   tmp = builtin_decl_explicit (fn);
 
   gfc_add_modify (&block, old, comp);

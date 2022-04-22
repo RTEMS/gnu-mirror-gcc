@@ -187,4 +187,17 @@ struct access_data
 extern bool check_access (tree, tree, tree, tree, tree, tree, tree,
 			  bool = true, const access_data * = NULL);
 
+/* Enumerates the data-size-specific suffix of a group of sync-builtins.def
+   functions.  See the comments in that file for more details.  */
+enum sync_dsize {
+  SYNC_I1 = 1,
+  SYNC_I2 = 2,
+  SYNC_I4 = 4,
+  SYNC_I8 = 8,
+  SYNC_I16 = 16,
+  SYNC_ICAP = 0xcafe
+};
+extern built_in_function builtin_sync_code (built_in_function, int);
+extern sync_dsize builtin_sync_dsize (built_in_function, built_in_function);
+
 #endif /* GCC_BUILTINS_H */

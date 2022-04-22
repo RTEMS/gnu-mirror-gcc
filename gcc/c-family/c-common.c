@@ -51,6 +51,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "c-spellcheck.h"
 #include "selftest.h"
 #include "debug.h"
+#include "builtins.h"
 
 cpp_reader *parse_in;		/* Declared in c-pragma.h.  */
 
@@ -6951,15 +6952,15 @@ speculation_safe_value_resolve_return (tree first_param, tree result)
   return result;
 }
 
-/* A helper function for resolve_overloaded_builtin in resolving the
-   overloaded __sync_ builtins.  Returns a positive power of 2 if the
-   first operand of PARAMS is a pointer to a supported data type.
-   Returns 0 if an error is encountered.
-   FETCH is true when FUNCTION is one of the _FETCH_OP_ or _OP_FETCH_
-   built-ins.  */
+/* A function to help resolve_overloaded_builtin resolve overloaded
+   __sync_ builtin ORIG_FCODE.  Return the non-overloaded function if
+   the first operand of PARAMS is a pointer to a supported data type.
+   Return END_BUILTINS if an error is encountered.  FETCH is true when
+   FUNCTION is one of the _FETCH_OP_ or _OP_FETCH_ built-ins.  */
 
-static int
-sync_resolve_size (tree function, vec<tree, va_gc> *params, bool fetch)
+static built_in_function
+sync_resolve_function (tree function, built_in_function orig_fcode,
+		       vec<tree, va_gc> *params, bool fetch)
 {
   /* Type of the argument.  */
   tree argtype;
@@ -6968,7 +6969,6 @@ sync_resolve_size (tree function, vec<tree, va_gc> *params, bool fetch)
   int size;
 
   argtype = type = TREE_TYPE ((*params)[0]);
-  gcc_assert (!capability_type_p (TREE_TYPE (type)));
 
   if (TREE_CODE (type) == ARRAY_TYPE && c_dialect_cxx ())
     {
@@ -6991,9 +6991,12 @@ sync_resolve_size (tree function, vec<tree, va_gc> *params, bool fetch)
   if (fetch && TREE_CODE (type) == BOOLEAN_TYPE)
     goto incompatible;
 
+  if (capability_type_p (type))
+    return builtin_sync_code (orig_fcode, SYNC_ICAP);
+
   size = tree_to_uhwi (TYPE_SIZE_UNIT (type));
   if (size == 1 || size == 2 || size == 4 || size == 8 || size == 16)
-    return size;
+    return builtin_sync_code (orig_fcode, size);
 
  incompatible:
   /* Issue the diagnostic only if the argument is valid, otherwise
@@ -7001,7 +7004,7 @@ sync_resolve_size (tree function, vec<tree, va_gc> *params, bool fetch)
   if (argtype != error_mark_node)
     error ("operand type %qT is incompatible with argument %d of %qE",
 	   argtype, 1, function);
-  return 0;
+  return END_BUILTINS;
 }
 
 /* A helper function for resolve_overloaded_builtin.  Adds casts to
@@ -7687,20 +7690,12 @@ resolve_atomic_fncode_n (tree function, vec<tree, va_gc> *params,
       error ("too few arguments to function %qE", function);
       return error_mark_node;
     }
-   else if ((*params)[0] == error_mark_node)
-    return error_mark_node;
-  else if (capability_type_p (TYPE_MAIN_VARIANT (TREE_TYPE
-						 (TREE_TYPE ((*params)[0])))))
-    new_code_bt = (enum built_in_function) ((int) orig_code
-						+ CAPABILITY_BUILTIN_FCODE_DIFF
-						+ 1);
   else
     {
-      int n = sync_resolve_size (function, params, fetch_op);
-      if (n == 0)
+      new_code_bt = sync_resolve_function (function, orig_code, params,
+					   fetch_op);
+      if (new_code_bt == END_BUILTINS)
 	return error_mark_node;
-      new_code_bt = (enum built_in_function)((int) orig_code
-					      + exact_log2 (n) + 1);
     }
   return builtin_decl_explicit (new_code_bt);
 }

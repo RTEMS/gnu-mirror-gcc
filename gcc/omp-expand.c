@@ -59,6 +59,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "stringpool.h"
 #include "attribs.h"
 #include "tree-eh.h"
+#include "builtins.h"
 
 /* OMP region information.  Every parallel and workshare
    directive is enclosed between two markers, the OMP_* directive
@@ -8132,7 +8133,7 @@ omp_memory_order_to_memmodel (enum omp_memory_order mo)
 
 static bool
 expand_omp_atomic_load (basic_block load_bb, tree addr,
-			tree loaded_val, int index)
+			tree loaded_val, int nbytes)
 {
   enum built_in_function tmpbase;
   gimple_stmt_iterator gsi;
@@ -8150,7 +8151,7 @@ expand_omp_atomic_load (basic_block load_bb, tree addr,
      is smaller than word size, then expand_atomic_load assumes that the load
      is atomic.  We could avoid the builtin entirely in this case.  */
 
-  tmpbase = (enum built_in_function) (BUILT_IN_ATOMIC_LOAD_N + index + 1);
+  tmpbase = builtin_sync_code (BUILT_IN_ATOMIC_LOAD_N, nbytes);
   decl = builtin_decl_explicit (tmpbase);
   if (decl == NULL_TREE)
     return false;
@@ -8184,7 +8185,7 @@ expand_omp_atomic_load (basic_block load_bb, tree addr,
 
 static bool
 expand_omp_atomic_store (basic_block load_bb, tree addr,
-			 tree loaded_val, tree stored_val, int index)
+			 tree loaded_val, tree stored_val, int nbytes)
 {
   enum built_in_function tmpbase;
   gimple_stmt_iterator gsi;
@@ -8212,7 +8213,7 @@ expand_omp_atomic_store (basic_block load_bb, tree addr,
      is atomic.  We could avoid the builtin entirely in this case.  */
 
   tmpbase = (exchange ? BUILT_IN_ATOMIC_EXCHANGE_N : BUILT_IN_ATOMIC_STORE_N);
-  tmpbase = (enum built_in_function) ((int) tmpbase + index + 1);
+  tmpbase = builtin_sync_code (tmpbase, nbytes);
   decl = builtin_decl_explicit (tmpbase);
   if (decl == NULL_TREE)
     return false;
@@ -8255,14 +8256,14 @@ expand_omp_atomic_store (basic_block load_bb, tree addr,
 }
 
 /* A subroutine of expand_omp_atomic.  Attempt to implement the atomic
-   operation as a __atomic_fetch_op builtin.  INDEX is log2 of the
-   size of the data type, and thus usable to find the index of the builtin
-   decl.  Returns false if the expression is not of the proper form.  */
+   operation as a __atomic_fetch_op builtin.  NBYTES the size of the
+   data type in bytes.  Returns false if the expression is not of the
+   proper form.  */
 
 static bool
 expand_omp_atomic_fetch_op (basic_block load_bb,
 			    tree addr, tree loaded_val,
-			    tree stored_val, int index)
+			    tree stored_val, int nbytes)
 {
   enum built_in_function oldbase, newbase, tmpbase;
   tree decl, itype, call;
@@ -8352,8 +8353,7 @@ expand_omp_atomic_fetch_op (basic_block load_bb,
   else
     return false;
 
-  tmpbase = ((enum built_in_function)
-	     ((need_new ? newbase : oldbase) + index + 1));
+  tmpbase = builtin_sync_code (need_new ? newbase : oldbase, nbytes);
   decl = builtin_decl_explicit (tmpbase);
   if (decl == NULL_TREE)
     return false;
@@ -8413,13 +8413,12 @@ expand_omp_atomic_fetch_op (basic_block load_bb,
 	if (oldval != newval)
 	  goto repeat;
 
-   INDEX is log2 of the size of the data type, and thus usable to find the
-   index of the builtin decl.  */
+   NBYTES is the size of the data type in bytes.  */
 
 static bool
 expand_omp_atomic_pipeline (basic_block load_bb, basic_block store_bb,
 			    tree addr, tree loaded_val, tree stored_val,
-			    int index)
+			    int nbytes)
 {
   tree loadedi, storedi, initial, new_storedi, old_vali;
   tree type, itype, cmpxchg, iaddr, atype;
@@ -8431,8 +8430,7 @@ expand_omp_atomic_pipeline (basic_block load_bb, basic_block store_bb,
 
   /* ??? We need a non-pointer interface to __atomic_compare_exchange in
      order to use the RELAXED memory model effectively.  */
-  fncode = (enum built_in_function)((int)BUILT_IN_SYNC_VAL_COMPARE_AND_SWAP_N
-				    + index + 1);
+  fncode = builtin_sync_code (BUILT_IN_SYNC_VAL_COMPARE_AND_SWAP_N, nbytes);
   cmpxchg = builtin_decl_explicit (fncode);
   if (cmpxchg == NULL_TREE)
     return false;
@@ -8474,7 +8472,7 @@ expand_omp_atomic_pipeline (basic_block load_bb, basic_block store_bb,
       loadedi = loaded_val;
     }
 
-  fncode = (enum built_in_function) (BUILT_IN_ATOMIC_LOAD_N + index + 1);
+  fncode = builtin_sync_code (BUILT_IN_ATOMIC_LOAD_N, nbytes);
   tree loaddecl = builtin_decl_explicit (fncode);
   if (loaddecl)
     initial
@@ -8686,8 +8684,8 @@ expand_omp_atomic (struct omp_region *region)
   HOST_WIDE_INT index;
 
   /* Make sure the type is one of the supported sizes.  */
-  index = tree_to_uhwi (TYPE_SIZE_UNIT (type));
-  index = exact_log2 (index);
+  auto nbytes = tree_to_uhwi (TYPE_SIZE_UNIT (type));
+  index = exact_log2 (nbytes);
   if (index >= 0 && index <= 4)
     {
       unsigned int align = TYPE_ALIGN_UNIT (type);
@@ -8701,7 +8699,7 @@ expand_omp_atomic (struct omp_region *region)
 	      && (is_int_mode (TYPE_MODE (type), &smode)
 		  || is_float_mode (TYPE_MODE (type), &smode))
 	      && GET_MODE_BITSIZE (smode) <= BITS_PER_WORD
-	      && expand_omp_atomic_load (load_bb, addr, loaded_val, index))
+	      && expand_omp_atomic_load (load_bb, addr, loaded_val, nbytes))
 	    return;
 
 	  /* Atomic store.  */
@@ -8711,20 +8709,20 @@ expand_omp_atomic (struct omp_region *region)
 	      && store_bb == single_succ (load_bb)
 	      && first_stmt (store_bb) == store
 	      && expand_omp_atomic_store (load_bb, addr, loaded_val,
-					  stored_val, index))
+					  stored_val, nbytes))
 	    return;
 
 	  /* When possible, use specialized atomic update functions.  */
 	  if ((INTEGRAL_TYPE_P (type) || POINTER_TYPE_P (type))
 	      && store_bb == single_succ (load_bb)
 	      && expand_omp_atomic_fetch_op (load_bb, addr,
-					     loaded_val, stored_val, index))
+					     loaded_val, stored_val, nbytes))
 	    return;
 
 	  /* If we don't have specialized __sync builtins, try and implement
 	     as a compare and swap loop.  */
 	  if (expand_omp_atomic_pipeline (load_bb, store_bb, addr,
-					  loaded_val, stored_val, index))
+					  loaded_val, stored_val, nbytes))
 	    return;
 	}
     }

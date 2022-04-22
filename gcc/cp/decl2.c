@@ -48,6 +48,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "intl.h"
 #include "c-family/c-ada-spec.h"
 #include "asan.h"
+#include "builtins.h"
 
 /* Id for dumping the raw trees.  */
 int raw_dump_id;
@@ -3326,12 +3327,10 @@ build_atomic_load_byte (tree src, HOST_WIDE_INT model)
   tree mem_model = build_int_cst (integer_type_node, model);
   tree t, addr, val;
   unsigned int size;
-  int fncode;
 
   size = tree_to_uhwi (TYPE_SIZE_UNIT (char_type_node));
 
-  fncode = BUILT_IN_ATOMIC_LOAD_N + exact_log2 (size) + 1;
-  t = builtin_decl_implicit ((enum built_in_function) fncode);
+  t = builtin_decl_implicit (builtin_sync_code (BUILT_IN_ATOMIC_LOAD_N, size));
 
   addr = build_addr_expr (ptr_type, src);
   val = build_call_expr (t, 2, addr, mem_model);
