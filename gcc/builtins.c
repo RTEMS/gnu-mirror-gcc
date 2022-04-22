@@ -6622,6 +6622,14 @@ expand_builtin_fork_or_exec (tree fn, tree exp, rtx target, int ignore)
 
 
 
+/* Return an integer mode that has exactly 2**NBYTES_LOG2 bytes.  */
+
+static scalar_int_mode
+log2_nbytes_int_mode (int nbytes_log2)
+{
+  return int_mode_for_size (BITS_PER_UNIT << nbytes_log2, 0).require ();
+}
+
 /* Reconstitute a mode for a __sync intrinsic operation.  Since the type of
    the pointer in these functions is void*, the tree optimizers may remove
    casts.  The mode computed in expand_builtin isn't reliable either, due
@@ -8963,7 +8971,7 @@ expand_builtin (tree exp, rtx target, rtx subtarget, machine_mode mode,
     case BUILT_IN_SPECULATION_SAFE_VALUE_4:
     case BUILT_IN_SPECULATION_SAFE_VALUE_8:
     case BUILT_IN_SPECULATION_SAFE_VALUE_16:
-      mode = get_builtin_sync_mode (fcode - BUILT_IN_SPECULATION_SAFE_VALUE_1);
+      mode = log2_nbytes_int_mode (fcode - BUILT_IN_SPECULATION_SAFE_VALUE_1);
       return expand_speculation_safe_value (mode, exp, target, ignore);
 
     default:	/* just do library call, if unknown builtin */
