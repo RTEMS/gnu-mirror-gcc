@@ -2509,18 +2509,10 @@ expr_expected_value_1 (tree type, tree op0, enum tree_code code,
 		}
 
 	      case BUILT_IN_SYNC_BOOL_COMPARE_AND_SWAP_N:
-	      case BUILT_IN_SYNC_BOOL_COMPARE_AND_SWAP_1:
-	      case BUILT_IN_SYNC_BOOL_COMPARE_AND_SWAP_2:
-	      case BUILT_IN_SYNC_BOOL_COMPARE_AND_SWAP_4:
-	      case BUILT_IN_SYNC_BOOL_COMPARE_AND_SWAP_8:
-	      case BUILT_IN_SYNC_BOOL_COMPARE_AND_SWAP_16:
+	      CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_SYNC_BOOL_COMPARE_AND_SWAP):
 	      case BUILT_IN_ATOMIC_COMPARE_EXCHANGE:
 	      case BUILT_IN_ATOMIC_COMPARE_EXCHANGE_N:
-	      case BUILT_IN_ATOMIC_COMPARE_EXCHANGE_1:
-	      case BUILT_IN_ATOMIC_COMPARE_EXCHANGE_2:
-	      case BUILT_IN_ATOMIC_COMPARE_EXCHANGE_4:
-	      case BUILT_IN_ATOMIC_COMPARE_EXCHANGE_8:
-	      case BUILT_IN_ATOMIC_COMPARE_EXCHANGE_16:
+	      CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_ATOMIC_COMPARE_EXCHANGE):
 		/* Assume that any given atomic operation has low contention,
 		   and thus the compare-and-swap operation succeeds.  */
 		*predictor = PRED_COMPARE_AND_SWAP;

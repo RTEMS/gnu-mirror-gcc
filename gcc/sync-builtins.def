@@ -52,6 +52,19 @@ along with GCC; see the file COPYING3.  If not see
   FOR_NONCAP_SYNC_N (ENUM, NAME, DEF) \
   DEF (ENUM##_CAPABILITY, NAME "_capability", ICAP)
 
+/* Case statements for everything defined by FOR_NONCAP_SYNC_N.  */
+#define CASE_SYNC_BUILTIN_NONCAP_N(ENUM) \
+  case ENUM##_1: \
+  case ENUM##_2: \
+  case ENUM##_4: \
+  case ENUM##_8: \
+  case ENUM##_16
+
+/* Case statements for everything defined by FOR_ALL_SYNC_N.  */
+#define CASE_SYNC_BUILTIN_ALL_N(ENUM) \
+  CASE_SYNC_BUILTIN_NONCAP_N (ENUM): \
+  case ENUM##_CAPABILITY
+
 /* The macros below operate in pairs.  The first macro defines functions
    for a particular DSIZE and the second macro defines the following:
 
