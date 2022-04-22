@@ -3259,6 +3259,10 @@ check_local_shadow (tree decl)
       enum opt_code warning_code;
       if (warn_shadow)
 	warning_code = OPT_Wshadow;
+      else if ((TREE_CODE (decl) == TYPE_DECL)
+	       ^ (TREE_CODE (old) == TYPE_DECL))
+	/* If exactly one is a type, they aren't compatible.  */
+	warning_code = OPT_Wshadow_local;
       else if ((TREE_TYPE (old)
 		&& TREE_TYPE (decl)
 		&& same_type_p (TREE_TYPE (old), TREE_TYPE (decl)))
@@ -3481,6 +3485,9 @@ push_local_extern_decl_alias (tree decl)
 	      && CP_DECL_THREAD_LOCAL_P (decl)
 	      && alias != error_mark_node)
 	    set_decl_tls_model (alias, DECL_TLS_MODEL (decl));
+
+	  /* Adjust visibility.  */
+	  determine_visibility (alias);
 	}
     }
 

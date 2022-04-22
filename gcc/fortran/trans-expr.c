@@ -2763,9 +2763,9 @@ conv_parent_component_references (gfc_se * se, gfc_ref * ref)
   dt = ref->u.c.sym;
   c = ref->u.c.component;
 
-  /* Return if the component is in the parent type.  */
+  /* Return if the component is in this type, i.e. not in the parent type.  */
   for (cmp = dt->components; cmp; cmp = cmp->next)
-    if (strcmp (c->name, cmp->name) == 0)
+    if (c == cmp)
       return;
 
   /* Build a gfc_ref to recursively call gfc_conv_component_ref.  */
@@ -2825,6 +2825,9 @@ tree
 gfc_maybe_dereference_var (gfc_symbol *sym, tree var, bool descriptor_only_p,
 			   bool is_classarray)
 {
+  if (!POINTER_TYPE_P (TREE_TYPE (var)))
+    return var;
+
   /* Characters are entirely different from other types, they are treated
      separately.  */
   if (sym->ts.type == BT_CHARACTER)
@@ -8779,8 +8782,8 @@ gfc_trans_structure_assign (tree dest, gfc_expr * expr, bool init, bool coarray)
   return gfc_finish_block (&block);
 }
 
-void
-gfc_conv_union_initializer (vec<constructor_elt, va_gc> *v,
+static void
+gfc_conv_union_initializer (vec<constructor_elt, va_gc> *&v,
                             gfc_component *un, gfc_expr *init)
 {
   gfc_constructor *ctor;

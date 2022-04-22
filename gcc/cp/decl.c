@@ -2273,6 +2273,9 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 	      for (parm = DECL_ARGUMENTS (old_result); parm;
 		   parm = DECL_CHAIN (parm))
 		DECL_CONTEXT (parm) = old_result;
+
+	      if (tree fc = DECL_FRIEND_CONTEXT (new_result))
+		SET_DECL_FRIEND_CONTEXT (old_result, fc);
 	    }
 	}
 
@@ -2592,6 +2595,8 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 	     otherwise it is a DECL_FRIEND_CONTEXT.  */
 	  if (DECL_VIRTUAL_P (newdecl))
 	    SET_DECL_THUNKS (newdecl, DECL_THUNKS (olddecl));
+	  else if (tree fc = DECL_FRIEND_CONTEXT (newdecl))
+	    SET_DECL_FRIEND_CONTEXT (olddecl, fc);
 	}
       else if (VAR_P (newdecl))
 	{
@@ -5590,7 +5595,7 @@ start_decl (const cp_declarator *declarator,
       && DECL_DECLARED_CONSTEXPR_P (current_function_decl))
     {
       bool ok = false;
-      if (CP_DECL_THREAD_LOCAL_P (decl))
+      if (CP_DECL_THREAD_LOCAL_P (decl) && !DECL_REALLY_EXTERN (decl))
 	error_at (DECL_SOURCE_LOCATION (decl),
 		  "%qD declared %<thread_local%> in %qs function", decl,
 		  DECL_IMMEDIATE_FUNCTION_P (current_function_decl)
@@ -6409,8 +6414,9 @@ reshape_init_class (tree type, reshape_iter *d, bool first_initializer_p,
     {
       tree field_init;
       constructor_elt *old_cur = d->cur;
+      bool direct_desig = false;
 
-      /* Handle designated initializers, as an extension.  */
+      /* Handle C++20 designated initializers.  */
       if (d->cur->index)
 	{
 	  if (d->cur->index == error_mark_node)
@@ -6428,7 +6434,10 @@ reshape_init_class (tree type, reshape_iter *d, bool first_initializer_p,
 		}
 	    }
 	  else if (TREE_CODE (d->cur->index) == IDENTIFIER_NODE)
-	    field = get_class_binding (type, d->cur->index);
+	    {
+	      field = get_class_binding (type, d->cur->index);
+	      direct_desig = true;
+	    }
 	  else
 	    {
 	      if (complain & tf_error)
@@ -6436,6 +6445,11 @@ reshape_init_class (tree type, reshape_iter *d, bool first_initializer_p,
 		       " for class %qT", d->cur->index, type);
 	      return error_mark_node;
 	    }
+
+	  if (!field && ANON_AGGR_TYPE_P (type))
+	    /* Apparently the designator isn't for a member of this anonymous
+	       struct, so head back to the enclosing class.  */
+	    break;
 
 	  if (!field || TREE_CODE (field) != FIELD_DECL)
 	    {
@@ -6469,6 +6483,7 @@ reshape_init_class (tree type, reshape_iter *d, bool first_initializer_p,
 		  break;
 	      gcc_assert (aafield);
 	      field = aafield;
+	      direct_desig = false;
 	    }
 	}
 
@@ -6483,9 +6498,32 @@ reshape_init_class (tree type, reshape_iter *d, bool first_initializer_p,
 	   assumed to correspond to no elements of the initializer list.  */
 	goto continue_;
 
-      field_init = reshape_init_r (TREE_TYPE (field), d,
-				   /*first_initializer_p=*/NULL_TREE,
-				   complain);
+      if (direct_desig)
+	{
+	  /* The designated field F is initialized from this one element:
+	     Temporarily clear the designator so a recursive reshape_init_class
+	     doesn't try to find it again in F, and adjust d->end so we don't
+	     try to use the next initializer to initialize another member of F.
+
+	     Note that we don't want these changes if we found the designator
+	     inside an anon aggr above; we leave them alone to implement:
+
+	     "If the element is an anonymous union member and the initializer
+	     list is a brace-enclosed designated- initializer-list, the element
+	     is initialized by the designated-initializer-list { D }, where D
+	     is the designated- initializer-clause naming a member of the
+	     anonymous union member."  */
+	  auto end_ = make_temp_override (d->end, d->cur + 1);
+	  auto idx_ = make_temp_override (d->cur->index, NULL_TREE);
+	  field_init = reshape_init_r (TREE_TYPE (field), d,
+				       /*first_initializer_p=*/NULL_TREE,
+				       complain);
+	}
+      else
+	field_init = reshape_init_r (TREE_TYPE (field), d,
+				     /*first_initializer_p=*/NULL_TREE,
+				     complain);
+
       if (field_init == error_mark_node)
 	return error_mark_node;
 
@@ -6737,6 +6775,15 @@ reshape_init_r (tree type, reshape_iter *d, tree first_initializer_p,
 	     to handle initialization of arrays and similar.  */
 	  else if (COMPOUND_LITERAL_P (stripped_init))
 	    gcc_assert (!BRACE_ENCLOSED_INITIALIZER_P (stripped_init));
+	  /* If we have an unresolved designator, we need to find the member it
+	     designates within TYPE, so proceed to the routines below.  For
+	     FIELD_DECL or INTEGER_CST designators, we're already initializing
+	     the designated element.  */
+	  else if (d->cur->index
+		   && TREE_CODE (d->cur->index) == IDENTIFIER_NODE)
+	    /* Brace elision with designators is only permitted for anonymous
+	       aggregates.  */
+	    gcc_checking_assert (ANON_AGGR_TYPE_P (type));
 	  /* A CONSTRUCTOR of the target's type is a previously
 	     digested initializer.  */
 	  else if (same_type_ignoring_top_level_qualifiers_p (type, init_type))
@@ -7081,6 +7128,10 @@ check_initializer (tree decl, tree init, int flags, vec<tree, va_gc> **cleanups)
 	   && !(init && BRACE_ENCLOSED_INITIALIZER_P (init)
 		&& CP_AGGREGATE_TYPE_P (type)
 		&& (CLASS_TYPE_P (type)
+		    /* The call to build_aggr_init below could end up
+		       calling build_vec_init, which may break when we
+		       are processing a template.  */
+		    || processing_template_decl
 		    || !TYPE_NEEDS_CONSTRUCTING (type)
 		    || type_has_extended_temps (type))))
 	  || (DECL_DECOMPOSITION_P (decl) && TREE_CODE (type) == ARRAY_TYPE))
@@ -7809,9 +7860,20 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
       enum auto_deduction_context adc = adc_variable_type;
       if (VAR_P (decl) && DECL_DECOMPOSITION_P (decl))
 	adc = adc_decomp_type;
+      tree outer_targs = NULL_TREE;
+      if (flag_concepts
+	  && PLACEHOLDER_TYPE_CONSTRAINTS_INFO (auto_node)
+	  && VAR_P (decl)
+	  && DECL_LANG_SPECIFIC (decl)
+	  && DECL_TEMPLATE_INFO (decl)
+	  && !DECL_FUNCTION_SCOPE_P (decl))
+	/* The outer template arguments might be needed for satisfaction.
+	   (For function scope variables, do_auto_deduction will obtain the
+	   outer template arguments from current_function_decl.)  */
+	outer_targs = DECL_TI_ARGS (decl);
       type = TREE_TYPE (decl) = do_auto_deduction (type, d_init, auto_node,
 						   tf_warning_or_error, adc,
-						   NULL_TREE, flags);
+						   outer_targs, flags);
       if (type == error_mark_node)
 	return;
       if (TREE_CODE (type) == FUNCTION_TYPE)
@@ -12548,6 +12610,11 @@ grokdeclarator (const cp_declarator *declarator,
 			    "type specifier", name);
 		return error_mark_node;
 	      }
+	    if (late_return_type && sfk == sfk_conversion)
+	      {
+		error ("a conversion function cannot have a trailing return type");
+		return error_mark_node;
+	      }
 	    type = splice_late_return_type (type, late_return_type);
 	    if (type == error_mark_node)
 	      return error_mark_node;
@@ -12712,8 +12779,6 @@ grokdeclarator (const cp_declarator *declarator,
 		    maybe_warn_cpp0x (CPP0X_EXPLICIT_CONVERSION);
 		    explicitp = 2;
 		  }
-		if (late_return_type_p)
-		  error ("a conversion function cannot have a trailing return type");
 	      }
 	    else if (sfk == sfk_deduction_guide)
 	      {

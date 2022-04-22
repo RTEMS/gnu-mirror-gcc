@@ -1,3 +1,131 @@
+2022-04-21  Fritz Reese  <foreese@gcc.gnu.org>
+
+	Backported from master:
+	2022-04-21  Fritz Reese  <foreese@gcc.gnu.org>
+
+	PR fortran/105310
+	* trans-expr.c (gfc_conv_union_initializer): Pass vec* by reference.
+
+2022-04-21  Release Manager
+
+	* GCC 11.3.0 released.
+
+2022-04-10  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-04-05  Harald Anlauf  <anlauf@gmx.de>
+		    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/105138
+	* intrinsic.c (gfc_is_intrinsic): When a symbol refers to a
+	RECURSIVE procedure, it cannot be an INTRINSIC.
+
+2022-04-10  Mikael Morin  <mikael@gcc.gnu.org>
+
+	Backported from master:
+	2022-03-19  Mikael Morin  <mikael@gcc.gnu.org>
+
+	PR fortran/104228
+	PR fortran/104570
+	* parse.c (parse_associate): Use a new distinct gfc_charlen if the
+	copied type has one whose length is not known to be constant.
+	* resolve.c (resolve_assoc_var): Reset charlen if it’s shared with
+	the associate target regardless of the expression type.
+	Don’t reinitialize charlen if it’s deferred.
+
+2022-04-10  Mikael Morin  <mikael@gcc.gnu.org>
+
+	Backported from master:
+	2022-02-13  Mikael Morin  <mikael@gcc.gnu.org>
+
+	PR fortran/104228
+	* resolve.c (resolve_assoc_var): Also create a new character
+	length for non-dummy associate targets.
+	* trans-stmt.c (trans_associate_var): Initialize character length
+	even if no temporary is used for the associate variable.
+
+2022-04-07  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-04-05  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/104210
+	* arith.c (eval_intrinsic): Avoid NULL pointer dereference.
+	(gfc_zero_size_array): Likewise.
+
+2022-03-19  Tobias Burnus  <tobias@codesourcery.com>
+
+	Backported from master:
+	2022-03-07  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR fortran/99585
+	PR fortran/104430
+	* trans-expr.c (conv_parent_component_references): Fix comment;
+	simplify comparison.
+	(gfc_maybe_dereference_var): Avoid d referencing a nonpointer.
+
+2022-03-17   Michael Meissner  <meissner@linux.ibm.com>
+
+	PR fortran/96983
+	* trans-intrinsic.c (build_round_expr): If int type is larger than
+	long long, do the round and convert to the integer type.  Do not
+	try to find a floating point type the exact size of the integer
+	type.  Backport patch from 2021-04-22 on the trunk.
+
+2022-03-13  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-03-08  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/104811
+	* frontend-passes.c (optimize_minmaxloc): Do not attempt
+	frontend-optimization of MINLOC/MAXLOC for character arrays, as
+	there is no suitable code yet for inline expansion.
+
+2022-02-23  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-02-22  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/104619
+	* resolve.c (resolve_structure_cons): Skip shape check if shape
+	of constructor cannot be determined at compile time.
+
+2022-02-20  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-02-09  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/66193
+	* arith.c (reduce_binary_ac): When reducing binary expressions,
+	try simplification.  Handle case of empty constructor.
+	(reduce_binary_ca): Likewise.
+
+2022-02-16  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-02-14  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/104211
+	* expr.c (find_array_section): Replace assertion by error
+	recovery when encountering bad array constructor.
+
+2022-02-14  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/100337
+	Backport from master.
+	* trans-intrinsic.c (conv_co_collective): Check stat for null ptr
+	before dereferrencing.
+
+2022-02-14  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/103790
+	Backported from master.
+	* trans-array.c (structure_alloc_comps): Prevent descriptor
+	stacking for non-array data; do not broadcast caf-tokens.
+	* trans-intrinsic.c (conv_co_collective): Prevent generation
+	of unused descriptor.
+
 2022-02-04  Harald Anlauf  <anlauf@gmx.de>
 
 	Backported from master:

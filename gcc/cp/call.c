@@ -2799,7 +2799,7 @@ add_builtin_candidate (struct z_candidate **candidates, enum tree_code code,
 	  tree c1 = TREE_TYPE (type1);
 	  tree c2 = TYPE_PTRMEM_CLASS_TYPE (type2);
 
-	  if (MAYBE_CLASS_TYPE_P (c1) && DERIVED_FROM_P (c2, c1)
+	  if (CLASS_TYPE_P (c1) && DERIVED_FROM_P (c2, c1)
 	      && (TYPE_PTRMEMFUNC_P (type2)
 		  || is_complete (TYPE_PTRMEM_POINTED_TO_TYPE (type2))))
 	    break;
@@ -4764,7 +4764,6 @@ build_operator_new_call (tree fnname, vec<tree, va_gc> **args,
 
      we disregard block-scope declarations of "operator new".  */
   fns = lookup_name (fnname, LOOK_where::NAMESPACE);
-  fns = lookup_arg_dependent (fnname, fns, *args);
 
   if (align_arg)
     {
@@ -8643,6 +8642,7 @@ make_base_init_ok (tree exp)
        call target.  It would be possible to splice in the appropriate
        arguments, but probably not worth the complexity.  */
     return false;
+  mark_used (fn);
   AGGR_INIT_EXPR_FN (exp) = build_address (fn);
   return true;
 }
@@ -9456,7 +9456,10 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	   && DECL_OVERLOADED_OPERATOR_IS (fn, NOP_EXPR)
 	   && trivial_fn_p (fn))
     {
-      tree to = cp_build_fold_indirect_ref (argarray[0]);
+      /* Don't use cp_build_fold_indirect_ref, op= returns an lvalue even if
+	 the object argument isn't one.  */
+      tree to = cp_build_indirect_ref (input_location, argarray[0],
+				       RO_ARROW, complain);
       tree type = TREE_TYPE (to);
       tree as_base = CLASSTYPE_AS_BASE (type);
       tree arg = argarray[1];
@@ -12531,6 +12534,8 @@ set_up_extended_ref_temp (tree decl, tree expr, vec<tree, va_gc> **cleanups,
      VAR.  */
   if (TREE_CODE (expr) != TARGET_EXPR)
     expr = get_target_expr (expr);
+  else if (TREE_ADDRESSABLE (expr))
+    TREE_ADDRESSABLE (var) = 1;
 
   if (TREE_CODE (decl) == FIELD_DECL
       && extra_warnings && !TREE_NO_WARNING (decl))

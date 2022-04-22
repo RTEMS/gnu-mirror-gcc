@@ -3748,7 +3748,7 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 	if (can_create_pseudo_p ())
 	  tmp_reg = gen_reg_rtx (mode);
 
-	emit_move_insn (tmp_reg, gen_rtx_HIGH (mode, imm));
+	emit_move_insn (tmp_reg, gen_rtx_HIGH (mode, copy_rtx (imm)));
 	emit_insn (gen_add_losym (dest, tmp_reg, imm));
 	return;
       }
@@ -21095,7 +21095,7 @@ aarch64_sve_expand_vector_init_handle_trailing_constants
 	{
 	  rtx x = builder.elt (i + nelts_reqd - n_trailing_constants);
 	  if (!valid_for_const_vector_p (elem_mode, x))
-	    x = const0_rtx;
+	    x = CONST0_RTX (elem_mode);
 	  v.quick_push (x);
 	}
       rtx const_vec = v.build ();
