@@ -344,7 +344,7 @@
 (define_expand "atomic_<atomic_optab>cadi"
  [(match_operand:CADI 0 "aarch64_sync_memory_operand")
   (atomic_op:CADI
-   (match_operand:CADI 1 "<atomic_op_operand>")
+   (match_operand:DI 1 "<atomic_op_operand>")
    (match_operand:SI 2 "const_int_operand"))]
   ""
   {
@@ -355,14 +355,12 @@
       {
 	gcc_assert (TARGET_CAPABILITY_FAKE);
 	const atomic_ool_names *names;
-	rtx temp = drop_capability (operands[1]);
 
 	switch (<CODE>)
 	  {
 	  case MINUS:
-	    temp = expand_simple_unop (DImode, NEG, temp, NULL_RTX, 1);
-	    operands[1] = expand_replace_address_value (CADImode, operands[1],
-							temp, NULL_RTX);
+	    operands[1] = expand_simple_unop (DImode, NEG, operands[1],
+					      NULL_RTX, 1);
 	    /* fallthru */
 	  case PLUS:
 	    names = &aarch64_ool_ldadd_names;
@@ -374,9 +372,8 @@
 	    names = &aarch64_ool_ldeor_names;
 	    break;
 	  case AND:
-	    temp = expand_simple_unop (DImode, NOT, temp, NULL_RTX, 1);
-	    operands[1] = expand_replace_address_value (CADImode, operands[1],
-							temp, NULL_RTX);
+	    operands[1] = expand_simple_unop (DImode, NOT, operands[1],
+					      NULL_RTX, 1);
 	    names = &aarch64_ool_ldclr_names;
 	    break;
 	  default:
@@ -384,7 +381,7 @@
 	  }
 	rtx func = aarch64_atomic_ool_func (CADImode, operands[2], names);
 	emit_library_call_value (func, NULL_RTX, LCT_NORMAL, CADImode,
-				 operands[1], CADImode,
+				 operands[1], DImode,
 				 XEXP (operands[0], 0), Pmode);
         DONE;
       }
@@ -420,7 +417,7 @@
 (define_insn_and_split "aarch64_atomic_<atomic_capoptab>cadi"
 [(replace_address_value:CADI (match_operand:CADI 0 "aarch64_sync_memory_operand" "+Q")
    (unspec_volatile:DI
-    [(match_operand:CADI 1 "<atomic_capop_operand>" "r<atomic_capopconst_operand>")
+    [(match_operand:DI 1 "<atomic_capop_operand>" "r<atomic_capopconst_operand>")
      (match_operand:SI 2 "const_int_operand")]
     ATOMIC_CAPOP))
   (clobber (reg:CC CC_REGNUM))
@@ -499,7 +496,7 @@
   [(replace_address_value:CADI (match_operand:CADI 0 "aarch64_sync_memory_operand" "+Q")
     (unspec_volatile:DI
       [(match_dup 0)
-       (match_operand:CADI 1 "aarch64_logical_operand" "rL")
+       (match_operand:DI 1 "aarch64_logical_operand" "rL")
        (match_operand:SI 2 "const_int_operand")]		;; model
       UNSPECV_ATOMIC_CAPABILITY_NAND))
    (clobber (reg:CC CC_REGNUM))
@@ -604,7 +601,7 @@
  [(match_operand:CADI 0 "register_operand")
   (match_operand:CADI 1 "aarch64_sync_memory_operand")
   (atomic_op:CADI
-   (match_operand:CADI 2 "<atomic_op_operand>")
+   (match_operand:DI 2 "<atomic_op_operand>")
    (match_operand:SI 3 "const_int_operand"))]
  ""
 {
@@ -615,14 +612,11 @@
     {
       gcc_assert (TARGET_CAPABILITY_FAKE);
       const atomic_ool_names *names;
-      rtx tmp = gen_reg_rtx (DImode);
       switch (<CODE>)
 	{
 	case MINUS:
-	  tmp = expand_simple_unop (DImode, NEG, drop_capability (operands[2]),
-				    NULL_RTX, 1);
-	  operands[2] = expand_replace_address_value (CADImode, operands[2],
-						      tmp, NULL_RTX);
+	  operands[2] = expand_simple_unop (DImode, NEG, operands[2],
+					    NULL_RTX, 1);
 	  /* fallthru */
 	case PLUS:
 	  names = &aarch64_ool_ldadd_names;
@@ -634,10 +628,8 @@
 	  names = &aarch64_ool_ldeor_names;
 	  break;
 	case AND:
-	  tmp = expand_simple_unop (DImode, NOT, drop_capability (operands[2]),
-				    NULL_RTX, 1);
-	  operands[2] = expand_replace_address_value (CADImode, operands[2],
-						      tmp, NULL_RTX);
+	  operands[2] = expand_simple_unop (DImode, NOT, operands[2],
+					    NULL_RTX, 1);
 	  names = &aarch64_ool_ldclr_names;
 	  break;
 	default:
@@ -645,7 +637,7 @@
 	}
       rtx func = aarch64_atomic_ool_func (CADImode, operands[3], names);
       rtx rval = emit_library_call_value (func, operands[0], LCT_NORMAL,
-					  CADImode, operands[2], CADImode,
+					  CADImode, operands[2], DImode,
 					  XEXP (operands[1], 0), Pmode);
       emit_move_insn (operands[0], rval);
       DONE;
@@ -687,7 +679,7 @@
     (match_dup 1)
     (unspec_volatile:DI
       [(match_dup 1)
-       (match_operand:CADI 2 "<atomic_capop_operand>" "r<atomic_capopconst_operand>")
+       (match_operand:DI 2 "<atomic_capop_operand>" "r<atomic_capopconst_operand>")
        (match_operand:SI 3 "const_int_operand")]		;; model
       ATOMIC_CAPOP))
    (clobber (reg:CC CC_REGNUM))
@@ -759,7 +751,7 @@
    (replace_address_value:CADI (match_dup 1)
      (unspec_volatile:DI
        [(match_dup 1)
-	(match_operand: CADI 2 "aarch64_logical_operand" "rL")
+	(match_operand:DI 2 "aarch64_logical_operand" "rL")
 	(match_operand:SI 3 "const_int_operand")]		;; model
       UNSPECV_ATOMIC_CAPABILITY_NAND))
    (clobber (reg:CC CC_REGNUM))
@@ -784,7 +776,7 @@
  [(match_operand:ALLIC 0 "register_operand")
   (atomic_op:ALLIC
    (match_operand:ALLIC 1 "aarch64_sync_memory_operand")
-   (match_operand:ALLIC 2 "<atomic_op_operand>"))
+   (match_operand:<PTR_OFF> 2 "<atomic_op_operand>"))
   (match_operand:SI 3 "const_int_operand")]
  ""
 {
@@ -794,7 +786,7 @@
        && !(TARGET_MORELLO && CAPABILITY_MODE_P (<MODE>mode)))
     {
       rtx tmp = gen_reg_rtx (<MODE>mode);
-      operands[2] = force_reg (<MODE>mode, operands[2]);
+      operands[2] = force_reg (<PTR_OFF>mode, operands[2]);
       emit_insn (gen_atomic_fetch_<atomic_optab><mode>
                  (tmp, operands[1], operands[2], operands[3]));
 
@@ -803,20 +795,17 @@
 	  switch (<CODE>)
 	    {
 	    case PLUS:
-	      tmp = expand_pointer_plus (<MODE>mode, tmp,
-					 drop_capability (operands[2]),
+	      tmp = expand_pointer_plus (<MODE>mode, tmp, operands[2],
 					 operands[0], 1, OPTAB_WIDEN);
 	      break;
 	    case MINUS:
-	      tmp = expand_pointer_minus (<MODE>mode, tmp,
-					  drop_capability (operands[2]),
+	      tmp = expand_pointer_minus (<MODE>mode, tmp, operands[2],
 					  operands[0], 1, OPTAB_WIDEN);
 	      break;
 	    default:
 	      tmp = expand_simple_binop (noncapability_mode (<MODE>mode),
 					 <CODE>, drop_capability (tmp),
-					 drop_capability (operands[2]),
-					 tmp, 1, OPTAB_WIDEN);
+					 operands[2], tmp, 1, OPTAB_WIDEN);
 	      tmp = expand_replace_address_value (as_a <scalar_addr_mode>
 						    (<MODE>mode),
 						  operands[0], tmp,
@@ -865,7 +854,7 @@
   [(replace_address_value:CADI (match_operand:CADI 0 "register_operand" "=&r")
     (unspec_volatile:DI
       [(match_operand:CADI 1 "aarch64_sync_memory_operand" "+Q")
-      (match_operand:CADI 2 "<atomic_capop_operand>" "r<atomic_capopconst_operand>")]
+      (match_operand:DI 2 "<atomic_capop_operand>" "r<atomic_capopconst_operand>")]
       ATOMIC_CAPOP))
    (set (match_dup 1)
     (unspec_volatile:CADI
@@ -915,7 +904,7 @@
   [(replace_address_value:CADI (match_operand:CADI 0 "register_operand" "=&r")
     (unspec_volatile:DI
 	[(match_operand:CADI 1 "aarch64_sync_memory_operand" "+Q")
-	 (match_operand:CADI 2 "aarch64_logical_operand" "rL")]
+	 (match_operand:DI 2 "aarch64_logical_operand" "rL")]
 	UNSPECV_ATOMIC_CAPABILITY_NAND))
    (set (match_dup 1)
     (unspec_volatile:CADI

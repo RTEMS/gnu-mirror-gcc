@@ -6776,12 +6776,13 @@ expand_expr_force_mode (tree exp, machine_mode mode)
    fetch_and_xxx form.  */
 
 static rtx
-expand_builtin_sync_operation (machine_mode mode, tree exp,
+expand_builtin_sync_operation (scalar_addr_mode mode, tree exp,
 			       enum rtx_code code, bool after,
 			       rtx target)
 {
   rtx val, mem;
   location_t loc = EXPR_LOCATION (exp);
+  auto op_mode = offset_mode (mode);
 
   if (code == NOT && warn_sync_nand)
     {
@@ -6817,7 +6818,7 @@ expand_builtin_sync_operation (machine_mode mode, tree exp,
 
   /* Expand the operands.  */
   mem = get_builtin_sync_mem (CALL_EXPR_ARG (exp, 0), mode);
-  val = expand_expr_force_mode (CALL_EXPR_ARG (exp, 1), mode);
+  val = expand_expr_force_mode (CALL_EXPR_ARG (exp, 1), op_mode);
 
   return expand_atomic_fetch_op (target, mem, val, code, MEMMODEL_SYNC_SEQ_CST,
 				 after);
@@ -7229,7 +7230,7 @@ expand_builtin_atomic_store (machine_mode mode, tree exp)
    resolved to an instruction sequence.  */
 
 static rtx
-expand_builtin_atomic_fetch_op (machine_mode mode, tree exp, rtx target,
+expand_builtin_atomic_fetch_op (scalar_addr_mode mode, tree exp, rtx target,
 				enum rtx_code code, bool fetch_after,
 				bool ignore, enum built_in_function ext_call)
 {
@@ -7238,11 +7239,13 @@ expand_builtin_atomic_fetch_op (machine_mode mode, tree exp, rtx target,
   tree fndecl;
   tree addr;
 
+  auto op_mode = offset_mode (mode);
+
   model = get_memmodel (CALL_EXPR_ARG (exp, 2));
 
   /* Expand the operands.  */
   mem = get_builtin_sync_mem (CALL_EXPR_ARG (exp, 0), mode);
-  val = expand_expr_force_mode (CALL_EXPR_ARG (exp, 1), mode);
+  val = expand_expr_force_mode (CALL_EXPR_ARG (exp, 1), op_mode);
 
   /* Only try generating instructions if inlining is turned on.  */
   if (flag_inline_atomics)
@@ -8639,88 +8642,120 @@ expand_builtin (tree exp, rtx target, rtx subtarget, machine_mode mode,
       break;
 
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_SYNC_FETCH_AND_ADD):
-      mode = builtin_sync_mode (BUILT_IN_SYNC_FETCH_AND_ADD_N, fcode);
-      target = expand_builtin_sync_operation (mode, exp, PLUS, false, target);
-      if (target)
-	return target;
-      break;
+      {
+	auto smode = builtin_sync_mode (BUILT_IN_SYNC_FETCH_AND_ADD_N, fcode);
+	target = expand_builtin_sync_operation (smode, exp, PLUS,
+						false, target);
+	if (target)
+	  return target;
+	break;
+      }
 
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_SYNC_FETCH_AND_SUB):
-      mode = builtin_sync_mode (BUILT_IN_SYNC_FETCH_AND_SUB_N, fcode);
-      target = expand_builtin_sync_operation (mode, exp, MINUS, false, target);
-      if (target)
-	return target;
-      break;
+      {
+	auto smode = builtin_sync_mode (BUILT_IN_SYNC_FETCH_AND_SUB_N, fcode);
+	target = expand_builtin_sync_operation (smode, exp, MINUS,
+						false, target);
+	if (target)
+	  return target;
+	break;
+      }
 
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_SYNC_FETCH_AND_OR):
-      mode = builtin_sync_mode (BUILT_IN_SYNC_FETCH_AND_OR_N, fcode);
-      target = expand_builtin_sync_operation (mode, exp, IOR, false, target);
-      if (target)
-	return target;
-      break;
+      {
+	auto smode = builtin_sync_mode (BUILT_IN_SYNC_FETCH_AND_OR_N, fcode);
+	target = expand_builtin_sync_operation (smode, exp, IOR,
+						false, target);
+	if (target)
+	  return target;
+	break;
+      }
 
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_SYNC_FETCH_AND_AND):
-      mode = builtin_sync_mode (BUILT_IN_SYNC_FETCH_AND_AND_N, fcode);
-      target = expand_builtin_sync_operation (mode, exp, AND, false, target);
-      if (target)
-	return target;
-      break;
+      {
+	auto smode = builtin_sync_mode (BUILT_IN_SYNC_FETCH_AND_AND_N, fcode);
+	target = expand_builtin_sync_operation (smode, exp, AND,
+						false, target);
+	if (target)
+	  return target;
+	break;
+      }
 
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_SYNC_FETCH_AND_XOR):
-      mode = builtin_sync_mode (BUILT_IN_SYNC_FETCH_AND_XOR_N, fcode);
-      target = expand_builtin_sync_operation (mode, exp, XOR, false, target);
-      if (target)
-	return target;
-      break;
+      {
+	auto smode = builtin_sync_mode (BUILT_IN_SYNC_FETCH_AND_XOR_N, fcode);
+	target = expand_builtin_sync_operation (smode, exp, XOR,
+						false, target);
+	if (target)
+	  return target;
+	break;
+      }
 
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_SYNC_FETCH_AND_NAND):
-      mode = builtin_sync_mode (BUILT_IN_SYNC_FETCH_AND_NAND_N, fcode);
-      target = expand_builtin_sync_operation (mode, exp, NOT, false, target);
-      if (target)
-	return target;
-      break;
+      {
+	auto smode = builtin_sync_mode (BUILT_IN_SYNC_FETCH_AND_NAND_N, fcode);
+	target = expand_builtin_sync_operation (smode, exp, NOT,
+						false, target);
+	if (target)
+	  return target;
+	break;
+      }
 
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_SYNC_ADD_AND_FETCH):
-      mode = builtin_sync_mode (BUILT_IN_SYNC_ADD_AND_FETCH_N, fcode);
-      target = expand_builtin_sync_operation (mode, exp, PLUS, true, target);
-      if (target)
-	return target;
-      break;
+      {
+	auto smode = builtin_sync_mode (BUILT_IN_SYNC_ADD_AND_FETCH_N, fcode);
+	target = expand_builtin_sync_operation (smode, exp, PLUS,
+						true, target);
+	if (target)
+	  return target;
+	break;
+      }
 
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_SYNC_SUB_AND_FETCH):
-      mode = builtin_sync_mode (BUILT_IN_SYNC_SUB_AND_FETCH_N, fcode);
-      target = expand_builtin_sync_operation (mode, exp, MINUS, true, target);
-      if (target)
-	return target;
-      break;
+      {
+	auto smode = builtin_sync_mode (BUILT_IN_SYNC_SUB_AND_FETCH_N, fcode);
+	target = expand_builtin_sync_operation (smode, exp, MINUS,
+						true, target);
+	if (target)
+	  return target;
+	break;
+      }
 
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_SYNC_OR_AND_FETCH):
-      mode = builtin_sync_mode (BUILT_IN_SYNC_OR_AND_FETCH_N, fcode);
-      target = expand_builtin_sync_operation (mode, exp, IOR, true, target);
-      if (target)
-	return target;
-      break;
+      {
+	auto smode = builtin_sync_mode (BUILT_IN_SYNC_OR_AND_FETCH_N, fcode);
+	target = expand_builtin_sync_operation (smode, exp, IOR, true, target);
+	if (target)
+	  return target;
+	break;
+      }
 
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_SYNC_AND_AND_FETCH):
-      mode = builtin_sync_mode (BUILT_IN_SYNC_AND_AND_FETCH_N, fcode);
-      target = expand_builtin_sync_operation (mode, exp, AND, true, target);
-      if (target)
-	return target;
-      break;
+      {
+	auto smode = builtin_sync_mode (BUILT_IN_SYNC_AND_AND_FETCH_N, fcode);
+	target = expand_builtin_sync_operation (smode, exp, AND, true, target);
+	if (target)
+	  return target;
+	break;
+      }
 
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_SYNC_XOR_AND_FETCH):
-      mode = builtin_sync_mode (BUILT_IN_SYNC_XOR_AND_FETCH_N, fcode);
-      target = expand_builtin_sync_operation (mode, exp, XOR, true, target);
-      if (target)
-	return target;
-      break;
+      {
+	auto smode = builtin_sync_mode (BUILT_IN_SYNC_XOR_AND_FETCH_N, fcode);
+	target = expand_builtin_sync_operation (smode, exp, XOR, true, target);
+	if (target)
+	  return target;
+	break;
+      }
 
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_SYNC_NAND_AND_FETCH):
-      mode = builtin_sync_mode (BUILT_IN_SYNC_NAND_AND_FETCH_N, fcode);
-      target = expand_builtin_sync_operation (mode, exp, NOT, true, target);
-      if (target)
-	return target;
-      break;
+      {
+	auto smode = builtin_sync_mode (BUILT_IN_SYNC_NAND_AND_FETCH_N, fcode);
+	target = expand_builtin_sync_operation (smode, exp, NOT, true, target);
+	if (target)
+	  return target;
+	break;
+      }
 
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_SYNC_BOOL_COMPARE_AND_SWAP):
       if (mode == VOIDmode)
@@ -8801,12 +8836,12 @@ expand_builtin (tree exp, rtx target, rtx subtarget, machine_mode mode,
 
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_ATOMIC_ADD_FETCH):
       {
-	mode = builtin_sync_mode (BUILT_IN_ATOMIC_ADD_FETCH_N, fcode);
+	auto smode = builtin_sync_mode (BUILT_IN_ATOMIC_ADD_FETCH_N, fcode);
 	enum built_in_function lib;
 	lib = (enum built_in_function)((int)BUILT_IN_ATOMIC_FETCH_ADD_1 + 
 				       (fcode - BUILT_IN_ATOMIC_ADD_FETCH_1));
-	target = expand_builtin_atomic_fetch_op (mode, exp, target, PLUS, true,
-						 ignore, lib);
+	target = expand_builtin_atomic_fetch_op (smode, exp, target, PLUS,
+						 true, ignore, lib);
 	if (target)
 	  return target;
 	break;
@@ -8814,11 +8849,11 @@ expand_builtin (tree exp, rtx target, rtx subtarget, machine_mode mode,
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_ATOMIC_SUB_FETCH):
       {
 	enum built_in_function lib;
-	mode = builtin_sync_mode (BUILT_IN_ATOMIC_SUB_FETCH_N, fcode);
+	auto smode = builtin_sync_mode (BUILT_IN_ATOMIC_SUB_FETCH_N, fcode);
 	lib = (enum built_in_function)((int)BUILT_IN_ATOMIC_FETCH_SUB_1 + 
 				       (fcode - BUILT_IN_ATOMIC_SUB_FETCH_1));
-	target = expand_builtin_atomic_fetch_op (mode, exp, target, MINUS, true,
-						 ignore, lib);
+	target = expand_builtin_atomic_fetch_op (smode, exp, target, MINUS,
+						 true, ignore, lib);
 	if (target)
 	  return target;
 	break;
@@ -8826,11 +8861,11 @@ expand_builtin (tree exp, rtx target, rtx subtarget, machine_mode mode,
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_ATOMIC_AND_FETCH):
       {
 	enum built_in_function lib;
-	mode = builtin_sync_mode (BUILT_IN_ATOMIC_AND_FETCH_N, fcode);
+	auto smode = builtin_sync_mode (BUILT_IN_ATOMIC_AND_FETCH_N, fcode);
 	lib = (enum built_in_function)((int)BUILT_IN_ATOMIC_FETCH_AND_1 + 
 				       (fcode - BUILT_IN_ATOMIC_AND_FETCH_1));
-	target = expand_builtin_atomic_fetch_op (mode, exp, target, AND, true,
-						 ignore, lib);
+	target = expand_builtin_atomic_fetch_op (smode, exp, target, AND,
+						 true, ignore, lib);
 	if (target)
 	  return target;
 	break;
@@ -8838,11 +8873,11 @@ expand_builtin (tree exp, rtx target, rtx subtarget, machine_mode mode,
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_ATOMIC_NAND_FETCH):
       {
 	enum built_in_function lib;
-	mode = builtin_sync_mode (BUILT_IN_ATOMIC_NAND_FETCH_N, fcode);
+	auto smode = builtin_sync_mode (BUILT_IN_ATOMIC_NAND_FETCH_N, fcode);
 	lib = (enum built_in_function)((int)BUILT_IN_ATOMIC_FETCH_NAND_1 + 
 				       (fcode - BUILT_IN_ATOMIC_NAND_FETCH_1));
-	target = expand_builtin_atomic_fetch_op (mode, exp, target, NOT, true,
-						 ignore, lib);
+	target = expand_builtin_atomic_fetch_op (smode, exp, target, NOT,
+						 true, ignore, lib);
 	if (target)
 	  return target;
 	break;
@@ -8850,11 +8885,11 @@ expand_builtin (tree exp, rtx target, rtx subtarget, machine_mode mode,
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_ATOMIC_XOR_FETCH):
       {
 	enum built_in_function lib;
-	mode = builtin_sync_mode (BUILT_IN_ATOMIC_XOR_FETCH_N, fcode);
+	auto smode = builtin_sync_mode (BUILT_IN_ATOMIC_XOR_FETCH_N, fcode);
 	lib = (enum built_in_function)((int)BUILT_IN_ATOMIC_FETCH_XOR_1 + 
 				       (fcode - BUILT_IN_ATOMIC_XOR_FETCH_1));
-	target = expand_builtin_atomic_fetch_op (mode, exp, target, XOR, true,
-						 ignore, lib);
+	target = expand_builtin_atomic_fetch_op (smode, exp, target, XOR,
+						 true, ignore, lib);
 	if (target)
 	  return target;
 	break;
@@ -8862,62 +8897,74 @@ expand_builtin (tree exp, rtx target, rtx subtarget, machine_mode mode,
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_ATOMIC_OR_FETCH):
       {
 	enum built_in_function lib;
-	mode = builtin_sync_mode (BUILT_IN_ATOMIC_OR_FETCH_N, fcode);
+	auto smode = builtin_sync_mode (BUILT_IN_ATOMIC_OR_FETCH_N, fcode);
 	lib = (enum built_in_function)((int)BUILT_IN_ATOMIC_FETCH_OR_1 + 
 				       (fcode - BUILT_IN_ATOMIC_OR_FETCH_1));
-	target = expand_builtin_atomic_fetch_op (mode, exp, target, IOR, true,
-						 ignore, lib);
+	target = expand_builtin_atomic_fetch_op (smode, exp, target, IOR,
+						 true, ignore, lib);
 	if (target)
 	  return target;
 	break;
       }
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_ATOMIC_FETCH_ADD):
-      mode = builtin_sync_mode (BUILT_IN_ATOMIC_FETCH_ADD_N, fcode);
-      target = expand_builtin_atomic_fetch_op (mode, exp, target, PLUS, false,
-					       ignore, BUILT_IN_NONE);
-      if (target)
-	return target;
-      break;
+      {
+	auto smode = builtin_sync_mode (BUILT_IN_ATOMIC_FETCH_ADD_N, fcode);
+	target = expand_builtin_atomic_fetch_op (smode, exp, target, PLUS,
+						 false, ignore, BUILT_IN_NONE);
+	if (target)
+	  return target;
+	break;
+      }
 
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_ATOMIC_FETCH_SUB):
-      mode = builtin_sync_mode (BUILT_IN_ATOMIC_FETCH_SUB_N, fcode);
-      target = expand_builtin_atomic_fetch_op (mode, exp, target, MINUS, false,
-					       ignore, BUILT_IN_NONE);
-      if (target)
-	return target;
-      break;
+      {
+	auto smode = builtin_sync_mode (BUILT_IN_ATOMIC_FETCH_SUB_N, fcode);
+	target = expand_builtin_atomic_fetch_op (smode, exp, target, MINUS,
+						 false, ignore, BUILT_IN_NONE);
+	if (target)
+	  return target;
+	break;
+      }
 
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_ATOMIC_FETCH_AND):
-      mode = builtin_sync_mode (BUILT_IN_ATOMIC_FETCH_AND_N, fcode);
-      target = expand_builtin_atomic_fetch_op (mode, exp, target, AND, false,
-					       ignore, BUILT_IN_NONE);
-      if (target)
-	return target;
-      break;
+      {
+	auto smode = builtin_sync_mode (BUILT_IN_ATOMIC_FETCH_AND_N, fcode);
+	target = expand_builtin_atomic_fetch_op (smode, exp, target, AND,
+						 false, ignore, BUILT_IN_NONE);
+	if (target)
+	  return target;
+	break;
+      }
   
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_ATOMIC_FETCH_NAND):
-      mode = builtin_sync_mode (BUILT_IN_ATOMIC_FETCH_NAND_N, fcode);
-      target = expand_builtin_atomic_fetch_op (mode, exp, target, NOT, false,
-					       ignore, BUILT_IN_NONE);
-      if (target)
-	return target;
-      break;
+      {
+	auto smode = builtin_sync_mode (BUILT_IN_ATOMIC_FETCH_NAND_N, fcode);
+	target = expand_builtin_atomic_fetch_op (smode, exp, target, NOT,
+						 false, ignore, BUILT_IN_NONE);
+	if (target)
+	  return target;
+	break;
+      }
  
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_ATOMIC_FETCH_XOR):
-      mode = builtin_sync_mode (BUILT_IN_ATOMIC_FETCH_XOR_N, fcode);
-      target = expand_builtin_atomic_fetch_op (mode, exp, target, XOR, false,
-					       ignore, BUILT_IN_NONE);
-      if (target)
-	return target;
-      break;
+      {
+	auto smode = builtin_sync_mode (BUILT_IN_ATOMIC_FETCH_XOR_N, fcode);
+	target = expand_builtin_atomic_fetch_op (smode, exp, target, XOR,
+						 false, ignore, BUILT_IN_NONE);
+	if (target)
+	  return target;
+	break;
+      }
  
     CASE_SYNC_BUILTIN_ALL_N (BUILT_IN_ATOMIC_FETCH_OR):
-      mode = builtin_sync_mode (BUILT_IN_ATOMIC_FETCH_OR_N, fcode);
-      target = expand_builtin_atomic_fetch_op (mode, exp, target, IOR, false,
-					       ignore, BUILT_IN_NONE);
-      if (target)
-	return target;
-      break;
+      {
+	auto smode = builtin_sync_mode (BUILT_IN_ATOMIC_FETCH_OR_N, fcode);
+	target = expand_builtin_atomic_fetch_op (smode, exp, target, IOR,
+						 false, ignore, BUILT_IN_NONE);
+	if (target)
+	  return target;
+	break;
+      }
 
     case BUILT_IN_ATOMIC_TEST_AND_SET:
       return expand_builtin_atomic_test_and_set (exp, target);

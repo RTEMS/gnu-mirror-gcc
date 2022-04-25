@@ -6839,7 +6839,8 @@ maybe_optimize_fetch_op (rtx target, rtx mem, rtx val, enum rtx_code code,
 {
   /* If the value is prefetched, or not used, it may be possible to replace
      the sequence with a native exchange operation.  */
-  if (!after || target == const0_rtx)
+  if ((!after || target == const0_rtx)
+      && !CAPABILITY_MODE_P (GET_MODE (mem)))
     {
       /* fetch_and (&x, 0, m) can be replaced with exchange (&x, 0, m).  */
       if (code == AND && val == const0_rtx)
@@ -6874,7 +6875,8 @@ static rtx
 maybe_emit_op (const struct atomic_op_functions *optab, rtx target, rtx mem,
 	       rtx val, bool use_memmodel, enum memmodel model, bool after)
 {
-  machine_mode mode = GET_MODE (mem);
+  auto mode = as_a<scalar_addr_mode> (GET_MODE (mem));
+  auto op_mode = offset_mode (mode);
   class expand_operand ops[4];
   enum insn_code icode;
   int op_counter = 0;
@@ -6918,7 +6920,7 @@ maybe_emit_op (const struct atomic_op_functions *optab, rtx target, rtx mem,
 
   create_fixed_operand (&ops[op_counter++], mem);
   /* VAL may have been promoted to a wider mode.  Shrink it if so.  */
-  create_convert_operand_to (&ops[op_counter++], val, mode, true);
+  create_convert_operand_to (&ops[op_counter++], val, op_mode, true);
 
   if (maybe_expand_insn (icode, num_ops, ops))
     return (target == const0_rtx ? const0_rtx : ops[0].value);
@@ -6944,7 +6946,8 @@ expand_atomic_fetch_op_no_fallback (rtx target, rtx mem, rtx val,
 				    enum rtx_code code, enum memmodel model,
 				    bool after)
 {
-  machine_mode mode = GET_MODE (mem);
+  auto mode = as_a<scalar_addr_mode> (GET_MODE (mem));
+  auto op_mode = offset_mode (mode);
   struct atomic_op_functions optab;
   rtx result;
   bool unused_result = (target == const0_rtx);
@@ -7002,15 +7005,30 @@ expand_atomic_fetch_op_no_fallback (rtx target, rtx mem, rtx val,
 	     Fetch_before == after REVERSE_OP val.  */
 	  if (!after)
 	    code = optab.reverse_code;
-	  if (code == NOT)
-	    {
-	      result = expand_simple_binop (mode, AND, result, val, NULL_RTX,
-					    true, OPTAB_LIB_WIDEN);
-	      result = expand_simple_unop (mode, NOT, result, target, true);
-	    }
-	  else
-	    result = expand_simple_binop (mode, code, result, val, target,
+
+	  if (CAPABILITY_MODE_P (mode) && code == PLUS)
+	    result = expand_pointer_plus (mode, result, val, target,
 					  true, OPTAB_LIB_WIDEN);
+	  else
+	    {
+	      rtx initial = result;
+	      rtx subtarget = mode == op_mode ? target : NULL_RTX;
+	      if (code == NOT)
+		{
+		  result = expand_simple_binop (op_mode, AND, result, val,
+						NULL_RTX, true,
+						OPTAB_LIB_WIDEN);
+		  result = expand_simple_unop (mode, NOT, result,
+					       subtarget, true);
+		}
+	      else
+		result = expand_simple_binop (op_mode, code, result, val,
+					      subtarget, true,
+					      OPTAB_LIB_WIDEN);
+	      if (mode != op_mode)
+		result = expand_replace_address_value (mode, initial,
+						       result, target);
+	    }
 	  return result;
 	}
     }

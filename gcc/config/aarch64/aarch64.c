@@ -21035,7 +21035,7 @@ aarch64_split_atomic_op (enum rtx_code code, rtx old_out, rtx new_out, rtx mem,
   /* Split after prolog/epilog to avoid interactions with shrinkwrapping.  */
   gcc_assert (epilogue_completed);
 
-  machine_mode mode = GET_MODE (mem);
+  auto mode = as_a<scalar_addr_mode> (GET_MODE (mem));
   machine_mode arith_mode, subreg_mode;
   switch (mode)
     {
@@ -21067,74 +21067,74 @@ aarch64_split_atomic_op (enum rtx_code code, rtx old_out, rtx new_out, rtx mem,
     old_out = gen_lowpart (subreg_mode, old_out);
   else
     old_out = new_out;
-  value = simplify_gen_subreg (subreg_mode, value, mode, 0);
 
   /* The initial load can be relaxed for a __sync operation since a final
      barrier will be emitted to stop code hoisting.  */
- if (is_sync)
+  if (is_sync)
     aarch64_emit_load_exclusive (mode, old_out, mem,
 				 GEN_INT (MEMMODEL_RELAXED));
   else
     aarch64_emit_load_exclusive (mode, old_out, mem, model_rtx);
 
-  switch (code)
+  if (code == SET)
+    new_out = value;
+  else
     {
-    case SET:
-	new_out = value;
-      break;
+      value = simplify_gen_subreg (arith_mode, value, offset_mode (mode), 0);
+      switch (code)
+	{
+	case NOT:
+	  if (CAPABILITY_MODE_P (mode))
+	    {
+	      /* For Morello we require a temporary DImode register so that we can
+	      then REPLACE_ADDRESS_VALUE the OP result into new_out.  */
+	      x = gen_rtx_AND (arith_mode, drop_capability (old_out), value);
+	      emit_insn (gen_rtx_SET (tmp_reg, x));
+	      x = gen_rtx_NOT (arith_mode, tmp_reg);
+	      emit_insn (gen_rtx_SET (tmp_reg, x));
+	      emit_insn (gen_replace_address_value_cadi (new_out, old_out,
+							 tmp_reg));
+	    }
+	  else
+	    {
+	      x = gen_rtx_AND (arith_mode, old_out, value);
+	      emit_insn (gen_rtx_SET (new_out, x));
+	      x = gen_rtx_NOT (arith_mode, new_out);
+	      emit_insn (gen_rtx_SET (new_out, x));
+	    }
+	  break;
 
-    case NOT:
-      value = drop_capability (value);
-      if (CAPABILITY_MODE_P (mode))
-	{
-	  /* For Morello we require a temporary DImode register so that we can
-	  then REPLACE_ADDRESS_VALUE the OP result into new_out.  */
-	  x = gen_rtx_AND (arith_mode, drop_capability (old_out), value);
-	  emit_insn (gen_rtx_SET (tmp_reg, x));
-	  x = gen_rtx_NOT (arith_mode, tmp_reg);
-	  emit_insn (gen_rtx_SET (tmp_reg, x));
-	  emit_insn (gen_replace_address_value_cadi (new_out, old_out,
-						     tmp_reg));
+	case MINUS:
+	  if (CONST_INT_P (value))
+	    {
+	      value = GEN_INT (-INTVAL (value));
+	      code = PLUS;
+	    }
+	  /* Fall through.  */
+	default:
+	  if (CAPABILITY_MODE_P (mode) && code == PLUS)
+	    emit_insn (gen_pointer_plus_cadi (new_out, old_out, value));
+	  else if (CAPABILITY_MODE_P (mode))
+	    {
+	      /* For Morello we require a temporary DImode register so that we can
+	      then REPLACE_ADDRESS_VALUE the OP result into new_out.  */
+	      x = gen_rtx_fmt_ee (code, arith_mode, drop_capability (old_out),
+				  value);
+	      emit_insn (gen_rtx_SET (tmp_reg, x));
+	      emit_insn (gen_replace_address_value_cadi (new_out, old_out,
+							 tmp_reg));
+	    }
+	  else
+	    {
+	      x = gen_rtx_fmt_ee (code, arith_mode, old_out, value);
+	      emit_insn (gen_rtx_SET (new_out, x));
+	    }
+	    break;
 	}
-      else
-	{
-	  x = gen_rtx_AND (arith_mode, old_out, value);
-	  emit_insn (gen_rtx_SET (new_out, x));
-	  x = gen_rtx_NOT (arith_mode, new_out);
-	  emit_insn (gen_rtx_SET (new_out, x));
-	}
-      break;
-
-    case MINUS:
-      value = drop_capability (value);
-      if (CONST_INT_P (value))
-	{
-	  value = GEN_INT (-INTVAL (value));
-	  code = PLUS;
-	}
-      /* Fall through.  */
-    default:
-      value = drop_capability (value);
-      if (CAPABILITY_MODE_P (mode))
-	{
-	  /* For Morello we require a temporary DImode register so that we can
-	  then REPLACE_ADDRESS_VALUE the OP result into new_out.  */
-	  x = gen_rtx_fmt_ee (code, arith_mode, drop_capability (old_out),
-			      value);
-	  emit_insn (gen_rtx_SET (tmp_reg, x));
-	  emit_insn (gen_replace_address_value_cadi (new_out, old_out,
-						     tmp_reg));
-	}
-      else
-	{
-	  x = gen_rtx_fmt_ee (code, arith_mode, old_out, value);
-	  emit_insn (gen_rtx_SET (new_out, x));
-	}
-	break;
+      new_out = gen_lowpart (mode, new_out);
     }
 
-  aarch64_emit_store_exclusive (mode, cond, mem,
-				gen_lowpart (mode, new_out), model_rtx);
+  aarch64_emit_store_exclusive (mode, cond, mem, new_out, model_rtx);
 
   if (aarch64_track_speculation)
     {
