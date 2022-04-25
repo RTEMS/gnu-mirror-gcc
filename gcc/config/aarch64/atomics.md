@@ -942,6 +942,21 @@
   }
 )
 
+(define_expand "atomic_storeti"
+  [(set (match_operand:TI 0 "aarch64_rcpc_memory_operand")
+	(unspec_volatile:TI
+	  [(match_operand:TI 1 "const0_operand")
+	   (match_operand:SI 2 "const_int_operand")]		;; model
+	  UNSPECV_STL))]
+  "TARGET_MORELLO"
+  {
+    operands[0] = adjust_address (operands[0], CADImode, 0);
+    emit_insn (gen_atomic_storecadi (operands[0], CONST0_RTX (CADImode),
+				     operands[2]));
+    DONE;
+  }
+)
+
 (define_insn "atomic_store<mode>"
   [(set (match_operand:ALLIC 0 "aarch64_rcpc_memory_operand" "=Q,Ust")
     (unspec_volatile:ALLIC
