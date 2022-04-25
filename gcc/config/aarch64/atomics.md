@@ -926,19 +926,45 @@
   }
 )
 
-(define_insn "atomic_load<mode>"
-  [(set (match_operand:ALLIC 0 "register_operand" "=r")
+(define_expand "atomic_load<mode>"
+  [(set (match_operand:ALLIC 0 "register_operand")
     (unspec_volatile:ALLIC
-      [(match_operand:ALLIC 1 "aarch64_sync_memory_operand" "Q")
+      [(match_operand:ALLIC 1 "aarch64_atomic_load_memory_operand")
        (match_operand:SI 2 "const_int_operand")]			;; model
       UNSPECV_LDA))]
   ""
+  {
+    if (!aarch64_atomic_load_store_ok_p (operands[1], operands[2]))
+      FAIL;
+  }
+)
+
+(define_insn "*atomic_load<mode>"
+  [(set (match_operand:ALLIC 0 "register_operand" "=r")
+    (unspec_volatile:ALLIC
+      [(match_operand:ALLIC 1 "aarch64_atomic_load_memory_operand" "Q")
+       (match_operand:SI 2 "const_int_operand")]			;; model
+      UNSPECV_LDA))]
+  "aarch64_atomic_load_store_ok_p (operands[1], operands[2])"
   {
     enum memmodel model = memmodel_from_int (INTVAL (operands[2]));
     if (is_mm_relaxed (model) || is_mm_consume (model) || is_mm_release (model))
       return "ldr<atomic_sfx>\t%<w>0, %1";
     else
       return "ldar<atomic_sfx>\t%<w>0, %1";
+  }
+)
+
+(define_expand "atomic_store<mode>"
+  [(set (match_operand:ALLIC 0 "aarch64_rcpc_memory_operand")
+    (unspec_volatile:ALLIC
+      [(match_operand:ALLIC 1 "general_operand")
+       (match_operand:SI 2 "const_int_operand")]			;; model
+      UNSPECV_STL))]
+  ""
+  {
+    if (!aarch64_atomic_load_store_ok_p (operands[0], operands[2]))
+      FAIL;
   }
 )
 
@@ -957,13 +983,13 @@
   }
 )
 
-(define_insn "atomic_store<mode>"
+(define_insn "*atomic_store<mode>"
   [(set (match_operand:ALLIC 0 "aarch64_rcpc_memory_operand" "=Q,Ust")
     (unspec_volatile:ALLIC
       [(match_operand:ALLIC 1 "general_operand" "rZ,rZ")
        (match_operand:SI 2 "const_int_operand")]			;; model
       UNSPECV_STL))]
-  ""
+  "aarch64_atomic_load_store_ok_p (operands[0], operands[2])"
   {
     gcc_assert (which_alternative == 0 || <MODE>mode != CADImode
 		|| TARGET_CAPABILITY_FAKE);

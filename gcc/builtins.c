@@ -6649,7 +6649,7 @@ builtin_sync_code (built_in_function base_code, int dsize)
   /* The capability entry comes after the numerical ones.  */
   if (dsize == SYNC_ICAP)
     dsize = 32;
-  return (built_in_function) ((int) base_code + exact_log2 (dsize) + 1);
+  return (built_in_function) ((int) base_code + exact_log2 (dsize) * 2 + 1);
 }
 
 /* BASE_CODE is an overloaded BUILT_IN_*_N function defined in
@@ -6659,7 +6659,7 @@ builtin_sync_code (built_in_function base_code, int dsize)
 sync_dsize
 builtin_sync_dsize (built_in_function base_code, built_in_function code)
 {
-  int nbytes_log2 = (int) code - (int) base_code - 1;
+  int nbytes_log2 = ((int) code - (int) base_code - 1) / 2;
   gcc_assert (nbytes_log2 >= 0 && nbytes_log2 <= 5);
   if (nbytes_log2 == 5)
     return SYNC_ICAP;
@@ -7259,7 +7259,6 @@ expand_builtin_atomic_fetch_op (scalar_addr_mode mode, tree exp, rtx target,
   if (ext_call == BUILT_IN_NONE)
     return NULL_RTX;
 
-  gcc_assert (!CAPABILITY_MODE_P (mode));
   /* Change the call to the specified function.  */
   fndecl = get_callee_fndecl (exp);
   addr = CALL_EXPR_FN (exp);
@@ -7275,23 +7274,33 @@ expand_builtin_atomic_fetch_op (scalar_addr_mode mode, tree exp, rtx target,
     CALL_EXPR_TAILCALL (exp) = 0;
 
   /* Expand the call here so we can emit trailing code.  */
-  ret = expand_call (exp, target, ignore);
+  rtx fetched = expand_call (exp, target, ignore);
 
   /* Replace the original function just in case it matters.  */
   TREE_OPERAND (addr, 0) = fndecl;
 
   /* Then issue the arithmetic correction to return the right result.  */
-  if (!ignore)
+  if (ignore)
+    ret = fetched;
+  else if (CAPABILITY_MODE_P (mode) && code == PLUS)
+    ret = expand_pointer_plus (mode, fetched, val, target,
+			       true, OPTAB_LIB_WIDEN);
+  else
     {
+      rtx subtarget = mode == op_mode ? target : NULL_RTX;
       if (code == NOT)
 	{
-	  ret = expand_simple_binop (mode, AND, ret, val, NULL_RTX, true,
-				     OPTAB_LIB_WIDEN);
-	  ret = expand_simple_unop (mode, NOT, ret, target, true);
+	  ret = expand_simple_binop (op_mode, AND,
+				     drop_capability (fetched), val,
+				     NULL_RTX, true, OPTAB_LIB_WIDEN);
+	  ret = expand_simple_unop (op_mode, NOT, ret, subtarget, true);
 	}
       else
-	ret = expand_simple_binop (mode, code, ret, val, target, true,
-				   OPTAB_LIB_WIDEN);
+	ret = expand_simple_binop (op_mode, code,
+				   drop_capability (fetched), val,
+				   subtarget, true, OPTAB_LIB_WIDEN);
+      if (mode != op_mode)
+	ret = expand_replace_address_value (mode, fetched, ret, target);
     }
   return ret;
 }

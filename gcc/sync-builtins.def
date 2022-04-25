@@ -37,6 +37,11 @@ along with GCC; see the file COPYING3.  If not see
    DOFF is the non-capability form of DSIZE, so that DOFF is ICAPOFF
    when DSIZE is ICAP.  */
 
+/* Like DEF_SYNC_BUILTIN, but define capability and non-capability forms.  */
+#define DEF_SYNC_BUILTIN_C(ENUM, NAME, TYPE, ATTRS) \
+  DEF_SYNC_BUILTIN (ENUM, NAME, TYPE, ATTRS) \
+  DEF_SYNC_BUILTIN (ENUM ## _C, NAME "_c", TYPE ## _C, ATTRS)
+
 /* Generate DSIZE-specific functions for ENUM and NAME by invoking:
 
      DEF (ENUM', NAME', DSIZE, DOFF)
@@ -58,15 +63,21 @@ along with GCC; see the file COPYING3.  If not see
 /* Case statements for everything defined by FOR_NONCAP_SYNC_N.  */
 #define CASE_SYNC_BUILTIN_NONCAP_N(ENUM) \
   case ENUM##_1: \
+  case ENUM##_1_C: \
   case ENUM##_2: \
+  case ENUM##_2_C: \
   case ENUM##_4: \
+  case ENUM##_4_C: \
   case ENUM##_8: \
-  case ENUM##_16
+  case ENUM##_8_C: \
+  case ENUM##_16: \
+  case ENUM##_16_C
 
 /* Case statements for everything defined by FOR_ALL_SYNC_N.  */
 #define CASE_SYNC_BUILTIN_ALL_N(ENUM) \
   CASE_SYNC_BUILTIN_NONCAP_N (ENUM): \
-  case ENUM##_CAPABILITY
+  case ENUM##_CAPABILITY: \
+  case ENUM##_CAPABILITY_C
 
 /* The macros below operate in pairs.  The first macro defines functions
    for a particular DSIZE and the second macro defines the following:
@@ -78,11 +89,17 @@ along with GCC; see the file COPYING3.  If not see
 
    - BUILT_IN_SYNC_FETCH_AND_ADD_N
    - BUILT_IN_SYNC_FETCH_AND_ADD_1
+   - BUILT_IN_SYNC_FETCH_AND_ADD_1_C
    - BUILT_IN_SYNC_FETCH_AND_ADD_2
+   - BUILT_IN_SYNC_FETCH_AND_ADD_2_C
    - BUILT_IN_SYNC_FETCH_AND_ADD_4
+   - BUILT_IN_SYNC_FETCH_AND_ADD_4_C
    - BUILT_IN_SYNC_FETCH_AND_ADD_8
+   - BUILT_IN_SYNC_FETCH_AND_ADD_8_C
    - BUILT_IN_SYNC_FETCH_AND_ADD_16
+   - BUILT_IN_SYNC_FETCH_AND_ADD_16_C
    - BUILT_IN_SYNC_FETCH_AND_ADD_CAPABILITY
+   - BUILT_IN_SYNC_FETCH_AND_ADD_CAPABILITY_C
 
    although not all functions have a CAPABILITY form.
 
@@ -92,8 +109,8 @@ along with GCC; see the file COPYING3.  If not see
    and code outside the front ends uses it for that purpose.
 
    Various bits of code rely on the relationship between the enum values.
-   For example, adding log2(nbytes) + 1 to an _N function gives (and must
-   give) the associated DSIZE function.
+   For example, adding log2(nbytes) * 2 + 1 to an _N function gives
+   (and must give) the associated DSIZE function.
 
    For historical reasons, the functions are inconsistent in whether
    the _N function has an "_n" suffix or has no suffix.  For example,
@@ -104,8 +121,8 @@ along with GCC; see the file COPYING3.  If not see
 /* DSIZE NAME (volatile void *ptr, DSIZE val).  */
 
 #define DEF_SYNC_BUILTIN_RMW_N(ENUM, NAME, DSIZE, DOFF) \
-  DEF_SYNC_BUILTIN (ENUM, NAME, BT_FN_##DSIZE##_VPTR_##DSIZE, \
-		    ATTR_NOTHROWCALL_LEAF_LIST)
+  DEF_SYNC_BUILTIN_C (ENUM, NAME, BT_FN_##DSIZE##_VPTR_##DSIZE, \
+		      ATTR_NOTHROWCALL_LEAF_LIST)
 
 #define DEF_SYNC_BUILTIN_RMW_ALL_N(ENUM, NAME) \
   DEF_SYNC_BUILTIN (ENUM##_N, NAME, BT_FN_VOID_VAR, \
@@ -115,8 +132,8 @@ along with GCC; see the file COPYING3.  If not see
 /* DSIZE NAME (volatile void *ptr, DSIZE val, int memorder).  */
 
 #define DEF_SYNC_BUILTIN_RMW_ORDER_N(ENUM, NAME, DSIZE, DOFF) \
-  DEF_SYNC_BUILTIN (ENUM, NAME, BT_FN_##DSIZE##_VPTR_##DSIZE##_INT, \
-		    ATTR_NOTHROWCALL_LEAF_LIST)
+  DEF_SYNC_BUILTIN_C (ENUM, NAME, BT_FN_##DSIZE##_VPTR_##DSIZE##_INT, \
+		      ATTR_NOTHROWCALL_LEAF_LIST)
 
 #define DEF_SYNC_BUILTIN_RMW_ORDER_ALL_N(ENUM, NAME, SUFFIX) \
   DEF_SYNC_BUILTIN (ENUM##_N, NAME SUFFIX, BT_FN_VOID_VAR, \
@@ -126,8 +143,8 @@ along with GCC; see the file COPYING3.  If not see
 /* DSIZE NAME (volatile void *ptr, DOFF val).  */
 
 #define DEF_SYNC_BUILTIN_RMW_OFF_N(ENUM, NAME, DSIZE, DOFF) \
-  DEF_SYNC_BUILTIN (ENUM, NAME, BT_FN_##DSIZE##_VPTR_##DOFF, \
-		    ATTR_NOTHROWCALL_LEAF_LIST)
+  DEF_SYNC_BUILTIN_C (ENUM, NAME, BT_FN_##DSIZE##_VPTR_##DOFF, \
+		      ATTR_NOTHROWCALL_LEAF_LIST)
 
 #define DEF_SYNC_BUILTIN_RMW_OFF_ALL_N(ENUM, NAME) \
   DEF_SYNC_BUILTIN (ENUM##_N, NAME, BT_FN_VOID_VAR, \
@@ -137,8 +154,8 @@ along with GCC; see the file COPYING3.  If not see
 /* DSIZE NAME (volatile void *ptr, DOFF val, int memorder).  */
 
 #define DEF_SYNC_BUILTIN_RMW_OFF_ORDER_N(ENUM, NAME, DSIZE, DOFF) \
-  DEF_SYNC_BUILTIN (ENUM, NAME, BT_FN_##DSIZE##_VPTR_##DOFF##_INT, \
-		    ATTR_NOTHROWCALL_LEAF_LIST)
+  DEF_SYNC_BUILTIN_C (ENUM, NAME, BT_FN_##DSIZE##_VPTR_##DOFF##_INT, \
+		      ATTR_NOTHROWCALL_LEAF_LIST)
 
 #define DEF_SYNC_BUILTIN_RMW_OFF_ORDER_ALL_N(ENUM, NAME) \
   DEF_SYNC_BUILTIN (ENUM##_N, NAME, BT_FN_VOID_VAR, \
@@ -148,8 +165,8 @@ along with GCC; see the file COPYING3.  If not see
 /* DSIZE NAME (const volatile void *ptr, int memorder).  */
 
 #define DEF_SYNC_BUILTIN_LOAD_ORDER_N(ENUM, NAME, DSIZE, DOFF) \
-  DEF_SYNC_BUILTIN (ENUM, NAME, BT_FN_##DSIZE##_CONST_VPTR_INT, \
-		    ATTR_NOTHROWCALL_LEAF_LIST)
+  DEF_SYNC_BUILTIN_C (ENUM, NAME, BT_FN_##DSIZE##_CONST_VPTR_INT, \
+		      ATTR_NOTHROWCALL_LEAF_LIST)
 
 #define DEF_SYNC_BUILTIN_LOAD_ORDER_ALL_N(ENUM, NAME, SUFFIX) \
   DEF_SYNC_BUILTIN (ENUM##_N, NAME SUFFIX, BT_FN_VOID_VAR, \
@@ -159,8 +176,8 @@ along with GCC; see the file COPYING3.  If not see
 /* void NAME (volatile void *ptr, DSIZE val, int memorder).  */
 
 #define DEF_SYNC_BUILTIN_STORE_ORDER_N(ENUM, NAME, DSIZE, DOFF) \
-  DEF_SYNC_BUILTIN (ENUM, NAME, BT_FN_VOID_VPTR_##DSIZE##_INT, \
-		    ATTR_NOTHROWCALL_LEAF_LIST)
+  DEF_SYNC_BUILTIN_C (ENUM, NAME, BT_FN_VOID_VPTR_##DSIZE##_INT, \
+		      ATTR_NOTHROWCALL_LEAF_LIST)
 
 #define DEF_SYNC_BUILTIN_STORE_ORDER_ALL_N(ENUM, NAME, SUFFIX) \
   DEF_SYNC_BUILTIN (ENUM##_N, NAME SUFFIX, BT_FN_VOID_VAR, \
@@ -170,7 +187,7 @@ along with GCC; see the file COPYING3.  If not see
 /* void NAME (volatile void *ptr).  */
 
 #define DEF_SYNC_BUILTIN_RELEASE_N(ENUM, NAME, DSIZE, DOFF) \
-  DEF_SYNC_BUILTIN (ENUM, NAME, BT_FN_VOID_VPTR, ATTR_NOTHROWCALL_LEAF_LIST)
+  DEF_SYNC_BUILTIN_C (ENUM, NAME, BT_FN_VOID_VPTR, ATTR_NOTHROWCALL_LEAF_LIST)
 
 #define DEF_SYNC_BUILTIN_RELEASE_NONCAP_N(ENUM, NAME) \
   DEF_SYNC_BUILTIN (ENUM##_N, NAME, BT_FN_VOID_VAR, \
@@ -180,8 +197,8 @@ along with GCC; see the file COPYING3.  If not see
 /* bool NAME (volatile void *ptr, DSIZE oldval, DSIZE newval).  */
 
 #define DEF_SYNC_BUILTIN_BOOL_CMP_SWAP_N(ENUM, NAME, DSIZE, DOFF) \
-  DEF_SYNC_BUILTIN (ENUM, NAME, BT_FN_BOOL_VPTR_##DSIZE##_##DSIZE, \
-		    ATTR_NOTHROWCALL_LEAF_LIST)
+  DEF_SYNC_BUILTIN_C (ENUM, NAME, BT_FN_BOOL_VPTR_##DSIZE##_##DSIZE, \
+		      ATTR_NOTHROWCALL_LEAF_LIST)
 
 #define DEF_SYNC_BUILTIN_BOOL_CMP_SWAP_ALL_N(ENUM, NAME) \
   DEF_SYNC_BUILTIN (ENUM##_N, NAME, BT_FN_VOID_VAR, \
@@ -191,8 +208,8 @@ along with GCC; see the file COPYING3.  If not see
 /* DSIZE NAME (volatile void *ptr, DSIZE oldval, DSIZE newval).  */
 
 #define DEF_SYNC_BUILTIN_VAL_CMP_SWAP_N(ENUM, NAME, DSIZE, DOFF) \
-  DEF_SYNC_BUILTIN (ENUM, NAME, BT_FN_##DSIZE##_VPTR_##DSIZE##_##DSIZE, \
-		    ATTR_NOTHROWCALL_LEAF_LIST)
+  DEF_SYNC_BUILTIN_C (ENUM, NAME, BT_FN_##DSIZE##_VPTR_##DSIZE##_##DSIZE, \
+		      ATTR_NOTHROWCALL_LEAF_LIST)
 
 #define DEF_SYNC_BUILTIN_VAL_CMP_SWAP_ALL_N(ENUM, NAME) \
   DEF_SYNC_BUILTIN (ENUM##_N, NAME, BT_FN_VOID_VAR, \
@@ -203,8 +220,8 @@ along with GCC; see the file COPYING3.  If not see
 	      int success_memorder, int failure_memorder).  */
 
 #define DEF_SYNC_BUILTIN_CMP_XCHG_ORDER_N(ENUM, NAME, DSIZE, DOFF) \
-  DEF_SYNC_BUILTIN (ENUM, NAME, BT_FN_BOOL_VPTR_PTR_##DSIZE##_BOOL_INT_INT, \
-		    ATTR_NOTHROWCALL_LEAF_LIST)
+  DEF_SYNC_BUILTIN_C (ENUM, NAME, BT_FN_BOOL_VPTR_PTR_##DSIZE##_BOOL_INT_INT, \
+		      ATTR_NOTHROWCALL_LEAF_LIST)
 
 #define DEF_SYNC_BUILTIN_CMP_XCHG_ORDER_ALL_N(ENUM, NAME, SUFFIX) \
   DEF_SYNC_BUILTIN (ENUM##_N, NAME SUFFIX, BT_FN_VOID_VAR, \

@@ -8092,6 +8092,17 @@ addr_expr_type (tree_code code, tree op_type)
   return build_pointer_type_for_mode (op_type, ptr_mode, false);
 }
 
+/* Try building a capability pointer to TO_TYPE.  Return error_mark_node
+   if the target doesn't support such pointers.  */
+
+tree
+try_building_capability_pointer_type (tree to_type)
+{
+  if (targetm.capability_mode ().exists ())
+    return addr_expr_type (CAP_ADDR_EXPR, to_type);
+  return error_mark_node;
+}
+
 /* Build REPLACE_ADDRESS_VALUE internal function.  This represents replacing
    the value of a pointer with something else.  It is different to a simple
    assignment since it works with pointers represented by capabilities and not

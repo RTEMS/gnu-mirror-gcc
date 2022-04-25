@@ -415,10 +415,17 @@
   return false;
 })
 
+(define_predicate "aarch64_plain_base_mem_operand"
+  (and (match_operand 0 "memory_operand")
+       (match_code "reg,subreg" "0")))
+
 ;; True if the operand is memory reference suitable for a load/store exclusive.
 (define_predicate "aarch64_sync_memory_operand"
-  (and (match_operand 0 "memory_operand")
-       (match_code "reg" "0")))
+  (and (match_operand 0 "aarch64_normal_base_mem_operand")
+       (match_code "reg,subreg" "0")))
+
+(define_predicate "aarch64_atomic_load_memory_operand"
+  (match_operand 0 "aarch64_plain_base_mem_operand"))
 
 (define_predicate "aarch64_9bit_offset_memory_operand"
   (and (match_operand 0 "memory_operand")
@@ -449,7 +456,7 @@
 (define_predicate "aarch64_rcpc_memory_operand"
   (if_then_else (match_test "AARCH64_ISA_RCPC8_4")
     (match_operand 0 "aarch64_9bit_offset_memory_operand")
-    (match_operand 0 "aarch64_sync_memory_operand")))
+    (match_operand 0 "aarch64_plain_base_mem_operand")))
 
 ;; Predicates for parallel expanders based on mode.
 (define_special_predicate "vect_par_cnst_hi_half"

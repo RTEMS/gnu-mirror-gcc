@@ -20703,6 +20703,28 @@ aarch64_start_file (void)
    default_file_start ();
 }
 
+/* Return true if we can do an atomic load from MEM or an atomic store
+   to MEM using the memory model in CONST_INT MODEL_RTX.  */
+
+bool
+aarch64_atomic_load_store_ok_p (rtx mem, rtx model_rtx)
+{
+  enum memmodel model = memmodel_from_int (INTVAL (model_rtx));
+  machine_mode mode = GET_MODE (mem);
+
+  /* Relaxed and consume operations can use normal loads and stores.
+     There are also alternative-base forms of the byte, word and capability
+     atomic loads and stores.  */
+  if (is_mm_relaxed (model)
+      || is_mm_consume (model)
+      || mode == QImode
+      || mode == SImode
+      || mode == CADImode)
+    return true;
+
+  return aarch64_normal_base_mem_operand (mem, mode);
+}
+
 /* Emit load exclusive.  */
 
 static void

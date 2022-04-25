@@ -776,6 +776,7 @@ struct atomic_ool_names
     const char *str[5][4];
 };
 
+bool aarch64_atomic_load_store_ok_p (rtx, rtx);
 rtx aarch64_atomic_ool_func(machine_mode mode, rtx model_rtx,
 			    const atomic_ool_names *names);
 extern const atomic_ool_names aarch64_ool_swp_names;

@@ -5999,6 +5999,7 @@ expand_compare_and_swap_loop (rtx mem, rtx old_reg, rtx new_reg, rtx seq)
      Note that we only do the plain load from memory once.  Subsequent
      iterations use the value loaded by the compare-and-swap pattern.  */
 
+  rtx_insn *last_insn = get_last_insn ();
   label = gen_label_rtx ();
   cmp_reg = gen_reg_rtx (mode);
 
@@ -6013,7 +6014,10 @@ expand_compare_and_swap_loop (rtx mem, rtx old_reg, rtx new_reg, rtx seq)
   if (!expand_atomic_compare_and_swap (&success, &oldval, mem, old_reg,
 				       new_reg, false, MEMMODEL_SYNC_SEQ_CST,
 				       MEMMODEL_RELAXED))
-    return false;
+    {
+      delete_insns_since (last_insn);
+      return false;
+    }
 
   if (oldval != cmp_reg)
     emit_move_insn (cmp_reg, oldval);
@@ -7158,7 +7162,7 @@ expand_atomic_fetch_op (rtx target, rtx mem, rtx val, enum rtx_code code,
 				  OPTAB_LIB_WIDEN);
 
       /* For after, copy the value now.  */
-      if (!unused_result && after)
+      if (t1 && !unused_result && after)
         emit_move_insn (target, t1);
       insn = get_insns ();
       end_sequence ();
