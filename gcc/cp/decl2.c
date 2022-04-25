@@ -3330,7 +3330,9 @@ build_atomic_load_byte (tree src, HOST_WIDE_INT model)
 
   size = tree_to_uhwi (TYPE_SIZE_UNIT (char_type_node));
 
-  t = builtin_decl_implicit (builtin_sync_code (BUILT_IN_ATOMIC_LOAD_N, size));
+  auto fcode = builtin_sync_code (BUILT_IN_ATOMIC_LOAD_N, size,
+				  capability_type_p (ptr_type));
+  t = builtin_decl_implicit (fcode);
 
   addr = build_addr_expr (ptr_type, src);
   val = build_call_expr (t, 2, addr, mem_model);

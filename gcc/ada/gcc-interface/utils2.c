@@ -701,7 +701,8 @@ build_atomic_load (tree src, bool sync)
   if (size == 0)
     return orig_src;
 
-  t = builtin_decl_implicit (builtin_sync_code (BUILT_IN_ATOMIC_LOAD_N, size));
+  t = builtin_decl_implicit (builtin_sync_code (BUILT_IN_ATOMIC_LOAD_N, size,
+						capability_type_p (ptr_type)));
 
   addr = build_unary_op (unqualified_addr_expr (), ptr_type, src);
   val = build_call_expr (t, 2, addr, mem_model);
@@ -735,7 +736,8 @@ build_atomic_store (tree dest, tree src, bool sync)
   if (size == 0)
     return build_binary_op (MODIFY_EXPR, NULL_TREE, orig_dest, src);
 
-  auto fncode = builtin_sync_code (BUILT_IN_ATOMIC_STORE_N, size);
+  auto fncode = builtin_sync_code (BUILT_IN_ATOMIC_STORE_N, size,
+				   capability_type_p (ptr_type));
   t = builtin_decl_implicit (fncode);
   int_type = gnat_type_for_size (BITS_PER_UNIT * size, 1);
 

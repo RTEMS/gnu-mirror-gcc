@@ -8151,7 +8151,8 @@ expand_omp_atomic_load (basic_block load_bb, tree addr,
      is smaller than word size, then expand_atomic_load assumes that the load
      is atomic.  We could avoid the builtin entirely in this case.  */
 
-  tmpbase = builtin_sync_code (BUILT_IN_ATOMIC_LOAD_N, nbytes);
+  tmpbase = builtin_sync_code (BUILT_IN_ATOMIC_LOAD_N, nbytes,
+			       capability_type_p (TREE_TYPE (addr)));
   decl = builtin_decl_explicit (tmpbase);
   if (decl == NULL_TREE)
     return false;
@@ -8213,7 +8214,8 @@ expand_omp_atomic_store (basic_block load_bb, tree addr,
      is atomic.  We could avoid the builtin entirely in this case.  */
 
   tmpbase = (exchange ? BUILT_IN_ATOMIC_EXCHANGE_N : BUILT_IN_ATOMIC_STORE_N);
-  tmpbase = builtin_sync_code (tmpbase, nbytes);
+  tmpbase = builtin_sync_code (tmpbase, nbytes,
+			       capability_type_p (TREE_TYPE (addr)));
   decl = builtin_decl_explicit (tmpbase);
   if (decl == NULL_TREE)
     return false;
@@ -8353,7 +8355,8 @@ expand_omp_atomic_fetch_op (basic_block load_bb,
   else
     return false;
 
-  tmpbase = builtin_sync_code (need_new ? newbase : oldbase, nbytes);
+  tmpbase = builtin_sync_code (need_new ? newbase : oldbase, nbytes,
+			       capability_type_p (TREE_TYPE (addr)));
   decl = builtin_decl_explicit (tmpbase);
   if (decl == NULL_TREE)
     return false;
@@ -8430,7 +8433,8 @@ expand_omp_atomic_pipeline (basic_block load_bb, basic_block store_bb,
 
   /* ??? We need a non-pointer interface to __atomic_compare_exchange in
      order to use the RELAXED memory model effectively.  */
-  fncode = builtin_sync_code (BUILT_IN_SYNC_VAL_COMPARE_AND_SWAP_N, nbytes);
+  fncode = builtin_sync_code (BUILT_IN_SYNC_VAL_COMPARE_AND_SWAP_N, nbytes,
+			      capability_type_p (TREE_TYPE (addr)));
   cmpxchg = builtin_decl_explicit (fncode);
   if (cmpxchg == NULL_TREE)
     return false;
@@ -8472,7 +8476,8 @@ expand_omp_atomic_pipeline (basic_block load_bb, basic_block store_bb,
       loadedi = loaded_val;
     }
 
-  fncode = builtin_sync_code (BUILT_IN_ATOMIC_LOAD_N, nbytes);
+  fncode = builtin_sync_code (BUILT_IN_ATOMIC_LOAD_N, nbytes,
+			      capability_type_p (TREE_TYPE (addr)));
   tree loaddecl = builtin_decl_explicit (fncode);
   if (loaddecl)
     initial

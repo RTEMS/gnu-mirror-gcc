@@ -11360,7 +11360,8 @@ conv_intrinsic_atomic_op (gfc_code *code)
     }
 
   tmp = TREE_TYPE (TREE_TYPE (atom));
-  fn = builtin_sync_code (fn, tree_to_uhwi (TYPE_SIZE_UNIT (tmp)));
+  fn = builtin_sync_code (fn, tree_to_uhwi (TYPE_SIZE_UNIT (tmp)),
+			  capability_type_p (TREE_TYPE (atom)));
   tree itype = TREE_TYPE (TREE_TYPE (atom));
   tmp = builtin_decl_explicit (fn);
 
@@ -11483,7 +11484,8 @@ conv_intrinsic_atomic_ref (gfc_code *code)
 
   tmp = TREE_TYPE (TREE_TYPE (atom));
   fn = builtin_sync_code (BUILT_IN_ATOMIC_LOAD_N,
-			  tree_to_uhwi (TYPE_SIZE_UNIT (tmp)));
+			  tree_to_uhwi (TYPE_SIZE_UNIT (tmp)),
+			  capability_type_p (TREE_TYPE (atom)));
   tmp = builtin_decl_explicit (fn);
   tmp = build_call_expr_loc (input_location, tmp, 2, atom,
 			     build_int_cst (integer_type_node,
@@ -11608,7 +11610,8 @@ conv_intrinsic_atomic_cas (gfc_code *code)
 
   tmp = TREE_TYPE (TREE_TYPE (atom));
   fn = builtin_sync_code (BUILT_IN_ATOMIC_COMPARE_EXCHANGE_N,
-			  tree_to_uhwi (TYPE_SIZE_UNIT (tmp)));
+			  tree_to_uhwi (TYPE_SIZE_UNIT (tmp)),
+			  capability_type_p (TREE_TYPE (atom)));
   tmp = builtin_decl_explicit (fn);
 
   gfc_add_modify (&block, old, comp);

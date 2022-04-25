@@ -6967,6 +6967,7 @@ sync_resolve_function (tree function, built_in_function orig_fcode,
   /* Type the argument points to.  */
   tree type;
   int size;
+  bool capability_p;
 
   argtype = type = TREE_TYPE ((*params)[0]);
 
@@ -6979,6 +6980,7 @@ sync_resolve_function (tree function, built_in_function orig_fcode,
   if (TREE_CODE (type) != POINTER_TYPE)
     goto incompatible;
 
+  capability_p = capability_type_p (type);
   type = TREE_TYPE (type);
   if (!INTEGRAL_TYPE_P (type)
       && !POINTER_TYPE_P (type)
@@ -6992,11 +6994,11 @@ sync_resolve_function (tree function, built_in_function orig_fcode,
     goto incompatible;
 
   if (capability_type_p (type))
-    return builtin_sync_code (orig_fcode, SYNC_ICAP);
+    return builtin_sync_code (orig_fcode, SYNC_ICAP, capability_p);
 
   size = tree_to_uhwi (TYPE_SIZE_UNIT (type));
   if (size == 1 || size == 2 || size == 4 || size == 8 || size == 16)
-    return builtin_sync_code (orig_fcode, size);
+    return builtin_sync_code (orig_fcode, size, capability_p);
 
  incompatible:
   /* Issue the diagnostic only if the argument is valid, otherwise

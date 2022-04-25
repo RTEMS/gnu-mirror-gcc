@@ -197,7 +197,7 @@ enum sync_dsize {
   SYNC_I16 = 16,
   SYNC_ICAP = 0xcafe
 };
-extern built_in_function builtin_sync_code (built_in_function, int);
+extern built_in_function builtin_sync_code (built_in_function, int, bool);
 extern sync_dsize builtin_sync_dsize (built_in_function, built_in_function);
 
 #endif /* GCC_BUILTINS_H */

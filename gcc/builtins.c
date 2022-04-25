@@ -6632,13 +6632,16 @@ log2_nbytes_int_mode (int nbytes_log2)
 
 /* BASE_CODE is an overloaded BUILT_IN_*_N function defined in
    sync-builtins.def.  Return the non-overloaded function associated
-   with sync_dsize DSIZE.
+   with DSIZE and CAPABILITY_POINTERS_P, where DSIZE specifies the
+   sync_dsize of the data and CAPABILITY_POINTERS_P specifies whether
+   the first pointer argument is a capability.
 
    The type of the perameter is int rather than sync_dsize because many
    callers can validly pass a plain byte size.  */
 
 built_in_function
-builtin_sync_code (built_in_function base_code, int dsize)
+builtin_sync_code (built_in_function base_code, int dsize,
+		   bool capability_pointers_p)
 {
   gcc_assert (dsize == SYNC_I1
 	      || dsize == SYNC_I2
@@ -6649,7 +6652,13 @@ builtin_sync_code (built_in_function base_code, int dsize)
   /* The capability entry comes after the numerical ones.  */
   if (dsize == SYNC_ICAP)
     dsize = 32;
-  return (built_in_function) ((int) base_code + exact_log2 (dsize) * 2 + 1);
+  int index = exact_log2 (dsize) * 2;
+  if (CAPABILITY_MODE_P (Pmode))
+    gcc_assert (capability_pointers_p);
+  else if (capability_pointers_p)
+    /* Pick the _c form.  */
+    index += 1;
+  return (built_in_function) ((int) base_code + index + 1);
 }
 
 /* BASE_CODE is an overloaded BUILT_IN_*_N function defined in
@@ -7068,7 +7077,8 @@ expand_ifn_atomic_compare_exchange_into_call (gcall *call, machine_mode mode)
   /* At present we only have BUILT_IN_ATOMIC_COMPARE_EXCHANGE_{1,2,4,8,16}.  */
   unsigned int nbytes = GET_MODE_SIZE (mode).to_constant ();
   built_in_function fncode
-    = builtin_sync_code (BUILT_IN_ATOMIC_COMPARE_EXCHANGE_N, nbytes);
+    = builtin_sync_code (BUILT_IN_ATOMIC_COMPARE_EXCHANGE_N, nbytes,
+			 capability_type_p (TREE_TYPE ((*vec)[0])));
   tree fndecl = builtin_decl_explicit (fncode);
   tree fn = build_addr_expr (build_pointer_type (TREE_TYPE (fndecl)), fndecl);
   tree exp = build_call_vec (boolean_type_node, fn, vec);
