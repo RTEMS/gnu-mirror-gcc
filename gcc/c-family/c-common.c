@@ -6980,7 +6980,9 @@ sync_resolve_size (tree function, vec<tree, va_gc> *params, bool fetch)
     goto incompatible;
 
   type = TREE_TYPE (type);
-  if (!INTEGRAL_TYPE_P (type) && !POINTER_TYPE_P (type))
+  if (!INTEGRAL_TYPE_P (type)
+      && !POINTER_TYPE_P (type)
+      && !INTCAP_TYPE_P (type))
     goto incompatible;
 
   if (!COMPLETE_TYPE_P (type))
