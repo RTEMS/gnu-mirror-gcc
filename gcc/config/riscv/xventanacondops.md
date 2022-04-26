@@ -29,6 +29,26 @@
   "TARGET_XVENTANACONDOPS"
   "vt.maskc<n>\t%0,%2,%1")
 
+;; XVentanaCondOps does not have immediate forms, so we need to do extra
+;; work to support these: if we encounter a vt.maskc/n with an immediate,
+;; we split this into a load-immediate followed by a vt.maskc/n.
+(define_split
+  [(set (match_operand:DI 0 "register_operand")
+	(and:DI (neg:DI (match_operator:DI 1 "equality_operator"
+			       [(match_operand:DI 2 "register_operand")
+				(const_int 0)]))
+		(match_operand:DI 3 "immediate_operand")))
+   (clobber (match_operand:DI 4 "register_operand"))]
+  "TARGET_XVENTANACONDOPS"
+  [(set (match_dup 4) (match_dup 3))
+   (set (match_dup 0) (and:DI (neg:DI (match_dup 1))
+			      (match_dup 4)))]
+{
+  /* Eliminate the clobber/temporary, if it is not needed. */
+  if (!rtx_equal_p (operands[0], operands[2]))
+     operands[4] = operands[0];
+})
+
 ;; Make order operators digestible to the vt.maskc<n> logic by
 ;; wrapping their result in a comparison against (const_int 0).
 
@@ -37,7 +57,7 @@
   [(set (match_operand:X 0 "register_operand")
 	(and:X (neg:X (match_operator:X 1 "anyge_operator"
 			     [(match_operand:X 2 "register_operand")
-			      (match_operand:X 3 "register_operand")]))
+			      (match_operand:X 3 "arith_operand")]))
 	       (match_operand:X 4 "register_operand")))
    (clobber (match_operand:X 5 "register_operand"))]
   "TARGET_XVENTANACONDOPS"
@@ -54,7 +74,7 @@
   [(set (match_operand:X 0 "register_operand")
 	(and:X (neg:X (match_operator:X 1 "anygt_operator"
 			     [(match_operand:X 2 "register_operand")
-			      (match_operand:X 3 "register_operand")]))
+			      (match_operand:X 3 "arith_operand")]))
 	       (match_operand:X 4 "register_operand")))
    (clobber (match_operand:X 5 "register_operand"))]
   "TARGET_XVENTANACONDOPS"
