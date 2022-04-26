@@ -2051,7 +2051,6 @@ process_alt_operands (int only_alternative)
 	  enum reg_class this_alternative, this_costly_alternative;
 	  HARD_REG_SET this_alternative_set, this_costly_alternative_set;
 	  bool this_alternative_match_win, this_alternative_win;
-	  bool this_alternative_offmemok;
 	  bool scratch_p;
 	  machine_mode mode;
 	  enum constraint_num cn;
@@ -2088,7 +2087,6 @@ process_alt_operands (int only_alternative)
 	  CLEAR_HARD_REG_SET (this_costly_alternative_set);
 	  this_alternative_win = false;
 	  this_alternative_match_win = false;
-	  this_alternative_offmemok = false;
 	  this_alternative_matches = -1;
 
 	  /* An empty constraint should be excluded by the fast
@@ -2579,7 +2577,6 @@ process_alt_operands (int only_alternative)
 		  reject -= 3;
 		}
 
-	      this_alternative_offmemok = offmemok;
 	      if (this_costly_alternative != NO_REGS)
 		{
 		  if (lra_dump_file != NULL)
@@ -2920,7 +2917,7 @@ process_alt_operands (int only_alternative)
 	  curr_alt_set[nop] = this_alternative_set;
 	  curr_alt_win[nop] = this_alternative_win;
 	  curr_alt_match_win[nop] = this_alternative_match_win;
-	  curr_alt_offmemok[nop] = this_alternative_offmemok;
+	  curr_alt_offmemok[nop] = offmemok;
 	  curr_alt_matches[nop] = this_alternative_matches;
 
 	  if (this_alternative_matches >= 0
