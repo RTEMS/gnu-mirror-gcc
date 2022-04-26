@@ -7054,6 +7054,10 @@ grokdeclarator (const struct c_declarator *declarator,
       && deprecated_capability_uses > 1
       && !POINTER_TYPE_P (declspecs->type))
     error_at (input_location, "use of %<__capability%> is ambiguous");
+
+  *decl_attrs = chainon (returned_attrs, *decl_attrs);
+  *decl_attrs = chainon (decl_id_attrs, *decl_attrs);
+
   /* Now TYPE has the actual type, apart from any qualifiers in
      TYPE_QUALS.  */
 
