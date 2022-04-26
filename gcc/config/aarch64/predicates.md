@@ -529,16 +529,12 @@
 ;; Like general_operand but allow only valid SIMD addressing modes.
 (define_predicate "aarch64_simd_general_operand"
   (and (match_operand 0 "general_operand")
-       (match_test "!MEM_P (op)
-		    || GET_CODE (XEXP (op, 0)) == POST_INC
-		    || GET_CODE (XEXP (op, 0)) == REG")))
+       (match_test "!MEM_P (op) || aarch64_simd_mem_operand_p (op)")))
 
 ;; Like nonimmediate_operand but allow only valid SIMD addressing modes.
 (define_predicate "aarch64_simd_nonimmediate_operand"
   (and (match_operand 0 "nonimmediate_operand")
-       (match_test "!MEM_P (op)
-		    || GET_CODE (XEXP (op, 0)) == POST_INC
-		    || GET_CODE (XEXP (op, 0)) == REG")))
+       (match_test "!MEM_P (op) || aarch64_simd_mem_operand_p (op)")))
 
 ;; Predicates used by the various SIMD shift operations.  These
 ;; fall in to 3 categories.
