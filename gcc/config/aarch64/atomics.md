@@ -226,7 +226,11 @@
       UNSPECV_ATOMIC_EXCHG))
    (clobber (reg:CC CC_REGNUM))
    (clobber (match_scratch:SI 4 "=&r"))]
-  ""
+  ;; The LSE version of this pattern has the same form as this base Armv8-A
+  ;; version, but without the clobbers.  We always want to use the LSE version
+  ;; where possible, so prevent combine from converting an LSE pattern into
+  ;; a base Armv8-A one.
+  "!TARGET_LSE"
   "#"
   "&& epilogue_completed"
   [(const_int 0)]
