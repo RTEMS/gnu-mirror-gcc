@@ -7429,7 +7429,7 @@ resolve_overloaded_atomic_exchange (location_t loc, tree function,
   else
     I_type = intcap_type_node;
 
-  I_type_ptr = build_pointer_type (I_type);
+  I_type_ptr = change_pointer_target_type (TREE_TYPE (p0), I_type);
 
   /* Convert object pointer to required type.  */
   p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
@@ -7515,13 +7515,13 @@ resolve_overloaded_atomic_compare_exchange (location_t loc, tree function,
   else
     I_type = intcap_type_node;
 
-  I_type_ptr = build_pointer_type (I_type);
+  I_type_ptr = change_pointer_target_type (TREE_TYPE (p0), I_type);
 
   /* Convert object pointer to required type.  */
   p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
 
   /* Convert expected pointer to required type.  */
-  p1 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p1);
+  p1 = build1 (CONVERT_EXPR, build_pointer_type (I_type), p1);
 
   /* Convert desired value to required type, and dereference it.  */
   p2 = build_indirect_ref (loc, p2, RO_UNARY_STAR);
@@ -7591,7 +7591,7 @@ resolve_overloaded_atomic_load (location_t loc, tree function,
   else
     I_type = intcap_type_node;
 
-  I_type_ptr = build_pointer_type (I_type);
+  I_type_ptr = change_pointer_target_type (TREE_TYPE (p0), I_type);
 
   /* Convert object pointer to required type.  */
   p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
@@ -7660,7 +7660,7 @@ resolve_overloaded_atomic_store (location_t loc, tree function,
   else
     I_type = intcap_type_node;
 
-  I_type_ptr = build_pointer_type (I_type);
+  I_type_ptr = change_pointer_target_type (TREE_TYPE (p0), I_type);
 
   /* Convert object pointer to required type.  */
   p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);

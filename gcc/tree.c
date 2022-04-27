@@ -8104,6 +8104,17 @@ try_building_capability_pointer_type (tree to_type)
   return error_mark_node;
 }
 
+/* Return a pointer like PTR_TYPE but with its target type (i.e. its TREE_TYPE)
+   replaced by TO_TYPE.  */
+
+tree
+change_pointer_target_type (tree ptr_type, tree to_type)
+{
+  tree t = addr_expr_type (addr_expr_code (ptr_type), to_type);
+  return build_type_attribute_qual_variant (t, TYPE_ATTRIBUTES (ptr_type),
+					    TYPE_QUALS (ptr_type));
+}
+
 /* Build REPLACE_ADDRESS_VALUE internal function.  This represents replacing
    the value of a pointer with something else.  It is different to a simple
    assignment since it works with pointers represented by capabilities and not
