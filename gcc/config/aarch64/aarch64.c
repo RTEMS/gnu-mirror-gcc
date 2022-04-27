@@ -10402,7 +10402,7 @@ aarch64_expand_call (rtx result, rtx mem, rtx callee_abi, bool sibcall)
   gcc_assert (MEM_P (mem));
   callee = XEXP (mem, 0);
   mode = GET_MODE (callee);
-  gcc_assert (mode == Pmode);
+  gcc_assert (aarch64_mem_addr_mode_p (mode));
 
   /* Decide if we should generate indirect calls by loading the
      address of the callee into a register before performing
@@ -10421,7 +10421,7 @@ aarch64_expand_call (rtx result, rtx mem, rtx callee_abi, bool sibcall)
   if (sibcall)
     tmp = ret_rtx;
   else
-    tmp = gen_rtx_CLOBBER (VOIDmode, gen_rtx_REG (Pmode, LR_REGNUM));
+    tmp = gen_rtx_CLOBBER (VOIDmode, gen_rtx_REG (mode, LR_REGNUM));
 
   gcc_assert (CONST_INT_P (callee_abi));
   callee_abi = gen_rtx_UNSPEC (DImode, gen_rtvec (1, callee_abi),
