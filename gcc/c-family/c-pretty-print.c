@@ -1512,6 +1512,12 @@ c_pretty_printer::postfix_expression (tree e)
 
     case CALL_EXPR:
       {
+	if (CALL_EXPR_IFN (e) == IFN_REPLACE_ADDRESS_VALUE)
+	  {
+	    pp_c_type_cast (this, TREE_TYPE (e));
+	    pp_c_cast_expression (this, CALL_EXPR_ARG (e, 1));
+	    break;
+	  }
 	call_expr_arg_iterator iter;
 	tree arg;
 	postfix_expression (CALL_EXPR_FN (e));
