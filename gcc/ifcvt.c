@@ -2055,7 +2055,8 @@ noce_try_cmove_arith (struct noce_if_info *if_info)
      already checked for no side effects.  */
   if (cse_not_expected
       && MEM_P (a) && MEM_P (b)
-      && MEM_ADDR_SPACE (a) == MEM_ADDR_SPACE (b))
+      && MEM_ADDR_SPACE (a) == MEM_ADDR_SPACE (b)
+      && mem_address_mode (a) == mem_address_mode (b))
     {
       machine_mode address_mode = mem_address_mode (a);
 
