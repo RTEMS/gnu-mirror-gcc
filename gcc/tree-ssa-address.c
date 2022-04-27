@@ -376,7 +376,8 @@ create_mem_ref_raw (tree type, tree alias_ptr_type, struct mem_address *addr,
     addr->step = NULL_TREE;
 
   if (addr->offset)
-    addr->offset = fold_convert (alias_ptr_type, addr->offset);
+    addr->offset = wide_int_to_tree (alias_ptr_type,
+				     wi::to_poly_wide (addr->offset));
   else
     addr->offset = build_int_cst (alias_ptr_type, 0);
 
