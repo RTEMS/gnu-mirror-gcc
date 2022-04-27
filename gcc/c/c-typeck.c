@@ -7171,7 +7171,7 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 	    pedwarn (location, OPT_Wpedantic,
 		     "ISO C prohibits argument conversion to union type");
 
-	  rhs = fold_convert_loc (location, TREE_TYPE (memb), rhs);
+	  rhs = convert (TREE_TYPE (memb), rhs);
 	  return build_constructor_single (type, memb, rhs);
 	}
     }
