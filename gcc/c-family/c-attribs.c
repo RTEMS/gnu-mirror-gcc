@@ -878,12 +878,11 @@ handle_noreturn_attribute (tree *node, tree name, tree ARG_UNUSED (args),
     TREE_THIS_VOLATILE (*node) = 1;
   else if (TREE_CODE (type) == POINTER_TYPE
 	   && TREE_CODE (TREE_TYPE (type)) == FUNCTION_TYPE)
-    TREE_TYPE (*node)
-      = (build_qualified_type
-	 (build_pointer_type
-	  (build_type_variant (TREE_TYPE (type),
-			       TYPE_READONLY (TREE_TYPE (type)), 1)),
-	  TYPE_QUALS (type)));
+    {
+      tree target = build_type_variant (TREE_TYPE (type),
+					TYPE_READONLY (TREE_TYPE (type)), 1);
+      TREE_TYPE (*node) = change_pointer_target_type (type, target);
+    }
   else
     {
       warning (OPT_Wattributes, "%qE attribute ignored", name);
@@ -1465,12 +1464,11 @@ handle_const_attribute (tree *node, tree name, tree ARG_UNUSED (args),
     TREE_READONLY (*node) = 1;
   else if (TREE_CODE (type) == POINTER_TYPE
 	   && TREE_CODE (TREE_TYPE (type)) == FUNCTION_TYPE)
-    TREE_TYPE (*node)
-      = (build_qualified_type
-	 (build_pointer_type
-	  (build_type_variant (TREE_TYPE (type), 1,
-			       TREE_THIS_VOLATILE (TREE_TYPE (type)))),
-	  TYPE_QUALS (type)));
+    {
+      tree target = build_type_variant (TREE_TYPE (type), 1,
+					TREE_THIS_VOLATILE (TREE_TYPE (type)));
+      TREE_TYPE (*node) = change_pointer_target_type (type, target);
+    }
   else
     {
       warning (OPT_Wattributes, "%qE attribute ignored", name);
