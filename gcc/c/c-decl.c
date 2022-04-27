@@ -5950,6 +5950,11 @@ test_fake_hybrid (void)
   if (!flag_fake_hybrid || !targetm.capability_mode ().exists ())
     return false;
 
+  /* Fiddling with gimple testcases is likely to generate justified
+     verify_gimple ICEs.  */
+  if (flag_gimple)
+    return false;
+
   if (flag_fake_hybrid_init < flag_fake_hybrid)
     {
       int count = flag_fake_hybrid_init + fake_hybrid_counter++;
