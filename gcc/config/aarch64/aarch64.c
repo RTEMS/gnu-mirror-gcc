@@ -9640,7 +9640,9 @@ aarch64_valid_ldr_str_offset_p (machine_mode mode, bool alt_base_p,
 				poly_int64 offset,
 				aarch64_addr_query_type type)
 {
+  /* See the comment in aarch64_classify_address.  */
   unsigned int vec_flags = aarch64_classify_vector_mode (mode);
+  vec_flags &= ~VEC_PARTIAL;
 
   /* Make "m" use the LD1 offset range for SVE data modes, so
      that pre-RTL optimizers like ivopts will work to that
