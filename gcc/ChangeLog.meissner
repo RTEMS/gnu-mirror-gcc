@@ -1,3 +1,215 @@
+==================== work087, patch #8:
+
+Generate vadduqm and vsubuqm for TImode add/subtract
+
+If the TImode variable is in an Altivec register instead of a GPR
+register, then generate vadduqm and vsubuqm instead of having to move the
+value to the GPR registers and doing the add and subtract with carry
+instructions.  To do this, we have to delay the splitting of the addition
+and subtraction until after register allocation.
+
+2022-04-28   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/rs6000.md (addti3): Generate vadduqm if we are
+	using the Altivec registers.
+	(subti3): Generate vsubuqm if we using the Altivec registers.
+	(negti3): New insn.
+
+gcc/testsuite/
+	* gcc.target/powerpc/vadduqm-vsubuqm.c: New test.
+
+==================== work087, patch #7:
+
+Optimize multiply/add of DImode extended to TImode, PR target/103109.
+
+On power9 and power10 systems, we have instructions that support doing
+64-bit integers converted to 128-bit integers and producing 128-bit
+results.  This patch adds support to generate these instructions.
+
+Previously GCC had define_expands to handle conversion of the 64-bit
+extend to 128-bit and multiply.  This patch changes these define_expands
+to define_insn_and_split and then it provides combiner patterns to
+generate thes multiply/add instructions.
+
+To support using this optimization on power9, this patch extend the sign
+extend DImode to TImode to also run on power9 (added for PR
+target/104698).
+
+This patch needs the previous patch to add unsigned DImode to TImode
+conversion so that the combiner can combine the extend, multiply, and add
+instructions.
+
+
+2022-04-28   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	PR target/103109
+	* config/rs6000/rs6000.md (su_int32): New code attribute.
+	(<u>mul<mode><dmode>3): Convert from define_expand to
+	define_insn_and_split.
+	(maddld<mode>4): Add generator function.
+	(<u>mulditi3_<u>adddi3): New insn.
+	(<u>mulditi3_add_const): New insn.
+	(<u>mulditi3_<u>adddi3_upper): New insn.
+
+gcc/testsuite/
+	PR target/103109
+	* gcc.target/powerpc/pr103109.c: New test.
+
+
+==================== work087, patch #6:
+
+Add zero_extendditi2.  Improve lxvr*x code generation.
+
+This pattern adds zero_extendditi2 so that if we are extending DImode to
+TImode, and we want the result in a vector register, the compiler can
+generate MTVSRDDD.
+
+In addition the patterns for generating lxvr{b,h,w,d}x were tuned to allow
+loading to gpr registers.  This prevents needlessly doing direct moves to
+get the value into the vector registers if the gpr register was already
+selected.
+
+In updating the insn counts for two tests due to these changes, I noticed
+the tests were done at -O0.  I changed this so that the tests are now done
+at the normal -O2 optimization level.
+
+2022-04-28   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/vsx.md (vsx_lxvr<wd>x): Add support for loading to
+	GPR registers.
+	(vsx_stxvr<wd>x): Add support for storing from GPR registers.
+	(zero_extendditi2): New insn.
+
+gcc/testsuite/
+	* gcc.target/powerpc/vsx-load-element-extend-int.c: Use -O2
+	instead of -O0 and update insn counts.
+	* gcc.target/powerpc/vsx-load-element-extend-short.c: Likewise.
+	* gcc.target/powerpc/zero-extend-di-ti.c: New test.
+
+==================== work087, patch #5:
+
+Make addti3/subti3 be define_insn_and_split, instead of define_expand
+
+This patch makes addti3 and subti3 be define_insn_and_split instead of
+define_expand.  This patch will be a building block to support in a future
+patch PR target/103109 which wants to optimize 128-bit some integer
+multiply-add combinations to use the power9 maddld, maddhd, maddhdu
+instructions.  In order to support recognizing the multiply and add
+combination, we need to keep the addti3 and subti3 as complete insns
+through the combiner phase.
+
+2022-04-28   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/rs6000.md (addti3): Don't immediately expand the
+	insn.  Delay expansion until the split passes.
+	(subti3): Likewise.
+
+==================== work087, patch #4:
+
+Replace UNSPEC with RTL code for extendditi2.
+
+When I submitted my patch on March 12th for extendditi2, Segher wished I
+had removed the use of the UNSPEC for the vextsd2q instruction.  This
+patch rewrites extendditi2_vector to use VEC_SELECT rather than UNSPEC.
+
+
+2022-04-28   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/vsx.md (UNSPEC_EXTENDDITI2): Delete.
+	(extendditi2_vector): Rewrite to use VEC_SELECT as a
+	define_expand.
+	(extendditi2_vector2): New insn.
+
+==================== work087, patch #3:
+
+Optimize vec_splats of constant vec_extract for V2DI/V2DF, PR target 99293.
+
+This is version 2 of the patch.  The original patch was:
+
+| Date: Mon, 28 Mar 2022 12:26:02 -0400
+| Subject: [PATCH 1/4] Optimize vec_splats of constant vec_extract for V2DI/V2DF, PR target 99293.
+| Message-ID: <YkHhmvwSJF7DUDhJ@toto.the-meissners.org>
+| https://gcc.gnu.org/pipermail/gcc-patches/2022-March/592420.html
+
+In PR target/99293, it was pointed out that doing:
+
+	vector long long dest0, dest1, src;
+	/* ... */
+	dest0 = vec_splats (vec_extract (src, 0));
+	dest1 = vec_splats (vec_extract (src, 1));
+
+would generate slower code.
+
+It generates the following code on power8:
+
+	;; vec_splats (vec_extract (src, 0))
+	xxpermdi 0,34,34,3
+	xxpermdi 34,0,0,0
+
+	;; vec_splats (vec_extract (src, 1))
+	xxlor 0,34,34
+	xxpermdi 34,0,0,0
+
+However on power9 and power10 it generates:
+
+	;; vec_splats (vec_extract (src, 0))
+	mfvsld 3,34
+	mtvsrdd 34,9,9
+
+	;; vec_splats (vec_extract (src, 1))
+	mfvsrd 9,34
+	mtvsrdd 34,9,9
+
+This is due to the power9 having the mfvsrld instruction which can extract
+either 64-bit element into a GPR.  While there are alternatives for both
+vector registers and GPR registers, the register allocator prefers to put
+DImode into GPR registers.
+
+However in this case, it is better to have a single combiner pattern that
+can generate a single xxpermdi, instead of doing 2 insnsns (the extract
+and then the concat).  This is particularly true if the two operations are
+move from vector register and move to vector register.  As Segher pointed
+out in a previous version of the patch, the combiner already tries doing
+creating a (vec_duplicate (vec_select ...)) pattern, but we didn't provide
+one.
+
+This patch reworks vsx_xxspltd_<mode> for V2DImode and V2DFmode so that it
+no longer uses an UNSPEC.  Instead it uses VEC_DUPLICATE, which the
+combiner checks for.
+
+I have built Spec 2017 with this patch installed, and the cam4_r benchmark
+is the only benchmark that generated different code (3 mfvsrld/mtvsrdd
+pairs of instructions were replaced with xxpermdi).
+
+I have built bootstrap versions on the following systems and I have run
+the regression tests.  There were no regressions in the runs:
+
+	Power9 little endian, --with-cpu=power9
+	Power10 little endian, --with-cpu=power10
+	Power8 big endian, --with-cpu=power8 (both 32-bit & 64-bit tests)
+
+Can I install this into the trunk?  After a burn-in period, can I backport
+and install this into GCC 11 and GCC 10 branches?
+
+2022-04-28   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	PR target/99293
+	* config/rs6000/rs6000-p8swap.cc (rtx_is_swappable_p): Remove
+	UNSPEC_VSX_XXSPLTD case.
+	* config/rs6000/vsx.md (UNSPEC_VSX_XXSPLTD): Delete.
+	(vsx_xxspltd_<mode>): Rewrite to use VEC_DUPLICATE.
+
+gcc/testsuite:
+	PR target/99293
+	* gcc.target/powerpc/builtins-1.c: Update insn count.
+	* gcc.target/powerpc/pr99293.c: New test.
+
 ==================== work087, merge up to 4/27 master.
 
 ==================== work087, patch #2:
