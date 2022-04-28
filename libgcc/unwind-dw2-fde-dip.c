@@ -161,6 +161,21 @@ base_from_cb_data (unsigned char encoding, struct unw_eh_callback_data *data)
     }
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+static int
+valid_cheri_capability (void *x, uintptr_t *base, uintptr_t *top)
+{
+  int is_valid = __builtin_cheri_tag_get (x);
+  if (! is_valid)
+    return 0;
+  if (!base || !top)
+    return 1;
+  *base = __builtin_cheri_base_get (x);
+  *top = *base + __builtin_cheri_length_get (x);
+  return 1;
+}
+#endif
+
 static int
 _Unwind_IteratePhdrCallback (struct dl_phdr_info *info, size_t size, void *ptr)
 {
@@ -178,10 +193,13 @@ _Unwind_IteratePhdrCallback (struct dl_phdr_info *info, size_t size, void *ptr)
   struct object ob;
   _Unwind_Ptr pc_low = 0, pc_high = 0;
 
-  /* MORELLO TODO Update types here dlpi_addr should hold uintptr_t.  */
   struct ext_dl_phdr_info
     {
+#ifdef __CHERI_PURE_CAPABILITY__
+      uintptr_t dlpi_addr;
+#else
       ElfW(Addr) dlpi_addr;
+#endif
       const char *dlpi_name;
       const ElfW(Phdr) *dlpi_phdr;
       ElfW(Half) dlpi_phnum;
@@ -194,6 +212,14 @@ _Unwind_IteratePhdrCallback (struct dl_phdr_info *info, size_t size, void *ptr)
   load_base = info->dlpi_addr;
   p_eh_frame_hdr = NULL;
   p_dynamic = NULL;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+  /* Check on every object we iterate over that we are provided valid
+     capabilities by the libc.  */
+  gcc_assert (valid_cheri_capability (phdr, NULL, NULL));
+  gcc_assert (load_base == 0
+	      || valid_cheri_capability (load_base, NULL, NULL));
+#endif
 
   struct frame_hdr_cache_element *prev_cache_entry = NULL,
     *last_cache_entry = NULL;
@@ -323,9 +349,32 @@ _Unwind_IteratePhdrCallback (struct dl_phdr_info *info, size_t size, void *ptr)
   if (!p_eh_frame_hdr)
     return 0;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+  /* If we found the FDE we're looking for in a static and position dependent
+     object, then the `load_base` is zero and does not have associated bounds.
+     It does not have relevant bounds because restrictions on the cheri bounds
+     encoding mean that a zero valued capability can not have large bounds.  In
+     this case the kernel and libc ensure that dlpi_phdr spans the executable
+     mapping (while its value is not interesting here).
+
+     The dlpi_phdr pointer would have provided the provenance for the
+     `p_eh_frame_hdr` pointer.  Hence in this case we want to use the *address*
+     stored in p_eh_frame_hdr->p_vaddr with the metadata of the capability
+     pointing to p_eh_frame_hdr.  */
+  if (load_base == 0)
+    hdr = __builtin_cheri_address_set (p_eh_frame_hdr, p_eh_frame_hdr->p_vaddr);
+  else
+#endif
   /* Read .eh_frame_hdr header.  */
   hdr = (const struct unw_eh_frame_hdr *)
     __RELOC_POINTER (p_eh_frame_hdr->p_vaddr, load_base);
+
+#ifdef __CHERI_PURE_CAPABILITY__
+  uintptr_t base, top;
+  gcc_assert (valid_cheri_capability (hdr, &base, &top));
+  gcc_assert (base <= data->pc && top > data->pc);
+#endif
+
   if (hdr->version != 1)
     return 1;
 
@@ -426,6 +475,13 @@ _Unwind_IteratePhdrCallback (struct dl_phdr_info *info, size_t size, void *ptr)
 	  return 1;
 	}
     }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+  /* Any encoding other than DW_EH_PE_pcrel would mean that our eh_frame
+     pointer would not be a valid capability.  Here we're reading from eh_frame
+     and hence would need provenance.  */
+  gcc_assert (valid_cheri_capability (eh_frame, NULL, NULL));
+#endif
 
   /* We have no sorted search table, so need to go the slow way.
      As soon as GLIBC will provide API so to notify that a library has been
