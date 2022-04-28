@@ -10064,7 +10064,18 @@ aarch64_classify_address (struct aarch64_address_info *info,
 	  && GET_MODE_SIZE (mode).is_constant (&const_size)
 	  && const_size >= 4
 	  && aarch64_classify_symbolic_expression (x) == SYMBOL_TINY_ABSOLUTE)
-	return true;
+	{
+	  /* ??? This is a bit of a hack.  All SYMBOL_TINY_ABSOLUTE loads
+	     should be in range, not just function constant pool entries.
+	     However, to handle that properly, we would need to distinguish
+	     between load and store contexts.  This would probably mean
+	     defining TARGET_MEM_CONSTRAINT to something other than "m",
+	     keeping the current meaning of "m", and having a more relaxed
+	     constraint than "m" for loads.  */
+	  rtx base = strip_offset (x, &offset);
+	  if (SYMBOL_REF_P (base) && CONSTANT_POOL_ADDRESS_P (base))
+	    return true;
+	}
       return false;
 
     case LO_SUM:
