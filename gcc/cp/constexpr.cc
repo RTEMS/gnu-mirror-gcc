@@ -920,7 +920,8 @@ maybe_save_constexpr_fundef (tree fun)
   if (!potential && complain)
     require_potential_rvalue_constant_expression (massaged);
 
-  if (DECL_CONSTRUCTOR_P (fun) && potential)
+  if (DECL_CONSTRUCTOR_P (fun) && potential
+      && !DECL_DEFAULTED_FN (fun))
     {
       if (cx_check_missing_mem_inits (DECL_CONTEXT (fun),
 				      massaged, complain))
@@ -4565,19 +4566,18 @@ cxx_eval_bit_cast (const constexpr_ctx *ctx, tree t, bool *non_constant_p,
 static tree
 cxx_eval_logical_expression (const constexpr_ctx *ctx, tree t,
                              tree bailout_value, tree continue_value,
-			     bool lval,
 			     bool *non_constant_p, bool *overflow_p)
 {
   tree r;
   tree lhs = cxx_eval_constant_expression (ctx, TREE_OPERAND (t, 0),
-					   lval,
-					   non_constant_p, overflow_p);
+					   /*lval*/false, non_constant_p,
+					   overflow_p);
   VERIFY_CONSTANT (lhs);
   if (tree_int_cst_equal (lhs, bailout_value))
     return lhs;
   gcc_assert (tree_int_cst_equal (lhs, continue_value));
   r = cxx_eval_constant_expression (ctx, TREE_OPERAND (t, 1),
-				    lval, non_constant_p,
+				    /*lval*/false, non_constant_p,
 				    overflow_p);
   VERIFY_CONSTANT (r);
   return r;
@@ -7105,7 +7105,6 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
     case TRUTH_ANDIF_EXPR:
       r = cxx_eval_logical_expression (ctx, t, boolean_false_node,
 				       boolean_true_node,
-				       lval,
 				       non_constant_p, overflow_p);
       break;
 
@@ -7113,7 +7112,6 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
     case TRUTH_ORIF_EXPR:
       r = cxx_eval_logical_expression (ctx, t, boolean_true_node,
 				       boolean_false_node,
-				       lval,
 				       non_constant_p, overflow_p);
       break;
 

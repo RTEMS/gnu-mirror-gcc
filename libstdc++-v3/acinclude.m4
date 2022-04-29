@@ -3612,6 +3612,9 @@ AC_DEFUN([GLIBCXX_ENABLE_LOCK_POLICY], [
     dnl Why don't we check 8-byte CAS for sparc64, where _Atomic_word is long?!
     dnl New targets should only check for CAS for the _Atomic_word type.
     AC_TRY_COMPILE([
+    #if defined __riscv
+    # error "Defaulting to mutex-based locks for ABI compatibility"
+    #endif
     #if ! defined __GCC_HAVE_SYNC_COMPARE_AND_SWAP_2
     # error "No 2-byte compare-and-swap"
     #elif ! defined __GCC_HAVE_SYNC_COMPARE_AND_SWAP_4
@@ -5004,10 +5007,10 @@ esac
 BACKTRACE_CPPFLAGS="$BACKTRACE_CPPFLAGS -DBACKTRACE_ELF_SIZE=$elfsize"
 
   AC_MSG_CHECKING([whether to build libbacktrace support])
-  if test "$enable_libstdcxx_backtrace" == "auto"; then
+  if test "$enable_libstdcxx_backtrace" = "auto"; then
     enable_libstdcxx_backtrace=no
   fi
-  if test "$enable_libstdcxx_backtrace" == "yes"; then
+  if test "$enable_libstdcxx_backtrace" = "yes"; then
     BACKTRACE_SUPPORTED=1
 
     AC_CHECK_HEADERS(sys/mman.h)
@@ -5054,7 +5057,7 @@ BACKTRACE_CPPFLAGS="$BACKTRACE_CPPFLAGS -DBACKTRACE_ELF_SIZE=$elfsize"
     BACKTRACE_SUPPORTS_THREADS=0
   fi
   AC_MSG_RESULT($enable_libstdcxx_backtrace)
-  GLIBCXX_CONDITIONAL(ENABLE_BACKTRACE, [test "$enable_libstdcxx_backtrace" != no])
+  GLIBCXX_CONDITIONAL(ENABLE_BACKTRACE, [test "$enable_libstdcxx_backtrace" = yes])
 ])
 
 # Macros from the top-level gcc directory.

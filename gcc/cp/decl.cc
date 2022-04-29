@@ -8554,7 +8554,7 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
     {
       for (tree t : *cleanups)
 	{
-	  push_cleanup (decl, t, false);
+	  push_cleanup (NULL_TREE, t, false);
 	  /* As in initialize_local_var.  */
 	  wrap_temporary_cleanups (init, t);
 	}
@@ -12243,6 +12243,8 @@ grokdeclarator (const cp_declarator *declarator,
 	      pedwarn (loc, OPT_Wpedantic, "%qs specified with %qT",
 		       key, type);
 	      ok = !flag_pedantic_errors;
+	      type = DECL_ORIGINAL_TYPE (typedef_decl);
+	      typedef_decl = NULL_TREE;
 	    }
 	  else if (declspecs->decltype_p)
 	    error_at (loc, "%qs specified with %<decltype%>", key);

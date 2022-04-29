@@ -4891,6 +4891,7 @@ ix86_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
 	{
 	  int i, prev_size = 0;
 	  tree temp = create_tmp_var (type, "va_arg_tmp");
+	  TREE_ADDRESSABLE (temp) = 1;
 
 	  /* addr = &temp; */
 	  t = build1 (ADDR_EXPR, build_pointer_type (type), temp);
@@ -18807,7 +18808,8 @@ ix86_veclibabi_svml (combined_fn fn, tree type_out, tree type_in)
       return NULL_TREE;
     }
 
-  tree fndecl = mathfn_built_in (TREE_TYPE (type_in), fn);
+  tree fndecl = mathfn_built_in (el_mode == DFmode
+				 ? double_type_node : float_type_node, fn);
   bname = IDENTIFIER_POINTER (DECL_NAME (fndecl));
 
   if (DECL_FUNCTION_CODE (fndecl) == BUILT_IN_LOGF)
@@ -18899,7 +18901,8 @@ ix86_veclibabi_acml (combined_fn fn, tree type_out, tree type_in)
       return NULL_TREE;
     }
 
-  tree fndecl = mathfn_built_in (TREE_TYPE (type_in), fn);
+  tree fndecl = mathfn_built_in (el_mode == DFmode
+				 ? double_type_node : float_type_node, fn);
   bname = IDENTIFIER_POINTER (DECL_NAME (fndecl));
   sprintf (name + 7, "%s", bname+10);
 

@@ -4341,7 +4341,9 @@ check_for_bare_parameter_packs (tree t, location_t loc /* = UNKNOWN_LOCATION */)
 	 parameter_packs = TREE_CHAIN (parameter_packs))
       {
 	tree pack = TREE_VALUE (parameter_packs);
-	if (is_capture_proxy (pack))
+	if (is_capture_proxy (pack)
+	    || (TREE_CODE (pack) == PARM_DECL
+		&& DECL_CONTEXT (DECL_CONTEXT (pack)) == lam))
 	  break;
       }
 
@@ -5227,8 +5229,9 @@ process_partial_specialization (tree decl)
 	   && !get_partial_spec_bindings (maintmpl, maintmpl, specargs))
     {
       auto_diagnostic_group d;
-      if (permerror (input_location, "partial specialization %qD is not "
-		     "more specialized than", decl))
+      if (pedwarn (input_location, 0,
+		   "partial specialization %qD is not more specialized than",
+		   decl))
 	inform (DECL_SOURCE_LOCATION (maintmpl), "primary template %qD",
 		maintmpl);
     }
@@ -10902,7 +10905,7 @@ uses_template_parms (tree t)
 		   || uses_template_parms (TREE_CHAIN (t)));
   else if (TREE_CODE (t) == TYPE_DECL)
     dependent_p = dependent_type_p (TREE_TYPE (t));
-  else if (t == error_mark_node)
+  else if (t == error_mark_node || TREE_CODE (t) == NAMESPACE_DECL)
     dependent_p = false;
   else
     dependent_p = instantiation_dependent_expression_p (t);
@@ -12679,7 +12682,13 @@ gen_elem_of_pack_expansion_instantiation (tree pattern,
     t = tsubst_expr (pattern, args, complain, in_decl,
 		     /*integral_constant_expression_p=*/false);
   else
-    t = tsubst (pattern, args, complain, in_decl);
+    {
+      t = tsubst (pattern, args, complain, in_decl);
+      if (is_auto (t) && !ith_elem_is_expansion)
+	/* When expanding the fake auto... pack expansion from add_capture, we
+	   need to mark that the expansion is no longer a pack.  */
+	TEMPLATE_TYPE_PARAMETER_PACK (t) = false;
+    }
 
   /*  If the Ith argument pack element is a pack expansion, then
       the Ith element resulting from the substituting is going to
@@ -15084,6 +15093,12 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain)
 	  {
 	    DECL_ORIGINAL_TYPE (r) = NULL_TREE;
 	    set_underlying_type (r);
+
+	    /* common_handle_aligned_attribute doesn't apply the alignment
+	       to DECL_ORIGINAL_TYPE.  */
+	    if (TYPE_USER_ALIGN (TREE_TYPE (t)))
+	      TREE_TYPE (r) = build_aligned_type (TREE_TYPE (r),
+						  TYPE_ALIGN (TREE_TYPE (t)));
 	  }
 
 	layout_decl (r, 0);
@@ -15182,7 +15197,9 @@ tsubst_arg_types (tree arg_types,
   /* Except that we do substitute default arguments under tsubst_lambda_expr,
      since the new op() won't have any associated template arguments for us
      to refer to later.  */
-  if (lambda_fn_in_template_p (in_decl))
+  if (lambda_fn_in_template_p (in_decl)
+      || (in_decl && TREE_CODE (in_decl) == FUNCTION_DECL
+	  && DECL_LOCAL_DECL_P (in_decl)))
     default_arg = tsubst_copy_and_build (default_arg, args, complain, in_decl,
 					 false/*fn*/, false/*constexpr*/);
 
@@ -16470,7 +16487,8 @@ tsubst_baselink (tree baselink, tree object_type,
 
   tree binfo_type = BINFO_TYPE (BASELINK_BINFO (baselink));
   binfo_type = tsubst (binfo_type, args, complain, in_decl);
-  bool dependent_p = binfo_type != BINFO_TYPE (BASELINK_BINFO (baselink));
+  bool dependent_p = (binfo_type != BINFO_TYPE (BASELINK_BINFO (baselink))
+		      || optype != BASELINK_OPTYPE (baselink));
 
   if (dependent_p)
     {
@@ -24258,7 +24276,8 @@ unify (tree tparms, tree targs, tree parm, tree arg, int strict,
 	    }
 	}
 
-      if (!TREE_TYPE (arg))
+      if (!TREE_TYPE (arg)
+	  || TREE_CODE (TREE_TYPE (arg)) == DEPENDENT_OPERATOR_TYPE)
 	/* Template-parameter dependent expression.  Just accept it for now.
 	   It will later be processed in convert_template_argument.  */
 	;
@@ -24290,7 +24309,7 @@ unify (tree tparms, tree targs, tree parm, tree arg, int strict,
 	      /* Now check whether the type of this parameter is still
 		 dependent, and give up if so.  */
 	      ++processing_template_decl;
-	      tparm = tsubst (tparm, targs, tf_none, NULL_TREE);
+	      tparm = tsubst (TREE_TYPE (parm), targs, tf_none, NULL_TREE);
 	      --processing_template_decl;
 	      if (uses_template_parms (tparm))
 		return unify_success (explain_p);
