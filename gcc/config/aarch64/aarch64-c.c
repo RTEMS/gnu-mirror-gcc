@@ -140,32 +140,16 @@ aarch64_update_cpp_builtins (cpp_reader *pfile)
 
   aarch64_def_or_undef (TARGET_CAPABILITY_ANY,
 			"__GCC_ARM_CAPABILITY_ANY", pfile);
-  /* MORELLO TODO
-     For the moment we're going to predefine these macros when compiling for
-     fake-capability.
-     This should not stay for very long.
-     It's just here to help Carlos test the glibc build system in the time
-     before we have pure capability codegen.
-     Once we're getting pure-capability code running we should make these
-     predefined macros only available for that.  */
   aarch64_def_or_undef (AARCH64_ISA_C64, "__ARM_FEATURE_C64", pfile);
-  if (TARGET_CAPABILITY_PURE || TARGET_CAPABILITY_FAKE)
+
+  if (TARGET_MORELLO)
     {
-      /* N.b. I've only found the values for __ARM_CAP* defined in a document.
-	 The others were found by looking at the assembly after using them in
-	 the compiler explorer.  */
-      cpp_undef (pfile, "__CHERI_CAP_PERMISSION_PERMIT_CCALL__");
+      /* These defines are Morello-specific, as per the Morello ACLE.  */
       builtin_define_with_int_value ("__ARM_CAP_PERMISSION_EXECUTIVE__", 2);
       builtin_define_with_int_value ("__ARM_CAP_PERMISSION_MUTABLE_LOAD__", 64);
       builtin_define_with_int_value ("__ARM_CAP_PERMISSION_COMPARTMENT_ID__", 128);
       builtin_define_with_int_value ("__ARM_CAP_PERMISSION_BRANCH_SEALED_PAIR__", 256);
     }
-  /* MORELLO TODO I guess there should be a hook to give the information of
-     whether we're targetting a pure capability ABI or not the frontend so that
-     `__CHERI_PURE_CAPABILITY__` can be defined in the `c_cpp_builtins` in the
-     C frontend code rather than in the backend.  */
-  aarch64_def_or_undef (TARGET_CAPABILITY_PURE, "__CHERI_PURE_CAPABILITY__",
-			pfile);
 
   aarch64_def_or_undef (TARGET_CRYPTO, "__ARM_FEATURE_CRYPTO", pfile);
   aarch64_def_or_undef (TARGET_SIMD_RDMA, "__ARM_FEATURE_QRDMX", pfile);

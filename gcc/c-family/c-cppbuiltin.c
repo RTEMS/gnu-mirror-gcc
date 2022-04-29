@@ -1457,15 +1457,8 @@ c_cpp_builtins (cpp_reader *pfile)
   builtin_define_type_sizeof ("__SIZEOF_PTRDIFF_T__",
 			      unsigned_ptrdiff_type_node);
 
-  /* MORELLO TODO
-     For the moment we're going to predefine these macros when compiling for
-     fake-capability.
-     This should not stay for very long.
-     It's just here to help Carlos test the glibc build system in the time
-     before we have pure capability codegen.
-     Once we're getting pure-capability code running we should make these
-     predefined macros only available for that.  */
-  if (targetm.capability_mode().exists())
+  if (targetm.capability_mode ().exists ()
+      && targetm.capabilities_in_hardware ())
     {
       /* N.b. I've not found these values defined in a document anywhere.
 	 The values were found by looking at the assembly after using them in
@@ -1482,6 +1475,9 @@ c_cpp_builtins (cpp_reader *pfile)
       builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_EXECUTE__", 32768);
       builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_STORE__", 65536);
       builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_LOAD__", 131072);
+
+      if (targetm.capability_mode ().require () == Pmode)
+	cpp_define (pfile, "__CHERI_PURE_CAPABILITY__");
     }
 
   /* A straightforward target hook doesn't work, because of problems
