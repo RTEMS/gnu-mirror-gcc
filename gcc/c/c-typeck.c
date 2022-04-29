@@ -11145,6 +11145,8 @@ c_start_case (location_t switch_loc,
 
   if (exp != error_mark_node)
     {
+      if (INTCAP_TYPE_P (TREE_TYPE (exp)))
+	exp = drop_capability (exp);
       orig_type = TREE_TYPE (exp);
 
       if (!INTEGRAL_TYPE_P (orig_type))
