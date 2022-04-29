@@ -48,6 +48,11 @@
 (define_register_constraint "y" "FP_LO8_REGS"
   "Floating point and SIMD vector registers V0 - V7.")
 
+(define_register_constraint "C" "GENERAL_REGS"
+  "An alias of the r constraint for Morello capability registers.  This is not
+   intended to ever be used in backend patterns.  It only exists to enable the
+   compiling of CHERI-specific inline asm")
+
 (define_constraint "c"
  "@internal The condition code register."
   (match_operand 0 "cc_register"))

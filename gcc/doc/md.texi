@@ -1760,6 +1760,13 @@ One of the low eight SVE predicate registers (@code{P0} to @code{P7})
 @item Upa
 Any of the SVE predicate registers (@code{P0} to @code{P15})
 
+@item C
+An alias of the r constraint for Morello capability registers.
+@ifset INTERNALS
+This is not intended to ever be used in backend patterns.  It only exists to
+enable the compiling of CHERI-specific inline asm.
+@end ifset
+
 @item I
 Integer constant that is valid as an immediate operand in an @code{ADD}
 instruction
