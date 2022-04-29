@@ -924,18 +924,18 @@ c_common_type (tree t1, tree t2)
 
   /* INTCAP_TYPEs out-rank all other integer types.  */
 
-  if ((code1 == INTCAP_TYPE && INTEGRAL_TYPE_P (t2))
-      || (code2 == INTCAP_TYPE && INTEGRAL_TYPE_P (t1)))
+  if (code1 == INTCAP_TYPE || code2 == INTCAP_TYPE)
     {
       tree t_intcap = (code1 == INTCAP_TYPE) ? t1 : t2;
       tree t_int = (t_intcap == t1) ? t2 : t1;
+      gcc_assert (INTEGRAL_TYPE_P (t_int) || INTCAP_TYPE_P (t_int));
 
       /* If the signs differ, the unsigned type has conversion rank less
 	 than the signed type, and the signed type cannot represent all values
 	 of the unsigned type, then both operands are converted to the unsigned
 	 counterpart of the signed operand.  */
       if (!TYPE_UNSIGNED (t_intcap) && TYPE_UNSIGNED (t_int)
-	  && TYPE_NONCAP_PRECISION (t_intcap) <= TYPE_PRECISION (t_int))
+	  && TYPE_NONCAP_PRECISION (t_intcap) <= TYPE_NONCAP_PRECISION (t_int))
 	return uintcap_type_node;
       else
 	return t_intcap;
