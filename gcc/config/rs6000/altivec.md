@@ -2051,6 +2051,52 @@
   "vsraq %0,%1,%2"
   [(set_attr "type" "vecsimple")])
 
+(define_code_iterator ti_shift [ashift ashiftrt lshiftrt])
+
+(define_code_attr ti_shift_insn [(ashift   "vslq")
+				 (ashiftrt "vsraq")
+				 (lshiftrt "vsrq")])
+
+(define_code_attr ti_shift_name [(ashift   "ashl")
+				 (ashiftrt "ashr")
+				 (lshiftrt "lshr")])
+
+;; If we have the register allocator load up the shift count, it likely will
+;; generate 2 instructions (li + mtvsrd or vsplitw + vunpack).  Since the shift
+;; instruction only cares about the the bottom 7 bits in the upper word, we can
+;; generate the constant easier with vspltisw or xxspltiw.  In the future, we
+;; can also do constant integer shifts in GPR registers fairly simply.
+;;
+;; If we are shifting by 16 or more, we will need to use xxsplitw, which is a
+;; prefixed instruction, and a longer instruction.
+(define_insn_and_split "<ti_shift_name><mode>3"
+  [(set (match_operand:VEC_TI 0 "register_operand" "=v,&v,&v")
+	(ti_shift:VEC_TI (match_operand:VEC_TI 1 "register_operand" "v,v,v")
+			 (match_operand:SI 2 "input_operand" "v,wB,n")))
+   (clobber (match_scratch:V4SI 3 "=X,&v,&v"))]
+  "TARGET_POWER10"
+  "@
+   <ti_shift_insn> %0,%1,%2
+   #
+   #"
+  "&& reload_completed && CONST_INT_P (operands[2])"
+  [(set (match_dup 3)
+	(match_dup 4))
+   (parallel [(set (match_dup 0)
+		   (ti_shift:VEC_TI (match_dup 1)
+				    (match_dup 5)))
+	      (clobber (match_dup 6))])]
+{
+  rtx op2 = operands[2];
+  rtx tmp = operands[3];
+  operands[4] = gen_rtx_CONST_VECTOR (V4SImode,
+				      gen_rtvec (4, op2, op2, op2, op2));
+  operands[5] = gen_rtx_REG (SImode, reg_or_subregno (tmp));
+  operands[6] = gen_rtx_SCRATCH (V4SImode);
+}
+  [(set_attr "type" "vecsimple")
+   (set_attr "length" "*,8,16")])
+
 (define_insn "altivec_vsr"
   [(set (match_operand:V4SI 0 "register_operand" "=v")
         (unspec:V4SI [(match_operand:V4SI 1 "register_operand" "v")
