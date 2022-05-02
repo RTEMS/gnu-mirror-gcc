@@ -1,3 +1,16 @@
+==================== work087, patch #9:
+
+Add support for power10 128-bit shifts.
+
+2022-05-02   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/altivec.md (ti_shift): New code iterator.
+	(ti_shift_insn): New code attribute.
+	(ti_shift_name): New code attribute.
+	(<ti_shift_name><mode>3): Add support for 128-bit integer shift
+	right, left, and arithmetic right using power10 instructions.
+
 ==================== work087, patch #8:
 
 Generate vadduqm and vsubuqm for TImode add/subtract
