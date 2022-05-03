@@ -1,4 +1,4 @@
-/* { dg-do run } */
+/* { dg-do run { target cheri_capability_any } } */
 
 /* Declare twice to ensure that the types are the same (error otherwise).  */
 __INTPTR_TYPE__ x(int);

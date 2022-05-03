@@ -3580,6 +3580,14 @@ proc check_effective_target_cheri_capability_pure { } {
   }]
 }
 
+proc check_effective_target_cheri_capability_any { } {
+  return [check_no_compiler_messages cheri_capability_any assembly {
+  #if !defined (__CHERI__)
+  #error foo
+  #endif
+  }]
+}
+
 # Return the size in bits of an SVE vector, or 0 if the size is variable.
 proc aarch64_sve_bits { } {
     return [check_cached_effective_target aarch64_sve_bits {
