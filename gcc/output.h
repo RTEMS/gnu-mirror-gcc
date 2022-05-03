@@ -365,6 +365,8 @@ extern bool decl_readonly_section (const_tree, int);
    given a constant expression.  */
 extern int compute_reloc_for_constant (tree);
 
+extern int compute_reloc_for_rtx (const_rtx);
+
 /* User label prefix in effect for this compilation.  */
 extern const char *user_label_prefix;
 

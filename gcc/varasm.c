@@ -7170,12 +7170,19 @@ default_unique_section (tree decl, int reloc)
 static int
 compute_reloc_for_rtx_1 (const_rtx x)
 {
+  int reloc = 0;
   switch (GET_CODE (x))
     {
     case SYMBOL_REF:
-      return SYMBOL_REF_LOCAL_P (x) ? 1 : 2;
     case LABEL_REF:
-      return 1;
+      if (CAPABILITY_MODE_P (GET_MODE (x)))
+	reloc |= RELOC_CAPABILITY;
+      if (SYMBOL_REF_P (x) && !SYMBOL_REF_LOCAL_P (x))
+	reloc |= 2;
+      else
+	reloc |= 1;
+      return reloc;
+
     default:
       return 0;
     }
@@ -7185,34 +7192,27 @@ compute_reloc_for_rtx_1 (const_rtx x)
    is a mask for which bit 1 indicates a global relocation, and bit 0
    indicates a local relocation.  */
 
-static int
+int
 compute_reloc_for_rtx (const_rtx x)
 {
-  int reloc = 0;
-
   switch (GET_CODE (x))
     {
     case SYMBOL_REF:
     case LABEL_REF:
-      reloc = compute_reloc_for_rtx_1 (x);
-      break;
+      return compute_reloc_for_rtx_1 (x);
 
     case CONST:
       {
+	int reloc = 0;
 	subrtx_iterator::array_type array;
 	FOR_EACH_SUBRTX (iter, array, x, ALL)
 	  reloc |= compute_reloc_for_rtx_1 (*iter);
+	return reloc;
       }
-      break;
 
     default:
       return 0;
     }
-
-  if (CAPABILITY_MODE_P (GET_MODE (x)))
-    reloc |= RELOC_CAPABILITY;
-
-  return reloc;
 }
 
 section *

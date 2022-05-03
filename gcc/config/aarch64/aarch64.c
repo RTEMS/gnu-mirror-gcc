@@ -9733,7 +9733,9 @@ aarch64_can_use_per_function_literal_pools_p (const_rtx x)
 {
   /* Real capabilities aren't link-time constants, so putting one in the
      text section would require the text segment to be load-time writable.  */
-  if (!TARGET_CAPABILITY_FAKE && x && CAPABILITY_MODE_P (GET_MODE (x)))
+  if (!TARGET_CAPABILITY_FAKE
+      && x
+      && (compute_reloc_for_rtx (x) & RELOC_CAPABILITY))
     return false;
 
   return (aarch64_pcrelative_literal_loads
