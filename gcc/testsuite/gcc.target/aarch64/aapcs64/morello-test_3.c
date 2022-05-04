@@ -11,7 +11,7 @@
    This testcase is part of a set.  morello-test_{2,3,4}.c test passing the same
    structures in different orders to ensure the behaviour is correct.  */
 
-/* { dg-do run { target { { aarch64*-*-* } && { cheri_capability_pure } } } */
+/* { dg-do run } */
 
 #ifndef IN_FRAMEWORK
 #define TESTFILE "morello-test_3.c"

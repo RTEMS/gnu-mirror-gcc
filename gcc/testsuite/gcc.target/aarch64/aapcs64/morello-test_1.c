@@ -8,7 +8,7 @@
    This file tests that plain capabilities (i.e. not as part of a composite
    type) are passed as expected.  */
 
-/* { dg-do run { target { { aarch64*-*-* } && { cheri_capability_pure } } } */
+/* { dg-do run } */
 
 #ifndef IN_FRAMEWORK
 #define TESTFILE "morello-test_1.c"
@@ -20,6 +20,6 @@
   ARG(__uintcap_t, 100, C1)
   ARG(__intcap_t, 100, C2)
   ARG(int, 3, W3)
-  ARG(int *, 0, C4)
+  ARG(int * __capability, 0, C4)
   LAST_ARG(long long, 0xDEADBEEFCAFEBABELL, X5)
 #endif

@@ -184,19 +184,19 @@ union non_hfa_union_t
   float b;
 };
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 /* Structures containing capabilities.  */
 union cap_no_overlap_union_t
 {
   __uintcap_t uic;
-  int *ip;
+  int * __capability ip;
   int i;
 };
 
 union cap_overlap_union_t
 {
   __uintcap_t uic;
-  int *ip;
+  int * __capability ip;
   struct {
       long long ll1;
       long long ll2;

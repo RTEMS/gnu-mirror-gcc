@@ -78,8 +78,13 @@
 #define C9     496
 
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
 #define STACK  512
+#else
+#define STACK  352
+#endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
 #define PTR0 C0
 #define PTR1 C1
 #define PTR2 C2
@@ -90,7 +95,6 @@
 #define PTR7 C7
 #define PTR8 C8
 #else
-#define STACK  352
 #define PTR0 X0
 #define PTR1 X1
 #define PTR2 X2

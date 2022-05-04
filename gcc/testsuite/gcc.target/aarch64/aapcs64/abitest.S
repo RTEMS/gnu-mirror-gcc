@@ -89,7 +89,16 @@ dumpregs:
 myfunc:
       mov	x16, sp
       mov	x17, sp
+#ifdef __CHERI__
+      sub	sp,  sp, 528 // 512 for registers and 16 for old sp and lr
+      stp	c8, c9, [x17, #-32]! // 496
+      stp	c6, c7, [x17, #-32]! // 464
+      stp	c4, c5, [x17, #-32]! // 432
+      stp	c2, c3, [x17, #-32]! // 400
+      stp	c0, c1, [x17, #-32]! // 368
+#else
       sub	sp,  sp, 368 // 352 for registers and 16 for old sp and lr
+#endif
 
       sub	x17, x17, 8
       st4	{ v4.h, v5.h, v6.h, v7.h }[0], [x17] //344

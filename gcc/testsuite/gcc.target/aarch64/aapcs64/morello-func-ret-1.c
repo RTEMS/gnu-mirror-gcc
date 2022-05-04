@@ -3,7 +3,7 @@
    This test covers homogeneous floating-point aggregate types as described
    in AAPCS64 \S 4.3.5.  */
 
-/* { dg-do run { target { { aarch64*-*-* } && { cheri_capability_pure } } } */
+/* { dg-do run } */
 /* { dg-additional-sources "abitest.S" } */
 
 #ifndef IN_FRAMEWORK

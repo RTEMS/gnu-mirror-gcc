@@ -8,7 +8,7 @@
    This file tests that composite types containing capabilities are passed as
    expected.  */
 
-/* { dg-do run { target { { aarch64*-*-* } && { cheri_capability_pure } } } */
+/* { dg-do run } */
 
 #ifndef IN_FRAMEWORK
 #define TESTFILE "morello-test_8.c"

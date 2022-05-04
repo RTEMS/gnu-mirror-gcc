@@ -11,7 +11,7 @@
    This testcase is part of a set.  morello-test_{2,3,4}.c test passing the same
    structures in different orders to ensure the behaviour is correct.  */
 
-/* { dg-do run { target { { aarch64*-*-* } && { cheri_capability_pure } } } */
+/* { dg-do run } */
 
 #ifndef IN_FRAMEWORK
 #define TESTFILE "morello-test_4.c"
@@ -36,8 +36,8 @@ struct cap_large_struct_t  lc1 = { 13, 14, 15 };
   ARG(struct cap_no_overlap_cn_t, cn1, STACK+32)
   ARG(struct cap_two_cap_t,       tc1, STACK+64)
   PTR(struct cap_overlap_nc_t,    onc1, STACK+96)
-  PTR(struct cap_overlap_cn_t,    ocn1, STACK+112)
-  PTR(struct cap_large_struct_t,    lc1, STACK+128)
-  LAST_ARG(long long, 0xDEADBEEFCAFEBABELL, STACK+144)
+  PTR(struct cap_overlap_cn_t,    ocn1, STACK + 96 + sizeof(void*))
+  PTR(struct cap_large_struct_t,    lc1, STACK + 96 + 2*sizeof(void*))
+  LAST_ARG(long long, 0xDEADBEEFCAFEBABELL, STACK + 96 + 3*sizeof(void*))
 #endif
 

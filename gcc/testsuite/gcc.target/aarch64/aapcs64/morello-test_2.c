@@ -11,7 +11,7 @@
    This testcase is part of a set.  morello-test_{2,3,4}.c test passing the
    same structures in different orders to ensure the behaviour is correct.  */
 
-/* { dg-do run { target { { aarch64*-*-* } && { cheri_capability_pure } } } */
+/* { dg-do run } */
 
 #ifndef IN_FRAMEWORK
 #define TESTFILE "morello-test_2.c"
@@ -25,10 +25,9 @@ struct cap_overlap_cn_t    ocn1 = { 10, 11, 12 };
 #include "abitest.h"
 #else
   ARG(struct cap_no_overlap_nc_t, nc1, C0)
-  PTR(struct cap_overlap_nc_t, onc1, C2)
+  PTR(struct cap_overlap_nc_t, onc1, PTR2)
   ARG(struct cap_no_overlap_cn_t, cn1, C3)
   ARG(struct cap_two_cap_t, tc1, C5)
-  PTR(struct cap_overlap_cn_t, ocn1, C7)
+  PTR(struct cap_overlap_cn_t, ocn1, PTR7)
   LAST_ARG(long long, 0xDEADBEEFCAFEBABELL, STACK)
 #endif
-

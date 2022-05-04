@@ -42,7 +42,7 @@ if { [check_weak_available] } {
     }
     # Using `c-torture-execute` means that target selectors in the files are
     # ignored.
-    if { [ check_effective_target_cheri_capability_pure ] } {
+    if { [ check_effective_target_cheri_capability_any ] } {
 	foreach src [lsort [glob -nocomplain $srcdir/$subdir/morello-test_*.c]] {
 	    if {[runtest_file_p $runtests $src]} {
 		c-torture-execute [list $src \
@@ -91,7 +91,7 @@ if { [check_weak_available] } {
     }
     # Using `c-torture-execute` means that target selectors in the files are
     # ignored.
-    if { [ check_effective_target_cheri_capability_pure ] } {
+    if { [ check_effective_target_cheri_capability_any ] } {
 	foreach src [lsort [glob -nocomplain $srcdir/$subdir/morello-func-ret-*.c]] {
 	    if {[runtest_file_p $runtests $src]} {
 		c-torture-execute [list $src \
