@@ -150,6 +150,8 @@ static inline __SIZE_TYPE__ cheri_subset_test(const void * __capability __cap_a,
   return __IF_CAPS(__builtin_cheri_subset_test(__cap_a, __cap_b), 0);
 }
 
+/* MORELLO TODO: implement these.  */
+#if 0
 #ifndef __CHERI_PURE_CAPABILITY__
 static inline
 void * __capability
@@ -164,6 +166,7 @@ void * cheri_cap_to_pointer(const void * __capability __cap,
   return __IF_CAPS(__builtin_cheri_cap_to_pointer(__cap, __offset),
                    (void *)__offset);
 }
+#endif
 #endif
 
 static inline

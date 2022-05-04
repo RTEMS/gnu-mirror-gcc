@@ -159,10 +159,26 @@ aarch64-bti-insert.o: $(srcdir)/config/aarch64/aarch64-bti-insert.c \
 		$(srcdir)/config/aarch64/aarch64-bti-insert.c
 
 comma=,
-MULTILIB_OPTIONS    = $(subst $(comma),/, $(patsubst %, mabi=%, $(subst $(comma),$(comma)mabi=,$(TM_MULTILIB_CONFIG)))) march=morello+c64 march=morello+c64+nolse
+
+# Adding nothing to an empty variable is one way to obtain a space
+# character in a variable. As with comma above, we then use it as an
+# escaped space character.
+space =
+space +=
+
+WITHOUT_HYBRID = $(subst $(space),$(comma),$(filter-out hybridcap,$(subst $(comma),$(space),$(TM_MULTILIB_CONFIG))))
+MULTILIB_OPTIONS = $(subst $(comma),/, $(patsubst %, mabi=%, $(subst $(comma),$(comma)mabi=,$(WITHOUT_HYBRID))))
+
+ifeq ($(findstring hybridcap,$(TM_MULTILIB_CONFIG)), hybridcap)
+MULTILIB_OPTIONS += march=morello
+endif
+
+MULTILIB_OPTIONS += march=morello+c64 march=morello+c64+nolse
+
 MULTILIB_REQUIRED   = mabi=ilp32
 MULTILIB_REQUIRED   += mabi=lp64
 MULTILIB_REQUIRED   += mabi=purecap/march=morello+c64
+MULTILIB_REQUIRED   += march=morello
 # MORELLO TODO This is a bit of an ugly approach.  We want to say "ignore any
 # extra architecture extensions other than the +c64 extension when deciding
 # which multilib to use".  This statement below says "the option
