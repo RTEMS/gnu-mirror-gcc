@@ -213,16 +213,12 @@ final class CParser(AST) : Parser!AST
                     goto Lexp;
 
                 case TOK.leftParenthesis:
-                {
-                    /* If tokens look like a function call, assume it is one,
-                     * As any type-name won't be resolved until semantic, this
-                     * could be rewritten later.
-                     */
-                    auto tk = &token;
-                    if (isFunctionCall(tk))
-                        goto Lexp;
-                    goto default;
-                }
+                    if (auto pt = lookupTypedef(token.ident))
+                    {
+                        if (*pt)
+                            goto Ldeclaration;
+                    }
+                    goto Lexp;  // function call
 
                 default:
                 {
@@ -259,6 +255,7 @@ final class CParser(AST) : Parser!AST
         case TOK.plusPlus:
         case TOK.minusMinus:
         case TOK.sizeof_:
+        case TOK._Generic:
         Lexp:
             auto exp = cparseExpression();
             if (token.value == TOK.identifier && exp.op == EXP.identifier)
@@ -981,7 +978,12 @@ final class CParser(AST) : Parser!AST
                     e = new AST.DotIdExp(loc, e, Id.__sizeof);
                     break;
                 }
+                // must be an expression
+                e = cparsePrimaryExp();
+                e = new AST.DotIdExp(loc, e, Id.__sizeof);
+                break;
             }
+
             e = cparseUnaryExp();
             e = new AST.DotIdExp(loc, e, Id.__sizeof);
             break;
@@ -1016,10 +1018,16 @@ final class CParser(AST) : Parser!AST
     {
         if (token.value == TOK.leftParenthesis)
         {
+            //printf("cparseCastExp()\n");
             auto tk = peek(&token);
-            if (tk.value == TOK.identifier &&
-                !isTypedef(tk.ident) &&
-                peek(tk).value == TOK.rightParenthesis)
+            bool iscast;
+            bool isexp;
+            if (tk.value == TOK.identifier)
+            {
+                iscast = isTypedef(tk.ident);
+                isexp = !iscast;
+            }
+            if (isexp)
             {
                 // ( identifier ) is an expression
                 return cparseUnaryExp();
@@ -1045,9 +1053,18 @@ final class CParser(AST) : Parser!AST
                     auto ce = new AST.CompoundLiteralExp(loc, t, ci);
                     return cparsePostfixOperators(ce);
                 }
-                else if (t.isTypeIdentifier() &&
-                         token.value == TOK.leftParenthesis &&
-                         !isCastExpression(pt))
+
+                if (iscast)
+                {
+                    // ( type-name ) cast-expression
+                    auto ce = cparseCastExp();
+                    return new AST.CastExp(loc, ce, t);
+                }
+
+                if (t.isTypeIdentifier() &&
+                    isexp &&
+                    token.value == TOK.leftParenthesis &&
+                    !isCastExpression(pt))
                 {
                     /* (t)(...)... might be a cast expression or a function call,
                      * with different grammars: a cast would be cparseCastExp(),
@@ -1061,12 +1078,10 @@ final class CParser(AST) : Parser!AST
                     AST.Expression e = new AST.CallExp(loc, ie, cparseArguments());
                     return cparsePostfixOperators(e);
                 }
-                else
-                {
-                    // ( type-name ) cast-expression
-                    auto ce = cparseCastExp();
-                    return new AST.CastExp(loc, ce, t);
-                }
+
+                // ( type-name ) cast-expression
+                auto ce = cparseCastExp();
+                return new AST.CastExp(loc, ce, t);
             }
         }
         return cparseUnaryExp();
@@ -1607,10 +1622,21 @@ final class CParser(AST) : Parser!AST
          */
         if (token.value == TOK.semicolon)
         {
-            nextToken();
             if (!tspec)
+            {
+                nextToken();
                 return;         // accept empty declaration as an extension
+            }
 
+            if (auto ti = tspec.isTypeIdentifier())
+            {
+                // C11 6.7.2-2
+                error("type-specifier missing for declaration of `%s`", ti.ident.toChars());
+                nextToken();
+                return;
+            }
+
+            nextToken();
             auto tt = tspec.isTypeTag();
             if (!tt ||
                 !tt.id && (tt.tok == TOK.struct_ || tt.tok == TOK.union_))
@@ -1640,6 +1666,22 @@ final class CParser(AST) : Parser!AST
         {
             tspec = toConst(tspec);
             specifier.mod &= ~MOD.xnone;          // 'used' it
+        }
+
+        void scanPastSemicolon()
+        {
+            while (token.value != TOK.semicolon && token.value != TOK.endOfFile)
+                nextToken();
+            nextToken();
+        }
+
+        if (token.value == TOK.assign && tspec && tspec.isTypeIdentifier())
+        {
+            /* C11 6.7.2-2
+             * Special check for `const b = 1;` because some compilers allow it
+             */
+            error("type-specifier omitted for declaration of `%s`", tspec.isTypeIdentifier().ident.toChars());
+            return scanPastSemicolon();
         }
 
         bool first = true;
@@ -1764,8 +1806,6 @@ final class CParser(AST) : Parser!AST
                         symbols.push(stag);
                         if (tt.tok == TOK.enum_)
                         {
-                            if (!stag.members)
-                                error(tt.loc, "`enum %s` has no members", stag.toChars());
                             isalias = false;
                             s = new AST.AliasDeclaration(token.loc, id, stag);
                         }
@@ -1863,10 +1903,7 @@ final class CParser(AST) : Parser!AST
                 default:
                     error("`=`, `;` or `,` expected to end declaration instead of `%s`", token.toChars());
                 Lend:
-                    while (token.value != TOK.semicolon && token.value != TOK.endOfFile)
-                        nextToken();
-                    nextToken();
-                    return;
+                    return scanPastSemicolon();
             }
         }
     }
@@ -2382,7 +2419,17 @@ final class CParser(AST) : Parser!AST
                 const idx = previd.toString();
                 if (idx.length > 2 && idx[0] == '_' && idx[1] == '_')  // leading double underscore
                     importBuiltins = true;  // probably one of those compiler extensions
-                t = new AST.TypeIdentifier(loc, previd);
+                t = null;
+
+                /* Punch through to what the typedef is, to support things like:
+                 *  typedef T* T;
+                 */
+                auto pt = lookupTypedef(previd);
+                if (pt && *pt)      // if previd is a known typedef
+                    t = *pt;
+
+                if (!t)
+                    t = new AST.TypeIdentifier(loc, previd);
                 break;
             }
 
@@ -2501,7 +2548,14 @@ final class CParser(AST) : Parser!AST
                 default:
                     if (declarator == DTR.xdirect)
                     {
-                        error("identifier or `(` expected"); // )
+                        if (!t || t.isTypeIdentifier())
+                        {
+                            // const arr[1];
+                            error("no type-specifier for declarator");
+                            t = AST.Type.tint32;
+                        }
+                        else
+                            error("identifier or `(` expected"); // )
                         panic();
                     }
                     ts = t;
@@ -2717,6 +2771,16 @@ final class CParser(AST) : Parser!AST
         Specifier specifier;
         specifier.packalign.setDefault();
         auto tspec = cparseSpecifierQualifierList(LVL.global, specifier);
+        if (!tspec)
+        {
+            error("type-specifier is missing");
+            tspec = AST.Type.tint32;
+        }
+        if (tspec && specifier.mod & MOD.xconst)
+        {
+            tspec = toConst(tspec);
+            specifier.mod = MOD.xnone;      // 'used' it
+        }
         Identifier id;
         return cparseDeclarator(DTR.xabstract, tspec, id, specifier);
     }
@@ -2797,8 +2861,18 @@ final class CParser(AST) : Parser!AST
             Specifier specifier;
             specifier.packalign.setDefault();
             auto tspec = cparseDeclarationSpecifiers(LVL.prototype, specifier);
-            if (tspec && specifier.mod & MOD.xconst)
+            if (!tspec)
             {
+                error("no type-specifier for parameter");
+                tspec = AST.Type.tint32;
+            }
+
+            if (specifier.mod & MOD.xconst)
+            {
+                if ((token.value == TOK.rightParenthesis || token.value == TOK.comma) &&
+                    tspec.isTypeIdentifier())
+                    error("type-specifier omitted for parameter `%s`", tspec.isTypeIdentifier().ident.toChars());
+
                 tspec = toConst(tspec);
                 specifier.mod = MOD.xnone;      // 'used' it
             }
@@ -3368,7 +3442,12 @@ final class CParser(AST) : Parser!AST
         Specifier specifier;
         specifier.packalign = this.packalign;
         auto tspec = cparseSpecifierQualifierList(LVL.member, specifier);
-        if (tspec && specifier.mod & MOD.xconst)
+        if (!tspec)
+        {
+            error("no type-specifier for struct member");
+            tspec = AST.Type.tint32;
+        }
+        if (specifier.mod & MOD.xconst)
         {
             tspec = toConst(tspec);
             specifier.mod = MOD.xnone;          // 'used' it
@@ -3381,7 +3460,13 @@ final class CParser(AST) : Parser!AST
             nextToken();
             auto tt = tspec.isTypeTag();
             if (!tt)
+            {
+                if (auto ti = tspec.isTypeIdentifier())
+                {
+                    error("type-specifier omitted before declaration of `%s`", ti.ident.toChars());
+                }
                 return; // legal but meaningless empty declaration
+            }
 
             /* If anonymous struct declaration
              *   struct { ... members ... };
@@ -3421,6 +3506,12 @@ final class CParser(AST) : Parser!AST
             AST.Type dt;
             if (token.value == TOK.colon)
             {
+                if (auto ti = tspec.isTypeIdentifier())
+                {
+                    error("type-specifier omitted before bit field declaration of `%s`", ti.ident.toChars());
+                    tspec = AST.Type.tint32;
+                }
+
                 // C11 6.7.2.1-12 unnamed bit-field
                 id = Identifier.generateAnonymousId("BitField");
                 dt = tspec;
@@ -4767,7 +4858,8 @@ final class CParser(AST) : Parser!AST
         scan(&n);
         if (n.value == TOK.identifier && n.ident == Id.pack)
             return pragmaPack(loc);
-        skipToNextLine();
+        if (n.value != TOK.endOfLine)
+            skipToNextLine();
     }
 
     /*********
@@ -4786,7 +4878,8 @@ final class CParser(AST) : Parser!AST
         if (n.value != TOK.leftParenthesis)
         {
             error(loc, "left parenthesis expected to follow `#pragma pack`");
-            skipToNextLine();
+            if (n.value != TOK.endOfLine)
+                skipToNextLine();
             return;
         }
 
@@ -4796,7 +4889,8 @@ final class CParser(AST) : Parser!AST
             {
                 error(loc, "right parenthesis expected to close `#pragma pack(`");
             }
-            skipToNextLine();
+            if (n.value != TOK.endOfLine)
+                skipToNextLine();
         }
 
         void setPackAlign(ref const Token t)
@@ -4923,7 +5017,8 @@ final class CParser(AST) : Parser!AST
         }
 
         error(loc, "unrecognized `#pragma pack(%s)`", n.toChars());
-        skipToNextLine();
+        if (n.value != TOK.endOfLine)
+            skipToNextLine();
     }
 
     //}

@@ -327,9 +327,7 @@
 
 ;; 128-, 256- and 512-bit float vector modes for bitwise operations
 (define_mode_iterator VFB
-  [(V32HF "TARGET_AVX512FP16")
-   (V16HF "TARGET_AVX512FP16")
-   (V8HF "TARGET_AVX512FP16")
+  [(V32HF "TARGET_AVX512F") (V16HF "TARGET_AVX") (V8HF "TARGET_SSE2")
    (V16SF "TARGET_AVX512F") (V8SF "TARGET_AVX") V4SF
    (V8DF "TARGET_AVX512F") (V4DF "TARGET_AVX") (V2DF "TARGET_SSE2")])
 
@@ -340,8 +338,7 @@
 
 ;; 128- and 256-bit float vector modes for bitwise operations
 (define_mode_iterator VFB_128_256
-  [(V16HF "TARGET_AVX512FP16")
-   (V8HF "TARGET_AVX512FP16")
+  [(V16HF "TARGET_AVX") (V8HF "TARGET_SSE2")
    (V8SF "TARGET_AVX") V4SF
    (V4DF "TARGET_AVX") (V2DF "TARGET_SSE2")])
 
@@ -399,7 +396,7 @@
 
 ;; All 512bit vector float modes for bitwise operations
 (define_mode_iterator VFB_512
-  [(V32HF "TARGET_AVX512FP16") V16SF V8DF])
+  [V32HF V16SF V8DF])
 
 (define_mode_iterator VI48_AVX512VL
   [V16SI (V8SI  "TARGET_AVX512VL") (V4SI  "TARGET_AVX512VL")
@@ -4581,7 +4578,8 @@
 	  (not:VFB_128_256
 	    (match_operand:VFB_128_256 1 "register_operand" "0,x,v,v"))
 	  (match_operand:VFB_128_256 2 "vector_operand" "xBm,xm,vm,vm")))]
-  "TARGET_SSE && <mask_avx512vl_condition>"
+  "TARGET_SSE && <mask_avx512vl_condition>
+   && (!<mask_applied> || <ssescalarmode>mode != HFmode)"
 {
   char buf[128];
   const char *ops;
@@ -4648,7 +4646,7 @@
 	  (not:VFB_512
 	    (match_operand:VFB_512 1 "register_operand" "v"))
 	  (match_operand:VFB_512 2 "nonimmediate_operand" "vm")))]
-  "TARGET_AVX512F"
+  "TARGET_AVX512F && (!<mask_applied> || <ssescalarmode>mode != HFmode)"
 {
   char buf[128];
   const char *ops;
@@ -4683,7 +4681,8 @@
        (any_logic:VFB_128_256
          (match_operand:VFB_128_256 1 "vector_operand")
          (match_operand:VFB_128_256 2 "vector_operand")))]
-  "TARGET_SSE && <mask_avx512vl_condition>"
+  "TARGET_SSE && <mask_avx512vl_condition>
+   && (!<mask_applied> || <ssescalarmode>mode != HFmode)"
   "ix86_fixup_binary_operands_no_copy (<CODE>, <MODE>mode, operands);")
 
 (define_expand "<code><mode>3<mask_name>"
@@ -4691,7 +4690,7 @@
        (any_logic:VFB_512
          (match_operand:VFB_512 1 "nonimmediate_operand")
          (match_operand:VFB_512 2 "nonimmediate_operand")))]
-  "TARGET_AVX512F"
+  "TARGET_AVX512F && (!<mask_applied> || <ssescalarmode>mode != HFmode)"
   "ix86_fixup_binary_operands_no_copy (<CODE>, <MODE>mode, operands);")
 
 (define_insn "*<code><mode>3<mask_name>"
@@ -4700,6 +4699,7 @@
 	  (match_operand:VFB_128_256 1 "vector_operand" "%0,x,v,v")
 	  (match_operand:VFB_128_256 2 "vector_operand" "xBm,xm,vm,vm")))]
   "TARGET_SSE && <mask_avx512vl_condition>
+   && (!<mask_applied> || <ssescalarmode>mode != HFmode)
    && !(MEM_P (operands[1]) && MEM_P (operands[2]))"
 {
   char buf[128];
@@ -4766,7 +4766,8 @@
 	(any_logic:VFB_512
 	  (match_operand:VFB_512 1 "nonimmediate_operand" "%v")
 	  (match_operand:VFB_512 2 "nonimmediate_operand" "vm")))]
-  "TARGET_AVX512F && !(MEM_P (operands[1]) && MEM_P (operands[2]))"
+  "TARGET_AVX512F && !(MEM_P (operands[1]) && MEM_P (operands[2]))
+   && (!<mask_applied> || <ssescalarmode>mode != HFmode)"
 {
   char buf[128];
   const char *ops;
@@ -4923,11 +4924,14 @@
 	      ]
 	      (const_string "<ssevecmode>")))])
 
-(define_insn "*andnottf3"
-  [(set (match_operand:TF 0 "register_operand" "=x,x,v,v")
-	(and:TF
-	  (not:TF (match_operand:TF 1 "register_operand" "0,x,v,v"))
-	  (match_operand:TF 2 "vector_operand" "xBm,xm,vm,v")))]
+;; Modes for andnot3 not covered by VI and MODEF.
+(define_mode_iterator ANDNOT_MODE [TF V1TI])
+
+(define_insn "*andnot<mode>3"
+  [(set (match_operand:ANDNOT_MODE 0 "register_operand" "=x,x,v,v")
+	(and:ANDNOT_MODE
+	  (not:ANDNOT_MODE (match_operand:ANDNOT_MODE 1 "register_operand" "0,x,v,v"))
+	  (match_operand:ANDNOT_MODE 2 "vector_operand" "xBm,xm,vm,v")))]
   "TARGET_SSE"
 {
   char buf[128];
@@ -10617,9 +10621,9 @@
   [(set (attr "isa")
 	(cond [(eq_attr "alternative" "0,1,2")
 		 (const_string "avx512fp16")
-	       (eq_attr "alternative" "3")
+	       (eq_attr "alternative" "3,4")
 		 (const_string "noavx")
-	       (eq_attr "alternative" "4,5,6")
+	       (eq_attr "alternative" "5,6")
 		 (const_string "sse4_noavx")
 	       (eq_attr "alternative" "7,8,9")
 		 (const_string "avx")
@@ -16738,17 +16742,6 @@
 	  (match_operand:<avx512fmaskmode> 4 "register_operand")))]
   "TARGET_AVX512F")
 
-(define_expand "<sse2_avx2>_andnot<mode>3_mask"
-  [(set (match_operand:VI12_AVX512VL 0 "register_operand")
-	(vec_merge:VI12_AVX512VL
-	  (and:VI12_AVX512VL
-	    (not:VI12_AVX512VL
-	      (match_operand:VI12_AVX512VL 1 "register_operand"))
-	    (match_operand:VI12_AVX512VL 2 "nonimmediate_operand"))
-	  (match_operand:VI12_AVX512VL 3 "nonimm_or_0_operand")
-	  (match_operand:<avx512fmaskmode> 4 "register_operand")))]
-  "TARGET_AVX512BW")
-
 (define_insn "*andnot<mode>3"
   [(set (match_operand:VI 0 "register_operand" "=x,x,v")
 	(and:VI
@@ -19028,6 +19021,26 @@
 (define_mode_iterator PEXTR_MODE12
   [(V16QI "TARGET_SSE4_1") V8HI])
 
+(define_insn_and_split "*vec_extract<mode>_0_mem"
+  [(set (match_operand:<ssescalarmode> 0 "memory_operand")
+	(vec_select:<ssescalarmode>
+	  (match_operand:PEXTR_MODE12 1 "register_operand")
+	  (parallel [(const_int 0)])))]
+  "TARGET_SSE2
+   && !TARGET_SSE4_1
+   && (TARGET_INTER_UNIT_MOVES_FROM_VEC
+       || optimize_function_for_speed_p (cfun))
+   && ix86_pre_reload_split ()"
+  "#"
+  "&& 1"
+  [(set (match_dup 2) (match_dup 3))
+   (set (match_dup 0) (match_dup 4))]
+{
+  operands[2] = gen_reg_rtx (SImode);
+  operands[3] = gen_lowpart (SImode, force_reg (<MODE>mode, operands[1]));
+  operands[4] = gen_lowpart (<ssescalarmode>mode, operands[2]);
+})
+
 (define_insn "*vec_extract<mode>"
   [(set (match_operand:<ssescalarmode> 0 "register_sse4nonimm_operand" "=r,m")
 	(vec_select:<ssescalarmode>
@@ -20764,7 +20777,7 @@
 		      (match_operand:V4SI 4 "reg_or_const_vector_operand"
 					  "i,3,3")]
 		     UNSPEC_PSHUFB))
-   (clobber (match_scratch:V4SI 3 "=X,&x,&Yv"))]
+   (clobber (match_scratch:V4SI 3 "=X,&x,&Yw"))]
   "(TARGET_MMX || TARGET_MMX_WITH_SSE) && TARGET_SSSE3"
   "@
    pshufb\t{%2, %0|%0, %2}

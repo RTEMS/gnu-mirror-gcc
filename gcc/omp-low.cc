@@ -3982,6 +3982,7 @@ omp_runtime_api_call (const_tree fndecl)
       "alloc",
       "calloc",
       "free",
+      "get_mapped_ptr",
       "realloc",
       "target_alloc",
       "target_associate_ptr",
@@ -6232,7 +6233,7 @@ lower_rec_input_clauses (tree clauses, gimple_seq *ilist, gimple_seq *dlist,
 			  x = lang_hooks.decls.omp_clause_copy_ctor (c, iv, x);
 			  gimplify_and_add (x, ilist);
 			  gimple_stmt_iterator gsi
-			    = gsi_start_1 (gimple_omp_body_ptr (ctx->stmt));
+			    = gsi_start (*gimple_omp_body_ptr (ctx->stmt));
 			  gassign *g
 			    = gimple_build_assign (unshare_expr (lvar), iv);
 			  gsi_insert_before_without_update (&gsi, g,
@@ -6897,7 +6898,7 @@ lower_rec_input_clauses (tree clauses, gimple_seq *ilist, gimple_seq *dlist,
 					      uid, integer_zero_node,
 					      nonconst_simd_if);
       gimple_call_set_lhs (g, sctx.lane);
-      gimple_stmt_iterator gsi = gsi_start_1 (gimple_omp_body_ptr (ctx->stmt));
+      gimple_stmt_iterator gsi = gsi_start (*gimple_omp_body_ptr (ctx->stmt));
       gsi_insert_before_without_update (&gsi, g, GSI_SAME_STMT);
       g = gimple_build_assign (sctx.lane, INTEGER_CST,
 			       build_int_cst (unsigned_type_node, 0));
@@ -10324,7 +10325,7 @@ lower_omp_scan (gimple_stmt_iterator *gsi_p, omp_context *ctx)
   lower_omp (gimple_omp_body_ptr (stmt), octx);
   if (before)
     {
-      gimple_stmt_iterator gsi = gsi_start_1 (gimple_omp_body_ptr (stmt));
+      gimple_stmt_iterator gsi = gsi_start (*gimple_omp_body_ptr (stmt));
       gsi_insert_seq_before (&gsi, before, GSI_SAME_STMT);
     }
 }
@@ -13405,7 +13406,7 @@ lower_omp_target (gimple_stmt_iterator *gsi_p, omp_context *ctx)
 
 	    type = TREE_TYPE (ovar);
 	    if (lang_hooks.decls.omp_array_data (ovar, true))
-	      var = lang_hooks.decls.omp_array_data (ovar, false);
+	      var = lang_hooks.decls.omp_array_data (var, false);
 	    else if (((OMP_CLAUSE_CODE (c) == OMP_CLAUSE_USE_DEVICE_ADDR
 		      || OMP_CLAUSE_CODE (c) == OMP_CLAUSE_HAS_DEVICE_ADDR)
 		      && !omp_privatize_by_reference (ovar)

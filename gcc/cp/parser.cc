@@ -18818,8 +18818,13 @@ cp_parser_template_argument (cp_parser* parser)
      In C++0x, the '>>' will be considered two separate '>'
      tokens.  */
   if (!cp_parser_error_occurred (parser)
-      && cxx_dialect == cxx98
-      && cp_lexer_next_token_is (parser->lexer, CPP_RSHIFT))
+      && ((cxx_dialect == cxx98
+	   && cp_lexer_next_token_is (parser->lexer, CPP_RSHIFT))
+	  /* Similarly for >= which
+	     cp_parser_next_token_ends_template_argument_p treats for
+	     diagnostics purposes as mistyped > =, but can be valid
+	     after a type-id.  */
+	  || cp_lexer_next_token_is (parser->lexer, CPP_GREATER_EQ)))
     {
       maybe_type_id = true;
       cp_parser_abort_tentative_parse (parser);
@@ -20041,7 +20046,16 @@ cp_parser_placeholder_type_specifier (cp_parser *parser, location_t loc,
   /* In a template parameter list, a type-parameter can be introduced
      by type-constraints alone.  */
   if (processing_template_parmlist && !placeholder)
-    return build_constrained_parameter (con, proto, args);
+    {
+      /* In a default argument we may not be creating new parameters.  */
+      if (parser->local_variables_forbidden_p & LOCAL_VARS_FORBIDDEN)
+	{
+	  /* If this assert turns out to be false, do error() instead.  */
+	  gcc_assert (tentative);
+	  return error_mark_node;
+	}
+      return build_constrained_parameter (con, proto, args);
+    }
 
   /* Diagnose issues placeholder issues.  */
   if (!flag_concepts_ts
@@ -20998,7 +21012,9 @@ cp_parser_enum_specifier (cp_parser* parser)
       /* If the next token is not '}', then there are some enumerators.  */
       else if (cp_lexer_next_token_is (parser->lexer, CPP_CLOSE_BRACE))
 	{
-	  if (is_unnamed && !scoped_enum_p)
+	  if (is_unnamed && !scoped_enum_p
+	      /* Don't warn for enum {} a; here.  */
+	      && cp_lexer_nth_token_is (parser->lexer, 2, CPP_SEMICOLON))
 	    pedwarn (type_start_token->location, OPT_Wpedantic,
 		     "ISO C++ forbids empty unnamed enum");
 	}
@@ -25924,6 +25940,7 @@ cp_parser_class_specifier_1 (cp_parser* parser)
       case CPP_OPEN_PAREN:
       case CPP_CLOSE_PAREN:
       case CPP_COMMA:
+      case CPP_SCOPE:
         want_semicolon = false;
         break;
 
@@ -29964,7 +29981,8 @@ cp_parser_requires_expression (cp_parser *parser)
       scope_sentinel ()
       {
 	++cp_unevaluated_operand;
-	begin_scope (sk_block, NULL_TREE);
+	begin_scope (sk_function_parms, NULL_TREE);
+	current_binding_level->requires_expression = true;
       }
 
       ~scope_sentinel ()
@@ -31417,8 +31435,14 @@ cp_parser_template_introduction (cp_parser* parser, bool member_p)
   tree saved_scope = parser->scope;
   tree saved_object_scope = parser->object_scope;
   tree saved_qualifying_scope = parser->qualifying_scope;
+  bool saved_colon_corrects_to_scope_p = parser->colon_corrects_to_scope_p;
 
   cp_token *start_token = cp_lexer_peek_token (parser->lexer);
+
+  /* In classes don't parse valid unnamed bitfields as invalid
+     template introductions.  */
+  if (member_p)
+    parser->colon_corrects_to_scope_p = false;
 
   /* Look for the optional `::' operator.  */
   cp_parser_global_scope_opt (parser,
@@ -31440,6 +31464,7 @@ cp_parser_template_introduction (cp_parser* parser, bool member_p)
   parser->scope = saved_scope;
   parser->object_scope = saved_object_scope;
   parser->qualifying_scope = saved_qualifying_scope;
+  parser->colon_corrects_to_scope_p = saved_colon_corrects_to_scope_p;
 
   if (concept_name == error_mark_node
       || (seen_error () && !concept_definition_p (tmpl_decl)))
@@ -32027,7 +32052,9 @@ cp_parser_enclosed_template_argument_list (cp_parser* parser)
   cp_evaluated ev;
   /* Parse the template-argument-list itself.  */
   if (cp_lexer_next_token_is (parser->lexer, CPP_GREATER)
-      || cp_lexer_next_token_is (parser->lexer, CPP_RSHIFT))
+      || cp_lexer_next_token_is (parser->lexer, CPP_RSHIFT)
+      || cp_lexer_next_token_is (parser->lexer, CPP_GREATER_EQ)
+      || cp_lexer_next_token_is (parser->lexer, CPP_RSHIFT_EQ))
     arguments = NULL_TREE;
   else
     arguments = cp_parser_template_argument_list (parser);
@@ -32083,6 +32110,38 @@ cp_parser_enclosed_template_argument_list (cp_parser* parser)
 		    "spurious %<>>%>, use %<>%> to terminate "
 		    "a template argument list");
 	}
+    }
+  /* Similarly for >>= and >=.  */
+  else if (cp_lexer_next_token_is (parser->lexer, CPP_GREATER_EQ)
+	   || cp_lexer_next_token_is (parser->lexer, CPP_RSHIFT_EQ))
+    {
+      cp_token *token = cp_lexer_consume_token (parser->lexer);
+      gcc_rich_location richloc (token->location);
+      enum cpp_ttype new_type;
+      const char *replacement;
+      if (token->type == CPP_GREATER_EQ)
+	{
+	  replacement = "> =";
+	  new_type = CPP_EQ;
+	}
+      else if (!saved_greater_than_is_operator_p)
+	{
+	  if (cxx_dialect != cxx98)
+	    replacement = ">> =";
+	  else
+	    replacement = "> > =";
+	  new_type = CPP_GREATER;
+	}
+      else
+	{
+	  replacement = "> >=";
+	  new_type = CPP_GREATER_EQ;
+	}
+      richloc.add_fixit_replace (replacement);
+      error_at (&richloc, "%qs should be %qs to terminate a template "
+		"argument list",
+		cpp_type2name (token->type, token->flags), replacement);
+      token->type = new_type;
     }
   else
     cp_parser_require_end_of_template_parameter_list (parser);
@@ -33162,7 +33221,11 @@ cp_parser_next_token_ends_template_argument_p (cp_parser *parser)
   return (token->type == CPP_COMMA
           || token->type == CPP_GREATER
           || token->type == CPP_ELLIPSIS
-	  || ((cxx_dialect != cxx98) && token->type == CPP_RSHIFT));
+	  || ((cxx_dialect != cxx98) && token->type == CPP_RSHIFT)
+	  /* For better diagnostics, treat >>= like that too, that
+	     shouldn't appear non-nested in template arguments.  */
+	  || token->type == CPP_GREATER_EQ
+	  || token->type == CPP_RSHIFT_EQ);
 }
 
 /* Returns TRUE iff the n-th token is a "<", or the n-th is a "[" and the
@@ -48075,7 +48138,7 @@ static tree
 synthesize_implicit_template_parm  (cp_parser *parser, tree constr)
 {
   /* A requires-clause is not a function and cannot have placeholders.  */
-  if (current_binding_level->kind == sk_block)
+  if (current_binding_level->requires_expression)
     {
       error ("placeholder type not allowed in this context");
       return error_mark_node;

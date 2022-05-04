@@ -1375,11 +1375,22 @@ resolve_structure_cons (gfc_expr *expr, int init)
 	  && comp->ts.u.cl->length->expr_type == EXPR_CONSTANT
 	  && cons->expr->ts.u.cl && cons->expr->ts.u.cl->length
 	  && cons->expr->ts.u.cl->length->expr_type == EXPR_CONSTANT
-	  && cons->expr->rank != 0
 	  && mpz_cmp (cons->expr->ts.u.cl->length->value.integer,
 		      comp->ts.u.cl->length->value.integer) != 0)
 	{
+	  if (comp->attr.pointer)
+	    {
+	      HOST_WIDE_INT la, lb;
+	      la = gfc_mpz_get_hwi (comp->ts.u.cl->length->value.integer);
+	      lb = gfc_mpz_get_hwi (cons->expr->ts.u.cl->length->value.integer);
+	      gfc_error ("Unequal character lengths (%wd/%wd) for pointer "
+			 "component %qs in constructor at %L",
+			 la, lb, comp->name, &cons->expr->where);
+	      t = false;
+	    }
+
 	  if (cons->expr->expr_type == EXPR_VARIABLE
+	      && cons->expr->rank != 0
 	      && cons->expr->symtree->n.sym->attr.flavor == FL_PARAMETER)
 	    {
 	      /* Wrap the parameter in an array constructor (EXPR_ARRAY)
@@ -2386,8 +2397,9 @@ resolve_elemental_actual (gfc_expr *expr, gfc_code *c)
   if (rank > 0 && esym && expr == NULL)
     for (eformal = esym->formal, arg = arg0; arg && eformal;
 	 arg = arg->next, eformal = eformal->next)
-      if ((eformal->sym->attr.intent == INTENT_OUT
-	   || eformal->sym->attr.intent == INTENT_INOUT)
+      if (eformal->sym
+	  && (eformal->sym->attr.intent == INTENT_OUT
+	      || eformal->sym->attr.intent == INTENT_INOUT)
 	  && arg->expr && arg->expr->rank == 0)
 	{
 	  gfc_error ("Actual argument at %L for INTENT(%s) dummy %qs of "
@@ -8096,12 +8108,13 @@ resolve_allocate_expr (gfc_expr *e, gfc_code *code, bool *array_alloc_wo_spec)
 	    goto failure;
 
 	  case  DIMEN_RANGE:
-	    if (ar->start[i] == 0 || ar->end[i] == 0)
+	    /* F2018:R937:
+	     * allocate-coshape-spec is [ lower-bound-expr : ] upper-bound-expr
+	     */
+	    if (ar->start[i] == 0 || ar->end[i] == 0 || ar->stride[i] != NULL)
 	      {
-		/* If ar->stride[i] is NULL, we issued a previous error.  */
-		if (ar->stride[i] == NULL)
-		  gfc_error ("Bad array specification in ALLOCATE statement "
-			     "at %L", &e->where);
+		gfc_error ("Bad coarray specification in ALLOCATE statement "
+			   "at %L", &e->where);
 		goto failure;
 	      }
 	    else if (gfc_dep_compare_expr (ar->start[i], ar->end[i]) == 1)
@@ -15138,7 +15151,10 @@ resolve_fl_derived (gfc_symbol *sym)
 
       /* Nothing more to do for unlimited polymorphic entities.  */
       if (data->ts.u.derived->attr.unlimited_polymorphic)
-	return true;
+	{
+	  add_dt_to_dt_list (sym);
+	  return true;
+	}
       else if (vptr->ts.u.derived == NULL)
 	{
 	  gfc_symbol *vtab = gfc_find_derived_vtab (data->ts.u.derived);

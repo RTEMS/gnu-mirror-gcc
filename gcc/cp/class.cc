@@ -5415,11 +5415,10 @@ type_has_user_provided_or_explicit_constructor (tree t)
 
 /* Returns true iff class T has a non-user-provided (i.e. implicitly
    declared or explicitly defaulted in the class body) default
-   constructor.  If SYNTH, only return true if it hasn't been
-   implicitly defined yet.  */
+   constructor.  */
 
-static bool
-type_has_non_user_provided_default_constructor_1 (tree t, bool synth)
+bool
+type_has_non_user_provided_default_constructor (tree t)
 {
   if (!TYPE_HAS_DEFAULT_CONSTRUCTOR (t))
     return false;
@@ -5432,26 +5431,10 @@ type_has_non_user_provided_default_constructor_1 (tree t, bool synth)
       if (TREE_CODE (fn) == FUNCTION_DECL
 	  && default_ctor_p (fn)
 	  && !user_provided_p (fn))
-	{
-	  if (synth)
-	    return !DECL_INITIAL (fn);
-	  return true;
-	}
+	return true;
     }
 
   return false;
-}
-
-bool
-type_has_non_user_provided_default_constructor (tree t)
-{
-  return type_has_non_user_provided_default_constructor_1 (t, false);
-}
-
-bool
-type_has_default_ctor_to_be_synthesized (tree t)
-{
-  return type_has_non_user_provided_default_constructor_1 (t, true);
 }
 
 /* TYPE is being used as a virtual base, and has a non-trivial move
@@ -7740,17 +7723,14 @@ finish_struct (tree t, tree attributes)
 	 lookup not to fail or recurse into bases.  This isn't added
 	 to the template decl list so we drop this at instantiation
 	 time.  */
-      if (!get_class_binding_direct (t, assign_op_identifier, false))
-	{
-	  tree ass_op = build_lang_decl (USING_DECL, assign_op_identifier,
-					 NULL_TREE);
-	  DECL_CONTEXT (ass_op) = t;
-	  USING_DECL_SCOPE (ass_op) = t;
-	  DECL_DEPENDENT_P (ass_op) = true;
-	  DECL_ARTIFICIAL (ass_op) = true;
-	  DECL_CHAIN (ass_op) = TYPE_FIELDS (t);
-	  TYPE_FIELDS (t) = ass_op;
-	}
+      tree ass_op = build_lang_decl (USING_DECL, assign_op_identifier,
+				     NULL_TREE);
+      DECL_CONTEXT (ass_op) = t;
+      USING_DECL_SCOPE (ass_op) = t;
+      DECL_DEPENDENT_P (ass_op) = true;
+      DECL_ARTIFICIAL (ass_op) = true;
+      DECL_CHAIN (ass_op) = TYPE_FIELDS (t);
+      TYPE_FIELDS (t) = ass_op;
 
       TYPE_SIZE (t) = bitsize_zero_node;
       TYPE_SIZE_UNIT (t) = size_zero_node;
@@ -8951,32 +8931,53 @@ is_really_empty_class (tree type, bool ignore_vptr)
 void
 maybe_note_name_used_in_class (tree name, tree decl)
 {
-  splay_tree names_used;
-
   /* If we're not defining a class, there's nothing to do.  */
   if (!(innermost_scope_kind() == sk_class
 	&& TYPE_BEING_DEFINED (current_class_type)
 	&& !LAMBDA_TYPE_P (current_class_type)))
     return;
 
-  /* If there's already a binding for this NAME, then we don't have
-     anything to worry about.  */
-  if (lookup_member (current_class_type, name,
-		     /*protect=*/0, /*want_type=*/false, tf_warning_or_error))
-    return;
+  const cp_binding_level *blev = nullptr;
+  if (const cxx_binding *binding = IDENTIFIER_BINDING (name))
+    blev = binding->scope;
+  const cp_binding_level *lev = current_binding_level;
 
-  if (!current_class_stack[current_class_depth - 1].names_used)
-    current_class_stack[current_class_depth - 1].names_used
-      = splay_tree_new (splay_tree_compare_pointers, 0, 0);
-  names_used = current_class_stack[current_class_depth - 1].names_used;
+  /* Record the binding in the names_used tables for classes inside blev.  */
+  for (int i = current_class_depth; i > 0; --i)
+    {
+      tree type = (i == current_class_depth
+		   ? current_class_type
+		   : current_class_stack[i].type);
 
-  splay_tree_insert (names_used,
-		     (splay_tree_key) name,
-		     (splay_tree_value) decl);
+      for (; lev; lev = lev->level_chain)
+	{
+	  if (lev == blev)
+	    /* We found the declaration.  */
+	    return;
+	  if (lev->kind == sk_class && lev->this_entity == type)
+	    /* This class is inside the declaration scope.  */
+	    break;
+	}
+
+      auto &names_used = current_class_stack[i-1].names_used;
+      if (!names_used)
+	names_used = splay_tree_new (splay_tree_compare_pointers, 0, 0);
+
+      tree use = build1_loc (input_location, VIEW_CONVERT_EXPR,
+			     TREE_TYPE (decl), decl);
+      EXPR_LOCATION_WRAPPER_P (use) = 1;
+      splay_tree_insert (names_used,
+			 (splay_tree_key) name,
+			 (splay_tree_value) use);
+    }
 }
 
 /* Note that NAME was declared (as DECL) in the current class.  Check
-   to see that the declaration is valid.  */
+   to see that the declaration is valid under [class.member.lookup]:
+
+   If [the result of a search in T for N at point P] differs from the result of
+   a search in T for N from immediately after the class-specifier of T, the
+   program is ill-formed, no diagnostic required.  */
 
 void
 note_name_declared_in_class (tree name, tree decl)
@@ -8999,6 +9000,9 @@ note_name_declared_in_class (tree name, tree decl)
   n = splay_tree_lookup (names_used, (splay_tree_key) name);
   if (n)
     {
+      tree use = (tree) n->value;
+      location_t loc = EXPR_LOCATION (use);
+      tree olddecl = OVL_FIRST (TREE_OPERAND (use, 0));
       /* [basic.scope.class]
 
 	 A name N used in a class S shall refer to the same declaration
@@ -9007,9 +9011,10 @@ note_name_declared_in_class (tree name, tree decl)
       if (permerror (location_of (decl),
 		     "declaration of %q#D changes meaning of %qD",
 		     decl, OVL_NAME (decl)))
-	inform (location_of ((tree) n->value),
-		"%qD declared here as %q#D",
-		OVL_NAME (decl), (tree) n->value);
+	{
+	  inform (loc, "used here to mean %q#D", olddecl);
+	  inform (location_of (olddecl), "declared here" );
+	}
     }
 }
 

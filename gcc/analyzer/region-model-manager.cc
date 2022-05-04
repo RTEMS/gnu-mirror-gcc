@@ -1169,17 +1169,38 @@ region_model_manager::get_or_create_compound_svalue (tree type,
   return compound_sval;
 }
 
+/* class conjured_purge.  */
+
+/* Purge state relating to SVAL.  */
+
+void
+conjured_purge::purge (const conjured_svalue *sval) const
+{
+  m_model->purge_state_involving (sval, m_ctxt);
+}
+
 /* Return the svalue * of type TYPE for the value conjured for ID_REG
-   at STMT, creating it if necessary.  */
+   at STMT, creating it if necessary.
+   Use P to purge existing state from the svalue, for the case where a
+   conjured_svalue would be reused along an execution path.  */
 
 const svalue *
 region_model_manager::get_or_create_conjured_svalue (tree type,
 						     const gimple *stmt,
-						     const region *id_reg)
+						     const region *id_reg,
+						     const conjured_purge &p)
 {
   conjured_svalue::key_t key (type, stmt, id_reg);
   if (conjured_svalue **slot = m_conjured_values_map.get (key))
-    return *slot;
+    {
+      const conjured_svalue *sval = *slot;
+      /* We're reusing an existing conjured_svalue, perhaps from a different
+	 state within this analysis, or perhaps from an earlier state on this
+	 execution path.  For the latter, purge any state involving the "new"
+	 svalue from the current program_state.  */
+      p.purge (sval);
+      return sval;
+    }
   conjured_svalue *conjured_sval
     = new conjured_svalue (type, stmt, id_reg);
   RETURN_UNKNOWN_IF_TOO_COMPLEX (conjured_sval);
@@ -1341,6 +1362,19 @@ region_model_manager::get_region_for_global (tree expr)
   return reg;
 }
 
+/* Return the region for an unknown access of type REGION_TYPE,
+   creating it if necessary.
+   This is a symbolic_region, where the pointer is an unknown_svalue
+   of type &REGION_TYPE.  */
+
+const region *
+region_model_manager::get_unknown_symbolic_region (tree region_type)
+{
+  tree ptr_type = region_type ? build_pointer_type (region_type) : NULL_TREE;
+  const svalue *unknown_ptr = get_or_create_unknown_svalue (ptr_type);
+  return get_symbolic_region (unknown_ptr);
+}
+
 /* Return the region that describes accessing field FIELD of PARENT,
    creating it if necessary.  */
 
@@ -1351,12 +1385,7 @@ region_model_manager::get_field_region (const region *parent, tree field)
 
   /* (*UNKNOWN_PTR).field is (*UNKNOWN_PTR_OF_&FIELD_TYPE).  */
   if (parent->symbolic_for_unknown_ptr_p ())
-    {
-      tree ptr_to_field_type = build_pointer_type (TREE_TYPE (field));
-      const svalue *unknown_ptr_to_field
-	= get_or_create_unknown_svalue (ptr_to_field_type);
-      return get_symbolic_region (unknown_ptr_to_field);
-    }
+    return get_unknown_symbolic_region (TREE_TYPE (field));
 
   field_region::key_t key (parent, field);
   if (field_region *reg = m_field_regions.get (key))
@@ -1376,6 +1405,10 @@ region_model_manager::get_element_region (const region *parent,
 					  tree element_type,
 					  const svalue *index)
 {
+  /* (UNKNOWN_PTR[IDX]) is (UNKNOWN_PTR).  */
+  if (parent->symbolic_for_unknown_ptr_p ())
+    return get_unknown_symbolic_region (element_type);
+
   element_region::key_t key (parent, element_type, index);
   if (element_region *reg = m_element_regions.get (key))
     return reg;
@@ -1395,6 +1428,10 @@ region_model_manager::get_offset_region (const region *parent,
 					 tree type,
 					 const svalue *byte_offset)
 {
+  /* (UNKNOWN_PTR + OFFSET) is (UNKNOWN_PTR).  */
+  if (parent->symbolic_for_unknown_ptr_p ())
+    return get_unknown_symbolic_region (type);
+
   /* If BYTE_OFFSET is zero, return PARENT.  */
   if (tree cst_offset = byte_offset->maybe_get_constant ())
     if (zerop (cst_offset))
@@ -1430,6 +1467,9 @@ region_model_manager::get_sized_region (const region *parent,
 					tree type,
 					const svalue *byte_size_sval)
 {
+  if (parent->symbolic_for_unknown_ptr_p ())
+    return get_unknown_symbolic_region (type);
+
   if (byte_size_sval->get_type () != size_type_node)
     byte_size_sval = get_or_create_cast (size_type_node, byte_size_sval);
 
@@ -1464,6 +1504,9 @@ region_model_manager::get_cast_region (const region *original_region,
   /* If types match, return ORIGINAL_REGION.  */
   if (type == original_region->get_type ())
     return original_region;
+
+  if (original_region->symbolic_for_unknown_ptr_p ())
+    return get_unknown_symbolic_region (type);
 
   cast_region::key_t key (original_region, type);
   if (cast_region *reg = m_cast_regions.get (key))
@@ -1536,6 +1579,9 @@ region_model_manager::get_bit_range (const region *parent, tree type,
 				     const bit_range &bits)
 {
   gcc_assert (parent);
+
+  if (parent->symbolic_for_unknown_ptr_p ())
+    return get_unknown_symbolic_region (type);
 
   bit_range_region::key_t key (parent, type, bits);
   if (bit_range_region *reg = m_bit_range_regions.get (key))
@@ -1748,6 +1794,13 @@ dump_untracked_region (const decl_region *decl_reg)
 {
   tree decl = decl_reg->get_decl ();
   if (TREE_CODE (decl) != VAR_DECL)
+    return;
+  /* For now, don't emit the status of decls in the constant pool, to avoid
+     differences in DejaGnu test results between targets that use these vs
+     those that don't.
+     (Eventually these decls should probably be untracked and we should test
+     for that, but that's not stage 4 material).  */
+  if (DECL_IN_CONSTANT_POOL (decl))
     return;
   warning_at (DECL_SOURCE_LOCATION (decl), 0,
 	      "track %qD: %s",

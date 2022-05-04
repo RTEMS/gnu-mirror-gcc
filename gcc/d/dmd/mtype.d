@@ -4198,27 +4198,30 @@ extern (C++) final class TypeFunction : TypeNext
 
     ParameterList parameterList;   // function parameters
 
-    private enum FunctionFlag : uint
+    // These flags can be accessed like `bool` properties,
+    // getters and setters are generated for them
+    private extern (D) static struct BitFields
     {
-        none            = 0,
-        isnothrow       = 0x0001, // nothrow
-        isnogc          = 0x0002, // is @nogc
-        isproperty      = 0x0004, // can be called without parentheses
-        isref           = 0x0008, // returns a reference
-        isreturn        = 0x0010, // 'this' is returned by ref
-        isscope         = 0x0020, // 'this' is scope
-        isreturninferred= 0x0040, // 'this' is return from inference
-        isscopeinferred = 0x0080, // 'this' is scope from inference
-        islive          = 0x0100, // is @live
-        incomplete      = 0x0200, // return type or default arguments removed
-        inoutParam      = 0x0400, // inout on the parameters
-        inoutQual       = 0x0800, // inout on the qualifier
-        isctor          = 0x1000, // the function is a constructor
-        isreturnscope   = 0x2000, // `this` is returned by value
+        bool isnothrow;        /// nothrow
+        bool isnogc;           /// is @nogc
+        bool isproperty;       /// can be called without parentheses
+        bool isref;            /// returns a reference
+        bool isreturn;         /// 'this' is returned by ref
+        bool isScopeQual;      /// 'this' is scope
+        bool isreturninferred; /// 'this' is return from inference
+        bool isscopeinferred;  /// 'this' is scope from inference
+        bool islive;           /// is @live
+        bool incomplete;       /// return type or default arguments removed
+        bool isInOutParam;     /// inout on the parameters
+        bool isInOutQual;      /// inout on the qualifier
+        bool isctor;           /// the function is a constructor
+        bool isreturnscope;    /// `this` is returned by value
     }
 
+    import dmd.common.bitfields : generateBitFields;
+    mixin(generateBitFields!(BitFields, ushort));
+
     LINK linkage;               // calling convention
-    FunctionFlag funcFlags;
     TRUST trust;                // level of trust
     PURE purity = PURE.impure;
     byte inuse;
@@ -4357,29 +4360,6 @@ extern (C++) final class TypeFunction : TypeNext
         return linkage == LINK.d && parameterList.varargs == VarArg.variadic;
     }
 
-    /***************************
-     * Examine function signature for parameter p and see if
-     * the value of p can 'escape' the scope of the function.
-     * This is useful to minimize the needed annotations for the parameters.
-     * Params:
-     *  tthis = type of `this` parameter, null if none
-     *  p = parameter to this function
-     * Returns:
-     *  true if escapes via assignment to global or through a parameter
-     */
-    bool parameterEscapes(Type tthis, Parameter p)
-    {
-        /* Scope parameters do not escape.
-         * Allow 'lazy' to imply 'scope' -
-         * lazy parameters can be passed along
-         * as lazy parameters to the next function, but that isn't
-         * escaping.
-         */
-        if (parameterStorageClass(tthis, p) & (STC.scope_ | STC.lazy_))
-            return false;
-        return true;
-    }
-
     /************************************
      * Take the specified storage class for p,
      * and use the function signature to infer whether
@@ -4407,7 +4387,7 @@ extern (C++) final class TypeFunction : TypeNext
 
         /* If haven't inferred the return type yet, can't infer storage classes
          */
-        if (!nextOf())
+        if (!nextOf() || !isnothrow())
             return stc;
 
         purityLevel();
@@ -4458,37 +4438,12 @@ extern (C++) final class TypeFunction : TypeNext
             }
         }
 
-        /* Inferring STC.return_ here has false positives
-         * for pure functions, producing spurious error messages
-         * about escaping references.
-         * Give up on it for now.
-         */
-        version (none)
-        {
-            stc |= STC.scope_;
-
-            Type tret = nextOf().toBasetype();
-            if (isref || tret.hasPointers())
-            {
-                /* The result has references, so p could be escaping
-                 * that way.
-                 */
-                stc |= STC.return_;
-            }
-        }
+        // Check escaping through return value
+        Type tret = nextOf().toBasetype();
+        if (isref || tret.hasPointers())
+            return stc | STC.scope_ | STC.return_ | STC.returnScope;
         else
-        {
-            // Check escaping through return value
-            Type tret = nextOf().toBasetype();
-            if (isref || tret.hasPointers())
-            {
-                return stc;
-            }
-
-            stc |= STC.scope_;
-        }
-
-        return stc;
+            return stc | STC.scope_;
     }
 
     override Type addStorageClass(StorageClass stc)
@@ -4682,6 +4637,16 @@ extern (C++) final class TypeFunction : TypeNext
             match = MATCH.convert; // match ... with a "conversion" match level
         }
 
+        // https://issues.dlang.org/show_bug.cgi?id=22997
+        if (parameterList.varargs == VarArg.none && nparams > nargs && !parameterList[nargs].defaultArg)
+        {
+            OutBuffer buf;
+            buf.printf("too few arguments, expected `%d`, got `%d`", cast(int)nparams, cast(int)nargs);
+            if (pMessage)
+                *pMessage = buf.extractChars();
+            goto Nomatch;
+        }
+
         foreach (u, p; parameterList)
         {
             if (u == nargs)
@@ -4778,14 +4743,40 @@ extern (C++) final class TypeFunction : TypeNext
                                 m = MATCH.exact;
                             else
                             {
-                                m = MATCH.nomatch;
                                 if (pMessage)
                                 {
+                                    /* https://issues.dlang.org/show_bug.cgi?id=22202
+                                     *
+                                     * If a function was deduced by semantic on the CallExp,
+                                     * it means that resolveFuncCall completed succesfully.
+                                     * Therefore, there exists a callable copy constructor,
+                                     * however, it cannot be called because scope constraints
+                                     * such as purity, safety or nogc.
+                                     */
                                     OutBuffer buf;
-                                    buf.printf("`struct %s` does not define a copy constructor for `%s` to `%s` copies",
-                                           argStruct.toChars(), targ.toChars(), tprm.toChars());
+                                    auto callExp = e.isCallExp();
+                                    if (auto f = callExp.f)
+                                    {
+                                        char[] s;
+                                        if (!f.isPure && sc.func.setImpure())
+                                            s ~= "pure ";
+                                        if (!f.isSafe() && !f.isTrusted() && sc.func.setUnsafe())
+                                            s ~= "@safe ";
+                                        if (!f.isNogc && sc.func.setGC())
+                                            s ~= "nogc ";
+                                        s[$-1] = '\0';
+                                        buf.printf("`%s` copy constructor cannot be called from a `%s` context", f.type.toChars(), s.ptr);
+
+                                    }
+                                    else
+                                    {
+                                        buf.printf("`struct %s` does not define a copy constructor for `%s` to `%s` copies",
+                                               argStruct.toChars(), targ.toChars(), tprm.toChars());
+                                    }
+
                                     *pMessage = buf.extractChars();
                                 }
+                                m = MATCH.nomatch;
                                 goto Nomatch;
                             }
                         }
@@ -5084,189 +5075,21 @@ extern (C++) final class TypeFunction : TypeNext
         return false;
     }
 
-    /// set or get if the function has the `nothrow` attribute
-    bool isnothrow() const pure nothrow @safe @nogc
-    {
-        return (funcFlags & FunctionFlag.isnothrow) != 0;
-    }
-    /// ditto
-    void isnothrow(bool v) pure nothrow @safe @nogc
-    {
-        if (v) funcFlags |= FunctionFlag.isnothrow;
-        else funcFlags &= ~FunctionFlag.isnothrow;
-    }
 
-    /// set or get if the function has the `@nogc` attribute
-    bool isnogc() const pure nothrow @safe @nogc
-    {
-        return (funcFlags & FunctionFlag.isnogc) != 0;
-    }
-    /// ditto
-    void isnogc(bool v) pure nothrow @safe @nogc
-    {
-        if (v) funcFlags |= FunctionFlag.isnogc;
-        else funcFlags &= ~FunctionFlag.isnogc;
-    }
-
-    /// set or get if the function has the `@property` attribute
-    bool isproperty() const pure nothrow @safe @nogc
-    {
-        return (funcFlags & FunctionFlag.isproperty) != 0;
-    }
-    /// ditto
-    void isproperty(bool v) pure nothrow @safe @nogc
-    {
-        if (v) funcFlags |= FunctionFlag.isproperty;
-        else funcFlags &= ~FunctionFlag.isproperty;
-    }
-
-    /// set or get if the function has the `ref` attribute
-    bool isref() const pure nothrow @safe @nogc
-    {
-        return (funcFlags & FunctionFlag.isref) != 0;
-    }
-    /// ditto
-    void isref(bool v) pure nothrow @safe @nogc
-    {
-        if (v) funcFlags |= FunctionFlag.isref;
-        else funcFlags &= ~FunctionFlag.isref;
-    }
-
-    /// set or get if the function has the `return` attribute
-    bool isreturn() const pure nothrow @safe @nogc
-    {
-        return (funcFlags & FunctionFlag.isreturn) != 0;
-    }
-    /// ditto
-    void isreturn(bool v) pure nothrow @safe @nogc
-    {
-        if (v) funcFlags |= FunctionFlag.isreturn;
-        else funcFlags &= ~FunctionFlag.isreturn;
-    }
-
-    /// set or get if the function has the `returnscope` attribute
-    bool isreturnscope() const pure nothrow @safe @nogc
-    {
-        return (funcFlags & FunctionFlag.isreturnscope) != 0;
-    }
-    /// ditto
-    void isreturnscope(bool v) pure nothrow @safe @nogc
-    {
-        if (v) funcFlags |= FunctionFlag.isreturnscope;
-        else funcFlags &= ~FunctionFlag.isreturnscope;
-    }
-
-    /// set or get if the function has the `scope` attribute
-    bool isScopeQual() const pure nothrow @safe @nogc
-    {
-        return (funcFlags & FunctionFlag.isscope) != 0;
-    }
-    /// ditto
-    void isScopeQual(bool v) pure nothrow @safe @nogc
-    {
-        if (v) funcFlags |= FunctionFlag.isscope;
-        else funcFlags &= ~FunctionFlag.isscope;
-    }
-
-    /// set or get if the function has the `return` attribute inferred
-    bool isreturninferred() const pure nothrow @safe @nogc
-    {
-        return (funcFlags & FunctionFlag.isreturninferred) != 0;
-    }
-    /// ditto
-    void isreturninferred(bool v) pure nothrow @safe @nogc
-    {
-        if (v) funcFlags |= FunctionFlag.isreturninferred;
-        else funcFlags &= ~FunctionFlag.isreturninferred;
-    }
-
-    /// set or get if the function has the `scope` attribute inferred
-    bool isscopeinferred() const pure nothrow @safe @nogc
-    {
-        return (funcFlags & FunctionFlag.isscopeinferred) != 0;
-    }
-    /// ditoo
-    void isscopeinferred(bool v) pure nothrow @safe @nogc
-    {
-        if (v) funcFlags |= FunctionFlag.isscopeinferred;
-        else funcFlags &= ~FunctionFlag.isscopeinferred;
-    }
-
-    /// set or get if the function has the `@live` attribute
-    bool islive() const pure nothrow @safe @nogc
-    {
-        return (funcFlags & FunctionFlag.islive) != 0;
-    }
-    /// ditto
-    void islive(bool v) pure nothrow @safe @nogc
-    {
-        if (v) funcFlags |= FunctionFlag.islive;
-        else funcFlags &= ~FunctionFlag.islive;
-    }
-
-    /// set or get if the return type or the default arguments are removed
-    bool incomplete() const pure nothrow @safe @nogc
-    {
-        return (funcFlags & FunctionFlag.incomplete) != 0;
-    }
-    /// ditto
-    void incomplete(bool v) pure nothrow @safe @nogc
-    {
-        if (v) funcFlags |= FunctionFlag.incomplete;
-        else funcFlags &= ~FunctionFlag.incomplete;
-    }
-
-    /// set or get if the function has the `inout` on the parameters
-    bool isInOutParam() const pure nothrow @safe @nogc
-    {
-        return (funcFlags & FunctionFlag.inoutParam) != 0;
-    }
-    /// ditto
-    void isInOutParam(bool v) pure nothrow @safe @nogc
-    {
-        if (v) funcFlags |= FunctionFlag.inoutParam;
-        else funcFlags &= ~FunctionFlag.inoutParam;
-    }
-
-    /// set or get if the function has the `inout` on the parameters
-    bool isInOutQual() const pure nothrow @safe @nogc
-    {
-        return (funcFlags & FunctionFlag.inoutQual) != 0;
-    }
-    /// ditto
-    void isInOutQual(bool v) pure nothrow @safe @nogc
-    {
-        if (v) funcFlags |= FunctionFlag.inoutQual;
-        else funcFlags &= ~FunctionFlag.inoutQual;
-    }
     /// Returns: `true` the function is `isInOutQual` or `isInOutParam` ,`false` otherwise.
     bool iswild() const pure nothrow @safe @nogc
     {
-        return (funcFlags & (FunctionFlag.inoutParam | FunctionFlag.inoutQual)) != 0;
-    }
-
-    /// set or get if the function is a constructor
-    bool isctor() const pure nothrow @safe @nogc
-    {
-        return (funcFlags & FunctionFlag.isctor) != 0;
-    }
-    /// ditto
-    void isctor(bool v) pure nothrow @safe @nogc
-    {
-        if (v) funcFlags |= FunctionFlag.isctor;
-        else funcFlags &= ~FunctionFlag.isctor;
+        return isInOutParam || isInOutQual;
     }
 
     /// Returns: whether `this` function type has the same attributes (`@safe`,...) as `other`
     bool attributesEqual(const scope TypeFunction other) const pure nothrow @safe @nogc
     {
-        enum attributes = FunctionFlag.isnothrow
-                        | FunctionFlag.isnogc
-                        | FunctionFlag.islive;
-
         return this.trust == other.trust &&
                 this.purity == other.purity &&
-                (this.funcFlags & attributes) == (other.funcFlags & attributes);
+                this.isnothrow == other.isnothrow &&
+                this.isnogc == other.isnogc &&
+                this.islive == other.islive;
     }
 
     override void accept(Visitor v)
@@ -6418,9 +6241,6 @@ extern (C++) final class TypeClass : Type
 
     override MOD deduceWild(Type t, bool isRef)
     {
-        // If sym is forward referenced:
-        if (sym.semanticRun < PASS.semanticdone && !sym.isBaseInfoComplete())
-            sym.dsymbolSemantic(null);
         ClassDeclaration cd = t.isClassHandle();
         if (cd && (sym == cd || cd.isBaseOf(sym, null)))
             return Type.deduceWild(t, isRef);
@@ -7176,6 +6996,17 @@ extern (C++) final class Parameter : ASTNode
 
     extern (D) private static bool isCovariantScope(bool returnByRef, StorageClass from, StorageClass to) pure nothrow @nogc @safe
     {
+        // Workaround for failing covariance when finding a common type of delegates,
+        // some of which have parameters with inferred scope
+        // https://issues.dlang.org/show_bug.cgi?id=21285
+        // The root cause is that scopeinferred is not part of the mangle, and mangle
+        // is used for type equality checks
+        if (to & STC.returninferred)
+            to &= ~STC.return_;
+        // note: f(return int* x) currently 'infers' scope without inferring `return`, in that case keep STC.scope
+        if (to & STC.scopeinferred && !(to & STC.return_))
+            to &= ~STC.scope_;
+
         if (from == to)
             return true;
 

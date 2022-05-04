@@ -1260,8 +1260,8 @@ slpeel_add_loop_guard (basic_block guard_bb, tree cond,
   enter_e->flags |= EDGE_FALSE_VALUE;
   gsi = gsi_last_bb (guard_bb);
 
-  cond = force_gimple_operand_1 (cond, &gimplify_stmt_list, is_gimple_condexpr,
-				 NULL_TREE);
+  cond = force_gimple_operand_1 (cond, &gimplify_stmt_list,
+				 is_gimple_condexpr_for_cond, NULL_TREE);
   if (gimplify_stmt_list)
     gsi_insert_seq_after (&gsi, gimplify_stmt_list, GSI_NEW_STMT);
 
@@ -2056,22 +2056,28 @@ vect_gen_vector_loop_niters (loop_vec_info loop_vinfo, tree niters,
       if (stmts != NULL && log_vf)
 	{
 	  if (niters_no_overflow)
-	    set_range_info (niters_vector, VR_RANGE,
-			    wi::one (TYPE_PRECISION (type)),
-			    wi::rshift (wi::max_value (TYPE_PRECISION (type),
-						       TYPE_SIGN (type)),
-					exact_log2 (const_vf),
-					TYPE_SIGN (type)));
+	    {
+	      value_range vr (type,
+			      wi::one (TYPE_PRECISION (type)),
+			      wi::rshift (wi::max_value (TYPE_PRECISION (type),
+							 TYPE_SIGN (type)),
+					  exact_log2 (const_vf),
+					  TYPE_SIGN (type)));
+	      set_range_info (niters_vector, vr);
+	    }
 	  /* For VF == 1 the vector IV might also overflow so we cannot
 	     assert a minimum value of 1.  */
 	  else if (const_vf > 1)
-	    set_range_info (niters_vector, VR_RANGE,
-			    wi::one (TYPE_PRECISION (type)),
-			    wi::rshift (wi::max_value (TYPE_PRECISION (type),
-						       TYPE_SIGN (type))
-					- (const_vf - 1),
-					exact_log2 (const_vf), TYPE_SIGN (type))
-			    + 1);
+	    {
+	      value_range vr (type,
+			      wi::one (TYPE_PRECISION (type)),
+			      wi::rshift (wi::max_value (TYPE_PRECISION (type),
+							 TYPE_SIGN (type))
+					  - (const_vf - 1),
+					  exact_log2 (const_vf), TYPE_SIGN (type))
+			      + 1);
+	      set_range_info (niters_vector, vr);
+	    }
 	}
     }
   *niters_vector_ptr = niters_vector;
@@ -2888,9 +2894,12 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
       /* It's guaranteed that vector loop bound before vectorization is at
 	 least VF, so set range information for newly generated var.  */
       if (new_var_p)
-	set_range_info (niters, VR_RANGE,
-			wi::to_wide (build_int_cst (type, vf)),
-			wi::to_wide (TYPE_MAX_VALUE (type)));
+	{
+	  value_range vr (type,
+			  wi::to_wide (build_int_cst (type, vf)),
+			  wi::to_wide (TYPE_MAX_VALUE (type)));
+	  set_range_info (niters, vr);
+	}
 
       /* Prolog iterates at most bound_prolog times, latch iterates at
 	 most bound_prolog - 1 times.  */
@@ -3445,13 +3454,34 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
 	cond_expr = expr;
     }
 
+  tree cost_name = NULL_TREE;
+  profile_probability prob2 = profile_probability::uninitialized ();
+  if (cond_expr
+      && !integer_truep (cond_expr)
+      && (version_niter
+	  || version_align
+	  || version_alias
+	  || version_simd_if_cond))
+    {
+      cost_name = cond_expr = force_gimple_operand_1 (unshare_expr (cond_expr),
+						      &cond_expr_stmt_list,
+						      is_gimple_val, NULL_TREE);
+      /* Split prob () into two so that the overall probability of passing
+	 both the cost-model and versioning checks is the orig prob.  */
+      prob2 = prob.split (prob);
+    }
+
   if (version_niter)
     vect_create_cond_for_niters_checks (loop_vinfo, &cond_expr);
 
   if (cond_expr)
-    cond_expr = force_gimple_operand_1 (unshare_expr (cond_expr),
-					&cond_expr_stmt_list,
-					is_gimple_condexpr, NULL_TREE);
+    {
+      gimple_seq tem = NULL;
+      cond_expr = force_gimple_operand_1 (unshare_expr (cond_expr),
+					  &tem, is_gimple_condexpr_for_cond,
+					  NULL_TREE);
+      gimple_seq_add_seq (&cond_expr_stmt_list, tem);
+    }
 
   if (version_align)
     vect_create_cond_for_align_checks (loop_vinfo, &cond_expr,
@@ -3491,7 +3521,7 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
 
   cond_expr = force_gimple_operand_1 (unshare_expr (cond_expr),
 				      &gimplify_stmt_list,
-				      is_gimple_condexpr, NULL_TREE);
+				      is_gimple_condexpr_for_cond, NULL_TREE);
   gimple_seq_add_seq (&cond_expr_stmt_list, gimplify_stmt_list);
 
   /* Compute the outermost loop cond_expr and cond_expr_stmt_list are
@@ -3524,7 +3554,8 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
 	outermost = superloop_at_depth (loop, 1);
       /* And avoid applying versioning on non-perfect nests.  */
       while (loop_to_version != outermost
-	     && single_exit (loop_outer (loop_to_version))
+	     && (e = single_exit (loop_outer (loop_to_version)))
+	     && !(e->flags & EDGE_COMPLEX)
 	     && (!loop_outer (loop_to_version)->inner->next
 		 || vect_loop_vectorized_call (loop_to_version))
 	     && (!loop_outer (loop_to_version)->inner->next
@@ -3652,6 +3683,39 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
 	}
 
       update_ssa (TODO_update_ssa);
+    }
+
+  /* Split the cost model check off to a separate BB.  Costing assumes
+     this is the only thing we perform when we enter the scalar loop
+     from a failed cost decision.  */
+  if (cost_name && TREE_CODE (cost_name) == SSA_NAME)
+    {
+      gimple *def = SSA_NAME_DEF_STMT (cost_name);
+      /* All uses of the cost check are 'true' after the check we
+	 are going to insert.  */
+      replace_uses_by (cost_name, boolean_true_node);
+      /* And we're going to build the new single use of it.  */
+      gcond *cond = gimple_build_cond (NE_EXPR, cost_name, boolean_false_node,
+				       NULL_TREE, NULL_TREE);
+      edge e = split_block (gimple_bb (def), def);
+      gimple_stmt_iterator gsi = gsi_for_stmt (def);
+      gsi_insert_after (&gsi, cond, GSI_NEW_STMT);
+      edge true_e, false_e;
+      extract_true_false_edges_from_block (e->dest, &true_e, &false_e);
+      e->flags &= ~EDGE_FALLTHRU;
+      e->flags |= EDGE_TRUE_VALUE;
+      edge e2 = make_edge (e->src, false_e->dest, EDGE_FALSE_VALUE);
+      e->probability = prob2;
+      e2->probability = prob2.invert ();
+      set_immediate_dominator (CDI_DOMINATORS, false_e->dest, e->src);
+      auto_vec<basic_block, 3> adj;
+      for (basic_block son = first_dom_son (CDI_DOMINATORS, e->dest);
+	   son;
+	   son = next_dom_son (CDI_DOMINATORS, son))
+	if (EDGE_COUNT (son->preds) > 1)
+	  adj.safe_push (son);
+      for (auto son : adj)
+	set_immediate_dominator (CDI_DOMINATORS, son, e->src);
     }
 
   if (version_niter)

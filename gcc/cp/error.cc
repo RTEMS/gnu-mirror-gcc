@@ -1246,6 +1246,8 @@ dump_decl (cxx_pretty_printer *pp, tree t, int flags)
 	      || flags & TFF_CLASS_KEY_OR_ENUM))
 	{
 	  pp_cxx_ws_string (pp, "using");
+	  if (! (flags & TFF_UNQUALIFIED_NAME))
+	    dump_scope (pp, CP_DECL_CONTEXT (t), flags);
 	  dump_decl (pp, DECL_NAME (t), flags);
 	  pp_cxx_whitespace (pp);
 	  pp_cxx_ws_string (pp, "=");
@@ -1437,16 +1439,20 @@ dump_decl (cxx_pretty_printer *pp, tree t, int flags)
 
     case USING_DECL:
       {
-	pp_cxx_ws_string (pp, "using");
-	tree scope = USING_DECL_SCOPE (t);
+	if (flags & TFF_DECL_SPECIFIERS)
+	  pp_cxx_ws_string (pp, "using");
 	bool variadic = false;
-	if (PACK_EXPANSION_P (scope))
+	if (!(flags & TFF_UNQUALIFIED_NAME))
 	  {
-	    scope = PACK_EXPANSION_PATTERN (scope);
-	    variadic = true;
+	    tree scope = USING_DECL_SCOPE (t);
+	    if (PACK_EXPANSION_P (scope))
+	      {
+		scope = PACK_EXPANSION_PATTERN (scope);
+		variadic = true;
+	      }
+	    dump_type (pp, scope, flags);
+	    pp_cxx_colon_colon (pp);
 	  }
-	dump_type (pp, scope, flags);
-	pp_cxx_colon_colon (pp);
 	dump_decl (pp, DECL_NAME (t), flags);
 	if (variadic)
 	  pp_cxx_ws_string (pp, "...");
@@ -2203,6 +2209,7 @@ dump_expr (cxx_pretty_printer *pp, tree t, int flags)
     case WILDCARD_DECL:
     case OVERLOAD:
     case TYPE_DECL:
+    case USING_DECL:
     case IDENTIFIER_NODE:
       dump_decl (pp, t, ((flags & ~(TFF_DECL_SPECIFIERS|TFF_RETURN_TYPE
                                     |TFF_TEMPLATE_HEADER))
@@ -2584,6 +2591,13 @@ dump_expr (cxx_pretty_printer *pp, tree t, int flags)
     case VIEW_CONVERT_EXPR:
       {
 	tree op = TREE_OPERAND (t, 0);
+
+	if (location_wrapper_p (t))
+	  {
+	    dump_expr (pp, op, flags);
+	    break;
+	  }
+
 	tree ttype = TREE_TYPE (t);
 	tree optype = TREE_TYPE (op);
 

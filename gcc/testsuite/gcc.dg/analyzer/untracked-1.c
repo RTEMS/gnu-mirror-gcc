@@ -1,5 +1,7 @@
 /* { dg-additional-options "-fdump-analyzer-untracked" } */
 
+#include "analyzer-decls.h"
+
 struct st
 {
   const char *m_filename;
@@ -11,6 +13,7 @@ typedef struct boxed_int { int value; } boxed_int;
 extern void extern_fn (struct st *);
 static void __attribute__((noinline)) internal_fn (struct st *) {}
 extern int extern_get_int (void);
+extern void extern_fn_char_ptr (const char *);
 
 void test_0 (void)
 {
@@ -36,6 +39,16 @@ void test_3 (void)
 {
   struct st s3 = { __FILE__, __LINE__ }; /* { dg-warning "track 's3': yes" } */
   extern_fn (&s3);
+}
+
+void test_3a (void)
+{
+  struct st s3a = { "foo.c", 42 }; /* { dg-warning "track 's3a': yes" } */
+  __analyzer_eval (s3a.m_filename[0] == 'f'); /* { dg-warning "TRUE" } */
+  __analyzer_eval (s3a.m_line == 42); /* { dg-warning "TRUE" } */
+  extern_fn (&s3a);
+  __analyzer_eval (s3a.m_filename[0] == 'f'); /* { dg-warning "UNKNOWN" } */
+  __analyzer_eval (s3a.m_line == 42); /* { dg-warning "UNKNOWN" } */
 }
 
 extern void called_by_test_4 (int *);
@@ -96,4 +109,23 @@ int test_12 (void (*fnptr) (struct st *))
 {
   static struct st s12 = { __FILE__, __LINE__ }; /* { dg-warning "track 's12': yes" } */
   fnptr (&s12);
+}
+
+void test_13 (void)
+{
+  extern_fn_char_ptr (__func__); /* { dg-warning "track '__func__': no" } */
+}
+
+char t14_global_unused[100]; /* { dg-warning "track 't14_global_unused': yes" } */
+static char t14_static_unused[100]; /* { dg-warning "track 't14_static_unused': yes" } */
+char t14_global_used[100]; /* { dg-warning "track 't14_global_used': yes" } */
+static char t14_static_used[100]; /* { dg-warning "track 't14_static_used': yes" } */
+void test_14 (void)
+{
+  extern_fn_char_ptr (t14_global_unused);
+  extern_fn_char_ptr (t14_static_unused);
+  extern_fn_char_ptr (t14_global_used);
+  __analyzer_eval (t14_global_used[0] == '\0'); /* { dg-warning "UNKNOWN" } */
+  extern_fn_char_ptr (t14_static_used);
+  __analyzer_eval (t14_static_used[0] == '\0'); /* { dg-warning "UNKNOWN" } */
 }

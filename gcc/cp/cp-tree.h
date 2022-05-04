@@ -5565,6 +5565,7 @@ enum tsubst_flags {
 				    constraint normalization.  */
   tf_tst_ok = 1 << 12,		 /* Allow a typename-specifier to name
 				    a template (C++17 or later).  */
+  tf_dguide = 1 << 13,		/* Building a deduction guide from a ctor.  */
   /* Convenient substitution flags combinations.  */
   tf_warning_or_error = tf_warning | tf_error
 };
@@ -6720,7 +6721,6 @@ extern tree in_class_defaulted_default_constructor (tree);
 extern bool user_provided_p			(tree);
 extern bool type_has_user_provided_constructor  (tree);
 extern bool type_has_non_user_provided_default_constructor (tree);
-extern bool type_has_default_ctor_to_be_synthesized (tree);
 extern bool vbase_has_user_provided_move_assign (tree);
 extern tree default_init_uninitialized_part (tree);
 extern bool trivial_default_constructor_is_constexpr (tree);
@@ -7312,7 +7312,7 @@ extern tree lookup_template_class		(tree, tree, tree, tree,
 						 int, tsubst_flags_t);
 extern tree lookup_template_function		(tree, tree);
 extern tree lookup_template_variable		(tree, tree);
-extern int uses_template_parms			(tree);
+extern bool uses_template_parms			(tree);
 extern bool uses_template_parms_level		(tree, int);
 extern bool in_template_function		(void);
 extern bool need_generic_capture		(void);
@@ -7615,7 +7615,8 @@ inline tree force_paren_expr_uneval 		(tree t)
 { return force_paren_expr (t, true); }
 extern tree maybe_undo_parenthesized_ref	(tree);
 extern tree maybe_strip_ref_conversion		(tree);
-extern tree finish_non_static_data_member       (tree, tree, tree);
+extern tree finish_non_static_data_member       (tree, tree, tree,
+						 tsubst_flags_t = tf_warning_or_error);
 extern tree begin_stmt_expr			(void);
 extern tree finish_stmt_expr_expr		(tree, tree);
 extern tree finish_stmt_expr			(tree, bool);
@@ -8244,6 +8245,7 @@ extern tree fold_builtin_source_location	(location_t);
 /* in name-lookup.cc */
 extern tree strip_using_decl                    (tree);
 extern void diagnose_name_conflict		(tree, tree);
+extern bool dependent_local_decl_p		(tree);
 
 /* Tell the binding oracle what kind of binding we are looking for.  */
 

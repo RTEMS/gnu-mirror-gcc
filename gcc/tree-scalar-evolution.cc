@@ -2977,7 +2977,8 @@ gather_stats_on_scev_database (void)
 void
 scev_initialize (void)
 {
-  gcc_assert (! scev_initialized_p ());
+  gcc_assert (! scev_initialized_p ()
+	      && loops_state_satisfies_p (cfun, LOOPS_NORMAL));
 
   scalar_evolution_info = hash_table<scev_info_hasher>::create_ggc (100);
 
@@ -3395,7 +3396,7 @@ expression_expensive_p (tree expr, hash_map<tree, uint64_t> &cache,
       call_expr_arg_iterator iter;
       /* Even though is_inexpensive_builtin might say true, we will get a
 	 library call for popcount when backend does not have an instruction
-	 to do so.  We consider this to be expenseive and generate
+	 to do so.  We consider this to be expensive and generate
 	 __builtin_popcount only when backend defines it.  */
       combined_fn cfn = get_call_combined_fn (expr);
       switch (cfn)
@@ -3420,12 +3421,15 @@ expression_expensive_p (tree expr, hash_map<tree, uint64_t> &cache,
 		  break;
 	      return true;
 	    }
+	  break;
+
 	default:
+	  if (cfn == CFN_LAST
+	      || !is_inexpensive_builtin (get_callee_fndecl (expr)))
+	    return true;
 	  break;
 	}
 
-      if (!is_inexpensive_builtin (get_callee_fndecl (expr)))
-	return true;
       FOR_EACH_CALL_EXPR_ARG (arg, iter, expr)
 	if (expression_expensive_p (arg, cache, op_cost))
 	  return true;

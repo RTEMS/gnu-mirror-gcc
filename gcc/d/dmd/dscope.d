@@ -457,6 +457,8 @@ struct Scope
 
                 if (sc.scopesym.isModule())
                     flags |= SearchUnqualifiedModule;        // tell Module.search() that SearchLocalsOnly is to be obeyed
+                else if (sc.flags & SCOPE.Cfile && sc.scopesym.isStructDeclaration())
+                    continue;                                // C doesn't have struct scope
 
                 if (Dsymbol s = sc.scopesym.search(loc, ident, flags))
                 {
@@ -706,6 +708,31 @@ struct Scope
                 return ad;
         }
         return null;
+    }
+
+    /********************************************
+     * Find the lexically enclosing function (if any).
+     *
+     * This function skips through generated FuncDeclarations,
+     * e.g. rewritten foreach bodies.
+     *
+     * Returns: the function or null
+     */
+    inout(FuncDeclaration) getEnclosingFunction() inout
+    {
+        if (!this.func)
+            return null;
+
+        auto fd = cast(FuncDeclaration) this.func;
+
+        // Look through foreach bodies rewritten as delegates
+        while (fd.fes)
+        {
+            assert(fd.fes.func);
+            fd = fd.fes.func;
+        }
+
+        return cast(inout(FuncDeclaration)) fd;
     }
 
     /*******************************************

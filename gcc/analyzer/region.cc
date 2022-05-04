@@ -1016,7 +1016,9 @@ root_region::dump_to_pp (pretty_printer *pp, bool simple) const
 symbolic_region::symbolic_region (unsigned id, region *parent,
 				  const svalue *sval_ptr)
 : region (complexity::from_pair (parent, sval_ptr), id, parent,
-	  TREE_TYPE (sval_ptr->get_type ())),
+	  (sval_ptr->get_type ()
+	   ? TREE_TYPE (sval_ptr->get_type ())
+	   : NULL_TREE)),
   m_sval_ptr (sval_ptr)
 {
 }
@@ -1045,8 +1047,11 @@ symbolic_region::dump_to_pp (pretty_printer *pp, bool simple) const
     {
       pp_string (pp, "symbolic_region(");
       get_parent_region ()->dump_to_pp (pp, simple);
-      pp_string (pp, ", ");
-      print_quoted_type (pp, get_type ());
+      if (get_type ())
+	{
+	  pp_string (pp, ", ");
+	  print_quoted_type (pp, get_type ());
+	}
       pp_string (pp, ", ");
       m_sval_ptr->dump_to_pp (pp, simple);
       pp_string (pp, ")");
@@ -1168,11 +1173,10 @@ decl_region::get_svalue_for_initializer (region_model_manager *mgr) const
 }
 
 /* Subroutine of symnode_requires_tracking_p; return true if REF
-   within CONTEXT_FNDECL might imply that we should be tracking the
-   value of a decl.  */
+   might imply that we should be tracking the value of its decl.  */
 
 static bool
-ipa_ref_requires_tracking (const ipa_ref *ref, tree context_fndecl)
+ipa_ref_requires_tracking (ipa_ref *ref)
 {
   /* If we have a load/store/alias of the symbol, then we'll track
      the decl's value.  */
@@ -1188,8 +1192,10 @@ ipa_ref_requires_tracking (const ipa_ref *ref, tree context_fndecl)
       return true;
     case GIMPLE_CALL:
       {
-	cgraph_node *context_cnode = cgraph_node::get (context_fndecl);
-	cgraph_edge *edge = context_cnode->get_edge (ref->stmt);
+	cgraph_node *caller_cnode = dyn_cast <cgraph_node *> (ref->referring);
+	if (caller_cnode == NULL)
+	  return true;
+	cgraph_edge *edge = caller_cnode->get_edge (ref->stmt);
 	if (!edge)
 	  return true;
 	if (edge->callee == NULL)
@@ -1232,7 +1238,7 @@ symnode_requires_tracking_p (symtab_node *symnode)
   if (TREE_CODE (context_fndecl) != FUNCTION_DECL)
     return true;
   for (auto ref : symnode->ref_list.referring)
-    if (ipa_ref_requires_tracking (ref, context_fndecl))
+    if (ipa_ref_requires_tracking (ref))
       return true;
 
   /* If we get here, then we don't have uses of this decl that require

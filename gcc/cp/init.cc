@@ -679,10 +679,10 @@ get_nsdmi (tree member, bool in_ctor, tsubst_flags_t complain)
   if (simple_target)
     init = TARGET_EXPR_INITIAL (init);
   init = break_out_target_exprs (init, /*loc*/true);
-  if (in_ctor && init && TREE_CODE (init) == TARGET_EXPR)
-    /* This expresses the full initialization, prevent perform_member_init from
-       calling another constructor (58162).  */
-    TARGET_EXPR_DIRECT_INIT_P (init) = true;
+  if (init && TREE_CODE (init) == TARGET_EXPR)
+    /* In a constructor, this expresses the full initialization, prevent
+       perform_member_init from calling another constructor (58162).  */
+    TARGET_EXPR_DIRECT_INIT_P (init) = in_ctor;
   if (simple_target && TREE_CODE (init) != CONSTRUCTOR)
     /* Now put it back so C++17 copy elision works.  */
     init = get_target_expr (init);
@@ -1066,7 +1066,7 @@ perform_member_init (tree member, tree init, hash_set<tree> &uninitialized)
       init = build2 (INIT_EXPR, type, decl, init);
       finish_expr_stmt (init);
       FOR_EACH_VEC_ELT (*cleanups, i, t)
-	push_cleanup (decl, t, false);
+	push_cleanup (NULL_TREE, t, false);
     }
   else if (type_build_ctor_call (type)
 	   || (init && CLASS_TYPE_P (strip_array_types (type))))
@@ -2811,6 +2811,11 @@ warn_placement_new_too_small (tree type, tree nelts, tree size, tree oper)
   if (!objsize)
     return;
 
+  /* We can only draw conclusions if ref.deref == -1,
+     i.e. oper is the address of the object.  */
+  if (ref.deref != -1)
+    return;
+
   offset_int bytes_avail = wi::to_offset (objsize);
   offset_int bytes_need;
 
@@ -3284,7 +3289,13 @@ build_new_1 (vec<tree, va_gc> **placement, tree type, tree nelts,
 
   tree align_arg = NULL_TREE;
   if (type_has_new_extended_alignment (elt_type))
-    align_arg = build_int_cst (align_type_node, TYPE_ALIGN_UNIT (elt_type));
+    {
+      unsigned align = TYPE_ALIGN_UNIT (elt_type);
+      /* Also consider the alignment of the cookie, if any.  */
+      if (array_p && TYPE_VEC_NEW_USES_COOKIE (elt_type))
+	align = MAX (align, TYPE_ALIGN_UNIT (size_type_node));
+      align_arg = build_int_cst (align_type_node, align);
+    }
 
   alloc_fn = NULL_TREE;
 
@@ -3473,18 +3484,19 @@ build_new_1 (vec<tree, va_gc> **placement, tree type, tree nelts,
 	}
     }
 
+  alloc_expr = alloc_call;
   if (cookie_size)
-    alloc_call = maybe_wrap_new_for_constexpr (alloc_call, type,
+    alloc_expr = maybe_wrap_new_for_constexpr (alloc_expr, type,
 					       cookie_size);
 
   /* In the simple case, we can stop now.  */
   pointer_type = build_pointer_type (type);
   if (!cookie_size && !is_initialized && !member_delete_p)
-    return build_nop (pointer_type, alloc_call);
+    return build_nop (pointer_type, alloc_expr);
 
   /* Store the result of the allocation call in a variable so that we can
      use it more than once.  */
-  alloc_expr = get_target_expr (alloc_call);
+  alloc_expr = get_target_expr (alloc_expr);
   alloc_node = TARGET_EXPR_SLOT (alloc_expr);
 
   /* Strip any COMPOUND_EXPRs from ALLOC_CALL.  */
@@ -4901,10 +4913,9 @@ build_vec_init (tree base, tree maxindex, tree init,
   /* Now make the result have the correct type.  */
   if (TREE_CODE (atype) == ARRAY_TYPE)
     {
-      atype = build_pointer_type (atype);
+      atype = build_reference_type (atype);
       stmt_expr = build1 (NOP_EXPR, atype, stmt_expr);
-      stmt_expr = cp_build_fold_indirect_ref (stmt_expr);
-      suppress_warning (stmt_expr /* What warning? */);
+      stmt_expr = convert_from_reference (stmt_expr);
     }
 
   return stmt_expr;

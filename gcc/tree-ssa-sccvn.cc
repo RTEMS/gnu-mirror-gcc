@@ -5140,12 +5140,11 @@ visit_reference_op_call (tree lhs, gcall *stmt)
 		{
 		  accesses.quick_grow (accesses.length () + 1);
 		  ao_ref *r = &accesses.last ();
-		  tree arg = access_node.get_call_arg (stmt);
-		  if (!POINTER_TYPE_P (TREE_TYPE (arg))
-		      || !access_node.get_ao_ref (stmt, r))
+		  if (!access_node.get_ao_ref (stmt, r))
 		    {
 		      /* Initialize a ref based on the argument and
 			 unknown offset if possible.  */
+		      tree arg = access_node.get_call_arg (stmt);
 		      if (arg && TREE_CODE (arg) == SSA_NAME)
 			arg = SSA_VAL (arg);
 		      if (arg
@@ -6305,9 +6304,7 @@ eliminate_dom_walker::eliminate_stmt (basic_block b, gimple_stmt_iterator *gsi)
 		   && SSA_NAME_RANGE_INFO (lhs)
 		   && ! SSA_NAME_RANGE_INFO (sprime)
 		   && b == sprime_b)
-	    duplicate_ssa_name_range_info (sprime,
-					   SSA_NAME_RANGE_TYPE (lhs),
-					   SSA_NAME_RANGE_INFO (lhs));
+	    duplicate_ssa_name_range_info (sprime, lhs);
 	}
 
       /* Inhibit the use of an inserted PHI on a loop header when

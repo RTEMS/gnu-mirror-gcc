@@ -1736,12 +1736,6 @@ valid_builtin_call (gimple *stmt)
     return false;
 
   tree callee = gimple_call_fndecl (stmt);
-  tree decl = builtin_decl_explicit (DECL_FUNCTION_CODE (callee));
-  if (decl
-      && decl != callee
-      && !gimple_builtin_call_types_compatible_p (stmt, decl))
-    return false;
-
   switch (DECL_FUNCTION_CODE (callee))
     {
     case BUILT_IN_MEMCMP:
@@ -1957,7 +1951,8 @@ set_strlen_range (tree lhs, wide_int min, wide_int max,
   if (min == max)
     return wide_int_to_tree (size_type_node, min);
 
-  set_range_info (lhs, VR_RANGE, min, max);
+  value_range vr (TREE_TYPE (lhs), min, max);
+  set_range_info (lhs, vr);
   return lhs;
 }
 
@@ -4349,8 +4344,9 @@ strlen_pass::handle_builtin_string_cmp ()
 	       known to be unequal set the range of the result to non-zero.
 	       This allows the call to be eliminated if its result is only
 	       used in tests for equality to zero.  */
-	    wide_int zero = wi::zero (TYPE_PRECISION (TREE_TYPE (lhs)));
-	    set_range_info (lhs, VR_ANTI_RANGE, zero, zero);
+	    value_range nz;
+	    nz.set_nonzero (TREE_TYPE (lhs));
+	    set_range_info (lhs, nz);
 	    return false;
 	  }
 	/* When the two strings are definitely equal (such as when they
@@ -5858,13 +5854,8 @@ printf_strlen_execute (function *fun, bool warn_only)
   strlen_optimize = !warn_only;
 
   calculate_dominance_info (CDI_DOMINATORS);
-
-  bool use_scev = optimize > 0 && flag_printf_return_value;
-  if (use_scev)
-    {
-      loop_optimizer_init (LOOPS_NORMAL);
-      scev_initialize ();
-    }
+  loop_optimizer_init (LOOPS_NORMAL);
+  scev_initialize ();
 
   gcc_assert (!strlen_to_stridx);
   if (warn_stringop_overflow || warn_stringop_truncation)
@@ -5902,11 +5893,8 @@ printf_strlen_execute (function *fun, bool warn_only)
       strlen_to_stridx = NULL;
     }
 
-  if (use_scev)
-    {
-      scev_finalize ();
-      loop_optimizer_finalize ();
-    }
+  scev_finalize ();
+  loop_optimizer_finalize ();
 
   return walker.m_cleanup_cfg ? TODO_cleanup_cfg : 0;
 }
