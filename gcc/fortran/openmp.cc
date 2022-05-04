@@ -6283,7 +6283,7 @@ resolve_omp_clauses (gfc_code *code, gfc_omp_clauses *omp_clauses,
 	"DEVICE_RESIDENT", "LINK", "USE_DEVICE",
 	"CACHE", "IS_DEVICE_PTR", "USE_DEVICE_PTR", "USE_DEVICE_ADDR",
 	"NONTEMPORAL", "ALLOCATE", "HAS_DEVICE_ADDR" };
-  STATIC_ASSERT (ARRAY_SIZE (clause_names) == OMP_LIST_NUM);
+  static_assert (ARRAY_SIZE (clause_names) == OMP_LIST_NUM);
 
   if (omp_clauses == NULL)
     return;

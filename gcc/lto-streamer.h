@@ -388,7 +388,7 @@ struct lto_section
   }
 };
 
-STATIC_ASSERT (sizeof (lto_section) == 8);
+static_assert (sizeof (lto_section) == 8);
 
 /* The is the first part of the record in an LTO file for many of the
    IPA passes.  */

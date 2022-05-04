@@ -1248,7 +1248,7 @@ static cpuset_popcount (unsigned long cpusetsize, cpu_set_t *cpusetp)
 #endif
   size_t i;
   unsigned long ret = 0;
-  STATIC_ASSERT (sizeof (cpusetp->__bits[0]) == sizeof (unsigned long int));
+  static_assert (sizeof (cpusetp->__bits[0]) == sizeof (unsigned long int));
   for (i = 0; i < cpusetsize / sizeof (cpusetp->__bits[0]); i++)
     {
       unsigned long int mask = cpusetp->__bits[i];

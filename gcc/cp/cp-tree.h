@@ -6084,7 +6084,7 @@ enum ovl_op_code {
 };
 
 /* Make sure it fits in lang_decl_fn::ovl_op_code. */
-STATIC_ASSERT (OVL_OP_MAX < (1 << 6));
+static_assert (OVL_OP_MAX < (1 << 6));
 
 struct GTY(()) ovl_op_info_t {
   /* The IDENTIFIER_NODE for the operator.  */

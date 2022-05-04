@@ -2274,7 +2274,7 @@ enum pta_flag
 };
 
 /* wide_int_bitmask can handle only 128 flags.  */
-STATIC_ASSERT (END_PTA <= 128);
+static_assert (END_PTA <= 128);
 
 #define WIDE_INT_BITMASK_FROM_NTH(N) (N < 64 ? wide_int_bitmask (0, 1ULL << N) \
 				      : wide_int_bitmask (1ULL << (N - 64), 0))

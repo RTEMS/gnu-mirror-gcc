@@ -1005,7 +1005,7 @@ base_bitmap_view<T, Traits>::base_bitmap_view (const T &array,
   /* The code currently assumes that each element of ARRAY corresponds
      to exactly one bitmap_element.  */
   const size_t array_element_bits = CHAR_BIT * sizeof (array_element_type);
-  STATIC_ASSERT (BITMAP_ELEMENT_ALL_BITS % array_element_bits == 0);
+  static_assert (BITMAP_ELEMENT_ALL_BITS % array_element_bits == 0);
   size_t array_step = BITMAP_ELEMENT_ALL_BITS / array_element_bits;
   size_t array_size = Traits::size (array);
 

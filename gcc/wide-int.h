@@ -466,7 +466,7 @@ namespace wi
   template <typename T1, typename T2>
   struct binary_traits <T1, T2, CONST_PRECISION, CONST_PRECISION>
   {
-    STATIC_ASSERT (int_traits <T1>::precision == int_traits <T2>::precision);
+    static_assert (int_traits <T1>::precision == int_traits <T2>::precision);
     /* Spelled out explicitly (rather than through FIXED_WIDE_INT)
        so as not to confuse gengtype.  */
     typedef generic_wide_int < fixed_wide_int_storage
@@ -1110,8 +1110,8 @@ inline wide_int_storage::wide_int_storage () {}
 template <typename T>
 inline wide_int_storage::wide_int_storage (const T &x)
 {
-  { STATIC_ASSERT (!wi::int_traits<T>::host_dependent_precision); }
-  { STATIC_ASSERT (wi::int_traits<T>::precision_type != wi::CONST_PRECISION); }
+  { static_assert (!wi::int_traits<T>::host_dependent_precision); }
+  { static_assert (wi::int_traits<T>::precision_type != wi::CONST_PRECISION); }
   WIDE_INT_REF_FOR (T) xi (x);
   precision = xi.precision;
   wi::copy (*this, xi);
@@ -1121,8 +1121,8 @@ template <typename T>
 inline wide_int_storage&
 wide_int_storage::operator = (const T &x)
 {
-  { STATIC_ASSERT (!wi::int_traits<T>::host_dependent_precision); }
-  { STATIC_ASSERT (wi::int_traits<T>::precision_type != wi::CONST_PRECISION); }
+  { static_assert (!wi::int_traits<T>::host_dependent_precision); }
+  { static_assert (wi::int_traits<T>::precision_type != wi::CONST_PRECISION); }
   WIDE_INT_REF_FOR (T) xi (x);
   precision = xi.precision;
   wi::copy (*this, xi);
@@ -1201,7 +1201,7 @@ inline wide_int
 wi::int_traits <wide_int_storage>::get_binary_result (const T1 &x, const T2 &y)
 {
   /* This shouldn't be used for two flexible-precision inputs.  */
-  STATIC_ASSERT (wi::int_traits <T1>::precision_type != FLEXIBLE_PRECISION
+  static_assert (wi::int_traits <T1>::precision_type != FLEXIBLE_PRECISION
 		 || wi::int_traits <T2>::precision_type != FLEXIBLE_PRECISION);
   if (wi::int_traits <T1>::precision_type == FLEXIBLE_PRECISION)
     return wide_int::create (wi::get_precision (y));
@@ -1296,7 +1296,7 @@ fixed_wide_int_storage <N>::set_len (unsigned int l, bool)
 {
   len = l;
   /* There are no excess bits in val[len - 1].  */
-  STATIC_ASSERT (N % HOST_BITS_PER_WIDE_INT == 0);
+  static_assert (N % HOST_BITS_PER_WIDE_INT == 0);
 }
 
 /* Treat X as having signedness SGN and convert it to an N-bit number.  */
@@ -3446,7 +3446,7 @@ template <typename T>
 inline T
 wi::mask (unsigned int width, bool negate_p)
 {
-  STATIC_ASSERT (wi::int_traits<T>::precision);
+  static_assert (wi::int_traits<T>::precision);
   T result;
   result.set_len (mask (result.write_val (), width, negate_p,
 			wi::int_traits <T>::precision));
@@ -3460,7 +3460,7 @@ template <typename T>
 inline T
 wi::shifted_mask (unsigned int start, unsigned int width, bool negate_p)
 {
-  STATIC_ASSERT (wi::int_traits<T>::precision);
+  static_assert (wi::int_traits<T>::precision);
   T result;
   result.set_len (shifted_mask (result.write_val (), start, width,
 				negate_p,

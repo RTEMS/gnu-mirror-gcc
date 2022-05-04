@@ -2157,9 +2157,9 @@ subreg_shape::operator != (const subreg_shape &other) const
 inline unsigned HOST_WIDE_INT
 subreg_shape::unique_id () const
 {
-  { STATIC_ASSERT (MAX_MACHINE_MODE <= 256); }
-  { STATIC_ASSERT (NUM_POLY_INT_COEFFS <= 3); }
-  { STATIC_ASSERT (sizeof (offset.coeffs[0]) <= 2); }
+  { static_assert (MAX_MACHINE_MODE <= 256); }
+  { static_assert (NUM_POLY_INT_COEFFS <= 3); }
+  { static_assert (sizeof (offset.coeffs[0]) <= 2); }
   int res = (int) inner_mode + ((int) outer_mode << 8);
   for (int i = 0; i < NUM_POLY_INT_COEFFS; ++i)
     res += (HOST_WIDE_INT) offset.coeffs[i] << ((1 + i) * 16);

@@ -677,7 +677,7 @@ template<typename C0, typename C1>
 inline
 poly_int<N, C>::poly_int (const C0 &c0, const C1 &c1)
 {
-  STATIC_ASSERT (N >= 2);
+  static_assert (N >= 2);
   POLY_SET_COEFF (C, *this, 0, c0);
   POLY_SET_COEFF (C, *this, 1, c1);
   for (unsigned int i = 2; i < N; i++)
@@ -1225,7 +1225,7 @@ template<unsigned int N, typename Ca, typename Cb>
 inline bool
 maybe_eq (const poly_int_pod<N, Ca> &a, const poly_int_pod<N, Cb> &b)
 {
-  STATIC_ASSERT (N <= 2);
+  static_assert (N <= 2);
   if (N == 2)
     return maybe_eq_2 (a.coeffs[0], a.coeffs[1], b.coeffs[0], b.coeffs[1]);
   return a.coeffs[0] == b.coeffs[0];
@@ -1235,7 +1235,7 @@ template<unsigned int N, typename Ca, typename Cb>
 inline typename if_nonpoly<Cb, bool>::type
 maybe_eq (const poly_int_pod<N, Ca> &a, const Cb &b)
 {
-  STATIC_ASSERT (N <= 2);
+  static_assert (N <= 2);
   if (N == 2)
     return maybe_eq_2 (a.coeffs[0], a.coeffs[1], b);
   return a.coeffs[0] == b;
@@ -1245,7 +1245,7 @@ template<unsigned int N, typename Ca, typename Cb>
 inline typename if_nonpoly<Ca, bool>::type
 maybe_eq (const Ca &a, const poly_int_pod<N, Cb> &b)
 {
-  STATIC_ASSERT (N <= 2);
+  static_assert (N <= 2);
   if (N == 2)
     return maybe_eq_2 (b.coeffs[0], b.coeffs[1], a);
   return a == b.coeffs[0];
@@ -2495,7 +2495,7 @@ template<unsigned int N, typename C>
 void
 print_dec (const poly_int_pod<N, C> &value, FILE *file)
 {
-  STATIC_ASSERT (poly_coeff_traits<C>::signedness >= 0);
+  static_assert (poly_coeff_traits<C>::signedness >= 0);
   print_dec (value, file,
 	     poly_coeff_traits<C>::signedness ? SIGNED : UNSIGNED);
 }

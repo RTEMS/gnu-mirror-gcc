@@ -640,7 +640,7 @@ ira_conflict_vector_profitable_p (ira_object_t obj, int num)
     return false;
 
   nbytes = (max - min) / 8 + 1;
-  STATIC_ASSERT (sizeof (ira_object_t) <= 8);
+  static_assert (sizeof (ira_object_t) <= 8);
   /* Don't use sizeof (ira_object_t), use constant 8.  Size of ira_object_t (a
      pointer) is different on 32-bit and 64-bit targets.  Usage sizeof
      (ira_object_t) can result in different code generation by GCC built as 32-

@@ -100,7 +100,7 @@ along with GCC; see the file COPYING3.  If not see
 #define BDESC_VERIFY(x, y, z) \
   gcc_checking_assert ((x) == (enum ix86_builtins) ((y) + (z)))
 #define BDESC_VERIFYS(x, y, z) \
-  STATIC_ASSERT ((x) == (enum ix86_builtins) ((y) + (z)))
+  static_assert ((x) == (enum ix86_builtins) ((y) + (z)))
 
 BDESC_VERIFYS (IX86_BUILTIN__BDESC_PCMPESTR_FIRST,
 	       IX86_BUILTIN__BDESC_COMI_LAST, 1);

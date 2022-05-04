@@ -3999,7 +3999,7 @@ id_equal (const char *str, const_tree id)
 inline poly_uint64
 TYPE_VECTOR_SUBPARTS (const_tree node)
 {
-  STATIC_ASSERT (NUM_POLY_INT_COEFFS <= 2);
+  static_assert (NUM_POLY_INT_COEFFS <= 2);
   unsigned int precision = VECTOR_TYPE_CHECK (node)->type_common.precision;
   if (NUM_POLY_INT_COEFFS == 2)
     {
@@ -4021,7 +4021,7 @@ TYPE_VECTOR_SUBPARTS (const_tree node)
 inline void
 SET_TYPE_VECTOR_SUBPARTS (tree node, poly_uint64 subparts)
 {
-  STATIC_ASSERT (NUM_POLY_INT_COEFFS <= 2);
+  static_assert (NUM_POLY_INT_COEFFS <= 2);
   unsigned HOST_WIDE_INT coeff0 = subparts.coeffs[0];
   int index = exact_log2 (coeff0);
   gcc_assert (index >= 0);

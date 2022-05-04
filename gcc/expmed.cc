@@ -5348,7 +5348,7 @@ make_tree (tree type, rtx x)
       return t;
 
     case CONST_DOUBLE:
-      STATIC_ASSERT (HOST_BITS_PER_WIDE_INT * 2 <= MAX_BITSIZE_MODE_ANY_INT);
+      static_assert (HOST_BITS_PER_WIDE_INT * 2 <= MAX_BITSIZE_MODE_ANY_INT);
       if (TARGET_SUPPORTS_WIDE_INT == 0 && GET_MODE (x) == VOIDmode)
 	t = wide_int_to_tree (type,
 			      wide_int::from_array (&CONST_DOUBLE_LOW (x), 2,

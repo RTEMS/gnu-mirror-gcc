@@ -1834,7 +1834,7 @@ const char *const processor_names[] =
 };
 
 /* Guarantee that the array is aligned with enum processor_type.  */
-STATIC_ASSERT (ARRAY_SIZE (processor_names) == PROCESSOR_max);
+static_assert (ARRAY_SIZE (processor_names) == PROCESSOR_max);
 
 const pta processor_alias_table[] =
 {

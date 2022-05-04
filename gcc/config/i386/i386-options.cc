@@ -772,7 +772,7 @@ static const struct processor_costs *processor_cost_table[] =
 };
 
 /* Guarantee that the array is aligned with enum processor_type.  */
-STATIC_ASSERT (ARRAY_SIZE (processor_cost_table) == PROCESSOR_max);
+static_assert (ARRAY_SIZE (processor_cost_table) == PROCESSOR_max);
 
 static bool
 ix86_option_override_internal (bool main_args_p,

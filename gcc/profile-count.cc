@@ -292,7 +292,7 @@ profile_count::to_frequency (struct function *fun) const
     return BB_FREQ_MAX;
   if (*this == zero ())
     return 0;
-  STATIC_ASSERT (REG_BR_PROB_BASE == BB_FREQ_MAX);
+  static_assert (REG_BR_PROB_BASE == BB_FREQ_MAX);
   gcc_assert (fun->cfg->count_max.initialized_p ());
   profile_probability prob = probability_in (fun->cfg->count_max);
   if (!prob.initialized_p ())

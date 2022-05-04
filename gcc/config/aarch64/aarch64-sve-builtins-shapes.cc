@@ -506,7 +506,7 @@ struct binary_imm_narrowb_base : public overloaded_base<0>
   build (function_builder &b, const function_group_info &group) const OVERRIDE
   {
     b.add_overloaded_functions (group, MODE_n);
-    STATIC_ASSERT (CLASS == function_resolver::SAME_TYPE_CLASS
+    static_assert (CLASS == function_resolver::SAME_TYPE_CLASS
 		   || CLASS == TYPE_unsigned);
     if (CLASS == TYPE_unsigned)
       build_all (b, "vhu0,v0,su64", group, MODE_n);
@@ -531,7 +531,7 @@ struct binary_imm_narrowt_base : public overloaded_base<0>
   build (function_builder &b, const function_group_info &group) const OVERRIDE
   {
     b.add_overloaded_functions (group, MODE_n);
-    STATIC_ASSERT (CLASS == function_resolver::SAME_TYPE_CLASS
+    static_assert (CLASS == function_resolver::SAME_TYPE_CLASS
 		   || CLASS == TYPE_unsigned);
     if (CLASS == TYPE_unsigned)
       build_all (b, "vhu0,vhu0,v0,su64", group, MODE_n);
@@ -969,7 +969,7 @@ struct unary_narrowb_base : public overloaded_base<0>
   build (function_builder &b, const function_group_info &group) const OVERRIDE
   {
     b.add_overloaded_functions (group, MODE_none);
-    STATIC_ASSERT (CLASS == function_resolver::SAME_TYPE_CLASS
+    static_assert (CLASS == function_resolver::SAME_TYPE_CLASS
 		   || CLASS == TYPE_unsigned);
     if (CLASS == TYPE_unsigned)
       build_all (b, "vhu0,v0", group, MODE_none);
@@ -994,7 +994,7 @@ struct unary_narrowt_base : public overloaded_base<0>
   build (function_builder &b, const function_group_info &group) const OVERRIDE
   {
     b.add_overloaded_functions (group, MODE_none);
-    STATIC_ASSERT (CLASS == function_resolver::SAME_TYPE_CLASS
+    static_assert (CLASS == function_resolver::SAME_TYPE_CLASS
 		   || CLASS == TYPE_unsigned);
     if (CLASS == TYPE_unsigned)
       build_all (b, "vhu0,vhu0,v0", group, MODE_none);

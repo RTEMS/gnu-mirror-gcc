@@ -34,7 +34,7 @@ extern GTY(()) class line_maps *saved_line_table;
 
 /* line-map.cc reserves RESERVED_LOCATION_COUNT to the user.  Ensure
    both UNKNOWN_LOCATION and BUILTINS_LOCATION fit into that.  */
-STATIC_ASSERT (BUILTINS_LOCATION < RESERVED_LOCATION_COUNT);
+static_assert (BUILTINS_LOCATION < RESERVED_LOCATION_COUNT);
 
 /* Hasher for 'location_t' values satisfying '!RESERVED_LOCATION_P', thus able
    to use 'UNKNOWN_LOCATION'/'BUILTINS_LOCATION' as spare values for

@@ -1038,7 +1038,7 @@ template<unsigned int N, typename C>
 static optinfo_item *
 make_item_for_dump_dec (const poly_int<N, C> &value)
 {
-  STATIC_ASSERT (poly_coeff_traits<C>::signedness >= 0);
+  static_assert (poly_coeff_traits<C>::signedness >= 0);
   signop sgn = poly_coeff_traits<C>::signedness ? SIGNED : UNSIGNED;
 
   pretty_printer pp;

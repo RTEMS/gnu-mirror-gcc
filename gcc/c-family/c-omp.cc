@@ -2589,7 +2589,7 @@ c_omp_split_clauses (location_t loc, enum tree_code code,
 		    continue;
 		  break;
 		case C_OMP_CLAUSE_SPLIT_FOR:
-		  STATIC_ASSERT (C_OMP_CLAUSE_SPLIT_SECTIONS
+		  static_assert (C_OMP_CLAUSE_SPLIT_SECTIONS
 				 == C_OMP_CLAUSE_SPLIT_FOR
 				 && (C_OMP_CLAUSE_SPLIT_TASKLOOP
 				     == C_OMP_CLAUSE_SPLIT_FOR)
