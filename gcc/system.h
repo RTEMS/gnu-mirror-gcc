@@ -801,8 +801,7 @@ extern void fancy_abort (const char *, int, const char *)
 
 #define STATIC_CONSTANT_P(X) (__builtin_constant_p (X) && (X))
 
-/* static_assert (COND, MESSAGE) is available in C++11 onwards.  */
-#if __cplusplus >= 201103L
+#ifdef __cplusplus
 #define STATIC_ASSERT(X) \
   static_assert ((X), #X)
 #else
