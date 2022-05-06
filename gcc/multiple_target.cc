@@ -533,7 +533,7 @@ public:
 bool
 pass_target_clone::gate (function *)
 {
-  return true;
+  return !seen_error ();
 }
 
 } // anon namespace

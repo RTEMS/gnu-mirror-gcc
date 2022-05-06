@@ -119,6 +119,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "stringpool.h"
 #include "attribs.h"
 #include "asan.h"
+#include "ipa-strub.h"
 
 typedef fibonacci_heap <sreal, cgraph_edge> edge_heap_t;
 typedef fibonacci_node <sreal, cgraph_edge> edge_heap_node_t;
@@ -397,6 +398,11 @@ can_inline_edge_p (struct cgraph_edge *e, bool report,
       inlinable = false;
     }
 
+  if (inlinable && !strub_inlinable_to_p (callee, caller))
+    {
+      e->inline_failed = CIF_UNSPECIFIED;
+      inlinable = false;
+    }
   if (!inlinable && report)
     report_inline_failed_reason (e);
   return inlinable;

@@ -1476,6 +1476,7 @@ OBJS = \
 	ipa-reference.o \
 	ipa-ref.o \
 	ipa-utils.o \
+	ipa-strub.o \
 	ipa.o \
 	ira.o \
 	ira-build.o \
