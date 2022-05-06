@@ -2688,6 +2688,8 @@ pass_ipa_strub::execute (function *)
     if (onode->calls_comdat_local)
       nnode->add_to_same_comdat_group (onode);
 
+    gcc_checking_assert (!DECL_STRUCT_FUNCTION (nnode->decl)->stdarg);
+
     set_strub_mode_to (onode, STRUB_WRAPPER);
     set_strub_mode_to (nnode, STRUB_WRAPPED);
 

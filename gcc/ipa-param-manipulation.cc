@@ -314,14 +314,16 @@ drop_type_attribute_if_params_changed_p (tree name)
 static tree
 build_adjusted_function_type (tree orig_type, vec<tree> *new_param_types,
 			      bool method2func, bool skip_return,
-			      bool args_modified)
+			      bool skip_valist, bool args_modified)
 {
   tree new_arg_types = NULL;
   if (TYPE_ARG_TYPES (orig_type))
     {
       gcc_checking_assert (new_param_types);
-      bool last_parm_void = (TREE_VALUE (tree_last (TYPE_ARG_TYPES (orig_type)))
-			     == void_type_node);
+      bool last_parm_void = (skip_valist
+			     || (TREE_VALUE (tree_last (TYPE_ARG_TYPES
+							(orig_type)))
+				 == void_type_node));
       unsigned len = new_param_types->length ();
       for (unsigned i = 0; i < len; i++)
 	new_arg_types = tree_cons (NULL_TREE, (*new_param_types)[i],
@@ -548,10 +550,11 @@ ipa_param_adjustments::build_new_function_type (tree old_type,
 	  || get_original_index (index) != (int)index)
 	modified = true;
 
+  bool skip_valist = m_always_copy_start < 0;
 
   return build_adjusted_function_type (old_type, new_param_types_p,
 				       method2func_p (old_type), m_skip_return,
-				       modified);
+				       skip_valist, modified);
 }
 
 /* Build variant of function decl ORIG_DECL which has no return value if
@@ -1571,8 +1574,10 @@ ipa_param_body_adjustments::modify_formal_parameters ()
      through tree_function_versioning, not when modifying function body
      directly.  */
   gcc_assert (!m_adjustments || !m_adjustments->m_skip_return);
+  bool skip_valist = m_adjustments && m_adjustments->m_always_copy_start < 0;
   tree new_type = build_adjusted_function_type (orig_type, &m_new_types,
-						m_method2func, false, modified);
+						m_method2func, false,
+						skip_valist, modified);
 
   TREE_TYPE (m_fndecl) = new_type;
   DECL_VIRTUAL_P (m_fndecl) = 0;

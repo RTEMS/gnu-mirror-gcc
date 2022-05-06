@@ -2822,7 +2822,7 @@ initialize_cfun (tree new_fndecl, tree callee_fndecl, profile_count count)
   cfun->va_list_fpr_size = src_cfun->va_list_fpr_size;
   cfun->has_nonlocal_label = src_cfun->has_nonlocal_label;
   cfun->calls_eh_return = src_cfun->calls_eh_return;
-  cfun->stdarg = src_cfun->stdarg;
+  cfun->stdarg = src_cfun->stdarg && stdarg_p (TREE_TYPE (new_fndecl));
   cfun->after_inlining = src_cfun->after_inlining;
   cfun->can_throw_non_call_exceptions
     = src_cfun->can_throw_non_call_exceptions;
