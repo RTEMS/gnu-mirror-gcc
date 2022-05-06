@@ -97,6 +97,8 @@ public:
        call and restore it if it returns again.  */
     if (fun->calls_setjmp)
       {
+	if (flag_harden_control_flow_redundancy < 0)
+	  return false;
 	warning_at (DECL_SOURCE_LOCATION (fun->decl), 0,
 		    "%qD calls %<setjmp%> or similar,"
 		    " %<-fharden-control-flow-redundancy%> is not supported",
@@ -110,6 +112,8 @@ public:
        enough to make it worthwhile.  */
     if (fun->has_nonlocal_label)
       {
+	if (flag_harden_control_flow_redundancy < 0)
+	  return false;
 	warning_at (DECL_SOURCE_LOCATION (fun->decl), 0,
 		    "%qD receives nonlocal gotos,"
 		    " %<-fharden-control-flow-redundancy%> is not supported",
@@ -120,6 +124,8 @@ public:
     if (param_hardcfr_max_blocks > 0
 	&& n_basic_blocks_for_fn (fun) - 2 > param_hardcfr_max_blocks)
       {
+	if (flag_harden_control_flow_redundancy < 0)
+	  return false;
 	warning_at (DECL_SOURCE_LOCATION (fun->decl), 0,
 		    "%qD has more than %u blocks, the requested"
 		    " maximum for %<-fharden-control-flow-redundancy%>",
