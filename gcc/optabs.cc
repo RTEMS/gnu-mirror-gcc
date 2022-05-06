@@ -255,7 +255,7 @@ expand_widen_pattern_expr (sepops ops, rtx op0, rtx op1, rtx wide_op,
 			   rtx target, int unsignedp)
 {
   class expand_operand eops[4];
-  tree oprnd0, oprnd1, oprnd2;
+  tree oprnd0, oprnd1 = NULL_TREE, oprnd2 = NULL_TREE;
   machine_mode wmode = VOIDmode, tmode0, tmode1 = VOIDmode;
   optab widen_pattern_optab;
   enum insn_code icode;
