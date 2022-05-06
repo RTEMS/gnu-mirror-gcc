@@ -1,3 +1,53 @@
+==================== work088 patch #2
+
+Eliminate power8-fusion and power8-fusion-sign options.
+
+2022-05-06   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/102059
+	* config/rs6000/predicates.md (fusion_gpr_mem_load): Remove
+	support for fusing load with sign extend.
+	* config/rs6000/rs6000-cpus.def (OTHER_FUSION_MASKS): Delete.
+	(ISA_3_0_MASKS_SERVER): Don't reset fusion masks.
+	(POWERPC_MASKS): Delete -mpower8-fusion option.
+	* config/rs6000/rs6000.cc (rs6000_debug_reg_global): Delete code
+	to print out power8 fusion status.
+	(rs6000_option_override_internal): Delete support for power8
+	fusion options.
+	(rs6000_opt_masks): Delete power8-fusion and power8-fusion-sign
+	options.
+	(rs6000_can_inline_p): Delete resetting power8 fusion.
+	(fusion_gpr_load_p): Don't fuse load with sign extend.
+	(expand_fusion_gpr_load): Likewise.
+	* config/rs6000/rs6000.h (MASK_P8_FUSION): Delete.
+	(TARGET_P8_FUSION): New macro.
+	* config/rs6000/rs6000.opt (-mpower8-fusion): Delete option, allow
+	-mno-power8-fusion without warning.
+	(-mpower8-fusion-sign): Delete option.
+	* doc/invoke.texi (RS/6000 and PowerPC Options): Delete
+	-mpower8-fusion.
+
+gcc/testsuite/
+
+	PR target/102059
+	* gcc.target/powerpc/pr102059-3.c: Remove -mno-power8-fusion
+	option.
+
+==================== work088 patch #1
+
+Clear fusion bits for inline tests.
+
+2022-05-05   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/rs6000.cc (rs6000_can_inline_p): Clear the fusion
+	bits when testing for inline function compatibility.
+
+
+==================== work088 start branch
+
 2022-05-05   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
