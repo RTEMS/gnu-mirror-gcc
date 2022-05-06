@@ -1350,11 +1350,17 @@ ipa_param_body_adjustments::common_initialization (tree old_fndecl,
      corresponding m_id->dst_node->clone.performed_splits entries.  */
 
   m_new_decls.reserve_exact (adj_len);
-  for (unsigned i = 0; i < adj_len ; i++)
+  for (unsigned i = 0, nti = 0; i < adj_len ; i++, nti++)
     {
       ipa_adjusted_param *apm = &(*m_adj_params)[i];
       unsigned prev_index = apm->prev_clone_index;
       tree new_parm;
+      if (apm->op == IPA_PARAM_OP_COPY
+	  && prev_index >= otypes.length ())
+	/* Keep nti in sync with the m_new_types indices used in
+	   fill_vector_of_new_param_types, for any non-IPA_PARAM_OP_COPY
+	   parms.  */
+	nti--;
       if (apm->op == IPA_PARAM_OP_COPY
 	  || apm->prev_clone_adjustment)
 	{
@@ -1365,7 +1371,7 @@ ipa_param_body_adjustments::common_initialization (tree old_fndecl,
       else if (apm->op == IPA_PARAM_OP_NEW
 	       || apm->op == IPA_PARAM_OP_SPLIT)
 	{
-	  tree new_type = m_new_types[i];
+	  tree new_type = m_new_types[nti];
 	  gcc_checking_assert (new_type);
 	  new_parm = build_decl (UNKNOWN_LOCATION, PARM_DECL, NULL_TREE,
 				 new_type);
