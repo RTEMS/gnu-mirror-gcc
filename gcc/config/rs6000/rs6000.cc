@@ -25332,6 +25332,11 @@ rs6000_can_inline_p (tree caller, tree callee)
       HOST_WIDE_INT callee_isa = callee_opts->x_rs6000_isa_flags;
       HOST_WIDE_INT explicit_isa = callee_opts->x_rs6000_isa_flags_explicit;
 
+      callee_isa &= ~(OPTION_MASK_P8_FUSION
+		      | OPTION_MASK_P10_FUSION);
+      explicit_isa &= ~(OPTION_MASK_P8_FUSION
+			| OPTION_MASK_P10_FUSION);
+
       /* If the caller has option attributes, then use them.
 	 Otherwise, use the command line options.  */
       if (caller_tree)
