@@ -20294,7 +20294,8 @@ add_const_value_attribute (dw_die_ref die, machine_mode mode, rtx rtl)
       if (dwarf_version >= 4 || !dwarf_strict)
 	{
 	  dw_loc_descr_ref loc_result;
-	  resolve_one_addr (&rtl);
+	  if (!resolve_one_addr (&rtl))
+	    return false;
 	rtl_addr:
           loc_result = new_addr_loc_descr (rtl, dtprel_false);
 	  add_loc_descr (&loc_result, new_loc_descr (DW_OP_stack_value, 0, 0));
@@ -20378,6 +20379,12 @@ reference_to_unused (tree * tp, int * walk_subtrees,
       varpool_node *node = varpool_node::get (*tp);
       if (!node || !node->definition)
 	return *tp;
+      /* If it's local, it might still be optimized out, unless we've
+	 already committed to outputting it by assigning RTL to it.  */
+      if (! TREE_PUBLIC (*tp) && ! TREE_ASM_WRITTEN (*tp)
+	  && symtab->state <= IPA_SSA_AFTER_INLINING
+	  && ! DECL_RTL_SET_P (*tp))
+	return *tp;
     }
   else if (TREE_CODE (*tp) == FUNCTION_DECL
 	   && (!DECL_EXTERNAL (*tp) || DECL_DECLARED_INLINE_P (*tp)))
@@ -20402,6 +20409,7 @@ static rtx
 rtl_for_decl_init (tree init, tree type)
 {
   rtx rtl = NULL_RTX;
+  bool valid_p = false;
 
   STRIP_NOPS (init);
 
@@ -20448,7 +20456,7 @@ rtl_for_decl_init (tree init, tree type)
   /* If the initializer is something that we know will expand into an
      immediate RTL constant, expand it now.  We must be careful not to
      reference variables which won't be output.  */
-  else if (initializer_constant_valid_p (init, type)
+  else if ((valid_p = initializer_constant_valid_p (init, type))
 	   && ! walk_tree (&init, reference_to_unused, NULL, NULL))
     {
       /* Convert vector CONSTRUCTOR initializers to VECTOR_CST if
@@ -20493,6 +20501,9 @@ rtl_for_decl_init (tree init, tree type)
       /* If expand_expr returns a MEM, it wasn't immediate.  */
       gcc_assert (!rtl || !MEM_P (rtl));
     }
+  else if (valid_p)
+    /* Perhaps we could just use this and skip all of the above?  */
+    rtl = expand_debug_expr (init);
 
   return rtl;
 }

@@ -307,6 +307,8 @@ expand_normal (tree exp)
   return expand_expr_real (exp, NULL_RTX, VOIDmode, EXPAND_NORMAL, NULL, false);
 }
 
+/* This one is defined in cfgexpand.c.  */
+extern rtx expand_debug_expr (tree);
 
 /* Return STRING_CST and set offset, size and decl, if the first
    argument corresponds to a string constant.  */

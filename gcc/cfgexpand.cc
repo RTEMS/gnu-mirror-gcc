@@ -91,8 +91,6 @@ struct ssaexpand SA;
    of comminucating the profile info to the builtin expanders.  */
 gimple *currently_expanding_gimple_stmt;
 
-static rtx expand_debug_expr (tree);
-
 static bool defer_stack_allocation (tree, bool);
 
 static void record_alignment_for_reg_var (unsigned int);
@@ -4402,7 +4400,7 @@ expand_debug_parm_decl (tree decl)
 
 /* Return an RTX equivalent to the value of the tree expression EXP.  */
 
-static rtx
+rtx
 expand_debug_expr (tree exp)
 {
   rtx op0 = NULL_RTX, op1 = NULL_RTX, op2 = NULL_RTX;
@@ -5273,6 +5271,14 @@ expand_debug_expr (tree exp)
 	}
       else
 	goto flag_unsupported;
+
+    case COMPOUND_LITERAL_EXPR:
+      exp = COMPOUND_LITERAL_EXPR_DECL_EXPR (exp);
+      /* DECL_EXPR is a tcc_statement, which expand_debug_expr does
+	 not expect, so instead of recursing we take care of it right
+	 away.  */
+      exp = DECL_EXPR_DECL (exp);
+      return expand_debug_expr (exp);
 
     case CALL_EXPR:
       /* ??? Maybe handle some builtins?  */
