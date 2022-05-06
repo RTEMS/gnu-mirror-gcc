@@ -517,6 +517,7 @@ extern int rs6000_vector_align[];
 #define MASK_FLOAT128_KEYWORD		OPTION_MASK_FLOAT128_KEYWORD
 #define MASK_FLOAT128_HW		OPTION_MASK_FLOAT128_HW
 #define MASK_FPRND			OPTION_MASK_FPRND
+#define MASK_P8_FUSION			OPTION_MASK_P8_FUSION
 #define MASK_HARD_FLOAT			OPTION_MASK_HARD_FLOAT
 #define MASK_HTM			OPTION_MASK_HTM
 #define MASK_ISEL			OPTION_MASK_ISEL
@@ -629,9 +630,6 @@ extern unsigned char rs6000_recip_bits[];
 
 #define RS6000_RECIP_AUTO_RSQRTE_P(MODE) \
   (rs6000_recip_bits[(int)(MODE)] & RS6000_RECIP_MASK_AUTO_RSQRTE)
-
-/* Whether we need to enable power8 fusion.  */
-#define TARGET_P8_FUSION (rs6000_tune == PROCESSOR_POWER8)
 
 /* The default CPU for TARGET_OPTION_OVERRIDE.  */
 #define OPTION_TARGET_CPU_DEFAULT TARGET_CPU_DEFAULT
