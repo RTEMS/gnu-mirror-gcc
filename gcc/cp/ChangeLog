@@ -1,3 +1,34 @@
+2022-05-06  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2022-05-04  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/105476
+	* pt.cc (maybe_aggr_guide): Set processing_template_decl when
+	partially instantiating the guide's parameter list.
+
+2022-05-06  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2022-05-04  Jakub Jelinek  <jakub@redhat.com>
+
+	* lambda.cc: Include decl.h.
+	(maybe_add_lambda_conv_op): Temporarily override deprecated_state to
+	UNAVAILABLE_DEPRECATED_SUPPRESS.
+
+2022-05-06  Release Manager
+
+	* GCC 12.1.0 released.
+
+2022-04-29  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backported from master:
+	2022-04-29  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR c++/105426
+	* coroutines.cc (register_local_var_uses): Allow promotion of unnamed
+	temporaries to coroutine frame copies.
+
 2022-04-28  Patrick Palka  <ppalka@redhat.com>
 
 	Backported from master:
