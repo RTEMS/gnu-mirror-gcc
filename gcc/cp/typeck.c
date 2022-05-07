@@ -5879,7 +5879,7 @@ cp_build_binary_op (const op_location_t &location,
 	{
 	  tree ic_type = cp_common_type (TREE_TYPE (intcap),
 					 TREE_TYPE (result));
-	  gcc_assert (TREE_TYPE (result) == noncapability_type (ic_type));
+	  gcc_assert (same_type_p (TREE_TYPE (result), noncapability_type (ic_type)));
 	  intcap = cp_convert (ic_type, intcap, complain);
 	  result = fold_build_replace_address_value_loc (location,
 							 intcap,
