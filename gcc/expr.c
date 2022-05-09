@@ -11139,7 +11139,9 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 	get_bit_range (&bitregion_start, &bitregion_end, exp, &bitpos,
 		       &offset);
       else if (MEM_P (op0) && MEM_SIZE_KNOWN_P (op0)
-	       && CAPABILITY_MODE_P (GET_MODE (XEXP (op0, 0))))
+	       && CAPABILITY_MODE_P (GET_MODE (XEXP (op0, 0)))
+	       && known_gt (MEM_SIZE (op0) * BITS_PER_UNIT,
+			    force_align_down (bitpos, BITS_PER_UNIT)))
 	{
 	  bitregion_start = force_align_down (bitpos, BITS_PER_UNIT);
 	  bitregion_end = MEM_SIZE (op0) * BITS_PER_UNIT - 1;
