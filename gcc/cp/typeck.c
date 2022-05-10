@@ -7663,8 +7663,10 @@ build_static_cast_1 (location_t loc, tree type, tree expr, bool c_cast_p,
      types which are integral, floating, or enumeration types can be
      performed.  */
   if ((INTEGRAL_OR_ENUMERATION_TYPE_P (type)
+       || INTCAP_TYPE_P (type)
        || SCALAR_FLOAT_TYPE_P (type))
       && (INTEGRAL_OR_ENUMERATION_TYPE_P (intype)
+	  || INTCAP_TYPE_P (intype)
 	  || SCALAR_FLOAT_TYPE_P (intype)))
     {
       if (processing_template_decl)
