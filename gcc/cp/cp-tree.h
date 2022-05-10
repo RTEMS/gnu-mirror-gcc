@@ -117,6 +117,7 @@ enum cp_tree_index
 {
     CPTI_WCHAR_DECL,
     CPTI_VTABLE_ENTRY_TYPE,
+    CPTI_NULL_VTABLE_ENTRY,
     CPTI_DELTA_TYPE,
     CPTI_VTABLE_INDEX_TYPE,
     CPTI_CLEANUP_TYPE,
@@ -221,6 +222,7 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
 
 #define wchar_decl_node			cp_global_trees[CPTI_WCHAR_DECL]
 #define vtable_entry_type		cp_global_trees[CPTI_VTABLE_ENTRY_TYPE]
+#define null_vtable_entry		cp_global_trees[CPTI_NULL_VTABLE_ENTRY]
 /* The type used to represent an offset by which to adjust the `this'
    pointer in pointer-to-member types.  */
 #define delta_type_node			cp_global_trees[CPTI_DELTA_TYPE]

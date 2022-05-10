@@ -9818,7 +9818,7 @@ build_vtbl_initializer (tree binfo,
 	 with erroneous values (though harmless, apart from relocation
 	 costs).  */
       if (BV_LOST_PRIMARY (v))
-	init = size_zero_node;
+	init = null_vtable_entry;
 
       if (! init)
 	{
@@ -9885,7 +9885,7 @@ build_vtbl_initializer (tree binfo,
 	      if (DECL_DESTRUCTOR_P (fn_original)
 		  && (CLASSTYPE_PURE_VIRTUALS (DECL_CONTEXT (fn_original))
 		      || orig_binfo != binfo))
-		init = size_zero_node;
+		init = null_vtable_entry;
 	    }
 	}
 
@@ -9893,7 +9893,7 @@ build_vtbl_initializer (tree binfo,
       if (TARGET_VTABLE_USES_DESCRIPTORS)
 	{
 	  int i;
-	  if (init == size_zero_node)
+	  if (init == null_vtable_entry)
 	    for (i = 0; i < TARGET_VTABLE_USES_DESCRIPTORS; ++i)
 	      CONSTRUCTOR_APPEND_ELT (*inits, size_int (jx++), init);
 	  else

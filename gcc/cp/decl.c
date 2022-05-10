@@ -4377,6 +4377,7 @@ cxx_init_decl_processing (void)
     layout_type (vfunc_type);
 
     vtable_entry_type = build_pointer_type (vfunc_type);
+    null_vtable_entry = build_int_cst (vtable_entry_type, 0);
   }
   record_builtin_type (RID_MAX, "__vtbl_ptr_type", vtable_entry_type);
 
