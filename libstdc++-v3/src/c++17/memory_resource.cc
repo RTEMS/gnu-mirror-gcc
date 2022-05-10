@@ -544,8 +544,11 @@ namespace pmr
   // For 32-bit and 20-bit pointers it's four pointers (16 bytes).
   // For 16-bit pointers it's five pointers (10 bytes).
   // TODO pad 64-bit to 4*sizeof(void*) to avoid splitting across cache lines?
+#ifndef __CHERI_PURE_CAPABILITY__
+  // MORELLO TODO: FIXME.  This code will need adapting for capabilities.
   static_assert(sizeof(chunk)
       == sizeof(bitset::size_type) + sizeof(uint32_t) + 2 * sizeof(void*));
+#endif
 
   // An oversized allocation that doesn't fit in a pool.
   struct big_block

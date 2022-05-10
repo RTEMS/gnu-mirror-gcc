@@ -307,6 +307,12 @@ _txnal_cow_string_C1_for_exceptions(void* that, const char* s,
 
 static void* txnal_read_ptr(void* const * ptr)
 {
+#ifdef __CHERI_PURE_CAPABILITY__
+  // MORELLO TODO: FIXME.  Either we need to make this code work for
+  // capabilities or declare transaction-safe exceptions unsupported
+  // (perhaps removing the relevant libstdc++ entry points).
+  __builtin_abort ();
+#else
   static_assert(sizeof(uint64_t) == sizeof(void*)
 		|| sizeof(uint32_t) == sizeof(void*)
 		|| sizeof(uint16_t) == sizeof(void*),
@@ -317,6 +323,7 @@ static void* txnal_read_ptr(void* const * ptr)
   return (void*)_ITM_RU4((const uint32_t*)ptr);
 #else
   return (void*)_ITM_RU2((const uint16_t*)ptr);
+#endif
 #endif
 }
 
