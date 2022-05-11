@@ -9480,7 +9480,7 @@ proc check_vect_support_and_set_flags { } {
 
 # Return 1 if the target does *not* require strict alignment.
 
-proc check_effective_target_non_strict_align {} {
+proc check_effective_target_non_strict_align_scalar {} {
 
     # On ARM, the default is to use STRICT_ALIGNMENT, but there
     # are interfaces defined for misaligned access and thus
@@ -9490,7 +9490,15 @@ proc check_effective_target_non_strict_align {} {
 	return [check_effective_target_arm_unaligned]
     }
 
-    return [check_no_compiler_messages non_strict_align assembly {
+    # N.b. Targets that implement targetm.mode_strict_align to do something
+    # other than fall back to a total STRICT_ALIGNMENT check should ensure this
+    # returns what they want.
+    # As yet the only target which does the above is the AArch64 - Morello
+    # backend.  That backend requires strict alignment on pointers.  This test
+    # checks for a requirement on `char`'s.  Hence this returns `true` (because
+    # we *don't* require strict alignment on char's) for Morello.  In almost
+    # all cases this is what we want.
+    return [check_no_compiler_messages non_strict_align_scalar assembly {
 	char *y;
 	typedef char __attribute__ ((__aligned__(__BIGGEST_ALIGNMENT__))) c;
 	c *z;
@@ -10034,7 +10042,7 @@ proc check_effective_target_divmod_simode { } {
 # with a smallish (< 32) size.
 
 proc check_effective_target_store_merge { } {
-    if { [is-effective-target non_strict_align ] && [is-effective-target int32plus] } {
+    if { [is-effective-target non_strict_align_scalar ] && [is-effective-target int32plus] } {
 	return 1
     }
 

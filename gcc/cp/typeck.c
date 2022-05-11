@@ -40,6 +40,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 #include "asan.h"
 #include "gimplify.h"
+#include "mode-align.h"
 
 static tree cp_build_addr_expr_strict (tree, tsubst_flags_t);
 static tree cp_build_function_call (tree, tree, tsubst_flags_t);
@@ -8038,12 +8039,13 @@ build_reinterpret_cast_1 (location_t loc, tree type, tree expr,
 					       complain))
 	return error_mark_node;
       /* Warn about possible alignment problems.  */
-      if ((STRICT_ALIGNMENT || warn_cast_align == 2)
-	  && (complain & tf_warning)
+      if ((complain & tf_warning)
 	  && !VOID_TYPE_P (type)
 	  && TREE_CODE (TREE_TYPE (intype)) != FUNCTION_TYPE
 	  && COMPLETE_TYPE_P (TREE_TYPE (type))
 	  && COMPLETE_TYPE_P (TREE_TYPE (intype))
+	  && (mode_strict_align_inc_blk_void (TYPE_MODE (TREE_TYPE (type)))
+	      || warn_cast_align == 2)
 	  && min_align_of_type (TREE_TYPE (type))
 	     > min_align_of_type (TREE_TYPE (intype)))
 	warning_at (loc, OPT_Wcast_align, "cast from %qH to %qI "
@@ -8232,8 +8234,10 @@ build_const_cast_1 (location_t loc, tree dst_type, tree expr,
 	      check_for_casting_away_constness (loc, src_type, dst_type,
 						CAST_EXPR, complain);
 	      /* ??? comp_ptr_ttypes_const ignores TYPE_ALIGN.  */
-	      if ((STRICT_ALIGNMENT || warn_cast_align == 2)
-		  && (complain & tf_warning)
+	      if ((complain & tf_warning)
+		  && (mode_strict_align_inc_blk_void
+			(TYPE_MODE (TREE_TYPE (dst_type)))
+		      || warn_cast_align == 2)
 		  && min_align_of_type (TREE_TYPE (dst_type))
 		     > min_align_of_type (TREE_TYPE (src_type)))
 		warning_at (loc, OPT_Wcast_align, "cast from %qH to %qI "

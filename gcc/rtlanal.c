@@ -37,6 +37,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "rtl-iter.h"
 #include "hard-reg-set.h"
 #include "function-abi.h"
+#include "mode-align.h"
 
 /* Forward declarations */
 static void set_of_1 (rtx, const_rtx, void *);
@@ -468,7 +469,8 @@ rtx_addr_can_trap_p_1 (const_rtx x, poly_int64 offset, poly_int64 size,
 
   /* The offset must be a multiple of the mode size if we are considering
      unaligned memory references on strict alignment machines.  */
-  if (STRICT_ALIGNMENT && unaligned_mems && mode != BLKmode)
+  if (mode != BLKmode && unaligned_mems
+      && mode_strict_align (mode))
     {
       poly_int64 actual_offset = offset;
 

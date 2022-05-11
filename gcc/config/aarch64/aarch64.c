@@ -3027,6 +3027,13 @@ aarch64_morello_precise_bounds_align (uint64_t size, uint64_t align,
   return MAX(required.align, align);
 }
 
+/* The implementation of TARGET_MODE_STRICT_ALIGNMENT.  */
+bool
+aarch64_mode_strict_alignment (machine_mode mode)
+{
+  return STRICT_ALIGNMENT ? true : (TARGET_MORELLO && mode == CADImode);
+}
+
 /* Takes a size and alignment in *bytes* and returns the number of extra bytes
    of padding necessary for Morello capabilities to an object of such size to
    have precise bounds.  */
@@ -25777,6 +25784,9 @@ aarch64_libgcc_floating_mode_supported_p
 
 #undef TARGET_UNWIND_WORD_MODE
 #define TARGET_UNWIND_WORD_MODE		aarch64_unwind_word_mode
+
+#undef TARGET_MODE_STRICT_ALIGNMENT
+#define TARGET_MODE_STRICT_ALIGNMENT    aarch64_mode_strict_alignment
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

@@ -131,6 +131,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "builtins.h"
 #include "tree-vectorizer.h"
 #include "dbgcnt.h"
+#include "mode-align.h"
 
 /* For lang_hooks.types.type_for_mode.  */
 #include "langhooks.h"
@@ -2374,7 +2375,8 @@ find_interesting_uses_address (struct ivopts_data *data, gimple *stmt,
 
       /* Moreover, on strict alignment platforms, check that it is
 	 sufficiently aligned.  */
-      if (STRICT_ALIGNMENT && may_be_unaligned_p (base, step))
+      if (mode_strict_align_inc_blk_void (TYPE_MODE (TREE_TYPE (base)))
+	  && may_be_unaligned_p (base, step))
 	goto fail;
 
       base = build_fold_addr_expr (base);

@@ -80,6 +80,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple.h"
 #include "options.h"
 #include "function-abi.h"
+#include "mode-align.h"
 
 /* So we can assign to cfun in this file.  */
 #undef cfun
@@ -2930,8 +2931,11 @@ assign_parm_setup_block (struct assign_parm_data_all *all,
   size_stored = CEIL_ROUND (size, UNITS_PER_WORD);
   if (stack_parm == 0)
     {
+      /* MORELLO TODO (OPTIMISED).
+	 Based on the surrounding code it seems we may be able to branch based
+	 on mode_strict_alignment (word_mode).  Look into that ...  */
       HOST_WIDE_INT parm_align
-	= (STRICT_ALIGNMENT
+	= (any_modes_strict_align ()
 	   ? MAX (DECL_ALIGN (parm), BITS_PER_WORD) : DECL_ALIGN (parm));
 
       SET_DECL_ALIGN (parm, parm_align);

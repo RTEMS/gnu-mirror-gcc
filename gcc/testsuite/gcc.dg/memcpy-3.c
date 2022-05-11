@@ -1,6 +1,6 @@
 /* { dg-do compile } */
 /* { dg-options "-O -fdump-tree-optimized" } */
-/* { dg-require-effective-target non_strict_align } */
+/* { dg-require-effective-target non_strict_align_scalar } */
 
 int get_int(const void *p)
 {

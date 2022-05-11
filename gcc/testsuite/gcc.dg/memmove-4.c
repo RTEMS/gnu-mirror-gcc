@@ -8,4 +8,4 @@ void b(char *a, char *b, int i)
   __builtin_memmove (&a[i], &b[i], sizeof(w));
 }
 
-/* { dg-final { scan-tree-dump-not "memmove" "optimized" { xfail { ! non_strict_align } } } } */
+/* { dg-final { scan-tree-dump-not "memmove" "optimized" { xfail { ! non_strict_align_scalar } } } } */

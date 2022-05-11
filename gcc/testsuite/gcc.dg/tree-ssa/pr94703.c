@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-require-effective-target non_strict_align } */
+/* { dg-require-effective-target non_strict_align_scalar } */
 /* { dg-options "-O -fdump-tree-ssa" } */
 
 unsigned int set_lowpart (unsigned int const *X)

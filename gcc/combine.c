@@ -105,6 +105,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "rtl-iter.h"
 #include "print-rtl.h"
 #include "function-abi.h"
+#include "mode-align.h"
 
 /* Number of attempts to combine instructions in this function.  */
 
@@ -7698,7 +7699,8 @@ make_extraction (machine_mode mode, rtx inner, HOST_WIDE_INT pos,
 		   && have_insn_for (STRICT_LOW_PART, tmode))))
 	  || (MEM_P (inner) && pos_rtx == 0
 	      && (pos
-		  % (STRICT_ALIGNMENT ? GET_MODE_ALIGNMENT (tmode)
+		  % (mode_strict_align (tmode)
+		     ? GET_MODE_ALIGNMENT (tmode)
 		     : BITS_PER_UNIT)) == 0
 	      /* We can't do this if we are widening INNER_MODE (it
 		 may not be aligned, for one thing).  */

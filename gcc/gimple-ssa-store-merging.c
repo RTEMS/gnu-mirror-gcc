@@ -170,6 +170,7 @@
 #include "optabs-tree.h"
 #include "dbgcnt.h"
 #include "selftest.h"
+#include "mode-align.h"
 
 /* The maximum size (in bits) of the stores this pass should generate.  */
 #define MAX_STORE_BITSIZE (BITS_PER_WORD)
@@ -2493,8 +2494,11 @@ imm_store_chain_info::try_coalesce_bswap (merged_store_group *merged_store,
   if (width != try_size)
     return false;
 
-  bool allow_unaligned
-    = !STRICT_ALIGNMENT && param_store_merging_allow_unaligned;
+  /* MORELLO TODO (OPTIMISED)
+     Would be nice to understand this algorithm better and see if we can narrow
+     the mode_strict_alignment query down a bit here.  */
+  bool allow_unaligned = !any_modes_strict_align ()
+			  && param_store_merging_allow_unaligned;
   /* Punt if the combined store would not be aligned and we need alignment.  */
   if (!allow_unaligned)
     {
@@ -3709,8 +3713,11 @@ imm_store_chain_info::output_merged_store (merged_store_group *group)
   if (orig_num_stmts < 2)
     return false;
 
-  bool allow_unaligned_store
-    = !STRICT_ALIGNMENT && param_store_merging_allow_unaligned;
+  /* MORELLO TODO (OPTIMISED)
+     Would be nice to understand this algorithm better and see if we can narrow
+     the mode_strict_alignment query down a bit here.  */
+  bool allow_unaligned_store = !any_modes_strict_align ()
+				&& param_store_merging_allow_unaligned;
   bool allow_unaligned_load = allow_unaligned_store;
   bool bzero_first = false;
   store_immediate_info *store;
@@ -4662,9 +4669,11 @@ mem_valid_for_store_merging (tree mem, poly_uint64 *pbitsize,
 
   /* Store merging is simply not valid for capabilities.
      They *must* be stored with the associated capability-wise instruction as a
-     single instruction.  */
-  if (capability_type_p (TREE_TYPE (base_addr)))
+     single instruction.  Hence check if the base address is a pointer to a
+     capability.  If so then we are accessing capabilities.  */
+  if (capability_type_p (TREE_TYPE (TREE_TYPE (base_addr))))
     return NULL_TREE;
+
   return base_addr;
 }
 

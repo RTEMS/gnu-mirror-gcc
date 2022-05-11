@@ -2724,7 +2724,8 @@ do {								        \
 #define MEM_SIZE(RTX) (get_mem_attrs (RTX)->size)
 
 /* For a MEM rtx, the alignment in bits.  We can use the alignment of the
-   mode as a default when STRICT_ALIGNMENT, but not if not.  */
+   mode as a default when STRICT_ALIGNMENT of if targetm.mode_strict_alignment
+   is true for that mode, but if not we can't use such a default.  */
 #define MEM_ALIGN(RTX) (get_mem_attrs (RTX)->align)
 #else
 #define MEM_ADDR_SPACE(RTX) ADDR_SPACE_GENERIC

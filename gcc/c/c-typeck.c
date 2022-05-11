@@ -52,6 +52,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "stringpool.h"
 #include "attribs.h"
 #include "asan.h"
+#include "mode-align.h"
 
 /* Possible cases of implicit bad conversions.  Used to select
    diagnostic messages in convert_for_assignment.  */
@@ -6022,8 +6023,7 @@ build_c_cast (location_t loc, tree type, tree expr)
 	}
 
       /* Warn about possible alignment problems.  */
-      if ((STRICT_ALIGNMENT || warn_cast_align == 2)
-	  && TREE_CODE (type) == POINTER_TYPE
+      if (TREE_CODE (type) == POINTER_TYPE
 	  && TREE_CODE (otype) == POINTER_TYPE
 	  && TREE_CODE (TREE_TYPE (otype)) != VOID_TYPE
 	  && TREE_CODE (TREE_TYPE (otype)) != FUNCTION_TYPE
@@ -6031,6 +6031,8 @@ build_c_cast (location_t loc, tree type, tree expr)
 	     restriction is unknown.  */
 	  && !(RECORD_OR_UNION_TYPE_P (TREE_TYPE (otype))
 	       && TYPE_MODE (TREE_TYPE (otype)) == VOIDmode)
+	  && (mode_strict_align_inc_blk_void (TYPE_MODE (TREE_TYPE (type)))
+	      || warn_cast_align == 2)
 	  && min_align_of_type (TREE_TYPE (type))
 	     > min_align_of_type (TREE_TYPE (otype)))
 	warning_at (loc, OPT_Wcast_align,

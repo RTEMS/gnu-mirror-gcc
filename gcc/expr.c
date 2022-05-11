@@ -62,6 +62,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "ccmp.h"
 #include "gimple-fold.h"
 #include "rtx-vector-builder.h"
+#include "mode-align.h"
 
 
 /* If this is nonzero, we do not bother generating VOLATILE
@@ -3017,10 +3018,12 @@ copy_blkmode_to_reg (machine_mode mode_in, tree src)
 	 the read/writes.  So if there is any padding just use single byte
 	 operations.  */
       opt_scalar_int_mode mode_iter;
-      if (padding_correction == 0 && !STRICT_ALIGNMENT)
+      if (padding_correction == 0)
 	{
 	  FOR_EACH_MODE_FROM (mode_iter, min_mode)
 	    {
+	      if (mode_strict_align (mode_iter.require ()))
+		continue;
 	      unsigned int msize = GET_MODE_BITSIZE (mode_iter.require ());
 	      if (msize <= ((bytes * BITS_PER_UNIT) - bitpos)
 		  && msize <= BITS_PER_WORD)
@@ -3554,6 +3557,11 @@ emit_move_via_integer (machine_mode mode, rtx x, rtx y, bool force)
   if (!int_mode_for_mode (mode).exists (&imode))
     return NULL;
 
+  if (mode_strict_align (imode)
+      && (! mode_strict_align (mode)
+	  || get_mode_alignment (mode) < get_mode_alignment (imode)))
+    return NULL;
+
   /* The target must support moves in this mode.  */
   code = optab_handler (mov_optab, imode);
   if (code == CODE_FOR_nothing)
@@ -3719,9 +3727,7 @@ emit_move_complex (machine_mode mode, rtx x, rtx y)
      are friendly enough, we may be able to do combined memory operations.
      We do not attempt this if Y is a constant because that combination is
      usually better with the by-parts thing below.  */
-  else if ((MEM_P (x) ? !CONSTANT_P (y) : MEM_P (y))
-	   && (!STRICT_ALIGNMENT
-	       || get_mode_alignment (mode) == BIGGEST_ALIGNMENT))
+  else if ((MEM_P (x) ? !CONSTANT_P (y) : MEM_P (y)))
     try_int = true;
   else
     try_int = false;
@@ -4628,7 +4634,8 @@ emit_push_insn (rtx x, machine_mode mode, tree type, rtx size,
   int overlapping = 0;
 
   if (mode == BLKmode
-      || (STRICT_ALIGNMENT && align < GET_MODE_ALIGNMENT (mode)))
+      || (mode_strict_align (mode)
+	  && align < GET_MODE_ALIGNMENT (mode)))
     {
       /* Copy a block into the stack, entirely or partially.  */
 
@@ -11362,7 +11369,7 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 		     && modifier != EXPAND_MEMORY
 		     && ((modifier == EXPAND_CONST_ADDRESS
 			  || modifier == EXPAND_INITIALIZER)
-			 ? STRICT_ALIGNMENT
+			 ? mode_strict_align (mode1)
 			 : targetm.slow_unaligned_access (mode1,
 							  MEM_ALIGN (op0))))
 		    || !multiple_p (bitpos, BITS_PER_UNIT)))
@@ -11727,7 +11734,7 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 		  emit_insn (insn);
 		  return reg;
 		}
-	      else if (STRICT_ALIGNMENT)
+	      else if (mode_strict_align (mode))
 		{
 		  poly_uint64 mode_size = GET_MODE_SIZE (mode);
 		  poly_uint64 temp_size = mode_size;

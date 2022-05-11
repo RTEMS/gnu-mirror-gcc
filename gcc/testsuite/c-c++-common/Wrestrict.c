@@ -56,7 +56,7 @@ void test_memcpy_cst (void *d, const void *s)
   /* This isn't detected because memcpy calls with size of 1 are
      intentionally folded into safe copies equivalent to memmove,
      regardless of the target (larger power-of-2 copies may or
-     may not be folded depending on the target -- see non_strict_align
+     may not be folded depending on the target -- see non_strict_align_scalar
      below, for example).
      It's marked xfail only because there is value in detecting such
      invalid calls for portability, and as a reminder of why it isn't
@@ -195,19 +195,19 @@ void test_memcpy_range (char *d, size_t sz)
   T (a + ir, a, 2);
   T (a + ir, a, 3);
   /* The following fails because the size is a small power of 2.  */
-  T (a + ir, a, 4);               /* { dg-warning "accessing 4 bytes at offsets \\\[2, 3] and 0 overlaps between 1 and 2 bytes at offset \(\\\[3, 2]|\\\[2, 3]\)" "pr79220" { xfail non_strict_align } } */
+  T (a + ir, a, 4);               /* { dg-warning "accessing 4 bytes at offsets \\\[2, 3] and 0 overlaps between 1 and 2 bytes at offset \(\\\[3, 2]|\\\[2, 3]\)" "pr79220" { xfail non_strict_align_scalar } } */
   T (a + ir, a, 5);               /* { dg-warning "accessing 5 bytes at offsets \\\[2, 3] and 0 overlaps between 2 and 3 bytes at offset \\\[2, 3]" "memcpy" } */
 
   T (d + ir, d, 0);
   T (d + ir, d, 1);
   T (d + ir, d, 2);
   T (d + ir, d, 3);
-  T (d + ir, d, 4);               /* { dg-warning "accessing 4 bytes at offsets \\\[2, 3] and 0 overlaps between 1 and 2 bytes at offset \\\[2, 3]" "pr79220" { xfail non_strict_align } } */
+  T (d + ir, d, 4);               /* { dg-warning "accessing 4 bytes at offsets \\\[2, 3] and 0 overlaps between 1 and 2 bytes at offset \\\[2, 3]" "pr79220" { xfail non_strict_align_scalar } } */
   T (d + ir, d, 5);               /* { dg-warning "accessing 5 bytes at offsets \\\[2, 3] and 0 overlaps between 2 and 3 bytes at offset \\\[2, 3]" "memcpy" } */
 
   /* Because the size is constant and a power of 2 the following is
      folded too early to detect the overlap.  */
-  T (d + ir, d, 4);               /* { dg-warning "accessing 4 bytes at offsets \\\[2, 3] and 0 overlaps between 1 and 2 bytes at offset \\\[2, 3]" "pr79220" { xfail non_strict_align } } */
+  T (d + ir, d, 4);               /* { dg-warning "accessing 4 bytes at offsets \\\[2, 3] and 0 overlaps between 1 and 2 bytes at offset \\\[2, 3]" "pr79220" { xfail non_strict_align_scalar } } */
   T (d + ir, d, 5);               /* { dg-warning "accessing 5 bytes at offsets \\\[2, 3] and 0 overlaps between 2 and 3 bytes at offset \\\[2, 3]" "memcpy" } */
 
   /* Exercise the full range of size_t.  */

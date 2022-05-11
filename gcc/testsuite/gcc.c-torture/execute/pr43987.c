@@ -1,3 +1,4 @@
+/* { dg-skip-if "Test performs invalid address casting that may be unaligned for capabilities" { cheri_capability_pure} }  */
 char B[256 * sizeof(void *)];
 typedef void *FILE;
 typedef struct globals {

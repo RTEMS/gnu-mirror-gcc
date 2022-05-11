@@ -1,5 +1,5 @@
 /* PR tree-optimization/48377 */
-/* { dg-require-effective-target non_strict_align } */
+/* { dg-require-effective-target non_strict_align_scalar } */
 
 #include "tree-vect.h"
 

@@ -10,7 +10,7 @@
    by the test aren't merged.  When they involve multiple trailing nuls
    these assignments then defeat the strlen optimization as a result of
    pr83821.  When the bug is resolved the directive below can be removed.
-   { dg-require-effective-target non_strict_align } */
+   { dg-require-effective-target non_strict_align_scalar } */
 
 #include "strlenopt.h"
 

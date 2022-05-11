@@ -43,6 +43,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 #include "debug.h"
 #include "calls.h"
+#include "mode-align.h"
 
 /* Data type for the expressions representing sizes of data types.
    It is the first integer type laid out.  */
@@ -1323,7 +1324,7 @@ place_field (record_layout_info rli, tree field)
 	{
 	  if (TYPE_ALIGN (type) > desired_align)
 	    {
-	      if (STRICT_ALIGNMENT)
+	      if (mode_strict_align_inc_blk_void (TYPE_MODE (type)))
 		warning (OPT_Wattributes, "packed attribute causes "
                          "inefficient alignment for %q+D", field);
 	      /* Don't warn if DECL_PACKED was set by the type.  */
@@ -1810,18 +1811,30 @@ finalize_record_size (record_layout_info rli)
 	      else
 		name = DECL_NAME (TYPE_NAME (rli->t));
 
-	      if (STRICT_ALIGNMENT)
+	      /* MORELLO TODO
+		 Would be nice to only give this more strict warning if one of
+		 the fields in this record has a mode which requires strict
+		 alignment.  */
+	      if (all_modes_strict_align ())
 		warning (OPT_Wpacked, "packed attribute causes inefficient "
 			 "alignment for %qE", name);
+	      else if (any_modes_strict_align ())
+		warning (OPT_Wpacked, "packed attribute may cause inefficient "
+			 "alignment for %qE if record contains members which "
+			 "must be aligned", name);
 	      else
 		warning (OPT_Wpacked,
 			 "packed attribute is unnecessary for %qE", name);
 	    }
 	  else
 	    {
-	      if (STRICT_ALIGNMENT)
+	      if (all_modes_strict_align ())
 		warning (OPT_Wpacked,
 			 "packed attribute causes inefficient alignment");
+	      else if (any_modes_strict_align ())
+		warning (OPT_Wpacked, "packed attribute may cause inefficient "
+			 "alignment if record contains members which must be "
+			 "aligned");
 	      else
 		warning (OPT_Wpacked, "packed attribute is unnecessary");
 	    }
@@ -1942,10 +1955,10 @@ compute_record_mode (tree type)
 
   /* If structure's known alignment is less than what the scalar
      mode would need, and it matters, then stick with BLKmode.  */
-  if (mode != BLKmode
-      && STRICT_ALIGNMENT
-      && ! (TYPE_ALIGN (type) >= BIGGEST_ALIGNMENT
-	    || TYPE_ALIGN (type) >= GET_MODE_ALIGNMENT (mode)))
+  if ((mode != BLKmode
+       && mode_strict_align (mode)
+       && ! (TYPE_ALIGN (type) >= BIGGEST_ALIGNMENT
+	     || TYPE_ALIGN (type) >= GET_MODE_ALIGNMENT (mode))))
     {
       /* If this is the only reason this type is BLKmode, then
 	 don't force containing types to be BLKmode.  */
@@ -1968,7 +1981,8 @@ finalize_type_size (tree type)
      alignment.  */
   if (TYPE_MODE (type) != BLKmode
       && TYPE_MODE (type) != VOIDmode
-      && (STRICT_ALIGNMENT || !AGGREGATE_TYPE_P (type)))
+      && (mode_strict_align (TYPE_MODE (type))
+	  || !AGGREGATE_TYPE_P (type)))
     {
       unsigned mode_align = GET_MODE_ALIGNMENT (TYPE_MODE (type));
 
@@ -2618,7 +2632,8 @@ layout_type (tree type)
 	    SET_TYPE_MODE (type, mode_for_array (TREE_TYPE (type),
 						 TYPE_SIZE (type)));
 	    if (TYPE_MODE (type) != BLKmode
-		&& STRICT_ALIGNMENT && TYPE_ALIGN (type) < BIGGEST_ALIGNMENT
+		&& mode_strict_align (TYPE_MODE (type))
+		&& TYPE_ALIGN (type) < BIGGEST_ALIGNMENT
 		&& TYPE_ALIGN (type) < GET_MODE_ALIGNMENT (TYPE_MODE (type)))
 	      {
 		TYPE_NO_FORCE_BLK (type) = 1;

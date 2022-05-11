@@ -83,6 +83,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "langhooks.h"
 #include "sbitmap.h"
 #include "function-abi.h"
+#include "mode-align.h"
 
 bool
 default_legitimate_address_p (machine_mode mode ATTRIBUTE_UNUSED,
@@ -1746,7 +1747,14 @@ default_register_move_cost (machine_mode mode ATTRIBUTE_UNUSED,
 /* The default implementation of TARGET_SLOW_UNALIGNED_ACCESS.  */
 
 bool
-default_slow_unaligned_access (machine_mode, unsigned int)
+default_slow_unaligned_access (machine_mode m, unsigned int)
+{
+  return mode_strict_align (m);
+}
+
+/* The default implementation of TARGET_MODE_STRICT_ALIGNMENT.  */
+bool
+default_mode_strict_alignment (machine_mode)
 {
   return STRICT_ALIGNMENT;
 }

@@ -3778,10 +3778,28 @@ moves.  This can cause significantly more instructions to be produced.\n\
 Therefore, do not make this hook return true if unaligned accesses only\n\
 add a cycle or two to the time for a memory access.\n\
 \n\
-The hook must return true whenever @code{STRICT_ALIGNMENT} is true.\n\
-The default implementation returns @code{STRICT_ALIGNMENT}.",
+The hook must return true whenever the @code{mode_strict_alignment} hook\n\
+returns true.\n\
+The default implementation returns the result of\n\
+@code{mode_strict_alignment}.",
  bool, (machine_mode mode, unsigned int align),
  default_slow_unaligned_access)
+
+DEFHOOK
+(mode_strict_alignment,
+ "This hook returns true if memory accesses to the given @var{mode} will\n\
+fail to work if the data is not on the nominal alignment.  This hook is defined\n\
+to represent a mode-specific version of @code{STRICT_ALIGNMENT}.\n\
+\n\
+If this hook is given the mode of @code{BLKmode} then it should return true if\n\
+@emph{any} modes accesses would fault if applied at an unaligned address.\n\
+If this hook is given the mode of @code{VOIDmode} this it should return true if\n\
+@emph{all} mode accesses would fault if applied at an unaligned address.\n\
+\n\
+The hook must return true whenever @code{STRICT_ALIGNMENT} is true.\n\
+The default implementation returns @code{STRICT_ALIGNMENT}.",
+ bool, (machine_mode mode),
+ default_mode_strict_alignment)
 
 DEFHOOK
 (optab_supported_p,

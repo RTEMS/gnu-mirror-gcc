@@ -57,6 +57,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 #include "builtins.h"
 #include "gimple-fold.h"
+#include "mode-align.h"
 
 /* Like PREFERRED_STACK_BOUNDARY but in units of bytes, not bits.  */
 #define STACK_BYTES (PREFERRED_STACK_BOUNDARY / BITS_PER_UNIT)
@@ -4442,7 +4443,12 @@ expand_call (tree exp, rtx target, int ignore)
 	 and whose alignment does not permit a direct copy into registers,
 	 make a group of pseudos that correspond to each register that we
 	 will later fill.  */
-      if (STRICT_ALIGNMENT)
+      /* MORELLO TODO (OPTIMISATION)
+	 Would be interesting if we can change this clause to check if
+	 `word_mode` requires strict alignment rather than any mode.  Seems
+	 like this may be the case given the behaviour of
+	 store_unaligned_arguments_into_pseudos.  */
+      if (any_modes_strict_align ())
 	store_unaligned_arguments_into_pseudos (args, num_actuals);
 
       /* Now store any partially-in-registers parm.

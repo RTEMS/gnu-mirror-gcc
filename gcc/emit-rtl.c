@@ -63,10 +63,13 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple.h"
 #include "gimple-ssa.h"
 #include "gimplify.h"
+#include "mode-align.h"
 
 struct target_rtl default_target_rtl;
+struct target_mode_align default_target_mode_align;
 #if SWITCHABLE_TARGET
 struct target_rtl *this_target_rtl = &default_target_rtl;
+struct target_mode_align *this_target_mode_align = &default_target_mode_align;
 #endif
 
 #define initial_regno_reg_rtx (this_target_rtl->x_initial_regno_reg_rtx)
@@ -6210,6 +6213,8 @@ init_emit_regs (void)
   if ((unsigned) PIC_OFFSET_TABLE_REGNUM != INVALID_REGNUM)
     pic_offset_table_rtx = gen_raw_REG (Pmode, PIC_OFFSET_TABLE_REGNUM);
 
+  bool all_modes_strict_align = true;
+  bool any_modes_strict_align = false;
   for (i = 0; i < (int) MAX_MACHINE_MODE; i++)
     {
       mode = (machine_mode) i;
@@ -6220,11 +6225,22 @@ init_emit_regs (void)
 	{
 	  attrs->size_known_p = true;
 	  attrs->size = GET_MODE_SIZE (mode);
-	  if (STRICT_ALIGNMENT)
-	    attrs->align = GET_MODE_ALIGNMENT (mode);
+	  if (targetm.mode_strict_alignment (mode))
+	    {
+	      any_modes_strict_align = true;
+	      this_target_mode_align->x_mode_strict_align[mode] = true;
+	      attrs->align = GET_MODE_ALIGNMENT (mode);
+	    }
+	  else
+	    {
+	      all_modes_strict_align = false;
+	      this_target_mode_align->x_mode_strict_align[mode] = false;
+	    }
 	}
       mode_mem_attrs[i] = attrs;
     }
+  this_target_mode_align->any_modes_align = any_modes_strict_align;
+  this_target_mode_align->all_modes_align = all_modes_strict_align;
 
   split_branch_probability = profile_probability::uninitialized ();
 }

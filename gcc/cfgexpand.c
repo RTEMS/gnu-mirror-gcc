@@ -73,6 +73,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa-address.h"
 #include "output.h"
 #include "builtins.h"
+#include "mode-align.h"
 
 /* Some systems use __main in a way incompatible with its use in gcc, in these
    cases use the macros NAME__MAIN to give a quoted symbol and SYMBOL__MAIN to
@@ -1194,7 +1195,12 @@ expand_stack_vars (bool (*pred) (size_t), class stack_vars_data *data)
 		data->asan_base = gen_reg_rtx (Pmode);
 	      base = data->asan_base;
 
-	      if (!STRICT_ALIGNMENT)
+	      /* MORELLO TODO
+		 Believe that this is here to ensure ASAN redzones are aligned.
+		 If that is the case then this mode wise alignment should check
+		 whether SImode is aligned.  Confirming and testing that is
+		 left for later since ASAN is not supported for Morello.  */
+	      if (!any_modes_strict_align ())
 		base_align = crtl->max_used_stack_slot_alignment;
 	      else
 		base_align = MAX (crtl->max_used_stack_slot_alignment,
@@ -2253,8 +2259,14 @@ expand_used_vars (void)
 		    .to_constant ());
 	  data.asan_vec.safe_push (prev_offset);
 	  data.asan_vec.safe_push (offset);
-	  /* Leave space for alignment if STRICT_ALIGNMENT.  */
-	  if (STRICT_ALIGNMENT)
+	  /* Leave space for alignment if require strict alignment for any
+	     mode.  */
+	  /* MORELLO TODO
+	     Believe that this is here to ensure ASAN redzones are aligned.  If
+	     that is the case then this mode wise alignment should check
+	     whether SImode is aligned.  Confirming and testing that is left
+	     for later since ASAN is not supported for Morello.  */
+	  if (any_modes_strict_align ())
 	    alloc_stack_frame_space ((GET_MODE_ALIGNMENT (SImode)
 				      << ASAN_SHADOW_SHIFT)
 				     / BITS_PER_UNIT, 1);
