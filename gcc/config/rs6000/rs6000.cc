@@ -2535,17 +2535,6 @@ rs6000_debug_reg_global (void)
   if (TARGET_LINK_STACK)
     fprintf (stderr, DEBUG_FMT_S, "link_stack", "true");
 
-  if (TARGET_P8_FUSION)
-    {
-      char options[80];
-
-      strcpy (options, "power8");
-      if (TARGET_P8_FUSION_SIGN)
-	strcat (options, ", sign");
-
-      fprintf (stderr, DEBUG_FMT_S, "fusion", options);
-    }
-
   fprintf (stderr, DEBUG_FMT_S, "plt-format",
 	   TARGET_SECURE_PLT ? "secure" : "bss");
   fprintf (stderr, DEBUG_FMT_S, "struct-return",
@@ -4029,41 +4018,6 @@ rs6000_option_override_internal (bool global_init_p)
       && flag_shrink_wrap_separate
       && optimize_function_for_speed_p (cfun))
     rs6000_isa_flags |= OPTION_MASK_SAVE_TOC_INDIRECT;
-
-  /* Enable power8 fusion if we are tuning for power8, even if we aren't
-     generating power8 instructions.  Power9 does not optimize power8 fusion
-     cases.  */
-  if (!(rs6000_isa_flags_explicit & OPTION_MASK_P8_FUSION))
-    {
-      if (processor_target_table[tune_index].processor == PROCESSOR_POWER8)
-	rs6000_isa_flags |= OPTION_MASK_P8_FUSION;
-      else
-	rs6000_isa_flags &= ~OPTION_MASK_P8_FUSION;
-    }
-
-  /* Setting additional fusion flags turns on base fusion.  */
-  if (!TARGET_P8_FUSION && TARGET_P8_FUSION_SIGN)
-    {
-      if (rs6000_isa_flags_explicit & OPTION_MASK_P8_FUSION)
-	{
-	  if (TARGET_P8_FUSION_SIGN)
-	    error ("%qs requires %qs", "-mpower8-fusion-sign",
-		   "-mpower8-fusion");
-
-	  rs6000_isa_flags &= ~OPTION_MASK_P8_FUSION;
-	}
-      else
-	rs6000_isa_flags |= OPTION_MASK_P8_FUSION;
-    }
-
-  /* Power8 does not fuse sign extended loads with the addis.  If we are
-     optimizing at high levels for speed, convert a sign extended load into a
-     zero extending load, and an explicit sign extension.  */
-  if (TARGET_P8_FUSION
-      && !(rs6000_isa_flags_explicit & OPTION_MASK_P8_FUSION_SIGN)
-      && optimize_function_for_speed_p (cfun)
-      && optimize >= 3)
-    rs6000_isa_flags |= OPTION_MASK_P8_FUSION_SIGN;
 
   /* ISA 3.0 vector instructions include ISA 2.07.  */
   if (TARGET_P9_VECTOR && !TARGET_P8_VECTOR)
@@ -24000,8 +23954,6 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "pcrel-opt",		OPTION_MASK_PCREL_OPT,		false, true  },
   { "popcntb",			OPTION_MASK_POPCNTB,		false, true  },
   { "popcntd",			OPTION_MASK_POPCNTD,		false, true  },
-  { "power8-fusion",		OPTION_MASK_P8_FUSION,		false, true  },
-  { "power8-fusion-sign",	OPTION_MASK_P8_FUSION_SIGN,	false, true  },
   { "power8-vector",		OPTION_MASK_P8_VECTOR,		false, true  },
   { "power9-minmax",		OPTION_MASK_P9_MINMAX,		false, true  },
   { "power9-misc",		OPTION_MASK_P9_MISC,		false, true  },
@@ -25340,10 +25292,9 @@ rs6000_can_inline_p (tree caller, tree callee)
 	    }
 	}
 
-      /* Ignore -mpower8-fusion and -mpower10-fusion options for inlining
-	 purposes.  */
-      callee_isa &= ~(OPTION_MASK_P8_FUSION | OPTION_MASK_P10_FUSION);
-      explicit_isa &= ~(OPTION_MASK_P8_FUSION | OPTION_MASK_P10_FUSION);
+      /* Ignore -mpower10-fusion option for inlining purposes.  */
+      callee_isa &= ~OPTION_MASK_P10_FUSION;
+      explicit_isa &= ~OPTION_MASK_P10_FUSION;
 
       /* The callee's options must be a subset of the caller's options, i.e.
 	 a vsx function may inline an altivec function, but a no-vsx function
@@ -27403,9 +27354,9 @@ fusion_gpr_load_p (rtx addis_reg,	/* register set via addis.  */
   if (!fusion_gpr_addis (addis_value, GET_MODE (addis_value)))
     return false;
 
-  /* Allow sign/zero extension.  */
-  if (GET_CODE (mem) == ZERO_EXTEND
-      || (GET_CODE (mem) == SIGN_EXTEND && TARGET_P8_FUSION_SIGN))
+  /* Allow zero extension.  Do not allow sign extension, since the hrdware does
+     not fuse load with sign extend instructions.  */
+  if (GET_CODE (mem) == ZERO_EXTEND)
     mem = XEXP (mem, 0);
 
   if (!MEM_P (mem))
@@ -27468,8 +27419,7 @@ expand_fusion_gpr_load (rtx *operands)
   machine_mode ptr_mode = Pmode;
   enum rtx_code extend = UNKNOWN;
 
-  if (GET_CODE (orig_mem) == ZERO_EXTEND
-      || (TARGET_P8_FUSION_SIGN && GET_CODE (orig_mem) == SIGN_EXTEND))
+  if (GET_CODE (orig_mem) == ZERO_EXTEND)
     {
       extend = GET_CODE (orig_mem);
       orig_mem = XEXP (orig_mem, 0);
