@@ -1,3 +1,20 @@
+==================== work089 patch #3
+
+Replace UNSPEC with RTL code for extendditi2.
+
+When I submitted my patch on March 12th for extendditi2, Segher wished I
+had removed the use of the UNSPEC for the vextsd2q instruction.  This
+patch rewrites extendditi2_vector to use VEC_SELECT rather than UNSPEC.
+
+
+2022-05ー12   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/vsx.md (UNSPEC_EXTENDDITI2): Delete.
+	(extendditi2_vector): Rewrite to use VEC_SELECT as a
+	define_expand.
+	(extendditi2_vector2): New insn.
+
 ==================== work089 patch #2
 
 Optimize vec_splats of constant vec_extract for V2DI/V2DF, PR target 99293.
