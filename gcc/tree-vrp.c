@@ -1835,6 +1835,7 @@ register_edge_assert_for_2 (tree name, edge e,
       if (gimple_assign_cast_p (def_stmt))
 	{
 	  if (CONVERT_EXPR_CODE_P (gimple_assign_rhs_code (def_stmt))
+	      && INTEGRAL_TYPE_P (TREE_TYPE (gimple_assign_rhs1 (def_stmt)))
 	      && ! TYPE_UNSIGNED (TREE_TYPE (gimple_assign_rhs1 (def_stmt)))
 	      && (TYPE_PRECISION (gimple_expr_type (def_stmt))
 		  == TYPE_PRECISION (TREE_TYPE (gimple_assign_rhs1 (def_stmt)))))
@@ -1845,8 +1846,7 @@ register_edge_assert_for_2 (tree name, edge e,
       if (name3 != NULL_TREE
       	  && TREE_CODE (name3) == SSA_NAME
 	  && (cst2 == NULL_TREE
-	      || TREE_CODE (cst2) == INTEGER_CST)
-	  && INTEGRAL_TYPE_P (TREE_TYPE (name3)))
+	      || TREE_CODE (cst2) == INTEGER_CST))
 	{
 	  tree tmp;
 
