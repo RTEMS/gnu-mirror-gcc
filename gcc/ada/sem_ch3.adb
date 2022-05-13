@@ -40,6 +40,7 @@ with Exp_Disp;       use Exp_Disp;
 with Exp_Dist;       use Exp_Dist;
 with Exp_Tss;        use Exp_Tss;
 with Exp_Util;       use Exp_Util;
+with Expander;       use Expander;
 with Freeze;         use Freeze;
 with Ghost;          use Ghost;
 with Itypes;         use Itypes;
@@ -3478,6 +3479,14 @@ package body Sem_Ch3 is
       then
          Check_Nonoverridable_Aspects;
       end if;
+
+      --  Check for tagged type declaration at library level
+
+      if Is_Tagged_Type (T)
+        and then not Is_Library_Level_Entity (T)
+      then
+         Check_Restriction (No_Local_Tagged_Types, T);
+      end if;
    end Analyze_Full_Type_Declaration;
 
    ----------------------------------
@@ -5848,7 +5857,7 @@ package body Sem_Ch3 is
          --  Inherit Subprograms_For_Type from the full view, if present
 
          if Present (Full_View (T))
-           and then Subprograms_For_Type (Full_View (T)) /= No_Elist
+           and then Present (Subprograms_For_Type (Full_View (T)))
          then
             Set_Subprograms_For_Type
               (Id, Subprograms_For_Type (Full_View (T)));
@@ -13344,11 +13353,12 @@ package body Sem_Ch3 is
    is
       T             : constant Entity_Id := Entity (Subtype_Mark (S));
       Desig_Type    : constant Entity_Id := Designated_Type (T);
-      Desig_Subtype : Entity_Id := Create_Itype (E_Void, Related_Nod);
+      Desig_Subtype : Entity_Id;
       Constraint_OK : Boolean := True;
 
    begin
       if Is_Array_Type (Desig_Type) then
+         Desig_Subtype := Create_Itype (E_Void, Related_Nod);
          Constrain_Array (Desig_Subtype, S, Related_Nod, Def_Id, 'P');
 
       elsif (Is_Record_Type (Desig_Type)
@@ -13444,12 +13454,14 @@ package body Sem_Ch3 is
             end;
          end if;
 
+         Desig_Subtype := Create_Itype (E_Void, Related_Nod);
          Constrain_Discriminated_Type (Desig_Subtype, S, Related_Nod,
            For_Access => True);
 
       elsif Is_Concurrent_Type (Desig_Type)
         and then not Is_Constrained (Desig_Type)
       then
+         Desig_Subtype := Create_Itype (E_Void, Related_Nod);
          Constrain_Concurrent (Desig_Subtype, S, Related_Nod, Desig_Type, ' ');
 
       else
@@ -13962,7 +13974,7 @@ package body Sem_Ch3 is
               or else D = CR_Discriminant (Discr_Id)
               or else Corresponding_Discriminant (D) = Discr_Id
             then
-               return Node (E);
+               return New_Copy_Tree (Node (E));
             end if;
 
             Next_Discriminant (D);
@@ -13986,7 +13998,7 @@ package body Sem_Ch3 is
             E := First_Elmt (Constraints);
             while Present (D) loop
                if D = Discr_Id then
-                  return Node (E);
+                  return New_Copy_Tree (Node (E));
                end if;
 
                Next_Discriminant (D);
@@ -18266,7 +18278,7 @@ package body Sem_Ch3 is
          --  If In_Spec_Expression, for example within a pre/postcondition,
          --  provide enough information for use of the subtype without
          --  depending on full analysis and freezing, which will happen when
-         --  building the correspondiing subprogram.
+         --  building the corresponding subprogram.
 
          if In_Spec_Expression then
             Analyze (Subtype_Mark (Obj_Def));
@@ -20184,20 +20196,14 @@ package body Sem_Ch3 is
          =>
             return not Comes_From_Source (Exp)
               and then
-                --  If the conversion has been rewritten, check Original_Node
+                --  If the conversion has been rewritten, check Original_Node;
+                --  otherwise, check the expression of the compiler-generated
+                --  conversion (which is a conversion that we want to ignore
+                --  for purposes of the limited-initialization restrictions).
 
-                ((Original_Node (Exp) /= Exp
-                   and then
-                     OK_For_Limited_Init_In_05 (Typ, Original_Node (Exp)))
-
-                  --  Otherwise, check the expression of the compiler-generated
-                  --  conversion (which is a conversion that we want to ignore
-                  --  for purposes of the limited-initialization restrictions).
-
-                  or else
-                    (Original_Node (Exp) = Exp
-                      and then
-                        OK_For_Limited_Init_In_05 (Typ, Expression (Exp))));
+                (if Is_Rewrite_Substitution (Exp)
+                 then OK_For_Limited_Init_In_05 (Typ, Original_Node (Exp))
+                 else OK_For_Limited_Init_In_05 (Typ, Expression (Exp)));
 
          when N_Explicit_Dereference
             | N_Indexed_Component
@@ -20387,6 +20393,40 @@ package body Sem_Ch3 is
       In_Assertion_Expr := In_Assertion_Expr - 1;
    end Preanalyze_Assert_Expression;
 
+   --  ??? The variant below explicitly saves and restores all the flags,
+   --  because it is impossible to compose the existing variety of
+   --  Analyze/Resolve (and their wrappers, e.g. Preanalyze_Spec_Expression)
+   --  to achieve the desired semantics.
+
+   procedure Preanalyze_Assert_Expression (N : Node_Id) is
+      Save_In_Spec_Expression : constant Boolean := In_Spec_Expression;
+      Save_Must_Not_Freeze    : constant Boolean := Must_Not_Freeze (N);
+      Save_Full_Analysis      : constant Boolean := Full_Analysis;
+
+   begin
+      In_Assertion_Expr  := In_Assertion_Expr + 1;
+      In_Spec_Expression := True;
+      Set_Must_Not_Freeze (N);
+      Inside_Preanalysis_Without_Freezing :=
+        Inside_Preanalysis_Without_Freezing + 1;
+      Full_Analysis      := False;
+      Expander_Mode_Save_And_Set (False);
+
+      if GNATprove_Mode then
+         Analyze_And_Resolve (N);
+      else
+         Analyze_And_Resolve (N, Suppress => All_Checks);
+      end if;
+
+      Expander_Mode_Restore;
+      Full_Analysis      := Save_Full_Analysis;
+      Inside_Preanalysis_Without_Freezing :=
+        Inside_Preanalysis_Without_Freezing - 1;
+      Set_Must_Not_Freeze (N, Save_Must_Not_Freeze);
+      In_Spec_Expression := Save_In_Spec_Expression;
+      In_Assertion_Expr  := In_Assertion_Expr - 1;
+   end Preanalyze_Assert_Expression;
+
    -----------------------------------
    -- Preanalyze_Default_Expression --
    -----------------------------------
@@ -20512,7 +20552,7 @@ package body Sem_Ch3 is
             --  its Original_Node points to the old Discr and the access type
             --  for Discr_Type has already been created.
 
-            if Original_Node (Discr) /= Discr then
+            if Is_Rewrite_Substitution (Discr) then
                Discr_Type := Etype (Discriminant_Type (Discr));
             else
                Discr_Type :=

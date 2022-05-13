@@ -5432,6 +5432,22 @@ gimplify_init_constructor (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 	if (notify_temp_creation)
 	  return GS_OK;
 
+	/* Vector types use CONSTRUCTOR all the way through gimple
+	   compilation as a general initializer.  */
+	FOR_EACH_VEC_SAFE_ELT (elts, ix, ce)
+	  {
+	    enum gimplify_status tret;
+	    tret = gimplify_expr (&ce->value, pre_p, post_p, is_gimple_val,
+				  fb_rvalue);
+	    if (tret == GS_ERROR)
+	      ret = GS_ERROR;
+	    else if (TREE_STATIC (ctor)
+		     && !initializer_constant_valid_p (ce->value,
+						       TREE_TYPE (ce->value)))
+	      TREE_STATIC (ctor) = 0;
+	  }
+	recompute_constructor_flags (ctor);
+
 	/* Go ahead and simplify constant constructors to VECTOR_CST.  */
 	if (TREE_CONSTANT (ctor))
 	  {
@@ -5454,25 +5470,8 @@ gimplify_init_constructor (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 		TREE_OPERAND (*expr_p, 1) = build_vector_from_ctor (type, elts);
 		break;
 	      }
-
-	    TREE_CONSTANT (ctor) = 0;
 	  }
 
-	/* Vector types use CONSTRUCTOR all the way through gimple
-	   compilation as a general initializer.  */
-	FOR_EACH_VEC_SAFE_ELT (elts, ix, ce)
-	  {
-	    enum gimplify_status tret;
-	    tret = gimplify_expr (&ce->value, pre_p, post_p, is_gimple_val,
-				  fb_rvalue);
-	    if (tret == GS_ERROR)
-	      ret = GS_ERROR;
-	    else if (TREE_STATIC (ctor)
-		     && !initializer_constant_valid_p (ce->value,
-						       TREE_TYPE (ce->value)))
-	      TREE_STATIC (ctor) = 0;
-	  }
-	recompute_constructor_flags (ctor);
 	if (!is_gimple_reg (TREE_OPERAND (*expr_p, 0)))
 	  TREE_OPERAND (*expr_p, 1) = get_formal_tmp_var (ctor, pre_p);
       }
@@ -8624,7 +8623,8 @@ gimplify_omp_depend (tree *list_p, gimple_seq *pre_p)
 	      }
 	    if (error_operand_p (TREE_VALUE (t)))
 	      return 2;
-	    TREE_VALUE (t) = build_fold_addr_expr (TREE_VALUE (t));
+	    if (TREE_VALUE (t) != null_pointer_node)
+	      TREE_VALUE (t) = build_fold_addr_expr (TREE_VALUE (t));
 	    r = build4 (ARRAY_REF, ptr_type_node, array, cnts[i],
 			NULL_TREE, NULL_TREE);
 	    tem = build2_loc (OMP_CLAUSE_LOCATION (c), MODIFY_EXPR,
@@ -8651,7 +8651,8 @@ gimplify_omp_depend (tree *list_p, gimple_seq *pre_p)
 	      }
 	    if (error_operand_p (OMP_CLAUSE_DECL (c)))
 	      return 2;
-	    OMP_CLAUSE_DECL (c) = build_fold_addr_expr (OMP_CLAUSE_DECL (c));
+	    if (OMP_CLAUSE_DECL (c) != null_pointer_node)
+	      OMP_CLAUSE_DECL (c) = build_fold_addr_expr (OMP_CLAUSE_DECL (c));
 	    if (gimplify_expr (&OMP_CLAUSE_DECL (c), pre_p, NULL,
 			       is_gimple_val, fb_rvalue) == GS_ERROR)
 	      return 2;
@@ -10347,12 +10348,15 @@ gimplify_scan_omp_clauses (tree *list_p, gimple_seq *pre_p,
 	      remove = true;
 	      break;
 	    }
-	  OMP_CLAUSE_DECL (c) = build_fold_addr_expr (OMP_CLAUSE_DECL (c));
-	  if (gimplify_expr (&OMP_CLAUSE_DECL (c), pre_p, NULL,
-			     is_gimple_val, fb_rvalue) == GS_ERROR)
+	  if (OMP_CLAUSE_DECL (c) != null_pointer_node)
 	    {
-	      remove = true;
-	      break;
+	      OMP_CLAUSE_DECL (c) = build_fold_addr_expr (OMP_CLAUSE_DECL (c));
+	      if (gimplify_expr (&OMP_CLAUSE_DECL (c), pre_p, NULL,
+				 is_gimple_val, fb_rvalue) == GS_ERROR)
+		{
+		  remove = true;
+		  break;
+		}
 	    }
 	  if (code == OMP_TASK)
 	    ctx->has_depend = true;
@@ -12510,11 +12514,11 @@ gimplify_omp_for (tree *expr_p, gimple_seq *pre_p)
 			       OMP_CLAUSE_SCHEDULE))
 	    error_at (EXPR_LOCATION (for_stmt),
 		      "%qs clause may not appear on non-rectangular %qs",
-		      "schedule", "for");
+		      "schedule", lang_GNU_Fortran () ? "do" : "for");
 	  if (omp_find_clause (OMP_FOR_CLAUSES (for_stmt), OMP_CLAUSE_ORDERED))
 	    error_at (EXPR_LOCATION (for_stmt),
 		      "%qs clause may not appear on non-rectangular %qs",
-		      "ordered", "for");
+		      "ordered", lang_GNU_Fortran () ? "do" : "for");
 	}
       break;
     case OMP_DISTRIBUTE:
@@ -12529,6 +12533,19 @@ gimplify_omp_for (tree *expr_p, gimple_seq *pre_p)
       ort = ORT_ACC;
       break;
     case OMP_TASKLOOP:
+      if (OMP_FOR_NON_RECTANGULAR (inner_for_stmt ? inner_for_stmt : for_stmt))
+	{
+	  if (omp_find_clause (OMP_FOR_CLAUSES (for_stmt),
+			       OMP_CLAUSE_GRAINSIZE))
+	    error_at (EXPR_LOCATION (for_stmt),
+		      "%qs clause may not appear on non-rectangular %qs",
+		      "grainsize", "taskloop");
+	  if (omp_find_clause (OMP_FOR_CLAUSES (for_stmt),
+			       OMP_CLAUSE_NUM_TASKS))
+	    error_at (EXPR_LOCATION (for_stmt),
+		      "%qs clause may not appear on non-rectangular %qs",
+		      "num_tasks", "taskloop");
+	}
       if (omp_find_clause (OMP_FOR_CLAUSES (for_stmt), OMP_CLAUSE_UNTIED))
 	ort = ORT_UNTIED_TASKLOOP;
       else

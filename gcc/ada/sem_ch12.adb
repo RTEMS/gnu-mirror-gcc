@@ -1178,9 +1178,9 @@ package body Sem_Ch12 is
       --  anonymous types, the presence a formal equality will introduce an
       --  implicit declaration for the corresponding inequality.
 
-      -----------------------------------------
-      -- procedure Build_Subprogram_Wrappers --
-      -----------------------------------------
+      -------------------------------
+      -- Build_Subprogram_Wrappers --
+      -------------------------------
 
       procedure Build_Subprogram_Wrappers is
          Formal : constant Entity_Id :=
@@ -5708,9 +5708,9 @@ package body Sem_Ch12 is
          Set_Scope (Inst_Id, Current_Scope);
 
          Set_Entity (Gen_Id, Gen_Unit);
-         Set_Is_Instantiated (Gen_Unit);
 
          if In_Extended_Main_Source_Unit (N) then
+            Set_Is_Instantiated (Gen_Unit);
             Generate_Reference (Gen_Unit, N);
          end if;
 
@@ -10224,7 +10224,7 @@ package body Sem_Ch12 is
       Prim      : Node_Id;
 
    begin
-      if Prims_List /= No_Elist then
+      if Present (Prims_List) then
          Prim_Elmt := First_Elmt (Prims_List);
          while Present (Prim_Elmt) loop
             Prim := Node (Prim_Elmt);
@@ -17192,7 +17192,7 @@ package body Sem_Ch12 is
          end if;
       end Validate_Derived_Type_Default;
 
-      --  Start of processing for Validate_Formal_Type_Default
+   --  Start of processing for Validate_Formal_Type_Default
 
    begin
       Analyze (Default);

@@ -195,7 +195,7 @@ package body Sem_Ch13 is
    --  returned for non-scalar types.
    --
    --  Note: the RM seems to suggest that string types can also have static
-   --  predicates. But that really makes lttle sense as very few useful
+   --  predicates. But that really makes little sense as very few useful
    --  predicates can be constructed for strings. Remember that:
    --
    --     "ABC" < "DEF"
@@ -6550,22 +6550,47 @@ package body Sem_Ch13 is
                     ("\?j?use interrupt procedure instead", N);
                end if;
 
-            --  Case of an address clause for a class-wide object, which is
-            --  considered erroneous.
-
-            elsif Is_Class_Wide_Type (Etype (U_Ent)) then
-               Error_Msg_NE
-                 ("??class-wide object & must not be overlaid", Nam, U_Ent);
-               Error_Msg_N
-                 ("\??Program_Error will be raised at run time", Nam);
-               Insert_Action (Declaration_Node (U_Ent),
-                 Make_Raise_Program_Error (Loc,
-                   Reason => PE_Overlaid_Controlled_Object));
-               return;
-
             --  Case of address clause for an object
 
             elsif Ekind (U_Ent) in E_Constant | E_Variable then
+
+               --  Disallow case of an address clause for an object of an
+               --  indefinite subtype which takes its bounds/discriminant/tag
+               --  from its initial value. Without this, we get a Gigi
+               --  assertion failure for things like
+               --    X : String := Some_Function (...) with Address => ...;
+               --  where the result subtype of the function is unconstrained.
+               --
+               --  We want to reject two cases: the class-wide case, and the
+               --  case where the FE conjures up a renaming declaration and
+               --  would then otherwise generate an address specification for
+               --  that renaming (which is a malformed tree, which is why Gigi
+               --  complains).
+
+               if Is_Class_Wide_Type (Etype (U_Ent)) then
+                  Error_Msg_N
+                    ("address specification not supported for class-wide " &
+                     "object declaration", Nam);
+                  return;
+               elsif Is_Constr_Subt_For_U_Nominal (Etype (U_Ent))
+                 and then
+                   Nkind (Parent (U_Ent)) = N_Object_Renaming_Declaration
+               then
+                  --  Confirm accuracy of " and dynamic size" message text
+                  --  before including it. We want to include that text when
+                  --  it is correct because it may be useful to the reader.
+                  --  The case where we omit that part of the message text
+                  --  might be dead code, but let's not rely on that.
+
+                  Error_Msg_N
+                    ("address specification not supported for object " &
+                     "declaration with indefinite nominal subtype" &
+                     (if Size_Known_At_Compile_Time (Etype (U_Ent))
+                      then ""
+                      else " and dynamic size"), Nam);
+                  return;
+               end if;
+
                declare
                   Expr  : constant Node_Id := Expression (N);
                   O_Ent : Entity_Id;
@@ -12449,7 +12474,7 @@ package body Sem_Ch13 is
                OC_Lbit (To) := OC_Lbit (From);
             end OC_Move;
 
-            --  Start of processing for Overlap_Check
+         --  Start of processing for Overlap_Check
 
          begin
             CC := First (Component_Clauses (N));
@@ -15176,25 +15201,24 @@ package body Sem_Ch13 is
                end if;
 
                --  The components of the type are directly visible and can
-               --  be referenced without a prefix.
+               --  be referenced in the source code without a prefix.
+               --  If a name denoting a component doesn't already have a
+               --  prefix, then normalize it by adding a reference to the
+               --  current instance of the type as a prefix.
+               --
+               --  This isn't right in the pathological corner case of an
+               --  object-declaring expression (e.g., a quantified expression
+               --  or a declare expression) that declares an object with the
+               --  same name as a visible component declaration, thereby hiding
+               --  the component within that expression. For example, given a
+               --  record with a Boolean component "C" and a dynamic predicate
+               --  "C = (for some C in Character => Some_Function (C))", only
+               --  the first of the two uses of C should have a prefix added
+               --  here; instead, both will get prefixes.
 
-               if Nkind (Parent (N)) = N_Selected_Component then
-                  null;
-
-               --  In expression C (I), C may be a directly visible function
-               --  or a visible component that has an array type. Disambiguate
-               --  by examining the component type.
-
-               elsif Nkind (Parent (N)) = N_Indexed_Component
-                 and then N = Prefix (Parent (N))
+               if Nkind (Parent (N)) /= N_Selected_Component
+                 or else N /= Selector_Name (Parent (N))
                then
-                  Comp := Visible_Component (Chars (N));
-
-                  if Present (Comp) and then Is_Array_Type (Etype (Comp)) then
-                     Add_Prefix (N, Comp);
-                  end if;
-
-               else
                   Comp := Visible_Component (Chars (N));
 
                   if Present (Comp) then

@@ -1258,9 +1258,8 @@ package Sem_Util is
    --  Retrieve one of the primitives First, Last, Next, Previous, Has_Element,
    --  Element from the value of the Iterable aspect of a type.
 
-   procedure Get_Library_Unit_Name_String (Decl_Node : Node_Id);
-   --  Retrieve the fully expanded name of the library unit declared by
-   --  Decl_Node into the name buffer.
+   function Get_Library_Unit_Name (Decl_Node : Node_Id) return String_Id;
+   --  Return the full expanded name of the library unit declared by Decl_Node
 
    function Get_Max_Queue_Length (Id : Entity_Id) return Uint;
    --  Return the argument of pragma Max_Queue_Length or zero if the annotation
@@ -1723,13 +1722,17 @@ package Sem_Util is
    --  This version is more efficient than calling the single root version of
    --  Is_Subtree twice.
 
+   function In_Statement_Condition_With_Actions (N : Node_Id) return Boolean;
+   --  Returns true if the expression N occurs within the condition of a
+   --  statement node with actions. Subsidiary to inlining for GNATprove, where
+   --  inlining of function calls in such expressions would expand the called
+   --  body into actions list of the condition node. GNATprove cannot yet cope
+   --  with such a complex AST.
+
    function In_Visible_Part (Scope_Id : Entity_Id) return Boolean;
    --  Determine whether a declaration occurs within the visible part of a
    --  package specification. The package must be on the scope stack, and the
    --  corresponding private part must not.
-
-   function In_While_Loop_Condition (N : Node_Id) return Boolean;
-   --  Returns true if the expression N occurs within the condition of a while
 
    function Incomplete_Or_Partial_View (Id : Entity_Id) return Entity_Id;
    --  Given the entity of a constant or a type, retrieve the incomplete or
@@ -2069,6 +2072,8 @@ package Sem_Util is
    function Is_Expression_Function (Subp : Entity_Id) return Boolean;
    --  Determine whether subprogram [body] Subp denotes an expression function
 
+   --  WARNING: There is a matching C declaration of this subprogram in fe.h
+
    function Is_Expression_Function_Or_Completion
      (Subp : Entity_Id) return Boolean;
    --  Determine whether subprogram [body] Subp denotes an expression function
@@ -2332,12 +2337,6 @@ package Sem_Util is
    --  AI05-0139-2: Check whether Typ is derived from the predefined interface
    --  Ada.Iterator_Interfaces.Reversible_Iterator.
 
-   function Is_Selector_Name (N : Node_Id) return Boolean;
-   --  Given an N_Identifier node N, determines if it is a Selector_Name.
-   --  As described in Sinfo, Selector_Names are special because they
-   --  represent use of the N_Identifier node for a true identifier, when
-   --  normally such nodes represent a direct name.
-
    function Is_Single_Concurrent_Object (Id : Entity_Id) return Boolean;
    --  Determine whether arbitrary entity Id denotes the anonymous object
    --  created for a single protected or single task type.
@@ -2467,6 +2466,12 @@ package Sem_Util is
 
    function Is_User_Defined_Equality (Id : Entity_Id) return Boolean;
    --  Determine whether an entity denotes a user-defined equality
+
+   function Is_User_Defined_Literal
+     (N   : Node_Id;
+      Typ : Entity_Id) return Boolean;
+   pragma Inline (Is_User_Defined_Literal);
+   --  Determine whether N is a user-defined literal for Typ
 
    function Is_Validation_Variable_Reference (N : Node_Id) return Boolean;
    --  Determine whether N denotes a reference to a variable which captures the

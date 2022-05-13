@@ -31,6 +31,7 @@ with Opt;            use Opt;
 with Output;         use Output;
 with Sinfo.Utils;    use Sinfo.Utils;
 with System.Storage_Elements;
+with Unchecked_Conversion;
 
 package body Atree is
 
@@ -2146,7 +2147,7 @@ package body Atree is
       --  not already rewritten the node, as indicated by an Orig_Nodes entry
       --  that does not reference the Old_Node.
 
-      if Original_Node (Old_Node) = Old_Node then
+      if not Is_Rewrite_Substitution (Old_Node) then
          Sav_Node := New_Copy (Old_Node);
          Set_Original_Node (Sav_Node, Sav_Node);
          Set_Original_Node (Old_Node, Sav_Node);

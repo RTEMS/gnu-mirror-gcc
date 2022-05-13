@@ -1,3 +1,478 @@
+2022-05-12  Richard Biener  <rguenther@suse.de>
+
+	PR rtl-optimization/105577
+	* dse.cc (rest_of_handle_dse): Make sure to purge dead EH
+	edges before running fast DCE via df_analyze.
+
+2022-05-12  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/105562
+	* tree-ssa-sccvn.cc (vn_reference_lookup_3): Disambiguate
+	against all CLOBBER defs if there's not an obvious must-alias
+	and we are not doing redundant store elimination.
+	(vn_walk_cb_data::redundant_store_removal_p): New field.
+	(vn_reference_lookup_pieces): Initialize it.
+	(vn_reference_lookup): Add argument to specify if we are
+	doing redundant store removal.
+	(eliminate_dom_walker::eliminate_stmt): Specify we do.
+	* tree-ssa-sccvn.h (vn_reference_lookup): Adjust.
+
+2022-05-12  Haochen Jiang  <haochen.jiang@intel.com>
+
+	PR target/104371
+	* config/i386/sse.md (vi1avx2const): New define_mode_attr.
+	(pxor/pcmpeqb/pmovmskb/cmp 0xffff to ptest splitter):
+	New define_split pattern.
+
+2022-05-12  Jakub Jelinek  <jakub@redhat.com>
+
+	* gimplify.cc (gimplify_omp_depend): Don't build_fold_addr_expr
+	if null_pointer_node.
+	(gimplify_scan_omp_clauses): Likewise.
+	* tree-pretty-print.cc (dump_omp_clause): Print null_pointer_node
+	as omp_all_memory.
+
+2022-05-11  Patrick Palka  <ppalka@redhat.com>
+
+	* tree.h (TREE_VEC_BEGIN): Define.
+	(TREE_VEC_END): Correct 'length' member access.
+	(class tree_vec_range): Define.
+
+2022-05-11  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* config/rs6000/rs6000.md: Use wa instead of <Fv>.
+
+2022-05-11  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* config/rs6000/rs6000.md: Use d instead of <Ff>.
+
+2022-05-11  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* config/rs6000/constraints.md (register_constraint "f"): Use
+	RS6000_CONSTRAINT_d.
+	* config/rs6000/rs6000.cc (rs6000_debug_reg_global): Do not handle
+	RS6000_CONSTRAINT_f.
+	(rs6000_init_hard_regno_mode_ok): Ditto.  Reorder and simplify a bit.
+	* config/rs6000/rs6000.h (r6000_reg_class_enum): Delete
+	RS6000_CONSTRAINT_d.
+
+2022-05-11  Richard Biener  <rguenther@suse.de>
+
+	* gimple-fold.h (gimple_build): Use variadic template
+	functions for the gimple_build API forwarders without
+	location_t argument.
+
+2022-05-11  Siddhesh Poyarekar  <siddhesh@gotplt.org>
+
+	PR middle-end/70090
+	* asan.cc (initialize_sanitizer_builtins): Register
+	__builtin_dynamic_object_size if necessary.
+
+2022-05-11  Richard Biener  <rguenther@suse.de>
+
+	PR rtl-optimization/105559
+	* cfgrtl.cc (delete_insn_and_edges): Only perform search to BB_END
+	for non-debug insns.
+
+2022-05-11  Richard Biener  <rguenther@suse.de>
+
+	* generic-match-head.cc: Include tree-eh.h.
+	* match.pd ((cond ...) cmp X): New simplification inspired
+	by fold_binary_op_with_conditional_arg.
+	(eq/ne (cmp ...) true/false): Likewise.
+
+2022-05-11  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* doc/install.texi: Don't document '--with-hsa-runtime',
+	'--with-hsa-runtime-include', '--with-hsa-runtime-lib'.
+
+2022-05-11  Martin Liska  <mliska@suse.cz>
+
+	PR other/105527
+	* doc/install.texi: Document the configure option --with-zstd.
+
+2022-05-11  Martin Liska  <mliska@suse.cz>
+
+	* common/config/i386/cpuinfo.h (has_cpu_feature): Directly
+	compute index in cpu_features2.
+	(set_cpu_feature): Likewise.
+	* config/i386/i386-builtins.cc (fold_builtin_cpu): Also remove
+	loop for cpu_features2 and use NOP_EXPRs.
+
+2022-05-11  Richard Biener  <rguenther@suse.de>
+
+	PR bootstrap/105551
+	* opts.cc (finish_options): Also disable var-tracking if
+	!DWARF2_DEBUGGING_INFO.
+
+2022-05-11  liuhongt  <hongtao.liu@intel.com>
+
+	PR target/104915
+	* config/i386/sse.md (*vec_set<mode>_0_zero_extendhi): New
+	pre_reload define_insn_and_split.
+	(*vec_setv2di_0_zero_extendhi_1): Ditto.
+	(*vec_set<mode>_0_zero_extendsi): Ditto.
+	(*vec_setv2di_0_zero_extendsi_1): Ditto.
+	(ssewvecmode): New mode attr.
+	(ssewvecmodelower): Ditto.
+	(ssepackmodelower): Ditto.
+
+2022-05-11  Kewen Lin  <linkw@linux.ibm.com>
+
+	* config/rs6000/constraints.md (register constraint v): Use
+	rs6000_constraints[RS6000_CONSTRAINT_v] instead of ALTIVEC_REGS.
+
+2022-05-11  Martin Liska  <mliska@suse.cz>
+
+	PR target/105355
+	* config/riscv/riscv.opt: Remove Separate from
+	-msmall-data-limit=.
+	* optc-gen.awk: Report error for the described situation.
+	* gcc.cc: Use Separate syntax.
+	* opts.cc (gen_command_line_string): Change option name.
+
+2022-05-11  Haochen Gui  <guihaoc@gcc.gnu.org>
+
+	PR target/105414
+	* match.pd (minmax): Skip constant folding for fmin/fmax when both
+	arguments are sNaN or one is sNaN and another is NaN.
+
+2022-05-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/105528
+	* gimple-isel.cc (gimple_expand_vec_set_expr): After gsi_remove
+	set *gsi to gsi_for_stmt (ass_stmt).  Fix up function comment.
+
+2022-05-10  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* doc/md.texi (Defining Mode Iterators): Correct example replacement
+	text.
+
+2022-05-10  Maciej W. Rozycki  <macro@embecosm.com>
+
+	* config/riscv/riscv.md (UNSPEC_FMIN, UNSPEC_FMAX): New
+	constants.
+	(fmin<mode>3, fmax<mode>3): New insns.
+
+2022-05-10  Richard Biener  <rguenther@suse.de>
+
+	* tree-if-conv.cc (fold_build_cond_expr): Use
+	match-and-simplify to simplify the condition.
+	(ifcvt_follow_ssa_use_edges): Remove.
+	(predicate_scalar_phi): Use follow_all_ssa_edges.
+
+2022-05-10  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR middle-end/100400
+	* omp-oacc-kernels-decompose.cc
+	(visit_loops_in_gang_single_region) <GIMPLE_OMP_FOR>: Explicitly
+	call 'internal_error'.
+
+2022-05-10  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/105537
+	* toplev.cc (process_options): Move flag_var_tracking
+	handling ...
+	* opts.cc (finish_options): ... here.
+
+2022-05-10  Martin Liska  <mliska@suse.cz>
+
+	* basic-block.h (struct basic_block_d): Use void *
+	instead PTR.
+	* cfgloop.h: Likewise.
+	* cgraph.h: Likewise.
+	* gengtype-state.cc (state_ident_by_name): Likewise.
+	(record_type): Likewise.
+	(read_state_already_seen_type): Likewise.
+	* gengtype.cc (dump_type): Likewise.
+	(input_file_by_name): Likewise.
+	(main): Likewise.
+	* ggc-common.cc (ggc_cleared_alloc_ptr_array_two_args): Likewise.
+	* ipa-utils.h (struct ipa_dfs_info): Likewise.
+	* plugin.cc (htab_hash_plugin): Likewise.
+
+2022-05-10  Richard Biener  <rguenther@suse.de>
+
+	* flags.h (dwarf_debuginfo_p): Add opts argument, guard
+	API with !GENERATOR_FILE.
+	* opts.cc (global_options): Poison.
+	(global_options_set): Likewise.
+	(finish_options): Refer to options via opts.
+
+2022-05-10  Uroš Bizjak  <ubizjak@gmail.com>
+	    Roger Sayle  <roger@nextmovesoftware.com>
+
+	* config/i386/i386.md (*testqi_1_maybe_si): Prefer shorter SImode
+	alternative when optimizing for size and the immediate operand is
+	const_0_to_127_operand.
+	(*andqi_2_maybe_si): Likewise.
+	* config/i386/predicates.md (const_0_to_127_operand): New predicate.
+
+2022-05-10  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* tree-chrec.cc (chrec_apply): Attempt to fold the linear chrec
+	"{a, +, a} (x-1)" as "a*x", as the number of loop iterations, x-1,
+	can't be negative.
+
+2022-05-10  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR target/105292
+	* config/sparc/sparc.cc (sparc_vectorize_vec_perm_const): Return
+	true only for 8-byte vector modes.
+
+2022-05-10  Siddhesh Poyarekar  <siddhesh@gotplt.org>
+
+	PR middle-end/70090
+	* ubsan.cc (ubsan_expand_objsize_ifn): Allow non-constant SIZE.
+	(instrument_object_size): Get dynamic object size expression.
+
+2022-05-10  Jiufu Guo  <guojiufu@linux.ibm.com>
+
+	PR preprocessor/101168
+	* config/rs6000/rs6000-c.cc (rs6000_macro_to_expand):
+	Avoid empty identifier.
+
+2022-05-09  Qing Zhao  <qing.zhao@oracle.com>
+
+	PR target/101891
+	* config/i386/i386.cc (zero_call_used_regno_mode): use V2SImode
+	as a generic MMX mode instead of V4HImode.
+	(zero_all_mm_registers): Use SET to zero instead of MOV for
+	zeroing scratch registers.
+	(ix86_zero_call_used_regs): Likewise.
+
+2022-05-09  liuhongt  <hongtao.liu@intel.com>
+
+	PR target/105354
+	* config/i386/i386-expand.cc
+	(expand_vec_perm_pslldq_psrldq_por): New function.
+	(ix86_expand_vec_perm_const_1): Try
+	expand_vec_perm_pslldq_psrldq_por for both 3-instruction and
+	4/5-instruction sequence.
+
+2022-05-09  Martin Liška  <mliska@suse.cz>
+
+	* basic-block.h (STATIC_ASSERT): Use normal STATIC_ASSERT.
+	* system.h (STATIC_ASSERT): Define as static_assert for C++
+	and fallback to array index in C.
+
+2022-05-09  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/105517
+	* tree-ssa-sccvn.cc (vn_reference_lookup): Make sure the accumulated
+	offset can be represented in the POINTER_PLUS_EXPR IL.
+	(vn_reference_insert): Likewise.
+	* poly-int.h (sext_hwi): Add poly version of sext_hwi.
+
+2022-05-09  Richard Biener  <rguenther@suse.de>
+
+	* match.pd: Remove #if GIMPLE guards around ! using patterns.
+
+2022-05-09  liuhongt  <hongtao.liu@intel.com>
+
+	PR target/105072
+	* config/i386/sse.md (*sse4_1_<code>v2qiv2di2<mask_name>_1):
+	New define_insn.
+	(*sse4_1_zero_extendv2qiv2di2_2): New pre_reload
+	define_insn_and_split.
+
+2022-05-09  Alex Coplan  <alex.coplan@arm.com>
+
+	* cgraph.cc (cgraph_node::get_create): Don't dump if the current
+	symtab state is PARSING.
+
+2022-05-09  Martin Liska  <mliska@suse.cz>
+
+	* system.h (LIKELY): Define.
+	(UNLIKELY): Likewise.
+	* domwalk.cc (sort_bbs_postorder): Use {,UN}LIKELY
+	macros.
+	* dse.cc (set_position_unneeded): Likewise.
+	(set_all_positions_unneeded): Likewise.
+	(any_positions_needed_p): Likewise.
+	(all_positions_needed_p): Likewise.
+	* expmed.cc (flip_storage_order): Likewise.
+	* genmatch.cc (dt_simplify::gen_1): Likewise.
+	* ggc-common.cc (gt_pch_save): Likewise.
+	* print-rtl.cc: Likewise.
+	* rtl-iter.h (T>::array_type::~array_type): Likewise.
+	(T>::next): Likewise.
+	* rtl-ssa/internals.inl: Likewise.
+	* rtl-ssa/member-fns.inl: Likewise.
+	* rtlanal.cc (T>::add_subrtxes_to_queue): Likewise.
+	(rtx_properties::try_to_add_dest): Likewise.
+	* rtlanal.h (growing_rtx_properties::repeat): Likewise.
+	(vec_rtx_properties_base::~vec_rtx_properties_base): Likewise.
+	* simplify-rtx.cc (simplify_replace_fn_rtx): Likewise.
+	* sort.cc (likely): Likewise.
+	(mergesort): Likewise.
+	* wide-int.h (wi::eq_p): Likewise.
+	(wi::ltu_p): Likewise.
+	(wi::cmpu): Likewise.
+	(wi::bit_and): Likewise.
+	(wi::bit_and_not): Likewise.
+	(wi::bit_or): Likewise.
+	(wi::bit_or_not): Likewise.
+	(wi::bit_xor): Likewise.
+	(wi::add): Likewise.
+	(wi::sub): Likewise.
+
+2022-05-09  Kito Cheng  <kito.cheng@sifive.com>
+
+	* config/riscv/arch-canonicalize: Handle g correctly.
+
+2022-05-07  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/101833
+	PR c++/47634
+	* tree-core.h (struct attribute_spec): Update comment for HANDLER.
+
+2022-05-06  Jason Merrill  <jason@redhat.com>
+
+	* diagnostic-color.cc: Add fnname and targs color entries.
+	* doc/invoke.texi: Document them.
+
+2022-05-06  Jason Merrill  <jason@redhat.com>
+
+	* vec.h (vec::iterate): Fix comment.
+
+2022-05-06   Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/102059
+	* config/rs6000/rs6000.cc (rs6000_can_inline_p): Ignore -mpower8-fusion
+	and -mpower10-fusion options for inlining purposes.
+
+2022-05-06  Christophe Lyon  <christophe.lyon@arm.com>
+
+	* config/aarch64/iterators.md (GPF_TF_F16): Delete.
+
+2022-05-06  Marcel Vollweiler  <marcel@codesourcery.com>
+
+	* omp-low.cc (omp_runtime_api_call): Added target_is_accessible to
+	omp_runtime_apis array.
+
+2022-05-06  Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* omp-low.cc (omp_maybe_offloaded_ctx): New prototype.
+	(scan_sharing_clauses):  Check a restriction on allocate clause.
+
+2022-05-05  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* gimplify.cc (gimplify_omp_for): Update messages for SCHEDULED
+	and ORDERED clause conflict errors.  Add check for GRAINSIZE and
+	NUM_TASKS on TASKLOOP.
+
+2022-05-05  Martin Liska  <mliska@suse.cz>
+
+	* genautomata.cc (create_composed_state): Remove dead code.
+	* graphite-poly.cc (print_pdrs): Likewise.
+	* lto-wrapper.cc (run_gcc): Likewise.
+	* tree-switch-conversion.cc (switch_decision_tree::balance_case_nodes):
+	Likewise.
+
+2022-05-05  Martin Liska  <mliska@suse.cz>
+
+	* tree-profile.cc (gimple_gen_ic_profiler): Prefix names with
+	PROF_*.
+	(gimple_gen_time_profiler): Likewise.
+
+2022-05-05  Martin Liska  <mliska@suse.cz>
+
+	* value-prof.cc (stream_out_histogram_value): Remove sanity
+	checking.
+
+2022-05-05  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/104162
+	* tree-ssa-sccvn.cc (vn_reference_lookup): Handle
+	&MEM[_1 + 5].a[i] like a POINTER_PLUS_EXPR if the offset
+	becomes invariant.
+	(vn_reference_insert): Likewise.
+
+2022-05-05  Richard Biener  <rguenther@suse.de>
+
+	* tree-core.h (tree_real_cst::real_cst_ptr): Remove pointer
+	to real_value field.
+	(tree_real_cst::value): Add real_value field.
+	* tree.h (TREE_REAL_CST_PTR): Adjust.
+	* tree.cc (build_real): Remove separate allocation.
+	* tree-streamer-in.cc (unpack_ts_real_cst_value_fields):
+	Likewise.
+
+2022-05-05  Richard Biener  <rguenther@suse.de>
+
+	* tree-ssa-ifcombine.cc (bb_no_side_effects_p): Avoid executing
+	divisions with undefined overflow unconditionally.
+	(pass_tree_ifcombine::execute): Rewrite stmts with undefined
+	overflow to defined.
+
+2022-05-05  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/105484
+	* gimple-isel.cc (gimple_expand_vec_set_expr): Clean EH, return
+	whether the CFG changed.
+	(gimple_expand_vec_exprs): When the CFG changed, clean it up.
+
+2022-05-05  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/104595
+	* tree-vect-patterns.cc (vect_recog_bool_pattern): For
+	COND_EXPR do not fail if check_bool_pattern returns false.
+
+2022-05-04  Tobias Burnus  <tobias@codesourcery.com>
+
+	* omp-low.cc (lower_omp_target): Fix use_device_{addr,ptr} with list
+	item that is in an outer data-sharing clause.
+
+2022-05-04  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/104658
+	* tree-vect-slp.cc (vect_slp_convert_to_external): Do not
+	create VECTOR_BOOLEAN_TYPE_P extern defs.  Reset the vector
+	type on nodes we promote.
+	(vectorizable_bb_reduc_epilogue): Deal with externalized
+	root.
+	* tree-vect-stmts.cc (vect_maybe_update_slp_op_vectype): Do
+	not allow VECTOR_BOOLEAN_TYPE_P extern defs.
+
+2022-05-04  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/103116
+	* tree-vect-stmts.cc (get_group_load_store_type): Handle the
+	case we need peeling for gaps even though GROUP_GAP is zero.
+
+2022-05-04  Martin Liska  <mliska@suse.cz>
+
+	* gengtype-state.cc (read_a_state_token): Remove dead code.
+	* ipa-profile.cc (ipa_profile_read_summary_section): Likewise.
+
+2022-05-04  Richard Biener  <rguenther@suse.de>
+
+	* gimplify.cc (gimplify_init_constructor): First gimplify,
+	then simplify the result to a VECTOR_CST.
+
+2022-05-04  Jakub Jelinek  <jakub@redhat.com>
+
+	* genconditions.cc (write_conditions): Append a { nullptr, -1 }
+	element at the end of insn_conditions.
+	(write_writer): Use ARRAY_SIZE (insn_conditions) - 1 instead of
+	ARRAY_SIZE (insn_conditions).
+
+2022-05-04  Christophe Lyon  <christophe.lyon@arm.com>
+
+	PR target/104662
+	* config/arm/arm.cc (simd_valid_immediate): Exit when input is a
+	vector of booleans and MVE is not enabled.
+
+2022-05-04  Richard Biener  <rguenther@suse.de>
+
+	PR debug/105158
+	* tree-cfgcleanup.cc (move_debug_stmts_from_forwarder):
+	Move debug stmts to the predecessor if moving to the
+	destination is not possible.
+	(remove_forwarder_block): Adjust.
+	(remove_forwarder_block_with_phi): Likewise.
+
 2022-05-03  Roger Sayle  <roger@nextmovesoftware.com>
 
 	PR tree-optimization/102950

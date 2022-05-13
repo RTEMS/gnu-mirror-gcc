@@ -3707,7 +3707,8 @@ package body Exp_Ch9 is
 
       Analyze_Statements (Bod_Stmts);
 
-      Set_Scope (Entity (Identifier (First (Bod_Stmts))), Bod_Id);
+      Set_Scope (Entity (Identifier (First (Bod_Stmts))),
+                 Protected_Body_Subprogram (Ent));
 
       Reset_Scopes_To
         (First (Bod_Stmts), Entity (Identifier (First (Bod_Stmts))));
@@ -6338,7 +6339,7 @@ package body Exp_Ch9 is
 
             when N_Expression_With_Actions =>
                --  this may occur in the case of a Count attribute reference
-               if Original_Node (N) /= N
+               if Is_Rewrite_Substitution (N)
                  and then Is_Pure_Barrier (Original_Node (N)) /= Abandon
                then
                   return Skip;

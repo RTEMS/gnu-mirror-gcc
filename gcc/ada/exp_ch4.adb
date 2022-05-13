@@ -835,6 +835,7 @@ package body Exp_Ch4 is
               Make_Raise_Program_Error (Loc,
                 Reason => PE_Accessibility_Check_Failed));
 
+            Error_Msg_Warn := SPARK_Mode /= On;
             Error_Msg_N ("anonymous access discriminant is too deep for use"
                          & " in allocator<<", N);
             Error_Msg_N ("\Program_Error [<<", N);
@@ -5793,6 +5794,10 @@ package body Exp_Ch4 is
    --  Start of processing for Expand_N_If_Expression
 
    begin
+      --  Deal with non-standard booleans
+
+      Adjust_Condition (Cond);
+
       --  Check for MINIMIZED/ELIMINATED overflow mode.
       --  Apply_Arithmetic_Overflow_Check will not deal with Then/Else_Actions
       --  so skip this step if any actions are present.
@@ -11745,31 +11750,24 @@ package body Exp_Ch4 is
                   declare
                      Stored : constant Elist_Id :=
                                 Stored_Constraint (Operand_Type);
-
-                     Elmt : Elmt_Id;
+                     --  Stored constraints of the operand. If present, they
+                     --  correspond to the discriminants of the parent type.
 
                      Disc_O : Entity_Id;
                      --  Discriminant of the operand type. Its value in the
                      --  object is captured in a selected component.
 
-                     Disc_S : Entity_Id;
-                     --  Stored discriminant of the operand. If present, it
-                     --  corresponds to a constrained discriminant of the
-                     --  parent type.
-
                      Disc_T : Entity_Id;
                      --  Discriminant of the target type
 
-                  begin
-                     Disc_T := First_Discriminant (Target_Type);
-                     Disc_O := First_Discriminant (Operand_Type);
-                     Disc_S := First_Stored_Discriminant (Operand_Type);
+                     Elmt : Elmt_Id;
 
-                     if Present (Stored) then
-                        Elmt := First_Elmt (Stored);
-                     else
-                        Elmt := No_Elmt; -- init to avoid warning
-                     end if;
+                  begin
+                     Disc_O := First_Discriminant (Operand_Type);
+                     Disc_T := First_Discriminant (Target_Type);
+                     Elmt   := (if Present (Stored)
+                                 then First_Elmt (Stored)
+                                 else No_Elmt);
 
                      Cons := New_List;
                      while Present (Disc_T) loop
@@ -11784,8 +11782,11 @@ package body Exp_Ch4 is
                                  Make_Identifier (Loc, Chars (Disc_O))));
                            Next_Discriminant (Disc_O);
 
-                        elsif Present (Disc_S) then
+                        elsif Present (Elmt) then
                            Append_To (Cons, New_Copy_Tree (Node (Elmt)));
+                        end if;
+
+                        if Present (Elmt) then
                            Next_Elmt (Elmt);
                         end if;
 
@@ -12756,18 +12757,35 @@ package body Exp_Ch4 is
          if not Has_Compatible_Representation (Target_Type, Operand_Type)
            and then not Conversion_OK (N)
          then
+            if Optimization_Level > 0
+              and then Is_Boolean_Type (Target_Type)
+            then
+               --  Convert x(y) to (if y then x'(True) else x'(False)).
+               --  Use literals, instead of indexing x'val, to enable
+               --  further optimizations in the middle-end.
 
-            --  Convert: x(y) to x'val (ytyp'pos (y))
+               Rewrite (N,
+                 Make_If_Expression (Loc,
+                   Expressions => New_List (
+                     Operand,
+                     Convert_To (Target_Type,
+                                 New_Occurrence_Of (Standard_True, Loc)),
+                     Convert_To (Target_Type,
+                                 New_Occurrence_Of (Standard_False, Loc)))));
 
-            Rewrite (N,
-              Make_Attribute_Reference (Loc,
-                Prefix         => New_Occurrence_Of (Target_Type, Loc),
-                Attribute_Name => Name_Val,
-                Expressions    => New_List (
-                  Make_Attribute_Reference (Loc,
-                    Prefix         => New_Occurrence_Of (Operand_Type, Loc),
-                    Attribute_Name => Name_Pos,
-                    Expressions    => New_List (Operand)))));
+            else
+               --  Convert: x(y) to x'val (ytyp'pos (y))
+
+               Rewrite (N,
+                 Make_Attribute_Reference (Loc,
+                   Prefix         => New_Occurrence_Of (Target_Type, Loc),
+                   Attribute_Name => Name_Val,
+                   Expressions    => New_List (
+                     Make_Attribute_Reference (Loc,
+                       Prefix         => New_Occurrence_Of (Operand_Type, Loc),
+                       Attribute_Name => Name_Pos,
+                       Expressions    => New_List (Operand)))));
+            end if;
 
             Analyze_And_Resolve (N, Target_Type);
          end if;

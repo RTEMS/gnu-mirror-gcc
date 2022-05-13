@@ -539,7 +539,7 @@ package body Treepr is
          return;
       end if;
 
-      if E = No_Elist then
+      if No (E) then
          Write_Str ("<no elist>");
 
       elsif Is_Empty_Elmt_List (E) then
@@ -1142,21 +1142,7 @@ package body Treepr is
    procedure Print_Name (N : Name_Id) is
    begin
       if Phase = Printing then
-         if N = No_Name then
-            Print_Str ("<No_Name>");
-
-         elsif N = Error_Name then
-            Print_Str ("<Error_Name>");
-
-         elsif Is_Valid_Name (N) then
-            Get_Name_String (N);
-            Print_Char ('"');
-            Write_Name (N);
-            Print_Char ('"');
-
-         else
-            Print_Str ("<invalid name>");
-         end if;
+         Write_Name_For_Debug (N, Quote => """");
       end if;
    end Print_Name;
 
@@ -1229,7 +1215,7 @@ package body Treepr is
 
          else
             Sfile := Get_Source_File_Index (Sloc (N));
-            Print_Int (Int (Sloc (N)) - Int (Source_Text (Sfile)'First));
+            Print_Int (Int (Sloc (N) - Source_Text (Sfile)'First));
             Write_Str ("  ");
             Write_Location (Sloc (N));
          end if;
@@ -1878,7 +1864,7 @@ package body Treepr is
 
          Write_Eol;
          Write_Str ("Tree created for ");
-         Write_Unit_Name (Unit_Name (Main_Unit));
+         Write_Unit_Name_For_Debug (Unit_Name (Main_Unit));
          Underline;
          Print_Node_Subtree (Cunit (Main_Unit));
          Write_Eol;
