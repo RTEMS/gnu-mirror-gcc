@@ -9,6 +9,5 @@ foo (void **p, int i)
   intptr_t x = 0;
   while (i--)
     x ^= (intptr_t) p[i];
-    /* { dg-warning "binary expression on capability types" "" { target { aarch64_capability_any } } .-1 } */
   return x;
 }

@@ -7092,6 +7092,11 @@ type_cache_hasher::equal (type_hash *a, type_hash *b)
       return known_eq (TYPE_VECTOR_SUBPARTS (a->type),
 		       TYPE_VECTOR_SUBPARTS (b->type));
 
+    case INTCAP_TYPE:
+      gcc_assert (TYPE_CAP_PRECISION (a->type) == TYPE_CAP_PRECISION (b->type)
+		  && TYPE_UNSIGNED (a->type) == TYPE_UNSIGNED (b->type));
+      return 1;
+
     case ENUMERAL_TYPE:
       if (TYPE_VALUES (a->type) != TYPE_VALUES (b->type)
 	  && !(TYPE_VALUES (a->type)
@@ -7987,6 +7992,11 @@ build_intcap_type_for_mode (machine_mode mode, int unsignedp)
      Then later use the type precision to set the min and max values.  */
   set_min_and_max_values_for_integral_type
 	  (t, TYPE_CAP_PRECISION (t), unsignedp ? UNSIGNED : SIGNED);
+
+  /* Ensure the node we cache here is the same node you get when calling
+     type_hash_canon.  */
+  auto hash = type_hash_canon_hash (t);
+  t = type_hash_canon (hash, t);
 
   /* N.b. this is somewhat superfluous, since the time this function is called
      from `build_common_tree_nodes` will be the first time this function is

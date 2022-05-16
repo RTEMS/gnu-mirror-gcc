@@ -75,3 +75,10 @@ __intcap_t intcap_shift_intcap(__intcap_t a, __intcap_t b)
 { return a << b; }
 
 int intcap_index(int *p, __intcap_t c) { return p[c]; }
+
+/* Note the self-modifying operators are considered to have unambiguous
+   provenance.  */
+__intcap x, y;
+void pluseq(void) { x += y; }
+void timeseq(void) { x *= y; }
+void modeq(void) { x %= y; }

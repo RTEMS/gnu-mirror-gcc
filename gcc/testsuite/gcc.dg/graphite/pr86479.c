@@ -25,7 +25,6 @@ m7 (__INTPTR_TYPE__ *aw, __INTPTR_TYPE__ ws)
 
           ws /= cq;
           *aw *= ws;
-          /* { dg-warning "binary expression on capability types" "" { target { aarch64_capability_any } } .-1 } */
 
           for (*ud = 0; *ud < 2; ++*ud)
             {
