@@ -483,6 +483,18 @@ enum ld_plugin_level
   LDPL_FATAL
 };
 
+/* The linker's interface for API version negotiation.  */
+
+typedef
+int (*ld_plugin_get_api_version) (char *linker_identifier, int linker_version,
+				  int preferred_linker_api,
+				  const char **compiler_identifier,
+				  int *compiler_version);
+
+typedef
+enum ld_plugin_status
+(*ld_plugin_register_get_api_version) (ld_plugin_get_api_version handler);
+
 /* Values for the tv_tag field of the transfer vector.  */
 
 enum ld_plugin_tag
@@ -521,6 +533,7 @@ enum ld_plugin_tag
   LDPT_REGISTER_NEW_INPUT_HOOK,
   LDPT_GET_WRAP_SYMBOLS,
   LDPT_ADD_SYMBOLS_V2,
+  LDPT_REGISTER_GET_API_VERSION,
 };
 
 /* The plugin transfer vector.  */
@@ -556,6 +569,7 @@ struct ld_plugin_tv
     ld_plugin_get_input_section_size tv_get_input_section_size;
     ld_plugin_register_new_input tv_register_new_input;
     ld_plugin_get_wrap_symbols tv_get_wrap_symbols;
+    ld_plugin_register_get_api_version tv_register_get_api_version;
   } tv_u;
 };
 

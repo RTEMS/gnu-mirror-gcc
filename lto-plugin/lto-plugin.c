@@ -69,6 +69,7 @@ along with this program; see the file COPYING3.  If not see
 #include "../gcc/lto/common.h"
 #include "simple-object.h"
 #include "plugin-api.h"
+#include "ansidecl.h"
 
 /* We need to use I64 instead of ll width-specifier on native Windows.
    The reason for this is that older MS-runtimes don't support the ll.  */
@@ -166,6 +167,10 @@ static ld_plugin_add_input_file add_input_file;
 static ld_plugin_add_input_library add_input_library;
 static ld_plugin_message message;
 static ld_plugin_add_symbols add_symbols, add_symbols_v2;
+static ld_plugin_register_get_api_version register_get_api_version;
+
+/* By default, use version 1 if there is not negotiation.  */
+static int used_api_version = 1;
 
 static struct plugin_file_info *claimed_files = NULL;
 static unsigned int num_claimed_files = 0;
@@ -1407,6 +1412,29 @@ process_option (const char *option)
   verbose = verbose || debug;
 }
 
+static int
+get_api_version (char *linker_identifier, int linker_version,
+		 int preferred_linker_api,
+		 const char **compiler_identifier,
+		 int *compiler_version)
+{
+  *compiler_identifier = "GCC";
+  *compiler_version = GCC_VERSION;
+
+  if (preferred_linker_api >= 2)
+    {
+      check (get_symbols_v3, LDPL_FATAL,
+	     "get_symbols_v3 requires for API version 2");
+      check (add_symbols_v2, LDPL_FATAL,
+	     "add_symbols_v2 requires for API version 2");
+
+      /* The plug-in supports version 2.  */
+      used_api_version = 2;
+    }
+
+  return used_api_version;
+}
+
 /* Called by a linker after loading the plugin. TV is the transfer vector. */
 
 enum ld_plugin_status
@@ -1467,10 +1495,20 @@ onload (struct ld_plugin_tv *tv)
 	  /* We only use this to make user-friendly temp file names.  */
 	  link_output_name = p->tv_u.tv_string;
 	  break;
+	case LDPT_REGISTER_GET_API_VERSION:
+	  register_get_api_version = p->tv_u.tv_register_get_api_version;
+	  break;
 	default:
 	  break;
 	}
       p++;
+    }
+
+  if (register_get_api_version)
+    {
+      status = register_get_api_version (get_api_version);
+      check (status == LDPS_OK, LDPL_FATAL,
+	     "could not register the get_api_version callback");
     }
 
   check (register_claim_file, LDPL_FATAL, "register_claim_file not found");
