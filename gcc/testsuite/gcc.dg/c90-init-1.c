@@ -19,7 +19,7 @@ void foo (int *);
 
 void bar (void)
 {
-  int x[] = { g++, 2 };				/* { dg-error "is not computable at load time" } */
+  int x[] = { g++, 2 };				/* { dg-error "is not constant" } */
 
   foo (x);
 }

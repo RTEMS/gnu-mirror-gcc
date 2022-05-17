@@ -1,3 +1,5 @@
+/* { dg-additional-options "-Wno-cheri-explicit-pointer-conversion-from-cap" } */
+
 struct S { char s[0]; } *__capability a;
 
 void

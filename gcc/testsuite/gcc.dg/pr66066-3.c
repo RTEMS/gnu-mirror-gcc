@@ -3,16 +3,16 @@
 /* { dg-options "-Wno-div-by-zero -pedantic-errors" } */
 
 /* Accept these unless -pedantic-errors/-Werror.  */
-int a1 = -1 << 0;		/* { dg-error "initializer element is not a constant expression" } */
-int a2 = -1 << 0 | 0;		/* { dg-error "initializer element is not a constant expression" } */
-int a3 = -1 << 0 & 1;		/* { dg-error "initializer element is not a constant expression" } */
-int a4 = -1 << 2 ^ 1;		/* { dg-error "initializer element is not a constant expression" } */
-int a5 = 4 & -1 << 2;		/* { dg-error "initializer element is not a constant expression" } */
-int a6 = (-1 << 2) ^ (1 >> 1);	/* { dg-error "initializer element is not a constant expression" } */
-int a7 = 0 || (-1 << 1);	/* { dg-error "initializer element is not a constant expression" } */
-int a8 = 0 ? 2 : (-1 << 1);	/* { dg-error "initializer element is not a constant expression" } */
-int a9 = 1 && -1 << 0;		/* { dg-error "initializer element is not a constant expression" } */
-int a10 = !(-1 << 0);		/* { dg-error "initializer element is not a constant expression" } */
+int a1 = -1 << 0;		/* { dg-error "initializer element is not constant" } */
+int a2 = -1 << 0 | 0;		/* { dg-error "initializer element is not constant" } */
+int a3 = -1 << 0 & 1;		/* { dg-error "initializer element is not constant" } */
+int a4 = -1 << 2 ^ 1;		/* { dg-error "initializer element is not constant" } */
+int a5 = 4 & -1 << 2;		/* { dg-error "initializer element is not constant" } */
+int a6 = (-1 << 2) ^ (1 >> 1);	/* { dg-error "initializer element is not constant" } */
+int a7 = 0 || (-1 << 1);	/* { dg-error "initializer element is not constant" } */
+int a8 = 0 ? 2 : (-1 << 1);	/* { dg-error "initializer element is not constant" } */
+int a9 = 1 && -1 << 0;		/* { dg-error "initializer element is not constant" } */
+int a10 = !(-1 << 0);		/* { dg-error "initializer element is not constant" } */
 
 /* Don't accept these.  */
 int b1 = 1 / 0;		/* { dg-error "initializer element is not constant" } */

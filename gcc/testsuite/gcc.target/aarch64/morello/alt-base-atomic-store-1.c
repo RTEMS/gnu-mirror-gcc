@@ -1,5 +1,5 @@
 /* { dg-do assemble } */
-/* { dg-additional-options "-foptimize-sibling-calls -save-temps" } */
+/* { dg-additional-options "-foptimize-sibling-calls -save-temps -Wno-cheri-implicit-pointer-conversion-from-cap -Wno-cheri-explicit-pointer-conversion-from-cap" } */
 /* { dg-final { check-function-bodies "**" ""  { {-O[123s]} } } } */
 /* { dg-skip-if "" { *-*-* } { "-mabi=purecap" "-mfake-capability" } { "" } }  */
 

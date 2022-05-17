@@ -4,7 +4,7 @@
 #define INTM1 (sizeof (int) * __CHAR_BIT__ - 1)
 
 enum { A = 1 << INTM1 }; /* { dg-error "constant expression" } */
-int k = 1 << INTM1; /* { dg-error "constant expression" } */
+int k = 1 << INTM1; /* { dg-error "is not constant" } */
 
 void
 fn (int i)

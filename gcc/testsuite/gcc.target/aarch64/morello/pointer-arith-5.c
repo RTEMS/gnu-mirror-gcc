@@ -1,4 +1,5 @@
 /* { dg-do compile } */
+/* { dg-additional-options "-Wno-cheri-explicit-pointer-conversion-from-cap -Wno-cheri-implicit-pointer-conversion-from-cap" } */
 
 struct GTeth_desc
 {

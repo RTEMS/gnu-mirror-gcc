@@ -1,5 +1,5 @@
 /* { dg-do compile { target aarch64*-*-* } } */
-/* { dg-additional-options "-Wno-declaration-after-statement" } */
+/* { dg-additional-options "-Wno-declaration-after-statement -Wno-cheri-implicit-pointer-conversion-to-cap" } */
 
 #include <stdio.h>
 

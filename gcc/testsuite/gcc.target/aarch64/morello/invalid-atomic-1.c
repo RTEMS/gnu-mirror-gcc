@@ -1,8 +1,9 @@
 /* { dg-do compile } */
+/* { dg-additional-options "-Wno-cheri-implicit-pointer-conversion-from-cap" } */
 
 #include <stdatomic.h>
 
-void atomic_check_valid_1(int *__capability *intptrptr, int *intptr)
+void atomic_check_valid_1(int *__capability * intptrptr, int *intptr)
 {
   intptr = __atomic_fetch_add(intptrptr, intptr, memory_order_relaxed); /* { dg-warning "integer from pointer without a cast" } */
   intptr = __atomic_fetch_sub(intptrptr, intptr, memory_order_relaxed); /* { dg-warning "integer from pointer without a cast" } */

@@ -1,4 +1,5 @@
 /* { dg-do compile } */
+/* { dg-additional-options "-Wno-cheri-implicit-pointer-conversion-to-cap" } */
 
 void (*__capability nonnull1) (void) __attribute__((nonnull));
 void (*nonnull2) (void) __attribute__((nonnull));

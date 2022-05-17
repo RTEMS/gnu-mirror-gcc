@@ -582,6 +582,26 @@ Common Var(warn_cheri_provenance) Init(1) Warning
 Warn when an expression has ambiguous pointer provenance or will be known
 invalid.
 
+Wcheri-implicit-pointer-conversion-from-cap
+Common Var(warn_cheri_implicit_pointer_conversion_from_cap) Init(1) Warning
+Warn on implicit conversions from capability pointers to non-capability
+pointers.
+
+Wcheri-implicit-pointer-conversion-to-cap
+Common Var(warn_cheri_implicit_pointer_conversion_to_cap) Init(1) Warning
+Warn on implicit conversions from non-capability pointers to capability
+pointers.
+
+Wcheri-explicit-pointer-conversion-from-cap
+Common Var(warn_cheri_explicit_pointer_conversion_from_cap) Init(1) Warning
+Warn on explicit conversions from capability pointers to non-capability
+pointers.
+
+Wcheri-explicit-pointer-conversion-to-cap
+Common Var(warn_cheri_explicit_pointer_conversion_to_cap) Init(1) Warning
+Warn on explicit conversions from non-capability pointers to capability
+pointers.
+
 Wattribute-warning
 Common Var(warn_attribute_warning) Init(1) Warning
 Warn about uses of __attribute__((warning)) declarations.

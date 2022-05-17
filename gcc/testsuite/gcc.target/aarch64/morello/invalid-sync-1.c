@@ -1,4 +1,5 @@
 /* { dg-do compile } */
+/* { dg-additional-options "-Wno-cheri-implicit-pointer-conversion-from-cap" } */
 
 void atomic_check_valid_1(int *__capability *intptrptr, int *intptr) {
   intptr = __sync_fetch_and_add(intptrptr, intptr); /* { dg-warning "integer from pointer without a cast" } */

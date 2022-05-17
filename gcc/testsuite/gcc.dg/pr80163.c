@@ -10,7 +10,7 @@ foo (void)
 a:
   bar ();
 b:;
-  static __int128_t d = (long) &&a - (long) &&b;	/* { dg-error "initializer element is not computable at load time" } */
+  static __int128_t d = (long) &&a - (long) &&b;	/* { dg-error "initializer element is not constant" } */
   return &d;
 }
 

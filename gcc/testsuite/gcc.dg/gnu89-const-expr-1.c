@@ -51,6 +51,6 @@ f (void)
   /* { dg-error "imaginary" "ISO" { target *-*-* } .-1 } */
   /* Statement expressions allowed in unevaluated subexpressions in
      initializers in gnu99 but not gnu89.  */
-  static int j = (1 ? 0 : ({ 0; })); /* { dg-error "constant expression" } */
+  static int j = (1 ? 0 : ({ 0; })); /* { dg-error "is not constant" } */
   /* { dg-error "braced" "ISO" { target *-*-* } .-1 } */
 }

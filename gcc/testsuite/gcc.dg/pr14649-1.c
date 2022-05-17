@@ -4,7 +4,7 @@
 
 double atan(double);
 
-const double pi = 4*atan(1.0);  /* { dg-warning "not a constant expression" } */
+const double pi = 4*atan(1.0);  /* { dg-warning "is not constant" } */
 
 const double ok = 4*__builtin_atan(1.0);
 

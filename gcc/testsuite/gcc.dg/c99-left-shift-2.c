@@ -4,7 +4,7 @@
 #define INTM2 (sizeof (int) * __CHAR_BIT__ - 2)
 
 enum { A = 10 << INTM2 }; /* { dg-error "constant expression" } */
-int k = 10 << INTM2; /* { dg-error "constant expression" } */
+int k = 10 << INTM2; /* { dg-error "is not constant" } */
 
 void
 fn (int i)

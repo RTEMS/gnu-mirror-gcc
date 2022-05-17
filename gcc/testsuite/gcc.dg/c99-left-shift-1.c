@@ -2,7 +2,7 @@
 /* { dg-options "-std=iso9899:1999 -pedantic-errors" } */
 
 enum E { A = -2 << 1 }; /* { dg-error "constant expression" } */
-int i = -1 << 0; /* { dg-error "constant expression" } */
+int i = -1 << 0; /* { dg-error "is not constant" } */
 
 int
 f (int i)

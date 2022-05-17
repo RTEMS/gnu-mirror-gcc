@@ -7748,6 +7748,41 @@ Warn whenever a pointer is cast such that the required alignment of the
 target is increased.  For example, warn if a @code{char *} is cast to
 an @code{int *} regardless of the target machine.
 
+@item -Wcheri-bounds
+@opindex Wcheri-bounds
+@opindex Wno-cheri-bounds
+Warn when an object can not be aligned to ensure non-overlapping bounds.
+
+@item -Wcheri-provenance
+@opindex Wcheri-provenance
+@opindex Wno-cheri-provenance
+Warn when an expression has ambiguous pointer provenance or will be known
+invalid.
+
+@item -Wcheri-implicit-pointer-conversion-from-cap
+@opindex Wcheri-implicit-pointer-conversion-from-cap
+@opindex Wno-cheri-implicit-pointer-conversion-from-cap
+Warn on implicit conversions from capability pointers to non-capability
+pointers.
+
+@item -Wcheri-implicit-pointer-conversion-to-cap
+@opindex Wcheri-implicit-pointer-conversion-to-cap
+@opindex Wno-cheri-implicit-pointer-conversion-to-cap
+Warn on implicit conversions from non-capability pointers to capability
+pointers.
+
+@item -Wcheri-explicit-pointer-conversion-from-cap
+@opindex Wcheri-explicit-pointer-conversion-from-cap
+@opindex Wno-cheri-explicit-pointer-conversion-from-cap
+Warn on explicit conversions from capability pointers to non-capability
+pointers.
+
+@item -Wcheri-explicit-pointer-conversion-to-cap
+@opindex Wcheri-explicit-pointer-conversion-to-cap
+@opindex Wnocheri-explicit-pointer-conversion-to-cap
+Warn on explicit conversions from non-capability pointers to capability
+pointers.
+
 @item -Wcast-function-type
 @opindex Wcast-function-type
 @opindex Wno-cast-function-type

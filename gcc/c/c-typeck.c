@@ -6108,6 +6108,32 @@ build_c_cast (location_t loc, tree type, tree expr)
 	    inform (loc, "insert cast to intptr_t to silence this warning");
 	}
 
+      if (capability_type_p (type)
+	  && TREE_CODE (type) != INTCAP_TYPE
+	  && POINTER_TYPE_P (TREE_TYPE (value))
+	  && !capability_type_p (TREE_TYPE (value))
+	  && !integer_zerop (value)
+	  && !flag_fake_hybrid)
+	{
+	  /* MORELLO TODO: This will require a __cheri_tocap note
+	     and suppression when __cheri_tocap is used.  */
+	  warning_at (loc, OPT_Wcheri_explicit_pointer_conversion_to_cap,
+		      "cast from non-capability pointer to capability pointer "
+		      "is most likely an error");
+	}
+      if (!capability_type_p (type)
+	  && POINTER_TYPE_P (type)
+	  && capability_type_p (TREE_TYPE (value))
+	  && TREE_CODE (TREE_TYPE (value)) != INTCAP_TYPE
+	  && !flag_fake_hybrid)
+	{
+	  /* MORELLO TODO: This will require a __cheri_fromcap note
+	     and suppression when __cheri_fromcap is used.  */
+	  warning_at (loc, OPT_Wcheri_explicit_pointer_conversion_from_cap,
+		      "cast from capability pointer to non-capability pointer "
+		      "is most likely an error");
+	}
+
       ovalue = value;
       value = convert (type, value);
 
@@ -6726,6 +6752,44 @@ maybe_warn_builtin_no_proto_arg (location_t loc, tree fundecl, int parmnum,
     inform (DECL_SOURCE_LOCATION (fundecl),
 	    "built-in %qD declared here",
 	    fundecl);
+}
+
+bool
+invalid_capability_initializer_in_hybrid (location_t init_loc, tree typelhs, tree typerhs)
+{
+  if (capability_type_p (typelhs) && !capability_type_p (typerhs)
+      && targetm.capability_mode ().require () != Pmode)
+    {
+      error_init (init_loc, "initializer element is not valid for"
+			    " capability type");
+      inform (init_loc, "the base type of the expression on the right"
+			" hand side needs to be a capability type in order to"
+			" initialize a capability");
+      return true;
+    }
+  return false;
+}
+
+
+/* Print a pedantic warning for an initializer element not being constant.
+   For capability types this is instead a hard error, which gets its own error
+   message.  */
+
+void
+initalizer_element_pedwarn (location_t init_loc, tree typelhs, tree typerhs)
+{
+  if (!invalid_capability_initializer_in_hybrid (init_loc, typelhs, typerhs))
+    pedwarn_init (init_loc, OPT_Wpedantic,
+		  "initializer element is not constant");
+}
+
+/* The same as above but print an unconditional error.  */
+
+void
+initalizer_element_error (location_t init_loc, tree typelhs, tree typerhs)
+{
+  if (!invalid_capability_initializer_in_hybrid (init_loc, typelhs, typerhs))
+    error_init (init_loc, "initializer element is not constant");
 }
 
 /* Convert value RHS to type TYPE as preparation for an assignment to
@@ -7560,6 +7624,29 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 	    }
 	}
 
+      /* Emit a warning on implicit conversion from a capability pointer to a
+	 non-capability pointer. In CHERI C this is intended to only be
+	 done with an explicit cast.
+	 Do not warn on -ffake-hybrid as that would randomly make "Excess
+	 Error" checks fail in the testsuite.  */
+      /* MORELLO TODO: This location is going to need some cheri_fromcap and
+	 and cheri_tocap handling when we implement those.  */
+      if (capability_type_p (TREE_TYPE (rhs))
+	  && !capability_type_p (type)
+	  && !flag_fake_hybrid)
+	warning_at (location, OPT_Wcheri_implicit_pointer_conversion_from_cap,
+		    "converting capability pointer to non-capability "
+		    "pointer without an explicit cast");
+      /* And the reverse, going from a non-capability pointer to a capability
+	 pointer.  */
+      if (!capability_type_p (TREE_TYPE (rhs))
+	  && capability_type_p (type)
+	  && !integer_zerop (rhs)
+	  && !flag_fake_hybrid)
+	warning_at (location, OPT_Wcheri_implicit_pointer_conversion_to_cap,
+		    "converting non-capability pointer to capability "
+		    "pointer without an explicit cast");
+
       /* If RHS isn't an address, check pointer or array of packed
 	 struct or union.  */
       warn_for_address_or_pointer_of_packed_member (type, orig_rhs);
@@ -8216,12 +8303,20 @@ digest_init (location_t init_loc, tree type, tree init, tree origtype,
 	      if (TREE_CODE (inside_init) == STRING_CST
 		  || TREE_CODE (inside_init) == COMPOUND_LITERAL_EXPR)
 		inside_init = array_to_pointer_conversion
-		  (init_loc, inside_init);
+				  (init_loc, inside_init);
 	      else
 		{
 		  error_init (init_loc, "invalid use of non-lvalue array");
 		  return error_mark_node;
 		}
+	      /* MORELLO TODO: For now we always error on strings and compound
+		 literals with a capability type on the LHS.  In the future
+		 when we implement the capability-address-of operator we will
+		 need to adjust this.  */
+	      if (require_constant &&
+		  invalid_capability_initializer_in_hybrid (init_loc, type,
+							     ptr_type_node))
+		    inside_init = error_mark_node;
 	    }
 	}
 
@@ -8238,8 +8333,7 @@ digest_init (location_t init_loc, tree type, tree init, tree origtype,
 	     the brace enclosed list they contain).  Also allow this for
 	     vectors, as we can only assign them with compound literals.  */
 	  if (flag_isoc99 && code != VECTOR_TYPE)
-	    pedwarn_init (init_loc, OPT_Wpedantic, "initializer element "
-			  "is not constant");
+	    initalizer_element_pedwarn (init_loc, type, TREE_TYPE (init));
 	  tree decl = COMPOUND_LITERAL_EXPR_DECL (inside_init);
 	  inside_init = DECL_INITIAL (decl);
 	}
@@ -8262,10 +8356,10 @@ digest_init (location_t init_loc, tree type, tree init, tree origtype,
 	    = valid_compound_expr_initializer (inside_init,
 					       TREE_TYPE (inside_init));
 	  if (inside_init == error_mark_node)
-	    error_init (init_loc, "initializer element is not constant");
+	    initalizer_element_error (init_loc, type, TREE_TYPE (init));
 	  else
-	    pedwarn_init (init_loc, OPT_Wpedantic,
-			  "initializer element is not constant");
+	    initalizer_element_pedwarn (init_loc, type, TREE_TYPE (init));
+
 	  if (flag_pedantic_errors)
 	    inside_init = error_mark_node;
 	}
@@ -8273,12 +8367,11 @@ digest_init (location_t init_loc, tree type, tree init, tree origtype,
 	       && !initializer_constant_valid_p (inside_init,
 						 TREE_TYPE (inside_init)))
 	{
-	  error_init (init_loc, "initializer element is not constant");
+	  initalizer_element_error (init_loc, type, TREE_TYPE (init));
 	  inside_init = error_mark_node;
 	}
       else if (require_constant && !maybe_const)
-	pedwarn_init (init_loc, OPT_Wpedantic,
-		      "initializer element is not a constant expression");
+	initalizer_element_pedwarn (init_loc, type, TREE_TYPE (init));
 
       /* Added to enable additional -Wsuggest-attribute=format warnings.  */
       if (TREE_CODE (TREE_TYPE (inside_init)) == POINTER_TYPE)
@@ -8313,20 +8406,18 @@ digest_init (location_t init_loc, tree type, tree init, tree origtype,
 	;
       else if (require_constant && !TREE_CONSTANT (inside_init))
 	{
-	  error_init (init_loc, "initializer element is not constant");
+	  initalizer_element_error (init_loc, type, TREE_TYPE (init));
 	  inside_init = error_mark_node;
 	}
       else if (require_constant
 	       && !initializer_constant_valid_p (inside_init,
 						 TREE_TYPE (inside_init)))
 	{
-	  error_init (init_loc, "initializer element is not computable at "
-		      "load time");
+	  initalizer_element_error (init_loc, type, TREE_TYPE (init));
 	  inside_init = error_mark_node;
 	}
       else if (require_constant && !maybe_const)
-	pedwarn_init (init_loc, OPT_Wpedantic,
-		      "initializer element is not a constant expression");
+	initalizer_element_pedwarn (init_loc, type, TREE_TYPE (init));
 
       return inside_init;
     }
@@ -9857,8 +9948,8 @@ output_init_element (location_t loc, tree value, tree origtype,
 	 duration with compound literals (which are then treated just as
 	 the brace enclosed list they contain).  */
       if (flag_isoc99)
-	pedwarn_init (loc, OPT_Wpedantic, "initializer element is not "
-		      "constant");
+	initalizer_element_pedwarn (loc, type, TREE_TYPE (value));
+
       tree decl = COMPOUND_LITERAL_EXPR_DECL (value);
       value = DECL_INITIAL (decl);
     }
@@ -9907,17 +9998,15 @@ output_init_element (location_t loc, tree value, tree origtype,
     {
       if (require_constant_value)
 	{
-	  error_init (loc, "initializer element is not constant");
+	  initalizer_element_error (loc, type, TREE_TYPE (value));
 	  value = error_mark_node;
 	}
       else if (require_constant_elements)
-	pedwarn (loc, OPT_Wpedantic,
-		 "initializer element is not computable at load time");
+	initalizer_element_pedwarn (loc, type, TREE_TYPE (value));
     }
   else if (!maybe_const
 	   && (require_constant_value || require_constant_elements))
-    pedwarn_init (loc, OPT_Wpedantic,
-		  "initializer element is not a constant expression");
+    initalizer_element_pedwarn (loc, type, TREE_TYPE (value));
 
   /* Issue -Wc++-compat warnings about initializing a bitfield with
      enum type.  */
