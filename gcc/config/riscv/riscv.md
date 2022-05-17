@@ -2205,6 +2205,23 @@
   [(set_attr "type" "shift")
    (set_attr "mode" "SI")])
 
+;; A zero-extract that can be expressed as an ANDI
+(define_insn "*zero_extract<GPR:mode>_lowbits"
+  [(set (match_operand:GPR 0 "register_operand" "=r")
+	(zero_extract:GPR (match_operand:GPR 1 "register_operand" "r")
+			  (match_operand 2 "dimode_shift_operand" "i")
+			  (const_int 0)))]
+  "SMALL_OPERAND ((HOST_WIDE_INT_1U << INTVAL (operands[2])) - 1)"
+;  "#"
+;  "&& reload_completed"
+;  [(set (match_dup 0) (and:GPR (match_dup 1) (match_dup 4)))]
+{
+  operands[4] = GEN_INT ((HOST_WIDE_INT_1U << INTVAL (operands[2])) - 1);
+  return "andi\t%0,%1,%4";
+}
+  [(set_attr "type" "logical")
+   (set_attr "mode" "<GPR:MODE>")])
+
 ;; Canonical form for a zero-extend of a logical right shift when the
 ;; shift count is 31.
 (define_insn "*lshrsi3_zero_extend_3"
@@ -2261,23 +2278,57 @@
 ;; occur when unsigned int is used for array indexing.  Split this into two
 ;; shifts.  Otherwise we can get 3 shifts.
 
-(define_insn_and_split "zero_extendsidi2_shifted"
+(define_insn_and_split "*zero_extendsidi2_shifted"
   [(set (match_operand:DI 0 "register_operand" "=r")
 	(and:DI (ashift:DI (match_operand:DI 1 "register_operand" "r")
-			   (match_operand:QI 2 "immediate_operand" "I"))
-		(match_operand 3 "immediate_operand" "")))
+			   (match_operand:QI 2 "dimode_shift_operand" ""))
+		(match_operand:DI 3 "consecutive_bits_operand" "")))
    (clobber (match_scratch:DI 4 "=&r"))]
-  "TARGET_64BIT && !TARGET_ZBA
-   && ((INTVAL (operands[3]) >> INTVAL (operands[2])) == 0xffffffff)"
+  "TARGET_64BIT
+   && riscv_shamt_matches_mask_p (INTVAL (operands[2]), INTVAL (operands[3]))
+   && !(TARGET_ZBA && clz_hwi (INTVAL (operands[3])) <= 32)"
   "#"
   "&& reload_completed"
-  [(set (match_dup 4)
-	(ashift:DI (match_dup 1) (const_int 32)))
-   (set (match_dup 0)
-	(lshiftrt:DI (match_dup 4) (match_dup 5)))]
-  "operands[5] = GEN_INT (32 - (INTVAL (operands [2])));"
-  [(set_attr "type" "shift")
-   (set_attr "mode" "DI")])
+  [(set (match_dup 4) (ashift:DI (match_dup 1) (match_dup 5)))
+   (set (match_dup 0) (lshiftrt:DI (match_dup 4) (match_dup 6)))]
+{
+	unsigned HOST_WIDE_INT mask = INTVAL (operands[3]);
+	int leading  = clz_hwi (mask);
+	int trailing = ctz_hwi (mask);
+
+	operands[5] = GEN_INT (leading + trailing);
+	operands[6] = GEN_INT (leading);
+})
+
+;; Handle SImode shift of a truth-value w/ zero-extract
+;;
+;; TODO: match comparison/equality operators
+;;
+(define_insn_and_split "*shift<GPR:MODE>_truthvalue"
+  [(set (match_operand:GPR 0 "register_operand" "=r")
+	(ashift:GPR (ne:GPR (match_operand:GPR 1 "register_operand" "r")
+			  (const_int 0))
+		   (match_operand 2 "dimode_shift_operand" "i")))]
+  "!partial_subreg_p (operands[1])
+   && INTVAL (operands[2]) > 0
+   && INTVAL (operands[2]) < GET_MODE_BITSIZE (<GPR:MODE>mode)"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0) (ne:GPR (match_dup 1) (const_int 0)))
+   (set (match_dup 0) (ashift:GPR (match_dup 0) (match_dup 2)))]
+{
+	rtx op1 = operands[1];
+	machine_mode opmode = TARGET_64BIT ? DImode : SImode;
+
+	/* If operating on a subreg, unwrap op1. */
+	if (SUBREG_P (op1))
+	   op1 = XEXP (op1, 0);
+
+	if (GET_MODE (op1) != opmode)
+	   op1 = gen_rtx_SUBREG (opmode, op1, 0);
+
+	operands[1] = op1;
+})
 
 ;;
 ;;  ....................
