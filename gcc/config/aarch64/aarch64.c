@@ -20654,10 +20654,10 @@ aarch64_asm_output_capability (rtx x, unsigned int size, int aligned_p)
     }
   else
     {
-      fputs ("\t.capinit\t", asm_out_file);
+      fputs ("\t.chericap\t", asm_out_file);
       output_addr_const (asm_out_file, x);
       fputc ('\n', asm_out_file);
-      ret = targetm.asm_out.integer (const0_rtx, offset_size, aligned_p);
+      return true;
     }
 
   return ret && targetm.asm_out.integer (const0_rtx, offset_size, aligned_p);

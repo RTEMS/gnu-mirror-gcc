@@ -19,4 +19,4 @@ __GIMPLE int *__capability foo() {
 
 /* { dg-final { scan-assembler {\t\.size\t\.LC1, 8\n\.LC1:\n\t\.xword\t\.LC0\n} } } */
 /* { dg-final { scan-assembler {\t\.section\t\.data\.rel\.ro\.local,"aw"\n\t\.align\t4\n\t\.type\t\.LC0, %object\n} } } */
-/* { dg-final { scan-assembler {\t\.size\t\.LC0, 16\n\.LC0:\n\t\.capinit\tx\n} } } */
+/* { dg-final { scan-assembler {\t\.size\t\.LC0, 16\n\.LC0:\n\t\.chericap\tx\n} } } */

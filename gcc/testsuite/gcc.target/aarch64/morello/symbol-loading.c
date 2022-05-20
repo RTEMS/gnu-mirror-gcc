@@ -16,10 +16,10 @@ int ret_c() { return c; }
 void modify_just_for_optimisation () { b += 1; }
 
 /* Ensure that we load `b` *indirectly*.  Do this by checking that we do not
-   emit an `adrp` for that symbol and by ensuring that there is a `capinit b`
+   emit an `adrp` for that symbol and by ensuring that there is a `chericap b`
    in the output.  */
 /* { dg-final { scan-assembler-not {adrp[^\n]*b} { target cheri_capability_pure } } } */
-/* { dg-final { scan-assembler {capinit\tb} { target cheri_capability_pure } } } */
+/* { dg-final { scan-assembler {chericap\tb} { target cheri_capability_pure } } } */
 
 /* Ensure that `a` and `c` are accessed through the GOT.  */
 /* { dg-final { scan-assembler {adrp[^\n]*:got:a} { target cheri_capability_pure } } } */
