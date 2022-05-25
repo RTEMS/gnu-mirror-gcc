@@ -41,8 +41,7 @@ dnl Arrange to define HAVE_DECL_<FUNCTION> to 0 or 1 as appropriate.
 dnl gcc_AC_CHECK_DECLS(SYMBOLS,
 dnl 	[ACTION-IF-NEEDED [, ACTION-IF-NOT-NEEDED [, INCLUDES]]])
 AC_DEFUN([gcc_AC_CHECK_DECLS],
-[AC_FOREACH([gcc_AC_Func], [$1],
-  [AH_TEMPLATE(AS_TR_CPP(HAVE_DECL_[]gcc_AC_Func),
+[m4_foreach_w([gcc_AC_Func],[$1],[AH_TEMPLATE(AS_TR_CPP(HAVE_DECL_[]gcc_AC_Func),
   [Define to 1 if we found a declaration for ']gcc_AC_Func[', otherwise
    define to 0.])])dnl
 for ac_func in $1
