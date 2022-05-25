@@ -5419,8 +5419,6 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 fi
 
 
-
-
 if test -n "$ac_tool_prefix"; then
   # Extract the first word of "${ac_tool_prefix}gnatbind", so it can be a program name with args.
 set dummy ${ac_tool_prefix}gnatbind; ac_word=$2
@@ -5636,7 +5634,6 @@ if test "x$GNATBIND" != xno && test "x$GNATMAKE" != xno && test x$acx_cv_cc_gcc_
 else
   have_gnat=no
 fi
-
 
 
 if test -n "$ac_tool_prefix"; then
