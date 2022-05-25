@@ -74,7 +74,7 @@ static inline struct gomp_thread_pool *
 gomp_get_own_thread_pool (struct gomp_thread *thr, unsigned nthreads)
 {
   struct gomp_thread_pool *pool = thr->thread_pool;
-  if (__builtin_expect (pool == NULL, 0))
+  if (UNLIKELY (pool == NULL))
     {
       pool = gomp_malloc_cleared (sizeof (*pool));
       pool->threads_busy = nthreads;
@@ -89,7 +89,7 @@ gomp_get_thread_pool (struct gomp_thread *thr, unsigned nthreads)
   struct gomp_thread_pool *pool;
   struct gomp_thread_pool_reservoir *res;
 
-  if (__builtin_expect (thr->thread_pool == NULL, 0))
+  if (UNLIKELY (thr->thread_pool == NULL))
     pthread_setspecific (gomp_thread_destructor, thr);
 
   res = gomp_get_thread_pool_reservoir ();

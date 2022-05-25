@@ -949,7 +949,7 @@ nvptx_exec (void (*fn), size_t mapnum, void **hostaddrs, void **devaddrs,
   acc_prof_info *prof_info = thr->prof_info;
   acc_event_info enqueue_launch_event_info;
   acc_api_info *api_info = thr->api_info;
-  bool profiling_p = __builtin_expect (prof_info != NULL, false);
+  bool profiling_p = UNLIKELY (prof_info != NULL);
   if (profiling_p)
     {
       prof_info->event_type = acc_ev_enqueue_launch_start;
@@ -1057,7 +1057,7 @@ nvptx_alloc (size_t s, bool suppress_errors)
   /* NOTE: We only do profiling stuff if the memory allocation succeeds.  */
   struct goacc_thread *thr = GOMP_PLUGIN_goacc_thread ();
   bool profiling_p
-    = __builtin_expect (thr != NULL && thr->prof_info != NULL, false);
+    = UNLIKELY (thr != NULL && thr->prof_info != NULL);
   if (profiling_p)
     goacc_profiling_acc_ev_alloc (thr, (void *) d, s);
 
@@ -1125,7 +1125,7 @@ nvptx_free (void *p, struct ptx_device *ptx_dev)
   CUDA_CALL (cuMemFree, (CUdeviceptr) p);
   struct goacc_thread *thr = GOMP_PLUGIN_goacc_thread ();
   bool profiling_p
-    = __builtin_expect (thr != NULL && thr->prof_info != NULL, false);
+    = UNLIKELY (thr != NULL && thr->prof_info != NULL);
   if (profiling_p)
     goacc_profiling_acc_ev_free (thr, p);
 
@@ -1460,7 +1460,7 @@ GOMP_OFFLOAD_openacc_exec (void (*fn) (void *), size_t mapnum,
   acc_prof_info *prof_info = thr->prof_info;
   acc_event_info data_event_info;
   acc_api_info *api_info = thr->api_info;
-  bool profiling_p = __builtin_expect (prof_info != NULL, false);
+  bool profiling_p = UNLIKELY (prof_info != NULL);
 
   void **hp = NULL;
   CUdeviceptr dp = 0;
@@ -1548,7 +1548,7 @@ GOMP_OFFLOAD_openacc_async_exec (void (*fn) (void *), size_t mapnum,
   acc_prof_info *prof_info = thr->prof_info;
   acc_event_info data_event_info;
   acc_api_info *api_info = thr->api_info;
-  bool profiling_p = __builtin_expect (prof_info != NULL, false);
+  bool profiling_p = UNLIKELY (prof_info != NULL);
 
   void **hp = NULL;
   CUdeviceptr dp = 0;

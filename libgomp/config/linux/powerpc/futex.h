@@ -51,7 +51,7 @@ sys_futex0 (int *addr, int op, int val)
 		  : "r"(r0), "r"(r3), "r"(r4), "r"(r5), "r"(r6)
 		  : "r7", "r8", "r9", "r10", "r11", "r12",
 		    "cr0", "ctr", "memory");
-  if (__builtin_expect (r0 & (1 << 28), 0))
+  if (UNLIKELY (r0 & (1 << 28)))
     return r3;
   return 0;
 }
@@ -60,7 +60,7 @@ static inline void
 futex_wait (int *addr, int val)
 {
   long err = sys_futex0 (addr, gomp_futex_wait, val);
-  if (__builtin_expect (err == ENOSYS, 0))
+  if (UNLIKELY (err == ENOSYS))
     {
       gomp_futex_wait &= ~FUTEX_PRIVATE_FLAG;
       gomp_futex_wake &= ~FUTEX_PRIVATE_FLAG;
@@ -72,7 +72,7 @@ static inline void
 futex_wake (int *addr, int count)
 {
   long err = sys_futex0 (addr, gomp_futex_wake, count);
-  if (__builtin_expect (err == ENOSYS, 0))
+  if (UNLIKELY (err == ENOSYS))
     {
       gomp_futex_wait &= ~FUTEX_PRIVATE_FLAG;
       gomp_futex_wake &= ~FUTEX_PRIVATE_FLAG;

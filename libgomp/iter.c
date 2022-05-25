@@ -191,7 +191,7 @@ gomp_iter_dynamic_next (long *pstart, long *pend)
   incr = ws->incr;
   chunk = ws->chunk_size;
 
-  if (__builtin_expect (ws->mode, 1))
+  if (LIKELY (ws->mode))
     {
       long tmp = __sync_fetch_and_add (&ws->next, chunk);
       if (incr > 0)
@@ -240,7 +240,7 @@ gomp_iter_dynamic_next (long *pstart, long *pend)
       nend = start + chunk;
 
       tmp = __sync_val_compare_and_swap (&ws->next, start, nend);
-      if (__builtin_expect (tmp == start, 1))
+      if (LIKELY (tmp == start))
 	break;
 
       start = tmp;
@@ -319,13 +319,13 @@ gomp_iter_guided_next (long *pstart, long *pend)
 
       if (q < chunk_size)
 	q = chunk_size;
-      if (__builtin_expect (q <= n, 1))
+      if (LIKELY (q <= n))
 	nend = start + q * incr;
       else
 	nend = end;
 
       tmp = __sync_val_compare_and_swap (&ws->next, start, nend);
-      if (__builtin_expect (tmp == start, 1))
+      if (LIKELY (tmp == start))
 	break;
 
       start = tmp;

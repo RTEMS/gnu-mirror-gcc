@@ -49,7 +49,7 @@ futex_wait (int *addr, int val)
 		  : "0"(sc_0), "r" (sc_16), "r"(sc_17), "r"(sc_18), "1"(sc_19)
 		  : "$1", "$2", "$3", "$4", "$5", "$6", "$7", "$8",
 		    "$22", "$23", "$24", "$25", "$27", "$28", "memory");
-  if (__builtin_expect (sc_19, 0) && sc_0 == ENOSYS)
+  if (UNLIKELY (sc_19) && sc_0 == ENOSYS)
     {
       gomp_futex_wait &= ~FUTEX_PRIVATE_FLAG;
       gomp_futex_wake &= ~FUTEX_PRIVATE_FLAG;
@@ -83,7 +83,7 @@ futex_wake (int *addr, int count)
 		  : "0"(sc_0), "r" (sc_16), "r"(sc_17), "r"(sc_18)
 		  : "$1", "$2", "$3", "$4", "$5", "$6", "$7", "$8",
 		    "$22", "$23", "$24", "$25", "$27", "$28", "memory");
-  if (__builtin_expect (sc_19, 0) && sc_0 == ENOSYS)
+  if (UNLIKELY (sc_19) && sc_0 == ENOSYS)
     {
       gomp_futex_wait &= ~FUTEX_PRIVATE_FLAG;
       gomp_futex_wake &= ~FUTEX_PRIVATE_FLAG;

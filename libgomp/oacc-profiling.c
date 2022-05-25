@@ -504,7 +504,7 @@ _goacc_profiling_dispatch_p (bool check_not_nested_p)
   bool ret;
 
   struct goacc_thread *thr = goacc_thread ();
-  if (__builtin_expect (thr == NULL, false))
+  if (UNLIKELY (thr == NULL))
     {
       /* If we don't have any per-thread state yet, that means that per-thread
 	 callback dispatch has not been explicitly disabled (which only a call
@@ -523,7 +523,7 @@ _goacc_profiling_dispatch_p (bool check_not_nested_p)
 	  assert (thr->api_info == NULL);
 	}
 
-      if (__builtin_expect (!thr->prof_callbacks_enabled, true))
+      if (LIKELY (!thr->prof_callbacks_enabled))
 	{
 	  gomp_debug (0, "  %s: disabled for this thread\n", __FUNCTION__);
 	  ret = false;
@@ -534,7 +534,7 @@ _goacc_profiling_dispatch_p (bool check_not_nested_p)
   gomp_mutex_lock (&goacc_prof_lock);
 
   /* 'goacc_prof_callbacks_enabled[acc_ev_none]' acts as a global toggle.  */
-  if (__builtin_expect (!goacc_prof_callbacks_enabled[acc_ev_none], true))
+  if (LIKELY (!goacc_prof_callbacks_enabled[acc_ev_none]))
     {
       gomp_debug (0, "  %s: disabled globally\n", __FUNCTION__);
       ret = false;
@@ -560,7 +560,7 @@ _goacc_profiling_setup_p (struct goacc_thread *thr,
 
   /* If we don't have any per-thread state yet, we can't register 'prof_info'
      and 'api_info'.  */
-  if (__builtin_expect (thr == NULL, false))
+  if (UNLIKELY (thr == NULL))
     {
       gomp_debug (0, "Can't dispatch OpenACC Profiling Interface events for"
 		  " the current call, construct, or directive\n");

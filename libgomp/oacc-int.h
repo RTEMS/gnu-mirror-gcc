@@ -147,8 +147,7 @@ async_synchronous_p (int async)
 extern bool goacc_prof_enabled;
 /* Tune for the (very common) case that profiling is not enabled.  */
 #define GOACC_PROF_ENABLED \
-  (__builtin_expect (__atomic_load_n (&goacc_prof_enabled, \
-				      MEMMODEL_ACQUIRE) == true, false))
+  (UNLIKELY (__atomic_load_n (&goacc_prof_enabled, MEMMODEL_ACQUIRE) == true))
 
 void goacc_profiling_initialize (void);
 bool _goacc_profiling_dispatch_p (bool);

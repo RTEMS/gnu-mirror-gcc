@@ -94,7 +94,7 @@ futex_wait (int *addr, int val)
 {
   long err = __futex_wait (addr, gomp_futex_wait, val);
 
-  if (__builtin_expect (err == -ENOSYS, 0))
+  if (UNLIKELY (err == -ENOSYS))
     {
       gomp_futex_wait &= ~FUTEX_PRIVATE_FLAG;
       gomp_futex_wake &= ~FUTEX_PRIVATE_FLAG;
@@ -108,7 +108,7 @@ futex_wake (int *addr, int count)
 {
   long err = __futex_wake (addr, gomp_futex_wake, count);
 
-  if (__builtin_expect (err == -ENOSYS, 0))
+  if (UNLIKELY (err == -ENOSYS))
     {
       gomp_futex_wait &= ~FUTEX_PRIVATE_FLAG;
       gomp_futex_wake &= ~FUTEX_PRIVATE_FLAG;

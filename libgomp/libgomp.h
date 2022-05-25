@@ -73,6 +73,9 @@
 # pragma GCC visibility push(hidden)
 #endif
 
+#define LIKELY(x) (__builtin_expect ((x), 1))
+#define UNLIKELY(x) (__builtin_expect ((x), 0))
+
 /* If we were a C++ library, we'd get this from <std/atomic>.  */
 enum memmodel
 {
@@ -180,12 +183,12 @@ extern void gomp_debug (int, const char *, ...)
 	__attribute__ ((format (printf, 2, 3)));
 #define gomp_vdebug(KIND, FMT, VALIST) \
   do { \
-    if (__builtin_expect (gomp_debug_var, 0)) \
+    if (UNLIKELY (gomp_debug_var)) \
       (gomp_vdebug) ((KIND), (FMT), (VALIST)); \
   } while (0)
 #define gomp_debug(KIND, ...) \
   do { \
-    if (__builtin_expect (gomp_debug_var, 0)) \
+    if (UNLIKELY (gomp_debug_var)) \
       (gomp_debug) ((KIND), __VA_ARGS__); \
   } while (0)
 extern void gomp_verror (const char *, va_list);
@@ -996,7 +999,7 @@ extern void gomp_workshare_task_reduction_register (uintptr_t *, uintptr_t *);
 static void inline
 gomp_finish_task (struct gomp_task *task)
 {
-  if (__builtin_expect (task->depend_hash != NULL, 0))
+  if (UNLIKELY (task->depend_hash != NULL))
     free (task->depend_hash);
 }
 
@@ -1316,7 +1319,7 @@ static inline void
 gomp_work_share_init_done (void)
 {
   struct gomp_thread *thr = gomp_thread ();
-  if (__builtin_expect (thr->ts.last_work_share != NULL, 1))
+  if (LIKELY (thr->ts.last_work_share != NULL))
     gomp_ptrlock_set (&thr->ts.last_work_share->next_ws, thr->ts.work_share);
 }
 

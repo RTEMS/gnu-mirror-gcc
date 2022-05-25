@@ -143,7 +143,7 @@ extern struct gomp_task *priority_tree_next_task (enum priority_queue_type,
 static inline bool
 priority_queue_multi_p (struct priority_queue *head)
 {
-  return __builtin_expect (head->t.root != NULL, 0);
+  return UNLIKELY (head->t.root != NULL);
 }
 
 /* Initialize a priority queue.  */
@@ -300,7 +300,7 @@ priority_tree_insert (enum priority_queue_type type,
 		      bool adjust_parent_depends_on,
 		      bool task_is_parent_depends_on)
 {
-  if (__builtin_expect (head->t.root == NULL, 0))
+  if (UNLIKELY (head->t.root == NULL))
     {
       /* The first time around, transfer any priority 0 items to the
 	 tree.  */
@@ -349,7 +349,7 @@ priority_queue_insert (enum priority_queue_type type,
   if (priority_queue_task_in_queue_p (type, head, task))
     gomp_fatal ("Attempt to insert existing task %p", task);
 #endif
-  if (priority_queue_multi_p (head) || __builtin_expect (priority > 0, 0))
+  if (priority_queue_multi_p (head) || UNLIKELY (priority > 0))
     priority_tree_insert (type, head, task, priority, pos,
 			  adjust_parent_depends_on,
 			  task_is_parent_depends_on);

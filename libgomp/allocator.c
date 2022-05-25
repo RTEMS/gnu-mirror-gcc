@@ -214,7 +214,7 @@ omp_aligned_alloc (size_t alignment, size_t size,
   size_t new_size, new_alignment;
   void *ptr, *ret;
 
-  if (__builtin_expect (size == 0, 0))
+  if (UNLIKELY (size == 0))
     return NULL;
 
 retry:
@@ -246,8 +246,8 @@ retry:
   if (__builtin_add_overflow (size, new_size, &new_size))
     goto fail;
 
-  if (__builtin_expect (allocator_data
-			&& allocator_data->pool_size < ~(uintptr_t) 0, 0))
+  if (UNLIKELY (allocator_data
+		&& allocator_data->pool_size < ~(uintptr_t) 0))
     {
       uintptr_t used_pool_size;
       if (new_size > allocator_data->pool_size)
@@ -363,7 +363,7 @@ GOMP_alloc (size_t alignment, size_t size, uintptr_t allocator)
   void *ret
     = ialias_call (omp_aligned_alloc) (alignment, size,
 				       (omp_allocator_handle_t) allocator);
-  if (__builtin_expect (ret == NULL, 0) && size)
+  if (UNLIKELY (ret == NULL) && size)
     gomp_fatal ("Out of memory allocating %lu bytes",
 		(unsigned long) size);
   return ret;
@@ -413,7 +413,7 @@ omp_aligned_calloc (size_t alignment, size_t nmemb, size_t size,
   size_t new_size, size_temp, new_alignment;
   void *ptr, *ret;
 
-  if (__builtin_expect (size == 0 || nmemb == 0, 0))
+  if (UNLIKELY (size == 0 || nmemb == 0))
     return NULL;
 
 retry:
@@ -447,8 +447,8 @@ retry:
   if (__builtin_add_overflow (size_temp, new_size, &new_size))
     goto fail;
 
-  if (__builtin_expect (allocator_data
-			&& allocator_data->pool_size < ~(uintptr_t) 0, 0))
+  if (UNLIKELY (allocator_data
+		&& allocator_data->pool_size < ~(uintptr_t) 0))
     {
       uintptr_t used_pool_size;
       if (new_size > allocator_data->pool_size)
@@ -563,10 +563,10 @@ omp_realloc (void *ptr, size_t size, omp_allocator_handle_t allocator,
   void *new_ptr, *ret;
   struct omp_mem_header *data;
 
-  if (__builtin_expect (ptr == NULL, 0))
+  if (UNLIKELY (ptr == NULL))
     return ialias_call (omp_aligned_alloc) (1, size, allocator);
 
-  if (__builtin_expect (size == 0, 0))
+  if (UNLIKELY (size == 0))
     {
       ialias_call (omp_free) (ptr, free_allocator);
       return NULL;
@@ -601,8 +601,8 @@ retry:
     goto fail;
   old_size = data->size;
 
-  if (__builtin_expect (allocator_data
-			&& allocator_data->pool_size < ~(uintptr_t) 0, 0))
+  if (UNLIKELY (allocator_data
+		&& allocator_data->pool_size < ~(uintptr_t) 0))
     {
       uintptr_t used_pool_size;
       size_t prev_size = 0;
@@ -719,8 +719,8 @@ retry:
   if (old_size - old_alignment < size)
     size = old_size - old_alignment;
   memcpy (ret, ptr, size);
-  if (__builtin_expect (free_allocator_data
-			&& free_allocator_data->pool_size < ~(uintptr_t) 0, 0))
+  if (UNLIKELY (free_allocator_data
+		&& free_allocator_data->pool_size < ~(uintptr_t) 0))
     {
 #ifdef HAVE_SYNC_BUILTINS
       __atomic_add_fetch (&free_allocator_data->used_pool_size, -data->size,

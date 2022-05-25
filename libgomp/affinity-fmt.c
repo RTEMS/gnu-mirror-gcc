@@ -101,7 +101,7 @@ gomp_display_string (char *buffer, size_t size, size_t *ret,
       memcpy (buffer + r, str, l);
     }
   *ret += len;
-  if (__builtin_expect (r > *ret, 0))
+  if (UNLIKELY (r > *ret))
     gomp_fatal ("overflow in omp_capture_affinity");
 }
 
@@ -118,7 +118,7 @@ gomp_display_repeat (char *buffer, size_t size, size_t *ret,
       memset (buffer + r, c, l);
     }
   *ret += len;
-  if (__builtin_expect (r > *ret, 0))
+  if (UNLIKELY (r > *ret))
     gomp_fatal ("overflow in omp_capture_affinity");
 }
 

@@ -82,7 +82,7 @@ gomp_resolve_num_threads (unsigned specified, unsigned count)
     }
 
   /* UINT_MAX stands for infinity.  */
-  if (__builtin_expect (icv->thread_limit_var == UINT_MAX, 1)
+  if (LIKELY (icv->thread_limit_var == UINT_MAX)
       || max_num_threads == 1)
     return max_num_threads;
 
@@ -138,7 +138,7 @@ void
 GOMP_parallel_end (void)
 {
   struct gomp_task_icv *icv = gomp_icv (false);
-  if (__builtin_expect (icv->thread_limit_var != UINT_MAX, 0))
+  if (UNLIKELY (icv->thread_limit_var != UINT_MAX))
     {
       struct gomp_thread *thr = gomp_thread ();
       struct gomp_team *team = thr->ts.team;

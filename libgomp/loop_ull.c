@@ -62,19 +62,19 @@ gomp_loop_ull_init (struct gomp_work_share *ws, bool up, gomp_ull start,
 	struct gomp_team *team = thr->ts.team;
 	long nthreads = team ? team->nthreads : 1;
 
-	if (__builtin_expect (up, 1))
+	if (LIKELY (up))
 	  {
 	    /* Cheap overflow protection.  */
-	    if (__builtin_expect ((nthreads | ws->chunk_size_ull)
-				  < 1ULL << (sizeof (gomp_ull)
-					     * __CHAR_BIT__ / 2 - 1), 1))
+	    if (LIKELY ((nthreads | ws->chunk_size_ull)
+			< 1ULL << (sizeof (gomp_ull)
+				   * __CHAR_BIT__ / 2 - 1)))
 	      ws->mode = ws->end_ull < (__LONG_LONG_MAX__ * 2ULL + 1
 					- (nthreads + 1) * ws->chunk_size_ull);
 	  }
 	/* Cheap overflow protection.  */
-	else if (__builtin_expect ((nthreads | -ws->chunk_size_ull)
-				   < 1ULL << (sizeof (gomp_ull)
-					      * __CHAR_BIT__ / 2 - 1), 1))
+	else if (LIKELY ((nthreads | -ws->chunk_size_ull)
+			 < 1ULL << (sizeof (gomp_ull)
+				    * __CHAR_BIT__ / 2 - 1)))
 	  ws->mode = ws->end_ull > ((nthreads + 1) * -ws->chunk_size_ull
 				    - (__LONG_LONG_MAX__ * 2ULL + 1));
       }

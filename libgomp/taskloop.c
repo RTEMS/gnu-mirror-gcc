@@ -180,7 +180,7 @@ GOMP_taskloop (void (*fn) (void *), void *data, void (*cpyfn) (void *, void *),
 
   if (flags & GOMP_TASK_FLAG_NOGROUP)
     {
-      if (__builtin_expect (gomp_cancel_var, 0)
+      if (UNLIKELY (gomp_cancel_var)
 	  && thr->task
 	  && thr->task->taskgroup)
 	{
@@ -211,7 +211,7 @@ GOMP_taskloop (void (*fn) (void *), void *data, void (*cpyfn) (void *, void *),
       || team->task_count + num_tasks > 64 * team->nthreads)
     {
       unsigned long i;
-      if (__builtin_expect (cpyfn != NULL, 0))
+      if (UNLIKELY (cpyfn != NULL))
 	{
 	  struct gomp_task task[num_tasks];
 	  struct gomp_task *parent = thr->task;
@@ -332,7 +332,7 @@ GOMP_taskloop (void (*fn) (void *), void *data, void (*cpyfn) (void *, void *),
       gomp_mutex_lock (&team->task_lock);
       /* If parallel or taskgroup has been cancelled, don't start new
 	 tasks.  */
-      if (__builtin_expect (gomp_cancel_var, 0)
+      if (UNLIKELY (gomp_cancel_var)
 	  && cpyfn == NULL)
 	{
 	  if (gomp_team_barrier_cancelled (&team->barrier))

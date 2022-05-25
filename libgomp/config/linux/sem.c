@@ -44,8 +44,7 @@ gomp_sem_wait_slow (gomp_sem_t *sem, int count)
 	break;
       }
   /* Something changed.  If it wasn't the wait flag, we're good to go.  */
-    else if (__builtin_expect (((count = *sem) & SEM_WAIT) == 0 && count != 0,
-			       1))
+    else if (LIKELY (((count = *sem) & SEM_WAIT) == 0 && count != 0))
       {
 	if (__atomic_compare_exchange_n (sem, &count, count - SEM_INC, false,
 					 MEMMODEL_ACQUIRE, MEMMODEL_RELAXED))

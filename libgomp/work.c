@@ -102,13 +102,13 @@ gomp_init_work_share (struct gomp_work_share *ws, size_t ordered,
 		      unsigned nthreads)
 {
   gomp_mutex_init (&ws->lock);
-  if (__builtin_expect (ordered, 0))
+  if (UNLIKELY (ordered))
     {
 #define INLINE_ORDERED_TEAM_IDS_SIZE \
   (sizeof (struct gomp_work_share) \
    - offsetof (struct gomp_work_share, inline_ordered_team_ids))
 
-      if (__builtin_expect (ordered != 1, 0))
+      if (UNLIKELY (ordered != 1))
 	{
 	  size_t o = nthreads * sizeof (*ws->ordered_team_ids);
 	  o += __alignof__ (long long) - 1;
@@ -155,7 +155,7 @@ static inline void
 free_work_share (struct gomp_team *team, struct gomp_work_share *ws)
 {
   gomp_fini_work_share (ws);
-  if (__builtin_expect (team == NULL, 0))
+  if (UNLIKELY (team == NULL))
     free (ws);
   else
     {
@@ -244,7 +244,7 @@ gomp_work_share_end (void)
 
   if (gomp_barrier_last_thread (bstate))
     {
-      if (__builtin_expect (thr->ts.last_work_share != NULL, 1))
+      if (LIKELY (thr->ts.last_work_share != NULL))
 	{
 	  team->work_shares_to_free = thr->ts.work_share;
 	  free_work_share (team, thr->ts.last_work_share);
@@ -270,7 +270,7 @@ gomp_work_share_end_cancel (void)
 
   if (gomp_barrier_last_thread (bstate))
     {
-      if (__builtin_expect (thr->ts.last_work_share != NULL, 1))
+      if (LIKELY (thr->ts.last_work_share != NULL))
 	{
 	  team->work_shares_to_free = thr->ts.work_share;
 	  free_work_share (team, thr->ts.last_work_share);
@@ -300,7 +300,7 @@ gomp_work_share_end_nowait (void)
       return;
     }
 
-  if (__builtin_expect (thr->ts.last_work_share == NULL, 0))
+  if (UNLIKELY (thr->ts.last_work_share == NULL))
     return;
 
 #ifdef HAVE_SYNC_BUILTINS

@@ -67,7 +67,7 @@ gomp_iter_ull_static_next (gomp_ull *pstart, gomp_ull *pend)
 	return 1;
 
       /* Compute the total number of iterations.  */
-      if (__builtin_expect (ws->mode, 0) == 0)
+      if (UNLIKELY (ws->mode) == 0)
 	n = (ws->end_ull - ws->next_ull + ws->incr_ull - 1) / ws->incr_ull;
       else
 	n = (ws->next_ull - ws->end_ull - ws->incr_ull - 1) / -ws->incr_ull;
@@ -108,7 +108,7 @@ gomp_iter_ull_static_next (gomp_ull *pstart, gomp_ull *pend)
       /* Otherwise, each thread gets exactly chunk_size iterations
 	 (if available) each time through the loop.  */
 
-      if (__builtin_expect (ws->mode, 0) == 0)
+      if (UNLIKELY (ws->mode) == 0)
 	n = (ws->end_ull - ws->next_ull + ws->incr_ull - 1) / ws->incr_ull;
       else
 	n = (ws->next_ull - ws->end_ull - ws->incr_ull - 1) / -ws->incr_ull;
@@ -159,7 +159,7 @@ gomp_iter_ull_dynamic_next_locked (gomp_ull *pstart, gomp_ull *pend)
 
   chunk = ws->chunk_size_ull;
   left = ws->end_ull - start;
-  if (__builtin_expect (ws->mode & 2, 0))
+  if (UNLIKELY (ws->mode & 2))
     {
       if (chunk < left)
 	chunk = left;
@@ -192,10 +192,10 @@ gomp_iter_ull_dynamic_next (gomp_ull *pstart, gomp_ull *pend)
   end = ws->end_ull;
   chunk = ws->chunk_size_ull;
 
-  if (__builtin_expect (ws->mode & 1, 1))
+  if (LIKELY (ws->mode & 1))
     {
       gomp_ull tmp = __sync_fetch_and_add (&ws->next_ull, chunk);
-      if (__builtin_expect (ws->mode & 2, 0) == 0)
+      if (UNLIKELY (ws->mode & 2) == 0)
 	{
 	  if (tmp >= end)
 	    return false;
@@ -228,7 +228,7 @@ gomp_iter_ull_dynamic_next (gomp_ull *pstart, gomp_ull *pend)
       if (start == end)
 	return false;
 
-      if (__builtin_expect (ws->mode & 2, 0))
+      if (UNLIKELY (ws->mode & 2))
 	{
 	  if (chunk < left)
 	    chunk = left;
@@ -241,7 +241,7 @@ gomp_iter_ull_dynamic_next (gomp_ull *pstart, gomp_ull *pend)
       nend = start + chunk;
 
       tmp = __sync_val_compare_and_swap (&ws->next_ull, start, nend);
-      if (__builtin_expect (tmp == start, 1))
+      if (LIKELY (tmp == start))
 	break;
 
       start = tmp;
@@ -272,7 +272,7 @@ gomp_iter_ull_guided_next_locked (gomp_ull *pstart, gomp_ull *pend)
     return false;
 
   start = ws->next_ull;
-  if (__builtin_expect (ws->mode, 0) == 0)
+  if (UNLIKELY (ws->mode) == 0)
     n = (ws->end_ull - start) / ws->incr_ull;
   else
     n = (start - ws->end_ull) / -ws->incr_ull;
@@ -318,7 +318,7 @@ gomp_iter_ull_guided_next (gomp_ull *pstart, gomp_ull *pend)
       if (start == end)
 	return false;
 
-      if (__builtin_expect (ws->mode, 0) == 0)
+      if (UNLIKELY (ws->mode) == 0)
 	n = (end - start) / incr;
       else
 	n = (start - end) / -incr;
@@ -326,13 +326,13 @@ gomp_iter_ull_guided_next (gomp_ull *pstart, gomp_ull *pend)
 
       if (q < chunk_size)
 	q = chunk_size;
-      if (__builtin_expect (q <= n, 1))
+      if (LIKELY (q <= n))
 	nend = start + q * incr;
       else
 	nend = end;
 
       tmp = __sync_val_compare_and_swap (&ws->next_ull, start, nend);
-      if (__builtin_expect (tmp == start, 1))
+      if (LIKELY (tmp == start))
 	break;
 
       start = tmp;

@@ -40,7 +40,7 @@ GOMP_single_start (void)
   struct gomp_team *team = thr->ts.team;
   unsigned long single_count;
 
-  if (__builtin_expect (team == NULL, 0))
+  if (UNLIKELY (team == NULL))
     return true;
 
   single_count = thr->ts.single_count++;

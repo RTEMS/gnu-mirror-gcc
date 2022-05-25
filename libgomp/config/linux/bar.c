@@ -34,7 +34,7 @@
 void
 gomp_barrier_wait_end (gomp_barrier_t *bar, gomp_barrier_state_t state)
 {
-  if (__builtin_expect (state & BAR_WAS_LAST, 0))
+  if (UNLIKELY (state & BAR_WAS_LAST))
     {
       /* Next time we'll be awaiting TOTAL threads again.  */
       bar->awaited = bar->total;
@@ -82,7 +82,7 @@ gomp_team_barrier_wait_end (gomp_barrier_t *bar, gomp_barrier_state_t state)
 {
   unsigned int generation, gen;
 
-  if (__builtin_expect (state & BAR_WAS_LAST, 0))
+  if (UNLIKELY (state & BAR_WAS_LAST))
     {
       /* Next time we'll be awaiting TOTAL threads again.  */
       struct gomp_thread *thr = gomp_thread ();
@@ -90,7 +90,7 @@ gomp_team_barrier_wait_end (gomp_barrier_t *bar, gomp_barrier_state_t state)
 
       bar->awaited = bar->total;
       team->work_share_cancelled = 0;
-      if (__builtin_expect (team->task_count, 0))
+      if (UNLIKELY (team->task_count))
 	{
 	  gomp_barrier_handle_tasks (state);
 	  state &= ~BAR_WAS_LAST;
@@ -111,7 +111,7 @@ gomp_team_barrier_wait_end (gomp_barrier_t *bar, gomp_barrier_state_t state)
     {
       do_wait ((int *) &bar->generation, generation);
       gen = __atomic_load_n (&bar->generation, MEMMODEL_ACQUIRE);
-      if (__builtin_expect (gen & BAR_TASK_PENDING, 0))
+      if (UNLIKELY (gen & BAR_TASK_PENDING))
 	{
 	  gomp_barrier_handle_tasks (state);
 	  gen = __atomic_load_n (&bar->generation, MEMMODEL_ACQUIRE);
@@ -131,7 +131,7 @@ void
 gomp_team_barrier_wait_final (gomp_barrier_t *bar)
 {
   gomp_barrier_state_t state = gomp_barrier_wait_final_start (bar);
-  if (__builtin_expect (state & BAR_WAS_LAST, 0))
+  if (UNLIKELY (state & BAR_WAS_LAST))
     bar->awaited_final = bar->total;
   gomp_team_barrier_wait_end (bar, state);
 }
@@ -142,7 +142,7 @@ gomp_team_barrier_wait_cancel_end (gomp_barrier_t *bar,
 {
   unsigned int generation, gen;
 
-  if (__builtin_expect (state & BAR_WAS_LAST, 0))
+  if (UNLIKELY (state & BAR_WAS_LAST))
     {
       /* Next time we'll be awaiting TOTAL threads again.  */
       /* BAR_CANCELLED should never be set in state here, because
@@ -154,7 +154,7 @@ gomp_team_barrier_wait_cancel_end (gomp_barrier_t *bar,
 
       bar->awaited = bar->total;
       team->work_share_cancelled = 0;
-      if (__builtin_expect (team->task_count, 0))
+      if (UNLIKELY (team->task_count))
 	{
 	  gomp_barrier_handle_tasks (state);
 	  state &= ~BAR_WAS_LAST;
@@ -168,7 +168,7 @@ gomp_team_barrier_wait_cancel_end (gomp_barrier_t *bar,
 	}
     }
 
-  if (__builtin_expect (state & BAR_CANCELLED, 0))
+  if (UNLIKELY (state & BAR_CANCELLED))
     return true;
 
   generation = state;
@@ -176,9 +176,9 @@ gomp_team_barrier_wait_cancel_end (gomp_barrier_t *bar,
     {
       do_wait ((int *) &bar->generation, generation);
       gen = __atomic_load_n (&bar->generation, MEMMODEL_ACQUIRE);
-      if (__builtin_expect (gen & BAR_CANCELLED, 0))
+      if (UNLIKELY (gen & BAR_CANCELLED))
 	return true;
-      if (__builtin_expect (gen & BAR_TASK_PENDING, 0))
+      if (UNLIKELY (gen & BAR_TASK_PENDING))
 	{
 	  gomp_barrier_handle_tasks (state);
 	  gen = __atomic_load_n (&bar->generation, MEMMODEL_ACQUIRE);

@@ -146,7 +146,7 @@ gomp_team_barrier_waiting_for_tasks (gomp_barrier_t *bar)
 static inline bool
 gomp_team_barrier_cancelled (gomp_barrier_t *bar)
 {
-  return __builtin_expect ((bar->generation & BAR_CANCELLED) != 0, 0);
+  return UNLIKELY ((bar->generation & BAR_CANCELLED) != 0);
 }
 
 static inline void

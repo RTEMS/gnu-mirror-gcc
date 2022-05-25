@@ -37,7 +37,7 @@ static inline struct gomp_thread_pool *
 gomp_get_thread_pool (struct gomp_thread *thr, unsigned nthreads)
 {
   struct gomp_thread_pool *pool = thr->thread_pool;
-  if (__builtin_expect (pool == NULL, 0))
+  if (UNLIKELY (pool == NULL))
     {
       pool = gomp_malloc (sizeof (*pool));
       pool->threads = NULL;

@@ -348,7 +348,7 @@ gomp_copy_host2dev (struct gomp_device_descr *devicep,
 		    void *d, const void *h, size_t sz,
 		    bool ephemeral, struct gomp_coalesce_buf *cbuf)
 {
-  if (__builtin_expect (aq != NULL, 0))
+  if (UNLIKELY (aq != NULL))
     {
       /* See 'gomp_coalesce_buf_add'.  */
       assert (!cbuf);
@@ -409,7 +409,7 @@ gomp_copy_dev2host (struct gomp_device_descr *devicep,
 		    struct goacc_asyncqueue *aq,
 		    void *h, const void *d, size_t sz)
 {
-  if (__builtin_expect (aq != NULL, 0))
+  if (UNLIKELY (aq != NULL))
     goacc_device_copy_async (devicep, devicep->openacc.async.dev2host_func,
 			     "host", h, "dev", d, NULL, sz, aq);
   else
@@ -2659,7 +2659,7 @@ GOMP_target_ext (int device, void (*fn) (void *), size_t mapnum,
       /* Create a team if we don't have any around, as nowait
 	 target tasks make sense to run asynchronously even when
 	 outside of any parallel.  */
-      if (__builtin_expect (thr->ts.team == NULL, 0))
+      if (UNLIKELY (thr->ts.team == NULL))
 	{
 	  struct gomp_team *team = gomp_new_team (1);
 	  struct gomp_task *task = thr->task;
@@ -2898,7 +2898,7 @@ GOMP_target_update_ext (int device, size_t mapnum, void **hostaddrs,
 	      struct gomp_team *team = thr->ts.team;
 	      /* If parallel or taskgroup has been cancelled, don't start new
 		 tasks.  */
-	      if (__builtin_expect (gomp_cancel_var, 0) && team)
+	      if (UNLIKELY (gomp_cancel_var) && team)
 		{
 		  if (gomp_team_barrier_cancelled (&team->barrier))
 		    return;
@@ -2926,7 +2926,7 @@ GOMP_target_update_ext (int device, size_t mapnum, void **hostaddrs,
   struct gomp_thread *thr = gomp_thread ();
   struct gomp_team *team = thr->ts.team;
   /* If parallel or taskgroup has been cancelled, don't start new tasks.  */
-  if (__builtin_expect (gomp_cancel_var, 0) && team)
+  if (UNLIKELY (gomp_cancel_var) && team)
     {
       if (gomp_team_barrier_cancelled (&team->barrier))
 	return;
@@ -3091,7 +3091,7 @@ GOMP_target_enter_exit_data (int device, size_t mapnum, void **hostaddrs,
 	      struct gomp_team *team = thr->ts.team;
 	      /* If parallel or taskgroup has been cancelled, don't start new
 		 tasks.  */
-	      if (__builtin_expect (gomp_cancel_var, 0) && team)
+	      if (UNLIKELY (gomp_cancel_var) && team)
 		{
 		  if (gomp_team_barrier_cancelled (&team->barrier))
 		    return;
@@ -3119,7 +3119,7 @@ GOMP_target_enter_exit_data (int device, size_t mapnum, void **hostaddrs,
   struct gomp_thread *thr = gomp_thread ();
   struct gomp_team *team = thr->ts.team;
   /* If parallel or taskgroup has been cancelled, don't start new tasks.  */
-  if (__builtin_expect (gomp_cancel_var, 0) && team)
+  if (UNLIKELY (gomp_cancel_var) && team)
     {
       if (gomp_team_barrier_cancelled (&team->barrier))
 	return;

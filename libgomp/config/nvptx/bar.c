@@ -59,7 +59,7 @@ futex_wait (int *addr, int val)
   gomp_mutex_lock (&bar->lock);
 
   /* Futex semantics: only go to sleep if *addr == val.  */
-  if (__builtin_expect (__atomic_load_n (addr, MEMMODEL_ACQUIRE) != val, 0))
+  if (UNLIKELY (__atomic_load_n (addr, MEMMODEL_ACQUIRE) != val))
     {
       gomp_mutex_unlock (&bar->lock);
       return;

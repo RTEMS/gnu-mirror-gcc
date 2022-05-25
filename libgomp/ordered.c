@@ -379,14 +379,14 @@ GOMP_doacross_post (long *counts)
   unsigned long ent;
   unsigned int i;
 
-  if (__builtin_expect (doacross == NULL, 0)
-      || __builtin_expect (doacross->array == NULL, 0))
+  if (UNLIKELY (doacross == NULL)
+      || UNLIKELY (doacross->array == NULL))
     {
       __sync_synchronize ();
       return;
     }
 
-  if (__builtin_expect (ws->sched == GFS_STATIC, 1))
+  if (LIKELY (ws->sched == GFS_STATIC))
     ent = thr->ts.team_id;
   else if (ws->sched == GFS_GUIDED)
     ent = counts[0];
@@ -395,7 +395,7 @@ GOMP_doacross_post (long *counts)
   unsigned long *array = (unsigned long *) (doacross->array
 					    + ent * doacross->elt_sz);
 
-  if (__builtin_expect (doacross->flattened, 1))
+  if (LIKELY (doacross->flattened))
     {
       unsigned long flattened
 	= (unsigned long) counts[0] << doacross->shift_counts[0];
@@ -431,14 +431,14 @@ GOMP_doacross_wait (long first, ...)
   unsigned long ent;
   unsigned int i;
 
-  if (__builtin_expect (doacross == NULL, 0)
-      || __builtin_expect (doacross->array == NULL, 0))
+  if (UNLIKELY (doacross == NULL)
+      || UNLIKELY (doacross->array == NULL))
     {
       __sync_synchronize ();
       return;
     }
 
-  if (__builtin_expect (ws->sched == GFS_STATIC, 1))
+  if (LIKELY (ws->sched == GFS_STATIC))
     {
       if (ws->chunk_size == 0)
 	{
@@ -458,7 +458,7 @@ GOMP_doacross_wait (long first, ...)
   unsigned long *array = (unsigned long *) (doacross->array
 					    + ent * doacross->elt_sz);
 
-  if (__builtin_expect (doacross->flattened, 1))
+  if (LIKELY (doacross->flattened))
     {
       unsigned long flattened
 	= (unsigned long) first << doacross->shift_counts[0];
@@ -635,21 +635,21 @@ GOMP_doacross_ull_post (gomp_ull *counts)
   unsigned long ent;
   unsigned int i;
 
-  if (__builtin_expect (doacross == NULL, 0)
-      || __builtin_expect (doacross->array == NULL, 0))
+  if (UNLIKELY (doacross == NULL)
+      || UNLIKELY (doacross->array == NULL))
     {
       __sync_synchronize ();
       return;
     }
 
-  if (__builtin_expect (ws->sched == GFS_STATIC, 1))
+  if (LIKELY (ws->sched == GFS_STATIC))
     ent = thr->ts.team_id;
   else if (ws->sched == GFS_GUIDED)
     ent = counts[0];
   else
     ent = counts[0] / doacross->chunk_size_ull;
 
-  if (__builtin_expect (doacross->flattened, 1))
+  if (LIKELY (doacross->flattened))
     {
       unsigned long *array = (unsigned long *) (doacross->array
 			      + ent * doacross->elt_sz);
@@ -708,14 +708,14 @@ GOMP_doacross_ull_wait (gomp_ull first, ...)
   unsigned long ent;
   unsigned int i;
 
-  if (__builtin_expect (doacross == NULL, 0)
-      || __builtin_expect (doacross->array == NULL, 0))
+  if (UNLIKELY (doacross == NULL)
+      || UNLIKELY (doacross->array == NULL))
     {
       __sync_synchronize ();
       return;
     }
 
-  if (__builtin_expect (ws->sched == GFS_STATIC, 1))
+  if (LIKELY (ws->sched == GFS_STATIC))
     {
       if (ws->chunk_size_ull == 0)
 	{
@@ -733,7 +733,7 @@ GOMP_doacross_ull_wait (gomp_ull first, ...)
   else
     ent = first / doacross->chunk_size_ull;
 
-  if (__builtin_expect (doacross->flattened, 1))
+  if (LIKELY (doacross->flattened))
     {
       unsigned long *array = (unsigned long *) (doacross->array
 						+ ent * doacross->elt_sz);

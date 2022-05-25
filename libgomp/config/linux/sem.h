@@ -80,7 +80,7 @@ gomp_sem_post (gomp_sem_t *sem)
 				       MEMMODEL_RELEASE, MEMMODEL_RELAXED))
     continue;
 
-  if (__builtin_expect (count & SEM_WAIT, 0))
+  if (UNLIKELY (count & SEM_WAIT))
     gomp_sem_post_slow (sem);
 }
 

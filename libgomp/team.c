@@ -303,7 +303,7 @@ gomp_free_thread (void *arg __attribute__((unused)))
 #endif
       thr->thread_pool = NULL;
     }
-  if (thr->ts.level == 0 && __builtin_expect (thr->ts.team != NULL, 0))
+  if (thr->ts.level == 0 && UNLIKELY (thr->ts.team != NULL))
     gomp_team_end ();
   if (thr->task != NULL)
     {
@@ -341,10 +341,10 @@ gomp_team_start (void (*fn) (void *), void *data, unsigned nthreads,
   pool = thr->thread_pool;
   task = thr->task;
   icv = task ? &task->icv : &gomp_global_icv;
-  if (__builtin_expect (gomp_places_list != NULL, 0) && thr->place == 0)
+  if (UNLIKELY (gomp_places_list != NULL) && thr->place == 0)
     {
       gomp_init_affinity ();
-      if (__builtin_expect (gomp_display_affinity_var, 0) && nthreads == 1)
+      if (UNLIKELY (gomp_display_affinity_var) && nthreads == 1)
 	gomp_display_affinity_thread (gomp_thread_self (), &thr->ts,
 				      thr->place);
     }
@@ -370,14 +370,14 @@ gomp_team_start (void (*fn) (void *), void *data, unsigned nthreads,
   thr->handle = pthread_self ();
 #endif
   nthreads_var = icv->nthreads_var;
-  if (__builtin_expect (gomp_nthreads_var_list != NULL, 0)
+  if (UNLIKELY (gomp_nthreads_var_list != NULL)
       && thr->ts.level < gomp_nthreads_var_list_len)
     nthreads_var = gomp_nthreads_var_list[thr->ts.level];
   bind_var = icv->bind_var;
   if (bind_var != omp_proc_bind_false && (flags & 7) != omp_proc_bind_false)
     bind_var = flags & 7;
   bind = bind_var;
-  if (__builtin_expect (gomp_bind_var_list != NULL, 0)
+  if (UNLIKELY (gomp_bind_var_list != NULL)
       && thr->ts.level < gomp_bind_var_list_len)
     bind_var = gomp_bind_var_list[thr->ts.level];
   gomp_init_task (thr->task, task, icv);
@@ -390,7 +390,7 @@ gomp_team_start (void (*fn) (void *), void *data, unsigned nthreads,
 
   i = 1;
 
-  if (__builtin_expect (gomp_places_list != NULL, 0))
+  if (UNLIKELY (gomp_places_list != NULL))
     {
       /* Depending on chosen proc_bind model, set subpartition
 	 for the master thread and initialize helper variables
@@ -508,7 +508,7 @@ gomp_team_start (void (*fn) (void *), void *data, unsigned nthreads,
 	  unsigned int place_partition_off = thr->ts.place_partition_off;
 	  unsigned int place_partition_len = thr->ts.place_partition_len;
 	  unsigned int place = 0;
-	  if (__builtin_expect (gomp_places_list != NULL, 0))
+	  if (UNLIKELY (gomp_places_list != NULL))
 	    {
 	      switch (bind)
 		{
@@ -667,7 +667,7 @@ gomp_team_start (void (*fn) (void *), void *data, unsigned nthreads,
 	  team->ordered_release[i] = &nthr->release;
 	}
 
-      if (__builtin_expect (affinity_thr != NULL, 0))
+      if (UNLIKELY (affinity_thr != NULL))
 	{
 	  /* If AFFINITY_THR is non-NULL just because we had to
 	     permute some threads in the pool, but we've managed
@@ -730,7 +730,7 @@ gomp_team_start (void (*fn) (void *), void *data, unsigned nthreads,
 
     }
 
-  if (__builtin_expect (nthreads + affinity_count > old_threads_used, 0))
+  if (UNLIKELY (nthreads + affinity_count > old_threads_used))
     {
       long diff = (long) (nthreads + affinity_count) - (long) old_threads_used;
 
@@ -747,7 +747,7 @@ gomp_team_start (void (*fn) (void *), void *data, unsigned nthreads,
     }
 
   attr = &gomp_thread_attr;
-  if (__builtin_expect (gomp_places_list != NULL, 0))
+  if (UNLIKELY (gomp_places_list != NULL))
     {
       size_t stacksize;
       pthread_attr_init (&thread_attr);
@@ -767,7 +767,7 @@ gomp_team_start (void (*fn) (void *), void *data, unsigned nthreads,
       start_data->ts.place_partition_off = thr->ts.place_partition_off;
       start_data->ts.place_partition_len = thr->ts.place_partition_len;
       start_data->place = 0;
-      if (__builtin_expect (gomp_places_list != NULL, 0))
+      if (UNLIKELY (gomp_places_list != NULL))
 	{
 	  switch (bind)
 	    {
@@ -862,7 +862,7 @@ gomp_team_start (void (*fn) (void *), void *data, unsigned nthreads,
 	gomp_fatal ("Thread creation failed: %s", strerror (err));
     }
 
-  if (__builtin_expect (attr == &thread_attr, 0))
+  if (UNLIKELY (attr == &thread_attr))
     pthread_attr_destroy (&thread_attr);
 
  do_release:
@@ -879,8 +879,8 @@ gomp_team_start (void (*fn) (void *), void *data, unsigned nthreads,
      set to NTHREADS + AFFINITY_COUNT.  For NTHREADS < OLD_THREADS_COUNT,
      AFFINITY_COUNT if non-zero will be always at least
      OLD_THREADS_COUNT - NTHREADS.  */
-  if (__builtin_expect (nthreads < old_threads_used, 0)
-      || __builtin_expect (affinity_count, 0))
+  if (UNLIKELY (nthreads < old_threads_used)
+      || UNLIKELY (affinity_count))
     {
       long diff = (long) nthreads - (long) old_threads_used;
 
@@ -897,7 +897,7 @@ gomp_team_start (void (*fn) (void *), void *data, unsigned nthreads,
       gomp_mutex_unlock (&gomp_managed_threads_lock);
 #endif
     }
-  if (__builtin_expect (gomp_display_affinity_var, 0))
+  if (UNLIKELY (gomp_display_affinity_var))
     {
       if (nested
 	  || nthreads != old_threads_used
@@ -933,7 +933,7 @@ gomp_team_start (void (*fn) (void *), void *data, unsigned nthreads,
 	    }
 	}
     }
-  if (__builtin_expect (affinity_thr != NULL, 0)
+  if (UNLIKELY (affinity_thr != NULL)
       && team->prev_ts.place_partition_len > 64)
     free (affinity_thr);
 }
@@ -954,7 +954,7 @@ gomp_team_end (void)
      team->barrier in a inconsistent state, we need to use a different
      counter here.  */
   gomp_team_barrier_wait_final (&team->barrier);
-  if (__builtin_expect (team->team_cancelled, 0))
+  if (UNLIKELY (team->team_cancelled))
     {
       struct gomp_work_share *ws = team->work_shares_to_free;
       do
@@ -973,7 +973,7 @@ gomp_team_end (void)
   gomp_end_task ();
   thr->ts = team->prev_ts;
 
-  if (__builtin_expect (thr->ts.level != 0, 0))
+  if (UNLIKELY (thr->ts.level != 0))
     {
 #ifdef HAVE_SYNC_BUILTINS
       __sync_fetch_and_add (&gomp_managed_threads, 1L - team->nthreads);
@@ -987,7 +987,7 @@ gomp_team_end (void)
       gomp_barrier_wait (&team->barrier);
     }
 
-  if (__builtin_expect (team->work_shares[0].next_alloc != NULL, 0))
+  if (UNLIKELY (team->work_shares[0].next_alloc != NULL))
     {
       struct gomp_work_share *ws = team->work_shares[0].next_alloc;
       do
@@ -1000,8 +1000,8 @@ gomp_team_end (void)
     }
   gomp_sem_destroy (&team->master_release);
 
-  if (__builtin_expect (thr->ts.team != NULL, 0)
-      || __builtin_expect (team->nthreads == 1, 0))
+  if (UNLIKELY (thr->ts.team != NULL)
+      || UNLIKELY (team->nthreads == 1))
     free_team (team);
   else
     {

@@ -61,7 +61,7 @@ static inline void
 gomp_mutex_unlock (gomp_mutex_t *mutex)
 {
   int wait = __atomic_exchange_n (mutex, 0, MEMMODEL_RELEASE);
-  if (__builtin_expect (wait < 0, 0))
+  if (UNLIKELY (wait < 0))
     gomp_mutex_unlock_slow (mutex);
 }
 #endif /* GOMP_MUTEX_H */

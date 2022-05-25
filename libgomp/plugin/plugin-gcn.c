@@ -1838,7 +1838,7 @@ alloc_by_agent (struct agent_info *agent, size_t size)
 
   struct goacc_thread *thr = GOMP_PLUGIN_goacc_thread ();
   bool profiling_dispatch_p
-    = __builtin_expect (thr != NULL && thr->prof_info != NULL, false);
+    = UNLIKELY (thr != NULL && thr->prof_info != NULL);
   if (profiling_dispatch_p)
     {
       acc_prof_info *prof_info = thr->prof_info;
@@ -3131,7 +3131,7 @@ gcn_exec (struct kernel_info *kernel, size_t mapnum, void **hostaddrs,
   acc_prof_info *prof_info = thr->prof_info;
   acc_event_info enqueue_launch_event_info;
   acc_api_info *api_info = thr->api_info;
-  bool profiling_dispatch_p = __builtin_expect (prof_info != NULL, false);
+  bool profiling_dispatch_p = UNLIKELY (prof_info != NULL);
   if (profiling_dispatch_p)
     {
       prof_info->event_type = acc_ev_enqueue_launch_start;
@@ -3671,7 +3671,7 @@ GOMP_OFFLOAD_free (int device, void *ptr)
 
   struct goacc_thread *thr = GOMP_PLUGIN_goacc_thread ();
   bool profiling_dispatch_p
-    = __builtin_expect (thr != NULL && thr->prof_info != NULL, false);
+    = UNLIKELY (thr != NULL && thr->prof_info != NULL);
   if (profiling_dispatch_p)
     {
       acc_prof_info *prof_info = thr->prof_info;

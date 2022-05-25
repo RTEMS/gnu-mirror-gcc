@@ -59,21 +59,21 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 	struct gomp_team *team = thr->ts.team;
 	long nthreads = team ? team->nthreads : 1;
 
-	if (__builtin_expect (incr > 0, 1))
+	if (LIKELY (incr > 0))
 	  {
 	    /* Cheap overflow protection.  */
-	    if (__builtin_expect ((nthreads | ws->chunk_size)
-				  >= 1UL << (sizeof (long)
-					     * __CHAR_BIT__ / 2 - 1), 0))
+	    if (UNLIKELY ((nthreads | ws->chunk_size)
+			  >= 1UL << (sizeof (long)
+				     * __CHAR_BIT__ / 2 - 1)))
 	      ws->mode = 0;
 	    else
 	      ws->mode = ws->end < (LONG_MAX
 				    - (nthreads + 1) * ws->chunk_size);
 	  }
 	/* Cheap overflow protection.  */
-	else if (__builtin_expect ((nthreads | -ws->chunk_size)
-				   >= 1UL << (sizeof (long)
-					      * __CHAR_BIT__ / 2 - 1), 0))
+	else if (UNLIKELY ((nthreads | -ws->chunk_size)
+			   >= 1UL << (sizeof (long)
+				      * __CHAR_BIT__ / 2 - 1)))
 	  ws->mode = 0;
 	else
 	  ws->mode = ws->end > (nthreads + 1) * -ws->chunk_size - LONG_MAX;

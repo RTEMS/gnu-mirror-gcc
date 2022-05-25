@@ -76,7 +76,7 @@ static __thread int tid_cache;
 static inline int gomp_tid (void)
 {
   int tid = tid_cache;
-  if (__builtin_expect (tid == 0, 0))
+  if (UNLIKELY (tid == 0))
     tid_cache = tid = syscall (SYS_gettid);
   return tid;
 }

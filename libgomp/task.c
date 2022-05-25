@@ -238,7 +238,7 @@ gomp_task_handle_depend (struct gomp_task *task, struct gomp_task *parent,
 	  }
     }
   task->num_dependees = 0;
-  if (__builtin_expect (parent->depend_all_memory && ndepend, false))
+  if (UNLIKELY (parent->depend_all_memory && ndepend))
     {
       struct gomp_task *tsk = parent->depend_all_memory;
       if (tsk->dependers == NULL)
@@ -266,7 +266,7 @@ gomp_task_handle_depend (struct gomp_task *task, struct gomp_task *parent,
 	}
       task->num_dependees++;
     }
-  if (__builtin_expect (all_memory, false))
+  if (UNLIKELY (all_memory))
     {
       /* A task with depend(inout: omp_all_memory) depends on all previous
 	 sibling tasks which have any dependencies and all later sibling
@@ -509,7 +509,7 @@ GOMP_task (void (*fn) (void *), void *data, void (*cpyfn) (void *, void *),
 #endif
 
   /* If parallel or taskgroup has been cancelled, don't start new tasks.  */
-  if (__builtin_expect (gomp_cancel_var, 0) && team)
+  if (UNLIKELY (gomp_cancel_var) && team)
     {
       if (gomp_team_barrier_cancelled (&team->barrier))
 	return;
@@ -524,7 +524,7 @@ GOMP_task (void (*fn) (void *), void *data, void (*cpyfn) (void *, void *),
 	}
     }
 
-  if (__builtin_expect ((flags & GOMP_TASK_FLAG_PRIORITY) != 0, 0))
+  if (UNLIKELY ((flags & GOMP_TASK_FLAG_PRIORITY) != 0))
     {
       priority = priority_arg;
       if (priority > gomp_max_task_priority_var)
@@ -572,7 +572,7 @@ GOMP_task (void (*fn) (void *), void *data, void (*cpyfn) (void *, void *),
 	  task.taskgroup = thr->task->taskgroup;
 	}
       thr->task = &task;
-      if (__builtin_expect (cpyfn != NULL, 0))
+      if (UNLIKELY (cpyfn != NULL))
 	{
 	  char buf[arg_size + arg_align - 1];
 	  char *arg = (char *) (((uintptr_t) buf + arg_align - 1)
@@ -654,7 +654,7 @@ GOMP_task (void (*fn) (void *), void *data, void (*cpyfn) (void *, void *),
       gomp_mutex_lock (&team->task_lock);
       /* If parallel or taskgroup has been cancelled, don't start new
 	 tasks.  */
-      if (__builtin_expect (gomp_cancel_var, 0)
+      if (UNLIKELY (gomp_cancel_var)
 	  && !task->copy_ctors_done)
 	{
 	  if (gomp_team_barrier_cancelled (&team->barrier))
@@ -694,7 +694,7 @@ GOMP_task (void (*fn) (void *), void *data, void (*cpyfn) (void *, void *),
 	    }
 	  /* Check for taskwait nowait depend which doesn't need to wait for
 	     anything.  */
-	  if (__builtin_expect (fn == empty_task, 0))
+	  if (UNLIKELY (fn == empty_task))
 	    {
 	      if (taskgroup)
 		taskgroup->num_children--;
@@ -875,7 +875,7 @@ gomp_create_target_task (struct gomp_device_descr *devicep,
   struct gomp_team *team = thr->ts.team;
 
   /* If parallel or taskgroup has been cancelled, don't start new tasks.  */
-  if (__builtin_expect (gomp_cancel_var, 0) && team)
+  if (UNLIKELY (gomp_cancel_var) && team)
     {
       if (gomp_team_barrier_cancelled (&team->barrier))
 	return true;
@@ -993,7 +993,7 @@ gomp_create_target_task (struct gomp_device_descr *devicep,
   task->final_task = 0;
   gomp_mutex_lock (&team->task_lock);
   /* If parallel or taskgroup has been cancelled, don't start new tasks.  */
-  if (__builtin_expect (gomp_cancel_var, 0))
+  if (UNLIKELY (gomp_cancel_var))
     {
       if (gomp_team_barrier_cancelled (&team->barrier))
 	{
@@ -1216,7 +1216,7 @@ priority_list_downgrade_task (enum priority_queue_type type,
 
   /* If the current task is the last_parent_depends_on for its
      priority, adjust last_parent_depends_on appropriately.  */
-  if (__builtin_expect (child_task->parent_depends_on, 0)
+  if (UNLIKELY (child_task->parent_depends_on)
       && list->last_parent_depends_on == node)
     {
       struct gomp_task *prev_child = priority_node_to_task (type, node->prev);
@@ -1304,7 +1304,7 @@ gomp_task_run_pre (struct gomp_task *child_task, struct gomp_task *parent,
 
   if (--team->task_queued_count == 0)
     gomp_team_barrier_clear_task_pending (&team->barrier);
-  if (__builtin_expect (gomp_cancel_var, 0)
+  if (UNLIKELY (gomp_cancel_var)
       && !child_task->copy_ctors_done)
     {
       if (gomp_team_barrier_cancelled (&team->barrier))
@@ -1378,11 +1378,11 @@ gomp_task_run_post_handle_dependers (struct gomp_task *child_task,
 	continue;
 
       struct gomp_taskgroup *taskgroup = task->taskgroup;
-      if (__builtin_expect (task->fn == empty_task, 0))
+      if (UNLIKELY (task->fn == empty_task))
 	{
 	  if (!parent)
 	    task->parent = NULL;
-	  else if (__builtin_expect (task->parent_depends_on, 0)
+	  else if (UNLIKELY (task->parent_depends_on)
 		   && --parent->taskwait->n_depend == 0
 		   && parent->taskwait->in_depend_wait)
 	    {
@@ -1498,7 +1498,7 @@ gomp_task_run_post_remove_parent (struct gomp_task *child_task)
   /* If this was the last task the parent was depending on,
      synchronize with gomp_task_maybe_wait_for_dependencies so it can
      clean up and return.  */
-  if (__builtin_expect (child_task->parent_depends_on, 0)
+  if (UNLIKELY (child_task->parent_depends_on)
       && --parent->taskwait->n_depend == 0
       && parent->taskwait->in_depend_wait)
     {
@@ -1584,7 +1584,7 @@ gomp_barrier_handle_tasks (gomp_barrier_state_t state)
 					&ignored);
 	  cancelled = gomp_task_run_pre (child_task, child_task->parent,
 					 team);
-	  if (__builtin_expect (cancelled, 0))
+	  if (UNLIKELY (cancelled))
 	    {
 	      if (to_free)
 		{
@@ -1625,7 +1625,7 @@ gomp_barrier_handle_tasks (gomp_barrier_state_t state)
       if (child_task)
 	{
 	  thr->task = child_task;
-	  if (__builtin_expect (child_task->fn == NULL, 0))
+	  if (UNLIKELY (child_task->fn == NULL))
 	    {
 	      if (gomp_target_task_fn (child_task->fn_data))
 		{
@@ -1743,7 +1743,7 @@ GOMP_taskwait (void)
 	  child_task = next_task;
 	  cancelled
 	    = gomp_task_run_pre (child_task, task, team);
-	  if (__builtin_expect (cancelled, 0))
+	  if (UNLIKELY (cancelled))
 	    {
 	      if (to_free)
 		{
@@ -1784,7 +1784,7 @@ GOMP_taskwait (void)
       if (child_task)
 	{
 	  thr->task = child_task;
-	  if (__builtin_expect (child_task->fn == NULL, 0))
+	  if (UNLIKELY (child_task->fn == NULL))
 	    {
 	      if (gomp_target_task_fn (child_task->fn_data))
 		{
@@ -1866,7 +1866,7 @@ GOMP_taskwait_depend (void **depend)
   struct gomp_team *team = thr->ts.team;
 
   /* If parallel or taskgroup has been cancelled, return early.  */
-  if (__builtin_expect (gomp_cancel_var, 0) && team)
+  if (UNLIKELY (gomp_cancel_var) && team)
     {
       if (gomp_team_barrier_cancelled (&team->barrier))
 	return;
@@ -1935,7 +1935,7 @@ gomp_task_maybe_wait_for_dependencies (void **depend)
       n = 5;
     }
   gomp_mutex_lock (&team->task_lock);
-  if (__builtin_expect (task->depend_all_memory && ndepend, false))
+  if (UNLIKELY (task->depend_all_memory && ndepend))
     {
       struct gomp_task *tsk = task->depend_all_memory;
       if (!tsk->parent_depends_on)
@@ -1950,7 +1950,7 @@ gomp_task_maybe_wait_for_dependencies (void **depend)
     {
       elem.addr = depend[i + n];
       elem.is_in = i >= nout;
-      if (__builtin_expect (i >= normal, 0))
+      if (UNLIKELY (i >= normal))
 	{
 	  void **d = (void **) elem.addr;
 	  switch ((uintptr_t) d[1])
@@ -1971,7 +1971,7 @@ gomp_task_maybe_wait_for_dependencies (void **depend)
 	    }
 	  elem.addr = d[0];
 	}
-      if (__builtin_expect (elem.addr == NULL && !elem.is_in, false))
+      if (UNLIKELY (elem.addr == NULL && !elem.is_in))
 	{
 	  size_t size = htab_size (task->depend_hash);
 	  if (htab_elements (task->depend_hash) * 8 < size && size > 32)
@@ -2070,7 +2070,7 @@ gomp_task_maybe_wait_for_dependencies (void **depend)
 	  child_task = next_task;
 	  cancelled
 	    = gomp_task_run_pre (child_task, task, team);
-	  if (__builtin_expect (cancelled, 0))
+	  if (UNLIKELY (cancelled))
 	    {
 	      if (to_free)
 		{
@@ -2102,7 +2102,7 @@ gomp_task_maybe_wait_for_dependencies (void **depend)
       if (child_task)
 	{
 	  thr->task = child_task;
-	  if (__builtin_expect (child_task->fn == NULL, 0))
+	  if (UNLIKELY (child_task->fn == NULL))
 	    {
 	      if (gomp_target_task_fn (child_task->fn_data))
 		{
@@ -2212,7 +2212,7 @@ GOMP_taskgroup_end (void)
   if (team == NULL)
     return;
   taskgroup = task->taskgroup;
-  if (__builtin_expect (taskgroup == NULL, 0)
+  if (UNLIKELY (taskgroup == NULL)
       && thr->ts.level == 0)
     {
       /* This can happen if GOMP_taskgroup_start is called when
@@ -2270,7 +2270,7 @@ GOMP_taskgroup_end (void)
 	{
 	  cancelled
 	    = gomp_task_run_pre (child_task, child_task->parent, team);
-	  if (__builtin_expect (cancelled, 0))
+	  if (UNLIKELY (cancelled))
 	    {
 	      if (to_free)
 		{
@@ -2306,7 +2306,7 @@ GOMP_taskgroup_end (void)
       if (child_task)
 	{
 	  thr->task = child_task;
-	  if (__builtin_expect (child_task->fn == NULL, 0))
+	  if (UNLIKELY (child_task->fn == NULL))
 	    {
 	      if (gomp_target_task_fn (child_task->fn_data))
 		{
@@ -2382,7 +2382,7 @@ gomp_reduction_register (uintptr_t *data, uintptr_t *old, uintptr_t *orig,
   struct htab *old_htab = NULL, *new_htab;
   do
     {
-      if (__builtin_expect (orig != NULL, 0))
+      if (UNLIKELY (orig != NULL))
 	{
 	  /* For worksharing task reductions, memory has been allocated
 	     already by some other thread that encountered the construct
@@ -2515,7 +2515,7 @@ GOMP_taskgroup_reduction_register (uintptr_t *data)
   struct gomp_team *team = thr->ts.team;
   struct gomp_task *task;
   unsigned nthreads;
-  if (__builtin_expect (team == NULL, 0))
+  if (UNLIKELY (team == NULL))
     {
       /* The task reduction code needs a team and task, so for
 	 orphaned taskgroups just create the implicit team.  */
@@ -2576,7 +2576,7 @@ GOMP_task_reduction_remap (size_t cnt, size_t cntorig, void **ptrs)
 	     for one thread.  */
 	  d = (uintptr_t *) p[2];
 	  ptrs[i] = (void *) (d[2] + id * d[1] + p[1]);
-	  if (__builtin_expect (i < cntorig, 0))
+	  if (UNLIKELY (i < cntorig))
 	    ptrs[cnt + i] = (void *) p[0];
 	  continue;
 	}
@@ -2592,7 +2592,7 @@ GOMP_task_reduction_remap (size_t cnt, size_t cntorig, void **ptrs)
 		    "task modifier for %p", ptrs[i]);
       uintptr_t off = ((uintptr_t) ptrs[i] - d[2]) % d[1];
       ptrs[i] = (void *) (d[2] + id * d[1] + off);
-      if (__builtin_expect (i < cntorig, 0))
+      if (UNLIKELY (i < cntorig))
 	{
 	  size_t lo = 0, hi = d[0] - 1;
 	  while (lo <= hi)

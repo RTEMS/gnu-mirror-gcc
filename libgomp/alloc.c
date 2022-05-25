@@ -78,7 +78,7 @@ gomp_aligned_alloc (size_t al, size_t size)
 #elif defined(HAVE_ALIGNED_ALLOC)
   {
     size_t sz = (size + al - 1) & ~(al - 1);
-    if (__builtin_expect (sz >= size, 1))
+    if (LIKELY (sz >= size))
       ret = aligned_alloc (al, sz);
     else
       ret = NULL;
