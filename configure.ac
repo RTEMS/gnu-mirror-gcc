@@ -40,7 +40,8 @@ dnl#    part of the release process, so if we added a VERSION argument here, tha
 dnl#    would have to get updated regularly, too
 dnl# 3. There's a --with-bugurl=URL flag, so we can't declare a BUG-REPORT-ADDRESS
 dnl#    argument here if we also want to respect that flag
-AC_INIT(move-if-change)
+AC_INIT
+AC_CONFIG_SRCDIR([move-if-change])
 AC_DISABLE_OPTION_CHECKING
 
 progname=$0
@@ -78,14 +79,14 @@ ACX_NONCANONICAL_TARGET
 
 dnl Autoconf 2.5x and later will set a default program prefix if
 dnl --target was used, even if it was the same as --host.  Disable
-dnl that behavior.  This must be done before AC_CANONICAL_SYSTEM
+dnl that behavior.  This must be done before AC_CANONICAL_TARGET
 dnl to take effect.
 test "$host_noncanonical" = "$target_noncanonical" &&
   test "$program_prefix$program_suffix$program_transform_name" = \
     NONENONEs,x,x, &&
   program_transform_name=s,y,y,
 
-AC_CANONICAL_SYSTEM
+AC_CANONICAL_TARGET
 AC_ARG_PROGRAM
 
 m4_pattern_allow([^AS_FOR_TARGET$])dnl
@@ -487,7 +488,7 @@ fi]
 # for intelmic we enable host liboffloadmic by default.  Otherwise
 # liboffloadmic is disabled by default.
 AC_ARG_ENABLE([liboffloadmic],
-AC_HELP_STRING([[--enable-liboffloadmic[=ARG]]],
+AS_HELP_STRING([[--enable-liboffloadmic[=ARG]]],
 	       [build liboffloadmic @<:@ARG={no,host,target}@:>@]),
 [case "$enableval" in
   no | host | target)
@@ -1687,53 +1688,50 @@ if test -d ${srcdir}/gcc && test "x$have_gmp" = xno; then
   CFLAGS="$CFLAGS $gmpinc"
   # Check for the recommended and required versions of GMP.
   AC_MSG_CHECKING([for the correct version of gmp.h])
-  AC_TRY_COMPILE([#include "gmp.h"],[
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include "gmp.h"]], [[
   #define GCC_GMP_VERSION_NUM(a,b,c) (((a) << 16L) | ((b) << 8) | (c))
   #define GCC_GMP_VERSION GCC_GMP_VERSION_NUM(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL)
   #if GCC_GMP_VERSION < GCC_GMP_VERSION_NUM(4,2,3)
   choke me
   #endif
-  ], [AC_TRY_COMPILE([#include <gmp.h>],[
+  ]])],[AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <gmp.h>]], [[
   #define GCC_GMP_VERSION_NUM(a,b,c) (((a) << 16L) | ((b) << 8) | (c))
   #define GCC_GMP_VERSION GCC_GMP_VERSION_NUM(__GNU_MP_VERSION,__GNU_MP_VERSION_MINOR,__GNU_MP_VERSION_PATCHLEVEL)
   #if GCC_GMP_VERSION < GCC_GMP_VERSION_NUM(4,3,2)
   choke me
   #endif
-  ], [AC_MSG_RESULT([yes])], [AC_MSG_RESULT([buggy but acceptable])])],
-   [AC_MSG_RESULT([no]); have_gmp=no])
+  ]])],[AC_MSG_RESULT([yes])],[AC_MSG_RESULT([buggy but acceptable])])],[AC_MSG_RESULT([no]); have_gmp=no])
 
   # If we have GMP, check the MPFR version.
   if test x"$have_gmp" = xyes; then
     # Check for the recommended and required versions of MPFR.
     AC_MSG_CHECKING([for the correct version of mpfr.h])
-    AC_TRY_COMPILE([#include <gmp.h>
-    #include <mpfr.h>],[
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <gmp.h>
+    #include <mpfr.h>]], [[
     #if MPFR_VERSION < MPFR_VERSION_NUM(3,1,0)
     choke me
     #endif
-    ], [AC_TRY_COMPILE([#include <gmp.h>
-    #include <mpfr.h>],[
+    ]])],[AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <gmp.h>
+    #include <mpfr.h>]], [[
     #if MPFR_VERSION < MPFR_VERSION_NUM(3,1,6)
     choke me
     #endif
-    ], [AC_MSG_RESULT([yes])], [AC_MSG_RESULT([buggy but acceptable])])],
-     [AC_MSG_RESULT([no]); have_gmp=no])
+    ]])],[AC_MSG_RESULT([yes])],[AC_MSG_RESULT([buggy but acceptable])])],[AC_MSG_RESULT([no]); have_gmp=no])
   fi
 
   # Check for the MPC header version.
   if test x"$have_gmp" = xyes ; then
     # Check for the recommended and required versions of MPC.
     AC_MSG_CHECKING([for the correct version of mpc.h])
-    AC_TRY_COMPILE([#include <mpc.h>],[
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <mpc.h>]], [[
     #if MPC_VERSION < MPC_VERSION_NUM(0,8,0)
     choke me
     #endif
-    ], [AC_TRY_COMPILE([#include <mpc.h>],[
+    ]])],[AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <mpc.h>]], [[
     #if MPC_VERSION < MPC_VERSION_NUM(0,8,1)
     choke me
     #endif
-    ], [AC_MSG_RESULT([yes])], [AC_MSG_RESULT([buggy but acceptable])])],
-     [AC_MSG_RESULT([no]); have_gmp=no])
+    ]])],[AC_MSG_RESULT([yes])],[AC_MSG_RESULT([buggy but acceptable])])],[AC_MSG_RESULT([no]); have_gmp=no])
   fi
 
   # Now check the MPFR library.
@@ -1741,7 +1739,7 @@ if test -d ${srcdir}/gcc && test "x$have_gmp" = xno; then
     saved_LIBS="$LIBS"
     LIBS="$LIBS $gmplibs"
     AC_MSG_CHECKING([for the correct version of the gmp/mpfr/mpc libraries])
-    AC_TRY_LINK([#include <mpc.h>],[
+    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <mpc.h>]], [[
     mpfr_t n;
     mpfr_t x;
     mpc_t c;
@@ -1759,7 +1757,7 @@ if test -d ${srcdir}/gcc && test "x$have_gmp" = xno; then
     mpc_pow (c, c, c, MPC_RNDNN);
     mpc_acosh (c, c, MPC_RNDNN);
     mpc_clear (c);
-    ], [AC_MSG_RESULT([yes])], [AC_MSG_RESULT([no]); have_gmp=no])
+    ]])],[AC_MSG_RESULT([yes])],[AC_MSG_RESULT([no]); have_gmp=no])
     LIBS="$saved_LIBS"
   fi
 
