@@ -31,6 +31,15 @@ m4_include([ltversion.m4])
 m4_include([lt~obsolete.m4])
 m4_include([config/isl.m4])
 
+dnl# FIXME: single-argument calls to AC\_INIT are deprecated, but updating this
+dnl# to the new 3-argument version is rather complicated for multiple reasons:
+dnl# 1. This configure script is share between binutils-gdb and gcc, so there isn't
+dnl#    a single simple FULL-PACKAGE-NAME to use
+dnl# 2. There's tooling in place to update the version number automatically as
+dnl#    part of the release process, so if we added a VERSION argument here, that
+dnl#    would have to get updated regularly, too
+dnl# 3. There's a --with-bugurl=URL flag, so we can't declare a BUG-REPORT-ADDRESS
+dnl#    argument here if we also want to respect that flag
 AC_INIT(move-if-change)
 AC_DISABLE_OPTION_CHECKING
 
