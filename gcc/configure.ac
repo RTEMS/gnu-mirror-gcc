@@ -573,7 +573,7 @@ AC_ARG_ENABLE(build-format-warnings,
 AS_IF([test $enable_build_format_warnings = no],
       [wf_opt=-Wno-format],[wf_opt=])
 ACX_PROG_CXX_WARNING_OPTS(
-	m4_quote(m4_do([-W -Wall -Wno-narrowing -Wwrite-strings ],
+	m4_quote(m4_do([-Wall -Wextra -Wnarrowing -Wwrite-strings ],
 		       [-Wcast-qual $wf_opt])),
 		       [loose_warn])
 ACX_PROG_CC_WARNING_OPTS(
@@ -586,7 +586,7 @@ ACX_PROG_CC_WARNING_OPTS(
 	m4_quote(m4_do([-Wold-style-definition -Wc++-compat])), [c_strict_warn])
 ACX_PROG_CXX_WARNING_ALMOST_PEDANTIC(
 	m4_quote(m4_do([-Wno-long-long -Wno-variadic-macros ], 
-		       [-Wno-overlength-strings])), [strict_warn])
+		       [-Woverlength-strings])), [strict_warn])
 ACX_PROG_CXX_WARNINGS_ARE_ERRORS([manual], [strict_warn])
 
 # The above macros do nothing if the compiler is not GCC.  However, the
@@ -2239,14 +2239,18 @@ esac
 
 AC_ARG_ENABLE(secureplt,
 [AS_HELP_STRING([--enable-secureplt],
-		[enable -msecure-plt by default for PowerPC])],
-[], [])
+		[enable -msecure-plt by default for PowerPC ELF])],
+[
+# TODO: reject on unsupported platforms
+], [])
 
 AC_ARG_ENABLE(mingw-wildcard,
 [AS_HELP_STRING([--enable-mingw-wildcard],
 		[Set whether to expand wildcard on command-line.
 		 Default to platform configuration])],
-[],[enable_mingw_wildcard=platform])
+[
+# TODO: only allow on mingw
+],[enable_mingw_wildcard=platform])
 AS_IF([test x"$enable_mingw_wildcard" != xplatform ],
       [AC_DEFINE_UNQUOTED(MINGW_DOWILDCARD,
 		 $(test x"$enable_mingw_wildcard" = xno; echo $?),
@@ -5839,7 +5843,9 @@ AC_ARG_ENABLE(gnu-unique-object,
  [AS_HELP_STRING([--enable-gnu-unique-object],
    [enable the use of the @gnu_unique_object ELF extension on glibc systems])],
  [case $enable_gnu_unique_object in
-    yes | no) ;;
+    yes | no)
+      # TODO: warn on unsupported platforms
+      ;;
     *) AC_MSG_ERROR(['$enable_gnu_unique_object' is an invalid value for --enable-gnu-unique-object.
 Valid choices are 'yes' and 'no'.]) ;;
   esac],
