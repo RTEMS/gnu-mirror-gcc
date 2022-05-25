@@ -90,7 +90,7 @@ function_info::temp_access_array (access_array accesses)
   gcc_assert (obstack_object_size (&m_temp_obstack) == 0);
   obstack_grow (&m_temp_obstack, accesses.begin (), accesses.size_bytes ());
   return { static_cast<access_info **> (obstack_finish (&m_temp_obstack)),
-	   accesses.size () };
+	   static_cast<unsigned int>(accesses.size ()) };
 }
 
 // See the comment above the declaration.

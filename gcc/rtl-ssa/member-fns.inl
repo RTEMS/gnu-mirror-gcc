@@ -47,7 +47,7 @@ access_array_builder::finish ()
 
   auto **base = static_cast<access_info **> (obstack_finish (m_obstack));
   keep ();
-  return { base, num_accesses };
+  return { base, static_cast<unsigned int>(num_accesses) };
 }
 
 inline bool

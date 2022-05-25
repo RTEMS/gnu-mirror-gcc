@@ -2119,7 +2119,7 @@ modref_lattice::add_escape_point (gcall *call, int arg, int min_flags,
       merge (0);
       return true;
     }
-  escape_point new_ep = {call, arg, min_flags, direct};
+  escape_point new_ep = {call, arg, static_cast<eaf_flags_t>(min_flags), direct};
   escape_points.safe_push (new_ep);
   return true;
 }
@@ -2880,7 +2880,8 @@ modref_eaf_analysis::record_escape_points (tree name, int parm_index, int flags)
 	if ((ep->min_flags & flags) != flags)
 	  {
 	    cgraph_edge *e = node->get_edge (ep->call);
-	    struct escape_entry ee = {parm_index, ep->arg,
+	    struct escape_entry ee = {parm_index,
+				      static_cast<unsigned int>(ep->arg),
 				      ep->min_flags, ep->direct};
 
 	    escape_summaries->get_create (e)->esc.safe_push (ee);
@@ -4350,8 +4351,8 @@ update_escape_summary_1 (cgraph_edge *e,
 	  if (ee->direct && !em->direct)
 	    min_flags = deref_flags (min_flags, ignore_stores);
 	  struct escape_entry entry = {em->parm_index, ee->arg,
-				       min_flags,
-				       ee->direct & em->direct};
+				       static_cast<eaf_flags_t>(min_flags),
+				       static_cast<bool>(ee->direct & em->direct)};
 	  sum->esc.safe_push (entry);
 	}
     }

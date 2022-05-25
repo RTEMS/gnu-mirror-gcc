@@ -1909,7 +1909,7 @@ vect_truncate_gather_scatter_offset (stmt_vec_info stmt_info,
     count = max_iters.to_shwi ();
 
   /* Try scales of 1 and the element size.  */
-  int scales[] = { 1, vect_get_scalar_dr_size (dr_info) };
+  int scales[] = { 1, static_cast<int>(vect_get_scalar_dr_size (dr_info)) };
   wi::overflow_type overflow = wi::OVF_NONE;
   for (int i = 0; i < 2; ++i)
     {
@@ -6447,7 +6447,7 @@ vectorizable_operation (vec_info *vinfo,
 	      && VECTOR_BOOLEAN_TYPE_P (vectype))
 	    {
 	      if (loop_vinfo->scalar_cond_masked_set.contains ({ op0,
-								 ncopies}))
+								 static_cast<unsigned int>(ncopies)}))
 		{
 		  mask = vect_get_loop_mask (gsi, masks, vec_num * ncopies,
 					     vectype, i);
@@ -6457,7 +6457,7 @@ vectorizable_operation (vec_info *vinfo,
 		}
 
 	      if (loop_vinfo->scalar_cond_masked_set.contains ({ op1,
-								 ncopies }))
+								 static_cast<unsigned int>(ncopies) }))
 		{
 		  mask = vect_get_loop_mask (gsi, masks, vec_num * ncopies,
 					     vectype, i);
