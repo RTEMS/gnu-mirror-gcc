@@ -1712,7 +1712,7 @@ Optional Features:
   --disable-rpath         do not hardcode runtime library paths
   --enable-sjlj-exceptions
                           arrange to use setjmp/longjmp exception handling
-  --enable-secureplt      enable -msecure-plt by default for PowerPC
+  --enable-secureplt      enable -msecure-plt by default for PowerPC ELF
   --enable-mingw-wildcard Set whether to expand wildcard on command-line.
                           Default to platform configuration
   --enable-large-address-aware
@@ -7089,7 +7089,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 
 loose_warn=
 save_CXXFLAGS="$CXXFLAGS"
-for real_option in -W -Wall -Wno-narrowing -Wwrite-strings -Wcast-qual $wf_opt; do
+for real_option in -Wall -Wextra -Wnarrowing -Wwrite-strings -Wcast-qual $wf_opt; do
   # Do the check with the no- prefix removed since gcc silently
   # accepts any -Wno-* option on purpose
   case $real_option in
@@ -7348,7 +7348,7 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $acx_cv_prog_cc_pedantic__Wlong_long__Wvariadic_macros__Woverlength_strings" >&5
 $as_echo "$acx_cv_prog_cc_pedantic__Wlong_long__Wvariadic_macros__Woverlength_strings" >&6; }
 if test $acx_cv_prog_cc_pedantic__Wlong_long__Wvariadic_macros__Woverlength_strings = yes; then :
-  strict_warn="$strict_warn${strict_warn:+ }-pedantic -Wno-long-long -Wno-variadic-macros -Wno-overlength-strings"
+  strict_warn="$strict_warn${strict_warn:+ }-pedantic -Wno-long-long -Wno-variadic-macros -Woverlength-strings"
 fi
 
 fi
@@ -13183,12 +13183,16 @@ esac
 # Check whether --enable-secureplt was given.
 if test "${enable_secureplt+set}" = set; then :
   enableval=$enable_secureplt;
+# TODO: reject on unsupported platforms
+
 fi
 
 
 # Check whether --enable-mingw-wildcard was given.
 if test "${enable_mingw_wildcard+set}" = set; then :
   enableval=$enable_mingw_wildcard;
+# TODO: only allow on mingw
+
 else
   enable_mingw_wildcard=platform
 fi
@@ -19682,7 +19686,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 19685 "configure"
+#line 19689 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -19788,7 +19792,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 19791 "configure"
+#line 19795 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -29835,7 +29839,9 @@ _ACEOF
 # Check whether --enable-gnu-unique-object was given.
 if test "${enable_gnu_unique_object+set}" = set; then :
   enableval=$enable_gnu_unique_object; case $enable_gnu_unique_object in
-    yes | no) ;;
+    yes | no)
+      # TODO: warn on unsupported platforms
+      ;;
     *) as_fn_error $? "'$enable_gnu_unique_object' is an invalid value for --enable-gnu-unique-object.
 Valid choices are 'yes' and 'no'." "$LINENO" 5 ;;
   esac
