@@ -3212,6 +3212,9 @@ case "${host}" in
 	# sets the default TLS model and affects inlining.
 	PICFLAG=-fPIC
 	;;
+    loongarch*-*-*)
+	PICFLAG=-fpic
+	;;
     mips-sgi-irix6*)
 	# PIC is the default.
 	;;
@@ -4938,8 +4941,8 @@ $as_echo "$as_me: executing $ac_file commands" >&6;}
 # Only add multilib support code if we just rebuilt the top-level
 # Makefile.
 case " $CONFIG_FILES " in
- *" Makefile "*)
-   ac_file=Makefile . ${multi_basedir}/config-ml.in
+ *" m4_default(,Makefile) "*)
+   ac_file=m4_default(,Makefile) . ${multi_basedir}/config-ml.in
    ;;
 esac ;;
 

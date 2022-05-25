@@ -22,7 +22,7 @@
 #  see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #  <http://www.gnu.org/licenses/>.
 
-AC_INIT([GNU Atomic Library], 1.0,,[libatomic])
+AC_INIT([GNU Atomic Library],[1.0],[],[libatomic])
 AC_CONFIG_HEADER(auto-config.h)
 
 # -------
@@ -66,10 +66,10 @@ AM_CONDITIONAL(GENINSRC, test "$enable_generated_files_in_srcdir" = yes)
 #
 # Do not delete or change the following two lines.  For why, see
 # http://gcc.gnu.org/ml/libstdc++/2003-07/msg00451.html
-AC_CANONICAL_SYSTEM
+AC_CANONICAL_TARGET
 target_alias=${target_alias-$host_alias}
 
-# Sets up automake.  Must come after AC_CANONICAL_SYSTEM.  Each of the
+# Sets up automake.  Must come after AC_CANONICAL_TARGET.  Each of the
 # following is magically included in AUTOMAKE_OPTIONS in each Makefile.am.
 #  1.9.0:  minimum required version
 #  no-define:  PACKAGE and VERSION will not be #define'd in config.h (a bunch
@@ -150,7 +150,7 @@ AC_PATH_PROG(PERL, perl, perl-not-found-in-path-error)
 AC_PROG_INSTALL
 
 # Configure libtool
-AM_PROG_LIBTOOL
+LT_INIT
 ACX_LT_HOST_FLAGS
 AC_SUBST(enable_shared)
 AC_SUBST(enable_static)
@@ -186,7 +186,7 @@ AC_DEFINE_UNQUOTED(IFUNC_RESOLVER_ARGS, $IFUNC_RESOLVER_ARGS,
 CFLAGS="$save_CFLAGS -fno-sync-libcalls $XCFLAGS"
 
 # Check header files.
-AC_STDC_HEADERS
+AC_HEADER_STDC
 ACX_HEADER_STRING
 GCC_HEADER_STDINT(gstdint.h)
 AC_CHECK_HEADERS([fenv.h])
