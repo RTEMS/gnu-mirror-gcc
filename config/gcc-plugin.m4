@@ -107,10 +107,7 @@ AC_DEFUN([GCC_ENABLE_PLUGINS],
        ;;
      esac
      AC_MSG_CHECKING([for -fPIC -shared])
-     AC_TRY_LINK(
-       [extern int X;],[return X == 0;],
-       [AC_MSG_RESULT([yes]); have_pic_shared=yes],
-       [AC_MSG_RESULT([no]); have_pic_shared=no])
+     AC_LINK_IFELSE([AC_LANG_PROGRAM([[extern int X;]], [[return X == 0;]])],[AC_MSG_RESULT([yes]); have_pic_shared=yes],[AC_MSG_RESULT([no]); have_pic_shared=no])
      if test x"$have_pic_shared" != x"yes" -o x"$ac_cv_search_dlopen" = x"no"; then
        pluginlibs=
        enable_plugin=no

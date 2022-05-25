@@ -26,9 +26,9 @@ case "${host}" in
     # procfs support.
     #
     # Check if <sys/procfs.h> is incompatible with large-file support.
-    AC_TRY_COMPILE([#define _FILE_OFFSET_BITS 64
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#define _FILE_OFFSET_BITS 64
 #define _STRUCTURED_PROC 1
-#include <sys/procfs.h>], , acx_cv_procfs_lfs=yes, acx_cv_procfs_lfs=no)
+#include <sys/procfs.h>]], [[]])],[acx_cv_procfs_lfs=yes],[acx_cv_procfs_lfs=no])
     #
     # Forcefully disable large-file support only if necessary, gdb is in
     # tree and enabled.

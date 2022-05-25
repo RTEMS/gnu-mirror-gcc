@@ -12,7 +12,7 @@ AC_CHECK_PROGS(CXX, $CCC c++ g++ gcc CC cxx cc++, gcc)
 
 CYG_AC_PROG_GXX_WORKS
 
-if test $ac_cv_prog_gxx = yes; then
+if test $ac_cv_cxx_compiler_gnu = yes; then
   GXX=yes
 dnl Check whether -g works, even if CXXFLAGS is set, in case the package
 dnl plays around with CXXFLAGS (such as to build both debugging and
@@ -38,7 +38,7 @@ dnl See if the G++ compiler we found works.
 AC_DEFUN([CYG_AC_PROG_GXX_WORKS],
 [AC_MSG_CHECKING([whether the G++ compiler ($CXX $CXXFLAGS $LDFLAGS) actually works])
 AC_LANG_SAVE
-AC_LANG_CPLUSPLUS
+AC_LANG([C++])
 dnl Try a test case. We only compile, because it's close to impossible
 dnl to get a correct fully linked executable with a cross compiler. For
 dnl most cross compilers, this test is bogus. For G++, we can use various
@@ -59,14 +59,14 @@ libgccpath=`${CXX} --print-libgcc`
 
 dnl If we don't have a path with libgcc.a on the end, this isn't G++.
 if test `echo $libgccpath | sed -e 's:/.*/::'` = libgcc.a ; then
-   ac_cv_prog_gxx=yes
+   ac_cv_cxx_compiler_gnu=yes
 else
-   ac_cv_prog_gxx=no
+   ac_cv_cxx_compiler_gnu=no
 fi
 
 dnl If we are using G++, look for the files that need to exist if this
 dnl compiler works.
-if test x"${ac_cv_prog_gxx}" = xyes ; then
+if test x"${ac_cv_cxx_compiler_gnu}" = xyes ; then
     gccfiles=`echo $libgccpath | sed -e 's:/libgcc.a::'`
     if test -f ${gccfiles}/specs -a -f ${gccfiles}/cpp -a -f ${gccfiles}/cc1plus; then
 	gccfiles=yes
@@ -109,7 +109,7 @@ AC_CHECK_PROGS(CC, cc, gcc)
 
 CYG_AC_PROG_GCC_WORKS
 
-if test $ac_cv_prog_gcc = yes; then
+if test $ac_cv_c_compiler_gnu = yes; then
   GCC=yes
 dnl Check whether -g works, even if CFLAGS is set, in case the package
 dnl plays around with CFLAGS (such as to build both debugging and
@@ -135,7 +135,7 @@ dnl See if the GCC compiler we found works.
 AC_DEFUN([CYG_AC_PROG_GCC_WORKS],
 [AC_MSG_CHECKING([whether the Gcc compiler ($CC $CFLAGS $LDFLAGS) actually works])
 AC_LANG_SAVE
-AC_LANG_C
+AC_LANG([C])
 dnl Try a test case. We only compile, because it's close to impossible
 dnl to get a correct fully linked executable with a cross
 dnl compiler. For most cross compilers, this test is bogus. For G++,
@@ -155,14 +155,14 @@ libgccpath=`${CC} --print-libgcc`
 
 dnl If we don't have a path with libgcc.a on the end, this isn't G++.
 if test `echo $libgccpath | sed -e 's:/.*/::'` = libgcc.a ; then
-   ac_cv_prog_gcc=yes
+   ac_cv_c_compiler_gnu=yes
 else
-   ac_cv_prog_gcc=no
+   ac_cv_c_compiler_gnu=no
 fi
 
 dnl If we are using Gcc, look for the files that need to exist if this
 dnl compiler works.
-if test x"${ac_cv_prog_gcc}" = xyes ; then
+if test x"${ac_cv_c_compiler_gnu}" = xyes ; then
     gccfiles=`echo $libgccpath | sed -e 's:/libgcc.a::'`
     if test -f ${gccfiles}/specs -a -f ${gccfiles}/cpp -a -f ${gccfiles}/cc1plus; then
 	gccfiles=yes
@@ -562,21 +562,21 @@ AC_MSG_CHECKING(to see if this is a little endian host)
 AC_CACHE_VAL(ac_cv_c_little_endian, [
 ac_cv_c_little_endian=unknown
 # See if sys/param.h defines the BYTE_ORDER macro.
-AC_TRY_COMPILE([#include <sys/types.h>
-#include <sys/param.h>], [
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
+#include <sys/param.h>]], [[
 #if !BYTE_ORDER || !_BIG_ENDIAN || !_LITTLE_ENDIAN
  bogus endian macros
-#endif], [# It does; now see whether it defined to _LITTLE_ENDIAN or not.
-AC_TRY_COMPILE([#include <sys/types.h>
+#endif]])],[# It does; now see whether it defined to _LITTLE_ENDIAN or not.
+_au_m4_changequote([,])AC_TRY_COMPILE([#include <sys/types.h>
 #include <sys/param.h>], [
 #if BYTE_ORDER != _LITTLE_ENDIAN
  not big endian
 #endif], ac_cv_c_little_endian=yes, ac_cv_c_little_endian=no)
-])
+],[])
 if test ${ac_cv_c_little_endian} = unknown; then
 old_cflags=$CFLAGS
 CFLAGS=-g
-AC_TRY_RUN([
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
 main () {
   /* Are we little or big endian?  From Harbison&Steele.  */
   union
@@ -586,9 +586,7 @@ main () {
   } u;
   u.l = 1;
   exit (u.c[0] == 1);
-}],
-ac_cv_c_little_endian=no,
-ac_cv_c_little_endian=yes,[
+}]])],[ac_cv_c_little_endian=no],[ac_cv_c_little_endian=yes],[
 dnl Yes, this is ugly, and only used for a canadian cross anyway. This
 dnl is just to keep configure from stopping here.
 case "${host}" in
@@ -617,20 +615,20 @@ dnl in libgcc.a with LD.
 AC_DEFUN([CYG_AC_PATH_LIBGCC],
 [AC_MSG_CHECKING([Looking for the path to libgcc.a])
 AC_LANG_SAVE
-AC_LANG_C
+AC_LANG([C])
 
 dnl Get Gcc's full path to libgcc.a
 libgccpath=`${CC} --print-libgcc`
 
 dnl If we don't have a path with libgcc.a on the end, this isn't G++.
 if test `echo $libgccpath | sed -e 's:/.*/::'` = libgcc.a ; then
-   ac_cv_prog_gcc=yes
+   ac_cv_c_compiler_gnu=yes
 else
-   ac_cv_prog_gcc=no
+   ac_cv_c_compiler_gnu=no
 fi
 
 dnl 
-if test x"${ac_cv_prog_gcc}" = xyes ; then
+if test x"${ac_cv_c_compiler_gnu}" = xyes ; then
    gccpath=`echo $libgccpath | sed -e 's:/libgcc.a::'`
    LIBGCC="-L${gccpath}"
    AC_MSG_RESULT(${gccpath})

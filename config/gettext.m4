@@ -127,7 +127,7 @@ AC_DEFUN([AM_GNU_GETTEXT],
         define([gt_cv_func_gnugettext_libintl], [gt_cv_func_gnugettext]gt_api_version[_libintl])
 
         AC_CACHE_CHECK([for GNU gettext in libc], gt_cv_func_gnugettext_libc,
-         [AC_TRY_LINK([#include <libintl.h>
+         [AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <libintl.h>
 #ifndef __GNU_GETTEXT_SUPPORTED_REVISION
 extern int _nl_msg_cat_cntr;
 extern int *_nl_domain_bindings;
@@ -135,18 +135,15 @@ extern int *_nl_domain_bindings;
 #else
 #define __GNU_GETTEXT_SYMBOL_EXPRESSION 0
 #endif
-]ifelse([$2], [need-formatstring-macros],
-[#ifndef __GNU_GETTEXT_SUPPORTED_REVISION
+ifelse($2, need-formatstring-macros,
+#ifndef __GNU_GETTEXT_SUPPORTED_REVISION
 #define __GNU_GETTEXT_SUPPORTED_REVISION(major) ((major) == 0 ? 0 : -1)
 #endif
 changequote(,)dnl
 typedef int array [2 * (__GNU_GETTEXT_SUPPORTED_REVISION(0) >= 1) - 1];
 changequote([,])dnl
-], []),
-            [bindtextdomain ("", "");
-return (int) gettext ("")]ifelse([$2], [need-ngettext], [ + (int) ngettext ("", "", 0)], [])[ + __GNU_GETTEXT_SYMBOL_EXPRESSION],
-            gt_cv_func_gnugettext_libc=yes,
-            gt_cv_func_gnugettext_libc=no)])
+, )]], [[bindtextdomain ("", "");
+return (int) gettext ("")ifelse($2, need-ngettext,  + (int) ngettext ("", "", 0), ) + __GNU_GETTEXT_SYMBOL_EXPRESSION]])],[gt_cv_func_gnugettext_libc=yes],[gt_cv_func_gnugettext_libc=no])])
 
         if test "$gt_cv_func_gnugettext_libc" != "yes"; then
           dnl Sometimes libintl requires libiconv, so first search for libiconv.
@@ -165,7 +162,7 @@ return (int) gettext ("")]ifelse([$2], [need-ngettext], [ + (int) ngettext ("", 
             gt_save_LIBS="$LIBS"
             LIBS="$LIBS $LIBINTL"
             dnl Now see whether libintl exists and does not depend on libiconv.
-            AC_TRY_LINK([#include <libintl.h>
+            AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <libintl.h>
 #ifndef __GNU_GETTEXT_SUPPORTED_REVISION
 extern int _nl_msg_cat_cntr;
 extern
@@ -177,22 +174,19 @@ const char *_nl_expand_alias ();
 #else
 #define __GNU_GETTEXT_SYMBOL_EXPRESSION 0
 #endif
-]ifelse([$2], [need-formatstring-macros],
-[#ifndef __GNU_GETTEXT_SUPPORTED_REVISION
+ifelse($2, need-formatstring-macros,
+#ifndef __GNU_GETTEXT_SUPPORTED_REVISION
 #define __GNU_GETTEXT_SUPPORTED_REVISION(major) ((major) == 0 ? 0 : -1)
 #endif
 changequote(,)dnl
 typedef int array [2 * (__GNU_GETTEXT_SUPPORTED_REVISION(0) >= 1) - 1];
 changequote([,])dnl
-], []),
-              [bindtextdomain ("", "");
-return (int) gettext ("")]ifelse([$2], [need-ngettext], [ + (int) ngettext ("", "", 0)], [])[ + __GNU_GETTEXT_SYMBOL_EXPRESSION],
-              gt_cv_func_gnugettext_libintl=yes,
-              gt_cv_func_gnugettext_libintl=no)
+, )]], [[bindtextdomain ("", "");
+return (int) gettext ("")ifelse($2, need-ngettext,  + (int) ngettext ("", "", 0), ) + __GNU_GETTEXT_SYMBOL_EXPRESSION]])],[gt_cv_func_gnugettext_libintl=yes],[gt_cv_func_gnugettext_libintl=no])
             dnl Now see whether libintl exists and depends on libiconv.
             if test "$gt_cv_func_gnugettext_libintl" != yes && test -n "$LIBICONV"; then
               LIBS="$LIBS $LIBICONV"
-              AC_TRY_LINK([#include <libintl.h>
+              AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <libintl.h>
 #ifndef __GNU_GETTEXT_SUPPORTED_REVISION
 extern int _nl_msg_cat_cntr;
 extern
@@ -204,20 +198,18 @@ const char *_nl_expand_alias ();
 #else
 #define __GNU_GETTEXT_SYMBOL_EXPRESSION 0
 #endif
-]ifelse([$2], [need-formatstring-macros],
-[#ifndef __GNU_GETTEXT_SUPPORTED_REVISION
+ifelse($2, need-formatstring-macros,
+#ifndef __GNU_GETTEXT_SUPPORTED_REVISION
 #define __GNU_GETTEXT_SUPPORTED_REVISION(major) ((major) == 0 ? 0 : -1)
 #endif
 changequote(,)dnl
 typedef int array [2 * (__GNU_GETTEXT_SUPPORTED_REVISION(0) >= 1) - 1];
 changequote([,])dnl
-], []),
-                [bindtextdomain ("", "");
-return (int) gettext ("")]ifelse([$2], [need-ngettext], [ + (int) ngettext ("", "", 0)], [])[ + __GNU_GETTEXT_SYMBOL_EXPRESSION],
-               [LIBINTL="$LIBINTL $LIBICONV"
+, )]], [[bindtextdomain ("", "");
+return (int) gettext ("")ifelse($2, need-ngettext,  + (int) ngettext ("", "", 0), ) + __GNU_GETTEXT_SYMBOL_EXPRESSION]])],[LIBINTL="$LIBINTL $LIBICONV"
                 LTLIBINTL="$LTLIBINTL $LTLIBICONV"
                 gt_cv_func_gnugettext_libintl=yes
-               ])
+               ],[])
             fi
             CPPFLAGS="$gt_save_CPPFLAGS"
             LIBS="$gt_save_LIBS"])
@@ -369,8 +361,8 @@ AC_DEFUN([AM_INTL_SUBDIR],
   AC_REQUIRE([AC_PROG_CC])dnl
   AC_REQUIRE([AC_CANONICAL_HOST])dnl
   AC_REQUIRE([AC_PROG_RANLIB])dnl
-  AC_REQUIRE([AC_ISC_POSIX])dnl
-  AC_REQUIRE([AC_HEADER_STDC])dnl
+  AC_REQUIRE([AC_CHECK_INCLUDES_DEFAULT])dnl
+  AC_REQUIRE([AC_PROG_EGREP])dnl
   AC_REQUIRE([AC_C_CONST])dnl
   AC_REQUIRE([AC_C_INLINE])dnl
   AC_REQUIRE([AC_TYPE_OFF_T])dnl

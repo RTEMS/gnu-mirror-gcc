@@ -121,27 +121,22 @@ cet_save_LDFLAGS="$LDFLAGS"
 LDFLAGS="$LDFLAGS -Wl,-z,ibt,-z,shstk"
 if test x$may_have_cet = xyes; then
   # Check whether -fcf-protection=none -Wl,-z,ibt,-z,shstk work.
-  AC_TRY_LINK(
-    [],[return 0;],
-    [may_have_cet=yes],
-    [may_have_cet=no])
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[]], [[return 0;]])],[may_have_cet=yes],[may_have_cet=no])
 fi
 
 if test x$may_have_cet = xyes; then
   if test x$cross_compiling = xno; then
-    AC_TRY_RUN([
+    AC_RUN_IFELSE([AC_LANG_SOURCE([[
 int
 main ()
 {
   asm ("endbr32");
   return 0;
 }
-    ],
-    [have_multi_byte_nop=yes],
-    [have_multi_byte_nop=no])
+    ]])],[have_multi_byte_nop=yes],[have_multi_byte_nop=no],[])
     have_cet=no
     if test x$have_multi_byte_nop = xyes; then
-      AC_TRY_RUN([
+      AC_RUN_IFELSE([AC_LANG_SOURCE([[
 static void
 foo (void)
 {
@@ -167,9 +162,7 @@ main ()
   bar ();
   return 0;
 }
-      ],
-      [have_cet=no],
-      [have_cet=yes])
+      ]])],[have_cet=no],[have_cet=yes],[])
     fi
     if test x$enable_cet = xno -a x$have_cet = xyes; then
       AC_MSG_ERROR([Intel CET must be enabled on Intel CET enabled host])

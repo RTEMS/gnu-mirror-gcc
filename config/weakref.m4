@@ -5,9 +5,7 @@ AC_DEFUN([GCC_CHECK_ATTRIBUTE_WEAK], [
 		 ac_cv_have_attribute_weak, [
   weakref_m4_saved_CFLAGS="$CFLAGS"
   CFLAGS="$CFLAGS -Werror"
-  AC_TRY_COMPILE([void __attribute__((weak)) foo(void) { }],
-		 [], ac_cv_have_attribute_weak=yes,
-		 ac_cv_have_attribute_weak=no)
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[void __attribute__((weak)) foo(void) { }]], [[]])],[ac_cv_have_attribute_weak=yes],[ac_cv_have_attribute_weak=no])
   CFLAGS="$weakref_m4_saved_CFLAGS"])
   if test x"$ac_cv_have_attribute_weak" = xyes; then
     AC_DEFINE(HAVE_ATTRIBUTE_WEAK, 1,
