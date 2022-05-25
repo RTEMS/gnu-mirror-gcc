@@ -1,10 +1,11 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_INIT(cpplib, [ ], gcc-bugs@gcc.gnu.org, cpplib)
+AC_PREREQ([2.69])
+AC_INIT([cpplib],[ ],[gcc-bugs@gcc.gnu.org],[cpplib])
 AC_CONFIG_SRCDIR(ucnid.h)
 AC_CONFIG_MACRO_DIR(../config)
-AC_CANONICAL_SYSTEM
+AC_CANONICAL_TARGET
 
 # Checks for programs.
 AC_PROG_MAKE_SET
@@ -30,7 +31,7 @@ AC_SUBST([ETAGS])
 # Figure out what compiler warnings we can enable.
 # See config/warnings.m4 for details.
 
-ACX_PROG_CC_WARNING_OPTS([-W -Wall -Wno-narrowing -Wwrite-strings \
+ACX_PROG_CC_WARNING_OPTS([-Wall -Wextra -Wno-narrowing -Wwrite-strings \
 			  -Wmissing-format-attribute], [warn])
 ACX_PROG_CC_WARNING_OPTS([-Wstrict-prototypes -Wmissing-prototypes \
 			  -Wold-style-definition -Wc++-compat], [c_warn])
@@ -54,10 +55,11 @@ ZW_PROG_COMPILER_DEPENDENCIES([CXX])
 
 # Checks for header files.
 AC_HEADER_TIME
+AC_HEADER_STDBOOL
 ACX_HEADER_STRING
 
-AC_CHECK_HEADERS(locale.h fcntl.h limits.h stddef.h \
-	stdlib.h strings.h string.h sys/file.h unistd.h)
+AC_CHECK_HEADERS([locale.h fcntl.h langinfo.h libintl.h limits.h stddef.h \
+	stdlib.h strings.h string.h sys/file.h sys/time.h unistd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_BIGENDIAN
@@ -69,6 +71,8 @@ AC_TYPE_SIZE_T
 AC_TYPE_SSIZE_T
 AC_TYPE_UINTPTR_T
 AC_CHECK_TYPE(ptrdiff_t, int)
+AC_TYPE_UINT8_T
+AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 if test x"$ac_cv_c_uint64_t" = x"no"; then
   AC_MSG_ERROR([uint64_t not found])
@@ -92,12 +96,10 @@ AM_LANGINFO_CODESET
 ZW_GNU_GETTEXT_SISTER_DIR
 
 AC_CACHE_CHECK(for uchar, gcc_cv_type_uchar,
-[AC_TRY_COMPILE([
+[AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <sys/types.h>
-],
-[if ((uchar *)0) return 0;
- if (sizeof(uchar)) return 0;],
-ac_cv_type_uchar=yes, ac_cv_type_uchar=no)])
+]], [[if ((uchar *)0) return 0;
+ if (sizeof(uchar)) return 0;]])],[ac_cv_type_uchar=yes],[ac_cv_type_uchar=no])])
 if test $ac_cv_type_uchar = yes; then
   AC_DEFINE(HAVE_UCHAR, 1,
   [Define if <sys/types.h> defines \`uchar'.])
@@ -203,9 +205,8 @@ fi
 
 case $target in
   i?86-* | x86_64-*)
-    AC_TRY_COMPILE([], [asm ("pcmpestri %0, %%xmm0, %%xmm1" : : "i"(0))],
-      [AC_DEFINE([HAVE_SSE4], [1],
-		 [Define to 1 if you can assemble SSE4 insns.])])
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[asm ("pcmpestri %0, %%xmm0, %%xmm1" : : "i"(0))]])],[AC_DEFINE([HAVE_SSE4], [1],
+		 [Define to 1 if you can assemble SSE4 insns.])],[])
 esac
 
 # Enable --enable-host-shared.

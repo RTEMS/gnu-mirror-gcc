@@ -19,7 +19,8 @@
 # along with GCC; see the file COPYING3.  If not see
 # <http://www.gnu.org/licenses/>.
 
-AC_INIT(libdecnumber, [ ], gcc-bugs@gcc.gnu.org, libdecnumber)
+AC_PREREQ([2.69])
+AC_INIT([libdecnumber],[ ],[gcc-bugs@gcc.gnu.org],[libdecnumber])
 AC_CONFIG_SRCDIR(decNumber.h)
 AC_CONFIG_MACRO_DIR(../config)
 AC_CONFIG_AUX_DIR(..)
@@ -27,6 +28,7 @@ AC_CONFIG_AUX_DIR(..)
 # Checks for programs.
 AC_PROG_MAKE_SET
 AC_PROG_CC
+AC_PROG_INSTALL
 AC_PROG_RANLIB
 AC_CHECK_TOOL(AR, ar)
 
@@ -38,7 +40,7 @@ AC_CHECK_PROGS([AUTOHEADER], [autoheader], [$MISSING autoheader])
 # Figure out what compiler warnings we can enable.
 # See config/warnings.m4 for details.
 
-ACX_PROG_CC_WARNING_OPTS([-W -Wall -Wwrite-strings -Wstrict-prototypes \
+ACX_PROG_CC_WARNING_OPTS([-Wall -Wextra -Wwrite-strings -Wstrict-prototypes \
 			  -Wmissing-prototypes -Wold-style-definition \
 			  -Wmissing-format-attribute -Wcast-qual])
 ACX_PROG_CC_WARNING_ALMOST_PEDANTIC([-Wno-long-long])
@@ -50,17 +52,25 @@ ACX_PROG_CC_WARNING_OPTS([-fno-lto], [nolto_flags])
 ACX_PROG_CC_WARNINGS_ARE_ERRORS([manual])
 
 # Checks for header files.
-AC_CHECK_HEADERS(ctype.h stddef.h string.h stdio.h)
+AC_CHECK_HEADERS([ctype.h fenv.h stddef.h string.h stdio.h])
 GCC_HEADER_STDINT(gstdint.h)
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
+AC_TYPE_INT32_T
 AC_TYPE_OFF_T
+AC_TYPE_SIZE_T
+AC_TYPE_UINT8_T
+AC_TYPE_UINT16_T
+AC_TYPE_UINT32_T
+AC_TYPE_UINT64_T
 AC_CHECK_SIZEOF(int)
 AC_CHECK_SIZEOF(long)
 
 # Checks for library functions.
 AC_HEADER_STDC
+AC_FUNC_MALLOC
+AC_CHECK_FUNCS([memset])
 
 AC_ARG_ENABLE(maintainer-mode,
 [  --enable-maintainer-mode enable rules only needed by maintainers],,
