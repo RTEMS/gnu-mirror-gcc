@@ -2723,7 +2723,6 @@ test -n "$target_alias" &&
   test "$program_prefix$program_suffix$program_transform_name" = \
     NONENONEs,x,x, &&
   program_prefix=${target_alias}-
-
 target_alias=${target_alias-$host_alias}
 
 # Expand $ac_aux_dir to an absolute path.
@@ -11511,7 +11510,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 11514 "configure"
+#line 11513 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -11617,7 +11616,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 11620 "configure"
+#line 11619 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -12250,7 +12249,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 WARN_FLAGS=
 save_CFLAGS="$CFLAGS"
-for real_option in -W -Wall -Wwrite-strings -Wstrict-prototypes \
+for real_option in -Wall -Wextra -Wwrite-strings -Wstrict-prototypes \
 			  -Wmissing-prototypes -Wold-style-definition \
 			  -Wmissing-format-attribute -Wcast-qual; do
   # Do the check with the no- prefix removed since gcc silently

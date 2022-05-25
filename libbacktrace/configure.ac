@@ -29,7 +29,7 @@
 # IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-AC_INIT(package-unused, version-unused,, libbacktrace)
+AC_INIT([package-unused],[version-unused],[],[libbacktrace])
 AC_CONFIG_SRCDIR(backtrace.h)
 AC_CONFIG_HEADER(config.h)
 
@@ -37,7 +37,7 @@ if test -n "${with_target_subdir}"; then
   AM_ENABLE_MULTILIB(, ..)
 fi
 
-AC_CANONICAL_SYSTEM
+AC_CANONICAL_TARGET
 target_alias=${target_alias-$host_alias}
 
 AC_USE_SYSTEM_EXTENSIONS
@@ -140,7 +140,7 @@ if test -n "${with_target_subdir}"; then
 fi
 AC_SUBST(EXTRA_FLAGS)
 
-ACX_PROG_CC_WARNING_OPTS([-W -Wall -Wwrite-strings -Wstrict-prototypes \
+ACX_PROG_CC_WARNING_OPTS([-Wall -Wextra -Wwrite-strings -Wstrict-prototypes \
 			  -Wmissing-prototypes -Wold-style-definition \
 			  -Wmissing-format-attribute -Wcast-qual],
 			  [WARN_FLAGS])

@@ -16,11 +16,11 @@ dnl You should have received a copy of the GNU General Public License
 dnl along with GCC; see the file COPYING3.  If not see
 dnl <http://www.gnu.org/licenses/>.
 
-AC_INIT([libcc1], [version-unused])
+AC_INIT([libcc1],[version-unused])
 AC_CONFIG_SRCDIR([libcc1.cc])
 AC_CONFIG_HEADER(cc1plugin-config.h)
 
-AC_CANONICAL_SYSTEM
+AC_CANONICAL_TARGET
 AC_USE_SYSTEM_EXTENSIONS
 # Determine the noncanonical target name, for directory use.
 ACX_NONCANONICAL_TARGET
@@ -62,7 +62,7 @@ fi
 AC_SUBST(gcc_version)
 AC_SUBST([CONFIG_STATUS_DEPENDENCIES], ['$(top_srcdir)/../gcc/BASE-VER'])
 
-ACX_PROG_CC_WARNING_OPTS([-W -Wall], [WARN_FLAGS])
+ACX_PROG_CC_WARNING_OPTS([-Wall -Wextra], [WARN_FLAGS])
 AC_SUBST(WARN_FLAGS)
 ACX_PROG_CC_WARNINGS_ARE_ERRORS([manual])
 
