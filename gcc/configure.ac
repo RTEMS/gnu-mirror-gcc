@@ -572,7 +572,7 @@ AC_ARG_ENABLE(build-format-warnings,
 AS_IF([test $enable_build_format_warnings = no],
       [wf_opt=-Wno-format],[wf_opt=])
 ACX_PROG_CXX_WARNING_OPTS(
-	m4_quote(m4_do([-Wall -Wextra -Wnarrowing -Wwrite-strings ],
+	m4_quote(m4_do([-Wall -Wextra -Wno-narrowing -Wwrite-strings ],
 		       [-Wcast-qual $wf_opt])),
 		       [loose_warn])
 ACX_PROG_CC_WARNING_OPTS(
@@ -584,7 +584,7 @@ ACX_PROG_CXX_WARNING_OPTS(
 ACX_PROG_CC_WARNING_OPTS(
 	m4_quote(m4_do([-Wold-style-definition -Wc++-compat])), [c_strict_warn])
 ACX_PROG_CXX_WARNING_ALMOST_PEDANTIC(
-	m4_quote(m4_do([-Wno-long-long -Wno-variadic-macros ], 
+	m4_quote(m4_do([-Wno-long-long -Wno-variadic-macros -Wno-mismatched-tags ], 
 		       [-Woverlength-strings])), [strict_warn])
 ACX_PROG_CXX_WARNINGS_ARE_ERRORS([manual], [strict_warn])
 
