@@ -24,14 +24,15 @@
 sinclude(../config/acx.m4)
 sinclude(../config/ax_lib_socket_nsl.m4)
 
-AC_INIT(c++tools)
+AC_INIT
+AC_CONFIG_SRCDIR([c++tools])
 
 AC_CONFIG_SRCDIR([server.cc])
 
 # Determine the noncanonical names used for directories.
 ACX_NONCANONICAL_TARGET
 
-AC_CANONICAL_SYSTEM
+AC_CANONICAL_TARGET
 AC_PROG_INSTALL
 test -z "$INSTALL_PROGRAM" && INSTALL_PROGRAM='${INSTALL}'
 AC_SUBST(INSTALL_PROGRAM)

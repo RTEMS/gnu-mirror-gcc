@@ -1,9 +1,9 @@
 
-AC_INIT(fixincludes, [ ])
+AC_INIT([fixincludes],[ ])
 AC_CONFIG_SRCDIR(inclhack.def)
 AC_CONFIG_AUX_DIR(..)
 m4_sinclude(../libtool.m4)
-AC_CANONICAL_SYSTEM
+AC_CANONICAL_TARGET
 AC_PROG_CC
 AC_USE_SYSTEM_EXTENSIONS
 AC_PROG_SED
@@ -11,9 +11,9 @@ AC_PROG_SED
 # Figure out what compiler warnings we can enable.
 # See config/warnings.m4 for details.
 
-ACX_PROG_CC_WARNING_OPTS([-W -Wall -Wwrite-strings -Wstrict-prototypes \
+ACX_PROG_CC_WARNING_OPTS([-Wall -Wextra -Wwrite-strings -Wstrict-prototypes \
 			  -Wmissing-prototypes -Wold-style-definition \
-			  -Wmissing-format-attribute -Wno-overlength-strings])
+			  -Wmissing-format-attribute])
 ACX_PROG_CC_WARNING_ALMOST_PEDANTIC([-Wno-long-long])
 
 # Only enable with --enable-werror-always until existing warnings are
