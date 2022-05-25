@@ -7957,6 +7957,17 @@ _ACEOF
 # Check whether --enable-fixed-point was given.
 if test "${enable_fixed_point+set}" = set; then :
   enableval=$enable_fixed_point;
+  case $target in
+    arm*-*-* | mips*-*-* | loongarch*-*-*)
+      # (enable_fixed_point already gets set to "yes" by the flag being passed)
+      ;;
+    *)
+      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: fixed-point is not supported for this target, ignoring the --enable-fixed-point flag" >&5
+$as_echo "$as_me: WARNING: fixed-point is not supported for this target, ignoring the --enable-fixed-point flag" >&2;}
+      enable_fixed_point=no
+      ;;
+  esac
+
 else
 
   case $target in
@@ -7971,8 +7982,8 @@ else
       enable_fixed_point=yes
       ;;
     *)
-      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: fixed-point is not supported for this target, ignored" >&5
-$as_echo "$as_me: WARNING: fixed-point is not supported for this target, ignored" >&2;}
+      # (no need to warn in this case, because no flag was given, so nothing was
+      # ignored)
       enable_fixed_point=no
       ;;
   esac
@@ -19674,7 +19685,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 19676 "configure"
+#line 19688 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -19780,7 +19791,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 19782 "configure"
+#line 19794 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -33860,5 +33871,4 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: unrecognized options: $ac_unrecognized_opts" >&5
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
-
 

@@ -941,7 +941,17 @@ point format instead of DPD])
 AC_ARG_ENABLE(fixed-point,
 [AS_HELP_STRING([--enable-fixed-point],
 		[enable fixed-point arithmetic extension to C])],
-[],
+[
+  case $target in
+    arm*-*-* | mips*-*-* | loongarch*-*-*)
+      # (enable_fixed_point already gets set to "yes" by the flag being passed)
+      ;;
+    *)
+      AC_MSG_WARN([fixed-point is not supported for this target, ignoring the --enable-fixed-point flag])
+      enable_fixed_point=no
+      ;;
+  esac
+],
 [
   case $target in
     arm*)
@@ -955,7 +965,8 @@ AC_ARG_ENABLE(fixed-point,
       enable_fixed_point=yes
       ;;
     *)
-      AC_MSG_WARN([fixed-point is not supported for this target, ignored])
+      # (no need to warn in this case, because no flag was given, so nothing was
+      # ignored)
       enable_fixed_point=no
       ;;
   esac
@@ -7701,4 +7712,3 @@ done
 ], 
 [subdirs='$subdirs'])
 AC_OUTPUT
-

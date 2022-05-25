@@ -7983,12 +7983,19 @@ fi
 if test "x$with_mpc" != x; then
   gmplibs="-L$with_mpc/lib $gmplibs"
   gmpinc="-I$with_mpc/include $gmpinc"
+elif test "x${prefix}" != "x" && test -d "${prefix}"; then
+  gmplibs="-L${prefix}/lib $gmplibs"
+  gmpinc="-I${prefix}/include $gmpinc"
 fi
 if test "x$with_mpc_include" != x; then
   gmpinc="-I$with_mpc_include $gmpinc"
+elif test "x${prefix}" != "x" && test -d "${prefix}/include"; then
+  gmpinc="-I${prefix}/include $gmpinc"
 fi
 if test "x$with_mpc_lib" != x; then
   gmplibs="-L$with_mpc_lib $gmplibs"
+elif test "x${prefix}" != "x" && test -d "${prefix}/lib"; then
+  gmplibs="-L${prefix}/lib $gmplibs"
 fi
 if test "x$with_mpc$with_mpc_include$with_mpc_lib" = x && test -d ${srcdir}/mpc; then
   gmplibs='-L$$r/$(HOST_SUBDIR)/mpc/src/'"$lt_cv_objdir $gmplibs"
@@ -8024,12 +8031,19 @@ fi
 if test "x$with_mpfr" != x; then
   gmplibs="-L$with_mpfr/lib $gmplibs"
   gmpinc="-I$with_mpfr/include $gmpinc"
+elif test "x${prefix}" != "x" && test -d "${prefix}"; then
+  gmplibs="-L${prefix}/lib $gmplibs"
+  gmpinc="-I${prefix}/include $gmpinc"
 fi
 if test "x$with_mpfr_include" != x; then
   gmpinc="-I$with_mpfr_include $gmpinc"
+elif test "x${prefix}" != "x" && test -d "${prefix}/include"; then
+  gmpinc="-I${prefix}/include $gmpinc"
 fi
 if test "x$with_mpfr_lib" != x; then
   gmplibs="-L$with_mpfr_lib $gmplibs"
+elif test "x${prefix}" != "x" && test -d "${prefix}/lib"; then
+  gmplibs="-L${prefix}/lib $gmplibs"
 fi
 if test "x$with_mpfr$with_mpfr_include$with_mpfr_lib" = x && test -d ${srcdir}/mpfr; then
   # MPFR v3.1.0 moved the sources into a src sub-directory.
@@ -8070,12 +8084,19 @@ fi
 if test "x$with_gmp" != x; then
   gmplibs="-L$with_gmp/lib $gmplibs"
   gmpinc="-I$with_gmp/include $gmpinc"
+elif test "x${prefix}" != "x" && test -d "${prefix}"; then
+  gmplibs="-L${prefix}/lib $gmplibs"
+  gmpinc="-I${prefix}/include $gmpinc"
 fi
 if test "x$with_gmp_include" != x; then
   gmpinc="-I$with_gmp_include $gmpinc"
+elif test "x${prefix}" != "x" && test -d "${prefix}/include"; then
+  gmpinc="-I${prefix}/include $gmpinc"
 fi
 if test "x$with_gmp_lib" != x; then
   gmplibs="-L$with_gmp_lib $gmplibs"
+elif test "x${prefix}" != "x" && test -d "${prefix}/lib"; then
+  gmplibs="-L${prefix}/lib $gmplibs"
 fi
 if test "x$with_gmp$with_gmp_include$with_gmp_lib" = x && test -d ${srcdir}/gmp; then
   gmplibs='-L$$r/$(HOST_SUBDIR)/gmp/'"$lt_cv_objdir $gmplibs"
