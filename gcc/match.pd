@@ -6571,3 +6571,15 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
    to the number of trailing zeroes.  */
 (match (ctz_table_index @1 @2 @3)
   (rshift (mult (bit_and:c (negate @1) @1) INTEGER_CST@2) INTEGER_CST@3))
+
+#if GIMPLE
+
+/* (non-cap) RAV (c, cv) -> (non-cap) cv.  */
+(simplify
+  (convert
+    (IFN_REPLACE_ADDRESS_VALUE @0 @1))
+  (if (INTEGRAL_TYPE_P (type)
+       && TYPE_PRECISION (type) <= TYPE_PRECISION (TREE_TYPE (@1)))
+   (convert @1)))
+
+#endif

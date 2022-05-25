@@ -4613,10 +4613,16 @@ narrowing_initializer_constant_valid_p (tree value, tree endtype, tree *cache)
    cleared metadata).
 
    That should ensure we don't start handling capabilities with non-zero
-   metadata without knowing why & where it comes from.  */
+   metadata without knowing why & where it comes from.
+
+   Returns NULL_TREE if T cannot be a valid base capability for an
+   initializer constant.  */
 inline const_tree
 tree_innermost_capability (const_tree t)
 {
+  if (TREE_SIDE_EFFECTS (t))
+    return NULL_TREE;
+
   switch (TREE_CODE (t))
     {
     case INTEGER_CST:
@@ -4666,6 +4672,8 @@ initializer_constant_valid_p_1 (tree value, tree endtype, tree *cache)
 	  break;
 
 	const_tree base_cap = tree_innermost_capability (ptr);
+	if (!base_cap)
+	  break;
 
 	tree ptr_ret = initializer_constant_valid_p_1 (ptr, endtype, cache);
 	tree addrval_ret = initializer_constant_valid_p_1

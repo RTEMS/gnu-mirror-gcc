@@ -5183,6 +5183,111 @@ finish_label_address_expr (tree label, location_t loc)
 }
 
 
+/* Given operands OP0 and OP1 for a binary operation given by CODE,
+   return an operand of INTCAP_TYPE (if any) from which provenance
+   should be derived for the binary expression.
+
+   WARN_P should be set if we should warn when the provenance
+   is ambiguous.  LOC is the location that will be used for the warning.  */
+tree
+binary_op_get_intcap_provenance (location_t loc,
+				 enum tree_code code,
+				 tree op0, tree op1,
+				 bool warn_p)
+{
+  tree type0 = TREE_TYPE (op0);
+  tree type1 = TREE_TYPE (op1);
+  bool ic0 = INTCAP_TYPE_P (type0);
+  bool ic1 = INTCAP_TYPE_P (type1);
+
+  if (!ic0 && !ic1)
+    return NULL_TREE;
+
+  /* Comparisons don't return capabilities.  */
+  if (TREE_CODE_CLASS (code) == tcc_comparison)
+    return NULL_TREE;
+
+  bool shift = false;
+
+  switch (code)
+    {
+    case TRUTH_ANDIF_EXPR:
+    case TRUTH_ORIF_EXPR:
+    case TRUTH_AND_EXPR:
+    case TRUTH_OR_EXPR:
+    case TRUTH_XOR_EXPR:
+      return NULL_TREE;
+    case RSHIFT_EXPR:
+    case LSHIFT_EXPR:
+      shift = true;
+      break;
+    default:
+      break;
+    }
+
+  bool need_ic0 = ic0 && (ic1 || INTEGRAL_TYPE_P (type1));
+  bool need_ic1 = ic1 && !shift && (ic0 || INTEGRAL_TYPE_P (type0));
+
+  if (!need_ic0 && !need_ic1)
+    return NULL_TREE;
+
+  static const char *cnp = "cheri_no_provenance";
+  bool prov0 = need_ic0 && !lookup_attribute (cnp, TYPE_ATTRIBUTES (type0));
+  bool prov1 = need_ic1 && !lookup_attribute (cnp, TYPE_ATTRIBUTES (type1));
+
+  if (prov0 && prov1 && warn_p)
+    {
+      warning_at (loc, OPT_Wcheri_provenance,
+	"binary expression on capability types %qT and %qT; "
+	"it is not clear which should be used as the source of provenance; "
+	"currently provenance is inherited from the left-hand side",
+	type0, type1);
+    }
+
+  if (prov0)
+    return op0;
+  if (prov1)
+    return op1;
+
+  /* MORELLO TODO: right now we don't propagate cheri_no_provenance
+     attributes, since this is what LLVM does, but it's actually
+     probably better to propagate these and avoid warning in cases where
+     the provenance is unambiguous (e.g. when all the operands of a
+     subexpression have cheri_no_provenance attributes).  */
+  tree type;
+  if (need_ic0 && need_ic1)
+    type = common_type (type0, type1);
+  else
+    {
+      type = need_ic0 ? type0 : type1;
+      tree attrs = remove_attribute (cnp, TYPE_ATTRIBUTES (type));
+      type = build_type_attribute_variant (type, attrs);
+    }
+
+  return build_int_cst (type, 0);
+}
+
+tree
+unary_op_get_intcap_provenance (tree c)
+{
+  /* MORELLO TODO: right now we don't propagate cheri_no_provenance
+     attributes, since this is what LLVM does, but it's actually
+     probably better to propagate these and avoid warning in cases where
+     the provenance is unambiguous (e.g. when all the operands of a
+     subexpression have cheri_no_provenance attributes).  */
+  tree type = TREE_TYPE (c);
+  tree attrs = TYPE_ATTRIBUTES (type);
+  static const char *cnp = "cheri_no_provenance";
+  if (lookup_attribute (cnp, attrs))
+    {
+      attrs = remove_attribute (cnp, attrs);
+      type = build_type_attribute_variant (type, attrs);
+      return build_int_cst (type, 0);
+    }
+
+  return c;
+}
+
 /* Given a boolean expression ARG, return a tree representing an increment
    or decrement (as indicated by CODE) of ARG.  The front end must check for
    invalid cases (e.g., decrement in C++).  */

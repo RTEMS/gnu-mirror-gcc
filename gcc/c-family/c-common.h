@@ -1013,6 +1013,10 @@ extern tree common_type (tree, tree);
 
 extern tree decl_constant_value (tree);
 
+extern tree binary_op_get_intcap_provenance (location_t,
+					     enum tree_code, tree, tree, bool);
+extern tree unary_op_get_intcap_provenance (tree);
+
 /* Handle increment and decrement of boolean types.  */
 extern tree boolean_increment (enum tree_code, tree);
 

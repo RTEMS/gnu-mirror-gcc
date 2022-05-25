@@ -4354,51 +4354,27 @@ cas_loop:
 }
 
 static tree
-c_build_replace_address_value_1 (location_t loc, tree c, tree cv, bool fold)
-{
-  tree type = TREE_TYPE (c);
-  tree attrs = TYPE_ATTRIBUTES (type);
-  static const char * const cnp = "cheri_no_provenance";
-  if (lookup_attribute (cnp, attrs))
-    {
-      attrs = remove_attribute (cnp, attrs);
-      type = build_type_attribute_variant (type, attrs);
-      return c_common_cap_from_noncap (type, cv);
-    }
-
-  return fold
-    ? fold_build_replace_address_value_loc (loc, c, cv)
-    : build_replace_address_value_loc (loc, c, cv);
-}
-
-static tree
-c_build_replace_address_value (location_t loc, tree c, tree cv)
-{
-  return c_build_replace_address_value_1 (loc, c, cv, false);
-}
-
-static tree
-c_fold_build_replace_address_value (location_t loc, tree c, tree cv)
-{
-  return c_build_replace_address_value_1 (loc, c, cv, true);
-}
-
-static tree
 intcap_increment (location_t loc, tree_code code, tree arg)
 {
-  tree t, cv;
+  tree t, cv, intcap, lval;
 
-  arg = stabilize_reference (arg);
+  arg = lval = stabilize_reference (arg);
+  intcap = unary_op_get_intcap_provenance (arg);
+  if (intcap == arg)
+    /* This save_expr is needed to avoid evaluating
+       the intcap twice when we compute the REPLACE_ADDRESS_VALUE.  */
+    intcap = arg = save_expr (intcap);
   cv = drop_capability (arg);
 
   int dir = (code == PREINCREMENT_EXPR || code == POSTINCREMENT_EXPR) ? 1 : -1;
   t = build_int_cst (TREE_TYPE (cv), dir);
   t = build2 (PLUS_EXPR, TREE_TYPE (cv), cv, t);
-  t = c_build_replace_address_value (loc, arg, t);
-  t = build2 (MODIFY_EXPR, TREE_TYPE (t), arg, t);
+  t = build_replace_address_value_loc (loc, intcap, t);
+  t = build2 (MODIFY_EXPR, TREE_TYPE (t), lval, t);
 
   if (code == POSTINCREMENT_EXPR || code == POSTDECREMENT_EXPR)
     {
+      /* This save_expr is needed to remember the original value.  */
       arg = save_expr (arg);
       t = build2 (COMPOUND_EXPR, TREE_TYPE (t), t, arg);
       t = build2 (COMPOUND_EXPR, TREE_TYPE (t), arg, t);
@@ -4440,6 +4416,7 @@ build_unary_op (location_t location, enum tree_code code, tree xarg,
   if (!ADDR_EXPR_CODE_P (code))
     arg = require_complete_type (location, arg);
 
+  tree intcap = NULL_TREE;
   if (TREE_CODE (TREE_TYPE (arg)) == INTCAP_TYPE)
     {
       switch (code)
@@ -4450,8 +4427,12 @@ build_unary_op (location_t location, enum tree_code code, tree xarg,
 	case POSTINCREMENT_EXPR:
 	case PREDECREMENT_EXPR:
 	case POSTDECREMENT_EXPR:
+	case TRUTH_NOT_EXPR:
 	  break;
 	default:
+	  intcap = unary_op_get_intcap_provenance (arg);
+	  if (arg == intcap)
+	    intcap = arg = save_expr (arg);
 	  arg = drop_capability (arg);
 	}
     }
@@ -4584,7 +4565,7 @@ build_unary_op (location_t location, enum tree_code code, tree xarg,
     case TRUTH_NOT_EXPR:
       if (typecode != INTEGER_TYPE && typecode != FIXED_POINT_TYPE
 	  && typecode != REAL_TYPE && typecode != POINTER_TYPE
-	  && typecode != COMPLEX_TYPE)
+	  && typecode != COMPLEX_TYPE && typecode != INTCAP_TYPE)
 	{
 	  error_at (location,
 		    "wrong type argument to unary exclamation mark");
@@ -4959,9 +4940,8 @@ build_unary_op (location_t location, enum tree_code code, tree xarg,
   else
     ret = build1 (code, argtype, arg);
 
-  if (TREE_CODE (TREE_TYPE (xarg)) == INTCAP_TYPE
-      && !capability_type_p (TREE_TYPE (ret)))
-    ret = c_fold_build_replace_address_value (location, xarg, ret);
+  if (intcap)
+    ret = fold_build_replace_address_value_loc (location, intcap, ret);
 
  return_build_unary_op:
   gcc_assert (ret != error_mark_node);
@@ -12022,6 +12002,20 @@ build_binary_op_1 (location_t location, enum tree_code code,
   orig_type0 = TREE_TYPE (op0);
   orig_type1 = TREE_TYPE (op1);
 
+  tree intcap = binary_op_get_intcap_provenance (location, code, op0, op1,
+						 !op0_provenance_p);
+
+  /* If we will derive an intcap from either the LHS or the RHS,
+     wrap it with save_expr.  This will prevent us re-evaluating
+     any side effects of the intcap which will appear twice
+     in the resulting expression.  E.g. for
+     c + cv --> REPLACE_ADDRESS_VALUE (c, (non-cap type) c + cv)
+     we need to avoid evaluating c twice.  */
+  if (intcap == op0)
+    intcap = op0 = save_expr (op0);
+  else if (intcap == op1)
+    intcap = op1 = save_expr (op1);
+
   if (TREE_CODE (orig_type0) == INTCAP_TYPE)
     op0 = drop_capability (op0);
   if (TREE_CODE (orig_type1) == INTCAP_TYPE)
@@ -13106,65 +13100,19 @@ build_binary_op_1 (location_t location, enum tree_code code,
 
 
   /* For INTCAP_TYPEs, we dropped the capabilities early on and now need
-     to work out where the provenance (if any) should come from.  */
-  if (!capability_type_p (TREE_TYPE (ret))
-      && TREE_CODE_CLASS (code) != tcc_comparison
-      && !boolean_op)
+     to derive the final intcap expression.  */
+  if (intcap)
     {
-      bool ic0 = TREE_CODE (orig_type0) == INTCAP_TYPE;
-      bool ic1 = TREE_CODE (orig_type1) == INTCAP_TYPE;
+      gcc_assert (!capability_type_p (TREE_TYPE (ret)));
+      tree ic_type = c_common_type (TREE_TYPE (intcap), TREE_TYPE (ret));
+      gcc_assert (TREE_TYPE (ret) == noncapability_type (ic_type));
+      intcap = convert (ic_type, intcap);
 
-      /* These flags are set if we need an intcap result type because of
-	 either the left or right operand respectively.  */
-      bool need_ic0 = ic0 && code1 == INTEGER_TYPE;
-      bool need_ic1 = ic1 && !doing_shift && code0 == INTEGER_TYPE;
-
-      static const char * const cnp = "cheri_no_provenance";
-      bool prov0 = need_ic0
-		   && !lookup_attribute (cnp,
-					 TYPE_ATTRIBUTES (orig_type0));
-      bool prov1 = need_ic1
-		   && !lookup_attribute (cnp,
-					 TYPE_ATTRIBUTES (orig_type1));
-
-      tree intcap = NULL;
-      if (prov0)
-	intcap = orig_op0;
-      else if (prov1)
-	intcap = orig_op1;
-      else if (need_ic0 || need_ic1)
-	{
-	  tree type;
-	  if (need_ic0 && need_ic1)
-	    type = c_common_type (orig_type0, orig_type1);
-	  else
-	    {
-	      type = need_ic0 ? orig_type0 : orig_type1;
-	      tree attrs = remove_attribute (cnp, TYPE_ATTRIBUTES (type));
-	      type = build_type_attribute_variant (type, attrs);
-	    }
-	  intcap = build_int_cst (type, 0);
-	}
-
-      if (intcap)
-	{
-	  tree ic_type = c_common_type (TREE_TYPE (intcap), TREE_TYPE (ret));
-	  gcc_assert (TREE_TYPE (ret) == noncapability_type (ic_type));
-	  intcap = convert (ic_type, intcap);
-
-	  /* We can't fold inside REPLACE_ADDRESS_VALUE calls, so ensure
-	     we've folded the operands.  */
-	  ret = c_fully_fold (ret, false, NULL);
-	  intcap = c_fully_fold (intcap, false, NULL);
-	  ret = fold_build_replace_address_value_loc (location, intcap, ret);
-	}
-
-	if (prov0 && prov1 && !op0_provenance_p)
-	  warning_at (location, OPT_Wcheri_provenance,
-	    "binary expression on capability types %qT and %qT; "
-	    "it is not clear which should be used as the source of provenance; "
-	    "currently provenance is inherited from the left-hand side",
-	    orig_type0, orig_type1);
+      /* We can't fold inside REPLACE_ADDRESS_VALUE calls, so ensure
+	 we've folded the operands.  */
+      ret = c_fully_fold (ret, false, NULL);
+      intcap = c_fully_fold (intcap, false, NULL);
+      ret = fold_build_replace_address_value_loc (location, intcap, ret);
     }
 
  return_build_binary_op:

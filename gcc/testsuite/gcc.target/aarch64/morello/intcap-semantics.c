@@ -7,43 +7,43 @@ __intcap f1(__intcap x1, long y1)
 {
   return x1 + y1;
 }
-/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(x1, \(long int\) x1 \+ y1\)} 1 "original"  } } */
+/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x1>, \(long int\) SAVE_EXPR <x1> \+ y1\)} 1 "original"  } } */
 
 __intcap f2(__intcap x2, int y2)
 {
   return x2 + y2;
 }
-/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(x2, \(long int\) x2 \+ \(long int\) y2\)} 1 "original"  } } */
+/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x2>, \(long int\) SAVE_EXPR <x2> \+ \(long int\) y2\)} 1 "original"  } } */
 
 __intcap f3(__intcap x3, short y3)
 {
   return x3 + y3;
 }
-/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(x3, \(long int\) x3 \+ \(long int\) y3\)} 1 "original"  } } */
+/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x3>, \(long int\) SAVE_EXPR <x3> \+ \(long int\) y3\)} 1 "original"  } } */
 
 __intcap f4(__intcap x4, unsigned int y4)
 {
   return x4 + y4;
 }
-/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(x4, \(long int\) x4 \+ \(long int\) y4\)} 1 "original"  } } */
+/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x4>, \(long int\) SAVE_EXPR <x4> \+ \(long int\) y4\)} 1 "original"  } } */
 
 unsigned __intcap f5(__intcap x5, unsigned long y5)
 {
   return x5 + y5;
 }
-/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(\(unsigned __intcap\) x5, \(long unsigned int\) x5 \+ y5\)} 1 "original"  } } */
+/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(\(unsigned __intcap\) SAVE_EXPR <x5>, \(long unsigned int\) SAVE_EXPR <x5> \+ y5\)} 1 "original"  } } */
 
 unsigned __intcap f6(unsigned __intcap x6, unsigned long y6)
 {
   return x6 + y6;
 }
-/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(x6, \(long unsigned int\) x6 \+ y6\)} 1 "original"  } } */
+/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x6>, \(long unsigned int\) SAVE_EXPR <x6> \+ y6\)} 1 "original"  } } */
 
 unsigned __intcap f7(unsigned __intcap x7, long y7)
 {
   return x7 + y7;
 }
-/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(x7, \(long unsigned int\) x7 \+ \(long unsigned int\) y7\)} 1 "original"  } } */
+/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x7>, \(long unsigned int\) SAVE_EXPR <x7> \+ \(long unsigned int\) y7\)} 1 "original"  } } */
 
 _Bool f8(__intcap x8, __intcap y8)
 {
@@ -85,13 +85,13 @@ __intcap f14(__intcap x14)
 {
   return -x14;
 }
-/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(x14, * -\(long int\) x14\);} 1 "original"  } } */
+/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x14>, -\(long int\) SAVE_EXPR <x14>\);} 1 "original"  } } */
 
 __intcap f15(__intcap x15)
 {
   return ~x15;
 }
-/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(x15, * ~\(long int\) x15\);} 1 "original"  } } */
+/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x15>, ~\(long int\) SAVE_EXPR <x15>\);} 1 "original"  } } */
 
 _Bool f16(__intcap x16)
 {
@@ -110,14 +110,14 @@ __intcap f18 (__intcap x18 __attribute__((cheri_no_provenance)), __intcap y18)
 {
   return x18 + y18;
 }
-/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(y18, \(long int\) x18 \+ \(long int\) y18\)} 1 "original"  } } */
+/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <y18>, \(long int\) x18 \+ \(long int\) SAVE_EXPR <y18>\)} 1 "original"  } } */
 
 __intcap f19 (__intcap x19,
 	      __intcap y19 __attribute__((cheri_no_provenance)))
 {
   return x19 + y19;
 }
-/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(x19, \(long int\) x19 \+ \(long int\) y19\)} 1 "original"  } } */
+/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x19>, \(long int\) SAVE_EXPR <x19> \+ \(long int\) y19\)} 1 "original"  } } */
 
 __intcap f20 (__intcap x20 __attribute__((cheri_no_provenance)),
 	      __intcap y20 __attribute__((cheri_no_provenance)))
@@ -168,13 +168,13 @@ __intcap x26;
 __intcap f26(void) {
     return x26++;
 }
-/* { dg-final { scan-tree-dump-times {return SAVE_EXPR <x26>;, x26 = \.REPLACE_ADDRESS_VALUE \(x26, \(long int\) x26 \+ 1\);, SAVE_EXPR <x26>;;} 1 "original"  } } */
+/* { dg-final { scan-tree-dump-times {return SAVE_EXPR <x26>;, x26 = \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x26>, \(long int\) SAVE_EXPR <x26> \+ 1\);, SAVE_EXPR <x26>;;} 1 "original"  } } */
 
 __intcap x27;
 __intcap f27(void) {
     return ++x27;
 }
-/* { dg-final { scan-tree-dump-times {return x27 = \.REPLACE_ADDRESS_VALUE \(x27, \(long int\) x27 \+ 1\);} 1 "original"  } } */
+/* { dg-final { scan-tree-dump-times {return x27 = \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x27>, \(long int\) SAVE_EXPR <x27> \+ 1\);} 1 "original"  } } */
 
 __intcap x28 __attribute__((cheri_no_provenance));
 __intcap f28(void) {
@@ -194,20 +194,20 @@ __intcap f30(__intcap x30,
 {
   return x30 + y30; /* { dg-warning "it is not clear which should be used as the source of provenance" } */
 }
-/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(x30, \(long int\) x30 \+ \(long int\) y30\)} 1 "original"  } } */
+/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x30>, \(long int\) SAVE_EXPR <x30> \+ \(long int\) y30\)} 1 "original"  } } */
 
 __intcap x31, y31;
 void f31(void)
 {
   x31 += y31;
 }
-/* { dg-final { scan-tree-dump-times {x31 = \.REPLACE_ADDRESS_VALUE \(x31, \(long int\) x31 \+ \(long int\) y31\)} 1 "original"  } } */
+/* { dg-final { scan-tree-dump-times {x31 = \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x31>, \(long int\) SAVE_EXPR <x31> \+ \(long int\) y31\)} 1 "original"  } } */
 
 __intcap f32 (__intcap x32, __intcap y32)
 {
   return x32 << y32;
 }
-/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(x32, \(long int\) x32 << \(long int\) y32\)} 1 "original"  } } */
+/* { dg-final { scan-tree-dump-times {return \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x32>, \(long int\) SAVE_EXPR <x32> << \(long int\) y32\)} 1 "original"  } } */
 
 int f33 (__intcap x33, __intcap y33)
 {
