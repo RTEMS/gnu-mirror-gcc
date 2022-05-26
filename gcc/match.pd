@@ -6582,4 +6582,10 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
        && TYPE_PRECISION (type) <= TYPE_PRECISION (TREE_TYPE (@1)))
    (convert @1)))
 
+/* RAV (RAV (c, cv1), cv2) -> RAV (c, cv2).  */
+(simplify
+  (IFN_REPLACE_ADDRESS_VALUE
+    (IFN_REPLACE_ADDRESS_VALUE @0 @1) @2)
+  (IFN_REPLACE_ADDRESS_VALUE @0 @2))
+
 #endif

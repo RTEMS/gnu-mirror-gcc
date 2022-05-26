@@ -4665,9 +4665,6 @@ initializer_constant_valid_p_1 (tree value, tree endtype, tree *cache)
 	  break;
 	tree ptr = CALL_EXPR_ARG (value, 0);
 	tree addr_value = CALL_EXPR_ARG (value, 1);
-	/* Assume VALUE has been folded as much as possible.  */
-	gcc_assert (TREE_CODE (ptr) != CALL_EXPR
-		    || CALL_EXPR_IFN (ptr) != IFN_REPLACE_ADDRESS_VALUE);
 	if (TREE_CODE (ptr) == CALL_EXPR)
 	  break;
 

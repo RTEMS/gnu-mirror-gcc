@@ -3806,6 +3806,7 @@ process_call_operands (tree t)
 {
   bool side_effects = TREE_SIDE_EFFECTS (t);
   bool read_only = false;
+  bool constant = false;
   int i = call_expr_flags (t);
 
   /* Calls have side-effects, except those to const or pure functions.  */
@@ -3815,6 +3816,10 @@ process_call_operands (tree t)
   if (i & ECF_CONST)
     read_only = true;
 
+  /* Only internal function calls can be TREE_CONSTANT.  */
+  if (!CALL_EXPR_FN (t) && (i & ECF_CONST) && (i & ECF_NOTHROW))
+    constant = true;
+
   if (!side_effects || read_only)
     for (i = 1; i < TREE_OPERAND_LENGTH (t); i++)
       {
@@ -3823,10 +3828,16 @@ process_call_operands (tree t)
 	  side_effects = true;
 	if (op && !TREE_READONLY (op) && !CONSTANT_CLASS_P (op))
 	  read_only = false;
+	if (op && !TREE_CONSTANT (op))
+	  constant = false;
       }
+
+  /* constant => !side_effects.  */
+  gcc_assert (!constant || !side_effects);
 
   TREE_SIDE_EFFECTS (t) = side_effects;
   TREE_READONLY (t) = read_only;
+  TREE_CONSTANT (t) = constant;
 }
 
 /* Return true if EXP contains a PLACEHOLDER_EXPR, i.e. if it represents a

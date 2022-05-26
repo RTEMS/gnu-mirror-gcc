@@ -394,7 +394,7 @@ DEF_INTERNAL_FN (CO_FRAME, ECF_PURE | ECF_NOTHROW | ECF_LEAF, NULL)
    actually have to be properly passed to the function (which is *not* valid)
    -- but it would be worth checking if it only means that the argument is not
    dereferenced.  */
-DEF_INTERNAL_FN (REPLACE_ADDRESS_VALUE, ECF_CONST | ECF_LEAF, ".RR")
+DEF_INTERNAL_FN (REPLACE_ADDRESS_VALUE, ECF_CONST | ECF_LEAF | ECF_NOTHROW, ".RR")
 
 DEF_INTERNAL_FN (CAP_GLOBAL_DATA_GET, ECF_CONST | ECF_LEAF | ECF_NOTHROW, NULL)
 
