@@ -14,7 +14,7 @@ sinclude(../config/gthr.m4)
 sinclude(../config/sjlj.m4)
 sinclude(../config/cet.m4)
 
-AC_INIT([GNU C Runtime Library], 1.0,,[libgcc])
+AC_INIT([GNU C Runtime Library],[1.0],[],[libgcc])
 AC_CONFIG_SRCDIR([static-object.mk])
 
 # The libgcc should not depend on any header files
@@ -22,12 +22,13 @@ AC_DEFUN([_AC_INCLUDES_DEFAULT_REQUIREMENTS],
   [m4_divert_text([DEFAULTS],
     [ac_includes_default='/* none */'])])
 
-AC_ARG_WITH(target-subdir,
-[  --with-target-subdir=SUBDIR      Configuring in a subdirectory for target])
-AC_ARG_WITH(cross-host,
-[  --with-cross-host=HOST           Configuring with a cross compiler])
-AC_ARG_WITH(ld,
-[  --with-ld               arrange to use the specified ld (full pathname)])
+AC_ARG_WITH([target-subdir],
+[AS_HELP_STRING([--with-target-subdir=SUBDIR],
+                [Configuring in a subdirectory for target])])
+AC_ARG_WITH([cross-host],
+[AS_HELP_STRING([--with-cross-host=HOST],[Configuring with a cross compiler])])
+AC_ARG_WITH([ld],
+[AS_HELP_STRING([--with-ld],[arrange to use the specified ld (full pathname)])])
 
 if test "${srcdir}" = "."; then
   if test -n "${with_build_subdir}"; then
@@ -49,8 +50,8 @@ AC_SUBST(libgcc_topdir)
 AC_CONFIG_AUX_DIR($libgcc_topdir)
 AC_CONFIG_HEADER(auto-target.h:config.in)
 
-AC_ARG_ENABLE(shared,
-[  --disable-shared        don't provide a shared libgcc],
+AC_ARG_ENABLE([shared],
+[AS_HELP_STRING([--disable-shared],[don't provide a shared libgcc])],
 [
   case $enable_shared in
   yes | no) ;;
@@ -69,7 +70,7 @@ AC_ARG_ENABLE(shared,
 AC_SUBST(enable_shared)
 
 AC_ARG_ENABLE(vtable-verify,
-[  --enable-vtable-verify    Enable vtable verification feature ],
+[AS_HELP_STRING([--enable-vtable-verify],[Enable vtable verification feature])],
 [case "$enableval" in
  yes) enable_vtable_verify=yes ;;
  no)  enable_vtable_verify=no ;;
@@ -133,7 +134,7 @@ AC_SUBST(slibdir)
 # Command-line options.
 # Very limited version of AC_MAINTAINER_MODE.
 AC_ARG_ENABLE([maintainer-mode],
-  [AC_HELP_STRING([--enable-maintainer-mode],
+  [AS_HELP_STRING([--enable-maintainer-mode],
                  [enable make rules and dependencies not useful (and
                   sometimes confusing) to the casual installer])],
   [case ${enable_maintainer_mode} in
@@ -150,7 +151,7 @@ AC_PROG_INSTALL
 AC_PROG_AWK
 # We need awk; bail out if it's missing.
 case ${AWK} in
-  "") AC_MSG_ERROR([can't build without awk, bailing out]) ;;
+  "") AC_MSG_ERROR([cannot build without awk, bailing out]) ;;
 esac
 
 AC_CANONICAL_HOST
@@ -270,7 +271,7 @@ GCC_CET_FLAGS(CET_FLAGS)
 AC_SUBST(CET_FLAGS)
 
 AC_ARG_ENABLE([explicit-exception-frame-registration],
-  [AC_HELP_STRING([--enable-explicit-exception-frame-registration],
+  [AS_HELP_STRING([--enable-explicit-exception-frame-registration],
      [register exception tables explicitly at module start, for use
       e.g. for compatibility with installations without PT_GNU_EH_FRAME support])],
 [
@@ -619,8 +620,7 @@ AC_DEFUN([LIBGCC_CHECK_AS_AVX], [
 case "${target}" in
 i[[34567]]86-*-* | x86_64-*-*)
   AC_CACHE_CHECK([if the assembler supports AVX], libgcc_cv_as_avx, [
-    AC_TRY_COMPILE([], [asm("vzeroupper");],
-		   [libgcc_cv_as_avx=yes], [libgcc_cv_as_avx=no])
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[asm("vzeroupper");]])],[libgcc_cv_as_avx=yes],[libgcc_cv_as_avx=no])
   ])
   if test x$libgcc_cv_as_avx = xyes; then
     AC_DEFINE(HAVE_AS_AVX, 1, [Define to 1 if the assembler supports AVX.])
@@ -633,7 +633,7 @@ dnl Check if as supports LSE instructions.
 AC_DEFUN([LIBGCC_CHECK_AS_LSE], [
 case "${target}" in
 aarch64*-*-*)
-  AC_CACHE_CHECK([if the assembler supports LSE], libgcc_cv_as_lse, [
+  AC_CACHE_CHECK([if the assembler supports LSE],[libgcc_cv_as_lse],[
     AC_TRY_COMPILE([],
 changequote(,)dnl
 			asm(".arch armv8-a+lse\n\tcas w0, w1, [x2]");

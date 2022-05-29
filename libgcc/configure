@@ -1342,7 +1342,7 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --disable-shared        don't provide a shared libgcc
-  --enable-vtable-verify    Enable vtable verification feature
+  --enable-vtable-verify  Enable vtable verification feature
   --enable-version-specific-runtime-libs    Specify that runtime libraries should be installed in a compiler-specific directory
   --enable-maintainer-mode
                           enable make rules and dependencies not useful (and
@@ -1364,8 +1364,9 @@ Optional Features:
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
-  --with-target-subdir=SUBDIR      Configuring in a subdirectory for target
-  --with-cross-host=HOST           Configuring with a cross compiler
+  --with-target-subdir=SUBDIR
+                          Configuring in a subdirectory for target
+  --with-cross-host=HOST  Configuring with a cross compiler
   --with-ld               arrange to use the specified ld (full pathname)
   --with-aix-soname=aix|svr4|both
                           shared library versioning (aka "SONAME") variant to
@@ -2653,7 +2654,7 @@ done
 
 # We need awk; bail out if it's missing.
 case ${AWK} in
-  "") as_fn_error $? "can't build without awk, bailing out" "$LINENO" 5 ;;
+  "") as_fn_error $? "cannot build without awk, bailing out" "$LINENO" 5 ;;
 esac
 
 
