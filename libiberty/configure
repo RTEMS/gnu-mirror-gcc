@@ -4263,7 +4263,6 @@ $as_echo "$ac_cv_safe_to_define___extensions__" >&6; }
   $as_echo "#define _TANDEM_SOURCE 1" >>confdefs.h
 
 
-
 # Check whether --enable-largefile was given.
 if test "${enable_largefile+set}" = set; then :
   enableval=$enable_largefile;
@@ -4475,7 +4474,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 ac_libiberty_warn_cflags=
 save_CFLAGS="$CFLAGS"
-for real_option in -W -Wall -Wwrite-strings -Wc++-compat \
+for real_option in -Wall -Wextra -Wwrite-strings -Wc++-compat \
 			  -Wstrict-prototypes \
 			  -Wshadow=local; do
   # Do the check with the no- prefix removed since gcc silently
@@ -5207,6 +5206,9 @@ case "${host}" in
 	# On IA64 HP-UX, PIC is the default but the pic flag
 	# sets the default TLS model and affects inlining.
 	PICFLAG=-fPIC
+	;;
+    loongarch*-*-*)
+	PICFLAG=-fpic
 	;;
     mips-sgi-irix6*)
 	# PIC is the default.

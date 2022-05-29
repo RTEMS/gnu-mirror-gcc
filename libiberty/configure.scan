@@ -1,0 +1,50 @@
+#                                               -*- Autoconf -*-
+# Process this file with autoconf to produce a configure script.
+
+AC_PREREQ([2.69])
+AC_INIT([FULL-PACKAGE-NAME], [VERSION], [BUG-REPORT-ADDRESS])
+AC_CONFIG_SRCDIR([pex-djgpp.c])
+AC_CONFIG_HEADERS([config.h])
+
+# Checks for programs.
+AC_PROG_CC
+AC_PROG_INSTALL
+AC_PROG_RANLIB
+
+# Checks for libraries.
+
+# Checks for header files.
+AC_FUNC_ALLOCA
+AC_CHECK_HEADERS([fcntl.h float.h inttypes.h langinfo.h libintl.h limits.h malloc.h stddef.h stdint.h stdio_ext.h stdlib.h string.h strings.h sys/file.h sys/param.h sys/time.h unistd.h wchar.h wctype.h])
+
+# Checks for typedefs, structures, and compiler characteristics.
+AC_CHECK_HEADER_STDBOOL
+AC_C_INLINE
+AC_TYPE_INT32_T
+AC_FUNC_OBSTACK
+AC_TYPE_OFF_T
+AC_TYPE_PID_T
+AC_TYPE_SIZE_T
+AC_TYPE_SSIZE_T
+AC_CHECK_DECLS([sys_siglist])
+AC_TYPE_UINT16_T
+AC_TYPE_UINT32_T
+AC_TYPE_UINT64_T
+AC_TYPE_UINT8_T
+AC_CHECK_TYPES([ptrdiff_t])
+
+# Checks for library functions.
+AC_FUNC_ERROR_AT_LINE
+AC_FUNC_FORK
+AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
+AC_FUNC_MALLOC
+AC_FUNC_MBRTOWC
+AC_FUNC_MMAP
+AC_FUNC_REALLOC
+AC_FUNC_STRNLEN
+AC_FUNC_STRTOD
+AC_CHECK_FUNCS([atexit btowc bzero dup2 getcwd getpagesize gettimeofday memchr memmove mempcpy memset munmap pathconf pstat_getdynamic putenv re_comp realpath regcomp setenv stpcpy strcasecmp strchr strcspn strdup strerror strncasecmp strndup strrchr strspn strstr strtol strtoul strtoull strverscmp])
+
+AC_CONFIG_FILES([Makefile
+                 testsuite/Makefile])
+AC_OUTPUT

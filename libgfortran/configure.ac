@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script, like so:
 # aclocal && autoconf && autoheader && automake
 
-AC_INIT([GNU Fortran Runtime Library], 0.3,,[libgfortran])
+AC_INIT([GNU Fortran Runtime Library],[0.3],[],[libgfortran])
 AC_CONFIG_HEADER(config.h)
 GCC_TOPLEV_SUBDIRS
 
@@ -49,13 +49,13 @@ AC_SUBST(onestep)
 #
 # Do not delete or change the following two lines.  For why, see
 # http://gcc.gnu.org/ml/libstdc++/2003-07/msg00451.html
-AC_CANONICAL_SYSTEM
+AC_CANONICAL_TARGET
 ACX_NONCANONICAL_TARGET
 
 target_alias=${target_alias-$host_alias}
 AC_SUBST(target_alias)
 
-# Sets up automake.  Must come after AC_CANONICAL_SYSTEM.  Each of the
+# Sets up automake.  Must come after AC_CANONICAL_TARGET.  Each of the
 # following is magically included in AUTOMAKE_OPTIONS in each Makefile.am.
 #  1.9.6:  minimum required version
 #  no-define:  PACKAGE and VERSION will not be #define'd in config.h (a bunch
@@ -128,7 +128,7 @@ AC_SUBST(toolexeclibdir)
 # Create a spec file, so that compile/link tests don't fail
 test -f libgfortran.spec || touch libgfortran.spec
 
-AC_LANG_C
+AC_LANG([C])
 # Check the compiler.
 # The same as in boehm-gc and libstdc++. Have to borrow it from there.
 # We must force CC to /not/ be precious variables; otherwise
@@ -276,8 +276,7 @@ AC_PROG_INSTALL
 
 # Configure libtool
 #AC_MSG_NOTICE([====== Starting libtool configuration])
-AC_LIBTOOL_DLOPEN
-AM_PROG_LIBTOOL
+LT_INIT([dlopen])
 LT_LIB_M
 ACX_LT_HOST_FLAGS
 AC_SUBST(enable_shared)
