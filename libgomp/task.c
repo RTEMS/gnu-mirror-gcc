@@ -197,6 +197,7 @@ gomp_task_handle_depend (struct gomp_task *task, struct gomp_task *parent,
       /* ndepend - nout - nmutexinoutset - nin is # of depobjs */
       size_t normal = nout + nmutexinoutset + nin;
       size_t n = 0;
+      bool has_in = false;
       for (i = normal; i < ndepend; i++)
 	{
 	  void **d = (void **) (uintptr_t) depend[5 + i];
@@ -209,6 +210,8 @@ gomp_task_handle_depend (struct gomp_task *task, struct gomp_task *parent,
 	    case GOMP_DEPEND_MUTEXINOUTSET:
 	      break;
 	    case GOMP_DEPEND_IN:
+	    case GOMP_DEPEND_INOUTSET:
+	      has_in = true;
 	      continue;
 	    default:
 	      gomp_fatal ("unknown omp_depend_t dependence type %d",
@@ -222,14 +225,17 @@ gomp_task_handle_depend (struct gomp_task *task, struct gomp_task *parent,
 	  task->depend[n].addr = depend[5 + i];
 	  task->depend[n++].is_in = i >= nout + nmutexinoutset;
 	}
-      for (i = normal; i < ndepend; i++)
-	{
-	  void **d = (void **) (uintptr_t) depend[5 + i];
-	  if ((uintptr_t) d[1] != GOMP_DEPEND_IN)
-	    continue;
-	  task->depend[n].addr = d[0];
-	  task->depend[n++].is_in = 1;
-	}
+      if (has_in)
+	for (i = normal; i < ndepend; i++)
+	  {
+	    void **d = (void **) (uintptr_t) depend[5 + i];
+	    if ((uintptr_t) d[1] != GOMP_DEPEND_IN
+		&& (uintptr_t) d[1] != GOMP_DEPEND_INOUTSET)
+	      continue;
+	    task->depend[n].addr = d[0];
+	    task->depend[n++].is_in
+	      = 1 + ((uintptr_t) d[1] == GOMP_DEPEND_INOUTSET);
+	  }
     }
   task->num_dependees = 0;
   if (__builtin_expect (parent->depend_all_memory && ndepend, false))
@@ -381,8 +387,10 @@ gomp_task_handle_depend (struct gomp_task *task, struct gomp_task *parent,
 
 	      last = ent;
 
-	      /* depend(in:...) doesn't depend on earlier depend(in:...).  */
-	      if (task->depend[i].is_in && ent->is_in)
+	      /* depend(in:...) doesn't depend on earlier depend(in:...).
+		 Similarly depend(inoutset:...) doesn't depend on earlier
+		 depend(inoutset:...).  */
+	      if (task->depend[i].is_in && task->depend[i].is_in == ent->is_in)
 		continue;
 
 	      if (!ent->is_in)
@@ -451,6 +459,17 @@ gomp_task_handle_depend (struct gomp_task *task, struct gomp_task *parent,
 	}
     }
 }
+
+/* Body of empty task like taskwait nowait depend.  */
+
+static void
+empty_task (void *data __attribute__((unused)))
+{
+}
+
+static void gomp_task_run_post_handle_depend_hash (struct gomp_task *);
+static inline size_t gomp_task_run_post_handle_depend (struct gomp_task *,
+						       struct gomp_team *);
 
 /* Called when encountering an explicit task directive.  If IF_CLAUSE is
    false, then we must not delay in executing the task.  If UNTIED is true,
@@ -673,6 +692,18 @@ GOMP_task (void (*fn) (void *), void *data, void (*cpyfn) (void *, void *),
 	      gomp_mutex_unlock (&team->task_lock);
 	      return;
 	    }
+	  /* Check for taskwait nowait depend which doesn't need to wait for
+	     anything.  */
+	  if (__builtin_expect (fn == empty_task, 0))
+	    {
+	      if (taskgroup)
+		taskgroup->num_children--;
+	      gomp_task_run_post_handle_depend_hash (task);
+	      gomp_mutex_unlock (&team->task_lock);
+	      gomp_finish_task (task);
+	      free (task);
+	      return;
+	    }
 	}
 
       priority_queue_insert (PQ_CHILDREN, &parent->children_queue,
@@ -704,6 +735,7 @@ GOMP_task (void (*fn) (void *), void *data, void (*cpyfn) (void *, void *),
     }
 }
 
+ialias (GOMP_task)
 ialias (GOMP_taskgroup_start)
 ialias (GOMP_taskgroup_end)
 ialias (GOMP_taskgroup_reduction_register)
@@ -829,8 +861,6 @@ GOMP_PLUGIN_target_task_completion (void *data)
   gomp_target_task_completion (team, task);
   gomp_mutex_unlock (&team->task_lock);
 }
-
-static void gomp_task_run_post_handle_depend_hash (struct gomp_task *);
 
 /* Called for nowait target tasks.  */
 
@@ -1348,6 +1378,38 @@ gomp_task_run_post_handle_dependers (struct gomp_task *child_task,
 	continue;
 
       struct gomp_taskgroup *taskgroup = task->taskgroup;
+      if (__builtin_expect (task->fn == empty_task, 0))
+	{
+	  if (!parent)
+	    task->parent = NULL;
+	  else if (__builtin_expect (task->parent_depends_on, 0)
+		   && --parent->taskwait->n_depend == 0
+		   && parent->taskwait->in_depend_wait)
+	    {
+	      parent->taskwait->in_depend_wait = false;
+	      gomp_sem_post (&parent->taskwait->taskwait_sem);
+	    }
+	  if (gomp_task_run_post_handle_depend (task, team))
+	    ++ret;
+	  if (taskgroup)
+	    {
+	      if (taskgroup->num_children > 1)
+		--taskgroup->num_children;
+	      else
+		{
+		  __atomic_store_n (&taskgroup->num_children, 0,
+				    MEMMODEL_RELEASE);
+		  if (taskgroup->in_taskgroup_wait)
+		    {
+		      taskgroup->in_taskgroup_wait = false;
+		      gomp_sem_post (&taskgroup->taskgroup_sem);
+		    }
+		}
+	    }
+	  gomp_finish_task (task);
+	  free (task);
+	  continue;
+	}
       if (parent)
 	{
 	  priority_queue_insert (PQ_CHILDREN, &parent->children_queue,
@@ -1823,6 +1885,16 @@ GOMP_taskwait_depend (void **depend)
     gomp_task_maybe_wait_for_dependencies (depend);
 }
 
+/* Called when encountering a taskwait directive with nowait and depend
+   clause(s).  Create a possibly deferred task construct with empty body.  */
+
+void
+GOMP_taskwait_depend_nowait (void **depend)
+{
+  ialias_call (GOMP_task) (empty_task, "", NULL, 0, 1, true,
+			   GOMP_TASK_FLAG_DEPEND, depend, 0, NULL);
+}
+
 /* An undeferred task is about to run.  Wait for all tasks that this
    undeferred task depends on.
 
@@ -1890,6 +1962,9 @@ gomp_task_maybe_wait_for_dependencies (void **depend)
 	    case GOMP_DEPEND_MUTEXINOUTSET:
 	      elem.is_in = 0;
 	      break;
+	    case GOMP_DEPEND_INOUTSET:
+	      elem.is_in = 2;
+	      break;
 	    default:
 	      gomp_fatal ("unknown omp_depend_t dependence type %d",
 			  (int) (uintptr_t) d[1]);
@@ -1928,7 +2003,7 @@ gomp_task_maybe_wait_for_dependencies (void **depend)
 	}
       ent = htab_find (task->depend_hash, &elem);
       for (; ent; ent = ent->next)
-	if (elem.is_in && ent->is_in)
+	if (elem.is_in && elem.is_in == ent->is_in)
 	  continue;
 	else
 	  {

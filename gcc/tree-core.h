@@ -302,9 +302,9 @@ enum omp_clause_code {
   /* OpenMP clause: uniform (argument-list).  */
   OMP_CLAUSE_UNIFORM,
 
-  /* OpenMP clause: to (extended-list).
-     Only when it appears in declare target.  */
-  OMP_CLAUSE_TO_DECLARE,
+  /* OpenMP clause: enter (extended-list).
+     to is a deprecated alias when it appears in declare target.  */
+  OMP_CLAUSE_ENTER,
 
   /* OpenMP clause: link (variable-list).  */
   OMP_CLAUSE_LINK,
@@ -1527,6 +1527,7 @@ enum omp_clause_depend_kind
   OMP_CLAUSE_DEPEND_OUT,
   OMP_CLAUSE_DEPEND_INOUT,
   OMP_CLAUSE_DEPEND_MUTEXINOUTSET,
+  OMP_CLAUSE_DEPEND_INOUTSET,
   OMP_CLAUSE_DEPEND_SOURCE,
   OMP_CLAUSE_DEPEND_SINK,
   OMP_CLAUSE_DEPEND_DEPOBJ,

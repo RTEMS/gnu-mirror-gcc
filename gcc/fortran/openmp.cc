@@ -296,14 +296,17 @@ gfc_find_omp_udr (gfc_namespace *ns, const char *name, gfc_typespec *ts)
 }
 
 
-/* Match a variable/common block list and construct a namelist from it.  */
+/* Match a variable/common block list and construct a namelist from it;
+   if has_all_memory != NULL, *has_all_memory is set and omp_all_memory
+   yields a list->sym NULL entry. */
 
 static match
 gfc_match_omp_variable_list (const char *str, gfc_omp_namelist **list,
 			     bool allow_common, bool *end_colon = NULL,
 			     gfc_omp_namelist ***headp = NULL,
 			     bool allow_sections = false,
-			     bool allow_derived = false)
+			     bool allow_derived = false,
+			     bool *has_all_memory = NULL)
 {
   gfc_omp_namelist *head, *tail, *p;
   locus old_loc, cur_loc;
@@ -315,7 +318,8 @@ gfc_match_omp_variable_list (const char *str, gfc_omp_namelist **list,
   head = tail = NULL;
 
   old_loc = gfc_current_locus;
-
+  if (has_all_memory)
+    *has_all_memory = false;
   m = gfc_match (str);
   if (m != MATCH_YES)
     return m;
@@ -323,7 +327,35 @@ gfc_match_omp_variable_list (const char *str, gfc_omp_namelist **list,
   for (;;)
     {
       cur_loc = gfc_current_locus;
-      m = gfc_match_symbol (&sym, 1);
+
+      m = gfc_match_name (n);
+      if (m == MATCH_YES && strcmp (n, "omp_all_memory") == 0)
+	{
+	  if (!has_all_memory)
+	    {
+	      gfc_error ("%<omp_all_memory%> at %C not permitted in this "
+			 "clause");
+	      goto cleanup;
+	    }
+	  *has_all_memory = true;
+	  p = gfc_get_omp_namelist ();
+	  if (head == NULL)
+	    head = tail = p;
+	  else
+	    {
+	      tail->next = p;
+	      tail = tail->next;
+	    }
+	  tail->where = cur_loc;
+	  goto next_item;
+	}
+      if (m == MATCH_YES)
+	{
+	  gfc_symtree *st;
+	  if ((m = gfc_get_ha_sym_tree (n, &st) ? MATCH_ERROR : MATCH_YES)
+	      == MATCH_YES)
+	    sym = st->n.sym;
+	}
       switch (m)
 	{
 	case MATCH_YES:
@@ -578,6 +610,12 @@ gfc_match_omp_depend_sink (gfc_omp_namelist **list)
 	  tail->sym = sym;
 	  tail->expr = NULL;
 	  tail->where = cur_loc;
+	  if (UNLIKELY (strcmp (sym->name, "omp_all_memory") == 0))
+	    {
+	      gfc_error ("%<omp_all_memory%> used with DEPEND kind "
+			 "other than OUT or INOUT at %C");
+	      goto cleanup;
+	    }
 	  if (gfc_match_char ('+') == MATCH_YES)
 	    {
 	      if (gfc_match_literal_constant (&tail->expr, 0) != MATCH_YES)
@@ -948,6 +986,7 @@ enum omp_mask2
   OMP_CLAUSE_ATTACH,
   OMP_CLAUSE_NOHOST,
   OMP_CLAUSE_HAS_DEVICE_ADDR,  /* OpenMP 5.1  */
+  OMP_CLAUSE_ENTER, /* OpenMP 5.2 */
   /* This must come last.  */
   OMP_MASK2_LAST
 };
@@ -1868,6 +1907,7 @@ gfc_match_omp_clauses (gfc_omp_clauses **cp, const omp_mask mask,
 	  if ((mask & OMP_CLAUSE_DEPEND)
 	      && gfc_match ("depend ( ") == MATCH_YES)
 	    {
+	      bool has_omp_all_memory;
 	      gfc_namespace *ns_iter = NULL, *ns_curr = gfc_current_ns;
 	      match m_it = gfc_match_iterator (&ns_iter, false);
 	      if (m_it == MATCH_ERROR)
@@ -1876,7 +1916,9 @@ gfc_match_omp_clauses (gfc_omp_clauses **cp, const omp_mask mask,
 		break;
 	      m = MATCH_YES;
 	      gfc_omp_depend_op depend_op = OMP_DEPEND_OUT;
-	      if (gfc_match ("inout") == MATCH_YES)
+	      if (gfc_match ("inoutset") == MATCH_YES)
+		depend_op = OMP_DEPEND_INOUTSET;
+	      else if (gfc_match ("inout") == MATCH_YES)
 		depend_op = OMP_DEPEND_INOUT;
 	      else if (gfc_match ("in") == MATCH_YES)
 		depend_op = OMP_DEPEND_IN;
@@ -1920,21 +1962,27 @@ gfc_match_omp_clauses (gfc_omp_clauses **cp, const omp_mask mask,
 	      if (m == MATCH_YES)
 		m = gfc_match_omp_variable_list (" : ",
 						 &c->lists[OMP_LIST_DEPEND],
-						 false, NULL, &head, true);
+						 false, NULL, &head, true,
+						 false, &has_omp_all_memory);
+	      if (m != MATCH_YES)
+		goto error;
 	      gfc_current_ns = ns_curr;
-	      if (m == MATCH_YES)
+	      if (has_omp_all_memory && depend_op != OMP_DEPEND_INOUT
+		  && depend_op != OMP_DEPEND_OUT)
 		{
-		  gfc_omp_namelist *n;
-		  for (n = *head; n; n = n->next)
-		    {
-		      n->u.depend_op = depend_op;
-		      n->u2.ns = ns_iter;
-		      if (ns_iter)
-			ns_iter->refs++;
-		    }
-		  continue;
+		  gfc_error ("%<omp_all_memory%> used with DEPEND kind "
+			     "other than OUT or INOUT at %C");
+		  goto error;
 		}
-	      break;
+	      gfc_omp_namelist *n;
+	      for (n = *head; n; n = n->next)
+		{
+		  n->u.depend_op = depend_op;
+		  n->u2.ns = ns_iter;
+		  if (ns_iter)
+		    ns_iter->refs++;
+		}
+	      continue;
 	    }
 	  if ((mask & OMP_CLAUSE_DETACH)
 	      && !openacc
@@ -2051,6 +2099,16 @@ gfc_match_omp_clauses (gfc_omp_clauses **cp, const omp_mask mask,
 		  gfc_current_locus = old_loc;
 		}
 	      else
+		continue;
+	    }
+	  break;
+	case 'e':
+	  if ((mask & OMP_CLAUSE_ENTER))
+	    {
+	      m = gfc_match_omp_to_link ("enter (", &c->lists[OMP_LIST_ENTER]);
+	      if (m == MATCH_ERROR)
+		goto error;
+	      if (m == MATCH_YES)
 		continue;
 	    }
 	  break;
@@ -2874,8 +2932,12 @@ gfc_match_omp_clauses (gfc_omp_clauses **cp, const omp_mask mask,
 	    continue;
 	  if ((mask & OMP_CLAUSE_TO) && (mask & OMP_CLAUSE_LINK))
 	    {
-	      if (gfc_match_omp_to_link ("to (", &c->lists[OMP_LIST_TO])
-		  == MATCH_YES)
+	      /* Declare target: 'to' is an alias for 'enter';
+		 'to' is deprecated since 5.2.  */
+	      m = gfc_match_omp_to_link ("to (", &c->lists[OMP_LIST_TO]);
+	      if (m == MATCH_ERROR)
+		goto error;
+	      if (m == MATCH_YES)
 		continue;
 	    }
 	  else if ((mask & OMP_CLAUSE_TO)
@@ -3677,7 +3739,8 @@ cleanup:
 #define OMP_ORDERED_CLAUSES \
   (omp_mask (OMP_CLAUSE_THREADS) | OMP_CLAUSE_SIMD)
 #define OMP_DECLARE_TARGET_CLAUSES \
-  (omp_mask (OMP_CLAUSE_TO) | OMP_CLAUSE_LINK | OMP_CLAUSE_DEVICE_TYPE)
+  (omp_mask (OMP_CLAUSE_ENTER) | OMP_CLAUSE_LINK | OMP_CLAUSE_DEVICE_TYPE \
+   | OMP_CLAUSE_TO)
 #define OMP_ATOMIC_CLAUSES \
   (omp_mask (OMP_CLAUSE_ATOMIC) | OMP_CLAUSE_CAPTURE | OMP_CLAUSE_HINT	\
    | OMP_CLAUSE_MEMORDER | OMP_CLAUSE_COMPARE | OMP_CLAUSE_FAIL 	\
@@ -3760,7 +3823,9 @@ gfc_match_omp_depobj (void)
   if (gfc_match ("update ( ") == MATCH_YES)
     {
       c = gfc_get_omp_clauses ();
-      if (gfc_match ("inout )") == MATCH_YES)
+      if (gfc_match ("inoutset )") == MATCH_YES)
+	c->depobj_update = OMP_DEPEND_INOUTSET;
+      else if (gfc_match ("inout )") == MATCH_YES)
 	c->depobj_update = OMP_DEPEND_INOUT;
       else if (gfc_match ("in )") == MATCH_YES)
 	c->depobj_update = OMP_DEPEND_IN;
@@ -3770,8 +3835,8 @@ gfc_match_omp_depobj (void)
 	c->depobj_update = OMP_DEPEND_MUTEXINOUTSET;
       else
 	{
-	  gfc_error ("Expected IN, OUT, INOUT, MUTEXINOUTSET followed by "
-		     "%<)%> at %C");
+	  gfc_error ("Expected IN, OUT, INOUT, INOUTSET or MUTEXINOUTSET "
+		     "followed by %<)%> at %C");
 	  goto error;
 	}
     }
@@ -4481,7 +4546,7 @@ gfc_match_omp_declare_target (void)
     {
       c = gfc_get_omp_clauses ();
       gfc_current_locus = old_loc;
-      m = gfc_match_omp_to_link (" (", &c->lists[OMP_LIST_TO]);
+      m = gfc_match_omp_to_link (" (", &c->lists[OMP_LIST_ENTER]);
       if (m != MATCH_YES)
 	goto syntax;
       if (gfc_match_omp_eos () != MATCH_YES)
@@ -4495,38 +4560,40 @@ gfc_match_omp_declare_target (void)
 
   gfc_buffer_error (false);
 
-  for (list = OMP_LIST_TO; list != OMP_LIST_NUM;
-       list = (list == OMP_LIST_TO ? OMP_LIST_LINK : OMP_LIST_NUM))
+  static const int to_enter_link_lists[]
+    = { OMP_LIST_TO, OMP_LIST_ENTER, OMP_LIST_LINK };
+  for (size_t listn = 0; listn < ARRAY_SIZE (to_enter_link_lists)
+			 && (list = to_enter_link_lists[listn], true); ++listn)
     for (n = c->lists[list]; n; n = n->next)
       if (n->sym)
 	n->sym->mark = 0;
       else if (n->u.common->head)
 	n->u.common->head->mark = 0;
 
-  for (list = OMP_LIST_TO; list != OMP_LIST_NUM;
-       list = (list == OMP_LIST_TO ? OMP_LIST_LINK : OMP_LIST_NUM))
+  for (size_t listn = 0; listn < ARRAY_SIZE (to_enter_link_lists)
+			 && (list = to_enter_link_lists[listn], true); ++listn)
     for (n = c->lists[list]; n; n = n->next)
       if (n->sym)
 	{
 	  if (n->sym->attr.in_common)
 	    gfc_error_now ("OMP DECLARE TARGET variable at %L is an "
 			   "element of a COMMON block", &n->where);
-	  else if (n->sym->attr.omp_declare_target
-		   && n->sym->attr.omp_declare_target_link
-		   && list != OMP_LIST_LINK)
-	    gfc_error_now ("OMP DECLARE TARGET variable at %L previously "
-			   "mentioned in LINK clause and later in TO clause",
-			   &n->where);
-	  else if (n->sym->attr.omp_declare_target
-		   && !n->sym->attr.omp_declare_target_link
-		   && list == OMP_LIST_LINK)
-	    gfc_error_now ("OMP DECLARE TARGET variable at %L previously "
-			   "mentioned in TO clause and later in LINK clause",
-			   &n->where);
 	  else if (n->sym->mark)
 	    gfc_error_now ("Variable at %L mentioned multiple times in "
 			   "clauses of the same OMP DECLARE TARGET directive",
 			   &n->where);
+	  else if (n->sym->attr.omp_declare_target
+		   && n->sym->attr.omp_declare_target_link
+		   && list != OMP_LIST_LINK)
+	    gfc_error_now ("OMP DECLARE TARGET variable at %L previously "
+			   "mentioned in LINK clause and later in %s clause",
+			   &n->where, list == OMP_LIST_TO ? "TO" : "ENTER");
+	  else if (n->sym->attr.omp_declare_target
+		   && !n->sym->attr.omp_declare_target_link
+		   && list == OMP_LIST_LINK)
+	    gfc_error_now ("OMP DECLARE TARGET variable at %L previously "
+			   "mentioned in TO or ENTER clause and later in "
+			   "LINK clause", &n->where);
 	  else if (gfc_add_omp_declare_target (&n->sym->attr, n->sym->name,
 					       &n->sym->declared_at))
 	    {
@@ -4549,14 +4616,14 @@ gfc_match_omp_declare_target (void)
 	       && n->u.common->omp_declare_target_link
 	       && list != OMP_LIST_LINK)
 	gfc_error_now ("OMP DECLARE TARGET COMMON at %L previously "
-		       "mentioned in LINK clause and later in TO clause",
-		       &n->where);
+		       "mentioned in LINK clause and later in %s clause",
+		       &n->where, list == OMP_LIST_TO ? "TO" : "ENTER");
       else if (n->u.common->omp_declare_target
 	       && !n->u.common->omp_declare_target_link
 	       && list == OMP_LIST_LINK)
 	gfc_error_now ("OMP DECLARE TARGET COMMON at %L previously "
-		       "mentioned in TO clause and later in LINK clause",
-		       &n->where);
+		       "mentioned in TO or ENTER clause and later in "
+		       "LINK clause", &n->where);
       else if (n->u.common->head && n->u.common->head->mark)
 	gfc_error_now ("COMMON at %L mentioned multiple times in "
 		       "clauses of the same OMP DECLARE TARGET directive",
@@ -4590,7 +4657,10 @@ gfc_match_omp_declare_target (void)
 	      s->attr.omp_device_type = c->device_type;
 	    }
 	}
-  if (c->device_type && !c->lists[OMP_LIST_TO] && !c->lists[OMP_LIST_LINK])
+  if (c->device_type
+      && !c->lists[OMP_LIST_ENTER]
+      && !c->lists[OMP_LIST_TO]
+      && !c->lists[OMP_LIST_LINK])
     gfc_warning_now (0, "OMP DECLARE TARGET directive at %L with only "
 			"DEVICE_TYPE clause is ignored", &old_loc);
 
@@ -4902,8 +4972,7 @@ gfc_match_omp_context_selector_specification (gfc_omp_declare_variant *odv)
       match m;
       const char *selector_sets[] = { "construct", "device",
 				      "implementation", "user" };
-      const int selector_set_count
-	= sizeof (selector_sets) / sizeof (*selector_sets);
+      const int selector_set_count = ARRAY_SIZE (selector_sets);
       int i;
       char buf[GFC_MAX_SYMBOL_LEN + 1];
 
@@ -5224,7 +5293,7 @@ gfc_check_omp_requires (gfc_namespace *ns, int ref_omp_requires)
       if ((ref_omp_requires & OMP_REQ_REVERSE_OFFLOAD)
 	  && !(ns->omp_requires & OMP_REQ_REVERSE_OFFLOAD))
 	gfc_error ("Program unit at %L has OpenMP device constructs/routines "
-		   "but does not set !$OMP REQUIRES REVERSE_OFFSET but other "
+		   "but does not set !$OMP REQUIRES REVERSE_OFFLOAD but other "
 		   "program units do", &ns->proc_name->declared_at);
       if ((ref_omp_requires & OMP_REQ_UNIFIED_ADDRESS)
 	  && !(ns->omp_requires & OMP_REQ_UNIFIED_ADDRESS))
@@ -5653,7 +5722,8 @@ gfc_match_omp_taskwait (void)
       new_st.ext.omp_clauses = NULL;
       return MATCH_YES;
     }
-  return match_omp (EXEC_OMP_TASKWAIT, omp_mask (OMP_CLAUSE_DEPEND));
+  return match_omp (EXEC_OMP_TASKWAIT,
+		    omp_mask (OMP_CLAUSE_DEPEND) | OMP_CLAUSE_NOWAIT);
 }
 
 
@@ -6282,7 +6352,7 @@ resolve_omp_clauses (gfc_code *code, gfc_omp_clauses *omp_clauses,
 	"IN_REDUCTION", "TASK_REDUCTION",
 	"DEVICE_RESIDENT", "LINK", "USE_DEVICE",
 	"CACHE", "IS_DEVICE_PTR", "USE_DEVICE_PTR", "USE_DEVICE_ADDR",
-	"NONTEMPORAL", "ALLOCATE", "HAS_DEVICE_ADDR" };
+	"NONTEMPORAL", "ALLOCATE", "HAS_DEVICE_ADDR", "ENTER" };
   STATIC_ASSERT (ARRAY_SIZE (clause_names) == OMP_LIST_NUM);
 
   if (omp_clauses == NULL)
@@ -6491,6 +6561,8 @@ resolve_omp_clauses (gfc_code *code, gfc_omp_clauses *omp_clauses,
   for (list = 0; list < OMP_LIST_NUM; list++)
     for (n = omp_clauses->lists[list]; n; n = n->next)
       {
+	if (!n->sym)  /* omp_all_memory.  */
+	  continue;
 	n->sym->mark = 0;
 	n->sym->comp_mark = 0;
 	if (n->sym->attr.flavor == FL_VARIABLE

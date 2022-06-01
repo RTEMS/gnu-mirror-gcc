@@ -2777,7 +2777,7 @@ void functionResolve(ref MatchAccumulator m, Dsymbol dstart, Loc loc, Scope* sc,
             fd.storage_class == m.lastf.storage_class &&
             fd.parent == m.lastf.parent &&
             fd.visibility == m.lastf.visibility &&
-            fd.linkage == m.lastf.linkage)
+            fd._linkage == m.lastf._linkage)
         {
             if (fd.fbody && !m.lastf.fbody)
                 goto LfIsBetter;
@@ -5352,7 +5352,7 @@ extern (C++) class TemplateParameter : ASTNode
         return this.ident.toChars();
     }
 
-    override DYNCAST dyncast() const pure @nogc nothrow @safe
+    override DYNCAST dyncast() const
     {
         return DYNCAST.templateparameter;
     }

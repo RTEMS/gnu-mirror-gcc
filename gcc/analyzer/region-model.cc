@@ -465,9 +465,9 @@ public:
     m_src_region (src_region)
   {}
 
-  const char *get_kind () const FINAL OVERRIDE { return "poisoned_value_diagnostic"; }
+  const char *get_kind () const final override { return "poisoned_value_diagnostic"; }
 
-  bool use_of_uninit_p () const FINAL OVERRIDE
+  bool use_of_uninit_p () const final override
   {
     return m_pkind == POISON_KIND_UNINIT;
   }
@@ -479,7 +479,7 @@ public:
 	    && m_src_region == other.m_src_region);
   }
 
-  int get_controlling_option () const FINAL OVERRIDE
+  int get_controlling_option () const final override
   {
     switch (m_pkind)
       {
@@ -494,7 +494,7 @@ public:
       }
   }
 
-  bool emit (rich_location *rich_loc) FINAL OVERRIDE
+  bool emit (rich_location *rich_loc) final override
   {
     switch (m_pkind)
       {
@@ -530,7 +530,7 @@ public:
       }
   }
 
-  label_text describe_final_event (const evdesc::final_event &ev) FINAL OVERRIDE
+  label_text describe_final_event (const evdesc::final_event &ev) final override
   {
     switch (m_pkind)
       {
@@ -549,7 +549,7 @@ public:
       }
   }
 
-  void mark_interesting_stuff (interesting_t *interest) FINAL OVERRIDE
+  void mark_interesting_stuff (interesting_t *interest) final override
   {
     if (m_src_region)
       interest->add_region_creation (m_src_region);
@@ -572,7 +572,7 @@ public:
   : m_assign (assign), m_count_cst (count_cst)
   {}
 
-  const char *get_kind () const FINAL OVERRIDE
+  const char *get_kind () const final override
   {
     return "shift_count_negative_diagnostic";
   }
@@ -583,18 +583,18 @@ public:
 	    && same_tree_p (m_count_cst, other.m_count_cst));
   }
 
-  int get_controlling_option () const FINAL OVERRIDE
+  int get_controlling_option () const final override
   {
     return OPT_Wanalyzer_shift_count_negative;
   }
 
-  bool emit (rich_location *rich_loc) FINAL OVERRIDE
+  bool emit (rich_location *rich_loc) final override
   {
     return warning_at (rich_loc, get_controlling_option (),
 		       "shift by negative count (%qE)", m_count_cst);
   }
 
-  label_text describe_final_event (const evdesc::final_event &ev) FINAL OVERRIDE
+  label_text describe_final_event (const evdesc::final_event &ev) final override
   {
     return ev.formatted_print ("shift by negative amount here (%qE)", m_count_cst);
   }
@@ -618,7 +618,7 @@ public:
     m_count_cst (count_cst)
   {}
 
-  const char *get_kind () const FINAL OVERRIDE
+  const char *get_kind () const final override
   {
     return "shift_count_overflow_diagnostic";
   }
@@ -630,19 +630,19 @@ public:
 	    && same_tree_p (m_count_cst, other.m_count_cst));
   }
 
-  int get_controlling_option () const FINAL OVERRIDE
+  int get_controlling_option () const final override
   {
     return OPT_Wanalyzer_shift_count_overflow;
   }
 
-  bool emit (rich_location *rich_loc) FINAL OVERRIDE
+  bool emit (rich_location *rich_loc) final override
   {
     return warning_at (rich_loc, get_controlling_option (),
 		       "shift by count (%qE) >= precision of type (%qi)",
 		       m_count_cst, m_operand_precision);
   }
 
-  label_text describe_final_event (const evdesc::final_event &ev) FINAL OVERRIDE
+  label_text describe_final_event (const evdesc::final_event &ev) final override
   {
     return ev.formatted_print ("shift by count %qE here", m_count_cst);
   }
@@ -1117,18 +1117,18 @@ class dump_path_diagnostic
   : public pending_diagnostic_subclass<dump_path_diagnostic>
 {
 public:
-  int get_controlling_option () const FINAL OVERRIDE
+  int get_controlling_option () const final override
   {
     return 0;
   }
 
-  bool emit (rich_location *richloc) FINAL OVERRIDE
+  bool emit (rich_location *richloc) final override
   {
     inform (richloc, "path");
     return true;
   }
 
-  const char *get_kind () const FINAL OVERRIDE { return "dump_path_diagnostic"; }
+  const char *get_kind () const final override { return "dump_path_diagnostic"; }
 
   bool operator== (const dump_path_diagnostic &) const
   {
@@ -1342,6 +1342,9 @@ region_model::on_call_pre (const gcall *call, region_model_context *ctxt,
 	 return false;
        case IFN_UBSAN_BOUNDS:
 	 return false;
+       case IFN_VA_ARG:
+	 impl_call_va_arg (cd);
+	 return false;
        }
     }
 
@@ -1428,6 +1431,13 @@ region_model::on_call_pre (const gcall *call, region_model_context *ctxt,
 	       on the return value.  */
 	    check_call_args (cd);
 	    break;
+
+	  case BUILT_IN_VA_START:
+	    impl_call_va_start (cd);
+	    return false;
+	  case BUILT_IN_VA_COPY:
+	    impl_call_va_copy (cd);
+	    return false;
 	  }
       else if (is_named_call_p (callee_fndecl, "malloc", call, 1))
 	{
@@ -1570,6 +1580,10 @@ region_model::on_call_post (const gcall *call,
 	  case BUILT_IN_REALLOC:
 	    impl_call_realloc (cd);
 	    return;
+
+	  case BUILT_IN_VA_END:
+	    impl_call_va_end (cd);
+	    return;
 	  }
     }
 
@@ -1624,9 +1638,9 @@ public:
   {
   }
 
-  const char *get_kind () const FINAL OVERRIDE { return "reason_attr_access"; }
+  const char *get_kind () const final override { return "reason_attr_access"; }
 
-  void emit () const
+  void emit () const final override
   {
     inform (DECL_SOURCE_LOCATION (m_callee_fndecl),
 	    "parameter %i of %qD marked with attribute %qs",
@@ -1705,7 +1719,7 @@ check_external_function_for_access_attr (const gcall *call,
 	      m_access (access)
 	    {
 	    }
-	    pending_note *make_note () FINAL OVERRIDE
+	    pending_note *make_note () final override
 	    {
 	      return new reason_attr_access (m_callee_fndecl, m_access);
 	    }
@@ -2552,7 +2566,7 @@ public:
   : m_reg (reg), m_decl (decl)
   {}
 
-  const char *get_kind () const FINAL OVERRIDE
+  const char *get_kind () const final override
   {
     return "write_to_const_diagnostic";
   }
@@ -2563,12 +2577,12 @@ public:
 	    && m_decl == other.m_decl);
   }
 
-  int get_controlling_option () const FINAL OVERRIDE
+  int get_controlling_option () const final override
   {
     return OPT_Wanalyzer_write_to_const;
   }
 
-  bool emit (rich_location *rich_loc) FINAL OVERRIDE
+  bool emit (rich_location *rich_loc) final override
   {
     auto_diagnostic_group d;
     bool warned;
@@ -2592,7 +2606,7 @@ public:
     return warned;
   }
 
-  label_text describe_final_event (const evdesc::final_event &ev) FINAL OVERRIDE
+  label_text describe_final_event (const evdesc::final_event &ev) final override
   {
     switch (m_reg->get_kind ())
       {
@@ -2621,7 +2635,7 @@ public:
   : m_reg (reg)
   {}
 
-  const char *get_kind () const FINAL OVERRIDE
+  const char *get_kind () const final override
   {
     return "write_to_string_literal_diagnostic";
   }
@@ -2631,12 +2645,12 @@ public:
     return m_reg == other.m_reg;
   }
 
-  int get_controlling_option () const FINAL OVERRIDE
+  int get_controlling_option () const final override
   {
     return OPT_Wanalyzer_write_to_string_literal;
   }
 
-  bool emit (rich_location *rich_loc) FINAL OVERRIDE
+  bool emit (rich_location *rich_loc) final override
   {
     return warning_at (rich_loc, get_controlling_option (),
 		       "write to string literal");
@@ -2644,7 +2658,7 @@ public:
        but it is not available at this point.  */
   }
 
-  label_text describe_final_event (const evdesc::final_event &ev) FINAL OVERRIDE
+  label_text describe_final_event (const evdesc::final_event &ev) final override
   {
     return ev.formatted_print ("write to string literal here");
   }
@@ -3520,6 +3534,7 @@ region_model::get_representative_path_var_1 (const region *reg,
 	return path_var (string_reg->get_string_cst (), 0);
       }
 
+    case RK_VAR_ARG:
     case RK_UNKNOWN:
       return path_var (NULL_TREE, 0);
     }
@@ -3887,6 +3902,17 @@ region_model::push_frame (function *fun, const vec<const svalue *> *arg_svals,
 	  const region *parm_reg = get_lvalue (parm_lval, ctxt);
 	  const svalue *arg_sval = (*arg_svals)[idx];
 	  set_value (parm_reg, arg_sval, ctxt);
+	}
+
+      /* Handle any variadic args.  */
+      unsigned va_arg_idx = 0;
+      for (; idx < arg_svals->length (); idx++, va_arg_idx++)
+	{
+	  const svalue *arg_sval = (*arg_svals)[idx];
+	  const region *var_arg_reg
+	    = m_mgr->get_var_arg_region (m_current_frame,
+					 va_arg_idx);
+	  set_value (var_arg_reg, arg_sval, ctxt);
 	}
     }
   else

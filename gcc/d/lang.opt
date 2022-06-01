@@ -340,6 +340,10 @@ fpreview=all
 D RejectNegative
 Turn on all upcoming D language features.
 
+fpreview=bitfields
+D RejectNegative
+Implement D bit-fields.
+
 fpreview=dip1000
 D RejectNegative
 Implement DIP1000: Scoped pointers.
@@ -367,6 +371,10 @@ Use field-wise comparisons for struct equality.
 fpreview=fixaliasthis
 D RejectNegative
 When a symbol is resolved, check `alias this' scope before going to upper scopes.
+
+fpreview=fiximmutableconv
+D RejectNegative
+Disallow unsound immutable conversions that were formerly incorrectly permitted.
 
 fpreview=in
 D RejectNegative
@@ -412,10 +420,6 @@ frevert=intpromote
 D RejectNegative
 Use C-style integral promotion for unary '+', '-' and '~'.
 
-frevert=markdown
-D RejectNegative
-Disable Markdown replacements in Ddoc.
-
 frtti
 D
 ; Documented in C
@@ -451,10 +455,6 @@ List statistics on template instantiations.
 ftransition=tls
 D RejectNegative
 List all variables going into thread local storage.
-
-ftransition=vmarkdown
-D RejectNegative
-List instances of Markdown replacements in Ddoc.
 
 funittest
 D

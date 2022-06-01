@@ -2267,12 +2267,20 @@ ix86_expand_branch (enum rtx_code code, rtx op0, rtx op1, rtx label)
 
   /* Handle special case - vector comparsion with boolean result, transform
      it using ptest instruction.  */
-  if (GET_MODE_CLASS (mode) == MODE_VECTOR_INT)
+  if (GET_MODE_CLASS (mode) == MODE_VECTOR_INT
+      || mode == OImode)
     {
       rtx flag = gen_rtx_REG (CCZmode, FLAGS_REG);
       machine_mode p_mode = GET_MODE_SIZE (mode) == 32 ? V4DImode : V2DImode;
 
       gcc_assert (code == EQ || code == NE);
+
+      if (mode == OImode)
+	{
+	  op0 = lowpart_subreg (p_mode, force_reg (mode, op0), mode);
+	  op1 = lowpart_subreg (p_mode, force_reg (mode, op1), mode);
+	  mode = p_mode;
+	}
       /* Generate XOR since we can't check that one operand is zero vector.  */
       tmp = gen_reg_rtx (mode);
       emit_insn (gen_rtx_SET (tmp, gen_rtx_XOR (mode, op0, op1)));
@@ -2309,21 +2317,15 @@ ix86_expand_branch (enum rtx_code code, rtx op0, rtx op1, rtx label)
     case E_DImode:
       if (TARGET_64BIT)
 	goto simple;
-      /* For 32-bit target DI comparison may be performed on
-	 SSE registers.  To allow this we should avoid split
-	 to SI mode which is achieved by doing xor in DI mode
-	 and then comparing with zero (which is recognized by
-	 STV pass).  We don't compare using xor when optimizing
-	 for size.  */
-      if (!optimize_insn_for_size_p ()
-	  && TARGET_STV
-	  && (code == EQ || code == NE))
-	{
-	  op0 = force_reg (mode, gen_rtx_XOR (mode, op0, op1));
-	  op1 = const0_rtx;
-	}
       /* FALLTHRU */
     case E_TImode:
+      /* DI and TI mode equality/inequality comparisons may be performed
+         on SSE registers.  Avoid splitting them, except when optimizing
+	 for size.  */
+      if ((code == EQ || code == NE)
+	  && !optimize_insn_for_size_p ())
+	goto simple;
+
       /* Expand DImode branch into multiple compare+branch.  */
       {
 	rtx lo[2], hi[2];
@@ -2342,34 +2344,7 @@ ix86_expand_branch (enum rtx_code code, rtx op0, rtx op1, rtx label)
 
 	submode = mode == DImode ? SImode : DImode;
 
-	/* When comparing for equality, we can use (hi0^hi1)|(lo0^lo1) to
-	   avoid two branches.  This costs one extra insn, so disable when
-	   optimizing for size.  */
-
-	if ((code == EQ || code == NE)
-	    && (!optimize_insn_for_size_p ()
-	        || hi[1] == const0_rtx || lo[1] == const0_rtx))
-	  {
-	    rtx xor0, xor1;
-
-	    xor1 = hi[0];
-	    if (hi[1] != const0_rtx)
-	      xor1 = expand_binop (submode, xor_optab, xor1, hi[1],
-				   NULL_RTX, 0, OPTAB_WIDEN);
-
-	    xor0 = lo[0];
-	    if (lo[1] != const0_rtx)
-	      xor0 = expand_binop (submode, xor_optab, xor0, lo[1],
-				   NULL_RTX, 0, OPTAB_WIDEN);
-
-	    tmp = expand_binop (submode, ior_optab, xor1, xor0,
-				NULL_RTX, 0, OPTAB_WIDEN);
-
-	    ix86_expand_branch (code, tmp, const0_rtx, label);
-	    return;
-	  }
-
-	/* Otherwise, if we are doing less-than or greater-or-equal-than,
+	/* If we are doing less-than or greater-or-equal-than,
 	   op1 is a constant and the low word is zero, then we can just
 	   examine the high word.  Similarly for low word -1 and
 	   less-or-equal-than or greater-than.  */
@@ -3134,6 +3109,7 @@ ix86_expand_int_movcc (rtx operands[])
   rtx compare_op;
   machine_mode mode = GET_MODE (operands[0]);
   bool sign_bit_compare_p = false;
+  bool negate_cc_compare_p = false;
   rtx op0 = XEXP (operands[1], 0);
   rtx op1 = XEXP (operands[1], 1);
   rtx op2 = operands[2];
@@ -3180,16 +3156,48 @@ ix86_expand_int_movcc (rtx operands[])
       HOST_WIDE_INT cf = INTVAL (op3);
       HOST_WIDE_INT diff;
 
+      if ((mode == SImode
+	   || (TARGET_64BIT && mode == DImode))
+	  && (GET_MODE (op0) == SImode
+	      || (TARGET_64BIT && GET_MODE (op0) == DImode)))
+	{
+	  /* Special case x != 0 ? -1 : y.  */
+	  if (code == NE && op1 == const0_rtx && ct == -1)
+	    {
+	      negate_cc_compare_p = true;
+	      std::swap (ct, cf);
+	      code = EQ;
+	    }
+	  else if (code == EQ && op1 == const0_rtx && cf == -1)
+	    negate_cc_compare_p = true;
+	}
+
       diff = ct - cf;
       /*  Sign bit compares are better done using shifts than we do by using
 	  sbb.  */
       if (sign_bit_compare_p
+	  || negate_cc_compare_p
 	  || ix86_expand_carry_flag_compare (code, op0, op1, &compare_op))
 	{
 	  /* Detect overlap between destination and compare sources.  */
 	  rtx tmp = out;
 
-          if (!sign_bit_compare_p)
+	  if (negate_cc_compare_p)
+	    {
+	      if (GET_MODE (op0) == DImode)
+		emit_insn (gen_x86_negdi_ccc (gen_reg_rtx (DImode), op0));
+	      else
+		emit_insn (gen_x86_negsi_ccc (gen_reg_rtx (SImode),
+					      gen_lowpart (SImode, op0)));
+
+	      tmp = gen_reg_rtx (mode);
+	      if (mode == DImode)
+		emit_insn (gen_x86_movdicc_0_m1_neg (tmp));
+	      else
+		emit_insn (gen_x86_movsicc_0_m1_neg (gen_lowpart (SImode,
+								  tmp)));
+	    }
+	  else if (!sign_bit_compare_p)
 	    {
 	      rtx flags;
 	      bool fpcmp = false;
@@ -4018,6 +4026,7 @@ ix86_expand_sse_movcc (rtx dest, rtx cmp, rtx op_true, rtx op_false)
     case E_V8HFmode:
     case E_V4SImode:
     case E_V2DImode:
+    case E_V1TImode:
       if (TARGET_SSE4_1)
 	{
 	  gen = gen_sse4_1_pblendvb;
@@ -20963,7 +20972,8 @@ expand_vec_perm_pslldq_psrldq_por (struct expand_vec_perm_d *d, bool pandn)
   start1 = d->perm[0];
   for (i = 1; i < nelt; i++)
     {
-      if (d->perm[i] != d->perm[i-1] + 1)
+      if (d->perm[i] != d->perm[i-1] + 1
+	  || d->perm[i] == nelt)
 	{
 	  if (start2 == -1)
 	    {
@@ -20972,12 +20982,6 @@ expand_vec_perm_pslldq_psrldq_por (struct expand_vec_perm_d *d, bool pandn)
 	    }
 	  else
 	    return false;
-	}
-      else if (d->perm[i] >= nelt
-	       && start2 == -1)
-	{
-	  start2 = d->perm[i];
-	  end1 = d->perm[i-1];
 	}
     }
 
@@ -22065,9 +22069,13 @@ canonicalize_perm (struct expand_vec_perm_d *d)
 /* Implement TARGET_VECTORIZE_VEC_PERM_CONST.  */
 
 bool
-ix86_vectorize_vec_perm_const (machine_mode vmode, rtx target, rtx op0,
-			       rtx op1, const vec_perm_indices &sel)
+ix86_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
+			       rtx target, rtx op0, rtx op1,
+			       const vec_perm_indices &sel)
 {
+  if (vmode != op_mode)
+    return false;
+
   struct expand_vec_perm_d d;
   unsigned char perm[MAX_VECT_LEN];
   unsigned int i, nelt, which;

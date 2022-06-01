@@ -280,7 +280,7 @@ unsigned const char omp_clause_num_ops[] =
   1, /* OMP_CLAUSE_DEPEND  */
   1, /* OMP_CLAUSE_NONTEMPORAL  */
   1, /* OMP_CLAUSE_UNIFORM  */
-  1, /* OMP_CLAUSE_TO_DECLARE  */
+  1, /* OMP_CLAUSE_ENTER  */
   1, /* OMP_CLAUSE_LINK  */
   1, /* OMP_CLAUSE_DETACH  */
   1, /* OMP_CLAUSE_USE_DEVICE_PTR  */
@@ -370,7 +370,7 @@ const char * const omp_clause_code_name[] =
   "depend",
   "nontemporal",
   "uniform",
-  "to",
+  "enter",
   "link",
   "detach",
   "use_device_ptr",
@@ -9408,9 +9408,7 @@ build_common_tree_nodes (bool signed_char)
   ptr_type_node = build_pointer_type (void_type_node);
   const_ptr_type_node
     = build_pointer_type (build_type_variant (void_type_node, 1, 0));
-  for (unsigned i = 0;
-       i < sizeof (builtin_structptr_types) / sizeof (builtin_structptr_type);
-       ++i)
+  for (unsigned i = 0; i < ARRAY_SIZE (builtin_structptr_types); ++i)
     builtin_structptr_types[i].node = builtin_structptr_types[i].base;
 
   pointer_sized_int_node = build_nonstandard_integer_type (POINTER_SIZE, 1);

@@ -318,7 +318,7 @@ public:
 
   logger *get_logger () const { return m_logger.get_logger (); }
 
-  tree get_fndecl_for_call (const gcall *call) FINAL OVERRIDE
+  tree get_fndecl_for_call (const gcall *call) final override
   {
     impl_region_model_context old_ctxt
       (m_eg, m_enode_for_diag, NULL, NULL, NULL/*m_enode->get_state ()*/,
@@ -328,7 +328,7 @@ public:
   }
 
   state_machine::state_t get_state (const gimple *stmt ATTRIBUTE_UNUSED,
-				    tree var)
+				    tree var) final override
   {
     logger * const logger = get_logger ();
     LOG_FUNC (logger);
@@ -342,7 +342,7 @@ public:
     return current;
   }
   state_machine::state_t get_state (const gimple *stmt ATTRIBUTE_UNUSED,
-				    const svalue *sval)
+				    const svalue *sval) final override
   {
     logger * const logger = get_logger ();
     LOG_FUNC (logger);
@@ -355,7 +355,7 @@ public:
   void set_next_state (const gimple *stmt,
 		       tree var,
 		       state_machine::state_t to,
-		       tree origin)
+		       tree origin) final override
   {
     logger * const logger = get_logger ();
     LOG_FUNC (logger);
@@ -384,7 +384,7 @@ public:
   void set_next_state (const gimple *stmt,
 		       const svalue *sval,
 		       state_machine::state_t to,
-		       tree origin)
+		       tree origin) final override
   {
     logger * const logger = get_logger ();
     LOG_FUNC (logger);
@@ -417,7 +417,7 @@ public:
   }
 
   void warn (const supernode *snode, const gimple *stmt,
-	     tree var, pending_diagnostic *d) FINAL OVERRIDE
+	     tree var, pending_diagnostic *d) final override
   {
     LOG_FUNC (get_logger ());
     gcc_assert (d); // take ownership
@@ -435,13 +435,30 @@ public:
        var, var_old_sval, current, d);
   }
 
+  void warn (const supernode *snode, const gimple *stmt,
+	     const svalue *sval, pending_diagnostic *d) final override
+  {
+    LOG_FUNC (get_logger ());
+    gcc_assert (d); // take ownership
+    impl_region_model_context old_ctxt
+      (m_eg, m_enode_for_diag, m_old_state, m_new_state, NULL, NULL, NULL);
+
+    state_machine::state_t current
+      = (sval
+	 ? m_old_smap->get_state (sval, m_eg.get_ext_state ())
+	 : m_old_smap->get_global_state ());
+    m_eg.get_diagnostic_manager ().add_diagnostic
+      (&m_sm, m_enode_for_diag, snode, stmt, m_stmt_finder,
+       NULL_TREE, sval, current, d);
+  }
+
   /* Hook for picking more readable trees for SSA names of temporaries,
      so that rather than e.g.
        "double-free of '<unknown>'"
      we can print:
        "double-free of 'inbuf.data'".  */
 
-  tree get_diagnostic_tree (tree expr) FINAL OVERRIDE
+  tree get_diagnostic_tree (tree expr) final override
   {
     /* Only for SSA_NAMEs of temporaries; otherwise, return EXPR, as it's
        likely to be the least surprising tree to report.  */
@@ -459,29 +476,29 @@ public:
       return expr;
   }
 
-  tree get_diagnostic_tree (const svalue *sval) FINAL OVERRIDE
+  tree get_diagnostic_tree (const svalue *sval) final override
   {
     return m_new_state->m_region_model->get_representative_tree (sval);
   }
 
-  state_machine::state_t get_global_state () const FINAL OVERRIDE
+  state_machine::state_t get_global_state () const final override
   {
     return m_old_state->m_checker_states[m_sm_idx]->get_global_state ();
   }
 
-  void set_global_state (state_machine::state_t state) FINAL OVERRIDE
+  void set_global_state (state_machine::state_t state) final override
   {
     m_new_state->m_checker_states[m_sm_idx]->set_global_state (state);
   }
 
-  void on_custom_transition (custom_transition *transition) FINAL OVERRIDE
+  void on_custom_transition (custom_transition *transition) final override
   {
     transition->impl_transition (&m_eg,
 				 const_cast<exploded_node *> (m_enode_for_diag),
 				 m_sm_idx);
   }
 
-  tree is_zero_assignment (const gimple *stmt) FINAL OVERRIDE
+  tree is_zero_assignment (const gimple *stmt) final override
   {
     const gassign *assign_stmt = dyn_cast <const gassign *> (stmt);
     if (!assign_stmt)
@@ -497,19 +514,24 @@ public:
     return NULL_TREE;
   }
 
-  path_context *get_path_context () const FINAL OVERRIDE
+  path_context *get_path_context () const final override
   {
     return m_path_ctxt;
   }
 
-  bool unknown_side_effects_p () const FINAL OVERRIDE
+  bool unknown_side_effects_p () const final override
   {
     return m_unknown_side_effects;
   }
 
-  const program_state *get_old_program_state () const FINAL OVERRIDE
+  const program_state *get_old_program_state () const final override
   {
     return m_old_state;
+  }
+
+  const program_state *get_new_program_state () const final override
+  {
+    return m_new_state;
   }
 
   log_user m_logger;
@@ -535,13 +557,13 @@ public:
   leak_stmt_finder (const exploded_graph &eg, tree var)
   : m_eg (eg), m_var (var) {}
 
-  stmt_finder *clone () const FINAL OVERRIDE
+  stmt_finder *clone () const final override
   {
     return new leak_stmt_finder (m_eg, m_var);
   }
 
   const gimple *find_stmt (const exploded_path &epath)
-    FINAL OVERRIDE
+    final override
   {
     logger * const logger = m_eg.get_logger ();
     LOG_FUNC (logger);
@@ -1139,7 +1161,7 @@ exploded_node::get_dot_fillcolor () const
 	= {"azure", "coral", "cornsilk", "lightblue", "yellow",
 	   "honeydew", "lightpink", "lightsalmon", "palegreen1",
 	   "wheat", "seashell"};
-      const int num_colors = sizeof (colors) / sizeof (colors[0]);
+      const int num_colors = ARRAY_SIZE (colors);
       return colors[total_sm_state % num_colors];
     }
   else
@@ -1523,12 +1545,12 @@ public:
     m_setjmp_point (setjmp_point), m_stack_pop_event (NULL)
   {}
 
-  int get_controlling_option () const FINAL OVERRIDE
+  int get_controlling_option () const final override
   {
     return OPT_Wanalyzer_stale_setjmp_buffer;
   }
 
-  bool emit (rich_location *richloc) FINAL OVERRIDE
+  bool emit (rich_location *richloc) final override
   {
     return warning_at
       (richloc, get_controlling_option (),
@@ -1537,7 +1559,7 @@ public:
        get_user_facing_name (m_setjmp_call));
   }
 
-  const char *get_kind () const FINAL OVERRIDE
+  const char *get_kind () const final override
   { return "stale_jmp_buf"; }
 
   bool operator== (const stale_jmp_buf &other) const
@@ -1549,7 +1571,7 @@ public:
   bool
   maybe_add_custom_events_for_superedge (const exploded_edge &eedge,
 					 checker_path *emission_path)
-    FINAL OVERRIDE
+    final override
   {
     /* Detect exactly when the stack first becomes invalid,
        and issue an event then.  */
@@ -1575,7 +1597,7 @@ public:
     return false;
   }
 
-  label_text describe_final_event (const evdesc::final_event &ev)
+  label_text describe_final_event (const evdesc::final_event &ev) final override
   {
     if (m_stack_pop_event)
       return ev.formatted_print
@@ -2413,7 +2435,7 @@ public:
   {
   }
 
-  label_text get_desc (bool can_colorize) const FINAL OVERRIDE
+  label_text get_desc (bool can_colorize) const final override
   {
     return make_label_text
       (can_colorize,
@@ -2435,21 +2457,21 @@ public:
   : m_fndecl (fndecl)
   {}
 
-  void print (pretty_printer *pp) const FINAL OVERRIDE
+  void print (pretty_printer *pp) const final override
   {
     pp_string (pp, "call to tainted_args function");
   };
 
   bool update_model (region_model *,
 		     const exploded_edge *,
-		     region_model_context *) const FINAL OVERRIDE
+		     region_model_context *) const final override
   {
     /* No-op.  */
     return true;
   }
 
   void add_events_to_path (checker_path *emission_path,
-			   const exploded_edge &) const FINAL OVERRIDE
+			   const exploded_edge &) const final override
   {
     emission_path->add_event
       (new tainted_args_function_custom_event
@@ -2830,7 +2852,7 @@ public:
   {
   }
 
-  label_text get_desc (bool can_colorize) const FINAL OVERRIDE
+  label_text get_desc (bool can_colorize) const final override
   {
     return make_label_text (can_colorize,
 			    "field %qE of %qT"
@@ -2856,7 +2878,7 @@ public:
   {
   }
 
-  label_text get_desc (bool can_colorize) const FINAL OVERRIDE
+  label_text get_desc (bool can_colorize) const final override
   {
     return make_label_text (can_colorize,
 			    "function %qE used as initializer for field %qE"
@@ -2878,21 +2900,21 @@ public:
   : m_field (field), m_fndecl (fndecl), m_loc (loc)
   {}
 
-  void print (pretty_printer *pp) const FINAL OVERRIDE
+  void print (pretty_printer *pp) const final override
   {
     pp_string (pp, "call to tainted field");
   };
 
   bool update_model (region_model *,
 		     const exploded_edge *,
-		     region_model_context *) const FINAL OVERRIDE
+		     region_model_context *) const final override
   {
     /* No-op.  */
     return true;
   }
 
   void add_events_to_path (checker_path *emission_path,
-			   const exploded_edge &) const FINAL OVERRIDE
+			   const exploded_edge &) const final override
   {
     /* Show the field in the struct declaration, e.g.
        "(1) field 'store' is marked with '__attribute__((tainted_args))'"  */
@@ -3589,7 +3611,7 @@ public:
   }
 
   void
-  bifurcate (custom_edge_info *info) FINAL OVERRIDE
+  bifurcate (custom_edge_info *info) final override
   {
     if (m_state_at_bifurcation)
       /* Verify that the state at bifurcation is consistent when we
@@ -3605,12 +3627,12 @@ public:
     m_custom_eedge_infos.safe_push (info);
   }
 
-  void terminate_path () FINAL OVERRIDE
+  void terminate_path () final override
   {
     m_terminate_path = true;
   }
 
-  bool terminate_path_p () const FINAL OVERRIDE
+  bool terminate_path_p () const final override
   {
     return m_terminate_path;
   }
@@ -4646,7 +4668,7 @@ public:
 
   // TODO: dtor?
 
-  void dump_dot (graphviz_out *gv, const dump_args_t &args) const FINAL OVERRIDE
+  void dump_dot (graphviz_out *gv, const dump_args_t &args) const final override
   {
     gv->println ("subgraph \"cluster_supernode_%i\" {", m_supernode->m_index);
     gv->indent ();
@@ -4665,7 +4687,7 @@ public:
     gv->println ("}");
   }
 
-  void add_node (exploded_node *en) FINAL OVERRIDE
+  void add_node (exploded_node *en) final override
   {
     m_enodes.safe_push (en);
   }
@@ -4703,7 +4725,7 @@ public:
       delete (*iter).second;
   }
 
-  void dump_dot (graphviz_out *gv, const dump_args_t &args) const FINAL OVERRIDE
+  void dump_dot (graphviz_out *gv, const dump_args_t &args) const final override
   {
     const char *funcname = function_name (m_fun);
 
@@ -4735,7 +4757,7 @@ public:
     gv->println ("}");
   }
 
-  void add_node (exploded_node *en) FINAL OVERRIDE
+  void add_node (exploded_node *en) final override
   {
     const supernode *supernode = en->get_supernode ();
     gcc_assert (supernode);
@@ -4850,7 +4872,7 @@ public:
       delete (*iter).second;
   }
 
-  void dump_dot (graphviz_out *gv, const dump_args_t &args) const FINAL OVERRIDE
+  void dump_dot (graphviz_out *gv, const dump_args_t &args) const final override
   {
     int i;
     exploded_node *enode;
@@ -4871,7 +4893,7 @@ public:
       child_cluster->dump_dot (gv, args);
   }
 
-  void add_node (exploded_node *en) FINAL OVERRIDE
+  void add_node (exploded_node *en) final override
   {
     function *fun = en->get_function ();
     if (!fun)
@@ -4919,7 +4941,7 @@ class enode_label : public range_label
 	       exploded_node *enode)
   : m_ext_state (ext_state), m_enode (enode) {}
 
-  label_text get_text (unsigned) const FINAL OVERRIDE
+  label_text get_text (unsigned) const final override
   {
     pretty_printer pp;
     pp_format_decoder (&pp) = default_tree_printer;
@@ -5221,7 +5243,7 @@ public:
     gcc_assert (fun);
   }
 
-  void dump_dot (graphviz_out *gv, const dump_args_t &args) const FINAL OVERRIDE
+  void dump_dot (graphviz_out *gv, const dump_args_t &args) const final override
   {
     pretty_printer *pp = gv->get_pp ();
 
@@ -5326,7 +5348,7 @@ public:
   {}
 
   void dump_dot (graphviz_out *gv, const dump_args_t &) const
-    FINAL OVERRIDE
+    final override
   {
     pretty_printer *pp = gv->get_pp ();
 
@@ -5469,7 +5491,7 @@ public:
   /* Show exploded nodes for BEFORE_SUPERNODE points before N.  */
   bool add_node_annotations (graphviz_out *gv, const supernode &n,
 			     bool within_table)
-    const FINAL OVERRIDE
+    const final override
   {
     if (!within_table)
       return false;
@@ -5503,7 +5525,7 @@ public:
   /* Show exploded nodes for STMT.  */
   void add_stmt_annotations (graphviz_out *gv, const gimple *stmt,
 			     bool within_row)
-    const FINAL OVERRIDE
+    const final override
   {
     if (!within_row)
       return;
@@ -5534,7 +5556,7 @@ public:
 
   /* Show exploded nodes for AFTER_SUPERNODE points after N.  */
   bool add_after_node_annotations (graphviz_out *gv, const supernode &n)
-    const FINAL OVERRIDE
+    const final override
   {
     gv->begin_tr ();
     pretty_printer *pp = gv->get_pp ();
@@ -5695,12 +5717,12 @@ public:
     m_logger (logger)
   {}
 
-  void register_state_machine (state_machine *sm) FINAL OVERRIDE
+  void register_state_machine (state_machine *sm) final override
   {
     m_checkers->safe_push (sm);
   }
 
-  logger *get_logger () const FINAL OVERRIDE
+  logger *get_logger () const final override
   {
     return m_logger;
   }

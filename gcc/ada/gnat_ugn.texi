@@ -3197,8 +3197,7 @@ if any of these units are modified.
 
 @item 
 Cross-reference data. Contains information on all entities referenced
-in the unit. Used by tools like @code{gnatxref} and @code{gnatfind} to
-provide cross-reference information.
+in the unit. Used by some tools to provide cross-reference information.
 @end itemize
 
 For a full detailed description of the format of the @code{ALI} file,
@@ -3505,8 +3504,8 @@ be @code{adalib}).
 You can also specify a new default path to the run-time library at compilation
 time with the switch @code{--RTS=rts-path}. You can thus choose / change
 the run-time library you want your program to be compiled with. This switch is
-recognized by @code{gcc}, @code{gnatmake}, @code{gnatbind},
-@code{gnatls}, @code{gnatfind} and @code{gnatxref}.
+recognized by @code{gcc}, @code{gnatmake}, @code{gnatbind}, @code{gnatls}, and all
+project aware tools.
 
 It is possible to install a library before or after the standard GNAT
 library, by reordering the lines in the configuration files. In general, a
@@ -15077,10 +15076,10 @@ types in package Standard.
 @item @code{-gnatx}
 
 Normally the compiler generates full cross-referencing information in
-the @code{ALI} file. This information is used by a number of tools,
-including @code{gnatfind} and @code{gnatxref}. The @code{-gnatx} switch
-suppresses this information. This saves some space and may slightly
-speed up compilation, but means that these tools cannot be used.
+the @code{ALI} file. This information is used by a number of tools.
+The @code{-gnatx} switch suppresses this information. This saves some space
+and may slightly speed up compilation, but means that tools depending
+on this information cannot be used.
 @end table
 
 @geindex -fgnat-encodings (gcc)
@@ -20478,11 +20477,11 @@ package p2 is
    function to_a2 (Input : a1) return a2;
 end p2;
 
-with Unchecked_Conversion;
+with Ada.Unchecked_Conversion;
 package body p2 is
    function to_a2 (Input : a1) return a2 is
       function to_a2u is
-        new Unchecked_Conversion (a1, a2);
+        new Ada.Unchecked_Conversion (a1, a2);
    begin
       return to_a2u (Input);
    end to_a2;
@@ -20581,7 +20580,7 @@ the warning off:
 @example
 pragma Warnings (Off);
 function to_a2u is
-  new Unchecked_Conversion (a1, a2);
+  new Ada.Unchecked_Conversion (a1, a2);
 pragma Warnings (On);
 @end example
 @end quotation
@@ -22221,9 +22220,9 @@ properly allocated memory location. Here is a complete example of use of
 @quotation
 
 @example
-with Gnat.Io; use Gnat.Io;
-with Unchecked_Deallocation;
-with Unchecked_Conversion;
+with GNAT.IO; use GNAT.IO;
+with Ada.Unchecked_Deallocation;
+with Ada.Unchecked_Conversion;
 with GNAT.Debug_Pools;
 with System.Storage_Elements;
 with Ada.Exceptions; use Ada.Exceptions;
@@ -22235,8 +22234,8 @@ procedure Debug_Pool_Test is
    P : GNAT.Debug_Pools.Debug_Pool;
    for T'Storage_Pool use P;
 
-   procedure Free is new Unchecked_Deallocation (Integer, T);
-   function UC is new Unchecked_Conversion (U, T);
+   procedure Free is new Ada.Unchecked_Deallocation (Integer, T);
+   function UC is new Ada.Unchecked_Conversion (U, T);
    A, B : aliased T;
 
    procedure Info is new GNAT.Debug_Pools.Print_Info(Put_Line);
@@ -29248,8 +29247,8 @@ to permit their use in free software.
 
 @printindex ge
 
-@anchor{gnat_ugn/gnat_utility_programs switches-related-to-project-files}@w{                              }
 @anchor{cf}@w{                              }
+@anchor{gnat_ugn/gnat_utility_programs switches-related-to-project-files}@w{                              }
 
 @c %**end of body
 @bye

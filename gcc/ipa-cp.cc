@@ -113,6 +113,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cgraph.h"
 #include "diagnostic.h"
 #include "fold-const.h"
+#include "gimple-iterator.h"
 #include "gimple-fold.h"
 #include "symbol-summary.h"
 #include "tree-vrp.h"
@@ -4189,9 +4190,9 @@ public:
       m_initialize_when_cloning = true;
     }
 
-  virtual void duplicate (cgraph_edge *src_edge, cgraph_edge *dst_edge,
-			  edge_clone_summary *src_data,
-			  edge_clone_summary *dst_data);
+  void duplicate (cgraph_edge *src_edge, cgraph_edge *dst_edge,
+		  edge_clone_summary *src_data,
+		  edge_clone_summary *dst_data) final override;
 };
 
 /* Edge duplication hook.  */

@@ -46,21 +46,21 @@ along with GCC; see the file COPYING3.  If not see
 class gimple_ranger : public range_query
 {
 public:
-  gimple_ranger ();
+  gimple_ranger (bool use_imm_uses = true);
   ~gimple_ranger ();
-  virtual bool range_of_stmt (irange &r, gimple *, tree name = NULL) OVERRIDE;
-  virtual bool range_of_expr (irange &r, tree name, gimple * = NULL) OVERRIDE;
-  virtual bool range_on_edge (irange &r, edge e, tree name) OVERRIDE;
+  virtual bool range_of_stmt (irange &r, gimple *, tree name = NULL) override;
+  virtual bool range_of_expr (irange &r, tree name, gimple * = NULL) override;
+  virtual bool range_on_edge (irange &r, edge e, tree name) override;
   void range_on_entry (irange &r, basic_block bb, tree name);
   void range_on_exit (irange &r, basic_block bb, tree name);
   void export_global_ranges ();
   inline gori_compute &gori ()  { return m_cache.m_gori; }
-  virtual void dump (FILE *f) OVERRIDE;
+  virtual void dump (FILE *f) override;
   void debug ();
   void dump_bb (FILE *f, basic_block bb);
   auto_edge_flag non_executable_edge_flag;
   bool fold_stmt (gimple_stmt_iterator *gsi, tree (*) (tree));
-  void register_side_effects (gimple *s);
+  void register_inferred_ranges (gimple *s);
 protected:
   bool fold_range_internal (irange &r, gimple *s, tree name);
   void prefill_name (irange &r, tree name);
@@ -69,12 +69,15 @@ protected:
   range_tracer tracer;
   basic_block current_bb;
   vec<tree> m_stmt_list;
+  friend class path_range_query;
 };
 
 /* Create a new ranger instance and associate it with a function.
    Each call must be paired with a call to disable_ranger to release
-   resources.  */
-extern gimple_ranger *enable_ranger (struct function *);
+   resources.  If USE_IMM_USES is true, pre-calculate sideffects like
+   non-null uses as required using the immediate use chains.  */
+extern gimple_ranger *enable_ranger (struct function *m,
+				     bool use_imm_uses = true);
 extern void disable_ranger (struct function *);
 
 #endif // GCC_GIMPLE_RANGE_H

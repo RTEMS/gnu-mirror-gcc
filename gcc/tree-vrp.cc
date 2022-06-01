@@ -3795,8 +3795,8 @@ public:
   void finalize ();
 
 private:
-  enum ssa_prop_result visit_stmt (gimple *, edge *, tree *) FINAL OVERRIDE;
-  enum ssa_prop_result visit_phi (gphi *) FINAL OVERRIDE;
+  enum ssa_prop_result visit_stmt (gimple *, edge *, tree *) final override;
+  enum ssa_prop_result visit_phi (gphi *) final override;
 
   struct function *fun;
   vr_values *m_vr_values;
@@ -4036,11 +4036,11 @@ class vrp_folder : public substitute_and_fold_engine
   void simplify_casted_conds (function *fun);
 
 private:
-  tree value_of_expr (tree name, gimple *stmt) OVERRIDE
+  tree value_of_expr (tree name, gimple *stmt) override
     {
       return m_vr_values->value_of_expr (name, stmt);
     }
-  bool fold_stmt (gimple_stmt_iterator *) FINAL OVERRIDE;
+  bool fold_stmt (gimple_stmt_iterator *) final override;
   bool fold_predicate_in (gimple_stmt_iterator *);
 
   vr_values *m_vr_values;
@@ -4269,7 +4269,7 @@ public:
     delete m_pta;
   }
 
-  tree value_of_expr (tree name, gimple *s = NULL) OVERRIDE
+  tree value_of_expr (tree name, gimple *s = NULL) override
   {
     // Shortcircuit subst_and_fold callbacks for abnormal ssa_names.
     if (TREE_CODE (name) == SSA_NAME && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (name))
@@ -4280,7 +4280,7 @@ public:
     return ret;
   }
 
-  tree value_on_edge (edge e, tree name) OVERRIDE
+  tree value_on_edge (edge e, tree name) override
   {
     // Shortcircuit subst_and_fold callbacks for abnormal ssa_names.
     if (TREE_CODE (name) == SSA_NAME && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (name))
@@ -4291,7 +4291,7 @@ public:
     return ret;
   }
 
-  tree value_of_stmt (gimple *s, tree name = NULL) OVERRIDE
+  tree value_of_stmt (gimple *s, tree name = NULL) override
   {
     // Shortcircuit subst_and_fold callbacks for abnormal ssa_names.
     if (TREE_CODE (name) == SSA_NAME && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (name))
@@ -4299,27 +4299,30 @@ public:
     return m_ranger->value_of_stmt (s, name);
   }
 
-  void pre_fold_bb (basic_block bb) OVERRIDE
+  void pre_fold_bb (basic_block bb) override
   {
     m_pta->enter (bb);
+    for (gphi_iterator gsi = gsi_start_phis (bb); !gsi_end_p (gsi);
+	 gsi_next (&gsi))
+      m_ranger->register_inferred_ranges (gsi.phi ());
   }
 
-  void post_fold_bb (basic_block bb) OVERRIDE
+  void post_fold_bb (basic_block bb) override
   {
     m_pta->leave (bb);
   }
 
-  void pre_fold_stmt (gimple *stmt) OVERRIDE
+  void pre_fold_stmt (gimple *stmt) override
   {
     m_pta->visit_stmt (stmt);
   }
 
-  bool fold_stmt (gimple_stmt_iterator *gsi) OVERRIDE
+  bool fold_stmt (gimple_stmt_iterator *gsi) override
   {
     bool ret = m_simplifier.simplify (gsi);
     if (!ret)
       ret = m_ranger->fold_stmt (gsi, follow_single_use_edges);
-    m_ranger->register_side_effects (gsi_stmt (*gsi));
+    m_ranger->register_inferred_ranges (gsi_stmt (*gsi));
     return ret;
   }
 
@@ -4342,10 +4345,9 @@ execute_ranger_vrp (struct function *fun, bool warn_array_bounds_p)
   calculate_dominance_info (CDI_DOMINATORS);
 
   set_all_edges_as_executable (fun);
-  gimple_ranger *ranger = enable_ranger (fun);
+  gimple_ranger *ranger = enable_ranger (fun, false);
   rvrp_folder folder (ranger);
   folder.substitute_and_fold ();
-  ranger->export_global_ranges ();
   if (dump_file && (dump_flags & TDF_DETAILS))
     ranger->dump (dump_file);
 

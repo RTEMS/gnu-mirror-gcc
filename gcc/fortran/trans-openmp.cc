@@ -169,6 +169,48 @@ gfc_omp_array_data (tree decl, bool type_only)
   return decl;
 }
 
+/* Return the byte-size of the passed array descriptor. */
+
+tree
+gfc_omp_array_size (tree decl, gimple_seq *pre_p)
+{
+  stmtblock_t block;
+  if (POINTER_TYPE_P (TREE_TYPE (decl)))
+    decl = build_fold_indirect_ref (decl);
+  tree type = TREE_TYPE (decl);
+  gcc_assert (GFC_DESCRIPTOR_TYPE_P (type));
+  bool allocatable = (GFC_TYPE_ARRAY_AKIND (type) == GFC_ARRAY_ALLOCATABLE
+		      || GFC_TYPE_ARRAY_AKIND (type) == GFC_ARRAY_POINTER
+		      || GFC_TYPE_ARRAY_AKIND (type) == GFC_ARRAY_POINTER_CONT);
+  gfc_init_block (&block);
+  tree size = gfc_full_array_size (&block, decl,
+				   GFC_TYPE_ARRAY_RANK (TREE_TYPE (decl)));
+  size = fold_convert (size_type_node, size);
+  tree elemsz = gfc_get_element_type (TREE_TYPE (decl));
+  if (TREE_CODE (elemsz) == ARRAY_TYPE && TYPE_STRING_FLAG (elemsz))
+    elemsz = gfc_conv_descriptor_elem_len (decl);
+  else
+    elemsz = TYPE_SIZE_UNIT (elemsz);
+  size = fold_build2 (MULT_EXPR, size_type_node, size, elemsz);
+  if (!allocatable)
+    gimplify_and_add (gfc_finish_block (&block), pre_p);
+  else
+    {
+      tree var = create_tmp_var (size_type_node);
+      gfc_add_expr_to_block (&block, build2 (MODIFY_EXPR, sizetype, var, size));
+      tree tmp = fold_build2_loc (input_location, NE_EXPR, boolean_type_node,
+				  gfc_conv_descriptor_data_get (decl),
+				  null_pointer_node);
+      tmp = build3_loc (input_location, COND_EXPR, void_type_node, tmp,
+			gfc_finish_block (&block),
+			build2 (MODIFY_EXPR, sizetype, var, size_zero_node));
+      gimplify_and_add (tmp, pre_p);
+      size = var;
+    }
+  return size;
+}
+
+
 /* True if OpenMP should privatize what this DECL points to rather
    than the DECL itself.  */
 
@@ -1922,16 +1964,7 @@ gfc_trans_omp_variable_list (enum omp_clause_code code,
 	if (t != error_mark_node)
 	  {
 	    tree node;
-	    /* For HAS_DEVICE_ADDR of an array descriptor, firstprivatize the
-	       descriptor such that the bounds are available; its data component
-	       is unmodified; it is handled as device address inside target. */
-	    if (code == OMP_CLAUSE_HAS_DEVICE_ADDR
-		&& (GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (t))
-		    || (POINTER_TYPE_P (TREE_TYPE (t))
-			&& GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (TREE_TYPE (t))))))
-	      node = build_omp_clause (input_location, OMP_CLAUSE_FIRSTPRIVATE);
-	    else
-	      node = build_omp_clause (input_location, code);
+	    node = build_omp_clause (input_location, code);
 	    OMP_CLAUSE_DECL (node) = t;
 	    list = gfc_trans_add_clause (node, list);
 
@@ -2880,14 +2913,16 @@ gfc_trans_omp_clauses (stmtblock_t *block, gfc_omp_clauses *clauses,
 		  continue;
 		}
 
-	      if (!n->sym->attr.referenced)
+	      if (n->sym && !n->sym->attr.referenced)
 		continue;
 
 	      tree node = build_omp_clause (input_location,
 					    list == OMP_LIST_DEPEND
 					    ? OMP_CLAUSE_DEPEND
 					    : OMP_CLAUSE_AFFINITY);
-	      if (n->expr == NULL || n->expr->ref->u.ar.type == AR_FULL)
+	      if (n->sym == NULL)  /* omp_all_memory  */
+		OMP_CLAUSE_DECL (node) = null_pointer_node;
+	      else if (n->expr == NULL || n->expr->ref->u.ar.type == AR_FULL)
 		{
 		  tree decl = gfc_trans_omp_variable (n->sym, false);
 		  if (gfc_omp_privatize_by_reference (decl))
@@ -2934,6 +2969,9 @@ gfc_trans_omp_clauses (stmtblock_t *block, gfc_omp_clauses *clauses,
 		    break;
 		  case OMP_DEPEND_INOUT:
 		    OMP_CLAUSE_DEPEND_KIND (node) = OMP_CLAUSE_DEPEND_INOUT;
+		    break;
+		  case OMP_DEPEND_INOUTSET:
+		    OMP_CLAUSE_DEPEND_KIND (node) = OMP_CLAUSE_DEPEND_INOUTSET;
 		    break;
 		  case OMP_DEPEND_MUTEXINOUTSET:
 		    OMP_CLAUSE_DEPEND_KIND (node)
@@ -3312,9 +3350,15 @@ gfc_trans_omp_clauses (stmtblock_t *block, gfc_omp_clauses *clauses,
 		  /* An array element or array section which is not part of a
 		     derived type, etc.  */
 		  bool element = n->expr->ref->u.ar.type == AR_ELEMENT;
-		  gfc_trans_omp_array_section (block, n, decl, element,
-					       GOMP_MAP_POINTER, node, node2,
-					       node3, node4);
+		  tree type = TREE_TYPE (decl);
+		  gomp_map_kind k = GOMP_MAP_POINTER;
+		  if (!openacc
+		      && !GFC_DESCRIPTOR_TYPE_P (type)
+		      && !(POINTER_TYPE_P (type)
+			   && GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (type))))
+		    k = GOMP_MAP_FIRSTPRIVATE_POINTER;
+		  gfc_trans_omp_array_section (block, n, decl, element, k,
+					       node, node2, node3, node4);
 		}
 	      else if (n->expr
 		       && n->expr->expr_type == EXPR_VARIABLE
@@ -5525,7 +5569,9 @@ gfc_trans_omp_depobj (gfc_code *code)
   if (n)
     {
       tree var;
-      if (n->expr && n->expr->ref->u.ar.type != AR_FULL)
+      if (!n->sym)  /* omp_all_memory.  */
+	var = null_pointer_node;
+      else if (n->expr && n->expr->ref->u.ar.type != AR_FULL)
 	{
 	  gfc_init_se (&se, NULL);
 	  if (n->expr->ref->u.ar.type == AR_ELEMENT)
@@ -5583,6 +5629,7 @@ gfc_trans_omp_depobj (gfc_code *code)
       case OMP_DEPEND_IN: k = GOMP_DEPEND_IN; break;
       case OMP_DEPEND_OUT: k = GOMP_DEPEND_OUT; break;
       case OMP_DEPEND_INOUT: k = GOMP_DEPEND_INOUT; break;
+      case OMP_DEPEND_INOUTSET: k = GOMP_DEPEND_INOUTSET; break;
       case OMP_DEPEND_MUTEXINOUTSET: k = GOMP_DEPEND_MUTEXINOUTSET; break;
       default: gcc_unreachable ();
       }

@@ -984,7 +984,7 @@ extern (C++) class Dsymbol : ASTNode
      */
     uinteger_t size(const ref Loc loc)
     {
-        error("Dsymbol `%s` has no size", toChars());
+        error("symbol `%s` has no size", toChars());
         return SIZE_INVALID;
     }
 
@@ -1641,6 +1641,32 @@ public:
         }
     }
 
+
+    /*****************************************
+     * Returns: the symbols whose members have been imported, i.e. imported modules
+     * and template mixins.
+     *
+     * See_Also: importScope
+     */
+    extern (D) final Dsymbols* getImportedScopes() nothrow @nogc @safe pure
+    {
+        return importedScopes;
+    }
+
+    /*****************************************
+     * Returns: the array of visibilities associated with each imported scope. The
+     * length of the array matches the imported scopes array.
+     *
+     * See_Also: getImportedScopes
+     */
+    extern (D) final Visibility.Kind[] getImportVisibilities() nothrow @nogc @safe pure
+    {
+        if (!importedScopes)
+            return null;
+
+        return (() @trusted => visibilities[0 .. importedScopes.dim])();
+    }
+
     extern (D) final void addAccessiblePackage(Package p, Visibility visibility) nothrow
     {
         auto pary = visibility.kind == Visibility.Kind.private_ ? &privateAccessiblePackages : &accessiblePackages;
@@ -1952,8 +1978,9 @@ extern (C++) final class ArrayScopeSymbol : ScopeDsymbol
         }
 
         const DYNCAST kind = arrayContent.dyncast();
-        if (kind == DYNCAST.dsymbol)
+        switch (kind) with (DYNCAST)
         {
+        case dsymbol:
             TupleDeclaration td = cast(TupleDeclaration) arrayContent;
             /* $ gives the number of elements in the tuple
              */
@@ -1963,10 +1990,10 @@ extern (C++) final class ArrayScopeSymbol : ScopeDsymbol
             v.storage_class |= STC.temp | STC.static_ | STC.const_;
             v.dsymbolSemantic(sc);
             return v;
-        }
-        if (kind == DYNCAST.type)
-        {
+        case type:
             return dollarFromTypeTuple(loc, cast(TypeTuple) arrayContent, sc);
+        default:
+            break;
         }
         Expression exp = cast(Expression) arrayContent;
         if (auto ie = exp.isIndexExp())
@@ -2505,6 +2532,16 @@ Dsymbol handleSymbolRedeclarations(ref Scope sc, Dsymbol s, Dsymbol s2, ScopeDsy
         if (log) printf(" collision\n");
         return null;
     }
+    /*
+    Handle merging declarations with asm("foo") and their definitions
+    */
+    static void mangleWrangle(Declaration oldDecl, Declaration newDecl)
+    {
+        if (oldDecl && newDecl)
+        {
+            newDecl.mangleOverride = oldDecl.mangleOverride ? oldDecl.mangleOverride : null;
+        }
+    }
 
     auto vd = s.isVarDeclaration(); // new declaration
     auto vd2 = s2.isVarDeclaration(); // existing declaration
@@ -2521,6 +2558,8 @@ Dsymbol handleSymbolRedeclarations(ref Scope sc, Dsymbol s, Dsymbol s2, ScopeDsy
 
         if (i1 && i2)
             return collision();         // can't both have initializers
+
+        mangleWrangle(vd2, vd);
 
         if (i1)                         // vd is the definition
         {
@@ -2566,6 +2605,8 @@ Dsymbol handleSymbolRedeclarations(ref Scope sc, Dsymbol s, Dsymbol s2, ScopeDsy
 
         if (fd.fbody && fd2.fbody)
             return collision();         // can't both have bodies
+
+        mangleWrangle(fd2, fd);
 
         if (fd.fbody)                   // fd is the definition
         {

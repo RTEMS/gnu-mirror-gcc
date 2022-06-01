@@ -1111,7 +1111,7 @@ package body Sem_Ch5 is
 
          --  Where the object is the same on both sides
 
-         and then Same_Object (Lhs, Original_Node (Rhs))
+         and then Same_Object (Lhs, Rhs)
 
          --  But exclude the case where the right side was an operation that
          --  got rewritten (e.g. JUNK + K, where K was known to be zero). We
@@ -1207,21 +1207,12 @@ package body Sem_Ch5 is
                --  There may have been a previous reference to a component of
                --  the variable, which in general removes the Last_Assignment
                --  field of the variable to indicate a relevant use of the
-               --  previous assignment. However, if the assignment is to a
-               --  subcomponent the reference may not have registered, because
-               --  it is not possible to determine whether the context is an
-               --  assignment. In those cases we generate a Deferred_Reference,
-               --  to be used at the end of compilation to generate the right
-               --  kind of reference, and we suppress a potential warning for
-               --  a useless assignment, which might be premature. This may
-               --  lose a warning in rare cases, but seems preferable to a
-               --  misleading warning.
+               --  previous assignment.
 
                if Warn_On_Modified_Unread
                  and then Is_Assignable (Ent)
                  and then Comes_From_Source (N)
                  and then In_Extended_Main_Source_Unit (Ent)
-                 and then not Has_Deferred_Reference (Ent)
                  and then not Has_Target_Names (N)
                then
                   Warn_On_Useless_Assignment (Ent, N);
@@ -2316,7 +2307,7 @@ package body Sem_Ch5 is
                           Defining_Identifier => S,
                           Subtype_Indication  => New_Copy_Tree (Subt));
             begin
-               Insert_Before (Parent (Parent (N)), Decl);
+               Insert_Action (N, Decl);
                Analyze (Decl);
                Rewrite (Subt, New_Occurrence_Of (S, Sloc (Subt)));
             end;
@@ -2761,9 +2752,21 @@ package body Sem_Ch5 is
                end;
             end if;
 
-         --  IN iterator, domain is a range, or a call to Iterate function
+         --  IN iterator, domain is a range, a call to Iterate function,
+         --  or an object/actual parameter of an iterator type.
 
          else
+            --  If the type of the name is class-wide and its root type is a
+            --  derived type, the primitive operations (First, Next, etc.) are
+            --  those inherited by its specific type. Calls to these primitives
+            --  will be dispatching.
+
+            if Is_Class_Wide_Type (Typ)
+              and then Is_Derived_Type (Etype (Typ))
+            then
+               Typ := Etype (Typ);
+            end if;
+
             --  For an iteration of the form IN, the name must denote an
             --  iterator, typically the result of a call to Iterate. Give a
             --  useful error message when the name is a container by itself.
@@ -3675,6 +3678,7 @@ package body Sem_Ch5 is
          begin
             return
               Present (Def_Iter)
+                and then Present (Etype (Def_Iter))
                 and then Requires_Transient_Scope (Etype (Def_Iter));
          end Has_Sec_Stack_Default_Iterator;
 

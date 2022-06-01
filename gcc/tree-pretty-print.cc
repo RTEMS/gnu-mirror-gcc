@@ -517,8 +517,11 @@ dump_omp_clause (pretty_printer *pp, tree clause, int spc, dump_flags_t flags)
     case OMP_CLAUSE__SCANTEMP_:
       name = "_scantemp_";
       goto print_remap;
-    case OMP_CLAUSE_TO_DECLARE:
-      name = "to";
+    case OMP_CLAUSE_ENTER:
+      if (OMP_CLAUSE_ENTER_TO (clause))
+	name = "to";
+      else
+	name = "enter";
       goto print_remap;
     case OMP_CLAUSE_LINK:
       name = "link";
@@ -803,6 +806,9 @@ dump_omp_clause (pretty_printer *pp, tree clause, int spc, dump_flags_t flags)
 	  break;
 	case OMP_CLAUSE_DEPEND_MUTEXINOUTSET:
 	  name = "mutexinoutset";
+	  break;
+	case OMP_CLAUSE_DEPEND_INOUTSET:
+	  name = "inoutset";
 	  break;
 	case OMP_CLAUSE_DEPEND_SOURCE:
 	  pp_string (pp, "source)");

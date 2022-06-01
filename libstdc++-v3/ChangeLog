@@ -1,3 +1,585 @@
+2022-05-27  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/105671
+	* include/std/sstream (basic_stringbuf::_M_high_mark): Add
+	always_inline attribute.
+
+2022-05-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/105681
+	* include/ext/pb_ds/detail/resize_policy/hash_prime_size_policy_imp.hpp:
+	Limit ga_sizes array to values that fit in size_t.
+	* include/ext/random [__SIZE_WIDTH < 32] (sfmt86243)
+	(sfmt86243_64, sfmt132049, sfmt132049_64, sfmt216091)
+	(sfmt216091_64): Do not declare.
+
+2022-05-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	* python/libstdcxx/v6/printers.py (StdErrorCodePrinter): Make
+	lookup for ios_errc and future_errc check versioned namespace.
+	(StdAtomicPrinter): Strip versioned namespace from typename.
+
+2022-05-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++11/Makefile.am: Add new source file.
+	* src/c++11/Makefile.in: Regenerate.
+	* src/c++11/cxx11-ios_failure.cc (iostream_category):
+	Move to ...
+	* src/c++11/ios_errcat.cc: New file.
+	* testsuite/27_io/ios_base/failure/error_code.cc: Check that
+	std::iostream_category() is defined and used for std::io_errc.
+
+2022-05-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/stl_iterator.h (counted_iterator::operator++(int)):
+	Add 'constexpr' as per LWG 3643.
+	* testsuite/24_iterators/counted_iterator/lwg3643.cc: New test.
+
+2022-05-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/functional_hash.h (__is_fast_hash): Add doxygen
+	comment.
+	* include/bits/hashtable.h: Do not include <bits/stl_function.h>
+	here.
+	* include/bits/hashtable_policy.h: Include <bits/stl_pair.h> and
+	<bits/functional_hash.h>.
+	* include/bits/unordered_map.h: Include required headers.
+	* include/bits/unordered_set.h: Likewise.
+	* include/std/unordered_map: Do not include headers for indirect
+	dependencies.
+	* include/std/unordered_set: Likewise.
+
+2022-05-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/ranges_algobase.h: Do not include
+	<bits/stl_iterator_base_types.h>.
+	* include/std/string: Likewise.
+	* include/std/variant: Likewise.
+
+2022-05-26  Nathan Sidwell  <nathan@acm.org>
+
+	* include/bits/hashtable.h: Include required headers.
+	* include/bits/hashtable_policy.h: Likewise.
+	* include/bits/stl_heap.h: Likewise.
+	* include/bits/stl_iterator_base_funcs.h: Likewise.
+
+2022-05-26  François Dumont  <fdumont@gcc.gnu.org>
+
+	* python/libstdcxx/v6/printers.py (StdSpanPrinter.__init__):
+	Strip typename from version namespace.
+
+2022-05-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	* python/libstdcxx/v6/printers.py (SharedPointerPrinter): Strip
+	versioned namespace from the template argument too.
+
+2022-05-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/21_strings/basic_string/modifiers/pop_back/char/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/modifiers/pop_back/char.cc:
+	...here.
+	* testsuite/21_strings/basic_string/modifiers/pop_back/wchar_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/modifiers/pop_back/wchar_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string/modifiers/swap/wchar_t/constexpr.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/modifiers/swap/constexpr-wchar_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string/modifiers/swap/char/constexpr.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/modifiers/swap/constexpr.cc:
+	...here.
+	* testsuite/21_strings/basic_string/operations/contains/char/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/operations/contains/char.cc:
+	...here.
+	* testsuite/21_strings/basic_string/operations/contains/wchar_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/operations/contains/wchar_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string/operations/data/char/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/operations/data/char.cc:
+	...here.
+	* testsuite/21_strings/basic_string/operations/data/wchar_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/operations/data/wchar_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string/operations/ends_with/char/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/operations/ends_with/char.cc:
+	...here.
+	* testsuite/21_strings/basic_string/operations/ends_with/wchar_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/operations/ends_with/wchar_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string/operations/starts_with/char/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/operations/starts_with/char.cc:
+	...here.
+	* testsuite/21_strings/basic_string/operations/starts_with/wchar_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/operations/starts_with/wchar_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string/operations/substr/char/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/operations/substr/char.cc:
+	...here.
+	* testsuite/21_strings/basic_string/operations/substr/wchar_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/operations/substr/wchar_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string/range_access/char/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/range_access/char.cc:
+	...here.
+	* testsuite/21_strings/basic_string/range_access/wchar_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/range_access/wchar_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/modifiers/remove_prefix/char/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/modifiers/remove_prefix/char.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/modifiers/remove_prefix/wchar_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/modifiers/remove_prefix/wchar_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/modifiers/remove_suffix/char/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/modifiers/remove_suffix/char.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/modifiers/remove_suffix/wchar_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/modifiers/remove_suffix/wchar_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/modifiers/swap/char/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/modifiers/swap/char.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/modifiers/swap/wchar_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/modifiers/swap/wchar_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/operations/contains/char/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/operations/contains/char.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/operations/contains/wchar_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/operations/contains/wchar_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/operations/data/char/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/operations/data/char.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/operations/data/wchar_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/operations/data/wchar_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/operations/ends_with/char/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/operations/ends_with/char.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/operations/ends_with/wchar_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/operations/ends_with/wchar_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/operations/starts_with/char/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/operations/starts_with/char.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/operations/starts_with/wchar_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/operations/starts_with/wchar_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/operations/substr/char/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/operations/substr/char.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/operations/substr/wchar_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/operations/substr/wchar_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/range_access/char/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/range_access/char.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/range_access/wchar_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/range_access/wchar_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string/requirements/explicit_instantiation/char/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/requirements/explicit_instantiation/char.cc:
+	...here.
+	* testsuite/21_strings/basic_string/requirements/explicit_instantiation/char16_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/requirements/explicit_instantiation/char16_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string/requirements/explicit_instantiation/char32_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/requirements/explicit_instantiation/char32_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string/requirements/explicit_instantiation/char8_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/requirements/explicit_instantiation/char8_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string/requirements/explicit_instantiation/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/requirements/explicit_instantiation/int.cc:
+	...here.
+	* testsuite/21_strings/basic_string/requirements/explicit_instantiation/wchar_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string/requirements/explicit_instantiation/wchar_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/requirements/explicit_instantiation/char/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/requirements/explicit_instantiation/char.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/requirements/explicit_instantiation/char16_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/requirements/explicit_instantiation/char16_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/requirements/explicit_instantiation/char32_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/requirements/explicit_instantiation/char32_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/requirements/explicit_instantiation/char8_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/requirements/explicit_instantiation/char8_t.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/requirements/explicit_instantiation/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/requirements/explicit_instantiation/int.cc:
+	...here.
+	* testsuite/21_strings/basic_string_view/requirements/explicit_instantiation/wchar_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/basic_string_view/requirements/explicit_instantiation/wchar_t.cc:
+	...here.
+	* testsuite/21_strings/char_traits/requirements/explicit_instantiation/char/1.cc:
+	Moved to...
+	* testsuite/21_strings/char_traits/requirements/explicit_instantiation/char.cc:
+	...here.
+	* testsuite/21_strings/char_traits/requirements/explicit_instantiation/char16_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/char_traits/requirements/explicit_instantiation/char16_t.cc:
+	...here.
+	* testsuite/21_strings/char_traits/requirements/explicit_instantiation/char32_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/char_traits/requirements/explicit_instantiation/char32_t.cc:
+	...here.
+	* testsuite/21_strings/char_traits/requirements/explicit_instantiation/char8_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/char_traits/requirements/explicit_instantiation/char8_t.cc:
+	...here.
+	* testsuite/21_strings/char_traits/requirements/explicit_instantiation/short/1.cc:
+	Moved to...
+	* testsuite/21_strings/char_traits/requirements/explicit_instantiation/short.cc:
+	...here.
+	* testsuite/21_strings/char_traits/requirements/explicit_instantiation/wchar_t/1.cc:
+	Moved to...
+	* testsuite/21_strings/char_traits/requirements/explicit_instantiation/wchar_t.cc:
+	...here.
+
+2022-05-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/20_util/duration/requirements/explicit_instantiation/explicit_instantiation.cc:
+	Moved to...
+	* testsuite/20_util/duration/requirements/explicit_instantiation.cc: ...here.
+	* testsuite/20_util/time_point/requirements/explicit_instantiation/explicit_instantiation.cc:
+	Moved to...
+	* testsuite/20_util/time_point/requirements/explicit_instantiation.cc: ...here.
+	* testsuite/20_util/unique_ptr/requirements/explicit_instantiation/explicit_instantiation.cc:
+	Moved to...
+	* testsuite/20_util/unique_ptr/requirements/explicit_instantiation.cc: ...here.
+
+2022-05-25  Jason Merrill  <jason@redhat.com>
+
+	* testsuite/20_util/function_objects/constexpr_searcher.cc: Add
+	constexpr.
+
+2022-05-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/26_numerics/random/bernoulli_distribution/operators/values.cc:
+	Run fewer iterations for simulator targets.
+	* testsuite/26_numerics/random/binomial_distribution/operators/values.cc:
+	Likewise.
+	* testsuite/26_numerics/random/discrete_distribution/operators/values.cc:
+	Likewise.
+	* testsuite/26_numerics/random/geometric_distribution/operators/values.cc:
+	Likewise.
+	* testsuite/26_numerics/random/negative_binomial_distribution/operators/values.cc:
+	Likewise.
+	* testsuite/26_numerics/random/poisson_distribution/operators/values.cc:
+	Likewise.
+	* testsuite/26_numerics/random/uniform_int_distribution/operators/values.cc:
+	Likewise.
+
+2022-05-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/char_traits.h: Only include <cstdint> when
+	necessary.
+	* include/std/stacktrace: Use __UINTPTR_TYPE__ instead of
+	uintptr_t.
+	* src/c++11/cow-stdexcept.cc: Include <stdint.h>.
+	* src/c++17/floating_to_chars.cc: Likewise.
+	* testsuite/20_util/assume_aligned/1.cc: Include <cstdint>.
+	* testsuite/20_util/assume_aligned/3.cc: Likewise.
+	* testsuite/20_util/shared_ptr/creation/array.cc: Likewise.
+
+2022-05-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/basic_string.h: Do not include <ext/atomicity.h>
+	here.
+	* include/bits/cow_string.h: Include it here.
+
+2022-05-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/Makefile.am: Add new header.
+	* include/Makefile.in: Regenerate.
+	* include/bits/memory_resource.h: New file.
+	* include/std/deque: Include <bits/memory_resource.h>.
+	* include/std/forward_list: Likewise.
+	* include/std/list: Likewise.
+	* include/std/map: Likewise.
+	* include/std/memory_resource (pmr::memory_resource): Move to
+	new <bits/memory_resource.h> header.
+	(pmr::polymorphic_allocator): Likewise.
+	* include/std/regex: Likewise.
+	* include/std/set: Likewise.
+	* include/std/stacktrace: Likewise.
+	* include/std/string: Likewise.
+	* include/std/unordered_map: Likewise.
+	* include/std/unordered_set: Likewise.
+	* include/std/vector: Likewise.
+	* testsuite/21_strings/basic_string/types/pmr_typedefs.cc:
+	Remove <memory_resource> header and check construction.
+	* testsuite/23_containers/deque/types/pmr_typedefs.cc: Likewise.
+	* testsuite/23_containers/forward_list/pmr_typedefs.cc:
+	Likewise.
+	* testsuite/23_containers/list/pmr_typedefs.cc: Likewise.
+	* testsuite/23_containers/map/pmr_typedefs.cc: Likewise.
+	* testsuite/23_containers/multimap/pmr_typedefs.cc: Likewise.
+	* testsuite/23_containers/multiset/pmr_typedefs.cc: Likewise.
+	* testsuite/23_containers/set/pmr_typedefs.cc: Likewise.
+	* testsuite/23_containers/unordered_map/pmr_typedefs.cc:
+	Likewise.
+	* testsuite/23_containers/unordered_multimap/pmr_typedefs.cc:
+	Likewise.
+	* testsuite/23_containers/unordered_multiset/pmr_typedefs.cc:
+	Likewise.
+	* testsuite/23_containers/unordered_set/pmr_typedefs.cc:
+	Likewise.
+	* testsuite/23_containers/vector/pmr_typedefs.cc: Likewise.
+	* testsuite/28_regex/match_results/pmr_typedefs.cc: Likewise.
+
+2022-05-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/memory_resource (polymorphic_allocator): Add
+	non-template equality operator, as proposed for LWG 3683.
+	* testsuite/20_util/polymorphic_allocator/lwg3683.cc: New test.
+
+2022-05-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++17/memory_resource.cc (set_default_resource): Use
+	memory_order_acq_rel.
+	(get_default_resource): Use memory_order_acquire.
+
+2022-05-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/memory_resource (new_delete_resource): Add
+	nodiscard, returns_nonnull and const attributes.
+	(null_memory_resource): Likewise.
+	(set_default_resource, get_default_resource): Add returns_nonnull
+	attribute.
+	(memory_resource::is_equal): Add nodiscard attribute.
+	(operator==, operator!=): Likewise.
+
+2022-05-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/ios_base.h (io_category): Add const and nodiscard
+	attributes.
+	(make_error_code, make_error_condition): Add nodiscard.
+	* include/std/future (future_category): Add const and nodiscard.
+	(make_error_code, make_error_condition): Add nodiscard.
+	* include/std/system_error (generic_category system_category):
+	Add nodiscard. Replace _GLIBCXX_CONST with C++11 attribute.
+	(error_code::value, error_code::category, error_code::operator bool)
+	(error_condition::value, error_condition::category)
+	(error_condition::operator bool, make_error_code)
+	(make_error_condition, operator==, operator!=, operator<=>): Add
+	nodiscard.
+
+2022-05-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/20_util/expected/synopsis.cc: Skip for versioned
+	namespace.
+	* testsuite/27_io/headers/iosfwd/synopsis.cc: Likewise.
+
+2022-05-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/Makefile.am [ENABLE_SYMVERS_GNU_NAMESPACE] (cxx11_sources):
+	Do not build the compatibility*-c++0x.cc objects.
+	* src/Makefile.in: Regenerate.
+	* src/c++11/compatibility-c++0x.cc [_GLIBCXX_INLINE_VERSION]:
+	Refuse to build for the versioned namespace.
+	* src/c++11/compatibility-chrono.cc: Likewise.
+	* src/c++11/compatibility-condvar.cc: Likewise.
+	* src/c++11/compatibility-thread-c++0x.cc: Likewise.
+	* src/c++11/chrono.cc (system_clock, steady_clock):
+	Use macros to define in inline namespace _V2, matching the
+	declarations in <system_error>.
+	* src/c++11/system_error.cc (system_category, generic_category):
+	Likewise.
+
+2022-05-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/prerequisites.xml: Fix attributes for external
+	hyperlink.
+	* doc/html/manual/setup.html: Regenerate.
+
+2022-05-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/status_cxx2023.xml: Update with gcc-12 support.
+	* doc/html/*: Regenerate.
+
+2022-05-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/intro.xml: Include new chapter.
+	* doc/xml/manual/status_cxx2020.xml: Tweak release numbers.
+	* doc/xml/manual/status_cxx2023.xml: New file.
+	* doc/html/*: Regenerate.
+
+2022-05-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/html/manual/status.html: Regenerate.
+	* doc/xml/manual/status_cxx2020.xml: Fix supported version for
+	C++20 bit operations.
+
+2022-05-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/std_thread.h (thread::_State, thread::_State_ptr):
+	Declare as private unless _GLIBCXX_THREAD_IMPL is defined.
+	* src/c++11/thread.cc (_GLIBCXX_THREAD_IMPL): Define.
+
+2022-05-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/future (launch): Make operators noexcept.
+
+2022-05-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/doxygen/user.cfg.in (PREDEFINED): Replace __exception_ptr
+	with "__unspecified__".
+	* libsupc++/exception_ptr.h: Improve doxygen docs.
+	(__exception_ptr::swap): Also declare in namespace std.
+
+2022-05-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	* libsupc++/nested_exception.h (throw_with_nested) [C++17]: Use
+	if-constexpr instead of tag dispatching.
+	(rethrow_if_nested) [C++17]: Likewise.
+	(rethrow_if_nested) [!__cpp_rtti]: Do not use dynamic_cast if it
+	would require RTTI.
+	* testsuite/18_support/nested_exception/rethrow_if_nested-term.cc:
+	New test.
+
+2022-05-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/doxygen/user.cfg.in (PREDEFINED): Define
+	_GTHREAD_USE_MUTEX_TIMEDLOCK macro.
+	* include/bits/std_mutex.h (mutex, lock_guard): Use @since and
+	@headerfile.
+	* include/bits/unique_lock.h (unique_lock): Likewise.
+	* include/std/mutex (recursive_mutex, timed_mutex)
+	(recursive_timed_mutex, scoped_lock): Likewise.
+
+2022-05-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/doxygen/user.cfg.in (PREDEFINED): Define
+	_GLIBCXX23_CONSTEXPR macro.
+	* include/backward/auto_ptr.h (auto_ptr): Use @deprecated.
+	* include/bits/unique_ptr.h (default_delete): Use @since and
+	@headerfile.
+	* include/std/scoped_allocator: Remove @ingroup from @file
+	block.
+
+2022-05-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/std_thread.h (thread, thread::id): Improve
+	doxygen docs.
+	* include/std/future: Likewise.
+	* include/std/thread (jthread): Likewise.
+
+2022-05-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/ostream_insert.h: Mark helper functions as
+	undocumented by Doxygen.
+	* include/bits/stl_algo.h: Use markdown for formatting and mark
+	helper functions as undocumented.
+	* include/bits/stl_numeric.h:  Likewise.
+	* include/bits/stl_pair.h (pair): Add @headerfile.
+
+2022-05-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/doxygen/user.cfg.in (PREDEFINED): Define __allocator_base
+	so that Doxygen shows the right base-class for std::allocator.
+	* include/bits/alloc_traits.h: Improve doxygen docs.
+	* include/bits/allocator.h: Likewise.
+	* include/bits/new_allocator.h: Likewise.
+	* include/ext/new_allocator.h: Likewise.
+
+2022-05-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/doxygen/user.cfg.in (PREDEFINED): Define macro
+	_GLIBCXX_DOXYGEN_ONLY to expand its argument.
+	* include/bits/c++config (_GLIBCXX_DOXYGEN_ONLY): Define.
+	* include/bits/regex.h: Improve doxygen docs.
+	* include/bits/regex_constants.h: Likewise.
+	* include/bits/regex_error.h: Likewise.
+
+2022-05-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/atomic: Suppress doxygen docs for
+	implementation details.
+	* include/bits/atomic_base.h: Likewise.
+	* include/bits/shared_ptr_atomic.h: Use markdown. Fix grouping
+	so that std::atomic is not added to the pointer abstractions
+	group.
+
+2022-05-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/system_error: Improve doxygen comments.
+
+2022-05-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/ptr_traits.h: Add some doxygen comments.
+
+2022-05-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/doxygen/user.cfg.in (PREDEFINED): Expand new macros to
+	nothing.
+	* include/bits/c++config (_GLIBCXX_BEGIN_INLINE_ABI_NAMESPACE)
+	(_GLIBCXX_END_INLINE_ABI_NAMESPACE): Define new macros.
+	* include/bits/algorithmfwd.h (_V2::__rotate): Use new macros
+	for the namespace.
+	* include/bits/chrono.h (chrono::_V2::system_clock): Likewise.
+	* include/bits/stl_algo.h (_V2::__rotate): Likewise.
+	* include/std/condition_variable (_V2::condition_variable_any):
+	Likewise.
+	* include/std/system_error (_V2::error_category): Likewise.
+
+2022-05-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/mofunc_impl.h: Fix doxygen command.
+
+2022-05-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/doxygen/user.cfg.in (GROUP_NESTED_COMPOUNDS): Set to NO.
+	(CLASS_DIAGRAMS): Remove obsolete option.
+
 2022-05-12  Jonathan Wakely  <jwakely@redhat.com>
 
 	* config/locale/dragonfly/numeric_members.cc: Remove whitespace.

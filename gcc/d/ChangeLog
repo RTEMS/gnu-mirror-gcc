@@ -1,3 +1,61 @@
+2022-05-31  Jason Merrill  <jason@redhat.com>
+
+	* Make-lang.in (d.tags): Just look at *.cc.
+
+2022-05-31  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/105544
+	* d-lang.cc (d_parse_file): Zero padding past the end of the stdin
+	buffer so the D lexer has a sentinel to stop parsing at.
+
+2022-05-27  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* dmd/MERGE: Merge upstream dmd 4d07f22f2
+	* d-lang.cc (d_handle_option): Handle OPT_fpreview_fiximmutableconv.
+	* lang.opt (fpreview=fiximmutableconv): New option.
+	* runtime.def (ARRAYAPPENDT): Remove.
+
+2022-05-25  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* expr.cc: Add "final" and "override" to all "visit" vfunc decls
+	as appropriate.
+	* imports.cc: Likewise.
+	* typeinfo.cc: Likewise.
+
+2022-05-24  David Malcolm  <dmalcolm@redhat.com>
+
+	* decl.cc: Add "final" and "override" to all "visit" vfunc decls
+	as appropriate.
+	* expr.cc: Likewise.
+	* toir.cc: Likewise.
+	* typeinfo.cc: Likewise.
+	* types.cc: Likewise.
+
+2022-05-16  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* dmd/MERGE: Merge upstream dmd 60bfa0ee7.
+	* dmd/VERSION: Update version to v2.100.0.
+	* d-builtins.cc (d_init_versions): Update for new front-end interface.
+	* d-codegen.cc (d_decl_context): Use resolvedLinkage to get
+	declaration linkage.
+	(build_struct_literal): Track offset in bits.
+	* d-gimplify.cc (d_gimplify_modify_expr): Check both operands for a
+	bit-field reference.
+	* d-lang.cc (d_handle_option): Handle -fpreview=bitfields, remove
+	-frevert=markdown and -ftransition=vmarkdown.
+	(d_post_options): Set flag_rtti and flag_exceptions if -fno-druntime
+	was seen on command-line.
+	(d_parse_file): Update for new front-end interface.
+	(d_type_promotes_to): Use resolvedLinkage to get declaration linkage.
+	* decl.cc (make_thunk): Likewise.
+	* expr.cc (ExprVisitor::visit (CatAssignExp *)): Remove lowering for
+	appending of an element or array to another array.
+	* lang.opt (fpreview=bitfields): New option.
+	(frevert=markdown): Remove.
+	(ftransition=vmarkdown): Remove.
+	* types.cc (layout_aggregate_members): Ignore anonymous fields in
+	total count.
+
 2022-04-28  Iain Buclaw  <ibuclaw@gdcproject.org>
 
 	* dmd/MERGE: Merge upstream dmd 313d28b3d.

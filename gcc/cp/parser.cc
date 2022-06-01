@@ -4200,7 +4200,7 @@ cp_parser_new (cp_lexer *lexer)
 {
   /* Initialize the binops_by_token so that we can get the tree
      directly from the token.  */
-  for (unsigned i = 0; i < sizeof (binops) / sizeof (binops[0]); i++)
+  for (unsigned i = 0; i < ARRAY_SIZE (binops); i++)
     binops_by_token[binops[i].token_type] = binops[i];
 
   cp_parser *parser = ggc_cleared_alloc<cp_parser> ();
@@ -12557,7 +12557,7 @@ cp_parser_statement (cp_parser* parser, tree in_statement_expr,
 
 /* Append ATTR to attribute list ATTRS.  */
 
-static tree
+tree
 attr_chainon (tree attrs, tree attr)
 {
   if (attrs == error_mark_node)
@@ -18646,6 +18646,9 @@ cp_parser_template_name (cp_parser* parser,
     (9.3.4), or in a type-only context other than a nested-name-specifier
     (13.8).  */
 
+  /* Handle injected-class-name.  */
+  decl = maybe_get_template_decl_from_type_decl (decl);
+
   /* If DECL is a template, then the name was a template-name.  */
   if (TREE_CODE (decl) == TEMPLATE_DECL)
     {
@@ -19103,7 +19106,7 @@ cp_parser_explicit_instantiation (cp_parser* parser)
   cp_decl_specifier_seq decl_specifiers;
   tree extension_specifier = NULL_TREE;
 
-  timevar_push (TV_TEMPLATE_INST);
+  auto_timevar tv (TV_TEMPLATE_INST);
 
   /* Look for an (optional) storage-class-specifier or
      function-specifier.  */
@@ -19203,8 +19206,6 @@ cp_parser_explicit_instantiation (cp_parser* parser)
   end_explicit_instantiation ();
 
   cp_parser_consume_semicolon_at_end_of_statement (parser);
-
-  timevar_pop (TV_TEMPLATE_INST);
 
   cp_finalize_omp_declare_simd (parser, &odsd);
 }
@@ -20963,7 +20964,8 @@ cp_parser_enum_specifier (cp_parser* parser)
      elaborated-type-specifier.  */
   if (cp_lexer_next_token_is (parser->lexer, CPP_OPEN_BRACE))
     {
-      timevar_push (TV_PARSE_ENUM);
+      auto_timevar tv (TV_PARSE_ENUM);
+
       if (nested_name_specifier
 	  && nested_name_specifier != error_mark_node)
 	{
@@ -21069,7 +21071,6 @@ cp_parser_enum_specifier (cp_parser* parser)
 
       if (scoped_enum_p)
 	finish_scope ();
-      timevar_pop (TV_PARSE_ENUM);
     }
   else
     {
@@ -25924,9 +25925,11 @@ pop_injected_parms (void)
 
    Returns the TREE_TYPE representing the class.  */
 
-static tree
-cp_parser_class_specifier_1 (cp_parser* parser)
+tree
+cp_parser_class_specifier (cp_parser* parser)
 {
+  auto_timevar tv (TV_PARSE_STRUCT);
+
   tree type;
   tree attributes = NULL_TREE;
   bool nested_name_specifier_p;
@@ -26316,16 +26319,6 @@ cp_parser_class_specifier_1 (cp_parser* parser)
     = saved_in_unbraced_linkage_specification_p;
 
   return type;
-}
-
-static tree
-cp_parser_class_specifier (cp_parser* parser)
-{
-  tree ret;
-  timevar_push (TV_PARSE_STRUCT);
-  ret = cp_parser_class_specifier_1 (parser);
-  timevar_pop (TV_PARSE_STRUCT);
-  return ret;
 }
 
 /* Parse a class-head.
@@ -31273,15 +31266,10 @@ cp_parser_function_definition_from_specifiers_and_declarator
     }
   else
     {
-      timevar_id_t tv;
-      if (DECL_DECLARED_INLINE_P (current_function_decl))
-        tv = TV_PARSE_INLINE;
-      else
-        tv = TV_PARSE_FUNC;
-      timevar_push (tv);
+      auto_timevar tv (DECL_DECLARED_INLINE_P (current_function_decl)
+		       ? TV_PARSE_INLINE : TV_PARSE_FUNC);
       fn = cp_parser_function_definition_after_declarator (parser,
 							 /*inline_p=*/false);
-      timevar_pop (tv);
     }
 
   return fn;
@@ -31808,12 +31796,6 @@ cp_parser_single_declaration (cp_parser* parser,
       if (cp_parser_declares_only_class_p (parser)
 	  || (declares_class_or_enum & 2))
 	{
-	  /* If this is a declaration, but not a definition, associate
-	     any constraints with the type declaration. Constraints
-	     are associated with definitions in cp_parser_class_specifier.  */
-	  if (declares_class_or_enum == 1)
-	    associate_classtype_constraints (decl_specifiers.type);
-
 	  decl = shadow_tag (&decl_specifiers);
 
 	  /* In this case:
@@ -31834,6 +31816,12 @@ cp_parser_single_declaration (cp_parser* parser,
 	    decl = TYPE_NAME (decl);
 	  else
 	    decl = error_mark_node;
+
+	  /* If this is a declaration, but not a definition, associate
+	     any constraints with the type declaration. Constraints
+	     are associated with definitions in cp_parser_class_specifier.  */
+	  if (declares_class_or_enum == 1)
+	    associate_classtype_constraints (TREE_TYPE (decl));
 
 	  /* Perform access checks for template parameters.  */
 	  cp_parser_perform_template_parameter_access_checks (checks);
@@ -32273,7 +32261,8 @@ cp_parser_enclosed_template_argument_list (cp_parser* parser)
 static void
 cp_parser_late_parsing_for_member (cp_parser* parser, tree member_function)
 {
-  timevar_push (TV_PARSE_INMETH);
+  auto_timevar tv (TV_PARSE_INMETH);
+
   /* If this member is a template, get the underlying
      FUNCTION_DECL.  */
   if (DECL_FUNCTION_TEMPLATE_P (member_function))
@@ -32343,7 +32332,6 @@ cp_parser_late_parsing_for_member (cp_parser* parser, tree member_function)
 
   /* Restore the queue.  */
   pop_unparsed_function_queues (parser);
-  timevar_pop (TV_PARSE_INMETH);
 }
 
 /* If DECL contains any default args, remember it on the unparsed
@@ -33663,7 +33651,8 @@ class_decl_loc_t::add (cp_parser *parser, location_t key_loc,
   bool key_redundant = (!def_p && !decl_p
 			&& (decl == type_decl
 			    || TREE_CODE (decl) == TEMPLATE_DECL
-			    || TYPE_BEING_DEFINED (type)));
+			    || (CLASS_TYPE_P (type)
+				&& TYPE_BEING_DEFINED (type))));
 
   if (key_redundant
       && class_key != class_type
@@ -33701,7 +33690,7 @@ class_decl_loc_t::add (cp_parser *parser, location_t key_loc,
 	}
       else
 	{
-	  /* TYPE was previously defined in some unknown precompiled hdeader.
+	  /* TYPE was previously defined in some unknown precompiled header.
 	     Simply add a record of its definition at an unknown location and
 	     proceed below to add a reference to it at the current location.
 	     (Declarations in precompiled headers that are not definitions
@@ -36494,6 +36483,10 @@ cp_parser_omp_clause_name (cp_parser *parser)
 	    result = PRAGMA_OMP_CLAUSE_DEVICE_TYPE;
 	  else if (!strcmp ("dist_schedule", p))
 	    result = PRAGMA_OMP_CLAUSE_DIST_SCHEDULE;
+	  break;
+	case 'e':
+	  if (!strcmp ("enter", p))
+	    result = PRAGMA_OMP_CLAUSE_ENTER;
 	  break;
 	case 'f':
 	  if (!strcmp ("filter", p))
@@ -39443,6 +39436,8 @@ cp_parser_omp_clause_depend (cp_parser *parser, tree list, location_t loc)
 	kind = OMP_CLAUSE_DEPEND_IN;
       else if (strcmp ("inout", p) == 0)
 	kind = OMP_CLAUSE_DEPEND_INOUT;
+      else if (strcmp ("inoutset", p) == 0)
+	kind = OMP_CLAUSE_DEPEND_INOUTSET;
       else if (strcmp ("mutexinoutset", p) == 0)
 	kind = OMP_CLAUSE_DEPEND_MUTEXINOUTSET;
       else if (strcmp ("out", p) == 0)
@@ -40413,8 +40408,13 @@ cp_parser_omp_all_clauses (cp_parser *parser, omp_clause_mask mask,
 	  break;
 	case PRAGMA_OMP_CLAUSE_TO:
 	  if ((mask & (OMP_CLAUSE_MASK_1 << PRAGMA_OMP_CLAUSE_LINK)) != 0)
-	    clauses = cp_parser_omp_var_list (parser, OMP_CLAUSE_TO_DECLARE,
-					      clauses);
+	    {
+	      tree nl = cp_parser_omp_var_list (parser, OMP_CLAUSE_ENTER,
+						clauses);
+	      for (tree c = nl; c != clauses; c = OMP_CLAUSE_CHAIN (c))
+		OMP_CLAUSE_ENTER_TO (c) = 1;
+	      clauses = nl;
+	    }
 	  else
 	    clauses = cp_parser_omp_var_list (parser, OMP_CLAUSE_TO, clauses,
 					      true);
@@ -40520,6 +40520,11 @@ cp_parser_omp_all_clauses (cp_parser *parser, omp_clause_mask mask,
 	    = cp_parser_omp_clause_orderedkind (parser, OMP_CLAUSE_SIMD,
 						clauses, token->location);
 	  c_name = "simd";
+	  break;
+	case PRAGMA_OMP_CLAUSE_ENTER:
+	  clauses = cp_parser_omp_var_list (parser, OMP_CLAUSE_ENTER,
+					    clauses);
+	  c_name = "enter";
 	  break;
 	default:
 	  cp_parser_error (parser, "expected %<#pragma omp%> clause");
@@ -41742,12 +41747,14 @@ cp_parser_omp_depobj (cp_parser *parser, cp_token *pragma_tok)
 		    kind = OMP_CLAUSE_DEPEND_INOUT;
 		  else if (!strcmp ("mutexinoutset", p2))
 		    kind = OMP_CLAUSE_DEPEND_MUTEXINOUTSET;
+		  else if (!strcmp ("inoutset", p2))
+		    kind = OMP_CLAUSE_DEPEND_INOUTSET;
 		}
 	      if (kind == OMP_CLAUSE_DEPEND_SOURCE)
 		{
 		  clause = error_mark_node;
-		  error_at (c2_loc, "expected %<in%>, %<out%>, %<inout%> or "
-				    "%<mutexinoutset%>");
+		  error_at (c2_loc, "expected %<in%>, %<out%>, %<inout%>, "
+				    "%<mutexinoutset%> or %<inoutset%>");
 		}
 	      if (!c_parens.require_close (parser))
 		cp_parser_skip_to_closing_parenthesis (parser,
@@ -43725,7 +43732,9 @@ cp_parser_omp_single (cp_parser *parser, cp_token *pragma_tok, bool *if_p)
 
 #define OMP_SCOPE_CLAUSE_MASK					\
 	( (OMP_CLAUSE_MASK_1 << PRAGMA_OMP_CLAUSE_PRIVATE)	\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OMP_CLAUSE_FIRSTPRIVATE)	\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OMP_CLAUSE_REDUCTION)	\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OMP_CLAUSE_ALLOCATE)	\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OMP_CLAUSE_NOWAIT))
 
 static tree
@@ -43786,7 +43795,8 @@ cp_parser_omp_task (cp_parser *parser, cp_token *pragma_tok, bool *if_p)
    # pragma omp taskwait taskwait-clause[opt] new-line  */
 
 #define OMP_TASKWAIT_CLAUSE_MASK				\
-	(OMP_CLAUSE_MASK_1 << PRAGMA_OMP_CLAUSE_DEPEND)
+	( (OMP_CLAUSE_MASK_1 << PRAGMA_OMP_CLAUSE_DEPEND)	\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OMP_CLAUSE_NOWAIT))
 
 static void
 cp_parser_omp_taskwait (cp_parser *parser, cp_token *pragma_tok)
@@ -45969,9 +45979,14 @@ handle_omp_declare_target_clause (tree c, tree t, int device_type)
     id = get_identifier ("omp declare target");
   if (at2)
     {
-      error_at (OMP_CLAUSE_LOCATION (c),
-		"%qD specified both in declare target %<link%> and %<to%>"
-		" clauses", t);
+      if (OMP_CLAUSE_CODE (c) == OMP_CLAUSE_ENTER)
+	error_at (OMP_CLAUSE_LOCATION (c),
+		  "%qD specified both in declare target %<link%> and %qs"
+		  " clauses", t, OMP_CLAUSE_ENTER_TO (c) ? "to" : "enter");
+      else
+	error_at (OMP_CLAUSE_LOCATION (c),
+		  "%qD specified both in declare target %<link%> and "
+		  "%<to%> or %<enter%> clauses", t);
       return false;
     }
   if (!at1)
@@ -46029,6 +46044,7 @@ handle_omp_declare_target_clause (tree c, tree t, int device_type)
 
 #define OMP_DECLARE_TARGET_CLAUSE_MASK				\
 	( (OMP_CLAUSE_MASK_1 << PRAGMA_OMP_CLAUSE_TO)		\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OMP_CLAUSE_ENTER)	\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OMP_CLAUSE_LINK)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OMP_CLAUSE_DEVICE_TYPE))
 
@@ -46048,7 +46064,7 @@ cp_parser_omp_declare_target (cp_parser *parser, cp_token *pragma_tok)
 				   "#pragma omp declare target", pragma_tok);
   else if (cp_lexer_next_token_is (parser->lexer, CPP_OPEN_PAREN))
     {
-      clauses = cp_parser_omp_var_list (parser, OMP_CLAUSE_TO_DECLARE,
+      clauses = cp_parser_omp_var_list (parser, OMP_CLAUSE_ENTER,
 					clauses);
       clauses = finish_omp_clauses (clauses, C_ORT_OMP);
       cp_parser_require_pragma_eol (parser, pragma_tok);

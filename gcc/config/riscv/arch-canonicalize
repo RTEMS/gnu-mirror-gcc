@@ -32,7 +32,7 @@ import itertools
 from functools import reduce
 
 SUPPORTED_ISA_SPEC = ["2.2", "20190608", "20191213"]
-CANONICAL_ORDER = "imafdgqlcbjktpvn"
+CANONICAL_ORDER = "imafdgqlcbkjtpvn"
 LONG_EXT_PREFIXES = ['z', 's', 'h', 'x']
 
 #
@@ -73,8 +73,8 @@ def arch_canonicalize(arch, isa_spec):
   std_exts = []
   if arch[:5] in ['rv32e', 'rv32i', 'rv32g', 'rv64i', 'rv64g']:
     new_arch = arch[:5].replace("g", "i")
-    std_exts = ['m', 'a', 'f', 'd']
     if arch[:5] in ['rv32g', 'rv64g']:
+      std_exts = ['m', 'a', 'f', 'd']
       if not is_isa_spec_2p2:
         extra_long_ext = ['zicsr', 'zifencei']
   else:

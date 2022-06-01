@@ -70,6 +70,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "debug.h"
 #include "langhooks.h"
 #include "internal-fn.h"
+#include "gimple-iterator.h"
 #include "gimple-fold.h"
 #include "tree-eh.h"
 #include "gimplify.h"
@@ -8768,7 +8769,7 @@ static machine_mode constant_modes[] =
   QImode,
   V1QImode
 };
-#define NR_C_MODES (sizeof (constant_modes) / sizeof (constant_modes[0]))
+#define NR_C_MODES (ARRAY_SIZE (constant_modes))
 
 struct constant
 {
@@ -17174,9 +17175,13 @@ vectorize_vec_perm_const_1 (const struct expand_vec_perm_d &d)
    hook is supposed to emit the required INSNs.  */
 
 bool
-s390_vectorize_vec_perm_const (machine_mode vmode, rtx target, rtx op0, rtx op1,
+s390_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
+			       rtx target, rtx op0, rtx op1,
 			       const vec_perm_indices &sel)
 {
+  if (vmode != op_mode)
+    return false;
+
   struct expand_vec_perm_d d;
   unsigned int i, nelt;
 

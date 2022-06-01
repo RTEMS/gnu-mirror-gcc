@@ -1359,9 +1359,8 @@ c_build_qualified_type (tree type, int type_quals, tree /* orig_qual_type */,
    in a similar manner for restricting non-pointer types.  */
 
 tree
-cp_build_qualified_type_real (tree type,
-			      int type_quals,
-			      tsubst_flags_t complain)
+cp_build_qualified_type (tree type, int type_quals,
+			 tsubst_flags_t complain /* = tf_warning_or_error */)
 {
   tree result;
   int bad_quals = TYPE_UNQUALIFIED;
@@ -1378,9 +1377,7 @@ cp_build_qualified_type_real (tree type,
 	 type.  Obtain the appropriately qualified element type.  */
       tree t;
       tree element_type
-	= cp_build_qualified_type_real (TREE_TYPE (type),
-					type_quals,
-					complain);
+	= cp_build_qualified_type (TREE_TYPE (type), type_quals, complain);
 
       if (element_type == error_mark_node)
 	return error_mark_node;
@@ -1431,7 +1428,7 @@ cp_build_qualified_type_real (tree type,
     {
       tree t = PACK_EXPANSION_PATTERN (type);
 
-      t = cp_build_qualified_type_real (t, type_quals, complain);
+      t = cp_build_qualified_type (t, type_quals, complain);
       return make_pack_expansion (t, complain);
     }
 
@@ -2901,7 +2898,11 @@ bind_template_template_parm (tree t, tree newargs)
   TYPE_NAME (t2) = decl;
   TYPE_STUB_DECL (t2) = decl;
   TYPE_SIZE (t2) = 0;
-  SET_TYPE_STRUCTURAL_EQUALITY (t2);
+
+  if (any_template_arguments_need_structural_equality_p (newargs))
+    SET_TYPE_STRUCTURAL_EQUALITY (t2);
+  else
+    TYPE_CANONICAL (t2) = canonical_type_parameter (t2);
 
   return t2;
 }

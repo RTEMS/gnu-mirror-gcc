@@ -252,6 +252,7 @@ package body ALI is
       'E' | --  external
       'G' | --  invocation graph
       'I' | --  interrupt
+      'K' | --  CUDA kernels
       'L' | --  linker option
       'M' | --  main program
       'N' | --  notes
@@ -269,7 +270,7 @@ package body ALI is
 
       --  Still available:
 
-      'B' | 'F' | 'H' | 'J' | 'K' | 'O' | 'Q' => False);
+      'B' | 'F' | 'H' | 'J' | 'O' | 'Q' => False);
 
    ------------------------------
    -- Add_Invocation_Construct --
@@ -1743,12 +1744,14 @@ package body ALI is
       ALIs.Table (Id) := (
         Afile                        => F,
         Compile_Errors               => False,
+        First_CUDA_Kernel            => CUDA_Kernels.Last + 1,
         First_Interrupt_State        => Interrupt_States.Last + 1,
         First_Sdep                   => No_Sdep_Id,
         First_Specific_Dispatching   => Specific_Dispatching.Last + 1,
         First_Unit                   => No_Unit_Id,
         GNATprove_Mode               => False,
         Invocation_Graph_Encoding    => No_Encoding,
+        Last_CUDA_Kernel             => CUDA_Kernels.Last,
         Last_Interrupt_State         => Interrupt_States.Last,
         Last_Sdep                    => No_Sdep_Id,
         Last_Specific_Dispatching    => Specific_Dispatching.Last,
@@ -1915,6 +1918,24 @@ package body ALI is
          C := Getc;
       end loop A_Loop;
 
+      --  Acquire 'K' lines if present
+
+      Check_Unknown_Line;
+
+      while C = 'K' loop
+         if Ignore ('K') then
+            Skip_Line;
+
+         else
+            Skip_Space;
+            CUDA_Kernels.Append ((Kernel_Name => Get_Name));
+            ALIs.Table (Id).Last_CUDA_Kernel := CUDA_Kernels.Last;
+            Skip_Eol;
+         end if;
+
+         C := Getc;
+      end loop;
+
       --  Acquire P line
 
       Check_Unknown_Line;
@@ -2058,7 +2079,15 @@ package body ALI is
                --  Processing for SS
 
                elsif C = 'S' then
-                  Opt.Sec_Stack_Used := True;
+                  --  Special case: a-tags.ali by itself should not set
+                  --  Sec_Stack_Used, only if other code uses the secondary
+                  --  stack should we set this flag. This ensures that we do
+                  --  not bring the secondary stack unnecessarily when using
+                  --  Ada.Tags and not actually using the secondary stack.
+
+                  if Get_Name_String (F) /= "a-tags.ali" then
+                     Opt.Sec_Stack_Used := True;
+                  end if;
 
                --  Invalid switch starting with S
 

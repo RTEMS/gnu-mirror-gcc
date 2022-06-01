@@ -375,7 +375,7 @@ fixup_anonymous_offset (tree fields, tree offset)
 
 /* Iterate over all MEMBERS of an aggregate, and add them as fields to CONTEXT.
    If INHERITED_P is true, then the members derive from a base class.
-   Returns the number of fields found.  */
+   Returns the number of named fields found.  */
 
 static size_t
 layout_aggregate_members (Dsymbols *members, tree context, bool inherited_p)
@@ -418,7 +418,8 @@ layout_aggregate_members (Dsymbols *members, tree context, bool inherited_p)
 	  /* Insert the field declaration at its given offset.  */
 	  if (var->isField ())
 	    {
-	      const char *ident = var->ident ? var->ident->toChars () : NULL;
+	      const char *ident = (var->ident && !var->ident->isAnonymous ())
+		? var->ident->toChars () : NULL;
 	      tree field = create_field_decl (declaration_type (var), ident,
 					      inherited_p, inherited_p);
 	      apply_user_attributes (var, field);
@@ -442,7 +443,10 @@ layout_aggregate_members (Dsymbols *members, tree context, bool inherited_p)
 		  var->csym = field;
 		}
 
-	      fields += 1;
+	      /* Only count the named fields in an aggregate.  */
+	      if (ident != NULL)
+		fields += 1;
+
 	      continue;
 	    }
 	}
@@ -661,7 +665,7 @@ public:
 
   /* This should be overridden by each type class.  */
 
-  void visit (Type *)
+  void visit (Type *) final override
   {
     gcc_unreachable ();
   }
@@ -669,21 +673,21 @@ public:
   /* Type assigned to erroneous expressions or constructs that
      failed during the semantic stage.  */
 
-  void visit (TypeError *t)
+  void visit (TypeError *t) final override
   {
     t->ctype = error_mark_node;
   }
 
   /* Type assigned to generic nullable types.  */
 
-  void visit (TypeNull *t)
+  void visit (TypeNull *t) final override
   {
     t->ctype = ptr_type_node;
   }
 
   /* Bottom type used for functions that never return.  */
 
-  void visit (TypeNoreturn *t)
+  void visit (TypeNoreturn *t) final override
   {
     t->ctype = noreturn_type_node;
     TYPE_NAME (t->ctype) = get_identifier (t->toChars ());
@@ -691,7 +695,7 @@ public:
 
   /* Basic Data Types.  */
 
-  void visit (TypeBasic *t)
+  void visit (TypeBasic *t) final override
   {
     /* [type/basic-data-types]
 
@@ -757,7 +761,7 @@ public:
 
   /* Build a simple pointer to data type, analogous to C pointers.  */
 
-  void visit (TypePointer *t)
+  void visit (TypePointer *t) final override
   {
     t->ctype = build_pointer_type (build_ctype (t->next));
   }
@@ -765,7 +769,7 @@ public:
   /* Build a dynamic array type, consisting of a length and a pointer
      to the array data.  */
 
-  void visit (TypeDArray *t)
+  void visit (TypeDArray *t) final override
   {
     /* In [abi/arrays], dynamic array layout is:
 	.length	array dimension.
@@ -783,7 +787,7 @@ public:
   /* Build a static array type, distinguished from dynamic arrays by
      having a length fixed at compile-time, analogous to C arrays.  */
 
-  void visit (TypeSArray *t)
+  void visit (TypeSArray *t) final override
   {
     if (t->dim->isConst () && t->dim->type->isintegral ())
       {
@@ -800,7 +804,7 @@ public:
 
   /* Build a vector type, a fixed array of floating or integer types.  */
 
-  void visit (TypeVector *t)
+  void visit (TypeVector *t) final override
   {
     int nunits = t->basetype->isTypeSArray ()->dim->toUInteger ();
     tree inner = build_ctype (t->elementType ());
@@ -817,7 +821,7 @@ public:
   /* Build an associative array type, distinguished from arrays by having an
      index that's not necessarily an integer, and can be sparsely populated.  */
 
-  void visit (TypeAArray *t)
+  void visit (TypeAArray *t) final override
   {
     /* In [abi/associative-arrays], associative arrays are a struct that only
        consist of a pointer to an opaque, implementation defined type.  */
@@ -831,7 +835,7 @@ public:
   /* Build type for a function declaration, which consists of a return type,
      and a list of parameter types, and a linkage attribute.  */
 
-  void visit (TypeFunction *t)
+  void visit (TypeFunction *t) final override
   {
     tree fnparams = NULL_TREE;
     tree fntype;
@@ -921,7 +925,7 @@ public:
      reference and a pointer to a non-static member function, or a pointer
      to a closure and a pointer to a nested function.  */
 
-  void visit (TypeDelegate *t)
+  void visit (TypeDelegate *t) final override
   {
     /* In [abi/delegates], delegate layout is:
 	.ptr	    context pointer.
@@ -948,7 +952,7 @@ public:
   /* Build a named enum type, a distinct value whose values are restrict to
      a group of constants of the same underlying base type.  */
 
-  void visit (TypeEnum *t)
+  void visit (TypeEnum *t) final override
   {
     tree basetype = (t->sym->memtype)
       ? build_ctype (t->sym->memtype) : void_type_node;
@@ -1063,7 +1067,7 @@ public:
   /* Build a struct or union type.  Layout should be exactly represented
      as an equivalent C struct, except for non-POD or nested structs.  */
 
-  void visit (TypeStruct *t)
+  void visit (TypeStruct *t) final override
   {
     /* Merge types in the back-end if the front-end did not itself do so.  */
     tree deco = get_identifier (d_mangle_decl (t->sym));
@@ -1119,7 +1123,7 @@ public:
   /* Build a class type.  Whereas structs are value types, classes are
      reference types, with all the object-orientated features.  */
 
-  void visit (TypeClass *t)
+  void visit (TypeClass *t) final override
   {
     /* Merge types in the back-end if the front-end did not itself do so.  */
     tree deco = get_identifier (d_mangle_decl (t->sym));

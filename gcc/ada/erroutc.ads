@@ -465,7 +465,7 @@ package Erroutc is
    --  Tests if message buffer ends with given string preceded by a space
 
    procedure Buffer_Remove (C : Character);
-   --  Remove given character fron end of buffer if it is present
+   --  Remove given character from end of buffer if it is present
 
    procedure Buffer_Remove (S : String);
    --  Removes given string from end of buffer if it is present at end of
@@ -492,6 +492,10 @@ package Erroutc is
    function Count_Compile_Time_Pragma_Warnings return Int;
    --  Returns the number of warnings in the Errors table that were triggered
    --  by a Compile_Time_Warning pragma.
+
+   function Get_Warning_Option (Id : Error_Msg_Id) return String;
+   --  Returns the warning switch causing this warning message or an empty
+   --  string is there is none..
 
    function Get_Warning_Tag (Id : Error_Msg_Id) return String;
    --  Given an error message ID, return tag showing warning message class, or

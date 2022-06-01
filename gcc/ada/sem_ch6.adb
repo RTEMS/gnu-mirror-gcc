@@ -190,14 +190,12 @@ package body Sem_Ch6 is
    --  in posting the warning message.
 
    procedure Check_Untagged_Equality (Eq_Op : Entity_Id);
-   --  In Ada 2012, a primitive equality operator on an untagged record type
-   --  must appear before the type is frozen, and have the same visibility as
-   --  that of the type. This procedure checks that this rule is met, and
-   --  otherwise emits an error on the subprogram declaration and a warning
-   --  on the earlier freeze point if it is easy to locate. In Ada 2012 mode,
-   --  this routine outputs errors (or warnings if -gnatd.E is set). In earlier
-   --  versions of Ada, warnings are output if Warn_On_Ada_2012_Incompatibility
-   --  is set, otherwise the call has no effect.
+   --  In Ada 2012, a primitive equality operator for an untagged record type
+   --  must appear before the type is frozen. This procedure checks that this
+   --  rule is met, and otherwise gives an error on the subprogram declaration
+   --  and a warning on the earlier freeze point if it is easy to pinpoint. In
+   --  earlier versions of Ada, the call has not effect, unless compatibility
+   --  warnings are requested by means of Warn_On_Ada_2012_Incompatibility.
 
    procedure Enter_Overloaded_Entity (S : Entity_Id);
    --  This procedure makes S, a new overloaded entity, into the first visible
@@ -777,6 +775,12 @@ package body Sem_Ch6 is
          function First_Selector (Assoc : Node_Id) return Node_Id;
          --  Obtain the first selector or choice from a given association
 
+         function Is_Formal_Of_Current_Function
+           (Assoc_Expr : Entity_Id) return Boolean;
+         --  Predicate to test if a given expression associated with a
+         --  discriminant is a formal parameter to the function in which the
+         --  return construct we checking applies to.
+
          --------------------
          -- First_Selector --
          --------------------
@@ -793,6 +797,19 @@ package body Sem_Ch6 is
                raise Program_Error;
             end if;
          end First_Selector;
+
+         -----------------------------------
+         -- Is_Formal_Of_Current_Function --
+         -----------------------------------
+
+         function Is_Formal_Of_Current_Function
+           (Assoc_Expr : Entity_Id) return Boolean is
+         begin
+            return Is_Entity_Name (Assoc_Expr)
+                     and then Enclosing_Subprogram
+                                (Entity (Assoc_Expr)) = Scope_Id
+                     and then Is_Formal (Entity (Assoc_Expr));
+         end Is_Formal_Of_Current_Function;
 
          --  Local declarations
 
@@ -869,7 +886,10 @@ package body Sem_Ch6 is
          --  with all anonymous access discriminants, then generate a
          --  dynamic check or static error when relevant.
 
-         Unqual := Unqualify (Original_Node (Return_Con));
+         --  Note the repeated use of Original_Node to avoid checking
+         --  expanded code.
+
+         Unqual := Original_Node (Unqualify (Original_Node (Return_Con)));
 
          --  Get the corresponding declaration based on the return object's
          --  identifier.
@@ -1052,8 +1072,6 @@ package body Sem_Ch6 is
                if Nkind (Assoc) = N_Component_Association
                  and then Box_Present (Assoc)
                then
-                  Assoc_Present := False;
-
                   if Nkind (First_Selector (Assoc)) = N_Others_Choice then
                      Unseen_Disc_Count := 0;
                   end if;
@@ -1178,9 +1196,24 @@ package body Sem_Ch6 is
             if Present (Assoc_Expr)
               and then Present (Disc)
               and then Ekind (Etype (Disc)) = E_Anonymous_Access_Type
+
+              --  We disable the check when we have a tagged return type and
+              --  the associated expression for the discriminant is a formal
+              --  parameter since the check would require us to compare the
+              --  accessibility level of Assoc_Expr to the level of the
+              --  Extra_Accessibility_Of_Result of the function - which is
+              --  currently disabled for functions with tagged return types.
+              --  This may change in the future ???
+
+              --  See Needs_Result_Accessibility_Level for details.
+
+              and then not
+                (No (Extra_Accessibility_Of_Result (Scope_Id))
+                  and then Is_Formal_Of_Current_Function (Assoc_Expr)
+                  and then Is_Tagged_Type (Etype (Scope_Id)))
             then
                --  Generate a dynamic check based on the extra accessibility of
-               --  the result or the scope.
+               --  the result or the scope of the current function.
 
                Check_Cond :=
                  Make_Op_Gt (Loc,
@@ -1188,14 +1221,24 @@ package body Sem_Ch6 is
                                    (Expr              => Assoc_Expr,
                                     Level             => Dynamic_Level,
                                     In_Return_Context => True),
-                   Right_Opnd => (if Present
-                                       (Extra_Accessibility_Of_Result
-                                         (Scope_Id))
-                                  then
-                                     Extra_Accessibility_Of_Result (Scope_Id)
-                                  else
-                                     Make_Integer_Literal
-                                       (Loc, Scope_Depth (Scope (Scope_Id)))));
+                   Right_Opnd =>
+                     (if Present (Extra_Accessibility_Of_Result (Scope_Id))
+
+                        --  When Assoc_Expr is a formal we have to look at the
+                        --  extra accessibility-level formal associated with
+                        --  the result.
+
+                        and then Is_Formal_Of_Current_Function (Assoc_Expr)
+                      then
+                         New_Occurrence_Of
+                           (Extra_Accessibility_Of_Result (Scope_Id), Loc)
+
+                      --  Otherwise, we compare the level of Assoc_Expr to the
+                      --  scope of the current function.
+
+                      else
+                         Make_Integer_Literal
+                           (Loc, Scope_Depth (Scope (Scope_Id)))));
 
                Insert_Before_And_Analyze (Return_Stmt,
                  Make_Raise_Program_Error (Loc,
@@ -1523,17 +1566,18 @@ package body Sem_Ch6 is
 
             --  Check RM 6.5 (5.9/3)
 
-            if Has_Aliased then
+            if Has_Aliased and then not Is_Immutably_Limited_Type (R_Type) then
                if Ada_Version < Ada_2012
                  and then Warn_On_Ada_2012_Compatibility
                then
                   Error_Msg_N
-                    ("ALIASED only allowed for limited return objects "
-                     & "in Ada 2012?y?", N);
+                    ("ALIASED only allowed for immutably limited return " &
+                     "objects in Ada 2012?y?", N);
 
-               elsif not Is_Limited_View (R_Type) then
+               else
                   Error_Msg_N
-                    ("ALIASED only allowed for limited return objects", N);
+                    ("ALIASED only allowed for immutably limited return " &
+                     "objects", N);
                end if;
             end if;
 
@@ -2018,6 +2062,11 @@ package body Sem_Ch6 is
          Rewrite (N, Make_Null_Statement (Loc));
          Analyze_Generic_Subprogram_Body (Null_Body, Prev);
          Is_Completion := True;
+
+         --  Mark the newly generated subprogram body as trivial
+
+         Set_Is_Trivial_Subprogram
+           (Defining_Unit_Name (Specification (Null_Body)));
 
          goto Leave;
 
@@ -3688,6 +3737,7 @@ package body Sem_Ch6 is
 
          procedure Detect_And_Exchange (Id : Entity_Id) is
             Typ : constant Entity_Id := Etype (Id);
+
          begin
             if From_Limited_With (Typ)
               and then Has_Non_Limited_View (Typ)
@@ -5144,23 +5194,34 @@ package body Sem_Ch6 is
       --  is the limited view of a class-wide type and the non-limited view is
       --  available, update the return type accordingly.
 
-      if Ada_Version >= Ada_2005 and then Present (Spec_Id) then
+      if Ada_Version >= Ada_2005
+        and then Present (Spec_Id)
+        and then Ekind (Etype (Spec_Id)) = E_Anonymous_Access_Type
+      then
          declare
             Etyp : Entity_Id;
-            Rtyp : Entity_Id;
 
          begin
-            Rtyp := Etype (Spec_Id);
+            Etyp := Directly_Designated_Type (Etype (Spec_Id));
 
-            if Ekind (Rtyp) = E_Anonymous_Access_Type then
-               Etyp := Directly_Designated_Type (Rtyp);
+            if Is_Class_Wide_Type (Etyp)
+              and then From_Limited_With (Etyp)
+              and then Has_Non_Limited_View (Etyp)
+            then
+               Desig_View := Etyp;
+               Etyp := Non_Limited_View (Etyp);
 
-               if Is_Class_Wide_Type (Etyp)
-                 and then From_Limited_With (Etyp)
+               --  If the class-wide type has been created by the completion of
+               --  an incomplete tagged type declaration, get the class-wide
+               --  type of the incomplete tagged type to match Find_Type_Name.
+
+               if Nkind (Parent (Etyp)) = N_Full_Type_Declaration
+                 and then Present (Incomplete_View (Parent (Etyp)))
                then
-                  Desig_View := Etyp;
-                  Set_Directly_Designated_Type (Rtyp, Available_View (Etyp));
+                  Etyp := Class_Wide_Type (Incomplete_View (Parent (Etyp)));
                end if;
+
+               Set_Directly_Designated_Type (Etype (Spec_Id), Etyp);
             end if;
          end;
       end if;
@@ -5403,6 +5464,22 @@ package body Sem_Ch6 is
             end if;
          end;
       end;
+
+      --  Check if a Body_To_Inline was created, but the subprogram has
+      --  references to object renamings which will be replaced by the special
+      --  SPARK expansion into nodes of a different kind, which is not expected
+      --  by the inlining mechanism. In that case, the Body_To_Inline is
+      --  deleted prior to being analyzed. This check needs to take place
+      --  after analysis of the subprogram body.
+
+      if GNATprove_Mode
+        and then Present (Spec_Id)
+        and then
+          Nkind (Unit_Declaration_Node (Spec_Id)) = N_Subprogram_Declaration
+        and then Present (Body_To_Inline (Unit_Declaration_Node (Spec_Id)))
+      then
+         Check_Object_Renaming_In_GNATprove_Mode (Spec_Id);
+      end if;
 
       --  Check for variables that are never modified
 
@@ -9454,12 +9531,12 @@ package body Sem_Ch6 is
 
    begin
       --  This check applies only if we have a subprogram declaration with an
-      --  untagged record type that is conformant to the predefined op.
+      --  untagged record type that is conformant to the predefined operator.
 
       if Nkind (Decl) /= N_Subprogram_Declaration
         or else not Is_Record_Type (Typ)
         or else Is_Tagged_Type (Typ)
-        or else Etype (Next_Formal (First_Formal (Eq_Op))) /= Typ
+        or else not Is_User_Defined_Equality (Eq_Op)
       then
          return;
       end if;
@@ -9571,22 +9648,7 @@ package body Sem_Ch6 is
             end if;
          end if;
 
-      --  Here if type is not frozen yet. It is illegal to have a primitive
-      --  equality declared in the private part if the type is visible
-      --  (RM 4.5.2(9.8)).
-
-      elsif not In_Same_List (Parent (Typ), Decl)
-        and then not Is_Limited_Type (Typ)
-      then
-         if Ada_Version >= Ada_2012 then
-            Error_Msg_N
-              ("equality operator appears too late<<", Eq_Op);
-         else
-            Error_Msg_N
-              ("equality operator appears too late (Ada 2012)?y?", Eq_Op);
-         end if;
-
-      --  Finally check for AI12-0352: declaration of a user-defined primitive
+      --  Now check for AI12-0352: the declaration of a user-defined primitive
       --  equality operation for a record type T is illegal if it occurs after
       --  a type has been derived from T.
 
@@ -9810,7 +9872,8 @@ package body Sem_Ch6 is
                  and then Ada_Version >= Ada_2005
                  and then not Comes_From_Source (E)
                  and then Has_Controlling_Result (E)
-                 and then Is_Null_Extension (Etype (E))
+                 and then (not Is_Class_Wide_Type (Etype (E))
+                            and then Is_Null_Extension (Etype (E)))
                  and then Comes_From_Source (Spec)
                then
                   Set_Has_Completion (E, False);
@@ -10066,14 +10129,13 @@ package body Sem_Ch6 is
                  and then Discriminal_Link (Entity (E1)) =
                           Discriminal_Link (Entity (E2)))
 
-             --  AI12-050: The loop variables of quantified expressions match
-             --  if they have the same identifier, even though they may have
-             --  different entities.
+             --  AI12-050: The entities of quantified expressions match if they
+             --  have the same identifier, even if they may be distinct nodes.
 
               or else
                 (Chars (Entity (E1)) = Chars (Entity (E2))
-                  and then Ekind (Entity (E1)) = E_Loop_Parameter
-                  and then Ekind (Entity (E2)) = E_Loop_Parameter)
+                  and then Is_Entity_Of_Quantified_Expression (Entity (E1))
+                  and then Is_Entity_Of_Quantified_Expression (Entity (E2)))
 
               --  A call to an instantiation of Unchecked_Conversion is
               --  rewritten with the name of the generated function created for
@@ -11209,7 +11271,8 @@ package body Sem_Ch6 is
 
             function Overrides_Private_Part_Op return Boolean is
                Over_Decl : constant Node_Id :=
-                             Unit_Declaration_Node (Overridden_Operation (S));
+                             Unit_Declaration_Node
+                               (Ultimate_Alias (Overridden_Operation (S)));
                Subp_Decl : constant Node_Id := Unit_Declaration_Node (S);
 
             begin
@@ -12245,7 +12308,34 @@ package body Sem_Ch6 is
                            --  Work done in Override_Dispatching_Operation, so
                            --  nothing else needs to be done here.
 
-                           null;
+                           --  ??? Special case to keep supporting the hiding
+                           --  of the predefined "=" operator for a nonlimited
+                           --  tagged type by a user-defined "=" operator for
+                           --  its class-wide type when the type is private.
+
+                           if Chars (E) = Name_Op_Eq then
+                              declare
+                                 Typ : constant Entity_Id
+                                         := Etype (First_Entity (E));
+                                 H   : Entity_Id := Homonym (E);
+
+                              begin
+                                 while Present (H)
+                                   and then Scope (H) = Scope (E)
+                                 loop
+                                    if Is_User_Defined_Equality (H)
+                                       and then Is_Immediately_Visible (H)
+                                       and then Etype (First_Entity (H))
+                                                  = Class_Wide_Type (Typ)
+                                    then
+                                       Remove_Entity_And_Homonym (E);
+                                       exit;
+                                    end if;
+
+                                    H := Homonym (H);
+                                 end loop;
+                              end;
+                           end if;
                         end if;
 
                      else

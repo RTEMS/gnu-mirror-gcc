@@ -1536,7 +1536,7 @@ public:
                 bodyToBuffer(f);
                 hgs.autoMember--;
             }
-            else if (hgs.tpltMember == 0 && global.params.hdrStripPlainFunctions)
+            else if (hgs.tpltMember == 0 && global.params.dihdr.fullOutput == false)
             {
                 if (!f.fbody)
                 {
@@ -1621,7 +1621,7 @@ public:
 
     void bodyToBuffer(FuncDeclaration f)
     {
-        if (!f.fbody || (hgs.hdrgen && global.params.hdrStripPlainFunctions && !hgs.autoMember && !hgs.tpltMember))
+        if (!f.fbody || (hgs.hdrgen && global.params.dihdr.fullOutput == false && !hgs.autoMember && !hgs.tpltMember))
         {
             if (!f.fbody && (f.fensures || f.frequires))
             {
@@ -3835,26 +3835,24 @@ private void typeToBufferx(Type t, OutBuffer* buf, HdrGenState* hgs)
     {
         foreach (id; t.idents)
         {
-            if (id.dyncast() == DYNCAST.dsymbol)
+            switch (id.dyncast()) with (DYNCAST)
             {
+            case dsymbol:
                 buf.writeByte('.');
                 TemplateInstance ti = cast(TemplateInstance)id;
                 ti.dsymbolToBuffer(buf, hgs);
-            }
-            else if (id.dyncast() == DYNCAST.expression)
-            {
+                break;
+            case expression:
                 buf.writeByte('[');
                 (cast(Expression)id).expressionToBuffer(buf, hgs);
                 buf.writeByte(']');
-            }
-            else if (id.dyncast() == DYNCAST.type)
-            {
+                break;
+            case type:
                 buf.writeByte('[');
                 typeToBufferx(cast(Type)id, buf, hgs);
                 buf.writeByte(']');
-            }
-            else
-            {
+                break;
+            default:
                 buf.writeByte('.');
                 buf.writestring(id.toString());
             }

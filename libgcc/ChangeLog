@@ -1,3 +1,35 @@
+2022-05-25  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	PR libgcc/105708
+	* config/aarch64/lse-init.c: Increase constructor priority.
+
+2022-05-25  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	PR target/104689
+	* config/aarch64/aarch64-unwind.h (aarch64_frob_update_context):
+	Handle the !REG_UNSAVED case.
+	* unwind-dw2.c (execute_cfa_program): Fail toggle if !REG_UNSAVED.
+
+2022-05-20  Christophe Lyon  <christophe.lyon@arm.com>
+
+	* Makefile.in (D32PBIT_FUNCS): Add _hf_to_sd and _sd_to_hf.
+	(D64PBIT_FUNCS): Add _hf_to_dd and _dd_to_hf.
+	(D128PBIT_FUNCS): Add _hf_to_td _td_to_hf.
+
+2022-05-20  Christophe Lyon  <christophe.lyon@arm.com>
+
+	* config.host: Add t-dfprules to AArch64 targets.
+
+2022-05-20  Christophe Lyon  <christophe.lyon@arm.com>
+
+	* configure: Regenerate.
+
+2022-05-13  Sebastian Pop  <spop@amazon.com>
+
+	PR target/105162
+	* config/aarch64/lse.S: Define BARRIER and handle memory MODEL 5.
+	* config/aarch64/t-lse: Add a 5th memory model for _sync functions.
+
 2022-05-10  Martin Liska  <mliska@suse.cz>
 	    Hans-Peter Helfert  <peter-helfert@t-online.de>
 

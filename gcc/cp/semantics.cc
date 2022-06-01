@@ -3387,8 +3387,7 @@ finish_template_template_parm (tree aggr, tree identifier)
 
   /* Associate the constraints with the underlying declaration,
      not the template.  */
-  tree reqs = TEMPLATE_PARMS_CONSTRAINTS (current_template_parms);
-  tree constr = build_constraints (reqs, NULL_TREE);
+  tree constr = current_template_constraints ();
   set_constraints (decl, constr);
 
   end_template_decl ();
@@ -4138,6 +4137,15 @@ finish_id_expression_1 (tree id_expression,
 	  *non_integral_constant_expression_p = true;
 	}
       return r;
+    }
+  else if (TREE_CODE (decl) == UNBOUND_CLASS_TEMPLATE)
+    {
+      gcc_checking_assert (scope);
+      *idk = CP_ID_KIND_QUALIFIED;
+      cp_warn_deprecated_use_scopes (scope);
+      decl = finish_qualified_id_expr (scope, decl, done, address_p,
+				       template_p, template_arg_p,
+				       tf_warning_or_error);
     }
   else
     {
@@ -8341,48 +8349,50 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	    }
 	  break;
 
-	case OMP_CLAUSE_TO_DECLARE:
+	case OMP_CLAUSE_ENTER:
 	case OMP_CLAUSE_LINK:
 	  t = OMP_CLAUSE_DECL (c);
+	  const char *cname;
+	  cname = omp_clause_code_name[OMP_CLAUSE_CODE (c)];
+	  if (OMP_CLAUSE_CODE (c) == OMP_CLAUSE_ENTER
+	      && OMP_CLAUSE_ENTER_TO (c))
+	    cname = "to";
 	  if (TREE_CODE (t) == FUNCTION_DECL
-	      && OMP_CLAUSE_CODE (c) == OMP_CLAUSE_TO_DECLARE)
+	      && OMP_CLAUSE_CODE (c) == OMP_CLAUSE_ENTER)
 	    ;
 	  else if (!VAR_P (t))
 	    {
-	      if (OMP_CLAUSE_CODE (c) == OMP_CLAUSE_TO_DECLARE)
+	      if (OMP_CLAUSE_CODE (c) == OMP_CLAUSE_ENTER)
 		{
 		  if (TREE_CODE (t) == TEMPLATE_ID_EXPR)
 		    error_at (OMP_CLAUSE_LOCATION (c),
-			      "template %qE in clause %qs", t,
-			      omp_clause_code_name[OMP_CLAUSE_CODE (c)]);
+			      "template %qE in clause %qs", t, cname);
 		  else if (really_overloaded_fn (t))
 		    error_at (OMP_CLAUSE_LOCATION (c),
 			      "overloaded function name %qE in clause %qs", t,
-			      omp_clause_code_name[OMP_CLAUSE_CODE (c)]);
+			      cname);
 		  else
 		    error_at (OMP_CLAUSE_LOCATION (c),
 			      "%qE is neither a variable nor a function name "
-			      "in clause %qs", t,
-			      omp_clause_code_name[OMP_CLAUSE_CODE (c)]);
+			      "in clause %qs", t, cname);
 		}
 	      else
 		error_at (OMP_CLAUSE_LOCATION (c),
-			  "%qE is not a variable in clause %qs", t,
-			  omp_clause_code_name[OMP_CLAUSE_CODE (c)]);
+			  "%qE is not a variable in clause %qs", t, cname);
 	      remove = true;
 	    }
 	  else if (DECL_THREAD_LOCAL_P (t))
 	    {
 	      error_at (OMP_CLAUSE_LOCATION (c),
 			"%qD is threadprivate variable in %qs clause", t,
-			omp_clause_code_name[OMP_CLAUSE_CODE (c)]);
+			cname);
 	      remove = true;
 	    }
 	  else if (!cp_omp_mappable_type (TREE_TYPE (t)))
 	    {
 	      error_at (OMP_CLAUSE_LOCATION (c),
 			"%qD does not have a mappable type in %qs clause", t,
-			omp_clause_code_name[OMP_CLAUSE_CODE (c)]);
+			cname);
 	      cp_omp_emit_unmappable_type_notes (TREE_TYPE (t));
 	      remove = true;
 	    }
@@ -8575,14 +8585,20 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	      else
 		{
 		  t = OMP_CLAUSE_DECL (c);
+		  while (TREE_CODE (t) == TREE_LIST)
+		    t = TREE_CHAIN (t);
 		  while (TREE_CODE (t) == INDIRECT_REF
 			 || TREE_CODE (t) == ARRAY_REF)
 		    t = TREE_OPERAND (t, 0);
 		}
 	    }
-	  bitmap_set_bit (&is_on_device_head, DECL_UID (t));
 	  if (VAR_P (t) || TREE_CODE (t) == PARM_DECL)
-	    cxx_mark_addressable (t);
+	    {
+	      bitmap_set_bit (&is_on_device_head, DECL_UID (t));
+	      if (!processing_template_decl
+		  && !cxx_mark_addressable (t))
+		remove = true;
+	    }
 	  goto check_dup_generic_t;
 
 	case OMP_CLAUSE_USE_DEVICE_ADDR:

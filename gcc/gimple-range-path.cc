@@ -357,8 +357,8 @@ path_range_query::range_defined_in_block (irange &r, tree name, basic_block bb)
 	r.set_varying (TREE_TYPE (name));
     }
 
-  if (bb)
-    m_non_null.adjust_range (r, name, bb, false);
+  if (bb && POINTER_TYPE_P (TREE_TYPE (name)))
+    m_ranger->m_cache.m_exit.maybe_adjust_range (r, name, bb);
 
   if (DEBUG_SOLVER && (bb || !r.varying_p ()))
     {
@@ -528,7 +528,7 @@ path_range_query::adjust_for_non_null_uses (basic_block bb)
       else
 	r.set_varying (TREE_TYPE (name));
 
-      if (m_non_null.adjust_range (r, name, bb, false))
+      if (m_ranger->m_cache.m_exit.maybe_adjust_range (r, name, bb))
 	set_cache (r, name);
     }
 }
@@ -740,10 +740,10 @@ relation_kind
 jt_fur_source::query_relation (tree op1, tree op2)
 {
   if (!m_oracle)
-    return VREL_NONE;
+    return VREL_VARYING;
 
   if (TREE_CODE (op1) != SSA_NAME || TREE_CODE (op2) != SSA_NAME)
-    return VREL_NONE;
+    return VREL_VARYING;
 
   return m_oracle->query_relation (m_entry, op1, op2);
 }
@@ -799,7 +799,7 @@ path_range_query::maybe_register_phi_relation (gphi *phi, edge e)
     fprintf (dump_file, "maybe_register_phi_relation in bb%d:", bb->index);
 
   get_path_oracle ()->killing_def (result);
-  m_oracle->register_relation (entry_bb (), EQ_EXPR, arg, result);
+  m_oracle->register_relation (entry_bb (), VREL_EQ, arg, result);
 }
 
 // Compute relations for each PHI in BB.  For example:
