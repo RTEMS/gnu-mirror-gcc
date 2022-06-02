@@ -18,11 +18,11 @@
 #along with GCC; see the file COPYING3.  If not see
 #<http://www.gnu.org/licenses/>.
 
-AC_INIT(package-unused, version-unused,, libobjc)
+AC_INIT([package-unused],[version-unused],[],[libobjc])
 AC_CONFIG_SRCDIR([objc/objc.h])
 GCC_TOPLEV_SUBDIRS
 
-# We need the following definitions because AC_PROG_LIBTOOL relies on them
+# We need the following definitions because LT_INIT relies on them
 PACKAGE=libobjc
 # Version is pulled out to make it a bit easier to change using sed.
 VERSION=4:0:0
@@ -63,7 +63,7 @@ AC_MSG_RESULT($version_specific_libs)
 # Find the rest of the source tree framework.
 AM_ENABLE_MULTILIB(, ..)
 
-AC_CANONICAL_SYSTEM
+AC_CANONICAL_TARGET
 ACX_NONCANONICAL_TARGET
 
 # Export source directory.
@@ -174,9 +174,7 @@ AC_PROG_INSTALL
 AM_MAINTAINER_MODE
 
 # Enable Win32 DLL on MS Windows - FIXME
-AC_LIBTOOL_WIN32_DLL
-
-AC_PROG_LIBTOOL
+LT_INIT([win32-dll])dnl
 
 AM_PROG_CC_C_O
 

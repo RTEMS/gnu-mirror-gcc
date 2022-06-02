@@ -28,9 +28,9 @@
 # Process this file with autoconf to produce a configure script, like so:
 # aclocal -I .. -I ../config && autoconf && automake
 
-AC_INIT([MIC Offload Runtime Library], [1.0], ,[liboffloadmic])
+AC_INIT([MIC Offload Runtime Library],[1.0],[],[liboffloadmic])
 
-AC_CANONICAL_SYSTEM
+AC_CANONICAL_TARGET
 target_alias=${target_alias-$host_alias}
 AC_SUBST(target_alias)
 
@@ -60,7 +60,7 @@ fi
 
 AC_MSG_CHECKING([for --enable-version-specific-runtime-libs])
 AC_ARG_ENABLE([version-specific-runtime-libs],
-  AC_HELP_STRING([--enable-version-specific-runtime-libs],
+  AS_HELP_STRING([--enable-version-specific-runtime-libs],
 		 [Specify that runtime libraries should be installed in a compiler-specific directory]),
   [case "$enableval" in
     yes) enable_version_specific_runtime_libs=yes ;;
@@ -116,8 +116,8 @@ case ${enable_version_specific_runtime_libs} in
     ;;
 esac
 
-AC_LIBTOOL_DLOPEN
-AM_PROG_LIBTOOL
+# Libtool:
+LT_INIT([dlopen])
 # Forbid libtool to hardcode RPATH, because we want to be able to specify
 # library search directory using LD_LIBRARY_PATH
 hardcode_into_libs=no

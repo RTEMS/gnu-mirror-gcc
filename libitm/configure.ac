@@ -15,7 +15,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.  
 
-AC_INIT([GNU TM Runtime Library], 1.0,,[libitm])
+AC_INIT([GNU TM Runtime Library],[1.0],[],[libitm])
 AC_CONFIG_HEADER(config.h)
 
 # -------
@@ -60,10 +60,10 @@ AM_CONDITIONAL(GENINSRC, test "$enable_generated_files_in_srcdir" = yes)
 #
 # Do not delete or change the following two lines.  For why, see
 # http://gcc.gnu.org/ml/libstdc++/2003-07/msg00451.html
-AC_CANONICAL_SYSTEM
+AC_CANONICAL_TARGET
 target_alias=${target_alias-$host_alias}
 
-# Sets up automake.  Must come after AC_CANONICAL_SYSTEM.  Each of the
+# Sets up automake.  Must come after AC_CANONICAL_TARGET.  Each of the
 # following is magically included in AUTOMAKE_OPTIONS in each Makefile.am.
 #  1.9.0:  minimum required version
 #  no-define:  PACKAGE and VERSION will not be #define'd in config.h (a bunch
@@ -154,7 +154,7 @@ AM_CONDITIONAL(BUILD_INFO, test $gcc_cv_prog_makeinfo_modern = "yes")
 
 
 # Configure libtool
-AM_PROG_LIBTOOL
+LT_INIT
 AC_SUBST(enable_shared)
 AC_SUBST(enable_static)
 
@@ -165,7 +165,7 @@ libtool_VERSION=1:0:0
 AC_SUBST(libtool_VERSION)
 
 # Check header files.
-AC_STDC_HEADERS
+AC_HEADER_STDC
 AC_HEADER_TIME
 ACX_HEADER_STRING
 AC_CHECK_HEADERS(unistd.h semaphore.h sys/time.h sys/auxv.h malloc.h)

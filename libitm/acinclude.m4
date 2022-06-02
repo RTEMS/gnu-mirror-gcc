@@ -5,8 +5,7 @@ dnl Check whether the target supports __sync_*_compare_and_swap.
 AC_DEFUN([LIBITM_CHECK_SYNC_BUILTINS], [
   AC_CACHE_CHECK([whether the target supports __sync_*_compare_and_swap],
 		 libitm_cv_have_sync_builtins, [
-  AC_TRY_LINK([], [int foo, bar; bar = __sync_val_compare_and_swap(&foo, 0, 1);],
-	      libitm_cv_have_sync_builtins=yes, libitm_cv_have_sync_builtins=no)])
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[]], [[int foo, bar; bar = __sync_val_compare_and_swap(&foo, 0, 1);]])],[libitm_cv_have_sync_builtins=yes],[libitm_cv_have_sync_builtins=no])])
   if test $libitm_cv_have_sync_builtins = yes; then
     AC_DEFINE(HAVE_SYNC_BUILTINS, 1,
 	      [Define to 1 if the target supports __sync_*_compare_and_swap])
@@ -16,11 +15,8 @@ dnl Check whether the target supports 64-bit __sync_*_compare_and_swap.
 AC_DEFUN([LIBITM_CHECK_64BIT_SYNC_BUILTINS], [
   AC_CACHE_CHECK([whether the target supports 64-bit __sync_*_compare_and_swap],
 		 libitm_cv_have_64bit_sync_builtins, [
-  AC_TRY_LINK([#include <stdint.h>],
-    [uint64_t foo, bar;
-     bar = __sync_val_compare_and_swap(&foo, 0, 1);],
-    libitm_cv_have_64bit_sync_builtins=yes,
-    libitm_cv_have_64bit_sync_builtins=no)])
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <stdint.h>]], [[uint64_t foo, bar;
+     bar = __sync_val_compare_and_swap(&foo, 0, 1);]])],[libitm_cv_have_64bit_sync_builtins=yes],[libitm_cv_have_64bit_sync_builtins=no])])
     if test $libitm_cv_have_64bit_sync_builtins = yes; then
       AC_DEFINE(HAVE_64BIT_SYNC_BUILTINS, 1,
 	        [Define to 1 if the target supports 64-bit __sync_*_compare_and_swap])
@@ -32,9 +28,7 @@ AC_DEFUN([LIBITM_CHECK_ATTRIBUTE_VISIBILITY], [
 		 libitm_cv_have_attribute_visibility, [
   save_CFLAGS="$CFLAGS"
   CFLAGS="$CFLAGS -Werror"
-  AC_TRY_COMPILE([void __attribute__((visibility("hidden"))) foo(void) { }],
-		 [], libitm_cv_have_attribute_visibility=yes,
-		 libitm_cv_have_attribute_visibility=no)
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[void __attribute__((visibility("hidden"))) foo(void) { }]], [[]])],[libitm_cv_have_attribute_visibility=yes],[libitm_cv_have_attribute_visibility=no])
   CFLAGS="$save_CFLAGS"])
   if test $libitm_cv_have_attribute_visibility = yes; then
     AC_DEFINE(HAVE_ATTRIBUTE_VISIBILITY, 1,
@@ -47,9 +41,7 @@ AC_DEFUN([LIBITM_CHECK_ATTRIBUTE_DLLEXPORT], [
 		 libitm_cv_have_attribute_dllexport, [
   save_CFLAGS="$CFLAGS"
   CFLAGS="$CFLAGS -Werror"
-  AC_TRY_COMPILE([void __attribute__((dllexport)) foo(void) { }],
-		 [], libitm_cv_have_attribute_dllexport=yes,
-		 libitm_cv_have_attribute_dllexport=no)
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[void __attribute__((dllexport)) foo(void) { }]], [[]])],[libitm_cv_have_attribute_dllexport=yes],[libitm_cv_have_attribute_dllexport=no])
   CFLAGS="$save_CFLAGS"])
   if test $libitm_cv_have_attribute_dllexport = yes; then
     AC_DEFINE(HAVE_ATTRIBUTE_DLLEXPORT, 1,
@@ -60,10 +52,9 @@ dnl Check whether the target supports symbol aliases.
 AC_DEFUN([LIBITM_CHECK_ATTRIBUTE_ALIAS], [
   AC_CACHE_CHECK([whether the target supports symbol aliases],
 		 libitm_cv_have_attribute_alias, [
-  AC_TRY_LINK([
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[
 void foo(void) { }
-extern void bar(void) __attribute__((alias("foo")));],
-    [bar();], libitm_cv_have_attribute_alias=yes, libitm_cv_have_attribute_alias=no)])
+extern void bar(void) __attribute__((alias("foo")));]], [[bar();]])],[libitm_cv_have_attribute_alias=yes],[libitm_cv_have_attribute_alias=no])])
   if test $libitm_cv_have_attribute_alias = yes; then
     AC_DEFINE(HAVE_ATTRIBUTE_ALIAS, 1,
       [Define to 1 if the target supports __attribute__((alias(...))).])
@@ -73,17 +64,10 @@ dnl Check how size_t is mangled.
 AC_DEFUN([LIBITM_CHECK_SIZE_T_MANGLING], [
   AC_CACHE_CHECK([how size_t is mangled],
                  libitm_cv_size_t_mangling, [
-    AC_TRY_COMPILE([], [extern __SIZE_TYPE__ x; extern unsigned long x;],
-	           [libitm_cv_size_t_mangling=m], [
-      AC_TRY_COMPILE([], [extern __SIZE_TYPE__ x; extern unsigned int x;],
-	             [libitm_cv_size_t_mangling=j], [
-        AC_TRY_COMPILE([],
-		       [extern __SIZE_TYPE__ x; extern unsigned long long x;],
-	               [libitm_cv_size_t_mangling=y], [
-          AC_TRY_COMPILE([],
-			 [extern __SIZE_TYPE__ x; extern unsigned short x;],
-			 [libitm_cv_size_t_mangling=t],
-		         [libitm_cv_size_t_mangling=x])
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[extern __SIZE_TYPE__ x; extern unsigned long x;]])],[libitm_cv_size_t_mangling=m],[
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[extern __SIZE_TYPE__ x; extern unsigned int x;]])],[libitm_cv_size_t_mangling=j],[
+        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[extern __SIZE_TYPE__ x; extern unsigned long long x;]])],[libitm_cv_size_t_mangling=y],[
+          AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[extern __SIZE_TYPE__ x; extern unsigned short x;]])],[libitm_cv_size_t_mangling=t],[libitm_cv_size_t_mangling=x])
 	])
       ])
     ])
@@ -100,8 +84,7 @@ AC_DEFUN([LIBITM_CHECK_AS_AVX], [
 case "${target_cpu}" in
 i[[34567]]86 | x86_64)
   AC_CACHE_CHECK([if the assembler supports AVX], libitm_cv_as_avx, [
-    AC_TRY_COMPILE([], [asm("vzeroupper");],
-		   [libitm_cv_as_avx=yes], [libitm_cv_as_avx=no])
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[asm("vzeroupper");]])],[libitm_cv_as_avx=yes],[libitm_cv_as_avx=no])
   ])
   if test x$libitm_cv_as_avx = xyes; then
     AC_DEFINE(HAVE_AS_AVX, 1, [Define to 1 if the assembler supports AVX.])
@@ -114,8 +97,7 @@ AC_DEFUN([LIBITM_CHECK_AS_RTM], [
 case "${target_cpu}" in
 i[[34567]]86 | x86_64)
   AC_CACHE_CHECK([if the assembler supports RTM], libitm_cv_as_rtm, [
-    AC_TRY_COMPILE([], [asm("1: xbegin 1b; xend");],
-		   [libitm_cv_as_rtm=yes], [libitm_cv_as_rtm=no])
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[asm("1: xbegin 1b; xend");]])],[libitm_cv_as_rtm=yes],[libitm_cv_as_rtm=no])
   ])
   if test x$libitm_cv_as_rtm = xyes; then
     AC_DEFINE(HAVE_AS_RTM, 1, [Define to 1 if the assembler supports RTM.])
@@ -128,8 +110,7 @@ AC_DEFUN([LIBITM_CHECK_AS_HTM], [
 case "${target_cpu}" in
 powerpc*)
   AC_CACHE_CHECK([if the assembler supports HTM], libitm_cv_as_htm, [
-    AC_TRY_COMPILE([], [asm("tbegin. 0; tend. 0");],
-		   [libitm_cv_as_htm=yes], [libitm_cv_as_htm=no])
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[asm("tbegin. 0; tend. 0");]])],[libitm_cv_as_htm=yes],[libitm_cv_as_htm=no])
   ])
   if test x$libitm_cv_as_htm = xyes; then
     AC_DEFINE(HAVE_AS_HTM, 1, [Define to 1 if the assembler supports HTM.])
@@ -139,8 +120,7 @@ s390*)
   AC_CACHE_CHECK([if the assembler supports HTM], libitm_cv_as_htm, [
     save_CFLAGS="$CFLAGS"
     CFLAGS="$CFLAGS -march=zEC12"
-    AC_TRY_COMPILE([], [asm("tbegin 0,0; tend");],
-		   [libitm_cv_as_htm=yes], [libitm_cv_as_htm=no])
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[asm("tbegin 0,0; tend");]])],[libitm_cv_as_htm=yes],[libitm_cv_as_htm=no])
     CFLAGS="$save_CFLAGS"])
   if test x$libitm_cv_as_htm = xyes; then
     AC_DEFINE(HAVE_AS_HTM, 1, [Define to 1 if the assembler supports HTM.])
@@ -172,7 +152,7 @@ dnl See docs/html/17_intro/configury.html#enable for documentation.
 dnl
 m4_define([LIBITM_ENABLE],[dnl
 m4_define([_g_switch],[--enable-$1])dnl
-m4_define([_g_help],[AC_HELP_STRING(_g_switch$3,[$4 @<:@default=$2@:>@])])dnl
+m4_define([_g_help],[AS_HELP_STRING([_g_switch$3],[$4 @<:@default=$2@:>@])])dnl
  AC_ARG_ENABLE($1,_g_help,
   m4_bmatch([$5],
    [^permit ],
@@ -222,7 +202,7 @@ AC_DEFUN([LIBITM_CHECK_LINKER_FEATURES], [
   # by now (in libtool), but require it now just to be safe...
   test -z "$SECTION_LDFLAGS" && SECTION_LDFLAGS=''
   test -z "$OPT_LDFLAGS" && OPT_LDFLAGS=''
-  AC_REQUIRE([AC_PROG_LD])
+  AC_REQUIRE([LT_PATH_LD])
   AC_REQUIRE([AC_PROG_AWK])
 
   # The name set by libtool depends on the version of libtool.  Shame on us
@@ -274,14 +254,14 @@ AC_DEFUN([LIBITM_CHECK_LINKER_FEATURES], [
     # .eh_frame and now some of the glibc sections for iconv).
     # Bzzzzt.  Thanks for playing, maybe next time.
     AC_MSG_CHECKING([for ld that supports -Wl,--gc-sections])
-    AC_TRY_RUN([
+    AC_RUN_IFELSE([AC_LANG_SOURCE([[
      int main(void)
      {
        try { throw 1; }
        catch (...) { };
        return 0;
      }
-    ], [ac_sectionLDflags=yes],[ac_sectionLDflags=no], [ac_sectionLDflags=yes])
+    ]])],[ac_sectionLDflags=yes],[ac_sectionLDflags=no],[ac_sectionLDflags=yes])
     if test "$ac_test_CFLAGS" = set; then
       CFLAGS="$ac_save_CFLAGS"
     else
@@ -368,7 +348,7 @@ if test $enable_symvers != no; then
   AC_MSG_CHECKING([for shared libgcc])
   ac_save_CFLAGS="$CFLAGS"
   CFLAGS=' -lgcc_s'
-  AC_TRY_LINK(, [return 0;], libitm_shared_libgcc=yes, libitm_shared_libgcc=no)
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[]], [[return 0;]])],[libitm_shared_libgcc=yes],[libitm_shared_libgcc=no])
   CFLAGS="$ac_save_CFLAGS"
   if test $libitm_shared_libgcc = no; then
     cat > conftest.c <<EOF
@@ -383,7 +363,7 @@ changequote([,])dnl
     rm -f conftest.c conftest.so
     if test x${libitm_libgcc_s_suffix+set} = xset; then
       CFLAGS=" -lgcc_s$libitm_libgcc_s_suffix"
-      AC_TRY_LINK(, [return 0;], libitm_shared_libgcc=yes)
+      AC_LINK_IFELSE([AC_LANG_PROGRAM([[]], [[return 0;]])],[libitm_shared_libgcc=yes],[])
       CFLAGS="$ac_save_CFLAGS"
     fi
   fi
