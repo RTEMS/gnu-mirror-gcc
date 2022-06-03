@@ -1,7 +1,11 @@
 /* { dg-require-effective-target power10_ok } */
-/* { dg-options "-O2 -mdejagnu-cpu=power10" } */
+/* { dg-options "-O2 -mdejagnu-cpu=power10 -mstore-vector-pair" } */
 
 #include <altivec.h>
+
+/* The test relies on store vector pair being generated.  Otherwise, it
+   will generate 2 stxv instructions.  */
+
 void
 bug (__vector_pair *dst)
 {

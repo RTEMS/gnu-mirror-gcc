@@ -260,7 +260,6 @@ foo13b (__vector_quad *dst, __vector_quad *src, vec_t *vec)
 
 /* { dg-final { scan-assembler-times {\mlxv\M} 40 } } */
 /* { dg-final { scan-assembler-times {\mlxvp\M} 12 } } */
-/* { dg-final { scan-assembler-times {\mstxvp\M} 40 } } */
 /* { dg-final { scan-assembler-times {\mxxmfacc\M} 20 } } */
 /* { dg-final { scan-assembler-times {\mxxmtacc\M} 6 } } */
 /* { dg-final { scan-assembler-times {\mxvbf16ger2\M} 1 } } */

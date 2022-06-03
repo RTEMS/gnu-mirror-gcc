@@ -17,4 +17,3 @@ foo (__vector_quad *dst)
 /* { dg-final { scan-assembler-not {\mxxmtacc\M} } } */
 /* { dg-final { scan-assembler-times {\mxxsetaccz\M} 2 } } */
 /* { dg-final { scan-assembler-times {\mxxmfacc\M} 2 } } */
-/* { dg-final { scan-assembler-times {\mstxvp\M} 4 } } */
