@@ -1,3 +1,32 @@
+==================== work090 patch #3
+
+Adjust MMA tests to account for no store vector pair.
+
+In changing the default for generating the store vector pair instructions,
+I had to adjust several of the MMA tests to remove checking for these
+instructions.  Mostly I just deleted the scan-assembler lines checking for
+stxvp.  In two of the tests, I added the -mstore-vector-pair option since
+the point of the test was to check for specific cases with store vector
+pair instructions.
+
+2022-06-03   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/mma-builtin-1.c: Eliminate checking for store
+	vector pair instructions.
+	* gcc.target/powerpc/mma-builtin-10-pair.c: Likewise.
+	* gcc.target/powerpc/mma-builtin-10-quit.c: Likewise.
+	* gcc.target/powerpc/mma-builtin-2.c: Likewise.
+	* gcc.target/powerpc/mma-builtin-3.c: Likewise.
+	* gcc.target/powerpc/mma-builtin-4.c: Likewise.
+	* gcc.target/powerpc/mma-builtin-5.c: Likewise.
+	* gcc.target/powerpc/mma-builtin-6.c: Likewise.
+	* gcc.target/powerpc/mma-builtin-7.c: Likewise.
+	* gcc.target/powerpc/mma-builtin-9.c: Likewise.
+	* gcc.target/powerpc/mma-builtin-8.c: Add -mstore-vector-pair.
+	* gcc.target/powerpc/pr102976.c: Likewise.
+
 ==================== work090 patch #2
 
 Disable generating load/store vector pairs for block copies.
