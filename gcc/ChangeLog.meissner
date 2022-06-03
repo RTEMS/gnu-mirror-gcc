@@ -1,3 +1,70 @@
+==================== work090 patch #2
+
+Disable generating load/store vector pairs for block copies.
+
+If the store vector pair instruction is disabled, do not generate block
+copies that use load and store vector pair instructions.
+
+2022-06-02   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-string.cc (expand_block_move): If the store
+	vector pair instructions are disabled, do not generate block
+	copies using load and store vector pairs.
+
+Disable generating store vector pair.
+
+Testing has revealed that the power10 has some slowdowns if the store
+vector pair instruction is generated in some cases.  This patch disables
+generating the store vector pair instructions (stxvp, pstxvp, and stxvpx)
+unless an undocumented switch is used.  It is anticipated that perhaps
+with future machines we can generate the store vector pair instruction.
+
+This patch does a split after reload to convert a store vector pair
+instruction into a pair of store vector instructions.
+
+We do continue to generate the load vector pair instructions (lxvp, plxvp,
+and lxvpx), since we have found that in code that heavily uses MMA, it is
+still a win to generate the load vector pair instructions.
+
+There are two future patches planed:
+
+    1)	Disable block moves from generating load/store vector pair
+	instructions unless the the store vector pair instructions are
+	being generted.
+
+    2)	Make the built-in functions for generating store vector pair
+	always generate those instructions even if store vector pair
+	instructions are disabled.
+
+==================== work090 patch #1
+
+2022-06-02   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (movoo): Disable generating store vector
+	pair instructions unless these are enabled by the user.
+	(movxo): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_setup_reg_addr_masks): If store
+	vector pair instructions are disabled, do not allow vector pair
+	addresses to be indexed.
+	(rs6000_split_multireg_move): Do not split XOmode stores into two
+	store vector pair instructions unless store vector pair
+	instructions are enabled.
+	* config/rs6000/rs6000.md (isa attribute): Add stxvp attribute.
+	(enabled attribute): Disable alternative using store vector pair
+	instructions unless they are enabled.
+	* config/rs6000/rs6000.opt (-mstore-vector-pair): New option.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/p10-store-vector-pair-1.c: New test.
+	* gcc.target/powerpc/p10-store-vector-pair-2.c: New test.
+
+==================== work090 banch creation
+
 2022-06-02   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
