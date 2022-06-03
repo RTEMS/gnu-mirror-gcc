@@ -2714,7 +2714,8 @@ rs6000_setup_reg_addr_masks (void)
 	  /* Vector pairs can do both indexed and offset loads if the
 	     instructions are enabled, otherwise they can only do offset loads
 	     since it will be broken into two vector moves.  Vector quads can
-	     only do offset loads.  */
+	     only do offset loads.  If stxvp is disabled, we can't do indexed
+	     arithmetic.  */
 	  else if ((addr_mask != 0) && TARGET_MMA
 		   && (m2 == OOmode || m2 == XOmode))
 	    {
@@ -2722,7 +2723,8 @@ rs6000_setup_reg_addr_masks (void)
 	      if (rc == RELOAD_REG_FPR || rc == RELOAD_REG_VMX)
 		{
 		  addr_mask |= RELOAD_REG_QUAD_OFFSET;
-		  if (m2 == OOmode)
+		  if (m2 == OOmode
+		      && TARGET_STORE_VECTOR_PAIR)
 		    addr_mask |= RELOAD_REG_INDEXED;
 		}
 	    }
@@ -26992,7 +26994,8 @@ rs6000_split_multireg_move (rtx dst, rtx src)
   /* If we have a vector quad register for MMA, and this is a load or store,
      see if we can use vector paired load/stores.  */
   if (mode == XOmode && TARGET_MMA
-      && (MEM_P (dst) || MEM_P (src)))
+      && ((MEM_P (dst) && TARGET_STORE_VECTOR_PAIR)
+	  || MEM_P (src)))
     {
       reg_mode = OOmode;
       nregs /= 2;

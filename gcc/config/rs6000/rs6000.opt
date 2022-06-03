@@ -624,6 +624,10 @@ mieee128-constant
 Target Var(TARGET_IEEE128_CONSTANT) Init(1) Save
 Generate (do not generate) code that uses the LXVKQ instruction.
 
+; Generate (do not generate) code that uses the store vector pair instruction.
+mstore-vector-pair
+Target Undocumented Var(TARGET_STORE_VECTOR_PAIR) Init(0) Save
+
 -param=rs6000-density-pct-threshold=
 Target Undocumented Joined UInteger Var(rs6000_density_pct_threshold) Init(85) IntegerRange(0, 100) Param
 When costing for loop vectorization, we probably need to penalize the loop body
