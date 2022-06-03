@@ -1,6 +1,6 @@
 /* { dg-do compile } */
 /* { dg-require-effective-target power10_ok } */
-/* { dg-options "-mdejagnu-cpu=power10 -O2 -mstore-vector-pair" } */
+/* { dg-options "-mdejagnu-cpu=power10 -O2" } */
 
 void
 foo (__vector_pair *dst, __vector_pair *src, long idx)

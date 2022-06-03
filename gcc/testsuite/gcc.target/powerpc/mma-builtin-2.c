@@ -59,6 +59,7 @@ foo3 (__vector_quad *dst, __vector_quad *src, vec_t *vec, __vector_pair *pvecp)
 /* { dg-final { scan-assembler-times {\mxxmtacc\M} 2 } } */
 /* { dg-final { scan-assembler-times {\mlxv\M} 4 } } */
 /* { dg-final { scan-assembler-times {\mlxvp\M} 8 } } */
+/* { dg-final { scan-assembler-times {\mstxvp\M} 8 } } */
 /* { dg-final { scan-assembler-times {\mxvf64ger\M} 1 } } */
 /* { dg-final { scan-assembler-times {\mxvf64gerpp\M} 1 } } */
 /* { dg-final { scan-assembler-times {\mxvf64gerpn\M} 1 } } */

@@ -23,3 +23,4 @@ foo (__vector_pair *dst, __vector_pair *src, long idx)
 /* { dg-final { scan-assembler-times {\mlxvp\M} 3 } } */
 /* { dg-final { scan-assembler-times {\mlxvpx\M} 1 } } */
 /* { dg-final { scan-assembler-times {\mplxvp\M} 1 } } */
+/* { dg-final { scan-assembler-times {\mstxvp\M} 5 } } */

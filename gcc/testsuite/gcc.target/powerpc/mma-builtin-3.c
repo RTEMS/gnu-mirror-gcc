@@ -26,5 +26,6 @@ foo1 (vec_t *vec)
 /* { dg-final { scan-assembler-times {\mlxv\M} 2 } } */
 /* { dg-final { scan-assembler-times {\mstxv\M} 2 } } */
 /* { dg-final { scan-assembler-not {\mlxvp\M} } } */
+/* { dg-final { scan-assembler-not {\mstxvp\M} } } */
 /* { dg-final { scan-assembler-times {\mxvcvspbf16\M} 1 } } */
 /* { dg-final { scan-assembler-times {\mxvcvbf16spn\M} 1 } } */

@@ -20,3 +20,4 @@ foo (__vector_quad *dst, vec_t *src)
 /* { dg-final { scan-assembler-times {\mlxvp\M} 4 } } */
 /* { dg-final { scan-assembler-times {\mxxmtacc\M} 2 } } */
 /* { dg-final { scan-assembler-times {\mxxmfacc\M} 2 } } */
+/* { dg-final { scan-assembler-times {\mstxvp\M} 4 } } */
