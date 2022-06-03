@@ -2787,14 +2787,16 @@ expand_block_move (rtx operands[], bool might_overlap)
       rtx src, dest;
       bool move_with_length = false;
 
-      /* Use OOmode for paired vsx load/store.  Use V2DI for single
-	 unaligned vsx load/store, for consistency with what other
-	 expansions (compare) already do, and so we can use lxvd2x on
-	 p8.  Order is VSX pair unaligned, VSX unaligned, Altivec, VSX
-	 with length < 16 (if allowed), then gpr load/store.  */
+      /* Use OOmode for paired vsx load/store unless the store vector pair
+	 instructions are disabled.  Use V2DI for single unaligned vsx
+	 load/store, for consistency with what other expansions (compare)
+	 already do, and so we can use lxvd2x on p8.  Order is VSX pair
+	 unaligned, VSX unaligned, Altivec, VSX with length < 16 (if allowed),
+	 then gpr load/store.  */
 
       if (TARGET_MMA && TARGET_BLOCK_OPS_UNALIGNED_VSX
 	  && TARGET_BLOCK_OPS_VECTOR_PAIR
+	  && TARGET_STORE_VECTOR_PAIR
 	  && bytes >= 32
 	  && (align >= 256 || !STRICT_ALIGNMENT))
 	{
