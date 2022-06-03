@@ -69,5 +69,4 @@ bar2 (vec_t *dst, __vector_pair *src)
 /* { dg-final { scan-assembler-times {\mlxv\M} 6 } } */
 /* { dg-final { scan-assembler-times {\mlxvp\M} 2 } } */
 /* { dg-final { scan-assembler-times {\mstxv\M} 4 } } */
-/* { dg-final { scan-assembler-times {\mstxvp\M} 3 } } */
 

@@ -18,4 +18,3 @@ foo (__vector_pair *dst, vec_t *src)
 /* { dg-final { scan-assembler-not {\mlxv\M} } } */
 /* { dg-final { scan-assembler-not {\mstxv\M} } } */
 /* { dg-final { scan-assembler-times {\mlxvp\M} 1 } } */
-/* { dg-final { scan-assembler-times {\mstxvp\M} 2 } } */
