@@ -4625,6 +4625,10 @@ tree_innermost_capability (const_tree t)
 
   switch (TREE_CODE (t))
     {
+    case VAR_DECL:
+    case PARM_DECL:
+      /* These can never be assembly constants.  */
+      return NULL_TREE;
     case INTEGER_CST:
     CASE_ADDR_EXPR:
       return t;
