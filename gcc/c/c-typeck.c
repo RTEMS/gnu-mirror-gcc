@@ -4353,37 +4353,6 @@ cas_loop:
 		 return_old_p ? old : newval);
 }
 
-static tree
-intcap_increment (location_t loc, tree_code code, tree arg)
-{
-  tree t, cv, intcap, lval;
-
-  arg = lval = stabilize_reference (arg);
-  intcap = unary_op_get_intcap_provenance (arg);
-  if (intcap == arg)
-    /* This save_expr is needed to avoid evaluating
-       the intcap twice when we compute the REPLACE_ADDRESS_VALUE.  */
-    intcap = arg = save_expr (intcap);
-  cv = drop_capability (arg);
-
-  int dir = (code == PREINCREMENT_EXPR || code == POSTINCREMENT_EXPR) ? 1 : -1;
-  t = build_int_cst (TREE_TYPE (cv), dir);
-  t = build2 (PLUS_EXPR, TREE_TYPE (cv), cv, t);
-  t = build_replace_address_value_loc (loc, intcap, t);
-  t = build2 (MODIFY_EXPR, TREE_TYPE (t), lval, t);
-
-  if (code == POSTINCREMENT_EXPR || code == POSTDECREMENT_EXPR)
-    {
-      /* This save_expr is needed to remember the original value.  */
-      arg = save_expr (arg);
-      t = build2 (COMPOUND_EXPR, TREE_TYPE (t), t, arg);
-      t = build2 (COMPOUND_EXPR, TREE_TYPE (t), arg, t);
-    }
-
-  TREE_SIDE_EFFECTS (t) = 1;
-  return t;
-}
-
 /* Construct and perhaps optimize a tree representation
    for a unary operation.  CODE, a tree_code, specifies the operation
    and XARG is the operand.

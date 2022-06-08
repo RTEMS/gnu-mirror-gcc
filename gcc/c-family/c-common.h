@@ -1020,6 +1020,9 @@ extern tree unary_op_get_intcap_provenance (tree);
 /* Handle increment and decrement of boolean types.  */
 extern tree boolean_increment (enum tree_code, tree);
 
+/* Likewise for intcap types.  */
+extern tree intcap_increment (location_t loc, enum tree_code, tree);
+
 extern int case_compare (splay_tree_key, splay_tree_key);
 
 extern tree c_add_case_label (location_t, splay_tree, tree, tree, tree);

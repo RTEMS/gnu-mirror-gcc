@@ -5216,6 +5216,7 @@ binary_op_get_intcap_provenance (location_t loc,
     case TRUTH_AND_EXPR:
     case TRUTH_OR_EXPR:
     case TRUTH_XOR_EXPR:
+    case SPACESHIP_EXPR:
       return NULL_TREE;
     case RSHIFT_EXPR:
     case LSHIFT_EXPR:
@@ -5325,6 +5326,38 @@ boolean_increment (enum tree_code code, tree arg)
     }
   TREE_SIDE_EFFECTS (val) = 1;
   return val;
+}
+
+/* Like boolean_increment, but where ARG is of INTCAP_TYPE.  */
+tree
+intcap_increment (location_t loc, tree_code code, tree arg)
+{
+  tree t, cv, intcap, lval;
+
+  arg = lval = stabilize_reference (arg);
+  intcap = unary_op_get_intcap_provenance (arg);
+  if (intcap == arg)
+    /* This save_expr is needed to avoid evaluating
+       the intcap twice when we compute the REPLACE_ADDRESS_VALUE.  */
+    intcap = arg = save_expr (intcap);
+  cv = drop_capability (arg);
+
+  int dir = (code == PREINCREMENT_EXPR || code == POSTINCREMENT_EXPR) ? 1 : -1;
+  t = build_int_cst (TREE_TYPE (cv), dir);
+  t = build2 (PLUS_EXPR, TREE_TYPE (cv), cv, t);
+  t = build_replace_address_value_loc (loc, intcap, t);
+  t = build2 (MODIFY_EXPR, TREE_TYPE (t), lval, t);
+
+  if (code == POSTINCREMENT_EXPR || code == POSTDECREMENT_EXPR)
+    {
+      /* This save_expr is needed to remember the original value.  */
+      arg = save_expr (arg);
+      t = build2 (COMPOUND_EXPR, TREE_TYPE (t), t, arg);
+      t = build2 (COMPOUND_EXPR, TREE_TYPE (t), arg, t);
+    }
+
+  TREE_SIDE_EFFECTS (t) = 1;
+  return t;
 }
 
 /* Built-in macros for stddef.h and stdint.h, that require macros

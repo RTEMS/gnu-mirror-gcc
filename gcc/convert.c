@@ -360,6 +360,9 @@ convert_to_real_1 (tree type, tree expr, bool fold_p)
 			  || DECIMAL_FLOAT_TYPE_P (itype))
 			 ? CONVERT_EXPR : NOP_EXPR, type, expr);
 
+    case INTCAP_TYPE:
+      expr = convert (noncapability_type (TREE_TYPE (expr)), expr);
+      /* FALLTHROUGH.  */
     case INTEGER_TYPE:
     case ENUMERAL_TYPE:
     case BOOLEAN_TYPE:

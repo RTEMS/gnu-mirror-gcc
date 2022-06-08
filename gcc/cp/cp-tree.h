@@ -5650,6 +5650,7 @@ enum overload_flags { NO_SPECIAL = 0, DTOR_FLAG, TYPENAME_FLAG };
 #define WANT_POINTER	8 /* pointer types */
 #define WANT_NULL      16 /* null pointer constant */
 #define WANT_VECTOR_OR_COMPLEX 32 /* vector or complex types */
+#define WANT_INTCAP	64 /* intcap types */
 #define WANT_ARITH	(WANT_INT | WANT_FLOAT | WANT_VECTOR_OR_COMPLEX)
 
 /* Used with comptypes, and related functions, to guide type
@@ -7615,7 +7616,8 @@ extern tree spaceship_type			(tree, tsubst_flags_t = tf_warning_or_error);
 extern tree genericize_spaceship		(tree, tree, tree);
 extern tree cp_build_binary_op                  (const op_location_t &,
 						 enum tree_code, tree, tree,
-						 tsubst_flags_t);
+						 tsubst_flags_t,
+						 bool = false);
 extern tree build_x_vec_perm_expr               (location_t,
 						 tree, tree, tree,
 						 tsubst_flags_t);

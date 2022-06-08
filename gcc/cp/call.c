@@ -4395,7 +4395,8 @@ build_converted_constant_expr_internal (tree type, tree expr,
 	case ck_ptr:
 	case ck_std:
 	  t = next_conversion (c)->type;
-	  if (INTEGRAL_OR_ENUMERATION_TYPE_P (t)
+	  if ((INTEGRAL_OR_ENUMERATION_TYPE_P (t)
+	       || INTCAP_TYPE_P (t))
 	      && INTEGRAL_OR_ENUMERATION_TYPE_P (type))
 	    /* Integral promotion or conversion.  */
 	    break;
@@ -5612,8 +5613,10 @@ build_conditional_expr_1 (const op_location_t &loc,
        type; the usual arithmetic conversions are performed to bring
        them to a common type, and the result is of that type.  */
   else if ((ARITHMETIC_TYPE_P (arg2_type)
+	    || INTCAP_TYPE_P (arg2_type)
 	    || UNSCOPED_ENUM_P (arg2_type))
 	   && (ARITHMETIC_TYPE_P (arg3_type)
+	       || INTCAP_TYPE_P (arg3_type)
 	       || UNSCOPED_ENUM_P (arg3_type)))
     {
       /* In this case, there is always a common type.  */

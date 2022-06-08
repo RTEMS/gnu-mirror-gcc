@@ -327,12 +327,11 @@ cp_common_type (tree t1, tree t2)
     return build_type_attribute_variant (t2, attributes);
 
   /* INTCAP_TYPEs out-rank all other integer types.  */
-  if ((code1 == INTCAP_TYPE && code2 != INTCAP_TYPE)
-      || (code2 == INTCAP_TYPE && code1 != INTCAP_TYPE))
+  if (code1 == INTCAP_TYPE || code2 == INTCAP_TYPE)
     {
       tree t_intcap = (code1 == INTCAP_TYPE) ? t1 : t2;
       tree t_int = (t_intcap == t1) ? t2 : t1;
-      gcc_assert (INTEGRAL_TYPE_P (t_int));
+      gcc_assert (INTEGRAL_TYPE_P (t_int) || INTCAP_TYPE_P (t_int));
 
       /* Note that the intcap always out-ranks the integer type, the only
 	 interesting case is therefore when the intcap is signed, the integer is
@@ -343,7 +342,7 @@ cp_common_type (tree t1, tree t2)
 	 to the unsigned integer type corresponding to the type of the operand
 	 with the signed integer type.  */
       if (!TYPE_UNSIGNED (t_intcap) && TYPE_UNSIGNED (t_int)
-	  && TYPE_NONCAP_PRECISION (t_intcap) <= TYPE_PRECISION (t_int))
+	  && TYPE_NONCAP_PRECISION (t_intcap) <= TYPE_NONCAP_PRECISION (t_int))
 	return uintcap_type_node;
       else
 	return t_intcap;
@@ -456,9 +455,11 @@ tree
 type_after_usual_arithmetic_conversions (tree t1, tree t2)
 {
   gcc_assert (ARITHMETIC_TYPE_P (t1)
+	      || INTCAP_TYPE_P (t1)
 	      || VECTOR_TYPE_P (t1)
 	      || UNSCOPED_ENUM_P (t1));
   gcc_assert (ARITHMETIC_TYPE_P (t2)
+	      || INTCAP_TYPE_P (t2)
 	      || VECTOR_TYPE_P (t2)
 	      || UNSCOPED_ENUM_P (t2));
 
@@ -1358,6 +1359,14 @@ structural_comptypes (tree t1, tree t2, int strict)
 	 represent the same type.  The canonical type system keeps
 	 track of equivalence in this case, so we fall back on it.  */
       return TYPE_CANONICAL (t1) == TYPE_CANONICAL (t2);
+
+    case INTCAP_TYPE:
+      /* There are only two INTCAP_TYPEs, identified by their
+	 signedness.  */
+      gcc_assert (TYPE_CAP_PRECISION (t1) == TYPE_CAP_PRECISION (t2));
+      if (TYPE_UNSIGNED (t1) != TYPE_UNSIGNED (t2))
+	return false;
+      break;
 
     case TEMPLATE_TEMPLATE_PARM:
     case BOUND_TEMPLATE_TEMPLATE_PARM:
@@ -4476,7 +4485,8 @@ warn_for_null_address (location_t location, tree op, tsubst_flags_t complain)
 tree
 cp_build_binary_op (const op_location_t &location,
 		    enum tree_code code, tree orig_op0, tree orig_op1,
-		    tsubst_flags_t complain)
+		    tsubst_flags_t complain,
+		    bool op0_provenance_p)
 {
   tree op0, op1;
   enum tree_code code0, code1;
@@ -4567,6 +4577,20 @@ cp_build_binary_op (const op_location_t &location,
   /* Strip NON_LVALUE_EXPRs, etc., since we aren't using as an lvalue.  */
   STRIP_TYPE_NOPS (op0);
   STRIP_TYPE_NOPS (op1);
+
+  tree intcap = binary_op_get_intcap_provenance (location, code, op0, op1,
+						 !op0_provenance_p);
+
+  /* If we will derive an intcap from either the LHS or the RHS,
+     wrap it with save_expr.  This will prevent us re-evaluating
+     any side effects of the intcap which will appear twice
+     in the resulting expression.  E.g. for
+     c + cv --> REPLACE_ADDRESS_VALUE (c, (non-cap type) c + cv)
+     we need to avoid evaluating c twice.  */
+  if (intcap == op0)
+    intcap = op0 = save_expr (op0);
+  else if (intcap == op1)
+    intcap = op1 = save_expr (op1);
 
   if (INTCAP_TYPE_P (TREE_TYPE (op0)))
     op0 = drop_capability (op0);
@@ -5842,56 +5866,15 @@ cp_build_binary_op (const op_location_t &location,
 
   /* For INTCAP_TYPEs, we dropped the capabilities early on and now need
      to work out where the provenance (if any) should come from.  */
-  if (!capability_type_p (TREE_TYPE (result))
-      && TREE_CODE_CLASS (code) != tcc_comparison
-      && code != SPACESHIP_EXPR
-      && result_type != boolean_type_node)
+  if (intcap)
     {
-      tree orig_type0 = TREE_TYPE (orig_op0);
-      tree orig_type1 = TREE_TYPE (orig_op1);
-
-      bool ic0 = INTCAP_TYPE_P (orig_type0);
-      bool ic1 = INTCAP_TYPE_P (orig_type1);
-
-      /* These flags are set if we need an intcap result type because of
-	 either the left or right operand respectively.  */
-      bool need_ic0 = ic0 && code1 == INTEGER_TYPE;
-      bool need_ic1 = ic1 && !doing_shift && code0 == INTEGER_TYPE;
-
-      bool prov0 = need_ic0
-	&& !lookup_attribute ("cheri_no_provenance",
-			      TYPE_ATTRIBUTES (orig_type0));
-      bool prov1 = need_ic1
-	&& !lookup_attribute ("cheri_no_provenance",
-			      TYPE_ATTRIBUTES (orig_type1));
-
-      tree intcap = nullptr;
-      if (prov0)
-	intcap = orig_op0;
-      else if (prov1)
-	intcap = orig_op1;
-      else if (need_ic0)
-	intcap = build_int_cst (orig_type0, 0);
-      else if (need_ic1)
-	intcap = build_int_cst (orig_type1, 0);
-
-      if (intcap)
-	{
-	  tree ic_type = cp_common_type (TREE_TYPE (intcap),
-					 TREE_TYPE (result));
-	  gcc_assert (same_type_p (TREE_TYPE (result), noncapability_type (ic_type)));
-	  intcap = cp_convert (ic_type, intcap, complain);
-	  result = fold_build_replace_address_value_loc (location,
-							 intcap,
-							 result);
-	}
-
-      if (prov0 && prov1)
-	warning_at (location, OPT_Wcheri_provenance,
-		    "binary expression on capability types %qT and %qT; "
-		    "it is not clear which should be the source of provenance; "
-		    "currently provenance is inherited from the left-hand side",
-		    orig_type0, orig_type1);
+      gcc_assert (!capability_type_p (TREE_TYPE (result)));
+      tree ic_type = cp_common_type (TREE_TYPE (intcap), TREE_TYPE (result));
+      gcc_assert (same_type_p (TREE_TYPE (result), noncapability_type (ic_type)));
+      intcap = cp_convert (ic_type, intcap, complain);
+      result = build_replace_address_value_loc (location,
+						intcap,
+						result);
     }
 
   if (instrument_expr != NULL)
@@ -6600,6 +6583,27 @@ cp_build_unary_op (enum tree_code code, tree xarg, bool noconvert,
       return error_mark_node;
     }
 
+  tree intcap = NULL_TREE;
+  if (INTCAP_TYPE_P (TREE_TYPE (arg)))
+    {
+      switch (code)
+	{
+	CASE_ADDR_EXPR:
+	case UNARY_PLUS_EXPR:
+	case PREINCREMENT_EXPR:
+	case POSTINCREMENT_EXPR:
+	case PREDECREMENT_EXPR:
+	case POSTDECREMENT_EXPR:
+	case TRUTH_NOT_EXPR:
+	  break;
+	default:
+	  intcap = unary_op_get_intcap_provenance (arg);
+	  if (arg == intcap)
+	    intcap = arg = save_expr (arg);
+	  arg = drop_capability (arg);
+	}
+    }
+
   switch (code)
     {
     case UNARY_PLUS_EXPR:
@@ -6608,7 +6612,7 @@ cp_build_unary_op (enum tree_code code, tree xarg, bool noconvert,
 	int flags = WANT_ARITH | WANT_ENUM;
 	/* Unary plus (but not unary minus) is allowed on pointers.  */
 	if (code == UNARY_PLUS_EXPR)
-	  flags |= WANT_POINTER;
+	  flags |= (WANT_POINTER | WANT_INTCAP);
 	arg = build_expr_type_conversion (flags, arg, true);
 	if (!arg)
 	  errstring = (code == NEGATE_EXPR
@@ -6729,7 +6733,9 @@ cp_build_unary_op (enum tree_code code, tree xarg, bool noconvert,
 
       /* Report invalid types.  */
 
-      if (!(arg = build_expr_type_conversion (WANT_ARITH | WANT_POINTER,
+      if (!(arg = build_expr_type_conversion (WANT_ARITH
+					      | WANT_POINTER
+					      | WANT_INTCAP,
 					      arg, true)))
 	{
 	  if (code == PREINCREMENT_EXPR)
@@ -6880,6 +6886,8 @@ cp_build_unary_op (enum tree_code code, tree xarg, bool noconvert,
 	      }
 	    val = boolean_increment (code, arg);
 	  }
+	else if (TREE_CODE (declared_type) == INTCAP_TYPE)
+	  val = intcap_increment (location, code, arg);
 	else if (code == POSTINCREMENT_EXPR || code == POSTDECREMENT_EXPR)
 	  /* An rvalue has no cv-qualifiers.  */
 	  val = build2 (code, cv_unqualified (TREE_TYPE (arg)), arg, inc);
@@ -6903,7 +6911,10 @@ cp_build_unary_op (enum tree_code code, tree xarg, bool noconvert,
     {
       if (argtype == 0)
 	argtype = TREE_TYPE (arg);
-      return build1 (code, argtype, arg);
+      arg = build1 (code, argtype, arg);
+      if (intcap)
+	arg = build_replace_address_value_loc (location, intcap, arg);
+      return arg;
     }
 
   if (complain & tf_error)
@@ -8740,7 +8751,7 @@ cp_build_modify_expr (location_t loc, tree lhs, enum tree_code modifycode,
 	  if (rhs == error_mark_node)
 	    return error_mark_node;
 	  rhs = stabilize_expr (rhs, &init);
-	  newrhs = cp_build_binary_op (loc, modifycode, lhs, rhs, complain);
+	  newrhs = cp_build_binary_op (loc, modifycode, lhs, rhs, complain, true);
 	  if (newrhs == error_mark_node)
 	    {
 	      if (complain & tf_error)

@@ -10366,6 +10366,9 @@ compute_array_index_type_loc (location_t name_loc, tree name, tree size,
       if (error_operand_p (size))
 	return error_mark_node;
 
+      if (INTCAP_TYPE_P (TREE_TYPE (size)))
+	size = drop_capability (size);
+
       /* The array bound must be an integer type.  */
       tree type = TREE_TYPE (size);
       if (!INTEGRAL_OR_UNSCOPED_ENUMERATION_TYPE_P (type))
