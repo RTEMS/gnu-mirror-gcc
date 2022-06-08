@@ -1,6 +1,7 @@
 /* This was being miscompiled on capability targets since we were
    incorrectly evaluating intcap operands twice: once to get the
    capability, and again to get the capability value.  */
+/* { dg-do run } */
 
 int i;
 __INTPTR_TYPE__ f() { i++; return 1; }
