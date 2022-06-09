@@ -1,3 +1,20 @@
+==================== patch work091/work001
+
+Disable generating load/store vector pairs for block copies.
+
+Testing has found that using store vector pair for block copies can result
+in a slow down on power10.  This patch disables using the vector pair
+instructions for block copies if we are tuning for power10.
+
+2022-06-09   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Do
+	not generate block copies with vector pair instructions if we are
+	tuning for power10.
+
+==================== New branch.
+
 2022-06-09   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
