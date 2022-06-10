@@ -25,17 +25,18 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "backend.h"
-#include "target.h"
 #include "tree.h"
+#include "gimple.h"
 #include "tree-pass.h"
-#include "memmodel.h"
-#include "tm_p.h"
+#include "gimple-iterator.h"
+
+#include "gimple-pretty-print.h"
 
 /* TODO Popisek passu  */
 
 namespace {
 
-const pass_data pass_data_adjust_alignment =
+const pass_data pass_data_sccp =
 {
   GIMPLE_PASS, /* type */
   "sccp", /* name */
