@@ -37,8 +37,7 @@ fi
 dnl See if the G++ compiler we found works.
 AC_DEFUN([CYG_AC_PROG_GXX_WORKS],
 [AC_MSG_CHECKING([whether the G++ compiler ($CXX $CXXFLAGS $LDFLAGS) actually works])
-AC_LANG_SAVE
-AC_LANG([C++])
+AC_LANG_PUSH([C++])
 dnl Try a test case. We only compile, because it's close to impossible
 dnl to get a correct fully linked executable with a cross compiler. For
 dnl most cross compilers, this test is bogus. For G++, we can use various
@@ -89,7 +88,7 @@ else
    ac_cv_prog_cxx_works=yes 
 fi
 
-AC_LANG_RESTORE
+AC_LANG_POP([])
 AC_MSG_RESULT($ac_cv_prog_cxx_works)
 if test x"$ac_cv_prog_cxx_works" = xno; then
   AC_MSG_ERROR([installation or configuration problem: C++ compiler cannot create executables.])
@@ -134,8 +133,7 @@ fi
 dnl See if the GCC compiler we found works.
 AC_DEFUN([CYG_AC_PROG_GCC_WORKS],
 [AC_MSG_CHECKING([whether the Gcc compiler ($CC $CFLAGS $LDFLAGS) actually works])
-AC_LANG_SAVE
-AC_LANG([C])
+AC_LANG_PUSH([C])
 dnl Try a test case. We only compile, because it's close to impossible
 dnl to get a correct fully linked executable with a cross
 dnl compiler. For most cross compilers, this test is bogus. For G++,
@@ -185,7 +183,7 @@ else
     ac_cv_prog_cc_works=yes
 fi
 
-AC_LANG_RESTORE
+AC_LANG_POP([])
 AC_MSG_RESULT($ac_cv_prog_cc_works)
 if test x"$ac_cv_prog_cc_works" = xno; then
   AC_MSG_ERROR([installation or configuration problem: C++ compiler cannot create executables.])
@@ -567,11 +565,11 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
 #if !BYTE_ORDER || !_BIG_ENDIAN || !_LITTLE_ENDIAN
  bogus endian macros
 #endif]])],[# It does; now see whether it defined to _LITTLE_ENDIAN or not.
-_au_m4_changequote([,])AC_TRY_COMPILE([#include <sys/types.h>
-#include <sys/param.h>], [
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
+#include <sys/param.h>]], [[
 #if BYTE_ORDER != _LITTLE_ENDIAN
  not big endian
-#endif], ac_cv_c_little_endian=yes, ac_cv_c_little_endian=no)
+#endif]])],[ac_cv_c_little_endian=yes],[ac_cv_c_little_endian=no])
 ],[])
 if test ${ac_cv_c_little_endian} = unknown; then
 old_cflags=$CFLAGS
@@ -614,8 +612,7 @@ dnl Look for the path to libgcc, so we can use it to directly link
 dnl in libgcc.a with LD.
 AC_DEFUN([CYG_AC_PATH_LIBGCC],
 [AC_MSG_CHECKING([Looking for the path to libgcc.a])
-AC_LANG_SAVE
-AC_LANG([C])
+AC_LANG_PUSH([C])
 
 dnl Get Gcc's full path to libgcc.a
 libgccpath=`${CC} --print-libgcc`
@@ -637,6 +634,6 @@ else
    AC_MSG_ERROR(Not using gcc)
 fi
 
-AC_LANG_RESTORE
+AC_LANG_POP([])
 AC_SUBST(LIBGCC)
 ])
