@@ -1,8 +1,7 @@
 # -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_INIT([GNU Vtable Verification Runtime Library], 1.0,,[libvtv])
-#AC_INIT(package-unused, version-unused, libvtv)
+AC_INIT([GNU Vtable Verification Runtime Library],[1.0],[],[libvtv])
 AC_CONFIG_SRCDIR([vtv_rts.h])
 
 AM_ENABLE_MULTILIB(, ..)
@@ -23,7 +22,7 @@ AC_MSG_RESULT($version_specific_libs)
 
 # Do not delete or change the following two lines.  For why, see
 # http://gcc.gnu.org/ml/libstdc++/2003-07/msg00451.html
-AC_CANONICAL_SYSTEM
+AC_CANONICAL_TARGET
 target_alias=${target_alias-$host_alias}
 AC_SUBST(target_alias)
 GCC_LIBSTDCXX_RAW_CXX_FLAGS
@@ -117,10 +116,8 @@ esac
 AC_SUBST(toolexecdir)
 AC_SUBST(toolexeclibdir)
 
-AC_GNU_SOURCE
+AC_USE_SYSTEM_EXTENSIONS
 AC_CHECK_FUNCS([__secure_getenv])
-
-AC_GNU_SOURCE
 AC_CHECK_FUNCS([secure_getenv])
 
 AC_CHECK_FUNCS([getexecname __fortify_fail])
@@ -148,8 +145,7 @@ AC_CHECK_TOOL(AR, ar)
 AC_CHECK_TOOL(RANLIB, ranlib, :)
 
 # Configure libtool
-AC_LIBTOOL_DLOPEN
-AM_PROG_LIBTOOL
+LT_INIT([dlopen])
 ACX_LT_HOST_FLAGS
 AC_SUBST(enable_shared)
 AC_SUBST(enable_static)
@@ -175,7 +171,7 @@ fi
 AC_CONFIG_FILES([Makefile])
 
 if test "x$VTV_SUPPORTED" = "xyes"; then
-  AC_CONFIG_FILES(AC_FOREACH([DIR], [testsuite], [DIR/Makefile ]), 
+  AC_CONFIG_FILES(m4_foreach_w([DIR],[testsuite],[DIR/Makefile ]), 
     [cat > vpsed$$ << \_EOF
 s!`test -f '$<' || echo '$(srcdir)/'`!!
 _EOF
