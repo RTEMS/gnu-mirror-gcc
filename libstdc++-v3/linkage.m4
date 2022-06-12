@@ -12,16 +12,13 @@ AC_DEFUN([GLIBCXX_CHECK_MATH_DECL_1], [
   AC_MSG_CHECKING([for $1 declaration])
   if test x${glibcxx_cv_func_$1_use+set} != xset; then
     AC_CACHE_VAL(glibcxx_cv_func_$1_use, [
-      AC_LANG_SAVE
-      AC_LANG_CPLUSPLUS
-      AC_TRY_COMPILE([#include <math.h>
+      AC_LANG_PUSH([C++])
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <math.h>
 		      #ifdef HAVE_IEEEFP_H
 		      #include <ieeefp.h>
 		      #endif
-		     ],
-                     [ $1(0);],
-                      [glibcxx_cv_func_$1_use=yes], [glibcxx_cv_func_$1_use=no])
-      AC_LANG_RESTORE
+		     ]], [[ $1(0);]])],[glibcxx_cv_func_$1_use=yes],[glibcxx_cv_func_$1_use=no])
+      AC_LANG_POP([])
     ])
   fi
   AC_MSG_RESULT($glibcxx_cv_func_$1_use)
@@ -35,8 +32,7 @@ dnl but _func does, then it will "#define func _func".
 dnl
 dnl GLIBCXX_MAYBE_UNDERSCORED_FUNCS
 AC_DEFUN([GLIBCXX_MAYBE_UNDERSCORED_FUNCS], 
-[AC_FOREACH([glibcxx_ufunc], [$1],
-  [AH_VERBATIM(_[]glibcxx_ufunc,
+[m4_foreach_w([glibcxx_ufunc],[$1],[AH_VERBATIM(_[]glibcxx_ufunc,
 [#if defined (]AS_TR_CPP(HAVE__[]glibcxx_ufunc)[) && ! defined (]AS_TR_CPP(HAVE_[]glibcxx_ufunc)[)
 # define ]AS_TR_CPP(HAVE_[]glibcxx_ufunc)[ 1
 # define ]glibcxx_ufunc[ _]glibcxx_ufunc[
@@ -80,26 +76,18 @@ AC_DEFUN([GLIBCXX_CHECK_MATH_DECLS_AND_LINKAGES_1], [
   define([funclist],patsubst($3,\(\w+\)\(\W*\),\1 ))dnl
   AC_MSG_CHECKING([for $1 functions])
   AC_CACHE_VAL(glibcxx_cv_func_$2_use, [
-    AC_LANG_SAVE
-    AC_LANG_CPLUSPLUS
-    AC_TRY_COMPILE([#include <math.h>],
-                   patsubst(funclist,[\w+],[\& (0);]),
-                   [glibcxx_cv_func_$2_use=yes],
-                   [glibcxx_cv_func_$2_use=no])
-    AC_LANG_RESTORE])
+    AC_LANG_PUSH([C++])
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <math.h>]], [[patsubst(funclist,\w+,\& (0);)]])],[glibcxx_cv_func_$2_use=yes],[glibcxx_cv_func_$2_use=no])
+    AC_LANG_POP([])])
   AC_MSG_RESULT($glibcxx_cv_func_$2_use)
   if test x$glibcxx_cv_func_$2_use = x"yes"; then
     AC_CHECK_FUNCS(funclist)
   else
     AC_MSG_CHECKING([for _$1 functions])
     AC_CACHE_VAL(glibcxx_cv_func__$2_use, [
-      AC_LANG_SAVE
-      AC_LANG_CPLUSPLUS
-      AC_TRY_COMPILE([#include <math.h>],
-                     patsubst(funclist,[\w+],[_\& (0);]),
-                     [glibcxx_cv_func__$2_use=yes],
-                     [glibcxx_cv_func__$2_use=no])
-      AC_LANG_RESTORE])
+      AC_LANG_PUSH([C++])
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <math.h>]], [[patsubst(funclist,\w+,_\& (0);)]])],[glibcxx_cv_func__$2_use=yes],[glibcxx_cv_func__$2_use=no])
+      AC_LANG_POP([])])
     AC_MSG_RESULT($glibcxx_cv_func__$2_use)
     if test x$glibcxx_cv_func__$2_use = x"yes"; then
       AC_CHECK_FUNCS(patsubst(funclist,[\w+],[_\&]))
@@ -119,12 +107,9 @@ AC_DEFUN([GLIBCXX_CHECK_MATH_DECL_2], [
   AC_MSG_CHECKING([for $1 declaration])
   if test x${glibcxx_cv_func_$1_use+set} != xset; then
     AC_CACHE_VAL(glibcxx_cv_func_$1_use, [
-      AC_LANG_SAVE
-      AC_LANG_CPLUSPLUS
-      AC_TRY_COMPILE([#include <math.h>],
-                     [ $1(0, 0);],
-                     [glibcxx_cv_func_$1_use=yes], [glibcxx_cv_func_$1_use=no])
-      AC_LANG_RESTORE
+      AC_LANG_PUSH([C++])
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <math.h>]], [[ $1(0, 0);]])],[glibcxx_cv_func_$1_use=yes],[glibcxx_cv_func_$1_use=no])
+      AC_LANG_POP([])
     ])
   fi
   AC_MSG_RESULT($glibcxx_cv_func_$1_use)
@@ -166,12 +151,9 @@ AC_DEFUN([GLIBCXX_CHECK_MATH_DECL_3], [
   AC_MSG_CHECKING([for $1 declaration])
   if test x${glibcxx_cv_func_$1_use+set} != xset; then
     AC_CACHE_VAL(glibcxx_cv_func_$1_use, [
-      AC_LANG_SAVE
-      AC_LANG_CPLUSPLUS
-      AC_TRY_COMPILE([#include <math.h>],
-                     [ $1(0, 0, 0);],
-                     [glibcxx_cv_func_$1_use=yes], [glibcxx_cv_func_$1_use=no])
-      AC_LANG_RESTORE
+      AC_LANG_PUSH([C++])
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <math.h>]], [[ $1(0, 0, 0);]])],[glibcxx_cv_func_$1_use=yes],[glibcxx_cv_func_$1_use=no])
+      AC_LANG_POP([])
     ])
   fi
   AC_MSG_RESULT($glibcxx_cv_func_$1_use)
@@ -217,12 +199,9 @@ AC_DEFUN([GLIBCXX_CHECK_STDLIB_DECL_AND_LINKAGE_0], [
   AC_MSG_CHECKING([for $1 declaration])
   if test x${glibcxx_cv_func_$1_use+set} != xset; then
     AC_CACHE_VAL(glibcxx_cv_func_$1_use, [
-      AC_LANG_SAVE
-      AC_LANG_CPLUSPLUS
-      AC_TRY_COMPILE([#include <stdlib.h>],
-                     [ $1();],
-                     [glibcxx_cv_func_$1_use=yes], [glibcxx_cv_func_$1_use=no])
-      AC_LANG_RESTORE
+      AC_LANG_PUSH([C++])
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <stdlib.h>]], [[ $1();]])],[glibcxx_cv_func_$1_use=yes],[glibcxx_cv_func_$1_use=no])
+      AC_LANG_POP([])
     ])
   fi
   AC_MSG_RESULT($glibcxx_cv_func_$1_use)
@@ -246,12 +225,9 @@ AC_DEFUN([GLIBCXX_CHECK_STDLIB_DECL_AND_LINKAGE_1], [
   AC_MSG_CHECKING([for $1 declaration])
   if test x${glibcxx_cv_func_$1_use+set} != xset; then
     AC_CACHE_VAL(glibcxx_cv_func_$1_use, [
-      AC_LANG_SAVE
-      AC_LANG_CPLUSPLUS
-      AC_TRY_COMPILE([#include <stdlib.h>],
-                     [ $1(0);],
-                     [glibcxx_cv_func_$1_use=yes], [glibcxx_cv_func_$1_use=no])
-      AC_LANG_RESTORE
+      AC_LANG_PUSH([C++])
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <stdlib.h>]], [[ $1(0);]])],[glibcxx_cv_func_$1_use=yes],[glibcxx_cv_func_$1_use=no])
+      AC_LANG_POP([])
     ])
   fi
   AC_MSG_RESULT($glibcxx_cv_func_$1_use)
@@ -275,12 +251,9 @@ AC_DEFUN([GLIBCXX_CHECK_STDLIB_DECL_AND_LINKAGE_2], [
   AC_MSG_CHECKING([for $1 declaration])
   if test x${glibcxx_cv_func_$1_use+set} != xset; then
     AC_CACHE_VAL(glibcxx_cv_func_$1_use, [
-      AC_LANG_SAVE
-      AC_LANG_CPLUSPLUS
-      AC_TRY_COMPILE([#include <stdlib.h>],
-                     [ $1(0, 0);],
-                     [glibcxx_cv_func_$1_use=yes], [glibcxx_cv_func_$1_use=no])
-      AC_LANG_RESTORE
+      AC_LANG_PUSH([C++])
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <stdlib.h>]], [[ $1(0, 0);]])],[glibcxx_cv_func_$1_use=yes],[glibcxx_cv_func_$1_use=no])
+      AC_LANG_POP([])
     ])
   fi
   AC_MSG_RESULT($glibcxx_cv_func_$1_use)
@@ -305,12 +278,9 @@ AC_DEFUN([GLIBCXX_CHECK_STDLIB_DECL_AND_LINKAGE_3], [
   AC_MSG_CHECKING([for $1 declaration])
   if test x${glibcxx_cv_func_$1_use+set} != xset; then
     AC_CACHE_VAL(glibcxx_cv_func_$1_use, [
-      AC_LANG_SAVE
-      AC_LANG_CPLUSPLUS
-      AC_TRY_COMPILE([#include <stdlib.h>],
-                     [ $1(0, 0, 0);],
-                     [glibcxx_cv_func_$1_use=yes], [glibcxx_cv_func_$1_use=no])
-      AC_LANG_RESTORE
+      AC_LANG_PUSH([C++])
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <stdlib.h>]], [[ $1(0, 0, 0);]])],[glibcxx_cv_func_$1_use=yes],[glibcxx_cv_func_$1_use=no])
+      AC_LANG_POP([])
     ])
   fi
   AC_MSG_RESULT($glibcxx_cv_func_$1_use)

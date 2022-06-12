@@ -334,18 +334,17 @@ dnl GLIBCXX_CHECK_MATH_DECL
 AC_DEFUN([GLIBCXX_CHECK_MATH_DECL], [
   AC_CACHE_CHECK([for $1 declaration],
     [glibcxx_cv_func_$1_use], [
-      AC_LANG_SAVE
-      AC_LANG_C
-      AC_TRY_COMPILE([
+      AC_LANG_PUSH([C])
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <math.h>
 #ifdef HAVE_IEEEFP_H
 # include <ieeefp.h>
 #endif
 #undef $1
-], [
+]], [[
   void (*f)(void) = (void (*)(void))$1;
-], [glibcxx_cv_func_$1_use=yes
-], [glibcxx_cv_func_$1_use=no])])
+]])],[glibcxx_cv_func_$1_use=yes
+],[glibcxx_cv_func_$1_use=no])])
   if test "x$glibcxx_cv_func_$1_use" = xyes; then
     AC_DEFINE_UNQUOTED(AS_TR_CPP([HAVE_$1]))
   fi

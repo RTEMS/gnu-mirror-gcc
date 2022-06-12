@@ -1,6 +1,6 @@
 # Process this file with autoreconf to produce a configure script.
 
-AC_INIT(package-unused, version-unused,, libstdc++)
+AC_INIT([package-unused],[version-unused],[],[libstdc++])
 AC_CONFIG_SRCDIR(src/shared/hashtable-aux.cc)
 AC_CONFIG_HEADER(config.h)
 
@@ -27,7 +27,7 @@ AM_ENABLE_MULTILIB(, ..)
 #
 # Do not delete or change the following two lines.  For why, see
 # http://gcc.gnu.org/ml/libstdc++/2003-07/msg00451.html
-AC_CANONICAL_SYSTEM
+AC_CANONICAL_TARGET
 target_alias=${target_alias-$host_alias}
 
 # Handy for debugging:
@@ -58,7 +58,7 @@ else
   GLIBCXX_IS_NATIVE=true
 fi
 
-# Sets up automake.  Must come after AC_CANONICAL_SYSTEM.  Each of the
+# Sets up automake.  Must come after AC_CANONICAL_TARGET.  Each of the
 # following is magically included in AUTOMAKE_OPTIONS in each Makefile.am.
 #  1.x:  minimum required version
 #  no-define:  PACKAGE and VERSION will not be #define'd in config.h (a bunch
@@ -133,7 +133,7 @@ AC_SUBST(glibcxx_compiler_pic_flag)
 AC_SUBST(glibcxx_compiler_shared_flag)
 
 # Override the libtool's pic_flag and pic_mode.
-# Do this step after AM_PROG_LIBTOOL, but before AC_OUTPUT.
+# Do this step after LT_INIT, but before AC_OUTPUT.
 # NB: this impacts --with-pic and --without-pic.
 lt_prog_compiler_pic_CXX="$glibcxx_compiler_pic_flag $glibcxx_compiler_shared_flag"
 pic_mode='default'
@@ -417,11 +417,11 @@ case "$target" in
   sparc*-*-linux* | \
   s390*-*-linux* | \
   alpha*-*-linux*)
-  AC_TRY_COMPILE(, [
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[
 #if !defined __LONG_DOUBLE_128__ || (defined(__sparc__) && defined(__arch64__))
 #error no need for long double compatibility
 #endif
-  ], [ac_ldbl_compat=yes], [ac_ldbl_compat=no])
+  ]])],[ac_ldbl_compat=yes],[ac_ldbl_compat=no])
   if test "$ac_ldbl_compat" = yes; then
     AC_DEFINE([_GLIBCXX_LONG_DOUBLE_COMPAT],1,
 	      [Define if compatibility should be provided for -mlong-double-64.])
@@ -435,11 +435,11 @@ case "$target" in
                      [ac_ldbl_ieee128_in_libc=no])
         if test $ac_ldbl_ieee128_in_libc = yes; then
           # Determine which long double format is the compiler's default:
-          AC_TRY_COMPILE(, [
+          AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[
             #ifndef __LONG_DOUBLE_IEEE128__
             #error compiler defaults to ibm128
             #endif
-          ], [ac_ldbl_ieee128_default=yes], [ac_ldbl_ieee128_default=no])
+          ]])],[ac_ldbl_ieee128_default=yes],[ac_ldbl_ieee128_default=no])
           # Library objects should use default long double format.
           if test "$ac_ldbl_ieee128_default" = yes; then
             LONG_DOUBLE_128_FLAGS="-mno-gnu-attribute"
@@ -641,7 +641,7 @@ AC_CONFIG_FILES([src/libbacktrace/backtrace-supported.h])
 # append it here.  Only modify Makefiles that have just been created.
 #
 # Also, get rid of this simulated-VPATH thing that automake does.
-AC_CONFIG_FILES(AC_FOREACH([DIR], glibcxx_SUBDIRS, [DIR/Makefile ]),
+AC_CONFIG_FILES(m4_foreach_w([DIR],[glibcxx_SUBDIRS],[DIR/Makefile ]),
   [cat > vpsed$$ << \_EOF
 s!`test -f '$<' || echo '$(srcdir)/'`!!
 _EOF
