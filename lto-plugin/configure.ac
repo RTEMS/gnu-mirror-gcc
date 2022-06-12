@@ -1,5 +1,5 @@
-AC_INIT([LTO plugin for ld], 0.1,,[lto-plugin])
-AC_CANONICAL_SYSTEM
+AC_INIT([LTO plugin for ld],[0.1],[],[lto-plugin])
+AC_CANONICAL_TARGET
 GCC_TOPLEV_SUBDIRS
 AM_INIT_AUTOMAKE([foreign no-dist])
 AM_MAINTAINER_MODE
@@ -64,7 +64,7 @@ else
   global: *foo*; bar; local: *;
 };
 EOF
-  AC_TRY_LINK([int foo;],[],[lto_plugin_use_symver=gnu],[lto_plugin_use_symver=no])
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[int foo;]], [[]])],[lto_plugin_use_symver=gnu],[lto_plugin_use_symver=no])
   if test x$lto_plugin_use_symver = xno; then
     case "$target_os" in
       solaris2*)
@@ -76,7 +76,7 @@ EOF
   global: foo; local: *;
 };
 EOF
-	AC_TRY_LINK([int foo;],[],[lto_plugin_use_symver=sun],[lto_plugin_use_symver=no])
+	AC_LINK_IFELSE([AC_LANG_PROGRAM([[int foo;]], [[]])],[lto_plugin_use_symver=sun],[lto_plugin_use_symver=no])
 	  ;;
     esac
   fi
@@ -87,7 +87,7 @@ AM_CONDITIONAL(LTO_PLUGIN_USE_SYMVER, [test "x$lto_plugin_use_symver" != xno])
 AM_CONDITIONAL(LTO_PLUGIN_USE_SYMVER_GNU, [test "x$lto_plugin_use_symver" = xgnu])
 AM_CONDITIONAL(LTO_PLUGIN_USE_SYMVER_SUN, [test "x$lto_plugin_use_symver" = xsun])
 
-AM_PROG_LIBTOOL
+LT_INIT
 ACX_LT_HOST_FLAGS
 AC_SUBST(target_noncanonical)
 AC_TYPE_INT64_T
