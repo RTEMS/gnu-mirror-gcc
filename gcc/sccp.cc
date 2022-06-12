@@ -30,7 +30,62 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-pass.h"
 #include "gimple-iterator.h"
 
+#include <iostream>
 #include "gimple-pretty-print.h"
+#include "bitmap.h"
+#include "sbitmap.h"
+
+#include "backend.h"
+#include "cfghooks.h"
+#include "ssa.h"
+#include "tree-ssa.h"
+#include "fold-const.h"
+#include "calls.h"
+#include "cfganal.h"
+#include "tree-eh.h"
+#include "gimplify.h"
+#include "gimple-iterator.h"
+#include "tree-cfg.h"
+#include "tree-ssa-loop-niter.h"
+#include "tree-into-ssa.h"
+#include "tree-dfa.h"
+#include "cfgloop.h"
+#include "tree-scalar-evolution.h"
+#include "tree-ssa-propagate.h"
+#include "gimple-fold.h"
+
+/* TODO Smaz.  */
+static sbitmap visited;
+
+/* Initialize structures used for sccp.  */
+
+static void
+init_sccp (void)
+{
+  visited = sbitmap_alloc (num_ssa_names);
+}
+
+/* TODO Smaz.  */
+
+static void debug_reachable_phi(gimple* phi)
+{
+  debug_gimple_stmt (phi);
+
+  unsigned int i;
+  for (i = 0; i < gimple_phi_num_args (phi); i++)
+    {
+      tree op = gimple_phi_arg_def (phi, i);
+      // TODO Nerozbije se tohle někdy?
+      gimple *stmt = SSA_NAME_DEF_STMT (op);
+      int ver = SSA_NAME_VERSION (op);
+      if (gimple_code (stmt) == GIMPLE_PHI &&
+	  !bitmap_bit_p (visited, ver))
+	{
+	  bitmap_set_bit (visited, ver);
+	  debug_reachable_phi (stmt);
+        }
+    }
+}
 
 /* TODO Popisek passu  */
 
@@ -66,16 +121,20 @@ pass_sccp::execute (function *)
 {
   basic_block bb;
 
+  init_sccp ();
+
   FOR_EACH_BB_FN (bb, cfun)
     {
-      gphi_iterator i;
+      gphi_iterator pi;
 
-      for (i = gsi_start_phis (bb); !gsi_end_p (i); gsi_next (&i))
+      for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
 	{
-	  gphi *phi = i.phi ();
-
-	  debug_gimple_stmt (phi); // debug phi na obrazovku
-	  // dump_gimple_stmt ... do souboru
+	  gphi *phi = pi.phi ();
+	  // TODO Filtrovat stmts jako v copyprop
+	  // Ale to asi budu muset filtrovat stmts, ne phi
+	  bitmap_clear (visited);
+	  debug_reachable_phi (phi);
+	  std::cerr << std::endl; // Blank line
 	}
     }
 
