@@ -23101,7 +23101,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+acosf (0); asinf (0); atanf (0); cosf (0); sinf (0); tanf (0); coshf (0); sinhf (0); tanhf (0);
   ;
   return 0;
 }
@@ -23213,7 +23213,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+ceilf (0); floorf (0);
   ;
   return 0;
 }
@@ -25413,7 +25413,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+acosl (0); asinl (0); atanl (0); cosl (0); sinl (0); tanl (0); coshl (0); sinhl (0); tanhl (0);
   ;
   return 0;
 }
@@ -25525,7 +25525,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+ceill (0); floorl (0);
   ;
   return 0;
 }
@@ -30225,7 +30225,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+acosf (0); asinf (0); atanf (0); cosf (0); sinf (0); tanf (0); coshf (0); sinhf (0); tanhf (0);
   ;
   return 0;
 }
@@ -30337,7 +30337,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+ceilf (0); floorf (0);
   ;
   return 0;
 }
@@ -32537,7 +32537,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+acosl (0); asinl (0); atanl (0); cosl (0); sinl (0); tanl (0); coshl (0); sinhl (0); tanhl (0);
   ;
   return 0;
 }
@@ -32649,7 +32649,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+ceill (0); floorl (0);
   ;
   return 0;
 }
@@ -36068,7 +36068,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+acosf (0); asinf (0); atanf (0); cosf (0); sinf (0); tanf (0); coshf (0); sinhf (0); tanhf (0);
   ;
   return 0;
 }
@@ -36180,7 +36180,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+ceilf (0); floorf (0);
   ;
   return 0;
 }
@@ -38380,7 +38380,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+acosl (0); asinl (0); atanl (0); cosl (0); sinl (0); tanl (0); coshl (0); sinhl (0); tanhl (0);
   ;
   return 0;
 }
@@ -38492,7 +38492,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+ceill (0); floorl (0);
   ;
   return 0;
 }
@@ -41963,7 +41963,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+acosf (0); asinf (0); atanf (0); cosf (0); sinf (0); tanf (0); coshf (0); sinhf (0); tanhf (0);
   ;
   return 0;
 }
@@ -42075,7 +42075,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+ceilf (0); floorf (0);
   ;
   return 0;
 }
@@ -44275,7 +44275,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+acosl (0); asinl (0); atanl (0); cosl (0); sinl (0); tanl (0); coshl (0); sinhl (0); tanhl (0);
   ;
   return 0;
 }
@@ -44387,7 +44387,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+ceill (0); floorl (0);
   ;
   return 0;
 }
@@ -48584,7 +48584,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+acosf (0); asinf (0); atanf (0); cosf (0); sinf (0); tanf (0); coshf (0); sinhf (0); tanhf (0);
   ;
   return 0;
 }
@@ -48696,7 +48696,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+ceilf (0); floorf (0);
   ;
   return 0;
 }
@@ -50896,7 +50896,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+acosl (0); asinl (0); atanl (0); cosl (0); sinl (0); tanl (0); coshl (0); sinhl (0); tanhl (0);
   ;
   return 0;
 }
@@ -51008,7 +51008,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+ceill (0); floorl (0);
   ;
   return 0;
 }
@@ -54883,7 +54883,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+acosf (0); asinf (0); atanf (0); cosf (0); sinf (0); tanf (0); coshf (0); sinhf (0); tanhf (0);
   ;
   return 0;
 }
@@ -54995,7 +54995,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+ceilf (0); floorf (0);
   ;
   return 0;
 }
@@ -57195,7 +57195,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+acosl (0); asinl (0); atanl (0); cosl (0); sinl (0); tanl (0); coshl (0); sinhl (0); tanhl (0);
   ;
   return 0;
 }
@@ -57307,7 +57307,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+ceill (0); floorl (0);
   ;
   return 0;
 }
@@ -61386,7 +61386,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+acosf (0); asinf (0); atanf (0); cosf (0); sinf (0); tanf (0); coshf (0); sinhf (0); tanhf (0);
   ;
   return 0;
 }
@@ -61498,7 +61498,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+ceilf (0); floorf (0);
   ;
   return 0;
 }
@@ -63698,7 +63698,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+acosl (0); asinl (0); atanl (0); cosl (0); sinl (0); tanl (0); coshl (0); sinhl (0); tanhl (0);
   ;
   return 0;
 }
@@ -63810,7 +63810,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+ceill (0); floorl (0);
   ;
   return 0;
 }
@@ -67098,7 +67098,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+acosf (0); asinf (0); atanf (0); cosf (0); sinf (0); tanf (0); coshf (0); sinhf (0); tanhf (0);
   ;
   return 0;
 }
@@ -67210,7 +67210,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+ceilf (0); floorf (0);
   ;
   return 0;
 }
@@ -69410,7 +69410,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+acosl (0); asinl (0); atanl (0); cosl (0); sinl (0); tanl (0); coshl (0); sinhl (0); tanhl (0);
   ;
   return 0;
 }
@@ -69522,7 +69522,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 int
 main ()
 {
-patsubst(funclist,\w+,\& (0);)
+ceill (0); floorl (0);
   ;
   return 0;
 }
@@ -77946,7 +77946,7 @@ ac_config_files="$ac_config_files src/libbacktrace/backtrace-supported.h"
 # append it here.  Only modify Makefiles that have just been created.
 #
 # Also, get rid of this simulated-VPATH thing that automake does.
-ac_config_files="$ac_config_files include libsupc++ src src/c++98 src/c++11 src/c++17 src/c++20 src/filesystem src/libbacktrace doc po testsuite python/Makefile"
+ac_config_files="$ac_config_files include/Makefile libsupc++/Makefile src/Makefile src/c++98/Makefile src/c++11/Makefile src/c++17/Makefile src/c++20/Makefile src/filesystem/Makefile src/libbacktrace/Makefile doc/Makefile po/Makefile testsuite/Makefile python/Makefile"
 
 
 ac_config_commands="$ac_config_commands generate-headers"
@@ -79205,18 +79205,18 @@ do
     "scripts/extract_symvers") CONFIG_FILES="$CONFIG_FILES scripts/extract_symvers" ;;
     "doc/xsl/customization.xsl") CONFIG_FILES="$CONFIG_FILES doc/xsl/customization.xsl" ;;
     "src/libbacktrace/backtrace-supported.h") CONFIG_FILES="$CONFIG_FILES src/libbacktrace/backtrace-supported.h" ;;
-    "include") CONFIG_FILES="$CONFIG_FILES include" ;;
-    "libsupc++") CONFIG_FILES="$CONFIG_FILES libsupc++" ;;
-    "src") CONFIG_FILES="$CONFIG_FILES src" ;;
-    "src/c++98") CONFIG_FILES="$CONFIG_FILES src/c++98" ;;
-    "src/c++11") CONFIG_FILES="$CONFIG_FILES src/c++11" ;;
-    "src/c++17") CONFIG_FILES="$CONFIG_FILES src/c++17" ;;
-    "src/c++20") CONFIG_FILES="$CONFIG_FILES src/c++20" ;;
-    "src/filesystem") CONFIG_FILES="$CONFIG_FILES src/filesystem" ;;
-    "src/libbacktrace") CONFIG_FILES="$CONFIG_FILES src/libbacktrace" ;;
-    "doc") CONFIG_FILES="$CONFIG_FILES doc" ;;
-    "po") CONFIG_FILES="$CONFIG_FILES po" ;;
-    "testsuite") CONFIG_FILES="$CONFIG_FILES testsuite" ;;
+    "include/Makefile") CONFIG_FILES="$CONFIG_FILES include/Makefile" ;;
+    "libsupc++/Makefile") CONFIG_FILES="$CONFIG_FILES libsupc++/Makefile" ;;
+    "src/Makefile") CONFIG_FILES="$CONFIG_FILES src/Makefile" ;;
+    "src/c++98/Makefile") CONFIG_FILES="$CONFIG_FILES src/c++98/Makefile" ;;
+    "src/c++11/Makefile") CONFIG_FILES="$CONFIG_FILES src/c++11/Makefile" ;;
+    "src/c++17/Makefile") CONFIG_FILES="$CONFIG_FILES src/c++17/Makefile" ;;
+    "src/c++20/Makefile") CONFIG_FILES="$CONFIG_FILES src/c++20/Makefile" ;;
+    "src/filesystem/Makefile") CONFIG_FILES="$CONFIG_FILES src/filesystem/Makefile" ;;
+    "src/libbacktrace/Makefile") CONFIG_FILES="$CONFIG_FILES src/libbacktrace/Makefile" ;;
+    "doc/Makefile") CONFIG_FILES="$CONFIG_FILES doc/Makefile" ;;
+    "po/Makefile") CONFIG_FILES="$CONFIG_FILES po/Makefile" ;;
+    "testsuite/Makefile") CONFIG_FILES="$CONFIG_FILES testsuite/Makefile" ;;
     "python/Makefile") CONFIG_FILES="$CONFIG_FILES python/Makefile" ;;
     "generate-headers") CONFIG_COMMANDS="$CONFIG_COMMANDS generate-headers" ;;
 
@@ -81006,7 +81006,7 @@ fi
  ;;
     "scripts/testsuite_flags":F) chmod +x scripts/testsuite_flags ;;
     "scripts/extract_symvers":F) chmod +x scripts/extract_symvers ;;
-    "include":F) cat > vpsed$$ << \_EOF
+    "include/Makefile":F) cat > vpsed$$ << \_EOF
 s!`test -f '$<' || echo '$(srcdir)/'`!!
 _EOF
    sed -f vpsed$$ $ac_file > tmp$$
@@ -81017,7 +81017,7 @@ _EOF
    . ${multi_basedir}/config-ml.in
    { ml_norecursion=; unset ml_norecursion;}
  ;;
-    "libsupc++":F) cat > vpsed$$ << \_EOF
+    "libsupc++/Makefile":F) cat > vpsed$$ << \_EOF
 s!`test -f '$<' || echo '$(srcdir)/'`!!
 _EOF
    sed -f vpsed$$ $ac_file > tmp$$
@@ -81028,7 +81028,7 @@ _EOF
    . ${multi_basedir}/config-ml.in
    { ml_norecursion=; unset ml_norecursion;}
  ;;
-    "src":F) cat > vpsed$$ << \_EOF
+    "src/Makefile":F) cat > vpsed$$ << \_EOF
 s!`test -f '$<' || echo '$(srcdir)/'`!!
 _EOF
    sed -f vpsed$$ $ac_file > tmp$$
@@ -81039,7 +81039,7 @@ _EOF
    . ${multi_basedir}/config-ml.in
    { ml_norecursion=; unset ml_norecursion;}
  ;;
-    "src/c++98":F) cat > vpsed$$ << \_EOF
+    "src/c++98/Makefile":F) cat > vpsed$$ << \_EOF
 s!`test -f '$<' || echo '$(srcdir)/'`!!
 _EOF
    sed -f vpsed$$ $ac_file > tmp$$
@@ -81050,7 +81050,7 @@ _EOF
    . ${multi_basedir}/config-ml.in
    { ml_norecursion=; unset ml_norecursion;}
  ;;
-    "src/c++11":F) cat > vpsed$$ << \_EOF
+    "src/c++11/Makefile":F) cat > vpsed$$ << \_EOF
 s!`test -f '$<' || echo '$(srcdir)/'`!!
 _EOF
    sed -f vpsed$$ $ac_file > tmp$$
@@ -81061,7 +81061,7 @@ _EOF
    . ${multi_basedir}/config-ml.in
    { ml_norecursion=; unset ml_norecursion;}
  ;;
-    "src/c++17":F) cat > vpsed$$ << \_EOF
+    "src/c++17/Makefile":F) cat > vpsed$$ << \_EOF
 s!`test -f '$<' || echo '$(srcdir)/'`!!
 _EOF
    sed -f vpsed$$ $ac_file > tmp$$
@@ -81072,7 +81072,7 @@ _EOF
    . ${multi_basedir}/config-ml.in
    { ml_norecursion=; unset ml_norecursion;}
  ;;
-    "src/c++20":F) cat > vpsed$$ << \_EOF
+    "src/c++20/Makefile":F) cat > vpsed$$ << \_EOF
 s!`test -f '$<' || echo '$(srcdir)/'`!!
 _EOF
    sed -f vpsed$$ $ac_file > tmp$$
@@ -81083,7 +81083,7 @@ _EOF
    . ${multi_basedir}/config-ml.in
    { ml_norecursion=; unset ml_norecursion;}
  ;;
-    "src/filesystem":F) cat > vpsed$$ << \_EOF
+    "src/filesystem/Makefile":F) cat > vpsed$$ << \_EOF
 s!`test -f '$<' || echo '$(srcdir)/'`!!
 _EOF
    sed -f vpsed$$ $ac_file > tmp$$
@@ -81094,7 +81094,7 @@ _EOF
    . ${multi_basedir}/config-ml.in
    { ml_norecursion=; unset ml_norecursion;}
  ;;
-    "src/libbacktrace":F) cat > vpsed$$ << \_EOF
+    "src/libbacktrace/Makefile":F) cat > vpsed$$ << \_EOF
 s!`test -f '$<' || echo '$(srcdir)/'`!!
 _EOF
    sed -f vpsed$$ $ac_file > tmp$$
@@ -81105,7 +81105,7 @@ _EOF
    . ${multi_basedir}/config-ml.in
    { ml_norecursion=; unset ml_norecursion;}
  ;;
-    "doc":F) cat > vpsed$$ << \_EOF
+    "doc/Makefile":F) cat > vpsed$$ << \_EOF
 s!`test -f '$<' || echo '$(srcdir)/'`!!
 _EOF
    sed -f vpsed$$ $ac_file > tmp$$
@@ -81116,7 +81116,7 @@ _EOF
    . ${multi_basedir}/config-ml.in
    { ml_norecursion=; unset ml_norecursion;}
  ;;
-    "po":F) cat > vpsed$$ << \_EOF
+    "po/Makefile":F) cat > vpsed$$ << \_EOF
 s!`test -f '$<' || echo '$(srcdir)/'`!!
 _EOF
    sed -f vpsed$$ $ac_file > tmp$$
@@ -81127,7 +81127,7 @@ _EOF
    . ${multi_basedir}/config-ml.in
    { ml_norecursion=; unset ml_norecursion;}
  ;;
-    "testsuite":F) cat > vpsed$$ << \_EOF
+    "testsuite/Makefile":F) cat > vpsed$$ << \_EOF
 s!`test -f '$<' || echo '$(srcdir)/'`!!
 _EOF
    sed -f vpsed$$ $ac_file > tmp$$

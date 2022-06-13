@@ -77,7 +77,7 @@ AC_DEFUN([GLIBCXX_CHECK_MATH_DECLS_AND_LINKAGES_1], [
   AC_MSG_CHECKING([for $1 functions])
   AC_CACHE_VAL(glibcxx_cv_func_$2_use, [
     AC_LANG_PUSH([C++])
-    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <math.h>]], [[patsubst(funclist,\w+,\& (0);)]])],[glibcxx_cv_func_$2_use=yes],[glibcxx_cv_func_$2_use=no])
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <math.h>]],[patsubst(funclist,\w+,\& (0);)])],[glibcxx_cv_func_$2_use=yes],[glibcxx_cv_func_$2_use=no])
     AC_LANG_POP([])])
   AC_MSG_RESULT($glibcxx_cv_func_$2_use)
   if test x$glibcxx_cv_func_$2_use = x"yes"; then
