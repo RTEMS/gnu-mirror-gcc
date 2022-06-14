@@ -1,0 +1,89 @@
+# Composite yaml to rebase to upstream gcc master
+
+# Copyright (c) Microsoft Corporation.
+
+# MIT License
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+name: "build-tarball"
+description: "Build tar.xz release of gcc"
+runs:
+  using: "composite"
+  steps:
+
+    # This step will set an environment variable for branch name.
+    # e.g. branch_name=releases/gcc-11
+    - name: Set Environment Variable For Branch Name
+      shell: bash
+      run: echo "branch_name=${{ github.head_ref || github.ref_name }}" >> $GITHUB_ENV
+
+    # This step will set an environment variable for release name.
+    # e.g. release_version=11.2.1
+    - name: Set Environment Variable For Release Version
+      shell: bash
+      working-directory: ./gcc
+      run: echo "release_version=$(git show origin/${{ env.branch_name }}:gcc/BASE-VER)" >> $GITHUB_ENV
+
+    # This is only to fix a bug in CBL-Mariner build procedure.
+    # Eventually we will be able to delete this step. 
+    - name: Create Include Dir # to fix building GCC gfortran bug in Mariner
+      run: |
+        mkdir -p /usr/lib/gfortran/modules
+      shell: bash
+
+    # Update the package manager.
+    - name: TDNF Update
+      run: |
+        unset HOME && tdnf update -y
+      shell: bash
+
+    # Enable mariner-repos-extended repo. 
+    # In newer versions of CBL-Mariner, you have to enable this repo to install libdwarf and a few other packages.
+    - name: TDNF Install mariner-repos-extended
+      run: |
+        unset HOME && tdnf install -y mariner-repos-extended
+      shell: bash
+
+    # Install required packages. These packages are required to build gcc and create a RPM.
+    - name: Install Required Packages
+      run: |
+        unset HOME && tdnf install glibc-devel file dejagnu texinfo build-essential rpm-build git ca-certificates wget flex bison gdb gawk libgomp-devel gfortran libgomp lapack libdwarf make sudo autoconf automake libstdc++ libstdc++-devel sed  gmp-devel mpfr-devel libmpc-devel lynx -y
+      shell: bash
+
+    # In our fork of gcc_release script, gcc_release clones the repository locally.
+    # Because of that we need the release branch we are building to be available locally.
+    - name: Enable Release Branch Locally
+      working-directory: ./gcc
+      run: |
+        git fetch origin ${{ env.branch_name }}:${{ env.branch_name }}
+      shell: bash
+
+    # This is just running gcc_relase script with bare minimum flags.
+    # The flags are :
+    # -f : build is final (don't append "snapshot" to the end of tar.xz files).
+    # -r : release version.
+    # -l : it runs locally (do not fork from a repository).
+    # -c : clone the target branch locally.
+    # -d : destination directory for gcc-$(release_version).tar.xz.
+    # for more information about the flags, take a look at the commit pushing gcc_release to .github/scripts/gcc_release
+    # WARNING: This is going to take a long long time. Go get a coffee, watch a tv show and/or sleep. 
+    - name: Run gcc_release Script 
+      working-directory: ./gcc
+      run: ./.github/scripts/gcc_release -f -r ${{ env.release_version }} -c -l -d ~/ sources tarfiles
+      shell: sh
