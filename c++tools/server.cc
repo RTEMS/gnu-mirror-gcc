@@ -632,6 +632,8 @@ server (bool ipv6, int sock_fd, module_resolver *resolver)
 	{
 #ifdef HAVE_EPOLL
 	  event_count = epoll_pwait (epoll_fd, events, max_events, -1, &mask);
+#else
+	  event_count = 0;
 #endif
 	}
       else

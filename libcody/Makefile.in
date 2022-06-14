@@ -19,9 +19,10 @@ RANLIB := @RANLIB@
 INSTALL := $(srcdir)/build-aux/install-sh
 
 # C++ compiler options
-CXXFLAGS := @CXXFLAGS@
+CXXFLAGS := @CXXFLAGS@ @WARN_CXXFLAGS@
 CXXINC := $(filter -I%,@CXX@)
 CXXOPTS := $(CXXFLAGS) @PICFLAG@
+WARN_CXXFLAGS := @WARN_CXXFLAGS@
 
 ifneq (@EXCEPTIONS@,yes)
 CXXOPTS += -fno-exceptions -fno-rtti
@@ -56,7 +57,7 @@ vpath %.cc $(srcdir)
 %.o: %.cc
 	@mkdir -p $(dir $@)
 	$(CXX) $(strip $(CXXOPTS) $(call SRC_CXXFLAGS,$<) $(CXXINC)) \
-	  -MMD -MP -MF ${@:.o=.d} -c -o $@ $<
+	  $(WARN_CXXFLAGS) -MMD -MP -MF ${@:.o=.d} -c -o $@ $<
 
 all:: Makefile
 

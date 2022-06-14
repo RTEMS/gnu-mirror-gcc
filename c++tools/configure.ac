@@ -23,6 +23,7 @@
 
 sinclude(../config/acx.m4)
 sinclude(../config/ax_lib_socket_nsl.m4)
+sinclude(../config/warnings.m4)
 
 AC_INIT
 AC_CONFIG_SRCDIR([c++tools])
@@ -259,6 +260,8 @@ AX_LIB_SOCKET_NSL
 NETLIBS="$LIBS"
 LIBS="$save_LIBS"
 AC_SUBST(NETLIBS)
+
+ACX_PROG_CXX_WARNING_OPTS([-Wall -Wextra -Wmissing-declarations])
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile])

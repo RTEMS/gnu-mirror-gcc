@@ -5,6 +5,7 @@
 AC_INIT([codylib],[0.0],[github.com/urnathan/libcody])
 AC_CONFIG_SRCDIR(cody.hh)
 m4_include(config.m4)
+m4_include(../config/warnings.m4)
 
 AC_CONFIG_AUX_DIR(..)
 AC_SUBST(PACKAGE_VERSION)
@@ -74,6 +75,8 @@ AC_CHECK_TOOL([AR],[ar])
 AH_VERBATIM([_GNU_SOURCE],[#define _GNU_SOURCE 1])
 AH_VERBATIM([_FORTIFY_SOURCE],[#undef _FORTIFY_SOURCE])
 AC_CONFIG_HEADERS([config.h])
+
+ACX_PROG_CXX_WARNING_OPTS([-Wall -Wextra -Wmissing-declarations])
 
 AC_CONFIG_FILES([Makefile])
 AC_SUBST(configure_args,[$ac_configure_args])

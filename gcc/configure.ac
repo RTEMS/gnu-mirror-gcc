@@ -570,7 +570,7 @@ AC_ARG_ENABLE(build-format-warnings,
   AS_HELP_STRING([--disable-build-format-warnings],[don't use -Wformat while building GCC]),
   [],[enable_build_format_warnings=yes])
 AS_IF([test $enable_build_format_warnings = no],
-      [wf_opt=-Wno-format],[wf_opt=])
+      [wf_opt="-Wno-format -Wno-ignored-attributes"],[wf_opt=])
 ACX_PROG_CXX_WARNING_OPTS(
 	m4_quote(m4_do([-Wall -Wextra -Wno-narrowing -Wwrite-strings ],
 		       [-Wcast-qual $wf_opt])),
@@ -579,7 +579,7 @@ ACX_PROG_CC_WARNING_OPTS(
 	m4_quote(m4_do([-Wstrict-prototypes -Wmissing-prototypes ],
 		       [])), [c_loose_warn])
 ACX_PROG_CXX_WARNING_OPTS(
-	m4_quote(m4_do([-Wmissing-format-attribute ],
+	m4_quote(m4_do([-Wmissing-format-attribute -Wmissing-declarations ],
 		       [-Woverloaded-virtual])), [strict_warn])
 ACX_PROG_CC_WARNING_OPTS(
 	m4_quote(m4_do([-Wold-style-definition -Wc++-compat])), [c_strict_warn])

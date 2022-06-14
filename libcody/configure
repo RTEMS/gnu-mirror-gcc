@@ -588,6 +588,7 @@ ac_unique_file="cody.hh"
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
 configure_args
+WARN_CXXFLAGS
 AR
 RANLIB
 EXCEPTIONS
@@ -1836,6 +1837,64 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
+# Autoconf include file defining macros related to compile-time warnings.
+
+# Copyright 2004, 2005, 2007, 2009, 2011 Free Software Foundation, Inc.
+
+#This file is part of GCC.
+
+#GCC is free software; you can redistribute it and/or modify it under
+#the terms of the GNU General Public License as published by the Free
+#Software Foundation; either version 3, or (at your option) any later
+#version.
+
+#GCC is distributed in the hope that it will be useful, but WITHOUT
+#ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+#for more details.
+
+#You should have received a copy of the GNU General Public License
+#along with GCC; see the file COPYING3.  If not see
+#<http://www.gnu.org/licenses/>.
+
+# ACX_PROG_CC_WARNING_OPTS(WARNINGS, [VARIABLE = WARN_CFLAGS])
+#   Sets @VARIABLE@ to the subset of the given options which the
+#   compiler accepts.
+# ACX_PROG_CC_WARNING_OPTS
+
+# ACX_PROG_CC_WARNING_ALMOST_PEDANTIC(WARNINGS, [VARIABLE = WARN_PEDANTIC])
+#   Append to VARIABLE "-pedantic" + the argument, if the compiler is GCC
+#   and accepts all of those options simultaneously, otherwise to nothing.
+# ACX_PROG_CC_WARNING_ALMOST_PEDANTIC
+
+# ACX_PROG_CC_WARNINGS_ARE_ERRORS([x.y.z], [VARIABLE = WERROR])
+#   sets @VARIABLE@ to "-Werror" if the compiler is GCC >=x.y.z, or if
+#   --enable-werror-always was given on the command line, otherwise
+#   to nothing.
+#   If the argument is the word "manual" instead of a version number,
+#   then @VARIABLE@ will be set to -Werror only if --enable-werror-always
+#   appeared on the configure command line.
+# ACX_PROG_CC_WARNINGS_ARE_ERRORS
+
+# ACX_PROG_CXX_WARNING_OPTS(WARNINGS, [VARIABLE = WARN_CXXFLAGS])
+#   Sets @VARIABLE@ to the subset of the given options which the
+#   compiler accepts.
+# ACX_PROG_CXX_WARNING_OPTS
+
+# ACX_PROG_CXX_WARNING_ALMOST_PEDANTIC(WARNINGS, [VARIABLE = WARN_PEDANTIC])
+#   Append to VARIABLE "-pedantic" + the argument, if the compiler is G++
+#   and accepts all of those options simultaneously, otherwise to nothing.
+# ACX_PROG_CXX_WARNING_ALMOST_PEDANTIC
+
+# ACX_PROG_CXX_WARNINGS_ARE_ERRORS([x.y.z], [VARIABLE = WERROR])
+#   sets @VARIABLE@ to "-Werror" if the compiler is G++ >=x.y.z, or if
+#   --enable-werror-always was given on the command line, otherwise
+#   to nothing.
+#   If the argument is the word "manual" instead of a version number,
+#   then @VARIABLE@ will be set to -Werror only if --enable-werror-always
+#   appeared on the configure command line.
+# ACX_PROG_CXX_WARNINGS_ARE_ERRORS
+
 
 ac_aux_dir=
 for ac_dir in .. "$srcdir"/..; do
@@ -2853,6 +2912,64 @@ fi
 
 
 ac_config_headers="$ac_config_headers config.h"
+
+
+ac_ext=cpp
+ac_cpp='$CXXCPP $CPPFLAGS'
+ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
+
+WARN_CXXFLAGS=
+save_CXXFLAGS="$CXXFLAGS"
+for real_option in -Wall -Wextra -Wmissing-declarations; do
+  # Do the check with the no- prefix removed since gcc silently
+  # accepts any -Wno-* option on purpose
+  case $real_option in
+    -Wno-*) option=-W`expr x$real_option : 'x-Wno-\(.*\)'` ;;
+    *) option=$real_option ;;
+  esac
+  as_acx_Woption=`$as_echo "acx_cv_prog_cc_warning_$option" | $as_tr_sh`
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CXX supports $option" >&5
+$as_echo_n "checking whether $CXX supports $option... " >&6; }
+if eval \${$as_acx_Woption+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  CXXFLAGS="$option"
+    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  eval "$as_acx_Woption=yes"
+else
+  eval "$as_acx_Woption=no"
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+fi
+eval ac_res=\$$as_acx_Woption
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+  if test `eval 'as_val=${'$as_acx_Woption'};$as_echo "$as_val"'` = yes; then :
+  WARN_CXXFLAGS="$WARN_CXXFLAGS${WARN_CXXFLAGS:+ }$real_option"
+fi
+  done
+CXXFLAGS="$save_CXXFLAGS"
+ac_ext=cpp
+ac_cpp='$CXXCPP $CPPFLAGS'
+ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
+
 
 
 ac_config_files="$ac_config_files Makefile"

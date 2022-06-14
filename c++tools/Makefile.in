@@ -27,9 +27,10 @@ INSTALL_STRIP_PROGRAM := $(srcdir)/../install-sh -c -s
 AUTOCONF := @AUTOCONF@
 AUTOHEADER := @AUTOHEADER@
 CXX := @CXX@
-CXXFLAGS := @CXXFLAGS@
+CXXFLAGS := @CXXFLAGS@ @WARN_CXXFLAGS@
 PIEFLAG := @PIEFLAG@
 CXXOPTS := $(CXXFLAGS) $(PIEFLAG) -fno-exceptions -fno-rtti
+WARN_CXXFLAGS := @WARN_CXXFLAGS@
 LDFLAGS := @LDFLAGS@
 exeext := @EXEEXT@
 LIBIBERTY := ../libiberty/libiberty.a
@@ -82,7 +83,7 @@ SRC_CXXFLAGS = $(CXXFLAGS$(patsubst $(srcdir)%,%,$1)) \
 
 %.o: %.cc
 	$(CXX) $(strip $(CXXOPTS) $(call SRC_CXXFLAGS,$<) $(CXXINC)) \
-	  -MMD -MP -MF ${@:.o=.d} -c -o $@ $<
+	  $(WARN_CXXFLAGS) -MMD -MP -MF ${@:.o=.d} -c -o $@ $<
 
 ifeq (@CXX_AUX_TOOLS@,yes)
 
