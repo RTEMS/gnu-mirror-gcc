@@ -223,6 +223,7 @@ static int sjlj_size_of_call_site_table (void);
 static void dw2_output_call_site_table (int, int);
 static void sjlj_output_call_site_table (void);
 static void switch_to_exception_section (const char * );
+static void switch_to_relro_section (const char *);
 
 
 void
@@ -2933,8 +2934,7 @@ dw2_output_call_site_table (int cs_format, int section)
 	      ASM_OUTPUT_LABEL (asm_out_file, reg_cap_offs_lab);
 	      /* Then switch to the relocatable RO data section, build the
 		 capability as a POINTER_PLUS and output the capability.  */
-	      switch_to_section (get_named_section (NULL, ".data.rel.ro",
-						    0));
+	      switch_to_relro_section (name);
 	      ASM_GENERATE_INTERNAL_LABEL (cap_lab, "Llpcap",
 					   call_site_base + i);
 	      ASM_OUTPUT_LABEL (asm_out_file, cap_lab);
@@ -2994,10 +2994,50 @@ sjlj_output_call_site_table (void)
   call_site_base += n;
 }
 
+static section *
+get_eh_named_section (const char *base_sec_name,
+		      unsigned flags,
+		      const char * ARG_UNUSED (fnname),
+		      section **cache = NULL)
+{
+  section *s;
+#ifdef HAVE_LD_EH_GC_SECTIONS
+  if (flag_function_sections
+      || (DECL_COMDAT_GROUP (current_function_decl) && HAVE_COMDAT_GROUP))
+    {
+      char *section_name = XNEWVEC (char,
+				    strlen (base_sec_name) + 1 /* Dot.  */
+				    + strlen (fnname) + 1 /* NUL.  */);
+      /* The EH section must match the code section, so only mark
+	 it linkonce if we have COMDAT groups to tie them together.  */
+      if (DECL_COMDAT_GROUP (current_function_decl) && HAVE_COMDAT_GROUP)
+	flags |= SECTION_LINKONCE;
+      sprintf (section_name, "%s.%s", base_sec_name, fnname);
+      s = get_section (section_name, flags, current_function_decl);
+      free (section_name);
+    }
+  else
+#endif
+    {
+      s = get_section (base_sec_name, flags, NULL);
+      if (cache)
+	*cache = s;
+    }
+  return s;
+}
+
+static void
+switch_to_relro_section (const char *fnname)
+{
+  gcc_assert (targetm_common.have_named_sections);
+  unsigned flags = SECTION_WRITE | SECTION_RELRO;
+  switch_to_section (get_eh_named_section (".data.rel.ro", flags, fnname));
+}
+
 /* Switch to the section that should be used for exception tables.  */
 
 static void
-switch_to_exception_section (const char * ARG_UNUSED (fnname))
+switch_to_exception_section (const char * fnname)
 {
   section *s;
 
@@ -3005,7 +3045,7 @@ switch_to_exception_section (const char * ARG_UNUSED (fnname))
     s = exception_section;
   else
     {
-      int flags;
+      unsigned flags;
 
       if (EH_TABLES_CAN_BE_READ_ONLY)
 	{
@@ -3022,25 +3062,8 @@ switch_to_exception_section (const char * ARG_UNUSED (fnname))
       /* Compute the section and cache it into exception_section,
 	 unless it depends on the function name.  */
       if (targetm_common.have_named_sections)
-	{
-#ifdef HAVE_LD_EH_GC_SECTIONS
-	  if (flag_function_sections
-	      || (DECL_COMDAT_GROUP (current_function_decl) && HAVE_COMDAT_GROUP))
-	    {
-	      char *section_name = XNEWVEC (char, strlen (fnname) + 32);
-	      /* The EH table must match the code section, so only mark
-		 it linkonce if we have COMDAT groups to tie them together.  */
-	      if (DECL_COMDAT_GROUP (current_function_decl) && HAVE_COMDAT_GROUP)
-		flags |= SECTION_LINKONCE;
-	      sprintf (section_name, ".gcc_except_table.%s", fnname);
-	      s = get_section (section_name, flags, current_function_decl);
-	      free (section_name);
-	    }
-	  else
-#endif
-	    exception_section
-	      = s = get_section (".gcc_except_table", flags, NULL);
-	}
+	s = get_eh_named_section (".gcc_except_table", flags, fnname,
+				  &exception_section);
       else
 	exception_section
 	  = s = flags == SECTION_WRITE ? data_section : readonly_data_section;
