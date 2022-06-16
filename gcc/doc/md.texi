@@ -6873,7 +6873,27 @@ the restoring of a function return value from the result block.
 @item @samp{cap_global_data_get}
 An instruction that is used on capability architectures that have the concept
 of a global default capability to be used in integer to capability conversions.
-This expands the CAP_GLOBAL_DATA_GET internal function to RTL.
+The instruction sets operand 0 to this global capability.
+
+@cindex @code{cap_program_counter_get} instruction pattern
+@item @samp{cap_program_counter_get}
+Only used on capability architectures.  Set capability operand 0 to the current
+program counter.
+
+@cindex @code{cap_representable_alignment_mask} instruction pattern
+@cindex @code{cap_round_representable_length} instruction pattern
+@item @samp{cap_representable_alignment_mask}
+@itemx @samp{cap_round_representable_length}
+Only used on capability architectures.  For both instructions, input
+operand 1 specifies the minimum acceptable length for a capability's
+bounds.  The instructions then produce a mask @var{m} and length
+@var{l} such that, for any valid capability @var{c},
+@code{cap_bounds_set_exact} will succeed for address operand
+@samp{@var{c} & @var{m}} and length operand @var{l}.
+@code{cap_representable_alignment_mask} sets output operand 0 to @var{m}
+and @code{cap_round_representable_length} sets output operand 0 to @var{l}.
+All operands have the mode normally associated with @code{size_t} on
+this target.
 
 @cindex @code{nop} instruction pattern
 @item @samp{nop}

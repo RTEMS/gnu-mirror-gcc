@@ -2235,6 +2235,9 @@ direct_cheri_internal_fn (built_in_function code)
     case BUILT_IN_CHERI_FLAGS_SET:
       return IFN_CAP_FLAGS_SET;
 
+    case BUILT_IN_CHERI_GLOBAL_DATA_GET:
+      return IFN_CAP_GLOBAL_DATA_GET;
+
     case BUILT_IN_CHERI_LENGTH_GET:
       return IFN_CAP_LENGTH_GET;
 
@@ -2249,6 +2252,15 @@ direct_cheri_internal_fn (built_in_function code)
 
     case BUILT_IN_CHERI_PERMS_GET:
       return IFN_CAP_PERMS_GET;
+
+    case BUILT_IN_CHERI_PROGRAM_COUNTER_GET:
+      return IFN_CAP_PROGRAM_COUNTER_GET;
+
+    case BUILT_IN_CHERI_REPRESENTABLE_ALIGNMENT_MASK:
+      return IFN_CAP_REPRESENTABLE_ALIGNMENT_MASK;
+
+    case BUILT_IN_CHERI_ROUND_REPRESENTABLE_LENGTH:
+      return IFN_CAP_ROUND_REPRESENTABLE_LENGTH;
 
     case BUILT_IN_CHERI_SEAL:
       return IFN_CAP_SEAL;

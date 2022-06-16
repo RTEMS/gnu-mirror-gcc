@@ -197,7 +197,7 @@
   "gclen\\t%0, %1"
 )
 
-(define_insn "aarch64_cap_repr_align_mask"
+(define_insn "cap_representable_alignment_mask"
   [(set (match_operand:DI 0 "register_operand" "=r")
         (unspec:DI [(match_operand:DI 1 "register_operand" "r")]
             UNSPEC_CHERI_REPR_ALIGN_MASK)
@@ -206,7 +206,7 @@
   "rrmask\\t%0, %1"
 )
 
-(define_insn "aarch64_cap_round_repr_len"
+(define_insn "cap_round_representable_length"
   [(set (match_operand:DI 0 "register_operand" "=r")
         (unspec:DI [(match_operand:DI 1 "register_operand" "r")]
            UNSPEC_CHERI_ROUND_REPR_LEN)
@@ -404,7 +404,7 @@
   "gcperm\\t%0, %1"
 )
 
-(define_insn "aarch64_cap_pc_get"
+(define_insn "cap_program_counter_get"
   [(set (match_operand:CADI 0 "register_operand" "=r")
         (unspec_volatile:CADI [(const_int 0)]
             UNSPECV_CHERI_PC_GET))]
