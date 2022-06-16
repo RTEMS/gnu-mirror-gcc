@@ -100,38 +100,45 @@ init_internal_fns ()
 
 /* Create static initializers for the information returned by
    direct_internal_fn.  */
-#define not_direct { -2, -2, false }
-#define mask_load_direct { -1, 2, false }
-#define load_lanes_direct { -1, -1, false }
-#define mask_load_lanes_direct { -1, -1, false }
-#define gather_load_direct { 3, 1, false }
-#define len_load_direct { -1, -1, false }
-#define mask_store_direct { 3, 2, false }
-#define store_lanes_direct { 0, 0, false }
-#define mask_store_lanes_direct { 0, 0, false }
-#define vec_cond_mask_direct { 0, 0, false }
-#define vec_cond_direct { 0, 0, false }
-#define vec_condu_direct { 0, 0, false }
-#define vec_condeq_direct { 0, 0, false }
-#define scatter_store_direct { 3, 1, false }
-#define len_store_direct { 3, 3, false }
-#define unary_direct { 0, 0, true }
-#define binary_direct { 0, 0, true }
-#define ternary_direct { 0, 0, true }
-#define cond_unary_direct { 1, 1, true }
-#define cond_binary_direct { 1, 1, true }
-#define cond_ternary_direct { 1, 1, true }
-#define while_direct { 0, 2, false }
-#define fold_extract_direct { 2, 2, false }
-#define fold_left_direct { 1, 1, false }
-#define mask_fold_left_direct { 1, 1, false }
-#define check_ptrs_direct { 0, 0, false }
+#define not_direct			{ -2, -2, false, false }
+#define direct_insn			{ -2, -2, true, false }
+#define optab1(TYPE0)			{ TYPE0, TYPE0, true, false }
+#define optab2(TYPE0, TYPE1)		{ TYPE0, TYPE1, true, false }
+#define vectorizable_optab1(TYPE0)	{ TYPE0, TYPE0, true, true }
+
+#define mask_load_direct		optab2 (-1, 2)
+#define load_lanes_direct		optab1 (-1)
+#define mask_load_lanes_direct		optab1 (-1)
+#define gather_load_direct		optab2 (3, 1)
+#define len_load_direct			optab1 (-1)
+#define mask_store_direct		optab2 (3, 2)
+#define store_lanes_direct		optab1 (0)
+#define mask_store_lanes_direct		optab1 (0)
+#define vec_cond_mask_direct		optab1 (0)
+#define vec_cond_direct			optab1 (0)
+#define vec_condu_direct		optab1 (0)
+#define vec_condeq_direct		optab1 (0)
+#define scatter_store_direct		optab2 (3, 1)
+#define len_store_direct		optab1 (3)
+#define unary_direct			vectorizable_optab1 (0)
+#define binary_direct			vectorizable_optab1 (0)
+#define ternary_direct			vectorizable_optab1 (0)
+#define cond_unary_direct		vectorizable_optab1 (1)
+#define cond_binary_direct		vectorizable_optab1 (1)
+#define cond_ternary_direct		vectorizable_optab1 (1)
+#define while_direct			optab2 (0, 2)
+#define fold_extract_direct		optab1 (2)
+#define fold_left_direct		optab1 (1)
+#define mask_fold_left_direct		optab1 (1)
+#define check_ptrs_direct		optab1 (0)
 
 const direct_internal_fn_info direct_internal_fn_array[IFN_LAST + 1] = {
 #define DEF_INTERNAL_FN(CODE, FLAGS, FNSPEC) not_direct,
 #define DEF_INTERNAL_OPTAB_FN(CODE, FLAGS, OPTAB, TYPE) TYPE##_direct,
 #define DEF_INTERNAL_SIGNED_OPTAB_FN(CODE, FLAGS, SELECTOR, SIGNED_OPTAB, \
 				     UNSIGNED_OPTAB, TYPE) TYPE##_direct,
+#define DEF_INTERNAL_INSN_FN(CODE, FLAGS, INSN, NOUTPUTS, NINPUTS) \
+  direct_insn,
 #include "internal-fn.def"
   not_direct
 };
@@ -3104,17 +3111,6 @@ expand_REPLACE_ADDRESS_VALUE (internal_fn, gcall *gc)
 }
 
 
-/* Expand CAP_GLOBAL_DATA_GET internal function.
-   This takes no parameters and returns only the value of the target's default
-   global capability.  */
-
-static void
-expand_CAP_GLOBAL_DATA_GET (internal_fn, gcall *stmt)
-{
-  gcc_assert (targetm.have_cap_global_data_get ());
-  expand_fn_using_insn (stmt, targetm.code_for_cap_global_data_get, 1, 0);
-}
-
 /* Expand a NOP.  */
 
 static void
@@ -3231,6 +3227,10 @@ tree_pair
 direct_internal_fn_types (internal_fn fn, tree return_type, tree *args)
 {
   const direct_internal_fn_info &info = direct_internal_fn (fn);
+  if (info.type0 == -2)
+    /* Functions created by DEF_INTERNAL_INSN_FN are not type-dependent.  */
+    return tree_pair {};
+
   tree type0 = (info.type0 < 0 ? return_type : TREE_TYPE (args[info.type0]));
   tree type1 = (info.type1 < 0 ? return_type : TREE_TYPE (args[info.type1]));
   return tree_pair (type0, type1);
@@ -3244,6 +3244,10 @@ tree_pair
 direct_internal_fn_types (internal_fn fn, gcall *call)
 {
   const direct_internal_fn_info &info = direct_internal_fn (fn);
+  if (info.type0 == -2)
+    /* Functions created by DEF_INTERNAL_INSN_FN are not type-dependent.  */
+    return tree_pair {};
+
   tree op0 = (info.type0 < 0
 	      ? gimple_call_lhs (call)
 	      : gimple_call_arg (call, info.type0));
@@ -3406,6 +3410,8 @@ direct_internal_fn_supported_p (internal_fn fn, tree_pair types,
 	return direct_##TYPE##_optab_supported_p (which_optab, types,	\
 						  opt_type);		\
       }
+#define DEF_INTERNAL_INSN_FN(CODE, FLAGS, INSN, NOUTPUTS, NINPUTS) \
+    case IFN_##CODE: return targetm.have_##INSN ();
 #include "internal-fn.def"
 
     case IFN_LAST:
@@ -3502,6 +3508,14 @@ set_edom_supported_p (void)
     tree_pair types = direct_internal_fn_types (fn, stmt);		\
     optab which_optab = direct_internal_fn_optab (fn, types);		\
     expand_##TYPE##_optab_fn (fn, stmt, which_optab);			\
+  }
+#define DEF_INTERNAL_INSN_FN(CODE, FLAGS, INSN, NOUTPUTS, NINPUTS)	\
+  static void								\
+  expand_##CODE (internal_fn, gcall *stmt)				\
+  {									\
+    gcc_assert (targetm.have_##INSN ());				\
+    expand_fn_using_insn (stmt, targetm.code_for_##INSN,		\
+			  NOUTPUTS, NINPUTS);				\
   }
 #include "internal-fn.def"
 
