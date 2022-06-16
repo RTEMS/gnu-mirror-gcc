@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 ==================== rebase 2022/06/16
-=======
-==================== merge 2022-06-13
->>>>>>> ebc4e92b5f3 (Update ChangeLog.meissner.)
 
 ==================== patch work091/work001
 
@@ -24,4 +20,3 @@ gcc/
 2022-06-09   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-
