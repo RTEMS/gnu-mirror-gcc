@@ -163,8 +163,8 @@ comma=,
 # Adding nothing to an empty variable is one way to obtain a space
 # character in a variable. As with comma above, we then use it as an
 # escaped space character.
-space =
-space +=
+E =
+space = $E $E
 
 WITHOUT_HYBRID = $(subst $(space),$(comma),$(filter-out hybridcap,$(subst $(comma),$(space),$(TM_MULTILIB_CONFIG))))
 MULTILIB_OPTIONS = $(subst $(comma),/, $(patsubst %, mabi=%, $(subst $(comma),$(comma)mabi=,$(WITHOUT_HYBRID))))
