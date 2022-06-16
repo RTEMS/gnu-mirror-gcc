@@ -1952,7 +1952,7 @@ tilegx_expand_unaligned_load (rtx dest_reg, rtx mem, HOST_WIDE_INT bitsize,
     {
       rtx extracted =
 	extract_bit_field (gen_lowpart (DImode, wide_result),
-			   bitsize, bit_offset % BITS_PER_UNIT,
+			   bitsize, bit_offset % BITS_PER_UNIT, 0, 0,
 			   !sign, gen_lowpart (DImode, dest_reg),
 			   DImode, DImode, false, NULL);
 

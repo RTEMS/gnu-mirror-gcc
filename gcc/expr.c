@@ -2209,8 +2209,8 @@ move_block_to_reg (int regno, rtx x, int nregs, machine_mode mode)
    {
       rtx return_reg = gen_rtx_REG (word_mode, regno + nregs - 1);
       emit_move_insn (return_reg,
-		      extract_bit_field (x, remainder * BITS_PER_UNIT, 0, 0,
-					 0, remainder * BITS_PER_UNIT - 1,
+		      extract_bit_field (x, remainder * BITS_PER_UNIT, 0,
+					 0, remainder * BITS_PER_UNIT - 1, 0,
 					 return_reg, word_mode, word_mode, 0,
 					 NULL));
       return;
@@ -2419,8 +2419,8 @@ emit_group_load_1 (rtx *tmps, rtx dst, rtx orig_src, tree type,
 		      && (!REG_P (tmps[i]) || GET_MODE (tmps[i]) != mode)))
 		tmps[i] = extract_bit_field (tmps[i], bytelen * BITS_PER_UNIT,
 					     subpos * BITS_PER_UNIT,
-					     1, bitregion_start, bitregion_end,
-					     NULL_RTX, mode, mode,
+					     bitregion_start, bitregion_end,
+					     1, NULL_RTX, mode, mode,
 					     false, NULL);
 	    }
 	  else
@@ -2430,9 +2430,9 @@ emit_group_load_1 (rtx *tmps, rtx dst, rtx orig_src, tree type,
 	      gcc_assert (known_eq (bytepos, 0));
 	      mem = assign_stack_temp (GET_MODE (src), slen);
 	      emit_move_insn (mem, src);
-	      tmps[i] = extract_bit_field (mem, bytelen * BITS_PER_UNIT,
-					   0, 1, bitregion_start, bitregion_end,
-					   NULL_RTX, mode, mode,
+	      tmps[i] = extract_bit_field (mem, bytelen * BITS_PER_UNIT, 0,
+					   bitregion_start, bitregion_end,
+					   1, NULL_RTX, mode, mode,
 					   false, NULL);
 	    }
 	}
@@ -2473,9 +2473,9 @@ emit_group_load_1 (rtx *tmps, rtx dst, rtx orig_src, tree type,
 	tmps[i] = src;
       else
 	tmps[i] = extract_bit_field (src, bytelen * BITS_PER_UNIT,
-				     bytepos * BITS_PER_UNIT, 1,
+				     bytepos * BITS_PER_UNIT,
 				     bitregion_start, bitregion_end,
-				     NULL_RTX, mode, mode, false, NULL);
+				     1, NULL_RTX, mode, mode, false, NULL);
 
       if (maybe_ne (shift, 0))
 	tmps[i] = expand_shift (LSHIFT_EXPR, mode, tmps[i],
@@ -2939,8 +2939,8 @@ copy_blkmode_from_reg (rtx target, rtx srcreg, tree type)
 	 bitpos for the destination store (left justified).  */
       store_bit_field (dst, bitsize, bitpos % BITS_PER_WORD, 0, 0, copy_mode,
 		       extract_bit_field (src, bitsize,
-					  xbitpos % BITS_PER_WORD, 1, 0, 0,
-					  NULL_RTX, copy_mode, copy_mode,
+					  xbitpos % BITS_PER_WORD, 0, 0,
+					  1, NULL_RTX, copy_mode, copy_mode,
 					  false, NULL),
 		       false);
     }
@@ -3043,8 +3043,8 @@ copy_blkmode_to_reg (machine_mode mode_in, tree src)
       store_bit_field (dst_word, bitsize, xbitpos % BITS_PER_WORD,
 		       0, 0, word_mode,
 		       extract_bit_field (src_word, bitsize,
-					  bitpos % BITS_PER_WORD, 1, 0, 0,
-					  NULL_RTX, word_mode, word_mode,
+					  bitpos % BITS_PER_WORD, 0, 0,
+					  1, NULL_RTX, word_mode, word_mode,
 					  false, NULL),
 		       false);
     }
@@ -3493,7 +3493,7 @@ read_complex_part (rtx cplx, bool imag_p)
     }
 
   return extract_bit_field (cplx, ibitsize, imag_p ? ibitsize : 0,
-			    true, 0, 0, NULL_RTX, imode, imode, false, NULL);
+			    0, 0, true, NULL_RTX, imode, imode, false, NULL);
 }
 
 /* A subroutine of emit_move_insn_1.  Yet another lowpart generator.
@@ -7445,8 +7445,8 @@ store_field (rtx target, poly_int64 bitsize, poly_int64 bitpos,
       if (GET_MODE (temp) == BLKmode && known_le (bitsize, BITS_PER_WORD))
 	{
 	  temp_mode = smallest_int_mode_for_size (bitsize);
-	  temp = extract_bit_field (temp, bitsize, 0, 1, bitregion_start,
-				    bitregion_end, NULL_RTX, temp_mode,
+	  temp = extract_bit_field (temp, bitsize, 0, bitregion_start,
+				    bitregion_end, 1, NULL_RTX, temp_mode,
 				    temp_mode, false, NULL);
 	}
 
@@ -8782,7 +8782,7 @@ expand_misaligned_mem_ref (rtx temp, machine_mode mode, int unsignedp,
     }
   else if (targetm.slow_unaligned_access (mode, align))
     temp = extract_bit_field (temp, GET_MODE_BITSIZE (mode),
-			      0, unsignedp, 0, 0, target,
+			      0, 0, 0, unsignedp, target,
 			      mode, mode, false, alt_rtl);
   return temp;
 }
@@ -11438,8 +11438,8 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 	      reversep = TYPE_REVERSE_STORAGE_ORDER (type);
 
 	    gcc_checking_assert (known_ge (bitpos, 0));
-	    op0 = extract_bit_field (op0, bitsize, bitpos, unsignedp,
-				     bitregion_start, bitregion_end,
+	    op0 = extract_bit_field (op0, bitsize, bitpos,
+				     bitregion_start, bitregion_end, unsignedp,
 				     (modifier == EXPAND_STACK_PARM
 				      ? NULL_RTX : target),
 				     ext_mode, ext_mode, reversep, alt_rtl);
@@ -11678,7 +11678,7 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
       /* If the output type is a bit-field type, do an extraction.  */
       else if (reduce_bit_field)
 	return extract_bit_field (op0, TYPE_PRECISION (type), 0,
-				  TYPE_UNSIGNED (type), 0, 0, NULL_RTX,
+				  0, 0, TYPE_UNSIGNED (type), NULL_RTX,
 				  mode, mode, false, NULL);
       /* As a last resort, spill op0 to memory, and reload it in a
 	 different mode.  */

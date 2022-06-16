@@ -978,8 +978,8 @@ store_integral_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 	  rtx value_word
 	    = fieldmode == BLKmode
 	      ? extract_bit_field (value, new_bitsize, wordnum * BITS_PER_WORD,
-				   1, wordnum * BITS_PER_WORD, bitregion_end,
-				   NULL_RTX, word_mode, word_mode,
+				   wordnum * BITS_PER_WORD, bitregion_end,
+				   1, NULL_RTX, word_mode, word_mode,
 				   false, NULL)
 	      : operand_subword_force (value, wordnum, value_mode);
 
@@ -2090,8 +2090,8 @@ extract_integral_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 
 rtx
 extract_bit_field (rtx str_rtx, poly_uint64 bitsize, poly_uint64 bitnum,
-		   int unsignedp, poly_uint64 bitregion_start,
-		   poly_uint64 bitregion_end, rtx target, machine_mode mode,
+		   poly_uint64 bitregion_start, poly_uint64 bitregion_end,
+		   int unsignedp, rtx target, machine_mode mode,
 		   machine_mode tmode, bool reverse, rtx *alt_rtl)
 {
   machine_mode mode1;
