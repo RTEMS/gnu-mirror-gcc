@@ -492,3 +492,59 @@
   "TARGET_MORELLO"
   "cfhi\\t%0, %1"
 )
+
+(define_insn "aarch64_cap_subset_check_cadi"
+  [(set (reg:CC_N CC_REGNUM)
+        (unspec:CC_N [(match_operand:CADI 1 "register_operand" "rk")
+                      (match_operand:CADI 2 "register_operand" "rk")]
+          UNSPEC_CHERI_SUBSET_CHECK_INNER))
+   (set (match_operand:CADI 0 "register_operand" "=r")
+        (unspec:CADI [(match_dup 1)
+                      (match_dup 2)]
+          UNSPEC_CHERI_SUBSET_CHECK))]
+  "TARGET_MORELLO"
+  "chkssu\\t%0, %1, %2"
+)
+
+(define_insn "aarch64_ptr_to_cap_offset_cadi"
+  [(set (match_operand:CADI 0 "register_operand" "=r")
+        (unspec:CADI [(match_operand:CADI 1 "register_operand" "rk")
+          (match_operand:DI 2 "register_operand" "r")]
+            UNSPEC_CHERI_PTR_TO_CAP_OFFSET))
+  ]
+  "TARGET_MORELLO"
+  "cvtz\\t%0, %1, %2"
+)
+
+(define_insn "cmovcadi_insn"
+  [(set (match_operand:CADI 0 "register_operand" "=r,r,r")
+	(if_then_else:CADI
+	 (match_operator 1 "aarch64_comparison_operator"
+	  [(match_operand 2 "cc_register" "") (const_int 0)])
+	 (match_operand:CADI 3 "aarch64_reg_or_zero" "r,r,Z")
+	 (match_operand:CADI 4 "aarch64_reg_or_zero" "r,Z,r")))]
+  "TARGET_MORELLO"
+  "@
+  csel\\t%0, %3, %4, %m1
+  csel\\t%0, %3, czr, %m1
+  csel\\t%0, %4, czr, %m1"
+  [(set_attr "type" "csel, csel, csel")]
+)
+
+(define_expand "aarch64_cap_subset_test_unseal_or_null_cadi"
+  [(match_operand:CADI 0 "register_operand")
+   (match_operand:CADI 1 "register_operand")
+   (match_operand:CADI 2 "register_operand")]
+  "TARGET_MORELLO"
+  {
+    rtx chkssu = gen_aarch64_cap_subset_check_cadi (operands[0], operands[1],
+                                                    operands[2]);
+    emit_insn (chkssu);
+    rtx cc = gen_rtx_REG (CCmode, CC_REGNUM);
+    rtx cmp_res = gen_reg_rtx (SImode);
+    rtx compare_neg = gen_rtx_LT (GET_MODE(cmp_res), cmp_res, const0_rtx);
+    emit_insn (gen_cmovcadi_insn (operands[0], compare_neg, cc, operands[0],
+                                  const0_rtx));
+    DONE;
+  }
+)
