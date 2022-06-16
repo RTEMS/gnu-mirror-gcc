@@ -485,7 +485,8 @@ adjust_bit_field_mem_for_reg (enum extraction_pattern pattern,
 {
   bit_field_mode_iterator iter (bitsize, bitnum, bitregion_start,
 				bitregion_end, MEM_ALIGN (op0),
-				MEM_VOLATILE_P (op0));
+				MEM_VOLATILE_P (op0),
+				has_capability_address (op0));
   scalar_int_mode best_mode;
   if (iter.next_mode (&best_mode))
     {
@@ -513,6 +514,42 @@ adjust_bit_field_mem_for_reg (enum extraction_pattern pattern,
 				   new_bitnum);
     }
   return NULL_RTX;
+}
+
+/* The caller needs to access BITSIZE bits at bit offset *PBITNUM from
+   the start of memory *PSTRUCT, but it is not allowed to access bytes
+   outside the bit region [*PBITREGION_START, *PBITREGION_END].
+   Adjust *PSTRUCT to the start of this bitregion and reduce bit offsets
+   *PBITNUM, *PBITREGION_START, and *PBITREGION_END so that they are relative
+   to the new start address.
+
+   *PBITREGION_START is guaranteed to be a whole number of bytes.  */
+
+static void
+constrain_access_to_bitregion (rtx *pstruct, poly_uint64 bitsize,
+			       poly_uint64 *pbitnum,
+			       poly_uint64 *pbitregion_start,
+			       poly_uint64 *pbitregion_end)
+{
+  scalar_int_mode best_mode;
+  machine_mode addr_mode = VOIDmode;
+  unsigned HOST_WIDE_INT ibitsize, ibitnum;
+
+  poly_uint64 offset = exact_div (*pbitregion_start, BITS_PER_UNIT);
+  *pbitnum -= *pbitregion_start;
+  poly_int64 size = bits_to_bytes_round_up (*pbitnum + bitsize);
+  *pbitregion_end -= *pbitregion_start;
+  *pbitregion_start = 0;
+  if (bitsize.is_constant (&ibitsize)
+      && pbitnum->is_constant (&ibitnum)
+      && get_best_mode (ibitsize, ibitnum,
+			*pbitregion_start, *pbitregion_end,
+			MEM_ALIGN (*pstruct), INT_MAX,
+			MEM_VOLATILE_P (*pstruct),
+			has_capability_address (*pstruct), &best_mode))
+    addr_mode = best_mode;
+  *pstruct = adjust_bitfield_address_size (*pstruct, addr_mode,
+					   offset, size);
 }
 
 /* Return true if a bitfield of size BITSIZE at bit number BITNUM within
@@ -978,8 +1015,7 @@ store_integral_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 	  rtx value_word
 	    = fieldmode == BLKmode
 	      ? extract_bit_field (value, new_bitsize, wordnum * BITS_PER_WORD,
-				   wordnum * BITS_PER_WORD, bitregion_end,
-				   1, NULL_RTX, word_mode, word_mode,
+				   0, 0, 1, NULL_RTX, word_mode, word_mode,
 				   false, NULL)
 	      : operand_subword_force (value, wordnum, value_mode);
 
@@ -1157,25 +1193,8 @@ store_bit_field (rtx str_rtx, poly_uint64 bitsize, poly_uint64 bitnum,
      bit region.  Adjust the address to start at the beginning of the
      bit region.  */
   if (MEM_P (str_rtx) && maybe_ne (bitregion_start, 0U))
-    {
-      scalar_int_mode best_mode;
-      machine_mode addr_mode = VOIDmode;
-
-      poly_uint64 offset = exact_div (bitregion_start, BITS_PER_UNIT);
-      bitnum -= bitregion_start;
-      poly_int64 size = bits_to_bytes_round_up (bitnum + bitsize);
-      bitregion_end -= bitregion_start;
-      bitregion_start = 0;
-      if (bitsize.is_constant (&ibitsize)
-	  && bitnum.is_constant (&ibitnum)
-	  && get_best_mode (ibitsize, ibitnum,
-			    bitregion_start, bitregion_end,
-			    MEM_ALIGN (str_rtx), INT_MAX,
-			    MEM_VOLATILE_P (str_rtx), &best_mode))
-	addr_mode = best_mode;
-      str_rtx = adjust_bitfield_address_size (str_rtx, addr_mode,
-					      offset, size);
-    }
+    constrain_access_to_bitregion (&str_rtx, bitsize, &bitnum,
+				   &bitregion_start, &bitregion_end);
 
   if (!store_bit_field_1 (str_rtx, bitsize, bitnum,
 			  bitregion_start, bitregion_end,
@@ -1214,7 +1233,7 @@ store_fixed_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 
       if (!get_best_mode (bitsize, bitnum, bitregion_start, bitregion_end,
 			  MEM_ALIGN (op0), max_bitsize, MEM_VOLATILE_P (op0),
-			  &best_mode))
+			  has_capability_address (op0), &best_mode))
 	{
 	  /* The only way this should occur is if the field spans word
 	     boundaries.  */
@@ -1393,25 +1412,28 @@ store_split_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
       offset = (bitpos + bitsdone) / unit;
       thispos = (bitpos + bitsdone) % unit;
 
-      /* When region of bytes we can touch is restricted, decrease
-	 UNIT close to the end of the region as needed.  If op0 is a REG
-	 or SUBREG of REG, don't do this, as there can't be data races
-	 on a register and we can expand shorter code in some cases.  */
-      if (maybe_ne (bitregion_end, 0U)
-	  && unit > BITS_PER_UNIT
-	  && maybe_gt (bitpos + bitsdone - thispos + unit, bitregion_end + 1)
-	  && !REG_P (op0)
-	  && (GET_CODE (op0) != SUBREG || !REG_P (SUBREG_REG (op0))))
-	{
-	  unit = unit / 2;
-	  continue;
-	}
-
       /* THISSIZE must not overrun a word boundary.  Otherwise,
 	 store_fixed_bit_field will call us again, and we will mutually
 	 recurse forever.  */
       thissize = MIN (bitsize - bitsdone, BITS_PER_WORD);
       thissize = MIN (thissize, unit - thispos);
+
+      /* When the region of bytes we can touch is restricted, decrease
+	 UNIT close to the end of the region as needed.  If op0 is a REG
+	 or SUBREG of REG, don't do this, as there can't be data races
+	 on a register and we can expand shorter code in some cases.  */
+      if (unit > BITS_PER_UNIT
+	  && !REG_P (op0)
+	  && (GET_CODE (op0) != SUBREG || !REG_P (SUBREG_REG (op0)))
+	  && (maybe_ne (bitregion_end, 0U)
+	      ? maybe_gt (bitpos + bitsdone - thispos + unit,
+			  bitregion_end + 1)
+	      : (has_capability_address (op0)
+		 && ROUND_UP (thispos + thissize, BITS_PER_UNIT) != unit)))
+	{
+	  unit = unit / 2;
+	  continue;
+	}
 
       if (reverse ? !BYTES_BIG_ENDIAN : BYTES_BIG_ENDIAN)
 	{
@@ -1425,8 +1447,7 @@ store_split_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 	    part = extract_fixed_bit_field (word_mode, value, value_mode,
 					    thissize,
 					    bitsize - bitsdone - thissize,
-					    bitregion_start, bitregion_end,
-					    NULL_RTX, 1, false);
+					    0, 0, NULL_RTX, 1, false);
 	  else
 	    /* The args are chosen so that the last part includes the
 	       lsb.  Give extract_bit_field the value it needs (with
@@ -1434,8 +1455,7 @@ store_split_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 	    part = extract_fixed_bit_field (word_mode, value, value_mode,
 					    thissize,
 					    total_bits - bitsize + bitsdone,
-					    bitregion_start, bitregion_end,
-					    NULL_RTX, 1, false);
+					    0, 0, NULL_RTX, 1, false);
 	}
       else
 	{
@@ -1449,12 +1469,10 @@ store_split_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 	    part = extract_fixed_bit_field (word_mode, value, value_mode,
 					    thissize,
 					    total_bits - bitsdone - thissize,
-					    bitregion_start, bitregion_end,
-					    NULL_RTX, 1, false);
+					    0, 0, NULL_RTX, 1, false);
 	  else
 	    part = extract_fixed_bit_field (word_mode, value, value_mode,
-					    thissize, bitsdone,
-					    bitregion_start, bitregion_end,
+					    thissize, bitsdone, 0, 0,
 					    NULL_RTX, 1, false);
 	}
 
@@ -2135,34 +2153,15 @@ extract_bit_field (rtx str_rtx, poly_uint64 bitsize, poly_uint64 bitnum,
 				  target, mode, tmode, reverse, true, alt_rtl);
     }
 
-  /* If bitregion_start has been set to a value, then we are compiling for a
-     target that limits memory accesses to tight bounds so we must not touch
-     bits outside the bit region.  Adjust the address to start at the beginning of the
-     bit region.  */
+  /* Adjust the address to start at the beginning of the bit region,
+     if one is specified.  */
   if (MEM_P (str_rtx) && maybe_ne (bitregion_start, 0U))
-    {
-      scalar_int_mode best_mode;
-      machine_mode addr_mode = VOIDmode;
-
-      poly_uint64 offset = exact_div (bitregion_start, BITS_PER_UNIT);
-      bitnum -= bitregion_start;
-      poly_int64 size = bits_to_bytes_round_up (bitnum + bitsize);
-      bitregion_end -= bitregion_start;
-      bitregion_start = 0;
-      if (bitsize.is_constant (&ibitsize)
-	  && bitnum.is_constant (&ibitnum)
-	  && get_best_mode (ibitsize, ibitnum,
-			    bitregion_start, bitregion_end,
-			    MEM_ALIGN (str_rtx), INT_MAX,
-			    MEM_VOLATILE_P (str_rtx), &best_mode))
-	addr_mode = best_mode;
-      str_rtx = adjust_bitfield_address_size (str_rtx, addr_mode,
-					      offset, size);
-    }
+    constrain_access_to_bitregion (&str_rtx, bitsize, &bitnum,
+				   &bitregion_start, &bitregion_end);
 
   return extract_bit_field_1 (str_rtx, bitsize, bitnum, bitregion_start,
-			      bitregion_end, unsignedp,
-			      target, mode, tmode, reverse, true, alt_rtl);
+			      bitregion_end, unsignedp, target, mode,
+			      tmode, reverse, true, alt_rtl);
 }
 
 /* Use shifts and boolean operations to extract a field of BITSIZE bits
@@ -2188,15 +2187,9 @@ extract_fixed_bit_field (machine_mode tmode, rtx op0,
   scalar_int_mode mode;
   if (MEM_P (op0))
     {
-      unsigned int max_bitsize = BITS_PER_WORD;
-      scalar_int_mode imode;
-      if (op0_mode.exists (&imode) && GET_MODE_BITSIZE (imode) < max_bitsize
-	  && maybe_ne (bitregion_end, 0U))
-	max_bitsize = GET_MODE_BITSIZE (imode);
-
       if (!get_best_mode (bitsize, bitnum, bitregion_start, bitregion_end,
-			  MEM_ALIGN (op0), max_bitsize, MEM_VOLATILE_P (op0),
-			  &mode))
+			  MEM_ALIGN (op0), BITS_PER_WORD, MEM_VOLATILE_P (op0),
+			  has_capability_address (op0), &mode))
 	/* The only way this should occur is if the field spans word
 	   boundaries.  */
 	return extract_split_bit_field (op0, op0_mode, bitsize, bitnum,
@@ -2336,13 +2329,6 @@ extract_split_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
   else
     unit = MIN (MEM_ALIGN (op0), BITS_PER_WORD);
 
-  /* For capability targets, if OP0 is a memory with a mode,
-     then UNIT must not be larger than OP0's mode as well.
-     Otherwise, extract_fixed_bit_field will call us
-     again, and we will mutually recurse forever.  */
-  if (MEM_P (op0) && op0_mode.exists () && maybe_ne (bitregion_end, 0U))
-    unit = MIN (unit, GET_MODE_BITSIZE (op0_mode.require ()));
-
   while (bitsdone < bitsize)
     {
       unsigned HOST_WIDE_INT thissize;
@@ -2352,19 +2338,6 @@ extract_split_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 
       offset = (bitpos + bitsdone) / unit;
       thispos = (bitpos + bitsdone) % unit;
-
-      /* For capability targets the region of bytes we can read is restricted
-	 by the capability bounds, so we must decrease UNIT close to the end
-	 of the region as needed.  */
-      if (maybe_ne (bitregion_end, 0U)
-	  && unit > BITS_PER_UNIT
-	  && maybe_gt (bitpos + bitsdone - thispos + unit, bitregion_end + 1)
-	  && !REG_P (op0)
-	  && (GET_CODE (op0) != SUBREG || !REG_P (SUBREG_REG (op0))))
-	{
-	  unit = unit / 2;
-	  continue;
-	}
 
       /* THISSIZE must not overrun a word boundary.  Otherwise,
 	 extract_fixed_bit_field will call us again, and we will mutually
@@ -2380,6 +2353,17 @@ extract_split_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
 	  op0_piece = operand_subword_force (op0, offset, op0_mode.require ());
 	  op0_piece_mode = word_mode;
 	  offset = 0;
+	}
+      /* When the region of bytes we can touch is restricted, decrease
+	 UNIT close to the end of the region as needed.  */
+      else if (maybe_ne (bitregion_end, 0U)
+	       ? maybe_gt (bitpos + bitsdone - thispos + unit,
+			   bitregion_end + 1)
+	       : (has_capability_address (op0)
+		  && ROUND_UP (thispos + thissize, BITS_PER_UNIT) != unit))
+	{
+	  unit /= 2;
+	  continue;
 	}
 
       /* Extract the parts in bit-counting order,

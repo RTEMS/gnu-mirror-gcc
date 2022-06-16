@@ -2933,14 +2933,18 @@ fixup_unsigned_type (tree type)
    memory access to that range.  Otherwise, we are allowed to touch
    any adjacent non bit-fields.
 
-   ALIGN is the alignment of the underlying object in bits.
-   VOLATILEP says whether the bitfield is volatile.  */
+   In addition:
+   - ALIGN is the alignment of the underlying object in bits.
+   - VOLATILEP says whether the bitfield is volatile.
+   - CAPABILITY_ADDRESSP says whether the bitfield is part of a MEM
+     that has a capability address.  */
 
 bit_field_mode_iterator
 ::bit_field_mode_iterator (HOST_WIDE_INT bitsize, HOST_WIDE_INT bitpos,
 			   poly_int64 bitregion_start,
 			   poly_int64 bitregion_end,
-			   unsigned int align, bool volatilep)
+			   unsigned int align, bool volatilep,
+			   bool capability_addressp)
 : m_mode (NARROWEST_INT_MODE), m_bitsize (bitsize),
   m_bitpos (bitpos), m_bitregion_start (bitregion_start),
   m_bitregion_end (bitregion_end), m_align (align),
@@ -2948,12 +2952,18 @@ bit_field_mode_iterator
 {
   if (known_eq (m_bitregion_end, 0))
     {
-      /* We can assume that any aligned chunk of ALIGN bits that overlaps
-	 the bitfield is mapped and won't trap, provided that ALIGN isn't
-	 too large.  The cap is the biggest required alignment for data,
-	 or at least the word size.  And force one such chunk at least.  */
-      unsigned HOST_WIDE_INT units
-	= MIN (align, MAX (BIGGEST_ALIGNMENT, BITS_PER_WORD));
+      /* If the bitfield is being addressed using capabilities, we must
+	 conservatively assume that the bounds of the capability do not
+	 extend beyond the bitfield.
+
+	 Otherwise, we can assume that any aligned chunk of ALIGN bits
+	 that overlaps the bitfield is mapped and won't trap, provided
+	 that ALIGN isn't too large.  The cap is the biggest required
+	 alignment for data, or at least the word size.  And force one
+	 such chunk at least.  */
+      unsigned HOST_WIDE_INT units = BITS_PER_UNIT;
+      if (!capability_addressp)
+	units = MIN (align, MAX (BIGGEST_ALIGNMENT, BITS_PER_WORD));
       if (bitsize <= 0)
 	bitsize = 1;
       HOST_WIDE_INT end = bitpos + bitsize + units - 1;
@@ -3050,17 +3060,21 @@ bit_field_mode_iterator::prefer_smaller_modes ()
    all the conditions.
 
    If VOLATILEP is true the narrow_volatile_bitfields target hook is used to
-   decide which of the above modes should be used.  */
+   decide which of the above modes should be used.
+
+   CAPABILITY_ADDRESSP says whether the bitfield is part of a MEM
+   that has a capability address.  */
 
 bool
 get_best_mode (int bitsize, int bitpos,
 	       poly_uint64 bitregion_start, poly_uint64 bitregion_end,
 	       unsigned int align,
 	       unsigned HOST_WIDE_INT largest_mode_bitsize, bool volatilep,
-	       scalar_int_mode *best_mode)
+	       bool capability_addressp, scalar_int_mode *best_mode)
 {
   bit_field_mode_iterator iter (bitsize, bitpos, bitregion_start,
-				bitregion_end, align, volatilep);
+				bitregion_end, align, volatilep,
+				capability_addressp);
   scalar_int_mode mode;
   bool found = false;
   while (iter.next_mode (&mode)

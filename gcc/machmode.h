@@ -1019,7 +1019,7 @@ class bit_field_mode_iterator
 public:
   bit_field_mode_iterator (HOST_WIDE_INT, HOST_WIDE_INT,
 			   poly_int64, poly_int64,
-			   unsigned int, bool);
+			   unsigned int, bool, bool);
   bool next_mode (scalar_int_mode *);
   bool prefer_smaller_modes ();
 
@@ -1039,7 +1039,8 @@ private:
 /* Find the best mode to use to access a bit field.  */
 
 extern bool get_best_mode (int, int, poly_uint64, poly_uint64, unsigned int,
-			   unsigned HOST_WIDE_INT, bool, scalar_int_mode *);
+			   unsigned HOST_WIDE_INT, bool, bool,
+			   scalar_int_mode *);
 
 /* Determine alignment, 1<=result<=BIGGEST_ALIGNMENT.  */
 

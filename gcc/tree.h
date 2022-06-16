@@ -2036,6 +2036,7 @@ extern tree fold_drop_capability (tree);
 extern tree build_replace_address_value_loc (location_t, tree, tree);
 extern tree build_cap_global_data_get_loc (location_t, tree);
 extern bool valid_capability_code_p (tree_code);
+extern bool has_capability_address (const_tree);
 extern tree_code addr_expr_code (const_tree);
 extern tree_code unqualified_addr_expr ();
 

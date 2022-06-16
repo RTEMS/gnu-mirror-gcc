@@ -4524,6 +4524,7 @@ optimize_bit_field_compare (location_t loc, enum tree_code code,
       || lvolatilep)
     return 0;
 
+  bool is_capability_address = has_capability_address (linner);
   if (const_p)
     rreversep = lreversep;
   else
@@ -4543,6 +4544,8 @@ optimize_bit_field_compare (location_t loc, enum tree_code code,
 	 || TREE_CODE (rinner) == PLACEHOLDER_EXPR
 	 || rvolatilep)
        return 0;
+
+     is_capability_address |= has_capability_address (rinner);
    }
 
   /* Honor the C++ memory model and mimic what RTL expansion does.  */
@@ -4561,7 +4564,7 @@ optimize_bit_field_compare (location_t loc, enum tree_code code,
 		      const_p ? TYPE_ALIGN (TREE_TYPE (linner))
 		      : MIN (TYPE_ALIGN (TREE_TYPE (linner)),
 			     TYPE_ALIGN (TREE_TYPE (rinner))),
-		      BITS_PER_WORD, false, &nmode))
+		      BITS_PER_WORD, false, is_capability_address, &nmode))
     return 0;
 
   /* Set signed and unsigned types of the precision of this mode for the
@@ -6410,9 +6413,11 @@ fold_truth_andor_1 (location_t loc, enum tree_code code, tree truth_type,
      to be relative to a field of that size.  */
   first_bit = MIN (ll_bitpos, rl_bitpos);
   end_bit = MAX (ll_bitpos + ll_bitsize, rl_bitpos + rl_bitsize);
+  bool capabilityp = (has_capability_address (ll_inner)
+		      || has_capability_address (rl_inner));
   if (!get_best_mode (end_bit - first_bit, first_bit, 0, 0,
 		      TYPE_ALIGN (TREE_TYPE (ll_inner)), BITS_PER_WORD,
-		      volatilep, &lnmode))
+		      volatilep, capabilityp, &lnmode))
     return 0;
 
   lnbitsize = GET_MODE_BITSIZE (lnmode);
@@ -6475,9 +6480,11 @@ fold_truth_andor_1 (location_t loc, enum tree_code code, tree truth_type,
 
       first_bit = MIN (lr_bitpos, rr_bitpos);
       end_bit = MAX (lr_bitpos + lr_bitsize, rr_bitpos + rr_bitsize);
+      capabilityp = (has_capability_address (lr_inner)
+		     || has_capability_address (rr_inner));
       if (!get_best_mode (end_bit - first_bit, first_bit, 0, 0,
 			  TYPE_ALIGN (TREE_TYPE (lr_inner)), BITS_PER_WORD,
-			  volatilep, &rnmode))
+			  volatilep, capabilityp, &rnmode))
 	return 0;
 
       rnbitsize = GET_MODE_BITSIZE (rnmode);

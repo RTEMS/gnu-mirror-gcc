@@ -2209,10 +2209,9 @@ move_block_to_reg (int regno, rtx x, int nregs, machine_mode mode)
    {
       rtx return_reg = gen_rtx_REG (word_mode, regno + nregs - 1);
       emit_move_insn (return_reg,
-		      extract_bit_field (x, remainder * BITS_PER_UNIT, 0,
-					 0, remainder * BITS_PER_UNIT - 1, 0,
-					 return_reg, word_mode, word_mode, 0,
-					 NULL));
+		      extract_bit_field (x, remainder * BITS_PER_UNIT, 0, 0, 0,
+					 0, return_reg, word_mode, word_mode,
+					 0, NULL));
       return;
    }
    else
@@ -2336,8 +2335,6 @@ emit_group_load_1 (rtx *tmps, rtx dst, rtx orig_src, tree type,
       poly_int64 bytepos = rtx_to_poly_int64 (XEXP (XVECEXP (dst, 0, i), 1));
       poly_int64 bytelen = GET_MODE_SIZE (mode);
       poly_int64 shift = 0;
-      poly_int64 bitregion_start = 0;
-      poly_int64 bitregion_end = 0;
 
       /* Handle trailing fragments that run over the size of the struct.
 	 It's the target's responsibility to make sure that the fragment
@@ -2358,12 +2355,7 @@ emit_group_load_1 (rtx *tmps, rtx dst, rtx orig_src, tree type,
 	      )
 	    shift = (bytelen - (ssize - bytepos)) * BITS_PER_UNIT;
 	  bytelen = ssize - bytepos;
-	  if (MEM_P (orig_src)
-	      && CAPABILITY_MODE_P (GET_MODE (XEXP (orig_src, 0))))
-	  {
-	    bitregion_start = bytepos * BITS_PER_UNIT;
-	    bitregion_end = (bytepos + bytelen) * BITS_PER_UNIT - 1;
-	  }
+	  gcc_assert (maybe_gt (bytelen, 0));
 	}
 
       /* If we won't be loading directly from memory, protect the real source
@@ -2418,10 +2410,9 @@ emit_group_load_1 (rtx *tmps, rtx dst, rtx orig_src, tree type,
 		  || (!CONSTANT_P (tmps[i])
 		      && (!REG_P (tmps[i]) || GET_MODE (tmps[i]) != mode)))
 		tmps[i] = extract_bit_field (tmps[i], bytelen * BITS_PER_UNIT,
-					     subpos * BITS_PER_UNIT,
-					     bitregion_start, bitregion_end,
-					     1, NULL_RTX, mode, mode,
-					     false, NULL);
+					     subpos * BITS_PER_UNIT, 0, 0,
+					     1, NULL_RTX, mode, mode, false,
+					     NULL);
 	    }
 	  else
 	    {
@@ -2431,8 +2422,7 @@ emit_group_load_1 (rtx *tmps, rtx dst, rtx orig_src, tree type,
 	      mem = assign_stack_temp (GET_MODE (src), slen);
 	      emit_move_insn (mem, src);
 	      tmps[i] = extract_bit_field (mem, bytelen * BITS_PER_UNIT, 0,
-					   bitregion_start, bitregion_end,
-					   1, NULL_RTX, mode, mode,
+					   0, 0, 1, NULL_RTX, mode, mode,
 					   false, NULL);
 	    }
 	}
@@ -2473,8 +2463,7 @@ emit_group_load_1 (rtx *tmps, rtx dst, rtx orig_src, tree type,
 	tmps[i] = src;
       else
 	tmps[i] = extract_bit_field (src, bytelen * BITS_PER_UNIT,
-				     bytepos * BITS_PER_UNIT,
-				     bitregion_start, bitregion_end,
+				     bytepos * BITS_PER_UNIT, 0, 0,
 				     1, NULL_RTX, mode, mode, false, NULL);
 
       if (maybe_ne (shift, 0))
@@ -5030,7 +5019,8 @@ optimize_bitfield_assignment_op (poly_uint64 pbitsize,
 
       scalar_int_mode best_mode;
       if (!get_best_mode (bitsize, bitpos, bitregion_start, bitregion_end,
-			  MEM_ALIGN (str_rtx), str_bitsize, false, &best_mode))
+			  MEM_ALIGN (str_rtx), str_bitsize, false,
+			  has_capability_address (str_rtx), &best_mode))
 	return false;
       str_mode = best_mode;
       str_bitsize = GET_MODE_BITSIZE (best_mode);
@@ -7445,9 +7435,8 @@ store_field (rtx target, poly_int64 bitsize, poly_int64 bitpos,
       if (GET_MODE (temp) == BLKmode && known_le (bitsize, BITS_PER_WORD))
 	{
 	  temp_mode = smallest_int_mode_for_size (bitsize);
-	  temp = extract_bit_field (temp, bitsize, 0, bitregion_start,
-				    bitregion_end, 1, NULL_RTX, temp_mode,
-				    temp_mode, false, NULL);
+	  temp = extract_bit_field (temp, bitsize, 0, 0, 0, 1, NULL_RTX,
+				    temp_mode, temp_mode, false, NULL);
 	}
 
       /* Store the value in the bitfield.  */
@@ -7513,6 +7502,7 @@ get_inner_reference (tree exp, poly_int64_pod *pbitsize,
 {
   tree size_tree = 0;
   machine_mode mode = VOIDmode;
+  bool volatile_bitfield = false;
   bool blkmode_bitfield = false;
   tree offset = size_zero_node;
   poly_offset_int bit_offset = 0;
@@ -7528,10 +7518,16 @@ get_inner_reference (tree exp, poly_int64_pod *pbitsize,
 	  && TREE_THIS_VOLATILE (exp)
 	  && DECL_BIT_FIELD_TYPE (field)
 	  && DECL_MODE (field) != BLKmode)
-	/* Volatile bitfields should be accessed in the mode of the
-	     field's type, not the mode computed based on the bit
-	     size.  */
-	mode = TYPE_MODE (DECL_BIT_FIELD_TYPE (field));
+	{
+	  /* In general, volatile bitfields should be accessed in the mode
+	     of the field's type, not the mode computed based on the bit size.
+	     However, whether we apply -fstrict-volatile-bitfields ultimately
+	     depends on whether such an access would be sufficiently aligned;
+	     see strict_volatile_bitfield_p for details.  We can't decide
+	     that until we've peeled all accesses.  */
+	  mode = TYPE_MODE (DECL_BIT_FIELD_TYPE (field));
+	  volatile_bitfield = true;
+	}
       else if (!DECL_BIT_FIELD (field))
 	{
 	  mode = DECL_MODE (field);
@@ -7697,6 +7693,21 @@ get_inner_reference (tree exp, poly_int64_pod *pbitsize,
 
       *poffset = offset;
     }
+
+  /* Drop the mode of a volatile bitfield if the containing type doesn't
+     have enough alignment to support it.  This explicitly avoids looking
+     at DECL_ALIGN for two reasons:
+
+     (1) It shouldn't matter for correctness whether a decl with a volatile
+	 bitfield is accessed directly or indirectly; the interpretation of
+	 "volatile" should be the same in both cases.
+
+     (2) The size of the type is not necessarily a factor of DECL_ALIGN,
+	 so relying on DECL_ALIGN can lead to out-of-range accesses on
+	 targets (such as capability targets) that track type sizes.  */
+  if (volatile_bitfield
+      && TYPE_ALIGN (TREE_TYPE (exp)) < GET_MODE_ALIGNMENT (mode))
+    mode = VOIDmode;
 
   /* We can use BLKmode for a byte-aligned BLKmode bitfield.  */
   if (mode == VOIDmode
@@ -11111,8 +11122,8 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 				 &unsignedp, &reversep, &volatilep);
 	rtx orig_op0, memloc;
 	bool clear_mem_expr = false;
-      poly_uint64 bitregion_start = 0;
-      poly_uint64 bitregion_end = 0;
+	poly_uint64 bitregion_start = 0;
+	poly_uint64 bitregion_end = 0;
 
 	/* If we got back the original object, something is wrong.  Perhaps
 	   we are evaluating an expression too early.  In any event, don't
@@ -11134,25 +11145,23 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 			      modifier == EXPAND_SUM ? EXPAND_NORMAL : modifier,
 			      NULL, true);
 
-      /* For capability targets there is a need to limit the memory access to
-	 the bounds of the struct or union.  For bit fields in a struct use
-	 get_bit_range and for other cases fall back to a sensible alternative
-	 based on MEM_SIZE.  This needs to be done here, before
-	 op0 gets modified in a way that increases the MEM_SIZE.  */
-      if (MEM_P (op0) && CAPABILITY_MODE_P (GET_MODE (XEXP (op0, 0)))
-	  && TREE_CODE (exp) == COMPONENT_REF
-	  && DECL_BIT_FIELD_TYPE (TREE_OPERAND (exp, 1))
-	  && DECL_BIT_FIELD_REPRESENTATIVE (TREE_OPERAND (exp, 1)))
-	get_bit_range (&bitregion_start, &bitregion_end, exp, &bitpos,
-		       &offset);
-      else if (MEM_P (op0) && MEM_SIZE_KNOWN_P (op0)
-	       && CAPABILITY_MODE_P (GET_MODE (XEXP (op0, 0)))
-	       && known_gt (MEM_SIZE (op0) * BITS_PER_UNIT,
-			    force_align_down (bitpos, BITS_PER_UNIT)))
-	{
-	  bitregion_start = force_align_down (bitpos, BITS_PER_UNIT);
-	  bitregion_end = MEM_SIZE (op0) * BITS_PER_UNIT - 1;
-	}
+	/* The default assumption on capability targets is that the access
+	   must not go beyond the last byte in the field.  Widening the
+	   access beyond that byte could in general lead to an out-of-bounds
+	   condition.
+
+	   However, as an optimization, the normal bitfield semantics
+	   should guarantee that any access to the containing bit range
+	   is safe.  */
+	if (MEM_P (op0)
+	    && has_capability_address (op0)
+	    && TREE_CODE (exp) == COMPONENT_REF
+	    && DECL_BIT_FIELD_TYPE (TREE_OPERAND (exp, 1)))
+	  {
+	    get_bit_range (&bitregion_start, &bitregion_end, exp, &bitpos,
+			   &offset);
+	    bitregion_start = 0;
+	  }
 
 	/* If the field has a mode, we want to access it in the
 	   field's mode, not the computed mode.

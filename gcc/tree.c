@@ -14270,6 +14270,28 @@ unqualified_addr_expr ()
   return CAPABILITY_MODE_P (Pmode) ? CAP_ADDR_EXPR : NONCAP_ADDR_EXPR;
 }
 
+/* EXP is something that might live in memory.  Return true if a MEM
+   expansion of EXP would have a capability address.
+
+   This function can be called for a decl before we've decided where
+   the decl will live, so the question about what would happen for a
+   MEM expansion might be purely speculative.  */
+
+bool
+has_capability_address (const_tree exp)
+{
+  while (handled_component_p (exp)
+	 || TREE_CODE (exp) == TARGET_EXPR)
+    exp = TREE_OPERAND (exp, 0);
+
+  if (TREE_CODE (exp) == INDIRECT_REF
+      || TREE_CODE (exp) == MEM_REF
+      || TREE_CODE (exp) == TARGET_MEM_REF)
+    return capability_type_p (TREE_TYPE (TREE_OPERAND (exp, 0)));
+
+  return CAPABILITY_MODE_P (Pmode);
+}
+
 /* Return the machine mode of T.  For vectors, returns the mode of the
    inner type.  The main use case is to feed the result to HONOR_NANS,
    avoiding the BLKmode that a direct TYPE_MODE (T) might return.  */
