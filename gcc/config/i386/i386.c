@@ -10222,7 +10222,8 @@ standard_80387_constant_p (rtx x)
   /* For XFmode constants, try to find a special 80387 instruction when
      optimizing for size or on those CPUs that benefit from them.  */
   if (mode == XFmode
-      && (optimize_function_for_size_p (cfun) || TARGET_EXT_80387_CONSTANTS))
+      && (optimize_function_for_size_p (cfun) || TARGET_EXT_80387_CONSTANTS)
+      && !flag_rounding_math)
     {
       int i;
 
@@ -33801,6 +33802,8 @@ ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 
     do_shift:
       gcc_assert (n_args >= 2);
+      if (!gimple_call_lhs (stmt))
+	break;
       arg0 = gimple_call_arg (stmt, 0);
       arg1 = gimple_call_arg (stmt, 1);
       if (n_args > 2)
@@ -37592,6 +37595,9 @@ rdseed_step:
       return target;
 
     case IX86_BUILTIN_READ_FLAGS:
+      if (ignore)
+	return const0_rtx;
+
       emit_insn (gen_push (gen_rtx_REG (word_mode, FLAGS_REG)));
 
       if (optimize
@@ -43370,9 +43376,9 @@ quarter:
 	      else
 		{
 		  word = expand_simple_binop (word_mode, ASHIFT, word, shift,
-					      word, 1, OPTAB_LIB_WIDEN);
+					      NULL_RTX, 1, OPTAB_LIB_WIDEN);
 		  word = expand_simple_binop (word_mode, IOR, word, elt,
-					      word, 1, OPTAB_LIB_WIDEN);
+					      NULL_RTX, 1, OPTAB_LIB_WIDEN);
 		}
 	    }
 
@@ -43425,11 +43431,15 @@ ix86_expand_vector_init (bool mmx_ok, rtx target, rtx vals)
       if (GET_MODE_NUNITS (GET_MODE (x)) * 2 == n_elts)
 	{
 	  rtx ops[2] = { XVECEXP (vals, 0, 0), XVECEXP (vals, 0, 1) };
-	  if (inner_mode == QImode || inner_mode == HImode)
+	  if (inner_mode == QImode
+	      || inner_mode == HImode
+	      || inner_mode == TImode)
 	    {
 	      unsigned int n_bits = n_elts * GET_MODE_SIZE (inner_mode);
-	      mode = mode_for_vector (SImode, n_bits / 4).require ();
-	      inner_mode = mode_for_vector (SImode, n_bits / 8).require ();
+	      scalar_mode elt_mode = inner_mode == TImode ? DImode : SImode;
+	      n_bits /= GET_MODE_SIZE (elt_mode);
+	      mode = mode_for_vector (elt_mode, n_bits).require ();
+	      inner_mode = mode_for_vector (elt_mode, n_bits / 2).require ();
 	      ops[0] = gen_lowpart (inner_mode, ops[0]);
 	      ops[1] = gen_lowpart (inner_mode, ops[1]);
 	      subtarget = gen_reg_rtx (mode);
@@ -44829,6 +44839,11 @@ void ix86_emit_i387_log1p (rtx op0, rtx op1)
   rtx res = gen_reg_rtx (XFmode);
   rtx cst, cstln2, cst1;
   rtx_insn *insn;
+
+  /* The emit_jump call emits pending stack adjust, make sure it is emitted
+     before the conditional jump, otherwise the stack adjustment will be
+     only conditional.  */
+  do_pending_stack_adjust ();
 
   cst = const_double_from_real_value
     (REAL_VALUE_ATOF ("0.29289321881345247561810596348408353", XFmode), XFmode);

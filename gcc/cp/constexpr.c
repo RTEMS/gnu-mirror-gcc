@@ -890,7 +890,7 @@ register_constexpr_fundef (tree fun, tree body)
       return NULL;
     }
 
-  if (DECL_CONSTRUCTOR_P (fun)
+  if (DECL_CONSTRUCTOR_P (fun) && !DECL_DEFAULTED_FN (fun)
       && cx_check_missing_mem_inits (DECL_CONTEXT (fun),
 				     massaged, !DECL_GENERATED_P (fun)))
     return NULL;
@@ -1529,13 +1529,10 @@ cxx_eval_internal_function (const constexpr_ctx *ctx, tree t,
 						 false, non_constant_p,
 						 overflow_p);
 	if (TREE_CODE (arg) == VECTOR_CST)
-	  return fold_const_call (CFN_VEC_CONVERT, TREE_TYPE (t), arg);
-	else
-	  {
-	    *non_constant_p = true;
-	    return t;
-	  }
+	  if (tree r = fold_const_call (CFN_VEC_CONVERT, TREE_TYPE (t), arg))
+	    return r;
       }
+      /* FALLTHRU */
 
     default:
       if (!ctx->quiet)
@@ -2063,7 +2060,7 @@ cxx_eval_check_shift_p (location_t loc, const constexpr_ctx *ctx,
      The value of E1 << E2 is the unique value congruent to E1 x 2^E2 modulo
      2^N, where N is the range exponent of the type of the result.  */
   if (code == LSHIFT_EXPR
-      && !TYPE_UNSIGNED (lhstype)
+      && !TYPE_OVERFLOW_WRAPS (lhstype)
       && cxx_dialect >= cxx11
       && cxx_dialect < cxx2a)
     {
@@ -4469,6 +4466,10 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 
       if (TREE_CODE (t) == INTEGER_CST
 	  && TYPE_PTR_P (TREE_TYPE (t))
+	  /* INTEGER_CST with pointer-to-method type is only used
+	     for a virtual method in a pointer to member function.
+	     Don't reject those.  */
+	  && TREE_CODE (TREE_TYPE (TREE_TYPE (t))) != METHOD_TYPE
 	  && !integer_zerop (t))
 	{
 	  if (!ctx->quiet)
@@ -6662,18 +6663,18 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
       tmp = DECL_EXPR_DECL (t);
       if (VAR_P (tmp) && !DECL_ARTIFICIAL (tmp))
 	{
-	  if (TREE_STATIC (tmp))
-	    {
-	      if (flags & tf_error)
-		error_at (DECL_SOURCE_LOCATION (tmp), "%qD declared "
-			  "%<static%> in %<constexpr%> context", tmp);
-	      return false;
-	    }
-	  else if (CP_DECL_THREAD_LOCAL_P (tmp))
+	  if (CP_DECL_THREAD_LOCAL_P (tmp) && !DECL_REALLY_EXTERN (tmp))
 	    {
 	      if (flags & tf_error)
 		error_at (DECL_SOURCE_LOCATION (tmp), "%qD declared "
 			  "%<thread_local%> in %<constexpr%> context", tmp);
+	      return false;
+	    }
+	  else if (TREE_STATIC (tmp))
+	    {
+	      if (flags & tf_error)
+		error_at (DECL_SOURCE_LOCATION (tmp), "%qD declared "
+			  "%<static%> in %<constexpr%> context", tmp);
 	      return false;
 	    }
 	  else if (!check_for_uninitialized_const_var
@@ -6927,8 +6928,8 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
     case GOTO_EXPR:
       {
 	tree *target = &TREE_OPERAND (t, 0);
-	/* Gotos representing break and continue are OK.  */
-	if (breaks (target) || continues (target))
+	/* Gotos representing break, continue and cdtor return are OK.  */
+	if (breaks (target) || continues (target) || returns (target))
 	  {
 	    *jump_target = *target;
 	    return true;
