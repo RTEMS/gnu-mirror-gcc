@@ -1533,7 +1533,7 @@ strip_typedefs (tree t, bool *remove_attributes, unsigned int flags)
     {
     case POINTER_TYPE:
       type = strip_typedefs (TREE_TYPE (t), remove_attributes, flags);
-      result = build_pointer_type (type);
+      result = change_pointer_target_type (t, type);
       break;
     case REFERENCE_TYPE:
       type = strip_typedefs (TREE_TYPE (t), remove_attributes, flags);

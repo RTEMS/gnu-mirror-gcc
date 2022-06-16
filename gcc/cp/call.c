@@ -1346,7 +1346,7 @@ standard_conversion (tree to, tree from, tree expr, bool c_cast_p,
 	  /* Don't try to apply restrict to void.  */
 	  int quals = cp_type_quals (nfrom) & ~TYPE_QUAL_RESTRICT;
 	  from_pointee = cp_build_qualified_type (void_type_node, quals);
-	  from = build_pointer_type (from_pointee);
+	  from = change_pointer_target_type (from, from_pointee);
 	  conv = build_conv (ck_ptr, from, conv);
 	}
       else if (TYPE_PTRDATAMEM_P (from))

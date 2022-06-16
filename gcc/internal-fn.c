@@ -3235,6 +3235,23 @@ direct_internal_fn_types (internal_fn fn, gcall *call)
   return tree_pair (TREE_TYPE (op0), TREE_TYPE (op1));
 }
 
+/* FNTYPE is a function type whose signature is compatible with FN
+   (which satisfies direct_internal_fn_p).  Return the types that
+   should be used to determine whether the target supports FN.  */
+
+tree_pair
+direct_internal_fn_types (internal_fn fn, tree fntype)
+{
+  const direct_internal_fn_info &info = direct_internal_fn (fn);
+  tree type0 = (info.type0 < 0
+		? TREE_TYPE (fntype)
+		: type_argument_type (fntype, info.type0));
+  tree type1 = (info.type1 < 0
+		? TREE_TYPE (fntype)
+		: type_argument_type (fntype, info.type1));
+  return tree_pair (type0, type1);
+}
+
 /* Return true if OPTAB is supported for TYPES (whose modes should be
    the same) when the optimization type is OPT_TYPE.  Used for simple
    direct optabs.  */

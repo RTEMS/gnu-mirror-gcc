@@ -67,6 +67,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "dbgcnt.h"
 #include "omp-offload.h"
 #include "context.h"
+#include "internal-fn.h"
 
 /* Hash set of poisoned variables in a bind expr.  */
 static hash_set<tree> *asan_poisoned_variables = NULL;
@@ -3282,6 +3283,36 @@ maybe_fold_stmt (gimple_stmt_iterator *gsi)
   return fold_stmt (gsi);
 }
 
+/* If call expression EXPR should be gimplified as a call to an internal
+   function, return that internal function, otherwise return IFN_LAST.  */
+
+static internal_fn
+gimplify_internal_fn (tree expr)
+{
+  if (!CALL_EXPR_FN (expr))
+    return CALL_EXPR_IFN (expr);
+
+  tree fndecl = get_callee_fndecl (expr);
+  if (fndecl && fndecl_built_in_p (fndecl, BUILT_IN_NORMAL))
+    {
+      built_in_function code = DECL_FUNCTION_CODE (fndecl);
+
+      if (code == BUILT_IN_CHERI_ADDRESS_SET
+	  && targetm.capability_mode ().exists ())
+	return IFN_REPLACE_ADDRESS_VALUE;
+
+      internal_fn ifn = direct_cheri_internal_fn (code);
+      if (ifn != IFN_LAST)
+	{
+	  tree_pair types = direct_internal_fn_types (ifn, TREE_TYPE (fndecl));
+	  if (direct_internal_fn_supported_p (ifn, types, OPTIMIZE_FOR_BOTH))
+	    return ifn;
+	}
+    }
+
+  return IFN_LAST;
+}
+
 /* Gimplify the CALL_EXPR node *EXPR_P into the GIMPLE sequence PRE_P.
    WANT_VALUE is true if the result of the call is desired.  */
 
@@ -3303,13 +3334,17 @@ gimplify_call_expr (tree *expr_p, gimple_seq *pre_p, bool want_value)
     SET_EXPR_LOCATION (*expr_p, input_location);
 
   /* Gimplify internal functions created in the FEs.  */
-  if (CALL_EXPR_FN (*expr_p) == NULL_TREE)
+  internal_fn ifn = gimplify_internal_fn (*expr_p);
+  if (ifn != IFN_LAST)
     {
       if (want_value)
-	return GS_ALL_DONE;
+	{
+	  CALL_EXPR_FN (*expr_p) = NULL_TREE;
+	  CALL_EXPR_IFN (*expr_p) = ifn;
+	  return GS_ALL_DONE;
+	}
 
       nargs = call_expr_nargs (*expr_p);
-      enum internal_fn ifn = CALL_EXPR_IFN (*expr_p);
       auto_vec<tree> vargs (nargs);
 
       for (i = 0; i < nargs; i++)
@@ -3373,6 +3408,12 @@ gimplify_call_expr (tree *expr_p, gimple_seq *pre_p, bool want_value)
       case BUILT_IN_EH_RETURN:
 	cfun->calls_eh_return = true;
 	break;
+
+      case BUILT_IN_CHERI_OFFSET_INCREMENT:
+	*expr_p = fold_build_pointer_plus_loc (EXPR_LOCATION (*expr_p),
+					       CALL_EXPR_ARG (*expr_p, 0),
+					       CALL_EXPR_ARG (*expr_p, 1));
+	return GS_OK;
 
       default:
         ;

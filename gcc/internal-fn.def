@@ -398,6 +398,57 @@ DEF_INTERNAL_FN (REPLACE_ADDRESS_VALUE, ECF_CONST | ECF_LEAF | ECF_NOTHROW, ".RR
 
 DEF_INTERNAL_FN (CAP_GLOBAL_DATA_GET, ECF_CONST | ECF_LEAF | ECF_NOTHROW, NULL)
 
+DEF_INTERNAL_OPTAB_FN (CAP_ADDRESS_GET, ECF_CONST | ECF_NOTHROW,
+		       cap_address_get, unary)
+DEF_INTERNAL_OPTAB_FN (CAP_BASE_GET, ECF_CONST | ECF_NOTHROW,
+		       cap_base_get, unary)
+DEF_INTERNAL_OPTAB_FN (CAP_BOUNDS_SET, ECF_CONST | ECF_NOTHROW,
+		       cap_bounds_set, binary)
+DEF_INTERNAL_OPTAB_FN (CAP_BOUNDS_SET_EXACT, ECF_CONST | ECF_NOTHROW,
+		       cap_bounds_set_exact, binary)
+DEF_INTERNAL_OPTAB_FN (CAP_BUILD, ECF_CONST | ECF_NOTHROW,
+		       cap_build, binary)
+DEF_INTERNAL_OPTAB_FN (CAP_CONDITIONAL_SEAL, ECF_CONST | ECF_NOTHROW,
+		       cap_conditional_seal, binary)
+DEF_INTERNAL_OPTAB_FN (CAP_COPY_FROM_HIGH, ECF_CONST | ECF_NOTHROW,
+		       cap_copy_from_high, unary)
+DEF_INTERNAL_OPTAB_FN (CAP_COPY_TO_HIGH, ECF_CONST | ECF_NOTHROW,
+		       cap_copy_to_high, binary)
+DEF_INTERNAL_OPTAB_FN (CAP_EQUAL_EXACT, ECF_CONST | ECF_NOTHROW,
+		       cap_equal_exact, binary)
+DEF_INTERNAL_OPTAB_FN (CAP_FLAGS_GET, ECF_CONST | ECF_NOTHROW,
+		       cap_flags_get, unary)
+DEF_INTERNAL_OPTAB_FN (CAP_FLAGS_SET, ECF_CONST | ECF_NOTHROW,
+		       cap_flags_set, binary)
+DEF_INTERNAL_OPTAB_FN (CAP_LENGTH_GET, ECF_CONST | ECF_NOTHROW,
+		       cap_length_get, unary)
+DEF_INTERNAL_OPTAB_FN (CAP_OFFSET_GET, ECF_CONST | ECF_NOTHROW,
+		       cap_offset_get, unary)
+DEF_INTERNAL_OPTAB_FN (CAP_OFFSET_SET, ECF_CONST | ECF_NOTHROW,
+		       cap_offset_set, binary)
+DEF_INTERNAL_OPTAB_FN (CAP_PERMS_AND, ECF_CONST | ECF_NOTHROW,
+		       cap_perms_and, binary)
+DEF_INTERNAL_OPTAB_FN (CAP_PERMS_GET, ECF_CONST | ECF_NOTHROW,
+		       cap_perms_get, unary)
+DEF_INTERNAL_OPTAB_FN (CAP_SEAL, ECF_CONST | ECF_NOTHROW,
+		       cap_seal, binary)
+DEF_INTERNAL_OPTAB_FN (CAP_SEAL_ENTRY, ECF_CONST | ECF_NOTHROW,
+		       cap_seal_entry, unary)
+DEF_INTERNAL_OPTAB_FN (CAP_SEALED_GET, ECF_CONST | ECF_NOTHROW,
+		       cap_sealed_get, unary)
+DEF_INTERNAL_OPTAB_FN (CAP_SUBSET_TEST, ECF_CONST | ECF_NOTHROW,
+		       cap_subset_test, binary)
+DEF_INTERNAL_OPTAB_FN (CAP_TAG_CLEAR, ECF_CONST | ECF_NOTHROW,
+		       cap_tag_clear, unary)
+DEF_INTERNAL_OPTAB_FN (CAP_TAG_GET, ECF_CONST | ECF_NOTHROW,
+		       cap_tag_get, unary)
+DEF_INTERNAL_OPTAB_FN (CAP_TYPE_COPY, ECF_CONST | ECF_NOTHROW,
+		       cap_type_copy, binary)
+DEF_INTERNAL_OPTAB_FN (CAP_TYPE_GET, ECF_CONST | ECF_NOTHROW,
+		       cap_type_get, unary)
+DEF_INTERNAL_OPTAB_FN (CAP_UNSEAL, ECF_CONST | ECF_NOTHROW,
+		       cap_unseal, binary)
+
 /* A NOP function with arbitrary arguments and return value.  */
 DEF_INTERNAL_FN (NOP, ECF_CONST | ECF_LEAF | ECF_NOTHROW, NULL)
 

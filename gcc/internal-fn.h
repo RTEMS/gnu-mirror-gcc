@@ -183,6 +183,7 @@ direct_internal_fn (internal_fn fn)
 
 extern tree_pair direct_internal_fn_types (internal_fn, tree, tree *);
 extern tree_pair direct_internal_fn_types (internal_fn, gcall *);
+extern tree_pair direct_internal_fn_types (internal_fn, tree);
 extern bool direct_internal_fn_supported_p (internal_fn, tree_pair,
 					    optimization_type);
 extern bool direct_internal_fn_supported_p (internal_fn, tree,

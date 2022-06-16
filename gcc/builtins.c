@@ -2190,6 +2190,95 @@ mathfn_built_in (tree type, enum built_in_function fn)
   return mathfn_built_in_1 (type, as_combined_fn (fn), /*implicit=*/ 1);
 }
 
+/* If CODE is a __builtin_cheri_* function that corresponds to a
+   directly-mapped internal function, return that internal function,
+   otherwise return IFN_LAST.  */
+
+internal_fn
+direct_cheri_internal_fn (built_in_function code)
+{
+  switch (code)
+    {
+    case BUILT_IN_CHERI_ADDRESS_GET:
+      return IFN_CAP_ADDRESS_GET;
+
+    case BUILT_IN_CHERI_BASE_GET:
+      return IFN_CAP_BASE_GET;
+
+    case BUILT_IN_CHERI_BOUNDS_SET:
+      return IFN_CAP_BOUNDS_SET;
+
+    case BUILT_IN_CHERI_BOUNDS_SET_EXACT:
+      return IFN_CAP_BOUNDS_SET_EXACT;
+
+    case BUILT_IN_CHERI_CAP_BUILD:
+      return IFN_CAP_BUILD;
+
+    case BUILT_IN_CHERI_CAP_TYPE_COPY:
+      return IFN_CAP_TYPE_COPY;
+
+    case BUILT_IN_CHERI_CONDITIONAL_SEAL:
+      return IFN_CAP_CONDITIONAL_SEAL;
+
+    case BUILT_IN_CHERI_COPY_FROM_HIGH:
+      return IFN_CAP_COPY_FROM_HIGH;
+
+    case BUILT_IN_CHERI_COPY_TO_HIGH:
+      return IFN_CAP_COPY_TO_HIGH;
+
+    case BUILT_IN_CHERI_EQUAL_EXACT:
+      return IFN_CAP_EQUAL_EXACT;
+
+    case BUILT_IN_CHERI_FLAGS_GET:
+      return IFN_CAP_FLAGS_GET;
+
+    case BUILT_IN_CHERI_FLAGS_SET:
+      return IFN_CAP_FLAGS_SET;
+
+    case BUILT_IN_CHERI_LENGTH_GET:
+      return IFN_CAP_LENGTH_GET;
+
+    case BUILT_IN_CHERI_OFFSET_GET:
+      return IFN_CAP_OFFSET_GET;
+
+    case BUILT_IN_CHERI_OFFSET_SET:
+      return IFN_CAP_OFFSET_SET;
+
+    case BUILT_IN_CHERI_PERMS_AND:
+      return IFN_CAP_PERMS_AND;
+
+    case BUILT_IN_CHERI_PERMS_GET:
+      return IFN_CAP_PERMS_GET;
+
+    case BUILT_IN_CHERI_SEAL:
+      return IFN_CAP_SEAL;
+
+    case BUILT_IN_CHERI_SEAL_ENTRY:
+      return IFN_CAP_SEAL_ENTRY;
+
+    case BUILT_IN_CHERI_SEALED_GET:
+      return IFN_CAP_SEALED_GET;
+
+    case BUILT_IN_CHERI_SUBSET_TEST:
+      return IFN_CAP_SUBSET_TEST;
+
+    case BUILT_IN_CHERI_TAG_CLEAR:
+      return IFN_CAP_TAG_CLEAR;
+
+    case BUILT_IN_CHERI_TAG_GET:
+      return IFN_CAP_TAG_GET;
+
+    case BUILT_IN_CHERI_TYPE_GET:
+      return IFN_CAP_TYPE_GET;
+
+    case BUILT_IN_CHERI_UNSEAL:
+      return IFN_CAP_UNSEAL;
+
+    default:
+      return IFN_LAST;
+    }
+}
+
 /* If BUILT_IN_NORMAL function FNDECL has an associated internal function,
    return its code, otherwise return IFN_LAST.  Note that this function
    only tests whether the function is defined in internals.def, not whether
@@ -2224,7 +2313,7 @@ associated_internal_fn (tree fndecl)
       return IFN_LAST;
 
     default:
-      return IFN_LAST;
+      return direct_cheri_internal_fn (DECL_FUNCTION_CODE (fndecl));
     }
 }
 

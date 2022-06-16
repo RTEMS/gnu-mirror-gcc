@@ -179,7 +179,7 @@
 
 ;; CHERI builtins helpers.
 
-(define_insn "aarch64_cap_base_get"
+(define_insn "cap_base_get_cadi"
   [(set (match_operand:DI 0 "register_operand" "=r")
         (unspec:DI [(match_operand:CADI 1 "register_operand" "rk")]
             UNSPEC_CHERI_BASE_GET))
@@ -188,7 +188,7 @@
   "gcbase\\t%0, %1"
 )
 
-(define_insn "aarch64_cap_length_get"
+(define_insn "cap_length_get_cadi"
   [(set (match_operand:DI 0 "register_operand" "=r")
         (unspec:DI [(match_operand:CADI 1 "register_operand" "rk")]
             UNSPEC_CHERI_LEN_GET))
@@ -215,7 +215,7 @@
   "rrlen\\t%0, %1"
 )
 
-(define_insn "aarch64_cap_bounds_set"
+(define_insn "cap_bounds_set_cadi"
   [(set (match_operand:CADI 0 "register_operand" "=rk")
         (unspec:CADI [(match_operand:CADI 1 "register_operand" "rk")
           (match_operand:DI 2 "register_operand" "r")]
@@ -225,7 +225,7 @@
   "scbnds\\t%0, %1, %2"
 )
 
-(define_insn "aarch64_cap_bounds_set_exact"
+(define_insn "cap_bounds_set_exact_cadi"
   [(set (match_operand:CADI 0 "register_operand" "=rk")
         (unspec:CADI [(match_operand:CADI 1 "register_operand" "rk")
           (match_operand:DI 2 "register_operand" "r")]
@@ -235,7 +235,7 @@
   "scbndse\\t%0, %1, %2"
 )
 
-(define_insn "aarch64_cap_seal"
+(define_insn "cap_seal_cadi"
   [(set (match_operand:CADI 0 "register_operand" "=rk")
         (unspec:CADI [(match_operand:CADI 1 "register_operand" "rk")
           (match_operand:CADI 2 "register_operand" "rk")]
@@ -263,7 +263,7 @@
   "mrs\\t%0, DDC"
 )
 
-(define_expand "aarch64_cap_perms_and"
+(define_expand "cap_perms_and_cadi"
   [(match_operand:CADI 0 "register_operand")
    (match_operand:CADI 1 "register_operand")
    (match_operand:DI 2 "register_operand")]
@@ -275,7 +275,7 @@
   }
 )
 
-(define_insn "aarch64_cap_offset_get"
+(define_insn "cap_offset_get_cadi"
   [(set (match_operand:DI 0 "register_operand" "=r")
         (unspec:DI [(match_operand:CADI 1 "register_operand" "rk")]
             UNSPEC_CHERI_OFFSET_GET))
@@ -284,7 +284,7 @@
   "gcoff\\t%0, %1"
 )
 
-(define_insn "aarch64_cap_offset_set"
+(define_insn "cap_offset_set_cadi"
   [(set (match_operand:CADI 0 "register_operand" "=rk")
         (unspec:CADI [(match_operand:CADI 1 "register_operand" "rk")
           (match_operand:DI 2 "register_operand" "r")]
@@ -294,7 +294,7 @@
   "scoff\\t%0, %1, %2"
 )
 
-(define_insn "aarch64_cap_address_get"
+(define_insn "cap_address_get_cadi"
   [(set (match_operand:DI 0 "register_operand" "=r")
         (unspec:DI [(match_operand:CADI 1 "register_operand" "rk")]
             UNSPEC_CHERI_ADDR_GET))
@@ -303,7 +303,7 @@
   "gcvalue\\t%0, %1"
 )
 
-(define_insn "aarch64_cap_tag_get"
+(define_insn "cap_tag_get_cadi"
   [(set (match_operand:DI 0 "register_operand" "=r")
         (unspec:DI [(match_operand:CADI 1 "register_operand" "rk")]
             UNSPEC_CHERI_TAG_GET))
@@ -312,7 +312,7 @@
   "gctag\\t%0, %1"
 )
 
-(define_insn "aarch64_cap_tag_clear"
+(define_insn "cap_tag_clear_cadi"
   [(set (match_operand:CADI 0 "register_operand" "=rk")
         (unspec:CADI [(match_operand:CADI 1 "register_operand" "rk")]
             UNSPEC_CHERI_TAG_CLEAR))
@@ -321,7 +321,7 @@
   "clrtag\\t%0, %1"
 )
 
-(define_insn "aarch64_cap_build"
+(define_insn "cap_build_cadi"
   [(set (match_operand:CADI 0 "register_operand" "=rk")
         (unspec:CADI [(match_operand:CADI 1 "register_operand" "rk")
           (match_operand:CADI 2 "register_operand" "rk")]
@@ -331,7 +331,7 @@
   "build\\t%0, %2, %1"
 )
 
-(define_insn "aarch64_cap_cond_seal"
+(define_insn "cap_conditional_seal_cadi"
   [(set (match_operand:CADI 0 "register_operand" "=rk")
         (unspec:CADI [(match_operand:CADI 1 "register_operand" "rk")
           (match_operand:CADI 2 "register_operand" "rk")]
@@ -341,7 +341,7 @@
   "cseal\\t%0, %1, %2"
 )
 
-(define_insn "aarch64_cap_type_copy"
+(define_insn "cap_type_copy_cadi"
   [(set (match_operand:CADI 0 "register_operand" "=r")
         (unspec:CADI [(match_operand:CADI 1 "register_operand" "r")
           (match_operand:CADI 2 "register_operand" "r")]
@@ -361,7 +361,7 @@
   "chkeq\\t%0, %1"
 )
 
-(define_expand "aarch64_cap_equal_exact"
+(define_expand "cap_equal_exact_cadi"
   [(match_operand:SI 0 "register_operand")
    (match_operand:CADI 1 "register_operand")
    (match_operand:CADI 2 "register_operand")]
@@ -376,7 +376,7 @@
   }
 )
 
-(define_insn "aarch64_cap_flags_set"
+(define_insn "cap_flags_set_cadi"
   [(set (match_operand:CADI 0 "register_operand" "=rk")
         (unspec:CADI [(match_operand:CADI 1 "register_operand" "rk")
           (match_operand:DI 2 "register_operand" "r")]
@@ -386,7 +386,7 @@
   "scflgs\\t%0, %1, %2"
 )
 
-(define_insn "aarch64_cap_flags_get"
+(define_insn "cap_flags_get_cadi"
   [(set (match_operand:DI 0 "register_operand" "=r")
         (unspec:DI [(match_operand:CADI 1 "register_operand" "rk")]
             UNSPEC_CHERI_FLAGS_GET))
@@ -395,7 +395,7 @@
   "gcflgs\\t%0, %1"
 )
 
-(define_insn "aarch64_cap_perms_get"
+(define_insn "cap_perms_get_cadi"
   [(set (match_operand:DI 0 "register_operand" "=r")
         (unspec:DI [(match_operand:CADI 1 "register_operand" "rk")]
             UNSPEC_CHERI_PERMS_GET))
@@ -412,7 +412,7 @@
   "adr\\t%0, #0"
 )
 
-(define_insn "aarch64_cap_seal_entry"
+(define_insn "cap_seal_entry_cadi"
   [(set (match_operand:CADI 0 "register_operand" "=r")
         (unspec:CADI [(match_operand:CADI 1 "register_operand" "r")]
             UNSPEC_CHERI_SEAL_ENTRY))
@@ -421,7 +421,7 @@
   "seal\\t%0, %1, rb"
 )
 
-(define_insn "aarch64_cap_sealed_get"
+(define_insn "cap_sealed_get_cadi"
   [(set (match_operand:DI 0 "register_operand" "=r")
         (unspec:DI [(match_operand:CADI 1 "register_operand" "rk")]
             UNSPEC_CHERI_SEALED_GET))
@@ -440,7 +440,7 @@
   "chkss\\t%0, %1"
 )
 
-(define_expand "aarch64_cap_subset_test"
+(define_expand "cap_subset_test_cadi"
   [(match_operand:SI 0 "register_operand")
    (match_operand:CADI 1 "register_operand")
    (match_operand:CADI 2 "register_operand")]
@@ -455,7 +455,7 @@
   }
 )
 
-(define_insn "aarch64_cap_type_get"
+(define_insn "cap_type_get_cadi"
   [(set (match_operand:DI 0 "register_operand" "=r")
         (unspec:DI [(match_operand:CADI 1 "register_operand" "rk")]
             UNSPEC_CHERI_TYPE_GET))
@@ -464,7 +464,7 @@
   "gctype\\t%0, %1"
 )
 
-(define_insn "aarch64_cap_unseal"
+(define_insn "cap_unseal_cadi"
   [(set (match_operand:CADI 0 "register_operand" "=r")
         (unspec:CADI [(match_operand:CADI 1 "register_operand" "r")
           (match_operand:CADI 2 "register_operand" "r")]
@@ -474,7 +474,7 @@
   "unseal\\t%0, %1, %2"
 )
 
-(define_insn "aarch64_cap_copy_to_high"
+(define_insn "cap_copy_to_high_cadi"
   [(set (match_operand:CADI 0 "register_operand" "=rk")
         (unspec:CADI [(match_operand:CADI 1 "register_operand" "r")
           (match_operand:DI 2 "register_operand" "r")]
@@ -484,10 +484,10 @@
   "cthi\\t%0, %1, %2"
 )
 
-(define_insn "aarch64_cap_copy_from_high"
+(define_insn "cap_copy_from_high_cadi"
   [(set (match_operand:DI 0 "register_operand" "=r")
         (unspec:DI [(match_operand:CADI 1 "register_operand" "rk")]
-            UNSPEC_CHERI_COPY_TO_HIGH))
+            UNSPEC_CHERI_COPY_FROM_HIGH))
   ]
   "TARGET_MORELLO"
   "cfhi\\t%0, %1"

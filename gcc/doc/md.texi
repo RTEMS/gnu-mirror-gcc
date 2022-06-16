@@ -7715,6 +7715,221 @@ Operand 2 must be a power of two.
 Similar to @samp{align_up_@var{m}}, except that this pattern aligns the address
 up rather than down to the power of two provided in operand 2.
 
+@cindex @code{cap_address_get_@var{m}} instruction pattern
+@item @samp{cap_address_get_@var{m}}
+Set operand 0 to the address held in capability operand 1.  Operand 1 has
+capability mode @var{m} and operand 0 has the corresponding offset mode.
+
+@cindex @code{cap_base_get_@var{m}} instruction pattern
+@item @samp{cap_base_get_@var{m}}
+Set operand 0 to the lower bound of capability operand 1.  Operand 1 has
+capability mode @var{m} and operand 0 has the corresponding offset mode.
+
+@cindex @code{cap_bounds_set_@var{m}} instruction pattern
+@item @samp{cap_bounds_set_@var{m}}
+Use operand 1 to derive a capability with the following properties:
+
+@itemize @bullet
+@item
+The lower bound is the address in operand 1.
+
+@item
+The address is the same as in operand 1.
+
+@item
+the length of the bounds is at least operand 2.
+@end itemize
+
+Store the result in operand 0.
+
+Operands 0 and 1 have capability mode @var{m} and operand 2 has the
+corresponding offset mode.
+
+@cindex @code{cap_bounds_set_exact_@var{m}} instruction pattern
+@item @samp{cap_bounds_set_exact_@var{m}}
+Like @samp{cap_bounds_set_@var{m}}, but clear the tag if the length
+of the bounds cannot be set to exactly operand 2.
+
+@cindex @code{cap_build_@var{m}} instruction pattern
+@item @samp{cap_build_@var{m}}
+Perform the following procedure:
+
+@itemize @bullet
+@item
+Take a temporary copy T of capability operand 1.
+
+@item
+If T is sealed, unseal it and clear its tag.
+
+@item
+Set T's tag bit if capability operand 2 is unsealed and if T
+is a subset of operand 2.
+
+@item
+Store T in operand 0.
+@end itemize
+
+All three operands have capability mode @var{m}.
+
+@cindex @code{cap_conditionally_seal_@var{m}} instruction pattern
+@item @samp{cap_conditionally_seal_@var{m}}
+Try to use capability operand 2 to seal capability operand 1.  Store the
+result in operand 0 on success, otherwise copy operand 1 to operand 0
+unmodified (preserving its tag).
+
+All three operands have capability mode @var{m}.
+
+@cindex @code{cap_copy_from_high_@var{m}} instruction pattern
+@item @samp{cap_copy_from_high_@var{m}}
+Set operand 0 to the upper (non-value, non-tag) bits of capability operand 1.
+Operand 1 has capability mode @var{m} and operand 0 has an integer
+mode of the target's choosing.
+
+@cindex @code{cap_copy_to_high_@var{m}} instruction pattern
+@item @samp{cap_copy_to_high_@var{m}}
+Set operand 0 to a capability that has the following properties:
+
+@itemize @bullet
+@item
+The tag bit is clear.
+
+@item
+The low (value) bits are the same as those in capability operand 1.
+
+@item
+The high (non-value, non-tag) bits are those specified by integer operand 2,
+shifted into place.
+@end itemize
+
+Operands 0 and 1 have capability mode @var{m}.  Operand 2 has an
+integer mode of the target's choosing.
+
+@cindex @code{cap_equal_exact_@var{m}} instruction pattern
+@item @samp{cap_equal_exact_@var{m}}
+Set operand 0 to true if capability operands 1 and 2 are bit-for-bit
+identical (including the tag bits).  Set operand 0 to false otherwise.
+
+Operands 1 and 2 have capability mode @var{m}.  Operand 0 has an integer
+mode of the target's choosing.
+
+@cindex @code{cap_flags_get_@var{m}} instruction pattern
+@item @samp{cap_flags_get_@var{m}}
+Set operand 0 to the flags of capability operand 1.  Operand 1 has
+capability mode @var{m} and operand 0 has an integer mode of the
+target's choosing.
+
+@cindex @code{cap_flags_set_@var{m}} instruction pattern
+@item @samp{cap_flags_set_@var{m}}
+Set operand 0 to a copy of capability operand 1, but with the flags
+replaced by those in integer operand 2 (shifted into place).  Clear the
+tag of the result if the capability is sealed.
+
+Operands 0 and 1 have capability mode @var{m}.  Operand 2 has an
+integer mode of the target's choosing.
+
+@cindex @code{cap_length_get_@var{m}} instruction pattern
+@item @samp{cap_length_get_@var{m}}
+Set operand 0 to the length of the bounds of capability operand 1.
+Operand 1 has capability mode @var{m} and operand 0 has the corresponding
+offset mode.
+
+Adding the result of this operation to the result of
+@samp{cap_base_get_@var{m}} gives the (exclusive) upper bound
+of the capability.
+
+@cindex @code{cap_offset_get_@var{m}} instruction pattern
+@item @samp{cap_offset_get_@var{m}}
+Subtract the base of capability operand 1's bounds from its address
+and store the result in operand 0.  Operand 1 has capability mode
+@var{m} and operand 0 has the corresponding offset mode.
+
+@cindex @code{cap_perms_and_@var{m}} instruction pattern
+@item @samp{cap_perms_and_@var{m}}
+Copy capability operand 1 to operand 0, but AND the resulting permission
+bits with integer operand 2 (shifted into place).  The meaning of each bit
+of operand 2 is target-dependent, but the bit positions must be
+consistent with those defined in @file{cheriintrin.h}.
+
+Operands 0 and 1 have capability mode @var{m}.  Operand 2 has an integer
+mode of the target's choosing.
+
+@cindex @code{cap_perms_get_@var{m}} instruction pattern
+@item @samp{cap_perms_get_@var{m}}
+Set operand 0 to the permissions of capability operand 1.  The meaning
+of each bit of operand 0 is target-dependent, but the bit positions must
+be consistent with those defined in @file{cheriintrin.h}.
+
+Operand 1 has capability mode @var{m} and operand 0 has an integer
+mode of the target's choosing.
+
+@cindex @code{cap_seal_@var{m}} instruction pattern
+@item @samp{cap_seal_@var{m}}
+Use capability operand 2 to seal capability operand 1 and store the
+result in operand 0.  All three operands have capability mode @var{m}.
+
+@cindex @code{cap_seal_entry_@var{m}} instruction pattern
+@item @samp{cap_seal_entry_@var{m}}
+Seal capability operand 1 for use in an indirect branch and store the
+result in operand 0.  Both operands have capability mode @var{m}.
+
+@cindex @code{cap_sealed_get_@var{m}} instruction pattern
+@item @samp{cap_sealed_get_@var{m}}
+Set operand 0 to true if capability operand 1 is sealed.  Set operand 0
+to false otherwise.
+
+Operand 1 has capability mode @var{m} and operand 0 has an integer mode
+of the target's choosing.
+
+@cindex @code{cap_subset_test_@var{m}} instruction pattern
+@item @samp{cap_subset_test_@var{m}}
+Set operand 0 to true if the tag bits of capability operands 1 and 2
+are equal and if operand 1 is a subset of operand 2.  Set operand 0
+to false otherwise.
+
+Operands 1 and 2 have capability mode @var{m}.  Operand 0 has an integer
+mode of the target's choosing.
+
+@cindex @code{cap_tag_clear_@var{m}} instruction pattern
+@item @samp{cap_tag_clear_@var{m}}
+Set operand 0 to an untagged copy of capability operand 1.
+Both operands have capability mode @var{m}.
+
+@cindex @code{cap_tag_get_@var{m}} instruction pattern
+@item @samp{cap_tag_get_@var{m}}
+Set operand 0 to true if capability operand 1's tag bit is set.  Set operand 0
+to false otherwise.
+
+Operand 1 has capability mode @var{m} and operand 0 has an integer mode
+of the target's choosing.
+
+@cindex @code{cap_type_copy_@var{m}} instruction pattern
+@item @samp{cap_type_copy_@var{m}}
+Perform the following procedure:
+
+@itemize @bullet
+@item
+Use capability operand 1 to derive a temporary capability T,
+setting T's value to the object type of capability operand 2.
+
+@item
+Clear T's tag if operand 1 is sealed.
+
+@item
+Store T in operand 0.
+@end itemize
+
+All three operands have capability mode @var{m}.
+
+@cindex @code{cap_type_get_@var{m}} instruction pattern
+@item @samp{cap_type_get_@var{m}}
+Set operand 0 to the object type of capability operand 1.  Operand 1 has
+capability mode @var{m} and operand 0 has an integer mode of the
+target's choosing.
+
+@cindex @code{cap_unseal_@var{m}} instruction pattern
+@item @samp{cap_unseal_@var{m}}
+Use capability operand 2 to unseal capability operand 1 and store the
+result in capability operand 0.
 @end table
 
 @end ifset

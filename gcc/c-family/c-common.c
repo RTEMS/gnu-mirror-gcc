@@ -52,6 +52,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "selftest.h"
 #include "debug.h"
 #include "builtins.h"
+#include "internal-fn.h"
 
 cpp_reader *parse_in;		/* Declared in c-pragma.h.  */
 
@@ -7855,6 +7856,73 @@ resolve_atomic_fncode_n (tree function, vec<tree, va_gc> *params,
   return builtin_decl_explicit (new_code_bt);
 }
 
+/* A subroutine of resolve_overloaded_builtin, with the same arguments.
+   FUNCTION is known to be an overloaded BUILT_IN_CHERI_* function
+   with the following properties:
+
+   - Arguments with declared type cap_ptr_type_node can in fact be
+     any capability type, not just "void *__capability".
+
+   - A declared return type of cap_ptr_type_node represents the same type
+     as the first argument of type cap_ptr_type_node.
+
+   We can "resolve" the overload by casting all cap_ptr_type_node arguments
+   to cap_ptr_type_node and casting any cap_ptr_type_node result to its
+   real type (determined by the first cap_ptr_type_node argument).
+   The called function itself doesn't change.
+
+   Doing things this way ensures that full semantic analysis is applied
+   to the adjusted call, such as checking the types of non-overloaded
+   arguments.  */
+
+static tree
+resolve_cheri_builtin (location_t loc, tree function,
+		       vec<tree, va_gc> *params)
+{
+  unsigned int num_params = vec_safe_length (params);
+
+  vec<tree, va_gc> *new_params = vec_safe_copy (params);
+  vec<tree, va_gc> *origtypes = vec_safe_copy (params);
+  for (unsigned int i = 0; i < num_params; ++i)
+    (*origtypes)[i] = ((*origtypes)[i] == error_mark_node
+		       ? error_mark_node
+		       : TREE_TYPE ((*origtypes)[i]));
+
+  tree cap_type = NULL_TREE;
+  tree arg_type;
+  function_args_iterator arg_iter;
+  unsigned int i = 0;
+  FOREACH_FUNCTION_ARGS (TREE_TYPE (function), arg_type, arg_iter)
+    {
+      if (i < num_params && arg_type == cap_ptr_type_node)
+	{
+	  tree param = (*params)[i];
+	  tree param_type = (integer_zerop (param)
+			     ? arg_type
+			     : (*origtypes)[i]);
+	  if (param_type != error_mark_node
+	      && !capability_type_p (param_type))
+	    {
+	      error_at (loc, "passing %qT to argument %u of %qE, "
+			"which expects a capability type",
+			param_type, i + 1, function);
+	      param = build_zero_cst (arg_type);
+	      param_type = error_mark_node;
+	    }
+	  if (!cap_type)
+	    cap_type = param_type;
+	  (*new_params)[i] = convert (arg_type, param);
+	}
+      i += 1;
+    }
+
+  tree res = build_function_call_vec (loc, vNULL, function, new_params,
+				      origtypes, NULL_TREE);
+  if (cap_type && TREE_TYPE (TREE_TYPE (function)) == cap_ptr_type_node)
+    res = convert (cap_type, res);
+  return res;
+}
+
 /* Some builtin functions are placeholders for other expressions.  This
    function should be called immediately after parsing the call expression
    before surrounding code has committed to the type of the expression.
@@ -7943,6 +8011,35 @@ resolve_overloaded_builtin (location_t loc, tree function,
 	    return first_param;
 	  }
       }
+
+    case BUILT_IN_CHERI_ADDRESS_GET:
+    case BUILT_IN_CHERI_ADDRESS_SET:
+    case BUILT_IN_CHERI_BASE_GET:
+    case BUILT_IN_CHERI_BOUNDS_SET:
+    case BUILT_IN_CHERI_BOUNDS_SET_EXACT:
+    case BUILT_IN_CHERI_CAP_BUILD:
+    case BUILT_IN_CHERI_CAP_TYPE_COPY:
+    case BUILT_IN_CHERI_CONDITIONAL_SEAL:
+    case BUILT_IN_CHERI_COPY_FROM_HIGH:
+    case BUILT_IN_CHERI_COPY_TO_HIGH:
+    case BUILT_IN_CHERI_EQUAL_EXACT:
+    case BUILT_IN_CHERI_FLAGS_GET:
+    case BUILT_IN_CHERI_FLAGS_SET:
+    case BUILT_IN_CHERI_LENGTH_GET:
+    case BUILT_IN_CHERI_OFFSET_GET:
+    case BUILT_IN_CHERI_OFFSET_INCREMENT:
+    case BUILT_IN_CHERI_OFFSET_SET:
+    case BUILT_IN_CHERI_PERMS_AND:
+    case BUILT_IN_CHERI_PERMS_GET:
+    case BUILT_IN_CHERI_SEAL:
+    case BUILT_IN_CHERI_SEAL_ENTRY:
+    case BUILT_IN_CHERI_SEALED_GET:
+    case BUILT_IN_CHERI_SUBSET_TEST:
+    case BUILT_IN_CHERI_TAG_CLEAR:
+    case BUILT_IN_CHERI_TAG_GET:
+    case BUILT_IN_CHERI_TYPE_GET:
+    case BUILT_IN_CHERI_UNSEAL:
+      return resolve_cheri_builtin (loc, function, params);
 
     case BUILT_IN_ATOMIC_EXCHANGE:
     case BUILT_IN_ATOMIC_COMPARE_EXCHANGE:
