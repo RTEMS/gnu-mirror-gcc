@@ -1193,7 +1193,7 @@ conversion_warning (location_t loc, tree type, tree expr, tree result)
       /* Conversion from boolean to a signed:1 bit-field (which only
 	 can hold the values 0 and -1) doesn't lose information - but
 	 it does change the value.  */
-      if (TYPE_PRECISION (type) == 1 && !TYPE_UNSIGNED (type))
+      if (TYPE_NONCAP_PRECISION (type) == 1 && !TYPE_UNSIGNED (type))
 	warning_at (loc, OPT_Wconversion,
 		    "conversion to %qT from boolean expression", type);
       return true;
@@ -1293,6 +1293,11 @@ conversion_warning (location_t loc, tree type, tree expr, tree result)
 		|| conversion_warning (loc, type, op2, result));
       }
 
+    case CALL_EXPR:
+      if (CALL_EXPR_IFN (expr) == IFN_REPLACE_ADDRESS_VALUE)
+	return conversion_warning (loc, type, CALL_EXPR_ARG (expr, 1), result);
+      goto default_;
+
     default_:
     default:
       conversion_kind = unsafe_conversion_p (type, expr, result, true);
@@ -1370,7 +1375,8 @@ warnings_for_convert_and_check (location_t loc, tree type, tree expr,
 
   if (TREE_CODE (expr) == INTEGER_CST
       && (TREE_CODE (type) == INTEGER_TYPE
-	  || TREE_CODE (type) == ENUMERAL_TYPE)
+	  || TREE_CODE (type) == ENUMERAL_TYPE
+	  || TREE_CODE (type) == INTCAP_TYPE)
       && !int_fits_type_p (expr, type))
     {
       /* Do not diagnose overflow in a constant expression merely

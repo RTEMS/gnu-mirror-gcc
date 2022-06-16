@@ -9033,10 +9033,15 @@ excess_precision_type (tree type)
 tree
 get_unwidened (tree op, tree for_type)
 {
-  /* Set UNS initially if converting OP to FOR_TYPE is a zero-extension.  */
   tree type = TREE_TYPE (op);
+
+  /* Capability values have a fixed size, so we can't drop their precision.  */
+  if (TREE_CODE (type) == INTCAP_TYPE)
+    return op;
+
   unsigned final_prec
-    = TYPE_PRECISION (for_type != 0 ? for_type : type);
+    = TYPE_NONCAP_PRECISION (for_type != 0 ? for_type : type);
+  /* Set UNS initially if converting OP to FOR_TYPE is a zero-extension.  */
   int uns
     = (for_type != 0 && for_type != type
        && final_prec > TYPE_PRECISION (type)

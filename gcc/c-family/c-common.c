@@ -1331,7 +1331,16 @@ enum conversion_safety
 unsafe_conversion_p (tree type, tree expr, tree result, bool check_sign)
 {
   enum conversion_safety give_warning = SAFE_CONVERSION; /* is 0 or false */
+
+  /* Converting an intcap_t or uintcap_t is unsafe iff the same conversion
+     would be unsafe for the integer capability value.  */
+  if (TREE_CODE (TREE_TYPE (expr)) == INTCAP_TYPE)
+    expr = fold_drop_capability (expr);
   tree expr_type = TREE_TYPE (expr);
+
+  /* Likewise converting to an intcap_t or uintcap_t.  */
+  if (TREE_CODE (type) == INTCAP_TYPE)
+    type = TREE_TYPE (type);
 
   expr = fold_for_warn (expr);
 
@@ -1439,6 +1448,12 @@ unsafe_conversion_p (tree type, tree expr, tree result, bool check_sign)
   /* Checks for remaining case: EXPR is not constant.  */
   else
     {
+      /* Treat a conversion from a scalar to a complex in the same way
+	 as a conversion from the scalar to the real component.  */
+      if (TREE_CODE (type) == COMPLEX_TYPE
+	  && TREE_CODE (expr_type) != COMPLEX_TYPE)
+	type = TREE_TYPE (type);
+
       /* Warn for real types converted to integer types.  */
       if (TREE_CODE (expr_type) == REAL_TYPE
 	  && TREE_CODE (type) == INTEGER_TYPE)
