@@ -214,10 +214,19 @@ PERSONALITY_FUNCTION (int version,
       _Unwind_Ptr marker = 0;
       /* Single uleb128 value as the capability marker.  */
       p = read_encoded_value (0, DW_EH_PE_uleb128, p, &marker);
-      /* 8 byte value indicating the offset from said 8 byte value.
-	 Could use DW_EH_PE_indirect except that the offset is zero if there is
-	 no landing pad.  */
-      p = read_encoded_value (0, DW_EH_PE_pcrel | DW_EH_PE_udata8, p, &cs_lp);
+      if (marker == 0xd)
+	{
+	  /* 8 byte value indicating the offset from said 8 byte value.
+	     Could use DW_EH_PE_indirect except that the offset is zero
+	     if there is no landing pad.  */
+	  p = read_encoded_value (0, DW_EH_PE_pcrel | DW_EH_PE_udata8, p,
+				  &cs_lp);
+	}
+      else if (marker)
+	/* Unsupported landing pad marker value.  */
+	__builtin_abort ();
+      else
+	cs_lp = 0; /* No landing pad.  */
 #  else
       p = read_encoded_value (0, info.call_site_encoding, p, &cs_lp);
 #  endif

@@ -375,7 +375,8 @@ PERSONALITY_FUNCTION (int version,
   const unsigned char *language_specific_data;
   const unsigned char *action_record;
   const unsigned char *p;
-  _Unwind_Ptr landing_pad, ip;
+  _Unwind_Ptr landing_pad, ip_ptr;
+  _Unwind_Address ip;
   int handler_switch_value;
   void* thrown_ptr = 0;
   bool foreign_exception;
@@ -422,8 +423,8 @@ PERSONALITY_FUNCTION (int version,
   // function and LSDA pointers.  The ARM implementation caches these in
   // the exception header (UCB).  To avoid rewriting everything we make a
   // virtual scratch register point at the UCB.
-  ip = (_Unwind_Ptr) ue_header;
-  _Unwind_SetGR(context, UNWIND_POINTER_REG, ip);
+  ip_ptr = (_Unwind_Ptr) ue_header;
+  _Unwind_SetGR (context, UNWIND_POINTER_REG, ip_ptr);
 #else
   __cxa_exception* xh = __get_exception_header_from_ue(ue_header);
 
@@ -454,10 +455,17 @@ PERSONALITY_FUNCTION (int version,
   p = parse_lsda_header (context, language_specific_data, &info);
   info.ttype_base = base_of_encoded_value (info.ttype_encoding, context);
 #ifdef _GLIBCXX_HAVE_GETIPINFO
-  ip = _Unwind_GetIPInfo (context, &ip_before_insn);
+  ip_ptr = _Unwind_GetIPInfo (context, &ip_before_insn);
 #else
-  ip = _Unwind_GetIP (context);
+  ip_ptr = _Unwind_GetIP (context);
 #endif
+
+#ifdef __USING_SJLJ_EXCEPTIONS__
+  ip = (_Unwind_Address) ip_ptr;
+#else
+  ip = __builtin_code_address_from_pointer ((void *)ip_ptr);
+#endif
+
   if (! ip_before_insn)
     --ip;
   landing_pad = 0;
@@ -502,7 +510,26 @@ PERSONALITY_FUNCTION (int version,
       // Note that all call-site encodings are "absolute" displacements.
       p = read_encoded_value (0, info.call_site_encoding, p, &cs_start);
       p = read_encoded_value (0, info.call_site_encoding, p, &cs_len);
+#ifdef __CHERI_PURE_CAPABILITY__
+      // Single uleb128 value as the capability marker.
+      _Unwind_Ptr marker = 0;
+      p = read_encoded_value (0, DW_EH_PE_uleb128, p, &marker);
+      if (marker == 0xd)
+	{
+	  // 8-byte offset to the (indirected) capability.
+	  p = read_encoded_value (0, DW_EH_PE_pcrel | DW_EH_PE_udata8, p,
+				  &cs_lp);
+	}
+      else if (marker)
+	{
+	  // Unsupported landing pad marker value.
+	  std::abort ();
+	}
+      else
+	cs_lp = 0; // No landing pad.
+#else
       p = read_encoded_value (0, info.call_site_encoding, p, &cs_lp);
+#endif
       p = read_uleb128 (p, &cs_action);
 
       // The table is sorted, so if we've passed the ip, stop.
@@ -511,7 +538,13 @@ PERSONALITY_FUNCTION (int version,
       else if (ip < info.Start + cs_start + cs_len)
 	{
 	  if (cs_lp)
-	    landing_pad = info.LPStart + cs_lp;
+	    {
+#ifdef __CHERI_PURE_CAPABILITY__
+	      landing_pad = *(_Unwind_Ptr *)cs_lp;
+#else
+	      landing_pad = info.LPStart + cs_lp;
+#endif
+	    }
 	  if (cs_action)
 	    action_record = info.action_table + cs_action - 1;
 	  goto found_something;
