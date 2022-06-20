@@ -701,13 +701,20 @@ forward_propagate_addr_expr_1 (tree name, tree def_rhs,
 	  return true;
 	}
 
+      /* If we have a conversion between two capability types, they should have
+	 the same precision.  */
+      gcc_assert (!capability_type_p (TREE_TYPE (lhs))
+		  || !capability_type_p (TREE_TYPE (def_rhs))
+		  || TYPE_CAP_PRECISION (TREE_TYPE (lhs))
+		     == TYPE_CAP_PRECISION (TREE_TYPE (def_rhs)));
+
       /* Else recurse if the conversion preserves the address value.  */
       if ((INTEGRAL_TYPE_P (TREE_TYPE (lhs))
 	   || POINTER_TYPE_P (TREE_TYPE (lhs)))
 	  && (capability_type_p (TREE_TYPE (lhs))
 	      == capability_type_p (TREE_TYPE (def_rhs)))
-	  && (TYPE_PRECISION (TREE_TYPE (lhs))
-	      >= TYPE_PRECISION (TREE_TYPE (def_rhs))))
+	  && (TYPE_NONCAP_PRECISION (TREE_TYPE (lhs))
+	      >= TYPE_NONCAP_PRECISION (TREE_TYPE (def_rhs))))
 	return forward_propagate_addr_expr (lhs, def_rhs, single_use_p);
 
       return false;
