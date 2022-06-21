@@ -741,11 +741,11 @@ collect_conditions (conds_ctx& ctx, const basic_block block)
     }
     else
     {
-	blocks.truncate (0);
 	location_t loc = gimple_location (gsi_stmt (gsi_last_bb (block)));
 	warning_at (loc, OPT_Wcoverage_too_many_conditions,
 		    "Too many conditions (found %u); giving up coverage",
 		    blocks.length ());
+	blocks.truncate (0);
     }
     return blocks;
 }
