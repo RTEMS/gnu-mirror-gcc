@@ -5790,6 +5790,21 @@ cp_build_binary_op (const op_location_t &location,
   if (! converted)
     {
       warning_sentinel w (warn_sign_conversion, short_compare);
+
+      /* If we have a common capability type which is distinct from the final
+	 result type, first convert both operands to the common capability type.
+	 This is important when the conversion is not a no-op, e.g. for pointers
+	 to different classes within the same class hierarchy, we may have to
+	 perform a "this adjustment".  */
+      if (cap_result_type
+	  && result_type != cap_result_type)
+	{
+	  if (!same_type_p (TREE_TYPE (op0), cap_result_type))
+	    op0 = cp_convert_and_check (cap_result_type, op0, complain);
+	  if (!same_type_p (TREE_TYPE (op1), cap_result_type))
+	    op1 = cp_convert_and_check (cap_result_type, op1, complain);
+	}
+
       if (!same_type_p (TREE_TYPE (op0), result_type))
 	{
 	  op0 = cp_convert_and_check (result_type, op0, complain);
