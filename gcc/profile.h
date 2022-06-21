@@ -77,4 +77,27 @@ extern void get_working_sets (void);
    profile.cc.  */
 extern struct gcov_summary *profile_info;
 
+/* Condition coverage. Implemented in tree-profile.cc */
+struct condition_coverage
+{
+public:
+    condition_coverage () = default;
+
+    int find_conditions (struct function*);
+
+    unsigned length () const noexcept (true);
+
+    /* Get the blocks for the nth conditional expression in this function. */
+    array_slice<basic_block> blocks (unsigned) noexcept (true);
+
+    /* Get the masking vectors for the nth conditional expression in this
+       function. */
+    array_slice<gcov_type_unsigned> masks (unsigned) noexcept (true);
+
+private:
+    auto_vec<int, 16> m_index;
+    auto_vec<basic_block, 32> m_blocks;
+    auto_vec<gcov_type_unsigned, 32> m_masks;
+};
+
 #endif /* PROFILE_H */

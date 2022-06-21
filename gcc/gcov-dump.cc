@@ -35,6 +35,7 @@ static void print_version (void);
 static void tag_function (const char *, unsigned, int, unsigned);
 static void tag_blocks (const char *, unsigned, int, unsigned);
 static void tag_arcs (const char *, unsigned, int, unsigned);
+static void tag_conditions (const char *, unsigned, int, unsigned);
 static void tag_lines (const char *, unsigned, int, unsigned);
 static void tag_counters (const char *, unsigned, int, unsigned);
 static void tag_summary (const char *, unsigned, int, unsigned);
@@ -71,6 +72,7 @@ static const tag_format_t tag_table[] =
   {GCOV_TAG_FUNCTION, "FUNCTION", tag_function},
   {GCOV_TAG_BLOCKS, "BLOCKS", tag_blocks},
   {GCOV_TAG_ARCS, "ARCS", tag_arcs},
+  {GCOV_TAG_CONDS, "CONDITIONS", tag_conditions},
   {GCOV_TAG_LINES, "LINES", tag_lines},
   {GCOV_TAG_OBJECT_SUMMARY, "OBJECT_SUMMARY", tag_summary},
   {0, NULL, NULL}
@@ -381,6 +383,28 @@ tag_arcs (const char *filename ATTRIBUTE_UNUSED,
     }
 }
 
+static void
+tag_conditions (const char *filename ATTRIBUTE_UNUSED,
+		unsigned tag ATTRIBUTE_UNUSED, int length ATTRIBUTE_UNUSED,
+		unsigned depth)
+{
+  unsigned n_conditions = GCOV_TAG_CONDS_NUM (length);
+
+  printf (" %u conditionals", n_conditions);
+  if (flag_dump_contents)
+    {
+      for (unsigned ix = 0; ix != n_conditions; ix++)
+	{
+	  const unsigned blockno = gcov_read_unsigned ();
+	  const unsigned nterms = gcov_read_unsigned ();
+
+	  printf ("\n");
+	  print_prefix (filename, depth, gcov_position ());
+	  printf (VALUE_PADDING_PREFIX "block %u:", blockno);
+	  printf (" %u", nterms);
+	}
+    }
+}
 static void
 tag_lines (const char *filename ATTRIBUTE_UNUSED,
 	   unsigned tag ATTRIBUTE_UNUSED, int length ATTRIBUTE_UNUSED,
