@@ -1,3 +1,32 @@
+==================== Work092, patch #1
+
+__float128 and __ibm128 always gets different internal types.
+
+2022-06-22   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/rs6000-builtin.cc (rs6000_init_builtins): Always
+	create a new tree node for __ibm128, even if long double uses the
+	IBM 128-bit format.  Always create a new tree node for __float128,
+	even if long double uses the IEEE 128-bit format.  Change the
+	keyword create for IEEE 128-bit to be '__float128', not
+	'__ieee128'.
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
+	__ieee128 compatibility macro.
+	* config/rs6000/rs600.cc (reg_offset_addressing_ok_p): Allow
+	IFmode to use offset addresses.
+	(create_complex_muldiv): Delete.
+	(init_float128_ieee): Do not create __mulkc3 and __divkc3 since
+	__float128 always creates these functions.
+	(rs6000_libgcc_floating_mode_supported_p): Always allow KFmode.
+	(rs6000_floatn_mode): Always return KFmode for IEEE 128-bit.  Do
+	not return TFmode, even if long double uses the IEEE 128-bit
+	format.
+	(rs6000_c_mode_for_suffix): The 'q' suffix always uses KFmode,
+	even if long double uses the IEEE 128-bit encoding.
+
+==================== Branch creation
+
 2022-06-22   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
