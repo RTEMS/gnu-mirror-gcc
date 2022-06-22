@@ -9463,7 +9463,7 @@ pointer_may_wrap_p (tree base, tree offset, poly_int64 bitpos)
     return true;
 
   poly_wide_int wi_offset;
-  int precision = TYPE_PRECISION (TREE_TYPE (base));
+  int precision = TYPE_NONCAP_PRECISION (TREE_TYPE (base));
   if (offset == NULL_TREE)
     wi_offset = wi::zero (precision);
   else if (!poly_int_tree_p (offset) || TREE_OVERFLOW (offset))
@@ -9522,6 +9522,292 @@ maybe_nonzero_address (tree decl)
   return -1;
 }
 
+/* Subroutine of fold_comparison.
+
+   OP0 and OP1 are pointer-typed expressions.  This function attempts to
+   fold a comparison of the address values of OP0 and OP1.
+
+   For non-capability pointer types, this is just a standard comparison
+   of OP0 and OP1, but for capability pointer types, this is a
+   comparison of the address values of the capabilities.
+
+   ORIG_TYPE, if set, gives the original type in which the address value
+   operands were compared.  */
+static tree
+fold_address_value_comparison (location_t loc, enum tree_code code,
+			       tree type, tree arg0, tree arg1,
+			       tree orig_type)
+{
+  if (!ADDR_EXPR_P (arg0)
+      && !ADDR_EXPR_P (arg1)
+      && TREE_CODE (arg0) != POINTER_PLUS_EXPR
+      && TREE_CODE (arg1) != POINTER_PLUS_EXPR)
+    return NULL_TREE;
+
+  const bool equality_code = (code == EQ_EXPR || code == NE_EXPR);
+
+  tree base0, base1, offset0 = NULL_TREE, offset1 = NULL_TREE;
+  poly_int64 bitsize, bitpos0 = 0, bitpos1 = 0;
+  machine_mode mode;
+  int volatilep, reversep, unsignedp;
+  bool indirect_base0 = false, indirect_base1 = false;
+
+  /* Get base and offset for the access.  Strip *ADDR_EXPR for
+     get_inner_reference, but put it back by stripping INDIRECT_REF
+     off the base object if possible.  indirect_baseN will be true
+     if baseN is not an address but refers to the object itself.  */
+  base0 = arg0;
+  if (ADDR_EXPR_P (arg0))
+    {
+      base0
+	= get_inner_reference (TREE_OPERAND (arg0, 0),
+			       &bitsize, &bitpos0, &offset0, &mode,
+			       &unsignedp, &reversep, &volatilep);
+      if (TREE_CODE (base0) == INDIRECT_REF)
+	base0 = TREE_OPERAND (base0, 0);
+      else
+	indirect_base0 = true;
+    }
+  else if (TREE_CODE (arg0) == POINTER_PLUS_EXPR)
+    {
+      base0 = TREE_OPERAND (arg0, 0);
+      STRIP_SIGN_NOPS (base0);
+      if (ADDR_EXPR_P (base0))
+	{
+	  base0
+	    = get_inner_reference (TREE_OPERAND (base0, 0),
+				   &bitsize, &bitpos0, &offset0, &mode,
+				   &unsignedp, &reversep, &volatilep);
+	  if (TREE_CODE (base0) == INDIRECT_REF)
+	    base0 = TREE_OPERAND (base0, 0);
+	  else
+	    indirect_base0 = true;
+	}
+      if (offset0 == NULL_TREE || integer_zerop (offset0))
+	offset0 = TREE_OPERAND (arg0, 1);
+      else
+	offset0 = size_binop (PLUS_EXPR, offset0,
+			      TREE_OPERAND (arg0, 1));
+      if (poly_int_tree_p (offset0))
+	{
+	  poly_offset_int tem = wi::sext (wi::to_poly_offset (offset0),
+					  TYPE_PRECISION (sizetype));
+	  tem <<= LOG2_BITS_PER_UNIT;
+	  tem += bitpos0;
+	  if (tem.to_shwi (&bitpos0))
+	    offset0 = NULL_TREE;
+	}
+    }
+
+  base1 = arg1;
+  if (ADDR_EXPR_P (arg1))
+    {
+      base1
+	= get_inner_reference (TREE_OPERAND (arg1, 0),
+			       &bitsize, &bitpos1, &offset1, &mode,
+			       &unsignedp, &reversep, &volatilep);
+      if (TREE_CODE (base1) == INDIRECT_REF)
+	base1 = TREE_OPERAND (base1, 0);
+      else
+	indirect_base1 = true;
+    }
+  else if (TREE_CODE (arg1) == POINTER_PLUS_EXPR)
+    {
+      base1 = TREE_OPERAND (arg1, 0);
+      STRIP_SIGN_NOPS (base1);
+      if (ADDR_EXPR_P (base1))
+	{
+	  base1
+	    = get_inner_reference (TREE_OPERAND (base1, 0),
+				   &bitsize, &bitpos1, &offset1, &mode,
+				   &unsignedp, &reversep, &volatilep);
+	  if (TREE_CODE (base1) == INDIRECT_REF)
+	    base1 = TREE_OPERAND (base1, 0);
+	  else
+	    indirect_base1 = true;
+	}
+      if (offset1 == NULL_TREE || integer_zerop (offset1))
+	offset1 = TREE_OPERAND (arg1, 1);
+      else
+	offset1 = size_binop (PLUS_EXPR, offset1,
+			      TREE_OPERAND (arg1, 1));
+      if (poly_int_tree_p (offset1))
+	{
+	  poly_offset_int tem = wi::sext (wi::to_poly_offset (offset1),
+					  TYPE_PRECISION (sizetype));
+	  tem <<= LOG2_BITS_PER_UNIT;
+	  tem += bitpos1;
+	  if (tem.to_shwi (&bitpos1))
+	    offset1 = NULL_TREE;
+	}
+    }
+
+  /* If we have equivalent bases we might be able to simplify.  */
+  if (indirect_base0 == indirect_base1
+      && operand_equal_p (base0, base1,
+			  indirect_base0 ? OEP_ADDRESS_OF : 0))
+    {
+      /* We can fold this expression to a constant if the non-constant
+	 offset parts are equal.  */
+      if ((offset0 == offset1
+	   || (offset0 && offset1
+	       && operand_equal_p (offset0, offset1, 0)))
+	  && (equality_code
+	      || (indirect_base0
+		  && (DECL_P (base0) || CONSTANT_CLASS_P (base0)))
+	      || TYPE_OVERFLOW_UNDEFINED (TREE_TYPE (arg0))))
+	{
+	  if (!equality_code
+	      && maybe_ne (bitpos0, bitpos1)
+	      && (pointer_may_wrap_p (base0, offset0, bitpos0)
+		  || pointer_may_wrap_p (base1, offset1, bitpos1)))
+	    fold_overflow_warning (("assuming pointer wraparound does not "
+				    "occur when comparing P +- C1 with "
+				    "P +- C2"),
+				   WARN_STRICT_OVERFLOW_CONDITIONAL);
+
+	  switch (code)
+	    {
+	    case EQ_EXPR:
+	      if (known_eq (bitpos0, bitpos1))
+		return constant_boolean_node (true, type);
+	      if (known_ne (bitpos0, bitpos1))
+		return constant_boolean_node (false, type);
+	      break;
+	    case NE_EXPR:
+	      if (known_ne (bitpos0, bitpos1))
+		return constant_boolean_node (true, type);
+	      if (known_eq (bitpos0, bitpos1))
+		return constant_boolean_node (false, type);
+	      break;
+	    case LT_EXPR:
+	      if (known_lt (bitpos0, bitpos1))
+		return constant_boolean_node (true, type);
+	      if (known_ge (bitpos0, bitpos1))
+		return constant_boolean_node (false, type);
+	      break;
+	    case LE_EXPR:
+	      if (known_le (bitpos0, bitpos1))
+		return constant_boolean_node (true, type);
+	      if (known_gt (bitpos0, bitpos1))
+		return constant_boolean_node (false, type);
+	      break;
+	    case GE_EXPR:
+	      if (known_ge (bitpos0, bitpos1))
+		return constant_boolean_node (true, type);
+	      if (known_lt (bitpos0, bitpos1))
+		return constant_boolean_node (false, type);
+	      break;
+	    case GT_EXPR:
+	      if (known_gt (bitpos0, bitpos1))
+		return constant_boolean_node (true, type);
+	      if (known_le (bitpos0, bitpos1))
+		return constant_boolean_node (false, type);
+	      break;
+	    default:;
+	    }
+	}
+      /* We can simplify the comparison to a comparison of the variable
+	 offset parts if the constant offset parts are equal.
+	 Be careful to use signed sizetype here because otherwise we
+	 mess with array offsets in the wrong way.  This is possible
+	 because pointer arithmetic is restricted to retain within an
+	 object and overflow on pointer differences is undefined as of
+	 6.5.6/8 and /9 with respect to the signed ptrdiff_t.  */
+      else if (known_eq (bitpos0, bitpos1)
+	       && (equality_code
+		   || (indirect_base0
+		       && (DECL_P (base0) || CONSTANT_CLASS_P (base0)))
+		   || TYPE_OVERFLOW_UNDEFINED (TREE_TYPE (arg0))))
+	{
+	  /* By converting to signed sizetype we cover middle-end pointer
+	     arithmetic which operates on unsigned pointer types of size
+	     type size and ARRAY_REF offsets which are properly sign or
+	     zero extended from their type in case it is narrower than
+	     sizetype.  */
+	  if (offset0 == NULL_TREE)
+	    offset0 = build_int_cst (ssizetype, 0);
+	  else
+	    offset0 = fold_convert_loc (loc, ssizetype, offset0);
+	  if (offset1 == NULL_TREE)
+	    offset1 = build_int_cst (ssizetype, 0);
+	  else
+	    offset1 = fold_convert_loc (loc, ssizetype, offset1);
+
+	  if (!equality_code
+	      && (pointer_may_wrap_p (base0, offset0, bitpos0)
+		  || pointer_may_wrap_p (base1, offset1, bitpos1)))
+	    fold_overflow_warning (("assuming pointer wraparound does not "
+				    "occur when comparing P +- C1 with "
+				    "P +- C2"),
+				   WARN_STRICT_OVERFLOW_COMPARISON);
+
+	  return fold_build2_loc (loc, code, type, offset0, offset1);
+	}
+    }
+  /* For equal offsets we can simplify to a comparison of the
+     base addresses.  */
+  else if (known_eq (bitpos0, bitpos1)
+	   && (indirect_base0
+	       ? base0 != TREE_OPERAND (arg0, 0) : base0 != arg0)
+	   && (indirect_base1
+	       ? base1 != TREE_OPERAND (arg1, 0) : base1 != arg1)
+	   && ((offset0 == offset1)
+	       || (offset0 && offset1
+		   && operand_equal_p (offset0, offset1, 0))))
+    {
+      if (indirect_base0)
+	base0 = build_fold_addr_expr_loc (loc, base0);
+      if (indirect_base1)
+	base1 = build_fold_addr_expr_loc (loc, base1);
+
+      if (orig_type)
+	{
+	  base0 = fold_convert (orig_type, base0);
+	  base1 = fold_convert (orig_type, base1);
+	}
+
+      return fold_build2_loc (loc, code, type, base0, base1);
+    }
+  /* Comparison between an ordinary (non-weak) symbol and a null
+     pointer can be eliminated since such symbols must have a non
+     null address.  In C, relational expressions between pointers
+     to objects and null pointers are undefined.  The results
+     below follow the C++ rules with the additional property that
+     every object pointer compares greater than a null pointer.
+  */
+  else if (((DECL_P (base0)
+	     && maybe_nonzero_address (base0) > 0
+	     /* Avoid folding references to struct members at offset 0 to
+		prevent tests like '&ptr->firstmember == 0' from getting
+		eliminated.  When ptr is null, although the -> expression
+		is strictly speaking invalid, GCC retains it as a matter
+		of QoI.  See PR c/44555.  */
+	     && (offset0 == NULL_TREE && known_ne (bitpos0, 0)))
+	    || CONSTANT_CLASS_P (base0))
+	   && indirect_base0
+	   /* The caller guarantees that when one of the arguments is
+	      constant (i.e., null in this case) it is second.  */
+	   && integer_zerop (arg1))
+    {
+      switch (code)
+	{
+	case EQ_EXPR:
+	case LE_EXPR:
+	case LT_EXPR:
+	  return constant_boolean_node (false, type);
+	case GE_EXPR:
+	case GT_EXPR:
+	case NE_EXPR:
+	  return constant_boolean_node (true, type);
+	default:
+	  gcc_unreachable ();
+	}
+    }
+
+  return NULL_TREE;
+}
+
 /* Subroutine of fold_binary.  This routine performs all of the
    transformations that are common to the equality/inequality
    operators (EQ_EXPR and NE_EXPR) and the ordering operators
@@ -9534,7 +9820,6 @@ static tree
 fold_comparison (location_t loc, enum tree_code code, tree type,
 		 tree op0, tree op1)
 {
-  const bool equality_code = (code == EQ_EXPR || code == NE_EXPR);
   tree arg0, arg1, tem;
 
   arg0 = op0;
@@ -9547,261 +9832,46 @@ fold_comparison (location_t loc, enum tree_code code, tree type,
      comparison of the base objects and the offsets into the object.
      This requires at least one operand being an *ADDR_EXPR or a
      POINTER_PLUS_EXPR to do more than the operand_equal_p test below.  */
-  if (POINTER_TYPE_P (TREE_TYPE (arg0))
-      && (ADDR_EXPR_P (arg0)
-	  || ADDR_EXPR_P (arg1)
-	  || TREE_CODE (arg0) == POINTER_PLUS_EXPR
-	  || TREE_CODE (arg1) == POINTER_PLUS_EXPR))
+  if (POINTER_TYPE_P (TREE_TYPE (arg0)))
     {
-      tree base0, base1, offset0 = NULL_TREE, offset1 = NULL_TREE;
-      poly_int64 bitsize, bitpos0 = 0, bitpos1 = 0;
-      machine_mode mode;
-      int volatilep, reversep, unsignedp;
-      bool indirect_base0 = false, indirect_base1 = false;
+      tem = fold_address_value_comparison (loc, code, type, arg0, arg1,
+					   NULL);
+      if (tem)
+	return tem;
+    }
 
-      /* Get base and offset for the access.  Strip *ADDR_EXPR for
-	 get_inner_reference, but put it back by stripping INDIRECT_REF
-	 off the base object if possible.  indirect_baseN will be true
-	 if baseN is not an address but refers to the object itself.  */
-      base0 = arg0;
-      if (ADDR_EXPR_P (arg0))
+  /* Handle comparisons of the form:
+     (T) ptr1 <cmp> (T) ptr2
+     where T is an integer type of the same sign and precision as the
+     non-capability type of the pointer type.  */
+  if (CONVERT_EXPR_P (arg0))
+    {
+      tree type0 = TREE_TYPE (arg0);
+      tree inner0 = TREE_OPERAND (arg0, 0);
+      tree inner_type0 = TREE_TYPE (inner0);
+      if (POINTER_TYPE_P (inner_type0)
+	  && TREE_CODE (type0) == INTEGER_TYPE
+	  && TYPE_UNSIGNED (type0)
+	  && TYPE_NONCAP_PRECISION (type0) == TYPE_NONCAP_PRECISION (inner_type0))
 	{
-	  base0
-	    = get_inner_reference (TREE_OPERAND (arg0, 0),
-				   &bitsize, &bitpos0, &offset0, &mode,
-				   &unsignedp, &reversep, &volatilep);
-	  if (TREE_CODE (base0) == INDIRECT_REF)
-	    base0 = TREE_OPERAND (base0, 0);
-	  else
-	    indirect_base0 = true;
-	}
-      else if (TREE_CODE (arg0) == POINTER_PLUS_EXPR)
-	{
-	  base0 = TREE_OPERAND (arg0, 0);
-	  STRIP_SIGN_NOPS (base0);
-	  if (ADDR_EXPR_P (base0))
+	  tree inner1 = NULL_TREE;
+	  if (CONVERT_EXPR_P (arg1)
+	      && tree_nop_conversion_p (inner_type0,
+					TREE_TYPE (TREE_OPERAND (arg1, 0))))
+	    inner1 = TREE_OPERAND (arg1, 0);
+	  else if (TREE_CODE (arg1) == INTEGER_CST)
 	    {
-	      base0
-		= get_inner_reference (TREE_OPERAND (base0, 0),
-				       &bitsize, &bitpos0, &offset0, &mode,
-				       &unsignedp, &reversep, &volatilep);
-	      if (TREE_CODE (base0) == INDIRECT_REF)
-		base0 = TREE_OPERAND (base0, 0);
-	      else
-		indirect_base0 = true;
+	      tree z = build_zero_cst (inner_type0);
+	      inner1 = fold_build_replace_address_value (z, arg1);
 	    }
-	  if (offset0 == NULL_TREE || integer_zerop (offset0))
-	    offset0 = TREE_OPERAND (arg0, 1);
-	  else
-	    offset0 = size_binop (PLUS_EXPR, offset0,
-				  TREE_OPERAND (arg0, 1));
-	  if (poly_int_tree_p (offset0))
-	    {
-	      poly_offset_int tem = wi::sext (wi::to_poly_offset (offset0),
-					      TYPE_PRECISION (sizetype));
-	      tem <<= LOG2_BITS_PER_UNIT;
-	      tem += bitpos0;
-	      if (tem.to_shwi (&bitpos0))
-		offset0 = NULL_TREE;
-	    }
-	}
 
-      base1 = arg1;
-      if (ADDR_EXPR_P (arg1))
-	{
-	  base1
-	    = get_inner_reference (TREE_OPERAND (arg1, 0),
-				   &bitsize, &bitpos1, &offset1, &mode,
-				   &unsignedp, &reversep, &volatilep);
-	  if (TREE_CODE (base1) == INDIRECT_REF)
-	    base1 = TREE_OPERAND (base1, 0);
-	  else
-	    indirect_base1 = true;
-	}
-      else if (TREE_CODE (arg1) == POINTER_PLUS_EXPR)
-	{
-	  base1 = TREE_OPERAND (arg1, 0);
-	  STRIP_SIGN_NOPS (base1);
-	  if (ADDR_EXPR_P (base1))
+	  if (inner1)
 	    {
-	      base1
-		= get_inner_reference (TREE_OPERAND (base1, 0),
-				       &bitsize, &bitpos1, &offset1, &mode,
-				       &unsignedp, &reversep, &volatilep);
-	      if (TREE_CODE (base1) == INDIRECT_REF)
-		base1 = TREE_OPERAND (base1, 0);
-	      else
-		indirect_base1 = true;
-	    }
-	  if (offset1 == NULL_TREE || integer_zerop (offset1))
-	    offset1 = TREE_OPERAND (arg1, 1);
-	  else
-	    offset1 = size_binop (PLUS_EXPR, offset1,
-				  TREE_OPERAND (arg1, 1));
-	  if (poly_int_tree_p (offset1))
-	    {
-	      poly_offset_int tem = wi::sext (wi::to_poly_offset (offset1),
-					      TYPE_PRECISION (sizetype));
-	      tem <<= LOG2_BITS_PER_UNIT;
-	      tem += bitpos1;
-	      if (tem.to_shwi (&bitpos1))
-		offset1 = NULL_TREE;
-	    }
-	}
-
-      /* If we have equivalent bases we might be able to simplify.  */
-      if (indirect_base0 == indirect_base1
-	  && operand_equal_p (base0, base1,
-			      indirect_base0 ? OEP_ADDRESS_OF : 0))
-	{
-	  /* We can fold this expression to a constant if the non-constant
-	     offset parts are equal.  */
-	  if ((offset0 == offset1
-	       || (offset0 && offset1
-		   && operand_equal_p (offset0, offset1, 0)))
-	      && (equality_code
-		  || (indirect_base0
-		      && (DECL_P (base0) || CONSTANT_CLASS_P (base0)))
-		  || TYPE_OVERFLOW_UNDEFINED (TREE_TYPE (arg0))))
-	    {
-	      if (!equality_code
-		  && maybe_ne (bitpos0, bitpos1)
-		  && (pointer_may_wrap_p (base0, offset0, bitpos0)
-		      || pointer_may_wrap_p (base1, offset1, bitpos1)))
-		fold_overflow_warning (("assuming pointer wraparound does not "
-					"occur when comparing P +- C1 with "
-					"P +- C2"),
-				       WARN_STRICT_OVERFLOW_CONDITIONAL);
-
-	      switch (code)
-		{
-		case EQ_EXPR:
-		  if (known_eq (bitpos0, bitpos1))
-		    return constant_boolean_node (true, type);
-		  if (known_ne (bitpos0, bitpos1))
-		    return constant_boolean_node (false, type);
-		  break;
-		case NE_EXPR:
-		  if (known_ne (bitpos0, bitpos1))
-		    return constant_boolean_node (true, type);
-		  if (known_eq (bitpos0, bitpos1))
-		    return constant_boolean_node (false, type);
-		  break;
-		case LT_EXPR:
-		  if (known_lt (bitpos0, bitpos1))
-		    return constant_boolean_node (true, type);
-		  if (known_ge (bitpos0, bitpos1))
-		    return constant_boolean_node (false, type);
-		  break;
-		case LE_EXPR:
-		  if (known_le (bitpos0, bitpos1))
-		    return constant_boolean_node (true, type);
-		  if (known_gt (bitpos0, bitpos1))
-		    return constant_boolean_node (false, type);
-		  break;
-		case GE_EXPR:
-		  if (known_ge (bitpos0, bitpos1))
-		    return constant_boolean_node (true, type);
-		  if (known_lt (bitpos0, bitpos1))
-		    return constant_boolean_node (false, type);
-		  break;
-		case GT_EXPR:
-		  if (known_gt (bitpos0, bitpos1))
-		    return constant_boolean_node (true, type);
-		  if (known_le (bitpos0, bitpos1))
-		    return constant_boolean_node (false, type);
-		  break;
-		default:;
-		}
-	    }
-	  /* We can simplify the comparison to a comparison of the variable
-	     offset parts if the constant offset parts are equal.
-	     Be careful to use signed sizetype here because otherwise we
-	     mess with array offsets in the wrong way.  This is possible
-	     because pointer arithmetic is restricted to retain within an
-	     object and overflow on pointer differences is undefined as of
-	     6.5.6/8 and /9 with respect to the signed ptrdiff_t.  */
-	  else if (known_eq (bitpos0, bitpos1)
-		   && (equality_code
-		       || (indirect_base0
-			   && (DECL_P (base0) || CONSTANT_CLASS_P (base0)))
-		       || TYPE_OVERFLOW_UNDEFINED (TREE_TYPE (arg0))))
-	    {
-	      /* By converting to signed sizetype we cover middle-end pointer
-	         arithmetic which operates on unsigned pointer types of size
-	         type size and ARRAY_REF offsets which are properly sign or
-	         zero extended from their type in case it is narrower than
-	         sizetype.  */
-	      if (offset0 == NULL_TREE)
-		offset0 = build_int_cst (ssizetype, 0);
-	      else
-		offset0 = fold_convert_loc (loc, ssizetype, offset0);
-	      if (offset1 == NULL_TREE)
-		offset1 = build_int_cst (ssizetype, 0);
-	      else
-		offset1 = fold_convert_loc (loc, ssizetype, offset1);
-
-	      if (!equality_code
-		  && (pointer_may_wrap_p (base0, offset0, bitpos0)
-		      || pointer_may_wrap_p (base1, offset1, bitpos1)))
-		fold_overflow_warning (("assuming pointer wraparound does not "
-					"occur when comparing P +- C1 with "
-					"P +- C2"),
-				       WARN_STRICT_OVERFLOW_COMPARISON);
-
-	      return fold_build2_loc (loc, code, type, offset0, offset1);
-	    }
-	}
-      /* For equal offsets we can simplify to a comparison of the
-	 base addresses.  */
-      else if (known_eq (bitpos0, bitpos1)
-	       && (indirect_base0
-		   ? base0 != TREE_OPERAND (arg0, 0) : base0 != arg0)
-	       && (indirect_base1
-		   ? base1 != TREE_OPERAND (arg1, 0) : base1 != arg1)
-	       && ((offset0 == offset1)
-		   || (offset0 && offset1
-		       && operand_equal_p (offset0, offset1, 0))))
-	{
-	  if (indirect_base0)
-	    base0 = build_fold_addr_expr_loc (loc, base0);
-	  if (indirect_base1)
-	    base1 = build_fold_addr_expr_loc (loc, base1);
-	  return fold_build2_loc (loc, code, type, base0, base1);
-	}
-      /* Comparison between an ordinary (non-weak) symbol and a null
-	 pointer can be eliminated since such symbols must have a non
-	 null address.  In C, relational expressions between pointers
-	 to objects and null pointers are undefined.  The results
-	 below follow the C++ rules with the additional property that
-	 every object pointer compares greater than a null pointer.
-      */
-      else if (((DECL_P (base0)
-		 && maybe_nonzero_address (base0) > 0
-		 /* Avoid folding references to struct members at offset 0 to
-		    prevent tests like '&ptr->firstmember == 0' from getting
-		    eliminated.  When ptr is null, although the -> expression
-		    is strictly speaking invalid, GCC retains it as a matter
-		    of QoI.  See PR c/44555. */
-		 && (offset0 == NULL_TREE && known_ne (bitpos0, 0)))
-		|| CONSTANT_CLASS_P (base0))
-	       && indirect_base0
-	       /* The caller guarantees that when one of the arguments is
-		  constant (i.e., null in this case) it is second.  */
-	       && integer_zerop (arg1))
-	{
-	  switch (code)
-	    {
-	    case EQ_EXPR:
-	    case LE_EXPR:
-	    case LT_EXPR:
-	      return constant_boolean_node (false, type);
-	    case GE_EXPR:
-	    case GT_EXPR:
-	    case NE_EXPR:
-	      return constant_boolean_node (true, type);
-	    default:
-	      gcc_unreachable ();
+	      tem = fold_address_value_comparison (loc, code, type,
+						   inner0, inner1,
+						   type0);
+	      if (tem)
+		return tem;
 	    }
 	}
     }
