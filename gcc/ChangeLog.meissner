@@ -1,3 +1,26 @@
+==================== Work092, patch #2
+
+Iterate on getting long double complex multiply and divide working.
+
+2022-06-23   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/rs6000-builtin.cc (rs6000_type_string): The type
+	for __float128 is __float128, not __ieee128.
+	* config/rs6000/rs6000.cc (create_complex_muldiv): Add function
+	back in.
+	(rs6000_init_libfuncs): Move the IEEE 128-bit complex long double
+	multiply and divide support here.  Use the names __multc3_ieee128
+	and __divtc3_ieee128.
+
+libgcc/
+	* config/rs6000/float128-ifunc.c (__multc3_ieee128): Add
+	ifunc support.
+	(__divtc3_ieee128): Likewise.
+	* config/rs6000/quad-float128.h (__multc3_ieee128): Add
+	Declaration.
+	(__divtc3_ieee128): Likewise.
+
 ==================== Work092, patch #1
 
 __float128 and __ibm128 always gets different internal types.
