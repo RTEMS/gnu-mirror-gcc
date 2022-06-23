@@ -1,3 +1,14 @@
+==================== Work092, patch #3
+
+Fix IEEE 128-bit long double Complex multiply and divide tests.
+
+2022-06-23   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/mulkd3-2.c: Update test.
+	* gcc.target/powerpc/divkd3-2.c: Likewise.
+
 ==================== Work092, patch #2
 
 Iterate on getting long double complex multiply and divide working.
