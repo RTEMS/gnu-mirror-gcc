@@ -11034,6 +11034,26 @@ init_float128_ibm (machine_mode mode)
     }
 }
 
+/* Create a decl for either complex long double multiply or complex long double
+   divide when long double is IEEE 128-bit floating point.  We can't use
+   __multc3 and __divtc3 because the original long double using IBM extended
+   double used those names.  The complex multiply/divide functions are encoded
+   as builtin functions with a complex result and 4 scalar inputs.  */
+
+static void
+create_complex_muldiv (const char *name, built_in_function fncode, tree fntype)
+{
+  tree fndecl = add_builtin_function (name, fntype, fncode, BUILT_IN_NORMAL,
+				      name, NULL_TREE);
+
+  set_builtin_decl (fncode, fndecl, true);
+
+  if (TARGET_DEBUG_BUILTIN)
+    fprintf (stderr, "create complex %s, fncode: %d\n", name, (int) fncode);
+
+  return;
+}
+
 /* Set up IEEE 128-bit floating point routines.  Use different names if the
    arguments can be passed in a vector register.  The historical PowerPC
    implementation of IEEE 128-bit floating point used _q_<op> for the names, so
@@ -11148,6 +11168,46 @@ rs6000_init_libfuncs (void)
       /* IEEE 128-bit including 32-bit SVR4 quad floating point routines.  */
       else
 	init_float128_ieee (TFmode);
+    }
+
+  /* Set up to call __mulkc3 and __divkc3 when long double uses the IEEE
+     128-bit encoding.  We cannot use the same name (__mulkc3 or __divkc3 for
+     both IEEE long double and for explicit _Float128/__float128) because
+     c_builtin_function will complain if we create two built-in functions with
+     the same name.  Instead we use an alias name for the case when long double
+     uses the IEEE 128-bit encoding.  Libgcc will create a weak alias reference
+     for this name.
+
+     We need to only execute this once.  If we have clone or target attributes,
+     this will be called a second time.  We need to create the built-in
+     function only once.  */
+  static bool complex_muldiv_init_p = false;
+
+  if (TARGET_FLOAT128_TYPE && TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128
+      && !complex_muldiv_init_p)
+    {
+      complex_muldiv_init_p = true;
+
+      tree fntype = build_function_type_list (complex_long_double_type_node,
+					      long_double_type_node,
+					      long_double_type_node,
+					      long_double_type_node,
+					      long_double_type_node,
+					      NULL_TREE);
+
+      /* Create complex multiply.  */
+      built_in_function mul_fncode =
+	(built_in_function) (BUILT_IN_COMPLEX_MUL_MIN + TCmode
+			     - MIN_MODE_COMPLEX_FLOAT);
+
+      create_complex_muldiv ("__multc3_ieee128", mul_fncode, fntype);
+
+      /* Create complex divide.  */
+      built_in_function div_fncode =
+	(built_in_function) (BUILT_IN_COMPLEX_DIV_MIN + TCmode
+			     - MIN_MODE_COMPLEX_FLOAT);
+
+      create_complex_muldiv ("__divtc3_ieee128", div_fncode, fntype);
     }
 }
 

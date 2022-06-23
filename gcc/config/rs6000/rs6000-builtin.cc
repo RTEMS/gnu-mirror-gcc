@@ -435,7 +435,7 @@ const char *rs6000_type_string (tree type_node)
   else if (type_node == ibm128_float_type_node)
     return "__ibm128";
   else if (type_node == ieee128_float_type_node)
-    return "__ieee128";
+    return "__float128";
   else if (type_node == opaque_V4SI_type_node)
     return "opaque";
   else if (POINTER_TYPE_P (type_node))
