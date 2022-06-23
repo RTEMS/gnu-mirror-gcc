@@ -14,4 +14,4 @@ divide (cld_t *p, cld_t *q, cld_t *r)
   *p = *q / *r;
 }
 
-/* { dg-final { scan-assembler "bl __divkc3" } } */
+/* { dg-final { scan-assembler "bl __divtc3_ieee128" } } */
