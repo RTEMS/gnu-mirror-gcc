@@ -99,9 +99,12 @@ cleanup_auto_inc_dec (rtx src, machine_mode mem_mode ATTRIBUTE_UNUSED)
 	poly_int64 offset = GET_MODE_SIZE (mem_mode);
 	if (code == PRE_DEC)
 	  offset = -offset;
-	return gen_rtx_PLUS (GET_MODE (x),
-			     cleanup_auto_inc_dec (XEXP (x, 0), mem_mode),
-			     gen_int_mode (offset, GET_MODE (x)));
+
+	const auto sa = as_a <scalar_addr_mode> (GET_MODE (x));
+	return gen_raw_pointer_plus (sa,
+				     cleanup_auto_inc_dec (XEXP (x, 0),
+							   mem_mode),
+				     gen_int_mode (offset, offset_mode (sa)));
       }
 
     case POST_INC:
