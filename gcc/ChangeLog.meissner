@@ -1,3 +1,18 @@
+==================== Work092, patch #4
+
+Add __float128 to __ibm128 conversations.
+
+In the past, GCC used the long double type for __ibm128 if long double
+used the IBM 128-bit encoding.  Now that we always use a separate internal
+type for __ibm128, it exposed that some conversions were missing.
+
+2022-06-24   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.md (extendkfif2): New insn.
+	(trunckfif2): Likewise.
+
 ==================== Work092, patch #3
 
 Fix IEEE 128-bit long double Complex multiply and divide tests.
