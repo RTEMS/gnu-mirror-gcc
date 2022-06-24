@@ -113,7 +113,7 @@ g (){
 
     local found=false
     cat $inp \
-	| egrep $color -- "$arg" \
+	| grep -E $color -- "$arg" \
 	> "$tmp" && found=true
 
     if $found; then
@@ -130,8 +130,8 @@ ag (){
 
     local found=false
     cat $inp \
-	| egrep $color -- "$arg1" \
-	| egrep $color -- "$arg2" \
+	| grep -E $color -- "$arg1" \
+	| grep -E $color -- "$arg2" \
 	> "$tmp" && found=true
 
     if $found; then
@@ -148,8 +148,8 @@ vg (){
 
     local found=false
     cat $inp \
-	| egrep -v -- "$varg" \
-	| egrep $color -- "$arg" \
+	| grep -E -v -- "$varg" \
+	| grep -E $color -- "$arg" \
 	> "$tmp" && found=true
 
     if $found; then

@@ -54,6 +54,17 @@ if test -z "$AWK" ; then
   done
 fi
 
+# Prefer "grep -E" which should work with POSIX-conform grep, but fallback
+# to "egrep" (which is deprecated for a long time) if grep does not support
+# -E.
+if test -z "$EGREP" ; then
+  if echo a | grep -E '(a|b)' > /dev/null 2> /dev/null; then
+    EGREP="grep -E"
+  else
+    EGREP="egrep"
+  fi
+fi
+
 : ${filesuffix=}; export filesuffix
 : ${move=true}; export move
 : ${forcemail=false}; export forcemail
@@ -77,7 +88,7 @@ for file in $files; do
     { $anychange ||
       anychange=`diff $file.sent $file 2>/dev/null |
 	if test ! -f $file.sent ||
-	   egrep '^[<>] (XPASS|FAIL)' >/dev/null; then
+	   $EGREP '^[<>] (XPASS|FAIL)' >/dev/null; then
 	    echo true
 	else
 	    echo false

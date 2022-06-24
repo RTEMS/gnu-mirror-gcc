@@ -57,7 +57,7 @@ subdirectoryFilter()
   else
     if test "$filter" = nosub ; then
       # Omit all subdirectories.
-      egrep -v '/gcc/(ch|cp|f|fortran|ada|intl|fixinc)/'
+      $EGREP -v '/gcc/(ch|cp|f|fortran|ada|intl|fixinc)/'
     else
       # Pass through only subdir $filter.
       grep "/gcc/$filter/"
@@ -153,6 +153,17 @@ if test -z "$AWK" ; then
       break
     fi
   done
+fi
+
+# Prefer "grep -E" which should work with POSIX-conform grep, but fallback
+# to "egrep" (which is deprecated for a long time) if grep does not support
+# -E.
+if test -z "$EGREP" ; then
+  if echo a | grep -E '(a|b)' > /dev/null 2> /dev/null; then
+    EGREP="grep -E"
+  else
+    EGREP="egrep"
+  fi
 fi
 
 # Parse command line arguments.
