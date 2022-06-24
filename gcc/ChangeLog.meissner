@@ -1,3 +1,16 @@
+==================== Work092, patch #5
+
+Remove code that depends on __float128 or __ibm128 using the long double type.
+
+2022-06-24   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_expand_builtin): Remove
+	code that assumed __float128 and __ibm128 used the long double
+	type if long double uses 128-bit IEEE or IBM encodings
+	respectively.
+
 ==================== Work092, patch #4
 
 Add __float128 to __ibm128 conversations.
