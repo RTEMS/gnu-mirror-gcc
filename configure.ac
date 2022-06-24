@@ -88,6 +88,7 @@ ACX_PROG_LN
 AC_PROG_LN_S
 AC_PROG_SED
 AC_PROG_AWK
+AC_PROG_EGREP
 
 srcpwd=`cd ${srcdir} ; ${PWDCMD-pwd}`
 
@@ -2634,7 +2635,7 @@ if test x${use_gnu_as} = x &&
 fi
 
 if test x${use_gnu_ld} = x &&
-   echo " ${configdirs} " | egrep " (go)?ld " > /dev/null 2>&1 ; then
+   echo " ${configdirs} " | $EGREP " (go)?ld " > /dev/null 2>&1 ; then
   with_gnu_ld=yes
   extra_host_args="$extra_host_args --with-gnu-ld"
 fi
@@ -3549,7 +3550,7 @@ changequote(,)
     # For an installed makeinfo, we require it to be from texinfo 4.7 or
     # higher, else we use the "missing" dummy.
     if ${MAKEINFO} --version \
-       | egrep 'texinfo[^0-9]*(4\.([7-9]|[1-9][0-9])|[5-9]|[1-9][0-9])' >/dev/null 2>&1; then
+       | $EGREP 'texinfo[^0-9]*(4\.([7-9]|[1-9][0-9])|[5-9]|[1-9][0-9])' >/dev/null 2>&1; then
       :
     else
       MAKEINFO="$MISSING makeinfo"

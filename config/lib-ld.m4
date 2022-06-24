@@ -14,7 +14,8 @@ dnl From libtool-1.4. Sets the variable with_gnu_ld to yes or no.
 AC_DEFUN([AC_LIB_PROG_LD_GNU],
 [AC_CACHE_CHECK([if the linker ($LD) is GNU ld], acl_cv_prog_gnu_ld,
 [# I'd rather use --version here, but apparently some GNU ld's only accept -v.
-if $LD -v 2>&1 </dev/null | egrep '(GNU|with BFD)' 1>&5; then
+AC_REQUIRE([AC_PROG_EGREP])dnl
+if $LD -v 2>&1 </dev/null | $EGREP '(GNU|with BFD)' 1>&5; then
   acl_cv_prog_gnu_ld=yes
 else
   acl_cv_prog_gnu_ld=no
@@ -28,6 +29,7 @@ AC_DEFUN([AC_LIB_PROG_LD],
 [  --with-gnu-ld           assume the C compiler uses GNU ld [default=no]],
 test "$withval" = no || with_gnu_ld=yes, with_gnu_ld=no)
 AC_REQUIRE([AC_PROG_CC])dnl
+AC_REQUIRE([AC_PROG_EGREP])dnl
 AC_REQUIRE([AC_CANONICAL_HOST])dnl
 # Prepare PATH_SEPARATOR.
 # The user is always right.
@@ -88,7 +90,7 @@ AC_CACHE_VAL(acl_cv_path_LD,
       # Check to see if the program is GNU ld.  I'd rather use --version,
       # but apparently some GNU ld's only accept -v.
       # Break only if it was the GNU/non-GNU ld that we prefer.
-      if "$acl_cv_path_LD" -v 2>&1 < /dev/null | egrep '(GNU|with BFD)' > /dev/null; then
+      if "$acl_cv_path_LD" -v 2>&1 < /dev/null | $EGREP '(GNU|with BFD)' > /dev/null; then
 	test "$with_gnu_ld" != no && break
       else
 	test "$with_gnu_ld" != yes && break
