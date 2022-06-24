@@ -3274,7 +3274,7 @@ fix = {
      *  If we do, we will replace the one in math.h with that one.
      */
 
-    "\tdbl_max_def=`egrep 'define[ \t]+DBL_MAX[ \t]+.*' float.h "
+    "\tdbl_max_def=`grep 'define[ \t][ \t]*DBL_MAX[ \t][ \t]*.*' float.h "
                    "| sed 's/.*DBL_MAX[ \t]*//' 2>/dev/null`\n\n"
 
     "\tif ( test -n \"${dbl_max_def}\" ) > /dev/null 2>&1\n"
@@ -5266,8 +5266,8 @@ fix = {
     hackname = vxworks_needs_vxworks;
     files    = sys/stat.h;
     test     = " -r types/vxTypesOld.h";
-    test     = " -n \"`egrep '#include' $file`\"";
-    test     = " -n \"`egrep ULONG $file`\"";
+    test     = " -n \"`grep '#include' $file`\"";
+    test     = " -n \"`grep ULONG $file`\"";
     select   = "#[ \t]define[ \t]+__INCstath";
 
     sed = "/#[ \t]define[ \t][ \t]*__INCstath/a\\\n"

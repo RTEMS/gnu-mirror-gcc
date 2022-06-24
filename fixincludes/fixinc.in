@@ -448,7 +448,7 @@ while [ $# != 0 ]; do
         chmod a+r $3 2>/dev/null
         if test $VERBOSE -gt 2
         then echo Copied $2 ; fi
-        for include in `egrep '^[ 	]*#[ 	]*include[ 	]*"[^/]' $3 |
+        for include in `grep '^[ 	]*#[ 	]*include[ 	]*"[^/]' $3 |
              sed -e 's/^[ 	]*#[ 	]*include[ 	]*"\([^"]*\)".*$/\1/'`
         do
 	  dir=`echo $2 | sed -e s'|/[^/]*$||'`

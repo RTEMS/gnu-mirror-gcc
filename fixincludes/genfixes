@@ -58,7 +58,7 @@ done
 AG="autogen $AG"
 set -e
 
-if [ -z "`${AG} -v | fgrep ' 5.'`" ]
+if [ -z "`${AG} -v | grep ' 5\.'`" ]
 then
   echo "AutoGen appears to be out of date or not correctly installed."
   echo "Please download and install from:"
