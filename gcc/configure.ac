@@ -1219,6 +1219,7 @@ case ${AWK} in
   "") AC_MSG_ERROR([can't build without awk, bailing out]) ;;
 esac
 
+AC_PROG_EGREP
 gcc_AC_PROG_LN_S
 ACX_PROG_LN($LN_S)
 AC_PROG_RANLIB

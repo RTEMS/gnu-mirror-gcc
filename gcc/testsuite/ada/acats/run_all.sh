@@ -53,6 +53,12 @@ if [ "$dir" = "$testdir" ]; then
   exit 1
 fi
 
+if [ -z "$EGREP" ]; then
+  # Set a default suitable for all "modern" system in case this script is
+  # not invoked by GCC building system.
+  EGREP="grep -E"
+fi
+
 GCC="$BASE/xgcc -B$BASE/"
 
 target_gnatchop () {
@@ -367,7 +373,7 @@ for chapter in $chapters; do
       target_run $dir/tests/$chapter/$i/$binmain > $dir/tests/$chapter/$i/${i}.log 2>&1
       cd $dir/tests/$chapter/$i
       cat ${i}.log >> $dir/acats.log
-      egrep -e '(==== |\+\+\+\+ |\!\!\!\! )' ${i}.log > /dev/null 2>&1
+      $EGREP -e '(==== |\+\+\+\+ |\!\!\!\! )' ${i}.log > /dev/null 2>&1
       if [ $? -ne 0 ]; then
          grep 'tasking not implemented' ${i}.log > /dev/null 2>&1
 

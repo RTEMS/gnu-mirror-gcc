@@ -1050,7 +1050,8 @@ check-acats:
 	  rm -rf $(ACATSDIR)-parallel; \
 	  mkdir $(ACATSDIR)-parallel; \
 	  ( testdir=`cd ${srcdir}/${ACATSDIR} && ${PWD_COMMAND}`; \
-	    export testdir; \
+	    EGREP="$EGREP"; \
+	    export testdir EGREP; \
 	    cd $(ACATSDIR) && $(SHELL) $${testdir}/$(ACATSCMD) NONE ) \
 	    || exit 1; \
 	  GCC_RUNTEST_PARALLELIZE_DIR=$$rootme/$(ACATSDIR)-parallel; \
