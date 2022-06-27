@@ -1,3 +1,20 @@
+==================== Work092, patch #6
+
+Allow __ibm128 on systems that support 128-bit long double.
+
+2022-06-27   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (init_float128_ibm): Allow -msoft-float
+	with __ibm128.
+	(rs6000_scalar_mode_supported_p): Allow __ibm128 on systems that
+	support 128-bit long double.
+	* config/rs6000/rs6000.h (FLOAT128_IBM_P): Allow -msoft-float with
+	__ibm128.
+	* config/rs6000/rs6000.md (unpack<mode>_dm): Likewise.
+	(unpack<mode>_nodm): Likewise.
+
 ==================== Work092, patch #5
 
 Remove code that depends on __float128 or __ibm128 using the long double type.
