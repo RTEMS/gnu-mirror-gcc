@@ -2902,11 +2902,11 @@
   fpmath double __builtin_truncf128_round_to_odd_kf (_Float128);
     TRUNCF128_ODD_KF trunckfdf2_odd {}
 
-  const signed long long __builtin_vsx_scalar_extract_expq (_Float128);
-    VSEEQP xsxexpqp_kf {}
+  const signed long long __builtin_vsx_scalar_extract_expq_kf (_Float128);
+    VSEEQP_KF xsxexpqp_kf {}
 
-  const signed __int128 __builtin_vsx_scalar_extract_sigq (_Float128);
-    VSESQP xsxsigqp_kf {}
+  const signed __int128 __builtin_vsx_scalar_extract_sigq_kf (_Float128);
+    VSESQP_KF xsxsigqp_kf {}
 
   const _Float128 __builtin_vsx_scalar_insert_exp_q (unsigned __int128, \
                                                      unsigned long long);
@@ -2950,6 +2950,12 @@
 
   fpmath double __builtin_truncf128_round_to_odd_tf (long double);
     TRUNCF128_ODD_TF trunctfdf2_odd {ieeeld}
+
+  const signed long long __builtin_vsx_scalar_extract_expq_tf (_Float128);
+    VSEEQP_TF xsxexpqp_tf {}
+
+  const signed __int128 __builtin_vsx_scalar_extract_sigq_tf (_Float128);
+    VSESQP_TF xsxsigqp_tf {}
 
   const signed int __builtin_vsx_scalar_test_data_class_qp_tf (long double, \
 							       const int<7>);
