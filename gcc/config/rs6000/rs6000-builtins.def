@@ -2916,12 +2916,12 @@
                                                       unsigned long long);
     VSIEQPF xsiexpqpf_kf {}
 
-  const signed int __builtin_vsx_scalar_test_data_class_qp (_Float128, \
-                                                            const int<7>);
-    VSTDCQP xststdcqp_kf {}
+  const signed int __builtin_vsx_scalar_test_data_class_qp_kf (_Float128, \
+							       const int<7>);
+    VSTDCQP_KF xststdcqp_kf {}
 
-  const signed int __builtin_vsx_scalar_test_neg_qp (_Float128);
-    VSTDCNQP xststdcnegqp_kf {}
+  const signed int __builtin_vsx_scalar_test_neg_qp_kf (_Float128);
+    VSTDCNQP_KF xststdcnegqp_kf {}
 
 ; Builtins requiring hardware support for IEEE-128 floating-point.  Long double
 ; must use the IEEE 128-bit encoding.
@@ -2951,6 +2951,12 @@
   fpmath double __builtin_truncf128_round_to_odd_tf (long double);
     TRUNCF128_ODD_TF trunctfdf2_odd {ieeeld}
 
+  const signed int __builtin_vsx_scalar_test_data_class_qp_tf (long double, \
+							       const int<7>);
+    VSTDCQP_TF xststdcqp_tf {}
+
+  const signed int __builtin_vsx_scalar_test_neg_qp (_Float128);
+    VSTDCNQP_TF xststdcnegqp_tf {}
 
 
 ; Decimal floating-point builtins.
