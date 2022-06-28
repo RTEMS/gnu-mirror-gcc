@@ -1,3 +1,29 @@
+==================== Work092, patch #8
+
+Use overloading for ODD KF/TF functions.
+
+2022-06-28   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_invalid_builtin): Add
+	support for ieee128-hw-ld.
+	(rs6000_builtin_is_supported): Likewise.
+	(rs6000_init_builtins): Fix comment from previous change.  Add
+	support of ieee128-hd-ld.
+	(rs6000_expand_builtin): Add support for ieee128-hw-ld.
+	* config/rs6000/rs6000-builtins.def (IEEE 128-bit odd builtins):
+	Move the IEEE 128-bit odd builtins to being overloaded.
+	* config/rs6000/rs6000-gen-builtins.cc (bif_stanza): Add
+	stanza for IEEE 128-bit floating point where long double is IEEE
+	128-bit.
+	(stanza_map): Likewise.
+	(enable_string): Likewise.
+	(write_decls): Likewise.
+	* config/rs6000/rs6000-overload.def (IEEE 128-bit odd builtins):
+	Add the various IEEE 128-bit odd built-in functions for both
+	KFmode and TFmode.
+
 ==================== Work092, patch #7
 
 Only change IEEE 128-bit built-ins if passed IEEE 128-bit long double.
