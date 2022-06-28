@@ -139,6 +139,7 @@
 ;   endian   Needs special handling for endianness
 ;   ibmld    Restrict usage to the case when TFmode is IBM-128
 ;   ibm128   Restrict usage to the case where __ibm128 is supported or if ibmld
+;   ieeeld   Restrict usage to the case when TFmode is IEEE-128
 ;
 ; Each attribute corresponds to extra processing required when
 ; the built-in is expanded.  All such special processing should
@@ -2926,29 +2927,29 @@
 ; must use the IEEE 128-bit encoding.
 [ieee128-hw-ld]
   fpmath long double __builtin_addf128_round_to_odd_tf (long double, long double);
-    ADDF128_ODD_TF addtf3_odd {}
+    ADDF128_ODD_TF addtf3_odd {ieeeld}
 
   fpmath long double __builtin_divf128_round_to_odd_tf (long double,long double);
-    DIVF128_ODD_TF divtf3_odd {}
+    DIVF128_ODD_TF divtf3_odd {ieeeld}
 
   fpmath long double __builtin_fmaf128_round_to_odd_tf (long double, \
 							long double, \
 							long double);
-    FMAF128_ODD_TF fmatf4_odd {}
+    FMAF128_ODD_TF fmatf4_odd {ieeeld}
 
   fpmath long double __builtin_mulf128_round_to_odd_tf (long double, \
 							long double);
-    MULF128_ODD_TF multf3_odd {}
+    MULF128_ODD_TF multf3_odd {ieeeld}
 
   fpmath long double __builtin_sqrtf128_round_to_odd_tf (long double);
-    SQRTF128_ODD_TF sqrttf2_odd {}
+    SQRTF128_ODD_TF sqrttf2_odd {ieeeld}
 
   fpmath long double __builtin_subf128_round_to_odd_tf (long double, \
 							long double);
-    SUBF128_ODD_TF subtf3_odd {}
+    SUBF128_ODD_TF subtf3_odd {ieeeld}
 
   fpmath double __builtin_truncf128_round_to_odd_tf (long double);
-    TRUNCF128_ODD_TF trunctfdf2_odd {}
+    TRUNCF128_ODD_TF trunctfdf2_odd {ieeeld}
 
 
 

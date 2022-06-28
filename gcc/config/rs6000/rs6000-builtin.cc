@@ -3421,6 +3421,13 @@ rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
       return const0_rtx;
     }
 
+  if (bif_is_ieeeld (*bifaddr) && !FLOAT128_IEEE_P (TFmode))
+    {
+      error ("%qs requires %<long double%> to be IEEE 128-bit format",
+	     bifaddr->bifname);
+      return const0_rtx;
+    }
+
   if (bif_is_cpu (*bifaddr))
     return cpu_expand_builtin (fcode, exp, target);
 
