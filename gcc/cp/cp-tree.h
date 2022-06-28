@@ -5565,6 +5565,7 @@ enum tsubst_flags {
 				    constraint normalization.  */
   tf_tst_ok = 1 << 12,		 /* Allow a typename-specifier to name
 				    a template (C++17 or later).  */
+  tf_dguide = 1 << 13,		/* Building a deduction guide from a ctor.  */
   /* Convenient substitution flags combinations.  */
   tf_warning_or_error = tf_warning | tf_error
 };
@@ -6884,6 +6885,7 @@ extern void initialize_artificial_var		(tree, vec<constructor_elt, va_gc> *);
 extern tree check_var_type			(tree, tree, location_t);
 extern tree reshape_init                        (tree, tree, tsubst_flags_t);
 extern tree next_initializable_field (tree);
+extern tree next_subobject_field		(tree);
 extern tree first_field				(const_tree);
 extern tree fndecl_declared_return_type		(tree);
 extern bool undeduced_auto_decl			(tree);
@@ -7412,6 +7414,7 @@ extern bool push_tinst_level_loc                (tree, location_t);
 extern bool push_tinst_level_loc                (tree, tree, location_t);
 extern void pop_tinst_level                     (void);
 extern struct tinst_level *outermost_tinst_level(void);
+extern bool non_templated_friend_p		(tree);
 extern void init_template_processing		(void);
 extern void print_template_statistics		(void);
 bool template_template_parameter_p		(const_tree);
