@@ -1,3 +1,18 @@
+==================== Work092, patch #13
+
+Fix typos.
+
+2022-06-28   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def
+	(__builtin_vsx_scalar_extract_expq_tf): Fix argument to be long
+	double, add ieeeld condition.
+	(__builtin_vsx_scalar_extract_sigq_tf): Likewise.
+	(__builtin_vsx_scalar_test_data_class_qp_tf): Add ieeeld condition.
+	(__builtin_vsx_scalar_test_neg_qp): Likewise.
+
 ==================== Work092, patch #12
 
 Make float128 extract builtins overloaded.
