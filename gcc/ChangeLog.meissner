@@ -1,3 +1,24 @@
+==================== Work092, patch #10
+
+Make float128 test builtin's overloaded.
+
+2022-06-28   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def
+	(__builtin_vsx_scalar_test_data_class_qp_kf): Make rename builtin
+	to add _kf suffix.
+	(__builtin_vsx_scalar_test_neg_qp_kf): Likewise.
+	(__builtin_vsx_scalar_test_data_class_qp_tf): New builtin for IEEE
+	128-bit long double.
+	(__builtin_vsx_scalar_test_neg_qp_tf): Likewise.
+	* config/rs6000/rs6000-overload.def
+	(__builtin_vec_scalar_test_data_class): Add KF/TF overloads.
+	(__builtin_vec_scalar_test_neg): Likewise.
+	(__builtin_vec_scalar_test_neg_qp): Likewise.
+	(__builtin_vec_scalar_test_data_class_qp): Likewise.
+
 ==================== Work092, patch #9
 
 Add builtin ieeeld for long double is IEEE 128-bit.
