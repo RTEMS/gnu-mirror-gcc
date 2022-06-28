@@ -123,6 +123,10 @@ rs6000_invalid_builtin (enum rs6000_gen_builtins fncode)
     case ENB_IEEE128_HW:
       error ("%qs requires quad-precision floating-point arithmetic", name);
       break;
+    case ENB_IEEE128_HW_LD:
+      error ("%qs requires %qs to use IEEE quad-precision floating-point "
+	     "arithmetic", name, "long double");
+      break;
     case ENB_DFP:
       error ("%qs requires the %qs option", name, "-mhard-dfp");
       break;
@@ -189,6 +193,8 @@ rs6000_builtin_is_supported (enum rs6000_gen_builtins fncode)
       return TARGET_ALTIVEC && rs6000_cpu == PROCESSOR_CELL;
     case ENB_IEEE128_HW:
       return TARGET_FLOAT128_HW;
+    case ENB_IEEE128_HW_LD:
+      return TARGET_FLOAT128_HW && FLOAT128_IEEE_P (TFmode);
     case ENB_DFP:
       return TARGET_DFP;
     case ENB_CRYPTO:
@@ -710,9 +716,7 @@ rs6000_init_builtins (void)
      Always create __ibm128 as a separate type, even if the current long double
      format is IBM extended double.
 
-     For IEEE 128-bit floating point, always create the type __ieee128.  If the
-     user used -mfloat128, rs6000-c.cc will create a define from __float128 to
-     __ieee128.  */
+     For IEEE 128-bit floating point, always create the type __float128.  */
   if (TARGET_LONG_DOUBLE_128 || TARGET_FLOAT128_TYPE)
     {
       ibm128_float_type_node = make_node (REAL_TYPE);
@@ -846,6 +850,9 @@ rs6000_init_builtins (void)
 	  if (e == ENB_P9V && !TARGET_P9_VECTOR)
 	    continue;
 	  if (e == ENB_IEEE128_HW && !TARGET_FLOAT128_HW)
+	    continue;
+	  if (e == ENB_IEEE128_HW_LD && (!TARGET_FLOAT128_HW
+					 || !FLOAT128_IEEE_P (TFmode)))
 	    continue;
 	  if (e == ENB_DFP && !TARGET_DFP)
 	    continue;
@@ -3373,6 +3380,8 @@ rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
 	|| (e == ENB_P9_64 && TARGET_MODULO && TARGET_POWERPC64)
 	|| (e == ENB_P9V && TARGET_P9_VECTOR)
 	|| (e == ENB_IEEE128_HW && TARGET_FLOAT128_HW)
+	|| (e == ENB_IEEE128_HW_LD && TARGET_FLOAT128_HW
+	    && FLOAT128_IEEE_P (TFmode))
 	|| (e == ENB_DFP && TARGET_DFP)
 	|| (e == ENB_CRYPTO && TARGET_CRYPTO)
 	|| (e == ENB_HTM && TARGET_HTM)

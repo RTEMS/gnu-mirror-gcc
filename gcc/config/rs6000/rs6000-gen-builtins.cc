@@ -227,6 +227,7 @@ enum bif_stanza
  BSTZ_P9_64,
  BSTZ_P9V,
  BSTZ_IEEE128_HW,
+ BSTZ_IEEE128_HW_LD,
  BSTZ_DFP,
  BSTZ_CRYPTO,
  BSTZ_HTM,
@@ -261,6 +262,7 @@ static stanza_entry stanza_map[NUMBIFSTANZAS] =
     { "power9-64",	BSTZ_P9_64	},
     { "power9-vector",	BSTZ_P9V	},
     { "ieee128-hw",	BSTZ_IEEE128_HW	},
+    { "ieee128-hw-ld",	BSTZ_IEEE128_HW_LD },
     { "dfp",		BSTZ_DFP	},
     { "crypto",		BSTZ_CRYPTO	},
     { "htm",		BSTZ_HTM	},
@@ -286,6 +288,7 @@ static const char *enable_string[NUMBIFSTANZAS] =
     "ENB_P9_64",
     "ENB_P9V",
     "ENB_IEEE128_HW",
+    "ENB_IEEE128_HW_LD",
     "ENB_DFP",
     "ENB_CRYPTO",
     "ENB_HTM",
@@ -2252,6 +2255,7 @@ write_decls (void)
   fprintf (header_file, "  ENB_P9_64,\n");
   fprintf (header_file, "  ENB_P9V,\n");
   fprintf (header_file, "  ENB_IEEE128_HW,\n");
+  fprintf (header_file, "  ENB_IEEE128_HW_LD,\n");
   fprintf (header_file, "  ENB_DFP,\n");
   fprintf (header_file, "  ENB_CRYPTO,\n");
   fprintf (header_file, "  ENB_HTM,\n");
