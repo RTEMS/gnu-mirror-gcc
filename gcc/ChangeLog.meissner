@@ -1,3 +1,27 @@
+==================== Work092, patch #9
+
+Add builtin ieeeld for long double is IEEE 128-bit.
+
+2022-06-28   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_expand_builtin): Add
+	check for ieeeld.
+	* config/rs6000/rs6000-builtins.def (ieeeld): New attribute.
+	(__builtin_addf128_round_to_odd_tf): Add ieeeld.
+	(__builtin_divf128_round_to_odd_tf): Likewise.
+	(__builtin_fmaf128_round_to_odd_tf): Likewise.
+	(__builtin_mulf128_round_to_odd_tf): Likewise.
+	(__builtin_sqrtf128_round_to_odd_tf): Likewise.
+	(__builtin_subf128_round_to_odd_tf): Likewise.
+	(__builtin_truncf128_round_to_odd_tf): Likewise.
+	* config/rs6000/rs6000-gen-builtins.c (ieeeld): New attribute.
+	(struct attrinfo): Add ieeeld.
+	(parse_bif_attrs): Likewise.
+	(write_decls): Likewise.
+	(write_bif_static_init): Likewise.
+
 ==================== Work092, patch #8
 
 Use overloading for ODD KF/TF functions.
