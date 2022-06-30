@@ -3336,6 +3336,18 @@ rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
       case CODE_FOR_xststdcqp_kf:
 	icode = CODE_FOR_xststdcqp_tf;
 	break;
+      case CODE_FOR_xscmpexpqp_eq_kf:
+	icode = CODE_FOR_xscmpexpqp_eq_tf;
+	break;
+      case CODE_FOR_xscmpexpqp_lt_kf:
+	icode = CODE_FOR_xscmpexpqp_lt_tf;
+	break;
+      case CODE_FOR_xscmpexpqp_gt_kf:
+	icode = CODE_FOR_xscmpexpqp_gt_tf;
+	break;
+      case CODE_FOR_xscmpexpqp_unordered_kf:
+	icode = CODE_FOR_xscmpexpqp_unordered_tf;
+	break;
       default:
 	break;
       }
