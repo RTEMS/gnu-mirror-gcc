@@ -1,3 +1,20 @@
+==================== work093, patch #1
+
+Change __ieee128 to __float128.
+
+2022-06-29   Michael Meissner  <meissner@linux.ibm.com>
+
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_init_builtins): Make the
+	IEEE 128-bit keyword "__float128", not "__ieee128".
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
+	__ieee128 to be __float128 instead of defining __float128 to be
+	__ieee128.
+
+==================== work093, create branch
+
 2022-06-29   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
