@@ -710,9 +710,7 @@ rs6000_init_builtins (void)
      Always create __ibm128 as a separate type, even if the current long double
      format is IBM extended double.
 
-     For IEEE 128-bit floating point, always create the type __ieee128.  If the
-     user used -mfloat128, rs6000-c.cc will create a define from __float128 to
-     __ieee128.  */
+     For IEEE 128-bit floating point, always create the type __float128.  */
   if (TARGET_LONG_DOUBLE_128 && (!TARGET_IEEEQUAD || TARGET_FLOAT128_TYPE))
     {
       if (!TARGET_IEEEQUAD)
@@ -739,7 +737,7 @@ rs6000_init_builtins (void)
 	ieee128_float_type_node = float128_type_node;
       t = build_qualified_type (ieee128_float_type_node, TYPE_QUAL_CONST);
       lang_hooks.types.register_builtin_type (ieee128_float_type_node,
-					      "__ieee128");
+					      "__float128");
     }
   else
     ieee128_float_type_node = NULL_TREE;

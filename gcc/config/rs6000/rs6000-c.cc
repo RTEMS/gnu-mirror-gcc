@@ -578,13 +578,17 @@ rs6000_target_modify_macros (bool define_p, HOST_WIDE_INT flags,
      2. If TARGET_ALTIVEC is turned off.  */
   if ((flags & OPTION_MASK_CRYPTO) != 0)
     rs6000_define_or_undefine_macro (define_p, "__CRYPTO__");
+  /* In GCC 12 and before, we defined the actual IEEE keyword as __ieee128.
+     This was due some issues in the GCC 8 time frame, where __float128 support
+     was being worked on.  In GCC 13, we change the keyword to __float128, and
+     add a macro for backwards compatibility for __ieee128.  */
   if ((flags & OPTION_MASK_FLOAT128_KEYWORD) != 0)
     {
       rs6000_define_or_undefine_macro (define_p, "__FLOAT128__");
       if (define_p)
-	rs6000_define_or_undefine_macro (true, "__float128=__ieee128");
+	rs6000_define_or_undefine_macro (true, "__ieee128=__float128");
       else
-	rs6000_define_or_undefine_macro (false, "__float128");
+	rs6000_define_or_undefine_macro (false, "__ieee128");
       if (ieee128_float_type_node && define_p)
 	rs6000_define_or_undefine_macro (true, "__SIZEOF_FLOAT128__=16");
       else
