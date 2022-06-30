@@ -6,10 +6,6 @@ Overload IEEE 128-bit extract and insert support.
 
 gcc/
 
-	* config/rs6000/rs6000-builtin.cc (rs6000_expand_builtin): Remove
-	converting KFmode IEEE insert and extract built-in functions to
-	TFmode insert and extract built-in functions when long double is
-	IEEE 128-bit.
 	* config/rs6000/rs6000-builtins.def
 	(__builtin_vsx_scalar_extract_expq_kf): Rename KFmode IEEE 128-bit
 	insert and extract built-in functions to have a KF suffix to allow
