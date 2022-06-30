@@ -3318,27 +3318,6 @@ rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
   if (FLOAT128_IEEE_P (TFmode))
     switch (icode)
       {
-      case CODE_FOR_sqrtkf2_odd:
-	icode = CODE_FOR_sqrttf2_odd;
-	break;
-      case CODE_FOR_trunckfdf2_odd:
-	icode = CODE_FOR_trunctfdf2_odd;
-	break;
-      case CODE_FOR_addkf3_odd:
-	icode = CODE_FOR_addtf3_odd;
-	break;
-      case CODE_FOR_subkf3_odd:
-	icode = CODE_FOR_subtf3_odd;
-	break;
-      case CODE_FOR_mulkf3_odd:
-	icode = CODE_FOR_multf3_odd;
-	break;
-      case CODE_FOR_divkf3_odd:
-	icode = CODE_FOR_divtf3_odd;
-	break;
-      case CODE_FOR_fmakf4_odd:
-	icode = CODE_FOR_fmatf4_odd;
-	break;
       case CODE_FOR_xsxexpqp_kf:
 	icode = CODE_FOR_xsxexpqp_tf;
 	break;
