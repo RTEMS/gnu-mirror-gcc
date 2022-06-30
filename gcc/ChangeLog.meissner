@@ -1,3 +1,40 @@
+==================== work093, patch #3
+
+Make _round_to_odd functions overloaded.
+
+2022-06-30   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_expand_builtin): Remove
+	converting KFmode round to odd built-in functions to TFmode round
+	to odd built-in functions when long double is IEEE 128-bit.
+	* config/rs6000/rs6000-builtins.def
+	(__builtin_addf128_round_to_odd_kf): Rename KFmode round to odd
+	built-in functions with a KF suffix to allow overloading.
+	(__builtin_divf128_round_to_odd_kf): Likewise.
+	(__builtin_fmaf128_round_to_odd_kf): Likewise.
+	(__builtin_mulf128_round_to_odd_kf): Likewise.
+	(__builtin_sqrtf128_round_to_odd_kf): Likewise.
+	(__builtin_subf128_round_to_odd_kf): Likewise.
+	(__builtin_truncf128_round_to_odd_kf): Likewise.
+	(__builtin_addf128_round_to_odd_tf): Add TFmode round to odd
+	built-in functions.
+	(__builtin_fmaf128_round_to_odd_tf): Likewise.
+	(__builtin_mulf128_round_to_odd_tf): Likewise.
+	(__builtin_sqrtf128_round_to_odd_tf): Likewise.
+	(__builtin_subf128_round_to_odd_tf): Likewise.
+	(__builtin_truncf128_round_to_odd_tf): Likewise.
+	* config/rs6000/rs6000-overload.def
+	(__builtin_addf128_round_to_odd): Make round to odd built-in
+	functions overloaded.
+	(__builtin_divf128_round_to_odd): Likewise.
+	(__builtin_fmaf128_round_to_odd): Likewise.
+	(__builtin_mulf128_round_to_odd): Likewise.
+	(__builtin_sqrtf128_round_to_odd): Likewise.
+	(__builtin_subf128_round_to_odd): Likewise.
+	(__builtin_truncf128_round_to_odd): Likewise.
+
 ==================== work093, patch #2
 
 Add support to built-ins for long double using IEEE 128-bit.
