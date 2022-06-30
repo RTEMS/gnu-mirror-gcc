@@ -1,3 +1,32 @@
+==================== work093, patch #5
+
+Overload IEEE 128-bit extract and insert support.
+
+2022-06-30   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_expand_builtin): Remove
+	converting KFmode IEEE insert and extract built-in functions to
+	TFmode insert and extract built-in functions when long double is
+	IEEE 128-bit.
+	* config/rs6000/rs6000-builtins.def
+	(__builtin_vsx_scalar_extract_expq_kf): Rename KFmode IEEE 128-bit
+	insert and extract built-in functions to have a KF suffix to allow
+	overloading.
+	(__builtin_vsx_scalar_extract_sigq_kf): Likewise.
+	(__builtin_vsx_scalar_insert_exp_qp_kf): Likewise.
+	(__builtin_vsx_scalar_extract_expq_tf): Add TFmode variants for
+	IEEE 128-bit insert and extract support.
+	(__builtin_vsx_scalar_extract_sigq_tf): Likewise.
+	(__builtin_vsx_scalar_insert_exp_qp_tf): Likewise.
+	* config/rs6000/rs6000-c.cc (altivec_resolve_overloaded_builtin):
+	Add support for having KFmode and TFmode variants of VSIEQPF.
+	* config/rs6000/rs6000-overload.def
+	(__builtin_vec_scalar_extract_exp): Add TFmode overloads.
+	(__builtin_vec_scalar_extract_sig): Likewise.
+	(__builtin_vec_scalar_insert_exp): Likewise.
+
 ==================== work093, patch #4
 
 Overload IEEE 128-bit scalar eq, gt, lt, and unordered built-ins.
