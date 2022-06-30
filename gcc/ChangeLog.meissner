@@ -1,3 +1,43 @@
+==================== work093, patch #2
+
+Add support to built-ins for long double using IEEE 128-bit.
+
+This patch lays the ground work that future patches will use to add
+builtin support (both normal and overloaded) for the case where long
+double uses the IEEE 128-bit encoding.  The issue to enable migrating the
+builtins to use the overload facility to allow both __float128 and long
+double to the functions.
+
+This adds a new stanza (ieee128-hw-ld) for when we have IEEE 128-bit
+hardware support and long double uses the IEEE 128-bit encoding.
+
+A new type attribute (ieeeld) is added for long double if long double uses
+the IEEE 128-bit encoding.
+
+2022-06-30   Michael Meissner  <meissner@linux.ibm.com>
+
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_invalid_builtin): Add
+	support for ibm128-hw-ld stanza.
+	(rs6000_builtin_is_supported): Likewise.
+	(rs6000_init_builtins): Likewise.
+	(rs6000_expand_builtin): Add support for IEEE128_HW_LD.  Add
+	support for ieeeld.
+	* config/rs6000/rs6000-builtins.def (toplevel): Add comment about
+	the new ieeeld attribute.
+	* config/rs6000/rs6000-gen-builtins.cc (enum bif_stanza): Add
+	BSTZ_IEEE128_HW_LD.
+	(stanza_map): Likewise.
+	(enable_string): Likewise.
+	(attrinfo): Add isieeeld.
+	(parse_bif_attrs): Parse ieeeld.  Add printing ieeeld to the debug
+	print.
+	(write_decls): Add support for ibm128-hw-ld stanza and ieeeld
+	attribute.
+	(write_bif_static_init): Add support for ieeeld attribute.
+
 ==================== work093, patch #1
 
 Change __ieee128 to __float128.
