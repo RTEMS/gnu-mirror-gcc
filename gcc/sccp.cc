@@ -32,9 +32,11 @@ along with GCC; see the file COPYING3.  If not see
 
 #include <iostream>
 #include "gimple-pretty-print.h"
-#include "bitmap.h"
-#include "sbitmap.h"
+#include "vec.h"
+#include "libiberty.h"
+#include <algorithm>
 
+// Tohle jsem naimportoval kvuli num_ssa_names
 #include "backend.h"
 #include "cfghooks.h"
 #include "ssa.h"
@@ -54,20 +56,101 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa-propagate.h"
 #include "gimple-fold.h"
 
-/* TODO Smaz.  */
-static sbitmap visited;
+struct vertex // Variables from Tarjan's SCC algorithm
+{
+  bool visited;
+  bool is_on_stack;
+  unsigned index;
+  unsigned lowlink;
+}
+
+static *vertices; // Each SSA name ~ vertex. Indexed by SSA version number.
+static vec<vec<unsigned>> tarjan_sccs; // Each SCC is a vector of version nums.
+static vec<unsigned> tarjan_stack;
+static unsigned tarjan_index = 0;
 
 /* Initialize structures used for sccp.  */
 
 static void
 init_sccp (void)
 {
-  visited = sbitmap_alloc (num_ssa_names);
+  vertices = XCNEWVEC (vertex, num_ssa_names);
 }
+
+/* TODO */
+
+static void
+tarjan_assign_index (unsigned vnum)
+{
+  vertices[vnum].index = tarjan_index;
+  vertices[vnum].lowlink = tarjan_index;
+  tarjan_index++;
+}
+
+/* TODO */
+
+static void
+tarjan_update_lowlink (unsigned vnum, unsigned new_lowlink)
+{
+  unsigned old_lowlink = vertices[vnum].lowlink.
+  vertices[vnum].lowlink = min (old_lowlink, new_lowlink);
+}
+
+/* Tarjan SCC algorithm subprocedure.  */
+
+static void
+tarjan_strongconnect (unsigned vnum)
+{
+  tarjan_assign_index (vnum);
+  vec_safe_push (tarjan_stack, vnum);
+  vertices[vnum].is_on_stack = true;
+
+  for (neigh_vnum) // TODO Iterate over neighbours (arguments of PHI)
+    {
+      if (!vertices[neigh_vnum].visited)
+	{
+	  tarjan_strongconnect (neigh_vnum);
+	  tarjan_update_lowlink (vnum, vertices[neigh_vnum].lowlink);
+	}
+      else if (vertices[neigh_vnum].is_on_stack)
+	{
+	  tarjan_update_lowlink (vnum, vertices[neigh_vnum].index);
+	}
+    }
+
+  if (vertices[vnum].lowlink == vertices[vnum].index)
+    {
+      // TODO
+    }
+}
+
+/* Runs Tarjan's SCC algorithm on PHIs. Fills out tarjan_sccs.  */
+
+static void
+tarjan_compute_sccs (void)
+{
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      gphi_iterator pi;
+
+      for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
+	{
+	  gphi *phi = pi.phi ();
+	  // TODO Filtrovat stmts jako v copyprop
+	  int ver = SSA_NAME_VERSION (phi);
+	  if (!vertices[ver].visited)
+	    {
+	      tarjan_strongconnect (ver);
+	    }
+	}
+    }
+}
+
 
 /* TODO Smaz.  */
 
-static void debug_reachable_phi(gimple* phi)
+static void
+debug_reachable_phi(gimple* phi)
 {
   debug_gimple_stmt (phi);
 
@@ -120,22 +203,16 @@ unsigned
 pass_sccp::execute (function *)
 {
   basic_block bb;
-
   init_sccp ();
+  vec<vec<unsigned>> *sccs = tarjan_compute_sccs ();
 
-  FOR_EACH_BB_FN (bb, cfun)
+  for (vec<unsigned> scc : *sccs)
     {
-      gphi_iterator pi;
-
-      for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
+      for (unsigned phi : scc)
 	{
-	  gphi *phi = pi.phi ();
-	  // TODO Filtrovat stmts jako v copyprop
-	  // Ale to asi budu muset filtrovat stmts, ne phi
-	  bitmap_clear (visited);
-	  debug_reachable_phi (phi);
-	  std::cerr << std::endl; // Blank line
+	  std::cerr << phi << std::endl;
 	}
+      std::cerr << std::endl;
     }
 
   return 0; // TODO Co tu mam vracet?
