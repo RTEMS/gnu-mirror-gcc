@@ -2,7 +2,7 @@
 
 Overload IEEE 128-bit extract and insert support.
 
-2022-06-30   Michael Meissner  <meissner@linux.ibm.com>
+2022-07-01   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -22,6 +22,14 @@ gcc/
 	(__builtin_vec_scalar_extract_exp): Add TFmode overloads.
 	(__builtin_vec_scalar_extract_sig): Likewise.
 	(__builtin_vec_scalar_insert_exp): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/bfp/scalar-extract-exp-4.c:  Update error
+	message to account to match built-in functions are now
+	overloaded.
+	* gcc.target/powerpc/bfp/scalar-extract-sig-4.c: Likewise.
+	* gcc.target/powerpc/bfp/scalar-insert-exp-10.c: Likewise.
 
 ==================== work093, patch #4
 
