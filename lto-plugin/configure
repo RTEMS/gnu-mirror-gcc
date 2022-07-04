@@ -650,6 +650,7 @@ LD
 FGREP
 SED
 LIBTOOL
+PTHREAD_CFLAGS
 LTO_PLUGIN_USE_SYMVER_SUN_FALSE
 LTO_PLUGIN_USE_SYMVER_SUN_TRUE
 LTO_PLUGIN_USE_SYMVER_GNU_FALSE
@@ -6016,6 +6017,35 @@ if test "x$ac_cv_header_pthread_h" = xyes; then :
 
 $as_echo "#define HAVE_PTHREAD_H 1" >>confdefs.h
 
+fi
+
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether -pthread is supported" >&5
+$as_echo_n "checking whether -pthread is supported... " >&6; }
+if ${lto_plugin_cv_lib_pthread+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  CFLAGS_hold=$CFLAGS
+CFLAGS="$CFLAGS -pthread -L../$build/libatomic/.libs"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+int i;
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  lto_plugin_cv_lib_pthread=yes
+else
+  lto_plugin_cv_lib_pthread=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+CFLAGS=$CFLAGS_hold
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $lto_plugin_cv_lib_pthread" >&5
+$as_echo "$lto_plugin_cv_lib_pthread" >&6; }
+PTHREAD_CFLAGS=
+if test "$libgo_cv_lib_pthread" = yes; then
+  # RISC-V apparently adds -latomic when using -pthread.
+  PTHREAD_CFLAGS="-pthread -L../$build/libatomic/.libs"
 fi
 
 
@@ -12091,7 +12121,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 12094 "configure"
+#line 12124 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -12197,7 +12227,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 12200 "configure"
+#line 12230 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H

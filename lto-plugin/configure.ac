@@ -91,6 +91,23 @@ AM_CONDITIONAL(LTO_PLUGIN_USE_SYMVER_SUN, [test "x$lto_plugin_use_symver" = xsun
 AC_CHECK_HEADER(pthread.h,
   [AC_DEFINE(HAVE_PTHREAD_H, 1, [Define to 1 if pthread.h is present.])])
 
+dnl Test whether the compiler supports the -pthread option.
+AC_CACHE_CHECK([whether -pthread is supported],
+[lto_plugin_cv_lib_pthread],
+[CFLAGS_hold=$CFLAGS
+CFLAGS="$CFLAGS -pthread -L../$build/libatomic/.libs"
+AC_COMPILE_IFELSE([AC_LANG_SOURCE([int i;])],
+[lto_plugin_cv_lib_pthread=yes],
+[lto_plugin_cv_lib_pthread=no])
+CFLAGS=$CFLAGS_hold])
+PTHREAD_CFLAGS=
+if test "$libgo_cv_lib_pthread" = yes; then
+  # RISC-V apparently adds -latomic when using -pthread.
+  PTHREAD_CFLAGS="-pthread -L../$build/libatomic/.libs"
+fi
+AC_SUBST(PTHREAD_CFLAGS)
+
+
 AM_PROG_LIBTOOL
 ACX_LT_HOST_FLAGS
 AC_SUBST(target_noncanonical)
