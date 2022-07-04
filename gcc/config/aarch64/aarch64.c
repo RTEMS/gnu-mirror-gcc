@@ -2879,7 +2879,8 @@ aarch64_hard_regno_call_part_clobbered (unsigned int abi_id,
 					unsigned int regno,
 					machine_mode mode)
 {
-  if (TARGET_CAPABILITY_HYBRID && mode == CADImode && GP_REGNUM_P (regno))
+  if (TARGET_CAPABILITY_HYBRID && mode == CADImode
+      && regno >= R19_REGNUM && regno <= R28_REGNUM)
     return true;
 
   if (FP_REGNUM_P (regno) && abi_id != ARM_PCS_SVE)
