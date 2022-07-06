@@ -36,7 +36,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "libiberty.h"
 #include <algorithm>
 
-// Tohle jsem naimportoval kvuli num_ssa_names
+// TODO Imported for global var num_ssa_names to work
 #include "backend.h"
 #include "cfghooks.h"
 #include "ssa.h"
@@ -56,7 +56,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa-propagate.h"
 #include "gimple-fold.h"
 
-struct vertex // Variables from Tarjan's SCC algorithm
+/* Variable from Tarjan's SCC algorithm */
+struct vertex
 {
   bool visited;
   bool is_on_stack;
@@ -64,8 +65,10 @@ struct vertex // Variables from Tarjan's SCC algorithm
   unsigned lowlink;
 }
 
-static *vertices; // Each SSA name ~ vertex. Indexed by SSA version number.
-static vec<vec<unsigned>> tarjan_sccs; // Each SCC is a vector of version nums.
+/* Each SSA name corresponds to a vertex.  Indexed by SSA version number.  */
+static *vertices;
+/* Each SCC is a vector of version nums.  */
+static vec<vec<unsigned>*> tarjan_sccs;
 static vec<unsigned> tarjan_stack;
 static unsigned tarjan_index = 0;
 
@@ -75,6 +78,14 @@ static void
 init_sccp (void)
 {
   vertices = XCNEWVEC (vertex, num_ssa_names);
+}
+
+/* Free structures used for sccp.  */
+
+static void
+finalize_sscp (void)
+{
+  // TODO
 }
 
 /* TODO */
@@ -92,35 +103,61 @@ tarjan_assign_index (unsigned vnum)
 static void
 tarjan_update_lowlink (unsigned vnum, unsigned new_lowlink)
 {
-  unsigned old_lowlink = vertices[vnum].lowlink.
-  vertices[vnum].lowlink = min (old_lowlink, new_lowlink);
+  unsigned old_lowlink = vertices[vnum].lowlink;
+  if (old_lowlink < new_lowlink)
+    vertices[vnum].lowlink = old_lowlink;
+  else
+    vertices[vnum].lowlink = new_lowlink;
 }
 
 /* Tarjan SCC algorithm subprocedure.  */
 
 static void
-tarjan_strongconnect (unsigned vnum)
+tarjan_strongconnect (gphi *phi)
 {
+  tree foo = gimple_vdef (phi); // TODO Name.  Do I want vuse?
+  unsigned vnum = SSA_NAME_VERSION (foo);
+
   tarjan_assign_index (vnum);
-  vec_safe_push (tarjan_stack, vnum);
+  tarjan_stack.safe_push (vnum);
   vertices[vnum].is_on_stack = true;
 
-  for (neigh_vnum) // TODO Iterate over neighbours (arguments of PHI)
+  unsigned i;
+  for (i = 0; i < gimple_phi_num_args (phi); i++)
     {
-      if (!vertices[neigh_vnum].visited)
+      tree op = gimple_phi_arg_def (phi, i);
+      // TODO Is there a case where the next line won't work?
+      gimple *stmt = SSA_NAME_DEF_STMT (op);
+      if (gimple_code (stmt) != GIMPLE_PHI)
+	continue;
+
+      unsigned op_vnum = SSA_NAME_VERSION (op);
+      if (!vertices[op_vnum].visited)
 	{
-	  tarjan_strongconnect (neigh_vnum);
-	  tarjan_update_lowlink (vnum, vertices[neigh_vnum].lowlink);
+	  // TODO Will the next line work? Implicit gimple* -> gphi*
+	  tarjan_strongconnect (stmt);
+	  tarjan_update_lowlink (vnum, vertices[op_vnum].lowlink);
 	}
-      else if (vertices[neigh_vnum].is_on_stack)
+      else if (vertices[op_vnum].is_on_stack)
 	{
-	  tarjan_update_lowlink (vnum, vertices[neigh_vnum].index);
+	  tarjan_update_lowlink (vnum, vertices[op_vnum].index);
 	}
     }
 
   if (vertices[vnum].lowlink == vertices[vnum].index)
     {
-      // TODO
+      vec<unsigned> *new_scc = new vec<unsigned>();
+
+      unsigned stack_vnum;
+      do /* There will always be at least 1 vertex on stack.  */
+	{
+	  stack_vnum = tarjan_stack.pop ();
+	  vertices[stack_vnum].is_on_stack = false;
+	  new_scc->safe_push (stack_vnum);
+	}
+      while (stack_vnum != vnum);
+
+      tarjan_sccs.safe_push (new_scc);
     }
 }
 
@@ -129,6 +166,7 @@ tarjan_strongconnect (unsigned vnum)
 static void
 tarjan_compute_sccs (void)
 {
+  basic_block bb;
   FOR_EACH_BB_FN (bb, cfun)
     {
       gphi_iterator pi;
@@ -136,41 +174,18 @@ tarjan_compute_sccs (void)
       for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
 	{
 	  gphi *phi = pi.phi ();
+	  tree foo = gimple_vdef (phi); // TODO Name
+	  unsigned vnum = SSA_NAME_VERSION (foo);
 	  // TODO Filtrovat stmts jako v copyprop
-	  int ver = SSA_NAME_VERSION (phi);
-	  if (!vertices[ver].visited)
+	  if (!vertices[vnum].visited)
 	    {
-	      tarjan_strongconnect (ver);
+	      tarjan_strongconnect (phi);
 	    }
 	}
     }
 }
 
-
-/* TODO Smaz.  */
-
-static void
-debug_reachable_phi(gimple* phi)
-{
-  debug_gimple_stmt (phi);
-
-  unsigned int i;
-  for (i = 0; i < gimple_phi_num_args (phi); i++)
-    {
-      tree op = gimple_phi_arg_def (phi, i);
-      // TODO Nerozbije se tohle někdy?
-      gimple *stmt = SSA_NAME_DEF_STMT (op);
-      int ver = SSA_NAME_VERSION (op);
-      if (gimple_code (stmt) == GIMPLE_PHI &&
-	  !bitmap_bit_p (visited, ver))
-	{
-	  bitmap_set_bit (visited, ver);
-	  debug_reachable_phi (stmt);
-        }
-    }
-}
-
-/* TODO Popisek passu  */
+/* TODO Pass description.  */
 
 namespace {
 
@@ -195,27 +210,28 @@ public:
   {}
 
   /* opt_pass methods: */
-  virtual bool gate (function *) { return true; } // TODO Rozhodovat, jestli pass pustit
+  virtual bool gate (function *) { return true; } // TODO
   virtual unsigned int execute (function *);
 }; // class pass_sccp
 
 unsigned
 pass_sccp::execute (function *)
 {
-  basic_block bb;
   init_sccp ();
-  vec<vec<unsigned>> *sccs = tarjan_compute_sccs ();
+  tarjan_compute_sccs ();
 
-  for (vec<unsigned> scc : *sccs)
+  for (vec<unsigned> *scc : tarjan_sccs)
     {
-      for (unsigned phi : scc)
+      for (unsigned phi : *scc)
 	{
 	  std::cerr << phi << std::endl;
 	}
       std::cerr << std::endl;
     }
 
-  return 0; // TODO Co tu mam vracet?
+  finalize_sscp ();
+
+  return 0; // TODO What should I return?
 }
 
 } // anon namespace
