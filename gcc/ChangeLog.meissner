@@ -30,6 +30,13 @@ gcc/
 	format.
 	(rs6000_c_mode_for_suffix): The 'q' suffix always uses KFmode,
 	even if long double uses the IEEE 128-bit encoding.
+	* config/rs6000/rs6000.md (extendkfif2): New insn.
+	(trunckfif2): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/mulkd3-2.c: Update test.
+	* gcc.target/powerpc/divkd3-2.c: Likewise.
 
 libgcc/
 
