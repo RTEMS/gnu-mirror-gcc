@@ -7286,6 +7286,7 @@ convert_nontype_argument (tree type, tree expr, tsubst_flags_t complain)
      integral promotions (_conv.prom_) and integral conversions
      (_conv.integral_) are applied.  */
   if (INTEGRAL_OR_ENUMERATION_TYPE_P (type)
+      || INTCAP_TYPE_P (type)
       || TREE_CODE (type) == REAL_TYPE)
     {
       if (cxx_dialect < cxx11)
