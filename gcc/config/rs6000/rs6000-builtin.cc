@@ -3290,70 +3290,6 @@ rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
   size_t uns_fcode = (size_t)fcode;
   enum insn_code icode = rs6000_builtin_info[uns_fcode].icode;
 
-  /* If long double is IEEE 128-bit, we may need to convert from the KFmode
-     builtin function to the TFmode builtin function if the argument is long
-     double (i.e. TFmode).  */
-  if (FLOAT128_IEEE_P (TFmode) && call_expr_nargs (exp) >= 1)
-    {
-      if (TYPE_MODE (TREE_TYPE (CALL_EXPR_ARG (exp, 0))) == TFmode)
-	switch (icode)
-	  {
-	  case CODE_FOR_sqrtkf2_odd:
-	    icode = CODE_FOR_sqrttf2_odd;
-	    break;
-	  case CODE_FOR_trunckfdf2_odd:
-	    icode = CODE_FOR_trunctfdf2_odd;
-	    break;
-	  case CODE_FOR_addkf3_odd:
-	    icode = CODE_FOR_addtf3_odd;
-	    break;
-	  case CODE_FOR_subkf3_odd:
-	    icode = CODE_FOR_subtf3_odd;
-	    break;
-	  case CODE_FOR_mulkf3_odd:
-	    icode = CODE_FOR_multf3_odd;
-	    break;
-	  case CODE_FOR_divkf3_odd:
-	    icode = CODE_FOR_divtf3_odd;
-	    break;
-	  case CODE_FOR_fmakf4_odd:
-	    icode = CODE_FOR_fmatf4_odd;
-	    break;
-	  case CODE_FOR_xsxexpqp_kf:
-	    icode = CODE_FOR_xsxexpqp_tf;
-	    break;
-	  case CODE_FOR_xsxsigqp_kf:
-	    icode = CODE_FOR_xsxsigqp_tf;
-	    break;
-	  case CODE_FOR_xststdcnegqp_kf:
-	    icode = CODE_FOR_xststdcnegqp_tf;
-	    break;
-	  case CODE_FOR_xsiexpqp_kf:
-	    icode = CODE_FOR_xsiexpqp_tf;
-	    break;
-	  case CODE_FOR_xsiexpqpf_kf:
-	    icode = CODE_FOR_xsiexpqpf_tf;
-	    break;
-	  case CODE_FOR_xststdcqp_kf:
-	    icode = CODE_FOR_xststdcqp_tf;
-	    break;
-	  case CODE_FOR_xscmpexpqp_eq_kf:
-	    icode = CODE_FOR_xscmpexpqp_eq_tf;
-	    break;
-	  case CODE_FOR_xscmpexpqp_lt_kf:
-	    icode = CODE_FOR_xscmpexpqp_lt_tf;
-	    break;
-	  case CODE_FOR_xscmpexpqp_gt_kf:
-	    icode = CODE_FOR_xscmpexpqp_gt_tf;
-	    break;
-	  case CODE_FOR_xscmpexpqp_unordered_kf:
-	    icode = CODE_FOR_xscmpexpqp_unordered_tf;
-	    break;
-	  default:
-	    break;
-	  }
-    }
-
   /* In case of "#pragma target" changes, we initialize all builtins
      but check for actual availability now, during expand time.  For
      invalid builtins, generate a normal call.  */
@@ -3655,9 +3591,7 @@ rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
 
   for (int i = 0; i < nargs; i++)
     if (!insn_data[icode].operand[i+k].predicate (op[i], mode[i+k]))
-      op[i] = ((mode[i+k] == GET_MODE (op[i]) || GET_MODE (op[i]) == VOIDmode)
-	       ? copy_to_mode_reg (mode[i+k], op[i])
-	       : convert_to_mode (mode[i+k], op[i], false));
+      op[i] = copy_to_mode_reg (mode[i+k], op[i]);
 
   rtx pat;
 
