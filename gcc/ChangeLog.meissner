@@ -1,3 +1,15 @@
+==================== work093, patch #10
+
+Allow KF/TF conversions in IEEE 128-bit insns.
+
+2022-07-07   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-c.cc (is_float128_p): Update comment.
+	(rs6000_builtin_type_compatible): Do not consider _Float128 to be
+	compatible with long double under -mabi=ieeelongdouble.
+
 ==================== work093, patch #9 (reverted)
 
 ==================== work093, patch #8 (reverted)
