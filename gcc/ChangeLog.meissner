@@ -1,3 +1,31 @@
+==================== work093, patch #9
+
+Allow KF/TF conversions in IEEE 128-bit insns.
+
+2022-07-07   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/predicate.md (kf_or_tf_operand): New predicate.
+	* config/rs6000/rs6000.md (add<mode>3_odd): Use kf_or_tf_operand
+	instead of altivec_register_operand.
+	(sub<mode>3_odd): Likewise.
+	(mul<mode>3_odd): Likewise.
+	(div<mode>3_odd): Likewise.
+	(sqrt<mode>2_odd): Likewise.
+	(fma<mode>4_odd): Likewise.
+	(fms<mode>4_odd): Likewise.
+	(nfma<mode>4_odd): Likewise.
+	(nfms<mode>4_odd): Likewise.
+	* config/rs6000/vsx.md (xsxexpqp_<mode>): Likewise.
+	(xsxsigqp_<mode>): Likewise.
+	(xsiexpqpf_<mode>): Likewise.
+	(xscmpexpqp_<code>_<mode>): Likewise.
+	(xscmpexpqp_<code>_<mode>): Likewise.
+	(xststdcqp_<mode>): Likewise.
+	(xststdcnegqp_<mode>): Likewise.
+	(xststdcqp_<mode>): Likewise.
+
 ==================== work093, patch #8
 
 Fixup KFmode to TFmode built-in functions.
