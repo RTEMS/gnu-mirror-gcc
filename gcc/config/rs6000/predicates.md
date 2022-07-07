@@ -2064,3 +2064,29 @@
   else
     return false;
 })
+
+;; Return 1 if the argument is KFmode or TFmode (when TFmode is IEEE 128-bit).
+;; Include various conversions between these formats.  This allows passing long
+;; double to IEEE 128-bit built-ins without separate conversions.
+;;
+;; Since all of the instructions that operate on IEEE 128-bit require Altivec
+;; registers, check that the register is an Altivec register.
+(define_predicate "kf_or_tf_operand"
+  (match_code "reg,subreg,float_extend,float_truncate")
+{
+  if (mode == VOIDmode)
+    mode = GET_MODE (op);
+
+  if (!FLOAT128_IEEE_P (mode))
+    return 0;
+
+  if (GET_CODE (op) == FLOAT_EXTEND || GET_CODE (op) == FLOAT_TRUNCATE)
+    {
+      op = XEXP (op, 0);
+      mode = GET_MODE (op);
+      if (!FLOAT128_IEEE_P (mode))
+	return 0;
+    }
+
+  return altivec_register_operand (op, mode);
+})
