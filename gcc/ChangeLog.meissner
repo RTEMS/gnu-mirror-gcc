@@ -1,3 +1,26 @@
+==================== work093, patch #13
+
+Initialize __ibm128 indepenently of initializing __float128.
+
+2022-07-07   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_init_libfuncs): Initialize
+	IFmode if either IEEE 128-bit is supported or long double is
+	128-bit.
+
+==================== work093, patch #12
+
+Allow __ibm128 with -msoft-float
+
+2022-07-07   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.h (FLOAT128_IBM_P): Remove
+	TARGET_HARD_FLOAT test.
+
 ==================== work093, patch #11
 
 Fix typos in KF/TF overload
