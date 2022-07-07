@@ -2976,15 +2976,15 @@
   const signed __int128 __builtin_vsx_scalar_extract_sigq_tf (long double);
     VSESQP_TF xsxsigqp_tf {ieeeld}
 
-  const long double __builtin_vsx_scalar_insert_exp_qp_tf (_Float128, \
+  const long double __builtin_vsx_scalar_insert_exp_qp_tf (long double, \
 							   unsigned long long);
     VSIEQPF_TF xsiexpqpf_tf {ieeeld}
 
-  const signed int __builtin_vsx_scalar_test_data_class_qp_tf (_Float128, \
+  const signed int __builtin_vsx_scalar_test_data_class_qp_tf (long double, \
 							       const int<7>);
     VSTDCQP_TF xststdcqp_tf {ieeeld}
 
-  const signed int __builtin_vsx_scalar_test_neg_qp_tf (_Float128);
+  const signed int __builtin_vsx_scalar_test_neg_qp_tf (long double);
     VSTDCNQP_TF xststdcnegqp_tf {ieeeld}
 
 
