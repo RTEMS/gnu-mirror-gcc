@@ -1,3 +1,17 @@
+==================== work093, patch #8
+
+Fixup KFmode to TFmode built-in functions.
+
+2022-07-07   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_expand_builtin): If we
+	have certain KFmode built-in functions, convert to TFmode if a
+	long double was passed, and long double is IEEE 128-bit.  Also if
+	the modes are different, call convert_to_mode instead of
+	copy_to_mode_reg.
+
 ==================== work093, patch #7
 
 __float128 and __ibm128 always gets different internal types.
