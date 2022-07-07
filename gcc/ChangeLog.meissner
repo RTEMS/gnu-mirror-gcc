@@ -1,3 +1,17 @@
+==================== work093, patch #11
+
+Fix typos in KF/TF overload
+
+2022-07-07   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def
+	(__builtin_vsx_scalar_insert_exp_qp_tf): Correct argument type to
+	long double.
+	(__builtin_vsx_scalar_test_data_class_qp_tf): Likewise.
+	(__builtin_vsx_scalar_test_neg_qp_tf): Likewise.
+
 ==================== work093, patch #10
 
 Allow KF/TF conversions in IEEE 128-bit insns.
