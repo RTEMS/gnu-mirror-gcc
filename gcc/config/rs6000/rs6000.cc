@@ -11151,10 +11151,11 @@ rs6000_init_libfuncs (void)
 {
   /* __float128 support.  */
   if (TARGET_FLOAT128_TYPE)
-    {
-      init_float128_ibm (IFmode);
-      init_float128_ieee (KFmode);
-    }
+    init_float128_ieee (KFmode);
+
+  /* __ibm128 support.  */
+  if (TARGET_FLOAT128_TYPE || TARGET_LONG_DOUBLE_128)
+    init_float128_ibm (IFmode);
 
   /* AIX/Darwin/64-bit Linux quad floating point routines.  */
   if (TARGET_LONG_DOUBLE_128)
