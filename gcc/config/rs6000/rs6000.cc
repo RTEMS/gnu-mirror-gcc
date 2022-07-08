@@ -11031,26 +11031,6 @@ init_float128_ibm (machine_mode mode)
     }
 }
 
-/* Create a decl for either complex long double multiply or complex long double
-   divide when long double is IEEE 128-bit floating point.  We can't use
-   __multc3 and __divtc3 because the original long double using IBM extended
-   double used those names.  The complex multiply/divide functions are encoded
-   as builtin functions with a complex result and 4 scalar inputs.  */
-
-static void
-create_complex_muldiv (const char *name, built_in_function fncode, tree fntype)
-{
-  tree fndecl = add_builtin_function (name, fntype, fncode, BUILT_IN_NORMAL,
-				      name, NULL_TREE);
-
-  set_builtin_decl (fncode, fndecl, true);
-
-  if (TARGET_DEBUG_BUILTIN)
-    fprintf (stderr, "create complex %s, fncode: %d\n", name, (int) fncode);
-
-  return;
-}
-
 /* Set up IEEE 128-bit floating point routines.  Use different names if the
    arguments can be passed in a vector register.  The historical PowerPC
    implementation of IEEE 128-bit floating point used _q_<op> for the names, so
@@ -11146,6 +11126,107 @@ init_float128_ieee (machine_mode mode)
     }
 }
 
+/* Create a decls for complex long double multiply and complex long double
+   divide for the 128-bit floating point types.
+
+   When long double is IEEE 128-bit floating point, we can't use __multc3 and
+   __divtc3 because the original long double using IBM extended double used
+   those names.
+
+   Similarly for __ibm128, we want to use __multc3 and __divtc3.
+
+   For these cases, we create a decl with a different name, and then set the
+   ASM name so that we don't have to change libgcc to provide these extra
+   names.  We can't just use the same name because we will get an abort if a
+   built-in function uses the same name.
+
+   The complex multiply/divide functions are encoded as builtin functions with
+   a complex result and 4 scalar inputs.  */
+
+/* Inner function to create a single complex multiply or complex divide
+   function.
+
+   Mul_or_div is either "mul" or "div" depending on whether we are creating
+   multiply or divide.
+
+   Lib_mode_name is "ic", "kc", or "tc" (i.e. the 2 letter mode for the complex
+   type being created).
+
+   Asm_mode_name is "kc" or "tc" (i.e. the 2 letter mode for the function that
+   will be called).
+
+   Fncode is the function code of the multiply/divide built-in function.
+
+   Fntype is the tree type node of the function.  */
+
+static void
+create_complex_muldiv_inner (const char *mul_or_div,
+			     const char *lib_mode_name,
+			     const char *asm_mode_name,
+			     built_in_function fncode,
+			     tree fntype)
+{
+  char *asm_name = ACONCAT (("__", mul_or_div, asm_mode_name, "3", NULL));
+  char *name = ACONCAT (("__", mul_or_div, lib_mode_name, "3_", asm_mode_name,
+			 NULL));
+
+  tree fndecl = add_builtin_function (name, fntype, fncode, BUILT_IN_NORMAL,
+				      asm_name, NULL_TREE);
+
+  set_builtin_decl (fncode, fndecl, true);
+
+  if (TARGET_DEBUG_BUILTIN)
+    fprintf (stderr, "create complex %s (%s), fncode: %d\n", name, asm_name,
+	     (int) fncode);
+
+  return;
+}
+
+/* Create both complex multiply and complex divide for a given 128-bit floating
+   point type.
+
+   Lib_mode_name is "ic", "kc", or "tc" (i.e. the 2 letter mode for the complex
+   type being created).
+
+   Asm_mode_name is "kc" or "tc" (i.e. the 2 letter mode for the function that
+   will be called).
+
+   Complex_mode is the mode of the complex type (i.e. KCmode, ICmode, or
+   TCmode).
+
+   Arg_type is the type of scalar 128-bit floating point type (i.e. the
+   _Float128, __ibm128, or long double type nodes).  */
+
+static void
+create_complex_muldiv (const char *lib_mode_name,
+		       const char *asm_mode_name,
+		       machine_mode complex_mode,
+		       tree arg_type)
+{
+  tree complex_type = (arg_type == long_double_type_node
+		       ? complex_long_double_type_node
+		       : build_complex_type (arg_type));
+  tree fntype = build_function_type_list (complex_type, arg_type, arg_type,
+					  arg_type, arg_type, NULL_TREE);
+
+  /* Build complex multiply.  */
+  built_in_function mul_fncode =
+    (built_in_function) (BUILT_IN_COMPLEX_MUL_MIN + complex_mode
+			 - MIN_MODE_COMPLEX_FLOAT);
+
+  create_complex_muldiv_inner ("mul", lib_mode_name, asm_mode_name, mul_fncode,
+			       fntype);
+
+  /* Build complex divide.  */
+  built_in_function div_fncode =
+    (built_in_function) (BUILT_IN_COMPLEX_DIV_MIN + complex_mode
+			 - MIN_MODE_COMPLEX_FLOAT);
+
+  create_complex_muldiv_inner ("div", lib_mode_name, asm_mode_name, div_fncode,
+			       fntype);
+  return;
+}
+
 static void
 rs6000_init_libfuncs (void)
 {
@@ -11168,44 +11249,27 @@ rs6000_init_libfuncs (void)
 	init_float128_ieee (TFmode);
     }
 
-  /* Set up to call __mulkc3 and __divkc3 when long double uses the IEEE
-     128-bit encoding.  We cannot use the same name (__mulkc3 or __divkc3 for
-     both IEEE long double and for explicit _Float128/__float128) because
-     c_builtin_function will complain if we create two built-in functions with
-     the same name.  Instead we use an alias name for the case when long double
-     uses the IEEE 128-bit encoding.  Libgcc will create a weak alias reference
-     for this name.
+  /* Set up to call the appropriate __mul{kc,tc}3 and __div{kc,tc}3 for the
+     128-bit floating point types, using kc3 for IEEE 128-bit and tc3 for IBM
+     128-bit.  We only call this for the functions that don't use the default
+     names.
 
      We need to only execute this once.  If we have clone or target attributes,
      this will be called a second time.  We need to create the built-in
      function only once.  */
   static bool complex_muldiv_init_p = false;
 
-  if (TARGET_FLOAT128_TYPE && TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128
-      && !complex_muldiv_init_p)
+  if (!complex_muldiv_init_p
+      && (TARGET_FLOAT128_TYPE || TARGET_LONG_DOUBLE_128))
     {
       complex_muldiv_init_p = true;
 
-      tree fntype = build_function_type_list (complex_long_double_type_node,
-					      long_double_type_node,
-					      long_double_type_node,
-					      long_double_type_node,
-					      long_double_type_node,
-					      NULL_TREE);
+      /* Create __ibm128 complex multiply divide.  */
+      create_complex_muldiv ("ic", "tc", ICmode, ibm128_float_type_node);
 
-      /* Create complex multiply.  */
-      built_in_function mul_fncode =
-	(built_in_function) (BUILT_IN_COMPLEX_MUL_MIN + TCmode
-			     - MIN_MODE_COMPLEX_FLOAT);
-
-      create_complex_muldiv ("__multc3_ieee128", mul_fncode, fntype);
-
-      /* Create complex divide.  */
-      built_in_function div_fncode =
-	(built_in_function) (BUILT_IN_COMPLEX_DIV_MIN + TCmode
-			     - MIN_MODE_COMPLEX_FLOAT);
-
-      create_complex_muldiv ("__divtc3_ieee128", div_fncode, fntype);
+      if (TARGET_LONG_DOUBLE_128 && TARGET_IEEEQUAD)
+	/* Create long double (IEEE 128-bit) complex multiply/divide.  */
+	create_complex_muldiv ("tc", "kc", TCmode, long_double_type_node);
     }
 }
 
