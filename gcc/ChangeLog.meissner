@@ -1,26 +1,4 @@
-==================== work093, patch #15
-
-Rework setting 128-bit complex multiply and divide.
-
-2022-07-08   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/rs600.cc (create_complex_muldiv_inner): New
-	function.
-	(create_complex_muldiv): Rewrite function to handle both multiply
-	and divide.  Set the decl assembler name to change the name to the
-	external function.
-
-gcc/testsuite/
-
-	* gcc.target/powerpc/mulkc3-2.c: Revert patch #7.
-	* gcc.target/powerpc/divkc3-2.c: Likewise.
-
-libgcc/
-
-	* config/rs6000/float128-ifunc.c: Revert patch #7.
-	* config/rs6000/quad-float128.h: Likewise.
+==================== work093, patch #15 (reverted)
 
 ==================== work093, patch #14
 
