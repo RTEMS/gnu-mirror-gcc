@@ -14,4 +14,4 @@ multiply (cld_t *p, cld_t *q, cld_t *r)
   *p = *q * *r;
 }
 
-/* { dg-final { scan-assembler "bl __multc3_ieee128" } } */
+/* { dg-final { scan-assembler "bl __mulkc3" } } */

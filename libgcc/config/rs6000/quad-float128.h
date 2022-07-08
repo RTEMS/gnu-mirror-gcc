@@ -191,11 +191,6 @@ extern TFtype __trunctfkf2 (IBM128_TYPE);
 extern TCtype __mulkc3 (TFtype, TFtype, TFtype, TFtype);
 extern TCtype __divkc3 (TFtype, TFtype, TFtype, TFtype);
 
-/* Complex long double multiply/divide if long double uses the IEEE 128-bit
-   encoding.  */
-extern TCtype __multc3_ieee128 (TFtype, TFtype, TFtype, TFtype);
-extern TCtype __divtc3_ieee128 (TFtype, TFtype, TFtype, TFtype);
-
 /* Convert IEEE 128-bit floating point to/from string.  We explicitly use
    _Float128 instead of TFmode because _strtokf and _strfromkf must be compiled
    with long double being IBM 128.  */
