@@ -1,3 +1,15 @@
+==================== work093, patch #14
+
+Mangle __ibm128 types differently from long double.
+
+2022-07-07   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_mangle_type): Mangle __ibm128
+	differently than long double if long double uses the IBM 128-bit
+	format.
+
 ==================== work093, patch #13
 
 Initialize __ibm128 indepenently of initializing __float128.
