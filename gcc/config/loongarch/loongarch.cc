@@ -5782,6 +5782,14 @@ loongarch_starting_frame_offset (void)
   return crtl->outgoing_args_size;
 }
 
+/* Implement TARGET_ASAN_SHADOW_OFFSET.  */
+
+static unsigned HOST_WIDE_INT
+loongarch_asan_shadow_offset (void)
+{
+  return TARGET_64BIT ? (HOST_WIDE_INT_1 << 46) : 0;
+}
+
 /* Initialize the GCC target structure.  */
 #undef TARGET_ASM_ALIGNED_HI_OP
 #define TARGET_ASM_ALIGNED_HI_OP "\t.half\t"
@@ -5963,6 +5971,9 @@ loongarch_starting_frame_offset (void)
 
 #undef  TARGET_HAVE_SPECULATION_SAFE_VALUE
 #define TARGET_HAVE_SPECULATION_SAFE_VALUE speculation_safe_value_not_needed
+
+#undef TARGET_ASAN_SHADOW_OFFSET
+#define TARGET_ASAN_SHADOW_OFFSET loongarch_asan_shadow_offset
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
