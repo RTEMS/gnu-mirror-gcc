@@ -134,8 +134,8 @@ tarjan_strongconnect (gphi *phi)
       unsigned op_vnum = SSA_NAME_VERSION (op);
       if (!vertices[op_vnum].visited)
 	{
-	  // TODO Will the next line work? Implicit gimple* -> gphi*
-	  tarjan_strongconnect (stmt);
+	  // TODO Will the next line work?
+	  tarjan_strongconnect (as_a <gphi *> (stmt));
 	  tarjan_update_lowlink (vnum, vertices[op_vnum].lowlink);
 	}
       else if (vertices[op_vnum].is_on_stack)
