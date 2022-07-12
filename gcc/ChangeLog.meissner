@@ -1,3 +1,25 @@
+==================== work093, patch #16
+
+Make __ibm128 support work on older machines.
+
+2022-07-08   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs600.md (IFKF): Delete.
+	(IFKF_reg): Delete.
+	(extendiftf2): Allow __ibm128 on older systems.
+	(extendtfif2): Likewise.
+	(trunciftf2): Likewise.
+	(trunctfif2): Likewise.
+	(extendkftf2_internal): Split extend<mode>tf2_internal and
+	extendtf<mode>2_internal into separate insns that handle either
+	conversions between IEEE 128-bit types or between IBM 128-bit
+	types.  Set the type and insn length correctly.
+	(extendtfkf2_internal): Likewise.
+	(extendiftf2_internal): Likewise.
+	(extendtfif2_internal): Likewise.
+
 ==================== work093, patch #15 (reverted)
 
 ==================== work093, patch #14
