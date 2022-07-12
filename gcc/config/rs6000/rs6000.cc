@@ -11154,7 +11154,7 @@ rs6000_init_libfuncs (void)
     init_float128_ieee (KFmode);
 
   /* __ibm128 support.  */
-  if (TARGET_FLOAT128_TYPE || TARGET_LONG_DOUBLE_128)
+  if (TARGET_IBM128)
     init_float128_ibm (IFmode);
 
   /* AIX/Darwin/64-bit Linux quad floating point routines.  */
@@ -23837,7 +23837,7 @@ rs6000_scalar_mode_supported_p (scalar_mode mode)
     return default_decimal_float_supported_p ();
   else if (TARGET_FLOAT128_TYPE && mode == KFmode)
     return true;
-  else if ((TARGET_FLOAT128_TYPE || TARGET_LONG_DOUBLE_128) && mode == IFmode)
+  else if (TARGET_IBM128 && mode == IFmode)
     return true;
   else
     return default_scalar_mode_supported_p (mode);

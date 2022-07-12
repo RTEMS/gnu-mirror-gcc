@@ -717,7 +717,7 @@ rs6000_init_builtins (void)
      format is IBM extended double.
 
      For IEEE 128-bit floating point, always create the type __float128.  */
-  if (TARGET_LONG_DOUBLE_128 || TARGET_FLOAT128_TYPE)
+  if (TARGET_IBM128)
     {
       ibm128_float_type_node = make_node (REAL_TYPE);
       TYPE_PRECISION (ibm128_float_type_node) = 128;
