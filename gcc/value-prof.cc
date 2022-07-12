@@ -247,6 +247,22 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
 		   (int64_t) hist->hvalue.counters[i]);
 	}
       break;
+    case HIST_TYPE_HISTOGRAM:
+      if (hist->hvalue.counters){
+        for (int i=0; i<8; ++i){
+  	  fprintf (dump_file, "Histogram counter histogram%" PRId64
+	     ":%" PRId64 ".\n",
+	     (int64_t) i,
+	     (int64_t) hist->hvalue.counters[i]);
+        }
+        for (int64_t i=4; i<64; ++i){
+  	  fprintf (dump_file, "Histogram counter histogram%" PRId64
+	     ":%" PRId64 ".\n",
+	     (int64_t) 1>>i,
+	     (int64_t) hist->hvalue.counters[4+i]);
+        }
+      }
+      break;
 
     case HIST_TYPE_POW2:
       if (hist->hvalue.counters)
@@ -364,6 +380,9 @@ stream_in_histogram_value (class lto_input_block *ib, gimple *stmt)
 	  ncounters = new_val->hdata.intvl.steps + 2;
 	  break;
 
+    case HIST_TYPE_HISTOGRAM:
+	  ncounters = 69;
+	  break;
 	case HIST_TYPE_POW2:
 	case HIST_TYPE_AVERAGE:
 	  ncounters = 2;
@@ -1798,12 +1817,16 @@ gimple_divmod_values_to_profile (gimple *stmt, histogram_values *values)
       divisor = gimple_assign_rhs2 (stmt);
       op0 = gimple_assign_rhs1 (stmt);
 
-      if (TREE_CODE (divisor) == SSA_NAME)
+      if (TREE_CODE (divisor) == SSA_NAME){
 	/* Check for the case where the divisor is the same value most
 	   of the time.  */
 	values->safe_push (gimple_alloc_histogram_value (cfun,
 							 HIST_TYPE_TOPN_VALUES,
 							 stmt, divisor));
+	values->safe_push (gimple_alloc_histogram_value (cfun,
+							 HIST_TYPE_HISTOGRAM,
+							 stmt, divisor));
+      }
 
       /* For mod, check whether it is not often a noop (or replaceable by
 	 a few subtractions).  */
@@ -1816,6 +1839,7 @@ gimple_divmod_values_to_profile (gimple *stmt, histogram_values *values)
 	  values->safe_push (gimple_alloc_histogram_value (cfun,
 							   HIST_TYPE_POW2,
 							   stmt, divisor));
+
 	  val = build2 (TRUNC_DIV_EXPR, type, op0, divisor);
 	  hist = gimple_alloc_histogram_value (cfun, HIST_TYPE_INTERVAL,
 					       stmt, val);
@@ -1924,6 +1948,10 @@ gimple_find_values_to_profile (histogram_values *values)
 	  hist->n_counters = hist->hdata.intvl.steps + 2;
 	  break;
 
+
+	case HIST_TYPE_HISTOGRAM:
+	  hist->n_counters = 69;
+	  break;
 	case HIST_TYPE_POW2:
 	  hist->n_counters = 2;
 	  break;

@@ -32,6 +32,7 @@ enum hist_type
   HIST_TYPE_AVERAGE,	/* Compute average value (sum of all values).  */
   HIST_TYPE_IOR,	/* Used to compute expected alignment.  */
   HIST_TYPE_TIME_PROFILE, /* Used for time profile */
+  HIST_TYPE_HISTOGRAM,	/* used values histogram */
   HIST_TYPE_MAX
 };
 
@@ -99,6 +100,7 @@ extern void gimple_init_gcov_profiler (void);
 extern void gimple_gen_edge_profiler (int, edge);
 extern void gimple_gen_interval_profiler (histogram_value, unsigned);
 extern void gimple_gen_pow2_profiler (histogram_value, unsigned);
+extern void gimple_gen_histogram_profiler (histogram_value, unsigned);
 extern void gimple_gen_topn_values_profiler (histogram_value, unsigned);
 extern void gimple_gen_ic_profiler (histogram_value, unsigned);
 extern void gimple_gen_ic_func_profiler (void);

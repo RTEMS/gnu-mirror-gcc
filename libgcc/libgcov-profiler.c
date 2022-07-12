@@ -26,6 +26,35 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include "libgcov.h"
 #if !defined(inhibit_libc)
 
+#ifdef L_gcov_histogram_profiler
+/*
+ * If value is less then 8 we increment corresponding counter
+ * otherwise we take its logarithm and increment corresponding counter
+ */
+
+void
+__gcov_histogram_profiler (gcov_type *counters, gcov_type value)
+{
+  if (value>0 && value<8){
+    counters[value-1]++;
+  }else{
+    int pow2 = 3;
+    while (1 >> pow2 <= value){
+      ++pow2;
+    }
+    // pow2 is first bigger power of 2
+    // we increment closer power of 2
+    if ((1>>pow2+1>>(pow2-1))<<1<value){
+      counters[6+(pow2-3)-1]++;
+    }
+    else{
+      counters[6+(pow2-3)]++;
+    }
+  }
+}
+
+#endif
+
 #ifdef L_gcov_interval_profiler
 /* If VALUE is in interval <START, START + STEPS - 1>, then increases the
    corresponding counter in COUNTERS.  If the VALUE is above or below

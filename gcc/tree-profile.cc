@@ -62,6 +62,7 @@ along with GCC; see the file COPYING3.  If not see
 static GTY(()) tree gcov_type_node;
 static GTY(()) tree tree_interval_profiler_fn;
 static GTY(()) tree tree_pow2_profiler_fn;
+static GTY(()) tree tree_histogram_profiler_fn;
 static GTY(()) tree tree_topn_values_profiler_fn;
 static GTY(()) tree tree_indirect_call_profiler_fn;
 static GTY(()) tree tree_average_profiler_fn;
@@ -119,6 +120,7 @@ gimple_init_gcov_profiler (void)
 {
   tree interval_profiler_fn_type;
   tree pow2_profiler_fn_type;
+  tree histogram_profiler_fn_type;
   tree topn_values_profiler_fn_type;
   tree gcov_type_ptr;
   tree ic_profiler_fn_type;
@@ -160,6 +162,19 @@ gimple_init_gcov_profiler (void)
       DECL_ATTRIBUTES (tree_pow2_profiler_fn)
 	= tree_cons (get_identifier ("leaf"), NULL,
 		     DECL_ATTRIBUTES (tree_pow2_profiler_fn));
+
+      /* void (*) (gcov_type *, gcov_type)  */
+      histogram_profiler_fn_type
+	      = build_function_type_list (void_type_node,
+					  gcov_type_ptr, gcov_type_node,
+					  NULL_TREE);
+      fn_name = concat ("__gcov_histogram_profiler", fn_suffix, NULL);
+      tree_histogram_profiler_fn = build_fn_decl (fn_name, histogram_profiler_fn_type);
+      free (CONST_CAST (char *, fn_name));
+      TREE_NOTHROW (tree_histogram_profiler_fn) = 1;
+      DECL_ATTRIBUTES (tree_histogram_profiler_fn)
+	= tree_cons (get_identifier ("leaf"), NULL,
+		     DECL_ATTRIBUTES (tree_histogram_profiler_fn));
 
       /* void (*) (gcov_type *, gcov_type)  */
       topn_values_profiler_fn_type
@@ -228,6 +243,7 @@ gimple_init_gcov_profiler (void)
          late, we need to initialize them by hand.  */
       DECL_ASSEMBLER_NAME (tree_interval_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_pow2_profiler_fn);
+      DECL_ASSEMBLER_NAME (tree_histogram_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_topn_values_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_indirect_call_profiler_fn);
       DECL_ASSEMBLER_NAME (tree_average_profiler_fn);
@@ -333,6 +349,27 @@ gimple_gen_pow2_profiler (histogram_value value, unsigned tag)
 				      true, NULL_TREE, true, GSI_SAME_STMT);
   val = prepare_instrumented_value (&gsi, value);
   call = gimple_build_call (tree_pow2_profiler_fn, 2, ref_ptr, val);
+  gsi_insert_before (&gsi, call, GSI_NEW_STMT);
+}
+
+/* Output instructions as GIMPLE trees to increment the power of two histogram
+   counter.  VALUE is the expression whose value is profiled.  TAG is the tag
+   of the section for counters.  */
+
+void
+gimple_gen_histogram_profiler (histogram_value value, unsigned tag)
+{
+  gimple *stmt = value->hvalue.stmt;
+  gimple_stmt_iterator gsi = gsi_for_stmt (stmt);
+  tree ref_ptr = tree_coverage_counter_addr (tag, 0);
+  // TODO why does it crash
+  gcall *call;
+  tree val;
+
+  ref_ptr = force_gimple_operand_gsi (&gsi, ref_ptr,
+				      true, NULL_TREE, true, GSI_SAME_STMT);
+  val = prepare_instrumented_value (&gsi, value);
+  call = gimple_build_call (tree_histogram_profiler_fn, 2, ref_ptr, val);
   gsi_insert_before (&gsi, call, GSI_NEW_STMT);
 }
 

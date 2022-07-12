@@ -188,6 +188,10 @@ instrument_values (histogram_values values)
 	case HIST_TYPE_TIME_PROFILE:
 	  gimple_gen_time_profiler (t);
 	  break;
+      
+	case HIST_TYPE_HISTOGRAM:
+	  gimple_gen_histogram_profiler (hist, t);
+	  break;
 
 	default:
 	  gcc_unreachable ();

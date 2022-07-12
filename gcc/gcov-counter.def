@@ -49,3 +49,7 @@ DEF_GCOV_COUNTER(GCOV_COUNTER_IOR, "ior", _ior)
 
 /* Time profile collecting first run of a function */
 DEF_GCOV_COUNTER(GCOV_TIME_PROFILER, "time_profiler", _time_profile)
+
+/* Histogram of values from 1 to  8 and them powers of 2 */
+DEF_GCOV_COUNTER(GCOV_COUNTER_V_HISTOGRAM, "histogram", _add)
+
