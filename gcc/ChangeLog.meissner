@@ -1,3 +1,23 @@
+==================== work093, patch #17
+
+Add TARGET_IBM128
+
+2022-07-08   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_init_builtins): Use
+	TARGET_IBM128.
+	* config/rs6000/rs0000.c (rs6000_init_libfuncs): Likewise.
+	* config/rs6000/rs6000.h (TARGET_IBM128): New macro.
+	* config/rs6000/rs6000.md (extenddf<mode>2_fprs): Remove redundant
+	test for TARGET_LONG_DOUBLE_128.
+	(extenddf<mode>2_vsx): Likewise.
+	(extendiftf2): Use TARGET_IBM128.
+	(extendtfkf2): Likewise.
+	(extendtfif2): Likewise.
+	(trunckftf2): Likewise.
+
 ==================== work093, patch #16
 
 Make __ibm128 support work on older machines.
