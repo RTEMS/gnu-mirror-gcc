@@ -100,6 +100,8 @@ case $target in
 esac
 
 if test x$use_locking = xyes; then
+  LDFLAGS="$LDFLAGS -pthread"
+
   AC_CHECK_HEADER(pthread.h,
     [AC_DEFINE(HAVE_PTHREAD_LOCKING, 1, [Define if the system provides pthread locking mechanism.])])
 fi
