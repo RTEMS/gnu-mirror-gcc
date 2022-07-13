@@ -1,32 +1,6 @@
-==================== work094 branch, patch #3
+==================== work094, patch #1
 
-Overload IEEE 128-bit scalar eq, gt, lt, and unordered built-ins.
-
-2022-07-13   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/rs6000-builtins.def
-	(__builtin_vsx_scalar_cmp_exp_qp_eq_kf): Rename KFmode comparison
-	built-in functions to have a KF suffix to allow overloading.
-	(__builtin_vsx_scalar_cmp_exp_qp_gt_kf): Likewise.
-	(__builtin_vsx_scalar_cmp_exp_qp_lt_kf): Likewise.
-	(__builtin_vsx_scalar_cmp_exp_qp_unordered_kf): Likewise.
-	(__builtin_vsx_scalar_cmp_exp_qp_eq_tf): Add TFmode comparison
-	built-in functions.
-	(__builtin_vsx_scalar_cmp_exp_qp_gt_tf): Likewise.
-	(__builtin_vsx_scalar_cmp_exp_qp_lt_tf): Likewise.
-	(__builtin_vsx_scalar_cmp_exp_qp_unordered_tf): Likewise.
-	* config/rs6000/rs6000-overload.def
-	(__builtin_vec_scalar_cmp_exp_eq): Add TFmode overloaded
-	functions.
-	(__builtin_vec_scalar_cmp_exp_gt): Likewise.
-	(__builtin_vec_scalar_cmp_exp_lt): Likewise.
-	(__builtin_vec_scalar_cmp_exp_unordered): Likewise.
-
-==================== work094 branch, patch #2
-
-Make _round_to_odd functions overloaded.
+Make IEEE 128-bit round_to_odd functions overloaded.
 
 2022-07-13   Michael Meissner  <meissner@linux.ibm.com>
 
@@ -49,8 +23,8 @@ gcc/
 	(__builtin_subf128_round_to_odd_tf): Likewise.
 	(__builtin_truncf128_round_to_odd_tf): Likewise.
 	* config/rs6000/rs6000-overload.def
-	(__builtin_addf128_round_to_odd): Make round to odd built-in
-	functions overloaded.
+	(__builtin_addf128_round_to_odd): Make IEEE 128-bit round to odd
+	built-in functions overloaded.
 	(__builtin_divf128_round_to_odd): Likewise.
 	(__builtin_fmaf128_round_to_odd): Likewise.
 	(__builtin_mulf128_round_to_odd): Likewise.
@@ -58,9 +32,9 @@ gcc/
 	(__builtin_subf128_round_to_odd): Likewise.
 	(__builtin_truncf128_round_to_odd): Likewise.
 
-==================== work094 branch, patch #1
+==================== work094, patch #1
 
-Add long double IEEE 128-bit built-in support.
+Add support for IEEE 128-bit long double built-ins.
 
 This patch lays the ground work that future patches will use to add
 builtin support (both normal and overloaded) for the case where long
@@ -96,7 +70,7 @@ gcc/
 	attribute.
 	(write_bif_static_init): Add support for ieeeld attribute.
 
-==================== create branch
+==================== work094, create branch
 
 2022-07-13   Michael Meissner  <meissner@linux.ibm.com>
 
