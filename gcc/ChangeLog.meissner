@@ -1,3 +1,29 @@
+==================== work094, patch #3
+
+Make IEEE 128-bit comparison built-in functions overloaded.
+
+2022-07-13   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def
+	(__builtin_vsx_scalar_cmp_exp_qp_eq_kf): Rename KFmode comparison
+	built-in functions to have a KF suffix to allow overloading.
+	(__builtin_vsx_scalar_cmp_exp_qp_gt_kf): Likewise.
+	(__builtin_vsx_scalar_cmp_exp_qp_lt_kf): Likewise.
+	(__builtin_vsx_scalar_cmp_exp_qp_unordered_kf): Likewise.
+	(__builtin_vsx_scalar_cmp_exp_qp_eq_tf): Add TFmode comparison
+	built-in functions.
+	(__builtin_vsx_scalar_cmp_exp_qp_gt_tf): Likewise.
+	(__builtin_vsx_scalar_cmp_exp_qp_lt_tf): Likewise.
+	(__builtin_vsx_scalar_cmp_exp_qp_unordered_tf): Likewise.
+	* config/rs6000/rs6000-overload.def
+	(__builtin_vec_scalar_cmp_exp_eq): Add TFmode overloaded
+	functions.
+	(__builtin_vec_scalar_cmp_exp_gt): Likewise.
+	(__builtin_vec_scalar_cmp_exp_lt): Likewise.
+	(__builtin_vec_scalar_cmp_exp_unordered): Likewise.
+
 ==================== work094, patch #2
 
 Make IEEE 128-bit round_to_odd functions overloaded.
