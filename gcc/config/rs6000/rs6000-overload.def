@@ -6175,3 +6175,47 @@
     VUPKLSW  VUPKLSW_DEPR1
   vbll __builtin_vec_vupklsw (vbi);
     VUPKLSW  VUPKLSW_DEPR2
+
+[ADDF128_ODD, SKIP, __builtin_addf128_round_to_odd]
+  long double __builtin_addf128_round_to_odd (long double, long double);
+    ADDF128_ODD_TF
+  _Float128 __builtin_addf128_round_to_odd (_Float128, _Float128);
+    ADDF128_ODD_KF
+
+[DIVF128_ODD, SKIP, __builtin_divf128_round_to_odd]
+  long double __builtin_divf128_round_to_odd (long double, long double);
+    DIVF128_ODD_TF
+  _Float128 __builtin_divf128_round_to_odd (_Float128, _Float128);
+    DIVF128_ODD_KF
+
+[FMAF128_ODD, SKIP, __builtin_fmaf128_round_to_odd]
+  long double __builtin_fmaf128_round_to_odd (long double, long double, \
+					      long double);
+    FMAF128_ODD_TF
+  _Float128 __builtin_fmaf128_round_to_odd (_Float128, _Float128, \
+					    _Float128);
+    FMAF128_ODD_KF
+
+[MULF128_ODD, SKIP, __builtin_mulf128_round_to_odd]
+  long double __builtin_mulf128_round_to_odd (long double, long double);
+    MULF128_ODD_TF
+  _Float128 __builtin_mulf128_round_to_odd (_Float128, _Float128);
+    MULF128_ODD_KF
+
+[SQRTF128_ODD, SKIP, __builtin_sqrtf128_round_to_odd]
+  long double __builtin_sqrtf128_round_to_odd (long double);
+    SQRTF128_ODD_TF
+  _Float128 __builtin_sqrtf128_round_to_odd (_Float128);
+    SQRTF128_ODD_KF
+
+[SUBF128_ODD, SKIP, __builtin_subf128_round_to_odd]
+  long double __builtin_subf128_round_to_odd (long double, long double);
+    SUBF128_ODD_TF
+  _Float128 __builtin_subf128_round_to_odd (_Float128, _Float128);
+    SUBF128_ODD_KF
+
+[TRUNCF128_ODD, SKIP, __builtin_truncf128_round_to_odd]
+  long double __builtin_truncf128_round_to_odd (long double);
+    TRUNCF128_ODD_TF
+  _Float128 __builtin_truncf128_round_to_odd (_Float128);
+    TRUNCF128_ODD_KF
