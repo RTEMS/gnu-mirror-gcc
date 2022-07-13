@@ -1,3 +1,35 @@
+==================== work094, patch #4
+
+Make IEEE 128-bit extract and insert built-in functions overloaded.
+
+2022-07-13   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def
+	(__builtin_vsx_scalar_extract_expq_kf): Rename KFmode IEEE 128-bit
+	insert and extract built-in functions to have a KF suffix to allow
+	overloading.
+	(__builtin_vsx_scalar_extract_sigq_kf): Likewise.
+	(__builtin_vsx_scalar_insert_exp_qp_kf): Likewise.
+	(__builtin_vsx_scalar_extract_expq_tf): Add TFmode variants for
+	IEEE 128-bit insert and extract support.
+	(__builtin_vsx_scalar_extract_sigq_tf): Likewise.
+	(__builtin_vsx_scalar_insert_exp_qp_tf): Likewise.
+	* config/rs6000/rs6000-c.cc (altivec_resolve_overloaded_builtin):
+	Add support for having KFmode and TFmode variants of VSIEQPF.
+	* config/rs6000/rs6000-overload.def
+	(__builtin_vec_scalar_extract_exp): Add TFmode overloads.
+	(__builtin_vec_scalar_extract_sig): Likewise.
+	(__builtin_vec_scalar_insert_exp): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/bfp/scalar-extract-exp-4.c:  Update the
+	expected error message.
+	* gcc.target/powerpc/bfp/scalar-extract-sig-4.c: Likewise.
+	* gcc.target/powerpc/bfp/scalar-insert-exp-10.c: Likewise.
+
 ==================== work094, patch #3
 
 Make IEEE 128-bit comparison built-in functions overloaded.
