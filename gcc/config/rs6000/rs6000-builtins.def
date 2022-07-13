@@ -139,7 +139,6 @@
 ;   endian   Needs special handling for endianness
 ;   ibmld    Restrict usage to the case when TFmode is IBM-128
 ;   ibm128   Restrict usage to the case where __ibm128 is supported or if ibmld
-;   ieeeld   Restrict usage to the case when TFmode is IEEE-128
 ;
 ; Each attribute corresponds to extra processing required when
 ; the built-in is expanded.  All such special processing should
@@ -2867,56 +2866,54 @@
 
 ; Builtins requiring hardware support for IEEE-128 floating-point.
 [ieee128-hw]
-  fpmath _Float128 __builtin_addf128_round_to_odd_kf (_Float128, _Float128);
-    ADDF128_ODD_KF addkf3_odd {}
+  fpmath _Float128 __builtin_addf128_round_to_odd (_Float128, _Float128);
+    ADDF128_ODD addkf3_odd {}
 
-  fpmath _Float128 __builtin_divf128_round_to_odd_kf (_Float128, _Float128);
-    DIVF128_ODD_KF divkf3_odd {}
+  fpmath _Float128 __builtin_divf128_round_to_odd (_Float128, _Float128);
+    DIVF128_ODD divkf3_odd {}
 
-  fpmath _Float128 __builtin_fmaf128_round_to_odd_kf (_Float128, _Float128, \
-						      _Float128);
-    FMAF128_ODD_KF fmakf4_odd {}
+  fpmath _Float128 __builtin_fmaf128_round_to_odd (_Float128, _Float128, \
+                                                   _Float128);
+    FMAF128_ODD fmakf4_odd {}
 
-  fpmath _Float128 __builtin_mulf128_round_to_odd_kf (_Float128, _Float128);
-    MULF128_ODD_KF mulkf3_odd {}
+  fpmath _Float128 __builtin_mulf128_round_to_odd (_Float128, _Float128);
+    MULF128_ODD mulkf3_odd {}
 
-  const signed int __builtin_vsx_scalar_cmp_exp_qp_eq_kf (_Float128, _Float128);
-    VSCEQPEQ_KF xscmpexpqp_eq_kf {}
+  const signed int __builtin_vsx_scalar_cmp_exp_qp_eq (_Float128, _Float128);
+    VSCEQPEQ xscmpexpqp_eq_kf {}
 
-  const signed int __builtin_vsx_scalar_cmp_exp_qp_gt_kf (_Float128, _Float128);
-    VSCEQPGT_KF xscmpexpqp_gt_kf {}
+  const signed int __builtin_vsx_scalar_cmp_exp_qp_gt (_Float128, _Float128);
+    VSCEQPGT xscmpexpqp_gt_kf {}
 
-  const signed int __builtin_vsx_scalar_cmp_exp_qp_lt_kf (_Float128, _Float128);
-    VSCEQPLT_KF xscmpexpqp_lt_kf {}
+  const signed int __builtin_vsx_scalar_cmp_exp_qp_lt (_Float128, _Float128);
+    VSCEQPLT xscmpexpqp_lt_kf {}
 
   const signed int \
-      __builtin_vsx_scalar_cmp_exp_qp_unordered_kf (_Float128, _Float128);
-    VSCEQPUO_KF xscmpexpqp_unordered_kf {}
+      __builtin_vsx_scalar_cmp_exp_qp_unordered (_Float128, _Float128);
+    VSCEQPUO xscmpexpqp_unordered_kf {}
 
-  fpmath _Float128 __builtin_sqrtf128_round_to_odd_kf (_Float128);
-    SQRTF128_ODD_KF sqrtkf2_odd {}
+  fpmath _Float128 __builtin_sqrtf128_round_to_odd (_Float128);
+    SQRTF128_ODD sqrtkf2_odd {}
 
-  fpmath _Float128 __builtin_subf128_round_to_odd_kf (_Float128, _Float128);
-    SUBF128_ODD_KF subkf3_odd {}
+  fpmath _Float128 __builtin_subf128_round_to_odd (_Float128, _Float128);
+    SUBF128_ODD subkf3_odd {}
 
-  fpmath double __builtin_truncf128_round_to_odd_kf (_Float128);
-    TRUNCF128_ODD_KF trunckfdf2_odd {}
+  fpmath double __builtin_truncf128_round_to_odd (_Float128);
+    TRUNCF128_ODD trunckfdf2_odd {}
 
-  const signed long long __builtin_vsx_scalar_extract_expq_kf (_Float128);
-    VSEEQP_KF xsxexpqp_kf {}
+  const signed long long __builtin_vsx_scalar_extract_expq (_Float128);
+    VSEEQP xsxexpqp_kf {}
 
-  const signed __int128 __builtin_vsx_scalar_extract_sigq_kf (_Float128);
-    VSESQP_KF xsxsigqp_kf {}
+  const signed __int128 __builtin_vsx_scalar_extract_sigq (_Float128);
+    VSESQP xsxsigqp_kf {}
 
-; Note we cannot overload this function since it does not have KFmode
-; or TFmode arguments.
   const _Float128 __builtin_vsx_scalar_insert_exp_q (unsigned __int128, \
                                                      unsigned long long);
     VSIEQP xsiexpqp_kf {}
 
-  const _Float128 __builtin_vsx_scalar_insert_exp_qp_kf (_Float128, \
-							 unsigned long long);
-    VSIEQPF_KF xsiexpqpf_kf {}
+  const _Float128 __builtin_vsx_scalar_insert_exp_qp (_Float128, \
+                                                      unsigned long long);
+    VSIEQPF xsiexpqpf_kf {}
 
   const signed int __builtin_vsx_scalar_test_data_class_qp (_Float128, \
                                                             const int<7>);
@@ -2925,60 +2922,6 @@
   const signed int __builtin_vsx_scalar_test_neg_qp (_Float128);
     VSTDCNQP xststdcnegqp_kf {}
 
-
-; Builtins requiring hardware support for IEEE-128 floating-point.  Long double
-; must use the IEEE 128-bit encoding.
-[ieee128-hw-ld]
-  fpmath long double __builtin_addf128_round_to_odd_tf (long double, long double);
-    ADDF128_ODD_TF addtf3_odd {ieeeld}
-
-  fpmath long double __builtin_divf128_round_to_odd_tf (long double,long double);
-    DIVF128_ODD_TF divtf3_odd {ieeeld}
-
-  fpmath long double __builtin_fmaf128_round_to_odd_tf (long double, \
-							long double, \
-							long double);
-    FMAF128_ODD_TF fmatf4_odd {ieeeld}
-
-  fpmath long double __builtin_mulf128_round_to_odd_tf (long double, \
-							long double);
-    MULF128_ODD_TF multf3_odd {ieeeld}
-
-  const signed int __builtin_vsx_scalar_cmp_exp_qp_eq_tf (long double, \
-							  long double);
-    VSCEQPEQ_TF xscmpexpqp_eq_tf {ieeeld}
-
-  const signed int __builtin_vsx_scalar_cmp_exp_qp_gt_tf (long double, \
-							  long double);
-    VSCEQPGT_TF xscmpexpqp_gt_kf {ieeeld}
-
-  const signed int __builtin_vsx_scalar_cmp_exp_qp_lt_tf (long double, \
-							  long double);
-    VSCEQPLT_TF xscmpexpqp_lt_tf {ieeeld}
-
-  const signed int \
-      __builtin_vsx_scalar_cmp_exp_qp_unordered_tf (_Float128, _Float128);
-    VSCEQPUO_TF xscmpexpqp_unordered_tf {ieeeld}
-
-  fpmath long double __builtin_sqrtf128_round_to_odd_tf (long double);
-    SQRTF128_ODD_TF sqrttf2_odd {ieeeld}
-
-  fpmath long double __builtin_subf128_round_to_odd_tf (long double, \
-							long double);
-    SUBF128_ODD_TF subtf3_odd {ieeeld}
-
-  fpmath double __builtin_truncf128_round_to_odd_tf (long double);
-    TRUNCF128_ODD_TF trunctfdf2_odd {ieeeld}
-
-  const signed long long __builtin_vsx_scalar_extract_expq_tf (long double);
-    VSEEQP_TF xsxexpqp_tf {ieeeld}
-
-  const signed __int128 __builtin_vsx_scalar_extract_sigq_tf (long double);
-    VSESQP_TF xsxsigqp_tf {ieeeld}
-
-  const long double __builtin_vsx_scalar_insert_exp_qp_tf (_Float128, \
-							   unsigned long long);
-    VSIEQPF_TF xsiexpqpf_tf {ieeeld}
 
 
 ; Decimal floating-point builtins.
