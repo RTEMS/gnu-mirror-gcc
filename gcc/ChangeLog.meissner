@@ -1,3 +1,15 @@
+==================== patch #1 work094 branch
+
+Update ChangeLog.meissner.
+
+2022-07-13   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* ChangeLog.meissner: Update.
+
+==================== create branch
+
 2022-07-13   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
