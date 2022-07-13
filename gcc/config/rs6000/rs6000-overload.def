@@ -4474,25 +4474,33 @@
   signed int __builtin_vec_scalar_cmp_exp_eq (double, double);
     VSCEDPEQ
   signed int __builtin_vec_scalar_cmp_exp_eq (_Float128, _Float128);
-    VSCEQPEQ
+    VSCEQPEQ_KF
+  signed int __builtin_vec_scalar_cmp_exp_eq (long double, long double);
+    VSCEQPEQ_TF
 
 [VEC_VSCEGT, scalar_cmp_exp_gt, __builtin_vec_scalar_cmp_exp_gt]
   signed int __builtin_vec_scalar_cmp_exp_gt (double, double);
     VSCEDPGT
   signed int __builtin_vec_scalar_cmp_exp_gt (_Float128, _Float128);
-    VSCEQPGT
+    VSCEQPGT_KF
+  signed int __builtin_vec_scalar_cmp_exp_gt (long double, long double);
+    VSCEQPGT_TF
 
 [VEC_VSCELT, scalar_cmp_exp_lt, __builtin_vec_scalar_cmp_exp_lt]
   signed int __builtin_vec_scalar_cmp_exp_lt (double, double);
     VSCEDPLT
   signed int __builtin_vec_scalar_cmp_exp_lt (_Float128, _Float128);
-    VSCEQPLT
+    VSCEQPLT_KF
+  signed int __builtin_vec_scalar_cmp_exp_lt (long double, long double);
+    VSCEQPLT_TF
 
 [VEC_VSCEUO, scalar_cmp_exp_unordered, __builtin_vec_scalar_cmp_exp_unordered]
   signed int __builtin_vec_scalar_cmp_exp_unordered (double, double);
     VSCEDPUO
   signed int __builtin_vec_scalar_cmp_exp_unordered (_Float128, _Float128);
-    VSCEQPUO
+    VSCEQPUO_KF
+  signed int __builtin_vec_scalar_cmp_exp_unordered (long double, long double);
+    VSCEQPUO_TF
 
 [VEC_VSEE, scalar_extract_exp, __builtin_vec_scalar_extract_exp]
   unsigned int __builtin_vec_scalar_extract_exp (double);
