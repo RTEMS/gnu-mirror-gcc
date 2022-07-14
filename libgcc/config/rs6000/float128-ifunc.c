@@ -359,3 +359,9 @@ TCtype __mulkc3 (TFtype, TFtype, TFtype, TFtype)
 
 TCtype __divkc3 (TFtype, TFtype, TFtype, TFtype)
   __attribute__ ((__ifunc__ ("__divkc3_resolve")));
+
+TCtype __multc3_ieee128 (TFtype, TFtype, TFtype, TFtype)
+  __attribute__ ((__ifunc__ ("__mulkc3_resolve")));
+
+TCtype __divtc3_ieee128 (TFtype, TFtype, TFtype, TFtype)
+  __attribute__ ((__ifunc__ ("__divkc3_resolve")));
