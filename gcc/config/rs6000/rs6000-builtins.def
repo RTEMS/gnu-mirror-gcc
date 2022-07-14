@@ -2880,18 +2880,18 @@
   fpmath _Float128 __builtin_mulf128_round_to_odd_kf (_Float128, _Float128);
     MULF128_ODD_KF mulkf3_odd {}
 
-  const signed int __builtin_vsx_scalar_cmp_exp_qp_eq (_Float128, _Float128);
-    VSCEQPEQ xscmpexpqp_eq_kf {}
+  const signed int __builtin_vsx_scalar_cmp_exp_qp_eq_kf (_Float128, _Float128);
+    VSCEQPEQ_KF xscmpexpqp_eq_kf {}
 
-  const signed int __builtin_vsx_scalar_cmp_exp_qp_gt (_Float128, _Float128);
-    VSCEQPGT xscmpexpqp_gt_kf {}
+  const signed int __builtin_vsx_scalar_cmp_exp_qp_gt_kf (_Float128, _Float128);
+    VSCEQPGT_KF xscmpexpqp_gt_kf {}
 
-  const signed int __builtin_vsx_scalar_cmp_exp_qp_lt (_Float128, _Float128);
-    VSCEQPLT xscmpexpqp_lt_kf {}
+  const signed int __builtin_vsx_scalar_cmp_exp_qp_lt_kf (_Float128, _Float128);
+    VSCEQPLT_KF xscmpexpqp_lt_kf {}
 
   const signed int \
-      __builtin_vsx_scalar_cmp_exp_qp_unordered (_Float128, _Float128);
-    VSCEQPUO xscmpexpqp_unordered_kf {}
+      __builtin_vsx_scalar_cmp_exp_qp_unordered_kf (_Float128, _Float128);
+    VSCEQPUO_KF xscmpexpqp_unordered_kf {}
 
   fpmath _Float128 __builtin_sqrtf128_round_to_odd_kf (_Float128);
     SQRTF128_ODD_KF sqrtkf2_odd {}
@@ -2941,6 +2941,22 @@
   fpmath long double __builtin_mulf128_round_to_odd_tf (long double, \
 							long double);
     MULF128_ODD_TF multf3_odd {ieeeld}
+
+  const signed int __builtin_vsx_scalar_cmp_exp_qp_eq_tf (long double, \
+							  long double);
+    VSCEQPEQ_TF xscmpexpqp_eq_tf {ieeeld}
+
+  const signed int __builtin_vsx_scalar_cmp_exp_qp_gt_tf (long double, \
+							  long double);
+    VSCEQPGT_TF xscmpexpqp_gt_kf {ieeeld}
+
+  const signed int __builtin_vsx_scalar_cmp_exp_qp_lt_tf (long double, \
+							  long double);
+    VSCEQPLT_TF xscmpexpqp_lt_tf {ieeeld}
+
+  const signed int \
+      __builtin_vsx_scalar_cmp_exp_qp_unordered_tf (long double, long double);
+    VSCEQPUO_TF xscmpexpqp_unordered_tf {ieeeld}
 
   fpmath long double __builtin_sqrtf128_round_to_odd_tf (long double);
     SQRTF128_ODD_TF sqrttf2_odd {ieeeld}
