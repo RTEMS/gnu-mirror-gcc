@@ -104,6 +104,8 @@ if test x$use_locking = xyes; then
     [AC_DEFINE(HAVE_PTHREAD_LOCKING, 1, [Define if the system provides pthread locking mechanism.])])
 fi
 
+AM_CONDITIONAL(LTO_PLUGIN_USE_PTHREAD, [test "x$use_locking" = xyes])
+
 AM_PROG_LIBTOOL
 ACX_LT_HOST_FLAGS
 AC_SUBST(target_noncanonical)
