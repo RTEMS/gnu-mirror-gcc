@@ -2902,19 +2902,21 @@
   fpmath double __builtin_truncf128_round_to_odd_kf (_Float128);
     TRUNCF128_ODD_KF trunckfdf2_odd {}
 
-  const signed long long __builtin_vsx_scalar_extract_expq (_Float128);
-    VSEEQP xsxexpqp_kf {}
+  const signed long long __builtin_vsx_scalar_extract_expq_kf (_Float128);
+    VSEEQP_KF xsxexpqp_kf {}
 
-  const signed __int128 __builtin_vsx_scalar_extract_sigq (_Float128);
-    VSESQP xsxsigqp_kf {}
+  const signed __int128 __builtin_vsx_scalar_extract_sigq_kf (_Float128);
+    VSESQP_KF xsxsigqp_kf {}
 
+; Note we cannot overload this function since it does not have KFmode
+; or TFmode arguments.
   const _Float128 __builtin_vsx_scalar_insert_exp_q (unsigned __int128, \
                                                      unsigned long long);
     VSIEQP xsiexpqp_kf {}
 
-  const _Float128 __builtin_vsx_scalar_insert_exp_qp (_Float128, \
-                                                      unsigned long long);
-    VSIEQPF xsiexpqpf_kf {}
+  const _Float128 __builtin_vsx_scalar_insert_exp_qp_kf (_Float128, \
+							 unsigned long long);
+    VSIEQPF_KF xsiexpqpf_kf {}
 
   const signed int __builtin_vsx_scalar_test_data_class_qp (_Float128, \
                                                             const int<7>);
@@ -2967,6 +2969,16 @@
 
   fpmath double __builtin_truncf128_round_to_odd_tf (long double);
     TRUNCF128_ODD_TF trunctfdf2_odd {ieeeld}
+
+  const signed long long __builtin_vsx_scalar_extract_expq_tf (long double);
+    VSEEQP_TF xsxexpqp_tf {ieeeld}
+
+  const signed __int128 __builtin_vsx_scalar_extract_sigq_tf (long double);
+    VSESQP_TF xsxsigqp_tf {ieeeld}
+
+  const long double __builtin_vsx_scalar_insert_exp_qp_tf (long double,		\
+							   unsigned long long);
+    VSIEQPF_TF xsiexpqpf_tf {ieeeld}
 
 
 ; Decimal floating-point builtins.
