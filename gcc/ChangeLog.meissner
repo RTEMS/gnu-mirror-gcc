@@ -1,3 +1,31 @@
+==================== work094, patch #5
+
+Make IEEE 128-bit test data built-in functions overloaded.
+
+2022-07-13   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def
+	(__builtin_vsx_scalar_test_data_class_qp_kf): Rename KFmode IEEE
+	128-bit test data built-in functions to have a KF suffix to allow
+	overloading.
+	(__builtin_vsx_scalar_test_neg_qp_kf): Likewise.
+	(__builtin_vsx_scalar_test_data_class_qp_tf): Add TFmode variants
+	for IEEE 128-bit insert and extract support.
+	(__builtin_vsx_scalar_test_neg_qp_tf): Likewise.
+	* config/rs6000/rs6000-overload.def
+	(__builtin_vec_scalar_test_data_class): Add TFmode overloads.
+	(__builtin_vec_scalar_test_neg): Likewise.
+	(__builtin_vec_scalar_test_neg_qp): Likewise.
+	(__builtin_vec_scalar_test_data_class_qp): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/bfp/scalar-test-data-class-11.c:  Update the
+	expected error message.
+	* gcc.target/powerpc/bfp/scalar-test-neg-5.c: Likewise.
+
 ==================== work094, patch #4
 
 Make IEEE 128-bit extract and insert built-in functions overloaded.
