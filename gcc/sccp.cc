@@ -70,7 +70,7 @@ struct vertex
 /* Each SSA name corresponds to a vertex.  Indexed by SSA version number.  */
 static *vertices;
 /* Each SCC is a vector of version nums.  */
-static vec<vec<unsigned>*> tarjan_sccs; // TODO Correct * style?
+static vec<vec<unsigned>> tarjan_sccs;
 static vec<unsigned> tarjan_stack;
 static unsigned tarjan_index = 0;
 
@@ -85,9 +85,9 @@ init_sccp (void)
 /* Free structures used for sccp.  */
 
 static void
-finalize_sscp (void)
+finalize_sccp (void)
 {
-  // TODO
+  XDELETEVEC (vertices);
 }
 
 /* TODO */
@@ -149,14 +149,14 @@ tarjan_strongconnect (gphi *phi)
 
   if (vertices[vnum].lowlink == vertices[vnum].index)
     {
-      vec<unsigned> *new_scc = new vec<unsigned>();
+      vec<unsigned> new_scc = vNULL;
 
       unsigned stack_vnum;
       do /* There will always be at least 1 vertex on stack.  */
 	{
 	  stack_vnum = tarjan_stack.pop ();
 	  vertices[stack_vnum].is_on_stack = false;
-	  new_scc->safe_push (stack_vnum);
+	  new_scc.safe_push (stack_vnum);
 	}
       while (stack_vnum != vnum);
 
@@ -243,16 +243,16 @@ pass_sccp::execute (function *)
   tarjan_compute_sccs ();
 
   std::cerr << "ahoj" << std::endl;
-  for (vec<unsigned> *scc : tarjan_sccs)
+  for (vec<unsigned> scc : tarjan_sccs)
     {
-      for (unsigned phi : *scc)
+      for (unsigned phi : scc)
 	{
 	  std::cerr << phi << std::endl;
 	}
       std::cerr << std::endl;
     }
 
-  finalize_sscp ();
+  finalize_sccp ();
 
   return 0; // TODO What should I return?
 }
