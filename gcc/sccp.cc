@@ -34,7 +34,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-pretty-print.h"
 #include "vec.h"
 #include "libiberty.h"
-#include <algorithm>
+
+#include "print-tree.h"
+#include "dumpfile.h"
 
 // TODO Imported for global var num_ssa_names to work
 #include "backend.h"
@@ -68,7 +70,7 @@ struct vertex
 /* Each SSA name corresponds to a vertex.  Indexed by SSA version number.  */
 static *vertices;
 /* Each SCC is a vector of version nums.  */
-static vec<vec<unsigned>*> tarjan_sccs;
+static vec<vec<unsigned>*> tarjan_sccs; // TODO Correct * style?
 static vec<unsigned> tarjan_stack;
 static unsigned tarjan_index = 0;
 
@@ -95,6 +97,7 @@ tarjan_assign_index (unsigned vnum)
 {
   vertices[vnum].index = tarjan_index;
   vertices[vnum].lowlink = tarjan_index;
+  vertices[vnum].visited = true;
   tarjan_index++;
 }
 
@@ -115,7 +118,7 @@ tarjan_update_lowlink (unsigned vnum, unsigned new_lowlink)
 static void
 tarjan_strongconnect (gphi *phi)
 {
-  tree foo = gimple_vdef (phi); // TODO Name.  Do I want vuse?
+  tree foo = gimple_get_lhs (phi); // TODO foo
   unsigned vnum = SSA_NAME_VERSION (foo);
 
   tarjan_assign_index (vnum);
@@ -174,9 +177,11 @@ tarjan_compute_sccs (void)
       for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
 	{
 	  gphi *phi = pi.phi ();
-	  tree foo = gimple_vdef (phi); // TODO Name
+	  tree foo = gimple_get_lhs (phi); // TODO foo
+	  //fprintf (dump_file, "ahoj\n"); // DEBUG, use -fdump-tree-sccp
+	  //debug_tree (foo); // DEBUG
 	  unsigned vnum = SSA_NAME_VERSION (foo);
-	  // TODO Filtrovat stmts jako v copyprop
+	  // TODO Filtrovat stmts jako v copyprop?
 	  if (!vertices[vnum].visited)
 	    {
 	      tarjan_strongconnect (phi);
@@ -217,9 +222,27 @@ public:
 unsigned
 pass_sccp::execute (function *)
 {
+  // DEBUG
+  /*
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      debug_bb (bb);
+      gphi_iterator pi;
+      std::cerr << "PHI LIST" << std::endl;
+      for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
+	{
+	  gphi *phi = pi.phi ();
+	  debug_gimple_stmt (phi);
+	}
+      std::cerr << std::endl << std::endl;
+    }
+  */
+
   init_sccp ();
   tarjan_compute_sccs ();
 
+  std::cerr << "ahoj" << std::endl;
   for (vec<unsigned> *scc : tarjan_sccs)
     {
       for (unsigned phi : *scc)
