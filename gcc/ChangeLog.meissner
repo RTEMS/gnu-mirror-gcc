@@ -1,3 +1,41 @@
+==================== work095, patch #2.
+
+Remove setting -mblock-ops-vector-pair on power10.
+
+Testing has shown that using the load vector pair and store vector pair
+instructions for block moves has some performance issues on power10.  This
+patch does not set this option by default.  If it is a win in other
+machines, this flag can be set in the ISA options.
+
+2022-07-18   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal):
+	Remove code setting -mblock-ops-vector-pair by default on
+	power10.
+
+==================== work095, patch #2.
+
+Make BLOCK_OPTS options settable with ISA flags.
+
+In wanting to turn off block moves from generating load and store vector
+pair operations on the power10, I noticed that the options for controlling
+the code block moves generate (OPTION_MASK_BLOCK_OPS_UNALIGNED_VSX and
+OPTION_MASK_BLOCK_OPS_VECTOR_PAIR) were not set in POWERPC_MASKS.  It is
+possible in future CPUs we might want to enable these options
+automatically.  This code moves these options to POWERPC_MASKS.
+
+2022-07-18   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-cpus.def (POWERPC_MASKS): Add
+	OPTION_MASK_BLOCK_OPS_VECTOR_PAIR and
+	OPTION_MASK_BLOCK_OPS_UNALIGNED_VSX.
+
+==================== work095, branch setup.
+
 2022-07-18   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
