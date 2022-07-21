@@ -58,135 +58,288 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa-propagate.h"
 #include "gimple-fold.h"
 
-/* Variable from Tarjan's SCC algorithm.  */
 struct vertex
 {
   bool visited;
   bool is_on_stack;
   unsigned index;
   unsigned lowlink;
+  gphi* stmt;
+};
+
+static unsigned
+min (unsigned x, unsigned y)
+{
+  if (x < y)
+    return x;
+  else
+    return y;
 }
 
-/* Each SSA name corresponds to a vertex.  Indexed by SSA version number.  */
-static *vertices;
-/* Each SCC is a vector of version nums.  */
-static vec<vec<unsigned>> tarjan_sccs;
-static vec<unsigned> tarjan_stack;
-static unsigned tarjan_index = 0;
+static void
+tarjan_set_using (gimple* stmt)
+{
+  gimple_set_plf (stmt, GF_PLF_1, true);
+}
 
-/* Initialize structures used for sccp.  */
+static void
+tarjan_clear_using (gimple* stmt)
+{
+  gimple_set_plf (stmt, GF_PLF_1, false);
+}
+
+static bool
+tarjan_is_using (gimple* stmt)
+{
+  return gimple_plf (stmt, GF_PLF_1);
+}
+
+static void
+tarjan_set_phinum (gphi* phi, unsigned num)
+{
+  gimple_set_uid (phi, num);
+}
+
+static unsigned
+tarjan_phinum (gphi* phi)
+{
+  return gimple_uid (phi);
+}
 
 static void
 init_sccp (void)
 {
-  vertices = XCNEWVEC (vertex, num_ssa_names);
+  // Clear 'tarjan using' flag on all statements
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      gimple_stmt_iterator gsi;
+      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+	{
+	  gimple* stmt = gsi_stmt (gsi);
+	  tarjan_clear_using (stmt);
+	}
+    }
 }
-
-/* Free structures used for sccp.  */
 
 static void
 finalize_sccp (void)
 {
-  XDELETEVEC (vertices);
 }
 
-/* TODO */
+/* Return vector of all PHI functions available to this pass that aren't
+   abnormal.  */
 
-static void
-tarjan_assign_index (unsigned vnum)
+static vec<gphi *>
+get_all_normal_phis (void)
 {
-  vertices[vnum].index = tarjan_index;
-  vertices[vnum].lowlink = tarjan_index;
-  vertices[vnum].visited = true;
-  tarjan_index++;
-}
+  vec<gphi *> result = vNULL;
 
-/* TODO */
-
-static void
-tarjan_update_lowlink (unsigned vnum, unsigned new_lowlink)
-{
-  unsigned old_lowlink = vertices[vnum].lowlink;
-  if (old_lowlink < new_lowlink)
-    vertices[vnum].lowlink = old_lowlink;
-  else
-    vertices[vnum].lowlink = new_lowlink;
-}
-
-/* Tarjan SCC algorithm subprocedure.  */
-
-static void
-tarjan_strongconnect (gphi *phi)
-{
-  tree foo = gimple_get_lhs (phi); // TODO foo
-  unsigned vnum = SSA_NAME_VERSION (foo);
-
-  tarjan_assign_index (vnum);
-  tarjan_stack.safe_push (vnum);
-  vertices[vnum].is_on_stack = true;
-
-  unsigned i;
-  for (i = 0; i < gimple_phi_num_args (phi); i++)
-    {
-      tree op = gimple_phi_arg_def (phi, i);
-      // TODO Is there a case where the next line won't work?
-      gimple *stmt = SSA_NAME_DEF_STMT (op);
-      if (gimple_code (stmt) != GIMPLE_PHI)
-	continue;
-
-      unsigned op_vnum = SSA_NAME_VERSION (op);
-      if (!vertices[op_vnum].visited)
-	{
-	  // TODO Will the next line work?
-	  tarjan_strongconnect (as_a <gphi *> (stmt));
-	  tarjan_update_lowlink (vnum, vertices[op_vnum].lowlink);
-	}
-      else if (vertices[op_vnum].is_on_stack)
-	{
-	  tarjan_update_lowlink (vnum, vertices[op_vnum].index);
-	}
-    }
-
-  if (vertices[vnum].lowlink == vertices[vnum].index)
-    {
-      vec<unsigned> new_scc = vNULL;
-
-      unsigned stack_vnum;
-      do /* There will always be at least 1 vertex on stack.  */
-	{
-	  stack_vnum = tarjan_stack.pop ();
-	  vertices[stack_vnum].is_on_stack = false;
-	  new_scc.safe_push (stack_vnum);
-	}
-      while (stack_vnum != vnum);
-
-      tarjan_sccs.safe_push (new_scc);
-    }
-}
-
-/* Runs Tarjan's SCC algorithm on PHIs. Fills out tarjan_sccs.  */
-
-static void
-tarjan_compute_sccs (void)
-{
   basic_block bb;
   FOR_EACH_BB_FN (bb, cfun)
     {
       gphi_iterator pi;
-
       for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
 	{
 	  gphi *phi = pi.phi ();
-	  tree foo = gimple_get_lhs (phi); // TODO foo
-	  //fprintf (dump_file, "ahoj\n"); // DEBUG, use -fdump-tree-sccp
-	  //debug_tree (foo); // DEBUG
-	  unsigned vnum = SSA_NAME_VERSION (foo);
-	  // TODO Filtrovat stmts jako v copyprop?
-	  if (!vertices[vnum].visited)
+	  tree ssa_name = gimple_phi_result (phi);
+	  if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (ssa_name))
+	    continue;
+	  result.safe_push (phi);
+	}
+    }
+
+  return result;
+}
+
+static vec<vertex>
+tarjan_phis_to_vertices (vec<gphi *> phis)
+{
+  vec<vertex> result = vNULL;
+  for (gphi *phi : phis)
+    {
+      vertex v;
+      v.visited = false;
+      v.is_on_stack = false;
+      v.index = 0;
+      v.lowlink = 0;
+      v.stmt = phi;
+
+      result.safe_push (v);
+    }
+  return result;
+}
+
+static vec<vec<gphi *>>
+tarjan_compute_sccs (vec<gphi *> phis)
+{
+  vec<vec<gphi *>> sccs = vNULL;
+  vec<unsigned> worklist = vNULL;
+  unsigned curr_index = 0;
+
+  vec<vertex> vs = tarjan_phis_to_vertices (phis);
+
+  /* Assign phinums and set PHI functions' 'using' flag.  */
+  unsigned i;
+  for (i = 0; i < vs.length (); i++)
+    {
+      gphi *phi = vs[i].stmt;
+      tarjan_set_using (phi);
+      tarjan_set_phinum (phi, i);
+    }
+
+  /* Put all vertices on worklist.  */
+  for (i = 0; i < vs.length (); i++)
+    {
+      worklist.safe_push (i);
+    }
+
+  /* Worklist loop.  */
+  while (!worklist.is_empty ())
+    {
+      unsigned i = worklist.pop();
+
+      if (!vs[i].visited)
+	{
+	  gphi *phi = vs[i].stmt;
+
+	  /* Assign index to this vertex.  */
+	  vs[i].index = curr_index;
+	  vs[i].lowlink = curr_index;
+	  curr_index++;
+
+	  /* Put this vertex back on worklist.  */
+	  worklist.safe_push (i);
+
+	  /* Put not yet visited children of vertex on worklist and update
+	     lowlink of this vertex according to lowlinks of children on stack.  */
+	  unsigned j;
+	  for (j = 0; j < gimple_phi_num_args (phi); j++)
 	    {
-	      tarjan_strongconnect (phi);
+	      tree op_ssa = gimple_phi_arg_def (phi, i);
+	      gimple *op_stmt = SSA_NAME_DEF_STMT (op_ssa);
+
+	      /* Skip any operand that isn't a vertex we're using.  */
+	      if (!tarjan_is_using (op_stmt))
+		continue;
+
+	      gphi *op_phi = dyn_cast<gphi *> (op_stmt);
+	      if (op_phi == NULL)
+		/* Only PHI functions have the 'using' flags set.  */
+		gcc_unreachable ();
+
+	      unsigned op_i = tarjan_phinum (op_phi);
+	      if (!vs[op_i].visited)
+		{
+		  worklist.safe_push (op_i);
+		}
+	      else if (vs[op_i].is_on_stack)
+		{
+		  vs[i].lowlink = min (vs[i].lowlink, vs[op_i].index);
+		}
 	    }
 	}
+      else if (vs[i].is_on_stack) // TODO This check is redundant
+	{
+	  vec<gphi *> scc = vNULL;
+
+	  /* Put vertex back on stack/worklist.  */
+	  worklist.safe_push (i);
+
+	  /* Pop scc from stack/worklist.  */
+	  unsigned j;
+	  do
+	    {
+	      j = worklist.pop();
+	      scc.safe_push (vs[j].stmt);
+	      vs[j].is_on_stack = false;
+	    }
+	  while (vs[j].lowlink != vs[j].index);
+
+	  sccs.safe_push (scc);
+	}
+    }
+
+  /* Clear PHI functions' 'using' flags.  */
+  for (vertex v : vs)
+    {
+      gphi *phi = v.stmt;
+      tarjan_clear_using (phi);
+    }
+
+  return sccs;
+}
+
+static void
+replace_scc_by_value (vec<gphi *> scc, tree v)
+{
+  for (gphi *phi : scc)
+    {
+      // DEBUG
+      tree ssa_name = gimple_get_lhs (phi);
+      unsigned vnum_get_replaced = SSA_NAME_VERSION (ssa_name);
+      unsigned vnum_replaced_by = SSA_NAME_VERSION (v);
+      std::cerr << "Replacing " << vnum_get_replaced << " by " <<
+	vnum_replaced_by << std::endl;
+      // TODO Remove phi statement and free ssa name
+      // TODO Replace occurences of phi with v
+    }
+}
+
+static void remove_redundant_phis (vec<gphi *> phis); // TODO Where to put
+						      // declaration?
+
+static void
+process_scc (vec<gphi *> scc)
+{
+  vec<gphi *> inner = vNULL;
+  vec<tree> outer_ops = vNULL;
+
+  for (gphi *phi : scc)
+    {
+      bool is_inner = true;
+      
+      unsigned i;
+      for (i = 0; i < gimple_phi_num_args (phi); i++)
+	{
+	  tree op = gimple_phi_arg_def (phi, i);
+	  gimple *op_stmt = SSA_NAME_DEF_STMT (op);
+
+	  // Check if operand is a phi from scc (TODO Efficiency)
+	  bool op_in_scc = false;
+	  for (gphi *foo : scc)
+	    {
+	      if (op_stmt == foo)
+		op_in_scc = true;
+	    }
+
+	  if (!op_in_scc)
+	    {
+	      outer_ops.safe_push (op);
+	      is_inner = false;
+	    }
+	}
+
+      if (is_inner)
+	{
+	  inner.safe_push (phi);
+	}
+    }
+
+  // TODO if == 0 -> unreachable?
+  if (outer_ops.length () == 1)
+    replace_scc_by_value (scc, outer_ops.pop());
+  else if (outer_ops.length () > 1)
+    remove_redundant_phis (inner);
+}
+
+static void
+remove_redundant_phis (vec<gphi *> phis)
+{
+  vec<vec<gphi *>> sccs = tarjan_compute_sccs (phis);
+  for (vec<gphi *> scc : sccs)
+    {
+      process_scc (scc);
     }
 }
 
@@ -222,35 +375,22 @@ public:
 unsigned
 pass_sccp::execute (function *)
 {
-  // DEBUG
-  /*
-  basic_block bb;
-  FOR_EACH_BB_FN (bb, cfun)
-    {
-      debug_bb (bb);
-      gphi_iterator pi;
-      std::cerr << "PHI LIST" << std::endl;
-      for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
-	{
-	  gphi *phi = pi.phi ();
-	  debug_gimple_stmt (phi);
-	}
-      std::cerr << std::endl << std::endl;
-    }
-  */
-
   init_sccp ();
-  tarjan_compute_sccs ();
+  vec<vec<gphi *>> sccs = tarjan_compute_sccs (get_all_normal_phis ());
 
-  std::cerr << "ahoj" << std::endl;
-  for (vec<unsigned> scc : tarjan_sccs)
+  std::cerr << "function:" << std::endl;
+  for (vec<gphi *> scc : sccs)
     {
-      for (unsigned phi : scc)
+      std::cerr << "scc:" << std::endl;
+      for (gphi *phi : scc)
 	{
-	  std::cerr << phi << std::endl;
+	  tree ssa_name = gimple_phi_result (phi);
+	  unsigned vnum = SSA_NAME_VERSION (ssa_name);
+	  std::cerr << vnum << std::endl;
 	}
       std::cerr << std::endl;
     }
+  std::cerr << std::endl;
 
   finalize_sccp ();
 
