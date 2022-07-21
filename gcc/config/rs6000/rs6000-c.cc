@@ -1935,11 +1935,13 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 	   128-bit variant of built-in function.  */
 	if (GET_MODE_PRECISION (arg1_mode) > 64)
 	  {
-	    /* If first argument is of float variety, choose variant
-	       that expects __ieee128 argument.  Otherwise, expect
-	       __int128 argument.  */
+	    /* If first argument is of float variety, choose variant that
+	       expects _Float128 argument (or long double if long doubles are
+	       IEEE 128-bit).  Otherwise, expect __int128 argument.  */
 	    if (GET_MODE_CLASS (arg1_mode) == MODE_FLOAT)
-	      instance_code = RS6000_BIF_VSIEQPF;
+	      instance_code = ((arg1_mode == TFmode)
+			       ? RS6000_BIF_VSIEQPF_TF
+			       : RS6000_BIF_VSIEQPF_KF);
 	    else
 	      instance_code = RS6000_BIF_VSIEQP;
 	  }
