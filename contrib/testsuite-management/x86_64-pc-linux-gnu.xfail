@@ -145,3 +145,8 @@ UNRESOLVED: g++.dg/asan/asan_test.C -O2  compilation failed to produce executabl
 FAIL: g++.dg/cpp0x/variadic-alias3.C -std=c++17 (internal compiler error: in hashtab_chk_error, at hash-table.cc:137)
 FAIL: g++.dg/cpp0x/variadic-alias3.C -std=c++17 (test for excess errors)
 FAIL: gcc.target/i386/auto-init-4.c scan-assembler-times long\t-16843010 5
+FAIL: gcc.dg/pr23911.c scan-tree-dump-times dce3 "__complex__ \\(1.0e\\+0, 0.0\\)" 2
+FAIL: gcc.dg/pr56837.c scan-tree-dump-times optimized "memset ..c, 68, 16384.;" 1
+XPASS: g++.dg/warn/Wstringop-overflow-4.C -std=gnu++14  (test for bogus messages, line 198)
+XPASS: g++.dg/warn/Wstringop-overflow-4.C -std=gnu++17  (test for bogus messages, line 198)
+XPASS: g++.dg/warn/Wstringop-overflow-4.C -std=gnu++20  (test for bogus messages, line 198)
