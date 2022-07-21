@@ -4716,7 +4716,10 @@ narrowing_initializer_constant_valid_p (tree value, tree endtype, tree *cache)
     {
       tree inner = TREE_OPERAND (op0, 0);
       if (inner == error_mark_node
-	  || ! INTEGRAL_MODE_P (TYPE_MODE (TREE_TYPE (inner)))
+	  || ! INTEGRAL_TYPE_P (TREE_TYPE (op0))
+	  || ! SCALAR_INT_MODE_P (TYPE_MODE (TREE_TYPE (op0)))
+	  || ! INTEGRAL_TYPE_P (TREE_TYPE (inner))
+	  || ! SCALAR_INT_MODE_P (TYPE_MODE (TREE_TYPE (inner)))
 	  || (GET_MODE_SIZE (SCALAR_INT_TYPE_MODE (TREE_TYPE (op0)))
 	      > GET_MODE_SIZE (SCALAR_INT_TYPE_MODE (TREE_TYPE (inner)))))
 	break;
@@ -4728,7 +4731,10 @@ narrowing_initializer_constant_valid_p (tree value, tree endtype, tree *cache)
     {
       tree inner = TREE_OPERAND (op1, 0);
       if (inner == error_mark_node
-	  || ! INTEGRAL_MODE_P (TYPE_MODE (TREE_TYPE (inner)))
+	  || ! INTEGRAL_TYPE_P (TREE_TYPE (op1))
+	  || ! SCALAR_INT_MODE_P (TYPE_MODE (TREE_TYPE (op1)))
+	  || ! INTEGRAL_TYPE_P (TREE_TYPE (inner))
+	  || ! SCALAR_INT_MODE_P (TYPE_MODE (TREE_TYPE (inner)))
 	  || (GET_MODE_SIZE (SCALAR_INT_TYPE_MODE (TREE_TYPE (op1)))
 	      > GET_MODE_SIZE (SCALAR_INT_TYPE_MODE (TREE_TYPE (inner)))))
 	break;
@@ -5069,7 +5075,7 @@ initializer_constant_valid_p (tree value, tree endtype, bool reverse)
    an element of a "constant" initializer.  */
 
 bool
-initializer_constant_valid_for_bitfield_p (tree value)
+initializer_constant_valid_for_bitfield_p (const_tree value)
 {
   /* For bitfields we support integer constants or possibly nested aggregates
      of such.  */
@@ -5078,7 +5084,7 @@ initializer_constant_valid_for_bitfield_p (tree value)
     case CONSTRUCTOR:
       {
 	unsigned HOST_WIDE_INT idx;
-	tree elt;
+	const_tree elt;
 
 	FOR_EACH_CONSTRUCTOR_VALUE (CONSTRUCTOR_ELTS (value), idx, elt)
 	  if (!initializer_constant_valid_for_bitfield_p (elt))

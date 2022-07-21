@@ -23,58 +23,60 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
-with Aspects;        use Aspects;
-with Atree;          use Atree;
-with Checks;         use Checks;
-with Contracts;      use Contracts;
-with Debug;          use Debug;
-with Einfo;          use Einfo;
-with Einfo.Entities; use Einfo.Entities;
-with Einfo.Utils;    use Einfo.Utils;
-with Elists;         use Elists;
-with Errout;         use Errout;
-with Exp_Disp;       use Exp_Disp;
-with Exp_Tss;        use Exp_Tss;
-with Exp_Util;       use Exp_Util;
-with Freeze;         use Freeze;
-with Ghost;          use Ghost;
-with Lib;            use Lib;
-with Lib.Xref;       use Lib.Xref;
-with Namet;          use Namet;
-with Nlists;         use Nlists;
-with Nmake;          use Nmake;
-with Opt;            use Opt;
-with Par_SCO;        use Par_SCO;
-with Restrict;       use Restrict;
-with Rident;         use Rident;
-with Rtsfind;        use Rtsfind;
-with Sem;            use Sem;
-with Sem_Aux;        use Sem_Aux;
-with Sem_Case;       use Sem_Case;
-with Sem_Cat;        use Sem_Cat;
-with Sem_Ch3;        use Sem_Ch3;
-with Sem_Ch6;        use Sem_Ch6;
-with Sem_Ch7;        use Sem_Ch7;
-with Sem_Ch8;        use Sem_Ch8;
-with Sem_Dim;        use Sem_Dim;
-with Sem_Eval;       use Sem_Eval;
-with Sem_Prag;       use Sem_Prag;
-with Sem_Res;        use Sem_Res;
-with Sem_Type;       use Sem_Type;
-with Sem_Util;       use Sem_Util;
-with Sem_Warn;       use Sem_Warn;
-with Sinfo;          use Sinfo;
-with Sinfo.Nodes;    use Sinfo.Nodes;
-with Sinfo.Utils;    use Sinfo.Utils;
-with Sinput;         use Sinput;
-with Snames;         use Snames;
-with Stand;          use Stand;
+with Aspects;          use Aspects;
+with Atree;            use Atree;
+with Checks;           use Checks;
+with Contracts;        use Contracts;
+with Debug;            use Debug;
+with Einfo;            use Einfo;
+with Einfo.Entities;   use Einfo.Entities;
+with Einfo.Utils;      use Einfo.Utils;
+with Elists;           use Elists;
+with Errout;           use Errout;
+with Exp_Ch3;          use Exp_Ch3;
+with Exp_Disp;         use Exp_Disp;
+with Exp_Tss;          use Exp_Tss;
+with Exp_Util;         use Exp_Util;
+with Freeze;           use Freeze;
+with Ghost;            use Ghost;
+with Lib;              use Lib;
+with Lib.Xref;         use Lib.Xref;
+with Namet;            use Namet;
+with Nlists;           use Nlists;
+with Nmake;            use Nmake;
+with Opt;              use Opt;
+with Par_SCO;          use Par_SCO;
+with Restrict;         use Restrict;
+with Rident;           use Rident;
+with Rtsfind;          use Rtsfind;
+with Sem;              use Sem;
+with Sem_Aux;          use Sem_Aux;
+with Sem_Case;         use Sem_Case;
+with Sem_Cat;          use Sem_Cat;
+with Sem_Ch3;          use Sem_Ch3;
+with Sem_Ch6;          use Sem_Ch6;
+with Sem_Ch7;          use Sem_Ch7;
+with Sem_Ch8;          use Sem_Ch8;
+with Sem_Dim;          use Sem_Dim;
+with Sem_Eval;         use Sem_Eval;
+with Sem_Prag;         use Sem_Prag;
+with Sem_Res;          use Sem_Res;
+with Sem_Type;         use Sem_Type;
+with Sem_Util;         use Sem_Util;
+with Sem_Warn;         use Sem_Warn;
+with Sinfo;            use Sinfo;
+with Sinfo.Nodes;      use Sinfo.Nodes;
+with Sinfo.Utils;      use Sinfo.Utils;
+with Sinput;           use Sinput;
+with Snames;           use Snames;
+with Stand;            use Stand;
+with System.Case_Util; use System.Case_Util;
 with Table;
-with Targparm;       use Targparm;
-with Ttypes;         use Ttypes;
-with Tbuild;         use Tbuild;
-with Urealp;         use Urealp;
-with Warnsw;         use Warnsw;
+with Targparm;         use Targparm;
+with Ttypes;           use Ttypes;
+with Tbuild;           use Tbuild;
+with Urealp;           use Urealp;
+with Warnsw;           use Warnsw;
 
 with GNAT.Heap_Sort_G;
 
@@ -1649,6 +1651,18 @@ package body Sem_Ch13 is
       --  pragma of the same kind. Flag Is_Generic should be set when the
       --  context denotes a generic instance.
 
+      function Relocate_Expression (Source : Node_Id) return Node_Id;
+      --  Outside of a generic this function is equivalent to Relocate_Node.
+      --  Inside a generic it is an identity function, because Relocate_Node
+      --  would create a new node that is not associated with the generic
+      --  template. This association is needed to save references to entities
+      --  that are global to the generic (and might be not visible from where
+      --  the generic is instantiated).
+      --
+      --  Inside a generic the original tree is shared between aspect and
+      --  a corresponding pragma (or an attribute definition clause). This
+      --  parallels what is done in sem_prag.adb (see Get_Argument).
+
       --------------
       -- Decorate --
       --------------
@@ -1833,6 +1847,19 @@ package body Sem_Ch13 is
             Insert_After (N, Prag);
          end if;
       end Insert_Pragma;
+
+      -------------------------
+      -- Relocate_Expression --
+      -------------------------
+
+      function Relocate_Expression (Source : Node_Id) return Node_Id is
+      begin
+         if Inside_A_Generic then
+            return Source;
+         else
+            return Atree.Relocate_Node (Source);
+         end if;
+      end Relocate_Expression;
 
       --  Local variables
 
@@ -2723,13 +2750,11 @@ package body Sem_Ch13 is
                Expr_Value : Boolean := False;
 
             begin
-               --  Check valid declarations for 'Yield
+               --  Check valid entity for 'Yield
 
-               if Nkind (N) in N_Abstract_Subprogram_Declaration
-                             | N_Entry_Declaration
-                             | N_Generic_Subprogram_Declaration
-                             | N_Subprogram_Declaration
-                             | N_Formal_Subprogram_Declaration
+               if (Is_Subprogram (E)
+                     or else Is_Generic_Subprogram (E)
+                     or else Is_Entry (E))
                  and then not Within_Protected_Type (E)
                then
                   null;
@@ -3230,7 +3255,7 @@ package body Sem_Ch13 is
                     Make_Attribute_Definition_Clause (Loc,
                       Name       => Ent,
                       Chars      => Nam,
-                      Expression => Relocate_Node (Expr));
+                      Expression => Relocate_Expression (Expr));
 
                   --  If the address is specified, then we treat the entity as
                   --  referenced, to avoid spurious warnings. This is analogous
@@ -3294,7 +3319,7 @@ package body Sem_Ch13 is
                        Make_Pragma_Argument_Association (Sloc (Ent),
                          Expression => Ent),
                        Make_Pragma_Argument_Association (Sloc (Expr),
-                         Expression => Relocate_Node (Expr))),
+                         Expression => Relocate_Expression (Expr))),
                      Pragma_Name                  => Name_Attach_Handler);
 
                   --  We need to insert this pragma into the tree to get proper
@@ -3336,7 +3361,7 @@ package body Sem_Ch13 is
                        Make_Pragma_Argument_Association (Sloc (Ent),
                          Expression => Ent),
                        Make_Pragma_Argument_Association (Sloc (Expr),
-                         Expression => Relocate_Node (Expr))),
+                         Expression => Relocate_Expression (Expr))),
                      Pragma_Name => Name_Predicate);
 
                   --  Mark type has predicates, and remember what kind of
@@ -3581,7 +3606,7 @@ package body Sem_Ch13 is
                        Make_Attribute_Definition_Clause (Loc,
                          Name       => Ent,
                          Chars      => Nam,
-                         Expression => Relocate_Node (Expr));
+                         Expression => Relocate_Expression (Expr));
                   end if;
 
                --  Suppress/Unsuppress
@@ -4600,32 +4625,12 @@ package body Sem_Ch13 is
 
                   --  Build the precondition/postcondition pragma
 
-                  --  We use Relocate_Node here rather than New_Copy_Tree
-                  --  because subsequent visibility analysis of the aspect
-                  --  depends on this sharing. This should be cleaned up???
-
-                  --  If the context is generic, we want to preserve the
-                  --  original tree, and simply share it between aspect and
-                  --  generated attribute. This parallels what is done in
-                  --  sem_prag.adb (see Get_Argument).
-
-                  declare
-                     New_Expr : Node_Id;
-
-                  begin
-                     if Inside_A_Generic then
-                        New_Expr := Expr;
-                     else
-                        New_Expr := Relocate_Node (Expr);
-                     end if;
-
-                     Aitem := Make_Aitem_Pragma
-                       (Pragma_Argument_Associations => New_List (
-                          Make_Pragma_Argument_Association (Eloc,
-                            Chars      => Name_Check,
-                            Expression => New_Expr)),
-                          Pragma_Name                => Pname);
-                  end;
+                  Aitem := Make_Aitem_Pragma
+                    (Pragma_Argument_Associations => New_List (
+                       Make_Pragma_Argument_Association (Eloc,
+                         Chars      => Name_Check,
+                         Expression => Relocate_Expression (Expr))),
+                       Pragma_Name                => Pname);
 
                   --  Add message unless exception messages are suppressed
 
@@ -11352,6 +11357,16 @@ package body Sem_Ch13 is
             return;
 
          when Aspect_Storage_Model_Type =>
+
+            --  The aggregate argument of Storage_Model_Type is optional, and
+            --  when not present the aspect defaults to the native storage
+            --  model (where the address type is System.Address, and other
+            --  arguments default to corresponding native storage operations).
+
+            if No (Expression (ASN)) then
+               return;
+            end if;
+
             T := Entity (ASN);
 
             declare
@@ -11754,13 +11769,11 @@ package body Sem_Ch13 is
          Nod1 : Node_Id;
 
       begin
-         if Present (Lst) then
-            Nod1 := First (Lst);
-            while Present (Nod1) loop
-               Check_Expr_Constants (Nod1);
-               Next (Nod1);
-            end loop;
-         end if;
+         Nod1 := First (Lst);
+         while Present (Nod1) loop
+            Check_Expr_Constants (Nod1);
+            Next (Nod1);
+         end loop;
       end Check_List_Constants;
 
    --  Start of processing for Check_Constant_Address_Clause
@@ -12136,24 +12149,22 @@ package body Sem_Ch13 is
             begin
                --  Gather discriminants into Comp
 
-               if DS /= No_List then
-                  Citem := First (DS);
-                  while Present (Citem) loop
-                     if Nkind (Citem) = N_Discriminant_Specification then
-                        declare
-                           Ent : constant Entity_Id :=
-                                   Defining_Identifier (Citem);
-                        begin
-                           if Ekind (Ent) = E_Discriminant then
-                              Ncomps := Ncomps + 1;
-                              Comps (Ncomps) := Ent;
-                           end if;
-                        end;
-                     end if;
+               Citem := First (DS);
+               while Present (Citem) loop
+                  if Nkind (Citem) = N_Discriminant_Specification then
+                     declare
+                        Ent : constant Entity_Id :=
+                                Defining_Identifier (Citem);
+                     begin
+                        if Ekind (Ent) = E_Discriminant then
+                           Ncomps := Ncomps + 1;
+                           Comps (Ncomps) := Ent;
+                        end if;
+                     end;
+                  end if;
 
-                     Next (Citem);
-                  end loop;
-               end if;
+                  Next (Citem);
+               end loop;
 
                --  Gather component entities into Comp
 
@@ -13138,12 +13149,20 @@ package body Sem_Ch13 is
             end if;
          end;
 
+         --  Before we build a predicate function, ensure that discriminant
+         --  checking functions are available. The predicate function might
+         --  need to call these functions if the predicate references
+         --  any components declared in a variant part.
+         if Ekind (E) = E_Record_Type and then Has_Discriminants (E) then
+            Build_Or_Copy_Discr_Checking_Funcs (Parent (E));
+         end if;
+
          Build_Predicate_Function (E, N);
       end if;
 
       --  If type has delayed aspects, this is where we do the preanalysis at
       --  the freeze point, as part of the consistent visibility check. Note
-      --  that this must be done after calling Build_Predicate_Functions or
+      --  that this must be done after calling Build_Predicate_Function or
       --  Build_Invariant_Procedure since these subprograms fix occurrences of
       --  the subtype name in the saved expression so that they will not cause
       --  trouble in the preanalysis.
@@ -15936,6 +15955,7 @@ package body Sem_Ch13 is
             while Present (It.Typ) loop
                if Ekind (It.Nam) = E_Function
                   and then Scope (It.Nam) = Scope (Typ)
+                  and then Present (First_Formal (It.Nam))
                   and then Etype (First_Formal (It.Nam)) = Typ
                then
                   F1 := First_Formal (It.Nam);
@@ -16550,12 +16570,14 @@ package body Sem_Ch13 is
 
          return;
 
-      elsif not Present (Addr_Type) then
-         Error_Msg_N ("argument association for Address_Type missing; "
-                         & "must be specified as first aspect argument", N);
-         return;
+      --  If Addr_Type is not present as the first association, then we default
+      --  it to System.Address.
 
-      elsif Nam = Name_Null_Address then
+      elsif not Present (Addr_Type) then
+         Addr_Type := RTE (RE_Address);
+      end if;
+
+      if Nam = Name_Null_Address then
          if not Is_Entity_Name (N)
            or else not Is_Constant_Object (Entity (N))
            or else
@@ -17326,9 +17348,10 @@ package body Sem_Ch13 is
    procedure Validate_Storage_Model_Type_Aspect
      (Typ : Entity_Id; ASN : Node_Id)
    is
-      Assoc  : Node_Id;
-      Choice : Entity_Id;
-      Expr   : Node_Id;
+      Assoc       : Node_Id;
+      Choice      : Entity_Id;
+      Choice_Name : Name_Id;
+      Expr        : Node_Id;
 
       Address_Type_Id : Entity_Id := Empty;
       Null_Address_Id : Entity_Id := Empty;
@@ -17338,7 +17361,49 @@ package body Sem_Ch13 is
       Copy_To_Id      : Entity_Id := Empty;
       Storage_Size_Id : Entity_Id := Empty;
 
+      procedure Check_And_Resolve_Storage_Model_Type_Argument
+        (Expr        : Node_Id;
+         Typ         : Entity_Id;
+         Argument_Id : in out Entity_Id;
+         Nam         : Name_Id);
+      --  Checks that the subaspect for Nam has not already been specified for
+      --  Typ's Storage_Model_Type aspect (i.e., checks Argument_Id = Empty),
+      --  resolves Expr, and sets Argument_Id to the entity resolved for Expr.
+
+      procedure Check_And_Resolve_Storage_Model_Type_Argument
+        (Expr        : Node_Id;
+         Typ         : Entity_Id;
+         Argument_Id : in out Entity_Id;
+         Nam         : Name_Id)
+      is
+         Name_String : String := Get_Name_String (Nam);
+
+      begin
+         To_Mixed (Name_String);
+
+         if Present (Argument_Id) then
+            Error_Msg_String (1 .. Name_String'Length) := Name_String;
+            Error_Msg_Strlen := Name_String'Length;
+
+            Error_Msg_N ("~ already specified", Expr);
+         end if;
+
+         Resolve_Storage_Model_Type_Argument (Expr, Typ, Address_Type_Id, Nam);
+         Argument_Id := Entity (Expr);
+      end Check_And_Resolve_Storage_Model_Type_Argument;
+
+   --  Start of processing for Validate_Storage_Model_Type_Aspect
+
    begin
+      --  The aggregate argument of Storage_Model_Type is optional, and when
+      --  not present the aspect defaults to the native storage model (where
+      --  the address type is System.Address, and other arguments default to
+      --  the corresponding native storage operations).
+
+      if No (Expression (ASN)) then
+         return;
+      end if;
+
       --  Each expression must resolve to an entity of the right kind or proper
       --  profile.
 
@@ -17349,65 +17414,67 @@ package body Sem_Ch13 is
 
          Choice := First (Choices (Assoc));
 
+         Choice_Name := Chars (Choice);
+
          if Nkind (Choice) /= N_Identifier or else Present (Next (Choice)) then
             Error_Msg_N ("illegal name in association", Choice);
 
-         elsif Chars (Choice) = Name_Address_Type then
+         elsif Choice_Name = Name_Address_Type then
             if Assoc /= First (Component_Associations (Expression (ASN))) then
                Error_Msg_N ("Address_Type must be first association", Choice);
             end if;
 
-            Resolve_Storage_Model_Type_Argument
+            Check_And_Resolve_Storage_Model_Type_Argument
               (Expr, Typ, Address_Type_Id, Name_Address_Type);
-            Address_Type_Id := Entity (Expr);
-
-         --  Shouldn't we check for duplicates of the same subaspect name,
-         --  and issue an error in such cases???
-
-         elsif not Present (Address_Type_Id) then
-            Error_Msg_N
-              ("Address_Type missing, must be first association", Choice);
-
-         elsif Chars (Choice) = Name_Null_Address then
-            Resolve_Storage_Model_Type_Argument
-              (Expr, Typ, Address_Type_Id, Name_Null_Address);
-            Null_Address_Id := Entity (Expr);
-
-         elsif Chars (Choice) = Name_Allocate then
-            Resolve_Storage_Model_Type_Argument
-              (Expr, Typ, Address_Type_Id, Name_Allocate);
-            Allocate_Id := Entity (Expr);
-
-         elsif Chars (Choice) = Name_Deallocate then
-            Resolve_Storage_Model_Type_Argument
-              (Expr, Typ, Address_Type_Id, Name_Deallocate);
-            Deallocate_Id := Entity (Expr);
-
-         elsif Chars (Choice) = Name_Copy_From then
-            Resolve_Storage_Model_Type_Argument
-              (Expr, Typ, Address_Type_Id, Name_Copy_From);
-            Copy_From_Id := Entity (Expr);
-
-         elsif Chars (Choice) = Name_Copy_To then
-            Resolve_Storage_Model_Type_Argument
-              (Expr, Typ, Address_Type_Id, Name_Copy_To);
-            Copy_To_Id := Entity (Expr);
-
-         elsif Chars (Choice) = Name_Storage_Size then
-            Resolve_Storage_Model_Type_Argument
-              (Expr, Typ, Address_Type_Id, Name_Storage_Size);
-            Storage_Size_Id := Entity (Expr);
 
          else
-            Error_Msg_N
-              ("invalid name for Storage_Model_Type argument", Choice);
+            --  It's allowed to leave out the Address_Type argument, in which
+            --  case the address type is defined to default to System.Address.
+
+            if No (Address_Type_Id) then
+               Address_Type_Id := RTE (RE_Address);
+            end if;
+
+            if Choice_Name = Name_Null_Address then
+               Check_And_Resolve_Storage_Model_Type_Argument
+                 (Expr, Typ, Null_Address_Id, Name_Null_Address);
+
+            elsif Choice_Name = Name_Allocate then
+               Check_And_Resolve_Storage_Model_Type_Argument
+                 (Expr, Typ, Allocate_Id, Name_Allocate);
+
+            elsif Choice_Name = Name_Deallocate then
+               Check_And_Resolve_Storage_Model_Type_Argument
+                 (Expr, Typ, Deallocate_Id, Name_Deallocate);
+
+            elsif Choice_Name = Name_Copy_From then
+               Check_And_Resolve_Storage_Model_Type_Argument
+                 (Expr, Typ, Copy_From_Id, Name_Copy_From);
+
+            elsif Choice_Name = Name_Copy_To then
+               Check_And_Resolve_Storage_Model_Type_Argument
+                 (Expr, Typ, Copy_To_Id, Name_Copy_To);
+
+            elsif Choice_Name = Name_Storage_Size then
+               Check_And_Resolve_Storage_Model_Type_Argument
+                 (Expr, Typ, Storage_Size_Id, Name_Storage_Size);
+
+            else
+               Error_Msg_N
+                 ("invalid name for Storage_Model_Type argument", Choice);
+            end if;
          end if;
 
          Next (Assoc);
       end loop;
 
-      if No (Address_Type_Id) then
-         Error_Msg_N ("match for Address_Type not found", ASN);
+      --  If Address_Type has been specified as or defaults to System.Address,
+      --  then other "subaspect" arguments can be specified, but are optional.
+      --  Otherwise, all other arguments are required and an error is flagged
+      --  about any that are missing.
+
+      if Address_Type_Id = RTE (RE_Address) then
+         return;
 
       elsif No (Null_Address_Id) then
          Error_Msg_N ("match for Null_Address primitive not found", ASN);

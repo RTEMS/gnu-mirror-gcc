@@ -1438,6 +1438,20 @@ cxx_eval_builtin_function_call (const constexpr_ctx *ctx, tree t, tree fun,
 	/* These builtins shall be ignored during constant expression
 	   evaluation.  */
 	return void_node;
+      case BUILT_IN_UNREACHABLE:
+      case BUILT_IN_TRAP:
+	if (!*non_constant_p && !ctx->quiet)
+	  {
+	    /* Do not allow__builtin_unreachable in constexpr function.
+	       The __builtin_unreachable call with BUILTINS_LOCATION
+	       comes from cp_maybe_instrument_return.  */
+	    if (EXPR_LOCATION (t) == BUILTINS_LOCATION)
+	      error ("%<constexpr%> call flows off the end of the function");
+	    else
+	      error ("%q+E is not a constant expression", t);
+	  }
+	*non_constant_p = true;
+	return t;
       default:
 	break;
       }
@@ -1531,18 +1545,9 @@ cxx_eval_builtin_function_call (const constexpr_ctx *ctx, tree t, tree fun,
     {
       if (!*non_constant_p && !ctx->quiet)
 	{
-	  /* Do not allow__builtin_unreachable in constexpr function.
-	     The __builtin_unreachable call with BUILTINS_LOCATION
-	     comes from cp_maybe_instrument_return.  */
-	  if (fndecl_built_in_p (fun, BUILT_IN_UNREACHABLE)
-	      && EXPR_LOCATION (t) == BUILTINS_LOCATION)
-	    error ("%<constexpr%> call flows off the end of the function");
-	  else
-	    {
-	      new_call = build_call_array_loc (EXPR_LOCATION (t), TREE_TYPE (t),
-					       CALL_EXPR_FN (t), nargs, args);
-	      error ("%q+E is not a constant expression", new_call);
-	    }
+	  new_call = build_call_array_loc (EXPR_LOCATION (t), TREE_TYPE (t),
+					   CALL_EXPR_FN (t), nargs, args);
+	  error ("%q+E is not a constant expression", new_call);
 	}
       *non_constant_p = true;
       return t;
@@ -3502,6 +3507,13 @@ cxx_eval_conditional_expression (const constexpr_ctx *ctx, tree t,
     val = TREE_OPERAND (t, 1);
   if (TREE_CODE (t) == IF_STMT && !val)
     val = void_node;
+  /* A TARGET_EXPR may be nested inside another TARGET_EXPR, but still
+     serve as the initializer for the same object as the outer TARGET_EXPR,
+     as in
+       A a = true ? A{} : A{};
+     so strip the inner TARGET_EXPR so we don't materialize a temporary.  */
+  if (TREE_CODE (val) == TARGET_EXPR)
+    val = TARGET_EXPR_INITIAL (val);
   return cxx_eval_constant_expression (ctx, val, lval, non_constant_p,
 				       overflow_p, jump_target);
 }
@@ -4198,9 +4210,16 @@ cxx_eval_bit_field_ref (const constexpr_ctx *ctx, tree t,
   if (*non_constant_p)
     return t;
 
-  if (TREE_CODE (whole) == VECTOR_CST)
-    return fold_ternary (BIT_FIELD_REF, TREE_TYPE (t), whole,
-			 TREE_OPERAND (t, 1), TREE_OPERAND (t, 2));
+  if (TREE_CODE (whole) == VECTOR_CST || !INTEGRAL_TYPE_P (TREE_TYPE (t)))
+    {
+      if (tree r = fold_ternary (BIT_FIELD_REF, TREE_TYPE (t), whole,
+				 TREE_OPERAND (t, 1), TREE_OPERAND (t, 2)))
+	return r;
+      if (!ctx->quiet)
+	error ("%qE is not a constant expression", orig_whole);
+      *non_constant_p = true;
+      return t;
+    }
 
   start = TREE_OPERAND (t, 2);
   istart = tree_to_shwi (start);
@@ -4695,9 +4714,17 @@ init_subob_ctx (const constexpr_ctx *ctx, constexpr_ctx &new_ctx,
       else
 	new_ctx.object = build_ctor_subob_ref (index, type, ctx->object);
     }
-  tree elt = build_constructor (type, NULL);
-  CONSTRUCTOR_NO_CLEARING (elt) = true;
-  new_ctx.ctor = elt;
+
+  if (is_empty_class (type))
+    /* Leave ctor null for an empty subobject, they aren't represented in the
+       result of evaluation.  */
+    new_ctx.ctor = NULL_TREE;
+  else
+    {
+      tree elt = build_constructor (type, NULL);
+      CONSTRUCTOR_NO_CLEARING (elt) = true;
+      new_ctx.ctor = elt;
+    }
 
   if (TREE_CODE (value) == TARGET_EXPR)
     /* Avoid creating another CONSTRUCTOR when we expand the TARGET_EXPR.  */
@@ -4762,11 +4789,14 @@ cxx_eval_bare_aggregate (const constexpr_ctx *ctx, tree t,
       ctx = &new_ctx;
     };
   verify_ctor_sanity (ctx, type);
-  vec<constructor_elt, va_gc> **p = &CONSTRUCTOR_ELTS (ctx->ctor);
-  vec_alloc (*p, vec_safe_length (v));
-
-  if (CONSTRUCTOR_PLACEHOLDER_BOUNDARY (t))
-    CONSTRUCTOR_PLACEHOLDER_BOUNDARY (ctx->ctor) = 1;
+  vec<constructor_elt, va_gc> **p = nullptr;
+  if (ctx->ctor)
+    {
+      p = &CONSTRUCTOR_ELTS (ctx->ctor);
+      vec_alloc (*p, vec_safe_length (v));
+      if (CONSTRUCTOR_PLACEHOLDER_BOUNDARY (t))
+	CONSTRUCTOR_PLACEHOLDER_BOUNDARY (ctx->ctor) = 1;
+    }
 
   unsigned i;
   tree index, value;
@@ -4777,12 +4807,9 @@ cxx_eval_bare_aggregate (const constexpr_ctx *ctx, tree t,
       tree orig_value = value;
       /* Like in cxx_eval_store_expression, omit entries for empty fields.  */
       bool no_slot = TREE_CODE (type) == RECORD_TYPE && is_empty_field (index);
-      if (no_slot)
-	new_ctx = *ctx;
-      else
-	init_subob_ctx (ctx, new_ctx, index, value);
+      init_subob_ctx (ctx, new_ctx, index, value);
       int pos_hint = -1;
-      if (new_ctx.ctor != ctx->ctor)
+      if (new_ctx.ctor != ctx->ctor && !no_slot)
 	{
 	  /* If we built a new CONSTRUCTOR, attach it now so that other
 	     initializers can refer to it.  */
@@ -4817,17 +4844,19 @@ cxx_eval_bare_aggregate (const constexpr_ctx *ctx, tree t,
 	  inner->value = elt;
 	  changed = true;
 	}
+      else if (no_slot)
+	/* This is an initializer for an empty field; now that we've
+	   checked that it's constant, we can ignore it.  */
+	changed = true;
       else if (index
 	       && (TREE_CODE (index) == NOP_EXPR
 		   || TREE_CODE (index) == POINTER_PLUS_EXPR))
 	{
-	  /* This is an initializer for an empty base; now that we've
-	     checked that it's constant, we can ignore it.  */
+	  /* Old representation of empty bases.  FIXME remove.  */
+	  gcc_checking_assert (false);
 	  gcc_assert (is_empty_class (TREE_TYPE (TREE_TYPE (index))));
 	  changed = true;
 	}
-      else if (no_slot)
-	changed = true;
       else
 	{
 	  if (TREE_CODE (type) == UNION_TYPE
@@ -4852,6 +4881,8 @@ cxx_eval_bare_aggregate (const constexpr_ctx *ctx, tree t,
   if (*non_constant_p || !changed)
     return t;
   t = ctx->ctor;
+  if (!t)
+    t = build_constructor (type, NULL);
   /* We're done building this CONSTRUCTOR, so now we can interpret an
      element without an explicit initializer as value-initialized.  */
   CONSTRUCTOR_NO_CLEARING (t) = false;
@@ -5836,6 +5867,16 @@ cxx_eval_store_expression (const constexpr_ctx *ctx, tree t,
       valp = &cep->value;
     }
 
+  /* For initialization of an empty base, the original target will be
+     *(base*)this, evaluation of which resolves to the object
+     argument, which has the derived type rather than the base type.  */
+  if (!empty_base && !(same_type_ignoring_top_level_qualifiers_p
+		       (initialized_type (init), type)))
+    {
+      gcc_assert (is_empty_class (TREE_TYPE (target)));
+      empty_base = true;
+    }
+
   /* Detect modifying a constant object in constexpr evaluation.
      We have found a const object that is being modified.  Figure out
      if we need to issue an error.  Consider
@@ -5904,7 +5945,7 @@ cxx_eval_store_expression (const constexpr_ctx *ctx, tree t,
 	  *valp = build_constructor (type, NULL);
 	  CONSTRUCTOR_NO_CLEARING (*valp) = no_zero_init;
 	}
-      new_ctx.ctor = *valp;
+      new_ctx.ctor = empty_base ? NULL_TREE : *valp;
       new_ctx.object = target;
       /* Avoid temporary materialization when initializing from a TARGET_EXPR.
 	 We don't need to mess with AGGR_EXPR_SLOT/VEC_INIT_EXPR_SLOT because
@@ -5934,16 +5975,10 @@ cxx_eval_store_expression (const constexpr_ctx *ctx, tree t,
 
   gcc_checking_assert (!*valp || (same_type_ignoring_top_level_qualifiers_p
 				  (TREE_TYPE (*valp), type)));
-  if (empty_base || !(same_type_ignoring_top_level_qualifiers_p
-		      (initialized_type (init), type)))
+  if (empty_base)
     {
-      /* For initialization of an empty base, the original target will be
-       *(base*)this, evaluation of which resolves to the object
-       argument, which has the derived type rather than the base type.  In
-       this situation, just evaluate the initializer and return, since
-       there's no actual data to store, and we didn't build a CONSTRUCTOR.  */
-      gcc_assert (is_empty_class (TREE_TYPE (target)));
-      empty_base = true;
+      /* Just evaluate the initializer and return, since there's no actual data
+	 to store, and we didn't build a CONSTRUCTOR.  */
       if (!*valp)
 	{
 	  /* But do make sure we have something in *valp.  */
@@ -9023,12 +9058,20 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 		  "before C++17");
       return false;
 
-    case DYNAMIC_CAST_EXPR:
-    case PSEUDO_DTOR_EXPR:
     case NEW_EXPR:
     case VEC_NEW_EXPR:
     case DELETE_EXPR:
     case VEC_DELETE_EXPR:
+      if (cxx_dialect >= cxx20)
+	/* In C++20, new-expressions are potentially constant.  */
+	return true;
+      else if (flags & tf_error)
+	error_at (loc, "new-expression is not a constant expression "
+		  "before C++20");
+      return false;
+
+    case DYNAMIC_CAST_EXPR:
+    case PSEUDO_DTOR_EXPR:
     case THROW_EXPR:
     case OMP_PARALLEL:
     case OMP_TASK:

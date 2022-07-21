@@ -104,7 +104,7 @@ is
 
    function To_Neg_Int (A : Uns32) return Int32
    with
-     Annotate => (GNATprove, Terminating),
+     Annotate => (GNATprove, Always_Return),
      Pre      => In_Int32_Range (-Big (A)),
      Post     => Big (To_Neg_Int'Result) = -Big (A);
    --  Convert to negative integer equivalent. If the input is in the range
@@ -114,7 +114,7 @@ is
 
    function To_Pos_Int (A : Uns32) return Int32
    with
-     Annotate => (GNATprove, Terminating),
+     Annotate => (GNATprove, Always_Return),
      Pre      => In_Int32_Range (Big (A)),
      Post     => Big (To_Pos_Int'Result) = Big (A);
    --  Convert to positive integer equivalent. If the input is in the range
@@ -541,8 +541,10 @@ is
          end if;
       end if;
 
+      pragma Assert (In_Int32_Range (Big_Q));
       pragma Assert (Big (Qu) = abs Big_Q);
       pragma Assert (Big (Ru) = abs Big_R);
+      Prove_Sign_R;
 
       --  Set final signs (RM 4.5.5(27-30))
 
@@ -563,7 +565,6 @@ is
          Q := (if Z > 0 then To_Neg_Int (Qu) else To_Pos_Int (Qu));
       end if;
 
-      Prove_Sign_R;
       Prove_Signs;
    end Scaled_Divide32;
 

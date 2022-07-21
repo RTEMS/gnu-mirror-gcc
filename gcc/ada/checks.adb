@@ -2297,6 +2297,15 @@ package body Checks is
       Assign : constant Node_Id := Parent (Target);
 
    begin
+      --  Do not apply length checks if parent is still an assignment statement
+      --  with Suppress_Assignment_Checks flag set.
+
+      if Nkind (Assign) = N_Assignment_Statement
+        and then Suppress_Assignment_Checks (Assign)
+      then
+         return;
+      end if;
+
       --  No check is needed for the initialization of an object whose
       --  nominal subtype is unconstrained.
 
@@ -2944,14 +2953,28 @@ package body Checks is
 
          --  Similarly, if the expression is an aggregate in an object
          --  declaration, apply it to the object after the declaration.
-         --  This is only necessary in rare cases of tagged extensions
-         --  initialized with an aggregate with an "others => <>" clause.
+
+         --  This is only necessary in cases of tagged extensions
+         --  initialized with an aggregate with an "others => <>" clause,
+         --  when the subtypes of LHS and RHS do not statically match or
+         --  when we know the object's type will be rewritten later.
+         --  The condition for the later is copied from the
+         --  Analyze_Object_Declaration procedure when it actually builds the
+         --  subtype.
 
          elsif Nkind (Par) = N_Object_Declaration then
-            Insert_Action_After (Par,
-              Make_Predicate_Check (Typ,
-                New_Occurrence_Of (Defining_Identifier (Par), Sloc (N))));
-            return;
+            if Subtypes_Statically_Match
+                 (Etype (Defining_Identifier (Par)), Typ)
+              and then (Nkind (N) = N_Extension_Aggregate
+                         or else (Is_Definite_Subtype (Typ)
+                                   and then Build_Default_Subtype_OK (Typ)))
+            then
+               Insert_Action_After (Par,
+                  Make_Predicate_Check (Typ,
+                    New_Occurrence_Of (Defining_Identifier (Par), Sloc (N))));
+               return;
+            end if;
+
          end if;
       end if;
 
@@ -6448,7 +6471,7 @@ package body Checks is
       end if;
 
       --  Do not set range check flag if parent is assignment statement or
-      --  object declaration with Suppress_Assignment_Checks flag set
+      --  object declaration with Suppress_Assignment_Checks flag set.
 
       if Nkind (Parent (N)) in N_Assignment_Statement | N_Object_Declaration
         and then Suppress_Assignment_Checks (Parent (N))
@@ -10486,6 +10509,11 @@ package body Checks is
       --  Returns expression to compute:
       --    N'First or N'Last using Duplicate_Subexpr_No_Checks
 
+      function Is_Cond_Expr_Ge (N : Node_Id; V : Node_Id) return Boolean;
+      function Is_Cond_Expr_Le (N : Node_Id; V : Node_Id) return Boolean;
+      --  Return True if N is a conditional expression whose dependent
+      --  expressions are all known and greater/lower than or equal to V.
+
       function Range_E_Cond
         (Exptyp : Entity_Id;
          Typ    : Entity_Id;
@@ -10507,6 +10535,16 @@ package body Checks is
          Indx : Nat) return Node_Id;
       --  Return expression to compute:
       --    Exp'First < Typ'First or else Exp'Last > Typ'Last
+
+      function "<" (Left, Right : Node_Id) return Boolean
+      is (if Is_Floating_Point_Type (S_Typ)
+          then Expr_Value_R (Left) < Expr_Value_R (Right)
+          else Expr_Value   (Left) < Expr_Value   (Right));
+      function "<=" (Left, Right : Node_Id) return Boolean
+      is (if Is_Floating_Point_Type (S_Typ)
+          then Expr_Value_R (Left) <= Expr_Value_R (Right)
+          else Expr_Value   (Left) <= Expr_Value   (Right));
+      --  Convenience comparison functions of integer or floating point values
 
       ---------------
       -- Add_Check --
@@ -10688,6 +10726,60 @@ package body Checks is
               Make_Integer_Literal (Loc, Indx)));
       end Get_N_Last;
 
+      ---------------------
+      -- Is_Cond_Expr_Ge --
+      ---------------------
+
+      function Is_Cond_Expr_Ge (N : Node_Id; V : Node_Id) return Boolean is
+      begin
+         --  Only if expressions are relevant for the time being
+
+         if Nkind (N) = N_If_Expression then
+            declare
+               Cond  : constant Node_Id := First (Expressions (N));
+               Thenx : constant Node_Id := Next (Cond);
+               Elsex : constant Node_Id := Next (Thenx);
+
+            begin
+               return Compile_Time_Known_Value (Thenx)
+                 and then V <= Thenx
+                 and then
+                   ((Compile_Time_Known_Value (Elsex) and then V <= Elsex)
+                    or else Is_Cond_Expr_Ge (Elsex, V));
+            end;
+
+         else
+            return False;
+         end if;
+      end Is_Cond_Expr_Ge;
+
+      ---------------------
+      -- Is_Cond_Expr_Le --
+      ---------------------
+
+      function Is_Cond_Expr_Le (N : Node_Id; V : Node_Id) return Boolean is
+      begin
+         --  Only if expressions are relevant for the time being
+
+         if Nkind (N) = N_If_Expression then
+            declare
+               Cond  : constant Node_Id := First (Expressions (N));
+               Thenx : constant Node_Id := Next (Cond);
+               Elsex : constant Node_Id := Next (Thenx);
+
+            begin
+               return Compile_Time_Known_Value (Thenx)
+                 and then Thenx <= V
+                 and then
+                   ((Compile_Time_Known_Value (Elsex) and then Elsex <= V)
+                    or else Is_Cond_Expr_Le (Elsex, V));
+            end;
+
+         else
+            return False;
+         end if;
+      end Is_Cond_Expr_Le;
+
       ------------------
       -- Range_E_Cond --
       ------------------
@@ -10768,13 +10860,6 @@ package body Checks is
                  Right_Opnd =>
                    Get_E_First_Or_Last (Loc, Typ, Indx, Name_Last)));
       end Range_N_Cond;
-
-      function "<" (Left, Right : Node_Id) return Boolean
-      is (if Is_Floating_Point_Type (S_Typ)
-          then Expr_Value_R (Left) < Expr_Value_R (Right)
-          else Expr_Value   (Left) < Expr_Value   (Right));
-      --  Convenience comparison function of integer or floating point
-      --  values.
 
    --  Start of processing for Selected_Range_Checks
 
@@ -10871,6 +10956,14 @@ package body Checks is
                then
                   LB := T_LB;
                   Known_LB := True;
+
+               --  Similarly; deal with the case where the low bound is a
+               --  conditional expression whose result is greater than or
+               --  equal to the target low bound.
+
+               elsif Is_Cond_Expr_Ge (LB, T_LB) then
+                  LB := T_LB;
+                  Known_LB := True;
                end if;
 
                --  Likewise for the high bound
@@ -10881,6 +10974,10 @@ package body Checks is
                elsif Ekind (Etype (HB)) = E_Signed_Integer_Subtype
                  and then Scalar_Range (Etype (HB)) = Scalar_Range (T_Typ)
                then
+                  HB := T_HB;
+                  Known_HB := True;
+
+               elsif Is_Cond_Expr_Le (HB, T_HB) then
                   HB := T_HB;
                   Known_HB := True;
                end if;

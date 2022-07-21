@@ -554,9 +554,9 @@ package Sinfo is
    --  The tree after this light expansion should be fully analyzed
    --  semantically, which sometimes requires the insertion of semantic
    --  preanalysis, for example for subprogram contracts and pragma
-   --  check/assert. In particular, all expression must have their proper type,
-   --  and semantic links should be set between tree nodes (partial to full
-   --  view, etc.) Some kinds of nodes should be either absent, or can be
+   --  check/assert. In particular, all expressions must have their proper
+   --  type, and semantic links should be set between tree nodes (partial to
+   --  full view, etc.). Some kinds of nodes should be either absent, or can be
    --  ignored by the formal verification backend:
 
    --      N_Object_Renaming_Declaration: can be ignored safely
@@ -926,12 +926,6 @@ package Sinfo is
    --    For a subprogram declaration, the flag is set except in the case where
    --    a pragma Import or Interface applies, in which case no body is
    --    permitted (in Ada 83 or Ada 95).
-
-   --  By_Ref
-   --    Present in N_Simple_Return_Statement and N_Extended_Return_Statement,
-   --    this flag is set when the returned expression is already allocated on
-   --    the secondary stack and thus the result is passed by reference rather
-   --    than copied another time.
 
    --  Cleanup_Actions
    --    Present in block statements created for transient blocks, contains
@@ -1680,6 +1674,10 @@ package Sinfo is
    --    nodes which emulate the barrier function of a protected entry body.
    --    The flag is used when checking for incorrect use of Current_Task.
 
+   --  Is_Enum_Array_Aggregate
+   --    A flag set on an aggregate created internally while building the
+   --    images tables for enumerations.
+
    --  Is_Expanded_Build_In_Place_Call
    --    This flag is set in an N_Function_Call node to indicate that the extra
    --    actuals to support a build-in-place style of call have been added to
@@ -1793,6 +1791,9 @@ package Sinfo is
    --    A flag present in all expression nodes. Used temporarily during
    --    overloading determination. The setting of this flag is not relevant
    --    once overloading analysis is complete.
+
+   --  Is_Parenthesis_Aggregate
+   --    A flag set on an aggregate that uses parentheses as delimiters
 
    --  Is_Power_Of_2_For_Shift
    --    A flag present only in N_Op_Expon nodes. It is set when the
@@ -2298,7 +2299,7 @@ package Sinfo is
    --    can be set in N_Object_Declaration nodes, to similarly suppress any
    --    checks on the initializing value. In assignment statements it also
    --    suppresses access checks in the generated code for out- and in-out
-   --    parameters in entry calls.
+   --    parameters in entry calls, as well as length checks.
 
    --  Suppress_Loop_Warnings
    --    Used in N_Loop_Statement node to indicate that warnings within the
@@ -4024,7 +4025,9 @@ package Sinfo is
       --  Compile_Time_Known_Aggregate
       --  Expansion_Delayed
       --  Has_Self_Reference
+      --  Is_Enum_Array_Aggregate
       --  Is_Homogeneous_Aggregate
+      --  Is_Parenthesis_Aggregate
       --  plus fields for expression
 
       --  Note: this structure is used for both record and array aggregates
@@ -4648,7 +4651,7 @@ package Sinfo is
 
       --  Note: The Actions field temporarily holds any actions associated with
       --  evaluation of the Expression. During expansion of the case expression
-      --  these actions are wrapped into an N_Expressions_With_Actions node
+      --  these actions are wrapped into an N_Expression_With_Actions node
       --  replacing the original expression.
 
       --  Note: this node never appears in the tree passed to the back end,
@@ -5567,7 +5570,6 @@ package Sinfo is
       --  Expression (set to Empty if no expression present)
       --  Storage_Pool
       --  Procedure_To_Call
-      --  By_Ref
       --  Comes_From_Extended_Return_Statement
 
       --  Note: Return_Statement_Entity points to an E_Return_Statement
@@ -5582,7 +5584,6 @@ package Sinfo is
       --  Handled_Statement_Sequence (set to Empty if not present)
       --  Storage_Pool
       --  Procedure_To_Call
-      --  By_Ref
 
       --  Note: Return_Statement_Entity points to an E_Return_Statement.
 

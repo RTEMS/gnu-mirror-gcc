@@ -1816,10 +1816,10 @@ package body Sem_Eval is
 
    begin
       --  Never known at compile time if bad type or raises Constraint_Error
-      --  or empty (latter case occurs only as a result of a previous error).
+      --  or empty (which can occur as a result of a previous error or in the
+      --  case of e.g. an imported constant).
 
       if No (Op) then
-         Check_Error_Detected;
          return False;
 
       elsif Op = Error
@@ -7485,17 +7485,15 @@ package body Sem_Eval is
                   return;
                end if;
 
-               if Present (Expressions (N)) then
-                  Exp := First (Expressions (N));
-                  while Present (Exp) loop
-                     if Raises_Constraint_Error (Exp) then
-                        Why_Not_Static (Exp);
-                        return;
-                     end if;
+               Exp := First (Expressions (N));
+               while Present (Exp) loop
+                  if Raises_Constraint_Error (Exp) then
+                     Why_Not_Static (Exp);
+                     return;
+                  end if;
 
-                     Next (Exp);
-                  end loop;
-               end if;
+                  Next (Exp);
+               end loop;
 
             --  Special case a subtype name
 

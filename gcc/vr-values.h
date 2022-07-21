@@ -41,6 +41,7 @@ public:
   // ?? These should be cleaned, merged, and made private.
   tree vrp_evaluate_conditional (tree_code, tree, tree, gimple *);
   void vrp_visit_cond_stmt (gcond *, edge *);
+  bool fold_cond (gcond *);
   tree vrp_evaluate_conditional_warnv_with_ops (gimple *stmt, enum tree_code,
 						tree, tree, bool,
 						bool *, bool *);
@@ -53,7 +54,6 @@ private:
   bool simplify_bit_ops_using_ranges (gimple_stmt_iterator *, gimple *);
   bool simplify_min_or_max_using_ranges (gimple_stmt_iterator *, gimple *);
   bool simplify_cond_using_ranges_1 (gcond *);
-  bool fold_cond (gcond *);
   bool simplify_switch_using_ranges (gswitch *);
   bool simplify_float_conversion_using_ranges (gimple_stmt_iterator *,
 					       gimple *);
@@ -109,7 +109,7 @@ class vr_values : public range_query
   vr_values (void);
   ~vr_values (void);
 
-  virtual bool range_of_expr (irange &r, tree expr, gimple *stmt) override;
+  virtual bool range_of_expr (vrange &r, tree expr, gimple *stmt) override;
   virtual tree value_of_expr (tree, gimple * = NULL) override;
   virtual tree value_on_edge (edge, tree) override;
   virtual tree value_of_stmt (gimple *, tree = NULL_TREE) override;

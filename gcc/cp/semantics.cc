@@ -1029,9 +1029,9 @@ maybe_warn_for_constant_evaluated (tree cond, bool constexpr_if)
    IF_STMT.  */
 
 tree
-finish_if_stmt_cond (tree cond, tree if_stmt)
+finish_if_stmt_cond (tree orig_cond, tree if_stmt)
 {
-  cond = maybe_convert_cond (cond);
+  tree cond = maybe_convert_cond (orig_cond);
   if (IF_STMT_CONSTEXPR_P (if_stmt)
       && !type_dependent_expression_p (cond)
       && require_constant_expression (cond)
@@ -1045,7 +1045,11 @@ finish_if_stmt_cond (tree cond, tree if_stmt)
       cond = cxx_constant_value (cond, NULL_TREE);
     }
   else
-    maybe_warn_for_constant_evaluated (cond, /*constexpr_if=*/false);
+    {
+      maybe_warn_for_constant_evaluated (cond, /*constexpr_if=*/false);
+      if (processing_template_decl)
+	cond = orig_cond;
+    }
   finish_cond (&IF_COND (if_stmt), cond);
   add_stmt (if_stmt);
   THEN_CLAUSE (if_stmt) = push_stmt_list ();
@@ -6827,10 +6831,22 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	  if (ort != C_ORT_OMP_DECLARE_SIMD
 	      && OMP_CLAUSE_LINEAR_KIND (c) != OMP_CLAUSE_LINEAR_DEFAULT)
 	    {
-	      error_at (OMP_CLAUSE_LOCATION (c),
-			"modifier should not be specified in %<linear%> "
-			"clause on %<simd%> or %<for%> constructs");
-	      OMP_CLAUSE_LINEAR_KIND (c) = OMP_CLAUSE_LINEAR_DEFAULT;
+	      if (OMP_CLAUSE_LINEAR_OLD_LINEAR_MODIFIER (c))
+		{
+		  error_at (OMP_CLAUSE_LOCATION (c),
+			    "modifier should not be specified in %<linear%> "
+			    "clause on %<simd%> or %<for%> constructs when "
+			    "not using OpenMP 5.2 modifiers");
+		  OMP_CLAUSE_LINEAR_KIND (c) = OMP_CLAUSE_LINEAR_DEFAULT;
+		}
+	      else if (OMP_CLAUSE_LINEAR_KIND (c) != OMP_CLAUSE_LINEAR_VAL)
+		{
+		  error_at (OMP_CLAUSE_LOCATION (c),
+			    "modifier other than %<val%> specified in "
+			    "%<linear%> clause on %<simd%> or %<for%> "
+			    "constructs when using OpenMP 5.2 modifiers");
+		  OMP_CLAUSE_LINEAR_KIND (c) = OMP_CLAUSE_LINEAR_DEFAULT;
+		}
 	    }
 	  if ((VAR_P (t) || TREE_CODE (t) == PARM_DECL)
 	      && !type_dependent_expression_p (t))
@@ -11991,6 +12007,12 @@ trait_expr_value (cp_trait_kind kind, tree type1, tree type2)
     case CPTK_IS_NOTHROW_CONSTRUCTIBLE:
       return is_nothrow_xible (INIT_EXPR, type1, type2);
 
+    case CPTK_REF_CONSTRUCTS_FROM_TEMPORARY:
+      return ref_xes_from_temporary (type1, type2, /*direct_init=*/true);
+
+    case CPTK_REF_CONVERTS_FROM_TEMPORARY:
+      return ref_xes_from_temporary (type1, type2, /*direct_init=*/false);
+
     default:
       gcc_unreachable ();
       return false;
@@ -12072,6 +12094,8 @@ finish_trait_expr (location_t loc, cp_trait_kind kind, tree type1, tree type2)
     case CPTK_IS_TRIVIALLY_CONSTRUCTIBLE:
     case CPTK_IS_NOTHROW_ASSIGNABLE:
     case CPTK_IS_NOTHROW_CONSTRUCTIBLE:
+    case CPTK_REF_CONSTRUCTS_FROM_TEMPORARY:
+    case CPTK_REF_CONVERTS_FROM_TEMPORARY:
       if (!check_trait_type (type1)
 	  || !check_trait_type (type2))
 	return error_mark_node;

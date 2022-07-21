@@ -6,7 +6,7 @@
  *                                                                          *
  *                          C Implementation File                           *
  *                                                                          *
- *          Copyright (C) 1992-2021, Free Software Foundation, Inc.         *
+ *          Copyright (C) 1992-2022, Free Software Foundation, Inc.         *
  *                                                                          *
  * GNAT is free software;  you can  redistribute it  and/or modify it under *
  * terms of the  GNU General Public License as published  by the Free Soft- *
@@ -264,9 +264,6 @@ struct GTY((chain_next ("%h.chain"))) gnat_binding_level {
   struct gnat_binding_level *chain;
   /* The BLOCK node for this level.  */
   tree block;
-  /* If nonzero, the setjmp buffer that needs to be updated for any
-     variable-sized definition within this context.  */
-  tree jmpbuf_decl;
 };
 
 /* The binding level currently in effect.  */
@@ -599,7 +596,6 @@ gnat_pushlevel (void)
 
   /* Add this level to the front of the chain (stack) of active levels.  */
   newlevel->chain = current_binding_level;
-  newlevel->jmpbuf_decl = NULL_TREE;
   current_binding_level = newlevel;
 }
 
@@ -612,22 +608,6 @@ set_current_block_context (tree fndecl)
   BLOCK_SUPERCONTEXT (current_binding_level->block) = fndecl;
   DECL_INITIAL (fndecl) = current_binding_level->block;
   set_block_for_group (current_binding_level->block);
-}
-
-/* Set the jmpbuf_decl for the current binding level to DECL.  */
-
-void
-set_block_jmpbuf_decl (tree decl)
-{
-  current_binding_level->jmpbuf_decl = decl;
-}
-
-/* Get the jmpbuf_decl, if any, for the current binding level.  */
-
-tree
-get_block_jmpbuf_decl (void)
-{
-  return current_binding_level->jmpbuf_decl;
 }
 
 /* Exit a binding level.  Set any BLOCK into the current code group.  */
@@ -897,21 +877,18 @@ gnat_pushdecl (tree decl, Node_Id gnat_node)
     {
       tree t = TREE_TYPE (decl);
 
-      /* Array and pointer types aren't tagged types in the C sense so we need
-	 to generate a typedef in DWARF for them and make sure it is preserved,
-	 unless the type is artificial.  */
+      /* Pointer types aren't named types in the C sense so we need to generate
+         a typedef in DWARF for them and make sure it is preserved, unless the
+         type is artificial.  */
       if (!(TYPE_NAME (t) && TREE_CODE (TYPE_NAME (t)) == TYPE_DECL)
-	  && ((TREE_CODE (t) != ARRAY_TYPE && TREE_CODE (t) != POINTER_TYPE)
-	      || DECL_ARTIFICIAL (decl)))
+	  && (TREE_CODE (t) != POINTER_TYPE || DECL_ARTIFICIAL (decl)))
 	;
-      /* For array and pointer types, create the DECL_ORIGINAL_TYPE that will
-	 generate the typedef in DWARF.  Also do that for fat pointer types
-	 because, even though they are tagged types in the C sense, they are
-	 still XUP types attached to the base array type at this point.  */
+      /* For pointer types, create the DECL_ORIGINAL_TYPE that will generate
+	 the typedef in DWARF.  Also do that for fat pointer types because,
+	 even though they are named types in the C sense, they are still the
+	 XUP types created for the base array type at this point.  */
       else if (!DECL_ARTIFICIAL (decl)
-	       && (TREE_CODE (t) == ARRAY_TYPE
-		   || TREE_CODE (t) == POINTER_TYPE
-		   || TYPE_IS_FAT_POINTER_P (t)))
+	       && (TREE_CODE (t) == POINTER_TYPE || TYPE_IS_FAT_POINTER_P (t)))
 	{
 	  tree tt = build_variant_type_copy (t);
 	  TYPE_NAME (tt) = decl;
@@ -925,10 +902,6 @@ gnat_pushdecl (tree decl, Node_Id gnat_node)
 	    DECL_ORIGINAL_TYPE (decl) = DECL_ORIGINAL_TYPE (TYPE_NAME (t));
 	  else
 	    DECL_ORIGINAL_TYPE (decl) = t;
-	  /* Array types need to have a name so that they can be related to
-	     their GNAT encodings.  */
-	  if (TREE_CODE (t) == ARRAY_TYPE && !TYPE_NAME (t))
-	    TYPE_NAME (t) = DECL_NAME (decl);
 	  /* Remark the canonical fat pointer type as artificial.  */
 	  if (TYPE_IS_FAT_POINTER_P (t))
 	    TYPE_ARTIFICIAL (t) = 1;
@@ -3841,11 +3814,10 @@ gnat_useless_type_conversion (tree expr)
 /* Return true if T, a {FUNCTION,METHOD}_TYPE, has the specified flags.  */
 
 bool
-fntype_same_flags_p (const_tree t, tree cico_list, bool return_unconstrained_p,
-		     bool return_by_direct_ref_p, bool return_by_invisi_ref_p)
+fntype_same_flags_p (const_tree t, tree cico_list, bool return_by_direct_ref_p,
+		     bool return_by_invisi_ref_p)
 {
   return TYPE_CI_CO_LIST (t) == cico_list
-	 && TYPE_RETURN_UNCONSTRAINED_P (t) == return_unconstrained_p
 	 && TYPE_RETURN_BY_DIRECT_REF_P (t) == return_by_direct_ref_p
 	 && TREE_ADDRESSABLE (t) == return_by_invisi_ref_p;
 }
@@ -5524,8 +5496,8 @@ unchecked_convert (tree type, tree expr, bool notrunc_p)
       expr = unchecked_convert (type, expr, notrunc_p);
     }
 
-  /* If we are converting from a scalar type to a type with a different size,
-     we need to pad to have the same size on both sides.
+  /* If we are converting between fixed-size types with different sizes, we
+     need to pad to have the same size on both sides.
 
      ??? We cannot do it unconditionally because unchecked conversions are
      used liberally by the front-end to implement interface thunks:
@@ -5536,8 +5508,10 @@ unchecked_convert (tree type, tree expr, bool notrunc_p)
 
      so we need to skip dereferences.  */
   else if (!INDIRECT_REF_P (expr)
-	   && !AGGREGATE_TYPE_P (etype)
+	   && TREE_CODE (expr) != STRING_CST
+	   && !(AGGREGATE_TYPE_P (etype) && AGGREGATE_TYPE_P (type))
 	   && ecode != UNCONSTRAINED_ARRAY_TYPE
+	   && TREE_CONSTANT (TYPE_SIZE (etype))
 	   && TREE_CONSTANT (TYPE_SIZE (type))
 	   && (c = tree_int_cst_compare (TYPE_SIZE (etype), TYPE_SIZE (type))))
     {
@@ -5553,15 +5527,18 @@ unchecked_convert (tree type, tree expr, bool notrunc_p)
 	  tree rec_type = maybe_pad_type (type, TYPE_SIZE (etype), 0, Empty,
 					  false, false, true);
 	  expr = unchecked_convert (rec_type, expr, notrunc_p);
-	  expr = build_component_ref (expr, TYPE_FIELDS (rec_type), false);
+	  expr = build3 (COMPONENT_REF, type, expr, TYPE_FIELDS (rec_type),
+			 NULL_TREE);
 	}
     }
 
-  /* Likewise if we are converting from a scalar type to a type with self-
+  /* Likewise if we are converting from a fixed-szie type to a type with self-
      referential size.  We use the max size to do the padding in this case.  */
   else if (!INDIRECT_REF_P (expr)
-	   && !AGGREGATE_TYPE_P (etype)
+	   && TREE_CODE (expr) != STRING_CST
+	   && !(AGGREGATE_TYPE_P (etype) && AGGREGATE_TYPE_P (type))
 	   && ecode != UNCONSTRAINED_ARRAY_TYPE
+	   && TREE_CONSTANT (TYPE_SIZE (etype))
 	   && CONTAINS_PLACEHOLDER_P (TYPE_SIZE (type)))
     {
       tree new_size = max_size (TYPE_SIZE (type), true);
@@ -5578,7 +5555,8 @@ unchecked_convert (tree type, tree expr, bool notrunc_p)
 	  tree rec_type = maybe_pad_type (type, TYPE_SIZE (etype), 0, Empty,
 					  false, false, true);
 	  expr = unchecked_convert (rec_type, expr, notrunc_p);
-	  expr = build_component_ref (expr, TYPE_FIELDS (rec_type), false);
+	  expr = build3 (COMPONENT_REF, type, expr, TYPE_FIELDS (rec_type),
+			 NULL_TREE);
 	}
     }
 

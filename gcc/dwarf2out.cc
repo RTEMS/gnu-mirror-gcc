@@ -6069,7 +6069,11 @@ dwarf2out_register_external_die (tree decl, const char *sym,
 
   if (!external_die_map)
     external_die_map = hash_map<tree, sym_off_pair>::create_ggc (1000);
-  gcc_checking_assert (!external_die_map->get (decl));
+  /* When we do tree merging during WPA we can end up re-using GC memory
+     as there's currently no way to unregister external DIEs.  Ideally
+     we'd register them only after merging finished but allowing override
+     here is easiest.  See PR106334.  */
+  gcc_checking_assert (flag_wpa || !external_die_map->get (decl));
   sym_off_pair p = { IDENTIFIER_POINTER (get_identifier (sym)), off };
   external_die_map->put (decl, p);
 }
@@ -12916,7 +12920,7 @@ output_one_line_info_table (dw_line_info_table *table)
   char line_label[MAX_ARTIFICIAL_LABEL_BYTES];
   unsigned int current_line = 1;
   bool current_is_stmt = DWARF_LINE_DEFAULT_IS_STMT_START;
-  dw_line_info_entry *ent, *prev_addr;
+  dw_line_info_entry *ent, *prev_addr = NULL;
   size_t i;
   unsigned int view;
 
@@ -22539,11 +22543,14 @@ gen_array_type_die (tree type, dw_die_ref context_die)
 
   if (TREE_CODE (type) == VECTOR_TYPE)
     {
-      /* For VECTOR_TYPEs we use an array die with appropriate bounds.  */
+      /* For VECTOR_TYPEs we use an array DIE with appropriate bounds.  */
       dw_die_ref subrange_die = new_die (DW_TAG_subrange_type, array_die, NULL);
-      add_bound_info (subrange_die, DW_AT_lower_bound, size_zero_node, NULL);
+      int lb = lower_bound_default ();
+      if (lb == -1)
+	lb = 0;
+      add_bound_info (subrange_die, DW_AT_lower_bound, size_int (lb), NULL);
       add_bound_info (subrange_die, DW_AT_upper_bound,
-		      size_int (TYPE_VECTOR_SUBPARTS (type) - 1), NULL);
+		      size_int (lb + TYPE_VECTOR_SUBPARTS (type) - 1), NULL);
     }
   else
     add_subscript_info (array_die, type, collapse_nested_arrays);

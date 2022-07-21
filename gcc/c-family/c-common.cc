@@ -537,6 +537,10 @@ const struct c_common_resword c_common_reswords[] =
   { "__is_constructible", RID_IS_CONSTRUCTIBLE, D_CXXONLY },
   { "__is_nothrow_assignable", RID_IS_NOTHROW_ASSIGNABLE, D_CXXONLY },
   { "__is_nothrow_constructible", RID_IS_NOTHROW_CONSTRUCTIBLE, D_CXXONLY },
+  { "__reference_constructs_from_temporary", RID_REF_CONSTRUCTS_FROM_TEMPORARY,
+					D_CXXONLY },
+  { "__reference_converts_from_temporary", RID_REF_CONVERTS_FROM_TEMPORARY,
+					D_CXXONLY },
 
   /* C++ transactional memory.  */
   { "synchronized",	RID_SYNCHRONIZED, D_CXX_OBJC | D_TRANSMEM },
@@ -6609,6 +6613,20 @@ c_option_controlling_cpp_diagnostic (enum cpp_warning_reason reason)
 	return entry->option_code;
     }
   return 0;
+}
+
+/* Return TRUE if the given option index corresponds to a diagnostic
+   issued by libcpp.  Linear search seems fine for now.  */
+bool
+c_option_is_from_cpp_diagnostics (int option_index)
+{
+  for (auto entry = cpp_reason_option_codes; entry->reason != CPP_W_NONE;
+       ++entry)
+    {
+      if (entry->option_code == option_index)
+	return true;
+    }
+  return false;
 }
 
 /* Callback from cpp_diagnostic for PFILE to print diagnostics from the

@@ -50,6 +50,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "sbitmap.h"
 #include "analyzer/diagnostic-manager.h"
 #include "analyzer/exploded-graph.h"
+#include "diagnostic-metadata.h"
 
 #if ENABLE_ANALYZER
 
@@ -333,6 +334,19 @@ public:
     if (const char *fnname = maybe_get_fnname (change))
       return change.formatted_print ("%qs called here", fnname);
     return label_text ();
+  }
+
+  diagnostic_event::meaning
+  get_meaning_for_state_change (const evdesc::state_change &change)
+    const final override
+  {
+    if (change.m_new_state == m_sm.m_started)
+      return diagnostic_event::meaning (diagnostic_event::VERB_acquire,
+					diagnostic_event::NOUN_resource);
+    if (change.m_new_state == m_sm.m_ended)
+      return diagnostic_event::meaning (diagnostic_event::VERB_release,
+					diagnostic_event::NOUN_resource);
+    return diagnostic_event::meaning ();
   }
 
 protected:
@@ -843,12 +857,15 @@ public:
   bool emit (rich_location *rich_loc) final override
   {
     auto_diagnostic_group d;
+    diagnostic_metadata m;
+    /* "CWE-686: Function Call With Incorrect Argument Type".  */
+    m.add_cwe (686);
     bool warned
-      = warning_at (rich_loc, get_controlling_option (),
-		    "%<va_arg%> expected %qT but received %qT"
-		    " for variadic argument %i of %qE",
-		    m_expected_type, m_actual_type,
-		    get_variadic_index_for_diagnostic (), m_va_list_tree);
+      = warning_meta (rich_loc, m, get_controlling_option (),
+		      "%<va_arg%> expected %qT but received %qT"
+		      " for variadic argument %i of %qE",
+		      m_expected_type, m_actual_type,
+		      get_variadic_index_for_diagnostic (), m_va_list_tree);
     return warned;
   }
 
@@ -890,9 +907,12 @@ public:
   bool emit (rich_location *rich_loc) final override
   {
     auto_diagnostic_group d;
-    bool warned = warning_at (rich_loc, get_controlling_option (),
-			      "%qE has no more arguments (%i consumed)",
-			      m_va_list_tree, get_num_consumed ());
+    diagnostic_metadata m;
+    /* CWE-685: Function Call With Incorrect Number of Arguments.  */
+    m.add_cwe (685);
+    bool warned = warning_meta (rich_loc, m, get_controlling_option (),
+				"%qE has no more arguments (%i consumed)",
+				m_va_list_tree, get_num_consumed ());
     return warned;
   }
 

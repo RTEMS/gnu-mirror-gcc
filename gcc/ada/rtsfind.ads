@@ -540,13 +540,11 @@ package Rtsfind is
    --  value is required syntactically, but no real entry is required or
    --  needed. Use of this value will cause a fatal error in an RTE call.
 
-   --  Note that under no circumstances can any of these entities be defined
-   --  more than once in a given package, i.e. no overloading is allowed for
-   --  any entity that is found using rtsfind. A fatal error is given if this
-   --  rule is violated. The one exception is for Save_Occurrence, where the
-   --  RM mandates the overloading. In this case, the compiler only uses the
-   --  procedure, not the function, and the procedure must come first so that
-   --  the compiler finds it and not the function.
+   --  It is normally not allowed to have more than one of these entities with
+   --  the same name in a given package. The one exception is Save_Occurrence,
+   --  where the RM mandates the overloading. In this case, the compiler uses
+   --  the procedure, not the function, and the procedure must come first so
+   --  that the compiler finds it and not the function.
 
    type RE_Id is (
 
@@ -911,15 +909,6 @@ package Rtsfind is
      RE_Str_Concat_7,                    -- System.Concat_7
      RE_Str_Concat_8,                    -- System.Concat_8
      RE_Str_Concat_9,                    -- System.Concat_9
-
-     RE_Str_Concat_Bounds_2,             -- System.Concat_2
-     RE_Str_Concat_Bounds_3,             -- System.Concat_3
-     RE_Str_Concat_Bounds_4,             -- System.Concat_4
-     RE_Str_Concat_Bounds_5,             -- System.Concat_5
-     RE_Str_Concat_Bounds_6,             -- System.Concat_6
-     RE_Str_Concat_Bounds_7,             -- System.Concat_7
-     RE_Str_Concat_Bounds_8,             -- System.Concat_8
-     RE_Str_Concat_Bounds_9,             -- System.Concat_9
 
      RE_Get_Active_Partition_Id,         -- System.DSA_Services
      RE_Get_Local_Partition_Id,          -- System.DSA_Services
@@ -2609,15 +2598,6 @@ package Rtsfind is
      RE_Str_Concat_7                     => System_Concat_7,
      RE_Str_Concat_8                     => System_Concat_8,
      RE_Str_Concat_9                     => System_Concat_9,
-
-     RE_Str_Concat_Bounds_2              => System_Concat_2,
-     RE_Str_Concat_Bounds_3              => System_Concat_3,
-     RE_Str_Concat_Bounds_4              => System_Concat_4,
-     RE_Str_Concat_Bounds_5              => System_Concat_5,
-     RE_Str_Concat_Bounds_6              => System_Concat_6,
-     RE_Str_Concat_Bounds_7              => System_Concat_7,
-     RE_Str_Concat_Bounds_8              => System_Concat_8,
-     RE_Str_Concat_Bounds_9              => System_Concat_9,
 
      RE_Get_Active_Partition_Id          => System_DSA_Services,
      RE_Get_Local_Partition_Id           => System_DSA_Services,

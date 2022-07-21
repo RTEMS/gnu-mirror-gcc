@@ -21,6 +21,8 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_ANALYZER_PENDING_DIAGNOSTIC_H
 #define GCC_ANALYZER_PENDING_DIAGNOSTIC_H
 
+#include "diagnostic-path.h"
+
 namespace ana {
 
 /* A bundle of information about things that are of interest to a
@@ -54,6 +56,17 @@ struct event_desc
     ATTRIBUTE_GCC_DIAG(2,3);
 
   bool m_colorize;
+};
+
+/* For use by pending_diagnostic::describe_region_creation.  */
+
+struct region_creation : public event_desc
+{
+  region_creation (bool colorize, const region *reg)
+  : event_desc (colorize), m_reg (reg)
+  {}
+
+  const region *m_reg;
 };
 
 /* For use by pending_diagnostic::describe_state_change.  */
@@ -213,6 +226,15 @@ class pending_diagnostic
      description; NULL otherwise (falling back on a more generic
      description).  */
 
+  /* Precision-of-wording vfunc for describing a region creation event
+     triggered by the mark_interesting_stuff vfunc.  */
+  virtual label_text
+  describe_region_creation_event (const evdesc::region_creation &)
+  {
+    /* Default no-op implementation.  */
+    return label_text ();
+  }
+
   /* Precision-of-wording vfunc for describing a critical state change
      within the diagnostic_path.
 
@@ -230,6 +252,15 @@ class pending_diagnostic
   {
     /* Default no-op implementation.  */
     return label_text ();
+  }
+
+  /* Vfunc for implementing diagnostic_event::get_meaning for
+     state_change_event.  */
+  virtual diagnostic_event::meaning
+  get_meaning_for_state_change (const evdesc::state_change &) const
+  {
+    /* Default no-op implementation.  */
+    return diagnostic_event::meaning ();
   }
 
   /* Precision-of-wording vfunc for describing an interprocedural call

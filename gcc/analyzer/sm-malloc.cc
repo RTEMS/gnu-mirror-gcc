@@ -736,6 +736,20 @@ public:
     return label_text ();
   }
 
+  diagnostic_event::meaning
+  get_meaning_for_state_change (const evdesc::state_change &change)
+    const final override
+  {
+    if (change.m_old_state == m_sm.get_start_state ()
+	&& unchecked_p (change.m_new_state))
+      return diagnostic_event::meaning (diagnostic_event::VERB_acquire,
+					diagnostic_event::NOUN_memory);
+    if (freed_p (change.m_new_state))
+      return diagnostic_event::meaning (diagnostic_event::VERB_release,
+					diagnostic_event::NOUN_memory);
+    return diagnostic_event::meaning ();
+  }
+
 protected:
   const malloc_state_machine &m_sm;
   tree m_arg;
@@ -993,8 +1007,7 @@ inform_nonnull_attribute (tree fndecl, int arg_idx)
   label_text arg_desc = describe_argument_index (fndecl, arg_idx);
   inform (DECL_SOURCE_LOCATION (fndecl),
 	  "argument %s of %qD must be non-null",
-	  arg_desc.m_buffer, fndecl);
-  arg_desc.maybe_free ();
+	  arg_desc.get (), fndecl);
   /* Ideally we would use the location of the parm and underline the
      attribute also - but we don't have the location_t values at this point
      in the middle-end.
@@ -1052,13 +1065,12 @@ public:
     if (m_origin_of_unchecked_event.known_p ())
       result = ev.formatted_print ("argument %s (%qE) from %@ could be NULL"
 				   " where non-null expected",
-				   arg_desc.m_buffer, ev.m_expr,
+				   arg_desc.get (), ev.m_expr,
 				   &m_origin_of_unchecked_event);
     else
       result = ev.formatted_print ("argument %s (%qE) could be NULL"
 				   " where non-null expected",
-				   arg_desc.m_buffer, ev.m_expr);
-    arg_desc.maybe_free ();
+				   arg_desc.get (), ev.m_expr);
     return result;
   }
 
@@ -1161,12 +1173,11 @@ public:
     label_text result;
     if (zerop (ev.m_expr))
       result = ev.formatted_print ("argument %s NULL where non-null expected",
-				   arg_desc.m_buffer);
+				   arg_desc.get ());
     else
       result = ev.formatted_print ("argument %s (%qE) NULL"
 				   " where non-null expected",
-				   arg_desc.m_buffer, ev.m_expr);
-    arg_desc.maybe_free ();
+				   arg_desc.get (), ev.m_expr);
     return result;
   }
 

@@ -113,7 +113,7 @@ package body Exp_Util is
      (Header_Num => Type_Map_Header,
       Key        => Entity_Id,
       Element    => Node_Or_Entity_Id,
-      No_element => Empty,
+      No_Element => Empty,
       Hash       => Type_Map_Hash,
       Equal      => "=");
 
@@ -5730,8 +5730,17 @@ package body Exp_Util is
             or else not Is_Array_Type (Exp_Typ)
             or else not Aliased_Present (N))
       then
-         if Is_Itype (Exp_Typ) then
+         if Is_Itype (Exp_Typ)
 
+           --  If Exp_Typ was created for a previous declaration whose nominal
+           --  subtype is unconstrained, and that declaration is aliased,
+           --  we need to generate a new subtype, because otherwise the
+           --  Is_Constr_Subt_For_U_Nominal flag will be set on the wrong
+           --  subtype, causing failure to detect non-statically-matching
+           --  subtypes on 'Access of the previously-declared object.
+
+           and then not Is_Constr_Subt_For_UN_Aliased (Exp_Typ)
+         then
             --  Within an initialization procedure, a selected component
             --  denotes a component of the enclosing record, and it appears as
             --  an actual in a call to its own initialization procedure. If
@@ -5770,7 +5779,7 @@ package body Exp_Util is
             --  This type is marked as an itype even though it has an explicit
             --  declaration since otherwise Is_Generic_Actual_Type can get
             --  set, resulting in the generation of spurious errors. (See
-            --  sem_ch8.Analyze_Package_Renaming and sem_type.covers)
+            --  sem_ch8.Analyze_Package_Renaming and Sem_Type.Covers.)
 
             Set_Is_Itype (T);
             Set_Associated_Node_For_Itype (T, Exp);
@@ -6397,16 +6406,7 @@ package body Exp_Util is
 
    begin
       if Has_Storage_Model_Type_Aspect (Typ) then
-         declare
-            SMT_Op : constant Entity_Id :=
-                       Get_Storage_Model_Type_Entity (Typ, Nam);
-         begin
-            if not Present (SMT_Op) then
-               raise Program_Error;
-            else
-               return SMT_Op;
-            end if;
-         end;
+         return Get_Storage_Model_Type_Entity (Typ, Nam);
 
       --  Otherwise we assume that Typ is a descendant of Root_Storage_Pool
 
@@ -8368,9 +8368,10 @@ package body Exp_Util is
       function Initialized_By_Aliased_BIP_Func_Call
         (Trans_Id : Entity_Id) return Boolean;
       --  Determine whether transient object Trans_Id is initialized by a
-      --  build-in-place function call where the BIPalloc parameter is of
-      --  value 1 and BIPaccess is not null. This case creates an aliasing
-      --  between the returned value and the value denoted by BIPaccess.
+      --  build-in-place function call where the BIPalloc parameter either
+      --  does not exist or is Caller_Allocation, and BIPaccess is not null.
+      --  This case creates an aliasing between the returned value and the
+      --  value denoted by BIPaccess.
 
       function Is_Aliased
         (Trans_Id   : Entity_Id;
@@ -8427,11 +8428,14 @@ package body Exp_Util is
 
          if Is_Build_In_Place_Function_Call (Call) then
             declare
+               Caller_Allocation_Val : constant Uint :=
+                 UI_From_Int (BIP_Allocation_Form'Pos (Caller_Allocation));
+
                Access_Nam : Name_Id := No_Name;
                Access_OK  : Boolean := False;
                Actual     : Node_Id;
                Alloc_Nam  : Name_Id := No_Name;
-               Alloc_OK   : Boolean := False;
+               Alloc_OK   : Boolean := True;
                Formal     : Node_Id;
                Func_Id    : Entity_Id;
                Param      : Node_Id;
@@ -8466,7 +8470,7 @@ package body Exp_Util is
                             BIP_Formal_Suffix (BIP_Alloc_Form));
                      end if;
 
-                     --  A match for BIPaccess => Temp has been found
+                     --  A nonnull BIPaccess has been found
 
                      if Chars (Formal) = Access_Nam
                        and then Nkind (Actual) /= N_Null
@@ -8474,13 +8478,12 @@ package body Exp_Util is
                         Access_OK := True;
                      end if;
 
-                     --  A match for BIPalloc => 1 has been found
+                     --  A BIPalloc has been found
 
                      if Chars (Formal) = Alloc_Nam
                        and then Nkind (Actual) = N_Integer_Literal
-                       and then Intval (Actual) = Uint_1
                      then
-                        Alloc_OK := True;
+                        Alloc_OK := Intval (Actual) = Caller_Allocation_Val;
                      end if;
                   end if;
 
@@ -8767,7 +8770,6 @@ package body Exp_Util is
       return
         Ekind (Obj_Id) in E_Constant | E_Variable
           and then Needs_Finalization (Desig)
-          and then Requires_Transient_Scope (Desig)
           and then Nkind (Rel_Node) /= N_Simple_Return_Statement
           and then not Is_Part_Of_BIP_Return_Statement (Rel_Node)
 
@@ -9291,6 +9293,17 @@ package body Exp_Util is
 
       return False;
    end Is_Secondary_Stack_BIP_Func_Call;
+
+   ------------------------------
+   -- Is_Secondary_Stack_Thunk --
+   ------------------------------
+
+   function Is_Secondary_Stack_Thunk (Id : Entity_Id) return Boolean is
+   begin
+      return Ekind (Id) = E_Function
+        and then Is_Thunk (Id)
+        and then Has_Controlling_Result (Id);
+   end Is_Secondary_Stack_Thunk;
 
    -------------------------------------
    -- Is_Tag_To_Class_Wide_Conversion --
@@ -10191,8 +10204,8 @@ package body Exp_Util is
 
       elsif Is_Class_Wide_Type (Unc_Typ) then
          declare
-            CW_Subtype : Entity_Id;
-            EQ_Typ     : Entity_Id := Empty;
+            CW_Subtype : constant Entity_Id :=
+                           New_Class_Wide_Subtype (Unc_Typ, E);
 
          begin
             --  A class-wide equivalent type is not needed on VM targets
@@ -10215,11 +10228,10 @@ package body Exp_Util is
                   Set_Etype (Unc_Typ, Base_Type (Full_View (Etype (Unc_Typ))));
                end if;
 
-               EQ_Typ := Make_CW_Equivalent_Type (Unc_Typ, E);
+               Set_Equivalent_Type
+                 (CW_Subtype, Make_CW_Equivalent_Type (Unc_Typ, E));
             end if;
 
-            CW_Subtype := New_Class_Wide_Subtype (Unc_Typ, E);
-            Set_Equivalent_Type (CW_Subtype, EQ_Typ);
             Set_Cloned_Subtype (CW_Subtype, Base_Type (Unc_Typ));
 
             return New_Occurrence_Of (CW_Subtype, Loc);
@@ -11995,31 +12007,23 @@ package body Exp_Util is
       --  renaming is handled by the front end, as the back end may balk at
       --  the nonstandard representation (see Evaluation_Required in Exp_Ch8).
 
-      elsif Nkind (Exp) in N_Indexed_Component | N_Selected_Component
-        and then Has_Non_Standard_Rep (Etype (Prefix (Exp)))
-      then
-         Def_Id := Build_Temporary (Loc, 'R', Exp);
-         Res := New_Occurrence_Of (Def_Id, Loc);
+      elsif (Nkind (Exp) in N_Indexed_Component | N_Selected_Component
+              and then Has_Non_Standard_Rep (Etype (Prefix (Exp))))
 
-         Insert_Action (Exp,
-           Make_Object_Renaming_Declaration (Loc,
-             Defining_Identifier => Def_Id,
-             Subtype_Mark        => New_Occurrence_Of (Exp_Type, Loc),
-             Name                => Relocate_Node (Exp)));
+        --  For an expression that denotes a name, we can use a renaming
+        --  scheme. This is needed for correctness in the case of a volatile
+        --  object of a nonvolatile type because the Make_Reference call of the
+        --  "default" approach would generate an illegal access value (an
+        --  access value cannot designate such an object - see
+        --  Analyze_Reference).
 
-      --  For an expression that denotes a name, we can use a renaming scheme.
-      --  This is needed for correctness in the case of a volatile object of
-      --  a nonvolatile type because the Make_Reference call of the "default"
-      --  approach would generate an illegal access value (an access value
-      --  cannot designate such an object - see Analyze_Reference).
+        or else (Is_Name_Reference (Exp)
 
-      elsif Is_Name_Reference (Exp)
+          --  We skip using this scheme if we have an object of a volatile
+          --  type and we do not have Name_Req set true (see comments for
+          --  Side_Effect_Free).
 
-        --  We skip using this scheme if we have an object of a volatile
-        --  type and we do not have Name_Req set true (see comments for
-        --  Side_Effect_Free).
-
-        and then (Name_Req or else not Treat_As_Volatile (Exp_Type))
+          and then (Name_Req or else not Treat_As_Volatile (Exp_Type)))
       then
          Def_Id := Build_Temporary (Loc, 'R', Exp);
          Res := New_Occurrence_Of (Def_Id, Loc);
@@ -14056,6 +14060,23 @@ package body Exp_Util is
          raise Program_Error;
       end if;
    end Small_Integer_Type_For;
+
+   ------------------
+   -- Thunk_Target --
+   ------------------
+
+   function Thunk_Target (Thunk : Entity_Id) return Entity_Id is
+      Target : Entity_Id := Thunk;
+
+   begin
+      pragma Assert (Is_Thunk (Thunk));
+
+      while Is_Thunk (Target) loop
+         Target := Thunk_Entity (Target);
+      end loop;
+
+      return Target;
+   end Thunk_Target;
 
    -------------------
    -- Type_Map_Hash --

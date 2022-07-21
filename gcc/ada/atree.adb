@@ -1775,6 +1775,11 @@ package body Atree is
 
          --  Mark the copy as Ghost depending on the current Ghost region
 
+         if Nkind (New_Id) in N_Entity then
+            Set_Is_Checked_Ghost_Entity (New_Id, False);
+            Set_Is_Ignored_Ghost_Entity (New_Id, False);
+         end if;
+
          Mark_New_Ghost_Node (New_Id);
 
          New_Node_Debugging_Output (New_Id);
@@ -1961,7 +1966,7 @@ package body Atree is
       end if;
    end Paren_Count;
 
-   function Parent (N : Node_Or_Entity_Id) return Node_Or_Entity_Id is
+   function Node_Parent (N : Node_Or_Entity_Id) return Node_Or_Entity_Id is
    begin
       pragma Assert (Present (N));
 
@@ -1970,7 +1975,7 @@ package body Atree is
       else
          return Node_Or_Entity_Id (Link (N));
       end if;
-   end Parent;
+   end Node_Parent;
 
    -------------
    -- Present --
@@ -2287,12 +2292,12 @@ package body Atree is
    -- Set_Parent --
    ----------------
 
-   procedure Set_Parent (N : Node_Or_Entity_Id; Val : Node_Or_Entity_Id) is
+   procedure Set_Node_Parent (N : Node_Or_Entity_Id; Val : Node_Or_Entity_Id) is
    begin
       pragma Assert (Present (N));
       pragma Assert (not In_List (N));
       Set_Link (N, Union_Id (Val));
-   end Set_Parent;
+   end Set_Node_Parent;
 
    ------------------------
    -- Set_Reporting_Proc --

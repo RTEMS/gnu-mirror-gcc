@@ -244,6 +244,12 @@ public:
   region_model_manager (logger *logger = NULL);
   ~region_model_manager ();
 
+  /* call_string consolidation.  */
+  const call_string &get_empty_call_string () const
+  {
+    return m_empty_call_string;
+  }
+
   /* svalue consolidation.  */
   const svalue *get_or_create_constant_svalue (tree cst_expr);
   const svalue *get_or_create_int_cst (tree type, poly_int64);
@@ -380,6 +386,8 @@ private:
 					      const vec<const svalue *> &inputs);
 
   logger *m_logger;
+
+  const call_string m_empty_call_string;
 
   unsigned m_next_region_id;
   root_region m_root_region;
@@ -857,6 +865,8 @@ class region_model
 			       region_model_context *ctxt) const;
   void check_region_for_read (const region *src_reg,
 			      region_model_context *ctxt) const;
+  void check_region_size (const region *lhs_reg, const svalue *rhs_sval,
+			  region_model_context *ctxt) const;
 
   void check_call_args (const call_details &cd) const;
   void check_external_function_for_access_attr (const gcall *call,
@@ -921,6 +931,13 @@ class region_model_context
 			     enum tree_code op,
 			     const svalue *rhs) = 0;
 
+  /* Hook for clients to be notified when the condition that
+     SVAL is within RANGES is added to the region model.
+     Similar to on_condition, but for use when handling switch statements.
+     RANGES is non-empty.  */
+  virtual void on_bounded_ranges (const svalue &sval,
+				  const bounded_ranges &ranges) = 0;
+
   /* Hooks for clients to be notified when an unknown change happens
      to SVAL (in response to a call to an unknown function).  */
   virtual void on_unknown_change (const svalue *sval, bool is_mutable) = 0;
@@ -979,6 +996,10 @@ public:
   void on_condition (const svalue *lhs ATTRIBUTE_UNUSED,
 		     enum tree_code op ATTRIBUTE_UNUSED,
 		     const svalue *rhs ATTRIBUTE_UNUSED) override
+  {
+  }
+  void on_bounded_ranges (const svalue &,
+			  const bounded_ranges &) override
   {
   }
   void on_unknown_change (const svalue *sval ATTRIBUTE_UNUSED,
@@ -1075,6 +1096,12 @@ class region_model_context_decorator : public region_model_context
 		     const svalue *rhs) override
   {
     m_inner->on_condition (lhs, op, rhs);
+  }
+
+  void on_bounded_ranges (const svalue &sval,
+			  const bounded_ranges &ranges) override
+  {
+    m_inner->on_bounded_ranges (sval, ranges);
   }
 
   void on_unknown_change (const svalue *sval, bool is_mutable) override

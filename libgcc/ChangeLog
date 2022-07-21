@@ -1,3 +1,37 @@
+2022-07-18  Claudiu Zissulescu  <claziss@synopsys.com>
+
+	* config/arc/lib2funcs.c (udivmodsi4): Update AND mask.
+	* config/arc/lib1funcs.S (umodsi3): Don't use it for RF16
+	configurations.
+
+2022-06-25  Jeff Law  <jeffreyalaw@gmail.com>
+
+	* config.host: Removed tilegx and tilepro entries.
+	* config/tilegx/sfp-machine.h: Removed.
+	* config/tilegx/sfp-machine32.h: Removed.
+	* config/tilegx/sfp-machine64.h: Removed.
+	* config/tilegx/t-crtstuff: Removed.
+	* config/tilegx/t-softfp: Removed.
+	* config/tilegx/t-tilegx: Removed.
+	* config/tilepro/atomic.c: Removed.
+	* config/tilepro/atomic.h: Removed.
+	* config/tilepro/linux-unwind.h: Removed.
+	* config/tilepro/sfp-machine.h: Removed.
+	* config/tilepro/softdivide.c: Removed.
+	* config/tilepro/softmpy.S: Removed.
+	* config/tilepro/t-crtstuff: Removed.
+	* config/tilepro/t-tilepro: Removed.
+
+2022-06-09  Takayuki 'January June' Suwa  <jjsuwa_sys3175@yahoo.co.jp>
+
+	* config/xtensa/lib1funcs.S (__clrsbsi2): New function.
+	* config/xtensa/t-xtensa (LIB1ASMFUNCS): Add _clrsbsi2.
+
+2022-06-01  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR libgcc/27576
+	* crtstuff.c (__EH_FRAME_BEGIN__): Aligned to pointer size.
+
 2022-05-25  Wilco Dijkstra  <wilco.dijkstra@arm.com>
 
 	PR libgcc/105708

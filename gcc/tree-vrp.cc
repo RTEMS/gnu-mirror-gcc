@@ -924,20 +924,6 @@ extract_range_from_plus_minus_expr (value_range *vr,
     vr->set (min, max, kind);
 }
 
-/* Return the range-ops handler for CODE and EXPR_TYPE.  If no
-   suitable operator is found, return NULL and set VR to VARYING.  */
-
-static const range_operator *
-get_range_op_handler (value_range *vr,
-		      enum tree_code code,
-		      tree expr_type)
-{
-  const range_operator *op = range_op_handler (code, expr_type);
-  if (!op)
-    vr->set_varying (expr_type);
-  return op;
-}
-
 /* If the types passed are supported, return TRUE, otherwise set VR to
    VARYING and return FALSE.  */
 
@@ -946,8 +932,8 @@ supported_types_p (value_range *vr,
 		   tree type0,
 		   tree type1 = NULL)
 {
-  if (!value_range::supports_type_p (type0)
-      || (type1 && !value_range::supports_type_p (type1)))
+  if (!value_range_equiv::supports_p (type0)
+      || (type1 && !value_range_equiv::supports_p (type1)))
     {
       vr->set_varying (type0);
       return false;
@@ -1005,10 +991,12 @@ range_fold_binary_symbolics_p (value_range *vr,
 						&vr0, &vr1);
 	  return true;
 	}
-      const range_operator *op = get_range_op_handler (vr, code, expr_type);
+      range_op_handler op (code, expr_type);
+      if (!op)
+	vr->set_varying (expr_type);
       vr0.normalize_symbolics ();
       vr1.normalize_symbolics ();
-      return op->fold_range (*vr, expr_type, vr0, vr1);
+      return op.fold_range (*vr, expr_type, vr0, vr1);
     }
   return false;
 }
@@ -1036,14 +1024,17 @@ range_fold_unary_symbolics_p (value_range *vr,
 	{
 	  /* ~X is simply -1 - X.  */
 	  value_range minusone;
-	  minusone.set (build_int_cst (vr0->type (), -1));
+	  tree t = build_int_cst (vr0->type (), -1);
+	  minusone.set (t, t);
 	  range_fold_binary_expr (vr, MINUS_EXPR, expr_type, &minusone, vr0);
 	  return true;
 	}
-      const range_operator *op = get_range_op_handler (vr, code, expr_type);
+      range_op_handler op (code, expr_type);
+      if (!op)
+	vr->set_varying (expr_type);
       value_range vr0_cst (*vr0);
       vr0_cst.normalize_symbolics ();
-      return op->fold_range (*vr, expr_type, vr0_cst, value_range (expr_type));
+      return op.fold_range (*vr, expr_type, vr0_cst, value_range (expr_type));
     }
   return false;
 }
@@ -1060,9 +1051,12 @@ range_fold_binary_expr (value_range *vr,
   if (!supported_types_p (vr, expr_type)
       || !defined_ranges_p (vr, vr0_, vr1_))
     return;
-  const range_operator *op = get_range_op_handler (vr, code, expr_type);
+  range_op_handler op (code, expr_type);
   if (!op)
-    return;
+    {
+      vr->set_varying (expr_type);
+      return;
+    }
 
   if (range_fold_binary_symbolics_p (vr, code, expr_type, vr0_, vr1_))
     return;
@@ -1075,7 +1069,7 @@ range_fold_binary_expr (value_range *vr,
     vr1.set_varying (expr_type);
   vr0.normalize_addresses ();
   vr1.normalize_addresses ();
-  op->fold_range (*vr, expr_type, vr0, vr1);
+  op.fold_range (*vr, expr_type, vr0, vr1);
 }
 
 /* Perform a unary operation on a range.  */
@@ -1089,16 +1083,19 @@ range_fold_unary_expr (value_range *vr,
   if (!supported_types_p (vr, expr_type, vr0_type)
       || !defined_ranges_p (vr, vr0))
     return;
-  const range_operator *op = get_range_op_handler (vr, code, expr_type);
+  range_op_handler op (code, expr_type);
   if (!op)
-    return;
+    {
+      vr->set_varying (expr_type);
+      return;
+    }
 
   if (range_fold_unary_symbolics_p (vr, code, expr_type, vr0))
     return;
 
   value_range vr0_cst (*vr0);
   vr0_cst.normalize_addresses ();
-  op->fold_range (*vr, expr_type, vr0_cst, value_range (expr_type));
+  op.fold_range (*vr, expr_type, vr0_cst, value_range (expr_type));
 }
 
 /* If the range of values taken by OP can be inferred after STMT executes,
@@ -3742,16 +3739,18 @@ vrp_asserts::remove_range_assertions ()
 		    && all_imm_uses_in_stmt_or_feed_cond (var, stmt,
 							  single_pred (bb)))
 		  {
-		    /* We could use duplicate_ssa_name_range_info here
-		       instead of peeking inside SSA_NAME_RANGE_INFO,
-		       but the aforementioned asserts that the
-		       destination has no global range.  This is
-		       slated for removal anyhow.  */
-		    value_range r (TREE_TYPE (lhs),
-				   SSA_NAME_RANGE_INFO (lhs)->get_min (),
-				   SSA_NAME_RANGE_INFO (lhs)->get_max (),
-				   SSA_NAME_RANGE_TYPE (lhs));
-		    set_range_info (var, r);
+		    if (SSA_NAME_RANGE_INFO (var))
+		      {
+			/* ?? This is a minor wart exposing the
+			   internals of SSA_NAME_RANGE_INFO in order
+			   to maintain existing behavior.  This is
+			   because duplicate_ssa_name_range_info below
+			   needs a NULL destination range.  This is
+			   all slated for removal...  */
+			ggc_free (SSA_NAME_RANGE_INFO (var));
+			SSA_NAME_RANGE_INFO (var) = NULL;
+		      }
+		    duplicate_ssa_name_range_info (var, lhs);
 		    maybe_set_nonzero_bits (single_pred_edge (bb), var);
 		  }
 	      }
@@ -4392,25 +4391,42 @@ const pass_data pass_data_vrp =
   ( TODO_cleanup_cfg | TODO_update_ssa ), /* todo_flags_finish */
 };
 
+const pass_data pass_data_early_vrp =
+{
+  GIMPLE_PASS, /* type */
+  "evrp", /* name */
+  OPTGROUP_NONE, /* optinfo_flags */
+  TV_TREE_EARLY_VRP, /* tv_id */
+  PROP_ssa, /* properties_required */
+  0, /* properties_provided */
+  0, /* properties_destroyed */
+  0, /* todo_flags_start */
+  ( TODO_cleanup_cfg | TODO_update_ssa | TODO_verify_all ),
+};
+
 static int vrp_pass_num = 0;
 class pass_vrp : public gimple_opt_pass
 {
 public:
-  pass_vrp (gcc::context *ctxt)
-    : gimple_opt_pass (pass_data_vrp, ctxt), warn_array_bounds_p (false),
-      my_pass (++vrp_pass_num)
+  pass_vrp (gcc::context *ctxt, const pass_data &data_)
+    : gimple_opt_pass (data_, ctxt), data (data_), warn_array_bounds_p (false),
+      my_pass (vrp_pass_num++)
   {}
 
   /* opt_pass methods: */
-  opt_pass * clone () { return new pass_vrp (m_ctxt); }
-  void set_pass_param (unsigned int n, bool param)
+  opt_pass * clone () final override { return new pass_vrp (m_ctxt, data); }
+  void set_pass_param (unsigned int n, bool param) final override
     {
       gcc_assert (n == 0);
       warn_array_bounds_p = param;
     }
-  virtual bool gate (function *) { return flag_tree_vrp != 0; }
-  virtual unsigned int execute (function *fun)
+  bool gate (function *) final override { return flag_tree_vrp != 0; }
+  unsigned int execute (function *fun) final override
     {
+      // Early VRP pass.
+      if (my_pass == 0)
+	return execute_ranger_vrp (fun, /*warn_array_bounds_p=*/false);
+
       if ((my_pass == 1 && param_vrp1_mode == VRP_MODE_RANGER)
 	  || (my_pass == 2 && param_vrp2_mode == VRP_MODE_RANGER))
 	return execute_ranger_vrp (fun, warn_array_bounds_p);
@@ -4418,6 +4434,7 @@ public:
     }
 
  private:
+  const pass_data &data;
   bool warn_array_bounds_p;
   int my_pass;
 }; // class pass_vrp
@@ -4427,5 +4444,11 @@ public:
 gimple_opt_pass *
 make_pass_vrp (gcc::context *ctxt)
 {
-  return new pass_vrp (ctxt);
+  return new pass_vrp (ctxt, pass_data_vrp);
+}
+
+gimple_opt_pass *
+make_pass_early_vrp (gcc::context *ctxt)
+{
+  return new pass_vrp (ctxt, pass_data_early_vrp);
 }
