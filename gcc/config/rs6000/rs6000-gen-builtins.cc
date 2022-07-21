@@ -95,6 +95,7 @@ along with GCC; see the file COPYING3.  If not see
      ibmld    Restrict usage to the case when TFmode is IBM-128
      ibm128   Restrict usage to the case where __ibm128 is supported or
               if ibmld
+     ieeeld   Restrict usage to the case when TFmode is IEEE-128
 
    An example stanza might look like this:
 
@@ -227,6 +228,7 @@ enum bif_stanza
  BSTZ_P9_64,
  BSTZ_P9V,
  BSTZ_IEEE128_HW,
+ BSTZ_IEEE128_HW_LD,
  BSTZ_DFP,
  BSTZ_CRYPTO,
  BSTZ_HTM,
@@ -261,6 +263,7 @@ static stanza_entry stanza_map[NUMBIFSTANZAS] =
     { "power9-64",	BSTZ_P9_64	},
     { "power9-vector",	BSTZ_P9V	},
     { "ieee128-hw",	BSTZ_IEEE128_HW	},
+    { "ieee128-hw-ld",	BSTZ_IEEE128_HW_LD },
     { "dfp",		BSTZ_DFP	},
     { "crypto",		BSTZ_CRYPTO	},
     { "htm",		BSTZ_HTM	},
@@ -286,6 +289,7 @@ static const char *enable_string[NUMBIFSTANZAS] =
     "ENB_P9_64",
     "ENB_P9V",
     "ENB_IEEE128_HW",
+    "ENB_IEEE128_HW_LD",
     "ENB_DFP",
     "ENB_CRYPTO",
     "ENB_HTM",
@@ -395,6 +399,7 @@ struct attrinfo
   bool isendian;
   bool isibmld;
   bool isibm128;
+  bool isieeeld;
 };
 
 /* Fields associated with a function prototype (bif or overload).  */
@@ -1444,6 +1449,8 @@ parse_bif_attrs (attrinfo *attrptr)
 	  attrptr->isibmld = 1;
 	else if (!strcmp (attrname, "ibm128"))
 	  attrptr->isibm128 = 1;
+	else if (!strcmp (attrname, "ieeeld"))
+	  attrptr->isieeeld = 1;
 	else
 	  {
 	    diag (oldpos, "unknown attribute.\n");
@@ -1477,7 +1484,8 @@ parse_bif_attrs (attrinfo *attrptr)
 	"ldvec = %d, stvec = %d, reve = %d, pred = %d, htm = %d, "
 	"htmspr = %d, htmcr = %d, mma = %d, quad = %d, pair = %d, "
 	"mmaint = %d, no32bit = %d, 32bit = %d, cpu = %d, ldstmask = %d, "
-	"lxvrse = %d, lxvrze = %d, endian = %d, ibmdld = %d, ibm128 = %d.\n",
+	"lxvrse = %d, lxvrze = %d, endian = %d, ibmdld = %d, ibm128 = %d, "
+	"ieeeld = %d.\n",
 	attrptr->isinit, attrptr->isset, attrptr->isextract,
 	attrptr->isnosoft, attrptr->isldvec, attrptr->isstvec,
 	attrptr->isreve, attrptr->ispred, attrptr->ishtm, attrptr->ishtmspr,
@@ -1485,7 +1493,7 @@ parse_bif_attrs (attrinfo *attrptr)
 	attrptr->ismmaint, attrptr->isno32bit, attrptr->is32bit,
 	attrptr->iscpu, attrptr->isldstmask, attrptr->islxvrse,
 	attrptr->islxvrze, attrptr->isendian, attrptr->isibmld,
-	attrptr->isibm128);
+	attrptr->isibm128, attrptr->isieeeld);
 #endif
 
   return PC_OK;
@@ -2252,6 +2260,7 @@ write_decls (void)
   fprintf (header_file, "  ENB_P9_64,\n");
   fprintf (header_file, "  ENB_P9V,\n");
   fprintf (header_file, "  ENB_IEEE128_HW,\n");
+  fprintf (header_file, "  ENB_IEEE128_HW_LD,\n");
   fprintf (header_file, "  ENB_DFP,\n");
   fprintf (header_file, "  ENB_CRYPTO,\n");
   fprintf (header_file, "  ENB_HTM,\n");
@@ -2301,6 +2310,7 @@ write_decls (void)
   fprintf (header_file, "#define bif_endian_bit\t\t(0x00200000)\n");
   fprintf (header_file, "#define bif_ibmld_bit\t\t(0x00400000)\n");
   fprintf (header_file, "#define bif_ibm128_bit\t\t(0x00800000)\n");
+  fprintf (header_file, "#define bif_ieeeld_bit\t\t(0x01000000)\n");
   fprintf (header_file, "\n");
   fprintf (header_file,
 	   "#define bif_is_init(x)\t\t((x).bifattrs & bif_init_bit)\n");
@@ -2350,6 +2360,8 @@ write_decls (void)
 	   "#define bif_is_ibmld(x)\t((x).bifattrs & bif_ibmld_bit)\n");
   fprintf (header_file,
 	   "#define bif_is_ibm128(x)\t((x).bifattrs & bif_ibm128_bit)\n");
+  fprintf (header_file,
+	   "#define bif_is_ieeeld(x)\t((x).bifattrs & bif_ieeeld_bit)\n");
   fprintf (header_file, "\n");
 
   fprintf (header_file,
@@ -2548,6 +2560,8 @@ write_bif_static_init (void)
 	fprintf (init_file, " | bif_ibmld_bit");
       if (bifp->attrs.isibm128)
 	fprintf (init_file, " | bif_ibm128_bit");
+      if (bifp->attrs.isieeeld)
+	fprintf (init_file, " | bif_ieeeld_bit");
       fprintf (init_file, ",\n");
       fprintf (init_file, "      /* restr_opnd */\t{%d, %d, %d},\n",
 	       bifp->proto.restr_opnd[0], bifp->proto.restr_opnd[1],
