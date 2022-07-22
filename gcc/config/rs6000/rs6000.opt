@@ -324,8 +324,6 @@ mblock-ops-unaligned-vsx
 Target Mask(BLOCK_OPS_UNALIGNED_VSX) Var(rs6000_isa_flags)
 Generate unaligned VSX load/store for inline expansion of memcpy/memmove.
 
-; Not set on power10 by default due to performance reasons, but it could be set
-; in future processors.
 mblock-ops-vector-pair
 Target Undocumented Mask(BLOCK_OPS_VECTOR_PAIR) Var(rs6000_isa_flags)
 Generate unaligned VSX vector pair load/store for inline expansion of memcpy/memmove.
