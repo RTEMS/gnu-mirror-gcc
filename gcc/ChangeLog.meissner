@@ -1,3 +1,26 @@
+==================== work095, patch #9.
+
+Do not enable -mblock-ops-vector-pair.
+
+Testing has shown that using the load vector pair and store vector pair
+instructions for block moves has some performance issues on power10.
+
+A patch on June 11th modified the code so that GCC would not set
+-mblock-ops-vector-pair by default if we are tuning for power10, but it
+would set the option if we were tuning for a different machine and have
+load and store vector pair instructions enabled.
+
+This patch just eliminates the code setting -mblock-ops-vector-pair at
+all.
+
+
+2022-07-22   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal):
+	Do not enable -mblock-ops-vector-pair by default on power10.
+
 ==================== work095, patch #8.
 
 Support IEEE 128-bit overload test data built-in functions.
@@ -168,44 +191,11 @@ gcc/
 	attribute.
 	(write_bif_static_init): Add support for ieeeld attribute.
 
-==================== work095, patch #3.
+==================== work095, patch #3 was reverted.
 
-Make -mblock-ops-vector-pair option valid as an ISA option.
+==================== work095, patch #2 was reverted.
 
-I needed to turn off using load vector pair and store vector pair
-instructions on the power10 for performance reasons.  It is likely that in
-future machines, we will want to enable these instructions for block moves
-and copies.  This patch adds the -mblock-ops-vector-pair option mask to
-POWERPC_MASKS so that it is automatically set and cleared as we change the
-target cpu.
-
-2022-07-19   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/rs6000-cpus.def (POWERPC_MASKS): Add
-	OPTION_MASK_BLOCK_OPS_VECTOR_PAIR.
-	* config/rs6000/rs6000.opt (-mblock-ops-vector-pair): Add a
-	comment.
-
-==================== work095, patch #2.
-
-Remove setting -mblock-ops-vector-pair on power10.
-
-Testing has shown that using the load vector pair and store vector pair
-instructions for block moves has some performance issues on power10.  This
-patch does not set this option by default.  If it is a win in other
-machines, this flag can be set in the ISA options.
-
-2022-07-18   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/rs6000.cc (rs6000_option_override_internal):
-	Remove code setting -mblock-ops-vector-pair by default on
-	power10.
-
-==================== work095, patch #1 (reverted)
+==================== work095, patch #1 was reverted.
 
 ==================== work095, branch setup.
 
