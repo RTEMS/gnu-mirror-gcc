@@ -1,3 +1,19 @@
+==================== work095, patch #10.
+
+Allow IBM 128-bit  to do offset addressing.
+
+I noticed that we didn't enable offset addressing for IBM 128-bit floating
+point.
+
+2022-07-22   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_setup_reg_addr_masks): Allow
+	IFmode and possibly TFmode to use offset addressing.
+	(reg_offset_addressing_ok_p): IBM 128-bit floating point modes can do
+	offset addressing.
+
 ==================== work095, patch #9.
 
 Do not enable -mblock-ops-vector-pair.
