@@ -2697,6 +2697,11 @@ rs6000_setup_reg_addr_masks (void)
 			  || (rc == RELOAD_REG_VMX && TARGET_P9_VECTOR)))))
 	    addr_mask |= RELOAD_REG_OFFSET;
 
+	  /* IBM 128-bit can do REG+OFFSET addressing.  */
+	  else if ((addr_mask != 0) && !indexed_only_p
+		   && FLOAT128_IBM_P (m))
+	    addr_mask |= RELOAD_REG_OFFSET;
+
 	  /* VSX registers can do REG+OFFSET addresssing if ISA 3.0
 	     instructions are enabled.  The offset for 128-bit VSX registers is
 	     only 12-bits.  While GPRs can handle the full offset range, VSX
@@ -8511,6 +8516,16 @@ reg_offset_addressing_ok_p (machine_mode mode)
 {
   switch (mode)
     {
+    case E_IFmode:
+      return true;
+
+    case E_TFmode:
+      if (FLOAT128_IBM_P (TFmode))
+	return true;
+
+      /* If TFmode is IEEE 128-bit, treat it like a vector.  */
+      /* fall through */
+
     case E_V16QImode:
     case E_V8HImode:
     case E_V4SFmode:
@@ -8519,7 +8534,6 @@ reg_offset_addressing_ok_p (machine_mode mode)
     case E_V2DImode:
     case E_V1TImode:
     case E_TImode:
-    case E_TFmode:
     case E_KFmode:
       /* AltiVec/VSX vector modes.  Only reg+reg addressing was valid until the
 	 ISA 3.0 vector d-form addressing mode was added.  While TImode is not
