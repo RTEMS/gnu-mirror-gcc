@@ -58,23 +58,21 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa-propagate.h"
 #include "gimple-fold.h"
 
+enum vstate
+{
+  unvisited,
+  vopen, /* Open and closed vertices are on stack.  */
+  closed,
+  in_scc
+};
+
 struct vertex
 {
-  bool visited;
-  bool is_on_stack;
+  vstate state;
   unsigned index;
   unsigned lowlink;
   gphi* stmt;
 };
-
-static unsigned
-min (unsigned x, unsigned y)
-{
-  if (x < y)
-    return x;
-  else
-    return y;
-}
 
 static void
 tarjan_set_using (gimple* stmt)
@@ -159,8 +157,7 @@ tarjan_phis_to_vertices (vec<gphi *> phis)
   for (gphi *phi : phis)
     {
       vertex v;
-      v.visited = false;
-      v.is_on_stack = false;
+      v.state = unvisited;
       v.index = 0;
       v.lowlink = 0;
       v.stmt = phi;
@@ -175,6 +172,7 @@ tarjan_compute_sccs (vec<gphi *> phis)
 {
   vec<vec<gphi *>> sccs = vNULL;
   vec<unsigned> worklist = vNULL;
+  vec<unsigned> stack = vNULL;
   unsigned curr_index = 0;
 
   vec<vertex> vs = tarjan_phis_to_vertices (phis);
@@ -198,67 +196,108 @@ tarjan_compute_sccs (vec<gphi *> phis)
   while (!worklist.is_empty ())
     {
       unsigned i = worklist.pop();
+      gphi *phi = vs[i].stmt;
 
-      if (!vs[i].visited)
+      if (vs[i].state == unvisited)
 	{
-	  gphi *phi = vs[i].stmt;
+	  vs[i].state = vopen;
 
 	  /* Assign index to this vertex.  */
 	  vs[i].index = curr_index;
 	  vs[i].lowlink = curr_index;
 	  curr_index++;
 
-	  /* Put this vertex back on worklist.  */
+	  /* Put vertex on stack and also on worklist to be closed later.  */
+	  stack.safe_push (i);
 	  worklist.safe_push (i);
 
-	  /* Put not yet visited children of vertex on worklist and update
-	     lowlink of this vertex according to lowlinks of children on stack.  */
+	  /* Put unvisited neighbors of vertex on worklist and update
+	     lowlink of this vertex according to indices of neighbors on
+	     stack.  */
 	  unsigned j;
 	  for (j = 0; j < gimple_phi_num_args (phi); j++)
 	    {
-	      tree op_ssa = gimple_phi_arg_def (phi, i);
+	      tree op_ssa = gimple_phi_arg_def (phi, j);
 	      gimple *op_stmt = SSA_NAME_DEF_STMT (op_ssa);
 
 	      /* Skip any operand that isn't a vertex we're using.  */
 	      if (!tarjan_is_using (op_stmt))
 		continue;
-
+	      
 	      gphi *op_phi = dyn_cast<gphi *> (op_stmt);
 	      if (op_phi == NULL)
 		/* Only PHI functions have the 'using' flags set.  */
 		gcc_unreachable ();
 
 	      unsigned op_i = tarjan_phinum (op_phi);
-	      if (!vs[op_i].visited)
+	      switch (vs[op_i].state)
 		{
+		case unvisited:
 		  worklist.safe_push (op_i);
-		}
-	      else if (vs[op_i].is_on_stack)
-		{
-		  vs[i].lowlink = min (vs[i].lowlink, vs[op_i].index);
+		  break;
+		case vopen:
+		case closed:
+		  vs[i].lowlink = std::min (vs[i].lowlink, vs[op_i].index);
+		  break;
+		case in_scc:
+		  /* Ignore these edges.  */
+		  break;
 		}
 	    }
 	}
-      else if (vs[i].is_on_stack) // TODO This check is redundant
+      else if (vs[i].state == vopen)
 	{
-	  vec<gphi *> scc = vNULL;
+	  vs[i].state = closed;
 
-	  /* Put vertex back on stack/worklist.  */
-	  worklist.safe_push (i);
-
-	  /* Pop scc from stack/worklist.  */
+	  /* Update lowlink of this vertex according to lowlinks of children
+	     of this vertex (in terms of DFS tree).  */
 	  unsigned j;
-	  do
+	  for (j = 0; j < gimple_phi_num_args (phi); j++)
 	    {
-	      j = worklist.pop();
-	      scc.safe_push (vs[j].stmt);
-	      vs[j].is_on_stack = false;
-	    }
-	  while (vs[j].lowlink != vs[j].index);
+	      tree op_ssa = gimple_phi_arg_def (phi, j); // TODO Same code
+							 // twice (iterator?)
+	      gimple *op_stmt = SSA_NAME_DEF_STMT (op_ssa);
 
-	  sccs.safe_push (scc);
+	      /* Skip any operand that isn't a vertex we're using.  */
+	      if (!tarjan_is_using (op_stmt))
+		continue;
+	      
+	      gphi *op_phi = dyn_cast<gphi *> (op_stmt);
+	      if (op_phi == NULL)
+		/* Only PHI functions have the 'using' flags set.  */
+		gcc_unreachable ();
+
+	      unsigned op_i = tarjan_phinum (op_phi);
+	      if (vs[op_i].state == closed)
+		{
+		  vs[i].lowlink = std::min (vs[i].lowlink, vs[op_i].lowlink);
+		}
+	    }
+
+	  /* If this is the root of an scc, pop it from stack.  */
+	  if (vs[i].lowlink == vs[i].index)
+	    {
+	      vec<gphi *> scc = vNULL;
+
+	      unsigned j;
+	      do
+		{
+		  j = stack.pop();
+		  scc.safe_push (vs[j].stmt);
+		  vs[j].state = in_scc;
+		}
+	      while (j != i);
+
+	      sccs.safe_push (scc);
+	    }
 	}
     }
+
+  // DEBUG
+  if (!stack.is_empty ())
+  {
+    gcc_unreachable();
+  }
 
   /* Clear PHI functions' 'using' flags.  */
   for (vertex v : vs)
