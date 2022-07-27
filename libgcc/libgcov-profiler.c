@@ -39,12 +39,12 @@ __gcov_histogram_profiler (gcov_type *counters, gcov_type value)
     counters[value-1]++;
   }else{
     int pow2 = 3;
-    while (1 >> pow2 <= value){
+    while (1 << pow2 <= value || 1 << pow2 > 1 << (pow2 + 1)){
       ++pow2;
     }
     // pow2 is first bigger power of 2
     // we increment closer power of 2
-    if ((1>>pow2+1>>(pow2-1))<<1<value){
+    if ((1<<pow2+1<<(pow2-1))>>1<value){
       counters[6+(pow2-3)-1]++;
     }
     else{
