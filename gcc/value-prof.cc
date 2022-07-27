@@ -42,6 +42,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-pretty-print.h"
 #include "dumpfile.h"
 #include "builtins.h"
+#include "cfgloop.h"
+#include "tree-ssa-loop-manip.h"
 
 /* In this file value profile based optimizations are placed.  Currently the
    following optimizations are implemented (for more detailed descriptions
@@ -1913,6 +1915,30 @@ gimple_stringops_values_to_profile (gimple *gs, histogram_values *values)
 						     stmt, dest));
 }
 
+static void
+gimple_histogram_values_to_profile(function *fun, histogram_values * values){
+    for (auto loop : loops_list (fun, 0)){
+         tree var;
+         gimple_stmt_iterator gsi;
+         gsi = gsi_last_bb (loop->latch);
+         create_iv (build_int_cst_type (var, 0), build_int_cst (var, 1), NULL_TREE,
+             loop, &gsi, true, &var, NULL);
+         auto_vec<edge> exits = get_loop_exit_edges (loop);
+         for ( auto exit : exits ){
+              if (single_pred_p (exit->dest)){
+                values->safe_push (gimple_alloc_histogram_value (fun,
+                                         HIST_TYPE_HISTOGRAM,
+                                         exit->src, var));
+              }
+             //pridate ulozeni var do histogramu na zacated basic blocku exit->dest
+             // TREE_TYPE (name)
+               else
+               {
+               }
+         }
+    }
+}
+
 /* Find values inside STMT for that we want to measure histograms and adds
    them to list VALUES.  */
 
@@ -1932,8 +1958,8 @@ gimple_find_values_to_profile (histogram_values *values)
   unsigned i;
   histogram_value hist = NULL;
   values->create (0);
-
   FOR_EACH_BB_FN (bb, cfun)
+    gimple_histogram_values_to_profile(cfun, values);
     for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
       gimple_values_to_profile (gsi_stmt (gsi), values);
 
@@ -1948,10 +1974,6 @@ gimple_find_values_to_profile (histogram_values *values)
 	  hist->n_counters = hist->hdata.intvl.steps + 2;
 	  break;
 
-
-	case HIST_TYPE_HISTOGRAM:
-	  hist->n_counters = 69;
-	  break;
 	case HIST_TYPE_POW2:
 	  hist->n_counters = 2;
 	  break;
@@ -1971,6 +1993,10 @@ gimple_find_values_to_profile (histogram_values *values)
 
 	case HIST_TYPE_IOR:
 	  hist->n_counters = 1;
+	  break;
+
+	case HIST_TYPE_HISTOGRAM:
+	  hist->n_counters = 69;
 	  break;
 
 	default:
