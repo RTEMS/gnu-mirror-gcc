@@ -2931,7 +2931,7 @@ Enable stack scrub as per attributes, with strict call checking.
 ; 0 if no strub-enabling attribute is seen.  This minimizes the strub
 ; overhead.
 fstrub=relaxed
-Common RejectNegative Var(flag_strub, -3) Init(-3)
+Common RejectNegative Var(flag_strub, -3) Init(3) ; alt default for testing.
 Restore default strub mode: as per attributes, with relaxed checking.
 
 fstrub=all
