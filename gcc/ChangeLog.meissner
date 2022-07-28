@@ -1,3 +1,37 @@
+==================== work095, patch #12.
+
+Enable using overload built-ins for 128-bit floating point.
+
+2022-07-28   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_expand_builtin): Remove all
+	of the code that changed KFmode built-in functions into TFmode, since
+	these functions now support overloading between KFmode and TFmode.
+	* config/rs6000/rs6000-c.cc (rs6000_builtin_type_compatible):
+	Don't consider _Float128 and long double under
+	-mabi=ieeelongdouble to be compatible for built-in functions.  Use
+	overloading instead.
+	* config/rs6000/rs6000.md (IFKF): Delete.
+	(IFKF_reg): Delete.
+	(@extenddf<mode>2_fprs): Remove extra test for
+	TARGET_LONG_DOUBLE_128.
+	(@extenddf<mode2>_vsx): Likewise.
+	(extendiftf2): Allow __ibm128 even if _Float128 is not supported.
+	(extendkfif2): New insn.
+	(extendtfkf2): Allow __ibm128 even if _Float128 is not supported.
+	(extendtfif2): Likewise.
+	(trunckfif2): New insn.
+	(trunctfif2): Allow __ibm128 even if _Float128 is not supported.
+	(extendkftf2_internal): Split extend<mode>tf2_internal and
+	extendtf<mode>2_internal into separate insns that handle either
+	conversions between IEEE 128-bit types or between IBM 128-bit types.
+	Set the type and insn length correctly.
+	(extendtfkf2_internal): Likewise.
+	(extendiftf2_internal): Likewise.
+	(extendtfif2_internal): Likewise.
+
 ==================== work095, patch #11.
 
 Make __float128 and __ibm128 use different types from long double.
