@@ -1,3 +1,14 @@
+==================== work095, patch #13.
+
+Mangle __ibm128 into u8__ibm128.
+
+2022-07-28   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs600.cc (rs6000_mangle_type): Mangle __ibm128 into
+	"u8__ibm128".
+
 ==================== work095, patch #12.
 
 Enable using overload built-ins for 128-bit floating point.
