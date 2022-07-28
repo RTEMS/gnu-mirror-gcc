@@ -1,3 +1,48 @@
+==================== work095, patch #11.
+
+Make __float128 and __ibm128 use different types from long double.
+
+2022-07-28   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_init_builtins): Always
+	create a new tree node for __ibm128, even if long double uses the IBM
+	128-bit format.  Always create a new tree node for __float128, even if
+	long double uses the IEEE 128-bit format.
+	* config/rs6000/rs600.cc (init_float128_ibm): Remove checks for
+	hardware floating point for the IBM 128-bit comparisons.
+	(init_float128_ieee): Do not create __mulkc3 and __divkc3 since
+	__float128 always creates these functions.
+	(rs6000_init_libfuncs): Create complex multiply and divide for long
+	double if long double uses the IEEE 128-bit encoding.
+	(rs6000_scalar_mode_supported_p): Allow __ibm128 even if we don't
+	support _Float128.
+	(rs6000_libgcc_floating_mode_supported_p): Allow KFmode if IEEE
+	128-bit floating point is supported.  Allow IFmode if either IEEE
+	128-bit floating point is supported or long double is IBM 128-bit.
+	(rs6000_floatn_mode): Always return KFmode for IEEE 128-bit.  Do not
+	return TFmode, even if long double uses the IEEE 128-bit format.
+	(rs6000_c_mode_for_suffix): The 'q' suffix always uses KFmode, even if
+	long double uses the IEEE 128-bit encoding.
+	* config/rs6000/rs6000.h (FLOAT128_IBM_P): Remove checks for
+	-mhard-float.
+	(TARGET_IBM128): New macro.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/mulkd3-2.c: Update test.
+	* gcc.target/powerpc/divkd3-2.c: Likewise.
+
+libgcc/
+
+	* config/rs6000/float128-ifunc.c (__multc3_ieee128): Add ifunc
+	support.
+	(__divtc3_ieee128): Likewise.
+	* config/rs6000/quad-float128.h (__multc3_ieee128): Add
+        Declaration.
+        (__divtc3_ieee128): Likewise.
+
 ==================== work095, patch #10.
 
 Allow IBM 128-bit  to do offset addressing.
