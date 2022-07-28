@@ -46,6 +46,8 @@ jobs:
             githubBranch: current
           - upstreamBranch: '9.1.0'
             githubBranch: gcc-9.1.0
+          - upstreamBranch: 'releases/gcc-11'
+            githubBranch: 'releases/gcc-11'
 
         # Exclude the default case because we can't have empty matricies
         exclude:
