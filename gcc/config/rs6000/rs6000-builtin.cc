@@ -719,18 +719,12 @@ rs6000_init_builtins (void)
      For IEEE 128-bit floating point, always create the type __ieee128.  If the
      user used -mfloat128, rs6000-c.cc will create a define from __float128 to
      __ieee128.  */
-  if (TARGET_LONG_DOUBLE_128 && (!TARGET_IEEEQUAD || TARGET_FLOAT128_TYPE))
+  if (TARGET_IBM128)
     {
-      if (!TARGET_IEEEQUAD)
-	ibm128_float_type_node = long_double_type_node;
-      else
-	{
-	  ibm128_float_type_node = make_node (REAL_TYPE);
-	  TYPE_PRECISION (ibm128_float_type_node) = 128;
-	  SET_TYPE_MODE (ibm128_float_type_node, IFmode);
-	  layout_type (ibm128_float_type_node);
-	}
-      t = build_qualified_type (ibm128_float_type_node, TYPE_QUAL_CONST);
+      ibm128_float_type_node = make_node (REAL_TYPE);
+      TYPE_PRECISION (ibm128_float_type_node) = 128;
+      SET_TYPE_MODE (ibm128_float_type_node, IFmode);
+      layout_type (ibm128_float_type_node);
       lang_hooks.types.register_builtin_type (ibm128_float_type_node,
 					      "__ibm128");
     }
@@ -739,11 +733,7 @@ rs6000_init_builtins (void)
 
   if (TARGET_FLOAT128_TYPE)
     {
-      if (TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128)
-	ieee128_float_type_node = long_double_type_node;
-      else
-	ieee128_float_type_node = float128_type_node;
-      t = build_qualified_type (ieee128_float_type_node, TYPE_QUAL_CONST);
+      ieee128_float_type_node = float128_type_node;
       lang_hooks.types.register_builtin_type (ieee128_float_type_node,
 					      "__ieee128");
     }
