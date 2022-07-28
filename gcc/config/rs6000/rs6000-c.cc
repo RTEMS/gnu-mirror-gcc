@@ -808,8 +808,11 @@ rs6000_builtin_type (int id)
 /* Check whether the type of an argument, T, is compatible with a type ID
    stored into a struct altivec_builtin_types.  Integer types are considered
    compatible; otherwise, the language hook lang_hooks.types_compatible_p makes
-   the decision.  Also allow long double and _Float128 to be compatible if
-   -mabi=ieeelongdouble.  */
+   the decision.
+
+   In the past, we used to consider _Float128 and long double to be compatible
+   under -mabi=ieeelongdouble.  We no longer consider them compatible and use
+   the overload mechanism to deal with KFmode vs. TFmode types.  */
 
 static inline bool
 is_float128_p (tree t)
@@ -832,7 +835,8 @@ rs6000_builtin_type_compatible (tree parmtype, tree argtype)
     return true;
 
   if (TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128
-      && is_float128_p (parmtype) && is_float128_p (argtype))
+      && is_float128_p (parmtype) && is_float128_p (argtype)
+      && TYPE_MODE (parmtype) == TYPE_MODE (argtype))
     return true;
 
   if (POINTER_TYPE_P (parmtype) && POINTER_TYPE_P (argtype))
