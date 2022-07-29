@@ -1,3 +1,19 @@
+==================== work095, patch #18
+
+Mangle __ibm128 into u8__ibm128.
+
+This patch changes the mangling of __ibm128 when long double uses the IBM
+128-bit encoding.  This change is necessary due to the change where __ibm128 and
+long double no longer share the same internal type node.
+
+2022-07-29   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/85657
+	* config/rs6000/rs600.cc (rs6000_mangle_type): Mangle __ibm128 into
+	"u8__ibm128".
+
 ==================== work095, patch #17
 
 Make __ibm128 and __float128 separate types from long double.
