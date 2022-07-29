@@ -1,71 +1,114 @@
-==================== work095, patch #14.
+==================== work095, patch #17
 
-Make __float128 and __ibm128 use different types from long double.
+Make __ibm128 and __float128 separate types from long double.
+
+This patch changes GCC so that __float128 and __ibm128 use different types
+internally than long double.  In the past, GCC would use the long double type
+for __float128 if -mabi=ieeelongdouble was used, and it would use the long
+double type for __ibm128 if -mabi=ibmlongdouble was used.
+
+The rs6000 internal ieee128_float_type_node is deleted in favor of using the
+standard float128_type_node.
+
+I deleted the code in rs6000_expand_builtin which used to convert some built-in
+functions that used KFmode arguments to the equivalent built-in functions that
+used TFmode arguments if -mabi=ieeelongdouble.  I also deleted the code that
+converted the built-ins that used IFmode arguments to the equivalant functions
+that used TFmode arguments if -mabi=ibmlongdouble.
+
+I changed rs6000_builtin_type_compatible so that if the types are both IEEE
+128-bit floating point or both IBM 128-bit floating point have compatible
+types.
+
+I deleted the translate mode attribute hook which is no longer need with these
+changes.
+
+I changed how complex 128-bit long double multiply and divide are done.  The
+previous code indrectly depended on the type mode for __float128 being long
+double, and it no longer works when __float128 always has a unique type.  To do
+this, I had to create two new functions (__multc3_ieee128 and divtc3_ieee128)
+which are called in this case.  I added support in libgcc to make the ifunc
+support for these functions use the __mulkc3 and __divkc3 functions.
+
+I split the define_insn_and_splits for converting between two IEEE 128-bit types
+or two IBM 128-bit types into separate insns, one for converting between IEEE
+128-bit types, and the other for converting between IBM 128-bit types.  One
+benefit of doing this is that we can get the type and length attributes correct
+for each move.
 
 2022-07-29   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
-	* config/rs6000/rs6000-builtin.cc (rs6000_init_builtins): Always
-	create a new tree node for __ibm128, even if long double uses the IBM
-	128-bit format.  Always create a new tree node for __float128, even if
-	long double uses the IEEE 128-bit format.
-	* config/rs6000/rs600.cc (rs6000_expand_builtin): Remove code that
-	converted the KFmode and IFmode built-in functions to TFmode depending
-	on what the long double format is, and use built-in overloading
-	instead.
-	(init_float128_ieee): Remove setting up KFmode complex multiply and
-	divide here.
-	(rs6000_init_libfuncs): Rewrite the setup for complex multiply and
-	divide for long double if long double uses the IEEE 128-bit encoding.
-	(rs6000_scalar_mode_supported_p): Allow __ibm128 even if we don't
-	support _Float128.
-	(rs6000_libgcc_floating_mode_supported_p): Allow KFmode if IEEE
-	128-bit floating point is supported.  Allow IFmode if either IEEE
-	128-bit floating point is supported or long double is IBM 128-bit.
-	(rs6000_floatn_mode): Always return KFmode for IEEE 128-bit.  Do not
-	return TFmode, even if long double uses the IEEE 128-bit format.
-	(rs6000_c_mode_for_suffix): The 'q' suffix always uses KFmode, even if
-	long double uses the IEEE 128-bit encoding.
+	* config/rs6000/rs6000-builtin.cc (rs6000_type_string): Replace
+	ieee128_float_type_node with float128_type_node.
+	(rs6000_init_builtins): Use the float128_type_node for __float128 even
+	if long double uses the IEEE 128-bit encoding.  The type node for
+	__ibm128 is a unqiue type node even if long double uses the IBM 128-bit
+	encoding.
+	(rs6000_expand_builtin): Delete code that converted built-in functions
+	using KFmode to the equivalant built-in function using TFmode if
+	-mabi=ieeelongdouble.  Delete code that coverted built-in functions
+	using IFmode to the equivalent built-in function using TFmode if
+	-mabi=ibmlongdouble.
+	* config/rs6000/rs6000-c.c (rs6000_target_modify_macros): Delete
+	reference to ieee128_float_type_node.
+	(rs6000_cpu_cpp_builtins): Delete reference to ieee128_float_type_node.
+	Use TARGET_IBM128 for checking if __ibm128 is supported.
+	(is_float128_p): Delete.
+	(rs6000_builtin_type_compatible): For 128-bit floating point, check if
+	both types have the same encoding.
+	* config/rs6000/rs6000.cc (TARGET_TRANSLATE_MODE_ATTRIBUTE): Delete.
+	(init_float128_ieee): Delete creation of complex long double multiply
+	and divide here and move the implemention to rs6000_init_libfuncs.
+	(rs6000_init_libfuncs): Rework complex long double multiply and divide
+	support here if long double uses IEEE 128-bit encoding.
+	(rs6000_translate_mode_attribute): Delete.
+	(rs6000_libgcc_floating_mode_supported_p): Remove code that used TFmode
+	if long double used the IEEE 128-bit encoding.
+	(rs6000_floatn_mode): Likewise.
+	(rs6000_c_mode_for_suffix): Likewise.
+	* config/rs6000/rs6000.h (RS6000_BTI_ieee128_float): Delete.
+	(ieee128_float_type_node): Delete.
 	* config/rs6000/rs6000.md (IFKF): Delete.
 	(IFKF_reg): Delete.
+	(extendkfif2): New insn.
 	(trunckfif2): New insn.
-	(trunctfif2): Likewise.
-	(extendkftf2_internal): Split extend<mode>tf2_internal and
-	extendtf<mode>2_internal into separate insns that handle either
-	conversions between IEEE 128-bit types or between IBM 128-bit types.
-	Set the type and insn length correctly.
-	(extendtfkf2_internal): Likewise.
-	(extendiftf2_internal): Likewise.
-	(extendtfif2_internal): Likewise.
+	(extend<mode>tf2_internal): Delete combined extend mode, and split it
+	into separate insns that either just handle IEEE 128-bit to IEEE 128-bit
+	conversions or IBM 128-bit to IBM 128-bit conversions.
+	(extendtf<mode>2_internal): Likewise.
+	(extendkftf2_internal): New insn.
+	(extendtfkf2_internal): New insn.
+	(extendiftf2_internal): New insn.
+	(extendtfif2_internal): New insn.
 
 gcc/testsuite/
 
-	* gcc.target/powerpc/mulkc3-2.c: Update test.
-	* gcc.target/powerpc/divkc3-2.c: Likewise.
+	* gcc.target/powerpc/divkc3-2: Update test to track compiler changes.
+	* gcc.target/powerpc/mulkc3-2: Likewise.
 
 libgcc/
 
-	* config/rs6000/float128-ifunc.c (__multc3_ieee128): Add ifunc
-	support.
+	* config/rs6000/float128-ifunc.c (__multc3_ieee128): New ifunc handler.
 	(__divtc3_ieee128): Likewise.
-	* config/rs6000/quad-float128.h (__multc3_ieee128): Add
-        declaration.
-        (__divtc3_ieee128): Likewise.
+	* config/rs6000/quad-float128.h (__multc3_ieee128): Add declaration.
+	(__divtc3_ieee128): Likewise.
 
-==================== work095, patch #14.
+==================== work095, patch #16
 
 Allow __ibm128 even if IEEE 128-bit floating point is not supported.
 
-This set of patches fixes places in the compiler where it was assumed to use
-__ibm128 we needed to have IEEE 128-bit support enabled.  A future patch will
-implement the change to create the __ibm128 type if either we have IEEE 128-bit
-floating point enabled, or the long double type is IBM 128-bit floating point.
+This set of patches changes the GCC compiler to allow the use of the __ibm128
+keyword if we have IEEE 128-bit floating point support enabled or if long double
+is 128-bits.
 
-2022-07-28   Michael Meissner  <meissner@linux.ibm.com>
+2022-07-29   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
+	* config/rs6000/rs6000-builtins.cc (rs6000_init_builtins): Create
+	__ibm128 on older machines without IEEE 128-bit support.
 	* config/rs6000/rs600.cc (init_float128_ibm): Remove checks for hardware
 	floating point for the IBM 128-bit comparisons.
 	(rs6000_init_libfuncs): Create IBM 128-bit floating point support even
@@ -81,6 +124,10 @@ gcc/
 	(extendtfif2): Allow conversion if we have __ibm128 but not IEEE 128-bit
 	floating point.
 	(trunckftf2): Likewise.
+
+==================== work095, patch #15 was reverted.
+
+==================== work095, patch #14 was reverted.
 
 ==================== work095, patch #13 was reverted.
 
