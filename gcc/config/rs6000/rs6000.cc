@@ -10980,23 +10980,26 @@ init_float128_ibm (machine_mode mode)
       set_optab_libfunc (smul_optab, mode, "__gcc_qmul");
       set_optab_libfunc (sdiv_optab, mode, "__gcc_qdiv");
 
-      set_optab_libfunc (neg_optab, mode, "__gcc_qneg");
-      set_optab_libfunc (eq_optab, mode, "__gcc_qeq");
-      set_optab_libfunc (ne_optab, mode, "__gcc_qne");
-      set_optab_libfunc (gt_optab, mode, "__gcc_qgt");
-      set_optab_libfunc (ge_optab, mode, "__gcc_qge");
-      set_optab_libfunc (lt_optab, mode, "__gcc_qlt");
-      set_optab_libfunc (le_optab, mode, "__gcc_qle");
-      set_optab_libfunc (unord_optab, mode, "__gcc_qunord");
+      if (!TARGET_HARD_FLOAT)
+	{
+	  set_optab_libfunc (neg_optab, mode, "__gcc_qneg");
+	  set_optab_libfunc (eq_optab, mode, "__gcc_qeq");
+	  set_optab_libfunc (ne_optab, mode, "__gcc_qne");
+	  set_optab_libfunc (gt_optab, mode, "__gcc_qgt");
+	  set_optab_libfunc (ge_optab, mode, "__gcc_qge");
+	  set_optab_libfunc (lt_optab, mode, "__gcc_qlt");
+	  set_optab_libfunc (le_optab, mode, "__gcc_qle");
+	  set_optab_libfunc (unord_optab, mode, "__gcc_qunord");
 
-      set_conv_libfunc (sext_optab, mode, SFmode, "__gcc_stoq");
-      set_conv_libfunc (sext_optab, mode, DFmode, "__gcc_dtoq");
-      set_conv_libfunc (trunc_optab, SFmode, mode, "__gcc_qtos");
-      set_conv_libfunc (trunc_optab, DFmode, mode, "__gcc_qtod");
-      set_conv_libfunc (sfix_optab, SImode, mode, "__gcc_qtoi");
-      set_conv_libfunc (ufix_optab, SImode, mode, "__gcc_qtou");
-      set_conv_libfunc (sfloat_optab, mode, SImode, "__gcc_itoq");
-      set_conv_libfunc (ufloat_optab, mode, SImode, "__gcc_utoq");
+	  set_conv_libfunc (sext_optab, mode, SFmode, "__gcc_stoq");
+	  set_conv_libfunc (sext_optab, mode, DFmode, "__gcc_dtoq");
+	  set_conv_libfunc (trunc_optab, SFmode, mode, "__gcc_qtos");
+	  set_conv_libfunc (trunc_optab, DFmode, mode, "__gcc_qtod");
+	  set_conv_libfunc (sfix_optab, SImode, mode, "__gcc_qtoi");
+	  set_conv_libfunc (ufix_optab, SImode, mode, "__gcc_qtou");
+	  set_conv_libfunc (sfloat_optab, mode, SImode, "__gcc_itoq");
+	  set_conv_libfunc (ufloat_optab, mode, SImode, "__gcc_utoq");
+	}
     }
   else
     {
@@ -11179,11 +11182,10 @@ rs6000_init_libfuncs (void)
 {
   /* __float128 support.  */
   if (TARGET_FLOAT128_TYPE)
-    init_float128_ieee (KFmode);
-
-  /* __ibm128 support.  */
-  if (TARGET_IBM128)
-    init_float128_ibm (IFmode);
+    {
+      init_float128_ibm (IFmode);
+      init_float128_ieee (KFmode);
+    }
 
   /* AIX/Darwin/64-bit Linux quad floating point routines.  */
   if (TARGET_LONG_DOUBLE_128)
@@ -23817,9 +23819,7 @@ rs6000_scalar_mode_supported_p (scalar_mode mode)
 
   if (DECIMAL_FLOAT_MODE_P (mode))
     return default_decimal_float_supported_p ();
-  else if (TARGET_FLOAT128_TYPE && mode == KFmode)
-    return true;
-  else if (TARGET_IBM128 && mode == IFmode)
+  else if (TARGET_FLOAT128_TYPE && (mode == KFmode || mode == IFmode))
     return true;
   else
     return default_scalar_mode_supported_p (mode);
