@@ -2,7 +2,7 @@
 %define _use_internal_dependency_generator 0
 Summary:        Contains the GNU compiler collection
 Name:           gcc
-Version:        11.2.1
+Version:        11.2.0
 Release:        2%{?dist}
 License:        GPLv2+
 Vendor:         Microsoft Corporation
