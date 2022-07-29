@@ -24,5 +24,19 @@
 # SOFTWARE.
 
 git checkout $1 -f
+exit_code=$?
+if [ $exit_code != 0 ]; then
+    exit $exit_code
+fi
+
 git fetch origin +refs/pull/*:refs/remotes/origin/refs/pull/*
+exit_code=$?
+if [ $exit_code != 0 ]; then
+    exit $exit_code
+fi
+
 git checkout $2 -- .github/
+exit_code=$?
+if [ $exit_code != 0 ]; then
+    exit $exit_code
+fi
