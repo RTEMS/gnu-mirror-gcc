@@ -82,7 +82,7 @@ jobs:
       # The flags are bare minimum, and we are forcing rpmbuild to build everything.     
       - name: Build RPM
         working-directory: ./gcc
-        run: rpmbuild -bb --rebuild --clean --verbose --nocheck  .github/Mariner/specs/11.2.1/gcc.specs
+        run: rpmbuild -bb --rebuild --clean --verbose --nocheck  .github/Mariner/specs/${{ env.release_version }}/gcc.specs
         shell: bash
 
       # Upload gcc-${{ env.release_version }}-rpms folder to the Github Action artifact storage.

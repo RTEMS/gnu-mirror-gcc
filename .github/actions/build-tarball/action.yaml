@@ -34,7 +34,7 @@ runs:
       run: echo "branch_name=${{ github.head_ref || github.ref_name }}" >> $GITHUB_ENV
 
     # This step will set an environment variable for release name.
-    # e.g. release_version=11.2.1
+    # e.g. release_version=11.2.0
     - name: Set Environment Variable For Release Version
       shell: bash
       working-directory: ./gcc
