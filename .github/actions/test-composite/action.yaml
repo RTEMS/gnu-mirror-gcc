@@ -1,0 +1,64 @@
+# Composite yaml that's re-usable in multiple workflows to run gcc tests
+
+# Copyright (c) Microsoft Corporation.
+
+# MIT License
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+inputs:
+  configjson:
+    description: 'Config object converted into json'
+    required: true
+    default: ''
+  testSet:
+    description: 'gcc test set to run'
+    required: true
+    default: ''
+  githubtoken:
+    description: 'GitHub auth token'
+    required: true
+    default: ''
+  buildDownloaded:
+    description: 'Whether the build is already available on the machine this composite action is running on'
+    required: true
+    default: true
+outputs:
+  configJson:
+    description: 'Config object that may have been updated'
+    value: ${{ steps.runTests.outputs.noSecretConfigJson }}
+runs:
+  using: "composite"
+  steps:
+    - name: Download build and run tests
+      id: runTests
+      run: | 
+        chmod +x .github/scripts/gccWorkflow.py
+        echo "$PYTHONPATH"
+        echo "$CONFIG_JSON"
+        export PYTHONPATH=${PYTHONPATH}:${PWD}/.github/scripts
+        echo "$PYTHONPATH"
+        echo "$BUILD_DOWNLOADED"
+        python -c 'import sys; from gccWorkflow import *; GccWorkflow.Test(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])' "${CONFIG_JSON}" "${TEST_SET}" "${GITHUB_TOKEN}" "${BUILD_DOWNLOADED}"
+      shell: bash
+      env:
+        CONFIG_JSON: ${{ inputs.configJson }}
+        TEST_SET: ${{ inputs.testSet }}
+        GITHUB_TOKEN: ${{ inputs.githubtoken }}
+        BUILD_DOWNLOADED: ${{ inputs.buildDownloaded }}

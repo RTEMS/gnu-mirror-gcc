@@ -1,0 +1,95 @@
+# Copyright (c) Microsoft Corporation.
+
+# MIT License
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+name: package-rpm
+
+# Disable for now since packaging needs to run after the build.
+# Run this workflow on every new commit
+# For the time being, we are only running this workflow manually.
+on:
+  # We use the push and pull_request events instead of the workflow_run event
+  # so that this workflow will show up during the PR
+  push:
+    branches:
+      - "releases/**"
+  pull_request:
+    branches:
+      - "releases/**"
+  workflow_dispatch:
+
+jobs:
+  package:
+    container: cblmariner2preview.azurecr.io/base/core:2.0
+    runs-on: ubuntu-18.04
+    steps:
+
+      # We need to install a minimum number of packages to run the workflow: git and ca-certificates.
+      # We need to checkout the repository, and to checkout the repository we need git, since 
+      # by default CBL-Mariner 2.0 image does not have git running.
+      - name: Install Minimal Required Packages
+        run: unset HOME && tdnf install git ca-certificates -y
+        shell: bash
+
+      # Clone the GCC repository to path gcc.
+      - name: Checkout GCC Repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          lfs: false
+          path: gcc
+
+      # Run composite job to generate gcc tar.xz files.
+      - name: Run Composite Job To Build Tarball
+        uses: ./gcc/.github/actions/build-tarball
+
+      # Before running a complete build, check whether we have the .spec file to build for this version.
+      # If this fails, it means we don't have .spec file for ${{ env.release_version }} version.
+      # The file should be present in .github/Mariner/specs/${{ env.release_version }} directory inside gcc source tree.
+      - name: Check the SPEC File Does Exist in GCC Source Tree
+        working-directory: ./gcc
+        run: test -f .github/Mariner/specs/${{ env.release_version }}/gcc.specs
+        shell: bash
+
+      # Copy gcc-${{ env.release_version }}.tar.xz to /usr/src/mariner/SOURCES/
+      # /usr/src/mariner/SOURCES/ is a hardcoded path for rpmbuild in CBL-Mariner
+      # to look for tar.xz files when starts building packages.
+      - name: Copy GCC
+        run: mkdir -p /usr/src/mariner/SOURCES/ && cp ~/gcc-${{ env.release_version }}/gcc-${{ env.release_version }}.tar.xz /usr/src/mariner/SOURCES/
+        shell: bash
+
+      # Build RPM   
+      # Simple rpmbuild command which will build GCC based on the spec file available in our repo.
+      # The flags are bare minimum, and we are forcing rpmbuild to build everything.     
+      - name: Build RPM
+        working-directory: ./gcc
+        run: rpmbuild -bb --rebuild --clean --verbose --nocheck  .github/Mariner/specs/11.2.1/gcc.specs
+        shell: bash
+
+      # Upload gcc-${{ env.release_version }}-rpms folder to the Github Action artifact storage.
+      # The variable ${{ env.release_version }} will be set by ./gcc/.github/actions/build-tarball job.
+      - name: Upload GCC RPM
+        uses: actions/upload-artifact@v2
+        with:
+          name: gcc-${{ env.release_version }}-rpms
+          path: /usr/src/mariner/RPMS/x86_64/
+          if-no-files-found: error # 'warn' or 'ignore' are also available, defaults to `warn`
