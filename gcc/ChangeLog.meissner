@@ -1,92 +1,35 @@
-==================== work095, patch #13.
-
-Mangle __ibm128 into u8__ibm128.
-
-2022-07-28   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/rs600.cc (rs6000_mangle_type): Mangle __ibm128 into
-	"u8__ibm128".
-
-==================== work095, patch #12.
-
-Enable using overload built-ins for 128-bit floating point.
-
-2022-07-28   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/rs6000-builtin.cc (rs6000_expand_builtin): Remove all
-	of the code that changed KFmode built-in functions into TFmode, since
-	these functions now support overloading between KFmode and TFmode.
-	* config/rs6000/rs6000-c.cc (rs6000_builtin_type_compatible):
-	Don't consider _Float128 and long double under
-	-mabi=ieeelongdouble to be compatible for built-in functions.  Use
-	overloading instead.
-	* config/rs6000/rs6000.md (IFKF): Delete.
-	(IFKF_reg): Delete.
-	(@extenddf<mode>2_fprs): Remove extra test for
-	TARGET_LONG_DOUBLE_128.
-	(@extenddf<mode2>_vsx): Likewise.
-	(extendiftf2): Allow __ibm128 even if _Float128 is not supported.
-	(extendkfif2): New insn.
-	(extendtfkf2): Allow __ibm128 even if _Float128 is not supported.
-	(extendtfif2): Likewise.
-	(trunckfif2): New insn.
-	(trunctfif2): Allow __ibm128 even if _Float128 is not supported.
-	(extendkftf2_internal): Split extend<mode>tf2_internal and
-	extendtf<mode>2_internal into separate insns that handle either
-	conversions between IEEE 128-bit types or between IBM 128-bit types.
-	Set the type and insn length correctly.
-	(extendtfkf2_internal): Likewise.
-	(extendiftf2_internal): Likewise.
-	(extendtfif2_internal): Likewise.
-
-==================== work095, patch #11.
+==================== work095, patch #14.
 
 Make __float128 and __ibm128 use different types from long double.
 
+This set of patches goes through to allow the use of __ibm128 if we don't have
+IEEE 128-bit support enabled, but long double uses the IBM 128-bit support.
+
 2022-07-28   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
-	* config/rs6000/rs6000-builtin.cc (rs6000_init_builtins): Always
-	create a new tree node for __ibm128, even if long double uses the IBM
-	128-bit format.  Always create a new tree node for __float128, even if
-	long double uses the IEEE 128-bit format.
-	* config/rs6000/rs600.cc (init_float128_ibm): Remove checks for
-	hardware floating point for the IBM 128-bit comparisons.
-	(init_float128_ieee): Do not create __mulkc3 and __divkc3 since
-	__float128 always creates these functions.
-	(rs6000_init_libfuncs): Create complex multiply and divide for long
-	double if long double uses the IEEE 128-bit encoding.
+	* config/rs6000/rs600.cc (init_float128_ibm): Remove checks for hardware
+	floating point for the IBM 128-bit comparisons.
+	(rs6000_init_libfuncs): Create IBM 128-bit floating point support even
+	if we don't support IEEE 128-bit floating point.
 	(rs6000_scalar_mode_supported_p): Allow __ibm128 even if we don't
 	support _Float128.
-	(rs6000_libgcc_floating_mode_supported_p): Allow KFmode if IEEE
-	128-bit floating point is supported.  Allow IFmode if either IEEE
-	128-bit floating point is supported or long double is IBM 128-bit.
-	(rs6000_floatn_mode): Always return KFmode for IEEE 128-bit.  Do not
-	return TFmode, even if long double uses the IEEE 128-bit format.
-	(rs6000_c_mode_for_suffix): The 'q' suffix always uses KFmode, even if
-	long double uses the IEEE 128-bit encoding.
 	* config/rs6000/rs6000.h (FLOAT128_IBM_P): Remove checks for
 	-mhard-float.
 	(TARGET_IBM128): New macro.
+	* config/rs6000/rs6000.md (@extenddf<mode>2_fprs): Allow IFmode to be
+	converted even if long double is not 128-bits.
+	(extenddf<mode>2_vsx): Likewise.
+	(extendtfif2): Allow conversion if we have __ibm128 but not IEEE 128-bit
+	floating point.
+	(trunckftf2): Likewise.
 
-gcc/testsuite/
+==================== work095, patch #13 was reverted.
 
-	* gcc.target/powerpc/mulkd3-2.c: Update test.
-	* gcc.target/powerpc/divkd3-2.c: Likewise.
+==================== work095, patch #12 was reverted.
 
-libgcc/
-
-	* config/rs6000/float128-ifunc.c (__multc3_ieee128): Add ifunc
-	support.
-	(__divtc3_ieee128): Likewise.
-	* config/rs6000/quad-float128.h (__multc3_ieee128): Add
-        Declaration.
-        (__divtc3_ieee128): Likewise.
+==================== work095, patch #11 was reverted.
 
 ==================== work095, patch #10.
 
