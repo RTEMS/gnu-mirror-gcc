@@ -1545,9 +1545,6 @@ static const struct attribute_spec rs6000_attribute_table[] =
 #undef TARGET_EH_RETURN_FILTER_MODE
 #define TARGET_EH_RETURN_FILTER_MODE rs6000_eh_return_filter_mode
 
-#undef TARGET_TRANSLATE_MODE_ATTRIBUTE
-#define TARGET_TRANSLATE_MODE_ATTRIBUTE rs6000_translate_mode_attribute
-
 #undef TARGET_SCALAR_MODE_SUPPORTED_P
 #define TARGET_SCALAR_MODE_SUPPORTED_P rs6000_scalar_mode_supported_p
 
@@ -11064,32 +11061,6 @@ init_float128_ieee (machine_mode mode)
 {
   if (FLOAT128_VECTOR_P (mode))
     {
-      static bool complex_muldiv_init_p = false;
-
-      /* Set up to call __mulkc3 and __divkc3 under -mabi=ieeelongdouble.  If
-	 we have clone or target attributes, this will be called a second
-	 time.  We want to create the built-in function only once.  */
-     if (mode == TFmode && TARGET_IEEEQUAD && !complex_muldiv_init_p)
-       {
-	 complex_muldiv_init_p = true;
-	 built_in_function fncode_mul =
-	   (built_in_function) (BUILT_IN_COMPLEX_MUL_MIN + TCmode
-				- MIN_MODE_COMPLEX_FLOAT);
-	 built_in_function fncode_div =
-	   (built_in_function) (BUILT_IN_COMPLEX_DIV_MIN + TCmode
-				- MIN_MODE_COMPLEX_FLOAT);
-
-	 tree fntype = build_function_type_list (complex_long_double_type_node,
-						 long_double_type_node,
-						 long_double_type_node,
-						 long_double_type_node,
-						 long_double_type_node,
-						 NULL_TREE);
-
-	 create_complex_muldiv ("__mulkc3", fncode_mul, fntype);
-	 create_complex_muldiv ("__divkc3", fncode_div, fntype);
-       }
-
       set_optab_libfunc (add_optab, mode, "__addkf3");
       set_optab_libfunc (sub_optab, mode, "__subkf3");
       set_optab_libfunc (neg_optab, mode, "__negkf2");
@@ -11194,6 +11165,46 @@ rs6000_init_libfuncs (void)
       /* IEEE 128-bit including 32-bit SVR4 quad floating point routines.  */
       else
 	init_float128_ieee (TFmode);
+    }
+
+  /* Set up to call __mulkc3 and __divkc3 when long double uses the IEEE
+     128-bit encoding.  We cannot use the same name (__mulkc3 or __divkc3 for
+     both IEEE long double and for explicit _Float128/__float128) because
+     c_builtin_function will complain if we create two built-in functions with
+     the same name.  Instead we use an alias name for the case when long double
+     uses the IEEE 128-bit encoding.  Libgcc will create a weak alias reference
+     for this name.
+
+     We need to only execute this once.  If we have clone or target attributes,
+     this will be called a second time.  We need to create the built-in
+     function only once.  */
+  static bool complex_muldiv_init_p = false;
+
+  if (TARGET_FLOAT128_TYPE && TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128
+      && !complex_muldiv_init_p)
+    {
+      complex_muldiv_init_p = true;
+
+      tree fntype = build_function_type_list (complex_long_double_type_node,
+					      long_double_type_node,
+					      long_double_type_node,
+					      long_double_type_node,
+					      long_double_type_node,
+					      NULL_TREE);
+
+      /* Create complex multiply.  */
+      built_in_function mul_fncode =
+	(built_in_function) (BUILT_IN_COMPLEX_MUL_MIN + TCmode
+			     - MIN_MODE_COMPLEX_FLOAT);
+
+      create_complex_muldiv ("__multc3_ieee128", mul_fncode, fntype);
+
+      /* Create complex divide.  */
+      built_in_function div_fncode =
+	(built_in_function) (BUILT_IN_COMPLEX_DIV_MIN + TCmode
+			     - MIN_MODE_COMPLEX_FLOAT);
+
+      create_complex_muldiv ("__divtc3_ieee128", div_fncode, fntype);
     }
 }
 
@@ -23791,18 +23802,6 @@ rs6000_eh_return_filter_mode (void)
   return TARGET_32BIT ? SImode : word_mode;
 }
 
-/* Target hook for translate_mode_attribute.  */
-static machine_mode
-rs6000_translate_mode_attribute (machine_mode mode)
-{
-  if ((FLOAT128_IEEE_P (mode)
-       && ieee128_float_type_node == long_double_type_node)
-      || (FLOAT128_IBM_P (mode)
-	  && ibm128_float_type_node == long_double_type_node))
-    return COMPLEX_MODE_P (mode) ? E_TCmode : E_TFmode;
-  return mode;
-}
-
 /* Target hook for scalar_mode_supported_p.  */
 static bool
 rs6000_scalar_mode_supported_p (scalar_mode mode)
@@ -23837,13 +23836,9 @@ rs6000_libgcc_floating_mode_supported_p (scalar_float_mode mode)
     case E_TFmode:
       return true;
 
-      /* We only return true for KFmode if IEEE 128-bit types are supported, and
-	 if long double does not use the IEEE 128-bit format.  If long double
-	 uses the IEEE 128-bit format, it will use TFmode and not KFmode.
-	 Because the code will not use KFmode in that case, there will be aborts
-	 because it can't find KFmode in the Floatn types.  */
+      /* We only return true for KFmode if IEEE 128-bit types are supported.  */
     case E_KFmode:
-      return TARGET_FLOAT128_TYPE && !TARGET_IEEEQUAD;
+      return TARGET_FLOAT128_TYPE;
 
     default:
       return false;
@@ -23877,7 +23872,7 @@ rs6000_floatn_mode (int n, bool extended)
 
 	case 64:
 	  if (TARGET_FLOAT128_TYPE)
-	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
+	    return KFmode;
 	  else
 	    return opt_scalar_float_mode ();
 
@@ -23901,7 +23896,7 @@ rs6000_floatn_mode (int n, bool extended)
 
 	case 128:
 	  if (TARGET_FLOAT128_TYPE)
-	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
+	    return KFmode;
 	  else
 	    return opt_scalar_float_mode ();
 
@@ -23919,7 +23914,7 @@ rs6000_c_mode_for_suffix (char suffix)
   if (TARGET_FLOAT128_TYPE)
     {
       if (suffix == 'q' || suffix == 'Q')
-	return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
+	return KFmode;
 
       /* At the moment, we are not defining a suffix for IBM extended double.
 	 If/when the default for -mabi=ieeelongdouble is changed, and we want
