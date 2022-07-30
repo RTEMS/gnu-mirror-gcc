@@ -2,7 +2,39 @@
 
 ==================== work095, patch #17 was reverted.
 
-==================== work095, patch #16 was reverted.
+==================== work095, patch #16
+
+Allow __ibm128 even if IEEE 128-bit floating point is not supported.
+
+This set of patches changes the GCC compiler to allow the use of the __ibm128
+keyword if we have IEEE 128-bit floating point support enabled or if long double
+is 128-bits.
+
+In addition, checks for requiring hardware floating point to use __ibm128 have
+been removed.  This fixes PR target/105534.
+
+2022-07-29   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/105534
+	* config/rs6000/rs6000-builtins.cc (rs6000_init_builtins): Create
+	__ibm128 on older machines without IEEE 128-bit support.
+	* config/rs6000/rs600.cc (init_float128_ibm): Remove checks for hardware
+	floating point for the IBM 128-bit comparisons.
+	(rs6000_init_libfuncs): Create IBM 128-bit floating point support even
+	if we don't support IEEE 128-bit floating point.
+	(rs6000_scalar_mode_supported_p): Allow __ibm128 even if we don't
+	support _Float128.
+	* config/rs6000/rs6000.h (FLOAT128_IBM_P): Remove checks for
+	-mhard-float.
+	(TARGET_IBM128): New macro.
+	* config/rs6000/rs6000.md (@extenddf<mode>2_fprs): Allow IFmode to be
+	converted even if long double is not 128-bits.
+	(extenddf<mode>2_vsx): Likewise.
+	(extendtfif2): Allow conversion if we have __ibm128 but not IEEE 128-bit
+	floating point.
+	(trunckftf2): Likewise.
 
 ==================== work095, patch #15 was reverted.
 
