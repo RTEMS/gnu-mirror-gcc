@@ -585,7 +585,7 @@ rs6000_target_modify_macros (bool define_p, HOST_WIDE_INT flags,
 	rs6000_define_or_undefine_macro (true, "__float128=__ieee128");
       else
 	rs6000_define_or_undefine_macro (false, "__float128");
-      if (define_p)
+      if (ieee128_float_type_node && define_p)
 	rs6000_define_or_undefine_macro (true, "__SIZEOF_FLOAT128__=16");
       else
 	rs6000_define_or_undefine_macro (false, "__SIZEOF_FLOAT128__");
@@ -628,12 +628,11 @@ rs6000_cpu_cpp_builtins (cpp_reader *pfile)
   if (TARGET_FRSQRTES)
     builtin_define ("__RSQRTEF__");
   if (TARGET_FLOAT128_TYPE)
-    {
-      builtin_define ("__FLOAT128_TYPE__");
-      builtin_define ("__SIZEOF_IEEE128__=16");
-    }
-  if (TARGET_IBM128)
+    builtin_define ("__FLOAT128_TYPE__");
+  if (ibm128_float_type_node)
     builtin_define ("__SIZEOF_IBM128__=16");
+  if (ieee128_float_type_node)
+    builtin_define ("__SIZEOF_IEEE128__=16");
 #ifdef TARGET_LIBC_PROVIDES_HWCAP_IN_TCB
   builtin_define ("__BUILTIN_CPU_SUPPORTS__");
 #endif
@@ -806,6 +805,22 @@ rs6000_builtin_type (int id)
   return id < 0 ? build_pointer_type (t) : t;
 }
 
+/* Check whether the type of an argument, T, is compatible with a type ID
+   stored into a struct altivec_builtin_types.  Integer types are considered
+   compatible; otherwise, the language hook lang_hooks.types_compatible_p makes
+   the decision.  Also allow long double and _Float128 to be compatible if
+   -mabi=ieeelongdouble.  */
+
+static inline bool
+is_float128_p (tree t)
+{
+  return (t == float128_type_node
+	  || (TARGET_IEEEQUAD
+	      && TARGET_LONG_DOUBLE_128
+	      && t == long_double_type_node));
+}
+  
+
 /* Return true iff ARGTYPE can be compatibly passed as PARMTYPE.  */
 static bool
 rs6000_builtin_type_compatible (tree parmtype, tree argtype)
@@ -816,12 +831,8 @@ rs6000_builtin_type_compatible (tree parmtype, tree argtype)
   if (INTEGRAL_TYPE_P (parmtype) && INTEGRAL_TYPE_P (argtype))
     return true;
 
-  machine_mode parmmode = TYPE_MODE (parmtype);
-  machine_mode argmode = TYPE_MODE (argtype);
-  if (FLOAT128_IEEE_P (parmmode) && FLOAT128_IEEE_P (argmode))
-    return true;
-
-  if (FLOAT128_IBM_P (parmmode) && FLOAT128_IBM_P (argmode))
+  if (TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128
+      && is_float128_p (parmtype) && is_float128_p (argtype))
     return true;
 
   if (POINTER_TYPE_P (parmtype) && POINTER_TYPE_P (argtype))

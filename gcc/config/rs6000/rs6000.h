@@ -334,7 +334,7 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 #define FLOAT128_IBM_P(MODE)						\
   ((!TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128				\
     && ((MODE) == TFmode || (MODE) == TCmode))				\
-   || ((MODE) == IFmode || (MODE) == ICmode))
+   || (TARGET_HARD_FLOAT && ((MODE) == IFmode || (MODE) == ICmode)))
 
 /* Helper macros to say whether a 128-bit floating point type can go in a
    single vector register, or whether it needs paired scalar values.  */
@@ -560,12 +560,6 @@ extern int rs6000_vector_align[];
 #define TARGET_DIRECT_MOVE_64BIT	(TARGET_DIRECT_MOVE		\
 					 && TARGET_P8_VECTOR		\
 					 && TARGET_POWERPC64)
-
-/* Whether the __ibm128 keyword is allowed.  Any system that supports _Float128
-   is assumed to be capable of supporting __ibm128.  Similarly if the long
-   double size is 128 bits, we assume __ibm128 is supported.  We don't want to
-   support it on a system without existing 128-bit long doubles.  */
-#define TARGET_IBM128	(TARGET_FLOAT128_TYPE || TARGET_LONG_DOUBLE_128)
 
 /* Inlining allows targets to define the meanings of bits in target_info
    field of ipa_fn_summary by itself, the used bits for rs6000 are listed
@@ -2265,6 +2259,7 @@ enum rs6000_builtin_type_index
   RS6000_BTI_dfloat64,		 /* dfloat64_type_node */
   RS6000_BTI_dfloat128,		 /* dfloat128_type_node */
   RS6000_BTI_void,	         /* void_type_node */
+  RS6000_BTI_ieee128_float,	 /* ieee 128-bit floating point */
   RS6000_BTI_ibm128_float,	 /* IBM 128-bit floating point */
   RS6000_BTI_const_str,		 /* pointer to const char * */
   RS6000_BTI_vector_pair,	 /* unsigned 256-bit types (vector pair).  */
@@ -2359,6 +2354,7 @@ enum rs6000_builtin_type_index
 #define dfloat64_type_internal_node	 (rs6000_builtin_types[RS6000_BTI_dfloat64])
 #define dfloat128_type_internal_node	 (rs6000_builtin_types[RS6000_BTI_dfloat128])
 #define void_type_internal_node		 (rs6000_builtin_types[RS6000_BTI_void])
+#define ieee128_float_type_node		 (rs6000_builtin_types[RS6000_BTI_ieee128_float])
 #define ibm128_float_type_node		 (rs6000_builtin_types[RS6000_BTI_ibm128_float])
 #define const_str_type_node		 (rs6000_builtin_types[RS6000_BTI_const_str])
 #define vector_pair_type_node		 (rs6000_builtin_types[RS6000_BTI_vector_pair])
