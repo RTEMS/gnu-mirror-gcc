@@ -1,3 +1,29 @@
+==================== work096, patch 1.
+
+Do not enable -mblock-ops-vector-pair.
+
+Testing has shown that using the load vector pair and store vector pair
+instructions for block moves has some performance issues on power10.
+
+A patch on June 11th modified the code so that GCC would not set
+-mblock-ops-vector-pair by default if we are tuning for power10, but it
+would set the option if we were tuning for a different machine and have
+load and store vector pair instructions enabled.
+
+This patch eliminates the code setting -mblock-ops-vector-pair.  If you
+want to generate load vector pair and store vector pair instructions for
+block moves, you must use -mblock-ops-vector-pair.
+
+
+2022-08-01   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Remove
+	code setting -mblock-ops-vector-pair.
+
+==================== work096, create branch.
+
 2022-08-01   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
