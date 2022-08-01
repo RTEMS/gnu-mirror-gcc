@@ -2867,18 +2867,18 @@
 
 ; Builtins requiring hardware support for IEEE-128 floating-point.
 [ieee128-hw]
-  fpmath _Float128 __builtin_addf128_round_to_odd (_Float128, _Float128);
-    ADDF128_ODD addkf3_odd {}
+  fpmath _Float128 __builtin_addf128_round_to_odd_kf (_Float128, _Float128);
+    ADDF128_ODD_KF addkf3_odd {}
 
-  fpmath _Float128 __builtin_divf128_round_to_odd (_Float128, _Float128);
-    DIVF128_ODD divkf3_odd {}
+  fpmath _Float128 __builtin_divf128_round_to_odd_kf (_Float128, _Float128);
+    DIVF128_ODD_KF divkf3_odd {}
 
-  fpmath _Float128 __builtin_fmaf128_round_to_odd (_Float128, _Float128, \
-                                                   _Float128);
-    FMAF128_ODD fmakf4_odd {}
+  fpmath _Float128 __builtin_fmaf128_round_to_odd_kf (_Float128, _Float128, \
+						      _Float128);
+    FMAF128_ODD_KF fmakf4_odd {}
 
-  fpmath _Float128 __builtin_mulf128_round_to_odd (_Float128, _Float128);
-    MULF128_ODD mulkf3_odd {}
+  fpmath _Float128 __builtin_mulf128_round_to_odd_kf (_Float128, _Float128);
+    MULF128_ODD_KF mulkf3_odd {}
 
   const signed int __builtin_vsx_scalar_cmp_exp_qp_eq (_Float128, _Float128);
     VSCEQPEQ xscmpexpqp_eq_kf {}
@@ -2893,14 +2893,14 @@
       __builtin_vsx_scalar_cmp_exp_qp_unordered (_Float128, _Float128);
     VSCEQPUO xscmpexpqp_unordered_kf {}
 
-  fpmath _Float128 __builtin_sqrtf128_round_to_odd (_Float128);
-    SQRTF128_ODD sqrtkf2_odd {}
+  fpmath _Float128 __builtin_sqrtf128_round_to_odd_kf (_Float128);
+    SQRTF128_ODD_KF sqrtkf2_odd {}
 
-  fpmath _Float128 __builtin_subf128_round_to_odd (_Float128, _Float128);
-    SUBF128_ODD subkf3_odd {}
+  fpmath _Float128 __builtin_subf128_round_to_odd_kf (_Float128, _Float128);
+    SUBF128_ODD_KF subkf3_odd {}
 
-  fpmath double __builtin_truncf128_round_to_odd (_Float128);
-    TRUNCF128_ODD trunckfdf2_odd {}
+  fpmath double __builtin_truncf128_round_to_odd_kf (_Float128);
+    TRUNCF128_ODD_KF trunckfdf2_odd {}
 
   const signed long long __builtin_vsx_scalar_extract_expq (_Float128);
     VSEEQP xsxexpqp_kf {}
@@ -2923,6 +2923,34 @@
   const signed int __builtin_vsx_scalar_test_neg_qp (_Float128);
     VSTDCNQP xststdcnegqp_kf {}
 
+
+; Builtins requiring hardware support for IEEE-128 floating-point.  Long double
+; must use the IEEE 128-bit encoding.
+[ieee128-hw-ld]
+  fpmath long double __builtin_addf128_round_to_odd_tf (long double, long double);
+    ADDF128_ODD_TF addtf3_odd {ieeeld}
+
+  fpmath long double __builtin_divf128_round_to_odd_tf (long double,long double);
+    DIVF128_ODD_TF divtf3_odd {ieeeld}
+
+  fpmath long double __builtin_fmaf128_round_to_odd_tf (long double, \
+							long double, \
+							long double);
+    FMAF128_ODD_TF fmatf4_odd {ieeeld}
+
+  fpmath long double __builtin_mulf128_round_to_odd_tf (long double, \
+							long double);
+    MULF128_ODD_TF multf3_odd {ieeeld}
+
+  fpmath long double __builtin_sqrtf128_round_to_odd_tf (long double);
+    SQRTF128_ODD_TF sqrttf2_odd {ieeeld}
+
+  fpmath long double __builtin_subf128_round_to_odd_tf (long double, \
+							long double);
+    SUBF128_ODD_TF subtf3_odd {ieeeld}
+
+  fpmath double __builtin_truncf128_round_to_odd_tf (long double);
+    TRUNCF128_ODD_TF trunctfdf2_odd {ieeeld}
 
 
 ; Decimal floating-point builtins.
