@@ -139,6 +139,7 @@
 ;   endian   Needs special handling for endianness
 ;   ibmld    Restrict usage to the case when TFmode is IBM-128
 ;   ibm128   Restrict usage to the case where __ibm128 is supported or if ibmld
+;   ieeeld   Restrict usage to the case when TFmode is IEEE-128
 ;
 ; Each attribute corresponds to extra processing required when
 ; the built-in is expanded.  All such special processing should
