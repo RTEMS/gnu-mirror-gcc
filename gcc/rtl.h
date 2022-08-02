@@ -3470,7 +3470,7 @@ unsigned_condition_p (enum rtx_code code)
 extern rtx_insn *delete_related_insns (rtx);
 
 /* In recog.c  */
-extern rtx *find_constant_term_loc (rtx *);
+extern rtx *find_constant_term_loc (rtx *, scalar_addr_mode * = NULL);
 
 /* In emit-rtl.c  */
 extern rtx_insn *try_split (rtx, rtx_insn *, int);

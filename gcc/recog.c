@@ -1838,51 +1838,65 @@ asm_operand_ok (rtx op, const char *constraint, const char **constraints)
   return result;
 }
 
-/* Given an rtx *P, if it is a sum containing an integer constant term,
-   return the location (type rtx *) of the pointer to that constant term.
-   Otherwise, return a null pointer.  */
-
-rtx *
-find_constant_term_loc (rtx *p)
+static rtx *
+find_constant_term_loc_1 (rtx *p, scalar_addr_mode mode_in,
+			  scalar_addr_mode *mode_out)
 {
   rtx *tem;
   enum rtx_code code = GET_CODE (*p);
 
-  /* If *P IS such a constant term, P is its location.  */
+  gcc_assert (code == CONST_INT || mode_in == GET_MODE (*p));
 
-  if (code == CONST_INT || code == SYMBOL_REF || code == LABEL_REF
+  /* If *P is a constant term, return its location.  */
+  if (code == CONST_INT
+      || code == SYMBOL_REF
+      || code == LABEL_REF
       || code == CONST)
-    return p;
+    {
+      if (mode_out)
+	*mode_out = mode_in;
+      return p;
+    }
 
   /* Otherwise, if not a sum, it has no constant term.  */
-
   if (!any_plus_p (*p))
     return 0;
 
-  /* If one of the summands is constant, return its location.  */
-
-  if (XEXP (*p, 0) && CONSTANT_P (XEXP (*p, 0))
-      && XEXP (*p, 1) && CONSTANT_P (XEXP (*p, 1)))
-    return p;
+  /* If both of the summands are constant, return its location.  */
+  if (CONSTANT_P (XEXP (*p, 0)) && CONSTANT_P (XEXP (*p, 1)))
+    {
+      if (mode_out)
+	*mode_out = mode_in;
+      return p;
+    }
 
   /* Otherwise, check each summand for containing a constant term.  */
+  tem = find_constant_term_loc_1 (&XEXP (*p, 0), mode_in, mode_out);
+  if (tem)
+    return tem;
 
-  if (XEXP (*p, 0) != 0)
-    {
-      tem = find_constant_term_loc (&XEXP (*p, 0));
-      if (tem != 0)
-	return tem;
-    }
 
-  if (XEXP (*p, 1) != 0)
-    {
-      tem = find_constant_term_loc (&XEXP (*p, 1));
-      if (tem != 0)
-	return tem;
-    }
+  scalar_addr_mode om = offset_mode (mode_in);
+  gcc_assert (code == POINTER_PLUS || om == mode_in);
+  tem = find_constant_term_loc_1 (&XEXP (*p, 1), om, mode_out);
+  if (tem)
+    return tem;
 
   return 0;
 }
+
+/* Given an rtx *P, if it is a sum containing a constant term,
+   return the location (type rtx *) of the pointer to that constant
+   term, and set *MODE_OUT to the mode of the constant term.
+
+   Otherwise, return a null pointer.  */
+rtx *
+find_constant_term_loc (rtx *p, scalar_addr_mode *mode_out)
+{
+  const auto sa = as_a <scalar_addr_mode> (GET_MODE (*p));
+  return find_constant_term_loc_1 (p, sa, mode_out);
+}
+
 
 /* Return 1 if OP is a memory reference
    whose address contains no side effects
@@ -1961,13 +1975,14 @@ offsettable_address_addr_space_p (int strictp, machine_mode mode, rtx y,
   /* If the expression contains a constant term,
      see if it remains valid when max possible offset is added.  */
 
+  scalar_addr_mode y2_mode;
   if ((ycode == PLUS || ycode == POINTER_PLUS)
-      && (y2 = find_constant_term_loc (&y1)))
+      && (y2 = find_constant_term_loc (&y1, &y2_mode)))
     {
       int good;
 
       y1 = *y2;
-      *y2 = plus_constant (address_mode, *y2, mode_sz - 1);
+      *y2 = plus_constant (y2_mode, *y2, mode_sz - 1);
       /* Use QImode because an odd displacement may be automatically invalid
 	 for any wider mode.  But it should be valid for a single byte.  */
       good = (*addressp) (QImode, y, as);
