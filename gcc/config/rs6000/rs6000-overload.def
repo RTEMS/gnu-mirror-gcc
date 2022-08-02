@@ -4536,7 +4536,9 @@
   unsigned int __builtin_vec_scalar_test_data_class (double, const int);
     VSTDCDP
   unsigned int __builtin_vec_scalar_test_data_class (_Float128, const int);
-    VSTDCQP
+    VSTDCQP_KF
+  unsigned int __builtin_vec_scalar_test_data_class (long double, const int);
+    VSTDCQP_TF
 
 [VEC_VSTDCN, scalar_test_neg, __builtin_vec_scalar_test_neg]
   unsigned int __builtin_vec_scalar_test_neg (float);
@@ -4544,7 +4546,9 @@
   unsigned int __builtin_vec_scalar_test_neg (double);
     VSTDCNDP
   unsigned int __builtin_vec_scalar_test_neg (_Float128);
-    VSTDCNQP
+    VSTDCNQP_KF
+  unsigned int __builtin_vec_scalar_test_neg (long double);
+    VSTDCNQP_TF
 
 [VEC_VTDC, vec_test_data_class, __builtin_vec_test_data_class]
   vbi __builtin_vec_test_data_class (vf, const int);
@@ -5928,9 +5932,11 @@
   unsigned int __builtin_vec_scalar_test_neg_dp (double);
     VSTDCNDP  VSTDCNDP_DEPR1
 
-[VEC_VSTDCNQP, scalar_test_neg_qp, __builtin_vec_scalar_test_neg_qp]
+[VEC_VSTDCNQP_KF, scalar_test_neg_qp, __builtin_vec_scalar_test_neg_qp]
   unsigned int __builtin_vec_scalar_test_neg_qp (_Float128);
-    VSTDCNQP  VSTDCNQP_DEPR1
+    VSTDCNQP_KF  VSTDCNQP_KF_DEPR1
+  unsigned int __builtin_vec_scalar_test_neg_qp (long double);
+    VSTDCNQP_TF  VSTDCNQP_TF_DEPR1
 
 [VEC_VSTDCNSP, scalar_test_neg_sp, __builtin_vec_scalar_test_neg_sp]
   unsigned int __builtin_vec_scalar_test_neg_sp (float);
@@ -5938,7 +5944,9 @@
 
 [VEC_VSTDCQP, scalar_test_data_class_qp, __builtin_vec_scalar_test_data_class_qp]
   unsigned int __builtin_vec_scalar_test_data_class_qp (_Float128, const int);
-    VSTDCQP  VSTDCQP_DEPR1
+    VSTDCQP_KF  VSTDCQP_KF_DEPR1
+  unsigned int __builtin_vec_scalar_test_data_class_qp (long double, const int);
+    VSTDCQP_TF  VSTDCQP_TF_DEPR1
 
 [VEC_VSTDCSP, scalar_test_data_class_sp, __builtin_vec_scalar_test_data_class_sp]
   unsigned int __builtin_vec_scalar_test_data_class_sp (float, const int);
