@@ -1,3 +1,59 @@
+==================== work096, patch 9.
+
+Use _Float128 type for __float128.
+
+In the past if the long double type was IEEE 128-bit, the __float128 type would
+use the long double type, and TFmode would be used for the mode for both
+_Float128 and long double types.
+
+This patch always uses the _Float128 type for __float128, and it always uses
+KFmode for the mode.  Right now, a similar change for __ibm128 has not been
+made.
+
+In making these changes, I noticed that there was an internal tree for holding
+the __float128 type.  This code removes that internal tree variable.
+
+2022-08-02   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_type_string): Use
+	float128_type_node, not ieee128_float_type_mode.
+	(rs6000_init_builtins): Always use the _Float128 type for the __float128
+	keyword.
+	(rs6000_expand_builtin): Remove code that mapped the KFmode built-in
+	functions to TFmode functions if long double was IEEE 128-bit, and use
+	built-in function overloading instead.  Also remove the conversion of
+	IBM 128-bit built-in functions from IFmode to TFmode if long double is
+	IBM 128-bit.
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Use
+	float128_type_node, not ieee128_float_type_mode.
+	(rs6000_cpu_cpp_builtins): Delete ieee128_float_type_mode.
+	(is_float128_p): Delete.
+	(rs6000_builtin_type_compatible): Don't consider 128-bit floating point
+	types to be compatible if they use the same encoding.  Use built-in
+	function overloading instead.
+	(rs6000_libgcc_floating_mode_supported_p): Use KFmode for _Float128 and
+	__float128, not TFmode.
+	(rs6000_floatn_mode): Likewise.
+	(rs6000_c_mode_for_suffix): Likewise.
+	* config/rs6000/rs6000.h (RS6000_BTI_ieee128_float): Delete.
+	(ieee128_float_type_node): Likewise.
+	* config/rs6000/rs6000.md (IFKF): Delete.
+	(IFKF_reg): Delete.
+	(extendkfif2): New define_expand.
+	(trunckfif2): New define_expand.
+	(extend<mode>tf2_internal): Split into extendiftf2_internal and
+	extendkftf2_internal.  Update the insns to use the correct insn type and
+	length attributes based on whether KFmode or IFmode is used.
+	(extendiftf2_internal): Likewise.
+	(extendkftf2_internal): Likewise.
+	(extendtf<mode>2_internal): Split into extendtfif2_internal and
+	extendtfkf2_internal.  Update the insns to use the correct insn type and
+	length attributes based on whether KFmode or IFmode is used.
+	(extendtfif2_internal): Likewise.
+	(extendtfkf2_internal): Likewise.
+
 ==================== work096, patch 8.
 
 Rework 128-bit complex multiply and divide.
