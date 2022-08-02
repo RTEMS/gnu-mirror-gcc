@@ -9,3 +9,8 @@
 .wy-nav-content {
   max-width: initial;
 }
+
+/* FIXME: remove once https://github.com/pradyunsg/furo/pull/493 is merged */
+.sig-inline {
+  padding-left: 0.5rem;
+}
