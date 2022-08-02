@@ -1,3 +1,31 @@
+==================== work096, patch 8.
+
+Rework 128-bit complex multiply and divide.
+
+This function reworks how the complex multiply and divide built-in functions are
+done.  Previously we created built-in declarations for doing long double complex
+multiply and divide when long double is IEEE 128-bit.  The old code also did not
+support __ibm128 complex multiply and divide if long double is IEEE 128-bit.
+
+One of the problems with this approach is that the add_builtin_function would
+abort if we used the same name for two different built-in functions.
+
+This code does not create the built-in declaration.  Instead, it uses the
+TARGET_MANGLE_DECL_ASSEMBLER_NAME hook to change the name before it is written
+out to the assembler file.
+
+2022-08-02   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (create_complex_muldiv): Delete.
+	(init_float128_ieee): Delete code to switch complex multiply and divide
+	for long double.
+	(complex_multiply_name): New helper function.
+	(complex_divide_name): Likewise.
+	(rs6000_mangle_decl_assembler_name): Add support for mangling the name
+	of complex 128-bit multiply and divide built-in functions.
+
 ==================== work096, patch 7.
 
 Allow __ibm128 even if IEEE 128-bit floating point is not supported.
