@@ -18,6 +18,8 @@ out to the assembler file.
 
 gcc/
 
+	* config/rs6000/rs6000-c.cc (rs6000_cpu_cpp_builtins): Set
+	building_libgcc.
 	* config/rs6000/rs6000.cc (create_complex_muldiv): Delete.
 	(init_float128_ieee): Delete code to switch complex multiply and divide
 	for long double.
@@ -25,6 +27,7 @@ gcc/
 	(complex_divide_name): Likewise.
 	(rs6000_mangle_decl_assembler_name): Add support for mangling the name
 	of complex 128-bit multiply and divide built-in functions.
+	* config/rs6000/rs6000.opt (building_libgcc): New target variable.
 
 ==================== work096, patch 7.
 
