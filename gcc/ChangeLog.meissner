@@ -1,3 +1,170 @@
+==================== work096, patch 6.
+
+Support IEEE 128-bit overload extract and insert built-in functions.
+
+This patch adds support for overloading the IEEE 128-bit extract and insert
+built-in functions bewteeen KFmode and TFmode arguments.
+
+2022-08-01   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def
+	(__builtin_vsx_scalar_extract_expq_kf): Rename KFmode IEEE 128-bit
+	insert and extract built-in functions to have a KF suffix to allow
+	overloading.
+	(__builtin_vsx_scalar_extract_sigq_kf): Likewise.
+	(__builtin_vsx_scalar_insert_exp_qp_kf): Likewise.
+	(__builtin_vsx_scalar_extract_expq_tf): Add TFmode variants for IEEE
+	128-bit insert and extract support.
+	(__builtin_vsx_scalar_extract_sigq_tf): Likewise.
+	(__builtin_vsx_scalar_insert_exp_qp_tf): Likewise.
+	* config/rs6000/rs6000-c.cc (altivec_resolve_overloaded_builtin):
+	Add support for having KFmode and TFmode variants of VSIEQPF.
+	* config/rs6000/rs6000-overload.def (__builtin_vec_scalar_extract_exp):
+	Add TFmode overloads.
+	(__builtin_vec_scalar_extract_sig): Likewise.
+	(__builtin_vec_scalar_insert_exp): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/bfp/scalar-extract-exp-4.c:  Update the expected
+	error message.
+	* gcc.target/powerpc/bfp/scalar-extract-sig-4.c: Likewise.
+	* gcc.target/powerpc/bfp/scalar-insert-exp-10.c: Likewise.
+
+==================== work096, patch 5.
+
+Add IEEE 128-bit overload comparison built-in functions.
+
+This patch adds support for overloading the IEEE 128-bit comparison built-in
+functions bewteeen KFmode and TFmode arguments.
+
+2022-08-01   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def
+	(__builtin_vsx_scalar_cmp_exp_qp_eq_kf): Rename KFmode comparison
+	built-in functions to have a KF suffix to allow overloading.
+	(__builtin_vsx_scalar_cmp_exp_qp_gt_kf): Likewise.
+	(__builtin_vsx_scalar_cmp_exp_qp_lt_kf): Likewise.
+	(__builtin_vsx_scalar_cmp_exp_qp_unordered_kf): Likewise.
+	(__builtin_vsx_scalar_cmp_exp_qp_eq_tf): Add TFmode comparison built-in
+	functions.
+	(__builtin_vsx_scalar_cmp_exp_qp_gt_tf): Likewise.
+	(__builtin_vsx_scalar_cmp_exp_qp_lt_tf): Likewise.
+	(__builtin_vsx_scalar_cmp_exp_qp_unordered_tf): Likewise.
+	* config/rs6000/rs6000-overload.def (__builtin_vec_scalar_cmp_exp_eq):
+	Add TFmode overloaded functions.
+	(__builtin_vec_scalar_cmp_exp_gt): Likewise.
+	(__builtin_vec_scalar_cmp_exp_lt): Likewise.
+	(__builtin_vec_scalar_cmp_exp_unordered): Likewise.
+
+==================== work096, patch 4.
+
+Add IEEE 128-bit overload comparison built-in functions.
+
+This patch adds support for overloading the IEEE 128-bit comparison built-in
+functions bewteeen KFmode and TFmode arguments.
+
+2022-08-01   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def
+	(__builtin_vsx_scalar_cmp_exp_qp_eq_kf): Rename KFmode comparison
+	built-in functions to have a KF suffix to allow overloading.
+	(__builtin_vsx_scalar_cmp_exp_qp_gt_kf): Likewise.
+	(__builtin_vsx_scalar_cmp_exp_qp_lt_kf): Likewise.
+	(__builtin_vsx_scalar_cmp_exp_qp_unordered_kf): Likewise.
+	(__builtin_vsx_scalar_cmp_exp_qp_eq_tf): Add TFmode comparison
+	built-in functions.
+	(__builtin_vsx_scalar_cmp_exp_qp_gt_tf): Likewise.
+	(__builtin_vsx_scalar_cmp_exp_qp_lt_tf): Likewise.
+	(__builtin_vsx_scalar_cmp_exp_qp_unordered_tf): Likewise.
+	* config/rs6000/rs6000-overload.def
+	(__builtin_vec_scalar_cmp_exp_eq): Add TFmode overloaded
+	functions.
+	(__builtin_vec_scalar_cmp_exp_gt): Likewise.
+	(__builtin_vec_scalar_cmp_exp_lt): Likewise.
+	(__builtin_vec_scalar_cmp_exp_unordered): Likewise.
+
+==================== work096, patch 3.
+
+Add IEEE 128-bit overload round_to_odd built-in functions.
+
+This patch adds support for overloading the IEEE 128-bit round to odd built-in
+functions bewteeen KFmode and TFmode arguments.
+
+2022-08-01   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def
+	(__builtin_addf128_round_to_odd_kf): Rename KFmode round to odd
+	built-in functions with a KF suffix to allow overloading.
+	(__builtin_divf128_round_to_odd_kf): Likewise.
+	(__builtin_fmaf128_round_to_odd_kf): Likewise.
+	(__builtin_mulf128_round_to_odd_kf): Likewise.
+	(__builtin_sqrtf128_round_to_odd_kf): Likewise.
+	(__builtin_subf128_round_to_odd_kf): Likewise.
+	(__builtin_truncf128_round_to_odd_kf): Likewise.
+	(__builtin_addf128_round_to_odd_tf): Add TFmode round to odd
+	built-in functions.
+	(__builtin_fmaf128_round_to_odd_tf): Likewise.
+	(__builtin_mulf128_round_to_odd_tf): Likewise.
+	(__builtin_sqrtf128_round_to_odd_tf): Likewise.
+	(__builtin_subf128_round_to_odd_tf): Likewise.
+	(__builtin_truncf128_round_to_odd_tf): Likewise.
+	* config/rs6000/rs6000-overload.def
+	(__builtin_addf128_round_to_odd): Make IEEE 128-bit round to odd
+	built-in functions overloaded.
+	(__builtin_divf128_round_to_odd): Likewise.
+	(__builtin_fmaf128_round_to_odd): Likewise.
+	(__builtin_mulf128_round_to_odd): Likewise.
+	(__builtin_sqrtf128_round_to_odd): Likewise.
+	(__builtin_subf128_round_to_odd): Likewise.
+	(__builtin_truncf128_round_to_odd): Likewise.
+
+==================== work096, patch 2.
+
+IEEE 128-bit built-in overload support.
+
+This patch lays the ground work that future patches will use to add builtin
+support (both normal and overloaded) for the case where long double uses the
+IEEE 128-bit encoding.
+
+This adds a new stanza (ieee128-hw-ld) for when we have IEEE 128-bit hardware
+support and long double uses the IEEE 128-bit encoding.
+
+A new type attribute (ieeeld) is added for long double if long double uses the
+IEEE 128-bit encoding.
+
+2022-08-01   Michael Meissner  <meissner@linux.ibm.com>
+
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_invalid_builtin): Add
+	support for ibm128-hw-ld stanza.
+	(rs6000_builtin_is_supported): Likewise.
+	(rs6000_init_builtins): Likewise.
+	(rs6000_expand_builtin): Add support for IEEE128_HW_LD.  Add
+	support for ieeeld.
+	* config/rs6000/rs6000-builtins.def (toplevel): Add comment about
+	the new ieeeld attribute.
+	* config/rs6000/rs6000-gen-builtins.cc (enum bif_stanza): Add
+	BSTZ_IEEE128_HW_LD.
+	(stanza_map): Likewise.
+	(enable_string): Likewise.
+	(attrinfo): Add isieeeld.
+	(parse_bif_attrs): Parse ieeeld.  Add printing ieeeld to the debug
+	print.
+	(write_decls): Add support for ibm128-hw-ld stanza and ieeeld
+	attribute.
+	(write_bif_static_init): Add support for ieeeld attribute.
+
 ==================== work096, patch 1.
 
 Do not enable -mblock-ops-vector-pair.
