@@ -4506,13 +4506,17 @@
   unsigned int __builtin_vec_scalar_extract_exp (double);
     VSEEDP
   unsigned int __builtin_vec_scalar_extract_exp (_Float128);
-    VSEEQP
+    VSEEQP_KF
+  unsigned int __builtin_vec_scalar_extract_exp (long double);
+    VSEEQP_TF
 
 [VEC_VSES, scalar_extract_sig, __builtin_vec_scalar_extract_sig]
   unsigned long long __builtin_vec_scalar_extract_sig (double);
     VSESDP
   unsigned __int128 __builtin_vec_scalar_extract_sig (_Float128);
-    VSESQP
+    VSESQP_KF
+  unsigned __int128 __builtin_vec_scalar_extract_sig (long double);
+    VSESQP_TF
 
 [VEC_VSIE, scalar_insert_exp, __builtin_vec_scalar_insert_exp]
   double __builtin_vec_scalar_insert_exp (unsigned long long, unsigned long long);
@@ -4522,7 +4526,9 @@
   _Float128 __builtin_vec_scalar_insert_exp (unsigned __int128, unsigned long long);
     VSIEQP
   _Float128 __builtin_vec_scalar_insert_exp (_Float128, unsigned long long);
-    VSIEQPF
+    VSIEQPF_KF
+  long double __builtin_vec_scalar_insert_exp (long double, unsigned long long);
+    VSIEQPF_TF
 
 [VEC_VSTDC, scalar_test_data_class, __builtin_vec_scalar_test_data_class]
   unsigned int __builtin_vec_scalar_test_data_class (float, const int);
