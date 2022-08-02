@@ -1,6 +1,70 @@
+==================== work096, patch 7.
+
+Allow __ibm128 even if IEEE 128-bit floating point is not supported.
+
+This set of patches changes the GCC compiler to allow the use of the __ibm128
+keyword if we have IEEE 128-bit floating point support enabled or if long double
+is 128-bits.
+
+In addition, checks for requiring hardware floating point to use __ibm128 have
+been removed.  This fixes PR target/105534.
+
+2022-08-02   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/105534
+	* config/rs6000/rs6000-builtins.cc (rs6000_init_builtins): Create
+	__ibm128 on older machines without IEEE 128-bit support.
+	* config/rs6000/rs600.cc (init_float128_ibm): Remove checks for hardware
+	floating point for the IBM 128-bit comparisons.
+	(rs6000_init_libfuncs): Create IBM 128-bit floating point support even
+	if we don't support IEEE 128-bit floating point.
+	(rs6000_scalar_mode_supported_p): Allow __ibm128 even if we don't
+	support _Float128.
+	* config/rs6000/rs6000.h (FLOAT128_IBM_P): Remove checks for
+	-mhard-float.
+	(TARGET_IBM128): New macro.
+	* config/rs6000/rs6000.md (@extenddf<mode>2_fprs): Allow IFmode to be
+	converted even if long double is not 128-bits.
+	(extenddf<mode>2_vsx): Likewise.
+	(extendtfif2): Allow conversion if we have __ibm128 but not IEEE 128-bit
+	floating point.
+	(trunckftf2): Likewise.
+
 ==================== work096, patch 6.
 
-Support IEEE 128-bit overload extract and insert built-in functions.
+Add IEEE 128-bit overload test data built-in functions.
+
+This patch adds support for overloading the IEEE 128-bit test data and test data
+negate built-in functions bewteeen KFmode and TFmode arguments.
+
+2022-08-01   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def
+	(__builtin_vsx_scalar_test_data_class_qp_kf): Rename KFmode IEEE 128-bit
+	test data built-in functions to have a KF suffix to allow overloading.
+	(__builtin_vsx_scalar_test_neg_qp_kf): Likewise.
+	(__builtin_vsx_scalar_test_data_class_qp_tf): Add TFmode variants for
+	IEEE 128-bit insert and extract support.
+	(__builtin_vsx_scalar_test_neg_qp_tf): Likewise.
+	* config/rs6000/rs6000-overload.def
+	(__builtin_vec_scalar_test_data_class): Add TFmode overloads.
+	(__builtin_vec_scalar_test_neg): Likewise.
+	(__builtin_vec_scalar_test_neg_qp): Likewise.
+	(__builtin_vec_scalar_test_data_class_qp): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/bfp/scalar-test-data-class-11.c:  Update the
+	expected error message.
+	* gcc.target/powerpc/bfp/scalar-test-neg-5.c: Likewise.
+
+==================== work096, patch 5.
+
+Add IEEE 128-bit overload extract and insert built-in functions.
 
 This patch adds support for overloading the IEEE 128-bit extract and insert
 built-in functions bewteeen KFmode and TFmode arguments.
@@ -32,34 +96,6 @@ gcc/testsuite/
 	error message.
 	* gcc.target/powerpc/bfp/scalar-extract-sig-4.c: Likewise.
 	* gcc.target/powerpc/bfp/scalar-insert-exp-10.c: Likewise.
-
-==================== work096, patch 5.
-
-Add IEEE 128-bit overload comparison built-in functions.
-
-This patch adds support for overloading the IEEE 128-bit comparison built-in
-functions bewteeen KFmode and TFmode arguments.
-
-2022-08-01   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/rs6000-builtins.def
-	(__builtin_vsx_scalar_cmp_exp_qp_eq_kf): Rename KFmode comparison
-	built-in functions to have a KF suffix to allow overloading.
-	(__builtin_vsx_scalar_cmp_exp_qp_gt_kf): Likewise.
-	(__builtin_vsx_scalar_cmp_exp_qp_lt_kf): Likewise.
-	(__builtin_vsx_scalar_cmp_exp_qp_unordered_kf): Likewise.
-	(__builtin_vsx_scalar_cmp_exp_qp_eq_tf): Add TFmode comparison built-in
-	functions.
-	(__builtin_vsx_scalar_cmp_exp_qp_gt_tf): Likewise.
-	(__builtin_vsx_scalar_cmp_exp_qp_lt_tf): Likewise.
-	(__builtin_vsx_scalar_cmp_exp_qp_unordered_tf): Likewise.
-	* config/rs6000/rs6000-overload.def (__builtin_vec_scalar_cmp_exp_eq):
-	Add TFmode overloaded functions.
-	(__builtin_vec_scalar_cmp_exp_gt): Likewise.
-	(__builtin_vec_scalar_cmp_exp_lt): Likewise.
-	(__builtin_vec_scalar_cmp_exp_unordered): Likewise.
 
 ==================== work096, patch 4.
 
