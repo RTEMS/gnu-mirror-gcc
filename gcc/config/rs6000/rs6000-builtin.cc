@@ -709,31 +709,28 @@ rs6000_init_builtins (void)
      format that uses a pair of doubles, depending on the switches and
      defaults.
 
-     If we don't support for either 128-bit IBM double double or IEEE 128-bit
-     floating point, we need make sure the type is non-zero or else self-test
-     fails during bootstrap.
+     In the past, we used to map _Float128 and __float128/__ieee128 modes into
+     TFmode if long double used the IEEE 128-bit encoding.  Similarly, we used
+     to map __ibm128 into TFmode if long double used the IBM 128-bit encoding.
 
-     For IEEE 128-bit floating point, always create the type __ieee128.  If the
-     user used -mfloat128, rs6000-c.cc will create a define from __float128 to
-     __ieee128.  Use the standard _Float128 type even if long double uses IEEE
-     128-bit.  */
+     Now __ieee128/__float128 always uses the type for _Float128 and KFmode.
+     And __ibm128 always uses a distinct type and IFmode.
+
+     If we don't have support for either 128-bit IBM double double or IEEE
+     128-bit floating point, we need make sure the type is non-zero or else
+     self-test fails during bootstrap.  */
   if (TARGET_IBM128)
     {
-      if (!TARGET_IEEEQUAD)
-	ibm128_float_type_node = long_double_type_node;
-      else
-	{
-	  ibm128_float_type_node = make_node (REAL_TYPE);
-	  TYPE_PRECISION (ibm128_float_type_node) = 128;
-	  SET_TYPE_MODE (ibm128_float_type_node, IFmode);
-	  layout_type (ibm128_float_type_node);
-	}
+      ibm128_float_type_node = make_node (REAL_TYPE);
+      TYPE_PRECISION (ibm128_float_type_node) = 128;
+      SET_TYPE_MODE (ibm128_float_type_node, IFmode);
+      layout_type (ibm128_float_type_node);
       t = build_qualified_type (ibm128_float_type_node, TYPE_QUAL_CONST);
       lang_hooks.types.register_builtin_type (ibm128_float_type_node,
 					      "__ibm128");
     }
   else
-    ibm128_float_type_node = NULL_TREE;
+    ibm128_float_type_node = long_double_type_node;
 
   if (TARGET_FLOAT128_TYPE)
     {

@@ -1543,9 +1543,6 @@ static const struct attribute_spec rs6000_attribute_table[] =
 #undef TARGET_EH_RETURN_FILTER_MODE
 #define TARGET_EH_RETURN_FILTER_MODE rs6000_eh_return_filter_mode
 
-#undef TARGET_TRANSLATE_MODE_ATTRIBUTE
-#define TARGET_TRANSLATE_MODE_ATTRIBUTE rs6000_translate_mode_attribute
-
 #undef TARGET_SCALAR_MODE_SUPPORTED_P
 #define TARGET_SCALAR_MODE_SUPPORTED_P rs6000_scalar_mode_supported_p
 
@@ -23676,20 +23673,6 @@ static scalar_int_mode
 rs6000_eh_return_filter_mode (void)
 {
   return TARGET_32BIT ? SImode : word_mode;
-}
-
-/* Target hook for translate_mode_attribute.  The __float128 and _Float128
-   types always have a separate type and mode from the long double types.
-
-   Currently __ibm128 shares the type and mode with long double if long double
-   uses the IBM 128-bit encoding.  */
-static machine_mode
-rs6000_translate_mode_attribute (machine_mode mode)
-{
-  if (FLOAT128_IEEE_P (mode))
-    return COMPLEX_MODE_P (mode) ? E_KCmode : E_KFmode;
-
-  return mode;
 }
 
 /* Target hook for scalar_mode_supported_p.  */

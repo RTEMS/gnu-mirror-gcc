@@ -716,16 +716,12 @@ rs6000_cpu_cpp_builtins (cpp_reader *pfile)
 
       if (TARGET_IEEEQUAD)
 	{
-	  /* Older versions of GLIBC used __attribute__((__KC__)) to create the
-	     IEEE 128-bit floating point complex type for C++ (which does not
-	     support _Float128 _Complex).  If the default for long double is
-	     IEEE 128-bit mode, the library would need to use
-	     __attribute__((__TC__)) instead.  Defining __KF__ and __KC__
-	     is a stop-gap to build with the older libraries, until we
-	     get an updated library.  */
+	  /* In the past, we used to map __KF__ to __TF__ and __KC__ to __TC__
+	     to allow older glibc code to work on systems where the long double
+	     type uses the IEEE 128-bit encoding.  Now that we always use
+	     KFmode and KCmode for the _Float128 and __float128 types, we don't
+	     need to use these defines any more.  */
 	  builtin_define ("__LONG_DOUBLE_IEEE128__");
-	  builtin_define ("__KF__=__TF__");
-	  builtin_define ("__KC__=__TC__");
 	}
       else
 	builtin_define ("__LONG_DOUBLE_IBM128__");
