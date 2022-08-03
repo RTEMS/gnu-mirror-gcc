@@ -1,0 +1,22 @@
+Název: Optimalizace silných komponent phi funkcí pro překladač GCC
+
+Účelem je vytvořit patch pro komunitou vyvíjený překladač GCC. Patch bude
+obsahovat implementaci algoritmu z sekce 3.2 článku Simple and Efficient
+Construction of Static Single Assignment Form[1]. Cílem algoritmu je vyhledávat
+a redukovat phi funkce odkazující se na sebe navzájem, tedy tvořící silné
+komponenty. Algoritmus se bude nacházet v novém optimalizačním průchodu.
+
+Ani GCC ani konkurenční LLVM v tuto chvíli neobsahuje v produkční verzi
+implementaci algoritmu. Je možné, že průchod FRE (Forward Elimination) v GCC
+také umí redukovat silné komponenty, ale nový průchod bude rychlejší a tedy
+použitelný ve více fázích optimalizace. Nový průchod by také mohl nahradit
+starý Copy Propagation průchod.
+
+OS: Primárně Linux
+Jazyk: C++
+
+[1] Braun, M., Buchwald, S., Hack, S., Leißa, R., Mallon, C., Zwinkau, A.
+(2013). Simple and Efficient Construction of Static Single Assignment Form. In:
+Jhala, R., De Bosschere, K. (eds) Compiler Construction. CC 2013. Lecture Notes
+in Computer Science, vol 7791. Springer, Berlin, Heidelberg.
+https://doi.org/10.1007/978-3-642-37051-9_6

@@ -369,13 +369,17 @@ process_scc (vec<gphi *> scc)
   if (outer_ops.length () == 1)
     replace_scc_by_value (scc, outer_ops.pop());
   else if (outer_ops.length () > 1)
-    remove_redundant_phis (inner);
+    {
+      std::cerr << inner.length () << std::endl;
+      remove_redundant_phis (inner);
+    }
 }
 
 static void
 remove_redundant_phis (vec<gphi *> phis)
 {
   vec<vec<gphi *>> sccs = tarjan_compute_sccs (phis);
+  sccs.reverse (); /* Reverse topological order -> normal topo. order.  */
   for (vec<gphi *> scc : sccs)
     {
       process_scc (scc);
@@ -407,7 +411,7 @@ public:
   {}
 
   /* opt_pass methods: */
-  virtual bool gate (function *) { return true; } // TODO
+  virtual bool gate (function *) { return true; }
   virtual unsigned int execute (function *);
 }; // class pass_sccp
 
@@ -415,8 +419,26 @@ unsigned
 pass_sccp::execute (function *)
 {
   init_sccp ();
-  vec<vec<gphi *>> sccs = tarjan_compute_sccs (get_all_normal_phis ());
+  remove_redundant_phis (get_all_normal_phis ());
 
+  /*
+  // DEBUG
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      debug_bb (bb);
+      gphi_iterator pi;
+      std::cerr << "PHI LIST" << std::endl;
+      for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
+	{
+	  gphi *phi = pi.phi ();
+	  debug_gimple_stmt (phi);
+	}
+      std::cerr << std::endl << std::endl;
+    }
+  */
+
+  /*
   std::cerr << "function:" << std::endl;
   for (vec<gphi *> scc : sccs)
     {
@@ -430,10 +452,11 @@ pass_sccp::execute (function *)
       std::cerr << std::endl;
     }
   std::cerr << std::endl;
+  */
 
   finalize_sccp ();
 
-  return 0; // TODO What should I return?
+  return 0;
 }
 
 } // anon namespace
