@@ -22,16 +22,10 @@
 
 name: package-source-tarball
 
-# Disable for now since packaging needs to run after the build.
-# Run this workflow on every new commit
-# For the time being, we are only running this workflow manually.
 on:
-  # We use the push and pull_request events instead of the workflow_run event
+  # We use only push event and workflow_dispatch event.
   # so that this workflow will show up during the PR
   push:
-    branches:
-      - "releases/**"
-  pull_request:
     branches:
       - "releases/**"
   workflow_dispatch:
