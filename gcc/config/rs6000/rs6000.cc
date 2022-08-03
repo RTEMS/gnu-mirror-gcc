@@ -20068,6 +20068,11 @@ rs6000_mangle_type (const_tree type)
   if (type == bool_int_type_node) return "U6__booli";
   if (type == bool_long_long_type_node) return "U6__boolx";
 
+  /* If long double uses the IBM 128-bit extended format, we need to
+     distinguish between __ibm128 and long double.  */
+  if (type == ibm128_float_type_node && FLOAT128_IBM_P (TFmode))
+    return "u8__ibm128";
+
   if (SCALAR_FLOAT_TYPE_P (type) && FLOAT128_IBM_P (TYPE_MODE (type)))
     return "g";
   if (SCALAR_FLOAT_TYPE_P (type) && FLOAT128_IEEE_P (TYPE_MODE (type)))
