@@ -66,14 +66,6 @@ runs:
         unset HOME && tdnf install glibc-devel file dejagnu texinfo build-essential rpm-build git ca-certificates wget flex bison gdb gawk libgomp-devel gfortran libgomp lapack libdwarf make sudo autoconf automake libstdc++ libstdc++-devel sed  gmp-devel mpfr-devel libmpc-devel lynx -y
       shell: bash
 
-    # In our fork of gcc_release script, gcc_release clones the repository locally.
-    # Because of that we need the release branch we are building to be available locally.
-    - name: Enable Release Branch Locally
-      working-directory: ./gcc
-      run: |
-        git fetch origin ${{ env.branch_name }}:${{ env.branch_name }}
-      shell: bash
-
     # This is just running gcc_relase script with bare minimum flags.
     # The flags are :
     # -f : build is final (don't append "snapshot" to the end of tar.xz files).
