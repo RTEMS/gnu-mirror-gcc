@@ -1,3 +1,24 @@
+==================== work096, patch 10.
+
+Make __ibm128 have a distinct type and always use IFmode.
+
+This patch makes the __ibm128 use a distinct type which always uses the IFmode
+instead of __ibm128 using the long double type when long double uses the IBM
+128-bit encoding.
+
+
+2022-08-03   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_init_builtins): Always create
+	a unique type for __ibm128 instead of using the long double type.  Make
+	sure ibm128_float_type_node is initialized.
+	* config/rs6000/rs6000-c.c (rs6000_cpu_cpp_builtins): Do not define
+	__KF__ and __KC__ mode when long double uses the IEEE 128-bit encoding.
+	* config/rs6000/rs6000.cc (TARGET_TRANSLATE_MODE_ATTRIBUTE): Delete.
+	(rs6000_translate_mode_attribute): Likewise.
+
 ==================== work096, patch 9.
 
 Use _Float128 type for __float128.
