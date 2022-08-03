@@ -1,3 +1,18 @@
+==================== work096, patch 11.
+
+Mangle __ibm128 to u8__ibm128.
+
+With the change to __ibm128 having a distinct type within GCC, we need to adjust
+the mangling for __ibm128 to distinguish it from long double, when long double
+uses the IBM 128-bit encoding.
+
+2022-08-03   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_mangle_type): Mangle __ibm128 to
+	u8__ibm128 if long double uses the IBM 128-bit encoding.
+
 ==================== work096, patch 10.
 
 Make __ibm128 have a distinct type and always use IFmode.
