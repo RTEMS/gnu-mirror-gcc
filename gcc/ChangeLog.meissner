@@ -1,3 +1,28 @@
+==================== work096, patch 12.
+
+Make 'w' the __ibm128 suffix.
+
+In writing code with __ibm128 support, it would be nice if we supported a suffix
+that marked __ibm128 constants.  The preprocessor lexer supports using either
+'q'/'Q' or 'w'/'W' as machine dependent suffixes.  The 'q'/'Q' suffix was
+already taken for __float128 constants, so I added 'w' or 'W' as the suffix for
+the __ibm128 constant.
+
+I went to the file doc/extend.texi to document using a 'w' or 'W' suffix, but it
+appears that we already had documented using 'w'/'W' for __ibm128.  This code
+adds this support to the GCC compiler.
+
+2022-08-04   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_c_mode_for_suffix): Add support for
+	using 'w' or 'W' as the __ibm128 bit constant.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/ibm128-suffix.c: New test.
+
 ==================== work096, patch 11.
 
 Mangle __ibm128 to u8__ibm128.
