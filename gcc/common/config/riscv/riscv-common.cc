@@ -65,6 +65,11 @@ static const riscv_implied_info_t riscv_implied_info[] =
   {"zks", "zksed"},
   {"zks", "zksh"},
 
+  {"b", "zba"},
+  {"b", "zbb"},
+  {"b", "zbc"},
+  {"b", "zbs"},
+
   {"v", "zvl128b"},
   {"v", "zve64d"},
 
@@ -149,6 +154,7 @@ static const struct riscv_ext_version riscv_ext_version_table[] =
   {"zifencei", ISA_SPEC_CLASS_20191213, 2, 0},
   {"zifencei", ISA_SPEC_CLASS_20190608, 2, 0},
 
+  {"b",  ISA_SPEC_CLASS_NONE,  1, 0},
   {"zba", ISA_SPEC_CLASS_NONE, 1, 0},
   {"zbb", ISA_SPEC_CLASS_NONE, 1, 0},
   {"zbc", ISA_SPEC_CLASS_NONE, 1, 0},
