@@ -2011,7 +2011,7 @@ gimple_fold_builtin_strchr (gimple_stmt_iterator *gsi, bool is_strrchr)
 
       if (p1 == NULL)
 	{
-	  replace_call_with_value (gsi, integer_zero_node);
+	  replace_call_with_value (gsi, null_pointer_node);
 	  return true;
 	}
 
@@ -2101,7 +2101,7 @@ gimple_fold_builtin_strstr (gimple_stmt_iterator *gsi)
 
       if (r == NULL)
 	{
-	  replace_call_with_value (gsi, integer_zero_node);
+	  replace_call_with_value (gsi, null_pointer_node);
 	  return true;
 	}
 
