@@ -9182,15 +9182,24 @@ driver::detect_jobserver () const
   const char *makeflags = env.get ("MAKEFLAGS");
   if (makeflags != NULL)
     {
-      const char *needle = "--jobserver-auth=";
-      const char *n = strstr (makeflags, needle);
+      /* Traditionally, GNU make uses opened pieps for jobserver-auth,
+	 e.g. --jobserver-auth=3,4.  */
+      const char *pipe_needle = "--jobserver-auth=";
+
+      /* Starting with GNU make 4.4, one can use --jobserver-style=fifo
+	 and then named pipe is used: --jobserver-auth=fifo:/tmp/hcsparta.  */
+      const char *fifo_needle = "--jobserver-auth=fifo:";
+      if (strstr (makeflags, fifo_needle) != NULL)
+	return;
+
+      const char *n = strstr (makeflags, pipe_needle);
       if (n != NULL)
 	{
 	  int rfd = -1;
 	  int wfd = -1;
 
 	  bool jobserver
-	    = (sscanf (n + strlen (needle), "%d,%d", &rfd, &wfd) == 2
+	    = (sscanf (n + strlen (pipe_needle), "%d,%d", &rfd, &wfd) == 2
 	       && rfd > 0
 	       && wfd > 0
 	       && is_valid_fd (rfd)

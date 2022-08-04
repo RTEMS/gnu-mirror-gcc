@@ -1342,27 +1342,37 @@ static const char *
 jobserver_active_p (void)
 {
   #define JS_PREFIX "jobserver is not available: "
-  #define JS_NEEDLE "--jobserver-auth="
+
+  /* Traditionally, GNU make uses opened pieps for jobserver-auth,
+     e.g. --jobserver-auth=3,4.  */
+  #define JS_PIPE_NEEDLE "--jobserver-auth="
+
+  /* Starting with GNU make 4.4, one can use --jobserver-style=fifo
+     and then named pipe is used: --jobserver-auth=fifo:/tmp/hcsparta.  */
+  #define JS_FIFO_NEEDLE "--jobserver-auth=fifo:"
 
   const char *makeflags = getenv ("MAKEFLAGS");
   if (makeflags == NULL)
     return JS_PREFIX "%<MAKEFLAGS%> environment variable is unset";
 
-  const char *n = strstr (makeflags, JS_NEEDLE);
+  if (strstr (makeflags, JS_FIFO_NEEDLE) != NULL)
+    return NULL;
+
+  const char *n = strstr (makeflags, JS_PIPE_NEEDLE);
   if (n == NULL)
-    return JS_PREFIX "%<" JS_NEEDLE "%> is not present in %<MAKEFLAGS%>";
+    return JS_PREFIX "%<" JS_PIPE_NEEDLE "%> is not present in %<MAKEFLAGS%>";
 
   int rfd = -1;
   int wfd = -1;
 
-  if (sscanf (n + strlen (JS_NEEDLE), "%d,%d", &rfd, &wfd) == 2
+  if (sscanf (n + strlen (JS_PIPE_NEEDLE), "%d,%d", &rfd, &wfd) == 2
       && rfd > 0
       && wfd > 0
       && is_valid_fd (rfd)
       && is_valid_fd (wfd))
     return NULL;
   else
-    return JS_PREFIX "cannot access %<" JS_NEEDLE "%> file descriptors";
+    return JS_PREFIX "cannot access %<" JS_PIPE_NEEDLE "%> file descriptors";
 }
 
 /* Print link to -flto documentation with a hint message.  */
