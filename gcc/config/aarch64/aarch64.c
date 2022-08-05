@@ -3263,6 +3263,26 @@ aarch64_indirection_sym_with_offset_p (const_rtx imm)
   return true;
 }
 
+/* Generate and return a store pair instruction of mode MODE to store
+   register REG1 to MEM1 and register REG2 to MEM2.  */
+
+static rtx
+aarch64_gen_store_pair (machine_mode mode, rtx mem1, rtx reg1, rtx mem2,
+			rtx reg2)
+{
+  return gen_store_pair (mode, mode, mem1, reg1, mem2, reg2);
+}
+
+/* Generate and regurn a load pair isntruction of mode MODE to load register
+   REG1 from MEM1 and register REG2 from MEM2.  */
+
+static rtx
+aarch64_gen_load_pair (machine_mode mode, rtx reg1, rtx mem1, rtx reg2,
+		       rtx mem2)
+{
+  return gen_load_pair (mode, mode, reg1, mem1, reg2, mem2);
+}
+
 /* We'll allow lo_sum's in addresses in our legitimate addresses
    so that combine would take care of combining addresses where
    necessary, but for generation purposes, we'll generate the address
@@ -3494,6 +3514,8 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 	    aarch64_load_tp (gen_rtx_REG (Pmode, R2_REGNUM));
 	    check_emit_insn (gen_tlsdesc_purecap (imm));
 	    emit_move_insn (dest, gen_rtx_REG (CADImode, R0_REGNUM));
+	    if (REG_P (dest))
+	      set_unique_reg_note (get_last_insn (), REG_EQUIV, imm2);
 	    return;
 	  }
 
@@ -3527,8 +3549,41 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 	rtx tmp_reg = gen_reg_rtx (mode);
 	rtx om_reg = drop_capability (tmp_reg);
 
-	rtx tp = aarch64_load_tp (NULL);
+	if (TARGET_CAPABILITY_PURE)
+	  {
+	    rtx dest_reg = REG_P (dest) ? dest : gen_reg_rtx (mode);
+	    /* Rather than try and specify that certain information should go
+	       in the DImode lower part of some CADImode registers we just tell
+	       the compiler that we need the information somewhere.
+	       Interestingly, if we use `off_reg = drop_capability(dest)` here
+	       then LRA recognises that the load_pair below changes the upper
+	       bits of the `dest` register, doesn't recognise that the upper
+	       bits are not needed, and hence decides that the register should
+	       be stored in memory (causing extra spills).  Similar for the
+	       tmp_reg and size_reg.  */
+	    rtx off_reg = gen_reg_rtx (noncapability_mode (mode));
+	    rtx size_reg = gen_reg_rtx (noncapability_mode (mode));
 
+	    emit_move_insn (tmp_reg, gen_rtx_HIGH (mode, imm));
+	    check_emit_insn (gen_tlsie_add_purecap (tmp_reg, tmp_reg, imm));
+	    rtx mem = gen_rtx_MEM (DImode, tmp_reg);
+	    rtx mem2 = gen_rtx_MEM (DImode,
+				    plus_constant (Pmode, tmp_reg,
+						   GET_MODE_SIZE (DImode)));
+	    check_emit_insn
+	      (aarch64_gen_load_pair (mode, off_reg, mem, size_reg, mem2));
+
+	    rtx tp = aarch64_load_tp (NULL);
+	    check_emit_insn (gen_add3_insn (dest_reg, tp, off_reg));
+	    check_emit_insn (gen_cap_bounds_set_cadi (dest_reg, dest_reg, size_reg));
+
+	    set_unique_reg_note (get_last_insn (), REG_EQUIV, imm2);
+	    if (dest != dest_reg)
+	      emit_move_insn (dest, dest_reg);
+	    return;
+	  }
+
+	rtx tp = aarch64_load_tp (NULL);
 	if (mode == ptr_mode)
 	  {
 	    check_emit_insn (gen_tlsie_small (mode, om_reg, imm, tmp_reg));
@@ -3554,12 +3609,14 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
     case SYMBOL_TLSLE48:
       {
 	machine_mode mode = GET_MODE (dest);
+	machine_mode off_mode = noncapability_mode (mode);
 	rtx tp = aarch64_load_tp (NULL);
+	rtx offset = gen_reg_rtx (POmode);
+	gcc_assert (!TARGET_CAPABILITY_PURE || type == SYMBOL_TLSLE32);
 
 	if (mode != Pmode)
 	  tp = gen_lowpart (mode, tp);
 
-	rtx dest_om = drop_capability (dest);
 
 	switch (type)
 	  {
@@ -3570,12 +3627,18 @@ aarch64_load_symref_appropriately (rtx dest, rtx imm,
 	    check_emit_insn (gen_tlsle24 (mode, dest, tp, imm));
 	    break;
 	  case SYMBOL_TLSLE32:
-	    check_emit_insn (gen_tlsle32 (mode, dest, imm));
-	    check_emit_insn (gen_add3_insn (dest, tp, dest_om));
+	    check_emit_insn (gen_tlsle32 (off_mode, offset, imm));
+	    check_emit_insn (gen_add3_insn (dest, tp, offset));
+	    if (TARGET_CAPABILITY_PURE)
+	      {
+		rtx size = gen_reg_rtx (off_mode);
+		check_emit_insn (gen_tlsle32_size (size, imm));
+		check_emit_insn (gen_cap_bounds_set_cadi (dest, dest, size));
+	      }
 	    break;
 	  case SYMBOL_TLSLE48:
-	    check_emit_insn (gen_tlsle48 (mode, dest, imm));
-	    check_emit_insn (gen_add3_insn (dest, tp, dest_om));
+	    check_emit_insn (gen_tlsle48 (off_mode, offset, imm));
+	    check_emit_insn (gen_add3_insn (dest, tp, offset));
 	    break;
 	  default:
 	    gcc_unreachable ();
@@ -7597,26 +7660,6 @@ aarch64_pop_regs (unsigned regno1, unsigned regno2, HOST_WIDE_INT adjustment,
       emit_insn (aarch64_gen_loadwb_pair (mode, stack_pointer_rtx, reg1,
 					  reg2, adjustment));
     }
-}
-
-/* Generate and return a store pair instruction of mode MODE to store
-   register REG1 to MEM1 and register REG2 to MEM2.  */
-
-static rtx
-aarch64_gen_store_pair (machine_mode mode, rtx mem1, rtx reg1, rtx mem2,
-			rtx reg2)
-{
-  return gen_store_pair (mode, mode, mem1, reg1, mem2, reg2);
-}
-
-/* Generate and regurn a load pair isntruction of mode MODE to load register
-   REG1 from MEM1 and register REG2 from MEM2.  */
-
-static rtx
-aarch64_gen_load_pair (machine_mode mode, rtx reg1, rtx mem1, rtx reg2,
-		       rtx mem2)
-{
-  return gen_load_pair (mode, mode, reg1, mem1, reg2, mem2);
 }
 
 /* Return TRUE if return address signing should be enabled for the current
@@ -15338,6 +15381,10 @@ aarch64_override_options_internal (struct gcc_options *opts)
 	    aarch64_cap = AARCH64_CAPABILITY_FAKE;
 	}
     }
+  if (TARGET_CAPABILITY_PURE && opts->x_aarch64_tls_dialect != TLS_DESCRIPTORS)
+    error("%<-mabi=purecap%> only supports TLS descriptor dialect");
+  if (TARGET_CAPABILITY_PURE && opts->x_aarch64_tls_size > 32)
+    error("%<-mabi=purecap%> only supports TLS size of <= 32 bits");
 
   if (TARGET_CAPABILITY_ANY && opts->x_flag_sanitize)
     /* At the moment we're disabling this.
@@ -16979,10 +17026,6 @@ aarch64_classify_tls_symbol (rtx x)
 {
   enum tls_model tls_kind = tls_symbolic_operand_type (x);
 
-  /* For purecap Morello, we have to use the global dynamic model.  */
-  if (TARGET_CAPABILITY_PURE)
-    return SYMBOL_SMALL_TLSDESC;
-
   switch (tls_kind)
     {
     case TLS_MODEL_GLOBAL_DYNAMIC:
@@ -16990,6 +17033,8 @@ aarch64_classify_tls_symbol (rtx x)
       return TARGET_TLS_DESC ? SYMBOL_SMALL_TLSDESC : SYMBOL_SMALL_TLSGD;
 
     case TLS_MODEL_INITIAL_EXEC:
+      if (TARGET_CAPABILITY_PURE)
+	return SYMBOL_SMALL_TLSIE;
       switch (aarch64_cmodel)
 	{
 	case AARCH64_CMODEL_TINY:
@@ -17000,6 +17045,8 @@ aarch64_classify_tls_symbol (rtx x)
 	}
 
     case TLS_MODEL_LOCAL_EXEC:
+      if (TARGET_CAPABILITY_PURE)
+	return SYMBOL_TLSLE32;
       if (aarch64_tls_size == 12)
 	return SYMBOL_TLSLE12;
       else if (aarch64_tls_size == 24)

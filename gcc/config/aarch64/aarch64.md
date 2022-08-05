@@ -243,6 +243,7 @@
     UNSPEC_TLSLE24
     UNSPEC_TLSLE32
     UNSPEC_TLSLE48
+    UNSPEC_SYM_SIZE
     UNSPEC_UABAL
     UNSPEC_UABDL2
     UNSPEC_UADALP
@@ -7035,9 +7036,9 @@
 )
 
 (define_insn "@tlsle32_<mode>"
-  [(set (match_operand:P 0 "register_operand" "=r")
-	(unspec:P [(match_operand 1 "aarch64_tls_le_symref" "S")]
-		   UNSPEC_TLSLE32))]
+  [(set (match_operand:PO 0 "register_operand" "=r")
+	(unspec:PO [(match_operand 1 "aarch64_tls_le_symref" "S")]
+		     UNSPEC_TLSLE32))]
   ""
   "movz\\t%<w>0, #:tprel_g1:%1\;movk\\t%<w>0, #:tprel_g0_nc:%1"
   [(set_attr "type" "multiple")
@@ -7045,9 +7046,9 @@
 )
 
 (define_insn "@tlsle48_<mode>"
-  [(set (match_operand:P 0 "register_operand" "=r")
-	(unspec:P [(match_operand 1 "aarch64_tls_le_symref" "S")]
-		   UNSPEC_TLSLE48))]
+  [(set (match_operand:PO 0 "register_operand" "=r")
+	(unspec:PO [(match_operand 1 "aarch64_tls_le_symref" "S")]
+		    UNSPEC_TLSLE48))]
   ""
   "movz\\t%<w>0, #:tprel_g2:%1\;movk\\t%<w>0, #:tprel_g1_nc:%1\;movk\\t%<w>0, #:tprel_g0_nc:%1"
   [(set_attr "type" "multiple")
@@ -7071,6 +7072,7 @@
   }
 )
 
+;; tlsdesc calls preserve all registers except c0 and c1.
 (define_insn "tlsdesc_purecap"
   [(set (reg:CADI R0_REGNUM)
 	(unspec:CADI [(match_operand 0 "aarch64_valid_symref" "S")]
@@ -7082,17 +7084,32 @@
    (use (reg:CADI R2_REGNUM))]
   "TARGET_CAPABILITY_PURE"
   {
-    return "nop\;"
-	   "adrp\\tc0, %A0\;"
+    return "adrp\\tc0, %A0\;"
 	   "ldr\\tc1, [c0, #%L0]\;"
 	   "add\\tc0, c0, %L0\;"
+	   "nop\;"
 	   ".tlsdesccall\\t%0\;"
-	   "blr\\tc1\;"
-	   "scbnds\tc0, c0, x1";
+	   "blr\\tc1";
   }
   [(set_attr "type" "call")
-   (set_attr "length" "24")])
+   (set_attr "length" "20")])
 
+(define_insn "tlsie_add_purecap"
+  [(set (match_operand:CADI 0 "register_operand" "=r")
+	(lo_sum:CADI (match_operand:CADI 1 "register_operand" "r")
+		     (unspec:CADI [(match_operand:CADI 2 "aarch64_valid_symref" "S")]
+				   UNSPEC_GOTSMALLTLS)))]
+  "TARGET_CAPABILITY_PURE"
+  "add\\t%B0, %B1, %L2")
+
+(define_insn "tlsle32_size"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+	(unspec:DI [(match_operand 1 "aarch64_tls_le_symref" "S")]
+		    UNSPEC_SYM_SIZE))]
+  "TARGET_CAPABILITY_PURE"
+  "movz\\t%x0, #:size_g1:%1\;movk\\t%x0, #:size_g0_nc:%1"
+  [(set_attr "type" "multiple")
+   (set_attr "length" "8")])
 
 ;; tlsdesc calls preserve all core and Advanced SIMD registers except
 ;; R0 and LR.

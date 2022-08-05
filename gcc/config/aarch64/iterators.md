@@ -148,6 +148,13 @@
 ; Possibly it's TARGET_CAPABILITY_NONE || TARGET_CAPABILITY_HYBRID?
 (define_mode_iterator ADDR [DI (CADI "TARGET_CAPABILITY_ANY")])
 
+;; This mode iterator allows :PO to be used for patterns that operate on
+;; address offsets in different modes.  If LP64 DI will match, in ILP32 either
+;; DI or SI will match, in C64 DI will match.
+(define_mode_iterator PO
+   [(SI "ptr_mode == SImode || Pmode == SImode")
+    (DI "ptr_mode == DImode || Pmode == DImode || Pmode == CADImode")])
+
 ;; Advanced SIMD Float modes suitable for moving, loading and storing.
 (define_mode_iterator VDQF_F16 [V4HF V8HF V2SF V4SF V2DF
 				V4BF V8BF])
