@@ -321,6 +321,16 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     struct __is_integral_helper<unsigned long long>
     : public true_type { };
 
+#ifdef __CHERI__
+  template<>
+    struct __is_integral_helper<__intcap>
+    : public true_type { };
+
+  template<>
+    struct __is_integral_helper<unsigned __intcap>
+    : public true_type { };
+#endif
+
   // Conditionalizing on __STRICT_ANSI__ here will break any port that
   // uses one of these types for size_t.
 #if defined(__GLIBCXX_TYPE_INT_N_0)

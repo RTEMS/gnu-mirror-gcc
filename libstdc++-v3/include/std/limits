@@ -1477,6 +1477,16 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        = round_toward_zero;
     };
 
+#ifdef __CHERI__
+  template<>
+    struct numeric_limits<__intcap>
+    : public numeric_limits<long> { };
+
+  template<>
+    struct numeric_limits<unsigned __intcap>
+    : public numeric_limits<unsigned long> { };
+#endif
+
 #define __INT_N(TYPE, BITSIZE, EXT, UEXT)				\
   template<>								\
     struct numeric_limits<TYPE>						\
