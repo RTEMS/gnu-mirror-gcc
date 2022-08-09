@@ -2656,6 +2656,17 @@ add_builtin_candidate (struct z_candidate **candidates, enum tree_code code,
 		       tree type2, vec<tree,va_gc> &args, tree *argtypes,
 		       int flags, tsubst_flags_t complain)
 {
+  tree orig_type1 = type1;
+  tree orig_type2 = type2;
+
+  if (INTCAP_TYPE_P (type1))
+    type1 = noncapability_type (type1);
+  if (type2 && INTCAP_TYPE_P (type2))
+    type2 = noncapability_type (type2);
+
+  tree precheck_type1 = type1;
+  tree precheck_type2 = type2;
+
   switch (code)
     {
     case POSTINCREMENT_EXPR:
@@ -2701,7 +2712,7 @@ add_builtin_candidate (struct z_candidate **candidates, enum tree_code code,
 	return;
       if (ARITHMETIC_TYPE_P (type1) || TYPE_PTROB_P (type1))
 	{
-	  type1 = build_reference_type (type1);
+	  type1 = build_reference_type (orig_type1);
 	  break;
 	}
       return;
@@ -3009,7 +3020,7 @@ add_builtin_candidate (struct z_candidate **candidates, enum tree_code code,
 	default:
 	  gcc_unreachable ();
 	}
-      type1 = build_reference_type (type1);
+      type1 = build_reference_type (orig_type1);
       break;
 
     case COND_EXPR:
@@ -3047,10 +3058,19 @@ add_builtin_candidate (struct z_candidate **candidates, enum tree_code code,
       if (ARITHMETIC_TYPE_P (type1))
 	break;
       return;
- 
+
     default:
       gcc_unreachable ();
     }
+
+  /* Restore the original types if necessary.  */
+  if (INTCAP_TYPE_P (orig_type1) && type1 == precheck_type1)
+    type1 = orig_type1;
+
+  if (orig_type2
+      && INTCAP_TYPE_P (orig_type2)
+      && type2 == precheck_type2)
+    type2 = orig_type2;
 
   /* Make sure we don't create builtin candidates with dependent types.  */
   bool u1 = uses_template_parms (type1);

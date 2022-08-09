@@ -3552,6 +3552,9 @@ cp_build_array_ref (location_t loc, tree array, tree idx,
       return error_mark_node;
     }
 
+  if (INTCAP_TYPE_P (TREE_TYPE (idx)))
+    idx = drop_capability (idx);
+
   if (TREE_TYPE (array) == error_mark_node
       || TREE_TYPE (idx) == error_mark_node)
     return error_mark_node;
