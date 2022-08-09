@@ -1,3 +1,38 @@
+==================== work097, patch003
+
+Use _Float128 type for __float128.
+
+In the past if the long double type was IEEE 128-bit, the __float128 type would
+use the long double type, and TFmode would be used for the mode for both
+_Float128 and long double types.
+
+This patch always uses the _Float128 type for __float128, and it always uses
+KFmode for the mode.  Right now, a similar change for __ibm128 has not been
+made.
+
+In making these changes, I noticed that there was an internal tree for holding
+the __float128 type.  This code removes that internal tree variable.
+
+2022-08-09   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_type_string): Use
+	float128_type_node, not ieee128_float_type_mode.
+	(rs6000_init_builtins): Always use the _Float128 type for the __float128
+	keyword.  Do not use the long double type.
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Use
+	float128_type_node, not ieee128_float_type_mode.  Simplify if
+	statements.
+	(rs6000_cpu_cpp_builtins): Delete ieee128_float_type_mode.
+	* config/rs6000/rs6000.cc (rs6000_libgcc_floating_mode_supported_p):
+	Always use KFmode for _Float128 and __float128.
+	(rs6000_floatn_mode): Likewise.
+	(rs6000_c_mode_for_suffix): Always use KFmode for _Float128 and
+	__float128.  Add 'w' and 'W' suffix for __ibm128 constants.
+	* config/rs6000/rs6000.h (RS6000_BTI_ieee128_float): Delete.
+	(ieee128_float_type_node): Likewise.
+
 ==================== work097, patch002
 
 Rework 128-bit complex multiply and divide.
