@@ -578,13 +578,15 @@ rs6000_target_modify_macros (bool define_p, HOST_WIDE_INT flags)
     {
       rs6000_define_or_undefine_macro (define_p, "__FLOAT128__");
       if (define_p)
-	rs6000_define_or_undefine_macro (true, "__float128=__ieee128");
+	{
+	  rs6000_define_or_undefine_macro (true, "__float128=__ieee128");
+	  rs6000_define_or_undefine_macro (true, "__SIZEOF_FLOAT128__=16");
+	}
       else
-	rs6000_define_or_undefine_macro (false, "__float128");
-      if (ieee128_float_type_node && define_p)
-	rs6000_define_or_undefine_macro (true, "__SIZEOF_FLOAT128__=16");
-      else
-	rs6000_define_or_undefine_macro (false, "__SIZEOF_FLOAT128__");
+	{
+	  rs6000_define_or_undefine_macro (false, "__float128");
+	  rs6000_define_or_undefine_macro (false, "__SIZEOF_FLOAT128__");
+	}
     }
   /* OPTION_MASK_FLOAT128_HARDWARE can be turned on if -mcpu=power9 is used or
      via the target attribute/pragma.  */
@@ -624,7 +626,7 @@ rs6000_cpu_cpp_builtins (cpp_reader *pfile)
     builtin_define ("__FLOAT128_TYPE__");
   if (ibm128_float_type_node)
     builtin_define ("__SIZEOF_IBM128__=16");
-  if (ieee128_float_type_node)
+  if (TARGET_FLOAT128_KEYWORD)
     builtin_define ("__SIZEOF_IEEE128__=16");
 #ifdef TARGET_LIBC_PROVIDES_HWCAP_IN_TCB
   builtin_define ("__BUILTIN_CPU_SUPPORTS__");

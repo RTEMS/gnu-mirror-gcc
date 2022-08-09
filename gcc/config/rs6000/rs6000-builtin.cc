@@ -434,7 +434,7 @@ const char *rs6000_type_string (tree type_node)
     return "ss";
   else if (type_node == ibm128_float_type_node)
     return "__ibm128";
-  else if (type_node == ieee128_float_type_node)
+  else if (type_node == float128_type_node)
     return "__ieee128";
   else if (type_node == opaque_V4SI_type_node)
     return "opaque";
@@ -733,16 +733,10 @@ rs6000_init_builtins (void)
 
   if (TARGET_FLOAT128_TYPE)
     {
-      if (TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128)
-	ieee128_float_type_node = long_double_type_node;
-      else
-	ieee128_float_type_node = float128_type_node;
-      t = build_qualified_type (ieee128_float_type_node, TYPE_QUAL_CONST);
-      lang_hooks.types.register_builtin_type (ieee128_float_type_node,
+      t = build_qualified_type (float128_type_node, TYPE_QUAL_CONST);
+      lang_hooks.types.register_builtin_type (float128_type_node,
 					      "__ieee128");
     }
-  else
-    ieee128_float_type_node = NULL_TREE;
 
   /* Vector pair and vector quad support.  */
   vector_pair_type_node = make_node (OPAQUE_TYPE);
