@@ -3676,10 +3676,10 @@ emit_inc (enum reg_class new_rclass, rtx in, rtx value, poly_int64 inc_amount)
 
   if (GET_CODE (value) == PRE_MODIFY || GET_CODE (value) == POST_MODIFY)
     {
-      lra_assert (GET_CODE (XEXP (value, 1)) == PLUS
+      lra_assert (any_plus_p (XEXP (value, 1))
 		  || GET_CODE (XEXP (value, 1)) == MINUS);
       lra_assert (rtx_equal_p (XEXP (XEXP (value, 1), 0), XEXP (value, 0)));
-      plus_p = GET_CODE (XEXP (value, 1)) == PLUS;
+      plus_p = any_plus_p (XEXP (value, 1));
       inc = XEXP (XEXP (value, 1), 1);
     }
   else
@@ -3687,7 +3687,7 @@ emit_inc (enum reg_class new_rclass, rtx in, rtx value, poly_int64 inc_amount)
       if (GET_CODE (value) == PRE_DEC || GET_CODE (value) == POST_DEC)
 	inc_amount = -inc_amount;
 
-      inc = gen_int_mode (inc_amount, GET_MODE (value));
+      inc = gen_int_mode (inc_amount, noncapability_mode (GET_MODE (value)));
     }
 
   if (! post && REG_P (incloc))
@@ -3764,10 +3764,10 @@ emit_inc (enum reg_class new_rclass, rtx in, rtx value, poly_int64 inc_amount)
       if (plus_p)
 	{
 	  poly_int64 offset;
+	  machine_mode om = noncapability_mode (GET_MODE (result));
 	  if (poly_int_rtx_p (inc, &offset))
 	    emit_insn (gen_add2_insn (result,
-				      gen_int_mode (-offset,
-						    GET_MODE (result))));
+				      gen_int_mode (-offset, om)));
 	  else
 	    emit_insn (gen_sub2_insn (result, inc));
 	}
