@@ -23678,14 +23678,14 @@ rs6000_eh_return_filter_mode (void)
   return TARGET_32BIT ? SImode : word_mode;
 }
 
-/* Target hook for translate_mode_attribute.  In the past, we used to convert
-   KFmode and KCmode to TFmode and TCmode if long double is IEEE 128-bit.  We
-   no longer do this because we always use the standard float128_type_node for
-   __float128, and we no longer try to use the long double type.  */
+/* Target hook for translate_mode_attribute.  */
 static machine_mode
 rs6000_translate_mode_attribute (machine_mode mode)
 {
-  if (FLOAT128_IBM_P (mode) && ibm128_float_type_node == long_double_type_node)
+  if ((FLOAT128_IEEE_P (mode)
+       && ieee128_float_type_node == long_double_type_node)
+      || (FLOAT128_IBM_P (mode)
+	  && ibm128_float_type_node == long_double_type_node))
     return COMPLEX_MODE_P (mode) ? E_TCmode : E_TFmode;
   return mode;
 }
@@ -23724,8 +23724,13 @@ rs6000_libgcc_floating_mode_supported_p (scalar_float_mode mode)
     case E_TFmode:
       return true;
 
+      /* We only return true for KFmode if IEEE 128-bit types are supported, and
+	 if long double does not use the IEEE 128-bit format.  If long double
+	 uses the IEEE 128-bit format, it will use TFmode and not KFmode.
+	 Because the code will not use KFmode in that case, there will be aborts
+	 because it can't find KFmode in the Floatn types.  */
     case E_KFmode:
-      return TARGET_FLOAT128_TYPE;
+      return TARGET_FLOAT128_TYPE && !TARGET_IEEEQUAD;
 
     default:
       return false;
@@ -23759,7 +23764,7 @@ rs6000_floatn_mode (int n, bool extended)
 
 	case 64:
 	  if (TARGET_FLOAT128_TYPE)
-	    return KFmode;
+	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
 	  else
 	    return opt_scalar_float_mode ();
 
@@ -23783,7 +23788,7 @@ rs6000_floatn_mode (int n, bool extended)
 
 	case 128:
 	  if (TARGET_FLOAT128_TYPE)
-	    return KFmode;
+	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
 	  else
 	    return opt_scalar_float_mode ();
 
@@ -23798,11 +23803,18 @@ rs6000_floatn_mode (int n, bool extended)
 static machine_mode
 rs6000_c_mode_for_suffix (char suffix)
 {
-  if (TARGET_FLOAT128_TYPE && (suffix == 'q' || suffix == 'Q'))
-    return KFmode;
+  if (TARGET_FLOAT128_TYPE)
+    {
+      if (suffix == 'q' || suffix == 'Q')
+	return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
 
-  if (TARGET_IBM128 && (suffix == 'w' || suffix == 'W'))
-    return FLOAT128_IBM_P (TFmode) ? TFmode : IFmode;
+      /* At the moment, we are not defining a suffix for IBM extended double.
+	 If/when the default for -mabi=ieeelongdouble is changed, and we want
+	 to support __ibm128 constants in legacy library code, we may need to
+	 re-evalaute this decision.  Currently, c-lex.cc only supports 'w' and
+	 'q' as machine dependent suffixes.  The x86_64 port uses 'w' for
+	 __float80 constants.  */
+    }
 
   return VOIDmode;
 }

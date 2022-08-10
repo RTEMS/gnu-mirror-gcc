@@ -2268,6 +2268,7 @@ enum rs6000_builtin_type_index
   RS6000_BTI_dfloat64,		 /* dfloat64_type_node */
   RS6000_BTI_dfloat128,		 /* dfloat128_type_node */
   RS6000_BTI_void,	         /* void_type_node */
+  RS6000_BTI_ieee128_float,	 /* ieee 128-bit floating point */
   RS6000_BTI_ibm128_float,	 /* IBM 128-bit floating point */
   RS6000_BTI_const_str,		 /* pointer to const char * */
   RS6000_BTI_vector_pair,	 /* unsigned 256-bit types (vector pair).  */
@@ -2362,6 +2363,7 @@ enum rs6000_builtin_type_index
 #define dfloat64_type_internal_node	 (rs6000_builtin_types[RS6000_BTI_dfloat64])
 #define dfloat128_type_internal_node	 (rs6000_builtin_types[RS6000_BTI_dfloat128])
 #define void_type_internal_node		 (rs6000_builtin_types[RS6000_BTI_void])
+#define ieee128_float_type_node		 (rs6000_builtin_types[RS6000_BTI_ieee128_float])
 #define ibm128_float_type_node		 (rs6000_builtin_types[RS6000_BTI_ibm128_float])
 #define const_str_type_node		 (rs6000_builtin_types[RS6000_BTI_const_str])
 #define vector_pair_type_node		 (rs6000_builtin_types[RS6000_BTI_vector_pair])
