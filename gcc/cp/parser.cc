@@ -30561,9 +30561,12 @@ cp_parser_lookup_name (cp_parser *parser, tree name,
     }
   else if (object_type)
     {
+      bool dep = dependent_scope_p (object_type);
+
       /* Look up the name in the scope of the OBJECT_TYPE, unless the
 	 OBJECT_TYPE is not a class.  */
-      if (CLASS_TYPE_P (object_type))
+      if (CLASS_TYPE_P (object_type)
+	  && !(dep && LAMBDA_TYPE_P (object_type)))
 	/* If the OBJECT_TYPE is a template specialization, it may
 	   be instantiated during name lookup.  In that case, errors
 	   may be issued.  Even if we rollback the current tentative
@@ -31694,12 +31697,6 @@ cp_parser_single_declaration (cp_parser* parser,
       if (cp_parser_declares_only_class_p (parser)
 	  || (declares_class_or_enum & 2))
 	{
-	  /* If this is a declaration, but not a definition, associate
-	     any constraints with the type declaration. Constraints
-	     are associated with definitions in cp_parser_class_specifier.  */
-	  if (declares_class_or_enum == 1)
-	    associate_classtype_constraints (decl_specifiers.type);
-
 	  decl = shadow_tag (&decl_specifiers);
 
 	  /* In this case:
@@ -31720,6 +31717,12 @@ cp_parser_single_declaration (cp_parser* parser,
 	    decl = TYPE_NAME (decl);
 	  else
 	    decl = error_mark_node;
+
+	  /* If this is a declaration, but not a definition, associate
+	     any constraints with the type declaration. Constraints
+	     are associated with definitions in cp_parser_class_specifier.  */
+	  if (declares_class_or_enum == 1)
+	    associate_classtype_constraints (TREE_TYPE (decl));
 
 	  /* Perform access checks for template parameters.  */
 	  cp_parser_perform_template_parameter_access_checks (checks);
@@ -32046,7 +32049,10 @@ cp_parser_enclosed_template_argument_list (cp_parser* parser)
   /* Parse the template-argument-list itself.  */
   if (cp_lexer_next_token_is (parser->lexer, CPP_GREATER)
       || cp_lexer_next_token_is (parser->lexer, CPP_RSHIFT))
-    arguments = NULL_TREE;
+    {
+      arguments = make_tree_vec (0);
+      SET_NON_DEFAULT_TEMPLATE_ARGS_COUNT (arguments, 0);
+    }
   else
     arguments = cp_parser_template_argument_list (parser);
   /* Look for the `>' that ends the template-argument-list. If we find

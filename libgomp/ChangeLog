@@ -1,3 +1,38 @@
+2022-08-01  Lewis Hyatt  <lhyatt@gmail.com>
+
+	Backported from master:
+	2022-07-10  Lewis Hyatt  <lhyatt@gmail.com>
+
+	* testsuite/libgomp.oacc-c-c++-common/reduction-5.c: Adapt for
+	improved warning locations.
+	* testsuite/libgomp.oacc-c-c++-common/vred2d-128.c: Likewise.
+
+2022-07-30  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2022-07-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/106449
+	* testsuite/libgomp.c-c++-common/pr106449.c: New test.
+
+2022-06-28  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2022-06-21  Jakub Jelinek  <jakub@redhat.com>
+		    Paul Iannetta  <piannetta@kalrayinc.com>
+
+	PR libgomp/106045
+	* testsuite/libgomp.c/target-31.c: Add private (i) clause.
+
+2022-06-28  Martin Liska  <mliska@suse.cz>
+
+	Backported from master:
+	2022-06-28  Martin Liska  <mliska@suse.cz>
+
+	* acinclude.m4: Fix typo in mold linker detection.
+	* Makefile.in: Regenerate.
+	* configure: Regenerate.
+
 2022-05-30  Jakub Jelinek  <jakub@redhat.com>
 
 	Backported from master:
