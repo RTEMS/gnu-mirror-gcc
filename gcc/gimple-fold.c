@@ -701,6 +701,29 @@ bucket_type_for_size (unsigned int bits, int unsignedp)
 	  : lang_hooks.types.type_for_size (bits, unsignedp);
 }
 
+/* Returns true if (conservatively) a memcpy of length LEN could be used
+   to copy capabilities.
+
+   Note if we also take account of source and destination types here we may be
+   able to safely reject more cases (and thus optimize more), but for now we
+   keep the check simple and assume that any memcpy that copies enough bytes to
+   contain at least one capability on a capability target may indeed be a
+   capability copy.  */
+static bool
+maybe_capability_copy_p (tree len)
+{
+  const auto maybe_cap_mode = targetm.capability_mode ();
+  if (!maybe_cap_mode.exists ())
+    return false;
+
+  const auto cap_mode = maybe_cap_mode.require ();
+  const unsigned HOST_WIDE_INT ilen = tree_to_uhwi (len);
+  const unsigned HOST_WIDE_INT cap_bytes
+    = GET_MODE_PRECISION (cap_mode) / BITS_PER_UNIT;
+
+  return ilen >= cap_bytes;
+}
+
 /* Fold function call to builtin mem{{,p}cpy,move}.  Try to detect and
    diagnose (otherwise undefined) overlapping copies without preventing
    folding.  When folded, GCC guarantees that overlapping memcpy has
@@ -782,6 +805,11 @@ gimple_fold_builtin_memory_op (gimple_stmt_iterator *gsi,
       dest_align = get_pointer_alignment (dest);
       if (tree_fits_uhwi_p (len)
 	  && compare_tree_int (len, MOVE_MAX) <= 0
+	  /* Avoid doing this for possible copies of capabilities: we
+	     would need to use capability loads/stores but this is
+	     only safe if the source and destination are suitably
+	     aligned, and we don't necessarily know this.  */
+	  && !maybe_capability_copy_p (len)
 	  /* FIXME: Don't transform copies from strings with known length.
 	     Until GCC 9 this prevented a case in gcc.dg/strlenopt-8.c
 	     from being handled, and the case was XFAILed for that reason.
