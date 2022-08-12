@@ -1,3 +1,77 @@
+==================== work097, patch014
+
+Add 'w' suffix for __ibm128 constants.
+
+In the documentation, we mention that 'w' or 'W' can be used as a suffix for
+__ibm128 constants.  We never implemented this.  This patch fixes that.
+
+2022-08-12   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_c_mode_for_suffix): Allow 'w' or 'W'
+	for __ibm128 constants.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/ibm128-suffix.c: New test.
+
+==================== work097, patch013
+
+Make __float128 use the _Float128 type.
+
+2022-08-12   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_init_builtins): Always use the
+	_Float128 type for __float128.  Don't use the long double type.
+	* config/rs6000/rs6000.cc (rs6000_libgcc_floating_mode_supported_p):
+	Always use KFmode for Float128 mode.
+	(rs6000_floatn_mode): Likewise.
+	(rs6000_c_mode_for_suffix): Likewise.
+
+==================== work097, patch012
+
+Update switching between KFmode to TFmode and IFmode to TFmode builtins
+
+This patch looks to see if the caller function wants TFmode (when long double is
+IEEE 128-bit) to switch the KFmode built-in functions to TFmode.
+
+It will look to see if the caller functions wants IFmode (when long double is
+IBM 128-bit) to switch the unpackif built-in function to unpacktf.
+
+It will look to see if a TFmode argument is passed (when long double is IBM
+128-bit) to switch the packif built-in function to packtf.
+
+2022-08-12   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_expand_builtin): Update
+	switching from KFmode/IFmode built-in functions to TFmode built-in
+	functions.
+
+==================== work097, patch011
+
+Add ibm128_operand.
+
+Since we have 2 modes for IBM 128-bit (IFmode and TFmode if long double is IBM
+128-bit), this patch provides a new predicate (ibm128_operand) that allows
+combining a conversion from one mode to another.
+
+2022-08-12   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/predicates.md (ibm128_operand): New predicate.
+	* config/rs6000/rs6000.md (extendiftf2_internal): Add GPR registers in
+	case -msoft-float is used.
+	(extendtfif2_internal): Likewise.
+	(unpack<mode>): Use ibm128_operand.
+	(unpack<mode>_dm): Likewise.
+	(unpack<mode>_nodm): Likewise.
+
 ==================== work097, patch010
 
 Update switching between KFmode to TFmode and IFmode to TFmode builtins
