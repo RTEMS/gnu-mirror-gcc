@@ -1,13 +1,4 @@
-==================== work097, patch008
-
-Make __float128 use the _Float128 type.
-
-2022-08-11   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/rs6000-builtin.cc (rs6000_init_builtins): Always use the
-	_Float128 type for __float128.  Don't use the long double type.
+==================== work097, patch008 was reverted
 
 ==================== work097, patch007
 
