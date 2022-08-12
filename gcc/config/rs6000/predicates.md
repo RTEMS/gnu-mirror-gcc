@@ -119,43 +119,6 @@
   return VSX_REGNO_P (REGNO (op));
 })
 
-;; Return 1 if op is an IEEE 128-bit floating point type that is in a
-;; traditional Altivec register in order to do one of the IEEE 128-bit hardware
-;; instructions.  We allow the operand mode to be different from the mode in
-;; the call to allow using either KFmode or TFmode, assuming the mode supports
-;; IEEE 128-bits.  This way combinations of long double and __float128 will
-;; work when long double uses the IEEE 128-bit format without having to have
-;; insns that recognize the pattern with convert insns used.
-(define_predicate "ieee128_operand"
-  (match_code "reg,subreg")
-{
-  if (GET_MODE (op) != VOIDmode)
-    mode = GET_MODE (op);
-
-  if (!FLOAT128_IEEE_P (mode))
-    return 0;
-
-  return altivec_register_operand (op, mode);
-})
-
-;; Return 1 if op is an IBM 128-bit floating point type.  We allow the operand
-;; mode to be different from the mode in the call to allow using either IFmode
-;; or TFmode, assuming the mode supports IBM 128-bits.  This way combinations
-;; of long double and __ibm128 will work when long double uses the IBM 128-bit
-;; format without having to have insns that recognize the pattern with convert
-;; insns used.
-(define_predicate "ibm128_operand"
-  (match_code "reg,subreg")
-{
-  if (GET_MODE (op) != VOIDmode)
-    mode = GET_MODE (op);
-
-  if (!FLOAT128_IBM_P (mode))
-    return 0;
-
-  return register_operand (op, mode);
-})
-
 ;; Return 1 if op is a vector register that operates on floating point vectors
 ;; (either altivec or VSX).
 (define_predicate "vfloat_operand"
