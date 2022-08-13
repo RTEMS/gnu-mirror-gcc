@@ -1,3 +1,22 @@
+==================== work097, patch015
+
+Delete ieee128_float_type_node.
+
+Now that we always use float128_type_node for __float128, we can delete the tree
+variable ieee128_float_type_node.
+
+2022-08-12   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_type_string): Delete
+	ieee128_float_type_node.
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Likewise.
+	(rs6000_cpu_cpp_builtins): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_translate_mode_attribute): Likewise.
+	* config/rs6000/rs6000.h (RS6000_BTI_ieee128_float): Delete.
+	(ieee128_float_type_node): Delete.
+
 ==================== work097, patch014
 
 Add 'w' suffix for __ibm128 constants.
