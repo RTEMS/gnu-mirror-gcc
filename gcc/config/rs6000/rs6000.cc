@@ -23682,10 +23682,8 @@ rs6000_eh_return_filter_mode (void)
 static machine_mode
 rs6000_translate_mode_attribute (machine_mode mode)
 {
-  if ((FLOAT128_IEEE_P (mode)
-       && ieee128_float_type_node == long_double_type_node)
-      || (FLOAT128_IBM_P (mode)
-	  && ibm128_float_type_node == long_double_type_node))
+  if ((FLOAT128_IBM_P (mode)
+       && ibm128_float_type_node == long_double_type_node))
     return COMPLEX_MODE_P (mode) ? E_TCmode : E_TFmode;
   return mode;
 }

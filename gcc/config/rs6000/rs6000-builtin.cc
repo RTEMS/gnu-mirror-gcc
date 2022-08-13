@@ -434,7 +434,7 @@ const char *rs6000_type_string (tree type_node)
     return "ss";
   else if (type_node == ibm128_float_type_node)
     return "__ibm128";
-  else if (type_node == ieee128_float_type_node)
+  else if (type_node == float128_type_node)
     return "__ieee128";
   else if (type_node == opaque_V4SI_type_node)
     return "opaque";
@@ -736,13 +736,10 @@ rs6000_init_builtins (void)
       /* Always make the type used by __float128 to be the same as the
 	 _Float128 type.  The C23 standard will want long double to be a
 	 different type than _Float128, so don't use the long double type.  */
-      ieee128_float_type_node = float128_type_node;
-      t = build_qualified_type (ieee128_float_type_node, TYPE_QUAL_CONST);
-      lang_hooks.types.register_builtin_type (ieee128_float_type_node,
+      t = build_qualified_type (float128_type_node, TYPE_QUAL_CONST);
+      lang_hooks.types.register_builtin_type (float128_type_node,
 					      "__ieee128");
     }
-  else
-    ieee128_float_type_node = NULL_TREE;
 
   /* Vector pair and vector quad support.  */
   vector_pair_type_node = make_node (OPAQUE_TYPE);
