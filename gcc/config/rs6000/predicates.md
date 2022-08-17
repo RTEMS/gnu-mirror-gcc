@@ -144,6 +144,29 @@
   return altivec_register_operand (op, mode);
 })
 
+;; Return 1 if op is an IBM 128-bit floating point type.  We allow the operand
+;; to be converted from a mode that also supports IBM 128-bit.
+(define_predicate "ibm128_operand"
+  (match_code "reg,subreg,float_extend,float_truncate")
+{
+  if (mode == VOIDmode)
+    mode = GET_MODE (op);
+
+  if (!FLOAT128_IBM_P (mode))
+    return 0;
+
+  /* Allow conversions from another IBM 128-bit mode.  */
+  if (GET_CODE (op) == FLOAT_EXTEND || GET_CODE (op) == FLOAT_TRUNCATE)
+    {
+      op = XEXP (op, 0);
+      mode = GET_MODE (op);
+      if (!FLOAT128_IBM_P (mode))
+	return 0;
+    }
+
+  return register_operand (op, mode);
+})
+
 ;; Return 1 if op is a vector register that operates on floating point vectors
 ;; (either altivec or VSX).
 (define_predicate "vfloat_operand"
