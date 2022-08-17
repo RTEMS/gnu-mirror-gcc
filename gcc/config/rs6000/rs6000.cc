@@ -10913,23 +10913,26 @@ init_float128_ibm (machine_mode mode)
       set_optab_libfunc (smul_optab, mode, "__gcc_qmul");
       set_optab_libfunc (sdiv_optab, mode, "__gcc_qdiv");
 
-      set_optab_libfunc (neg_optab, mode, "__gcc_qneg");
-      set_optab_libfunc (eq_optab, mode, "__gcc_qeq");
-      set_optab_libfunc (ne_optab, mode, "__gcc_qne");
-      set_optab_libfunc (gt_optab, mode, "__gcc_qgt");
-      set_optab_libfunc (ge_optab, mode, "__gcc_qge");
-      set_optab_libfunc (lt_optab, mode, "__gcc_qlt");
-      set_optab_libfunc (le_optab, mode, "__gcc_qle");
-      set_optab_libfunc (unord_optab, mode, "__gcc_qunord");
+      if (!TARGET_HARD_FLOAT)
+	{
+	  set_optab_libfunc (neg_optab, mode, "__gcc_qneg");
+	  set_optab_libfunc (eq_optab, mode, "__gcc_qeq");
+	  set_optab_libfunc (ne_optab, mode, "__gcc_qne");
+	  set_optab_libfunc (gt_optab, mode, "__gcc_qgt");
+	  set_optab_libfunc (ge_optab, mode, "__gcc_qge");
+	  set_optab_libfunc (lt_optab, mode, "__gcc_qlt");
+	  set_optab_libfunc (le_optab, mode, "__gcc_qle");
+	  set_optab_libfunc (unord_optab, mode, "__gcc_qunord");
 
-      set_conv_libfunc (sext_optab, mode, SFmode, "__gcc_stoq");
-      set_conv_libfunc (sext_optab, mode, DFmode, "__gcc_dtoq");
-      set_conv_libfunc (trunc_optab, SFmode, mode, "__gcc_qtos");
-      set_conv_libfunc (trunc_optab, DFmode, mode, "__gcc_qtod");
-      set_conv_libfunc (sfix_optab, SImode, mode, "__gcc_qtoi");
-      set_conv_libfunc (ufix_optab, SImode, mode, "__gcc_qtou");
-      set_conv_libfunc (sfloat_optab, mode, SImode, "__gcc_itoq");
-      set_conv_libfunc (ufloat_optab, mode, SImode, "__gcc_utoq");
+	  set_conv_libfunc (sext_optab, mode, SFmode, "__gcc_stoq");
+	  set_conv_libfunc (sext_optab, mode, DFmode, "__gcc_dtoq");
+	  set_conv_libfunc (trunc_optab, SFmode, mode, "__gcc_qtos");
+	  set_conv_libfunc (trunc_optab, DFmode, mode, "__gcc_qtod");
+	  set_conv_libfunc (sfix_optab, SImode, mode, "__gcc_qtoi");
+	  set_conv_libfunc (ufix_optab, SImode, mode, "__gcc_qtou");
+	  set_conv_libfunc (sfloat_optab, mode, SImode, "__gcc_itoq");
+	  set_conv_libfunc (ufloat_optab, mode, SImode, "__gcc_utoq");
+	}
     }
   else
     {
@@ -10966,6 +10969,26 @@ init_float128_ibm (machine_mode mode)
     }
 }
 
+/* Create a decl for either complex long double multiply or complex long double
+   divide when long double is IEEE 128-bit floating point.  We can't use
+   __multc3 and __divtc3 because the original long double using IBM extended
+   double used those names.  The complex multiply/divide functions are encoded
+   as builtin functions with a complex result and 4 scalar inputs.  */
+
+static void
+create_complex_muldiv (const char *name, built_in_function fncode, tree fntype)
+{
+  tree fndecl = add_builtin_function (name, fntype, fncode, BUILT_IN_NORMAL,
+				      name, NULL_TREE);
+
+  set_builtin_decl (fncode, fndecl, true);
+
+  if (TARGET_DEBUG_BUILTIN)
+    fprintf (stderr, "create complex %s, fncode: %d\n", name, (int) fncode);
+
+  return;
+}
+
 /* Set up IEEE 128-bit floating point routines.  Use different names if the
    arguments can be passed in a vector register.  The historical PowerPC
    implementation of IEEE 128-bit floating point used _q_<op> for the names, so
@@ -10977,6 +11000,32 @@ init_float128_ieee (machine_mode mode)
 {
   if (FLOAT128_VECTOR_P (mode))
     {
+      static bool complex_muldiv_init_p = false;
+
+      /* Set up to call __mulkc3 and __divkc3 under -mabi=ieeelongdouble.  If
+	 we have clone or target attributes, this will be called a second
+	 time.  We want to create the built-in function only once.  */
+     if (mode == TFmode && TARGET_IEEEQUAD && !complex_muldiv_init_p)
+       {
+	 complex_muldiv_init_p = true;
+	 built_in_function fncode_mul =
+	   (built_in_function) (BUILT_IN_COMPLEX_MUL_MIN + TCmode
+				- MIN_MODE_COMPLEX_FLOAT);
+	 built_in_function fncode_div =
+	   (built_in_function) (BUILT_IN_COMPLEX_DIV_MIN + TCmode
+				- MIN_MODE_COMPLEX_FLOAT);
+
+	 tree fntype = build_function_type_list (complex_long_double_type_node,
+						 long_double_type_node,
+						 long_double_type_node,
+						 long_double_type_node,
+						 long_double_type_node,
+						 NULL_TREE);
+
+	 create_complex_muldiv ("__mulkc3", fncode_mul, fntype);
+	 create_complex_muldiv ("__divkc3", fncode_div, fntype);
+       }
+
       set_optab_libfunc (add_optab, mode, "__addkf3");
       set_optab_libfunc (sub_optab, mode, "__subkf3");
       set_optab_libfunc (neg_optab, mode, "__negkf2");
@@ -11066,11 +11115,10 @@ rs6000_init_libfuncs (void)
 {
   /* __float128 support.  */
   if (TARGET_FLOAT128_TYPE)
-    init_float128_ieee (KFmode);
-
-  /* __ibm128 support.  */
-  if (TARGET_IBM128)
-    init_float128_ibm (IFmode);
+    {
+      init_float128_ibm (IFmode);
+      init_float128_ieee (KFmode);
+    }
 
   /* AIX/Darwin/64-bit Linux quad floating point routines.  */
   if (TARGET_LONG_DOUBLE_128)
@@ -23704,9 +23752,7 @@ rs6000_scalar_mode_supported_p (scalar_mode mode)
 
   if (DECIMAL_FLOAT_MODE_P (mode))
     return default_decimal_float_supported_p ();
-  else if (TARGET_FLOAT128_TYPE && mode == KFmode)
-    return true;
-  else if (TARGET_IBM128 && mode == IFmode)
+  else if (TARGET_FLOAT128_TYPE && (mode == KFmode || mode == IFmode))
     return true;
   else
     return default_scalar_mode_supported_p (mode);
@@ -23724,8 +23770,13 @@ rs6000_libgcc_floating_mode_supported_p (scalar_float_mode mode)
     case E_TFmode:
       return true;
 
+      /* We only return true for KFmode if IEEE 128-bit types are supported, and
+	 if long double does not use the IEEE 128-bit format.  If long double
+	 uses the IEEE 128-bit format, it will use TFmode and not KFmode.
+	 Because the code will not use KFmode in that case, there will be aborts
+	 because it can't find KFmode in the Floatn types.  */
     case E_KFmode:
-      return TARGET_FLOAT128_TYPE;
+      return TARGET_FLOAT128_TYPE && !TARGET_IEEEQUAD;
 
     default:
       return false;
@@ -23759,7 +23810,7 @@ rs6000_floatn_mode (int n, bool extended)
 
 	case 64:
 	  if (TARGET_FLOAT128_TYPE)
-	    return KFmode;
+	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
 	  else
 	    return opt_scalar_float_mode ();
 
@@ -23783,7 +23834,7 @@ rs6000_floatn_mode (int n, bool extended)
 
 	case 128:
 	  if (TARGET_FLOAT128_TYPE)
-	    return KFmode;
+	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
 	  else
 	    return opt_scalar_float_mode ();
 
@@ -23798,11 +23849,18 @@ rs6000_floatn_mode (int n, bool extended)
 static machine_mode
 rs6000_c_mode_for_suffix (char suffix)
 {
-  if (TARGET_FLOAT128_TYPE && (suffix == 'q' || suffix == 'Q'))
-    return TYPE_MODE (float128_type_node);
+  if (TARGET_FLOAT128_TYPE)
+    {
+      if (suffix == 'q' || suffix == 'Q')
+	return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
 
-  if (TARGET_IBM128 && (suffix == 'w' || suffix == 'W'))
-    return TYPE_MODE (ibm128_float_type_node);
+      /* At the moment, we are not defining a suffix for IBM extended double.
+	 If/when the default for -mabi=ieeelongdouble is changed, and we want
+	 to support __ibm128 constants in legacy library code, we may need to
+	 re-evalaute this decision.  Currently, c-lex.cc only supports 'w' and
+	 'q' as machine dependent suffixes.  The x86_64 port uses 'w' for
+	 __float80 constants.  */
+    }
 
   return VOIDmode;
 }
@@ -27912,25 +27970,6 @@ rs6000_starting_frame_offset (void)
   return RS6000_STARTING_FRAME_OFFSET;
 }
 
-/* Internal function to return the built-in function id for the complex
-   multiply operation for a given mode.  */
-
-static inline built_in_function
-complex_multiply_builtin_code (machine_mode mode)
-{
-  return (built_in_function) (BUILT_IN_COMPLEX_MUL_MIN + mode
-			      - MIN_MODE_COMPLEX_FLOAT);
-}
-
-/* Internal function to return the built-in function id for the complex divide
-   operation for a given mode.  */
-
-static inline built_in_function
-complex_divide_builtin_code (machine_mode mode)
-{
-  return (built_in_function) (BUILT_IN_COMPLEX_DIV_MIN + mode
-			      - MIN_MODE_COMPLEX_FLOAT);
-}
 
 /* On 64-bit Linux and Freebsd systems, possibly switch the long double library
    function names from <foo>l to <foo>f128 if the default long double type is
@@ -27949,54 +27988,11 @@ complex_divide_builtin_code (machine_mode mode)
    only do this transformation if the __float128 type is enabled.  This
    prevents us from doing the transformation on older 32-bit ports that might
    have enabled using IEEE 128-bit floating point as the default long double
-   type.
-
-   We also use the TARGET_MANGLE_DECL_ASSEMBLER_NAME hook to change the
-   function names used for complex multiply and divide to the appropriate
-   names.  */
+   type.  */
 
 static tree
 rs6000_mangle_decl_assembler_name (tree decl, tree id)
 {
-  /* Handle complex multiply/divide.  For IEEE 128-bit, use __mulkc3 or
-     __divkc3 and for IBM 128-bit use __multc3 and __divtc3.  */
-  if ((TARGET_FLOAT128_TYPE || TARGET_IBM128)
-      && !building_libgcc
-      && TREE_CODE (decl) == FUNCTION_DECL
-      && DECL_IS_UNDECLARED_BUILTIN (decl)
-      && DECL_BUILT_IN_CLASS (decl) == BUILT_IN_NORMAL)
-    {
-      built_in_function id = DECL_FUNCTION_CODE (decl);
-      const char *newname = NULL;
-
-      if (id == complex_multiply_builtin_code (KCmode))
-	newname = "__mulkc3";
-
-      else if (id == complex_multiply_builtin_code (ICmode))
-	newname = "__multc3";
-
-      else if (id == complex_multiply_builtin_code (TCmode))
-	newname = (TARGET_IEEEQUAD) ? "__mulkc3" : "__multc3";
-
-      else if (id == complex_divide_builtin_code (KCmode))
-	newname = "__divkc3";
-
-      else if (id == complex_divide_builtin_code (ICmode))
-	newname = "__divtc3";
-
-      else if (id == complex_divide_builtin_code (TCmode))
-	newname = (TARGET_IEEEQUAD) ? "__divkc3" : "__divtc3";
-
-      if (newname)
-	{
-	  if (TARGET_DEBUG_BUILTIN)
-	    fprintf (stderr, "Map complex mul/div => %s\n", newname);
-
-	  return get_identifier (newname);
-	}
-    }
-
-  /* Map long double built-in functions if long double is IEEE 128-bit.  */
   if (TARGET_FLOAT128_TYPE && TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128
       && TREE_CODE (decl) == FUNCTION_DECL
       && DECL_IS_UNDECLARED_BUILTIN (decl)

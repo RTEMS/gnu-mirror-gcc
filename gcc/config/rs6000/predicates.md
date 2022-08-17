@@ -119,31 +119,6 @@
   return VSX_REGNO_P (REGNO (op));
 })
 
-;; Return 1 if op is an IEEE 128-bit floating point type that is in a
-;; traditional Altivec register in order to do one of the IEEE 128-bit hardware
-;; instructions.  We allow the operand to be converted from a mode that also
-;; supports IEEE 128-bit.
-(define_predicate "ieee128_operand"
-  (match_code "reg,subreg,float_extend,float_truncate")
-{
-  if (mode == VOIDmode)
-    mode = GET_MODE (op);
-
-  if (!FLOAT128_IEEE_P (mode))
-    return 0;
-
-  /* Allow conversions from another IEEE 128-bit mode.  */
-  if (GET_CODE (op) == FLOAT_EXTEND || GET_CODE (op) == FLOAT_TRUNCATE)
-    {
-      op = XEXP (op, 0);
-      mode = GET_MODE (op);
-      if (!FLOAT128_IEEE_P (mode))
-	return 0;
-    }
-
-  return altivec_register_operand (op, mode);
-})
-
 ;; Return 1 if op is a vector register that operates on floating point vectors
 ;; (either altivec or VSX).
 (define_predicate "vfloat_operand"
