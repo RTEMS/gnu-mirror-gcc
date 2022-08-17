@@ -1,5 +1,76 @@
 ==================== work098, patch #9 was reverted.
 
+Add 'w' suffix for __ibm128 constants.
+
+In the documentation, we mention that 'w' or 'W' can be used as a suffix for
+__ibm128 constants.  We never implemented this.  This patch fixes that.
+
+In addition, the 'q' and 'Q' suffix were changed to use the mode used for the
+__float128 type, instead of knowing whether to use KFmode or TFmode explicitly.
+This will be used in a future patch where we change the mode used for __float128
+on systems where long double is IEEE 128-bit.
+
+2022-08-17   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_c_mode_for_suffix): Allow 'w' or 'W'
+	for __ibm128 constants.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/ibm128-suffix.c: New test.
+
+==================== work098, patch #9 was reverted.
+
+Allow __ibm128 with -msoft-float (PR target/105334)
+
+This patch allows __ibm128 to be used on systems with software floating point
+enabled.  Previously, we required hardware floating point to be enabled to use
+__ibm128 keyword and the __ibm128 built-in functions.  This patch fixes PR
+target/105334.
+
+2022-08-17   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/105334
+	* config/rs6000/rs6000.cc (init_float128_ibm): Do not require hardware
+	floating point for the IBM 128-bit floating point comparison functions.
+	* config/rs6000/rs6000.h (FLOAT128_IBM_P): Do not require hardware
+	floating point to enable recognizing IBM 128-bit floating point modes.
+
+==================== work098, patch #10
+
+Allow __ibm128 even if IEEE 128-bit floating point is not supported.
+
+This set of patches changes the GCC compiler to allow the use of the __ibm128
+keyword if we have IEEE 128-bit floating point support enabled or if long double
+is 128-bits.
+
+2022-08-17   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.cc (rs6000_init_builtins): Enable using
+	the__ibm128 keyword on systems that either use the 128-bit IBM long
+	double format for long double or support IEEE 128-bit.
+	* config/rs6000/rs6000.cc (rs6000_init_libfuncs): Create IBM 128-bit
+	floating point support functions on systems that support the __ibm128
+	keyword.
+	(rs6000_scalar_mode_supported_p): Likewise.
+	* config/rs6000/rs6000.h (TARGET_IBM128): New macro.
+	* config/rs6000/rs6000.md (@extenddf<mode>2_fprs): Allow IFmode to be
+	converted even if long double is not 128-bits.
+	(extenddf<mode>2_vsx): Likewise.
+	(extendiftf2):Allow conversion on systems that support the __ibm128
+	keyword.
+	(extendtfif2): Likewise.
+	(trunciftf2): Likewise.
+	(trunctfif2): Likewise.
+
+==================== work098, patch #9 was reverted.
+
 ==================== work098, patch #8 was reverted.
 
 ==================== work098, patch #7 was reverted.
