@@ -23806,7 +23806,7 @@ rs6000_c_mode_for_suffix (char suffix)
   if (TARGET_FLOAT128_TYPE && (suffix == 'q' || suffix == 'Q'))
     return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
 
-  if (TARGET_IBM128 && (suffix == 'q' || suffix == 'Q'))
+  if (TARGET_IBM128 && (suffix == 'w' || suffix == 'W'))
     return (FLOAT128_IBM_P (TFmode)) ? TFmode : IFmode;
 
   return VOIDmode;
