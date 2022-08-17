@@ -1,3 +1,32 @@
+==================== work098, patch #5
+
+Improve converting between 128-bit modes that use the same format.
+
+This patch improves the insns used for converting between two modes using
+the 128-bit floating point format (i.e. converting between KFmode and TFmode if
+-mabi=ieeelongdouble is used, and converting between IFmode and TFmode if
+-mabi=ibmlongdouble is used).  The new insns have the correct insn type and
+instruction length for the move involved.
+
+2022-08-10   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.md (IFKF): Delete.
+	(IFKF_reg): Delete.
+	(extendkfif2): New define_expand.
+	(trunckfif2): New define_expand.
+	(extend<mode>tf2_internal): Split into extendiftf2_internal and
+	extendkftf2_internal.  Update the insns to use the correct insn type and
+	length attributes based on whether KFmode or IFmode is used.
+	(extendiftf2_internal): Likewise.
+	(extendkftf2_internal): Likewise.
+	(extendtf<mode>2_internal): Split into extendtfif2_internal and
+	extendtfkf2_internal.  Update the insns to use the correct insn type and
+	length attributes based on whether KFmode or IFmode is used.
+	(extendtfif2_internal): Likewise.
+	(extendtfkf2_internal): Likewise.
+
 ==================== work098, patch #4
 
 Rework 128-bit complex multiply and divide.
