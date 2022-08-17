@@ -1,3 +1,26 @@
+==================== work098, patch #8
+
+Update switching between equivalent 128-bit FP in builtins
+
+This patch looks to see if the caller function was passed TFmode.  If it was
+passed TFmode and the built-in function uses KFmode, switch the built-in
+function to the equivalent TFmode built-in.  Similarly, if it was passed TFmode
+and the built-in functions uses IFmode, switch the built-in function to the
+equivalent TFmode built-in.
+
+In the past the code would do the conversion based on what 128-bit floating
+point format was used.  This patch changes this to look at the 	arguments.  If
+any of the arguments use TFmode instead of KFmode or IFmode, it will do the
+conversion.
+
+2022-08-17   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_expand_builtin): Update
+	switching from KFmode/IFmode built-in functions to TFmode built-in
+	functions.
+
 ==================== work098, patch #7
 
 Add ibm128_operand.
