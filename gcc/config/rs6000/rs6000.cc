@@ -23849,18 +23849,11 @@ rs6000_floatn_mode (int n, bool extended)
 static machine_mode
 rs6000_c_mode_for_suffix (char suffix)
 {
-  if (TARGET_FLOAT128_TYPE)
-    {
-      if (suffix == 'q' || suffix == 'Q')
-	return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
+  if (TARGET_FLOAT128_TYPE && (suffix == 'q' || suffix == 'Q'))
+    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
 
-      /* At the moment, we are not defining a suffix for IBM extended double.
-	 If/when the default for -mabi=ieeelongdouble is changed, and we want
-	 to support __ibm128 constants in legacy library code, we may need to
-	 re-evalaute this decision.  Currently, c-lex.cc only supports 'w' and
-	 'q' as machine dependent suffixes.  The x86_64 port uses 'w' for
-	 __float80 constants.  */
-    }
+  if (TARGET_IBM128 && (suffix == 'q' || suffix == 'Q'))
+    return (FLOAT128_IBM_P (TFmode)) ? TFmode : IFmode;
 
   return VOIDmode;
 }
