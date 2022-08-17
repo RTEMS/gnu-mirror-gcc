@@ -3243,13 +3243,13 @@ htm_expand_builtin (bifdata *bifaddr, rs6000_gen_builtins fcode,
 
 /* Expand an expression EXP that calls a built-in function,
    with result going to TARGET if that's convenient
-   (and in mode MODE if that's convenient).
+   (and in mode RESULT_MODE if that's convenient).
    SUBTARGET may be used as the target for computing one of EXP's operands.
    IGNORE is nonzero if the value is to be ignored.
    Use the new builtin infrastructure.  */
 rtx
 rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
-		       machine_mode /* mode */, int ignore)
+		       machine_mode result_mode, int ignore)
 {
   tree fndecl = TREE_OPERAND (CALL_EXPR_FN (exp), 0);
   enum rs6000_gen_builtins fcode
@@ -3257,22 +3257,10 @@ rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
   size_t uns_fcode = (size_t)fcode;
   enum insn_code icode = rs6000_builtin_info[uns_fcode].icode;
 
-  /* TODO: The following commentary and code is inherited from the original
-     builtin processing code.  The commentary is a bit confusing, with the
-     intent being that KFmode is always IEEE-128, IFmode is always IBM
-     double-double, and TFmode is the current long double.  The code is
-     confusing in that it converts from KFmode to TFmode pattern names,
-     when the other direction is more intuitive.  Try to address this.  */
-
-  /* We have two different modes (KFmode, TFmode) that are the IEEE
-     128-bit floating point type, depending on whether long double is the
-     IBM extended double (KFmode) or long double is IEEE 128-bit (TFmode).
-     It is simpler if we only define one variant of the built-in function,
-     and switch the code when defining it, rather than defining two built-
-     ins and using the overload table in rs6000-c.cc to switch between the
-     two.  If we don't have the proper assembler, don't do this switch
-     because CODE_FOR_*kf* and CODE_FOR_*tf* will be CODE_FOR_nothing.  */
-  if (FLOAT128_IEEE_P (TFmode))
+  /* If we have a KFmode built-in function and we want TFmode because long
+     double uses the IEEE 128-bit format, we have to convert the KFmode
+     built-in to the similar TFmode built-in.  */
+  if (result_mode == TFmode && FLOAT128_IEEE_P (TFmode))
     switch (icode)
       {
       case CODE_FOR_sqrtkf2_odd:
@@ -3329,6 +3317,15 @@ rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
       default:
 	break;
       }
+
+  /* If we have a IFmode built-in function, we might need to map that built-in
+     function to use TFmode instead of IFmode.  */
+  if (result_mode == TFmode && icode == CODE_FOR_packif)
+    icode = CODE_FOR_packtf;
+
+  else if (icode == CODE_FOR_unpackif
+	   && TYPE_MODE (TREE_TYPE (CALL_EXPR_ARG (exp, 0))) == TFmode)
+    icode = CODE_FOR_unpacktf;
 
   /* In case of "#pragma target" changes, we initialize all builtins
      but check for actual availability now, during expand time.  For
@@ -3447,22 +3444,6 @@ rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
 	icode = CODE_FOR_vctzlsbb_v8hi;
       else
 	gcc_unreachable ();
-    }
-
-  if (bif_is_ibm128 (*bifaddr) && TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD)
-    {
-      if (fcode == RS6000_BIF_PACK_IF)
-	{
-	  icode = CODE_FOR_packtf;
-	  fcode = RS6000_BIF_PACK_TF;
-	  uns_fcode = (size_t) fcode;
-	}
-      else if (fcode == RS6000_BIF_UNPACK_IF)
-	{
-	  icode = CODE_FOR_unpacktf;
-	  fcode = RS6000_BIF_UNPACK_TF;
-	  uns_fcode = (size_t) fcode;
-	}
     }
 
   /* TRUE iff the built-in function returns void.  */
@@ -3617,7 +3598,21 @@ rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
 
   for (int i = 0; i < nargs; i++)
     if (!insn_data[icode].operand[i+k].predicate (op[i], mode[i+k]))
-      op[i] = copy_to_mode_reg (mode[i+k], op[i]);
+      {
+	/* copy_to_mode_reg will abort if the mode we want to copy to is
+	   different from the operand.  If the modes are different, do a
+	   convert instead of copy.  This can show up if we are wanting KFmode
+	   and we get a TFmode when long double uses the IEEE 128-bit
+	   encoding.  */
+	if (GET_MODE (op[i]) != mode[i+k])
+	  {
+	    rtx tmp = gen_reg_rtx (mode[i+k]);
+	    convert_move (tmp, op[i], 0);
+	    op[i] = tmp;
+	  }
+	else
+	  op[i] = copy_to_mode_reg (mode[i+k], op[i]);
+      }
 
   rtx pat;
 
