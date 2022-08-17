@@ -1,3 +1,65 @@
+==================== work098, patch #4
+
+Rework 128-bit complex multiply and divide.
+
+This function reworks how the complex multiply and divide built-in functions are
+done.  Previously we created built-in declarations for doing long double complex
+multiply and divide when long double is IEEE 128-bit.  The old code also did not
+support __ibm128 complex multiply and divide if long double is IEEE 128-bit.
+
+In terms of history, I wrote the original code just as I was starting to test
+GCC on systems where IEEE 128-bit long double was the default.  At the time, we
+had not yet started mangling the built-in function names as a way to bridge
+going from a system with 128-bit IBM long double to 128-bin IEEE long double.
+
+The original code depends on there only being two 128-bit types invovled.  With
+some of the changes that I plan on making, this assumption will no longer be
+true in the future.
+
+The problem is we cannot create two separate built-in functions that resolve to
+the same name.  This is a requirement of add_builtin_function and the C front
+end.  That means for the 3 possible modes (IFmode, KFmode, and TFmode), you can
+only use 2 of them.
+
+This code does not create the built-in declaration with the changed name.
+Instead, it uses the TARGET_MANGLE_DECL_ASSEMBLER_NAME hook to change the name
+before it is written out to the assembler file like it now does for all of the
+other long double built-in functions.
+
+We need to disable using this mapping when we are building libgcc, which is
+creating the multiply and divide functions.  The flag that is used when libgcc
+is built (-fbuilding-libcc) is only available in the C/C++ front ends.  We need
+to remember that we are building libgcc in the rs6000-c.cc support to be able to
+use this later to decided whether to mangle the decl assembler name or not.
+
+When I wrote these patches, I discovered that __ibm128 complex multiply and
+divide had originally not been supported if long double is IEEE 128-bit as it
+would generate calls to __mulic3 and __divic3.  I added tests in the testsuite
+to verify that the correct name (i.e. __multc3 and __divtc3) is used in this
+case.
+
+2022-08-16   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-c.cc (rs6000_cpu_cpp_builtins): Set
+	building_libgcc.
+	* config/rs6000/rs6000.cc (create_complex_muldiv): Delete.
+	(init_float128_ieee): Delete code to switch complex multiply and divide
+	for long double.
+	(complex_multiply_builtin_code): New helper function.
+	(complex_divide_builtin_code): Likewise.
+	(rs6000_mangle_decl_assembler_name): Add support for mangling the name
+	of complex 128-bit multiply and divide built-in functions.
+	* config/rs6000/rs6000.opt (building_libgcc): New target variable.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/divic3-1.c: New test.
+	* gcc.target/powerpc/divic3-2.c: Likewise.
+	* gcc.target/powerpc/mulic3-1.c: Likewise.
+	* gcc.target/powerpc/mulic3-2.c: Likewise.
+
 ==================== work098, patch #3
 
 Add 'w' suffix for __ibm128 constants.
