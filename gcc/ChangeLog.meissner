@@ -1,3 +1,18 @@
+==================== work098, patch #9
+
+Make __float128 use the _Float128 type.
+
+2022-08-17   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_init_builtins): Always use the
+	_Float128 type for __float128.  Don't use the long double type.
+	* config/rs6000/rs6000.cc (rs6000_libgcc_floating_mode_supported_p):
+	Always use KFmode for Float128 mode.
+	(rs6000_floatn_mode): Likewise.
+	(rs6000_c_mode_for_suffix): Likewise.
+
 ==================== work098, patch #8
 
 Update switching between equivalent 128-bit FP in builtins
