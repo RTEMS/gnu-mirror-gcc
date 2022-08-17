@@ -1,3 +1,57 @@
+==================== work098, patch #7
+
+Add ibm128_operand.
+
+Since we have 2 modes for IBM 128-bit (IFmode and TFmode if long double is IBM
+128-bit), this patch provides a new predicate (ibm128_operand) that allows
+combining a conversion from one mode to another.
+
+2022-08-17   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/predicates.md (ibm128_operand): New predicate.
+	* config/rs6000/rs6000.md (extendiftf2_internal): Add GPR registers in
+	case -msoft-float is used.
+	(extendtfif2_internal): Likewise.
+	(unpack<mode>): Use ibm128_operand.
+	(unpack<mode>_dm): Likewise.
+	(unpack<mode>_nodm): Likewise.
+
+==================== work098, patch #5
+
+Add ieee128_operand.
+
+Since we have 2 modes for IEEE 128-bit (KFmode and TFmode if long double is IEEE
+128-bit), this patch provides a new predicate (ieee128_operand) that allows
+combining a conversion from one mode to another.
+
+2022-08-17   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/predicates.md (ieee128_operand): New predicate.
+	* config/rs6000/rs6000.md (trunc<mode>sf2_hw): Use ieee128_operand.
+	(round<mode>2): Likewise.
+	(add<mode>3_odd): Likewise.
+	(sub<mode>3_odd): Likewise.
+	(mul<mode>3_odd): Likewise.
+	(div<mode>3_odd): Likewise.
+	(sqrt<mode>2_odd): Likewise.
+	(fma<mode>4_odd): Likewise.
+	(fms<mode>4_odd): Likewise.
+	(nfma<mode>4_odd): Likewise.
+	(nfms<mode>4_odd): Likewise.
+	(trunc<mode>df2_odd): Likewise.
+	* config/rs6000/vsx.md (xsxexpqp_<mode>): Likewise.
+	(xsxsigqp_<mode>): Likewise.
+	(xsiexpqpf_<mode>): Likewise.
+	(xscmpexpqp_<code>_<mode): Likewise.
+	(xscmpexpqp_<code>_<mode>): Likewise.
+	(xststdcqp_<mode>): Likewise.
+	(xststdcnegqp_<mode>): Likewise.
+	(xststdcqp_<mode>): Likewise.
+
 ==================== work098, patch #5
 
 Improve converting between 128-bit modes that use the same format.
@@ -8,7 +62,7 @@ the 128-bit floating point format (i.e. converting between KFmode and TFmode if
 -mabi=ibmlongdouble is used).  The new insns have the correct insn type and
 instruction length for the move involved.
 
-2022-08-10   Michael Meissner  <meissner@linux.ibm.com>
+2022-08-17   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -67,7 +121,7 @@ would generate calls to __mulic3 and __divic3.  I added tests in the testsuite
 to verify that the correct name (i.e. __multc3 and __divtc3) is used in this
 case.
 
-2022-08-16   Michael Meissner  <meissner@linux.ibm.com>
+2022-08-17   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -96,7 +150,7 @@ Add 'w' suffix for __ibm128 constants.
 In the documentation, we mention that 'w' or 'W' can be used as a suffix for
 __ibm128 constants.  We never implemented this.  This patch fixes that.
 
-2022-08-16   Michael Meissner  <meissner@linux.ibm.com>
+2022-08-17   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -117,7 +171,7 @@ the __builtin_pack_ibm128 and __builtin_unpack_libm128 built-in functions.  This
 fixes PR target/105334.
 
 
-2022-08-16   Michael Meissner  <meissner@linux.ibm.com>
+2022-08-17   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -147,7 +201,7 @@ This set of patches changes the GCC compiler to allow the use of the __ibm128
 keyword if we have IEEE 128-bit floating point support enabled or if long double
 is 128-bits.
 
-2022-08-16   Michael Meissner  <meissner@linux.ibm.com>
+2022-08-17   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
