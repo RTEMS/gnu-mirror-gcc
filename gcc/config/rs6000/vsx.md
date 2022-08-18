@@ -5087,7 +5087,7 @@
 ;; VSX Scalar Extract Exponent Quad-Precision
 (define_insn "xsxexpqp_<mode>"
   [(set (match_operand:DI 0 "altivec_register_operand" "=v")
-	(unspec:DI [(match_operand:IEEE128 1 "ieee128_operand" "v")]
+	(unspec:DI [(match_operand:IEEE128 1 "altivec_register_operand" "v")]
 	 UNSPEC_VSX_SXEXPDP))]
   "TARGET_P9_VECTOR"
   "xsxexpqp %0,%1"
@@ -5105,7 +5105,7 @@
 ;; VSX Scalar Extract Significand Quad-Precision
 (define_insn "xsxsigqp_<mode>"
   [(set (match_operand:TI 0 "altivec_register_operand" "=v")
-	(unspec:TI [(match_operand:IEEE128 1 "ieee128_operand" "v")]
+	(unspec:TI [(match_operand:IEEE128 1 "altivec_register_operand" "v")]
 	 UNSPEC_VSX_SXSIG))]
   "TARGET_P9_VECTOR"
   "xsxsigqp %0,%1"
@@ -5124,7 +5124,7 @@
 (define_insn "xsiexpqpf_<mode>"
   [(set (match_operand:IEEE128 0 "altivec_register_operand" "=v")
 	(unspec:IEEE128
-	 [(match_operand:IEEE128 1 "ieee128_operand" "v")
+	 [(match_operand:IEEE128 1 "altivec_register_operand" "v")
 	  (match_operand:DI 2 "altivec_register_operand" "v")]
 	 UNSPEC_VSX_SIEXPQP))]
   "TARGET_P9_VECTOR"
@@ -5200,8 +5200,8 @@
   [(set (match_dup 3)
 	(compare:CCFP
 	 (unspec:IEEE128
-	  [(match_operand:IEEE128 1 "ieee128_operand" "v")
-	   (match_operand:IEEE128 2 "ieee128_operand" "v")]
+	  [(match_operand:IEEE128 1 "vsx_register_operand" "v")
+	   (match_operand:IEEE128 2 "vsx_register_operand" "v")]
 	  UNSPEC_VSX_SCMPEXPQP)
 	 (const_int 0)))
    (set (match_operand:SI 0 "register_operand" "=r")
@@ -5221,8 +5221,8 @@
 (define_insn "*xscmpexpqp"
   [(set (match_operand:CCFP 0 "cc_reg_operand" "=y")
 	(compare:CCFP
-	 (unspec:IEEE128 [(match_operand:IEEE128 1 "ieee128_operand" "v")
-		          (match_operand:IEEE128 2 "ieee128_operand" "v")]
+	 (unspec:IEEE128 [(match_operand:IEEE128 1 "altivec_register_operand" "v")
+		          (match_operand:IEEE128 2 "altivec_register_operand" "v")]
 	  UNSPEC_VSX_SCMPEXPQP)
 	 (match_operand:SI 3 "zero_constant" "j")))]
   "TARGET_P9_VECTOR"
@@ -5238,7 +5238,7 @@
   [(set (match_dup 3)
 	(compare:CCFP
 	 (unspec:IEEE128
-	  [(match_operand:IEEE128 1 "ieee128_operand" "v")
+	  [(match_operand:IEEE128 1 "altivec_register_operand" "v")
 	   (match_operand:SI 2 "u7bit_cint_operand" "n")]
 	  UNSPEC_VSX_STSTDC)
 	 (const_int 0)))
@@ -5276,7 +5276,7 @@
   [(set (match_dup 2)
 	(compare:CCFP
 	 (unspec:IEEE128
-	  [(match_operand:IEEE128 1 "ieee128_operand" "v")
+	  [(match_operand:IEEE128 1 "altivec_register_operand" "v")
 	   (const_int 0)]
 	  UNSPEC_VSX_STSTDC)
 	 (const_int 0)))
@@ -5310,7 +5310,7 @@
   [(set (match_operand:CCFP 0 "" "=y")
 	(compare:CCFP
 	 (unspec:IEEE128
-	  [(match_operand:IEEE128 1 "ieee128_operand" "v")
+	  [(match_operand:IEEE128 1 "altivec_register_operand" "v")
 	   (match_operand:SI 2 "u7bit_cint_operand" "n")]
 	  UNSPEC_VSX_STSTDC)
 	 (const_int 0)))]

@@ -23724,8 +23724,13 @@ rs6000_libgcc_floating_mode_supported_p (scalar_float_mode mode)
     case E_TFmode:
       return true;
 
+      /* We only return true for KFmode if IEEE 128-bit types are supported, and
+	 if long double does not use the IEEE 128-bit format.  If long double
+	 uses the IEEE 128-bit format, it will use TFmode and not KFmode.
+	 Because the code will not use KFmode in that case, there will be aborts
+	 because it can't find KFmode in the Floatn types.  */
     case E_KFmode:
-      return TARGET_FLOAT128_TYPE;
+      return TARGET_FLOAT128_TYPE && !TARGET_IEEEQUAD;
 
     default:
       return false;
@@ -23759,7 +23764,7 @@ rs6000_floatn_mode (int n, bool extended)
 
 	case 64:
 	  if (TARGET_FLOAT128_TYPE)
-	    return KFmode;
+	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
 	  else
 	    return opt_scalar_float_mode ();
 
@@ -23783,7 +23788,7 @@ rs6000_floatn_mode (int n, bool extended)
 
 	case 128:
 	  if (TARGET_FLOAT128_TYPE)
-	    return KFmode;
+	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
 	  else
 	    return opt_scalar_float_mode ();
 
