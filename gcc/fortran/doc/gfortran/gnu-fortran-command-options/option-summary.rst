@@ -71,7 +71,7 @@ by type.  Explanations are in the following sections.
 *Link Options*
   See :ref:`link-options`.
 
-  :option:`-static-libgfortran`
+  :option:`-static-libgfortran`  :option:`-static-libquadmath`
 
 *Runtime Options*
   See :ref:`runtime-options`.

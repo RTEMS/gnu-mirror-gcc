@@ -399,8 +399,8 @@ source code it should not be quoted.
 Spelling and Terminology
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-See the `terminology and markup <https://gcc.gnu.org/codingconventions.html#Spelling
-Spelling>`_ section of the GCC coding conventions.
+See the `Spelling, terminology and markup <https://gcc.gnu.org/codingconventions.html#Spelling>`_
+section of the GCC coding conventions.
 
 .. index:: fix-it hints, diagnostics guidelines, fix-it hints
 

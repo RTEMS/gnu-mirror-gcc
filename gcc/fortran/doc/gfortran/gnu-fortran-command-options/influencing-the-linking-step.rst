@@ -22,3 +22,16 @@ a link step.
   library, this option forces the use of the static version. If no
   shared version of :samp:`libgfortran` was built when the compiler was
   configured, this option has no effect.
+
+.. index:: static-libquadmath
+
+.. option:: -static-libquadmath
+
+  On systems that provide :samp:`libquadmath` as a shared and a static
+  library, this option forces the use of the static version. If no
+  shared version of :samp:`libquadmath` was built when the compiler was
+  configured, this option has no effect.
+
+  Please note that the :samp:`libquadmath` runtime library is licensed under the
+  GNU Lesser General Public License (LGPL), and linking it statically introduces
+  requirements when redistributing the resulting binaries.

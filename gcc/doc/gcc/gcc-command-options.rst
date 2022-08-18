@@ -7,6 +7,9 @@
 
 .. _invoking-gcc:
 
+GCC Command Options
+--------------------
+
 .. only:: man
 
   Synopsis

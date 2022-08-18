@@ -3874,6 +3874,14 @@ section includes experimental options that may produce broken code.
     Maximum number of statements allowed in a block that needs to be
     duplicated when threading jumps.
 
+  .. gcc-param:: max-jump-thread-paths
+
+    The maximum number of paths to consider when searching for jump threading
+    opportunities.  When arriving at a block, incoming edges are only considered
+    if the number of paths to be searched so far multiplied by the number of
+    incoming edges does not exhaust the specified maximum number of paths to
+    consider.
+
   .. gcc-param:: max-fields-for-field-sensitive
 
     Maximum number of fields in a structure treated in
@@ -4457,10 +4465,6 @@ section includes experimental options that may produce broken code.
 
     Maximum number of instructions to copy when duplicating blocks on a
     finite state automaton jump thread path.
-
-  .. gcc-param:: max-fsm-thread-length
-
-    Maximum number of basic blocks on a jump thread path.
 
   .. gcc-param:: threader-debug
 

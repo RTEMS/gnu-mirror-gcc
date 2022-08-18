@@ -21,9 +21,6 @@ contact their makers.
 
 * AIX:
 
-  * `Bull's Open Source Software Archive for
-    for AIX 6 and AIX 7 <http://www.bullfreeware.com>`_;
-
   * `AIX Open Source Packages (AIX5L AIX 6.1
     AIX 7.1) <http://www.perzl.org/aix/>`_.
 

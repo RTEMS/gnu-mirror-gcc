@@ -324,6 +324,13 @@ Here are macros for DWARF output.
   :start-after: [TARGET_DWARF_CALLING_CONVENTION]
   :end-before: [TARGET_DWARF_CALLING_CONVENTION]
 
+
+.. function:: int TARGET_DWARF_CALLING_CONVENTION (const_tree function)
+
+  Define this to enable the dwarf attribute ``DW_AT_calling_convention`` to
+  be emitted for each function.  Instead of an integer return the enum
+  value for the ``DW_CC_`` tag.
+
 .. c:macro:: DWARF2_FRAME_INFO
 
   Define this macro to a nonzero value if GCC should always output

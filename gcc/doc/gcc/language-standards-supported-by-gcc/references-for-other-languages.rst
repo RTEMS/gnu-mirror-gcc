@@ -9,5 +9,5 @@ References for Other Languages
 See :ref:`gnat_rm:top`, for information on standard
 conformance and compatibility of the Ada compiler.
 
-See :ref:`fortran:standards`, for details
+See :ref:`gfortran:standards`, for details
 of standards supported by GNU Fortran.

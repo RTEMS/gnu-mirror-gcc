@@ -21,6 +21,7 @@ gcov-dump---an Offline Gcda and Gcno Profile Dump Tool
        [ :option:`-l` | :option:`--long` ]
        [ :option:`-p` | :option:`--positions` ]
        [ :option:`-r` | :option:`--raw` ]
+       [ :option:`-s` | :option:`--stable` ]
        [ :samp:`{gcovfiles}` ]
 
 .. only:: not man
@@ -54,6 +55,10 @@ Options
 .. option:: -r, --raw
 
   Print content records in raw format.
+
+.. option:: -s, --stable
+
+  Print content in stable format usable for comparison.
 
 .. option:: -v, --version
 

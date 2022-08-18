@@ -34,7 +34,7 @@ found in the following sections of the documentation.
 
 Additionally, the GNU Fortran compilers supports the OpenMP specification
 (version 4.5 and partial support of the features of the 5.0 version,
-https://openmp.org/openmp-specifications/).
+https://openmp.org/specifications/).
 There also is support for the OpenACC specification (targeting
 version 2.6, https://www.openacc.org/).  See
 https://gcc.gnu.org/wiki/OpenACC for more information.
