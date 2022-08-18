@@ -5292,13 +5292,17 @@ expand_assignment (tree to, tree from, bool nontemporal)
 	   != CODE_FOR_nothing)
 	  || targetm.slow_unaligned_access (mode, align)))
     {
-      rtx reg, mem;
+      rtx reg = NULL_RTX, from_rtx, mem;
 
-      reg = expand_expr (from, NULL_RTX, VOIDmode, EXPAND_NORMAL);
-      reg = force_not_mem (reg);
+      from_rtx = expand_expr (from, NULL_RTX, VOIDmode, EXPAND_NORMAL);
       mem = expand_expr (to, NULL_RTX, VOIDmode, EXPAND_WRITE);
-      if (TREE_CODE (to) == MEM_REF && REF_REVERSE_STORAGE_ORDER (to))
-	reg = flip_storage_order (mode, reg);
+
+      if (icode != CODE_FOR_nothing || !CAPABILITY_MODE_P (mode))
+	{
+	  reg = force_not_mem (from_rtx);
+	  if (TREE_CODE (to) == MEM_REF && REF_REVERSE_STORAGE_ORDER (to))
+	    reg = flip_storage_order (mode, reg);
+	}
 
       if (icode != CODE_FOR_nothing)
 	{
@@ -5309,6 +5313,22 @@ expand_assignment (tree to, tree from, bool nontemporal)
 	  /* The movmisalign<mode> pattern cannot fail, else the assignment
 	     would silently be omitted.  */
 	  expand_insn (icode, 2, ops);
+	}
+      else if (CAPABILITY_MODE_P (mode))
+	{
+	  push_temp_slots ();
+	  if (!MEM_P (from_rtx))
+	    {
+	      gcc_assert (TREE_CODE (to) != MEM_REF
+			  || !REF_REVERSE_STORAGE_ORDER (to));
+	      rtx temp_slot = assign_stack_temp (mode, GET_MODE_SIZE (mode));
+	      emit_move_insn (temp_slot, from_rtx);
+	      from_rtx = temp_slot;
+	    }
+	  emit_block_move (mem, from_rtx,
+			   gen_int_mode (GET_MODE_SIZE (mode), POmode),
+			   BLOCK_OP_NORMAL);
+	  pop_temp_slots ();
 	}
       else
 	store_bit_field (mem, GET_MODE_BITSIZE (mode), 0, 0, 0, mode, reg,
@@ -8790,6 +8810,38 @@ expand_misaligned_mem_ref (rtx temp, machine_mode mode, int unsignedp,
       create_fixed_operand (&ops[1], temp);
       expand_insn (icode, 2, ops);
       temp = ops[0].value;
+    }
+  else if (CAPABILITY_MODE_P (mode))
+    {
+      push_temp_slots ();
+
+      gcc_assert (MEM_P (temp));
+
+      rtx move_dst;
+      if (target
+	  && MEM_P (target)
+	  && MEM_ALIGN (target) >= GET_MODE_ALIGNMENT (mode))
+	move_dst = target;
+      else
+	move_dst = assign_stack_temp (mode, GET_MODE_SIZE (mode));
+
+      emit_block_move (move_dst, temp,
+		       gen_int_mode (GET_MODE_SIZE (mode), POmode),
+		       BLOCK_OP_NORMAL);
+
+      if (target == move_dst || (target && REG_P (target)))
+	{
+	  temp = target;
+	  if (alt_rtl)
+	    *alt_rtl = target;
+	}
+      else
+	temp = gen_reg_rtx (mode);
+
+      if (REG_P (temp))
+	emit_move_insn (temp, move_dst);
+
+      pop_temp_slots ();
     }
   else if (targetm.slow_unaligned_access (mode, align))
     temp = extract_bit_field (temp, GET_MODE_BITSIZE (mode),

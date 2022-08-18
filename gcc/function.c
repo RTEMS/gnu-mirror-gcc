@@ -3321,6 +3321,14 @@ assign_parm_setup_reg (struct assign_parm_data_all *all, tree parm,
 	       || targetm.slow_unaligned_access (promoted_nominal_mode,
 						 MEM_ALIGN (data->entry_parm))))
     {
+      /* It is believed this code path is unreachable with
+	 promoted_nominal_mode a capability mode.  If it
+	 becomes reachable, then we will need to use
+	 emit_block_move to handle that case, similar to
+	 other cases handling underalgined capability
+	 moves in expr.c.  */
+      gcc_assert (!CAPABILITY_MODE_P (promoted_nominal_mode));
+
       if (icode != CODE_FOR_nothing)
 	emit_insn (GEN_FCN (icode) (parmreg, validated_mem));
       else
