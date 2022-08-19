@@ -1,28 +1,4 @@
-==================== work098, patch #18
-
-Make __float128 use the _Float128 type.
-
-Currently GCC uses the long double type node for __float128 if long double is
-IEEE 128-bit.  It did not use the node for _Float128.
-
-This showed up if you call the nansq function to make a signaling NaN (nansq is
-mapped to nansf128).  Because the type node for _Float128 is different from
-__float128, the machine independent code converts signaling NaNs to quiet NaNs
-if the types are  not compatible.  The following tests used to fail when run on
-a system where long double is IEEE 128-bit:
-
-	gcc.dg/torture/float128-nan.c
-	gcc.target/powerpc/nan128-1.c
-
-This patch makes both __float128 and _Float128 use the same type node.
-
-
-2022-08-17   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/rs6000-builtin.cc (rs6000_init_builtins): Always use the
-	_Float128 type for __float128.  Don't use the long double type.
+==================== work098, patch #18 was reverted.
 
 ==================== work098, patch #17 was reverted.
 

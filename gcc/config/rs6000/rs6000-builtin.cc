@@ -733,7 +733,10 @@ rs6000_init_builtins (void)
 
   if (TARGET_FLOAT128_TYPE)
     {
-      ieee128_float_type_node = float128_type_node;
+      if (TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128)
+	ieee128_float_type_node = long_double_type_node;
+      else
+	ieee128_float_type_node = float128_type_node;
       t = build_qualified_type (ieee128_float_type_node, TYPE_QUAL_CONST);
       lang_hooks.types.register_builtin_type (ieee128_float_type_node,
 					      "__ieee128");
