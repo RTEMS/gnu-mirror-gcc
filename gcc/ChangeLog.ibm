@@ -1,3 +1,7 @@
+2022-08-19  Peter Bergner  <bergner@linux.ibm.com>
+
+	Merge up to releases/gcc-12 2d29d7b240d9ca87cbee5d90c846694125d293af
+
 2022-06-15  Peter Bergner  <bergner@linux.ibm.com>
 
 	Create ibm/gcc-12-branch which follows the releases/gcc-12 branch.

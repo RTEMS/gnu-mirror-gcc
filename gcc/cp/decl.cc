@@ -5474,7 +5474,8 @@ shadow_tag (cp_decl_specifier_seq *declspecs)
   if (!t)
     return NULL_TREE;
 
-  if (maybe_process_partial_specialization (t) == error_mark_node)
+  t = maybe_process_partial_specialization (t);
+  if (t == error_mark_node)
     return NULL_TREE;
 
   /* This is where the variables in an anonymous union are
@@ -6503,6 +6504,8 @@ reshape_init_array_1 (tree elt_type, tree max_index, reshape_iter *d,
       tree elt_init;
       constructor_elt *old_cur = d->cur;
 
+      if (d->cur->index)
+	CONSTRUCTOR_IS_DESIGNATED_INIT (new_init) = true;
       check_array_designated_initializer (d->cur, index);
       elt_init = reshape_init_r (elt_type, d,
 				 /*first_initializer_p=*/NULL_TREE,
@@ -6670,6 +6673,7 @@ reshape_init_class (tree type, reshape_iter *d, bool first_initializer_p,
 	    }
 	  else if (TREE_CODE (d->cur->index) == IDENTIFIER_NODE)
 	    {
+	      CONSTRUCTOR_IS_DESIGNATED_INIT (new_init) = true;
 	      field = get_class_binding (type, d->cur->index);
 	      direct_desig = true;
 	    }
@@ -15012,8 +15016,6 @@ copy_fn_p (const_tree d)
 bool
 move_fn_p (const_tree d)
 {
-  gcc_assert (DECL_FUNCTION_MEMBER_P (d));
-
   if (cxx_dialect == cxx98)
     /* There are no move constructors if we are in C++98 mode.  */
     return false;
