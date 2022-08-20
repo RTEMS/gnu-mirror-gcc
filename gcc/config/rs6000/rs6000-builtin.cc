@@ -733,15 +733,10 @@ rs6000_init_builtins (void)
 
   if (TARGET_FLOAT128_TYPE)
     {
-      /* In the past we used long_double_type_node when long double was IEEE
-	 128-bit.  However, this means that the _Float128 type
-	 (i.e. float128_type_node) is a different type from __float128
-	 (i.e. ieee128_float_type_nonde).  This leads to some corner cases,
-	 such as processing signaling NaNs with the nansf128 built-in function
-	 (which returns a _Float128 value) and assign it to a long double or
-	 __float128 value.  The two explicit IEEE 128-bit types should always
-	 use the same internal type.  */
-      ieee128_float_type_node = float128_type_node;
+      if (TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128)
+	ieee128_float_type_node = long_double_type_node;
+      else
+	ieee128_float_type_node = float128_type_node;
       t = build_qualified_type (ieee128_float_type_node, TYPE_QUAL_CONST);
       lang_hooks.types.register_builtin_type (ieee128_float_type_node,
 					      "__ieee128");
@@ -3622,24 +3617,7 @@ rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
 
   for (int i = 0; i < nargs; i++)
     if (!insn_data[icode].operand[i+k].predicate (op[i], mode[i+k]))
-      {
-	/* If the predicate failed because the modes are different, do a
-	   convert instead of copy_to_mode_reg, since copy_to_mode_reg will
-	   abort in this case.  The modes might be different if we have two
-	   different 128-bit floating point modes (i.e. KFmode and TFmode if
-	   long double is IEEE 128-bit and IFmode and TFmode if long double is
-	   IBM 128-bit).  */
-	machine_mode mode_insn = mode[i+k];
-	machine_mode mode_op = GET_MODE (op[i]);
-	if (mode_insn != mode_op && mode_op != VOIDmode)
-	  {
-	    rtx tmp = gen_reg_rtx (mode_insn);
-	    convert_move (tmp, op[i], 0);
-	    op[i] = tmp;
-	  }
-	else
-	  op[i] = copy_to_mode_reg (mode_insn, op[i]);
-      }
+      op[i] = copy_to_mode_reg (mode[i+k], op[i]);
 
   rtx pat;
 
