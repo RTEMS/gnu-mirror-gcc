@@ -352,25 +352,47 @@ gimple_gen_pow2_profiler (histogram_value value, unsigned tag)
   gsi_insert_before (&gsi, call, GSI_NEW_STMT);
 }
 
-/* Output instructions as GIMPLE trees to increment the power of two histogram
+/* Output instructions as GIMPLE trees to increment the histogram
    counter.  VALUE is the expression whose value is profiled.  TAG is the tag
    of the section for counters.  */
 
 void
-gimple_gen_histogram_profiler (histogram_value value, unsigned tag)
+gimple_gen_histogram_profiler (histogram_value value, unsigned tag) // , edge_def* edge
 {
   gimple *stmt = value->hvalue.stmt;
-  gimple_stmt_iterator gsi = gsi_for_stmt (stmt);
-  tree ref_ptr = tree_coverage_counter_addr (tag, 0);
-  // TODO why does it crash
-  gcall *call;
-  tree val;
+  if (stmt){
+      gimple_stmt_iterator gsi = gsi_for_stmt (stmt);
+      tree ref_ptr = tree_coverage_counter_addr (tag, 0);
+      gcall *call;
+      tree val;
 
-  ref_ptr = force_gimple_operand_gsi (&gsi, ref_ptr,
-				      true, NULL_TREE, true, GSI_SAME_STMT);
-  val = prepare_instrumented_value (&gsi, value);
-  call = gimple_build_call (tree_histogram_profiler_fn, 2, ref_ptr, val);
-  gsi_insert_before (&gsi, call, GSI_NEW_STMT);
+      ref_ptr = force_gimple_operand_gsi (&gsi, ref_ptr,
+                          true, NULL_TREE, true, GSI_SAME_STMT);
+      val = prepare_instrumented_value (&gsi, value);
+      call = gimple_build_call (tree_histogram_profiler_fn, 2, ref_ptr, val);
+      gsi_insert_before (&gsi, call, GSI_NEW_STMT);
+  } else {
+      edge_def *edge = value->hvalue.edge;
+      if (edge==NULL){
+          // BAD
+      }
+      gimple_stmt_iterator gsi;
+      gimple_seq seq = NULL;
+      gsi = gsi_start (seq);
+
+      tree ref_ptr = tree_coverage_counter_addr (tag, 0);
+      gcall *call;
+      tree val;
+
+      ref_ptr = force_gimple_operand_gsi (&gsi, ref_ptr,
+                          true, NULL_TREE, true, GSI_SAME_STMT);
+      val = prepare_instrumented_value (&gsi, value);
+      call = gimple_build_call (tree_histogram_profiler_fn, 2, ref_ptr, val);
+      gsi_insert_before (&gsi, call, GSI_NEW_STMT); // might crash
+
+      seq = gsi_seq (gsi);
+      gsi_insert_seq_on_edge (edge, seq);
+  }
 }
 
 /* Output instructions as GIMPLE trees for code to find the most N common

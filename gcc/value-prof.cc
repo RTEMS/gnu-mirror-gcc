@@ -119,6 +119,19 @@ gimple_alloc_histogram_value (struct function *fun ATTRIBUTE_UNUSED,
    histogram_value hist = (histogram_value) xcalloc (1, sizeof (*hist));
    hist->hvalue.value = value;
    hist->hvalue.stmt = stmt;
+   hist->hvalue.edge = NULL;
+   hist->type = type;
+   return hist;
+}
+
+histogram_value
+gimple_alloc_histogram_value_edge (struct function *fun ATTRIBUTE_UNUSED,
+			      enum hist_type type, gimple *stmt, tree value, edge_def *edge)
+{
+   histogram_value hist = (histogram_value) xcalloc (1, sizeof (*hist));
+   hist->hvalue.value = value;
+   hist->hvalue.stmt = stmt;
+   hist->hvalue.edge = stmt ? NULL : edge;
    hist->type = type;
    return hist;
 }
@@ -1921,14 +1934,16 @@ gimple_histogram_values_to_profile(function *fun, histogram_values * values){
          tree var;
          gimple_stmt_iterator gsi;
          gsi = gsi_last_bb (loop->latch);
-         create_iv (build_int_cst_type (var, 0), build_int_cst (var, 1), NULL_TREE,
+         create_iv3 (build_int_cst_type (get_gcov_type(), 0), build_int_cst (get_gcov_type(), 1), NULL_TREE,
              loop, &gsi, true, &var, NULL);
          auto_vec<edge> exits = get_loop_exit_edges (loop);
          for ( auto exit : exits ){
               if (single_pred_p (exit->dest)){
-                values->safe_push (gimple_alloc_histogram_value (fun,
+                 gimple_stmt_iterator gsi_edge = gsi_start_bb (exit->src);
+                 gimple_seq seq = gsi_seq (gsi_edge);
+                 values->safe_push (gimple_alloc_histogram_value_edge (fun,
                                          HIST_TYPE_HISTOGRAM,
-                                         exit->src, var));
+                                         seq, var, exit));
               }
              //pridate ulozeni var do histogramu na zacated basic blocku exit->dest
              // TREE_TYPE (name)
@@ -1937,6 +1952,7 @@ gimple_histogram_values_to_profile(function *fun, histogram_values * values){
                }
          }
     }
+    gsi_commit_edge_inserts ();
 }
 
 /* Find values inside STMT for that we want to measure histograms and adds
@@ -1958,8 +1974,8 @@ gimple_find_values_to_profile (histogram_values *values)
   unsigned i;
   histogram_value hist = NULL;
   values->create (0);
+  gimple_histogram_values_to_profile(cfun, values);
   FOR_EACH_BB_FN (bb, cfun)
-    gimple_histogram_values_to_profile(cfun, values);
     for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
       gimple_values_to_profile (gsi_stmt (gsi), values);
 

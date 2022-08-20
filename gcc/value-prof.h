@@ -48,6 +48,7 @@ struct histogram_value_t
     {
       tree value;		/* The value to profile.  */
       gimple *stmt;		/* Insn containing the value.  */
+      edge_def *edge;    /* For adding to empty bbs */
       gcov_type *counters;		        /* Pointer to first counter.  */
       struct histogram_value_t *next;		/* Linked list pointer.  */
     } hvalue;
