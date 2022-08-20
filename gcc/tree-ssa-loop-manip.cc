@@ -180,6 +180,204 @@ find_sibling_superloop (class loop *use_loop, class loop *def_loop)
   return use_loop;
 }
 
+// create_iv2 simplified version of create iv nor requiring pre-headers
+void
+create_iv2 (tree base, tree step, tree var, class loop *loop,
+	   gimple_stmt_iterator *incr_pos, bool after,
+	   tree *var_before, tree *var_after)
+{
+  gassign *stmt;
+  gphi *phi;
+  tree initial, step1;
+  gimple_seq stmts;
+  tree vb, va;
+  enum tree_code incr_op = PLUS_EXPR;
+
+  if (var != NULL_TREE)
+    {
+      vb = make_ssa_name (var);
+      va = make_ssa_name (var);
+    }
+  else
+    {
+      vb = make_temp_ssa_name (TREE_TYPE (base), NULL, "ivtmp");
+      va = make_temp_ssa_name (TREE_TYPE (base), NULL, "ivtmp");
+    }
+  if (var_before)
+    *var_before = vb;
+  if (var_after)
+    *var_after = va;
+
+  /* For easier readability of the created code, produce MINUS_EXPRs
+     when suitable.  */
+  if (TREE_CODE (step) == INTEGER_CST)
+    {
+      if (TYPE_UNSIGNED (TREE_TYPE (step)))
+	{
+	  step1 = fold_build1 (NEGATE_EXPR, TREE_TYPE (step), step);
+	  if (tree_int_cst_lt (step1, step))
+	    {
+	      incr_op = MINUS_EXPR;
+	      step = step1;
+	    }
+	}
+      else
+	{
+	  bool ovf;
+
+	  if (!tree_expr_nonnegative_warnv_p (step, &ovf)
+	      && may_negate_without_overflow_p (step))
+	    {
+	      incr_op = MINUS_EXPR;
+	      step = fold_build1 (NEGATE_EXPR, TREE_TYPE (step), step);
+	    }
+	}
+    }
+  if (POINTER_TYPE_P (TREE_TYPE (base)))
+    {
+      if (TREE_CODE (base) == ADDR_EXPR)
+	mark_addressable (TREE_OPERAND (base, 0));
+      step = convert_to_ptrofftype (step);
+      if (incr_op == MINUS_EXPR)
+	step = fold_build1 (NEGATE_EXPR, TREE_TYPE (step), step);
+      incr_op = POINTER_PLUS_EXPR;
+    }
+  /* Gimplify the step if necessary.  We put the computations in front of the
+     loop (i.e. the step should be loop invariant).  */
+  step = force_gimple_operand (step, &stmts, true, NULL_TREE);
+
+  stmt = gimple_build_assign (va, incr_op, vb, step);
+  /* Prevent the increment from inheriting a bogus location if it is not put
+     immediately after a statement whose location is known.  */
+  if (after)
+    {
+      if (gsi_end_p (*incr_pos)
+	  || (is_gimple_debug (gsi_stmt (*incr_pos))
+	      && gsi_bb (*incr_pos)
+	      && gsi_end_p (gsi_last_nondebug_bb (gsi_bb (*incr_pos)))))
+	{
+	  edge e = single_succ_edge (gsi_bb (*incr_pos));
+	  gimple_set_location (stmt, e->goto_locus);
+	}
+      gsi_insert_after (incr_pos, stmt, GSI_NEW_STMT);
+    }
+  else
+    {
+      gimple_stmt_iterator gsi = *incr_pos;
+      if (!gsi_end_p (gsi) && is_gimple_debug (gsi_stmt (gsi)))
+	gsi_next_nondebug (&gsi);
+      if (!gsi_end_p (gsi))
+	gimple_set_location (stmt, gimple_location (gsi_stmt (gsi)));
+      gsi_insert_before (incr_pos, stmt, GSI_NEW_STMT);
+    }
+
+  initial = force_gimple_operand (base, &stmts, true, var);
+
+  phi = create_phi_node (vb, loop->header);
+  add_phi_arg (phi, va, loop_latch_edge (loop), UNKNOWN_LOCATION);
+}
+
+void
+create_iv3 (tree base, tree step, tree var, class loop *loop,
+	   gimple_stmt_iterator *incr_pos, bool after,
+	   tree *var_before, tree *var_after)
+{
+  gassign *stmt;
+  gphi *phi;
+  tree initial, step1;
+  gimple_seq stmts;
+  tree vb, va;
+  enum tree_code incr_op = PLUS_EXPR;
+
+  if (var != NULL_TREE)
+    {
+      vb = make_ssa_name (var);
+      va = make_ssa_name (var);
+    }
+  else
+    {
+      vb = make_temp_ssa_name (TREE_TYPE (base), NULL, "ivtmp");
+      va = make_temp_ssa_name (TREE_TYPE (base), NULL, "ivtmp");
+    }
+  if (var_before)
+    *var_before = vb;
+  if (var_after)
+    *var_after = va;
+
+  /* For easier readability of the created code, produce MINUS_EXPRs
+     when suitable.  */
+  if (TREE_CODE (step) == INTEGER_CST)
+    {
+      if (TYPE_UNSIGNED (TREE_TYPE (step)))
+	{
+	  step1 = fold_build1 (NEGATE_EXPR, TREE_TYPE (step), step);
+	  if (tree_int_cst_lt (step1, step))
+	    {
+	      incr_op = MINUS_EXPR;
+	      step = step1;
+	    }
+	}
+      else
+	{
+	  bool ovf;
+
+	  if (!tree_expr_nonnegative_warnv_p (step, &ovf)
+	      && may_negate_without_overflow_p (step))
+	    {
+	      incr_op = MINUS_EXPR;
+	      step = fold_build1 (NEGATE_EXPR, TREE_TYPE (step), step);
+	    }
+	}
+    }
+  if (POINTER_TYPE_P (TREE_TYPE (base)))
+    {
+      if (TREE_CODE (base) == ADDR_EXPR)
+	mark_addressable (TREE_OPERAND (base, 0));
+      step = convert_to_ptrofftype (step);
+      if (incr_op == MINUS_EXPR)
+	step = fold_build1 (NEGATE_EXPR, TREE_TYPE (step), step);
+      incr_op = POINTER_PLUS_EXPR;
+    }
+  /* Gimplify the step if necessary.  We put the computations in front of the
+     loop (i.e. the step should be loop invariant).  */
+  step = force_gimple_operand (step, &stmts, true, NULL_TREE);
+  if (stmts)
+    gsi_insert_seq_on_edge_immediate (loop_preheader_edge (loop), stmts);
+
+  stmt = gimple_build_assign (va, incr_op, vb, step);
+  /* Prevent the increment from inheriting a bogus location if it is not put
+     immediately after a statement whose location is known.  */
+  if (after)
+    {
+      if (gsi_end_p (*incr_pos)
+	  || (is_gimple_debug (gsi_stmt (*incr_pos))
+	      && gsi_bb (*incr_pos)
+	      && gsi_end_p (gsi_last_nondebug_bb (gsi_bb (*incr_pos)))))
+	{
+	  edge e = single_succ_edge (gsi_bb (*incr_pos));
+	  gimple_set_location (stmt, e->goto_locus);
+	}
+      gsi_insert_after (incr_pos, stmt, GSI_NEW_STMT);
+    }
+  else
+    {
+      gimple_stmt_iterator gsi = *incr_pos;
+      if (!gsi_end_p (gsi) && is_gimple_debug (gsi_stmt (gsi)))
+	gsi_next_nondebug (&gsi);
+      if (!gsi_end_p (gsi))
+	gimple_set_location (stmt, gimple_location (gsi_stmt (gsi)));
+      gsi_insert_before (incr_pos, stmt, GSI_NEW_STMT);
+    }
+
+  initial = force_gimple_operand (base, &stmts, true, var);
+  if (stmts)
+    gsi_insert_seq_on_edge_immediate (loop_preheader_edge (loop), stmts);
+
+  phi = create_phi_node (vb, loop->header);
+  add_phi_arg (phi, initial, loop_preheader_edge (loop), UNKNOWN_LOCATION);
+  add_phi_arg (phi, va, loop_latch_edge (loop), UNKNOWN_LOCATION);
+}
+
 /* DEF_BB is a basic block containing a DEF that needs rewriting into
    loop-closed SSA form.  USE_BLOCKS is the set of basic blocks containing
    uses of DEF that "escape" from the loop containing DEF_BB (i.e. blocks in
