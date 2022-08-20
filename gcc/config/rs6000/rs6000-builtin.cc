@@ -733,13 +733,10 @@ rs6000_init_builtins (void)
 
   if (TARGET_FLOAT128_TYPE)
     {
-      /* If long double uses IEEE 128-bit, for now make the types the same.
-	 However, it is anticipated that in C23, we will need to have to have
-	 different types between _Float128/__float128 and long double.  */
       if (TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128)
-	float128_type_node = build_variant_type_copy (long_double_type_node);
-
-      ieee128_float_type_node = float128_type_node;
+	ieee128_float_type_node = long_double_type_node;
+      else
+	ieee128_float_type_node = float128_type_node;
       t = build_qualified_type (ieee128_float_type_node, TYPE_QUAL_CONST);
       lang_hooks.types.register_builtin_type (ieee128_float_type_node,
 					      "__ieee128");
