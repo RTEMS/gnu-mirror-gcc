@@ -35,6 +35,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "insn-attr-common.h" /* for INSN_SCHEDULING.  */
 #include "insn-attr.h" /* for init_sched_attrs.  */
 #include "run-rtl-passes.h"
+#include "toplev.h"
 
 /* Run the backend passes, starting at the given pass.
    Take ownership of INITIAL_PASS_NAME.  */
@@ -44,6 +45,9 @@ run_rtl_passes (char *initial_pass_name)
 {
   cfun->pass_startwith = initial_pass_name;
   max_regno = max_reg_num ();
+
+  if (asm_out_file == NULL)
+    init_asm_output ();
 
   /* cgraphunit.cc normally handles this.  */
   switch_to_section (text_section);

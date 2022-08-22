@@ -99,4 +99,6 @@ extern void parse_alignment_opts (void);
 
 extern void initialize_rtl (void);
 
+extern void init_asm_output (void);
+
 #endif /* ! GCC_TOPLEV_H */

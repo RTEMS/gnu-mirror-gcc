@@ -98,7 +98,6 @@ along with GCC; see the file COPYING3.  If not see
 static void general_init (const char *, bool);
 static void backend_init (void);
 static int lang_dependent_init (const char *);
-static void init_asm_output (const char *);
 static void finalize (bool);
 
 static void crash_signal (int) ATTRIBUTE_NORETURN;
@@ -675,14 +674,16 @@ print_version (FILE *file, const char *indent, bool show_global_state)
 }
 
 
+static const char *asm_name;
 
 /* Open assembly code output file.  Do this even if -fsyntax-only is
    on, because then the driver will have provided the name of a
    temporary file or bit bucket for us.  NAME is the file specified on
    the command line, possibly NULL.  */
-static void
-init_asm_output (const char *name)
+void
+init_asm_output ()
 {
+  const char *name = asm_name;
   if (name == NULL && asm_file_name == 0)
     asm_out_file = stdout;
   else
@@ -1818,7 +1819,7 @@ lang_dependent_init (const char *name)
 
   if (!flag_wpa)
     {
-      init_asm_output (name);
+      asm_name = xstrdup (name);
 
       if (!flag_generate_lto && !flag_compare_debug)
 	{
