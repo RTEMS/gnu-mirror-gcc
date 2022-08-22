@@ -1,46 +1,5 @@
 ==================== work098, patch #22 was reverted.
 
-Make __float128 use the _Float128 type.
-
-Currently GCC uses the long double type node for __float128 if long double is
-IEEE 128-bit.  It did not use the node for _Float128.
-
-Problems showed up if you call the nansq function to make a signaling NaN (nansq
-is mapped to nansf128).  Because the type node for _Float128 is different from
-__float128, the machine independent code converts signaling NaNs to quiet NaNs
-if the types are  not compatible.  The following tests used to fail when run on
-a system where long double is IEEE 128-bit:
-
-	gcc.dg/torture/float128-nan.c
-	gcc.target/powerpc/nan128-1.c
-
-This patch makes both __float128 and _Float128 use the same type node.
-
-One side effect of not using the long double type node for __float128 is that we
-must only use KFmode for _Float128/__float128.
-
-2022-08-20   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/rs6000-builtin.cc (rs6000_init_builtins): Always use the
-	_Float128 type for __float128.
-	(rs6000_expand_builtin): Only change a KFmode built-in to TFmode, if the
-	built-in passes or returns TFmode.  If the predicate failed because the
-	modes were different, use convert_move to load up the value instead of
-	copy_to_mode_reg.
-	* config/rs6000/rs6000.cc (rs6000_translate_mode_attribute): Don't
-	translate __float128 modes to long double modes (TFmode or TCmode).
-	(rs6000_libgcc_floating_mode_supported_p): Support KFmode all of the
-	time if we support IEEE 128-bit floating point.
-	(rs6000_floatn_mode): _Float128 and _Float128x always uses KFmode.
-
-gcc/testsuite/
-
-	* gcc.target/powerpc/float128-hw12.c: New test.
-	* gcc.target/powerpc/float128-hw13.c: Likewise.
-	* gcc.target/powerpc/float128-hw4.c: Update insns.
-
 ==================== work098, patch #21 was reverted.
 
 ==================== work098, patch #20 was reverted.
