@@ -1,3 +1,7 @@
+2022-08-23  Peter Bergner  <bergner@linux.ibm.com>
+
+	Merge up to releases/gcc-10 ae8daf74e741c71921fb01a84ae1c347de18adcd
+
 2022-03-29  Peter Bergner  <bergner@linux.ibm.com>
 
 	Merge up to releases/gcc-10 4e7cbbdd5d67b84d2d9d376d6e8dfd06c177e2c9

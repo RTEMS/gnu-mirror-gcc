@@ -104,10 +104,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   template<typename _Tp> class valarray;
   // These overloads must be declared for cbegin and cend to use them.
-  template<typename _Tp> _Tp* begin(valarray<_Tp>&);
-  template<typename _Tp> const _Tp* begin(const valarray<_Tp>&);
-  template<typename _Tp> _Tp* end(valarray<_Tp>&);
-  template<typename _Tp> const _Tp* end(const valarray<_Tp>&);
+  template<typename _Tp> _Tp* begin(valarray<_Tp>&) noexcept;
+  template<typename _Tp> const _Tp* begin(const valarray<_Tp>&) noexcept;
+  template<typename _Tp> _Tp* end(valarray<_Tp>&) noexcept;
+  template<typename _Tp> const _Tp* end(const valarray<_Tp>&) noexcept;
 
   /**
    *  @brief  Return an iterator pointing to the first element of
@@ -773,7 +773,7 @@ namespace ranges
 	_S_noexcept()
 	{
 	  if constexpr (__member_empty<_Tp>)
-	    return noexcept(std::declval<_Tp>().empty());
+	    return noexcept(bool(std::declval<_Tp>().empty()));
 	  else if constexpr (__size0_empty<_Tp>)
 	    return noexcept(_Size{}(std::declval<_Tp>()) == 0);
 	  else
@@ -1011,25 +1011,27 @@ namespace ranges
 	  {
 	    const auto __diff = __bound - __it;
 
-#ifdef __cpp_lib_is_constant_evaluated
-	    if (std::is_constant_evaluated()
-		&& !(__n == 0 || __diff == 0 || (__n < 0 == __diff < 0)))
-	      throw "inconsistent directions for distance and bound";
-#endif
-	    // n and bound must not lead in opposite directions:
-	    __glibcxx_assert(__n == 0 || __diff == 0 || (__n < 0 == __diff < 0));
-	    const auto __absdiff = __diff < 0 ? -__diff : __diff;
-	    const auto __absn = __n < 0 ? -__n : __n;;
-	    if (__absn >= __absdiff)
+	    if (__diff == 0)
+	      return __n;
+	    else if (__diff > 0 ? __n >= __diff : __n <= __diff)
 	      {
 		(*this)(__it, __bound);
 		return __n - __diff;
 	      }
-	    else
+	    else if (__n != 0) [[likely]]
 	      {
+#ifdef __cpp_lib_is_constant_evaluated
+		if (std::is_constant_evaluated() && !(__n < 0 == __diff < 0))
+		  throw "inconsistent directions for distance and bound";
+#endif
+		// n and bound must not lead in opposite directions:
+		__glibcxx_assert(__n < 0 == __diff < 0);
+
 		(*this)(__it, __n);
 		return 0;
 	      }
+	    else
+	      return 0;
 	  }
 	else if (__it == __bound || __n == 0)
 	  return __n;

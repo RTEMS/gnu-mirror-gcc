@@ -1887,6 +1887,7 @@ destringize_and_run (cpp_reader *pfile, const cpp_string *in,
       maxcount = 50;
       toks = XNEWVEC (cpp_token, maxcount);
       toks[0] = pfile->directive_result;
+      toks[0].src_loc = expansion_loc;
 
       do
 	{
@@ -1911,8 +1912,7 @@ destringize_and_run (cpp_reader *pfile, const cpp_string *in,
   else
     {
       count = 1;
-      toks = XNEW (cpp_token);
-      toks[0] = pfile->directive_result;
+      toks = &pfile->avoid_paste;
 
       /* If we handled the entire pragma internally, make sure we get the
 	 line number correct for the next token.  */

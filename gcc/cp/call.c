@@ -2763,7 +2763,7 @@ add_builtin_candidate (struct z_candidate **candidates, enum tree_code code,
 	  tree c1 = TREE_TYPE (type1);
 	  tree c2 = TYPE_PTRMEM_CLASS_TYPE (type2);
 
-	  if (MAYBE_CLASS_TYPE_P (c1) && DERIVED_FROM_P (c2, c1)
+	  if (CLASS_TYPE_P (c1) && DERIVED_FROM_P (c2, c1)
 	      && (TYPE_PTRMEMFUNC_P (type2)
 		  || is_complete (TYPE_PTRMEM_POINTED_TO_TYPE (type2))))
 	    break;
@@ -4063,7 +4063,7 @@ build_user_type_conversion_1 (tree totype, tree expr, int flags,
 	{
 	  cand->second_conv = build_identity_conv (totype, NULL_TREE);
 
-	  /* If totype isn't a reference, and LOOKUP_NO_TEMP_BIND isn't
+	  /* If totype isn't a reference, and LOOKUP_ONLYCONVERTING is
 	     set, then this is copy-initialization.  In that case, "The
 	     result of the call is then used to direct-initialize the
 	     object that is the destination of the copy-initialization."
@@ -4072,6 +4072,8 @@ build_user_type_conversion_1 (tree totype, tree expr, int flags,
 	     We represent this in the conversion sequence with an
 	     rvalue conversion, which means a constructor call.  */
 	  if (!TYPE_REF_P (totype)
+	      && cxx_dialect < cxx17
+	      && (flags & LOOKUP_ONLYCONVERTING)
 	      && !(convflags & LOOKUP_NO_TEMP_BIND))
 	    cand->second_conv
 	      = build_conv (ck_rvalue, totype, cand->second_conv);
@@ -4682,7 +4684,6 @@ build_operator_new_call (tree fnname, vec<tree, va_gc> **args,
 
      we disregard block-scope declarations of "operator new".  */
   fns = lookup_name_real (fnname, 0, 1, /*block_p=*/false, 0, 0);
-  fns = lookup_arg_dependent (fnname, fns, *args);
 
   if (align_arg)
     {
@@ -7679,7 +7680,7 @@ convert_like_real_1 (conversion *convs, tree expr, tree fn, int argnum,
   expr = convert_like_real (next_conversion (convs), expr, fn, argnum,
 			    convs->kind == ck_ref_bind
 			    ? issue_conversion_warnings : false, 
-			    c_cast_p, complain);
+			    c_cast_p, complain & ~tf_no_cleanup);
   if (expr == error_mark_node)
     return error_mark_node;
 
@@ -7968,7 +7969,10 @@ convert_arg_to_ellipsis (tree arg, tsubst_flags_t complain)
     {
       arg = mark_rvalue_use (arg);
       if (TREE_SIDE_EFFECTS (arg))
-	arg = cp_build_compound_expr (arg, null_pointer_node, complain);
+	{
+	  warning_sentinel w(warn_unused_result);
+	  arg = cp_build_compound_expr (arg, null_pointer_node, complain);
+	}
       else
 	arg = null_pointer_node;
     }
@@ -9079,8 +9083,11 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	   && DECL_OVERLOADED_OPERATOR_IS (fn, NOP_EXPR)
 	   && trivial_fn_p (fn))
     {
-      tree to = cp_stabilize_reference
-	(cp_build_fold_indirect_ref (argarray[0]));
+      /* Don't use cp_build_fold_indirect_ref, op= returns an lvalue even if
+	 the object argument isn't one.  */
+      tree to = cp_build_indirect_ref (input_location, argarray[0],
+				       RO_ARROW, complain);
+      to = cp_stabilize_reference (to);
       tree type = TREE_TYPE (to);
       tree as_base = CLASSTYPE_AS_BASE (type);
       tree arg = argarray[1];

@@ -1,3 +1,139 @@
+2022-07-26  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-07-26  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103504
+	* interface.c (get_sym_storage_size): Array bounds and character
+	length can only be of integer type.
+
+2022-07-16  Steve Kargl  <kargl@gcc.gnu.org>
+
+	Backported from master:
+	2022-07-15  Steve Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/104313
+	* trans-decl.c (gfc_generate_return): Do not generate conflicting
+	fake results for functions with no result variable under -ff2c.
+
+2022-07-03  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-06-30  Harald Anlauf  <anlauf@gmx.de>
+		    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/103137
+	PR fortran/103138
+	PR fortran/103693
+	PR fortran/105243
+	* decl.c (gfc_match_data_decl): Reject CLASS entity declaration
+	when it is given the PARAMETER attribute.
+
+2022-07-03  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-06-29  Harald Anlauf  <anlauf@gmx.de>
+		    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/106121
+	* simplify.c (gfc_simplify_extends_type_of): Do not attempt to
+	simplify when one of the arguments is a CLASS variable that was
+	not properly declared.
+
+2022-07-01  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-06-26  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/105954
+	* decl.c (variable_decl): Adjust upper bounds for explicit-shape
+	specs with constant bound expressions to ensure non-negative
+	extents.
+
+2022-07-01  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-06-26  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/105691
+	* simplify.c (gfc_simplify_index): Replace old simplification
+	code by the equivalent of the runtime library implementation.  Use
+	HOST_WIDE_INT instead of int for string index, length variables.
+
+2022-07-01  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-06-24  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/105813
+	* check.c (gfc_check_unpack): Try to simplify MASK argument to
+	UNPACK so that checking of the VECTOR argument can work when MASK
+	is a variable.
+
+2022-06-28  Release Manager
+
+	* GCC 10.4.0 released.
+
+2022-05-16  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-05-11  Harald Anlauf  <anlauf@gmx.de>
+		    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/105230
+	* expr.c (find_array_section): Correct logic to avoid NULL
+	pointer dereference on invalid array section.
+
+2022-05-16  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-03-09  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/104849
+	* expr.c (find_array_section): Avoid NULL pointer dereference on
+	invalid array section.
+
+2022-05-16  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-04-05  Harald Anlauf  <anlauf@gmx.de>
+		    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/105138
+	* intrinsic.c (gfc_is_intrinsic): When a symbol refers to a
+	RECURSIVE procedure, it cannot be an INTRINSIC.
+
+2022-05-10  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2021-11-21  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/103315
+	* trans-types.c (gfc_get_array_descr_info): Use DW_OP_deref_size 1
+	instead of DW_OP_deref for DW_AT_rank.
+
+2022-04-24  Mikael Morin  <mikael@gcc.gnu.org>
+
+	PR fortran/104228
+	PR fortran/104570
+	* parse.c (parse_associate): Use a new distinct gfc_charlen if
+	the copied type has one whose length is not known to be
+	constant.
+	* resolve.c (resolve_assoc_var): Also create a new character
+	length for non-dummy associate targets.  Reset charlen if it’s
+	shared with the associate target regardless of the expression
+	type.  Don’t reinitialize charlen if it’s deferred.
+	* trans-stmt.c (trans_associate_var): Initialize character
+	length even if no temporary is used for the associate variable.
+
+2022-04-21  Fritz Reese  <foreese@gcc.gnu.org>
+
+	Backported from master:
+	2022-04-21  Fritz Reese  <foreese@gcc.gnu.org>
+
+	PR fortran/105310
+	* trans-expr.c (gfc_conv_union_initializer): Pass vec* by reference.
+
 2022-02-23  Harald Anlauf  <anlauf@gmx.de>
 
 	Backported from master:

@@ -12318,9 +12318,9 @@ use_pack_expansion_extra_args_p (tree parm_packs,
       return false;
     }
 
-  bool has_expansion_arg = false;
   for (int i = 0 ; i < arg_pack_len; ++i)
     {
+      bool has_expansion_arg = false;
       bool has_non_expansion_arg = false;
       for (tree parm_pack = parm_packs;
 	   parm_pack;
@@ -12340,7 +12340,10 @@ use_pack_expansion_extra_args_p (tree parm_packs,
 	}
 
       if (has_expansion_arg && has_non_expansion_arg)
-	return true;
+	{
+	  gcc_checking_assert (false);
+	  return true;
+	}
     }
   return false;
 }
@@ -14811,6 +14814,13 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain)
 	  {
 	    DECL_ORIGINAL_TYPE (r) = NULL_TREE;
 	    set_underlying_type (r);
+
+	    /* common_handle_aligned_attribute doesn't apply the alignment
+	       to DECL_ORIGINAL_TYPE.  */
+	    if (TYPE_USER_ALIGN (TREE_TYPE (t)))
+	      TREE_TYPE (r) = build_aligned_type (TREE_TYPE (r),
+						  TYPE_ALIGN (TREE_TYPE (t)));
+
 	    if (TYPE_DECL_ALIAS_P (r))
 	      /* An alias template specialization can be dependent
 		 even if its underlying type is not.  */
@@ -16130,7 +16140,8 @@ tsubst_baselink (tree baselink, tree object_type,
 
   tree binfo_type = BINFO_TYPE (BASELINK_BINFO (baselink));
   binfo_type = tsubst (binfo_type, args, complain, in_decl);
-  bool dependent_p = binfo_type != BINFO_TYPE (BASELINK_BINFO (baselink));
+  bool dependent_p = (binfo_type != BINFO_TYPE (BASELINK_BINFO (baselink))
+		      || optype != BASELINK_OPTYPE (baselink));
 
   if (dependent_p)
     {
@@ -16156,8 +16167,19 @@ tsubst_baselink (tree baselink, tree object_type,
 	fns = BASELINK_FUNCTIONS (baselink);
     }
   else
-    /* We're going to overwrite pieces below, make a duplicate.  */
-    baselink = copy_node (baselink);
+    {
+      /* We're going to overwrite pieces below, make a duplicate.  */
+      baselink = copy_node (baselink);
+
+      if (qualifying_scope != BINFO_TYPE (BASELINK_ACCESS_BINFO (baselink)))
+	{
+	  /* The decl we found was from non-dependent scope, but we still need
+	     to update the binfos for the instantiated qualifying_scope.  */
+	  BASELINK_ACCESS_BINFO (baselink) = TYPE_BINFO (qualifying_scope);
+	  BASELINK_BINFO (baselink) = lookup_base (qualifying_scope, binfo_type,
+						   ba_unique, NULL, complain);
+	}
+    }
 
   /* If lookup found a single function, mark it as used at this point.
      (If lookup found multiple functions the one selected later by
@@ -24032,7 +24054,10 @@ mark_decl_instantiated (tree result, int extern_p)
   DECL_COMDAT (result) = 0;
 
   if (extern_p)
-    DECL_NOT_REALLY_EXTERN (result) = 0;
+    {
+      DECL_EXTERNAL (result) = 1;
+      DECL_NOT_REALLY_EXTERN (result) = 0;
+    }
   else
     {
       mark_definable (result);

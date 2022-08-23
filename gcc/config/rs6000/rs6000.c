@@ -5547,33 +5547,68 @@ const char *rs6000_machine;
 const char *
 rs6000_machine_from_flags (void)
 {
-  /* For some CPUs, the machine cannot be determined by ISA flags.  We have to
-     check them first.  */
-  switch (rs6000_cpu)
-    {
-    case PROCESSOR_PPC8540:
-    case PROCESSOR_PPC8548:
-      return "e500";
+  /* e300 and e500 */
+  if (rs6000_cpu == PROCESSOR_PPCE300C2 || rs6000_cpu == PROCESSOR_PPCE300C3)
+    return "e300";
+  if (rs6000_cpu == PROCESSOR_PPC8540 || rs6000_cpu == PROCESSOR_PPC8548)
+    return "e500";
+  if (rs6000_cpu == PROCESSOR_PPCE500MC)
+    return "e500mc";
+  if (rs6000_cpu == PROCESSOR_PPCE500MC64)
+    return "e500mc64";
+  if (rs6000_cpu == PROCESSOR_PPCE5500)
+    return "e5500";
+  if (rs6000_cpu == PROCESSOR_PPCE6500)
+    return "e6500";
 
-    case PROCESSOR_PPCE300C2:
-    case PROCESSOR_PPCE300C3:
-      return "e300";
+  /* 400 series */
+  if (rs6000_cpu == PROCESSOR_PPC403)
+    return "\"403\"";
+  if (rs6000_cpu == PROCESSOR_PPC405)
+    return "\"405\"";
+  if (rs6000_cpu == PROCESSOR_PPC440)
+    return "\"440\"";
+  if (rs6000_cpu == PROCESSOR_PPC476)
+    return "\"476\"";
 
-    case PROCESSOR_PPCE500MC:
-      return "e500mc";
+  /* A2 */
+  if (rs6000_cpu == PROCESSOR_PPCA2)
+    return "a2";
 
-    case PROCESSOR_PPCE500MC64:
-      return "e500mc64";
+  /* Cell BE */
+  if (rs6000_cpu == PROCESSOR_CELL)
+    return "cell";
 
-    case PROCESSOR_PPCE5500:
-      return "e5500";
+  /* Titan */
+  if (rs6000_cpu == PROCESSOR_TITAN)
+    return "titan";
 
-    case PROCESSOR_PPCE6500:
-      return "e6500";
+  /* 500 series and 800 series */
+  if (rs6000_cpu == PROCESSOR_MPCCORE)
+    return "\"821\"";
 
-    default:
-      break;
-    }
+#if 0
+  /* This (and ppc64 below) are disabled here (for now at least) because
+     PROCESSOR_POWERPC, PROCESSOR_POWERPC64, and PROCESSOR_COMMON
+     are #define'd as some of these.  Untangling that is a job for later.  */
+
+  /* 600 series and 700 series, "classic" */
+  if (rs6000_cpu == PROCESSOR_PPC601 || rs6000_cpu == PROCESSOR_PPC603
+      || rs6000_cpu == PROCESSOR_PPC604 || rs6000_cpu == PROCESSOR_PPC604e
+      || rs6000_cpu == PROCESSOR_PPC750)
+    return "ppc";
+#endif
+
+  /* Classic with AltiVec, "G4" */
+  if (rs6000_cpu == PROCESSOR_PPC7400 || rs6000_cpu == PROCESSOR_PPC7450)
+    return "\"7450\"";
+
+#if 0
+  /* The older 64-bit CPUs */
+  if (rs6000_cpu == PROCESSOR_PPC620 || rs6000_cpu == PROCESSOR_PPC630
+      || rs6000_cpu == PROCESSOR_RS64A)
+    return "ppc64";
+#endif
 
   HOST_WIDE_INT flags = rs6000_isa_flags;
 
@@ -5939,7 +5974,7 @@ vspltis_constant (rtx op, unsigned step, unsigned copies)
 
   /* Also check if are loading up the most significant bit which can be done by
      loading up -1 and shifting the value left by -1.  */
-  else if (EASY_VECTOR_MSB (splat_val, inner))
+  else if (EASY_VECTOR_MSB (splat_val, inner) && step == 1 && copies == 1)
     ;
 
   else
@@ -5988,8 +6023,11 @@ vspltis_shifted (rtx op)
     return false;
 
   /* We need to create pseudo registers to do the shift, so don't recognize
-     shift vector constants after reload.  */
-  if (!can_create_pseudo_p ())
+     shift vector constants after reload.  Don't match it even before RA
+     after split1 is done, because there won't be further splitting pass
+     before RA to do the splitting.  */
+  if (!can_create_pseudo_p ()
+      || (cfun->curr_properties & PROP_rtl_split_insns))
     return false;
 
   nunits = GET_MODE_NUNITS (mode);
@@ -7579,8 +7617,14 @@ darwin_rs6000_legitimate_lo_sum_const_p (rtx x, machine_mode mode)
   if (GET_CODE (x) == CONST)
     x = XEXP (x, 0);
 
+  /* If we are building PIC code, then any symbol must be wrapped in an
+     UNSPEC_MACHOPIC_OFFSET so that it will get the picbase subtracted.  */
+  bool machopic_offs_p = false;
   if (GET_CODE (x) == UNSPEC && XINT (x, 1) == UNSPEC_MACHOPIC_OFFSET)
-    x =  XVECEXP (x, 0, 0);
+    {
+      x =  XVECEXP (x, 0, 0);
+      machopic_offs_p = true;
+    }
 
   rtx sym = NULL_RTX;
   unsigned HOST_WIDE_INT offset = 0;
@@ -7611,6 +7655,9 @@ darwin_rs6000_legitimate_lo_sum_const_p (rtx x, machine_mode mode)
   if (sym)
     {
       tree decl = SYMBOL_REF_DECL (sym);
+      /* As noted above, PIC code cannot use a bare SYMBOL_REF.  */
+      if (TARGET_MACHO && flag_pic && !machopic_offs_p)
+	return false;
 #if TARGET_MACHO
       if (MACHO_SYMBOL_INDIRECTION_P (sym))
       /* The decl in an indirection symbol is the original one, which might
@@ -8198,7 +8245,7 @@ legitimate_lo_sum_address_p (machine_mode mode, rtx x, int strict)
     return false;
   x = XEXP (x, 1);
 
-  if (TARGET_ELF || TARGET_MACHO)
+  if (TARGET_ELF)
     {
       bool large_toc_ok;
 
@@ -8224,7 +8271,32 @@ legitimate_lo_sum_address_p (machine_mode mode, rtx x, int strict)
 
       return CONSTANT_P (x) || large_toc_ok;
     }
+  else if (TARGET_MACHO)
+    {
+      if (GET_MODE_NUNITS (mode) != 1)
+	return false;
+      if (GET_MODE_SIZE (mode) > UNITS_PER_WORD
+	  && !(/* see above  */
+	       TARGET_HARD_FLOAT && (mode == DFmode || mode == DDmode)))
+	return false;
+#if TARGET_MACHO
+      if (MACHO_DYNAMIC_NO_PIC_P || !flag_pic)
+	return CONSTANT_P (x);
+#endif
+      /* Macho-O PIC code from here.  */
+      if (GET_CODE (x) == CONST)
+	x = XEXP (x, 0);
 
+      /* SYMBOL_REFs need to be wrapped in an UNSPEC_MACHOPIC_OFFSET.  */
+      if (SYMBOL_REF_P (x))
+	return false;
+
+      /* So this is OK if the wrapped object is const.  */
+      if (GET_CODE (x) == UNSPEC
+	  && XINT (x, 1) == UNSPEC_MACHOPIC_OFFSET)
+	return CONSTANT_P (XVECEXP (x, 0, 0));
+      return CONSTANT_P (x);
+    }
   return false;
 }
 
@@ -8278,7 +8350,7 @@ rs6000_legitimize_address (rtx x, rtx oldx ATTRIBUTE_UNUSED,
       else
 	return force_reg (Pmode, x);
     }
-  if (SYMBOL_REF_P (x))
+  if (SYMBOL_REF_P (x) && !TARGET_MACHO)
     {
       enum tls_model model = SYMBOL_REF_TLS_MODEL (x);
       if (model != 0)
@@ -8954,15 +9026,21 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
   bool reg_offset_p = reg_offset_addressing_ok_p (mode);
   bool quad_offset_p = mode_supports_dq_form (mode);
 
-  /* If this is an unaligned stvx/ldvx type address, discard the outer AND.  */
+  if (TARGET_ELF && RS6000_SYMBOL_REF_TLS_P (x))
+    return 0;
+
+  /* Handle unaligned altivec lvx/stvx type addresses.  */
   if (VECTOR_MEM_ALTIVEC_OR_VSX_P (mode)
       && GET_CODE (x) == AND
       && CONST_INT_P (XEXP (x, 1))
       && INTVAL (XEXP (x, 1)) == -16)
-    x = XEXP (x, 0);
+    {
+      x = XEXP (x, 0);
+      return (legitimate_indirect_address_p (x, reg_ok_strict)
+	      || legitimate_indexed_address_p (x, reg_ok_strict)
+	      || virtual_stack_registers_memory_p (x));
+    }
 
-  if (TARGET_ELF && RS6000_SYMBOL_REF_TLS_P (x))
-    return 0;
   if (legitimate_indirect_address_p (x, reg_ok_strict))
     return 1;
   if (TARGET_UPDATE
@@ -24476,6 +24554,10 @@ rs6000_can_inline_p (tree caller, tree callee)
 	caller_isa = TREE_TARGET_OPTION (caller_tree)->x_rs6000_isa_flags;
       else
 	caller_isa = rs6000_isa_flags;
+
+      /* Ignore the -mpower8-fusion option for inlining purposes.  */
+      callee_isa &= ~OPTION_MASK_P8_FUSION;
+      explicit_isa &= ~OPTION_MASK_P8_FUSION;
 
       /* The callee's options must be a subset of the caller's options, i.e.
 	 a vsx function may inline an altivec function, but a no-vsx function
