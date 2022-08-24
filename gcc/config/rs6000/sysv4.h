@@ -504,9 +504,6 @@ extern int fixuplabelno;
 #undef  PREFERRED_DEBUGGING_TYPE
 #define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
 
-/* Historically we have also supported stabs debugging.  */
-#define DBX_DEBUGGING_INFO 1
-
 #define TARGET_ENCODE_SECTION_INFO  rs6000_elf_encode_section_info
 #define TARGET_IN_SMALL_DATA_P  rs6000_elf_in_small_data_p
 

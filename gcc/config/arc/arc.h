@@ -1330,12 +1330,7 @@ do { \
 
 /* Debugging information.  */
 
-/* Generate DBX and DWARF debugging information.  */
-#ifdef DBX_DEBUGGING_INFO
-#undef DBX_DEBUGGING_INFO
-#endif
-#define DBX_DEBUGGING_INFO
-
+/* Generate DWARF debugging information.  */
 #ifdef DWARF2_DEBUGGING_INFO
 #undef DWARF2_DEBUGGING_INFO
 #endif

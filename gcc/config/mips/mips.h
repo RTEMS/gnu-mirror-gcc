@@ -1508,7 +1508,6 @@ FP_ASM_SPEC "\
 #define SUBTARGET_EXTRA_SPECS
 #endif
 
-#define DBX_DEBUGGING_INFO 1		/* generate stabs (OSF/rose) */
 #define DWARF2_DEBUGGING_INFO 1         /* dwarf2 debugging info */
 
 #ifndef PREFERRED_DEBUGGING_TYPE
@@ -1877,7 +1876,7 @@ FP_ASM_SPEC "\
 #define FP_REG_FIRST 32
 #define FP_REG_LAST  63
 #define FP_REG_NUM   (FP_REG_LAST - FP_REG_FIRST + 1)
-#define FP_DBX_FIRST ((write_symbols == DBX_DEBUG) ? 38 : 32)
+#define FP_DBX_FIRST 32
 
 #define MD_REG_FIRST 64
 #define MD_REG_LAST  65

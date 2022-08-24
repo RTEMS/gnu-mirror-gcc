@@ -508,10 +508,6 @@ enum reg_class { NO_REGS, ALL_REGS, LIM_REG_CLASSES };
     "r8", "r9", "r10", "r11", "ap", "fp", "sp", "pc",	\
     "psl" }
 
-/* This is BSD, so it wants DBX format.  */
-
-#define DBX_DEBUGGING_INFO 1
-
 /* Do not break .stabs pseudos into continuations.  */
 
 #define DBX_CONTIN_LENGTH 0

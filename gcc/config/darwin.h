@@ -583,14 +583,7 @@ extern GTY(()) int darwin_ms_struct;
 "%{static} -arch %(darwin_arch) " \
 ASM_OPTIONS ASM_MMACOSX_VERSION_MIN_SPEC
 
-#ifdef HAVE_AS_STABS_DIRECTIVE
-/* We only pass a debug option to the assembler if that supports stabs, since
-   dwarf is not uniformly supported in the assemblers.  */
-#define ASM_DEBUG_SPEC  "%{g*:%{%:debug-level-gt(0):%{!gdwarf*:--gstabs}}}"
-#else
 #define ASM_DEBUG_SPEC  ""
-#endif
-
 #undef  ASM_DEBUG_OPTION_SPEC
 #define ASM_DEBUG_OPTION_SPEC	""
 
@@ -603,10 +596,6 @@ ASM_OPTIONS ASM_MMACOSX_VERSION_MIN_SPEC
 
 #define DWARF2_DEBUGGING_INFO 1
 #define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
-
-#ifdef HAVE_AS_STABS_DIRECTIVE
-#define DBX_DEBUGGING_INFO 1
-#endif
 
 #define DEBUG_FRAME_SECTION	  "__DWARF,__debug_frame,regular,debug"
 #define DEBUG_INFO_SECTION	  "__DWARF,__debug_info,regular,debug"

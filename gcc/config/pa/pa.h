@@ -130,8 +130,6 @@ extern unsigned long total_code_bytes;
    and the old mnemonics are dialect zero.  */
 #define ASSEMBLER_DIALECT (TARGET_PA_20 ? 1 : 0)
 
-/* Override some settings from dbxelf.h.  */
-
 /* We do not have to be compatible with dbx, so we enable gdb extensions
    by default.  */
 #define DEFAULT_GDB_EXTENSIONS 1

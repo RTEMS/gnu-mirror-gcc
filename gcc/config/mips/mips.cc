@@ -9595,10 +9595,6 @@ mips_output_filename (FILE *stream, const char *name)
       output_quoted_string (stream, name);
       putc ('\n', stream);
     }
-  /* If we are emitting stabs, let dbxout.cc handle this (except for
-     the mips_output_filename_first_time case).  */
-  else if (write_symbols == DBX_DEBUG)
-    return;
   else if (name != current_function_file
 	   && strcmp (name, current_function_file) != 0)
     {
