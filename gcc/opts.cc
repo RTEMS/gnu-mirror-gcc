@@ -53,7 +53,7 @@ const char *const debug_type_names[] =
 
 static uint32_t debug_type_masks[] =
 {
-  NO_DEBUG, DWARF2_DEBUG, XCOFF_DEBUG, VMS_DEBUG,
+  NO_DEBUG, DWARF2_DEBUG, VMS_DEBUG,
   CTF_DEBUG, BTF_DEBUG
 };
 
@@ -3149,12 +3149,6 @@ common_handle_option (struct gcc_options *opts,
       set_debug_level (VMS_DEBUG, false, arg, opts, opts_set, loc);
       break;
 
-    case OPT_gxcoff:
-    case OPT_gxcoff_:
-      set_debug_level (XCOFF_DEBUG, code == OPT_gxcoff_, arg, opts, opts_set,
-		       loc);
-      break;
-
     case OPT_gz:
     case OPT_gz_:
       /* Handled completely via specs.  */
@@ -3357,8 +3351,6 @@ set_debug_level (uint32_t dinfo, int extended, const char *arg,
 		 struct gcc_options *opts, struct gcc_options *opts_set,
 		 location_t loc)
 {
-  opts->x_use_gnu_debug_info_extensions = extended;
-
   if (dinfo == NO_DEBUG)
     {
       if (opts->x_write_symbols == NO_DEBUG)

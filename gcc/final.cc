@@ -83,10 +83,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "function-abi.h"
 #include "common/common-target.h"
 
-#ifdef XCOFF_DEBUGGING_INFO
-#include "xcoffout.h"		/* Needed for external data declarations.  */
-#endif
-
 #include "dwarf2out.h"
 
 /* Most ports don't need to define CC_STATUS_INIT.

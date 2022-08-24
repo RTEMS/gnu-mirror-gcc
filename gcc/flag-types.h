@@ -26,7 +26,6 @@ enum debug_info_type
 {
   DINFO_TYPE_NONE,		  /* No debug info.  */
   DINFO_TYPE_DWARF2,		  /* Dwarf v2 debug info.  */
-  DINFO_TYPE_XCOFF,		  /* IBM/Xcoff debug info.  */
   DINFO_TYPE_VMS,		  /* VMS debug info.  */
   DINFO_TYPE_CTF,		  /* CTF debug info.  */
   DINFO_TYPE_BTF,		  /* BTF debug info.  */
@@ -37,8 +36,6 @@ enum debug_info_type
 #define NO_DEBUG      (0U)
 /* Write DWARF2 debug info (using dwarf2out.cc).  */
 #define DWARF2_DEBUG  (1U << DINFO_TYPE_DWARF2)
-/* Write IBM/XCOFF debug info (using dbxout.cc).  */
-#define XCOFF_DEBUG   (1U << DINFO_TYPE_XCOFF)
 /* Write VMS debug info (using vmsdbgout.cc).  */
 #define VMS_DEBUG     (1U << DINFO_TYPE_VMS)
 /* Write CTF debug info (using ctfout.cc).  */
