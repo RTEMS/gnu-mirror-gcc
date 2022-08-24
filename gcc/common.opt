@@ -3323,7 +3323,7 @@ Common Driver JoinedOrMissing Negative(gdwarf-)
 Generate debug information in default version of DWARF format.
 
 gdwarf-
-Common Driver Joined UInteger Var(dwarf_version) Init(5) Negative(gstabs)
+Common Driver Joined UInteger Var(dwarf_version) Init(5)
 Generate debug information in DWARF v2 (or later) format.
 
 gdwarf32
@@ -3369,14 +3369,6 @@ Record gcc command line switches in DWARF DW_AT_producer.
 gsplit-dwarf
 Common Driver Var(dwarf_split_debug_info) Init(0)
 Generate debug information in separate .dwo files.
-
-gstabs
-Common Driver JoinedOrMissing Negative(gstabs+)
-Generate debug information in STABS format.
-
-gstabs+
-Common Driver JoinedOrMissing Negative(gvms)
-Generate debug information in extended STABS format.
 
 gstatement-frontiers
 Common Driver Var(debug_nonbind_markers_p) PerFunction
