@@ -512,11 +512,6 @@ extern int fixuplabelno;
 #define	RS6000_OUTPUT_BASENAME(FILE, NAME)	\
     assemble_name (FILE, NAME)
 
-/* We have to output the stabs for the function name *first*, before
-   outputting its label.  */
-
-#define	DBX_FUNCTION_FIRST
-
 /* This is the end of what might become sysv4dbx.h.  */
 
 #define TARGET_OS_SYSV_CPP_BUILTINS()		\

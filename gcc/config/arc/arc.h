@@ -1380,9 +1380,6 @@ do { \
 
 #define EH_RETURN_STACKADJ_RTX   gen_rtx_REG (Pmode, 2)
 
-/* Turn off splitting of long stabs.  */
-#define DBX_CONTIN_LENGTH 0
-
 /* Miscellaneous.  */
 
 /* Specify the machine mode that this machine uses

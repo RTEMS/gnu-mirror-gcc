@@ -483,9 +483,6 @@ extern int current_first_parm_offset;
 /* Nonzero if access to memory by byte is no faster than by word.  */
 #define SLOW_BYTE_ACCESS 1
 
-/* Do not break .stabs pseudos into continuations.  */
-#define DBX_CONTIN_LENGTH 0
-
 /* Give a comparison code (EQ, NE etc) and the first operand of a COMPARE,
    return the mode to be used for the comparison.  */
 

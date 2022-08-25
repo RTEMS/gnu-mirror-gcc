@@ -145,11 +145,6 @@
 #define NO_DOLLAR_IN_LABEL 1
 #endif
 
-/* Acorn dbx moans about continuation chars, so don't use any.  */
-#ifndef DBX_CONTIN_LENGTH
-#define DBX_CONTIN_LENGTH  0
-#endif
-
 /* Output a function label definition.  */
 #ifndef ASM_DECLARE_FUNCTION_NAME
 #define ASM_DECLARE_FUNCTION_NAME(STREAM, NAME, DECL)	\

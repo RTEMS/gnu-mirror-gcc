@@ -628,18 +628,6 @@ ASM_OPTIONS ASM_MMACOSX_VERSION_MIN_SPEC
                                ? "__DWARF,__debug_gnu_pubt,regular,debug" \
                                : "__DWARF,__debug_pubtypes,regular,debug")
 
-/* When generating stabs debugging, use N_BINCL entries.  */
-
-#define DBX_USE_BINCL
-
-/* There is no limit to the length of stabs strings.  */
-
-#define DBX_CONTIN_LENGTH 0
-
-/* gdb needs a null N_SO at the end of each file for scattered loading.  */
-
-#define DBX_OUTPUT_NULL_N_SO_AT_MAIN_SOURCE_FILE_END
-
 /* GCC's definition of 'one_only' is the same as its definition of 'weak'.  */
 #define MAKE_DECL_ONE_ONLY(DECL) (DECL_WEAK (DECL) = 1)
 

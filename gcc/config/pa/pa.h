@@ -137,14 +137,6 @@ extern unsigned long total_code_bytes;
 /* Select dwarf2 as the preferred debug format.  */
 #define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
 
-/* This used to be zero (no max length), but big enums and such can
-   cause huge strings which killed gas.
-
-   We also have to avoid lossage in dbxout.cc -- it does not compute the
-   string size accurately, so we are real conservative here.  */
-#undef DBX_CONTIN_LENGTH
-#define DBX_CONTIN_LENGTH 3000
-
 /* GDB always assumes the current function's frame begins at the value
    of the stack pointer upon entry to the current function.  Accessing
    local variables and parameters passed on the stack is done using the

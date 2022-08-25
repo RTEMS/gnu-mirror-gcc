@@ -21,17 +21,6 @@ along with GCC; see the file COPYING3.  If not see
 #undef TARGET_SOM
 #define TARGET_SOM 1
 
-/* We do not use BINCL stabs in SOM.
-   ??? If it does not hurt, we probably should to avoid useless divergence
-   from other embedded stabs implementations.  */
-#undef DBX_USE_BINCL
-
-#define DBX_LINES_FUNCTION_RELATIVE 1
-
-/* gdb needs a null N_SO at the end of each file for scattered loading.  */
-
-#define DBX_OUTPUT_NULL_N_SO_AT_MAIN_SOURCE_FILE_END
-
 /* HPUX has a program 'chatr' to list the dependencies of dynamically
    linked executables and shared libraries.  */
 #define LDD_SUFFIX "chatr"
