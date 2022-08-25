@@ -498,6 +498,7 @@ along with GCC; see the file COPYING3.  If not see
 
 #define AS_NEEDS_DASH_FOR_PIPED_INPUT
 
+#endif
 /* Solaris has an implementation of __enable_execute_stack.  */
 #define HAVE_ENABLE_EXECUTE_STACK
 
