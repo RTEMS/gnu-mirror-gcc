@@ -50,7 +50,7 @@ along with GCC; see the file COPYING3.  If not see
   while (0)
 
 
-/* Generate DBX debugging information.  */
+/* Generate debugger debugging information.  */
 #define TARGET_40_PLUS		(TARGET_40 || TARGET_45)
 #define TARGET_10		(! TARGET_40_PLUS)
 
