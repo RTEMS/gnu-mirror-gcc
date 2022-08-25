@@ -37,7 +37,7 @@ else
    # Systems known to be in this category are Windows (all variants),
    # VMS, and Darwin.
    case "$host_os" in
-     vms* | cygwin* | pe | mingw* | darwin* | ultrix* | hpux10* | hpux11.00)
+     vms* | cygwin* | pe | mingw* | darwin* | ultrix* | hpux11.00)
 	ac_cv_func_mmap_dev_zero=no ;;
      *)
 	ac_cv_func_mmap_dev_zero=yes;;
