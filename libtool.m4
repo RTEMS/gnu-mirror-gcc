@@ -2338,7 +2338,7 @@ haiku*)
   hardcode_into_libs=yes
   ;;
 
-hpux9* | hpux10* | hpux11*)
+hpux11*)
   # Give a soname corresponding to the major version so that dld.sl refuses to
   # link against other versions.
   version_type=sunos
@@ -3052,7 +3052,7 @@ haiku*)
   lt_cv_deplibs_check_method=pass_all
   ;;
 
-hpux10.20* | hpux11*)
+hpux11*)
   lt_cv_file_magic_cmd=/usr/bin/file
   case $host_cpu in
   ia64*)
@@ -3691,7 +3691,7 @@ m4_if([$1], [CXX], [
       freebsd* | dragonfly*)
 	# FreeBSD uses GNU C++
 	;;
-      hpux9* | hpux10* | hpux11*)
+      hpux11*)
 	case $cc_basename in
 	  CC*)
 	    _LT_TAGVAR(lt_prog_compiler_wl, $1)='-Wl,'
@@ -4007,7 +4007,7 @@ m4_if([$1], [CXX], [
 	[_LT_TAGVAR(lt_prog_compiler_pic, $1)='-DDLL_EXPORT'])
       ;;
 
-    hpux9* | hpux10* | hpux11*)
+    hpux11*)
       _LT_TAGVAR(lt_prog_compiler_wl, $1)='-Wl,'
       # PIC is the default for IA64 HP-UX and 64-bit HP-UX, but
       # not for PA HP-UX.
@@ -4829,41 +4829,6 @@ _LT_EOF
       _LT_TAGVAR(hardcode_libdir_flag_spec, $1)='-R$libdir'
       _LT_TAGVAR(hardcode_direct, $1)=yes
       _LT_TAGVAR(hardcode_shlibpath_var, $1)=no
-      ;;
-
-    hpux9*)
-      if test "$GCC" = yes; then
-	_LT_TAGVAR(archive_cmds, $1)='$RM $output_objdir/$soname~$CC -shared -fPIC ${wl}+b ${wl}$install_libdir -o $output_objdir/$soname $libobjs $deplibs $compiler_flags~test $output_objdir/$soname = $lib || mv $output_objdir/$soname $lib'
-      else
-	_LT_TAGVAR(archive_cmds, $1)='$RM $output_objdir/$soname~$LD -b +b $install_libdir -o $output_objdir/$soname $libobjs $deplibs $linker_flags~test $output_objdir/$soname = $lib || mv $output_objdir/$soname $lib'
-      fi
-      _LT_TAGVAR(hardcode_libdir_flag_spec, $1)='${wl}+b ${wl}$libdir'
-      _LT_TAGVAR(hardcode_libdir_separator, $1)=:
-      _LT_TAGVAR(hardcode_direct, $1)=yes
-
-      # hardcode_minus_L: Not really in the search PATH,
-      # but as the default location of the library.
-      _LT_TAGVAR(hardcode_minus_L, $1)=yes
-      _LT_TAGVAR(export_dynamic_flag_spec, $1)='${wl}-E'
-      ;;
-
-    hpux10*)
-      if test "$GCC" = yes && test "$with_gnu_ld" = no; then
-	_LT_TAGVAR(archive_cmds, $1)='$CC -shared -fPIC ${wl}+h ${wl}$soname ${wl}+b ${wl}$install_libdir -o $lib $libobjs $deplibs $compiler_flags'
-      else
-	_LT_TAGVAR(archive_cmds, $1)='$LD -b +h $soname +b $install_libdir -o $lib $libobjs $deplibs $linker_flags'
-      fi
-      if test "$with_gnu_ld" = no; then
-	_LT_TAGVAR(hardcode_libdir_flag_spec, $1)='${wl}+b ${wl}$libdir'
-	_LT_TAGVAR(hardcode_libdir_flag_spec_ld, $1)='+b $libdir'
-	_LT_TAGVAR(hardcode_libdir_separator, $1)=:
-	_LT_TAGVAR(hardcode_direct, $1)=yes
-	_LT_TAGVAR(hardcode_direct_absolute, $1)=yes
-	_LT_TAGVAR(export_dynamic_flag_spec, $1)='${wl}-E'
-	# hardcode_minus_L: Not really in the search PATH,
-	# but as the default location of the library.
-	_LT_TAGVAR(hardcode_minus_L, $1)=yes
-      fi
       ;;
 
     hpux11*)
@@ -5787,44 +5752,7 @@ if test "$_lt_caught_CXX_error" != yes; then
         _LT_TAGVAR(link_all_deplibs, $1)=yes
         ;;
 
-      hpux9*)
-        _LT_TAGVAR(hardcode_libdir_flag_spec, $1)='${wl}+b ${wl}$libdir'
-        _LT_TAGVAR(hardcode_libdir_separator, $1)=:
-        _LT_TAGVAR(export_dynamic_flag_spec, $1)='${wl}-E'
-        _LT_TAGVAR(hardcode_direct, $1)=yes
-        _LT_TAGVAR(hardcode_minus_L, $1)=yes # Not in the search PATH,
-				             # but as the default
-				             # location of the library.
-
-        case $cc_basename in
-          CC*)
-            # FIXME: insert proper C++ library support
-            _LT_TAGVAR(ld_shlibs, $1)=no
-            ;;
-          aCC*)
-            _LT_TAGVAR(archive_cmds, $1)='$RM $output_objdir/$soname~$CC -b ${wl}+b ${wl}$install_libdir -o $output_objdir/$soname $predep_objects $libobjs $deplibs $postdep_objects $compiler_flags~test $output_objdir/$soname = $lib || mv $output_objdir/$soname $lib'
-            # Commands to make compiler produce verbose output that lists
-            # what "hidden" libraries, object files and flags are used when
-            # linking a shared library.
-            #
-            # There doesn't appear to be a way to prevent this compiler from
-            # explicitly linking system object files so we need to strip them
-            # from the output so that they don't get included in the library
-            # dependencies.
-            output_verbose_link_cmd='templist=`($CC -b $CFLAGS -v conftest.$objext 2>&1) | $EGREP "\-L"`; list=""; for z in $templist; do case $z in conftest.$objext) list="$list $z";; *.$objext);; *) list="$list $z";;esac; done; func_echo_all "$list"'
-            ;;
-          *)
-            if test "$GXX" = yes; then
-              _LT_TAGVAR(archive_cmds, $1)='$RM $output_objdir/$soname~$CC -shared -nostdlib -fPIC ${wl}+b ${wl}$install_libdir -o $output_objdir/$soname $predep_objects $libobjs $deplibs $postdep_objects $compiler_flags~test $output_objdir/$soname = $lib || mv $output_objdir/$soname $lib'
-            else
-              # FIXME: insert proper C++ library support
-              _LT_TAGVAR(ld_shlibs, $1)=no
-            fi
-            ;;
-        esac
-        ;;
-
-      hpux10*|hpux11*)
+      hpux11*)
         if test $with_gnu_ld = no; then
 	  _LT_TAGVAR(hardcode_libdir_flag_spec, $1)='${wl}+b ${wl}$libdir'
 	  _LT_TAGVAR(hardcode_libdir_separator, $1)=:

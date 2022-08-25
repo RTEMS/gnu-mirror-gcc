@@ -62,7 +62,7 @@ else
       ;;
     mingw* | pw32* | os2*)
       ;;
-    hpux9* | hpux10* | hpux11*)
+    hpux11*)
       wl='-Wl,'
       ;;
     irix5* | irix6* | nonstopux*)
@@ -296,15 +296,7 @@ else
       hardcode_libdir_flag_spec='-R$libdir'
       hardcode_direct=yes
       ;;
-    hpux9*)
-      hardcode_libdir_flag_spec='${wl}+b ${wl}$libdir'
-      hardcode_libdir_separator=:
-      hardcode_direct=yes
-      # hardcode_minus_L: Not really in the search PATH,
-      # but as the default location of the library.
-      hardcode_minus_L=yes
-      ;;
-    hpux10* | hpux11*)
+    hpux11*)
       if test "$with_gnu_ld" = no; then
         case "$host_cpu" in
           hppa*64*)
@@ -449,7 +441,7 @@ case "$host_os" in
     ;;
   gnu*)
     ;;
-  hpux9* | hpux10* | hpux11*)
+  hpux11*)
     case "$host_cpu" in
       ia64*)
         shrext=.so
