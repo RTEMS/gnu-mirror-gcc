@@ -6663,8 +6663,8 @@ exceptions.  If @code{DWARF2_DEBUGGING_INFO} is defined, GCC uses the
 value @code{DWARF2_DEBUG}.
 
 The value of this macro only affects the default debugging output; the
-user can always get a specific type of output by using @option{-gstabs},
-@option{-gdwarf-2}, or @option{-gvms}.
+user can always get a specific type of output by using  @option{-gdwarf-2},
+or @option{-gvms}.
 @end defmac
 
 @defmac DEFAULT_GDB_EXTENSIONS

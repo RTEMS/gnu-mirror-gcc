@@ -5730,12 +5730,6 @@ foo:
    fi
  fi
 
- gcc_GAS_CHECK_FEATURE([--gstabs option],
-  gcc_cv_as_gstabs_flag,
-  [--gstabs], [$insn],,
-  [AC_DEFINE(HAVE_AS_GSTABS_DEBUG_FLAG, 1,
-[Define if your assembler supports the --gstabs option.])])
-
  gcc_GAS_CHECK_FEATURE([--debug-prefix-map option],
   gcc_cv_as_debug_prefix_map_flag,
   [--debug-prefix-map /a=/b], [$insn],,
