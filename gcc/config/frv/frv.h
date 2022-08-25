@@ -1745,16 +1745,16 @@ fprintf (STREAM, "\t.word .L%d\n", VALUE)
 
    If two registers have consecutive numbers inside GCC, and they can be
    used as a pair to hold a multiword value, then they *must* have consecutive
-   numbers after renumbering with `DBX_REGISTER_NUMBER'.  Otherwise, debuggers
+   numbers after renumbering with `DEBUGGER_REGISTER_NUMBER'.  Otherwise, debuggers
    will be unable to access such a pair, because they expect register pairs to
    be consecutive in their own numbering scheme.
 
-   If you find yourself defining `DBX_REGISTER_NUMBER' in way that does not
+   If you find yourself defining `DEBUGGER_REGISTER_NUMBER' in way that does not
    preserve register pairs, then what you must do instead is redefine the
    actual register numbering scheme.
 
    This declaration is required.  */
-#define DBX_REGISTER_NUMBER(REGNO) (REGNO)
+#define DEBUGGER_REGISTER_NUMBER(REGNO) (REGNO)
 
 #undef  PREFERRED_DEBUGGING_TYPE
 #define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG

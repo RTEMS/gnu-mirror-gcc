@@ -3889,7 +3889,7 @@ nds32_dwarf_register_span (rtx reg)
 /* Map internal gcc register numbers to DWARF2 register numbers.  */
 
 unsigned int
-nds32_dbx_register_number (unsigned int regno)
+nds32_debugger_register_number (unsigned int regno)
 {
   /* The nds32 port in GDB maintains a mapping between dwarf register
      number and displayed register name.  For backward compatibility to

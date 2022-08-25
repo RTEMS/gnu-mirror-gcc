@@ -757,8 +757,8 @@ typedef struct { int regs; int lib; } CUMULATIVE_ARGS;
 
 /* Node: All Debuggers */
 
-#define DBX_REGISTER_NUMBER(REGNO) \
- mmix_dbx_register_number (REGNO)
+#define DEBUGGER_REGISTER_NUMBER(REGNO) \
+ mmix_debugger_register_number (REGNO)
 
 
 /* Node: DBX Options */

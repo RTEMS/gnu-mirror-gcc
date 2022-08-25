@@ -1491,7 +1491,7 @@ do									\
    This describes how to specify debugging information.
 
     mda is known to GDB, but not to GCC. */
-#define DBX_REGISTER_NUMBER(REGNO) \
+#define DEBUGGER_REGISTER_NUMBER(REGNO) \
   ((REGNO) > MDB_REGNUM ? (REGNO) + 1 : (REGNO))
 
 /* `DEBUGGER_AUTO_OFFSET (X)'
