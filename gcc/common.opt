@@ -3364,6 +3364,14 @@ gsplit-dwarf
 Common Driver Var(dwarf_split_debug_info) Init(0)
 Generate debug information in separate .dwo files.
 
+gstabs
+Common Driver WarnRemoved
+Does nothing.  Preserved for backward compatibility.
+
+gstabs+
+Common Driver WarnRemoved
+Does nothing.  Preserved for backward compatibility.
+
 gstatement-frontiers
 Common Driver Var(debug_nonbind_markers_p) PerFunction
 Emit progressive recommended breakpoint locations.
@@ -3390,6 +3398,14 @@ Common Driver RejectNegative Var(debug_variable_location_views, -1) Init(2)
 gvms
 Common Driver JoinedOrMissing
 Generate debug information in VMS format.
+
+gxcoff
+Common Driver WarnRemoved
+Does nothing.  Preserved for backward compatibility.
+
+gxcoff+
+Common Driver JoinedOrMissing  WarnRemoved
+Does nothing.  Preserved for backward compatibility.
 
 Enum
 Name(compressed_debug_sections) Type(int)
