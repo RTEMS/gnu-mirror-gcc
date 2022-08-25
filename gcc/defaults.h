@@ -429,17 +429,17 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #endif
 #endif
 
-/* How to renumber registers for dbx and gdb.  If not defined, assume
+/* How to renumber registers for gdb.  If not defined, assume
    no renumbering is necessary.  */
 
-#ifndef DBX_REGISTER_NUMBER
-#define DBX_REGISTER_NUMBER(REGNO) (REGNO)
+#ifndef DEBUGGER_REGISTER_NUMBER
+#define DEBUGGER_REGISTER_NUMBER(REGNO) (REGNO)
 #endif
 
 /* The mapping from gcc register number to DWARF 2 CFA column number.
    By default, we just provide columns for all registers.  */
 #ifndef DWARF_FRAME_REGNUM
-#define DWARF_FRAME_REGNUM(REG) DBX_REGISTER_NUMBER (REG)
+#define DWARF_FRAME_REGNUM(REG) DEBUGGER_REGISTER_NUMBER (REG)
 #endif
 
 /* The mapping from dwarf CFA reg number to internal dwarf reg numbers.  */

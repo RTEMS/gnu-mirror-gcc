@@ -224,8 +224,8 @@ along with GCC; see the file COPYING3.  If not see
 
 #define TARGET_ASM_FILE_END file_end_indicate_exec_stack
 
-#undef DBX_REGISTER_NUMBER
-#define DBX_REGISTER_NUMBER(REGNO) (REGNO)
+#undef DEBUGGER_REGISTER_NUMBER
+#define DEBUGGER_REGISTER_NUMBER(REGNO) (REGNO)
 
 #undef  SIZE_TYPE
 #define SIZE_TYPE "unsigned int"

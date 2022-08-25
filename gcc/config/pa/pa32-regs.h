@@ -227,7 +227,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
       || (GET_MODE_SIZE (MODE) == 8 * UNITS_PER_WORD			\
 	  && ((REGNO) & 7) == 3 && (REGNO) <= 19)))
 
-/* How to renumber registers for dbx and gdb.
+/* How to renumber registers for gdb.
 
    Registers 0  - 31 remain unchanged.
 
@@ -235,7 +235,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
    Register 88 is mapped to 32.  */
 
-#define DBX_REGISTER_NUMBER(REGNO) \
+#define DEBUGGER_REGISTER_NUMBER(REGNO) \
   ((REGNO) <= 31 ? (REGNO) :						\
    ((REGNO) <= 87 ? (REGNO) + 40 : 32))
 

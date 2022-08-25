@@ -1659,9 +1659,9 @@ extern bool current_function_interrupt;
    to match gdb.  */
 /* expand_builtin_init_dwarf_reg_sizes uses this to test if a
    register exists, so we should return -1 for invalid register numbers.  */
-#define DBX_REGISTER_NUMBER(REGNO) SH_DBX_REGISTER_NUMBER (REGNO)
+#define DEBUGGER_REGISTER_NUMBER(REGNO) SH_DEBUGGER_REGISTER_NUMBER (REGNO)
 
-#define SH_DBX_REGISTER_NUMBER(REGNO) \
+#define SH_DEBUGGER_REGISTER_NUMBER(REGNO) \
   (IN_RANGE ((REGNO), \
 	     (unsigned HOST_WIDE_INT) FIRST_GENERAL_REG, \
 	     FIRST_GENERAL_REG + 15U) \

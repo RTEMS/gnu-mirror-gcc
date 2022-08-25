@@ -165,14 +165,14 @@ along with GCC; see the file COPYING3.  If not see
       || (GET_MODE_SIZE (MODE) == 4 * UNITS_PER_WORD			\
 	  && ((REGNO) & 3) == 3 && (REGNO) <= 23)))
 
-/* How to renumber registers for dbx and gdb.
+/* How to renumber registers for gdb.
 
    Registers 0  - 31 remain unchanged.
 
    Registers 32 - 59 are mapped to 72, 74, 76 ...
 
    Register 60 is mapped to 32.  */
-#define DBX_REGISTER_NUMBER(REGNO) \
+#define DEBUGGER_REGISTER_NUMBER(REGNO) \
   ((REGNO) <= 31 ? (REGNO) : ((REGNO) < 60 ? (REGNO - 32) * 2 + 72 : 32))
 
 /* We must not use the DBX register numbers for the DWARF 2 CFA column
