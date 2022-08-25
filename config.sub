@@ -1127,9 +1127,6 @@ case $cpu-$vendor in
 
 	# Recognize the canonical CPU Types that limit and/or modify the
 	# company names they are paired with.
-	cr16-*)
-		basic_os=${basic_os:-elf}
-		;;
 	crisv32-* | etraxfs*-*)
 		cpu=crisv32
 		vendor=axis
