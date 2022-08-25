@@ -9977,7 +9977,7 @@ value @code{DWARF2_DEBUG}.
 
 The value of this macro only affects the default debugging output; the
 user can always get a specific type of output by using @option{-gstabs},
-@option{-gdwarf-2}, @option{-gxcoff}, or @option{-gvms}.
+@option{-gdwarf-2}, or @option{-gvms}.
 @end defmac
 
 @defmac DEFAULT_GDB_EXTENSIONS
