@@ -2644,7 +2644,7 @@ ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 
 # _LT_DARWIN_LINKER_FEATURES
 # --------------------------
-# Checks for linker and compiler features on darwin
+# Checks for linker and compiler features on Darwin / macOS / iOS
 
 
 # _LT_SYS_MODULE_PATH_AIX
@@ -5347,7 +5347,7 @@ else
    # Systems known to be in this category are Windows (all variants),
    # VMS, and Darwin.
    case "$host_os" in
-     *vms* | cygwin* | pe | mingw* | darwin* | ultrix* | hpux10* | hpux11.00)
+     *vms* | cygwin* | pe | mingw* | darwin* | ultrix* | hpux11.00)
         gcc_cv_func_mmap_dev_zero=no ;;
      *)
         gcc_cv_func_mmap_dev_zero=yes;;

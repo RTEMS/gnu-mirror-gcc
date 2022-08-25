@@ -4027,16 +4027,6 @@ if test x$with_fpmath != x; then
   esac
 fi
 
-# Similarly for --with-schedule.
-if test x$with_schedule = x; then
-	case ${target} in
-	hppa1*)
-		# Override default PA8000 scheduling model.
-		with_schedule=7100LC
-		;;
-	esac
-fi
-
 # Infer a default setting for --with-llsc.
 if test x$with_llsc = x; then
   case ${target} in

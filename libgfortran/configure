@@ -7673,7 +7673,7 @@ haiku*)
   lt_cv_deplibs_check_method=pass_all
   ;;
 
-hpux10.20* | hpux11*)
+hpux11*)
   lt_cv_file_magic_cmd=/usr/bin/file
   case $host_cpu in
   ia64*)
@@ -9908,7 +9908,7 @@ $as_echo_n "checking for $compiler option to produce PIC... " >&6; }
       lt_prog_compiler_pic='-DDLL_EXPORT'
       ;;
 
-    hpux9* | hpux10* | hpux11*)
+    hpux11*)
       lt_prog_compiler_wl='-Wl,'
       # PIC is the default for IA64 HP-UX and 64-bit HP-UX, but
       # not for PA HP-UX.
@@ -11001,41 +11001,6 @@ if test -z "$aix_libpath"; then aix_libpath="/usr/lib:/lib"; fi
       hardcode_shlibpath_var=no
       ;;
 
-    hpux9*)
-      if test "$GCC" = yes; then
-	archive_cmds='$RM $output_objdir/$soname~$CC -shared -fPIC ${wl}+b ${wl}$install_libdir -o $output_objdir/$soname $libobjs $deplibs $compiler_flags~test $output_objdir/$soname = $lib || mv $output_objdir/$soname $lib'
-      else
-	archive_cmds='$RM $output_objdir/$soname~$LD -b +b $install_libdir -o $output_objdir/$soname $libobjs $deplibs $linker_flags~test $output_objdir/$soname = $lib || mv $output_objdir/$soname $lib'
-      fi
-      hardcode_libdir_flag_spec='${wl}+b ${wl}$libdir'
-      hardcode_libdir_separator=:
-      hardcode_direct=yes
-
-      # hardcode_minus_L: Not really in the search PATH,
-      # but as the default location of the library.
-      hardcode_minus_L=yes
-      export_dynamic_flag_spec='${wl}-E'
-      ;;
-
-    hpux10*)
-      if test "$GCC" = yes && test "$with_gnu_ld" = no; then
-	archive_cmds='$CC -shared -fPIC ${wl}+h ${wl}$soname ${wl}+b ${wl}$install_libdir -o $lib $libobjs $deplibs $compiler_flags'
-      else
-	archive_cmds='$LD -b +h $soname +b $install_libdir -o $lib $libobjs $deplibs $linker_flags'
-      fi
-      if test "$with_gnu_ld" = no; then
-	hardcode_libdir_flag_spec='${wl}+b ${wl}$libdir'
-	hardcode_libdir_flag_spec_ld='+b $libdir'
-	hardcode_libdir_separator=:
-	hardcode_direct=yes
-	hardcode_direct_absolute=yes
-	export_dynamic_flag_spec='${wl}-E'
-	# hardcode_minus_L: Not really in the search PATH,
-	# but as the default location of the library.
-	hardcode_minus_L=yes
-      fi
-      ;;
-
     hpux11*)
       if test "$GCC" = yes && test "$with_gnu_ld" = no; then
 	case $host_cpu in
@@ -11952,7 +11917,7 @@ haiku*)
   hardcode_into_libs=yes
   ;;
 
-hpux9* | hpux10* | hpux11*)
+hpux11*)
   # Give a soname corresponding to the major version so that dld.sl refuses to
   # link against other versions.
   version_type=sunos
@@ -12767,7 +12732,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 12770 "configure"
+#line 12735 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -12873,7 +12838,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 12876 "configure"
+#line 12841 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -13913,7 +13878,7 @@ $as_echo_n "checking for $compiler option to produce PIC... " >&6; }
       lt_prog_compiler_pic_FC='-DDLL_EXPORT'
       ;;
 
-    hpux9* | hpux10* | hpux11*)
+    hpux11*)
       lt_prog_compiler_wl_FC='-Wl,'
       # PIC is the default for IA64 HP-UX and 64-bit HP-UX, but
       # not for PA HP-UX.
@@ -14979,41 +14944,6 @@ if test -z "$aix_libpath"; then aix_libpath="/usr/lib:/lib"; fi
       hardcode_shlibpath_var_FC=no
       ;;
 
-    hpux9*)
-      if test "$GCC" = yes; then
-	archive_cmds_FC='$RM $output_objdir/$soname~$CC -shared -fPIC ${wl}+b ${wl}$install_libdir -o $output_objdir/$soname $libobjs $deplibs $compiler_flags~test $output_objdir/$soname = $lib || mv $output_objdir/$soname $lib'
-      else
-	archive_cmds_FC='$RM $output_objdir/$soname~$LD -b +b $install_libdir -o $output_objdir/$soname $libobjs $deplibs $linker_flags~test $output_objdir/$soname = $lib || mv $output_objdir/$soname $lib'
-      fi
-      hardcode_libdir_flag_spec_FC='${wl}+b ${wl}$libdir'
-      hardcode_libdir_separator_FC=:
-      hardcode_direct_FC=yes
-
-      # hardcode_minus_L: Not really in the search PATH,
-      # but as the default location of the library.
-      hardcode_minus_L_FC=yes
-      export_dynamic_flag_spec_FC='${wl}-E'
-      ;;
-
-    hpux10*)
-      if test "$GCC" = yes && test "$with_gnu_ld" = no; then
-	archive_cmds_FC='$CC -shared -fPIC ${wl}+h ${wl}$soname ${wl}+b ${wl}$install_libdir -o $lib $libobjs $deplibs $compiler_flags'
-      else
-	archive_cmds_FC='$LD -b +h $soname +b $install_libdir -o $lib $libobjs $deplibs $linker_flags'
-      fi
-      if test "$with_gnu_ld" = no; then
-	hardcode_libdir_flag_spec_FC='${wl}+b ${wl}$libdir'
-	hardcode_libdir_flag_spec_ld_FC='+b $libdir'
-	hardcode_libdir_separator_FC=:
-	hardcode_direct_FC=yes
-	hardcode_direct_absolute_FC=yes
-	export_dynamic_flag_spec_FC='${wl}-E'
-	# hardcode_minus_L: Not really in the search PATH,
-	# but as the default location of the library.
-	hardcode_minus_L_FC=yes
-      fi
-      ;;
-
     hpux11*)
       if test "$GCC" = yes && test "$with_gnu_ld" = no; then
 	case $host_cpu in
@@ -15722,7 +15652,7 @@ haiku*)
   hardcode_into_libs=yes
   ;;
 
-hpux9* | hpux10* | hpux11*)
+hpux11*)
   # Give a soname corresponding to the major version so that dld.sl refuses to
   # link against other versions.
   version_type=sunos

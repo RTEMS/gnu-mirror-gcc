@@ -1107,8 +1107,6 @@ case "${target}" in
   h8500-*-*)
     noconfigdirs="$noconfigdirs target-libgloss"
     ;;
-  hppa1.1-*-osf* | hppa1.1-*-bsd* )
-    ;;
   hppa*64*-*-hpux*)
     noconfigdirs="$noconfigdirs gdb"
     ;;

@@ -375,9 +375,6 @@ case "$UNAME_MACHINE:$UNAME_SYSTEM:$UNAME_RELEASE:$UNAME_VERSION" in
     arm*:riscos:*:*|arm*:RISCOS:*:*)
 	echo arm-unknown-riscos
 	exit ;;
-    SR2?01:HI-UX/MPP:*:* | SR8000:HI-UX/MPP:*:*)
-	echo hppa1.1-hitachi-hiuxmpp
-	exit ;;
     Pyramid*:OSx*:*:* | MIS*:OSx*:*:* | MIS*:SMP_DC-OSx*:*:*)
 	# akee@wpdis03.wpafb.af.mil (Earle F. Ake) contributed MIS and NILE.
 	if test "$( (/bin/universe) 2>/dev/null)" = att ; then
@@ -669,13 +666,9 @@ EOF
 		    sc_cpu_version=$(/usr/bin/getconf SC_CPU_VERSION 2>/dev/null)
 		    sc_kernel_bits=$(/usr/bin/getconf SC_KERNEL_BITS 2>/dev/null)
 		    case "$sc_cpu_version" in
-		      523) HP_ARCH=hppa1.0 ;; # CPU_PA_RISC1_0
-		      528) HP_ARCH=hppa1.1 ;; # CPU_PA_RISC1_1
 		      532)                      # CPU_PA_RISC2_0
 			case "$sc_kernel_bits" in
-			  32) HP_ARCH=hppa2.0n ;;
 			  64) HP_ARCH=hppa2.0w ;;
-			  '') HP_ARCH=hppa2.0 ;;   # HP-UX 10.20
 			esac ;;
 		    esac
 		fi
@@ -696,20 +689,16 @@ EOF
 
 		    switch (cpu)
 			{
-			case CPU_PA_RISC1_0: puts ("hppa1.0"); break;
-			case CPU_PA_RISC1_1: puts ("hppa1.1"); break;
 			case CPU_PA_RISC2_0:
 		#if defined(_SC_KERNEL_BITS)
 			    switch (bits)
 				{
 				case 64: puts ("hppa2.0w"); break;
-				case 32: puts ("hppa2.0n"); break;
 				default: puts ("hppa2.0"); break;
 				} break;
 		#else  /* !defined(_SC_KERNEL_BITS) */
 			    puts ("hppa2.0"); break;
 		#endif
-			default: puts ("hppa1.0"); break;
 			}
 		    exit (0);
 		}
@@ -760,8 +749,6 @@ EOF
 	    {
 	      switch (cpu)
 		{
-		  case CPU_PA_RISC1_0: puts ("hppa1.0-hitachi-hiuxwe2"); break;
-		  case CPU_PA_RISC1_1: puts ("hppa1.1-hitachi-hiuxwe2"); break;
 		  case CPU_PA_RISC2_0: puts ("hppa2.0-hitachi-hiuxwe2"); break;
 		  default: puts ("hppa-hitachi-hiuxwe2"); break;
 		}
@@ -776,30 +763,12 @@ EOF
 		{ echo "$SYSTEM_NAME"; exit; }
 	echo unknown-hitachi-hiuxwe2
 	exit ;;
-    9000/7??:4.3bsd:*:* | 9000/8?[79]:4.3bsd:*:*)
-	echo hppa1.1-hp-bsd
-	exit ;;
-    9000/8??:4.3bsd:*:*)
-	echo hppa1.0-hp-bsd
-	exit ;;
-    *9??*:MPE/iX:*:* | *3000*:MPE/iX:*:*)
-	echo hppa1.0-hp-mpeix
-	exit ;;
-    hp7??:OSF1:*:* | hp8?[79]:OSF1:*:*)
-	echo hppa1.1-hp-osf
-	exit ;;
-    hp8??:OSF1:*:*)
-	echo hppa1.0-hp-osf
-	exit ;;
     i*86:OSF1:*:*)
 	if test -x /usr/sbin/sysversion ; then
 	    echo "$UNAME_MACHINE"-unknown-osf1mk
 	else
 	    echo "$UNAME_MACHINE"-unknown-osf1
 	fi
-	exit ;;
-    parisc*:Lites*:*:*)
-	echo hppa1.1-hp-lites
 	exit ;;
     C1*:ConvexOS:*:* | convex:ConvexOS:C1*:*)
 	echo c1-convex-bsd
@@ -1069,7 +1038,6 @@ EOF
     parisc:Linux:*:* | hppa:Linux:*:*)
 	# Look for CPU level
 	case $(grep '^cpu[^a-z]*:' /proc/cpuinfo 2>/dev/null | cut -d' ' -f2) in
-	  PA7*) echo hppa1.1-unknown-linux-"$LIBC" ;;
 	  PA8*) echo hppa2.0-unknown-linux-"$LIBC" ;;
 	  *)    echo hppa-unknown-linux-"$LIBC" ;;
 	esac
@@ -1283,11 +1251,6 @@ EOF
 			# says <Richard.M.Bartel@ccMail.Census.GOV>
 	echo i586-unisys-sysv4
 	exit ;;
-    *:UNIX_System_V:4*:FTX*)
-	# From Gerald Hewes <hewes@openmarket.com>.
-	# How about differentiating between stratus architectures? -djm
-	echo hppa1.1-stratus-sysv4
-	exit ;;
     *:*:*:FTX*)
 	# From seanf@swdc.stratus.com.
 	echo i860-stratus-sysv4
@@ -1295,10 +1258,6 @@ EOF
     i*86:VOS:*:*)
 	# From Paul.Green@stratus.com.
 	echo "$UNAME_MACHINE"-stratus-vos
-	exit ;;
-    *:VOS:*:*)
-	# From Paul.Green@stratus.com.
-	echo hppa1.1-stratus-vos
 	exit ;;
     mc68*:A/UX:*:*)
 	echo m68k-apple-aux"$UNAME_RELEASE"
