@@ -2255,7 +2255,7 @@ fix = {
 };
 
 fix = {
-     hackname  = hpux11_cpp_pow_inline;
+     hackname  = hpux11_2_cpp_pow_inline;
      files     = math.h;
      select    = " +inline double pow\\(double d,int expon\\) \\{\n"
                  " +return pow\\(d, \\(double\\)expon\\);\n"
