@@ -150,3 +150,16 @@ FAIL: gcc.dg/pr56837.c scan-tree-dump-times optimized "memset ..c, 68, 16384.;" 
 XPASS: g++.dg/warn/Wstringop-overflow-4.C -std=gnu++14  (test for bogus messages, line 198)
 XPASS: g++.dg/warn/Wstringop-overflow-4.C -std=gnu++17  (test for bogus messages, line 198)
 XPASS: g++.dg/warn/Wstringop-overflow-4.C -std=gnu++20  (test for bogus messages, line 198)
+FAIL: g++.dg/modules/xtreme-header-2_b.C -std=c++17 (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header-2_b.C -std=c++2a (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header-2_b.C -std=c++2b (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header-4_b.C -std=c++17 (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header-4_b.C -std=c++2a (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header-4_b.C -std=c++2b (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header_b.C -std=c++17 (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header_b.C -std=c++2a (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header_b.C -std=c++2b (test for excess errors)
+FAIL: gcc.dg/tree-prof/cmpsf-1.c scan-tree-dump-not dom2 "Invalid sum"
+FAIL: libstdc++-prettyprinters/48362.cc print t2
+FAIL: libstdc++-prettyprinters/cxx11.cc print rtpl
+FAIL: libstdc++-prettyprinters/cxx11.cc print tpl
