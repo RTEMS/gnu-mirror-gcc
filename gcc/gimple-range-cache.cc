@@ -960,7 +960,7 @@ ranger_cache::edge_range (vrange &r, edge e, tree name, enum rfd_mode mode)
   // If this is not an abnormal edge, check for inferred ranges on exit.
   if ((e->flags & (EDGE_EH | EDGE_ABNORMAL)) == 0)
     m_exit.maybe_adjust_range (r, name, e->src);
-  int_range_max er;
+  Value_Range er (TREE_TYPE (name));
   if (m_gori.outgoing_edge_range_p (er, e, name, *this))
     r.intersect (er);
   return true;
@@ -1211,13 +1211,56 @@ ranger_cache::fill_block_cache (tree name, basic_block bb, basic_block def_bb)
   // Check if a dominators can supply the range.
   if (range_from_dom (block_result, name, bb, RFD_FILL))
     {
-      m_on_entry.set_bb_range (name, bb, block_result);
       if (DEBUG_RANGE_CACHE)
 	{
 	  fprintf (dump_file, "Filled from dominator! :  ");
 	  block_result.dump (dump_file);
 	  fprintf (dump_file, "\n");
 	}
+      // See if any equivalences can refine it.
+      if (m_oracle)
+	{
+	  unsigned i;
+	  bitmap_iterator bi;
+	  // Query equivalences in read-only mode.
+	  const_bitmap equiv = m_oracle->equiv_set (name, bb);
+	  EXECUTE_IF_SET_IN_BITMAP (equiv, 0, i, bi)
+	    {
+	      if (i == SSA_NAME_VERSION (name))
+		continue;
+	      tree equiv_name = ssa_name (i);
+	      basic_block equiv_bb = gimple_bb (SSA_NAME_DEF_STMT (equiv_name));
+
+	      // Check if the equiv has any ranges calculated.
+	      if (!m_gori.has_edge_range_p (equiv_name))
+		continue;
+
+	      // Check if the equiv definition dominates this block
+	      if (equiv_bb == bb ||
+		  (equiv_bb && !dominated_by_p (CDI_DOMINATORS, bb, equiv_bb)))
+		continue;
+
+	      Value_Range equiv_range (TREE_TYPE (equiv_name));
+	      if (range_from_dom (equiv_range, equiv_name, bb, RFD_READ_ONLY))
+		{
+		  if (block_result.intersect (equiv_range))
+		    {
+		      if (DEBUG_RANGE_CACHE)
+			{
+			  fprintf (dump_file, "Equivalence update! :  ");
+			  print_generic_expr (dump_file, equiv_name, TDF_SLIM);
+			  fprintf (dump_file, "had range  :  ");
+			  equiv_range.dump (dump_file);
+			  fprintf (dump_file, " refining range to :");
+			  block_result.dump (dump_file);
+			  fprintf (dump_file, "\n");
+			}
+		    }
+		}
+	    }
+	}
+
+      m_on_entry.set_bb_range (name, bb, block_result);
       gcc_checking_assert (m_workback.length () == 0);
       return;
     }
@@ -1364,7 +1407,8 @@ ranger_cache::range_from_dom (vrange &r, tree name, basic_block start_bb,
   basic_block prev_bb = start_bb;
 
   // Track any inferred ranges seen.
-  int_range_max infer (TREE_TYPE (name));
+  Value_Range infer (TREE_TYPE (name));
+  infer.set_varying (TREE_TYPE (name));
 
   // Range on entry to the DEF block should not be queried.
   gcc_checking_assert (start_bb != def_bb);
@@ -1431,7 +1475,7 @@ ranger_cache::range_from_dom (vrange &r, tree name, basic_block start_bb,
   // Now process any blocks wit incoming edges that nay have adjustemnts.
   while (m_workback.length () > start_limit)
     {
-      int_range_max er;
+      Value_Range er (TREE_TYPE (name));
       prev_bb = m_workback.pop ();
       if (!single_pred_p (prev_bb))
 	{

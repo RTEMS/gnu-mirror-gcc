@@ -284,9 +284,11 @@ int c_inhibit_evaluation_warnings;
    be generated.  */
 bool in_late_binary_op;
 
-/* Whether lexing has been completed, so subsequent preprocessor
-   errors should use the compiler's input_location.  */
-bool done_lexing = false;
+/* Depending on which phase of processing we are in, we may need
+   to prefer input_location to libcpp's locations.  (Specifically,
+   after the C++ lexer is done lexing tokens, but prior to calling
+   cpp_finish (), we need to do so.  */
+bool override_libcpp_locations;
 
 /* Information about how a function name is generated.  */
 struct fname_var_t
@@ -322,8 +324,10 @@ static bool nonnull_check_p (tree, unsigned HOST_WIDE_INT);
    if they match the mask.
 
    Masks for languages:
-   C --std=c89: D_C99 | D_CXXONLY | D_OBJC | D_CXX_OBJC
-   C --std=c99: D_CXXONLY | D_OBJC
+   C --std=c89: D_C99 | D_C2X | D_CXXONLY | D_OBJC | D_CXX_OBJC
+   C --std=c99: D_C2X | D_CXXONLY | D_OBJC
+   C --std=c17: D_C2X | D_CXXONLY | D_OBJC
+   C --std=c2x: D_CXXONLY | D_OBJC
    ObjC is like C except that D_OBJC and D_CXX_OBJC are not set
    C++ --std=c++98: D_CONLY | D_CXX11 | D_CXX20 | D_OBJC
    C++ --std=c++11: D_CONLY | D_CXX20 | D_OBJC
@@ -498,7 +502,7 @@ const struct c_common_resword c_common_reswords[] =
   { "namespace",	RID_NAMESPACE,	D_CXXONLY | D_CXXWARN },
   { "new",		RID_NEW,	D_CXXONLY | D_CXXWARN },
   { "noexcept",		RID_NOEXCEPT,	D_CXXONLY | D_CXX11 | D_CXXWARN },
-  { "nullptr",		RID_NULLPTR,	D_CXXONLY | D_CXX11 | D_CXXWARN },
+  { "nullptr",		RID_NULLPTR,	D_C2X | D_CXX11 | D_CXXWARN },
   { "operator",		RID_OPERATOR,	D_CXXONLY | D_CXXWARN },
   { "private",		RID_PRIVATE,	D_CXX_OBJC | D_CXXWARN },
   { "protected",	RID_PROTECTED,	D_CXX_OBJC | D_CXXWARN },
@@ -4721,6 +4725,18 @@ c_common_nodes_and_builtins (void)
   null_node = make_int_cst (1, 1);
   TREE_TYPE (null_node) = c_common_type_for_size (POINTER_SIZE, 0);
 
+  /* Create the built-in nullptr node.  This part of its initialization is
+     common to C and C++.  The front ends can further adjust its definition
+     in {c,cxx}_init_decl_processing.  In particular, we aren't setting the
+     alignment here for C++ backward ABI bug compatibility.  */
+  nullptr_type_node = make_node (NULLPTR_TYPE);
+  TYPE_SIZE (nullptr_type_node) = bitsize_int (GET_MODE_BITSIZE (ptr_mode));
+  TYPE_SIZE_UNIT (nullptr_type_node) = size_int (GET_MODE_SIZE (ptr_mode));
+  TYPE_UNSIGNED (nullptr_type_node) = 1;
+  TYPE_PRECISION (nullptr_type_node) = GET_MODE_BITSIZE (ptr_mode);
+  SET_TYPE_MODE (nullptr_type_node, ptr_mode);
+  nullptr_node = build_int_cst (nullptr_type_node, 0);
+
   /* Since builtin_types isn't gc'ed, don't export these nodes.  */
   memset (builtin_types, 0, sizeof (builtin_types));
 }
@@ -6292,6 +6308,7 @@ check_builtin_function_arguments (location_t loc, vec<location_t> arg_loc,
     case BUILT_IN_ISINF_SIGN:
     case BUILT_IN_ISNAN:
     case BUILT_IN_ISNORMAL:
+    case BUILT_IN_ISSIGNALING:
     case BUILT_IN_SIGNBIT:
       if (builtin_function_validate_nargs (loc, fndecl, nargs, 1))
 	{
@@ -6681,7 +6698,7 @@ c_cpp_diagnostic (cpp_reader *pfile ATTRIBUTE_UNUSED,
     default:
       gcc_unreachable ();
     }
-  if (done_lexing)
+  if (override_libcpp_locations)
     richloc->set_range (0, input_location, SHOW_RANGE_WITH_CARET);
   diagnostic_set_info_translated (&diagnostic, msg, ap,
 				  richloc, dlevel);

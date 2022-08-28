@@ -1,3 +1,81 @@
+2022-08-26  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/81159
+	* c.opt (Wself-move): New option.
+
+2022-08-26  Jakub Jelinek  <jakub@redhat.com>
+
+	* c-common.cc (check_builtin_function_arguments): Handle
+	BUILT_IN_ISSIGNALING.
+
+2022-08-26  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/106648
+	* c-cppbuiltin.cc (c_cpp_builtins): Predefine
+	__cpp_named_character_escapes to 202207L.
+
+2022-08-25  Marek Polacek  <polacek@redhat.com>
+
+	* c-common.cc (c_common_reswords): Enable nullptr in C2X.
+	(c_common_nodes_and_builtins): Create the built-in node for nullptr.
+	* c-common.h (enum c_tree_index): Add CTI_NULLPTR, CTI_NULLPTR_TYPE.
+	(struct c_common_resword): Resize the disable member.
+	(D_C2X): Add.
+	(nullptr_node): Define.
+	(nullptr_type_node): Define.
+	(NULLPTR_TYPE_P): Define.
+	* c-pretty-print.cc (c_pretty_printer::simple_type_specifier): Handle
+	NULLPTR_TYPE.
+	(c_pretty_printer::direct_abstract_declarator): Likewise.
+	(c_pretty_printer::constant): Likewise.
+
+2022-08-16  Tom Honermann  <tom@honermann.net>
+
+	PR c++/106423
+	* c-opts.cc (c_common_post_options): Disable -Wc++20-compat
+	diagnostics in C++20 and later.
+	* c.opt (Wc++20-compat): Enable hooks for the preprocessor.
+
+2022-08-11  Marek Polacek  <polacek@redhat.com>
+
+	PR middle-end/102633
+	* c-gimplify.cc (c_gimplify_expr) <case DECL_EXPR>: Don't call
+	suppress_warning here.
+
+2022-08-08  Tom Honermann  <tom@honermann.net>
+
+	PR preprocessor/106426
+	* c-opts.cc (c_common_post_options): Assign cpp_opts->unsigned_utf8char
+	subject to -fchar8_t, -fsigned-char, and/or -funsigned-char.
+
+2022-08-08  Tom Honermann  <tom@honermann.net>
+
+	* c-lex.cc (lex_string, lex_charconst): Use char8_t as the type
+	of CPP_UTF8CHAR and CPP_UTF8STRING when char8_t support is
+	enabled.
+	* c-opts.cc (c_common_post_options): Set flag_char8_t if
+	targeting C2x.
+
+2022-07-31  Lewis Hyatt  <lhyatt@gmail.com>
+
+	PR c++/66290
+	* c-common.h: Rename global done_lexing to
+	override_libcpp_locations.
+	* c-common.cc (c_cpp_diagnostic): Likewise.
+	* c-opts.cc (c_common_finish): Set override_libcpp_locations
+	(formerly done_lexing) immediately prior to calling cpp_finish ().
+
+2022-07-27  Lewis Hyatt  <lhyatt@gmail.com>
+
+	* c-ppoutput.cc (token_streamer::stream): Update input_location
+	prior to streaming each token.
+
+2022-07-23  Immad Mir  <mirimmad@outlook.com>
+
+	* c-attribs.cc: (c_common_attribute_table): add three new attributes
+	namely: fd_arg, fd_arg_read and fd_arg_write.
+	(handle_fd_arg_attribute): New.
+
 2022-07-15  Marek Polacek  <polacek@redhat.com>
 
 	PR c++/104477

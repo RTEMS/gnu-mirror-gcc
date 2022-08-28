@@ -5488,8 +5488,11 @@ gimplify_init_constructor (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
   if (ret == GS_ERROR)
     return GS_ERROR;
   /* If we have gimplified both sides of the initializer but have
-     not emitted an assignment, do so now.  */
-  if (*expr_p)
+     not emitted an assignment, do so now.   */
+  if (*expr_p
+      /* If the type is an empty type, we don't need to emit the
+	 assignment. */
+      && !is_empty_type (TREE_TYPE (TREE_OPERAND (*expr_p, 0))))
     {
       tree lhs = TREE_OPERAND (*expr_p, 0);
       tree rhs = TREE_OPERAND (*expr_p, 1);
@@ -6026,6 +6029,21 @@ gimplify_modify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
       gimplify_seq_add_stmt (pre_p, gimple_build_assign (*to_p, *from_p));
       *expr_p = NULL;
       return GS_ALL_DONE;
+    }
+
+  /* Convert initialization from an empty variable-size CONSTRUCTOR to
+     memset.  */
+  if (TREE_TYPE (*from_p) != error_mark_node
+      && TYPE_SIZE_UNIT (TREE_TYPE (*from_p))
+      && !poly_int_tree_p (TYPE_SIZE_UNIT (TREE_TYPE (*from_p)))
+      && TREE_CODE (*from_p) == CONSTRUCTOR
+      && CONSTRUCTOR_NELTS (*from_p) == 0)
+    {
+      maybe_with_size_expr (from_p);
+      gcc_assert (TREE_CODE (*from_p) == WITH_SIZE_EXPR);
+      return gimplify_modify_expr_to_memset (expr_p,
+					     TREE_OPERAND (*from_p, 1),
+					     want_value, pre_p);
     }
 
   /* Insert pointer conversions required by the middle-end that are not
@@ -7882,7 +7900,7 @@ omp_notice_variable (struct gimplify_omp_ctx *ctx, tree decl, bool in_code)
 	      if (gimplify_omp_ctxp->target_firstprivatize_array_bases
 		  && omp_privatize_by_reference (decl))
 		type = TREE_TYPE (type);
-	      if (!lang_hooks.types.omp_mappable_type (type))
+	      if (!omp_mappable_type (type))
 		{
 		  error ("%qD referenced in target region does not have "
 			 "a mappable type", decl);

@@ -9022,6 +9022,13 @@ unsafe_return_slot_p (tree t)
   if (is_empty_base_ref (t))
     return 2;
 
+  /* A delegating constructor might be used to initialize a base.  */
+  if (current_function_decl
+      && DECL_CONSTRUCTOR_P (current_function_decl)
+      && (t == current_class_ref
+	  || tree_strip_nop_conversions (t) == current_class_ptr))
+    return 2;
+
   STRIP_NOPS (t);
   if (TREE_CODE (t) == ADDR_EXPR)
     t = TREE_OPERAND (t, 0);
@@ -9627,10 +9634,13 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
       if (!conversion_warning)
 	arg_complain &= ~tf_warning;
 
+      if (arg_complain & tf_warning)
+	maybe_warn_pessimizing_move (arg, type, /*return_p*/false);
+
       val = convert_like_with_context (conv, arg, fn, i - is_method,
 				       arg_complain);
       val = convert_for_arg_passing (type, val, arg_complain);
-	
+
       if (val == error_mark_node)
         return error_mark_node;
       else

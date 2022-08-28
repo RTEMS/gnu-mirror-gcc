@@ -1,3 +1,83 @@
+2022-08-26  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/106647
+	* charset.cc (wide_str_to_charconst): Implement P2362R3 - Remove
+	non-encodable wide character literals and multicharacter.  For
+	C++23 use CPP_DL_ERROR instead of CPP_DL_WARNING for
+	"character constant too long for its type" diagnostics on CPP_WCHAR
+	literals.
+
+2022-08-26  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/106648
+	* charset.cc: Implement C++23 P2071R2 - Named universal character
+	escapes.  Include uname2c.h.
+	(hangul_syllables, hangul_count): New variables.
+	(struct uname2c_data): New type.
+	(_cpp_uname2c, _cpp_uname2c_uax44_lm2): New functions.
+	(_cpp_valid_ucn): Use them.  Handle named universal character escapes.
+	(convert_ucn): Adjust comment.
+	(convert_escape): Call convert_ucn even for \N.
+	(_cpp_interpret_identifier): Handle named universal character escapes.
+	* lex.cc (get_bidi_ucn): Fix up function comment formatting.
+	(get_bidi_named): New function.
+	(forms_identifier_p, lex_string): Handle named universal character
+	escapes.
+	* makeuname2c.cc: New file.  Small parts copied from makeucnid.cc.
+	* uname2c.h: New generated file.
+
+2022-08-24  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/106646
+	* init.cc: Implement C++23 P2437R1 - Support for #warning.
+	(lang_defaults): Set warning_directive for GNUCXX23 and CXX23.
+	* directives.cc (directive_diagnostics): Use different wording of
+	#warning pedwarn for C++.
+
+2022-08-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/106645
+	* include/cpplib.h (struct cpp_options): Implement
+	P2290R3 - Delimited escape sequences.  Add delimite_escape_seqs
+	member.
+	* init.cc (struct lang_flags): Likewise.
+	(lang_defaults): Add delim column.
+	(cpp_set_lang): Copy over delimite_escape_seqs.
+	* charset.cc (extend_char_range): New function.
+	(_cpp_valid_ucn): Use it.  Handle delimited escape sequences.
+	(convert_hex): Likewise.
+	(convert_oct): Likewise.
+	(convert_ucn): Use extend_char_range.
+	(convert_escape): Call convert_oct even for \o.
+	(_cpp_interpret_identifier): Handle delimited escape sequences.
+	* lex.cc (get_bidi_ucn_1): Likewise.  Add end argument, fill it in.
+	(get_bidi_ucn): Adjust get_bidi_ucn_1 caller.  Use end argument to
+	compute num_bytes.
+
+2022-08-18  Joseph Myers  <joseph@codesourcery.com>
+
+	* include/cpplib.h (struct cpp_options): Add warning_directive.
+	* init.cc (struct lang_flags, lang_defaults): Add
+	warning_directive.
+	* directives.cc (DIRECTIVE_TABLE): Mark #warning as STDC2X not
+	EXTENSION.
+	(directive_diagnostics): Diagnose #warning with -Wc11-c2x-compat,
+	or with -pedantic for a standard not supporting #warning.
+
+2022-08-16  Tom Honermann  <tom@honermann.net>
+
+	PR c++/106423
+	* include/cpplib.h (cpp_warning_reason): Add CPP_W_CXX20_COMPAT.
+	* init.cc (cpp_create_reader): Add cpp_warn_cxx20_compat.
+
+2022-08-08  Tom Honermann  <tom@honermann.net>
+
+	PR preprocessor/106426
+	* charset.cc (narrow_str_to_charconst): Set signedness of CPP_UTF8CHAR
+	literals based on unsigned_utf8char.
+	* include/cpplib.h (cpp_options): Add unsigned_utf8char.
+	* init.cc (cpp_create_reader): Initialize unsigned_utf8char.
+
 2022-07-15  Jonathan Wakely  <jwakely@redhat.com>
 
 	* include/line-map.h (label_text::take_or_copy): Remove.

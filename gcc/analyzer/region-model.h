@@ -630,6 +630,7 @@ class region_model
   void impl_call_malloc (const call_details &cd);
   void impl_call_memcpy (const call_details &cd);
   void impl_call_memset (const call_details &cd);
+  void impl_call_putenv (const call_details &cd);
   void impl_call_realloc (const call_details &cd);
   void impl_call_strchr (const call_details &cd);
   void impl_call_strcpy (const call_details &cd);
@@ -732,6 +733,7 @@ class region_model
 					  region_model_context *ctxt);
 
   tree get_representative_tree (const svalue *sval) const;
+  tree get_representative_tree (const region *reg) const;
   path_var
   get_representative_path_var (const svalue *sval,
 			       svalue_set *visited) const;
@@ -851,6 +853,8 @@ class region_model
   void check_dynamic_size_for_taint (enum memory_space mem_space,
 				     const svalue *size_in_bytes,
 				     region_model_context *ctxt) const;
+  void check_dynamic_size_for_floats (const svalue *size_in_bytes,
+				      region_model_context *ctxt) const;
 
   void check_region_for_taint (const region *reg,
 			       enum access_direction dir,
@@ -867,6 +871,8 @@ class region_model
 			      region_model_context *ctxt) const;
   void check_region_size (const region *lhs_reg, const svalue *rhs_sval,
 			  region_model_context *ctxt) const;
+  void check_region_bounds (const region *reg, enum access_direction dir,
+			    region_model_context *ctxt) const;
 
   void check_call_args (const call_details &cd) const;
   void check_external_function_for_access_attr (const gcall *call,

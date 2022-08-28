@@ -39,6 +39,7 @@ public:
   template <typename T> T *clone (const T &src);
 private:
   irange *alloc_irange (unsigned pairs);
+  frange *alloc_frange ();
   void operator= (const vrange_allocator &) = delete;
 };
 
@@ -99,7 +100,26 @@ private:
   trailing_wide_ints<MAX_INTS> m_ints;
 };
 
-class obstack_vrange_allocator : public vrange_allocator
+// A chunk of memory to store an frange to long term memory.
+
+class GTY (()) frange_storage_slot
+{
+ public:
+  static frange_storage_slot *alloc_slot (vrange_allocator &, const frange &r);
+  void set_frange (const frange &r);
+  void get_frange (frange &r, tree type) const;
+  bool fits_p (const frange &) const;
+ private:
+  frange_storage_slot (const frange &r) { set_frange (r); }
+  DISABLE_COPY_AND_ASSIGN (frange_storage_slot);
+
+  // We can get away with just storing the properties because the type
+  // can be gotten from the SSA, and UNDEFINED is unsupported, so it
+  // can only be a range.
+  frange_props m_props;
+};
+
+class obstack_vrange_allocator final: public vrange_allocator
 {
 public:
   obstack_vrange_allocator ()
@@ -119,7 +139,7 @@ private:
   obstack m_obstack;
 };
 
-class ggc_vrange_allocator : public vrange_allocator
+class ggc_vrange_allocator final: public vrange_allocator
 {
 public:
   ggc_vrange_allocator () { }
@@ -142,7 +162,9 @@ vrange_allocator::alloc_vrange (tree type)
 {
   if (irange::supports_p (type))
     return alloc_irange (2);
-
+  if (frange::supports_p (type))
+    return alloc_frange ();
+  return NULL;
   gcc_unreachable ();
 }
 
@@ -164,6 +186,13 @@ vrange_allocator::alloc_irange (unsigned num_pairs)
   return new (r) irange (mem, num_pairs);
 }
 
+inline frange *
+vrange_allocator::alloc_frange ()
+{
+  void *r = alloc (sizeof (frange));
+  return new (r) frange ();
+}
+
 // Return a clone of an irange.
 
 template <>
@@ -171,6 +200,17 @@ inline irange *
 vrange_allocator::clone <irange> (const irange &src)
 {
   irange *r = alloc_irange (src.num_pairs ());
+  *r = src;
+  return r;
+}
+
+// Return a clone of an frange.
+
+template <>
+inline frange *
+vrange_allocator::clone <frange> (const frange &src)
+{
+  frange *r = alloc_frange ();
   *r = src;
   return r;
 }
@@ -183,7 +223,9 @@ vrange_allocator::clone <vrange> (const vrange &src)
 {
   if (is_a <irange> (src))
     return clone <irange> (as_a <irange> (src));
-
+  if (is_a <frange> (src))
+    return clone <frange> (as_a <frange> (src));
+  return NULL;
   gcc_unreachable ();
 }
 

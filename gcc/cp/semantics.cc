@@ -1411,6 +1411,11 @@ finish_for_stmt (tree for_stmt)
 
   add_stmt (do_poplevel (scope));
 
+  /* If we're being called from build_vec_init, don't mess with the names of
+     the variables for an enclosing range-for.  */
+  if (!stmts_are_full_exprs_p ())
+    return;
+
   for (int i = 0; i < 3; i++)
     if (range_for_decl[i])
       DECL_NAME (range_for_decl[i])
@@ -7987,13 +7992,15 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 		  t = OMP_CLAUSE_DECL (c);
 		  if (TREE_CODE (t) != TREE_LIST
 		      && !type_dependent_expression_p (t)
-		      && !cp_omp_mappable_type (TREE_TYPE (t)))
+		      && !omp_mappable_type (TREE_TYPE (t)))
 		    {
 		      error_at (OMP_CLAUSE_LOCATION (c),
 				"array section does not have mappable type "
 				"in %qs clause",
 				omp_clause_code_name[OMP_CLAUSE_CODE (c)]);
-		      cp_omp_emit_unmappable_type_notes (TREE_TYPE (t));
+		      if (TREE_TYPE (t) != error_mark_node
+			  && !COMPLETE_TYPE_P (TREE_TYPE (t)))
+			cxx_incomplete_type_inform (TREE_TYPE (t));
 		      remove = true;
 		    }
 		  while (TREE_CODE (t) == ARRAY_REF)
@@ -8129,12 +8136,14 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 			    t, omp_clause_code_name[OMP_CLAUSE_CODE (c)]);
 		  remove = true;
 		}
-	      else if (!cp_omp_mappable_type (TREE_TYPE (t)))
+	      else if (!omp_mappable_type (TREE_TYPE (t)))
 		{
 		  error_at (OMP_CLAUSE_LOCATION (c),
 			    "%qE does not have a mappable type in %qs clause",
 			    t, omp_clause_code_name[OMP_CLAUSE_CODE (c)]);
-		  cp_omp_emit_unmappable_type_notes (TREE_TYPE (t));
+		  if (TREE_TYPE (t) != error_mark_node
+		      && !COMPLETE_TYPE_P (TREE_TYPE (t)))
+		    cxx_incomplete_type_inform (TREE_TYPE (t));
 		  remove = true;
 		}
 	      while (TREE_CODE (t) == COMPONENT_REF)
@@ -8227,14 +8236,16 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 			     == GOMP_MAP_FIRSTPRIVATE_POINTER)))
 		   && t == OMP_CLAUSE_DECL (c)
 		   && !type_dependent_expression_p (t)
-		   && !cp_omp_mappable_type (TYPE_REF_P (TREE_TYPE (t))
-					     ? TREE_TYPE (TREE_TYPE (t))
-					     : TREE_TYPE (t)))
+		   && !omp_mappable_type (TYPE_REF_P (TREE_TYPE (t))
+					  ? TREE_TYPE (TREE_TYPE (t))
+					  : TREE_TYPE (t)))
 	    {
 	      error_at (OMP_CLAUSE_LOCATION (c),
 			"%qD does not have a mappable type in %qs clause", t,
 			omp_clause_code_name[OMP_CLAUSE_CODE (c)]);
-	      cp_omp_emit_unmappable_type_notes (TREE_TYPE (t));
+	      if (TREE_TYPE (t) != error_mark_node
+		  && !COMPLETE_TYPE_P (TREE_TYPE (t)))
+		cxx_incomplete_type_inform (TREE_TYPE (t));
 	      remove = true;
 	    }
 	  else if (OMP_CLAUSE_CODE (c) == OMP_CLAUSE_MAP
@@ -8404,12 +8415,14 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 			cname);
 	      remove = true;
 	    }
-	  else if (!cp_omp_mappable_type (TREE_TYPE (t)))
+	  else if (!omp_mappable_type (TREE_TYPE (t)))
 	    {
 	      error_at (OMP_CLAUSE_LOCATION (c),
 			"%qD does not have a mappable type in %qs clause", t,
 			cname);
-	      cp_omp_emit_unmappable_type_notes (TREE_TYPE (t));
+	      if (TREE_TYPE (t) != error_mark_node
+		  && !COMPLETE_TYPE_P (TREE_TYPE (t)))
+		cxx_incomplete_type_inform (TREE_TYPE (t));
 	      remove = true;
 	    }
 	  if (remove)

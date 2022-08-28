@@ -45,6 +45,8 @@ enum value_range_discriminator
 {
   // Range holds an integer or pointer.
   VR_IRANGE,
+  // Floating point range.
+  VR_FRANGE,
   // Range holds an unsupported type.
   VR_UNKNOWN
 };
@@ -76,7 +78,7 @@ public:
   virtual void accept (const class vrange_visitor &v) const = 0;
   virtual void set (tree, tree, value_range_kind = VR_RANGE);
   virtual tree type () const;
-  virtual bool supports_type_p (tree type) const;
+  virtual bool supports_type_p (const_tree type) const;
   virtual void set_varying (tree type);
   virtual void set_undefined ();
   virtual bool union_ (const vrange &);
@@ -120,8 +122,8 @@ public:
   virtual void set_undefined () override;
 
   // Range types.
-  static bool supports_p (tree type);
-  virtual bool supports_type_p (tree type) const override;
+  static bool supports_p (const_tree type);
+  virtual bool supports_type_p (const_tree type) const override;
   virtual tree type () const override;
 
   // Iteration over sub-ranges.
@@ -226,6 +228,7 @@ public:
   int_range (tree type);
   int_range (const int_range &);
   int_range (const irange &);
+  virtual ~int_range () = default;
   int_range& operator= (const int_range &);
 private:
   template <unsigned X> friend void gt_ggc_mx (int_range<X> *);
@@ -248,8 +251,126 @@ private:
 class unsupported_range : public vrange
 {
 public:
-  unsupported_range ();
+  unsupported_range ()
+  {
+    m_discriminator = VR_UNKNOWN;
+    set_undefined ();
+  }
+  virtual void set_undefined () final override
+  {
+    m_kind = VR_UNDEFINED;
+  }
   virtual void accept (const vrange_visitor &v) const override;
+};
+
+// Floating point property to represent possible values of a NAN, INF, etc.
+
+class fp_prop
+{
+public:
+  enum kind {
+    UNDEFINED	= 0x0,		// Prop is impossible.
+    YES		= 0x1,		// Prop is definitely set.
+    NO		= 0x2,		// Prop is definitely not set.
+    VARYING	= (YES | NO)	// Prop may hold.
+  };
+  fp_prop (kind f) : m_kind (f) { }
+  bool varying_p () const { return m_kind == VARYING; }
+  bool undefined_p () const { return m_kind == UNDEFINED; }
+  bool yes_p () const { return m_kind == YES; }
+  bool no_p () const { return m_kind == NO; }
+private:
+  unsigned char m_kind : 2;
+};
+
+// Accessors for individual FP properties.
+
+#define FP_PROP_ACCESSOR(NAME) \
+  void NAME##_set_varying () { u.bits.NAME = fp_prop::VARYING; }	\
+  void NAME##_set_yes () { u.bits.NAME = fp_prop::YES; }	\
+  void NAME##_set_no () { u.bits.NAME = fp_prop::NO; }	\
+  bool NAME##_varying_p () const { return u.bits.NAME == fp_prop::VARYING; } \
+  bool NAME##_undefined_p () const { return u.bits.NAME == fp_prop::UNDEFINED; } \
+  bool NAME##_yes_p () const { return u.bits.NAME == fp_prop::YES; }	\
+  bool NAME##_no_p () const { return u.bits.NAME == fp_prop::NO; } \
+  fp_prop get_##NAME () const				   \
+  { return fp_prop ((fp_prop::kind) u.bits.NAME); } \
+  void set_##NAME (fp_prop::kind f) { u.bits.NAME = f; }
+
+// Aggregate of all the FP properties in an frange packed into one
+// structure to save space.  Using explicit fp_prop's in the frange,
+// would take one byte per property because of padding.  Instead, we
+// can save all properties into one byte.
+
+class frange_props
+{
+public:
+  frange_props () { set_varying (); }
+  void set_varying () { u.bytes = 0xff; }
+  void set_undefined () { u.bytes = 0; }
+  bool varying_p () { return u.bytes == 0xff; }
+  bool undefined_p () { return u.bytes == 0; }
+  bool union_ (const frange_props &other);
+  bool intersect (const frange_props &other);
+  bool operator== (const frange_props &other) const;
+  FP_PROP_ACCESSOR(nan)
+  FP_PROP_ACCESSOR(inf)
+  FP_PROP_ACCESSOR(ninf)
+private:
+  union {
+    struct {
+      unsigned char nan : 2;
+      unsigned char inf : 2;
+      unsigned char ninf : 2;
+    } bits;
+    unsigned char bytes;
+  } u;
+};
+
+// Accessors for getting/setting all FP properties at once.
+
+#define FRANGE_PROP_ACCESSOR(NAME)				\
+  fp_prop get_##NAME () const { return m_props.get_##NAME (); }	\
+  void set_##NAME (fp_prop::kind f)				\
+  {								\
+    m_props.set_##NAME (f);					\
+    normalize_kind ();						\
+  }
+
+// A floating point range.
+
+class frange : public vrange
+{
+  friend class frange_storage_slot;
+public:
+  frange ();
+  frange (const frange &);
+  static bool supports_p (const_tree type)
+  {
+    return SCALAR_FLOAT_TYPE_P (type);
+  }
+  virtual tree type () const override;
+  virtual void set (tree, tree, value_range_kind = VR_RANGE) override;
+  virtual void set_varying (tree type) override;
+  virtual void set_undefined () override;
+  virtual bool union_ (const vrange &) override;
+  virtual bool intersect (const vrange &) override;
+  virtual bool supports_type_p (const_tree type) const override;
+  virtual void accept (const vrange_visitor &v) const override;
+  frange& operator= (const frange &);
+  bool operator== (const frange &) const;
+  bool operator!= (const frange &r) const { return !(*this == r); }
+
+  // Each fp_prop can be accessed with get_PROP() and set_PROP().
+  FRANGE_PROP_ACCESSOR(nan)
+  FRANGE_PROP_ACCESSOR(inf)
+  FRANGE_PROP_ACCESSOR(ninf)
+private:
+  void verify_range ();
+  bool normalize_kind ();
+
+  frange_props m_props;
+  tree m_type;
 };
 
 // is_a<> and as_a<> implementation for vrange.
@@ -297,10 +418,18 @@ is_a <irange> (vrange &v)
   return v.m_discriminator == VR_IRANGE;
 }
 
+template <>
+inline bool
+is_a <frange> (vrange &v)
+{
+  return v.m_discriminator == VR_FRANGE;
+}
+
 class vrange_visitor
 {
 public:
   virtual void visit (const irange &) const { }
+  virtual void visit (const frange &) const { }
   virtual void visit (const unsupported_range &) const { }
 };
 
@@ -336,7 +465,7 @@ public:
   operator vrange &();
   operator const vrange &() const;
   void dump (FILE *) const;
-  static bool supports_type_p (tree type);
+  static bool supports_type_p (const_tree type);
 
   // Convenience methods for vrange compatability.
   void set (tree min, tree max, value_range_kind kind = VR_RANGE)
@@ -360,6 +489,7 @@ private:
   unsupported_range m_unsupported;
   vrange *m_vrange;
   int_range_max m_irange;
+  frange m_frange;
 };
 
 inline
@@ -401,6 +531,8 @@ Value_Range::init (tree type)
 
   if (irange::supports_p (type))
     m_vrange = &m_irange;
+  else if (frange::supports_p (type))
+    m_vrange = &m_frange;
   else
     m_vrange = &m_unsupported;
 }
@@ -425,6 +557,11 @@ Value_Range::operator= (const vrange &r)
     {
       m_irange = as_a <irange> (r);
       m_vrange = &m_irange;
+    }
+  else if (is_a <frange> (r))
+    {
+      m_frange = as_a <frange> (r);
+      m_vrange = &m_frange;
     }
   else
     gcc_unreachable ();
@@ -459,9 +596,9 @@ Value_Range::operator const vrange &() const
 // Return TRUE if TYPE is supported by the vrange infrastructure.
 
 inline bool
-Value_Range::supports_type_p (tree type)
+Value_Range::supports_type_p (const_tree type)
 {
-  return irange::supports_p (type);
+  return irange::supports_p (type) || frange::supports_p (type);
 }
 
 // Returns true for an old-school value_range as described above.
@@ -601,7 +738,7 @@ irange::nonzero_p () const
 }
 
 inline bool
-irange::supports_p (tree type)
+irange::supports_p (const_tree type)
 {
   return INTEGRAL_TYPE_P (type) || POINTER_TYPE_P (type);
 }
@@ -893,6 +1030,12 @@ vrp_val_max (const_tree type)
       wide_int max = wi::max_value (TYPE_PRECISION (type), TYPE_SIGN (type));
       return wide_int_to_tree (const_cast<tree> (type), max);
     }
+  if (frange::supports_p (type))
+    {
+      REAL_VALUE_TYPE real;
+      real_inf (&real);
+      return build_real (const_cast <tree> (type), real);
+    }
   return NULL_TREE;
 }
 
@@ -905,7 +1048,74 @@ vrp_val_min (const_tree type)
     return TYPE_MIN_VALUE (type);
   if (POINTER_TYPE_P (type))
     return build_zero_cst (const_cast<tree> (type));
+  if (frange::supports_p (type))
+    {
+      REAL_VALUE_TYPE real, real_ninf;
+      real_inf (&real);
+      real_ninf = real_value_negate (&real);
+      return build_real (const_cast <tree> (type), real_ninf);
+    }
   return NULL_TREE;
+}
+
+// Supporting methods for frange.
+
+inline bool
+frange_props::operator== (const frange_props &other) const
+{
+  return u.bytes == other.u.bytes;
+}
+
+inline bool
+frange_props::union_ (const frange_props &other)
+{
+  unsigned char saved = u.bytes;
+  u.bytes |= other.u.bytes;
+  return u.bytes != saved;
+}
+
+inline bool
+frange_props::intersect (const frange_props &other)
+{
+  unsigned char saved = u.bytes;
+  u.bytes &= other.u.bytes;
+  return u.bytes != saved;
+}
+
+inline
+frange::frange ()
+{
+  m_discriminator = VR_FRANGE;
+  set_undefined ();
+}
+
+inline
+frange::frange (const frange &src)
+{
+  m_discriminator = VR_FRANGE;
+  *this = src;
+}
+
+inline tree
+frange::type () const
+{
+  return m_type;
+}
+
+inline void
+frange::set_varying (tree type)
+{
+  m_kind = VR_VARYING;
+  m_type = type;
+  m_props.set_varying ();
+}
+
+inline void
+frange::set_undefined ()
+{
+  m_kind = VR_UNDEFINED;
+  m_type = NULL;
+  m_props.set_undefined ();
 }
 
 #endif // GCC_VALUE_RANGE_H

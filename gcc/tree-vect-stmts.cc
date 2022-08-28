@@ -3423,6 +3423,14 @@ vectorizable_call (vec_info *vinfo,
       return false;
     }
 
+  if (vect_emulated_vector_p (vectype_in) || vect_emulated_vector_p (vectype_out))
+  {
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+			 "use emulated vector type for call\n");
+      return false;
+  }
+
   /* FORNOW */
   nunits_in = TYPE_VECTOR_SUBPARTS (vectype_in);
   nunits_out = TYPE_VECTOR_SUBPARTS (vectype_out);
@@ -10017,7 +10025,10 @@ vectorizable_load (vec_info *vinfo,
 				 (NULL_TREE, BIT_AND_EXPR, ptr,
 				  build_int_cst
 				  (TREE_TYPE (ptr), -(HOST_WIDE_INT) align));
-		    ptr = copy_ssa_name (ptr, new_stmt);
+		    if (TREE_CODE (ptr) == SSA_NAME)
+		      ptr = copy_ssa_name (ptr, new_stmt);
+		    else
+		      ptr = make_ssa_name (TREE_TYPE (ptr), new_stmt);
 		    gimple_assign_set_lhs (new_stmt, ptr);
 		    vect_finish_stmt_generation (vinfo, stmt_info,
 						 new_stmt, gsi);

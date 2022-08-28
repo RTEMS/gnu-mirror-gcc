@@ -455,7 +455,7 @@ Wc++2a-compat
 C++ ObjC++ Warning Alias(Wc++20-compat) Undocumented
 
 Wc++20-compat
-C++ ObjC++ Var(warn_cxx20_compat) Warning LangEnabledBy(C++ ObjC++,Wall)
+C++ ObjC++ Var(warn_cxx20_compat) Warning LangEnabledBy(C++ ObjC++,Wall) Init(0) CPP(cpp_warn_cxx20_compat) CppReason(CPP_W_CXX20_COMPAT)
 Warn about C++ constructs whose meaning differs between ISO C++ 2017 and ISO C++ 2020.
 
 Wc++11-extensions
@@ -1228,6 +1228,10 @@ Warn on suspicious constructs involving reverse scalar storage order.
 Wselector
 ObjC ObjC++ Var(warn_selector) Warning
 Warn if a selector has multiple methods.
+
+Wself-move
+C++ ObjC++ Var(warn_self_move) Warning LangEnabledBy(C++ ObjC++, Wall)
+Warn when a value is moved to itself with std::move.
 
 Wsequence-point
 C ObjC C++ ObjC++ Var(warn_sequence_point) Warning LangEnabledBy(C ObjC C++ ObjC++,Wall)

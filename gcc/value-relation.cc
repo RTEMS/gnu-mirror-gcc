@@ -667,8 +667,6 @@ private:
 inline void
 value_relation::set_relation (relation_kind r, tree n1, tree n2)
 {
-  gcc_checking_assert (SSA_NAME_VERSION (n1) != SSA_NAME_VERSION (n2)
-		       || r == VREL_EQ);
   related = r;
   name1 = n1;
   name2 = n2;
@@ -1402,16 +1400,7 @@ path_oracle::killing_def (tree ssa)
   unsigned v = SSA_NAME_VERSION (ssa);
 
   bitmap_set_bit (m_killed_defs, v);
-
-  // Walk the equivalency list and remove SSA from any equivalencies.
-  if (bitmap_bit_p (m_equiv.m_names, v))
-    {
-      for (equiv_chain *ptr = m_equiv.m_next; ptr; ptr = ptr->m_next)
-	if (bitmap_bit_p (ptr->m_names, v))
-	  bitmap_clear_bit (ptr->m_names, v);
-    }
-  else
-    bitmap_set_bit (m_equiv.m_names, v);
+  bitmap_set_bit (m_equiv.m_names, v);
 
   // Now add an equivalency with itself so we don't look to the root oracle.
   bitmap b = BITMAP_ALLOC (&m_bitmaps);
@@ -1449,6 +1438,11 @@ void
 path_oracle::register_relation (basic_block bb, relation_kind k, tree ssa1,
 				tree ssa2)
 {
+  // If the 2 ssa_names are the same, do nothing.  An equivalence is implied,
+  // and no other relation makes sense.
+  if (ssa1 == ssa2)
+    return;
+
   if (dump_file && (dump_flags & TDF_DETAILS))
     {
       value_relation vr (k, ssa1, ssa2);
@@ -1519,11 +1513,13 @@ path_oracle::query_relation (basic_block bb, tree ssa1, tree ssa2)
   return query_relation (bb, equiv_1, equiv_2);
 }
 
-// Reset any relations registered on this path.
+// Reset any relations registered on this path.  ORACLE is the root
+// oracle to use.
 
 void
-path_oracle::reset_path ()
+path_oracle::reset_path (relation_oracle *oracle)
 {
+  set_root_oracle (oracle);
   m_equiv.m_next = NULL;
   bitmap_clear (m_equiv.m_names);
   m_relations.m_head = NULL;

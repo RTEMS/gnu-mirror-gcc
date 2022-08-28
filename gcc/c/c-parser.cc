@@ -119,6 +119,8 @@ c_parse_init (void)
   mask |= D_CXXONLY;
   if (!flag_isoc99)
     mask |= D_C99;
+  if (!flag_isoc2x)
+    mask |= D_C2X;
   if (flag_no_asm)
     {
       mask |= D_ASM | D_EXT;
@@ -1521,9 +1523,9 @@ static struct c_arg_info *c_parser_parms_list_declarator (c_parser *, tree,
 static struct c_parm *c_parser_parameter_declaration (c_parser *, tree, bool);
 static tree c_parser_simple_asm_expr (c_parser *);
 static tree c_parser_gnu_attributes (c_parser *);
-static struct c_expr c_parser_initializer (c_parser *);
+static struct c_expr c_parser_initializer (c_parser *, tree);
 static struct c_expr c_parser_braced_init (c_parser *, tree, bool,
-					   struct obstack *);
+					   struct obstack *, tree);
 static void c_parser_initelt (c_parser *, struct obstack *);
 static void c_parser_initval (c_parser *, struct c_expr *,
 			      struct obstack *);
@@ -2286,7 +2288,7 @@ c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
 		  int flag_sanitize_save = flag_sanitize;
 		  if (TREE_CODE (d) == PARM_DECL)
 		    flag_sanitize = 0;
-		  init = c_parser_initializer (parser);
+		  init = c_parser_initializer (parser, d);
 		  flag_sanitize = flag_sanitize_save;
 		  finish_init ();
 		}
@@ -5211,19 +5213,34 @@ c_parser_type_name (c_parser *parser, bool alignas_ok)
    Any expression without commas is accepted in the syntax for the
    constant-expressions, with non-constant expressions rejected later.
 
+   DECL is the declaration we're parsing this initializer for.
+
    This function is only used for top-level initializers; for nested
    ones, see c_parser_initval.  */
 
 static struct c_expr
-c_parser_initializer (c_parser *parser)
+c_parser_initializer (c_parser *parser, tree decl)
 {
   if (c_parser_next_token_is (parser, CPP_OPEN_BRACE))
-    return c_parser_braced_init (parser, NULL_TREE, false, NULL);
+    return c_parser_braced_init (parser, NULL_TREE, false, NULL, decl);
   else
     {
       struct c_expr ret;
       location_t loc = c_parser_peek_token (parser)->location;
+      if (decl != error_mark_node && C_DECL_VARIABLE_SIZE (decl))
+	error_at (loc,
+		  "variable-sized object may not be initialized except "
+		  "with an empty initializer");
       ret = c_parser_expr_no_commas (parser, NULL);
+      /* This is handled mostly by gimplify.cc, but we have to deal with
+	 not warning about int x = x; as it is a GCC extension to turn off
+	 this warning but only if warn_init_self is zero.  */
+      if (VAR_P (decl)
+	  && !DECL_EXTERNAL (decl)
+	  && !TREE_STATIC (decl)
+	  && ret.value == decl
+	  && !warn_init_self)
+	suppress_warning (decl, OPT_Winit_self);
       if (TREE_CODE (ret.value) != STRING_CST
 	  && TREE_CODE (ret.value) != COMPOUND_LITERAL_EXPR)
 	ret = convert_lvalue_to_rvalue (loc, ret, true, true);
@@ -5240,11 +5257,12 @@ location_t last_init_list_comma;
    compound literal, and NULL_TREE for other initializers and for
    nested braced lists.  NESTED_P is true for nested braced lists,
    false for the list of a compound literal or the list that is the
-   top-level initializer in a declaration.  */
+   top-level initializer in a declaration.  DECL is the declaration for
+   the top-level initializer for a declaration, otherwise NULL_TREE.  */
 
 static struct c_expr
 c_parser_braced_init (c_parser *parser, tree type, bool nested_p,
-		      struct obstack *outer_obstack)
+		      struct obstack *outer_obstack, tree decl)
 {
   struct c_expr ret;
   struct obstack braced_init_obstack;
@@ -5262,10 +5280,15 @@ c_parser_braced_init (c_parser *parser, tree type, bool nested_p,
     really_start_incremental_init (type);
   if (c_parser_next_token_is (parser, CPP_CLOSE_BRACE))
     {
-      pedwarn (brace_loc, OPT_Wpedantic, "ISO C forbids empty initializer braces");
+      pedwarn_c11 (brace_loc, OPT_Wpedantic,
+		   "ISO C forbids empty initializer braces before C2X");
     }
   else
     {
+      if (decl && decl != error_mark_node && C_DECL_VARIABLE_SIZE (decl))
+	error_at (brace_loc,
+		  "variable-sized object may not be initialized except "
+		  "with an empty initializer");
       /* Parse a non-empty initializer list, possibly with a trailing
 	 comma.  */
       while (true)
@@ -5521,7 +5544,7 @@ c_parser_initval (c_parser *parser, struct c_expr *after,
 
   if (c_parser_next_token_is (parser, CPP_OPEN_BRACE) && !after)
     init = c_parser_braced_init (parser, NULL_TREE, true,
-				 braced_init_obstack);
+				 braced_init_obstack, NULL_TREE);
   else
     {
       init = c_parser_expr_no_commas (parser, after);
@@ -7447,7 +7470,14 @@ c_parser_string_literal (c_parser *parser, bool translate, bool wide_ok)
 	default:
 	case CPP_STRING:
 	case CPP_UTF8STRING:
-	  value = build_string (1, "");
+	  if (type == CPP_UTF8STRING && flag_char8_t)
+	    {
+	      value = build_string (TYPE_PRECISION (char8_type_node)
+				    / TYPE_PRECISION (char_type_node),
+				    "");  /* char8_t is 8 bits */
+	    }
+	  else
+	    value = build_string (1, "");
 	  break;
 	case CPP_STRING16:
 	  value = build_string (TYPE_PRECISION (char16_type_node)
@@ -7472,8 +7502,13 @@ c_parser_string_literal (c_parser *parser, bool translate, bool wide_ok)
     {
     default:
     case CPP_STRING:
-    case CPP_UTF8STRING:
       TREE_TYPE (value) = char_array_type_node;
+      break;
+    case CPP_UTF8STRING:
+      if (flag_char8_t)
+	TREE_TYPE (value) = char8_array_type_node;
+      else
+	TREE_TYPE (value) = char_array_type_node;
       break;
     case CPP_STRING16:
       TREE_TYPE (value) = char16_array_type_node;
@@ -10220,6 +10255,14 @@ c_parser_postfix_expression (c_parser *parser)
 			 "%<depend%> clause");
 	  expr.set_error ();
 	  break;
+	/* C23 'nullptr' literal.  */
+	case RID_NULLPTR:
+	  c_parser_consume_token (parser);
+	  expr.value = nullptr_node;
+	  set_c_expr_source_range (&expr, tok_range);
+	  pedwarn_c11 (loc, OPT_Wpedantic,
+		       "ISO C does not support %qs before C2X", "nullptr");
+	  break;
 	default:
 	  c_parser_error (parser, "expected expression");
 	  expr.set_error ();
@@ -10284,7 +10327,7 @@ c_parser_postfix_expression_after_paren_type (c_parser *parser,
       error_at (type_loc, "compound literal has variable size");
       type = error_mark_node;
     }
-  init = c_parser_braced_init (parser, type, false, NULL);
+  init = c_parser_braced_init (parser, type, false, NULL, NULL_TREE);
   finish_init ();
   maybe_warn_string_init (type_loc, type, init);
 
@@ -22576,7 +22619,7 @@ c_parser_omp_declare_reduction (c_parser *parser, enum pragma_context context)
 		  location_t loc = c_parser_peek_token (parser)->location;
 		  rich_location richloc (line_table, loc);
 		  start_init (omp_priv, NULL_TREE, 0, &richloc);
-		  struct c_expr init = c_parser_initializer (parser);
+		  struct c_expr init = c_parser_initializer (parser, omp_priv);
 		  finish_init ();
 		  finish_decl (omp_priv, loc, init.value,
 		      	       init.original_type, NULL_TREE);

@@ -1268,6 +1268,414 @@ region_model::on_stmt_pre (const gimple *stmt,
     }
 }
 
+/* Abstract base class for all out-of-bounds warnings.  */
+
+class out_of_bounds : public pending_diagnostic_subclass<out_of_bounds>
+{
+public:
+  out_of_bounds (const region *reg, tree diag_arg,
+		 byte_range out_of_bounds_range)
+  : m_reg (reg), m_diag_arg (diag_arg),
+    m_out_of_bounds_range (out_of_bounds_range)
+  {}
+
+  const char *get_kind () const final override
+  {
+    return "out_of_bounds_diagnostic";
+  }
+
+  bool operator== (const out_of_bounds &other) const
+  {
+    return m_reg == other.m_reg
+	   && m_out_of_bounds_range == other.m_out_of_bounds_range
+	   && pending_diagnostic::same_tree_p (m_diag_arg, other.m_diag_arg);
+  }
+
+  int get_controlling_option () const final override
+  {
+    return OPT_Wanalyzer_out_of_bounds;
+  }
+
+  void mark_interesting_stuff (interesting_t *interest) final override
+  {
+    interest->add_region_creation (m_reg);
+  }
+
+protected:
+  const region *m_reg;
+  tree m_diag_arg;
+  byte_range m_out_of_bounds_range;
+};
+
+/* Abstract subclass to complaing about out-of-bounds
+   past the end of the buffer.  */
+
+class past_the_end : public out_of_bounds
+{
+public:
+  past_the_end (const region *reg, tree diag_arg, byte_range range,
+		tree byte_bound)
+  : out_of_bounds (reg, diag_arg, range), m_byte_bound (byte_bound)
+  {}
+
+  bool operator== (const past_the_end &other) const
+  {
+    return out_of_bounds::operator== (other)
+	   && pending_diagnostic::same_tree_p (m_byte_bound,
+					       other.m_byte_bound);
+  }
+
+  label_text
+  describe_region_creation_event (const evdesc::region_creation &ev) final
+  override
+  {
+    if (m_byte_bound && TREE_CODE (m_byte_bound) == INTEGER_CST)
+      return ev.formatted_print ("capacity is %E bytes", m_byte_bound);
+
+    return label_text ();
+  }
+
+protected:
+  tree m_byte_bound;
+};
+
+/* Concrete subclass to complain about buffer overflows.  */
+
+class buffer_overflow : public past_the_end
+{
+public:
+  buffer_overflow (const region *reg, tree diag_arg,
+		   byte_range range, tree byte_bound)
+  : past_the_end (reg, diag_arg, range, byte_bound)
+  {}
+
+  bool emit (rich_location *rich_loc) final override
+  {
+    diagnostic_metadata m;
+    bool warned;
+    switch (m_reg->get_memory_space ())
+      {
+      default:
+	m.add_cwe (787);
+	warned = warning_meta (rich_loc, m, get_controlling_option (),
+			       "buffer overflow");
+	break;
+      case MEMSPACE_STACK:
+	m.add_cwe (121);
+	warned = warning_meta (rich_loc, m, get_controlling_option (),
+			       "stack-based buffer overflow");
+	break;
+      case MEMSPACE_HEAP:
+	m.add_cwe (122);
+	warned = warning_meta (rich_loc, m, get_controlling_option (),
+			       "heap-based buffer overflow");
+	break;
+      }
+
+    if (warned)
+      {
+	char num_bytes_past_buf[WIDE_INT_PRINT_BUFFER_SIZE];
+	print_dec (m_out_of_bounds_range.m_size_in_bytes,
+		   num_bytes_past_buf, UNSIGNED);
+	if (m_diag_arg)
+	  inform (rich_loc->get_loc (), "write is %s bytes past the end"
+					" of %qE", num_bytes_past_buf,
+						   m_diag_arg);
+	else
+	  inform (rich_loc->get_loc (), "write is %s bytes past the end"
+					"of the region",
+					num_bytes_past_buf);
+      }
+
+    return warned;
+  }
+
+  label_text describe_final_event (const evdesc::final_event &ev)
+  final override
+  {
+    byte_size_t start = m_out_of_bounds_range.get_start_byte_offset ();
+    byte_size_t end = m_out_of_bounds_range.get_last_byte_offset ();
+    char start_buf[WIDE_INT_PRINT_BUFFER_SIZE];
+    print_dec (start, start_buf, SIGNED);
+    char end_buf[WIDE_INT_PRINT_BUFFER_SIZE];
+    print_dec (end, end_buf, SIGNED);
+
+    if (start == end)
+      {
+	if (m_diag_arg)
+	  return ev.formatted_print ("out-of-bounds write at byte %s but %qE"
+				     " ends at byte %E", start_buf, m_diag_arg,
+							 m_byte_bound);
+	return ev.formatted_print ("out-of-bounds write at byte %s but region"
+				   " ends at byte %E", start_buf,
+						       m_byte_bound);
+      }
+    else
+      {
+	if (m_diag_arg)
+	  return ev.formatted_print ("out-of-bounds write from byte %s till"
+				     " byte %s but %qE ends at byte %E",
+				     start_buf, end_buf, m_diag_arg,
+				     m_byte_bound);
+	return ev.formatted_print ("out-of-bounds write from byte %s till"
+				   " byte %s but region ends at byte %E",
+				   start_buf, end_buf, m_byte_bound);
+      }
+  }
+};
+
+/* Concrete subclass to complain about buffer overreads.  */
+
+class buffer_overread : public past_the_end
+{
+public:
+  buffer_overread (const region *reg, tree diag_arg,
+		   byte_range range, tree byte_bound)
+  : past_the_end (reg, diag_arg, range, byte_bound)
+  {}
+
+  bool emit (rich_location *rich_loc) final override
+  {
+    diagnostic_metadata m;
+    m.add_cwe (126);
+    bool warned = warning_meta (rich_loc, m, get_controlling_option (),
+				"buffer overread");
+
+    if (warned)
+      {
+	char num_bytes_past_buf[WIDE_INT_PRINT_BUFFER_SIZE];
+	print_dec (m_out_of_bounds_range.m_size_in_bytes,
+		   num_bytes_past_buf, UNSIGNED);
+	if (m_diag_arg)
+	  inform (rich_loc->get_loc (), "read is %s bytes past the end"
+					" of %qE", num_bytes_past_buf,
+						    m_diag_arg);
+	else
+	  inform (rich_loc->get_loc (), "read is %s bytes past the end"
+					"of the region",
+					num_bytes_past_buf);
+      }
+
+    return warned;
+  }
+
+  label_text describe_final_event (const evdesc::final_event &ev)
+  final override
+  {
+    byte_size_t start = m_out_of_bounds_range.get_start_byte_offset ();
+    byte_size_t end = m_out_of_bounds_range.get_last_byte_offset ();
+    char start_buf[WIDE_INT_PRINT_BUFFER_SIZE];
+    print_dec (start, start_buf, SIGNED);
+    char end_buf[WIDE_INT_PRINT_BUFFER_SIZE];
+    print_dec (end, end_buf, SIGNED);
+
+    if (start == end)
+      {
+	if (m_diag_arg)
+	  return ev.formatted_print ("out-of-bounds read at byte %s but %qE"
+				     " ends at byte %E", start_buf, m_diag_arg,
+							 m_byte_bound);
+	return ev.formatted_print ("out-of-bounds read at byte %s but region"
+				   " ends at byte %E", start_buf,
+						       m_byte_bound);
+      }
+    else
+      {
+	if (m_diag_arg)
+	  return ev.formatted_print ("out-of-bounds read from byte %s till"
+				     " byte %s but %qE ends at byte %E",
+				     start_buf, end_buf, m_diag_arg,
+				     m_byte_bound);
+	return ev.formatted_print ("out-of-bounds read from byte %s till"
+				   " byte %s but region ends at byte %E",
+				   start_buf, end_buf, m_byte_bound);
+      }
+  }
+};
+
+/* Concrete subclass to complain about buffer underflows.  */
+
+class buffer_underflow : public out_of_bounds
+{
+public:
+  buffer_underflow (const region *reg, tree diag_arg, byte_range range)
+  : out_of_bounds (reg, diag_arg, range)
+  {}
+
+  bool emit (rich_location *rich_loc) final override
+  {
+    diagnostic_metadata m;
+    m.add_cwe (124);
+    return warning_meta (rich_loc, m, get_controlling_option (),
+			 "buffer underflow");
+  }
+
+  label_text describe_final_event (const evdesc::final_event &ev)
+  final override
+  {
+    byte_size_t start = m_out_of_bounds_range.get_start_byte_offset ();
+    byte_size_t end = m_out_of_bounds_range.get_last_byte_offset ();
+    char start_buf[WIDE_INT_PRINT_BUFFER_SIZE];
+    print_dec (start, start_buf, SIGNED);
+    char end_buf[WIDE_INT_PRINT_BUFFER_SIZE];
+    print_dec (end, end_buf, SIGNED);
+
+    if (start == end)
+      {
+	if (m_diag_arg)
+	  return ev.formatted_print ("out-of-bounds write at byte %s but %qE"
+				     " starts at byte 0", start_buf,
+							  m_diag_arg);
+	return ev.formatted_print ("out-of-bounds write at byte %s but region"
+				   " starts at byte 0", start_buf);
+      }
+    else
+      {
+	if (m_diag_arg)
+	  return ev.formatted_print ("out-of-bounds write from byte %s till"
+				     " byte %s but %qE starts at byte 0",
+				     start_buf, end_buf, m_diag_arg);
+	return ev.formatted_print ("out-of-bounds write from byte %s till"
+				   " byte %s but region starts at byte 0",
+				   start_buf, end_buf);;
+      }
+  }
+};
+
+/* Concrete subclass to complain about buffer underreads.  */
+
+class buffer_underread : public out_of_bounds
+{
+public:
+  buffer_underread (const region *reg, tree diag_arg, byte_range range)
+  : out_of_bounds (reg, diag_arg, range)
+  {}
+
+  bool emit (rich_location *rich_loc) final override
+  {
+    diagnostic_metadata m;
+    m.add_cwe (127);
+    return warning_meta (rich_loc, m, get_controlling_option (),
+			 "buffer underread");
+  }
+
+  label_text describe_final_event (const evdesc::final_event &ev)
+  final override
+  {
+    byte_size_t start = m_out_of_bounds_range.get_start_byte_offset ();
+    byte_size_t end = m_out_of_bounds_range.get_last_byte_offset ();
+    char start_buf[WIDE_INT_PRINT_BUFFER_SIZE];
+    print_dec (start, start_buf, SIGNED);
+    char end_buf[WIDE_INT_PRINT_BUFFER_SIZE];
+    print_dec (end, end_buf, SIGNED);
+
+    if (start == end)
+      {
+	if (m_diag_arg)
+	  return ev.formatted_print ("out-of-bounds read at byte %s but %qE"
+				     " starts at byte 0", start_buf,
+							  m_diag_arg);
+	return ev.formatted_print ("out-of-bounds read at byte %s but region"
+				  " starts at byte 0", start_buf);
+      }
+    else
+      {
+	if (m_diag_arg)
+	  return ev.formatted_print ("out-of-bounds read from byte %s till"
+				     " byte %s but %qE starts at byte 0",
+				     start_buf, end_buf, m_diag_arg);
+	return ev.formatted_print ("out-of-bounds read from byte %s till"
+				   " byte %s but region starts at byte 0",
+				   start_buf, end_buf);;
+      }
+  }
+};
+
+/* May complain when the access on REG is out-of-bounds.  */
+
+void region_model::check_region_bounds (const region *reg,
+					enum access_direction dir,
+					region_model_context *ctxt) const
+{
+  gcc_assert (ctxt);
+
+  region_offset reg_offset = reg->get_offset ();
+  const region *base_reg = reg_offset.get_base_region ();
+
+  /* Bail out on symbolic offsets or symbolic regions.
+     (e.g. because the analyzer did not see previous offsets on the latter,
+     it might think that a negative access is before the buffer).  */
+  if (reg_offset.symbolic_p () || base_reg->symbolic_p ())
+    return;
+  byte_offset_t offset_unsigned
+    = reg_offset.get_bit_offset () >> LOG2_BITS_PER_UNIT;
+  /* The constant offset from a pointer is represented internally as a sizetype
+     but should be interpreted as a signed value here.  The statement below
+     converts the offset to a signed integer with the same precision the
+     sizetype has on the target system.
+
+     For example, this is needed for out-of-bounds-3.c test1 to pass when
+     compiled with a 64-bit gcc build targeting 32-bit systems.  */
+  byte_offset_t offset
+    = offset_unsigned.to_shwi (TYPE_PRECISION (size_type_node));
+
+  /* Find out how many bytes were accessed.  */
+  const svalue *num_bytes_sval = reg->get_byte_size_sval (m_mgr);
+  tree num_bytes_tree = num_bytes_sval->maybe_get_constant ();
+  if (!num_bytes_tree || TREE_CODE (num_bytes_tree) != INTEGER_CST)
+    /* If we do not know how many bytes were read/written,
+       assume that at least one byte was read/written.  */
+    num_bytes_tree = integer_one_node;
+
+  byte_range out (0, 0);
+  /* NUM_BYTES_TREE should always be interpreted as unsigned.  */
+  byte_range read_bytes (offset, wi::to_offset (num_bytes_tree).to_uhwi ());
+  /* If read_bytes has a subset < 0, we do have an underflow.  */
+  if (read_bytes.falls_short_of_p (0, &out))
+    {
+      tree diag_arg = get_representative_tree (reg->get_base_region ());
+      switch (dir)
+	{
+	default:
+	  gcc_unreachable ();
+	  break;
+	case DIR_READ:
+	  ctxt->warn (new buffer_underread (reg, diag_arg, out));
+	  break;
+	case DIR_WRITE:
+	  ctxt->warn (new buffer_underflow (reg, diag_arg, out));
+	  break;
+	}
+    }
+
+  const svalue *capacity = get_capacity (base_reg);
+  tree cst_capacity_tree = capacity->maybe_get_constant ();
+  if (!cst_capacity_tree || TREE_CODE (cst_capacity_tree) != INTEGER_CST)
+    return;
+
+  byte_range buffer (0, wi::to_offset (cst_capacity_tree));
+  /* If READ_BYTES exceeds BUFFER, we do have an overflow.  */
+  if (read_bytes.exceeds_p (buffer, &out))
+    {
+      tree byte_bound = wide_int_to_tree (size_type_node,
+					  buffer.get_next_byte_offset ());
+      tree diag_arg = get_representative_tree (reg->get_base_region ());
+
+      switch (dir)
+	{
+	default:
+	  gcc_unreachable ();
+	  break;
+	case DIR_READ:
+	  ctxt->warn (new buffer_overread (reg, diag_arg, out, byte_bound));
+	  break;
+	case DIR_WRITE:
+	  ctxt->warn (new buffer_overflow (reg, diag_arg, out, byte_bound));
+	  break;
+	}
+    }
+}
+
 /* Ensure that all arguments at the call described by CD are checked
    for poisoned values, by calling get_rvalue on each argument.  */
 
@@ -1354,6 +1762,13 @@ region_model::on_call_pre (const gcall *call, region_model_context *ctxt,
   if (gimple_call_internal_p (call)
       && gimple_call_internal_fn (call) == IFN_DEFERRED_INIT)
     return false;
+
+  /* Get svalues for all of the arguments at the callsite, to ensure that we
+     complain about any uninitialized arguments.  This might lead to
+     duplicates if any of the handling below also looks up the svalues,
+     but the deduplication code should deal with that.  */
+  if (ctxt)
+    check_call_args (cd);
 
   /* Some of the cases below update the lhs of the call based on the
      return value, but not all.  Provide a default value, which may
@@ -1473,7 +1888,6 @@ region_model::on_call_pre (const gcall *call, region_model_context *ctxt,
 	    /* These stdio builtins have external effects that are out
 	       of scope for the analyzer: we only want to model the effects
 	       on the return value.  */
-	    check_call_args (cd);
 	    break;
 
 	  case BUILT_IN_VA_START:
@@ -1537,6 +1951,12 @@ region_model::on_call_pre (const gcall *call, region_model_context *ctxt,
 	       && POINTER_TYPE_P (cd.get_arg_type (0)))
 	{
 	  impl_call_memset (cd);
+	  return false;
+	}
+      else if (is_named_call_p (callee_fndecl, "putenv", call, 1)
+	       && POINTER_TYPE_P (cd.get_arg_type (0)))
+	{
+	  impl_call_putenv (cd);
 	  return false;
 	}
       else if (is_named_call_p (callee_fndecl, "strchr", call, 2)
@@ -2811,6 +3231,7 @@ region_model::check_region_access (const region *reg,
     return;
 
   check_region_for_taint (reg, dir, ctxt);
+  check_region_bounds (reg, dir, ctxt);
 
   switch (dir)
     {
@@ -2880,7 +3301,8 @@ public:
     m.add_cwe (131);
 
     return warning_meta (rich_loc, m, get_controlling_option (),
-	       "allocated buffer size is not a multiple of the pointee's size");
+			 "allocated buffer size is not a multiple"
+			 " of the pointee's size");
   }
 
   label_text
@@ -2956,7 +3378,7 @@ capacity_compatible_with_type (tree cst, tree pointee_size_tree,
   unsigned HOST_WIDE_INT alloc_size = TREE_INT_CST_LOW (cst);
 
   if (is_struct)
-    return alloc_size >= pointee_size;
+    return alloc_size == 0 || alloc_size >= pointee_size;
   return alloc_size % pointee_size == 0;
 }
 
@@ -2975,21 +3397,20 @@ capacity_compatible_with_type (tree cst, tree pointee_size_tree)
 class size_visitor : public visitor
 {
 public:
-  size_visitor (tree size_cst, const svalue *sval, constraint_manager *cm)
-  : m_size_cst (size_cst), m_sval (sval), m_cm (cm)
+  size_visitor (tree size_cst, const svalue *root_sval, constraint_manager *cm)
+  : m_size_cst (size_cst), m_root_sval (root_sval), m_cm (cm)
   {
-    sval->accept (this);
+    m_root_sval->accept (this);
   }
 
   bool get_result ()
   {
-    return result_set.contains (m_sval);
+    return result_set.contains (m_root_sval);
   }
 
   void visit_constant_svalue (const constant_svalue *sval) final override
   {
-    if (capacity_compatible_with_type (sval->get_constant (), m_size_cst))
-      result_set.add (sval);
+    check_constant (sval->get_constant (), sval);
   }
 
   void visit_unknown_svalue (const unknown_svalue *sval ATTRIBUTE_UNUSED)
@@ -3004,7 +3425,7 @@ public:
     result_set.add (sval);
   }
 
-  void visit_unaryop_svalue (const unaryop_svalue *sval)
+  void visit_unaryop_svalue (const unaryop_svalue *sval) final override
   {
     const svalue *arg = sval->get_arg ();
     if (result_set.contains (arg))
@@ -3028,7 +3449,7 @@ public:
       }
   }
 
-  void visit_repeated_svalue (const repeated_svalue *sval)
+  void visit_repeated_svalue (const repeated_svalue *sval) final override
   {
     sval->get_inner_svalue ()->accept (this);
     if (result_set.contains (sval->get_inner_svalue ()))
@@ -3057,15 +3478,10 @@ public:
     equiv_class_id id (-1);
     if (m_cm->get_equiv_class_by_svalue (sval, &id))
       {
-	if (tree cst_val = id.get_obj (*m_cm).get_any_constant ())
-	  {
-	    if (capacity_compatible_with_type (cst_val, m_size_cst))
-	      result_set.add (sval);
-	  }
+	if (tree cst = id.get_obj (*m_cm).get_any_constant ())
+	  check_constant (cst, sval);
 	else
-	  {
-	    result_set.add (sval);
-	  }
+	  result_set.add (sval);
       }
   }
 
@@ -3082,8 +3498,23 @@ public:
   }
 
 private:
+  void check_constant (tree cst, const svalue *sval)
+  {
+    switch (TREE_CODE (cst))
+      {
+      default:
+	/* Assume all unhandled operands are compatible.  */
+	result_set.add (sval);
+	break;
+      case INTEGER_CST:
+	if (capacity_compatible_with_type (cst, m_size_cst))
+	  result_set.add (sval);
+	break;
+      }
+  }
+
   tree m_size_cst;
-  const svalue *m_sval;
+  const svalue *m_root_sval;
   constraint_manager *m_cm;
   svalue_set result_set; /* Used as a mapping of svalue*->bool.  */
 };
@@ -3120,12 +3551,12 @@ struct_or_union_with_inheritance_p (tree struc)
 static bool
 is_any_cast_p (const gimple *stmt)
 {
-  if (const gassign *assign = dyn_cast<const gassign *>(stmt))
+  if (const gassign *assign = dyn_cast <const gassign *> (stmt))
     return gimple_assign_cast_p (assign)
 	   || !pending_diagnostic::same_tree_p (
 		  TREE_TYPE (gimple_assign_lhs (assign)),
 		  TREE_TYPE (gimple_assign_rhs1 (assign)));
-  else if (const gcall *call = dyn_cast<const gcall *>(stmt))
+  else if (const gcall *call = dyn_cast <const gcall *> (stmt))
     {
       tree lhs = gimple_call_lhs (call);
       return lhs != NULL_TREE && !pending_diagnostic::same_tree_p (
@@ -3185,10 +3616,11 @@ region_model::check_region_size (const region *lhs_reg, const svalue *rhs_sval,
     case svalue_kind::SK_CONSTANT:
       {
 	const constant_svalue *cst_cap_sval
-		= as_a <const constant_svalue *> (capacity);
+	  = as_a <const constant_svalue *> (capacity);
 	tree cst_cap = cst_cap_sval->get_constant ();
-	if (!capacity_compatible_with_type (cst_cap, pointee_size_tree,
-					    is_struct))
+	if (TREE_CODE (cst_cap) == INTEGER_CST
+	    && !capacity_compatible_with_type (cst_cap, pointee_size_tree,
+					       is_struct))
 	  ctxt->warn (new dubious_allocation_size (lhs_reg, rhs_reg,
 						   cst_cap));
       }
@@ -3798,6 +4230,19 @@ region_model::get_representative_tree (const svalue *sval) const
 {
   svalue_set visited;
   tree expr = get_representative_path_var (sval, &visited).m_tree;
+
+  /* Strip off any top-level cast.  */
+  if (expr && TREE_CODE (expr) == NOP_EXPR)
+    expr = TREE_OPERAND (expr, 0);
+
+  return fixup_tree_for_diagnostic (expr);
+}
+
+tree
+region_model::get_representative_tree (const region *reg) const
+{
+  svalue_set visited;
+  tree expr = get_representative_path_var (reg, &visited).m_tree;
 
   /* Strip off any top-level cast.  */
   if (expr && TREE_CODE (expr) == NOP_EXPR)
@@ -4621,6 +5066,125 @@ region_model::append_regions_cb (const region *base_reg,
     cb_data->out->safe_push (decl_reg);
 }
 
+
+/* Abstract class for diagnostics related to the use of
+   floating-point arithmetic where precision is needed.  */
+
+class imprecise_floating_point_arithmetic : public pending_diagnostic
+{
+public:
+  int get_controlling_option () const final override
+  {
+    return OPT_Wanalyzer_imprecise_fp_arithmetic;
+  }
+};
+
+/* Concrete diagnostic to complain about uses of floating-point arithmetic
+   in the size argument of malloc etc.  */
+
+class float_as_size_arg : public imprecise_floating_point_arithmetic
+{
+public:
+  float_as_size_arg (tree arg) : m_arg (arg)
+  {}
+
+  const char *get_kind () const final override
+  {
+    return "float_as_size_arg_diagnostic";
+  }
+
+  bool subclass_equal_p (const pending_diagnostic &other) const final override
+  {
+    return same_tree_p (m_arg, ((const float_as_size_arg &) other).m_arg);
+  }
+
+  bool emit (rich_location *rich_loc) final override
+  {
+    diagnostic_metadata m;
+    bool warned = warning_meta (rich_loc, m, get_controlling_option (),
+				"use of floating-point arithmetic here might"
+				" yield unexpected results");
+    if (warned)
+      inform (rich_loc->get_loc (), "only use operands of an integer type"
+				    " inside the size argument");
+    return warned;
+  }
+
+  label_text describe_final_event (const evdesc::final_event &ev) final
+  override
+  {
+    if (m_arg)
+      return ev.formatted_print ("operand %qE is of type %qT",
+				 m_arg, TREE_TYPE (m_arg));
+    return ev.formatted_print ("at least one operand of the size argument is"
+			       " of a floating-point type");
+  }
+
+private:
+  tree m_arg;
+};
+
+/* Visitor to find uses of floating-point variables/constants in an svalue.  */
+
+class contains_floating_point_visitor : public visitor
+{
+public:
+  contains_floating_point_visitor (const svalue *root_sval) : m_result (NULL)
+  {
+    root_sval->accept (this);
+  }
+
+  const svalue *get_svalue_to_report ()
+  {
+    return m_result;
+  }
+
+  void visit_constant_svalue (const constant_svalue *sval) final override
+  {
+    /* At the point the analyzer runs, constant integer operands in a floating
+       point expression are already implictly converted to floating-points.
+       Thus, we do prefer to report non-constants such that the diagnostic
+       always reports a floating-point operand.  */
+    tree type = sval->get_type ();
+    if (type && FLOAT_TYPE_P (type) && !m_result)
+      m_result = sval;
+  }
+
+  void visit_conjured_svalue (const conjured_svalue *sval) final override
+  {
+    tree type = sval->get_type ();
+    if (type && FLOAT_TYPE_P (type))
+      m_result = sval;
+  }
+
+  void visit_initial_svalue (const initial_svalue *sval) final override
+  {
+    tree type = sval->get_type ();
+    if (type && FLOAT_TYPE_P (type))
+      m_result = sval;
+  }
+
+private:
+  /* Non-null if at least one floating-point operand was found.  */
+  const svalue *m_result;
+};
+
+/* May complain about uses of floating-point operands in SIZE_IN_BYTES.  */
+
+void
+region_model::check_dynamic_size_for_floats (const svalue *size_in_bytes,
+					     region_model_context *ctxt) const
+{
+  gcc_assert (ctxt);
+
+  contains_floating_point_visitor v (size_in_bytes);
+  if (const svalue *float_sval = v.get_svalue_to_report ())
+	{
+	  tree diag_arg = get_representative_tree (float_sval);
+	  ctxt->warn (new float_as_size_arg (diag_arg));
+	}
+}
+
 /* Return a new region describing a heap-allocated block of memory.
    Use CTXT to complain about tainted sizes.  */
 
@@ -4658,8 +5222,11 @@ region_model::set_dynamic_extents (const region *reg,
 {
   assert_compat_types (size_in_bytes->get_type (), size_type_node);
   if (ctxt)
-    check_dynamic_size_for_taint (reg->get_memory_space (), size_in_bytes,
-				  ctxt);
+    {
+      check_dynamic_size_for_taint (reg->get_memory_space (), size_in_bytes,
+				    ctxt);
+      check_dynamic_size_for_floats (size_in_bytes, ctxt);
+    }
   m_dynamic_extents.put (reg, size_in_bytes);
 }
 

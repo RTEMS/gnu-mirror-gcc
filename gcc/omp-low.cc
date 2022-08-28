@@ -2101,6 +2101,11 @@ create_omp_child_function (omp_context *ctx, bool task_copy)
 	  else
 	    target_attr = NULL;
 	}
+      if (target_attr
+	  && is_gimple_omp_offloaded (ctx->stmt)
+	  && lookup_attribute ("noclone", DECL_ATTRIBUTES (decl)) == NULL_TREE)
+	DECL_ATTRIBUTES (decl) = tree_cons (get_identifier ("noclone"),
+					   NULL_TREE, DECL_ATTRIBUTES (decl));
       if (target_attr)
 	DECL_ATTRIBUTES (decl)
 	  = tree_cons (get_identifier (target_attr),
@@ -6188,6 +6193,8 @@ lower_rec_input_clauses (tree clauses, gimple_seq *ilist, gimple_seq *dlist,
 		      && gimple_omp_for_combined_into_p (ctx->stmt))
 		    {
 		      tree t = OMP_CLAUSE_LINEAR_STEP (c);
+		      if (DECL_P (t))
+			t = build_outer_var_ref (t, ctx);
 		      tree stept = TREE_TYPE (t);
 		      tree ct = omp_find_clause (clauses,
 						 OMP_CLAUSE__LOOPTEMP_);
@@ -6241,10 +6248,10 @@ lower_rec_input_clauses (tree clauses, gimple_seq *ilist, gimple_seq *dlist,
 			}
 
 		      if (POINTER_TYPE_P (TREE_TYPE (x)))
-			x = fold_build2 (POINTER_PLUS_EXPR,
-					 TREE_TYPE (x), x, t);
+			x = fold_build_pointer_plus (x, t);
 		      else
-			x = fold_build2 (PLUS_EXPR, TREE_TYPE (x), x, t);
+			x = fold_build2 (PLUS_EXPR, TREE_TYPE (x), x,
+					 fold_convert (TREE_TYPE (x), t));
 		    }
 
 		  if ((OMP_CLAUSE_CODE (c) != OMP_CLAUSE_LINEAR

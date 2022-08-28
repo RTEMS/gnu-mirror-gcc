@@ -424,6 +424,73 @@ byte_range::contains_p (const byte_range &other, byte_range *out) const
     return false;
 }
 
+/* Return true if THIS and OTHER intersect and write the number
+   of bytes both buffers overlap to *OUT_NUM_OVERLAP_BYTES.
+
+   Otherwise return false.  */
+
+bool
+byte_range::intersects_p (const byte_range &other,
+			  byte_size_t *out_num_overlap_bytes) const
+{
+  if (get_start_byte_offset () < other.get_next_byte_offset ()
+      && other.get_start_byte_offset () < get_next_byte_offset ())
+    {
+      byte_offset_t overlap_start = MAX (get_start_byte_offset (),
+					 other.get_start_byte_offset ());
+      byte_offset_t overlap_next = MIN (get_next_byte_offset (),
+					other.get_next_byte_offset ());
+      gcc_assert (overlap_next > overlap_start);
+      *out_num_overlap_bytes = overlap_next - overlap_start;
+      return true;
+    }
+  else
+    return false;
+}
+
+/* Return true if THIS exceeds OTHER and write the overhanging
+   byte range to OUT_OVERHANGING_BYTE_RANGE.  */
+
+bool
+byte_range::exceeds_p (const byte_range &other,
+		       byte_range *out_overhanging_byte_range) const
+{
+  if (other.get_last_byte_offset () < get_last_byte_offset ())
+    {
+      /* THIS definitely exceeds OTHER.  */
+      byte_offset_t start = MAX (get_start_byte_offset (),
+				 other.get_next_byte_offset ());
+      byte_offset_t size = get_next_byte_offset () - start;
+      gcc_assert (size > 0);
+      out_overhanging_byte_range->m_start_byte_offset = start;
+      out_overhanging_byte_range->m_size_in_bytes = size;
+      return true;
+    }
+  else
+    return false;
+}
+
+/* Return true if THIS falls short of OFFSET and write the
+   byte range fallen short to OUT_FALL_SHORT_BYTES.  */
+
+bool
+byte_range::falls_short_of_p (byte_offset_t offset,
+			      byte_range *out_fall_short_bytes) const
+{
+  if (get_start_byte_offset () < offset)
+    {
+      /* THIS falls short of OFFSET.  */
+      byte_offset_t start = get_start_byte_offset ();
+      byte_offset_t size = MIN (offset, get_next_byte_offset ()) - start;
+      gcc_assert (size > 0);
+      out_fall_short_bytes->m_start_byte_offset = start;
+      out_fall_short_bytes->m_size_in_bytes = size;
+      return true;
+    }
+  else
+    return false;
+}
+
 /* qsort comparator for byte ranges.  */
 
 int
@@ -1107,7 +1174,6 @@ binding_cluster::binding_cluster (const region *base_region)
 : m_base_region (base_region), m_map (),
   m_escaped (false), m_touched (false)
 {
-  gcc_assert (base_region->tracked_p ());
 }
 
 /* binding_cluster's copy ctor.  */
@@ -2446,7 +2512,9 @@ store::set_value (store_manager *mgr, const region *lhs_reg,
 
   remove_overlapping_bindings (mgr, lhs_reg, uncertainty);
 
-  rhs_sval = simplify_for_binding (rhs_sval);
+  if (lhs_reg->get_type ())
+    rhs_sval = simplify_for_binding (rhs_sval);
+  /* ...but if we have no type for the region, retain any cast.  */
 
   const region *lhs_base_reg = lhs_reg->get_base_region ();
   binding_cluster *lhs_cluster;

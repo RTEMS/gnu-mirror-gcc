@@ -133,6 +133,13 @@ null_pointer_constant_p (const_tree expr)
   /* This should really operate on c_expr structures, but they aren't
      yet available everywhere required.  */
   tree type = TREE_TYPE (expr);
+
+  /* An integer constant expression with the value 0, such an expression
+     cast to type void*, or the predefined constant nullptr, are a null
+     pointer constant.  */
+  if (expr == nullptr_node)
+    return true;
+
   return (TREE_CODE (expr) == INTEGER_CST
 	  && !TREE_OVERFLOW (expr)
 	  && integer_zerop (expr)
@@ -3546,6 +3553,7 @@ convert_arguments (location_t loc, vec<location_t> arg_loc, tree typelist,
 	  case BUILT_IN_ISINF_SIGN:
 	  case BUILT_IN_ISNAN:
 	  case BUILT_IN_ISNORMAL:
+	  case BUILT_IN_ISSIGNALING:
 	  case BUILT_IN_FPCLASSIFY:
 	    type_generic_remove_excess_precision = true;
 	    break;
@@ -4575,7 +4583,7 @@ build_unary_op (location_t location, enum tree_code code, tree xarg,
     case TRUTH_NOT_EXPR:
       if (typecode != INTEGER_TYPE && typecode != FIXED_POINT_TYPE
 	  && typecode != REAL_TYPE && typecode != POINTER_TYPE
-	  && typecode != COMPLEX_TYPE)
+	  && typecode != COMPLEX_TYPE && typecode != NULLPTR_TYPE)
 	{
 	  error_at (location,
 		    "wrong type argument to unary exclamation mark");
@@ -5515,6 +5523,13 @@ build_conditional_expr (location_t colon_loc, tree ifexp, bool ifexp_bcp,
 	}
       result_type = type2;
     }
+  /* 6.5.15: "if one is a null pointer constant (other than a pointer) or has
+     type nullptr_t and the other is a pointer, the result type is the pointer
+     type."  */
+  else if (code1 == NULLPTR_TYPE && code2 == POINTER_TYPE)
+    result_type = type2;
+  else if (code1 == POINTER_TYPE && code2 == NULLPTR_TYPE)
+    result_type = type1;
 
   if (!result_type)
     {
@@ -6032,18 +6047,18 @@ build_c_cast (location_t loc, tree type, tree expr)
 	  if (!addr_space_superset (as_to, as_from, &as_common))
 	    {
 	      if (ADDR_SPACE_GENERIC_P (as_from))
-		warning_at (loc, 0, "cast to %s address space pointer "
+		warning_at (loc, 0, "cast to %qs address space pointer "
 			    "from disjoint generic address space pointer",
 			    c_addr_space_name (as_to));
 
 	      else if (ADDR_SPACE_GENERIC_P (as_to))
 		warning_at (loc, 0, "cast to generic address space pointer "
-			    "from disjoint %s address space pointer",
+			    "from disjoint %qs address space pointer",
 			    c_addr_space_name (as_from));
 
 	      else
-		warning_at (loc, 0, "cast to %s address space pointer "
-			    "from disjoint %s address space pointer",
+		warning_at (loc, 0, "cast to %qs address space pointer "
+			    "from disjoint %qs address space pointer",
 			    c_addr_space_name (as_to),
 			    c_addr_space_name (as_from));
 	    }
@@ -7252,6 +7267,8 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
       if (!null_pointer_constant_p (rhs)
 	  && asr != asl && !targetm.addr_space.subset_p (asr, asl))
 	{
+	  auto_diagnostic_group d;
+	  bool diagnosed = true;
 	  switch (errtype)
 	    {
 	    case ic_argpass:
@@ -7259,7 +7276,8 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 		const char msg[] = G_("passing argument %d of %qE from "
 				      "pointer to non-enclosed address space");
 		if (warnopt)
-		  warning_at (expr_loc, warnopt, msg, parmnum, rname);
+		  diagnosed
+		    = warning_at (expr_loc, warnopt, msg, parmnum, rname);
 		else
 		  error_at (expr_loc, msg, parmnum, rname);
 	      break;
@@ -7269,7 +7287,7 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 		const char msg[] = G_("assignment from pointer to "
 				      "non-enclosed address space");
 		if (warnopt)
-		  warning_at (location, warnopt, msg);
+		  diagnosed = warning_at (location, warnopt, msg);
 		else
 		  error_at (location, msg);
 		break;
@@ -7280,7 +7298,7 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 		const char msg[] = G_("initialization from pointer to "
 				      "non-enclosed address space");
 		if (warnopt)
-		  warning_at (location, warnopt, msg);
+		  diagnosed = warning_at (location, warnopt, msg);
 		else
 		  error_at (location, msg);
 		break;
@@ -7290,13 +7308,21 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 		const char msg[] = G_("return from pointer to "
 				      "non-enclosed address space");
 		if (warnopt)
-		  warning_at (location, warnopt, msg);
+		  diagnosed = warning_at (location, warnopt, msg);
 		else
 		  error_at (location, msg);
 		break;
 	      }
 	    default:
 	      gcc_unreachable ();
+	    }
+	  if (diagnosed)
+	    {
+	      if (errtype == ic_argpass)
+		inform_for_arg (fundecl, expr_loc, parmnum, type, rhstype);
+	      else
+		inform (location, "expected %qT but pointer is of type %qT",
+			type, rhstype);
 	    }
 	  return error_mark_node;
 	}
@@ -7602,12 +7628,13 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 	error_at (location, msg);
       return error_mark_node;
     }
-  else if (codel == POINTER_TYPE && coder == INTEGER_TYPE)
+  else if (codel == POINTER_TYPE
+	   && (coder == INTEGER_TYPE || coder == NULLPTR_TYPE))
     {
-      /* An explicit constant 0 can convert to a pointer,
-	 or one that results from arithmetic, even including
-	 a cast to integer type.  */
-      if (!null_pointer_constant)
+      /* An explicit constant 0 or type nullptr_t can convert to a pointer,
+	 or one that results from arithmetic, even including a cast to
+	 integer type.  */
+      if (!null_pointer_constant && coder != NULLPTR_TYPE)
 	switch (errtype)
 	  {
 	  case ic_argpass:
@@ -7680,7 +7707,10 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 
       return convert (type, rhs);
     }
-  else if (codel == BOOLEAN_TYPE && coder == POINTER_TYPE)
+  else if (codel == BOOLEAN_TYPE
+	   /* The type nullptr_t may be converted to bool.  The
+	      result is false.  */
+	   && (coder == POINTER_TYPE || coder == NULLPTR_TYPE))
     {
       tree ret;
       bool save = in_late_binary_op;
@@ -8045,7 +8075,7 @@ digest_init (location_t init_loc, tree type, tree init, tree origtype,
 
 	  if (char_array)
 	    {
-	      if (typ2 != char_type_node)
+	      if (typ2 != char_type_node && typ2 != char8_type_node)
 		incompat_string_cst = true;
 	    }
 	  else if (!comptypes (typ1, typ2))
@@ -8280,7 +8310,9 @@ digest_init (location_t init_loc, tree type, tree init, tree origtype,
 
   if (COMPLETE_TYPE_P (type) && TREE_CODE (TYPE_SIZE (type)) != INTEGER_CST)
     {
-      error_init (init_loc, "variable-sized object may not be initialized");
+      error_init (init_loc,
+		  "variable-sized object may not be initialized except "
+		  "with an empty initializer");
       return error_mark_node;
     }
 
@@ -8630,8 +8662,9 @@ really_start_incremental_init (tree type)
 	    constructor_max_index = integer_minus_one_node;
 
 	  /* constructor_max_index needs to be an INTEGER_CST.  Attempts
-	     to initialize VLAs will cause a proper error; avoid tree
-	     checking errors as well by setting a safe value.  */
+	     to initialize VLAs with a nonempty initializer will cause a
+	     proper error; avoid tree checking errors as well by setting a
+	     safe value.  */
 	  if (constructor_max_index
 	      && TREE_CODE (constructor_max_index) != INTEGER_CST)
 	    constructor_max_index = integer_minus_one_node;
@@ -9013,12 +9046,14 @@ pop_init_level (location_t loc, int implicit,
 	   && !gnu_vector_type_p (constructor_type))
     {
       /* A nonincremental scalar initializer--just return
-	 the element, after verifying there is just one.  */
+	 the element, after verifying there is just one.
+         Empty scalar initializers are supported in C2X.  */
       if (vec_safe_is_empty (constructor_elements))
 	{
-	  if (!constructor_erroneous && constructor_type != error_mark_node)
-	    error_init (loc, "empty scalar initializer");
-	  ret.value = error_mark_node;
+	  if (constructor_erroneous || constructor_type == error_mark_node)
+	    ret.value = error_mark_node;
+	  else
+	    ret.value = build_zero_cst (constructor_type);
 	}
       else if (vec_safe_length (constructor_elements) != 1)
 	{
@@ -9103,7 +9138,7 @@ set_designator (location_t loc, bool array,
     return true;
 
   /* Likewise for an initializer for a variable-size type.  Those are
-     diagnosed in digest_init.  */
+     diagnosed in the parser, except for empty initializer braces.  */
   if (COMPLETE_TYPE_P (constructor_type)
       && TREE_CODE (TYPE_SIZE (constructor_type)) != INTEGER_CST)
     return true;
@@ -10264,7 +10299,7 @@ process_init_element (location_t loc, struct c_expr value, bool implicit,
     return;
 
   /* Ignore elements of an initializer for a variable-size type.
-     Those are diagnosed in digest_init.  */
+     Those are diagnosed in the parser (empty initializer braces are OK).  */
   if (COMPLETE_TYPE_P (constructor_type)
       && !poly_int_tree_p (TYPE_SIZE (constructor_type)))
     return;
@@ -12096,10 +12131,10 @@ build_binary_op (location_t location, enum tree_code code,
     case TRUTH_XOR_EXPR:
       if ((code0 == INTEGER_TYPE || code0 == POINTER_TYPE
 	   || code0 == REAL_TYPE || code0 == COMPLEX_TYPE
-	   || code0 == FIXED_POINT_TYPE)
+	   || code0 == FIXED_POINT_TYPE || code0 == NULLPTR_TYPE)
 	  && (code1 == INTEGER_TYPE || code1 == POINTER_TYPE
 	      || code1 == REAL_TYPE || code1 == COMPLEX_TYPE
-	      || code1 == FIXED_POINT_TYPE))
+	      || code1 == FIXED_POINT_TYPE || code1 ==  NULLPTR_TYPE))
 	{
 	  /* Result of these operations is always an int,
 	     but that does not mean the operands should be
@@ -12407,6 +12442,27 @@ build_binary_op (location_t location, enum tree_code code,
 	  result_type = type1;
 	  pedwarn (location, 0, "comparison between pointer and integer");
 	}
+      /* 6.5.9: One of the following shall hold:
+	 -- both operands have type nullptr_t;  */
+      else if (code0 == NULLPTR_TYPE && code1 == NULLPTR_TYPE)
+	{
+	  result_type = nullptr_type_node;
+	  /* No need to convert the operands to result_type later.  */
+	  converted = 1;
+	}
+    /* -- one operand has type nullptr_t and the other is a null pointer
+       constant.  We will have to convert the former to the type of the
+       latter, because during gimplification we can't have mismatching
+       comparison operand type.  We convert from nullptr_t to the other
+       type, since only nullptr_t can be converted to nullptr_t.  Also,
+       even a constant 0 is a null pointer constant, so we may have to
+       create a pointer type from its type.  */
+      else if (code0 == NULLPTR_TYPE && null_pointer_constant_p (orig_op1))
+	result_type = (INTEGRAL_TYPE_P (type1)
+		       ? build_pointer_type (type1) : type1);
+      else if (code1 == NULLPTR_TYPE && null_pointer_constant_p (orig_op0))
+	result_type = (INTEGRAL_TYPE_P (type0)
+		       ? build_pointer_type (type0) : type0);
       if ((TREE_CODE (TREE_TYPE (orig_op0)) == BOOLEAN_TYPE
 	   || truth_value_p (TREE_CODE (orig_op0)))
 	  ^ (TREE_CODE (TREE_TYPE (orig_op1)) == BOOLEAN_TYPE
@@ -14944,7 +15000,7 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	      else
 		{
 		  t = OMP_CLAUSE_DECL (c);
-		  if (!lang_hooks.types.omp_mappable_type (TREE_TYPE (t)))
+		  if (!omp_mappable_type (TREE_TYPE (t)))
 		    {
 		      error_at (OMP_CLAUSE_LOCATION (c),
 				"array section does not have mappable type "
@@ -15081,7 +15137,7 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 			    t, omp_clause_code_name[OMP_CLAUSE_CODE (c)]);
 		  remove = true;
 		}
-	      else if (!lang_hooks.types.omp_mappable_type (TREE_TYPE (t)))
+	      else if (!omp_mappable_type (TREE_TYPE (t)))
 		{
 		  error_at (OMP_CLAUSE_LOCATION (c),
 			    "%qE does not have a mappable type in %qs clause",
@@ -15162,7 +15218,7 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 			 || (OMP_CLAUSE_MAP_KIND (c)
 			     == GOMP_MAP_FORCE_DEVICEPTR)))
 		   && t == OMP_CLAUSE_DECL (c)
-		   && !lang_hooks.types.omp_mappable_type (TREE_TYPE (t)))
+		   && !omp_mappable_type (TREE_TYPE (t)))
 	    {
 	      error_at (OMP_CLAUSE_LOCATION (c),
 			"%qD does not have a mappable type in %qs clause", t,
@@ -15279,7 +15335,7 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 			cname);
 	      remove = true;
 	    }
-	  else if (!lang_hooks.types.omp_mappable_type (TREE_TYPE (t)))
+	  else if (!omp_mappable_type (TREE_TYPE (t)))
 	    {
 	      error_at (OMP_CLAUSE_LOCATION (c),
 			"%qD does not have a mappable type in %qs clause", t,
