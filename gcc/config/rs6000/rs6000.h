@@ -564,6 +564,12 @@ extern int rs6000_vector_align[];
 					 && TARGET_P8_VECTOR		\
 					 && TARGET_POWERPC64)
 
+/* Whether the __ibm128 keyword is allowed.  Any system that supports _Float128
+   is assumed to be capable of supporting __ibm128.  Similarly if the long
+   double size is 128 bits, we assume __ibm128 is supported.  We don't want to
+   support it on a system without existing 128-bit long doubles.  */
+#define TARGET_IBM128	(TARGET_FLOAT128_TYPE || TARGET_LONG_DOUBLE_128)
+
 /* Inlining allows targets to define the meanings of bits in target_info
    field of ipa_fn_summary by itself, the used bits for rs6000 are listed
    below.  */
