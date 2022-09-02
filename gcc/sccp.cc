@@ -320,14 +320,43 @@ replace_scc_by_value (vec<gphi *> scc, tree v)
 {
   for (gphi *phi : scc)
     {
-      // DEBUG
       tree ssa_name = gimple_get_lhs (phi);
+
+      // DEBUG
       unsigned vnum_get_replaced = SSA_NAME_VERSION (ssa_name);
       unsigned vnum_replaced_by = SSA_NAME_VERSION (v);
       std::cerr << "Replacing " << vnum_get_replaced << " by " <<
 	vnum_replaced_by << std::endl;
-      // TODO Remove phi statement and free ssa name
-      // TODO Replace occurences of phi with v
+
+      /* Replace each occurence of phi by value v.  */
+      use_operand_p use_p;
+      imm_use_iterator iter;
+      gimple *use_stmt;
+      FOR_EACH_IMM_USE_STMT (use_stmt, iter, ssa_name)
+	FOR_EACH_IMM_USE_ON_STMT (use_p, iter)
+	  SET_USE (use_p, v);
+    }
+}
+
+/* Remove all PHIs with zero uses.  */
+
+static void
+remove_zero_uses_phis ()
+{
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      gphi_iterator pi;
+      for (pi = gsi_start_phis (bb); !gsi_end_p (pi);)
+	{
+	  gphi *phi = pi.phi ();
+	  tree ssa_name = gimple_phi_result (phi);
+	  if (has_zero_uses (ssa_name))
+	    /* Note that remove_phi_node() also frees SSA name.  */
+	    remove_phi_node (&pi, true);
+	  else
+	    gsi_next (&pi);
+	}
     }
 }
 
@@ -393,6 +422,7 @@ remove_redundant_phis (vec<gphi *> phis)
     {
       process_scc (scc);
     }
+  remove_zero_uses_phis ();
 }
 
 /* TODO Pass description.  */
