@@ -1,4 +1,40 @@
+==================== Work099, patch #5:
+
+Update float 128-bit conversions.
+
+This patch reworks the conversions between 128-bit binary floating point types.
+Previously, we would call rs6000_expand_float128_convert to do all conversions.
+Now, we only define the conversions between the same type.  The appropriate
+extend or truncate insn is generated, and after register allocation, it is
+converted to a move.
+
+This patch fixes two places where we want to override the external name for the
+conversion function, and the wrong optab was used.
+
+2022-09-01   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+	* config/rs6000/rs6000.cc (init_float128_ieee): Use the correct
+	float_extend or float_truncate optab based on how the machine converts
+	between IEEE 128-bit and IBM 128-bit.
+	* config/rs6000/rs6000.md (IFKF): Delete.
+	(IFKF_reg): Delete.
+	(extendiftf2): Rewrite to be a move if IFmode and TFmode are both IBM
+	128-bit.  Do not run if TFmode is IEEE 128-bit.
+	(extendifkf2): Delete.
+	(extendtfkf2): Delete.
+	(extendtfif2): Delete.
+	(trunciftf2): Delete.
+	(truncifkf2): Delete.
+	(trunckftf2): Delete.
+	(extendkftf2): Implement conversion of IEEE 128-bit types as a move.
+	(trunctfif2): Delete.
+	(trunctfkf2): Implement conversion of IEEE 128-bit types as a move.
+	(extend<mode>tf2_internal): Delete.
+	(extendtf<mode>2_internal): Delete.
+
 ==================== Work099, patch #4:
+
 Rework 128-bit complex multiply and divide.
 
 This function reworks how the complex multiply and divide built-in functions are
