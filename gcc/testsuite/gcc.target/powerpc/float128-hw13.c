@@ -1,13 +1,14 @@
 /* { dg-do compile { target lp64 } } */
 /* { dg-require-effective-target powerpc_p9vector_ok } */
 /* { dg-require-effective-target float128 } */
-/* { dg-options "-mpower9-vector -O2 -mabi=ieeelongdouble -Wno-psabi" } */
+/* { dg-options "-mpower9-vector -O2 -mabi=ibmlongdouble -Wno-psabi" } */
 
-/* Insure that the ISA 3.0 IEEE 128-bit floating point built-in functions can
-   be used with long double when the default is IEEE 128-bit.  */
+/* Insure that the ISA 3.0 IEEE 128-bit floating point built-in functions work
+   with __float128.  This is the same as float128-hw4.c, except the type
+   __float128 is used, and the IBM 128-bit long double ABI is used.  */
 
 #ifndef TYPE
-#define TYPE long double
+#define TYPE __float128
 #endif
 
 unsigned int
@@ -118,11 +119,6 @@ nfms_odd (TYPE a, TYPE b, TYPE c)
   return -__builtin_fmaf128_round_to_odd (a, b, -c);
 }
 
-/* In using long double instead of _Float128, we might not be able to optimize
-   __builtin_fmaf128_round_to_odd (a, b, -c) into using xsmsubqpo instead of
-   xsnegqp and xsmaddqpo due to conversions between TFmode and KFmode.  So just
-   recognize that the did the FMA optimization.  */
-
 /* { dg-final { scan-assembler 	   {\mxsiexpdp\M}   } } */
 /* { dg-final { scan-assembler 	   {\mxsiexpqp\M}   } } */
 /* { dg-final { scan-assembler 	   {\mxsxexpdp\M}   } } */
@@ -131,8 +127,11 @@ nfms_odd (TYPE a, TYPE b, TYPE c)
 /* { dg-final { scan-assembler 	   {\mxsxsigqp\M}   } } */
 /* { dg-final { scan-assembler 	   {\mxsaddqpo\M}   } } */
 /* { dg-final { scan-assembler 	   {\mxsdivqpo\M}   } } */
-/* { dg-final { scan-assembler 	   {\mxsn?m(add|sub)qpo\M} } } */
+/* { dg-final { scan-assembler 	   {\mxsmaddqpo\M}  } } */
+/* { dg-final { scan-assembler 	   {\mxsmsubqpo\M}  } } */
 /* { dg-final { scan-assembler 	   {\mxsmulqpo\M}   } } */
+/* { dg-final { scan-assembler 	   {\mxsnmaddqpo\M} } } */
+/* { dg-final { scan-assembler 	   {\mxsnmsubqpo\M} } } */
 /* { dg-final { scan-assembler 	   {\mxssqrtqpo\M}  } } */
 /* { dg-final { scan-assembler 	   {\mxssubqpo\M}   } } */
 /* { dg-final { scan-assembler-not {\mbl\M}         } } */
