@@ -217,8 +217,11 @@ tarjan_compute_sccs (vec<gphi *> phis)
 	  unsigned j;
 	  for (j = 0; j < gimple_phi_num_args (phi); j++)
 	    {
-	      tree op_ssa = gimple_phi_arg_def (phi, j);
-	      gimple *op_stmt = SSA_NAME_DEF_STMT (op_ssa);
+	      tree op_var = gimple_phi_arg_def (phi, j);
+	      if (TREE_CODE (op_var) != SSA_NAME)
+		continue; /* Skip arguments that aren't SSA names.  */
+
+	      gimple *op_stmt = SSA_NAME_DEF_STMT (op_var);
 
 	      /* Skip any operand that isn't a vertex we're using.  */
 	      if (!tarjan_is_using (op_stmt))
@@ -254,9 +257,12 @@ tarjan_compute_sccs (vec<gphi *> phis)
 	  unsigned j;
 	  for (j = 0; j < gimple_phi_num_args (phi); j++)
 	    {
-	      tree op_ssa = gimple_phi_arg_def (phi, j); // TODO Same code
+	      tree op_var = gimple_phi_arg_def (phi, j); // TODO Same code
 							 // twice (iterator?)
-	      gimple *op_stmt = SSA_NAME_DEF_STMT (op_ssa);
+	      if (TREE_CODE (op_var) != SSA_NAME)
+		continue; /* Skip arguments that aren't SSA names.  */
+
+	      gimple *op_stmt = SSA_NAME_DEF_STMT (op_var);
 
 	      /* Skip any operand that isn't a vertex we're using.  */
 	      if (!tarjan_is_using (op_stmt))
@@ -342,6 +348,9 @@ process_scc (vec<gphi *> scc)
       for (i = 0; i < gimple_phi_num_args (phi); i++)
 	{
 	  tree op = gimple_phi_arg_def (phi, i);
+	  if (TREE_CODE (op) != SSA_NAME)
+	    continue; /* Skip arguments that aren't SSA names.  */
+
 	  gimple *op_stmt = SSA_NAME_DEF_STMT (op);
 
 	  // Check if operand is a phi from scc (TODO Efficiency)
