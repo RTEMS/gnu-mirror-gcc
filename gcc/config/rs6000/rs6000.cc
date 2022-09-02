@@ -10999,11 +10999,11 @@ init_float128_ieee (machine_mode mode)
       set_conv_libfunc (trunc_optab, SFmode, mode, "__trunckfsf2");
       set_conv_libfunc (trunc_optab, DFmode, mode, "__trunckfdf2");
 
-      set_conv_libfunc (trunc_optab, mode, IFmode, "__trunctfkf2");
+      set_conv_libfunc (sext_optab, mode, IFmode, "__trunctfkf2");
       if (mode != TFmode && FLOAT128_IBM_P (TFmode))
 	set_conv_libfunc (sext_optab, mode, TFmode, "__trunctfkf2");
 
-      set_conv_libfunc (sext_optab, IFmode, mode, "__extendkftf2");
+      set_conv_libfunc (trunc_optab, IFmode, mode, "__extendkftf2");
       if (mode != TFmode && FLOAT128_IBM_P (TFmode))
 	set_conv_libfunc (trunc_optab, TFmode, mode, "__extendkftf2");
 
@@ -23682,8 +23682,10 @@ rs6000_eh_return_filter_mode (void)
 static machine_mode
 rs6000_translate_mode_attribute (machine_mode mode)
 {
-  if (FLOAT128_IBM_P (mode)
-      && ibm128_float_type_node == long_double_type_node)
+  if ((FLOAT128_IEEE_P (mode)
+       && ieee128_float_type_node == long_double_type_node)
+      || (FLOAT128_IBM_P (mode)
+	  && ibm128_float_type_node == long_double_type_node))
     return COMPLEX_MODE_P (mode) ? E_TCmode : E_TFmode;
   return mode;
 }
@@ -23722,10 +23724,13 @@ rs6000_libgcc_floating_mode_supported_p (scalar_float_mode mode)
     case E_TFmode:
       return true;
 
-      /* We only return true for KFmode if IEEE 128-bit types are
-	 supported.  */
+      /* We only return true for KFmode if IEEE 128-bit types are supported, and
+	 if long double does not use the IEEE 128-bit format.  If long double
+	 uses the IEEE 128-bit format, it will use TFmode and not KFmode.
+	 Because the code will not use KFmode in that case, there will be aborts
+	 because it can't find KFmode in the Floatn types.  */
     case E_KFmode:
-      return TARGET_FLOAT128_TYPE;
+      return TARGET_FLOAT128_TYPE && !TARGET_IEEEQUAD;
 
     default:
       return false;
@@ -23759,7 +23764,7 @@ rs6000_floatn_mode (int n, bool extended)
 
 	case 64:
 	  if (TARGET_FLOAT128_TYPE)
-	    return KFmode;
+	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
 	  else
 	    return opt_scalar_float_mode ();
 
@@ -23783,7 +23788,7 @@ rs6000_floatn_mode (int n, bool extended)
 
 	case 128:
 	  if (TARGET_FLOAT128_TYPE)
-	    return KFmode;
+	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
 	  else
 	    return opt_scalar_float_mode ();
 
