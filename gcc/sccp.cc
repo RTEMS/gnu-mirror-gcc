@@ -219,7 +219,7 @@ tarjan_compute_sccs (vec<gphi *> phis)
 	    {
 	      tree op_var = gimple_phi_arg_def (phi, j);
 	      if (TREE_CODE (op_var) != SSA_NAME)
-		continue; /* Skip arguments that aren't SSA names.  */
+		continue; /* Skip any operand that isn't an SSA name.  */
 
 	      gimple *op_stmt = SSA_NAME_DEF_STMT (op_var);
 
@@ -260,7 +260,7 @@ tarjan_compute_sccs (vec<gphi *> phis)
 	      tree op_var = gimple_phi_arg_def (phi, j); // TODO Same code
 							 // twice (iterator?)
 	      if (TREE_CODE (op_var) != SSA_NAME)
-		continue; /* Skip arguments that aren't SSA names.  */
+		continue; /* Skip any operand that isn't an SSA name.  */
 
 	      gimple *op_stmt = SSA_NAME_DEF_STMT (op_var);
 
@@ -352,8 +352,14 @@ remove_zero_uses_phis ()
 	  gphi *phi = pi.phi ();
 	  tree ssa_name = gimple_phi_result (phi);
 	  if (has_zero_uses (ssa_name))
-	    /* Note that remove_phi_node() also frees SSA name.  */
-	    remove_phi_node (&pi, true);
+	    {
+	      /* Note that remove_phi_node() also frees SSA name.  */
+	      remove_phi_node (&pi, true);
+
+	      // DEBUG
+	      unsigned version = SSA_NAME_VERSION (ssa_name);
+	      std::cerr << "Removed " << version << std::endl;
+	    }
 	  else
 	    gsi_next (&pi);
 	}
@@ -376,18 +382,20 @@ process_scc (vec<gphi *> scc)
       unsigned i;
       for (i = 0; i < gimple_phi_num_args (phi); i++)
 	{
-	  tree op = gimple_phi_arg_def (phi, i);
-	  if (TREE_CODE (op) != SSA_NAME)
-	    continue; /* Skip arguments that aren't SSA names.  */
-
-	  gimple *op_stmt = SSA_NAME_DEF_STMT (op);
-
-	  // Check if operand is a phi from scc (TODO Efficiency)
+	  // Check if operand is a phi from scc
 	  bool op_in_scc = false;
-	  for (gphi *foo : scc)
+	  tree op = gimple_phi_arg_def (phi, i);
+
+	  if (TREE_CODE (op) == SSA_NAME)
 	    {
-	      if (op_stmt == foo)
-		op_in_scc = true;
+	      gimple *op_stmt = SSA_NAME_DEF_STMT (op);
+
+	      // TODO Efficiency
+	      for (gphi *foo : scc)
+		{
+		  if (op_stmt == foo)
+		    op_in_scc = true;
+		}
 	    }
 
 	  if (!op_in_scc)
@@ -408,7 +416,6 @@ process_scc (vec<gphi *> scc)
     replace_scc_by_value (scc, outer_ops.pop());
   else if (outer_ops.length () > 1)
     {
-      std::cerr << inner.length () << std::endl;
       remove_redundant_phis (inner);
     }
 }
@@ -459,40 +466,6 @@ pass_sccp::execute (function *)
 {
   init_sccp ();
   remove_redundant_phis (get_all_normal_phis ());
-
-  /*
-  // DEBUG
-  basic_block bb;
-  FOR_EACH_BB_FN (bb, cfun)
-    {
-      debug_bb (bb);
-      gphi_iterator pi;
-      std::cerr << "PHI LIST" << std::endl;
-      for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
-	{
-	  gphi *phi = pi.phi ();
-	  debug_gimple_stmt (phi);
-	}
-      std::cerr << std::endl << std::endl;
-    }
-  */
-
-  /*
-  std::cerr << "function:" << std::endl;
-  for (vec<gphi *> scc : sccs)
-    {
-      std::cerr << "scc:" << std::endl;
-      for (gphi *phi : scc)
-	{
-	  tree ssa_name = gimple_phi_result (phi);
-	  unsigned vnum = SSA_NAME_VERSION (ssa_name);
-	  std::cerr << vnum << std::endl;
-	}
-      std::cerr << std::endl;
-    }
-  std::cerr << std::endl;
-  */
-
   finalize_sccp ();
 
   return 0;
