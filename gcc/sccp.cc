@@ -380,82 +380,82 @@ remove_zero_uses_phis ()
     }
 }
 
-static void remove_redundant_phis (vec<gphi *> phis); // TODO Where to put
-						      // declaration?
-
-static void
-process_scc (vec<gphi *> scc)
-{
-  vec<gphi *> inner = vNULL;
-  hash_set<tree> outer_ops;
-
-  for (gphi *phi : scc)
-    {
-      bool is_inner = true;
-      
-      unsigned i;
-      for (i = 0; i < gimple_phi_num_args (phi); i++)
-	{
-	  // Check if operand is a phi from scc
-	  bool op_in_scc = false;
-	  tree op = gimple_phi_arg_def (phi, i);
-
-	  if (TREE_CODE (op) == SSA_NAME)
-	    {
-	      gimple *op_stmt = SSA_NAME_DEF_STMT (op);
-
-	      // TODO Efficiency
-	      for (gphi *foo : scc)
-		{
-		  if (op_stmt == foo)
-		    op_in_scc = true;
-		}
-	    }
-
-	  if (!op_in_scc)
-	    {
-	      outer_ops.add (op);
-	      is_inner = false;
-	    }
-	}
-
-      if (is_inner)
-	{
-	  inner.safe_push (phi);
-	}
-    }
-
-  // TODO if == 0 -> unreachable?
-  if (outer_ops.elements () == 1)
-    {
-      /* Get the only operand in outer_ops.  */
-      tree outer_op;
-      for (tree foo : outer_ops)
-	{
-	  outer_op = foo;
-	  break;
-	}
-
-      /* Only replace by non-abnormal phi.  */
-      if (!(TREE_CODE (outer_op) == SSA_NAME &&
-	  SSA_NAME_OCCURS_IN_ABNORMAL_PHI (outer_op)))
-	replace_scc_by_value (scc, outer_op);
-    }
-  else if (outer_ops.elements () > 1)
-    {
-      remove_redundant_phis (inner);
-    }
-}
-
 static void
 remove_redundant_phis (vec<gphi *> phis)
 {
-  vec<vec<gphi *>> sccs = tarjan_compute_sccs (phis);
-  sccs.reverse (); /* Reverse topological order -> normal topo. order.  */
-  for (vec<gphi *> scc : sccs)
+  vec<vec<gphi *>> worklist = vNULL;
+  worklist = tarjan_compute_sccs (phis);
+
+  while (!worklist.is_empty ())
     {
-      process_scc (scc);
+      vec<gphi *> scc = worklist.pop ();
+
+      vec<gphi *> inner = vNULL;
+      hash_set<tree> outer_ops;
+
+      for (gphi *phi : scc)
+	{
+	  bool is_inner = true;
+
+	  unsigned i;
+	  for (i = 0; i < gimple_phi_num_args (phi); i++)
+	    {
+	      // Check if operand is a phi from current scc
+	      bool op_in_scc = false;
+	      tree op = gimple_phi_arg_def (phi, i);
+
+	      if (TREE_CODE (op) == SSA_NAME)
+		{
+		  gimple *op_stmt = SSA_NAME_DEF_STMT (op);
+
+		  // TODO Efficiency
+		  for (gphi *foo : scc)
+		    {
+		      if (op_stmt == foo)
+			op_in_scc = true;
+		    }
+		}
+
+	      if (!op_in_scc)
+		{
+		  outer_ops.add (op);
+		  is_inner = false;
+		}
+	    }
+
+	  if (is_inner)
+	    {
+	      inner.safe_push (phi);
+	    }
+	}
+
+      // TODO if == 0 -> unreachable?
+      if (outer_ops.elements () == 1)
+	{
+	  /* Get the only operand in outer_ops.  */
+	  tree outer_op;
+	  for (tree foo : outer_ops)
+	    {
+	      outer_op = foo;
+	      break;
+	    }
+
+	  /* Don't replace by abnormal phis!  */
+	  if (!(TREE_CODE (outer_op) == SSA_NAME &&
+	      SSA_NAME_OCCURS_IN_ABNORMAL_PHI (outer_op)))
+	    replace_scc_by_value (scc, outer_op);
+	}
+      else if (outer_ops.elements () > 1)
+	{
+	  /* Add inner sccs to worklist.  */
+	  vec<vec<gphi *>> inner_sccs = tarjan_compute_sccs (inner);
+	  for (vec<gphi *> inner_scc : inner_sccs)
+	    {
+	      worklist.safe_push (inner_scc);
+	    }
+	}
     }
+
   remove_zero_uses_phis ();
 }
 
