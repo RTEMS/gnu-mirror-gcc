@@ -126,11 +126,10 @@ finalize_sccp (void)
 {
 }
 
-/* Return vector of all PHI functions available to this pass that aren't
-   abnormal.  */
+/* Return vector of all PHI functions from all basic blocks.  */
 
 static vec<gphi *>
-get_all_normal_phis (void)
+get_all_phis (void)
 {
   vec<gphi *> result = vNULL;
 
@@ -141,9 +140,6 @@ get_all_normal_phis (void)
       for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
 	{
 	  gphi *phi = pi.phi ();
-	  tree ssa_name = gimple_phi_result (phi);
-	  if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (ssa_name))
-	    continue;
 	  result.safe_push (phi);
 	}
     }
@@ -423,7 +419,10 @@ process_scc (vec<gphi *> scc)
 	  break;
 	}
 
-      replace_scc_by_value (scc, outer_op);
+      /* Only replace by non-abnormal phi.  */
+      if (!(TREE_CODE (outer_op) == SSA_NAME &&
+	  SSA_NAME_OCCURS_IN_ABNORMAL_PHI (outer_op)))
+	replace_scc_by_value (scc, outer_op);
     }
   else if (outer_ops.elements () > 1)
     {
@@ -476,7 +475,7 @@ unsigned
 pass_sccp::execute (function *)
 {
   init_sccp ();
-  remove_redundant_phis (get_all_normal_phis ());
+  remove_redundant_phis (get_all_phis ());
   finalize_sccp ();
 
   return 0;
