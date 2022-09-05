@@ -126,6 +126,23 @@ finalize_sccp (void)
 {
 }
 
+static void
+debug_phis (void) // DEBUG
+{
+  std::cerr << "List of PHIs" << std::endl;
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      gphi_iterator pi;
+      for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
+	{
+	  gphi *phi = pi.phi ();
+	  debug_gimple_stmt (phi);
+	}
+    }
+  std::cerr << std::endl;
+}
+
 /* Return vector of all PHI functions from all basic blocks.  */
 
 static vec<gphi *>
@@ -474,9 +491,17 @@ public:
 unsigned
 pass_sccp::execute (function *)
 {
+  //debug_phis (); // DEBUG
+
   init_sccp ();
   remove_redundant_phis (get_all_phis ());
   finalize_sccp ();
+
+  /*
+  // DEBUG
+  std::cerr << std::endl;
+  debug_phis ();
+  */
 
   return 0;
 }
