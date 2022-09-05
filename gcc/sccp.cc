@@ -33,6 +33,7 @@ along with GCC; see the file COPYING3.  If not see
 #include <iostream>
 #include "gimple-pretty-print.h"
 #include "vec.h"
+#include "hash-set.h"
 #include "libiberty.h"
 
 #include "print-tree.h"
@@ -373,7 +374,7 @@ static void
 process_scc (vec<gphi *> scc)
 {
   vec<gphi *> inner = vNULL;
-  vec<tree> outer_ops = vNULL;
+  hash_set<tree> outer_ops;
 
   for (gphi *phi : scc)
     {
@@ -400,7 +401,7 @@ process_scc (vec<gphi *> scc)
 
 	  if (!op_in_scc)
 	    {
-	      outer_ops.safe_push (op);
+	      outer_ops.add (op);
 	      is_inner = false;
 	    }
 	}
@@ -412,9 +413,19 @@ process_scc (vec<gphi *> scc)
     }
 
   // TODO if == 0 -> unreachable?
-  if (outer_ops.length () == 1)
-    replace_scc_by_value (scc, outer_ops.pop());
-  else if (outer_ops.length () > 1)
+  if (outer_ops.elements () == 1)
+    {
+      /* Get the only operand in outer_ops.  */
+      tree outer_op;
+      for (tree foo : outer_ops)
+	{
+	  outer_op = foo;
+	  break;
+	}
+
+      replace_scc_by_value (scc, outer_op);
+    }
+  else if (outer_ops.elements () > 1)
     {
       remove_redundant_phis (inner);
     }
