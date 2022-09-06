@@ -145,10 +145,10 @@ debug_phis (void) // DEBUG
 
 /* Return vector of all PHI functions from all basic blocks.  */
 
-static vec<gphi *>
+static auto_vec<gphi *>
 get_all_phis (void)
 {
-  vec<gphi *> result = vNULL;
+  auto_vec<gphi *> result;
 
   basic_block bb;
   FOR_EACH_BB_FN (bb, cfun)
@@ -164,10 +164,10 @@ get_all_phis (void)
   return result;
 }
 
-static vec<vertex>
-tarjan_phis_to_vertices (vec<gphi *> phis)
+static auto_vec<vertex>
+tarjan_phis_to_vertices (auto_vec<gphi *> &phis)
 {
-  vec<vertex> result = vNULL;
+  auto_vec<vertex> result;
   for (gphi *phi : phis)
     {
       vertex v;
@@ -181,15 +181,15 @@ tarjan_phis_to_vertices (vec<gphi *> phis)
   return result;
 }
 
-static vec<vec<gphi *>>
-tarjan_compute_sccs (vec<gphi *> phis)
+static auto_vec<vec<gphi *>>
+tarjan_compute_sccs (auto_vec<gphi *> &phis)
 {
-  vec<vec<gphi *>> sccs = vNULL;
-  vec<unsigned> worklist = vNULL;
-  vec<unsigned> stack = vNULL;
+  auto_vec<vec<gphi *>> sccs;
+  auto_vec<unsigned> worklist;
+  auto_vec<unsigned> stack;
   unsigned curr_index = 0;
 
-  vec<vertex> vs = tarjan_phis_to_vertices (phis);
+  auto_vec<vertex> vs = tarjan_phis_to_vertices (phis);
 
   /* Assign phinums and set PHI functions' 'using' flag.  */
   unsigned i;
@@ -297,7 +297,7 @@ tarjan_compute_sccs (vec<gphi *> phis)
 	  /* If this is the root of an scc, pop it from stack.  */
 	  if (vs[i].lowlink == vs[i].index)
 	    {
-	      vec<gphi *> scc = vNULL;
+	      auto_vec<gphi *> scc;
 
 	      unsigned j;
 	      do
@@ -330,7 +330,7 @@ tarjan_compute_sccs (vec<gphi *> phis)
 }
 
 static void
-replace_scc_by_value (vec<gphi *> scc, tree v)
+replace_scc_by_value (vec<gphi *> &scc, tree v)
 {
   for (gphi *phi : scc)
     {
@@ -381,16 +381,16 @@ remove_zero_uses_phis ()
 }
 
 static void
-remove_redundant_phis (vec<gphi *> phis)
+remove_redundant_phis (auto_vec<gphi *> &phis)
 {
-  vec<vec<gphi *>> worklist = vNULL;
+  auto_vec<vec<gphi *>> worklist;
   worklist = tarjan_compute_sccs (phis);
 
   while (!worklist.is_empty ())
     {
       vec<gphi *> scc = worklist.pop ();
 
-      vec<gphi *> inner = vNULL;
+      auto_vec<gphi *> inner;
       hash_set<tree> outer_ops;
 
       for (gphi *phi : scc)
@@ -448,12 +448,14 @@ remove_redundant_phis (vec<gphi *> phis)
       else if (outer_ops.elements () > 1)
 	{
 	  /* Add inner sccs to worklist.  */
-	  vec<vec<gphi *>> inner_sccs = tarjan_compute_sccs (inner);
+	  auto_vec<vec<gphi *>> inner_sccs = tarjan_compute_sccs (inner);
 	  for (vec<gphi *> inner_scc : inner_sccs)
 	    {
 	      worklist.safe_push (inner_scc);
 	    }
 	}
+
+      scc.release();
     }
 
   remove_zero_uses_phis ();
@@ -494,7 +496,8 @@ pass_sccp::execute (function *)
   //debug_phis (); // DEBUG
 
   init_sccp ();
-  remove_redundant_phis (get_all_phis ());
+  auto_vec<gphi *> phis = get_all_phis ();
+  remove_redundant_phis (phis);
   finalize_sccp ();
 
   /*
