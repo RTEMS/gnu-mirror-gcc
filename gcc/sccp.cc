@@ -28,36 +28,16 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree.h"
 #include "gimple.h"
 #include "tree-pass.h"
+#include "ssa.h"
 #include "gimple-iterator.h"
+
+#include "vec.h"
+#include "hash-set.h"
 
 #include <iostream>
 #include "gimple-pretty-print.h"
-#include "vec.h"
-#include "hash-set.h"
-#include "libiberty.h"
-
 #include "print-tree.h"
 #include "dumpfile.h"
-
-// TODO Imported for global var num_ssa_names to work
-#include "backend.h"
-#include "cfghooks.h"
-#include "ssa.h"
-#include "tree-ssa.h"
-#include "fold-const.h"
-#include "calls.h"
-#include "cfganal.h"
-#include "tree-eh.h"
-#include "gimplify.h"
-#include "gimple-iterator.h"
-#include "tree-cfg.h"
-#include "tree-ssa-loop-niter.h"
-#include "tree-into-ssa.h"
-#include "tree-dfa.h"
-#include "cfgloop.h"
-#include "tree-scalar-evolution.h"
-#include "tree-ssa-propagate.h"
-#include "gimple-fold.h"
 
 enum vstate
 {
@@ -297,7 +277,7 @@ tarjan_compute_sccs (auto_vec<gphi *> &phis)
 	  /* If this is the root of an scc, pop it from stack.  */
 	  if (vs[i].lowlink == vs[i].index)
 	    {
-	      auto_vec<gphi *> scc;
+	      vec<gphi *> scc = vNULL;
 
 	      unsigned j;
 	      do
@@ -455,7 +435,7 @@ remove_redundant_phis (auto_vec<gphi *> &phis)
 	    }
 	}
 
-      scc.release();
+      scc.release ();
     }
 
   remove_zero_uses_phis ();
