@@ -191,8 +191,9 @@ tarjan_compute_sccs (auto_vec<gphi *> &phis)
     {
       unsigned i = worklist.pop();
       gphi *phi = vs[i].stmt;
+      vstate state = vs[i].state;
 
-      if (vs[i].state == unvisited)
+      if (state == unvisited)
 	{
 	  vs[i].state = vopen;
 
@@ -204,29 +205,37 @@ tarjan_compute_sccs (auto_vec<gphi *> &phis)
 	  /* Put vertex on stack and also on worklist to be closed later.  */
 	  stack.safe_push (i);
 	  worklist.safe_push (i);
+	}
+      else if (state == vopen)
+	{
+	  vs[i].state = closed;
+	}
 
-	  /* Put unvisited neighbors of vertex on worklist and update
-	     lowlink of this vertex according to indices of neighbors on
-	     stack.  */
-	  unsigned j;
-	  for (j = 0; j < gimple_phi_num_args (phi); j++)
+      /* Iterate over neighbors of this vertex.  */
+      unsigned j;
+      for (j = 0; j < gimple_phi_num_args (phi); j++)
+	{
+	  tree op_var = gimple_phi_arg_def (phi, j);
+	  if (TREE_CODE (op_var) != SSA_NAME)
+	    continue; /* Skip any operand that isn't an SSA name.  */
+
+	  gimple *op_stmt = SSA_NAME_DEF_STMT (op_var);
+
+	  /* Skip any operand that isn't a vertex we're using.  */
+	  if (!tarjan_is_using (op_stmt))
+	    continue;
+	  
+	  gphi *op_phi = dyn_cast<gphi *> (op_stmt);
+	  if (op_phi == NULL)
+	    /* Only PHI functions have the 'using' flags set.  */
+	    gcc_unreachable ();
+
+	  unsigned op_i = tarjan_phinum (op_phi);
+
+	  if (state == unvisited)
 	    {
-	      tree op_var = gimple_phi_arg_def (phi, j);
-	      if (TREE_CODE (op_var) != SSA_NAME)
-		continue; /* Skip any operand that isn't an SSA name.  */
-
-	      gimple *op_stmt = SSA_NAME_DEF_STMT (op_var);
-
-	      /* Skip any operand that isn't a vertex we're using.  */
-	      if (!tarjan_is_using (op_stmt))
-		continue;
-	      
-	      gphi *op_phi = dyn_cast<gphi *> (op_stmt);
-	      if (op_phi == NULL)
-		/* Only PHI functions have the 'using' flags set.  */
-		gcc_unreachable ();
-
-	      unsigned op_i = tarjan_phinum (op_phi);
+	      /* Put unvisited neighbors on worklist. Update lowlink of this
+	         vertex according to indices of neighbors present on stack.  */
 	      switch (vs[op_i].state)
 		{
 		case unvisited:
@@ -241,55 +250,32 @@ tarjan_compute_sccs (auto_vec<gphi *> &phis)
 		  break;
 		}
 	    }
-	}
-      else if (vs[i].state == vopen)
-	{
-	  vs[i].state = closed;
-
-	  /* Update lowlink of this vertex according to lowlinks of children
-	     of this vertex (in terms of DFS tree).  */
-	  unsigned j;
-	  for (j = 0; j < gimple_phi_num_args (phi); j++)
+	  else if (state == vopen)
 	    {
-	      tree op_var = gimple_phi_arg_def (phi, j); // TODO Same code
-							 // twice (iterator?)
-	      if (TREE_CODE (op_var) != SSA_NAME)
-		continue; /* Skip any operand that isn't an SSA name.  */
-
-	      gimple *op_stmt = SSA_NAME_DEF_STMT (op_var);
-
-	      /* Skip any operand that isn't a vertex we're using.  */
-	      if (!tarjan_is_using (op_stmt))
-		continue;
-	      
-	      gphi *op_phi = dyn_cast<gphi *> (op_stmt);
-	      if (op_phi == NULL)
-		/* Only PHI functions have the 'using' flags set.  */
-		gcc_unreachable ();
-
-	      unsigned op_i = tarjan_phinum (op_phi);
+	      /* Update lowlink of this vertex according to lowlinks of
+	         children of this vertex (in terms of DFS tree).  */
 	      if (vs[op_i].state == closed)
 		{
 		  vs[i].lowlink = std::min (vs[i].lowlink, vs[op_i].lowlink);
 		}
 	    }
+	}
 
-	  /* If this is the root of an scc, pop it from stack.  */
-	  if (vs[i].lowlink == vs[i].index)
+      /* If we just closed a root vertex of an scc, pop scc from stack.  */
+      if (state == vopen && vs[i].lowlink == vs[i].index)
+	{
+	  vec<gphi *> scc = vNULL;
+
+	  unsigned j;
+	  do
 	    {
-	      vec<gphi *> scc = vNULL;
-
-	      unsigned j;
-	      do
-		{
-		  j = stack.pop();
-		  scc.safe_push (vs[j].stmt);
-		  vs[j].state = in_scc;
-		}
-	      while (j != i);
-
-	      sccs.safe_push (scc);
+	      j = stack.pop();
+	      scc.safe_push (vs[j].stmt);
+	      vs[j].state = in_scc;
 	    }
+	  while (j != i);
+
+	  sccs.safe_push (scc);
 	}
     }
 
@@ -310,7 +296,7 @@ tarjan_compute_sccs (auto_vec<gphi *> &phis)
 }
 
 static void
-replace_scc_by_value (vec<gphi *> &scc, tree v)
+replace_scc_by_value (vec<gphi *> scc, tree v)
 {
   for (gphi *phi : scc)
     {
