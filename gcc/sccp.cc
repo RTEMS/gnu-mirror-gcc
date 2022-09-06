@@ -1,4 +1,4 @@
-/* TODO Popis passu
+/* TODO Pass description
    Strongly connected copy propagation pass
    Copyright (C) 2022 Free Software Foundation, Inc.
    Contributed by Filip Kastl <filip.kastl@gmail.com>
@@ -19,8 +19,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-// TODO Clean up includes
-
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -34,6 +32,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "vec.h"
 #include "hash-set.h"
 
+// DEBUG includes
 #include <iostream>
 #include "gimple-pretty-print.h"
 #include "print-tree.h"
@@ -359,6 +358,13 @@ remove_redundant_phis (auto_vec<gphi *> &phis)
       auto_vec<gphi *> inner;
       hash_set<tree> outer_ops;
 
+      /* Prepare hash set of PHIs in scc to query later.  */
+      hash_set<gphi *> scc_set;
+      for (gphi *phi : scc)
+	{
+	  scc_set.add (phi);
+	}
+
       for (gphi *phi : scc)
 	{
 	  bool is_inner = true;
@@ -366,20 +372,15 @@ remove_redundant_phis (auto_vec<gphi *> &phis)
 	  unsigned i;
 	  for (i = 0; i < gimple_phi_num_args (phi); i++)
 	    {
-	      // Check if operand is a phi from current scc
 	      bool op_in_scc = false;
 	      tree op = gimple_phi_arg_def (phi, i);
 
 	      if (TREE_CODE (op) == SSA_NAME)
 		{
 		  gimple *op_stmt = SSA_NAME_DEF_STMT (op);
-
-		  // TODO Efficiency
-		  for (gphi *foo : scc)
-		    {
-		      if (op_stmt == foo)
-			op_in_scc = true;
-		    }
+		  if (gimple_code (op_stmt) == GIMPLE_PHI &&
+		      scc_set.contains (as_a<gphi *> (op_stmt)))
+		    op_in_scc = true;
 		}
 
 	      if (!op_in_scc)
@@ -395,7 +396,6 @@ remove_redundant_phis (auto_vec<gphi *> &phis)
 	    }
 	}
 
-      // TODO if == 0 -> unreachable?
       if (outer_ops.elements () == 1)
 	{
 	  /* Get the only operand in outer_ops.  */
@@ -419,6 +419,10 @@ remove_redundant_phis (auto_vec<gphi *> &phis)
 	    {
 	      worklist.safe_push (inner_scc);
 	    }
+	}
+      else
+	{
+	  gcc_unreachable (); // DEBUG
 	}
 
       scc.release ();
