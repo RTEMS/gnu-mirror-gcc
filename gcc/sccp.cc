@@ -1,5 +1,4 @@
-/* TODO Pass description
-   Strongly connected copy propagation pass
+/* Strongly connected copy propagation pass for the GNU compiler.
    Copyright (C) 2022 Free Software Foundation, Inc.
    Contributed by Filip Kastl <filip.kastl@gmail.com>
 
@@ -19,6 +18,25 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+/* Strongly connected copy propagation (SCCP) 
+
+   References:
+
+     Simple and Efficient Construction of Static Single Assignment Form,
+     Matthias Braun, et al., 2013, Section 3.2.
+
+   SCCP uses algorithm presented by Braun et al. to seek out redundant sets of
+   PHI functions and remove them. Redundant set of PHIs is defined as a set
+   where for some value v each PHI in the set references either another PHI
+   from the set or v.
+
+   Braun et al. prove that each redundant set contains a strongly connected
+   component (SCC) that is also redundant. The algorithm is based around
+   computing SCCs and then replacing all uses of variables from an SCC by
+   the appropriate value v.
+
+   For computing SCCs, local implementation of Tarjan's algorithm is used.  */
+
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -28,23 +46,31 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-pass.h"
 #include "ssa.h"
 #include "gimple-iterator.h"
-
 #include "vec.h"
 #include "hash-set.h"
+#include <algorithm>
 
-// DEBUG includes
+// DEBUG
 #include <iostream>
-#include "gimple-pretty-print.h"
-#include "print-tree.h"
-#include "dumpfile.h"
+
+/* State of vertex during tarjan computation.
+
+   unvisited  Vertex hasn't yet been popped from worklist.
+   vopen      DFS has visited vertex for the first time. Vertex has been put on
+	      Tarjan stack.
+   closed     DFS has backtracked through vertex. At this point, vertex doesn't
+	      have any unvisited neighbors.
+   in_scc     Vertex has been popped from tarjan stack.  */
 
 enum vstate
 {
   unvisited,
-  vopen, /* Open and closed vertices are on stack.  */
+  vopen,
   closed,
   in_scc
 };
+
+/* Information about a vertex used by tarjan.  */
 
 struct vertex
 {
@@ -53,6 +79,9 @@ struct vertex
   unsigned lowlink;
   gphi* stmt;
 };
+
+/* Set 'using' flag of gimple statement to true.
+   If the flag isn't set, tarjan will ignore the statement.  */
 
 static void
 tarjan_set_using (gimple* stmt)
@@ -72,6 +101,9 @@ tarjan_is_using (gimple* stmt)
   return gimple_plf (stmt, GF_PLF_1);
 }
 
+/* Set 'phinum' of gimple PHI. Before computing SCCs, tarjan assigns PHIs
+   unique ids - phinums.  */
+
 static void
 tarjan_set_phinum (gphi* phi, unsigned num)
 {
@@ -84,64 +116,7 @@ tarjan_phinum (gphi* phi)
   return gimple_uid (phi);
 }
 
-static void
-init_sccp (void)
-{
-  // Clear 'tarjan using' flag on all statements
-  basic_block bb;
-  FOR_EACH_BB_FN (bb, cfun)
-    {
-      gimple_stmt_iterator gsi;
-      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
-	{
-	  gimple* stmt = gsi_stmt (gsi);
-	  tarjan_clear_using (stmt);
-	}
-    }
-}
-
-static void
-finalize_sccp (void)
-{
-}
-
-static void
-debug_phis (void) // DEBUG
-{
-  std::cerr << "List of PHIs" << std::endl;
-  basic_block bb;
-  FOR_EACH_BB_FN (bb, cfun)
-    {
-      gphi_iterator pi;
-      for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
-	{
-	  gphi *phi = pi.phi ();
-	  debug_gimple_stmt (phi);
-	}
-    }
-  std::cerr << std::endl;
-}
-
-/* Return vector of all PHI functions from all basic blocks.  */
-
-static auto_vec<gphi *>
-get_all_phis (void)
-{
-  auto_vec<gphi *> result;
-
-  basic_block bb;
-  FOR_EACH_BB_FN (bb, cfun)
-    {
-      gphi_iterator pi;
-      for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
-	{
-	  gphi *phi = pi.phi ();
-	  result.safe_push (phi);
-	}
-    }
-
-  return result;
-}
+/* Create and initialize vertex struct for each given PHI.  */
 
 static auto_vec<vertex>
 tarjan_phis_to_vertices (auto_vec<gphi *> &phis)
@@ -160,12 +135,18 @@ tarjan_phis_to_vertices (auto_vec<gphi *> &phis)
   return result;
 }
 
+/* Nonrecursive implementation of Tarjan's algorithm for computing strongly
+   connected components in a graph. PHIs are vertices. Edges lead from a PHI p
+   using another PHI q to the PHI being used (p -> q when q is operand of p).
+
+   Considers only the given PHIs. Ignores other PHIs. */
+
 static auto_vec<vec<gphi *>>
 tarjan_compute_sccs (auto_vec<gphi *> &phis)
 {
   auto_vec<vec<gphi *>> sccs;
-  auto_vec<unsigned> worklist;
-  auto_vec<unsigned> stack;
+  auto_vec<unsigned> worklist; /* DFS stack.  */
+  auto_vec<unsigned> stack; /* Tarjan stack.  */
   unsigned curr_index = 0;
 
   auto_vec<vertex> vs = tarjan_phis_to_vertices (phis);
@@ -278,7 +259,6 @@ tarjan_compute_sccs (auto_vec<gphi *> &phis)
 	}
     }
 
-  // DEBUG
   if (!stack.is_empty ())
   {
     gcc_unreachable();
@@ -294,34 +274,21 @@ tarjan_compute_sccs (auto_vec<gphi *> &phis)
   return sccs;
 }
 
+/* Modify all usages of PHIs in a given SCC to instead reference a given
+   variable.  */
+
 static void
 replace_scc_by_value (vec<gphi *> scc, tree replace_by)
 {
   // DEBUG
   if (scc.length () >= 5)
     {
-      std::cerr << "Replacing scc of size " << scc.length () << std::endl;
+      std::cerr << "Replacing SCC of length " << scc.length () << std::endl;
     }
 
   for (gphi *phi : scc)
     {
       tree get_replaced = gimple_get_lhs (phi);
-
-      // DEBUG
-      /*
-      unsigned vnum_get_replaced = SSA_NAME_VERSION (get_replaced);
-      if (TREE_CODE (replace_by) == SSA_NAME)
-	{
-	  unsigned vnum_replaced_by = SSA_NAME_VERSION (replace_by);
-	  std::cerr << "Replacing " << vnum_get_replaced << " by " <<
-	    vnum_replaced_by << std::endl;
-	}
-      else
-	{
-	  std::cerr << "Replacing " << vnum_get_replaced << " by something"
-	    << " that isn't an SSA name" << std::endl;
-	}
-      */
 
       if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (get_replaced)
 	  && TREE_CODE (replace_by) == SSA_NAME)
@@ -357,18 +324,15 @@ remove_zero_uses_phis ()
 	    {
 	      /* Note that remove_phi_node() also frees SSA name.  */
 	      remove_phi_node (&pi, true);
-
-	      // DEBUG
-	      /*
-	      unsigned version = SSA_NAME_VERSION (ssa_name);
-	      std::cerr << "Removed " << version << std::endl;
-	      */
 	    }
 	  else
 	    gsi_next (&pi);
 	}
     }
 }
+
+/* Apply Braun et al.'s algorithm on a given set of PHIs.
+   Main function of this pass.  */
 
 static void
 remove_redundant_phis (auto_vec<gphi *> &phis)
@@ -424,7 +388,7 @@ remove_redundant_phis (auto_vec<gphi *> &phis)
       if (outer_ops.elements () == 1)
 	{
 	  /* Get the only operand in outer_ops.  */
-	  tree outer_op;
+	  tree outer_op = NULL_TREE;
 	  for (tree foo : outer_ops)
 	    {
 	      outer_op = foo;
@@ -447,7 +411,7 @@ remove_redundant_phis (auto_vec<gphi *> &phis)
 	}
       else
 	{
-	  gcc_unreachable (); // DEBUG
+	  gcc_unreachable ();
 	}
 
       scc.release ();
@@ -456,7 +420,51 @@ remove_redundant_phis (auto_vec<gphi *> &phis)
   remove_zero_uses_phis ();
 }
 
-/* TODO Pass description.  */
+/* Return vector of all PHI functions from all basic blocks.  */
+
+static auto_vec<gphi *>
+get_all_phis (void)
+{
+  auto_vec<gphi *> result;
+
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      gphi_iterator pi;
+      for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
+	{
+	  gphi *phi = pi.phi ();
+	  result.safe_push (phi);
+	}
+    }
+
+  return result;
+}
+
+/* Called when pass execution starts.  */
+
+static void
+init_sccp (void)
+{
+  // Clear 'tarjan using' flag on all statements
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      gimple_stmt_iterator gsi;
+      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+	{
+	  gimple* stmt = gsi_stmt (gsi);
+	  tarjan_clear_using (stmt);
+	}
+    }
+}
+
+/* Called before pass execution ends.  */
+
+static void
+finalize_sccp (void)
+{
+}
 
 namespace {
 
@@ -488,18 +496,10 @@ public:
 unsigned
 pass_sccp::execute (function *)
 {
-  //debug_phis (); // DEBUG
-
   init_sccp ();
   auto_vec<gphi *> phis = get_all_phis ();
   remove_redundant_phis (phis);
   finalize_sccp ();
-
-  /*
-  // DEBUG
-  std::cerr << std::endl;
-  debug_phis ();
-  */
 
   return 0;
 }
