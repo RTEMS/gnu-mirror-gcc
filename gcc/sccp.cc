@@ -297,23 +297,40 @@ tarjan_compute_sccs (auto_vec<gphi *> &phis)
 static void
 replace_scc_by_value (vec<gphi *> scc, tree v)
 {
+  // DEBUG
+  if (scc.length () >= 3)
+    {
+      std::cerr << "Replacing scc of size " << scc.length () << std::endl;
+    }
+
   for (gphi *phi : scc)
     {
       tree ssa_name = gimple_get_lhs (phi);
 
       // DEBUG
       unsigned vnum_get_replaced = SSA_NAME_VERSION (ssa_name);
-      unsigned vnum_replaced_by = SSA_NAME_VERSION (v);
-      std::cerr << "Replacing " << vnum_get_replaced << " by " <<
-	vnum_replaced_by << std::endl;
+      if (TREE_CODE (v) == SSA_NAME)
+	{
+	  unsigned vnum_replaced_by = SSA_NAME_VERSION (v);
+	  std::cerr << "Replacing " << vnum_get_replaced << " by " <<
+	    vnum_replaced_by << std::endl;
+	}
+      else
+	{
+	  std::cerr << "Replacing " << vnum_get_replaced << " by something"
+	    << " that isn't an SSA name" << std::endl;
+	}
 
       /* Replace each occurence of phi by value v.  */
       use_operand_p use_p;
       imm_use_iterator iter;
       gimple *use_stmt;
       FOR_EACH_IMM_USE_STMT (use_stmt, iter, ssa_name)
-	FOR_EACH_IMM_USE_ON_STMT (use_p, iter)
-	  SET_USE (use_p, v);
+	{
+	  FOR_EACH_IMM_USE_ON_STMT (use_p, iter)
+	    SET_USE (use_p, v);
+	  update_stmt (use_stmt);
+	}
     }
 }
 
@@ -463,7 +480,7 @@ public:
 unsigned
 pass_sccp::execute (function *)
 {
-  //debug_phis (); // DEBUG
+  debug_phis (); // DEBUG
 
   init_sccp ();
   auto_vec<gphi *> phis = get_all_phis ();
