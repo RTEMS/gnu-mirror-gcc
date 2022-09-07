@@ -298,12 +298,10 @@ static void
 replace_scc_by_value (vec<gphi *> scc, tree replace_by)
 {
   // DEBUG
-  /*
-  if (scc.length () >= 3)
+  if (scc.length () >= 5)
     {
       std::cerr << "Replacing scc of size " << scc.length () << std::endl;
     }
-  */
 
   for (gphi *phi : scc)
     {
