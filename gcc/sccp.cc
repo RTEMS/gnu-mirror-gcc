@@ -295,23 +295,26 @@ tarjan_compute_sccs (auto_vec<gphi *> &phis)
 }
 
 static void
-replace_scc_by_value (vec<gphi *> scc, tree v)
+replace_scc_by_value (vec<gphi *> scc, tree replace_by)
 {
   // DEBUG
+  /*
   if (scc.length () >= 3)
     {
       std::cerr << "Replacing scc of size " << scc.length () << std::endl;
     }
+  */
 
   for (gphi *phi : scc)
     {
-      tree ssa_name = gimple_get_lhs (phi);
+      tree get_replaced = gimple_get_lhs (phi);
 
       // DEBUG
-      unsigned vnum_get_replaced = SSA_NAME_VERSION (ssa_name);
-      if (TREE_CODE (v) == SSA_NAME)
+      /*
+      unsigned vnum_get_replaced = SSA_NAME_VERSION (get_replaced);
+      if (TREE_CODE (replace_by) == SSA_NAME)
 	{
-	  unsigned vnum_replaced_by = SSA_NAME_VERSION (v);
+	  unsigned vnum_replaced_by = SSA_NAME_VERSION (replace_by);
 	  std::cerr << "Replacing " << vnum_get_replaced << " by " <<
 	    vnum_replaced_by << std::endl;
 	}
@@ -320,15 +323,20 @@ replace_scc_by_value (vec<gphi *> scc, tree v)
 	  std::cerr << "Replacing " << vnum_get_replaced << " by something"
 	    << " that isn't an SSA name" << std::endl;
 	}
+      */
 
-      /* Replace each occurence of phi by value v.  */
+      if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (get_replaced)
+	  && TREE_CODE (replace_by) == SSA_NAME)
+	SSA_NAME_OCCURS_IN_ABNORMAL_PHI (replace_by) = 1;
+
+      /* Replace each occurence of PHI by value replace_by.  */
       use_operand_p use_p;
       imm_use_iterator iter;
       gimple *use_stmt;
-      FOR_EACH_IMM_USE_STMT (use_stmt, iter, ssa_name)
+      FOR_EACH_IMM_USE_STMT (use_stmt, iter, get_replaced)
 	{
 	  FOR_EACH_IMM_USE_ON_STMT (use_p, iter)
-	    SET_USE (use_p, v);
+	    SET_USE (use_p, replace_by);
 	  update_stmt (use_stmt);
 	}
     }
@@ -353,8 +361,10 @@ remove_zero_uses_phis ()
 	      remove_phi_node (&pi, true);
 
 	      // DEBUG
+	      /*
 	      unsigned version = SSA_NAME_VERSION (ssa_name);
 	      std::cerr << "Removed " << version << std::endl;
+	      */
 	    }
 	  else
 	    gsi_next (&pi);
@@ -480,7 +490,7 @@ public:
 unsigned
 pass_sccp::execute (function *)
 {
-  debug_phis (); // DEBUG
+  //debug_phis (); // DEBUG
 
   init_sccp ();
   auto_vec<gphi *> phis = get_all_phis ();
