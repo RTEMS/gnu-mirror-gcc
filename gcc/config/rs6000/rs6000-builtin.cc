@@ -710,7 +710,7 @@ rs6000_init_builtins (void)
      For IEEE 128-bit floating point, always create the type __ieee128.  If the
      user used -mfloat128, rs6000-c.cc will create a define from __float128 to
      __ieee128.  */
-  if (TARGET_LONG_DOUBLE_128 && (!TARGET_IEEEQUAD || TARGET_FLOAT128_TYPE))
+  if (TARGET_IBM128)
     {
       if (!TARGET_IEEEQUAD)
 	ibm128_float_type_node = long_double_type_node;
