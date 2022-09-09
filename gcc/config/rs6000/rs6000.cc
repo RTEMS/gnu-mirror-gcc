@@ -10910,26 +10910,23 @@ init_float128_ibm (machine_mode mode)
       set_optab_libfunc (smul_optab, mode, "__gcc_qmul");
       set_optab_libfunc (sdiv_optab, mode, "__gcc_qdiv");
 
-      if (!TARGET_HARD_FLOAT)
-	{
-	  set_optab_libfunc (neg_optab, mode, "__gcc_qneg");
-	  set_optab_libfunc (eq_optab, mode, "__gcc_qeq");
-	  set_optab_libfunc (ne_optab, mode, "__gcc_qne");
-	  set_optab_libfunc (gt_optab, mode, "__gcc_qgt");
-	  set_optab_libfunc (ge_optab, mode, "__gcc_qge");
-	  set_optab_libfunc (lt_optab, mode, "__gcc_qlt");
-	  set_optab_libfunc (le_optab, mode, "__gcc_qle");
-	  set_optab_libfunc (unord_optab, mode, "__gcc_qunord");
+      set_optab_libfunc (neg_optab, mode, "__gcc_qneg");
+      set_optab_libfunc (eq_optab, mode, "__gcc_qeq");
+      set_optab_libfunc (ne_optab, mode, "__gcc_qne");
+      set_optab_libfunc (gt_optab, mode, "__gcc_qgt");
+      set_optab_libfunc (ge_optab, mode, "__gcc_qge");
+      set_optab_libfunc (lt_optab, mode, "__gcc_qlt");
+      set_optab_libfunc (le_optab, mode, "__gcc_qle");
+      set_optab_libfunc (unord_optab, mode, "__gcc_qunord");
 
-	  set_conv_libfunc (sext_optab, mode, SFmode, "__gcc_stoq");
-	  set_conv_libfunc (sext_optab, mode, DFmode, "__gcc_dtoq");
-	  set_conv_libfunc (trunc_optab, SFmode, mode, "__gcc_qtos");
-	  set_conv_libfunc (trunc_optab, DFmode, mode, "__gcc_qtod");
-	  set_conv_libfunc (sfix_optab, SImode, mode, "__gcc_qtoi");
-	  set_conv_libfunc (ufix_optab, SImode, mode, "__gcc_qtou");
-	  set_conv_libfunc (sfloat_optab, mode, SImode, "__gcc_itoq");
-	  set_conv_libfunc (ufloat_optab, mode, SImode, "__gcc_utoq");
-	}
+      set_conv_libfunc (sext_optab, mode, SFmode, "__gcc_stoq");
+      set_conv_libfunc (sext_optab, mode, DFmode, "__gcc_dtoq");
+      set_conv_libfunc (trunc_optab, SFmode, mode, "__gcc_qtos");
+      set_conv_libfunc (trunc_optab, DFmode, mode, "__gcc_qtod");
+      set_conv_libfunc (sfix_optab, SImode, mode, "__gcc_qtoi");
+      set_conv_libfunc (ufix_optab, SImode, mode, "__gcc_qtou");
+      set_conv_libfunc (sfloat_optab, mode, SImode, "__gcc_itoq");
+      set_conv_libfunc (ufloat_optab, mode, SImode, "__gcc_utoq");
     }
   else
     {
