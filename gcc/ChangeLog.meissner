@@ -1,3 +1,210 @@
+==================== work100, patch #5
+
+Rework 128-bit complex multiply and divide.
+
+This function reworks how the complex multiply and divide built-in functions are
+done.  Previously we created built-in declarations for doing long double complex
+multiply and divide when long double is IEEE 128-bit.  The old code also did not
+support __ibm128 complex multiply and divide if long double is IEEE 128-bit.
+
+In terms of history, I wrote the original code just as I was starting to test
+GCC on systems where IEEE 128-bit long double was the default.  At the time, we
+had not yet started mangling the built-in function names as a way to bridge
+going from a system with 128-bit IBM long double to 128-bin IEEE long double.
+
+The original code depends on there only being two 128-bit types invovled.  With
+some of the changes that I plan on making, this assumption will no longer be
+true in the future.
+
+The problem is we cannot create two separate built-in functions that resolve to
+the same name.  This is a requirement of add_builtin_function and the C front
+end.  That means for the 3 possible modes (IFmode, KFmode, and TFmode), you can
+only use 2 of them.
+
+This code does not create the built-in declaration with the changed name.
+Instead, it uses the TARGET_MANGLE_DECL_ASSEMBLER_NAME hook to change the name
+before it is written out to the assembler file like it now does for all of the
+other long double built-in functions.
+
+We need to disable using this mapping when we are building libgcc, which is
+creating the multiply and divide functions.  The flag that is used when libgcc
+is built (-fbuilding-libcc) is only available in the C/C++ front ends.  We need
+to remember that we are building libgcc in the rs6000-c.cc support to be able to
+use this later to decided whether to mangle the decl assembler name or not.
+
+When I wrote these patches, I discovered that __ibm128 complex multiply and
+divide had originally not been supported if long double is IEEE 128-bit as it
+would generate calls to __mulic3 and __divic3.  I added tests in the testsuite
+to verify that the correct name (i.e. __multc3 and __divtc3) is used in this
+case.
+
+2022-09-09   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-c.cc (rs6000_cpu_cpp_builtins): Set
+	building_libgcc.
+	* config/rs6000/rs6000.cc (create_complex_muldiv): Delete.
+	(init_float128_ieee): Delete code to switch complex multiply and divide
+	for long double.
+	(complex_multiply_builtin_code): New helper function.
+	(complex_divide_builtin_code): Likewise.
+	(rs6000_mangle_decl_assembler_name): Add support for mangling the name
+	of complex 128-bit multiply and divide built-in functions.
+	* config/rs6000/rs6000.opt (building_libgcc): New target variable.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/divic3-1.c: New test.
+	* gcc.target/powerpc/divic3-2.c: Likewise.
+	* gcc.target/powerpc/mulic3-1.c: Likewise.
+	* gcc.target/powerpc/mulic3-2.c: Likewise.
+
+==================== work100, patch #4
+
+Add 'w' suffix for __ibm128 constants.
+
+In the documentation, we mention that 'w' or 'W' can be used as a suffix for
+__ibm128 constants.  We never implemented this.  This patch fixes that.
+
+In addition, the 'q' and 'Q' suffix were changed to use the mode used for the
+__float128 type, instead of knowing whether to use KFmode or TFmode explicitly.
+This will be used in a future patch where we change the mode used for __float128
+on systems where long double is IEEE 128-bit.
+
+2022-09-09   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_c_mode_for_suffix): Allow 'w' or 'W'
+	for __ibm128 constants.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/ibm128-suffix.c: New test.
+
+==================== work100, patch #3
+
+Allow __ibm128 with -msoft-float (PR target/105334)
+
+This patch allows __ibm128 to be used on systems with software floating point
+enabled.  Previously, we required hardware floating point to be enabled to use
+__ibm128 keyword and the __ibm128 built-in functions.  This patch fixes PR
+target/105334.
+
+2022-09-09   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/105334
+	* config/rs6000/rs6000.cc (init_float128_ibm): Do not require hardware
+	floating point for the IBM 128-bit floating point comparison functions.
+	* config/rs6000/rs6000.h (FLOAT128_IBM_P): Do not require hardware
+	floating point to enable recognizing IBM 128-bit floating point modes.
+
+==================== work100, patch #2
+
+Allow __ibm128 even if IEEE 128-bit floating point is not supported.
+
+This patch allows the use of the __ibm128 keyword on non-VSX systems.
+Originally, the __ibm128 keyword was only enabled when the IEEE 128-bit
+floating point is enabled.  Sometime back in the GCC 12 development period,
+Segher asked that the __ibm128 keyword be allowed in older systems that don't
+support IEEE 128-bit.  But at the time, stage 1 had closed for GCC 12, so I
+deferred doing this change until GCC 13.  This patch allows __ibm128 to be used
+if either IEEE 128-bit is enabled or long double used the IBM 128-bit format.
+
+2022-09-09   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.cc (rs6000_init_builtins): Enable using
+	the__ibm128 keyword on systems that either use the 128-bit IBM long
+	double format for long double or support IEEE 128-bit.
+	* config/rs6000/rs6000.cc (rs6000_init_libfuncs): Create IBM 128-bit
+	floating point support functions on systems that support the __ibm128
+	keyword.
+	(rs6000_scalar_mode_supported_p): Likewise.
+	* config/rs6000/rs6000.h (TARGET_IBM128): New macro.
+	* config/rs6000/rs6000.md (@extenddf<mode>2_fprs): Allow IFmode to be
+	converted even if long double is not 128-bits.
+	(extenddf<mode>2_vsx): Likewise.
+	(extendiftf2):Allow conversion on systems that support the __ibm128
+	keyword.
+	(extendtfif2): Likewise.
+	(trunciftf2): Likewise.
+	(trunctfif2): Likewise.
+
+==================== work100, patch #1
+
+Update float 128-bit conversions.
+
+This patch is a rewrite of the patch submitted on August 18th:
+
+| https://gcc.gnu.org/pipermail/gcc-patches/2022-August/599988.html
+
+This patch reworks the conversions between 128-bit binary floating point types.
+Previously, we would call rs6000_expand_float128_convert to do all conversions.
+Now, we only define the conversions between the same representation that turn
+into a NOP.  The appropriate extend or truncate insn is generated, and after
+register allocation, it is converted to a move.
+
+This patch also fixes two places where we want to override the external name
+for the conversion function, and the wrong optab was used.  Previously,
+rs6000_expand_float128_convert would handle the move or generate the call as
+needed.  Now, it lets the machine independent code generate the call.  But if
+we use the machine independent code to generate the call, we need to update the
+name for two optabs where a truncate would be used in terms of converting
+between the modes.  This patch updates those two optabs.
+
+While I know you feel the whole area needs to be rewritten, I would think it is
+better to make things work incrementally rather than waiting for some grand
+rewrite (that may or may not occur).
+
+With the current sources, we don't yet need this patch.  But we will need this
+patch when a future patch is submitted that will change the internal __float128
+type to use the _Float128 type when long double is IEEE 128-bit.  I'm trying to
+break out the smaller patches that each can stand alone, without having a
+single larger patch.  This future patch will fix various testsuite issues with
+signalling NaNs when long double is IEEE 128-bit.
+
+I tested this patch on:
+
+    1)	LE Power10 using --with-cpu=power10 --with-long-double-format=ieee
+    2)	LE Power10 using --with-cpu=power9  --with-long-double-format=ibm
+    3)	LE Power10 using --with-cpu=power8  --with-long-double-format=ibm
+    4)	LE Power10 using --with-cpu=power10 --with-long-double-format=ibm
+    5)	LE Power9  using --with-cpu=power9  --with-long-double-format=ibm
+    6)	BE Power7  using --with-cpu=power7  --with-long-double-format=ibm
+
+There were no regressions in the bootstrap process or running the tests.  Can I
+check this patch into the trunk?
+
+2022-09-08   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (init_float128_ieee): Use the correct
+	float_extend or float_truncate optab based on how the machine converts
+	between IEEE 128-bit and IBM 128-bit.
+	* config/rs6000/rs6000.md (IFKF): Delete.
+	(IFKF_reg): Delete.
+	(extendiftf2): Rewrite to be a move if IFmode and TFmode are both IBM
+	128-bit.  Do not run if TFmode is IEEE 128-bit.
+	(extendifkf2): Delete.
+	(extendtfkf2): Delete.
+	(extendtfif2): Delete.
+	(trunciftf2): Delete.
+	(truncifkf2): Delete.
+	(trunckftf2): Delete.
+	(extendkftf2): Implement conversion of IEEE 128-bit types as a move.
+	(trunctfif2): Delete.
+	(trunctfkf2): Implement conversion of IEEE 128-bit types as a move.
+	(extend<mode>tf2_internal): Delete.
+	(extendtf<mode>2_internal): Delete.
+
+==================== work100, branch creation
+
 2022-09-08   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
