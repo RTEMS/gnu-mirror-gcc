@@ -2468,7 +2468,9 @@ vect_print_slp_tree (dump_flags_t dump_kind, dump_location_t loc,
 
   dump_metadata_t metadata (dump_kind, loc.get_impl_location ());
   dump_user_location_t user_loc = loc.get_user_location ();
-  dump_printf_loc (metadata, user_loc, "node%s %p (max_nunits=%u, refcnt=%u)",
+  dump_printf_loc (metadata, user_loc,
+		   "node%s %p (max_nunits=" HOST_WIDE_INT_PRINT_UNSIGNED
+		   ", refcnt=%u)",
 		   SLP_TREE_DEF_TYPE (node) == vect_external_def
 		   ? " (external)"
 		   : (SLP_TREE_DEF_TYPE (node) == vect_constant_def
@@ -4385,6 +4387,15 @@ vect_detect_hybrid_slp (loop_vec_info loop_vinfo)
 	 to use walk_gimple_op.  */
       wi.is_lhs = 0;
       walk_gimple_op (stmt_info->stmt, vect_detect_hybrid_slp, &wi);
+      /* For gather/scatter make sure to walk the offset operand, that
+	 can be a scaling and conversion away.  */
+      gather_scatter_info gs_info;
+      if (STMT_VINFO_GATHER_SCATTER_P (stmt_info)
+	  && vect_check_gather_scatter (stmt_info, loop_vinfo, &gs_info))
+	{
+	  int dummy;
+	  vect_detect_hybrid_slp (&gs_info.offset, &dummy, &wi);
+	}
     }
 }
 
