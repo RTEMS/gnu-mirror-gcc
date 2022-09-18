@@ -373,9 +373,7 @@ gimple_gen_histogram_profiler (histogram_value value, unsigned tag) // , edge_de
       gsi_insert_before (&gsi, call, GSI_NEW_STMT);
   } else {
       edge_def *edge = value->hvalue.edge;
-      if (edge==NULL){
-          // BAD
-      }
+      gcc_assert(edge);
       gimple_stmt_iterator gsi;
       gimple_seq seq = NULL;
       gsi = gsi_start (seq);
@@ -388,9 +386,8 @@ gimple_gen_histogram_profiler (histogram_value value, unsigned tag) // , edge_de
                           true, NULL_TREE, true, GSI_SAME_STMT);
       val = prepare_instrumented_value (&gsi, value);
       call = gimple_build_call (tree_histogram_profiler_fn, 2, ref_ptr, val);
-      gsi_insert_before (&gsi, call, GSI_NEW_STMT); // might crash
-
       seq = gsi_seq (gsi);
+      gsi_insert_before (&gsi, call, GSI_NEW_STMT);
       gsi_insert_seq_on_edge (edge, seq);
   }
 }

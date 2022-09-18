@@ -126,12 +126,12 @@ gimple_alloc_histogram_value (struct function *fun ATTRIBUTE_UNUSED,
 
 histogram_value
 gimple_alloc_histogram_value_edge (struct function *fun ATTRIBUTE_UNUSED,
-			      enum hist_type type, gimple *stmt, tree value, edge_def *edge)
+			      enum hist_type type, tree value, edge_def *edge)
 {
    histogram_value hist = (histogram_value) xcalloc (1, sizeof (*hist));
    hist->hvalue.value = value;
-   hist->hvalue.stmt = stmt;
-   hist->hvalue.edge = stmt ? NULL : edge;
+   hist->hvalue.stmt = NULL;
+   hist->hvalue.edge = edge;
    hist->type = type;
    return hist;
 }
@@ -396,7 +396,7 @@ stream_in_histogram_value (class lto_input_block *ib, gimple *stmt)
 	  break;
 
     case HIST_TYPE_HISTOGRAM:
-	  ncounters = 69;
+	  ncounters = 70;
 	  break;
 	case HIST_TYPE_POW2:
 	case HIST_TYPE_AVERAGE:
@@ -1838,9 +1838,6 @@ gimple_divmod_values_to_profile (gimple *stmt, histogram_values *values)
 	values->safe_push (gimple_alloc_histogram_value (cfun,
 							 HIST_TYPE_TOPN_VALUES,
 							 stmt, divisor));
-	values->safe_push (gimple_alloc_histogram_value (cfun,
-							 HIST_TYPE_HISTOGRAM,
-							 stmt, divisor));
       }
 
       /* For mod, check whether it is not often a noop (or replaceable by
@@ -1930,28 +1927,21 @@ gimple_stringops_values_to_profile (gimple *gs, histogram_values *values)
 
 static void
 gimple_histogram_values_to_profile(function *fun, histogram_values * values){
+    calculate_dominance_info (CDI_DOMINATORS);
     for (auto loop : loops_list (fun, 0)){
          tree var;
          gimple_stmt_iterator gsi;
          gsi = gsi_last_bb (loop->latch);
-         create_iv3 (build_int_cst_type (get_gcov_type(), 0), build_int_cst (get_gcov_type(), 1), NULL_TREE,
+         create_iv (build_int_cst_type (get_gcov_type(), 0), build_int_cst (get_gcov_type(), 1), NULL_TREE,
              loop, &gsi, true, &var, NULL);
          auto_vec<edge> exits = get_loop_exit_edges (loop);
          for ( auto exit : exits ){
-              if (single_pred_p (exit->dest)){
-                 gimple_stmt_iterator gsi_edge = gsi_start_bb (exit->src);
-                 gimple_seq seq = gsi_seq (gsi_edge);
                  values->safe_push (gimple_alloc_histogram_value_edge (fun,
                                          HIST_TYPE_HISTOGRAM,
-                                         seq, var, exit));
-              }
-             //pridate ulozeni var do histogramu na zacated basic blocku exit->dest
-             // TREE_TYPE (name)
-               else
-               {
-               }
+                                         var, exit));
          }
     }
+    free_dominance_info (CDI_DOMINATORS);
     gsi_commit_edge_inserts ();
 }
 
@@ -2012,7 +2002,7 @@ gimple_find_values_to_profile (histogram_values *values)
 	  break;
 
 	case HIST_TYPE_HISTOGRAM:
-	  hist->n_counters = 69;
+	  hist->n_counters = 70;
 	  break;
 
 	default:
