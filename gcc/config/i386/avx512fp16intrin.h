@@ -53,6 +53,18 @@ typedef _Float16 __m256h_u __attribute__ ((__vector_size__ (32),	\
 typedef _Float16 __m512h_u __attribute__ ((__vector_size__ (64),	\
 					   __may_alias__, __aligned__ (1)));
 
+
+/* Internal data types for implementing the bf16 intrinsics.  */
+typedef __bf16 __v32bf __attribute__((__vector_size__(64), __aligned__(64)));
+typedef __bf16 __m512bf16 __attribute__((__vector_size__(64), __aligned__(64)));
+typedef __bf16 __m512bf16_u __attribute__((__vector_size__(64), __aligned__(1)));
+typedef __bf16 __v8bf __attribute__((__vector_size__(16), __aligned__(16)));
+typedef __bf16 __m128bf16 __attribute__((__vector_size__(16), __aligned__(16)));
+typedef __bf16 __m128bf16_u __attribute__((__vector_size__(16), __aligned__(1)));
+typedef __bf16 __v16bf __attribute__((__vector_size__(32), __aligned__(32)));
+typedef __bf16 __m256bf16 __attribute__((__vector_size__(32), __aligned__(32)));
+typedef __bf16 __m256bf16_u __attribute__((__vector_size__(32), __aligned__(1)));
+
 extern __inline __m128h
 __attribute__ ((__gnu_inline__, __always_inline__, __artificial__))
 _mm_set_ph (_Float16 __A7, _Float16 __A6, _Float16 __A5,
@@ -2771,6 +2783,44 @@ _mm_mask_store_sh (_Float16 const* __A, __mmask8 __B, __m128h __C)
   __builtin_ia32_storesh_mask (__A,  __C, __B);
 }
 
+extern __inline __m128bf16
+__attribute__ ((__gnu_inline__, __always_inline__, __artificial__))
+_mm_load_sbf16 (void const *__dp)
+{
+  return (__m128bf16)
+    __builtin_ia32_loadsh_mask ((_Float16 const*) __dp,
+				_mm_setzero_ph(),
+				(__mmask8) -1);
+}
+
+extern __inline __m128bf16
+__attribute__ ((__gnu_inline__, __always_inline__, __artificial__))
+_mm_mask_load_sbf16 (__m128bf16 __A, __mmask8 __B, const void *__C)
+{
+  return (__m128bf16)
+    __builtin_ia32_loadsh_mask ((_Float16 const*) __C,
+				(__v8hf) __A,
+				 (__mmask8) __B);
+}
+
+extern __inline __m128bf16
+__attribute__ ((__gnu_inline__, __always_inline__, __artificial__))
+_mm_maskz_load_sbf16 (__mmask8 __A, const void *__B)
+{
+  return (__m128bf16)
+    __builtin_ia32_loadsh_mask ((_Float16 const*) __B,
+				_mm_setzero_ph(),
+				(__mmask8) __A);
+}
+
+extern __inline void
+__attribute__ ((__gnu_inline__, __always_inline__, __artificial__))
+_mm_mask_store_sbf16 (const void *__A,  __mmask8 __B, __m128bf16 __C)
+{
+  __builtin_ia32_storesh_mask ((_Float16 const*) __A,
+			       (__v8hf) __C, (__mmask8) __B);
+}
+
 extern __inline __m128h
 __attribute__ ((__gnu_inline__, __always_inline__, __artificial__))
 _mm_move_sh (__m128h __A, __m128h  __B)
@@ -2791,6 +2841,26 @@ __attribute__ ((__gnu_inline__, __always_inline__, __artificial__))
 _mm_maskz_move_sh (__mmask8 __A, __m128h  __B, __m128h __C)
 {
   return __builtin_ia32_vmovsh_mask (__B, __C, _mm_setzero_ph (), __A);
+}
+
+extern __inline __m128bf16
+__attribute__ ((__gnu_inline__, __always_inline__, __artificial__))
+_mm_mask_move_sbf16 (__m128bf16 __A, __mmask8 __B,
+		     __m128bf16 __C, __m128bf16 __D)
+{
+  return (__m128bf16)
+    __builtin_ia32_vmovsh_mask ((__v8hf) __C, (__v8hf) __D,
+				(__v8hf) __A, (__mmask8) __B);
+}
+
+extern __inline __m128bf16
+__attribute__ ((__gnu_inline__, __always_inline__, __artificial__))
+_mm_maskz_move_sbf16 (__mmask8 __A, __m128bf16 __B, __m128bf16 __C)
+{
+  return (__m128bf16)
+    __builtin_ia32_vmovsh_mask ((__v8hf) __B, (__v8hf) __C,
+				_mm_setzero_ph(),
+				(__mmask8) __A);
 }
 
 /* Intrinsics vcvtph2dq.  */
