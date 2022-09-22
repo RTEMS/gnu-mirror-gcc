@@ -4734,7 +4734,8 @@ friend_from_decl_list (tree frnd)
       if (TYPE_P (frnd))
 	{
 	  res = TYPE_NAME (frnd);
-	  if (CLASSTYPE_TEMPLATE_INFO (frnd))
+	  if (CLASS_TYPE_P (frnd)
+	      && CLASSTYPE_TEMPLATE_INFO (frnd))
 	    tmpl = CLASSTYPE_TI_TEMPLATE (frnd);
 	}
       else if (DECL_TEMPLATE_INFO (frnd))
@@ -8921,6 +8922,7 @@ trees_out::type_node (tree type)
       if (streaming_p ())
 	u (PACK_EXPANSION_LOCAL_P (type));
       tree_node (PACK_EXPANSION_PARAMETER_PACKS (type));
+      tree_node (PACK_EXPANSION_EXTRA_ARGS (type));
       break;
 
     case TYPENAME_TYPE:
@@ -9454,12 +9456,14 @@ trees_in::tree_node (bool is_use)
 	    {
 	      bool local = u ();
 	      tree param_packs = tree_node ();
+	      tree extra_args = tree_node ();
 	      if (!get_overrun ())
 		{
 		  tree expn = cxx_make_type (TYPE_PACK_EXPANSION);
 		  SET_TYPE_STRUCTURAL_EQUALITY (expn);
 		  PACK_EXPANSION_PATTERN (expn) = res;
 		  PACK_EXPANSION_PARAMETER_PACKS (expn) = param_packs;
+		  PACK_EXPANSION_EXTRA_ARGS (expn) = extra_args;
 		  PACK_EXPANSION_LOCAL_P (expn) = local;
 		  res = expn;
 		}
@@ -12121,7 +12125,7 @@ trees_in::read_class_def (tree defn, tree maybe_template)
 	    {
 	      tree f = TREE_VALUE (friend_classes);
 
-	      if (TYPE_P (f))
+	      if (CLASS_TYPE_P (f))
 		{
 		  CLASSTYPE_BEFRIENDING_CLASSES (f)
 		    = tree_cons (NULL_TREE, type,

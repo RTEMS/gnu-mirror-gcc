@@ -1,3 +1,36 @@
+2022-09-21  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* ieee/ieee_arithmetic.F90 (IEEE_SET_ROUNDING_MODE): Handle
+	RADIX argument better.
+
+2022-09-21  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* gfortran.map: Add symbols for IEEE_GET_MODES
+	and IEEE_SET_MODES.
+
+2022-09-19  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* ieee/ieee_exceptions.F90: Add IEEE_MODES_TYPE, IEEE_GET_MODES
+	and IEEE_SET_MODES.
+	* ieee/ieee_arithmetic.F90: Make them public in IEEE_ARITHMETIC
+	as well.
+
+2022-09-19  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* ieee/ieee_arithmetic.F90: Add RADIX argument to
+	IEEE_SET_ROUNDING_MODE and IEEE_GET_ROUNDING_MODE.
+	* config/fpu-387.h: Add IEEE_AWAY mode.
+	* config/fpu-aarch64.h: Add IEEE_AWAY mode.
+	* config/fpu-aix.h: Add IEEE_AWAY mode.
+	* config/fpu-generic.h: Add IEEE_AWAY mode.
+	* config/fpu-glibc.h: Add IEEE_AWAY mode.
+	* config/fpu-sysv.h: Add IEEE_AWAY mode.
+
+2022-09-10  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	PR fortran/95644
+	* ieee/ieee_arithmetic.F90: Add IEEE_SIGNBIT and IEEE_FMA.
+
 2022-08-26  Jakub Jelinek  <jakub@redhat.com>
 
 	PR fortran/106579

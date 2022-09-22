@@ -41,6 +41,7 @@
 #include "calls.h"
 #include "value-query.h"
 #include "cfganal.h"
+#include "tree-eh.h"
 
 #include "gimple-predicate-analysis.h"
 
@@ -50,41 +51,6 @@
    and in those MAX_CHAIN_LEN (inverted) and predicates.  */
 #define MAX_NUM_CHAINS 8
 #define MAX_CHAIN_LEN 5
-
-/* When enumerating paths between two blocks this limits the number of
-   post-dominator skips between two edges possibly defining a predicate.  */
-#define MAX_POSTDOM_CHECK 8
-
-/* The limit for the number of switch cases when we do the linear search
-   for the case corresponding to an edge.  */
-#define MAX_SWITCH_CASES 40
-
-/* Return true if, when BB1 is postdominating BB2, BB1 is a loop exit.  */
-
-static bool
-is_loop_exit (basic_block bb2, basic_block bb1)
-{
-  return single_pred_p (bb1) && !single_succ_p (bb2);
-}
-
-/* Find BB's closest postdominator that is its control equivalent (i.e.,
-   that's controlled by the same predicate).  */
-
-static inline basic_block
-find_control_equiv_block (basic_block bb)
-{
-  basic_block pdom = get_immediate_dominator (CDI_POST_DOMINATORS, bb);
-
-  /* Skip the postdominating bb that is also a loop exit.  */
-  if (is_loop_exit (bb, pdom))
-    return NULL;
-
-  /* If the postdominator is dominated by BB, return it.  */
-  if (dominated_by_p (CDI_DOMINATORS, pdom, bb))
-    return pdom;
-
-  return NULL;
-}
 
 /* Return true if X1 is the negation of X2.  */
 
@@ -149,10 +115,10 @@ format_edge_vec (const vec<edge> &ev)
     {
       char es[32];
       const_edge e = ev[i];
-      sprintf (es, "%u", e->src->index);
+      sprintf (es, "%u -> %u", e->src->index, e->dest->index);
       str += es;
       if (i + 1 < n)
-	str += " -> ";
+	str += ", ";
     }
   return str;
 }
@@ -176,58 +142,34 @@ format_edge_vecs (const vec<edge> eva[], unsigned n)
   return str;
 }
 
-/* Dump a single pred_info to DUMP_FILE.  */
+/* Dump a single pred_info to F.  */
 
 static void
-dump_pred_info (const pred_info &pred)
+dump_pred_info (FILE *f, const pred_info &pred)
 {
   if (pred.invert)
-    fprintf (dump_file, "NOT (");
-  print_generic_expr (dump_file, pred.pred_lhs);
-  fprintf (dump_file, " %s ", op_symbol_code (pred.cond_code));
-  print_generic_expr (dump_file, pred.pred_rhs);
+    fprintf (f, "NOT (");
+  print_generic_expr (f, pred.pred_lhs);
+  fprintf (f, " %s ", op_symbol_code (pred.cond_code));
+  print_generic_expr (f, pred.pred_rhs);
   if (pred.invert)
-    fputc (')', dump_file);
+    fputc (')', f);
 }
 
-/* Dump a pred_chain to DUMP_FILE.  */
+/* Dump a pred_chain to F.  */
 
 static void
-dump_pred_chain (const pred_chain &chain)
+dump_pred_chain (FILE *f, const pred_chain &chain)
 {
   unsigned np = chain.length ();
-  if (np > 1)
-    fprintf (dump_file, "AND (");
-
   for (unsigned j = 0; j < np; j++)
     {
-      dump_pred_info (chain[j]);
-      if (j < np - 1)
-	fprintf (dump_file, ", ");
-      else if (j > 0)
-	fputc (')', dump_file);
-    }
-}
-
-/* Dump the first NCHAINS elements of the DEP_CHAINS array into DUMP_FILE.  */
-
-static void
-dump_dep_chains (const auto_vec<edge> dep_chains[], unsigned nchains)
-{
-  if (!dump_file)
-    return;
-
-  for (unsigned i = 0; i != nchains; ++i)
-    {
-      const auto_vec<edge> &v = dep_chains[i];
-      unsigned n = v.length ();
-      for (unsigned j = 0; j != n; ++j)
-	{
-	  fprintf (dump_file, "%u", v[j]->src->index);
-	  if (j + 1 < n)
-	    fprintf (dump_file, " -> ");
-	}
-      fputc ('\n', dump_file);
+      if (j > 0)
+	fprintf (f, " AND (");
+      else
+	fputc ('(', f);
+      dump_pred_info (f, chain[j]);
+      fputc (')', f);
     }
 }
 
@@ -570,35 +512,13 @@ uninit_analysis::collect_phi_def_edges (gphi *phi, basic_block cd_root,
     return;
 
   unsigned n = gimple_phi_num_args (phi);
+  unsigned opnds_arg_phi = m_eval.phi_arg_set (phi);
   for (unsigned i = 0; i < n; i++)
     {
-      edge opnd_edge = gimple_phi_arg_edge (phi, i);
-      tree opnd = gimple_phi_arg_def (phi, i);
-
-      if (TREE_CODE (opnd) == SSA_NAME)
+      if (!MASK_TEST_BIT (opnds_arg_phi, i))
 	{
-	  gimple *def = SSA_NAME_DEF_STMT (opnd);
-
-	  if (!m_eval (opnd))
-	    {
-	      if (dump_file && (dump_flags & TDF_DETAILS))
-		{
-		  fprintf (dump_file,
-			   "\tFound def edge %i -> %i for cd_root %i "
-			   "and operand %u of: ",
-			   opnd_edge->src->index, opnd_edge->dest->index,
-			   cd_root->index, i);
-		  print_gimple_stmt (dump_file, phi, 0);
-		}
-	      edges->safe_push (opnd_edge);
-	    }
-	  else if (gimple_code (def) == GIMPLE_PHI
-		   && dominated_by_p (CDI_DOMINATORS, gimple_bb (def), cd_root))
-	    collect_phi_def_edges (as_a<gphi *> (def), cd_root, edges,
-				   visited);
-	}
-      else
-	{
+	  /* Add the edge for a not maybe-undefined edge value.  */
+	  edge opnd_edge = gimple_phi_arg_edge (phi, i);
 	  if (dump_file && (dump_flags & TDF_DETAILS))
 	    {
 	      fprintf (dump_file,
@@ -608,56 +528,24 @@ uninit_analysis::collect_phi_def_edges (gphi *phi, basic_block cd_root,
 		       cd_root->index, i);
 	      print_gimple_stmt (dump_file, phi, 0);
 	    }
-
-	  if (!m_eval (opnd))
-	    edges->safe_push (opnd_edge);
+	  edges->safe_push (opnd_edge);
+	  continue;
+	}
+      else
+	{
+	  tree opnd = gimple_phi_arg_def (phi, i);
+	  if (TREE_CODE (opnd) == SSA_NAME)
+	    {
+	      gimple *def = SSA_NAME_DEF_STMT (opnd);
+	      if (gimple_code (def) == GIMPLE_PHI
+		  && dominated_by_p (CDI_DOMINATORS, gimple_bb (def), cd_root))
+		/* Process PHI defs of maybe-undefined edge values
+		   recursively.  */
+		collect_phi_def_edges (as_a<gphi *> (def), cd_root, edges,
+				       visited);
+	    }
 	}
     }
-}
-
-/* Return an expression corresponding to the predicate PRED.  */
-
-static tree
-build_pred_expr (const pred_info &pred)
-{
-  tree_code cond_code = pred.cond_code;
-  tree lhs = pred.pred_lhs;
-  tree rhs = pred.pred_rhs;
-
-  if (pred.invert)
-    cond_code = invert_tree_comparison (cond_code, false);
-
-  return build2 (cond_code, TREE_TYPE (lhs), lhs, rhs);
-}
-
-/* Return an expression corresponding to PREDS.  */
-
-static tree
-build_pred_expr (const pred_chain_union &preds, bool invert = false)
-{
-  tree_code code = invert ? TRUTH_AND_EXPR : TRUTH_OR_EXPR;
-  tree_code subcode = invert ? TRUTH_OR_EXPR : TRUTH_AND_EXPR;
-
-  tree expr = NULL_TREE;
-  for (unsigned i = 0; i != preds.length (); ++i)
-    {
-      tree subexpr = NULL_TREE;
-      for (unsigned j = 0; j != preds[i].length (); ++j)
-       {
-         const pred_info &pi = preds[i][j];
-         tree cond = build_pred_expr (pi);
-	 if (invert)
-	   cond = invert_truthvalue (cond);
-         subexpr = subexpr ? build2 (subcode, boolean_type_node,
-                                     subexpr, cond) : cond;
-       }
-      if (expr)
-       expr = build2 (code, boolean_type_node, expr, subexpr);
-      else
-       expr = subexpr;
-    }
-
-  return expr;
 }
 
 /* Return a bitset of all PHI arguments or zero if there are too many.  */
@@ -1038,31 +926,35 @@ simple_control_dep_chain (vec<edge>& chain, basic_block from, basic_block to)
     {
       basic_block dest = src;
       src = get_immediate_dominator (CDI_DOMINATORS, src);
-      edge pred_e;
-      if (single_pred_p (dest)
-	  && (pred_e = find_edge (src, dest)))
-	chain.safe_push (pred_e);
+      if (single_pred_p (dest))
+	{
+	  edge pred_e = single_pred_edge (dest);
+	  gcc_assert (pred_e->src == src);
+	  if (!(pred_e->flags & ((EDGE_FAKE | EDGE_ABNORMAL | EDGE_DFS_BACK)))
+	      && !single_succ_p (src))
+	    chain.safe_push (pred_e);
+	}
     }
 }
 
 /* Perform a DFS walk on predecessor edges to mark the region denoted
-   by the EXIT edge and DOM which dominates EXIT->src, including DOM.
+   by the EXIT_SRC block and DOM which dominates EXIT_SRC, including DOM.
    Blocks in the region are marked with FLAG and added to BBS.  BBS is
    filled up to its capacity only after which the walk is terminated
    and false is returned.  If the whole region was marked, true is returned.  */
 
 static bool
-dfs_mark_dominating_region (edge exit, basic_block dom, int flag,
+dfs_mark_dominating_region (basic_block exit_src, basic_block dom, int flag,
 			    vec<basic_block> &bbs)
 {
-  if (exit->src == dom || exit->src->flags & flag)
+  if (exit_src == dom || exit_src->flags & flag)
     return true;
   if (!bbs.space (1))
     return false;
-  bbs.quick_push (exit->src);
-  exit->src->flags |= flag;
+  bbs.quick_push (exit_src);
+  exit_src->flags |= flag;
   auto_vec<edge_iterator, 20> stack (bbs.allocated () - bbs.length () + 1);
-  stack.quick_push (ei_start (exit->src->preds));
+  stack.quick_push (ei_start (exit_src->preds));
   while (!stack.is_empty ())
     {
       /* Look at the edge on the top of the stack.  */
@@ -1093,6 +985,97 @@ dfs_mark_dominating_region (edge exit, basic_block dom, int flag,
   return true;
 }
 
+static bool
+compute_control_dep_chain (basic_block dom_bb, const_basic_block dep_bb,
+			   vec<edge> cd_chains[], unsigned *num_chains,
+			   vec<edge> &cur_cd_chain, unsigned *num_calls,
+			   unsigned in_region, unsigned depth,
+			   bool *complete_p);
+
+/* Helper for compute_control_dep_chain that walks the post-dominator
+   chain from CD_BB up unto TARGET_BB looking for paths to DEP_BB.  */
+
+static bool
+compute_control_dep_chain_pdom (basic_block cd_bb, const_basic_block dep_bb,
+				basic_block target_bb,
+				vec<edge> cd_chains[], unsigned *num_chains,
+				vec<edge> &cur_cd_chain, unsigned *num_calls,
+				unsigned in_region, unsigned depth,
+				bool *complete_p)
+{
+  bool found_cd_chain = false;
+  while (cd_bb != target_bb)
+    {
+      if (cd_bb == dep_bb)
+	{
+	  /* Found a direct control dependence.  */
+	  if (*num_chains < MAX_NUM_CHAINS)
+	    {
+	      if (DEBUG_PREDICATE_ANALYZER && dump_file)
+		fprintf (dump_file, "%*s pushing { %s }\n",
+			 depth, "", format_edge_vec (cur_cd_chain).c_str ());
+	      cd_chains[*num_chains] = cur_cd_chain.copy ();
+	      (*num_chains)++;
+	    }
+	  found_cd_chain = true;
+	  /* Check path from next edge.  */
+	  break;
+	}
+
+      /* If the dominating region has been marked avoid walking outside.  */
+      if (in_region != 0 && !(cd_bb->flags & in_region))
+	break;
+
+      /* Count the number of steps we perform to limit compile-time.
+	 This should cover both recursion and the post-dominator walk.  */
+      if (*num_calls > (unsigned)param_uninit_control_dep_attempts)
+	{
+	  if (dump_file)
+	    fprintf (dump_file, "param_uninit_control_dep_attempts "
+		     "exceeded: %u\n", *num_calls);
+	  *complete_p = false;
+	  break;
+	}
+      ++*num_calls;
+
+      /* Check if DEP_BB is indirectly control-dependent on DOM_BB.  */
+      if (!single_succ_p (cd_bb)
+	  && compute_control_dep_chain (cd_bb, dep_bb, cd_chains,
+					num_chains, cur_cd_chain,
+					num_calls, in_region, depth + 1,
+					complete_p))
+	{
+	  found_cd_chain = true;
+	  break;
+	}
+
+      /* The post-dominator walk will reach a backedge only
+	 from a forwarder, otherwise it should choose to exit
+	 the SCC.  */
+      if (single_succ_p (cd_bb)
+	  && single_succ_edge (cd_bb)->flags & EDGE_DFS_BACK)
+	break;
+      basic_block prev_cd_bb = cd_bb;
+      cd_bb = get_immediate_dominator (CDI_POST_DOMINATORS, cd_bb);
+      if (cd_bb == EXIT_BLOCK_PTR_FOR_FN (cfun))
+	break;
+      /* Pick up conditions toward the post dominator such like
+	 loop exit conditions.  See gcc.dg/uninit-pred-11.c and
+	 gcc.dg/unninit-pred-12.c and PR106754.  */
+      if (single_pred_p (cd_bb))
+	{
+	  edge e2 = single_pred_edge (cd_bb);
+	  gcc_assert (e2->src == prev_cd_bb);
+	  /* But avoid adding fallthru or abnormal edges.  */
+	  if (!(e2->flags & (EDGE_FAKE | EDGE_ABNORMAL | EDGE_DFS_BACK))
+	      && !single_succ_p (prev_cd_bb))
+	    cur_cd_chain.safe_push (e2);
+	}
+    }
+  return found_cd_chain;
+}
+
+
 /* Recursively compute the control dependence chains (paths of edges)
    from the dependent basic block, DEP_BB, up to the dominating basic
    block, DOM_BB (the head node of a chain should be dominated by it),
@@ -1102,22 +1085,20 @@ dfs_mark_dominating_region (edge exit, basic_block dom, int flag,
    *NUM_CALLS is the number of recursive calls to control unbounded
    recursion.
    Return true if the information is successfully computed, false if
-   there is no control dependence or not computed.  */
+   there is no control dependence or not computed.
+   *COMPLETE_P is set to false if we stopped walking due to limits.
+   In this case there might be missing chains.  */
 
 static bool
 compute_control_dep_chain (basic_block dom_bb, const_basic_block dep_bb,
 			   vec<edge> cd_chains[], unsigned *num_chains,
 			   vec<edge> &cur_cd_chain, unsigned *num_calls,
-			   unsigned in_region = 0, unsigned depth = 0)
+			   unsigned in_region, unsigned depth,
+			   bool *complete_p)
 {
-  if (*num_calls > (unsigned)param_uninit_control_dep_attempts)
-    {
-      if (dump_file)
-	fprintf (dump_file, "param_uninit_control_dep_attempts exceeded: %u\n",
-		 *num_calls);
-      return false;
-    }
-  ++*num_calls;
+  /* In our recursive calls this doesn't happen.  */
+  if (single_succ_p (dom_bb))
+    return false;
 
   /* FIXME: Use a set instead.  */
   unsigned cur_chain_len = cur_cd_chain.length ();
@@ -1126,6 +1107,7 @@ compute_control_dep_chain (basic_block dom_bb, const_basic_block dep_bb,
       if (dump_file)
 	fprintf (dump_file, "MAX_CHAIN_LEN exceeded: %u\n", cur_chain_len);
 
+      *complete_p = false;
       return false;
     }
 
@@ -1135,23 +1117,12 @@ compute_control_dep_chain (basic_block dom_bb, const_basic_block dep_bb,
 	fprintf (dump_file, "chain length exceeds 5: %u\n", cur_chain_len);
     }
 
-  for (unsigned i = 0; i < cur_chain_len; i++)
-    {
-      edge e = cur_cd_chain[i];
-      /* Cycle detected.  */
-      if (e->src == dom_bb)
-	{
-	  if (dump_file)
-	    fprintf (dump_file, "cycle detected\n");
-	  return false;
-	}
-    }
-
   if (DEBUG_PREDICATE_ANALYZER && dump_file)
     fprintf (dump_file,
-	     "%*s%s (dom_bb = %u, dep_bb = %u, cd_chains = { %s }, ...)\n",
+	     "%*s%s (dom_bb = %u, dep_bb = %u, ..., "
+	     "cur_cd_chain = { %s }, ...)\n",
 	     depth, "", __func__, dom_bb->index, dep_bb->index,
-	     format_edge_vecs (cd_chains, *num_chains).c_str ());
+	     format_edge_vec (cur_cd_chain).c_str ());
 
   bool found_cd_chain = false;
 
@@ -1160,53 +1131,45 @@ compute_control_dep_chain (basic_block dom_bb, const_basic_block dep_bb,
   edge_iterator ei;
   FOR_EACH_EDGE (e, ei, dom_bb->succs)
     {
-      int post_dom_check = 0;
-      if (e->flags & (EDGE_FAKE | EDGE_ABNORMAL))
+      if (e->flags & (EDGE_FAKE | EDGE_ABNORMAL | EDGE_DFS_BACK))
 	continue;
 
       basic_block cd_bb = e->dest;
+      unsigned pop_mark = cur_cd_chain.length ();
       cur_cd_chain.safe_push (e);
-      while (!dominated_by_p (CDI_POST_DOMINATORS, dom_bb, cd_bb)
-	     || is_loop_exit (dom_bb, cd_bb))
-	{
-	  if (cd_bb == dep_bb)
-	    {
-	      /* Found a direct control dependence.  */
-	      if (*num_chains < MAX_NUM_CHAINS)
-		{
-		  cd_chains[*num_chains] = cur_cd_chain.copy ();
-		  (*num_chains)++;
-		}
-	      found_cd_chain = true;
-	      /* Check path from next edge.  */
-	      break;
-	    }
-
-	  /* If the dominating region has been marked avoid walking outside.  */
-	  if (in_region != 0 && !(cd_bb->flags & in_region))
-	    break;
-
-	  /* Check if DEP_BB is indirectly control-dependent on DOM_BB.  */
-	  if (compute_control_dep_chain (cd_bb, dep_bb, cd_chains,
-					 num_chains, cur_cd_chain,
-					 num_calls, in_region, depth + 1))
-	    {
-	      found_cd_chain = true;
-	      break;
-	    }
-
-	  cd_bb = get_immediate_dominator (CDI_POST_DOMINATORS, cd_bb);
-	  post_dom_check++;
-	  if (cd_bb == EXIT_BLOCK_PTR_FOR_FN (cfun)
-	      || post_dom_check > MAX_POSTDOM_CHECK)
-	    break;
-	}
-      cur_cd_chain.pop ();
+      basic_block target_bb
+	= get_immediate_dominator (CDI_POST_DOMINATORS, dom_bb);
+      /* Walk the post-dominator chain up to the CFG merge.  */
+      found_cd_chain
+	  |= compute_control_dep_chain_pdom (cd_bb, dep_bb, target_bb,
+					     cd_chains, num_chains,
+					     cur_cd_chain, num_calls,
+					     in_region, depth, complete_p);
+      cur_cd_chain.truncate (pop_mark);
       gcc_assert (cur_cd_chain.length () == cur_chain_len);
     }
 
   gcc_assert (cur_cd_chain.length () == cur_chain_len);
   return found_cd_chain;
+}
+
+/* Wrapper around the compute_control_dep_chain worker above.  Returns
+   true when the collected set of chains in CD_CHAINS is complete.  */
+
+static bool
+compute_control_dep_chain (basic_block dom_bb, const_basic_block dep_bb,
+			   vec<edge> cd_chains[], unsigned *num_chains,
+			   unsigned in_region = 0)
+{
+  auto_vec<edge, MAX_CHAIN_LEN + 1> cur_cd_chain;
+  unsigned num_calls = 0;
+  unsigned depth = 0;
+  bool complete_p = true;
+  /* Walk the post-dominator chain.  */
+  compute_control_dep_chain_pdom (dom_bb, dep_bb, NULL, cd_chains,
+				  num_chains, cur_cd_chain, &num_calls,
+				  in_region, depth, &complete_p);
+  return complete_p;
 }
 
 /* Implemented simplifications:
@@ -1484,7 +1447,7 @@ predicate::simplify (gimple *use_or_def, bool is_use)
   if (dump_file && dump_flags & TDF_DETAILS)
     {
       fprintf (dump_file, "Before simplication ");
-      dump (use_or_def, is_use ? "[USE]:\n" : "[DEF]:\n");
+      dump (dump_file, use_or_def, is_use ? "[USE]:\n" : "[DEF]:\n");
     }
 
   unsigned n = m_preds.length ();
@@ -1720,7 +1683,7 @@ predicate::normalize (gimple *use_or_def, bool is_use)
   if (dump_file && dump_flags & TDF_DETAILS)
     {
       fprintf (dump_file, "Before normalization ");
-      dump (use_or_def, is_use ? "[USE]:\n" : "[DEF]:\n");
+      dump (dump_file, use_or_def, is_use ? "[USE]:\n" : "[DEF]:\n");
     }
 
   predicate norm_preds;
@@ -1737,7 +1700,7 @@ predicate::normalize (gimple *use_or_def, bool is_use)
   if (dump_file)
     {
       fprintf (dump_file, "After normalization ");
-      dump (use_or_def, is_use ? "[USE]:\n" : "[DEF]:\n");
+      dump (dump_file, use_or_def, is_use ? "[USE]:\n" : "[DEF]:\n");
     }
 }
 
@@ -1752,20 +1715,17 @@ predicate::normalize (gimple *use_or_def, bool is_use)
 
 void
 predicate::init_from_control_deps (const vec<edge> *dep_chains,
-				   unsigned num_chains)
+				   unsigned num_chains, bool is_use)
 {
   gcc_assert (is_empty ());
 
-  bool has_valid_pred = false;
   if (num_chains == 0)
     return;
 
-  if (num_chains >= MAX_NUM_CHAINS)
-    {
-      if (dump_file)
-	fprintf (dump_file, "MAX_NUM_CHAINS exceeded: %u\n", num_chains);
-      return;
-    }
+  if (DEBUG_PREDICATE_ANALYZER && dump_file)
+    fprintf (dump_file, "init_from_control_deps [%s] {%s}:\n",
+	     is_use ? "USE" : "DEF",
+	     format_edge_vecs (dep_chains, num_chains).c_str ());
 
   /* Convert the control dependency chain into a set of predicates.  */
   m_preds.reserve (num_chains);
@@ -1776,32 +1736,22 @@ predicate::init_from_control_deps (const vec<edge> *dep_chains,
 	 of the predicates.  */
       const vec<edge> &path = dep_chains[i];
 
-      has_valid_pred = false;
+      bool has_valid_pred = false;
       /* The chain of predicates guarding the definition along this path.  */
       pred_chain t_chain{ };
       for (unsigned j = 0; j < path.length (); j++)
 	{
 	  edge e = path[j];
 	  basic_block guard_bb = e->src;
-	  /* Ignore empty forwarder blocks.  */
-	  if (empty_block_p (guard_bb) && single_succ_p (guard_bb))
-	    continue;
 
-	  /* An empty basic block here is likely a PHI, and is not one
-	     of the cases we handle below.  */
-	  gimple_stmt_iterator gsi = gsi_last_bb (guard_bb);
-	  if (gsi_end_p (gsi))
-	    {
-	      has_valid_pred = false;
-	      break;
-	    }
-	  /* Get the conditional controlling the bb exit edge.  */
-	  gimple *cond_stmt = gsi_stmt (gsi);
-	  if (is_gimple_call (cond_stmt) && EDGE_COUNT (e->src->succs) >= 2)
-	    /* Ignore EH edge.  Can add assertion on the other edge's flag.  */
-	    continue;
-	  /* Skip if there is essentially one succesor.  */
-	  if (EDGE_COUNT (e->src->succs) == 2)
+	  gcc_assert (!empty_block_p (guard_bb) && !single_succ_p (guard_bb));
+
+	  /* Skip this edge if it is bypassing an abort - when the
+	     condition is not satisfied we are neither reaching the
+	     definition nor the use so it isn't meaningful.  Note if
+	     we are processing the use predicate the condition is
+	     meaningful.  See PR65244.  */
+	  if (!is_use && EDGE_COUNT (e->src->succs) == 2)
 	    {
 	      edge e1;
 	      edge_iterator ei1;
@@ -1816,8 +1766,13 @@ predicate::init_from_control_deps (const vec<edge> *dep_chains,
 		    }
 		}
 	      if (skip)
-		continue;
+		{
+		  has_valid_pred = true;
+		  continue;
+		}
 	    }
+	  /* Get the conditional controlling the bb exit edge.  */
+	  gimple *cond_stmt = last_stmt (guard_bb);
 	  if (gimple_code (cond_stmt) == GIMPLE_COND)
 	    {
 	      /* The true edge corresponds to the uninteresting condition.
@@ -1833,8 +1788,9 @@ predicate::init_from_control_deps (const vec<edge> *dep_chains,
 
 	      if (DEBUG_PREDICATE_ANALYZER && dump_file)
 		{
-		  fprintf (dump_file, "one_pred = ");
-		  dump_pred_info (one_pred);
+		  fprintf (dump_file, "%d -> %d: one_pred = ",
+			   e->src->index, e->dest->index);
+		  dump_pred_info (dump_file, one_pred);
 		  fputc ('\n', dump_file);
 		}
 
@@ -1842,76 +1798,82 @@ predicate::init_from_control_deps (const vec<edge> *dep_chains,
 	    }
 	  else if (gswitch *gs = dyn_cast<gswitch *> (cond_stmt))
 	    {
-	      /* Avoid quadratic behavior.  */
-	      if (gimple_switch_num_labels (gs) > MAX_SWITCH_CASES)
-		{
-		  has_valid_pred = false;
-		  break;
-		}
-	      /* Find the case label.  */
-	      tree l = NULL_TREE;
-	      unsigned idx;
-	      for (idx = 0; idx < gimple_switch_num_labels (gs); ++idx)
-		{
-		  tree tl = gimple_switch_label (gs, idx);
-		  if (e->dest == label_to_block (cfun, CASE_LABEL (tl)))
-		    {
-		      if (!l)
-			l = tl;
-		      else
-			{
-			  l = NULL_TREE;
-			  break;
-			}
-		    }
-		}
+	      /* Find the case label, but avoid quadratic behavior.  */
+	      tree l = get_cases_for_edge (e, gs);
 	      /* If more than one label reaches this block or the case
-		 label doesn't have a single value (like the default one)
-		 fail.  */
-	      if (!l
-		  || !CASE_LOW (l)
-		  || (CASE_HIGH (l)
-		      && !operand_equal_p (CASE_LOW (l), CASE_HIGH (l), 0)))
+		 label doesn't have a contiguous range of values (like the
+		 default one) fail.  */
+	      if (!l || CASE_CHAIN (l) || !CASE_LOW (l))
+		has_valid_pred = false;
+	      else if (!CASE_HIGH (l)
+		      || operand_equal_p (CASE_LOW (l), CASE_HIGH (l)))
 		{
-		  has_valid_pred = false;
-		  break;
+		  pred_info one_pred;
+		  one_pred.pred_lhs = gimple_switch_index (gs);
+		  one_pred.pred_rhs = CASE_LOW (l);
+		  one_pred.cond_code = EQ_EXPR;
+		  one_pred.invert = false;
+		  t_chain.safe_push (one_pred);
+		  has_valid_pred = true;
 		}
-
-	      pred_info one_pred;
-	      one_pred.pred_lhs = gimple_switch_index (gs);
-	      one_pred.pred_rhs = CASE_LOW (l);
-	      one_pred.cond_code = EQ_EXPR;
-	      one_pred.invert = false;
-	      t_chain.safe_push (one_pred);
-	      has_valid_pred = true;
+	      else
+		{
+		  /* Support a case label with a range with
+		     two predicates.  We're overcommitting on
+		     the MAX_CHAIN_LEN budget by at most a factor
+		     of two here.  */
+		  pred_info one_pred;
+		  one_pred.pred_lhs = gimple_switch_index (gs);
+		  one_pred.pred_rhs = CASE_LOW (l);
+		  one_pred.cond_code = GE_EXPR;
+		  one_pred.invert = false;
+		  t_chain.safe_push (one_pred);
+		  one_pred.pred_rhs = CASE_HIGH (l);
+		  one_pred.cond_code = LE_EXPR;
+		  t_chain.safe_push (one_pred);
+		  has_valid_pred = true;
+		}
 	    }
+	  else if (stmt_can_throw_internal (cfun, cond_stmt)
+		   && !(e->flags & EDGE_EH))
+	    /* Ignore the exceptional control flow and proceed as if
+	       E were a fallthru without a controlling predicate for
+	       both the USE (valid) and DEF (questionable) case.  */
+	    has_valid_pred = true;
 	  else
-	    {
-	      /* Disabled.  See PR 90994.
-		 has_valid_pred = false;  */
-	      break;
-	    }
+	    has_valid_pred = false;
+
+	  /* For USE predicates we can drop components of the
+	     AND chain.  */
+	  if (!has_valid_pred && !is_use)
+	    break;
 	}
 
-      if (!has_valid_pred)
-	break;
-      else
-	m_preds.safe_push (t_chain);
+      /* For DEF predicates we have to drop components of the OR chain
+	 on failure.  */
+      if (!has_valid_pred && !is_use)
+	{
+	  t_chain.release ();
+	  continue;
+	}
+
+      /* When we add || 1 simply prune the chain and return.  */
+      if (t_chain.is_empty ())
+	{
+	  t_chain.release ();
+	  for (auto chain : m_preds)
+	    chain.release ();
+	  m_preds.truncate (0);
+	  break;
+	}
+
+      m_preds.quick_push (t_chain);
     }
 
   if (DEBUG_PREDICATE_ANALYZER && dump_file)
-    {
-      fprintf (dump_file, "init_from_control_deps {%s}:\n",
-	       format_edge_vecs (dep_chains, num_chains).c_str ());
-      dump (NULL, "");
-    }
-
-  if (has_valid_pred)
-    gcc_assert (m_preds.length () != 0);
-  else
-    /* Clear M_PREDS to indicate failure.  */
-    m_preds.release ();
+    dump (dump_file);
 }
+
 /* Store a PRED in *THIS.  */
 
 void
@@ -1922,46 +1884,51 @@ predicate::push_pred (const pred_info &pred)
   m_preds.safe_push (chain);
 }
 
-/* Dump predicates in *THIS for STMT prepended by MSG.  */
+/* Dump predicates in *THIS to F.  */
 
 void
-predicate::dump (gimple *stmt, const char *msg) const
+predicate::dump (FILE *f) const
 {
-  fprintf (dump_file, "%s", msg);
-  if (stmt)
-    {
-      fputc ('\t', dump_file);
-      print_gimple_stmt (dump_file, stmt, 0);
-      fprintf (dump_file, "  is conditional on:\n");
-    }
-
   unsigned np = m_preds.length ();
   if (np == 0)
     {
-      fprintf (dump_file, "\t(empty)\n");
+      fprintf (f, "\tTRUE (empty)\n");
       return;
     }
 
-  {
-    tree expr = build_pred_expr (m_preds);
-    char *str = print_generic_expr_to_str (expr);
-    fprintf (dump_file, "\t%s (expanded)\n", str);
-    free (str);
-  }
-
-  if (np > 1)
-    fprintf (dump_file, "\tOR (");
-  else
-    fputc ('\t', dump_file);
   for (unsigned i = 0; i < np; i++)
     {
-      dump_pred_chain (m_preds[i]);
-      if (i < np - 1)
-	fprintf (dump_file, ", ");
-      else if (i > 0)
-	fputc (')', dump_file);
+      if (i > 0)
+	fprintf (f, "\tOR (");
+      else
+	fprintf (f, "\t(");
+      dump_pred_chain (f, m_preds[i]);
+      fprintf (f, ")\n");
     }
-  fputc ('\n', dump_file);
+}
+
+/* Dump predicates in *THIS to stderr.  */
+
+void
+predicate::debug () const
+{
+  dump (stderr);
+}
+
+/* Dump predicates in *THIS for STMT prepended by MSG to F.  */
+
+void
+predicate::dump (FILE *f, gimple *stmt, const char *msg) const
+{
+  fprintf (f, "%s", msg);
+  if (stmt)
+    {
+      fputc ('\t', f);
+      print_gimple_stmt (f, stmt, 0);
+      fprintf (f, "  is conditional on:\n");
+    }
+
+  dump (f);
 }
 
 /* Initialize USE_PREDS with the predicates of the control dependence chains
@@ -1972,56 +1939,68 @@ bool
 uninit_analysis::init_use_preds (predicate &use_preds, basic_block def_bb,
 				 basic_block use_bb)
 {
-  gcc_assert (use_preds.is_empty ());
+  if (DEBUG_PREDICATE_ANALYZER && dump_file)
+    fprintf (dump_file, "init_use_preds (def_bb = %u, use_bb = %u)\n",
+	     def_bb->index, use_bb->index);
+
+  gcc_assert (use_preds.is_empty ()
+	      && dominated_by_p (CDI_DOMINATORS, use_bb, def_bb));
 
   /* Set CD_ROOT to the basic block closest to USE_BB that is the control
      equivalent of (is guarded by the same predicate as) DEF_BB that also
-     dominates USE_BB.  */
+     dominates USE_BB.  This mimics the inner loop in
+     compute_control_dep_chain.  */
   basic_block cd_root = def_bb;
-  while (dominated_by_p (CDI_DOMINATORS, use_bb, cd_root))
+  do
     {
-      /* Find CD_ROOT's closest postdominator that's its control
-	 equivalent.  */
-      if (basic_block bb = find_control_equiv_block (cd_root))
-	if (dominated_by_p (CDI_DOMINATORS, use_bb, bb))
-	  {
-	    cd_root = bb;
-	    continue;
-	  }
+      basic_block pdom = get_immediate_dominator (CDI_POST_DOMINATORS, cd_root);
 
-      break;
+      /* Stop at a loop exit which is also postdominating cd_root.  */
+      if (single_pred_p (pdom) && !single_succ_p (cd_root))
+	break;
+
+      if (!dominated_by_p (CDI_DOMINATORS, pdom, cd_root)
+	  || !dominated_by_p (CDI_DOMINATORS, use_bb, pdom))
+	break;
+
+      cd_root = pdom;
     }
+  while (1);
+
+  auto_bb_flag in_region (cfun);
+  auto_vec<basic_block, 20> region (MIN (n_basic_blocks_for_fn (cfun),
+					 param_uninit_control_dep_attempts));
 
   /* Set DEP_CHAINS to the set of edges between CD_ROOT and USE_BB.
      Each DEP_CHAINS element is a series of edges whose conditions
      are logical conjunctions.  Together, the DEP_CHAINS vector is
      used below to initialize an OR expression of the conjunctions.  */
-  unsigned num_calls = 0;
   unsigned num_chains = 0;
   auto_vec<edge> dep_chains[MAX_NUM_CHAINS];
-  auto_vec<edge, MAX_CHAIN_LEN + 1> cur_chain;
 
-  if (!compute_control_dep_chain (cd_root, use_bb, dep_chains, &num_chains,
-				  cur_chain, &num_calls))
+  if (!dfs_mark_dominating_region (use_bb, cd_root, in_region, region)
+      || !compute_control_dep_chain (cd_root, use_bb, dep_chains, &num_chains,
+				     in_region))
     {
-      gcc_assert (num_chains == 0);
+      /* If the info in dep_chains is not complete we need to use a
+	 conservative approximation for the use predicate.  */
+      if (DEBUG_PREDICATE_ANALYZER && dump_file)
+	fprintf (dump_file, "init_use_preds: dep_chain incomplete, using "
+		 "conservative approximation\n");
+      num_chains = 1;
+      dep_chains[0].truncate (0);
       simple_control_dep_chain (dep_chains[0], cd_root, use_bb);
-      num_chains++;
     }
 
-  if (DEBUG_PREDICATE_ANALYZER && dump_file)
-    {
-      fprintf (dump_file, "predicate::predicate (def_bb = %u, use_bb = %u, func_t) "
-	       "initialized from %u dep_chains:\n\t",
-	       def_bb->index, use_bb->index, num_chains);
-      dump_dep_chains (dep_chains, num_chains);
-    }
+  /* Unmark the region.  */
+  for (auto bb : region)
+    bb->flags &= ~in_region;
 
   /* From the set of edges computed above initialize *THIS as the OR
      condition under which the definition in DEF_BB is used in USE_BB.
      Each OR subexpression is represented by one element of DEP_CHAINS,
      where each element consists of a series of AND subexpressions.  */
-  use_preds.init_from_control_deps (dep_chains, num_chains);
+  use_preds.init_from_control_deps (dep_chains, num_chains, true);
   return !use_preds.is_empty ();
 }
 
@@ -2099,24 +2078,28 @@ uninit_analysis::init_from_phi_def (gphi *phi)
 	}
     }
   for (unsigned i = 0; i < nedges; i++)
-    if (!dfs_mark_dominating_region (def_edges[i], cd_root, in_region, region))
+    if (!dfs_mark_dominating_region (def_edges[i]->src, cd_root,
+				     in_region, region))
       break;
 
   unsigned num_chains = 0;
   auto_vec<edge> dep_chains[MAX_NUM_CHAINS];
-  auto_vec<edge, MAX_CHAIN_LEN + 1> cur_chain;
   for (unsigned i = 0; i < nedges; i++)
     {
       edge e = def_edges[i];
-      unsigned num_calls = 0;
       unsigned prev_nc = num_chains;
-      compute_control_dep_chain (cd_root, e->src, dep_chains,
-				 &num_chains, cur_chain, &num_calls, in_region);
+      bool complete_p = compute_control_dep_chain (cd_root, e->src, dep_chains,
+						   &num_chains, in_region);
 
       /* Update the newly added chains with the phi operand edge.  */
       if (EDGE_COUNT (e->src->succs) > 1)
 	{
-	  if (prev_nc == num_chains && num_chains < MAX_NUM_CHAINS)
+	  if (complete_p
+	      && prev_nc == num_chains
+	      && num_chains < MAX_NUM_CHAINS)
+	    /* We can only add a chain for the PHI operand edge when the
+	       collected info was complete, otherwise the predicate may
+	       not be conservative.  */
 	    dep_chains[num_chains++] = vNULL;
 	  for (unsigned j = prev_nc; j < num_chains; j++)
 	    dep_chains[j].safe_push (e);
@@ -2130,7 +2113,7 @@ uninit_analysis::init_from_phi_def (gphi *phi)
   /* Convert control dependence chains to the predicate in *THIS under
      which the PHI operands are defined to values for which M_EVAL is
      false.  */
-  m_phi_def_preds.init_from_control_deps (dep_chains, num_chains);
+  m_phi_def_preds.init_from_control_deps (dep_chains, num_chains, false);
   return !m_phi_def_preds.is_empty ();
 }
 
@@ -2164,16 +2147,15 @@ uninit_analysis::is_use_guarded (gimple *use_stmt, basic_block use_bb,
   /* The basic block where the PHI is defined.  */
   basic_block def_bb = gimple_bb (phi);
 
-  if (dominated_by_p (CDI_POST_DOMINATORS, def_bb, use_bb))
-    /* The use is not guarded.  */
-    return false;
-
   /* Try to build the predicate expression under which the PHI flows
      into its use.  This will be empty if the PHI is defined and used
      in the same bb.  */
   predicate use_preds;
   if (!init_use_preds (use_preds, def_bb, use_bb))
     return false;
+
+  use_preds.simplify (use_stmt, /*is_use=*/true);
+  use_preds.normalize (use_stmt, /*is_use=*/true);
 
   /* Try to prune the dead incoming phi edges.  */
   if (!overlap (phi, opnds, visited, use_preds))
@@ -2193,9 +2175,6 @@ uninit_analysis::is_use_guarded (gimple *use_stmt, basic_block use_bb,
       m_phi_def_preds.simplify (phi);
       m_phi_def_preds.normalize (phi);
     }
-
-  use_preds.simplify (use_stmt, /*is_use=*/true);
-  use_preds.normalize (use_stmt, /*is_use=*/true);
 
   /* Return true if the predicate guarding the valid definition (i.e.,
      *THIS) is a superset of the predicate guarding the use (i.e.,

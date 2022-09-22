@@ -297,9 +297,9 @@
 (define_mode_iterator V_256
   [V32QI V16HI V8SI V4DI V8SF V4DF])
 
-;; All 256bit vector modes including HF vector mode
+;; All 256bit vector modes including HF/BF vector modes
 (define_mode_iterator V_256H
-  [V32QI V16HI V8SI V4DI V8SF V4DF V16HF])
+  [V32QI V16HI V8SI V4DI V8SF V4DF V16HF V16BF])
 
 ;; All 128bit and 256bit vector modes
 (define_mode_iterator V_128_256
@@ -320,6 +320,11 @@
 (define_mode_iterator VF
   [(V16SF "TARGET_AVX512F") (V8SF "TARGET_AVX") V4SF
    (V8DF "TARGET_AVX512F") (V4DF "TARGET_AVX") (V2DF "TARGET_SSE2")])
+
+(define_mode_iterator VF1_VF2_AVX512DQ
+  [(V16SF "TARGET_AVX512F") (V8SF "TARGET_AVX") V4SF
+   (V8DF "TARGET_AVX512DQ") (V4DF "TARGET_AVX512DQ && TARGET_AVX512VL")
+   (V2DF "TARGET_AVX512DQ && TARGET_AVX512VL")])
 
 (define_mode_iterator VFH
   [(V32HF "TARGET_AVX512FP16")
@@ -984,6 +989,7 @@
    (V16SI "QI") (V8SI  "QI") (V4SI  "QI")
    (V8DI  "QI") (V4DI  "QI") (V2DI  "QI")
    (V32HF "HI") (V16HF "QI") (V8HF  "QI")
+   (V32BF "HI") (V16BF "QI") (V8BF  "QI")
    (V16SF "QI") (V8SF  "QI") (V4SF  "QI")
    (V8DF  "QI") (V4DF  "QI") (V2DF  "QI")])
 
@@ -10712,7 +10718,7 @@
 	   ]
 	   (symbol_ref "true")))])
 
-(define_insn "vec_set<mode>_0"
+(define_insn "@vec_set<mode>_0"
   [(set (match_operand:V8_128 0 "register_operand"
 	  "=v,v,v,x,x,Yr,*x,x,x,x,v,v")
 	(vec_merge:V8_128
@@ -17895,7 +17901,7 @@
    (set_attr "prefix" "maybe_evex")
    (set_attr "mode" "OI")])
 
-(define_insn "vec_interleave_high<mode><mask_name>"
+(define_insn "@vec_interleave_high<mode><mask_name>"
   [(set (match_operand:V8_128 0 "register_operand" "=x,Yw")
 	(vec_select:V8_128
 	  (vec_concat:<ssedoublevecmode>
@@ -17963,7 +17969,7 @@
    (set_attr "prefix" "maybe_evex")
    (set_attr "mode" "OI")])
 
-(define_insn "vec_interleave_low<mode><mask_name>"
+(define_insn "@vec_interleave_low<mode><mask_name>"
   [(set (match_operand:V8_128 0 "register_operand" "=x,Yw")
 	(vec_select:V8_128
 	  (vec_concat:<ssedoublevecmode>
@@ -23176,6 +23182,14 @@
   "TARGET_SSE4_1"
   "operands[2] = GEN_INT (ROUND_MXCSR);")
 
+;; Note vcvtpd2qq require avx512dq for all vector lengths.
+(define_expand "lrint<mode><sseintvecmodelower>2"
+  [(set (match_operand:<sseintvecmode> 0 "register_operand")
+	(unspec:<sseintvecmode>
+	  [(match_operand:VF1_VF2_AVX512DQ 1 "register_operand")]
+	 UNSPEC_FIX_NOTRUNC))]
+ "TARGET_SSE2")
+
 (define_insn "<sse4_1>_round<ssemodesuffix><avxsizesuffix>"
   [(set (match_operand:VF_128_256 0 "register_operand" "=Yr,*x,x")
 	(unspec:VF_128_256
@@ -23315,6 +23329,55 @@
    (set_attr "prefix" "orig,orig,vex,evex")
    (set_attr "mode" "<MODE>")])
 
+(define_expand "floor<mode>2"
+  [(set (match_operand:VFH 0 "register_operand")
+	(unspec:VFH
+	  [(match_operand:VFH 1 "vector_operand")
+	   (match_dup 2)]
+	  UNSPEC_ROUND))]
+  "TARGET_SSE4_1 && !flag_trapping_math"
+  "operands[2] = GEN_INT (ROUND_FLOOR | ROUND_NO_EXC);")
+
+(define_expand "lfloor<mode><sseintvecmodelower>2"
+  [(match_operand:<sseintvecmode> 0 "register_operand")
+   (match_operand:VF1_VF2_AVX512DQ 1 "register_operand")]
+ "TARGET_SSE4_1 && !flag_trapping_math"
+{
+  rtx tmp = gen_reg_rtx (<MODE>mode);
+  emit_insn (gen_floor<mode>2 (tmp, operands[1]));
+  emit_insn (gen_fix_trunc<mode><sseintvecmodelower>2 (operands[0], tmp));
+  DONE;
+})
+
+(define_expand "ceil<mode>2"
+  [(set (match_operand:VFH 0 "register_operand")
+	(unspec:VFH
+	  [(match_operand:VFH 1 "vector_operand")
+	   (match_dup 2)]
+	  UNSPEC_ROUND))]
+  "TARGET_SSE4_1 && !flag_trapping_math"
+  "operands[2] = GEN_INT (ROUND_CEIL | ROUND_NO_EXC);")
+
+(define_expand "lceil<mode><sseintvecmodelower>2"
+  [(match_operand:<sseintvecmode> 0 "register_operand")
+   (match_operand:VF1_VF2_AVX512DQ 1 "register_operand")]
+ "TARGET_SSE4_1 && !flag_trapping_math"
+{
+  rtx tmp = gen_reg_rtx (<MODE>mode);
+  emit_insn (gen_ceil<mode>2 (tmp, operands[1]));
+  emit_insn (gen_fix_trunc<mode><sseintvecmodelower>2 (operands[0], tmp));
+  DONE;
+})
+
+(define_expand "btrunc<mode>2"
+  [(set (match_operand:VFH 0 "register_operand")
+	(unspec:VFH
+	  [(match_operand:VFH 1 "vector_operand")
+	   (match_dup 2)]
+	  UNSPEC_ROUND))]
+  "TARGET_SSE4_1 && !flag_trapping_math"
+  "operands[2] = GEN_INT (ROUND_TRUNC | ROUND_NO_EXC);")
+
 (define_expand "round<mode>2"
   [(set (match_dup 3)
 	(plus:VF
@@ -23347,6 +23410,17 @@
 
   operands[3] = gen_reg_rtx (<MODE>mode);
   operands[4] = GEN_INT (ROUND_TRUNC);
+})
+
+(define_expand "lround<mode><sseintvecmodelower>2"
+  [(match_operand:<sseintvecmode> 0 "register_operand")
+   (match_operand:VF1_VF2_AVX512DQ 1 "register_operand")]
+ "TARGET_SSE4_1 && !flag_trapping_math"
+{
+  rtx tmp = gen_reg_rtx (<MODE>mode);
+  emit_insn (gen_round<mode>2 (tmp, operands[1]));
+  emit_insn (gen_fix_trunc<mode><sseintvecmodelower>2 (operands[0], tmp));
+  DONE;
 })
 
 (define_expand "round<mode>2_sfix"
@@ -23866,6 +23940,13 @@
   [(set_attr "type" "sse")
    (set_attr "prefix" "evex")
    (set_attr "mode" "XI")])
+
+(define_expand "exp2<mode>2"
+  [(set (match_operand:VF_512 0 "register_operand")
+	(unspec:VF_512
+	  [(match_operand:VF_512 1 "vector_operand")]
+	  UNSPEC_EXP2))]
+  "TARGET_AVX512ER")
 
 (define_insn "avx512er_exp2<mode><mask_name><round_saeonly_name>"
   [(set (match_operand:VF_512 0 "register_operand" "=v")
@@ -26902,14 +26983,40 @@
    (set_attr "btver2_decode" "vector")
    (set_attr "mode" "V8SF")])
 
-(define_insn "<mask_codefor>avx512f_vcvtps2ph512<mask_name>"
+;; vcvtps2ph is special, it encodes {sae} in evex, but round control in the imm
+;; For intrinsic _mm512_cvt_roundps_ph (a, imm), imm contains both {sae}
+;; and round control, we need to separate it in the assembly output.
+;; op2 in avx512f_vcvtps2ph512_mask_sae contains both sae and round control.
+(define_expand "avx512f_vcvtps2ph512_mask_sae"
+ [(set (match_operand:V16HI 0 "register_operand" "=v")
+       (vec_merge:V16HI
+	 (unspec:V16HI
+	   [(match_operand:V16SF 1 "register_operand" "v")
+	   (match_operand:SI 2 "const_0_to_255_operand")]
+	   UNSPEC_VCVTPS2PH)
+	 (match_operand:V16HI 3 "nonimm_or_0_operand")
+	 (match_operand:HI 4 "register_operand")))]
+  "TARGET_AVX512F"
+{
+  int round = INTVAL (operands[2]);
+  /* Separate {sae} from rounding control imm,
+     imm[3:7] will be ignored by the instruction.  */
+  if (round & 8)
+    {
+      emit_insn (gen_avx512f_vcvtps2ph512_mask_round (operands[0], operands[1],
+	  operands[2], operands[3], operands[4], GEN_INT (8)));
+      DONE;
+    }
+})
+
+(define_insn "<mask_codefor>avx512f_vcvtps2ph512<mask_name><round_saeonly_name>"
   [(set (match_operand:V16HI 0 "register_operand" "=v")
 	(unspec:V16HI
 	  [(match_operand:V16SF 1 "register_operand" "v")
 	   (match_operand:SI 2 "const_0_to_255_operand")]
 	  UNSPEC_VCVTPS2PH))]
   "TARGET_AVX512F"
-  "vcvtps2ph\t{%2, %1, %0<mask_operand3>|%0<mask_operand3>, %1, %2}"
+  "vcvtps2ph\t{%2, <round_saeonly_mask_op3>%1, %0<mask_operand3>|%0<mask_operand3>, %1<round_saeonly_mask_op3>, %2}"
   [(set_attr "type" "ssecvt")
    (set_attr "prefix" "evex")
    (set_attr "mode" "V16SF")])

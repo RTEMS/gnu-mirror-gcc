@@ -5895,6 +5895,7 @@ gfc_simplify_findloc (gfc_expr *array, gfc_expr *value, gfc_expr *dim,
   bool back_val = false;
 
   if (!is_constant_array_expr (array)
+      || array->shape == NULL
       || !gfc_is_constant_expr (dim))
     return NULL;
 
@@ -6431,7 +6432,7 @@ gfc_simplify_pack (gfc_expr *array, gfc_expr *mask, gfc_expr *vector)
       /* Copy only those elements of ARRAY to RESULT whose
 	 MASK equals .TRUE..  */
       mask_ctor = gfc_constructor_first (mask->value.constructor);
-      while (mask_ctor)
+      while (mask_ctor && array_ctor)
 	{
 	  if (mask_ctor->expr->value.logical)
 	    {

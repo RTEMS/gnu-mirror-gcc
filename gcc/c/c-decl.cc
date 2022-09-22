@@ -7868,7 +7868,7 @@ grokparms (struct c_arg_info *arg_info, bool funcdef_flag)
       error ("%<[*]%> not allowed in other than function prototype scope");
     }
 
-  if (arg_types == NULL_TREE && !funcdef_flag
+  if (arg_types == NULL_TREE && !funcdef_flag && !flag_isoc2x
       && !in_system_header_at (input_location))
     warning (OPT_Wstrict_prototypes,
 	     "function declaration isn%'t a prototype");
@@ -7896,9 +7896,8 @@ grokparms (struct c_arg_info *arg_info, bool funcdef_flag)
       tree parm, type, typelt;
       unsigned int parmno;
 
-      /* In C2X, convert () in a function definition to (void).  */
+      /* In C2X, convert () to (void).  */
       if (flag_isoc2x
-	  && funcdef_flag
 	  && !arg_types
 	  && !arg_info->parms)
 	arg_types = arg_info->types = void_list_node;
@@ -10675,14 +10674,6 @@ record_builtin_type (enum rid rid_index, const char *name, tree type)
   pushdecl (decl);
   if (debug_hooks->type_decl)
     debug_hooks->type_decl (decl, false);
-}
-
-/* Build the void_list_node (void_type_node having been created).  */
-tree
-build_void_list_node (void)
-{
-  tree t = build_tree_list (NULL_TREE, void_type_node);
-  return t;
 }
 
 /* Return a c_parm structure with the given SPECS, ATTRS and DECLARATOR.  */

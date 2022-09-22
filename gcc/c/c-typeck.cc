@@ -3829,6 +3829,7 @@ parser_build_binary_op (location_t location, enum tree_code code,
 			struct c_expr arg1, struct c_expr arg2)
 {
   struct c_expr result;
+  result.m_decimal = 0;
 
   enum tree_code code1 = arg1.original_code;
   enum tree_code code2 = arg2.original_code;
@@ -3985,6 +3986,14 @@ parser_build_binary_op (location_t location, enum tree_code code,
     warning_at (location, OPT_Wenum_compare,
 		"comparison between %qT and %qT",
 		type1, type2);
+
+  if (warn_xor_used_as_pow
+      && code == BIT_XOR_EXPR
+      && arg1.m_decimal
+      && arg2.m_decimal)
+    check_for_xor_used_as_pow (arg1.get_location (), arg1.value,
+			       location,
+			       arg2.value);
 
   return result;
 }
@@ -11172,10 +11181,10 @@ c_start_switch (location_t switch_loc,
   return add_stmt (cs->switch_stmt);
 }
 
-/* Process a case label at location LOC.  */
+/* Process a case label at location LOC, with attributes ATTRS.  */
 
 tree
-do_case (location_t loc, tree low_value, tree high_value)
+do_case (location_t loc, tree low_value, tree high_value, tree attrs)
 {
   tree label = NULL_TREE;
 
@@ -11211,7 +11220,7 @@ do_case (location_t loc, tree low_value, tree high_value)
 
   label = c_add_case_label (loc, c_switch_stack->cases,
 			    SWITCH_STMT_COND (c_switch_stack->switch_stmt),
-			    low_value, high_value);
+			    low_value, high_value, attrs);
   if (label == error_mark_node)
     label = NULL_TREE;
   return label;
@@ -11729,18 +11738,19 @@ maybe_warn_for_null_address (location_t loc, tree op, tree_code code)
       || from_macro_expansion_at (loc))
     return;
 
+  bool w;
   if (code == EQ_EXPR)
-    warning_at (loc, OPT_Waddress,
-		"the comparison will always evaluate as %<false%> "
-		"for the address of %qE will never be NULL",
-		op);
+    w = warning_at (loc, OPT_Waddress,
+		    "the comparison will always evaluate as %<false%> "
+		    "for the address of %qE will never be NULL",
+		    op);
   else
-    warning_at (loc, OPT_Waddress,
-		"the comparison will always evaluate as %<true%> "
-		"for the address of %qE will never be NULL",
-		op);
+    w = warning_at (loc, OPT_Waddress,
+		    "the comparison will always evaluate as %<true%> "
+		    "for the address of %qE will never be NULL",
+		    op);
 
-  if (DECL_P (op))
+  if (w && DECL_P (op))
     inform (DECL_SOURCE_LOCATION (op), "%qD declared here", op);
 }
 
@@ -14229,11 +14239,18 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	  break;
 	}
 
+  tree *grp_start_p = NULL, grp_sentinel = NULL_TREE;
+
   for (pc = &clauses, c = clauses; c ; c = *pc)
     {
       bool remove = false;
       bool need_complete = false;
       bool need_implicitly_determined = false;
+
+      /* We've reached the end of a list of expanded nodes.  Reset the group
+	 start pointer.  */
+      if (c == grp_sentinel)
+	grp_start_p = NULL;
 
       switch (OMP_CLAUSE_CODE (c))
 	{
@@ -14834,15 +14851,11 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	    }
 	  break;
 
-	case OMP_CLAUSE_DEPEND:
+	case OMP_CLAUSE_DOACROSS:
 	  t = OMP_CLAUSE_DECL (c);
 	  if (t == NULL_TREE)
-	    {
-	      gcc_assert (OMP_CLAUSE_DEPEND_KIND (c)
-			  == OMP_CLAUSE_DEPEND_SOURCE);
-	      break;
-	    }
-	  if (OMP_CLAUSE_DEPEND_KIND (c) == OMP_CLAUSE_DEPEND_SINK)
+	    break;
+	  if (OMP_CLAUSE_DOACROSS_KIND (c) == OMP_CLAUSE_DOACROSS_SINK)
 	    {
 	      gcc_assert (TREE_CODE (t) == TREE_LIST);
 	      for (; t; t = TREE_CHAIN (t))
@@ -14870,7 +14883,8 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 		}
 	      break;
 	    }
-	  /* FALLTHRU */
+	  gcc_unreachable ();
+	case OMP_CLAUSE_DEPEND:
 	case OMP_CLAUSE_AFFINITY:
 	  t = OMP_CLAUSE_DECL (c);
 	  if (TREE_CODE (t) == TREE_LIST
@@ -14995,6 +15009,9 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	  t = OMP_CLAUSE_DECL (c);
 	  if (TREE_CODE (t) == TREE_LIST)
 	    {
+	      grp_start_p = pc;
+	      grp_sentinel = OMP_CLAUSE_CHAIN (c);
+
 	      if (handle_omp_array_sections (c, ort))
 		remove = true;
 	      else
@@ -15638,7 +15655,19 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	}
 
       if (remove)
-	*pc = OMP_CLAUSE_CHAIN (c);
+	{
+	  if (grp_start_p)
+	    {
+	      /* If we found a clause to remove, we want to remove the whole
+		 expanded group, otherwise gimplify
+		 (omp_resolve_clause_dependencies) can get confused.  */
+	      *grp_start_p = grp_sentinel;
+	      pc = grp_start_p;
+	      grp_start_p = NULL;
+	    }
+	  else
+	    *pc = OMP_CLAUSE_CHAIN (c);
+	}
       else
 	pc = &OMP_CLAUSE_CHAIN (c);
     }

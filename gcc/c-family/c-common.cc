@@ -459,11 +459,11 @@ const struct c_common_resword c_common_reswords[] =
   { "__GIMPLE",		RID_GIMPLE,	D_CONLY },
   { "__PHI",		RID_PHI,	D_CONLY },
   { "__RTL",		RID_RTL,	D_CONLY },
-  { "alignas",		RID_ALIGNAS,	D_CXXONLY | D_CXX11 | D_CXXWARN },
-  { "alignof",		RID_ALIGNOF,	D_CXXONLY | D_CXX11 | D_CXXWARN },
+  { "alignas",		RID_ALIGNAS,	D_C2X | D_CXX11 | D_CXXWARN },
+  { "alignof",		RID_ALIGNOF,	D_C2X | D_CXX11 | D_CXXWARN },
   { "asm",		RID_ASM,	D_ASM },
   { "auto",		RID_AUTO,	0 },
-  { "bool",		RID_BOOL,	D_CXXONLY | D_CXXWARN },
+  { "bool",		RID_BOOL,	D_C2X | D_CXXWARN },
   { "break",		RID_BREAK,	0 },
   { "case",		RID_CASE,	0 },
   { "catch",		RID_CATCH,	D_CXX_OBJC | D_CXXWARN },
@@ -489,7 +489,7 @@ const struct c_common_resword c_common_reswords[] =
   { "explicit",		RID_EXPLICIT,	D_CXXONLY | D_CXXWARN },
   { "export",		RID_EXPORT,	D_CXXONLY | D_CXXWARN },
   { "extern",		RID_EXTERN,	0 },
-  { "false",		RID_FALSE,	D_CXXONLY | D_CXXWARN },
+  { "false",		RID_FALSE,	D_C2X | D_CXXWARN },
   { "float",		RID_FLOAT,	0 },
   { "for",		RID_FOR,	0 },
   { "friend",		RID_FRIEND,	D_CXXONLY | D_CXXWARN },
@@ -515,15 +515,15 @@ const struct c_common_resword c_common_reswords[] =
   { "signed",		RID_SIGNED,	0 },
   { "sizeof",		RID_SIZEOF,	0 },
   { "static",		RID_STATIC,	0 },
-  { "static_assert",    RID_STATIC_ASSERT, D_CXXONLY | D_CXX11 | D_CXXWARN },
+  { "static_assert",    RID_STATIC_ASSERT, D_C2X | D_CXX11 | D_CXXWARN },
   { "static_cast",	RID_STATCAST,	D_CXXONLY | D_CXXWARN },
   { "struct",		RID_STRUCT,	0 },
   { "switch",		RID_SWITCH,	0 },
   { "template",		RID_TEMPLATE,	D_CXXONLY | D_CXXWARN },
   { "this",		RID_THIS,	D_CXXONLY | D_CXXWARN },
-  { "thread_local",	RID_THREAD,	D_CXXONLY | D_CXX11 | D_CXXWARN },
+  { "thread_local",	RID_THREAD,	D_C2X | D_CXX11 | D_CXXWARN },
   { "throw",		RID_THROW,	D_CXX_OBJC | D_CXXWARN },
-  { "true",		RID_TRUE,	D_CXXONLY | D_CXXWARN },
+  { "true",		RID_TRUE,	D_C2X | D_CXXWARN },
   { "try",		RID_TRY,	D_CXX_OBJC | D_CXXWARN },
   { "typedef",		RID_TYPEDEF,	0 },
   { "typename",		RID_TYPENAME,	D_CXXONLY | D_CXXWARN },
@@ -4505,8 +4505,6 @@ c_common_nodes_and_builtins (void)
     TYPE_NAME (void_type_node) = void_name;
   }
 
-  void_list_node = build_void_list_node ();
-
   /* Make a type to be the domain of a few array types
      whose domains don't really matter.
      200 is small enough that it always fits in size_t
@@ -4550,6 +4548,7 @@ c_common_nodes_and_builtins (void)
   if (c_dialect_cxx ())
     {
       char8_type_node = make_unsigned_type (char8_type_size);
+      TYPE_STRING_FLAG (char8_type_node) = true;
 
       if (flag_char8_t)
         record_builtin_type (RID_CHAR8, "char8_t", char8_type_node);
@@ -5068,11 +5067,12 @@ case_compare (splay_tree_key k1, splay_tree_key k2)
    CASES is a tree containing all the case ranges processed so far;
    COND is the condition for the switch-statement itself.
    Returns the CASE_LABEL_EXPR created, or ERROR_MARK_NODE if no
-   CASE_LABEL_EXPR is created.  */
+   CASE_LABEL_EXPR is created.  ATTRS are the attributes to be applied
+   to the label.  */
 
 tree
 c_add_case_label (location_t loc, splay_tree cases, tree cond,
-		  tree low_value, tree high_value)
+		  tree low_value, tree high_value, tree attrs)
 {
   tree type;
   tree label;
@@ -5081,6 +5081,7 @@ c_add_case_label (location_t loc, splay_tree cases, tree cond,
 
   /* Create the LABEL_DECL itself.  */
   label = create_artificial_label (loc);
+  decl_attributes (&label, attrs, 0);
 
   /* If there was an error processing the switch condition, bail now
      before we get more confused.  */
@@ -9343,11 +9344,14 @@ braced_list_to_string (tree type, tree ctor, bool member)
   if (!member && !tree_fits_uhwi_p (typesize))
     return ctor;
 
-  /* If the target char size differes from the host char size, we'd risk
+  /* If the target char size differs from the host char size, we'd risk
      loosing data and getting object sizes wrong by converting to
      host chars.  */
   if (TYPE_PRECISION (char_type_node) != CHAR_BIT)
     return ctor;
+
+  /* STRING_CST doesn't support wide characters.  */
+  gcc_checking_assert (TYPE_PRECISION (TREE_TYPE (type)) == CHAR_BIT);
 
   /* If the array has an explicit bound, use it to constrain the size
      of the string.  If it doesn't, be sure to create a string that's
