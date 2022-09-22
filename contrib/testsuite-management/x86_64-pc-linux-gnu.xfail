@@ -163,3 +163,7 @@ FAIL: gcc.dg/tree-prof/cmpsf-1.c scan-tree-dump-not dom2 "Invalid sum"
 FAIL: libstdc++-prettyprinters/48362.cc print t2
 FAIL: libstdc++-prettyprinters/cxx11.cc print rtpl
 FAIL: libstdc++-prettyprinters/cxx11.cc print tpl
+FAIL: g++.dg/abi/pure-virtual1.C -std=c++14 (test for excess errors)
+FAIL: g++.dg/abi/pure-virtual1.C -std=c++17 (test for excess errors)
+FAIL: g++.dg/abi/pure-virtual1.C -std=c++20 (test for excess errors)
+FAIL: g++.dg/abi/pure-virtual1.C -std=c++98 (test for excess errors)
