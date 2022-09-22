@@ -120,18 +120,20 @@ gimple_alloc_histogram_value (struct function *fun ATTRIBUTE_UNUSED,
    hist->hvalue.value = value;
    hist->hvalue.stmt = stmt;
    hist->hvalue.edge = NULL;
+   hist->hvalue.lp = NULL;
    hist->type = type;
    return hist;
 }
 
 histogram_value
-gimple_alloc_histogram_value_edge (struct function *fun ATTRIBUTE_UNUSED,
-			      enum hist_type type, tree value, edge_def *edge)
+gimple_alloc_histogram_value_loop (struct function *fun ATTRIBUTE_UNUSED,
+			      enum hist_type type, tree value, edge_def *edge, class loop *lp)
 {
    histogram_value hist = (histogram_value) xcalloc (1, sizeof (*hist));
    hist->hvalue.value = value;
    hist->hvalue.stmt = NULL;
    hist->hvalue.edge = edge;
+   hist->hvalue.lp = lp;
    hist->type = type;
    return hist;
 }
@@ -396,7 +398,7 @@ stream_in_histogram_value (class lto_input_block *ib, gimple *stmt)
 	  break;
 
     case HIST_TYPE_HISTOGRAM:
-	  ncounters = 70;
+	  ncounters = 69;
 	  break;
 	case HIST_TYPE_POW2:
 	case HIST_TYPE_AVERAGE:
@@ -631,6 +633,39 @@ check_counter (gimple *stmt, const char * name,
   return false;
 }
 
+static bool
+gimple_loop_histogram_transform (gimple_stmt_iterator *si)
+{
+  histogram_value histogram;
+  gassign *stmt;
+
+  stmt = dyn_cast <gassign *> (gsi_stmt (*si));
+  histogram = gimple_histogram_value_of_type (cfun, stmt, HIST_TYPE_HISTOGRAM);
+  debug_gimple_stmt (stmt);
+  if (!histogram)
+      return false;
+
+  gcov_type *counter = histogram->hvalue.counters;
+  auto lp = histogram->hvalue.lp;
+
+  if (lp->valid_hist){
+      for (int i=0;i<69;++i){
+          lp->hist[i]+=counter[i];
+      }
+  } else {
+      lp->valid_hist = true;
+      for (int i=0;i<69;++i){
+          lp->hist[i]=counter[i];
+      }
+  }
+
+  gimple_remove_histogram_value (cfun, stmt, histogram);
+
+  update_stmt (gsi_stmt (*si));
+
+  return true;
+}
+
 /* GIMPLE based transformations. */
 
 bool
@@ -666,7 +701,8 @@ gimple_value_profile_transformations (void)
 	  if (gimple_mod_subtract_transform (&gsi)
 	      || gimple_divmod_fixed_value_transform (&gsi)
 	      || gimple_mod_pow2_value_transform (&gsi)
-	      || gimple_stringops_transform (&gsi))
+	      || gimple_stringops_transform (&gsi)
+          || gimple_loop_histogram_transform (&gsi))
 	    {
 	      stmt = gsi_stmt (gsi);
 	      changed = true;
@@ -1936,9 +1972,11 @@ gimple_histogram_values_to_profile(function *fun, histogram_values * values){
              loop, &gsi, true, &var, NULL);
          auto_vec<edge> exits = get_loop_exit_edges (loop);
          for ( auto exit : exits ){
-                 values->safe_push (gimple_alloc_histogram_value_edge (fun,
-                                         HIST_TYPE_HISTOGRAM,
-                                         var, exit));
+                 if (!(exit->flags & (EDGE_COMPLEX | EDGE_FAKE))) {
+                     values->safe_push (gimple_alloc_histogram_value_loop (fun,
+                                             HIST_TYPE_HISTOGRAM,
+                                             var, exit, loop));
+                 }
          }
     }
     free_dominance_info (CDI_DOMINATORS);
@@ -2002,7 +2040,7 @@ gimple_find_values_to_profile (histogram_values *values)
 	  break;
 
 	case HIST_TYPE_HISTOGRAM:
-	  hist->n_counters = 70;
+	  hist->n_counters = 69;
 	  break;
 
 	default:

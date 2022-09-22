@@ -113,6 +113,8 @@ struct GTY ((chain_next ("%h.next"))) control_iv {
   struct control_iv *next;
 };
 
+#include "value-prof.h"
+
 /* Structure to hold information for each natural loop.  */
 class GTY ((chain_next ("%h.next"))) loop {
 public:
@@ -272,6 +274,11 @@ public:
      the basic-block from being collected but its index can still be
      reused.  */
   basic_block former_header;
+
+  bool valid_hist = false;
+
+  // We store histogram values here
+  gcov_type hist[69];
 };
 
 /* Set if the loop is known to be infinite.  */

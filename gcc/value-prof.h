@@ -40,7 +40,8 @@ enum hist_type
 #define HIST_TYPE_FOR_COUNTER(COUNTER) \
   ((enum hist_type) ((COUNTER) - GCOV_FIRST_VALUE_COUNTER))
 
-
+class loop;
+
 /* The value to measure.  */
 struct histogram_value_t
 {
@@ -49,6 +50,7 @@ struct histogram_value_t
       tree value;		/* The value to profile.  */
       gimple *stmt;		/* Insn containing the value.  */
       edge_def *edge;    /* For adding to empty bbs */
+      class loop *lp;
       gcov_type *counters;		        /* Pointer to first counter.  */
       struct histogram_value_t *next;		/* Linked list pointer.  */
     } hvalue;
@@ -76,7 +78,7 @@ extern bool gimple_value_profile_transformations (void);
 
 histogram_value gimple_alloc_histogram_value (struct function *, enum hist_type,
 					      gimple *stmt = NULL,
-					      tree value = NULL_TREE);
+					      tree value = NULL);
 histogram_value gimple_histogram_value (struct function *, gimple *);
 histogram_value gimple_histogram_value_of_type (struct function *, gimple *,
 						enum hist_type);

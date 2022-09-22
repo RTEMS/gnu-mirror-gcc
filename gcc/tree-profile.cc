@@ -52,6 +52,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "stringpool.h"
 #include "attribs.h"
 #include "tree-pretty-print.h"
+#include "gimple-pretty-print.h"
 #include "langhooks.h"
 #include "stor-layout.h"
 #include "xregex.h"
@@ -374,21 +375,11 @@ gimple_gen_histogram_profiler (histogram_value value, unsigned tag) // , edge_de
   } else {
       edge_def *edge = value->hvalue.edge;
       gcc_assert(edge);
-      gimple_stmt_iterator gsi;
-      gimple_seq seq = NULL;
-      gsi = gsi_start (seq);
-
       tree ref_ptr = tree_coverage_counter_addr (tag, 0);
       gcall *call;
-      tree val;
-
-      ref_ptr = force_gimple_operand_gsi (&gsi, ref_ptr,
-                          true, NULL_TREE, true, GSI_SAME_STMT);
-      val = prepare_instrumented_value (&gsi, value);
+      tree val = prepare_instrumented_value (NULL, value);
       call = gimple_build_call (tree_histogram_profiler_fn, 2, ref_ptr, val);
-      seq = gsi_seq (gsi);
-      gsi_insert_before (&gsi, call, GSI_NEW_STMT);
-      gsi_insert_seq_on_edge (edge, seq);
+      gsi_insert_seq_on_edge (edge, call);
   }
 }
 

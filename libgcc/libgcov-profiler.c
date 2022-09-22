@@ -35,9 +35,10 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 void
 __gcov_histogram_profiler (gcov_type *counters, gcov_type value)
 {
-  if (value>0 && value<8){
-    counters[value-1]++;
+  if (value>=0 && value<8){
+    counters[value]++;
   }else{
+    gcc_assert(value>0);
     int pow2 = 3;
     while (1 << pow2 <= value || 1 << pow2 > 1 << (pow2 + 1)){
       ++pow2;
@@ -45,10 +46,10 @@ __gcov_histogram_profiler (gcov_type *counters, gcov_type value)
     // pow2 is first bigger power of 2
     // we increment closer power of 2
     if ((1<<pow2+1<<(pow2-1))>>1<value){
-      counters[6+(pow2-3)-1]++;
+      counters[6+(pow2-3)]++;
     }
     else{
-      counters[6+(pow2-3)]++;
+      counters[7+(pow2-3)]++;
     }
   }
 }
