@@ -26222,6 +26222,8 @@ invalid_nontype_parm_type_p (tree type, tsubst_flags_t complain)
 {
   if (INTEGRAL_OR_ENUMERATION_TYPE_P (type))
     return false;
+  else if (INTCAP_TYPE_P (type))
+    return false;
   else if (TYPE_PTR_P (type))
     return false;
   else if (TYPE_REF_P (type)
