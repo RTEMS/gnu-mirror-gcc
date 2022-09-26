@@ -10229,7 +10229,9 @@ check_static_variable_definition (tree decl, tree type)
       && (DECL_DECLARED_CONSTEXPR_P (decl)
 	  || DECL_VAR_DECLARED_INLINE_P (decl)))
     ;
-  else if (cxx_dialect >= cxx11 && !INTEGRAL_OR_ENUMERATION_TYPE_P (type))
+  else if (cxx_dialect >= cxx11
+	   && !INTEGRAL_OR_ENUMERATION_TYPE_P (type)
+	   && !INTCAP_TYPE_P (type))
     {
       if (!COMPLETE_TYPE_P (type))
 	error_at (DECL_SOURCE_LOCATION (decl),
@@ -10250,7 +10252,9 @@ check_static_variable_definition (tree decl, tree type)
      the definition, but not both.  If it appears in the class, the
      member is a member constant.  The file-scope definition is always
      required.  */
-  else if (!ARITHMETIC_TYPE_P (type) && TREE_CODE (type) != ENUMERAL_TYPE)
+  else if (!ARITHMETIC_TYPE_P (type)
+	   && TREE_CODE (type) != ENUMERAL_TYPE
+	   && !INTCAP_TYPE_P (type))
     error_at (DECL_SOURCE_LOCATION (decl),
 	      "invalid in-class initialization of static data member "
 	      "of non-integral type %qT",
@@ -10260,7 +10264,8 @@ check_static_variable_definition (tree decl, tree type)
 	      "ISO C++ forbids in-class initialization of non-const "
 	      "static member %qD",
 	      decl);
-  else if (!INTEGRAL_OR_ENUMERATION_TYPE_P (type))
+  else if (!INTEGRAL_OR_ENUMERATION_TYPE_P (type)
+	   && !INTCAP_TYPE_P (type))
     pedwarn (DECL_SOURCE_LOCATION (decl), OPT_Wpedantic,
 	     "ISO C++ forbids initialization of member constant "
 	     "%qD of non-integral type %qT", decl, type);
