@@ -8,7 +8,7 @@ from adabaseconf import *
 project = 'GNAT Coding Style: A Guide for GNAT Developers'
 authors = 'AdaCore'
 
-set_latex_elements(project)
+set_latex_elements(latex_elements, project)
 
 # Grouping the document tree into Texinfo files. List of tuples
 # (source start file, target name, title, author,

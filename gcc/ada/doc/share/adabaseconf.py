@@ -15,7 +15,6 @@ import ada_latex_elements
 
 import ada_pygments
 
-texi_fsf = True  # Set to False when FSF doc is switched to sphinx by default
 gnatvsn_content = read_file('ada/gnatvsn.ads')
 
 
@@ -26,10 +25,7 @@ def get_gnat_version():
     if m:
         return m.group(1).strip()
     else:
-        if texi_fsf:
-            return ''
-        else:
-            return gcc_BASEVER
+        return gcc_BASEVER
 
 
 def get_gnat_build_type():
@@ -54,7 +50,7 @@ if os.path.isfile('adacore_transparent.png'):
 if os.path.isfile('favicon.ico'):
     html_favicon = 'favicon.ico'
 
-latex_additional_files = ['gnat.sty']
+latex_additional_files = ['../share/gnat.sty']
 
 copyright_macros = {
     'date': time.strftime('%b %d, %Y'),
@@ -65,19 +61,19 @@ copyright_macros = {
     'version': version}
 
 
-def set_latex_elements(title):
-    global latex_elements
-
-    latex_elements = {
+def set_latex_elements(latex_elements, title):
+    elements = {
         'preamble': '\\usepackage{gnat}\n' +
         ada_latex_elements.TOC_DEPTH +
         ada_latex_elements.PAGE_BLANK +
         ada_latex_elements.TOC_CMD +
         ada_latex_elements.LATEX_HYPHEN +
-        ada_latex_elements.ENCLOSE +
         ada_latex_elements.doc_settings(title, get_gnat_version()),
         'tableofcontents': ada_latex_elements.TOC % copyright_macros
     }
+    for key, value in elements.items():
+        latex_elements.setdefault(key, '')
+        latex_elements[key] += value
 
 
 def setup(app):
