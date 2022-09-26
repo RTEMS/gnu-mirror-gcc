@@ -919,6 +919,31 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
       bool topn_p = (hist->type == HIST_TYPE_TOPN_VALUES
 		     || hist->type == HIST_TYPE_INDIR_CALL);
 
+
+      /* Histogram profiler counter is not related to any statement,
+         so that we have to read the counter and set the value to
+         the corresponding loop  */
+
+      if (hist->type == HIST_TYPE_HISTOGRAM)
+      {
+        printf("tata");
+        auto lp = hist->hvalue.lp;
+        if (act_count[t]){
+            if (lp->valid_hist)
+            {
+               for (int i=0;i<69;++i){
+                   lp->hist[i]+=act_count[t][i];
+               }
+            } else {
+               lp->valid_hist = true;
+               for (int i=0;i<69;++i){
+                   lp->hist[i]=act_count[t][i];
+               }
+            }
+        }
+        continue;
+      }
+
       /* TOP N counter uses variable number of counters.  */
       if (topn_p)
 	{
@@ -953,6 +978,7 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
 	    else
 	      hist->hvalue.counters[j] = 0;
 	}
+
 
       /* Time profiler counter is not related to any statement,
          so that we have to read the counter and set the value to
@@ -1514,6 +1540,13 @@ branch_prob (bool thunk)
       compute_branch_probabilities (cfg_checksum, lineno_checksum);
       if (flag_profile_values)
 	compute_value_histograms (values, cfg_checksum, lineno_checksum);
+    }
+
+    for (auto loop : loops_list (cfun, 0)){
+      printf("fasdfasdfasdf");
+      if (loop->valid_hist){
+          printf("%ld %ld %ld %ld", loop->hist[0], loop->hist[1], loop->hist[2], loop->hist[3]);
+    }
     }
 
   remove_fake_edges ();

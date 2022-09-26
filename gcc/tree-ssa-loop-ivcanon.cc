@@ -1162,6 +1162,7 @@ canonicalize_loop_induction_variables (class loop *loop,
 				       bool create_iv, enum unroll_level ul,
 				       bool try_eval, bool allow_peel)
 {
+
   edge exit = NULL;
   tree niter;
   HOST_WIDE_INT maxiter;
@@ -1273,7 +1274,6 @@ canonicalize_loop_induction_variables (class loop *loop,
       if (iv_niter)
 	create_canonical_iv (loop, exit, iv_niter);
     }
-
   if (ul == UL_ALL)
     modified |= try_peel_loop (loop, exit, niter, may_be_zero, maxiter);
 

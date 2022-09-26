@@ -266,7 +266,7 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
       break;
     case HIST_TYPE_HISTOGRAM:
       if (hist->hvalue.counters){
-        for (int i=0; i<8; ++i){
+        for (int i=0; i<=8; ++i){
   	  fprintf (dump_file, "Histogram counter histogram%" PRId64
 	     ":%" PRId64 ".\n",
 	     (int64_t) i,
@@ -276,7 +276,7 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
   	  fprintf (dump_file, "Histogram counter histogram%" PRId64
 	     ":%" PRId64 ".\n",
 	     (int64_t) 1>>i,
-	     (int64_t) hist->hvalue.counters[4+i]);
+	     (int64_t) hist->hvalue.counters[5+i]);
         }
       }
       break;
@@ -633,39 +633,6 @@ check_counter (gimple *stmt, const char * name,
   return false;
 }
 
-static bool
-gimple_loop_histogram_transform (gimple_stmt_iterator *si)
-{
-  histogram_value histogram;
-  gassign *stmt;
-
-  stmt = dyn_cast <gassign *> (gsi_stmt (*si));
-  histogram = gimple_histogram_value_of_type (cfun, stmt, HIST_TYPE_HISTOGRAM);
-  debug_gimple_stmt (stmt);
-  if (!histogram)
-      return false;
-
-  gcov_type *counter = histogram->hvalue.counters;
-  auto lp = histogram->hvalue.lp;
-
-  if (lp->valid_hist){
-      for (int i=0;i<69;++i){
-          lp->hist[i]+=counter[i];
-      }
-  } else {
-      lp->valid_hist = true;
-      for (int i=0;i<69;++i){
-          lp->hist[i]=counter[i];
-      }
-  }
-
-  gimple_remove_histogram_value (cfun, stmt, histogram);
-
-  update_stmt (gsi_stmt (*si));
-
-  return true;
-}
-
 /* GIMPLE based transformations. */
 
 bool
@@ -701,8 +668,7 @@ gimple_value_profile_transformations (void)
 	  if (gimple_mod_subtract_transform (&gsi)
 	      || gimple_divmod_fixed_value_transform (&gsi)
 	      || gimple_mod_pow2_value_transform (&gsi)
-	      || gimple_stringops_transform (&gsi)
-          || gimple_loop_histogram_transform (&gsi))
+	      || gimple_stringops_transform (&gsi))
 	    {
 	      stmt = gsi_stmt (gsi);
 	      changed = true;
