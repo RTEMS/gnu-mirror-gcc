@@ -1,3 +1,67 @@
+2022-09-26  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/106656
+	* typeck2.cc (array_string_literal_compatible_p): Allow
+	initializing arrays of char or unsigned char by a UTF-8 string literal.
+
+2022-09-26  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/106784
+	* method.cc (is_convertible_helper): New.
+	(is_convertible): Use it.
+	(is_nothrow_convertible): Likewise.
+
+2022-09-26  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/107033
+	* module.cc (trees_in::decl_value): In the MK_partial case for
+	a variable template partial specialization, pass decl_p=true to
+	add_mergeable_specialization, and set spec to the VAR_DECL not
+	the TEMPLATE_DECL.
+	* pt.cc (add_mergeable_specialization): For a variable template
+	partial specialization, set the TREE_TYPE of the new
+	DECL_TEMPLATE_SPECIALIZATIONS node to the TREE_TYPE of the
+	VAR_DECL not the VAR_DECL itself.
+
+2022-09-23  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/106784
+	* constraint.cc (diagnose_trait_expr): Handle CPTK_IS_CONVERTIBLE
+	and CPTK_IS_NOTHROW_CONVERTIBLE.
+	* cp-objcp-common.cc (names_builtin_p): Handle RID_IS_CONVERTIBLE
+	RID_IS_NOTHROW_CONVERTIBLE.
+	* cp-tree.h (enum cp_trait_kind): Add CPTK_IS_CONVERTIBLE and
+	CPTK_IS_NOTHROW_CONVERTIBLE.
+	(is_convertible): Declare.
+	(is_nothrow_convertible): Likewise.
+	* cxx-pretty-print.cc (pp_cxx_trait_expression): Handle
+	CPTK_IS_CONVERTIBLE and CPTK_IS_NOTHROW_CONVERTIBLE.
+	* method.cc (is_convertible): New.
+	(is_nothrow_convertible): Likewise.
+	* parser.cc (cp_parser_primary_expression): Handle RID_IS_CONVERTIBLE
+	and RID_IS_NOTHROW_CONVERTIBLE.
+	(cp_parser_trait_expr): Likewise.
+	* semantics.cc (trait_expr_value): Handle CPTK_IS_CONVERTIBLE and
+	CPTK_IS_NOTHROW_CONVERTIBLE.
+	(finish_trait_expr): Likewise.
+
+2022-09-23  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/106983
+	* typeck2.cc (split_nonconstant_init_1): Check TYPE_P.
+
+2022-09-22  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/106826
+	* module.cc (trees_out::decl_value): Use get_template_info in
+	the MK_partial case to handle both VAR_DECL and TYPE_DECL.
+	(trees_out::key_mergeable): Likewise.
+	(trees_in::key_mergeable): Likewise.
+	(has_definition): Consider DECL_INITIAL of a partial variable
+	template specialization.
+	(depset::hash::make_dependency): Handle partial variable template
+	specializations too.
+
 2022-09-20  Patrick Palka  <ppalka@redhat.com>
 
 	* decl.cc (cp_finish_decl): After updating the deduced type of a
