@@ -1929,11 +1929,11 @@ gimple_stringops_values_to_profile (gimple *gs, histogram_values *values)
 
 static void
 gimple_histogram_values_to_profile(function *fun, histogram_values * values){
-    calculate_dominance_info (CDI_DOMINATORS);
     for (auto loop : loops_list (fun, 0)){
          tree var;
          gimple_stmt_iterator gsi;
-         gsi = gsi_last_bb (loop->latch);
+         
+         gsi = gsi_start_bb (loop->latch);
          create_iv (build_int_cst_type (get_gcov_type(), 0), build_int_cst (get_gcov_type(), 1), NULL_TREE,
              loop, &gsi, true, &var, NULL);
          auto_vec<edge> exits = get_loop_exit_edges (loop);
@@ -1945,7 +1945,6 @@ gimple_histogram_values_to_profile(function *fun, histogram_values * values){
                  }
          }
     }
-    free_dominance_info (CDI_DOMINATORS);
     gsi_commit_edge_inserts ();
 }
 

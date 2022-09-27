@@ -1206,6 +1206,9 @@ branch_prob (bool thunk)
 
   total_num_times_called++;
 
+  calculate_dominance_info (CDI_DOMINATORS);
+  loop_optimizer_init (LOOPS_HAVE_SIMPLE_LATCHES);
+
   flow_call_edges_add (NULL);
   add_noreturn_fake_exit_edges ();
 
@@ -1593,6 +1596,8 @@ branch_prob (bool thunk)
 	  }
       compute_function_frequency ();
     }
+   loop_optimizer_finalize ();
+   free_dominance_info (CDI_DOMINATORS);
 }
 
 /* Union find algorithm implementation for the basic blocks using
