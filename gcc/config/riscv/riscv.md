@@ -65,6 +65,9 @@
 
   ;; OR-COMBINE
   UNSPEC_ORC_B
+
+  ;; ZBB STRLEN
+  UNSPEC_STRLEN
 ])
 
 (define_c_enum "unspecv" [
@@ -3223,6 +3226,31 @@
   ""
 {
   if (riscv_expand_block_move (operands[0], operands[1], operands[2]))
+    DONE;
+  else
+    FAIL;
+})
+
+;; Search character in string (generalization of strlen).
+;; Argument 0 is the resulting offset
+;; Argument 1 is the string
+;; Argument 2 is the search character
+;; Argument 3 is the alignment
+
+(define_expand "strlen<mode>"
+  [(set (match_operand:X 0 "register_operand")
+	(unspec:X [(match_operand:BLK 1 "general_operand")
+		     (match_operand:SI 2 "const_int_operand")
+		     (match_operand:SI 3 "const_int_operand")]
+		  UNSPEC_STRLEN))]
+  ""
+{
+  rtx search_char = operands[2];
+
+  if (optimize_insn_for_size_p () || search_char != const0_rtx)
+    FAIL;
+
+  if (riscv_expand_strlen (operands[0], operands[1], operands[2], operands[3]))
     DONE;
   else
     FAIL;
