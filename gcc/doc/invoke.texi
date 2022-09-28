@@ -1213,6 +1213,7 @@ See RS/6000 and PowerPC Options.
 -msave-restore  -mno-save-restore @gol
 -mshorten-memrefs  -mno-shorten-memrefs @gol
 -mstrict-align  -mno-strict-align @gol
+-mstring-compare-inline-limit=@var{num} @gol
 -mcmodel=medlow  -mcmodel=medany @gol
 -mexplicit-relocs  -mno-explicit-relocs @gol
 -mrelax  -mno-relax @gol
@@ -28652,6 +28653,13 @@ integer load/stores only.
 Do not or do generate unaligned memory accesses.  The default is set depending
 on whether the processor we are optimizing for supports fast unaligned access
 or not.
+
+@item -mstring-compare-inline-limit=@var{num}
+@opindex mstring-compare-inline-limit
+Compare at most @var{num} string bytes with inline code.
+If the difference or end of string is not found at the
+end of the inline compare a call to @code{strcmp} or @code{strncmp} will
+take care of the rest of the comparison. The default is 64 bytes.
 
 @item -mcmodel=medlow
 @opindex mcmodel=medlow

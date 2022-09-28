@@ -74,6 +74,11 @@ GEN_EMIT_HELPER2(one_cmpl) /* do_one_cmpl2  */
 GEN_EMIT_HELPER2(clz) /* do_clz2  */
 GEN_EMIT_HELPER2(ctz) /* do_ctz2  */
 GEN_EMIT_HELPER2(zero_extendqi) /* do_zero_extendqi2  */
+GEN_EMIT_HELPER3(xor) /* do_xor3  */
+GEN_EMIT_HELPER3(ashl) /* do_ashl3  */
+GEN_EMIT_HELPER2(bswap) /* do_bswap2  */
+GEN_EMIT_HELPER3(riscv_ior_not) /* do_riscv_ior_not3  */
+GEN_EMIT_HELPER3(riscv_and_not) /* do_riscv_and_not3  */
 
 #undef GEN_EMIT_HELPER2
 #undef GEN_EMIT_HELPER3
@@ -258,6 +263,334 @@ riscv_expand_block_move (rtx dest, rtx src, rtx length)
 	  return true;
 	}
     }
+  return false;
+}
+
+/* Generate the sequence of compares for strcmp/strncmp using zbb instructions.
+   BYTES_TO_COMPARE is the number of bytes to be compared.
+   BASE_ALIGN is the smaller of the alignment of the two strings.
+   ORIG_SRC1 is the unmodified rtx for the first string.
+   ORIG_SRC2 is the unmodified rtx for the second string.
+   DATA1 is the register for loading the first string.
+   DATA2 is the register for loading the second string.
+   HAS_NUL is the register holding non-NUL bytes for NUL-bytes in the string.
+   TARGET is the rtx for the result register (SImode)
+   EQUALITY_COMPARE_REST if set, then we hand over to libc if string matches.
+   END_LABEL is the location before the calculation of the result value.
+   FINAL_LABEL is the location after the calculation of the result value.  */
+
+static void
+expand_strncmp_zbb_sequence (unsigned HOST_WIDE_INT bytes_to_compare,
+			     rtx src1, rtx src2, rtx data1, rtx data2,
+			     rtx target, rtx orc, bool equality_compare_rest,
+			     rtx end_label, rtx final_label)
+{
+  const unsigned HOST_WIDE_INT p_mode_size = GET_MODE_SIZE (Pmode);
+  rtx src1_addr = force_reg (Pmode, XEXP (src1, 0));
+  rtx src2_addr = force_reg (Pmode, XEXP (src2, 0));
+  unsigned HOST_WIDE_INT offset = 0;
+
+  rtx m1 = gen_reg_rtx (Pmode);
+  emit_insn (gen_rtx_SET (m1, constm1_rtx));
+
+  /* Generate a compare sequence.  */
+  while (bytes_to_compare > 0)
+    {
+      machine_mode load_mode = QImode;
+      unsigned HOST_WIDE_INT load_mode_size = 1;
+      if (bytes_to_compare > 1)
+	{
+	  load_mode = Pmode;
+	  load_mode_size = p_mode_size;
+	}
+      unsigned HOST_WIDE_INT cmp_bytes = 0;
+
+      if (bytes_to_compare >= load_mode_size)
+	cmp_bytes = load_mode_size;
+      else
+	cmp_bytes = bytes_to_compare;
+
+      unsigned HOST_WIDE_INT remain = bytes_to_compare - cmp_bytes;
+
+      /* load_mode_size...bytes we will read
+	 cmp_bytes...bytes we will compare (might be less than load_mode_size)
+	 bytes_to_compare...bytes we will compare (incl. cmp_bytes)
+	 remain...bytes left to compare (excl. cmp_bytes)  */
+
+      rtx addr1 = gen_rtx_PLUS (Pmode, src1_addr, GEN_INT (offset));
+      rtx addr2 = gen_rtx_PLUS (Pmode, src2_addr, GEN_INT (offset));
+
+      do_load_from_addr (load_mode, data1, addr1, src1);
+      do_load_from_addr (load_mode, data2, addr2, src2);
+
+      if (load_mode_size == 1)
+	{
+	  /* Special case for comparing just single (last) byte.  */
+	  gcc_assert (remain == 0);
+
+	  if (!equality_compare_rest)
+	    {
+	      /* Calculate difference and jump to final_label.  */
+	      rtx result = gen_reg_rtx (Pmode);
+	      do_sub3 (result, data1, data2);
+	      emit_insn (gen_movsi (target, gen_lowpart (SImode, result)));
+	      emit_jump_insn (gen_jump (final_label));
+	    }
+	  else
+	    {
+	      /* Compare both bytes and jump to final_label if not equal.  */
+	      rtx result = gen_reg_rtx (Pmode);
+	      do_sub3 (result, data1, data2);
+	      emit_insn (gen_movsi (target, gen_lowpart (SImode, result)));
+	      /* Check if str1[i] is NULL.  */
+	      rtx cond1 = gen_rtx_EQ (VOIDmode, data1, const0_rtx);
+	      emit_unlikely_jump_insn (gen_cbranch4 (Pmode, cond1,
+				       data1, const0_rtx, final_label));
+	      /* Check if str1[i] == str2[i].  */
+	      rtx cond2 = gen_rtx_NE (VOIDmode, data1, data2);
+	      emit_unlikely_jump_insn (gen_cbranch4 (Pmode, cond2,
+				       data1, data2, final_label));
+	      /* Processing will fall through to libc calls.  */
+	    }
+	}
+      else
+	{
+	  /* Eliminate irrelevant data (behind the N-th character).  */
+	  if (bytes_to_compare < p_mode_size)
+	    {
+	      gcc_assert (remain == 0);
+	     /* Set a NUL-byte after the relevant data (behind the string).  */
+	      unsigned long im = 0xffUL;
+	      rtx imask = gen_rtx_CONST_INT (Pmode, im);
+	      rtx m_reg = gen_reg_rtx (Pmode);
+	      emit_insn (gen_rtx_SET (m_reg, imask));
+	      do_ashl3 (m_reg, m_reg, GEN_INT (cmp_bytes * BITS_PER_UNIT));
+	      do_riscv_and_not3 (data1, m_reg, data1);
+	      do_riscv_and_not3 (data2, m_reg, data2);
+	      do_orcb2 (orc, data1);
+	      emit_jump_insn (gen_jump (end_label));
+	    }
+	  else
+	    {
+	      /* Check if data1 contains a NUL character.  */
+	      do_orcb2 (orc, data1);
+	      rtx cond1 = gen_rtx_NE (VOIDmode, orc, m1);
+	      emit_unlikely_jump_insn (gen_cbranch4 (Pmode, cond1, orc, m1,
+						     end_label));
+
+	      /* Break out if u1 != u2 */
+	      rtx cond2 = gen_rtx_NE (VOIDmode, data1, data2);
+	      emit_unlikely_jump_insn (gen_cbranch4 (Pmode, cond2, data1,
+						     data2, end_label));
+
+	      /* Fast-exit for complete and equal strings.  */
+	      if (remain == 0 && !equality_compare_rest)
+		{
+		  /* All compared and everything was equal.  */
+		  emit_insn (gen_rtx_SET (target, gen_rtx_CONST_INT (SImode, 0)));
+		  emit_jump_insn (gen_jump (final_label));
+		}
+	    }
+	}
+
+      offset += cmp_bytes;
+      bytes_to_compare -= cmp_bytes;
+    }
+  /* Processing will fall through to libc calls.  */
+}
+
+/* Emit a string comparison sequence using Zbb instruction.
+
+   OPERANDS[0] is the target (result).
+   OPERANDS[1] is the first source.
+   OPERANDS[2] is the second source.
+   If NO_LENGTH is zero, then:
+   OPERANDS[3] is the length.
+   OPERANDS[4] is the alignment in bytes.
+   If NO_LENGTH is nonzero, then:
+   OPERANDS[3] is the alignment in bytes.
+   BYTES_TO_COMPARE is the maximum number of bytes to compare.
+   EQUALITY_COMPARE_REST defines if str(n)cmp should be called on equality.
+ */
+
+static bool
+riscv_emit_str_compare_zbb (rtx target, rtx src1, rtx src2,
+			    unsigned HOST_WIDE_INT length,
+			    unsigned HOST_WIDE_INT bytes_to_compare,
+			    bool equality_compare_rest,
+			    unsigned HOST_WIDE_INT alignment)
+{
+  const unsigned HOST_WIDE_INT p_mode_size = GET_MODE_SIZE (Pmode);
+
+  gcc_assert (TARGET_ZBB);
+
+  /* Enable only if we can access at least one XLEN-register.  */
+  if (bytes_to_compare < p_mode_size)
+    return false;
+
+  /* Limit to 12-bits (maximum load-offset).  */
+  if (bytes_to_compare > IMM_REACH)
+    return false;
+
+  /* We don't support big endian.  */
+  if (BYTES_BIG_ENDIAN)
+    return false;
+
+  /* We need aligned strings.  */
+  if (alignment < p_mode_size)
+    return false;
+
+  rtx data1 = gen_reg_rtx (Pmode);
+  rtx data2 = gen_reg_rtx (Pmode);
+  rtx orc = gen_reg_rtx (Pmode);
+  rtx end_label = gen_label_rtx ();
+  rtx final_label = gen_label_rtx ();
+
+  /* Generate a sequence of zbb instructions to compare out
+     to the length specified.  */
+  expand_strncmp_zbb_sequence (bytes_to_compare, src1, src2, data1, data2,
+			       target, orc, equality_compare_rest,
+			       end_label, final_label);
+
+  if (equality_compare_rest)
+    {
+      /* Update pointers past what has been compared already.  */
+      rtx src1_addr = force_reg (Pmode, XEXP (src1, 0));
+      rtx src2_addr = force_reg (Pmode, XEXP (src2, 0));
+      unsigned HOST_WIDE_INT offset = bytes_to_compare;
+      rtx src1 = force_reg (Pmode,
+			    gen_rtx_PLUS (Pmode, src1_addr, GEN_INT (offset)));
+      rtx src2 = force_reg (Pmode,
+			    gen_rtx_PLUS (Pmode, src2_addr, GEN_INT (offset)));
+
+      /* Construct call to strcmp/strncmp to compare the rest of the string.  */
+      if (length == 0)
+	{
+	  tree fun = builtin_decl_explicit (BUILT_IN_STRCMP);
+	  emit_library_call_value (XEXP (DECL_RTL (fun), 0),
+				   target, LCT_NORMAL, GET_MODE (target),
+				   src1, Pmode, src2, Pmode);
+	}
+      else
+	{
+	  unsigned HOST_WIDE_INT delta = length - bytes_to_compare;
+	  gcc_assert (delta > 0);
+	  rtx len_rtx = gen_reg_rtx (Pmode);
+	  emit_move_insn (len_rtx, gen_int_mode (delta, Pmode));
+	  tree fun = builtin_decl_explicit (BUILT_IN_STRNCMP);
+	  emit_library_call_value (XEXP (DECL_RTL (fun), 0),
+				   target, LCT_NORMAL, GET_MODE (target),
+				   src1, Pmode, src2, Pmode, len_rtx, Pmode);
+	}
+
+      emit_jump_insn (gen_jump (final_label));
+    }
+
+  emit_barrier (); /* No fall-through.  */
+
+  emit_label (end_label);
+
+  /* Convert non-equal bytes into non-NUL bytes.  */
+  rtx diff = gen_reg_rtx (Pmode);
+  do_xor3 (diff, data1, data2);
+  do_orcb2 (diff, diff);
+
+  /* Convert non-equal or NUL-bytes into non-NUL bytes.  */
+  rtx syndrome = gen_reg_rtx (Pmode);
+  do_riscv_ior_not3 (syndrome, orc, diff);
+
+  /* Count the number of equal bits from the beginning of the word.  */
+  rtx shift = gen_reg_rtx (Pmode);
+  do_ctz2 (shift, syndrome);
+
+  do_bswap2 (data1, data1);
+  do_bswap2 (data2, data2);
+
+  /* The most-significant-non-zero bit of the syndrome marks either the
+     first bit that is different, or the top bit of the first zero byte.
+     Shifting left now will bring the critical information into the
+     top bits.  */
+  do_ashl3 (data1, data1, gen_lowpart (QImode, shift));
+  do_ashl3 (data2, data2, gen_lowpart (QImode, shift));
+
+  /* But we need to zero-extend (char is unsigned) the value and then
+     perform a signed 32-bit subtraction.  */
+  unsigned int shiftr = p_mode_size * BITS_PER_UNIT - 8;
+  do_lshr3 (data1, data1, GEN_INT (shiftr));
+  do_lshr3 (data2, data2, GEN_INT (shiftr));
+
+  rtx result = gen_reg_rtx (Pmode);
+  do_sub3 (result, data1, data2);
+  emit_insn (gen_movsi (target, gen_lowpart (SImode, result)));
+
+  /* And we are done.  */
+  emit_label (final_label);
+  return true;
+}
+
+/* Expand a string compare operation.
+
+   The result will be stored in TARGET.
+   The strings are referenced by SRC1 and SRC2.
+   The argument BYTES_RTX either holds the number of characters to
+   compare, or is NULL_RTX. The argument ALIGN_RTX hold the alignment.
+ 
+   Return true if expansion was successful, or false otherwise.  */
+
+bool
+riscv_expand_strn_compare (rtx target, rtx src1, rtx src2,
+			   rtx bytes_rtx, rtx align_rtx)
+{
+  const unsigned HOST_WIDE_INT compare_max = riscv_string_compare_inline_limit;
+  unsigned HOST_WIDE_INT length;
+  unsigned HOST_WIDE_INT bytes_to_compare;
+  bool equality_compare_rest;
+  unsigned HOST_WIDE_INT alignment;
+
+  if (riscv_string_compare_inline_limit == 0)
+    return false;
+
+  /* Decide how many bytes to compare inline and what to do if there is
+     no difference detected at the end of the compared bytes.
+     We might call libc to continue the comparison.  */
+  if (bytes_rtx == NULL_RTX)
+    {
+      length = 0;
+      bytes_to_compare = compare_max;
+      equality_compare_rest = true;
+    }
+  else
+    {
+      /* If we have a length, it must be constant.  */
+      if (!CONST_INT_P (bytes_rtx))
+	return false;
+      length = UINTVAL (bytes_rtx);
+
+      /* Limit the bytes to compare if necessary.  */
+      if (length <= compare_max)
+	{
+	  bytes_to_compare = length;
+	  equality_compare_rest = false;
+	}
+      else
+	{
+	  bytes_to_compare = compare_max;
+	  equality_compare_rest = true;
+	}
+    }
+
+  if (!CONST_INT_P (align_rtx))
+    return false;
+  alignment = UINTVAL (align_rtx);
+
+  if (TARGET_ZBB)
+    {
+      return riscv_emit_str_compare_zbb (target, src1, src2,
+					 length, bytes_to_compare,
+					 equality_compare_rest,
+					 alignment);
+    }
+
   return false;
 }
 

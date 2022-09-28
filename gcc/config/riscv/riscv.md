@@ -3231,6 +3231,54 @@
     FAIL;
 })
 
+;; String compare N insn.
+;; Argument 0 is the target (result)
+;; Argument 1 is the source1
+;; Argument 2 is the source2
+;; Argument 3 is the length
+;; Argument 4 is the alignment
+
+(define_expand "cmpstrnsi"
+  [(parallel [(set (match_operand:SI 0)
+	      (compare:SI (match_operand:BLK 1)
+			  (match_operand:BLK 2)))
+	      (use (match_operand:SI 3))
+	      (use (match_operand:SI 4))])]
+  ""
+{
+  if (optimize_insn_for_size_p ())
+    FAIL;
+
+  if (riscv_expand_strn_compare (operands[0], operands[1], operands[2],
+				 operands[3], operands[4]))
+    DONE;
+  else
+    FAIL;
+})
+
+;; String compare insn.
+;; Argument 0 is the target (result)
+;; Argument 1 is the source1
+;; Argument 2 is the source2
+;; Argument 3 is the alignment
+
+(define_expand "cmpstrsi"
+  [(parallel [(set (match_operand:SI 0)
+	      (compare:SI (match_operand:BLK 1)
+			  (match_operand:BLK 2)))
+	      (use (match_operand:SI 3))])]
+  ""
+{
+  if (optimize_insn_for_size_p ())
+    FAIL;
+
+  if (riscv_expand_strn_compare (operands[0], operands[1], operands[2],
+				 NULL_RTX, operands[3]))
+    DONE;
+  else
+    FAIL;
+})
+
 ;; Search character in string (generalization of strlen).
 ;; Argument 0 is the resulting offset
 ;; Argument 1 is the string
