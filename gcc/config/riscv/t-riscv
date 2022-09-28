@@ -63,6 +63,10 @@ riscv-selftests.o: $(srcdir)/config/riscv/riscv-selftests.cc
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
+riscv-string.o: $(srcdir)/config/riscv/riscv-string.cc
+	$(COMPILE) $<
+	$(POSTCOMPILE)
+
 riscv-v.o: $(srcdir)/config/riscv/riscv-v.cc
 	$(COMPILE) $<
 	$(POSTCOMPILE)
