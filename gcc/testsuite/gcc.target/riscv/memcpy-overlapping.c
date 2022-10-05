@@ -25,26 +25,23 @@ COPY_N(15)
 /* Emits 2x {ld,sd} and 1x {lw,sw}.  */
 COPY_N(19)
 
-/* Emits 3x ld and 3x sd.  */
+/* Emits 3x {ld,sd}.  */
 COPY_N(23)
 
 /* The by-pieces infrastructure handles up to 24 bytes.
    So the code below is emitted via cpymemsi/block_move_straight.  */
 
-/* Emits 3x {ld,sd} and 1x {lhu,lbu,sh,sb}.  */
+/* Emits 3x {ld,sd} and 1x {lw,sw}.  */
 COPY_N(27)
 
-/* Emits 3x {ld,sd} and 1x {lw,lbu,sw,sb}.  */
+/* Emits 4x {ld,sd}.  */
 COPY_N(29)
 
-/* Emits 3x {ld,sd} and 2x {lw,sw}.  */
+/* Emits 4x {ld,sd}.  */
 COPY_N(31)
 
-/* { dg-final { scan-assembler-times "ld\t" 21 } } */
-/* { dg-final { scan-assembler-times "sd\t" 21 } } */
+/* { dg-final { scan-assembler-times "ld\t" 23 } } */
+/* { dg-final { scan-assembler-times "sd\t" 23 } } */
 
-/* { dg-final { scan-assembler-times "lw\t" 5 } } */
-/* { dg-final { scan-assembler-times "sw\t" 5 } } */
-
-/* { dg-final { scan-assembler-times "lbu\t" 2 } } */
-/* { dg-final { scan-assembler-times "sb\t" 2 } } */
+/* { dg-final { scan-assembler-times "lw\t" 3 } } */
+/* { dg-final { scan-assembler-times "sw\t" 3 } } */
