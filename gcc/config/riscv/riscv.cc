@@ -251,6 +251,7 @@ struct riscv_tune_param
   unsigned short fmv_cost;
   bool slow_unaligned_access;
   unsigned int fusible_ops;
+  bool overlap_op_by_pieces;
 };
 
 /* Information about one micro-arch we know about.  */
@@ -339,6 +340,7 @@ static const struct riscv_tune_param rocket_tune_info = {
   8,						/* fmv_cost */
   true,						/* slow_unaligned_access */
   RISCV_FUSE_NOTHING,                           /* fusible_ops */
+  false,					/* overlap_op_by_pieces */
 };
 
 /* Costs to use when optimizing for Sifive 7 Series.  */
@@ -354,6 +356,7 @@ static const struct riscv_tune_param sifive_7_tune_info = {
   8,						/* fmv_cost */
   true,						/* slow_unaligned_access */
   RISCV_FUSE_NOTHING,                           /* fusible_ops */
+  false,					/* overlap_op_by_pieces */
 };
 
 /* Costs to use when optimizing for T-HEAD c906.  */
@@ -369,6 +372,7 @@ static const struct riscv_tune_param thead_c906_tune_info = {
   8,		/* fmv_cost */
   false,            /* slow_unaligned_access */
   RISCV_FUSE_NOTHING,                           /* fusible_ops */
+  false,					/* overlap_op_by_pieces */
 };
 
 /* Costs to use when optimizing for size.  */
@@ -384,6 +388,7 @@ static const struct riscv_tune_param optimize_size_tune_info = {
   8,						/* fmv_cost */
   false,					/* slow_unaligned_access */
   RISCV_FUSE_NOTHING,                           /* fusible_ops */
+  false,					/* overlap_op_by_pieces */
 };
 
 /* Costs to use when optimizing for Ventana Micro VT1.  */
@@ -401,7 +406,8 @@ static const struct riscv_tune_param ventana_vt1_tune_info = {
   ( RISCV_FUSE_ZEXTW | RISCV_FUSE_ZEXTH |       /* fusible_ops */
     RISCV_FUSE_ZEXTWS | RISCV_FUSE_LDINDEXED |
     RISCV_FUSE_LUI_ADDI | RISCV_FUSE_AUIPC_ADDI |
-    RISCV_FUSE_LUI_LD | RISCV_FUSE_AUIPC_LD )
+    RISCV_FUSE_LUI_LD | RISCV_FUSE_AUIPC_LD ),
+  true,						/* overlap_op_by_pieces */
 };
 
 static tree riscv_handle_fndecl_attribute (tree *, tree, tree, int, bool *);
@@ -6667,6 +6673,12 @@ riscv_slow_unaligned_access (machine_mode, unsigned int)
   return riscv_slow_unaligned_access_p;
 }
 
+static bool
+riscv_overlap_op_by_pieces (void)
+{
+  return tune_param->overlap_op_by_pieces && !TARGET_STRICT_ALIGN;
+}
+
 /* Implement TARGET_CAN_CHANGE_MODE_CLASS.  */
 
 static bool
@@ -7229,6 +7241,9 @@ riscv_shamt_matches_mask_p (int shamt, HOST_WIDE_INT mask)
 
 #undef TARGET_SLOW_UNALIGNED_ACCESS
 #define TARGET_SLOW_UNALIGNED_ACCESS riscv_slow_unaligned_access
+
+#undef TARGET_OVERLAP_OP_BY_PIECES_P
+#define TARGET_OVERLAP_OP_BY_PIECES_P riscv_overlap_op_by_pieces
 
 #undef TARGET_SECONDARY_MEMORY_NEEDED
 #define TARGET_SECONDARY_MEMORY_NEEDED riscv_secondary_memory_needed
