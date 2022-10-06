@@ -2248,6 +2248,13 @@ toplev::main (int argc, char **argv)
 
   handle_common_deferred_options ();
 
+  if (getenv ("DUMPALL"))
+    {
+      g->get_dumps ()->dump_switch_p ("ipa-all=/dev/null");
+      g->get_dumps ()->dump_switch_p ("tree-all=/dev/null");
+      g->get_dumps ()->dump_switch_p ("rtl-all=/dev/null");
+    }
+
   init_local_tick ();
 
   initialize_plugins ();
