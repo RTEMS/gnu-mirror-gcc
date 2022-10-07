@@ -3742,6 +3742,10 @@ rs6000_option_override_internal (bool global_init_p)
   gcc_assert (tune_index >= 0);
   rs6000_tune = processor_target_table[tune_index].processor;
 
+  /* For now, make -mtune=future the same as -mtune=power10.  */
+  if (rs6000_tune == PROCESSOR_FUTURE)
+    rs6000_tune = PROCESSOR_POWER10;
+
   if (rs6000_cpu == PROCESSOR_PPCE300C2 || rs6000_cpu == PROCESSOR_PPCE300C3
       || rs6000_cpu == PROCESSOR_PPCE500MC || rs6000_cpu == PROCESSOR_PPCE500MC64
       || rs6000_cpu == PROCESSOR_PPCE5500)
@@ -4395,6 +4399,14 @@ rs6000_option_override_internal (bool global_init_p)
   if (!TARGET_PCREL && TARGET_PCREL_OPT)
     rs6000_isa_flags &= ~OPTION_MASK_PCREL_OPT;
 
+  /* DMF requires MMA.  */
+  if (TARGET_DMF && !TARGET_MMA)
+    {
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_DMF) != 0)
+	error ("%qs requires %qs", "-mdmf", "-mmma");
+      rs6000_isa_flags &= ~OPTION_MASK_DMF;
+    }
+
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after subtarget", rs6000_isa_flags);
 
@@ -4405,6 +4417,7 @@ rs6000_option_override_internal (bool global_init_p)
 			&& rs6000_tune != PROCESSOR_POWER8
 			&& rs6000_tune != PROCESSOR_POWER9
 			&& rs6000_tune != PROCESSOR_POWER10
+			&& rs6000_tune != PROCESSOR_FUTURE
 			&& rs6000_tune != PROCESSOR_PPCA2
 			&& rs6000_tune != PROCESSOR_CELL
 			&& rs6000_tune != PROCESSOR_PPC476);
@@ -4419,6 +4432,7 @@ rs6000_option_override_internal (bool global_init_p)
 				 || rs6000_tune == PROCESSOR_POWER8
 				 || rs6000_tune == PROCESSOR_POWER9
 				 || rs6000_tune == PROCESSOR_POWER10
+				 || rs6000_tune == PROCESSOR_FUTURE
 				 || rs6000_tune == PROCESSOR_PPCE500MC
 				 || rs6000_tune == PROCESSOR_PPCE500MC64
 				 || rs6000_tune == PROCESSOR_PPCE5500
@@ -4718,6 +4732,7 @@ rs6000_option_override_internal (bool global_init_p)
 	break;
 
       case PROCESSOR_POWER10:
+      case PROCESSOR_FUTURE:
 	rs6000_cost = &power10_cost;
 	break;
 
@@ -5848,6 +5863,10 @@ rs6000_machine_from_flags (void)
   /* 500 series and 800 series */
   if (rs6000_cpu == PROCESSOR_MPCCORE)
     return "\"821\"";
+
+  /* Some future processor.  For now, just use power10.  */
+  if (rs6000_cpu == PROCESSOR_FUTURE)
+    return "power10";
 
 #if 0
   /* This (and ppc64 below) are disabled here (for now at least) because
@@ -10085,6 +10104,7 @@ rs6000_reassociation_width (unsigned int opc ATTRIBUTE_UNUSED,
     case PROCESSOR_POWER8:
     case PROCESSOR_POWER9:
     case PROCESSOR_POWER10:
+    case PROCESSOR_FUTURE:
       if (DECIMAL_FLOAT_MODE_P (mode))
 	return 1;
       if (VECTOR_MODE_P (mode))
@@ -17872,7 +17892,8 @@ rs6000_adjust_cost (rtx_insn *insn, int dep_type, rtx_insn *dep_insn, int cost,
 
 	/* Separate a load from a narrower, dependent store.  */
 	if ((rs6000_sched_groups || rs6000_tune == PROCESSOR_POWER9
-	     || rs6000_tune == PROCESSOR_POWER10)
+	     || rs6000_tune == PROCESSOR_POWER10
+	     || rs6000_tune == PROCESSOR_FUTURE)
 	    && GET_CODE (PATTERN (insn)) == SET
 	    && GET_CODE (PATTERN (dep_insn)) == SET
 	    && MEM_P (XEXP (PATTERN (insn), 1))
@@ -17911,6 +17932,7 @@ rs6000_adjust_cost (rtx_insn *insn, int dep_type, rtx_insn *dep_insn, int cost,
 		 || rs6000_tune == PROCESSOR_POWER8
 		 || rs6000_tune == PROCESSOR_POWER9
 		 || rs6000_tune == PROCESSOR_POWER10
+		 || rs6000_tune == PROCESSOR_FUTURE
                  || rs6000_tune == PROCESSOR_CELL)
                 && recog_memoized (dep_insn)
                 && (INSN_CODE (dep_insn) >= 0))
@@ -18485,6 +18507,7 @@ rs6000_issue_rate (void)
   case PROCESSOR_POWER9:
     return 6;
   case PROCESSOR_POWER10:
+  case PROCESSOR_FUTURE:
     return 8;
   default:
     return 1;
@@ -19201,7 +19224,8 @@ rs6000_sched_reorder (FILE *dump ATTRIBUTE_UNUSED, int sched_verbose,
     load_store_pendulum = 0;
 
   /* Do Power10 dependent reordering.  */
-  if (rs6000_tune == PROCESSOR_POWER10 && last_scheduled_insn)
+  if ((rs6000_tune == PROCESSOR_POWER10
+       || rs6000_tune == PROCESSOR_FUTURE) && last_scheduled_insn)
     power10_sched_reorder (ready, n_ready - 1);
 
   return rs6000_issue_rate ();
@@ -19226,7 +19250,8 @@ rs6000_sched_reorder2 (FILE *dump, int sched_verbose, rtx_insn **ready,
     return power9_sched_reorder2 (ready, *pn_ready - 1);
 
   /* Do Power10 dependent reordering.  */
-  if (rs6000_tune == PROCESSOR_POWER10 && last_scheduled_insn)
+  if ((rs6000_tune == PROCESSOR_POWER10
+       || rs6000_tune == PROCESSOR_FUTURE) && last_scheduled_insn)
     return power10_sched_reorder (ready, *pn_ready - 1);
 
   return cached_can_issue_more;
@@ -22441,7 +22466,8 @@ rs6000_register_move_cost (machine_mode mode,
 		 allocation a move within the same class might turn
 		 out to be a nop.  */
 	      if (rs6000_tune == PROCESSOR_POWER9
-		  || rs6000_tune == PROCESSOR_POWER10)
+		  || rs6000_tune == PROCESSOR_POWER10
+		  || rs6000_tune == PROCESSOR_FUTURE)
 		ret = 3 * hard_regno_nregs (FIRST_GPR_REGNO, mode);
 	      else
 		ret = 4 * hard_regno_nregs (FIRST_GPR_REGNO, mode);
@@ -24093,6 +24119,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "crypto",			OPTION_MASK_CRYPTO,		false, true  },
   { "direct-move",		OPTION_MASK_DIRECT_MOVE,	false, true  },
   { "dlmzb",			OPTION_MASK_DLMZB,		false, true  },
+  { "dmf",			OPTION_MASK_DMF,		false, true  },
   { "efficient-unaligned-vsx",	OPTION_MASK_EFFICIENT_UNALIGNED_VSX,
 								false, true  },
   { "float128",			OPTION_MASK_FLOAT128_KEYWORD,	false, true  },
