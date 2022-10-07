@@ -290,7 +290,8 @@ enum rs6000_reg_type {
   ALTIVEC_REG_TYPE,
   FPR_REG_TYPE,
   SPR_REG_TYPE,
-  CR_REG_TYPE
+  CR_REG_TYPE,
+  DMF_REG_TYPE
 };
 
 /* Map register class to register type.  */
@@ -304,22 +305,23 @@ static enum rs6000_reg_type reg_class_to_reg_type[N_REG_CLASSES];
 
 
 /* Register classes we care about in secondary reload or go if legitimate
-   address.  We only need to worry about GPR, FPR, and Altivec registers here,
-   along an ANY field that is the OR of the 3 register classes.  */
+   address.  We only need to worry about GPR, FPR, Altivec, and DMF registers
+   here, along an ANY field that is the OR of the 4 register classes.  */
 
 enum rs6000_reload_reg_type {
   RELOAD_REG_GPR,			/* General purpose registers.  */
   RELOAD_REG_FPR,			/* Traditional floating point regs.  */
   RELOAD_REG_VMX,			/* Altivec (VMX) registers.  */
-  RELOAD_REG_ANY,			/* OR of GPR, FPR, Altivec masks.  */
+  RELOAD_REG_DMF,			/* DMF registers.  */
+  RELOAD_REG_ANY,			/* OR of GPR/FPR/VMX/DMF masks.  */
   N_RELOAD_REG
 };
 
-/* For setting up register classes, loop through the 3 register classes mapping
+/* For setting up register classes, loop through the 4 register classes mapping
    into real registers, and skip the ANY class, which is just an OR of the
    bits.  */
 #define FIRST_RELOAD_REG_CLASS	RELOAD_REG_GPR
-#define LAST_RELOAD_REG_CLASS	RELOAD_REG_VMX
+#define LAST_RELOAD_REG_CLASS	RELOAD_REG_DMF
 
 /* Map reload register type to a register in the register class.  */
 struct reload_reg_map_type {
@@ -331,22 +333,24 @@ static const struct reload_reg_map_type reload_reg_map[N_RELOAD_REG] = {
   { "Gpr",	FIRST_GPR_REGNO },	/* RELOAD_REG_GPR.  */
   { "Fpr",	FIRST_FPR_REGNO },	/* RELOAD_REG_FPR.  */
   { "VMX",	FIRST_ALTIVEC_REGNO },	/* RELOAD_REG_VMX.  */
+  { "DMF",	FIRST_DMF_REGNO },	/* RELOAD_REG_DMF.  */
   { "Any",	-1 },			/* RELOAD_REG_ANY.  */
 };
 
 /* Mask bits for each register class, indexed per mode.  Historically the
    compiler has been more restrictive which types can do PRE_MODIFY instead of
    PRE_INC and PRE_DEC, so keep track of sepaate bits for these two.  */
-typedef unsigned char addr_mask_type;
+typedef unsigned short addr_mask_type;
 
-#define RELOAD_REG_VALID	0x01	/* Mode valid in register..  */
-#define RELOAD_REG_MULTIPLE	0x02	/* Mode takes multiple registers.  */
-#define RELOAD_REG_INDEXED	0x04	/* Reg+reg addressing.  */
-#define RELOAD_REG_OFFSET	0x08	/* Reg+offset addressing. */
-#define RELOAD_REG_PRE_INCDEC	0x10	/* PRE_INC/PRE_DEC valid.  */
-#define RELOAD_REG_PRE_MODIFY	0x20	/* PRE_MODIFY valid.  */
-#define RELOAD_REG_AND_M16	0x40	/* AND -16 addressing.  */
-#define RELOAD_REG_QUAD_OFFSET	0x80	/* quad offset is limited.  */
+#define RELOAD_REG_VALID	0x001	/* Mode valid in register..  */
+#define RELOAD_REG_MULTIPLE	0x002	/* Mode takes multiple registers.  */
+#define RELOAD_REG_INDEXED	0x004	/* Reg+reg addressing.  */
+#define RELOAD_REG_OFFSET	0x008	/* Reg+offset addressing. */
+#define RELOAD_REG_PRE_INCDEC	0x010	/* PRE_INC/PRE_DEC valid.  */
+#define RELOAD_REG_PRE_MODIFY	0x020	/* PRE_MODIFY valid.  */
+#define RELOAD_REG_AND_M16	0x040	/* AND -16 addressing.  */
+#define RELOAD_REG_QUAD_OFFSET	0x080	/* quad offset is limited.  */
+#define RELOAD_REG_NO_MEMORY	0x100	/* no memory access.  */
 
 /* Register type masks based on the type, of valid addressing modes.  */
 struct rs6000_reg_addr {
@@ -1223,6 +1227,8 @@ char rs6000_reg_names[][8] =
       "0",  "1",  "2",  "3",  "4",  "5",  "6",  "7",
   /* vrsave vscr sfp */
       "vrsave", "vscr", "sfp",
+  /* DMFs */
+      "0", "1", "2", "3", "4", "5", "6", "7",
 };
 
 #ifdef TARGET_REGNAMES
@@ -1249,6 +1255,8 @@ static const char alt_reg_names[][8] =
   "%cr0",  "%cr1", "%cr2", "%cr3", "%cr4", "%cr5", "%cr6", "%cr7",
   /* vrsave vscr sfp */
   "vrsave", "vscr", "sfp",
+  /* DMFs */
+  "%dmr0", "%dmr1", "%dmr2", "%dmr3", "%dmr4", "%dmr5", "%dmr6", "%dmr7",
 };
 #endif
 
@@ -1813,12 +1821,17 @@ rs6000_hard_regno_nregs_internal (int regno, machine_mode mode)
      128-bit floating point that can go in vector registers, which has VSX
      memory addressing.  */
   if (FP_REGNO_P (regno))
-    reg_size = (VECTOR_MEM_VSX_P (mode) || VECTOR_ALIGNMENT_P (mode)
+    reg_size = (VECTOR_MEM_VSX_P (mode)
+		|| VECTOR_ALIGNMENT_P (mode)
+		|| mode == TDOmode
 		? UNITS_PER_VSX_WORD
 		: UNITS_PER_FP_WORD);
 
   else if (ALTIVEC_REGNO_P (regno))
     reg_size = UNITS_PER_ALTIVEC_WORD;
+
+  else if (DMF_REGNO_P (regno))
+    reg_size = UNITS_PER_DMF_WORD;
 
   else
     reg_size = UNITS_PER_WORD;
@@ -1841,9 +1854,21 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
   if (mode == OOmode)
     return (TARGET_MMA && VSX_REGNO_P (regno) && (regno & 1) == 0);
 
-  /* MMA accumulator modes need FPR registers divisible by 4.  */
+  /* MMA accumulator modes need FPR registers divisible by 4 or they need DMF
+     registers.  */
   if (mode == XOmode)
-    return (TARGET_MMA && FP_REGNO_P (regno) && (regno & 3) == 0);
+    return ((TARGET_MMA && FP_REGNO_P (regno) && (regno & 3) == 0)
+	    || (TARGET_DMF && DMF_REGNO_P (regno)));
+
+  /* DMF register modes need DMF registers or VSX registers divisible by 4.  */
+  if (mode == TDOmode)
+    return (TARGET_DMF
+	    && (DMF_REGNO_P (regno)
+		|| (VSX_REGNO_P (regno) && (regno & 3) == 0)));
+
+  /* No other types other than XOmode or TDOmode can go in DMFs.  */
+  if (DMF_REGNO_P (regno))
+    return 0;
 
   /* PTImode can only go in GPRs.  Quad word memory operations require even/odd
      register combinations, and use PTImode where we need to deal with quad
@@ -1960,7 +1985,8 @@ static bool
 rs6000_modes_tieable_p (machine_mode mode1, machine_mode mode2)
 {
   if (mode1 == PTImode || mode1 == OOmode || mode1 == XOmode
-      || mode2 == PTImode || mode2 == OOmode || mode2 == XOmode)
+      || mode2 == PTImode || mode2 == OOmode || mode2 == XOmode
+      || mode1 == TDOmode || mode2 == TDOmode)
     return mode1 == mode2;
 
   if (ALTIVEC_OR_VSX_VECTOR_MODE (mode1))
@@ -2106,7 +2132,7 @@ rs6000_debug_vector_unit (enum rs6000_vector v)
 DEBUG_FUNCTION char *
 rs6000_debug_addr_mask (addr_mask_type mask, bool keep_spaces)
 {
-  static char ret[8];
+  static char ret[10];
   char *p = ret;
 
   if ((mask & RELOAD_REG_VALID) != 0)
@@ -2143,6 +2169,11 @@ rs6000_debug_addr_mask (addr_mask_type mask, bool keep_spaces)
 
   if ((mask & RELOAD_REG_AND_M16) != 0)
     *p++ = '&';
+  else if (keep_spaces)
+    *p++ = ' ';
+
+  if ((mask & RELOAD_REG_NO_MEMORY) != 0)
+    *p++ = 'M';
   else if (keep_spaces)
     *p++ = ' ';
 
@@ -2251,6 +2282,7 @@ rs6000_debug_reg_global (void)
     V4DFmode,
     OOmode,
     XOmode,
+    TDOmode,
     CCmode,
     CCUNSmode,
     CCEQmode,
@@ -2286,6 +2318,7 @@ rs6000_debug_reg_global (void)
   rs6000_debug_reg_print (FIRST_ALTIVEC_REGNO,
 			  LAST_ALTIVEC_REGNO,
 			  "vs");
+  rs6000_debug_reg_print (FIRST_DMF_REGNO, LAST_DMF_REGNO, "dmf");
   rs6000_debug_reg_print (LR_REGNO, LR_REGNO, "lr");
   rs6000_debug_reg_print (CTR_REGNO, CTR_REGNO, "ctr");
   rs6000_debug_reg_print (CR0_REGNO, CR7_REGNO, "cr");
@@ -2610,6 +2643,18 @@ rs6000_setup_reg_addr_masks (void)
 	  addr_mask = 0;
 	  reg = reload_reg_map[rc].reg;
 
+	  /* Special case DMF registers.  */
+	  if (rc == RELOAD_REG_DMF)
+	    {
+	      if (TARGET_DMF && (m2 == XOmode || m2 == TDOmode))
+		{
+		  addr_mask = RELOAD_REG_VALID | RELOAD_REG_NO_MEMORY;
+		  reg_addr[m].addr_mask[rc] = addr_mask;
+		  any_addr_mask |= addr_mask;
+		}
+	      continue;
+	    }
+
 	  /* Can mode values go in the GPR/FPR/Altivec registers?  */
 	  if (reg >= 0 && rs6000_hard_regno_mode_ok_p[m][reg])
 	    {
@@ -2760,6 +2805,9 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
   for (r = CR1_REGNO; r <= CR7_REGNO; ++r)
     rs6000_regno_regclass[r] = CR_REGS;
 
+  for (r = FIRST_DMF_REGNO; r <= LAST_DMF_REGNO; ++r)
+    rs6000_regno_regclass[r] = DMF_REGS;
+
   rs6000_regno_regclass[LR_REGNO] = LINK_REGS;
   rs6000_regno_regclass[CTR_REGNO] = CTR_REGS;
   rs6000_regno_regclass[CA_REGNO] = NO_REGS;
@@ -2784,6 +2832,7 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
   reg_class_to_reg_type[(int)LINK_OR_CTR_REGS] = SPR_REG_TYPE;
   reg_class_to_reg_type[(int)CR_REGS] = CR_REG_TYPE;
   reg_class_to_reg_type[(int)CR0_REGS] = CR_REG_TYPE;
+  reg_class_to_reg_type[(int)DMF_REGS] = DMF_REG_TYPE;
 
   if (TARGET_VSX)
     {

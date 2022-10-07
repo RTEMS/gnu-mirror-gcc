@@ -186,6 +186,19 @@
   return VLOGICAL_REGNO_P (REGNO (op));
 })
 
+;; Return 1 if op is a DMF register
+(define_predicate "dmf_operand"
+  (match_operand 0 "register_operand")
+{
+  if (!REG_P (op))
+    return 0;
+
+  if (!HARD_REGISTER_P (op))
+    return 1;
+
+  return DMF_REGNO_P (REGNO (op));
+})
+
 ;; Return 1 if op is the carry register.
 (define_predicate "ca_operand"
   (match_operand 0 "register_operand")
