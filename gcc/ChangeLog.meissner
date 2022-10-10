@@ -1,3 +1,110 @@
+==================== dmf001, patch #3
+
+Add initial DMR register support for XOmode.
+
+2022-10-10   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (movxo_p10): Rename from movxo, and limit its use
+	to non-DMF systems.
+	(movxo_dmf): New insn.
+	(mma_<acc>): NOP prime/de-prime usage when -mdmf is used.
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Allow
+	XOmode in DMR registers or Altivec registers if -mdmf.
+	(rs6000_setup_reg_addr_masks): Add support to allow TDOmode in DMF
+	registers, and also in Altivec registers if -mdmf.  TDOmode registers
+	can do offset addressing but not indexed addressing.
+	(rs6000_init_hard_regno_mode_ok): Add support for TDOmode.
+	(reg_offset_addressing_ok_p): Likewise.
+	(rs6000_emit_move): Warn about using SUBREGs with TDOmode.
+	(rs6000_preferred_reload_class): DMF registers can't be loaded or
+	stored.  With -mdmf, XOmode can go in Altivec registers.  TDOmode needs
+	to use VSX registers for load/store.
+	(rs6000_compute_pressure_classes): Add DMF registers to the pressure
+	classses.
+	(rs6000_split_multireg_move): If -mdmf, we don't need to prime or
+	de-prime the acculators.  Add initial support for TDOmode.
+	(rs6000_invalid_conversion): Warn about converting __dmr types.
+	* config/rs6000/rs6000.h (DMF_REG_CLASS_P): New macro.
+
+==================== dmf001, patch #2
+
+Add initial DMR register support.
+
+2022-10-07   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/constraints.md (wD): New constraint.
+	* config/rs6000/predicates.md (dmf_operand): New predicate.
+	* config/rs6000/rs6000-modes.def (TDOmode): New opaque mode.
+	* config/rs6000/rs6000.cc (rs6000_reg_type): Add support for DMF
+	registers.
+	(rs6000_reload_reg_type): Likewise.
+	(LAST_RELOAD_REG_CLASS): Likewise.
+	(reload_reg_map): Likewise.
+	(addr_mask_type): Grow to 16 bits.
+	(RELOAD_REG_NO_MEMORY): New RELOAD_REG macro.
+	(rs6000_reg_names): Add DMR registers.
+	(alt_reg_names): Likewise.
+	(rs6000_hard_regno_nregs_internal): Add support for DMF registers.
+	(rs6000_hard_regno_mode_ok_uncached): Likewise.
+	(rs6000_modes_tieable_p): Likewise.
+	(rs6000_debug_addr_mask): Likewise.
+	(rs6000_debug_reg_global): Likewise.
+	(rs6000_setup_reg_addr_masks): Likewise.
+	(rs6000_init_hard_regno_mode_ok): Likewise.
+	* config/rs6000/rs6000.h (UNITS_PER_DMF_WORD): New macro.
+	(FIRST_PSEUDO_REGISTER): Add support for DMF registers.
+	(FIXED_REGISTERS): Likewise.
+	(CALL_REALLY_USED_REGISTERS): Likewise.
+	(REG_ALLOC_ORDER): Likewise.
+	(DMF_REGNO_P): New macro.
+	(enum reg_class): Likewise.
+	(REG_CLASS_NAMES): Likewise.
+	(REG_CLASS_CONTENTS): Likewise.
+	(REGISTER_NAMES): Likewise.
+	(ADDITIONAL_REGISTER_NAMES): Likewise.
+	* config/rs6000/rs6000.md (FIRST_DMF_REGNO): New constant.
+	(LAST_DMF_REGNO): New constant.
+	(isa attribute): Add dmf and mma_fpr attributes.
+	(enabled attribute): Add support for dmf and mma_fpr attributes.
+
+==================== dmf001, patch #3
+
+Add -mcpu=future/-mdmf instrastructure.
+
+2022-10-07   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
+	__DMF__ if dmf support is enabled.
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS): New macro.
+	(POWERPC_MASKS): Add -mblock-ops-vector-pair and -mdmf.
+	(future cpu): Add -mcpu=future and -mtune=future support.
+	* config/rs6000/rs6000-opts.h (processor_type): Add PROCESSOR_FUTURE.
+	* config/rs6000/rs6000-tables.op: Regenerate.
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Add
+	-mcpu=future and -mtune=future support, but for now make them mostly
+	equivalent to power10.  Add -mdmf checking.
+	(rs6000_machine_from_flags): Likewise.
+	(rs6000_reassociation_width): Likewise.
+	(rs6000_adjust_cost): Likewise.
+	(rs6000_issue_rate): Likewise.
+	(rs6000_sched_reorder): Likewise.
+	(rs6000_sched_reorder2): Likewise.
+	(rs6000_register_move_cost): Likewise.
+	(rs6000_opt_masks): Add -mdmf.
+	* config/rs6000/rs6000.h (ASM_CPU_SPEC): Add -mcpu=future support.
+	* config/rs6000/rs6000.md (cpu attribute): Add future.
+	(isa attribute): Add dmf.
+	(enabled attribute): Likewise.
+	* config/rs6000/rs6000.opt (-mdmf): New option.
+
+==================== dmf001, base line
+
 2022-10-06   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
