@@ -387,8 +387,8 @@ cfn_toupper_tolower::fold_range (irange &r, tree type, const irange &lh,
   return true;
 }
 
-// Implement range operator for CFN_BUILT_IN_FFS and CFN_BUILT_IN_POPCOUNT.
-class cfn_popcount : public range_operator
+// Implement range operator for CFN_BUILT_IN_FFS.
+class cfn_ffs : public range_operator
 {
 public:
   using range_operator::fold_range;
@@ -397,14 +397,6 @@ public:
   {
     if (lh.undefined_p ())
       return false;
-    // Calculating the popcount of a singleton is trivial.
-    if (lh.singleton_p ())
-      {
-	wide_int nz = lh.get_nonzero_bits ();
-	wide_int pop = wi::shwi (wi::popcount (nz), TYPE_PRECISION (type));
-	r.set (type, pop, pop);
-	return true;
-      }
     // __builtin_ffs* and __builtin_popcount* return [0, prec].
     int prec = TYPE_PRECISION (lh.type ());
     // If arg is non-zero, then ffs or popcount are non-zero.
@@ -419,6 +411,35 @@ public:
     maxi = wi::floor_log2 (max) + 1;
     r.set (build_int_cst (type, mini), build_int_cst (type, maxi));
     return true;
+  }
+} op_cfn_ffs;
+
+// Implement range operator for CFN_BUILT_IN_POPCOUNT.
+class cfn_popcount : public cfn_ffs
+{
+public:
+  using range_operator::fold_range;
+  virtual bool fold_range (irange &r, tree type, const irange &lh,
+			   const irange &rh, relation_kind rel) const
+  {
+    if (lh.undefined_p ())
+      return false;
+    unsigned prec = TYPE_PRECISION (type);
+    wide_int nz = lh.get_nonzero_bits ();
+    wide_int pop = wi::shwi (wi::popcount (nz), prec);
+    // Calculating the popcount of a singleton is trivial.
+    if (lh.singleton_p ())
+      {
+	r.set (type, pop, pop);
+	return true;
+      }
+    if (cfn_ffs::fold_range (r, type, lh, rh, rel))
+      {
+	int_range<2> tmp (type, wi::zero (prec), pop);
+	r.intersect (tmp);
+	return true;
+      }
+    return false;
   }
 } op_cfn_popcount;
 
@@ -734,6 +755,11 @@ gimple_range_op_handler::maybe_builtin_call ()
       break;
 
     CASE_CFN_FFS:
+      m_op1 = gimple_call_arg (call, 0);
+      m_int = &op_cfn_ffs;
+      m_valid = true;
+      break;
+
     CASE_CFN_POPCOUNT:
       m_op1 = gimple_call_arg (call, 0);
       m_int = &op_cfn_popcount;

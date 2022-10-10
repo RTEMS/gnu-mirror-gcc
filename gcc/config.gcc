@@ -518,6 +518,7 @@ riscv*)
 	extra_objs="riscv-builtins.o riscv-c.o riscv-sr.o riscv-shorten-memrefs.o riscv-selftests.o"
 	extra_objs="${extra_objs} riscv-vector-builtins.o"
 	d_target_objs="riscv-d.o"
+	extra_headers="riscv_vector.h"
 	;;
 rs6000*-*-*)
 	extra_options="${extra_options} g.opt fused-madd.opt rs6000/rs6000-tables.opt"
@@ -1020,6 +1021,8 @@ case ${target} in
   cxx_target_objs="${cxx_target_objs} vxworks-c.o"
   extra_headers="${extra_headers} ../vxworks/vxworks-predef.h"
   target_has_targetcm="yes"
+
+  extra_gcc_objs="vxworks-driver.o"
 
   # This private header exposes a consistent interface for checks on
   # the VxWorks version our runtime header files need to perform, based on
@@ -5605,6 +5608,8 @@ case ${target} in
 		esac
 		if test x$with_arch != x; then
 			default_mips_arch=$with_arch
+		else
+			with_arch=$default_mips_arch
 		fi
 		if test x$with_abi != x; then
 			default_mips_abi=$with_abi

@@ -1761,6 +1761,8 @@ begin_compound_stmt (unsigned int flags)
 	sk = sk_try;
       else if (flags & BCS_TRANSACTION)
 	sk = sk_transaction;
+      else if (flags & BCS_STMT_EXPR)
+	sk = sk_stmt_expr;
       r = do_pushlevel (sk);
     }
 
@@ -2516,6 +2518,10 @@ finish_stmt_expr_expr (tree expr, tree stmt_expr)
 
 	  /* Update for array-to-pointer decay.  */
 	  type = TREE_TYPE (expr);
+
+	  /* This TARGET_EXPR will initialize the outer one added by
+	     finish_stmt_expr.  */
+	  set_target_expr_eliding (expr);
 
 	  /* Wrap it in a CLEANUP_POINT_EXPR and add it to the list like a
 	     normal statement, but don't convert to void or actually add
@@ -3358,16 +3364,20 @@ finish_translation_unit (void)
 
   if (vec_safe_length (scope_chain->omp_declare_target_attribute))
     {
+      cp_omp_declare_target_attr
+	a = scope_chain->omp_declare_target_attribute->pop ();
       if (!errorcount)
-	error ("%<#pragma omp declare target%> without corresponding "
-	       "%<#pragma omp end declare target%>");
+	error ("%qs without corresponding %qs",
+	       a.device_type >= 0 ? "#pragma omp begin declare target"
+				  : "#pragma omp declare target",
+	       "#pragma omp end declare target");
       vec_safe_truncate (scope_chain->omp_declare_target_attribute, 0);
     }
   if (vec_safe_length (scope_chain->omp_begin_assumes))
     {
       if (!errorcount)
-	error ("%<#pragma omp begin assumes%> without corresponding "
-	       "%<#pragma omp end assumes%>");
+	error ("%qs without corresponding %qs",
+	       "#pragma omp begin assumes", "#pragma omp end assumes");
       vec_safe_truncate (scope_chain->omp_begin_assumes, 0);
     }
 }
@@ -4662,7 +4672,7 @@ simplify_aggr_init_expr (tree *tp)
 	 expand_call{,_inline}.  */
       cxx_mark_addressable (slot);
       CALL_EXPR_RETURN_SLOT_OPT (call_expr) = true;
-      call_expr = build2 (INIT_EXPR, TREE_TYPE (call_expr), slot, call_expr);
+      call_expr = cp_build_init_expr (slot, call_expr);
     }
   else if (style == pcc)
     {
@@ -4681,7 +4691,7 @@ simplify_aggr_init_expr (tree *tp)
     {
       tree init = build_zero_init (type, NULL_TREE,
 				   /*static_storage_p=*/false);
-      init = build2 (INIT_EXPR, void_type_node, slot, init);
+      init = cp_build_init_expr (slot, init);
       call_expr = build2 (COMPOUND_EXPR, TREE_TYPE (call_expr),
 			  init, call_expr);
     }
@@ -4876,7 +4886,7 @@ finalize_nrv_r (tree* tp, int* walk_subtrees, void* data)
       tree init;
       if (DECL_INITIAL (dp->var)
 	  && DECL_INITIAL (dp->var) != error_mark_node)
-	init = build2 (INIT_EXPR, void_type_node, dp->result,
+	init = cp_build_init_expr (dp->result,
 		       DECL_INITIAL (dp->var));
       else
 	init = build_empty_stmt (EXPR_LOCATION (*tp));
@@ -6420,7 +6430,7 @@ finish_omp_reduction_clause (tree c, bool *need_default_ctor, bool *need_dtor)
 		  else
 		    init = fold_convert (TREE_TYPE (v), integer_zero_node);
 		  OMP_CLAUSE_REDUCTION_INIT (c)
-		    = build2 (INIT_EXPR, TREE_TYPE (v), v, init);
+		    = cp_build_init_expr (v, init);
 		}
 	    }
 	}
@@ -11166,42 +11176,31 @@ init_cp_semantics (void)
 }
 
 
-/* If we have a condition in conjunctive normal form (CNF), find the first
-   failing clause.  In other words, given an expression like
+/* Emit additional diagnostics for failing condition BAD.
+   Used by finish_static_assert and IFN_ASSUME constexpr diagnostics.
+   If SHOW_EXPR_P is true, print the condition (because it was
+   instantiation-dependent).  */
 
-     true && true && false && true && false
-
-   return the first 'false'.  EXPR is the expression.  */
-
-static tree
-find_failing_clause_r (tree expr)
+void
+diagnose_failing_condition (tree bad, location_t cloc, bool show_expr_p)
 {
-  if (TREE_CODE (expr) == TRUTH_ANDIF_EXPR)
+  /* Nobody wants to see the artificial (bool) cast.  */
+  bad = tree_strip_nop_conversions (bad);
+
+  /* Actually explain the failure if this is a concept check or a
+     requires-expression.  */
+  if (concept_check_p (bad) || TREE_CODE (bad) == REQUIRES_EXPR)
+    diagnose_constraints (cloc, bad, NULL_TREE);
+  else if (COMPARISON_CLASS_P (bad)
+	   && ARITHMETIC_TYPE_P (TREE_TYPE (TREE_OPERAND (bad, 0))))
     {
-      /* First check the left side...  */
-      tree e = find_failing_clause_r (TREE_OPERAND (expr, 0));
-      if (e == NULL_TREE)
-	/* ...if we didn't find a false clause, check the right side.  */
-	e = find_failing_clause_r (TREE_OPERAND (expr, 1));
-      return e;
+      tree op0 = fold_non_dependent_expr (TREE_OPERAND (bad, 0));
+      tree op1 = fold_non_dependent_expr (TREE_OPERAND (bad, 1));
+      tree cond = build2 (TREE_CODE (bad), boolean_type_node, op0, op1);
+      inform (cloc, "the comparison reduces to %qE", cond);
     }
-  tree e = contextual_conv_bool (expr, tf_none);
-  e = fold_non_dependent_expr (e, tf_none, /*manifestly_const_eval=*/true);
-  if (integer_zerop (e))
-    /* This is the failing clause.  */
-    return expr;
-  return NULL_TREE;
-}
-
-/* Wrapper for find_failing_clause_r.  */
-
-static tree
-find_failing_clause (tree expr)
-{
-  if (TREE_CODE (expr) == TRUTH_ANDIF_EXPR)
-    if (tree e = find_failing_clause_r (expr))
-      expr = e;
-  return expr;
+  else if (show_expr_p)
+    inform (cloc, "%qE evaluates to false", bad);
 }
 
 /* Build a STATIC_ASSERT for a static assertion with the condition
@@ -11268,12 +11267,12 @@ finish_static_assert (tree condition, tree message, location_t location,
 	  int len = TREE_STRING_LENGTH (message) / sz - 1;
 
 	  /* See if we can find which clause was failing (for logical AND).  */
-	  tree bad = find_failing_clause (orig_condition);
+	  tree bad = find_failing_clause (NULL, orig_condition);
 	  /* If not, or its location is unusable, fall back to the previous
 	     location.  */
 	  location_t cloc = cp_expr_loc_or_loc (bad, location);
-	  /* Nobody wants to see the artificial (bool) cast.  */
-	  bad = tree_strip_nop_conversions (bad);
+
+	  auto_diagnostic_group d;
 
           /* Report the error. */
 	  if (len == 0)
@@ -11282,21 +11281,7 @@ finish_static_assert (tree condition, tree message, location_t location,
 	    error_at (cloc, "static assertion failed: %s",
 		      TREE_STRING_POINTER (message));
 
-	  /* Actually explain the failure if this is a concept check or a
-	     requires-expression.  */
-	  if (concept_check_p (bad)
-	      || TREE_CODE (bad) == REQUIRES_EXPR)
-	    diagnose_constraints (location, bad, NULL_TREE);
-	  else if (COMPARISON_CLASS_P (bad)
-		   && ARITHMETIC_TYPE_P (TREE_TYPE (TREE_OPERAND (bad, 0))))
-	    {
-	      tree op0 = fold_non_dependent_expr (TREE_OPERAND (bad, 0));
-	      tree op1 = fold_non_dependent_expr (TREE_OPERAND (bad, 1));
-	      tree cond = build2 (TREE_CODE (bad), boolean_type_node, op0, op1);
-	      inform (cloc, "the comparison reduces to %qE", cond);
-	    }
-	  else if (show_expr_p)
-	    inform (cloc, "%qE evaluates to false", bad);
+	  diagnose_failing_condition (bad, cloc, show_expr_p);
 	}
       else if (condition && condition != error_mark_node)
 	{
@@ -12007,7 +11992,7 @@ trait_expr_value (cp_trait_kind kind, tree type1, tree type2)
     case CPTK_IS_POLYMORPHIC:
       return CLASS_TYPE_P (type1) && TYPE_POLYMORPHIC_P (type1);
 
-    case CPTK_IS_SAME_AS:
+    case CPTK_IS_SAME:
       return same_type_p (type1, type2);
 
     case CPTK_IS_STD_LAYOUT:
@@ -12052,10 +12037,15 @@ trait_expr_value (cp_trait_kind kind, tree type1, tree type2)
     case CPTK_REF_CONVERTS_FROM_TEMPORARY:
       return ref_xes_from_temporary (type1, type2, /*direct_init=*/false);
 
-    default:
-      gcc_unreachable ();
-      return false;
+#define DEFTRAIT_TYPE(CODE, NAME, ARITY) \
+    case CPTK_##CODE:
+#include "cp-trait.def"
+#undef DEFTRAIT_TYPE
+      /* Type-yielding traits are handled in finish_trait_type.  */
+      break;
     }
+
+  gcc_unreachable ();
 }
 
 /* Returns true if TYPE meets the requirements for the specified KIND,
@@ -12188,7 +12178,7 @@ finish_trait_expr (location_t loc, cp_trait_kind kind, tree type1, tree type2)
     case CPTK_IS_CLASS:
     case CPTK_IS_ENUM:
     case CPTK_IS_UNION:
-    case CPTK_IS_SAME_AS:
+    case CPTK_IS_SAME:
       break;
 
     case CPTK_IS_LAYOUT_COMPATIBLE:
@@ -12204,7 +12194,11 @@ finish_trait_expr (location_t loc, cp_trait_kind kind, tree type1, tree type2)
 	return error_mark_node;
       break;
 
-    default:
+#define DEFTRAIT_TYPE(CODE, NAME, ARITY) \
+    case CPTK_##CODE:
+#include "cp-trait.def"
+#undef DEFTRAIT_TYPE
+      /* Type-yielding traits are handled in finish_trait_type.  */
       gcc_unreachable ();
     }
 
@@ -12250,9 +12244,19 @@ finish_trait_type (cp_trait_kind kind, tree type1, tree type2)
       if (TYPE_REF_P (type1))
 	type1 = TREE_TYPE (type1);
       return cv_unqualified (type1);
-    default:
-      gcc_unreachable ();
+
+#define DEFTRAIT_EXPR(CODE, NAME, ARITY) \
+    case CPTK_##CODE:
+#include "cp-trait.def"
+#undef DEFTRAIT_EXPR
+      /* Expression-yielding traits are handled in finish_trait_expr.  */
+    case CPTK_BASES:
+    case CPTK_DIRECT_BASES:
+      /* BASES and DIRECT_BASES are handled in finish_bases.  */
+      break;
     }
+
+  gcc_unreachable ();
 }
 
 /* Do-nothing variants of functions to handle pragma FLOAT_CONST_DECIMAL64,

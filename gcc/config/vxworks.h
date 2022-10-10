@@ -28,6 +28,16 @@ along with GCC; see the file COPYING3.  If not see
 #undef TARGET_VXWORKS
 #define TARGET_VXWORKS 1
 
+/* ??? Even though assigned to a HOST driver hook, this function
+   operates for all vxworks targets regardless of the current host.
+   We will get warnings at build time if the macro happens to be
+   redefined one way or another for a host.  */
+struct cl_decoded_option;
+extern void vxworks_driver_init (unsigned int *, struct cl_decoded_option **);
+
+#define GCC_DRIVER_HOST_INITIALIZATION \
+        vxworks_driver_init (&decoded_options_count, &decoded_options)
+
 /* In kernel mode, VxWorks provides all the libraries itself, as well as
    the functionality of startup files, etc.  In RTP mode, it behaves more
    like a traditional Unix, with more external files.  Most of our specs
@@ -120,7 +130,7 @@ along with GCC; see the file COPYING3.  If not see
      -lc_internal after -lc -lgcc.
 
    - libc_internal also contains __init/__fini functions for
-     USE_INITFINI_ARRAY support. However, the system expects these in
+     INITFINI_ARRAY support. However, the system expects these in
      every shared lib as well, with slightly different names, and it is
      simpler for us to provide our own versions through vxcrtstuff.
 
@@ -225,10 +235,9 @@ along with GCC; see the file COPYING3.  If not see
 #endif
 
 /* Setup the crtstuff begin/end we might need for dwarf EH registration
-   and/or INITFINI_ARRAY support for shared libs.  */
-
-#if (HAVE_INITFINI_ARRAY_SUPPORT && defined(ENABLE_SHARED_LIBGCC)) \
-    || (DWARF2_UNWIND_INFO && !defined(CONFIG_SJLJ_EXCEPTIONS))
+   and/or INITFINI_ARRAY support.  */
+#if (HAVE_INITFINI_ARRAY_SUPPORT					\
+     || (DWARF2_UNWIND_INFO && !defined(CONFIG_SJLJ_EXCEPTIONS)))
 #define VX_CRTBEGIN_SPEC "%{!shared:vx_crtbegin.o%s;:vx_crtbeginS.o%s}"
 #define VX_CRTEND_SPEC   "%{!shared:vx_crtend.o%s;:vx_crtendS.o%s}"
 #else
@@ -367,11 +376,11 @@ extern void vxworks_asm_out_destructor (rtx symbol, int priority);
   vxworks_emit_call_builtin___clear_cache
 extern void vxworks_emit_call_builtin___clear_cache (rtx begin, rtx end);
 
-/* Default dwarf control values, for non-gdb debuggers that come with
-   VxWorks.  */
+/* Default dwarf control values, accounting for non-gdb debuggers that come
+   with VxWorks.  */
 
-#undef VXWORKS_DWARF_VERSION_DEFAULT
-#define VXWORKS_DWARF_VERSION_DEFAULT (TARGET_VXWORKS7 ? 4 : 2)
+#undef DWARF_VERSION_DEFAULT
+#define DWARF_VERSION_DEFAULT (TARGET_VXWORKS7 ? 3 : 2)
 
 #undef DWARF_GNAT_ENCODINGS_DEFAULT
 #define DWARF_GNAT_ENCODINGS_DEFAULT \

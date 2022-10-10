@@ -4296,6 +4296,7 @@ begin_scope (scope_kind kind, tree entity)
     case sk_scoped_enum:
     case sk_transaction:
     case sk_omp:
+    case sk_stmt_expr:
       scope->keep = keep_next_level_flag;
       break;
 
@@ -6381,7 +6382,7 @@ class namespace_limit_reached : public deferred_diagnostic
 			   std::unique_ptr<deferred_diagnostic> wrapped)
   : deferred_diagnostic (loc),
     m_limit (limit), m_name (name),
-    m_wrapped (move (wrapped))
+    m_wrapped (std::move (wrapped))
   {
   }
 
