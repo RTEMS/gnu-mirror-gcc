@@ -1854,11 +1854,20 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
   if (mode == OOmode)
     return (TARGET_MMA && VSX_REGNO_P (regno) && (regno & 1) == 0);
 
-  /* MMA accumulator modes need FPR registers divisible by 4 or they need DMF
-     registers.  */
+  /* On power10, MMA accumulator modes need FPR registers divisible by 4.  If
+     DMF is enabled, allow all VSX registers plus the DMF registers.  */
   if (mode == XOmode)
-    return ((TARGET_MMA && FP_REGNO_P (regno) && (regno & 3) == 0)
-	    || (TARGET_DMF && DMF_REGNO_P (regno)));
+    {
+      if (TARGET_DMF)
+	return (DMF_REGNO_P (regno)
+		|| (VSX_REGNO_P (regno) && (regno & 3) == 0));
+
+      else if (TARGET_MMA)
+	return (FP_REGNO_P (regno) && (regno & 3) == 0);
+
+      else
+	return 0;
+    }
 
   /* DMF register modes need DMF registers or VSX registers divisible by 4.  */
   if (mode == TDOmode)
@@ -2646,12 +2655,22 @@ rs6000_setup_reg_addr_masks (void)
 	  /* Special case DMF registers.  */
 	  if (rc == RELOAD_REG_DMF)
 	    {
-	      if (TARGET_DMF && (m2 == XOmode || m2 == TDOmode))
+	      if (TARGET_DMF && m2 == XOmode)
 		{
 		  addr_mask = RELOAD_REG_VALID | RELOAD_REG_NO_MEMORY;
 		  reg_addr[m].addr_mask[rc] = addr_mask;
 		  any_addr_mask |= addr_mask;
 		}
+	      else
+		reg_addr[m].addr_mask[rc] = 0;
+
+	      continue;
+	    }
+
+	  /* At the moment, don't enable TDOmode.  */
+	  if (m2 == TDOmode)
+	    {
+	      reg_addr[m].addr_mask[rc] = 0;
 	      continue;
 	    }
 
@@ -2750,10 +2769,10 @@ rs6000_setup_reg_addr_masks (void)
 
 	  /* Vector pairs can do both indexed and offset loads if the
 	     instructions are enabled, otherwise they can only do offset loads
-	     since it will be broken into two vector moves.  Vector quads can
-	     only do offset loads.  */
+	     since it will be broken into two vector moves.  Vector quads and
+	     1,024 bit DMR values can only do offset loads.  */
 	  else if ((addr_mask != 0) && TARGET_MMA
-		   && (m2 == OOmode || m2 == XOmode))
+		   && (m2 == OOmode || m2 == XOmode || m2 == TDOmode))
 	    {
 	      addr_mask |= RELOAD_REG_OFFSET;
 	      if (rc == RELOAD_REG_FPR || rc == RELOAD_REG_VMX)
@@ -2979,6 +2998,14 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
       rs6000_vector_unit[XOmode] = VECTOR_NONE;
       rs6000_vector_mem[XOmode] = VECTOR_VSX;
       rs6000_vector_align[XOmode] = 512;
+    }
+
+  /* Add support for 1,024 bit DMR registers.  */
+  if (TARGET_DMF)
+    {
+      rs6000_vector_unit[TDOmode] = VECTOR_NONE;
+      rs6000_vector_mem[TDOmode] = VECTOR_VSX;
+      rs6000_vector_align[TDOmode] = 512;
     }
 
   /* Register class constraints for the constraints that depend on compile
@@ -8662,10 +8689,11 @@ reg_offset_addressing_ok_p (machine_mode mode)
 	return mode_supports_dq_form (mode);
       break;
 
-      /* The vector pair/quad types support offset addressing if the
-	 underlying vectors support offset addressing.  */
+      /* The vector pair/quad types and the DMF types support offset addressing
+	 if the underlying vectors support offset addressing.  */
     case E_OOmode:
     case E_XOmode:
+    case E_TDOmode:
       return TARGET_MMA;
 
     case E_SDmode:
@@ -10943,6 +10971,12 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
 	       (mode == OOmode) ? "__vector_pair" : "__vector_quad");
       break;
 
+    case E_TDOmode:
+      if (CONST_INT_P (operands[1]))
+	error ("%qs is an opaque type, and you cannot set it to constants",
+	       "__dmr");
+      break;
+
     case E_SImode:
     case E_DImode:
       /* Use default pattern for address of ELF small data */
@@ -13130,6 +13164,10 @@ rs6000_preferred_reload_class (rtx x, enum reg_class rclass)
   machine_mode mode = GET_MODE (x);
   bool is_constant = CONSTANT_P (x);
 
+  /* DMF registers can't be loaded or stored.  */
+  if (rclass == DMF_REGS)
+    return NO_REGS;
+
   /* If a mode can't go in FPR/ALTIVEC/VSX registers, don't return a preferred
      reload class for it.  */
   if ((rclass == ALTIVEC_REGS || rclass == VSX_REGS)
@@ -13226,7 +13264,10 @@ rs6000_preferred_reload_class (rtx x, enum reg_class rclass)
 	return VSX_REGS;
 
       if (mode == XOmode)
-	return FLOAT_REGS;
+	return TARGET_DMF ? VSX_REGS : FLOAT_REGS;
+
+      if (mode == TDOmode)
+	return VSX_REGS;
 
       if (GET_MODE_CLASS (mode) == MODE_INT)
 	return GENERAL_REGS;
@@ -13350,6 +13391,11 @@ rs6000_secondary_reload_class (enum reg_class rclass, machine_mode mode,
     }
   else
     regno = -1;
+
+  /* DMF registers don't have loads or stores.  We have to go through the VSX
+     registers to load XOmode (vector quad) and TDOmode (dmf 1024 bit).  */
+  if (TARGET_DMF && rclass == DMF_REGS)
+    return VSX_REGS;
 
   /* If we have VSX register moves, prefer moving scalar values between
      Altivec registers and GPR by going via an FPR (and then via memory)
@@ -23794,6 +23840,8 @@ rs6000_compute_pressure_classes (enum reg_class *pressure_classes)
       if (TARGET_HARD_FLOAT)
 	pressure_classes[n++] = FLOAT_REGS;
     }
+  if (TARGET_DMF)
+    pressure_classes[n++] = DMF_REGS;
   pressure_classes[n++] = CR_REGS;
   pressure_classes[n++] = SPECIAL_REGS;
 
@@ -27135,7 +27183,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 
   /* If we have a vector quad register for MMA, and this is a load or store,
      see if we can use vector paired load/stores.  */
-  if (mode == XOmode && TARGET_MMA
+  if ((mode == XOmode || mode == TDOmode) && TARGET_MMA
       && (MEM_P (dst) || MEM_P (src)))
     {
       reg_mode = OOmode;
@@ -27143,7 +27191,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
     }
   /* If we have a vector pair/quad mode, split it into two/four separate
      vectors.  */
-  else if (mode == OOmode || mode == XOmode)
+  else if (mode == OOmode || mode == XOmode || mode == TDOmode)
     reg_mode = V1TImode;
   else if (FP_REGNO_P (reg))
     reg_mode = DECIMAL_FLOAT_MODE_P (mode) ? DDmode :
@@ -27195,7 +27243,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
      below.  This means the last register gets the first memory
      location.  We also need to be careful of using the right register
      numbers if we are splitting XO to OO.  */
-  if (mode == OOmode || mode == XOmode)
+  if (mode == OOmode || mode == XOmode || mode == TDOmode)
     {
       nregs = hard_regno_nregs (reg, mode);
       int reg_mode_nregs = hard_regno_nregs (reg, reg_mode);
@@ -27206,7 +27254,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 
 	  /* If we are reading an accumulator register, we have to
 	     deprime it before we can access it.  */
-	  if (TARGET_MMA
+	  if (TARGET_MMA && !TARGET_DMF
 	      && GET_MODE (src) == XOmode && FP_REGNO_P (REGNO (src)))
 	    emit_insn (gen_mma_xxmfacc (src, src));
 
@@ -27238,9 +27286,9 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 	      emit_insn (gen_rtx_SET (dst2, src2));
 	    }
 
-	  /* If we are writing an accumulator register, we have to
-	     prime it after we've written it.  */
-	  if (TARGET_MMA
+	  /* If we are writing an accumulator register that overlaps with the
+	     FPR registers, we have to prime it after we've written it.  */
+	  if (TARGET_MMA && !TARGET_DMF
 	      && GET_MODE (dst) == XOmode && FP_REGNO_P (REGNO (dst)))
 	    emit_insn (gen_mma_xxmtacc (dst, dst));
 
@@ -27254,7 +27302,9 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 		      || XINT (src, 1) == UNSPECV_MMA_ASSEMBLE);
 	  gcc_assert (REG_P (dst));
 	  if (GET_MODE (src) == XOmode)
-	    gcc_assert (FP_REGNO_P (REGNO (dst)));
+	    gcc_assert ((TARGET_DMF
+			 ? VSX_REGNO_P (REGNO (dst))
+			 : FP_REGNO_P (REGNO (dst))));
 	  if (GET_MODE (src) == OOmode)
 	    gcc_assert (VSX_REGNO_P (REGNO (dst)));
 
@@ -27307,9 +27357,9 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 	      emit_insn (gen_rtx_SET (dst_i, op));
 	    }
 
-	  /* We are writing an accumulator register, so we have to
-	     prime it after we've written it.  */
-	  if (GET_MODE (src) == XOmode)
+	  /* On systems without DMF where accumulators overlap with the vector
+	     registers, we have to prime it after we've written it.  */
+	  if (GET_MODE (src) == XOmode && !TARGET_DMF)
 	    emit_insn (gen_mma_xxmtacc (dst, dst));
 
 	  return;
@@ -27320,9 +27370,9 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 
   if (REG_P (src) && REG_P (dst) && (REGNO (src) < REGNO (dst)))
     {
-      /* If we are reading an accumulator register, we have to
-	 deprime it before we can access it.  */
-      if (TARGET_MMA
+      /* If we are reading an accumulator register and we don't have DMF, we
+	 have to deprime it before we can access it.  */
+      if (TARGET_MMA && !TARGET_DMF
 	  && GET_MODE (src) == XOmode && FP_REGNO_P (REGNO (src)))
 	emit_insn (gen_mma_xxmfacc (src, src));
 
@@ -27330,7 +27380,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 	 overlap.  */
       int i;
       /* XO/OO are opaque so cannot use subregs. */
-      if (mode == OOmode || mode == XOmode )
+      if (mode == OOmode || mode == XOmode || mode == TDOmode )
 	{
 	  for (i = nregs - 1; i >= 0; i--)
 	    {
@@ -27350,7 +27400,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 
       /* If we are writing an accumulator register, we have to
 	 prime it after we've written it.  */
-      if (TARGET_MMA
+      if (TARGET_MMA && !TARGET_DMF
 	  && GET_MODE (dst) == XOmode && FP_REGNO_P (REGNO (dst)))
 	emit_insn (gen_mma_xxmtacc (dst, dst));
     }
@@ -27487,7 +27537,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 
       /* If we are reading an accumulator register, we have to
 	 deprime it before we can access it.  */
-      if (TARGET_MMA && REG_P (src)
+      if (TARGET_MMA && !TARGET_DMF && REG_P (src)
 	  && GET_MODE (src) == XOmode && FP_REGNO_P (REGNO (src)))
 	emit_insn (gen_mma_xxmfacc (src, src));
 
@@ -27504,7 +27554,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 	    continue;
 
 	  /* XO/OO are opaque so cannot use subregs. */
-	  if (mode == OOmode || mode == XOmode )
+	  if (mode == OOmode || mode == XOmode || mode == TDOmode )
 	    {
 	      rtx dst_i = gen_rtx_REG (reg_mode, REGNO (dst) + j);
 	      rtx src_i = gen_rtx_REG (reg_mode, REGNO (src) + j);
@@ -27519,7 +27569,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 
       /* If we are writing an accumulator register, we have to
 	 prime it after we've written it.  */
-      if (TARGET_MMA && REG_P (dst)
+      if (TARGET_MMA && !TARGET_DMF && REG_P (dst)
 	  && GET_MODE (dst) == XOmode && FP_REGNO_P (REGNO (dst)))
 	emit_insn (gen_mma_xxmtacc (dst, dst));
 
@@ -28432,6 +28482,10 @@ rs6000_invalid_conversion (const_tree fromtype, const_tree totype)
 	return N_("invalid conversion from type %<__vector_pair%>");
       if (tomode == OOmode)
 	return N_("invalid conversion to type %<__vector_pair%>");
+      if (frommode == TDOmode)
+	return N_("invalid conversion from type %<__dmr%>");
+      if (tomode == TDOmode)
+	return N_("invalid conversion to type %<__dmr%>");
     }
 
   /* Conversion allowed.  */

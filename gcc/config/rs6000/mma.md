@@ -333,10 +333,10 @@
     gcc_unreachable ();
 })
 
-(define_insn_and_split "*movxo"
+(define_insn_and_split "*movxo_p10"
   [(set (match_operand:XO 0 "nonimmediate_operand" "=d,m,d")
 	(match_operand:XO 1 "input_operand" "m,d,d"))]
-  "TARGET_MMA
+  "TARGET_MMA && !TARGET_DMF
    && (gpc_reg_operand (operands[0], XOmode)
        || gpc_reg_operand (operands[1], XOmode))"
   "@
@@ -352,6 +352,31 @@
   [(set_attr "type" "vecload,vecstore,veclogical")
    (set_attr "length" "*,*,16")
    (set_attr "max_prefixed_insns" "2,2,*")])
+
+(define_insn_and_split "*movxo_dmf"
+  [(set (match_operand:XO 0 "nonimmediate_operand" "=wa,m, wa,wD,wD,wa")
+	(match_operand:XO 1 "input_operand"          "m,wa,wa,wa,wD,wD"))]
+  "TARGET_DMF
+   && (gpc_reg_operand (operands[0], XOmode)
+       || gpc_reg_operand (operands[1], XOmode))"
+  "@
+   #
+   #
+   #
+   dmxxinstdmr512 %0,%1,%Y1,0
+   dmmr %0,%1
+   dmxxexttdmr512 %1,%0,%Y0,0"
+  "&& reload_completed
+   && !dmf_operand (operands[0], XOmode)
+   && !dmf_operand (operands[1], XOmode)"
+  [(const_int 0)]
+{
+  rs6000_split_multireg_move (operands[0], operands[1]);
+  DONE;
+}
+  [(set_attr "type" "vecload,vecstore,veclogical,vecmove,vecmove,vecmove")
+   (set_attr "length" "*,*,16,*,*,*")
+   (set_attr "max_prefixed_insns" "2,2,*,*,*,*")])
 
 (define_expand "vsx_assemble_pair"
   [(match_operand:OO 0 "vsx_register_operand")
@@ -493,11 +518,29 @@
   DONE;
 })
 
-;; MMA instructions that do not use their accumulators as an input, still
-;; must not allow their vector operands to overlap the registers used by
-;; the accumulator.  We enforce this by marking the output as early clobber.
+;; MMA instructions that do not use their accumulators as an input, still must
+;; not allow their vector operands to overlap the registers used by the
+;; accumulator.  We enforce this by marking the output as early clobber.  If we
+;; have DMF, we don't need the whole prime/de-prime action, so just make thse
+;; instructions be NOPs.
 
-(define_insn "mma_<acc>"
+(define_expand "mma_<acc>"
+  [(set (match_operand:XO 0 "fpr_reg_operand")
+	(unspec:XO [(match_operand:XO 1 "fpr_reg_operand")]
+		   MMA_ACC))]
+  "TARGET_MMA"
+{
+  if (TARGET_DMF)
+    {
+      if (!rtx_equal_p (operands[0], operands[1]))
+	emit_move_insn (operands[0], operands[1]);
+      DONE;
+    }
+
+  /* Generate the prime/de-prime code.  */
+})
+
+(define_insn "*mma_<acc>"
   [(set (match_operand:XO 0 "fpr_reg_operand" "=&d")
 	(unspec:XO [(match_operand:XO 1 "fpr_reg_operand" "0")]
 		    MMA_ACC))]
