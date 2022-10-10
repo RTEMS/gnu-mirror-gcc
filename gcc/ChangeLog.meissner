@@ -71,7 +71,7 @@ gcc/
 	(isa attribute): Add dmf and mma_fpr attributes.
 	(enabled attribute): Add support for dmf and mma_fpr attributes.
 
-==================== dmf001, patch #3
+==================== dmf001, patch #1
 
 Add -mcpu=future/-mdmf instrastructure.
 
