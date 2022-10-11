@@ -1,3 +1,31 @@
+==================== dmf001, patch #7
+
+Implement DMF mma_assemble_acc and mma_disassemble_acc
+
+2022-10-11   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (UNSPEC_MMA_ASSEMBLE_ACC_DMF): New unspec.
+	(movxo_dmf): Use 'mma' type, not 'vecmove'.
+	(mma_assemble_acc): Split handling for non-DMF and DMF usage.
+	(mma_assemble_acc_p10): Rename from mma_assemble_acc to handle non-DMF
+	case.
+	(mma_assemble_acc_dmf): Build the accumulator from two vector pairs.
+	(mma_disassemble_acc_p10): Rename from mma_disassemble_acc to handle non-DMF
+	case.
+	(mma_disassemble_acc_dmf): Implement on DMF to use dmxxexttdmr256.
+
+==================== dmf001, patch #6
+
+Add accumulator_operand.
+
+2022-10-11   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/predicates.md (accumulator_operand): New predicate.
+
 ==================== dmf001, patch #5
 
 Make %A warn about not using accumulators.
