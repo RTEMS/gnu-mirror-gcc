@@ -1,3 +1,24 @@
+==================== dmf001, patch #5
+
+Make %A warn about not using accumulators.
+
+2022-10-11   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (print_operand): Under -mdmf, for output
+          modifier %A, make sure the argument is an accumulator.
+
+==================== dmf001, patch #4
+
+Fix dmxxextdmr512 order.
+
+2022-10-11   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (movxo_dmf): Updat operand order.
+
 ==================== dmf001, patch #3
 
 Add initial DMR register support for XOmode.
