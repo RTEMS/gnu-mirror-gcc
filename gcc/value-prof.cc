@@ -127,12 +127,12 @@ gimple_alloc_histogram_value (struct function *fun ATTRIBUTE_UNUSED,
 
 histogram_value
 gimple_alloc_histogram_value_loop (struct function *fun ATTRIBUTE_UNUSED,
-			      enum hist_type type, tree value, edge_def *edge, class loop *lp)
+			      enum hist_type type, tree value, class loop *lp)
 {
+
    histogram_value hist = (histogram_value) xcalloc (1, sizeof (*hist));
    hist->hvalue.value = value;
    hist->hvalue.stmt = NULL;
-   hist->hvalue.edge = edge;
    hist->hvalue.lp = lp;
    hist->type = type;
    return hist;
@@ -1936,16 +1936,10 @@ gimple_histogram_values_to_profile(function *fun, histogram_values * values){
          gsi = gsi_start_bb (loop->latch);
          create_iv (build_int_cst_type (get_gcov_type(), 0), build_int_cst (get_gcov_type(), 1), NULL_TREE,
              loop, &gsi, true, &var, NULL);
-         auto_vec<edge> exits = get_loop_exit_edges (loop);
-         for ( auto exit : exits ){
-                 if (!(exit->flags & (EDGE_COMPLEX | EDGE_FAKE))) {
-                     values->safe_push (gimple_alloc_histogram_value_loop (fun,
-                                             HIST_TYPE_HISTOGRAM,
-                                             var, exit, loop));
-                 }
-         }
+         values->safe_push (gimple_alloc_histogram_value_loop (fun,
+                                         HIST_TYPE_HISTOGRAM,
+                                         var, loop));
     }
-    gsi_commit_edge_inserts ();
 }
 
 /* Find values inside STMT for that we want to measure histograms and adds

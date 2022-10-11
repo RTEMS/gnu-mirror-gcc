@@ -59,6 +59,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "alloc-pool.h"
 #include "symbol-summary.h"
 #include "symtab-thunks.h"
+#include "cfgloop.h"
+
+#include "print-tree.h"
 
 static GTY(()) tree gcov_type_node;
 static GTY(()) tree tree_interval_profiler_fn;
@@ -353,33 +356,21 @@ gimple_gen_pow2_profiler (histogram_value value, unsigned tag)
   gsi_insert_before (&gsi, call, GSI_NEW_STMT);
 }
 
-/* Output instructions as GIMPLE trees to increment the histogram
-   counter.  VALUE is the expression whose value is profiled.  TAG is the tag
-   of the section for counters.  */
-
 void
 gimple_gen_histogram_profiler (histogram_value value, unsigned tag) // , edge_def* edge
 {
   gimple *stmt = value->hvalue.stmt;
-  if (stmt){
-      gimple_stmt_iterator gsi = gsi_for_stmt (stmt);
-      tree ref_ptr = tree_coverage_counter_addr (tag, 0);
-      gcall *call;
-      tree val;
-
-      ref_ptr = force_gimple_operand_gsi (&gsi, ref_ptr,
-                          true, NULL_TREE, true, GSI_SAME_STMT);
-      val = prepare_instrumented_value (&gsi, value);
-      call = gimple_build_call (tree_histogram_profiler_fn, 2, ref_ptr, val);
-      gsi_insert_before (&gsi, call, GSI_NEW_STMT);
-  } else {
-      edge_def *edge = value->hvalue.edge;
-      gcc_assert(edge);
-      tree ref_ptr = tree_coverage_counter_addr (tag, 0);
-      gcall *call;
-      tree val = prepare_instrumented_value (NULL, value);
-      call = gimple_build_call (tree_histogram_profiler_fn, 2, ref_ptr, val);
-      gsi_insert_seq_on_edge (edge, call);
+  gcc_assert(!stmt);
+  auto lp = value->hvalue.lp;
+  gcc_assert(lp);
+  tree ref_ptr = tree_coverage_counter_addr (tag, 0);
+  gcall *call;
+  auto_vec<edge> exits = get_loop_exit_edges (lp);
+  for ( auto exit : exits ){
+       if (!(exit->flags & (EDGE_COMPLEX | EDGE_FAKE))) {
+          call = gimple_build_call (tree_histogram_profiler_fn, 2, ref_ptr, value->hvalue.value);
+          gsi_insert_seq_on_edge (exit, call);
+       }
   }
 }
 

@@ -926,7 +926,6 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
 
       if (hist->type == HIST_TYPE_HISTOGRAM)
       {
-        printf("tata");
         auto lp = hist->hvalue.lp;
         if (act_count[t]){
             if (lp->valid_hist)
@@ -1546,7 +1545,6 @@ branch_prob (bool thunk)
     }
 
     for (auto loop : loops_list (cfun, 0)){
-      printf("fasdfasdfasdf");
       if (loop->valid_hist){
           printf("%ld %ld %ld %ld", loop->hist[0], loop->hist[1], loop->hist[2], loop->hist[3]);
     }
@@ -1568,10 +1566,9 @@ branch_prob (bool thunk)
 
       if (flag_profile_values)
 	instrument_values (values);
-
-      /* Commit changes done by instrumentation.  */
-      gsi_commit_edge_inserts ();
     }
+      /* Commit changes done by instrumentation.  */
+  gsi_commit_edge_inserts ();
 
   free_aux_for_edges ();
 
