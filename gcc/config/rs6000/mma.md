@@ -91,6 +91,7 @@
    UNSPEC_MMA_XVI8GER4SPP
    UNSPEC_MMA_XXMFACC
    UNSPEC_MMA_XXMTACC
+   UNSPEC_MMA_ASSEMBLE_ACC_DMF
   ])
 
 (define_c_enum "unspecv"
@@ -374,7 +375,7 @@
   rs6000_split_multireg_move (operands[0], operands[1]);
   DONE;
 }
-  [(set_attr "type" "vecload,vecstore,veclogical,vecmove,vecmove,vecmove")
+  [(set_attr "type" "vecload,vecstore,veclogical,mma,mma,mma")
    (set_attr "length" "*,*,16,*,*,*")
    (set_attr "max_prefixed_insns" "2,2,*,*,*,*")])
 
@@ -445,25 +446,38 @@
 })
 
 (define_expand "mma_assemble_acc"
-  [(match_operand:XO 0 "fpr_reg_operand")
+  [(match_operand:XO 0 "register_operand")
    (match_operand:V16QI 1 "mma_assemble_input_operand")
    (match_operand:V16QI 2 "mma_assemble_input_operand")
    (match_operand:V16QI 3 "mma_assemble_input_operand")
    (match_operand:V16QI 4 "mma_assemble_input_operand")]
   "TARGET_MMA"
 {
-  rtx src = gen_rtx_UNSPEC_VOLATILE (XOmode,
-			    	     gen_rtvec (4, operands[1], operands[2],
-				       		operands[3], operands[4]),
-			    	     UNSPECV_MMA_ASSEMBLE);
-  emit_move_insn (operands[0], src);
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  rtx op2 = operands[2];
+  rtx op3 = operands[3];
+  rtx op4 = operands[4];
+
+  if (TARGET_DMF)
+    {
+      rtx vpair1 = gen_reg_rtx (OOmode);
+      rtx vpair2 = gen_reg_rtx (OOmode);
+      emit_insn (gen_vsx_assemble_pair (vpair1, op1, op2));
+      emit_insn (gen_vsx_assemble_pair (vpair2, op3, op4));
+      emit_insn (gen_mma_assemble_acc_dmf (op0, vpair1, vpair2));
+    }
+
+  else
+    emit_insn (gen_mma_assemble_acc_p10 (op0, op1, op2, op3, op4));
+
   DONE;
 })
 
 ;; We cannot update the four output registers atomically, so mark the output
-;; as an early clobber so we don't accidentally clobber the input operands.  */
+;; as an early clobber so we don't accidentally clobber the input operands.
 
-(define_insn_and_split "*mma_assemble_acc"
+(define_insn_and_split "mma_assemble_acc_p10"
   [(set (match_operand:XO 0 "fpr_reg_operand" "=&d")
 	(unspec_volatile:XO
 	  [(match_operand:V16QI 1 "mma_assemble_input_operand" "mwa")
@@ -471,7 +485,7 @@
 	   (match_operand:V16QI 3 "mma_assemble_input_operand" "mwa")
 	   (match_operand:V16QI 4 "mma_assemble_input_operand" "mwa")]
 	  UNSPECV_MMA_ASSEMBLE))]
-  "TARGET_MMA
+  "TARGET_MMA && !TARGET_DMF
    && fpr_reg_operand (operands[0], XOmode)"
   "#"
   "&& reload_completed"
@@ -485,28 +499,30 @@
   DONE;
 })
 
-(define_expand "mma_disassemble_acc"
-  [(match_operand:V16QI 0 "mma_disassemble_output_operand")
-   (match_operand:XO 1 "fpr_reg_operand")
-   (match_operand 2 "const_0_to_3_operand")]
-  "TARGET_MMA"
-{
-  rtx src;
-  int regoff = INTVAL (operands[2]);
-  src = gen_rtx_UNSPEC (V16QImode,
-			gen_rtvec (2, operands[1], GEN_INT (regoff)),
-			UNSPEC_MMA_EXTRACT);
-  emit_move_insn (operands[0], src);
-  DONE;
-})
+;; On a system with DMF, we build the accumulators from two vector pairs.
 
-(define_insn_and_split "*mma_disassemble_acc"
-  [(set (match_operand:V16QI 0 "mma_disassemble_output_operand" "=mwa")
-       (unspec:V16QI [(match_operand:XO 1 "fpr_reg_operand" "d")
-		      (match_operand 2 "const_0_to_3_operand")]
+(define_insn "mma_assemble_acc_dmf"
+ [(set (match_operand:XO 0 "dmf_operand" "=wD")
+       (unspec:XO [(match_operand:OO 1 "vsx_register_operand" "wa")
+		   (match_operand:OO 2 "vsx_register_operand" "wa")]
+		  UNSPEC_MMA_ASSEMBLE_ACC_DMF))]
+ "TARGET_MMA && TARGET_DMF"
+ "dmxxinstdmr512 %0,%1,%2,0"
+ [(set_attr "type" "mma")])
+
+(define_expand "mma_disassemble_acc"
+  [(set (match_operand:V16QI 0 "register_operand")
+	(unspec:V16QI [(match_operand:XO 1 "register_operand")
+		       (match_operand 2 "const_0_to_3_operand")]
 		      UNSPEC_MMA_EXTRACT))]
-  "TARGET_MMA
-   && fpr_reg_operand (operands[1], XOmode)"
+  "TARGET_MMA")
+
+(define_insn_and_split "*mma_disassemble_acc_p10"
+  [(set (match_operand:V16QI 0 "mma_disassemble_output_operand" "=mwa")
+	(unspec:V16QI [(match_operand:XO 1 "fpr_reg_operand" "d")
+		       (match_operand 2 "const_0_to_3_operand")]
+		      UNSPEC_MMA_EXTRACT))]
+  "TARGET_MMA"
   "#"
   "&& reload_completed"
   [(const_int 0)]
@@ -517,6 +533,15 @@
   emit_move_insn (operands[0], src);
   DONE;
 })
+
+(define_insn "*mma_disassemble_acc_dmf"
+  [(set (match_operand:V16QI 0 "vsx_register_operand" "=wa")
+	(unspec:V16QI [(match_operand:XO 1 "dmf_operand" "wD")
+		       (match_operand 2 "const_0_to_3_operand")]
+		      UNSPEC_MMA_EXTRACT))]
+  "TARGET_DMF"
+  "dmxxexttdmr256 %0,%1,2"
+  [(set_attr "type" "mma")])
 
 ;; MMA instructions that do not use their accumulators as an input, still must
 ;; not allow their vector operands to overlap the registers used by the
