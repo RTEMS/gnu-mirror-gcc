@@ -13910,8 +13910,19 @@ print_operand (FILE *file, rtx x, int code)
 	 output_operand.  */
 
     case 'A':
-      /* Write the MMA accumulator number associated with VSX register X.  */
-      if (!REG_P (x) || !FP_REGNO_P (REGNO (x)) || (REGNO (x) % 4) != 0)
+      /* Write the MMA accumulator number associated with VSX register X.  On
+	 DMF systems, only allow DMF accumulators, not accumulators overlapping
+	 with the FPR registers.  */
+      if (!REG_P (x))
+	output_operand_lossage ("invalid %%A value");
+      else if (TARGET_DMF)
+	{
+	  if (DMF_REGNO_P (REGNO (x)))
+	    fprintf (file, "%d", REGNO (x) - FIRST_DMF_REGNO);
+	  else
+	    output_operand_lossage ("%%A operand is not a DMF accumulator");
+	}
+      else if (!FP_REGNO_P (REGNO (x)) || (REGNO (x) % 4) != 0)
 	output_operand_lossage ("invalid %%A value");
       else
 	fprintf (file, "%d", (REGNO (x) - FIRST_FPR_REGNO) / 4);
