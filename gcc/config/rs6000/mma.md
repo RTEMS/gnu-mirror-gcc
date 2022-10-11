@@ -365,7 +365,7 @@
    #
    dmxxinstdmr512 %0,%1,%Y1,0
    dmmr %0,%1
-   dmxxexttdmr512 %1,%0,%Y0,0"
+   dmxxexttdmr512 %0,%Y0,%1,0"
   "&& reload_completed
    && !dmf_operand (operands[0], XOmode)
    && !dmf_operand (operands[1], XOmode)"
