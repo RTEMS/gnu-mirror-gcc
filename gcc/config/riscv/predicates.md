@@ -337,3 +337,31 @@
   (and (match_code "const_int")
        (ior (match_operand 0 "not_uimm_extra_bit_operand")
 	    (match_operand 0 "const_nottwobits_operand"))))
+
+;; A CONST_INT that can be shifted down by 1, 2 or 3 bits (i.e., has
+;; these bits clear) and will then form a SMALL_OPERAND.
+(define_predicate "const_arith_shifted123_operand"
+  (and (match_code "const_int")
+       (not (match_test "SMALL_OPERAND (INTVAL (op))")))
+{
+  HOST_WIDE_INT val = INTVAL (op);
+  int trailing = ctz_hwi (val);
+
+  /* Clamp to 3, as we have sh[123]add instructions only. */
+  if (trailing > 3)
+     trailing = 3;
+
+  return trailing > 0 && SMALL_OPERAND (val >> trailing);
+})
+
+;; A CONST_INT that can formed by adding two SMALL_OPERANDs together
+(define_predicate "const_arith_2simm12_operand"
+  (and (match_code "const_int")
+       (ior (match_test "SMALL_OPERAND(INTVAL (op) - ~(HOST_WIDE_INT_M1U << (IMM_BITS - 1)))")
+	    (match_test "SMALL_OPERAND(INTVAL (op) -  (HOST_WIDE_INT_M1U << (IMM_BITS - 1)))"))))
+
+(define_predicate "addi_operand"
+  (ior (match_operand 0 "arith_operand")
+       (match_operand 0 "const_arith_2simm12_operand")
+       (and (match_operand 0 "const_arith_shifted123_operand")
+	    (match_test "TARGET_ZBA"))))

@@ -452,7 +452,7 @@
   [(set_attr "type" "fadd")
    (set_attr "mode" "<UNITMODE>")])
 
-(define_insn "addsi3"
+(define_insn "riscv_addsi3"
   [(set (match_operand:SI          0 "register_operand" "=r,r")
 	(plus:SI (match_operand:SI 1 "register_operand" " r,r")
 		 (match_operand:SI 2 "arith_operand"    " r,I")))]
@@ -461,7 +461,7 @@
   [(set_attr "type" "arith")
    (set_attr "mode" "SI")])
 
-(define_insn "adddi3"
+(define_insn "riscv_adddi3"
   [(set (match_operand:DI          0 "register_operand" "=r,r")
 	(plus:DI (match_operand:DI 1 "register_operand" " r,r")
 		 (match_operand:DI 2 "arith_operand"    " r,I")))]
@@ -469,6 +469,60 @@
   "add%i2\t%0,%1,%2"
   [(set_attr "type" "arith")
    (set_attr "mode" "DI")])
+
+(define_expand "add<mode>3"
+  [(set (match_operand:GPR           0 "register_operand"      "=r,r")
+	(plus:GPR (match_operand:GPR 1 "register_operand"      " r,r")
+		  (match_operand:GPR 2 "addi_operand"          " r,I")))]
+  ""
+{
+  if (arith_operand (operands[2], <MODE>mode))
+    emit_insn (gen_riscv_add<mode>3 (operands[0], operands[1], operands[2]));
+  else if (const_arith_2simm12_operand (operands[2], <MODE>mode))
+    {
+      /* Split into two immediates that add up to the desired value:
+       * e.g., break up "a + 2445" into:
+       *         addi	a0,a0,2047
+       *	 addi	a0,a0,398
+       */
+
+      HOST_WIDE_INT val = INTVAL (operands[2]);
+      HOST_WIDE_INT saturated = HOST_WIDE_INT_M1U << (IMM_BITS - 1);
+
+      if (val >= 0)
+	 saturated = ~saturated;
+
+      val -= saturated;
+
+      rtx tmp = gen_reg_rtx (<MODE>mode);
+      emit_insn (gen_riscv_add<mode>3 (tmp, operands[1], GEN_INT (saturated)));
+      emit_insn (gen_riscv_add<mode>3 (operands[0], tmp, GEN_INT (val)));
+    }
+  else if (<MODE>mode == word_mode
+	   && const_arith_shifted123_operand (operands[2], <MODE>mode))
+    {
+      /* Use a sh[123]add and an immediate shifted down by 1, 2, or 3. */
+
+      HOST_WIDE_INT val = INTVAL (operands[2]);
+      int shamt = ctz_hwi (val);
+
+      if (shamt > 3)
+	shamt = 3;
+
+      rtx tmp = gen_reg_rtx (<MODE>mode);
+      emit_insn (gen_rtx_SET (tmp, GEN_INT (val >> shamt)));
+
+      /* We don't use gen_riscv_shNadd here, as it will only exist for
+	 <X:mode>.  Instead we build up its canonical form directly.  */
+      rtx shifted_imm = gen_rtx_ASHIFT (<MODE>mode, tmp, GEN_INT (shamt));
+      rtx shNadd = gen_rtx_PLUS (<MODE>mode, shifted_imm, operands[1]);
+      emit_insn (gen_rtx_SET (operands[0], shNadd));
+    }
+  else
+    FAIL;
+
+  DONE;
+})
 
 (define_expand "addv<mode>4"
   [(set (match_operand:GPR           0 "register_operand" "=r,r")

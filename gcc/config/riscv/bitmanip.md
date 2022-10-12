@@ -29,7 +29,7 @@
   [(set_attr "type" "bitmanip,load")
    (set_attr "mode" "DI")])
 
-(define_insn "*shNadd"
+(define_insn "riscv_shNadd<X:mode>"
   [(set (match_operand:X 0 "register_operand" "=r")
 	(plus:X (ashift:X (match_operand:X 1 "register_operand" "r")
 			  (match_operand:QI 2 "imm123_operand" "Ds3"))
