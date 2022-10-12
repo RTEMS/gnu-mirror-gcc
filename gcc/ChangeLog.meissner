@@ -1,3 +1,45 @@
+==================== dmf001, patch #8
+
+Switch to DMF syntax and DMR for all MMA operations.
+
+2022-10-11   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (vvi4i4i8_dmf): New int attribute.
+	(avvi4i4i8_dmf): Likewise.
+	(vvi4i4i2_dmf): Likewise.
+	(avvi4i4i2_dmf): Likewise.
+	(vvi4i4_dmf): Likewise.
+	(avvi4i4_dmf): Likewise.
+	(pvi4i2_dmf): Likewise.
+	(apvi4i2_dmf): Likewise.
+	(vvi4i4i4_dmf): Likewise.
+	(avvi4i4i4_dmf): Likewise.
+	(movxo_dmf): Spell dmxxextfmdr512 correctly.
+	(mma_assemble_acc_dmf): Likewise.
+	(mma_disassemble_acc_dmf): Likewise.
+	(mma_<acc>): Change from using fpr_reg_operand in expand to just
+	register_operand.  Limit insn to just non-DMF case.
+	(mma_xxsetaccz): Break into 2 insns, depending on non-DMF vs. DMF.
+	(mma_xxsetaccz_p10): Rename from mma_xxsetaccz.
+	(mma_xxsetaccz_dmf): Use normal UNSPEC for DMF, not UNSPEC_VOLATILE.
+	(mma_<vv>): Add support for running on DMF systems, generating the DMF
+	instruction and using the DMF accumulator.
+	(mma_<avv>): Likewise.
+	(mma_<pv>): Likewise.
+	(mma_<apv>): Likewise.
+	(mma_<vvi4i4i8>): Likewise.
+	(mma_<avvi4i4i8>): Likewise.
+	(mma_<vvi4i4i2>): Likewise.
+	(mma_<avvi4i4i2>): Likewise.
+	(mma_<vvi4i4>): Likewise.
+	(mma_<avvi4i4): Likewise.
+	(mma_<pvi4i2>): Likewise.
+	(mma_<apvi4i2): Likewise.
+	(mma_<vvi4i4i4>): Likewise.
+	(mma_<avvi4i4i4>): Likewise.
+
 ==================== dmf001, patch #7
 
 Implement DMF mma_assemble_acc and mma_disassemble_acc
