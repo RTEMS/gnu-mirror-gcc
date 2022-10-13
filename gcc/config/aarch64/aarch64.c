@@ -3010,8 +3010,8 @@ aarch64_morello_precise_bounds_align (uint64_t size, uint64_t align,
      section.  Without a named section the user can not know which section the
      compiler will pick and hence can't be sure what padding will be between
      objects.  */
-  if (decl && DECL_USER_ALIGN (decl) && DECL_SECTION_NAME (decl)
-      && required.align > align)
+  if (decl && DECL_USER_ALIGN (decl) && is_global_var (decl)
+      && DECL_SECTION_NAME (decl) && required.align > align)
     {
       warning (OPT_Wcheri_bounds,
 	       "object %qD has cheri alignment overridden by a user-specified one",
@@ -3048,7 +3048,8 @@ aarch64_data_padding_size (uint64_t size, uint64_t align ATTRIBUTE_UNUSED, const
      section.  Without a named section the user can not know which section the
      compiler will pick and hence can't be sure what padding will be between
      objects.  */
-  if (decl && DECL_USER_ALIGN (decl) && DECL_SECTION_NAME (decl))
+  if (decl && DECL_USER_ALIGN (decl) && is_global_var (decl)
+      && DECL_SECTION_NAME (decl))
       return 0;
   /* As in align_variable, TLS space is too precious to waste.  */
   if (decl && DECL_THREAD_LOCAL_P (decl))
@@ -25123,6 +25124,84 @@ aarch64_target_capability_mode ()
   return opt_scalar_addr_mode ();
 }
 
+bool
+aarch64_scbnds_immediate (unsigned HOST_WIDE_INT size)
+{
+  /* First attempt the unshifted version.  */
+  if ((size & ((unsigned HOST_WIDE_INT)0x3f)) == size)
+    return true;
+
+  /* Then shift and re-attempt.  */
+  if (size & (unsigned HOST_WIDE_INT)0xf)
+    return false;
+  size >>= 4;
+
+  if ((size & ((unsigned HOST_WIDE_INT)0x3f)) == size)
+    return true;
+  return false;
+}
+
+/* Implement TARGET_CAP_NARROWED_POINTER hook.  */
+rtx
+aarch64_target_cap_narrowed_pointer (rtx base, rtx size)
+{
+  rtvec temp_vec = gen_rtvec (2, base, size);
+  /* We generate a pattern that can get matched by cap_bounds_set_maybe_exact
+     rather than either one of the cap_bounds_set_exact_cadi or
+     cap_bounds_set_cadi patterns.  Using either UNSPEC_CHERI_BOUNDS_SET or
+     UNSPEC_CHERI_BOUNDS_SET_EXACT commits to using a specific instruction at
+     the point where we generate this expression.  In general we want to emit
+     an SCBNDSE instruction whenever we are already using a register to hold
+     the size, but want to emit an SCBNDS instruction when we have a suitable
+     constant size since we do not want to unnecessarily emit extra
+     instructions.
+
+     To achieve this we return an expression which can be loaded into a
+     register with the `cap_bounds_set_maybe_exact` insn.  That pattern accepts
+     either a constant or a register, and emits the SCBNDSE instruction when it
+     is given a register.  This allows the RTL passes the opportunity to
+     recognise that something which was a pseudo register when this expression
+     was formed is now a constant.  */
+  return gen_rtx_UNSPEC (CADImode, temp_vec,
+			 UNSPEC_CHERI_BOUNDS_SET_MAYBE_EXACT);
+}
+
+/* Implement TARGET_FORCE_OPERAND.  */
+rtx
+aarch64_target_force_operand (rtx value, rtx target)
+{
+  if (GET_CODE (value) != UNSPEC)
+    return NULL_RTX;
+  if (XINT (value, 1) != UNSPEC_CHERI_BOUNDS_SET
+      && XINT (value, 1) != UNSPEC_CHERI_BOUNDS_SET_EXACT
+      && XINT (value, 1) != UNSPEC_CHERI_BOUNDS_SET_MAYBE_EXACT)
+    return NULL_RTX;
+  gcc_assert (GET_MODE (value) == CADImode);
+
+  /* Ensure each argument is valid for an insn.  */
+  rtx first_arg = force_reg (CADImode, XVECEXP (value, 0, 0));
+  rtx second_arg = XVECEXP (value, 0, 1);
+  if (!CONST_INT_P (second_arg))
+    second_arg = force_reg (DImode, second_arg);
+  rtvec new_arg_vec = gen_rtvec (2, first_arg, second_arg);
+  value = gen_rtx_UNSPEC (CADImode, new_arg_vec, XINT (value, 1));
+
+  /* Ensure the total expression is put into a register.  */
+  rtx temp;
+  if (target && REG_P (target) && GET_MODE (target) == CADImode)
+    temp = target;
+  else
+    temp = gen_reg_rtx (CADImode);
+  emit_move_insn (temp, value);
+  /* N.b. Look at the `force_reg` code for optimisation markings on the
+     previous instruction.  */
+  if (!target)
+    return temp;
+  if (temp != target)
+    emit_move_insn (target, temp);
+  return target;
+}
+
 /* Implement TARGET_CODE_ADDRESS_FROM_POINTER hook.  */
 rtx
 aarch64_code_address_from_pointer (rtx x)
@@ -25800,6 +25879,12 @@ aarch64_libgcc_floating_mode_supported_p
 
 #undef TARGET_CAPABILITY_MODE
 #define TARGET_CAPABILITY_MODE aarch64_target_capability_mode
+
+#undef TARGET_CAP_NARROWED_POINTER
+#define TARGET_CAP_NARROWED_POINTER aarch64_target_cap_narrowed_pointer
+
+#undef TARGET_FORCE_OPERAND
+#define TARGET_FORCE_OPERAND aarch64_target_force_operand
 
 #undef TARGET_DWARF_FRAME_REG_MODE
 #define TARGET_DWARF_FRAME_REG_MODE aarch64_dwarf_frame_reg_mode

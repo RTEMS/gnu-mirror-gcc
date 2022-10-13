@@ -2339,7 +2339,7 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
 		  set_mem_attributes (copy, type, 1);
 		}
 	      else
-		copy = assign_temp (type, 1, 0);
+		copy = assign_temp (type, 1, 0, true);
 
 	      store_expr (args[i].tree_value, copy, 0, false, false);
 
@@ -3762,7 +3762,7 @@ expand_call (tree exp, rtx target, int ignore)
 	    /* For variable-sized objects, we must be called with a target
 	       specified.  If we were to allocate space on the stack here,
 	       we would have no way of knowing when to free it.  */
-	    rtx d = assign_temp (rettype, 1, 1);
+	    rtx d = assign_temp (rettype, 1, 1, true);
 	    structure_value_addr = XEXP (d, 0);
 	    target = 0;
 	  }
@@ -4309,7 +4309,13 @@ expand_call (tree exp, rtx target, int ignore)
 		}
 	      /* We can pass TRUE as the 4th argument because we just
 		 saved the stack pointer and will restore it right after
-		 the call.  */
+		 the call.
+		 MORELLO TODO We should understand when and how this space is
+		 used.  Usually allocate_dynamic_stack_space returns a pointer
+		 and that pointer is used.  If this function is doing something
+		 different then it's likely whatever space is allocated is not
+		 used through a bounded pointer.  This may or may not be OK.
+		 */
 	      allocate_dynamic_stack_space (push_size, 0, BIGGEST_ALIGNMENT,
 					    -1, true);
 	    }
@@ -5119,7 +5125,7 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
 	  if (value != 0 && MEM_P (value))
 	    mem_value = value;
 	  else
-	    mem_value = assign_temp (tfom, 1, 1);
+	    mem_value = assign_temp (tfom, 1, 1, true);
 #endif
 	  /* This call returns a big structure.  */
 	  flags &= ~(ECF_CONST | ECF_PURE | ECF_LOOPING_CONST_OR_PURE);
@@ -5473,8 +5479,8 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
 		    {
 		      argvec[argnum].save_area
 			= assign_stack_temp (BLKmode,
-					     argvec[argnum].locate.size.constant
-					     );
+					     argvec[argnum].locate.size.constant,
+					     true);
 
 		      emit_block_move (validize_mem
 				         (copy_rtx (argvec[argnum].save_area)),

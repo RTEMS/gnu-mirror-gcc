@@ -1,4 +1,6 @@
-/* { dg-do run } */
+/* Can not run on Pure capability since this accesses a stack-local variable
+   out of the bounds of that stack local variable.  */
+/* { dg-do run { target { ! cheri_capability_pure } } } */
 /* { dg-options "-fwhole-program" } */
 
 

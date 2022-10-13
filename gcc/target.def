@@ -3274,6 +3274,25 @@ DEFHOOK
  opt_scalar_addr_mode.  This is the default.",
  opt_scalar_addr_mode, (), default_capability_mode)
 
+DEFHOOK
+(cap_narrowed_pointer,
+ "Return an RTL expression which represents @var{base} narrowed such that it\n\
+ can only access a length of @var{size} bytes.\n\
+ This is designed for capability targets.\n\
+ Note that this hook must not emit any insns.",
+ rtx, (rtx base, rtx size),
+ hook_rtx_rtx_rtx_idfirst)
+
+DEFHOOK
+(force_operand,
+ "Target hook to enable @code{force_operand} on target-specific RTL\n\
+ expressions.\n\
+ When @code{cap_narrowed_pointer} returns an RTX which can not be made an\n\
+ operand by the general @code{force_operand}, this hook may need to be\n\
+ implemented in order to handle said RTX.",
+ rtx, (rtx value, rtx target),
+ hook_rtx_rtx_rtx_null)
+
 /* Disambiguate with errno.  */
 DEFHOOK
 (capabilities_in_hardware,
@@ -3470,13 +3489,16 @@ padding of the given amount when emitting this variable.\n\
 This hook takes both its arguments in bytes. The default definition returns\n\
 @code{0}.\n\
 \n\
-The typical use of this hook is to add padding to the end of objects on\n\
-a capability architecture to ensure that the bounds of a capability pointing\n\
-to objects do not allow accesses to any neighbouring objects.\n\
+This hook is used to add padding to the end of objects on a capability\n\
+architecture to ensure that the bounds of a capability pointing to objects do\n\
+not allow accesses to any neighbouring objects.\n\
 \n\
 A requirement on the implementation of this function is that if @var{decl}\n\
 has a user-specified alignment on a decl which has an associated section\n\
-then this hook must return @code{0}.",
+then this hook must return @code{0}.\n\
+\n\
+This hook must be defined so that it can be used on global variables and stack\n\
+variables.",
   unsigned HOST_WIDE_INT, (unsigned HOST_WIDE_INT size,
 			   unsigned HOST_WIDE_INT align, const_tree decl),
   default_data_padding_size)
@@ -3488,11 +3510,20 @@ size @var{size} when writing it out to memory.\n\
 \n\
 This hook takes its argument in bytes.  The default definition returns the\n\
 alignment given as an argument.\n\
+The hook is used to ensure the alignment required so that the size @var{size}\n\
+can be precisely bounded using the CHERI bounds compression format.\n\
 \n\
-The typical use of this hook is to ensure alignment in order to give precise\n\
-bounds for a capability pointing to the given object on capability systems.\n\
 A requirement on the implementation of this function is that if @var{decl}\n\
-has a user-specified alignment then this hook must not decrease the alignment.",
+is a global variable with a named section and a user-specified alignment then\n\
+this hook must not return a greater alignment.\n\
+This requirement is so that users can ensure zero padding between objects\n\
+(something that is used in crtstuff.c).\n\
+\n\
+Similar is required for thread local variables due to this space being too\n\
+precious to waste (matching the @code{align_variable} behaviour).\n\
+\n\
+This hook must be defined so that it can be used on global variables and stack\n\
+variables.",
  unsigned HOST_WIDE_INT, (unsigned HOST_WIDE_INT size,
 			  unsigned HOST_WIDE_INT align, const_tree decl),
  default_data_padding_size)

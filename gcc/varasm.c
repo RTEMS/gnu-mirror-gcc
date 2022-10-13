@@ -1030,7 +1030,7 @@ bss_initializer_p (const_tree decl, bool named)
 void
 align_variable (tree decl, bool dont_output_data)
 {
-  unsigned int align = DECL_ALIGN (decl);
+  unsigned HOST_WIDE_INT align = DECL_ALIGN (decl);
 
   /* In the case for initialing an array whose length isn't specified,
      where we have not yet been able to do the layout,
@@ -1069,7 +1069,8 @@ align_variable (tree decl, bool dont_output_data)
 	  && !DECL_VIRTUAL_P (decl))
 	{
 #ifdef DATA_ALIGNMENT
-	  unsigned int data_align = DATA_ALIGNMENT (TREE_TYPE (decl), align);
+	  unsigned HOST_WIDE_INT data_align
+	    = DATA_ALIGNMENT (TREE_TYPE (decl), align);
 	  /* Don't increase alignment too much for TLS variables - TLS space
 	     is too precious.  */
 	  if (! DECL_THREAD_LOCAL_P (decl) || data_align <= BITS_PER_WORD)
@@ -1080,11 +1081,19 @@ align_variable (tree decl, bool dont_output_data)
 		 to mark offlined constructors.  */
 	      && (in_lto_p || DECL_INITIAL (decl) != error_mark_node))
 	    {
-	      unsigned int const_align
+	      unsigned HOST_WIDE_INT const_align
 		= targetm.constant_alignment (DECL_INITIAL (decl), align);
 	      /* Don't increase alignment too much for TLS variables - TLS
-		 space is too precious.  */
-	      if (! DECL_THREAD_LOCAL_P (decl) || const_align <= BITS_PER_WORD)
+		 space is too precious.
+		 MORELLO TODO
+		 After applying CHERI alignment requirements we may have a very
+		 large alignment.  Avoid recording new alignment if it's
+		 greater than UINT_MAX.  Most users of DECL_ALIGN use an
+		 unsigned int so this could overflow.  Marking a smaller
+		 alignment is also correct, so this is not a correctness issue.
+		 */
+	      if ((! DECL_THREAD_LOCAL_P (decl) || const_align <= BITS_PER_WORD)
+		  && const_align < UINT_MAX)
 		align = const_align;
 	    }
 	}
@@ -1101,7 +1110,7 @@ align_variable (tree decl, bool dont_output_data)
 static unsigned int
 get_variable_align (tree decl)
 {
-  unsigned int align = DECL_ALIGN (decl);
+  unsigned HOST_WIDE_INT align = DECL_ALIGN (decl);
 
   /* For user aligned vars or static vars align_variable already did
      everything.  */
@@ -1121,7 +1130,8 @@ get_variable_align (tree decl)
     {
       /* On some machines, it is good to increase alignment sometimes.  */
 #ifdef DATA_ALIGNMENT
-      unsigned int data_align = DATA_ALIGNMENT (TREE_TYPE (decl), align);
+      unsigned HOST_WIDE_INT data_align
+	= DATA_ALIGNMENT (TREE_TYPE (decl), align);
       /* Don't increase alignment too much for TLS variables - TLS space
          is too precious.  */
       if (! DECL_THREAD_LOCAL_P (decl) || data_align <= BITS_PER_WORD)
@@ -1132,11 +1142,15 @@ get_variable_align (tree decl)
 	     to mark offlined constructors.  */
 	  && (in_lto_p || DECL_INITIAL (decl) != error_mark_node))
 	{
-	  unsigned int const_align
+	  unsigned HOST_WIDE_INT const_align
 	    = targetm.constant_alignment (DECL_INITIAL (decl), align);
 	  /* Don't increase alignment too much for TLS variables - TLS space
-	     is too precious.  */
-	  if (! DECL_THREAD_LOCAL_P (decl) || const_align <= BITS_PER_WORD)
+	     is too precious.
+	     MORELLO TODO After applying CHERI alignment requirements we may
+	     have a very large alignment.  Avoid returning this alignment for
+	     now.  */
+	  if ((! DECL_THREAD_LOCAL_P (decl) || const_align <= BITS_PER_WORD)
+	      && const_align < UINT_MAX)
 	    align = const_align;
 	}
     }
@@ -1981,23 +1995,6 @@ assemble_string (const char *p, int size)
 }
 
 
-
-/* Handle using targetm.data_alignment hook on an alignment provided in bits.
-   Since the hook takes an alignment provided in bytes we could lose some
-   bit-wise alignment requirement.  This ensures that we maintain the bit-wise
-   alignment if the hook does not increase the alignment requirement.  */
-static unsigned HOST_WIDE_INT
-alignment_pad_from_bits (unsigned HOST_WIDE_INT size,
-			 unsigned HOST_WIDE_INT align_orig,
-			 const_tree decl)
-{
-  unsigned HOST_WIDE_INT align
-    = targetm.data_alignment (size, align_orig/BITS_PER_UNIT, decl);
-  if (align == 1 && align_orig < BITS_PER_UNIT)
-    return align_orig;
-  else
-    return align * BITS_PER_UNIT;
-}
 
 /* A noswitch_section_callback for lcomm_section.  */
 

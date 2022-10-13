@@ -317,7 +317,7 @@ public:
 
   /* The *byte* alignment required for this variable.  Or as, with the
      size, the alignment for this partition.  */
-  unsigned int alignb;
+  unsigned HOST_WIDE_INT alignb;
 
   /* The partition representative.  */
   size_t representative;
@@ -361,23 +361,30 @@ static bool has_short_buffer;
 /* Compute the byte alignment to use for DECL.  Ignore alignment
    we can't do with expected alignment of the stack boundary.  */
 
-static unsigned int
-align_local_variable (tree decl, bool really_expand)
+static unsigned HOST_WIDE_INT
+align_local_variable (tree decl, poly_uint64 size, bool really_expand)
 {
-  unsigned int align;
+  /* `alignment_pad_from_bits` can increase the alignment, and it can
+     increase the alignment to very large values.
+     That is why the `alignb` member of `class stack_var` is an unsigned
+     HOST_WIDE_INT and we use an unsigned HOST_WIDE_INT here.  */
+  unsigned HOST_WIDE_INT align;
 
   if (TREE_CODE (decl) == SSA_NAME)
     align = TYPE_ALIGN (TREE_TYPE (decl));
   else
-    {
-      align = LOCAL_DECL_ALIGNMENT (decl);
-      /* Don't change DECL_ALIGN when called from estimated_stack_frame_size.
-	 That is done before IPA and could bump alignment based on host
-	 backend even for offloaded code which wants different
-	 LOCAL_DECL_ALIGNMENT.  */
-      if (really_expand)
-	SET_DECL_ALIGN (decl, align);
-    }
+    align = LOCAL_DECL_ALIGNMENT (decl);
+
+  if (size.is_constant () && applying_cheri_stack_bounds ())
+    align = alignment_pad_from_bits (size.to_constant (), align,
+			     TREE_CODE (decl) == SSA_NAME ? NULL_TREE : decl);
+
+  /* Don't change DECL_ALIGN when called from estimated_stack_frame_size.
+     That is done before IPA and could bump alignment based on host
+     backend even for offloaded code which wants different
+     LOCAL_DECL_ALIGNMENT.  */
+  if (TREE_CODE (decl) != SSA_NAME && really_expand)
+    SET_DECL_ALIGN (decl, align);
   return align / BITS_PER_UNIT;
 }
 
@@ -448,11 +455,15 @@ add_stack_var (tree decl, bool really_expand)
     ? TYPE_SIZE_UNIT (TREE_TYPE (decl))
     : DECL_SIZE_UNIT (decl);
   v->size = tree_to_poly_uint64 (size);
+  if (v->size.is_constant () && applying_cheri_stack_bounds ())
+    v->size += targetm.data_padding_size
+      (v->size.to_constant (), 0,
+       TREE_CODE (decl) == SSA_NAME ? NULL_TREE : decl);
   /* Ensure that all variables have size, so that &a != &b for any two
      variables that are simultaneously live.  */
   if (known_eq (v->size, 0U))
     v->size = 1;
-  v->alignb = align_local_variable (decl, really_expand);
+  v->alignb = align_local_variable (decl, v->size, really_expand);
   /* An alignment of zero can mightily confuse us later.  */
   gcc_assert (v->alignb != 0);
 
@@ -680,8 +691,8 @@ stack_var_cmp (const void *a, const void *b)
 {
   size_t ia = *(const size_t *)a;
   size_t ib = *(const size_t *)b;
-  unsigned int aligna = stack_vars[ia].alignb;
-  unsigned int alignb = stack_vars[ib].alignb;
+  unsigned HOST_WIDE_INT aligna = stack_vars[ia].alignb;
+  unsigned HOST_WIDE_INT alignb = stack_vars[ib].alignb;
   poly_int64 sizea = stack_vars[ia].size;
   poly_int64 sizeb = stack_vars[ib].size;
   tree decla = stack_vars[ia].decl;
@@ -911,7 +922,7 @@ partition_stack_vars (void)
   for (si = 0; si < n; ++si)
     {
       size_t i = stack_vars_sorted[si];
-      unsigned int ialign = stack_vars[i].alignb;
+      unsigned HOST_WIDE_INT ialign = stack_vars[i].alignb;
       poly_int64 isize = stack_vars[i].size;
 
       /* Ignore objects that aren't partition representatives. If we
@@ -923,7 +934,7 @@ partition_stack_vars (void)
       for (sj = si + 1; sj < n; ++sj)
 	{
 	  size_t j = stack_vars_sorted[sj];
-	  unsigned int jalign = stack_vars[j].alignb;
+	  unsigned HOST_WIDE_INT jalign = stack_vars[j].alignb;
 	  poly_int64 jsize = stack_vars[j].size;
 
 	  /* Ignore objects that aren't partition representatives.  */
@@ -974,7 +985,8 @@ dump_stack_var_partition (void)
 
       fprintf (dump_file, "Partition %lu: size ", (unsigned long) i);
       print_dec (stack_vars[i].size, dump_file);
-      fprintf (dump_file, " align %u\n", stack_vars[i].alignb);
+      fprintf (dump_file, " align " HOST_WIDE_INT_PRINT_UNSIGNED "\n",
+	       stack_vars[i].alignb);
 
       for (j = i; j != EOC; j = stack_vars[j].next)
 	{
@@ -998,6 +1010,18 @@ expand_one_stack_var_at (tree decl, rtx base, unsigned base_align,
   gcc_assert (known_eq (offset, trunc_int_for_mode (offset, POmode)));
 
   x = plus_constant (Pmode, base, offset);
+  if (applying_cheri_stack_bounds ()
+      && TREE_CODE (decl) != SSA_NAME)
+    {
+      tree size = DECL_SIZE_UNIT (decl);
+
+      unsigned HOST_WIDE_INT size_int
+	= tree_to_poly_uint64 (size).to_constant ();
+      size_int += targetm.data_padding_size (size_int, 0, decl);
+      rtx size_rtx = gen_int_mode (size_int, POmode);
+
+      x = targetm.cap_narrowed_pointer (x, size_rtx);
+    }
   x = gen_rtx_MEM (TREE_CODE (decl) == SSA_NAME
 		   ? TYPE_MODE (TREE_TYPE (decl))
 		   : DECL_MODE (SSAVAR (decl)), x);
@@ -1053,7 +1077,7 @@ expand_stack_vars (bool (*pred) (size_t), class stack_vars_data *data)
   size_t si, i, j, n = stack_vars_num;
   poly_uint64 large_size = 0, large_alloc = 0;
   rtx large_base = NULL;
-  unsigned large_align = 0;
+  unsigned HOST_WIDE_INT large_align = 0;
   bool large_allocation_done = false;
   tree decl;
 
@@ -1066,7 +1090,7 @@ expand_stack_vars (bool (*pred) (size_t), class stack_vars_data *data)
       /* Find the total size of these variables.  */
       for (si = 0; si < n; ++si)
 	{
-	  unsigned alignb;
+	  unsigned HOST_WIDE_INT alignb;
 
 	  i = stack_vars_sorted[si];
 	  alignb = stack_vars[i].alignb;
@@ -1102,7 +1126,7 @@ expand_stack_vars (bool (*pred) (size_t), class stack_vars_data *data)
   for (si = 0; si < n; ++si)
     {
       rtx base;
-      unsigned base_align, alignb;
+      unsigned HOST_WIDE_INT base_align, alignb;
       poly_int64 offset;
 
       i = stack_vars_sorted[si];
@@ -1338,7 +1362,7 @@ expand_one_stack_var_1 (tree var)
   else
     {
       size = tree_to_poly_uint64 (DECL_SIZE_UNIT (var));
-      byte_align = align_local_variable (var, true);
+      byte_align = align_local_variable (var, size, true);
     }
 
   /* We handle highly aligned variables in expand_stack_vars.  */
@@ -1564,9 +1588,8 @@ defer_stack_allocation (tree var, bool toplevel)
   if (flag_stack_protect || asan_sanitize_stack_p ())
     return true;
 
-  unsigned int align = TREE_CODE (var) == SSA_NAME
-    ? TYPE_ALIGN (TREE_TYPE (var))
-    : DECL_ALIGN (var);
+  unsigned HOST_WIDE_INT align
+    = align_local_variable (var, size, false) * BITS_PER_UNIT;
 
   /* We handle "large" alignment via dynamic allocation.  We want to handle
      this extra complication in only one place, so defer them.  */

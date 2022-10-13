@@ -216,13 +216,15 @@
 )
 
 (define_insn "cap_bounds_set_cadi"
-  [(set (match_operand:CADI 0 "register_operand" "=rk")
-        (unspec:CADI [(match_operand:CADI 1 "register_operand" "rk")
-          (match_operand:DI 2 "register_operand" "r")]
+  [(set (match_operand:CADI 0 "register_operand" "=rk,rk")
+        (unspec:CADI [(match_operand:CADI 1 "register_operand" "rk,rk")
+          (match_operand:DI 2 "aarch64_scbnds_operand" "r,Ucc")]
             UNSPEC_CHERI_BOUNDS_SET))
   ]
   "TARGET_MORELLO"
-  "scbnds\\t%0, %1, %2"
+  "@
+  scbnds\\t%0, %1, %2
+  scbnds\\t%0, %1, %2"
 )
 
 (define_insn "cap_bounds_set_exact_cadi"
@@ -233,6 +235,18 @@
   ]
   "TARGET_MORELLO"
   "scbndse\\t%0, %1, %2"
+)
+
+(define_insn "cap_bounds_set_maybe_exact"
+  [(set (match_operand:CADI 0 "register_operand" "=rk,rk")
+        (unspec:CADI [(match_operand:CADI 1 "register_operand" "rk,rk")
+          (match_operand:DI 2 "aarch64_scbnds_operand" "r,Ucc")]
+            UNSPEC_CHERI_BOUNDS_SET_MAYBE_EXACT))
+  ]
+  "TARGET_MORELLO"
+  "@
+  scbndse\\t%0, %1, %2
+  scbnds\\t%0, %1, %2"
 )
 
 (define_insn "cap_seal_cadi"

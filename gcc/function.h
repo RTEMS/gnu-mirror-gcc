@@ -625,9 +625,10 @@ extern unsigned int spill_slot_alignment (machine_mode);
 
 extern rtx assign_stack_local_1 (machine_mode, poly_int64, int, int);
 extern rtx assign_stack_local (machine_mode, poly_int64, int);
-extern rtx assign_stack_temp_for_type (machine_mode, poly_int64, tree);
-extern rtx assign_stack_temp (machine_mode, poly_int64);
-extern rtx assign_temp (tree, int, int);
+extern rtx assign_stack_temp_for_type (machine_mode, poly_int64, tree,
+				       bool bounded = false);
+extern rtx assign_stack_temp (machine_mode, poly_int64, bool bounded = false);
+extern rtx assign_temp (tree, int, int, bool bounded = false);
 extern void update_temp_slot_address (rtx, rtx);
 extern void preserve_temp_slots (rtx);
 extern void free_temp_slots (void);

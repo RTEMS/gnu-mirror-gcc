@@ -43,9 +43,9 @@ test02()
   };
 
   int i[3];
-  Size n = {4};
-  auto j = std::__uninitialized_default_n(i, n);
-  VERIFY( j == (i + 4) );
+  Size n = {3};
+  auto j = std::uninitialized_value_construct_n(i, n);
+  VERIFY( j == (i + 3) );
 }
 
 int

@@ -354,28 +354,13 @@ add_frame_space (poly_int64 start, poly_int64 end)
   space->length = end - start;
 }
 
-/* Allocate a stack slot of SIZE bytes and return a MEM rtx for it
-   with machine mode MODE.
-
-   ALIGN controls the amount of alignment for the address of the slot:
-   0 means according to MODE,
-   -1 means use BIGGEST_ALIGNMENT and round size to multiple of that,
-   -2 means use BITS_PER_UNIT,
-   positive specifies alignment boundary in bits.
-
-   KIND has ASLK_REDUCE_ALIGN bit set if it is OK to reduce
-   alignment and ASLK_RECORD_PAD bit set if we should remember
-   extra space we allocated for alignment purposes.  When we are
-   called from assign_stack_temp_for_type, it is not set so we don't
-   track the same stack slot in two independent lists.
-
-   We do not round to stack_boundary here.  */
-
-rtx
-assign_stack_local_1 (machine_mode mode, poly_int64 size,
-		      int align, int kind)
+static rtx
+assign_stack_local_1_base (machine_mode mode, poly_int64 size,
+			   int align, int kind,
+			   unsigned int *pbit_align)
 {
-  rtx x, addr;
+
+  rtx addr;
   poly_int64 bigend_correction = 0;
   poly_int64 slot_offset = 0, old_frame_offset;
   unsigned int alignment, alignment_in_bits;
@@ -524,16 +509,69 @@ assign_stack_local_1 (machine_mode mode, poly_int64 size,
 			  (slot_offset + bigend_correction,
 			   POmode));
 
-  x = gen_rtx_MEM (mode, addr);
+  if (frame_offset_overflow (frame_offset, current_function_decl))
+    frame_offset = 0;
+
+  if (pbit_align)
+    *pbit_align = alignment_in_bits;
+
+  return addr;
+}
+
+static rtx
+assign_stack_local_1_as_mem (machine_mode mode,
+			     rtx addr,
+			     unsigned int alignment_in_bits)
+{
+  rtx x = gen_rtx_MEM (mode, addr);
   set_mem_align (x, alignment_in_bits);
   MEM_NOTRAP_P (x) = 1;
 
   vec_safe_push (stack_slot_list, x);
 
-  if (frame_offset_overflow (frame_offset, current_function_decl))
-    frame_offset = 0;
-
   return x;
+}
+
+static rtx
+assign_stack_local_narrowed (machine_mode mode, poly_int64 size, int align,
+			     int kind)
+{
+  unsigned int alignment_in_bits;
+  rtx addr = assign_stack_local_1_base (mode, size, align, kind,
+					&alignment_in_bits);
+  if (size.is_constant () && applying_cheri_stack_bounds ())
+    {
+      rtx size_rtx = gen_int_mode (size.to_constant (), POmode);
+      addr = targetm.cap_narrowed_pointer (addr, size_rtx);
+    }
+  return assign_stack_local_1_as_mem (mode, addr, alignment_in_bits);
+}
+/* Allocate a stack slot of SIZE bytes and return a MEM rtx for it
+   with machine mode MODE.
+
+   ALIGN controls the amount of alignment for the address of the slot:
+   0 means according to MODE,
+   -1 means use BIGGEST_ALIGNMENT and round size to multiple of that,
+   -2 means use BITS_PER_UNIT,
+   positive specifies alignment boundary in bits.
+
+   KIND has ASLK_REDUCE_ALIGN bit set if it is OK to reduce
+   alignment and ASLK_RECORD_PAD bit set if we should remember
+   extra space we allocated for alignment purposes.  When we are
+   called from assign_stack_temp_for_type, it is not set so we don't
+   track the same stack slot in two independent lists.
+
+   We do not round to stack_boundary here.  */
+
+rtx
+assign_stack_local_1 (machine_mode mode, poly_int64 size,
+		      int align, int kind)
+{
+  unsigned int alignment_in_bits;
+  rtx addr = assign_stack_local_1_base (mode, size, align, kind,
+					&alignment_in_bits);
+
+  return assign_stack_local_1_as_mem (mode, addr, alignment_in_bits);
 }
 
 /* Wrap up assign_stack_local_1 with last parameter as false.  */
@@ -574,7 +612,7 @@ public:
      conflict with objects of the type of the old slot.  */
   tree type;
   /* The alignment (in bits) of the slot.  */
-  unsigned int align;
+  unsigned HOST_WIDE_INT align;
   /* Nonzero if this temporary is currently in use.  */
   char in_use;
   /* Nesting level at which this slot is being used.  */
@@ -585,6 +623,9 @@ public:
   /* The size of the slot, including extra space for alignment.  This
      info is for combine_temp_slots.  */
   poly_int64 full_size;
+  /* Whether or not access to this slot is bounded.  If it is then it can not
+     be combined with other slots.  */
+  bool bounded;
 };
 
 /* Entry for the below hash table.  */
@@ -786,15 +827,24 @@ find_temp_slot_from_address (rtx x)
    TYPE is the type that will be used for the stack slot.  */
 
 rtx
-assign_stack_temp_for_type (machine_mode mode, poly_int64 size, tree type)
+assign_stack_temp_for_type (machine_mode mode, poly_int64 size, tree type,
+			    bool bounded)
 {
-  unsigned int align;
+  unsigned HOST_WIDE_INT align;
+  unsigned orig_align;
   class temp_slot *p, *best_p = 0, *selected = NULL, **pp;
   rtx slot;
+  poly_int64 size_stored = size;
 
   gcc_assert (known_size_p (size));
 
-  align = get_stack_local_alignment (type, mode);
+  orig_align = align = get_stack_local_alignment (type, mode);
+  bounded &= applying_cheri_stack_bounds ();
+  if (size.is_constant () && bounded)
+    {
+      size_stored += targetm.data_padding_size (size.to_constant (), 0, NULL_TREE);
+      align = alignment_pad_from_bits (size.to_constant (), align, NULL_TREE);
+    }
 
   /* Try to find an available, already-allocated temporary of the proper
      mode which meets the size and alignment requirements.  Choose the
@@ -839,7 +889,7 @@ assign_stack_temp_for_type (machine_mode mode, poly_int64 size, tree type)
 	 for BLKmode slots, so that we can be sure of the alignment.  */
       if (GET_MODE (best_p->slot) == BLKmode)
 	{
-	  int alignment = best_p->align / BITS_PER_UNIT;
+	  HOST_WIDE_INT alignment = best_p->align / BITS_PER_UNIT;
 	  poly_int64 rounded_size = aligned_upper_bound (size, alignment);
 
 	  if (known_ge (best_p->size - rounded_size, alignment))
@@ -876,14 +926,33 @@ assign_stack_temp_for_type (machine_mode mode, poly_int64 size, tree type)
 	 So for requests which depended on the rounding of SIZE, we go ahead
 	 and round it now.  We also make sure ALIGNMENT is at least
 	 BIGGEST_ALIGNMENT.  */
-      gcc_assert (mode != BLKmode || align == BIGGEST_ALIGNMENT);
-      p->slot = assign_stack_local_1 (mode,
-				      (mode == BLKmode
-				       ? aligned_upper_bound (size,
-							      (int) align
-							      / BITS_PER_UNIT)
-				       : size),
-				      align, 0);
+      gcc_assert (mode != BLKmode || align >= BIGGEST_ALIGNMENT);
+      if (!bounded)
+	p->slot = assign_stack_local_1
+	  (mode,
+	   (mode == BLKmode
+	    ? aligned_upper_bound (size, align / BITS_PER_UNIT)
+	    : size),
+	   align, 0);
+      else if (align > MAX_SUPPORTED_STACK_ALIGNMENT)
+	{
+	  rtx allocsize = gen_int_mode (size_stored, POmode);
+	  get_dynamic_stack_size (&allocsize, 0, align, NULL);
+	  rtx addr = assign_stack_local_1_base (BLKmode, UINTVAL (allocsize),
+						MAX_SUPPORTED_STACK_ALIGNMENT,
+						ASLK_RECORD_PAD, NULL);
+	  addr = align_dynamic_address (addr, align);
+	  addr = targetm.cap_narrowed_pointer
+	    (addr, gen_int_mode (size_stored, POmode));
+	  p->slot = assign_stack_local_1_as_mem (mode, addr, align);
+	}
+      else
+	p->slot = assign_stack_local_narrowed
+	  (mode,
+	   (mode == BLKmode
+	    ? aligned_upper_bound (size, align / BITS_PER_UNIT)
+	    : size),
+	   align, 0);
 
       p->align = align;
 
@@ -918,6 +987,7 @@ assign_stack_temp_for_type (machine_mode mode, poly_int64 size, tree type)
   p->in_use = 1;
   p->type = type;
   p->level = temp_slot_level;
+  p->bounded = bounded;
   n_temp_slots_in_use++;
 
   pp = temp_slots_at_level (p->level);
@@ -932,7 +1002,10 @@ assign_stack_temp_for_type (machine_mode mode, poly_int64 size, tree type)
      it.  If there's no TYPE, then we don't know anything about the
      alias set for the memory.  */
   set_mem_alias_set (slot, type ? get_alias_set (type) : 0);
-  set_mem_align (slot, align);
+  if (align < UINT_MAX)
+    set_mem_align (slot, align);
+  else
+    set_mem_align (slot, orig_align);
 
   /* If a type is specified, set the relevant flags.  */
   if (type != 0)
@@ -946,9 +1019,9 @@ assign_stack_temp_for_type (machine_mode mode, poly_int64 size, tree type)
    reuse.  First two arguments are same as in preceding function.  */
 
 rtx
-assign_stack_temp (machine_mode mode, poly_int64 size)
+assign_stack_temp (machine_mode mode, poly_int64 size, bool bounded)
 {
-  return assign_stack_temp_for_type (mode, size, NULL_TREE);
+  return assign_stack_temp_for_type (mode, size, NULL_TREE, bounded);
 }
 
 /* Assign a temporary.
@@ -962,7 +1035,8 @@ assign_stack_temp (machine_mode mode, poly_int64 size)
 
 rtx
 assign_temp (tree type_or_decl, int memory_required,
-	     int dont_promote ATTRIBUTE_UNUSED)
+	     int dont_promote ATTRIBUTE_UNUSED,
+	     bool bounded)
 {
   tree type, decl;
   machine_mode mode;
@@ -1012,7 +1086,7 @@ assign_temp (tree type_or_decl, int memory_required,
 	  size = 1;
 	}
 
-      tmp = assign_stack_temp_for_type (mode, size, type);
+      tmp = assign_stack_temp_for_type (mode, size, type, bounded);
       return tmp;
     }
 
@@ -1053,6 +1127,8 @@ combine_temp_slots (void)
       int delete_p = 0;
 
       next = p->next;
+      if (p->bounded)
+	continue;
 
       if (GET_MODE (p->slot) != BLKmode)
 	continue;
@@ -1062,6 +1138,8 @@ combine_temp_slots (void)
        	  int delete_q = 0;
 
 	  next_q = q->next;
+	  if (q->bounded)
+	    continue;
 
 	  if (GET_MODE (q->slot) != BLKmode)
 	    continue;
@@ -1714,9 +1792,11 @@ instantiate_virtual_regs_in_insn (rtx_insn *insn)
 	      /* ??? Recognize address_operand and/or "p" constraints
 		 to see if (plus new offset) is a valid before we put
 		 this through expand_simple_binop.  */
-	      /* MORELLO TODO: update for capabilities?  */
-	      x = expand_simple_binop (GET_MODE (x), PLUS, new_rtx,
-				       gen_int_mode (offset, GET_MODE (x)),
+	      scalar_addr_mode sa_mode
+		= as_a <scalar_addr_mode> (GET_MODE (x));
+	      scalar_int_mode off_mode = offset_mode (sa_mode);
+	      x = expand_pointer_plus (sa_mode, new_rtx,
+				       gen_int_mode (offset, off_mode),
 				       NULL_RTX, 1, OPTAB_LIB_WIDEN);
 	      seq = get_insns ();
 	      end_sequence ();
@@ -1731,10 +1811,11 @@ instantiate_virtual_regs_in_insn (rtx_insn *insn)
 	  if (maybe_ne (offset, 0))
 	    {
 	      start_sequence ();
-	      /* MORELLO TODO: expand_pointer_plus?  */
-	      new_rtx = expand_simple_binop
-		(GET_MODE (new_rtx), PLUS, new_rtx,
-		 gen_int_mode (offset, GET_MODE (new_rtx)),
+	      scalar_addr_mode sa_mode
+		= as_a <scalar_addr_mode> (GET_MODE (new_rtx));
+	      scalar_int_mode off_mode = offset_mode (sa_mode);
+	      new_rtx = expand_pointer_plus
+		(sa_mode, new_rtx, gen_int_mode (offset, off_mode),
 		 NULL_RTX, 1, OPTAB_LIB_WIDEN);
 	      seq = get_insns ();
 	      end_sequence ();
@@ -2929,31 +3010,47 @@ assign_parm_setup_block (struct assign_parm_data_all *all,
 
   size = int_size_in_bytes (data->arg.type);
   size_stored = CEIL_ROUND (size, UNITS_PER_WORD);
+  if (applying_cheri_stack_bounds ())
+    size_stored += targetm.data_padding_size (size, DECL_ALIGN (parm), parm);
   if (stack_parm == 0)
     {
       /* MORELLO TODO (OPTIMISED).
 	 Based on the surrounding code it seems we may be able to branch based
 	 on mode_strict_alignment (word_mode).  Look into that ...  */
-      HOST_WIDE_INT parm_align
+      unsigned HOST_WIDE_INT parm_align
 	= (any_modes_strict_align ()
 	   ? MAX (DECL_ALIGN (parm), BITS_PER_WORD) : DECL_ALIGN (parm));
+      /* While it is possible to store any 64 bit alignment in the 6bit
+	 log-power field of DECL_ALIGN, the majority of the rest of the code
+	 uses a 32bit int (as per limits on ELF alignment commented in
+	 tree_type_common.align).  However, marking the DECL as having a known
+	 very large alignment is not necessary, the alignment it is marked as
+	 having is also correct (just smaller than we could have guaranteed).
+	 We ensure the object is aligned on the stack using
+	 `get_dynamic_stack_size` and `align_dynamic_address` anyway.  */
+      if (applying_cheri_stack_bounds ())
+	parm_align = alignment_pad_from_bits (size, DECL_ALIGN (parm), parm);
 
-      SET_DECL_ALIGN (parm, parm_align);
-      if (DECL_ALIGN (parm) > MAX_SUPPORTED_STACK_ALIGNMENT)
+      if (parm_align < UINT_MAX)
+	SET_DECL_ALIGN (parm, parm_align);
+      if (parm_align > MAX_SUPPORTED_STACK_ALIGNMENT)
 	{
 	  rtx allocsize = gen_int_mode (size_stored, POmode);
-	  get_dynamic_stack_size (&allocsize, 0, DECL_ALIGN (parm), NULL);
-	  stack_parm = assign_stack_local (BLKmode, UINTVAL (allocsize),
-					   MAX_SUPPORTED_STACK_ALIGNMENT);
-	  rtx addr = align_dynamic_address (XEXP (stack_parm, 0),
-					    DECL_ALIGN (parm));
+	  get_dynamic_stack_size (&allocsize, 0, parm_align, NULL);
+	  rtx addr = assign_stack_local_1_base (BLKmode, UINTVAL (allocsize),
+						MAX_SUPPORTED_STACK_ALIGNMENT,
+						ASLK_RECORD_PAD, NULL);
+	  addr = align_dynamic_address (addr, parm_align);
 	  mark_reg_pointer (addr, DECL_ALIGN (parm));
-	  stack_parm = gen_rtx_MEM (GET_MODE (stack_parm), addr);
+	  if (applying_cheri_stack_bounds ())
+	    addr = targetm.cap_narrowed_pointer (addr, allocsize);
+	  stack_parm = gen_rtx_MEM (BLKmode, addr);
 	  MEM_NOTRAP_P (stack_parm) = 1;
 	}
       else
-	stack_parm = assign_stack_local (BLKmode, size_stored,
-					 DECL_ALIGN (parm));
+	stack_parm = assign_stack_local_narrowed (BLKmode, size_stored,
+						  DECL_ALIGN (parm),
+						  ASLK_RECORD_PAD);
       if (known_eq (GET_MODE_SIZE (GET_MODE (entry_parm)), size))
 	PUT_MODE (stack_parm, GET_MODE (entry_parm));
       set_mem_attributes (stack_parm, parm, 1);
@@ -3503,9 +3600,10 @@ assign_parm_setup_stack (struct assign_parm_data_all *all, tree parm,
 						    align)))
 	    align = GET_MODE_ALIGNMENT (GET_MODE (data->entry_parm));
 	  data->stack_parm
-	    = assign_stack_local (GET_MODE (data->entry_parm),
-				  GET_MODE_SIZE (GET_MODE (data->entry_parm)),
-				  align);
+	    = assign_stack_local_narrowed
+	    (GET_MODE (data->entry_parm),
+	     GET_MODE_SIZE (GET_MODE (data->entry_parm)), align,
+	     ASLK_RECORD_PAD);
 	  align = MEM_ALIGN (data->stack_parm);
 	  set_mem_attributes (data->stack_parm, parm, 1);
 	  set_mem_align (data->stack_parm, align);

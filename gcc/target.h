@@ -320,6 +320,38 @@ address_mode_to_pointer_mode (scalar_addr_mode address_mode, addr_space_t as)
   return targetm.addr_space.pointer_mode (as, is_capability);
 }
 
+/* Handle using targetm.data_alignment hook on an alignment provided in bits.
+   Since the hook takes an alignment provided in bytes we could lose some
+   bit-wise alignment requirement.  This ensures that we maintain the bit-wise
+   alignment if the hook does not increase the alignment requirement.  */
+inline unsigned HOST_WIDE_INT
+alignment_pad_from_bits (unsigned HOST_WIDE_INT size,
+			 unsigned HOST_WIDE_INT align_orig,
+			 const_tree decl)
+{
+  /* Alignment must be a power of two throughout the compiler (e.g. see
+     how TYPE_ALIGN and DECL_ALIGN are recorded).  */
+  gcc_assert (align_orig < BITS_PER_UNIT
+	      || (align_orig % BITS_PER_UNIT == 0));
+  unsigned HOST_WIDE_INT align
+    = targetm.data_alignment (size, align_orig/BITS_PER_UNIT, decl);
+  /* Only need to worry about the time that align_orig is less than
+     BITS_PER_UNIT, which is very rare (on bootstrapping and running the
+     testsuite at the time this line was added the only time that was hit was
+     via output_constant_pool_1 from output_object_block using an artificial
+     alignment of 1 bit because the alignment was already handled).  */
+  return MAX (align * BITS_PER_UNIT, align_orig);
+}
+
+/* Wrapper around choosing whether we need to apply CHERI bounds or not.  */
+inline bool
+applying_cheri_stack_bounds ()
+{
+  return targetm.capabilities_in_hardware ()
+    && CAPABILITY_MODE_P (Pmode)
+    && flag_cheri_stack_bounds;
+}
+
 #ifdef GCC_TM_H
 
 #ifndef CUMULATIVE_ARGS_MAGIC

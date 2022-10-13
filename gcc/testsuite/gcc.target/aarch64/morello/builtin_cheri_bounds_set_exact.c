@@ -1,5 +1,5 @@
 /* { dg-do compile { target aarch64*-*-* } } */
-/* { dg-additional-options "-march=morello+c64 -mabi=purecap" } */
+/* { dg-additional-options "-march=morello+c64 -mabi=purecap -fno-cheri-stack-bounds" } */
 
 #include <stddef.h>
 

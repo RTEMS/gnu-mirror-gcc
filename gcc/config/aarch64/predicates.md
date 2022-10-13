@@ -60,6 +60,10 @@
   (ior (match_operand 0 "register_operand")
        (match_operand 0 "aarch64_ccmp_immediate")))
 
+(define_predicate "aarch64_scbnds_operand"
+  (ior (match_operand 0 "register_operand")
+       (match_code "const_int")))
+
 (define_predicate "aarch64_simd_register"
   (and (match_code "reg")
        (match_test "FP_REGNUM_P (REGNO (op))")))

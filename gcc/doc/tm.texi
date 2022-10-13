@@ -1158,13 +1158,16 @@ padding of the given amount when emitting this variable.
 This hook takes both its arguments in bytes. The default definition returns
 @code{0}.
 
-The typical use of this hook is to add padding to the end of objects on
-a capability architecture to ensure that the bounds of a capability pointing
-to objects do not allow accesses to any neighbouring objects.
+This hook is used to add padding to the end of objects on a capability
+architecture to ensure that the bounds of a capability pointing to objects do
+not allow accesses to any neighbouring objects.
 
 A requirement on the implementation of this function is that if @var{decl}
 has a user-specified alignment on a decl which has an associated section
 then this hook must return @code{0}.
+
+This hook must be defined so that it can be used on global variables and stack
+variables.
 @end deftypefn
 
 @deftypefn {Target Hook} {unsigned HOST_WIDE_INT} TARGET_DATA_ALIGNMENT (unsigned HOST_WIDE_INT @var{size}, unsigned HOST_WIDE_INT @var{align}, const_tree @var{decl})
@@ -1173,11 +1176,20 @@ size @var{size} when writing it out to memory.
 
 This hook takes its argument in bytes.  The default definition returns the
 alignment given as an argument.
+The hook is used to ensure the alignment required so that the size @var{size}
+can be precisely bounded using the CHERI bounds compression format.
 
-The typical use of this hook is to ensure alignment in order to give precise
-bounds for a capability pointing to the given object on capability systems.
 A requirement on the implementation of this function is that if @var{decl}
-has a user-specified alignment then this hook must not decrease the alignment.
+is a global variable with a named section and a user-specified alignment then
+this hook must not return a greater alignment.
+This requirement is so that users can ensure zero padding between objects
+(something that is used in crtstuff.c).
+
+Similar is required for thread local variables due to this space being too
+precious to waste (matching the @code{align_variable} behaviour).
+
+This hook must be defined so that it can be used on global variables and stack
+variables.
 @end deftypefn
 
 @deftypefn {Target Hook} HOST_WIDE_INT TARGET_VECTOR_ALIGNMENT (const_tree @var{type})
@@ -4375,6 +4387,21 @@ Defines the mode for @code{__intcap_t} and @code{__uintcap_t}.
  describing the mode that these variables should be in.  If the target does
  not support capabilities then this should return an empty
  opt_scalar_addr_mode.  This is the default.
+@end deftypefn
+
+@deftypefn {Target Hook} rtx TARGET_CAP_NARROWED_POINTER (rtx @var{base}, rtx @var{size})
+Return an RTL expression which represents @var{base} narrowed such that it
+ can only access a length of @var{size} bytes.
+ This is designed for capability targets.
+ Note that this hook must not emit any insns.
+@end deftypefn
+
+@deftypefn {Target Hook} rtx TARGET_FORCE_OPERAND (rtx @var{value}, rtx @var{target})
+Target hook to enable @code{force_operand} on target-specific RTL
+ expressions.
+ When @code{cap_narrowed_pointer} returns an RTX which can not be made an
+ operand by the general @code{force_operand}, this hook may need to be
+ implemented in order to handle said RTX.
 @end deftypefn
 
 @deftypefn {Target Hook} machine_mode TARGET_TRANSLATE_MODE_ATTRIBUTE (machine_mode @var{mode})

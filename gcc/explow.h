@@ -98,18 +98,19 @@ extern void update_nonlocal_goto_save_area (void);
 extern void record_new_stack_level (void);
 
 /* Allocate some space on the stack dynamically and return its address.  */
-extern rtx allocate_dynamic_stack_space (rtx, unsigned, unsigned,
+extern rtx allocate_dynamic_stack_space (rtx, unsigned, unsigned HOST_WIDE_INT,
 					 HOST_WIDE_INT, bool);
 
 /* Calculate the necessary size of a constant dynamic stack allocation from the
    size of the variable area.  */
-extern void get_dynamic_stack_size (rtx *, unsigned, unsigned, HOST_WIDE_INT *);
+extern void get_dynamic_stack_size (rtx *, unsigned, unsigned HOST_WIDE_INT,
+				    HOST_WIDE_INT *);
 
 /* Returns the address of the dynamic stack space without allocating it.  */
 extern rtx get_dynamic_stack_base (poly_int64, unsigned);
 
 /* Return an rtx doing runtime alignment to REQUIRED_ALIGN on TARGET.  */
-extern rtx align_dynamic_address (rtx, unsigned);
+extern rtx align_dynamic_address (rtx, unsigned HOST_WIDE_INT);
 
 /* Emit one stack probe at ADDRESS, an address within the stack.  */
 extern void emit_stack_probe (rtx);

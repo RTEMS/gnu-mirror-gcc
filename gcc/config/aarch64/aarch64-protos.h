@@ -564,6 +564,7 @@ bool aarch64_uimm12_shift (HOST_WIDE_INT);
 int aarch64_movk_shift (const wide_int_ref &, const wide_int_ref &);
 bool aarch64_use_return_insn_p (void);
 const char *aarch64_output_casesi (rtx *);
+bool aarch64_scbnds_immediate (unsigned HOST_WIDE_INT);
 
 unsigned int aarch64_tlsdesc_abi_id ();
 enum aarch64_symbol_type aarch64_classify_symbol (rtx, HOST_WIDE_INT);

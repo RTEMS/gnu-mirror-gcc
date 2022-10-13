@@ -1,10 +1,8 @@
-/* { dg-do run { target { stdint_types } } } */
+/* Avoid cheri_capability_pure since this accesses one stack variable via
+   a pointer to another, and that breaks capability bounds.  */
+/* { dg-do run { target { { stdint_types } && { ! cheri_capability_pure } } } } */
 
-#ifdef __GCC_ARM_CAPABILITY_ANY
-typedef __UINTPTR_TYPE__ uintptr_t;
-#else
 #include <stdint.h>
-#endif
 
 extern void abort (void);
 int main()

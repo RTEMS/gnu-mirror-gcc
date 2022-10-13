@@ -394,6 +394,20 @@ hook_rtx_rtx_null (rtx)
   return NULL;
 }
 
+/* Generic hook that takes two rtx's and returns NULL_RTX.  */
+rtx
+hook_rtx_rtx_rtx_null (rtx, rtx)
+{
+  return NULL;
+}
+
+/* Generic hook that takes two rtx's and returns the first.  */
+rtx
+hook_rtx_rtx_rtx_idfirst (rtx a, rtx)
+{
+  return a;
+}
+
 /* Generic hook that takes a tree and an int and returns NULL_RTX.  */
 rtx
 hook_rtx_tree_int_null (tree, int)

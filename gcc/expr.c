@@ -7933,6 +7933,12 @@ force_operand (rtx value, rtx target)
 			     SUBREG_BYTE (value));
 #endif
 
+  /* We allow the target to handle forcing RTX's that it recognises and we
+     don't into operands.  */
+  rtx machine_specific = targetm.force_operand (value, target);
+  if (machine_specific)
+    return machine_specific;
+
   return value;
 }
 
@@ -11757,7 +11763,8 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 	    target
 	      = assign_stack_temp_for_type
 		(TYPE_MODE (inner_type),
-		 GET_MODE_SIZE (TYPE_MODE (inner_type)), inner_type);
+		 GET_MODE_SIZE (TYPE_MODE (inner_type)), inner_type,
+		 true);
 
 	  emit_move_insn (target, op0);
 	  op0 = target;

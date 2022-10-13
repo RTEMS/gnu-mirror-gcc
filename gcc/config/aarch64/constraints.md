@@ -85,6 +85,12 @@
    using multiple instructions, with one temporary register."
  (match_operand 0 "aarch64_split_add_offset_immediate"))
 
+(define_constraint "Ucc"
+  "A constraint matching a const_int immediate which can be used in scbnds."
+  (and (match_code "const_int")
+       (match_test "aarch64_scbnds_immediate (ival)")))
+
+
 (define_constraint "J"
  "A constant that can be used with a SUB operation (once negated)."
  (and (match_code "const_int")

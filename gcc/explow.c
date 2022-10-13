@@ -1263,7 +1263,7 @@ record_new_stack_level (void)
 /* Return an rtx doing runtime alignment to REQUIRED_ALIGN on TARGET.  */
 
 rtx
-align_dynamic_address (rtx target, unsigned required_align)
+align_dynamic_address (rtx target, unsigned HOST_WIDE_INT required_align)
 {
   return expand_align_up (Pmode, target, gen_int_mode
 			  (required_align / BITS_PER_UNIT, POmode), NULL_RTX,
@@ -1286,7 +1286,7 @@ align_dynamic_address (rtx target, unsigned required_align)
    the additional size returned.  */
 void
 get_dynamic_stack_size (rtx *psize, unsigned size_align,
-			unsigned required_align,
+			unsigned HOST_WIDE_INT required_align,
 			HOST_WIDE_INT *pstack_usage_size)
 {
   rtx size = *psize;
@@ -1329,7 +1329,8 @@ get_dynamic_stack_size (rtx *psize, unsigned size_align,
     known_align = BITS_PER_UNIT;
   if (required_align > known_align)
     {
-      unsigned extra = (required_align - known_align) / BITS_PER_UNIT;
+      unsigned HOST_WIDE_INT extra
+	= (required_align - known_align) / BITS_PER_UNIT;
       size = plus_constant (POmode, size, extra);
       size = force_operand (size, NULL_RTX);
       if (size_align > known_align)
@@ -1414,17 +1415,34 @@ get_stack_check_protect (void)
    in the course of the execution of the function.  It is always safe to
    pass FALSE here and the following criterion is sufficient in order to
    pass TRUE: every path in the CFG that starts at the allocation point and
-   loops to it executes the associated deallocation code.  */
+   loops to it executes the associated deallocation code.
+
+   For capability targets this returns a bounded pointer to the allocated
+   space.  */
 
 rtx
 allocate_dynamic_stack_space (rtx size, unsigned size_align,
-			      unsigned required_align,
+			      unsigned HOST_WIDE_INT required_align,
 			      HOST_WIDE_INT max_size,
 			      bool cannot_accumulate)
 {
   HOST_WIDE_INT stack_usage_size = -1;
   rtx_code_label *final_label;
   rtx final_target, target;
+  rtx cheri_alignment_mask, cheri_alignment_hunk;
+  /* We introduce a distinction between different sizes in this function.
+     There is "the size of the object bounds" for capability precise bounds,
+     "the size required on the stack" to represent how much space is needed on
+     the stack in order to allocate this object (including space required to
+     align the object), and "the size of the object" that we give as our
+     request to __morestack_allocate_stack_space.
+
+     This allows ensuring that we give as precise bounds as possible.
+
+     After all sizes have been calculated, `size` represents the total space on
+     the stack.  */
+  rtx orig_size = size;
+  rtx bounds_size = size;
 
   /* If we're asking for zero bytes, it doesn't matter what we point
      to since we can't dereference it.  But return a reasonable
@@ -1469,9 +1487,132 @@ allocate_dynamic_stack_space (rtx size, unsigned size_align,
 	  current_function_has_unbounded_dynamic_stack_size = 1;
 	  stack_usage_size = 0;
 	}
+      /* If the size is constant, then account for any bounding that may be
+	 required.  */
+      else if (applying_cheri_stack_bounds ())
+	stack_usage_size += targetm.data_padding_size (stack_usage_size,
+						       required_align,
+						       NULL_TREE);
     }
 
+  if (!applying_cheri_stack_bounds ())
+    { /* Do nothing. */ }
+  else if (CONST_INT_P (size))
+    {
+      unsigned HOST_WIDE_INT s = UINTVAL (size);
+      s += targetm.data_padding_size (s, required_align, NULL_TREE);
+      size = gen_int_mode (s, POmode);
+      required_align = alignment_pad_from_bits (s, required_align, NULL_TREE);
+    }
+  else
+    {
+      rtx tmp = force_reg (POmode, size);
+      rtx target = gen_reg_rtx (POmode);
+      emit_insn (gen_cap_round_representable_length (target, tmp));
+      size = target;
+    }
+
+  bounds_size = size;
   get_dynamic_stack_size (&size, size_align, required_align, &stack_usage_size);
+
+  if (!CONST_INT_P (size) && applying_cheri_stack_bounds ())
+    {
+      /* Ensure alignment to that required for capability precise bounds.
+
+	 This is slightly awkward since the operation CHERI provides is
+	 "generate a mask defining the required alignment".  This operation is
+	 not easy to fit in with how this function currently behaves.
+
+	 This function acts by calculating enough space to ensure that we can
+	 ensure alignment *after* allocation.  We then use that size to do
+	 probing of the stack and query whether we need to split the stack
+	 (when that feature is enabled).  It is only after this that the
+	 allocation is made.
+
+	 Hence naively it seems we need to use our mask first to calculate the
+	 size needed, and later to perform our alignment.
+
+	 For STACK_GROWS_DOWNWARD this is not actually needed.
+
+	 This is because we know that the `cap_round_representable_length`
+	 operation will round up the length to a multiple of the same alignment
+	 requirement that `cap_representable_alignment_mask` describes.  Hence
+	 after having calculated the extra size needed for alignment, we know
+	 that "before + alignment size + rounded CHERI size" is still at a
+	 CHERI alignment boundary.
+
+	 Calling the above position X, we can then show that the extra
+	 operations to ensure alignment to `required_align` will still always
+	 leave us at a properly CHERI aligned value.
+	 If `required_align` is greater than the CHERI alignment requirement,
+	 then the extra space from `get_dynamic_stack_size` and the alignment
+	 to `required_align` both work as usual to ensure we are aligned to
+	 `required_align`, since `required_align` is greater than the CHERI
+	 alignment requirement it will satisfy both requirements.
+
+	  - If `required_align` is less than the CHERI alignment requirement
+	    then we can model the alignment for that `required_align` as "extra
+	    work" done on top of the CHERI alignment operations.
+	  - This "extra work" adds some space on the bottom of the stack (this
+	    is the STACK_GROWS_DOWNWARD case), and then aligns upwards to a
+	    `required_align` boundary.
+	  - The amount extra is never going to be enough to span two
+	    `required_align` boundaries (due to the calculations in
+	    `get_dynamic_stack_size`).
+	  - Since the CHERI alignment requirement is greater than that of
+	    `required_align` we know that the position X is both a CHERI
+	    alignment boundary *and* a `required_align` boundary.
+	  - Given this is a `required_align` boundary the act of adding space
+	    and aligning upwards to `required_align` must bring us back to
+	    that same position.
+
+	For *NON* STACK_GROWS_DOWNWARD cases we must align for CHERI after
+	allocation, since in that case the allocation size does not affect the
+	pointer returned from this function.  */
+
+      /* Calculate the extra size required to align for CHERI precise bounds.
+      */
+      rtx cap_aligned = gen_reg_rtx (POmode);
+      emit_move_insn (cap_aligned,
+		      drop_capability (virtual_stack_dynamic_rtx));
+      rtx saved_top = gen_reg_rtx (POmode);
+      emit_move_insn (saved_top, cap_aligned);
+
+      /* Get the mask which describes the alignment we need.  */
+      rtx size_rtx = force_reg (POmode, orig_size);
+      cheri_alignment_mask = gen_reg_rtx (POmode);
+      emit_insn (gen_cap_representable_alignment_mask
+		 (cheri_alignment_mask, size_rtx));
+
+      /* Use that mask to apply the relevant alignment to our pointer onto the
+	 stack.  */
+      cap_aligned = expand_binop (POmode, and_optab,
+				  cap_aligned, cheri_alignment_mask,
+				  NULL_RTX, 1, OPTAB_LIB_WIDEN);
+
+      if (!STACK_GROWS_DOWNWARD)
+	{
+	  rtx tmp = expand_unop (POmode, one_cmpl_optab,
+				 cheri_alignment_mask, NULL_RTX, 0);
+	  cheri_alignment_hunk = plus_constant (POmode, tmp, 1);
+	  cap_aligned = expand_pointer_plus (POmode, cap_aligned,
+					     cheri_alignment_hunk,
+					     NULL_RTX, 1, OPTAB_DIRECT);
+	}
+
+      rtx extra_size;
+      if (STACK_GROWS_DOWNWARD)
+	extra_size = expand_binop (POmode, sub_optab,
+				   saved_top, cap_aligned,
+				   NULL_RTX, 1, OPTAB_LIB_WIDEN);
+      else
+	extra_size = expand_binop (POmode, sub_optab,
+				   cap_aligned, saved_top,
+				   NULL_RTX, 1, OPTAB_LIB_WIDEN);
+      size = expand_binop (POmode, add_optab, size, extra_size,
+			   extra_size, 1, OPTAB_LIB_WIDEN);
+    }
+
 
   target = gen_reg_rtx (Pmode);
 
@@ -1521,13 +1662,18 @@ allocate_dynamic_stack_space (rtx size, unsigned size_align,
 	 by malloc does not meet REQUIRED_ALIGN, we increase SIZE to
 	 make sure we allocate enough space.  */
       if (MALLOC_ABI_ALIGNMENT >= required_align)
-	ask = size;
+	ask = orig_size;
       else
-	ask = expand_binop (POmode, add_optab, size,
+	ask = expand_binop (POmode, add_optab, orig_size,
 			    gen_int_mode (required_align / BITS_PER_UNIT - 1,
 					  POmode),
 			    NULL_RTX, 1, OPTAB_LIB_WIDEN);
 
+      /* As mentioned above, __morestack_allocate_stack_space uses `malloc`.
+	 For purecap, malloc should provide a suitably aligned and padded
+	 allocation such that the returned capability does not give access to
+	 anything else.  Hence we should not have to adjust anything for
+	 precise bounds of the alloca object.  */
       func = init_one_libfunc ("__morestack_allocate_stack_space");
 
       space = emit_library_call_value (func, target, LCT_NORMAL, Pmode,
@@ -1641,14 +1787,43 @@ allocate_dynamic_stack_space (rtx size, unsigned size_align,
       target = final_target;
     }
 
+  /* Ensure alignment to that requested by the caller.  */
   target = align_dynamic_address (target, required_align);
+  /* For STACK_GROWS_DOWNWARD we do not need to align for CHERI precise bounds
+     since the length of allocation has been calculated so that the "end" of
+     the allocation is on a correct alignment boundary after the above call to
+     `align_dynamic_address`.  In the other case we do need to align for CHERI
+     precise bounds since the length of allocation has no bearing on the value
+     we return.  */
+  if (!CONST_INT_P (size) && !STACK_GROWS_DOWNWARD
+      && applying_cheri_stack_bounds ())
+    {
+      /* N.b. untested since we have no !STACK_GROWS_DOWNWARD capability
+	 targets.  However this should at least give an idea of how to proceed
+	 when that does happen.  */
+      rtx tmp = expand_binop (POmode, add_optab,
+			      drop_capability (target),
+			      cheri_alignment_hunk,
+			      NULL_RTX, 1, OPTAB_LIB_WIDEN);
+      tmp = expand_binop (POmode, and_optab,
+			  tmp, cheri_alignment_mask,
+			  NULL_RTX, 1, OPTAB_LIB_WIDEN);
+      target = expand_replace_address_value (Pmode, target, tmp, target);
+    }
 
-  /* Now that we've committed to a return value, mark its alignment.  */
+  /* Now that we've committed to a return value, mark its alignment.
+     This is always a *minimum* alignment, so is not affected by possible extra
+     alignment added by capability precise bounds requirements.  */
   mark_reg_pointer (target, required_align);
 
   /* Record the new stack level.  */
   record_new_stack_level ();
 
+  /* If we have split_stack_space_check, then we're returning a pointer from
+     malloc and hence it is already bounded.  */
+  if (!targetm.have_split_stack_space_check ()
+      && applying_cheri_stack_bounds ())
+    target = targetm.cap_narrowed_pointer (target, bounds_size);
   return target;
 }
 

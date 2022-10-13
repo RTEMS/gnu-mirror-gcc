@@ -2727,8 +2727,8 @@ expand_builtin_cexpi (tree exp, rtx target)
       else
 	gcc_unreachable ();
 
-      op1 = assign_temp (TREE_TYPE (arg), 1, 1);
-      op2 = assign_temp (TREE_TYPE (arg), 1, 1);
+      op1 = assign_temp (TREE_TYPE (arg), 1, 1, true);
+      op2 = assign_temp (TREE_TYPE (arg), 1, 1, true);
       op1a = copy_addr_to_reg (XEXP (op1, 0));
       op2a = copy_addr_to_reg (XEXP (op2, 0));
       top1 = make_tree (build_pointer_type (TREE_TYPE (arg)), op1a);
@@ -7164,7 +7164,7 @@ expand_ifn_atomic_compare_exchange_into_call (gcall *call, machine_mode mode)
   vec->quick_push (gimple_call_arg (call, 0));
   tree expected = gimple_call_arg (call, 1);
   rtx x = assign_stack_temp_for_type (mode, GET_MODE_SIZE (mode),
-				      TREE_TYPE (expected));
+				      TREE_TYPE (expected), true);
   rtx expd = expand_expr (expected, x, mode, EXPAND_NORMAL);
   if (expd != x)
     emit_move_insn (x, expd);

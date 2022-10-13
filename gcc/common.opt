@@ -1251,6 +1251,11 @@ ffake-hybrid-init=
 Common Joined RejectNegative UInteger Var(flag_fake_hybrid_init) Init(INT_MAX)
 Use a round-robin counter for -ffake-hybrid and specify its initial value.
 
+fcheri-stack-bounds
+Common Var(flag_cheri_stack_bounds, 1) Init(1)
+Developer option to enable or disable applying CHERI bounds to stack objects.
+This is only relevant on CHERI targets.
+
 fdebug-prefix-map=
 Common Joined RejectNegative Var(common_deferred_options) Defer
 -fdebug-prefix-map=<old>=<new>	Map one directory name to another in debug information.
