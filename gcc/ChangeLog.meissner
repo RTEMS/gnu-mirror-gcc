@@ -1,3 +1,38 @@
+==================== dmf001, patch #9
+
+Use MMA instruction instead of the renamed DMF instruction.
+
+2022-10-13   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (vvi4i4i8_dmf): Delete.
+	(avvi4i4i8_dmf): Likewise.
+	(vvi4i4i2_dmf): Likewise.
+	(avvi4i4i2_dmf): Likewise.
+	(vvi4i4_dmf): Likewise.
+	(avvi4i4_dmf): Likewise.
+	(pvi4i2_dmf): Likewise.
+	(apvi4i2_dmf): Likewise.
+	(vvi4i4i4_dmf): Likewise.
+	(avvi4i4i4_dmf): Likewise.
+	(mma_<vv>): Use MMA instruction instead of the renamed DMF
+	instruction.
+	(mma_<avv>): Likewise.
+	(mma_<pv>): Likewise.
+	(mma_<apv>): Likewise.
+	(mma_<vvi4i4i8>): Likewise.
+	(mma_<avvi4i4i8>): Likewise.
+	(mma_<vvi4i4i2>): Likewise.
+	(mma_<avvi4i4i2>): Likewise.
+	(mma_<vvi4i4>): Likewise.
+	(mma_<avvi4i4>): Likewise.
+	(mma_<pvi4i2>): Likewise.
+	(mma_<apvi4i2>): Likewise.
+	(mma_<vvi4i4i4>): Likewise.
+	(mma_<avvi4i4i4>): Likewise.
+	* config/rs6000/rs6000.cc (print_operand): Rework %A error message.
+
 ==================== dmf001, patch #8
 
 Switch to DMF syntax and DMR for all MMA operations.
