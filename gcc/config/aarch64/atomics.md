@@ -350,10 +350,16 @@
   {
     rtx (*gen) (rtx, rtx, rtx);
 
-    /* Use an atomic load-operate instruction when possible.  */
-    if (TARGET_OUTLINE_ATOMICS)
+    /* Use an atomic load-operate instruction when possible.
+       Note that there is no point using outline atomics when actually
+       targetting Morello since we know the architecture that we're targetting,
+       and anyway there aren't the LSE instructions to act on capability data.
+
+       (OOL atomics was introduced so we could generate a program which would
+       work on ARMv8-a targets but also efficiently use the LSE instructions
+       when running on a system that supports it).  */
+    if (TARGET_OUTLINE_ATOMICS && TARGET_CAPABILITY_FAKE)
       {
-	gcc_assert (TARGET_CAPABILITY_FAKE);
 	const atomic_ool_names *names;
 
 	switch (<CODE>)
@@ -608,9 +614,8 @@
   rtx (*gen) (rtx, rtx, rtx, rtx);
 
   /* Use an atomic load-operate instruction when possible.  */
-  if (TARGET_OUTLINE_ATOMICS)
+  if (TARGET_OUTLINE_ATOMICS && TARGET_CAPABILITY_FAKE)
     {
-      gcc_assert (TARGET_CAPABILITY_FAKE);
       const atomic_ool_names *names;
       switch (<CODE>)
 	{

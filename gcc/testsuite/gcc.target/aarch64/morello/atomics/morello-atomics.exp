@@ -36,12 +36,7 @@ if { [check_effective_target_aarch64_capability_any] } {
 }
 
 torture-init
-
-if { [check_effective_target_cheri_capability_pure] } {
-  set-torture-options "$C_TORTURE_OPTIONS" [list { } { -mno-outline-atomics } ]
-} else {
-  set-torture-options "$C_TORTURE_OPTIONS" [list { } { -mno-outline-atomics } { -moutline-atomics } ]
-}
+set-torture-options "$C_TORTURE_OPTIONS" [list { } { -mno-outline-atomics } { -moutline-atomics } ]
 
 # Main loop.
 gcc-dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/*.\[cCS\]]] \

@@ -15400,27 +15400,11 @@ aarch64_override_options_internal (struct gcc_options *opts)
     error ("MORELLO TODO OpenMP has not been implemented for Morello");
   if (opts->x_flag_openacc && TARGET_CAPABILITY_ANY)
     error ("MORELLO TODO OpenACC has not been implemented for Morello");
-  if (!flag_inline_atomics && TARGET_CAPABILITY_ANY)
-    error ("MORELLO TODO -fno-inline-atomics has not been implemented for Morello");
   if (flag_fake_hybrid >= flag_fake_hybrid_init)
     srand (get_random_seed (false));
 
   if (TARGET_CAPABILITY_ANY && TARGET_SVE)
     error ("SVE is not supported with capabilities");
-
-  if ((aarch64_cap == AARCH64_CAPABILITY_PURE
-       || aarch64_cap == AARCH64_CAPABILITY_HYBRID)
-      && TARGET_OUTLINE_ATOMICS)
-    {
-      if (aarch64_flag_outline_atomics == 2)
-	/* If outline atomics was just set by default, unset it.
-	  Complain if it was explicitly requested on the command line.
-	  MORELLO TODO Maybe should think a bit harder about the user interface
-	  here, but it's not that important.  */
-	aarch64_flag_outline_atomics = 0;
-      else
-	error ("Outlined Atomics are not supported with capabilities");
-    }
 
   if (opts->x_aarch64_override_tune_string)
     aarch64_parse_override_string (opts->x_aarch64_override_tune_string,
