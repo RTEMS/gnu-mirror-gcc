@@ -13920,7 +13920,7 @@ print_operand (FILE *file, rtx x, int code)
 	  if (DMF_REGNO_P (REGNO (x)))
 	    fprintf (file, "%d", REGNO (x) - FIRST_DMF_REGNO);
 	  else
-	    output_operand_lossage ("%%A operand is not a DMF accumulator");
+	    output_operand_lossage ("%%A operand is not a DMR");
 	}
       else if (!FP_REGNO_P (REGNO (x)) || (REGNO (x) % 4) != 0)
 	output_operand_lossage ("invalid %%A value");
