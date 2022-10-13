@@ -5305,6 +5305,15 @@ unary_op_get_intcap_provenance (tree c)
   return c;
 }
 
+void
+warn_int_cap_conversion (location_t loc)
+{
+  if (warning_at (loc, OPT_Wcheri_capability_misuse,
+    "cast from provenance-free integer type to pointer type will give "
+    "pointer that can not be dereferenced"))
+    inform (loc, "insert cast to intptr_t to silence this warning");
+}
+
 /* Given a boolean expression ARG, return a tree representing an increment
    or decrement (as indicated by CODE) of ARG.  The front end must check for
    invalid cases (e.g., decrement in C++).  */

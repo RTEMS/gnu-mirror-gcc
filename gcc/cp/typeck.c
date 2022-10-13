@@ -8051,8 +8051,12 @@ build_reinterpret_cast_1 (location_t loc, tree type, tree expr,
      converted to a pointer.  */
   else if (TYPE_PTR_P (type) && (INTEGRAL_OR_ENUMERATION_TYPE_P (intype)
 				 || INTCAP_TYPE_P (intype)))
-    /* OK */
-    ;
+    {
+      if (capability_type_p (type)
+	  && !INTCAP_TYPE_P (intype)
+	  && TREE_CODE (cp_fully_fold (expr)) != INTEGER_CST)
+	warn_int_cap_conversion (loc);
+    }
   else if ((INTEGRAL_OR_ENUMERATION_TYPE_P (type)
 	    || TYPE_PTR_OR_PTRMEM_P (type))
 	   && same_type_p (type, intype))

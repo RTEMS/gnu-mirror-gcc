@@ -6074,12 +6074,7 @@ build_c_cast (location_t loc, tree type, tree expr)
 	  && INTEGRAL_TYPE_P (TREE_TYPE (value))
 	  && TREE_CODE (type) != INTCAP_TYPE
 	  && TREE_CODE (value) != INTEGER_CST)
-	{
-	  if (warning_at (loc, OPT_Wint_to_pointer_cast,
-	    "cast from provenance-free integer type to pointer type will give "
-	    "pointer that can not be dereferenced"))
-	    inform (loc, "insert cast to intptr_t to silence this warning");
-	}
+	warn_int_cap_conversion (loc);
 
       if (capability_type_p (type)
 	  && TREE_CODE (type) != INTCAP_TYPE

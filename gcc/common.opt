@@ -573,32 +573,39 @@ Wcpp
 Common Var(warn_cpp) Init(1) Warning
 Warn when a #warning directive is encountered.
 
+Wcheri
+Common Var(warn_cheri) Warning
+Diagnostic group for all CHERI warnings.
+
 Wcheri-bounds
-Common Var(warn_cheri_bounds) Init(1) Warning
+Common Var(warn_cheri_bounds) Init(1) Warning EnabledBy(Wcheri)
 Warn when an object can not be aligned to ensure non-overlapping bounds.
 
+Wcheri-capability-misuse
+Common Var(warn_cheri_cap_misuse) Init(1) Warning EnabledBy(Wcheri)
+
 Wcheri-provenance
-Common Var(warn_cheri_provenance) Init(1) Warning
+Common Var(warn_cheri_provenance) Init(1) Warning EnabledBy(Wcheri)
 Warn when an expression has ambiguous pointer provenance or will be known
 invalid.
 
 Wcheri-implicit-pointer-conversion-from-cap
-Common Var(warn_cheri_implicit_pointer_conversion_from_cap) Init(1) Warning
+Common Var(warn_cheri_implicit_pointer_conversion_from_cap) Init(1) Warning EnabledBy(Wcheri)
 Warn on implicit conversions from capability pointers to non-capability
 pointers.
 
 Wcheri-implicit-pointer-conversion-to-cap
-Common Var(warn_cheri_implicit_pointer_conversion_to_cap) Init(1) Warning
+Common Var(warn_cheri_implicit_pointer_conversion_to_cap) Init(1) Warning EnabledBy(Wcheri)
 Warn on implicit conversions from non-capability pointers to capability
 pointers.
 
 Wcheri-explicit-pointer-conversion-from-cap
-Common Var(warn_cheri_explicit_pointer_conversion_from_cap) Init(1) Warning
+Common Var(warn_cheri_explicit_pointer_conversion_from_cap) Init(1) Warning EnabledBy(Wcheri)
 Warn on explicit conversions from capability pointers to non-capability
 pointers.
 
 Wcheri-explicit-pointer-conversion-to-cap
-Common Var(warn_cheri_explicit_pointer_conversion_to_cap) Init(1) Warning
+Common Var(warn_cheri_explicit_pointer_conversion_to_cap) Init(1) Warning EnabledBy(Wcheri)
 Warn on explicit conversions from non-capability pointers to capability
 pointers.
 

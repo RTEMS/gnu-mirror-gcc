@@ -1016,6 +1016,8 @@ extern tree binary_op_get_intcap_provenance (location_t,
 					     enum tree_code, tree, tree, bool);
 extern tree unary_op_get_intcap_provenance (tree);
 
+extern void warn_int_cap_conversion (location_t);
+
 /* Handle increment and decrement of boolean types.  */
 extern tree boolean_increment (enum tree_code, tree);
 
