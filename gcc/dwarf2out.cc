@@ -33044,6 +33044,10 @@ dwarf2out_early_finish (const char *filename)
       || TARGET_PECOFF || TARGET_COFF)
     return;
 
+  FILE *current_asm_file = asm_out_file;
+  asm_out_file = fopen ("/tmp/lto-debug.s", "w");
+  targetm.asm_out.file_start ();
+
   /* Now as we are going to output for LTO initialize sections and labels
      to the LTO variants.  We don't need a random-seed postfix as other
      LTO sections as linking the LTO debug sections into one in a partial
@@ -33167,6 +33171,11 @@ dwarf2out_early_finish (const char *filename)
       debug_line_str_hash->traverse<enum dwarf_form,
 				    output_indirect_string> (form);
     }
+
+  targetm.asm_out.file_end ();
+  fclose (asm_out_file);
+  asm_out_file = current_asm_file;
+  wipe_section_cache ();
 
   /* Switch back to the text section.  */
   switch_to_section (text_section);

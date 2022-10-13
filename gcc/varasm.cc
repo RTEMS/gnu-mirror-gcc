@@ -6658,6 +6658,12 @@ init_varasm_once (void)
 #endif
 }
 
+void
+wipe_section_cache ()
+{
+  section_htab->empty ();
+}
+
 enum tls_model
 decl_default_tls_model (const_tree decl)
 {

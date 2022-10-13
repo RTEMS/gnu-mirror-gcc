@@ -540,6 +540,7 @@ extern section *get_section (const char *, unsigned int, tree,
 			     bool not_existing = false);
 extern section *get_named_section (tree, const char *, int);
 extern section *get_variable_section (tree, bool);
+extern void wipe_section_cache (void);
 extern void place_block_symbol (rtx);
 extern rtx get_section_anchor (struct object_block *, HOST_WIDE_INT,
 			       enum tls_model);
