@@ -68,6 +68,7 @@ __thread int tls_array[16394];
    emitted for the TLS variable above).  */
 int aligned_array[16395] __attribute__ ((aligned(4),section(".aligned_sect")));
 /* { dg-warning "object 'aligned_array' has cheri alignment overridden by a user-specified one" "" { target cheri_capability_pure } .-1 } */
+/* { dg-warning "object 'tls_array' has cheri alignment ignored since it is thread local" "" { target tls_native } .-2 } */
 /* { dg-final { scan-assembler-not "\.zero\t24\n" } } */
 /* N.B. Checking for the non-existence of this line rather than the existence
    of an alternate line to allow running this testcase on bare-metal targets

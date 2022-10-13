@@ -1,7 +1,7 @@
 /* { dg-do assemble } */
 /* { dg-additional-options "-save-temps" } */
 /* { dg-final { check-function-bodies "**" ""  { {-O[123s]} } } } */
-/* { dg-skip-if "" { *-*-* } { "-mabi=purecap" "-mfake-capability" } { "" } }  */
+/* { dg-require-effective-target cheri_capability_hybrid } */
 
 #include <arm_neon.h>
 

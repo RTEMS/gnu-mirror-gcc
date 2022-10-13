@@ -1,6 +1,6 @@
 /* { dg-do assemble } */
 /* { dg-additional-options "-fno-ivopts -save-temps" } */
-/* { dg-skip-if "" { *-*-* } { "-mabi=purecap" "-mfake-capability" } { "" } }  */
+/* { dg-require-effective-target cheri_capability_hybrid } */
 
 #define ALT_BASE
 #include "load-store-utils.h"

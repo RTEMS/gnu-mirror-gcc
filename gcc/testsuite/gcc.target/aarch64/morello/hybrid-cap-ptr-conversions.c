@@ -1,5 +1,6 @@
 /* { dg-do compile { target aarch64*-*-* } } */
-/* { dg-skip-if "" { *-*-* } { "-mabi=purecap" "-mfake-capability" "-ffake-hybrid" "-ffake-hybrid-init" } { "" } }  */
+/* { dg-require-effective-target cheri_capability_hybrid } */
+/* { dg-skip-if "" { *-*-* } { "-ffake-hybrid" "-ffake-hybrid-init" } { "" } }  */
 
 int x;
 int * foo = &x;

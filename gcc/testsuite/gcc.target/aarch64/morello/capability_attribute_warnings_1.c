@@ -1,5 +1,5 @@
 /* { dg-do compile { target aarch64*-*-* } } */
-/* { dg-skip-if "" { *-*-* } { "-mabi=purecap" "-mfake-capability" } { "" } }  */
+/* { dg-require-effective-target cheri_capability_hybrid } */
 
 /* Improper ordering: Warning cases.  */
 int __capability *var1; /* { dg-warning "use of '__capability' before the pointer type is deprecated" } */

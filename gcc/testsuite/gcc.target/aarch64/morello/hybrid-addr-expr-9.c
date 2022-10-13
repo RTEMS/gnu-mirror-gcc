@@ -1,6 +1,6 @@
 /* { dg-do compile } */
 /* { dg-additional-options "-fgimple" } */
-/* { dg-skip-if "" { *-*-* } { "-mabi=purecap" "-mfake-capability" } { "" } }  */
+/* { dg-require-effective-target cheri_capability_hybrid } */
 
 int x;
 __GIMPLE int *foo(int i) {

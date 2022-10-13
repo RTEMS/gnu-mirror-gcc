@@ -1,6 +1,6 @@
 /* { dg-do assemble } */
 /* { dg-additional-options "-fpeephole2 -fno-tree-vectorize -mstrict-align -save-temps" } */
-/* { dg-skip-if "" { *-*-* } { "-mabi=purecap" "-mfake-capability" } { "" } }  */
+/* { dg-require-effective-target cheri_capability_hybrid } */
 
 #include <arm_neon.h>
 

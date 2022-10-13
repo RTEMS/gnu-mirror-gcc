@@ -1,7 +1,8 @@
 /* { dg-do assemble } */
 /* { dg-additional-options "-mcmodel=small -fPIC -fgimple -save-temps" } */
 /* { dg-final { check-function-bodies "**" "" } } */
-/* { dg-skip-if "" { *-*-* } { "-O0" "-mabi=purecap" "-mfake-capability" } { "" } }  */
+/* { dg-skip-if "" { *-*-* } { "-O0" } { "" } }  */
+/* { dg-require-effective-target cheri_capability_hybrid } */
 
 /*
 ** foo:
