@@ -33,6 +33,9 @@ inline void *operator new (__SIZE_TYPE__ size, void *p)
   return p;
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+__attribute__((aligned(16)))
+#endif
 char heap[sizeof(elt[500])];
 
 int main ()

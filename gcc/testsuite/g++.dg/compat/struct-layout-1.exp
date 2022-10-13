@@ -17,6 +17,11 @@
 # This file was written by Jakub Jelinek, <jakub@redhat.com>
 # Based on compat.exp writte by Janis Johnson, <janis187@us.ibm.com>
 
+# The random generator in this testsuite may deliberately underalign
+# capabilities in a packed struct. This is currently not supported.
+if { [check_effective_target_cheri_capability_pure] } then {
+  return
+}
 
 # Test interoperability of two compilers that follow the same ABI.
 #

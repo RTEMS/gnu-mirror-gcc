@@ -6,6 +6,12 @@
 
 #include <stddef.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+typedef __INTPTR_TYPE__ vtable_type;
+#else
+typedef ptrdiff_t vtable_type;
+#endif
+
 struct S0
 {
   virtual void s0 ();
@@ -149,14 +155,14 @@ extern "C" {
 #ifdef _LP64
 #define CMP_VPTR(A, B)	(*(unsigned long *)(*(A)+16) == *(unsigned long *)((unsigned long)(B)+16))
 #else
-#define CMP_VPTR(A, B)	(*(A) == (ptrdiff_t)(B))
+#define CMP_VPTR(A, B)	(*(A) == (vtable_type)(B))
 #endif /* _LP64 */
 #else
 extern "C" { unsigned int __canonicalize_funcptr_for_compare (void*); }
 #define CMP_VPTR(A, B) (__canonicalize_funcptr_for_compare(*(void **)A) == __canonicalize_funcptr_for_compare((void *)B))
 #endif /* __hpux__ */
 #else
-#define CMP_VPTR(A, B)	(*(A) == (ptrdiff_t)(B))
+#define CMP_VPTR(A, B)	(*(A) == (vtable_type)(B))
 #endif /* __hppa__ */
 #define INC_VPTR(A)	((A) += 1)
 #define INC_VDATA(A,N)	((A) += (N))
@@ -165,11 +171,11 @@ extern "C" { unsigned int __canonicalize_funcptr_for_compare (void*); }
 int main ()
 {
   S4 s4;
-  ptrdiff_t **vptr;
-  ptrdiff_t *vtbl;
+  vtable_type **vptr;
+  vtable_type *vtbl;
 
   // Set vtbl to point at the beginning of S4's primary vtable.
-  vptr = (ptrdiff_t **) &s4;
+  vptr = (vtable_type **) &s4;
   vtbl = *vptr;
   INC_VDATA (vtbl, -5);
 
