@@ -33044,7 +33044,7 @@ dwarf2out_early_finish (const char *filename)
       || TARGET_PECOFF || TARGET_COFF)
     return;
 
-  FILE *current_asm_file = asm_out_file;
+  gcc_assert (asm_out_file == NULL);
   asm_out_file = fopen ("/tmp/lto-debug.s", "w");
   targetm.asm_out.file_start ();
 
@@ -33174,8 +33174,8 @@ dwarf2out_early_finish (const char *filename)
 
   targetm.asm_out.file_end ();
   fclose (asm_out_file);
-  asm_out_file = current_asm_file;
   wipe_section_cache ();
+  init_asm_output ();
 
   /* Switch back to the text section.  */
   switch_to_section (text_section);

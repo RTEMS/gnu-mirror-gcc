@@ -2520,11 +2520,12 @@ symbol_table::finalize_compilation_unit (void)
 
       /* Clean up anything that needs cleaning up after initial debug
 	 generation.  */
-      if (asm_out_file == NULL)
-	init_asm_output ();
       debuginfo_early_start ();
       (*debug_hooks->early_finish) (main_input_filename);
       debuginfo_early_stop ();
+
+      if (asm_out_file == NULL)
+	init_asm_output ();
     }
 
   /* Finally drive the pass manager.  */
