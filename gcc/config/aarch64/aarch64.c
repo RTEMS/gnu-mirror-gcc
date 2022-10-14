@@ -12114,6 +12114,39 @@ aarch64_output_casesi (rtx *operands)
   return "";
 }
 
+const char *
+aarch64_output_clrperm_immed (rtx *operands)
+{
+  gcc_assert (REG_P (operands[0]) && GET_MODE (operands[0]) == CADImode);
+  gcc_assert (REG_P (operands[1]) && GET_MODE (operands[1]) == CADImode);
+  gcc_assert (CONST_INT_P (operands[2]));
+
+  char immed[4];
+  const unsigned rwx_bits = (UINTVAL (operands[2]) >> 15) & 7;
+  if (rwx_bits == 0)
+    snprintf (immed, sizeof (immed), "#0");
+  else
+    {
+      char *p = immed;
+      enum {
+	X = (1 << 0),
+	W = (1 << 1),
+	R = (1 << 2)
+      };
+      if (rwx_bits & R)
+	*p++ = 'r';
+      if (rwx_bits & W)
+	*p++ = 'w';
+      if (rwx_bits & X)
+	*p++ = 'x';
+      *p = '\0';
+    }
+
+  asm_fprintf (asm_out_file, "\tclrperm\tc%u, c%u, %s\n",
+	       REGNO (operands[0]), REGNO (operands[1]), immed);
+  return "";
+}
+
 
 /* Return size in bits of an arithmetic operand which is shifted/scaled and
    masked such that it is suitable for a UXTB, UXTH, or UXTW extend

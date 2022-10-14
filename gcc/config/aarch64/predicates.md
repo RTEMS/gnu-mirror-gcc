@@ -64,6 +64,18 @@
   (ior (match_operand 0 "register_operand")
        (match_code "const_int")))
 
+; We can use the immediate form of clrperm if we're only clearing rwx
+; bits (bits 16 through 18 inclusive), i.e. if all the low bits below
+; these are cleared in the mask.
+(define_predicate "aarch64_clrperm_immediate"
+  (and
+    (match_code "const_int")
+    (match_test "(UINTVAL (op) & 0x7fff) == 0")))
+
+(define_predicate "aarch64_clrperm_operand"
+  (ior (match_operand 0 "register_operand")
+       (match_operand 0 "aarch64_clrperm_immediate")))
+
 (define_predicate "aarch64_simd_register"
   (and (match_code "reg")
        (match_test "FP_REGNUM_P (REGNO (op))")))

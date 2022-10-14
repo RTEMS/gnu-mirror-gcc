@@ -260,13 +260,15 @@
 )
 
 (define_insn "aarch64_cap_clear_perm"
-  [(set (match_operand:CADI 0 "register_operand" "=rk")
-        (unspec:CADI [(match_operand:CADI 1 "register_operand" "rk")
-          (match_operand:DI 2 "register_operand" "r")]
-            UNSPEC_CHERI_CLEAR_PERM))
+  [(set (match_operand:CADI 0 "register_operand" "=rk,rk")
+	(unspec:CADI [(match_operand:CADI 1 "register_operand" "rk,rk")
+	  (match_operand:DI 2 "aarch64_clrperm_operand" "r,Ucp")]
+	    UNSPEC_CHERI_CLEAR_PERM))
   ]
   "TARGET_MORELLO"
-  "clrperm\\t%0, %1, %2"
+  "@
+  clrperm\\t%0, %1, %2
+  * return aarch64_output_clrperm_immed (operands);"
 )
 
 (define_insn "cap_global_data_get"
@@ -280,10 +282,20 @@
 (define_expand "cap_perms_and_cadi"
   [(match_operand:CADI 0 "register_operand")
    (match_operand:CADI 1 "register_operand")
-   (match_operand:DI 2 "register_operand")]
+   (match_operand:DI 2 "aarch64_reg_or_imm")]
   "TARGET_MORELLO"
   {
-    emit_insn (gen_one_cmpldi2 (operands[2], operands[2]));
+    if (CONST_INT_P (operands[2]))
+      {
+	rtx cand = gen_int_mode (~UINTVAL (operands[2]), DImode);
+	if (aarch64_clrperm_immediate (cand, DImode))
+	  operands[2] = cand;
+	else
+	  operands[2] = force_reg (DImode, cand);
+      }
+    else
+      emit_insn (gen_one_cmpldi2 (operands[2], operands[2]));
+
     emit_insn (gen_aarch64_cap_clear_perm (operands[0], operands[1], operands[2]));
     DONE;
   }

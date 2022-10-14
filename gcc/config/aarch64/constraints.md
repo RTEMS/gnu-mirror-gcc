@@ -90,6 +90,9 @@
   (and (match_code "const_int")
        (match_test "aarch64_scbnds_immediate (ival)")))
 
+(define_constraint "Ucp"
+  "A constraint matching an immediate suitable for clrperm."
+  (match_operand 0 "aarch64_clrperm_immediate"))
 
 (define_constraint "J"
  "A constant that can be used with a SUB operation (once negated)."
