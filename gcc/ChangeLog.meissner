@@ -1,3 +1,47 @@
+==================== dmf001, patch #10
+
+Make wD switch between FPRs and DMFs.
+
+2022-10-14   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* constraints.md (wD): Change wD to be FPR registers for power10 and DMF
+	registers for DMF systems.
+	* config/rs6000/mma.md (vvi4i4i8_insn): New int attribute.
+	(avvi4i4i8_insn): Likewise.
+	(vvi4i4i2_insn): Likewise.
+	(avvi4i4i2_insn): Likewise.
+	(vvi4i4_insn): Likewise.
+	(avvi4i4_insn): Likewise.
+	(pvi4i2_insn): Likewise.
+	(apvi4i2_insn): Likewise.
+	(vvi4i4i4_insn): Likewise.
+	(avvi4i4i4_insn): Likewise.
+	(mma_<vv>): Use wD constraint for accumulator inputs and outputs.
+	(mma_<avv>): Likewise.
+	(mma_<pv>): Likewise.
+	(mma_<apv>): Likewise.
+	(mma_<vvi4i4i8>): Likewise.
+	(mma_<avvi4i4i8>): Likewise.
+	(mma_<vvi4i4i2): Likewise.
+	(mma_<avvi4i4i2>): Likewise.
+	(mma_<vvi4i4>): Likewise.
+	(mma_<avvi4i4>): Likewise.
+	(mma_<pvi4i2>): Likewise.
+	(mma_<apvi4i2>): Likewise.
+	(mma_<vvi4i4i4): Likewise.
+	(mma_<avvi4i4i4>): Likewise.
+	* config/rs6000/s6000.cc (rs6000_debug_reg_global): Print what register
+	class wD implements.
+	(rs6000_init_hard_regno_mode_ok): Set up to make wD constraint choose
+	DMF accumualators on DMF systems and FPR registers on MMA systems
+	without DMF.
+	(print_operand): Add %d<n> output modifier, to print 'dm' or nothing to
+	switch MMA instructions being generated.
+	* config/rs6000/rs6000.h (enum rs6000_reg_class_enum): Add wD option.
+	* doc/md.texi (PowerPC constraints): Document the wD constraint.
+
 ==================== dmf001, patch #9
 
 Use MMA instruction instead of the renamed DMF instruction.
