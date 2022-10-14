@@ -1220,6 +1220,7 @@ enum r6000_reg_class_enum {
   RS6000_CONSTRAINT_wr,		/* GPR register if 64-bit  */
   RS6000_CONSTRAINT_wx,		/* FPR register for STFIWX */
   RS6000_CONSTRAINT_wA,		/* BASE_REGS if 64-bit.  */
+  RS6000_CONSTRAINT_wD,		/* FPR_REGS if !DMF, DMR_REGS if DMF.  */
   RS6000_CONSTRAINT_MAX
 };
 

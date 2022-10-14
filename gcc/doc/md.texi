@@ -3267,6 +3267,12 @@ Like @code{b}, if @option{-mpowerpc64} is used; otherwise, @code{NO_REGS}.
 @item wB
 Signed 5-bit constant integer that can be loaded into an Altivec register.
 
+@item wD
+Register to use with MMA instructions or @code{NO_REGS}.  If
+@option{-mdmf} is used, then this will be @code{FLOAT_REGS}.  If
+@option{-mmma} is used but @option{-mdmf} is not used, then this will
+be @code{FLOAT_REGS}.
+
 @item wE
 Vector constant that can be loaded with the XXSPLTIB instruction.
 
