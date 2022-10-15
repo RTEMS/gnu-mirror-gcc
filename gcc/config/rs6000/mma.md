@@ -227,12 +227,21 @@
 
 (define_int_attr vvi4i4i8	[(UNSPEC_MMA_PMXVI4GER8		"pmxvi4ger8")])
 
+(define_int_attr vvi4i4i8_dmf	[(UNSPEC_MMA_PMXVI4GER8		"pmdmxvi4ger8")])
+
 (define_int_attr avvi4i4i8	[(UNSPEC_MMA_PMXVI4GER8PP	"pmxvi4ger8pp")])
+
+(define_int_attr avvi4i4i8_dmf	[(UNSPEC_MMA_PMXVI4GER8PP	"pmdmxvi4ger8pp")])
 
 (define_int_attr vvi4i4i2	[(UNSPEC_MMA_PMXVI16GER2	"pmxvi16ger2")
 				 (UNSPEC_MMA_PMXVI16GER2S	"pmxvi16ger2s")
 				 (UNSPEC_MMA_PMXVF16GER2	"pmxvf16ger2")
 				 (UNSPEC_MMA_PMXVBF16GER2	"pmxvbf16ger2")])
+
+(define_int_attr vvi4i4i2_dmf	[(UNSPEC_MMA_PMXVI16GER2	"pmdmxvi16ger2")
+				 (UNSPEC_MMA_PMXVI16GER2S	"pmdmxvi16ger2s")
+				 (UNSPEC_MMA_PMXVF16GER2	"pmdmxvf16ger2")
+				 (UNSPEC_MMA_PMXVBF16GER2	"pmdmxvbf16ger2")])
 
 (define_int_attr avvi4i4i2	[(UNSPEC_MMA_PMXVI16GER2PP	"pmxvi16ger2pp")
 				 (UNSPEC_MMA_PMXVI16GER2SPP	"pmxvi16ger2spp")
@@ -245,24 +254,54 @@
 				 (UNSPEC_MMA_PMXVBF16GER2NP	"pmxvbf16ger2np")
 				 (UNSPEC_MMA_PMXVBF16GER2NN	"pmxvbf16ger2nn")])
 
+(define_int_attr avvi4i4i2_dmf	[(UNSPEC_MMA_PMXVI16GER2PP	"pmdmxvi16ger2pp")
+				 (UNSPEC_MMA_PMXVI16GER2SPP	"pmdmxvi16ger2spp")
+				 (UNSPEC_MMA_PMXVF16GER2PP	"pmdmxvf16ger2pp")
+				 (UNSPEC_MMA_PMXVF16GER2PN	"pmdmxvf16ger2pn")
+				 (UNSPEC_MMA_PMXVF16GER2NP	"pmdmxvf16ger2np")
+				 (UNSPEC_MMA_PMXVF16GER2NN	"pmdmxvf16ger2nn")
+				 (UNSPEC_MMA_PMXVBF16GER2PP	"pmdmxvbf16ger2pp")
+				 (UNSPEC_MMA_PMXVBF16GER2PN	"pmdmxvbf16ger2pn")
+				 (UNSPEC_MMA_PMXVBF16GER2NP	"pmdmxvbf16ger2np")
+				 (UNSPEC_MMA_PMXVBF16GER2NN	"pmdmxvbf16ger2nn")])
+
 (define_int_attr vvi4i4		[(UNSPEC_MMA_PMXVF32GER		"pmxvf32ger")])
+
+(define_int_attr vvi4i4_dmf	[(UNSPEC_MMA_PMXVF32GER		"pmdmxvf32ger")])
 
 (define_int_attr avvi4i4	[(UNSPEC_MMA_PMXVF32GERPP	"pmxvf32gerpp")
 				 (UNSPEC_MMA_PMXVF32GERPN	"pmxvf32gerpn")
 				 (UNSPEC_MMA_PMXVF32GERNP	"pmxvf32gernp")
 				 (UNSPEC_MMA_PMXVF32GERNN	"pmxvf32gernn")])
 
+(define_int_attr avvi4i4_dmf	[(UNSPEC_MMA_PMXVF32GERPP	"pmdmxvf32gerpp")
+				 (UNSPEC_MMA_PMXVF32GERPN	"pmdmxvf32gerpn")
+				 (UNSPEC_MMA_PMXVF32GERNP	"pmdmxvf32gernp")
+				 (UNSPEC_MMA_PMXVF32GERNN	"pmdmxvf32gernn")])
+
 (define_int_attr pvi4i2		[(UNSPEC_MMA_PMXVF64GER		"pmxvf64ger")])
+
+(define_int_attr pvi4i2_dmf	[(UNSPEC_MMA_PMXVF64GER		"pmdmxvf64ger")])
 
 (define_int_attr apvi4i2	[(UNSPEC_MMA_PMXVF64GERPP	"pmxvf64gerpp")
 				 (UNSPEC_MMA_PMXVF64GERPN	"pmxvf64gerpn")
 				 (UNSPEC_MMA_PMXVF64GERNP	"pmxvf64gernp")
 				 (UNSPEC_MMA_PMXVF64GERNN	"pmxvf64gernn")])
 
+(define_int_attr apvi4i2_dmf	[(UNSPEC_MMA_PMXVF64GERPP	"pmdmxvf64gerpp")
+				 (UNSPEC_MMA_PMXVF64GERPN	"pmdmxvf64gerpn")
+				 (UNSPEC_MMA_PMXVF64GERNP	"pmdmxvf64gernp")
+				 (UNSPEC_MMA_PMXVF64GERNN	"pmdmxvf64gernn")])
+
 (define_int_attr vvi4i4i4	[(UNSPEC_MMA_PMXVI8GER4		"pmxvi8ger4")])
+
+(define_int_attr vvi4i4i4_dmf	[(UNSPEC_MMA_PMXVI8GER4		"pmdmxvi8ger4")])
 
 (define_int_attr avvi4i4i4	[(UNSPEC_MMA_PMXVI8GER4PP	"pmxvi8ger4pp")
 				 (UNSPEC_MMA_PMXVI8GER4SPP	"pmxvi8ger4spp")])
+
+(define_int_attr avvi4i4i4_dmf	[(UNSPEC_MMA_PMXVI8GER4PP	"pmdmxvi8ger4pp")
+				 (UNSPEC_MMA_PMXVI8GER4SPP	"pmdmxvi8ger4spp")])
 
 ;; Vector pair support.  OOmode can only live in VSRs.
 (define_expand "movoo"
@@ -612,7 +651,10 @@
 		    (match_operand:V16QI 2 "vsx_register_operand" "wa,v,?wa")]
 		    MMA_VV))]
   "TARGET_MMA"
-  "<vv> %A0,%x1,%x2"
+  "@
+   dm<vv> %A0,%x1,%x2
+   <vv> %A0,%x1,%x2
+   <vv> %A0,%x1,%x2"
   [(set_attr "type" "mma")
    (set_attr "isa" "dmf,not_dmf,not_dmf")])
 
@@ -633,7 +675,10 @@
 		    (match_operand:V16QI 2 "vsx_register_operand" "wa,v,?wa")]
 		    MMA_PV))]
   "TARGET_MMA"
-  "<pv> %A0,%x1,%x2"
+  "@
+   dm<pv> %A0,%x1,%x2
+   <pv> %A0,%x1,%x2
+   <pv> %A0,%x1,%x2"
   [(set_attr "type" "mma")
    (set_attr "isa" "dmf,not_dmf,not_dmf")])
 
@@ -644,7 +689,10 @@
 		    (match_operand:V16QI 3 "vsx_register_operand" "wa,v,?wa")]
 		    MMA_APV))]
   "TARGET_MMA"
-  "<apv> %A0,%x2,%x3"
+  "@
+   dm<apv> %A0,%x2,%x3
+   <apv> %A0,%x2,%x3
+   <apv> %A0,%x2,%x3"
   [(set_attr "type" "mma")
    (set_attr "isa" "dmf,not_dmf,not_dmf")])
 
@@ -657,7 +705,10 @@
 		    (match_operand:SI 5 "u8bit_cint_operand" "n,n,n")]
 		    MMA_VVI4I4I8))]
   "TARGET_MMA"
-  "<vvi4i4i8> %A0,%x1,%x2,%3,%4,%5"
+  "@
+   dm<vvi4i4i8> %A0,%x1,%x2,%3,%4,%5
+   <vvi4i4i8> %A0,%x1,%x2,%3,%4,%5
+   <vvi4i4i8> %A0,%x1,%x2,%3,%4,%5"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")
    (set_attr "isa" "dmf,not_dmf,not_dmf")])
@@ -686,7 +737,10 @@
 		    (match_operand:SI 5 "const_0_to_3_operand" "n,n,n")]
 		    MMA_VVI4I4I2))]
   "TARGET_MMA"
-  "<vvi4i4i2> %A0,%x1,%x2,%3,%4,%5"
+  "@
+   <vvi4i4i2_dmf> %A0,%x1,%x2,%3,%4,%5
+   <vvi4i4i2> %A0,%x1,%x2,%3,%4,%5
+   <vvi4i4i2> %A0,%x1,%x2,%3,%4,%5"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")
    (set_attr "isa" "dmf,not_dmf,not_dmf")])
@@ -701,7 +755,10 @@
 		    (match_operand:SI 6 "const_0_to_3_operand" "n,n,n")]
 		    MMA_AVVI4I4I2))]
   "TARGET_MMA"
-  "<avvi4i4i2> %A0,%x2,%x3,%4,%5,%6"
+  "@
+   <avvi4i4i2_dmf> %A0,%x2,%x3,%4,%5,%6
+   <avvi4i4i2> %A0,%x2,%x3,%4,%5,%6
+   <avvi4i4i2> %A0,%x2,%x3,%4,%5,%6"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")
    (set_attr "isa" "dmf,not_dmf,not_dmf")])
@@ -714,7 +771,10 @@
 		    (match_operand:SI 4 "const_0_to_15_operand" "n,n,n")]
 		    MMA_VVI4I4))]
   "TARGET_MMA"
-  "<vvi4i4> %A0,%x1,%x2,%3,%4"
+  "@
+   <vvi4i4_dmf> %A0,%x1,%x2,%3,%4
+   <vvi4i4> %A0,%x1,%x2,%3,%4
+   <vvi4i4> %A0,%x1,%x2,%3,%4"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")
    (set_attr "isa" "dmf,not_dmf,not_dmf")])
@@ -728,7 +788,10 @@
 		    (match_operand:SI 5 "const_0_to_15_operand" "n,n,n")]
 		    MMA_AVVI4I4))]
   "TARGET_MMA"
-  "<avvi4i4> %A0,%x2,%x3,%4,%5"
+  "@
+   <avvi4i4_dmf> %A0,%x2,%x3,%4,%5
+   <avvi4i4> %A0,%x2,%x3,%4,%5
+   <avvi4i4> %A0,%x2,%x3,%4,%5"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")
    (set_attr "isa" "dmf,not_dmf,not_dmf")])
@@ -741,7 +804,10 @@
 		    (match_operand:SI 4 "const_0_to_3_operand" "n,n,n")]
 		    MMA_PVI4I2))]
   "TARGET_MMA"
-  "<pvi4i2> %A0,%x1,%x2,%3,%4"
+  "@
+   <pvi4i2_dmf> %A0,%x1,%x2,%3,%4
+   <pvi4i2> %A0,%x1,%x2,%3,%4
+   <pvi4i2> %A0,%x1,%x2,%3,%4"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")
    (set_attr "isa" "dmf,not_dmf,not_dmf")])
@@ -755,7 +821,10 @@
 		    (match_operand:SI 5 "const_0_to_3_operand" "n,n,n")]
 		    MMA_APVI4I2))]
   "TARGET_MMA"
-  "<apvi4i2> %A0,%x2,%x3,%4,%5"
+  "@
+   <apvi4i2_dmf> %A0,%x2,%x3,%4,%5
+   <apvi4i2> %A0,%x2,%x3,%4,%5
+   <apvi4i2> %A0,%x2,%x3,%4,%5"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")
    (set_attr "isa" "dmf,not_dmf,not_dmf")])
@@ -769,7 +838,10 @@
 		    (match_operand:SI 5 "const_0_to_15_operand" "n,n,n")]
 		    MMA_VVI4I4I4))]
   "TARGET_MMA"
-  "<vvi4i4i4> %A0,%x1,%x2,%3,%4,%5"
+  "@
+   <vvi4i4i4_dmf> %A0,%x1,%x2,%3,%4,%5
+   <vvi4i4i4> %A0,%x1,%x2,%3,%4,%5
+   <vvi4i4i4> %A0,%x1,%x2,%3,%4,%5"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")
    (set_attr "isa" "dmf,not_dmf,not_dmf")])
@@ -784,7 +856,10 @@
 		    (match_operand:SI 6 "const_0_to_15_operand" "n,n,n")]
 		    MMA_AVVI4I4I4))]
   "TARGET_MMA"
-  "<avvi4i4i4> %A0,%x2,%x3,%4,%5,%6"
+  "@
+   <avvi4i4i4_dmf> %A0,%x2,%x3,%4,%5,%6
+   <avvi4i4i4> %A0,%x2,%x3,%4,%5,%6
+   <avvi4i4i4> %A0,%x2,%x3,%4,%5,%6"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")
    (set_attr "isa" "dmf,not_dmf,not_dmf")])
