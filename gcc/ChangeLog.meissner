@@ -1,3 +1,39 @@
+==================== dmf001, patch #12
+
+Document wD constraint.
+
+2022-10-14   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* doc/md.texi (PowerPC constraints): Document the wD constraint.
+
+==================== dmf001, patch #11
+
+Change mma_fpr to not_dmf.
+
+2022-10-14   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (mma_<vv>): Use isa attribute 'not_dmf' instead
+	of 'mma_fpr'.
+	(mma_<avv>): Likewise.
+	(mma_<pv>): Likewise.
+	(mma_<apv>): Likewise.
+	(mma_<vvi4i4i8>): Likewise.
+	(mma_<avvi4i4i8>): Likewise.
+	(mma_<vvi4i4i2>): Likewise.
+	(mma_<avvi4i4i2>): Likewise.
+	(mma_<vvi4i4>): Likewise.
+	(mma_<avvi4i4>): Likewise.
+	(mma_<pvi4i2>): Likewise.
+	(mma_<apvi4i2>): Likewise.
+	(mma_<vvi4i4i4>"): Likewise.
+	(mma_<avvi4i4i4>): Likewise.
+	* config/rs6000/rs6000.md (isa attribute): Rename mma_fpr to not_dmf.
+	(enabled attribute): Likewise.
+
 ==================== dmf001, patch #10, patch reverted.
 
 ==================== dmf001, patch #9
