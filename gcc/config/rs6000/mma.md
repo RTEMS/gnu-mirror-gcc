@@ -614,7 +614,7 @@
   "TARGET_MMA"
   "<vv> %A0,%x1,%x2"
   [(set_attr "type" "mma")
-   (set_attr "isa" "dmf,mma_fpr,mma_fpr")])
+   (set_attr "isa" "dmf,not_dmf,not_dmf")])
 
 (define_insn "mma_<avv>"
   [(set (match_operand:XO 0 "accumulator_operand" "=wD,&d,&d")
@@ -625,7 +625,7 @@
   "TARGET_MMA"
   "<avv> %A0,%x2,%x3"
   [(set_attr "type" "mma")
-   (set_attr "isa" "dmf,mma_fpr,mma_fpr")])
+   (set_attr "isa" "dmf,not_dmf,not_dmf")])
 
 (define_insn "mma_<pv>"
   [(set (match_operand:XO 0 "accumulator_operand" "=wD,&d,&d")
@@ -635,7 +635,7 @@
   "TARGET_MMA"
   "<pv> %A0,%x1,%x2"
   [(set_attr "type" "mma")
-   (set_attr "isa" "dmf,mma_fpr,mma_fpr")])
+   (set_attr "isa" "dmf,not_dmf,not_dmf")])
 
 (define_insn "mma_<apv>"
   [(set (match_operand:XO 0 "accumulator_operand" "=wD,&d,&d")
@@ -646,7 +646,7 @@
   "TARGET_MMA"
   "<apv> %A0,%x2,%x3"
   [(set_attr "type" "mma")
-   (set_attr "isa" "dmf,mma_fpr,mma_fpr")])
+   (set_attr "isa" "dmf,not_dmf,not_dmf")])
 
 (define_insn "mma_<vvi4i4i8>"
   [(set (match_operand:XO 0 "accumulator_operand" "=wD,&d,&d")
@@ -659,7 +659,8 @@
   "TARGET_MMA"
   "<vvi4i4i8> %A0,%x1,%x2,%3,%4,%5"
   [(set_attr "type" "mma")
-   (set_attr "prefixed" "yes")])
+   (set_attr "prefixed" "yes")
+   (set_attr "isa" "dmf,not_dmf,not_dmf")])
 
 (define_insn "mma_<avvi4i4i8>"
   [(set (match_operand:XO 0 "accumulator_operand" "=wD,&d,&d")
@@ -674,7 +675,7 @@
   "<avvi4i4i8> %A0,%x2,%x3,%4,%5,%6"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")
-   (set_attr "isa" "dmf,mma_fpr,mma_fpr")])
+   (set_attr "isa" "dmf,not_dmf,not_dmf")])
 
 (define_insn "mma_<vvi4i4i2>"
   [(set (match_operand:XO 0 "accumulator_operand" "=wD,&d,&d")
@@ -688,7 +689,7 @@
   "<vvi4i4i2> %A0,%x1,%x2,%3,%4,%5"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")
-   (set_attr "isa" "dmf,mma_fpr,mma_fpr")])
+   (set_attr "isa" "dmf,not_dmf,not_dmf")])
 
 (define_insn "mma_<avvi4i4i2>"
   [(set (match_operand:XO 0 "accumulator_operand" "=wD,&d,&d")
@@ -703,7 +704,7 @@
   "<avvi4i4i2> %A0,%x2,%x3,%4,%5,%6"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")
-   (set_attr "isa" "dmf,mma_fpr,mma_fpr")])
+   (set_attr "isa" "dmf,not_dmf,not_dmf")])
 
 (define_insn "mma_<vvi4i4>"
   [(set (match_operand:XO 0 "accumulator_operand" "=wD,&d,&d")
@@ -716,7 +717,7 @@
   "<vvi4i4> %A0,%x1,%x2,%3,%4"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")
-   (set_attr "isa" "dmf,mma_fpr,mma_fpr")])
+   (set_attr "isa" "dmf,not_dmf,not_dmf")])
 
 (define_insn "mma_<avvi4i4>"
   [(set (match_operand:XO 0 "accumulator_operand" "=wD,&d,&d")
@@ -730,7 +731,7 @@
   "<avvi4i4> %A0,%x2,%x3,%4,%5"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")
-   (set_attr "isa" "dmf,mma_fpr,mma_fpr")])
+   (set_attr "isa" "dmf,not_dmf,not_dmf")])
 
 (define_insn "mma_<pvi4i2>"
   [(set (match_operand:XO 0 "accumulator_operand" "=wD,&d,&d")
@@ -743,7 +744,7 @@
   "<pvi4i2> %A0,%x1,%x2,%3,%4"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")
-   (set_attr "isa" "dmf,mma_fpr,mma_fpr")])
+   (set_attr "isa" "dmf,not_dmf,not_dmf")])
 
 (define_insn "mma_<apvi4i2>"
   [(set (match_operand:XO 0 "accumulator_operand" "=wD,&d,&d")
@@ -757,7 +758,7 @@
   "<apvi4i2> %A0,%x2,%x3,%4,%5"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")
-   (set_attr "isa" "dmf,mma_fpr,mma_fpr")])
+   (set_attr "isa" "dmf,not_dmf,not_dmf")])
 
 (define_insn "mma_<vvi4i4i4>"
   [(set (match_operand:XO 0 "accumulator_operand" "=wD,&d,&d")
@@ -771,7 +772,7 @@
   "<vvi4i4i4> %A0,%x1,%x2,%3,%4,%5"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")
-   (set_attr "isa" "dmf,mma_fpr,mma_fpr")])
+   (set_attr "isa" "dmf,not_dmf,not_dmf")])
 
 (define_insn "mma_<avvi4i4i4>"
   [(set (match_operand:XO 0 "accumulator_operand" "=wD,&d,&d")
@@ -786,4 +787,4 @@
   "<avvi4i4i4> %A0,%x2,%x3,%4,%5,%6"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")
-   (set_attr "isa" "dmf,mma_fpr,mma_fpr")])
+   (set_attr "isa" "dmf,not_dmf,not_dmf")])
