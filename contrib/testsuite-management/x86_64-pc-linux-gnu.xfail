@@ -172,3 +172,4 @@ FAIL: c-c++-common/goacc/struct-component-kind-1.c -std=c++17  at line 68 (test 
 FAIL: c-c++-common/goacc/struct-component-kind-1.c -std=c++20  at line 68 (test for errors, line 67)
 FAIL: c-c++-common/goacc/struct-component-kind-1.c -std=c++98  at line 68 (test for errors, line 67)
 FAIL: c-c++-common/goacc/struct-component-kind-1.c at line 68 (test for errors, line 67)
+FAIL: gcc.dg/tree-ssa/forwprop-19.c scan-tree-dump-not forwprop1 "VEC_PERM_EXPR"
