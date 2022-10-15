@@ -1,3 +1,37 @@
+==================== dmf001, patch #13
+
+Use DMF names instead of MMF for instructions.
+
+2022-10-14   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (vvi4i4i8_insn): New int attribute.
+	(avvi4i4i8_insn): Likewise.
+	(vvi4i4i2_insn): Likewise.
+	(avvi4i4i2_insn): Likewise.
+	(vvi4i4_insn): Likewise.
+	(avvi4i4_insn): Likewise.
+	(pvi4i2_insn): Likewise.
+	(apvi4i2_insn): Likewise.
+	(vvi4i4i4_insn): Likewise.
+	(avvi4i4i4_insn): Likewise.
+	(mma_<vv>): On DMF systems, emit the DMF instruction name instead of the
+	MMF instruction name.
+	(mma_<avv>): Likewise.
+	(mma_<pv>): Likewise.
+	(mma_<apv>): Likewise.
+	(mma_<vvi4i4i8>): Likewise.
+	(mma_<avvi4i4i8>): Likewise.
+	(mma_<vvi4i4i2>): Likewise.
+	(mma_<avvi4i4i2>): Likewise.
+	(mma_<vvi4i4>): Likewise.
+	(mma_<avvi4i4>): Likewise.
+	(mma_<pvi4i2>): Likewise.
+	(mma_<apvi4i2>): Likewise.
+	(mma_<vvi4i4i4>"): Likewise.
+	(mma_<avvi4i4i4>): Likewise.
+
 ==================== dmf001, patch #12
 
 Document wD constraint.
