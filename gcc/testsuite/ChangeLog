@@ -1,3 +1,323 @@
+2022-10-14  Joseph Myers  <joseph@codesourcery.com>
+
+	* gcc.dg/cpp/c2x-ucnid-1-utf8.c, gcc.dg/cpp/c2x-ucnid-1.c: New
+	tests.
+
+2022-10-14  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/100971
+	* gfortran.dg/der_io_5.f90: New test.
+
+2022-10-14  Tobias Burnus  <tobias@codesourcery.com>
+
+	* gfortran.dg/c-interop/deferred-character-2.f90: Use 'dg-do run'.
+
+2022-10-14  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/106304
+	* g++.dg/modules/pr106304_a.C: New test.
+	* g++.dg/modules/pr106304_b.C: New test.
+
+2022-10-14  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/107254
+	* gfortran.dg/vect/pr107254.f90: New testcase.
+
+2022-10-14  Jørgen Kvalsvik  <jorgen.kvalsvik@woven-planet.global>
+
+	* gcc.misc-tests/gcov-4.c: New testcase.
+
+2022-10-14  Jørgen Kvalsvik  <jorgen.kvalsvik@woven-planet.global>
+
+	* g++.dg/gcov/gcov-1.C: Add line count check.
+	* gcc.misc-tests/gcov-4.c: Likewise.
+
+2022-10-14  Jakub Jelinek  <jakub@redhat.com>
+
+	* lib/target-supports.exp (check_effective_target_bfloat16,
+	check_effective_target_bfloat16_runtime, add_options_for_bfloat16):
+	New.
+	* gcc.dg/torture/bfloat16-basic.c: New test.
+	* gcc.dg/torture/bfloat16-builtin.c: New test.
+	* gcc.dg/torture/bfloat16-builtin-issignaling-1.c: New test.
+	* gcc.dg/torture/bfloat16-complex.c: New test.
+	* gcc.dg/torture/builtin-issignaling-1.c: Allow to be includable
+	from bfloat16-builtin-issignaling-1.c.
+	* gcc.dg/torture/floatn-basic.h: Allow to be includable from
+	bfloat16-basic.c.
+	* gcc.target/i386/vect-bfloat16-typecheck_2.c: Adjust expected
+	diagnostics.
+	* gcc.target/i386/sse2-bfloat16-scalar-typecheck.c: Likewise.
+	* gcc.target/i386/vect-bfloat16-typecheck_1.c: Likewise.
+	* g++.target/i386/bfloat_cpp_typecheck.C: Likewise.
+
+2022-10-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/82071
+	PR c/87390
+	PR c++/107097
+	* gcc.target/i386/excess-precision-8.c: For C++ wrap abort and
+	exit declarations into extern "C" block.
+	* gcc.target/i386/excess-precision-10.c: Likewise.
+	* g++.target/i386/excess-precision-7.C: Remove.
+	* g++.target/i386/excess-precision-8.C: New test.
+	* g++.target/i386/excess-precision-9.C: Remove.
+	* g++.target/i386/excess-precision-10.C: New test.
+	* g++.target/i386/excess-precision-12.C: New test.
+
+2022-10-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/323
+	PR c++/107097
+	* gcc.target/i386/excess-precision-1.c: For C++ wrap abort and
+	exit declarations into extern "C" block.
+	* gcc.target/i386/excess-precision-2.c: Likewise.
+	* gcc.target/i386/excess-precision-3.c: Likewise.  Remove
+	check_float_nonproto and check_double_nonproto tests for C++.
+	* gcc.target/i386/excess-precision-7.c: For C++ wrap abort and
+	exit declarations into extern "C" block.
+	* gcc.target/i386/excess-precision-9.c: Likewise.
+	* g++.target/i386/excess-precision-1.C: New test.
+	* g++.target/i386/excess-precision-2.C: New test.
+	* g++.target/i386/excess-precision-3.C: New test.
+	* g++.target/i386/excess-precision-4.C: New test.
+	* g++.target/i386/excess-precision-5.C: New test.
+	* g++.target/i386/excess-precision-6.C: New test.
+	* g++.target/i386/excess-precision-7.C: New test.
+	* g++.target/i386/excess-precision-9.C: New test.
+	* g++.target/i386/excess-precision-11.C: New test.
+	* c-c++-common/dfp/convert-bfp-10.c: Add -fexcess-precision=fast
+	as dg-additional-options.
+	* c-c++-common/dfp/compare-eq-const.c: Likewise.
+	* g++.dg/cpp1z/constexpr-96862.C: Likewise.
+	* g++.dg/cpp1z/decomp12.C (main): Use 2.25 instead of 2.3 to
+	avoid excess precision differences.
+	* g++.dg/other/thunk1.C: Add -fexcess-precision=fast
+	as dg-additional-options.
+	* g++.dg/vect/pr64410.cc: Likewise.
+	* g++.dg/cpp1y/pr68180.C: Likewise.
+	* g++.dg/vect/pr89653.cc: Likewise.
+	* g++.dg/cpp0x/variadic-tuple.C: Likewise.
+	* g++.dg/cpp0x/nsdmi-union1.C: Use 4.25 instead of 4.2 to
+	avoid excess precision differences.
+	* g++.old-deja/g++.brendan/copy9.C: Add -fexcess-precision=fast
+	as dg-additional-options.
+	* g++.old-deja/g++.brendan/overload7.C: Likewise.
+
+2022-10-14  Joseph Myers  <joseph@codesourcery.com>
+
+	* gcc.dg/c11-complit-1.c, gcc.dg/c11-complit-2.c,
+	gcc.dg/c11-complit-3.c, gcc.dg/c2x-complit-2.c,
+	gcc.dg/c2x-complit-3.c, gcc.dg/c2x-complit-4.c,
+	gcc.dg/c2x-complit-5.c, gcc.dg/c2x-complit-6.c,
+	gcc.dg/c2x-complit-7.c, gcc.dg/c90-complit-2.c,
+	gcc.dg/gnu2x-complit-1.c, gcc.dg/gnu2x-complit-2.c: New tests.
+
+2022-10-13  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gcc.dg/Wstringop-overflow-89.c: New test.
+
+2022-10-13  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/107210
+	* gfortran.dg/analyzer/pr107210.f90: New test.
+
+2022-10-13  Andrew MacLeod  <amacleod@redhat.com>
+
+	* gcc.dg/pr102540.c: New.
+	* gcc.dg/pr102872.c: New.
+
+2022-10-13  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/106925
+	* g++.dg/cpp0x/initlist-defarg3.C: New test.
+
+2022-10-13  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	PR target/105773
+	* gcc.target/aarch64/ands_2.c: Test for ANDS.
+	* gcc.target/aarch64/bics_2.c: Test for BICS.
+	* gcc.target/aarch64/tst_2.c: Test for TST.
+	* gcc.target/aarch64/tst_imm_split_1.c: Fix test.
+
+2022-10-13  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/107160
+	* gcc.dg/vect/pr107160.c: New testcase.
+
+2022-10-13  Andre Vieira  <andre.simoesdiasvieira@arm.com>
+
+	* gcc.dg/vect/pr107229-1.c: New test.
+	* gcc.dg/vect/pr107229-2.c: New test.
+	* gcc.dg/vect/pr107229-3.c: New test.
+
+2022-10-13  Joseph Myers  <joseph@codesourcery.com>
+
+	* gcc.dg/c2x-float-10.c: Do not expect value 2 for *_IS_IEC_60559.
+
+2022-10-12  Lewis Hyatt  <lhyatt@gmail.com>
+
+	PR preprocessor/60014
+	PR preprocessor/60723
+	* gcc.dg/cpp/pr60014-1.c: New test.
+	* gcc.dg/cpp/pr60014-1.h: New test.
+	* gcc.dg/cpp/pr60014-2.c: New test.
+	* gcc.dg/cpp/pr60014-2.h: New test.
+	* gcc.dg/cpp/pr60014-3.c: New test.
+	* gcc.dg/cpp/pr60014-3.h: New test.
+
+2022-10-12  Marek Polacek  <polacek@redhat.com>
+
+	* g++.dg/cpp0x/Wredundant-move10.C: Adjust dg-warning.
+	* g++.dg/cpp0x/Wredundant-move7.C: Likewise.
+	* g++.dg/cpp0x/move-return2.C: Remove dg-error.
+	* g++.dg/cpp0x/move-return4.C: Likewise.
+	* g++.dg/cpp0x/ref-qual20.C: Adjust expected return value.
+	* g++.dg/cpp0x/move-return5.C: New test.
+
+2022-10-12  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/107217
+	* gfortran.dg/pr107217.f90: New test.
+
+2022-10-12  Jason Merrill  <jason@redhat.com>
+
+	DR 2631
+	* g++.dg/cpp2a/consteval-defarg3.C: New test.
+
+2022-10-11  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/107215
+	* gfortran.dg/pr107215.f90: New test.
+
+2022-10-11  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/100134
+	* g++.dg/modules/tpl-friend-8_a.H: New test.
+	* g++.dg/modules/tpl-friend-8_b.C: New test.
+
+2022-10-11  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/99377
+	* g++.dg/modules/pr99377-2_a.C: New test.
+	* g++.dg/modules/pr99377-2_b.C: New test.
+
+2022-10-11  Aldy Hernandez  <aldyh@redhat.com>
+
+	* gcc.dg/tree-ssa/vrp-float-abs-1.c: New test.
+
+2022-10-11  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/107212
+	* gcc.dg/vect/pr107212-1.c: New testcase.
+	* gcc.dg/vect/pr107212-2.c: Likewise.
+
+2022-10-11  Andrew Stubbs  <ams@codesourcery.com>
+
+	* gcc.dg/pr104464.c: Xfail on amdgcn.
+	* gcc.dg/signbit-2.c: Likewise.
+	* gcc.dg/signbit-5.c: Likewise.
+	* gcc.dg/vect/bb-slp-68.c: Likewise.
+	* gcc.dg/vect/bb-slp-cond-1.c: Change expectations on amdgcn.
+	* gcc.dg/vect/bb-slp-subgroups-3.c: Likewise.
+	* gcc.dg/vect/no-vfa-vect-depend-2.c: Change expectations for multiple
+	vector sizes.
+	* gcc.dg/vect/pr33953.c: Likewise.
+	* gcc.dg/vect/pr65947-12.c: Likewise.
+	* gcc.dg/vect/pr65947-13.c: Likewise.
+	* gcc.dg/vect/pr80631-2.c: Likewise.
+	* gcc.dg/vect/slp-reduc-4.c: Likewise.
+	* gcc.dg/vect/trapv-vect-reduc-4.c: Likewise.
+	* lib/target-supports.exp (available_vector_sizes): Add more sizes
+	for amdgcn.
+
+2022-10-11  Andre Vieira  <andre.simoesdiasvieira@arm.com>
+
+	* gcc.dg/vect/vect-bitfield-read-1.c: New test.
+	* gcc.dg/vect/vect-bitfield-read-2.c: New test.
+	* gcc.dg/vect/vect-bitfield-read-3.c: New test.
+	* gcc.dg/vect/vect-bitfield-read-4.c: New test.
+	* gcc.dg/vect/vect-bitfield-read-5.c: New test.
+	* gcc.dg/vect/vect-bitfield-read-6.c: New test.
+	* gcc.dg/vect/vect-bitfield-write-1.c: New test.
+	* gcc.dg/vect/vect-bitfield-write-2.c: New test.
+	* gcc.dg/vect/vect-bitfield-write-3.c: New test.
+	* gcc.dg/vect/vect-bitfield-write-4.c: New test.
+	* gcc.dg/vect/vect-bitfield-write-5.c: New test.
+
+2022-10-11  liuhongt  <hongtao.liu@intel.com>
+
+	* gcc.target/i386/pr107093.c: New test.
+
+2022-10-11  Aldy Hernandez  <aldyh@redhat.com>
+
+	PR tree-optimization/107195
+	* gcc.dg/tree-ssa/pr107195-1.c: New test.
+	* gcc.dg/tree-ssa/pr107195-2.c: New test.
+
+2022-10-11  Liwei Xu  <liwei.xu@intel.com>
+	    liuhongt  <hongtao.liu@intel.com>
+
+	* gcc.dg/pr54346.c: New test.
+
+2022-10-10  Nathan Sidwell  <nathan@acm.org>
+
+	* g++.dg/abi/lambda-ctx1-17.C: New.
+	* g++.dg/abi/lambda-ctx1-18.C: New.
+	* g++.dg/abi/lambda-ctx1-18vs17.C: New.
+	* g++.dg/abi/lambda-ctx1.h: New.
+	* g++.dg/abi/lambda-vis.C: Adjust expected mangles.
+	* g++.dg/abi/macro0.C: Adjust.
+
+2022-10-10  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/106937
+	* c-c++-common/pointer-to-fn1.c: New test.
+
+2022-10-10  Kito Cheng  <kito.cheng@sifive.com>
+
+	* gcc.target/riscv/rvv/base/riscv_vector.h: New.
+
+2022-10-10  Kito Cheng  <kito.cheng@sifive.com>
+
+	* gcc.target/riscv/rvv/base/user-1.c: Add dg-options and drop
+	dg-skip-if.
+
+2022-10-10  Kito Cheng  <kito.cheng@sifive.com>
+
+	* gcc.target/riscv/rvv/base/pragma-1.c: Add newline to the end of file.
+	* gcc.target/riscv/rvv/base/pragma-2.c: Ditto.
+	* gcc.target/riscv/rvv/base/pragma-3.c: Ditto.
+	* gcc.target/riscv/rvv/base/user-1.c: Ditto.
+	* gcc.target/riscv/rvv/base/user-2.c: Ditto.
+	* gcc.target/riscv/rvv/base/user-3.c: Ditto.
+	* gcc.target/riscv/rvv/base/user-4.c: Ditto.
+	* gcc.target/riscv/rvv/base/user-5.c: Ditto.
+	* gcc.target/riscv/rvv/base/user-6.c: Ditto.
+	* gcc.target/riscv/rvv/base/vread_csr.c: Ditto.
+	* gcc.target/riscv/rvv/base/vwrite_csr.c: Ditto.
+
+2022-10-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/107153
+	* gcc.dg/autopar/pr107153.c: Require fgraphite effective target.
+
+2022-10-10  Aldy Hernandez  <aldyh@redhat.com>
+
+	* gcc.dg/tree-ssa/vrp-float-signbit-3.c: New test.
+
+2022-10-10  liuhongt  <hongtao.liu@intel.com>
+
+	* gcc.target/i386/pr107185.c: New test.
+
+2022-10-10  Claudiu Zissulescu  <claziss@gmail.com>
+
+	* gcc.target/arc/tmac-2.c: Update test.
+
+2022-10-10  Claudiu Zissulescu  <claziss@gmail.com>
+
+	* gcc.target/arc/enter-dw2-1.c: New file.
+
 2022-10-09  Dimitar Dimitrov  <dimitar@dinux.eu>
 
 	PR target/106562

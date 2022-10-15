@@ -1010,13 +1010,6 @@ cp_fold_r (tree *stmt_p, int *walk_subtrees, void *data_)
 	}
       break;
 
-    case CALL_EXPR:
-      if (tree fndecl = cp_get_callee_fndecl_nofold (stmt))
-	if (DECL_IMMEDIATE_FUNCTION_P (fndecl)
-	    && source_location_current_p (fndecl))
-	  *stmt_p = stmt = cxx_constant_value (stmt);
-      break;
-
     default:
       break;
     }
@@ -2520,6 +2513,11 @@ cp_fold (tree x)
 	  && TREE_OVERFLOW_P (x) && !TREE_OVERFLOW_P (op0))
 	TREE_OVERFLOW (x) = false;
 
+      break;
+
+    case EXCESS_PRECISION_EXPR:
+      op0 = cp_fold_maybe_rvalue (TREE_OPERAND (x, 0), rval_ops);
+      x = fold_convert_loc (EXPR_LOCATION (x), TREE_TYPE (x), op0);
       break;
 
     case INDIRECT_REF:

@@ -1324,26 +1324,6 @@ save_fundef_copy (tree fun, tree copy)
   *slot = copy;
 }
 
-/* We have an expression tree T that represents a call, either CALL_EXPR
-   or AGGR_INIT_EXPR.  Return the Nth argument.  */
-
-static inline tree
-get_nth_callarg (tree t, int n)
-{
-  switch (TREE_CODE (t))
-    {
-    case CALL_EXPR:
-      return CALL_EXPR_ARG (t, n);
-
-    case AGGR_INIT_EXPR:
-      return AGGR_INIT_EXPR_ARG (t, n);
-
-    default:
-      gcc_unreachable ();
-      return NULL;
-    }
-}
-
 /* Whether our evaluation wants a prvalue (e.g. CONSTRUCTOR or _CST),
    a glvalue (e.g. VAR_DECL or _REF), or nothing.  */
 
@@ -2108,7 +2088,7 @@ cxx_dynamic_cast_fn_p (tree fndecl)
 {
   return (cxx_dialect >= cxx20
 	  && id_equal (DECL_NAME (fndecl), "__dynamic_cast")
-	  && CP_DECL_CONTEXT (fndecl) == global_namespace);
+	  && CP_DECL_CONTEXT (fndecl) == abi_node);
 }
 
 /* Often, we have an expression in the form of address + offset, e.g.
@@ -7618,6 +7598,19 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
       }
       break;
 
+    case EXCESS_PRECISION_EXPR:
+      {
+	tree oldop = TREE_OPERAND (t, 0);
+
+	tree op = cxx_eval_constant_expression (ctx, oldop,
+						lval,
+						non_constant_p, overflow_p);
+	if (*non_constant_p)
+	  return t;
+	r = fold_convert (TREE_TYPE (t), op);
+	break;
+      }
+
     case EMPTY_CLASS_EXPR:
       /* Handle EMPTY_CLASS_EXPR produced by build_call_a by lowering
 	 it to an appropriate CONSTRUCTOR.  */
@@ -8916,6 +8909,9 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
             -- an lvalue of literal type that refers to non-volatile
                object defined with constexpr, or that refers to a
                sub-object of such an object;  */
+      return RECUR (TREE_OPERAND (t, 0), rval);
+
+    case EXCESS_PRECISION_EXPR:
       return RECUR (TREE_OPERAND (t, 0), rval);
 
     case VAR_DECL:

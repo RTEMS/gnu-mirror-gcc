@@ -306,8 +306,9 @@ class cfn_signbit : public range_operator_float
 {
 public:
   using range_operator_float::fold_range;
+  using range_operator_float::op1_range;
   virtual bool fold_range (irange &r, tree type, const frange &lh,
-			   const irange &, relation_kind) const
+			   const irange &, relation_kind) const override
   {
     bool signbit;
     if (lh.signbit_p (signbit))
@@ -320,7 +321,58 @@ public:
       }
    return false;
   }
+  virtual bool op1_range (frange &r, tree type, const irange &lhs,
+			  const frange &, relation_kind) const override
+  {
+    if (lhs.zero_p ())
+      {
+	r.set (type, dconst0, frange_val_max (type));
+	r.update_nan (false);
+	return true;
+      }
+    if (!lhs.contains_p (build_zero_cst (lhs.type ())))
+      {
+	REAL_VALUE_TYPE dconstm0 = dconst0;
+	dconstm0.sign = 1;
+	r.set (type, frange_val_min (type), dconstm0);
+	r.update_nan (true);
+	return true;
+      }
+    return false;
+  }
 } op_cfn_signbit;
+
+// Implement range operator for CFN_BUILT_IN_COPYSIGN
+class cfn_copysign : public range_operator_float
+{
+public:
+  using range_operator_float::fold_range;
+  virtual bool fold_range (frange &r, tree type, const frange &lh,
+			   const frange &rh, relation_kind) const override
+  {
+    frange neg;
+    range_op_handler abs_op (ABS_EXPR, type);
+    range_op_handler neg_op (NEGATE_EXPR, type);
+    if (!abs_op || !abs_op.fold_range (r, type, lh, frange (type)))
+      return false;
+    if (!neg_op || !neg_op.fold_range (neg, type, r, frange (type)))
+      return false;
+
+    bool signbit;
+    if (rh.signbit_p (signbit))
+      {
+	// If the sign is negative, flip the result from ABS,
+	// otherwise leave things positive.
+	if (signbit)
+	  r = neg;
+      }
+    else
+      // If the sign is unknown, keep the positive and negative
+      // alternatives.
+      r.union_ (neg);
+    return true;
+  }
+} op_cfn_copysign;
 
 // Implement range operator for CFN_BUILT_IN_TOUPPER and CFN_BUILT_IN_TOLOWER.
 class cfn_toupper_tolower : public range_operator
@@ -736,9 +788,16 @@ gimple_range_op_handler::maybe_builtin_call ()
 	m_valid = false;
       break;
 
-    case CFN_BUILT_IN_SIGNBIT:
+    CASE_FLT_FN (CFN_BUILT_IN_SIGNBIT):
       m_op1 = gimple_call_arg (call, 0);
       m_float = &op_cfn_signbit;
+      m_valid = true;
+      break;
+
+    CASE_CFN_COPYSIGN_ALL:
+      m_op1 = gimple_call_arg (call, 0);
+      m_op2 = gimple_call_arg (call, 1);
+      m_float = &op_cfn_copysign;
       m_valid = true;
       break;
 
