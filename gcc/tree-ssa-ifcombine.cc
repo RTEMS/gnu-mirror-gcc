@@ -498,6 +498,62 @@ ifcombine_ifandif (basic_block inner_cond_bb, bool inner_inv,
       return true;
     }
 
+  /* See if we test polarity-reversed single bits of the same name in
+     both tests.  In that case remove the outer test, merging both
+     else edges, and change the inner one to test for
+       name & (bit1 | bit2) == (bit2).  */
+  else if ((recognize_single_bit_test (inner_cond, &name1, &bit1, !inner_inv)
+	    && recognize_single_bit_test (outer_cond, &name2, &bit2, outer_inv)
+	    && name1 == name2)
+	   || (recognize_single_bit_test (inner_cond, &name2, &bit2, inner_inv)
+	       && recognize_single_bit_test (outer_cond, &name1, &bit1, !outer_inv)
+	       && name1 == name2))
+    {
+      tree t, t2, t3;
+
+      /* Do it.  */
+      gsi = gsi_for_stmt (inner_cond);
+      t = fold_build2 (LSHIFT_EXPR, TREE_TYPE (name1),
+		       build_int_cst (TREE_TYPE (name1), 1), bit1);
+      t2 = fold_build2 (LSHIFT_EXPR, TREE_TYPE (name1),
+			build_int_cst (TREE_TYPE (name1), 1), bit2);
+      t = fold_build2 (BIT_IOR_EXPR, TREE_TYPE (name1), t, t2);
+      t = force_gimple_operand_gsi (&gsi, t, true, NULL_TREE,
+				    true, GSI_SAME_STMT);
+      t3 = fold_build2 (BIT_AND_EXPR, TREE_TYPE (name1), name1, t);
+      t3 = force_gimple_operand_gsi (&gsi, t3, true, NULL_TREE,
+				     true, GSI_SAME_STMT);
+      t = fold_build2 (result_inv ? NE_EXPR : EQ_EXPR,
+		       boolean_type_node, t2, t3);
+      t = canonicalize_cond_expr_cond (t);
+      if (!t)
+	return false;
+      gimple_cond_set_condition_from_tree (inner_cond, t);
+      update_stmt (inner_cond);
+
+      /* Leave CFG optimization to cfg_cleanup.  */
+      gimple_cond_set_condition_from_tree (outer_cond,
+	outer_inv ? boolean_false_node : boolean_true_node);
+      update_stmt (outer_cond);
+
+      update_profile_after_ifcombine (inner_cond_bb, outer_cond_bb);
+
+      if (dump_file)
+	{
+	  fprintf (dump_file, "optimizing double bit test to ");
+	  print_generic_expr (dump_file, name1);
+	  fprintf (dump_file, " & T == C\nwith temporary T = (1 << ");
+	  print_generic_expr (dump_file, bit1);
+	  fprintf (dump_file, ") | (1 << ");
+	  print_generic_expr (dump_file, bit2);
+	  fprintf (dump_file, ")\nand temporary C = (1 << ");
+	  print_generic_expr (dump_file, bit2);
+	  fprintf (dump_file, ")\n");
+	}
+
+      return true;
+    }
+
   /* See if we have two bit tests of the same name in both tests.
      In that case remove the outer test and change the inner one to
      test for name & (bits1 | bits2) != 0.  */
