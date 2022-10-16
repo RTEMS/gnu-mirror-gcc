@@ -225,6 +225,26 @@ recognize_single_bit_test (gcond *cond, tree *name, tree *bit, bool inv)
 {
   gimple *stmt;
 
+  /* Handle the test for a sign-bit:
+       unsigned charD.15 _1;
+       _2 = (signed char) _1;
+       if (_2 < 0) */
+  if (TREE_CODE (gimple_cond_lhs (cond)) == SSA_NAME
+      && !TYPE_UNSIGNED (TREE_TYPE (gimple_cond_lhs (cond)))
+      && gimple_cond_code (cond) == (inv ? GE_EXPR : LT_EXPR)
+      && integer_zerop (gimple_cond_rhs (cond)))
+    {
+      tree type = TREE_TYPE (gimple_cond_lhs (cond));
+
+      stmt = SSA_NAME_DEF_STMT (gimple_cond_lhs (cond));
+      if (!is_gimple_assign (stmt))
+	return false;
+      *name = gimple_assign_rhs1 (stmt);
+      *bit = build_int_cst (integer_type_node, TYPE_PRECISION (type) - 1);
+
+      return true;
+    }
+
   /* Get at the definition of the result of the bit test.  */
   if (gimple_cond_code (cond) != (inv ? EQ_EXPR : NE_EXPR)
       || TREE_CODE (gimple_cond_lhs (cond)) != SSA_NAME
