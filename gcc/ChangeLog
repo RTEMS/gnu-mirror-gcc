@@ -1,3 +1,168 @@
+2022-10-14  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR target/107248
+	* config/sparc/sparc.cc (sparc_expand_prologue): Emit a frame
+	blockage for leaf functions.
+	(sparc_flat_expand_prologue): Emit frame instead of full blockage.
+	(sparc_expand_epilogue): Emit a frame blockage for leaf functions.
+	(sparc_flat_expand_epilogue): Emit frame instead of full blockage.
+
+2022-10-13  Tobias Burnus  <tobias@codesourcery.com>
+
+	Backported from master:
+	2022-10-04  Tobias Burnus  <tobias@codesourcery.com>
+
+	* doc/install.texi (Specific): Add missing items to bullet list.
+	(amdgcn): Update LLVM requirements, use version not date for newlib.
+	(nvptx): Use version not git hash for newlib.
+
+2022-10-11  Christophe Lyon  <christophe.lyon@arm.com>
+
+	* config/arm/mve.md (mve_vqshluq_n_s<mode>): Use
+	MVE_pred/MVE_constraint instead of mve_imm_7/Ra.
+	(mve_vqshluq_m_n_s<mode>): Likewise.
+	(mve_vqrshrnbq_n_<supf><mode>): Use MVE_pred3/MVE_constraint3
+	instead of mve_imm_8/Rb.
+	(mve_vqrshrunbq_n_s<mode>): Likewise.
+	(mve_vqrshrntq_n_<supf><mode>): Likewise.
+	(mve_vqrshruntq_n_s<mode>): Likewise.
+	(mve_vrshrnbq_n_<supf><mode>): Likewise.
+	(mve_vrshrntq_n_<supf><mode>): Likewise.
+	(mve_vqrshrnbq_m_n_<supf><mode>): Likewise.
+	(mve_vqrshrntq_m_n_<supf><mode>): Likewise.
+	(mve_vrshrnbq_m_n_<supf><mode>): Likewise.
+	(mve_vrshrntq_m_n_<supf><mode>): Likewise.
+	(mve_vqrshrunbq_m_n_s<mode>): Likewise.
+	(mve_vsriq_n_<supf><mode): Use MVE_pred2/MVE_constraint2 instead
+	of mve_imm_selective_upto_8/Rg.
+	(mve_vsriq_m_n_<supf><mode>): Likewise.
+	(cherry-picked from c3fb6658c7670e446f2fd00984404d971e416b3c)
+
+2022-10-11  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-09-14  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/106934
+	* tree-ssa.cc (non_rewritable_mem_ref_base): Avoid BIT_FIELD_REFs
+	of bitfields.
+	(maybe_rewrite_mem_ref_base): Likewise.
+
+2022-10-11  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-09-15  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/106922
+	* tree-ssa-pre.cc (translate_vuse_through_block): Only
+	keep the VUSE if its def dominates PHIBLOCK.
+	(prune_clobbered_mems): Rewrite logic so we check whether
+	a value dies in a block when the VUSE def doesn't dominate it.
+
+2022-10-11  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-09-09  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/106892
+	* tree-predcom.cc (ref_at_iteration): Do not associate the
+	constant part of the offset into the MEM_REF offset
+	operand, across a non-zero offset.
+
+2022-10-11  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-08-22  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/105937
+	* tree-ssa-uninit.cc (find_uninit_use): Do not queue PHIs
+	on backedges.
+	(execute_late_warn_uninitialized): Mark backedges.
+
+2022-10-03  Sergei Trofimovich  <siarheit@google.com>
+
+	Backported from master:
+	2022-10-03  Sergei Trofimovich  <siarheit@google.com>
+
+	PR target/107064
+	* config/i386/t-i386: Add build-time dependencies against
+	i386-builtin-types.inc to i386-builtins.o, i386-expand.o,
+	i386-features.o.
+
+2022-09-29  H.J. Lu  <hjl.tools@gmail.com>
+
+	Backported from master:
+	2022-09-28  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/107061
+	* config/i386/predicates.md (encodekey128_operation): Check
+	XMM4-XMM6 as clobbered.
+	(encodekey256_operation): Likewise.
+	* config/i386/sse.md (encodekey128u32): Clobber XMM4-XMM6.
+	(encodekey256u32): Likewise.
+
+2022-09-29  Tobias Burnus  <tobias@codesourcery.com>
+
+	Backported from master:
+	2022-09-26  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR middle-end/106982
+	* omp-low.cc (lower_oacc_reductions): Add some unshare_expr.
+
+2022-09-28  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2022-09-23  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64-cores.def (neoverse-v2): New entry.
+	(demeter): Update tunings to neoversev2.
+	* config/aarch64/aarch64-tune.md: Regenerate.
+	* config/aarch64/aarch64.cc (demeter_addrcost_table): Rename to
+	neoversev2_addrcost_table.
+	(demeter_regmove_cost): Rename to neoversev2_addrcost_table.
+	(demeter_advsimd_vector_cost): Rename to neoversev2_advsimd_vector_cost.
+	(demeter_sve_vector_cost): Rename to neoversev2_sve_vector_cost.
+	(demeter_scalar_issue_info): Rename to neoversev2_scalar_issue_info.
+	(demeter_advsimd_issue_info): Rename to neoversev2_advsimd_issue_info.
+	(demeter_sve_issue_info): Rename to neoversev2_sve_issue_info.
+	(demeter_vec_issue_info): Rename to neoversev2_vec_issue_info.
+	Update references to above.
+	(demeter_vector_cost): Rename to neoversev2_vector_cost.
+	(demeter_tunings): Rename to neoversev2_tunings.
+	(aarch64_vec_op_count::rename_cycles_per_iter): Use
+	neoversev2_sve_issue_info instead of demeter_sve_issue_info.
+	* doc/invoke.texi (AArch64 Options): Document neoverse-v2.
+
+2022-09-21  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2022-09-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/106491
+	* config/aarch64/aarch64-sve-builtins.cc (scalar_types)
+	(acle_vector_types, acle_svpattern, acle_svprfop): Add GTY
+	markup to (new) extern declarations instead of to the main
+	definition.
+
+2022-09-21  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2022-09-13  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/104482
+	* config/rs6000/rs6000-c.cc (altivec_resolve_overloaded_builtin): Fix
+	the equality check for argument number, and move this hunk ahead.
+
+2022-09-21  Kewen.Lin  <linkw@gcc.gnu.org>
+
+	Backported from master:
+	2022-09-13  Kewen.Lin  <linkw@gcc.gnu.org>
+
+	PR target/105485
+	* config/rs6000/rs6000-builtin.cc (rs6000_gimple_fold_builtin): Add
+	the handling for unresolved overloaded builtin function.
+	(rs6000_expand_builtin): Likewise.
+
 2022-09-09  Richard Biener  <rguenther@suse.de>
 
 	Backported from master:
