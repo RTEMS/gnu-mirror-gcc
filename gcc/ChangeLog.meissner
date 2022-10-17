@@ -1,3 +1,13 @@
+==================== dmf001, patch #14
+
+Update comment.
+
+2022-10-17   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (movxo): Update comment.
+
 ==================== dmf001, patch #13
 
 Use DMF names instead of MMF for instructions.
