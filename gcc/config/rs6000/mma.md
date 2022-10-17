@@ -350,7 +350,8 @@
    (set_attr "length" "*,*,8")])
 
 
-;; Vector quad support.  XOmode can only live in FPRs.
+;; Vector quad support.  Under the original MMA, XOmode can only live in FPRs.
+;; With DMF, XOmode can live in either VSX registers or DMR registers.
 (define_expand "movxo"
   [(set (match_operand:XO 0 "nonimmediate_operand")
 	(match_operand:XO 1 "input_operand"))]
