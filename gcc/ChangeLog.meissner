@@ -1,3 +1,30 @@
+==================== dmf001, patch #15
+
+Initial support for __dmr type.
+
+2022-10-17   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-call.cc (rs6000_return_in_memory): TDOmode needs
+	to be returned in memory.
+	(rs6000_function_arg): TDOmode can't be passed in a register.
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Relax
+	XOmode requirement that the register number must be divisible by 4 if
+	-mdmf.  Add support for TDOmode registers.
+	(rs6000_modes_tieable_p): Reorder tests for TDOmode.
+	(rs6000_setup_reg_addr_masks): Allow TDOmode in DMR registers.
+	(reg_offset_addressing_ok_p): Allow loading/storing TDOmode values with
+	offset instructions.
+	(rs6000_split_multireg_move): Update comment.
+	(rs6000_invalid_conversion): Likewise.
+	* config/rs6000/rs6000.h (VECTOR_ALIGNMENT_P): TDOmode has 512 bit
+	alignment.
+	(rs6000_builtin_type_index): Add support for dmr type node and pointer
+	to dmr type node.
+	(dmr_type_node): Likewise.
+	(ptr_dmr_type_node): Likewise.
+
 ==================== dmf001, patch #14
 
 Update comment.
