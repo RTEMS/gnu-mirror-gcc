@@ -1,3 +1,31 @@
+==================== dmf001, patch #16
+
+Add initial __dmr support.
+
+2022-10-18   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (UNSPEC_DMF_INSERT512_UPPER): New unspec.
+	(UNSPEC_DMF_INSERT512_LOWER): Likewise.
+	(UNSPEC_DMF_EXTRACT512): Likewise.
+	(UNSPEC_DMR_RELOAD_FROM_MEMORY): Likewise.
+	(UNSPEC_DMR_RELOAD_TO_MEMORY): Likewise.
+	(movtdo): New expander and define_insn_and_split.
+	(movtdo_insert512_upper): New insn.
+	(movtdo_insert512_lower): Likewise.
+	(movtdo_extract512): Likewise.
+	(reload_dmf_from_memory): Likewise.
+	(reload_dmf_to_memory): Likewise.
+	* config/rs6000/rs6000-builtin.cc (rs6000_type_string): Add __dmr
+	support.
+	(rs6000_init_builtins): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Enable
+	TDOmode in DMF registers.
+	(rs6000_init_hard_regno_mode_ok): Add __dmr support.
+	(rs6000_secondary_reload_memory): Likewise.
+	(rs6000_secondary_reload_simple_move): Likewise.
+
 ==================== dmf001, patch #15
 
 Initial support for __dmr type.
