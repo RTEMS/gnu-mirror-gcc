@@ -1854,26 +1854,51 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
   if (mode == OOmode)
     return (TARGET_MMA && VSX_REGNO_P (regno) && (regno & 1) == 0);
 
-  /* On power10, MMA accumulator modes need FPR registers divisible by 4.  If
-     DMF is enabled, allow all VSX registers plus the DMF registers.  */
+  /* On power10, MMA accumulator modes need FPR registers divisible by 4.
+
+     If DMF is enabled, allow all VSX registers plus the DMF registers.  We
+     need to make sure we don't cross between the boundary of FPRs and
+     traditional Altiviec registers.  */
   if (mode == XOmode)
     {
-      if (TARGET_DMF)
-	return (DMF_REGNO_P (regno)
-		|| (VSX_REGNO_P (regno) && (regno & 3) == 0));
-
-      else if (TARGET_MMA)
+      if (TARGET_MMA && !TARGET_DMF)
 	return (FP_REGNO_P (regno) && (regno & 3) == 0);
+
+      else if (TARGET_DMF)
+	{
+	  if (DMF_REGNO_P (regno))
+	    return 1;
+
+	  if (FP_REGNO_P (regno))
+	    return ((regno & 1) == 0 && regno <= LAST_FPR_REGNO - 3);
+
+	  if (ALTIVEC_REGNO_P (regno))
+	    return ((regno & 1) == 0 && regno <= LAST_ALTIVEC_REGNO - 3);
+	}
 
       else
 	return 0;
     }
 
-  /* DMF register modes need DMF registers or VSX registers divisible by 4.  */
+  /* DMF register modes need DMF registers or VSX registers divisible by 2.  We
+     need to make sure we don't cross between the boundary of FPRs and
+     traditional Altiviec registers.  */
   if (mode == TDOmode)
-    return (TARGET_DMF
-	    && (DMF_REGNO_P (regno)
-		|| (VSX_REGNO_P (regno) && (regno & 3) == 0)));
+    {
+      if (!TARGET_DMF)
+	return 0;
+
+      if (DMF_REGNO_P (regno) && 0)
+	return 1;
+
+      if (FP_REGNO_P (regno))
+	return ((regno & 1) == 0 && regno <= LAST_FPR_REGNO - 7);
+
+      if (ALTIVEC_REGNO_P (regno))
+	return ((regno & 1) == 0 && regno <= LAST_ALTIVEC_REGNO - 7);
+
+      return 0;
+    }
 
   /* No other types other than XOmode or TDOmode can go in DMFs.  */
   if (DMF_REGNO_P (regno))
@@ -1983,9 +2008,11 @@ rs6000_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
    GPR registers, and TImode can go in any GPR as well as VSX registers (PR
    57744).
 
-   Similarly, don't allow OOmode (vector pair, restricted to even VSX
-   registers) or XOmode (vector quad, restricted to FPR registers divisible
-   by 4) to tie with other modes.
+   Similarly, don't allow OOmode (vector pair), XOmode (vector quad), or
+   TDOmode (dmr register) to pair with anything else.  Vector pairs are
+   restricted to even/odd VSX registers.  Without DMF, vector quads are limited
+   to FPR registers divisible by 4.  With DMF, vector quads are limited to even
+   VSX registers or DMR registers.
 
    Altivec/VSX vector tests were moved ahead of scalar float mode, so that IEEE
    128-bit floating point on VSX systems ties with other vectors.  */
@@ -1994,8 +2021,8 @@ static bool
 rs6000_modes_tieable_p (machine_mode mode1, machine_mode mode2)
 {
   if (mode1 == PTImode || mode1 == OOmode || mode1 == XOmode
-      || mode2 == PTImode || mode2 == OOmode || mode2 == XOmode
-      || mode1 == TDOmode || mode2 == TDOmode)
+      || mode1 == TDOmode || mode2 == PTImode || mode2 == OOmode
+      || mode2 == XOmode || mode2 == TDOmode)
     return mode1 == mode2;
 
   if (ALTIVEC_OR_VSX_VECTOR_MODE (mode1))
@@ -2655,7 +2682,7 @@ rs6000_setup_reg_addr_masks (void)
 	  /* Special case DMF registers.  */
 	  if (rc == RELOAD_REG_DMF)
 	    {
-	      if (TARGET_DMF && m2 == XOmode)
+	      if (TARGET_DMF && (m2 == XOmode || m2 == TDOmode))
 		{
 		  addr_mask = RELOAD_REG_VALID | RELOAD_REG_NO_MEMORY;
 		  reg_addr[m].addr_mask[rc] = addr_mask;
@@ -2664,13 +2691,6 @@ rs6000_setup_reg_addr_masks (void)
 	      else
 		reg_addr[m].addr_mask[rc] = 0;
 
-	      continue;
-	    }
-
-	  /* At the moment, don't enable TDOmode.  */
-	  if (m2 == TDOmode)
-	    {
-	      reg_addr[m].addr_mask[rc] = 0;
 	      continue;
 	    }
 
@@ -8693,8 +8713,10 @@ reg_offset_addressing_ok_p (machine_mode mode)
 	 if the underlying vectors support offset addressing.  */
     case E_OOmode:
     case E_XOmode:
-    case E_TDOmode:
       return TARGET_MMA;
+
+    case E_TDOmode:
+      return TARGET_DMF;
 
     case E_SDmode:
       /* If we can do direct load/stores of SDmode, restrict it to reg+reg
@@ -27192,8 +27214,8 @@ rs6000_split_multireg_move (rtx dst, rtx src)
   mode = GET_MODE (dst);
   nregs = hard_regno_nregs (reg, mode);
 
-  /* If we have a vector quad register for MMA, and this is a load or store,
-     see if we can use vector paired load/stores.  */
+  /* If we have a vector quad register for MMA or DMR register for DMF, and
+     this is a load or store, see if we can use vector paired load/stores.  */
   if ((mode == XOmode || mode == TDOmode) && TARGET_MMA
       && (MEM_P (dst) || MEM_P (src)))
     {
@@ -27248,12 +27270,12 @@ rs6000_split_multireg_move (rtx dst, rtx src)
       return;
     }
 
-  /* The __vector_pair and __vector_quad modes are multi-register
-     modes, so if we have to load or store the registers, we have to be
-     careful to properly swap them if we're in little endian mode
-     below.  This means the last register gets the first memory
-     location.  We also need to be careful of using the right register
-     numbers if we are splitting XO to OO.  */
+  /* The __vector_pair, __vector_quad, and __dmr modes are multi-register
+     modes, so if we have to load or store the registers, we have to be careful
+     to properly swap them if we're in little endian mode below.  This means
+     the last register gets the first memory location.  We also need to be
+     careful of using the right register numbers if we are splitting XO to
+     OO.  */
   if (mode == OOmode || mode == XOmode || mode == TDOmode)
     {
       nregs = hard_regno_nregs (reg, mode);
@@ -28484,7 +28506,8 @@ rs6000_invalid_conversion (const_tree fromtype, const_tree totype)
 
   if (frommode != tomode)
     {
-      /* Do not allow conversions to/from XOmode and OOmode types.  */
+      /* Do not allow conversions to/from XOmode, OOmode, and TDOmode
+	 types.  */
       if (frommode == XOmode)
 	return N_("invalid conversion from type %<__vector_quad%>");
       if (tomode == XOmode)
