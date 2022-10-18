@@ -92,6 +92,11 @@
    UNSPEC_MMA_XXMFACC
    UNSPEC_MMA_XXMTACC
    UNSPEC_MMA_ASSEMBLE_ACC_DMF
+   UNSPEC_DMF_INSERT512_UPPER
+   UNSPEC_DMF_INSERT512_LOWER
+   UNSPEC_DMF_EXTRACT512
+   UNSPEC_DMR_RELOAD_FROM_MEMORY
+   UNSPEC_DMR_RELOAD_TO_MEMORY
   ])
 
 (define_c_enum "unspecv"
@@ -864,3 +869,150 @@
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")
    (set_attr "isa" "dmf,not_dmf,not_dmf")])
+
+
+;; TDOmode (i.e. __dmr).
+(define_expand "movtdo"
+  [(set (match_operand:TDO 0 "nonimmediate_operand")
+	(match_operand:TDO 1 "input_operand"))]
+  "TARGET_DMF"
+{
+  rs6000_emit_move (operands[0], operands[1], TDOmode);
+  DONE;
+})
+
+(define_insn_and_split "*movtdo"
+  [(set (match_operand:TDO 0 "nonimmediate_operand" "=wa,m,wa,wD,wD,wa")
+	(match_operand:TDO 1 "input_operand" "m,wa,wa,wa,wD,wD"))]
+  "TARGET_DMF
+   && (gpc_reg_operand (operands[0], TDOmode)
+       || gpc_reg_operand (operands[1], TDOmode))"
+  "@
+   #
+   #
+   #
+   #
+   dmmr %0,%1
+   #"
+  "&& reload_completed
+   && (!dmf_operand (operands[0], TDOmode) || !dmf_operand (operands[1], TDOmode))"
+  [(const_int 0)]
+{
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+
+  if (REG_P (op0) && REG_P (op1))
+    {
+      int regno0 = REGNO (op0);
+      int regno1 = REGNO (op1);
+
+      if (DMF_REGNO_P (regno0) && VSX_REGNO_P (regno1))
+	{
+	  rtx op1_upper = gen_rtx_REG (XOmode, regno1);
+	  rtx op1_lower = gen_rtx_REG (XOmode, regno1 + 4);
+	  emit_insn (gen_movtdo_insert512_upper (op0, op1_upper));
+	  emit_insn (gen_movtdo_insert512_lower (op0, op0, op1_lower));
+	  DONE;
+	}
+
+      else if (VSX_REGNO_P (regno0) && DMF_REGNO_P (regno1))
+	{
+	  rtx op0_upper = gen_rtx_REG (XOmode, regno0);
+	  rtx op0_lower = gen_rtx_REG (XOmode, regno0 + 4);
+	  emit_insn (gen_movtdo_extract512 (op0_upper, op1, const0_rtx));
+	  emit_insn (gen_movtdo_extract512 (op0_lower, op1, const1_rtx));
+	  DONE;
+	}
+    }
+
+  rs6000_split_multireg_move (operands[0], operands[1]);
+  DONE;
+}
+  [(set_attr "type" "vecload,vecstore,vecmove,vecmove,vecmove,vecmove")
+   (set_attr "length" "*,*,32,8,*,8")
+   (set_attr "max_prefixed_insns" "4,4,*,*,*,*")])
+
+;; Move from VSX registers to DMR registers via two insert 512 bit
+;; instructions.
+(define_insn "movtdo_insert512_upper"
+  [(set (match_operand:TDO 0 "dmf_operand" "=wD")
+	(unspec:TDO [(match_operand:XO 1 "vsx_register_operand" "wa")]
+		    UNSPEC_DMF_INSERT512_UPPER))]
+  "TARGET_DMF"
+  "dmxxinstdmr512 %0,%1,%Y1,0"
+  [(set_attr "type" "mma")])
+
+(define_insn "movtdo_insert512_lower"
+  [(set (match_operand:TDO 0 "dmf_operand" "=wD")
+	(unspec:TDO [(match_operand:TDO 1 "dmf_operand" "0")
+		     (match_operand:XO 2 "vsx_register_operand" "wa")]
+		    UNSPEC_DMF_INSERT512_LOWER))]
+  "TARGET_DMF"
+  "dmxxinstdmr512 %0,%2,%Y2,1"
+  [(set_attr "type" "mma")])
+
+;; Move from DMR registers to VSX registers via two extract 512 bit
+;; instructions.
+(define_insn "movtdo_extract512"
+  [(set (match_operand:XO 0 "vsx_register_operand" "=wa")
+	(unspec:XO [(match_operand:TDO 1 "dmf_operand" "wD")
+		    (match_operand 2 "const_0_to_1_operand" "n")]
+		   UNSPEC_DMF_EXTRACT512))]
+  "TARGET_DMF"
+  "dmxxextfdmr512 %0,%Y0,%1,%2"
+  [(set_attr "type" "mma")])
+
+;; Reload DMF registers from memory
+(define_insn_and_split "reload_dmf_from_memory"
+  [(set (match_operand:TDO 0 "dmf_operand" "=wD")
+	(unspec:TDO [(match_operand:TDO 1 "memory_operand" "m")]
+		    UNSPEC_DMR_RELOAD_FROM_MEMORY))
+   (clobber (match_operand:XO 2 "vsx_register_operand" "=wa"))]
+  "TARGET_DMF"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  rtx dest = operands[0];
+  rtx src = operands[1];
+  rtx tmp = operands[2];
+  rtx mem_upper = adjust_address (src, XOmode, BYTES_BIG_ENDIAN ? 0 : 32);
+  rtx mem_lower = adjust_address (src, XOmode, BYTES_BIG_ENDIAN ? 32 : 0);
+
+  emit_move_insn (tmp, mem_upper);
+  emit_insn (gen_movtdo_insert512_upper (dest, tmp));
+
+  emit_move_insn (tmp, mem_lower);
+  emit_insn (gen_movtdo_insert512_lower (dest, dest, tmp));
+  DONE;
+}
+  [(set_attr "length" "16")
+   (set_attr "max_prefixed_insns" "2")
+   (set_attr "type" "vecload")])
+
+;; Reload DMF registers to memory
+(define_insn_and_split "reload_dmf_to_memory"
+  [(set (match_operand:TDO 0 "memory_operand" "=m")
+	(unspec:TDO [(match_operand:TDO 1 "dmf_operand" "wD")]
+		    UNSPEC_DMR_RELOAD_TO_MEMORY))
+   (clobber (match_operand:XO 2 "vsx_register_operand" "=wa"))]
+  "TARGET_DMF"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  rtx dest = operands[0];
+  rtx src = operands[1];
+  rtx tmp = operands[2];
+  rtx mem_upper = adjust_address (dest, XOmode, BYTES_BIG_ENDIAN ? 0 : 32);
+  rtx mem_lower = adjust_address (dest, XOmode, BYTES_BIG_ENDIAN ? 32 : 0);
+
+  emit_insn (gen_movtdo_extract512 (tmp, src, const0_rtx));
+  emit_move_insn (mem_upper, tmp);
+
+  emit_insn (gen_movtdo_extract512 (tmp, src, const1_rtx));
+  emit_move_insn (mem_lower, tmp);
+  DONE;
+}
+  [(set_attr "length" "16")
+   (set_attr "max_prefixed_insns" "2")])

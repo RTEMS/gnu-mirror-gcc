@@ -1888,7 +1888,7 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
       if (!TARGET_DMF)
 	return 0;
 
-      if (DMF_REGNO_P (regno) && 0)
+      if (DMF_REGNO_P (regno))
 	return 1;
 
       if (FP_REGNO_P (regno))
@@ -3232,6 +3232,12 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 	      reg_addr[QImode].scalar_in_vmx_p = true;
 	    }
 	}
+    }
+
+  if (TARGET_DMF)
+    {
+      reg_addr[TDOmode].reload_load = CODE_FOR_reload_dmf_from_memory;
+      reg_addr[TDOmode].reload_store = CODE_FOR_reload_dmf_to_memory;
     }
 
   /* Precalculate HARD_REGNO_NREGS.  */
@@ -12164,6 +12170,10 @@ rs6000_secondary_reload_memory (rtx addr,
     addr_mask = (reg_addr[mode].addr_mask[RELOAD_REG_VMX]
 		 & ~RELOAD_REG_AND_M16);
 
+  /* DMR registers don't support loads or stores.  */
+  else if (rclass == DMF_REGS)
+    return -1;
+
   /* If the register allocator hasn't made up its mind yet on the register
      class to use, settle on defaults to use.  */
   else if (rclass == NO_REGS)
@@ -12490,6 +12500,13 @@ rs6000_secondary_reload_simple_move (enum rs6000_reg_type to_type,
   else if ((size == 4 || (TARGET_POWERPC64 && size == 8))
 	   && ((to_type == GPR_REG_TYPE && from_type == SPR_REG_TYPE)
 	       || (to_type == SPR_REG_TYPE && from_type == GPR_REG_TYPE)))
+    return true;
+
+  /* We can transfer between VSX registers and DMR registers without needing
+     extra registers.  */
+  if (TARGET_DMF && (mode == XOmode || mode == TDOmode)
+      && ((to_type == DMF_REG_TYPE && from_type == VSX_REG_TYPE)
+	  || (to_type == VSX_REG_TYPE && from_type == DMF_REG_TYPE)))
     return true;
 
   return false;
