@@ -12170,9 +12170,10 @@ rs6000_secondary_reload_memory (rtx addr,
     addr_mask = (reg_addr[mode].addr_mask[RELOAD_REG_VMX]
 		 & ~RELOAD_REG_AND_M16);
 
-  /* DMR registers don't support loads or stores.  */
+  /* DMR registers use VSX registers, and need to generate some extra
+     instructions.  */
   else if (rclass == DMF_REGS)
-    return -1;
+    return 2;
 
   /* If the register allocator hasn't made up its mind yet on the register
      class to use, settle on defaults to use.  */
@@ -22563,6 +22564,35 @@ rs6000_debug_address_cost (rtx x, machine_mode mode,
 }
 
 
+/* Subroutine to determine the move cost of DMF registers.  If we are moving
+   to/from VSX_REGISTER registers, the cost is either 1 move (for 512-bit
+   accumulators) or 2 moves (for 1,024 dmr registers).  If we are moving to
+   anything else like GPR registers, make the cost very high.  */
+
+static int
+rs6000_dmf_register_move_cost (machine_mode mode, reg_class_t rclass)
+{
+  const int reg_move_base = 2;
+  HARD_REG_SET vsx_set = (reg_class_contents[rclass]
+			  & reg_class_contents[VSX_REGS]);
+
+  if (TARGET_DMF && !hard_reg_set_empty_p (vsx_set))
+    {
+      /* __vector_quad (i.e. XOmode) is tranfered in 1 instruction.  */
+      if (mode == XOmode)
+	return reg_move_base;
+
+      /* __dmr (i.e. TDOmode) is transferred in 2 instructions.  */
+      else if (mode == TDOmode)
+	return reg_move_base * 2;
+
+      else
+	return reg_move_base * 2 * hard_regno_nregs (FIRST_DMF_REGNO, mode);
+    }
+
+  return 1000 * 2 * hard_regno_nregs (FIRST_DMF_REGNO, mode);
+}
+
 /* A C expression returning the cost of moving data from a register of class
    CLASS1 to one of CLASS2.  */
 
@@ -22576,17 +22606,28 @@ rs6000_register_move_cost (machine_mode mode,
   if (TARGET_DEBUG_COST)
     dbg_cost_ctrl++;
 
+  HARD_REG_SET to_vsx, from_vsx;
+  to_vsx = reg_class_contents[to] & reg_class_contents[VSX_REGS];
+  from_vsx = reg_class_contents[from] & reg_class_contents[VSX_REGS];
+
+  /* Special case DMR registers, that can only move to/from VSX registers.  */
+  if (from == DMF_REGS && to == DMF_REGS)
+    ret = 2 * hard_regno_nregs (FIRST_DMF_REGNO, mode);
+
+  else if (from == DMF_REGS)
+    ret = rs6000_dmf_register_move_cost (mode, to);
+
+  else if (to == DMF_REGS)
+    ret = rs6000_dmf_register_move_cost (mode, from);
+
   /* If we have VSX, we can easily move between FPR or Altivec registers,
      otherwise we can only easily move within classes.
      Do this first so we give best-case answers for union classes
      containing both gprs and vsx regs.  */
-  HARD_REG_SET to_vsx, from_vsx;
-  to_vsx = reg_class_contents[to] & reg_class_contents[VSX_REGS];
-  from_vsx = reg_class_contents[from] & reg_class_contents[VSX_REGS];
-  if (!hard_reg_set_empty_p (to_vsx)
-      && !hard_reg_set_empty_p (from_vsx)
-      && (TARGET_VSX
-	  || hard_reg_set_intersect_p (to_vsx, from_vsx)))
+  else if (!hard_reg_set_empty_p (to_vsx)
+	   && !hard_reg_set_empty_p (from_vsx)
+	   && (TARGET_VSX
+	       || hard_reg_set_intersect_p (to_vsx, from_vsx)))
     {
       int reg = FIRST_FPR_REGNO;
       if (TARGET_VSX
@@ -22682,6 +22723,8 @@ rs6000_memory_move_cost (machine_mode mode, reg_class_t rclass,
     ret = 4 * hard_regno_nregs (32, mode);
   else if (reg_classes_intersect_p (rclass, ALTIVEC_REGS))
     ret = 4 * hard_regno_nregs (FIRST_ALTIVEC_REGNO, mode);
+  else if (reg_classes_intersect_p (rclass, DMF_REGS))
+    ret = 4 + rs6000_register_move_cost (mode, rclass, VSX_REGS);
   else
     ret = 4 + rs6000_register_move_cost (mode, rclass, GENERAL_REGS);
 
