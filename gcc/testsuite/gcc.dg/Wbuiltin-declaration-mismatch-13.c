@@ -10,7 +10,7 @@ void* ret_calloc (size_t n1, size_t n2)
   extern size_t calloc (size_t, size_t);    // { dg-warning "\\\[-Wbuiltin-declaration-mismatch" }
 
   return (void *) calloc (n1, n2);
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
 }
 
 void* ret_malloc (size_t n)
@@ -18,7 +18,7 @@ void* ret_malloc (size_t n)
   extern size_t malloc (size_t);            // { dg-warning "\\\[-Wbuiltin-declaration-mismatch" }
 
   return (void *) malloc (n);
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
 }
 
 void* ret_realloc (void *p, size_t n)
@@ -26,7 +26,7 @@ void* ret_realloc (void *p, size_t n)
   extern size_t realloc (void *p, size_t);  // { dg-warning "\\\[-Wbuiltin-declaration-mismatch" }
 
   return (void *) realloc (p, n);
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
 }
 
 void* ret_strdup (const char *s)
@@ -34,7 +34,7 @@ void* ret_strdup (const char *s)
   extern size_t strdup (const char*);       // { dg-warning "\\\[-Wbuiltin-declaration-mismatch" }
 
   return (void *) strdup (s);
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
 }
 
 void* ret_strndup (const char *s, size_t n)
@@ -43,7 +43,7 @@ void* ret_strndup (const char *s, size_t n)
     strndup (const char*, size_t);          // { dg-warning "\\\[-Wbuiltin-declaration-mismatch" }
 
   return (void *) strndup (s, n);
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
 }
 
 // For good measure also exerise strcmp return type (not part of the bug).

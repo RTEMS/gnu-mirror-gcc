@@ -5,7 +5,7 @@ static inline void wreg(unsigned char val, unsigned long addr) __attribute__((al
 static inline void wreg(unsigned char val, unsigned long addr)
 {
    *((volatile unsigned char *) (__SIZE_TYPE__) (base + addr)) = val;
-   /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+   /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
 }
 void wreg_twice(void)
 {

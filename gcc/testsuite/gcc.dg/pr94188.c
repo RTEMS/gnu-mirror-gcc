@@ -7,5 +7,5 @@ struct dm_tree_link {
 void fn1(void *p)
 {
   0 ? ((struct dm_tree_link *)((char *)p - (char *)&((struct dm_tree_link *)0)->list))->node : 0;
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
 }

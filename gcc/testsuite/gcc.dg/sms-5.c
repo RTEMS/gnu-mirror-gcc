@@ -36,7 +36,7 @@ int main ()
 
   /* Pretend that's good enough to start address arithmetic.  */
   p = (void *)start;
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
 
   /* Verify that GIV replacement computes the correct results.  */
   q[39] = 0;

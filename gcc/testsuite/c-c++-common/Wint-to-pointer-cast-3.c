@@ -8,7 +8,7 @@ char c;
 void *
 f (void)
 {
-  return (void *) c;
+  return (void *) c; /* { dg-warning "cast from provenance-free integer type to pointer type" "" { target { cheri_pointers_are_caps } } } */
 }
 
 void *p;

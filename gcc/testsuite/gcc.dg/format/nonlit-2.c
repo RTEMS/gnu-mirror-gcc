@@ -9,6 +9,6 @@ void
 foo (char *s, size_t i)
 {
   printf ((const char *)i, i); /* { dg-warning "argument types" "non-literal" } */
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
   printf (s, i); /* { dg-warning "argument types" "non-literal" } */
 }

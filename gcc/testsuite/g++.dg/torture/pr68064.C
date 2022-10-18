@@ -22,6 +22,7 @@ struct C {
   static A<C> *from_bitset(unsigned);
 };
 A<C> *C::from_bitset(unsigned p1) { return reinterpret_cast<A<C> *>(p1); }
+// { dg-warning "cast from provenance-free integer type to pointer type" "" { target { cheri_pointers_are_caps } } .-1 }
 
 namespace {
 int *a;

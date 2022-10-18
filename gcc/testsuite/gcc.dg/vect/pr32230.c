@@ -17,7 +17,7 @@ const_f (filter_buffer_t *buf)
 
   for (i = 0; i < 10; i++)
     ((float*) (&((sbuf_header_t *) (__PTRDIFF_TYPE__)((buf) == (filter_buffer_t *)&(buf)->buf[0]))->buf[0]))[i] = val;
-    /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+    /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
 }
 
 

@@ -27,7 +27,7 @@ extern void link_error (void);
 int main()
 {
   void (*anyfn)(int *) = (void (*)(int *))(__SIZE_TYPE__)anyfn_global;
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
   /* The following should cause local_address_taken to get &x
      as argument, but not local.  We shouldn't get &x added to
      arbitrary special sub-vars of local_address_taken though,

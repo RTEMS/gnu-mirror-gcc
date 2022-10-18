@@ -24,7 +24,7 @@ void sched_init (uintptr_t __ptr)
   struct prio_array *array;
   struct rq *rq;
   rq = (&(*( { (typeof (&per_cpu__runqueues)) (__ptr); } )));
-   /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+   /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
   for (j = 0; j < 2; j++)
   {
     array = rq->arrays + j;

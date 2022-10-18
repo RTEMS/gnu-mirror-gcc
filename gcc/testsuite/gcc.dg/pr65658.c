@@ -77,7 +77,7 @@ setup (void)
   if (fn4 (101))
     return 1;
   if (undefinit2 ((void *) problem.l1, problem.l3 * 4))  /* { dg-bogus "problem.l3" "uninitialized variable warning" } */ 
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
     return 1;
 }
 

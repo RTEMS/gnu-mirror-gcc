@@ -1,5 +1,6 @@
 // { dg-do assemble  }
 // { dg-options "-Wall -Wno-int-to-pointer-cast" }
+// { dg-additional-options "-Wno-cheri-capability-misuse" { target { cheri_pointers_are_caps } } }
 
 typedef char * charptr;
 typedef __SIZE_TYPE__ size_t;

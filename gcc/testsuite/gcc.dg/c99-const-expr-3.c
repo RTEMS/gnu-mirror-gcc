@@ -20,7 +20,7 @@ long *c;
    expressions has type 'void *' instead of 'int *'.
 */
 #define ASSERT_NOT_NPC(n)	(c = (1 ? a : (void *)(__SIZE_TYPE__)(n)))
-/* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+/* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
 
 void
 foo (void)

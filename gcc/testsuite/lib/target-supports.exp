@@ -3567,6 +3567,19 @@ proc check_effective_target_aarch64_capability_any { } {
   }]
 }
 
+proc check_effective_target_cheri_pointers_are_caps { } {
+  # True for pure-capability CHERI as well as AArch64 fake-capability
+  # mode.
+  if { ![istarget aarch64*-*-*] } {
+      return 0
+  }
+  return [check_no_compiler_messages cheri_pointers_are_caps assembly {
+  #if !defined (__GCC_ARM_CAPABILITY_ANY) || (defined(__CHERI__) && !defined(__CHERI_PURE_CAPABILITY__))
+  #error foo
+  #endif
+  }]
+}
+
 proc check_effective_target_cheri_capability_pure { } {
   # For now this is allowed only for AArch64. The definition of this may need
   # to be expanded if other targets add support for CHERI capabilities.

@@ -85,7 +85,7 @@ compute_motion (from, fromvpos, fromhpos, did_motion, to, tovpos, tohpos,
 		    (struct frame
 		     *) ((long) (((win)->frame) & ~((((long) 1) << 3) -
 						    1)))))->text_cols))
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-3 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-3 } */
 	    {
 	      if (pos <= to)
 		{
@@ -115,7 +115,7 @@ compute_motion (from, fromvpos, fromhpos, did_motion, to, tovpos, tohpos,
 		      (struct Lisp_Vector
 		       *) ((long) ((charvec) & ~((((long) 1) << 3) - 1))))->
 		     size & ((((unsigned long) 1 << (64 - 1)) >> 1)))))
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-3 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-3 } */
 		{
 		  unsigned char *ptr;
 		  int bytes, width, wide_column;
@@ -140,7 +140,7 @@ compute_motion (from, fromvpos, fromhpos, did_motion, to, tovpos, tohpos,
 								   Lisp_Type)
 								  (((unsigned
 								     long) (((dp)->ascii))) & ((((long) 1) << 3) - 1))) == Lisp_Vectorlike) && (((((void) 0, (struct Lisp_Vector *) ((long) (((dp)->ascii) & ~((((long) 1) << 3) - 1))))->size & (((((unsigned long) 1 << (64 - 1)) >> 1)) | (PVEC_SUB_CHAR_TABLE)))) == (((((unsigned long) 1 << (64 - 1)) >> 1)) | (PVEC_SUB_CHAR_TABLE)))) ? ((void) 0, (struct Lisp_Sub_Char_Table *) ((long) (((dp)->ascii) & ~((((long) 1) << 3) - 1))))->contents[c] : (dp)->ascii)) : disp_char_vector ((dp), (c)))))) & ((((long) 1) << 3) - 1))) == Lisp_Vectorlike) && !(((void) 0, (struct Lisp_Vector *) ((long) (((((unsigned) (c) < 0x80) ? ((((dp)->ascii) == (Qnil)) ? (dp)->defalt : (((((enum Lisp_Type) (((unsigned long) (((dp)->ascii))) & ((((long) 1) << 3) - 1))) == Lisp_Vectorlike) && (((((void) 0, (struct Lisp_Vector *) ((long) (((dp)->ascii) & ~((((long) 1) << 3) - 1))))->size & (((((unsigned long) 1 << (64 - 1)) >> 1)) | (PVEC_SUB_CHAR_TABLE)))) == (((((unsigned long) 1 << (64 - 1)) >> 1)) | (PVEC_SUB_CHAR_TABLE)))) ? ((void) 0, (struct Lisp_Sub_Char_Table *) ((long) (((dp)->ascii) & ~((((long) 1) << 3) - 1))))->contents[c] : (dp)->ascii)) : disp_char_vector ((dp), (c)))) & ~((((long) 1) << 3) - 1))))->size & ((((unsigned long) 1 << (64 - 1)) >> 1)))))
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
 			    width =
 			      ((void) 0,
 			       (struct Lisp_Vector
@@ -150,8 +150,8 @@ compute_motion (from, fromvpos, fromhpos, did_motion, to, tovpos, tohpos,
 							defalt
 							: (((((enum
 							       Lisp_Type) (((unsigned long) (((dp)->ascii))) & ((((long) 1) << 3) - 1))) == Lisp_Vectorlike) && (((((void) 0, (struct Lisp_Vector *) ((long) (((dp)->ascii) & ~((((long) 1) << 3) - 1))))->size & (((((unsigned long) 1 << (64 - 1)) >> 1)) | (PVEC_SUB_CHAR_TABLE)))) == (((((unsigned long) 1 << (64 - 1)) >> 1)) | (PVEC_SUB_CHAR_TABLE)))) ? ((void) 0, (struct Lisp_Sub_Char_Table *) ((long) (((dp)->ascii) & ~((((long) 1) << 3) - 1))))->contents[c] : (dp)->ascii)) : disp_char_vector ((dp), (c)))) & ~((((long) 1) << 3) - 1))))->size;
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-7 } */
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-2 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-7 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-2 } */
 			  else
 			    width =
 			      (((unsigned) (c) < 0x80) ? (c <

@@ -22,7 +22,7 @@ return_local_diff_cst (void)
 {
   int a[5];
   void *p = (void*)(&a[4] - &a[1]);
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
   return p;
 }
 
@@ -31,7 +31,7 @@ return_local_diff_var (int i, int j)
 {
   int a[5];
   void *p = (void*)(&a[j] - &a[i]);
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
   return p;
 }
 

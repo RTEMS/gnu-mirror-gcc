@@ -9,7 +9,7 @@ void f2();
 void
 foo (int a)
 {
-  if ((int *) a == 0)
+  if ((int *) a == 0) /* { dg-warning "cast from provenance-free integer type to pointer type" "" { target { cheri_pointers_are_caps } } } */
     {
       f1 ();
       if (a)

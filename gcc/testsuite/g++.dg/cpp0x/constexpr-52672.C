@@ -1,5 +1,6 @@
 // PR c++/52672
 // { dg-do compile { target c++11 } }
+// { dg-additional-options "-Wno-cheri-capability-misuse" { target { cheri_pointers_are_caps } } }
 
 __extension__ typedef __SIZE_TYPE__ * ul_ptr;
 constexpr unsigned long a = *((ul_ptr)0x0); // { dg-error "" }

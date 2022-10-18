@@ -11,3 +11,4 @@ class B {
 };
 long f;
 void B::d() { e.c((const int *)f); }
+// { dg-warning "cast from provenance-free integer type to pointer type" "" { target { cheri_pointers_are_caps } } .-1 }

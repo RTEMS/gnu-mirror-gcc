@@ -22,6 +22,6 @@ int main(int argc, char *argv[])
        pointer conversion to pointer offsetting.  */
     o = ((struct obj *)((const char *)(o->l.n)
 			- (const char *)&((struct obj *)0)->l));
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-2 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-2 } */
   return 0;
 }

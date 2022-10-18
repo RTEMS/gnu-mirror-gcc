@@ -7,6 +7,7 @@ setback(MEMBER *bp, MEMBER STRUCT::*offset)
         union { int i; MEMBER STRUCT::*of; } u;
         u.of = offset;
         return (STRUCT *) ((__SIZE_TYPE__) bp - u.i);
+// { dg-warning "cast from provenance-free integer type to pointer type" "" { target { cheri_pointers_are_caps } } .-1 }
 }
  
 

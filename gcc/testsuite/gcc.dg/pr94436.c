@@ -10,5 +10,5 @@ bar (void)
 {
   int s = 0;
   return foo ((struct S *) ((char *) &s - (char *) &((struct S *) 0)->s));	/* { dg-bogus "from incompatible pointer type" } */
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
 }

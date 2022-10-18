@@ -78,7 +78,7 @@ int main(void)
    char buf[sizeof(struct stuff)+CHUNK_SIZE];
    struct stuff *u
      = (struct stuff *)ossAlignX((unsigned long)&buf[0], CHUNK_SIZE);
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
 
    /* This test assumes system memory page
       size of CHUNK_SIZE bytes or less.  */

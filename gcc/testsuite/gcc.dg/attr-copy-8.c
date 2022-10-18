@@ -1,6 +1,7 @@
 /* PR c/89685 - ICE on attribute copy with a compound expression
    { dg-do compile }
-   { dg-options "-Wall -Wno-unused-value -Wno-int-to-pointer-cast" } */
+   { dg-options "-Wall -Wno-unused-value -Wno-int-to-pointer-cast" }
+   { dg-additional-options "-Wno-cheri-capability-misuse" { target { cheri_pointers_are_caps } } } */
 
 #define ATTR(...) __attribute__ ((__VA_ARGS__))
 

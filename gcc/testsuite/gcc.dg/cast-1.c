@@ -35,7 +35,7 @@ f (void)
   (void) sv;
   (const void) uv;
   (void *) c; /* { dg-warning "cast to pointer from integer of different size" } */
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
   (void *) (char) 1;
   (char) p; /* { dg-warning "cast from pointer to integer of different size" } */
   (char) (void *) 1; /* { dg-warning "cast from pointer to integer of different size" } */

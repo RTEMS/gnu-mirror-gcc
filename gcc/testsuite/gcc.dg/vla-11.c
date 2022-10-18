@@ -8,6 +8,6 @@
 
 void foo11a(int x[sizeof(int *(*)[*])]);	/* { dg-warning "not in a declaration" } */
 void foo11b(__SIZE_TYPE__ x, int y[(__UINTPTR_TYPE__)(int (*)[*])x]);	/* { dg-warning "not in a declaration" } */
-/* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+/* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
 void foo11c(struct s { int (*x)[*]; } *y);	/* { dg-error "a member of a structure or union cannot have a variably modified type" "variably modified" } */
 /* { dg-warning "'struct s' declared inside parameter list" "struct decl" { target *-*-* } .-1 } */

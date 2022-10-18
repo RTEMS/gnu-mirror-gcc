@@ -6,7 +6,7 @@ extern void __attribute__ ((noreturn)) abort (void);
 int __attribute__ ((noinline, noclone))
 foo (unsigned long addr) {
     unsigned long *p = (unsigned long*)((addr & 0xffff83fffffffff8UL) * 4);
-    /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+    /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
     unsigned long xxx = (unsigned long)(p + 1);
     return xxx >= 0x3c000000000UL;
 }

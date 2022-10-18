@@ -13,5 +13,5 @@ f (int x)
   printf("%s", x); /* { dg-warning "format" } */
   printf((char *)(__UINTPTR_TYPE__)"%s", x); /* { dg-warning "format" } */
   printf((char *)(char)"%s", x); /* { dg-warning "cast from pointer to integer of different size" } */
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
 }

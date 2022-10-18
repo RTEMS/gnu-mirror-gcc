@@ -27,7 +27,7 @@ foo(void)
   __SIZE_TYPE__ base = 0x000a0000;
   for (i = 0; i < (sizeof (a0) / sizeof ((a0)[0])); i++) {
     *(volatile t0 *) (base + 44) = a0[i];
-  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+  /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
   }
 }
 

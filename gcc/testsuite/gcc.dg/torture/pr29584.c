@@ -24,6 +24,6 @@ bar (void)
 	  s = foo1 ();
 	}
       foo3 ((void *) (0x8000000UL + i * 0x400), s);
-      /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { aarch64_capability_any } } .-1 } */
+      /* { dg-warning "cast from provenance-free integer type to pointer type will give pointer that can not be dereferenced" "" { target { cheri_pointers_are_caps } } .-1 } */
     }
 }
