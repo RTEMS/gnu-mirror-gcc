@@ -1,3 +1,18 @@
+==================== dmf001, patch #17
+
+Update DMR move costs.
+
+2022-10-18   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_secondary_reload_memory): Account for
+	extra instructions needed to load/store DMF registers using VSX
+	registers.
+	(rs6000_dmf_register_move_cost): New helper function.
+	(rs6000_register_move_cost): Add costs for moving DMF registers.
+	(rs6000_memory_move_cost): Add support for DMF registers.
+
 ==================== dmf001, patch #16
 
 Add initial __dmr support.
