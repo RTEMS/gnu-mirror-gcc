@@ -1,3 +1,13 @@
+==================== dmf001, patch #19
+
+Add mangling for __dmr.
+
+2022-10-18   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_mangle_type): Add mangling for __dmr.
+
 ==================== dmf001, patch #18
 
 Add Dwarf support for DMR registers.
