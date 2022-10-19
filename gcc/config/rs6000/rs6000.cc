@@ -22724,8 +22724,7 @@ rs6000_memory_move_cost (machine_mode mode, reg_class_t rclass,
   else if (reg_classes_intersect_p (rclass, ALTIVEC_REGS))
     ret = 4 * hard_regno_nregs (FIRST_ALTIVEC_REGNO, mode);
   else if (reg_classes_intersect_p (rclass, DMF_REGS))
-    ret = (rs6000_dmf_register_move_cost (mode, VSX_REGS)
-	   + rs6000_memory_move_cost (mode, VSX_REGS, false));
+    ret = 4 + rs6000_register_move_cost (mode, rclass, VSX_REGS);
   else
     ret = 4 + rs6000_register_move_cost (mode, rclass, GENERAL_REGS);
 
@@ -24100,10 +24099,6 @@ rs6000_debugger_regno (unsigned int regno, unsigned int format)
     return 67;
   if (regno == 64)
     return 64;
-  /* XXX: This is a guess.  The GCC register number for FIRST_DMF_REGNO is 111,
-     but the frame pointer regnum above uses that.  */
-  if (DMF_REGNO_P (regno))
-    return regno - FIRST_DMF_REGNO + 112;
 
   gcc_unreachable ();
 }
