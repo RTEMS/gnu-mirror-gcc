@@ -1,6 +1,6 @@
 // MT-optimized allocator -*- C++ -*-
 
-// Copyright (C) 2003-2020 Free Software Foundation, Inc.
+// Copyright (C) 2003-2022 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -58,9 +58,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     struct _Tune
     {
       // Compile time constants for the default _Tune values.
-      enum { _S_align = 8 };
+      enum { _S_align = sizeof (void*) > 8 ? sizeof (void*) : 8 };
+      enum { _S_min_bin = sizeof (void*) > 8 ? sizeof (void*) : 8 };
       enum { _S_max_bytes = 128 };
-      enum { _S_min_bin = 8 };
       enum { _S_chunk_size = 4096 - 4 * sizeof(void*) };
       enum { _S_max_threads = 4096 };
       enum { _S_freelist_headroom = 10 };
@@ -729,6 +729,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  __bin._M_first[__thread_id] = __block->_M_next;
 	  
 	  __pool._M_adjust_freelist(__bin, __block, __thread_id);
+#ifdef __CHERI_PURE_CAPABILITY__
+	  __block->_M_next = (_Block_record *)0;
+#endif
 	  __c = reinterpret_cast<char*>(__block) + __pool._M_get_align();
 	}
       else

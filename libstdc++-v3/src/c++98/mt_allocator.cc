@@ -1,6 +1,6 @@
 // Allocator details.
 
-// Copyright (C) 2004-2020 Free Software Foundation, Inc.
+// Copyright (C) 2004-2022 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -35,6 +35,13 @@
 // check to make sure the target has <stdint.h> and that it provides
 // uintptr_t.
 #include <stdint.h>
+
+#ifdef __CHERI_PURE_CAPABILITY__
+#define maybe_set_cheri_bounds(p, n) \
+	__builtin_cheri_bounds_set_exact ((p), (n))
+#else
+#define maybe_set_cheri_bounds(p, n) (p)
+#endif
 
 namespace
 {
@@ -151,12 +158,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
     char* __c = static_cast<char*>(__v) + sizeof(_Block_address);
     _Block_record* __block = reinterpret_cast<_Block_record*>(__c);
+    __block = maybe_set_cheri_bounds(__block, __bin_size);
     __bin._M_first[__thread_id] = __block;
     while (--__block_count > 0)
       {
 	__c += __bin_size;
 	__block->_M_next = reinterpret_cast<_Block_record*>(__c);
 	__block = __block->_M_next;
+	__block = maybe_set_cheri_bounds(__block, __bin_size);
       }
     __block->_M_next = 0;
 
@@ -396,12 +405,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	    char* __c = static_cast<char*>(__v) + sizeof(_Block_address);
 	    __block = reinterpret_cast<_Block_record*>(__c);
 	    __bin._M_free[__thread_id] = __block_count;
+	    __block = maybe_set_cheri_bounds(__block, __bin_size);
 	    __bin._M_first[__thread_id] = __block;
 	    while (--__block_count > 0)
 	      {
 		__c += __bin_size;
 		__block->_M_next = reinterpret_cast<_Block_record*>(__c);
 		__block = __block->_M_next;
+		__block = maybe_set_cheri_bounds(__block, __bin_size);
 	      }
 	    __block->_M_next = 0;
 	  }
@@ -440,12 +451,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 	char* __c = static_cast<char*>(__v) + sizeof(_Block_address);
 	__block = reinterpret_cast<_Block_record*>(__c);
+	__block = maybe_set_cheri_bounds(__block, __bin_size);
  	__bin._M_first[0] = __block;
 	while (--__block_count > 0)
 	  {
 	    __c += __bin_size;
 	    __block->_M_next = reinterpret_cast<_Block_record*>(__c);
 	    __block = __block->_M_next;
+	    __block = maybe_set_cheri_bounds(__block, __bin_size);
 	  }
 	__block->_M_next = 0;
       }
