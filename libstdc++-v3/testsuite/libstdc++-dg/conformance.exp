@@ -18,6 +18,7 @@
 
 # libstdc++-v3 testsuite that uses the 'dg.exp' driver.
 
+load_lib dg-enable-shouldfail.exp
 # Initialization.
 dg-init
 

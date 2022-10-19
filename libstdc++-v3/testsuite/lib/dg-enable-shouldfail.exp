@@ -1,0 +1,35 @@
+# The below mostly taken from gcc-dg.exp.
+# We want `dg-shouldfail` in libstdc++ tests.  The procedure itself is loaded
+# by a load_lib directive in libstdc++.exp, but it only works via a wrapper
+# around the procedure which runs an executable and sets the pass/fail status.
+#
+# This procedure defines that wrapper.  In order to define the wrapper the
+# original procedure to run the executable needs to have been defined.  This is
+# defined in the board/OS config (or config/default.exp if there is no specific
+# config given).
+# These configuration files are loaded after libstdc++.exp, which means
+# defining the wrapper there can not work.  Hence we define it in a separate
+# file and allow this file to be loaded from those testsuite drivers that need
+# it.
+if { [info procs ${tool}_load] != [list] \
+      && [info procs saved_${tool}_load] == [list] } {
+    rename ${tool}_load saved_${tool}_load
+
+    proc ${tool}_load { program args } {
+	global tool
+	global shouldfail
+
+	set result [eval [list saved_${tool}_load $program] $args]
+	if { $shouldfail != 0 } {
+	    switch [lindex $result 0] {
+		"pass" { set status "fail" }
+		"fail" { set status "pass" }
+		default { set status [lindex $result 0] }
+	    }
+	    set result [list $status [lindex $result 1]]
+	}
+
+	set result [list [lindex $result 0] [lindex $result 1]]
+	return $result
+    }
+}

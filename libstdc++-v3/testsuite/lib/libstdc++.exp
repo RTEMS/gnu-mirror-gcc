@@ -442,6 +442,7 @@ if { [info procs saved-dg-test] == [list] } {
 	global additional_prunes
 	global errorInfo
 	global testname_with_flags
+	global shouldfail
 
 	if { [ catch { eval saved-dg-test $args } errmsg ] } {
 	    set saved_info $errorInfo
@@ -450,6 +451,7 @@ if { [info procs saved-dg-test] == [list] } {
 		unset testname_with_flags
 	    }
 	    unset_timeout_vars
+	    set shouldfail 0
 	    error $errmsg $saved_info
 	}
 	set additional_prunes ""
@@ -457,6 +459,7 @@ if { [info procs saved-dg-test] == [list] } {
 	if [info exists testname_with_flags] {
 	    unset testname_with_flags
 	}
+	set shouldfail 0
     }
 }
 

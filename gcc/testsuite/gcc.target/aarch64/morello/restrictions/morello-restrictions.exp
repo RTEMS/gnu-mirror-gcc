@@ -25,22 +25,15 @@ if {![istarget aarch64*-*-*] } then {
 # Load support procs.
 load_lib gcc-dg.exp
 load_lib c-torture.exp
+load_lib target-supports-dg.exp
 
 # Initialize `dg'.
 dg-init
 
-# We define a different proc to be used by the testcases so we can use
-# `dg-shouldfail` without relying on looking for specific flags.  Sometimes we
-# compile purecap by default, sometimes we don't, hence can't use flags.
 if { [check_effective_target_cheri_capability_pure] } {
   set capability_flags ""
-  proc dg-shouldfail-purecap { args } {
-    upvar dg-do-what dg-do-what
-    dg-shouldfail "morello bounds"
-  }
 } else {
   set capability_flags "-mfake-capability"
-  proc dg-shouldfail-purecap { args } { }
 }
 
 torture-init
@@ -51,8 +44,6 @@ set-torture-options "$C_TORTURE_OPTIONS"
 gcc-dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/*.\[cCS\]]] \
     "" "$capability_flags"
 
-# Delete the proc now we don't need it.
-rename dg-shouldfail-purecap ""
 torture-finish
 # All done.
 dg-finish

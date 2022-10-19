@@ -1,6 +1,6 @@
 // Allocators -*- C++ -*-
 
-// Copyright (C) 2001-2020 Free Software Foundation, Inc.
+// Copyright (C) 2001-2022 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -77,7 +77,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       typedef std::size_t size_t;
     protected:
 
-      enum { _S_align = 8 };
+      // We round up allocations to this size.
+      // The allocation needs to be large enough to fit a pointer since
+      // internally we store pointers in the unused allocations.
+      enum { _S_align = sizeof (void*) > 8 ? sizeof (void*) : 8 };
       enum { _S_max_bytes = 128 };
       enum { _S_free_list_size = (size_t)_S_max_bytes / (size_t)_S_align };
       
@@ -255,9 +258,37 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 		{
 		  *__free_list = __result->_M_free_list_link;
 		  __ret = reinterpret_cast<_Tp*>(__result);
+#ifdef __CHERI_PURE_CAPABILITY__
+		  // Since CHERI is about restricting unnecessary permissions,
+		  // it seems reasonable to clear the internal free list link
+		  // before returning.
+		  __result->_M_free_list_link = 0;
+#endif
 		}
 	      if (__ret == 0)
 		std::__throw_bad_alloc();
+#ifdef __CHERI_PURE_CAPABILITY__
+	      // It is unfortunate that we require the bounds of the pointer we
+	      // return to be large enough to access the entire chunk even if
+	      // the allocation that the user asked for is less than that size.
+	      // This is required due to the fact that we do not increase the
+	      // bounds of allocations when reclaiming them in deallocate.
+	      // They simply go back onto the free list to be returned to a
+	      // later allocation.  This later allocation may need the entire
+	      // chunk allocated, and hence the pointer we bound here -- which
+	      // would be given as-is to such a hypothetical later allocation
+	      // -- must have the widest bounds an allocation which may get it
+	      //  would need.
+	      // It is possible to maintain some out-of-band capabilities
+	      // containing the permissions we need to increase the bounds on a
+	      // pointer that we are requesting be deallocated.  However this
+	      // would require we maintain another data structure, and there is
+	      // little security problem allowing a user to access padding
+	      // space just after their allocation (which will not be affecting
+	      // any other allocation).
+	      __ret = __builtin_cheri_bounds_set_exact
+		      (__ret, _M_round_up(__bytes));
+#endif
 	    }
 	}
       return __ret;
