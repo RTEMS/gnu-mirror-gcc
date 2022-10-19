@@ -20459,6 +20459,8 @@ rs6000_mangle_type (const_tree type)
     return "u13__vector_pair";
   if (type == vector_quad_type_node)
     return "u13__vector_quad";
+  if (type == dmr_type_node)
+    return "u5__dmr";
 
   /* For all other types, use the default mangling.  */
   return NULL;
