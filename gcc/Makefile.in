@@ -119,6 +119,7 @@ VPATH = @srcdir@
 # This vpath could be extended within the Make-lang fragments.
 
 vpath %.texi $(gcc_docdir)
+vpath %.rst $(gcc_docdir)
 vpath %.texi $(gcc_docdir)/include
 
 # --------
@@ -3332,7 +3333,7 @@ TEXI_GCC_FILES = gcc.texi gcc-common.texi gcc-vers.texi frontends.texi	\
 	 standards.texi invoke.texi extend.texi md.texi objc.texi	\
 	 gcov.texi trouble.texi bugreport.texi service.texi		\
 	 contribute.texi compat.texi funding.texi gnu.texi gpl_v3.texi	\
-	 fdl.texi contrib.texi cppenv.texi cppopts.texi avr-mmcu.texi	\
+	 fdl.texi contrib.texi cppenv.texi cppopts.texi avr-mmcu.rst \
 	 implement-c.texi implement-cxx.texi gcov-tool.texi gcov-dump.texi \
 	 lto-dump.texi
 
