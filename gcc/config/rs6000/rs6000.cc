@@ -6095,6 +6095,35 @@ rs6000_file_start (void)
 
   if (DEFAULT_ABI == ABI_ELFv2)
     fprintf (file, "\t.abiversion 2\n");
+
+  if (TARGET_LAGEN)
+    {
+      fprintf (file, "\n");
+      fprintf (file, "\t.macro lagen rt,ra,rb,n\n");
+      fprintf (file, "\tsldi \\rt,\\rb,\\n\n");
+      fprintf (file, "\tadd \\rt,\\rt,\\ra\n");
+      fprintf (file, "\t.endm\n");
+      fprintf (file, "\n");
+
+      fprintf (file, "\t.macro plagen1 rt,d,rb,n\n");
+      fprintf (file, "\tsldi \\rt,\\rb,\\n\n");
+      fprintf (file, "\tpaddi \\rt,\\rt,\\d\n");
+      fprintf (file, "\t.endm\n");
+      fprintf (file, "\n");
+
+      fprintf (file, "\t.macro plagen2 rt,d,ra,rb,n\n");
+      fprintf (file, "\tsldi \\rt,\\rb,\\n\n");
+      fprintf (file, "\tadd \\rt,\\rt,\\ra\n");
+      fprintf (file, "\tpaddi \\rt,\\rt,\\d\n");
+      fprintf (file, "\t.endm\n");
+      fprintf (file, "\n");
+
+      fprintf (file, "\t.macro plagen3 rt,d,ra,rb\n");
+      fprintf (file, "\tadd \\rt,\\rb,\\ra\n");
+      fprintf (file, "\tpaddi \\rt,\\rt,\\d\n");
+      fprintf (file, "\t.endm\n");
+      fprintf (file, "\n");
+    }
 }
 
 
@@ -24326,6 +24355,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "hard-dfp",			OPTION_MASK_DFP,		false, true  },
   { "htm",			OPTION_MASK_HTM,		false, true  },
   { "isel",			OPTION_MASK_ISEL,		false, true  },
+  { "lagen",			OPTION_MASK_LAGEN,		false, true  },
   { "mfcrf",			OPTION_MASK_MFCRF,		false, true  },
   { "mfpgpr",			0,				false, true  },
   { "mma",			OPTION_MASK_MMA,		false, true  },
