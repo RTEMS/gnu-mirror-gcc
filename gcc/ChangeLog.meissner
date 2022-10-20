@@ -1,3 +1,16 @@
+==================== dmf001, patch #21
+
+Adjust -mlagen.
+
+2022-10-19   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_file_start): Change the macros for
+	lagen and plagen so they are the same size as the new instruction.
+	Obviously, you won't be able to run the program.
+	* config/rs6000/rs6000.md (lagendi3): Remove early clobber.
+
 ==================== dmf001, patch #20
 
 Add -mlagen.
