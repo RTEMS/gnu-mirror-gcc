@@ -1,3 +1,18 @@
+==================== dmf001, patch #22
+
+Adjust -mlagen again.
+
+2022-10-20   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_file_start): Define just plagen, not
+	plagen1, plagen2, or plagen3.
+	* config/rs6000/rs6000.md (plagendi3_nora): Generate plagen, not
+	plagen1, plagen2, or plagen3.
+	(plagendi3): Likewise.
+	(plagendi3_noshift): Likewise.
+
 ==================== dmf001, patch #21
 
 Adjust -mlagen.
