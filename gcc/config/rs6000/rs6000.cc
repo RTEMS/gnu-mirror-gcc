@@ -6104,17 +6104,7 @@ rs6000_file_start (void)
       fprintf (file, "\t.endm\n");
       fprintf (file, "\n");
 
-      fprintf (file, "\t.macro plagen1 rt,d,rb,n\n");
-      fprintf (file, "\tpaddi \\rt,\\rt,0\n");
-      fprintf (file, "\t.endm\n");
-      fprintf (file, "\n");
-
-      fprintf (file, "\t.macro plagen2 rt,d,ra,rb,n\n");
-      fprintf (file, "\tpaddi \\rt,\\rt,0\n");
-      fprintf (file, "\t.endm\n");
-      fprintf (file, "\n");
-
-      fprintf (file, "\t.macro plagen3 rt,d,ra,rb\n");
+      fprintf (file, "\t.macro plagen rt,d,rb,n\n");
       fprintf (file, "\tpaddi \\rt,\\rt,0\n");
       fprintf (file, "\t.endm\n");
       fprintf (file, "\n");
