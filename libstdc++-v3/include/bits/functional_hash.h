@@ -158,6 +158,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   /// Explicit specialization for long long.
   _Cxx_hashtable_define_trivial_hash(long long)
 
+#ifdef __CHERI__
+  /// Explicit specialization for __intcap.
+  _Cxx_hashtable_define_trivial_hash(__intcap)
+
+  /// Explicit specialization for unsigned __intcap.
+  _Cxx_hashtable_define_trivial_hash(unsigned __intcap)
+#endif
+
   /// Explicit specialization for unsigned short.
   _Cxx_hashtable_define_trivial_hash(unsigned short)
 
