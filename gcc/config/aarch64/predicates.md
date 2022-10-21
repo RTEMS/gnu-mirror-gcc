@@ -254,6 +254,10 @@
        (match_test "INTVAL (op) != 0
 		    && (unsigned) exact_log2 (INTVAL (op)) < 64")))
 
+(define_predicate "aarch64_pwr_2"
+   (and (match_code "const_int")
+	(match_test "exact_log2 (INTVAL (op)) != -1")))
+
 (define_predicate "aarch64_alt_base_mem_operand"
   (and (match_code "mem")
        (match_test "aarch64_alt_base_address_p (GET_MODE (op),

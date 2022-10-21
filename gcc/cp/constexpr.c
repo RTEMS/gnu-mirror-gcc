@@ -1335,6 +1335,7 @@ cxx_eval_builtin_function_call (const constexpr_ctx *ctx, tree t, tree fun,
 
   int strops = 0;
   int strret = 0;
+  int alignop  = 0;
   if (fndecl_built_in_p (fun, BUILT_IN_NORMAL))
     switch (DECL_FUNCTION_CODE (fun))
       {
@@ -1355,6 +1356,12 @@ cxx_eval_builtin_function_call (const constexpr_ctx *ctx, tree t, tree fun,
       case BUILT_IN_STRSTR:
 	strops = 2;
 	strret = 1;
+	break;
+      case BUILT_IN_ALIGN_UP:
+      case BUILT_IN_ALIGN_DOWN:
+      case BUILT_IN_IS_ALIGNED:
+	alignop = 1;
+	break;
       default:
 	break;
       }
@@ -1403,6 +1410,26 @@ cxx_eval_builtin_function_call (const constexpr_ctx *ctx, tree t, tree fun,
 	    arg = build_address (arg);
 	  else
 	    arg = oarg;
+	}
+      else if (alignop && i == 1)
+	{
+	  if (TREE_CODE (arg) == INTEGER_CST)
+	    {
+	      const auto alignment = wi::to_wide (arg);
+	      location_t loc = EXPR_LOCATION (t);
+	      const char *errmsg = NULL;
+	      if (alignment == 0)
+		errmsg = "alignment must be nonzero";
+	      else if (exact_log2 (alignment) == -1)
+		errmsg = "alignment must be power of 2";
+	      if (errmsg)
+		{
+		  if (!ctx->quiet)
+		    error_at (loc, errmsg);
+		  *non_constant_p = true;
+		  return t;
+		}
+	    }
 	}
 
       args[i] = arg;

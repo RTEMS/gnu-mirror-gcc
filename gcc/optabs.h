@@ -346,6 +346,7 @@ rtx expand_pointer_plus (scalar_addr_mode, rtx, rtx, rtx, int, enum optab_method
 rtx expand_pointer_minus (scalar_addr_mode, rtx, rtx, rtx, int, enum optab_methods);
 rtx expand_align_down (scalar_addr_mode, rtx, rtx, rtx, int, enum optab_methods);
 rtx expand_align_up (scalar_addr_mode, rtx, rtx, rtx, int, enum optab_methods);
+rtx expand_is_aligned (scalar_addr_mode, rtx, rtx, rtx, int, enum optab_methods);
 
 extern bool insn_operand_matches (enum insn_code icode, unsigned int opno,
 				  rtx operand);

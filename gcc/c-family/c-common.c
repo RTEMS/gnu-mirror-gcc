@@ -7857,6 +7857,103 @@ resolve_atomic_fncode_n (tree function, vec<tree, va_gc> *params,
 }
 
 /* A subroutine of resolve_overloaded_builtin, with the same arguments.
+   FUNCTION is known to be an overloaded BUILT_IN_ALIGN_{UP|DOWN} or
+   BUILT_IN_IS_ALIGNED function with the following properties:
+
+   - First parameter is a pointer of type T (also const/capability pointer), an
+     integer, or an intcap type.
+
+   If first parameter is a capability we select for
+
+	BUILT_IN_ALIGN_{UP|DOWN} overload BUILT_IN_ALIGN_{UP|DOWN}_CAP and
+	BUILT_IN_IS_ALIGNED      overload BUILT_IN_IS_ALIGNED_CAP.
+
+   Otherwise we simply ensure that the arguments and return values are integers
+   (adding casts if necessary) and use the standard BUILT_IN_ALIGN_{UP|DOWN} or
+   BUILT_IN_IS_ALIGNED.
+
+   Please note that alignment builtins ORIG_CODE is ordered so that:
+
+	BUILT_IN_*     == ORIG_CODE
+	BUILT_IN_*_CAP == ORIG_CODE + 1
+
+   - Second parameter (alignment) is always size_t type.  If second parameter
+     is a constant integer simple checks for its value are made and this can
+     result in a warning or error at LOC depending on alignment value.
+
+   This function will convert return type of a BUILT_IN_ALIGN_{UP,DOWN}{,_CAP}
+   call to its first parameter type if first parameter was a (capability)
+   pointer.
+
+   If both parameters are constant integers alignment builtin is a candidate
+   for folding later on.  */
+
+static tree
+resolve_align_builtin (location_t loc, enum built_in_function const orig_code,
+		       tree function, vec<tree, va_gc> *params)
+{
+  unsigned int num_params = vec_safe_length (params);
+
+  vec<tree, va_gc> *new_params = vec_safe_copy (params);
+  vec<tree, va_gc> *origtypes = vec_safe_copy (params);
+  for (unsigned int i = 0; i < num_params; ++i)
+    (*origtypes)[i] = ((*origtypes)[i] == error_mark_node
+		       ? error_mark_node
+		       : TREE_TYPE ((*origtypes)[i]));
+
+  if (num_params == 0)
+    return NULL_TREE;
+  tree p0 = (*params)[0];    /* Pointer or integer to be aligned. */
+  STRIP_ANY_LOCATION_WRAPPER (p0);
+  tree res = NULL_TREE;
+  tree fndecl = function;
+  if (capability_type_p (TREE_TYPE (p0)))
+    {
+      enum built_in_function new_code
+	= (enum built_in_function)((int)orig_code + 1);
+      fndecl = builtin_decl_explicit (new_code);
+      tree cap_type = uintcap_type_node;
+      (*new_params)[0] = convert (cap_type, (*params)[0]);
+    }
+  else if (TREE_CODE (TREE_TYPE (p0)) == INTEGER_TYPE
+	   || POINTER_TYPE_P (TREE_TYPE (p0)))
+    {
+      tree int_type = long_long_unsigned_type_node;
+      if (TYPE_PRECISION (TREE_TYPE (p0)) > TYPE_PRECISION (int_type))
+	error_at (loc, "%qE does not support %u-bit integers",
+		  function, TYPE_PRECISION (TREE_TYPE (p0)));
+      else
+	(*new_params)[0] = convert (int_type, (*params)[0]);
+    }
+  /* Strange data types just get passed to the integral version directly and
+     we get the corresponding error messages.  */
+  res = build_function_call_vec (loc, vNULL, fndecl, new_params,
+				 origtypes, function);
+
+  if (orig_code != BUILT_IN_IS_ALIGNED)
+    res = convert ((*origtypes)[0], res);
+
+  if (num_params > 1)
+    {
+      tree p1 = (*params)[1];    /* Alignment.  */
+      STRIP_ANY_LOCATION_WRAPPER (p1);
+      if (TREE_CODE (p1) == INTEGER_CST)
+	{
+	  const auto align = wi::to_wide (p1);
+	  if (align == 0)
+	    warning_at (loc, 0, "requested alignment must be nonzero");
+	  else if (align == 1)
+	    warning_at (loc, 0, "the result of checking whether a "
+			"value is aligned to 1 byte is always true");
+	  else if (wi::exact_log2 (align) == -1)
+	    warning_at (loc, 0, "requested alignment is not a power of 2");
+	}
+    }
+
+  return res;
+}
+
+/* A subroutine of resolve_overloaded_builtin, with the same arguments.
    FUNCTION is known to be an overloaded BUILT_IN_CHERI_* function
    with the following properties:
 
@@ -8011,6 +8108,11 @@ resolve_overloaded_builtin (location_t loc, tree function,
 	    return first_param;
 	  }
       }
+
+    case BUILT_IN_ALIGN_UP:
+    case BUILT_IN_ALIGN_DOWN:
+    case BUILT_IN_IS_ALIGNED:
+      return resolve_align_builtin (loc, orig_code, function, params);
 
     case BUILT_IN_CHERI_ADDRESS_GET:
     case BUILT_IN_CHERI_ADDRESS_SET:

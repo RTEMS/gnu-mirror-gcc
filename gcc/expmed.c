@@ -6464,6 +6464,14 @@ align_down_optab (void *arg)
 			    ca->arg4, ca->arg5);
 }
 
+static rtx
+is_aligned_optab (void *arg)
+{
+  struct callback_args *ca = (struct callback_args *)arg;
+  return expand_is_aligned (ca->mode, ca->arg1, ca->arg2, ca->arg3,
+			    ca->arg4, ca->arg5);
+}
+
 static void
 test_capability_expand ()
 {
@@ -6503,6 +6511,8 @@ test_capability_expand ()
     = with_recorded_insn_emits (&x3, &ca, &align_up_optab);
   basic_rav
     = with_recorded_insn_emits (&x3, &ca, &align_down_optab);
+  basic_rav
+    = with_recorded_insn_emits (&x3, &ca, &is_aligned_optab);
 }
 
 /*

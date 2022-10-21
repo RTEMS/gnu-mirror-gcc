@@ -17,4 +17,5 @@ dummy ()
   return result;
 }
 
-/* { dg-final { scan-assembler "and\tx\[0-9\]+, x\[0-9\]+, -65536" } } */
+/* { dg-final { scan-assembler "and\tx\[0-9\]+, x\[0-9\]+, -65536" { target { ! cheri_capability_pure } } } } */
+/* { dg-final { scan-assembler "alignu\tc\[0-9\]+, c\[0-9\]+, #16" { target cheri_capability_pure } } } */

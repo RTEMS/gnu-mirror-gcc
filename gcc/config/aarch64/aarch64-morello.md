@@ -562,3 +562,45 @@
     DONE;
   }
 )
+
+;; Alignment functions.
+
+(define_insn "align_down_cadi"
+  [(set (match_operand:CADI 0 "register_operand" "=rk")
+        (align_address_down:CADI
+               (match_operand:CADI 1 "register_operand" "rk")
+               (match_operand:DI 2 "aarch64_pwr_2" "n")))
+  ]
+  "TARGET_MORELLO"
+{
+  operands[2] = GEN_INT (exact_log2 (UINTVAL (operands[2])));
+  return "alignd\\t%0, %1, #%2";
+})
+
+(define_insn "align_address_up_cadi"
+  [(set (match_operand:CADI 0 "register_operand" "=rk")
+        (align_address_down:CADI
+            (pointer_plus:CADI
+                (match_operand:CADI 1 "register_operand" "rk")
+                (match_operand:DI 2 "const_int_operand" "n"))
+        (match_operand:DI 3 "aarch64_pwr_2" "n")))
+  ]
+  "TARGET_MORELLO && ((INTVAL (operands[2]) + 1) == INTVAL (operands[3]))"
+{
+  operands[3] = GEN_INT (exact_log2 (INTVAL (operands[3])));
+  return "alignu\\t%0, %1, #%3";
+})
+
+(define_expand "align_up_cadi"
+  [(set (match_operand:CADI 0 "register_operand")
+       (align_address_down:CADI
+           (pointer_plus:CADI
+                (match_operand:CADI 1 "register_operand" "rk")
+                (match_dup 3))
+           (match_operand:DI 2 "aarch64_pwr_2")))
+  ]
+  "TARGET_MORELLO"
+  {
+    operands[3] = plus_constant (DImode, operands[2], -1);
+  }
+)

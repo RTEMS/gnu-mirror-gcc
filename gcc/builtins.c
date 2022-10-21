@@ -172,6 +172,10 @@ static tree fold_builtin_unordered_cmp (location_t, tree, tree, tree, enum tree_
 					enum tree_code);
 static tree fold_builtin_varargs (location_t, tree, tree*, int);
 
+static tree fold_builtin_align_down (tree, tree);
+static tree fold_builtin_align_up (tree, tree);
+static tree fold_builtin_is_aligned (tree, tree);
+
 static tree fold_builtin_strpbrk (location_t, tree, tree, tree, tree);
 static tree fold_builtin_strspn (location_t, tree, tree, tree);
 static tree fold_builtin_strcspn (location_t, tree, tree, tree);
@@ -194,6 +198,10 @@ char target_percent_s_newline[4];
 static tree do_mpfr_remquo (tree, tree, tree);
 static tree do_mpfr_lgamma_r (tree, tree, tree);
 static void expand_builtin_sync_synchronize (void);
+
+static rtx expand_builtin_align_down (tree exp, rtx target);
+static rtx expand_builtin_align_up (tree exp, rtx target);
+static rtx expand_builtin_is_aligned (tree exp, rtx target);
 
 /* Return true if NAME starts with __builtin_ or __sync_.  */
 
@@ -8749,6 +8757,16 @@ expand_builtin (tree exp, rtx target, rtx subtarget, machine_mode mode,
     case BUILT_IN_ADJUST_DESCRIPTOR:
       return expand_builtin_adjust_descriptor (exp);
 
+    case BUILT_IN_ALIGN_DOWN:
+    case BUILT_IN_ALIGN_DOWN_CAP:
+      return expand_builtin_align_down (exp, target);
+    case BUILT_IN_ALIGN_UP:
+    case BUILT_IN_ALIGN_UP_CAP:
+      return expand_builtin_align_up (exp, target);
+    case BUILT_IN_IS_ALIGNED:
+    case BUILT_IN_IS_ALIGNED_CAP:
+      return expand_builtin_is_aligned (exp, target);
+
     case BUILT_IN_FORK:
     case BUILT_IN_EXECL:
     case BUILT_IN_EXECV:
@@ -10474,6 +10492,15 @@ fold_builtin_2 (location_t loc, tree expr, tree fndecl, tree arg0, tree arg1)
     CASE_FLT_FN (BUILT_IN_MODF):
       return fold_builtin_modf (loc, arg0, arg1, type);
 
+    case BUILT_IN_ALIGN_DOWN:
+      return fold_builtin_align_down (arg0, arg1);
+
+    case BUILT_IN_ALIGN_UP:
+      return fold_builtin_align_up (arg0, arg1);
+
+    case BUILT_IN_IS_ALIGNED:
+      return fold_builtin_is_aligned (arg0, arg1);
+
     case BUILT_IN_STRSPN:
       return fold_builtin_strspn (loc, expr, arg0, arg1);
 
@@ -10956,6 +10983,41 @@ fold_builtin_strpbrk (location_t loc, tree expr, tree s1, tree s2, tree type)
 			      build_int_cst (integer_type_node, p2[0]));
 }
 
+static tree
+fold_builtin_align_down (tree s1, tree s2)
+{
+  if (TREE_CODE (s1) != INTEGER_CST
+      || TREE_CODE (s2) != INTEGER_CST)
+    return NULL_TREE;
+
+  return wide_int_to_tree (long_unsigned_type_node,
+			   wi::to_wide (s1) & -wi::to_wide (s2));
+}
+
+static tree
+fold_builtin_align_up (tree s1, tree s2)
+{
+  if (TREE_CODE (s1) != INTEGER_CST
+      || TREE_CODE (s2) != INTEGER_CST)
+    return NULL_TREE;
+
+  const auto value = wi::to_wide (s1);
+  const auto mask = wi::to_wide (s2) - 1;
+  return wide_int_to_tree (long_unsigned_type_node, (value + mask) & ~mask);
+}
+
+static tree
+fold_builtin_is_aligned (tree s1, tree s2)
+{
+  if (TREE_CODE (s1) != INTEGER_CST
+      || TREE_CODE (s2) != INTEGER_CST)
+    return NULL_TREE;
+
+  const auto value = wi::to_wide (s1);
+  const auto mask = wi::to_wide (s2) - 1;
+  return build_int_cst (boolean_type_node, (value & mask) == 0);
+}
+
 /* Simplify a call to the strspn builtin.  S1 and S2 are the arguments
    to the call.
 
@@ -11312,6 +11374,57 @@ expand_builtin_memory_chk (tree exp, rtx target, machine_mode mode,
 	}
       return NULL_RTX;
     }
+}
+
+static rtx
+expand_builtin_align_down (tree exp, rtx target)
+{
+  tree arg0, arg1;
+  rtx op0, op1;
+
+  arg0 = CALL_EXPR_ARG (exp, 0);
+  op0 = expand_normal (arg0);
+
+  arg1 = CALL_EXPR_ARG (exp, 1);
+  op1 = expand_normal (arg1);
+
+  scalar_addr_mode samode
+    = as_a <scalar_addr_mode> (TYPE_MODE (TREE_TYPE (exp)));
+  return expand_align_down (samode, op0, op1, target, true, OPTAB_DIRECT);
+}
+
+static rtx
+expand_builtin_align_up (tree exp, rtx target)
+{
+  tree arg0, arg1;
+  rtx op0, op1;
+
+  arg0 = CALL_EXPR_ARG (exp, 0);
+  op0 = expand_normal (arg0);
+
+  arg1 = CALL_EXPR_ARG (exp, 1);
+  op1 = expand_normal (arg1);
+
+  scalar_addr_mode samode
+    = as_a <scalar_addr_mode> (TYPE_MODE (TREE_TYPE (exp)));
+  return expand_align_up (samode, op0, op1, target, true, OPTAB_DIRECT);
+}
+
+rtx
+expand_builtin_is_aligned (tree exp, rtx target)
+{
+  tree arg0, arg1;
+  rtx op0, op1;
+
+  arg0 = CALL_EXPR_ARG (exp, 0);
+  op0 = expand_normal (arg0);
+
+  arg1 = CALL_EXPR_ARG (exp, 1);
+  op1 = expand_normal (arg1);
+
+  scalar_addr_mode samode
+    = as_a <scalar_addr_mode> (TYPE_MODE (TREE_TYPE (arg0)));
+  return expand_is_aligned (samode, op0, op1, target, true, OPTAB_DIRECT);
 }
 
 /* Emit warning if a buffer overflow is detected at compile time.  */

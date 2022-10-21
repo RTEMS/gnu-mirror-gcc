@@ -6728,6 +6728,27 @@ expand_align_up (scalar_addr_mode mode, rtx x, rtx align, rtx target,
   return expand_align_down (mode, temp, align, target, unsignedp, methods);
 }
 
+rtx
+expand_is_aligned (scalar_addr_mode mode, rtx x, rtx align, rtx target,
+		 int unsignedp, enum optab_methods methods)
+{
+#if STORE_FLAG_VALUE == 1 || STORE_FLAG_VALUE == -1
+  int normalizep = STORE_FLAG_VALUE;
+#else
+  int normalizep = 1;
+#endif
+
+  scalar_int_mode omode = offset_mode (mode);
+  rtx oneminus = expand_binop (omode, sub_optab, align,
+			       gen_int_mode (1, omode), NULL_RTX,
+			       unsignedp, methods);
+  rtx ret = expand_binop (omode, and_optab, oneminus,
+			  drop_capability (x), NULL_RTX,
+			  unsignedp, methods);
+  return emit_store_flag_force (target, EQ, ret, const0_rtx, omode,
+				unsignedp, normalizep);
+}
+
 /* Expand the replace_address_value optab:
     Assert that CAPABILITY has no side effects.
     If MODE is a capability mode:
