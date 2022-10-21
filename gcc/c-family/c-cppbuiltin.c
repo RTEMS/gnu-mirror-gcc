@@ -1460,21 +1460,7 @@ c_cpp_builtins (cpp_reader *pfile)
   if (targetm.capability_mode ().exists ()
       && targetm.capabilities_in_hardware ())
     {
-      /* N.b. I've not found these values defined in a document anywhere.
-	 The values were found by looking at the assembly after using them in
-	 the CUCL CHERI compiler explorer.  */
       cpp_define (pfile, "__CHERI__");
-      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_GLOBAL__", 1);
-      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_CCALL__", 256);
-      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_ACCESS_SYSTEM_REGISTERS__", 512);
-      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_UNSEAL__", 1024);
-      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_SEAL__", 2048);
-      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_STORE_LOCAL__", 4096);
-      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_STORE_CAPABILITY__", 8192);
-      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_LOAD_CAPABILITY__", 16384);
-      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_EXECUTE__", 32768);
-      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_STORE__", 65536);
-      builtin_define_with_int_value ("__CHERI_CAP_PERMISSION_PERMIT_LOAD__", 131072);
 
       if (targetm.capability_mode ().require () == Pmode)
 	cpp_define (pfile, "__CHERI_PURE_CAPABILITY__");

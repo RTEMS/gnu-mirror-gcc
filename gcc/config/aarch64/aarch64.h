@@ -986,6 +986,24 @@ enum aarch64_abi_type
 
 #define TARGET_ILP32	(aarch64_abi == AARCH64_ABI_ILP32)
 
+enum aarch64_cap_permissions {
+    AARCH64_CAP_PERM_GLOBAL		= (1LU << 0),
+    AARCH64_CAP_PERM_EXECUTIVE		= (1LU << 1),
+    /* 4 bits of User permissions.  */
+    AARCH64_CAP_PERM_MUTABLE_LOAD	= (1LU << 6),
+    AARCH64_CAP_PERM_COMPARTMENT_ID	= (1LU << 7),
+    AARCH64_CAP_PERM_BRANCH_SEALED_PAIR = (1LU << 8),
+    AARCH64_CAP_PERM_SYSTEM		= (1LU << 9),
+    AARCH64_CAP_PERM_UNSEAL		= (1LU << 10),
+    AARCH64_CAP_PERM_SEAL		= (1LU << 11),
+    AARCH64_CAP_PERM_STORE_LOCAL	= (1LU << 12),
+    AARCH64_CAP_PERM_STORE_CAP		= (1LU << 13),
+    AARCH64_CAP_PERM_LOAD_CAP		= (1LU << 14),
+    AARCH64_CAP_PERM_EXECUTE		= (1LU << 15),
+    AARCH64_CAP_PERM_STORE		= (1LU << 16),
+    AARCH64_CAP_PERM_LOAD		= (1LU << 17),
+};
+
 enum aarch64_capability {
     AARCH64_CAPABILITY_NONE,
     AARCH64_CAPABILITY_FAKE,

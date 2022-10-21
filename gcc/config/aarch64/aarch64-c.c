@@ -144,11 +144,38 @@ aarch64_update_cpp_builtins (cpp_reader *pfile)
 
   if (TARGET_MORELLO)
     {
+#define CAP_PERM(prefix, acle_name, arch_name)\
+      builtin_define_with_int_value ("__" prefix "_CAP_PERMISSION_" \
+				     acle_name "__", \
+				     AARCH64_CAP_PERM_##arch_name)
+
       /* These defines are Morello-specific, as per the Morello ACLE.  */
-      builtin_define_with_int_value ("__ARM_CAP_PERMISSION_EXECUTIVE__", 2);
-      builtin_define_with_int_value ("__ARM_CAP_PERMISSION_MUTABLE_LOAD__", 64);
-      builtin_define_with_int_value ("__ARM_CAP_PERMISSION_COMPARTMENT_ID__", 128);
-      builtin_define_with_int_value ("__ARM_CAP_PERMISSION_BRANCH_SEALED_PAIR__", 256);
+#define ARM_PERM(x) CAP_PERM ("ARM", #x, x)
+      ARM_PERM (EXECUTIVE);
+      ARM_PERM (MUTABLE_LOAD);
+      ARM_PERM (COMPARTMENT_ID);
+      ARM_PERM (BRANCH_SEALED_PAIR);
+#undef ARM_PERM
+
+      /* These defines are common to all CHERI architectures, but have
+	 Morello-specific values, hence defining them in the backend.  */
+#define CHERI_PERM(acle, arch) CAP_PERM ("CHERI", acle, arch)
+#define CHERI_PERMIT_1(acle, arch) CHERI_PERM ("PERMIT_" acle, arch)
+#define CHERI_PERMIT(x) CHERI_PERMIT_1 (#x, x)
+      CHERI_PERM ("GLOBAL", GLOBAL);
+      CHERI_PERM ("ACCESS_SYSTEM_REGISTERS", SYSTEM);
+      CHERI_PERMIT (UNSEAL);
+      CHERI_PERMIT (SEAL);
+      CHERI_PERMIT (STORE_LOCAL);
+      CHERI_PERMIT_1 ("STORE_CAPABILITY", STORE_CAP);
+      CHERI_PERMIT_1 ("LOAD_CAPABILITY", LOAD_CAP);
+      CHERI_PERMIT (EXECUTE);
+      CHERI_PERMIT (STORE);
+      CHERI_PERMIT (LOAD);
+#undef CHERI_PERMIT
+#undef CHERI_PERMIT_1
+#undef CHERI_PERM
+#undef CAP_PERM
     }
 
   aarch64_def_or_undef (TARGET_CRYPTO, "__ARM_FEATURE_CRYPTO", pfile);

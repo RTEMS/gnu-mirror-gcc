@@ -17962,16 +17962,29 @@ aarch64_setup_incoming_varargs (cumulative_args_t cum_v,
 }
 
 static void
-aarch64_handle_outgoing_varargs (rtx aama_addr,
-				 int n_anon_args ATTRIBUTE_UNUSED,
-				 rtx *fusage)
+aarch64_handle_outgoing_varargs (rtx aama_addr, int n_anon_args, rtx *fusage)
 {
   if (!TARGET_CAPABILITY_PURE)
     return;
 
-  /* Morello TODO: emit scbnds with size of (n_anon_args * 16).  */
   rtx c9 = gen_rtx_REG (CADImode, R9_REGNUM);
-  emit_move_insn (c9, aama_addr);
+
+  if (CONST_NULL_P (aama_addr))
+    emit_move_insn (c9, aama_addr);
+  else
+    {
+      const auto aama_size = (unsigned HOST_WIDE_INT)n_anon_args * 16;
+
+      rtx bounded = expand_binop (CADImode, cap_bounds_set_optab,
+				  aama_addr, gen_int_mode (aama_size, DImode),
+				  NULL_RTX, 1, OPTAB_DIRECT);
+
+      rtx perms_to_clear
+	= gen_int_mode (AARCH64_CAP_PERM_EXECUTE | AARCH64_CAP_PERM_STORE,
+			DImode);
+      emit_insn (gen_aarch64_cap_clear_perm (c9, bounded, perms_to_clear));
+    }
+
   use_reg (fusage, c9);
 }
 
