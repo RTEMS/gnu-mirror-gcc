@@ -18,6 +18,8 @@
 // <http://www.gnu.org/licenses/>.
 
 
+// { dg-do run { target { ! cheri_capability_pure } } }
+
 // This is a copy of vector/types/1.cc with altered allocator.
 // The operator+()s in this test initially failed the test -
 // they stress the accurate recognition, by the compiler,

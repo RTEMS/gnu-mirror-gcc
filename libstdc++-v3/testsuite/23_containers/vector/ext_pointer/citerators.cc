@@ -1,4 +1,4 @@
-// { dg-do run { target c++11 } }
+// { dg-do run { target { { c++11 } && { ! cheri_capability_pure } } } }
 
 // Copyright (C) 2008-2020 Free Software Foundation, Inc.
 //

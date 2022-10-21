@@ -18,6 +18,8 @@
 // <http://www.gnu.org/licenses/>.
 
 
+// { dg-do run { target { ! cheri_capability_pure } } }
+
 #include <algorithm>
 #include <testsuite_hooks.h>
 #include <ext/cast.h>

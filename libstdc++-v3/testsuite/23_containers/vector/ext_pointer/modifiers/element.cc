@@ -18,6 +18,8 @@
 // <http://www.gnu.org/licenses/>.
 
 
+// { dg-do run { target { ! cheri_capability_pure } } }
+
 #include <vector>
 #include <stdexcept>
 #include <testsuite_hooks.h>

@@ -18,7 +18,7 @@
 // <http://www.gnu.org/licenses/>.
 
 
-// { dg-do run { target c++11 } }
+// { dg-do run { target { { c++11 } && { ! cheri_capability_pure } } } }
 
 // This is a copy of vector/types/1.cc with altered allocator.
 // The operator+()s in this test initially failed the test -
