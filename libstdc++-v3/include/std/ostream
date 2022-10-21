@@ -162,6 +162,17 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  These functions use the stream's current locale (specifically, the
        *  @c num_get facet) to perform numeric formatting.
       */
+
+#ifdef __CHERI__
+      __ostream_type&
+      operator<<(__intcap __n)
+      { return _M_insert(static_cast<long>(__n)); }
+
+      __ostream_type&
+      operator<<(unsigned __intcap __n)
+      { return _M_insert(static_cast<unsigned long>(__n)); }
+#endif
+
       __ostream_type&
       operator<<(long __n)
       { return _M_insert(__n); }

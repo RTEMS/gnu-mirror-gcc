@@ -190,6 +190,26 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       operator>>(unsigned long& __n)
       { return _M_extract(__n); }
 
+#ifdef __CHERI__
+      __istream_type&
+      operator>>(__intcap& __n)
+      {
+	long __tmp;
+	__istream_type& __istr_tmp = _M_extract(__tmp);
+	__n = __tmp;
+	return __istr_tmp;
+      }
+
+      __istream_type&
+      operator>>(unsigned __intcap& __n)
+      {
+	unsigned long __tmp;
+	__istream_type& __istr_tmp = _M_extract(__tmp);
+	__n = __tmp;
+	return __istr_tmp;
+      }
+#endif
+
 #ifdef _GLIBCXX_USE_LONG_LONG
       __istream_type&
       operator>>(long long& __n)
