@@ -688,40 +688,82 @@ size_must_be_zero_p (tree size)
   return vr.zero_p ();
 }
 
-/* Return a type that can be used to copy a BITS sized area around in memory.
-   This is an integer unless there are capabilities of that size.
-   When there are capability types of that size we use them to ensure that
-   hidden validity bits are not lost.  */
-tree
-bucket_type_for_size (unsigned int bits, int unsignedp)
+/* Returns true if an access of MODE at address aligned to ALIGN is known to be
+   slow due to misalignment.  */
+static bool
+alignment_permits_fast_mov (unsigned int align, machine_mode mode)
 {
-  tree ret = lang_hooks.types.cap_type_for_size (bits, unsignedp);
-  return ret && (TYPE_CAP_PRECISION (ret) == bits)
-	  ? ret
-	  : lang_hooks.types.type_for_size (bits, unsignedp);
+  return !(align < GET_MODE_ALIGNMENT (mode)
+	   && targetm.slow_unaligned_access (mode, align)
+	   && optab_handler (movmisalign_optab, mode) == CODE_FOR_nothing);
 }
 
-/* Returns true if (conservatively) a memcpy of length LEN could be used
-   to copy capabilities.
+/* This function returns true if a memcpy of length LEN with known source and
+   destination alignments of SRC_ALIGN and DEST_ALIGN can be implemented in
+   terms of capability loads and stores.
 
-   Note if we also take account of source and destination types here we may be
-   able to safely reject more cases (and thus optimize more), but for now we
-   keep the check simple and assume that any memcpy that copies enough bytes to
-   contain at least one capability on a capability target may indeed be a
-   capability copy.  */
+   If targetm.capability_mode ().exists (), then this also leaves the rounded
+   down number of capability loads and stores required to move LEN bytes in
+   NUM_CAPS.  */
 static bool
-maybe_capability_copy_p (tree len)
+maybe_capability_copy_p (tree len, unsigned src_align, unsigned dest_align,
+			 unsigned *num_caps)
 {
+  *num_caps = 0;
+  if (!tree_fits_uhwi_p (len))
+    return false;
+
+  const unsigned HOST_WIDE_INT bytes = tree_to_uhwi (len);
   const auto maybe_cap_mode = targetm.capability_mode ();
   if (!maybe_cap_mode.exists ())
     return false;
 
   const auto cap_mode = maybe_cap_mode.require ();
-  const unsigned HOST_WIDE_INT ilen = tree_to_uhwi (len);
-  const unsigned HOST_WIDE_INT cap_bytes
-    = GET_MODE_PRECISION (cap_mode) / BITS_PER_UNIT;
+  const unsigned HOST_WIDE_INT cap_bytes = GET_MODE_SIZE (cap_mode);
+  *num_caps = bytes / cap_bytes;
+  /* Only need to check for bytes < cap_bytes if the size is zero, for the
+     memcpy use we'll never see that.  However it's nice to include the check
+     for completeness of the abstraction.  */
+  if (bytes % cap_bytes || bytes < cap_bytes)
+    return false;
 
-  return ilen >= cap_bytes;
+  gcc_assert (TYPE_MODE (uintcap_type_node) == cap_mode);
+  if (!alignment_permits_fast_mov (src_align, cap_mode)
+      || !alignment_permits_fast_mov (dest_align, cap_mode))
+    return false;
+  return true;
+}
+
+/* Return a type that can be used to copy a BITS sized area around in memory.
+   This is an integer unless there are capabilities of that size.
+   When there are capability types of that size  we use them to ensure that
+   hidden validity bits are not lost.
+   When there is a capability which is smaller than the given size but there is
+   no capability matching this size, there is no data type which can carry
+   around `bits` worth of data without losing the validity bit, hence we return
+   NULL_TREE.  */
+tree
+bucket_type_for_size (unsigned int bits, int unsignedp)
+{
+  tree ret = lang_hooks.types.cap_type_for_size (bits, unsignedp);
+  if (ret)
+    return ret;
+
+  /* Check for if the size requested could include a capability.
+     In that case we require a capability type in order to avoid invalidating
+     any capability in this size, but since we have no cap_type_for_size we
+     don't have one available.  Hence there is no available type.  */
+  const unsigned HOST_WIDE_INT bytes = bits / BITS_PER_UNIT;
+  const auto maybe_cap_mode = targetm.capability_mode ();
+  if (maybe_cap_mode.exists ())
+    {
+      const auto cap_mode = maybe_cap_mode.require ();
+      const unsigned HOST_WIDE_INT cap_bytes = GET_MODE_SIZE (cap_mode);
+      if (bytes >= cap_bytes)
+	return NULL_TREE;
+    }
+
+  return lang_hooks.types.type_for_size (bits, unsignedp);
 }
 
 /* Fold function call to builtin mem{{,p}cpy,move}.  Try to detect and
@@ -805,11 +847,6 @@ gimple_fold_builtin_memory_op (gimple_stmt_iterator *gsi,
       dest_align = get_pointer_alignment (dest);
       if (tree_fits_uhwi_p (len)
 	  && compare_tree_int (len, MOVE_MAX) <= 0
-	  /* Avoid doing this for possible copies of capabilities: we
-	     would need to use capability loads/stores but this is
-	     only safe if the source and destination are suitably
-	     aligned, and we don't necessarily know this.  */
-	  && !maybe_capability_copy_p (len)
 	  /* FIXME: Don't transform copies from strings with known length.
 	     Until GCC 9 this prevented a case in gcc.dg/strlenopt-8.c
 	     from being handled, and the case was XFAILed for that reason.
@@ -840,17 +877,14 @@ gimple_fold_builtin_memory_op (gimple_stmt_iterator *gsi,
 		if (warning != OPT_Wrestrict)
 		  return false;
 
-	      scalar_int_mode mode;
+	      scalar_addr_mode mode;
 	      tree type = bucket_type_for_size (ilen * 8, 1);
 	      if (type
-		  && is_a <scalar_int_mode> (TYPE_MODE (type), &mode)
+		  && is_a <scalar_addr_mode> (TYPE_MODE (type), &mode)
 		  && GET_MODE_SIZE (mode) * BITS_PER_UNIT == ilen * 8
 		  /* If the destination pointer is not aligned we must be able
 		     to emit an unaligned store.  */
-		  && (dest_align >= GET_MODE_ALIGNMENT (mode)
-		      || !targetm.slow_unaligned_access (mode, dest_align)
-		      || (optab_handler (movmisalign_optab, mode)
-			  != CODE_FOR_nothing)))
+		  && alignment_permits_fast_mov (dest_align, mode))
 		{
 		  tree srctype = type;
 		  tree desttype = type;
@@ -860,10 +894,7 @@ gimple_fold_builtin_memory_op (gimple_stmt_iterator *gsi,
 		  tree tem = fold_const_aggregate_ref (srcmem);
 		  if (tem)
 		    srcmem = tem;
-		  else if (src_align < GET_MODE_ALIGNMENT (mode)
-			   && targetm.slow_unaligned_access (mode, src_align)
-			   && (optab_handler (movmisalign_optab, mode)
-			       == CODE_FOR_nothing))
+		  else if (!alignment_permits_fast_mov (src_align, mode))
 		    srcmem = NULL_TREE;
 		  if (srcmem)
 		    {
@@ -1124,6 +1155,44 @@ gimple_fold_builtin_memory_op (gimple_stmt_iterator *gsi,
 	  return false;
 
       gimple *new_stmt;
+
+      /* Avoid any conversion from a function call to a MEM_REF if the length
+	 that we are copying could contain a capability and we can not
+	 implement the move in terms of capability loads and stores.  */
+      unsigned num_cap_moves = 0;
+      if (capability_type_p (srctype) && capability_type_p (desttype))
+	/* This must be a is_gimple_reg_type and hence we will just implement
+	   this as an assignment in the next if statement.
+
+	   Note that we may be able to look closer at source and destination
+	   types here and identify cases where based on the types we know that
+	   there can be no capability in the memory we are copying across (and
+	   thus optimize more).  */
+	gcc_assert (is_gimple_reg_type (TREE_TYPE (srcvar)));
+      else if (maybe_capability_copy_p (len, src_align, dest_align,
+					&num_cap_moves))
+	/* We don't know if this memory region contains capabilities or not.
+	   However, we know that we can copy the whole thing as a set of
+	   capability loads and stores.  May as well perform the operation like
+	   that to preserve any capabilities which may be there.  */
+	{
+	  desttype = build_array_type_nelts (uintcap_type_node, num_cap_moves);
+	  srctype = desttype;
+	  if (src_align > TYPE_ALIGN (srctype))
+	    srctype = build_aligned_type (srctype, src_align);
+	  if (dest_align > TYPE_ALIGN (desttype))
+	    desttype = build_aligned_type (desttype, dest_align);
+	  srcvar = fold_build2 (MEM_REF, srctype, src, off0);
+	  destvar = fold_build2 (MEM_REF, desttype, dest, off0);
+	  new_stmt = gimple_build_assign (destvar, srcvar);
+	  goto set_vop_and_replace;
+	}
+      else if (num_cap_moves != 0)
+	/* We don't know if this memory region will contain capabilities or
+	   not.  We can't tell for certain that we can use capability copies or
+	   not.  Hence do not inline.  */
+	return false;
+
       if (is_gimple_reg_type (TREE_TYPE (srcvar)))
 	{
 	  tree tem = fold_const_aggregate_ref (srcvar);
