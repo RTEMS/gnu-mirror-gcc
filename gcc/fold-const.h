@@ -79,6 +79,7 @@ extern tree get_array_ctor_element_at_index (tree, offset_int,
 #define fold_build_replace_address_value(T1, T2)\
    fold_build_replace_address_value_loc (UNKNOWN_LOCATION, T1, T2)
 extern tree fold_build_replace_address_value_loc (location_t, tree, tree);
+extern tree fold_replace_address_value_loc (location_t, tree);
 extern tree maybe_cap_int_const_binop (tree_code, tree, tree);
 extern bool fold_convertible_p (const_tree, const_tree);
 #define fold_convert(T1,T2)\

@@ -13026,7 +13026,11 @@ fold (tree expr)
     {
       if (code == CALL_EXPR)
 	{
-	  tem = fold_call_expr (loc, expr, false);
+	  if (CALL_EXPR_FN (expr) == NULL_TREE
+	      && CALL_EXPR_IFN (expr) == IFN_REPLACE_ADDRESS_VALUE)
+	    tem = fold_replace_address_value_loc (loc, expr);
+	  else
+	    tem = fold_call_expr (loc, expr, false);
 	  return tem ? tem : expr;
 	}
       return expr;
@@ -13638,26 +13642,20 @@ fold_build_call_array_initializer_loc (location_t loc, tree type, tree fn,
 #undef START_FOLD_INIT
 #undef END_FOLD_INIT
 
-/* Build REPLACE_ADDRESS_VALUE internal function, folding away constant
-   assignments if possible.
+/* Helper for both fold_build_replace_address_value_loc and
+   fold_build_replace_address_value.  This implements the folding for both.
 
-   We currently only fold away assignments to a constant 0 capability to make
-   constant integer initialisation work nicely, but this could be made to work
-   on assignments to any integer_cst capability.  */
-
-tree
-fold_build_replace_address_value_loc (location_t loc, tree c, tree cv)
+   We only handle expressions which we know are constants.  */
+static tree
+fold_replace_address_value_1 (location_t loc, tree c, tree cv)
 {
-  if (! tree_is_capability_value (c))
-    return fold_convert (TREE_TYPE (c), cv);
-  gcc_assert (INTEGRAL_TYPE_P (TREE_TYPE (cv))
-	      && TYPE_PRECISION (TREE_TYPE (cv))
-		<= TYPE_PRECISION (noncapability_type (TREE_TYPE (c))));
-
-  tree orig_c = c;
   tree orig_cv = cv;
   STRIP_ANY_LOCATION_WRAPPER (c);
   STRIP_ANY_LOCATION_WRAPPER (cv);
+
+  gcc_assert (INTEGRAL_TYPE_P (TREE_TYPE (cv))
+	      && TYPE_PRECISION (TREE_TYPE (cv))
+		<= TYPE_PRECISION (noncapability_type (TREE_TYPE (c))));
 
   if (TREE_CODE (c) == INTEGER_CST && TREE_CODE (cv) == INTEGER_CST)
     {
@@ -13690,7 +13688,32 @@ fold_build_replace_address_value_loc (location_t loc, tree c, tree cv)
 						   CALL_EXPR_ARG (c, 0), orig_cv);
     }
 
-  return build_replace_address_value_loc (loc, orig_c, orig_cv);
+  return NULL_TREE;
+}
+
+/* Build REPLACE_ADDRESS_VALUE internal function, folding away constant
+   assignments if possible.  */
+tree
+fold_build_replace_address_value_loc (location_t loc, tree c, tree cv)
+{
+  if (! tree_is_capability_value (c))
+    return fold_convert (TREE_TYPE (c), cv);
+
+  tree tmp = fold_replace_address_value_1 (loc, c, cv);
+  if (tmp)
+    return tmp;
+
+  return build_replace_address_value_loc (loc, c, cv);
+}
+
+/* Fold a REPLACE_ADDRESS_VALUE internal function call, folding away constant
+   assignments and constant recursive calls.  */
+tree
+fold_replace_address_value_loc (location_t loc, tree exp)
+{
+  tree c = CALL_EXPR_ARG (exp, 0);
+  tree cv = CALL_EXPR_ARG (exp, 1);
+  return fold_replace_address_value_1 (loc, c, cv);
 }
 
 tree
