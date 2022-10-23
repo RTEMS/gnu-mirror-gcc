@@ -119,7 +119,6 @@ gimple_alloc_histogram_value (struct function *fun ATTRIBUTE_UNUSED,
    histogram_value hist = (histogram_value) xcalloc (1, sizeof (*hist));
    hist->hvalue.value = value;
    hist->hvalue.stmt = stmt;
-   hist->hvalue.edge = NULL;
    hist->hvalue.lp = NULL;
    hist->type = type;
    return hist;

@@ -928,17 +928,9 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
       {
         auto lp = hist->hvalue.lp;
         if (act_count[t]){
-            if (lp->valid_hist)
-            {
-               for (int i=0;i<69;++i){
-                   lp->hist[i]+=act_count[t][i];
-               }
-            } else {
-               lp->valid_hist = true;
-               for (int i=0;i<69;++i){
-                   lp->hist[i]=act_count[t][i];
-               }
-            }
+           for (int i=0;i<69;++i){
+               lp->hist[i]=act_count[t][i];
+           }
         }
         continue;
       }
@@ -1542,12 +1534,6 @@ branch_prob (bool thunk)
       compute_branch_probabilities (cfg_checksum, lineno_checksum);
       if (flag_profile_values)
 	compute_value_histograms (values, cfg_checksum, lineno_checksum);
-    }
-
-    for (auto loop : loops_list (cfun, 0)){
-      if (loop->valid_hist){
-          printf("%ld %ld %ld %ld", loop->hist[0], loop->hist[1], loop->hist[2], loop->hist[3]);
-    }
     }
 
   remove_fake_edges ();

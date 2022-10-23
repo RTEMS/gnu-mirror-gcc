@@ -275,8 +275,6 @@ public:
      reused.  */
   basic_block former_header;
 
-  bool valid_hist = false;
-
   // We store histogram values here
   gcov_type hist[69];
 };
