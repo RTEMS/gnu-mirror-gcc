@@ -388,7 +388,7 @@ frange::normalize_kind ()
       && frange_val_is_min (m_min, m_type)
       && frange_val_is_max (m_max, m_type))
     {
-      if (m_pos_nan && m_neg_nan)
+      if (!HONOR_NANS (m_type) || (m_pos_nan && m_neg_nan))
 	{
 	  set_varying (m_type);
 	  return true;
@@ -396,7 +396,7 @@ frange::normalize_kind ()
     }
   else if (m_kind == VR_VARYING)
     {
-      if (!m_pos_nan || !m_neg_nan)
+      if (HONOR_NANS (m_type) && (!m_pos_nan || !m_neg_nan))
 	{
 	  m_kind = VR_RANGE;
 	  m_min = frange_val_min (m_type);
@@ -712,14 +712,19 @@ frange::supports_type_p (const_tree type) const
 void
 frange::verify_range ()
 {
+  if (flag_finite_math_only)
+    gcc_checking_assert (!maybe_isnan ());
   switch (m_kind)
     {
     case VR_UNDEFINED:
       gcc_checking_assert (!m_type);
       return;
     case VR_VARYING:
+      if (flag_finite_math_only)
+	gcc_checking_assert (!m_pos_nan && !m_neg_nan);
+      else
+	gcc_checking_assert (m_pos_nan && m_neg_nan);
       gcc_checking_assert (m_type);
-      gcc_checking_assert (m_pos_nan && m_neg_nan);
       gcc_checking_assert (frange_val_is_min (m_min, m_type));
       gcc_checking_assert (frange_val_is_max (m_max, m_type));
       return;
@@ -3437,6 +3442,8 @@ range_tests_misc ()
     max.union_ (min);
     ASSERT_TRUE (max.varying_p ());
   }
+  // Test that we can set a range of true+false for a 1-bit signed int.
+  r0 = range_true_and_false (one_bit_type);
 
   // Test inversion of 1-bit signed integers.
   {
@@ -3953,8 +3960,11 @@ range_tests_floats ()
   if (r0.maybe_isnan ())
     ASSERT_TRUE (r0.varying_p ());
   // ...unless it has some special property...
-  r0.clear_nan ();
-  ASSERT_FALSE (r0.varying_p ());
+  if (!flag_finite_math_only)
+    {
+      r0.clear_nan ();
+      ASSERT_FALSE (r0.varying_p ());
+    }
 
   // For most architectures, where float and double are different
   // sizes, having the same endpoints does not necessarily mean the
@@ -4022,10 +4032,13 @@ range_tests_floats ()
   r0.intersect (r1);
   ASSERT_TRUE (r0.undefined_p ());
 
-  // Make sure [-Inf, -Inf] doesn't get normalized.
-  r0 = frange_float ("-Inf", "-Inf");
-  ASSERT_TRUE (real_isinf (&r0.lower_bound (), true));
-  ASSERT_TRUE (real_isinf (&r0.upper_bound (), true));
+  if (!flag_finite_math_only)
+    {
+      // Make sure [-Inf, -Inf] doesn't get normalized.
+      r0 = frange_float ("-Inf", "-Inf");
+      ASSERT_TRUE (real_isinf (&r0.lower_bound (), true));
+      ASSERT_TRUE (real_isinf (&r0.upper_bound (), true));
+    }
 }
 
 void

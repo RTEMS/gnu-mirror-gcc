@@ -1,3 +1,73 @@
+2022-10-21  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/107295
+	* constexpr.cc (reduced_constant_expression_p) <case CONSTRUCTOR>:
+	Return false for VECTOR_TYPE CONSTRUCTORs even without
+	CONSTRUCTOR_NO_CLEARING set on them.
+	(cxx_eval_bare_aggregate): If constant but !changed, fold before
+	returning VECTOR_TYPE_P CONSTRUCTOR.
+	(cxx_eval_constant_expression) <case CONSTRUCTOR>: Don't fold
+	TREE_CONSTANT CONSTRUCTOR, just return it.
+
+2022-10-21  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/106863
+	* semantics.cc (finish_compound_literal): For void{}, if
+	processing_template_decl return a COMPOUND_LITERAL_P
+	CONSTRUCTOR rather than void_node.
+
+2022-10-20  Patrick Palka  <ppalka@redhat.com>
+
+	* pt.cc (lookup_and_finish_template_variable): Don't
+	instantiate if the template's scope is dependent.
+	(tsubst_copy) <case TEMPLATE_DECL>: Pass entering_scope=true
+	when substituting the class scope.
+
+2022-10-20  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/102963
+	* module.cc (node_template_info): Handle CONCEPT_DECL.
+
+2022-10-20  Jonathan Wakely   <jwakely@redhat.com>
+	    Ulrich Drepper  <drepper@redhat.com>
+
+	* Make-lang.in: Add rules to generate std-name-hint.gperf.  Adjust
+	rule to generate std-name-hint.h to allow chain rule.
+	* std-name-hint.h: Regenerated.
+	* std-name-hint.gperf: This file is now generated.
+	* cxxapi-data.csv: New file.  CSV file with C++ API data.
+	* gen-cxxapi-file.py: New file.  Generate std-name-hint.gperf
+	and module export source (in future).
+
+2022-10-19  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/85043
+	* typeck.cc (maybe_warn_about_useless_cast): Don't warn when
+	a glvalue is cast to a non-reference type.
+
+2022-10-18  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/105045
+	* module.cc (trees_out::tpl_parms_fini): Don't assume default
+	template arguments must be trailing.
+	(trees_in::tpl_parms_fini): Likewise.
+
+2022-10-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/106654
+	* cp-tree.h (build_assume_call): Declare.
+	* parser.cc (cp_parser_omp_assumption_clauses): Use build_assume_call.
+	* cp-gimplify.cc (build_assume_call): New function.
+	(process_stmt_assume_attribute): Use build_assume_call.
+	* pt.cc (tsubst_copy_and_build): Likewise.
+
+2022-10-17  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/101449
+	* module.cc (trees_out::write_function_def): Stream the
+	parms and result of the constexpr_fundef entry.
+	(trees_in::read_function_def): Likewise.
+
 2022-10-14  Patrick Palka  <ppalka@redhat.com>
 
 	PR c++/106304
