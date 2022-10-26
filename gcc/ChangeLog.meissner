@@ -1,3 +1,29 @@
+==================== Dmf002, patch001.
+
+Add -mcpu=future.
+
+2022-10-26   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS): New macro.
+	(POWERPC_MASKS): Add -mblock-ops-vector-pair.
+	* config/rs6000/rs6000-opts.h (enum processor_type): Add
+	PROCESSOR_FUTURE.
+	* config/rs6000/rs6000-tables.opt: Regenerate.
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Add
+	-mcpu=future support.
+	(rs6000_machine_from_flags): Likewise.
+	(rs6000_adjust_cost): Likewise.
+	(rs6000_issue_rate): Likewise.
+	(rs6000_sched_reorder): Likewise.
+	(rs6000_sched_reorder2): Likewise.
+	(rs6000_register_move_cost): Likewise.
+	* config/rs6000/rs6000.h (ASM_CPU_SUPPORT): Likewise.
+	* config/rs6000/rs6000.md (cpu attribute): Likewise.
+
+==================== Dmf002, initial branch.
+
 2022-10-26   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
