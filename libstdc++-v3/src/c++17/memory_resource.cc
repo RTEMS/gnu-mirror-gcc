@@ -544,10 +544,22 @@ namespace pmr
   // For 32-bit and 20-bit pointers it's four pointers (16 bytes).
   // For 16-bit pointers it's five pointers (10 bytes).
   // TODO pad 64-bit to 4*sizeof(void*) to avoid splitting across cache lines?
-#ifndef __CHERI_PURE_CAPABILITY__
-  // MORELLO TODO: FIXME.  This code will need adapting for capabilities.
+#if __SIZEOF_POINTER__ <= 8
   static_assert(sizeof(chunk)
       == sizeof(bitset::size_type) + sizeof(uint32_t) + 2 * sizeof(void*));
+#elif __SIZEOF_POINTER__ == 16
+  // CHERI pointers on 64 bit targets are 128 bits (i.e. 16 bytes) in size.
+  // Hence there is extra padding required to align _M_p, even though we do
+  // manage to use some padding from bitset in the chunk definition.
+  // Similar question about padding for cache lines as is made above could
+  // apply here.
+  static_assert(sizeof(chunk)
+      == sizeof(bitset::size_type) + sizeof(uint32_t) + 2 * sizeof(void*) + 8);
+#else
+  // Do not make assertions for other sizes, any architectures with new pointer
+  // sizes may want to revisit this and decide for themselves if the current
+  // situation is acceptable to them.
+#error "New pointer size -- suggest investigating padding in PMR chunk struct."
 #endif
 
   // An oversized allocation that doesn't fit in a pool.
@@ -689,6 +701,7 @@ namespace pmr
       const size_t __words = (__blocks + __bits - 1) / __bits;
       const size_t __block_size = block_size();
       size_t __bytes = __blocks * __block_size + __words * sizeof(word);
+      // N.b. this alignment is also enough for CHERI precise bounds.
       size_t __alignment = std::__bit_ceil(__block_size);
       void* __p = __r->allocate(__bytes, __alignment);
       __try
@@ -912,6 +925,12 @@ namespace pmr
 	// Setting _M_opts to the largest pool allows users to query it:
 	opts.largest_required_pool_block = std::end(pool_sizes)[-1];
       }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+    opts.largest_required_pool_block
+	    = __builtin_cheri_round_representable_length
+		    (opts.largest_required_pool_block);
+#endif
     return opts;
   }
 
@@ -1204,6 +1223,13 @@ namespace pmr
   synchronized_pool_resource::
   do_allocate(size_t bytes, size_t alignment)
   {
+    // N.b. this rounding up for a representable size is not needed when we
+    // request the size from `_M_impl`.  That __pool_resource would
+    // automatically handle adding associated bounds and rounding up since it
+    // would be passed to some "upstream" memory resource.
+    // That said, there is also no harm to adjusting the size we request here,
+    // and it makes the code slightly easier to read.
+    __maybe_cheri_round_allocation(&bytes, &alignment);
     const auto block_size = std::max(bytes, alignment);
     const pool_options opts = _M_impl._M_opts;
     if (block_size <= opts.largest_required_pool_block)
@@ -1217,7 +1243,7 @@ namespace pmr
 	      {
 		// Need exclusive lock to replenish so use try_allocate:
 		if (void* p = pools[index].try_allocate())
-		  return p;
+		  return __maybe_cheri_bounded(p, bytes);
 		// Need to take exclusive lock and replenish pool.
 	      }
 	    // Need to allocate or replenish thread-specific pools using
@@ -1230,7 +1256,9 @@ namespace pmr
 		exclusive_lock dummy(_M_mx);
 		_M_tpools = _M_alloc_shared_tpools(dummy);
 	      }
-	    return _M_tpools->pools[index].allocate(upstream_resource(), opts);
+	    void* ret
+	      = _M_tpools->pools[index].allocate(upstream_resource(), opts);
+	    return __maybe_cheri_bounded(ret, bytes);
 	  }
 
 	// N.B. Another thread could call release() now lock is not held.
@@ -1240,7 +1268,8 @@ namespace pmr
 	auto pools = _M_thread_specific_pools();
 	if (!pools)
 	  pools = _M_alloc_tpools(excl)->pools;
-	return pools[index].allocate(upstream_resource(), opts);
+	void* ret = pools[index].allocate(upstream_resource(), opts);
+	return __maybe_cheri_bounded(ret, bytes);
       }
     exclusive_lock l(_M_mx);
     return _M_impl.allocate(bytes, alignment); // unpooled allocation
@@ -1410,14 +1439,25 @@ namespace pmr
   void*
   unsynchronized_pool_resource::do_allocate(size_t bytes, size_t alignment)
   {
+    // N.b. this rounding up for a representable size is not needed when we
+    // request the size from `_M_impl`.  That __pool_resource would
+    // automatically handle adding associated bounds and rounding up since it
+    // would be passed to some "upstream" memory resource.
+    // That said, there is also no harm to adjusting the size we request here,
+    // and it makes the code slightly easier to read.
+    __maybe_cheri_round_allocation(&bytes, &alignment);
     const auto block_size = std::max(bytes, alignment);
+
     if (block_size <= _M_impl._M_opts.largest_required_pool_block)
       {
 	// Recreate pools if release() has been called:
 	if (__builtin_expect(_M_pools == nullptr, false))
 	  _M_pools = _M_impl._M_alloc_pools();
 	if (auto pool = _M_find_pool(block_size))
-	  return pool->allocate(upstream_resource(), _M_impl._M_opts);
+	  {
+	    void* ret = pool->allocate(upstream_resource(), _M_impl._M_opts);
+	    return __maybe_cheri_bounded(ret, bytes);
+	  }
       }
     return _M_impl.allocate(bytes, alignment);
   }

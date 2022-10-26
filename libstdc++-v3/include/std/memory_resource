@@ -129,6 +129,37 @@ namespace pmr
   { return !(__a == __b); }
 #endif
 
+  inline void
+  __maybe_cheri_round_allocation(size_t* __bytesp, size_t* __alignmentp)
+  noexcept
+    {
+#ifdef __CHERI_PURE_CAPABILITY__
+      size_t __bytes = *__bytesp;
+      size_t __alignment = *__alignmentp;
+      __bytes = __builtin_cheri_round_representable_length(__bytes);
+      // Check for overflow.  If overflow occured there's nothing we can do
+      // so we return without adjustment.
+      if (__bytes < *__bytesp)
+	return;
+      const size_t __alignment_mask
+	= __builtin_cheri_representable_alignment_mask(__bytes);
+      const size_t tmp = ((size_t)1) << __builtin_ctzl(__alignment_mask);
+      __alignment = std::max(tmp, __alignment);
+
+      *__bytesp = __bytes;
+      *__alignmentp = __alignment;
+#endif
+    }
+
+  inline void*
+  __maybe_cheri_bounded(void* __ret, size_t __length)
+    {
+#ifdef __CHERI_PURE_CAPABILITY__
+      __ret = __builtin_cheri_bounds_set_exact(__ret, __length);
+#endif
+      return __ret;
+    }
+
   // C++17 23.12.3 Class template polymorphic_allocator
   template<typename _Tp>
     class polymorphic_allocator
@@ -639,6 +670,7 @@ namespace pmr
       if (__bytes == 0)
 	__bytes = 1; // Ensures we don't return the same pointer twice.
 
+      __maybe_cheri_round_allocation(&__bytes, &__alignment);
       void* __p = std::align(__alignment, __bytes, _M_current_buf, _M_avail);
       if (!__p)
 	{
@@ -647,7 +679,7 @@ namespace pmr
 	}
       _M_current_buf = (char*)_M_current_buf + __bytes;
       _M_avail -= __bytes;
-      return __p;
+      return __maybe_cheri_bounded(__p, __bytes);
     }
 
     void

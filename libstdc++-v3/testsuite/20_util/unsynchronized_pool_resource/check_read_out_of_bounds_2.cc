@@ -1,0 +1,43 @@
+// Copyright (C) 2022 Free Software Foundation, Inc.
+//
+// This file is part of the GNU ISO C++ Library.  This library is free
+// software; you can redistribute it and/or modify it under the
+// terms of the GNU General Public License as published by the
+// Free Software Foundation; either version 3, or (at your option)
+// any later version.
+
+// This library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License along
+// with this library; see the file COPYING3.  If not see
+// <http://www.gnu.org/licenses/>.
+
+// { dg-options "-std=gnu++17" }
+// { dg-do run { target c++17 } }
+// { dg-shouldfail-purecap "out of bounds" }
+
+#include <memory_resource>
+#include <testsuite_hooks.h>
+
+void
+test01()
+{
+  std::pmr::unsynchronized_pool_resource r;
+  // Allocate twice so that the second allocation is from the same allocation
+  // as the first (and hence that with non-CHERI-bounded allocations we can
+  // access one byte before the second allocation).
+  char *ret = (char *)r.allocate (8, 1);
+  char *ret2 = (char *)r.allocate (8, 1);
+  ret[1] = 'x';
+  ret2[-1] = 'x';  // BOOM for purecap.
+}
+
+int
+main()
+{
+  test01();
+}
+

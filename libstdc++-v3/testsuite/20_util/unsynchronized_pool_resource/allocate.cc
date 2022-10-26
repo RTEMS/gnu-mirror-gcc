@@ -186,9 +186,28 @@ test06()
 	return std::pmr::new_delete_resource()->allocate(bytes, align);
 
       // This is a large, unpooled allocation. Check the arguments:
-      if (bytes < expected_size)
+      size_t size_expect = expected_size;
+      size_t alignment_expect = expected_alignment;
+#ifdef __CHERI_PURE_CAPABILITY__
+      // Since allocations need to be padded and bounded by the allocator for
+      // precise bounds on CHERI architectures, we account for that here.
+      {
+	size_t s = expected_size;
+	size_t size_tmp = __builtin_cheri_round_representable_length (s);
+	size_t mask = __builtin_cheri_representable_alignment_mask (s);
+	size_t alignment_tmp = 1UL << __builtin_ctzl(mask);
+	// Check for overflow.  Nothing is done in the allocators if there is
+	// overflow in the rounding of representable length.
+	if (size_tmp >= expected_size)
+	  {
+	    alignment_expect = std::max (alignment_tmp, expected_alignment);
+	    size_expect = std::max (size_tmp, expected_size);
+	  }
+      }
+#endif
+      if (bytes < size_expect)
 	throw bad_size();
-      else if (align != expected_alignment)
+      else if (align != alignment_expect)
 	throw bad_alignment();
       // Else just throw, don't really try to allocate:
       throw std::bad_alloc();
