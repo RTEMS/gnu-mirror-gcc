@@ -186,8 +186,8 @@
   return VLOGICAL_REGNO_P (REGNO (op));
 })
 
-;; Return 1 if op is a DMF register
-(define_predicate "dmf_operand"
+;; Return 1 if op is a dense math register
+(define_predicate "dmr_operand"
   (match_operand 0 "register_operand")
 {
   if (!REG_P (op))
@@ -196,12 +196,13 @@
   if (!HARD_REGISTER_P (op))
     return 1;
 
-  return DMF_REGNO_P (REGNO (op));
+  return DMR_REGNO_P (REGNO (op));
 })
 
 ;; Return 1 if op is an accumulator.  On power10 systems, the accumulators
-;; overlap with the FPRs, while on systems with DMF, the accumulators are
-;; separate dense math registers and do not overlap with the FPR registers..
+;; overlap with the FPRs, while on systems with dense math, the accumulators
+;; are separate dense math registers and do not overlap with the FPR
+;; registers..
 (define_predicate "accumulator_operand"
   (match_operand 0 "register_operand")
 {
@@ -212,8 +213,8 @@
     return 1;
 
   int r = REGNO (op);
-  return (TARGET_DMF
-	  ? DMF_REGNO_P (r)
+  return (TARGET_DENSE_MATH
+	  ? DMR_REGNO_P (r)
 	  : FP_REGNO_P (r) && (r & 3) == 0);
 })
 

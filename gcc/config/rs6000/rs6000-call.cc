@@ -1646,7 +1646,8 @@ rs6000_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
     {
       if (TYPE_CANONICAL (type) != NULL_TREE)
 	type = TYPE_CANONICAL (type);
-      error ("invalid use of DMF operand of type %qs as a function parameter",
+      error ("invalid use of dense math operand of type %qs as a function "
+	     "parameter",
 	     IDENTIFIER_POINTER (DECL_NAME (TYPE_NAME (type))));
       return NULL_RTX;
     }

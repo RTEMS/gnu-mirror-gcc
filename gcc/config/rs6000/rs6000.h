@@ -662,7 +662,7 @@ extern unsigned char rs6000_recip_bits[];
 #define UNITS_PER_FP_WORD 8
 #define UNITS_PER_ALTIVEC_WORD 16
 #define UNITS_PER_VSX_WORD 16
-#define UNITS_PER_DMF_WORD 128
+#define UNITS_PER_DMR_WORD 128
 
 /* Type used for ptrdiff_t, as a string used in a declaration.  */
 #define PTRDIFF_TYPE "int"
@@ -828,7 +828,7 @@ enum data_align { align_abi, align_opt, align_both };
    0, 0, 0, 0, 0, 0, 0, 0,			   \
    /* vrsave vscr sfp */			   \
    1, 1, 1,					   \
-   /* DMF registers.  */			   \
+   /* DMR registers.  */			   \
    0, 0, 0, 0, 0, 0, 0, 0			   \
 }
 
@@ -854,7 +854,7 @@ enum data_align { align_abi, align_opt, align_both };
    1, 1, 0, 0, 0, 1, 1, 1,			   \
    /* vrsave vscr sfp */			   \
    0, 0, 0,					   \
-   /* DMF registers.  */			   \
+   /* DMR registers.  */			   \
    0, 0, 0, 0, 0, 0, 0, 0			   \
 }
 
@@ -935,7 +935,7 @@ enum data_align { align_abi, align_opt, align_both };
    66,								\
    83, 82, 81, 80, 79, 78,					\
    95, 94, 93, 92, 91, 90, 89, 88, 87, 86, 85, 84,		\
-   /* DMF registers.  */					\
+   /* DMR registers.  */					\
    111, 112, 113, 114, 115, 116, 117, 118,			\
    /* Vrsave, vscr, sfp.  */					\
    108, 109,							\
@@ -964,8 +964,8 @@ enum data_align { align_abi, align_opt, align_both };
 /* True if register is a VSX register.  */
 #define VSX_REGNO_P(N) (FP_REGNO_P (N) || ALTIVEC_REGNO_P (N))
 
-/* True if register is a DMF register.  */
-#define DMF_REGNO_P(N) ((N) >= FIRST_DMF_REGNO && (N) <= LAST_DMF_REGNO)
+/* True if register is a DMR register.  */
+#define DMR_REGNO_P(N) ((N) >= FIRST_DMR_REGNO && (N) <= LAST_DMR_REGNO)
 
 /* Alternate name for any vector register supporting floating point, no matter
    which instruction set(s) are available.  */
@@ -1103,7 +1103,7 @@ enum reg_class
   FLOAT_REGS,
   ALTIVEC_REGS,
   VSX_REGS,
-  DMF_REGS,
+  DM_REGS,
   VRSAVE_REGS,
   VSCR_REGS,
   GEN_OR_FLOAT_REGS,
@@ -1133,7 +1133,7 @@ enum reg_class
   "FLOAT_REGS",								\
   "ALTIVEC_REGS",							\
   "VSX_REGS",								\
-  "DMF_REGS",								\
+  "DM_REGS",								\
   "VRSAVE_REGS",							\
   "VSCR_REGS",								\
   "GEN_OR_FLOAT_REGS",							\
@@ -1168,7 +1168,7 @@ enum reg_class
   { 0x00000000, 0x00000000, 0xffffffff, 0x00000000 },			\
   /* VSX_REGS.  */							\
   { 0x00000000, 0xffffffff, 0xffffffff, 0x00000000 },			\
-  /* DMF_REGS.  */							\
+  /* DM_REGS.  */							\
   { 0x00000000, 0x00000000, 0x00000000, 0x007f8000 },			\
   /* VRSAVE_REGS.  */							\
   { 0x00000000, 0x00000000, 0x00000000, 0x00001000 },			\
