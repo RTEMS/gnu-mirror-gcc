@@ -186,7 +186,7 @@
   return VLOGICAL_REGNO_P (REGNO (op));
 })
 
-;; Return 1 if op is a dense math register
+;; Return 1 if op is a DMR register
 (define_predicate "dmr_operand"
   (match_operand 0 "register_operand")
 {

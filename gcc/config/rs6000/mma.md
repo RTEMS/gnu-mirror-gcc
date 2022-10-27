@@ -543,7 +543,8 @@
   DONE;
 })
 
-;; On a system with dense math, we build the accumulators from two vector pairs.
+;; On a system with dense math, we build the accumulators from two vector
+;; pairs.
 
 (define_insn "mma_assemble_acc_dm"
  [(set (match_operand:XO 0 "dmr_operand" "=wD")
