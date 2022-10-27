@@ -100,10 +100,6 @@ unsigned int rs6000_recip_control
 TargetVariable
 unsigned int rs6000_debug
 
-;; Whether we are building libgcc or not.
-TargetVariable
-bool building_libgcc = false
-
 ;; Whether to enable the -mfloat128 stuff without necessarily enabling the
 ;; __float128 keyword.
 TargetSave
