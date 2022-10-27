@@ -1,3 +1,21 @@
+==================== Dmf002, patch005.
+
+Add LAGEN and PLAGEN support.
+
+2022-10-27   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-cpus.def (POWERPC_MASKS): Add -mlagen.
+	* config/rs6000/rs6000.cc (rs6000_file_start): Add macros for fake lagen
+	and plagen instructions.
+	(rs6000_opt_masks): Add -mlagen.
+	* config/rs6000/rs6000.md (lagendi3): New insn for -mlagen.
+	(plagendi3_nora): Likewise.
+	(plagendi3): Likewise.
+	(plagendi3_noshift): Likewise.
+	* config/rs6000/rs6000.opt (-mlagen): New option.
+
 ==================== Dmf002, patch004.
 
 Add support for 1,024 bit DMR registers.
