@@ -624,6 +624,10 @@ mdense-math
 Target Mask(DENSE_MATH) Var(rs6000_isa_flags)
 Generate (do not generate) dense math instructions.
 
+mlagen
+Target Undocumented Mask(LAGEN) Var(rs6000_isa_flags)
+Generate (do not generate) LAGEN instructions.
+
 ; Documented parameters
 
 -param=rs6000-vect-unroll-limit=
