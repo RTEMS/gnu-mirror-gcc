@@ -1,3 +1,17 @@
+==================== dmf001, patch #24
+
+Make more changes to make DMF002 branch merge easier.
+
+2022-10-27   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/constraints.md: Make various changes made in DMF002
+	branch to make cherry picking changes easier.
+	* config/rs6000/mma.md: Likewise.
+	* config/rs6000/predicates.md: Likewise.
+	* config/rs6000/rs6000.cc: Likewise.
+
 ==================== dmf001, patch #23
 
 Make changes to make DMF002 branch merge easier.
