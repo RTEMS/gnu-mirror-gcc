@@ -1,3 +1,142 @@
+==================== work101, patch #2
+
+Make __float128 use the _Float128 type.
+
+Currently GCC uses the long double type node for __float128 if long double is
+IEEE 128-bit.  It did not use the node for _Float128.
+
+Problems showed up if you call the nansq function to make a signaling NaN (nansq
+is mapped to nansf128).  Because the type node for _Float128 is different from
+__float128, the machine independent code converts signaling NaNs to quiet NaNs
+if the types are  not compatible.  The following tests used to fail when run on
+a system where long double is IEEE 128-bit:
+
+	gcc.dg/torture/float128-nan.c
+	gcc.target/powerpc/nan128-1.c
+
+This patch makes both __float128 and _Float128 use the same type node.
+
+One side effect of not using the long double type node for __float128 is that we
+must only use KFmode for _Float128/__float128.  The libstdc++ library won't
+build if we use TFmode for _Float128 and __float128 when long double is IEEE
+128-bit.
+
+Another minor side effect is that the f128 round to odd fused multiply-add
+function will not merge negatition with the FMA operation when the type is long
+double.  If the type is __float128 or _Float128, then it will continue to do the
+optimization.  The round to odd functions are defined in terms of __float128
+arguments.  For example:
+
+	long double
+	do_fms (long double a, long double b, long double c)
+	{
+	    return __builtin_fmaf128_round_to_odd (a, b, -c);
+	}
+
+will generate (assuming -mabi=ieeelongdouble):
+
+	xsnegqp 4,4
+	xsmaddqpo 4,2,3
+	xxlor 34,36,36
+
+while:
+
+	__float128
+	do_fms (__float128 a, __float128 b, __float128 c)
+	{
+	    return __builtin_fmaf128_round_to_odd (a, b, -c);
+	}
+
+will generate:
+
+	xsmsubqpo 4,2,3
+	xxlor 34,36,36
+
+2022-10-27   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_init_builtins): Always use the
+	_Float128 type for __float128.
+	(rs6000_expand_builtin): Only change a KFmode built-in to TFmode, if the
+	built-in passes or returns TFmode.  If the predicate failed because the
+	modes were different, use convert_move to load up the value instead of
+	copy_to_mode_reg.
+	* config/rs6000/rs6000.cc (rs6000_translate_mode_attribute): Don't
+	translate IEEE 128-bit floating point modes to explicit IEEE 128-bit
+	modes (KFmode or KCmode), even if long double is IEEE 128-bit.
+	(rs6000_libgcc_floating_mode_supported_p): Support KFmode all of the
+	time if we support IEEE 128-bit floating point.
+	(rs6000_floatn_mode): _Float128 and _Float128x always uses KFmode.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/float128-hw12.c: New test.
+	* gcc.target/powerpc/float128-hw13.c: Likewise.
+	* gcc.target/powerpc/float128-hw4.c: Update insns.
+
+==================== work101, patch #1
+
+Rework 128-bit complex multiply and divide.
+
+This function reworks how the complex multiply and divide built-in functions are
+done.  Previously we created built-in declarations for doing long double complex
+multiply and divide when long double is IEEE 128-bit.  The old code also did not
+support __ibm128 complex multiply and divide if long double is IEEE 128-bit.
+
+In terms of history, I wrote the original code just as I was starting to test
+GCC on systems where IEEE 128-bit long double was the default.  At the time, we
+had not yet started mangling the built-in function names as a way to bridge
+going from a system with 128-bit IBM long double to 128-bin IEEE long double.
+
+The original code depends on there only being two 128-bit types invovled.  With
+some of the changes that I plan on making, this assumption will no longer be
+true in the future.
+
+The problem is we cannot create two separate built-in functions that resolve to
+the same name.  This is a requirement of add_builtin_function and the C front
+end.  That means for the 3 possible modes (IFmode, KFmode, and TFmode), you can
+only use 2 of them.
+
+This code does not create the built-in declaration with the changed name.
+Instead, it uses the TARGET_MANGLE_DECL_ASSEMBLER_NAME hook to change the name
+before it is written out to the assembler file like it now does for all of the
+other long double built-in functions.
+
+We need to disable using this mapping when we are building libgcc, which is
+creating the multiply and divide functions.  The flag that is used when libgcc
+is built (-fbuilding-libcc) is only available in the C/C++ front ends.  We need
+to remember that we are building libgcc in the rs6000-c.cc support to be able to
+use this later to decided whether to mangle the decl assembler name or not.
+
+When I wrote these patches, I discovered that __ibm128 complex multiply and
+divide had originally not been supported if long double is IEEE 128-bit as it
+would generate calls to __mulic3 and __divic3.  I added tests in the testsuite
+to verify that the correct name (i.e. __multc3 and __divtc3) is used in this
+case.
+
+2022-10-27   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-c.cc (rs6000_cpu_cpp_builtins): Set
+	building_libgcc.
+	* config/rs6000/rs6000.cc (create_complex_muldiv): Delete.
+	(init_float128_ieee): Delete code to switch complex multiply and divide
+	for long double.
+	(complex_multiply_builtin_code): New helper function.
+	(complex_divide_builtin_code): Likewise.
+	(rs6000_mangle_decl_assembler_name): Add support for mangling the name
+	of complex 128-bit multiply and divide built-in functions.
+	* config/rs6000/rs6000.opt (building_libgcc): New target variable.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/divic3-1.c: New test.
+	* gcc.target/powerpc/divic3-2.c: Likewise.
+	* gcc.target/powerpc/mulic3-1.c: Likewise.
+	* gcc.target/powerpc/mulic3-2.c: Likewise.
+
 ==================== work101, Merge up to master, 10/27/2022
 
 ==================== work101, Initial branch
