@@ -1,0 +1,831 @@
+2022-05-05   Gaius Mulley   <gaius.mulley@southwales.ac.uk>
+
+        * m2-link-support.h (GM2CC): Add CC1_SPEC to the cc1/cc1plus
+        invocation.
+
+2022-05-04   Gaius Mulley   <gaius.mulley@southwales.ac.uk>
+
+        * m2/m2-link-support.h (RM_IF_NOSAVETEMP) New macro.
+        (GM2CC) Use RM_IF_NOSAVETEMP on the assembler intermediate file.
+        (GM2LCC) Use RM_IF_NOSAVETEMP when creating an archive of the
+        application.  (GEN_SCAFFOLD_SRC) Use RM_IF_NOSAVETEMP when
+        creating the scaffold source program.  (M2LINK) Use
+        RM_IF_NOSAVETEMP when creating the assembler source name and use
+        RM_IF_NOSAVETEMP when creating the main program object.
+
+2022-05-03   Gaius Mulley   <gaius.mulley@southwales.ac.uk>
+
+        * Make-lang.in:  Replaced sh with $(SHELL).
+        * gm2-lang.cc (gm2_langhook_post_options): Assign
+        main_input_filename.  (gm2_parse_input_files) Assign
+        main_input_filename before every source filename is compiled.
+
+2022-04-29   Gaius Mulley   <gaius.mulley@southwales.ac.uk>
+        * m2/gm2-libs-ch/SysExceptions.c: Replace sigfpe with sigfpe_ to
+        avoid name clash with C signal infastructure.
+        * m2/mc-boot-ch/GSysExceptions.c: Replace sigfpe with sigfpe_ to
+        avoid name clash with C signal infastructure.
+
+2022-04-28   Gaius Mulley   <gaius.mulley@southwales.ac.uk>
+
+        * Make-lang.in: Added $(INCLUDES) to all %.o rules requiring gmp.h.
+        * mc-boot/Gkeyc.c: Rebuilt.
+        * mc/keyc.mod (initMacros): Add sigfpe to the list of names to be
+        avoided.
+        * m2/mc-boot/GEnvironment.c: Rebuilt.
+        * mc-boot/GEnvironment.h: Rebuilt.
+        * mc-boot/Gdecl.c: Rebuilt.
+        * mc-boot/Gkeyc.c: Rebuilt.
+        * mc-boot/Glibc.h: Rebuilt.
+        * mc/keyc.mod (initMacros): Add trunc to the list of functions to
+        be avoided.
+
+2022-04-20   Gaius Mulley   <gaius.mulley@southwales.ac.uk>
+
+        * tools-src/mklink.c (FindObject): Replace calls to sprintf
+        with calls to snprintf.
+
+2022-03-02   Gaius Mulley   <gaius.mulley@southwales.ac.uk>
+
+        * ChangeLog: Correct month for last commit.
+
+2022-03-02   Gaius Mulley   <gaius.mulley@southwales.ac.uk>
+
+        * ChangeLog-2021: (New file).
+
+2022-03-02   Gaius Mulley   <gaius.mulley@southwales.ac.uk>
+
+	* gm2-libs/Args.def (GetArg): Corrected formatting.
+	* gm2-libs/Environment.def (GetEnvironment): Renamed parameter
+	a to dest.  (PutEnvironment) New procedure function.
+	* gm2-libs/Environment.mod (GetEnvironment): Renamed parameter
+	a to dest.  (PutEnvironment) New procedure function.
+	* gm2-libs/SEnvironment.def (GetEnvironment): Renamed parameter
+	a to dest.  (PutEnvironment) New procedure function.
+	* gm2-libs/SEnvironment.mod  (GetEnvironment): Renamed parameter
+	a to dest.  (PutEnvironment) New procedure function.
+	* gm2-libs/libc.def: Export list introduced identifiers putenv, execv.
+	* m2/m2-link-support.h: Ensure that the scaffold program
+	is not deleted if the user specified -fmakeinit.
+	* mc-boot-ch/Glibc.c (libc_putenv): New function.
+	* ChangeLog-2021: (New file).
+	* m2/m2-link-support.h (GEN_SCAFFOLD_SRC): New definition.
+	(M2LINK) use GEN_SCAFFOLD_SRC to generate the scaffold name.
+	* m2/configure.ac: Added rule to test for Python3.  Added rule to
+	detect realpath.
+
+2022-01-25   Gaius Mulley   <gaius.mulley@southwales.ac.uk>
+
+        * gm2spec.cc: Replaced save_switch by fe_save_switch.
+        Replaced xputenv by fe_putenv.  Replaced xgetenv by fe_getenv.
+
+2022-01-23   Gaius Mulley   <gaius.mulley@southwales.ac.uk>
+
+        * mc/decl.mod: (isZtypeEquivalent) New procedure function.
+        (isEquivalentType) New procedure function.  (doExprCastC)
+        Added header comment and check for type equivalence.
+        (needsCast) Added header comment and skip types for
+        the formal and actual parameters before comparison.
+        Add check for actual = nil parameter. (checkSystemCast)
+        check for actual = nil being passed to a pointer parameter.
+        * mc-boot/GArgs.c: Rebuilt.
+        * mc-boot/GCmdArgs.c: Rebuilt.
+        * mc-boot/GDebug.c: Rebuilt.
+        * mc-boot/GDynamicStrings.c: Rebuilt.
+        * mc-boot/GEnvironment.c: Rebuilt.
+        * mc-boot/GFIO.c: Rebuilt.
+        * mc-boot/GFormatStrings.c: Rebuilt.
+        * mc-boot/GIO.c: Rebuilt.
+        * mc-boot/GIndexing.c: Rebuilt.
+        * mc-boot/GM2RTS.c: Rebuilt.
+        * mc-boot/GNumberIO.c: Rebuilt.
+        * mc-boot/GPushBackInput.c: Rebuilt.
+        * mc-boot/GRTExceptions.c: Rebuilt.
+        * mc-boot/GRTint.c: Rebuilt.
+        * mc-boot/GStdIO.c: Rebuilt.
+        * mc-boot/GStrCase.c: Rebuilt.
+        * mc-boot/GStrIO.c: Rebuilt.
+        * mc-boot/GStrLib.c: Rebuilt.
+        * mc-boot/GStringConvert.c: Rebuilt.
+        * mc-boot/GSysStorage.c: Rebuilt.
+        * mc-boot/GTimeString.c: Rebuilt.
+        * mc-boot/Galists.c: Rebuilt.
+        * mc-boot/Gdecl.c: Rebuilt.
+        * mc-boot/Gkeyc.c: Rebuilt.
+        * mc-boot/Glists.c: Rebuilt.
+        * mc-boot/GmcComment.c: Rebuilt.
+        * mc-boot/GmcError.c: Rebuilt.
+        * mc-boot/GmcLexBuf.c: Rebuilt.
+        * mc-boot/GmcMetaError.c: Rebuilt.
+        * mc-boot/GmcOptions.c: Rebuilt.
+        * mc-boot/GmcPretty.c: Rebuilt.
+        * mc-boot/GmcPrintf.c: Rebuilt.
+        * mc-boot/GmcSearch.c: Rebuilt.
+        * mc-boot/GmcStack.c: Rebuilt.
+        * mc-boot/Gmcp1.c: Rebuilt.
+        * mc-boot/Gmcp2.c: Rebuilt.
+        * mc-boot/Gmcp3.c: Rebuilt.
+        * mc-boot/Gmcp4.c: Rebuilt.
+        * mc-boot/Gmcp5.c: Rebuilt.
+        * mc-boot/GnameKey.c: Rebuilt.
+        * mc-boot/GsymbolKey.c: Rebuilt.
+        * mc-boot/Gvarargs.c: Rebuilt.
+        * mc-boot/Gwlists.c: Rebuilt.
+
+2022-01-22   Gaius Mulley   <gaius.mulley@southwales.ac.uk>
+
+        * mc/decl.mod: (doReturnC) Use getExprType rather than getType.
+        (getExprType) Added header comment.
+        * mc-boot/GCmdArgs.c: Rebuilt.
+        * mc-boot/GDynamicStrings.c: Rebuilt.
+        * mc-boot/GFIO.c: Rebuilt.
+        * mc-boot/GFormatStrings.c: Rebuilt.
+        * mc-boot/GFpuIO.c: Rebuilt.
+        * mc-boot/GIO.c: Rebuilt.
+        * mc-boot/GIndexing.c: Rebuilt.
+        * mc-boot/GM2EXCEPTION.c: Rebuilt.
+        * mc-boot/GM2RTS.c: Rebuilt.
+        * mc-boot/GNumberIO.c: Rebuilt.
+        * mc-boot/GPushBackInput.c: Rebuilt.
+        * mc-boot/GRTExceptions.c: Rebuilt.
+        * mc-boot/GRTint.c: Rebuilt.
+        * mc-boot/GSArgs.c: Rebuilt.
+        * mc-boot/GSFIO.c: Rebuilt.
+        * mc-boot/GStorage.c: Rebuilt.
+        * mc-boot/GStrCase.c: Rebuilt.
+        * mc-boot/GStrIO.c: Rebuilt.
+        * mc-boot/GStrLib.c: Rebuilt.
+        * mc-boot/GStringConvert.c: Rebuilt.
+        * mc-boot/GSysStorage.c: Rebuilt.
+        * mc-boot/Galists.c: Rebuilt.
+        * mc-boot/Gdecl.c: Rebuilt.
+        * mc-boot/Gkeyc.c: Rebuilt.
+        * mc-boot/Glists.c: Rebuilt.
+        * mc-boot/GmcComment.c: Rebuilt.
+        * mc-boot/GmcComp.c: Rebuilt.
+        * mc-boot/GmcError.c: Rebuilt.
+        * mc-boot/GmcFileName.c: Rebuilt.
+        * mc-boot/GmcLexBuf.c: Rebuilt.
+        * mc-boot/GmcMetaError.c: Rebuilt.
+        * mc-boot/GmcOptions.c: Rebuilt.
+        * mc-boot/GmcPreprocess.c: Rebuilt.
+        * mc-boot/GmcPretty.c: Rebuilt.
+        * mc-boot/GmcPrintf.c: Rebuilt.
+        * mc-boot/GmcSearch.c: Rebuilt.
+        * mc-boot/GmcStack.c: Rebuilt.
+        * mc-boot/GmcStream.c: Rebuilt.
+        * mc-boot/Gmcp1.c: Rebuilt.
+        * mc-boot/Gmcp2.c: Rebuilt.
+        * mc-boot/Gmcp3.c: Rebuilt.
+        * mc-boot/Gmcp4.c: Rebuilt.
+        * mc-boot/Gmcp5.c: Rebuilt.
+        * mc-boot/GnameKey.c: Rebuilt.
+        * mc-boot/GsymbolKey.c: Rebuilt.
+        * mc-boot/Gvarargs.c: Rebuilt.
+        * mc-boot/Gwlists.c: Rebuilt.
+
+2022-01-22   Gaius Mulley   <gaius.mulley@southwales.ac.uk>
+
+        * mc-boot-ch/Gabort.c: (New file).
+        * Make-lang.in: Use $(CXX) rather than $(CC).  Use $(CC) rather
+        than $(HOSTCC) when compiling mcflex.c.  Invoke $(M2LINK) with
+        --langc++ rather than --g++.  (MCC_ARGS) changed to use
+        --olang=c++.  (m2/ppg$(exeext)) link with Gabort.o and make
+        dependant upon Gabort.o.  (m2/pg$(exeext)) link with Gabort.o
+        and make dependant upon Gabort.o.  (m2/pge$(exeext)) link with
+        Gabort.o and make dependant upon Gabort.o.  (gm2-check-examples)
+        Removed.
+        * gm2-ici/m2linemap.c: Introduce extern C for complete source
+        file.
+        * gm2-libs-ch/README: Reformatted.
+        * gm2-libs-ch/RTcodummy.c: Introduce extern C for complete source
+        file.
+        * gm2-libs-ch/RTintdummy.c: Introduce extern C for complete source
+        file.
+        * gm2-libs-ch/Selective.c: Introduce extern C for complete source
+        file.
+        * gm2-libs-ch/SysExceptions.c: Introduce extern C for complete
+        source file.
+        * gm2-libs-ch/UnixArgs.c: Introduce extern C for complete source
+        file.
+        * gm2-libs-ch/UnixArgs.c: Introduce extern C for complete source
+        file.
+        * gm2-libs-ch/cgetopt.c: Introduce extern C for complete source
+        file.
+        * gm2-libs-ch/choosetemp.c: Introduce extern C for complete source
+        file.
+        * gm2-libs-ch/dtoa.c: Introduce extern C for complete source
+        file.
+        * gm2-libs-ch/errno.c: Introduce extern C for complete source
+        file.
+        * gm2-libs-ch/host.c: Introduce extern C for complete source
+        file.
+        * gm2-libs-ch/ldtoa.c: Introduce extern C for complete source
+        file.
+        * gm2-libs-ch/termios.c: Introduce extern C for complete source
+        file.
+        * gm2-libs-ch/tools.c: Reformatted source.
+        * gm2-libs-ch/wrapc.c: Introduce extern C for complete source
+        file.
+        * gm2-libs-ch/xlibc.c: Introduce extern C for complete source
+        file.
+        * mc-boot-ch/GBuiltins.c: Introduce extern C for complete source
+        file.
+        * mc-boot-ch/GRTco.c: Introduce extern C for complete source
+        file.
+        * mc-boot-ch/GSYSTEM.c: Introduce extern C for complete source
+        file.
+        * mc-boot-ch/GSelective.c: Introduce extern C for complete source
+        file.
+        * mc-boot-ch/GSysExceptions.c: Introduce extern C for complete
+        source file.
+        * mc-boot-ch/GUnixArgs.c: Introduce extern C for complete source
+        file.
+        * mc-boot-ch/Gdtoa.c: Introduce extern C for complete source
+        file.
+        * mc-boot-ch/Gerrno.c: Introduce extern C for complete source
+        file.
+        * mc-boot-ch/Gldtoa.c: Introduce extern C for complete source
+        file.
+        * mc-boot-ch/Glibc.c: Introduce extern C for complete source
+        file.
+        * mc-boot-ch/Gmcrts.c: Removed fancy_abort. Introduce extern C for
+        complete source file.
+        * mc-boot-ch/Gtermios.c: Introduce extern C for complete source
+        file.
+        * mc-boot-ch/Gwrapc.c: Introduce extern C for complete source
+        file.
+        * mc-boot/GASCII.c: Rebuilt.
+        * mc-boot/GASCII.h: Rebuilt.
+        * mc-boot/GArgs.c: Rebuilt.
+        * mc-boot/GArgs.h: Rebuilt.
+        * mc-boot/GAssertion.c: Rebuilt.
+        * mc-boot/GAssertion.h: Rebuilt.
+        * mc-boot/GBreak.c: Rebuilt.
+        * mc-boot/GBreak.h: Rebuilt.
+        * mc-boot/GCOROUTINES.h: Rebuilt.
+        * mc-boot/GCmdArgs.c: Rebuilt.
+        * mc-boot/GCmdArgs.h: Rebuilt.
+        * mc-boot/GDebug.c: Rebuilt.
+        * mc-boot/GDebug.h: Rebuilt.
+        * mc-boot/GDynamicStrings.c: Rebuilt.
+        * mc-boot/GDynamicStrings.h: Rebuilt.
+        * mc-boot/GEnvironment.c: Rebuilt.
+        * mc-boot/GEnvironment.h: Rebuilt.
+        * mc-boot/GFIO.c: Rebuilt.
+        * mc-boot/GFIO.h: Rebuilt.
+        * mc-boot/GFormatStrings.c Rebuilt.:
+        * mc-boot/GFormatStrings.h: Rebuilt.
+        * mc-boot/GFpuIO.c: Rebuilt.
+        * mc-boot/GFpuIO.h: Rebuilt.
+        * mc-boot/GIO.c: Rebuilt.
+        * mc-boot/GIO.h: Rebuilt.
+        * mc-boot/GIndexing.c: Rebuilt.
+        * mc-boot/GIndexing.h: Rebuilt.
+        * mc-boot/GM2EXCEPTION.c: Rebuilt.
+        * mc-boot/GM2EXCEPTION.h: Rebuilt.
+        * mc-boot/GM2RTS.c: Rebuilt.
+        * mc-boot/GM2RTS.h: Rebuilt.
+        * mc-boot/GMemUtils.c: Rebuilt.
+        * mc-boot/GMemUtils.h: Rebuilt.
+        * mc-boot/GNumberIO.c: Rebuilt.
+        * mc-boot/GNumberIO.h: Rebuilt.
+        * mc-boot/GPushBackInput.c: Rebuilt.
+        * mc-boot/GPushBackInput.h: Rebuilt.
+        * mc-boot/GRTExceptions.c: Rebuilt.
+        * mc-boot/GRTExceptions.h: Rebuilt.
+        * mc-boot/GRTco.h: Rebuilt.
+        * mc-boot/GRTint.c: Rebuilt.
+        * mc-boot/GRTint.h: Rebuilt.
+        * mc-boot/GSArgs.c: Rebuilt.
+        * mc-boot/GSArgs.h: Rebuilt.
+        * mc-boot/GSFIO.c: Rebuilt.
+        * mc-boot/GSFIO.h: Rebuilt.
+        * mc-boot/GSYSTEM.h: Rebuilt.
+        * mc-boot/GSelective.h: Rebuilt.
+        * mc-boot/GStdIO.c: Rebuilt.
+        * mc-boot/GStdIO.h: Rebuilt.
+        * mc-boot/GStorage.c: Rebuilt.
+        * mc-boot/GStorage.h: Rebuilt.
+        * mc-boot/GStrCase.c: Rebuilt.
+        * mc-boot/GStrCase.h: Rebuilt.
+        * mc-boot/GStrIO.c: Rebuilt.
+        * mc-boot/GStrIO.h: Rebuilt.
+        * mc-boot/GStrLib.c: Rebuilt.
+        * mc-boot/GStrLib.h: Rebuilt.
+        * mc-boot/GStringConvert.c: Rebuilt.
+        * mc-boot/GStringConvert.h: Rebuilt.
+        * mc-boot/GSysExceptions.h: Rebuilt.
+        * mc-boot/GSysStorage.c: Rebuilt.
+        * mc-boot/GSysStorage.h: Rebuilt.
+        * mc-boot/GTimeString.c: Rebuilt.
+        * mc-boot/GTimeString.h: Rebuilt.
+        * mc-boot/GUnixArgs.h: Rebuilt.
+        * mc-boot/Galists.c: Rebuilt.
+        * mc-boot/Galists.h: Rebuilt.
+        * mc-boot/Gdecl.c: Rebuilt.
+        * mc-boot/Gdecl.h: Rebuilt.
+        * mc-boot/Gdtoa.h: Rebuilt.
+        * mc-boot/Gerrno.h: Rebuilt.
+        * mc-boot/Gkeyc.c: Rebuilt.
+        * mc-boot/Gkeyc.h: Rebuilt.
+        * mc-boot/Gldtoa.h: Rebuilt.
+        * mc-boot/Glibc.h: Rebuilt.
+        * mc-boot/Glibm.h: Rebuilt.
+        * mc-boot/Glists.c: Rebuilt.
+        * mc-boot/Glists.h: Rebuilt.
+        * mc-boot/GmcComment.c: Rebuilt.
+        * mc-boot/GmcComment.h: Rebuilt.
+        * mc-boot/GmcComp.c: Rebuilt.
+        * mc-boot/GmcComp.h: Rebuilt.
+        * mc-boot/GmcDebug.c: Rebuilt.
+        * mc-boot/GmcDebug.h: Rebuilt.
+        * mc-boot/GmcError.c: Rebuilt.
+        * mc-boot/GmcError.h: Rebuilt.
+        * mc-boot/GmcFileName.c: Rebuilt.
+        * mc-boot/GmcFileName.h: Rebuilt.
+        * mc-boot/GmcLexBuf.c: Rebuilt.
+        * mc-boot/GmcLexBuf.h: Rebuilt.
+        * mc-boot/GmcMetaError.c: Rebuilt.
+        * mc-boot/GmcMetaError.h: Rebuilt.
+        * mc-boot/GmcOptions.c: Rebuilt.
+        * mc-boot/GmcOptions.h: Rebuilt.
+        * mc-boot/GmcPreprocess.c: Rebuilt.
+        * mc-boot/GmcPreprocess.h: Rebuilt.
+        * mc-boot/GmcPretty.c: Rebuilt.
+        * mc-boot/GmcPretty.h: Rebuilt.
+        * mc-boot/GmcPrintf.c: Rebuilt.
+        * mc-boot/GmcPrintf.h: Rebuilt.
+        * mc-boot/GmcQuiet.c: Rebuilt.
+        * mc-boot/GmcQuiet.h: Rebuilt.
+        * mc-boot/GmcReserved.c: Rebuilt.
+        * mc-boot/GmcReserved.h: Rebuilt.
+        * mc-boot/GmcSearch.c: Rebuilt.
+        * mc-boot/GmcSearch.h: Rebuilt.
+        * mc-boot/GmcStack.c: Rebuilt.
+        * mc-boot/GmcStack.h: Rebuilt.
+        * mc-boot/GmcStream.c: Rebuilt.
+        * mc-boot/GmcStream.h: Rebuilt.
+        * mc-boot/Gmcflex.h: Rebuilt.
+        * mc-boot/Gmcp1.c: Rebuilt.
+        * mc-boot/Gmcp1.h: Rebuilt.
+        * mc-boot/Gmcp2.c: Rebuilt.
+        * mc-boot/Gmcp2.h: Rebuilt.
+        * mc-boot/Gmcp3.c: Rebuilt.
+        * mc-boot/Gmcp3.h: Rebuilt.
+        * mc-boot/Gmcp4.c: Rebuilt.
+        * mc-boot/Gmcp4.h: Rebuilt.
+        * mc-boot/Gmcp5.c: Rebuilt.
+        * mc-boot/Gmcp5.h: Rebuilt.
+        * mc-boot/GnameKey.c: Rebuilt.
+        * mc-boot/GnameKey.h: Rebuilt.
+        * mc-boot/GsymbolKey.c: Rebuilt.
+        * mc-boot/GsymbolKey.h: Rebuilt.
+        * mc-boot/Gtermios.h: Rebuilt.
+        * mc-boot/Gtop.c: Rebuilt.
+        * mc-boot/Gvarargs.c: Rebuilt.
+        * mc-boot/Gvarargs.h: Rebuilt.
+        * mc-boot/Gwlists.c: Rebuilt.
+        * mc-boot/Gwlists.h: Rebuilt.
+        * mc-boot/Gwrapc.h: Rebuilt.
+        * mc/decl.mod: (returnT) scope field added.  (makeReturn)
+        initialize scope field.  (doReturnC) check scope field and
+        generate error if expression exists and no return type specified.
+        Call doExprCastC to cast the return expression.
+        (outDefC) Call keyc.genConfigSystem before entering extern C
+        block.  (outImpC) Call keyc.genConfigSystem prior to keyc.genDefs.
+        (outModuleC) Call keyc.genConfigSystem prior to keyc.genDefs.
+        * mc/keyc.def: (genConfigSystem) exported.
+        * mc/varargs.mod: (copy) Rewritten pointer arithmetic to allow for
+        Modula-2 and translated C++ versions to compile cleanly.
+        * tools-src/mklink.c: Replace option --gcc with --langc.  Replace
+        option --g++ with --langc++.
+
+2022-01-18   Gaius Mulley   <gaius.mulley@southwales.ac.uk>
+
+        * Make-lang.in: (gm2spec.o) Use gm2spec.cc source
+        file.
+        (plugin/m2rte$(exeext).so) Use m2/plugin/m2rte.cc
+        source file.
+        (m2/gm2-gcc/%.o) Use .cc rather than .c source files.
+        (m2/stor-layout.o) Build from stor-layout.cc rather than
+        stor-layout.c.
+        * config-lang.in: Renamed all .c files to .cc files.
+        * gm2-gcc/init.cc: Remamed from m2/gm2-gcc/init.c.
+        * gm2-gcc/init.h: Summary name change.
+        * gm2-gcc/m2assert.cc: Remamed from
+        m2/gm2-gcc/m2assert.c.
+        * gm2-gcc/m2assert.h: Summary name change.
+        * gm2-gcc/m2block.cc: Renamed from
+        m2/gm2-gcc/m2block.c.
+        * gm2-gcc/m2block.def: Summary name change.
+        * gcc/m2/gm2-gcc/m2block.h: Summary name change.
+        * gm2-gcc/m2builtins.cc: Renamed from
+        m2/gm2-gcc/m2builtins.c.
+        * gm2-gcc/m2builtins.def: Summary name change.
+        * gm2-gcc/m2builtins.h: Summary name change.
+        * gm2-gcc/m2color.cc: Renamed from
+        m2/gm2-gcc/m2color.c.
+        * gm2-gcc/m2convert.cc: Renamed from
+        m2/gm2-gcc/m2convert.c.
+        * gm2-gcc/m2convert.def: Summary name change.
+        * gm2-gcc/m2convert.h: Summary name change.
+        * gm2-gcc/m2decl.cc: Renamed from m2/gm2-gcc/m2decl.c.
+        * gm2-gcc/m2decl.def: Summary name change.
+        * gm2-gcc/m2decl.h: Summary name change.
+        * gm2-gcc/m2except.cc: Renamed from
+        m2/gm2-gcc/m2except.c.
+        * gm2-gcc/m2except.h: Summary name change.
+        * gm2-gcc/m2expr.cc: Renamed from m2/gm2-gcc/m2expr.c.
+        * gm2-gcc/m2expr.def: Summary name change.
+        * gm2-gcc/m2expr.h: Summary name change.
+        * gm2-gcc/m2linemap.cc: Renamed from
+        m2/gm2-gcc/m2linemap.c.
+        * gm2-gcc/m2linemap.h: Summary name change.
+        * gm2-gcc/m2misc.cc: Renamed from m2/gm2-gcc/m2misc.c.
+        * gm2-gcc/m2misc.def: Summary name change.
+        * gm2-gcc/m2misc.h: Summary name change.
+        * gm2-gcc/m2statement.cc: Renamed from
+        m2/gm2-gcc/m2statement.c.
+        * gm2-gcc/m2statement.def: Summary name change.
+        * gm2-gcc/m2statement.h: Summary name change.
+        * gm2-gcc/m2top.cc: Renamed from m2/gm2-gcc/m2top.c.
+        * gm2-gcc/m2top.def: Summary name change.
+        * gm2-gcc/m2top.h: Summary name change.
+        * gm2-gcc/m2tree.cc: Renamed from m2/gm2-gcc/m2tree.c.
+        * gm2-gcc/m2tree.def: Summary name change.
+        * gm2-gcc/m2tree.h: Summary name change.
+        * gm2-gcc/m2treelib.cc: Renamed from
+        m2/gm2-gcc/m2treelib.c.
+        * gm2-gcc/m2treelib.def: Summary name change.
+        * gm2-gcc/m2treelib.h: Summary name change.
+        * gm2-gcc/m2type.cc: Renamed from m2/gm2-gcc/m2type.c.
+        * gm2-gcc/m2type.def: Summary name change.
+        * gm2-gcc/m2type.h: Summary name change.
+        * gm2-gcc/rtegraph.cc: Renamed from
+        m2/gm2-gcc/rtegraph.c.
+        * gm2-lang.cc: Renamed from m2/gm2-lang.c.
+        * gm2spec.cc: Renamed from m2/gm2spec.c.
+        * plugin/m2rte.cc: Renamed from m2/plugin/m2rte.c.
+
+2022-01-18   Gaius Mulley   <gaius.mulley@southwales.ac.uk>
+
+        * COPYING.FDL: Update copyright notice dates.
+        * COPYING.RUNTIME: Update copyright notice dates.
+        * Make-lang.in: Update copyright notice dates.
+        * bnf/gm2l.bnf: Update copyright notice dates.
+        * bnf/gm2m.bnf: Update copyright notice dates.
+        * bnf/m2-1.bnf: Update copyright notice dates.
+        * bnf/m2-2.bnf: Update copyright notice dates.
+        * bnf/m2-3.bnf: Update copyright notice dates.
+        * bnf/m2-c.bnf: Update copyright notice dates.
+        * bnf/m2-h.bnf: Update copyright notice dates.
+        * bnf/m2.bnf: Update copyright notice dates.
+        * bnf/mc-1.bnf: Update copyright notice dates.
+        * bnf/mc-2.bnf: Update copyright notice dates.
+        * bnf/mc-3.bnf: Update copyright notice dates.
+        * bnf/mc-4.bnf: Update copyright notice dates.
+        * bnf/mc-5.bnf: Update copyright notice dates.
+        * config-lang.in: Update copyright notice dates.
+        * configure.ac: Update copyright notice dates.
+        * gm2-compiler/CLexBuf.def: Update copyright notice dates.
+        * gm2-compiler/CLexBuf.mod: Update copyright notice dates.
+        * gm2-compiler/FifoQueue.def: Update copyright notice dates.
+        * gm2-compiler/FifoQueue.mod: Update copyright notice dates.
+        * gm2-compiler/Lists.def: Update copyright notice dates.
+        * gm2-compiler/Lists.mod: Update copyright notice dates.
+        * gm2-compiler/M2ALU.def: Update copyright notice dates.
+        * gm2-compiler/M2ALU.mod: Update copyright notice dates.
+        * gm2-compiler/M2AsmUtil.def: Update copyright notice dates.
+        * gm2-compiler/M2AsmUtil.mod: Update copyright notice dates.
+        * gm2-compiler/M2Base.def: Update copyright notice dates.
+        * gm2-compiler/M2Base.mod: Update copyright notice dates.
+        * gm2-compiler/M2BasicBlock.def: Update copyright notice dates.
+        * gm2-compiler/M2BasicBlock.mod: Update copyright notice dates.
+        * gm2-compiler/M2Batch.def: Update copyright notice dates.
+        * gm2-compiler/M2Batch.mod: Update copyright notice dates.
+        * gm2-compiler/M2Bitset.def: Update copyright notice dates.
+        * gm2-compiler/M2Bitset.mod: Update copyright notice dates.
+        * gm2-compiler/M2CaseList.def: Update copyright notice dates.
+        * gm2-compiler/M2CaseList.mod: Update copyright notice dates.
+        * gm2-compiler/M2Check.def: Update copyright notice dates.
+        * gm2-compiler/M2Check.mod: Update copyright notice dates.
+        * gm2-compiler/M2Code.def: Update copyright notice dates.
+        * gm2-compiler/M2Code.mod: Update copyright notice dates.
+        * gm2-compiler/M2ColorString.def: Update copyright notice dates.
+        * gm2-compiler/M2ColorString.mod: Update copyright notice dates.
+        * gm2-compiler/M2Comp.def: Update copyright notice dates.
+        * gm2-compiler/M2Comp.mod: Update copyright notice dates.
+        * gm2-compiler/M2Configure.def: Update copyright notice dates.
+        * gm2-compiler/M2Configure.mod: Update copyright notice dates.
+        * gm2-compiler/M2Const.def: Update copyright notice dates.
+        * gm2-compiler/M2Const.mod: Update copyright notice dates.
+        * gm2-compiler/M2Debug.def: Update copyright notice dates.
+        * gm2-compiler/M2Debug.mod: Update copyright notice dates.
+        * gm2-compiler/M2DebugStack.def: Update copyright notice dates.
+        * gm2-compiler/M2DebugStack.mod: Update copyright notice dates.
+        * gm2-compiler/M2Defaults.def: Update copyright notice dates.
+        * gm2-compiler/M2Defaults.mod: Update copyright notice dates.
+        * gm2-compiler/M2Depth.def: Update copyright notice dates.
+        * gm2-compiler/M2Depth.mod: Update copyright notice dates.
+        * gm2-compiler/M2DriverOptions.def: Update copyright notice dates.
+        * gm2-compiler/M2DriverOptions.mod: Update copyright notice dates.
+        * gm2-compiler/M2Emit.def: Update copyright notice dates.
+        * gm2-compiler/M2Emit.mod: Update copyright notice dates.
+        * gm2-compiler/M2Error.def: Update copyright notice dates.
+        * gm2-compiler/M2Error.mod: Update copyright notice dates.
+        * gm2-compiler/M2EvalSym.def: Update copyright notice dates.
+        * gm2-compiler/M2FileName.def: Update copyright notice dates.
+        * gm2-compiler/M2FileName.mod: Update copyright notice dates.
+        * gm2-compiler/M2GCCDeclare.def: Update copyright notice dates.
+        * gm2-compiler/M2GCCDeclare.mod: Update copyright notice dates.
+        * gm2-compiler/M2GenGCC.def: Update copyright notice dates.
+        * gm2-compiler/M2GenGCC.mod: Update copyright notice dates.
+        * gm2-compiler/M2Lex.def: Update copyright notice dates.
+        * gm2-compiler/M2Lex.mod: Update copyright notice dates.
+        * gm2-compiler/M2LexBuf.def: Update copyright notice dates.
+        * gm2-compiler/M2LexBuf.mod: Update copyright notice dates.
+        * gm2-compiler/M2MetaError.def: Update copyright notice dates.
+        * gm2-compiler/M2MetaError.mod: Update copyright notice dates.
+        * gm2-compiler/M2Optimize.def: Update copyright notice dates.
+        * gm2-compiler/M2Optimize.mod: Update copyright notice dates.
+        * gm2-compiler/M2Options.def: Update copyright notice dates.
+        * gm2-compiler/M2Options.mod: Update copyright notice dates.
+        * gm2-compiler/M2Pass.def: Update copyright notice dates.
+        * gm2-compiler/M2Pass.mod: Update copyright notice dates.
+        * gm2-compiler/M2Preprocess.def: Update copyright notice dates.
+        * gm2-compiler/M2Preprocess.mod: Update copyright notice dates.
+        * gm2-compiler/M2Printf.def: Update copyright notice dates.
+        * gm2-compiler/M2Printf.mod: Update copyright notice dates.
+        * gm2-compiler/M2Quads.def: Update copyright notice dates.
+        * gm2-compiler/M2Quads.mod: Update copyright notice dates.
+        * gm2-compiler/M2Quiet.def: Update copyright notice dates.
+        * gm2-compiler/M2Quiet.mod: Update copyright notice dates.
+        * gm2-compiler/M2Range.def: Update copyright notice dates.
+        * gm2-compiler/M2Range.mod: Update copyright notice dates.
+        * gm2-compiler/M2Reserved.def: Update copyright notice dates.
+        * gm2-compiler/M2Reserved.mod: Update copyright notice dates.
+        * gm2-compiler/M2SSA.mod: Update copyright notice dates.
+        * gm2-compiler/M2Scope.def: Update copyright notice dates.
+        * gm2-compiler/M2Scope.mod: Update copyright notice dates.
+        * gm2-compiler/M2Search.def: Update copyright notice dates.
+        * gm2-compiler/M2Search.mod: Update copyright notice dates.
+        * gm2-compiler/M2Size.def: Update copyright notice dates.
+        * gm2-compiler/M2Size.mod: Update copyright notice dates.
+        * gm2-compiler/M2StackAddress.def: Update copyright notice dates.
+        * gm2-compiler/M2StackAddress.mod: Update copyright notice dates.
+        * gm2-compiler/M2StackWord.def: Update copyright notice dates.
+        * gm2-compiler/M2StackWord.mod: Update copyright notice dates.
+        * gm2-compiler/M2Students.def: Update copyright notice dates.
+        * gm2-compiler/M2Students.mod: Update copyright notice dates.
+        * gm2-compiler/M2Swig.def: Update copyright notice dates.
+        * gm2-compiler/M2Swig.mod: Update copyright notice dates.
+        * gm2-compiler/M2System.def: Update copyright notice dates.
+        * gm2-compiler/M2System.mod: Update copyright notice dates.
+        * gm2-compiler/M2Version.def: Update copyright notice dates.
+        * gm2-compiler/NameKey.def: Update copyright notice dates.
+        * gm2-compiler/NameKey.mod: Update copyright notice dates.
+        * gm2-compiler/ObjectFiles.def: Update copyright notice dates.
+        * gm2-compiler/ObjectFiles.mod: Update copyright notice dates.
+        * gm2-compiler/Output.def: Update copyright notice dates.
+        * gm2-compiler/Output.mod: Update copyright notice dates.
+        * gm2-compiler/P0SymBuild.def: Update copyright notice dates.
+        * gm2-compiler/P0SymBuild.mod: Update copyright notice dates.
+        * gm2-compiler/P0SyntaxCheck.def: Update copyright notice dates.
+        * gm2-compiler/P1Build.def: Update copyright notice dates.
+        * gm2-compiler/P1SymBuild.def: Update copyright notice dates.
+        * gm2-compiler/P1SymBuild.mod: Update copyright notice dates.
+        * gm2-compiler/P2Build.def: Update copyright notice dates.
+        * gm2-compiler/P2SymBuild.def: Update copyright notice dates.
+        * gm2-compiler/P2SymBuild.mod: Update copyright notice dates.
+        * gm2-compiler/P3Build.def: Update copyright notice dates.
+        * gm2-compiler/P3SymBuild.def: Update copyright notice dates.
+        * gm2-compiler/P3SymBuild.mod: Update copyright notice dates.
+        * gm2-compiler/PCBuild.def: Update copyright notice dates.
+        * gm2-compiler/PCSymBuild.def: Update copyright notice dates.
+        * gm2-compiler/PCSymBuild.mod: Update copyright notice dates.
+        * gm2-compiler/PHBuild.def: Update copyright notice dates.
+        * gm2-compiler/Sets.def: Update copyright notice dates.
+        * gm2-compiler/Sets.mod: Update copyright notice dates.
+        * gm2-compiler/SymbolConversion.def: Update copyright notice dates.
+        * gm2-compiler/SymbolConversion.mod: Update copyright notice dates.
+        * gm2-compiler/SymbolKey.def: Update copyright notice dates.
+        * gm2-compiler/SymbolKey.mod: Update copyright notice dates.
+        * gm2-compiler/SymbolTable.def: Update copyright notice dates.
+        * gm2-compiler/SymbolTable.mod: Update copyright notice dates.
+        * gm2-compiler/bnflex.def: Update copyright notice dates.
+        * gm2-compiler/bnflex.mod: Update copyright notice dates.
+        * gm2-compiler/cflex.def: Update copyright notice dates.
+        * gm2-compiler/gm2.mod: Update copyright notice dates.
+        * gm2-compiler/gm2lcc.mod: Update copyright notice dates.
+        * gm2-compiler/gm2lgen.mod: Update copyright notice dates.
+        * gm2-compiler/gm2lorder.mod: Update copyright notice dates.
+        * gm2-compiler/m2flex.def: Update copyright notice dates.
+        * gm2-compiler/ppg.mod: Update copyright notice dates.
+        * gm2-gcc/dynamicstrings.h: Update copyright notice dates.
+        * gm2-gcc/gcc-consolidation.h: Update copyright notice dates.
+        * gm2-gcc/init.c: Update copyright notice dates.
+        * gm2-gcc/init.def: Update copyright notice dates.
+        * gm2-gcc/init.h: Update copyright notice dates.
+        * gm2-gcc/m2assert.c: Update copyright notice dates.
+        * gm2-gcc/m2assert.h: Update copyright notice dates.
+        * gm2-gcc/m2block.c: Update copyright notice dates.
+        * gm2-gcc/m2block.def: Update copyright notice dates.
+        * gm2-gcc/m2block.h: Update copyright notice dates.
+        * gm2-gcc/m2builtins.c: Update copyright notice dates.
+        * gm2-gcc/m2builtins.def: Update copyright notice dates.
+        * gm2-gcc/m2builtins.h: Update copyright notice dates.
+        * gm2-gcc/m2color.c: Update copyright notice dates.
+        * gm2-gcc/m2color.def: Update copyright notice dates.
+        * gm2-gcc/m2color.h: Update copyright notice dates.
+        * gm2-gcc/m2convert.c: Update copyright notice dates.
+        * gm2-gcc/m2convert.def: Update copyright notice dates.
+        * gm2-gcc/m2convert.h: Update copyright notice dates.
+        * gm2-gcc/m2decl.c: Update copyright notice dates.
+        * gm2-gcc/m2decl.def: Update copyright notice dates.
+        * gm2-gcc/m2decl.h: Update copyright notice dates.
+        * gm2-gcc/m2except.c: Update copyright notice dates.
+        * gm2-gcc/m2except.def: Update copyright notice dates.
+        * gm2-gcc/m2except.h: Update copyright notice dates.
+        * gm2-gcc/m2expr.c: Update copyright notice dates.
+        * gm2-gcc/m2expr.def: Update copyright notice dates.
+        * gm2-gcc/m2expr.h: Update copyright notice dates.
+        * gm2-gcc/m2linemap.c: Update copyright notice dates.
+        * gm2-gcc/m2linemap.def: Update copyright notice dates.
+        * gm2-gcc/m2linemap.h: Update copyright notice dates.
+        * gm2-gcc/m2misc.c: Update copyright notice dates.
+        * gm2-gcc/m2misc.def: Update copyright notice dates.
+        * gm2-gcc/m2misc.h: Update copyright notice dates.
+        * gm2-gcc/m2options.h: Update copyright notice dates.
+        * gm2-gcc/m2range.h: Update copyright notice dates.
+        * gm2-gcc/m2search.h: Update copyright notice dates.
+        * gm2-gcc/m2statement.c: Update copyright notice dates.
+        * gm2-gcc/m2statement.def: Update copyright notice dates.
+        * gm2-gcc/m2statement.h: Update copyright notice dates.
+        * gm2-gcc/m2top.c: Update copyright notice dates.
+        * gm2-gcc/m2top.def: Update copyright notice dates.
+        * gm2-gcc/m2top.h: Update copyright notice dates.
+        * gm2-gcc/m2tree.c: Update copyright notice dates.
+        * gm2-gcc/m2tree.def: Update copyright notice dates.
+        * gm2-gcc/m2tree.h: Update copyright notice dates.
+        * gm2-gcc/m2treelib.c: Update copyright notice dates.
+        * gm2-gcc/m2treelib.def: Update copyright notice dates.
+        * gm2-gcc/m2treelib.h: Update copyright notice dates.
+        * gm2-gcc/m2type.c: Update copyright notice dates.
+        * gm2-gcc/m2type.def: Update copyright notice dates.
+        * gm2-gcc/m2type.h: Update copyright notice dates.
+        * gm2-gcc/rtegraph.c: Update copyright notice dates.
+        * gm2-gcc/rtegraph.h: Update copyright notice dates.
+        * gm2-internals.texi: Update copyright notice dates.
+        * gm2-lang.c: Update copyright notice dates.
+        * gm2-lang.h: Update copyright notice dates.
+        * gm2-libs-ch/RTcodummy.c: Update copyright notice dates.
+        * gm2-libs-ch/RTintdummy.c: Update copyright notice dates.
+        * gm2-libs-ch/Selective.c: Update copyright notice dates.
+        * gm2-libs-ch/SysExceptions.c: Update copyright notice dates.
+        * gm2-libs-ch/UnixArgs.c: Update copyright notice dates.
+        * gm2-libs-ch/cgetopt.c: Update copyright notice dates.
+        * gm2-libs-ch/choosetemp.c: Update copyright notice dates.
+        * gm2-libs-ch/dtoa.c: Update copyright notice dates.
+        * gm2-libs-ch/errno.c: Update copyright notice dates.
+        * gm2-libs-ch/host.c: Update copyright notice dates.
+        * gm2-libs-ch/ldtoa.c: Update copyright notice dates.
+        * gm2-libs-ch/pthdummy.c: Update copyright notice dates.
+        * gm2-libs-ch/termios.c: Update copyright notice dates.
+        * gm2-libs-ch/tools.c: Update copyright notice dates.
+        * gm2-libs-ch/wrapc.c: Update copyright notice dates.
+        * gm2-libs-ch/xlibc.c: Update copyright notice dates.
+        * gm2-libs-coroutines/Debug.def: Update copyright notice dates.
+        * gm2-libs-coroutines/Debug.mod: Update copyright notice dates.
+        * gm2-libs-coroutines/Executive.def: Update copyright notice dates.
+        * gm2-libs-coroutines/Executive.mod: Update copyright notice dates.
+        * gm2-libs-coroutines/KeyBoardLEDs.def: Update copyright notice dates.
+        * gm2-libs-coroutines/README.texi: Update copyright notice dates.
+        * gm2-libs-coroutines/SYSTEM.def: Update copyright notice dates.
+        * gm2-libs-coroutines/SYSTEM.mod: Update copyright notice dates.
+        * gm2-libs-coroutines/TimerHandler.def: Update copyright notice dates.
+        * gm2-libs-coroutines/TimerHandler.mod: Update copyright notice dates.
+        * gm2config.h.in: Update copyright notice dates.
+        * gm2spec.c: Update copyright notice dates.
+        * gm2version.h: Update copyright notice dates.
+        * lang-options.h: Update copyright notice dates.
+        * lang-specs.h: Update copyright notice dates.
+        * lang.opt: Update copyright notice dates.
+        * m2-link-support.h: Update copyright notice dates.
+        * m2-tree.def: Update copyright notice dates.
+        * m2-tree.h: Update copyright notice dates.
+        * m2.flex: Update copyright notice dates.
+        * m2pp.c: Update copyright notice dates.
+        * m2pp.h: Update copyright notice dates.
+        * mc-boot-ch/GBuiltins.c: Update copyright notice dates.
+        * mc-boot-ch/GRTco.c: Update copyright notice dates.
+        * mc-boot-ch/GSYSTEM.c: Update copyright notice dates.
+        * mc-boot-ch/GSelective.c: Update copyright notice dates.
+        * mc-boot-ch/GSysExceptions.c: Update copyright notice dates.
+        * mc-boot-ch/GUnixArgs.c: Update copyright notice dates.
+        * mc-boot-ch/Gcbuiltin.c: Update copyright notice dates.
+        * mc-boot-ch/Gdtoa.c: Update copyright notice dates.
+        * mc-boot-ch/Gerrno.c: Update copyright notice dates.
+        * mc-boot-ch/Gldtoa.c: Update copyright notice dates.
+        * mc-boot-ch/Glibc.c: Update copyright notice dates.
+        * mc-boot-ch/Glibm.c: Update copyright notice dates.
+        * mc-boot-ch/Gmcrts.c: Update copyright notice dates.
+        * mc-boot-ch/Gmcrts.h: Update copyright notice dates.
+        * mc-boot-ch/Gnetwork.h: Update copyright notice dates.
+        * mc-boot-ch/Gpth.c: Update copyright notice dates.
+        * mc-boot-ch/Gtermios.c: Update copyright notice dates.
+        * mc-boot-ch/Gwrapc.c: Update copyright notice dates.
+        * mc-boot-ch/network.c: Update copyright notice dates.
+        * mc/Indexing.def: Update copyright notice dates.
+        * mc/Indexing.mod: Update copyright notice dates.
+        * mc/alists.def: Update copyright notice dates.
+        * mc/alists.mod: Update copyright notice dates.
+        * mc/decl.def: Update copyright notice dates.
+        * mc/decl.mod: Update copyright notice dates.
+        * mc/keyc.def: Update copyright notice dates.
+        * mc/keyc.mod: Update copyright notice dates.
+        * mc/lists.def: Update copyright notice dates.
+        * mc/lists.mod: Update copyright notice dates.
+        * mc/m2flex.def: Update copyright notice dates.
+        * mc/mc.flex: Update copyright notice dates.
+        * mc/mcComment.def: Update copyright notice dates.
+        * mc/mcComment.h: Update copyright notice dates.
+        * mc/mcComment.mod: Update copyright notice dates.
+        * mc/mcComp.def: Update copyright notice dates.
+        * mc/mcComp.mod: Update copyright notice dates.
+        * mc/mcDebug.def: Update copyright notice dates.
+        * mc/mcDebug.mod: Update copyright notice dates.
+        * mc/mcError.def: Update copyright notice dates.
+        * mc/mcError.mod: Update copyright notice dates.
+        * mc/mcFileName.def: Update copyright notice dates.
+        * mc/mcFileName.mod: Update copyright notice dates.
+        * mc/mcLexBuf.def: Update copyright notice dates.
+        * mc/mcLexBuf.h: Update copyright notice dates.
+        * mc/mcLexBuf.mod: Update copyright notice dates.
+        * mc/mcMetaError.def: Update copyright notice dates.
+        * mc/mcMetaError.mod: Update copyright notice dates.
+        * mc/mcOptions.def: Update copyright notice dates.
+        * mc/mcOptions.mod: Update copyright notice dates.
+        * mc/mcPreprocess.def: Update copyright notice dates.
+        * mc/mcPreprocess.mod: Update copyright notice dates.
+        * mc/mcPretty.def: Update copyright notice dates.
+        * mc/mcPretty.mod: Update copyright notice dates.
+        * mc/mcPrintf.def: Update copyright notice dates.
+        * mc/mcPrintf.mod: Update copyright notice dates.
+        * mc/mcQuiet.def: Update copyright notice dates.
+        * mc/mcQuiet.mod: Update copyright notice dates.
+        * mc/mcReserved.def: Update copyright notice dates.
+        * mc/mcReserved.h: Update copyright notice dates.
+        * mc/mcReserved.mod: Update copyright notice dates.
+        * mc/mcSearch.def: Update copyright notice dates.
+        * mc/mcSearch.mod: Update copyright notice dates.
+        * mc/mcStack.def: Update copyright notice dates.
+        * mc/mcStack.mod: Update copyright notice dates.
+        * mc/mcStream.def: Update copyright notice dates.
+        * mc/mcStream.mod: Update copyright notice dates.
+        * mc/mcflex.def: Update copyright notice dates.
+        * mc/mcp1.def: Update copyright notice dates.
+        * mc/mcp2.def: Update copyright notice dates.
+        * mc/mcp3.def: Update copyright notice dates.
+        * mc/mcp4.def: Update copyright notice dates.
+        * mc/mcp5.def: Update copyright notice dates.
+        * mc/nameKey.def: Update copyright notice dates.
+        * mc/nameKey.mod: Update copyright notice dates.
+        * mc/symbolKey.def: Update copyright notice dates.
+        * mc/symbolKey.mod: Update copyright notice dates.
+        * mc/top.mod: Update copyright notice dates.
+        * mc/varargs.def: Update copyright notice dates.
+        * mc/varargs.mod: Update copyright notice dates.
+        * mc/wlists.def: Update copyright notice dates.
+        * mc/wlists.mod: Update copyright notice dates.
+        * tools-src/array2index.py: Update copyright notice dates.
+        * tools-src/boilerplate.py: Update copyright notice dates.
+        * tools-src/buildpg: Update copyright notice dates.
+        * tools-src/buildsyntax: Update copyright notice dates.
+        * tools-src/calcpath: Update copyright notice dates.
+        * tools-src/createUlmSys: Update copyright notice dates.
+        * tools-src/def2texi.py: Update copyright notice dates.
+        * tools-src/gensum.py: Update copyright notice dates.
+        * tools-src/incfile: Update copyright notice dates.
+        * tools-src/makeSystem: Update copyright notice dates.
+        * tools-src/makeconfigure: Update copyright notice dates.
+        * tools-src/makeversion: Update copyright notice dates.
+        * tools-src/mklink.c: Update copyright notice dates.
+        * tools-src/tidydates.py: Update copyright notice dates.
+
+2022-01-11   Gaius Mulley   <gaiusmod2@gmail.com>
+
+        * Make-lang.in (m2/gm2spec.o): Added $(LIBS) to the dependants.
+        (stage1/m2/gm2l): Added $(LIBS) to the dependants.
+        (stage1/m2/gm2lcc): Added $(LIBS) to the dependants.
+        (stage1/m2/gm2lgen): Added $(LIBS) to the dependants.
+        (stage1/m2/gm2lorder): Added $(LIBS) to the dependants.
+        (stage1/m2/gm2m): Added $(LIBS) to the dependants.
+
+2022-01-04   Gaius Mulley   <gaius.mulley@southwales.ac.uk>
+
+        * mc/decl.mod: Added missing comments to many procedures.
+        (getStringContents) Completed missing code removing a --fixme--.
+        (getLiteralStringContents) New procedure function.
+        (doMakeEnumField) Return f even if an error should occur.
+        * mc-boot/Gdecl.c: Rebuilt.
