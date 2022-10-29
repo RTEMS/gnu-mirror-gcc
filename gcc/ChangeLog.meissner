@@ -1,3 +1,71 @@
+==================== work101, patch #3
+
+Update float 128-bit conversions.
+
+This patch is a rewrite of the patch submitted on August 18th:
+
+| https://gcc.gnu.org/pipermail/gcc-patches/2022-August/599988.html
+
+This patch reworks the conversions between 128-bit binary floating point types.
+Previously, we would call rs6000_expand_float128_convert to do all conversions.
+Now, we only define the conversions between the same representation that turn
+into a NOP.  The appropriate extend or truncate insn is generated, and after
+register allocation, it is converted to a move.
+
+This patch also fixes two places where we want to override the external name
+for the conversion function, and the wrong optab was used.  Previously,
+rs6000_expand_float128_convert would handle the move or generate the call as
+needed.  Now, it lets the machine independent code generate the call.  But if
+we use the machine independent code to generate the call, we need to update the
+name for two optabs where a truncate would be used in terms of converting
+between the modes.  This patch updates those two optabs.
+
+While I know you feel the whole area needs to be rewritten, I would think it is
+better to make things work incrementally rather than waiting for some grand
+rewrite (that may or may not occur).
+
+With the current sources, we don't yet need this patch.  But we will need this
+patch when a future patch is submitted that will change the internal __float128
+type to use the _Float128 type when long double is IEEE 128-bit.  I'm trying to
+break out the smaller patches that each can stand alone, without having a
+single larger patch.  This future patch will fix various testsuite issues with
+signalling NaNs when long double is IEEE 128-bit.
+
+I tested this patch on:
+
+    1)	LE Power10 using --with-cpu=power10 --with-long-double-format=ieee
+    2)	LE Power10 using --with-cpu=power9  --with-long-double-format=ibm
+    3)	LE Power10 using --with-cpu=power8  --with-long-double-format=ibm
+    4)	LE Power10 using --with-cpu=power10 --with-long-double-format=ibm
+    5)	LE Power9  using --with-cpu=power9  --with-long-double-format=ibm
+    6)	BE Power7  using --with-cpu=power7  --with-long-double-format=ibm
+
+There were no regressions in the bootstrap process or running the tests.  Can I
+check this patch into the trunk?
+
+2022-10-28   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (init_float128_ieee): Use the correct
+	float_extend or float_truncate optab based on how the machine converts
+	between IEEE 128-bit and IBM 128-bit.
+	* config/rs6000/rs6000.md (IFKF): Delete.
+	(IFKF_reg): Delete.
+	(extendiftf2): Rewrite to be a move if IFmode and TFmode are both IBM
+	128-bit.  Do not run if TFmode is IEEE 128-bit.
+	(extendifkf2): Delete.
+	(extendtfkf2): Delete.
+	(extendtfif2): Delete.
+	(trunciftf2): Delete.
+	(truncifkf2): Delete.
+	(trunckftf2): Delete.
+	(extendkftf2): Implement conversion of IEEE 128-bit types as a move.
+	(trunctfif2): Delete.
+	(trunctfkf2): Implement conversion of IEEE 128-bit types as a move.
+	(extend<mode>tf2_internal): Delete.
+	(extendtf<mode>2_internal): Delete.
+
 ==================== work101, patch #2
 
 Make __float128 use the _Float128 type.
