@@ -388,6 +388,7 @@ const struct c_common_resword c_common_reswords[] =
   { "__builtin_offsetof", RID_OFFSETOF, 0 },
   { "__builtin_types_compatible_p", RID_TYPES_COMPATIBLE_P, D_CONLY },
   { "__builtin_va_arg",	RID_VA_ARG,	0 },
+  { "__capability",	RID_CAPABILITY,	0 },
   { "__complex",	RID_COMPLEX,	0 },
   { "__complex__",	RID_COMPLEX,	0 },
   { "__const",		RID_CONST,	0 },
@@ -462,7 +463,6 @@ const struct c_common_resword c_common_reswords[] =
   { "char8_t",		RID_CHAR8,	D_CXX_CHAR8_T_FLAGS | D_CXXWARN },
   { "char16_t",		RID_CHAR16,	D_CXXONLY | D_CXX11 | D_CXXWARN },
   { "char32_t",		RID_CHAR32,	D_CXXONLY | D_CXX11 | D_CXXWARN },
-  { "cheri_capability", RID_CHERI_CAPABILITY,	0 },
   { "class",		RID_CLASS,	D_CXX_OBJC | D_CXXWARN },
   { "const",		RID_CONST,	0 },
   { "consteval",	RID_CONSTEVAL,	D_CXXONLY | D_CXX20 | D_CXXWARN },
@@ -8655,6 +8655,7 @@ keyword_is_type_qualifier (enum rid keyword)
     case RID_VOLATILE:
     case RID_RESTRICT:
     case RID_ATOMIC:
+    case RID_CAPABILITY:
       return true;
     default:
       return false;

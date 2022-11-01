@@ -81,13 +81,6 @@ struct cheri_object6
   void ** __capability var32;
 };
 
-/* Simple uses of defining the attribute as __attribute__, also with multiple
-   attribute definitions.  */
-char *__attribute__((__cheri_capability__)) attrtestvar1;
-char *__attribute__((cheri_capability)) attrtestvar2;
-char *__attribute__((cheri_capability, used)) attrtestvar3;
-char *__attribute__((__cheri_capability__, __used__)) attrtestvar4;
-
 /* And a quick runtime test.  */
 int main()
 {
@@ -109,10 +102,6 @@ int main()
   char* __capability test3 = test - 1;
   printf("%c\n", *test);
   printf("%c\n", *test2);
-
-  /* Simple test of assignments on the __attribute__-defined pointers.  */
-  attrtestvar1 = stringpointer;
-  attrtestvar3 = attrtestvar1;
 
   /* Simple test zero-assignment.  */
   test3 = 0;

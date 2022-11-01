@@ -261,7 +261,9 @@ const struct attribute_spec c_common_attribute_table[] =
   /* MORELLO TODO: The `affects_type_identity` has been set to true based on
      what is done in `attribs.c:comp_type_attributes`, but it is also used in
      the C++ frontend. Re-examine this when enabling C++.  */
-  { "cheri_capability",       0, 0, false, true, false, true,
+  /* For internal use only.  The name contains a space to prevent its
+     usage in source code.  */
+  { "cheri capability",       0, 0, false, true, false, true,
 			      handle_cheri_capability_attribute, NULL },
   { "cheri_no_provenance",    0, 0, false, true, false, false,
 			      handle_cheri_no_provenance_attribute, NULL },
@@ -804,8 +806,8 @@ handle_cheri_capability_attribute (tree *node, tree, tree, int,
   *no_add_attrs = true;
 
   if (!targetm.capability_mode ().exists ())
-    error_at (input_location, "%<__capability%> attribute is not supported for"
-			      "this architecture");
+    error_at (input_location, "%<__capability%> is not supported on"
+			      " this target");
   else if (TREE_CODE (*node) != POINTER_TYPE)
     error_at (input_location, "%<__capability%> only applies to pointers");
   else if (!capability_type_p (*node))
@@ -814,7 +816,7 @@ handle_cheri_capability_attribute (tree *node, tree, tree, int,
 	 includes REFERENCE_TYPE which would then need a call to
 	 `build_reference_type_for_mode`. I have not included this for now
 	 but it may be needed in the future for C++ frontend support.  */
-      tree attrs = tree_cons (get_identifier ("cheri_capability"),
+      tree attrs = tree_cons (get_identifier ("cheri capability"),
 				  NULL_TREE, TYPE_ATTRIBUTES (*node));
 
       /* Use build_type_attribute_qual_variant to reapply the

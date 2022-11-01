@@ -11039,9 +11039,13 @@ grokdeclarator (const cp_declarator *declarator,
   bool constexpr_p = decl_spec_seq_has_spec_p (declspecs, ds_constexpr);
   bool constinit_p = decl_spec_seq_has_spec_p (declspecs, ds_constinit);
   bool consteval_p = decl_spec_seq_has_spec_p (declspecs, ds_consteval);
+  bool decl_capability_p
+    = decl_spec_seq_has_spec_p (declspecs, ds_capability);
   bool late_return_type_p = false;
   bool array_parameter_p = false;
   tree reqs = NULL_TREE;
+
+  int deprecated_capability_uses = 0;
 
   signed_p = decl_spec_seq_has_spec_p (declspecs, ds_signed);
   unsigned_p = decl_spec_seq_has_spec_p (declspecs, ds_unsigned);
@@ -11998,8 +12002,36 @@ grokdeclarator (const cp_declarator *declarator,
 
   /* Determine the type of the entity declared by recurring on the
      declarator.  */
-  for (; declarator; declarator = declarator->declarator)
+  for (;; declarator = declarator->declarator)
     {
+      if (decl_capability_p
+	  && POINTER_TYPE_P (type)
+	  && deprecated_capability_uses++ == 0)
+	{
+	  /* For __capability in the deprecated prefix position, we can apply it
+	     at most once.  */
+	  if (!capability_type_p (type))
+	    {
+	      tree attr_name = get_identifier ("cheri capability");
+	      tree to_apply = tree_cons (attr_name, NULL_TREE,
+					 returned_attrs);
+	      returned_attrs = decl_attributes (&type, to_apply, 0);
+	    }
+
+	  /* Raise the deprecated declaration warning, but only if
+	     the base type wasn't already a typedef to a pointer type.  */
+	  if (!declspecs->type
+	      || TREE_CODE (declspecs->type) != TYPE_DECL
+	      || !POINTER_TYPE_P (TREE_TYPE (declspecs->type)))
+	    warning_at (declspecs->locations[ds_capability],
+			OPT_Wdeprecated_declarations,
+			"use of %<__capability%> before the pointer "
+			"type is deprecated");
+	}
+
+      if (!declarator)
+	break;
+
       const cp_declarator *inner_declarator;
       tree attrs;
 
@@ -12627,6 +12659,16 @@ grokdeclarator (const cp_declarator *declarator,
 	  gcc_unreachable ();
 	}
     }
+
+  if (decl_capability_p
+      && deprecated_capability_uses == 0)
+    error_at (declspecs->locations[ds_capability],
+	      "%<__capability%> only applies to pointers");
+
+  if (decl_capability_p
+      && deprecated_capability_uses > 1)
+    error_at (declspecs->locations[ds_capability],
+	      "use of %<__capability%> is ambiguous");
 
   id_loc = declarator ? declarator->id_loc : input_location;
 

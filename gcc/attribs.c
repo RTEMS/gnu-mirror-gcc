@@ -1155,7 +1155,7 @@ build_type_attribute_qual_variant (tree otype, tree attribute, int quals)
 	  && !capability_type_p (ptr_type_node))
 	{
 	  bool old_cap = capability_type_p (ttype);
-	  bool new_cap = lookup_attribute ("cheri_capability", attribute);
+	  bool new_cap = lookup_attribute ("cheri capability", attribute);
 	  if (old_cap != new_cap)
 	    {
 	      auto as = TYPE_ADDR_SPACE (TREE_TYPE (ntype));
@@ -1366,8 +1366,8 @@ comp_type_attributes (const_tree type1, const_tree type2)
   if ((lookup_attribute ("nocf_check", TYPE_ATTRIBUTES (type1)) != NULL)
       ^ (lookup_attribute ("nocf_check", TYPE_ATTRIBUTES (type2)) != NULL))
     return 0;
-  if (bool (lookup_attribute ("cheri_capability", TYPE_ATTRIBUTES (type1)))
-      != bool (lookup_attribute ("cheri_capability", TYPE_ATTRIBUTES (type2))))
+  if (bool (lookup_attribute ("cheri capability", TYPE_ATTRIBUTES (type1)))
+      != bool (lookup_attribute ("cheri capability", TYPE_ATTRIBUTES (type2))))
     return 0;
   /* As some type combinations - like default calling-convention - might
      be compatible, we have to call the target hook to get the final result.  */

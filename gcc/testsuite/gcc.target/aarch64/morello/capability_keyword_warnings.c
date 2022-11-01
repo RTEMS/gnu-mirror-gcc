@@ -7,9 +7,9 @@ __capability int *var2; /* { dg-warning "use of '__capability' before the pointe
 __capability int ** __capability var3; /* { dg-warning "use of '__capability' before the pointer type is deprecated" } */
 __capability void *var4, *var5; /* { dg-warning "use of '__capability' before the pointer type is deprecated" } */
 void __capability *var6, *var7; /* { dg-warning "use of '__capability' before the pointer type is deprecated" } */
-void *var8, __capability *var9;   /* { dg-warning "use of '__capability' before the pointer type is deprecated" } */
 __capability int **__capability z2;/* { dg-warning "use of '__capability' before the pointer type is deprecated" } */
 __capability int *__capability z3; /* { dg-warning "use of '__capability' before the pointer type is deprecated" } */
+typeof (__capability int *) x; /* { dg-warning "use of '__capability' before the pointer type is deprecated" } */
 
 /* Adding attribute to a function. Improper ordering: Warning cases. */
 __capability void *f1 (void);/* { dg-warning "use of '__capability' before the pointer type is deprecated" } */

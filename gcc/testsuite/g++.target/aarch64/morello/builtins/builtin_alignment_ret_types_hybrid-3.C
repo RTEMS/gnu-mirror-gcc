@@ -9,16 +9,16 @@ void
 check_return_types_for_alignment_builtin_overloads_cap (size_t a,
         int * __capability i, char * __capability c,  void * __capability v)
 {
-  static_assert (__is_same (decltype (__builtin_align_down (i, a)), int __capability*), "");
-  static_assert (__is_same (decltype (__builtin_align_down (c, a)), char __capability*), "");
-  static_assert (__is_same (decltype (__builtin_align_down (v, a)), void __capability*), "");
+  static_assert (__is_same (decltype (__builtin_align_down (i, a)), int * __capability), "");
+  static_assert (__is_same (decltype (__builtin_align_down (c, a)), char * __capability), "");
+  static_assert (__is_same (decltype (__builtin_align_down (v, a)), void * __capability), "");
   static_assert (__is_same (decltype (__builtin_align_down (128, a)), int), "");
   static_assert (__is_same (decltype (__builtin_align_down ((intptr_t)128, a)), intptr_t), "");
   static_assert (__is_same (decltype (__builtin_align_down ((uintptr_t)128, a)), uintptr_t), "");
 
-  static_assert (__is_same (decltype (__builtin_align_up (i, a)), int __capability*), "");
-  static_assert (__is_same (decltype (__builtin_align_up (c, a)), char __capability*), "");
-  static_assert (__is_same (decltype (__builtin_align_up (v, a)), void __capability*), "");
+  static_assert (__is_same (decltype (__builtin_align_up (i, a)), int * __capability), "");
+  static_assert (__is_same (decltype (__builtin_align_up (c, a)), char * __capability), "");
+  static_assert (__is_same (decltype (__builtin_align_up (v, a)), void * __capability), "");
   static_assert (__is_same (decltype (__builtin_align_up (128, a)), int), "");
   static_assert (__is_same (decltype (__builtin_align_up ((intptr_t)128, a)), intptr_t), "");
   static_assert (__is_same (decltype (__builtin_align_up ((uintptr_t)128, a)), uintptr_t), "");

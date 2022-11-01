@@ -1490,12 +1490,6 @@ c_cpp_builtins (cpp_reader *pfile)
      format.  */
   if (ENABLE_DECIMAL_FLOAT && ENABLE_DECIMAL_BID_FORMAT)
     cpp_define (pfile, "__DECIMAL_BID_FORMAT__");
-
-  opt_scalar_addr_mode opt_cap_mode = targetm.capability_mode();
-  if (opt_cap_mode.exists())
-    {
-      cpp_define (pfile, "__capability=__attribute__((__cheri_capability__))");
-    }
 }
 
 /* Pass an object-like macro.  If it doesn't lie in the user's

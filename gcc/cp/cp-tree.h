@@ -5945,6 +5945,7 @@ enum cp_decl_spec {
   ds_complex,
   ds_constinit,
   ds_consteval,
+  ds_capability,
   ds_thread,
   ds_type_spec,
   ds_redefined_builtin_type_spec,

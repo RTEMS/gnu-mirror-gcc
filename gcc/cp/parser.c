@@ -2259,7 +2259,7 @@ static cp_declarator *cp_parser_direct_declarator
 static enum tree_code cp_parser_ptr_operator
   (cp_parser *, tree *, cp_cv_quals *, tree *);
 static cp_cv_quals cp_parser_cv_qualifier_seq_opt
-  (cp_parser *);
+  (cp_parser *, tree *);
 static cp_virt_specifiers cp_parser_virt_specifier_seq_opt
   (cp_parser *);
 static cp_ref_qualifier cp_parser_ref_qualifier_opt
@@ -17863,6 +17863,12 @@ cp_parser_type_specifier (cp_parser* parser,
 	*is_cv_qualifier = true;
       break;
 
+    case RID_CAPABILITY:
+      ds = ds_capability;
+      if (is_cv_qualifier)
+	*is_cv_qualifier = true;
+      break;
+
     case RID_COMPLEX:
       /* The `__complex__' keyword is a GNU extension.  */
       ds = ds_complex;
@@ -21332,7 +21338,7 @@ cp_parser_direct_declarator (cp_parser* parser,
 		  first = false;
 
 		  /* Parse the cv-qualifier-seq.  */
-		  cv_quals = cp_parser_cv_qualifier_seq_opt (parser);
+		  cv_quals = cp_parser_cv_qualifier_seq_opt (parser, NULL);
 		  /* Parse the ref-qualifier. */
 		  ref_qual = cp_parser_ref_qualifier_opt (parser);
 		  /* Parse the tx-qualifier.  */
@@ -21842,6 +21848,7 @@ cp_parser_ptr_operator (cp_parser* parser,
   enum tree_code code = ERROR_MARK;
   cp_token *token;
   tree attrs = NULL_TREE;
+  tree qual_attrs = NULL_TREE;
 
   /* Assume that it's not a pointer-to-member.  */
   *type = NULL_TREE;
@@ -21871,9 +21878,10 @@ cp_parser_ptr_operator (cp_parser* parser,
 	 enforced during semantic analysis.  */
       if (code == INDIRECT_REF
 	  || cp_parser_allow_gnu_extensions_p (parser))
-	*cv_quals = cp_parser_cv_qualifier_seq_opt (parser);
+	*cv_quals = cp_parser_cv_qualifier_seq_opt (parser, &qual_attrs);
 
       attrs = cp_parser_std_attribute_spec_seq (parser);
+      attrs = chainon (attrs, qual_attrs);
       if (attributes != NULL)
 	*attributes = attrs;
     }
@@ -21915,10 +21923,12 @@ cp_parser_ptr_operator (cp_parser* parser,
 	      parser->object_scope = NULL_TREE;
 	      /* Look for optional c++11 attributes.  */
 	      attrs = cp_parser_std_attribute_spec_seq (parser);
+	      /* Look for the optional cv-qualifier-seq.  */
+	      *cv_quals = cp_parser_cv_qualifier_seq_opt (parser,
+							  &qual_attrs);
+	      attrs = chainon (attrs, qual_attrs);
 	      if (attributes != NULL)
 		*attributes = attrs;
-	      /* Look for the optional cv-qualifier-seq.  */
-	      *cv_quals = cp_parser_cv_qualifier_seq_opt (parser);
 	    }
 	}
       /* If that didn't work we don't have a ptr-operator.  */
@@ -21946,14 +21956,16 @@ cp_parser_ptr_operator (cp_parser* parser,
    Returns a bitmask representing the cv-qualifiers.  */
 
 static cp_cv_quals
-cp_parser_cv_qualifier_seq_opt (cp_parser* parser)
+cp_parser_cv_qualifier_seq_opt (cp_parser* parser, tree *attributes)
 {
   cp_cv_quals cv_quals = TYPE_UNQUALIFIED;
+  tree attr_list = NULL_TREE;
 
   while (true)
     {
       cp_token *token;
-      cp_cv_quals cv_qualifier;
+      cp_cv_quals cv_qualifier = TYPE_UNQUALIFIED;
+      tree attr = NULL_TREE;
 
       /* Peek at the next token.  */
       token = cp_lexer_peek_token (parser->lexer);
@@ -21972,12 +21984,18 @@ cp_parser_cv_qualifier_seq_opt (cp_parser* parser)
 	  cv_qualifier = TYPE_QUAL_RESTRICT;
 	  break;
 
+	case RID_CAPABILITY:
+	  if (attributes)
+	    attr = get_identifier ("cheri capability");
+	  else
+	    error_at (token->location, "unexpected %<__capability%>");
+	  break;
+
 	default:
-	  cv_qualifier = TYPE_UNQUALIFIED;
 	  break;
 	}
 
-      if (!cv_qualifier)
+      if (!cv_qualifier && !attr)
 	break;
 
       if (cv_quals & cv_qualifier)
@@ -21987,13 +22005,25 @@ cp_parser_cv_qualifier_seq_opt (cp_parser* parser)
 	  error_at (&richloc, "duplicate cv-qualifier");
 	  cp_lexer_purge_token (parser->lexer);
 	}
+      else if (attr && attr_list)
+	{
+	  gcc_rich_location richloc (token->location);
+	  richloc.add_fixit_remove ();
+	  error_at (&richloc, "duplicate %<__capability%>");
+	  cp_lexer_purge_token (parser->lexer);
+	}
       else
 	{
 	  cp_lexer_consume_token (parser->lexer);
-	  cv_quals |= cv_qualifier;
+	  if (attr)
+	    attr_list = build_tree_list (attr, NULL_TREE);
+	  else
+	    cv_quals |= cv_qualifier;
 	}
     }
 
+  if (attributes)
+    *attributes = attr_list;
   return cv_quals;
 }
 
@@ -30576,7 +30606,8 @@ set_and_check_decl_spec_loc (cp_decl_specifier_seq *decl_specs,
 	    "constexpr",
 	    "__complex",
 	    "constinit",
-	    "consteval"
+	    "consteval",
+	    "__capability",
 	  };
 	  gcc_rich_location richloc (location);
 	  richloc.add_fixit_remove ();

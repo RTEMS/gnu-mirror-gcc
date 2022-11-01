@@ -6318,16 +6318,16 @@ grokdeclarator (const struct c_declarator *declarator,
 	}
     }
 
-  /* Check if the cheri_capability attribute is in decl_attrs. If it is, then
+  /* Check if the cheri capability attribute is in decl_attrs. If it is, then
      we have a deprecated use of the __capability type attribute before the
      `*` pointer indirection.  For now, this is still supported.  */
   bool deprecated_capability_attribute_use = false;
   int deprecated_capability_uses = 0;
-  if (lookup_attribute ("cheri_capability", *decl_attrs))
+  if (lookup_attribute ("cheri capability", *decl_attrs))
     {
       deprecated_capability_attribute_use = true;
       /* Remove the __capability attribute from the decl attributes.  */
-      (*decl_attrs) = remove_attribute ("cheri_capability",
+      (*decl_attrs) = remove_attribute ("cheri capability",
 					*decl_attrs);
     }
 
@@ -6364,7 +6364,7 @@ grokdeclarator (const struct c_declarator *declarator,
 		 `int __capability * __capability x;  */
 	      if (!capability_type_p (type))
 		{
-		  tree attr_name = get_identifier ("cheri_capability");
+		  tree attr_name = get_identifier ("cheri capability");
 		  tree new_attrs = tree_cons (attr_name, NULL_TREE,
 					  returned_attrs);
 		  returned_attrs = decl_attributes (&type, new_attrs, 0);
@@ -7029,8 +7029,7 @@ grokdeclarator (const struct c_declarator *declarator,
 	    declarator = declarator->declarator;
 	    if (test_fake_hybrid ())
 	      {
-		tree attr_name = get_identifier ("cheri_capability");
-		// tree attr_args = tree_cons (NULL_TREE, NULL_TREE, NULL_TREE);
+		tree attr_name = get_identifier ("cheri capability");
 		tree new_attrs = tree_cons (attr_name, NULL_TREE, returned_attrs);
 		returned_attrs = decl_attributes (&type, new_attrs, 0);
 	      }

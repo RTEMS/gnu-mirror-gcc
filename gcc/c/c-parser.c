@@ -579,6 +579,7 @@ c_keyword_starts_typename (enum rid keyword)
     case RID_SAT:
     case RID_AUTO_TYPE:
     case RID_ALIGNAS:
+    case RID_CAPABILITY:
       return true;
     default:
       if (keyword >= RID_FIRST_INT_N
@@ -674,6 +675,7 @@ c_token_is_qualifier (c_token *token)
 	case RID_RESTRICT:
 	case RID_ATTRIBUTE:
 	case RID_ATOMIC:
+	case RID_CAPABILITY:
 	  return true;
 	default:
 	  return false;
@@ -757,6 +759,7 @@ c_token_starts_declspecs (c_token *token)
 	case RID_ALIGNAS:
 	case RID_ATOMIC:
 	case RID_AUTO_TYPE:
+	case RID_CAPABILITY:
 	  return true;
 	default:
 	  if (token->keyword >= RID_FIRST_INT_N
@@ -2198,15 +2201,6 @@ c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
 		}
 	    }
 
-	  if (lookup_attribute ("cheri_capability", postfix_attrs))
-	    {
-	      error_at (here,
-			"%<__capability%> type specifier must"
-			" precede the declarator");
-	      c_parser_skip_to_end_of_block_or_statement (parser);
-	      return;
-	    }
-
 	  if (c_parser_next_token_is (parser, CPP_EQ))
 	    {
 	      tree d;
@@ -3072,6 +3066,20 @@ c_parser_declspecs (c_parser *parser, struct c_declspecs *specs,
 	  declspecs_add_qual (loc, specs, c_parser_peek_token (parser)->value);
 	  c_parser_consume_token (parser);
 	  break;
+	case RID_CAPABILITY:
+	  {
+	    if (targetm.capability_mode ().exists ())
+	      {
+		tree attrs = build_tree_list (get_identifier ("cheri capability"),
+					      NULL_TREE);
+		declspecs_add_attrs (loc, specs, attrs);
+	      }
+	    else
+	      error_at (loc, ("%<__capability%> is not supported on this "
+			      "target"));
+	    c_parser_consume_token (parser);
+	    break;
+	  }
 	case RID_ATTRIBUTE:
 	  if (!attrs_ok)
 	    goto out;
@@ -3655,10 +3663,6 @@ c_parser_struct_declaration (c_parser *parser)
 	    }
 	  if (c_parser_next_token_is_keyword (parser, RID_ATTRIBUTE))
 	    postfix_attrs = c_parser_gnu_attributes (parser);
-
-	  if (lookup_attribute ("cheri_capability", postfix_attrs))
-	    c_parser_error (parser, "%<__capability%> type specifier must"
-				    " precede the declarator");
 
 	  d = grokfield (c_parser_peek_token (parser)->location,
 			 declarator, specs, width, &all_prefix_attrs);
@@ -4431,14 +4435,6 @@ c_parser_parameter_declaration (c_parser *parser, tree attrs,
   if (c_parser_next_token_is_keyword (parser, RID_ATTRIBUTE))
     postfix_attrs = c_parser_gnu_attributes (parser);
 
-  if (lookup_attribute ("cheri_capability", postfix_attrs))
-    {
-      error ("%<__capability%> type specifier must"
-	     " precede the declarator");
-      c_parser_skip_to_end_of_parameter (parser);
-      return NULL;
-    }
-
   /* Generate a location for the parameter, ranging from the start of the
      initial token to the end of the final token.
 
@@ -4541,7 +4537,6 @@ c_parser_gnu_attribute_any_word (c_parser *parser)
 	case RID_THREAD:
 	case RID_INT:
 	case RID_INTCAP:
-	case RID_CHERI_CAPABILITY:
 	case RID_CHAR:
 	case RID_FLOAT:
 	case RID_DOUBLE:

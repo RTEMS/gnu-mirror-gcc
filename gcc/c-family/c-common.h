@@ -249,9 +249,8 @@ enum rid
   RID_FIRST_INT_N = RID_INT_N_0,
   RID_LAST_INT_N = RID_INT_N_3,
 
-  /* Reserved Identifier for the __capability or cheri_capability type
-     attribute.  */
-  RID_CHERI_CAPABILITY,
+  /* Reserved Identifier for the __capability keyword.  */
+  RID_CAPABILITY,
 
   RID_MAX,
 
