@@ -53,7 +53,6 @@ floor_log2 (gcov_type x)
   return 63 - clz_hwi (x);
 }
 
-
 void
 __gcov_histogram_profiler (gcov_type *counters, gcov_type value)
 {
@@ -64,7 +63,6 @@ __gcov_histogram_profiler (gcov_type *counters, gcov_type value)
     int pow2=floor_log2(value);
     counters[pow2+5]++;
   }
-  printf("\n %d %d \n", floor_log2(value), value);
 }
 
 #endif
@@ -77,6 +75,28 @@ __gcov_histogram_profiler (gcov_type *counters, gcov_type value)
  * otherwise we take its logarithm and increment corresponding counter
  */
 
+/* For convenience, define 0 -> word_size.  */
+static inline int
+clz_hwi2 (gcov_type x)
+{
+  if (x == 0)
+    return 64;
+# if HOST_BITS_PER_WIDE_INT == HOST_BITS_PER_LONG
+  return __builtin_clzl (x);
+# elif HOST_BITS_PER_WIDE_INT == HOST_BITS_PER_LONGLONG
+  return __builtin_clzll (x);
+# else
+  return __builtin_clz (x);
+# endif
+}
+
+static inline int
+floor_log2_2 (gcov_type x)
+{
+  return 63 - clz_hwi2 (x);
+}
+
+
 void
 __gcov_histogram_profiler_atomic (gcov_type *counters, gcov_type value)
 {
@@ -84,7 +104,7 @@ __gcov_histogram_profiler_atomic (gcov_type *counters, gcov_type value)
     __atomic_fetch_add (&counters[value], 1, __ATOMIC_RELAXED);
   }else{
     gcc_assert(value>0);
-    int pow2=floor_log2(value);
+    int pow2=floor_log2_2(value);
     __atomic_fetch_add (&counters[pow2+5], 1, __ATOMIC_RELAXED);
   }
 }
