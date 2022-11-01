@@ -32,6 +32,28 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
  * otherwise we take its logarithm and increment corresponding counter
  */
 
+/* For convenience, define 0 -> word_size.  */
+static inline int
+clz_hwi (gcov_type x)
+{
+  if (x == 0)
+    return 64;
+# if HOST_BITS_PER_WIDE_INT == HOST_BITS_PER_LONG
+  return __builtin_clzl (x);
+# elif HOST_BITS_PER_WIDE_INT == HOST_BITS_PER_LONGLONG
+  return __builtin_clzll (x);
+# else
+  return __builtin_clz (x);
+# endif
+}
+
+static inline int
+floor_log2 (gcov_type x)
+{
+  return 63 - clz_hwi (x);
+}
+
+
 void
 __gcov_histogram_profiler (gcov_type *counters, gcov_type value)
 {
@@ -39,19 +61,10 @@ __gcov_histogram_profiler (gcov_type *counters, gcov_type value)
     counters[value]++;
   }else{
     gcc_assert(value>0);
-    int pow2 = 3;
-    while (1 << pow2 <= value || 1 << pow2 > 1 << (pow2 + 1)){
-      ++pow2;
-    }
-    // pow2 is first bigger power of 2
-    // we increment closer power of 2
-    if ((1<<pow2+1<<(pow2-1))>>1<value){
-      counters[6+(pow2-3)]++;
-    }
-    else{
-      counters[7+(pow2-3)]++;
-    }
+    int pow2=floor_log2(value);
+    counters[pow2+5]++;
   }
+  printf("\n %d %d \n", floor_log2(value), value);
 }
 
 #endif
@@ -71,18 +84,8 @@ __gcov_histogram_profiler_atomic (gcov_type *counters, gcov_type value)
     __atomic_fetch_add (&counters[value], 1, __ATOMIC_RELAXED);
   }else{
     gcc_assert(value>0);
-    int pow2 = 3;
-    while (1 << pow2 <= value || 1 << pow2 > 1 << (pow2 + 1)){
-      ++pow2;
-    }
-    // pow2 is first bigger power of 2
-    // we increment closer power of 2
-    if ((1<<pow2+1<<(pow2-1))>>1<value){
-      __atomic_fetch_add (&counters[6+(pow2-3)], 1, __ATOMIC_RELAXED);
-    }
-    else{
-      __atomic_fetch_add (&counters[7+(pow2-3)], 1, __ATOMIC_RELAXED);
-    }
+    int pow2=floor_log2(value);
+    __atomic_fetch_add (&counters[pow2+5], 1, __ATOMIC_RELAXED);
   }
 }
 
