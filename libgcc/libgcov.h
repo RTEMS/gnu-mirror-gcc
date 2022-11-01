@@ -318,6 +318,7 @@ extern void __gcov_interval_profiler (gcov_type *, gcov_type, int, unsigned);
 extern void __gcov_interval_profiler_atomic (gcov_type *, gcov_type, int,
 					     unsigned);
 extern void __gcov_histogram_profiler (gcov_type *, gcov_type);
+extern void __gcov_histogram_profiler_atomic (gcov_type *, gcov_type);
 extern void __gcov_pow2_profiler (gcov_type *, gcov_type);
 extern void __gcov_pow2_profiler_atomic (gcov_type *, gcov_type);
 extern void __gcov_topn_values_profiler (gcov_type *, gcov_type);

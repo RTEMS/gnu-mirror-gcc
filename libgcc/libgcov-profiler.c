@@ -56,6 +56,38 @@ __gcov_histogram_profiler (gcov_type *counters, gcov_type value)
 
 #endif
 
+
+#if defined(L_gcov_histogram_profiler_atomic) && GCOV_SUPPORTS_ATOMIC
+
+/*
+ * If value is less then 8 we increment corresponding counter
+ * otherwise we take its logarithm and increment corresponding counter
+ */
+
+void
+__gcov_histogram_profiler_atomic (gcov_type *counters, gcov_type value)
+{
+  if (value>=0 && value<8){
+    __atomic_fetch_add (&counters[value], 1, __ATOMIC_RELAXED);
+  }else{
+    gcc_assert(value>0);
+    int pow2 = 3;
+    while (1 << pow2 <= value || 1 << pow2 > 1 << (pow2 + 1)){
+      ++pow2;
+    }
+    // pow2 is first bigger power of 2
+    // we increment closer power of 2
+    if ((1<<pow2+1<<(pow2-1))>>1<value){
+      __atomic_fetch_add (&counters[6+(pow2-3)], 1, __ATOMIC_RELAXED);
+    }
+    else{
+      __atomic_fetch_add (&counters[7+(pow2-3)], 1, __ATOMIC_RELAXED);
+    }
+  }
+}
+
+#endif
+
 #ifdef L_gcov_interval_profiler
 /* If VALUE is in interval <START, START + STEPS - 1>, then increases the
    corresponding counter in COUNTERS.  If the VALUE is above or below
