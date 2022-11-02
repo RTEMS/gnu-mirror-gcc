@@ -21,7 +21,11 @@ eh1 (void *p, int x)
 {
   void *q = __builtin_alloca (x);
   eh0 (q);
+#ifdef __CHERI_PURE_CAPABILITY__
+  __builtin_eh_return ((unsigned __intcap)__builtin_dwarf_cfa (), p);
+#else
   __builtin_eh_return (0, p);
+#endif
 }
 
 void
@@ -34,7 +38,11 @@ void
 eh2 (void *p)
 {
   eh2a (val, val, val, val, val, val, val, val, p);
+#ifdef __CHERI_PURE_CAPABILITY__
+  __builtin_eh_return ((unsigned __intcap)__builtin_dwarf_cfa (), p);
+#else
   __builtin_eh_return (0, p);
+#endif
 }
 
 

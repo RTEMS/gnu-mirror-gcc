@@ -2283,9 +2283,9 @@ expand_builtin_eh_return (tree stackadj_tree ATTRIBUTE_UNUSED,
 #ifdef EH_RETURN_STACKADJ_RTX
   tmp = expand_expr (stackadj_tree, crtl->eh.ehr_stackadj,
 		     VOIDmode, EXPAND_NORMAL);
-  tmp = convert_to_offset_mode (tmp);
+  tmp = convert_memory_address (Pmode, tmp);
   if (!crtl->eh.ehr_stackadj)
-    crtl->eh.ehr_stackadj = copy_to_mode_reg (POmode, tmp);
+    crtl->eh.ehr_stackadj = copy_addr_to_reg (tmp);
   else if (tmp != crtl->eh.ehr_stackadj)
     emit_move_insn (crtl->eh.ehr_stackadj, tmp);
 #endif
@@ -2318,7 +2318,10 @@ expand_eh_return (void)
   crtl->calls_eh_return = 1;
 
 #ifdef EH_RETURN_STACKADJ_RTX
-  emit_move_insn (EH_RETURN_STACKADJ_RTX, const0_rtx);
+  if (CAPABILITY_MODE_P (Pmode))
+    emit_move_insn (EH_RETURN_STACKADJ_RTX, virtual_cfa_rtx);
+  else
+    emit_move_insn (EH_RETURN_STACKADJ_RTX, CONST0_RTX (Pmode));
 #endif
 
   around_label = gen_label_rtx ();

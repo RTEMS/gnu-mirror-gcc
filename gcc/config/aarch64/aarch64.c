@@ -9014,6 +9014,16 @@ aarch64_expand_epilogue (bool for_sibcall)
   /* Stack adjustment for exception handler.  */
   if (crtl->calls_eh_return && !for_sibcall)
     {
+      /* On pure capability targets we may be unwinding over a split stack
+	 (e.g. when a signal handler with SA_ONSTACK has been triggered).
+	 In this case simply adjusting the value with an offset usually takes
+	 the stack capability out of bounds.  On those targets we change the
+	 ABI by which the unwinder communicates with the epilogue of a function
+	 so the unwinder returns a "new stack pointer" to use and the epilogue
+	 uses that.  */
+      if (TARGET_CAPABILITY_PURE)
+	emit_move_insn (stack_pointer_rtx, EH_RETURN_STACKADJ_RTX);
+      else
       /* We need to unwind the stack by the offset computed by
 	 EH_RETURN_STACKADJ_RTX.  We have already reset the CFA
 	 to be SP; letting the CFA move during this adjustment

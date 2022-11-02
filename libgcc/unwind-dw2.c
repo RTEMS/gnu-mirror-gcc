@@ -1713,15 +1713,15 @@ _Unwind_DebugHook (void *cfa __attribute__ ((__unused__)),
 #define uw_install_context(CURRENT, TARGET, FRAMES)			\
   do									\
     {									\
-      long offset = uw_install_context_1 ((CURRENT), (TARGET));		\
+      _Unwind_Word cfaarg = uw_install_context_1 ((CURRENT), (TARGET));	\
       void *handler = __builtin_frob_return_addr ((TARGET)->ra);	\
       _Unwind_DebugHook ((TARGET)->cfa, handler);			\
       _Unwind_Frames_Extra (FRAMES);					\
-      __builtin_eh_return (offset, handler);				\
+      __builtin_eh_return (cfaarg, handler);				\
     }									\
   while (0)
 
-static long
+static _Unwind_Word
 uw_install_context_1 (struct _Unwind_Context *current,
 		      struct _Unwind_Context *target)
 {
@@ -1768,13 +1768,25 @@ uw_install_context_1 (struct _Unwind_Context *current,
 
       target_cfa = _Unwind_GetPtr (target, __builtin_dwarf_sp_column ());
 
+#ifdef __CHERI_PURE_CAPABILITY__
+      /* We return the target CFA (which includes both metadata and value).  */
+      if (__LIBGCC_STACK_GROWS_DOWNWARD__)
+	return (_Unwind_Word)target_cfa + target->args_size;
+      else
+	return (_Unwind_Word)target_cfa - target->args_size;
+#else
       /* We adjust SP by the difference between CURRENT and TARGET's CFA.  */
       if (__LIBGCC_STACK_GROWS_DOWNWARD__)
 	return target_cfa - current->cfa + target->args_size;
       else
 	return current->cfa - target_cfa - target->args_size;
+#endif
     }
+#ifdef __CHERI_PURE_CAPABILITY__
+  return _Unwind_GetGR (current, __builtin_dwarf_sp_column ());
+#else
   return 0;
+#endif
 }
 
 static inline _Unwind_Ptr

@@ -688,7 +688,7 @@ extern unsigned aarch64_architecture_version;
 #define ASM_DO_CFI_STARTPROC  aarch64_do_cfi_startproc
 
 /* For EH returns X4 contains the stack adjustment.  */
-#define EH_RETURN_STACKADJ_RTX	gen_rtx_REG (POmode, R4_REGNUM)
+#define EH_RETURN_STACKADJ_RTX	gen_rtx_REG (Pmode, R4_REGNUM)
 #define EH_RETURN_HANDLER_RTX  aarch64_eh_return_handler_rtx ()
 
 /* Don't use __builtin_setjmp until we've defined it.  */
