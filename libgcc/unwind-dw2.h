@@ -37,6 +37,16 @@ typedef struct
 	_Unwind_Reg reg;
 	_Unwind_SwordAddr offset;
 	const unsigned char *exp;
+#ifdef __CHERI_PURE_CAPABILITY__
+	struct {
+	    /* Only used for REG_SAVED_SETADDRESS.
+	       N.b. two SwordAddr's are the same size as a pointer in pure
+	       capability, hence this is not increasing the size of the frame
+	       state structure.  */
+	    _Unwind_SwordAddr offset1;
+	    _Unwind_SwordAddr offset2;
+	} offs;
+#endif
       } loc;
       enum {
 	REG_UNSAVED,
@@ -45,6 +55,9 @@ typedef struct
 	REG_SAVED_EXP,
 	REG_SAVED_VAL_OFFSET,
 	REG_SAVED_VAL_EXP,
+#ifdef __CHERI_PURE_CAPABILITY__
+	REG_SAVED_SET_ADDRESS,
+#endif
 	REG_UNDEFINED
       } how;
     } reg[__LIBGCC_DWARF_FRAME_REGISTERS__+1];

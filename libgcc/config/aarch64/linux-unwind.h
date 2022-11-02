@@ -41,13 +41,7 @@
 #define SVC_0		0xd4000001
 #endif
 
-/* The mechanism of reading the instructions pointed to by our LR can not work
-   for Morello since the CLR provided by the kernel will be sealed.
-   That means we can't read instructions from it.  Which means our
-   determination mechanism can no longer work.  */
-#ifndef __CHERI_PURE_CAPABILITY__
 #define MD_FALLBACK_FRAME_STATE_FOR aarch64_fallback_frame_state
-#endif
 
 static _Unwind_Reason_Code
 aarch64_fallback_frame_state (struct _Unwind_Context *context,
@@ -76,8 +70,16 @@ aarch64_fallback_frame_state (struct _Unwind_Context *context,
 
      0xd2801168         movz x8, #0x8b
      0xd4000001         svc  0x0
-   */
-  if (pc[0] != MOVZ_X8_8B || pc[1] != SVC_0)
+
+     In pure capability most context->ra entries are sealed, it is only in the
+     special signal frame that we expect to see an unsealed return address.
+     Hence we need to check that before attempting to read from the return
+     address to avoid a segmentation fault in the unwinder.  */
+  if (
+#ifdef __CHERI_PURE_CAPABILITY__
+      __builtin_cheri_sealed_get (pc) ||
+#endif
+      pc[0] != MOVZ_X8_8B || pc[1] != SVC_0)
     {
       return _URC_END_OF_STACK;
     }
@@ -91,13 +93,20 @@ aarch64_fallback_frame_state (struct _Unwind_Context *context,
   new_cfa = (_Unwind_Ptr) sc;
   fs->regs.cfa_how = CFA_REG_OFFSET;
   fs->regs.cfa_reg = __LIBGCC_STACK_POINTER_REGNUM__;
-  fs->regs.cfa_offset = new_cfa - (_Unwind_Ptr) context->cfa;
+  fs->regs.cfa_offset = new_cfa - (_Unwind_Address) context->cfa;
+
+  fs->regs.reg[31].how = REG_SAVED_OFFSET;
+  fs->regs.reg[31].loc.offset = (_Unwind_Ptr)&sc->sp - new_cfa;
+  fs->regs.reg[__LIBGCC_DWARF_ALT_FRAME_RETURN_COLUMN__].how =
+    REG_SAVED_OFFSET;
+  fs->regs.reg[__LIBGCC_DWARF_ALT_FRAME_RETURN_COLUMN__].loc.offset =
+    (_Unwind_Ptr)&sc->pc - new_cfa;
 
   for (i = 0; i < AARCH64_DWARF_NUMBER_R; i++)
     {
       fs->regs.reg[AARCH64_DWARF_R0 + i].how = REG_SAVED_OFFSET;
       fs->regs.reg[AARCH64_DWARF_R0 + i].loc.offset =
-	(_Unwind_Ptr) & (sc->regs[i]) - new_cfa;
+	(_Unwind_Address)(sc->regs + i) - (_Unwind_Address) new_cfa;
     }
 
   /* The core context may be extended with an arbitrary set of
@@ -131,7 +140,8 @@ aarch64_fallback_frame_state (struct _Unwind_Context *context,
 		 need to offset into the saved V register dependent on
 		 our endianness to find the saved D register.  */
 
-	      offset = (_Unwind_Ptr) & (ctx->vregs[i]) - new_cfa;
+	      offset = (_Unwind_Address)(ctx->vregs + i)
+			      - (_Unwind_Address) new_cfa;
 
 	      /* The endianness adjustment code below expects that a
 		 saved V register is 16 bytes.  */
@@ -142,22 +152,39 @@ aarch64_fallback_frame_state (struct _Unwind_Context *context,
 	      fs->regs.reg[AARCH64_DWARF_V0 + i].loc.offset = offset;
 	    }
 	}
+      /* N.b. we put this under an ifdef since it uses REG_SAVED_SET_ADDRESS
+	 which is not available for non-CHERI targets.  */
+#ifdef __CHERI_PURE_CAPABILITY__
+      else if (extension_marker->magic == MORELLO_MAGIC)
+	{
+#define ADD_OFFSET2(reg, newoffset) \
+	  do { \
+	      (reg).how = REG_SAVED_SET_ADDRESS;  \
+	      (reg).loc.offs.offset1 = (reg).loc.offset; \
+	      (reg).loc.offs.offset2 = (newoffset);  \
+	  } while (0)
+	  struct morello_context *ctx =
+	    (struct morello_context *) extension_marker;
+	  int i;
+	  for (i = 0; i < AARCH64_DWARF_NUMBER_R; i++)
+	    ADD_OFFSET2 (fs->regs.reg[AARCH64_DWARF_R0 + i],
+			 (_Unwind_Address)(ctx->cregs + i) - new_cfa);
+	  /* Override the existing SP and PC expressions with some
+	     describing the capability versions.  */
+	  ADD_OFFSET2 (fs->regs.reg[31],
+		       (_Unwind_Address)&ctx->csp - new_cfa);
+	  ADD_OFFSET2 (fs->regs.reg[__LIBGCC_DWARF_ALT_FRAME_RETURN_COLUMN__],
+		       (_Unwind_Address)&ctx->pcc - new_cfa);
+#undef ADD_OFFSET2
+	}
+#endif
       else
 	{
 	  /* There is context provided that we do not recognize!  */
 	}
     }
 
-  fs->regs.reg[31].how = REG_SAVED_OFFSET;
-  fs->regs.reg[31].loc.offset = (_Unwind_Ptr) & (sc->sp) - new_cfa;
-
   fs->signal_frame = 1;
-
-  fs->regs.reg[__LIBGCC_DWARF_ALT_FRAME_RETURN_COLUMN__].how =
-    REG_SAVED_VAL_OFFSET;
-  fs->regs.reg[__LIBGCC_DWARF_ALT_FRAME_RETURN_COLUMN__].loc.offset =
-    (_Unwind_Ptr) (sc->pc) - new_cfa;
-
   fs->retaddr_column = __LIBGCC_DWARF_ALT_FRAME_RETURN_COLUMN__;
 
   return _URC_NO_REASON;

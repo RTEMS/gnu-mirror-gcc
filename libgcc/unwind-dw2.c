@@ -1554,6 +1554,21 @@ uw_update_context_1 (struct _Unwind_Context *context, _Unwind_FrameState *fs)
 	  _Unwind_SetGRValue (context, i, val);
 	}
 	break;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+      /* Special description which contains two offsets where one points us to
+	 the address value of a capability and the other points us to a
+	 capability with the metadata we want for the result.  */
+      case REG_SAVED_SET_ADDRESS:
+	{
+	  _Unwind_SwordAddr cap_offset = fs->regs.reg[i].loc.offs.offset2;
+	  _Unwind_SwordAddr addr_offset = fs->regs.reg[i].loc.offs.offset1;
+	  _Unwind_Ptr creg = *(void **)(cfa + cap_offset);
+	  _Unwind_WordAddr xreg = read_8u (cfa + addr_offset);
+	  creg = __builtin_cheri_address_set (creg, xreg);
+	  _Unwind_SetGRValue (context, i, creg);
+	}
+#endif
       }
 
   _Unwind_SetSignalFrame (context, fs->signal_frame);
