@@ -163,7 +163,7 @@ base_from_cb_data (unsigned char encoding, struct unw_eh_callback_data *data)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 static int
-valid_cheri_capability (void *x, uintptr_t *base, uintptr_t *top)
+valid_cheri_capability (const void *x, uintptr_t *base, uintptr_t *top)
 {
   int is_valid = __builtin_cheri_tag_get (x);
   if (! is_valid)
@@ -218,7 +218,7 @@ _Unwind_IteratePhdrCallback (struct dl_phdr_info *info, size_t size, void *ptr)
      capabilities by the libc.  */
   gcc_assert (valid_cheri_capability (phdr, NULL, NULL));
   gcc_assert (load_base == 0
-	      || valid_cheri_capability (load_base, NULL, NULL));
+	      || valid_cheri_capability ((const void*)load_base, NULL, NULL));
 #endif
 
   struct frame_hdr_cache_element *prev_cache_entry = NULL,
@@ -265,7 +265,8 @@ _Unwind_IteratePhdrCallback (struct dl_phdr_info *info, size_t size, void *ptr)
 
 	      last_cache_entry = cache_entry;
 	      /* Exit early if we found an unused entry.  */
-	      if ((cache_entry->pc_low | cache_entry->pc_high) == 0)
+	      if ((cache_entry->pc_low
+		   | (_Unwind_Address)cache_entry->pc_high) == 0)
 		break;
 	      if (cache_entry->link != NULL)
 		prev_cache_entry = cache_entry;
@@ -362,7 +363,8 @@ _Unwind_IteratePhdrCallback (struct dl_phdr_info *info, size_t size, void *ptr)
      stored in p_eh_frame_hdr->p_vaddr with the metadata of the capability
      pointing to p_eh_frame_hdr.  */
   if (load_base == 0)
-    hdr = __builtin_cheri_address_set (p_eh_frame_hdr, p_eh_frame_hdr->p_vaddr);
+    hdr = (const struct unw_eh_frame_hdr *)
+      __builtin_cheri_address_set (p_eh_frame_hdr, p_eh_frame_hdr->p_vaddr);
   else
 #endif
   /* Read .eh_frame_hdr header.  */
@@ -469,7 +471,8 @@ _Unwind_IteratePhdrCallback (struct dl_phdr_info *info, size_t size, void *ptr)
 	  f_enc_size = size_of_encoded_value (f_enc);
 	  read_encoded_value_with_base (f_enc & 0x0f, 0,
 					&f->pc_begin[f_enc_size], &range);
-	  if (data->pc < table[mid].initial_loc + data_base + range)
+	  if (data->pc < table[mid].initial_loc + data_base
+			  + (_Unwind_Address)range)
 	    data->ret = f;
 	  data->func = (void *) (table[mid].initial_loc + data_base);
 	  return 1;
@@ -480,7 +483,7 @@ _Unwind_IteratePhdrCallback (struct dl_phdr_info *info, size_t size, void *ptr)
   /* Any encoding other than DW_EH_PE_pcrel would mean that our eh_frame
      pointer would not be a valid capability.  Here we're reading from eh_frame
      and hence would need provenance.  */
-  gcc_assert (valid_cheri_capability (eh_frame, NULL, NULL));
+  gcc_assert (valid_cheri_capability ((const void *)eh_frame, NULL, NULL));
 #endif
 
   /* We have no sorted search table, so need to go the slow way.
@@ -492,7 +495,8 @@ _Unwind_IteratePhdrCallback (struct dl_phdr_info *info, size_t size, void *ptr)
   ob.u.single = (fde *) eh_frame;
   ob.s.i = 0;
   ob.s.b.mixed_encoding = 1;  /* Need to assume worst case.  */
-  data->ret = linear_search_fdes (&ob, (fde *) eh_frame, (void *) data->pc);
+  data->ret = linear_search_fdes (&ob, (fde *) eh_frame,
+				  (_Unwind_Address) data->pc);
   if (data->ret != NULL)
     {
       _Unwind_Ptr func;
