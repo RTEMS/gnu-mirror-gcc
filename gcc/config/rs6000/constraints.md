@@ -107,8 +107,8 @@
        (match_test "TARGET_P8_VECTOR")
        (match_operand 0 "s5bit_cint_operand")))
 
-(define_register_constraint "wD" "DM_REGS"
-  "DMR register.")
+(define_register_constraint "wD" "rs6000_constraints[RS6000_CONSTRAINT_wD]"
+  "Accumulator register.")
 
 (define_constraint "wE"
   "@internal Vector constant that can be loaded with the XXSPLTIB instruction."
