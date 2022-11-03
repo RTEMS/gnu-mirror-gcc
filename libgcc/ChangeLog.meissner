@@ -1,3 +1,18 @@
+==================== Work101, patch #4
+
+Patch libgcc to always use _Float128 and _Complex _Float128 on PowerPC.
+
+2022-11-02   Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/quad-float128.h (TF): Delete definition.
+	(TFtype): Define to be _Float128.
+	(TCtype): Change to be _Complex _Float128.
+	* libgcc2.h (TFtype): Allow MD code to override definition.
+	(TCtype): Likewise.
+	* soft-fp/quad.h (TFtype): Likewise.
+
+==================== Work101, initial branch.
+
 2022-10-06   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
