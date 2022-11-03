@@ -1,3 +1,20 @@
+==================== Dmf002, patch006.
+
+Make wD match either FLOAT_REGS or DM_REGS.
+
+2022-11-02   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/constraint.md (wD): Match FLOAT_REGS on power10, DM_REGS
+	if dense math.
+	* config/rs6000/rs6000.md (rs6000_debug_reg_global): For -mdebug=reg,
+	print the register class for wD.
+	(rs6000_init_hard_regno_mode_ok): Set the register class for wD.
+	* config/rs6000/rs6000.h (enum r6000_reg_class_enum): New enumaation
+	value for wD.
+	* doc/md.texi (PowerPC constraints): Document wD constraint.
+
 ==================== Dmf002, patch005.
 
 Add LAGEN and PLAGEN support.
