@@ -408,9 +408,9 @@
    #
    #
    #
-   dmxxinstdmr512 %0,%1,%Y1,0
-   dmmr %0,%1
-   dmxxextfdmr512 %0,%Y0,%1,0"
+   dmxxinstdmr512 %A0,%1,%Y1,0
+   dmmr %A0,%A1
+   dmxxextfdmr512 %0,%Y0,%A1,0"
   "&& reload_completed
    && !dmr_operand (operands[0], XOmode)
    && !dmr_operand (operands[1], XOmode)"
@@ -552,7 +552,7 @@
 		   (match_operand:OO 2 "vsx_register_operand" "wa")]
 		  UNSPEC_DM_ASSEMBLE_ACC))]
  "TARGET_MMA && TARGET_DENSE_MATH"
- "dmxxinsfdmr512 %0,%1,%2,0"
+ "dmxxinstdmr512 %A0,%1,%2,0"
  [(set_attr "type" "mma")])
 
 (define_expand "mma_disassemble_acc"
@@ -585,7 +585,7 @@
 		       (match_operand 2 "const_0_to_3_operand")]
 		      UNSPEC_MMA_EXTRACT))]
   "TARGET_DENSE_MATH"
-  "dmxxextfdmr256 %0,%1,2"
+  "dmxxextfdmr256 %0,%A1,%2"
   [(set_attr "type" "mma")])
 
 ;; MMA instructions that do not use their accumulators as an input, still must
@@ -940,7 +940,7 @@
 	(unspec:TDO [(match_operand:XO 1 "vsx_register_operand" "wa")]
 		    UNSPEC_DM_INSERT512_UPPER))]
   "TARGET_DENSE_MATH"
-  "dmxxinstdmr512 %0,%1,%Y1,0"
+  "dmxxinstdmr512 %A0,%1,%Y1,0"
   [(set_attr "type" "mma")])
 
 (define_insn "movtdo_insert512_lower"
@@ -949,7 +949,7 @@
 		     (match_operand:XO 2 "vsx_register_operand" "wa")]
 		    UNSPEC_DM_INSERT512_LOWER))]
   "TARGET_DENSE_MATH"
-  "dmxxinstdmr512 %0,%2,%Y2,1"
+  "dmxxinstdmr512 %A0,%2,%Y2,1"
   [(set_attr "type" "mma")])
 
 ;; Move from DMR registers to VSX registers via two extract 512 bit
@@ -960,7 +960,7 @@
 		    (match_operand 2 "const_0_to_1_operand" "n")]
 		   UNSPEC_DM_EXTRACT512))]
   "TARGET_DENSE_MATH"
-  "dmxxextfdmr512 %0,%Y0,%1,%2"
+  "dmxxextfdmr512 %0,%Y0,%A1,%2"
   [(set_attr "type" "mma")])
 
 ;; Reload DMR registers from memory
