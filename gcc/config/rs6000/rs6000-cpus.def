@@ -87,6 +87,11 @@
 				 | OTHER_POWER10_MASKS			\
 				 | OPTION_MASK_P10_FUSION)
 
+/* Flags for a potential future processor that may or may not be delivered.  */
+#define ISA_FUTURE_MASKS	(ISA_3_1_MASKS_SERVER			\
+				 | OPTION_MASK_FUTURE			\
+				 | OPTION_MASK_BLOCK_OPS_VECTOR_PAIR)
+
 /* Flags that need to be turned off if -mno-power9-vector.  */
 #define OTHER_P9_VECTOR_MASKS	(OPTION_MASK_FLOAT128_HW		\
 				 | OPTION_MASK_P9_MINMAX)
@@ -122,6 +127,7 @@
 
 /* Mask of all options to set the default isa flags based on -mcpu=<xxx>.  */
 #define POWERPC_MASKS		(OPTION_MASK_ALTIVEC			\
+				 | OPTION_MASK_BLOCK_OPS_VECTOR_PAIR	\
 				 | OPTION_MASK_CMPB			\
 				 | OPTION_MASK_CRYPTO			\
 				 | OPTION_MASK_DFP			\
@@ -133,6 +139,7 @@
 				 | OPTION_MASK_FPRND			\
 				 | OPTION_MASK_POWER10			\
 				 | OPTION_MASK_P10_FUSION		\
+				 | OPTION_MASK_FUTURE			\
 				 | OPTION_MASK_HTM			\
 				 | OPTION_MASK_ISEL			\
 				 | OPTION_MASK_MFCRF			\
@@ -264,3 +271,4 @@ RS6000_CPU ("powerpc64", PROCESSOR_POWERPC64, OPTION_MASK_PPC_GFXOPT
 RS6000_CPU ("powerpc64le", PROCESSOR_POWER8, MASK_POWERPC64
 	    | ISA_2_7_MASKS_SERVER | OPTION_MASK_HTM)
 RS6000_CPU ("rs64", PROCESSOR_RS64A, OPTION_MASK_PPC_GFXOPT | MASK_POWERPC64)
+RS6000_CPU ("future", PROCESSOR_FUTURE, MASK_POWERPC64 | ISA_FUTURE_MASKS)
