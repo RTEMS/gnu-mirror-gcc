@@ -290,7 +290,8 @@ enum rs6000_reg_type {
   ALTIVEC_REG_TYPE,
   FPR_REG_TYPE,
   SPR_REG_TYPE,
-  CR_REG_TYPE
+  CR_REG_TYPE,
+  DMR_REG_TYPE
 };
 
 /* Map register class to register type.  */
@@ -304,22 +305,23 @@ static enum rs6000_reg_type reg_class_to_reg_type[N_REG_CLASSES];
 
 
 /* Register classes we care about in secondary reload or go if legitimate
-   address.  We only need to worry about GPR, FPR, and Altivec registers here,
-   along an ANY field that is the OR of the 3 register classes.  */
+   address.  We only need to worry about GPR, FPR, Altivec, and DMR registers
+   here, along an ANY field that is the OR of the 4 register classes.  */
 
 enum rs6000_reload_reg_type {
   RELOAD_REG_GPR,			/* General purpose registers.  */
   RELOAD_REG_FPR,			/* Traditional floating point regs.  */
   RELOAD_REG_VMX,			/* Altivec (VMX) registers.  */
-  RELOAD_REG_ANY,			/* OR of GPR, FPR, Altivec masks.  */
+  RELOAD_REG_DMR,			/* DMR registers.  */
+  RELOAD_REG_ANY,			/* OR of GPR/FPR/VMX/DMR masks.  */
   N_RELOAD_REG
 };
 
-/* For setting up register classes, loop through the 3 register classes mapping
+/* For setting up register classes, loop through the 4 register classes mapping
    into real registers, and skip the ANY class, which is just an OR of the
    bits.  */
 #define FIRST_RELOAD_REG_CLASS	RELOAD_REG_GPR
-#define LAST_RELOAD_REG_CLASS	RELOAD_REG_VMX
+#define LAST_RELOAD_REG_CLASS	RELOAD_REG_DMR
 
 /* Map reload register type to a register in the register class.  */
 struct reload_reg_map_type {
@@ -331,6 +333,7 @@ static const struct reload_reg_map_type reload_reg_map[N_RELOAD_REG] = {
   { "Gpr",	FIRST_GPR_REGNO },	/* RELOAD_REG_GPR.  */
   { "Fpr",	FIRST_FPR_REGNO },	/* RELOAD_REG_FPR.  */
   { "VMX",	FIRST_ALTIVEC_REGNO },	/* RELOAD_REG_VMX.  */
+  { "DMR",	FIRST_DMR_REGNO },	/* RELOAD_REG_DMR.  */
   { "Any",	-1 },			/* RELOAD_REG_ANY.  */
 };
 
@@ -1223,6 +1226,8 @@ char rs6000_reg_names[][8] =
       "0",  "1",  "2",  "3",  "4",  "5",  "6",  "7",
   /* vrsave vscr sfp */
       "vrsave", "vscr", "sfp",
+  /* DMRs */
+      "0", "1", "2", "3", "4", "5", "6", "7",
 };
 
 #ifdef TARGET_REGNAMES
@@ -1249,6 +1254,8 @@ static const char alt_reg_names[][8] =
   "%cr0",  "%cr1", "%cr2", "%cr3", "%cr4", "%cr5", "%cr6", "%cr7",
   /* vrsave vscr sfp */
   "vrsave", "vscr", "sfp",
+  /* DMRs */
+  "%dmr0", "%dmr1", "%dmr2", "%dmr3", "%dmr4", "%dmr5", "%dmr6", "%dmr7",
 };
 #endif
 
@@ -1820,6 +1827,9 @@ rs6000_hard_regno_nregs_internal (int regno, machine_mode mode)
   else if (ALTIVEC_REGNO_P (regno))
     reg_size = UNITS_PER_ALTIVEC_WORD;
 
+  else if (DMR_REGNO_P (regno))
+    reg_size = UNITS_PER_DMR_WORD;
+
   else
     reg_size = UNITS_PER_WORD;
 
@@ -1841,9 +1851,35 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
   if (mode == OOmode)
     return (TARGET_MMA && VSX_REGNO_P (regno) && (regno & 1) == 0);
 
-  /* MMA accumulator modes need FPR registers divisible by 4.  */
+  /* On power10, MMA accumulator modes need FPR registers divisible by 4.
+
+     If dense math is enabled, allow all VSX registers plus the DMR registers.
+     We need to make sure we don't cross between the boundary of FPRs and
+     traditional Altiviec registers.  */
   if (mode == XOmode)
-    return (TARGET_MMA && FP_REGNO_P (regno) && (regno & 3) == 0);
+    {
+      if (TARGET_MMA && !TARGET_DENSE_MATH)
+	return (FP_REGNO_P (regno) && (regno & 3) == 0);
+
+      else if (TARGET_DENSE_MATH)
+	{
+	  if (DMR_REGNO_P (regno))
+	    return 1;
+
+	  if (FP_REGNO_P (regno))
+	    return ((regno & 1) == 0 && regno <= LAST_FPR_REGNO - 3);
+
+	  if (ALTIVEC_REGNO_P (regno))
+	    return ((regno & 1) == 0 && regno <= LAST_ALTIVEC_REGNO - 3);
+	}
+
+      else
+	return 0;
+    }
+
+  /* No other types other than XOmode can go in DMRs.  */
+  if (DMR_REGNO_P (regno))
+    return 0;
 
   /* PTImode can only go in GPRs.  Quad word memory operations require even/odd
      register combinations, and use PTImode where we need to deal with quad
@@ -2286,6 +2322,7 @@ rs6000_debug_reg_global (void)
   rs6000_debug_reg_print (FIRST_ALTIVEC_REGNO,
 			  LAST_ALTIVEC_REGNO,
 			  "vs");
+  rs6000_debug_reg_print (FIRST_DMR_REGNO, LAST_DMR_REGNO, "dmr");
   rs6000_debug_reg_print (LR_REGNO, LR_REGNO, "lr");
   rs6000_debug_reg_print (CTR_REGNO, CTR_REGNO, "ctr");
   rs6000_debug_reg_print (CR0_REGNO, CR7_REGNO, "cr");
@@ -2306,6 +2343,7 @@ rs6000_debug_reg_global (void)
 	   "wr reg_class = %s\n"
 	   "wx reg_class = %s\n"
 	   "wA reg_class = %s\n"
+	   "wD reg_class = %s\n"
 	   "\n",
 	   reg_class_names[rs6000_constraints[RS6000_CONSTRAINT_d]],
 	   reg_class_names[rs6000_constraints[RS6000_CONSTRAINT_v]],
@@ -2313,7 +2351,8 @@ rs6000_debug_reg_global (void)
 	   reg_class_names[rs6000_constraints[RS6000_CONSTRAINT_we]],
 	   reg_class_names[rs6000_constraints[RS6000_CONSTRAINT_wr]],
 	   reg_class_names[rs6000_constraints[RS6000_CONSTRAINT_wx]],
-	   reg_class_names[rs6000_constraints[RS6000_CONSTRAINT_wA]]);
+	   reg_class_names[rs6000_constraints[RS6000_CONSTRAINT_wA]],
+	   reg_class_names[rs6000_constraints[RS6000_CONSTRAINT_wD]]);
 
   nl = "\n";
   for (m = 0; m < NUM_MACHINE_MODES; ++m)
@@ -2610,6 +2649,21 @@ rs6000_setup_reg_addr_masks (void)
 	  addr_mask = 0;
 	  reg = reload_reg_map[rc].reg;
 
+	  /* Special case DMR registers.  */
+	  if (rc == RELOAD_REG_DMR)
+	    {
+	      if (TARGET_DENSE_MATH && m2 == XOmode)
+		{
+		  addr_mask = RELOAD_REG_VALID;
+		  reg_addr[m].addr_mask[rc] = addr_mask;
+		  any_addr_mask |= addr_mask;
+		}
+	      else
+		reg_addr[m].addr_mask[rc] = 0;
+
+	      continue;
+	    }
+
 	  /* Can mode values go in the GPR/FPR/Altivec registers?  */
 	  if (reg >= 0 && rs6000_hard_regno_mode_ok_p[m][reg])
 	    {
@@ -2705,8 +2759,8 @@ rs6000_setup_reg_addr_masks (void)
 
 	  /* Vector pairs can do both indexed and offset loads if the
 	     instructions are enabled, otherwise they can only do offset loads
-	     since it will be broken into two vector moves.  Vector quads can
-	     only do offset loads.  */
+	     since it will be broken into two vector moves.  Vector quads and
+	     1,024 bit DMR values can only do offset loads.  */
 	  else if ((addr_mask != 0) && TARGET_MMA
 		   && (m2 == OOmode || m2 == XOmode))
 	    {
@@ -2760,6 +2814,9 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
   for (r = CR1_REGNO; r <= CR7_REGNO; ++r)
     rs6000_regno_regclass[r] = CR_REGS;
 
+  for (r = FIRST_DMR_REGNO; r <= LAST_DMR_REGNO; ++r)
+    rs6000_regno_regclass[r] = DM_REGS;
+
   rs6000_regno_regclass[LR_REGNO] = LINK_REGS;
   rs6000_regno_regclass[CTR_REGNO] = CTR_REGS;
   rs6000_regno_regclass[CA_REGNO] = NO_REGS;
@@ -2784,6 +2841,7 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
   reg_class_to_reg_type[(int)LINK_OR_CTR_REGS] = SPR_REG_TYPE;
   reg_class_to_reg_type[(int)CR_REGS] = CR_REG_TYPE;
   reg_class_to_reg_type[(int)CR0_REGS] = CR_REG_TYPE;
+  reg_class_to_reg_type[(int)DM_REGS] = DMR_REG_TYPE;
 
   if (TARGET_VSX)
     {
@@ -2969,6 +3027,13 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
   /* Support for new direct moves (ISA 3.0 + 64bit).  */
   if (TARGET_DIRECT_MOVE_128)
     rs6000_constraints[RS6000_CONSTRAINT_we] = VSX_REGS;
+
+  /* Support for the accumulator registers, either FPR registers (aka original
+     mma) or DMR registers (dense math).  */
+  if (TARGET_DENSE_MATH)
+    rs6000_constraints[RS6000_CONSTRAINT_wD] = DM_REGS;
+  else if (TARGET_MMA)
+    rs6000_constraints[RS6000_CONSTRAINT_wD] = FLOAT_REGS;
 
   /* Set up the reload helper and direct move functions.  */
   if (TARGET_VSX || TARGET_ALTIVEC)
@@ -4398,6 +4463,14 @@ rs6000_option_override_internal (bool global_init_p)
 
   if (!TARGET_PCREL && TARGET_PCREL_OPT)
     rs6000_isa_flags &= ~OPTION_MASK_PCREL_OPT;
+
+  /* Dense math requires MMA.  */
+  if (TARGET_DENSE_MATH && !TARGET_MMA)
+    {
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_DENSE_MATH) != 0)
+	error ("%qs requires %qs", "-mdense-math", "-mmma");
+      rs6000_isa_flags &= ~OPTION_MASK_DENSE_MATH;
+    }
 
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after subtarget", rs6000_isa_flags);
@@ -12054,6 +12127,11 @@ rs6000_secondary_reload_memory (rtx addr,
     addr_mask = (reg_addr[mode].addr_mask[RELOAD_REG_VMX]
 		 & ~RELOAD_REG_AND_M16);
 
+  /* DMR registers use VSX registers, and need to generate some extra
+     instructions.  */
+  else if (rclass == DM_REGS)
+    return 2;
+
   /* If the register allocator hasn't made up its mind yet on the register
      class to use, settle on defaults to use.  */
   else if (rclass == NO_REGS)
@@ -12380,6 +12458,13 @@ rs6000_secondary_reload_simple_move (enum rs6000_reg_type to_type,
   else if ((size == 4 || (TARGET_POWERPC64 && size == 8))
 	   && ((to_type == GPR_REG_TYPE && from_type == SPR_REG_TYPE)
 	       || (to_type == SPR_REG_TYPE && from_type == GPR_REG_TYPE)))
+    return true;
+
+  /* We can transfer between VSX registers and DMR registers without needing
+     extra registers.  */
+  if (TARGET_DENSE_MATH && mode == XOmode
+      && ((to_type == DMR_REG_TYPE && from_type == VSX_REG_TYPE)
+	  || (to_type == VSX_REG_TYPE && from_type == DMR_REG_TYPE)))
     return true;
 
   return false;
@@ -13076,6 +13161,10 @@ rs6000_preferred_reload_class (rtx x, enum reg_class rclass)
   machine_mode mode = GET_MODE (x);
   bool is_constant = CONSTANT_P (x);
 
+  /* DMR registers can't be loaded or stored.  */
+  if (rclass == DM_REGS)
+    return NO_REGS;
+
   /* If a mode can't go in FPR/ALTIVEC/VSX registers, don't return a preferred
      reload class for it.  */
   if ((rclass == ALTIVEC_REGS || rclass == VSX_REGS)
@@ -13172,7 +13261,7 @@ rs6000_preferred_reload_class (rtx x, enum reg_class rclass)
 	return VSX_REGS;
 
       if (mode == XOmode)
-	return FLOAT_REGS;
+	return TARGET_DENSE_MATH ? VSX_REGS : FLOAT_REGS;
 
       if (GET_MODE_CLASS (mode) == MODE_INT)
 	return GENERAL_REGS;
@@ -13296,6 +13385,11 @@ rs6000_secondary_reload_class (enum reg_class rclass, machine_mode mode,
     }
   else
     regno = -1;
+
+  /* DMR registers don't have loads or stores.  We have to go through the VSX
+     registers to load XOmode (vector quad).  */
+  if (TARGET_DENSE_MATH && rclass == DM_REGS)
+    return VSX_REGS;
 
   /* If we have VSX register moves, prefer moving scalar values between
      Altivec registers and GPR by going via an FPR (and then via memory)
@@ -13810,8 +13904,14 @@ print_operand (FILE *file, rtx x, int code)
 	 output_operand.  */
 
     case 'A':
-      /* Write the MMA accumulator number associated with VSX register X.  */
-      if (!REG_P (x) || !FP_REGNO_P (REGNO (x)) || (REGNO (x) % 4) != 0)
+      /* Write the MMA accumulator number associated with VSX register X.  On
+	 dense math systems, only allow DMR accumulators, not accumulators
+	 overlapping with the FPR registers.  */
+      if (!REG_P (x))
+	output_operand_lossage ("invalid %%A value");
+      else if (TARGET_DENSE_MATH && DMR_REGNO_P (REGNO (x)))
+	fprintf (file, "%d", REGNO (x) - FIRST_DMR_REGNO);
+      else if (!FP_REGNO_P (REGNO (x)) || (REGNO (x) % 4) != 0)
 	output_operand_lossage ("invalid %%A value");
       else
 	fprintf (file, "%d", (REGNO (x) - FIRST_FPR_REGNO) / 4);
@@ -22413,6 +22513,31 @@ rs6000_debug_address_cost (rtx x, machine_mode mode,
 }
 
 
+/* Subroutine to determine the move cost of dense math registers.  If we are
+   moving to/from VSX_REGISTER registers, the cost is either 1 move (for
+   512-bit accumulators) or 2 moves (for 1,024 dmr registers).  If we are
+   moving to anything else like GPR registers, make the cost very high.  */
+
+static int
+rs6000_dmr_register_move_cost (machine_mode mode, reg_class_t rclass)
+{
+  const int reg_move_base = 2;
+  HARD_REG_SET vsx_set = (reg_class_contents[rclass]
+			  & reg_class_contents[VSX_REGS]);
+
+  if (TARGET_DENSE_MATH && !hard_reg_set_empty_p (vsx_set))
+    {
+      /* __vector_quad (i.e. XOmode) is tranfered in 1 instruction.  */
+      if (mode == XOmode)
+	return reg_move_base;
+
+      else
+	return reg_move_base * 2 * hard_regno_nregs (FIRST_DMR_REGNO, mode);
+    }
+
+  return 1000 * 2 * hard_regno_nregs (FIRST_DMR_REGNO, mode);
+}
+
 /* A C expression returning the cost of moving data from a register of class
    CLASS1 to one of CLASS2.  */
 
@@ -22426,17 +22551,28 @@ rs6000_register_move_cost (machine_mode mode,
   if (TARGET_DEBUG_COST)
     dbg_cost_ctrl++;
 
+  HARD_REG_SET to_vsx, from_vsx;
+  to_vsx = reg_class_contents[to] & reg_class_contents[VSX_REGS];
+  from_vsx = reg_class_contents[from] & reg_class_contents[VSX_REGS];
+
+  /* Special case DMR registers, that can only move to/from VSX registers.  */
+  if (from == DM_REGS && to == DM_REGS)
+    ret = 2 * hard_regno_nregs (FIRST_DMR_REGNO, mode);
+
+  else if (from == DM_REGS)
+    ret = rs6000_dmr_register_move_cost (mode, to);
+
+  else if (to == DM_REGS)
+    ret = rs6000_dmr_register_move_cost (mode, from);
+
   /* If we have VSX, we can easily move between FPR or Altivec registers,
      otherwise we can only easily move within classes.
      Do this first so we give best-case answers for union classes
      containing both gprs and vsx regs.  */
-  HARD_REG_SET to_vsx, from_vsx;
-  to_vsx = reg_class_contents[to] & reg_class_contents[VSX_REGS];
-  from_vsx = reg_class_contents[from] & reg_class_contents[VSX_REGS];
-  if (!hard_reg_set_empty_p (to_vsx)
-      && !hard_reg_set_empty_p (from_vsx)
-      && (TARGET_VSX
-	  || hard_reg_set_intersect_p (to_vsx, from_vsx)))
+  else if (!hard_reg_set_empty_p (to_vsx)
+	   && !hard_reg_set_empty_p (from_vsx)
+	   && (TARGET_VSX
+	       || hard_reg_set_intersect_p (to_vsx, from_vsx)))
     {
       int reg = FIRST_FPR_REGNO;
       if (TARGET_VSX
@@ -22532,6 +22668,9 @@ rs6000_memory_move_cost (machine_mode mode, reg_class_t rclass,
     ret = 4 * hard_regno_nregs (32, mode);
   else if (reg_classes_intersect_p (rclass, ALTIVEC_REGS))
     ret = 4 * hard_regno_nregs (FIRST_ALTIVEC_REGNO, mode);
+  else if (reg_classes_intersect_p (rclass, DM_REGS))
+    ret = (rs6000_dmr_register_move_cost (mode, VSX_REGS)
+	   + rs6000_memory_move_cost (mode, VSX_REGS, false));
   else
     ret = 4 + rs6000_register_move_cost (mode, rclass, GENERAL_REGS);
 
@@ -23740,6 +23879,8 @@ rs6000_compute_pressure_classes (enum reg_class *pressure_classes)
       if (TARGET_HARD_FLOAT)
 	pressure_classes[n++] = FLOAT_REGS;
     }
+  if (TARGET_DENSE_MATH)
+    pressure_classes[n++] = DM_REGS;
   pressure_classes[n++] = CR_REGS;
   pressure_classes[n++] = SPECIAL_REGS;
 
@@ -23904,6 +24045,10 @@ rs6000_debugger_regno (unsigned int regno, unsigned int format)
     return 67;
   if (regno == 64)
     return 64;
+  /* XXX: This is a guess.  The GCC register number for FIRST_DMR_REGNO is 111,
+     but the frame pointer regnum uses that.  */
+  if (DMR_REGNO_P (regno))
+    return regno - FIRST_DMR_REGNO + 112;
 
   gcc_unreachable ();
 }
@@ -24114,6 +24259,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "crypto",			OPTION_MASK_CRYPTO,		false, true  },
   { "direct-move",		OPTION_MASK_DIRECT_MOVE,	false, true  },
   { "dlmzb",			OPTION_MASK_DLMZB,		false, true  },
+  { "dense-math",		OPTION_MASK_DENSE_MATH,		false, true  },
   { "efficient-unaligned-vsx",	OPTION_MASK_EFFICIENT_UNALIGNED_VSX,
 								false, true  },
   { "float128",			OPTION_MASK_FLOAT128_KEYWORD,	false, true  },
@@ -27200,7 +27346,9 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 		      || XINT (src, 1) == UNSPECV_MMA_ASSEMBLE);
 	  gcc_assert (REG_P (dst));
 	  if (GET_MODE (src) == XOmode)
-	    gcc_assert (FP_REGNO_P (REGNO (dst)));
+	    gcc_assert ((TARGET_DENSE_MATH
+			 ? VSX_REGNO_P (REGNO (dst))
+			 : FP_REGNO_P (REGNO (dst))));
 	  if (GET_MODE (src) == OOmode)
 	    gcc_assert (VSX_REGNO_P (REGNO (dst)));
 
