@@ -1,3 +1,37 @@
+==================== Dmf003 branch, patch #14.
+
+Switch to dense math names for all MMA operations.
+
+2022-11-04   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (vvi4i4i8_dm): New int attribute.
+	(avvi4i4i8_dm): Likewise.
+	(vvi4i4i2_dm): Likewise.
+	(avvi4i4i2_dm): Likewise.
+	(vvi4i4_dm): Likewise.
+	(avvi4i4_dm): Likewise.
+	(pvi4i2_dm): Likewise.
+	(apvi4i2_dm): Likewise.
+	(vvi4i4i4_dm): Likewise.
+	(avvi4i4i4_dm): Likewise.
+	(mma_<vv>): Add support for running on DMF systems, generating the dense
+	math instruction and using the dense math accumulators.
+	(mma_<avv>): Likewise.
+	(mma_<pv>): Likewise.
+	(mma_<apv>): Likewise.
+	(mma_<vvi4i4i8>): Likewise.
+	(mma_<avvi4i4i8>): Likewise.
+	(mma_<vvi4i4i2>): Likewise.
+	(mma_<avvi4i4i2>): Likewise.
+	(mma_<vvi4i4>): Likewise.
+	(mma_<avvi4i4): Likewise.
+	(mma_<pvi4i2>): Likewise.
+	(mma_<apvi4i2): Likewise.
+	(mma_<vvi4i4i4>): Likewise.
+	(mma_<avvi4i4i4>): Likewise.
+
 ==================== Dmf003 branch, patch #13.
 
 Make MMA insns support dmr registers.
