@@ -1,3 +1,18 @@
+==================== Dmf003 branch, patch #6.
+
+Fix typos.
+
+2022-11-04   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (movxo_dm): Fix typos.
+	(mma_assemble_acc_dm): Likewise.
+	(mma_disassemble_acc_dm): Likewise.
+	(movtdo_insert512_upper): Likewise.
+	(movtdo_insert512_lower): Likewise.
+	(movtdo_extract512): Likewise.
+
 ==================== Dmf003 branch, patch #5.
 
 Add LAGEN and PLAGEN support.
