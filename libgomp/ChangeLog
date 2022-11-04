@@ -1,3 +1,45 @@
+2022-11-03  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2022-10-12  Jakub Jelinek  <jakub@redhat.com>
+
+	* task.c (gomp_create_artificial_team): Fix up handling of invocations
+	from within explicit task.
+	* target.c (GOMP_target_ext): Likewise.
+	* testsuite/libgomp.c/task-7.c: New test.
+	* testsuite/libgomp.c/task-8.c: New test.
+	* testsuite/libgomp.c-c++-common/task-reduction-17.c: New test.
+	* testsuite/libgomp.c-c++-common/task-reduction-18.c: New test.
+
+2022-11-03  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2022-09-24  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/106981
+	* testsuite/libgomp.c-c++-common/pr106981.c: New test.
+
+2022-10-28  Julian Brown  <julian@codesourcery.com>
+
+	Backported from master:
+	2022-10-28  Julian Brown  <julian@codesourcery.com>
+		    Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR middle-end/90115
+	* testsuite/libgomp.oacc-fortran/declare-1.f90: Adjust scan output.
+	* testsuite/libgomp.oacc-fortran/host_data-5.F90: Likewise.
+	* testsuite/libgomp.oacc-fortran/if-1.f90: Likewise.
+	* testsuite/libgomp.oacc-fortran/print-1.f90: Likewise.
+	* testsuite/libgomp.oacc-fortran/privatized-ref-2.f90: Likewise.
+
+2022-10-21  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2022-10-20  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR target/105421
+	* testsuite/libgomp.oacc-c-c++-common/private-big-1.c: New.
+
 2022-08-23  Tobias Burnus  <tobias@codesourcery.com>
 
 	Backported from master:
