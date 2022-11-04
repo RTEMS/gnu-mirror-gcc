@@ -163,7 +163,6 @@
   mcpu=e5500: -me5500; \
   mcpu=e6500: -me6500; \
   mcpu=titan: -mtitan; \
-  mcpu=future: -mfuture; \
   !mcpu*: %{mpower9-vector: -mpower9; \
 	    mpower8-vector|mcrypto|mdirect-move|mhtm: -mpower8; \
 	    mvsx: -mpower7; \
@@ -662,7 +661,6 @@ extern unsigned char rs6000_recip_bits[];
 #define UNITS_PER_FP_WORD 8
 #define UNITS_PER_ALTIVEC_WORD 16
 #define UNITS_PER_VSX_WORD 16
-#define UNITS_PER_DMR_WORD 128
 
 /* Type used for ptrdiff_t, as a string used in a declaration.  */
 #define PTRDIFF_TYPE "int"
@@ -790,7 +788,7 @@ enum data_align { align_abi, align_opt, align_both };
    Another pseudo (not included in DWARF_FRAME_REGISTERS) is soft frame
    pointer, which is eventually eliminated in favor of SP or FP.  */
 
-#define FIRST_PSEUDO_REGISTER 119
+#define FIRST_PSEUDO_REGISTER 111
 
 /* Use standard DWARF numbering for DWARF debugging information.  */
 #define DEBUGGER_REGNO(REGNO) rs6000_debugger_regno ((REGNO), 0)
@@ -827,9 +825,7 @@ enum data_align { align_abi, align_opt, align_both };
    /* cr0..cr7 */				   \
    0, 0, 0, 0, 0, 0, 0, 0,			   \
    /* vrsave vscr sfp */			   \
-   1, 1, 1,					   \
-   /* DMR registers.  */			   \
-   0, 0, 0, 0, 0, 0, 0, 0			   \
+   1, 1, 1					   \
 }
 
 /* Like `CALL_USED_REGISTERS' except this macro doesn't require that
@@ -853,9 +849,7 @@ enum data_align { align_abi, align_opt, align_both };
    /* cr0..cr7 */				   \
    1, 1, 0, 0, 0, 1, 1, 1,			   \
    /* vrsave vscr sfp */			   \
-   0, 0, 0,					   \
-   /* DMR registers.  */			   \
-   0, 0, 0, 0, 0, 0, 0, 0			   \
+   0, 0, 0					   \
 }
 
 #define TOTAL_ALTIVEC_REGS	(LAST_ALTIVEC_REGNO - FIRST_ALTIVEC_REGNO + 1)
@@ -892,7 +886,6 @@ enum data_align { align_abi, align_opt, align_both };
 	v2		(not saved; incoming vector arg reg; return value)
 	v19 - v14	(not saved or used for anything)
 	v31 - v20	(saved; order given to save least number)
-	dmr0 - dmr7	(not saved)
 	vrsave, vscr	(fixed)
 	sfp		(fixed)
 */
@@ -935,9 +928,6 @@ enum data_align { align_abi, align_opt, align_both };
    66,								\
    83, 82, 81, 80, 79, 78,					\
    95, 94, 93, 92, 91, 90, 89, 88, 87, 86, 85, 84,		\
-   /* DMR registers.  */					\
-   111, 112, 113, 114, 115, 116, 117, 118,			\
-   /* Vrsave, vscr, sfp.  */					\
    108, 109,							\
    110								\
 }
@@ -963,9 +953,6 @@ enum data_align { align_abi, align_opt, align_both };
 
 /* True if register is a VSX register.  */
 #define VSX_REGNO_P(N) (FP_REGNO_P (N) || ALTIVEC_REGNO_P (N))
-
-/* True if register is a DMR register.  */
-#define DMR_REGNO_P(N) ((N) >= FIRST_DMR_REGNO && (N) <= LAST_DMR_REGNO)
 
 /* Alternate name for any vector register supporting floating point, no matter
    which instruction set(s) are available.  */
@@ -1006,8 +993,7 @@ enum data_align { align_abi, align_opt, align_both };
 /* Modes that are not vectors, but require vector alignment.  Treat these like
    vectors in terms of loads and stores.  */
 #define VECTOR_ALIGNMENT_P(MODE)					\
-  (FLOAT128_VECTOR_P (MODE) || (MODE) == OOmode || (MODE) == XOmode	\
-   || (MODE) == TDOmode)
+  (FLOAT128_VECTOR_P (MODE) || (MODE) == OOmode || (MODE) == XOmode)
 
 #define ALTIVEC_VECTOR_MODE(MODE)					\
   ((MODE) == V16QImode							\
@@ -1103,7 +1089,6 @@ enum reg_class
   FLOAT_REGS,
   ALTIVEC_REGS,
   VSX_REGS,
-  DM_REGS,
   VRSAVE_REGS,
   VSCR_REGS,
   GEN_OR_FLOAT_REGS,
@@ -1133,7 +1118,6 @@ enum reg_class
   "FLOAT_REGS",								\
   "ALTIVEC_REGS",							\
   "VSX_REGS",								\
-  "DM_REGS",								\
   "VRSAVE_REGS",							\
   "VSCR_REGS",								\
   "GEN_OR_FLOAT_REGS",							\
@@ -1168,8 +1152,6 @@ enum reg_class
   { 0x00000000, 0x00000000, 0xffffffff, 0x00000000 },			\
   /* VSX_REGS.  */							\
   { 0x00000000, 0xffffffff, 0xffffffff, 0x00000000 },			\
-  /* DM_REGS.  */							\
-  { 0x00000000, 0x00000000, 0x00000000, 0x007f8000 },			\
   /* VRSAVE_REGS.  */							\
   { 0x00000000, 0x00000000, 0x00000000, 0x00001000 },			\
   /* VSCR_REGS.  */							\
@@ -1197,7 +1179,7 @@ enum reg_class
   /* CA_REGS.  */							\
   { 0x00000000, 0x00000000, 0x00000000, 0x00000004 },			\
   /* ALL_REGS.  */							\
-  { 0xffffffff, 0xffffffff, 0xffffffff, 0x007fffff }			\
+  { 0xffffffff, 0xffffffff, 0xffffffff, 0x00007fff }			\
 }
 
 /* The same information, inverted:
@@ -1221,7 +1203,6 @@ enum r6000_reg_class_enum {
   RS6000_CONSTRAINT_wr,		/* GPR register if 64-bit  */
   RS6000_CONSTRAINT_wx,		/* FPR register for STFIWX */
   RS6000_CONSTRAINT_wA,		/* BASE_REGS if 64-bit.  */
-  RS6000_CONSTRAINT_wD,		/* Accumulator regs if MMA/Dense Math.  */
   RS6000_CONSTRAINT_MAX
 };
 
@@ -2095,16 +2076,7 @@ extern char rs6000_reg_names[][8];	/* register names (0 vs. %r0).  */
   &rs6000_reg_names[108][0],	/* vrsave  */				\
   &rs6000_reg_names[109][0],	/* vscr  */				\
 									\
-  &rs6000_reg_names[110][0],	/* sfp  */				\
-									\
-  &rs6000_reg_names[111][0],	/* dmr0  */				\
-  &rs6000_reg_names[112][0],	/* dmr1  */				\
-  &rs6000_reg_names[113][0],	/* dmr2  */				\
-  &rs6000_reg_names[114][0],	/* dmr3  */				\
-  &rs6000_reg_names[115][0],	/* dmr4  */				\
-  &rs6000_reg_names[116][0],	/* dmr5  */				\
-  &rs6000_reg_names[117][0],	/* dmr6  */				\
-  &rs6000_reg_names[118][0],	/* dmr7  */				\
+  &rs6000_reg_names[110][0]	/* sfp  */				\
 }
 
 /* Table of additional register names to use in user input.  */
@@ -2158,8 +2130,6 @@ extern char rs6000_reg_names[][8];	/* register names (0 vs. %r0).  */
   {"vs52", 84}, {"vs53", 85}, {"vs54", 86}, {"vs55", 87},	\
   {"vs56", 88}, {"vs57", 89}, {"vs58", 90}, {"vs59", 91},	\
   {"vs60", 92}, {"vs61", 93}, {"vs62", 94}, {"vs63", 95},	\
-  {"dmr0", 111}, {"dmr1", 112}, {"dmr2", 113}, {"dmr3", 114},	\
-  {"dmr4", 115}, {"dmr5", 116}, {"dmr6", 117}, {"dmr7", 118},	\
 }
 
 /* This is how to output an element of a case-vector that is relative.  */
@@ -2293,7 +2263,6 @@ enum rs6000_builtin_type_index
   RS6000_BTI_const_str,		 /* pointer to const char * */
   RS6000_BTI_vector_pair,	 /* unsigned 256-bit types (vector pair).  */
   RS6000_BTI_vector_quad,	 /* unsigned 512-bit types (vector quad).  */
-  RS6000_BTI_dmr,		 /* unsigned 1,024-bit types (dmr).  */
   RS6000_BTI_const_ptr_void,     /* const pointer to void */
   RS6000_BTI_ptr_V16QI,
   RS6000_BTI_ptr_V1TI,
@@ -2332,7 +2301,6 @@ enum rs6000_builtin_type_index
   RS6000_BTI_ptr_dfloat128,
   RS6000_BTI_ptr_vector_pair,
   RS6000_BTI_ptr_vector_quad,
-  RS6000_BTI_ptr_dmr,
   RS6000_BTI_ptr_long_long,
   RS6000_BTI_ptr_long_long_unsigned,
   RS6000_BTI_MAX
@@ -2390,7 +2358,6 @@ enum rs6000_builtin_type_index
 #define const_str_type_node		 (rs6000_builtin_types[RS6000_BTI_const_str])
 #define vector_pair_type_node		 (rs6000_builtin_types[RS6000_BTI_vector_pair])
 #define vector_quad_type_node		 (rs6000_builtin_types[RS6000_BTI_vector_quad])
-#define dmr_type_node			 (rs6000_builtin_types[RS6000_BTI_dmr])
 #define pcvoid_type_node		 (rs6000_builtin_types[RS6000_BTI_const_ptr_void])
 #define ptr_V16QI_type_node		 (rs6000_builtin_types[RS6000_BTI_ptr_V16QI])
 #define ptr_V1TI_type_node		 (rs6000_builtin_types[RS6000_BTI_ptr_V1TI])
@@ -2429,7 +2396,6 @@ enum rs6000_builtin_type_index
 #define ptr_dfloat128_type_node		 (rs6000_builtin_types[RS6000_BTI_ptr_dfloat128])
 #define ptr_vector_pair_type_node	 (rs6000_builtin_types[RS6000_BTI_ptr_vector_pair])
 #define ptr_vector_quad_type_node	 (rs6000_builtin_types[RS6000_BTI_ptr_vector_quad])
-#define ptr_dmr_type_node		 (rs6000_builtin_types[RS6000_BTI_ptr_dmr])
 #define ptr_long_long_integer_type_node	 (rs6000_builtin_types[RS6000_BTI_ptr_long_long])
 #define ptr_long_long_unsigned_type_node (rs6000_builtin_types[RS6000_BTI_ptr_long_long_unsigned])
 
