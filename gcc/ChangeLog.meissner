@@ -22,7 +22,7 @@ gcc/
 	support.
 	(rs6000_init_builtins): Add support for __dmr keyword.
 	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
-	__DENSE_MATH__ if we have dense math support.
+	__PPC_DMR__ if we have dense math support.
 	* config/rs6000/rs6000-call.cc (rs6000_return_in_memory): Add support
 	for TDOmode.
 	(rs6000_function_arg): Likewise.
