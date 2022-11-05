@@ -1,3 +1,15 @@
+==================== Dmf003 branch, patch #15.
+
+Add dense math test.
+
+2022-11-04   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/dm-double-test.c: New test.
+	* lib/target-supports.exp (check_effective_target_ppc_dmr_ok): New
+	target test.
+
 ==================== Dmf003 branch, patch #14.
 
 Switch to dense math names for all MMA operations.
@@ -66,12 +78,6 @@ gcc/
 	dense math and only FPRs if not dense math.
 	(rs6000_split_multireg_move): Do not generate accumulator prime or
 	de-prime instructions if dense math.
-
-gcc/testsuite/
-
-	* gcc.target/powerpc/dm-double-test.c: New test.
-	* lib/target-supports.exp (check_effective_target_ppc_dmr_ok): New
-	target test.
 
 ==================== Dmf003 branch, patch #12.
 
