@@ -2260,17 +2260,6 @@ expand_builtin_frob_return_addr (tree addr_tree)
   return addr;
 }
 
-static rtx
-convert_to_offset_mode (rtx x)
-{
-#ifndef POINTERS_EXTEND_UNSIGNED
-  gcc_assert (GET_MODE (x) == POmode || GET_MODE (x) == VOIDmode);
-  return x;
-#else
-  return convert_to_mode (POmode, x, POINTERS_EXTEND_UNSIGNED);
-#endif
-}
-
 /* Set up the epilogue with the magic bits we'll need to return to the
    exception handler.  */
 
