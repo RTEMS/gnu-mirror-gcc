@@ -1,6 +1,6 @@
 /* { dg-do assemble } */
 /* { dg-additional-options "-save-temps" } */
-/* { dg-final { check-function-bodies "**" ""  { {-O[123s]} } } } */
+/* { dg-final { check-function-bodies "**" ""  {-O[123s]} {target aarch64_small} } } */
 
 /*
 ** get_double:
