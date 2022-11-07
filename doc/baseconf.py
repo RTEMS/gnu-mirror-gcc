@@ -194,7 +194,7 @@ INTERNAL_DOCS = ('gccint', 'cppinternals', 'gfc-internals', 'gnat-style', 'libib
 # Cross manual reference mapping
 intersphinx_mapping = {}
 for manual in USER_LEVEL_DOCS + INTERNAL_DOCS:
-    intersphinx_mapping[manual] = (f'https://gcc.gnu.org/onlinedocs/{manual}/', None)
+    intersphinx_mapping[manual] = (f'https://splichal.eu/gccsphinx-final/html/{manual}/', None)
 
 # Custom references
 extlinks = {
@@ -213,5 +213,5 @@ def set_common(name, module):
         module['todo_include_todos'] = True
         module['tags'].add('development')
 
-    html_theme_options['source_edit_link'] = f'https://gcc.gnu.org/onlinedocs/{name}' \
+    html_theme_options['source_edit_link'] = f'https://splichal.eu/gccsphinx-final/html/{name}' \
                                                '/_sources/{filename}.txt'
