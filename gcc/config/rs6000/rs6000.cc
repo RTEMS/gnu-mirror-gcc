@@ -27489,7 +27489,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 	 overlap.  */
       int i;
       /* XO/OO are opaque so cannot use subregs. */
-      if (mode == OOmode || mode == XOmode || mode == TDOmode )
+      if (mode == OOmode || mode == XOmode || mode == TDOmode)
 	{
 	  for (i = nregs - 1; i >= 0; i--)
 	    {
@@ -27663,7 +27663,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 	    continue;
 
 	  /* XO/OO are opaque so cannot use subregs. */
-	  if (mode == OOmode || mode == XOmode || mode == TDOmode )
+	  if (mode == OOmode || mode == XOmode || mode == TDOmode)
 	    {
 	      rtx dst_i = gen_rtx_REG (reg_mode, REGNO (dst) + j);
 	      rtx src_i = gen_rtx_REG (reg_mode, REGNO (src) + j);
