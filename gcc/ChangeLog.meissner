@@ -1,3 +1,14 @@
+==================== Dmf003 branch, patch #16.
+
+Fix spacing.
+
+2022-11-08   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_split_multireg_move): Fix spacing
+	issue.
+
 ==================== Dmf003 branch, patch #15.
 
 Add support for 1,024 bit DMR registers.
