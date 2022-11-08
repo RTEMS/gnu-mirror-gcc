@@ -9305,10 +9305,6 @@ set_init_index (location_t loc, tree first, tree last,
 
   designator_erroneous = 1;
 
-  first = drop_intcap (first);
-  if (last)
-    last = drop_intcap (last);
-
   if ((!INTEGRAL_TYPE_P (TREE_TYPE (first))
        && !INTCAP_TYPE_P (TREE_TYPE (first)))
       || (last
@@ -11271,8 +11267,6 @@ do_case (location_t loc, tree low_value, tree high_value)
 
   if (low_value)
     {
-      low_value = drop_intcap (low_value);
-
       if (TREE_CODE (low_value) != INTEGER_CST)
 	{
 	  low_value = c_fully_fold (low_value, false, NULL);
@@ -11288,8 +11282,6 @@ do_case (location_t loc, tree low_value, tree high_value)
 
   if (high_value)
     {
-      high_value = drop_intcap (high_value);
-
       if (TREE_CODE (high_value) != INTEGER_CST)
 	{
 	  high_value = c_fully_fold (high_value, false, NULL);

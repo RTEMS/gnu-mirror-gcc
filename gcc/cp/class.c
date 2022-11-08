@@ -3400,7 +3400,8 @@ check_bitfield_decl (tree field)
       w = cxx_constant_value (w);
       input_location = loc;
 
-      w = drop_intcap (w);
+      if (INTCAP_TYPE_P (TREE_TYPE (w)))
+	w = drop_capability (w);
 
       if (TREE_CODE (w) != INTEGER_CST)
 	{

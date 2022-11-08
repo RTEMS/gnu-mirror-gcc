@@ -2089,7 +2089,7 @@ check_case_value (location_t loc, tree value)
 
   if (TREE_CODE (value) == INTEGER_CST)
     /* Promote char or short to int.  */
-    value = perform_integral_promotions (drop_intcap (value));
+    value = perform_integral_promotions (drop_capability (value));
   else if (value != error_mark_node)
     {
       error_at (loc, "case label does not reduce to an integer constant");
@@ -2647,32 +2647,6 @@ drop_capability (tree t)
   if (! capability_type_p (TREE_TYPE (t)))
     return t;
   return convert (noncapability_type (TREE_TYPE (t)), t);
-}
-
-/* A more lightweight version of drop_capability suitable for use on
-   candidate integer constant expressions (possibly involving
-   INTCAP_TYPEs). It aims to return an INTEGER_CST of INTEGER_TYPE
-   without stripping conversions that would be forbidden in an integer
-   constant expression (e.g. conversions to pointer type).  */
-
-tree
-drop_intcap (tree t)
-{
-  if (!INTCAP_TYPE_P (TREE_TYPE (t)))
-    return t;
-
-  if (TREE_CODE (t) == INTEGER_CST)
-    return drop_capability (t);
-
-  /* We can drop NOP_EXPRs from other integer types.  */
-  if (TREE_CODE (t) == NOP_EXPR)
-    {
-      auto ty = TREE_TYPE (TREE_OPERAND (t, 0));
-      if (INTEGRAL_TYPE_P (ty) || INTCAP_TYPE_P (ty))
-	return drop_intcap (TREE_OPERAND (t, 0));
-    }
-
-  return t;
 }
 
 /* Convert from a non-capability type to a capability.

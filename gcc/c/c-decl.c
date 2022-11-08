@@ -5786,7 +5786,6 @@ check_bitfield_type_and_width (location_t loc, tree *type, tree *width,
 		      ? identifier_to_locale (IDENTIFIER_POINTER (orig_name))
 		      : _("<anonymous>"));
 
-  *width = drop_intcap (*width);
 
   /* Detect and ignore out of range field width and process valid
      field widths.  */
@@ -6518,8 +6517,6 @@ grokdeclarator (const struct c_declarator *declarator,
 
 	    if (size)
 	      {
-		size = drop_intcap (size);
-
 		bool size_maybe_const = true;
 		bool size_int_const = (TREE_CODE (size) == INTEGER_CST
 				       && !TREE_OVERFLOW (size));
@@ -9141,8 +9138,6 @@ build_enumerator (location_t decl_loc, location_t loc,
 
   if (value != NULL_TREE)
     {
-      value = drop_intcap (value);
-
       if (!INTEGRAL_TYPE_P (TREE_TYPE (value))
 	  && !INTCAP_TYPE_P (TREE_TYPE (value)))
 	{
