@@ -55,4 +55,4 @@ tryagain:
  return (ret);
 }
 
-/* { dg-final { scan-rtl-dump {\(var_location [a-zA-Z_]* \(const_null:CADI\)\)} {vartrack} } } */
+/* { dg-final { scan-rtl-dump {\(var_location [a-zA-Z_]* \(const_null:CADI\)\)} {vartrack} {target {! cheri_capability_hybrid}} } } */

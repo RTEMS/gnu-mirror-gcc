@@ -2,40 +2,40 @@
 
 /* Conditional expressions.  */
 
-int *test_cond_1 (int *a, int b)
+int * __capability test_cond_1 (int * __capability a, int b)
 {
   return a ? b : a; /* { dg-warning {type mismatch} } */
 }
 
-int *test_cond_2 (int a, int *b)
+int * __capability test_cond_2 (int a, int * __capability b)
 {
   return a ? b : a; /* { dg-warning {type mismatch} } */
 }
 
-int *test_cond_3 (int *a)
+int * __capability test_cond_3 (int * __capability a)
 {
   return a ? 0 : a; /* No warning for null pointer constant.  */
 }
 
-int *test_cond_4 (int *a)
+int * __capability test_cond_4 (int * __capability a)
 {
   return a ? a : 0; /* Likewise.  */
 }
 
 /* Assignment.  */
 
-int *test_assign_1 ()
+int * __capability test_assign_1 ()
 {
   return 1; /* { dg-error {incompatible result} } */
 }
 
-int *test_assign_2 ()
+int * __capability test_assign_2 ()
 {
-  int *b = 1; /* { dg-error {incompatible type} } */
+  int * __capability b = 1; /* { dg-error {incompatible type} } */
   return b;
 }
 
-int *test_assign_3 (int *a)
+int * __capability test_assign_3 (int * __capability a)
 {
   a = 1; /* { dg-error {incompatible type} } */
   return a;
@@ -50,5 +50,5 @@ void test_assign_4 ()
 
 void test_goto_1 (int i)
 {
-  goto *i; /* { dg-error {parameter of incompatible capability type} } */
+  goto *i; /* { dg-error {parameter of incompatible capability type} "" {target {! cheri_capability_hybrid}} } */
 }

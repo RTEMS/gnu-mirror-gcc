@@ -13,5 +13,5 @@ union a g() {
 	return u;
 }
 
-/* { dg-final { scan-rtl-dump-not {reg:DI[^\n]*<retval>} "expand" } } */
-/* { dg-final { scan-rtl-dump {reg:CADI[^\n]*<retval>} "expand" } } */
+/* { dg-final { scan-rtl-dump-not {reg:DI[^\n]*<retval>} "expand" {target {! cheri_capability_hybrid}} } } */
+/* { dg-final { scan-rtl-dump {reg:CADI[^\n]*<retval>} "expand" {target {! cheri_capability_hybrid}} } } */

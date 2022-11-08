@@ -1,5 +1,6 @@
 /* { dg-do run { target cheri_capability_any } } */
 
+#ifdef __CHERI_PURE_CAPABILITY__
 /* Declare twice to ensure that the types are the same (error otherwise).  */
 __INTPTR_TYPE__ x(int);
 __intcap x(int);
@@ -7,6 +8,7 @@ __intcap x(int);
 /* Declare twice to ensure that the types are the same (error otherwise).  */
 __UINTPTR_TYPE__ y(int);
 unsigned __intcap y(int);
+#endif
 
 /* Declare twice to ensure that the types are the same (error otherwise).  */
 __PTRADDR_TYPE__ z(int);
@@ -65,5 +67,9 @@ int main()
 	assert (__CHERI_CAP_PERMISSION_PERMIT_EXECUTE__ == 32768);
 	assert (__CHERI_CAP_PERMISSION_PERMIT_STORE__ == 65536);
 	assert (__CHERI_CAP_PERMISSION_PERMIT_LOAD__ == 131072);
+#ifdef __CHERI_PURE_CAPABILITY__
 	return wrapper(__INTPTR_TYPE__);
+#else
+	return 0;
+#endif
 }
