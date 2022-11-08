@@ -7,7 +7,7 @@
 
 /*
 ** test_ret:
-**	mov	x0, xzr
+**	mov	x0, (0|xzr)
 **	ret
 */
 void*
