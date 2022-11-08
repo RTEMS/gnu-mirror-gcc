@@ -92,6 +92,55 @@ struct loop_exit_hasher : ggc_ptr_hash<loop_exit>
   static void remove (loop_exit *);
 };
 
+// Information about histogram of the loop from profiling
+
+struct histogram_counters{
+    gcov_type hist[69];
+    gcov_type sum;
+
+    // need to think about overflows
+    // quantil function for the distribution
+    // returns index under which is koef part of the distribution
+    int quantil(float koef){
+        gcc_assert(0<koef && koef<=1);
+        gcov_type quant=0;
+        int i=0;
+        for (;i<69;++i) {
+            if (quant+hist[i]<koef*sum) {
+                quant+=hist[i];
+            } else {
+                break;
+            }
+        }
+        return i;
+    };
+    // aproximate distribution mean value of the random variable to a power
+    float mean_value(int power){
+        gcov_type values=0;
+        for (int i=0;i<8;i++){
+            gcov_type val=1;
+            for (int j=1; j<=power;j++) {
+                val*=i;
+            }
+            values+=val*hist[i];
+        }
+        for (int i=8;i<69;i++){
+            gcov_type val=1;
+            for (int j=1; j<=power; j++) {
+                val*=1<<(i-5);
+            }
+            values+=val*hist[i];
+        }
+        return ((float)values)/sum;
+    };
+    // returns aproximate variance of the distribution
+    float variance(){
+        float one=mean_value(1);
+        return mean_value(2)-one*one;
+    };
+};
+
+
 typedef class loop *loop_p;
 
 /* An integer estimation of the number of iterations.  Estimate_state
@@ -275,8 +324,7 @@ public:
      reused.  */
   basic_block former_header;
 
-  // We store histogram values here
-  gcov_type hist[69];
+  histogram_counters* counters=NULL;
 };
 
 /* Set if the loop is known to be infinite.  */

@@ -928,9 +928,13 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
       {
         auto lp = hist->hvalue.lp;
         if (act_count[t]){
+           lp->counters=(histogram_counters*) xcalloc (1, sizeof (histogram_counters));
+           gcov_type sum=0;
            for (int i=0;i<69;++i){
-               lp->hist[i]=act_count[t][i];
+               lp->counters->hist[i]=act_count[t][i];
+               sum+=act_count[t][i];
            }
+           lp->counters->sum=sum;
         }
         continue;
       }
