@@ -1,3 +1,14 @@
+==================== Dmf003 branch, patch #17.
+
+Turn off CCP when testing __dmr.
+
+2022-11-09   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/dm-1024bit.c: Add -fno-tree-ccp until CCP can
+	handle OPAQUE types.
+
 ==================== Dmf003 branch, patch #16.
 
 Fix spacing.
