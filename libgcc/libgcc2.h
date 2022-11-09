@@ -156,8 +156,13 @@ typedef		float XFtype	__attribute__ ((mode (XF)));
 typedef _Complex float XCtype	__attribute__ ((mode (XC)));
 #endif
 #if LIBGCC2_HAS_TF_MODE
+/* PowerPC would like to override this to be _Float128.  */
+#ifndef TFtype
 typedef		float TFtype	__attribute__ ((mode (TF)));
+#endif
+#ifndef TCtype
 typedef _Complex float TCtype	__attribute__ ((mode (TC)));
+#endif
 #endif
 
 typedef int cmp_return_type __attribute__((mode (__libgcc_cmp_return__)));
