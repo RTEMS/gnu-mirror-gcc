@@ -89,6 +89,7 @@
 
 /* Flags for a potential future processor that may or may not be delivered.  */
 #define ISA_FUTURE_MASKS	(ISA_3_1_MASKS_SERVER			\
+				 | OPTION_MASK_BLOCK_OPS_VECTOR_PAIR	\
 				 | OPTION_MASK_FUTURE)
 
 /* Flags that need to be turned off if -mno-power9-vector.  */
@@ -126,6 +127,7 @@
 
 /* Mask of all options to set the default isa flags based on -mcpu=<xxx>.  */
 #define POWERPC_MASKS		(OPTION_MASK_ALTIVEC			\
+				 | OPTION_MASK_BLOCK_OPS_VECTOR_PAIR	\
 				 | OPTION_MASK_CMPB			\
 				 | OPTION_MASK_CRYPTO			\
 				 | OPTION_MASK_DFP			\
