@@ -1721,6 +1721,24 @@
 		      MAX_MACHINE_MODE, &operands[3], TRUE);
 })
 
+;; Misaligned (integer) moves: provide an implementation for
+;; movmisalign, so the default support_vector_misalignment() will
+;; return the right boolean depending on whether
+;; riscv_slow_unaligned_access_p is set or not.
+;;
+;; E.g., this is needed for SLP to convert "c[1] << 8) | c[0]" into a
+;; HImode load (a good test case will be blender and xalancbmk in SPEC
+;; CPU 2017).
+;;
+(define_expand "movmisalign<mode>"
+  [(set (match_operand:ANYI 0 "")
+	(match_operand:ANYI 1 ""))]
+  "!riscv_slow_unaligned_access_p"
+{
+  if (riscv_legitimize_move (<MODE>mode, operands[0], operands[1]))
+    DONE;
+})
+
 ;; 64-bit integer moves
 
 (define_expand "movdi"
