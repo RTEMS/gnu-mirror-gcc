@@ -1,6 +1,11 @@
 /* { dg-do compile } */
 /* { dg-require-effective-target powerpc_dense_math_ok } */
-/* { dg-options "-mdejagnu-cpu=future -O2" } */
+
+/* Note tree constant proprigation needs to be tweaked to allow skipping opaque
+   modes.  At the moment just to verify that basic loads and stores are handled
+   of the new type, just disable CCP for now.  By the time GCC 13 is shipped,
+   this needed to be fixed.  */
+/* { dg-options "-mdejagnu-cpu=future -O2 -fno-tree-ccp" } */
 
 /* Test basic load/store for __dmr type.  */
 
