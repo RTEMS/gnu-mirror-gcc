@@ -55,7 +55,7 @@ gcc/testsuite/
 
 Switch to dense math names for all MMA operations.
 
-2022-11-04   Michael Meissner  <meissner@linux.ibm.com>
+2022-11-09   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
