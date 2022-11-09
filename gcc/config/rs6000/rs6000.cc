@@ -1820,7 +1820,9 @@ rs6000_hard_regno_nregs_internal (int regno, machine_mode mode)
      128-bit floating point that can go in vector registers, which has VSX
      memory addressing.  */
   if (FP_REGNO_P (regno))
-    reg_size = (VECTOR_MEM_VSX_P (mode) || VECTOR_ALIGNMENT_P (mode)
+    reg_size = (VECTOR_MEM_VSX_P (mode)
+		|| VECTOR_ALIGNMENT_P (mode)
+		|| mode == TDOmode
 		? UNITS_PER_VSX_WORD
 		: UNITS_PER_FP_WORD);
 
@@ -1853,9 +1855,9 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
 
   /* On power10, MMA accumulator modes need FPR registers divisible by 4.
 
-     If dense math is enabled, allow all VSX registers plus the DMR registers.
-     We need to make sure we don't cross between the boundary of FPRs and
-     traditional Altiviec registers.  */
+     If dense math is enabled, allow all VSX registers plus the dense math
+     registers.  We need to make sure we don't cross between the boundary of
+     FPRs and traditional Altiviec registers.  */
   if (mode == XOmode)
     {
       if (TARGET_MMA && !TARGET_DENSE_MATH)
@@ -1877,7 +1879,27 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
 	return 0;
     }
 
-  /* No other types other than XOmode can go in DMRs.  */
+  /* Dense math register modes need DMR registers or VSX registers divisible by
+     2.  We need to make sure we don't cross between the boundary of FPRs and
+     traditional Altiviec registers.  */
+  if (mode == TDOmode)
+    {
+      if (!TARGET_DENSE_MATH)
+	return 0;
+
+      if (DMR_REGNO_P (regno))
+	return 1;
+
+      if (FP_REGNO_P (regno))
+	return ((regno & 1) == 0 && regno <= LAST_FPR_REGNO - 7);
+
+      if (ALTIVEC_REGNO_P (regno))
+	return ((regno & 1) == 0 && regno <= LAST_ALTIVEC_REGNO - 7);
+
+      return 0;
+    }
+
+  /* No other types other than XOmode or TDOmode can go in DMRs.  */
   if (DMR_REGNO_P (regno))
     return 0;
 
@@ -1985,9 +2007,11 @@ rs6000_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
    GPR registers, and TImode can go in any GPR as well as VSX registers (PR
    57744).
 
-   Similarly, don't allow OOmode (vector pair, restricted to even VSX
-   registers) or XOmode (vector quad, restricted to FPR registers divisible
-   by 4) to tie with other modes.
+   Similarly, don't allow OOmode (vector pair), XOmode (vector quad), or
+   TDOmode (dmr register) to pair with anything else.  Vector pairs are
+   restricted to even/odd VSX registers.  Without dense math, vector quads are
+   limited to FPR registers divisible by 4.  With dense math, vector quads are
+   limited to even VSX registers or DMR registers.
 
    Altivec/VSX vector tests were moved ahead of scalar float mode, so that IEEE
    128-bit floating point on VSX systems ties with other vectors.  */
@@ -1996,7 +2020,8 @@ static bool
 rs6000_modes_tieable_p (machine_mode mode1, machine_mode mode2)
 {
   if (mode1 == PTImode || mode1 == OOmode || mode1 == XOmode
-      || mode2 == PTImode || mode2 == OOmode || mode2 == XOmode)
+      || mode1 == TDOmode || mode2 == PTImode || mode2 == OOmode
+      || mode2 == XOmode || mode2 == TDOmode)
     return mode1 == mode2;
 
   if (ALTIVEC_OR_VSX_VECTOR_MODE (mode1))
@@ -2287,6 +2312,7 @@ rs6000_debug_reg_global (void)
     V4DFmode,
     OOmode,
     XOmode,
+    TDOmode,
     CCmode,
     CCUNSmode,
     CCEQmode,
@@ -2652,7 +2678,7 @@ rs6000_setup_reg_addr_masks (void)
 	  /* Special case DMR registers.  */
 	  if (rc == RELOAD_REG_DMR)
 	    {
-	      if (TARGET_DENSE_MATH && m2 == XOmode)
+	      if (TARGET_DENSE_MATH && (m2 == XOmode || m2 == TDOmode))
 		{
 		  addr_mask = RELOAD_REG_VALID;
 		  reg_addr[m].addr_mask[rc] = addr_mask;
@@ -2762,7 +2788,7 @@ rs6000_setup_reg_addr_masks (void)
 	     since it will be broken into two vector moves.  Vector quads and
 	     1,024 bit DMR values can only do offset loads.  */
 	  else if ((addr_mask != 0) && TARGET_MMA
-		   && (m2 == OOmode || m2 == XOmode))
+		   && (m2 == OOmode || m2 == XOmode || m2 == TDOmode))
 	    {
 	      addr_mask |= RELOAD_REG_OFFSET;
 	      if (rc == RELOAD_REG_FPR || rc == RELOAD_REG_VMX)
@@ -2990,6 +3016,14 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
       rs6000_vector_align[XOmode] = 512;
     }
 
+  /* Add support for 1,024 bit DMR registers.  */
+  if (TARGET_DENSE_MATH)
+    {
+      rs6000_vector_unit[TDOmode] = VECTOR_NONE;
+      rs6000_vector_mem[TDOmode] = VECTOR_VSX;
+      rs6000_vector_align[TDOmode] = 512;
+    }
+
   /* Register class constraints for the constraints that depend on compile
      switches. When the VSX code was added, different constraints were added
      based on the type (DFmode, V2DFmode, V4SFmode).  For the vector types, all
@@ -3201,6 +3235,12 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 	      reg_addr[QImode].scalar_in_vmx_p = true;
 	    }
 	}
+    }
+
+  if (TARGET_DENSE_MATH)
+    {
+      reg_addr[TDOmode].reload_load = CODE_FOR_reload_dmr_from_memory;
+      reg_addr[TDOmode].reload_store = CODE_FOR_reload_dmr_to_memory;
     }
 
   /* Precalculate HARD_REGNO_NREGS.  */
@@ -8678,11 +8718,14 @@ reg_offset_addressing_ok_p (machine_mode mode)
 	return mode_supports_dq_form (mode);
       break;
 
-      /* The vector pair/quad types support offset addressing if the
-	 underlying vectors support offset addressing.  */
+      /* The vector pair/quad types and the dense math types support offset
+	 addressing if the underlying vectors support offset addressing.  */
     case E_OOmode:
     case E_XOmode:
       return TARGET_MMA;
+
+    case E_TDOmode:
+      return TARGET_DENSE_MATH;
 
     case E_SDmode:
       /* If we can do direct load/stores of SDmode, restrict it to reg+reg
@@ -10962,6 +11005,12 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
 	       (mode == OOmode) ? "__vector_pair" : "__vector_quad");
       break;
 
+    case E_TDOmode:
+      if (CONST_INT_P (operands[1]))
+	error ("%qs is an opaque type, and you cannot set it to constants",
+	       "__dmr");
+      break;
+
     case E_SImode:
     case E_DImode:
       /* Use default pattern for address of ELF small data */
@@ -12416,7 +12465,7 @@ rs6000_secondary_reload_simple_move (enum rs6000_reg_type to_type,
 
   /* We can transfer between VSX registers and DMR registers without needing
      extra registers.  */
-  if (TARGET_DENSE_MATH && mode == XOmode
+  if (TARGET_DENSE_MATH && (mode == XOmode || mode == TDOmode)
       && ((to_type == DMR_REG_TYPE && from_type == VSX_REG_TYPE)
 	  || (to_type == VSX_REG_TYPE && from_type == DMR_REG_TYPE)))
     return true;
@@ -13217,6 +13266,9 @@ rs6000_preferred_reload_class (rtx x, enum reg_class rclass)
       if (mode == XOmode)
 	return TARGET_DENSE_MATH ? VSX_REGS : FLOAT_REGS;
 
+      if (mode == TDOmode)
+	return VSX_REGS;
+
       if (GET_MODE_CLASS (mode) == MODE_INT)
 	return GENERAL_REGS;
     }
@@ -13340,8 +13392,9 @@ rs6000_secondary_reload_class (enum reg_class rclass, machine_mode mode,
   else
     regno = -1;
 
-  /* DMR registers don't have loads or stores.  We have to go through the VSX
-     registers to load XOmode (vector quad).  */
+  /* Dense math registers don't have loads or stores.  We have to go through
+     the VSX registers to load XOmode (vector quad) and TDOmode (dmr 1024
+     bit).  */
   if (TARGET_DENSE_MATH && rclass == DM_REGS)
     return VSX_REGS;
 
@@ -20367,6 +20420,8 @@ rs6000_mangle_type (const_tree type)
     return "u13__vector_pair";
   if (type == vector_quad_type_node)
     return "u13__vector_quad";
+  if (type == dmr_type_node)
+    return "u5__dmr";
 
   /* For all other types, use the default mangling.  */
   return NULL;
@@ -22489,6 +22544,10 @@ rs6000_dmr_register_move_cost (machine_mode mode, reg_class_t rclass)
       /* __vector_quad (i.e. XOmode) is tranfered in 1 instruction.  */
       if (mode == XOmode)
 	return reg_move_base;
+
+      /* __dmr (i.e. TDOmode) is transferred in 2 instructions.  */
+      else if (mode == TDOmode)
+	return reg_move_base * 2;
 
       else
 	return reg_move_base * 2 * hard_regno_nregs (FIRST_DMR_REGNO, mode);
@@ -27189,9 +27248,10 @@ rs6000_split_multireg_move (rtx dst, rtx src)
   mode = GET_MODE (dst);
   nregs = hard_regno_nregs (reg, mode);
 
-  /* If we have a vector quad register for MMA, and this is a load or store,
-     see if we can use vector paired load/stores.  */
-  if (mode == XOmode && TARGET_MMA
+  /* If we have a vector quad register for MMA or DMR register for dense math,
+     and this is a load or store, see if we can use vector paired
+     load/stores.  */
+  if ((mode == XOmode || mode == TDOmode) && TARGET_MMA
       && (MEM_P (dst) || MEM_P (src)))
     {
       reg_mode = OOmode;
@@ -27199,7 +27259,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
     }
   /* If we have a vector pair/quad mode, split it into two/four separate
      vectors.  */
-  else if (mode == OOmode || mode == XOmode)
+  else if (mode == OOmode || mode == XOmode || mode == TDOmode)
     reg_mode = V1TImode;
   else if (FP_REGNO_P (reg))
     reg_mode = DECIMAL_FLOAT_MODE_P (mode) ? DDmode :
@@ -27245,13 +27305,13 @@ rs6000_split_multireg_move (rtx dst, rtx src)
       return;
     }
 
-  /* The __vector_pair and __vector_quad modes are multi-register
-     modes, so if we have to load or store the registers, we have to be
-     careful to properly swap them if we're in little endian mode
-     below.  This means the last register gets the first memory
-     location.  We also need to be careful of using the right register
-     numbers if we are splitting XO to OO.  */
-  if (mode == OOmode || mode == XOmode)
+  /* The __vector_pair, __vector_quad, and __dmr modes are multi-register
+     modes, so if we have to load or store the registers, we have to be careful
+     to properly swap them if we're in little endian mode below.  This means
+     the last register gets the first memory location.  We also need to be
+     careful of using the right register numbers if we are splitting XO to
+     OO.  */
+  if (mode == OOmode || mode == XOmode || mode == TDOmode)
     {
       nregs = hard_regno_nregs (reg, mode);
       int reg_mode_nregs = hard_regno_nregs (reg, reg_mode);
@@ -27388,7 +27448,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 	 overlap.  */
       int i;
       /* XO/OO are opaque so cannot use subregs. */
-      if (mode == OOmode || mode == XOmode )
+      if (mode == OOmode || mode == XOmode || mode == TDOmode)
 	{
 	  for (i = nregs - 1; i >= 0; i--)
 	    {
@@ -27562,7 +27622,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 	    continue;
 
 	  /* XO/OO are opaque so cannot use subregs. */
-	  if (mode == OOmode || mode == XOmode )
+	  if (mode == OOmode || mode == XOmode || mode == TDOmode)
 	    {
 	      rtx dst_i = gen_rtx_REG (reg_mode, REGNO (dst) + j);
 	      rtx src_i = gen_rtx_REG (reg_mode, REGNO (src) + j);
@@ -28543,7 +28603,8 @@ rs6000_invalid_conversion (const_tree fromtype, const_tree totype)
 
   if (frommode != tomode)
     {
-      /* Do not allow conversions to/from XOmode and OOmode types.  */
+      /* Do not allow conversions to/from XOmode, OOmode, and TDOmode
+	 types.  */
       if (frommode == XOmode)
 	return N_("invalid conversion from type %<__vector_quad%>");
       if (tomode == XOmode)
@@ -28552,6 +28613,10 @@ rs6000_invalid_conversion (const_tree fromtype, const_tree totype)
 	return N_("invalid conversion from type %<__vector_pair%>");
       if (tomode == OOmode)
 	return N_("invalid conversion to type %<__vector_pair%>");
+      if (frommode == TDOmode)
+	return N_("invalid conversion from type %<__dmr%>");
+      if (tomode == TDOmode)
+	return N_("invalid conversion to type %<__dmr%>");
     }
 
   /* Conversion allowed.  */
