@@ -785,6 +785,14 @@ rs6000_cpu_cpp_builtins (cpp_reader *pfile)
       || DEFAULT_ABI == ABI_ELFv2
       || (DEFAULT_ABI == ABI_AIX && !rs6000_compat_align_parm))
     builtin_define ("__STRUCT_PARM_ALIGN__=16");
+
+  /* Store whether or not we are building libgcc.  This is needed to disable
+     generating the alternate names for 128-bit complex multiply and divide.
+     We need to disable generating __multc3, __divtc3, __mulkc3, and __divkc3
+     when we are building those functions in libgcc.  The variable
+     flag_building_libgcc is only available for the C family of front-ends.
+     We set this variable here to disable generating the alternate names.  */
+  building_libgcc = flag_building_libgcc;
 }
 
 
