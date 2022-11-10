@@ -11,6 +11,8 @@ AM_CFLAGS = $(XCFLAGS)
 ## May be used by toolexeclibdir.
 gcc_version := $(shell @get_gcc_base_ver@ $(top_srcdir)/../gcc/BASE-VER)
 
+abs_doc_builddir = @abs_top_builddir@/doc
+
 ## Symbol versioning (copied from libssp).
 if LIBQUAD_USE_SYMVER
 if LIBQUAD_USE_SYMVER_GNU
@@ -138,8 +140,15 @@ stamp-geninsrc: libquadmath.info
 	cp -p $(top_builddir)/libquadmath.info $(srcdir)/libquadmath.info
 	@touch $@
 
-stamp-build-info: libquadmath.texi $(libquadmath_TEXINFOS)
-	$(MAKEINFO) $(AM_MAKEINFOFLAGS) $(MAKEINFOFLAGS) -I $(srcdir) -o libquadmath.info $(srcdir)/libquadmath.texi
+RST_FILES:=$(shell find $(srcdir) -name *.rst)
+SPHINX_CONFIG_FILES:=$(srcdir)/doc/conf.py $(srcdir)/../doc/baseconf.py
+SPHINX_FILES:=$(RST_FILES) $(SPHINX_CONFIG_FILES)
+
+stamp-build-info: $(SPHINX_FILES)
+	+ if [ x$(HAS_SPHINX_BUILD) = xhas-sphinx-build ]; then \
+	  make -C $(srcdir)/../doc info SOURCEDIR=$(abs_srcdir)/doc BUILDDIR=$(abs_doc_builddir)/info SPHINXBUILD=$(SPHINX_BUILD); \
+	  cp ./doc/info/texinfo/libquadmath.info libquadmath.info; \
+	else true; fi
 	@touch $@
 
 CLEANFILES = $(STAMP_GENINSRC) $(STAMP_BUILD_INFO)
@@ -147,32 +156,10 @@ MAINTAINERCLEANFILES = $(srcdir)/libquadmath.info
 
 endif BUILD_LIBQUADMATH
 
-all-local: $(ALL_LOCAL_DEPS)
+all-local: $(ALL_LOCAL_DEPS) $(STAMP_BUILD_INFO)
 
 # Unconditionally override this target, so that automake's definition
 # does not wrongly interfere.
 libquadmath.info: $(STAMP_BUILD_INFO)
-
-
-# Automake Documentation:
-# If your package has Texinfo files in many directories, you can use the
-# variable TEXINFO_TEX to tell Automake where to find the canonical
-# `texinfo.tex' for your package. The value of this variable should be
-# the relative path from the current `Makefile.am' to `texinfo.tex'.
-TEXINFO_TEX   = ../gcc/doc/include/texinfo.tex
-
-# Defines info, dvi, pdf and html targets
-MAKEINFOFLAGS = -I $(srcdir)/../gcc/doc/include
-
-if BUILD_LIBQUADMATH
-info_TEXINFOS = libquadmath.texi
-else
-info_TEXINFOS = 
-endif
-
-libquadmath_TEXINFOS = libquadmath-vers.texi
-
-libquadmath-vers.texi:
-	echo "@set BUGURL $(REPORT_BUGS_TEXI)" > $@
 
 include $(top_srcdir)/../multilib.am

@@ -11,6 +11,8 @@ config_path = @config_path@
 search_path = $(addprefix $(top_srcdir)/config/, $(config_path)) $(top_srcdir) \
 	      $(top_srcdir)/../include
 
+abs_doc_builddir = @abs_top_builddir@/doc
+
 fincludedir = $(libdir)/gcc/$(target_alias)/$(gcc_version)$(MULTISUBDIR)/finclude
 libsubincludedir = $(libdir)/gcc/$(target_alias)/$(gcc_version)/include
 
@@ -100,18 +102,6 @@ fortran.o: libgomp_f.h
 env.lo: libgomp_f.h
 env.o: libgomp_f.h
 
-
-# Automake Documentation:
-# If your package has Texinfo files in many directories, you can use the
-# variable TEXINFO_TEX to tell Automake where to find the canonical
-# `texinfo.tex' for your package. The value of this variable should be
-# the relative path from the current `Makefile.am' to `texinfo.tex'.
-TEXINFO_TEX   = ../gcc/doc/include/texinfo.tex
-
-# Defines info, dvi, pdf and html targets
-MAKEINFOFLAGS = -I $(srcdir)/../gcc/doc/include
-info_TEXINFOS = libgomp.texi
-
 # AM_CONDITIONAL on configure option --generated-files-in-srcdir
 if GENINSRC
 STAMP_GENINSRC = stamp-geninsrc
@@ -127,7 +117,7 @@ STAMP_BUILD_INFO =
 endif
 
 
-all-local: $(STAMP_GENINSRC)
+all-local: $(STAMP_GENINSRC) $(STAMP_BUILD_INFO)
 
 stamp-geninsrc: libgomp.info
 	cp -p $(top_builddir)/libgomp.info $(srcdir)/libgomp.info
@@ -135,8 +125,15 @@ stamp-geninsrc: libgomp.info
 
 libgomp.info: $(STAMP_BUILD_INFO)
 
-stamp-build-info: libgomp.texi
-	$(MAKEINFO) $(AM_MAKEINFOFLAGS) $(MAKEINFOFLAGS) -I $(srcdir) -o libgomp.info $(srcdir)/libgomp.texi
+RST_FILES:=$(shell find $(srcdir) -name *.rst)
+SPHINX_CONFIG_FILES:=$(srcdir)/doc/conf.py $(srcdir)/../doc/baseconf.py
+SPHINX_FILES:=$(RST_FILES) $(SPHINX_CONFIG_FILES)
+
+stamp-build-info: $(SPHINX_FILES)
+	+ if [ x$(HAS_SPHINX_BUILD) = xhas-sphinx-build ]; then \
+	  make -C $(srcdir)/../doc info SOURCEDIR=$(abs_srcdir)/doc BUILDDIR=$(abs_doc_builddir)/info SPHINXBUILD=$(SPHINX_BUILD); \
+	  cp ./doc/info/texinfo/libgomp.info libgomp.info; \
+	else true; fi
 	@touch $@
 
 

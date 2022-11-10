@@ -177,7 +177,7 @@ am__uninstall_files_from_dir = { \
     || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
-am__installdirs = "$(DESTDIR)$(toolexeclibdir)" "$(DESTDIR)$(infodir)" \
+am__installdirs = "$(DESTDIR)$(toolexeclibdir)" \
 	"$(DESTDIR)$(fincludedir)" "$(DESTDIR)$(libsubincludedir)" \
 	"$(DESTDIR)$(toolexeclibdir)"
 LTLIBRARIES = $(toolexeclib_LTLIBRARIES)
@@ -269,16 +269,9 @@ am__v_FCLD_0 = @echo "  FCLD    " $@;
 am__v_FCLD_1 = 
 SOURCES = $(libgomp_plugin_gcn_la_SOURCES) \
 	$(libgomp_plugin_nvptx_la_SOURCES) $(libgomp_la_SOURCES)
-AM_V_DVIPS = $(am__v_DVIPS_@AM_V@)
-am__v_DVIPS_ = $(am__v_DVIPS_@AM_DEFAULT_V@)
-am__v_DVIPS_0 = @echo "  DVIPS   " $@;
-am__v_DVIPS_1 = 
-INFO_DEPS = doc/info/texinfo/libgomp.info
-PDFS = doc/pdf/latex/libgomp.pdf
-HTMLS = doc/html/html/index.html
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
-	ctags-recursive html-recursive info-recursive \
-	install-data-recursive \
+	ctags-recursive dvi-recursive html-recursive info-recursive \
+	install-data-recursive install-dvi-recursive \
 	install-exec-recursive install-html-recursive \
 	install-info-recursive install-pdf-recursive \
 	install-ps-recursive install-recursive installcheck-recursive \
@@ -332,6 +325,7 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CONFIGURE_SPHINX_BUILD = @CONFIGURE_SPHINX_BUILD@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CPU_COUNT = @CPU_COUNT@
@@ -350,6 +344,7 @@ FC = @FC@
 FCFLAGS = @FCFLAGS@
 FGREP = @FGREP@
 GREP = @GREP@
+HAS_SPHINX_BUILD = @HAS_SPHINX_BUILD@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -365,6 +360,7 @@ LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
 MAINT = @MAINT@
+MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
 NM = @NM@
 NMEDIT = @NMEDIT@
@@ -401,7 +397,6 @@ SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 SPHINX_BUILD = @SPHINX_BUILD@
-HAS_SPHINX_BUILD = @HAS_SPHINX_BUILD@
 STRIP = @STRIP@
 VERSION = @VERSION@
 XCFLAGS = @XCFLAGS@
@@ -409,7 +404,6 @@ XLDFLAGS = @XLDFLAGS@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
-abs_doc_builddir = @abs_top_builddir@/doc
 abs_top_srcdir = @abs_top_srcdir@
 ac_ct_CC = @ac_ct_CC@
 ac_ct_DUMPBIN = @ac_ct_DUMPBIN@
@@ -430,6 +424,7 @@ config_path = @config_path@
 datadir = @datadir@
 datarootdir = @datarootdir@
 docdir = @docdir@
+dvidir = @dvidir@
 enable_shared = @enable_shared@
 enable_static = @enable_static@
 exec_prefix = @exec_prefix@
@@ -484,6 +479,7 @@ gcc_version := $(shell @get_gcc_base_ver@ $(top_srcdir)/../gcc/BASE-VER)
 search_path = $(addprefix $(top_srcdir)/config/, $(config_path)) $(top_srcdir) \
 	      $(top_srcdir)/../include
 
+abs_doc_builddir = @abs_top_builddir@/doc
 fincludedir = $(libdir)/gcc/$(target_alias)/$(gcc_version)$(MULTISUBDIR)/finclude
 libsubincludedir = $(libdir)/gcc/$(target_alias)/$(gcc_version)/include
 AM_CPPFLAGS = $(addprefix -I, $(search_path))
@@ -561,7 +557,6 @@ LTLDFLAGS = $(shell $(SHELL) $(top_srcdir)/../libtool-ldflags $(LDFLAGS))
 LINK = $(LIBTOOL) --tag CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link \
 	$(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LTLDFLAGS) -o $@
 
-
 @GENINSRC_FALSE@STAMP_GENINSRC = 
 
 # AM_CONDITIONAL on configure option --generated-files-in-srcdir
@@ -570,6 +565,9 @@ LINK = $(LIBTOOL) --tag CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link \
 
 # AM_CONDITIONAL on configure check ACX_CHECK_PROG_VER([MAKEINFO])
 @BUILD_INFO_TRUE@STAMP_BUILD_INFO = stamp-build-info
+RST_FILES := $(shell find $(srcdir) -name *.rst)
+SPHINX_CONFIG_FILES := $(srcdir)/doc/conf.py $(srcdir)/../doc/baseconf.py
+SPHINX_FILES := $(RST_FILES) $(SPHINX_CONFIG_FILES)
 CLEANFILES = $(STAMP_GENINSRC) $(STAMP_BUILD_INFO)
 MAINTAINERCLEANFILES = $(srcdir)/libgomp.info
 MULTISRCTOP = 
@@ -582,7 +580,7 @@ all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
 .SUFFIXES:
-.SUFFIXES: .c .f90 .lo .o .obj .ps
+.SUFFIXES: .c .f90 .lo .o .obj
 am--refresh: Makefile
 	@:
 $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/plugin/Makefrag.am $(top_srcdir)/../multilib.am $(am__configure_deps)
@@ -793,84 +791,6 @@ clean-libtool:
 
 distclean-libtool:
 	-rm -f libtool config.lt
-
-doc/pdf/latex/libgomp.pdf: $(SPHINX_FILES)
-	+ make -C $(srcdir)/../doc latexpdf SOURCEDIR=$(abs_srcdir)/doc BUILDDIR=$(abs_doc_builddir)/pdf SPHINXBUILD=$(SPHINX_BUILD)
-
-doc/html/html/index.html: $(SPHINX_FILES)
-	+ make -C $(srcdir)/../doc html SOURCEDIR=$(abs_srcdir)/doc BUILDDIR=$(abs_doc_builddir)/html SPHINXBUILD=$(SPHINX_BUILD)
-
-uninstall-info-am:
-	@$(PRE_UNINSTALL)
-	@if test -d '$(DESTDIR)$(infodir)' && $(am__can_run_installinfo); then \
-	  list='$(INFO_DEPS)'; \
-	  for file in $$list; do \
-	    relfile=`echo "$$file" | sed 's|^.*/||'`; \
-	    echo " install-info --info-dir='$(DESTDIR)$(infodir)' --remove '$(DESTDIR)$(infodir)/$$relfile'"; \
-	    if install-info --info-dir="$(DESTDIR)$(infodir)" --remove "$(DESTDIR)$(infodir)/$$relfile"; \
-	    then :; else test ! -f "$(DESTDIR)$(infodir)/$$relfile" || exit 1; fi; \
-	  done; \
-	else :; fi
-	@$(NORMAL_UNINSTALL)
-	@list='$(INFO_DEPS)'; \
-	for file in $$list; do \
-	  relfile=`echo "$$file" | sed 's|^.*/||'`; \
-	  relfile_i=`echo "$$relfile" | sed 's|\.info$$||;s|$$|.i|'`; \
-	  (if test -d "$(DESTDIR)$(infodir)" && cd "$(DESTDIR)$(infodir)"; then \
-	     echo " cd '$(DESTDIR)$(infodir)' && rm -f $$relfile $$relfile-[0-9] $$relfile-[0-9][0-9] $$relfile_i[0-9] $$relfile_i[0-9][0-9]"; \
-	     rm -f $$relfile $$relfile-[0-9] $$relfile-[0-9][0-9] $$relfile_i[0-9] $$relfile_i[0-9][0-9]; \
-	   else :; fi); \
-	done
-
-uninstall-pdf-am:
-	@$(NORMAL_UNINSTALL)
-	@list='$(PDFS)'; test -n "$(pdfdir)" || list=; \
-	for p in $$list; do \
-	  $(am__strip_dir) \
-	  echo " rm -f '$(DESTDIR)$(pdfdir)/$$f'"; \
-	  rm -f "$(DESTDIR)$(pdfdir)/$$f"; \
-	done
-
-uninstall-ps-am:
-	@$(NORMAL_UNINSTALL)
-	@list='$(PSS)'; test -n "$(psdir)" || list=; \
-	for p in $$list; do \
-	  $(am__strip_dir) \
-	  echo " rm -f '$(DESTDIR)$(psdir)/$$f'"; \
-	  rm -f "$(DESTDIR)$(psdir)/$$f"; \
-	done
-
-dist-info: $(INFO_DEPS)
-	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
-	list='$(INFO_DEPS)'; \
-	for base in $$list; do \
-	  case $$base in \
-	    $(srcdir)/*) base=`echo "$$base" | sed "s|^$$srcdirstrip/||"`;; \
-	  esac; \
-	  if test -f $$base; then d=.; else d=$(srcdir); fi; \
-	  base_i=`echo "$$base" | sed 's|\.info$$||;s|$$|.i|'`; \
-	  for file in $$d/$$base $$d/$$base-[0-9] $$d/$$base-[0-9][0-9] $$d/$$base_i[0-9] $$d/$$base_i[0-9][0-9]; do \
-	    if test -f $$file; then \
-	      relfile=`expr "$$file" : "$$d/\(.*\)"`; \
-	      test -f "$(distdir)/$$relfile" || \
-		cp -p $$file "$(distdir)/$$relfile"; \
-	    else :; fi; \
-	  done; \
-	done
-
-mostlyclean-aminfo:
-	-rm -rf libgomp.t2d libgomp.t2p
-
-clean-aminfo:
-	-test -z "doc/pdf/latex/libgomp.pdf libgomp.html" \
-	|| rm -rf doc/pdf/latex/libgomp.pdf libgomp.html
-
-maintainer-clean-aminfo:
-	@list='$(INFO_DEPS)'; for i in $$list; do \
-	  i_i=`echo "$$i" | sed 's|\.info$$||;s|$$|.i|'`; \
-	  echo " rm -f $$i $$i-[0-9] $$i-[0-9][0-9] $$i_i[0-9] $$i_i[0-9][0-9]"; \
-	  rm -f $$i $$i-[0-9] $$i-[0-9][0-9] $$i_i[0-9] $$i_i[0-9][0-9]; \
-	done
 install-nodist_fincludeHEADERS: $(nodist_finclude_HEADERS)
 	@$(NORMAL_INSTALL)
 	@list='$(nodist_finclude_HEADERS)'; test -n "$(fincludedir)" || list=; \
@@ -1042,11 +962,10 @@ distclean-tags:
 	-rm -f cscope.out cscope.in.out cscope.po.out cscope.files
 check-am: all-am
 check: check-recursive
-all-am: Makefile $(INFO_DEPS) $(LTLIBRARIES) $(HEADERS) config.h \
-		all-local
+all-am: Makefile $(LTLIBRARIES) $(HEADERS) config.h all-local
 installdirs: installdirs-recursive
 installdirs-am:
-	for dir in "$(DESTDIR)$(toolexeclibdir)" "$(DESTDIR)$(infodir)" "$(DESTDIR)$(fincludedir)" "$(DESTDIR)$(libsubincludedir)" "$(DESTDIR)$(toolexeclibdir)"; do \
+	for dir in "$(DESTDIR)$(toolexeclibdir)" "$(DESTDIR)$(fincludedir)" "$(DESTDIR)$(libsubincludedir)" "$(DESTDIR)$(toolexeclibdir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-recursive
@@ -1083,7 +1002,7 @@ maintainer-clean-generic:
 	-test -z "$(MAINTAINERCLEANFILES)" || rm -f $(MAINTAINERCLEANFILES)
 clean: clean-recursive
 
-clean-am: clean-aminfo clean-generic clean-libtool clean-local \
+clean-am: clean-generic clean-libtool clean-local \
 	clean-toolexeclibLTLIBRARIES mostlyclean-am
 
 distclean: distclean-recursive
@@ -1093,117 +1012,46 @@ distclean: distclean-recursive
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-hdr distclean-libtool distclean-local distclean-tags
 
+dvi: dvi-recursive
+
+dvi-am:
 
 html: html-recursive
 
-html-am: $(HTMLS)
+html-am:
 
 info: info-recursive
 
-info-am: $(INFO_DEPS)
+info-am:
 
-install-data-am: install-info-am install-nodist_fincludeHEADERS \
+install-data-am: install-nodist_fincludeHEADERS \
 	install-nodist_libsubincludeHEADERS
+
+install-dvi: install-dvi-recursive
+
+install-dvi-am:
 
 install-exec-am: install-exec-local install-nodist_toolexeclibHEADERS \
 	install-toolexeclibLTLIBRARIES
 
 install-html: install-html-recursive
 
-install-html-am: $(HTMLS)
-	@$(NORMAL_INSTALL)
-	@list='$(HTMLS)'; list2=; test -n "$(htmldir)" || list=; \
-	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(htmldir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(htmldir)" || exit 1; \
-	fi; \
-	for p in $$list; do \
-	  if test -f "$$p" || test -d "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  $(am__strip_dir) \
-	  d2=$$d$$p; \
-	  if test -d "$$d2"; then \
-	    echo " $(MKDIR_P) '$(DESTDIR)$(htmldir)/$$f'"; \
-	    $(MKDIR_P) "$(DESTDIR)$(htmldir)/$$f" || exit 1; \
-	    echo " $(INSTALL_DATA) '$$d2'/* '$(DESTDIR)$(htmldir)/$$f'"; \
-	    $(INSTALL_DATA) "$$d2"/* "$(DESTDIR)$(htmldir)/$$f" || exit $$?; \
-	  else \
-	    list2="$$list2 $$d2"; \
-	  fi; \
-	done; \
-	test -z "$$list2" || { echo "$$list2" | $(am__base_list) | \
-	while read files; do \
-	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(htmldir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(htmldir)" || exit $$?; \
-	done; }
+install-html-am:
+
 install-info: install-info-recursive
 
-install-info-am: $(INFO_DEPS)
-	@$(NORMAL_INSTALL)
-	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
-	list='$(INFO_DEPS)'; test -n "$(infodir)" || list=; \
-	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(infodir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(infodir)" || exit 1; \
-	fi; \
-	for file in $$list; do \
-	  case $$file in \
-	    $(srcdir)/*) file=`echo "$$file" | sed "s|^$$srcdirstrip/||"`;; \
-	  esac; \
-	  if test -f $$file; then d=.; else d=$(srcdir); fi; \
-	  file_i=`echo "$$file" | sed 's|\.info$$||;s|$$|.i|'`; \
-	  for ifile in $$d/$$file $$d/$$file-[0-9] $$d/$$file-[0-9][0-9] \
-	               $$d/$$file_i[0-9] $$d/$$file_i[0-9][0-9] ; do \
-	    if test -f $$ifile; then \
-	      echo "$$ifile"; \
-	    else : ; fi; \
-	  done; \
-	done | $(am__base_list) | \
-	while read files; do \
-	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(infodir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(infodir)" || exit $$?; done
-	@$(POST_INSTALL)
-	@if $(am__can_run_installinfo); then \
-	  list='$(INFO_DEPS)'; test -n "$(infodir)" || list=; \
-	  for file in $$list; do \
-	    relfile=`echo "$$file" | sed 's|^.*/||'`; \
-	    echo " install-info --info-dir='$(DESTDIR)$(infodir)' '$(DESTDIR)$(infodir)/$$relfile'";\
-	    install-info --info-dir="$(DESTDIR)$(infodir)" "$(DESTDIR)$(infodir)/$$relfile" || :;\
-	  done; \
-	else : ; fi
+install-info-am:
+
 install-man:
 
 install-pdf: install-pdf-recursive
 
-install-pdf-am: $(PDFS)
-	@$(NORMAL_INSTALL)
-	@list='$(PDFS)'; test -n "$(pdfdir)" || list=; \
-	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(pdfdir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(pdfdir)" || exit 1; \
-	fi; \
-	for p in $$list; do \
-	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  echo "$$d$$p"; \
-	done | $(am__base_list) | \
-	while read files; do \
-	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(pdfdir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(pdfdir)" || exit $$?; done
+install-pdf-am:
+
 install-ps: install-ps-recursive
 
-install-ps-am: $(PSS)
-	@$(NORMAL_INSTALL)
-	@list='$(PSS)'; test -n "$(psdir)" || list=; \
-	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(psdir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(psdir)" || exit 1; \
-	fi; \
-	for p in $$list; do \
-	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  echo "$$d$$p"; \
-	done | $(am__base_list) | \
-	while read files; do \
-	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(psdir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(psdir)" || exit $$?; done
+install-ps-am:
+
 installcheck-am:
 
 maintainer-clean: maintainer-clean-recursive
@@ -1211,39 +1059,37 @@ maintainer-clean: maintainer-clean-recursive
 	-rm -rf $(top_srcdir)/autom4te.cache
 	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
-maintainer-clean-am: distclean-am maintainer-clean-aminfo \
-	maintainer-clean-generic maintainer-clean-local
+maintainer-clean-am: distclean-am maintainer-clean-generic \
+	maintainer-clean-local
 
 mostlyclean: mostlyclean-recursive
 
-mostlyclean-am: mostlyclean-aminfo mostlyclean-compile \
-	mostlyclean-generic mostlyclean-libtool mostlyclean-local
+mostlyclean-am: mostlyclean-compile mostlyclean-generic \
+	mostlyclean-libtool mostlyclean-local
 
 pdf: pdf-recursive
 
-pdf-am: $(PDFS)
+pdf-am:
 
 ps: ps-recursive
 
-ps-am: $(PSS)
+ps-am:
 
-uninstall-am: uninstall-html-am uninstall-info-am \
-	uninstall-nodist_fincludeHEADERS \
+uninstall-am: uninstall-nodist_fincludeHEADERS \
 	uninstall-nodist_libsubincludeHEADERS \
-	uninstall-nodist_toolexeclibHEADERS uninstall-pdf-am \
-	uninstall-ps-am uninstall-toolexeclibLTLIBRARIES
+	uninstall-nodist_toolexeclibHEADERS \
+	uninstall-toolexeclibLTLIBRARIES
 
 .MAKE: $(am__recursive_targets) all install-am install-strip
 
 .PHONY: $(am__recursive_targets) CTAGS GTAGS TAGS all all-am all-local \
-	am--refresh check check-am clean clean-aminfo clean-cscope \
-	clean-generic clean-libtool clean-local \
-	clean-toolexeclibLTLIBRARIES cscope cscopelist-am ctags \
-	ctags-am dist-info distclean distclean-compile \
+	am--refresh check check-am clean clean-cscope clean-generic \
+	clean-libtool clean-local clean-toolexeclibLTLIBRARIES cscope \
+	cscopelist-am ctags ctags-am distclean distclean-compile \
 	distclean-generic distclean-hdr distclean-libtool \
-	distclean-local distclean-tags html html-am info \
+	distclean-local distclean-tags dvi dvi-am html html-am info \
 	info-am install install-am install-data install-data-am \
-	install-exec install-exec-am \
+	install-dvi install-dvi-am install-exec install-exec-am \
 	install-exec-local install-html install-html-am install-info \
 	install-info-am install-man install-nodist_fincludeHEADERS \
 	install-nodist_libsubincludeHEADERS \
@@ -1251,15 +1097,13 @@ uninstall-am: uninstall-html-am uninstall-info-am \
 	install-ps install-ps-am install-strip \
 	install-toolexeclibLTLIBRARIES installcheck installcheck-am \
 	installdirs installdirs-am maintainer-clean \
-	maintainer-clean-aminfo maintainer-clean-generic \
-	maintainer-clean-local mostlyclean mostlyclean-aminfo \
+	maintainer-clean-generic maintainer-clean-local mostlyclean \
 	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
 	mostlyclean-local pdf pdf-am ps ps-am tags tags-am uninstall \
-	uninstall-am uninstall-html-am \
-	uninstall-info-am uninstall-nodist_fincludeHEADERS \
+	uninstall-am uninstall-nodist_fincludeHEADERS \
 	uninstall-nodist_libsubincludeHEADERS \
-	uninstall-nodist_toolexeclibHEADERS uninstall-pdf-am \
-	uninstall-ps-am uninstall-toolexeclibLTLIBRARIES
+	uninstall-nodist_toolexeclibHEADERS \
+	uninstall-toolexeclibLTLIBRARIES
 
 .PRECIOUS: Makefile
 
@@ -1292,23 +1136,20 @@ fortran.o: libgomp_f.h
 env.lo: libgomp_f.h
 env.o: libgomp_f.h
 
-all-local: $(STAMP_GENINSRC)
+all-local: $(STAMP_GENINSRC) $(STAMP_BUILD_INFO)
 
-RST_FILES:=$(shell find $(srcdir) -name *.rst)
-SPHINX_CONFIG_FILES:=$(srcdir)/doc/conf.py $(srcdir)/../doc/baseconf.py
-SPHINX_FILES:=$(RST_FILES) $(SPHINX_CONFIG_FILES)
-
-export BUGURL=$(PACKAGE_BUGURL)
-
-stamp-geninsrc: doc/info/texinfo/libgomp.info
+stamp-geninsrc: libgomp.info
 	cp -p $(top_builddir)/libgomp.info $(srcdir)/libgomp.info
 	@touch $@
 
-doc/info/texinfo/libgomp.info: $(SPHINX_FILES)
+libgomp.info: $(STAMP_BUILD_INFO)
+
+stamp-build-info: $(SPHINX_FILES)
 	+ if [ x$(HAS_SPHINX_BUILD) = xhas-sphinx-build ]; then \
 	  make -C $(srcdir)/../doc info SOURCEDIR=$(abs_srcdir)/doc BUILDDIR=$(abs_doc_builddir)/info SPHINXBUILD=$(SPHINX_BUILD); \
+	  cp ./doc/info/texinfo/libgomp.info libgomp.info; \
 	else true; fi
-
+	@touch $@
 
 # target overrides
 -include $(tmake_file)
