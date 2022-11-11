@@ -1017,6 +1017,9 @@ faggressive-loop-optimizations
 Common Var(flag_aggressive_loop_optimizations) Optimization Init(1)
 Aggressively optimize loops using language constraints.
 
+falign-arrays
+Common Var(flag_align_arrays) Optimization Init(0)
+
 falign-functions
 Common Var(flag_align_functions) Optimization
 Align the start of functions.

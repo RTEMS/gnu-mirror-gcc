@@ -525,6 +525,7 @@ Objective-C and Objective-C++ Dialects}.
 @item Optimization Options
 @xref{Optimize Options,,Options that Control Optimization}.
 @gccoptlist{-faggressive-loop-optimizations @gol
+-falign-arrays @gol
 -falign-functions[=@var{n}[:@var{m}:[@var{n2}[:@var{m2}]]]] @gol
 -falign-jumps[=@var{n}[:@var{m}:[@var{n2}[:@var{m2}]]]] @gol
 -falign-labels[=@var{n}[:@var{m}:[@var{n2}[:@var{m2}]]]] @gol
@@ -13385,6 +13386,13 @@ function boundary.
 
 The @option{-fipa-strict-aliasing} option is enabled by default and is
 effective only in combination with @option{-fstrict-aliasing}.
+
+@item -falign-arrays
+@opindex falign-arrays
+
+If this option is enabled, the compiler increases the minimum
+alignment of arrays to @code{STACK_BOUNDARY}, meaning the minimum
+alignment of the stack pointer is used.
 
 @item -falign-functions
 @itemx -falign-functions=@var{n}

@@ -43,6 +43,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 #include "debug.h"
 #include "calls.h"
+#include "flags.h"
 
 /* Data type for the expressions representing sizes of data types.
    It is the first integer type laid out.  */
@@ -2567,6 +2568,11 @@ layout_type (tree type)
 	   using machine-dependent criteria if any.  */
 
 	unsigned align = TYPE_ALIGN (element);
+
+	/* Apply minimum alignment for arrays.  */
+	if (flag_align_arrays)
+	  align = MAX (align, STACK_BOUNDARY);
+
 	if (TYPE_USER_ALIGN (type))
 	  align = MAX (align, TYPE_ALIGN (type));
 	else
