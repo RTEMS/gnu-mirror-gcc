@@ -17,6 +17,12 @@ test_func (double *a, int L, int m, int n, int N)
     }
 }
 
+#ifdef PROT_MAX
+# define PROT_MAX_RW PROT_MAX (PROT_READ | PROT_WRITE)
+#else
+# define PROT_MAX_RW 0
+#endif
+
 int
 main ()
 {
@@ -29,7 +35,7 @@ main ()
   long pgsz = sysconf(_SC_PAGESIZE);
   if (pgsz < sizeof (double) || pgsz > L * sizeof (double))
     return 0;
-  p = mmap ((void *) 0, L * n * sizeof (double), PROT_NONE,
+  p = mmap ((void *) 0, L * n * sizeof (double), PROT_NONE | PROT_MAX_RW,
 	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (p == MAP_FAILED)
     return 0;
