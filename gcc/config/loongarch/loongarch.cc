@@ -756,7 +756,8 @@ loongarch_setup_incoming_varargs (cumulative_args_t cum,
      argument.  Advance a local copy of CUM past the last "real" named
      argument, to find out how many registers are left over.  */
   local_cum = *get_cumulative_args (cum);
-  loongarch_function_arg_advance (pack_cumulative_args (&local_cum), arg);
+  if (!TYPE_NO_NAMED_ARGS_STDARG_P (TREE_TYPE (current_function_decl)))
+    loongarch_function_arg_advance (pack_cumulative_args (&local_cum), arg);
 
   /* Found out how many registers we need to save.  */
   gp_saved = MAX_ARGS_IN_REGISTERS - local_cum.num_gprs;
@@ -4177,10 +4178,13 @@ loongarch_emit_int_compare (enum rtx_code *code, rtx *op0, rtx *op1)
 	      if (!increment && !decrement)
 		continue;
 
+	      if ((increment && rhs == HOST_WIDE_INT_MAX)
+		  || (decrement && rhs == HOST_WIDE_INT_MIN))
+		break;
+
 	      new_rhs = rhs + (increment ? 1 : -1);
 	      if (loongarch_integer_cost (new_rhs)
-		    < loongarch_integer_cost (rhs)
-		  && (rhs < 0) == (new_rhs < 0))
+		    < loongarch_integer_cost (rhs))
 		{
 		  *op1 = GEN_INT (new_rhs);
 		  *code = mag_comparisons[i][increment];

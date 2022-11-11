@@ -6232,6 +6232,7 @@ add_candidates (tree fns, tree first_arg, const vec<tree, va_gc> *args,
   bool check_list_ctor = false;
   bool check_converting = false;
   unification_kind_t strict;
+  tree ne_fns = NULL_TREE;
 
   if (!fns)
     return;
@@ -6267,6 +6268,32 @@ add_candidates (tree fns, tree first_arg, const vec<tree, va_gc> *args,
 	}
       strict = DEDUCE_CALL;
       ctype = conversion_path ? BINFO_TYPE (conversion_path) : NULL_TREE;
+    }
+
+  /* P2468: Check if operator== is a rewrite target with first operand
+     (*args)[0]; for now just do the lookups.  */
+  if ((flags & (LOOKUP_REWRITTEN | LOOKUP_REVERSED))
+      && DECL_OVERLOADED_OPERATOR_IS (fn, EQ_EXPR))
+    {
+      tree ne_name = ovl_op_identifier (false, NE_EXPR);
+      if (DECL_CLASS_SCOPE_P (fn))
+	{
+	  ne_fns = lookup_fnfields (TREE_TYPE ((*args)[0]), ne_name,
+				    1, tf_none);
+	  if (ne_fns == error_mark_node || ne_fns == NULL_TREE)
+	    ne_fns = NULL_TREE;
+	  else
+	    ne_fns = BASELINK_FUNCTIONS (ne_fns);
+	}
+      else
+	{
+	  tree context = decl_namespace_context (fn);
+	  ne_fns = lookup_qualified_name (context, ne_name, LOOK_want::NORMAL,
+					  /*complain*/false);
+	  if (ne_fns == error_mark_node
+	      || !is_overloaded_fn (ne_fns))
+	    ne_fns = NULL_TREE;
+	}
     }
 
   if (first_arg)
@@ -6342,6 +6369,27 @@ add_candidates (tree fns, tree first_arg, const vec<tree, va_gc> *args,
 	  tree parmlist = TYPE_ARG_TYPES (TREE_TYPE (fn));
 	  if (same_type_p (TREE_VALUE (parmlist),
 			   TREE_VALUE (TREE_CHAIN (parmlist))))
+	    continue;
+	}
+
+      /* When considering reversed operator==, if there's a corresponding
+	 operator!= in the same scope, it's not a rewrite target.  */
+      if (ne_fns)
+	{
+	  bool found = false;
+	  for (lkp_iterator ne (ne_fns); !found && ne; ++ne)
+	    if (0 && !ne.using_p ()
+		&& DECL_NAMESPACE_SCOPE_P (fn)
+		&& DECL_CONTEXT (*ne) != DECL_CONTEXT (fn))
+	      /* ??? This kludge excludes inline namespace members for the H
+		 test in spaceship-eq15.C, but I don't see why we would want
+		 that behavior.  Asked Core 2022-11-04.  Disabling for now.  */;
+	    else if (fns_correspond (fn, *ne))
+	      {
+		found = true;
+		break;
+	      }
+	  if (found)
 	    continue;
 	}
 
@@ -6917,10 +6965,12 @@ build_new_op (const op_location_t &loc, enum tree_code code, int flags,
 		  gcc_checking_assert (cand->reversed ());
 		  gcc_fallthrough ();
 		case NE_EXPR:
+		  if (result == error_mark_node)
+		    ;
 		  /* If a rewritten operator== candidate is selected by
 		     overload resolution for an operator @, its return type
 		     shall be cv bool.... */
-		  if (TREE_CODE (TREE_TYPE (result)) != BOOLEAN_TYPE)
+		  else if (TREE_CODE (TREE_TYPE (result)) != BOOLEAN_TYPE)
 		    {
 		      if (complain & tf_error)
 			{
@@ -9313,6 +9363,16 @@ conv_binds_ref_to_prvalue (conversion *c)
   return conv_is_prvalue (next_conversion (c));
 }
 
+/* True iff EXPR represents a (subobject of a) temporary.  */
+
+static bool
+expr_represents_temporary_p (tree expr)
+{
+  while (handled_component_p (expr))
+    expr = TREE_OPERAND (expr, 0);
+  return TREE_CODE (expr) == TARGET_EXPR;
+}
+
 /* True iff C is a conversion that binds a reference to a temporary.
    This is a superset of conv_binds_ref_to_prvalue: here we're also
    interested in xvalues.  */
@@ -9330,18 +9390,14 @@ conv_binds_ref_to_temporary (conversion *c)
        struct Derived : Base {};
        const Base& b(Derived{});
      where we bind 'b' to the Base subobject of a temporary object of type
-     Derived.  The subobject is an xvalue; the whole object is a prvalue.  */
-  if (c->kind != ck_base)
-    return false;
-  c = next_conversion (c);
-  if (c->kind == ck_identity && c->u.expr)
-    {
-      tree expr = c->u.expr;
-      while (handled_component_p (expr))
-	expr = TREE_OPERAND (expr, 0);
-      if (TREE_CODE (expr) == TARGET_EXPR)
-	return true;
-    }
+     Derived.  The subobject is an xvalue; the whole object is a prvalue.
+
+     The ck_base doesn't have to be present for cases like X{}.m.  */
+  if (c->kind == ck_base)
+    c = next_conversion (c);
+  if (c->kind == ck_identity && c->u.expr
+      && expr_represents_temporary_p (c->u.expr))
+    return true;
   return false;
 }
 
@@ -12482,10 +12538,53 @@ joust (struct z_candidate *cand1, struct z_candidate *cand2, bool warn,
 	  if (winner && comp != winner)
 	    {
 	      /* Ambiguity between normal and reversed comparison operators
-		 with the same parameter types; prefer the normal one.  */
-	      if ((cand1->reversed () != cand2->reversed ())
+		 with the same parameter types.  P2468 decided not to go with
+		 this approach to resolving the ambiguity, so pedwarn.  */
+	      if ((complain & tf_warning_or_error)
+		  && (cand1->reversed () != cand2->reversed ())
 		  && cand_parms_match (cand1, cand2))
-		return cand1->reversed () ? -1 : 1;
+		{
+		  struct z_candidate *w, *l;
+		  if (cand2->reversed ())
+		    winner = 1, w = cand1, l = cand2;
+		  else
+		    winner = -1, w = cand2, l = cand1;
+		  if (warn)
+		    {
+		      auto_diagnostic_group d;
+		      if (pedwarn (input_location, 0,
+				   "C++20 says that these are ambiguous, "
+				   "even though the second is reversed:"))
+			{
+			  print_z_candidate (input_location,
+					     N_("candidate 1:"), w);
+			  print_z_candidate (input_location,
+					     N_("candidate 2:"), l);
+			  if (w->fn == l->fn
+			      && DECL_NONSTATIC_MEMBER_FUNCTION_P (w->fn)
+			      && (type_memfn_quals (TREE_TYPE (w->fn))
+				  & TYPE_QUAL_CONST) == 0)
+			    {
+			      /* Suggest adding const to
+				 struct A { bool operator==(const A&); }; */
+			      tree parmtype
+				= FUNCTION_FIRST_USER_PARMTYPE (w->fn);
+			      parmtype = TREE_VALUE (parmtype);
+			      if (TYPE_REF_P (parmtype)
+				  && TYPE_READONLY (TREE_TYPE (parmtype))
+				  && (same_type_ignoring_top_level_qualifiers_p
+				      (TREE_TYPE (parmtype),
+				       DECL_CONTEXT (w->fn))))
+				inform (DECL_SOURCE_LOCATION (w->fn),
+					"try making the operator a %<const%> "
+					"member function");
+			    }
+			}
+		    }
+		  else
+		    add_warning (w, l);
+		  return winner;
+		}
 
 	      winner = 0;
 	      goto tweak;
@@ -12874,7 +12973,7 @@ tourney (struct z_candidate *candidates, tsubst_flags_t complain)
 {
   struct z_candidate *champ = candidates, *challenger;
   int fate;
-  int champ_compared_to_predecessor = 0;
+  struct z_candidate *champ_compared_to_predecessor = nullptr;
 
   /* Walk through the list once, comparing each current champ to the next
      candidate, knocking out a candidate or two with each comparison.  */
@@ -12891,12 +12990,12 @@ tourney (struct z_candidate *candidates, tsubst_flags_t complain)
 	      champ = challenger->next;
 	      if (champ == 0)
 		return NULL;
-	      champ_compared_to_predecessor = 0;
+	      champ_compared_to_predecessor = nullptr;
 	    }
 	  else
 	    {
+	      champ_compared_to_predecessor = champ;
 	      champ = challenger;
-	      champ_compared_to_predecessor = 1;
 	    }
 
 	  challenger = champ->next;
@@ -12908,7 +13007,7 @@ tourney (struct z_candidate *candidates, tsubst_flags_t complain)
 
   for (challenger = candidates;
        challenger != champ
-	 && !(champ_compared_to_predecessor && challenger->next == champ);
+	 && challenger != champ_compared_to_predecessor;
        challenger = challenger->next)
     {
       fate = joust (champ, challenger, 0, complain);
@@ -13428,6 +13527,178 @@ initialize_reference (tree type, tree expr,
   return expr;
 }
 
+/* Return true if T is std::pair<const T&, const T&>.  */
+
+static bool
+std_pair_ref_ref_p (tree t)
+{
+  /* First, check if we have std::pair.  */
+  if (!NON_UNION_CLASS_TYPE_P (t)
+      || !CLASSTYPE_TEMPLATE_INSTANTIATION (t))
+    return false;
+  tree tdecl = TYPE_NAME (TYPE_MAIN_VARIANT (t));
+  if (!decl_in_std_namespace_p (tdecl))
+    return false;
+  tree name = DECL_NAME (tdecl);
+  if (!name || !id_equal (name, "pair"))
+    return false;
+
+  /* Now see if the template arguments are both const T&.  */
+  tree args = CLASSTYPE_TI_ARGS (t);
+  if (TREE_VEC_LENGTH (args) != 2)
+    return false;
+  for (int i = 0; i < 2; i++)
+    if (!TYPE_REF_OBJ_P (TREE_VEC_ELT (args, i))
+	|| !CP_TYPE_CONST_P (TREE_TYPE (TREE_VEC_ELT (args, i))))
+      return false;
+
+  return true;
+}
+
+/* Helper for maybe_warn_dangling_reference to find a problematic CALL_EXPR
+   that initializes the LHS (and at least one of its arguments represents
+   a temporary, as outlined in maybe_warn_dangling_reference), or NULL_TREE
+   if none found.  For instance:
+
+     const S& s = S().self(); // S::self (&TARGET_EXPR <...>)
+     const int& r = (42, f(1)); // f(1)
+     const int& t = b ? f(1) : f(2); // f(1)
+     const int& u = b ? f(1) : f(g); // f(1)
+     const int& v = b ? f(g) : f(2); // f(2)
+     const int& w = b ? f(g) : f(g); // NULL_TREE
+     const int& y = (f(1), 42); // NULL_TREE
+     const int& z = f(f(1)); // f(f(1))
+
+   EXPR is the initializer.  */
+
+static tree
+do_warn_dangling_reference (tree expr)
+{
+  STRIP_NOPS (expr);
+  switch (TREE_CODE (expr))
+    {
+    case CALL_EXPR:
+      {
+	tree fndecl = cp_get_callee_fndecl_nofold (expr);
+	if (!fndecl
+	    || warning_suppressed_p (fndecl, OPT_Wdangling_reference)
+	    || !warning_enabled_at (DECL_SOURCE_LOCATION (fndecl),
+				    OPT_Wdangling_reference)
+	    /* Don't emit a false positive for:
+		std::vector<int> v = ...;
+		std::vector<int>::const_iterator it = v.begin();
+		const int &r = *it++;
+	       because R refers to one of the int elements of V, not to
+	       a temporary object.  Member operator* may return a reference
+	       but probably not to one of its arguments.  */
+	    || (DECL_NONSTATIC_MEMBER_FUNCTION_P (fndecl)
+		&& DECL_OVERLOADED_OPERATOR_P (fndecl)
+		&& DECL_OVERLOADED_OPERATOR_IS (fndecl, INDIRECT_REF)))
+	  return NULL_TREE;
+
+	tree rettype = TREE_TYPE (TREE_TYPE (fndecl));
+	/* If the function doesn't return a reference, don't warn.  This
+	   can be e.g.
+	     const int& z = std::min({1, 2, 3, 4, 5, 6, 7});
+	   which doesn't dangle: std::min here returns an int.
+
+	   If the function returns a std::pair<const T&, const T&>, we
+	   warn, to detect e.g.
+	     std::pair<const int&, const int&> v = std::minmax(1, 2);
+	   which also creates a dangling reference, because std::minmax
+	   returns std::pair<const T&, const T&>(b, a).  */
+	if (!(TYPE_REF_OBJ_P (rettype) || std_pair_ref_ref_p (rettype)))
+	  return NULL_TREE;
+
+	/* Here we're looking to see if any of the arguments is a temporary
+	   initializing a reference parameter.  */
+	for (int i = 0; i < call_expr_nargs (expr); ++i)
+	  {
+	    tree arg = CALL_EXPR_ARG (expr, i);
+	    /* Check that this argument initializes a reference, except for
+	       the argument initializing the object of a member function.  */
+	    if (!DECL_NONSTATIC_MEMBER_FUNCTION_P (fndecl)
+		&& !TYPE_REF_P (TREE_TYPE (arg)))
+	      continue;
+	    /* It could also be another call taking a temporary and returning
+	       it and initializing this reference parameter.  */
+	    if (do_warn_dangling_reference (arg))
+	      return expr;
+	    STRIP_NOPS (arg);
+	    if (TREE_CODE (arg) == ADDR_EXPR)
+	      arg = TREE_OPERAND (arg, 0);
+	    if (expr_represents_temporary_p (arg))
+	      return expr;
+	  /* Don't warn about member function like:
+	      std::any a(...);
+	      S& s = a.emplace<S>({0}, 0);
+	     which constructs a new object and returns a reference to it, but
+	     we still want to detect:
+	       struct S { const S& self () { return *this; } };
+	       const S& s = S().self();
+	     where 's' dangles.  If we've gotten here, the object this function
+	     is invoked on is not a temporary.  */
+	    if (DECL_NONSTATIC_MEMBER_FUNCTION_P (fndecl))
+	      break;
+	  }
+	return NULL_TREE;
+      }
+    case COMPOUND_EXPR:
+      return do_warn_dangling_reference (TREE_OPERAND (expr, 1));
+    case COND_EXPR:
+      if (tree t = do_warn_dangling_reference (TREE_OPERAND (expr, 1)))
+	return t;
+      return do_warn_dangling_reference (TREE_OPERAND (expr, 2));
+    case PAREN_EXPR:
+      return do_warn_dangling_reference (TREE_OPERAND (expr, 0));
+    case TARGET_EXPR:
+      return do_warn_dangling_reference (TARGET_EXPR_INITIAL (expr));
+    default:
+      return NULL_TREE;
+    }
+}
+
+/* Implement -Wdangling-reference, to detect cases like
+
+     int n = 1;
+     const int& r = std::max(n - 1, n + 1); // r is dangling
+
+   This creates temporaries from the arguments, returns a reference to
+   one of the temporaries, but both temporaries are destroyed at the end
+   of the full expression.
+
+   This works by checking if a reference is initialized with a function
+   that returns a reference, and at least one parameter of the function
+   is a reference that is bound to a temporary.  It assumes that such a
+   function actually returns one of its arguments.
+
+   DECL is the reference being initialized, INIT is the initializer.  */
+
+static void
+maybe_warn_dangling_reference (const_tree decl, tree init)
+{
+  if (!warn_dangling_reference)
+    return;
+  if (!(TYPE_REF_OBJ_P (TREE_TYPE (decl))
+	|| std_pair_ref_ref_p (TREE_TYPE (decl))))
+    return;
+  /* Don't suppress the diagnostic just because the call comes from
+     a system header.  If the DECL is not in a system header, or if
+     -Wsystem-headers was provided, warn.  */
+  auto wsh
+    = make_temp_override (global_dc->dc_warn_system_headers,
+			  (!in_system_header_at (DECL_SOURCE_LOCATION (decl))
+			   || global_dc->dc_warn_system_headers));
+  if (tree call = do_warn_dangling_reference (init))
+    {
+      auto_diagnostic_group d;
+      if (warning_at (DECL_SOURCE_LOCATION (decl), OPT_Wdangling_reference,
+		      "possibly dangling reference to a temporary"))
+	inform (EXPR_LOCATION (call), "the temporary was destroyed at "
+		"the end of the full expression %qE", call);
+    }
+}
+
 /* If *P is an xvalue expression, prevent temporary lifetime extension if it
    gets used to initialize a reference.  */
 
@@ -13525,6 +13796,9 @@ extend_ref_init_temps (tree decl, tree init, vec<tree, va_gc> **cleanups,
   tree type = TREE_TYPE (init);
   if (processing_template_decl)
     return init;
+
+  maybe_warn_dangling_reference (decl, init);
+
   if (TYPE_REF_P (type))
     init = extend_ref_init_temps_1 (decl, init, cleanups, cond_guard);
   else

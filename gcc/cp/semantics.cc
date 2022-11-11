@@ -731,7 +731,6 @@ end_maybe_infinite_loop (tree cond)
     }
 }
 
-
 /* Begin a conditional that might contain a declaration.  When generating
    normal code, we want the declaration to appear before the statement
    containing the conditional.  When generating template code, we want the
@@ -2738,6 +2737,10 @@ finish_call_expr (tree fn, vec<tree, va_gc> **args, bool disallow_virtual,
 	  result = build_min_nt_call_vec (orig_fn, *args);
 	  SET_EXPR_LOCATION (result, cp_expr_loc_or_input_loc (fn));
 	  KOENIG_LOOKUP_P (result) = koenig_p;
+	  /* Disable the std::move warnings since this call was dependent
+	     (c++/89780, c++/107363).  This also suppresses the
+	     -Wredundant-move warning.  */
+	  suppress_warning (result, OPT_Wpessimizing_move);
 	  if (is_overloaded_fn (fn))
 	    fn = get_fns (fn);
 
@@ -11182,33 +11185,6 @@ init_cp_semantics (void)
 {
 }
 
-
-/* Emit additional diagnostics for failing condition BAD.
-   Used by finish_static_assert and IFN_ASSUME constexpr diagnostics.
-   If SHOW_EXPR_P is true, print the condition (because it was
-   instantiation-dependent).  */
-
-void
-diagnose_failing_condition (tree bad, location_t cloc, bool show_expr_p)
-{
-  /* Nobody wants to see the artificial (bool) cast.  */
-  bad = tree_strip_nop_conversions (bad);
-
-  /* Actually explain the failure if this is a concept check or a
-     requires-expression.  */
-  if (concept_check_p (bad) || TREE_CODE (bad) == REQUIRES_EXPR)
-    diagnose_constraints (cloc, bad, NULL_TREE);
-  else if (COMPARISON_CLASS_P (bad)
-	   && ARITHMETIC_TYPE_P (TREE_TYPE (TREE_OPERAND (bad, 0))))
-    {
-      tree op0 = fold_non_dependent_expr (TREE_OPERAND (bad, 0));
-      tree op1 = fold_non_dependent_expr (TREE_OPERAND (bad, 1));
-      tree cond = build2 (TREE_CODE (bad), boolean_type_node, op0, op1);
-      inform (cloc, "the comparison reduces to %qE", cond);
-    }
-  else if (show_expr_p)
-    inform (cloc, "%qE evaluates to false", bad);
-}
 
 /* Build a STATIC_ASSERT for a static assertion with the condition
    CONDITION and the message text MESSAGE.  LOCATION is the location

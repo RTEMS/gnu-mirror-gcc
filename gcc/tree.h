@@ -772,6 +772,12 @@ extern void omp_clause_range_check_failed (const_tree, const char *, int,
    normal GNU extensions for target-specific vector types.  */
 #define TYPE_INDIVISIBLE_P(NODE) (TYPE_CHECK (NODE)->type_common.indivisible_p)
 
+/* True if this is a stdarg function with no named arguments (C2x
+   (...) prototype, where arguments can be accessed with va_start and
+   va_arg), as opposed to an unprototyped function.  */
+#define TYPE_NO_NAMED_ARGS_STDARG_P(NODE) \
+  (TYPE_CHECK (NODE)->type_common.no_named_args_stdarg_p)
+
 /* In an IDENTIFIER_NODE, this means that assemble_name was called with
    this string as an argument.  */
 #define TREE_SYMBOL_REFERENCED(NODE) \
@@ -1135,7 +1141,7 @@ extern void omp_clause_range_check_failed (const_tree, const char *, int,
 
 /* Define fields and accessors for some special-purpose tree nodes.  */
 
-/* As with STRING_CST, in C terms this is sizeof, not strlen.  */
+/* Unlike STRING_CST, in C terms this is strlen, not sizeof.  */
 #define IDENTIFIER_LENGTH(NODE) \
   (IDENTIFIER_NODE_CHECK (NODE)->identifier.id.len)
 #define IDENTIFIER_POINTER(NODE) \
@@ -4706,6 +4712,13 @@ extern tree build_alloca_call_expr (tree, unsigned int, HOST_WIDE_INT);
 extern tree build_string_literal (unsigned, const char * = NULL,
 				  tree = char_type_node,
 				  unsigned HOST_WIDE_INT = HOST_WIDE_INT_M1U);
+inline tree build_string_literal (const char *p)
+{ return build_string_literal (strlen (p) + 1, p); }
+inline tree build_string_literal (tree t)
+{
+  return build_string_literal (IDENTIFIER_LENGTH (t) + 1,
+			       IDENTIFIER_POINTER (t));
+}
 
 /* Construct various nodes representing data types.  */
 
@@ -4727,7 +4740,7 @@ extern tree build_array_type_1 (tree, tree, bool, bool, bool);
 extern tree build_array_type (tree, tree, bool = false);
 extern tree build_nonshared_array_type (tree, tree);
 extern tree build_array_type_nelts (tree, poly_uint64);
-extern tree build_function_type (tree, tree);
+extern tree build_function_type (tree, tree, bool = false);
 extern tree build_function_type_list (tree, ...);
 extern tree build_varargs_function_type_list (tree, ...);
 extern tree build_function_type_array (tree, int, tree *);
@@ -5541,10 +5554,10 @@ extern tree array_ref_up_bound (tree);
    EXP, an ARRAY_REF or an ARRAY_RANGE_REF.  */
 extern tree array_ref_low_bound (tree);
 
-/* Returns true if REF is an array reference or a component reference
-   to an array at the end of a structure.  If this is the case, the array
-   may be allocated larger than its upper bound implies.  */
-extern bool array_at_struct_end_p (tree);
+/* Returns true if REF is an array reference, a component reference,
+   or a memory reference to an array whose actual size might be larger
+   than its upper bound implies.  */
+extern bool array_ref_flexible_size_p (tree);
 
 /* Return a tree representing the offset, in bytes, of the field referenced
    by EXP.  This does not include any offset in DECL_FIELD_BIT_OFFSET.  */

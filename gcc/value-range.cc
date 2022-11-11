@@ -266,15 +266,16 @@ frange::flush_denormals_to_zero ()
   if (undefined_p () || known_isnan ())
     return;
 
+  machine_mode mode = TYPE_MODE (type ());
   // Flush [x, -DENORMAL] to [x, -0.0].
-  if (real_isdenormal (&m_max) && real_isneg (&m_max))
+  if (real_isdenormal (&m_max, mode) && real_isneg (&m_max))
     {
       m_max = dconst0;
       if (HONOR_SIGNED_ZEROS (m_type))
 	m_max.sign = 1;
     }
   // Flush [+DENORMAL, x] to [+0.0, x].
-  if (real_isdenormal (&m_min) && !real_isneg (&m_min))
+  if (real_isdenormal (&m_min, mode) && !real_isneg (&m_min))
     m_min = dconst0;
 }
 
@@ -341,7 +342,7 @@ frange::set (tree type,
 
   // For -ffinite-math-only we can drop ranges outside the
   // representable numbers to min/max for the type.
-  if (flag_finite_math_only)
+  if (!HONOR_INFINITIES (m_type))
     {
       REAL_VALUE_TYPE min_repr = frange_val_min (m_type);
       REAL_VALUE_TYPE max_repr = frange_val_max (m_type);
@@ -661,7 +662,7 @@ frange::contains_p (tree cst) const
     {
       // Make sure the signs are equal for signed zeros.
       if (HONOR_SIGNED_ZEROS (m_type) && real_iszero (rv))
-	return m_min.sign == m_max.sign && m_min.sign == rv->sign;
+	return rv->sign == m_min.sign || rv->sign == m_max.sign;
       return true;
     }
   return false;
@@ -712,21 +713,21 @@ frange::supports_type_p (const_tree type) const
 void
 frange::verify_range ()
 {
-  if (flag_finite_math_only)
-    gcc_checking_assert (!maybe_isnan ());
+  if (!undefined_p ())
+    gcc_checking_assert (HONOR_NANS (m_type) || !maybe_isnan ());
   switch (m_kind)
     {
     case VR_UNDEFINED:
       gcc_checking_assert (!m_type);
       return;
     case VR_VARYING:
-      if (flag_finite_math_only)
-	gcc_checking_assert (!m_pos_nan && !m_neg_nan);
-      else
-	gcc_checking_assert (m_pos_nan && m_neg_nan);
       gcc_checking_assert (m_type);
       gcc_checking_assert (frange_val_is_min (m_min, m_type));
       gcc_checking_assert (frange_val_is_max (m_max, m_type));
+      if (HONOR_NANS (m_type))
+	gcc_checking_assert (m_pos_nan && m_neg_nan);
+      else
+	gcc_checking_assert (!m_pos_nan && !m_neg_nan);
       return;
     case VR_RANGE:
       gcc_checking_assert (m_type);
@@ -796,14 +797,17 @@ frange::zero_p () const
 	  && real_iszero (&m_max));
 }
 
+// Set the range to non-negative numbers, that is [+0.0, +INF].
+//
+// The NAN in the resulting range (if HONOR_NANS) has a varying sign
+// as there are no guarantees in IEEE 754 wrt to the sign of a NAN,
+// except for copy, abs, and copysign.  It is the responsibility of
+// the caller to set the NAN's sign if desired.
+
 void
 frange::set_nonnegative (tree type)
 {
   set (type, dconst0, frange_val_max (type));
-
-  // Set +NAN as the only possibility.
-  if (HONOR_NANS (type))
-    update_nan (/*sign=*/false);
 }
 
 // Here we copy between any two irange's.  The ranges can be legacy or
@@ -3017,6 +3021,10 @@ irange::intersect_nonzero_bits (const irange &r)
   if (mask_to_wi (m_nonzero_mask, t) != mask_to_wi (r.m_nonzero_mask, t))
     {
       wide_int nz = get_nonzero_bits () & r.get_nonzero_bits ();
+      // If the nonzero bits did not change, return false.
+      if (nz == get_nonzero_bits ())
+	return false;
+
       m_nonzero_mask = wide_int_to_tree (t, nz);
       if (set_range_from_nonzero_bits ())
 	return true;
@@ -3855,6 +3863,14 @@ range_tests_signed_zeros ()
   ASSERT_TRUE (r0.contains_p (neg_zero));
   ASSERT_FALSE (r0.contains_p (zero));
 
+  r0 = frange (neg_zero, zero);
+  ASSERT_TRUE (r0.contains_p (neg_zero));
+  ASSERT_TRUE (r0.contains_p (zero));
+
+  r0 = frange_float ("-3", "5");
+  ASSERT_TRUE (r0.contains_p (neg_zero));
+  ASSERT_TRUE (r0.contains_p (zero));
+
   // The intersection of zeros that differ in sign is a NAN (or
   // undefined if not honoring NANs).
   r0 = frange (neg_zero, neg_zero);
@@ -3910,7 +3926,6 @@ range_tests_signed_zeros ()
     ASSERT_TRUE (r0.undefined_p ());
 
   r0.set_nonnegative (float_type_node);
-  ASSERT_TRUE (r0.signbit_p (signbit) && !signbit);
   if (HONOR_NANS (float_type_node))
     ASSERT_TRUE (r0.maybe_isnan ());
 }
@@ -3957,10 +3972,9 @@ range_tests_floats ()
   // A range of [-INF,+INF] is actually VARYING if no other properties
   // are set.
   r0 = frange_float ("-Inf", "+Inf");
-  if (r0.maybe_isnan ())
-    ASSERT_TRUE (r0.varying_p ());
+  ASSERT_TRUE (r0.varying_p ());
   // ...unless it has some special property...
-  if (!flag_finite_math_only)
+  if (HONOR_NANS (r0.type ()))
     {
       r0.clear_nan ();
       ASSERT_FALSE (r0.varying_p ());
@@ -4032,13 +4046,40 @@ range_tests_floats ()
   r0.intersect (r1);
   ASSERT_TRUE (r0.undefined_p ());
 
-  if (!flag_finite_math_only)
+  if (HONOR_INFINITIES (float_type_node))
     {
       // Make sure [-Inf, -Inf] doesn't get normalized.
       r0 = frange_float ("-Inf", "-Inf");
       ASSERT_TRUE (real_isinf (&r0.lower_bound (), true));
       ASSERT_TRUE (real_isinf (&r0.upper_bound (), true));
     }
+
+  // Test that reading back a global range yields the same result as
+  // what we wrote into it.
+  tree ssa = make_temp_ssa_name (float_type_node, NULL, "blah");
+  r0.set_varying (float_type_node);
+  r0.clear_nan ();
+  set_range_info (ssa, r0);
+  get_global_range_query ()->range_of_expr (r1, ssa);
+  ASSERT_EQ (r0, r1);
+}
+
+// Run floating range tests for various combinations of NAN and INF
+// support.
+
+static void
+range_tests_floats_various ()
+{
+  int save_finite_math_only = flag_finite_math_only;
+
+  // Test -ffinite-math-only.
+  flag_finite_math_only = 1;
+  range_tests_floats ();
+  // Test -fno-finite-math-only.
+  flag_finite_math_only = 0;
+  range_tests_floats ();
+
+  flag_finite_math_only = save_finite_math_only;
 }
 
 void
@@ -4049,7 +4090,7 @@ range_tests ()
   range_tests_int_range_max ();
   range_tests_strict_enum ();
   range_tests_nonzero_bits ();
-  range_tests_floats ();
+  range_tests_floats_various ();
   range_tests_misc ();
 }
 

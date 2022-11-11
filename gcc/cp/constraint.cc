@@ -323,7 +323,7 @@ resolve_function_concept_overload (tree ovl, tree args)
       /* Remember the candidate if we can deduce a substitution.  */
       ++processing_template_decl;
       tree parms = TREE_VALUE (DECL_TEMPLATE_PARMS (tmpl));
-      if (tree subst = coerce_template_parms (parms, args, tmpl))
+      if (tree subst = coerce_template_parms (parms, args, tmpl, tf_none))
         {
           if (subst == error_mark_node)
             ++nerrs;
@@ -404,7 +404,7 @@ resolve_concept_check (tree check)
   tree args = TREE_OPERAND (id, 1);
   tree parms = INNERMOST_TEMPLATE_PARMS (DECL_TEMPLATE_PARMS (tmpl));
   ++processing_template_decl;
-  tree result = coerce_template_parms (parms, args, tmpl);
+  tree result = coerce_template_parms (parms, args, tmpl, tf_none);
   --processing_template_decl;
   if (result == error_mark_node)
     return error_mark_node;
@@ -726,7 +726,7 @@ normalize_concept_check (tree check, tree args, norm_info info)
   /* Turn on template processing; coercing non-type template arguments
      will automatically assume they're non-dependent.  */
   ++processing_template_decl;
-  tree subst = coerce_template_parms (parms, targs, tmpl);
+  tree subst = coerce_template_parms (parms, targs, tmpl, tf_none);
   --processing_template_decl;
   if (subst == error_mark_node)
     return error_mark_node;
@@ -2251,6 +2251,9 @@ static tree
 tsubst_requires_expr (tree t, tree args, sat_info info)
 {
   local_specialization_stack stack (lss_copy);
+
+  /* We need to check access during the substitution.  */
+  deferring_access_check_sentinel acs (dk_no_deferred);
 
   /* A requires-expression is an unevaluated context.  */
   cp_unevaluated u;
