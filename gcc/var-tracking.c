@@ -1069,7 +1069,7 @@ adjust_mems (rtx loc, const_rtx old_rtx, void *data)
       mem = loc;
       if (!amd->store)
 	{
-	  mem = targetm.delegitimize_address (mem);
+	  mem = targetm.delegitimize_address (mem, true);
 	  if (mem != loc && !MEM_P (mem))
 	    return simplify_replace_fn_rtx (mem, old_rtx, adjust_mems, data);
 	}
@@ -1083,7 +1083,7 @@ adjust_mems (rtx loc, const_rtx old_rtx, void *data)
       amd->store = store_save;
       amd->mem_mode = mem_mode_save;
       if (mem == loc)
-	addr = targetm.delegitimize_address (addr);
+	addr = targetm.delegitimize_address (addr, true);
       if (addr != XEXP (mem, 0))
 	mem = replace_equiv_address_nv (mem, addr);
       if (!amd->store)
@@ -8656,7 +8656,7 @@ resolve_expansions_pending_recursion (vec<rtx, va_heap> *pending)
       (d).expanding.release ();					\
 								\
       if ((l) && MEM_P (l))					\
-	(l) = targetm.delegitimize_address (l);			\
+	(l) = targetm.delegitimize_address (l, true);		\
     }								\
   while (0)
 

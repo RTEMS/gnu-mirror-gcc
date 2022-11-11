@@ -619,7 +619,7 @@ propagate_rtx_1 (rtx *px, rtx old_rtx, rtx new_rtx, int flags)
 	  if (!can_simplify_addr (op0))
 	    return true;
 
-	  op0 = new_op0 = targetm.delegitimize_address (op0);
+	  op0 = new_op0 = targetm.delegitimize_address (op0, false);
 	  valid_ops &= propagate_rtx_1 (&new_op0, old_rtx, new_rtx,
 					flags | PR_CAN_APPEAR);
 

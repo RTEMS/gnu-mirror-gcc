@@ -1122,7 +1122,7 @@ reload (rtx_insn *first, int global)
 	  else if (reg_equiv_invariant (i))
 	    equiv = reg_equiv_invariant (i);
 	  else if (reg && MEM_P (reg))
-	    equiv = targetm.delegitimize_address (reg);
+	    equiv = targetm.delegitimize_address (reg, true);
 	  else if (reg && REG_P (reg) && (int)REGNO (reg) != i)
 	    equiv = reg;
 

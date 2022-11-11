@@ -261,7 +261,7 @@ avoid_constant_pool_reference (rtx x)
   addr = XEXP (x, 0);
 
   /* Call target hook to avoid the effects of -fpic etc....  */
-  addr = targetm.delegitimize_address (addr);
+  addr = targetm.delegitimize_address (addr, false);
 
   /* Split the address into a base and integer offset.  */
   addr = strip_offset (addr, &offset);
@@ -298,7 +298,7 @@ avoid_constant_pool_reference (rtx x)
    overrider call it.  */
 
 rtx
-delegitimize_mem_from_attrs (rtx x)
+delegitimize_mem_from_attrs (rtx x, bool debug ATTRIBUTE_UNUSED)
 {
   /* MEMs without MEM_OFFSETs may have been offset, so we can't just
      use their base addresses as equivalent.  */

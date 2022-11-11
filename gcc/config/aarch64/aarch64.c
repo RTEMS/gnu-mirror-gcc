@@ -11756,6 +11756,23 @@ aarch64_legitimize_address (rtx x, rtx /* orig_x  */, machine_mode mode)
   return x;
 }
 
+/* N.b. this is a little bit of a hack.
+   This hook is introduced to try to counter any obfuscating effects of
+   legitimize_address.  MORELLO TODO understand whether this is all working
+   fine.  */
+static rtx
+aarch64_delegitimize_address (rtx x, bool debug_only)
+{
+  x = delegitimize_mem_from_attrs (x, debug_only);
+  if (!debug_only || GET_CODE (x) != UNSPEC)
+    return x;
+  if (XINT (x, 1) != UNSPEC_CHERI_BOUNDS_SET
+      && XINT (x, 1) != UNSPEC_CHERI_BOUNDS_SET_EXACT
+      && XINT (x, 1) != UNSPEC_CHERI_BOUNDS_SET_MAYBE_EXACT)
+    return x;
+  return XVECEXP (x, 0, 0);
+}
+
 static reg_class_t
 aarch64_secondary_reload (bool in_p ATTRIBUTE_UNUSED, rtx x,
 			  reg_class_t rclass,
@@ -25787,6 +25804,9 @@ aarch64_libgcc_floating_mode_supported_p
 
 #undef TARGET_LEGITIMIZE_ADDRESS
 #define TARGET_LEGITIMIZE_ADDRESS aarch64_legitimize_address
+
+#undef TARGET_DELEGITIMIZE_ADDRESS
+#define TARGET_DELEGITIMIZE_ADDRESS aarch64_delegitimize_address
 
 #undef TARGET_SCHED_CAN_SPECULATE_INSN
 #define TARGET_SCHED_CAN_SPECULATE_INSN aarch64_sched_can_speculate_insn

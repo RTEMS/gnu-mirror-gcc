@@ -5970,14 +5970,20 @@ This hook returns true if @var{x} is a legitimate constant for a
 The default definition returns true.
 @end deftypefn
 
-@deftypefn {Target Hook} rtx TARGET_DELEGITIMIZE_ADDRESS (rtx @var{x})
+@deftypefn {Target Hook} rtx TARGET_DELEGITIMIZE_ADDRESS (rtx @var{x}, bool @var{debug})
 This hook is used to undo the possibly obfuscating effects of the
-@code{LEGITIMIZE_ADDRESS} and @code{LEGITIMIZE_RELOAD_ADDRESS} target
+@code{FORCE_OPERAND}, @code{LEGITIMIZE_ADDRESS} and @code{LEGITIMIZE_RELOAD_ADDRESS} target
 macros.  Some backend implementations of these macros wrap symbol
 references inside an @code{UNSPEC} rtx to represent PIC or similar
 addressing modes.  This target hook allows GCC's optimizers to understand
 the semantics of these opaque @code{UNSPEC}s by converting them back
 into their original form.
+
+The second argument @var{DEBUG} is there to indicate whether this
+information is for debug purposes or not.  Some implementations of this hook
+may return an address which is not semantically equivalent (e.g. has
+different security properties when accessing) but is equivalent for the user
+to know where values are.
 @end deftypefn
 
 @deftypefn {Target Hook} bool TARGET_CONST_NOT_OK_FOR_DEBUG_P (rtx @var{x})

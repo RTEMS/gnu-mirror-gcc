@@ -2839,13 +2839,19 @@ strategy can generate better code.",
 DEFHOOK
 (delegitimize_address,
  "This hook is used to undo the possibly obfuscating effects of the\n\
-@code{LEGITIMIZE_ADDRESS} and @code{LEGITIMIZE_RELOAD_ADDRESS} target\n\
+@code{FORCE_OPERAND}, @code{LEGITIMIZE_ADDRESS} and @code{LEGITIMIZE_RELOAD_ADDRESS} target\n\
 macros.  Some backend implementations of these macros wrap symbol\n\
 references inside an @code{UNSPEC} rtx to represent PIC or similar\n\
 addressing modes.  This target hook allows GCC's optimizers to understand\n\
 the semantics of these opaque @code{UNSPEC}s by converting them back\n\
-into their original form.",
- rtx, (rtx x),
+into their original form.\n\
+\n\
+The second argument @var{DEBUG} is there to indicate whether this\n\
+information is for debug purposes or not.  Some implementations of this hook\n\
+may return an address which is not semantically equivalent (e.g. has\n\
+different security properties when accessing) but is equivalent for the user\n\
+to know where values are.",
+ rtx, (rtx x, bool debug),
  delegitimize_mem_from_attrs)
 
 /* Given an RTX, return true if it is not ok to emit it into debug info

@@ -3512,7 +3512,7 @@ extern rtx simplify_rtx (const_rtx);
 extern rtx gen_pointer_plus (scalar_addr_mode, rtx, rtx);
 extern rtx gen_pointer_minus (scalar_addr_mode, rtx, rtx);
 extern rtx avoid_constant_pool_reference (rtx);
-extern rtx delegitimize_mem_from_attrs (rtx);
+extern rtx delegitimize_mem_from_attrs (rtx, bool debug_only=false);
 extern bool mode_signbit_p (machine_mode, const_rtx);
 extern bool val_signbit_p (machine_mode, unsigned HOST_WIDE_INT);
 extern bool val_signbit_known_set_p (machine_mode,

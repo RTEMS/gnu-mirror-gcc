@@ -15504,7 +15504,7 @@ mem_loc_descriptor (rtx rtl, machine_mode mode,
      actually within the array.  That's *not* necessarily the same as the
      zeroth element of the array.  */
 
-  rtl = targetm.delegitimize_address (rtl);
+  rtl = targetm.delegitimize_address (rtl, true);
 
   if (mode != GET_MODE (rtl) && GET_MODE (rtl) != VOIDmode)
     return NULL;
@@ -20085,7 +20085,7 @@ rtl_for_decl_location (tree decl)
 	          && VAR_P (decl)
 		  && TREE_STATIC (decl))))
 	{
-	  rtl = targetm.delegitimize_address (rtl);
+	  rtl = targetm.delegitimize_address (rtl, true);
 	  return rtl;
 	}
       rtl = NULL_RTX;
@@ -20191,7 +20191,7 @@ rtl_for_decl_location (tree decl)
     rtl = rtl_for_decl_init (DECL_INITIAL (decl), TREE_TYPE (decl));
 
   if (rtl)
-    rtl = targetm.delegitimize_address (rtl);
+    rtl = targetm.delegitimize_address (rtl, true);
 
   /* If we don't look past the constant pool, we risk emitting a
      reference to a constant pool entry that isn't referenced from
