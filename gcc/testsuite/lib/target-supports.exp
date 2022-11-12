@@ -6534,8 +6534,8 @@ proc check_effective_target_power10_ok { } {
     }
 }
 
-# Return 1 if this is a PowerPC target supporting -mcpu=future or -mdense-math
-# which enables the dense math operations.
+# Return 1 if this is a PowerPC target supporting -mcpu=future which enables
+# the dense math operations.
 proc check_effective_target_powerpc_dense_math_ok { } {
 	return [check_no_compiler_messages_nocache powerpc_dense_math_ok assembly {
 		__vector_quad vq;
@@ -6550,6 +6550,18 @@ proc check_effective_target_powerpc_dense_math_ok { } {
 		  vq = dmr;
 		#endif
 		}
+	} "-mcpu=future"]
+}
+
+# Return 1 if this is a PowerPC target supporting -mcpu=future which enables
+# the saturating subtract instruction.
+proc check_effective_target_powerpc_subfus_ok { } {
+	return [check_no_compiler_messages powerpc_future_ok object {
+	    #ifndef _ARCH_PWR_FUTURE
+	    #error "not -mcpu=future"
+	    #else
+	    int dummy;
+	    #endif
 	} "-mcpu=future"]
 }
 
