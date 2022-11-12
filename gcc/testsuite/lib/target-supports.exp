@@ -6555,7 +6555,7 @@ proc check_effective_target_powerpc_dense_math_ok { } {
 
 # Return 1 if this is a PowerPC target supporting -mcpu=future which enables
 # the saturating subtract instruction.
-proc check_effective_target_powerpc_subfus_ok { } {
+proc check_effective_target_powerpc_future_ok { } {
 	return [check_no_compiler_messages powerpc_future_ok object {
 	    #ifndef _ARCH_PWR_FUTURE
 	    #error "not -mcpu=future"
