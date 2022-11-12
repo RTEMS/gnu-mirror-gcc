@@ -6553,22 +6553,6 @@ proc check_effective_target_powerpc_dense_math_ok { } {
 	} "-mcpu=future"]
 }
 
-# Return 1 if this is a PowerPC target supporting -mcpu=future which enables
-# the saturating subtract instruction.
-proc check_effective_target_powerpc_subfus_ok { } {
-	return [check_no_compiler_messages_nocache powerpc_subfus_ok assembly {
-		int test (int a, int b)
-		{
-		#ifndef _ARCH_PWR_FUTURE
-		#error "target does not have saturating subtract support."
-		#else
-		/* Make sure we have saturating subtract support.  */
-		  return __builtin_saturate_subtract32 (a, b);
-		#endif
-		}
-	} "-mcpu=future"]
-}
-
 # Return 1 if this is a PowerPC target supporting -mfloat128 via either
 # software emulation on power7/power8 systems or hardware support on power9.
 
