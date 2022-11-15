@@ -1,3 +1,17 @@
+==================== Dmf004 branch, patch #22.
+
+Allow for inline code for memcpy to move more than 16 bytes.
+
+2022-11-15   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-string.cc (toplevel): Include optabs.h.
+	(expand_block_move_variable): New helper function, move variable byte
+	copy support here.  Add support to move more than 16 bytes.
+	(expand_block_move): Move variable copy support to
+	expand_block_move_variable.
+
 ==================== Dmf004 branch, patch #21.
 
 Add parameter for memcpy inline code moves
