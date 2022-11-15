@@ -4417,7 +4417,8 @@ build_converted_constant_expr_internal (tree type, tree expr,
 	  t = next_conversion (c)->type;
 	  if ((INTEGRAL_OR_ENUMERATION_TYPE_P (t)
 	       || INTCAP_TYPE_P (t))
-	      && INTEGRAL_OR_ENUMERATION_TYPE_P (type))
+	      && (INTEGRAL_OR_ENUMERATION_TYPE_P (type)
+		  || INTCAP_TYPE_P (type)))
 	    /* Integral promotion or conversion.  */
 	    break;
 	  if (NULLPTR_TYPE_P (t))

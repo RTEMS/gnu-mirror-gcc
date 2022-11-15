@@ -7213,6 +7213,7 @@ convert_nontype_argument (tree type, tree expr, tsubst_flags_t complain)
 	   to leave it in that form rather than lower it to a
 	   CONSTRUCTOR.  */;
       else if (INTEGRAL_OR_ENUMERATION_TYPE_P (type)
+	       || INTCAP_TYPE_P (type)
 	       || cxx_dialect >= cxx17)
 	{
 	  /* C++17: A template-argument for a non-type template-parameter shall
