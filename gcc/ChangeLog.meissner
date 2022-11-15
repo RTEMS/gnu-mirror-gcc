@@ -1,3 +1,26 @@
+==================== Dmf004 branch, patch #20.
+
+Use lxvl and stxvl for small variable memcpy moves.
+
+This patch adds support to generate inline code for block copy with a variable
+size if the size is 16 bytes or less.  If the size is more than 16 bytes, just
+call memcpy.
+
+To handle variable sizes, I found we need DImode versions of the two insns for
+copying memory (cpymem<mode> and <movmem<mode>).
+
+2022-11-14   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-string.cc (expand_block_move): Add support for
+	using lxvl and stxvl to move up to 16 bytes inline without calling
+	memcpy.
+	* config/rs6000/rs6000.md (cpymem<mode>): Expand cpymemsi to also
+	provide cpymemdi to handle DImode sizes as well as SImode sizes.
+	(movmem<mode>): Expand movmemsi to also provide movmemdi to handle
+	DImode sizes as well as SImode sizes.
+
 ==================== Dmf004 branch, patch #17.
 
 Support load/store vector with right length.
