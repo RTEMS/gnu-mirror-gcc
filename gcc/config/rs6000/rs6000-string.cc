@@ -2766,6 +2766,7 @@ expand_block_move (rtx operands[], bool might_overlap)
   if (! constp)
     {
       if (TARGET_BLOCK_OPS_UNALIGNED_VSX && TARGET_P9_VECTOR && TARGET_64BIT
+	  && rs6000_memcpy_inline_bytes == 16
 	  && !optimize_size)
 	{
 	  rtx join_label = gen_label_rtx ();
