@@ -2766,7 +2766,9 @@ expand_block_move (rtx operands[], bool might_overlap)
   if (! constp)
     {
       if (TARGET_BLOCK_OPS_UNALIGNED_VSX && TARGET_P9_VECTOR && TARGET_64BIT
-	  && !optimize_size)
+	  && rs6000_memcpy_inline_bytes > 0
+	  && rs6000_memcpy_inline_bytes <= GET_MODE_SIZE (V16QImode)
+	  && optimize && !optimize_size)
 	{
 	  rtx join_label = gen_label_rtx ();
 	  rtx inline_label = gen_label_rtx ();
@@ -2779,7 +2781,7 @@ expand_block_move (rtx operands[], bool might_overlap)
 		       : convert_to_mode (Pmode, bytes_rtx, true));
 
 	  rtx cr = gen_reg_rtx (CCUNSmode);
-	  rtx max_size = GEN_INT (16);
+	  rtx max_size = GEN_INT (rs6000_memcpy_inline_bytes);
 	  emit_insn (gen_rtx_SET (cr,
 				  gen_rtx_COMPARE (CCUNSmode, bytes_rtx,
 						   max_size)));
