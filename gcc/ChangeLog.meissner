@@ -1,3 +1,16 @@
+==================== Dmf004 branch, patch #21.
+
+Add parameter for memcpy inline code moves
+
+2022-11-15   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.opt (rs6000-memcpy-inline-bytes): New parameter,
+	set to 0.
+	* config/rs6000/rs6000-string.cc (expand_block_move): Only do
+	optimization if rs6000-memcpy-inline-bytes is 16.
+
 ==================== Dmf004 branch, patch #20.
 
 Use lxvl and stxvl for small variable memcpy moves.
