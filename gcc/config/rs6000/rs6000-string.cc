@@ -2760,9 +2760,58 @@ expand_block_move (rtx operands[], bool might_overlap)
   rtx stores[MAX_MOVE_REG];
   int num_reg = 0;
 
-  /* If this is not a fixed size move, just call memcpy */
+  /* If this is not a fixed size move, see if we can use load/store vector with
+     length to handle multiple bytes. Don't do the optimization if -Os.
+     Otherwise, just call memcpy.  */
   if (! constp)
-    return 0;
+    {
+      if (TARGET_BLOCK_OPS_UNALIGNED_VSX && TARGET_P9_VECTOR && TARGET_64BIT
+	  && !optimize_size)
+	{
+	  rtx join_label = gen_label_rtx ();
+	  rtx inline_label = gen_label_rtx ();
+	  rtx dest_addr = copy_addr_to_reg (XEXP (orig_dest, 0));
+	  rtx src_addr = copy_addr_to_reg (XEXP (orig_src, 0));
+
+	  /* Check if we want to handle this with inline code.  */
+	  bytes_rtx = (GET_MODE (bytes_rtx) == Pmode
+		       ? copy_to_reg (bytes_rtx)
+		       : convert_to_mode (Pmode, bytes_rtx, true));
+
+	  rtx cr = gen_reg_rtx (CCUNSmode);
+	  rtx max_size = GEN_INT (16);
+	  emit_insn (gen_rtx_SET (cr,
+				  gen_rtx_COMPARE (CCUNSmode, bytes_rtx,
+						   max_size)));
+				  
+	  do_ifelse (CCUNSmode, LEU, NULL_RTX, NULL_RTX, cr,
+		     inline_label, profile_probability::likely ());
+
+	  /* Call memcpy if the size is too large.  */
+	  tree fun = builtin_decl_explicit (BUILT_IN_MEMCPY);
+	  emit_library_call_value (XEXP (DECL_RTL (fun), 0),
+				   NULL_RTX, LCT_NORMAL, Pmode,
+				   dest_addr, Pmode,
+				   src_addr, Pmode,
+				   bytes_rtx, Pmode);
+
+	  rtx join_ref = gen_rtx_LABEL_REF (VOIDmode, join_label);
+	  emit_jump_insn (gen_rtx_SET (pc_rtx, join_ref));
+	  emit_barrier ();
+
+	  emit_label (inline_label);
+
+	  /* We want to move bytes inline.  Move 0..16 bytes now.  */
+	  rtx vreg = gen_reg_rtx (V16QImode);
+	  emit_insn (gen_lxvl (vreg, src_addr, bytes_rtx));
+	  emit_insn (gen_stxvl (vreg, dest_addr, bytes_rtx));
+
+	  emit_label (join_label);
+	  return 1;
+	}
+
+      return 0;
+    }
 
   /* This must be a fixed size alignment */
   gcc_assert (CONST_INT_P (align_rtx));
