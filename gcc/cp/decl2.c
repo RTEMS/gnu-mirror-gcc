@@ -4460,7 +4460,8 @@ decl_maybe_constant_var_p (tree decl)
   if (TYPE_REF_P (type))
     /* References can be constant.  */;
   else if (CP_TYPE_CONST_NON_VOLATILE_P (type)
-	   && INTEGRAL_OR_ENUMERATION_TYPE_P (type))
+	   && (INTEGRAL_OR_ENUMERATION_TYPE_P (type)
+	    || INTCAP_TYPE_P (type)))
     /* And const integers.  */;
   else
     return false;
