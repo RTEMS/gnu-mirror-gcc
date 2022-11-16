@@ -4878,12 +4878,6 @@ rs6000_option_override_internal (bool global_init_p)
 	SET_OPTION_IF_UNSET (&global_options, &global_options_set,
 			     param_vect_partial_vector_usage, 0);
 
-      /* If we have the lxvprl/stxvprl instructions, bump up the default size
-	 for doing inlining memcpy moves.  */
-      if (TARGET_FUTURE)
-	SET_OPTION_IF_UNSET (&global_options, &global_options_set,
-			     rs6000_memcpy_inline_bytes, 32);
-
       /* Use the 'model' -fsched-pressure algorithm by default.  */
       SET_OPTION_IF_UNSET (&global_options, &global_options_set,
 			   param_sched_pressure_algorithm,

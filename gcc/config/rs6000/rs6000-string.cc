@@ -2735,6 +2735,32 @@ gen_lxvl_stxvl_move (rtx dest, rtx src, int length)
     return gen_lxvl (dest, addr, len);
 }
 
+/* Generate a lxvl/stxvl or lxvprl/stxvprl pair of instructions to move up to
+   16 or 32 bytes at a time.  */
+
+static void
+expand_lxvl_stxvl (rtx dest_addr,
+		   rtx src_addr,
+		   rtx bytes_rtx,
+		   int max_bytes)
+{
+  if (max_bytes > GET_MODE_SIZE (V16QImode))
+    {
+      rtx vreg = gen_reg_rtx (XOmode);
+      emit_insn (gen_lxvprl (vreg, src_addr, bytes_rtx));
+      emit_insn (gen_stxvprl (vreg, dest_addr, bytes_rtx));
+    }
+
+  else
+    {
+      rtx vreg = gen_reg_rtx (V16QImode);
+      emit_insn (gen_lxvl (vreg, src_addr, bytes_rtx));
+      emit_insn (gen_stxvl (vreg, dest_addr, bytes_rtx));
+    }
+
+  return;
+}
+
 /* Expand a variable block move operation, and return 1 if successful.  Return
    0 if we should let the compiler generate normal code.
 
@@ -2766,11 +2792,16 @@ expand_block_move_variable (rtx operands[], bool might_overlap)
 		   ? copy_to_reg (operands[2])
 		   : convert_to_mode (Pmode, operands[2], true));
 
-  int var_size_int
+  /* Maximum size to move at one time.  */
+  int vect_size_int
     = (TARGET_FUTURE ? GET_MODE_SIZE (XOmode) : GET_MODE_SIZE (V16QImode));
 
-  if (var_size_int > rs6000_memcpy_inline_bytes)
-    var_size_int = rs6000_memcpy_inline_bytes;
+  /* Total size to move.  Limit the number of bytes that we do in this
+     optimization to just 2 variable moves.  Anything larger let the memcpy
+     glibc function handle it and do the extra optimizations it provides.  */
+  int var_size_int = (rs6000_memcpy_inline_bytes > (2 * vect_size_int)
+		      ? 2 * vect_size_int
+		      : rs6000_memcpy_inline_bytes);
 
   rtx var_size = GEN_INT (var_size_int);
   rtx var_cr = gen_reg_rtx (CCUNSmode);
@@ -2797,17 +2828,29 @@ expand_block_move_variable (rtx operands[], bool might_overlap)
   emit_label (var_label);
 
   /* We want to move bytes inline.  Move 0..16 or 0..32 bytes now.  */
-  if (var_size_int > GET_MODE_SIZE (V16QImode))
+  if (vect_size_int > var_size_int)
+    vect_size_int = var_size_int;
+
+  expand_lxvl_stxvl (dest_addr, src_addr, bytes_rtx, vect_size_int);
+
+  /* If we have more than 16/32 bytes, adjust the pointers/length and generate
+     a second move.  */
+  if (var_size_int > vect_size_int)
     {
-      rtx vreg = gen_reg_rtx (XOmode);
-      emit_insn (gen_lxvprl (vreg, src_addr, bytes_rtx));
-      emit_insn (gen_stxvprl (vreg, dest_addr, bytes_rtx));
-    }
-  else
-    {
-      rtx vreg = gen_reg_rtx (V16QImode);
-      emit_insn (gen_lxvl (vreg, src_addr, bytes_rtx));
-      emit_insn (gen_stxvl (vreg, dest_addr, bytes_rtx));
+      emit_insn (gen_add2_insn (bytes_rtx, GEN_INT (- vect_size_int)));
+
+      rtx vect_cr = gen_reg_rtx (CCmode);
+      emit_insn (gen_rtx_SET (vect_cr,
+			      gen_rtx_COMPARE (CCmode, bytes_rtx,
+					       const0_rtx)));
+
+      do_ifelse (CCmode, GT, NULL_RTX, NULL_RTX, vect_cr, join_label,
+		 profile_probability::likely ());
+
+      rtx ptr_adjust = GEN_INT (vect_size_int);
+      emit_insn (gen_add2_insn (dest_addr, ptr_adjust));
+      emit_insn (gen_add2_insn (src_addr, ptr_adjust));
+      expand_lxvl_stxvl (dest_addr, src_addr, bytes_rtx, vect_size_int);
     }
 
   emit_label (join_label);
