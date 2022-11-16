@@ -1,3 +1,19 @@
+==================== Dmf004 branch, patch #25.
+
+Add lxvprl and stxvprl support.
+
+2022-11-16   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-string.cc (expand_block_move_variable): Add
+	check for vect_partial_vector_usage before optimizing variable memcpys.
+	Add support for lxvprl and stxvprl if we have them.
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Bump up
+	memcpy inline size if we have lxvprl and stxvprl.
+	* config/rs6000/vsx.md (lxvprl): New insn.
+	(stxprl): New insn.
+
 ==================== Dmf004 branch, patch #24.
 
 Tweak variable move support.
