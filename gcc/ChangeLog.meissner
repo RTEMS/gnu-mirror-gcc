@@ -1,3 +1,19 @@
+==================== Dmf004 branch, patch #26.
+
+Limit memcpy inline copy to do just 2 variable moves.
+
+2022-11-16   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-string.cc (expand_lxvl_stxvl): New helper
+	function.
+	(expand_block_move_variable): Only do 2 variable moves per memcpy call.
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Remove
+	bumping up rs6000_memcpy_inline_bytes if -mcpu=future.
+	* config/rs6000/rs6000.opt (-param=rs6000-memcpy-inline-bytes=): Set
+	default to 32, not 16.
+
 ==================== Dmf004 branch, patch #25.
 
 Add lxvprl and stxvprl support.
