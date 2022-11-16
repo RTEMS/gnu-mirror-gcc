@@ -1,3 +1,17 @@
+==================== Dmf004 branch, patch #24.
+
+Tweak variable move support.
+
+2022-11-16   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-string.cc (expand_block_move_variable): Move
+	testing whether we want to do variable moves here.  For now, limit moves
+	to 0..16 bytes.
+	(expand_block_move): Move variable tests to
+	expand_block_moves_variable.
+
 ==================== Dmf004 branch, patch #23.
 
 Don't do load/store vector with length if overlap.
