@@ -2838,7 +2838,7 @@ expand_block_move (rtx operands[], bool might_overlap)
       if (TARGET_BLOCK_OPS_UNALIGNED_VSX && TARGET_P9_VECTOR && TARGET_64BIT
 	  && rs6000_memcpy_inline_bytes > 0
 	  && rs6000_memcpy_inline_bytes <= 255
-	  && optimize && !optimize_size)
+	  && !might_overlap && optimize && !optimize_size)
 	{
 	  expand_block_move_variable (orig_dest, orig_src, bytes_rtx);
 	  return 1;
