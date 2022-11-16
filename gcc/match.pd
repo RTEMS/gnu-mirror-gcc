@@ -3188,6 +3188,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
    (with
     {
       tree inside_type = TREE_TYPE (@0);
+      bool inside_iscap = capability_type_p (inside_type);
       tree inter_type = TREE_TYPE (@1);
       int inside_int = INTEGRAL_TYPE_P (inside_type);
       int inside_ptr = POINTER_TYPE_P (inside_type);
@@ -3262,7 +3263,8 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 	 && ((inter_unsignedp && inter_prec > inside_prec)
 	     == (final_unsignedp && final_prec > inter_prec))
 	 && ! (inside_ptr && inter_prec != final_prec)
-	 && ! (final_ptr && inside_prec != inter_prec))
+	 && ! (final_ptr && inside_prec != inter_prec)
+	 && ! (inside_iscap && final_prec > inside_prec))
      (ocvt @0))
 
     /* A truncation to an unsigned type (a zero-extension) should be

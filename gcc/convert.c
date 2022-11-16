@@ -514,6 +514,8 @@ convert_to_integer_1 (tree type, tree expr, bool dofold)
   unsigned int outprec = element_precision (type);
   location_t loc = EXPR_LOCATION (expr);
 
+  gcc_assert (!capability_type_p (type));
+
   /* An INTEGER_TYPE cannot be incomplete, but an ENUMERAL_TYPE can
      be.  Consider `enum E = { a, b = (enum E) 3 };'.  */
   if (!COMPLETE_TYPE_P (type))
@@ -688,17 +690,37 @@ convert_to_integer_1 (tree type, tree expr, bool dofold)
 	  && !TREE_OVERFLOW (tree_strip_any_location_wrapper (expr)))
 	return build_int_cst (type, 0);
 
-      /* Convert to an unsigned integer of the correct width first, and from
-	 there widen/truncate to the required type.  Some targets support the
-	 coexistence of multiple valid pointer sizes, so fetch the one we need
+      /* Convert to integer of the correct width first, and from there
+	 widen/truncate to the required type.  In the case of intcap
+	 values, the signedness of the intermediate type mirrors that
+	 of the original intcap type.  In the case of capabilities,
+	 GCC's implementation-defined behavior of sign-extending
+	 pointers is preserved.  Some targets support the coexistence
+	 of multiple valid pointer sizes, so fetch the one we need
 	 from the type.  */
-      if (!dofold)
-	return build1 (CONVERT_EXPR, type, expr);
-      expr = fold_build1 (CONVERT_EXPR,
-			  lang_hooks.types.type_for_size
-			    (TYPE_NONCAP_PRECISION (intype), 0),
-			  expr);
-      return fold_convert (type, expr);
+      {
+	int unsigned_p = INTCAP_TYPE_P (intype) ? TYPE_UNSIGNED (intype) : 0;
+	if (!dofold)
+	  {
+	    /* Enable conversion from capability and __intcap to __int128
+	       via initial conversion to (unsigned) long int. */
+	    if (capability_type_p (intype)
+		&& INTEGRAL_TYPE_P (type)
+		&& outprec > TYPE_NONCAP_PRECISION (intype))
+	      {
+		expr = build1 (CONVERT_EXPR,
+			       lang_hooks.types.type_for_size
+			       (TYPE_NONCAP_PRECISION (intype), unsigned_p),
+			       expr);
+	      }
+	    return build1 (CONVERT_EXPR, type, expr);
+	  }
+	expr = fold_build1 (CONVERT_EXPR,
+			    lang_hooks.types.type_for_size
+			    (TYPE_NONCAP_PRECISION (intype), unsigned_p),
+			    expr);
+	return fold_convert (type, expr);
+      }
 
     case INTEGER_TYPE:
     case ENUMERAL_TYPE:
