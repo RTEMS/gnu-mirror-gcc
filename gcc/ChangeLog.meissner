@@ -1,3 +1,15 @@
+==================== Dmf004 branch, patch #23.
+
+Don't do load/store vector with length if overlap.
+
+2022-11-16   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-string.cc (expand_block_move): Don't do the
+	optimization to use load/store vector with length if the source and
+	destination might overlap.
+
 ==================== Dmf004 branch, patch #22.
 
 Allow for inline code for memcpy to move more than 16 bytes.
