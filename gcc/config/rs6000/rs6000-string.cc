@@ -2752,6 +2752,7 @@ expand_block_move_variable (rtx operands[], bool might_overlap)
       || !TARGET_P9_VECTOR
       || !TARGET_64BIT
       || rs6000_memcpy_inline_bytes == 0
+      || !param_vect_partial_vector_usage
       || might_overlap
       || !optimize
       || optimize_size)
@@ -2765,10 +2766,11 @@ expand_block_move_variable (rtx operands[], bool might_overlap)
 		   ? copy_to_reg (operands[2])
 		   : convert_to_mode (Pmode, operands[2], true));
 
-  HOST_WIDE_INT var_size_int
-    = (rs6000_memcpy_inline_bytes > GET_MODE_SIZE (V16QImode)
-       ? GET_MODE_SIZE (V16QImode)
-       : rs6000_memcpy_inline_bytes);
+  int var_size_int
+    = (TARGET_FUTURE ? GET_MODE_SIZE (XOmode) : GET_MODE_SIZE (V16QImode));
+
+  if (var_size_int > rs6000_memcpy_inline_bytes)
+    var_size_int = rs6000_memcpy_inline_bytes;
 
   rtx var_size = GEN_INT (var_size_int);
   rtx var_cr = gen_reg_rtx (CCUNSmode);
@@ -2794,10 +2796,19 @@ expand_block_move_variable (rtx operands[], bool might_overlap)
 
   emit_label (var_label);
 
-  /* We want to move bytes inline.  Move 0..16 bytes now.  */
-  rtx vreg = gen_reg_rtx (V16QImode);
-  emit_insn (gen_lxvl (vreg, src_addr, bytes_rtx));
-  emit_insn (gen_stxvl (vreg, dest_addr, bytes_rtx));
+  /* We want to move bytes inline.  Move 0..16 or 0..32 bytes now.  */
+  if (var_size_int > GET_MODE_SIZE (V16QImode))
+    {
+      rtx vreg = gen_reg_rtx (XOmode);
+      emit_insn (gen_lxvprl (vreg, src_addr, bytes_rtx));
+      emit_insn (gen_stxvprl (vreg, dest_addr, bytes_rtx));
+    }
+  else
+    {
+      rtx vreg = gen_reg_rtx (V16QImode);
+      emit_insn (gen_lxvl (vreg, src_addr, bytes_rtx));
+      emit_insn (gen_stxvl (vreg, dest_addr, bytes_rtx));
+    }
 
   emit_label (join_label);
   return 1;
