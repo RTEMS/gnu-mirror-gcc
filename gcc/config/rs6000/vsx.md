@@ -5804,6 +5804,29 @@
   DONE;
 })
 
+;; There are no lxvpl and stxvpl instructions, so we can simplify the support
+;; for lxvprl and stxvprl by not incorporating the shift left by 56 bits.
+(define_insn "lxvprl"
+  [(set (match_operand:XO 0 "vsx_register_operand" "=wa")
+	(unspec:XO
+	 [(match_operand:DI 1 "gpc_reg_operand" "b")
+	  (mem:XO (match_dup 1))
+	  (match_operand:DI 2 "register_operand" "r")]
+	 UNSPEC_LXVL))]
+  "TARGET_FUTURE && TARGET_64BIT"
+  "lxvprl %x0,%1,%2"
+  [(set_attr "type" "vecload")])
+
+(define_insn "stxvprl"
+  [(set (mem:XO (match_operand:DI 1 "gpc_reg_operand" "b"))
+	(unspec:XO [(match_operand:XO 0 "vsx_register_operand" "wa")
+		       (mem:XO (match_dup 1))
+		       (match_operand:DI 2 "register_operand" "r")]
+	              UNSPEC_STXVLL))]
+  "TARGET_FUTURE"
+  "stxvprl %x0,%1,%2"
+  [(set_attr "type" "vecstore")])
+
 ;; Vector Compare Not Equal Byte (specified/not+eq:)
 (define_insn "vcmpneb"
   [(set (match_operand:V16QI 0 "altivec_register_operand" "=v")
