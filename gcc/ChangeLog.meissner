@@ -1,3 +1,21 @@
+==================== Dmf004 branch, patch #28.
+
+Add suuport to use stxvl for variable sized memsets.
+
+2022-11-17   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-protos.h (expand_block_set): Add declaration.
+	* config/rs6000/rs6000-string.cc (expand_block_set): New support for
+	optimizing variable sized memsets.
+	* config/rs6000/rs6000.md (setmem<mode>): Add setmemdi along with
+	setmemsi.  Add support for optimizing memsets of other bytes than just
+	0.  Add support for using stxvl to support variable sized sets.
+	* config/rs6000/rs6000.opt (--param rs6000-memcpy-inline-bytes): Make
+	the default 16, not 32.
+	((--param rs6000-memset-inline-bytes): New parameter.
+
 ==================== Dmf004 branch, patch #27.
 
 Fix lxvl and stxvl wrong conditional branch.
