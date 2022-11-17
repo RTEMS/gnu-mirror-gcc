@@ -4620,11 +4620,19 @@ tree_innermost_capability (const_tree t)
   if (TREE_SIDE_EFFECTS (t))
     return NULL_TREE;
 
+  if (location_wrapper_p (t))
+    return tree_innermost_capability (TREE_OPERAND (t, 0));
+
   switch (TREE_CODE (t))
     {
     case VAR_DECL:
     case PARM_DECL:
-      /* These can never be assembly constants.  */
+    case INDIRECT_REF:
+    case ARRAY_REF:
+    case COMPONENT_REF:
+    case COND_EXPR:
+      /* These can never give the base capability of a valid assembly
+	 constant.  */
       return NULL_TREE;
     case INTEGER_CST:
     CASE_ADDR_EXPR:
@@ -4635,7 +4643,15 @@ tree_innermost_capability (const_tree t)
       gcc_assert (CALL_EXPR_IFN (t) == IFN_REPLACE_ADDRESS_VALUE);
       return tree_innermost_capability (CALL_EXPR_ARG (t, 0));
     default:
-      gcc_unreachable ();
+      /* It is likely that anything we haven't already handled here
+	 cannot be the base capability of a valid assembly constant in
+	 the form of a call to REPLACE_ADDRESS_VALUE.  However, it would
+	 be good to check that for any case that arises in development
+	 which we haven't already explicitly handled.  Hence, we assert
+	 on any unrecognized codes, but only if CHECKING_P.  */
+      if (CHECKING_P)
+	gcc_unreachable ();
+      return NULL;
     }
 }
 
