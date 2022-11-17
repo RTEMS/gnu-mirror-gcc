@@ -689,6 +689,11 @@ When reduction factor computed for a loop exceeds the threshold specified by
 this parameter, prefer to unroll this loop.  The default value is 1.
 
 -param=rs6000-memcpy-inline-bytes=
-Target Undocumented Joined UInteger Var(rs6000_memcpy_inline_bytes) Init(32) Param
+Target Undocumented Joined UInteger Var(rs6000_memcpy_inline_bytes) Init(16) Param
 Maximum number of bytes to move with inline code before calling the memcpy
-library function.  The default value is 32.
+library function.  The default value is 16.
+
+-param=rs6000-memset-inline-bytes=
+Target Undocumented Joined UInteger Var(rs6000_memset_inline_bytes) Init(16) Param
+Maximum number of bytes to move with inline code before calling the memset
+library function.  The default value is 16.
