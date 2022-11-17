@@ -2844,7 +2844,7 @@ expand_block_move_variable (rtx operands[], bool might_overlap)
 			      gen_rtx_COMPARE (CCmode, bytes_rtx,
 					       const0_rtx)));
 
-      do_ifelse (CCmode, GT, NULL_RTX, NULL_RTX, vect_cr, join_label,
+      do_ifelse (CCmode, LE, NULL_RTX, NULL_RTX, vect_cr, join_label,
 		 profile_probability::likely ());
 
       rtx ptr_adjust = GEN_INT (vect_size_int);
