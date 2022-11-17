@@ -39,11 +39,6 @@
 #include "predict.h"
 #include "optabs.h"
 
-/* Forward reference.  */
-static void do_ifelse (machine_mode cmpmode, rtx_code comparison,
-		       rtx a, rtx b, rtx cr, rtx true_label,
-		       profile_probability br_prob);
-
 /* Expand a block clear operation, and return 1 if successful.  Return 0
    if we should let the compiler generate normal code.
 
@@ -150,88 +145,6 @@ expand_block_clear (rtx operands[])
       emit_move_insn (dest, CONST0_RTX (mode));
     }
 
-  return 1;
-}
-
-/* Expand a block set operation, and return 1 if successful.  Return 0
-   if we should let the compiler generate normal code.
-
-   operands[0] is the destination
-   operands[1] is the length
-   operands[2] is the value to set memory to (normally 0)
-   operands[3] is the alignment */
-
-int
-expand_block_set (rtx operands[])
-{
-  rtx bytes_rtx	= operands[1];
-  rtx set_byte = operands[2];
-  bool constp = CONST_INT_P (bytes_rtx);
-
-  /* At the moment, only handle setting memory to a constant.  */
-  if (!CONST_INT_P (set_byte)
-      || !IN_RANGE (INTVAL (set_byte), -127, 255))
-    return 0;
-
-  /* If we are storing to a memory region with a variable size, see if we have
-     the necessary support for store vector with length, and we want to do the
-     optimization.  Fall back to using the clear memory support if we don't
-     want to use stxvl using an inline test.  */
-  if (constp
-      || !TARGET_BLOCK_OPS_UNALIGNED_VSX
-      || !TARGET_P9_VECTOR
-      || !TARGET_64BIT
-      || rs6000_memset_inline_bytes == 0
-      || !param_vect_partial_vector_usage
-      || !optimize
-      || optimize_size)
-    {
-      if (set_byte == const0_rtx)
-	return expand_block_clear (operands);
-
-      return 0;
-    }
-
-  rtx dest_addr = force_reg (Pmode, XEXP (operands[0], 0));
-  int vect_size_int = (rs6000_memset_inline_bytes >= GET_MODE_SIZE (V16QImode)
-		       ? GET_MODE_SIZE (V16QImode)
-		       : rs6000_memset_inline_bytes);
-
-  rtx vect_size = GEN_INT (vect_size_int);
-  rtx var_cr = gen_reg_rtx (CCUNSmode);
-  emit_insn (gen_rtx_SET (var_cr,
-			  gen_rtx_COMPARE (CCUNSmode, bytes_rtx, vect_size)));
-				  
-  rtx var_label = gen_label_rtx ();
-  do_ifelse (CCUNSmode, LEU, NULL_RTX, NULL_RTX, var_cr, var_label,
-	     profile_probability::likely ());
-
-  /* Call memset if the size is too large.  */
-  tree fun = builtin_decl_explicit (BUILT_IN_MEMSET);
-  emit_library_call_value (XEXP (DECL_RTL (fun), 0),
-			   NULL_RTX, LCT_NORMAL, Pmode,
-			   dest_addr, Pmode,
-			   set_byte, SImode,
-			   bytes_rtx, Pmode);
-
-  rtx join_label = gen_label_rtx ();
-  rtx join_ref = gen_rtx_LABEL_REF (VOIDmode, join_label);
-  emit_jump_insn (gen_rtx_SET (pc_rtx, join_ref));
-  emit_barrier ();
-
-  emit_label (var_label);
-
-  if (IN_RANGE (INTVAL (set_byte), 128, 255))
-    set_byte = GEN_INT (((INTVAL (set_byte) & 0xff) ^ 0x80) - 0x80);
-
-  /* Create the vector with the bytes splatted.  */
-  rtx vreg = gen_reg_rtx (V16QImode);
-  emit_insn (gen_xxspltib_v16qi (vreg, set_byte));
-
-  /* We want to set bytes inline.  Set 0..16 bytes now.  */
-  emit_insn (gen_stxvl (vreg, dest_addr, bytes_rtx));
-
-  emit_label (join_label);
   return 1;
 }
 
