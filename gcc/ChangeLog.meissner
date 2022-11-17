@@ -1,3 +1,14 @@
+==================== Dmf004 branch, patch #27.
+
+Fix lxvl and stxvl wrong conditional branch.
+
+2022-11-16   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-string.cc (expand_block_move_variable): Fix wrong
+	conditional branch.
+
 ==================== Dmf004 branch, patch #26.
 
 Limit memcpy inline copy to do just 2 variable moves.
