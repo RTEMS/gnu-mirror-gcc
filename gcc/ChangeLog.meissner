@@ -1,3 +1,14 @@
+==================== Dmf004 branch, patch #29.
+
+Reset memcpy inline bytes parameter.
+
+2022-11-17   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.opt (--param rs6000-memcpy-inline-bytes): Make
+	the default 16, not 32.
+
 ==================== Dmf004 branch, patch #28 was reverted.
 
 ==================== Dmf004 branch, patch #27.
