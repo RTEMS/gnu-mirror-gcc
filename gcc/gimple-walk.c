@@ -770,6 +770,24 @@ walk_stmt_load_store_addr_ops (gimple *stmt, void *data,
 				     TREE_OPERAND (OBJ_TYPE_REF_OBJECT (val),
 						   0), arg, data);
 	    }
+	  /* MEM_REF [&<something>] usually does not count as the address of
+	     <something> being taken.  This is logically the same as a
+	     VIEW_CONVERT_EXPR.
+	     If the MEM_REF is of capability type, and the <something> is not
+	     then we have disallowed a VIEW_CONVERT_EXPR of the relevant type
+	     since most such VIEW_CONVERT_EXPR's occur due to the compiler
+	     attempting to do broken things.  We have no representation for
+	     "treat the bits of this decl as a capability" except this
+	     representation through memory.  Hence such a construct requires
+	     the original decl to be in memory, and hence we need to pass the
+	     value of this ADDR_EXPR to our callback.  */
+	  else if (TREE_CODE (rhs) == MEM_REF
+		   && capability_type_p (TREE_TYPE (rhs))
+		   && ADDR_EXPR_P (TREE_OPERAND (rhs, 0))
+		   && !capability_type_p (TREE_TYPE (TREE_OPERAND (TREE_OPERAND (rhs, 0), 0))))
+	    ret |= visit_addr (stmt,
+			       TREE_OPERAND (TREE_OPERAND (rhs, 0), 0),
+			       arg, data);
           lhs = gimple_assign_lhs (stmt);
 	  if (TREE_CODE (lhs) == TARGET_MEM_REF
               && ADDR_EXPR_P (TMR_BASE (lhs)))
