@@ -4450,13 +4450,18 @@ simplify_binary_operation_1 (enum rtx_code code, machine_mode mode,
 
       if (GET_CODE (op0) == CONST_NULL)
 	return simplify_gen_binary (POINTER_PLUS, mode, op0, op1);
-      else if (GET_CODE (op0) == REPLACE_ADDRESS_VALUE
-	    || GET_CODE (op0) == POINTER_PLUS
-	    || GET_CODE (op0) == ALIGN_ADDRESS_DOWN)
+
+      rtx x = op0;
+      if (GET_CODE (x) == CONST)
+	x = XEXP (x, 0);
+
+      if (GET_CODE (x) == REPLACE_ADDRESS_VALUE
+	    || GET_CODE (x) == POINTER_PLUS
+	    || GET_CODE (x) == ALIGN_ADDRESS_DOWN)
 	{
-	  if (!side_effects_p (XEXP (op0, 1)))
+	  if (!side_effects_p (XEXP (x, 1)))
 	    return simplify_gen_binary (REPLACE_ADDRESS_VALUE, mode,
-					XEXP (op0, 0), op1);
+					XEXP (x, 0), op1);
 	}
 
       if (GET_CODE (op1) == AND
@@ -7120,13 +7125,23 @@ simplify_subreg (machine_mode outermode, rtx op,
   if (GET_CODE (op) == CONST_VECTOR)
     byte = simplify_const_vector_byte_offset (op, byte);
 
-  if (CONST_NULL_P (op))
+  unsigned HOST_WIDE_INT cbyte;
+  if (byte.is_constant (&cbyte)
+      && known_eq (cbyte, subreg_lowpart_offset (outermode, innermode))
+      && noncapability_mode (innermode) == outermode)
     {
-      unsigned HOST_WIDE_INT cbyte;
-      if (byte.is_constant (&cbyte)
-	  && known_eq (cbyte, subreg_lowpart_offset (outermode, innermode))
-	  && noncapability_mode (innermode) == outermode)
+      if (CONST_NULL_P (op))
 	return gen_int_mode (0, outermode);
+
+      rtx x = op;
+      if (GET_CODE (x) == CONST)
+	x = XEXP (x, 0);
+
+      /* For a capability mode C and its non-capability mode NC:
+	 (subreg:NC (pointer_plus:C (const_null:C) (X:NC)))
+	 --> (X:NC).  */
+      if (POINTER_PLUS_P (x) && XEXP (x, 0) == CONST0_RTX (innermode))
+	return XEXP (x, 1);
     }
 
   if (multiple_p (byte, GET_MODE_UNIT_SIZE (innermode)))
@@ -8388,13 +8403,28 @@ test_align_address_down_simplifications ()
 }
 
 static void
-test_const_null_subreg ()
+test_cap_const_simplifications ()
 {
-  rtx inner = CONST0_RTX (CADImode);
-  rtx di_zero = CONST0_RTX (DImode);
-  ASSERT_EQ (simplify_subreg (DImode, inner, CADImode,
-			      subreg_lowpart_offset (DImode, CADImode)),
-	     di_zero);}
+  machine_mode cm = CADImode;
+  machine_mode om = DImode;
+
+  rtx const_null = CONST0_RTX (cm);
+  rtx di_zero = CONST0_RTX (om);
+  ASSERT_EQ (simplify_subreg (DImode, const_null, cm,
+			      subreg_lowpart_offset (om, cm)),
+	     di_zero);
+
+  rtx int42 = gen_int_mode (42, om);
+  rtx cap42 = plus_constant (cm, const_null, 42);
+  ASSERT_RTX_EQ (simplify_subreg (DImode, cap42, cm,
+				  subreg_lowpart_offset (om, cm)),
+		 int42);
+
+  rtx replaced = simplify_gen_binary (REPLACE_ADDRESS_VALUE, cm,
+				      plus_constant (cm, const_null, 4),
+				      int42);
+  ASSERT_RTX_EQ (replaced, cap42);
+}
 
 static void
 test_capability_simplifications ()
@@ -8403,7 +8433,7 @@ test_capability_simplifications ()
   test_pointer_plus_simplifications ();
   test_replace_address_value_simplifications ();
   test_align_address_down_simplifications ();
-  test_const_null_subreg ();
+  test_cap_const_simplifications ();
 }
 
 /* Run all of the selftests within this file.  */
