@@ -18,24 +18,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-/* Strongly connected copy propagation (SCCP) 
-
-   References:
-
-     Simple and Efficient Construction of Static Single Assignment Form,
-     Matthias Braun, et al., 2013, Section 3.2.
-
-   SCCP uses algorithm presented by Braun et al. to seek out redundant sets of
-   PHI functions and remove them. Redundant set of PHIs is defined as a set
-   where for some value v each PHI in the set references either another PHI
-   from the set or v.
-
-   Braun et al. prove that each redundant set contains a strongly connected
-   component (SCC) that is also redundant. The algorithm is based around
-   computing SCCs and then replacing all uses of variables from an SCC by
-   the appropriate value v.
-
-   For computing SCCs, local implementation of Tarjan's algorithm is used.  */
+// TODO: Description
 
 #include "config.h"
 #include "system.h"
@@ -50,8 +33,162 @@ along with GCC; see the file COPYING3.  If not see
 #include "hash-set.h"
 #include <algorithm>
 
-// DEBUG
 #include <iostream>
+
+/* Propagation statement. Wrapper around gimple statement signifying that the
+   statement may be useful to sccp.  */
+
+struct prop_stmt
+{
+  bool is_phi;
+  gimple *stmt;
+};
+
+/* Return true if this statement may be useful (is a prop stmt).  */
+
+static bool
+is_prop_stmt (gimple *stmt)
+{
+  // TODO NOTE: Based on 'may_generate_useful_copy' from tree-ssa-copy.cc
+  if (gimple_code (stmt) == GIMPLE_PHI)
+    return !SSA_NAME_OCCURS_IN_ABNORMAL_PHI (gimple_phi_result (stmt));
+
+  /* If the statement has volatile operands, it won't generate a
+     useful copy.  */
+  if (gimple_has_volatile_ops (stmt))
+    return false; // TODO Mozna tu nemusi byt
+
+  /* Statements with loads and/or stores will never generate a useful copy.  */
+  // TODO: Why?
+  if (gimple_vuse (stmt))
+    return false; // TODO Potrebuje alias analyzu, nahradit checkem na
+		  // load/store (gimple_store_p, gimple_assign_load_p)
+
+  return gimple_assign_copy_p (stmt);
+  // TODO Pridat is_gimple_min_invariant (...) kvuli propagovanim konstant
+  // Mozna lepsi gimple_assign_single_p
+  // if (gimple_assign_single_p (stmt)
+  //     && (TREE_CODE (gimple_assign_rhs1 (stmt) == SSA_NAME
+  //         || gimple_is_min_invariant (...))))
+  // A checkuj gimple_code je GIMPLE_ASSIGN
+  // A nebo se podívej, jak vypadá may_generate_copy teď
+}
+
+/* Iterator over tree operands of prop stmt.  */
+
+class op_iterator
+{
+public:
+  bool has_next;
+
+  op_iterator (prop_stmt pstmt) : pstmt (pstmt)
+    {
+      if (pstmt.is_phi)
+	{
+	  /* PHI statement.  */
+	  gphi *phi = as_a<gphi *> (pstmt.stmt);
+	  op_num = gimple_phi_num_args (phi);
+	}
+      else if (gimple_assign_copy_p (pstmt.stmt))
+	{
+	  /* Simple copy statement.  */
+	  op_num = 1;
+	}
+      else
+	{
+	  /* This would mean that pstmt isn't a prop statement.  */
+	  gcc_unreachable ();
+	}
+      update ();
+    }
+
+  tree get_next ()
+    {
+      gcc_assert (has_next);
+      tree result = curr_op;
+      update ();
+      return result;
+    }
+
+private:
+  prop_stmt pstmt;
+  tree curr_op;
+  unsigned op_num;
+  unsigned curr_i = 0;
+
+  void update ()
+    {
+      has_next = false;
+
+      if (pstmt.is_phi)
+	{
+	  /* PHI statement.  */
+	  gphi *phi = as_a<gphi *> (pstmt.stmt);
+	  while (curr_i < op_num)
+	    {
+	      curr_op = gimple_phi_arg_def (phi, curr_i);
+	      has_next = true;
+	      curr_i++;
+	    }
+	}
+      else
+	{
+	  /* Simple copy statement.  */
+	  if (curr_i == 0)
+	    {
+	      curr_op = gimple_assign_rhs1 (pstmt.stmt);
+	      has_next = true;
+	      curr_i++;
+	    }
+	}
+    }
+};
+
+/* Iterator over prop_stmts operands of prop stmt. Skips operands that aren't
+   prop stmts. */
+
+class op_iterator_pstmts
+{
+public:
+  bool has_next;
+
+  op_iterator_pstmts (prop_stmt pstmt) : oi (pstmt)
+    {
+      update ();
+    }
+
+  prop_stmt get_next ()
+    {
+      gcc_assert (has_next);
+      prop_stmt result = curr_op;
+      update ();
+      return result;
+    }
+
+private:
+  op_iterator oi;
+  prop_stmt curr_op;
+
+  void update ()
+    {
+      has_next = false;
+      while (oi.has_next)
+	{
+	  tree t = oi.get_next ();
+	  if (TREE_CODE (t) == SSA_NAME)
+	    {
+	      gimple *s = SSA_NAME_DEF_STMT (t);
+	      if (is_prop_stmt (s))
+		{
+		  has_next = true;
+		  curr_op.stmt = s;
+		  curr_op.is_phi = gimple_code (s) == GIMPLE_PHI;
+		  break;
+		}
+	    }
+	}
+    }
+};
 
 /* State of vertex during tarjan computation.
 
@@ -77,58 +214,64 @@ struct vertex
   vstate state;
   unsigned index;
   unsigned lowlink;
-  gphi* stmt;
+  prop_stmt pstmt;
 };
 
 /* Set 'using' flag of gimple statement to true.
    If the flag isn't set, tarjan will ignore the statement.  */
 
 static void
-tarjan_set_using (gimple* stmt)
+tarjan_set_using (prop_stmt pstmt)
 {
-  gimple_set_plf (stmt, GF_PLF_1, true);
+  gimple_set_plf (pstmt.stmt, GF_PLF_1, true);
 }
 
+/* Clear 'using' flag of gimple statement to false.  */
+
 static void
-tarjan_clear_using (gimple* stmt)
+tarjan_clear_using (prop_stmt pstmt)
 {
-  gimple_set_plf (stmt, GF_PLF_1, false);
+  gimple_set_plf (pstmt.stmt, GF_PLF_1, false);
 }
+
+/* Return value of 'using' flag of gimple statement.  */
 
 static bool
-tarjan_is_using (gimple* stmt)
+tarjan_is_using (prop_stmt pstmt)
 {
-  return gimple_plf (stmt, GF_PLF_1);
+  return gimple_plf (pstmt.stmt, GF_PLF_1);
 }
 
-/* Set 'phinum' of gimple PHI. Before computing SCCs, tarjan assigns PHIs
-   unique ids - phinums.  */
+/* Set 'vxnum' (vertex number) of prop stmt. Before computing SCCs, tarjan
+   assigns unique vxnums to statements that it will use.  */
 
 static void
-tarjan_set_phinum (gphi* phi, unsigned num)
+tarjan_set_vxnum (prop_stmt pstmt, unsigned num)
 {
-  gimple_set_uid (phi, num);
+  gimple_set_uid (pstmt.stmt, num);
 }
+
+/* Return 'vxnum' (vertex number) of prop stmt.  */
 
 static unsigned
-tarjan_phinum (gphi* phi)
+tarjan_vxnum (prop_stmt pstmt)
 {
-  return gimple_uid (phi);
+  return gimple_uid (pstmt.stmt);
 }
 
-/* Create and initialize vertex struct for each given PHI.  */
+/* Create and initialize vertex struct for each given prop stmt.  */
 
 static auto_vec<vertex>
-tarjan_phis_to_vertices (auto_vec<gphi *> &phis)
+tarjan_stmts_to_vertices (auto_vec<prop_stmt> &pstmts)
 {
   auto_vec<vertex> result;
-  for (gphi *phi : phis)
+  for (prop_stmt pstmt : pstmts)
     {
       vertex v;
       v.state = unvisited;
       v.index = 0;
       v.lowlink = 0;
-      v.stmt = phi;
+      v.pstmt = pstmt;
 
       result.safe_push (v);
     }
@@ -136,28 +279,29 @@ tarjan_phis_to_vertices (auto_vec<gphi *> &phis)
 }
 
 /* Nonrecursive implementation of Tarjan's algorithm for computing strongly
-   connected components in a graph. PHIs are vertices. Edges lead from a PHI p
-   using another PHI q to the PHI being used (p -> q when q is operand of p).
+   connected components in a graph. Prop stmts are vertices. Edges lead from a
+   prop stmt p using another prop stmt q to the prop stmt being used (p -> q
+   when q is operand of p).
 
-   Considers only the given PHIs. Ignores other PHIs. */
+   Considers only the given prop stmts. Ignores other prop stmts. */
 
-static auto_vec<vec<gphi *>>
-tarjan_compute_sccs (auto_vec<gphi *> &phis)
+static auto_vec<vec<prop_stmt>>
+tarjan_compute_sccs (auto_vec<prop_stmt> &pstmts)
 {
-  auto_vec<vec<gphi *>> sccs;
+  auto_vec<vec<prop_stmt>> sccs;
   auto_vec<unsigned> worklist; /* DFS stack.  */
   auto_vec<unsigned> stack; /* Tarjan stack.  */
   unsigned curr_index = 0;
 
-  auto_vec<vertex> vs = tarjan_phis_to_vertices (phis);
+  auto_vec<vertex> vs = tarjan_stmts_to_vertices (pstmts);
 
-  /* Assign phinums and set PHI functions' 'using' flag.  */
+  /* Assign vxnums and set prop stmts' 'using' flag.  */
   unsigned i;
   for (i = 0; i < vs.length (); i++)
     {
-      gphi *phi = vs[i].stmt;
-      tarjan_set_using (phi);
-      tarjan_set_phinum (phi, i);
+      prop_stmt pstmt = vs[i].pstmt;
+      tarjan_set_using (pstmt);
+      tarjan_set_vxnum (pstmt, i);
     }
 
   /* Put all vertices on worklist.  */
@@ -170,7 +314,7 @@ tarjan_compute_sccs (auto_vec<gphi *> &phis)
   while (!worklist.is_empty ())
     {
       unsigned i = worklist.pop();
-      gphi *phi = vs[i].stmt;
+      prop_stmt pstmt = vs[i].pstmt;
       vstate state = vs[i].state;
 
       if (state == unvisited)
@@ -192,25 +336,16 @@ tarjan_compute_sccs (auto_vec<gphi *> &phis)
 	}
 
       /* Iterate over neighbors of this vertex.  */
-      unsigned j;
-      for (j = 0; j < gimple_phi_num_args (phi); j++)
+      op_iterator_pstmts oi = op_iterator_pstmts (pstmt);
+      while (oi.has_next)
 	{
-	  tree op_var = gimple_phi_arg_def (phi, j);
-	  if (TREE_CODE (op_var) != SSA_NAME)
-	    continue; /* Skip any operand that isn't an SSA name.  */
-
-	  gimple *op_stmt = SSA_NAME_DEF_STMT (op_var);
+	  prop_stmt op_pstmt = oi.get_next();
 
 	  /* Skip any operand that isn't a vertex we're using.  */
-	  if (!tarjan_is_using (op_stmt))
+	  if (!tarjan_is_using (op_pstmt))
 	    continue;
-	  
-	  gphi *op_phi = dyn_cast<gphi *> (op_stmt);
-	  if (op_phi == NULL)
-	    /* Only PHI functions have the 'using' flags set.  */
-	    gcc_unreachable ();
 
-	  unsigned op_i = tarjan_phinum (op_phi);
+	  unsigned op_i = tarjan_vxnum (op_pstmt);
 
 	  if (state == unvisited)
 	    {
@@ -241,16 +376,16 @@ tarjan_compute_sccs (auto_vec<gphi *> &phis)
 	    }
 	}
 
-      /* If we just closed a root vertex of an scc, pop scc from stack.  */
+      /* If we've just closed a root vertex of an scc, pop scc from stack.  */
       if (state == vopen && vs[i].lowlink == vs[i].index)
 	{
-	  vec<gphi *> scc = vNULL;
+	  vec<prop_stmt> scc = vNULL;
 
 	  unsigned j;
 	  do
 	    {
 	      j = stack.pop();
-	      scc.safe_push (vs[j].stmt);
+	      scc.safe_push (vs[j].pstmt);
 	      vs[j].state = in_scc;
 	    }
 	  while (j != i);
@@ -264,11 +399,11 @@ tarjan_compute_sccs (auto_vec<gphi *> &phis)
     gcc_unreachable();
   }
 
-  /* Clear PHI functions' 'using' flags.  */
+  /* Clear prop stmts' 'using' flags.  */
   for (vertex v : vs)
     {
-      gphi *phi = v.stmt;
-      tarjan_clear_using (phi);
+      prop_stmt s = v.pstmt;
+      tarjan_clear_using (s);
     }
 
   return sccs;
@@ -278,23 +413,23 @@ tarjan_compute_sccs (auto_vec<gphi *> &phis)
    variable.  */
 
 static void
-replace_scc_by_value (vec<gphi *> scc, tree replace_by)
+replace_scc_by_value (vec<prop_stmt> scc, tree replace_by)
 {
   // DEBUG
-  if (scc.length () >= 5)
+  if (scc.length () >= 1)
     {
       std::cerr << "Replacing SCC of length " << scc.length () << std::endl;
     }
 
-  for (gphi *phi : scc)
+  for (prop_stmt pstmt : scc)
     {
-      tree get_replaced = gimple_get_lhs (phi);
+      tree get_replaced = gimple_get_lhs (pstmt.stmt);
 
       if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (get_replaced)
 	  && TREE_CODE (replace_by) == SSA_NAME)
 	SSA_NAME_OCCURS_IN_ABNORMAL_PHI (replace_by) = 1;
 
-      /* Replace each occurence of PHI by value replace_by.  */
+      /* Replace each occurence of prop stmt's LHS by value replace_by.  */
       use_operand_p use_p;
       imm_use_iterator iter;
       gimple *use_stmt;
@@ -307,95 +442,90 @@ replace_scc_by_value (vec<gphi *> scc, tree replace_by)
     }
 }
 
-/* Remove all PHIs with zero uses.  */
+/* Remove all prop stmts with zero uses.  */
 
+/*
 static void
-remove_zero_uses_phis ()
+remove_zero_uses_pstmts ()
 {
+  // TODO Maybe ditch this and just call DCE after this pass
   basic_block bb;
   FOR_EACH_BB_FN (bb, cfun)
     {
-      gphi_iterator pi;
-      for (pi = gsi_start_phis (bb); !gsi_end_p (pi);)
+      gimple_stmt_iterator gsi;
+      for (gsi = gsi_start (bb); !gsi_end_p (gsi);)
 	{
-	  gphi *phi = pi.phi ();
-	  tree ssa_name = gimple_phi_result (phi);
+	  gimple *stmt = gsi_stmt (gsi);
+	  tree ssa_name = gimple_get_lhs (stmt); // TODO Can I be sure that
+						 // this is SSA?
 	  if (has_zero_uses (ssa_name))
 	    {
-	      /* Note that remove_phi_node() also frees SSA name.  */
-	      remove_phi_node (&pi, true);
+	      // TODO This is copied from remove_phi_node (gsi, true)
+	      insert_debug_temps_for_defs (gsi);
+	      gsi_remove (gsi, false);
+	      release_ssa_name (gimple_get_lhs);
 	    }
 	  else
-	    gsi_next (&pi);
+	    gsi_next (&gsi);
 	}
     }
 }
+*/
 
-/* Apply Braun et al.'s algorithm on a given set of PHIs.
+/* Apply Braun et al.'s algorithm on a given set of statements. Treat copy
+   statements as PHI functions with a single argument.
    Main function of this pass.  */
 
 static void
-remove_redundant_phis (auto_vec<gphi *> &phis)
+sccp_propagate (auto_vec<prop_stmt> &pstmts)
 {
-  auto_vec<vec<gphi *>> worklist;
-  worklist = tarjan_compute_sccs (phis);
+  auto_vec<vec<prop_stmt>> worklist;
+  worklist = tarjan_compute_sccs (pstmts);
 
   while (!worklist.is_empty ())
     {
-      vec<gphi *> scc = worklist.pop ();
+      vec<prop_stmt> scc = worklist.pop ();
 
-      auto_vec<gphi *> inner;
+      auto_vec<prop_stmt> inner;
       hash_set<tree> outer_ops;
+      tree last_outer_op = NULL_TREE;
 
-      /* Prepare hash set of PHIs in scc to query later.  */
-      hash_set<gphi *> scc_set;
-      for (gphi *phi : scc)
+      /* Prepare hash set of stmts belonging to scc.  */
+      hash_set<gimple *> scc_set;
+      for (prop_stmt pstmt : scc)
 	{
-	  scc_set.add (phi);
+	  scc_set.add (pstmt.stmt);
 	}
 
-      for (gphi *phi : scc)
+      for (prop_stmt pstmt : scc)
 	{
 	  bool is_inner = true;
 
-	  unsigned i;
-	  for (i = 0; i < gimple_phi_num_args (phi); i++)
+	  op_iterator oi = op_iterator (pstmt);
+	  while (oi.has_next)
 	    {
-	      bool op_in_scc = false;
-	      tree op = gimple_phi_arg_def (phi, i);
-
-	      if (TREE_CODE (op) == SSA_NAME)
-		{
-		  gimple *op_stmt = SSA_NAME_DEF_STMT (op);
-		  if (gimple_code (op_stmt) == GIMPLE_PHI &&
-		      scc_set.contains (as_a<gphi *> (op_stmt)))
-		    op_in_scc = true;
-		}
-
-	      if (!op_in_scc)
+	      tree op = oi.get_next();
+	      if (TREE_CODE (op) != SSA_NAME ||
+		  !scc_set.contains (SSA_NAME_DEF_STMT (op)))
 		{
 		  outer_ops.add (op);
+		  last_outer_op = op;
 		  is_inner = false;
 		}
 	    }
 
 	  if (is_inner)
 	    {
-	      inner.safe_push (phi);
+	      inner.safe_push (pstmt);
 	    }
 	}
 
       if (outer_ops.elements () == 1)
 	{
-	  /* Get the only operand in outer_ops.  */
-	  tree outer_op = NULL_TREE;
-	  for (tree foo : outer_ops)
-	    {
-	      outer_op = foo;
-	      break;
-	    }
+	  /* The only operand in outer_ops.  */
+	  tree outer_op = last_outer_op;
 
-	  /* Don't replace by abnormal phis!  */
+	  /* Now replace (Unless replacing by abnormal PHI!)  */
 	  if (!(TREE_CODE (outer_op) == SSA_NAME &&
 	      SSA_NAME_OCCURS_IN_ABNORMAL_PHI (outer_op)))
 	    replace_scc_by_value (scc, outer_op);
@@ -403,8 +533,8 @@ remove_redundant_phis (auto_vec<gphi *> &phis)
       else if (outer_ops.elements () > 1)
 	{
 	  /* Add inner sccs to worklist.  */
-	  auto_vec<vec<gphi *>> inner_sccs = tarjan_compute_sccs (inner);
-	  for (vec<gphi *> inner_scc : inner_sccs)
+	  auto_vec<vec<prop_stmt>> inner_sccs = tarjan_compute_sccs (inner);
+	  for (vec<prop_stmt> inner_scc : inner_sccs)
 	    {
 	      worklist.safe_push (inner_scc);
 	    }
@@ -416,25 +546,29 @@ remove_redundant_phis (auto_vec<gphi *> &phis)
 
       scc.release ();
     }
-
-  remove_zero_uses_phis ();
 }
 
-/* Return vector of all PHI functions from all basic blocks.  */
+/* Return all statements in cfun that may be useful (prop stmts).  */
 
-static auto_vec<gphi *>
-get_all_phis (void)
+static auto_vec<prop_stmt>
+get_all_prop_stmts (void)
 {
-  auto_vec<gphi *> result;
+  auto_vec<prop_stmt> result;
 
   basic_block bb;
   FOR_EACH_BB_FN (bb, cfun)
     {
-      gphi_iterator pi;
-      for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
+      gimple_stmt_iterator gsi;
+      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
 	{
-	  gphi *phi = pi.phi ();
-	  result.safe_push (phi);
+	  gimple *s = gsi_stmt (gsi);
+	  if (is_prop_stmt (s))
+	    {
+	      prop_stmt pstmt;
+	      pstmt.stmt = s;
+	      pstmt.is_phi = gimple_code (s) == GIMPLE_PHI;
+	      result.safe_push (pstmt);
+	    }
 	}
     }
 
@@ -446,15 +580,15 @@ get_all_phis (void)
 static void
 init_sccp (void)
 {
-  // Clear 'tarjan using' flag on all statements
+  // Clear PLF bit 1 on all statements
   basic_block bb;
   FOR_EACH_BB_FN (bb, cfun)
     {
       gimple_stmt_iterator gsi;
       for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
 	{
-	  gimple* stmt = gsi_stmt (gsi);
-	  tarjan_clear_using (stmt);
+	  gimple *stmt = gsi_stmt (gsi);
+	  gimple_set_plf (stmt, GF_PLF_1, false);
 	}
     }
 }
@@ -497,8 +631,8 @@ unsigned
 pass_sccp::execute (function *)
 {
   init_sccp ();
-  auto_vec<gphi *> phis = get_all_phis ();
-  remove_redundant_phis (phis);
+  auto_vec<prop_stmt> stmts = get_all_prop_stmts ();
+  sccp_propagate (stmts);
   finalize_sccp ();
 
   return 0;
