@@ -4581,8 +4581,10 @@ cp_build_binary_op (const op_location_t &location,
   STRIP_TYPE_NOPS (op0);
   STRIP_TYPE_NOPS (op1);
 
+  tree common_ic_type;
   tree intcap = binary_op_get_intcap_provenance (location, code, op0, op1,
-						 !op0_provenance_p);
+						 !op0_provenance_p,
+						 &common_ic_type);
 
   /* If we will derive an intcap from either the LHS or the RHS,
      wrap it with save_expr.  This will prevent us re-evaluating
@@ -4595,10 +4597,25 @@ cp_build_binary_op (const op_location_t &location,
   else if (intcap == op1)
     intcap = op1 = save_expr (op1);
 
-  if (INTCAP_TYPE_P (TREE_TYPE (op0)))
-    op0 = drop_capability (op0);
-  if (INTCAP_TYPE_P (TREE_TYPE (op1)))
-    op1 = drop_capability (op1);
+  if (common_ic_type)
+    {
+      if (intcap)
+	intcap = convert (common_ic_type, intcap);
+
+      /* Both sides are logically converted to a common intcap type,
+	 but we do the address value arithmetic on the non-capability
+	 type of that common intcap type.  */
+      tree av_type = noncapability_type (common_ic_type);
+      op0 = convert (av_type, op0);
+      op1 = convert (av_type, op1);
+    }
+  else
+    {
+      if (INTCAP_TYPE_P (TREE_TYPE (op0)))
+	op0 = drop_capability (op0);
+      if (INTCAP_TYPE_P (TREE_TYPE (op1)))
+	op1 = drop_capability (op1);
+    }
 
   /* DTRT if one side is an overloaded function, but complain about it.  */
   if (type_unknown_p (op0))
@@ -5886,10 +5903,8 @@ cp_build_binary_op (const op_location_t &location,
      to work out where the provenance (if any) should come from.  */
   if (intcap)
     {
-      gcc_assert (!capability_type_p (TREE_TYPE (result)));
-      tree ic_type = cp_common_type (TREE_TYPE (intcap), TREE_TYPE (result));
-      gcc_assert (same_type_p (TREE_TYPE (result), noncapability_type (ic_type)));
-      intcap = cp_convert (ic_type, intcap, complain);
+      gcc_assert (same_type_p (TREE_TYPE (result),
+			       noncapability_type (TREE_TYPE (intcap))));
       result = build_replace_address_value_loc (location,
 						intcap,
 						result);

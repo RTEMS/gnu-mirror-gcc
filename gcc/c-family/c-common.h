@@ -1011,7 +1011,8 @@ extern tree common_type (tree, tree);
 extern tree decl_constant_value (tree);
 
 extern tree binary_op_get_intcap_provenance (location_t,
-					     enum tree_code, tree, tree, bool);
+					     enum tree_code, tree, tree, bool,
+					     tree *);
 extern tree unary_op_get_intcap_provenance (tree);
 
 extern void warn_int_cap_conversion (location_t);

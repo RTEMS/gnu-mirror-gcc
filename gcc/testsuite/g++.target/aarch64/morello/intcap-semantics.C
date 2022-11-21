@@ -214,3 +214,105 @@ bool f33 (__intcap x33, __intcap y33)
   return x33 || y33;
 }
 /* { dg-final { scan-tree-dump-times {<retval> = \(long int\) x33 != 0 \|\| \(long int\) y33 != 0;} 1 "original"  } } */
+
+__intcap f34 (__intcap x34, long long y34)
+{
+  return x34 + y34;
+}
+/* { dg-final { scan-tree-dump-times {<retval> = \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x34>, \(long int\) SAVE_EXPR <x34> \+ \(long int\) y34\)} 1 "original"  } } */
+
+unsigned __intcap f35 (unsigned __intcap x35, unsigned long long y35)
+{
+  return x35 + y35;
+}
+/* { dg-final { scan-tree-dump-times {<retval> = \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x35>, \(long unsigned int\) SAVE_EXPR <x35> \+ \(long unsigned int\) y35\)} 1 "original"  } } */
+
+unsigned __intcap f36 (__intcap x36, unsigned long long y36)
+{
+  return x36 + y36;
+}
+/* { dg-final { scan-tree-dump-times {<retval> = \.REPLACE_ADDRESS_VALUE \(\(unsigned __intcap\) SAVE_EXPR <x36>, \(long unsigned int\) SAVE_EXPR <x36> \+ \(long unsigned int\) y36\)} 1 "original"  } } */
+
+unsigned __intcap f37 (unsigned __intcap x37, long long y37)
+{
+  return x37 + y37;
+}
+/* { dg-final { scan-tree-dump-times {<retval> = \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x37>, \(long unsigned int\) SAVE_EXPR <x37> \+ \(long unsigned int\) y37\)} 1 "original"  } } */
+
+__intcap f38 (__intcap x38, __int128 y38)
+{
+  return x38 + y38;
+}
+/* { dg-final { scan-tree-dump-times {<retval> = \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x38>, \(long int\) SAVE_EXPR <x38> \+ \(long int\) y38\)} 1 "original"  } } */
+
+unsigned __intcap f39 (unsigned __intcap x39, unsigned __int128 y39)
+{
+  return x39 + y39;
+}
+/* { dg-final { scan-tree-dump-times {<retval> = \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x39>, \(long unsigned int\) SAVE_EXPR <x39> \+ \(long unsigned int\) y39\)} 1 "original"  } } */
+
+unsigned __intcap f40 (__intcap x40, unsigned __int128 y40)
+{
+  return x40 + y40;
+}
+/* { dg-final { scan-tree-dump-times {<retval> = \.REPLACE_ADDRESS_VALUE \(\(unsigned __intcap\) SAVE_EXPR <x40>, \(long unsigned int\) SAVE_EXPR <x40> \+ \(long unsigned int\) y40\)} 1 "original"  } } */
+
+unsigned __intcap f41 (unsigned __intcap x41, __int128 y41)
+{
+  return x41 + y41;
+}
+/* { dg-final { scan-tree-dump-times {<retval> = \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x41>, \(long unsigned int\) SAVE_EXPR <x41> \+ \(long unsigned int\) y41\)} 1 "original"  } } */
+
+bool f42 (__intcap x42, __intcap y42)
+{
+  return x42 == y42;
+}
+/* { dg-final { scan-tree-dump-times {<retval> = \(long int\) x42 == \(long int\) y42;} 1 "original" } } */
+
+bool f43 (__intcap x43, unsigned __intcap y43)
+{
+  return x43 == y43;
+}
+/* { dg-final { scan-tree-dump-times {<retval> = \(long unsigned int\) x43 == \(long unsigned int\) y43;} 1 "original" } } */
+
+bool f44 (unsigned __intcap x44, long y44)
+{
+  return x44 == y44;
+}
+/* { dg-final { scan-tree-dump-times {<retval> = \(long unsigned int\) x44 == \(long unsigned int\) y44;} 1 "original" } } */
+
+bool f45 (__intcap x45, long long y45)
+{
+  return x45 == y45;
+}
+/* { dg-final { scan-tree-dump-times {<retval> = \(long int\) x45 == \(long int\) y45;} 1 "original" } } */
+
+bool f46 (__intcap x46, unsigned long y46)
+{
+  return x46 == y46;
+}
+/* { dg-final { scan-tree-dump-times {<retval> = \(long unsigned int\) x46 == y46;} 1 "original" } } */
+
+bool f47 (__intcap x47, __int128 y47)
+{
+  return x47 == y47;
+}
+/* { dg-final { scan-tree-dump-times {<retval> = \(long int\) x47 == \(long int\) y47;} 1 "original" } } */
+
+bool f48 (__intcap x48, unsigned __int128 y48)
+{
+  return x48 == y48;
+}
+/* { dg-final { scan-tree-dump-times {<retval> = \(long unsigned int\) x48 == \(long unsigned int\) y48;} 1 "original" } } */
+
+__intcap f49 (__intcap x49, __int128 y49)
+{
+  return x49 << y49;
+}
+/* { dg-final { scan-tree-dump-times {<retval> = \.REPLACE_ADDRESS_VALUE \(SAVE_EXPR <x49>, \(long int\) SAVE_EXPR <x49> << y49\)} 1 "original"  } } */
+
+__int128 f50 (__int128 x50, __intcap y50)
+{
+  return x50 << y50;
+}
+/* { dg-final { scan-tree-dump-times {<retval> = x50 << \(long int\) y50;} 1 "original" } } */

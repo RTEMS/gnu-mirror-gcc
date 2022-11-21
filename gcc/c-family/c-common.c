@@ -5178,23 +5178,24 @@ finish_label_address_expr (tree label, location_t loc)
    should be derived for the binary expression.
 
    WARN_P should be set if we should warn when the provenance
-   is ambiguous.  LOC is the location that will be used for the warning.  */
+   is ambiguous.  LOC is the location that will be used for the warning.
+
+   *COMMON_IC_TYPE is set to the common intcap type that both operands
+   should be implicitly converted to, if any.  */
 tree
 binary_op_get_intcap_provenance (location_t loc,
 				 enum tree_code code,
 				 tree op0, tree op1,
-				 bool warn_p)
+				 bool warn_p,
+				 tree *common_ic_type)
 {
   tree type0 = TREE_TYPE (op0);
   tree type1 = TREE_TYPE (op1);
   bool ic0 = INTCAP_TYPE_P (type0);
   bool ic1 = INTCAP_TYPE_P (type1);
+  *common_ic_type = NULL_TREE;
 
   if (!ic0 && !ic1)
-    return NULL_TREE;
-
-  /* Comparisons don't return capabilities.  */
-  if (TREE_CODE_CLASS (code) == tcc_comparison)
     return NULL_TREE;
 
   bool shift = false;
@@ -5206,7 +5207,6 @@ binary_op_get_intcap_provenance (location_t loc,
     case TRUTH_AND_EXPR:
     case TRUTH_OR_EXPR:
     case TRUTH_XOR_EXPR:
-    case SPACESHIP_EXPR:
       return NULL_TREE;
     case RSHIFT_EXPR:
     case LSHIFT_EXPR:
@@ -5219,7 +5219,15 @@ binary_op_get_intcap_provenance (location_t loc,
   bool need_ic0 = ic0 && (ic1 || INTEGRAL_TYPE_P (type1));
   bool need_ic1 = ic1 && !shift && (ic0 || INTEGRAL_TYPE_P (type0));
 
-  if (!need_ic0 && !need_ic1)
+  if (!shift && (need_ic0 || need_ic1))
+    *common_ic_type = common_type (type0, type1);
+
+  /* Comparisons do not result in an intcap result type, but note
+     that both operands may need converting to a common intcap type
+     before we drop the capabilities.  */
+  if (TREE_CODE_CLASS (code) == tcc_comparison
+      || code == SPACESHIP_EXPR
+      || (!need_ic0 && !need_ic1))
     return NULL_TREE;
 
   static const char *cnp = "cheri_no_provenance";
@@ -5247,7 +5255,7 @@ binary_op_get_intcap_provenance (location_t loc,
      subexpression have cheri_no_provenance attributes).  */
   tree type;
   if (need_ic0 && need_ic1)
-    type = common_type (type0, type1);
+    type = *common_ic_type;
   else
     {
       type = need_ic0 ? type0 : type1;
