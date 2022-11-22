@@ -67,7 +67,9 @@ create_iv (tree base, tree step, tree var, class loop *loop,
   gimple_seq stmts;
   tree vb, va;
   enum tree_code incr_op = PLUS_EXPR;
-  edge pe = loop_preheader_edge (loop);
+  edge pe = NULL;
+  edge e;
+  edge_iterator ei;
 
   if (var != NULL_TREE)
     {
@@ -122,7 +124,11 @@ create_iv (tree base, tree step, tree var, class loop *loop,
      loop (i.e. the step should be loop invariant).  */
   step = force_gimple_operand (step, &stmts, true, NULL_TREE);
   if (stmts)
-    gsi_insert_seq_on_edge_immediate (pe, stmts);
+    {
+      if (!pe)
+       pe = loop_preheader_edge (loop);
+      gsi_insert_seq_on_edge_immediate (pe, stmts);
+    }
 
   stmt = gimple_build_assign (va, incr_op, vb, step);
   /* Prevent the increment from inheriting a bogus location if it is not put
@@ -151,11 +157,23 @@ create_iv (tree base, tree step, tree var, class loop *loop,
 
   initial = force_gimple_operand (base, &stmts, true, var);
   if (stmts)
-    gsi_insert_seq_on_edge_immediate (pe, stmts);
+    {
+      if (!pe)
+       pe = loop_preheader_edge (loop);
+      gsi_insert_seq_on_edge_immediate (pe, stmts);
+    }
 
   phi = create_phi_node (vb, loop->header);
-  add_phi_arg (phi, initial, loop_preheader_edge (loop), UNKNOWN_LOCATION);
-  add_phi_arg (phi, va, loop_latch_edge (loop), UNKNOWN_LOCATION);
+  FOR_EACH_EDGE (e, ei, loop->header->preds)
+  {
+      if (e==loop_latch_edge (loop)){
+          add_phi_arg (phi, va, loop_latch_edge (loop), UNKNOWN_LOCATION);
+      }
+      else
+      {
+          add_phi_arg (phi, initial, e, UNKNOWN_LOCATION);
+      }
+  }
 }
 
 /* Return the innermost superloop LOOP of USE_LOOP that is a superloop of
