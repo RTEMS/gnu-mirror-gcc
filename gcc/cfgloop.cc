@@ -199,6 +199,10 @@ flow_loop_free (class loop *loop)
     }
 
   ggc_free (loop->exits);
+  if (loop->counters)
+    {
+      ggc_free (loop->counters);
+    }
   ggc_free (loop);
 }
 
