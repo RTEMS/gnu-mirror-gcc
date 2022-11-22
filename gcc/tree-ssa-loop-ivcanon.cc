@@ -1035,6 +1035,23 @@ try_peel_loop (class loop *loop,
 
   /* Check if there is an estimate on the number of iterations.  */
   npeel = estimated_loop_iterations_int (loop);
+
+  // linear part most common number
+  //bool histogram_peeling=loop->counters!=NULL;
+  //if (histogram_peeling){
+  //  gcov_type max=0;
+  //  int most_common=-1;
+  //  for (int i=0;i<8; i++){
+  //      if (loop->counters->hist[i]>=max){
+  //          most_common=i;
+  //      }
+  //  }
+  //  if (most_common>0)
+  //  {
+  //      npeel=most_common+1;
+  //  }
+  //}
+
   if (npeel < 0)
     npeel = likely_max_loop_iterations_int (loop);
   if (npeel < 0)
