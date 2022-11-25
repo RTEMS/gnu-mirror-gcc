@@ -1046,7 +1046,16 @@ store_integral_bit_field (rtx op0, opt_scalar_int_mode op0_mode,
     {
       value_mode = int_mode_for_mode (GET_MODE (value)).require ();
       value = gen_reg_rtx (value_mode);
-      emit_move_insn (gen_lowpart (GET_MODE (orig_value), value), orig_value);
+
+      /* For capability modes, we forbid punning from a non-capability
+	 mode to a capability mode, but allow punning in the other
+	 direction, so pun on the RHS instead.  */
+      if (is_a <scalar_addr_mode> (GET_MODE (orig_value)))
+	emit_move_insn (value, lowpart_subreg (value_mode,
+					       orig_value,
+					       GET_MODE (orig_value)));
+      else
+	emit_move_insn (gen_lowpart (GET_MODE (orig_value), value), orig_value);
     }
 
   /* If OP0 is a multi-word register, narrow it to the affected word.

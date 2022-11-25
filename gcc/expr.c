@@ -7239,6 +7239,34 @@ store_constructor (tree exp, rtx target, int cleared, poly_int64 size,
     }
 }
 
+/* Determine if a region of bits of size BITSIZE starting at position
+   BITPOS covers any capability in a PARALLEL.  */
+static bool
+parallel_bitregion_covers_cap_p (rtx par,
+				 poly_int64 bitpos,
+				 poly_int64 bitsize)
+{
+  poly_int64 br_end = bitpos + bitsize;
+
+  for (int i = 0; i < XVECLEN (par, 0); i++)
+    {
+      rtx x = XVECEXP (par, 0, i);
+      gcc_assert (GET_CODE (x) == EXPR_LIST);
+
+      machine_mode mode = GET_MODE (XEXP (x, 0));
+      if (!CAPABILITY_MODE_P (mode))
+	continue;
+
+      auto cap_off = INTVAL (XEXP (x, 1)) * BITS_PER_UNIT;
+      auto cap_end = cap_off + GET_MODE_PRECISION (mode);
+
+      if (maybe_le (bitpos, cap_off) && maybe_ge (br_end, cap_end))
+	return true;
+    }
+
+  return false;
+}
+
 /* Store the value of EXP (an expression tree)
    into a subfield of TARGET which has mode MODE and occupies
    BITSIZE bits, starting BITPOS bits from the start of TARGET.
@@ -7378,10 +7406,43 @@ store_field (rtx target, poly_int64 bitsize, poly_int64 bitpos,
       if (GET_CODE (temp) == PARALLEL)
 	{
 	  HOST_WIDE_INT size = int_size_in_bytes (TREE_TYPE (exp));
-	  machine_mode temp_mode = GET_MODE (temp);
-	  if (temp_mode == BLKmode || temp_mode == VOIDmode)
-	    temp_mode = smallest_int_mode_for_size (size * BITS_PER_UNIT);
-	  rtx temp_target = gen_reg_rtx (temp_mode);
+
+	  /* As an optimization, try doing some of the store directly, where
+	     possible.  */
+	  if (known_eq (bitpos, 0)
+	      && known_gt (bitsize, BITS_PER_UNIT)
+	      && MEM_P (target))
+	    {
+	      poly_int64 to_store = bits_to_bytes_round_down (bitsize);
+	      emit_group_store (target, temp, TREE_TYPE (exp), to_store);
+
+	      poly_int64 bits_stored = to_store * BITS_PER_UNIT;
+
+	      /* If we stored everything, then we're done.  */
+	      if (known_eq (bitsize, bits_stored))
+		return const0_rtx;
+
+	      bitregion_start += bits_stored;
+	      bitpos += bits_stored;
+	      bitsize -= bits_stored;
+	      target = adjust_address (target, GET_MODE (target), to_store);
+	    }
+
+	  rtx temp_target;
+
+	  /* If the bits we want to store could potentially cover a valid
+	     capability, go via a stack temporary to avoid invalidating
+	     the capabilities if at all possible.  */
+	  if (parallel_bitregion_covers_cap_p (temp, bitpos, bitsize))
+	    temp_target = assign_stack_temp (GET_MODE (temp), size);
+	  else
+	    {
+	      machine_mode temp_mode = GET_MODE (temp);
+	      if (temp_mode == BLKmode || temp_mode == VOIDmode)
+		temp_mode = smallest_int_mode_for_size (size * BITS_PER_UNIT);
+	      temp_target = gen_reg_rtx (temp_mode);
+	    }
+
 	  emit_group_store (temp_target, temp, TREE_TYPE (exp), size);
 	  temp = temp_target;
 	}
