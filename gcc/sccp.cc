@@ -69,7 +69,10 @@ static bool
 may_generate_useful_copy (gimple *stmt)
 {
   if (gimple_code (stmt) == GIMPLE_PHI)
-    return !SSA_NAME_OCCURS_IN_ABNORMAL_PHI (gimple_phi_result (stmt));
+    return true;
+  else
+    return false;
+    //return !SSA_NAME_OCCURS_IN_ABNORMAL_PHI (gimple_phi_result (stmt));
   //  return true; // TODO
 
   if (gimple_code (stmt) != GIMPLE_ASSIGN)
@@ -85,9 +88,11 @@ may_generate_useful_copy (gimple *stmt)
     return false;
 
   /* If the assignment is from a constant it generates a useful copy.  */
+  /* TODO
   if (gimple_assign_single_p (stmt)
       && is_gimple_min_invariant (gimple_assign_rhs1 (stmt)))
     return true;
+  */
 
   /* Otherwise, the only statements that generate useful copies are
      assignments whose single SSA use doesn't flow through abnormal
@@ -217,9 +222,7 @@ tarjan_compute_sccs (auto_vec<gimple *> &copy_stmts)
       /* Iterate over neighbors of this vertex.  */
       ssa_op_iter iter;
       use_operand_p use_p;
-      std::cerr << gimple_code (stmt) << std::endl; // DEBUG
-      std::cerr << "Hi" << std::endl;
-      FOR_EACH_SSA_USE_OPERAND (use_p, stmt, iter, SSA_OP_ALL_USES)
+      FOR_EACH_PHI_OR_STMT_USE (use_p, stmt, iter, SSA_OP_ALL_USES)
 	{
 	  tree op_var = USE_FROM_PTR (use_p);
 
@@ -306,7 +309,7 @@ static void
 replace_scc_by_value (vec<gimple *> scc, tree replace_by)
 {
   // DEBUG
-  if (scc.length () >= 1)
+  if (scc.length () >= 5)
     {
       std::cerr << "Replacing SCC of length " << scc.length () << std::endl;
     }
@@ -363,8 +366,9 @@ sccp_propagate (auto_vec<gimple *> &copy_stmts)
 
 	  ssa_op_iter iter;
 	  use_operand_p use_p;
-	  FOR_EACH_SSA_USE_OPERAND (use_p, stmt, iter, SSA_OP_ALL_USES)
+	  FOR_EACH_PHI_OR_STMT_USE (use_p, stmt, iter, SSA_OP_ALL_USES)
 	    {
+	      //std::cerr << "Argument" << std::endl; // DEBUG
 	      tree op_var = USE_FROM_PTR (use_p);
 	      bool op_in_scc = false;
 
@@ -378,6 +382,7 @@ sccp_propagate (auto_vec<gimple *> &copy_stmts)
 	      if (!op_in_scc)
 		{
 		  outer_ops.add (op_var);
+		  last_outer_op = op_var;
 		  is_inner = false;
 		}
 	    }
@@ -387,6 +392,14 @@ sccp_propagate (auto_vec<gimple *> &copy_stmts)
 	      inner.safe_push (stmt);
 	    }
 	}
+
+      // DEBUG
+      /*
+      for (gimple *s : scc)
+	{
+	  debug_gimple_stmt (s);
+	}
+      */
 
       if (outer_ops.elements () == 1)
 	{
@@ -430,14 +443,6 @@ get_all_may_generate_useful_copy (void)
       for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
 	{
 	  gimple *s = gsi_stmt (gsi);
-
-	  /*
-	  std::cerr << GIMPLE_PHI << std::endl; // DEBUG
-	  std::cerr << GIMPLE_ASSIGN << std::endl;
-	  debug_gimple_stmt (s);
-	  std::cerr << gimple_code (s) << std::endl << std::endl;
-	  */
-
 	  if (may_generate_useful_copy (s))
 	    result.safe_push (s);
 	}
@@ -446,14 +451,6 @@ get_all_may_generate_useful_copy (void)
       for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
 	{
 	  gimple *s = pi.phi ();
-
-	  /*
-	  std::cerr << GIMPLE_PHI << std::endl; // DEBUG
-	  std::cerr << GIMPLE_ASSIGN << std::endl;
-	  debug_gimple_stmt (s);
-	  std::cerr << gimple_code (s) << std::endl << std::endl;
-	  */
-
 	  if (may_generate_useful_copy (s))
 	    result.safe_push (s);
 	}
