@@ -309,10 +309,12 @@ static void
 replace_scc_by_value (vec<gimple *> scc, tree replace_by)
 {
   // DEBUG
+  /*
   if (scc.length () >= 5)
     {
       std::cerr << "Replacing SCC of length " << scc.length () << std::endl;
     }
+  */
 
   for (gimple *stmt : scc)
     {
@@ -331,6 +333,30 @@ replace_scc_by_value (vec<gimple *> scc, tree replace_by)
 	  FOR_EACH_IMM_USE_ON_STMT (use_p, iter)
 	    SET_USE (use_p, replace_by);
 	  update_stmt (use_stmt);
+	}
+    }
+}
+
+/* Remove all PHIs with zero uses.  */
+
+static void
+remove_zero_uses_phis ()
+{
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      gphi_iterator pi;
+      for (pi = gsi_start_phis (bb); !gsi_end_p (pi);)
+	{
+	  gphi *phi = pi.phi ();
+	  tree ssa_name = gimple_phi_result (phi);
+	  if (has_zero_uses (ssa_name))
+	    {
+	      /* Note that remove_phi_node() also frees SSA name.  */
+	      remove_phi_node (&pi, true);
+	    }
+	  else
+	    gsi_next (&pi);
 	}
     }
 }
@@ -427,6 +453,8 @@ sccp_propagate (auto_vec<gimple *> &copy_stmts)
 
       scc.release ();
     }
+
+  remove_zero_uses_phis ();
 }
 
 /* Return all statements in cfun that may be useful.  */
@@ -515,8 +543,39 @@ unsigned
 pass_sccp::execute (function *)
 {
   init_sccp ();
+
+  // DEBUG
+  /*
+  std::cerr << "Before:" << std::endl;
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      gphi_iterator pi;
+      for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
+	{
+	  gphi *phi = pi.phi ();
+	  debug_gimple_stmt (phi);
+	}
+    }
+  */
+
   auto_vec<gimple *> stmts = get_all_may_generate_useful_copy ();
   sccp_propagate (stmts);
+
+  // DEBUG
+  /*
+  std::cerr << "After:" << std::endl;
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      gphi_iterator pi;
+      for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
+	{
+	  gphi *phi = pi.phi ();
+	  debug_gimple_stmt (phi);
+	}
+    }
+  */
+
   finalize_sccp ();
 
   return 0;
