@@ -15402,11 +15402,16 @@ aarch64_override_options_internal (struct gcc_options *opts)
      what state the processor should be in (which also defines some parts of
      the ABI like whether symbol values should have their lowest bit set).
      If we want to generate purecap code we will need the processor to be in
-     the C64 state.  */
+     the C64 state.
+
+     We automatically add this architecture feature without complaint when
+     targeting the -march=morello architecture.  This is a command line
+     argument convenience feature.  */
   if (opts->x_aarch64_abi == AARCH64_ABI_MORELLO_PURECAP
       && !AARCH64_ISA_C64)
     {
-      error ("%<-mabi=purecap%> requires the %<+c64%> extension");
+      if (selected_arch->arch != AARCH64_ARCH_MORELLO)
+	error ("%<-mabi=purecap%> requires the %<morello%> architecture");
       aarch64_isa_flags |= AARCH64_FL_C64;
     }
 
