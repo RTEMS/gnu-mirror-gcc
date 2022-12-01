@@ -88,11 +88,6 @@ package Sem_Util is
    --  Add A to the list of access types to process when expanding the
    --  freeze node of E.
 
-   procedure Add_Block_Identifier (N : Node_Id; Id : out Entity_Id);
-   --  Given a block statement N, generate an internal E_Block label and make
-   --  it the identifier of the block. Id denotes the generated entity. If the
-   --  block already has an identifier, Id returns the entity of its label.
-
    procedure Add_Global_Declaration (N : Node_Id);
    --  These procedures adds a declaration N at the library level, to be
    --  elaborated before any other code in the unit. It is used for example
@@ -319,6 +314,16 @@ package Sem_Util is
    --  subtype constrained by the default values, insert the subtype
    --  declaration in the tree before N, and return the entity of that
    --  subtype. Otherwise, simply return T.
+
+   function Build_Default_Subtype_OK (T : Entity_Id) return Boolean;
+   --  When analyzing components or object declarations, it is possible, in
+   --  some cases, to build subtypes for discriminated types. This is
+   --  worthwhile to avoid the backend allocating the maximum possible size for
+   --  objects of the type.
+   --  In particular, when T is limited, the discriminants and therefore the
+   --  size of an object of type T cannot change. Furthermore, if T is definite
+   --  with statically initialized defaulted discriminants, we are able and
+   --  want to build a constrained subtype of the right size.
 
    function Build_Discriminal_Subtype_Of_Component
      (T : Entity_Id) return Node_Id;
@@ -615,6 +620,11 @@ package Sem_Util is
    --  create a new compatible record type. Loc is the source location assigned
    --  to the created nodes.
 
+   procedure Copy_Ghost_Aspect (From : Node_Id; To : Node_Id);
+   --  Copy the Ghost aspect if present in the aspect specifications of node
+   --  From to node To. On entry it is assumed that To does not have aspect
+   --  specifications. If From has no aspects, the routine has no effect.
+
    function Copy_Parameter_List (Subp_Id : Entity_Id) return List_Id;
    --  Utility to create a parameter profile for a new subprogram spec, when
    --  the subprogram has a body that acts as spec. This is done for some cases
@@ -662,6 +672,15 @@ package Sem_Util is
 
    function Current_Scope return Entity_Id;
    --  Get entity representing current scope
+
+   procedure Add_Block_Identifier
+       (N : Node_Id;
+        Id : out Entity_Id;
+        Scope : Entity_Id := Current_Scope);
+   --  Given a block statement N, generate an internal E_Block label and make
+   --  it the identifier of the block. Scope denotes the scope in which the
+   --  generated entity Id is created and defaults to the current scope. If the
+   --  block already has an identifier, Id returns the entity of its label.
 
    function Current_Scope_No_Loops return Entity_Id;
    --  Return the current scope ignoring internally generated loops
@@ -789,6 +808,10 @@ package Sem_Util is
    function Enclosing_Declaration (N : Node_Id) return Node_Id;
    --  Returns the declaration node enclosing N (including possibly N itself),
    --  if any, or Empty otherwise.
+
+   function Enclosing_Declaration_Or_Statement (N : Node_Id) return Node_Id;
+   --  Return the nearest enclosing declaration or statement that houses
+   --  arbitrary node N.
 
    function Enclosing_Generic_Body (N : Node_Id) return Node_Id;
    --  Returns the Node_Id associated with the innermost enclosing generic
@@ -1172,6 +1195,12 @@ package Sem_Util is
    function Get_Enclosing_Object (N : Node_Id) return Entity_Id;
    --  If expression N references a part of an object, return this object.
    --  Otherwise return Empty. Expression N should have been resolved already.
+
+   function Get_Enclosing_Deep_Object (N : Node_Id) return Entity_Id;
+   --  If expression N references a reachable part of an object (as defined in
+   --  SPARK RM 6.9), return this object. Otherwise return Empty. It is similar
+   --  to Get_Enclosing_Object, but treats pointer dereference like component
+   --  selection. Expression N should have been resolved already.
 
    function Get_Generic_Entity (N : Node_Id) return Entity_Id;
    --  Returns the true generic entity in an instantiation. If the name in the
@@ -1852,12 +1881,13 @@ package Sem_Util is
    function Is_Attribute_Update (N : Node_Id) return Boolean;
    --  Determine whether node N denotes attribute 'Update
 
-   function Is_Body_Or_Package_Declaration (N : Node_Id) return Boolean;
+   function Is_Body_Or_Package_Declaration (N : Node_Id) return Boolean
+     with Inline;
    --  Determine whether node N denotes a body or a package declaration
 
    function Is_Bounded_String (T : Entity_Id) return Boolean;
    --  True if T is a bounded string type. Used to make sure "=" composes
-   --  properly for bounded string types.
+   --  properly for bounded string types (see 4.5.2(32.1/1)).
 
    function Is_By_Protected_Procedure (Id : Entity_Id) return Boolean;
    --  Determine whether entity Id denotes a procedure with synchronization
@@ -2460,6 +2490,10 @@ package Sem_Util is
    --  unconditional transfer of control at run time, i.e. the following
    --  statement definitely will not be executed.
 
+   function Is_Trivial_Boolean (N : Node_Id) return Boolean;
+   --  Determine whether source node N denotes "True" or "False". Note that
+   --  this is not true for expressions that got folded to True or False.
+
    function Is_Unchecked_Conversion_Instance (Id : Entity_Id) return Boolean;
    --  Determine whether an arbitrary entity denotes an instance of function
    --  Ada.Unchecked_Conversion.
@@ -2475,7 +2509,9 @@ package Sem_Util is
      (N   : Node_Id;
       Typ : Entity_Id) return Boolean;
    pragma Inline (Is_User_Defined_Literal);
-   --  Determine whether N is a user-defined literal for Typ
+   --  Determine whether N is a user-defined literal for Typ, including
+   --  the case where N denotes a named number of the appropriate kind
+   --  when Typ has an Integer_Literal or Real_Literal aspect.
 
    function Is_Validation_Variable_Reference (N : Node_Id) return Boolean;
    --  Determine whether N denotes a reference to a variable which captures the
@@ -2535,11 +2571,6 @@ package Sem_Util is
    procedure Iterate_Call_Parameters (Call : Node_Id);
    --  Calls Handle_Parameter for each pair of formal and actual parameters of
    --  a function, procedure, or entry call.
-
-   function Itype_Has_Declaration (Id : Entity_Id) return Boolean;
-   --  Applies to Itypes. True if the Itype is attached to a declaration for
-   --  the type through its Parent field, which may or not be present in the
-   --  tree.
 
    procedure Kill_Current_Values (Last_Assignment_Only : Boolean := False);
    --  This procedure is called to clear all constant indications from all
@@ -2667,6 +2698,12 @@ package Sem_Util is
    --  parameter to identify the accessibility level of the function result
    --  "determined by the point of call".
 
+   function Needs_Secondary_Stack (Id : Entity_Id) return Boolean;
+   --  Return true if functions whose result type is Id must return on the
+   --  secondary stack, i.e. allocate the return object on this stack.
+
+   --  WARNING: There is a matching C declaration of this subprogram in fe.h
+
    function Needs_Simple_Initialization
      (Typ         : Entity_Id;
       Consider_IS : Boolean := True) return Boolean;
@@ -2717,7 +2754,6 @@ package Sem_Util is
    --      fields are recreated after the replication takes place.
    --
    --        First_Named_Actual
-   --        First_Real_Statement
    --        Next_Named_Actual
    --
    --      If applicable, the Etype field (if any) is updated to refer to a
@@ -2856,7 +2892,7 @@ package Sem_Util is
    --  This routine is called if the sub-expression N maybe the target of
    --  an assignment (e.g. it is the left side of an assignment, used as
    --  an out parameters, or used as prefixes of access attributes). It
-   --  sets May_Be_Modified in the associated entity if there is one,
+   --  sets Never_Set_In_Source in the associated entity if there is one,
    --  taking into account the rule that in the case of renamed objects,
    --  it is the flag in the renamed object that must be set.
    --
@@ -3081,12 +3117,6 @@ package Sem_Util is
    procedure Restore_SPARK_Mode (Mode : SPARK_Mode_Type; Prag : Node_Id);
    --  Set the current SPARK_Mode to Mode and SPARK_Mode_Pragma to Prag. This
    --  routine must be used in tandem with Set_SPARK_Mode.
-
-   function Returns_On_Secondary_Stack (Id : Entity_Id) return Boolean;
-   --  Return true if functions whose result type is Id must return on the
-   --  secondary stack, i.e. allocate the return object on this stack.
-
-   --  WARNING: There is a matching C declaration of this subprogram in fe.h
 
    function Returns_Unconstrained_Type (Subp : Entity_Id) return Boolean;
    --  Return true if Subp is a function that returns an unconstrained type
@@ -3453,6 +3483,18 @@ package Sem_Util is
    function Within_Scope (E : Entity_Id; S : Entity_Id) return Boolean;
    --  Returns True if entity E is declared within scope S
 
+   procedure Warn_On_Hiding_Entity
+     (N               : Node_Id;
+      Hidden, Visible : Entity_Id;
+      On_Use_Clause   : Boolean);
+   --  Warn on hiding of an entity, either because a new declaration hides
+   --  an entity directly visible or potentially visible through a use_clause
+   --  (On_Use_Clause = False), or because the entity would be potentially
+   --  visible through a use_clause if it was now hidden by a visible
+   --  declaration (On_Use_Clause = True). N is the node on which the warning
+   --  is potentially issued: it is the visible entity in the former case, and
+   --  the use_clause in the latter case.
+
    procedure Wrong_Type (Expr : Node_Id; Expected_Type : Entity_Id);
    --  Output error message for incorrectly typed expression. Expr is the node
    --  for the incorrectly typed construct (Etype (Expr) is the type found),
@@ -3622,9 +3664,13 @@ package Sem_Util is
       function Has_Storage_Model_Type_Aspect (Typ : Entity_Id) return Boolean;
       --  Returns True iff Typ specifies aspect Storage_Model_Type
 
+      --  WARNING: There is a matching C declaration of this subprogram in fe.h
+
       function Has_Designated_Storage_Model_Aspect
         (Typ : Entity_Id) return Boolean;
       --  Returns True iff Typ specifies aspect Designated_Storage_Model
+
+      --  WARNING: There is a matching C declaration of this subprogram in fe.h
 
       function Storage_Model_Object (Typ : Entity_Id) return Entity_Id;
       --  Given an access type Typ with aspect Designated_Storage_Model,
@@ -3632,6 +3678,8 @@ package Sem_Util is
       --  The object Entity_Ids returned by this function can be passed
       --  other functions declared in this interface to retrieve operations
       --  associated with Storage_Model_Type aspect of the object's type.
+
+      --  WARNING: There is a matching C declaration of this subprogram in fe.h
 
       function Storage_Model_Type (Obj : Entity_Id) return Entity_Id;
       --  Given an object Obj of a type specifying aspect Storage_Model_Type,
@@ -3643,21 +3691,26 @@ package Sem_Util is
       --  Given a type with aspect Storage_Model_Type or an object of such a
       --  type, and Nam denoting the name of one of the argument kinds allowed
       --  for that aspect, returns the Entity_Id corresponding to the entity
-      --  associated with Nam in the aspect. If such an entity is not present,
-      --  then returns Empty. (Note: This function is modeled on function
-      --  Get_Iterable_Type_Primitive.)
+      --  associated with Nam in the aspect. If an entity was not explicitly
+      --  specified for Nam, then returns Empty, except that in the defaulted
+      --  Address_Type case, System.Address will be returned, and in the
+      --  defaulted Null_Address case, System.Null_Address will be returned.
+      --  (Note: This function is modeled on Get_Iterable_Type_Primitive.)
 
       function Storage_Model_Address_Type
         (SM_Obj_Or_Type : Entity_Id) return Entity_Id;
       --  Given a type with aspect Storage_Model_Type or an object of such a
       --  type, returns the type specified for the Address_Type choice in that
-      --  aspect; returns Empty if the type isn't specified.
+      --  aspect; returns type System.Address if the address type was not
+      --  explicitly specified (indicating use of the native memory model).
 
       function Storage_Model_Null_Address
         (SM_Obj_Or_Type : Entity_Id) return Entity_Id;
       --  Given a type with aspect Storage_Model_Type or an object of such a
       --  type, returns the constant specified for the Null_Address choice in
-      --  that aspect; returns Empty if the constant object isn't specified.
+      --  that aspect; returns Empty if the constant object isn't specified,
+      --  unless the native memory model is in use (System.Address), in which
+      --  case it returns System.Null_Address.
 
       function Storage_Model_Allocate
         (SM_Obj_Or_Type : Entity_Id) return Entity_Id;
@@ -3677,11 +3730,15 @@ package Sem_Util is
       --  type, returns the procedure specified for the Copy_From choice in
       --  that aspect; returns Empty if the procedure isn't specified.
 
+      --  WARNING: There is a matching C declaration of this subprogram in fe.h
+
       function Storage_Model_Copy_To
         (SM_Obj_Or_Type : Entity_Id) return Entity_Id;
       --  Given a type with aspect Storage_Model_Type or an object of such a
       --  type, returns the procedure specified for the Copy_To choice in that
       --  aspect; returns Empty if the procedure isn't specified.
+
+      --  WARNING: There is a matching C declaration of this subprogram in fe.h
 
       function Storage_Model_Storage_Size
         (SM_Obj_Or_Type : Entity_Id) return Entity_Id;

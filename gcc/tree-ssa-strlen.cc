@@ -243,8 +243,8 @@ public:
 
   ~strlen_pass ();
 
-  virtual edge before_dom_children (basic_block);
-  virtual void after_dom_children (basic_block);
+  edge before_dom_children (basic_block) final override;
+  void after_dom_children (basic_block) final override;
 
   bool check_and_optimize_stmt (bool *cleanup_eh);
   bool check_and_optimize_call (bool *zero_write);
@@ -1987,7 +1987,7 @@ maybe_set_strlen_range (tree lhs, tree src, tree bound)
 	 suggests if it's treated as a poor-man's flexible array member.  */
       src = TREE_OPERAND (src, 0);
       if (TREE_CODE (src) != MEM_REF
-	  && !array_at_struct_end_p (src))
+	  && !array_ref_flexible_size_p (src))
 	{
 	  tree type = TREE_TYPE (src);
 	  tree size = TYPE_SIZE_UNIT (type);
@@ -3913,8 +3913,8 @@ strlen_pass::handle_builtin_memset (bool *zero_write)
    nonnull if and only RES is used in such expressions exclusively and
    in none other.  */
 
-static gimple *
-use_in_zero_equality (tree res, bool exclusive = true)
+gimple *
+use_in_zero_equality (tree res, bool exclusive)
 {
   gimple *first_use = NULL;
 
@@ -4735,7 +4735,7 @@ strlen_pass::count_nonzero_bytes (tree exp, gimple *stmt,
 
   /* Compute the number of leading nonzero bytes in the representation
      and update the minimum and maximum.  */
-  unsigned n = prep ? strnlen (prep, nbytes) : nbytes;
+  unsigned HOST_WIDE_INT n = prep ? strnlen (prep, nbytes) : nbytes;
 
   if (n < lenrange[0])
     lenrange[0] = n;
@@ -5962,8 +5962,8 @@ public:
     : gimple_opt_pass (pass_data_warn_printf, ctxt)
   {}
 
-  virtual bool gate (function *);
-  virtual unsigned int execute (function *fun)
+  bool gate (function *) final override;
+  unsigned int execute (function *fun) final override
   {
     return printf_strlen_execute (fun, true);
   }
@@ -5999,10 +5999,10 @@ public:
     : gimple_opt_pass (pass_data_strlen, ctxt)
   {}
 
-  opt_pass * clone () { return new pass_strlen (m_ctxt); }
+  opt_pass * clone () final override { return new pass_strlen (m_ctxt); }
 
-  virtual bool gate (function *);
-  virtual unsigned int execute (function *fun)
+  bool gate (function *) final override;
+  unsigned int execute (function *fun) final override
   {
     return printf_strlen_execute (fun, false);
   }

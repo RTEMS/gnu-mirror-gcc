@@ -236,24 +236,32 @@ struct FieldState
     bool inFlight;      /// bit field is in flight
 }
 
+// 99.9% of Dsymbols don't have attributes (at least in druntime and Phobos),
+// so save memory by grouping them into a separate struct
+private struct DsymbolAttributes
+{
+    /// C++ namespace this symbol belongs to
+    CPPNamespaceDeclaration cppnamespace;
+    /// customized deprecation message
+    DeprecatedDeclaration depdecl_;
+    /// user defined attributes
+    UserAttributeDeclaration userAttribDecl;
+}
+
 /***********************************************************
  */
 extern (C++) class Dsymbol : ASTNode
 {
     Identifier ident;
     Dsymbol parent;
-    /// C++ namespace this symbol belongs to
-    CPPNamespaceDeclaration cppnamespace;
     Symbol* csym;           // symbol for code generator
     const Loc loc;          // where defined
     Scope* _scope;          // !=null means context to use for semantic()
     const(char)* prettystring;  // cached value of toPrettyChars()
+    private DsymbolAttributes* atts; /// attached attribute declarations
     bool errors;            // this symbol failed to pass semantic()
     PASS semanticRun = PASS.initial;
     ushort localNum;        /// perturb mangled name to avoid collisions with those in FuncDeclaration.localsymtab
-
-    DeprecatedDeclaration depdecl;           // customized deprecation message
-    UserAttributeDeclaration userAttribDecl;    // user defined attributes
 
     final extern (D) this() nothrow
     {
@@ -283,6 +291,42 @@ extern (C++) class Dsymbol : ASTNode
     override const(char)* toChars() const
     {
         return ident ? ident.toChars() : "__anonymous";
+    }
+
+    // Getters / setters for fields stored in `DsymbolAttributes`
+    final nothrow pure @safe
+    {
+        private ref DsymbolAttributes getAtts()
+        {
+            if (!atts)
+                atts = new DsymbolAttributes();
+            return *atts;
+        }
+
+        inout(DeprecatedDeclaration) depdecl() inout { return atts ? atts.depdecl_ : null; }
+        inout(CPPNamespaceDeclaration) cppnamespace() inout { return atts ? atts.cppnamespace : null; }
+        inout(UserAttributeDeclaration) userAttribDecl() inout { return atts ? atts.userAttribDecl : null; }
+
+        DeprecatedDeclaration depdecl(DeprecatedDeclaration dd)
+        {
+            if (!dd && !atts)
+                return null;
+            return getAtts().depdecl_ = dd;
+        }
+
+        CPPNamespaceDeclaration cppnamespace(CPPNamespaceDeclaration ns)
+        {
+            if (!ns && !atts)
+                return null;
+            return getAtts().cppnamespace = ns;
+        }
+
+        UserAttributeDeclaration userAttribDecl(UserAttributeDeclaration uad)
+        {
+            if (!uad && !atts)
+                return null;
+            return getAtts().userAttribDecl = uad;
+        }
     }
 
     // helper to print fully qualified (template) arguments
@@ -1544,6 +1588,12 @@ public:
 
                         if (flags & IgnoreAmbiguous) // if return NULL on ambiguity
                             return null;
+
+                        /* If two imports from C import files, pick first one, as C has global name space
+                         */
+                        if (s.isCsymbol() && s2.isCsymbol())
+                            continue;
+
                         if (!(flags & IgnoreErrors))
                             ScopeDsymbol.multiplyDefined(loc, s, s2);
                         break;
@@ -1978,8 +2028,9 @@ extern (C++) final class ArrayScopeSymbol : ScopeDsymbol
         }
 
         const DYNCAST kind = arrayContent.dyncast();
-        if (kind == DYNCAST.dsymbol)
+        switch (kind) with (DYNCAST)
         {
+        case dsymbol:
             TupleDeclaration td = cast(TupleDeclaration) arrayContent;
             /* $ gives the number of elements in the tuple
              */
@@ -1989,10 +2040,10 @@ extern (C++) final class ArrayScopeSymbol : ScopeDsymbol
             v.storage_class |= STC.temp | STC.static_ | STC.const_;
             v.dsymbolSemantic(sc);
             return v;
-        }
-        if (kind == DYNCAST.type)
-        {
+        case type:
             return dollarFromTypeTuple(loc, cast(TypeTuple) arrayContent, sc);
+        default:
+            break;
         }
         Expression exp = cast(Expression) arrayContent;
         if (auto ie = exp.isIndexExp())
@@ -2183,20 +2234,13 @@ extern (C++) final class OverloadSet : Dsymbol
  */
 extern (C++) final class ForwardingScopeDsymbol : ScopeDsymbol
 {
-    /*************************
-     * Symbol to forward insertions to.
-     * Can be `null` before being lazily initialized.
-     */
-    ScopeDsymbol forward;
-    extern (D) this(ScopeDsymbol forward) nothrow
+    extern (D) this() nothrow
     {
-        super(null);
-        this.forward = forward;
+        super();
     }
 
     override Dsymbol symtabInsert(Dsymbol s) nothrow
     {
-        assert(forward);
         if (auto d = s.isDeclaration())
         {
             if (d.storage_class & STC.local)
@@ -2211,6 +2255,8 @@ extern (C++) final class ForwardingScopeDsymbol : ScopeDsymbol
                 return super.symtabInsert(s); // insert locally
             }
         }
+        auto forward = parent.isScopeDsymbol();
+        assert(forward);
         if (!forward.symtab)
         {
             forward.symtab = new DsymbolTable();
@@ -2227,7 +2273,6 @@ extern (C++) final class ForwardingScopeDsymbol : ScopeDsymbol
      */
     override Dsymbol symtabLookup(Dsymbol s, Identifier id) nothrow
     {
-        assert(forward);
         // correctly diagnose clashing foreach loop variables.
         if (auto d = s.isDeclaration())
         {
@@ -2242,6 +2287,8 @@ extern (C++) final class ForwardingScopeDsymbol : ScopeDsymbol
         }
         // Declarations within `static foreach` do not clash with
         // `static foreach` loop variables.
+        auto forward = parent.isScopeDsymbol();
+        assert(forward);
         if (!forward.symtab)
         {
             forward.symtab = new DsymbolTable();
@@ -2251,6 +2298,8 @@ extern (C++) final class ForwardingScopeDsymbol : ScopeDsymbol
 
     override void importScope(Dsymbol s, Visibility visibility)
     {
+        auto forward = parent.isScopeDsymbol();
+        assert(forward);
         forward.importScope(s, visibility);
     }
 
@@ -2442,6 +2491,15 @@ Dsymbol handleTagSymbols(ref Scope sc, Dsymbol s, Dsymbol s2, ScopeDsymbol sds)
     auto sd = s.isScopeDsymbol(); // new declaration
     auto sd2 = s2.isScopeDsymbol(); // existing declaration
 
+    static if (log) void print(EnumDeclaration sd)
+    {
+        printf("members: %p\n", sd.members);
+        printf("symtab: %p\n", sd.symtab);
+        printf("endlinnum: %d\n", sd.endlinnum);
+        printf("type: %s\n", sd.type.toChars());
+        printf("memtype: %s\n", sd.memtype.toChars());
+    }
+
     if (!sd2)
     {
         /* Look in tag table
@@ -2474,6 +2532,23 @@ Dsymbol handleTagSymbols(ref Scope sc, Dsymbol s, Dsymbol s2, ScopeDsymbol sds)
         {
             sd2.members = sd.members; // transfer definition to sd2
             sd.members = null;
+            if (auto ed2 = sd2.isEnumDeclaration())
+            {
+                auto ed = sd.isEnumDeclaration();
+                if (ed.memtype != ed2.memtype)
+                    return null;        // conflict
+
+                // transfer ed's members to sd2
+                ed2.members.foreachDsymbol( (s)
+                {
+                    if (auto em = s.isEnumMember())
+                        em.ed = ed2;
+                });
+
+                ed2.type = ed.type;
+                ed2.memtype = ed.memtype;
+                ed2.added = false;
+            }
             return sd2;
         }
         else
@@ -2531,6 +2606,16 @@ Dsymbol handleSymbolRedeclarations(ref Scope sc, Dsymbol s, Dsymbol s2, ScopeDsy
         if (log) printf(" collision\n");
         return null;
     }
+    /*
+    Handle merging declarations with asm("foo") and their definitions
+    */
+    static void mangleWrangle(Declaration oldDecl, Declaration newDecl)
+    {
+        if (oldDecl && newDecl)
+        {
+            newDecl.mangleOverride = oldDecl.mangleOverride ? oldDecl.mangleOverride : null;
+        }
+    }
 
     auto vd = s.isVarDeclaration(); // new declaration
     auto vd2 = s2.isVarDeclaration(); // existing declaration
@@ -2547,6 +2632,8 @@ Dsymbol handleSymbolRedeclarations(ref Scope sc, Dsymbol s, Dsymbol s2, ScopeDsy
 
         if (i1 && i2)
             return collision();         // can't both have initializers
+
+        mangleWrangle(vd2, vd);
 
         if (i1)                         // vd is the definition
         {
@@ -2592,6 +2679,8 @@ Dsymbol handleSymbolRedeclarations(ref Scope sc, Dsymbol s, Dsymbol s2, ScopeDsy
 
         if (fd.fbody && fd2.fbody)
             return collision();         // can't both have bodies
+
+        mangleWrangle(fd2, fd);
 
         if (fd.fbody)                   // fd is the definition
         {

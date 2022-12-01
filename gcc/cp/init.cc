@@ -620,10 +620,8 @@ get_nsdmi (tree member, bool in_ctor, tsubst_flags_t complain)
 	  start_lambda_scope (member);
 
 	  /* Do deferred instantiation of the NSDMI.  */
-	  init = (tsubst_copy_and_build
-		  (init, DECL_TI_ARGS (member),
-		   complain, member, /*function_p=*/false,
-		   /*integral_constant_expression_p=*/false));
+	  init = tsubst_copy_and_build (init, DECL_TI_ARGS (member),
+					complain, member);
 	  init = digest_nsdmi_init (member, init, complain);
 
 	  finish_lambda_scope ();
@@ -685,6 +683,8 @@ get_nsdmi (tree member, bool in_ctor, tsubst_flags_t complain)
   if (simple_target && TREE_CODE (init) != CONSTRUCTOR)
     /* Now put it back so C++17 copy elision works.  */
     init = get_target_expr (init);
+
+  set_target_expr_eliding (init);
 
   current_class_ptr = save_ccp;
   current_class_ref = save_ccr;
@@ -1006,7 +1006,7 @@ perform_member_init (tree member, tree init, hash_set<tree> &uninitialized)
       if (TREE_CODE (type) == ARRAY_TYPE)
 	{
 	  init = build_vec_init_expr (type, init, tf_warning_or_error);
-	  init = build2 (INIT_EXPR, type, decl, init);
+	  init = cp_build_init_expr (decl, init);
 	  finish_expr_stmt (init);
 	}
       else
@@ -1014,7 +1014,7 @@ perform_member_init (tree member, tree init, hash_set<tree> &uninitialized)
 	  tree value = build_value_init (type, tf_warning_or_error);
 	  if (value == error_mark_node)
 	    return;
-	  init = build2 (INIT_EXPR, type, decl, value);
+	  init = cp_build_init_expr (decl, value);
 	  finish_expr_stmt (init);
 	}
     }
@@ -1025,7 +1025,7 @@ perform_member_init (tree member, tree init, hash_set<tree> &uninitialized)
     {
       if (init)
 	{
-	  init = build2 (INIT_EXPR, type, decl, TREE_VALUE (init));
+	  init = cp_build_init_expr (decl, TREE_VALUE (init));
 	  finish_expr_stmt (init);
 	}
     }
@@ -1062,7 +1062,7 @@ perform_member_init (tree member, tree init, hash_set<tree> &uninitialized)
       if (TREE_CODE (type) == ARRAY_TYPE
 	  && TYPE_HAS_NONTRIVIAL_DESTRUCTOR (TREE_TYPE (type)))
 	init = build_vec_init_expr (type, init, tf_warning_or_error);
-      init = build2 (INIT_EXPR, type, decl, init);
+      init = cp_build_init_expr (decl, init);
       finish_expr_stmt (init);
       FOR_EACH_VEC_ELT (*cleanups, i, t)
 	push_cleanup (NULL_TREE, t, false);
@@ -1081,7 +1081,7 @@ perform_member_init (tree member, tree init, hash_set<tree> &uninitialized)
 		  /* Initialize the array only if it's not a flexible
 		     array member (i.e., if it has an upper bound).  */
 		  init = build_vec_init_expr (type, init, tf_warning_or_error);
-		  init = build2 (INIT_EXPR, type, decl, init);
+		  init = cp_build_init_expr (decl, init);
 		  finish_expr_stmt (init);
 		}
 	    }
@@ -1436,7 +1436,6 @@ sort_mem_initializers (tree t, tree mem_inits)
 	  continue;
 	splice:
 	  *p = TREE_CHAIN (*p);
-	  continue;
 	}
     }
 
@@ -2098,7 +2097,7 @@ expand_default_init (tree binfo, tree true_exp, tree exp, tree init, int flags,
 	 complete objects.  */
       gcc_assert (TREE_CODE (init) == CONSTRUCTOR || true_exp == exp);
 
-      init = build2 (INIT_EXPR, TREE_TYPE (exp), exp, init);
+      init = cp_build_init_expr (exp, init);
       TREE_SIDE_EFFECTS (init) = 1;
       finish_expr_stmt (init);
       return true;
@@ -2125,19 +2124,19 @@ expand_default_init (tree binfo, tree true_exp, tree exp, tree init, int flags,
 	    return false;
 	}
 
-      if (TREE_CODE (init) == MUST_NOT_THROW_EXPR)
-	/* We need to protect the initialization of a catch parm with a
-	   call to terminate(), which shows up as a MUST_NOT_THROW_EXPR
-	   around the TARGET_EXPR for the copy constructor.  See
-	   initialize_handler_parm.  */
+      /* We need to protect the initialization of a catch parm with a
+	 call to terminate(), which shows up as a MUST_NOT_THROW_EXPR
+	 around the TARGET_EXPR for the copy constructor.  See
+	 initialize_handler_parm.  */
+      tree *p = &init;
+      while (TREE_CODE (*p) == MUST_NOT_THROW_EXPR
+	     || TREE_CODE (*p) == CLEANUP_POINT_EXPR)
 	{
-	  TREE_OPERAND (init, 0) = build2 (INIT_EXPR, TREE_TYPE (exp), exp,
-					   TREE_OPERAND (init, 0));
-	  TREE_TYPE (init) = void_type_node;
+	  /* Avoid voidify_wrapper_expr making a temporary.  */
+	  TREE_TYPE (*p) = void_type_node;
+	  p = &TREE_OPERAND (*p, 0);
 	}
-      else
-	init = build2 (INIT_EXPR, TREE_TYPE (exp), exp, init);
-      TREE_SIDE_EFFECTS (init) = 1;
+      *p = cp_build_init_expr (exp, *p);
       finish_expr_stmt (init);
       return true;
     }
@@ -2202,7 +2201,7 @@ expand_default_init (tree binfo, tree true_exp, tree exp, tree init, int flags,
 	{
 	  tree e = maybe_constant_init (rval, exp);
 	  if (TREE_CONSTANT (e))
-	    rval = build2 (INIT_EXPR, type, exp, e);
+	    rval = cp_build_init_expr (exp, e);
 	}
     }
 
@@ -2290,7 +2289,7 @@ expand_aggr_init_1 (tree binfo, tree true_exp, tree exp, tree init, int flags,
 	    field_size = TYPE_SIZE (CLASSTYPE_AS_BASE (type));
 	  init = build_zero_init_1 (type, NULL_TREE, /*static_storage_p=*/false,
 				    field_size);
-	  init = build2 (INIT_EXPR, type, exp, init);
+	  init = cp_build_init_expr (exp, init);
 	  finish_expr_stmt (init);
 	}
 
@@ -3159,7 +3158,7 @@ build_new_1 (vec<tree, va_gc> **placement, tree type, tree nelts,
 	     "%<new%> of %<initializer_list%> does not "
 	     "extend the lifetime of the underlying array");
 
-  if (abstract_virtuals_error_sfinae (ACU_NEW, elt_type, complain))
+  if (abstract_virtuals_error (ACU_NEW, elt_type, complain))
     return error_mark_node;
 
   is_initialized = (type_build_ctor_call (elt_type) || *init != NULL);
@@ -3678,7 +3677,7 @@ build_new_1 (vec<tree, va_gc> **placement, tree type, tree nelts,
 	      tree val = build_value_init (type, complain | tf_no_cleanup);
 	      if (val == error_mark_node)
 		return error_mark_node;
-	      init_expr = build2 (INIT_EXPR, type, init_expr, val);
+	      init_expr = cp_build_init_expr (init_expr, val);
 	    }
 	  else
 	    {
@@ -4395,6 +4394,10 @@ build_vec_init (tree base, tree maxindex, tree init,
 	}
     }
 
+  /* from_array doesn't apply to initialization from CONSTRUCTOR.  */
+  if (init && TREE_CODE (init) == CONSTRUCTOR)
+    from_array = 0;
+
   /* If we have a braced-init-list or string constant, make sure that the array
      is big enough for all the initializers.  */
   bool length_check = (init
@@ -4426,7 +4429,7 @@ build_vec_init (tree base, tree maxindex, tree init,
 
       if (BRACE_ENCLOSED_INITIALIZER_P (init))
 	init = digest_init (atype, init, complain);
-      stmt_expr = build2 (INIT_EXPR, atype, base, init);
+      stmt_expr = cp_build_init_expr (base, init);
       return stmt_expr;
     }
 
@@ -4494,7 +4497,7 @@ build_vec_init (tree base, tree maxindex, tree init,
   /* If initializing one array from another, initialize element by
      element.  We rely upon the below calls to do the argument
      checking.  Evaluate the initializer before entering the try block.  */
-  if (from_array && init && TREE_CODE (init) != CONSTRUCTOR)
+  if (from_array)
     {
       if (lvalue_kind (init) & clk_rvalueref)
 	xvalue = true;
@@ -4598,7 +4601,7 @@ build_vec_init (tree base, tree maxindex, tree init,
 	  gcc_checking_assert (!target_expr_needs_replace (elt));
 
 	  if (digested)
-	    one_init = build2 (INIT_EXPR, type, baseref, elt);
+	    one_init = cp_build_init_expr (baseref, elt);
 	  else if (tree vi = get_vec_init_expr (elt))
 	    one_init = expand_vec_init_expr (baseref, vi, complain, flags);
 	  else if (MAYBE_CLASS_TYPE_P (type) || TREE_CODE (type) == ARRAY_TYPE)
@@ -4619,7 +4622,7 @@ build_vec_init (tree base, tree maxindex, tree init,
 		  if (do_static_init)
 		    one_init = NULL_TREE;
 		  else
-		    one_init = build2 (INIT_EXPR, type, baseref, e);
+		    one_init = cp_build_init_expr (baseref, e);
 		}
 	      else
 		{
@@ -4801,7 +4804,7 @@ build_vec_init (tree base, tree maxindex, tree init,
 	{
 	  elt_init = build_value_init (type, complain);
 	  if (elt_init != error_mark_node)
-	    elt_init = build2 (INIT_EXPR, type, to, elt_init);
+	    elt_init = cp_build_init_expr (to, elt_init);
 	}
       else
 	{

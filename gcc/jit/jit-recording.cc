@@ -25,7 +25,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "pretty-print.h"
 #include "toplev.h"
 
-#include <pthread.h>
 
 #include "jit-builtins.h"
 #include "jit-recording.h"

@@ -61,6 +61,7 @@ with Snames;         use Snames;
 with Stand;          use Stand;
 with Stringt;        use Stringt;
 with Tbuild;         use Tbuild;
+with Warnsw;         use Warnsw;
 
 package body Sem_Eval is
 
@@ -1816,13 +1817,14 @@ package body Sem_Eval is
 
    begin
       --  Never known at compile time if bad type or raises Constraint_Error
-      --  or empty (latter case occurs only as a result of a previous error).
+      --  or empty (which can occur as a result of a previous error or in the
+      --  case of e.g. an imported constant).
 
       if No (Op) then
-         Check_Error_Detected;
          return False;
 
       elsif Op = Error
+        or else Nkind (Op) not in N_Has_Etype
         or else Etype (Op) = Any_Type
         or else Raises_Constraint_Error (Op)
       then
@@ -2856,10 +2858,11 @@ package body Sem_Eval is
          return;
       end if;
 
-      --  Intrinsic calls as part of a static function is a language extension.
+      --  Intrinsic calls as part of a static function is a (core)
+      --  language extension.
 
       if Checking_Potentially_Static_Expression
-        and then not Extensions_Allowed
+        and then not Core_Extensions_Allowed
       then
          return;
       end if;
@@ -7485,17 +7488,15 @@ package body Sem_Eval is
                   return;
                end if;
 
-               if Present (Expressions (N)) then
-                  Exp := First (Expressions (N));
-                  while Present (Exp) loop
-                     if Raises_Constraint_Error (Exp) then
-                        Why_Not_Static (Exp);
-                        return;
-                     end if;
+               Exp := First (Expressions (N));
+               while Present (Exp) loop
+                  if Raises_Constraint_Error (Exp) then
+                     Why_Not_Static (Exp);
+                     return;
+                  end if;
 
-                     Next (Exp);
-                  end loop;
-               end if;
+                  Next (Exp);
+               end loop;
 
             --  Special case a subtype name
 

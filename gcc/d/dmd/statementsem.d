@@ -502,10 +502,10 @@ package (dmd) extern (C++) final class StatementSemanticVisitor : Visitor
     override void visit(ForwardingStatement ss)
     {
         assert(ss.sym);
-        for (Scope* csc = sc; !ss.sym.forward; csc = csc.enclosing)
+        for (Scope* csc = sc; !ss.sym.parent; csc = csc.enclosing)
         {
             assert(csc);
-            ss.sym.forward = csc.scopesym;
+            ss.sym.parent = csc.scopesym;
         }
         sc = sc.push(ss.sym);
         sc.sbreak = ss;
@@ -733,9 +733,26 @@ package (dmd) extern (C++) final class StatementSemanticVisitor : Visitor
         {
             assert(oaggr.type);
 
-            fs.error("invalid `foreach` aggregate `%s` of type `%s`", oaggr.toChars(), oaggr.type.toPrettyChars());
-            if (isAggregate(fs.aggr.type))
-                fs.loc.errorSupplemental("maybe define `opApply()`, range primitives, or use `.tupleof`");
+            fs.error("invalid `%s` aggregate `%s` of type `%s`",
+                Token.toChars(fs.op), oaggr.toChars(), oaggr.type.toPrettyChars());
+
+            if (auto ad = isAggregate(fs.aggr.type))
+            {
+                if (fs.op == TOK.foreach_reverse_)
+                {
+                    fs.loc.errorSupplemental("`foreach_reverse` works with bidirectional ranges"~
+                        " (implementing `back` and `popBack`), aggregates implementing" ~
+                        " `opApplyReverse`, or the result of an aggregate's `.tupleof` property");
+                    fs.loc.errorSupplemental("https://dlang.org/phobos/std_range_primitives.html#isBidirectionalRange");
+                }
+                else
+                {
+                    fs.loc.errorSupplemental("`foreach` works with input ranges"~
+                        " (implementing `front` and `popFront`), aggregates implementing" ~
+                        " `opApply`, or the result of an aggregate's `.tupleof` property");
+                    fs.loc.errorSupplemental("https://dlang.org/phobos/std_range_primitives.html#isInputRange");
+                }
+            }
 
             return setError();
         }
@@ -1616,9 +1633,8 @@ package (dmd) extern (C++) final class StatementSemanticVisitor : Visitor
     static FuncExp foreachBodyToFunction(Scope* sc, ForeachStatement fs, TypeFunction tfld)
     {
         auto params = new Parameters();
-        foreach (i; 0 .. fs.parameters.dim)
+        foreach (i, p; *fs.parameters)
         {
-            Parameter p = (*fs.parameters)[i];
             StorageClass stc = STC.ref_ | (p.storageClass & STC.scope_);
             Identifier id;
 
@@ -1994,32 +2010,8 @@ package (dmd) extern (C++) final class StatementSemanticVisitor : Visitor
         //printf("body = %p\n", ps._body);
         if (ps.ident == Id.msg)
         {
-            if (ps.args)
-            {
-                foreach (arg; *ps.args)
-                {
-                    sc = sc.startCTFE();
-                    auto e = arg.expressionSemantic(sc);
-                    e = resolveProperties(sc, e);
-                    sc = sc.endCTFE();
-
-                    // pragma(msg) is allowed to contain types as well as expressions
-                    e = ctfeInterpretForPragmaMsg(e);
-                    if (e.op == EXP.error)
-                    {
-                        errorSupplemental(ps.loc, "while evaluating `pragma(msg, %s)`", arg.toChars());
-                        return setError();
-                    }
-                    if (auto se = e.toStringExp())
-                    {
-                        const slice = se.toUTF8(sc).peekString();
-                        fprintf(stderr, "%.*s", cast(int)slice.length, slice.ptr);
-                    }
-                    else
-                        fprintf(stderr, "%s", e.toChars());
-                }
-                fprintf(stderr, "\n");
-            }
+            if (!pragmaMsgSemantic(ps.loc, sc, ps.args))
+                return setError();
         }
         else if (ps.ident == Id.lib)
         {
@@ -2059,75 +2051,19 @@ package (dmd) extern (C++) final class StatementSemanticVisitor : Visitor
         }
         else if (ps.ident == Id.startaddress)
         {
-            if (!ps.args || ps.args.dim != 1)
-                ps.error("function name expected for start address");
-            else
-            {
-                Expression e = (*ps.args)[0];
-                sc = sc.startCTFE();
-                e = e.expressionSemantic(sc);
-                e = resolveProperties(sc, e);
-                sc = sc.endCTFE();
-
-                e = e.ctfeInterpret();
-                (*ps.args)[0] = e;
-                Dsymbol sa = getDsymbol(e);
-                if (!sa || !sa.isFuncDeclaration())
-                {
-                    ps.error("function name expected for start address, not `%s`", e.toChars());
-                    return setError();
-                }
-                if (ps._body)
-                {
-                    ps._body = ps._body.statementSemantic(sc);
-                    if (ps._body.isErrorStatement())
-                    {
-                        result = ps._body;
-                        return;
-                    }
-                }
-                result = ps;
-                return;
-            }
+            if (!pragmaStartAddressSemantic(ps.loc, sc, ps.args))
+                return setError();
         }
         else if (ps.ident == Id.Pinline)
         {
-            PINLINE inlining = PINLINE.default_;
-            if (!ps.args || ps.args.dim == 0)
-                inlining = PINLINE.default_;
-            else if (!ps.args || ps.args.dim != 1)
+            if (auto fd = sc.func)
             {
-                ps.error("boolean expression expected for `pragma(inline)`");
-                return setError();
+                fd.inlining = evalPragmaInline(ps.loc, sc, ps.args);
             }
             else
             {
-                Expression e = (*ps.args)[0];
-                sc = sc.startCTFE();
-                e = e.expressionSemantic(sc);
-                e = resolveProperties(sc, e);
-                sc = sc.endCTFE();
-                e = e.ctfeInterpret();
-                e = e.toBoolean(sc);
-                if (e.isErrorExp())
-                {
-                    ps.error("pragma(`inline`, `true` or `false`) expected, not `%s`", (*ps.args)[0].toChars());
-                    return setError();
-                }
-
-                const opt = e.toBool();
-                if (opt.hasValue(true))
-                    inlining = PINLINE.always;
-                else if (opt.hasValue(false))
-                    inlining = PINLINE.never;
-
-                    FuncDeclaration fd = sc.func;
-                if (!fd)
-                {
-                    ps.error("`pragma(inline)` is not inside a function");
-                    return setError();
-                }
-                fd.inlining = inlining;
+                ps.error("`pragma(inline)` is not inside a function");
+                return setError();
             }
         }
         else if (!global.params.ignoreUnsupportedPragmas)
@@ -2829,10 +2765,20 @@ package (dmd) extern (C++) final class StatementSemanticVisitor : Visitor
             rs.error("`return` statements cannot be in contracts");
             errors = true;
         }
-        if (sc.os && sc.os.tok != TOK.onScopeFailure)
+        if (sc.os)
         {
-            rs.error("`return` statements cannot be in `%s` bodies", Token.toChars(sc.os.tok));
-            errors = true;
+            // @@@DEPRECATED_2.112@@@
+            // Deprecated in 2.100, transform into an error in 2.112
+            if (sc.os.tok == TOK.onScopeFailure)
+            {
+                rs.deprecation("`return` statements cannot be in `scope(failure)` bodies.");
+                deprecationSupplemental(rs.loc, "Use try-catch blocks for this purpose");
+            }
+            else
+            {
+                rs.error("`return` statements cannot be in `%s` bodies", Token.toChars(sc.os.tok));
+                errors = true;
+            }
         }
         if (sc.tf)
         {
@@ -2892,7 +2838,8 @@ package (dmd) extern (C++) final class StatementSemanticVisitor : Visitor
             /* Void-return function can have void / noreturn typed expression
              * on return statement.
              */
-            const convToVoid = rs.exp.type.ty == Tvoid || rs.exp.type.ty == Tnoreturn;
+            auto texp = rs.exp.type;
+            const convToVoid = texp.ty == Tvoid || texp.ty == Tnoreturn;
 
             if (tbret && tbret.ty == Tvoid || convToVoid)
             {
@@ -2903,6 +2850,20 @@ package (dmd) extern (C++) final class StatementSemanticVisitor : Visitor
                     rs.exp = new CastExp(rs.loc, rs.exp, Type.tvoid);
                     rs.exp = rs.exp.expressionSemantic(sc);
                 }
+
+                // https://issues.dlang.org/show_bug.cgi?id=23063
+                rs.exp = checkNoreturnVarAccess(rs.exp);
+
+                // @@@DEPRECATED_2.111@@@
+                const olderrors = global.startGagging();
+                // uncomment to turn deprecation into an error when
+                // deprecation cycle is over
+                if (discardValue(rs.exp))
+                {
+                    //errors = true;
+                }
+                if (global.endGagging(olderrors))
+                    rs.exp.deprecation("`%s` has no effect", rs.exp.toChars());
 
                 /* Replace:
                  *      return exp;
@@ -2975,7 +2936,7 @@ package (dmd) extern (C++) final class StatementSemanticVisitor : Visitor
 
                     // If we previously assumed the function could be ref when
                     // checking for `shared`, make sure we were right
-                    if (global.params.noSharedAccess && rs.exp.type.isShared())
+                    if (global.params.noSharedAccess == FeatureState.enabled && rs.exp.type.isShared())
                     {
                         fd.error("function returns `shared` but cannot be inferred `ref`");
                         supplemental();
@@ -3601,7 +3562,7 @@ package (dmd) extern (C++) final class StatementSemanticVisitor : Visitor
 
         if (sc.func)
         {
-            sc.func.flags |= FUNCFLAG.hasCatches;
+            sc.func.hasCatches = true;
             if (flags == (FLAGcpp | FLAGd))
             {
                 tcs.error("cannot mix catching D and C++ exceptions in the same try-catch");
@@ -3699,6 +3660,13 @@ package (dmd) extern (C++) final class StatementSemanticVisitor : Visitor
 
         if (oss.tok != TOK.onScopeExit)
         {
+            // https://issues.dlang.org/show_bug.cgi?id=23159
+            if (!global.params.useExceptions)
+            {
+                oss.error("`%s` cannot be used with -betterC", Token.toChars(oss.tok));
+                return setError();
+            }
+
             // scope(success) and scope(failure) are rewritten to try-catch(-finally) statement,
             // so the generated catch block cannot be placed in finally block.
             // See also Catch::semantic.
@@ -3929,7 +3897,7 @@ package (dmd) extern (C++) final class StatementSemanticVisitor : Visitor
             cas.error("`asm` statement is assumed to use the GC - mark it with `@nogc` if it does not");
         if (!(cas.stc & (STC.trusted | STC.safe)))
         {
-            sc.func.setUnsafe(false, cas.loc, "`asm` statement is assumed to be `@system` - mark it with `@trusted` if it is not");
+            sc.setUnsafe(false, cas.loc, "`asm` statement is assumed to be `@system` - mark it with `@trusted` if it is not");
         }
 
         sc.pop();
@@ -4034,9 +4002,9 @@ void catchSemantic(Catch c, Scope* sc)
             error(c.loc, "catching C++ class objects not supported for this target");
             c.errors = true;
         }
-        if (sc.func && !sc.intypeof && !c.internalCatch)
+        if (!c.internalCatch)
         {
-            if (sc.func.setUnsafe(false, c.loc, "cannot catch C++ class objects in `@safe` code"))
+            if (sc.setUnsafe(false, c.loc, "cannot catch C++ class objects in `@safe` code"))
                 c.errors = true;
         }
     }
@@ -4045,9 +4013,9 @@ void catchSemantic(Catch c, Scope* sc)
         error(c.loc, "can only catch class objects derived from `Throwable`, not `%s`", c.type.toChars());
         c.errors = true;
     }
-    else if (sc.func && !sc.intypeof && !c.internalCatch && ClassDeclaration.exception &&
+    else if (!c.internalCatch && ClassDeclaration.exception &&
             cd != ClassDeclaration.exception && !ClassDeclaration.exception.isBaseOf(cd, null) &&
-            sc.func.setUnsafe(false, c.loc,
+            sc.setUnsafe(false, c.loc,
                 "can only catch class objects derived from `Exception` in `@safe` code, not `%s`", c.type))
     {
         c.errors = true;
@@ -4313,7 +4281,7 @@ public auto makeTupleForeach(Scope* sc, bool isStatic, bool isDecl, ForeachState
         if (!skip && dim == 2)
         {
             // Declare key
-            if (p.storageClass & (STC.out_ | STC.ref_ | STC.lazy_))
+            if (p.isReference() || p.isLazy())
             {
                 fs.error("no storage class for key `%s`", p.ident.toChars());
                 return returnEarly();
@@ -4385,19 +4353,21 @@ public auto makeTupleForeach(Scope* sc, bool isStatic, bool isDecl, ForeachState
                 Dsymbol ds = null;
                 if (!(storageClass & STC.manifest))
                 {
-                    if ((isStatic || tb.ty == Tfunction || storageClass&STC.alias_) && e.op == EXP.variable)
-                        ds = (cast(VarExp)e).var;
-                    else if (e.op == EXP.template_)
-                        ds = (cast(TemplateExp)e).td;
-                    else if (e.op == EXP.scope_)
-                        ds = (cast(ScopeExp)e).sds;
-                    else if (e.op == EXP.function_)
+                    if (isStatic || tb.ty == Tfunction || storageClass & STC.alias_)
                     {
-                        auto fe = cast(FuncExp)e;
-                        ds = fe.td ? cast(Dsymbol)fe.td : fe.fd;
+                        if (auto ve = e.isVarExp())
+                            ds = ve.var;
+                        else if (auto dve = e.isDotVarExp())
+                            ds = dve.var;
                     }
-                    else if (e.op == EXP.overloadSet)
-                        ds = (cast(OverExp)e).vars;
+                    if (auto te = e.isTemplateExp())
+                        ds = te.td;
+                    else if (auto se = e.isScopeExp())
+                        ds = se.sds;
+                    else if (auto fe = e.isFuncExp())
+                        ds = fe.td ? fe.td : fe.fd;
+                    else if (auto oe = e.isOverExp())
+                        ds = oe.vars;
                 }
                 else if (storageClass & STC.alias_)
                 {
@@ -4514,6 +4484,7 @@ public auto makeTupleForeach(Scope* sc, bool isStatic, bool isDecl, ForeachState
                 auto field = Identifier.idPool(StaticForeach.tupleFieldName.ptr,StaticForeach.tupleFieldName.length);
                 Expression access = new DotIdExp(loc, e, field);
                 access = expressionSemantic(access, sc);
+                access = access.optimize(WANTvalue);
                 if (!tuple) return returnEarly();
                 //printf("%s\n",tuple.toChars());
                 foreach (l; 0 .. dim)
@@ -4867,4 +4838,84 @@ private void debugThrowWalker(Statement s)
 
     scope walker = new DebugWalker();
     s.accept(walker);
+}
+
+/***********************************************************
+ * Evaluate and print a `pragma(msg, args)`
+ *
+ * Params:
+ *    loc = location for error messages
+ *    sc = scope for argument interpretation
+ *    args = expressions to print
+ * Returns:
+ *    `true` on success
+ */
+bool pragmaMsgSemantic(Loc loc, Scope* sc, Expressions* args)
+{
+    if (!args)
+        return true;
+    foreach (arg; *args)
+    {
+        sc = sc.startCTFE();
+        auto e = arg.expressionSemantic(sc);
+        e = resolveProperties(sc, e);
+        sc = sc.endCTFE();
+
+        // pragma(msg) is allowed to contain types as well as expressions
+        e = ctfeInterpretForPragmaMsg(e);
+        if (e.op == EXP.error)
+        {
+            errorSupplemental(loc, "while evaluating `pragma(msg, %s)`", arg.toChars());
+            return false;
+        }
+        if (auto se = e.toStringExp())
+        {
+            const slice = se.toUTF8(sc).peekString();
+            fprintf(stderr, "%.*s", cast(int)slice.length, slice.ptr);
+        }
+        else
+            fprintf(stderr, "%s", e.toChars());
+    }
+    fprintf(stderr, "\n");
+    return true;
+}
+
+/***********************************************************
+ * Evaluate `pragma(startAddress, func)` and store the resolved symbol in `args`
+ *
+ * Params:
+ *    loc = location for error messages
+ *    sc = scope for argument interpretation
+ *    args = pragma arguments
+ * Returns:
+ *    `true` on success
+ */
+bool pragmaStartAddressSemantic(Loc loc, Scope* sc, Expressions* args)
+{
+    if (!args || args.dim != 1)
+    {
+        .error(loc, "function name expected for start address");
+        return false;
+    }
+    else
+    {
+        /* https://issues.dlang.org/show_bug.cgi?id=11980
+         * resolveProperties and ctfeInterpret call are not necessary.
+         */
+        Expression e = (*args)[0];
+        sc = sc.startCTFE();
+        e = e.expressionSemantic(sc);
+        // e = resolveProperties(sc, e);
+        sc = sc.endCTFE();
+
+        // e = e.ctfeInterpret();
+        (*args)[0] = e;
+        Dsymbol sa = getDsymbol(e);
+        if (!sa || !sa.isFuncDeclaration())
+        {
+            .error(loc, "function name expected for start address, not `%s`", e.toChars());
+            return false;
+        }
+    }
+    return true;
 }

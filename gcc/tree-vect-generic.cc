@@ -1237,6 +1237,17 @@ expand_vector_operation (gimple_stmt_iterator *gsi, tree type, tree compute_type
 	  tree rhs2 = gimple_assign_rhs2 (assign);
 	  tree ret;
 
+	  /* Check if the target was going to handle it through the special
+	     division callback hook.  */
+	  tree cst = uniform_integer_cst_p (rhs2);
+	  if (cst &&
+	      targetm.vectorize.can_special_div_by_const (code, type,
+							  wi::to_wide (cst),
+							  NULL,
+							  NULL_RTX, NULL_RTX))
+	    return NULL_TREE;
+
+
 	  if (!optimize
 	      || !VECTOR_INTEGER_TYPE_P (type)
 	      || TREE_CODE (rhs2) != VECTOR_CST
@@ -1527,7 +1538,10 @@ lower_vec_perm (gimple_stmt_iterator *gsi)
       && tree_to_vec_perm_builder (&sel_int, mask))
     {
       vec_perm_indices indices (sel_int, 2, elements);
-      if (can_vec_perm_const_p (TYPE_MODE (vect_type), indices))
+      machine_mode vmode = TYPE_MODE (vect_type);
+      tree lhs_type = TREE_TYPE (gimple_assign_lhs (stmt));
+      machine_mode lhs_mode = TYPE_MODE (lhs_type);
+      if (can_vec_perm_const_p (lhs_mode, vmode, indices))
 	{
 	  gimple_assign_set_rhs3 (stmt, mask);
 	  update_stmt (stmt);
@@ -2415,12 +2429,12 @@ public:
   {}
 
   /* opt_pass methods: */
-  virtual bool gate (function *fun)
+  bool gate (function *fun) final override
     {
       return !(fun->curr_properties & PROP_gimple_lvec);
     }
 
-  virtual unsigned int execute (function *)
+  unsigned int execute (function *) final override
     {
       return expand_vector_operations ();
     }
@@ -2459,8 +2473,11 @@ public:
   {}
 
   /* opt_pass methods: */
-  opt_pass * clone () { return new pass_lower_vector_ssa (m_ctxt); }
-  virtual unsigned int execute (function *)
+  opt_pass * clone () final override
+  {
+    return new pass_lower_vector_ssa (m_ctxt);
+  }
+  unsigned int execute (function *) final override
     {
       return expand_vector_operations ();
     }

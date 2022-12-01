@@ -2805,13 +2805,10 @@ ipa_sra_dump_all_summaries (FILE *f)
       if (!ifs)
 	fprintf (f, "  Function does not have any associated IPA-SRA "
 		 "summary\n");
+      else if (!ifs->m_candidate)
+	fprintf (f, "  Not a candidate function\n");
       else
 	{
-	  if (!ifs->m_candidate)
-	    {
-	      fprintf (f, "  Not a candidate function\n");
-	      continue;
-	    }
 	  if (ifs->m_returns_value)
 	    fprintf (f, "  Returns value\n");
 	  if (vec_safe_is_empty (ifs->m_parameters))
@@ -4049,14 +4046,17 @@ public:
   {}
 
   /* opt_pass methods: */
-  virtual bool gate (function *)
+  bool gate (function *) final override
     {
       /* TODO: We should remove the optimize check after we ensure we never run
 	 IPA passes when not optimizing.  */
       return (flag_ipa_sra && optimize);
     }
 
-  virtual unsigned int execute (function *) { return ipa_sra_analysis (); }
+  unsigned int execute (function *)  final override
+  {
+    return ipa_sra_analysis ();
+  }
 
 }; // class pass_ipa_sra
 

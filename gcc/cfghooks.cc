@@ -541,7 +541,6 @@ split_block_1 (basic_block bb, void *i)
     return NULL;
 
   new_bb->count = bb->count;
-  new_bb->discriminator = bb->discriminator;
 
   if (dom_info_available_p (CDI_DOMINATORS))
     {
@@ -1086,9 +1085,16 @@ can_duplicate_block_p (const_basic_block bb)
   return cfg_hooks->can_duplicate_block_p (bb);
 }
 
-/* Duplicates basic block BB and redirects edge E to it.  Returns the
-   new basic block.  The new basic block is placed after the basic block
-   AFTER.  */
+/* Duplicate basic block BB, place it after AFTER (if non-null) and redirect
+   edge E to it (if non-null).  Return the new basic block.
+
+   If BB contains a returns_twice call, the caller is responsible for recreating
+   incoming abnormal edges corresponding to the "second return" for the copy.
+   gimple_can_duplicate_bb_p rejects such blocks, while RTL likes to live
+   dangerously.
+
+   If BB has incoming abnormal edges for some other reason, their destinations
+   should be tied to label(s) of the original BB and not the copy.  */
 
 basic_block
 duplicate_block (basic_block bb, edge e, basic_block after, copy_bb_data *id)

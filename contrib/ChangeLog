@@ -1,3 +1,161 @@
+2022-11-25  Martin Liska  <mliska@suse.cz>
+
+	Revert:
+	2022-11-25  Martin Liska  <mliska@suse.cz>
+
+	* gcc-changelog/git_commit.py: Temporarily disable
+	check_line.start.
+
+2022-11-25  Martin Liska  <mliska@suse.cz>
+
+	* gcc-changelog/git_commit.py: Temporarily disable
+	check_line.start.
+
+2022-11-21  Martin Liska  <mliska@suse.cz>
+
+	Revert:
+	2022-11-20  Martin Liska  <mliska@suse.cz>
+
+	* gcc-changelog/git_commit.py: Temporarily disable
+	check_line.start.
+
+2022-11-20  Martin Liska  <mliska@suse.cz>
+
+	* gcc-changelog/git_commit.py: Temporarily disable
+	check_line.start.
+
+2022-11-18  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc-changelog/git_update_version.py: Add
+	1957bedf29a1b2cc231972aba680fe80199d5498 to ignored commits.
+
+2022-11-15  Martin Liska  <mliska@suse.cz>
+
+	* gcc-changelog/git_commit.py: Revert temporary rule
+	relaxation.
+
+2022-11-14  Martin Liska  <mliska@suse.cz>
+
+	* gcc-changelog/git_commit.py: Temporarily disable
+	check_line.start.
+
+2022-11-11  Martin Liska  <mliska@suse.cz>
+
+	* gcc-changelog/git_commit.py: Check for a space after leading
+	tab.
+	* gcc-changelog/test_email.py: Likewise.
+	* gcc-changelog/test_patches.txt: Likewise.
+
+2022-11-06  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc-changelog/git_update_version.py: Add
+	e4cba49413ca429dc82f6aa2e88129ecb3fdd943 to ignored commits.
+
+2022-11-04  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* gcc-changelog/git_commit.py (default_changelog_locations):
+	Remove 'liboffloadmic'.
+	* gcc_update (files_and_dependencies): Remove 'liboffloadmic'
+	files.
+	* update-copyright.py (GCCCmdLine): Remove 'liboffloadmic'
+	comment.
+
+2022-10-20  Jonathan Wakely   <jwakely@redhat.com>
+	    Ulrich Drepper  <drepper@redhat.com>
+
+	* gcc_update: Add rule for gcc/cp/std-name-hint.gperf.
+
+2022-10-07  Martin Liska  <mliska@suse.cz>
+
+	* gcc-changelog/git_update_version.py: Remove extra fetch.
+
+2022-10-06  Martin Liska  <mliska@suse.cz>
+
+	* gcc-changelog/git_update_version.py: Use logging module
+	and provide robust debugging output.
+
+2022-10-05  Martin Liska  <mliska@suse.cz>
+
+	* gcc-changelog/git_update_version.py: Do fetch before a push.
+
+2022-09-20  Martin Liska  <mliska@suse.cz>
+
+	* filter-clang-warnings.py: Skip egrep: warning: egrep is
+	obsolescent; using grep -E.
+
+2022-08-31  Martin Liska  <mliska@suse.cz>
+
+	* config-list.mk: Remove deprecated ports.
+
+2022-08-30  Ulrich Drepper  <drepper@gmail.com>
+
+	* gcc_update (files_and_dependencies): Add rule for
+	gcc/cp/std-name-hint.h.
+
+2022-08-30  Martin Liska  <mliska@suse.cz>
+
+	* config-list.mk: Remove the port.
+
+2022-08-27  Xi Ruoyao  <xry111@xry111.site>
+
+	* gen_autofdo_event.py: Port to Python 3, and use grep -E
+	instead of egrep.
+
+2022-08-26  Martin Liska  <mliska@suse.cz>
+
+	* config-list.mk: Remove cr16.
+
+2022-08-19  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	* clang-format: Add further FOR_EACH_ macros.
+
+2022-08-18  Andrea Corallo  <andrea.corallo@arm.com>
+
+	* git-fetch-vendor.sh : Fix typo.
+
+2022-08-02  Martin Liska  <mliska@suse.cz>
+
+	* gcc-changelog/git_commit.py: Do not deduce changelog for root ChangeLog.
+
+2022-07-22  Martin Liska  <mliska@suse.cz>
+
+	* git-commit-mklog.py: Do not parse -b argument.
+	Pass mklog_args as json environment variable.
+	* mklog.py: Parse GCC_MKLOG_ARGS and append it to sys.argv.
+	* prepare-commit-msg: Do not append GCC_MKLOG_ARGS to args.
+
+2022-07-22  Martin Liska  <mliska@suse.cz>
+
+	* mklog.py: Use component: [PR xyz] only when one PR is used.
+
+2022-07-04  Martin Liska  <mliska@suse.cz>
+
+	* git-descr.sh: By default print revision for HEAD.
+
+2022-06-28  Lewis Hyatt  <lhyatt@gmail.com>
+
+	* unicode/README: Added instructions for updating ucnid.h.
+	* unicode/DerivedCoreProperties.txt: New file added to source
+	control from Unicode 14.0 release.
+	* unicode/DerivedNormalizationProps.txt: Likewise.
+
+2022-06-26  Lewis Hyatt  <lhyatt@gmail.com>
+
+	* unicode/EastAsianWidth.txt: Update to Unicode 14.0.0.
+	* unicode/PropList.txt: Likewise.
+	* unicode/README: Likewise.
+	* unicode/UnicodeData.txt: Likewise.
+
+2022-06-25  Jeff Law  <jeffreyalaw@gmail.com>
+
+	* config-list.mk: Remove tilegx and tilepro entries.
+	* gcc_update: Remove tilegx and tilepro entries.
+
+2022-05-27  Richard Biener  <rguenther@suse.de>
+
+	* gcc-changelog/git_update_version.py (active_refs): Remove
+	releases/gcc-9.
+
 2022-05-06  Jakub Jelinek  <jakub@redhat.com>
 
 	* gennews (files): Add files for GCC 12.
@@ -37,7 +195,7 @@
 	    Lulu Cheng  <chenglulu@loongson.cn>
 
 	* gcc_update (files_and_dependencies): Add
-	  config/loongarch/loongarch.opt and config/loongarch/loongarch-str.h.
+	config/loongarch/loongarch.opt and config/loongarch/loongarch-str.h.
 
 2022-03-28  Martin Liska  <mliska@suse.cz>
 
@@ -274,7 +432,7 @@
 2021-08-03  Martin Liska  <mliska@suse.cz>
 
 	* gcc-changelog/git_update_version.py: Ignore problematic
-	  commit.
+	commit.
 
 2021-07-20  Richard Earnshaw  <rearnsha@arm.com>
 
@@ -1727,7 +1885,7 @@
 2016-09-20  Christophe Lyon  <christophe.lyon@linaro.org>
 
 	* compare_tests: Take ERROR messages into account when
-	  comparing.
+	comparing.
 
 2016-08-17  Martin Liska  <mliska@suse.cz>
 
@@ -3822,13 +3980,13 @@ Tue Jun 12 12:21:40 CEST 2001  Jan Hubicka  <jh@suse.cz>
 2000-11-19  Zack Weinberg  <zackw@stanford.edu>
 
 	* texi2pod.pl:
-	  - Add real command line parsing.
+	- Add real command line parsing.
 	  - Support @ifset, @ifclear, @set, @value, -D switch.
 	  - Support @sc.  Improve handling of @ref and friends.
 	  - Discard @subsection, @need, @node lines.
-	  - Un-nest font changes to match texinfo semantics.
+	- Un-nest font changes to match texinfo semantics.
 	  - Handle @{ and @}.  Oops.
-	  - Don't emit E<> directives inside verbatim blocks.
+	- Don't emit E<> directives inside verbatim blocks.
 
 2000-11-12  Bruce Korb  <bkorb@gnu.org>
 

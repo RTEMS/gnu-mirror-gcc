@@ -723,9 +723,9 @@ public:
   bool force_leaf;
   /* If non-zero, the group for optional handling.  */
   unsigned char opt_grp;
-  virtual void gen_transform (FILE *f, int, const char *, bool, int,
-			      const char *, capture_info *,
-			      dt_operand ** = 0, int = 0);
+  void gen_transform (FILE *f, int, const char *, bool, int,
+		      const char *, capture_info *,
+		      dt_operand ** = 0, int = 0) override;
 };
 
 /* An operator that is represented by native C code.  This is always
@@ -757,9 +757,9 @@ public:
   unsigned nr_stmts;
   /* The identifier replacement vector.  */
   vec<id_tab> ids;
-  virtual void gen_transform (FILE *f, int, const char *, bool, int,
-			      const char *, capture_info *,
-			      dt_operand ** = 0, int = 0);
+  void gen_transform (FILE *f, int, const char *, bool, int,
+		      const char *, capture_info *,
+		      dt_operand ** = 0, int = 0) final override;
 };
 
 /* A wrapper around another operand that captures its value.  */
@@ -778,9 +778,9 @@ public:
   bool value_match;
   /* The captured value.  */
   operand *what;
-  virtual void gen_transform (FILE *f, int, const char *, bool, int,
-			      const char *, capture_info *,
-			      dt_operand ** = 0, int = 0);
+  void gen_transform (FILE *f, int, const char *, bool, int,
+		      const char *, capture_info *,
+		      dt_operand ** = 0, int = 0) final override;
 };
 
 /* if expression.  */
@@ -1655,7 +1655,7 @@ public:
       : dt_node (type, parent_), op (op_), match_dop (match_dop_),
       pos (pos_), value_match (false), for_id (current_id) {}
 
-  void gen (FILE *, int, bool, int);
+  void gen (FILE *, int, bool, int) final override;
   unsigned gen_predicate (FILE *, int, const char *, bool);
   unsigned gen_match_op (FILE *, int, const char *, bool);
 
@@ -1681,7 +1681,7 @@ public:
 	  indexes (indexes_), info (NULL)  {}
 
   void gen_1 (FILE *, int, bool, operand *);
-  void gen (FILE *f, int, bool, int);
+  void gen (FILE *f, int, bool, int) final override;
 };
 
 template<>
@@ -4447,8 +4447,11 @@ parser::parse_c_expr (cpp_ttype start)
       /* If this is possibly a user-defined identifier mark it used.  */
       if (token->type == CPP_NAME)
 	{
-	  id_base *idb = get_operator ((const char *)CPP_HASHNODE
-				      (token->val.node.node)->ident.str);
+	  const char *str
+	    = (const char *)CPP_HASHNODE (token->val.node.node)->ident.str;
+	  if (strcmp (str, "return") == 0)
+	    fatal_at (token, "return statement not allowed in C expression");
+	  id_base *idb = get_operator (str);
 	  user_id *p;
 	  if (idb && (p = dyn_cast<user_id *> (idb)) && p->is_oper_list)
 	    record_operlist (token->src_loc, p);

@@ -88,7 +88,6 @@ extern tree lhd_omp_array_size (tree, gimple_seq *);
 struct gimplify_omp_ctx;
 extern void lhd_omp_firstprivatize_type_sizes (struct gimplify_omp_ctx *,
 					       tree);
-extern bool lhd_omp_mappable_type (tree);
 extern bool lhd_omp_scalar_p (tree, bool);
 extern tree *lhd_omp_get_decl_init (tree);
 extern void lhd_omp_finish_decl_inits ();
@@ -98,6 +97,7 @@ extern const char *lhd_get_substring_location (const substring_loc &,
 extern int lhd_decl_dwarf_attribute (const_tree, int);
 extern int lhd_type_dwarf_attribute (const_tree, int);
 extern void lhd_finalize_early_debug (void);
+extern const char *lhd_get_sarif_source_language (const char *);
 
 #define LANG_HOOKS_NAME			"GNU unknown"
 #define LANG_HOOKS_IDENTIFIER_SIZE	sizeof (struct lang_identifier)
@@ -150,6 +150,7 @@ extern void lhd_finalize_early_debug (void);
 #define LANG_HOOKS_RUN_LANG_SELFTESTS   lhd_do_nothing
 #define LANG_HOOKS_GET_SUBSTRING_LOCATION lhd_get_substring_location
 #define LANG_HOOKS_FINALIZE_EARLY_DEBUG lhd_finalize_early_debug
+#define LANG_HOOKS_GET_SARIF_SOURCE_LANGUAGE lhd_get_sarif_source_language
 
 /* Attribute hooks.  */
 #define LANG_HOOKS_ATTRIBUTE_TABLE		NULL
@@ -204,7 +205,6 @@ extern tree lhd_unit_size_without_reusable_padding (tree);
 #define LANG_HOOKS_TYPE_MAX_SIZE	lhd_return_null_const_tree
 #define LANG_HOOKS_OMP_FIRSTPRIVATIZE_TYPE_SIZES \
   lhd_omp_firstprivatize_type_sizes
-#define LANG_HOOKS_OMP_MAPPABLE_TYPE	lhd_omp_mappable_type
 #define LANG_HOOKS_TYPE_HASH_EQ		NULL
 #define LANG_HOOKS_COPY_LANG_QUALIFIERS NULL
 #define LANG_HOOKS_GET_ARRAY_DESCR_INFO	NULL
@@ -233,7 +233,6 @@ extern tree lhd_unit_size_without_reusable_padding (tree);
   LANG_HOOKS_INCOMPLETE_TYPE_ERROR, \
   LANG_HOOKS_TYPE_MAX_SIZE, \
   LANG_HOOKS_OMP_FIRSTPRIVATIZE_TYPE_SIZES, \
-  LANG_HOOKS_OMP_MAPPABLE_TYPE, \
   LANG_HOOKS_TYPE_HASH_EQ, \
   LANG_HOOKS_COPY_LANG_QUALIFIERS, \
   LANG_HOOKS_GET_ARRAY_DESCR_INFO, \
@@ -394,7 +393,8 @@ extern void lhd_end_section (void);
   LANG_HOOKS_EMITS_BEGIN_STMT, \
   LANG_HOOKS_RUN_LANG_SELFTESTS, \
   LANG_HOOKS_GET_SUBSTRING_LOCATION, \
-  LANG_HOOKS_FINALIZE_EARLY_DEBUG \
+  LANG_HOOKS_FINALIZE_EARLY_DEBUG,   \
+  LANG_HOOKS_GET_SARIF_SOURCE_LANGUAGE \
 }
 
 #endif /* GCC_LANG_HOOKS_DEF_H */

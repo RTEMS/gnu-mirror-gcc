@@ -88,7 +88,6 @@ package Gen_IL.Fields is
       Body_Required,
       Body_To_Inline,
       Box_Present,
-      By_Ref,
       Char_Literal_Value,
       Chars,
       Check_Address_Alignment,
@@ -97,6 +96,7 @@ package Gen_IL.Fields is
       Class_Present,
       Classifications,
       Cleanup_Actions,
+      Comes_From_Check_Or_Contract,
       Comes_From_Extended_Return_Statement,
       Compile_Time_Known_Aggregate,
       Component_Associations,
@@ -118,7 +118,6 @@ package Gen_IL.Fields is
       Contract_Test_Cases,
       Controlling_Argument,
       Conversion_OK,
-      Convert_To_Return_False,
       Corresponding_Aspect,
       Corresponding_Body,
       Corresponding_Entry_Body,
@@ -185,7 +184,6 @@ package Gen_IL.Fields is
       First_Inlined_Subprogram,
       First_Name,
       First_Named_Actual,
-      First_Real_Statement,
       First_Subtype_Link,
       Float_Truncate,
       Formal_Type_Definition,
@@ -932,7 +930,8 @@ package Gen_IL.Fields is
       Warnings_Off_Used_Unmodified,
       Warnings_Off_Used_Unreferenced,
       Was_Hidden,
-      Wrapped_Entity
+      Wrapped_Entity,
+      Wrapped_Statements
 
       --  End of entity fields.
      ); -- Opt_Field_Enum

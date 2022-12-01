@@ -237,6 +237,11 @@ struct bit_range
   void dump_to_pp (pretty_printer *pp) const;
   void dump () const;
 
+  bool empty_p () const
+  {
+    return m_size_in_bits == 0;
+  }
+
   bit_offset_t get_start_bit_offset () const
   {
     return m_start_bit_offset;
@@ -247,6 +252,7 @@ struct bit_range
   }
   bit_offset_t get_last_bit_offset () const
   {
+    gcc_assert (!empty_p ());
     return get_next_bit_offset () - 1;
   }
 
@@ -297,6 +303,11 @@ struct byte_range
   void dump_to_pp (pretty_printer *pp) const;
   void dump () const;
 
+  bool empty_p () const
+  {
+    return m_size_in_bytes == 0;
+  }
+
   bool contains_p (byte_offset_t offset) const
   {
     return (offset >= get_start_byte_offset ()
@@ -310,6 +321,15 @@ struct byte_range
 	    && m_size_in_bytes == other.m_size_in_bytes);
   }
 
+  bool intersects_p (const byte_range &other,
+		     byte_size_t *out_num_overlap_bytes) const;
+
+  bool exceeds_p (const byte_range &other,
+		  byte_range *out_overhanging_byte_range) const;
+
+  bool falls_short_of_p (byte_offset_t offset,
+			 byte_range *out_fall_short_bytes) const;
+
   byte_offset_t get_start_byte_offset () const
   {
     return m_start_byte_offset;
@@ -320,6 +340,7 @@ struct byte_range
   }
   byte_offset_t get_last_byte_offset () const
   {
+    gcc_assert (!empty_p ());
     return m_start_byte_offset + m_size_in_bytes - 1;
   }
 
@@ -396,6 +417,14 @@ private:
 };
 
 } // namespace ana
+
+template <>
+template <>
+inline bool
+is_a_helper <const ana::concrete_binding *>::test (const ana::binding_key *key)
+{
+  return key->concrete_p ();
+}
 
 template <> struct default_hash_traits<ana::concrete_binding>
 : public member_function_hash_traits<ana::concrete_binding>
@@ -544,9 +573,7 @@ public:
   typedef hash_map <const binding_key *, const svalue *> map_t;
   typedef map_t::iterator iterator_t;
 
-  binding_cluster (const region *base_region)
-  : m_base_region (base_region), m_map (),
-    m_escaped (false), m_touched (false) {}
+  binding_cluster (const region *base_region);
   binding_cluster (const binding_cluster &other);
   binding_cluster& operator=(const binding_cluster &other);
 
@@ -617,7 +644,7 @@ public:
   void on_asm (const gasm *stmt, store_manager *mgr,
 	       const conjured_purge &p);
 
-  bool escaped_p () const { return m_escaped; }
+  bool escaped_p () const;
   bool touched_p () const { return m_touched; }
 
   bool redundant_p () const;
@@ -766,6 +793,12 @@ public:
   void canonicalize (store_manager *mgr);
   void loop_replay_fixup (const store *other_store,
 			  region_model_manager *mgr);
+
+  void replay_call_summary (call_summary_replay &r,
+			    const store &summary);
+  void replay_call_summary_cluster (call_summary_replay &r,
+				    const store &summary,
+				    const region *base_reg);
 
 private:
   void remove_overlapping_bindings (store_manager *mgr, const region *reg,

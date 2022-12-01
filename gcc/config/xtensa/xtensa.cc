@@ -55,6 +55,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "dumpfile.h"
 #include "hw-doloop.h"
 #include "rtl-iter.h"
+#include "insn-attr.h"
+#include "tree-pass.h"
 
 /* This file should be included last.  */
 #include "target-def.h"
@@ -101,6 +103,7 @@ struct GTY(()) machine_function
   int callee_save_size;
   bool frame_laid_out;
   bool epilogue_done;
+  bool inhibit_logues_a1_adjusts;
 };
 
 /* Vector, indexed by hard register number, which contains 1 for a
@@ -117,7 +120,7 @@ const char xtensa_leaf_regs[FIRST_PSEUDO_REGISTER] =
 
 static void xtensa_option_override (void);
 static enum internal_test map_test_to_internal_test (enum rtx_code);
-static rtx gen_int_relational (enum rtx_code, rtx, rtx, int *);
+static rtx gen_int_relational (enum rtx_code, rtx, rtx);
 static rtx gen_float_relational (enum rtx_code, rtx, rtx);
 static rtx gen_conditional_move (enum rtx_code, machine_mode, rtx, rtx);
 static rtx fixup_subreg_mem (rtx);
@@ -134,6 +137,7 @@ static unsigned int xtensa_multibss_section_type_flags (tree, const char *,
 static section *xtensa_select_rtx_section (machine_mode, rtx,
 					   unsigned HOST_WIDE_INT);
 static bool xtensa_rtx_costs (rtx, machine_mode, int, int, int *, bool);
+static int xtensa_insn_cost (rtx_insn *, bool);
 static int xtensa_register_move_cost (machine_mode, reg_class_t,
 				      reg_class_t);
 static int xtensa_memory_move_cost (machine_mode, reg_class_t, bool);
@@ -187,6 +191,16 @@ static bool xtensa_can_eliminate (const int from ATTRIBUTE_UNUSED,
 				  const int to);
 static HOST_WIDE_INT xtensa_starting_frame_offset (void);
 static unsigned HOST_WIDE_INT xtensa_asan_shadow_offset (void);
+static bool xtensa_function_ok_for_sibcall (tree, tree);
+static bool xtensa_can_output_mi_thunk (const_tree thunk_fndecl ATTRIBUTE_UNUSED,
+					HOST_WIDE_INT delta ATTRIBUTE_UNUSED,
+					HOST_WIDE_INT vcall_offset ATTRIBUTE_UNUSED,
+					const_tree function ATTRIBUTE_UNUSED);
+static void xtensa_output_mi_thunk (FILE *file, tree thunk ATTRIBUTE_UNUSED,
+				    HOST_WIDE_INT delta,
+				    HOST_WIDE_INT vcall_offset,
+				    tree function);
+static bool xtensa_lra_p (void);
 
 static rtx xtensa_delegitimize_address (rtx);
 
@@ -212,6 +226,8 @@ static rtx xtensa_delegitimize_address (rtx);
 #define TARGET_MEMORY_MOVE_COST xtensa_memory_move_cost
 #undef TARGET_RTX_COSTS
 #define TARGET_RTX_COSTS xtensa_rtx_costs
+#undef TARGET_INSN_COST
+#define TARGET_INSN_COST xtensa_insn_cost
 #undef TARGET_ADDRESS_COST
 #define TARGET_ADDRESS_COST hook_int_rtx_mode_as_bool_0
 
@@ -281,7 +297,7 @@ static rtx xtensa_delegitimize_address (rtx);
 #define TARGET_CANNOT_FORCE_CONST_MEM xtensa_cannot_force_const_mem
 
 #undef TARGET_LRA_P
-#define TARGET_LRA_P hook_bool_void_false
+#define TARGET_LRA_P xtensa_lra_p
 
 #undef TARGET_LEGITIMATE_ADDRESS_P
 #define TARGET_LEGITIMATE_ADDRESS_P	xtensa_legitimate_address_p
@@ -343,6 +359,18 @@ static rtx xtensa_delegitimize_address (rtx);
 #undef TARGET_DELEGITIMIZE_ADDRESS
 #define TARGET_DELEGITIMIZE_ADDRESS xtensa_delegitimize_address
 
+#undef TARGET_FUNCTION_OK_FOR_SIBCALL
+#define TARGET_FUNCTION_OK_FOR_SIBCALL xtensa_function_ok_for_sibcall
+
+#undef TARGET_ASM_CAN_OUTPUT_MI_THUNK
+#define TARGET_ASM_CAN_OUTPUT_MI_THUNK xtensa_can_output_mi_thunk
+
+#undef TARGET_ASM_OUTPUT_MI_THUNK
+#define TARGET_ASM_OUTPUT_MI_THUNK xtensa_output_mi_thunk
+
+#undef TARGET_MAX_ANCHOR_OFFSET
+#define TARGET_MAX_ANCHOR_OFFSET 1020
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 
@@ -351,42 +379,42 @@ struct gcc_target targetm = TARGET_INITIALIZER;
 bool
 xtensa_simm8 (HOST_WIDE_INT v)
 {
-  return v >= -128 && v <= 127;
+  return IN_RANGE (v, -128, 127);
 }
 
 
 bool
 xtensa_simm8x256 (HOST_WIDE_INT v)
 {
-  return (v & 255) == 0 && (v >= -32768 && v <= 32512);
+  return (v & 255) == 0 && IN_RANGE (v, -32768, 32512);
 }
 
 
 bool
 xtensa_simm12b (HOST_WIDE_INT v)
 {
-  return v >= -2048 && v <= 2047;
+  return IN_RANGE (v, -2048, 2047);
 }
 
 
 static bool
 xtensa_uimm8 (HOST_WIDE_INT v)
 {
-  return v >= 0 && v <= 255;
+  return IN_RANGE (v, 0, 255);
 }
 
 
 static bool
 xtensa_uimm8x2 (HOST_WIDE_INT v)
 {
-  return (v & 1) == 0 && (v >= 0 && v <= 510);
+  return (v & 1) == 0 && IN_RANGE (v, 0, 510);
 }
 
 
 static bool
 xtensa_uimm8x4 (HOST_WIDE_INT v)
 {
-  return (v & 3) == 0 && (v >= 0 && v <= 1020);
+  return (v & 3) == 0 && IN_RANGE (v, 0, 1020);
 }
 
 
@@ -456,19 +484,7 @@ xtensa_b4constu (HOST_WIDE_INT v)
 bool
 xtensa_mask_immediate (HOST_WIDE_INT v)
 {
-#define MAX_MASK_SIZE 16
-  int mask_size;
-
-  for (mask_size = 1; mask_size <= MAX_MASK_SIZE; mask_size++)
-    {
-      if ((v & 1) == 0)
-	return false;
-      v = v >> 1;
-      if (v == 0)
-	return true;
-    }
-
-  return false;
+  return IN_RANGE (exact_log2 (v + 1), 1, 16);
 }
 
 
@@ -478,21 +494,30 @@ xtensa_mask_immediate (HOST_WIDE_INT v)
 int
 xt_true_regnum (rtx x)
 {
-  if (GET_CODE (x) == REG)
+  if (REG_P (x))
     {
-      if (reg_renumber
-	  && REGNO (x) >= FIRST_PSEUDO_REGISTER
-	  && reg_renumber[REGNO (x)] >= 0)
+      if (! HARD_REGISTER_P (x)
+	  && reg_renumber
+	  && (lra_in_progress || reg_renumber[REGNO (x)] >= 0))
 	return reg_renumber[REGNO (x)];
       return REGNO (x);
     }
-  if (GET_CODE (x) == SUBREG)
+  if (SUBREG_P (x))
     {
       int base = xt_true_regnum (SUBREG_REG (x));
-      if (base >= 0 && base < FIRST_PSEUDO_REGISTER)
-        return base + subreg_regno_offset (REGNO (SUBREG_REG (x)),
-                                           GET_MODE (SUBREG_REG (x)),
-                                           SUBREG_BYTE (x), GET_MODE (x));
+
+      if (base >= 0
+	  && HARD_REGISTER_NUM_P (base))
+	{
+	  struct subreg_info info;
+
+	  subreg_get_info (lra_in_progress
+			   ? (unsigned) base : REGNO (SUBREG_REG (x)),
+			   GET_MODE (SUBREG_REG (x)),
+			   SUBREG_BYTE (x), GET_MODE (x), &info);
+	  if (info.representable_p)
+	    return base + info.offset;
+	}
     }
   return -1;
 }
@@ -549,7 +574,7 @@ smalloffset_mem_p (rtx op)
 	    return FALSE;
 
 	  val = INTVAL (offset);
-	  return (val & 3) == 0 && (val >= 0 && val <= 60);
+	  return (val & 3) == 0 && IN_RANGE (val, 0, 60);
 	}
     }
   return FALSE;
@@ -688,8 +713,7 @@ map_test_to_internal_test (enum rtx_code test_code)
 static rtx
 gen_int_relational (enum rtx_code test_code, /* relational test (EQ, etc) */
 		    rtx cmp0, /* first operand to compare */
-		    rtx cmp1, /* second operand to compare */
-		    int *p_invert /* whether branch needs to reverse test */)
+		    rtx cmp1 /* second operand to compare */)
 {
   struct cmp_info
   {
@@ -721,6 +745,7 @@ gen_int_relational (enum rtx_code test_code, /* relational test (EQ, etc) */
   enum internal_test test;
   machine_mode mode;
   struct cmp_info *p_info;
+  int invert;
 
   test = map_test_to_internal_test (test_code);
   gcc_assert (test != ITEST_MAX);
@@ -757,9 +782,9 @@ gen_int_relational (enum rtx_code test_code, /* relational test (EQ, etc) */
     }
 
   /* See if we need to invert the result.  */
-  *p_invert = ((GET_CODE (cmp1) == CONST_INT)
-	       ? p_info->invert_const
-	       : p_info->invert_reg);
+  invert = (CONST_INT_P (cmp1)
+	    ? p_info->invert_const
+	    : p_info->invert_reg);
 
   /* Comparison to constants, may involve adding 1 to change a LT into LE.
      Comparison between two registers, may involve switching operands.  */
@@ -776,7 +801,9 @@ gen_int_relational (enum rtx_code test_code, /* relational test (EQ, etc) */
       cmp1 = temp;
     }
 
-  return gen_rtx_fmt_ee (p_info->test_code, VOIDmode, cmp0, cmp1);
+  return gen_rtx_fmt_ee (invert ? reverse_condition (p_info->test_code)
+				: p_info->test_code,
+			 VOIDmode, cmp0, cmp1);
 }
 
 
@@ -835,45 +862,33 @@ xtensa_expand_conditional_branch (rtx *operands, machine_mode mode)
   enum rtx_code test_code = GET_CODE (operands[0]);
   rtx cmp0 = operands[1];
   rtx cmp1 = operands[2];
-  rtx cmp;
-  int invert;
-  rtx label1, label2;
+  rtx cmp, label;
 
   switch (mode)
     {
+    case E_SFmode:
+      if (TARGET_HARD_FLOAT)
+	{
+	  cmp = gen_float_relational (test_code, cmp0, cmp1);
+	  break;
+	}
+      /* FALLTHRU */
+
     case E_DFmode:
     default:
       fatal_insn ("bad test", gen_rtx_fmt_ee (test_code, VOIDmode, cmp0, cmp1));
 
     case E_SImode:
-      invert = FALSE;
-      cmp = gen_int_relational (test_code, cmp0, cmp1, &invert);
-      break;
-
-    case E_SFmode:
-      if (!TARGET_HARD_FLOAT)
-	fatal_insn ("bad test", gen_rtx_fmt_ee (test_code, VOIDmode,
-						cmp0, cmp1));
-      invert = FALSE;
-      cmp = gen_float_relational (test_code, cmp0, cmp1);
+      cmp = gen_int_relational (test_code, cmp0, cmp1);
       break;
     }
 
   /* Generate the branch.  */
-
-  label1 = gen_rtx_LABEL_REF (VOIDmode, operands[3]);
-  label2 = pc_rtx;
-
-  if (invert)
-    {
-      label2 = label1;
-      label1 = pc_rtx;
-    }
-
+  label = gen_rtx_LABEL_REF (VOIDmode, operands[3]);
   emit_jump_insn (gen_rtx_SET (pc_rtx,
 			       gen_rtx_IF_THEN_ELSE (VOIDmode, cmp,
-						     label1,
-						     label2)));
+						     label,
+						     pc_rtx)));
 }
 
 
@@ -1045,6 +1060,154 @@ xtensa_split_operand_pair (rtx operands[4], machine_mode mode)
 }
 
 
+/* Try to emit insns to load srcval (that cannot fit into signed 12-bit)
+   into dst with synthesizing a such constant value from a sequence of
+   load-immediate / arithmetic ones, instead of a L32R instruction
+   (plus a constant in litpool).  */
+
+static int
+xtensa_constantsynth_2insn (rtx dst, HOST_WIDE_INT srcval,
+			    rtx (*gen_op)(rtx, HOST_WIDE_INT),
+			    HOST_WIDE_INT op_imm)
+{
+  HOST_WIDE_INT imm = INT_MAX;
+  rtx x = NULL_RTX;
+  int shift;
+
+  gcc_assert (REG_P (dst));
+
+  shift = exact_log2 (srcval + 1);
+  if (IN_RANGE (shift, 1, 31))
+    {
+      imm = -1;
+      x = gen_lshrsi3 (dst, dst, GEN_INT (32 - shift));
+    }
+
+
+  shift = ctz_hwi (srcval);
+  if ((!x || (TARGET_DENSITY && ! IN_RANGE (imm, -32, 95)))
+      && xtensa_simm12b (srcval >> shift))
+    {
+      imm = srcval >> shift;
+      x = gen_ashlsi3 (dst, dst, GEN_INT (shift));
+    }
+
+  if ((!x || (TARGET_DENSITY && ! IN_RANGE (imm, -32, 95)))
+      && IN_RANGE (srcval, (-2048 - 32768), (2047 + 32512)))
+    {
+      HOST_WIDE_INT imm0, imm1;
+
+      if (srcval < -32768)
+	imm1 = -32768;
+      else if (srcval > 32512)
+	imm1 = 32512;
+      else
+	imm1 = srcval & ~255;
+      imm0 = srcval - imm1;
+      if (TARGET_DENSITY && imm1 < 32512 && IN_RANGE (imm0, 224, 255))
+	imm0 -= 256, imm1 += 256;
+      imm = imm0;
+      x = gen_addsi3 (dst, dst, GEN_INT (imm1));
+    }
+
+  if (!x)
+    return 0;
+
+  emit_move_insn (dst, GEN_INT (imm));
+  emit_insn (x);
+  if (gen_op)
+    emit_move_insn (dst, gen_op (dst, op_imm));
+
+  return 1;
+}
+
+static rtx
+xtensa_constantsynth_rtx_SLLI (rtx reg, HOST_WIDE_INT imm)
+{
+  return gen_rtx_ASHIFT (SImode, reg, GEN_INT (imm));
+}
+
+static rtx
+xtensa_constantsynth_rtx_ADDSUBX (rtx reg, HOST_WIDE_INT imm)
+{
+  return imm == 7
+	 ? gen_rtx_MINUS (SImode, gen_rtx_ASHIFT (SImode, reg, GEN_INT (3)),
+			  reg)
+	 : gen_rtx_PLUS (SImode, gen_rtx_ASHIFT (SImode, reg,
+						 GEN_INT (floor_log2 (imm - 1))),
+			 reg);
+}
+
+int
+xtensa_constantsynth (rtx dst, HOST_WIDE_INT srcval)
+{
+  /* No need for synthesizing for what fits into MOVI instruction.  */
+  if (xtensa_simm12b (srcval))
+    return 0;
+
+  /* 2-insns substitution.  */
+  if ((optimize_size || (optimize && xtensa_extra_l32r_costs >= 1))
+      && xtensa_constantsynth_2insn (dst, srcval, NULL, 0))
+    return 1;
+
+  /* 3-insns substitution.  */
+  if (optimize > 1 && !optimize_size && xtensa_extra_l32r_costs >= 2)
+    {
+      int shift, divisor;
+
+      /* 2-insns substitution followed by SLLI.  */
+      shift = ctz_hwi (srcval);
+      if (IN_RANGE (shift, 1, 31) &&
+	  xtensa_constantsynth_2insn (dst, srcval >> shift,
+				      xtensa_constantsynth_rtx_SLLI,
+				      shift))
+	return 1;
+
+      /* 2-insns substitution followed by ADDX[248] or SUBX8.  */
+      if (TARGET_ADDX)
+	for (divisor = 3; divisor <= 9; divisor += 2)
+	  if (srcval % divisor == 0 &&
+	      xtensa_constantsynth_2insn (dst, srcval / divisor,
+					  xtensa_constantsynth_rtx_ADDSUBX,
+					  divisor))
+	    return 1;
+
+      /* loading simm12 followed by left/right bitwise rotation:
+	 MOVI + SSAI + SRC.  */
+      if ((srcval & 0x001FF800) == 0
+	  || (srcval & 0x001FF800) == 0x001FF800)
+	{
+	  int32_t v;
+
+	  for (shift = 1; shift < 12; ++shift)
+	    {
+	      v = (int32_t)(((uint32_t)srcval >> shift)
+			    | ((uint32_t)srcval << (32 - shift)));
+	      if (xtensa_simm12b(v))
+		{
+		  emit_move_insn (dst, GEN_INT (v));
+		  emit_insn (gen_rotlsi3 (dst, dst, GEN_INT (shift)));
+		  return 1;
+		}
+	    }
+	  for (shift = 1; shift < 12; ++shift)
+	    {
+	      v = (int32_t)(((uint32_t)srcval << shift)
+			    | ((uint32_t)srcval >> (32 - shift)));
+	      if (xtensa_simm12b(v))
+		{
+		  emit_move_insn (dst, GEN_INT (v));
+		  emit_insn (gen_rotrsi3 (dst, dst, GEN_INT (shift)));
+		  return 1;
+		}
+	    }
+	}
+    }
+
+  return 0;
+}
+
+
 /* Emit insns to move operands[1] into operands[0].
    Return 1 if we have written out everything that needs to be done to
    do the move.  Otherwise, return 0 and the caller will emit the move
@@ -1080,24 +1243,9 @@ xtensa_emit_move_sequence (rtx *operands, machine_mode mode)
 	  return 1;
 	}
 
-      if (! TARGET_AUTO_LITPOOLS && ! TARGET_CONST16)
+      if (! TARGET_AUTO_LITPOOLS && ! TARGET_CONST16
+	  && ! (CONST_INT_P (src) && can_create_pseudo_p ()))
 	{
-	  /* Try to emit MOVI + SLLI sequence, that is smaller
-	     than L32R + literal.  */
-	  if (optimize_size && mode == SImode && CONST_INT_P (src)
-	      && register_operand (dst, mode))
-	    {
-	      HOST_WIDE_INT srcval = INTVAL (src);
-	      int shift = ctz_hwi (srcval);
-
-	      if (xtensa_simm12b (srcval >> shift))
-		{
-		  emit_move_insn (dst, GEN_INT (srcval >> shift));
-		  emit_insn (gen_ashlsi3_internal (dst, dst, GEN_INT (shift)));
-		  return 1;
-		}
-	    }
-
 	  src = force_const_mem (SImode, src);
 	  operands[1] = src;
 	}
@@ -1122,7 +1270,7 @@ xtensa_emit_move_sequence (rtx *operands, machine_mode mode)
 	}
     }
 
-  if (!(reload_in_progress | reload_completed)
+  if (can_create_pseudo_p ()
       && !xtensa_valid_move (mode, operands))
     operands[1] = force_reg (mode, operands[1]);
 
@@ -1325,7 +1473,7 @@ xtensa_expand_block_move (rtx *operands)
   move_ratio = 4;
   if (optimize > 2)
     move_ratio = LARGEST_MOVE_RATIO;
-  num_pieces = (bytes / align) + (bytes % align); /* Close enough anyway.  */
+  num_pieces = (bytes / align) + ((bytes % align + 1) / 2);
   if (num_pieces > move_ratio)
     return 0;
 
@@ -1362,7 +1510,7 @@ xtensa_expand_block_move (rtx *operands)
 	  temp[next] = gen_reg_rtx (mode[next]);
 
 	  x = adjust_address (src_mem, mode[next], offset_ld);
-	  emit_insn (gen_rtx_SET (temp[next], x));
+	  emit_move_insn (temp[next], x);
 
 	  offset_ld += next_amount;
 	  bytes -= next_amount;
@@ -1372,14 +1520,254 @@ xtensa_expand_block_move (rtx *operands)
       if (active[phase])
 	{
 	  active[phase] = false;
-	  
+
 	  x = adjust_address (dst_mem, mode[phase], offset_st);
-	  emit_insn (gen_rtx_SET (x, temp[phase]));
+	  emit_move_insn (x, temp[phase]);
 
 	  offset_st += amount[phase];
 	}
     }
   while (active[next]);
+
+  return 1;
+}
+
+
+/* Try to expand a block set operation to a sequence of RTL move
+   instructions.  If not optimizing, or if the block size is not a
+   constant, or if the block is too large, or if the value to
+   initialize the block with is not a constant, the expansion
+   fails and GCC falls back to calling memset().
+
+   operands[0] is the destination
+   operands[1] is the length
+   operands[2] is the initialization value
+   operands[3] is the alignment */
+
+static int
+xtensa_sizeof_MOVI (HOST_WIDE_INT imm)
+{
+  return (TARGET_DENSITY && IN_RANGE (imm, -32, 95)) ? 2 : 3;
+}
+
+int
+xtensa_expand_block_set_unrolled_loop (rtx *operands)
+{
+  rtx dst_mem = operands[0];
+  HOST_WIDE_INT bytes, value, align;
+  int expand_len, funccall_len;
+  rtx x, reg;
+  int offset;
+
+  if (!CONST_INT_P (operands[1]) || !CONST_INT_P (operands[2]))
+    return 0;
+
+  bytes = INTVAL (operands[1]);
+  if (bytes <= 0)
+    return 0;
+  value = (int8_t)INTVAL (operands[2]);
+  align = INTVAL (operands[3]);
+  if (align > MOVE_MAX)
+    align = MOVE_MAX;
+
+  /* Insn expansion: holding the init value.
+     Either MOV(.N) or L32R w/litpool.  */
+  if (align == 1)
+    expand_len = xtensa_sizeof_MOVI (value);
+  else if (value == 0 || value == -1)
+    expand_len = TARGET_DENSITY ? 2 : 3;
+  else
+    expand_len = 3 + 4;
+  /* Insn expansion: a series of aligned memory stores.
+     Consist of S8I, S16I or S32I(.N).  */
+  expand_len += (bytes / align) * (TARGET_DENSITY
+				   && align == 4 ? 2 : 3);
+  /* Insn expansion: the remainder, sub-aligned memory stores.
+     A combination of S8I and S16I as needed.  */
+  expand_len += ((bytes % align + 1) / 2) * 3;
+
+  /* Function call: preparing two arguments.  */
+  funccall_len = xtensa_sizeof_MOVI (value);
+  funccall_len += xtensa_sizeof_MOVI (bytes);
+  /* Function call: calling memset().  */
+  funccall_len += TARGET_LONGCALLS ? (3 + 4 + 3) : 3;
+
+  /* Apply expansion bonus (2x) if optimizing for speed.  */
+  if (optimize > 1 && !optimize_size)
+    funccall_len *= 2;
+
+  /* Decide whether to expand or not, based on the sum of the length
+     of instructions.  */
+  if (expand_len > funccall_len)
+    return 0;
+
+  x = XEXP (dst_mem, 0);
+  if (!REG_P (x))
+    dst_mem = replace_equiv_address (dst_mem, force_reg (Pmode, x));
+  switch (align)
+    {
+    case 1:
+      break;
+    case 2:
+      value = (int16_t)((uint8_t)value * 0x0101U);
+      break;
+    case 4:
+      value = (int32_t)((uint8_t)value * 0x01010101U);
+      break;
+    default:
+      gcc_unreachable ();
+    }
+  reg = force_reg (SImode, GEN_INT (value));
+
+  offset = 0;
+  do
+    {
+      int unit_size = MIN (bytes, align);
+      machine_mode unit_mode = (unit_size >= 4 ? SImode :
+			       (unit_size >= 2 ? HImode :
+						 QImode));
+      unit_size = GET_MODE_SIZE (unit_mode);
+
+      emit_move_insn (adjust_address (dst_mem, unit_mode, offset),
+		      unit_mode == SImode ? reg
+		      : convert_to_mode (unit_mode, reg, true));
+
+      offset += unit_size;
+      bytes -= unit_size;
+    }
+  while (bytes > 0);
+
+  return 1;
+}
+
+int
+xtensa_expand_block_set_small_loop (rtx *operands)
+{
+  HOST_WIDE_INT bytes, value, align, count;
+  int expand_len, funccall_len;
+  rtx x, dst, end, reg;
+  machine_mode unit_mode;
+  rtx_code_label *label;
+
+  if (!CONST_INT_P (operands[1]) || !CONST_INT_P (operands[2]))
+    return 0;
+
+  bytes = INTVAL (operands[1]);
+  if (bytes <= 0)
+    return 0;
+  value = (int8_t)INTVAL (operands[2]);
+  align = INTVAL (operands[3]);
+  if (align > MOVE_MAX)
+    align = MOVE_MAX;
+
+  /* Totally-aligned block only.  */
+  if (bytes % align != 0)
+    return 0;
+  count = bytes / align;
+
+  /* If the Loop Option (zero-overhead looping) is configured and active,
+     almost no restrictions about the length of the block.  */
+  if (! (TARGET_LOOPS && optimize))
+    {
+      /* If 4-byte aligned, small loop substitution is almost optimal,
+	 thus limited to only offset to the end address for ADDI/ADDMI
+	 instruction.  */
+      if (align == 4
+	  && ! (bytes <= 127 || xtensa_simm8x256 (bytes)))
+	return 0;
+
+      /* If no 4-byte aligned, loop count should be treated as the
+	 constraint.  */
+      if (align != 4
+	  && count > ((optimize > 1 && !optimize_size) ? 8 : 15))
+	return 0;
+    }
+
+  /* Insn expansion: holding the init value.
+     Either MOV(.N) or L32R w/litpool.  */
+  if (align == 1)
+    expand_len = xtensa_sizeof_MOVI (value);
+  else if (value == 0 || value == -1)
+    expand_len = TARGET_DENSITY ? 2 : 3;
+  else
+    expand_len = 3 + 4;
+  if (TARGET_LOOPS && optimize) /* zero-overhead looping */
+    {
+      /* Insn translation: Either MOV(.N) or L32R w/litpool for the
+	 loop count.  */
+      expand_len += xtensa_simm12b (count) ? xtensa_sizeof_MOVI (count)
+					   : 3 + 4;
+      /* Insn translation: LOOP, the zero-overhead looping setup
+	 instruction.  */
+      expand_len += 3;
+      /* Insn expansion: the loop body instructions.
+	For store, one of S8I, S16I or S32I(.N).
+	For advance, ADDI(.N).  */
+      expand_len += (TARGET_DENSITY && align == 4 ? 2 : 3)
+		    + (TARGET_DENSITY ? 2 : 3);
+    }
+  else /* NO zero-overhead looping */
+    {
+      /* Insn expansion: Either ADDI(.N) or ADDMI for the end address.  */
+      expand_len += bytes > 127 ? 3
+				: (TARGET_DENSITY && bytes <= 15) ? 2 : 3;
+      /* Insn expansion: the loop body and branch instruction.
+	For store, one of S8I, S16I or S32I(.N).
+	For advance, ADDI(.N).
+	For branch, BNE.  */
+      expand_len += (TARGET_DENSITY && align == 4 ? 2 : 3)
+		    + (TARGET_DENSITY ? 2 : 3) + 3;
+    }
+
+  /* Function call: preparing two arguments.  */
+  funccall_len = xtensa_sizeof_MOVI (value);
+  funccall_len += xtensa_sizeof_MOVI (bytes);
+  /* Function call: calling memset().  */
+  funccall_len += TARGET_LONGCALLS ? (3 + 4 + 3) : 3;
+
+  /* Apply expansion bonus (2x) if optimizing for speed.  */
+  if (optimize > 1 && !optimize_size)
+    funccall_len *= 2;
+
+  /* Decide whether to expand or not, based on the sum of the length
+     of instructions.  */
+  if (expand_len > funccall_len)
+    return 0;
+
+  x = XEXP (operands[0], 0);
+  if (!REG_P (x))
+    x = XEXP (replace_equiv_address (operands[0], force_reg (Pmode, x)), 0);
+  dst = gen_reg_rtx (SImode);
+  emit_move_insn (dst, x);
+  end = gen_reg_rtx (SImode);
+  if (TARGET_LOOPS && optimize)
+    x = force_reg (SImode, operands[1] /* the length */);
+  else
+    x = operands[1];
+  emit_insn (gen_addsi3 (end, dst, x));
+  switch (align)
+    {
+    case 1:
+      unit_mode = QImode;
+      break;
+    case 2:
+      value = (int16_t)((uint8_t)value * 0x0101U);
+      unit_mode = HImode;
+      break;
+    case 4:
+      value = (int32_t)((uint8_t)value * 0x01010101U);
+      unit_mode = SImode;
+      break;
+    default:
+      gcc_unreachable ();
+    }
+  reg = force_reg (unit_mode, GEN_INT (value));
+
+  label = gen_label_rtx ();
+  emit_label (label);
+  emit_move_insn (gen_rtx_MEM (unit_mode, dst), reg);
+  emit_insn (gen_addsi3 (dst, dst, GEN_INT (align)));
+  emit_cmp_and_jump_insns (dst, end, NE, const0_rtx, SImode, true, label);
 
   return 1;
 }
@@ -1735,21 +2123,20 @@ xtensa_emit_loop_end (rtx_insn *insn, rtx *operands)
 
 
 char *
-xtensa_emit_branch (bool inverted, bool immed, rtx *operands)
+xtensa_emit_branch (bool immed, rtx *operands)
 {
   static char result[64];
-  enum rtx_code code;
+  enum rtx_code code = GET_CODE (operands[3]);
   const char *op;
 
-  code = GET_CODE (operands[3]);
   switch (code)
     {
-    case EQ:	op = inverted ? "ne" : "eq"; break;
-    case NE:	op = inverted ? "eq" : "ne"; break;
-    case LT:	op = inverted ? "ge" : "lt"; break;
-    case GE:	op = inverted ? "lt" : "ge"; break;
-    case LTU:	op = inverted ? "geu" : "ltu"; break;
-    case GEU:	op = inverted ? "ltu" : "geu"; break;
+    case EQ:	op = "eq"; break;
+    case NE:	op = "ne"; break;
+    case LT:	op = "lt"; break;
+    case GE:	op = "ge"; break;
+    case LTU:	op = "ltu"; break;
+    case GEU:	op = "geu"; break;
     default:	gcc_unreachable ();
     }
 
@@ -1769,32 +2156,6 @@ xtensa_emit_branch (bool inverted, bool immed, rtx *operands)
 
 
 char *
-xtensa_emit_bit_branch (bool inverted, bool immed, rtx *operands)
-{
-  static char result[64];
-  const char *op;
-
-  switch (GET_CODE (operands[3]))
-    {
-    case EQ:	op = inverted ? "bs" : "bc"; break;
-    case NE:	op = inverted ? "bc" : "bs"; break;
-    default:	gcc_unreachable ();
-    }
-
-  if (immed)
-    {
-      unsigned bitnum = INTVAL (operands[1]) & 0x1f; 
-      operands[1] = GEN_INT (bitnum); 
-      sprintf (result, "b%si\t%%0, %%d1, %%2", op);
-    }
-  else
-    sprintf (result, "b%s\t%%0, %%1, %%2", op);
-
-  return result;
-}
-
-
-char *
 xtensa_emit_movcc (bool inverted, bool isfp, bool isbool, rtx *operands)
 {
   static char result[64];
@@ -1802,12 +2163,14 @@ xtensa_emit_movcc (bool inverted, bool isfp, bool isbool, rtx *operands)
   const char *op;
 
   code = GET_CODE (operands[4]);
+  if (inverted)
+    code = reverse_condition (code);
   if (isbool)
     {
       switch (code)
 	{
-	case EQ:	op = inverted ? "t" : "f"; break;
-	case NE:	op = inverted ? "f" : "t"; break;
+	case EQ:	op = "f"; break;
+	case NE:	op = "t"; break;
 	default:	gcc_unreachable ();
 	}
     }
@@ -1815,10 +2178,10 @@ xtensa_emit_movcc (bool inverted, bool isfp, bool isbool, rtx *operands)
     {
       switch (code)
 	{
-	case EQ:	op = inverted ? "nez" : "eqz"; break;
-	case NE:	op = inverted ? "eqz" : "nez"; break;
-	case LT:	op = inverted ? "gez" : "ltz"; break;
-	case GE:	op = inverted ? "ltz" : "gez"; break;
+	case EQ:	op = "eqz"; break;
+	case NE:	op = "nez"; break;
+	case LT:	op = "ltz"; break;
+	case GE:	op = "gez"; break;
 	default:	gcc_unreachable ();
 	}
     }
@@ -1826,6 +2189,29 @@ xtensa_emit_movcc (bool inverted, bool isfp, bool isbool, rtx *operands)
   sprintf (result, "mov%s%s\t%%0, %%%d, %%1",
 	   op, isfp ? ".s" : "", inverted ? 3 : 2);
   return result;
+}
+
+
+void
+xtensa_prepare_expand_call (int callop, rtx *operands)
+{
+  rtx addr = XEXP (operands[callop], 0);
+
+  if (flag_pic && SYMBOL_REF_P (addr)
+      && (!SYMBOL_REF_LOCAL_P (addr) || SYMBOL_REF_EXTERNAL_P (addr)))
+    addr = gen_sym_PLT (addr);
+
+  if (!call_insn_operand (addr, VOIDmode))
+    {
+      /* This may be called while generating MI thunk when we pretend
+	 that reload is over.  Use a8 as a temporary register in that case.  */
+      rtx reg = can_create_pseudo_p ()
+	? copy_to_mode_reg (Pmode, addr)
+	: copy_to_suggested_reg (addr,
+				 gen_rtx_REG (Pmode, A8_REG),
+				 Pmode);
+      XEXP (operands[callop], 0) = reg;
+    }
 }
 
 
@@ -1842,6 +2228,24 @@ xtensa_emit_call (int callop, rtx *operands)
     sprintf (result, "callx%d\t%%%d", WINDOW_SIZE, callop);
   else
     sprintf (result, "call%d\t%%%d", WINDOW_SIZE, callop);
+
+  return result;
+}
+
+
+char *
+xtensa_emit_sibcall (int callop, rtx *operands)
+{
+  static char result[64];
+  rtx tgt = operands[callop];
+
+  if (CONST_INT_P (tgt))
+    sprintf (result, "j.l\t" HOST_WIDE_INT_PRINT_HEX ", a9",
+	     INTVAL (tgt));
+  else if (register_operand (tgt, VOIDmode))
+    sprintf (result, "jx\t%%%d", callop);
+  else
+    sprintf (result, "j.l\t%%%d, a9", callop);
 
   return result;
 }
@@ -2070,6 +2474,50 @@ xtensa_tls_referenced_p (rtx x)
 }
 
 
+/* Helper function for "*shlrd_..." patterns.  */
+
+enum rtx_code
+xtensa_shlrd_which_direction (rtx op0, rtx op1)
+{
+  if (GET_CODE (op0) == ASHIFT && GET_CODE (op1) == LSHIFTRT)
+    return ASHIFT;	/* shld  */
+  if (GET_CODE (op0) == LSHIFTRT && GET_CODE (op1) == ASHIFT)
+    return LSHIFTRT;	/* shrd  */
+
+  return UNKNOWN;
+}
+
+
+/* Return true after "split1" pass has been finished.  */
+
+bool
+xtensa_split1_finished_p (void)
+{
+  return cfun && (cfun->curr_properties & PROP_rtl_split_insns);
+}
+
+
+/* Split a DImode pair of reg (operand[0]) and const_int (operand[1]) into
+   two SImode pairs, the low-part (operands[0] and [1]) and the high-part
+   (operands[2] and [3]).  */
+
+void
+xtensa_split_DI_reg_imm (rtx *operands)
+{
+  rtx lowpart, highpart;
+
+  if (WORDS_BIG_ENDIAN)
+    split_double (operands[1], &highpart, &lowpart);
+  else
+    split_double (operands[1], &lowpart, &highpart);
+
+  operands[3] = highpart;
+  operands[2] = gen_highpart (SImode, operands[0]);
+  operands[1] = lowpart;
+  operands[0] = gen_lowpart (SImode, operands[0]);
+}
+
+
 /* Implement TARGET_CANNOT_FORCE_CONST_MEM.  */
 
 static bool
@@ -2082,7 +2530,7 @@ xtensa_cannot_force_const_mem (machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 /* Return the debugger register number to use for 'regno'.  */
 
 int
-xtensa_dbx_register_number (int regno)
+xtensa_debugger_regno (int regno)
 {
   int first = -1;
 
@@ -2379,7 +2827,7 @@ static void
 printx (FILE *file, signed int val)
 {
   /* Print a hexadecimal value in a nice way.  */
-  if ((val > -0xa) && (val < 0xa))
+  if (IN_RANGE (val, -9, 9))
     fprintf (file, "%d", val);
   else if (val < 0)
     fprintf (file, "-0x%x", -val);
@@ -2430,17 +2878,11 @@ print_operand (FILE *file, rtx x, int letter)
     case 'K':
       if (GET_CODE (x) == CONST_INT)
 	{
-	  int num_bits = 0;
 	  unsigned val = INTVAL (x);
-	  while (val & 1)
-	    {
-	      num_bits += 1;
-	      val = val >> 1;
-	    }
-	  if ((val != 0) || (num_bits == 0) || (num_bits > 16))
+	  if (!xtensa_mask_immediate (val))
 	    fatal_insn ("invalid mask", x);
 
-	  fprintf (file, "%d", num_bits);
+	  fprintf (file, "%d", floor_log2 (val + 1));
 	}
       else
 	output_operand_lossage ("invalid %%K value");
@@ -2706,7 +3148,7 @@ xtensa_output_literal (FILE *file, rtx x, machine_mode mode, int labelno)
 }
 
 static bool
-xtensa_call_save_reg(int regno)
+xtensa_call_save_reg (int regno)
 {
   if (TARGET_WINDOWED_ABI)
     return false;
@@ -2715,7 +3157,7 @@ xtensa_call_save_reg(int regno)
     return crtl->profile || !crtl->is_leaf || crtl->calls_eh_return ||
       df_regs_ever_live_p (regno);
 
-  if (crtl->calls_eh_return && regno >= 2 && regno < 4)
+  if (crtl->calls_eh_return && IN_RANGE (regno, 2, 3))
     return true;
 
   return !call_used_or_fixed_reg_p (regno) && df_regs_ever_live_p (regno);
@@ -2742,7 +3184,7 @@ compute_frame_size (poly_int64 size)
   cfun->machine->callee_save_size = 0;
   for (regno = 0; regno < FIRST_PSEUDO_REGISTER; ++regno)
     {
-      if (xtensa_call_save_reg(regno))
+      if (xtensa_call_save_reg (regno))
 	cfun->machine->callee_save_size += UNITS_PER_WORD;
     }
 
@@ -2797,6 +3239,49 @@ xtensa_initial_elimination_offset (int from, int to ATTRIBUTE_UNUSED)
   return offset;
 }
 
+#define ADJUST_SP_NONE      0x0
+#define ADJUST_SP_NEED_NOTE 0x1
+#define ADJUST_SP_FRAME_PTR 0x2
+static void
+xtensa_emit_adjust_stack_ptr (HOST_WIDE_INT offset, int flags)
+{
+  rtx_insn *insn;
+  rtx ptr = (flags & ADJUST_SP_FRAME_PTR) ? hard_frame_pointer_rtx
+					  : stack_pointer_rtx;
+
+  if (cfun->machine->inhibit_logues_a1_adjusts)
+    return;
+
+  if (xtensa_simm8 (offset)
+      || xtensa_simm8x256 (offset))
+    insn = emit_insn (gen_addsi3 (stack_pointer_rtx, ptr, GEN_INT (offset)));
+  else
+    {
+      rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
+
+      if (offset < 0)
+	{
+	  emit_move_insn (tmp_reg, GEN_INT (-offset));
+	  insn = emit_insn (gen_subsi3 (stack_pointer_rtx, ptr, tmp_reg));
+	}
+      else
+	{
+	  emit_move_insn (tmp_reg, GEN_INT (offset));
+	  insn = emit_insn (gen_addsi3 (stack_pointer_rtx, ptr,	tmp_reg));
+	}
+    }
+
+  if (flags & ADJUST_SP_NEED_NOTE)
+    {
+      rtx note_rtx = gen_rtx_SET (stack_pointer_rtx,
+				  plus_constant (Pmode, stack_pointer_rtx,
+						 offset));
+
+      RTX_FRAME_RELATED_P (insn) = 1;
+      add_reg_note (insn, REG_FRAME_RELATED_EXPR, note_rtx);
+    }
+}
+
 /* minimum frame = reg save area (4 words) plus static chain (1 word)
    and the total number of words must be a multiple of 128 bits.  */
 #define MIN_FRAME_SIZE (8 * UNITS_PER_WORD)
@@ -2807,7 +3292,6 @@ xtensa_expand_prologue (void)
   HOST_WIDE_INT total_size;
   rtx_insn *insn = NULL;
   rtx note_rtx;
-
 
   total_size = compute_frame_size (get_frame_size ());
 
@@ -2833,17 +3317,30 @@ xtensa_expand_prologue (void)
       int regno;
       HOST_WIDE_INT offset = 0;
       int callee_save_size = cfun->machine->callee_save_size;
+      df_ref ref;
+      bool stack_pointer_needed = frame_pointer_needed
+				  || crtl->calls_eh_return;
+
+      /* Check if the function body really needs the stack pointer.  */
+      if (!stack_pointer_needed)
+	for (ref = DF_REG_USE_CHAIN (A1_REG);
+	     ref; ref = DF_REF_NEXT_REG (ref))
+	  if (DF_REF_CLASS (ref) == DF_REF_REGULAR
+	      && NONJUMP_INSN_P (DF_REF_INSN (ref)))
+	    stack_pointer_needed = true;
+      /* Check if callee-saved registers really need saving to the stack.  */
+      if (!stack_pointer_needed)
+	for (regno = 0; regno < FIRST_PSEUDO_REGISTER; ++regno)
+	  if (xtensa_call_save_reg (regno))
+	    stack_pointer_needed = true;
+
+      cfun->machine->inhibit_logues_a1_adjusts = !stack_pointer_needed;
 
       /* -128 is a limit of single addi instruction. */
-      if (total_size > 0 && total_size <= 128)
+      if (IN_RANGE (total_size, 1, 128))
 	{
-	  insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
-					GEN_INT (-total_size)));
-	  RTX_FRAME_RELATED_P (insn) = 1;
-	  note_rtx = gen_rtx_SET (stack_pointer_rtx,
-				  plus_constant (Pmode, stack_pointer_rtx,
-						 -total_size));
-	  add_reg_note (insn, REG_FRAME_RELATED_EXPR, note_rtx);
+	  xtensa_emit_adjust_stack_ptr (-total_size,
+					ADJUST_SP_NEED_NOTE);
 	  offset = total_size - UNITS_PER_WORD;
 	}
       else if (callee_save_size)
@@ -2853,26 +3350,14 @@ xtensa_expand_prologue (void)
 	   * move it to its final location. */
 	  if (total_size > 1024)
 	    {
-	      insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
-					    GEN_INT (-callee_save_size)));
-	      RTX_FRAME_RELATED_P (insn) = 1;
-	      note_rtx = gen_rtx_SET (stack_pointer_rtx,
-				      plus_constant (Pmode, stack_pointer_rtx,
-						     -callee_save_size));
-	      add_reg_note (insn, REG_FRAME_RELATED_EXPR, note_rtx);
+	      xtensa_emit_adjust_stack_ptr (-callee_save_size,
+					    ADJUST_SP_NEED_NOTE);
 	      offset = callee_save_size - UNITS_PER_WORD;
 	    }
 	  else
 	    {
-	      rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
-	      emit_move_insn (tmp_reg, GEN_INT (total_size));
-	      insn = emit_insn (gen_subsi3 (stack_pointer_rtx,
-					    stack_pointer_rtx, tmp_reg));
-	      RTX_FRAME_RELATED_P (insn) = 1;
-	      note_rtx = gen_rtx_SET (stack_pointer_rtx,
-				      plus_constant (Pmode, stack_pointer_rtx,
-						     -total_size));
-	      add_reg_note (insn, REG_FRAME_RELATED_EXPR, note_rtx);
+	      xtensa_emit_adjust_stack_ptr (-total_size,
+					    ADJUST_SP_NEED_NOTE);
 	      offset = total_size - UNITS_PER_WORD;
 	    }
 	}
@@ -2894,19 +3379,8 @@ xtensa_expand_prologue (void)
 	}
       if (total_size > 1024
 	  || (!callee_save_size && total_size > 128))
-	{
-	  rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
-	  emit_move_insn (tmp_reg, GEN_INT (total_size -
-					    callee_save_size));
-	  insn = emit_insn (gen_subsi3 (stack_pointer_rtx,
-					stack_pointer_rtx, tmp_reg));
-	  RTX_FRAME_RELATED_P (insn) = 1;
-	  note_rtx = gen_rtx_SET (stack_pointer_rtx,
-				  plus_constant (Pmode, stack_pointer_rtx,
-						 callee_save_size -
-						 total_size));
-	  add_reg_note (insn, REG_FRAME_RELATED_EXPR, note_rtx);
-	}
+	xtensa_emit_adjust_stack_ptr (callee_save_size - total_size,
+				      ADJUST_SP_NEED_NOTE);
     }
 
   if (frame_pointer_needed)
@@ -2964,7 +3438,7 @@ xtensa_expand_prologue (void)
 }
 
 void
-xtensa_expand_epilogue (void)
+xtensa_expand_epilogue (bool sibcall_p)
 {
   if (!TARGET_WINDOWED_ABI)
     {
@@ -2973,12 +3447,11 @@ xtensa_expand_epilogue (void)
 
       if (cfun->machine->current_frame_size > (frame_pointer_needed ? 127 : 1024))
 	{
-	  rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
-	  emit_move_insn (tmp_reg, GEN_INT (cfun->machine->current_frame_size -
-					    cfun->machine->callee_save_size));
-	  emit_insn (gen_addsi3 (stack_pointer_rtx, frame_pointer_needed ?
-				 hard_frame_pointer_rtx : stack_pointer_rtx,
-				 tmp_reg));
+	  xtensa_emit_adjust_stack_ptr (cfun->machine->current_frame_size -
+					cfun->machine->callee_save_size,
+					frame_pointer_needed
+					? ADJUST_SP_FRAME_PTR
+					: ADJUST_SP_NONE);
 	  offset = cfun->machine->callee_save_size - UNITS_PER_WORD;
 	}
       else
@@ -3004,6 +3477,8 @@ xtensa_expand_epilogue (void)
 			      gen_frame_mem (SImode, x));
 	    }
 	}
+      if (sibcall_p)
+	emit_use (gen_rtx_REG (SImode, A0_REG));
 
       if (cfun->machine->current_frame_size > 0)
 	{
@@ -3015,19 +3490,12 @@ xtensa_expand_epilogue (void)
 		offset = cfun->machine->current_frame_size;
 	      else
 		offset = cfun->machine->callee_save_size;
-
-	      emit_insn (gen_addsi3 (stack_pointer_rtx,
-				     stack_pointer_rtx,
-				     GEN_INT (offset)));
+	      if (offset)
+		xtensa_emit_adjust_stack_ptr (offset, ADJUST_SP_NONE);
 	    }
 	  else
-	    {
-	      rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
-	      emit_move_insn (tmp_reg,
-			      GEN_INT (cfun->machine->current_frame_size));
-	      emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
-				     tmp_reg));
-	    }
+	    xtensa_emit_adjust_stack_ptr (cfun->machine->current_frame_size,
+					  ADJUST_SP_NONE);
 	}
 
       if (crtl->calls_eh_return)
@@ -3036,7 +3504,8 @@ xtensa_expand_epilogue (void)
 				  EH_RETURN_STACKADJ_RTX));
     }
   cfun->machine->epilogue_done = true;
-  emit_jump_insn (gen_return ());
+  if (!sibcall_p)
+    emit_jump_insn (gen_return ());
 }
 
 bool
@@ -3715,7 +4184,7 @@ xtensa_memory_move_cost (machine_mode mode ATTRIBUTE_UNUSED,
 static bool
 xtensa_rtx_costs (rtx x, machine_mode mode, int outer_code,
 		  int opno ATTRIBUTE_UNUSED,
-		  int *total, bool speed ATTRIBUTE_UNUSED)
+		  int *total, bool speed)
 {
   int code = GET_CODE (x);
 
@@ -3727,7 +4196,7 @@ xtensa_rtx_costs (rtx x, machine_mode mode, int outer_code,
 	case SET:
 	  if (xtensa_simm12b (INTVAL (x)))
 	    {
-	      *total = 4;
+	      *total = speed ? COSTS_N_INSNS (1) : 0;
 	      return true;
 	    }
 	  break;
@@ -3803,7 +4272,12 @@ xtensa_rtx_costs (rtx x, machine_mode mode, int outer_code,
       return true;
 
     case CLZ:
+    case CLRSB:
       *total = COSTS_N_INSNS (TARGET_NSA ? 1 : 50);
+      return true;
+
+    case BSWAP:
+      *total = COSTS_N_INSNS (mode == HImode ? 3 : 5);
       return true;
 
     case NOT:
@@ -3829,13 +4303,16 @@ xtensa_rtx_costs (rtx x, machine_mode mode, int outer_code,
       return true;
 
     case ABS:
+    case NEG:
       {
 	if (mode == SFmode)
 	  *total = COSTS_N_INSNS (TARGET_HARD_FLOAT ? 1 : 50);
 	else if (mode == DFmode)
 	  *total = COSTS_N_INSNS (50);
-	else
+	else if (mode == DImode)
 	  *total = COSTS_N_INSNS (4);
+	else
+	  *total = COSTS_N_INSNS (1);
 	return true;
       }
 
@@ -3850,10 +4327,6 @@ xtensa_rtx_costs (rtx x, machine_mode mode, int outer_code,
 	  *total = COSTS_N_INSNS (1);
 	return true;
       }
-
-    case NEG:
-      *total = COSTS_N_INSNS (mode == DImode ? 4 : 2);
-      return true;
 
     case MULT:
       {
@@ -3894,11 +4367,11 @@ xtensa_rtx_costs (rtx x, machine_mode mode, int outer_code,
     case UMOD:
       {
 	if (mode == DImode)
-	  *total = COSTS_N_INSNS (50);
+	  *total = COSTS_N_INSNS (speed ? 100 : 50);
 	else if (TARGET_DIV32)
 	  *total = COSTS_N_INSNS (32);
 	else
-	  *total = COSTS_N_INSNS (50);
+	  *total = COSTS_N_INSNS (speed ? 100 : 50);
 	return true;
       }
 
@@ -3923,12 +4396,111 @@ xtensa_rtx_costs (rtx x, machine_mode mode, int outer_code,
 
     case ZERO_EXTRACT:
     case ZERO_EXTEND:
+    case IF_THEN_ELSE:
       *total = COSTS_N_INSNS (1);
       return true;
 
     default:
       return false;
     }
+}
+
+static bool
+xtensa_is_insn_L32R_p (const rtx_insn *insn)
+{
+  rtx x = PATTERN (insn);
+
+  if (GET_CODE (x) != SET)
+    return false;
+
+  x = XEXP (x, 1);
+  if (MEM_P (x))
+    {
+      x = XEXP (x, 0);
+      return (SYMBOL_REF_P (x) || CONST_INT_P (x))
+	     && CONSTANT_POOL_ADDRESS_P (x);
+    }
+
+  /* relaxed MOVI instructions, that will be converted to L32R by the
+     assembler.  */
+  if (CONST_INT_P (x)
+      && ! xtensa_simm12b (INTVAL (x)))
+    return true;
+
+  return false;
+}
+
+/* Compute a relative costs of RTL insns.  This is necessary in order to
+   achieve better RTL insn splitting/combination result.  */
+
+static int
+xtensa_insn_cost (rtx_insn *insn, bool speed)
+{
+  if (!(recog_memoized (insn) < 0))
+    {
+      int len = get_attr_length (insn), n = (len + 2) / 3;
+
+      if (len == 0)
+	return COSTS_N_INSNS (0);
+
+      if (speed)  /* For speed cost.  */
+	{
+	  /* "L32R" may be particular slow (implementation-dependent).  */
+	  if (xtensa_is_insn_L32R_p (insn))
+	    return COSTS_N_INSNS (1 + xtensa_extra_l32r_costs);
+
+	  /* Cost based on the pipeline model.  */
+	  switch (get_attr_type (insn))
+	    {
+	    case TYPE_STORE:
+	    case TYPE_MOVE:
+	    case TYPE_ARITH:
+	    case TYPE_MULTI:
+	    case TYPE_NOP:
+	    case TYPE_FSTORE:
+	      return COSTS_N_INSNS (n);
+
+	    case TYPE_LOAD:
+	      return COSTS_N_INSNS (n - 1 + 2);
+
+	    case TYPE_JUMP:
+	    case TYPE_CALL:
+	      return COSTS_N_INSNS (n - 1 + 3);
+
+	    case TYPE_FCONV:
+	    case TYPE_FLOAD:
+	    case TYPE_MUL16:
+	    case TYPE_MUL32:
+	    case TYPE_RSR:
+	      return COSTS_N_INSNS (n * 2);
+
+	    case TYPE_FMADD:
+	      return COSTS_N_INSNS (n * 4);
+
+	    case TYPE_DIV32:
+	      return COSTS_N_INSNS (n * 16);
+
+	    default:
+	      break;
+	    }
+	}
+      else  /* For size cost.  */
+	{
+	  /* Cost based on the instruction length.  */
+	  if (get_attr_type (insn) != TYPE_UNKNOWN)
+	    {
+	      /* "L32R" itself plus constant in litpool.  */
+	      if (xtensa_is_insn_L32R_p (insn))
+		return COSTS_N_INSNS (2) + 1;
+
+	      /* Consider ".n" short instructions.  */
+	      return COSTS_N_INSNS (n) - (n * 3 - len);
+	    }
+	}
+    }
+
+  /* Fall back.  */
+  return pattern_cost (PATTERN (insn), speed);
 }
 
 /* Worker function for TARGET_RETURN_IN_MEMORY.  */
@@ -3967,7 +4539,7 @@ xtensa_libcall_value (machine_mode mode, const_rtx fun ATTRIBUTE_UNUSED)
 static bool
 xtensa_function_value_regno_p (const unsigned int regno)
 {
-  return (regno == GP_RETURN);
+  return (regno >= GP_RETURN && regno < GP_RETURN + GP_RETURN_REG_COUNT);
 }
 
 /* The static chain is passed in memory.  Provide rtx giving 'mem'
@@ -4397,6 +4969,13 @@ xtensa_conditional_register_usage (void)
   /* Remove hard FP register from the preferred reload registers set.  */
   CLEAR_HARD_REG_BIT (reg_class_contents[(int)RL_REGS],
 		      HARD_FRAME_POINTER_REGNUM);
+
+  /* Register A0 holds the return address upon entry to a function
+     for the CALL0 ABI, but unlike the windowed register ABI, it is
+     not reserved for this purpose and may hold other values after
+     the return address has been saved.  */
+  if (!TARGET_WINDOWED_ABI)
+    fixed_regs[A0_REG] = 0;
 }
 
 /* Map hard register number to register class */
@@ -4467,6 +5046,107 @@ xtensa_asan_shadow_offset (void)
   return HOST_WIDE_INT_UC (0x10000000);
 }
 
+/* Implement TARGET_FUNCTION_OK_FOR_SIBCALL.  */
+static bool
+xtensa_function_ok_for_sibcall (tree decl ATTRIBUTE_UNUSED, tree exp ATTRIBUTE_UNUSED)
+{
+  /* Do not allow sibcalls when windowed registers ABI is in effect.  */
+  if (TARGET_WINDOWED_ABI)
+    return false;
+
+  return true;
+}
+
+static bool
+xtensa_can_output_mi_thunk (const_tree thunk_fndecl ATTRIBUTE_UNUSED,
+			    HOST_WIDE_INT delta ATTRIBUTE_UNUSED,
+			    HOST_WIDE_INT vcall_offset ATTRIBUTE_UNUSED,
+			    const_tree function ATTRIBUTE_UNUSED)
+{
+  if (TARGET_WINDOWED_ABI)
+    return false;
+
+  return true;
+}
+
+/* Output code to add DELTA to the first argument, and then jump
+   to FUNCTION.  Used for C++ multiple inheritance.  */
+static void
+xtensa_output_mi_thunk (FILE *file, tree thunk ATTRIBUTE_UNUSED,
+			HOST_WIDE_INT delta,
+			HOST_WIDE_INT vcall_offset,
+			tree function)
+{
+  rtx this_rtx;
+  rtx funexp;
+  rtx_insn *insn;
+  int this_reg_no;
+  rtx temp0 = gen_rtx_REG (Pmode, A9_REG);
+  const char *fnname = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (thunk));
+
+  reload_completed = 1;
+
+  if (aggregate_value_p (TREE_TYPE (TREE_TYPE (function)), function))
+    this_reg_no = 3;
+  else
+    this_reg_no = 2;
+
+  this_rtx = gen_rtx_REG (Pmode, A0_REG + this_reg_no);
+
+  if (delta)
+    {
+      if (xtensa_simm8 (delta))
+	emit_insn (gen_addsi3 (this_rtx, this_rtx, GEN_INT (delta)));
+      else
+	{
+	  emit_move_insn (temp0, GEN_INT (delta));
+	  emit_insn (gen_addsi3 (this_rtx, this_rtx, temp0));
+	}
+    }
+
+  if (vcall_offset)
+    {
+      rtx temp1 = gen_rtx_REG (Pmode, A0_REG + 10);
+      rtx addr = temp1;
+
+      emit_move_insn (temp0, gen_rtx_MEM (Pmode, this_rtx));
+      if (xtensa_uimm8x4 (vcall_offset))
+	addr = plus_constant (Pmode, temp0, vcall_offset);
+      else if (xtensa_simm8 (vcall_offset))
+	emit_insn (gen_addsi3 (temp1, temp0, GEN_INT (vcall_offset)));
+      else
+	{
+	  emit_move_insn (temp1, GEN_INT (vcall_offset));
+	  emit_insn (gen_addsi3 (temp1, temp0, temp1));
+	}
+      emit_move_insn (temp1, gen_rtx_MEM (Pmode, addr));
+      emit_insn (gen_add2_insn (this_rtx, temp1));
+    }
+
+  /* Generate a tail call to the target function.  */
+  if (!TREE_USED (function))
+    {
+      assemble_external (function);
+      TREE_USED (function) = 1;
+    }
+
+  funexp = XEXP (DECL_RTL (function), 0);
+  funexp = gen_rtx_MEM (FUNCTION_MODE, funexp);
+  insn = emit_call_insn (gen_sibcall (funexp, const0_rtx));
+  SIBLING_CALL_P (insn) = 1;
+
+  insn = get_insns ();
+  shorten_branches (insn);
+  assemble_start_function (thunk, fnname);
+  final_start_function (insn, file, 1);
+  final (insn, file, 1);
+  final_end_function ();
+  assemble_end_function (thunk, fnname);
+
+  /* Stop pretending to be a post-reload pass.  */
+  reload_completed = 0;
+}
+
 static rtx
 xtensa_delegitimize_address (rtx op)
 {
@@ -4484,6 +5164,14 @@ xtensa_delegitimize_address (rtx op)
       break;
     }
   return op;
+}
+
+/* Implement TARGET_LRA_P.  */
+
+static bool
+xtensa_lra_p (void)
+{
+  return TARGET_LRA;
 }
 
 #include "gt-xtensa.h"

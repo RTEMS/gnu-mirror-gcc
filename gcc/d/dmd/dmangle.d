@@ -371,10 +371,20 @@ public:
         if (ta.isnogc)
             buf.writestring("Ni");
 
-        if (ta.isreturn && !ta.isreturninferred)
-            buf.writestring("Nj");
-        else if (ta.isScopeQual && !ta.isscopeinferred)
-            buf.writestring("Nl");
+        // `return scope` must be in that order
+        if (ta.isreturnscope && !ta.isreturninferred)
+        {
+            buf.writestring("NjNl");
+        }
+        else
+        {
+            // when return ref, the order is `scope return`
+            if (ta.isScopeQual && !ta.isscopeinferred)
+                buf.writestring("Nl");
+
+            if (ta.isreturn && !ta.isreturninferred)
+                buf.writestring("Nj");
+        }
 
         if (ta.islive)
             buf.writestring("Nm");
@@ -822,6 +832,23 @@ public:
             if (s.parent)
                 printf("  parent = %s %s", s.parent.kind(), s.parent.toChars());
             printf("\n");
+        }
+        if (s.parent && s.ident)
+        {
+            if (auto m = s.parent.isModule())
+            {
+                if (m.filetype == FileType.c)
+                {
+                    /* C types at global level get mangled into the __C global namespace
+                     * to get the same mangling regardless of which module it
+                     * is declared in. This works because types are the same if the mangling
+                     * is the same.
+                     */
+                    mangleIdentifier(Id.ImportC, s); // parent
+                    mangleIdentifier(s.ident, s);
+                    return;
+                }
+            }
         }
         mangleParent(s);
         if (s.ident)

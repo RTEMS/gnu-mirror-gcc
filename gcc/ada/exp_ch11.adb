@@ -53,6 +53,7 @@ with Stringt;        use Stringt;
 with Targparm;       use Targparm;
 with Tbuild;         use Tbuild;
 with Uintp;          use Uintp;
+with Warnsw;         use Warnsw;
 
 package body Exp_Ch11 is
 
@@ -1136,7 +1137,7 @@ package body Exp_Ch11 is
       Set_Is_Statically_Allocated (Ex_Id);
 
       --  Create the aggregate list for type Standard.Exception_Type:
-      --  Handled_By_Other component: False
+      --  Not_Handled_By_Others component: False
 
       L := Empty_List;
       Append_To (L, New_Occurrence_Of (Standard_False, Loc));
@@ -1305,9 +1306,6 @@ package body Exp_Ch11 is
       then
          pragma Assert (not Is_Thunk (Current_Scope));
          Expand_Cleanup_Actions (Parent (N));
-
-      else
-         Set_First_Real_Statement (N, First (Statements (N)));
       end if;
    end Expand_N_Handled_Sequence_Of_Statements;
 
@@ -1350,37 +1348,19 @@ package body Exp_Ch11 is
       --     in
       --       raise Constraint_Error;
 
-      --  unless the flag Convert_To_Return_False is set, in which case
-      --  the transformation is to:
-
-      --     do
-      --       return False;
-      --     in
-      --       raise Constraint_Error;
-
       --  The raise constraint error can never be executed. It is just a dummy
       --  node that can be labeled with an arbitrary type.
 
       RCE := Make_Raise_Constraint_Error (Loc, Reason => CE_Explicit_Raise);
       Set_Etype (RCE, Typ);
 
-      if Convert_To_Return_False (N) then
-         Rewrite (N,
-           Make_Expression_With_Actions (Loc,
-             Actions     => New_List (
-               Make_Simple_Return_Statement (Loc,
-                 Expression => New_Occurrence_Of (Standard_False, Loc))),
-               Expression => RCE));
-
-      else
-         Rewrite (N,
-           Make_Expression_With_Actions (Loc,
-             Actions     => New_List (
-               Make_Raise_Statement (Loc,
-                 Name       => Name (N),
-                 Expression => Expression (N))),
-               Expression => RCE));
-      end if;
+      Rewrite (N,
+        Make_Expression_With_Actions (Loc,
+          Actions     => New_List (
+            Make_Raise_Statement (Loc,
+              Name       => Name (N),
+              Expression => Expression (N))),
+            Expression => RCE));
 
       Analyze_And_Resolve (N, Typ);
    end Expand_N_Raise_Expression;

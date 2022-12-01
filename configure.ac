@@ -132,7 +132,7 @@ build_tools="build-texinfo build-flex build-bison build-m4 build-fixincludes"
 
 # these libraries are used by various programs built for the host environment
 #f
-host_libs="intl libiberty opcodes bfd readline tcl tk itcl libgui zlib libbacktrace libcpp libcody libdecnumber gmp mpfr mpc isl libelf libiconv libctf"
+host_libs="intl libiberty opcodes bfd readline tcl tk itcl libgui zlib libbacktrace libcpp libcody libdecnumber gmp mpfr mpc isl libiconv libctf libsframe"
 
 # these tools are built for the host environment
 # Note, the powerpc-eabi build depends on sim occurring before gdb in order to
@@ -150,7 +150,6 @@ target_libraries="target-libgcc \
 		target-libgloss \
 		target-newlib \
 		target-libgomp \
-		target-liboffloadmic \
 		target-libatomic \
 		target-libitm \
 		target-libstdc++-v3 \
@@ -245,6 +244,12 @@ AC_ARG_WITH(system-zlib,
 if test x$with_system_zlib = xyes ; then
   use_included_zlib=no
   noconfigdirs="$noconfigdirs zlib"
+fi
+
+# Don't compile the bundled readline/libreadline.a if --with-system-readline
+# is provided.
+if test x$with_system_readline = xyes ; then
+  noconfigdirs="$noconfigdirs readline"
 fi
 
 # some tools are so dependent upon X11 that if we're not building with X, 
@@ -353,7 +358,7 @@ case "${ENABLE_GOLD}" in
       # Check for target supported by gold.
       case "${target}" in
         i?86-*-* | x86_64-*-* | sparc*-*-* | powerpc*-*-* | arm*-*-* \
-        | aarch64*-*-* | tilegx*-*-* | mips*-*-* | s390*-*-* | loongarch*-*-*)
+        | aarch64*-*-* | mips*-*-* | s390*-*-* | loongarch*-*-*)
 	  configdirs="$configdirs gold"
 	  if test x${ENABLE_GOLD} = xdefault; then
 	    default_ld=gold
@@ -473,42 +478,6 @@ ENABLE_LIBSTDCXX=default)
   noconfigdirs="$noconfigdirs target-libstdc++-v3"
 fi]
 
-# If this is accelerator compiler and its target is intelmic we enable
-# target liboffloadmic by default.  If this is compiler with offloading
-# for intelmic we enable host liboffloadmic by default.  Otherwise
-# liboffloadmic is disabled by default.
-AC_ARG_ENABLE([liboffloadmic],
-AC_HELP_STRING([[--enable-liboffloadmic[=ARG]]],
-	       [build liboffloadmic @<:@ARG={no,host,target}@:>@]),
-[case "$enableval" in
-  no | host | target)
-    enable_liboffloadmic=$enableval ;;
-  *)
-    AC_MSG_ERROR([--enable-liboffloadmic=no/host/target]) ;;
-esac],
-[if test x"$enable_as_accelerator_for" != x; then
-  case "${target}" in
-    *-intelmic-* | *-intelmicemul-*)
-      enable_liboffloadmic=target
-      extra_liboffloadmic_configure_flags="--enable-liboffloadmic=target"
-      ;;
-    *)
-      enable_liboffloadmic=no
-      ;;
-  esac
-else
-  case "${enable_offload_targets}" in
-    *-intelmic-* | *-intelmicemul-*)
-      enable_liboffloadmic=host
-      extra_liboffloadmic_configure_flags="--enable-liboffloadmic=host"
-      ;;
-    *)
-      enable_liboffloadmic=no
-      ;;
-    esac
-fi])
-AC_SUBST(extra_liboffloadmic_configure_flags)
-
 # Enable libgomp by default on hosted POSIX systems, and a few others.
 if test x$enable_libgomp = x ; then
     case "${target}" in
@@ -538,22 +507,6 @@ if test -d ${srcdir}/libatomic; then
 	then
 	    AC_MSG_RESULT([no])
 	    noconfigdirs="$noconfigdirs target-libatomic"
-	else
-	    AC_MSG_RESULT([yes])
-	fi
-    fi
-fi
-
-# Disable liboffloadmic on unsupported systems.
-if test -d ${srcdir}/liboffloadmic; then
-    if test x$enable_liboffloadmic != xno; then
-	AC_MSG_CHECKING([for liboffloadmic support])
-	if (srcdir=${srcdir}/liboffloadmic; \
-		. ${srcdir}/configure.tgt; \
-		test -n "$UNSUPPORTED")
-	then
-	    AC_MSG_RESULT([no])
-	    noconfigdirs="$noconfigdirs target-liboffloadmic"
 	else
 	    AC_MSG_RESULT([yes])
 	fi
@@ -802,11 +755,6 @@ case "${target}" in
     esac
     ;;
   hppa*64*-*-hpux*)
-    noconfigdirs="$noconfigdirs target-libffi"
-    ;;
-  hppa*-hp-hpux11*)
-    ;;
-  hppa*-*-hpux*)
     noconfigdirs="$noconfigdirs target-libffi"
     ;;
   ia64*-*-*vms*)
@@ -1112,13 +1060,8 @@ case "${target}" in
   h8500-*-*)
     noconfigdirs="$noconfigdirs target-libgloss"
     ;;
-  hppa1.1-*-osf* | hppa1.1-*-bsd* )
-    ;;
   hppa*64*-*-hpux*)
     noconfigdirs="$noconfigdirs gdb"
-    ;;
-  hppa*-*-hpux11*)
-    noconfigdirs="$noconfigdirs gdb ld"
     ;;
   hppa*64*-*-linux*)
     ;;
@@ -1274,9 +1217,6 @@ case "${target}" in
   tic6x-*-*)
     noconfigdirs="$noconfigdirs sim"
     ;;
-  tilepro*-*-* | tilegx*-*-*)
-    noconfigdirs="$noconfigdirs sim"
-    ;;
   v810-*-*)
     noconfigdirs="$noconfigdirs bfd binutils gas gdb ld opcodes target-libgloss"
     ;;
@@ -1316,9 +1256,6 @@ case "${host}" in
     ;;
   alpha*-linux*)
     host_makefile_frag="config/mh-alpha-linux"
-    ;;
-  hppa*-hp-hpux10*)
-    host_makefile_frag="config/mh-pa-hpux10"
     ;;
   hppa*-hp-hpux*)
     host_makefile_frag="config/mh-pa"
@@ -1918,7 +1855,7 @@ AC_ARG_ENABLE(host-shared,
 [AS_HELP_STRING([--enable-host-shared],
 		[build host code as shared libraries])],
 [host_shared=$enableval
- case $target in
+ case $host in
    x86_64-*-darwin* | aarch64-*-darwin*)
      if test x$host_shared != xyes ; then
        # PIC is the default, and actually cannot be switched off.
@@ -1927,7 +1864,7 @@ AC_ARG_ENABLE(host-shared,
      fi ;;
   *) ;;
  esac],
-[case $target in
+[case $host in
   x86_64-*-darwin* | aarch64-*-darwin*) host_shared=yes ;;
   *) host_shared=no ;;
  esac])
@@ -2344,7 +2281,7 @@ case ,${enable_languages},:${enable_objc_gc} in *,objc,*:yes|*,objc,*:auto)
   fi
 esac
 
-# Disable libitm, libsanitizer, libvtv, liboffloadmic if we're not building C++
+# Disable libitm, libsanitizer, libvtv if we're not building C++
 case ,${enable_languages}, in
   *,c++,*)
     # Disable libitm, libsanitizer if we're not building libstdc++
@@ -2356,7 +2293,7 @@ case ,${enable_languages}, in
     esac
     ;;
   *)
-    noconfigdirs="$noconfigdirs target-liboffloadmic target-libitm target-libsanitizer target-libvtv"
+    noconfigdirs="$noconfigdirs target-libitm target-libsanitizer target-libvtv"
     ;;
 esac
 
@@ -2455,13 +2392,18 @@ fi
 
 # Sometimes we have special requirements for the host libiberty.
 extra_host_libiberty_configure_flags=
-extra_host_zlib_configure_flags=
 case " $configdirs " in
-  *" lto-plugin "* | *" libcc1 "*)
+  *" lto-plugin "* | *" libcc1 "* | *" gdbserver "*)
     # When these are to be built as shared libraries, the same applies to
     # libiberty.
     extra_host_libiberty_configure_flags=--enable-shared
     ;;
+esac
+AC_SUBST(extra_host_libiberty_configure_flags)
+
+# Sometimes we have special requirements for the host zlib.
+extra_host_zlib_configure_flags=
+case " $configdirs " in
   *" bfd "*)
     # When bfd is to be built as a shared library, the same applies to
     # zlib.
@@ -2470,7 +2412,6 @@ case " $configdirs " in
     fi
     ;;
 esac
-AC_SUBST(extra_host_libiberty_configure_flags)
 AC_SUBST(extra_host_zlib_configure_flags)
 
 # Produce a warning message for the subdirs we can't configure.
@@ -3452,6 +3393,17 @@ case "${target}" in
   mep*)
     FLAGS_FOR_TARGET="$FLAGS_FOR_TARGET -mlibrary"
     ;;
+  # The VxWorks support for shared libraries is getting in
+  # incrementally.  Make sure it doesn't get activated implicitly:
+  *vxworks*)
+    if test "${enable_shared-unset}" = unset ; then
+      enable_shared=no
+      # So the build of libraries knows ...
+      target_configargs="${target_configargs} --disable-shared"
+      # So gcc knows ...
+      host_configargs="${host_configargs} --disable-shared"
+    fi
+    ;;
 esac
 
 # Makefile fragments.
@@ -3783,7 +3735,6 @@ AC_SUBST(stage2_werror_flag)
 compare_exclusions="gcc/cc*-checksum\$(objext) | gcc/ada/*tools/*"
 case "$target" in
   hppa*64*-*-hpux*) ;;
-  hppa*-*-hpux*) compare_exclusions="$compare_exclusions | */libgcc/lib2funcs* | gcc/function-tests.o" ;;
   powerpc*-ibm-aix*) compare_exclusions="$compare_exclusions | *libgomp*\$(objext)" ;;
 esac
 AC_SUBST(compare_exclusions)

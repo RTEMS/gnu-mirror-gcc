@@ -264,10 +264,8 @@ expand_widen_pattern_expr (sepops ops, rtx op0, rtx op1, rtx wide_op,
   bool sbool = false;
 
   oprnd0 = ops->op0;
-  if (nops >= 2)
-    oprnd1 = ops->op1;
-  if (nops >= 3)
-    oprnd2 = ops->op2;
+  oprnd1 = nops >= 2 ? ops->op1 : NULL_TREE;
+  oprnd2 = nops >= 3 ? ops->op2 : NULL_TREE;
 
   tmode0 = TYPE_MODE (TREE_TYPE (oprnd0));
   if (ops->code == VEC_UNPACK_FIX_TRUNC_HI_EXPR
@@ -1106,8 +1104,9 @@ expand_doubleword_mod (machine_mode mode, rtx op0, rtx op1, bool unsignedp)
 		return NULL_RTX;
 	    }
 	}
-      rtx remainder = expand_divmod (1, TRUNC_MOD_EXPR, word_mode, sum,
-				     gen_int_mode (INTVAL (op1), word_mode),
+      rtx remainder = expand_divmod (1, TRUNC_MOD_EXPR, word_mode, NULL, NULL,
+				     sum, gen_int_mode (INTVAL (op1),
+							word_mode),
 				     NULL_RTX, 1, OPTAB_DIRECT);
       if (remainder == NULL_RTX)
 	return NULL_RTX;
@@ -1210,8 +1209,8 @@ expand_doubleword_divmod (machine_mode mode, rtx op0, rtx op1, rtx *rem,
 
   if (op11 != const1_rtx)
     {
-      rtx rem2 = expand_divmod (1, TRUNC_MOD_EXPR, mode, quot1, op11,
-				NULL_RTX, unsignedp, OPTAB_DIRECT);
+      rtx rem2 = expand_divmod (1, TRUNC_MOD_EXPR, mode, NULL, NULL, quot1,
+				op11, NULL_RTX, unsignedp, OPTAB_DIRECT);
       if (rem2 == NULL_RTX)
 	return NULL_RTX;
 
@@ -1225,8 +1224,8 @@ expand_doubleword_divmod (machine_mode mode, rtx op0, rtx op1, rtx *rem,
       if (rem2 == NULL_RTX)
 	return NULL_RTX;
 
-      rtx quot2 = expand_divmod (0, TRUNC_DIV_EXPR, mode, quot1, op11,
-				 NULL_RTX, unsignedp, OPTAB_DIRECT);
+      rtx quot2 = expand_divmod (0, TRUNC_DIV_EXPR, mode, NULL, NULL, quot1,
+				 op11, NULL_RTX, unsignedp, OPTAB_DIRECT);
       if (quot2 == NULL_RTX)
 	return NULL_RTX;
 
@@ -4346,11 +4345,16 @@ can_vec_set_var_idx_p (machine_mode vec_mode)
     return false;
 
   machine_mode inner_mode = GET_MODE_INNER (vec_mode);
+
   rtx reg1 = alloca_raw_REG (vec_mode, LAST_VIRTUAL_REGISTER + 1);
   rtx reg2 = alloca_raw_REG (inner_mode, LAST_VIRTUAL_REGISTER + 2);
-  rtx reg3 = alloca_raw_REG (VOIDmode, LAST_VIRTUAL_REGISTER + 3);
 
   enum insn_code icode = optab_handler (vec_set_optab, vec_mode);
+
+  const struct insn_data_d *data = &insn_data[icode];
+  machine_mode idx_mode = data->operand[2].mode;
+
+  rtx reg3 = alloca_raw_REG (idx_mode, LAST_VIRTUAL_REGISTER + 3);
 
   return icode != CODE_FOR_nothing && insn_operand_matches (icode, 0, reg1)
 	 && insn_operand_matches (icode, 1, reg2)
@@ -4386,7 +4390,6 @@ prepare_cmp_insn (rtx x, rtx y, enum rtx_code comparison, rtx size,
   machine_mode mode = *pmode;
   rtx libfunc, test;
   machine_mode cmp_mode;
-  enum mode_class mclass;
 
   /* The other methods are not needed.  */
   gcc_assert (methods == OPTAB_DIRECT || methods == OPTAB_WIDEN
@@ -4492,9 +4495,8 @@ prepare_cmp_insn (rtx x, rtx y, enum rtx_code comparison, rtx size,
       return;
     }
 
-  mclass = GET_MODE_CLASS (mode);
   test = gen_rtx_fmt_ee (comparison, VOIDmode, x, y);
-  FOR_EACH_MODE_FROM (cmp_mode, mode)
+  FOR_EACH_WIDER_MODE_FROM (cmp_mode, mode)
     {
       enum insn_code icode;
       icode = optab_handler (cbranch_optab, cmp_mode);
@@ -4517,7 +4519,7 @@ prepare_cmp_insn (rtx x, rtx y, enum rtx_code comparison, rtx size,
 	  delete_insns_since (last);
 	}
 
-      if (methods == OPTAB_DIRECT || !CLASS_HAS_WIDER_MODES_P (mclass))
+      if (methods == OPTAB_DIRECT)
 	break;
     }
 
@@ -4713,7 +4715,7 @@ prepare_float_lib_cmp (rtx x, rtx y, enum rtx_code comparison,
   bool reversed_p = false;
   scalar_int_mode cmp_mode = targetm.libgcc_cmp_return_mode ();
 
-  FOR_EACH_MODE_FROM (mode, orig_mode)
+  FOR_EACH_WIDER_MODE_FROM (mode, orig_mode)
     {
       if (code_to_optab (comparison)
 	  && (libfunc = optab_libfunc (code_to_optab (comparison), mode)))
@@ -5830,7 +5832,8 @@ expand_sfix_optab (rtx to, rtx from, convert_optab tab)
   FOR_EACH_MODE_FROM (fmode, GET_MODE (from))
     FOR_EACH_MODE_FROM (imode, GET_MODE (to))
       {
-	icode = convert_optab_handler (tab, imode, fmode);
+	icode = convert_optab_handler (tab, imode, fmode,
+				       insn_optimization_type ());
 	if (icode != CODE_FOR_nothing)
 	  {
 	    rtx_insn *last = get_last_insn ();
@@ -6250,7 +6253,10 @@ expand_vec_perm_const (machine_mode mode, rtx v0, rtx v1,
       if (single_arg_p)
 	v1 = v0;
 
-      if (targetm.vectorize.vec_perm_const (mode, target, v0, v1, indices))
+      gcc_checking_assert (GET_MODE (v0) == GET_MODE (v1));
+      machine_mode op_mode = GET_MODE (v0);
+      if (targetm.vectorize.vec_perm_const (mode, op_mode, target, v0, v1,
+					    indices))
 	return target;
     }
 
@@ -6264,7 +6270,7 @@ expand_vec_perm_const (machine_mode mode, rtx v0, rtx v1,
       v0_qi = gen_lowpart (qimode, v0);
       v1_qi = gen_lowpart (qimode, v1);
       if (targetm.vectorize.vec_perm_const != NULL
-	  && targetm.vectorize.vec_perm_const (qimode, target_qi, v0_qi,
+	  && targetm.vectorize.vec_perm_const (qimode, qimode, target_qi, v0_qi,
 					       v1_qi, qimode_indices))
 	return gen_lowpart (mode, target_qi);
     }
@@ -7956,6 +7962,8 @@ maybe_gen_insn (enum insn_code icode, unsigned int nops,
 
   switch (nops)
     {
+    case 0:
+      return GEN_FCN (icode) ();
     case 1:
       return GEN_FCN (icode) (ops[0].value);
     case 2:

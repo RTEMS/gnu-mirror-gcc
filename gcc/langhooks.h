@@ -128,9 +128,6 @@ struct lang_hooks_for_types
      firstprivate variables.  */
   void (*omp_firstprivatize_type_sizes) (struct gimplify_omp_ctx *, tree);
 
-  /* Return true if TYPE is a mappable type.  */
-  bool (*omp_mappable_type) (tree type);
-
   /* Return TRUE if TYPE1 and TYPE2 are identical for type hashing purposes.
      Called only after doing all language independent checks.
      At present, this function is only called when both TYPE1 and TYPE2 are
@@ -639,6 +636,12 @@ struct lang_hooks
 
   /* Invoked before the early_finish debug hook is invoked.  */
   void (*finalize_early_debug) (void);
+
+  /* Get a value for the SARIF v2.1.0 "artifact.sourceLanguage" property
+     for FILENAME, or return NULL.
+     See SARIF v2.1.0 Appendix J for suggested values for common programming
+     languages.  */
+  const char *(*get_sarif_source_language) (const char *filename);
 
   /* Whenever you add entries here, make sure you adjust langhooks-def.h
      and langhooks.cc accordingly.  */

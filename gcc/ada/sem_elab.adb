@@ -64,6 +64,7 @@ with Table;
 with Tbuild;         use Tbuild;
 with Uintp;          use Uintp;
 with Uname;          use Uname;
+with Warnsw;         use Warnsw;
 
 with GNAT;                 use GNAT;
 with GNAT.Dynamic_HTables; use GNAT.Dynamic_HTables;
@@ -1809,11 +1810,6 @@ package body Sem_Elab is
       --  Determine whether arbitrary entity Id denotes a partial invariant
       --  procedure.
 
-      function Is_Postconditions_Proc (Id : Entity_Id) return Boolean;
-      pragma Inline (Is_Postconditions_Proc);
-      --  Determine whether arbitrary entity Id denotes internally generated
-      --  routine _Postconditions.
-
       function Is_Preelaborated_Unit (Id : Entity_Id) return Boolean;
       pragma Inline (Is_Preelaborated_Unit);
       --  Determine whether arbitrary entity Id denotes a unit which is subject
@@ -2480,14 +2476,6 @@ package body Sem_Elab is
 
          elsif Is_Partial_Invariant_Proc (Subp_Id) then
             null;
-
-         --  _Postconditions
-
-         elsif Is_Postconditions_Proc (Subp_Id) then
-            Output_Verification_Call
-              (Pred    => "postconditions",
-               Id      => Find_Enclosing_Scope (Call),
-               Id_Kind => "subprogram");
 
          --  Subprograms must come last because some of the previous cases fall
          --  under this category.
@@ -3339,7 +3327,9 @@ package body Sem_Elab is
                Traverse_List (Else_Actions (Scen));
 
             elsif Nkind (Scen) in
-                    N_Component_Association | N_Iterated_Component_Association
+                    N_Component_Association
+                  | N_Iterated_Component_Association
+                  | N_Iterated_Element_Association
             then
                Traverse_List (Loop_Actions (Scen));
 
@@ -4958,7 +4948,7 @@ package body Sem_Elab is
          then
             Error_Msg_Name_1 := Attribute_Name (Attr);
             Error_Msg_NE
-              ("??% attribute of & before body seen", Attr, Subp_Id);
+              ("?.f?% attribute of & before body seen", Attr, Subp_Id);
             Error_Msg_N ("\possible Program_Error on later references", Attr);
 
             Output_Active_Scenarios (Attr, New_In_State);
@@ -6635,14 +6625,6 @@ package body Sem_Elab is
 
             elsif Is_Partial_Invariant_Proc (Subp_Id) then
                null;
-
-            --  _Postconditions
-
-            elsif Is_Postconditions_Proc (Subp_Id) then
-               Info_Verification_Call
-                 (Pred    => "postconditions",
-                  Id      => Find_Enclosing_Scope (Call),
-                  Id_Kind => "subprogram");
 
             --  Subprograms must come last because some of the previous cases
             --  fall under this category.
@@ -13089,10 +13071,6 @@ package body Sem_Elab is
            (Extra : out Entity_Id;
             Kind  : out Invocation_Kind)
          is
-            Targ_Rep  : constant Target_Rep_Id :=
-                          Target_Representation_Of (Targ_Id, In_State);
-            Spec_Decl : constant Node_Id := Spec_Declaration (Targ_Rep);
-
          begin
             --  Accept within a task body
 
@@ -13177,12 +13155,6 @@ package body Sem_Elab is
             then
                Extra := First_Formal_Type (Targ_Id);
                Kind  := Invariant_Verification;
-
-            --  Postcondition verification
-
-            elsif Is_Postconditions_Proc (Targ_Id) then
-               Extra := Find_Enclosing_Scope (Spec_Decl);
-               Kind  := Postcondition_Verification;
 
             --  Protected entry call
 
@@ -14452,8 +14424,7 @@ package body Sem_Elab is
            Is_Default_Initial_Condition_Proc (Id)
              or else Is_Initial_Condition_Proc (Id)
              or else Is_Invariant_Proc (Id)
-             or else Is_Partial_Invariant_Proc (Id)
-             or else Is_Postconditions_Proc (Id);
+             or else Is_Partial_Invariant_Proc (Id);
       end Is_Assertion_Pragma_Target;
 
       ----------------------------
@@ -14495,7 +14466,6 @@ package body Sem_Elab is
            Is_Accept_Alternative_Proc (Id)
              or else Is_Finalizer_Proc (Id)
              or else Is_Partial_Invariant_Proc (Id)
-             or else Is_Postconditions_Proc (Id)
              or else Is_TSS (Id, TSS_Deep_Adjust)
              or else Is_TSS (Id, TSS_Deep_Finalize)
              or else Is_TSS (Id, TSS_Deep_Initialize);
@@ -14650,18 +14620,6 @@ package body Sem_Elab is
            Ekind (Id) = E_Procedure
              and then Is_Partial_Invariant_Procedure (Id);
       end Is_Partial_Invariant_Proc;
-
-      ----------------------------
-      -- Is_Postconditions_Proc --
-      ----------------------------
-
-      function Is_Postconditions_Proc (Id : Entity_Id) return Boolean is
-      begin
-         --  To qualify, the entity must denote a _Postconditions procedure
-
-         return
-           Ekind (Id) = E_Procedure and then Chars (Id) = Name_uPostconditions;
-      end Is_Postconditions_Proc;
 
       ---------------------------
       -- Is_Preelaborated_Unit --
@@ -17480,7 +17438,7 @@ package body Sem_Elab is
 
       if Nkind (N) = N_Procedure_Call_Statement
         and then Is_Entity_Name (Name (N))
-        and then Chars (Entity (Name (N))) = Name_uPostconditions
+        and then Chars (Entity (Name (N))) = Name_uWrapped_Statements
       then
          return;
       end if;
@@ -18765,9 +18723,9 @@ package body Sem_Elab is
                      T : constant Entity_Id := Etype (First_Formal (E));
                   begin
                      if Is_Controlled (T) then
-                        if Warnings_Off (T)
+                        if Has_Warnings_Off (T)
                           or else (Ekind (T) = E_Private_Type
-                                    and then Warnings_Off (Full_View (T)))
+                                    and then Has_Warnings_Off (Full_View (T)))
                         then
                            goto Output;
                         end if;
@@ -18910,18 +18868,16 @@ package body Sem_Elab is
 
       procedure Collect_Tasks (Decls : List_Id) is
       begin
-         if Present (Decls) then
-            Decl := First (Decls);
-            while Present (Decl) loop
-               if Nkind (Decl) = N_Object_Declaration
-                 and then Has_Task (Etype (Defining_Identifier (Decl)))
-               then
-                  Add_Task_Proc (Etype (Defining_Identifier (Decl)));
-               end if;
+         Decl := First (Decls);
+         while Present (Decl) loop
+            if Nkind (Decl) = N_Object_Declaration
+              and then Has_Task (Etype (Defining_Identifier (Decl)))
+            then
+               Add_Task_Proc (Etype (Defining_Identifier (Decl)));
+            end if;
 
-               Next (Decl);
-            end loop;
-         end if;
+            Next (Decl);
+         end loop;
       end Collect_Tasks;
 
       ----------------

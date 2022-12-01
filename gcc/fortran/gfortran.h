@@ -222,11 +222,12 @@ enum gfc_intrinsic_op
    Assumptions are made about the numbering of the interface_op enums.  */
 #define GFC_INTRINSIC_OPS GFC_INTRINSIC_END
 
-/* Arithmetic results.  */
+/* Arithmetic results.  ARITH_NOT_REDUCED is used to keep track of expressions
+   that were not reduced by the arithmetic evaluation code.  */
 enum arith
 { ARITH_OK = 1, ARITH_OVERFLOW, ARITH_UNDERFLOW, ARITH_NAN,
   ARITH_DIV0, ARITH_INCOMMENSURATE, ARITH_ASYMMETRIC, ARITH_PROHIBIT,
-  ARITH_WRONGCONCAT
+  ARITH_WRONGCONCAT, ARITH_INVALID_TYPE, ARITH_NOT_REDUCED
 };
 
 /* Statements.  */
@@ -316,7 +317,9 @@ enum gfc_statement
   ST_OMP_END_PARALLEL_MASKED_TASKLOOP_SIMD, ST_OMP_MASKED_TASKLOOP,
   ST_OMP_END_MASKED_TASKLOOP, ST_OMP_MASKED_TASKLOOP_SIMD,
   ST_OMP_END_MASKED_TASKLOOP_SIMD, ST_OMP_SCOPE, ST_OMP_END_SCOPE,
-  ST_OMP_ERROR, ST_NONE
+  ST_OMP_ERROR, ST_OMP_ASSUME, ST_OMP_END_ASSUME, ST_OMP_ASSUMES,
+  /* Note: gfc_match_omp_nothing returns ST_NONE. */
+  ST_OMP_NOTHING, ST_NONE
 };
 
 /* Types of interfaces that we can have.  Assignment interfaces are
@@ -1265,7 +1268,7 @@ enum gfc_omp_reduction_op
   OMP_REDUCTION_USER
 };
 
-enum gfc_omp_depend_op
+enum gfc_omp_depend_doacross_op
 {
   OMP_DEPEND_UNSET,
   OMP_DEPEND_IN,
@@ -1275,7 +1278,8 @@ enum gfc_omp_depend_op
   OMP_DEPEND_MUTEXINOUTSET,
   OMP_DEPEND_DEPOBJ,
   OMP_DEPEND_SINK_FIRST,
-  OMP_DEPEND_SINK
+  OMP_DOACROSS_SINK_FIRST,
+  OMP_DOACROSS_SINK
 };
 
 enum gfc_omp_map_op
@@ -1343,9 +1347,13 @@ typedef struct gfc_omp_namelist
   union
     {
       gfc_omp_reduction_op reduction_op;
-      gfc_omp_depend_op depend_op;
+      gfc_omp_depend_doacross_op depend_doacross_op;
       gfc_omp_map_op map_op;
-      gfc_omp_linear_op linear_op;
+      struct
+	{
+	  ENUM_BITFIELD (gfc_omp_linear_op) op:4;
+	  bool old_modifier;
+	} linear;
       struct gfc_common_head *common;
       bool lastprivate_conditional;
     } u;
@@ -1395,6 +1403,7 @@ enum
   OMP_LIST_NONTEMPORAL,
   OMP_LIST_ALLOCATE,
   OMP_LIST_HAS_DEVICE_ADDR,
+  OMP_LIST_ENTER,
   OMP_LIST_NUM /* Must be the last.  */
 };
 
@@ -1500,6 +1509,18 @@ enum gfc_omp_bind_type
   OMP_BIND_THREAD
 };
 
+typedef struct gfc_omp_assumptions
+{
+  int n_absent, n_contains;
+  enum gfc_statement *absent, *contains;
+  gfc_expr_list *holds;
+  bool no_openmp:1, no_openmp_routines:1, no_parallelism:1;
+}
+gfc_omp_assumptions;
+
+#define gfc_get_omp_assumptions() XCNEW (gfc_omp_assumptions)
+
+
 typedef struct gfc_omp_clauses
 {
   gfc_omp_namelist *lists[OMP_LIST_NUM];
@@ -1523,6 +1544,7 @@ typedef struct gfc_omp_clauses
   struct gfc_expr *if_exprs[OMP_IF_LAST];
   struct gfc_expr *dist_chunk_size;
   struct gfc_expr *message;
+  struct gfc_omp_assumptions *assume;
   const char *critical_name;
   enum gfc_omp_default_sharing default_sharing;
   enum gfc_omp_atomic_op atomic_op;
@@ -1531,17 +1553,17 @@ typedef struct gfc_omp_clauses
   unsigned nowait:1, ordered:1, untied:1, mergeable:1, ancestor:1;
   unsigned inbranch:1, notinbranch:1, nogroup:1;
   unsigned sched_simd:1, sched_monotonic:1, sched_nonmonotonic:1;
-  unsigned simd:1, threads:1, depend_source:1, destroy:1, order_concurrent:1;
+  unsigned simd:1, threads:1, doacross_source:1, depend_source:1, destroy:1;
   unsigned order_unconstrained:1, order_reproducible:1, capture:1;
   unsigned grainsize_strict:1, num_tasks_strict:1, compare:1, weak:1;
-  unsigned non_rectangular:1;
+  unsigned non_rectangular:1, order_concurrent:1;
   ENUM_BITFIELD (gfc_omp_sched_kind) sched_kind:3;
   ENUM_BITFIELD (gfc_omp_device_type) device_type:2;
   ENUM_BITFIELD (gfc_omp_memorder) memorder:3;
   ENUM_BITFIELD (gfc_omp_memorder) fail:3;
   ENUM_BITFIELD (gfc_omp_cancel_kind) cancel:3;
   ENUM_BITFIELD (gfc_omp_proc_bind_kind) proc_bind:3;
-  ENUM_BITFIELD (gfc_omp_depend_op) depobj_update:4;
+  ENUM_BITFIELD (gfc_omp_depend_doacross_op) depobj_update:4;
   ENUM_BITFIELD (gfc_omp_bind_type) bind:2;
   ENUM_BITFIELD (gfc_omp_at_type) at:2;
   ENUM_BITFIELD (gfc_omp_severity_type) severity:2;
@@ -2139,6 +2161,9 @@ typedef struct gfc_namespace
   /* Linked list of !$omp declare variant constructs.  */
   struct gfc_omp_declare_variant *omp_declare_variant;
 
+  /* OpenMP assumptions.  */
+  struct gfc_omp_assumptions *omp_assumes;
+
   /* A hash set for the gfc expressions that have already
      been finalized in this namespace.  */
 
@@ -2664,6 +2689,9 @@ typedef struct
   unsigned int c_double : 1;
   unsigned int c_long_double : 1;
   unsigned int c_float128 : 1;
+  /* True if for _Float128 C2X IEC 60559 *f128 APIs should be used
+     instead of libquadmath *q APIs.  */
+  unsigned int use_iec_60559 : 1;
 }
 gfc_real_info;
 
@@ -2904,7 +2932,7 @@ enum gfc_exec_op
   EXEC_OMP_ORDERED, EXEC_OMP_PARALLEL, EXEC_OMP_PARALLEL_DO,
   EXEC_OMP_PARALLEL_SECTIONS, EXEC_OMP_PARALLEL_WORKSHARE,
   EXEC_OMP_SECTIONS, EXEC_OMP_SINGLE, EXEC_OMP_WORKSHARE,
-  EXEC_OMP_ATOMIC, EXEC_OMP_BARRIER, EXEC_OMP_END_NOWAIT,
+  EXEC_OMP_ASSUME, EXEC_OMP_ATOMIC, EXEC_OMP_BARRIER, EXEC_OMP_END_NOWAIT,
   EXEC_OMP_END_SINGLE, EXEC_OMP_TASK, EXEC_OMP_TASKWAIT,
   EXEC_OMP_TASKYIELD, EXEC_OMP_CANCEL, EXEC_OMP_CANCELLATION_POINT,
   EXEC_OMP_TASKGROUP, EXEC_OMP_SIMD, EXEC_OMP_DO_SIMD,
@@ -3179,7 +3207,6 @@ int gfc_at_eof (void);
 int gfc_at_bol (void);
 int gfc_at_eol (void);
 void gfc_advance_line (void);
-int gfc_check_include (void);
 int gfc_define_undef_line (void);
 
 int gfc_wide_is_printable (gfc_char_t);
@@ -3567,6 +3594,7 @@ void gfc_free_omp_declare_simd (gfc_omp_declare_simd *);
 void gfc_free_omp_declare_simd_list (gfc_omp_declare_simd *);
 void gfc_free_omp_udr (gfc_omp_udr *);
 gfc_omp_udr *gfc_omp_udr_find (gfc_symtree *, gfc_typespec *);
+void gfc_resolve_omp_assumptions (gfc_omp_assumptions *);
 void gfc_resolve_omp_directive (gfc_code *, gfc_namespace *);
 void gfc_resolve_do_iterator (gfc_code *, gfc_symbol *, bool);
 void gfc_resolve_omp_local_vars (gfc_namespace *);

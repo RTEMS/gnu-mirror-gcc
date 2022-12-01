@@ -63,17 +63,13 @@ enum SCOPE
     free          = 0x8000,   /// is on free list
 
     fullinst      = 0x10000,  /// fully instantiate templates
-
-    // The following are mutually exclusive
-    printf        = 0x4_0000, /// printf-style function
-    scanf         = 0x8_0000, /// scanf-style function
 }
 
 /// Flags that are carried along with a scope push()
 private enum PersistentFlags =
     SCOPE.contract | SCOPE.debug_ | SCOPE.ctfe | SCOPE.compile | SCOPE.constraint |
     SCOPE.noaccesscheck | SCOPE.ignoresymbolvisibility |
-    SCOPE.printf | SCOPE.scanf | SCOPE.Cfile;
+    SCOPE.Cfile;
 
 struct Scope
 {
@@ -754,7 +750,6 @@ struct Scope
             //    assert(0);
         }
     }
-
     /******************************
      */
     structalign_t alignment()
@@ -771,13 +766,13 @@ struct Scope
             return sa;
         }
     }
-
+    @safe @nogc pure nothrow const:
     /**********************************
     * Checks whether the current scope (or any of its parents) is deprecated.
     *
     * Returns: `true` if this or any parent scope is deprecated, `false` otherwise`
     */
-    extern(C++) bool isDeprecated() @safe @nogc pure nothrow const
+    extern(C++) bool isDeprecated()
     {
         for (const(Dsymbol)* sp = &(this.parent); *sp; sp = &(sp.parent))
         {
@@ -798,5 +793,17 @@ struct Scope
             return true;
         }
         return false;
+    }
+    /**
+     * dmd relies on mutation of state during semantic analysis, however
+     * sometimes semantic is being performed in a speculative context that should
+     * not have any visible effect on the rest of the compilation: for example when compiling
+     * a typeof() or __traits(compiles).
+     *
+     * Returns: `true` if this `Scope` is known to be from one of these speculative contexts
+     */
+    extern(C++) bool isFromSpeculativeSemanticContext() scope
+    {
+        return this.intypeof || this.flags & SCOPE.compile;
     }
 }

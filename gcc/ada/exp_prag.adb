@@ -58,6 +58,7 @@ with Stand;          use Stand;
 with Tbuild;         use Tbuild;
 with Uintp;          use Uintp;
 with Validsw;        use Validsw;
+with Warnsw;         use Warnsw;
 
 package body Exp_Prag is
 
@@ -105,12 +106,10 @@ package body Exp_Prag is
          end if;
       end loop;
 
-      if Present (Arg)
-        and then Nkind (Arg) = N_Pragma_Argument_Association
-      then
-         return Expression (Arg);
+      if Present (Arg) then
+         return Get_Pragma_Arg (Arg);
       else
-         return Arg;
+         return Empty;
       end if;
    end Arg_N;
 
@@ -455,6 +454,8 @@ package body Exp_Prag is
                            New_Occurrence_Of (RTE (RE_Assert_Failure),
                                                                    Loc))))))));
 
+         Set_Comes_From_Check_Or_Contract (N);
+
       --  Case where we call the procedure
 
       else
@@ -543,6 +544,8 @@ package body Exp_Prag is
                  Name                   =>
                    New_Occurrence_Of (RTE (RE_Raise_Assert_Failure), Loc),
                  Parameter_Associations => New_List (Relocate_Node (Msg))))));
+
+         Set_Comes_From_Check_Or_Contract (N);
       end if;
 
       Analyze (N);
@@ -1435,6 +1438,8 @@ package body Exp_Prag is
                 Condition       => Cond,
                 Then_Statements => New_List (Error));
 
+            Set_Comes_From_Check_Or_Contract (Checks);
+
          else
             if No (Elsif_Parts (Checks)) then
                Set_Elsif_Parts (Checks, New_List);
@@ -1644,6 +1649,8 @@ package body Exp_Prag is
                 Condition       => New_Occurrence_Of (Flag, Loc),
                 Then_Statements => Eval_Stmts);
 
+            Set_Comes_From_Check_Or_Contract (Evals);
+
          --  Otherwise generate:
          --    elsif Flag then
          --       <evaluation statements>
@@ -1838,6 +1845,8 @@ package body Exp_Prag is
                   Set (Flag),
                   Increment (Count)));
 
+            Set_Comes_From_Check_Or_Contract (If_Stmt);
+
             Append_To (Decls, If_Stmt);
             Analyze (If_Stmt);
 
@@ -1906,6 +1915,8 @@ package body Exp_Prag is
               Right_Opnd => Make_Integer_Literal (Loc, 0)),
           Then_Statements => CG_Stmts);
 
+      Set_Comes_From_Check_Or_Contract (CG_Checks);
+
       --  Detect a possible failure due to several case guards evaluating to
       --  True.
 
@@ -1939,15 +1950,17 @@ package body Exp_Prag is
                            New_Occurrence_Of (Msg_Str, Loc))))))))));
       end if;
 
+      --  Append the checks, but do not analyze them at this point, because
+      --  contracts get potentially expanded as part of a wrapper which gets
+      --  fully analyzed once it is fully formed.
+
       Append_To (Decls, CG_Checks);
-      Analyze (CG_Checks);
 
       --  Once all case guards are evaluated and checked, evaluate any prefixes
       --  of attribute 'Old founds in the selected consequence.
 
       if Present (Old_Evals) then
          Append_To (Decls, Old_Evals);
-         Analyze (Old_Evals);
       end if;
 
       --  Raise Assertion_Error when the corresponding consequence of a case

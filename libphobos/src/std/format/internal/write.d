@@ -1337,7 +1337,7 @@ if (is(StringTypeOf!T) && !is(StaticArrayTypeOf!T) && !is(T == enum) && !hasToSt
 /*
     Static-size arrays are formatted as dynamic arrays.
  */
-void formatValueImpl(Writer, T, Char)(auto ref Writer w, auto ref const(T) obj,
+void formatValueImpl(Writer, T, Char)(auto ref Writer w, auto ref T obj,
     scope const ref FormatSpec!Char f)
 if (is(StaticArrayTypeOf!T) && !is(T == enum) && !hasToString!(T, Char))
 {
@@ -1782,13 +1782,13 @@ void formatChar(Writer)(ref Writer w, in dchar c, in char quote)
     Associative arrays are formatted by using `':'` and $(D ", ") as
     separators, and enclosed by `'['` and `']'`.
  */
-void formatValueImpl(Writer, T, Char)(auto ref Writer w, const(T) obj, scope const ref FormatSpec!Char f)
+void formatValueImpl(Writer, T, Char)(auto ref Writer w, T obj, scope const ref FormatSpec!Char f)
 if (is(AssocArrayTypeOf!T) && !is(T == enum) && !hasToString!(T, Char))
 {
     import std.format : enforceFmt, formatValue;
     import std.range.primitives : put;
 
-    AssocArrayTypeOf!(const(T)) val = obj;
+    AssocArrayTypeOf!T val = obj;
     const spec = f.spec;
 
     enforceFmt(spec == 's' || spec == '(',
@@ -3017,33 +3017,31 @@ if (is(T == enum))
     import std.array : appender;
     import std.range.primitives : put;
 
-    if (f.spec == 's')
+    if (f.spec != 's')
+        return formatValueImpl(w, cast(OriginalType!T) val, f);
+
+    static foreach (e; EnumMembers!T)
     {
-        foreach (i, e; EnumMembers!T)
+        if (val == e)
         {
-            if (val == e)
-            {
-                formatValueImpl(w, __traits(allMembers, T)[i], f);
-                return;
-            }
+            formatValueImpl(w, __traits(identifier, e), f);
+            return;
         }
-
-        auto w2 = appender!string();
-
-        // val is not a member of T, output cast(T) rawValue instead.
-        put(w2, "cast(");
-        put(w2, T.stringof);
-        put(w2, ")");
-        static assert(!is(OriginalType!T == T), "OriginalType!" ~ T.stringof ~
-            "must not be equal to " ~ T.stringof);
-
-        FormatSpec!Char f2 = f;
-        f2.width = 0;
-        formatValueImpl(w2, cast(OriginalType!T) val, f2);
-        writeAligned(w, w2.data, f);
-        return;
     }
-    formatValueImpl(w, cast(OriginalType!T) val, f);
+
+    auto w2 = appender!string();
+
+    // val is not a member of T, output cast(T) rawValue instead.
+    put(w2, "cast(");
+    put(w2, T.stringof);
+    put(w2, ")");
+    static assert(!is(OriginalType!T == T), "OriginalType!" ~ T.stringof ~
+                  "must not be equal to " ~ T.stringof);
+
+    FormatSpec!Char f2 = f;
+    f2.width = 0;
+    formatValueImpl(w2, cast(OriginalType!T) val, f2);
+    writeAligned(w, w2.data, f);
 }
 
 @safe unittest

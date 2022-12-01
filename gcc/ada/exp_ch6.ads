@@ -121,27 +121,23 @@ package Exp_Ch6 is
    --  The returned node is the root of the procedure body which will replace
    --  the original function body, which is not needed for the C program.
 
+   function Has_BIP_Extra_Formal
+     (E              : Entity_Id;
+      Kind           : BIP_Formal_Kind;
+      Must_Be_Frozen : Boolean := True) return Boolean;
+   --  Given a subprogram, subprogram type, entry or entry family, return True
+   --  if E has the BIP extra formal associated with Kind. In general this
+   --  subprogram must be invoked with a frozen entity or a subprogram type of
+   --  a dispatching call since we can only rely on the availability of extra
+   --  formals on these entities; this requirement can be relaxed using the
+   --  formal Must_Be_Frozen in scenarios where we know that the entity has
+   --  the extra formals.
+
    procedure Install_Class_Preconditions_Check (Call_Node : Node_Id);
    --  Install check of class-wide preconditions on the caller.
 
    function Is_Build_In_Place_Entity (E : Entity_Id) return Boolean;
    --  Ada 2005 (AI-318-02): Returns True if E is a BIP entity.
-
-   function Is_Build_In_Place_Result_Type (Typ : Entity_Id) return Boolean;
-   --  Ada 2005 (AI-318-02): Returns True if functions returning the type use
-   --  build-in-place protocols. For inherently limited types, this must be
-   --  True in >= Ada 2005, and must be False in Ada 95. For other types, it
-   --  can be True or False, and the decision should be based on efficiency,
-   --  and should be the same for all language versions, so that mixed-dialect
-   --  programs will work.
-   --
-   --  For inherently limited types in Ada 2005, True means that calls will
-   --  actually be build-in-place in all cases. For other types, build-in-place
-   --  will be used when possible, but we need to make a copy in some
-   --  cases. For example, for "X := F(...);" if F can see X, or if F can
-   --  propagate exceptions, we need to store its result in a temp in general,
-   --  and copy the temp into X. Also, for "return Global_Var;" Global_Var
-   --  needs to be copied into the function result object.
 
    function Is_Build_In_Place_Function (E : Entity_Id) return Boolean;
    --  Ada 2005 (AI-318-02): Returns True if E denotes a function, generic
@@ -153,7 +149,17 @@ package Exp_Ch6 is
    function Is_Build_In_Place_Function_Call (N : Node_Id) return Boolean;
    --  Ada 2005 (AI-318-02): Returns True if N denotes a call to a function
    --  that requires handling as a build-in-place call (possibly qualified or
-   --  converted).
+   --  converted); that is, BIP function calls, and calls to functions with
+   --  inherited BIP formals.
+
+   function Is_Build_In_Place_Result_Type (Typ : Entity_Id) return Boolean;
+   --  Ada 2005 (AI-318-02): Returns True if functions returning the type use
+   --  build-in-place protocols. For inherently limited types, this must be
+   --  True in >= Ada 2005 and must be False in Ada 95.
+
+   function Is_Build_In_Place_Return_Object (E : Entity_Id) return Boolean;
+   --  Ada 2005 (AI-318-02): Return True is E is a return object of a function
+   --  that uses build-in-place protocols.
 
    function Is_Null_Procedure (Subp : Entity_Id) return Boolean;
    --  Predicate to recognize stubbed procedures and null procedures, which
@@ -271,5 +277,13 @@ package Exp_Ch6 is
    --  an expression containing a call displacing the pointer to the BIP object
    --  to reference the secondary dispatch table of an interface; otherwise
    --  return Empty.
+
+   procedure Validate_Subprogram_Calls (N : Node_Id);
+   --  Check that the number of actuals (including extra actuals) of calls in
+   --  the subtree N match their corresponding formals; check also that the
+   --  names of BIP extra actuals and formals match.
+
+private
+   pragma Inline (Is_Build_In_Place_Return_Object);
 
 end Exp_Ch6;

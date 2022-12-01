@@ -160,7 +160,7 @@ class Child final : public Parent<T >
 {
 public:
     T childMember;
-    void parentVirtual();
+    void parentVirtual() override;
     T childFinal();
 };
 
@@ -219,9 +219,13 @@ struct ImportedBuffer final
 {
     typedef ActualBuffer Buffer;
     ActualBuffer buffer2;
-    ImportedBuffer()
+    ImportedBuffer() :
+        buffer2()
     {
     }
+    ImportedBuffer(ActualBuffer buffer2) :
+        buffer2(buffer2)
+        {}
 };
 ---
 */

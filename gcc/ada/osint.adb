@@ -1886,13 +1886,13 @@ package body Osint is
       end if;
 
       declare
-         Full_Name : String (1 .. Dir_Name'Length + Name'Length + 1);
+         Full_Name :
+           constant String (1 .. Dir_Name'Length + Name'Length + 1) :=
+           Dir_Name.all & Name & ASCII.NUL;
+         --  Use explicit bounds, because Dir_Name might be a substring whose
+         --  'First is not 1.
 
       begin
-         Full_Name (1 .. Dir_Name'Length) := Dir_Name.all;
-         Full_Name (Dir_Name'Length + 1 .. Full_Name'Last - 1) := Name;
-         Full_Name (Full_Name'Last) := ASCII.NUL;
-
          Attr.all := Unknown_Attributes;
 
          if not Is_Regular_File (Full_Name'Address, Attr) then
@@ -1904,10 +1904,8 @@ package body Osint is
             if Dir_Name'Length = 0 then
                Found := N;
             else
-               Name_Len := Full_Name'Length - 1;
-               Name_Buffer (1 .. Name_Len) :=
-                 Full_Name (1 .. Full_Name'Last - 1);
-               Found := Name_Find;
+               Found :=
+                 Name_Find (Full_Name (Full_Name'First .. Full_Name'Last - 1));
             end if;
          end if;
       end;

@@ -160,6 +160,7 @@ immutable Msgtable[] msgtable =
     { "xopEquals", "__xopEquals" },
     { "xopCmp", "__xopCmp" },
     { "xtoHash", "__xtoHash" },
+    { "__tmpfordtor" },
 
     { "LINE", "__LINE__" },
     { "FILE", "__FILE__" },
@@ -311,12 +312,16 @@ immutable Msgtable[] msgtable =
     { "__ArrayPostblit" },
     { "__ArrayDtor" },
     { "_d_delThrowable" },
+    { "_d_newThrowable" },
     { "_d_assert_fail" },
     { "dup" },
     { "_aaApply" },
     { "_aaApply2" },
     { "_d_arrayctor" },
     { "_d_arraysetctor" },
+    { "_d_arraysetassign" },
+    { "_d_arrayassign_l" },
+    { "_d_arrayassign_r" },
 
     // For pragma's
     { "Pinline", "inline" },
@@ -507,6 +512,7 @@ immutable Msgtable[] msgtable =
     { "wchar_t" },
 
     // for C compiler
+    { "ImportC", "__C" },
     { "__tag" },
     { "dllimport" },
     { "dllexport" },
@@ -523,6 +529,8 @@ immutable Msgtable[] msgtable =
     { "show" },
     { "push" },
     { "pop" },
+    { "define" },
+    { "undef" },
 ];
 
 

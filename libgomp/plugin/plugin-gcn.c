@@ -42,6 +42,7 @@
 #include <dlfcn.h>
 #include <signal.h>
 #include "libgomp-plugin.h"
+#include "config/gcn/libgomp-gcn.h"  /* For struct output.  */
 #include "gomp-constants.h"
 #include <elf.h>
 #include "oacc-plugin.h"
@@ -252,21 +253,7 @@ struct kernargs {
   int64_t arena_ptr;
 
   /* Output data.  */
-  struct output {
-    int return_value;
-    unsigned int next_output;
-    struct printf_data {
-      int written;
-      char msg[128];
-      int type;
-      union {
-	int64_t ivalue;
-	double dvalue;
-	char text[128];
-      };
-    } queue[1024];
-    unsigned int consumed;
-  } output_data;
+  struct output output_data;
 };
 
 /* A queue entry for a future asynchronous launch.  */
@@ -1931,6 +1918,15 @@ create_kernel_dispatch (struct kernel_info *kernel, int num_teams)
   return shadow;
 }
 
+static void
+process_reverse_offload (uint64_t fn, uint64_t mapnum, uint64_t hostaddrs,
+			 uint64_t sizes, uint64_t kinds, uint64_t dev_num64)
+{
+  int dev_num = dev_num64;
+  GOMP_PLUGIN_target_rev (fn, mapnum, hostaddrs, sizes, kinds, dev_num,
+			  NULL, NULL, NULL);
+}
+
 /* Output any data written to console output from the kernel.  It is expected
    that this function is polled during kernel execution.
 
@@ -1975,6 +1971,11 @@ console_output (struct kernel_info *kernel, struct kernargs *kernargs,
 	case 1: printf ("%.128s%f\n", data->msg, data->dvalue); break;
 	case 2: printf ("%.128s%.128s\n", data->msg, data->text); break;
 	case 3: printf ("%.128s%.128s", data->msg, data->text); break;
+	case 4:
+	  process_reverse_offload (data->value_u64[0], data->value_u64[1],
+				   data->value_u64[2], data->value_u64[3],
+				   data->value_u64[4], data->value_u64[5]);
+	  break;
 	default: printf ("GCN print buffer error!\n"); break;
 	}
       data->written = 0;
@@ -3221,10 +3222,14 @@ GOMP_OFFLOAD_version (void)
 /* Return the number of GCN devices on the system.  */
 
 int
-GOMP_OFFLOAD_get_num_devices (void)
+GOMP_OFFLOAD_get_num_devices (unsigned int omp_requires_mask)
 {
   if (!init_hsa_context ())
     return 0;
+  /* Return -1 if no omp_requires_mask cannot be fulfilled but
+     devices were present.  */
+  if (hsa_context.agent_count > 0 && omp_requires_mask != 0)
+    return -1;
   return hsa_context.agent_count;
 }
 
@@ -3342,11 +3347,14 @@ GOMP_OFFLOAD_init_device (int n)
 
 /* Load GCN object-code module described by struct gcn_image_desc in
    TARGET_DATA and return references to kernel descriptors in TARGET_TABLE.
-   If there are any constructors then run them.  */
+   If there are any constructors then run them.  If not NULL, REV_FN_TABLE will
+   contain the on-device addresses of the functions for reverse offload.  To be
+   freed by the caller.  */
 
 int
 GOMP_OFFLOAD_load_image (int ord, unsigned version, const void *target_data,
-			 struct addr_pair **target_table)
+			 struct addr_pair **target_table,
+			 uint64_t **rev_fn_table)
 {
   if (GOMP_VERSION_DEV (version) != GOMP_VERSION_GCN)
     {
@@ -3363,6 +3371,7 @@ GOMP_OFFLOAD_load_image (int ord, unsigned version, const void *target_data,
   struct kernel_info *kernel;
   int kernel_count = image_desc->kernel_count;
   unsigned var_count = image_desc->global_variable_count;
+  /* Currently, "others" is a struct of ICVS.  */
   int other_count = 1;
 
   agent = get_agent_info (ord);
@@ -3460,36 +3469,40 @@ GOMP_OFFLOAD_load_image (int ord, unsigned version, const void *target_data,
 	}
     }
 
-  GCN_DEBUG ("Looking for variable %s\n", XSTRING (GOMP_DEVICE_NUM_VAR));
+  GCN_DEBUG ("Looking for variable %s\n", XSTRING (GOMP_ADDITIONAL_ICVS));
 
   hsa_status_t status;
   hsa_executable_symbol_t var_symbol;
   status = hsa_fns.hsa_executable_get_symbol_fn (agent->executable, NULL,
-						 XSTRING (GOMP_DEVICE_NUM_VAR),
+						 XSTRING (GOMP_ADDITIONAL_ICVS),
 						 agent->id, 0, &var_symbol);
   if (status == HSA_STATUS_SUCCESS)
     {
-      uint64_t device_num_varptr;
-      uint32_t device_num_varsize;
+      uint64_t varptr;
+      uint32_t varsize;
 
       status = hsa_fns.hsa_executable_symbol_get_info_fn
 	(var_symbol, HSA_EXECUTABLE_SYMBOL_INFO_VARIABLE_ADDRESS,
-	 &device_num_varptr);
+	 &varptr);
       if (status != HSA_STATUS_SUCCESS)
 	hsa_fatal ("Could not extract a variable from its symbol", status);
       status = hsa_fns.hsa_executable_symbol_get_info_fn
 	(var_symbol, HSA_EXECUTABLE_SYMBOL_INFO_VARIABLE_SIZE,
-	 &device_num_varsize);
+	 &varsize);
       if (status != HSA_STATUS_SUCCESS)
-	hsa_fatal ("Could not extract a variable size from its symbol", status);
+	hsa_fatal ("Could not extract a variable size from its symbol",
+		   status);
 
-      pair->start = device_num_varptr;
-      pair->end = device_num_varptr + device_num_varsize;
+      pair->start = varptr;
+      pair->end = varptr + varsize;
     }
   else
-    /* The 'GOMP_DEVICE_NUM_VAR' variable was not in this image.  */
-    pair->start = pair->end = 0;
-  pair++;
+    {
+      /* The variable was not in this image.  */
+      GCN_DEBUG ("Variable not found in image: %s\n",
+		 XSTRING (GOMP_ADDITIONAL_ICVS));
+      pair->start = pair->end = 0;
+    }
 
   /* Ensure that constructors are run first.  */
   struct GOMP_kernel_launch_attributes kla =
@@ -3512,6 +3525,30 @@ GOMP_OFFLOAD_load_image (int ord, unsigned version, const void *target_data,
     kernel_count--;
   if (module->fini_array_func)
     kernel_count--;
+
+  if (rev_fn_table != NULL && kernel_count == 0)
+    *rev_fn_table = NULL;
+  else if (rev_fn_table != NULL)
+    {
+      hsa_status_t status;
+      hsa_executable_symbol_t var_symbol;
+      status = hsa_fns.hsa_executable_get_symbol_fn (agent->executable, NULL,
+						     ".offload_func_table",
+						     agent->id, 0, &var_symbol);
+      if (status != HSA_STATUS_SUCCESS)
+	hsa_fatal ("Could not find symbol for variable in the code object",
+		   status);
+      uint64_t fn_table_addr;
+      status = hsa_fns.hsa_executable_symbol_get_info_fn
+	(var_symbol, HSA_EXECUTABLE_SYMBOL_INFO_VARIABLE_ADDRESS,
+	 &fn_table_addr);
+      if (status != HSA_STATUS_SUCCESS)
+	hsa_fatal ("Could not extract a variable from its symbol", status);
+      *rev_fn_table = GOMP_PLUGIN_malloc (kernel_count * sizeof (uint64_t));
+      GOMP_OFFLOAD_dev2host (agent->device_id, *rev_fn_table,
+			     (void*) fn_table_addr,
+			     kernel_count * sizeof (uint64_t));
+    }
 
   return kernel_count + var_count + other_count;
 }

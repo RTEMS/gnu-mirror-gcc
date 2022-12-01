@@ -71,11 +71,15 @@ public:
   pass_harden_compares (gcc::context *ctxt)
     : gimple_opt_pass (pass_data_harden_compares, ctxt)
   {}
-  opt_pass *clone () { return new pass_harden_compares (m_ctxt); }
-  virtual bool gate (function *) {
+  opt_pass *clone ()  final override
+  {
+    return new pass_harden_compares (m_ctxt);
+  }
+  bool gate (function *) final override
+  {
     return flag_harden_compares;
   }
-  virtual unsigned int execute (function *);
+  unsigned int execute (function *) final override;
 };
 
 /* Define a pass to harden conditionals in branches.  This pass must
@@ -102,11 +106,15 @@ public:
   pass_harden_conditional_branches (gcc::context *ctxt)
     : gimple_opt_pass (pass_data_harden_conditional_branches, ctxt)
   {}
-  opt_pass *clone () { return new pass_harden_conditional_branches (m_ctxt); }
-  virtual bool gate (function *) {
+  opt_pass *clone () final override
+  {
+    return new pass_harden_conditional_branches (m_ctxt);
+  }
+  bool gate (function *) final override
+  {
     return flag_harden_conditional_branches;
   }
-  virtual unsigned int execute (function *);
+  unsigned int execute (function *) final override;
 };
 
 }
@@ -230,6 +238,7 @@ insert_check_and_trap (location_t loc, gimple_stmt_iterator *gsip,
 
   gimple_stmt_iterator gsit = gsi_after_labels (trp);
   gcall *trap = gimple_build_call (builtin_decl_explicit (BUILT_IN_TRAP), 0);
+  gimple_call_set_ctrl_altering (trap, true);
   gimple_set_location (trap, loc);
   gsi_insert_before (&gsit, trap, GSI_SAME_STMT);
 

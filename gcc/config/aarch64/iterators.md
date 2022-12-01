@@ -135,6 +135,9 @@
 ;; VQ without 2 element modes.
 (define_mode_iterator VQ_NO2E [V16QI V8HI V4SI V8HF V4SF V8BF])
 
+;; 2 element quad vector modes.
+(define_mode_iterator VQ_2E [V2DI V2DF])
+
 ;; BFmode vector modes.
 (define_mode_iterator VBF [V4BF V8BF])
 
@@ -309,6 +312,8 @@
 (define_mode_iterator VS [V2SI V4SI])
 
 (define_mode_iterator TX [TI TF TD])
+
+(define_mode_iterator VTX [TI TF TD V16QI V8HI V4SI V2DI V8HF V4SF V2DF V8BF])
 
 ;; Advanced SIMD opaque structure modes.
 (define_mode_iterator VSTRUCT [OI CI XI])
@@ -983,6 +988,7 @@
     UNSPECV_LX			; Represent a load-exclusive.
     UNSPECV_SX			; Represent a store-exclusive.
     UNSPECV_LDA			; Represent an atomic load or load-acquire.
+    UNSPECV_LDAP		; Represent an atomic acquire load with RCpc semantics.
     UNSPECV_STL			; Represent an atomic store or store-release.
     UNSPECV_ATOMIC_CMPSW	; Represent an atomic compare swap.
     UNSPECV_ATOMIC_EXCHG	; Represent an atomic exchange.
@@ -1067,12 +1073,13 @@
 (define_mode_attr nunits [(V8QI "8") (V16QI "16")
 			  (V4HI "4") (V8HI "8")
 			  (V2SI "2") (V4SI "4")
-			  (V2DI "2") (V8DI "8")
+			  (V1DI "1") (V2DI "2")
 			  (V4HF "4") (V8HF "8")
 			  (V4BF "4") (V8BF "8")
 			  (V2SF "2") (V4SF "4")
 			  (V1DF "1") (V2DF "2")
-			  (DI "1") (DF "1")])
+			  (DI "1") (DF "1")
+			  (V8DI "8")])
 
 ;; Map a mode to the number of bits in it, if the size of the mode
 ;; is constant.
@@ -1441,6 +1448,12 @@
 			 (V2SI "si")    (V4SI  "v2si")
 			 (V2DI "di")    (V2SF  "sf")
 			 (V4SF "v2sf")  (V2DF  "df")])
+
+;; Single-element half modes of quad vector modes.
+(define_mode_attr V1HALF [(V2DI "V1DI")  (V2DF  "V1DF")])
+
+;; Single-element half modes of quad vector modes, in lower-case
+(define_mode_attr V1half [(V2DI "v1di")  (V2DF  "v1df")])
 
 ;; Double modes of vector modes.
 (define_mode_attr VDBL [(V8QI "V16QI") (V4HI "V8HI")
@@ -2173,6 +2186,9 @@
 
 ;; Code iterator for variants of vector max and min.
 (define_code_iterator MAXMIN [smax smin umax umin])
+
+;; Code iterator for min/max ops but without UMAX.
+(define_code_iterator MAXMIN_NOUMAX [smax smin umin])
 
 (define_code_iterator FMAXMIN [smax smin])
 
@@ -3125,6 +3141,8 @@
 			       UNSPEC_FRINT64Z UNSPEC_FRINT64X])
 
 (define_int_iterator SVE_BRK_UNARY [UNSPEC_BRKA UNSPEC_BRKB])
+
+(define_int_iterator SVE_BRKP [UNSPEC_BRKPA UNSPEC_BRKPB])
 
 (define_int_iterator SVE_BRK_BINARY [UNSPEC_BRKN UNSPEC_BRKPA UNSPEC_BRKPB])
 

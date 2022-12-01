@@ -1113,7 +1113,7 @@ package body Sem_Ch12 is
       Analyzed_Formal : Node_Id;
       First_Named     : Node_Id := Empty;
       Formal          : Node_Id;
-      Match           : Node_Id;
+      Match           : Node_Id := Empty;
       Named           : Node_Id;
       Saved_Formal    : Node_Id;
 
@@ -1151,7 +1151,7 @@ package body Sem_Ch12 is
       --  in which case the predefined operations will be used. This merits
       --  a warning because of the special semantics of fixed point ops.
 
-      procedure Check_Overloaded_Formal_Subprogram (Formal : Entity_Id);
+      procedure Check_Overloaded_Formal_Subprogram (Formal : Node_Id);
       --  Apply RM 12.3(9): if a formal subprogram is overloaded, the instance
       --  cannot have a named association for it. AI05-0025 extends this rule
       --  to formals of formal packages by AI05-0025, and it also applies to
@@ -1203,11 +1203,30 @@ package body Sem_Ch12 is
       -------------------------------
 
       procedure Build_Subprogram_Wrappers is
+         function Adjust_Aspect_Sloc (N : Node_Id) return Traverse_Result;
+         --  Adjust sloc so that errors located at N will be reported with
+         --  information about the instance and not just about the generic.
+
+         ------------------------
+         -- Adjust_Aspect_Sloc --
+         ------------------------
+
+         function Adjust_Aspect_Sloc (N : Node_Id) return Traverse_Result is
+         begin
+            Adjust_Instantiation_Sloc (N, S_Adjustment);
+            return OK;
+         end Adjust_Aspect_Sloc;
+
+         procedure Adjust_Aspect_Slocs is new
+           Traverse_Proc (Adjust_Aspect_Sloc);
+
          Formal : constant Entity_Id :=
            Defining_Unit_Name (Specification (Analyzed_Formal));
          Aspect_Spec : Node_Id;
          Decl_Node   : Node_Id;
          Actual_Name : Node_Id;
+
+      --  Start of processing for Build_Subprogram_Wrappers
 
       begin
          --  Create declaration for wrapper subprogram
@@ -1247,6 +1266,7 @@ package body Sem_Ch12 is
 
          Aspect_Spec := First (Aspect_Specifications (Decl_Node));
          while Present (Aspect_Spec) loop
+            Adjust_Aspect_Slocs (Aspect_Spec);
             Set_Analyzed (Aspect_Spec, False);
             Next (Aspect_Spec);
          end loop;
@@ -1259,15 +1279,15 @@ package body Sem_Ch12 is
          --  actuals.
 
          Append_To (Assoc_List,
-            Build_Subprogram_Body_Wrapper (Formal, Actual_Name));
+           Build_Subprogram_Body_Wrapper (Formal, Actual_Name));
       end Build_Subprogram_Wrappers;
 
       ----------------------------------------
       -- Check_Overloaded_Formal_Subprogram --
       ----------------------------------------
 
-      procedure Check_Overloaded_Formal_Subprogram (Formal : Entity_Id) is
-         Temp_Formal : Entity_Id;
+      procedure Check_Overloaded_Formal_Subprogram (Formal : Node_Id) is
+         Temp_Formal : Node_Id;
 
       begin
          Temp_Formal := First (Formals);
@@ -1449,8 +1469,8 @@ package body Sem_Ch12 is
         (F   : Entity_Id;
          A_F : Entity_Id) return Node_Id
       is
-         Prev  : Node_Id;
-         Act   : Node_Id;
+         Prev : Node_Id;
+         Act  : Node_Id;
 
       begin
          Is_Named_Assoc := False;
@@ -1937,7 +1957,7 @@ package body Sem_Ch12 is
                      --  take place e.g. within an enclosing generic unit.
 
                      if Has_Contracts (Analyzed_Formal)
-                       and then Expander_Active
+                       and then (Expander_Active or GNATprove_Mode)
                      then
                         Build_Subprogram_Wrappers;
                      end if;
@@ -2203,6 +2223,19 @@ package body Sem_Ch12 is
                when others =>
                   raise Program_Error;
             end case;
+
+            --  Check here the correct use of Ghost entities in generic
+            --  instantiations, as now the generic has been resolved and
+            --  we know which formal generic parameters are ghost (SPARK
+            --  RM 6.9(10)).
+
+            if Nkind (Formal) not in N_Use_Package_Clause
+                                   | N_Use_Type_Clause
+            then
+               Check_Ghost_Context_In_Generic_Association
+                 (Actual => Match,
+                  Formal => Defining_Entity (Analyzed_Formal));
+            end if;
 
             Formal := Saved_Formal;
             Next_Non_Pragma (Analyzed_Formal);
@@ -2715,6 +2748,17 @@ package body Sem_Ch12 is
          if Present (E) then
             Preanalyze_Spec_Expression (E, T);
 
+            --  The default for a ghost generic formal IN parameter of
+            --  access-to-variable type should be a ghost object (SPARK
+            --  RM 6.9(13)).
+
+            if Is_Access_Variable (T) then
+               Check_Ghost_Formal_Variable
+                 (Actual     => E,
+                  Formal     => Id,
+                  Is_Default => True);
+            end if;
+
             if Is_Limited_Type (T) and then not OK_For_Limited_Init (T, E) then
                Error_Msg_N
                  ("initialization not allowed for limited types", E);
@@ -3097,7 +3141,6 @@ package body Sem_Ch12 is
       if Present (Aspect_Specifications (Gen_Decl)) then
          if No (Aspect_Specifications (N)) then
             Set_Aspect_Specifications (N, New_List);
-            Set_Has_Aspects (N);
          end if;
 
          declare
@@ -3396,6 +3439,25 @@ package body Sem_Ch12 is
             Analyze (Prefix (Def));
             Valid_Default_Attribute (Nam, Def);
             goto Leave;
+         end if;
+
+         --  The default for a ghost generic formal procedure should be a ghost
+         --  procedure (SPARK RM 6.9(13)).
+
+         if Ekind (Nam) = E_Procedure then
+            declare
+               Def_E : Entity_Id := Empty;
+            begin
+               if Nkind (Def) in N_Has_Entity then
+                  Def_E := Entity (Def);
+               end if;
+
+               Check_Ghost_Formal_Procedure_Or_Package
+                 (N          => Def,
+                  Actual     => Def_E,
+                  Formal     => Nam,
+                  Is_Default => True);
+            end;
          end if;
 
          --  Default name may be overloaded, in which case the interpretation
@@ -4254,7 +4316,6 @@ package body Sem_Ch12 is
 
       if Nkind (N) = N_Package_Instantiation then
          Act_Decl_Id := New_Copy (Defining_Entity (N));
-         Set_Comes_From_Source (Act_Decl_Id, True);
 
          if Nkind (Defining_Unit_Name (N)) = N_Defining_Program_Unit_Name then
             Act_Decl_Name :=
@@ -6211,7 +6272,7 @@ package body Sem_Ch12 is
 
       while Present (Act) loop
          Append_To (Actuals,
-            Make_Identifier  (Loc, Chars (Defining_Identifier (Act))));
+            Make_Identifier (Loc, Chars (Defining_Identifier (Act))));
          Next (Act);
       end loop;
 
@@ -6232,8 +6293,8 @@ package body Sem_Ch12 is
         Specification => Spec_Node,
         Declarations  => New_List,
         Handled_Statement_Sequence =>
-           Make_Handled_Sequence_Of_Statements (Loc,
-             Statements    => New_List (Stmt)));
+          Make_Handled_Sequence_Of_Statements (Loc,
+            Statements => New_List (Stmt)));
 
       return Body_Node;
    end Build_Subprogram_Body_Wrapper;
@@ -6254,13 +6315,16 @@ package body Sem_Ch12 is
       Old_Main   : constant Entity_Id := Cunit_Entity (Main_Unit);
 
    begin
-      --  A new compilation unit node is built for the instance declaration
+      --  A new compilation unit node is built for the instance declaration.
+      --  It relocates the auxiliary declaration node from the compilation unit
+      --  where the instance appeared, so that declarations that originally
+      --  followed the instance will be attached to the spec compilation unit.
 
       Decl_Cunit :=
         Make_Compilation_Unit (Sloc (N),
           Context_Items  => Empty_List,
           Unit           => Act_Decl,
-          Aux_Decls_Node => Make_Compilation_Unit_Aux (Sloc (N)));
+          Aux_Decls_Node => Relocate_Node (Aux_Decls_Node (Parent (N))));
 
       Set_Parent_Spec (Act_Decl, Parent_Spec (N));
 
@@ -6979,7 +7043,7 @@ package body Sem_Ch12 is
                Astype := First_Subtype (E);
             end if;
 
-            Set_Size_Info      (E, (Astype));
+            Set_Size_Info      (E, Astype);
             Copy_RM_Size       (To => E, From => Astype);
             Set_First_Rep_Item (E, First_Rep_Item (Astype));
 
@@ -7010,12 +7074,10 @@ package body Sem_Ch12 is
             elsif Present (Associated_Formal_Package (E))
               and then not Is_Generic_Formal (E)
             then
-               if Box_Present (Parent (Associated_Formal_Package (E))) then
-                  Check_Generic_Actuals (Renamed_Entity (E), True);
-
-               else
-                  Check_Generic_Actuals (Renamed_Entity (E), False);
-               end if;
+               Check_Generic_Actuals
+                 (Renamed_Entity (E),
+                  Is_Formal_Box =>
+                    Box_Present (Parent (Associated_Formal_Package (E))));
 
                Set_Is_Hidden (E, False);
             end if;
@@ -10572,7 +10634,6 @@ package body Sem_Ch12 is
          Error_Msg_N
            ("expect package instance to instantiate formal", Actual);
          Abandon_Instantiation (Actual);
-         raise Program_Error;
 
       else
          Actual_Pack := Entity (Actual);
@@ -10594,6 +10655,14 @@ package body Sem_Ch12 is
 
          Gen_Parent := Generic_Parent (Specification (Analyzed_Formal));
          Formal_Pack := Defining_Unit_Name (Specification (Analyzed_Formal));
+
+         --  The actual for a ghost generic formal package should be a ghost
+         --  package (SPARK RM 6.9(14)).
+
+         Check_Ghost_Formal_Procedure_Or_Package
+           (N      => Actual,
+            Actual => Actual_Pack,
+            Formal => Formal_Pack);
 
          if Nkind (Parent (Actual_Pack)) = N_Defining_Program_Unit_Name then
             Parent_Spec := Package_Specification (Actual_Pack);
@@ -10882,6 +10951,18 @@ package body Sem_Ch12 is
             Act_E := Empty;
          end if;
 
+         --  The actual for a ghost generic formal procedure should be a ghost
+         --  procedure (SPARK RM 6.9(14)).
+
+         if Present (Act_E)
+           and then Ekind (Act_E) = E_Procedure
+         then
+            Check_Ghost_Formal_Procedure_Or_Package
+              (N      => Act,
+               Actual => Act_E,
+               Formal => Analyzed_S);
+         end if;
+
          if (Present (Act_E) and then Is_Overloadable (Act_E))
            or else Nkind (Act) in N_Attribute_Reference
                                 | N_Indexed_Component
@@ -11026,6 +11107,8 @@ package body Sem_Ch12 is
          --  RM 12.6 (16.2/2): The procedure has convention Intrinsic
 
          Set_Convention (Defining_Unit_Name (New_Spec), Convention_Intrinsic);
+
+         Copy_Ghost_Aspect (Formal, To => Decl_Node);
 
          --  Eliminate the calls to it when optimization is enabled
 
@@ -11401,39 +11484,21 @@ package body Sem_Ch12 is
          --  volatility refinement aspects.
 
          declare
-            Actual_Obj : Entity_Id;
-            N          : Node_Id := Actual;
+            Actual_Obj : constant Entity_Id :=
+              Get_Enclosing_Deep_Object (Actual);
          begin
-            --  Similar to Sem_Util.Get_Enclosing_Object, but treat
-            --  pointer dereference like component selection.
-            loop
-               if Is_Entity_Name (N) then
-                  Actual_Obj := Entity (N);
-                  exit;
-               end if;
-
-               case Nkind (N) is
-                  when N_Indexed_Component
-                     | N_Selected_Component
-                     | N_Slice
-                     | N_Explicit_Dereference
-                  =>
-                     N := Prefix (N);
-
-                  when N_Type_Conversion =>
-                     N := Expression (N);
-
-                  when others =>
-                     Actual_Obj := Etype (N);
-                     exit;
-               end case;
-            end loop;
-
             Check_Volatility_Compatibility
               (Actual_Obj, A_Gen_Obj, "actual object",
                "its corresponding formal object of mode in out",
                Srcpos_Bearer => Actual);
          end;
+
+         --  The actual for a ghost generic formal IN OUT parameter should be a
+         --  ghost object (SPARK RM 6.9(14)).
+
+         Check_Ghost_Formal_Variable
+           (Actual => Actual,
+            Formal => A_Gen_Obj);
 
       --  Formal in-parameter
 
@@ -11460,6 +11525,7 @@ package body Sem_Ch12 is
                 Object_Definition      => Def,
                 Expression             => Actual);
 
+            Copy_Ghost_Aspect (Formal, To => Decl_Node);
             Set_Corresponding_Generic_Association (Decl_Node, Act_Assoc);
 
             --  A generic formal object of a tagged type is defined to be
@@ -11470,6 +11536,16 @@ package body Sem_Ch12 is
             end if;
 
             Append (Decl_Node, List);
+
+            --  The actual for a ghost generic formal IN parameter of
+            --  access-to-variable type should be a ghost object (SPARK
+            --  RM 6.9(14)).
+
+            if Is_Access_Variable (Etype (A_Gen_Obj)) then
+               Check_Ghost_Formal_Variable
+                 (Actual => Actual,
+                  Formal => A_Gen_Obj);
+            end if;
 
             --  No need to repeat (pre-)analysis of some expression nodes
             --  already handled in Preanalyze_Actuals.
@@ -11544,6 +11620,7 @@ package body Sem_Ch12 is
                 Expression             => New_Copy_Tree
                                             (Default_Expression (Formal)));
 
+            Copy_Ghost_Aspect (Formal, To => Decl_Node);
             Set_Corresponding_Generic_Association
               (Decl_Node, Expression (Decl_Node));
 
@@ -11815,7 +11892,7 @@ package body Sem_Ch12 is
       Saved_SM   : constant SPARK_Mode_Type          := SPARK_Mode;
       Saved_SMP  : constant Node_Id                  := SPARK_Mode_Pragma;
       Saved_SS   : constant Suppress_Record          := Scope_Suppress;
-      Saved_Warn : constant Warning_Record           := Save_Warnings;
+      Saved_Warn : constant Warnings_State           := Save_Warnings;
 
       Act_Body      : Node_Id;
       Act_Body_Id   : Entity_Id;
@@ -12352,7 +12429,7 @@ package body Sem_Ch12 is
       Saved_SM   : constant SPARK_Mode_Type          := SPARK_Mode;
       Saved_SMP  : constant Node_Id                  := SPARK_Mode_Pragma;
       Saved_SS   : constant Suppress_Record          := Scope_Suppress;
-      Saved_Warn : constant Warning_Record           := Save_Warnings;
+      Saved_Warn : constant Warnings_State           := Save_Warnings;
 
       Act_Body      : Node_Id;
       Act_Body_Id   : Entity_Id;
@@ -14028,7 +14105,7 @@ package body Sem_Ch12 is
             --  a full view, then we'll retrieve that.
 
             if Ekind (A_Gen_T) = E_Incomplete_Type
-              and then not Present (Full_View (Act_T))
+              and then No (Full_View (Act_T))
             then
                null;
 
@@ -14200,6 +14277,8 @@ package body Sem_Ch12 is
           Defining_Identifier => Subt,
           Subtype_Indication  => New_Occurrence_Of (Act_T, Loc));
 
+      Copy_Ghost_Aspect (Formal, To => Decl_Node);
+
       --  Record whether the actual is private at this point, so that
       --  Check_Generic_Actuals can restore its proper view before the
       --  semantic analysis of the instance.
@@ -14353,7 +14432,7 @@ package body Sem_Ch12 is
    is
       Comp_Unit          : constant Node_Id := Cunit (Get_Source_Unit (Spec));
       Saved_Style_Check  : constant Boolean := Style_Check;
-      Saved_Warnings     : constant Warning_Record := Save_Warnings;
+      Saved_Warn         : constant Warnings_State := Save_Warnings;
       True_Parent        : Node_Id;
       Inst_Node          : Node_Id;
       OK                 : Boolean;
@@ -14684,7 +14763,7 @@ package body Sem_Ch12 is
             Expander_Mode_Save_And_Set (True);
             Load_Needed_Body (Comp_Unit, OK);
             Opt.Style_Check := Saved_Style_Check;
-            Restore_Warnings (Saved_Warnings);
+            Restore_Warnings (Saved_Warn);
             Expander_Mode_Restore;
 
             if not OK
@@ -15398,7 +15477,7 @@ package body Sem_Ch12 is
             end loop;
          end if;
 
-         Exchange_Declarations (Node (M));
+         Exchange_Declarations (Typ);
          Next_Elmt (M);
       end loop;
 
@@ -17246,13 +17325,11 @@ package body Sem_Ch12 is
 
             else
                declare
-                  Act_Iface_List : Elist_Id;
-                  Iface          : Node_Id;
-                  Iface_Ent      : Entity_Id;
+                  Iface     : Node_Id;
+                  Iface_Ent : Entity_Id;
 
                begin
                   Iface := First (Abstract_Interface_List (Formal));
-                  Collect_Interfaces (Def_Sub, Act_Iface_List);
 
                   while Present (Iface) loop
                      Iface_Ent := Entity (Iface);

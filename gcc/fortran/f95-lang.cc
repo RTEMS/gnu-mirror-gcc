@@ -100,6 +100,15 @@ static const struct attribute_spec gfc_attribute_table[] =
   { NULL,		  0, 0, false, false, false, false, NULL, NULL }
 };
 
+/* Get a value for the SARIF v2.1.0 "artifact.sourceLanguage" property,
+   based on the list in SARIF v2.1.0 Appendix J.  */
+
+static const char *
+gfc_get_sarif_source_language (const char *)
+{
+  return "fortran";
+}
+
 #undef LANG_HOOKS_NAME
 #undef LANG_HOOKS_INIT
 #undef LANG_HOOKS_FINISH
@@ -138,6 +147,7 @@ static const struct attribute_spec gfc_attribute_table[] =
 #undef LANG_HOOKS_BUILTIN_FUNCTION
 #undef LANG_HOOKS_GET_ARRAY_DESCR_INFO
 #undef LANG_HOOKS_ATTRIBUTE_TABLE
+#undef LANG_HOOKS_GET_SARIF_SOURCE_LANGUAGE
 
 /* Define lang hooks.  */
 #define LANG_HOOKS_NAME                 "GNU Fortran"
@@ -177,6 +187,7 @@ static const struct attribute_spec gfc_attribute_table[] =
 #define LANG_HOOKS_BUILTIN_FUNCTION	gfc_builtin_function
 #define LANG_HOOKS_GET_ARRAY_DESCR_INFO	gfc_get_array_descr_info
 #define LANG_HOOKS_ATTRIBUTE_TABLE	gfc_attribute_table
+#define LANG_HOOKS_GET_SARIF_SOURCE_LANGUAGE gfc_get_sarif_source_language
 
 struct lang_hooks lang_hooks = LANG_HOOKS_INITIALIZER;
 
@@ -248,7 +259,7 @@ gfc_init (void)
   if (!gfc_cpp_enabled ())
     {
       linemap_add (line_table, LC_ENTER, false, gfc_source_file, 1);
-      linemap_add (line_table, LC_RENAME, false, "<built-in>", 0);
+      linemap_add (line_table, LC_RENAME, false, special_fname_builtin (), 0);
     }
   else
     gfc_cpp_init_0 ();
@@ -518,8 +529,6 @@ gfc_init_decl_processing (void)
   /* Build common tree nodes. char_type_node is unsigned because we
      only use it for actual characters, not for INTEGER(1).  */
   build_common_tree_nodes (false);
-
-  void_list_node = build_tree_list (NULL_TREE, void_type_node);
 
   /* Set up F95 type nodes.  */
   gfc_init_kinds ();
@@ -1002,10 +1011,13 @@ gfc_init_builtin_functions (void)
 		      "__builtin_isnan", ATTR_CONST_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_isnormal", ftype, BUILT_IN_ISNORMAL,
 		      "__builtin_isnormal", ATTR_CONST_NOTHROW_LEAF_LIST);
+  gfc_define_builtin ("__builtin_issignaling", ftype, BUILT_IN_ISSIGNALING,
+		      "__builtin_issignaling", ATTR_CONST_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_signbit", ftype, BUILT_IN_SIGNBIT,
 		      "__builtin_signbit", ATTR_CONST_NOTHROW_LEAF_LIST);
+  gfc_define_builtin ("__builtin_fpclassify", ftype, BUILT_IN_FPCLASSIFY,
+		      "__builtin_fpclassify", ATTR_CONST_NOTHROW_LEAF_LIST);
 
-  ftype = build_function_type (integer_type_node, NULL_TREE);
   gfc_define_builtin ("__builtin_isless", ftype, BUILT_IN_ISLESS,
 		      "__builtin_isless", ATTR_CONST_NOTHROW_LEAF_LIST);
   gfc_define_builtin ("__builtin_islessequal", ftype, BUILT_IN_ISLESSEQUAL,
@@ -1266,6 +1278,22 @@ gfc_init_builtin_functions (void)
 		      BUILT_IN_ASSUME_ALIGNED,
 		      "__builtin_assume_aligned",
 		      ATTR_CONST_NOTHROW_LEAF_LIST);
+
+  ftype = build_function_type_list (long_double_type_node, long_double_type_node,
+				    long_double_type_node, long_double_type_node,
+				    NULL_TREE);
+  gfc_define_builtin ("__builtin_fmal", ftype, BUILT_IN_FMAL,
+		      "fmal", ATTR_CONST_NOTHROW_LEAF_LIST);
+  ftype = build_function_type_list (double_type_node, double_type_node,
+				    double_type_node, double_type_node,
+				    NULL_TREE);
+  gfc_define_builtin ("__builtin_fma", ftype, BUILT_IN_FMA,
+		      "fma", ATTR_CONST_NOTHROW_LEAF_LIST);
+  ftype = build_function_type_list (float_type_node, float_type_node,
+				    float_type_node, float_type_node,
+				    NULL_TREE);
+  gfc_define_builtin ("__builtin_fmaf", ftype, BUILT_IN_FMAF,
+		      "fmaf", ATTR_CONST_NOTHROW_LEAF_LIST);
 
   gfc_define_builtin ("__emutls_get_address",
 		      builtin_types[BT_FN_PTR_PTR],

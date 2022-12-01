@@ -28,7 +28,6 @@
 --    - transient scopes
 
 with Atree;          use Atree;
-with Contracts;      use Contracts;
 with Debug;          use Debug;
 with Einfo;          use Einfo;
 with Einfo.Entities; use Einfo.Entities;
@@ -59,7 +58,6 @@ with Sinfo.Nodes;    use Sinfo.Nodes;
 with Sinfo.Utils;    use Sinfo.Utils;
 with Sem;            use Sem;
 with Sem_Aux;        use Sem_Aux;
-with Sem_Ch3;        use Sem_Ch3;
 with Sem_Ch7;        use Sem_Ch7;
 with Sem_Ch8;        use Sem_Ch8;
 with Sem_Res;        use Sem_Res;
@@ -76,15 +74,15 @@ package body Exp_Ch7 is
    -- Transient Scope Management --
    --------------------------------
 
-   --  A transient scope is created when temporary objects are created by the
-   --  compiler. These temporary objects are allocated on the secondary stack
-   --  and the transient scope is responsible for finalizing the object when
-   --  appropriate and reclaiming the memory at the right time. The temporary
-   --  objects are generally the objects allocated to store the result of a
-   --  function returning an unconstrained or a tagged value. Expressions
-   --  needing to be wrapped in a transient scope (functions calls returning
-   --  unconstrained or tagged values) may appear in 3 different contexts which
-   --  lead to 3 different kinds of transient scope expansion:
+   --  A transient scope is needed when certain temporary objects are created
+   --  by the compiler. These temporary objects are allocated on the secondary
+   --  stack and/or need finalization, and the transient scope is responsible
+   --  for finalizing the objects and reclaiming the memory of the secondary
+   --  stack at the appropriate time. They are generally objects allocated to
+   --  store the result of a function returning an unconstrained or controlled
+   --  value. Expressions needing to be wrapped in a transient scope may appear
+   --  in three different contexts which lead to different kinds of transient
+   --  scope expansion:
 
    --   1. In a simple statement (procedure call, assignment, ...). In this
    --      case the instruction is wrapped into a transient block. See
@@ -98,29 +96,6 @@ package body Exp_Ch7 is
    --      here, so the finalization actions, if any, are done right after the
    --      declaration and the secondary stack deallocation is done in the
    --      proper enclosing scope. See Wrap_Transient_Declaration for details.
-
-   --  Note about functions returning tagged types: it has been decided to
-   --  always allocate their result in the secondary stack, even though is not
-   --  absolutely mandatory when the tagged type is constrained because the
-   --  caller knows the size of the returned object and thus could allocate the
-   --  result in the primary stack. An exception to this is when the function
-   --  builds its result in place, as is done for functions with inherently
-   --  limited result types for Ada 2005. In that case, certain callers may
-   --  pass the address of a constrained object as the target object for the
-   --  function result.
-
-   --  By always allocating tagged results in the secondary stack, a couple of
-   --  implementation difficulties are avoided:
-
-   --    - If this is a dispatching function call, the computation of the size
-   --      of the result is possible but complex from the outside.
-
-   --    - If the result type is class-wide, it is unconstrained anyway.
-
-   --  Furthermore, the small loss in efficiency which is the result of this
-   --  decision is not such a big deal because functions returning tagged types
-   --  are not as common in practice compared to functions returning access to
-   --  a tagged type.
 
    --------------------------------------------------
    -- Transient Blocks and Finalization Management --
@@ -329,20 +304,9 @@ package body Exp_Ch7 is
    --  such as for task termination. Fin_Id is the finalizer declaration
    --  entity.
 
-   procedure Build_Finalizer_Helper
-     (N                 : Node_Id;
-      Clean_Stmts       : List_Id;
-      Mark_Id           : Entity_Id;
-      Top_Decls         : List_Id;
-      Defer_Abort       : Boolean;
-      Fin_Id            : out Entity_Id;
-      Finalize_Old_Only : Boolean);
-   --  An internal routine which does all of the heavy lifting on behalf of
-   --  Build_Finalizer.
-
    procedure Build_Finalizer_Call (N : Node_Id; Fin_Id : Entity_Id);
-   --  N is a construct which contains a handled sequence of statements, Fin_Id
-   --  is the entity of a finalizer. Create an At_End handler which covers the
+   --  N is a construct that contains a handled sequence of statements, Fin_Id
+   --  is the entity of a finalizer. Create an At_End handler that covers the
    --  statements of N and calls Fin_Id. If the handled statement sequence has
    --  an exception handler, the statements will be wrapped in a block to avoid
    --  unwanted interaction with the new At_End handler.
@@ -463,10 +427,6 @@ package body Exp_Ch7 is
    --  a conversion between the partial and full view of Arg to match the type
    --  of the formal of Proc, or force a conversion to the class-wide type in
    --  the case where the operation is abstract.
-
-   function Enclosing_Function (E : Entity_Id) return Entity_Id;
-   --  Given an arbitrary entity, traverse the scope chain looking for the
-   --  first enclosing function. Return Empty if no function was found.
 
    function Make_Call
      (Loc       : Source_Ptr;
@@ -894,19 +854,16 @@ package body Exp_Ch7 is
       Additional_Cleanup : List_Id) return List_Id
    is
       Is_Asynchronous_Call : constant Boolean :=
-                               Nkind (N) = N_Block_Statement
-                                 and then Is_Asynchronous_Call_Block (N);
-      Is_Master            : constant Boolean :=
-                               Nkind (N) /= N_Entry_Body
-                                 and then Is_Task_Master (N);
-      Is_Protected_Body    : constant Boolean :=
-                               Nkind (N) = N_Subprogram_Body
-                                 and then Is_Protected_Subprogram_Body (N);
-      Is_Task_Allocation   : constant Boolean :=
-                               Nkind (N) = N_Block_Statement
-                                 and then Is_Task_Allocation_Block (N);
-      Is_Task_Body         : constant Boolean :=
-                               Nkind (Original_Node (N)) = N_Task_Body;
+        Nkind (N) = N_Block_Statement and then Is_Asynchronous_Call_Block (N);
+      Is_Master : constant Boolean :=
+        Nkind (N) /= N_Entry_Body and then Is_Task_Master (N);
+      Is_Protected_Subp_Body : constant Boolean :=
+        Nkind (N) = N_Subprogram_Body
+        and then Is_Protected_Subprogram_Body (N);
+      Is_Task_Allocation : constant Boolean :=
+        Nkind (N) = N_Block_Statement and then Is_Task_Allocation_Block (N);
+      Is_Task_Body : constant Boolean :=
+        Nkind (Original_Node (N)) = N_Task_Body;
 
       Loc   : constant Source_Ptr := Sloc (N);
       Stmts : constant List_Id    := New_List;
@@ -932,7 +889,7 @@ package body Exp_Ch7 is
       --  NOTE: The generated code references _object, a parameter to the
       --  procedure.
 
-      elsif Is_Protected_Body then
+      elsif Is_Protected_Subp_Body then
          declare
             Spec      : constant Node_Id := Parent (Corresponding_Spec (N));
             Conc_Typ  : Entity_Id := Empty;
@@ -956,10 +913,6 @@ package body Exp_Ch7 is
 
             pragma Assert (Present (Param));
             pragma Assert (Present (Conc_Typ));
-
-            --  Historical note: In earlier versions of GNAT, there was code
-            --  at this point to generate stuff to service entry queues. It is
-            --  now abstracted in Build_Protected_Subprogram_Call_Cleanup.
 
             Build_Protected_Subprogram_Call_Cleanup
               (Specification (N), Conc_Typ, Loc, Stmts);
@@ -1412,18 +1365,17 @@ package body Exp_Ch7 is
       end;
    end Build_Finalization_Master;
 
-   ----------------------------
-   -- Build_Finalizer_Helper --
-   ----------------------------
+   ---------------------
+   -- Build_Finalizer --
+   ---------------------
 
-   procedure Build_Finalizer_Helper
+   procedure Build_Finalizer
      (N                 : Node_Id;
       Clean_Stmts       : List_Id;
       Mark_Id           : Entity_Id;
       Top_Decls         : List_Id;
       Defer_Abort       : Boolean;
-      Fin_Id            : out Entity_Id;
-      Finalize_Old_Only : Boolean)
+      Fin_Id            : out Entity_Id)
    is
       Acts_As_Clean    : constant Boolean :=
                            Present (Mark_Id)
@@ -1717,15 +1669,9 @@ package body Exp_Ch7 is
             --  there will need to be multiple finalization routines in the
             --  same scope. See Build_Finalizer for details.
 
-            if Finalize_Old_Only then
-               Fin_Id :=
-                 Make_Defining_Identifier (Loc,
-                   Chars => New_External_Name (Name_uFinalizer_Old));
-            else
-               Fin_Id :=
-                 Make_Defining_Identifier (Loc,
-                   Chars => New_External_Name (Name_uFinalizer));
-            end if;
+            Fin_Id :=
+              Make_Defining_Identifier (Loc,
+                Chars => New_External_Name (Name_uFinalizer));
 
             --  The visibility semantics of AT_END handlers force a strange
             --  separation of spec and body for stack-related finalizers:
@@ -2096,10 +2042,15 @@ package body Exp_Ch7 is
                --  In the case where the last construct to contain a controlled
                --  object is either a nested package, an instantiation or a
                --  freeze node, the body must be inserted directly after the
-               --  construct.
+               --  construct, except if the insertion point is already placed
+               --  after the construct, typically in the statement list.
 
                if Nkind (Last_Top_Level_Ctrl_Construct) in
                     N_Freeze_Entity | N_Package_Declaration | N_Package_Body
+                 and then not
+                  (List_Containing (Last_Top_Level_Ctrl_Construct) = Spec_Decls
+                    and then Present (Stmts)
+                    and then List_Containing (Finalizer_Insert_Nod) = Stmts)
                then
                   Finalizer_Insert_Nod := Last_Top_Level_Ctrl_Construct;
                end if;
@@ -2252,26 +2203,9 @@ package body Exp_Ch7 is
 
          Decl := Last_Non_Pragma (Decls);
          while Present (Decl) loop
-            --  Depending on the value of flag Finalize_Old_Only we determine
-            --  which objects get finalized as part of the current finalizer
-            --  being built.
-
-            --  When True, only temporaries capturing the value of attribute
-            --  'Old are finalized and all other cases are ignored.
-
-            --  When False, temporary objects used to capture the value of 'Old
-            --  are ignored and all others are considered.
-
-            if Finalize_Old_Only
-                 xor (Nkind (Decl) = N_Object_Declaration
-                       and then Stores_Attribute_Old_Prefix
-                                  (Defining_Identifier (Decl)))
-            then
-               null;
-
             --  Library-level tagged types
 
-            elsif Nkind (Decl) = N_Full_Type_Declaration then
+            if Nkind (Decl) = N_Full_Type_Declaration then
                Typ := Defining_Identifier (Decl);
 
                --  Ignored Ghost types do not need any cleanup actions because
@@ -2576,7 +2510,7 @@ package body Exp_Ch7 is
                            --  template and not the actually instantiation
                            --  (which is generated too late for us to process
                            --  it), so there is no need to update in particular
-                           --  to update Last_Top_Level_Ctrl_Construct here.
+                           --  Last_Top_Level_Ctrl_Construct here.
 
                            if Counter_Val > Old_Counter_Val then
                               Counter_Val := Old_Counter_Val;
@@ -3086,6 +3020,13 @@ package body Exp_Ch7 is
 
                return;
 
+            --  If the initialization is in the declaration, we're done, so
+            --  early return if we have no more statements or they have been
+            --  rewritten, which means that they were in the source code.
+
+            elsif No (Stmt) or else Original_Node (Stmt) /= Stmt then
+               return;
+
             --  In all other cases the initialization calls follow the related
             --  object. The general structure of object initialization built by
             --  routine Default_Initialize_Object is as follows:
@@ -3114,8 +3055,6 @@ package body Exp_Ch7 is
             --  Otherwise the initialization calls follow the related object
 
             else
-               pragma Assert (Present (Stmt));
-
                Stmt_2 := Next_Suitable_Statement (Stmt);
 
                --  Check for an optional call to Deep_Initialize which may
@@ -3449,7 +3388,9 @@ package body Exp_Ch7 is
 
             if Is_Return_Object (Obj_Id) then
                declare
-                  Func_Id : constant Entity_Id := Enclosing_Function (Obj_Id);
+                  Func_Id : constant Entity_Id :=
+                              Return_Applies_To (Scope (Obj_Id));
+
                begin
                   if Is_Build_In_Place_Function (Func_Id)
                     and then Needs_BIP_Finalization_Master (Func_Id)
@@ -3551,7 +3492,7 @@ package body Exp_Ch7 is
                New_Occurrence_Of (DT_Ptr, Loc))));
       end Process_Tagged_Type_Declaration;
 
-   --  Start of processing for Build_Finalizer_Helper
+   --  Start of processing for Build_Finalizer
 
    begin
       Fin_Id := Empty;
@@ -3708,22 +3649,13 @@ package body Exp_Ch7 is
       if Acts_As_Clean or Has_Ctrl_Objs or Has_Tagged_Types then
          Create_Finalizer;
       end if;
-   end Build_Finalizer_Helper;
+   end Build_Finalizer;
 
    --------------------------
    -- Build_Finalizer_Call --
    --------------------------
 
    procedure Build_Finalizer_Call (N : Node_Id; Fin_Id : Entity_Id) is
-      Is_Prot_Body : constant Boolean :=
-                       Nkind (N) = N_Subprogram_Body
-                         and then Is_Protected_Subprogram_Body (N);
-      --  Determine whether N denotes the protected version of a subprogram
-      --  which belongs to a protected type.
-
-      Loc : constant Source_Ptr := Sloc (N);
-      HSS : Node_Id;
-
    begin
       --  Do not perform this expansion in SPARK mode because we do not create
       --  finalizers in the first place.
@@ -3732,13 +3664,8 @@ package body Exp_Ch7 is
          return;
       end if;
 
-      --  The At_End handler should have been assimilated by the finalizer
-
-      HSS := Handled_Statement_Sequence (N);
-      pragma Assert (No (At_End_Proc (HSS)));
-
       --  If the construct to be cleaned up is a protected subprogram body, the
-      --  finalizer call needs to be associated with the block which wraps the
+      --  finalizer call needs to be associated with the block that wraps the
       --  unprotected version of the subprogram. The following illustrates this
       --  scenario:
 
@@ -3758,528 +3685,41 @@ package body Exp_Ch7 is
       --        end;
       --     end Prot_SubpP;
 
-      if Is_Prot_Body then
-         HSS := Handled_Statement_Sequence (Last (Statements (HSS)));
+      declare
+         Loc : constant Source_Ptr := Sloc (N);
 
-      --  An At_End handler and regular exception handlers cannot coexist in
-      --  the same statement sequence. Wrap the original statements in a block.
+         Is_Protected_Subp_Body : constant Boolean :=
+           Nkind (N) = N_Subprogram_Body
+           and then Is_Protected_Subprogram_Body (N);
+         --  True if N is the protected version of a subprogram that belongs to
+         --  a protected type.
 
-      elsif Present (Exception_Handlers (HSS)) then
-         declare
-            End_Lab : constant Node_Id := End_Label (HSS);
-            Block   : Node_Id;
+         HSS : constant Node_Id :=
+           (if Is_Protected_Subp_Body
+             then Handled_Statement_Sequence
+               (Last (Statements (Handled_Statement_Sequence (N))))
+             else Handled_Statement_Sequence (N));
 
-         begin
-            Block :=
-              Make_Block_Statement (Loc, Handled_Statement_Sequence => HSS);
+         --  We attach the At_End_Proc to the HSS if this is an accept
+         --  statement or extended return statement. Also in the case of
+         --  a protected subprogram, because if Service_Entries raises an
+         --  exception, we do not lock the PO, so we also do not want to
+         --  unlock it.
 
-            Set_Handled_Statement_Sequence (N,
-              Make_Handled_Sequence_Of_Statements (Loc, New_List (Block)));
+         Use_HSS : constant Boolean :=
+           Nkind (N) in N_Accept_Statement | N_Extended_Return_Statement
+           or else Is_Protected_Subp_Body;
 
-            HSS := Handled_Statement_Sequence (N);
-            Set_End_Label (HSS, End_Lab);
-         end;
-      end if;
-
-      Set_At_End_Proc (HSS, New_Occurrence_Of (Fin_Id, Loc));
-
-      --  Attach reference to finalizer to tree, for LLVM use
-
-      Set_Parent (At_End_Proc (HSS), HSS);
-
-      Analyze (At_End_Proc (HSS));
-      Expand_At_End_Handler (HSS, Empty);
+         At_End_Proc_Bearer : constant Node_Id := (if Use_HSS then HSS else N);
+      begin
+         pragma Assert (No (At_End_Proc (At_End_Proc_Bearer)));
+         Set_At_End_Proc (At_End_Proc_Bearer, New_Occurrence_Of (Fin_Id, Loc));
+         --  Attach reference to finalizer to tree, for LLVM use
+         Set_Parent (At_End_Proc (At_End_Proc_Bearer), At_End_Proc_Bearer);
+         Analyze (At_End_Proc (At_End_Proc_Bearer));
+         Expand_At_End_Handler (At_End_Proc_Bearer, Empty);
+      end;
    end Build_Finalizer_Call;
-
-   ---------------------
-   -- Build_Finalizer --
-   ---------------------
-
-   procedure Build_Finalizer
-     (N           : Node_Id;
-      Clean_Stmts : List_Id;
-      Mark_Id     : Entity_Id;
-      Top_Decls   : List_Id;
-      Defer_Abort : Boolean;
-      Fin_Id      : out Entity_Id)
-   is
-      Def_Ent : constant Entity_Id  := Unique_Defining_Entity (N);
-      Loc     : constant Source_Ptr := Sloc (N);
-
-      --  Declarations used for the creation of _finalization_controller
-
-      Fin_Old_Id           : Entity_Id := Empty;
-      Fin_Controller_Id    : Entity_Id := Empty;
-      Fin_Controller_Decls : List_Id;
-      Fin_Controller_Stmts : List_Id;
-      Fin_Controller_Body  : Node_Id   := Empty;
-      Fin_Controller_Spec  : Node_Id   := Empty;
-      Postconditions_Call  : Node_Id   := Empty;
-
-      --  Defining identifiers for local objects used to store exception info
-
-      Raised_Post_Exception_Id         : Entity_Id := Empty;
-      Raised_Finalization_Exception_Id : Entity_Id := Empty;
-      Saved_Exception_Id               : Entity_Id := Empty;
-
-   --  Start of processing for Build_Finalizer
-
-   begin
-      --  Create the general finalization routine
-
-      Build_Finalizer_Helper
-        (N                 => N,
-         Clean_Stmts       => Clean_Stmts,
-         Mark_Id           => Mark_Id,
-         Top_Decls         => Top_Decls,
-         Defer_Abort       => Defer_Abort,
-         Fin_Id            => Fin_Id,
-         Finalize_Old_Only => False);
-
-      --  When postconditions are present, expansion gets much more complicated
-      --  due to both the fact that they must be called after finalization and
-      --  that finalization of 'Old objects must occur after the postconditions
-      --  get checked.
-
-      --  Additionally, exceptions between general finalization and 'Old
-      --  finalization must be propagated correctly and exceptions which happen
-      --  during _postconditions need to be saved and reraised after
-      --  finalization of 'Old objects.
-
-      --  Generate:
-      --
-      --    Postcond_Enabled := False;
-      --
-      --    procedure _finalization_controller is
-      --
-      --       --  Exception capturing and tracking
-      --
-      --       Saved_Exception               : Exception_Occurrence;
-      --       Raised_Post_Exception         : Boolean := False;
-      --       Raised_Finalization_Exception : Boolean := False;
-      --
-      --    --  Start of processing for _finalization_controller
-      --
-      --    begin
-      --       --  Perform general finalization
-      --
-      --       begin
-      --          _finalizer;
-      --       exception
-      --          when others =>
-      --             --  Save the exception
-      --
-      --             Raised_Finalization_Exception := True;
-      --             Save_Occurrence
-      --               (Saved_Exception, Get_Current_Excep.all);
-      --       end;
-      --
-      --       --  Perform postcondition checks after general finalization, but
-      --       --  before finalization of 'Old related objects.
-      --
-      --       if not Raised_Finalization_Exception
-      --         and then Return_Success_For_Postcond
-      --       then
-      --          begin
-      --             --  Re-enable postconditions and check them
-      --
-      --             Postcond_Enabled := True;
-      --             _postconditions [(Result_Obj_For_Postcond[.all])];
-      --          exception
-      --             when others =>
-      --                --  Save the exception
-      --
-      --                Raised_Post_Exception := True;
-      --                Save_Occurrence
-      --                  (Saved_Exception, Get_Current_Excep.all);
-      --          end;
-      --       end if;
-      --
-      --       --  Finally finalize 'Old related objects
-      --
-      --       begin
-      --          _finalizer_old;
-      --       exception
-      --          when others =>
-      --             --  Reraise the previous finalization error if there is
-      --             --  one.
-      --
-      --             if Raised_Finalization_Exception then
-      --                Reraise_Occurrence (Saved_Exception);
-      --             end if;
-      --
-      --             --  Otherwise, reraise the current one
-      --
-      --             raise;
-      --       end;
-      --
-      --       --  Reraise any saved exception
-      --
-      --       if Raised_Finalization_Exception
-      --            or else Raised_Post_Exception
-      --       then
-      --          Reraise_Occurrence (Saved_Exception);
-      --       end if;
-      --    end _finalization_controller;
-
-      if Nkind (N) = N_Subprogram_Body
-        and then Present (Postconditions_Proc (Def_Ent))
-      then
-         Fin_Controller_Stmts := New_List;
-         Fin_Controller_Decls := New_List;
-
-         --  Build the 'Old finalizer
-
-         Build_Finalizer_Helper
-           (N                 => N,
-            Clean_Stmts       => Empty_List,
-            Mark_Id           => Mark_Id,
-            Top_Decls         => Top_Decls,
-            Defer_Abort       => Defer_Abort,
-            Fin_Id            => Fin_Old_Id,
-            Finalize_Old_Only => True);
-
-         --  Create local declarations for _finalization_controller needed for
-         --  saving exceptions.
-         --
-         --  Generate:
-         --
-         --    Saved_Exception               : Exception_Occurrence;
-         --    Raised_Post_Exception         : Boolean := False;
-         --    Raised_Finalization_Exception : Boolean := False;
-
-         Saved_Exception_Id               := Make_Temporary (Loc, 'S');
-         Raised_Post_Exception_Id         := Make_Temporary (Loc, 'P');
-         Raised_Finalization_Exception_Id := Make_Temporary (Loc, 'F');
-
-         Append_List_To (Fin_Controller_Decls, New_List (
-           Make_Object_Declaration (Loc,
-             Defining_Identifier => Saved_Exception_Id,
-             Object_Definition   =>
-               New_Occurrence_Of (RTE (RE_Exception_Occurrence), Loc)),
-           Make_Object_Declaration (Loc,
-             Defining_Identifier => Raised_Post_Exception_Id,
-             Object_Definition   => New_Occurrence_Of (Standard_Boolean, Loc),
-             Expression          => New_Occurrence_Of (Standard_False, Loc)),
-           Make_Object_Declaration (Loc,
-             Defining_Identifier => Raised_Finalization_Exception_Id,
-             Object_Definition   => New_Occurrence_Of (Standard_Boolean, Loc),
-             Expression          => New_Occurrence_Of (Standard_False, Loc))));
-
-         --  Call _finalizer and save any exceptions which occur
-
-         --  Generate:
-         --
-         --    begin
-         --       _finalizer;
-         --    exception
-         --       when others =>
-         --          Raised_Finalization_Exception := True;
-         --          Save_Occurrence
-         --            (Saved_Exception, Get_Current_Excep.all);
-         --    end;
-
-         if Present (Fin_Id) then
-            Append_To (Fin_Controller_Stmts,
-              Make_Block_Statement (Loc,
-                Handled_Statement_Sequence =>
-                  Make_Handled_Sequence_Of_Statements (Loc,
-                    Statements         => New_List (
-                      Make_Procedure_Call_Statement (Loc,
-                        Name => New_Occurrence_Of (Fin_Id, Loc))),
-                    Exception_Handlers => New_List (
-                      Make_Exception_Handler (Loc,
-                        Exception_Choices => New_List (
-                          Make_Others_Choice (Loc)),
-                        Statements        => New_List (
-                          Make_Assignment_Statement (Loc,
-                            Name       =>
-                              New_Occurrence_Of
-                                (Raised_Finalization_Exception_Id, Loc),
-                            Expression =>
-                              New_Occurrence_Of (Standard_True, Loc)),
-                          Make_Procedure_Call_Statement (Loc,
-                             Name                   =>
-                               New_Occurrence_Of
-                                 (RTE (RE_Save_Occurrence), Loc),
-                             Parameter_Associations => New_List (
-                               New_Occurrence_Of
-                                 (Saved_Exception_Id, Loc),
-                               Make_Explicit_Dereference (Loc,
-                                 Prefix =>
-                                   Make_Function_Call (Loc,
-                                     Name =>
-                                       Make_Explicit_Dereference (Loc,
-                                         Prefix =>
-                                           New_Occurrence_Of
-                                             (RTE (RE_Get_Current_Excep),
-                                              Loc))))))))))));
-         end if;
-
-         --  Create the call to postconditions based on the kind of the current
-         --  subprogram, and the type of the Result_Obj_For_Postcond.
-
-         --  Generate:
-         --
-         --    _postconditions (Result_Obj_For_Postcond[.all]);
-         --
-         --   or
-         --
-         --    _postconditions;
-
-         if Ekind (Def_Ent) = E_Procedure then
-            Postconditions_Call :=
-              Make_Procedure_Call_Statement (Loc,
-                Name =>
-                  New_Occurrence_Of
-                    (Postconditions_Proc (Def_Ent), Loc));
-         else
-            Postconditions_Call :=
-              Make_Procedure_Call_Statement (Loc,
-                Name                   =>
-                  New_Occurrence_Of
-                    (Postconditions_Proc (Def_Ent), Loc),
-                Parameter_Associations => New_List (
-                  (if Is_Elementary_Type (Etype (Def_Ent)) then
-                      New_Occurrence_Of
-                        (Get_Result_Object_For_Postcond
-                          (Def_Ent), Loc)
-                   else
-                      Make_Explicit_Dereference (Loc,
-                        New_Occurrence_Of
-                          (Get_Result_Object_For_Postcond
-                            (Def_Ent), Loc)))));
-         end if;
-
-         --  Call _postconditions when no general finalization exceptions have
-         --  occurred taking care to enable the postconditions and save any
-         --  exception occurrences.
-
-         --  Generate:
-         --
-         --    if not Raised_Finalization_Exception
-         --      and then Return_Success_For_Postcond
-         --    then
-         --       begin
-         --          Postcond_Enabled := True;
-         --          _postconditions [(Result_Obj_For_Postcond[.all])];
-         --       exception
-         --          when others =>
-         --             Raised_Post_Exception := True;
-         --             Save_Occurrence
-         --               (Saved_Exception, Get_Current_Excep.all);
-         --       end;
-         --    end if;
-
-         Append_To (Fin_Controller_Stmts,
-           Make_If_Statement (Loc,
-             Condition       =>
-               Make_And_Then (Loc,
-                 Left_Opnd  =>
-                   Make_Op_Not (Loc,
-                     Right_Opnd =>
-                       New_Occurrence_Of
-                         (Raised_Finalization_Exception_Id, Loc)),
-                 Right_Opnd =>
-                   New_Occurrence_Of
-                     (Get_Return_Success_For_Postcond (Def_Ent), Loc)),
-             Then_Statements => New_List (
-               Make_Block_Statement (Loc,
-                 Handled_Statement_Sequence =>
-                   Make_Handled_Sequence_Of_Statements (Loc,
-                     Statements         => New_List (
-                       Make_Assignment_Statement (Loc,
-                         Name       =>
-                           New_Occurrence_Of
-                             (Get_Postcond_Enabled (Def_Ent), Loc),
-                         Expression =>
-                            New_Occurrence_Of
-                              (Standard_True, Loc)),
-                       Postconditions_Call),
-                     Exception_Handlers => New_List (
-                       Make_Exception_Handler (Loc,
-                         Exception_Choices => New_List (
-                           Make_Others_Choice (Loc)),
-                         Statements        => New_List (
-                           Make_Assignment_Statement (Loc,
-                             Name       =>
-                               New_Occurrence_Of
-                                 (Raised_Post_Exception_Id, Loc),
-                             Expression =>
-                               New_Occurrence_Of (Standard_True, Loc)),
-                           Make_Procedure_Call_Statement (Loc,
-                              Name                   =>
-                                New_Occurrence_Of
-                                  (RTE (RE_Save_Occurrence), Loc),
-                              Parameter_Associations => New_List (
-                                New_Occurrence_Of
-                                  (Saved_Exception_Id, Loc),
-                                Make_Explicit_Dereference (Loc,
-                                  Prefix =>
-                                    Make_Function_Call (Loc,
-                                      Name =>
-                                        Make_Explicit_Dereference (Loc,
-                                          Prefix =>
-                                            New_Occurrence_Of
-                                              (RTE (RE_Get_Current_Excep),
-                                               Loc))))))))))))));
-
-         --  Call _finalizer_old and reraise any exception that occurred during
-         --  initial finalization within the exception handler. Otherwise,
-         --  propagate the current exception.
-
-         --  Generate:
-         --
-         --    begin
-         --       _finalizer_old;
-         --    exception
-         --       when others =>
-         --          if Raised_Finalization_Exception then
-         --             Reraise_Occurrence (Saved_Exception);
-         --          end if;
-         --          raise;
-         --    end;
-
-         if Present (Fin_Old_Id) then
-            Append_To (Fin_Controller_Stmts,
-              Make_Block_Statement (Loc,
-                Handled_Statement_Sequence =>
-                  Make_Handled_Sequence_Of_Statements (Loc,
-                    Statements         => New_List (
-                      Make_Procedure_Call_Statement (Loc,
-                        Name => New_Occurrence_Of (Fin_Old_Id, Loc))),
-                    Exception_Handlers => New_List (
-                      Make_Exception_Handler (Loc,
-                        Exception_Choices => New_List (
-                          Make_Others_Choice (Loc)),
-                        Statements        => New_List (
-                          Make_If_Statement (Loc,
-                            Condition       =>
-                              New_Occurrence_Of
-                                (Raised_Finalization_Exception_Id, Loc),
-                            Then_Statements => New_List (
-                              Make_Procedure_Call_Statement (Loc,
-                                Name                   =>
-                                  New_Occurrence_Of
-                                    (RTE (RE_Reraise_Occurrence), Loc),
-                                Parameter_Associations => New_List (
-                                  New_Occurrence_Of
-                                    (Saved_Exception_Id, Loc))))),
-                          Make_Raise_Statement (Loc)))))));
-         end if;
-
-         --  Once finalization is complete reraise any pending exceptions
-
-         --  Generate:
-         --
-         --    if Raised_Post_Exception
-         --      or else Raised_Finalization_Exception
-         --    then
-         --       Reraise_Occurrence (Saved_Exception);
-         --    end if;
-
-         Append_To (Fin_Controller_Stmts,
-           Make_If_Statement (Loc,
-             Condition       =>
-               Make_Or_Else (Loc,
-                 Left_Opnd  =>
-                   New_Occurrence_Of
-                     (Raised_Post_Exception_Id, Loc),
-                 Right_Opnd =>
-                   New_Occurrence_Of
-                     (Raised_Finalization_Exception_Id, Loc)),
-             Then_Statements => New_List (
-               Make_Procedure_Call_Statement (Loc,
-                 Name            =>
-                   New_Occurrence_Of (RTE (RE_Reraise_Occurrence), Loc),
-                 Parameter_Associations => New_List (
-                   New_Occurrence_Of
-                     (Saved_Exception_Id, Loc))))));
-
-         --  Make the finalization controller subprogram body and declaration.
-
-         --  Generate:
-         --    procedure _finalization_controller;
-         --
-         --    procedure _finalization_controller is
-         --    begin
-         --       [Fin_Controller_Stmts];
-         --    end;
-
-         Fin_Controller_Id :=
-           Make_Defining_Identifier (Loc,
-             Chars => New_External_Name (Name_uFinalization_Controller));
-
-         Fin_Controller_Spec :=
-           Make_Subprogram_Declaration (Loc,
-             Specification =>
-               Make_Procedure_Specification (Loc,
-                 Defining_Unit_Name => Fin_Controller_Id));
-
-         Fin_Controller_Body :=
-           Make_Subprogram_Body (Loc,
-             Specification              =>
-               Make_Procedure_Specification (Loc,
-                 Defining_Unit_Name =>
-                   Make_Defining_Identifier (Loc, Chars (Fin_Controller_Id))),
-             Declarations               => Fin_Controller_Decls,
-             Handled_Statement_Sequence =>
-               Make_Handled_Sequence_Of_Statements (Loc,
-                 Statements => Fin_Controller_Stmts));
-
-         --  Disable _postconditions calls which get generated before return
-         --  statements to delay their evaluation until after finalization.
-
-         --  This is done by way of the local Postcond_Enabled object which is
-         --  initially assigned to True - we then create an assignment within
-         --  the subprogram's declaration to make it False and assign it back
-         --  to True before _postconditions is called within
-         --  _finalization_controller.
-
-         --  Generate:
-         --
-         --    Postcond_Enable := False;
-
-         --  Note that we do not disable early evaluation of postconditions
-         --  for return types that are unconstrained or have unconstrained
-         --  elements since the temporary result object could get allocated on
-         --  the stack and be out of scope at the point where we perform late
-         --  evaluation of postconditions - leading to uninitialized memory
-         --  reads.
-
-         --  This disabling of early evaluation can lead to incorrect run-time
-         --  semantics where functions with unconstrained elements will
-         --  have their corresponding postconditions evaluated before
-         --  finalization. The proper solution here is to generate a wrapper
-         --  to capture the result instead of using multiple flags and playing
-         --  with flags which does not even work in all cases ???
-
-         if not Has_Unconstrained_Elements (Etype (Def_Ent))
-           or else (Is_Array_Type (Etype (Def_Ent))
-                     and then not Is_Constrained (Etype (Def_Ent)))
-         then
-            Append_To (Top_Decls,
-              Make_Assignment_Statement (Loc,
-                Name       =>
-                  New_Occurrence_Of
-                    (Get_Postcond_Enabled (Def_Ent), Loc),
-                Expression =>
-                  New_Occurrence_Of
-                    (Standard_False, Loc)));
-         end if;
-
-         --  Add the subprogram to the list of declarations an analyze it
-
-         Append_To (Top_Decls, Fin_Controller_Spec);
-         Analyze (Fin_Controller_Spec);
-         Insert_After (Fin_Controller_Spec, Fin_Controller_Body);
-         Analyze (Fin_Controller_Body, Suppress => All_Checks);
-
-         --  Return the finalization controller as the result Fin_Id
-
-         Fin_Id := Fin_Controller_Id;
-      end if;
-   end Build_Finalizer;
 
    ---------------------
    -- Build_Late_Proc --
@@ -5012,7 +4452,7 @@ package body Exp_Ch7 is
    begin
       if Is_Derived_Type (Typ)
         and then Comes_From_Source (E)
-        and then not Present (Overridden_Operation (E))
+        and then No (Overridden_Operation (E))
       then
          --  We know that the explicit operation on the type does not override
          --  the inherited operation of the parent, and that the derivation
@@ -5124,26 +4564,6 @@ package body Exp_Ch7 is
          return Arg;
       end if;
    end Convert_View;
-
-   ------------------------
-   -- Enclosing_Function --
-   ------------------------
-
-   function Enclosing_Function (E : Entity_Id) return Entity_Id is
-      Func_Id : Entity_Id;
-
-   begin
-      Func_Id := E;
-      while Present (Func_Id) and then Func_Id /= Standard_Standard loop
-         if Ekind (Func_Id) = E_Function then
-            return Func_Id;
-         end if;
-
-         Func_Id := Scope (Func_Id);
-      end loop;
-
-      return Empty;
-   end Enclosing_Function;
 
    -------------------------------
    -- Establish_Transient_Scope --
@@ -5568,10 +4988,10 @@ package body Exp_Ch7 is
    procedure Expand_Cleanup_Actions (N : Node_Id) is
       pragma Assert
         (Nkind (N) in N_Block_Statement
-                    | N_Entry_Body
-                    | N_Extended_Return_Statement
                     | N_Subprogram_Body
-                    | N_Task_Body);
+                    | N_Task_Body
+                    | N_Entry_Body
+                    | N_Extended_Return_Statement);
 
       Scop : constant Entity_Id := Current_Scope;
 
@@ -5610,12 +5030,6 @@ package body Exp_Ch7 is
                                  Nkind (N) = N_Block_Statement
                                    and then Present (Cleanup_Actions (N));
 
-      Has_Postcondition      : constant Boolean :=
-                                 Nkind (N) = N_Subprogram_Body
-                                   and then Present
-                                              (Postconditions_Proc
-                                                (Unique_Defining_Entity (N)));
-
       Actions_Required       : constant Boolean :=
                                  Requires_Cleanup_Actions (N, True)
                                    or else Is_Asynchronous_Call
@@ -5626,53 +5040,8 @@ package body Exp_Ch7 is
                                    or else Needs_Sec_Stack_Mark
                                    or else Needs_Custom_Cleanup;
 
-      HSS : Node_Id := Handled_Statement_Sequence (N);
       Loc : Source_Ptr;
       Cln : List_Id;
-
-      procedure Wrap_HSS_In_Block;
-      --  Move HSS inside a new block along with the original exception
-      --  handlers. Make the newly generated block the sole statement of HSS.
-
-      -----------------------
-      -- Wrap_HSS_In_Block --
-      -----------------------
-
-      procedure Wrap_HSS_In_Block is
-         Block    : Node_Id;
-         Block_Id : Entity_Id;
-         End_Lab  : Node_Id;
-
-      begin
-         --  Preserve end label to provide proper cross-reference information
-
-         End_Lab := End_Label (HSS);
-         Block :=
-           Make_Block_Statement (Loc, Handled_Statement_Sequence => HSS);
-
-         Block_Id := New_Internal_Entity (E_Block, Current_Scope, Loc, 'B');
-         Set_Identifier (Block, New_Occurrence_Of (Block_Id, Loc));
-         Set_Etype (Block_Id, Standard_Void_Type);
-         Set_Block_Node (Block_Id, Identifier (Block));
-
-         --  Signal the finalization machinery that this particular block
-         --  contains the original context.
-
-         Set_Is_Finalization_Wrapper (Block);
-
-         Set_Handled_Statement_Sequence (N,
-           Make_Handled_Sequence_Of_Statements (Loc, New_List (Block)));
-         HSS := Handled_Statement_Sequence (N);
-
-         Set_First_Real_Statement (HSS, Block);
-         Set_End_Label (HSS, End_Lab);
-
-         --  Comment needed here, see RH for 1.306 ???
-
-         if Nkind (N) = N_Subprogram_Body then
-            Set_Has_Nested_Block_With_Handler (Scop);
-         end if;
-      end Wrap_HSS_In_Block;
 
    --  Start of processing for Expand_Cleanup_Actions
 
@@ -5744,12 +5113,14 @@ package body Exp_Ch7 is
          Cln := No_List;
       end if;
 
-      declare
-         Decls     : List_Id := Declarations (N);
-         Fin_Id    : Entity_Id;
-         Mark      : Entity_Id := Empty;
-         New_Decls : List_Id;
+      if No (Declarations (N)) then
+         Set_Declarations (N, New_List);
+      end if;
 
+      declare
+         Decls  : constant List_Id := Declarations (N);
+         Fin_Id : Entity_Id;
+         Mark   : Entity_Id := Empty;
       begin
          --  If we are generating expanded code for debugging purposes, use the
          --  Sloc of the point of insertion for the cleanup code. The Sloc will
@@ -5776,114 +5147,21 @@ package body Exp_Ch7 is
             Establish_Task_Master (N);
          end if;
 
-         New_Decls := New_List;
-
          --  If secondary stack is in use, generate:
          --
          --    Mnn : constant Mark_Id := SS_Mark;
 
          if Needs_Sec_Stack_Mark then
+            Set_Uses_Sec_Stack (Scop, False); -- avoid duplicate SS marks
             Mark := Make_Temporary (Loc, 'M');
 
-            Append_To (New_Decls, Build_SS_Mark_Call (Loc, Mark));
-            Set_Uses_Sec_Stack (Scop, False);
-         end if;
-
-         --  If exception handlers are present, wrap the sequence of statements
-         --  in a block since it is not possible to have exception handlers and
-         --  an At_End handler in the same construct.
-
-         if Present (Exception_Handlers (HSS)) then
-            Wrap_HSS_In_Block;
-
-         --  Ensure that the First_Real_Statement field is set
-
-         elsif No (First_Real_Statement (HSS)) then
-            Set_First_Real_Statement (HSS, First (Statements (HSS)));
-         end if;
-
-         --  Do not move the Activation_Chain declaration in the context of
-         --  task allocation blocks. Task allocation blocks use _chain in their
-         --  cleanup handlers and gigi complains if it is declared in the
-         --  sequence of statements of the scope that declares the handler.
-
-         if Is_Task_Allocation then
             declare
-               Chain : constant Entity_Id := Activation_Chain_Entity (N);
-               Decl  : Node_Id;
-
+               Mark_Call : constant Node_Id := Build_SS_Mark_Call (Loc, Mark);
             begin
-               Decl := First (Decls);
-               while Nkind (Decl) /= N_Object_Declaration
-                 or else Defining_Identifier (Decl) /= Chain
-               loop
-                  Next (Decl);
-
-                  --  A task allocation block should always include a _chain
-                  --  declaration.
-
-                  pragma Assert (Present (Decl));
-               end loop;
-
-               Remove (Decl);
-               Prepend_To (New_Decls, Decl);
+               Prepend_To (Decls, Mark_Call);
+               Analyze (Mark_Call);
             end;
          end if;
-
-         --  Move the _postconditions subprogram declaration and its associated
-         --  objects into the declarations section so that it is callable
-         --  within _postconditions.
-
-         if Has_Postcondition then
-            declare
-               Decl      : Node_Id;
-               Prev_Decl : Node_Id;
-
-            begin
-               Decl :=
-                 Prev (Subprogram_Body
-                        (Postconditions_Proc (Current_Subprogram)));
-               while Present (Decl) loop
-                  Prev_Decl := Prev (Decl);
-
-                  Remove (Decl);
-                  Prepend_To (New_Decls, Decl);
-
-                  exit when Nkind (Decl) = N_Subprogram_Declaration
-                              and then Chars (Corresponding_Body (Decl))
-                                         = Name_uPostconditions;
-
-                  Decl := Prev_Decl;
-               end loop;
-            end;
-         end if;
-
-         --  Ensure the presence of a declaration list in order to successfully
-         --  append all original statements to it.
-
-         if No (Decls) then
-            Set_Declarations (N, New_List);
-            Decls := Declarations (N);
-         end if;
-
-         --  Move the declarations into the sequence of statements in order to
-         --  have them protected by the At_End handler. It may seem weird to
-         --  put declarations in the sequence of statement but in fact nothing
-         --  forbids that at the tree level.
-
-         Append_List_To (Decls, Statements (HSS));
-         Set_Statements (HSS, Decls);
-
-         --  Reset the Sloc of the handled statement sequence to properly
-         --  reflect the new initial "statement" in the sequence.
-
-         Set_Sloc (HSS, Sloc (First (Decls)));
-
-         --  The declarations of finalizer spec and auxiliary variables replace
-         --  the old declarations that have been moved inward.
-
-         Set_Declarations (N, New_Decls);
-         Analyze_Declarations (New_Decls);
 
          --  Generate finalization calls for all controlled objects appearing
          --  in the statements of N. Add context specific cleanup for various
@@ -5893,7 +5171,7 @@ package body Exp_Ch7 is
            (N           => N,
             Clean_Stmts => Build_Cleanup_Statements (N, Cln),
             Mark_Id     => Mark,
-            Top_Decls   => New_Decls,
+            Top_Decls   => Decls,
             Defer_Abort => Nkind (Original_Node (N)) = N_Task_Body
                              or else Is_Master,
             Fin_Id      => Fin_Id);
@@ -5923,15 +5201,19 @@ package body Exp_Ch7 is
       --  This is done only for non-generic packages
 
       if Ekind (Spec_Id) = E_Package then
-         Push_Scope (Spec_Id);
-
-         --  Build dispatch tables of library level tagged types
+         --  Build dispatch tables of library-level tagged types for bodies
+         --  that are not compilation units (see Analyze_Compilation_Unit),
+         --  except for instances because they have no N_Compilation_Unit.
 
          if Tagged_Type_Expansion
            and then Is_Library_Level_Entity (Spec_Id)
+           and then (not Is_Compilation_Unit (Spec_Id)
+                      or else Is_Generic_Instance (Spec_Id))
          then
             Build_Static_Dispatch_Tables (N);
          end if;
+
+         Push_Scope (Spec_Id);
 
          Expand_CUDA_Package (N);
 
@@ -6082,12 +5364,13 @@ package body Exp_Ch7 is
          Pop_Scope;
       end if;
 
-      --  Build dispatch tables of library-level tagged types
+      --  Build dispatch tables of library-level tagged types for instances
+      --  that are not compilation units (see Analyze_Compilation_Unit).
 
       if Tagged_Type_Expansion
-        and then (Is_Compilation_Unit (Id)
-                   or else (Is_Generic_Instance (Id)
-                             and then Is_Library_Level_Entity (Id)))
+        and then Is_Library_Level_Entity (Id)
+        and then Is_Generic_Instance (Id)
+        and then not Is_Compilation_Unit (Id)
       then
          Build_Static_Dispatch_Tables (N);
       end if;
@@ -10177,9 +9460,6 @@ package body Exp_Ch7 is
             Make_Handled_Sequence_Of_Statements (Loc,
               Statements => New_List (Loop_Copy)));
 
-      Set_First_Real_Statement
-        (Handled_Statement_Sequence (Local_Body), Loop_Copy);
-
       Rewrite (Loop_Stmt, Local_Body);
       Analyze (Loop_Stmt);
 
@@ -10336,7 +9616,7 @@ package body Exp_Ch7 is
          --  reclamation is done by the caller.
 
          if Ekind (Curr_S) = E_Function
-           and then Returns_On_Secondary_Stack (Etype (Curr_S))
+           and then Needs_Secondary_Stack (Etype (Curr_S))
          then
             null;
 

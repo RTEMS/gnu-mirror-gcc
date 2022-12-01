@@ -772,6 +772,12 @@ extern void omp_clause_range_check_failed (const_tree, const char *, int,
    normal GNU extensions for target-specific vector types.  */
 #define TYPE_INDIVISIBLE_P(NODE) (TYPE_CHECK (NODE)->type_common.indivisible_p)
 
+/* True if this is a stdarg function with no named arguments (C2x
+   (...) prototype, where arguments can be accessed with va_start and
+   va_arg), as opposed to an unprototyped function.  */
+#define TYPE_NO_NAMED_ARGS_STDARG_P(NODE) \
+  (TYPE_CHECK (NODE)->type_common.no_named_args_stdarg_p)
+
 /* In an IDENTIFIER_NODE, this means that assemble_name was called with
    this string as an argument.  */
 #define TREE_SYMBOL_REFERENCED(NODE) \
@@ -1135,7 +1141,7 @@ extern void omp_clause_range_check_failed (const_tree, const char *, int,
 
 /* Define fields and accessors for some special-purpose tree nodes.  */
 
-/* As with STRING_CST, in C terms this is sizeof, not strlen.  */
+/* Unlike STRING_CST, in C terms this is strlen, not sizeof.  */
 #define IDENTIFIER_LENGTH(NODE) \
   (IDENTIFIER_NODE_CHECK (NODE)->identifier.id.len)
 #define IDENTIFIER_POINTER(NODE) \
@@ -1399,10 +1405,6 @@ class auto_suppress_location_wrappers
 #define OBJ_TYPE_REF_EXPR(NODE)	  TREE_OPERAND (OBJ_TYPE_REF_CHECK (NODE), 0)
 #define OBJ_TYPE_REF_OBJECT(NODE) TREE_OPERAND (OBJ_TYPE_REF_CHECK (NODE), 1)
 #define OBJ_TYPE_REF_TOKEN(NODE)  TREE_OPERAND (OBJ_TYPE_REF_CHECK (NODE), 2)
-
-/* ASSERT_EXPR accessors.  */
-#define ASSERT_EXPR_VAR(NODE)	TREE_OPERAND (ASSERT_EXPR_CHECK (NODE), 0)
-#define ASSERT_EXPR_COND(NODE)	TREE_OPERAND (ASSERT_EXPR_CHECK (NODE), 1)
 
 /* CALL_EXPR accessors.  */
 #define CALL_EXPR_FN(NODE) TREE_OPERAND (CALL_EXPR_CHECK (NODE), 1)
@@ -1722,8 +1724,15 @@ class auto_suppress_location_wrappers
 #define OMP_CLAUSE_DEPEND_KIND(NODE) \
   (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_DEPEND)->omp_clause.subcode.depend_kind)
 
-#define OMP_CLAUSE_DEPEND_SINK_NEGATIVE(NODE) \
+#define OMP_CLAUSE_DOACROSS_KIND(NODE) \
+  (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_DOACROSS)->omp_clause.subcode.doacross_kind)
+
+#define OMP_CLAUSE_DOACROSS_SINK_NEGATIVE(NODE) \
   TREE_PUBLIC (TREE_LIST_CHECK (NODE))
+
+/* True if DOACROSS clause is spelled as DEPEND.  */
+#define OMP_CLAUSE_DOACROSS_DEPEND(NODE) \
+  TREE_PROTECTED (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_DOACROSS))
 
 #define OMP_CLAUSE_MAP_KIND(NODE) \
   ((enum gomp_map_kind) OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_MAP)->omp_clause.subcode.map_kind)
@@ -1786,6 +1795,11 @@ class auto_suppress_location_wrappers
 #define OMP_CLAUSE_ORDERED_EXPR(NODE) \
   OMP_CLAUSE_OPERAND (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_ORDERED), 0)
 
+/* True on an OMP_CLAUSE_ORDERED if stand-alone ordered construct is nested
+   inside of work-sharing loop the clause is on.  */
+#define OMP_CLAUSE_ORDERED_DOACROSS(NODE) \
+  (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_ORDERED)->base.public_flag)
+
 /* True for unconstrained modifier on order(concurrent) clause.  */
 #define OMP_CLAUSE_ORDER_UNCONSTRAINED(NODE) \
   (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_ORDER)->base.public_flag)
@@ -1840,6 +1854,11 @@ class auto_suppress_location_wrappers
 /* True if a LINEAR clause has a stride that is variable.  */
 #define OMP_CLAUSE_LINEAR_VARIABLE_STRIDE(NODE) \
   TREE_PROTECTED (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_LINEAR))
+
+/* True for a LINEAR clause with old style modifier syntax
+   linear(modifier(list)) or linear(modifier(list):step).  */
+#define OMP_CLAUSE_LINEAR_OLD_LINEAR_MODIFIER(NODE) \
+  (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_LINEAR)->base.addressable_flag)
 
 /* True if a LINEAR clause is for an array or allocatable variable that
    needs special handling by the frontend.  */
@@ -1924,6 +1943,10 @@ class auto_suppress_location_wrappers
 
 #define OMP_CLAUSE_BIND_KIND(NODE) \
   (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_BIND)->omp_clause.subcode.bind_kind)
+
+/* True if ENTER clause is spelled as TO.  */
+#define OMP_CLAUSE_ENTER_TO(NODE) \
+  (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_ENTER)->base.public_flag)
 
 #define OMP_CLAUSE_TILE_LIST(NODE) \
   OMP_CLAUSE_OPERAND (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_TILE), 0)
@@ -2020,14 +2043,6 @@ class auto_suppress_location_wrappers
 /* Attributes for SSA_NAMEs for pointer-type variables.  */
 #define SSA_NAME_PTR_INFO(N) \
    SSA_NAME_CHECK (N)->ssa_name.info.ptr_info
-
-/* True if SSA_NAME_RANGE_INFO describes an anti-range.  */
-#define SSA_NAME_ANTI_RANGE_P(N) \
-    SSA_NAME_CHECK (N)->base.static_flag
-
-/* The type of range described by SSA_NAME_RANGE_INFO.  */
-#define SSA_NAME_RANGE_TYPE(N) \
-    (SSA_NAME_ANTI_RANGE_P (N) ? VR_ANTI_RANGE : VR_RANGE)
 
 /* Value range info attributes for SSA_NAMEs of non pointer-type variables.  */
 #define SSA_NAME_RANGE_INFO(N) \
@@ -2991,6 +3006,12 @@ extern void decl_value_expr_insert (tree, tree);
 /* Used in a FIELD_DECL to indicate that this field is padding.  */
 #define DECL_PADDING_P(NODE) \
   (FIELD_DECL_CHECK (NODE)->decl_common.decl_flag_3)
+
+/* Used in a FIELD_DECL to indicate whether this field is not a flexible
+   array member. This is only valid for the last array type field of a
+   structure.  */
+#define DECL_NOT_FLEXARRAY(NODE) \
+  (FIELD_DECL_CHECK (NODE)->decl_common.decl_not_flexarray)
 
 /* A numeric unique identifier for a LABEL_DECL.  The UID allocation is
    dense, unique within any one function, and may be used to index arrays.
@@ -4272,6 +4293,7 @@ tree_strip_any_location_wrapper (tree exp)
 #define float_type_node			global_trees[TI_FLOAT_TYPE]
 #define double_type_node		global_trees[TI_DOUBLE_TYPE]
 #define long_double_type_node		global_trees[TI_LONG_DOUBLE_TYPE]
+#define bfloat16_type_node		global_trees[TI_BFLOAT16_TYPE]
 
 /* Nodes for particular _FloatN and _FloatNx types in sequence.  */
 #define FLOATN_TYPE_NODE(IDX)		global_trees[TI_FLOATN_TYPE_FIRST + (IDX)]
@@ -4288,6 +4310,10 @@ tree_strip_any_location_wrapper (tree exp)
 #define float32x_type_node		global_trees[TI_FLOAT32X_TYPE]
 #define float64x_type_node		global_trees[TI_FLOAT64X_TYPE]
 #define float128x_type_node		global_trees[TI_FLOAT128X_TYPE]
+
+/* Type used by certain backends for __float128, which in C++ should be
+   distinct type from _Float128 for backwards compatibility reasons.  */
+#define float128t_type_node		global_trees[TI_FLOAT128T_TYPE]
 
 #define float_ptr_type_node		global_trees[TI_FLOAT_PTR_TYPE]
 #define double_ptr_type_node		global_trees[TI_DOUBLE_PTR_TYPE]
@@ -4682,6 +4708,13 @@ extern tree build_alloca_call_expr (tree, unsigned int, HOST_WIDE_INT);
 extern tree build_string_literal (unsigned, const char * = NULL,
 				  tree = char_type_node,
 				  unsigned HOST_WIDE_INT = HOST_WIDE_INT_M1U);
+inline tree build_string_literal (const char *p)
+{ return build_string_literal (strlen (p) + 1, p); }
+inline tree build_string_literal (tree t)
+{
+  return build_string_literal (IDENTIFIER_LENGTH (t) + 1,
+			       IDENTIFIER_POINTER (t));
+}
 
 /* Construct various nodes representing data types.  */
 
@@ -4703,7 +4736,7 @@ extern tree build_array_type_1 (tree, tree, bool, bool, bool);
 extern tree build_array_type (tree, tree, bool = false);
 extern tree build_nonshared_array_type (tree, tree);
 extern tree build_array_type_nelts (tree, poly_uint64);
-extern tree build_function_type (tree, tree);
+extern tree build_function_type (tree, tree, bool = false);
 extern tree build_function_type_list (tree, ...);
 extern tree build_varargs_function_type_list (tree, ...);
 extern tree build_function_type_array (tree, int, tree *);
@@ -5517,10 +5550,10 @@ extern tree array_ref_up_bound (tree);
    EXP, an ARRAY_REF or an ARRAY_RANGE_REF.  */
 extern tree array_ref_low_bound (tree);
 
-/* Returns true if REF is an array reference or a component reference
-   to an array at the end of a structure.  If this is the case, the array
-   may be allocated larger than its upper bound implies.  */
-extern bool array_at_struct_end_p (tree);
+/* Returns true if REF is an array reference, a component reference,
+   or a memory reference to an array whose actual size might be larger
+   than its upper bound implies.  */
+extern bool array_ref_flexible_size_p (tree);
 
 /* Return a tree representing the offset, in bytes, of the field referenced
    by EXP.  This does not include any offset in DECL_FIELD_BIT_OFFSET.  */
@@ -5530,10 +5563,10 @@ extern tree component_ref_field_offset (tree);
    returns null.  */
 enum struct special_array_member
   {
-   none,      /* Not a special array member.  */
-   int_0,     /* Interior array member with size zero.  */
-   trail_0,   /* Trailing array member with size zero.  */
-   trail_1    /* Trailing array member with one element.  */
+    none,	/* Not a special array member.  */
+    int_0,	/* Interior array member with size zero.  */
+    trail_0,	/* Trailing array member with size zero.  */
+    trail_1	/* Trailing array member with one element.  */
   };
 
 /* Return the size of the member referenced by the COMPONENT_REF, using
@@ -5848,6 +5881,11 @@ builtin_decl_implicit (enum built_in_function fncode)
 
   return builtin_info[uns_fncode].decl;
 }
+
+/* For BUILTIN_UNREACHABLE, use one of these or
+   gimple_build_builtin_unreachable instead of one of the above.  */
+extern tree builtin_decl_unreachable ();
+extern tree build_builtin_unreachable (location_t);
 
 /* Set explicit builtin function nodes and whether it is an implicit
    function.  */

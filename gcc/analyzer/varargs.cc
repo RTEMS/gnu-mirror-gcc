@@ -19,37 +19,29 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
+#define INCLUDE_MEMORY
 #include "system.h"
 #include "coretypes.h"
+#include "make-unique.h"
 #include "tree.h"
 #include "function.h"
 #include "basic-block.h"
 #include "gimple.h"
 #include "diagnostic-path.h"
-#include "json.h"
 #include "analyzer/analyzer.h"
 #include "analyzer/analyzer-logging.h"
 #include "analyzer/sm.h"
 #include "analyzer/pending-diagnostic.h"
-#include "tristate.h"
-#include "selftest.h"
 #include "analyzer/call-string.h"
 #include "analyzer/program-point.h"
 #include "analyzer/store.h"
 #include "analyzer/region-model.h"
 #include "analyzer/program-state.h"
 #include "analyzer/checker-path.h"
-#include "digraph.h"
-#include "ordered-hash-map.h"
-#include "cfg.h"
-#include "gimple-iterator.h"
 #include "analyzer/supergraph.h"
-#include "alloc-pool.h"
-#include "fibonacci_heap.h"
-#include "shortest-paths.h"
-#include "sbitmap.h"
 #include "analyzer/diagnostic-manager.h"
 #include "analyzer/exploded-graph.h"
+#include "diagnostic-metadata.h"
 
 #if ENABLE_ANALYZER
 
@@ -142,7 +134,7 @@ namespace ana {
      __builtin_va_start (&ap, [...]);
 
    except for the 2nd param of __builtin_va_copy, where the type
-   is already target-dependent (see the discussion of BT_VALIST_ARG
+   is already target-dependent (see the discussion of get_va_copy_arg
    below).  */
 
 /* Get a tree for diagnostics.
@@ -157,26 +149,32 @@ get_va_list_diag_arg (tree va_list_tree)
   return va_list_tree;
 }
 
-/* Get argument ARG_IDX of type BT_VALIST_ARG (for use by va_copy).
+/* Get argument ARG_IDX of va_copy.
 
    builtin-types.def has:
      DEF_PRIMITIVE_TYPE (BT_VALIST_ARG, va_list_arg_type_node)
 
    and c_common_nodes_and_builtins initializes va_list_arg_type_node
    based on whether TREE_CODE (va_list_type_node) is of ARRAY_TYPE or
-   not, giving either one or zero levels of indirection.  */
+   not, giving either one or zero levels of indirection.
+
+   Alternatively we could be dealing with __builtin_ms_va_copy or
+   __builtin_sysv_va_copy.
+
+   Handle this by looking at the types of the argument in question.  */
 
 static const svalue *
-get_BT_VALIST_ARG (const region_model *model,
-		   region_model_context *ctxt,
-		   const gcall *call,
-		   unsigned arg_idx)
+get_va_copy_arg (const region_model *model,
+		 region_model_context *ctxt,
+		 const gcall *call,
+		 unsigned arg_idx)
 {
   tree arg = gimple_call_arg (call, arg_idx);
   const svalue *arg_sval = model->get_rvalue (arg, ctxt);
   if (const svalue *cast = arg_sval->maybe_undo_cast ())
     arg_sval = cast;
-  if (TREE_CODE (va_list_type_node) == ARRAY_TYPE)
+  if (TREE_CODE (TREE_TYPE (arg)) == POINTER_TYPE
+      && TREE_CODE (TREE_TYPE (TREE_TYPE (arg))) == ARRAY_TYPE)
     {
       /* va_list_arg_type_node is a pointer to a va_list;
 	 return *ARG_SVAL.  */
@@ -216,9 +214,9 @@ public:
   {
     return s != m_started;
   }
-  pending_diagnostic *on_leak (tree var) const final override;
+  std::unique_ptr<pending_diagnostic> on_leak (tree var) const final override;
 
-  /* State for a va_list that the result of a va_start or va_copy.  */
+  /* State for a va_list that is the result of a va_start or va_copy.  */
   state_t m_started;
 
   /* State for a va_list that has had va_end called on it.  */
@@ -333,6 +331,19 @@ public:
     if (const char *fnname = maybe_get_fnname (change))
       return change.formatted_print ("%qs called here", fnname);
     return label_text ();
+  }
+
+  diagnostic_event::meaning
+  get_meaning_for_state_change (const evdesc::state_change &change)
+    const final override
+  {
+    if (change.m_new_state == m_sm.m_started)
+      return diagnostic_event::meaning (diagnostic_event::VERB_acquire,
+					diagnostic_event::NOUN_resource);
+    if (change.m_new_state == m_sm.m_ended)
+      return diagnostic_event::meaning (diagnostic_event::VERB_release,
+					diagnostic_event::NOUN_resource);
+    return diagnostic_event::meaning ();
   }
 
 protected:
@@ -544,23 +555,23 @@ va_list_state_machine::check_for_ended_va_list (sm_context *sm_ctxt,
 {
   if (sm_ctxt->get_state (call, arg) == m_ended)
     sm_ctxt->warn (node, call, arg,
-		   new va_list_use_after_va_end (*this, arg, NULL_TREE,
-						 usage_fnname));
+		   make_unique<va_list_use_after_va_end>
+		     (*this, arg, NULL_TREE, usage_fnname));
 }
 
-/* Get the svalue with associated va_list_state_machine state for a
-   BT_VALIST_ARG for ARG_IDX of CALL, if SM_CTXT supports this,
+/* Get the svalue with associated va_list_state_machine state for
+   ARG_IDX of CALL to va_copy, if SM_CTXT supports this,
    or NULL otherwise.  */
 
 static const svalue *
-get_stateful_BT_VALIST_ARG (sm_context *sm_ctxt,
-			    const gcall *call,
-			    unsigned arg_idx)
+get_stateful_va_copy_arg (sm_context *sm_ctxt,
+			  const gcall *call,
+			  unsigned arg_idx)
 {
   if (const program_state *new_state = sm_ctxt->get_new_program_state ())
     {
       const region_model *new_model = new_state->m_region_model;
-      const svalue *arg = get_BT_VALIST_ARG (new_model, NULL, call, arg_idx);
+      const svalue *arg = get_va_copy_arg (new_model, NULL, call, arg_idx);
       return arg;
     }
   return NULL;
@@ -573,7 +584,7 @@ va_list_state_machine::on_va_copy (sm_context *sm_ctxt,
 				   const supernode *node,
 				   const gcall *call) const
 {
-  const svalue *src_arg = get_stateful_BT_VALIST_ARG (sm_ctxt, call, 1);
+  const svalue *src_arg = get_stateful_va_copy_arg (sm_ctxt, call, 1);
   if (src_arg)
     check_for_ended_va_list (sm_ctxt, node, call, src_arg, "va_copy");
 
@@ -620,10 +631,10 @@ va_list_state_machine::on_va_end (sm_context *sm_ctxt,
 /* Implementation of state_machine::on_leak vfunc for va_list_state_machine
    (for complaining about leaks of values in state 'started').  */
 
-pending_diagnostic *
+std::unique_ptr<pending_diagnostic>
 va_list_state_machine::on_leak (tree var) const
 {
-  return new va_list_leak (*this, NULL, var);
+  return make_unique<va_list_leak> (*this, NULL, var);
 }
 
 } // anonymous namespace
@@ -636,59 +647,99 @@ make_va_list_state_machine (logger *logger)
   return new va_list_state_machine (logger);
 }
 
-/* Handle the on_call_pre part of "__builtin_va_start".  */
+/* Handler for "__builtin_va_start".  */
+
+class kf_va_start : public known_function
+{
+public:
+  bool matches_call_types_p (const call_details &) const final override
+  {
+    return true;
+  }
+  void impl_call_pre (const call_details &cd) const final override;
+};
 
 void
-region_model::impl_call_va_start (const call_details &cd)
+kf_va_start::impl_call_pre (const call_details &cd) const
 {
+  region_model *model = cd.get_model ();
+  region_model_manager *mgr = cd.get_manager ();
   const svalue *out_ptr = cd.get_arg_svalue (0);
   const region *out_reg
-    = deref_rvalue (out_ptr, cd.get_arg_tree (0), cd.get_ctxt ());
+    = model->deref_rvalue (out_ptr, cd.get_arg_tree (0), cd.get_ctxt ());
+  const frame_region *frame = model->get_current_frame ();
 
   /* "*out_ptr = &IMPL_REGION;".  */
-  const region *impl_reg = m_mgr->create_region_for_alloca (m_current_frame);
+  const region *impl_reg = mgr->create_region_for_alloca (frame);
 
   /* We abuse the types here, since va_list_type isn't
      necessarily anything to do with a pointer.  */
-  const svalue *ptr_to_impl_reg = m_mgr->get_ptr_svalue (NULL_TREE, impl_reg);
-  set_value (out_reg, ptr_to_impl_reg, cd.get_ctxt ());
+  const svalue *ptr_to_impl_reg = mgr->get_ptr_svalue (NULL_TREE, impl_reg);
+  model->set_value (out_reg, ptr_to_impl_reg, cd.get_ctxt ());
 
-  /* "*(&IMPL_REGION) = VA_LIST_VAL (0);".  */
-  const region *init_var_arg_reg
-    = m_mgr->get_var_arg_region (get_current_frame (), 0);
-  const svalue *ap_sval = m_mgr->get_ptr_svalue (NULL_TREE, init_var_arg_reg);
-  set_value (impl_reg, ap_sval, cd.get_ctxt ());
+  if (model->get_stack_depth () > 1)
+    {
+      /* The interprocedural case: the frame containing the va_start call
+	 will have been populated with any variadic aruguments.
+	 Initialize IMPL_REGION with a ptr to var_arg_region 0.  */
+      const region *init_var_arg_reg = mgr->get_var_arg_region (frame, 0);
+      const svalue *ap_sval
+	= mgr->get_ptr_svalue (NULL_TREE, init_var_arg_reg);
+      model->set_value (impl_reg, ap_sval, cd.get_ctxt ());
+    }
+  else
+    {
+      /* The frame containing va_start is an entry-point to the analysis,
+	 so there won't be any specific var_arg_regions populated within it.
+	 Initialize IMPL_REGION as the UNKNOWN_SVALUE to avoid state
+	 explosions on repeated calls to va_arg.  */
+      const svalue *unknown_sval
+	= mgr->get_or_create_unknown_svalue (NULL_TREE);
+      model->set_value (impl_reg, unknown_sval, cd.get_ctxt ());
+    }
 }
 
-/* Handle the on_call_pre part of "__builtin_va_copy".  */
+/* Handler for "__builtin_va_copy".  */
+
+class kf_va_copy : public known_function
+{
+public:
+  bool matches_call_types_p (const call_details &) const final override
+  {
+    return true;
+  }
+  void impl_call_pre (const call_details &cd) const final override;
+};
 
 void
-region_model::impl_call_va_copy (const call_details &cd)
+kf_va_copy::impl_call_pre (const call_details &cd) const
 {
+  region_model *model = cd.get_model ();
+  region_model_manager *mgr = cd.get_manager ();
   const svalue *out_dst_ptr = cd.get_arg_svalue (0);
   const svalue *in_va_list
-    = get_BT_VALIST_ARG (this, cd.get_ctxt (), cd.get_call_stmt (), 1);
-  in_va_list = check_for_poison (in_va_list,
-				 get_va_list_diag_arg (cd.get_arg_tree (1)),
-				 cd.get_ctxt ());
+    = get_va_copy_arg (model, cd.get_ctxt (), cd.get_call_stmt (), 1);
+  in_va_list
+    = model->check_for_poison (in_va_list,
+			       get_va_list_diag_arg (cd.get_arg_tree (1)),
+			       cd.get_ctxt ());
 
   const region *out_dst_reg
-    = deref_rvalue (out_dst_ptr, cd.get_arg_tree (0), cd.get_ctxt ());
+    = model->deref_rvalue (out_dst_ptr, cd.get_arg_tree (0), cd.get_ctxt ());
 
   /* "*out_dst_ptr = &NEW_IMPL_REGION;".  */
   const region *new_impl_reg
-    = m_mgr->create_region_for_alloca (m_current_frame);
+    = mgr->create_region_for_alloca (model->get_current_frame ());
   const svalue *ptr_to_new_impl_reg
-    = m_mgr->get_ptr_svalue (NULL_TREE, new_impl_reg);
-  set_value (out_dst_reg, ptr_to_new_impl_reg, cd.get_ctxt ());
+    = mgr->get_ptr_svalue (NULL_TREE, new_impl_reg);
+  model->set_value (out_dst_reg, ptr_to_new_impl_reg, cd.get_ctxt ());
 
   if (const region *old_impl_reg = in_va_list->maybe_get_region ())
     {
-
       /* "(NEW_IMPL_REGION) = (OLD_IMPL_REGION);".  */
       const svalue *existing_sval
-	= get_store_value (old_impl_reg, cd.get_ctxt ());
-      set_value (new_impl_reg, existing_sval, cd.get_ctxt ());
+	= model->get_store_value (old_impl_reg, cd.get_ctxt ());
+      model->set_value (new_impl_reg, existing_sval, cd.get_ctxt ());
     }
 }
 
@@ -761,13 +812,13 @@ public:
 	  = get_num_variadic_arguments (dst_node->get_function ()->decl,
 					call_stmt);
 	emission_path->add_event
-	  (new va_arg_call_event (eedge,
-				  (last_stmt
-				   ? last_stmt->location
-				   : UNKNOWN_LOCATION),
-				  src_point.get_fndecl (),
-				  src_stack_depth,
-				  num_variadic_arguments));
+	  (make_unique<va_arg_call_event> (eedge,
+					   (last_stmt
+					    ? last_stmt->location
+					    : UNKNOWN_LOCATION),
+					   src_point.get_fndecl (),
+					   src_stack_depth,
+					   num_variadic_arguments));
       }
     else
       pending_diagnostic::add_call_event (eedge, emission_path);
@@ -843,12 +894,15 @@ public:
   bool emit (rich_location *rich_loc) final override
   {
     auto_diagnostic_group d;
+    diagnostic_metadata m;
+    /* "CWE-686: Function Call With Incorrect Argument Type".  */
+    m.add_cwe (686);
     bool warned
-      = warning_at (rich_loc, get_controlling_option (),
-		    "%<va_arg%> expected %qT but received %qT"
-		    " for variadic argument %i of %qE",
-		    m_expected_type, m_actual_type,
-		    get_variadic_index_for_diagnostic (), m_va_list_tree);
+      = warning_meta (rich_loc, m, get_controlling_option (),
+		      "%<va_arg%> expected %qT but received %qT"
+		      " for variadic argument %i of %qE",
+		      m_expected_type, m_actual_type,
+		      get_variadic_index_for_diagnostic (), m_va_list_tree);
     return warned;
   }
 
@@ -890,9 +944,12 @@ public:
   bool emit (rich_location *rich_loc) final override
   {
     auto_diagnostic_group d;
-    bool warned = warning_at (rich_loc, get_controlling_option (),
-			      "%qE has no more arguments (%i consumed)",
-			      m_va_list_tree, get_num_consumed ());
+    diagnostic_metadata m;
+    /* CWE-685: Function Call With Incorrect Number of Arguments.  */
+    m.add_cwe (685);
+    bool warned = warning_meta (rich_loc, m, get_controlling_option (),
+				"%qE has no more arguments (%i consumed)",
+				m_va_list_tree, get_num_consumed ());
     return warned;
   }
 
@@ -923,26 +980,35 @@ maybe_get_var_arg_region (const svalue *ap_sval)
   return NULL;
 }
 
-/* Handle the on_call_pre part of "__builtin_va_arg".  */
+/* Handler for "__builtin_va_arg".  */
+
+class kf_va_arg : public internal_known_function
+{
+public:
+  void impl_call_pre (const call_details &cd) const final override;
+};
 
 void
-region_model::impl_call_va_arg (const call_details &cd)
+kf_va_arg::impl_call_pre (const call_details &cd) const
 {
   region_model_context *ctxt = cd.get_ctxt ();
+  region_model *model = cd.get_model ();
+  region_model_manager *mgr = cd.get_manager ();
 
   const svalue *in_ptr = cd.get_arg_svalue (0);
-  const region *ap_reg = deref_rvalue (in_ptr, cd.get_arg_tree (0), ctxt);
+  const region *ap_reg
+    = model->deref_rvalue (in_ptr, cd.get_arg_tree (0), ctxt);
 
-  const svalue *ap_sval = get_store_value (ap_reg, ctxt);
+  const svalue *ap_sval = model->get_store_value (ap_reg, ctxt);
   if (const svalue *cast = ap_sval->maybe_undo_cast ())
     ap_sval = cast;
 
   tree va_list_tree = get_va_list_diag_arg (cd.get_arg_tree (0));
-  ap_sval = check_for_poison (ap_sval, va_list_tree, ctxt);
+  ap_sval = model->check_for_poison (ap_sval, va_list_tree, ctxt);
 
   if (const region *impl_reg = ap_sval->maybe_get_region ())
     {
-      const svalue *old_impl_sval = get_store_value (impl_reg, ctxt);
+      const svalue *old_impl_sval = model->get_store_value (impl_reg, ctxt);
       if (const var_arg_region *arg_reg
 	  = maybe_get_var_arg_region (old_impl_sval))
 	{
@@ -951,7 +1017,7 @@ region_model::impl_call_va_arg (const call_details &cd)
 	  const frame_region *frame_reg = arg_reg->get_frame_region ();
 	  unsigned next_arg_idx = arg_reg->get_index ();
 
-	  if (get_stack_depth () > 1)
+	  if (frame_reg->get_stack_depth () > 1)
 	    {
 	      /* The interprocedural case: the called frame will have been
 		 populated with any variadic aruguments.
@@ -959,8 +1025,8 @@ region_model::impl_call_va_arg (const call_details &cd)
 		 has a conjured_svalue), or warn if there's a problem
 		 (incompatible types, or if we've run out of args).  */
 	      if (const svalue *arg_sval
-		  = m_store.get_any_binding (m_mgr->get_store_manager (),
-					     arg_reg))
+		  = model->get_store ()->get_any_binding
+		      (mgr->get_store_manager (), arg_reg))
 		{
 		  tree lhs_type = cd.get_lhs_type ();
 		  tree arg_type = arg_sval->get_type ();
@@ -969,17 +1035,19 @@ region_model::impl_call_va_arg (const call_details &cd)
 		  else
 		    {
 		      if (ctxt)
-			ctxt->warn (new va_arg_type_mismatch (va_list_tree,
-							      arg_reg,
-							      lhs_type,
-							      arg_type));
+			ctxt->warn (make_unique <va_arg_type_mismatch>
+				      (va_list_tree,
+				       arg_reg,
+				       lhs_type,
+				       arg_type));
 		      saw_problem = true;
 		    }
 		}
 	      else
 		{
 		  if (ctxt)
-		    ctxt->warn (new va_list_exhausted (va_list_tree, arg_reg));
+		    ctxt->warn (make_unique <va_list_exhausted> (va_list_tree,
+								 arg_reg));
 		  saw_problem = true;
 		}
 	    }
@@ -989,35 +1057,49 @@ region_model::impl_call_va_arg (const call_details &cd)
 		 any specific var_arg_regions populated within it.
 		 We already have a conjured_svalue for the result, so leave
 		 it untouched.  */
-	      gcc_assert (get_stack_depth () == 1);
+	      gcc_assert (frame_reg->get_stack_depth () == 1);
 	    }
 
 	  if (saw_problem)
 	    {
 	      /* Set impl_reg to UNKNOWN to suppress further warnings.  */
 	      const svalue *new_ap_sval
-		= m_mgr->get_or_create_unknown_svalue (impl_reg->get_type ());
-	      set_value (impl_reg, new_ap_sval, ctxt);
+		= mgr->get_or_create_unknown_svalue (impl_reg->get_type ());
+	      model->set_value (impl_reg, new_ap_sval, ctxt);
 	    }
 	  else
 	    {
 	      /* Update impl_reg to advance to the next arg.  */
 	      const region *next_var_arg_region
-		= m_mgr->get_var_arg_region (frame_reg, next_arg_idx + 1);
+		= mgr->get_var_arg_region (frame_reg, next_arg_idx + 1);
 	      const svalue *new_ap_sval
-		= m_mgr->get_ptr_svalue (NULL_TREE, next_var_arg_region);
-	      set_value (impl_reg, new_ap_sval, ctxt);
+		= mgr->get_ptr_svalue (NULL_TREE, next_var_arg_region);
+	      model->set_value (impl_reg, new_ap_sval, ctxt);
 	    }
 	}
     }
 }
 
-/* Handle the on_call_post part of "__builtin_va_end".  */
+/* Handler for "__builtin_va_end".  */
+
+class kf_va_end : public known_function
+{
+public:
+  bool matches_call_types_p (const call_details &) const
+  {
+    return true;
+  }
+};
+
+/* Populate KFM with instances of known functions relating to varargs.  */
 
 void
-region_model::impl_call_va_end (const call_details &)
+register_varargs_builtins (known_function_manager &kfm)
 {
-  /* No-op.  */
+  kfm.add (BUILT_IN_VA_START, make_unique<kf_va_start> ());
+  kfm.add (BUILT_IN_VA_COPY, make_unique<kf_va_copy> ());
+  kfm.add (IFN_VA_ARG, make_unique<kf_va_arg> ());
+  kfm.add (BUILT_IN_VA_END, make_unique<kf_va_end> ());
 }
 
 } // namespace ana

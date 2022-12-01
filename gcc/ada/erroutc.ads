@@ -209,7 +209,7 @@ package Erroutc is
       --  will be posted. Note that an error placed on an instantiation will
       --  have Sptr pointing to the instantiation point.
 
-      Optr : Source_Ptr;
+      Optr : Source_Span;
       --  Flag location used in the call to post the error. This is the same as
       --  Sptr, except when an error is posted on a particular instantiation of
       --  a generic. In such a case, Sptr will point to the original source
@@ -492,6 +492,10 @@ package Erroutc is
    function Count_Compile_Time_Pragma_Warnings return Int;
    --  Returns the number of warnings in the Errors table that were triggered
    --  by a Compile_Time_Warning pragma.
+
+   function Get_Warning_Option (Id : Error_Msg_Id) return String;
+   --  Returns the warning switch causing this warning message or an empty
+   --  string is there is none..
 
    function Get_Warning_Tag (Id : Error_Msg_Id) return String;
    --  Given an error message ID, return tag showing warning message class, or

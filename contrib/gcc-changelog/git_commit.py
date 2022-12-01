@@ -67,7 +67,6 @@ default_changelog_locations = {
     'libiberty',
     'libitm',
     'libobjc',
-    'liboffloadmic',
     'libphobos',
     'libquadmath',
     'libsanitizer',
@@ -366,6 +365,7 @@ class GitCommit:
             self.check_for_broken_parentheses()
             self.deduce_changelog_locations()
             self.check_file_patterns()
+            self.check_line_start()
             if not self.errors:
                 self.check_mentioned_files()
                 self.check_for_correct_changelog()
@@ -614,6 +614,13 @@ class GitCommit:
                 msg = 'bad parentheses wrapping'
                 self.errors.append(Error(msg, entry.parentheses_stack[-1]))
 
+    def check_line_start(self):
+        for entry in self.changelog_entries:
+            for line in entry.lines:
+                if line.startswith('\t '):
+                    msg = 'extra space after tab'
+                    self.errors.append(Error(msg, line))
+
     def get_file_changelog_location(self, changelog_file):
         for file in self.info.modified_files:
             if file[0] == changelog_file:
@@ -626,7 +633,7 @@ class GitCommit:
 
     def deduce_changelog_locations(self):
         for entry in self.changelog_entries:
-            if not entry.folder:
+            if entry.folder is None:
                 changelog = None
                 for file in entry.files:
                     location = self.get_file_changelog_location(file)

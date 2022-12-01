@@ -57,16 +57,19 @@
 #define _STL_ALGO_H 1
 
 #include <bits/algorithmfwd.h>
+#include <bits/stl_algobase.h>
 #include <bits/stl_heap.h>
-#include <bits/stl_tempbuf.h>  // for _Temporary_buffer
 #include <bits/predefined_ops.h>
 
 #if __cplusplus >= 201103L
 #include <bits/uniform_int_dist.h>
 #endif
 
-#if _GLIBCXX_HOSTED && (__cplusplus <= 201103L || _GLIBCXX_USE_DEPRECATED)
-#include <cstdlib>	     // for rand
+#if _GLIBCXX_HOSTED
+# include <bits/stl_tempbuf.h>  // for _Temporary_buffer
+# if (__cplusplus <= 201103L || _GLIBCXX_USE_DEPRECATED)
+#  include <cstdlib>	     // for rand
+# endif
 #endif
 
 // See concept_check.h for the __glibcxx_*_requires macros.
@@ -1491,6 +1494,7 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
 	}
     }
 
+#if _GLIBCXX_HOSTED
   // partition
 
   /// This is a helper function...
@@ -1616,6 +1620,7 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
       return std::__stable_partition(__first, __last,
 				     __gnu_cxx::__ops::__pred_iter(__pred));
     }
+#endif // HOSTED
 
   /// @cond undocumented
 
@@ -2390,28 +2395,42 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
     }
 
   /// This is a helper function for the merge routines.
-  template<typename _BidirectionalIterator, typename _Distance, 
+  template<typename _BidirectionalIterator, typename _Distance,
 	   typename _Pointer, typename _Compare>
     void
     __merge_adaptive(_BidirectionalIterator __first,
 		     _BidirectionalIterator __middle,
 		     _BidirectionalIterator __last,
 		     _Distance __len1, _Distance __len2,
-		     _Pointer __buffer, _Distance __buffer_size,
-		     _Compare __comp)
+		     _Pointer __buffer, _Compare __comp)
     {
-      if (__len1 <= __len2 && __len1 <= __buffer_size)
+      if (__len1 <= __len2)
 	{
 	  _Pointer __buffer_end = _GLIBCXX_MOVE3(__first, __middle, __buffer);
 	  std::__move_merge_adaptive(__buffer, __buffer_end, __middle, __last,
 				     __first, __comp);
 	}
-      else if (__len2 <= __buffer_size)
+      else
 	{
 	  _Pointer __buffer_end = _GLIBCXX_MOVE3(__middle, __last, __buffer);
 	  std::__move_merge_adaptive_backward(__first, __middle, __buffer,
 					      __buffer_end, __last, __comp);
 	}
+    }
+
+  template<typename _BidirectionalIterator, typename _Distance,
+	   typename _Pointer, typename _Compare>
+    void
+    __merge_adaptive_resize(_BidirectionalIterator __first,
+			    _BidirectionalIterator __middle,
+			    _BidirectionalIterator __last,
+			    _Distance __len1, _Distance __len2,
+			    _Pointer __buffer, _Distance __buffer_size,
+			    _Compare __comp)
+    {
+      if (__len1 <= __buffer_size || __len2 <= __buffer_size)
+	std::__merge_adaptive(__first, __middle, __last,
+			      __len1, __len2, __buffer, __comp);
       else
 	{
 	  _BidirectionalIterator __first_cut = __first;
@@ -2439,14 +2458,14 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
 
 	  _BidirectionalIterator __new_middle
 	    = std::__rotate_adaptive(__first_cut, __middle, __second_cut,
-				     __len1 - __len11, __len22, __buffer,
-				     __buffer_size);
-	  std::__merge_adaptive(__first, __first_cut, __new_middle, __len11,
-				__len22, __buffer, __buffer_size, __comp);
-	  std::__merge_adaptive(__new_middle, __second_cut, __last,
-				__len1 - __len11,
-				__len2 - __len22, __buffer,
-				__buffer_size, __comp);
+				     __len1 - __len11, __len22,
+				     __buffer, __buffer_size);
+	  std::__merge_adaptive_resize(__first, __first_cut, __new_middle,
+				       __len11, __len22,
+				       __buffer, __buffer_size, __comp);
+	  std::__merge_adaptive_resize(__new_middle, __second_cut, __last,
+				       __len1 - __len11, __len2 - __len22,
+				       __buffer, __buffer_size, __comp);
 	}
     }
 
@@ -2512,7 +2531,6 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
 	  _ValueType;
       typedef typename iterator_traits<_BidirectionalIterator>::difference_type
 	  _DistanceType;
-      typedef _Temporary_buffer<_BidirectionalIterator, _ValueType> _TmpBuf;
 
       if (__first == __middle || __middle == __last)
 	return;
@@ -2520,17 +2538,26 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
       const _DistanceType __len1 = std::distance(__first, __middle);
       const _DistanceType __len2 = std::distance(__middle, __last);
 
+#if _GLIBCXX_HOSTED
+      typedef _Temporary_buffer<_BidirectionalIterator, _ValueType> _TmpBuf;
       // __merge_adaptive will use a buffer for the smaller of
       // [first,middle) and [middle,last).
       _TmpBuf __buf(__first, std::min(__len1, __len2));
 
-      if (__buf.begin() == 0)
+      if (__builtin_expect(__buf.size() == __buf.requested_size(), true))
+	std::__merge_adaptive
+	  (__first, __middle, __last, __len1, __len2, __buf.begin(), __comp);
+      else if (__builtin_expect(__buf.begin() == 0, false))
 	std::__merge_without_buffer
 	  (__first, __middle, __last, __len1, __len2, __comp);
       else
-	std::__merge_adaptive
+	std::__merge_adaptive_resize
 	  (__first, __middle, __last, __len1, __len2, __buf.begin(),
 	   _DistanceType(__buf.size()), __comp);
+#else
+      std::__merge_without_buffer
+	(__first, __middle, __last, __len1, __len2, __comp);
+#endif
     }
 
   /**
@@ -2709,34 +2736,46 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
 	}
     }
 
+  template<typename _RandomAccessIterator, typename _Pointer, typename _Compare>
+    void
+    __stable_sort_adaptive(_RandomAccessIterator __first,
+			   _RandomAccessIterator __middle,
+			   _RandomAccessIterator __last,
+			   _Pointer __buffer, _Compare __comp)
+    {
+      std::__merge_sort_with_buffer(__first, __middle, __buffer, __comp);
+      std::__merge_sort_with_buffer(__middle, __last, __buffer, __comp);
+
+      std::__merge_adaptive(__first, __middle, __last,
+			    __middle - __first, __last - __middle,
+			    __buffer, __comp);
+    }
+
   template<typename _RandomAccessIterator, typename _Pointer,
 	   typename _Distance, typename _Compare>
     void
-    __stable_sort_adaptive(_RandomAccessIterator __first,
-			   _RandomAccessIterator __last,
-			   _Pointer __buffer, _Distance __buffer_size,
-			   _Compare __comp)
+    __stable_sort_adaptive_resize(_RandomAccessIterator __first,
+				  _RandomAccessIterator __last,
+				  _Pointer __buffer, _Distance __buffer_size,
+				  _Compare __comp)
     {
       const _Distance __len = (__last - __first + 1) / 2;
       const _RandomAccessIterator __middle = __first + __len;
       if (__len > __buffer_size)
 	{
-	  std::__stable_sort_adaptive(__first, __middle, __buffer,
-				      __buffer_size, __comp);
-	  std::__stable_sort_adaptive(__middle, __last, __buffer,
-				      __buffer_size, __comp);
+	  std::__stable_sort_adaptive_resize(__first, __middle, __buffer,
+					     __buffer_size, __comp);
+	  std::__stable_sort_adaptive_resize(__middle, __last, __buffer,
+					     __buffer_size, __comp);
+	  std::__merge_adaptive_resize(__first, __middle, __last,
+				       _Distance(__middle - __first),
+				       _Distance(__last - __middle),
+				       __buffer, __buffer_size,
+				       __comp);
 	}
       else
-	{
-	  std::__merge_sort_with_buffer(__first, __middle, __buffer, __comp);
-	  std::__merge_sort_with_buffer(__middle, __last, __buffer, __comp);
-	}
-
-      std::__merge_adaptive(__first, __middle, __last,
-			    _Distance(__middle - __first),
-			    _Distance(__last - __middle),
-			    __buffer, __buffer_size,
-			    __comp);
+	std::__stable_sort_adaptive(__first, __middle, __last,
+				    __buffer, __comp);
     }
 
   /// This is a helper function for the stable sorting routines.
@@ -4555,7 +4594,6 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
 	      std::iter_swap(__i, __j);
 	  }
     }
-#endif
 
   /**
    *  @brief Shuffle the elements of a sequence using a random number
@@ -4599,6 +4637,7 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
 	    std::iter_swap(__i, __j);
 	}
     }
+#endif // HOSTED
 #endif // C++11 || USE_DEPRECATED
 
   /**
@@ -4987,20 +5026,28 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
 	_ValueType;
       typedef typename iterator_traits<_RandomAccessIterator>::difference_type
 	_DistanceType;
-      typedef _Temporary_buffer<_RandomAccessIterator, _ValueType> _TmpBuf;
 
       if (__first == __last)
 	return;
 
+#if _GLIBCXX_HOSTED
+      typedef _Temporary_buffer<_RandomAccessIterator, _ValueType> _TmpBuf;
       // __stable_sort_adaptive sorts the range in two halves,
       // so the buffer only needs to fit half the range at once.
       _TmpBuf __buf(__first, (__last - __first + 1) / 2);
 
-      if (__buf.begin() == 0)
+      if (__builtin_expect(__buf.requested_size() == __buf.size(), true))
+	std::__stable_sort_adaptive(__first,
+				    __first + _DistanceType(__buf.size()),
+				    __last, __buf.begin(), __comp);
+      else if (__builtin_expect(__buf.begin() == 0, false))
 	std::__inplace_stable_sort(__first, __last, __comp);
       else
-	std::__stable_sort_adaptive(__first, __last, __buf.begin(),
-				    _DistanceType(__buf.size()), __comp);
+	std::__stable_sort_adaptive_resize(__first, __last, __buf.begin(),
+					   _DistanceType(__buf.size()), __comp);
+#else
+      std::__inplace_stable_sort(__first, __last, __comp);
+#endif
     }
 
   /**

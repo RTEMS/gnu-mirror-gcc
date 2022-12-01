@@ -532,7 +532,12 @@ set_lattice_value (tree var, ccp_prop_value_t *new_val)
      use the meet operator to retain a conservative value.
      Missed optimizations like PR65851 makes this necessary.
      It also ensures we converge to a stable lattice solution.  */
-  if (old_val->lattice_val != UNINITIALIZED)
+  if (old_val->lattice_val != UNINITIALIZED
+      /* But avoid using meet for constant -> copy transitions.  */
+      && !(old_val->lattice_val == CONSTANT
+	   && CONSTANT_CLASS_P (old_val->value)
+	   && new_val->lattice_val == CONSTANT
+	   && TREE_CODE (new_val->value) == SSA_NAME))
     ccp_lattice_meet (new_val, old_val);
 
   gcc_checking_assert (valid_lattice_transition (*old_val, *new_val));
@@ -1934,6 +1939,18 @@ bit_value_binop (enum tree_code code, signop sgn, int width,
       {
 	widest_int r1max = r1val | r1mask;
 	widest_int r2max = r2val | r2mask;
+	if (r2mask == 0 && !wi::neg_p (r1max))
+	  {
+	    widest_int shift = wi::exact_log2 (r2val);
+	    if (shift != -1)
+	      {
+		// Handle division by a power of 2 as an rshift.
+		bit_value_binop (RSHIFT_EXPR, sgn, width, val, mask,
+				 r1type_sgn, r1type_precision, r1val, r1mask,
+				 r2type_sgn, r2type_precision, shift, r2mask);
+		return;
+	      }
+	  }
 	if (sgn == UNSIGNED
 	    || (!wi::neg_p (r1max) && !wi::neg_p (r2max)))
 	  {
@@ -2994,14 +3011,17 @@ public:
   {}
 
   /* opt_pass methods: */
-  opt_pass * clone () { return new pass_ccp (m_ctxt); }
-  void set_pass_param (unsigned int n, bool param)
+  opt_pass * clone () final override { return new pass_ccp (m_ctxt); }
+  void set_pass_param (unsigned int n, bool param) final override
     {
       gcc_assert (n == 0);
       nonzero_p = param;
     }
-  virtual bool gate (function *) { return flag_tree_ccp != 0; }
-  virtual unsigned int execute (function *) { return do_ssa_ccp (nonzero_p); }
+  bool gate (function *) final override { return flag_tree_ccp != 0; }
+  unsigned int execute (function *) final override
+  {
+    return do_ssa_ccp (nonzero_p);
+  }
 
  private:
   /* Determines whether the pass instance records nonzero bits.  */
@@ -3468,17 +3488,35 @@ optimize_atomic_bit_test_and (gimple_stmt_iterator *gsip,
 	{
 	  gimple *use_nop_stmt;
 	  if (!single_imm_use (use_lhs, &use_p, &use_nop_stmt)
-	      || !is_gimple_assign (use_nop_stmt))
+	      || (!is_gimple_assign (use_nop_stmt)
+		  && gimple_code (use_nop_stmt) != GIMPLE_COND))
 	    return false;
-	  tree use_nop_lhs = gimple_assign_lhs (use_nop_stmt);
-	  rhs_code = gimple_assign_rhs_code (use_nop_stmt);
-	  if (rhs_code != BIT_AND_EXPR)
+	  /* Handle both
+	     _4 = _5 < 0;
+	     and
+	     if (_5 < 0)
+	   */
+	  tree use_nop_lhs = nullptr;
+	  rhs_code = ERROR_MARK;
+	  if (is_gimple_assign (use_nop_stmt))
 	    {
-	      if (TREE_CODE (use_nop_lhs) == SSA_NAME
+	      use_nop_lhs = gimple_assign_lhs (use_nop_stmt);
+	      rhs_code = gimple_assign_rhs_code (use_nop_stmt);
+	    }
+	  if (!use_nop_lhs || rhs_code != BIT_AND_EXPR)
+	    {
+	      /* Also handle
+		 if (_5 < 0)
+	       */
+	      if (use_nop_lhs
+		  && TREE_CODE (use_nop_lhs) == SSA_NAME
 		  && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (use_nop_lhs))
 		return false;
-	      if (rhs_code == BIT_NOT_EXPR)
+	      if (use_nop_lhs && rhs_code == BIT_NOT_EXPR)
 		{
+		  /* Handle
+		     _7 = ~_2;
+		   */
 		  g = convert_atomic_bit_not (fn, use_nop_stmt, lhs,
 					      mask);
 		  if (!g)
@@ -3509,14 +3547,31 @@ optimize_atomic_bit_test_and (gimple_stmt_iterator *gsip,
 		}
 	      else
 		{
-		  if (TREE_CODE (TREE_TYPE (use_nop_lhs)) != BOOLEAN_TYPE)
-		    return false;
+		  tree cmp_rhs1, cmp_rhs2;
+		  if (use_nop_lhs)
+		    {
+		      /* Handle
+			 _4 = _5 < 0;
+		       */
+		      if (TREE_CODE (TREE_TYPE (use_nop_lhs))
+			  != BOOLEAN_TYPE)
+			return false;
+		      cmp_rhs1 = gimple_assign_rhs1 (use_nop_stmt);
+		      cmp_rhs2 = gimple_assign_rhs2 (use_nop_stmt);
+		    }
+		  else
+		    {
+		      /* Handle
+			 if (_5 < 0)
+		       */
+		      rhs_code = gimple_cond_code (use_nop_stmt);
+		      cmp_rhs1 = gimple_cond_lhs (use_nop_stmt);
+		      cmp_rhs2 = gimple_cond_rhs (use_nop_stmt);
+		    }
 		  if (rhs_code != GE_EXPR && rhs_code != LT_EXPR)
 		    return false;
-		  tree cmp_rhs1 = gimple_assign_rhs1 (use_nop_stmt);
 		  if (use_lhs != cmp_rhs1)
 		    return false;
-		  tree cmp_rhs2 = gimple_assign_rhs2 (use_nop_stmt);
 		  if (!integer_zerop (cmp_rhs2))
 		    return false;
 
@@ -3544,6 +3599,14 @@ optimize_atomic_bit_test_and (gimple_stmt_iterator *gsip,
 			 _1 = __atomic_fetch_and_4 (ptr_6, 0x7fffffff, _3);
 			 _6 = _1 & 0x80000000;
 			 _4 = _6 != 0 or _6 == 0;
+			 and convert
+			 _1 = __atomic_fetch_and_4 (ptr_6, 0x7fffffff, _3);
+			 _5 = (signed int) _1;
+			 if (_5 < 0 or _5 >= 0)
+			 to
+			 _1 = __atomic_fetch_and_4 (ptr_6, 0x7fffffff, _3);
+			 _6 = _1 & 0x80000000;
+			 if (_6 != 0 or _6 == 0)
 		       */
 		      and_mask = build_int_cst (TREE_TYPE (use_rhs),
 						highest);
@@ -3564,6 +3627,14 @@ optimize_atomic_bit_test_and (gimple_stmt_iterator *gsip,
 			 _1 = __atomic_fetch_or_4 (ptr_6, 0x80000000, _3);
 			 _6 = _1 & 0x80000000;
 			 _4 = _6 != 0 or _6 == 0;
+			 and convert
+			 _1 = __atomic_fetch_or_4 (ptr_6, 0x80000000, _3);
+			 _5 = (signed int) _1;
+			 if (_5 < 0 or _5 >= 0)
+			 to
+			 _1 = __atomic_fetch_or_4 (ptr_6, 0x80000000, _3);
+			 _6 = _1 & 0x80000000;
+			 if (_6 != 0 or _6 == 0)
 		       */
 		    }
 		  var = make_ssa_name (TREE_TYPE (use_rhs));
@@ -3574,11 +3645,14 @@ optimize_atomic_bit_test_and (gimple_stmt_iterator *gsip,
 		  gsi = gsi_for_stmt (use_nop_stmt);
 		  gsi_insert_before (&gsi, g, GSI_NEW_STMT);
 		  use_stmt = g;
-		  g = gimple_build_assign (use_nop_lhs,
-					   (rhs_code == GE_EXPR
-					    ? EQ_EXPR : NE_EXPR),
-					   var,
-					   build_zero_cst (TREE_TYPE (use_rhs)));
+		  rhs_code = rhs_code == GE_EXPR ? EQ_EXPR : NE_EXPR;
+		  tree const_zero = build_zero_cst (TREE_TYPE (use_rhs));
+		  if (use_nop_lhs)
+		    g = gimple_build_assign (use_nop_lhs, rhs_code,
+					     var, const_zero);
+		  else
+		    g = gimple_build_cond (rhs_code, var, const_zero,
+					   nullptr, nullptr);
 		  gsi_insert_after (&gsi, g, GSI_NEW_STMT);
 		  gsi = gsi_for_stmt (use_nop_stmt);
 		  gsi_remove (&gsi, true);
@@ -3789,11 +3863,12 @@ optimize_atomic_bit_test_and (gimple_stmt_iterator *gsip,
   tree new_lhs = make_ssa_name (TREE_TYPE (lhs));
   tree flag = build_int_cst (TREE_TYPE (lhs), use_bool);
   if (has_model_arg)
-    g = gimple_build_call_internal (fn, 4, gimple_call_arg (call, 0),
-				    bit, flag, gimple_call_arg (call, 2));
+    g = gimple_build_call_internal (fn, 5, gimple_call_arg (call, 0),
+				    bit, flag, gimple_call_arg (call, 2),
+				    gimple_call_fn (call));
   else
-    g = gimple_build_call_internal (fn, 3, gimple_call_arg (call, 0),
-				    bit, flag);
+    g = gimple_build_call_internal (fn, 4, gimple_call_arg (call, 0),
+				    bit, flag, gimple_call_fn (call));
   gimple_call_set_lhs (g, new_lhs);
   gimple_set_location (g, gimple_location (call));
   gimple_move_vops (g, call);
@@ -4003,14 +4078,16 @@ optimize_atomic_op_fetch_cmp_0 (gimple_stmt_iterator *gsip,
   gimple *g;
   tree flag = build_int_cst (TREE_TYPE (lhs), encoded);
   if (has_model_arg)
+    g = gimple_build_call_internal (fn, 5, flag,
+				    gimple_call_arg (call, 0),
+				    gimple_call_arg (call, 1),
+				    gimple_call_arg (call, 2),
+				    gimple_call_fn (call));
+  else
     g = gimple_build_call_internal (fn, 4, flag,
 				    gimple_call_arg (call, 0),
 				    gimple_call_arg (call, 1),
-				    gimple_call_arg (call, 2));
-  else
-    g = gimple_build_call_internal (fn, 3, flag,
-				    gimple_call_arg (call, 0),
-				    gimple_call_arg (call, 1));
+				    gimple_call_fn (call));
   gimple_call_set_lhs (g, new_lhs);
   gimple_set_location (g, gimple_location (call));
   gimple_move_vops (g, call);
@@ -4199,8 +4276,8 @@ public:
   {}
 
   /* opt_pass methods: */
-  opt_pass * clone () { return new pass_fold_builtins (m_ctxt); }
-  virtual unsigned int execute (function *);
+  opt_pass * clone () final override { return new pass_fold_builtins (m_ctxt); }
+  unsigned int execute (function *) final override;
 
 }; // class pass_fold_builtins
 
@@ -4247,6 +4324,12 @@ pass_fold_builtins::execute (function *fun)
 	    }
 
 	  callee = gimple_call_fndecl (stmt);
+	  if (!callee
+	      && gimple_call_internal_p (stmt, IFN_ASSUME))
+	    {
+	      gsi_remove (&i, true);
+	      continue;
+	    }
 	  if (!callee || !fndecl_built_in_p (callee, BUILT_IN_NORMAL))
 	    {
 	      gsi_next (&i);
@@ -4550,9 +4633,9 @@ public:
   {}
 
   /* opt_pass methods: */
-  opt_pass * clone () { return new pass_post_ipa_warn (m_ctxt); }
-  virtual bool gate (function *) { return warn_nonnull != 0; }
-  virtual unsigned int execute (function *);
+  opt_pass * clone () final override { return new pass_post_ipa_warn (m_ctxt); }
+  bool gate (function *) final override { return warn_nonnull != 0; }
+  unsigned int execute (function *) final override;
 
 }; // class pass_fold_builtins
 

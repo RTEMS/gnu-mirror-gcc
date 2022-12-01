@@ -64,6 +64,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-inline.h"
 #include "tree-ssa.h"
 #include "tree-eh.h"
+#include "diagnostic-core.h"
 
 /* AddressSanitizer finds out-of-bounds and use-after-free bugs
    with <2x slowdown on average.
@@ -1285,7 +1286,20 @@ has_stmt_been_instrumented_p (gimple *stmt)
 
       if (get_mem_ref_of_assignment (as_a <gassign *> (stmt), &r,
 				     &r_is_store))
-	return has_mem_ref_been_instrumented (&r);
+	{
+	  if (!has_mem_ref_been_instrumented (&r))
+	    return false;
+	  if (r_is_store && gimple_assign_load_p (stmt))
+	    {
+	      asan_mem_ref src;
+	      asan_mem_ref_init (&src, NULL, 1);
+	      src.start = gimple_assign_rhs1 (stmt);
+	      src.access_size = int_size_in_bytes (TREE_TYPE (src.start));
+	      if (!has_mem_ref_been_instrumented (&src))
+		return false;
+	    }
+	  return true;
+	}
     }
   else if (gimple_call_builtin_p (stmt, BUILT_IN_NORMAL))
     {
@@ -1804,6 +1818,11 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
   unsigned char cur_shadow_byte = ASAN_STACK_MAGIC_LEFT;
   tree str_cst, decl, id;
   int use_after_return_class = -1;
+
+  /* Don't emit anything when doing error recovery, the assertions
+     might fail e.g. if a function had a frame offset overflow.  */
+  if (seen_error ())
+    return NULL;
 
   if (shadow_ptr_types[0] == NULL_TREE)
     asan_init_shadow_ptr_types ();
@@ -4209,9 +4228,15 @@ public:
   {}
 
   /* opt_pass methods: */
-  opt_pass * clone () { return new pass_asan (m_ctxt); }
-  virtual bool gate (function *) { return gate_asan () || gate_hwasan (); }
-  virtual unsigned int execute (function *) { return asan_instrument (); }
+  opt_pass * clone () final override { return new pass_asan (m_ctxt); }
+  bool gate (function *) final override
+  {
+    return gate_asan () || gate_hwasan ();
+  }
+  unsigned int execute (function *) final override
+  {
+    return asan_instrument ();
+  }
 
 }; // class pass_asan
 
@@ -4246,11 +4271,14 @@ public:
   {}
 
   /* opt_pass methods: */
-  virtual bool gate (function *)
+  bool gate (function *) final override
     {
       return !optimize && (gate_asan () || gate_hwasan ());
     }
-  virtual unsigned int execute (function *) { return asan_instrument (); }
+  unsigned int execute (function *) final override
+  {
+    return asan_instrument ();
+  }
 
 }; // class pass_asan_O0
 

@@ -24,7 +24,7 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "range.h"
 #include "value-query.h"
-#include "range-op.h"
+#include "gimple-range-op.h"
 #include "gimple-range-trace.h"
 #include "gimple-range-edge.h"
 #include "gimple-range-fold.h"
@@ -48,11 +48,12 @@ class gimple_ranger : public range_query
 public:
   gimple_ranger (bool use_imm_uses = true);
   ~gimple_ranger ();
-  virtual bool range_of_stmt (irange &r, gimple *, tree name = NULL) override;
-  virtual bool range_of_expr (irange &r, tree name, gimple * = NULL) override;
-  virtual bool range_on_edge (irange &r, edge e, tree name) override;
-  void range_on_entry (irange &r, basic_block bb, tree name);
-  void range_on_exit (irange &r, basic_block bb, tree name);
+  virtual bool range_of_stmt (vrange &r, gimple *, tree name = NULL) override;
+  virtual bool range_of_expr (vrange &r, tree name, gimple * = NULL) override;
+  virtual bool range_on_edge (vrange &r, edge e, tree name) override;
+  virtual void update_stmt (gimple *) override;
+  void range_on_entry (vrange &r, basic_block bb, tree name);
+  void range_on_exit (vrange &r, basic_block bb, tree name);
   void export_global_ranges ();
   inline gori_compute &gori ()  { return m_cache.m_gori; }
   virtual void dump (FILE *f) override;
@@ -60,10 +61,11 @@ public:
   void dump_bb (FILE *f, basic_block bb);
   auto_edge_flag non_executable_edge_flag;
   bool fold_stmt (gimple_stmt_iterator *gsi, tree (*) (tree));
-  void register_side_effects (gimple *s);
+  void register_inferred_ranges (gimple *s);
+  void register_transitive_inferred_ranges (basic_block bb);
 protected:
-  bool fold_range_internal (irange &r, gimple *s, tree name);
-  void prefill_name (irange &r, tree name);
+  bool fold_range_internal (vrange &r, gimple *s, tree name);
+  void prefill_name (vrange &r, tree name);
   void prefill_stmt_dependencies (tree ssa);
   ranger_cache m_cache;
   range_tracer tracer;
@@ -79,5 +81,23 @@ protected:
 extern gimple_ranger *enable_ranger (struct function *m,
 				     bool use_imm_uses = true);
 extern void disable_ranger (struct function *);
+
+class assume_query : public range_query
+{
+public:
+  assume_query ();
+  bool assume_range_p (vrange &r, tree name);
+  virtual bool range_of_expr (vrange &r, tree expr, gimple * = NULL);
+  void dump (FILE *f);
+protected:
+  void calculate_stmt (gimple *s, vrange &lhs_range, fur_source &src);
+  void calculate_op (tree op, gimple *s, vrange &lhs, fur_source &src);
+  void calculate_phi (gphi *phi, vrange &lhs_range, fur_source &src);
+  void check_taken_edge (edge e, fur_source &src);
+
+  ssa_global_cache global;
+  gori_compute m_gori;
+};
+
 
 #endif // GCC_GIMPLE_RANGE_H

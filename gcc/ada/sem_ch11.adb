@@ -49,8 +49,8 @@ with Sem_Warn;       use Sem_Warn;
 with Sinfo;          use Sinfo;
 with Sinfo.Nodes;    use Sinfo.Nodes;
 with Sinfo.Utils;    use Sinfo.Utils;
-with Snames;         use Snames;
 with Stand;          use Stand;
+with Warnsw;         use Warnsw;
 
 package body Sem_Ch11 is
 
@@ -431,13 +431,10 @@ package body Sem_Ch11 is
 
       --  If the current scope is a subprogram, entry or task body or declare
       --  block then this is the right place to check for hanging useless
-      --  assignments from the statement sequence. Skip this in the body of a
-      --  postcondition, since in that case there are no source references, and
-      --  we need to preserve deferred references from the enclosing scope.
+      --  assignments from the statement sequence.
 
-      if (Is_Subprogram_Or_Entry (Current_Scope)
-           and then Chars (Current_Scope) /= Name_uPostconditions)
-         or else Ekind (Current_Scope) in E_Block | E_Task_Type
+      if Is_Subprogram_Or_Entry (Current_Scope)
+        or else Ekind (Current_Scope) in E_Block | E_Task_Type
       then
          Warn_On_Useless_Assignments (Current_Scope);
       end if;

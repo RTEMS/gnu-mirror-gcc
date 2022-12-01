@@ -9,7 +9,6 @@ version (linux):
 extern (C):
 pure:
 nothrow:
-@system:
 
 import core.stdc.stdint;
 public import core.sys.elf;
@@ -74,6 +73,26 @@ enum NT_ARM_HW_BREAK = 0x402;
 enum NT_ARM_HW_WATCH = 0x403;
 
 enum NT_VERSION =      1;
+
+struct Elf32_Dyn
+{
+  Elf32_Sword   d_tag;
+  union _d_un
+  {
+      Elf32_Word d_val;
+      Elf32_Addr d_ptr;
+  } _d_un d_un;
+}
+
+struct Elf64_Dyn
+{
+  Elf64_Sxword  d_tag;
+  union _d_un
+  {
+      Elf64_Xword d_val;
+      Elf64_Addr d_ptr;
+  } _d_un d_un;
+}
 
 enum NT_GNU_ABI_TAG =      1;
 enum NT_GNU_HWCAP =        2;

@@ -6,7 +6,8 @@
    spilling to stack.  */
 
 /* { dg-do compile } */
-/* { dg-options "-march=rv64g -ffast-math" } */
+/* { dg-require-effective-target hard_float } */
+/* { dg-options "-march=rv64g -mabi=lp64d -ffast-math" } */
 
 #define NITER 4
 #define NVARS 20

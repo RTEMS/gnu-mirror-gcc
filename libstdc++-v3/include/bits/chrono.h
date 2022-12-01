@@ -273,16 +273,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #endif // C++17
 
 #if __cplusplus > 201703L
-    template<typename _Tp>
-      struct is_clock;
-
-    template<typename _Tp>
-      inline constexpr bool is_clock_v = is_clock<_Tp>::value;
-
 #if __cpp_lib_concepts
     template<typename _Tp>
-      struct is_clock : false_type
-      { };
+      inline constexpr bool is_clock_v = false;
 
     template<typename _Tp>
       requires requires {
@@ -298,32 +291,30 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	requires same_as<typename _Tp::time_point::duration,
 			 typename _Tp::duration>;
       }
-      struct is_clock<_Tp> : true_type
-      { };
+    inline constexpr bool is_clock_v<_Tp> = true;
 #else
     template<typename _Tp, typename = void>
-      struct __is_clock_impl : false_type
-      { };
+      inline constexpr bool is_clock_v = false;
 
     template<typename _Tp>
-      struct __is_clock_impl<_Tp,
-			     void_t<typename _Tp::rep, typename _Tp::period,
-				    typename _Tp::duration,
-				    typename _Tp::time_point::duration,
-				    decltype(_Tp::is_steady),
-				    decltype(_Tp::now())>>
-      : __and_<is_same<typename _Tp::duration,
-		       duration<typename _Tp::rep, typename _Tp::period>>,
-	       is_same<typename _Tp::time_point::duration,
-		       typename _Tp::duration>,
-	       is_same<decltype(&_Tp::is_steady), const bool*>,
-	       is_same<decltype(_Tp::now()), typename _Tp::time_point>>::type
-      { };
-
-    template<typename _Tp>
-      struct is_clock : __is_clock_impl<_Tp>::type
-      { };
+      inline constexpr bool
+      is_clock_v<_Tp, void_t<typename _Tp::rep, typename _Tp::period,
+			     typename _Tp::duration,
+			     typename _Tp::time_point::duration,
+			     decltype(_Tp::is_steady),
+			     decltype(_Tp::now())>>
+	= __and_v<is_same<typename _Tp::duration,
+			  duration<typename _Tp::rep, typename _Tp::period>>,
+		  is_same<typename _Tp::time_point::duration,
+			  typename _Tp::duration>,
+		  is_same<decltype(&_Tp::is_steady), const bool*>,
+		  is_same<decltype(_Tp::now()), typename _Tp::time_point>>;
 #endif
+
+    template<typename _Tp>
+      struct is_clock
+      : bool_constant<is_clock_v<_Tp>>
+      { };
 #endif // C++20
 
 #if __cplusplus >= 201703L
@@ -442,6 +433,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     template<typename _Rep, typename _Period>
       struct duration
       {
+	static_assert(!__is_duration<_Rep>::value, "rep cannot be a duration");
+	static_assert(__is_ratio<_Period>::value,
+		      "period must be a specialization of ratio");
+	static_assert(_Period::num > 0, "period must be positive");
+
       private:
 	template<typename _Rep2>
 	  using __is_float = treat_as_floating_point<_Rep2>;
@@ -486,11 +482,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 	using rep = _Rep;
 	using period = typename _Period::type;
-
-	static_assert(!__is_duration<_Rep>::value, "rep cannot be a duration");
-	static_assert(__is_ratio<_Period>::value,
-		      "period must be a specialization of ratio");
-	static_assert(_Period::num > 0, "period must be positive");
 
 	// 20.11.5.1 construction / copy / destroy
 	constexpr duration() = default;

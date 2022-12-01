@@ -21,6 +21,13 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_ANALYZER_SUPERGRAPH_H
 #define GCC_ANALYZER_SUPERGRAPH_H
 
+#include "ordered-hash-map.h"
+#include "cfg.h"
+#include "basic-block.h"
+#include "gimple.h"
+#include "gimple-iterator.h"
+#include "digraph.h"
+
 using namespace ana;
 
 namespace ana {
@@ -331,7 +338,7 @@ class superedge : public dedge<supergraph_traits>
   ::edge get_any_cfg_edge () const;
   cgraph_edge *get_any_callgraph_edge () const;
 
-  char *get_description (bool user_facing) const;
+  label_text get_description (bool user_facing) const;
 
  protected:
   superedge (supernode *src, supernode *dest, enum edge_kind kind)
@@ -605,7 +612,8 @@ class dot_annotator
   }
 };
 
-extern cgraph_edge *supergraph_call_edge (function *fun, gimple *stmt);
+extern cgraph_edge *supergraph_call_edge (function *fun, const gimple *stmt);
+extern function *get_ultimate_function_for_cgraph_edge (cgraph_edge *edge);
 
 } // namespace ana
 

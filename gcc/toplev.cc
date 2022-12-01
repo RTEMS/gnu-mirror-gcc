@@ -89,14 +89,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-param-manipulation.h"
 #include "dbgcnt.h"
 
-#if defined(DBX_DEBUGGING_INFO) || defined(XCOFF_DEBUGGING_INFO)
-#include "dbxout.h"
-#endif
-
-#ifdef XCOFF_DEBUGGING_INFO
-#include "xcoffout.h"		/* Needed for external data declarations. */
-#endif
-
 #include "selftest.h"
 
 #ifdef HAVE_isl
@@ -721,7 +713,7 @@ init_asm_output (const char *name)
 		     "cannot open %qs for writing: %m", asm_file_name);
     }
 
-  if (!flag_syntax_only)
+  if (!flag_syntax_only && !(global_dc->lang_mask & CL_LTODump))
     {
       targetm.asm_out.file_start ();
 
@@ -1038,6 +1030,8 @@ general_init (const char *argv0, bool init_signals)
     = global_options_init.x_flag_diagnostics_show_line_numbers;
   global_dc->show_cwe
     = global_options_init.x_flag_diagnostics_show_cwe;
+  global_dc->show_rules
+    = global_options_init.x_flag_diagnostics_show_rules;
   global_dc->path_format
     = (enum diagnostic_path_format)global_options_init.x_flag_diagnostics_path_format;
   global_dc->show_path_depths
@@ -1415,21 +1409,8 @@ process_options (bool no_backend)
       && ctf_debug_info_level == CTFINFO_LEVEL_NONE)
     write_symbols = NO_DEBUG;
 
-  /* Warn if STABS debug gets enabled and is not the default.  */
-  if (PREFERRED_DEBUGGING_TYPE != DBX_DEBUG && (write_symbols & DBX_DEBUG))
-    warning (0, "STABS debugging information is obsolete and not "
-	     "supported anymore");
-
   if (write_symbols == NO_DEBUG)
     ;
-#if defined(DBX_DEBUGGING_INFO)
-  else if (write_symbols == DBX_DEBUG)
-    debug_hooks = &dbx_debug_hooks;
-#endif
-#if defined(XCOFF_DEBUGGING_INFO)
-  else if (write_symbols == XCOFF_DEBUG)
-    debug_hooks = &xcoff_debug_hooks;
-#endif
 #ifdef DWARF2_DEBUGGING_INFO
   else if (dwarf_debuginfo_p ())
     debug_hooks = &dwarf2_debug_hooks;
@@ -2295,7 +2276,7 @@ toplev::main (int argc, char **argv)
 	start_timevars ();
       do_compile (no_backend);
 
-      if (flag_self_test)
+      if (flag_self_test && !seen_error ())
 	{
 	  if (no_backend)
 	    error_at (UNKNOWN_LOCATION, "self-tests incompatible with %<-E%>");

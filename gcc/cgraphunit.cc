@@ -1033,8 +1033,7 @@ walk_polymorphic_call_targets (hash_set<void *> *reachable_call_targets,
 	  if (targets.length () == 1)
 	    target = targets[0];
 	  else
-	    target = cgraph_node::create
-			(builtin_decl_implicit (BUILT_IN_UNREACHABLE));
+	    target = cgraph_node::create (builtin_decl_unreachable ());
 
 	  if (symtab->dump_file)
 	    {
@@ -1754,7 +1753,7 @@ cgraph_node::assemble_thunks_and_aliases (void)
 	cgraph_node *thunk = e->caller;
 
 	e = e->next_caller;
-	expand_thunk (thunk, true, false);
+	expand_thunk (thunk, !rtl_dump_and_exit, false);
 	thunk->assemble_thunks_and_aliases ();
       }
     else
@@ -1882,6 +1881,16 @@ cgraph_node::expand (void)
 
   ggc_collect ();
   timevar_pop (TV_REST_OF_COMPILATION);
+
+  if (DECL_STRUCT_FUNCTION (decl)
+      && DECL_STRUCT_FUNCTION (decl)->assume_function)
+    {
+      /* Assume functions aren't expanded into RTL, on the other side
+	 we don't want to release their body.  */
+      if (cfun)
+	pop_cfun ();
+      return;
+    }
 
   /* Make sure that BE didn't give up on compiling.  */
   gcc_assert (TREE_ASM_WRITTEN (decl));
@@ -2374,6 +2383,10 @@ symbol_table::compile (void)
 	if (node->inlined_to
 	    || gimple_has_body_p (node->decl))
 	  {
+	    if (DECL_STRUCT_FUNCTION (node->decl)
+		&& (DECL_STRUCT_FUNCTION (node->decl)->curr_properties
+		    & PROP_assumptions_done) != 0)
+	      continue;
 	    error_found = true;
 	    node->debug ();
 	  }

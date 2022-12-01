@@ -456,16 +456,6 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       break;
 
     case OPT_fdebug_:
-      if (ISDIGIT (arg[0]))
-	{
-	  int level = integral_argument (arg);
-	  if (level != -1)
-	    {
-	      global.params.debuglevel = level;
-	      break;
-	    }
-	}
-
       if (Identifier::isValidIdentifier (CONST_CAST (char *, arg)))
 	{
 	  if (!global.params.debugids)
@@ -577,10 +567,11 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       global.params.fixAliasThis = value;
       global.params.previewIn = value;
       global.params.fix16997 = value;
-      global.params.noSharedAccess = value;
+      global.params.noSharedAccess = FeatureState::enabled;
       global.params.rvalueRefParam = FeatureState::enabled;
       global.params.inclusiveInContracts = value;
-      global.params.shortenedMethods = value;
+      global.params.systemVariables = FeatureState::enabled;
+      global.params.fixImmutableConv = value;
       break;
 
     case OPT_fpreview_bitfields:
@@ -615,6 +606,10 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       global.params.fixAliasThis = value;
       break;
 
+    case OPT_fpreview_fiximmutableconv:
+      global.params.fixImmutableConv = value;
+      break;
+
     case OPT_fpreview_in:
       global.params.previewIn = value;
       break;
@@ -624,15 +619,15 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       break;
 
     case OPT_fpreview_nosharedaccess:
-      global.params.noSharedAccess = value;
+      global.params.noSharedAccess = FeatureState::enabled;
       break;
 
     case OPT_fpreview_rvaluerefparam:
       global.params.rvalueRefParam = FeatureState::enabled;
       break;
 
-    case OPT_fpreview_shortenedmethods:
-      global.params.shortenedMethods = value;
+    case OPT_fpreview_systemvariables:
+      global.params.systemVariables = FeatureState::enabled;
       break;
 
     case OPT_frelease:
@@ -708,16 +703,6 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       break;
 
     case OPT_fversion_:
-      if (ISDIGIT (arg[0]))
-	{
-	  int level = integral_argument (arg);
-	  if (level != -1)
-	    {
-	      global.params.versionlevel = level;
-	      break;
-	    }
-	}
-
       if (Identifier::isValidIdentifier (CONST_CAST (char *, arg)))
 	{
 	  if (!global.params.versionids)
@@ -1072,6 +1057,10 @@ d_parse_file (void)
 				      global.params.dihdr.doOutput);
 	  modules.push (m);
 
+	  /* Zero the padding past the end of the buffer so the D lexer has a
+	     sentinel.  The lexer only reads up to 4 bytes at a time.  */
+	  memset (buffer + len, '\0', 16);
+
 	  /* Overwrite the source file for the module, the one created by
 	     Module::create would have a forced a `.d' suffix.  */
 	  m->src.length = len;
@@ -1202,7 +1191,6 @@ d_parse_file (void)
     }
 
   /* Do deferred semantic analysis.  */
-  Module::dprogress = 1;
   Module::runDeferredSemantic ();
 
   if (Module::deferred.length)
@@ -1924,6 +1912,15 @@ d_enum_underlying_base_type (const_tree type)
   return TREE_TYPE (type);
 }
 
+/* Get a value for the SARIF v2.1.0 "artifact.sourceLanguage" property,
+   based on the list in SARIF v2.1.0 Appendix J.  */
+
+static const char *
+d_get_sarif_source_language (const char *)
+{
+  return "d";
+}
+
 /* Definitions for our language-specific hooks.  */
 
 #undef LANG_HOOKS_NAME
@@ -1957,6 +1954,7 @@ d_enum_underlying_base_type (const_tree type)
 #undef LANG_HOOKS_TYPE_FOR_MODE
 #undef LANG_HOOKS_TYPE_FOR_SIZE
 #undef LANG_HOOKS_TYPE_PROMOTES_TO
+#undef LANG_HOOKS_GET_SARIF_SOURCE_LANGUAGE
 
 #define LANG_HOOKS_NAME			    "GNU D"
 #define LANG_HOOKS_INIT			    d_init
@@ -1989,6 +1987,7 @@ d_enum_underlying_base_type (const_tree type)
 #define LANG_HOOKS_TYPE_FOR_MODE	    d_type_for_mode
 #define LANG_HOOKS_TYPE_FOR_SIZE	    d_type_for_size
 #define LANG_HOOKS_TYPE_PROMOTES_TO	    d_type_promotes_to
+#define LANG_HOOKS_GET_SARIF_SOURCE_LANGUAGE d_get_sarif_source_language
 
 struct lang_hooks lang_hooks = LANG_HOOKS_INITIALIZER;
 

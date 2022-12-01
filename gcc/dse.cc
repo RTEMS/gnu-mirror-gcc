@@ -1508,6 +1508,14 @@ record_store (rtx body, bb_info_t bb_info)
 
 	  if (tem && CONSTANT_P (tem))
 	    const_rhs = tem;
+	  else
+	    {
+	      /* If RHS is set only once to a constant, set CONST_RHS
+		 to the constant.  */
+	      rtx def_src = df_find_single_def_src (rhs);
+	      if (def_src != nullptr && CONSTANT_P (def_src))
+		const_rhs = def_src;
+	    }
 	}
     }
 
@@ -1562,12 +1570,7 @@ record_store (rtx body, bb_info_t bb_info)
 					 width)
 	      /* We can only remove the later store if the earlier aliases
 		 at least all accesses the later one.  */
-	      && ((MEM_ALIAS_SET (mem) == MEM_ALIAS_SET (s_info->mem)
-		   || alias_set_subset_of (MEM_ALIAS_SET (mem),
-					   MEM_ALIAS_SET (s_info->mem)))
-		  && (!MEM_EXPR (s_info->mem)
-		      || refs_same_for_tbaa_p (MEM_EXPR (s_info->mem),
-					       MEM_EXPR (mem)))))
+	      && mems_same_for_tbaa_p (s_info->mem, mem))
 	    {
 	      if (GET_MODE (mem) == BLKmode)
 		{
@@ -3747,12 +3750,15 @@ public:
   {}
 
   /* opt_pass methods: */
-  virtual bool gate (function *)
+  bool gate (function *) final override
     {
       return optimize > 0 && flag_dse && dbg_cnt (dse1);
     }
 
-  virtual unsigned int execute (function *) { return rest_of_handle_dse (); }
+  unsigned int execute (function *) final override
+  {
+    return rest_of_handle_dse ();
+  }
 
 }; // class pass_rtl_dse1
 
@@ -3787,12 +3793,15 @@ public:
   {}
 
   /* opt_pass methods: */
-  virtual bool gate (function *)
+  bool gate (function *) final override
     {
       return optimize > 0 && flag_dse && dbg_cnt (dse2);
     }
 
-  virtual unsigned int execute (function *) { return rest_of_handle_dse (); }
+  unsigned int execute (function *) final override
+  {
+    return rest_of_handle_dse ();
+  }
 
 }; // class pass_rtl_dse2
 

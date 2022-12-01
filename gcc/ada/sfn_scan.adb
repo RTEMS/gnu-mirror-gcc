@@ -583,6 +583,7 @@ package body SFN_Scan is
 
          else
             Skip_Loop : loop
+               Skip_WS;
                exit Main_Scan_Loop when At_EOF;
                exit Skip_Loop when S (P) = ';';
 
@@ -622,7 +623,6 @@ package body SFN_Scan is
          Q := '%';
       else
          Error ("bad string");
-         Q := '"';
       end if;
 
       --  Scan out the string, B points to first char

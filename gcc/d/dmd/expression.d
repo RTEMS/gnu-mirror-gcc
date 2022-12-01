@@ -348,14 +348,16 @@ int expandAliasThisTuples(Expressions* exps, size_t starti = 0)
         if (TupleDeclaration td = exp.isAliasThisTuple)
         {
             exps.remove(u);
-            foreach (i, o; *td.objects)
+            size_t i;
+            td.foreachVar((s)
             {
-                auto d = o.isExpression().isDsymbolExp().s.isDeclaration();
+                auto d = s.isDeclaration();
                 auto e = new DotVarExp(exp.loc, exp, d);
                 assert(d.type);
                 e.type = d.type;
                 exps.insert(u + i, e);
-            }
+                ++i;
+            });
             version (none)
             {
                 printf("expansion ->\n");
@@ -1370,7 +1372,7 @@ extern (C++) abstract class Expression : ASTNode
          */
         if (v.storage_class & STC.gshared)
         {
-            if (sc.func.setUnsafe(false, this.loc,
+            if (sc.setUnsafe(false, this.loc,
                 "`@safe` function `%s` cannot access `__gshared` data `%s`", sc.func, v))
             {
                 err = true;
@@ -1419,12 +1421,26 @@ extern (C++) abstract class Expression : ASTNode
                 error("`@safe` %s `%s` cannot call `@system` %s `%s`",
                     sc.func.kind(), sc.func.toPrettyChars(), f.kind(),
                     prettyChars);
-                f.errorSupplementalInferredSafety(/*max depth*/ 10);
+                f.errorSupplementalInferredSafety(/*max depth*/ 10, /*deprecation*/ false);
                 .errorSupplemental(f.loc, "`%s` is declared here", prettyChars);
 
                 checkOverridenDtor(sc, f, dd => dd.type.toTypeFunction().trust > TRUST.system, "@system");
 
                 return true;
+            }
+        }
+        else if (f.isSafe() && f.safetyViolation)
+        {
+            // for dip1000 by default transition, print deprecations for calling functions that will become `@system`
+            if (sc.func.isSafeBypassingInference())
+            {
+                .deprecation(this.loc, "`@safe` function `%s` calling `%s`", sc.func.toChars(), f.toChars());
+                errorSupplementalInferredSafety(f, 10, true);
+            }
+            else if (!sc.func.safetyViolation)
+            {
+                import dmd.func : AttributeViolation;
+                sc.func.safetyViolation = new AttributeViolation(this.loc, null, f, null, null);
             }
         }
         return false;
@@ -2933,7 +2949,7 @@ extern (C++) final class ArrayLiteralExp : Expression
 
     Expressions* elements;
     OwnedBy ownedByCtfe = OwnedBy.code;
-
+    bool onstack = false;
 
     extern (D) this(const ref Loc loc, Type type, Expressions* elements)
     {
@@ -5137,7 +5153,7 @@ extern (C++) final class CallExp : UnaExp
                 /* Type needs destruction, so declare a tmp
                  * which the back end will recognize and call dtor on
                  */
-                auto tmp = copyToTemp(0, "__tmpfordtor", this);
+                auto tmp = copyToTemp(0, Id.__tmpfordtor.toString(), this);
                 auto de = new DeclarationExp(loc, tmp);
                 auto ve = new VarExp(loc, tmp);
                 Expression e = new CommaExp(loc, de, ve);
@@ -5761,7 +5777,7 @@ extern (C++) final class DelegatePtrExp : UnaExp
 
     override Expression modifiableLvalue(Scope* sc, Expression e)
     {
-        if (sc.func.setUnsafe(false, this.loc, "cannot modify delegate pointer in `@safe` code `%s`", this))
+        if (sc.setUnsafe(false, this.loc, "cannot modify delegate pointer in `@safe` code `%s`", this))
         {
             return ErrorExp.get();
         }
@@ -5799,7 +5815,7 @@ extern (C++) final class DelegateFuncptrExp : UnaExp
 
     override Expression modifiableLvalue(Scope* sc, Expression e)
     {
-        if (sc.func.setUnsafe(false, this.loc, "cannot modify delegate function pointer in `@safe` code `%s`", this))
+        if (sc.setUnsafe(false, this.loc, "cannot modify delegate function pointer in `@safe` code `%s`", this))
         {
             return ErrorExp.get();
         }
@@ -7179,6 +7195,26 @@ extern(D) Modifiable checkModifiable(Expression exp, Scope* sc, ModifyFlags flag
         default:
             return exp.type ? Modifiable.yes : Modifiable.no; // default modifiable
     }
+}
+
+/**
+ * Verify if the given identifier is any of
+ * _d_array{ctor,setctor,setassign,assign_l, assign_r}.
+ *
+ * Params:
+ *  id = the identifier to verify
+ *
+ * Returns:
+ *  `true` if the identifier corresponds to a construction of assignement
+ *  runtime hook, `false` otherwise.
+ */
+bool isArrayConstructionOrAssign(const Identifier id)
+{
+    import dmd.id : Id;
+
+    return id == Id._d_arrayctor || id == Id._d_arraysetctor ||
+        id == Id._d_arrayassign_l || id == Id._d_arrayassign_r ||
+        id == Id._d_arraysetassign;
 }
 
 /******************************

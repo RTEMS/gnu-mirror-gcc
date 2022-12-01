@@ -130,7 +130,6 @@ static tree eval_subst (location_t, tree, tree, tree, tree, tree);
 static tree optimize_bit_field_compare (location_t, enum tree_code,
 					tree, tree, tree);
 static bool simple_operand_p (const_tree);
-static bool simple_operand_p_2 (tree);
 static tree range_binop (enum tree_code, tree, tree, int, tree, int);
 static tree range_predecessor (tree);
 static tree range_successor (tree);
@@ -323,36 +322,62 @@ negate_mathfn_p (combined_fn fn)
   switch (fn)
     {
     CASE_CFN_ASIN:
+    CASE_CFN_ASIN_FN:
     CASE_CFN_ASINH:
+    CASE_CFN_ASINH_FN:
     CASE_CFN_ATAN:
+    CASE_CFN_ATAN_FN:
     CASE_CFN_ATANH:
+    CASE_CFN_ATANH_FN:
     CASE_CFN_CASIN:
+    CASE_CFN_CASIN_FN:
     CASE_CFN_CASINH:
+    CASE_CFN_CASINH_FN:
     CASE_CFN_CATAN:
+    CASE_CFN_CATAN_FN:
     CASE_CFN_CATANH:
+    CASE_CFN_CATANH_FN:
     CASE_CFN_CBRT:
+    CASE_CFN_CBRT_FN:
     CASE_CFN_CPROJ:
+    CASE_CFN_CPROJ_FN:
     CASE_CFN_CSIN:
+    CASE_CFN_CSIN_FN:
     CASE_CFN_CSINH:
+    CASE_CFN_CSINH_FN:
     CASE_CFN_CTAN:
+    CASE_CFN_CTAN_FN:
     CASE_CFN_CTANH:
+    CASE_CFN_CTANH_FN:
     CASE_CFN_ERF:
+    CASE_CFN_ERF_FN:
     CASE_CFN_LLROUND:
+    CASE_CFN_LLROUND_FN:
     CASE_CFN_LROUND:
+    CASE_CFN_LROUND_FN:
     CASE_CFN_ROUND:
     CASE_CFN_ROUNDEVEN:
     CASE_CFN_ROUNDEVEN_FN:
     CASE_CFN_SIN:
+    CASE_CFN_SIN_FN:
     CASE_CFN_SINH:
+    CASE_CFN_SINH_FN:
     CASE_CFN_TAN:
+    CASE_CFN_TAN_FN:
     CASE_CFN_TANH:
+    CASE_CFN_TANH_FN:
     CASE_CFN_TRUNC:
+    CASE_CFN_TRUNC_FN:
       return true;
 
     CASE_CFN_LLRINT:
+    CASE_CFN_LLRINT_FN:
     CASE_CFN_LRINT:
+    CASE_CFN_LRINT_FN:
     CASE_CFN_NEARBYINT:
+    CASE_CFN_NEARBYINT_FN:
     CASE_CFN_RINT:
+    CASE_CFN_RINT_FN:
       return !flag_rounding_math;
 
     default:
@@ -3352,9 +3377,6 @@ operand_compare::operand_equal_p (const_tree arg0, const_tree arg1,
 		if (compare_address
 		    && (flags & OEP_ADDRESS_OF_SAME_FIELD) == 0)
 		  {
-		    if (TREE_OPERAND (arg0, 2)
-			|| TREE_OPERAND (arg1, 2))
-		      return OP_SAME_WITH_NULL (2);
 		    tree field0 = TREE_OPERAND (arg0, 1);
 		    tree field1 = TREE_OPERAND (arg1, 1);
 
@@ -3865,17 +3887,10 @@ operand_compare::hash_operand (const_tree t, inchash::hash &hstate,
 	      if (sflags & OEP_ADDRESS_OF)
 		{
 		  hash_operand (TREE_OPERAND (t, 0), hstate, flags);
-		  if (TREE_OPERAND (t, 2))
-		    hash_operand (TREE_OPERAND (t, 2), hstate,
-				  flags & ~OEP_ADDRESS_OF);
-		  else
-		    {
-		      tree field = TREE_OPERAND (t, 1);
-		      hash_operand (DECL_FIELD_OFFSET (field),
-				    hstate, flags & ~OEP_ADDRESS_OF);
-		      hash_operand (DECL_FIELD_BIT_OFFSET (field),
-				    hstate, flags & ~OEP_ADDRESS_OF);
-		    }
+		  hash_operand (DECL_FIELD_OFFSET (TREE_OPERAND (t, 1)),
+				hstate, flags & ~OEP_ADDRESS_OF);
+		  hash_operand (DECL_FIELD_BIT_OFFSET (TREE_OPERAND (t, 1)),
+				hstate, flags & ~OEP_ADDRESS_OF);
 		  return;
 		}
 	      break;
@@ -4868,8 +4883,8 @@ sign_bit_p (tree exp, const_tree val)
   return NULL_TREE;
 }
 
-/* Subroutine for fold_truth_andor_1: determine if an operand is simple enough
-   to be evaluated unconditionally.  */
+/* Subroutine for fold_truth_andor_1 and simple_condition_p: determine if an
+   operand is simple enough to be evaluated unconditionally.  */
 
 static bool
 simple_operand_p (const_tree exp)
@@ -4897,13 +4912,12 @@ simple_operand_p (const_tree exp)
 	      && (! TREE_STATIC (exp) || DECL_REGISTER (exp))));
 }
 
-/* Subroutine for fold_truth_andor: determine if an operand is simple enough
-   to be evaluated unconditionally.
-   I addition to simple_operand_p, we assume that comparisons, conversions,
+/* Determine if an operand is simple enough to be evaluated unconditionally.
+   In addition to simple_operand_p, we assume that comparisons, conversions,
    and logic-not operations are simple, if their operands are simple, too.  */
 
-static bool
-simple_operand_p_2 (tree exp)
+bool
+simple_condition_p (tree exp)
 {
   enum tree_code code;
 
@@ -4920,7 +4934,7 @@ simple_operand_p_2 (tree exp)
 	    && simple_operand_p (TREE_OPERAND (exp, 1)));
 
   if (code == TRUTH_NOT_EXPR)
-      return simple_operand_p_2 (TREE_OPERAND (exp, 0));
+    return simple_condition_p (TREE_OPERAND (exp, 0));
 
   return simple_operand_p (exp);
 }
@@ -7530,7 +7544,7 @@ tree_swap_operands_p (const_tree arg0, const_tree arg1)
 static tree
 fold_to_nonsharp_ineq_using_bound (location_t loc, tree ineq, tree bound)
 {
-  tree a, typea, type = TREE_TYPE (ineq), a1, diff, y;
+  tree a, typea, type = TREE_TYPE (bound), a1, diff, y;
 
   if (TREE_CODE (bound) == LT_EXPR)
     a = TREE_OPERAND (bound, 0);
@@ -9516,6 +9530,16 @@ fold_unary_loc (location_t loc, enum tree_code code, tree type, tree op0)
 		  > min_align_of_type (TREE_TYPE (TREE_TYPE (arg00)))))
 	    return NULL_TREE;
 
+	  /* Similarly, avoid this optimization in GENERIC for -fsanitize=null
+	     when type is a reference type and arg00's type is not,
+	     because arg00 could be validly nullptr and if arg01 doesn't return,
+	     we don't want false positive binding of reference to nullptr.  */
+	  if (TREE_CODE (type) == REFERENCE_TYPE
+	      && !in_gimple_form
+	      && sanitize_flags_p (SANITIZE_NULL)
+	      && TREE_CODE (TREE_TYPE (arg00)) != REFERENCE_TYPE)
+	    return NULL_TREE;
+
 	  arg00 = fold_convert_loc (loc, type, arg00);
 	  return fold_build_pointer_plus_loc (loc, arg00, arg01);
 	}
@@ -9777,10 +9801,10 @@ fold_truth_andor (location_t loc, enum tree_code code, tree type,
 	 side-effects, or isn't simple, then we can't add to it,
 	 as otherwise we might destroy if-sequence.  */
       if (TREE_CODE (arg0) == icode
-	  && simple_operand_p_2 (arg1)
+	  && simple_condition_p (arg1)
 	  /* Needed for sequence points to handle trappings, and
 	     side-effects.  */
-	  && simple_operand_p_2 (TREE_OPERAND (arg0, 1)))
+	  && simple_condition_p (TREE_OPERAND (arg0, 1)))
 	{
 	  tem = fold_build2_loc (loc, ncode, type, TREE_OPERAND (arg0, 1),
 				 arg1);
@@ -9790,10 +9814,10 @@ fold_truth_andor (location_t loc, enum tree_code code, tree type,
 	/* Same as above but for (A AND[-IF] (B AND-IF C)) -> ((A AND B) AND-IF C),
 	   or (A OR[-IF] (B OR-IF C) -> ((A OR B) OR-IF C).  */
       else if (TREE_CODE (arg1) == icode
-	  && simple_operand_p_2 (arg0)
+	  && simple_condition_p (arg0)
 	  /* Needed for sequence points to handle trappings, and
 	     side-effects.  */
-	  && simple_operand_p_2 (TREE_OPERAND (arg1, 0)))
+	  && simple_condition_p (TREE_OPERAND (arg1, 0)))
 	{
 	  tem = fold_build2_loc (loc, ncode, type, 
 				 arg0, TREE_OPERAND (arg1, 0));
@@ -9804,8 +9828,8 @@ fold_truth_andor (location_t loc, enum tree_code code, tree type,
 	 into (A OR B).
 	 For sequence point consistancy, we need to check for trapping,
 	 and side-effects.  */
-      else if (code == icode && simple_operand_p_2 (arg0)
-               && simple_operand_p_2 (arg1))
+      else if (code == icode && simple_condition_p (arg0)
+	       && simple_condition_p (arg1))
 	return fold_build2_loc (loc, ncode, type, arg0, arg1);
     }
 
@@ -10727,7 +10751,6 @@ tree_expr_nonzero_warnv_p (tree t, bool *strict_overflow_p)
     case COND_EXPR:
     case CONSTRUCTOR:
     case OBJ_TYPE_REF:
-    case ASSERT_EXPR:
     case ADDR_EXPR:
     case WITH_SIZE_EXPR:
     case SSA_NAME:
@@ -12027,11 +12050,15 @@ fold_binary_loc (location_t loc, enum tree_code code, tree type,
 	{
 	  tem = fold_to_nonsharp_ineq_using_bound (loc, arg0, arg1);
 	  if (tem && !operand_equal_p (tem, arg0, 0))
-	    return fold_build2_loc (loc, code, type, tem, arg1);
+	    return fold_convert (type,
+				 fold_build2_loc (loc, code, TREE_TYPE (arg1),
+						  tem, arg1));
 
 	  tem = fold_to_nonsharp_ineq_using_bound (loc, arg1, arg0);
 	  if (tem && !operand_equal_p (tem, arg1, 0))
-	    return fold_build2_loc (loc, code, type, arg0, tem);
+	    return fold_convert (type,
+				 fold_build2_loc (loc, code, TREE_TYPE (arg0),
+						  arg0, tem));
 	}
 
       if ((tem = fold_truth_andor (loc, code, type, arg0, arg1, op0, op1))
@@ -12187,60 +12214,6 @@ fold_binary_loc (location_t loc, enum tree_code code, tree type,
 	      return fold_build2_loc (loc, code, type,
 				      fold_convert_loc (loc, TREE_TYPE (arg1),
 							tem), arg1);
-	    }
-	}
-
-      /* Fold ((X >> C1) & C2) == 0 and ((X >> C1) & C2) != 0 where
-	 C1 is a valid shift constant, and C2 is a power of two, i.e.
-	 a single bit.  */
-      if (TREE_CODE (arg0) == BIT_AND_EXPR
-	  && integer_pow2p (TREE_OPERAND (arg0, 1))
-	  && integer_zerop (arg1))
-	{
-	  tree arg00 = TREE_OPERAND (arg0, 0);
-	  STRIP_NOPS (arg00);
-	  if (TREE_CODE (arg00) == RSHIFT_EXPR
-	      && TREE_CODE (TREE_OPERAND (arg00, 1)) == INTEGER_CST)
-	    {
-	      tree itype = TREE_TYPE (arg00);
-	      tree arg001 = TREE_OPERAND (arg00, 1);
-	      prec = TYPE_PRECISION (itype);
-
-	      /* Check for a valid shift count.  */
-	      if (wi::ltu_p (wi::to_wide (arg001), prec))
-		{
-		  tree arg01 = TREE_OPERAND (arg0, 1);
-		  tree arg000 = TREE_OPERAND (arg00, 0);
-		  unsigned HOST_WIDE_INT log2 = tree_log2 (arg01);
-		  /* If (C2 << C1) doesn't overflow, then
-		     ((X >> C1) & C2) != 0 can be rewritten as
-		     (X & (C2 << C1)) != 0.  */
-		  if ((log2 + TREE_INT_CST_LOW (arg001)) < prec)
-		    {
-		      tem = fold_build2_loc (loc, LSHIFT_EXPR, itype,
-					     arg01, arg001);
-		      tem = fold_build2_loc (loc, BIT_AND_EXPR, itype,
-					     arg000, tem);
-		      return fold_build2_loc (loc, code, type, tem,
-				fold_convert_loc (loc, itype, arg1));
-		    }
-		  /* Otherwise, for signed (arithmetic) shifts,
-		     ((X >> C1) & C2) != 0 is rewritten as X < 0, and
-		     ((X >> C1) & C2) == 0 is rewritten as X >= 0.  */
-		  else if (!TYPE_UNSIGNED (itype))
-		    return fold_build2_loc (loc, code == EQ_EXPR ? GE_EXPR
-								 : LT_EXPR,
-					    type, arg000,
-					    build_int_cst (itype, 0));
-		  /* Otherwise, of unsigned (logical) shifts,
-		     ((X >> C1) & C2) != 0 is rewritten as (X,false), and
-		     ((X >> C1) & C2) == 0 is rewritten as (X,true).  */
-		  else
-		    return omit_one_operand_loc (loc, type,
-					 code == EQ_EXPR ? integer_one_node
-							 : integer_zero_node,
-					 arg000);
-		}
 	    }
 	}
 
@@ -12643,10 +12616,6 @@ fold_binary_loc (location_t loc, enum tree_code code, tree type,
       tem = integer_zerop (arg1) ? build1_loc (loc, NOP_EXPR, type, arg1)
 				 : fold_convert_loc (loc, type, arg1);
       return tem;
-
-    case ASSERT_EXPR:
-      /* An ASSERT_EXPR should never be passed to fold_binary.  */
-      gcc_unreachable ();
 
     default:
       return NULL_TREE;
@@ -14330,9 +14299,12 @@ tree_expr_finite_p (const_tree x)
       switch (get_call_combined_fn (x))
 	{
 	CASE_CFN_FABS:
+	CASE_CFN_FABS_FN:
 	  return tree_expr_finite_p (CALL_EXPR_ARG (x, 0));
 	CASE_CFN_FMAX:
+	CASE_CFN_FMAX_FN:
 	CASE_CFN_FMIN:
+	CASE_CFN_FMIN_FN:
 	  return tree_expr_finite_p (CALL_EXPR_ARG (x, 0))
 		 && tree_expr_finite_p (CALL_EXPR_ARG (x, 1));
 	default:
@@ -14450,9 +14422,12 @@ tree_expr_maybe_signaling_nan_p (const_tree x)
       switch (get_call_combined_fn (x))
 	{
 	CASE_CFN_FABS:
+	CASE_CFN_FABS_FN:
 	  return tree_expr_maybe_signaling_nan_p (CALL_EXPR_ARG (x, 0));
 	CASE_CFN_FMAX:
+	CASE_CFN_FMAX_FN:
 	CASE_CFN_FMIN:
+	CASE_CFN_FMIN_FN:
 	  return tree_expr_maybe_signaling_nan_p (CALL_EXPR_ARG (x, 0))
 		 || tree_expr_maybe_signaling_nan_p (CALL_EXPR_ARG (x, 1));
 	default:
@@ -14523,9 +14498,12 @@ tree_expr_maybe_nan_p (const_tree x)
       switch (get_call_combined_fn (x))
 	{
 	CASE_CFN_FABS:
+	CASE_CFN_FABS_FN:
 	  return tree_expr_maybe_nan_p (CALL_EXPR_ARG (x, 0));
 	CASE_CFN_FMAX:
+	CASE_CFN_FMAX_FN:
 	CASE_CFN_FMIN:
+	CASE_CFN_FMIN_FN:
 	  return tree_expr_maybe_nan_p (CALL_EXPR_ARG (x, 0))
 		 || tree_expr_maybe_nan_p (CALL_EXPR_ARG (x, 1));
 	default:
@@ -14562,6 +14540,7 @@ tree_expr_maybe_real_minus_zero_p (const_tree x)
       switch (get_call_combined_fn (x))
 	{
 	CASE_CFN_FABS:
+	CASE_CFN_FABS_FN:
 	  return false;
 	default:
 	  break;
@@ -14839,16 +14818,26 @@ tree_call_nonnegative_warnv_p (tree type, combined_fn fn, tree arg0, tree arg1,
   switch (fn)
     {
     CASE_CFN_ACOS:
+    CASE_CFN_ACOS_FN:
     CASE_CFN_ACOSH:
+    CASE_CFN_ACOSH_FN:
     CASE_CFN_CABS:
+    CASE_CFN_CABS_FN:
     CASE_CFN_COSH:
+    CASE_CFN_COSH_FN:
     CASE_CFN_ERFC:
+    CASE_CFN_ERFC_FN:
     CASE_CFN_EXP:
+    CASE_CFN_EXP_FN:
     CASE_CFN_EXP10:
     CASE_CFN_EXP2:
+    CASE_CFN_EXP2_FN:
     CASE_CFN_FABS:
+    CASE_CFN_FABS_FN:
     CASE_CFN_FDIM:
+    CASE_CFN_FDIM_FN:
     CASE_CFN_HYPOT:
+    CASE_CFN_HYPOT_FN:
     CASE_CFN_POW10:
     CASE_CFN_FFS:
     CASE_CFN_PARITY:
@@ -14870,17 +14859,25 @@ tree_call_nonnegative_warnv_p (tree type, combined_fn fn, tree arg0, tree arg1,
       return RECURSE (arg0);
 
     CASE_CFN_ASINH:
+    CASE_CFN_ASINH_FN:
     CASE_CFN_ATAN:
+    CASE_CFN_ATAN_FN:
     CASE_CFN_ATANH:
+    CASE_CFN_ATANH_FN:
     CASE_CFN_CBRT:
+    CASE_CFN_CBRT_FN:
     CASE_CFN_CEIL:
     CASE_CFN_CEIL_FN:
     CASE_CFN_ERF:
+    CASE_CFN_ERF_FN:
     CASE_CFN_EXPM1:
+    CASE_CFN_EXPM1_FN:
     CASE_CFN_FLOOR:
     CASE_CFN_FLOOR_FN:
     CASE_CFN_FMOD:
+    CASE_CFN_FMOD_FN:
     CASE_CFN_FREXP:
+    CASE_CFN_FREXP_FN:
     CASE_CFN_ICEIL:
     CASE_CFN_IFLOOR:
     CASE_CFN_IRINT:
@@ -14891,10 +14888,15 @@ tree_call_nonnegative_warnv_p (tree type, combined_fn fn, tree arg0, tree arg1,
     CASE_CFN_LLCEIL:
     CASE_CFN_LLFLOOR:
     CASE_CFN_LLRINT:
+    CASE_CFN_LLRINT_FN:
     CASE_CFN_LLROUND:
+    CASE_CFN_LLROUND_FN:
     CASE_CFN_LRINT:
+    CASE_CFN_LRINT_FN:
     CASE_CFN_LROUND:
+    CASE_CFN_LROUND_FN:
     CASE_CFN_MODF:
+    CASE_CFN_MODF_FN:
     CASE_CFN_NEARBYINT:
     CASE_CFN_NEARBYINT_FN:
     CASE_CFN_RINT:
@@ -14905,11 +14907,15 @@ tree_call_nonnegative_warnv_p (tree type, combined_fn fn, tree arg0, tree arg1,
     CASE_CFN_ROUNDEVEN_FN:
     CASE_CFN_SCALB:
     CASE_CFN_SCALBLN:
+    CASE_CFN_SCALBLN_FN:
     CASE_CFN_SCALBN:
+    CASE_CFN_SCALBN_FN:
     CASE_CFN_SIGNBIT:
     CASE_CFN_SIGNIFICAND:
     CASE_CFN_SINH:
+    CASE_CFN_SINH_FN:
     CASE_CFN_TANH:
+    CASE_CFN_TANH_FN:
     CASE_CFN_TRUNC:
     CASE_CFN_TRUNC_FN:
       /* True if the 1st argument is nonnegative.  */
@@ -14949,6 +14955,7 @@ tree_call_nonnegative_warnv_p (tree type, combined_fn fn, tree arg0, tree arg1,
       return RECURSE (arg0);
 
     CASE_CFN_POW:
+    CASE_CFN_POW_FN:
       /* True if the 1st argument is nonnegative or the second
 	 argument is an even integer valued real.  */
       if (TREE_CODE (arg1) == REAL_CST)
@@ -15105,7 +15112,6 @@ tree_expr_nonnegative_warnv_p (tree t, bool *strict_overflow_p, int depth)
     case COND_EXPR:
     case CONSTRUCTOR:
     case OBJ_TYPE_REF:
-    case ASSERT_EXPR:
     case ADDR_EXPR:
     case WITH_SIZE_EXPR:
     case SSA_NAME:

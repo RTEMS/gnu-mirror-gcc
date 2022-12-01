@@ -148,7 +148,6 @@ package Atree is
    --  This is a count of errors that are serious enough to stop expansion,
    --  and hence to prevent generation of an object file even if the
    --  switch -gnatQ is set. Initialized to zero at the start of compilation.
-   --  Initialized for -gnatVa use, see comment above.
 
    --  WARNING: There is a matching C declaration of this variable in fe.h
 
@@ -156,12 +155,11 @@ package Atree is
    --  Number of errors detected so far. Includes count of serious errors and
    --  non-serious errors, so this value is always greater than or equal to the
    --  Serious_Errors_Detected value. Initialized to zero at the start of
-   --  compilation. Initialized for -gnatVa use, see comment above.
+   --  compilation.
 
    Warnings_Detected : Nat := 0;
    --  Number of warnings detected. Initialized to zero at the start of
-   --  compilation. Initialized for -gnatVa use, see comment above. This
-   --  count includes the count of style and info messages.
+   --  compilation. This count includes the count of style and info messages.
 
    Warning_Info_Messages : Nat := 0;
    --  Number of info messages generated as warnings. Info messages are never
@@ -446,10 +444,15 @@ package Atree is
    --  Tests given Id for equality with the Empty node. This allows notations
    --  like "if No (Variant_Part)" as opposed to "if Variant_Part = Empty".
 
-   function Parent (N : Node_Or_Entity_Id) return Node_Or_Entity_Id;
+   function Node_Parent (N : Node_Or_Entity_Id) return Node_Or_Entity_Id;
+   pragma Inline (Node_Parent);
+   function Parent (N : Node_Or_Entity_Id) return Node_Or_Entity_Id
+     renames Node_Parent;
    pragma Inline (Parent);
    --  Returns the parent of a node if the node is not a list member, or else
    --  the parent of the list containing the node if the node is a list member.
+   --  Parent has the same name as the one in Nlists; Node_Parent can be used
+   --  more easily in the debugger.
 
    function Paren_Count (N : Node_Id) return Nat;
    pragma Inline (Paren_Count);
@@ -465,7 +468,10 @@ package Atree is
    --  Note that this routine is used only in very peculiar cases. In normal
    --  cases, the Original_Node link is set by calls to Rewrite.
 
-   procedure Set_Parent (N : Node_Or_Entity_Id; Val : Node_Or_Entity_Id);
+   procedure Set_Node_Parent (N : Node_Or_Entity_Id; Val : Node_Or_Entity_Id);
+   pragma Inline (Set_Node_Parent);
+   procedure Set_Parent (N : Node_Or_Entity_Id; Val : Node_Or_Entity_Id)
+     renames Set_Node_Parent;
    pragma Inline (Set_Parent);
 
    procedure Set_Paren_Count (N : Node_Id; Val : Nat);

@@ -210,15 +210,11 @@ package Scans is
 
       Tok_End_Of_Line,
       --  Represents an end of line. Not used during normal compilation scans
-      --  where end of line is ignored. Active for preprocessor scanning and
-      --  also when scanning project files (where it is needed because of ???)
+      --  where end of line is ignored. Active for preprocessor scanning.
 
       Tok_Special,
-      --  AI12-0125-03 : target name as abbreviation for LHS
-
-      --  Otherwise used only in preprocessor scanning (to represent one of
-      --  the characters '#', '$', '?', '@', '`', '\', '^', '~', or '_'. The
-      --  character value itself is stored in Scans.Special_Character.
+      --  Special character used by the preprocessor. The character itself is
+      --  stored in Special_Character below.
 
       No_Token);
       --  No_Token is used for initializing Token values to indicate that
@@ -362,38 +358,35 @@ package Scans is
    --  Note: these variables can only be referenced during the parsing of a
    --  file. Reference to any of them from Sem or the expander is wrong.
 
-   --  These variables are initialized as required by Scn.Initialize_Scanner,
-   --  and should not be referenced before such a call. However, there are
-   --  situations in which these variables are saved and restored, and this
-   --  may happen before the first Initialize_Scanner call, resulting in the
-   --  assignment of invalid values. To avoid this, and allow building with
-   --  the -gnatVa switch, we initialize some variables to known valid values.
+   --  These variables are initialized by Scn.Initialize_Scanner, and should
+   --  not be referenced before such a call, except for saving and restoring
+   --  them.
 
-   Scan_Ptr : Source_Ptr := No_Location; -- init for -gnatVa
+   Scan_Ptr : Source_Ptr := No_Location;
    --  Current scan pointer location. After a call to Scan, this points
    --  just past the end of the token just scanned.
 
-   Token : Token_Type := No_Token; -- init for -gnatVa
+   Token : Token_Type := No_Token;
    --  Type of current token
 
-   Token_Ptr : Source_Ptr := No_Location; -- init for -gnatVa
+   Token_Ptr : Source_Ptr := No_Location;
    --  Pointer to first character of current token
 
-   Current_Line_Start : Source_Ptr := No_Location; -- init for -gnatVa
+   Current_Line_Start : Source_Ptr := No_Location;
    --  Pointer to first character of line containing current token
 
-   Start_Column : Column_Number := No_Column_Number; -- init for -gnatVa
+   Start_Column : Column_Number := No_Column_Number;
    --  Starting column number (zero origin) of the first non-blank character
    --  on the line containing the current token. This is used for error
    --  recovery circuits which depend on looking at the column line up.
 
-   Type_Token_Location : Source_Ptr := No_Location; -- init for -gnatVa
+   Type_Token_Location : Source_Ptr := No_Location;
    --  Within a type declaration, gives the location of the TYPE keyword that
    --  opened the type declaration. Used in checking the end column of a record
    --  declaration, which can line up either with the TYPE keyword, or with the
    --  start of the line containing the RECORD keyword.
 
-   Checksum : Word := 0; -- init for -gnatVa
+   Checksum : Word := 0;
    --  Used to accumulate a CRC representing the tokens in the source
    --  file being compiled. This CRC includes only program tokens, and
    --  excludes comments.
@@ -403,7 +396,7 @@ package Scans is
    --  limited view of a package, i.e. visible type names and related
    --  tagged indicators.
 
-   First_Non_Blank_Location : Source_Ptr := No_Location; -- init for -gnatVa
+   First_Non_Blank_Location : Source_Ptr := No_Location;
    --  Location of first non-blank character on the line containing the
    --  current token (i.e. the location of the character whose column number
    --  is stored in Start_Column).
@@ -466,12 +459,9 @@ package Scans is
    --  character found (i.e. a character that does not fit in Character or
    --  Wide_Character).
 
-   Special_Character : Character;
-   --  AI12-0125-03 : '@' as target name is handled elsewhere.
-   --  Valid only when Token = Tok_Special. Returns one of the characters
-   --  '#', '$', '?', '`', '\', '^', '~', or '_'.
-   --
-   --  Why only this set? What about wide characters???
+   subtype Special_Preprocessor_Character is Character with
+     Predicate => Special_Preprocessor_Character in '#' | '$';
+   Special_Character : Special_Preprocessor_Character;
 
    Comment_Id : Name_Id := No_Name;
    --  Valid only when Token = Tok_Comment. Store the string that follows

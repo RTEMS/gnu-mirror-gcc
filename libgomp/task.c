@@ -1382,10 +1382,30 @@ gomp_task_run_post_handle_dependers (struct gomp_task *child_task,
 	{
 	  if (!parent)
 	    task->parent = NULL;
+	  else if (__builtin_expect (task->parent_depends_on, 0)
+		   && --parent->taskwait->n_depend == 0
+		   && parent->taskwait->in_depend_wait)
+	    {
+	      parent->taskwait->in_depend_wait = false;
+	      gomp_sem_post (&parent->taskwait->taskwait_sem);
+	    }
 	  if (gomp_task_run_post_handle_depend (task, team))
 	    ++ret;
 	  if (taskgroup)
-	    taskgroup->num_children--;
+	    {
+	      if (taskgroup->num_children > 1)
+		--taskgroup->num_children;
+	      else
+		{
+		  __atomic_store_n (&taskgroup->num_children, 0,
+				    MEMMODEL_RELEASE);
+		  if (taskgroup->in_taskgroup_wait)
+		    {
+		      taskgroup->in_taskgroup_wait = false;
+		      gomp_sem_post (&taskgroup->taskgroup_sem);
+		    }
+		}
+	    }
 	  gomp_finish_task (task);
 	  free (task);
 	  continue;
@@ -2445,6 +2465,7 @@ gomp_create_artificial_team (void)
   struct gomp_task_icv *icv;
   struct gomp_team *team = gomp_new_team (1);
   struct gomp_task *task = thr->task;
+  struct gomp_task **implicit_task = &task;
   icv = task ? &task->icv : &gomp_global_icv;
   team->prev_ts = thr->ts;
   thr->ts.team = team;
@@ -2457,17 +2478,25 @@ gomp_create_artificial_team (void)
   thr->ts.static_trip = 0;
   thr->task = &team->implicit_task[0];
   gomp_init_task (thr->task, NULL, icv);
-  if (task)
+  while (*implicit_task
+	 && (*implicit_task)->kind != GOMP_TASK_IMPLICIT)
+    implicit_task = &(*implicit_task)->parent;
+  if (*implicit_task)
     {
-      thr->task = task;
+      thr->task = *implicit_task;
       gomp_end_task ();
-      free (task);
+      free (*implicit_task);
       thr->task = &team->implicit_task[0];
     }
 #ifdef LIBGOMP_USE_PTHREADS
   else
     pthread_setspecific (gomp_thread_destructor, thr);
 #endif
+  if (implicit_task != &task)
+    {
+      *implicit_task = thr->task;
+      thr->task = task;
+    }
 }
 
 /* The format of data is:
@@ -2657,6 +2686,16 @@ omp_in_final (void)
 }
 
 ialias (omp_in_final)
+
+int
+omp_in_explicit_task (void)
+{
+  struct gomp_thread *thr = gomp_thread ();
+  struct gomp_task *task = thr->task;
+  return task && task->kind != GOMP_TASK_IMPLICIT;
+}
+
+ialias (omp_in_explicit_task)
 
 void
 omp_fulfill_event (omp_event_handle_t event)

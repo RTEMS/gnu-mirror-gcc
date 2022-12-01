@@ -1796,14 +1796,19 @@ handle_array_ref (tree aref, gimple *stmt, bool addr, int ostype,
       orng[0] = -orng[1] - 1;
     }
 
-  /* Convert the array index range determined above to a byte
-     offset.  */
+  /* Convert the array index range determined above to a byte offset.  */
   tree lowbnd = array_ref_low_bound (aref);
-  if (!integer_zerop (lowbnd) && tree_fits_uhwi_p (lowbnd))
+  if (TREE_CODE (lowbnd) == INTEGER_CST && !integer_zerop (lowbnd))
     {
-      /* Adjust the index by the low bound of the array domain
-	 (normally zero but 1 in Fortran).  */
-      unsigned HOST_WIDE_INT lb = tree_to_uhwi (lowbnd);
+      /* Adjust the index by the low bound of the array domain (0 in C/C++,
+	 1 in Fortran and anything in Ada) by applying the same processing
+	 as in get_offset_range.  */
+      const wide_int wlb = wi::to_wide (lowbnd);
+      signop sgn = SIGNED;
+      if (TYPE_UNSIGNED (TREE_TYPE (lowbnd))
+	  && wlb.get_precision () < TYPE_PRECISION (sizetype))
+	sgn = UNSIGNED;
+      const offset_int lb = offset_int::from (wlb, sgn);
       orng[0] -= lb;
       orng[1] -= lb;
     }
@@ -2139,12 +2144,6 @@ handle_ssa_name (tree ptr, bool addr, int ostype,
 
   tree rhs = gimple_assign_rhs1 (stmt);
 
-  if (code == ASSERT_EXPR)
-    {
-      rhs = TREE_OPERAND (rhs, 0);
-      return compute_objsize_r (rhs, stmt, addr, ostype, pref, snlim, qry);
-    }
-
   if (code == POINTER_PLUS_EXPR
       && TREE_CODE (TREE_TYPE (rhs)) == POINTER_TYPE)
     {
@@ -2448,9 +2447,13 @@ field_at_offset (tree type, tree start_after, HOST_WIDE_INT off,
       /* The offset of FLD within its immediately enclosing structure.  */
       HOST_WIDE_INT fldpos = next_pos < 0 ? int_byte_position (fld) : next_pos;
 
+      tree typesize = TYPE_SIZE_UNIT (fldtype);
+      if (typesize && TREE_CODE (typesize) != INTEGER_CST)
+	/* Bail if FLD is a variable length member.  */
+	return NULL_TREE;
+
       /* If the size is not available the field is a flexible array
 	 member.  Treat this case as success.  */
-      tree typesize = TYPE_SIZE_UNIT (fldtype);
       HOST_WIDE_INT fldsize = (tree_fits_uhwi_p (typesize)
 			       ? tree_to_uhwi (typesize)
 			       : off);
@@ -2464,7 +2467,11 @@ field_at_offset (tree type, tree start_after, HOST_WIDE_INT off,
 	{
 	  /* If OFF is equal to the offset of the next field continue
 	     to it and skip the array/struct business below.  */
-	  next_pos = int_byte_position (next_fld);
+	  tree pos = byte_position (next_fld);
+	  if (!tree_fits_shwi_p (pos))
+	    /* Bail if NEXT_FLD is a variable length member.  */
+	    return NULL_TREE;
+	  next_pos = tree_to_shwi (pos);
 	  *nextoff = *fldoff + next_pos;
 	  if (*nextoff == off && TREE_CODE (type) != UNION_TYPE)
 	    continue;

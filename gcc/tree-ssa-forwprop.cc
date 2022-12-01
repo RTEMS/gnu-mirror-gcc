@@ -42,6 +42,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-dfa.h"
 #include "tree-ssa-propagate.h"
 #include "tree-ssa-dom.h"
+#include "tree-ssa-strlen.h"
 #include "builtins.h"
 #include "tree-cfgcleanup.h"
 #include "cfganal.h"
@@ -1177,6 +1178,15 @@ constant_pointer_difference (tree p1, tree p2)
    memcpy (p, "abcd   ", 7);
    call if the latter can be stored by pieces during expansion.
 
+   Optimize
+   memchr ("abcd", a, 4) == 0;
+   or
+   memchr ("abcd", a, 4) != 0;
+   to
+   (a == 'a' || a == 'b' || a == 'c' || a == 'd') == 0
+   or
+   (a == 'a' || a == 'b' || a == 'c' || a == 'd') != 0
+
    Also canonicalize __atomic_fetch_op (p, x, y) op x
    to __atomic_op_fetch (p, x, y) or
    __atomic_op_fetch (p, x, y) iop x
@@ -1193,8 +1203,70 @@ simplify_builtin_call (gimple_stmt_iterator *gsi_p, tree callee2)
     return false;
   stmt1 = SSA_NAME_DEF_STMT (vuse);
 
+  tree res;
+
   switch (DECL_FUNCTION_CODE (callee2))
     {
+    case BUILT_IN_MEMCHR:
+      if (gimple_call_num_args (stmt2) == 3
+	  && (res = gimple_call_lhs (stmt2)) != nullptr
+	  && use_in_zero_equality (res) != nullptr
+	  && CHAR_BIT == 8
+	  && BITS_PER_UNIT == 8)
+	{
+	  tree ptr = gimple_call_arg (stmt2, 0);
+	  if (TREE_CODE (ptr) != ADDR_EXPR
+	      || TREE_CODE (TREE_OPERAND (ptr, 0)) != STRING_CST)
+	    break;
+	  unsigned HOST_WIDE_INT slen
+	    = TREE_STRING_LENGTH (TREE_OPERAND (ptr, 0));
+	  /* It must be a non-empty string constant.  */
+	  if (slen < 2)
+	    break;
+	  /* For -Os, only simplify strings with a single character.  */
+	  if (!optimize_bb_for_speed_p (gimple_bb (stmt2))
+	      && slen > 2)
+	    break;
+	  tree size = gimple_call_arg (stmt2, 2);
+	  /* Size must be a constant which is <= UNITS_PER_WORD and
+	     <= the string length.  */
+	  if (TREE_CODE (size) != INTEGER_CST || integer_zerop (size))
+	    break;
+
+	  if (!tree_fits_uhwi_p (size))
+	    break;
+
+	  unsigned HOST_WIDE_INT sz = tree_to_uhwi (size);
+	  if (sz > UNITS_PER_WORD || sz >= slen)
+	    break;
+
+	  tree ch = gimple_call_arg (stmt2, 1);
+	  location_t loc = gimple_location (stmt2);
+	  if (!useless_type_conversion_p (char_type_node,
+					  TREE_TYPE (ch)))
+	    ch = fold_convert_loc (loc, char_type_node, ch);
+	  const char *p = TREE_STRING_POINTER (TREE_OPERAND (ptr, 0));
+	  unsigned int isize = sz;
+	  tree *op = XALLOCAVEC (tree, isize);
+	  for (unsigned int i = 0; i < isize; i++)
+	    {
+	      op[i] = build_int_cst (char_type_node, p[i]);
+	      op[i] = fold_build2_loc (loc, EQ_EXPR, boolean_type_node,
+				       op[i], ch);
+	    }
+	  for (unsigned int i = isize - 1; i >= 1; i--)
+	    op[i - 1] = fold_convert_loc (loc, boolean_type_node,
+					  fold_build2_loc (loc,
+							   BIT_IOR_EXPR,
+							   boolean_type_node,
+							   op[i - 1],
+							   op[i]));
+	  res = fold_convert_loc (loc, TREE_TYPE (res), op[0]);
+	  gimplify_and_update_call_from_tree (gsi_p, res);
+	  return true;
+	}
+      break;
+
     case BUILT_IN_MEMSET:
       if (gimple_call_num_args (stmt2) != 3
 	  || gimple_call_lhs (stmt2)
@@ -2589,7 +2661,9 @@ simplify_permutation (gimple_stmt_iterator *gsi)
 
       /* Shuffle of a constructor.  */
       bool ret = false;
-      tree res_type = TREE_TYPE (arg0);
+      tree res_type
+	= build_vector_type (TREE_TYPE (TREE_TYPE (arg0)),
+			     TYPE_VECTOR_SUBPARTS (TREE_TYPE (op2)));
       tree opt = fold_ternary (VEC_PERM_EXPR, res_type, arg0, arg1, op2);
       if (!opt
 	  || (TREE_CODE (opt) != CONSTRUCTOR && TREE_CODE (opt) != VECTOR_CST))
@@ -2953,7 +3027,8 @@ simplify_vector_constructor (gimple_stmt_iterator *gsi)
 			: (elts[0].second == 0 && elts[0].first == 0
 			   ? 0 : refnelts) + i);
       vec_perm_indices indices (sel, orig[1] ? 2 : 1, refnelts);
-      if (!can_vec_perm_const_p (TYPE_MODE (perm_type), indices))
+      machine_mode vmode = TYPE_MODE (perm_type);
+      if (!can_vec_perm_const_p (vmode, vmode, indices))
 	return false;
       mask_type
 	= build_vector_type (build_nonstandard_integer_type (elem_size, 1),
@@ -3002,7 +3077,8 @@ simplify_vector_constructor (gimple_stmt_iterator *gsi)
 	    sel.quick_push (elts[i].first
 			    ? elts[i].second + nelts : i);
 	  vec_perm_indices indices (sel, 2, nelts);
-	  if (!can_vec_perm_const_p (TYPE_MODE (type), indices))
+	  machine_mode vmode = TYPE_MODE (type);
+	  if (!can_vec_perm_const_p (vmode, vmode, indices))
 	    return false;
 	  mask_type
 	    = build_vector_type (build_nonstandard_integer_type (elem_size, 1),
@@ -3086,7 +3162,11 @@ optimize_vector_load (gimple_stmt_iterator *gsi)
 	      && (def == lhs
 		  || (known_eq (bit_field_size (use_rhs), def_eltsize)
 		      && constant_multiple_p (bit_field_offset (use_rhs),
-					      def_eltsize))))
+					      def_eltsize)
+		      /* We can simulate the VEC_UNPACK_{HI,LO}_EXPR
+			 via a NOP_EXPR only for integral types.
+			 ???  Support VEC_UNPACK_FLOAT_{HI,LO}_EXPR.  */
+		      && INTEGRAL_TYPE_P (TREE_TYPE (use_rhs)))))
 	    {
 	      bf_stmts.safe_push (use_stmt);
 	      continue;
@@ -3264,9 +3344,9 @@ public:
   {}
 
   /* opt_pass methods: */
-  opt_pass * clone () { return new pass_forwprop (m_ctxt); }
-  virtual bool gate (function *) { return flag_tree_forwprop; }
-  virtual unsigned int execute (function *);
+  opt_pass * clone () final override { return new pass_forwprop (m_ctxt); }
+  bool gate (function *) final override { return flag_tree_forwprop; }
+  unsigned int execute (function *) final override;
 
 }; // class pass_forwprop
 
@@ -3287,6 +3367,7 @@ pass_forwprop::execute (function *fun)
   auto_vec<gimple *, 4> to_fixup;
   auto_vec<gimple *, 32> to_remove;
   to_purge = BITMAP_ALLOC (NULL);
+  bitmap need_ab_cleanup = BITMAP_ALLOC (NULL);
   for (int i = 0; i < postorder_num; ++i)
     {
       gimple_stmt_iterator gsi;
@@ -3308,7 +3389,12 @@ pass_forwprop::execute (function *fun)
 	  FOR_EACH_PHI_ARG (use_p, phi, it, SSA_OP_USE)
 	    {
 	      tree use = USE_FROM_PTR (use_p);
-	      if (! first)
+	      if (use == res)
+		/* The PHI result can also appear on a backedge, if so
+		   we can ignore this case for the purpose of determining
+		   the singular value.  */
+		;
+	      else if (! first)
 		first = use;
 	      else if (! operand_equal_p (first, use, 0))
 		{
@@ -3597,6 +3683,9 @@ pass_forwprop::execute (function *fun)
 	  /* Mark stmt as potentially needing revisiting.  */
 	  gimple_set_plf (stmt, GF_PLF_1, false);
 
+	  bool can_make_abnormal_goto = (is_gimple_call (stmt)
+					 && stmt_can_make_abnormal_goto (stmt));
+
 	  /* Substitute from our lattice.  We need to do so only once.  */
 	  bool substituted_p = false;
 	  use_operand_p usep;
@@ -3615,6 +3704,10 @@ pass_forwprop::execute (function *fun)
 	      && is_gimple_assign (stmt)
 	      && gimple_assign_rhs_code (stmt) == ADDR_EXPR)
 	    recompute_tree_invariant_for_addr_expr (gimple_assign_rhs1 (stmt));
+	  if (substituted_p
+	      && can_make_abnormal_goto
+	      && !stmt_can_make_abnormal_goto (stmt))
+	    bitmap_set_bit (need_ab_cleanup, bb->index);
 
 	  bool changed;
 	  do
@@ -3816,7 +3909,9 @@ pass_forwprop::execute (function *fun)
     }
 
   cfg_changed |= gimple_purge_all_dead_eh_edges (to_purge);
+  cfg_changed |= gimple_purge_all_dead_abnormal_call_edges (need_ab_cleanup);
   BITMAP_FREE (to_purge);
+  BITMAP_FREE (need_ab_cleanup);
 
   if (cfg_changed)
     todoflags |= TODO_cleanup_cfg;

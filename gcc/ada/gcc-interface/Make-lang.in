@@ -601,7 +601,6 @@ GNATBIND_OBJS = \
  ada/osint-b.o    \
  ada/osint.o      \
  ada/output.o     \
- ada/restrict.o   \
  ada/rident.o     \
  ada/scans.o      \
  ada/scil_ll.o    \
@@ -629,6 +628,7 @@ GNATBIND_OBJS = \
  ada/uintp.o      \
  ada/uname.o      \
  ada/urealp.o     \
+ ada/warnsw.o     \
  ada/widechar.o   \
  ada/gnat.o       \
  ada/g-dynhta.o   \
@@ -1158,7 +1158,7 @@ ada/generated/gnatvsn.ads: ada/gnatvsn.ads BASE-VER ada/GNAT_DATE
 	s=`cat $(srcdir)/BASE-VER | sed -e "s/\([0-9]*\)\.\([0-9]*\)\..*/-\1\2/g"`; \
 	d=`if test -f $(srcdir)/ada/GNAT_DATE; then \
            cat $(srcdir)/ada/GNAT_DATE; else date +%Y%m%d; fi`; \
-	cat $< | sed -e "/Version/s/(\([0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]\).*)/($$d$$s)/g" >$@
+	cat $< | sed -e "/Version/s/(\([0-9]\{8\}\).*)/($$d$$s)/g" >$@
 
 ada/gnatvsn.o : ada/gnatvsn.adb ada/generated/gnatvsn.ads
 	$(CC) -c $(ALL_ADAFLAGS) $(ADA_INCLUDES) $< $(ADA_OUTPUT_OPTION)

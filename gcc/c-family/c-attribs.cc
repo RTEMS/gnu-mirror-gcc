@@ -101,6 +101,8 @@ static tree handle_special_var_sec_attribute (tree *, tree, tree, int, bool *);
 static tree handle_aligned_attribute (tree *, tree, tree, int, bool *);
 static tree handle_warn_if_not_aligned_attribute (tree *, tree, tree,
 						  int, bool *);
+static tree handle_strict_flex_array_attribute (tree *, tree, tree,
+						 int, bool *);
 static tree handle_weak_attribute (tree *, tree, tree, int, bool *) ;
 static tree handle_noplt_attribute (tree *, tree, tree, int, bool *) ;
 static tree handle_alias_ifunc_attribute (bool, tree *, tree, tree, bool *);
@@ -144,6 +146,7 @@ static tree handle_type_generic_attribute (tree *, tree, tree, int, bool *);
 static tree handle_alloc_size_attribute (tree *, tree, tree, int, bool *);
 static tree handle_alloc_align_attribute (tree *, tree, tree, int, bool *);
 static tree handle_assume_aligned_attribute (tree *, tree, tree, int, bool *);
+static tree handle_assume_attribute (tree *, tree, tree, int, bool *);
 static tree handle_target_attribute (tree *, tree, tree, int, bool *);
 static tree handle_target_clones_attribute (tree *, tree, tree, int, bool *);
 static tree handle_optimize_attribute (tree *, tree, tree, int, bool *);
@@ -173,6 +176,7 @@ static tree handle_objc_nullability_attribute (tree *, tree, tree, int, bool *);
 static tree handle_signed_bool_precision_attribute (tree *, tree, tree, int,
 						    bool *);
 static tree handle_retain_attribute (tree *, tree, tree, int, bool *);
+static tree handle_fd_arg_attribute (tree *, tree, tree, int, bool *);
 
 /* Helper to define attribute exclusions.  */
 #define ATTR_EXCL(name, function, type, variable)	\
@@ -367,6 +371,8 @@ const struct attribute_spec c_common_attribute_table[] =
 	                      attr_aligned_exclusions },
   { "warn_if_not_aligned",    0, 1, false, false, false, false,
 			      handle_warn_if_not_aligned_attribute, NULL },
+  { "strict_flex_array",      1, 1, true, false, false, false,
+			      handle_strict_flex_array_attribute, NULL },
   { "weak",                   0, 0, true,  false, false, false,
 			      handle_weak_attribute, NULL },
   { "noplt",                   0, 0, true,  false, false, false,
@@ -529,6 +535,8 @@ const struct attribute_spec c_common_attribute_table[] =
 			      handle_designated_init_attribute, NULL },
   { "fallthrough",	      0, 0, false, false, false, false,
 			      handle_fallthrough_attribute, NULL },
+  { "assume",		      1, 1, false, false, false, false,
+			      handle_assume_attribute, NULL },
   { "patchable_function_entry",	1, 2, true, false, false, false,
 			      handle_patchable_function_entry_attribute,
 			      NULL },
@@ -555,6 +563,12 @@ const struct attribute_spec c_common_attribute_table[] =
 			      handle_dealloc_attribute, NULL },
   { "tainted_args",	      0, 0, true,  false, false, false,
 			      handle_tainted_args_attribute, NULL },
+  { "fd_arg",             1, 1, false, true, true, false,
+            handle_fd_arg_attribute, NULL},      
+  { "fd_arg_read",        1, 1, false, true, true, false,
+            handle_fd_arg_attribute, NULL},
+  { "fd_arg_write",       1, 1, false, true, true, false,
+            handle_fd_arg_attribute, NULL},         
   { NULL,                     0, 0, false, false, false, false, NULL, NULL }
 };
 
@@ -1895,7 +1909,7 @@ get_priority (tree args, bool is_destructor)
     }
 
   arg = TREE_VALUE (args);
-  if (TREE_CODE (arg) == IDENTIFIER_NODE)
+  if (TREE_CODE (arg) == IDENTIFIER_NODE || TREE_CODE (arg) == FUNCTION_DECL)
     goto invalid;
   if (arg == error_mark_node)
     return DEFAULT_INIT_PRIORITY;
@@ -2496,6 +2510,49 @@ handle_warn_if_not_aligned_attribute (tree *node, tree name,
 {
   return common_handle_aligned_attribute (node, name, args, flags,
 					  no_add_attrs, true);
+}
+
+/* Handle a "strict_flex_array" attribute; arguments as in
+   struct attribute_spec.handler.  */
+
+static tree
+handle_strict_flex_array_attribute (tree *node, tree name,
+				    tree args, int ARG_UNUSED (flags),
+				    bool *no_add_attrs)
+{
+  tree decl = *node;
+  tree argval = TREE_VALUE (args);
+
+  /* This attribute only applies to field decls of a structure.  */
+  if (TREE_CODE (decl) != FIELD_DECL)
+    {
+      error_at (DECL_SOURCE_LOCATION (decl),
+		"%qE attribute may not be specified for %q+D", name, decl);
+      *no_add_attrs = true;
+    }
+  /* This attribute only applies to field with array type.  */
+  else if (TREE_CODE (TREE_TYPE (decl)) != ARRAY_TYPE)
+    {
+      error_at (DECL_SOURCE_LOCATION (decl),
+		"%qE attribute may not be specified for a non-array field",
+		name);
+      *no_add_attrs = true;
+    }
+  else if (TREE_CODE (argval) != INTEGER_CST)
+    {
+      error_at (DECL_SOURCE_LOCATION (decl),
+		"%qE attribute argument not an integer", name);
+      *no_add_attrs = true;
+    }
+  else if (!tree_fits_uhwi_p (argval) || tree_to_uhwi (argval) > 3)
+    {
+      error_at (DECL_SOURCE_LOCATION (decl),
+		"%qE attribute argument %qE is not an integer constant"
+		" between 0 and 3", name, argval);
+      *no_add_attrs = true;
+    }
+
+  return NULL_TREE;
 }
 
 /* Handle a "weak" attribute; arguments as in
@@ -4154,8 +4211,16 @@ handle_deprecated_attribute (tree *node, tree name,
 	  || VAR_OR_FUNCTION_DECL_P (decl)
 	  || TREE_CODE (decl) == FIELD_DECL
 	  || TREE_CODE (decl) == CONST_DECL
-	  || objc_method_decl (TREE_CODE (decl)))
+	  || objc_method_decl (TREE_CODE (decl))
+	  || TREE_CODE (decl) == CONCEPT_DECL)
 	TREE_DEPRECATED (decl) = 1;
+      else if (TREE_CODE (decl) == LABEL_DECL)
+	{
+	  pedwarn (input_location, OPT_Wattributes, "%qE attribute ignored",
+		   name);
+	  *no_add_attrs = true;
+	  return NULL_TREE;
+	}
       else
 	warn = 1;
     }
@@ -4518,6 +4583,30 @@ handle_nonnull_attribute (tree *node, tree name,
       args = next;
     }
 
+  return NULL_TREE;
+}
+
+/* Handle the "fd_arg", "fd_arg_read" and "fd_arg_write" attributes */
+
+static tree
+handle_fd_arg_attribute (tree *node, tree name, tree args,
+                              int ARG_UNUSED (flags), bool *no_add_attrs)
+{
+  tree type = *node;
+  if (!args)
+    {
+      if (!prototype_p (type))
+        {
+          error ("%qE attribute without arguments on a non-prototype", name);
+          *no_add_attrs = true;
+        }
+      return NULL_TREE;
+    }
+
+  if (positional_argument (*node, name, TREE_VALUE (args), INTEGER_TYPE))
+      return NULL_TREE;
+
+  *no_add_attrs = true;  
   return NULL_TREE;
 }
 
@@ -5697,6 +5786,18 @@ handle_designated_init_attribute (tree *node, tree name, tree, int,
 tree
 handle_fallthrough_attribute (tree *, tree name, tree, int,
 			      bool *no_add_attrs)
+{
+  pedwarn (input_location, OPT_Wattributes, "%qE attribute ignored", name);
+  *no_add_attrs = true;
+  return NULL_TREE;
+}
+
+/* Handle a "assume" attribute; arguments as in struct
+   attribute_spec.handler.  */
+
+tree
+handle_assume_attribute (tree *, tree name, tree, int,
+			 bool *no_add_attrs)
 {
   pedwarn (input_location, OPT_Wattributes, "%qE attribute ignored", name);
   *no_add_attrs = true;

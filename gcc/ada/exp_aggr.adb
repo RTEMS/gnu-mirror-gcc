@@ -71,6 +71,7 @@ with Stringt;        use Stringt;
 with Tbuild;         use Tbuild;
 with Uintp;          use Uintp;
 with Urealp;         use Urealp;
+with Warnsw;         use Warnsw;
 
 package body Exp_Aggr is
 
@@ -2058,7 +2059,7 @@ package body Exp_Aggr is
          --  to do that if we already have the base type at hand.
 
          if Etype (L) = Index_Base then
-            L_L := L;
+            L_L := New_Copy_Tree (L);
          else
             L_L :=
               Make_Qualified_Expression (Loc,
@@ -2067,7 +2068,7 @@ package body Exp_Aggr is
          end if;
 
          if Etype (H) = Index_Base then
-            L_H := H;
+            L_H := New_Copy_Tree (H);
          else
             L_H :=
               Make_Qualified_Expression (Loc,
@@ -5734,7 +5735,8 @@ package body Exp_Aggr is
 
       procedure Check_Bounds (Aggr_Bounds_Node, Index_Bounds_Node : Node_Id);
       --  Checks that the bounds of Aggr_Bounds are within the bounds defined
-      --  by Index_Bounds.
+      --  by Index_Bounds. For null array aggregate (Ada 2022) check that the
+      --  aggregate bounds define a null range.
 
       procedure Check_Same_Aggr_Bounds (Sub_Aggr : Node_Id; Dim : Pos);
       --  Checks that in a multidimensional array aggregate all subaggregates
@@ -5850,6 +5852,22 @@ package body Exp_Aggr is
          Cond : Node_Id := Empty;
 
       begin
+         --  For a null array aggregate check that high bound (i.e., low
+         --  bound predecessor) exists. Fail if low bound is low bound of
+         --  base subtype (in all cases, including modular).
+
+         if Is_Null_Aggregate (N) then
+            Insert_Action (N,
+              Make_Raise_Constraint_Error (Loc,
+                Condition =>
+                  Make_Op_Eq (Loc,
+                    New_Copy_Tree (Aggr_Bounds.First),
+                    New_Copy_Tree
+                      (Type_Low_Bound (Base_Type (Etype (Ind_Bounds.First))))),
+                Reason    => CE_Range_Check_Failed));
+            return;
+         end if;
+
          --  Generate the following test:
 
          --    [constraint_error when
@@ -6430,7 +6448,7 @@ package body Exp_Aggr is
                          Left_Opnd  => New_Occurrence_Of (Size_Id, Loc),
                          Right_Opnd => Make_Integer_Literal (Loc, 1)));
 
-            One_Loop := Make_Loop_Statement (Loc,
+            One_Loop := Make_Implicit_Loop_Statement (N,
               Iteration_Scheme =>
                 Make_Iteration_Scheme (Loc,
                   Iterator_Specification => New_Copy_Tree (Iter)),
@@ -6536,7 +6554,7 @@ package body Exp_Aggr is
                     Prefix => New_Occurrence_Of (TmpE, Loc),
                     Expressions =>
                       New_List (New_Occurrence_Of (Index_Id, Loc))),
-               Expression => New_Copy_Tree (Expression (Assoc)));
+               Expression => Copy_Separate_Tree (Expression (Assoc)));
 
             --  Advance index position for insertion.
 
@@ -6562,7 +6580,7 @@ package body Exp_Aggr is
                       Attribute_Name => Name_Last)),
                Then_Statements => New_List (Incr));
 
-            One_Loop := Make_Loop_Statement (Loc,
+            One_Loop := Make_Implicit_Loop_Statement (N,
               Iteration_Scheme =>
                 Make_Iteration_Scheme (Loc,
                   Iterator_Specification => Copy_Separate_Tree (Iter)),
@@ -6600,21 +6618,6 @@ package body Exp_Aggr is
 
       if Is_RTE (Ctyp, RE_Asm_Input_Operand)
         or else Is_RTE (Ctyp, RE_Asm_Output_Operand)
-      then
-         return;
-
-      --  Do not expand an aggregate for an array type which contains tasks if
-      --  the aggregate is associated with an unexpanded return statement of a
-      --  build-in-place function. The aggregate is expanded when the related
-      --  return statement (rewritten into an extended return) is processed.
-      --  This delay ensures that any temporaries and initialization code
-      --  generated for the aggregate appear in the proper return block and
-      --  use the correct _chain and _master.
-
-      elsif Has_Task (Base_Type (Etype (N)))
-        and then Nkind (Parent (N)) = N_Simple_Return_Statement
-        and then Is_Build_In_Place_Function
-                   (Return_Applies_To (Return_Statement_Entity (Parent (N))))
       then
          return;
 
@@ -6837,7 +6840,9 @@ package body Exp_Aggr is
         or else Parent_Kind = N_Extension_Aggregate
         or else Parent_Kind = N_Component_Association
         or else (Parent_Kind = N_Object_Declaration
-                  and then Needs_Finalization (Typ))
+                  and then (Needs_Finalization (Typ)
+                             or else Is_Build_In_Place_Return_Object
+                                       (Defining_Identifier (Parent_Node))))
         or else (Parent_Kind = N_Assignment_Statement
                   and then Inside_Init_Proc)
       then
@@ -7513,11 +7518,11 @@ package body Exp_Aggr is
 
             --  Iterated_Component_Association.
 
-            Loop_Id :=
-              Make_Defining_Identifier (Loc,
-                Chars => Chars (Defining_Identifier (Comp)));
-
             if Present (Iterator_Specification (Comp)) then
+               Loop_Id :=
+                 Make_Defining_Identifier (Loc,
+                   Chars => Chars (Defining_Identifier
+                              (Iterator_Specification (Comp))));
                L_Iteration_Scheme :=
                  Make_Iteration_Scheme (Loc,
                    Iterator_Specification => Iterator_Specification (Comp));
@@ -7526,6 +7531,9 @@ package body Exp_Aggr is
                --  Loop_Parameter_Specification is parsed with a choice list.
                --  where the range is the first (and only) choice.
 
+               Loop_Id :=
+                 Make_Defining_Identifier (Loc,
+                   Chars => Chars (Defining_Identifier (Comp)));
                L_Range := Relocate_Node (First (Discrete_Choices (Comp)));
 
                L_Iteration_Scheme :=
@@ -8010,7 +8018,7 @@ package body Exp_Aggr is
          end if;
 
          return
-           Make_Loop_Statement (Loc,
+           Make_Implicit_Loop_Statement (C,
              Iteration_Scheme =>
                Make_Iteration_Scheme (Sl,
                  Loop_Parameter_Specification =>
@@ -8474,11 +8482,21 @@ package body Exp_Aggr is
                   Parent_Name  : Node_Id;
 
                begin
-                  --  Remove the inherited component association from the
-                  --  aggregate and store them in the parent aggregate
-
                   First_Comp   := First (Component_Associations (N));
                   Parent_Comps := New_List;
+
+                  --  First skip the discriminants
+
+                  while Present (First_Comp)
+                    and then Ekind (Entity (First (Choices (First_Comp))))
+                                                               = E_Discriminant
+                  loop
+                     Next (First_Comp);
+                  end loop;
+
+                  --  Then remove the inherited component association from the
+                  --  aggregate and store them in the parent aggregate
+
                   while Present (First_Comp)
                     and then
                       Scope (Original_Record_Component
@@ -8782,19 +8800,10 @@ package body Exp_Aggr is
    --  Start of processing for Expand_Record_Aggregate
 
    begin
-      --  If the aggregate is to be assigned to a full access variable, we have
-      --  to prevent a piecemeal assignment even if the aggregate is to be
-      --  expanded. We create a temporary for the aggregate, and assign the
-      --  temporary instead, so that the back end can generate an atomic move
-      --  for it.
-
-      if Is_Full_Access_Aggregate (N) then
-         return;
-
       --  No special management required for aggregates used to initialize
       --  statically allocated dispatch tables
 
-      elsif Is_Static_Dispatch_Table_Aggregate (N) then
+      if Is_Static_Dispatch_Table_Aggregate (N) then
          return;
 
       --  Case pattern aggregates need to remain as aggregates

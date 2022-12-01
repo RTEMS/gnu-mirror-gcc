@@ -260,6 +260,9 @@ struct access
 
   /* Should TREE_NO_WARNING of a replacement be set?  */
   unsigned grp_no_warning : 1;
+
+  /* Result of propagation accross link from LHS to RHS.  */
+  unsigned grp_result_of_prop_from_lhs : 1;
 };
 
 typedef struct access *access_p;
@@ -1667,7 +1670,18 @@ build_ref_for_offset (location_t loc, tree base, poly_int64 offset,
 static tree
 build_reconstructed_reference (location_t, tree base, struct access *model)
 {
-  tree expr = model->expr, prev_expr = NULL;
+  tree expr = model->expr;
+  /* We have to make sure to start just below the outermost union.  */
+  tree start_expr = expr;
+  while (handled_component_p (expr))
+    {
+      if (TREE_CODE (TREE_TYPE (TREE_OPERAND (expr, 0))) == UNION_TYPE)
+	start_expr = expr;
+      expr = TREE_OPERAND (expr, 0);
+    }
+
+  expr = start_expr;
+  tree prev_expr = NULL_TREE;
   while (!types_compatible_p (TREE_TYPE (expr), TREE_TYPE (base)))
     {
       if (!handled_component_p (expr))
@@ -2521,6 +2535,9 @@ analyze_access_subtree (struct access *root, struct access *parent,
   if (allow_replacements && expr_with_var_bounded_array_refs_p (root->expr))
     allow_replacements = false;
 
+  if (!totally && root->grp_result_of_prop_from_lhs)
+    allow_replacements = false;
+
   for (child = root->first_child; child; child = child->next_sibling)
     {
       hole |= covered_to < child->offset;
@@ -2948,6 +2965,7 @@ propagate_subaccesses_from_lhs (struct access *lacc, struct access *racc)
 	  struct access *new_acc
 	    = create_artificial_child_access (racc, lchild, norm_offset,
 					      true, false);
+	  new_acc->grp_result_of_prop_from_lhs = 1;
 	  propagate_subaccesses_from_lhs (lchild, new_acc);
 	}
       else
@@ -4743,8 +4761,11 @@ public:
   {}
 
   /* opt_pass methods: */
-  virtual bool gate (function *) { return gate_intra_sra (); }
-  virtual unsigned int execute (function *) { return early_intra_sra (); }
+  bool gate (function *) final override { return gate_intra_sra (); }
+  unsigned int execute (function *) final override
+  {
+    return early_intra_sra ();
+  }
 
 }; // class pass_sra_early
 
@@ -4779,8 +4800,8 @@ public:
   {}
 
   /* opt_pass methods: */
-  virtual bool gate (function *) { return gate_intra_sra (); }
-  virtual unsigned int execute (function *) { return late_intra_sra (); }
+  bool gate (function *) final override { return gate_intra_sra (); }
+  unsigned int execute (function *) final override { return late_intra_sra (); }
 
 }; // class pass_sra
 

@@ -20,6 +20,8 @@
 
 // Define macros for some common variables names that we must not use for
 // naming variables, parameters etc. in the library.
+// N.B. we cannot use '#pragma GCC poison A' because that also prevents using
+// these names even as macro arguments, e.g. #define FOO(A) BAR(A)
 #define A (
 #define B (
 #define C (
@@ -110,6 +112,7 @@
 #define tmp (
 #define sz (
 #define token (
+#define value_t (
 
 #if __cplusplus < 201103L
 #define uses_allocator  (
@@ -126,9 +129,16 @@
 #define ptr (
 #endif
 
-// This clashes with newlib so don't use it.
+// These clash with newlib so don't use them.
 # define __lockable		cannot be used as an identifier
+# define __packed		cannot be used as an identifier
+# define __unused		cannot be used as an identifier
+# define __used			cannot be used as an identifier
 
+#ifndef __APPLE__
+#define __weak   predefined qualifier on darwin
+#define __strong predefined qualifier on darwin
+#endif
 
 // Common template parameter names
 #define OutputIterator		OutputIterator is not a reserved name
@@ -232,8 +242,11 @@
 #endif
 
 #if __has_include(<newlib.h>)
-// newlib's <sys/cdefs.h> defines __lockable as a macro.
+// newlib's <sys/cdefs.h> defines these as macros.
 #undef __lockable
+#undef __packed
+#undef __unused
+#undef __used
 // newlib's <time.h> defines __tzrule_type with these members.
 #undef d
 #undef m

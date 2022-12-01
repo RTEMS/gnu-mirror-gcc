@@ -189,6 +189,7 @@ adjust_region_code_walk_stmt_fn (gimple_stmt_iterator *gsi_p,
     case GIMPLE_GOTO:
     case GIMPLE_SWITCH:
     case GIMPLE_ASM:
+    case GIMPLE_ASSUME:
     case GIMPLE_TRANSACTION:
     case GIMPLE_RETURN:
       /* Statement that might constitute some looping/control flow pattern.  */
@@ -1615,12 +1616,12 @@ public:
   {}
 
   /* opt_pass methods: */
-  virtual bool gate (function *)
+  bool gate (function *) final override
   {
     return (flag_openacc
 	    && param_openacc_kernels == OPENACC_KERNELS_DECOMPOSE);
   }
-  virtual unsigned int execute (function *)
+  unsigned int execute (function *) final override
   {
     return omp_oacc_kernels_decompose ();
   }
