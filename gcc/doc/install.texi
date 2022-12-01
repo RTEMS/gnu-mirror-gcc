@@ -1895,7 +1895,7 @@ should not be built.
 
 @item --with-dwarf2
 Specify that the compiler should
-use DWARF 2 debugging information as the default.
+use DWARF 2 (or later) debugging information as the default.
 
 @item --with-advance-toolchain=@var{at}
 On 64-bit PowerPC Linux systems, configure the compiler to use the
