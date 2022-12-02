@@ -2760,7 +2760,8 @@ get_sym_storage_size (gfc_symbol *sym)
   if (sym->ts.type == BT_CHARACTER)
     {
       if (sym->ts.u.cl && sym->ts.u.cl->length
-          && sym->ts.u.cl->length->expr_type == EXPR_CONSTANT)
+	  && sym->ts.u.cl->length->expr_type == EXPR_CONSTANT
+	  && sym->ts.u.cl->length->ts.type == BT_INTEGER)
 	strlen = mpz_get_ui (sym->ts.u.cl->length->value.integer);
       else
 	return 0;
@@ -2777,7 +2778,9 @@ get_sym_storage_size (gfc_symbol *sym)
   for (i = 0; i < sym->as->rank; i++)
     {
       if (sym->as->upper[i]->expr_type != EXPR_CONSTANT
-	  || sym->as->lower[i]->expr_type != EXPR_CONSTANT)
+	  || sym->as->lower[i]->expr_type != EXPR_CONSTANT
+	  || sym->as->upper[i]->ts.type != BT_INTEGER
+	  || sym->as->lower[i]->ts.type != BT_INTEGER)
 	return 0;
 
       elements *= mpz_get_si (sym->as->upper[i]->value.integer)
@@ -3969,6 +3972,14 @@ gfc_procedure_use (gfc_symbol *sym, gfc_actual_arglist **ap, locus *where)
 	    {
 	      gfc_error ("MOLD argument to NULL required at %L",
 			 &a->expr->where);
+	      a->expr->error = 1;
+	      return false;
+	    }
+
+	  if (a->expr && a->expr->expr_type == EXPR_NULL)
+	    {
+	      gfc_error ("Passing intrinsic NULL as actual argument at %L "
+			 "requires an explicit interface", &a->expr->where);
 	      a->expr->error = 1;
 	      return false;
 	    }
