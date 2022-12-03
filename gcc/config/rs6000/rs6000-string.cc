@@ -37,6 +37,7 @@
 #include "target.h"
 #include "profile-count.h"
 #include "predict.h"
+#include "optabs.h"
 
 /* Expand a block clear operation, and return 1 if successful.  Return 0
    if we should let the compiler generate normal code.
@@ -2734,6 +2735,128 @@ gen_lxvl_stxvl_move (rtx dest, rtx src, int length)
     return gen_lxvl (dest, addr, len);
 }
 
+/* Generate a lxvl/stxvl or lxvprl/stxvprl pair of instructions to move up to
+   16 or 32 bytes at a time.  */
+
+static void
+expand_lxvl_stxvl (rtx dest_addr,
+		   rtx src_addr,
+		   rtx bytes_rtx,
+		   int max_bytes)
+{
+  if (max_bytes > GET_MODE_SIZE (V16QImode))
+    {
+      rtx vreg = gen_reg_rtx (XOmode);
+      emit_insn (gen_lxvprl (vreg, src_addr, bytes_rtx));
+      emit_insn (gen_stxvprl (vreg, dest_addr, bytes_rtx));
+    }
+
+  else
+    {
+      rtx vreg = gen_reg_rtx (V16QImode);
+      emit_insn (gen_lxvl (vreg, src_addr, bytes_rtx));
+      emit_insn (gen_stxvl (vreg, dest_addr, bytes_rtx));
+    }
+
+  return;
+}
+
+/* Expand a variable block move operation, and return 1 if successful.  Return
+   0 if we should let the compiler generate normal code.
+
+   operands[0] is the destination
+   operands[1] is the source
+   operands[2] is the length
+   operands[3] is the alignment */
+
+static int
+expand_block_move_variable (rtx operands[], bool might_overlap)
+{
+  /* See if we have the necessary support for load/store vector with length,
+     and we want to do the optimization.  */
+  if (!TARGET_BLOCK_OPS_UNALIGNED_VSX
+      || !TARGET_P9_VECTOR
+      || !TARGET_64BIT
+      || rs6000_memcpy_inline_bytes == 0
+      || !param_vect_partial_vector_usage
+      || might_overlap
+      || !optimize
+      || optimize_size)
+    return 0;
+
+  rtx dest_addr = copy_addr_to_reg (XEXP (operands[0], 0));
+  rtx src_addr = copy_addr_to_reg (XEXP (operands[1], 0));
+
+  /* Check if we want to handle this with inline code.  */
+  rtx bytes_rtx = (GET_MODE (operands[2]) == Pmode
+		   ? copy_to_reg (operands[2])
+		   : convert_to_mode (Pmode, operands[2], true));
+
+  /* Maximum size to move at one time.  */
+  int vect_size_int
+    = (TARGET_FUTURE ? GET_MODE_SIZE (XOmode) : GET_MODE_SIZE (V16QImode));
+
+  /* Total size to move.  Limit the number of bytes that we do in this
+     optimization to just 2 variable moves.  Anything larger let the memcpy
+     glibc function handle it and do the extra optimizations it provides.  */
+  int var_size_int = (rs6000_memcpy_inline_bytes > (2 * vect_size_int)
+		      ? 2 * vect_size_int
+		      : rs6000_memcpy_inline_bytes);
+
+  rtx var_size = GEN_INT (var_size_int);
+  rtx var_cr = gen_reg_rtx (CCUNSmode);
+  emit_insn (gen_rtx_SET (var_cr,
+			  gen_rtx_COMPARE (CCUNSmode, bytes_rtx, var_size)));
+				  
+  rtx var_label = gen_label_rtx ();
+  do_ifelse (CCUNSmode, LEU, NULL_RTX, NULL_RTX, var_cr, var_label,
+	     profile_probability::likely ());
+
+  /* Call memcpy if the size is too large.  */
+  tree fun = builtin_decl_explicit (BUILT_IN_MEMCPY);
+  emit_library_call_value (XEXP (DECL_RTL (fun), 0),
+			   NULL_RTX, LCT_NORMAL, Pmode,
+			   dest_addr, Pmode,
+			   src_addr, Pmode,
+			   bytes_rtx, Pmode);
+
+  rtx join_label = gen_label_rtx ();
+  rtx join_ref = gen_rtx_LABEL_REF (VOIDmode, join_label);
+  emit_jump_insn (gen_rtx_SET (pc_rtx, join_ref));
+  emit_barrier ();
+
+  emit_label (var_label);
+
+  /* We want to move bytes inline.  Move 0..16 or 0..32 bytes now.  */
+  if (vect_size_int > var_size_int)
+    vect_size_int = var_size_int;
+
+  expand_lxvl_stxvl (dest_addr, src_addr, bytes_rtx, vect_size_int);
+
+  /* If we have more than 16/32 bytes, adjust the pointers/length and generate
+     a second move.  */
+  if (var_size_int > vect_size_int)
+    {
+      emit_insn (gen_add2_insn (bytes_rtx, GEN_INT (- vect_size_int)));
+
+      rtx vect_cr = gen_reg_rtx (CCmode);
+      emit_insn (gen_rtx_SET (vect_cr,
+			      gen_rtx_COMPARE (CCmode, bytes_rtx,
+					       const0_rtx)));
+
+      do_ifelse (CCmode, LE, NULL_RTX, NULL_RTX, vect_cr, join_label,
+		 profile_probability::likely ());
+
+      rtx ptr_adjust = GEN_INT (vect_size_int);
+      emit_insn (gen_add2_insn (dest_addr, ptr_adjust));
+      emit_insn (gen_add2_insn (src_addr, ptr_adjust));
+      expand_lxvl_stxvl (dest_addr, src_addr, bytes_rtx, vect_size_int);
+    }
+
+  emit_label (join_label);
+  return 1;
+}
+
 /* Expand a block move operation, and return 1 if successful.  Return 0
    if we should let the compiler generate normal code.
 
@@ -2760,9 +2883,11 @@ expand_block_move (rtx operands[], bool might_overlap)
   rtx stores[MAX_MOVE_REG];
   int num_reg = 0;
 
-  /* If this is not a fixed size move, just call memcpy */
+  /* If this is not a fixed size move, see if we can use load/store vector with
+     length to handle multiple bytes. Don't do the optimization if -Os.
+     Otherwise, just call memcpy.  */
   if (! constp)
-    return 0;
+    return expand_block_move_variable (operands, might_overlap);
 
   /* This must be a fixed size alignment */
   gcc_assert (CONST_INT_P (align_rtx));
