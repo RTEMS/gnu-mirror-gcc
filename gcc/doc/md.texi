@@ -3264,6 +3264,9 @@ Like @code{d}, if @option{-mpowerpc-gfxopt} is used; otherwise, @code{NO_REGS}.
 @item wA
 Like @code{b}, if @option{-mpowerpc64} is used; otherwise, @code{NO_REGS}.
 
+@item wD
+Accumulator register for either @option{-mma} or @option{-mdense-math}.
+
 @item wB
 Signed 5-bit constant integer that can be loaded into an Altivec register.
 

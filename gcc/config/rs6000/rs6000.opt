@@ -628,6 +628,10 @@ mfuture
 Target Undocumented Mask(FUTURE) Var(rs6000_isa_flags)
 Generate (do not generate) future instructions.
 
+mdense-math
+Target Undocumented Mask(DENSE_MATH) Var(rs6000_isa_flags)
+Generate (do not generate) dense math instructions.
+
 ; Documented parameters
 
 -param=rs6000-vect-unroll-limit=
