@@ -649,7 +649,7 @@
 	(unspec:XO [(const_int 0)]
 		   UNSPECV_MMA_XXSETACCZ))]
   "TARGET_DENSE_MATH"
-  "dmsetaccz %0"
+  "dmsetdmrz %0"
   [(set_attr "type" "mma")])
 
 (define_insn "mma_<vv>"
