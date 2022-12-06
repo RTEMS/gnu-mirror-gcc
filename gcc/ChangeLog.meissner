@@ -1,3 +1,16 @@
+==================== Branch dmf005, patch #21.
+
+Use correct dmsetdmrz instruction.
+
+I accidently used the power10 name for the set accumulator to 0 instruction.
+This patch fixes this.
+
+2022-12-05   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (mma_xxsetaccz_dm): Use the correct spelling.
+
 ==================== Branch dmf005, patch #20.
 
 Use lxvl and stxvl for small variable memcpy moves.
