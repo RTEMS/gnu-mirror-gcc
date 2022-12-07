@@ -41,6 +41,7 @@
 #include "analyzer/program-point.h"
 #include "analyzer/store.h"
 #include "analyzer/region-model.h"
+#include "analyzer/call-details.h"
 #include "analyzer/call-info.h"
 #include "make-unique.h"
 
@@ -55,6 +56,11 @@ namespace ana {
 class known_function_returns_42 : public known_function
 {
 public:
+  bool matches_call_types_p (const call_details &) const final override
+  {
+    return true;
+  }
+
   void impl_call_pre (const call_details &cd) const final override
   {
     if (cd.get_lhs_type ())
@@ -114,6 +120,11 @@ public:
       return true;
     }
   };
+
+  bool matches_call_types_p (const call_details &cd) const
+  {
+    return cd.num_args () == 3;
+  }
 
   void impl_call_pre (const call_details &cd) const final override
   {

@@ -263,8 +263,10 @@ init_loop_unswitch_info (class loop *&loop, unswitch_predicate *&hottest,
 
   /* Unswitch only nests with no sibling loops.  */
   class loop *outer_loop = loop;
+  unsigned max_depth = param_max_unswitch_depth;
   while (loop_outer (outer_loop)->num != 0
-	 && !loop_outer (outer_loop)->inner->next)
+	 && !loop_outer (outer_loop)->inner->next
+	 && --max_depth != 0)
     outer_loop = loop_outer (outer_loop);
   hottest = NULL;
   hottest_bb = NULL;
@@ -1631,6 +1633,7 @@ clean_up_after_unswitching (int ignored_edge_flag)
   basic_block bb;
   edge e;
   edge_iterator ei;
+  bool removed_edge = false;
 
   FOR_EACH_BB_FN (bb, cfun)
     {
@@ -1655,7 +1658,10 @@ clean_up_after_unswitching (int ignored_edge_flag)
 		     to preserve its edge.  But we can remove the
 		     non-default CASE sharing the edge.  */
 		  if (e != default_e)
-		    remove_edge (e);
+		    {
+		      remove_edge (e);
+		      removed_edge = true;
+		    }
 		}
 	      else
 		{
@@ -1672,6 +1678,10 @@ clean_up_after_unswitching (int ignored_edge_flag)
       FOR_EACH_EDGE (e, ei, bb->succs)
 	e->flags &= ~ignored_edge_flag;
     }
+
+  /* If we removed an edge we possibly have to recompute dominators.  */
+  if (removed_edge)
+    free_dominance_info (CDI_DOMINATORS);
 }
 
 /* Loop unswitching pass.  */

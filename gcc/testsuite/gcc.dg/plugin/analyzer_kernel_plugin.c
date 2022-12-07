@@ -41,6 +41,7 @@
 #include "analyzer/program-point.h"
 #include "analyzer/store.h"
 #include "analyzer/region-model.h"
+#include "analyzer/call-details.h"
 #include "analyzer/call-info.h"
 #include "make-unique.h"
 
@@ -57,6 +58,11 @@ class copy_across_boundary_fn : public known_function
  public:
   virtual bool untrusted_source_p () const = 0;
   virtual bool untrusted_destination_p () const = 0;
+
+  bool matches_call_types_p (const call_details &cd) const final override
+  {
+    return cd.num_args () == 3;
+  }
 
   void impl_call_pre (const call_details &cd) const final override
   {

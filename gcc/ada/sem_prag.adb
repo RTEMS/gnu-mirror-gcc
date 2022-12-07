@@ -63,6 +63,7 @@ with Sem;            use Sem;
 with Sem_Aux;        use Sem_Aux;
 with Sem_Ch3;        use Sem_Ch3;
 with Sem_Ch6;        use Sem_Ch6;
+with Sem_Ch7;        use Sem_Ch7;
 with Sem_Ch8;        use Sem_Ch8;
 with Sem_Ch12;       use Sem_Ch12;
 with Sem_Ch13;       use Sem_Ch13;
@@ -2115,9 +2116,16 @@ package body Sem_Prag is
                    First (Pragma_Argument_Associations (N));
       Obj_Decl : constant Node_Id   := Find_Related_Context (N);
       Obj_Id   : constant Entity_Id := Defining_Entity (Obj_Decl);
+      Obj_Typ  : Entity_Id;
       Expr     : Node_Id;
 
    begin
+      if Is_Type (Obj_Id) then
+         Obj_Typ := Obj_Id;
+      else
+         Obj_Typ := Etype (Obj_Id);
+      end if;
+
       --  Ensure that the Boolean expression (if present) is static. A missing
       --  argument defaults the value to True (SPARK RM 7.1.2(5)).
 
@@ -2152,9 +2160,7 @@ package body Sem_Prag is
       if Prag_Id /= Pragma_No_Caching
         and then not Is_Effectively_Volatile (Obj_Id)
       then
-         if Ekind (Obj_Id) = E_Variable
-           and then No_Caching_Enabled (Obj_Id)
-         then
+         if No_Caching_Enabled (Obj_Id) then
             if Expr_Val then  --  Confirming value of False is allowed
                SPARK_Msg_N
                  ("illegal combination of external property % and property "
@@ -2166,15 +2172,16 @@ package body Sem_Prag is
                N);
          end if;
 
-      --  Pragma No_Caching should only apply to volatile variables of
+      --  Pragma No_Caching should only apply to volatile types or variables of
       --  a non-effectively volatile type (SPARK RM 7.1.2).
 
       elsif Prag_Id = Pragma_No_Caching then
-         if Is_Effectively_Volatile (Etype (Obj_Id)) then
-            SPARK_Msg_N ("property % must not apply to an object of "
+         if Is_Effectively_Volatile (Obj_Typ) then
+            SPARK_Msg_N ("property % must not apply to a type or object of "
                          & "an effectively volatile type", N);
          elsif not Is_Volatile (Obj_Id) then
-            SPARK_Msg_N ("property % must apply to a volatile object", N);
+            SPARK_Msg_N
+              ("property % must apply to a volatile type or object", N);
          end if;
       end if;
 
@@ -3567,6 +3574,21 @@ package body Sem_Prag is
             return;
          end if;
 
+         --  In the case of state in a (descendant of a private) child which
+         --  is Part_Of the state of another package, the package defining the
+         --  encapsulating abstract state should have a body, to ensure that it
+         --  has a state refinement (SPARK RM 7.1.4(4)).
+
+         if Enclosing_Comp_Unit_Node (Encap_Id) /=
+            Enclosing_Comp_Unit_Node (Item_Id)
+           and then not Unit_Requires_Body (Scope (Encap_Id))
+         then
+            SPARK_Msg_N
+              ("indicator Part_Of must denote abstract state of package "
+               & "with a body (SPARK RM 7.1.4(4))", Indic);
+            return;
+         end if;
+
          --  At this point it is known that the Part_Of indicator is legal
 
          Legal := True;
@@ -4547,6 +4569,11 @@ package body Sem_Prag is
          --  Single task type
 
          elsif Nkind (Subp_Decl) = N_Single_Task_Declaration then
+            null;
+
+         --  Abstract subprogram declaration
+
+         elsif Nkind (Subp_Decl) = N_Abstract_Subprogram_Declaration then
             null;
 
          --  Subprogram body acts as spec
@@ -13463,22 +13490,19 @@ package body Sem_Prag is
             Obj_Or_Type_Decl := Find_Related_Context (N, Do_Checks => True);
 
             --  Pragma must apply to a object declaration or to a type
-            --  declaration (only the former in the No_Caching case).
-            --  Original_Node is necessary to account for untagged derived
-            --  types that are rewritten as subtypes of their
-            --  respective root types.
+            --  declaration. Original_Node is necessary to account for
+            --  untagged derived types that are rewritten as subtypes of
+            --  their respective root types.
 
-            if Nkind (Obj_Or_Type_Decl) /= N_Object_Declaration then
-               if Prag_Id = Pragma_No_Caching
-                  or else Nkind (Original_Node (Obj_Or_Type_Decl)) not in
-                            N_Full_Type_Declaration    |
-                            N_Private_Type_Declaration |
-                            N_Formal_Type_Declaration  |
-                            N_Task_Type_Declaration    |
-                            N_Protected_Type_Declaration
-               then
-                  Pragma_Misplaced;
-               end if;
+            if Nkind (Obj_Or_Type_Decl) /= N_Object_Declaration
+              and then Nkind (Original_Node (Obj_Or_Type_Decl)) not in
+                N_Full_Type_Declaration    |
+                N_Private_Type_Declaration |
+                N_Formal_Type_Declaration  |
+                N_Task_Type_Declaration    |
+                N_Protected_Type_Declaration
+            then
+               Pragma_Misplaced;
             end if;
 
             Obj_Or_Type_Id := Defining_Entity (Obj_Or_Type_Decl);
@@ -21097,6 +21121,25 @@ package body Sem_Prag is
                if Partition_Elaboration_Policy_Sloc /= System_Location then
                   Partition_Elaboration_Policy_Sloc := Loc;
                end if;
+
+               if PEP_Val = Name_Sequential
+                 and then not Restriction_Active (No_Task_Hierarchy)
+               then
+                  --  RM H.6(6) guarantees that No_Task_Hierarchy will be
+                  --  set eventually, so take advantage of that knowledge now.
+                  --  But we have to do this in a tricky way. If we simply
+                  --  set the No_Task_Hierarchy restriction here, then the
+                  --  assumption that the restriction will be set eventually
+                  --  becomes a self-fulfilling prophecy; the binder can
+                  --  then mistakenly conclude that the H.6(6) rule is
+                  --  satisified in cases where the post-compilation check
+                  --  should fail. So we invent a new restriction,
+                  --  No_Task_Hierarchy_Implicit, which is treated specially
+                  --  in the function Restriction_Active.
+
+                  Set_Restriction (No_Task_Hierarchy_Implicit, N);
+                  pragma Assert (Restriction_Active (No_Task_Hierarchy));
+               end if;
             end if;
          end PEP;
 
@@ -23424,10 +23467,14 @@ package body Sem_Prag is
                Spec_Id : constant Entity_Id := Unique_Defining_Entity (Decl);
 
             begin
-               --  Ignore pragma when applied to the special body created for
-               --  inlining, recognized by its internal name _Parent.
+               --  Ignore pragma when applied to the special body created
+               --  for inlining, recognized by its internal name _Parent; or
+               --  when applied to the special body created for contracts,
+               --  recognized by its internal name _Wrapped_Statements.
 
-               if Chars (Body_Id) = Name_uParent then
+               if Chars (Body_Id) in Name_uParent
+                                   | Name_uWrapped_Statements
+               then
                   return;
                end if;
 
@@ -25780,7 +25827,7 @@ package body Sem_Prag is
                                  C := Get_String_Char (Str, J);
                                  Chr := Get_Character (C);
 
-                                 if not Set_Dot_Warning_Switch (Chr) then
+                                 if not Set_Warning_Switch ('.', Chr) then
                                     Error_Pragma_Arg
                                       ("invalid warning switch character "
                                        & '.' & Chr, Arg1);
@@ -25789,7 +25836,7 @@ package body Sem_Prag is
                               --  Non-Dot case
 
                               else
-                                 OK := Set_Warning_Switch (Chr);
+                                 OK := Set_Warning_Switch (Plain, Chr);
                               end if;
 
                               if not OK then

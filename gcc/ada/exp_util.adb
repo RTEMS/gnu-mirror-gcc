@@ -67,6 +67,7 @@ with Stringt;        use Stringt;
 with Tbuild;         use Tbuild;
 with Ttypes;         use Ttypes;
 with Validsw;        use Validsw;
+with Warnsw;         use Warnsw;
 
 with GNAT.HTable;
 package body Exp_Util is
@@ -2966,7 +2967,7 @@ package body Exp_Util is
          --  Output an info message when inheriting an invariant and the
          --  listing option is enabled.
 
-         if Inherited and Opt.List_Inherited_Aspects then
+         if Inherited and List_Inherited_Aspects then
             Error_Msg_Sloc := Sloc (Prag);
             Error_Msg_N
               ("info: & inherits `Invariant''Class` aspect from #?.l?", Typ);
@@ -9165,7 +9166,11 @@ package body Exp_Util is
       return
         Present (Expr)
           and then Nkind (Unqual_Conv (Expr)) = N_Explicit_Dereference
-          and then Nkind (Parent (Expr)) = N_Simple_Return_Statement;
+          and then (Nkind (Parent (Expr)) = N_Simple_Return_Statement
+                     or else
+                       (Nkind (Parent (Expr)) = N_Object_Renaming_Declaration
+                         and then
+                        Is_Return_Object (Defining_Entity (Parent (Expr)))));
    end Is_Related_To_Func_Return;
 
    --------------------------------

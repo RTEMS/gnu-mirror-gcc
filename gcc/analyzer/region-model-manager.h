@@ -43,6 +43,7 @@ public:
   /* svalue consolidation.  */
   const svalue *get_or_create_constant_svalue (tree cst_expr);
   const svalue *get_or_create_int_cst (tree type, poly_int64);
+  const svalue *get_or_create_null_ptr (tree pointer_type);
   const svalue *get_or_create_unknown_svalue (tree type);
   const svalue *get_or_create_setjmp_svalue (const setjmp_record &r,
 					     tree type);
@@ -100,6 +101,7 @@ public:
   const svalue *create_unique_svalue (tree type);
 
   /* region consolidation.  */
+  unsigned get_num_regions () const { return m_next_region_id; }
   const stack_region * get_stack_region () const { return &m_stack_region; }
   const heap_region *get_heap_region () const { return &m_heap_region; }
   const code_region *get_code_region () const { return &m_code_region; }
@@ -152,7 +154,8 @@ public:
   /* Dynamically-allocated region instances.
      The number of these within the analysis can grow arbitrarily.
      They are still owned by the manager.  */
-  const region *create_region_for_heap_alloc ();
+  const region *
+  get_or_create_region_for_heap_alloc (const sbitmap &base_regs_in_use);
   const region *create_region_for_alloca (const frame_region *frame);
 
   void log_stats (logger *logger, bool show_objs) const;

@@ -92,6 +92,7 @@ class bounded_ranges_manager;
 
 class pending_diagnostic;
 class pending_note;
+struct event_loc_info;
 class state_change_event;
 class checker_path;
 class extrinsic_state;
@@ -228,14 +229,41 @@ extern location_t get_stmt_location (const gimple *stmt, function *fun);
 extern bool compat_types_p (tree src_type, tree dst_type);
 
 /* Abstract base class for simulating the behavior of known functions,
-   supplied by plugins.  */
+   supplied by the core of the analyzer, or by plugins.  */
 
 class known_function
 {
 public:
   virtual ~known_function () {}
-  virtual void impl_call_pre (const call_details &cd) const = 0;
+  virtual bool matches_call_types_p (const call_details &cd) const = 0;
+  virtual void impl_call_pre (const call_details &) const
+  {
+    return;
+  }
+  virtual void impl_call_post (const call_details &) const
+  {
+    return;
+  }
 };
+
+/* Subclass of known_function for IFN_* functions.  */
+
+class internal_known_function : public known_function
+{
+public:
+  bool matches_call_types_p (const call_details &) const final override
+  {
+    /* Types are assumed to be correct.  */
+    return true;
+  }
+};
+
+extern void register_known_functions (known_function_manager &mgr);
+extern void register_known_analyzer_functions (known_function_manager &kfm);
+extern void register_known_fd_functions (known_function_manager &kfm);
+extern void register_known_file_functions (known_function_manager &kfm);
+extern void register_known_functions_lang_cp (known_function_manager &kfm);
+extern void register_varargs_builtins (known_function_manager &kfm);
 
 /* Passed by pointer to PLUGIN_ANALYZER_INIT callbacks.  */
 
@@ -311,6 +339,11 @@ public:
   virtual bool terminate_path_p () const = 0;
 };
 
+extern tree get_stashed_constant_by_name (const char *name);
+extern void log_stashed_constants (logger *logger);
+
+extern FILE *get_or_create_any_logfile ();
+
 } // namespace ana
 
 extern bool is_special_named_call_p (const gcall *call, const char *funcname,
@@ -323,15 +356,14 @@ extern bool is_std_named_call_p (const_tree fndecl, const char *funcname,
 				 const gcall *call, unsigned int num_args);
 extern bool is_setjmp_call_p (const gcall *call);
 extern bool is_longjmp_call_p (const gcall *call);
-extern bool is_pipe_call_p (const_tree fndecl, const char *funcname,
-			    const gcall *call, unsigned int num_args);
 
 extern const char *get_user_facing_name (const gcall *call);
 
 extern void register_analyzer_pass ();
 
 extern label_text make_label_text (bool can_colorize, const char *fmt, ...);
-extern label_text make_label_text_n (bool can_colorize, int n,
+extern label_text make_label_text_n (bool can_colorize,
+				     unsigned HOST_WIDE_INT n,
 				     const char *singular_fmt,
 				     const char *plural_fmt, ...);
 

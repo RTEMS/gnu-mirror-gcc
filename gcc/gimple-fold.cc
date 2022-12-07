@@ -68,6 +68,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa-strlen.h"
 #include "varasm.h"
 #include "internal-fn.h"
+#include "gimple-range.h"
 
 enum strlen_range_kind {
   /* Compute the exact constant string length.  */
@@ -5386,18 +5387,17 @@ gimple_fold_partial_load_store_mem_ref (gcall *call, tree vectype, bool mask_p)
       tree mask = gimple_call_arg (call, 2);
       if (!integer_all_onesp (mask))
 	return NULL_TREE;
-    } else {
+    }
+  else
+    {
       tree basic_len = gimple_call_arg (call, 2);
-      if (!tree_fits_uhwi_p (basic_len))
+      if (!poly_int_tree_p (basic_len))
 	return NULL_TREE;
       unsigned int nargs = gimple_call_num_args (call);
       tree bias = gimple_call_arg (call, nargs - 1);
-      gcc_assert (tree_fits_uhwi_p (bias));
-      tree biased_len = int_const_binop (MINUS_EXPR, basic_len, bias);
-      unsigned int len = tree_to_uhwi (biased_len);
-      unsigned int vect_len
-	= GET_MODE_SIZE (TYPE_MODE (vectype)).to_constant ();
-      if (vect_len != len)
+      gcc_assert (TREE_CODE (bias) == INTEGER_CST);
+      if (maybe_ne (wi::to_poly_widest (basic_len) - wi::to_widest (bias),
+		    GET_MODE_SIZE (TYPE_MODE (vectype))))
 	return NULL_TREE;
     }
 
@@ -6916,6 +6916,7 @@ and_comparisons_1 (tree type, enum tree_code code1, tree op1a, tree op1b,
 }
 
 static basic_block fosa_bb;
+static vec<std::pair<tree, void *> > *fosa_unwind;
 static tree
 follow_outer_ssa_edges (tree val)
 {
@@ -6929,7 +6930,21 @@ follow_outer_ssa_edges (tree val)
 	      && (def_bb == fosa_bb
 		  || dominated_by_p (CDI_DOMINATORS, fosa_bb, def_bb))))
 	return val;
-      return NULL_TREE;
+      /* We cannot temporarily rewrite stmts with undefined overflow
+	 behavior, so avoid expanding them.  */
+      if ((ANY_INTEGRAL_TYPE_P (TREE_TYPE (val))
+	   || POINTER_TYPE_P (TREE_TYPE (val)))
+	  && !TYPE_OVERFLOW_WRAPS (TREE_TYPE (val)))
+	return NULL_TREE;
+      /* If the definition does not dominate fosa_bb temporarily reset
+	 flow-sensitive info.  */
+      if (val->ssa_name.info.range_info)
+	{
+	  fosa_unwind->safe_push (std::make_pair
+				    (val, val->ssa_name.info.range_info));
+	  val->ssa_name.info.range_info = NULL;
+	}
+      return val;
     }
   return val;
 }
@@ -6988,9 +7003,14 @@ maybe_fold_comparisons_from_match_pd (tree type, enum tree_code code,
 		      type, gimple_assign_lhs (stmt1),
 		      gimple_assign_lhs (stmt2));
   fosa_bb = outer_cond_bb;
+  auto_vec<std::pair<tree, void *>, 8> unwind_stack;
+  fosa_unwind = &unwind_stack;
   if (op.resimplify (NULL, (!outer_cond_bb
 			    ? follow_all_ssa_edges : follow_outer_ssa_edges)))
     {
+      fosa_unwind = NULL;
+      for (auto p : unwind_stack)
+	p.first->ssa_name.info.range_info = p.second;
       if (gimple_simplified_result_is_gimple_val (&op))
 	{
 	  tree res = op.ops[0];
@@ -7012,6 +7032,9 @@ maybe_fold_comparisons_from_match_pd (tree type, enum tree_code code,
 	  return build2 ((enum tree_code)op.code, op.type, op0, op1);
 	}
     }
+  fosa_unwind = NULL;
+  for (auto p : unwind_stack)
+    p.first->ssa_name.info.range_info = p.second;
 
   return NULL_TREE;
 }
@@ -9211,6 +9234,15 @@ bool
 gimple_stmt_nonnegative_warnv_p (gimple *stmt, bool *strict_overflow_p,
 				 int depth)
 {
+  tree type = gimple_range_type (stmt);
+  if (type && frange::supports_p (type))
+    {
+      frange r;
+      bool sign;
+      if (get_global_range_query ()->range_of_stmt (r, stmt)
+	  && r.signbit_p (sign))
+	return !sign;
+    }
   switch (gimple_code (stmt))
     {
     case GIMPLE_ASSIGN:

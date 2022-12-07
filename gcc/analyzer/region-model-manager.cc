@@ -237,6 +237,17 @@ region_model_manager::get_or_create_int_cst (tree type, poly_int64 val)
   return get_or_create_constant_svalue (tree_cst);
 }
 
+/* Return the svalue * for the constant_svalue for the NULL pointer
+   of POINTER_TYPE, creating it if necessary.  */
+
+const svalue *
+region_model_manager::get_or_create_null_ptr (tree pointer_type)
+{
+  gcc_assert (pointer_type);
+  gcc_assert (POINTER_TYPE_P (pointer_type));
+  return get_or_create_int_cst (pointer_type, 0);
+}
+
 /* Return the svalue * for a unknown_svalue for TYPE (which can be NULL),
    creating it if necessary.
    The unknown_svalue instances are reused, based on pointer equality
@@ -613,13 +624,16 @@ region_model_manager::maybe_fold_binop (tree type, enum tree_code op,
     case POINTER_PLUS_EXPR:
     case PLUS_EXPR:
       /* (VAL + 0) -> VAL.  */
-      if (cst1 && zerop (cst1) && type == arg0->get_type ())
-	return arg0;
+      if (cst1 && zerop (cst1))
+	return get_or_create_cast (type, arg0);
       break;
     case MINUS_EXPR:
       /* (VAL - 0) -> VAL.  */
-      if (cst1 && zerop (cst1) && type == arg0->get_type ())
-	return arg0;
+      if (cst1 && zerop (cst1))
+	return get_or_create_cast (type, arg0);
+      /* (0 - VAL) -> -VAL.  */
+      if (cst0 && zerop (cst0))
+	return get_or_create_unaryop (type, NEGATE_EXPR, arg1);
       break;
     case MULT_EXPR:
       /* (VAL * 0).  */
@@ -1678,11 +1692,22 @@ get_region_for_unexpected_tree_code (region_model_context *ctxt,
   return new_reg;
 }
 
-/* Return a new region describing a heap-allocated block of memory.  */
+/* Return a region describing a heap-allocated block of memory.
+   Reuse an existing heap_allocated_region is its id is not within
+   BASE_REGS_IN_USE.  */
 
 const region *
-region_model_manager::create_region_for_heap_alloc ()
+region_model_manager::
+get_or_create_region_for_heap_alloc (const sbitmap &base_regs_in_use)
 {
+  /* Try to reuse an existing region, if it's unreferenced in the
+     client state.  */
+  for (auto existing_reg : m_managed_dynamic_regions)
+    if (!bitmap_bit_p (base_regs_in_use, existing_reg->get_id ()))
+      if (existing_reg->get_kind () == RK_HEAP_ALLOCATED)
+	return existing_reg;
+
+  /* All existing ones (if any) are in use; create a new one.  */
   region *reg
     = new heap_allocated_region (alloc_region_id (), &m_heap_region);
   m_managed_dynamic_regions.safe_push (reg);

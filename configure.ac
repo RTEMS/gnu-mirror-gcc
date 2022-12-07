@@ -132,7 +132,7 @@ build_tools="build-texinfo build-flex build-bison build-m4 build-fixincludes"
 
 # these libraries are used by various programs built for the host environment
 #f
-host_libs="intl libiberty opcodes bfd readline tcl tk itcl libgui zlib libbacktrace libcpp libcody libdecnumber gmp mpfr mpc isl libiconv libctf"
+host_libs="intl libiberty opcodes bfd readline tcl tk itcl libgui zlib libbacktrace libcpp libcody libdecnumber gmp mpfr mpc isl libiconv libctf libsframe"
 
 # these tools are built for the host environment
 # Note, the powerpc-eabi build depends on sim occurring before gdb in order to
@@ -1680,7 +1680,7 @@ Try the --with-gmp, --with-mpfr and/or --with-mpc options to specify
 their locations.  Source code for these libraries can be found at
 their respective hosting sites as well as at
 https://gcc.gnu.org/pub/gcc/infrastructure/.  See also
-https://gcc.gnu.org/onlinedocs/install/prerequisites.html for additional info.  If
+http://gcc.gnu.org/install/prerequisites.html for additional info.  If
 you obtained GMP, MPFR and/or MPC from a vendor distribution package,
 make sure that you have installed both the libraries and the header
 files.  They may be located in separate packages.])
@@ -3525,6 +3525,7 @@ case " $configdirs " in
     test $host = $build && RUNTEST='$$s/$(HOST_SUBDIR)/dejagnu/runtest'
     ;;
 esac
+
 
 # Host tools.
 NCN_STRICT_CHECK_TOOLS(AR, ar)

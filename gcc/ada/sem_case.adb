@@ -48,6 +48,7 @@ with Stringt;        use Stringt;
 with Table;
 with Tbuild;         use Tbuild;
 with Uintp;          use Uintp;
+with Warnsw;         use Warnsw;
 
 with Ada.Unchecked_Deallocation;
 
@@ -209,6 +210,8 @@ package body Sem_Case is
                     null;
               end case;
            end record;
+         pragma Annotate (CodePeer, False_Positive, "raise exception",
+                          "function is abstract, hence never called");
          function "=" (X, Y : Choice_Range_Info) return Boolean is abstract;
 
          type Choices_Range_Info is array (Choice_Id) of Choice_Range_Info;

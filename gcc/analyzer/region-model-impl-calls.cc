@@ -26,468 +26,159 @@ along with GCC; see the file COPYING3.  If not see
 #include "function.h"
 #include "basic-block.h"
 #include "gimple.h"
-#include "gimple-iterator.h"
 #include "diagnostic-core.h"
-#include "graphviz.h"
-#include "options.h"
-#include "cgraph.h"
-#include "tree-dfa.h"
-#include "stringpool.h"
-#include "convert.h"
-#include "target.h"
-#include "fold-const.h"
-#include "tree-pretty-print.h"
-#include "diagnostic-color.h"
 #include "diagnostic-metadata.h"
-#include "bitmap.h"
 #include "analyzer/analyzer.h"
 #include "analyzer/analyzer-logging.h"
-#include "ordered-hash-map.h"
-#include "options.h"
-#include "analyzer/supergraph.h"
-#include "sbitmap.h"
-#include "analyzer/call-string.h"
-#include "analyzer/program-point.h"
-#include "analyzer/store.h"
+#include "diagnostic.h"
 #include "analyzer/region-model.h"
+#include "analyzer/call-details.h"
 #include "analyzer/call-info.h"
-#include "analyzer/sm.h"
-#include "diagnostic-path.h"
-#include "analyzer/pending-diagnostic.h"
-#include "gimple-pretty-print.h"
 #include "make-unique.h"
 
 #if ENABLE_ANALYZER
 
 namespace ana {
 
-/* class call_details.  */
-
-/* call_details's ctor.  */
-
-call_details::call_details (const gcall *call, region_model *model,
-			    region_model_context *ctxt)
-: m_call (call), m_model (model), m_ctxt (ctxt),
-  m_lhs_type (NULL_TREE), m_lhs_region (NULL)
-{
-  m_lhs_type = NULL_TREE;
-  if (tree lhs = gimple_call_lhs (call))
-    {
-      m_lhs_region = model->get_lvalue (lhs, ctxt);
-      m_lhs_type = TREE_TYPE (lhs);
-    }
-}
-
-/* Get the manager from m_model.  */
-
-region_model_manager *
-call_details::get_manager () const
-{
-  return m_model->get_manager ();
-}
-
-/* Get any logger associated with this object.  */
-
-logger *
-call_details::get_logger () const
-{
-  if (m_ctxt)
-    return m_ctxt->get_logger ();
-  else
-    return NULL;
-}
-
-/* Get any uncertainty_t associated with the region_model_context.  */
-
-uncertainty_t *
-call_details::get_uncertainty () const
-{
-  if (m_ctxt)
-    return m_ctxt->get_uncertainty ();
-  else
-    return NULL;
-}
-
-/* If the callsite has a left-hand-side region, set it to RESULT
-   and return true.
-   Otherwise do nothing and return false.  */
-
-bool
-call_details::maybe_set_lhs (const svalue *result) const
-{
-  gcc_assert (result);
-  if (m_lhs_region)
-    {
-      m_model->set_value (m_lhs_region, result, m_ctxt);
-      return true;
-    }
-  else
-    return false;
-}
-
-/* Return the number of arguments used by the call statement.  */
-
-unsigned
-call_details::num_args () const
-{
-  return gimple_call_num_args (m_call);
-}
-
-/* Get argument IDX at the callsite as a tree.  */
-
-tree
-call_details::get_arg_tree (unsigned idx) const
-{
-  return gimple_call_arg (m_call, idx);
-}
-
-/* Get the type of argument IDX.  */
-
-tree
-call_details::get_arg_type (unsigned idx) const
-{
-  return TREE_TYPE (gimple_call_arg (m_call, idx));
-}
-
-/* Get argument IDX at the callsite as an svalue.  */
-
-const svalue *
-call_details::get_arg_svalue (unsigned idx) const
-{
-  tree arg = get_arg_tree (idx);
-  return m_model->get_rvalue (arg, m_ctxt);
-}
-
-/* Attempt to get the string literal for argument IDX, or return NULL
-   otherwise.
-   For use when implementing "__analyzer_*" functions that take
-   string literals.  */
-
-const char *
-call_details::get_arg_string_literal (unsigned idx) const
-{
-  const svalue *str_arg = get_arg_svalue (idx);
-  if (const region *pointee = str_arg->maybe_get_region ())
-    if (const string_region *string_reg = pointee->dyn_cast_string_region ())
-      {
-	tree string_cst = string_reg->get_string_cst ();
-	return TREE_STRING_POINTER (string_cst);
-      }
-  return NULL;
-}
-
-/* Attempt to get the fndecl used at this call, if known, or NULL_TREE
-   otherwise.  */
-
-tree
-call_details::get_fndecl_for_call () const
-{
-  return m_model->get_fndecl_for_call (m_call, m_ctxt);
-}
-
-/* Dump a multiline representation of this call to PP.  */
-
-void
-call_details::dump_to_pp (pretty_printer *pp, bool simple) const
-{
-  pp_string (pp, "gcall: ");
-  pp_gimple_stmt_1 (pp, m_call, 0 /* spc */, TDF_NONE /* flags */);
-  pp_newline (pp);
-  pp_string (pp, "return region: ");
-  if (m_lhs_region)
-    m_lhs_region->dump_to_pp (pp, simple);
-  else
-    pp_string (pp, "NULL");
-  pp_newline (pp);
-  for (unsigned i = 0; i < gimple_call_num_args (m_call); i++)
-    {
-      const svalue *arg_sval = get_arg_svalue (i);
-      pp_printf (pp, "arg %i: ", i);
-      arg_sval->dump_to_pp (pp, simple);
-      pp_newline (pp);
-    }
-}
-
-/* Dump a multiline representation of this call to stderr.  */
-
-DEBUG_FUNCTION void
-call_details::dump (bool simple) const
-{
-  pretty_printer pp;
-  pp_format_decoder (&pp) = default_tree_printer;
-  pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.buffer->stream = stderr;
-  dump_to_pp (&pp, simple);
-  pp_flush (&pp);
-}
-
-/* Get a conjured_svalue for this call for REG,
-   and purge any state already relating to that conjured_svalue.  */
-
-const svalue *
-call_details::get_or_create_conjured_svalue (const region *reg) const
-{
-  region_model_manager *mgr = m_model->get_manager ();
-  return mgr->get_or_create_conjured_svalue (reg->get_type (), m_call, reg,
-					     conjured_purge (m_model, m_ctxt));
-}
-
 /* Implementations of specific functions.  */
 
-/* Handle the on_call_pre part of "alloca".  */
+/* Handler for "alloca".  */
+
+class kf_alloca : public known_function
+{
+public:
+  bool matches_call_types_p (const call_details &cd) const final override
+  {
+    return cd.num_args () == 1;
+  }
+  void impl_call_pre (const call_details &cd) const final override;
+};
 
 void
-region_model::impl_call_alloca (const call_details &cd)
+kf_alloca::impl_call_pre (const call_details &cd) const
 {
   const svalue *size_sval = cd.get_arg_svalue (0);
-  const region *new_reg = create_region_for_alloca (size_sval, cd.get_ctxt ());
+
+  region_model *model = cd.get_model ();
+  region_model_manager *mgr = cd.get_manager ();
+
+  const region *new_reg
+    = model->create_region_for_alloca (size_sval, cd.get_ctxt ());
   const svalue *ptr_sval
-    = m_mgr->get_ptr_svalue (cd.get_lhs_type (), new_reg);
+    = mgr->get_ptr_svalue (cd.get_lhs_type (), new_reg);
   cd.maybe_set_lhs (ptr_sval);
 }
 
-/* Handle a call to "__analyzer_describe".
+/* Handler for "__builtin_expect" etc.  */
 
-   Emit a warning describing the 2nd argument (which can be of any
-   type), at the given verbosity level.  This is for use when
-   debugging, and may be of use in DejaGnu tests.  */
+class kf_expect : public internal_known_function
+{
+public:
+  void impl_call_pre (const call_details &cd) const final override
+  {
+    /* __builtin_expect's return value is its initial argument.  */
+    const svalue *sval = cd.get_arg_svalue (0);
+    cd.maybe_set_lhs (sval);
+  }
+};
+
+/* Handler for "calloc".  */
+
+class kf_calloc : public known_function
+{
+public:
+  bool matches_call_types_p (const call_details &cd) const final override
+  {
+    return (cd.num_args () == 2
+	    && cd.arg_is_size_p (0)
+	    && cd.arg_is_size_p (1));
+  }
+  void impl_call_pre (const call_details &cd) const final override;
+};
 
 void
-region_model::impl_call_analyzer_describe (const gcall *call,
-					   region_model_context *ctxt)
+kf_calloc::impl_call_pre (const call_details &cd) const
 {
-  tree t_verbosity = gimple_call_arg (call, 0);
-  tree t_val = gimple_call_arg (call, 1);
-  const svalue *sval = get_rvalue (t_val, ctxt);
-  bool simple = zerop (t_verbosity);
-  label_text desc = sval->get_desc (simple);
-  warning_at (call->location, 0, "svalue: %qs", desc.get ());
-}
-
-/* Handle a call to "__analyzer_dump_capacity".
-
-   Emit a warning describing the capacity of the base region of
-   the region pointed to by the 1st argument.
-   This is for use when debugging, and may be of use in DejaGnu tests.  */
-
-void
-region_model::impl_call_analyzer_dump_capacity (const gcall *call,
-						region_model_context *ctxt)
-{
-  tree t_ptr = gimple_call_arg (call, 0);
-  const svalue *sval_ptr = get_rvalue (t_ptr, ctxt);
-  const region *reg = deref_rvalue (sval_ptr, t_ptr, ctxt);
-  const region *base_reg = reg->get_base_region ();
-  const svalue *capacity = get_capacity (base_reg);
-  label_text desc = capacity->get_desc (true);
-  warning_at (call->location, 0, "capacity: %qs", desc.get ());
-}
-
-/* Compare D1 and D2 using their names, and then IDs to order them.  */
-
-static int
-cmp_decls (tree d1, tree d2)
-{
-  gcc_assert (DECL_P (d1));
-  gcc_assert (DECL_P (d2));
-  if (DECL_NAME (d1) && DECL_NAME (d2))
-    if (int cmp = strcmp (IDENTIFIER_POINTER (DECL_NAME (d1)),
-			  IDENTIFIER_POINTER (DECL_NAME (d2))))
-      return cmp;
-  return (int)DECL_UID (d1) - (int)DECL_UID (d2);
-}
-
-/* Comparator for use by vec<tree>::qsort,
-   using their names, and then IDs to order them.  */
-
-static int
-cmp_decls_ptr_ptr (const void *p1, const void *p2)
-{
-  tree const *d1 = (tree const *)p1;
-  tree const *d2 = (tree const *)p2;
-
-  return cmp_decls (*d1, *d2);
-}
-
-/* Handle a call to "__analyzer_dump_escaped".
-
-   Emit a warning giving the number of decls that have escaped, followed
-   by a comma-separated list of their names, in alphabetical order.
-
-   This is for use when debugging, and may be of use in DejaGnu tests.  */
-
-void
-region_model::impl_call_analyzer_dump_escaped (const gcall *call)
-{
-  auto_vec<tree> escaped_decls;
-  for (auto iter : m_store)
-    {
-      const binding_cluster *c = iter.second;
-      if (!c->escaped_p ())
-	continue;
-      if (tree decl = c->get_base_region ()->maybe_get_decl ())
-	escaped_decls.safe_push (decl);
-    }
-
-  /* Sort them into deterministic order; alphabetical is
-     probably most user-friendly.  */
-  escaped_decls.qsort (cmp_decls_ptr_ptr);
-
-  pretty_printer pp;
-  pp_format_decoder (&pp) = default_tree_printer;
-  pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  bool first = true;
-  for (auto iter : escaped_decls)
-    {
-      if (first)
-	first = false;
-      else
-	pp_string (&pp, ", ");
-      pp_printf (&pp, "%qD", iter);
-    }
-  /* Print the number to make it easier to write DejaGnu tests for
-     the "nothing has escaped" case.  */
-  warning_at (call->location, 0, "escaped: %i: %s",
-	      escaped_decls.length (),
-	      pp_formatted_text (&pp));
-}
-
-/* Handle a call to "__analyzer_eval" by evaluating the input
-   and dumping as a dummy warning, so that test cases can use
-   dg-warning to validate the result (and so unexpected warnings will
-   lead to DejaGnu failures).
-   Broken out as a subroutine to make it easier to put a breakpoint on it
-   - though typically this doesn't help, as we have an SSA name as the arg,
-   and what's more interesting is usually the def stmt for that name.  */
-
-void
-region_model::impl_call_analyzer_eval (const gcall *call,
-				       region_model_context *ctxt)
-{
-  tree t_arg = gimple_call_arg (call, 0);
-  tristate t = eval_condition (t_arg, NE_EXPR, integer_zero_node, ctxt);
-  warning_at (call->location, 0, "%s", t.as_string ());
-}
-
-/* Handle the on_call_pre part of "__analyzer_get_unknown_ptr".  */
-
-void
-region_model::impl_call_analyzer_get_unknown_ptr (const call_details &cd)
-{
-  const svalue *ptr_sval
-    = m_mgr->get_or_create_unknown_svalue (cd.get_lhs_type ());
-  cd.maybe_set_lhs (ptr_sval);
-}
-
-/* Handle the on_call_pre part of "__builtin_expect" etc.  */
-
-void
-region_model::impl_call_builtin_expect (const call_details &cd)
-{
-  /* __builtin_expect's return value is its initial argument.  */
-  const svalue *sval = cd.get_arg_svalue (0);
-  cd.maybe_set_lhs (sval);
-}
-
-/* Handle the on_call_pre part of "calloc".  */
-
-void
-region_model::impl_call_calloc (const call_details &cd)
-{
+  region_model *model = cd.get_model ();
+  region_model_manager *mgr = cd.get_manager ();
   const svalue *nmemb_sval = cd.get_arg_svalue (0);
   const svalue *size_sval = cd.get_arg_svalue (1);
   /* TODO: check for overflow here?  */
   const svalue *prod_sval
-    = m_mgr->get_or_create_binop (size_type_node, MULT_EXPR,
-				  nmemb_sval, size_sval);
+    = mgr->get_or_create_binop (size_type_node, MULT_EXPR,
+				nmemb_sval, size_sval);
   const region *new_reg
-    = create_region_for_heap_alloc (prod_sval, cd.get_ctxt ());
+    = model->get_or_create_region_for_heap_alloc (prod_sval, cd.get_ctxt ());
   const region *sized_reg
-    = m_mgr->get_sized_region (new_reg, NULL_TREE, prod_sval);
-  zero_fill_region (sized_reg);
+    = mgr->get_sized_region (new_reg, NULL_TREE, prod_sval);
+  model->zero_fill_region (sized_reg);
   if (cd.get_lhs_type ())
     {
       const svalue *ptr_sval
-	= m_mgr->get_ptr_svalue (cd.get_lhs_type (), new_reg);
+	= mgr->get_ptr_svalue (cd.get_lhs_type (), new_reg);
       cd.maybe_set_lhs (ptr_sval);
     }
 }
 
-/* Handle the on_call_pre part of "__errno_location".  */
+/* Handler for glibc's "__errno_location".  */
+
+class kf_errno_location : public known_function
+{
+public:
+  bool matches_call_types_p (const call_details &cd) const final override
+  {
+    return cd.num_args () == 0;
+  }
+
+  void impl_call_pre (const call_details &cd) const final override
+  {
+    if (cd.get_lhs_region ())
+      {
+	region_model_manager *mgr = cd.get_manager ();
+	const region *errno_reg = mgr->get_errno_region ();
+	const svalue *errno_ptr = mgr->get_ptr_svalue (cd.get_lhs_type (),
+						       errno_reg);
+	cd.maybe_set_lhs (errno_ptr);
+      }
+  }
+};
+
+/* Handler for "error" and "error_at_line" from GNU's non-standard <error.h>.
+   MIN_ARGS identifies the minimum number of expected arguments
+   to be consistent with such a call (3 and 5 respectively).  */
+
+class kf_error : public known_function
+{
+public:
+  kf_error (unsigned min_args) : m_min_args (min_args) {}
+
+  bool matches_call_types_p (const call_details &cd) const final override
+  {
+    return (cd.num_args () >= m_min_args
+	    && cd.get_arg_type (0) == integer_type_node);
+  }
+
+  void impl_call_pre (const call_details &cd) const final override;
+
+private:
+  unsigned m_min_args;
+};
 
 void
-region_model::impl_call_errno_location (const call_details &cd)
+kf_error::impl_call_pre (const call_details &cd) const
 {
-  if (cd.get_lhs_region ())
-    {
-      const region *errno_reg = m_mgr->get_errno_region ();
-      const svalue *errno_ptr = m_mgr->get_ptr_svalue (cd.get_lhs_type (),
-						       errno_reg);
-      cd.maybe_set_lhs (errno_ptr);
-    }
-}
-
-/* Handle the on_call_pre part of "error" and "error_at_line" from
-   GNU's non-standard <error.h>.
-   MIN_ARGS identifies the minimum number of expected arguments
-   to be consistent with such a call (3 and 5 respectively).
-   Return true if handling it as one of these functions.
-   Write true to *OUT_TERMINATE_PATH if this execution path should be
-   terminated (e.g. the function call terminates the process).  */
-
-bool
-region_model::impl_call_error (const call_details &cd, unsigned min_args,
-			       bool *out_terminate_path)
-{
-  /* Bail if not enough args.  */
-  if (cd.num_args () < min_args)
-    return false;
-
-  /* Initial argument ought to be of type "int".  */
-  if (cd.get_arg_type (0) != integer_type_node)
-    return false;
-
   /* The process exits if status != 0, so it only continues
      for the case where status == 0.
      Add that constraint, or terminate this analysis path.  */
   tree status = cd.get_arg_tree (0);
-  if (!add_constraint (status, EQ_EXPR, integer_zero_node, cd.get_ctxt ()))
-    *out_terminate_path = true;
-
-  return true;
+  region_model_context *ctxt = cd.get_ctxt ();
+  region_model *model = cd.get_model ();
+  if (!model->add_constraint (status, EQ_EXPR, integer_zero_node, ctxt))
+    if (ctxt)
+      ctxt->terminate_path ();
 }
 
-/* Handle the on_call_pre part of "fgets" and "fgets_unlocked".  */
-
-void
-region_model::impl_call_fgets (const call_details &cd)
-{
-  /* Ideally we would bifurcate state here between the
-     error vs no error cases.  */
-  const svalue *ptr_sval = cd.get_arg_svalue (0);
-  if (const region *reg = ptr_sval->maybe_get_region ())
-    {
-      const region *base_reg = reg->get_base_region ();
-      const svalue *new_sval = cd.get_or_create_conjured_svalue (base_reg);
-      set_value (base_reg, new_sval, cd.get_ctxt ());
-    }
-}
-
-/* Handle the on_call_pre part of "fread".  */
-
-void
-region_model::impl_call_fread (const call_details &cd)
-{
-  const svalue *ptr_sval = cd.get_arg_svalue (0);
-  if (const region *reg = ptr_sval->maybe_get_region ())
-    {
-      const region *base_reg = reg->get_base_region ();
-      const svalue *new_sval = cd.get_or_create_conjured_svalue (base_reg);
-      set_value (base_reg, new_sval, cd.get_ctxt ());
-    }
-}
-
-/* Handle the on_call_post part of "free", after sm-handling.
+/* Handler for "free", after sm-handling.
 
    If the ptr points to an underlying heap region, delete the region,
    poisoning pointers to it and regions within it.
@@ -502,151 +193,135 @@ region_model::impl_call_fread (const call_details &cd)
    all pointers to the region to the "freed" state together, regardless
    of casts.  */
 
+class kf_free : public known_function
+{
+public:
+  bool matches_call_types_p (const call_details &cd) const final override
+  {
+    return (cd.num_args () == 0 && cd.arg_is_pointer_p (0));
+  }
+  void impl_call_post (const call_details &cd) const final override;
+};
+
 void
-region_model::impl_call_free (const call_details &cd)
+kf_free::impl_call_post (const call_details &cd) const
 {
   const svalue *ptr_sval = cd.get_arg_svalue (0);
   if (const region *freed_reg = ptr_sval->maybe_get_region ())
     {
       /* If the ptr points to an underlying heap region, delete it,
 	 poisoning pointers.  */
-      unbind_region_and_descendents (freed_reg, POISON_KIND_FREED);
-      m_dynamic_extents.remove (freed_reg);
+      region_model *model = cd.get_model ();
+      model->unbind_region_and_descendents (freed_reg, POISON_KIND_FREED);
+      model->unset_dynamic_extents (freed_reg);
     }
 }
 
 /* Handle the on_call_pre part of "malloc".  */
 
-void
-region_model::impl_call_malloc (const call_details &cd)
+class kf_malloc : public known_function
 {
+public:
+  bool matches_call_types_p (const call_details &cd) const final override
+  {
+    return (cd.num_args () == 1
+	    && cd.arg_is_size_p (0));
+  }
+  void impl_call_pre (const call_details &cd) const final override;
+};
+
+void
+kf_malloc::impl_call_pre (const call_details &cd) const
+{
+  region_model *model = cd.get_model ();
+  region_model_manager *mgr = cd.get_manager ();
   const svalue *size_sval = cd.get_arg_svalue (0);
   const region *new_reg
-    = create_region_for_heap_alloc (size_sval, cd.get_ctxt ());
+    = model->get_or_create_region_for_heap_alloc (size_sval, cd.get_ctxt ());
   if (cd.get_lhs_type ())
     {
       const svalue *ptr_sval
-	= m_mgr->get_ptr_svalue (cd.get_lhs_type (), new_reg);
+	= mgr->get_ptr_svalue (cd.get_lhs_type (), new_reg);
       cd.maybe_set_lhs (ptr_sval);
     }
 }
 
-/* Handle the on_call_pre part of "memcpy" and "__builtin_memcpy".  */
+/* Handler for "memcpy" and "__builtin_memcpy".  */
 // TODO: complain about overlapping src and dest.
 
+class kf_memcpy : public known_function
+{
+public:
+  bool matches_call_types_p (const call_details &cd) const final override
+  {
+    return (cd.num_args () == 3
+	    && cd.arg_is_pointer_p (0)
+	    && cd.arg_is_pointer_p (1)
+	    && cd.arg_is_size_p (2));
+  }
+  void impl_call_pre (const call_details &cd) const final override;
+};
+
 void
-region_model::impl_call_memcpy (const call_details &cd)
+kf_memcpy::impl_call_pre (const call_details &cd) const
 {
   const svalue *dest_ptr_sval = cd.get_arg_svalue (0);
   const svalue *src_ptr_sval = cd.get_arg_svalue (1);
   const svalue *num_bytes_sval = cd.get_arg_svalue (2);
 
-  const region *dest_reg = deref_rvalue (dest_ptr_sval, cd.get_arg_tree (0),
-					 cd.get_ctxt ());
-  const region *src_reg = deref_rvalue (src_ptr_sval, cd.get_arg_tree (1),
-					cd.get_ctxt ());
+  region_model *model = cd.get_model ();
+  region_model_manager *mgr = cd.get_manager ();
+
+  const region *dest_reg
+    = model->deref_rvalue (dest_ptr_sval, cd.get_arg_tree (0), cd.get_ctxt ());
+  const region *src_reg
+    = model->deref_rvalue (src_ptr_sval, cd.get_arg_tree (1), cd.get_ctxt ());
 
   cd.maybe_set_lhs (dest_ptr_sval);
 
   const region *sized_src_reg
-    = m_mgr->get_sized_region (src_reg, NULL_TREE, num_bytes_sval);
+    = mgr->get_sized_region (src_reg, NULL_TREE, num_bytes_sval);
   const region *sized_dest_reg
-    = m_mgr->get_sized_region (dest_reg, NULL_TREE, num_bytes_sval);
+    = mgr->get_sized_region (dest_reg, NULL_TREE, num_bytes_sval);
   const svalue *src_contents_sval
-    = get_store_value (sized_src_reg, cd.get_ctxt ());
-  set_value (sized_dest_reg, src_contents_sval, cd.get_ctxt ());
+    = model->get_store_value (sized_src_reg, cd.get_ctxt ());
+  model->set_value (sized_dest_reg, src_contents_sval, cd.get_ctxt ());
 }
 
-/* Handle the on_call_pre part of "memset" and "__builtin_memset".  */
+/* Handler for "memset" and "__builtin_memset".  */
+
+class kf_memset : public known_function
+{
+public:
+  bool matches_call_types_p (const call_details &cd) const final override
+  {
+    return (cd.num_args () == 3 && cd.arg_is_pointer_p (0));
+  }
+
+  void impl_call_pre (const call_details &cd) const final override;
+};
 
 void
-region_model::impl_call_memset (const call_details &cd)
+kf_memset::impl_call_pre (const call_details &cd) const
 {
   const svalue *dest_sval = cd.get_arg_svalue (0);
   const svalue *fill_value_sval = cd.get_arg_svalue (1);
   const svalue *num_bytes_sval = cd.get_arg_svalue (2);
 
-  const region *dest_reg = deref_rvalue (dest_sval, cd.get_arg_tree (0),
-					  cd.get_ctxt ());
+  region_model *model = cd.get_model ();
+  region_model_manager *mgr = cd.get_manager ();
+
+  const region *dest_reg
+    = model->deref_rvalue (dest_sval, cd.get_arg_tree (0), cd.get_ctxt ());
 
   const svalue *fill_value_u8
-    = m_mgr->get_or_create_cast (unsigned_char_type_node, fill_value_sval);
+    = mgr->get_or_create_cast (unsigned_char_type_node, fill_value_sval);
 
-  const region *sized_dest_reg = m_mgr->get_sized_region (dest_reg,
-							  NULL_TREE,
-							  num_bytes_sval);
-  check_region_for_write (sized_dest_reg, cd.get_ctxt ());
-  fill_region (sized_dest_reg, fill_value_u8);
-}
-
-/* Handle the on_call_post part of "pipe".  */
-
-void
-region_model::impl_call_pipe (const call_details &cd)
-{
-  class failure : public failed_call_info
-  {
-  public:
-    failure (const call_details &cd) : failed_call_info (cd) {}
-
-    bool update_model (region_model *model,
-		       const exploded_edge *,
-		       region_model_context *ctxt) const final override
-    {
-      /* Return -1; everything else is unchanged.  */
-      const call_details cd (get_call_details (model, ctxt));
-      model->update_for_int_cst_return (cd, -1, true);
-      return true;
-    }
-  };
-
-  class success : public success_call_info
-  {
-  public:
-    success (const call_details &cd) : success_call_info (cd) {}
-
-    bool update_model (region_model *model,
-		       const exploded_edge *,
-		       region_model_context *ctxt) const final override
-    {
-      const call_details cd (get_call_details (model, ctxt));
-
-      /* Return 0.  */
-      model->update_for_zero_return (cd, true);
-
-      /* Update fd array.  */
-      region_model_manager *mgr = cd.get_manager ();
-      tree arr_tree = cd.get_arg_tree (0);
-      const svalue *arr_sval = cd.get_arg_svalue (0);
-      for (int idx = 0; idx < 2; idx++)
-	{
-	  const region *arr_reg
-	    = model->deref_rvalue (arr_sval, arr_tree, cd.get_ctxt ());
-	  const svalue *idx_sval
-	    = mgr->get_or_create_int_cst (integer_type_node, idx);
-	  const region *element_reg
-	    = mgr->get_element_region (arr_reg, integer_type_node, idx_sval);
-	  conjured_purge p (model, cd.get_ctxt ());
-	  const svalue *fd_sval
-	    = mgr->get_or_create_conjured_svalue (integer_type_node,
-						  cd.get_call_stmt (),
-						  element_reg,
-						  p);
-	  model->set_value (element_reg, fd_sval, cd.get_ctxt ());
-	  model->mark_as_valid_fd (fd_sval, cd.get_ctxt ());
-
-	}
-      return true;
-    }
-  };
-
-  /* Body of region_model::impl_call_pipe.  */
-  if (cd.get_ctxt ())
-    {
-      cd.get_ctxt ()->bifurcate (make_unique<failure> (cd));
-      cd.get_ctxt ()->bifurcate (make_unique<success> (cd));
-      cd.get_ctxt ()->terminate_path ();
-    }
+  const region *sized_dest_reg = mgr->get_sized_region (dest_reg,
+							NULL_TREE,
+							num_bytes_sval);
+  model->check_region_for_write (sized_dest_reg, cd.get_ctxt ());
+  model->fill_region (sized_dest_reg, fill_value_u8);
 }
 
 /* A subclass of pending_diagnostic for complaining about 'putenv'
@@ -733,72 +408,50 @@ private:
   tree m_var_decl; // could be NULL
 };
 
-/* Handle the on_call_pre part of "putenv".
+/* Handler for calls to "putenv".
 
    In theory we could try to model the state of the environment variables
    for the process; for now we merely complain about putenv of regions
    on the stack.  */
 
-void
-region_model::impl_call_putenv (const call_details &cd)
+class kf_putenv : public known_function
 {
-  tree fndecl = cd.get_fndecl_for_call ();
-  gcc_assert (fndecl);
-  region_model_context *ctxt = cd.get_ctxt ();
-  const svalue *ptr_sval = cd.get_arg_svalue (0);
-  const region *reg = deref_rvalue (ptr_sval, cd.get_arg_tree (0), ctxt);
-  m_store.mark_as_escaped (reg);
-  enum memory_space mem_space = reg->get_memory_space ();
-  switch (mem_space)
-    {
-    default:
-      gcc_unreachable ();
-    case MEMSPACE_UNKNOWN:
-    case MEMSPACE_CODE:
-    case MEMSPACE_GLOBALS:
-    case MEMSPACE_HEAP:
-    case MEMSPACE_READONLY_DATA:
-      break;
-    case MEMSPACE_STACK:
-      if (ctxt)
-	ctxt->warn (make_unique<putenv_of_auto_var> (fndecl, reg));
-      break;
-    }
-}
+public:
+  bool matches_call_types_p (const call_details &cd) const final override
+  {
+    return (cd.num_args () == 1 && cd.arg_is_pointer_p (0));
+  }
 
-/* Handle the on_call_pre part of "operator new".  */
+  void impl_call_pre (const call_details &cd) const final override
+  {
+    tree fndecl = cd.get_fndecl_for_call ();
+    gcc_assert (fndecl);
+    region_model_context *ctxt = cd.get_ctxt ();
+    region_model *model = cd.get_model ();
+    const svalue *ptr_sval = cd.get_arg_svalue (0);
+    const region *reg
+      = model->deref_rvalue (ptr_sval, cd.get_arg_tree (0), ctxt);
+    model->get_store ()->mark_as_escaped (reg);
+    enum memory_space mem_space = reg->get_memory_space ();
+    switch (mem_space)
+      {
+      default:
+	gcc_unreachable ();
+      case MEMSPACE_UNKNOWN:
+      case MEMSPACE_CODE:
+      case MEMSPACE_GLOBALS:
+      case MEMSPACE_HEAP:
+      case MEMSPACE_READONLY_DATA:
+	break;
+      case MEMSPACE_STACK:
+	if (ctxt)
+	  ctxt->warn (make_unique<putenv_of_auto_var> (fndecl, reg));
+	break;
+      }
+  }
+};
 
-void
-region_model::impl_call_operator_new (const call_details &cd)
-{
-  const svalue *size_sval = cd.get_arg_svalue (0);
-  const region *new_reg
-    = create_region_for_heap_alloc (size_sval, cd.get_ctxt ());
-  if (cd.get_lhs_type ())
-    {
-      const svalue *ptr_sval
-	= m_mgr->get_ptr_svalue (cd.get_lhs_type (), new_reg);
-      cd.maybe_set_lhs (ptr_sval);
-    }
-}
-
-/* Handle the on_call_pre part of "operator delete", which comes in
-   both sized and unsized variants (2 arguments and 1 argument
-   respectively).  */
-
-void
-region_model::impl_call_operator_delete (const call_details &cd)
-{
-  const svalue *ptr_sval = cd.get_arg_svalue (0);
-  if (const region *freed_reg = ptr_sval->maybe_get_region ())
-    {
-      /* If the ptr points to an underlying heap region, delete it,
-	 poisoning pointers.  */
-      unbind_region_and_descendents (freed_reg, POISON_KIND_FREED);
-    }
-}
-
-/* Handle the on_call_post part of "realloc":
+/* Handler for "realloc":
 
      void *realloc(void *ptr, size_t size);
 
@@ -821,8 +474,20 @@ region_model::impl_call_operator_delete (const call_details &cd)
    Each of these has a custom_edge_info subclass, which updates
    the region_model and sm-state of the destination state.  */
 
+class kf_realloc : public known_function
+{
+public:
+  bool matches_call_types_p (const call_details &cd) const final override
+  {
+    return (cd.num_args () == 2
+	    && cd.arg_is_pointer_p (0)
+	    && cd.arg_is_size_p (1));
+  }
+  void impl_call_post (const call_details &cd) const final override;
+};
+
 void
-region_model::impl_call_realloc (const call_details &cd)
+kf_realloc::impl_call_post (const call_details &cd) const
 {
   /* Three custom subclasses of custom_edge_info, for handling the various
      outcomes of "realloc".  */
@@ -842,10 +507,11 @@ region_model::impl_call_realloc (const call_details &cd)
     {
       /* Return NULL; everything else is unchanged.  */
       const call_details cd (get_call_details (model, ctxt));
+      region_model_manager *mgr = cd.get_manager ();
       if (cd.get_lhs_type ())
 	{
 	  const svalue *zero
-	    = model->m_mgr->get_or_create_int_cst (cd.get_lhs_type (), 0);
+	    = mgr->get_or_create_int_cst (cd.get_lhs_type (), 0);
 	  model->set_value (cd.get_lhs_region (),
 			    zero,
 			    cd.get_ctxt ());
@@ -877,13 +543,14 @@ region_model::impl_call_realloc (const call_details &cd)
     {
       /* Update size of buffer and return the ptr unchanged.  */
       const call_details cd (get_call_details (model, ctxt));
+      region_model_manager *mgr = cd.get_manager ();
       const svalue *ptr_sval = cd.get_arg_svalue (0);
       const svalue *size_sval = cd.get_arg_svalue (1);
 
       /* We can only grow in place with a non-NULL pointer.  */
       {
 	const svalue *null_ptr
-	  = model->m_mgr->get_or_create_int_cst (ptr_sval->get_type (), 0);
+	  = mgr->get_or_create_int_cst (ptr_sval->get_type (), 0);
 	if (!model->add_constraint (ptr_sval, NE_EXPR, null_ptr,
 				    cd.get_ctxt ()))
 	  return false;
@@ -897,8 +564,8 @@ region_model::impl_call_realloc (const call_details &cd)
 	{
 	  model->set_value (cd.get_lhs_region (), ptr_sval, cd.get_ctxt ());
 	  const svalue *zero
-	    = model->m_mgr->get_or_create_int_cst (cd.get_lhs_type (), 0);
-	  return model->add_constraint (ptr_sval, NE_EXPR, zero, cd.get_ctxt ());
+	    = mgr->get_or_create_int_cst (cd.get_lhs_type (), 0);
+	  return model->add_constraint (ptr_sval, NE_EXPR, zero, ctxt);
 	}
       else
 	return true;
@@ -927,14 +594,15 @@ region_model::impl_call_realloc (const call_details &cd)
 		       region_model_context *ctxt) const final override
     {
       const call_details cd (get_call_details (model, ctxt));
+      region_model_manager *mgr = cd.get_manager ();
       const svalue *old_ptr_sval = cd.get_arg_svalue (0);
       const svalue *new_size_sval = cd.get_arg_svalue (1);
 
       /* Create the new region.  */
       const region *new_reg
-	= model->create_region_for_heap_alloc (new_size_sval, ctxt);
+	= model->get_or_create_region_for_heap_alloc (new_size_sval, ctxt);
       const svalue *new_ptr_sval
-	= model->m_mgr->get_ptr_svalue (cd.get_lhs_type (), new_reg);
+	= mgr->get_ptr_svalue (cd.get_lhs_type (), new_reg);
       if (!model->add_constraint (new_ptr_sval, NE_EXPR, old_ptr_sval,
 				  cd.get_ctxt ()))
 	return false;
@@ -952,13 +620,11 @@ region_model::impl_call_realloc (const call_details &cd)
 	      const svalue *copied_size_sval
 		= get_copied_size (model, old_size_sval, new_size_sval);
 	      const region *copied_old_reg
-		= model->m_mgr->get_sized_region (freed_reg, NULL,
-						  copied_size_sval);
+		= mgr->get_sized_region (freed_reg, NULL, copied_size_sval);
 	      const svalue *buffer_content_sval
 		= model->get_store_value (copied_old_reg, cd.get_ctxt ());
 	      const region *copied_new_reg
-		= model->m_mgr->get_sized_region (new_reg, NULL,
-						  copied_size_sval);
+		= mgr->get_sized_region (new_reg, NULL, copied_size_sval);
 	      model->set_value (copied_new_reg, buffer_content_sval,
 				cd.get_ctxt ());
 	    }
@@ -976,7 +642,7 @@ region_model::impl_call_realloc (const call_details &cd)
 	  /* If the ptr points to an underlying heap region, delete it,
 	     poisoning pointers.  */
 	  model->unbind_region_and_descendents (freed_reg, POISON_KIND_FREED);
-	  model->m_dynamic_extents.remove (freed_reg);
+	  model->unset_dynamic_extents (freed_reg);
 	}
 
       /* Update the sm-state: mark the old_ptr_sval as "freed",
@@ -986,7 +652,7 @@ region_model::impl_call_realloc (const call_details &cd)
       if (cd.get_lhs_type ())
 	{
 	  const svalue *zero
-	    = model->m_mgr->get_or_create_int_cst (cd.get_lhs_type (), 0);
+	    = mgr->get_or_create_int_cst (cd.get_lhs_type (), 0);
 	  return model->add_constraint (new_ptr_sval, NE_EXPR, zero,
 					cd.get_ctxt ());
 	}
@@ -1016,7 +682,7 @@ region_model::impl_call_realloc (const call_details &cd)
     }
   };
 
-  /* Body of region_model::impl_call_realloc.  */
+  /* Body of kf_realloc::impl_call_post.  */
 
   if (cd.get_ctxt ())
     {
@@ -1027,10 +693,20 @@ region_model::impl_call_realloc (const call_details &cd)
     }
 }
 
-/* Handle the on_call_post part of "strchr" and "__builtin_strchr".  */
+/* Handler for "strchr" and "__builtin_strchr".  */
+
+class kf_strchr : public known_function
+{
+public:
+  bool matches_call_types_p (const call_details &cd) const final override
+  {
+    return (cd.num_args () == 2 && cd.arg_is_pointer_p (0));
+  }
+  void impl_call_post (const call_details &cd) const final override;
+};
 
 void
-region_model::impl_call_strchr (const call_details &cd)
+kf_strchr::impl_call_post (const call_details &cd) const
 {
   class strchr_call_info : public call_info
   {
@@ -1089,7 +765,7 @@ region_model::impl_call_strchr (const call_details &cd)
     bool m_found;
   };
 
-  /* Body of region_model::impl_call_strchr.  */
+  /* Body of kf_strchr::impl_call_post.  */
   if (cd.get_ctxt ())
     {
       cd.get_ctxt ()->bifurcate (make_unique<strchr_call_info> (cd, false));
@@ -1098,41 +774,101 @@ region_model::impl_call_strchr (const call_details &cd)
     }
 }
 
-/* Handle the on_call_pre part of "strcpy" and "__builtin_strcpy_chk".  */
+/* Handler for "__builtin_stack_restore".  */
+
+class kf_stack_restore : public known_function
+{
+public:
+  bool matches_call_types_p (const call_details &) const final override
+  {
+    return true;
+  }
+
+  /* Currently a no-op.  */
+};
+
+/* Handler for "__builtin_stack_save".  */
+
+class kf_stack_save : public known_function
+{
+public:
+  bool matches_call_types_p (const call_details &) const final override
+  {
+    return true;
+  }
+
+  /* Currently a no-op.  */
+};
+
+/* Handler for "strcpy" and "__builtin_strcpy_chk".  */
+
+class kf_strcpy : public known_function
+{
+public:
+  kf_strcpy (unsigned int num_args) : m_num_args (num_args) {}
+  bool matches_call_types_p (const call_details &cd) const final override
+  {
+    return (cd.num_args () == m_num_args
+	    && cd.arg_is_pointer_p (0)
+	    && cd.arg_is_pointer_p (1));
+  }
+
+  void impl_call_pre (const call_details &cd) const final override;
+
+private:
+  unsigned int m_num_args;
+};
 
 void
-region_model::impl_call_strcpy (const call_details &cd)
+kf_strcpy::impl_call_pre (const call_details &cd) const
 {
+  region_model *model = cd.get_model ();
+  region_model_manager *mgr = cd.get_manager ();
+
   const svalue *dest_sval = cd.get_arg_svalue (0);
-  const region *dest_reg = deref_rvalue (dest_sval, cd.get_arg_tree (0),
+  const region *dest_reg = model->deref_rvalue (dest_sval, cd.get_arg_tree (0),
 					 cd.get_ctxt ());
   const svalue *src_sval = cd.get_arg_svalue (1);
-  const region *src_reg = deref_rvalue (src_sval, cd.get_arg_tree (1),
+  const region *src_reg = model->deref_rvalue (src_sval, cd.get_arg_tree (1),
 					cd.get_ctxt ());
-  const svalue *src_contents_sval = get_store_value (src_reg,
-						     cd.get_ctxt ());
+  const svalue *src_contents_sval = model->get_store_value (src_reg,
+							    cd.get_ctxt ());
 
   cd.maybe_set_lhs (dest_sval);
 
   /* Try to get the string size if SRC_REG is a string_region.  */
-  const svalue *copied_bytes_sval = get_string_size (src_reg);
+  const svalue *copied_bytes_sval = model->get_string_size (src_reg);
   /* Otherwise, check if the contents of SRC_REG is a string.  */
   if (copied_bytes_sval->get_kind () == SK_UNKNOWN)
-    copied_bytes_sval = get_string_size (src_contents_sval);
+    copied_bytes_sval = model->get_string_size (src_contents_sval);
 
   const region *sized_dest_reg
-    = m_mgr->get_sized_region (dest_reg, NULL_TREE, copied_bytes_sval);
-  set_value (sized_dest_reg, src_contents_sval, cd.get_ctxt ());
+    = mgr->get_sized_region (dest_reg, NULL_TREE, copied_bytes_sval);
+  model->set_value (sized_dest_reg, src_contents_sval, cd.get_ctxt ());
 }
 
 /* Handle the on_call_pre part of "strlen".  */
 
+class kf_strlen : public known_function
+{
+public:
+  bool matches_call_types_p (const call_details &cd) const final override
+  {
+    return (cd.num_args () == 1 && cd.arg_is_pointer_p (0));
+  }
+  void impl_call_pre (const call_details &cd) const final override;
+};
+
 void
-region_model::impl_call_strlen (const call_details &cd)
+kf_strlen::impl_call_pre (const call_details &cd) const
 {
   region_model_context *ctxt = cd.get_ctxt ();
+  region_model *model = cd.get_model ();
+  region_model_manager *mgr = cd.get_manager ();
+
   const svalue *arg_sval = cd.get_arg_svalue (0);
-  const region *buf_reg = deref_rvalue (arg_sval, cd.get_arg_tree (0), ctxt);
+  const region *buf_reg
+    = model->deref_rvalue (arg_sval, cd.get_arg_tree (0), ctxt);
   if (const string_region *str_reg
       = buf_reg->dyn_cast_string_region ())
     {
@@ -1144,7 +880,7 @@ region_model::impl_call_strlen (const call_details &cd)
 	{
 	  tree t_cst = build_int_cst (cd.get_lhs_type (), strlen_cst);
 	  const svalue *result_sval
-	    = m_mgr->get_or_create_constant_svalue (t_cst);
+	    = mgr->get_or_create_constant_svalue (t_cst);
 	  cd.maybe_set_lhs (result_sval);
 	  return;
 	}
@@ -1152,13 +888,96 @@ region_model::impl_call_strlen (const call_details &cd)
   /* Otherwise a conjured value.  */
 }
 
+class kf_ubsan_bounds : public internal_known_function
+{
+  /* Empty.  */
+};
+
 /* Handle calls to functions referenced by
    __attribute__((malloc(FOO))).  */
 
 void
 region_model::impl_deallocation_call (const call_details &cd)
 {
-  impl_call_free (cd);
+  kf_free kf;
+  kf.impl_call_post (cd);
+}
+
+/* Populate KFM with instances of known functions supported by the core of the
+   analyzer (as opposed to plugins).  */
+
+void
+register_known_functions (known_function_manager &kfm)
+{
+  /* Debugging/test support functions, all  with a "__analyzer_" prefix.  */
+  register_known_analyzer_functions (kfm);
+
+  /* Internal fns the analyzer has known_functions for.  */
+  {
+    kfm.add (IFN_BUILTIN_EXPECT, make_unique<kf_expect> ());
+    kfm.add (IFN_UBSAN_BOUNDS, make_unique<kf_ubsan_bounds> ());
+  }
+
+  /* Built-ins the analyzer has known_functions for.  */
+  {
+    kfm.add (BUILT_IN_ALLOCA, make_unique<kf_alloca> ());
+    kfm.add (BUILT_IN_ALLOCA_WITH_ALIGN, make_unique<kf_alloca> ());
+    kfm.add (BUILT_IN_CALLOC, make_unique<kf_calloc> ());
+    kfm.add (BUILT_IN_EXPECT, make_unique<kf_expect> ());
+    kfm.add (BUILT_IN_EXPECT_WITH_PROBABILITY, make_unique<kf_expect> ());
+    kfm.add (BUILT_IN_FREE, make_unique<kf_free> ());
+    kfm.add (BUILT_IN_MALLOC, make_unique<kf_malloc> ());
+    kfm.add (BUILT_IN_MEMCPY, make_unique<kf_memcpy> ());
+    kfm.add (BUILT_IN_MEMCPY_CHK, make_unique<kf_memcpy> ());
+    kfm.add (BUILT_IN_MEMSET, make_unique<kf_memset> ());
+    kfm.add (BUILT_IN_MEMSET_CHK, make_unique<kf_memset> ());
+    kfm.add (BUILT_IN_REALLOC, make_unique<kf_realloc> ());
+    kfm.add (BUILT_IN_STACK_RESTORE, make_unique<kf_stack_restore> ());
+    kfm.add (BUILT_IN_STACK_SAVE, make_unique<kf_stack_save> ());
+    kfm.add (BUILT_IN_STRCHR, make_unique<kf_strchr> ());
+    kfm.add (BUILT_IN_STRCPY, make_unique<kf_strcpy> (2));
+    kfm.add (BUILT_IN_STRCPY_CHK, make_unique<kf_strcpy> (3));
+    kfm.add (BUILT_IN_STRLEN, make_unique<kf_strlen> ());
+
+    register_varargs_builtins (kfm);
+  }
+
+  /* Known builtins and C standard library functions.  */
+  {
+    kfm.add ("memset", make_unique<kf_memset> ());
+  }
+
+  /* Known POSIX functions, and some non-standard extensions.  */
+  {
+    kfm.add ("putenv", make_unique<kf_putenv> ());
+
+    register_known_fd_functions (kfm);
+    register_known_file_functions (kfm);
+  }
+
+  /* glibc functions.  */
+  {
+    kfm.add ("__errno_location", make_unique<kf_errno_location> ());
+    kfm.add ("error", make_unique<kf_error> (3));
+    kfm.add ("error_at_line", make_unique<kf_error> (5));
+  }
+
+  /* Other implementations of C standard library.  */
+  {
+    /* According to PR 107807 comment #2, Solaris implements "errno"
+       like this:
+	 extern int *___errno(void) __attribute__((__const__));
+	 #define errno (*(___errno()))
+       and OS X like this:
+	 extern int * __error(void);
+	 #define errno (*__error())
+       Add these as synonyms for "__errno_location".  */
+    kfm.add ("___errno", make_unique<kf_errno_location> ());
+    kfm.add ("__error", make_unique<kf_errno_location> ());
+  }
+
+  /* Language-specific support functions.  */
+  register_known_functions_lang_cp (kfm);
 }
 
 } // namespace ana

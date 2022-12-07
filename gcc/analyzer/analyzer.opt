@@ -90,6 +90,14 @@ Wanalyzer-fd-leak
 Common Var(warn_analyzer_fd_leak) Init(1) Warning
 Warn about code paths in which a file descriptor is not closed.
 
+Wanalyzer-fd-phase-mismatch
+Common Var(warn_analyzer_fd_phase_mismatch) Init(1) Warning
+Warn about code paths in which an operation is attempted in the wrong phase of a file descriptor's lifetime.
+
+Wanalyzer-fd-type-mismatch
+Common Var(warn_analyzer_fd_type_mismatch) Init(1) Warning
+Warn about code paths in which an operation is attempted on the wrong type of file descriptor.
+
 Wanalyzer-fd-use-after-close
 Common Var(warn_analyzer_fd_use_after_close) Init(1) Warning
 Warn about code paths in which a read or write is performed on a closed file descriptor.
@@ -109,6 +117,10 @@ Warn about code paths in which a non-heap pointer is freed.
 Wanalyzer-imprecise-fp-arithmetic
 Common Var(warn_analyzer_imprecise_fp_arithmetic) Init(1) Warning
 Warn about code paths in which floating-point arithmetic is used in locations where precise computation is needed.
+
+Wanalyzer-infinite-recursion
+Common Var(warn_analyzer_infinite_recursion) Init(1) Warning
+Warn about code paths which appear to lead to infinite recursion.
 
 Wanalyzer-jump-through-null
 Common Var(warn_analyzer_jump_through_null) Init(1) Warning
@@ -169,6 +181,10 @@ Warn about code paths in which an unsanitized value is used as an allocation siz
 Wanalyzer-tainted-array-index
 Common Var(warn_analyzer_tainted_array_index) Init(1) Warning
 Warn about code paths in which an unsanitized value is used as an array index.
+
+Wanalyzer-tainted-assertion
+Common Var(warn_analyzer_tainted_assertion) Init(1) Warning
+Warn about code paths in which an 'assert()' is made involving an unsanitized value.
 
 Wanalyzer-tainted-divisor
 Common Var(warn_analyzer_tainted_divisor) Init(1) Warning

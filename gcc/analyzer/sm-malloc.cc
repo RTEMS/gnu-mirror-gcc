@@ -40,6 +40,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "analyzer/program-point.h"
 #include "analyzer/store.h"
 #include "analyzer/region-model.h"
+#include "analyzer/call-details.h"
 #include "stringpool.h"
 #include "attribs.h"
 #include "analyzer/function-set.h"
@@ -2175,7 +2176,7 @@ malloc_state_machine::on_deallocator_call (sm_context *sm_ctxt,
    Check for free of non-heap or mismatching allocators,
    transitioning to the "stop" state for such cases.
 
-   Otherwise, region_model::impl_call_realloc will later
+   Otherwise, kf_realloc::impl_call_post will later
    get called (which will handle other sm-state transitions
    when the state is bifurcated).  */
 
@@ -2432,7 +2433,7 @@ make_malloc_state_machine (logger *logger)
 }
 
 /* Specialcase hook for handling realloc, for use by
-   region_model::impl_call_realloc::success_with_move::update_model.  */
+   kf_realloc::impl_call_post::success_with_move::update_model.  */
 
 void
 region_model::on_realloc_with_move (const call_details &cd,

@@ -26,6 +26,7 @@ along with GCC; see the file COPYING3.  If not see
       (Zhongxing Xu, Ted Kremenek, and Jian Zhang)
      http://lcs.ios.ac.cn/~xuzb/canalyze/memmodel.pdf  */
 
+#include "sbitmap.h"
 #include "selftest.h"
 #include "analyzer/svalue.h"
 #include "analyzer/region.h"
@@ -235,50 +236,6 @@ public:
 
 struct append_regions_cb_data;
 
-/* Helper class for handling calls to functions with known behavior.
-   Implemented in region-model-impl-calls.c.  */
-
-class call_details
-{
-public:
-  call_details (const gcall *call, region_model *model,
-		region_model_context *ctxt);
-
-  region_model *get_model () const { return m_model; }
-  region_model_manager *get_manager () const;
-  region_model_context *get_ctxt () const { return m_ctxt; }
-  logger *get_logger () const;
-
-  uncertainty_t *get_uncertainty () const;
-  tree get_lhs_type () const { return m_lhs_type; }
-  const region *get_lhs_region () const { return m_lhs_region; }
-
-  bool maybe_set_lhs (const svalue *result) const;
-
-  unsigned num_args () const;
-
-  const gcall *get_call_stmt () const { return m_call; }
-
-  tree get_arg_tree (unsigned idx) const;
-  tree get_arg_type (unsigned idx) const;
-  const svalue *get_arg_svalue (unsigned idx) const;
-  const char *get_arg_string_literal (unsigned idx) const;
-
-  tree get_fndecl_for_call () const;
-
-  void dump_to_pp (pretty_printer *pp, bool simple) const;
-  void dump (bool simple) const;
-
-  const svalue *get_or_create_conjured_svalue (const region *) const;
-
-private:
-  const gcall *m_call;
-  region_model *m_model;
-  region_model_context *m_ctxt;
-  tree m_lhs_type;
-  const region *m_lhs_region;
-};
-
 /* A region_model encapsulates a representation of the state of memory, with
    a tree of regions, along with their associated values.
    The representation is graph-like because values can be pointers to
@@ -321,7 +278,6 @@ class region_model
 
   void
   on_stmt_pre (const gimple *stmt,
-	       bool *out_terminate_path,
 	       bool *out_unknown_side_effects,
 	       region_model_context *ctxt);
 
@@ -329,50 +285,14 @@ class region_model
   const svalue *get_gassign_result (const gassign *assign,
 				    region_model_context *ctxt);
   void on_asm_stmt (const gasm *asm_stmt, region_model_context *ctxt);
-  bool on_call_pre (const gcall *stmt, region_model_context *ctxt,
-		    bool *out_terminate_path);
+  bool on_call_pre (const gcall *stmt, region_model_context *ctxt);
   void on_call_post (const gcall *stmt,
 		     bool unknown_side_effects,
 		     region_model_context *ctxt);
 
   void purge_state_involving (const svalue *sval, region_model_context *ctxt);
 
-  /* Specific handling for on_call_pre.  */
-  void impl_call_alloca (const call_details &cd);
-  void impl_call_analyzer_describe (const gcall *call,
-				    region_model_context *ctxt);
-  void impl_call_analyzer_dump_capacity (const gcall *call,
-					 region_model_context *ctxt);
-  void impl_call_analyzer_dump_escaped (const gcall *call);
-  void impl_call_analyzer_eval (const gcall *call,
-				region_model_context *ctxt);
-  void impl_call_analyzer_get_unknown_ptr (const call_details &cd);
-  void impl_call_builtin_expect (const call_details &cd);
-  void impl_call_calloc (const call_details &cd);
-  void impl_call_errno_location (const call_details &cd);
-  bool impl_call_error (const call_details &cd, unsigned min_args,
-			bool *out_terminate_path);
-  void impl_call_fgets (const call_details &cd);
-  void impl_call_fread (const call_details &cd);
-  void impl_call_free (const call_details &cd);
-  void impl_call_malloc (const call_details &cd);
-  void impl_call_memcpy (const call_details &cd);
-  void impl_call_memset (const call_details &cd);
-  void impl_call_pipe (const call_details &cd);
-  void impl_call_putenv (const call_details &cd);
-  void impl_call_realloc (const call_details &cd);
-  void impl_call_strchr (const call_details &cd);
-  void impl_call_strcpy (const call_details &cd);
-  void impl_call_strlen (const call_details &cd);
-  void impl_call_operator_new (const call_details &cd);
-  void impl_call_operator_delete (const call_details &cd);
   void impl_deallocation_call (const call_details &cd);
-
-  /* Implemented in varargs.cc.  */
-  void impl_call_va_start (const call_details &cd);
-  void impl_call_va_copy (const call_details &cd);
-  void impl_call_va_arg (const call_details &cd);
-  void impl_call_va_end (const call_details &cd);
 
   const svalue *maybe_get_copy_bounds (const region *src_reg,
 				       const svalue *num_bytes_sval);
@@ -465,10 +385,12 @@ class region_model
 		       region_model_context *ctxt,
 		       rejected_constraint **out);
 
-  const region *create_region_for_heap_alloc (const svalue *size_in_bytes,
-					      region_model_context *ctxt);
+  const region *
+  get_or_create_region_for_heap_alloc (const svalue *size_in_bytes,
+				       region_model_context *ctxt);
   const region *create_region_for_alloca (const svalue *size_in_bytes,
 					  region_model_context *ctxt);
+  void get_referenced_base_regions (auto_sbitmap &out_ids) const;
 
   tree get_representative_tree (const svalue *sval) const;
   tree get_representative_tree (const region *reg) const;
@@ -556,7 +478,19 @@ class region_model
   void mark_as_tainted (const svalue *sval,
 			region_model_context *ctxt);
 
- private:
+  bool add_constraint (const svalue *lhs,
+		       enum tree_code op,
+		       const svalue *rhs,
+		       region_model_context *ctxt);
+
+  const svalue *check_for_poison (const svalue *sval,
+				  tree expr,
+				  region_model_context *ctxt) const;
+
+  void check_region_for_write (const region *dest_reg,
+			       region_model_context *ctxt) const;
+
+private:
   const region *get_lvalue_1 (path_var pv, region_model_context *ctxt) const;
   const svalue *get_rvalue_1 (path_var pv, region_model_context *ctxt) const;
 
@@ -567,12 +501,10 @@ class region_model
   get_representative_path_var_1 (const region *reg,
 				 svalue_set *visited) const;
 
-  const known_function *get_known_function (tree fndecl) const;
+  const known_function *get_known_function (tree fndecl,
+					    const call_details &cd) const;
+  const known_function *get_known_function (enum internal_fn) const;
 
-  bool add_constraint (const svalue *lhs,
-		       enum tree_code op,
-		       const svalue *rhs,
-		       region_model_context *ctxt);
   bool add_constraints_from_binop (const svalue *outer_lhs,
 				   enum tree_code outer_op,
 				   const svalue *outer_rhs,
@@ -598,14 +530,13 @@ class region_model
   int poison_any_pointers_to_descendents (const region *reg,
 					  enum poison_kind pkind);
 
-  void on_top_level_param (tree param, region_model_context *ctxt);
+  void on_top_level_param (tree param,
+			   bool nonnull,
+			   region_model_context *ctxt);
 
   bool called_from_main_p () const;
   const svalue *get_initial_value_for_global (const region *reg) const;
 
-  const svalue *check_for_poison (const svalue *sval,
-				  tree expr,
-				  region_model_context *ctxt) const;
   const region * get_region_for_poisoned_expr (tree expr) const;
 
   void check_dynamic_size_for_taint (enum memory_space mem_space,
@@ -623,12 +554,12 @@ class region_model
   void check_region_access (const region *reg,
 			    enum access_direction dir,
 			    region_model_context *ctxt) const;
-  void check_region_for_write (const region *dest_reg,
-			       region_model_context *ctxt) const;
   void check_region_for_read (const region *src_reg,
 			      region_model_context *ctxt) const;
   void check_region_size (const region *lhs_reg, const svalue *rhs_sval,
 			  region_model_context *ctxt) const;
+
+  /* Implemented in bounds-checking.cc  */
   void check_symbolic_bounds (const region *base_reg,
 			      const svalue *sym_byte_offset,
 			      const svalue *num_bytes_sval,
@@ -742,30 +673,33 @@ class region_model_context
 
   /* Hook for clients to access the a specific state machine in
      any underlying program_state.  */
-  virtual bool get_state_map_by_name (const char *name,
-				      sm_state_map **out_smap,
-				      const state_machine **out_sm,
-				      unsigned *out_sm_idx) = 0;
+  virtual bool
+  get_state_map_by_name (const char *name,
+			 sm_state_map **out_smap,
+			 const state_machine **out_sm,
+			 unsigned *out_sm_idx,
+			 std::unique_ptr<sm_context> *out_sm_context) = 0;
 
   /* Precanned ways for clients to access specific state machines.  */
   bool get_fd_map (sm_state_map **out_smap,
 		   const state_machine **out_sm,
-		   unsigned *out_sm_idx)
+		   unsigned *out_sm_idx,
+		   std::unique_ptr<sm_context> *out_sm_context)
   {
     return get_state_map_by_name ("file-descriptor", out_smap, out_sm,
-				  out_sm_idx);
+				  out_sm_idx, out_sm_context);
   }
   bool get_malloc_map (sm_state_map **out_smap,
 		       const state_machine **out_sm,
 		       unsigned *out_sm_idx)
   {
-    return get_state_map_by_name ("malloc", out_smap, out_sm, out_sm_idx);
+    return get_state_map_by_name ("malloc", out_smap, out_sm, out_sm_idx, NULL);
   }
   bool get_taint_map (sm_state_map **out_smap,
 		      const state_machine **out_sm,
 		      unsigned *out_sm_idx)
   {
-    return get_state_map_by_name ("taint", out_smap, out_sm, out_sm_idx);
+    return get_state_map_by_name ("taint", out_smap, out_sm, out_sm_idx, NULL);
   }
 
   /* Get the current statement, if any.  */
@@ -817,7 +751,8 @@ public:
   bool get_state_map_by_name (const char *,
 			      sm_state_map **,
 			      const state_machine **,
-			      unsigned *) override
+			      unsigned *,
+			      std::unique_ptr<sm_context> *) override
   {
     return false;
   }
@@ -944,9 +879,12 @@ class region_model_context_decorator : public region_model_context
   bool get_state_map_by_name (const char *name,
 			      sm_state_map **out_smap,
 			      const state_machine **out_sm,
-			      unsigned *out_sm_idx) override
+			      unsigned *out_sm_idx,
+			      std::unique_ptr<sm_context> *out_sm_context)
+    override
   {
-    return m_inner->get_state_map_by_name (name, out_smap, out_sm, out_sm_idx);
+    return m_inner->get_state_map_by_name (name, out_smap, out_sm, out_sm_idx,
+					   out_sm_context);
   }
 
   const gimple *get_stmt () const override

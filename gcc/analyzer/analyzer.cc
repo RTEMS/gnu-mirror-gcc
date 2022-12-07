@@ -380,22 +380,6 @@ is_longjmp_call_p (const gcall *call)
   return false;
 }
 
-/* Return true if this is a "pipe" call.  */
-
-bool
-is_pipe_call_p (const_tree fndecl, const char *funcname,
-		const gcall *call, unsigned int num_args)
-{
-  if (!is_named_call_p (fndecl, funcname, call, num_args))
-    return false;
-
-  /* We require a pointer for the initial argument.  */
-  if (!POINTER_TYPE_P (TREE_TYPE (gimple_call_arg (call, 0))))
-    return false;
-
-  return true;
-}
-
 /* For a CALL that matched is_special_named_call_p or is_named_call_p for
    some name, return a name for the called function suitable for use in
    diagnostics (stripping the leading underscores).  */
@@ -465,7 +449,7 @@ make_label_text (bool can_colorize, const char *fmt, ...)
 /* As above, but with singular vs plural.  */
 
 label_text
-make_label_text_n (bool can_colorize, int n,
+make_label_text_n (bool can_colorize, unsigned HOST_WIDE_INT n,
 		   const char *singular_fmt,
 		   const char *plural_fmt, ...)
 {

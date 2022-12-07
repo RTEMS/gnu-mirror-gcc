@@ -5005,8 +5005,9 @@ find_array_spec (gfc_expr *e)
       case REF_ARRAY:
 	if (as == NULL)
 	  {
+	    locus loc = ref->u.ar.where.lb ? ref->u.ar.where : e->where;
 	    gfc_error ("Invalid array reference of a non-array entity at %L",
-		       &ref->u.ar.where);
+		       &loc);
 	    return false;
 	  }
 
@@ -7569,7 +7570,7 @@ resolve_deallocate_expr (gfc_expr *e)
   sym = e->symtree->n.sym;
   unlimited = UNLIMITED_POLY(sym);
 
-  if (sym->ts.type == BT_CLASS)
+  if (sym->ts.type == BT_CLASS && sym->attr.class_ok && CLASS_DATA (sym))
     {
       allocatable = CLASS_DATA (sym)->attr.allocatable;
       pointer = CLASS_DATA (sym)->attr.class_pointer;
@@ -12967,6 +12968,7 @@ resolve_fl_var_and_proc (gfc_symbol *sym, int mp_flag)
 	  && sym->ts.u.derived
 	  && !sym->attr.select_type_temporary
 	  && !UNLIMITED_POLY (sym)
+	  && CLASS_DATA (sym)->ts.u.derived
 	  && !gfc_type_is_extensible (CLASS_DATA (sym)->ts.u.derived))
 	{
 	  gfc_error ("Type %qs of CLASS variable %qs at %L is not extensible",
