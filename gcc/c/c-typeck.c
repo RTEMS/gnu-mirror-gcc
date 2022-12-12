@@ -4401,7 +4401,7 @@ build_unary_op (location_t location, enum tree_code code, tree xarg,
 	default:
 	  intcap = unary_op_get_intcap_provenance (arg);
 	  if (arg == intcap)
-	    intcap = arg = save_expr (arg);
+	    intcap = arg = save_expr (c_fully_fold (arg, false, NULL));
 	  arg = drop_capability (arg);
 	}
     }
@@ -11970,9 +11970,9 @@ build_binary_op_1 (location_t location, enum tree_code code,
      c + cv --> REPLACE_ADDRESS_VALUE (c, (non-cap type) c + cv)
      we need to avoid evaluating c twice.  */
   if (intcap == op0)
-    intcap = op0 = save_expr (op0);
+    intcap = op0 = save_expr (c_fully_fold (op0, false, NULL));
   else if (intcap == op1)
-    intcap = op1 = save_expr (op1);
+    intcap = op1 = save_expr (c_fully_fold (op1, false, NULL));
 
   if (common_ic_type)
     {
