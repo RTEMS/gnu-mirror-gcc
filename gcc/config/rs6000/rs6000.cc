@@ -23819,15 +23819,23 @@ rs6000_eh_return_filter_mode (void)
   return TARGET_32BIT ? SImode : word_mode;
 }
 
-/* Target hook for translate_mode_attribute.  */
+/* Target hook for translate_mode_attribute.
+
+   When -mabi=ieeelongdouble is used, we want to translate either KFmode or
+   TFmode to KFmode.  This is because user code that wants to specify IEEE
+   128-bit types will use either TFmode or KFmode, and we really want to use
+   the _Float128 and __float128 types instead of long double.
+
+   Similarly when -mabi=ibmlongdouble is used, we want to map IFmode into
+   TFmode.  */
 static machine_mode
 rs6000_translate_mode_attribute (machine_mode mode)
 {
-  if ((FLOAT128_IEEE_P (mode)
-       && ieee128_float_type_node == long_double_type_node)
-      || (FLOAT128_IBM_P (mode)
-	  && ibm128_float_type_node == long_double_type_node))
+  if (FLOAT128_IBM_P (mode)
+      && ibm128_float_type_node == long_double_type_node)
     return COMPLEX_MODE_P (mode) ? E_TCmode : E_TFmode;
+  else if (FLOAT128_IEEE_P (mode))
+    return COMPLEX_MODE_P (mode) ? E_KCmode : E_KFmode;
   return mode;
 }
 
@@ -23863,13 +23871,10 @@ rs6000_libgcc_floating_mode_supported_p (scalar_float_mode mode)
     case E_TFmode:
       return true;
 
-      /* We only return true for KFmode if IEEE 128-bit types are supported, and
-	 if long double does not use the IEEE 128-bit format.  If long double
-	 uses the IEEE 128-bit format, it will use TFmode and not KFmode.
-	 Because the code will not use KFmode in that case, there will be aborts
-	 because it can't find KFmode in the Floatn types.  */
+      /* We only return true for KFmode if IEEE 128-bit types are
+	 supported.  */
     case E_KFmode:
-      return TARGET_FLOAT128_TYPE && !TARGET_IEEEQUAD;
+      return TARGET_FLOAT128_TYPE;
 
     default:
       return false;
@@ -23903,7 +23908,7 @@ rs6000_floatn_mode (int n, bool extended)
 
 	case 64:
 	  if (TARGET_FLOAT128_TYPE)
-	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
+	    return KFmode;
 	  else
 	    return opt_scalar_float_mode ();
 
@@ -23927,7 +23932,7 @@ rs6000_floatn_mode (int n, bool extended)
 
 	case 128:
 	  if (TARGET_FLOAT128_TYPE)
-	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
+	    return KFmode;
 	  else
 	    return opt_scalar_float_mode ();
 
