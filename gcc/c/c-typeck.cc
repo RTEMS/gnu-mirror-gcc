@@ -394,7 +394,7 @@ build_functype_attribute_variant (tree ntype, tree otype, tree attrs)
    assume that qualifiers match.  */
 
 tree
-composite_type (tree t1, tree t2)
+composite_type_cond (tree t1, tree t2, tree cond)
 {
   enum tree_code code1;
   enum tree_code code2;
@@ -437,7 +437,7 @@ composite_type (tree t1, tree t2)
       {
 	tree pointed_to_1 = TREE_TYPE (t1);
 	tree pointed_to_2 = TREE_TYPE (t2);
-	tree target = composite_type (pointed_to_1, pointed_to_2);
+	tree target = composite_type_cond (pointed_to_1, pointed_to_2, cond);
         t1 = build_pointer_type_for_mode (target, TYPE_MODE (t1), false);
 	t1 = build_type_attribute_variant (t1, attributes);
 	return qualify_type (t1, t2);
@@ -445,7 +445,7 @@ composite_type (tree t1, tree t2)
 
     case ARRAY_TYPE:
       {
-	tree elt = composite_type (TREE_TYPE (t1), TREE_TYPE (t2));
+	tree elt = composite_type_cond (TREE_TYPE (t1), TREE_TYPE (t2), cond);
 	int quals;
 	tree unqual_elt;
 	tree d1 = TYPE_DOMAIN (t1);
@@ -473,17 +473,19 @@ composite_type (tree t1, tree t2)
 	d1_variable = d1_variable || (d1_zero && C_TYPE_VARIABLE_SIZE (t1));
 	d2_variable = d2_variable || (d2_zero && C_TYPE_VARIABLE_SIZE (t2));
 
+	bool use0 = cond && d1_variable && d2_variable;
+	bool use1 = d1 && (d2_variable || d2_zero || !d1_variable);
+	bool use2 = d2 && (d1_variable || d1_zero || !d2_variable);
+
 	/* Save space: see if the result is identical to one of the args.  */
-	if (elt == TREE_TYPE (t1) && TYPE_DOMAIN (t1)
-	    && (d2_variable || d2_zero || !d1_variable))
+	if (elt == TREE_TYPE (t1) && use1 && !use0)
 	  return build_type_attribute_variant (t1, attributes);
-	if (elt == TREE_TYPE (t2) && TYPE_DOMAIN (t2)
-	    && (d1_variable || d1_zero || !d2_variable))
+	if (elt == TREE_TYPE (t2) && use2 && !use0)
 	  return build_type_attribute_variant (t2, attributes);
 
-	if (elt == TREE_TYPE (t1) && !TYPE_DOMAIN (t2) && !TYPE_DOMAIN (t1))
+	if (elt == TREE_TYPE (t1) && !use0 && !TYPE_DOMAIN (t2) && !TYPE_DOMAIN (t1))
 	  return build_type_attribute_variant (t1, attributes);
-	if (elt == TREE_TYPE (t2) && !TYPE_DOMAIN (t2) && !TYPE_DOMAIN (t1))
+	if (elt == TREE_TYPE (t2) && !use0 && !TYPE_DOMAIN (t2) && !TYPE_DOMAIN (t1))
 	  return build_type_attribute_variant (t2, attributes);
 
 	/* Merge the element types, and have a size if either arg has
@@ -493,13 +495,23 @@ composite_type (tree t1, tree t2)
 	   back at the end.  */
 	quals = TYPE_QUALS (strip_array_types (elt));
 	unqual_elt = c_build_qualified_type (elt, TYPE_UNQUALIFIED);
-	t1 = build_array_type (unqual_elt,
-			       TYPE_DOMAIN ((TYPE_DOMAIN (t1)
-					     && (d2_variable
-						 || d2_zero
-						 || !d1_variable))
-					    ? t1
-					    : t2));
+
+	tree td = NULL_TREE;
+
+	if (use0)
+	  {
+	    gcc_assert (size_zero_node == TYPE_MIN_VALUE (d1));
+	    gcc_assert (size_zero_node == TYPE_MIN_VALUE (d2));
+
+	    tree d = build_conditional_expr(UNKNOWN_LOCATION, cond, false,
+			TYPE_MAX_VALUE (d1), NULL_TREE, UNKNOWN_LOCATION,
+			TYPE_MAX_VALUE (d2), NULL_TREE, UNKNOWN_LOCATION);
+
+	    td = build_index_type (d);
+	  }
+
+	t1 = build_array_type (unqual_elt, use0 ? td : (use1 ? d1 : d2));
+
 	/* Ensure a composite type involving a zero-length array type
 	   is a zero-length type not an incomplete type.  */
 	if (d1_zero && d2_zero
@@ -530,7 +542,7 @@ composite_type (tree t1, tree t2)
       /* Function types: prefer the one that specified arg types.
 	 If both do, merge the arg types.  Also merge the return types.  */
       {
-	tree valtype = composite_type (TREE_TYPE (t1), TREE_TYPE (t2));
+	tree valtype = composite_type_cond (TREE_TYPE (t1), TREE_TYPE (t2), cond);
 	tree p1 = TYPE_ARG_TYPES (t1);
 	tree p2 = TYPE_ARG_TYPES (t2);
 	int len;
@@ -608,8 +620,8 @@ composite_type (tree t1, tree t2)
 		      mv3 = TYPE_MAIN_VARIANT (mv3);
 		    if (comptypes (mv3, mv2))
 		      {
-			TREE_VALUE (n) = composite_type (TREE_TYPE (memb),
-							 TREE_VALUE (p2));
+			TREE_VALUE (n) = composite_type_cond (TREE_TYPE (memb),
+							      TREE_VALUE (p2), cond);
 			pedwarn (input_location, OPT_Wpedantic,
 				 "function types not truly compatible in ISO C");
 			goto parm_done;
@@ -633,15 +645,15 @@ composite_type (tree t1, tree t2)
 		      mv3 = TYPE_MAIN_VARIANT (mv3);
 		    if (comptypes (mv3, mv1))
 		      {
-			TREE_VALUE (n) = composite_type (TREE_TYPE (memb),
-							 TREE_VALUE (p1));
+			TREE_VALUE (n) = composite_type_cond (TREE_TYPE (memb),
+							      TREE_VALUE (p1), cond);
 			pedwarn (input_location, OPT_Wpedantic,
 				 "function types not truly compatible in ISO C");
 			goto parm_done;
 		      }
 		  }
 	      }
-	    TREE_VALUE (n) = composite_type (TREE_VALUE (p1), TREE_VALUE (p2));
+	    TREE_VALUE (n) = composite_type_cond (TREE_VALUE (p1), TREE_VALUE (p2), cond);
 	  parm_done: ;
 	  }
 
@@ -656,6 +668,12 @@ composite_type (tree t1, tree t2)
 
 }
 
+tree
+composite_type (tree t1, tree t2)
+{
+  return composite_type_cond (t1, t2, NULL_TREE);
+}
+
 /* Return the type of a conditional expression between pointers to
    possibly differently qualified versions of compatible types.
 
@@ -663,7 +681,7 @@ composite_type (tree t1, tree t2)
    nonzero; if that isn't so, this may crash.  */
 
 static tree
-common_pointer_type (tree t1, tree t2)
+common_pointer_type (tree t1, tree t2, tree cond)
 {
   tree attributes;
   tree pointed_to_1, mv1;
@@ -698,7 +716,7 @@ common_pointer_type (tree t1, tree t2)
     mv1 = TYPE_MAIN_VARIANT (pointed_to_1);
   if (TREE_CODE (mv2) != ARRAY_TYPE)
     mv2 = TYPE_MAIN_VARIANT (pointed_to_2);
-  target = composite_type (mv1, mv2);
+  target = composite_type_cond (mv1, mv2, cond);
 
   /* Strip array types to get correct qualifier for pointers to arrays */
   quals1 = TYPE_QUALS_NO_ADDR_SPACE (strip_array_types (pointed_to_1));
@@ -4281,7 +4299,7 @@ pointer_diff (location_t loc, tree op0, tree op1, tree *instrument_expr)
       if (!addr_space_superset (as0, as1, &as_common))
 	gcc_unreachable ();
 
-      common_type = common_pointer_type (TREE_TYPE (op0), TREE_TYPE (op1));
+      common_type = common_pointer_type (TREE_TYPE (op0), TREE_TYPE (op1), NULL_TREE);
       op0 = convert (common_type, op0);
       op1 = convert (common_type, op1);
     }
@@ -5706,7 +5724,10 @@ build_conditional_expr (location_t colon_loc, tree ifexp, bool ifexp_bcp,
       addr_space_t as_common;
 
       if (comp_target_types (colon_loc, type1, type2))
-	result_type = common_pointer_type (type1, type2);
+	{
+	  ifexp = save_expr (ifexp);
+	  result_type = common_pointer_type (type1, type2, ifexp);
+	}
       else if (null_pointer_constant_p (orig_op1))
 	result_type = type2;
       else if (null_pointer_constant_p (orig_op2))
@@ -12971,7 +12992,7 @@ build_binary_op (location_t location, enum tree_code code,
 	     Otherwise, the targets must be compatible
 	     and both must be object or both incomplete.  */
 	  if (comp_target_types (location, type0, type1))
-	    result_type = common_pointer_type (type0, type1);
+	    result_type = common_pointer_type (type0, type1, NULL_TREE);
 	  else if (!addr_space_superset (as0, as1, &as_common))
 	    {
 	      error_at (location, "comparison of pointers to "
@@ -13108,7 +13129,7 @@ build_binary_op (location_t location, enum tree_code code,
 
 	  if (comp_target_types (location, type0, type1))
 	    {
-	      result_type = common_pointer_type (type0, type1);
+	      result_type = common_pointer_type (type0, type1, NULL_TREE);
 	      if (!COMPLETE_TYPE_P (TREE_TYPE (type0))
 		  != !COMPLETE_TYPE_P (TREE_TYPE (type1)))
 		pedwarn_c99 (location, OPT_Wpedantic,
