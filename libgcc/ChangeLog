@@ -1,3 +1,12 @@
+2022-12-16  Thomas Neumann  <tneumann@users.sourceforge.net>
+
+	* unwind-dw2-fde.c: Initialize fde object lazily when
+	the first exception tries to pass through.
+
+2022-12-16  Thomas Neumann  <tneumann@users.sourceforge.net>
+
+	* unwind-dw2-fde.c: Use radix sort instead of split+sort+merge.
+
 2010-06-30  Jakub Jelinek  <jakub@redhat.com>
 
 	* config/ia64/lib1funcs.S: Add .note.GNU-stack section on
