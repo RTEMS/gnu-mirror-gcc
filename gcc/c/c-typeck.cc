@@ -90,12 +90,14 @@ static bool require_constant_elements;
 static bool require_constexpr_value;
 
 static tree qualify_type (tree, tree);
-static int tagged_types_tu_compatible_p (const_tree, const_tree, bool *,
-					 bool *);
+struct comptypes_data;
+static int tagged_types_tu_compatible_p (const_tree, const_tree,
+					 struct comptypes_data *);
 static int comp_target_types (location_t, tree, tree);
-static int function_types_compatible_p (const_tree, const_tree, bool *,
-					bool *);
-static int type_lists_compatible_p (const_tree, const_tree, bool *, bool *);
+static int function_types_compatible_p (const_tree, const_tree,
+					struct comptypes_data *);
+static int type_lists_compatible_p (const_tree, const_tree,
+				    struct comptypes_data *);
 static tree lookup_field (tree, tree);
 static int convert_arguments (location_t, vec<location_t>, tree,
 			      vec<tree, va_gc> *, vec<tree, va_gc> *, tree,
@@ -125,7 +127,8 @@ static tree find_init_member (tree, struct obstack *);
 static void readonly_warning (tree, enum lvalue_use);
 static int lvalue_or_else (location_t, const_tree, enum lvalue_use);
 static void record_maybe_used_decl (tree);
-static int comptypes_internal (const_tree, const_tree, bool *, bool *);
+static int comptypes_internal (const_tree, const_tree,
+			       struct comptypes_data *data);
 
 /* Return true if EXP is a null pointer constant, false otherwise.  */
 
@@ -1039,6 +1042,12 @@ common_type (tree t1, tree t2)
   return c_common_type (t1, t2);
 }
 
+struct comptypes_data {
+
+  bool enum_and_int_p;
+  bool different_types_p;
+};
+
 /* Return 1 if TYPE1 and TYPE2 are compatible types for assignment
    or various other operations.  Return 2 if they are compatible
    but a warning may be needed if you use them together.  */
@@ -1049,7 +1058,9 @@ comptypes (tree type1, tree type2)
   const struct tagged_tu_seen_cache * tagged_tu_seen_base1 = tagged_tu_seen_base;
   int val;
 
-  val = comptypes_internal (type1, type2, NULL, NULL);
+  struct comptypes_data data = { };
+  val = comptypes_internal (type1, type2, &data);
+
   free_all_tagged_tu_seen_up_to (tagged_tu_seen_base1);
 
   return val;
@@ -1064,7 +1075,10 @@ comptypes_check_enum_int (tree type1, tree type2, bool *enum_and_int_p)
   const struct tagged_tu_seen_cache * tagged_tu_seen_base1 = tagged_tu_seen_base;
   int val;
 
-  val = comptypes_internal (type1, type2, enum_and_int_p, NULL);
+  struct comptypes_data data = { };
+  val = comptypes_internal (type1, type2, &data);
+  *enum_and_int_p = data.enum_and_int_p;
+
   free_all_tagged_tu_seen_up_to (tagged_tu_seen_base1);
 
   return val;
@@ -1080,7 +1094,10 @@ comptypes_check_different_types (tree type1, tree type2,
   const struct tagged_tu_seen_cache * tagged_tu_seen_base1 = tagged_tu_seen_base;
   int val;
 
-  val = comptypes_internal (type1, type2, NULL, different_types_p);
+  struct comptypes_data data = { };
+  val = comptypes_internal (type1, type2, &data);
+  *different_types_p = data.different_types_p;
+
   free_all_tagged_tu_seen_up_to (tagged_tu_seen_base1);
 
   return val;
@@ -1089,19 +1106,18 @@ comptypes_check_different_types (tree type1, tree type2,
 /* Return 1 if TYPE1 and TYPE2 are compatible types for assignment
    or various other operations.  Return 2 if they are compatible
    but a warning may be needed if you use them together.  If
-   ENUM_AND_INT_P is not NULL, and one type is an enum and the other a
-   compatible integer type, then this sets *ENUM_AND_INT_P to true;
-   *ENUM_AND_INT_P is never set to false.  If DIFFERENT_TYPES_P is not
-   NULL, and the types are compatible but different enough not to be
+   one type is an enum and the other a compatible integer type, then
+   this sets 'enum_and_int_p' in DATA to true (it is never set to
+   false).  If the types are compatible but different enough not to be
    permitted in C11 typedef redeclarations, then this sets
-   *DIFFERENT_TYPES_P to true; *DIFFERENT_TYPES_P is never set to
+   'different_types_p' in DATA to true; it is never set to
    false, but may or may not be set if the types are incompatible.
    This differs from comptypes, in that we don't free the seen
    types.  */
 
 static int
-comptypes_internal (const_tree type1, const_tree type2, bool *enum_and_int_p,
-		    bool *different_types_p)
+comptypes_internal (const_tree type1, const_tree type2,
+		    struct comptypes_data *data)
 {
   const_tree t1 = type1;
   const_tree t2 = type2;
@@ -1124,10 +1140,8 @@ comptypes_internal (const_tree type1, const_tree type2, bool *enum_and_int_p,
       t1 = ENUM_UNDERLYING_TYPE (t1);
       if (TREE_CODE (t2) != VOID_TYPE)
 	{
-	  if (enum_and_int_p != NULL)
-	    *enum_and_int_p = true;
-	  if (different_types_p != NULL)
-	    *different_types_p = true;
+	  data->enum_and_int_p = true;
+	  data->different_types_p = true;
 	}
     }
   else if (TREE_CODE (t2) == ENUMERAL_TYPE
@@ -1137,10 +1151,8 @@ comptypes_internal (const_tree type1, const_tree type2, bool *enum_and_int_p,
       t2 = ENUM_UNDERLYING_TYPE (t2);
       if (TREE_CODE (t1) != VOID_TYPE)
 	{
-	  if (enum_and_int_p != NULL)
-	    *enum_and_int_p = true;
-	  if (different_types_p != NULL)
-	    *different_types_p = true;
+	  data->enum_and_int_p = true;
+	  data->different_types_p = true;
 	}
     }
 
@@ -1198,13 +1210,11 @@ comptypes_internal (const_tree type1, const_tree type2, bool *enum_and_int_p,
       if (TYPE_MODE (t1) != TYPE_MODE (t2))
 	break;
       val = (TREE_TYPE (t1) == TREE_TYPE (t2)
-	     ? 1 : comptypes_internal (TREE_TYPE (t1), TREE_TYPE (t2),
-				       enum_and_int_p, different_types_p));
+	     ? 1 : comptypes_internal (TREE_TYPE (t1), TREE_TYPE (t2), data));
       break;
 
     case FUNCTION_TYPE:
-      val = function_types_compatible_p (t1, t2, enum_and_int_p,
-					 different_types_p);
+      val = function_types_compatible_p (t1, t2, data);
       break;
 
     case ARRAY_TYPE:
@@ -1218,13 +1228,11 @@ comptypes_internal (const_tree type1, const_tree type2, bool *enum_and_int_p,
 	/* Target types must match incl. qualifiers.  */
 	if (TREE_TYPE (t1) != TREE_TYPE (t2)
 	    && (val = comptypes_internal (TREE_TYPE (t1), TREE_TYPE (t2),
-					  enum_and_int_p,
-					  different_types_p)) == 0)
+					  data)) == 0)
 	  return 0;
 
-	if (different_types_p != NULL
-	    && (d1 == NULL_TREE) != (d2 == NULL_TREE))
-	  *different_types_p = true;
+	if ((d1 == NULL_TREE) != (d2 == NULL_TREE))
+	  data->different_types_p = true;
 	/* Sizes must match unless one is missing or variable.  */
 	if (d1 == NULL_TREE || d2 == NULL_TREE || d1 == d2)
 	  break;
@@ -1241,9 +1249,8 @@ comptypes_internal (const_tree type1, const_tree type2, bool *enum_and_int_p,
 	d1_variable = d1_variable || (d1_zero && C_TYPE_VARIABLE_SIZE (t1));
 	d2_variable = d2_variable || (d2_zero && C_TYPE_VARIABLE_SIZE (t2));
 
-	if (different_types_p != NULL
-	    && d1_variable != d2_variable)
-	  *different_types_p = true;
+	if (d1_variable != d2_variable)
+	  data->different_types_p = true;
 	if (d1_variable || d2_variable)
 	  break;
 	if (d1_zero && d2_zero)
@@ -1268,8 +1275,7 @@ comptypes_internal (const_tree type1, const_tree type2, bool *enum_and_int_p,
 	      && ! attribute_list_contained (a2, a1))
 	    break;
 
-	  val = tagged_types_tu_compatible_p (t1, t2, enum_and_int_p,
-					      different_types_p);
+	  val = tagged_types_tu_compatible_p (t1, t2, data);
 
 	  if (attrval != 2)
 	    return val;
@@ -1278,8 +1284,7 @@ comptypes_internal (const_tree type1, const_tree type2, bool *enum_and_int_p,
 
     case VECTOR_TYPE:
       val = (known_eq (TYPE_VECTOR_SUBPARTS (t1), TYPE_VECTOR_SUBPARTS (t2))
-	     && comptypes_internal (TREE_TYPE (t1), TREE_TYPE (t2),
-				    enum_and_int_p, different_types_p));
+	     && comptypes_internal (TREE_TYPE (t1), TREE_TYPE (t2), data));
       break;
 
     default:
@@ -1395,14 +1400,11 @@ free_all_tagged_tu_seen_up_to (const struct tagged_tu_seen_cache *tu_til)
 
 /* Return 1 if two 'struct', 'union', or 'enum' types T1 and T2 are
    compatible.  If the two types are not the same (which has been
-   checked earlier), this can only happen when multiple translation
-   units are being compiled.  See C99 6.2.7 paragraph 1 for the exact
-   rules.  ENUM_AND_INT_P and DIFFERENT_TYPES_P are as in
-   comptypes_internal.  */
+   checked earlier).  */
 
 static int
 tagged_types_tu_compatible_p (const_tree t1, const_tree t2,
-			      bool *enum_and_int_p, bool *different_types_p)
+			      struct comptypes_data* data)
 {
   tree s1, s2;
   bool needs_warning = false;
@@ -1513,8 +1515,7 @@ tagged_types_tu_compatible_p (const_tree t1, const_tree t2,
 
 	    if (DECL_NAME (s1) != DECL_NAME (s2))
 	      break;
-	    result = comptypes_internal (TREE_TYPE (s1), TREE_TYPE (s2),
-					 enum_and_int_p, different_types_p);
+	    result = comptypes_internal (TREE_TYPE (s1), TREE_TYPE (s2), data);
 
 	    if (result != 1 && !DECL_NAME (s1))
 	      break;
@@ -1550,8 +1551,7 @@ tagged_types_tu_compatible_p (const_tree t1, const_tree t2,
 		  int result;
 
 		  result = comptypes_internal (TREE_TYPE (s1), TREE_TYPE (s2),
-					       enum_and_int_p,
-					       different_types_p);
+					       data);
 
 		  if (result != 1 && !DECL_NAME (s1))
 		    continue;
@@ -1599,8 +1599,7 @@ tagged_types_tu_compatible_p (const_tree t1, const_tree t2,
 	    if (TREE_CODE (s1) != TREE_CODE (s2)
 		|| DECL_NAME (s1) != DECL_NAME (s2))
 	      break;
-	    result = comptypes_internal (TREE_TYPE (s1), TREE_TYPE (s2),
-					 enum_and_int_p, different_types_p);
+	    result = comptypes_internal (TREE_TYPE (s1), TREE_TYPE (s2), data);
 	    if (result == 0)
 	      break;
 	    if (result == 2)
@@ -1633,7 +1632,7 @@ tagged_types_tu_compatible_p (const_tree t1, const_tree t2,
 
 static int
 function_types_compatible_p (const_tree f1, const_tree f2,
-			     bool *enum_and_int_p, bool *different_types_p)
+			     struct comptypes_data *data)
 {
   tree args1, args2;
   /* 1 if no need for warning yet, 2 if warning cause has been seen.  */
@@ -1654,16 +1653,15 @@ function_types_compatible_p (const_tree f1, const_tree f2,
   if (TYPE_VOLATILE (ret2))
     ret2 = build_qualified_type (TYPE_MAIN_VARIANT (ret2),
 				 TYPE_QUALS (ret2) & ~TYPE_QUAL_VOLATILE);
-  val = comptypes_internal (ret1, ret2, enum_and_int_p, different_types_p);
+  val = comptypes_internal (ret1, ret2, data);
   if (val == 0)
     return 0;
 
   args1 = TYPE_ARG_TYPES (f1);
   args2 = TYPE_ARG_TYPES (f2);
 
-  if (different_types_p != NULL
-      && (args1 == NULL_TREE) != (args2 == NULL_TREE))
-    *different_types_p = true;
+  if ((args1 == NULL_TREE) != (args2 == NULL_TREE))
+    data->different_types_p = true;
 
   /* An unspecified parmlist matches any specified parmlist
      whose argument types don't need default promotions.  */
@@ -1679,7 +1677,7 @@ function_types_compatible_p (const_tree f1, const_tree f2,
 	 If they don't match, ask for a warning (but no error).  */
       if (TYPE_ACTUAL_ARG_TYPES (f1)
 	  && type_lists_compatible_p (args2, TYPE_ACTUAL_ARG_TYPES (f1),
-				      enum_and_int_p, different_types_p) != 1)
+				      data) != 1)
 	val = 2;
       return val;
     }
@@ -1691,14 +1689,13 @@ function_types_compatible_p (const_tree f1, const_tree f2,
 	return 0;
       if (TYPE_ACTUAL_ARG_TYPES (f2)
 	  && type_lists_compatible_p (args1, TYPE_ACTUAL_ARG_TYPES (f2),
-				      enum_and_int_p, different_types_p) != 1)
+				      data) != 1)
 	val = 2;
       return val;
     }
 
   /* Both types have argument lists: compare them and propagate results.  */
-  val1 = type_lists_compatible_p (args1, args2, enum_and_int_p,
-				  different_types_p);
+  val1 = type_lists_compatible_p (args1, args2, data);
   return val1 != 1 ? val1 : val;
 }
 
@@ -1709,7 +1706,7 @@ function_types_compatible_p (const_tree f1, const_tree f2,
 
 static int
 type_lists_compatible_p (const_tree args1, const_tree args2,
-			 bool *enum_and_int_p, bool *different_types_p)
+			 struct comptypes_data *data)
 {
   /* 1 if no need for warning yet, 2 if warning cause has been seen.  */
   int val = 1;
@@ -1740,9 +1737,8 @@ type_lists_compatible_p (const_tree args1, const_tree args2,
 	 means there is supposed to be an argument
 	 but nothing is specified about what type it has.
 	 So match anything that self-promotes.  */
-      if (different_types_p != NULL
-	  && (a1 == NULL_TREE) != (a2 == NULL_TREE))
-	*different_types_p = true;
+      if ((a1 == NULL_TREE) != (a2 == NULL_TREE))
+	data->different_types_p = true;
       if (a1 == NULL_TREE)
 	{
 	  if (c_type_promotes_to (a2) != a2)
@@ -1757,11 +1753,9 @@ type_lists_compatible_p (const_tree args1, const_tree args2,
       else if (TREE_CODE (a1) == ERROR_MARK
 	       || TREE_CODE (a2) == ERROR_MARK)
 	;
-      else if (!(newval = comptypes_internal (mv1, mv2, enum_and_int_p,
-					      different_types_p)))
+      else if (!(newval = comptypes_internal (mv1, mv2, data)))
 	{
-	  if (different_types_p != NULL)
-	    *different_types_p = true;
+	  data->different_types_p = true;
 	  /* Allow  wait (union {union wait *u; int *i} *)
 	     and  wait (union wait *)  to be compatible.  */
 	  if (TREE_CODE (a1) == UNION_TYPE
@@ -1782,8 +1776,7 @@ type_lists_compatible_p (const_tree args1, const_tree args2,
 			   ? c_build_qualified_type (TYPE_MAIN_VARIANT (mv3),
 						     TYPE_QUAL_ATOMIC)
 			   : TYPE_MAIN_VARIANT (mv3));
-		  if (comptypes_internal (mv3, mv2, enum_and_int_p,
-					  different_types_p))
+		  if (comptypes_internal (mv3, mv2, data))
 		    break;
 		}
 	      if (memb == NULL_TREE)
@@ -1807,8 +1800,7 @@ type_lists_compatible_p (const_tree args1, const_tree args2,
 			   ? c_build_qualified_type (TYPE_MAIN_VARIANT (mv3),
 						     TYPE_QUAL_ATOMIC)
 			   : TYPE_MAIN_VARIANT (mv3));
-		  if (comptypes_internal (mv3, mv1, enum_and_int_p,
-					  different_types_p))
+		  if (comptypes_internal (mv3, mv1, data))
 		    break;
 		}
 	      if (memb == NULL_TREE)
