@@ -45,3 +45,11 @@ struct cheri_object4
 {
   void *var17, __attribute((used)) *var18; /* { dg-error "" } */
 };/* { dg-warning "" } */
+
+void __capability * __attribute__((__warn_unused_result__))
+f17 (void); /* { dg-warning "use of '__capability' before the pointer type is deprecated" } */
+
+void f18 (void)
+{
+  f17 (); /* { dg-warning "ignoring return value" } */
+}

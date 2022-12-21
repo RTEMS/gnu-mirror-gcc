@@ -12013,9 +12013,8 @@ grokdeclarator (const cp_declarator *declarator,
 	  if (!capability_type_p (type))
 	    {
 	      tree attr_name = get_identifier ("cheri capability");
-	      tree to_apply = tree_cons (attr_name, NULL_TREE,
-					 returned_attrs);
-	      returned_attrs = decl_attributes (&type, to_apply, 0);
+	      tree to_apply = build_tree_list (attr_name, NULL_TREE);
+	      gcc_assert (!decl_attributes (&type, to_apply, 0));
 	    }
 
 	  /* Raise the deprecated declaration warning, but only if

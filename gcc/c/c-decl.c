@@ -6364,9 +6364,8 @@ grokdeclarator (const struct c_declarator *declarator,
 	      if (!capability_type_p (type))
 		{
 		  tree attr_name = get_identifier ("cheri capability");
-		  tree new_attrs = tree_cons (attr_name, NULL_TREE,
-					  returned_attrs);
-		  returned_attrs = decl_attributes (&type, new_attrs, 0);
+		  tree new_attrs = build_tree_list (attr_name, NULL_TREE);
+		  gcc_assert (!decl_attributes (&type, new_attrs, 0));
 		}
 	      deprecated_capability_uses = 1;
 
