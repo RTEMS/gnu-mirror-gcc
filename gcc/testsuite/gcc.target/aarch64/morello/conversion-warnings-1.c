@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-__intcap_t overflow_intcap() { return 1ULL << 63; } /* { dg-warning "overflow in conversion" } */
+__intcap_t overflow_intcap() { return 1ULL << 63; } /* { dg-warning "signed conversion" } */
 __uintcap_t overflow_uintcap() { return -1; } /* { dg-warning "unsigned conversion" } */
 
 __intcap_t compare_to_intcap(int x) { return x == 0; }

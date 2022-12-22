@@ -9247,6 +9247,12 @@ int_fits_type_p (const_tree c, const_tree type)
   if (TREE_CODE (type) == BOOLEAN_TYPE)
     return wi::fits_to_boolean_p (wi::to_wide (c), type);
 
+  /* If converting from a non-capability constant to an intcap type,
+     we want to know if the non-capability constant fits in the arithmetic
+     range of the intcap type.  */
+  if (!INTCAP_TYPE_P (TREE_TYPE (c)) && INTCAP_TYPE_P (type))
+    type = TREE_TYPE (type);
+
 retry:
   type_low_bound = TYPE_MIN_VALUE (type);
   type_high_bound = TYPE_MAX_VALUE (type);

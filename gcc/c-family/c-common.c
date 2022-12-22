@@ -2581,7 +2581,7 @@ c_common_signed_or_unsigned_type (int unsignedp, tree type)
      types, and producing a signed or unsigned variant of an
      ENUMERAL_TYPE may cause other problems as well.  */
 
-  if (!INTEGRAL_TYPE_P (type)
+  if ((!INTEGRAL_TYPE_P (type) && !INTCAP_TYPE_P (type))
       || TYPE_UNSIGNED (type) == unsignedp)
     return type;
 
