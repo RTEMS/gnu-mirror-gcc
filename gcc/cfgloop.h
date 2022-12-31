@@ -98,25 +98,22 @@ struct GTY(()) histogram_counters{
     gcov_type sum;
     int histogram_size;
     gcov_type hist[69];
-
-    // need to think about overflows
-    // quantil function for the distribution
-    // returns index under which is koef part of the distribution
-    // int quantil(float koef){
-    //     gcc_assert(0<koef && koef<=1);
-    //     gcov_type quant=0;
-    //     int i=0;
-    //     for (;i<69;++i) {
-    //         if (quant+hist[i]<koef*sum) {
-    //             quant+=hist[i];
-    //         } else {
-    //             break;
-    //         }
-    //     }
-    //     return i;
-    // };
 };
 
+// quantil function for the distribution
+// int quantil_asdf(float koef, histogram_counters* count){
+//     gcc_assert(0<koef && koef<=1);
+//     gcov_type quant=0;
+//     int i=0;
+//     for (;i<69;++i) {
+//         if (quant+count->hist[i]<koef*count->sum) {
+//             quant+=count->hist[i];
+//         } else {
+//             break;
+//         }
+//     }
+//     return i;
+// };
 
 typedef class loop *loop_p;
 

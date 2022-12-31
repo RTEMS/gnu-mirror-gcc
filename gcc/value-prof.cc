@@ -265,17 +265,20 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
       break;
     case HIST_TYPE_HISTOGRAM:
       if (hist->hvalue.counters){
-        for (int i=0; i<=8; ++i){
+        for (int i=0; i<=param_profile_histogram_size_lin; ++i){
   	  fprintf (dump_file, "Histogram counter histogram%" PRId64
 	     ":%" PRId64 ".\n",
 	     (int64_t) i,
 	     (int64_t) hist->hvalue.counters[i]);
         }
-        for (int64_t i=4; i<64; ++i){
+        int lin2_log=floor_log2 (param_profile_histogram_size_lin);
+        for (int64_t i=lin2_log;
+                i<param_profile_histogram_size-param_profile_histogram_size_lin+lin2_log;
+        ++i){
   	  fprintf (dump_file, "Histogram counter histogram%" PRId64
 	     ":%" PRId64 ".\n",
 	     (int64_t) 1>>i,
-	     (int64_t) hist->hvalue.counters[5+i]);
+	     (int64_t) hist->hvalue.counters[(param_profile_histogram_size_lin-lin2_log)+i]);
         }
       }
       break;
@@ -397,7 +400,7 @@ stream_in_histogram_value (class lto_input_block *ib, gimple *stmt)
 	  break;
 
     case HIST_TYPE_HISTOGRAM:
-	  ncounters = 69;
+	  ncounters = param_profile_histogram_size;
 	  break;
 	case HIST_TYPE_POW2:
 	case HIST_TYPE_AVERAGE:
@@ -1998,7 +2001,7 @@ gimple_find_values_to_profile (histogram_values *values)
 	  break;
 
 	case HIST_TYPE_HISTOGRAM:
-	  hist->n_counters = 69;
+	  hist->n_counters = param_profile_histogram_size;
 	  break;
 
 	default:

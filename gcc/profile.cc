@@ -930,7 +930,7 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
         if (act_count[t]){
            lp->counters=ggc_alloc<histogram_counters>();
            gcov_type sum=0;
-           for (int i=0;i<69;++i){
+           for (int i=0;i<param_profile_histogram_size;++i){
                lp->counters->hist[i]=act_count[t][i];
                sum+=act_count[t][i];
            }

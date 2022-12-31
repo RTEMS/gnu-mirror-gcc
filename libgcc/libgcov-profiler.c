@@ -65,6 +65,15 @@ __gcov_histogram_profiler (gcov_type *counters, gcov_type value)
   }
 }
 
+//  if (value>=0 && value<param_profile_histogram_size_lin){
+//    counters[value]++;
+//  }else{
+//    gcc_assert(value>0);
+//    int pow2=floor_log2(value);
+//    counters[pow2+(param_profile_histogram_size_lin-floor_log2
+//            (param_profile_histogram_size_lin))]++;
+//  }
+
 #endif
 
 

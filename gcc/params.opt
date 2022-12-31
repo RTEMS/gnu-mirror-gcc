@@ -874,6 +874,14 @@ Min. ratio of insns to mem ops to enable prefetching in a loop.
 Common Joined UInteger Var(param_prefetch_minimum_stride) Init(-1) Param Optimization
 The minimum constant stride beyond which we should use prefetch hints for.
 
+-param=profile-histogram-size=
+Common Joined UInteger Var(param_profile_histogram_size) Init(69) Param Optimization
+Total size of the histogram counter for profile feedback.
+
+-param=profile-histogram-size-lin=
+Common Joined UInteger Var(param_profile_histogram_size_lin) Init(8) Param Optimization
+Size of the linear portion of the histogram counter for profile feedback.
+
 -param=profile-func-internal-id=
 Common Joined UInteger Var(param_profile_func_internal_id) IntegerRange(0, 1) Param
 Use internal function id in profile lookup.
