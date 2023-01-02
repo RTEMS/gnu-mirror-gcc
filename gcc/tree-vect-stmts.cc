@@ -1,5 +1,5 @@
 /* Statement Analysis and Transformation for Vectorization
-   Copyright (C) 2003-2022 Free Software Foundation, Inc.
+   Copyright (C) 2003-2023 Free Software Foundation, Inc.
    Contributed by Dorit Naishlos <dorit@il.ibm.com>
    and Ira Rosen <irar@il.ibm.com>
 
@@ -9235,6 +9235,7 @@ vectorizable_load (vec_info *vinfo,
       unsigned int group_el = 0;
       unsigned HOST_WIDE_INT
 	elsz = tree_to_uhwi (TYPE_SIZE_UNIT (TREE_TYPE (vectype)));
+      unsigned int n_groups = 0;
       for (j = 0; j < ncopies; j++)
 	{
 	  if (nloads > 1)
@@ -9256,12 +9257,19 @@ vectorizable_load (vec_info *vinfo,
 	      if (! slp
 		  || group_el == group_size)
 		{
-		  tree newoff = copy_ssa_name (running_off);
-		  gimple *incr = gimple_build_assign (newoff, POINTER_PLUS_EXPR,
-						      running_off, stride_step);
-		  vect_finish_stmt_generation (vinfo, stmt_info, incr, gsi);
-
-		  running_off = newoff;
+		  n_groups++;
+		  /* When doing SLP make sure to not load elements from
+		     the next vector iteration, those will not be accessed
+		     so just use the last element again.  See PR107451.  */
+		  if (!slp || known_lt (n_groups, vf))
+		    {
+		      tree newoff = copy_ssa_name (running_off);
+		      gimple *incr
+			= gimple_build_assign (newoff, POINTER_PLUS_EXPR,
+					       running_off, stride_step);
+		      vect_finish_stmt_generation (vinfo, stmt_info, incr, gsi);
+		      running_off = newoff;
+		    }
 		  group_el = 0;
 		}
 	    }

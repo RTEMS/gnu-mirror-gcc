@@ -1,5 +1,5 @@
 /* Debug hooks for GCC.
-   Copyright (C) 2001-2022 Free Software Foundation, Inc.
+   Copyright (C) 2001-2023 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify it
    under the terms of the GNU General Public License as published by the
@@ -244,6 +244,8 @@ extern const struct gcc_debug_hooks dwarf2_lineno_debug_hooks;
 extern const struct gcc_debug_hooks vmsdbg_debug_hooks;
 
 /* Dwarf2 frame information.  */
+
+extern int dwarf_reg_sizes_constant ();
 
 extern void dwarf2out_begin_prologue (unsigned int, unsigned int,
 				      const char *);

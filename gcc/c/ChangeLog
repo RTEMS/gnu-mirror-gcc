@@ -1,3 +1,9 @@
+2022-12-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/108043
+	* c-parser.cc (c_parser_postfix_expression_after_paren_type): Diagnose
+	compound literals with function type.
+
 2022-12-07  Joseph Myers  <joseph@codesourcery.com>
 
 	* c-decl.cc (declspecs_add_type, declspecs_add_scspec): Check for
@@ -8976,7 +8982,7 @@
 	* c-decl.c: Likewise.  Include gt-c-c-decl.h, not gt-c-decl.h.
 	* c-parser.c: Likewise.  Include gt-c-c-parser.h, not gt-c-parser.h.
 
-Copyright (C) 2012-2022 Free Software Foundation, Inc.
+Copyright (C) 2012-2023 Free Software Foundation, Inc.
 
 Copying and distribution of this file, with or without modification,
 are permitted in any medium without royalty provided the copyright

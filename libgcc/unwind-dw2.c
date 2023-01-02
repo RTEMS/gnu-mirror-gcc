@@ -148,8 +148,24 @@ struct _Unwind_Context
   char by_value[__LIBGCC_DWARF_FRAME_REGISTERS__+1];
 };
 
+#ifdef __LIBGCC_DWARF_REG_SIZES_CONSTANT__
+static inline unsigned char
+dwarf_reg_size (int index __attribute__ ((__unused__)))
+{
+  return __LIBGCC_DWARF_REG_SIZES_CONSTANT__;
+}
+#else
 /* Byte size of every register managed by these routines.  */
 static unsigned char dwarf_reg_size_table[__LIBGCC_DWARF_FRAME_REGISTERS__+1];
+
+
+static inline unsigned char
+dwarf_reg_size (unsigned index)
+{
+  gcc_assert (index < sizeof (dwarf_reg_size_table));
+  return dwarf_reg_size_table[index];
+}
+#endif
 
 
 /* Read unaligned data from the instruction buffer.  */
@@ -232,8 +248,7 @@ _Unwind_GetGR (struct _Unwind_Context *context, int regno)
 #endif
 
   index = DWARF_REG_TO_UNWIND_COLUMN (regno);
-  gcc_assert (index < (int) sizeof(dwarf_reg_size_table));
-  size = dwarf_reg_size_table[index];
+  size = dwarf_reg_size (index);
   val = context->reg[index];
 
   if (_Unwind_IsExtendedContext (context) && context->by_value[index])
@@ -280,8 +295,7 @@ _Unwind_SetGR (struct _Unwind_Context *context, int index, _Unwind_Word val)
   void *ptr;
 
   index = DWARF_REG_TO_UNWIND_COLUMN (index);
-  gcc_assert (index < (int) sizeof(dwarf_reg_size_table));
-  size = dwarf_reg_size_table[index];
+  size = dwarf_reg_size (index);
 
   if (_Unwind_IsExtendedContext (context) && context->by_value[index])
     {
@@ -329,9 +343,8 @@ _Unwind_SetGRValue (struct _Unwind_Context *context, int index,
 		    _Unwind_Word val)
 {
   index = DWARF_REG_TO_UNWIND_COLUMN (index);
-  gcc_assert (index < (int) sizeof(dwarf_reg_size_table));
   /* Return column size may be smaller than _Unwind_Context_Reg_Val.  */
-  gcc_assert (dwarf_reg_size_table[index] <= sizeof (_Unwind_Context_Reg_Val));
+  gcc_assert (dwarf_reg_size (index) <= sizeof (_Unwind_Context_Reg_Val));
 
   context->by_value[index] = 1;
   context->reg[index] = _Unwind_Get_Unwind_Context_Reg_Val (val);
@@ -947,302 +960,43 @@ execute_stack_op (const unsigned char *op_ptr, const unsigned char *op_end,
    instruction sequence to decode, current register information and
    CIE info, and the PC range to evaluate.  */
 
+static void  __attribute__ ((__noinline__))
+execute_cfa_program_generic (const unsigned char *insn_ptr,
+			     const unsigned char *insn_end,
+			     struct _Unwind_Context *context,
+			     _Unwind_FrameState *fs)
+{
+#define DATA_ALIGN fs->data_align
+#define CODE_ALIGN fs->code_align
+#include "unwind-dw2-execute_cfa.h"
+}
+
+static inline void
+execute_cfa_program_specialized (const unsigned char *insn_ptr,
+				 const unsigned char *insn_end,
+				 struct _Unwind_Context *context,
+				 _Unwind_FrameState *fs)
+{
+#define DATA_ALIGN __LIBGCC_DWARF_CIE_DATA_ALIGNMENT__
+  /* GCC always uses 1 even on architectures with a fixed instruction
+     width.  */
+#define CODE_ALIGN 1
+#include "unwind-dw2-execute_cfa.h"
+}
+
 static void
 execute_cfa_program (const unsigned char *insn_ptr,
 		     const unsigned char *insn_end,
 		     struct _Unwind_Context *context,
 		     _Unwind_FrameState *fs)
 {
-  struct frame_state_reg_info *unused_rs = NULL;
-
-  /* Don't allow remember/restore between CIE and FDE programs.  */
-  fs->regs.prev = NULL;
-
-  /* The comparison with the return address uses < rather than <= because
-     we are only interested in the effects of code before the call; for a
-     noreturn function, the return address may point to unrelated code with
-     a different stack configuration that we are not interested in.  We
-     assume that the call itself is unwind info-neutral; if not, or if
-     there are delay instructions that adjust the stack, these must be
-     reflected at the point immediately before the call insn.
-     In signal frames, return address is after last completed instruction,
-     so we add 1 to return address to make the comparison <=.  */
-  while (insn_ptr < insn_end
-	 && fs->pc < context->ra + _Unwind_IsSignalFrame (context))
-    {
-      unsigned char insn = *insn_ptr++;
-      _uleb128_t reg, utmp;
-      _sleb128_t offset, stmp;
-
-      if ((insn & 0xc0) == DW_CFA_advance_loc)
-	fs->pc += (insn & 0x3f) * fs->code_align;
-      else if ((insn & 0xc0) == DW_CFA_offset)
-	{
-	  reg = insn & 0x3f;
-	  insn_ptr = read_uleb128 (insn_ptr, &utmp);
-	  offset = (_Unwind_Sword) utmp * fs->data_align;
-	  reg = DWARF_REG_TO_UNWIND_COLUMN (reg);
-	  if (UNWIND_COLUMN_IN_RANGE (reg))
-	    {
-	      fs->regs.how[reg] = REG_SAVED_OFFSET;
-	      fs->regs.reg[reg].loc.offset = offset;
-	    }
-	}
-      else if ((insn & 0xc0) == DW_CFA_restore)
-	{
-	  reg = insn & 0x3f;
-	  reg = DWARF_REG_TO_UNWIND_COLUMN (reg);
-	  if (UNWIND_COLUMN_IN_RANGE (reg))
-	    fs->regs.how[reg] = REG_UNSAVED;
-	}
-      else switch (insn)
-	{
-	case DW_CFA_set_loc:
-	  {
-	    _Unwind_Ptr pc;
-
-	    insn_ptr = read_encoded_value (context, fs->fde_encoding,
-					   insn_ptr, &pc);
-	    fs->pc = (void *) pc;
-	  }
-	  break;
-
-	case DW_CFA_advance_loc1:
-	  fs->pc += read_1u (insn_ptr) * fs->code_align;
-	  insn_ptr += 1;
-	  break;
-	case DW_CFA_advance_loc2:
-	  fs->pc += read_2u (insn_ptr) * fs->code_align;
-	  insn_ptr += 2;
-	  break;
-	case DW_CFA_advance_loc4:
-	  fs->pc += read_4u (insn_ptr) * fs->code_align;
-	  insn_ptr += 4;
-	  break;
-
-	case DW_CFA_offset_extended:
-	  insn_ptr = read_uleb128 (insn_ptr, &reg);
-	  insn_ptr = read_uleb128 (insn_ptr, &utmp);
-	  offset = (_Unwind_Sword) utmp * fs->data_align;
-	  reg = DWARF_REG_TO_UNWIND_COLUMN (reg);
-	  if (UNWIND_COLUMN_IN_RANGE (reg))
-	    {
-	      fs->regs.how[reg] = REG_SAVED_OFFSET;
-	      fs->regs.reg[reg].loc.offset = offset;
-	    }
-	  break;
-
-	case DW_CFA_restore_extended:
-	  insn_ptr = read_uleb128 (insn_ptr, &reg);
-	  /* FIXME, this is wrong; the CIE might have said that the
-	     register was saved somewhere.  */
-	  reg = DWARF_REG_TO_UNWIND_COLUMN (reg);
-	  if (UNWIND_COLUMN_IN_RANGE (reg))
-	    fs->regs.how[reg] = REG_UNSAVED;
-	  break;
-
-	case DW_CFA_same_value:
-	  insn_ptr = read_uleb128 (insn_ptr, &reg);
-	  reg = DWARF_REG_TO_UNWIND_COLUMN (reg);
-	  if (UNWIND_COLUMN_IN_RANGE (reg))
-	    fs->regs.how[reg] = REG_UNSAVED;
-	  break;
-
-	case DW_CFA_undefined:
-	  insn_ptr = read_uleb128 (insn_ptr, &reg);
-	  reg = DWARF_REG_TO_UNWIND_COLUMN (reg);
-	  if (UNWIND_COLUMN_IN_RANGE (reg))
-	    fs->regs.how[reg] = REG_UNDEFINED;
-	  break;
-
-	case DW_CFA_nop:
-	  break;
-
-	case DW_CFA_register:
-	  {
-	    _uleb128_t reg2;
-	    insn_ptr = read_uleb128 (insn_ptr, &reg);
-	    insn_ptr = read_uleb128 (insn_ptr, &reg2);
-	    reg = DWARF_REG_TO_UNWIND_COLUMN (reg);
-	    if (UNWIND_COLUMN_IN_RANGE (reg))
-	      {
-		fs->regs.how[reg] = REG_SAVED_REG;
-	        fs->regs.reg[reg].loc.reg = (_Unwind_Word)reg2;
-	      }
-	  }
-	  break;
-
-	case DW_CFA_remember_state:
-	  {
-	    struct frame_state_reg_info *new_rs;
-	    if (unused_rs)
-	      {
-		new_rs = unused_rs;
-		unused_rs = unused_rs->prev;
-	      }
-	    else
-	      new_rs = alloca (sizeof (struct frame_state_reg_info));
-
-	    *new_rs = fs->regs;
-	    fs->regs.prev = new_rs;
-	  }
-	  break;
-
-	case DW_CFA_restore_state:
-	  {
-	    struct frame_state_reg_info *old_rs = fs->regs.prev;
-	    fs->regs = *old_rs;
-	    old_rs->prev = unused_rs;
-	    unused_rs = old_rs;
-	  }
-	  break;
-
-	case DW_CFA_def_cfa:
-	  insn_ptr = read_uleb128 (insn_ptr, &utmp);
-	  fs->regs.cfa_reg = (_Unwind_Word)utmp;
-	  insn_ptr = read_uleb128 (insn_ptr, &utmp);
-	  fs->regs.cfa_offset = (_Unwind_Word)utmp;
-	  fs->regs.cfa_how = CFA_REG_OFFSET;
-	  break;
-
-	case DW_CFA_def_cfa_register:
-	  insn_ptr = read_uleb128 (insn_ptr, &utmp);
-	  fs->regs.cfa_reg = (_Unwind_Word)utmp;
-	  fs->regs.cfa_how = CFA_REG_OFFSET;
-	  break;
-
-	case DW_CFA_def_cfa_offset:
-	  insn_ptr = read_uleb128 (insn_ptr, &utmp);
-	  fs->regs.cfa_offset = utmp;
-	  /* cfa_how deliberately not set.  */
-	  break;
-
-	case DW_CFA_def_cfa_expression:
-	  fs->regs.cfa_exp = insn_ptr;
-	  fs->regs.cfa_how = CFA_EXP;
-	  insn_ptr = read_uleb128 (insn_ptr, &utmp);
-	  insn_ptr += utmp;
-	  break;
-
-	case DW_CFA_expression:
-	  insn_ptr = read_uleb128 (insn_ptr, &reg);
-	  reg = DWARF_REG_TO_UNWIND_COLUMN (reg);
-	  if (UNWIND_COLUMN_IN_RANGE (reg))
-	    {
-	      fs->regs.how[reg] = REG_SAVED_EXP;
-	      fs->regs.reg[reg].loc.exp = insn_ptr;
-	    }
-	  insn_ptr = read_uleb128 (insn_ptr, &utmp);
-	  insn_ptr += utmp;
-	  break;
-
-	  /* Dwarf3.  */
-	case DW_CFA_offset_extended_sf:
-	  insn_ptr = read_uleb128 (insn_ptr, &reg);
-	  insn_ptr = read_sleb128 (insn_ptr, &stmp);
-	  offset = stmp * fs->data_align;
-	  reg = DWARF_REG_TO_UNWIND_COLUMN (reg);
-	  if (UNWIND_COLUMN_IN_RANGE (reg))
-	    {
-	      fs->regs.how[reg] = REG_SAVED_OFFSET;
-	      fs->regs.reg[reg].loc.offset = offset;
-	    }
-	  break;
-
-	case DW_CFA_def_cfa_sf:
-	  insn_ptr = read_uleb128 (insn_ptr, &utmp);
-	  fs->regs.cfa_reg = (_Unwind_Word)utmp;
-	  insn_ptr = read_sleb128 (insn_ptr, &stmp);
-	  fs->regs.cfa_offset = (_Unwind_Sword)stmp;
-	  fs->regs.cfa_how = CFA_REG_OFFSET;
-	  fs->regs.cfa_offset *= fs->data_align;
-	  break;
-
-	case DW_CFA_def_cfa_offset_sf:
-	  insn_ptr = read_sleb128 (insn_ptr, &stmp);
-	  fs->regs.cfa_offset = (_Unwind_Sword)stmp;
-	  fs->regs.cfa_offset *= fs->data_align;
-	  /* cfa_how deliberately not set.  */
-	  break;
-
-	case DW_CFA_val_offset:
-	  insn_ptr = read_uleb128 (insn_ptr, &reg);
-	  insn_ptr = read_uleb128 (insn_ptr, &utmp);
-	  offset = (_Unwind_Sword) utmp * fs->data_align;
-	  reg = DWARF_REG_TO_UNWIND_COLUMN (reg);
-	  if (UNWIND_COLUMN_IN_RANGE (reg))
-	    {
-	      fs->regs.how[reg] = REG_SAVED_VAL_OFFSET;
-	      fs->regs.reg[reg].loc.offset = offset;
-	    }
-	  break;
-
-	case DW_CFA_val_offset_sf:
-	  insn_ptr = read_uleb128 (insn_ptr, &reg);
-	  insn_ptr = read_sleb128 (insn_ptr, &stmp);
-	  offset = stmp * fs->data_align;
-	  reg = DWARF_REG_TO_UNWIND_COLUMN (reg);
-	  if (UNWIND_COLUMN_IN_RANGE (reg))
-	    {
-	      fs->regs.how[reg] = REG_SAVED_VAL_OFFSET;
-	      fs->regs.reg[reg].loc.offset = offset;
-	    }
-	  break;
-
-	case DW_CFA_val_expression:
-	  insn_ptr = read_uleb128 (insn_ptr, &reg);
-	  reg = DWARF_REG_TO_UNWIND_COLUMN (reg);
-	  if (UNWIND_COLUMN_IN_RANGE (reg))
-	    {
-	      fs->regs.how[reg] = REG_SAVED_VAL_EXP;
-	      fs->regs.reg[reg].loc.exp = insn_ptr;
-	    }
-	  insn_ptr = read_uleb128 (insn_ptr, &utmp);
-	  insn_ptr += utmp;
-	  break;
-
-	case DW_CFA_GNU_window_save:
-#if defined (__aarch64__) && !defined (__ILP32__)
-	  /* This CFA is multiplexed with Sparc.  On AArch64 it's used to toggle
-	     return address signing status.  */
-	  reg = DWARF_REGNUM_AARCH64_RA_STATE;
-	  gcc_assert (fs->regs.how[reg] == REG_UNSAVED);
-	  fs->regs.reg[reg].loc.offset ^= 1;
-#else
-	  /* ??? Hardcoded for SPARC register window configuration.  */
-	  if (__LIBGCC_DWARF_FRAME_REGISTERS__ >= 32)
-	    for (reg = 16; reg < 32; ++reg)
-	      {
-		fs->regs.how[reg] = REG_SAVED_OFFSET;
-		fs->regs.reg[reg].loc.offset = (reg - 16) * sizeof (void *);
-	      }
-#endif
-	  break;
-
-	case DW_CFA_GNU_args_size:
-	  insn_ptr = read_uleb128 (insn_ptr, &utmp);
-	  context->args_size = (_Unwind_Word)utmp;
-	  break;
-
-	case DW_CFA_GNU_negative_offset_extended:
-	  /* Obsoleted by DW_CFA_offset_extended_sf, but used by
-	     older PowerPC code.  */
-	  insn_ptr = read_uleb128 (insn_ptr, &reg);
-	  insn_ptr = read_uleb128 (insn_ptr, &utmp);
-	  offset = (_Unwind_Word) utmp * fs->data_align;
-	  reg = DWARF_REG_TO_UNWIND_COLUMN (reg);
-	  if (UNWIND_COLUMN_IN_RANGE (reg))
-	    {
-	      fs->regs.how[reg] = REG_SAVED_OFFSET;
-	      fs->regs.reg[reg].loc.offset = -offset;
-	    }
-	  break;
-
-	default:
-	  gcc_unreachable ();
-	}
-    }
+  if (fs->data_align == __LIBGCC_DWARF_CIE_DATA_ALIGNMENT__
+      && fs->code_align == 1)
+    execute_cfa_program_specialized (insn_ptr, insn_end, context, fs);
+  else
+    execute_cfa_program_generic (insn_ptr, insn_end, context, fs);
 }
+
 
 /* Given the _Unwind_Context CONTEXT for a stack frame, look up the FDE for
    its caller and decode it into FS.  This function also sets the
@@ -1387,7 +1141,7 @@ static inline void
 _Unwind_SetSpColumn (struct _Unwind_Context *context, void *cfa,
 		     _Unwind_SpTmp *tmp_sp)
 {
-  int size = dwarf_reg_size_table[__builtin_dwarf_sp_column ()];
+  int size = dwarf_reg_size (__builtin_dwarf_sp_column ());
 
   if (size == sizeof(_Unwind_Ptr))
     tmp_sp->ptr = (_Unwind_Ptr) cfa;
@@ -1573,11 +1327,13 @@ uw_advance_context (struct _Unwind_Context *context, _Unwind_FrameState *fs)
     }									   \
   while (0)
 
+#ifndef __LIBGCC_DWARF_REG_SIZES_CONSTANT__
 static inline void
 init_dwarf_reg_size_table (void)
 {
   __builtin_init_dwarf_reg_size_table (dwarf_reg_size_table);
 }
+#endif
 
 static void __attribute__((noinline))
 uw_init_context_1 (struct _Unwind_Context *context,
@@ -1596,16 +1352,18 @@ uw_init_context_1 (struct _Unwind_Context *context,
   code = uw_frame_state_for (context, &fs);
   gcc_assert (code == _URC_NO_REASON);
 
-#if __GTHREADS
+#ifndef __LIBGCC_DWARF_REG_SIZES_CONSTANT__
+# if __GTHREADS
   {
     static __gthread_once_t once_regsizes = __GTHREAD_ONCE_INIT;
     if (__gthread_once (&once_regsizes, init_dwarf_reg_size_table) != 0
 	&& dwarf_reg_size_table[0] == 0)
       init_dwarf_reg_size_table ();
   }
-#else
+# else
   if (dwarf_reg_size_table[0] == 0)
     init_dwarf_reg_size_table ();
+# endif
 #endif
 
   /* Force the frame state to use the known cfa value.  */
@@ -1682,20 +1440,20 @@ uw_install_context_1 (struct _Unwind_Context *current,
 	{
 	  _Unwind_Word w;
 	  _Unwind_Ptr p;
-	  if (dwarf_reg_size_table[i] == sizeof (_Unwind_Word))
+	  if (dwarf_reg_size (i) == sizeof (_Unwind_Word))
 	    {
 	      w = (_Unwind_Internal_Ptr) t;
 	      memcpy (c, &w, sizeof (_Unwind_Word));
 	    }
 	  else
 	    {
-	      gcc_assert (dwarf_reg_size_table[i] == sizeof (_Unwind_Ptr));
+	      gcc_assert (dwarf_reg_size (i) == sizeof (_Unwind_Ptr));
 	      p = (_Unwind_Internal_Ptr) t;
 	      memcpy (c, &p, sizeof (_Unwind_Ptr));
 	    }
 	}
       else if (t && c && t != c)
-	memcpy (c, t, dwarf_reg_size_table[i]);
+	memcpy (c, t, dwarf_reg_size (i));
     }
 
   /* If the current frame doesn't have a saved stack pointer, then we
