@@ -43,13 +43,9 @@
 
 /* IBM 128-bit floating point.  */
 FRACTIONAL_FLOAT_MODE (IF, FLOAT_PRECISION_IFmode, 16, ibm_extended_format);
-ADJUST_PRECISION(IF, FLOAT128_IBM_P (TFmode) \
-		 ? FLOAT_PRECISION_TFmode : FLOAT_PRECISION_IFmode);
 
 /* Explicit IEEE 128-bit floating point.  */
 FRACTIONAL_FLOAT_MODE (KF, FLOAT_PRECISION_KFmode, 16, ieee_quad_format);
-ADJUST_PRECISION(KF, FLOAT128_IEEE_P (TFmode) \
-		 ? FLOAT_PRECISION_TFmode : FLOAT_PRECISION_KFmode);
 
 /* 128-bit floating point, either IBM 128-bit or IEEE 128-bit.  This is
    adjusted in rs6000_option_override_internal to be the appropriate floating
