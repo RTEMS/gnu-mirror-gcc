@@ -77,8 +77,6 @@ struct mode_data
 				   adjustment */
   bool need_bytesize_adj;	/* true if this mode needs dynamic size
 				   adjustment */
-  bool need_precision_adj;	/* true if this mode needs dynamic precision
-				   adjustment */
   unsigned int int_n;		/* If nonzero, then __int<INT_N> will be defined */
   bool boolean;
 };
@@ -91,7 +89,7 @@ static const struct mode_data blank_mode = {
   0, "<unknown>", MAX_MODE_CLASS,
   0, -1U, -1U, -1U, -1U,
   0, 0, 0, 0, 0, 0,
-  "<unknown>", 0, 0, 0, 0, false, false, false, 0,
+  "<unknown>", 0, 0, 0, 0, false, false, 0,
   false
 };
 
@@ -116,7 +114,6 @@ static struct mode_adjust *adj_alignment;
 static struct mode_adjust *adj_format;
 static struct mode_adjust *adj_ibit;
 static struct mode_adjust *adj_fbit;
-static struct mode_adjust *adj_precision;
 
 /* Mode class operations.  */
 static enum mode_class
@@ -825,7 +822,6 @@ make_vector_mode (enum mode_class bclass,
 #define ADJUST_FLOAT_FORMAT(M, X)    _ADD_ADJUST (format, M, X, FLOAT, FLOAT)
 #define ADJUST_IBIT(M, X)  _ADD_ADJUST (ibit, M, X, ACCUM, UACCUM)
 #define ADJUST_FBIT(M, X)  _ADD_ADJUST (fbit, M, X, FRACT, UACCUM)
-#define ADJUST_PRECISION(M, X)  _ADD_ADJUST (precision, M, X, FLOAT, FLOAT)
 
 static int bits_per_unit;
 static int max_bitsize_mode_any_int;
@@ -1216,8 +1212,7 @@ extern __inline__ __attribute__((__always_inline__, __gnu_inline__))\n\
 unsigned short\n\
 mode_unit_precision_inline (machine_mode mode)\n\
 {\n\
-  extern CONST_MODE_PRECISION unsigned short \n\
-    mode_unit_precision[NUM_MACHINE_MODES];\n\
+  extern const unsigned short mode_unit_precision[NUM_MACHINE_MODES];\n\
   gcc_assert (mode >= 0 && mode < NUM_MACHINE_MODES);\n\
   switch (mode)\n\
     {");
@@ -1365,8 +1360,7 @@ enum machine_mode\n{");
 
   /* I can't think of a better idea, can you?  */
   printf ("#define CONST_MODE_NUNITS%s\n", adj_nunits ? "" : " const");
-  printf ("#define CONST_MODE_PRECISION%s\n",
-	  adj_precision || adj_nunits ? "" : " const");
+  printf ("#define CONST_MODE_PRECISION%s\n", adj_nunits ? "" : " const");
   printf ("#define CONST_MODE_SIZE%s\n",
 	  adj_bytesize || adj_nunits ? "" : " const");
   printf ("#define CONST_MODE_UNIT_SIZE%s\n", adj_bytesize ? "" : " const");
@@ -1485,7 +1479,7 @@ emit_mode_precision (void)
   struct mode_data *m;
 
   print_maybe_const_decl ("%spoly_uint16_pod", "mode_precision",
-			  "NUM_MACHINE_MODES", adj_precision || adj_nunits);
+			  "NUM_MACHINE_MODES", adj_nunits);
 
   for_all_modes (c, m)
     if (m->precision != (unsigned int)-1)
@@ -1705,8 +1699,7 @@ emit_mode_unit_precision (void)
   int c;
   struct mode_data *m;
 
-  print_maybe_const_decl ("%sunsigned short", "mode_unit_precision",
-			  "NUM_MACHINE_MODES", adj_precision);
+  print_decl ("unsigned short", "mode_unit_precision", "NUM_MACHINE_MODES");
 
   for_all_modes (c, m)
     {
@@ -1969,46 +1962,6 @@ emit_mode_adjustments (void)
   for (a = adj_format; a; a = a->next)
     printf ("\n  /* %s:%d */\n  REAL_MODE_FORMAT (E_%smode) = %s;\n",
 	    a->file, a->line, a->mode->name, a->adjustment);
-
-
-  /* Precision adjustments propagate too.  */
-  for (a = adj_precision; a; a = a->next)
-    {
-      printf ("\n  /* %s:%d */\n  s = %s;\n",
-	      a->file, a->line, a->adjustment);
-      printf ("  mode_unit_precision[E_%smode] = s;\n", a->mode->name);
-
-      for (m = a->mode->contained; m; m = m->next_cont)
-	{
-	  switch (m->cl)
-	    {
-	    case MODE_COMPLEX_INT:
-	    case MODE_COMPLEX_FLOAT:
-	      printf ("  mode_unit_precision[E_%smode] = s;\n", m->name);
-	      break;
-
-	    case MODE_VECTOR_BOOL:
-	      /* Changes to BImode should not affect vector booleans.  */
-	      break;
-
-	    case MODE_VECTOR_INT:
-	    case MODE_VECTOR_FLOAT:
-	    case MODE_VECTOR_FRACT:
-	    case MODE_VECTOR_UFRACT:
-	    case MODE_VECTOR_ACCUM:
-	    case MODE_VECTOR_UACCUM:
-	      printf ("  mode_unit_precision[E_%smode] = %d*s;\n",
-		      m->name, m->ncomponents);
-	      break;
-
-	    default:
-	      internal_error (
-	      "mode %s is neither vector nor complex but contains %s",
-	      m->name, a->mode->name);
-	      /* NOTREACHED */
-	    }
-	}
-    }
 
   puts ("}");
 }

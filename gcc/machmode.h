@@ -27,7 +27,7 @@ extern CONST_MODE_PRECISION poly_uint16_pod mode_precision[NUM_MACHINE_MODES];
 extern const unsigned char mode_inner[NUM_MACHINE_MODES];
 extern CONST_MODE_NUNITS poly_uint16_pod mode_nunits[NUM_MACHINE_MODES];
 extern CONST_MODE_UNIT_SIZE unsigned char mode_unit_size[NUM_MACHINE_MODES];
-extern CONST_MODE_PRECISION unsigned short mode_unit_precision[NUM_MACHINE_MODES];
+extern const unsigned short mode_unit_precision[NUM_MACHINE_MODES];
 extern const unsigned char mode_next[NUM_MACHINE_MODES];
 extern const unsigned char mode_wider[NUM_MACHINE_MODES];
 extern const unsigned char mode_2xwider[NUM_MACHINE_MODES];
