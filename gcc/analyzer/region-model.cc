@@ -74,6 +74,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "calls.h"
 #include "is-a.h"
 #include "gcc-rich-location.h"
+#include "analyzer/checker-event.h"
+#include "analyzer/checker-path.h"
 
 #if ENABLE_ANALYZER
 
@@ -1002,11 +1004,13 @@ due_to_ifn_deferred_init_p (const gassign *assign_stmt)
 
 /* Check for SVAL being poisoned, adding a warning to CTXT.
    Return SVAL, or, if a warning is added, another value, to avoid
-   repeatedly complaining about the same poisoned value in followup code.  */
+   repeatedly complaining about the same poisoned value in followup code.
+   SRC_REGION is a hint about where SVAL came from, and can be NULL.  */
 
 const svalue *
 region_model::check_for_poison (const svalue *sval,
 				tree expr,
+				const region *src_region,
 				region_model_context *ctxt) const
 {
   if (!ctxt)
@@ -1044,8 +1048,7 @@ region_model::check_for_poison (const svalue *sval,
 	 the tree other than via the def stmts, using
 	 fixup_tree_for_diagnostic.  */
       tree diag_arg = fixup_tree_for_diagnostic (expr);
-      const region *src_region = NULL;
-      if (pkind == POISON_KIND_UNINIT)
+      if (src_region == NULL && pkind == POISON_KIND_UNINIT)
 	src_region = get_region_for_poisoned_expr (expr);
       if (ctxt->warn (make_unique<poisoned_value_diagnostic> (diag_arg,
 							      pkind,
@@ -1098,7 +1101,7 @@ region_model::on_assignment (const gassign *assign, region_model_context *ctxt)
   if (const svalue *sval = get_gassign_result (assign, ctxt))
     {
       tree expr = get_diagnostic_tree_for_gassign (assign);
-      check_for_poison (sval, expr, ctxt);
+      check_for_poison (sval, expr, NULL, ctxt);
       set_value (lhs_reg, sval, ctxt);
       return;
     }
@@ -2225,7 +2228,7 @@ region_model::get_rvalue (path_var pv, region_model_context *ctxt) const
 
   assert_compat_types (result_sval->get_type (), TREE_TYPE (pv.m_tree));
 
-  result_sval = check_for_poison (result_sval, pv.m_tree, ctxt);
+  result_sval = check_for_poison (result_sval, pv.m_tree, NULL, ctxt);
 
   return result_sval;
 }
@@ -2319,6 +2322,10 @@ const svalue *
 region_model::get_store_value (const region *reg,
 			       region_model_context *ctxt) const
 {
+  /* Getting the value of an empty region gives an unknown_svalue.  */
+  if (reg->empty_p ())
+    return m_mgr->get_or_create_unknown_svalue (reg->get_type ());
+
   check_region_for_read (reg, ctxt);
 
   /* Special-case: handle var_decls in the constant pool.  */
@@ -2777,12 +2784,14 @@ class dubious_allocation_size
 {
 public:
   dubious_allocation_size (const region *lhs, const region *rhs)
-  : m_lhs (lhs), m_rhs (rhs), m_expr (NULL_TREE)
+  : m_lhs (lhs), m_rhs (rhs), m_expr (NULL_TREE),
+    m_has_allocation_event (false)
   {}
 
   dubious_allocation_size (const region *lhs, const region *rhs,
 			   tree expr)
-  : m_lhs (lhs), m_rhs (rhs), m_expr (expr)
+  : m_lhs (lhs), m_rhs (rhs), m_expr (expr),
+    m_has_allocation_event (false)
   {}
 
   const char *get_kind () const final override
@@ -2811,34 +2820,17 @@ public:
 			 " of the pointee's size");
   }
 
-  label_text
-  describe_region_creation_event (const evdesc::region_creation &ev) final
-  override
-  {
-    m_allocation_event = &ev;
-    if (m_expr)
-      {
-	if (TREE_CODE (m_expr) == INTEGER_CST)
-	  return ev.formatted_print ("allocated %E bytes here", m_expr);
-	else
-	  return ev.formatted_print ("allocated %qE bytes here", m_expr);
-      }
-
-    return ev.formatted_print ("allocated here");
-  }
-
   label_text describe_final_event (const evdesc::final_event &ev) final
   override
   {
     tree pointee_type = TREE_TYPE (m_lhs->get_type ());
-    if (m_allocation_event)
-      /* Fallback: Typically, we should always
-	 see an m_allocation_event before.  */
+    if (m_has_allocation_event)
       return ev.formatted_print ("assigned to %qT here;"
 				 " %<sizeof (%T)%> is %qE",
 				 m_lhs->get_type (), pointee_type,
 				 size_in_bytes (pointee_type));
-
+    /* Fallback: Typically, we should always see an allocation_event
+       before.  */
     if (m_expr)
       {
 	if (TREE_CODE (m_expr) == INTEGER_CST)
@@ -2859,6 +2851,18 @@ public:
 			       size_in_bytes (pointee_type));
   }
 
+  void
+  add_region_creation_events (const region *,
+			      tree capacity,
+			      const event_loc_info &loc_info,
+			      checker_path &emission_path) final override
+  {
+    emission_path.add_event
+      (make_unique<region_creation_event_allocation_size> (capacity, loc_info));
+
+    m_has_allocation_event = true;
+  }
+
   void mark_interesting_stuff (interesting_t *interest) final override
   {
     interest->add_region_creation (m_rhs);
@@ -2868,7 +2872,7 @@ private:
   const region *m_lhs;
   const region *m_rhs;
   const tree m_expr;
-  const evdesc::region_creation *m_allocation_event;
+  bool m_has_allocation_event;
 };
 
 /* Return true on dubious allocation sizes for constant sizes.  */
@@ -3159,6 +3163,10 @@ region_model::set_value (const region *lhs_reg, const svalue *rhs_sval,
 {
   gcc_assert (lhs_reg);
   gcc_assert (rhs_sval);
+
+  /* Setting the value of an empty region is a no-op.  */
+  if (lhs_reg->empty_p ())
+    return;
 
   check_region_size (lhs_reg, rhs_sval, ctxt);
 
@@ -4386,11 +4394,13 @@ region_model::apply_constraints_for_exception (const gimple *last_stmt,
    PARAM has a defined but unknown initial value.
    Anything it points to has escaped, since the calling context "knows"
    the pointer, and thus calls to unknown functions could read/write into
-   the region.  */
+   the region.
+   If NONNULL is true, then assume that PARAM must be non-NULL.  */
 
 void
 region_model::on_top_level_param (tree param,
-				   region_model_context *ctxt)
+				  bool nonnull,
+				  region_model_context *ctxt)
 {
   if (POINTER_TYPE_P (TREE_TYPE (param)))
     {
@@ -4399,6 +4409,12 @@ region_model::on_top_level_param (tree param,
 	= m_mgr->get_or_create_initial_value (param_reg);
       const region *pointee_reg = m_mgr->get_symbolic_region (init_ptr_sval);
       m_store.mark_as_escaped (pointee_reg);
+      if (nonnull)
+	{
+	  const svalue *null_ptr_sval
+	    = m_mgr->get_or_create_null_ptr (TREE_TYPE (param));
+	  add_constraint (init_ptr_sval, NE_EXPR, null_ptr_sval, ctxt);
+	}
     }
 }
 
@@ -4454,14 +4470,27 @@ region_model::push_frame (function *fun, const vec<const svalue *> *arg_svals,
 	 have defined but unknown initial values.
 	 Anything they point to has escaped.  */
       tree fndecl = fun->decl;
+
+      /* Handle "__attribute__((nonnull))".   */
+      tree fntype = TREE_TYPE (fndecl);
+      bitmap nonnull_args = get_nonnull_args (fntype);
+
+      unsigned parm_idx = 0;
       for (tree iter_parm = DECL_ARGUMENTS (fndecl); iter_parm;
 	   iter_parm = DECL_CHAIN (iter_parm))
 	{
+	  bool non_null = (nonnull_args
+			   ? (bitmap_empty_p (nonnull_args)
+			      || bitmap_bit_p (nonnull_args, parm_idx))
+			   : false);
 	  if (tree parm_default_ssa = ssa_default_def (fun, iter_parm))
-	    on_top_level_param (parm_default_ssa, ctxt);
+	    on_top_level_param (parm_default_ssa, non_null, ctxt);
 	  else
-	    on_top_level_param (iter_parm, ctxt);
+	    on_top_level_param (iter_parm, non_null, ctxt);
+	  parm_idx++;
 	}
+
+      BITMAP_FREE (nonnull_args);
     }
 
   return m_current_frame;
@@ -4876,7 +4905,7 @@ region_model::get_or_create_region_for_heap_alloc (const svalue *size_in_bytes,
   /* Determine which regions are referenced in this region_model, so that
      we can reuse an existing heap_allocated_region if it's not in use on
      this path.  */
-  auto_sbitmap base_regs_in_use (m_mgr->get_num_regions ());
+  auto_bitmap base_regs_in_use;
   get_referenced_base_regions (base_regs_in_use);
   const region *reg
     = m_mgr->get_or_create_region_for_heap_alloc (base_regs_in_use);
@@ -4889,7 +4918,7 @@ region_model::get_or_create_region_for_heap_alloc (const svalue *size_in_bytes,
    reachable in this region_model.  */
 
 void
-region_model::get_referenced_base_regions (auto_sbitmap &out_ids) const
+region_model::get_referenced_base_regions (auto_bitmap &out_ids) const
 {
   reachable_regions reachable_regs (const_cast<region_model *> (this));
   m_store.for_each_cluster (reachable_regions::init_cluster_cb,

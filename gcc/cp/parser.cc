@@ -2342,7 +2342,7 @@ static tree cp_parser_c_for
 static tree cp_parser_range_for
   (cp_parser *, tree, tree, tree, bool, unsigned short, bool);
 static void do_range_for_auto_deduction
-  (tree, tree);
+  (tree, tree, tree, unsigned int);
 static tree cp_parser_perform_range_for_lookup
   (tree, tree *, tree *);
 static tree cp_parser_range_for_member_function
@@ -10224,7 +10224,10 @@ cp_parser_binary_expression (cp_parser* parser, bool cast_p,
 		      || (TREE_CODE (TREE_TYPE (TREE_OPERAND (current.lhs, 0)))
 			  != BOOLEAN_TYPE))))
 	  /* Avoid warning for !!b == y where b is boolean.  */
-	  && (!DECL_P (tree_strip_any_location_wrapper (current.lhs))
+	  && (!(DECL_P (tree_strip_any_location_wrapper (current.lhs))
+		|| (TREE_CODE (current.lhs) == NON_LVALUE_EXPR
+		    && DECL_P (tree_strip_any_location_wrapper
+					    (TREE_OPERAND (current.lhs, 0)))))
 	      || TREE_TYPE (current.lhs) == NULL_TREE
 	      || TREE_CODE (TREE_TYPE (current.lhs)) != BOOLEAN_TYPE))
 	warn_logical_not_parentheses (current.loc, current.tree_type,
@@ -13668,7 +13671,8 @@ cp_parser_range_for (cp_parser *parser, tree scope, tree init, tree range_decl,
       if (!type_dependent_expression_p (range_expr)
 	  /* do_auto_deduction doesn't mess with template init-lists.  */
 	  && !BRACE_ENCLOSED_INITIALIZER_P (range_expr))
-	do_range_for_auto_deduction (range_decl, range_expr);
+	do_range_for_auto_deduction (range_decl, range_expr, decomp_first_name,
+				     decomp_cnt);
     }
   else
     {
@@ -13707,7 +13711,8 @@ build_range_temp (tree range_expr)
    a shortcut version of cp_convert_range_for.  */
 
 static void
-do_range_for_auto_deduction (tree decl, tree range_expr)
+do_range_for_auto_deduction (tree decl, tree range_expr,
+			     tree decomp_first_name, unsigned int decomp_cnt)
 {
   tree auto_node = type_uses_auto (TREE_TYPE (decl));
   if (auto_node)
@@ -13727,6 +13732,8 @@ do_range_for_auto_deduction (tree decl, tree range_expr)
 						iter_decl, auto_node,
 						tf_warning_or_error,
 						adc_variable_type);
+	  if (VAR_P (decl) && DECL_DECOMPOSITION_P (decl))
+	    cp_finish_decomp (decl, decomp_first_name, decomp_cnt);
 	}
     }
 }
@@ -21666,6 +21673,13 @@ cp_parser_using_declaration (cp_parser* parser,
 
   cp_warn_deprecated_use_scopes (qscope);
 
+  if (access_declaration_p
+      && !MAYBE_CLASS_TYPE_P (qscope)
+      && TREE_CODE (qscope) != ENUMERAL_TYPE)
+    /* If the qualifying scope of an access-declaration isn't a class
+       or enumeration type then it can't be valid.  */
+    cp_parser_simulate_error (parser);
+
   if (access_declaration_p && cp_parser_error_occurred (parser))
     /* Something has already gone wrong; there's no need to parse
        further.  Since an error has occurred, the return value of
@@ -21694,7 +21708,36 @@ cp_parser_using_declaration (cp_parser* parser,
 	pedwarn (ell->location, OPT_Wc__17_extensions,
 		 "pack expansion in using-declaration only available "
 		 "with %<-std=c++17%> or %<-std=gnu++17%>");
-      qscope = make_pack_expansion (qscope);
+
+      /* A parameter pack can appear in the qualifying scope, and/or in the
+	 terminal name (if naming a conversion function).  Logically they're
+	 part of a single pack expansion of the overall USING_DECL, but we
+	 express them as separate pack expansions within the USING_DECL since
+	 we can't create a pack expansion over a USING_DECL.  */
+      bool saw_parm_pack = false;
+      if (uses_parameter_packs (qscope))
+	{
+	  qscope = make_pack_expansion (qscope);
+	  saw_parm_pack = true;
+	}
+      if (identifier_p (identifier)
+	  && IDENTIFIER_CONV_OP_P (identifier)
+	  && uses_parameter_packs (TREE_TYPE (identifier)))
+	{
+	  identifier = make_conv_op_name (make_pack_expansion
+					  (TREE_TYPE (identifier)));
+	  saw_parm_pack = true;
+	}
+      if (!saw_parm_pack)
+	{
+	  /* Issue an error in terms using a SCOPE_REF that includes both
+	     components.  */
+	  tree name
+	    = build_qualified_name (NULL_TREE, qscope, identifier, false);
+	  make_pack_expansion (name);
+	  gcc_assert (seen_error ());
+	  qscope = identifier = error_mark_node;
+	}
     }
 
   /* The function we call to handle a using-declaration is different
@@ -25441,6 +25484,7 @@ cp_parser_braced_list (cp_parser* parser, bool* non_constant_p)
   location_t finish_loc = cp_lexer_peek_token (parser->lexer)->location;
   braces.require_close (parser);
   TREE_TYPE (initializer) = init_list_type_node;
+  recompute_constructor_flags (initializer);
 
   cp_expr result (initializer);
   /* Build a location of the form:
@@ -42994,15 +43038,21 @@ cp_convert_omp_range_for (tree &this_pre_body, vec<tree, va_gc> *for_block,
 	  && !BRACE_ENCLOSED_INITIALIZER_P (init))
 	{
 	  tree d = decl;
+	  tree decomp_first_name = NULL_TREE;
+	  unsigned decomp_cnt = 0;
 	  if (decl != error_mark_node && DECL_HAS_VALUE_EXPR_P (decl))
 	    {
 	      tree v = DECL_VALUE_EXPR (decl);
 	      if (TREE_CODE (v) == ARRAY_REF
 		  && VAR_P (TREE_OPERAND (v, 0))
 		  && DECL_DECOMPOSITION_P (TREE_OPERAND (v, 0)))
-		d = TREE_OPERAND (v, 0);
+		{
+		  d = TREE_OPERAND (v, 0);
+		  decomp_cnt = tree_to_uhwi (TREE_OPERAND (v, 1)) + 1;
+		  decomp_first_name = decl;
+		}
 	    }
-	  do_range_for_auto_deduction (d, init);
+	  do_range_for_auto_deduction (d, init, decomp_first_name, decomp_cnt);
 	}
       cond = global_namespace;
       incr = NULL_TREE;
@@ -43116,8 +43166,16 @@ cp_convert_omp_range_for (tree &this_pre_body, vec<tree, va_gc> *for_block,
       tree t = build_x_indirect_ref (input_location, begin, RO_UNARY_STAR,
 				     NULL_TREE, tf_none);
       if (!error_operand_p (t))
-	TREE_TYPE (orig_decl) = do_auto_deduction (TREE_TYPE (orig_decl),
-						   t, auto_node);
+	{
+	  TREE_TYPE (orig_decl) = do_auto_deduction (TREE_TYPE (orig_decl),
+						     t, auto_node);
+	  if (decomp_first_name)
+	    {
+	      ++processing_template_decl;
+	      cp_finish_decomp (orig_decl, decomp_first_name, decomp_cnt);
+	      --processing_template_decl;
+	    }
+	}
     }
 
   tree v = make_tree_vec (decomp_cnt + 3);

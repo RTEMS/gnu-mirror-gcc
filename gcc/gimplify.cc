@@ -1,6 +1,6 @@
 /* Tree lowering pass.  This pass converts the GENERIC functions-as-trees
    tree representation into the GIMPLE form.
-   Copyright (C) 2002-2022 Free Software Foundation, Inc.
+   Copyright (C) 2002-2023 Free Software Foundation, Inc.
    Major work done by Sebastian Pop <s.pop@laposte.net>,
    Diego Novillo <dnovillo@redhat.com> and Jason Merrill <jason@redhat.com>.
 
@@ -15233,6 +15233,7 @@ computable_teams_clause (tree *tp, int *walk_subtrees, void *)
    0 stands for clause not specified at all, use implementation default
    -1 stands for value that can't be determined easily before entering
       the target construct.
+   -2 means that no explicit teams construct was specified
    If teams construct is not present at all, use 1 for num_teams
    and 0 for thread_limit (only one team is involved, and the thread
    limit is implementation defined.  */
@@ -15251,7 +15252,7 @@ optimize_target_teams (tree target, gimple_seq *pre_p)
   struct gimplify_omp_ctx *target_ctx = gimplify_omp_ctxp;
 
   if (teams == NULL_TREE)
-    num_teams_upper = integer_one_node;
+    num_teams_upper = build_int_cst (integer_type_node, -2);
   else
     for (c = OMP_TEAMS_CLAUSES (teams); c; c = OMP_CLAUSE_CHAIN (c))
       {
@@ -17097,6 +17098,9 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 		 Compare scalar mode aggregates as scalar mode values.  Using
 		 memcmp for them would be very inefficient at best, and is
 		 plain wrong if bitfields are involved.  */
+	      if (error_operand_p (TREE_OPERAND (*expr_p, 1)))
+		ret = GS_ERROR;
+	      else
 		{
 		  tree type = TREE_TYPE (TREE_OPERAND (*expr_p, 1));
 
@@ -17121,9 +17125,8 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 		    ret = gimplify_scalar_mode_aggregate_compare (expr_p);
 		  else
 		    ret = gimplify_variable_sized_compare (expr_p);
-
-		  break;
 		}
+	      break;
 
 	    /* If *EXPR_P does not need to be special-cased, handle it
 	       according to its class.  */

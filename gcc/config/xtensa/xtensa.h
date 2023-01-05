@@ -19,27 +19,12 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 /* Get Xtensa configuration settings */
-#include "xtensa-config.h"
+#include "xtensa-dynconfig.h"
 
 /* External variables defined in xtensa.cc.  */
 
 /* Macros used in the machine description to select various Xtensa
    configuration options.  */
-#ifndef XCHAL_HAVE_MUL32_HIGH
-#define XCHAL_HAVE_MUL32_HIGH 0
-#endif
-#ifndef XCHAL_HAVE_RELEASE_SYNC
-#define XCHAL_HAVE_RELEASE_SYNC 0
-#endif
-#ifndef XCHAL_HAVE_S32C1I
-#define XCHAL_HAVE_S32C1I 0
-#endif
-#ifndef XCHAL_HAVE_THREADPTR
-#define XCHAL_HAVE_THREADPTR 0
-#endif
-#ifndef XCHAL_HAVE_FP_POSTINC
-#define XCHAL_HAVE_FP_POSTINC 0
-#endif
 #define TARGET_BIG_ENDIAN	XCHAL_HAVE_BE
 #define TARGET_DENSITY		XCHAL_HAVE_DENSITY
 #define TARGET_MAC16		XCHAL_HAVE_MAC16
@@ -63,7 +48,7 @@ along with GCC; see the file COPYING3.  If not see
 #define TARGET_S32C1I		XCHAL_HAVE_S32C1I
 #define TARGET_ABSOLUTE_LITERALS XSHAL_USE_ABSOLUTE_LITERALS
 #define TARGET_THREADPTR	XCHAL_HAVE_THREADPTR
-#define TARGET_LOOPS	        XCHAL_HAVE_LOOPS
+#define TARGET_LOOPS		XCHAL_HAVE_LOOPS
 #define TARGET_WINDOWED_ABI_DEFAULT (XSHAL_ABI == XTHAL_ABI_WINDOWED)
 #define TARGET_WINDOWED_ABI	xtensa_windowed_abi
 #define TARGET_DEBUG		XCHAL_HAVE_DEBUG
@@ -76,7 +61,7 @@ along with GCC; see the file COPYING3.  If not see
 #endif
 
 /* Define this if the target has no hardware divide instructions.  */
-#if !TARGET_DIV32
+#if !__XCHAL_HAVE_DIV32
 #define TARGET_HAS_NO_HW_DIVIDE
 #endif
 
@@ -84,6 +69,7 @@ along with GCC; see the file COPYING3.  If not see
 /* Target CPU builtins.  */
 #define TARGET_CPU_CPP_BUILTINS()					\
   do {									\
+    const char **builtin;						\
     builtin_assert ("cpu=xtensa");					\
     builtin_assert ("machine=xtensa");					\
     builtin_define ("__xtensa__");					\
@@ -93,6 +79,8 @@ along with GCC; see the file COPYING3.  If not see
     builtin_define (TARGET_BIG_ENDIAN ? "__XTENSA_EB__" : "__XTENSA_EL__"); \
     if (!TARGET_HARD_FLOAT)						\
       builtin_define ("__XTENSA_SOFT_FLOAT__");				\
+    for (builtin = xtensa_get_config_strings (); *builtin; ++builtin)	\
+      builtin_define (*builtin);					\
   } while (0)
 
 #define CPP_SPEC " %(subtarget_cpp_spec) "
@@ -298,7 +286,7 @@ extern int leaf_function;
 
 /* Coprocessor registers */
 #define BR_REG_FIRST 18
-#define BR_REG_LAST  18 
+#define BR_REG_LAST  18
 #define BR_REG_NUM   (BR_REG_LAST - BR_REG_FIRST + 1)
 
 /* 16 floating-point registers */
@@ -486,9 +474,9 @@ enum reg_class
 
 /* Symbolic macros for the registers used to return integer, floating
    point, and values of coprocessor and user-defined modes.  */
-#define GP_RETURN (GP_REG_FIRST + 2 + WINDOW_SIZE)
+#define GP_RETURN_FIRST (GP_REG_FIRST + 2 + WINDOW_SIZE)
+#define GP_RETURN_LAST  (GP_RETURN_FIRST + 3)
 #define GP_OUTGOING_RETURN (GP_REG_FIRST + 2)
-#define GP_RETURN_REG_COUNT 4
 
 /* Symbolic macros for the first/last argument registers.  */
 #define GP_ARG_FIRST (GP_REG_FIRST + 2)
@@ -754,7 +742,7 @@ typedef struct xtensa_args
 
 
 /* Define output to appear before the constant pool.  */
-#define ASM_OUTPUT_POOL_PROLOGUE(FILE, FUNNAME, FUNDECL, SIZE)          \
+#define ASM_OUTPUT_POOL_PROLOGUE(FILE, FUNNAME, FUNDECL, SIZE)		\
   do {									\
     if ((SIZE) > 0 || !TARGET_WINDOWED_ABI)				\
       {									\

@@ -162,7 +162,7 @@ public:
   rvalue *
   new_comparison (location *loc,
 		  enum gcc_jit_comparison op,
-		  rvalue *a, rvalue *b);
+		  rvalue *a, rvalue *b, type *vec_result_type);
 
   rvalue *
   new_call (location *loc,
@@ -782,7 +782,7 @@ public:
   vec<location *> m_locations;
 
 private:
-  source_file *m_source_file;
+  source_file *m_source_file ATTRIBUTE_UNUSED;
   int m_line_num;
 };
 
@@ -801,7 +801,7 @@ public:
 
 private:
   recording::location *m_recording_loc;
-  source_line *m_line;
+  source_line *m_line ATTRIBUTE_UNUSED;
   int m_column_num;
 };
 

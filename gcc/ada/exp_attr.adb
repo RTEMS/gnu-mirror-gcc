@@ -23,6 +23,7 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
+with Accessibility;  use Accessibility;
 with Aspects;        use Aspects;
 with Atree;          use Atree;
 with Checks;         use Checks;
@@ -2215,12 +2216,24 @@ package body Exp_Attr is
 
             --  Local declarations
 
-            Enc_Object : constant Node_Id := Enclosing_Object (Ref_Object);
+            Enc_Object : Node_Id := Enclosing_Object (Ref_Object);
 
          --  Start of processing for Access_Cases
 
          begin
             Btyp_DDT := Designated_Type (Btyp);
+
+            --  When Enc_Object is a view conversion then RM 3.10.2 (9)
+            --  applies and we obtain the expression being converted.
+            --  Otherwise we do not dig any deeper since a conversion
+            --  might generate a copy and we can't assume it will be as
+            --  long-lived as the original.
+
+            while Nkind (Enc_Object) = N_Type_Conversion
+              and then Is_View_Conversion (Enc_Object)
+            loop
+               Enc_Object := Expression (Enc_Object);
+            end loop;
 
             --  Handle designated types that come from the limited view
 
@@ -5625,9 +5638,7 @@ package body Exp_Attr is
                          Make_Integer_Literal (Loc, 1))));
 
             else
-               --  Add Boolean parameter True, to request program error if
-               --  we have a bad representation on our hands. If checks are
-               --  suppressed, then add False instead
+               --  Add Boolean parameter depending on check suppression
 
                Append_To (Exprs, Rep_To_Pos_Flag (Ptyp, Loc));
                Rewrite (N,
@@ -5637,13 +5648,13 @@ package body Exp_Attr is
                        (Enum_Pos_To_Rep (Etyp), Loc),
                    Expressions => New_List (
                      Make_Op_Subtract (Loc,
-                    Left_Opnd =>
-                      Make_Function_Call (Loc,
-                        Name =>
-                          New_Occurrence_Of
-                            (TSS (Etyp, TSS_Rep_To_Pos), Loc),
-                          Parameter_Associations => Exprs),
-                    Right_Opnd => Make_Integer_Literal (Loc, 1)))));
+                       Left_Opnd =>
+                         Make_Function_Call (Loc,
+                           Name =>
+                             New_Occurrence_Of
+                               (TSS (Etyp, TSS_Rep_To_Pos), Loc),
+                           Parameter_Associations => Exprs),
+                       Right_Opnd => Make_Integer_Literal (Loc, 1)))));
             end if;
 
             --  Suppress checks since they have all been done above
@@ -6758,9 +6769,7 @@ package body Exp_Attr is
                          Make_Integer_Literal (Loc, 1))));
 
             else
-               --  Add Boolean parameter True, to request program error if
-               --  we have a bad representation on our hands. Add False if
-               --  checks are suppressed.
+               --  Add Boolean parameter depending on check suppression
 
                Append_To (Exprs, Rep_To_Pos_Flag (Ptyp, Loc));
                Rewrite (N,
@@ -6784,7 +6793,8 @@ package body Exp_Attr is
             Analyze_And_Resolve (N, Typ, Suppress => All_Checks);
 
          --  For floating-point, we transform 'Succ into a call to the Succ
-         --  floating-point attribute function in Fat_xxx (xxx is root type)
+         --  floating-point attribute function in Fat_xxx (xxx is root type).
+         --  Note that this function takes care of the overflow case.
 
          elsif Is_Floating_Point_Type (Ptyp) then
             Expand_Fpt_Attribute_R (N);

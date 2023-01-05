@@ -47,6 +47,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "analyzer/program-state.h"
 #include "analyzer/supergraph.h"
 #include "analyzer/analyzer-language.h"
+#include "analyzer/call-details.h"
 #include "analyzer/call-info.h"
 
 #if ENABLE_ANALYZER
@@ -1991,6 +1992,7 @@ fd_state_machine::on_accept (const call_details &cd,
 				  build_int_cst (TREE_TYPE (len_ptr), 0));
       old_len_sval = model->check_for_poison (old_len_sval,
 					      star_len_ptr,
+					      len_reg,
 					      cd.get_ctxt ());
       if (successful)
 	{

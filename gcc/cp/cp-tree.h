@@ -235,8 +235,6 @@ enum cp_tree_index
 
     CPTI_PSEUDO_CONTRACT_VIOLATION,
 
-    CPTI_SOURCE_LOCATION_IMPL,
-
     CPTI_FALLBACK_DFLOAT32_TYPE,
     CPTI_FALLBACK_DFLOAT64_TYPE,
     CPTI_FALLBACK_DFLOAT128_TYPE,
@@ -394,9 +392,6 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
 
 /* A node which matches any template argument.  */
 #define any_targ_node			cp_global_trees[CPTI_ANY_TARG]
-
-/* std::source_location::__impl class.  */
-#define source_location_impl		cp_global_trees[CPTI_SOURCE_LOCATION_IMPL]
 
 /* Node to indicate default access. This must be distinct from the
    access nodes in tree.h.  */
@@ -7061,6 +7056,7 @@ extern tree maybe_set_retval_sentinel		(void);
 extern tree template_parms_to_args		(tree);
 extern tree template_parms_level_to_args	(tree);
 extern tree generic_targs_for			(tree);
+extern tree outer_template_args			(tree);
 
 /* in expr.cc */
 extern tree cplus_expand_constant		(tree);
@@ -7087,6 +7083,7 @@ extern void set_global_friend			(tree);
 extern bool is_global_friend			(tree);
 
 /* in init.cc */
+extern tree find_temps_r			(tree *, int *, void *);
 extern tree expand_member_init			(tree);
 extern void emit_mem_initializers		(tree);
 extern tree build_aggr_init			(tree, tree, int,
@@ -8295,7 +8292,8 @@ extern tree process_stmt_hotness_attribute	(tree, location_t);
 extern tree build_assume_call			(location_t, tree);
 extern tree process_stmt_assume_attribute	(tree, tree, location_t);
 extern bool simple_empty_class_p		(tree, tree, tree_code);
-extern tree fold_builtin_source_location	(location_t);
+extern tree fold_builtin_source_location	(const_tree);
+extern tree get_source_location_impl_type	();
 
 /* in name-lookup.cc */
 extern tree strip_using_decl                    (tree);
@@ -8472,6 +8470,7 @@ extern bool is_rvalue_constant_expression (tree);
 extern bool is_nondependent_constant_expression (tree);
 extern bool is_nondependent_static_init_expression (tree);
 extern bool is_static_init_expression    (tree);
+extern bool is_std_allocator (tree);
 extern bool potential_rvalue_constant_expression (tree);
 extern bool require_potential_constant_expression (tree);
 extern bool require_constant_expression (tree);

@@ -92,6 +92,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "i386-options.h"
 #include "i386-builtins.h"
 #include "i386-expand.h"
+#include "asan.h"
 
 /* Split one or more double-mode RTL references into pairs of half-mode
    references.  The RTL can be REG, offsettable MEM, integer constant, or
@@ -1773,9 +1774,9 @@ ix86_split_convert_uns_si_sse (rtx operands[])
       input = gen_rtx_REG (vecmode, REGNO (input));
       emit_move_insn (value, CONST0_RTX (vecmode));
       if (vecmode == V4SFmode)
-	emit_insn (gen_sse_movss (value, value, input));
+	emit_insn (gen_sse_movss_v4sf (value, value, input));
       else
-	emit_insn (gen_sse2_movsd (value, value, input));
+	emit_insn (gen_sse2_movsd_v2df (value, value, input));
     }
 
   emit_move_insn (large, two31);
@@ -3283,8 +3284,8 @@ ix86_expand_int_movcc (rtx operands[])
 	  || negate_cc_compare_p
 	  || ix86_expand_carry_flag_compare (code, op0, op1, &compare_op))
 	{
-	  /* Detect overlap between destination and compare sources.  */
-	  rtx tmp = out;
+	  /* Place comparison result in its own pseudo.  */
+	  rtx tmp = gen_reg_rtx (mode);
 
 	  if (negate_cc_compare_p)
 	    {
@@ -3294,7 +3295,6 @@ ix86_expand_int_movcc (rtx operands[])
 		emit_insn (gen_x86_negsi_ccc (gen_reg_rtx (SImode),
 					      gen_lowpart (SImode, op0)));
 
-	      tmp = gen_reg_rtx (mode);
 	      if (mode == DImode)
 		emit_insn (gen_x86_movdicc_0_m1_neg (tmp));
 	      else
@@ -3336,9 +3336,6 @@ ix86_expand_int_movcc (rtx operands[])
 		}
 	      diff = ct - cf;
 
-	      if (reg_overlap_mentioned_p (out, compare_op))
-		tmp = gen_reg_rtx (mode);
-
 	      if (mode == DImode)
 		emit_insn (gen_x86_movdicc_0_m1 (tmp, flags, compare_op));
 	      else
@@ -3357,6 +3354,11 @@ ix86_expand_int_movcc (rtx operands[])
 	      tmp = emit_store_flag (tmp, code, op0, op1, VOIDmode, 0, -1);
 	    }
 
+	  /* Add a REG_EQUAL note to allow condition to be shared.  */
+	  rtx note = gen_rtx_fmt_ee (code, mode, op0, op1);
+	  set_unique_reg_note (get_last_insn (), REG_EQUAL,
+			       gen_rtx_NEG (mode, note));
+
 	  if (diff == 1)
 	    {
 	      /*
@@ -3367,9 +3369,8 @@ ix86_expand_int_movcc (rtx operands[])
 	       * Size 5 - 8.
 	       */
 	      if (ct)
-		tmp = expand_simple_binop (mode, PLUS,
-					   tmp, GEN_INT (ct),
-					   copy_rtx (tmp), 1, OPTAB_DIRECT);
+		tmp = expand_simple_binop (mode, PLUS, tmp, GEN_INT (ct),
+					   NULL_RTX, 1, OPTAB_DIRECT);
 	    }
 	  else if (cf == -1)
 	    {
@@ -3380,9 +3381,8 @@ ix86_expand_int_movcc (rtx operands[])
 	       *
 	       * Size 8.
 	       */
-	      tmp = expand_simple_binop (mode, IOR,
-					 tmp, GEN_INT (ct),
-					 copy_rtx (tmp), 1, OPTAB_DIRECT);
+	      tmp = expand_simple_binop (mode, IOR, tmp, GEN_INT (ct),
+					 NULL_RTX, 1, OPTAB_DIRECT);
 	    }
 	  else if (diff == -1 && ct)
 	    {
@@ -3394,11 +3394,10 @@ ix86_expand_int_movcc (rtx operands[])
 	       *
 	       * Size 8 - 11.
 	       */
-	      tmp = expand_simple_unop (mode, NOT, tmp, copy_rtx (tmp), 1);
+	      tmp = expand_simple_unop (mode, NOT, tmp, NULL_RTX, 1);
 	      if (cf)
-		tmp = expand_simple_binop (mode, PLUS,
-					   copy_rtx (tmp), GEN_INT (cf),
-					   copy_rtx (tmp), 1, OPTAB_DIRECT);
+		tmp = expand_simple_binop (mode, PLUS, tmp, GEN_INT (cf),
+					   NULL_RTX, 1, OPTAB_DIRECT);
 	    }
 	  else
 	    {
@@ -3416,22 +3415,18 @@ ix86_expand_int_movcc (rtx operands[])
 		{
 		  cf = ct;
 		  ct = 0;
-		  tmp = expand_simple_unop (mode, NOT, tmp, copy_rtx (tmp), 1);
+		  tmp = expand_simple_unop (mode, NOT, tmp, NULL_RTX, 1);
 		}
 
-	      tmp = expand_simple_binop (mode, AND,
-					 copy_rtx (tmp),
+	      tmp = expand_simple_binop (mode, AND, tmp,
 					 gen_int_mode (cf - ct, mode),
-					 copy_rtx (tmp), 1, OPTAB_DIRECT);
+					 NULL_RTX, 1, OPTAB_DIRECT);
 	      if (ct)
-		tmp = expand_simple_binop (mode, PLUS,
-					   copy_rtx (tmp), GEN_INT (ct),
-					   copy_rtx (tmp), 1, OPTAB_DIRECT);
+		tmp = expand_simple_binop (mode, PLUS, tmp, GEN_INT (ct),
+					   NULL_RTX, 1, OPTAB_DIRECT);
 	    }
 
-	  if (!rtx_equal_p (tmp, out))
-	    emit_move_insn (copy_rtx (out), copy_rtx (tmp));
-
+	  emit_move_insn (out, tmp);
 	  return true;
 	}
 
@@ -6210,7 +6205,7 @@ ix86_split_ashl (rtx *operands, rtx scratch, machine_mode mode)
       if (count >= half_width)
 	{
 	  emit_move_insn (high[0], low[1]);
-	  emit_move_insn (low[0], const0_rtx);
+	  ix86_expand_clear (low[0]);
 
 	  if (count > half_width)
 	    ix86_expand_ashl_const (high[0], count - half_width, mode);
@@ -8660,6 +8655,8 @@ ix86_expand_set_or_cpymem (rtx dst, rtx src, rtx count_exp, rtx val_exp,
 
       if (TARGET_AVX256_SPLIT_REGS && GET_MODE_BITSIZE (move_mode) > 128)
 	move_mode = TImode;
+      if (TARGET_AVX512_SPLIT_REGS && GET_MODE_BITSIZE (move_mode) > 256)
+	move_mode = OImode;
 
       /* Find the corresponding vector mode with the same size as MOVE_MODE.
 	 MOVE_MODE is an integer mode at the moment (SI, DI, TI, etc.).  */
@@ -9463,6 +9460,17 @@ ix86_expand_call (rtx retval, rtx fnaddr, rtx callarg1,
     {
       fnaddr = convert_to_mode (word_mode, XEXP (fnaddr, 0), 1);
       fnaddr = gen_rtx_MEM (QImode, copy_to_mode_reg (word_mode, fnaddr));
+    }
+
+  /* PR100665: Hwasan may tag code pointer which is not supported by LAM,
+     mask off code pointers here.
+     TODO: also need to handle indirect jump.  */
+  if (ix86_memtag_can_tag_addresses () && !fndecl
+      && sanitize_flags_p (SANITIZE_HWADDRESS))
+    {
+      rtx untagged_addr = ix86_memtag_untagged_pointer (XEXP (fnaddr, 0),
+							NULL_RTX);
+      fnaddr = gen_rtx_MEM (QImode, untagged_addr);
     }
 
   call = gen_rtx_CALL (VOIDmode, fnaddr, callarg1);
@@ -15187,6 +15195,10 @@ ix86_vector_duplicate_value (machine_mode mode, rtx target, rtx val)
   bool ok;
   rtx_insn *insn;
   rtx dup;
+  /* Save/restore recog_data in case this is called from splitters
+     or other routines where recog_data needs to stay valid across
+     force_reg.  See PR106577.  */
+  recog_data_d recog_data_save = recog_data;
 
   /* First attempt to recognize VAL as-is.  */
   dup = gen_vec_duplicate (mode, val);
@@ -15212,6 +15224,7 @@ ix86_vector_duplicate_value (machine_mode mode, rtx target, rtx val)
       ok = recog_memoized (insn) >= 0;
       gcc_assert (ok);
     }
+  recog_data = recog_data_save;
   return true;
 }
 
@@ -18886,8 +18899,10 @@ expand_vec_perm_movs (struct expand_vec_perm_d *d)
     return false;
 
   if (!(TARGET_SSE && vmode == V4SFmode)
+      && !(TARGET_SSE && vmode == V4SImode)
       && !(TARGET_MMX_WITH_SSE && vmode == V2SFmode)
-      && !(TARGET_SSE2 && vmode == V2DFmode))
+      && !(TARGET_SSE2 && vmode == V2DFmode)
+      && !(TARGET_SSE2 && vmode == V2DImode))
     return false;
 
   /* Only the first element is changed.  */
@@ -24182,14 +24197,13 @@ ix86_expand_fast_convert_bf_to_sf (rtx val)
       /* FLOAT_EXTEND simplification will fail if VAL is a sNaN.  */
       ret = gen_reg_rtx (SImode);
       emit_move_insn (ret, GEN_INT (INTVAL (op) & 0xffff));
+      emit_insn (gen_ashlsi3 (ret, ret, GEN_INT (16)));
+      return gen_lowpart (SFmode, ret);
     }
-  else
-    {
-      ret = gen_reg_rtx (SImode);
-      emit_insn (gen_zero_extendhisi2 (ret, op));
-    }
-  emit_insn (gen_ashlsi3 (ret, ret, GEN_INT (16)));
-  return gen_lowpart (SFmode, ret);
+
+  ret = gen_reg_rtx (SFmode);
+  emit_insn (gen_extendbfsf2_1 (ret, force_reg (BFmode, val)));
+  return ret;
 }
 
 #include "gt-i386-expand.h"

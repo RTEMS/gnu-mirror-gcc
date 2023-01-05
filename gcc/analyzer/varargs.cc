@@ -42,6 +42,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "analyzer/diagnostic-manager.h"
 #include "analyzer/exploded-graph.h"
 #include "diagnostic-metadata.h"
+#include "analyzer/call-details.h"
 
 #if ENABLE_ANALYZER
 
@@ -722,6 +723,7 @@ kf_va_copy::impl_call_pre (const call_details &cd) const
   in_va_list
     = model->check_for_poison (in_va_list,
 			       get_va_list_diag_arg (cd.get_arg_tree (1)),
+			       NULL,
 			       cd.get_ctxt ());
 
   const region *out_dst_reg
@@ -777,9 +779,9 @@ public:
     {
     public:
       va_arg_call_event (const exploded_edge &eedge,
-			 location_t loc, tree fndecl, int depth,
+			 const event_loc_info &loc_info,
 			 int num_variadic_arguments)
-      : call_event (eedge, loc, fndecl, depth),
+      : call_event (eedge, loc_info),
 	m_num_variadic_arguments (num_variadic_arguments)
       {
       }
@@ -812,13 +814,12 @@ public:
 	  = get_num_variadic_arguments (dst_node->get_function ()->decl,
 					call_stmt);
 	emission_path->add_event
-	  (make_unique<va_arg_call_event> (eedge,
-					   (last_stmt
-					    ? last_stmt->location
-					    : UNKNOWN_LOCATION),
-					   src_point.get_fndecl (),
-					   src_stack_depth,
-					   num_variadic_arguments));
+	  (make_unique<va_arg_call_event>
+	   (eedge,
+	    event_loc_info (last_stmt ? last_stmt->location : UNKNOWN_LOCATION,
+			    src_point.get_fndecl (),
+			    src_stack_depth),
+	    num_variadic_arguments));
       }
     else
       pending_diagnostic::add_call_event (eedge, emission_path);
@@ -1004,7 +1005,7 @@ kf_va_arg::impl_call_pre (const call_details &cd) const
     ap_sval = cast;
 
   tree va_list_tree = get_va_list_diag_arg (cd.get_arg_tree (0));
-  ap_sval = model->check_for_poison (ap_sval, va_list_tree, ctxt);
+  ap_sval = model->check_for_poison (ap_sval, va_list_tree, ap_reg, ctxt);
 
   if (const region *impl_reg = ap_sval->maybe_get_region ())
     {

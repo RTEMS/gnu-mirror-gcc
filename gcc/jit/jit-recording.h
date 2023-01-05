@@ -806,6 +806,15 @@ public:
 
   void replay_into (replayer *) final override;
 
+  bool is_same_type_as (type *other) final override
+  {
+    vector_type *other_vec_type = other->dyn_cast_vector_type ();
+    if (other_vec_type == NULL)
+      return false;
+    return get_num_units () == other_vec_type->get_num_units ()
+      && get_element_type () == other_vec_type->get_element_type ();
+  }
+
   vector_type *is_vector () final override { return this; }
 
 private:
@@ -1683,7 +1692,23 @@ public:
     m_op (op),
     m_a (a),
     m_b (b)
-  {}
+  {
+    type *a_type = a->get_type ();
+    vector_type *vec_type = a_type->dyn_cast_vector_type ();
+    if (vec_type != NULL)
+    {
+      type *element_type = vec_type->get_element_type ();
+      type *inner_type;
+      /* Vectors of floating-point values return a vector of integers of the
+         same size.  */
+      if (element_type->is_float ())
+	inner_type = ctxt->get_int_type (element_type->get_size (), false);
+      else
+	inner_type = element_type;
+      m_type = new vector_type (inner_type, vec_type->get_num_units ());
+      ctxt->record (m_type);
+    }
+  }
 
   void replay_into (replayer *r) final override;
 

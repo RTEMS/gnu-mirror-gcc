@@ -8473,9 +8473,10 @@ gnat_to_gnu (Node_Id gnat_node)
 	  declaration, return the result unmodified because we want to use the
 	  return slot optimization in this case.
 
-       5. If this is a reference to an unconstrained array which is used as the
-	  prefix of an attribute reference that requires an lvalue, return the
-	  result unmodified because we want to return the original bounds.
+       5. If this is a reference to an unconstrained array which is used either
+	  as the prefix of an attribute reference that requires an lvalue or in
+	  a return statement, then return the result unmodified because we want
+	  to return the original bounds.
 
        6. Finally, if the type of the result is already correct.  */
 
@@ -8539,8 +8540,9 @@ gnat_to_gnu (Node_Id gnat_node)
 
   else if (TREE_CODE (TREE_TYPE (gnu_result)) == UNCONSTRAINED_ARRAY_TYPE
 	   && Present (Parent (gnat_node))
-	   && Nkind (Parent (gnat_node)) == N_Attribute_Reference
-	   && lvalue_required_for_attribute_p (Parent (gnat_node)))
+	   && ((Nkind (Parent (gnat_node)) == N_Attribute_Reference
+	        && lvalue_required_for_attribute_p (Parent (gnat_node)))
+	       || Nkind (Parent (gnat_node)) == N_Simple_Return_Statement))
     ;
 
   else if (TREE_TYPE (gnu_result) != gnu_result_type)
@@ -10562,7 +10564,7 @@ Sloc_to_locus (Source_Ptr Sloc, location_t *locus, bool clear_column,
   *locus
     = linemap_position_for_line_and_column (line_table, map, line, column);
 
-  if (file_map && file_map[file - 1].Instance)
+  if (decl && file_map && file_map[file - 1].Instance)
     decl_to_instance_map->put (decl, file_map[file - 1].Instance);
 
   return true;

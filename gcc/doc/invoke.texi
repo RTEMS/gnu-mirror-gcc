@@ -8,7 +8,7 @@
 @c man end
 
 @c man begin COPYRIGHT
-Copyright @copyright{} 1988-2022 Free Software Foundation, Inc.
+Copyright @copyright{} 1988-2023 Free Software Foundation, Inc.
 
 Permission is granted to copy, distribute and/or modify this document
 under the terms of the GNU Free Documentation License, Version 1.3 or
@@ -398,7 +398,7 @@ Objective-C and Objective-C++ Dialects}.
 -Wstrict-aliasing=n  -Wstrict-overflow  -Wstrict-overflow=@var{n} @gol
 -Wstring-compare @gol
 -Wno-stringop-overflow -Wno-stringop-overread @gol
--Wno-stringop-truncation @gol
+-Wno-stringop-truncation -Wstrict-flex-arrays @gol
 -Wsuggest-attribute=@r{[}pure@r{|}const@r{|}noreturn@r{|}format@r{|}malloc@r{]} @gol
 -Wswitch  -Wno-switch-bool  -Wswitch-default  -Wswitch-enum @gol
 -Wno-switch-outside-range  -Wno-switch-unreachable  -Wsync-nand @gol
@@ -1433,7 +1433,7 @@ See RS/6000 and PowerPC Options.
 -m96bit-long-double  -mlong-double-64  -mlong-double-80  -mlong-double-128 @gol
 -mregparm=@var{num}  -msseregparm @gol
 -mveclibabi=@var{type}  -mvect8-ret-in-mem @gol
--mpc32  -mpc64  -mpc80  -mstackrealign @gol
+-mpc32  -mpc64  -mpc80  -mdaz-ftz -mstackrealign @gol
 -momit-leaf-frame-pointer  -mno-red-zone  -mno-tls-direct-seg-refs @gol
 -mcmodel=@var{code-model}  -mabi=@var{name}  -maddress-mode=@var{mode} @gol
 -m32  -m64  -mx32  -m16  -miamcu  -mlarge-data-threshold=@var{num} @gol
@@ -1448,7 +1448,7 @@ See RS/6000 and PowerPC Options.
 -mindirect-branch=@var{choice}  -mfunction-return=@var{choice} @gol
 -mindirect-branch-register -mharden-sls=@var{choice} @gol
 -mindirect-branch-cs-prefix -mneeded -mno-direct-extern-access @gol
--munroll-only-small-loops}
+-munroll-only-small-loops -mlam=@var{choice}}
 
 @emph{x86 Windows Options}
 @gccoptlist{-mconsole  -mcygwin  -mno-cygwin  -mdll @gol
@@ -7835,6 +7835,31 @@ however, are not suitable arguments to functions that expect
 such arrays GCC issues warnings unless it can prove that the use is
 safe.  @xref{Common Variable Attributes}.
 
+@item -Wstrict-flex-arrays
+@opindex Wstrict-flex-arrays
+@opindex Wno-strict-flex-arrays
+Warn about inproper usages of flexible array members
+according to the @var{level} of the @code{strict_flex_array (@var{level})}
+attribute attached to the trailing array field of a structure if it's
+available, otherwise according to the @var{level} of the option
+@option{-fstrict-flex-arrays=@var{level}}.
+
+This option is effective only when @var{level} is bigger than 0.  Otherwise,
+it will be ignored with a warning.
+
+when @var{level}=1, warnings will be issued for a trailing array reference
+of a structure that have 2 or more elements if the trailing array is referenced
+as a flexible array member.
+
+when @var{level}=2, in addition to @var{level}=1, additional warnings will be
+issued for a trailing one-element array reference of a structure
+if the array is referenced as a flexible array member.
+
+when @var{level}=3, in addition to @var{level}=2, additional warnings will be
+issued for a trailing zero-length array reference of a structure
+if the array is referenced as a flexible array member.
+
+
 @item -Wsuggest-attribute=@r{[}pure@r{|}const@r{|}noreturn@r{|}format@r{|}cold@r{|}malloc@r{]}
 @opindex Wsuggest-attribute=
 @opindex Wno-suggest-attribute=
@@ -8040,17 +8065,34 @@ is enabled by @option{-Wall}.  It is more effective when @option{-ftree-vrp}
 is active (the default for @option{-O2} and above) but a subset of instances
 are issued even without optimization.
 
+By default, the trailing array of a structure will be treated as a flexible
+array member by @option{-Warray-bounds} or @option{-Warray-bounds=@var{n}}
+if it is declared as either a flexible array member per C99 standard onwards
+(@samp{[]}), a GCC zero-length array extension (@samp{[0]}), or an one-element
+array (@samp{[1]}). As a result, out of bounds subscripts or offsets into
+zero-length arrays or one-element arrays are not warned by default.
+
+You can add the option @option{-fstrict-flex-arrays} or
+@option{-fstrict-flex-arrays=@var{level}} to control how this
+option treat trailing array of a structure as a flexible array member:
+
+when @var{level}<=1, no change to the default behavior.
+
+when @var{level}=2, additional warnings will be issued for out of bounds
+subscripts or offsets into one-element arrays;
+
+when @var{level}=3, in addition to @var{level}=2, additional warnings will be
+issued for out of bounds subscripts or offsets into zero-length arrays.
+
 @table @gcctabopt
 @item -Warray-bounds=1
 This is the default warning level of @option{-Warray-bounds} and is enabled
 by @option{-Wall}; higher levels are not, and must be explicitly requested.
 
 @item -Warray-bounds=2
-This warning level also warns about out of bounds accesses to trailing
-struct members of one-element array types (@pxref{Zero Length}) and about
-the intermediate results of pointer arithmetic that may yield out of bounds
-values.  This warning level may give a larger number of false positives and
-is deactivated by default.
+This warning level also warns about the intermediate results of pointer
+arithmetic that may yield out of bounds values. This warning level may
+give a larger number of false positives and is deactivated by default.
 @end table
 
 @item -Warray-compare
@@ -13191,7 +13233,8 @@ disclosure and use.
 GCC still considers an automatic variable that doesn't have an explicit
 initializer as uninitialized, @option{-Wuninitialized} and
 @option{-Wanalyzer-use-of-uninitialized-value} will still report
-warning messages on such automatic variables.
+warning messages on such automatic variables and the compiler will
+perform optimization as if the variable were uninitialized.
 With this option, GCC will also initialize any padding of automatic variables
 that have structure or union types to zeroes.
 However, the current implementation cannot initialize automatic variables that
@@ -13676,9 +13719,12 @@ compiled.  All public functions and variables with the exception of @code{main}
 and those merged by attribute @code{externally_visible} become static functions
 and in effect are optimized more aggressively by interprocedural optimizers.
 
-This option should not be used in combination with @option{-flto}.
-Instead relying on a linker plugin should provide safer and more precise
-information.
+With @option{-flto} this option has a limited use.  In most cases the
+precise list of symbols used or exported from the binary is known the
+resolution info passed to the link-time optimizer by the linker plugin.  It is
+still useful if no linker plugin is used or during incremental link step when
+final code is produced (with @option{-flto}
+@option{-flinker-output=nolto-rel}).
 
 @item -flto[=@var{n}]
 @opindex flto
@@ -14963,6 +15009,9 @@ The maximum depth of a loop nest suitable for complete peeling.
 @item max-unswitch-insns
 The maximum number of insns of an unswitched loop.
 
+@item max-unswitch-depth
+The maximum depth of a loop nest to be unswitched.
+
 @item lim-expensive
 The minimum cost of an expensive expression in the loop invariant motion.
 
@@ -15488,11 +15537,22 @@ the parameter is reserved exclusively for debug insns created by
 @option{-fvar-tracking-assignments}, but debug insns may get
 (non-overlapping) uids above it if the reserved range is exhausted.
 
+@item ipa-sra-deref-prob-threshold
+IPA-SRA replaces a pointer which is known not be NULL with one or more
+new parameters only when the probability (in percent, relative to
+function entry) of it being dereferenced is higher than this parameter.
+
 @item ipa-sra-ptr-growth-factor
 IPA-SRA replaces a pointer to an aggregate with one or more new
 parameters only when their cumulative size is less or equal to
 @option{ipa-sra-ptr-growth-factor} times the size of the original
 pointer parameter.
+
+@item ipa-sra-ptrwrap-growth-factor
+Additional maximum allowed growth of total size of new parameters
+that ipa-sra replaces a pointer to an aggregate with,
+if it points to a local variable that the caller only writes to and
+passes it as an argument to other functions.
 
 @item ipa-sra-max-replacements
 Maximum pieces of an aggregate that IPA-SRA tracks.  As a
@@ -16490,6 +16550,16 @@ The option cannot be combined with @option{-fsanitize=thread} or
 @option{-fsanitize=hwaddress}.  Note that the only target
 @option{-fsanitize=hwaddress} is currently supported on is AArch64.
 
+To get more accurate stack traces, it is possible to use options such as
+@option{-O0}, @option{-O1}, or @option{-Og} (which, for instance, prevent
+most function inlining), @option{-fno-optimize-sibling-calls} (which prevents
+optimizing sibling and tail recursive calls; this option is implicit for
+@option{-O0}, @option{-O1}, or @option{-Og}), or @option{-fno-ipa-icf} (which
+disables Identical Code Folding for functions).  Since multiple runs of the
+program may yield backtraces with different addresses due to ASLR (Address
+Space Layout Randomization), it may be desirable to turn ASLR off.  On Linux,
+this can be achieved with @samp{setarch `uname -m` -R ./prog}.
+
 @item -fsanitize=kernel-address
 @opindex fsanitize=kernel-address
 Enable AddressSanitizer for Linux kernel.
@@ -16702,8 +16772,8 @@ or when a method or constructor is invoked on insufficiently aligned object.
 @item -fsanitize=object-size
 @opindex fsanitize=object-size
 This option enables instrumentation of memory references using the
-@code{__builtin_object_size} function.  Various out of bounds pointer
-accesses are detected.
+@code{__builtin_dynamic_object_size} function.  Various out of bounds
+pointer accesses are detected.
 
 @item -fsanitize=float-divide-by-zero
 @opindex fsanitize=float-divide-by-zero
@@ -17626,7 +17696,8 @@ needs to build supplementary stub code for constructors to work.  On
 multi-libbed systems, @samp{gcc -shared} must select the correct support
 libraries to link against.  Failing to supply the correct flags may lead
 to subtle defects.  Supplying them in cases where they are not necessary
-is innocuous.}
+is innocuous. For x86, crtfastmath.o will not be added when
+@option{-shared} is specified. }
 
 @item -shared-libgcc
 @itemx -static-libgcc
@@ -32722,6 +32793,16 @@ are enabled by default; routines in such libraries could suffer significant
 loss of accuracy, typically through so-called ``catastrophic cancellation'',
 when this option is used to set the precision to less than extended precision.
 
+@item -mdaz-ftz
+@opindex mdaz-ftz
+
+The flush-to-zero (FTZ) and denormals-are-zero (DAZ) flags in the MXCSR register
+are used to control floating-point calculations.SSE and AVX instructions
+including scalar and vector instructions could benefit from enabling the FTZ
+and DAZ flags when @option{-mdaz-ftz} is specified. Don't set FTZ/DAZ flags
+when @option{-mno-daz-ftz} or @option{-shared} is specified, @option{-mdaz-ftz}
+will set FTZ/DAZ flags even with @option{-shared}.
+
 @item -mstackrealign
 @opindex mstackrealign
 Realign the stack at entry.  On the x86, the @option{-mstackrealign}
@@ -33861,6 +33942,13 @@ Controls conservative small loop unrolling. It is default enabled by
 O2, and unrolls loop with less than 4 insns by 1 time. Explicit
 -f[no-]unroll-[all-]loops would disable this flag to avoid any
 unintended unrolling behavior that user does not want.
+
+@item -mlam=@var{choice}
+@opindex mlam
+LAM(linear-address masking) allows special bits in the pointer to be used
+for metadata. The default is @samp{none}. With @samp{u48}, pointer bits in
+positions 62:48 can be used for metadata; With @samp{u57}, pointer bits in
+positions 62:57 can be used for metadata.
 @end table
 
 @node x86 Windows Options

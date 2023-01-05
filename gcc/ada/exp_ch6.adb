@@ -23,6 +23,7 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
+with Accessibility;  use Accessibility;
 with Atree;          use Atree;
 with Aspects;        use Aspects;
 with Checks;         use Checks;
@@ -190,16 +191,6 @@ package body Exp_Ch6 is
    --  indicated by No (Chain). However, in an allocator, the caller passes in
    --  the activation Chain. Note: Master_Actual can be Empty, but only if
    --  there are no tasks.
-
-   procedure Apply_CW_Accessibility_Check (Exp : Node_Id; Func : Entity_Id);
-   --  Ada 2005 (AI95-344): If the result type is class-wide, insert a check
-   --  that the level of the return expression's underlying type is not deeper
-   --  than the level of the master enclosing the function. Always generate the
-   --  check when the type of the return expression is class-wide, when it's a
-   --  type conversion, or when it's a formal parameter. Otherwise suppress the
-   --  check in the case where the return expression has a specific type whose
-   --  level is known not to be statically deeper than the result type of the
-   --  function.
 
    function Caller_Known_Size
      (Func_Call   : Node_Id;
@@ -5139,10 +5130,15 @@ package body Exp_Ch6 is
       end if;
 
       --  Another optimization: if the returned value is used to initialize an
-      --  object, and the secondary stack is not involved in the call, then no
-      --  need to copy/readjust/finalize, we can just initialize it in place.
+      --  object, then no need to copy/readjust/finalize, we can initialize it
+      --  in place. However, if the call returns on the secondary stack or this
+      --  is a special return object, then we need the expansion because we'll
+      --  be renaming the temporary as the (permanent) object.
 
-      if Nkind (Par) = N_Object_Declaration and then not Use_Sec_Stack then
+      if Nkind (Par) = N_Object_Declaration
+        and then not Use_Sec_Stack
+        and then not Is_Special_Return_Object (Defining_Entity (Par))
+      then
          return;
       end if;
 
@@ -5299,7 +5295,7 @@ package body Exp_Ch6 is
          --  Assert that if F says "return R : T := G(...) do..."
          --  then F and G are both b-i-p, or neither b-i-p.
 
-         if Nkind (Exp) = N_Function_Call then
+         if Present (Exp) and then Nkind (Exp) = N_Function_Call then
             pragma Assert (Ekind (Current_Subprogram) = E_Function);
             pragma Assert
               (Is_Build_In_Place_Function (Current_Subprogram) =
@@ -5307,16 +5303,6 @@ package body Exp_Ch6 is
             null;
          end if;
 
-         --  Ada 2005 (AI95-344): If the result type is class-wide, then insert
-         --  a check that the level of the return expression's underlying type
-         --  is not deeper than the level of the master enclosing the function.
-
-         --  AI12-043: The check is made immediately after the return object
-         --  is created.
-
-         if Present (Exp) and then Is_Class_Wide_Type (Ret_Typ) then
-            Apply_CW_Accessibility_Check (Exp, Func_Id);
-         end if;
       else
          Exp := Empty;
       end if;
@@ -6449,16 +6435,21 @@ package body Exp_Ch6 is
       --  The result type of the function
 
       Utyp : constant Entity_Id := Underlying_Type (R_Type);
+      --  The underlying result type of the function
 
       Exp : Node_Id := Expression (N);
       pragma Assert (Present (Exp));
 
       Exp_Is_Function_Call : constant Boolean :=
         Nkind (Exp) = N_Function_Call
-          or else (Nkind (Exp) = N_Explicit_Dereference
-                   and then Is_Entity_Name (Prefix (Exp))
-                   and then Ekind (Entity (Prefix (Exp))) = E_Constant
-                   and then Is_Related_To_Func_Return (Entity (Prefix (Exp))));
+          or else
+            (Is_Captured_Function_Call (Exp)
+              and then Is_Related_To_Func_Return (Entity (Prefix (Exp))));
+      --  If the expression is a captured function call, then we need to make
+      --  sure that the object doing the capture is properly recognized by the
+      --  Is_Related_To_Func_Return predicate; otherwise, if it is of a type
+      --  that needs finalization, Requires_Cleanup_Actions would return true
+      --  because of it and Build_Finalizer would finalize it prematurely.
 
       Exp_Typ : constant Entity_Id := Etype (Exp);
       --  The type of the expression (not necessarily the same as R_Type)
@@ -6527,19 +6518,6 @@ package body Exp_Ch6 is
       --  The reason for this design is that for Ada 2005 limited returns, we
       --  need to reify the return object, so we can build it "in place", and
       --  we need a block statement to hang finalization and tasking stuff.
-
-      --  ??? In order to avoid disruption, we avoid translating to extended
-      --  return except in the cases where we really need to (Ada 2005 for
-      --  inherently limited). We might prefer to do this translation in all
-      --  cases (except perhaps for the case of Ada 95 inherently limited),
-      --  in order to fully exercise the Expand_N_Extended_Return_Statement
-      --  code. This would also allow us to do the build-in-place optimization
-      --  for efficiency even in cases where it is semantically not required.
-
-      --  As before, we check the type of the return expression rather than the
-      --  return type of the function, because the latter may be a limited
-      --  class-wide interface type, which is not a limited type, even though
-      --  the type of the expression may be.
 
       pragma Assert
         (Comes_From_Extended_Return_Statement (N)
@@ -6655,7 +6633,8 @@ package body Exp_Ch6 is
          --  size. We create an actual subtype for this purpose. However we
          --  need not do it if the expression is a function call since this
          --  will be done in the called function and doing it here too would
-         --  cause a temporary with maximum size to be created.
+         --  cause a temporary with maximum size to be created. Likewise for
+         --  a special return object, since there is no copy in this case.
 
          declare
             Ubt  : constant Entity_Id := Underlying_Type (Base_Type (Exp_Typ));
@@ -6664,6 +6643,8 @@ package body Exp_Ch6 is
 
          begin
             if not Exp_Is_Function_Call
+              and then not (Is_Entity_Name (Exp)
+                             and then Is_Special_Return_Object (Entity (Exp)))
               and then Has_Defaulted_Discriminants (Ubt)
               and then not Is_Constrained (Ubt)
               and then not Has_Unchecked_Union (Ubt)
@@ -6681,15 +6662,18 @@ package body Exp_Ch6 is
 
          --    type Ann is access R_Type;
          --    for Ann'Storage_pool use rs_pool;
-         --    Rnn : Ann := new Exp_Typ'(Exp);
+         --    Rnn : constant Ann := new Exp_Typ'(Exp);
          --    return Rnn.all;
 
          --  but optimize the case where the result is a function call that
          --  also needs finalization. In this case the result can directly be
          --  allocated on the return stack of the caller and no further
-         --  processing is required.
+         --  processing is required. Likewise if this is a return object.
 
-         if Present (Utyp)
+         if Comes_From_Extended_Return_Statement (N) then
+            null;
+
+         elsif Present (Utyp)
            and then Needs_Finalization (Utyp)
            and then not (Exp_Is_Function_Call
                           and then Needs_Finalization (Exp_Typ))
@@ -6732,6 +6716,7 @@ package body Exp_Ch6 is
 
                  Make_Object_Declaration (Loc,
                    Defining_Identifier => Temp,
+                   Constant_Present    => True,
                    Object_Definition   => New_Occurrence_Of (Acc_Typ, Loc),
                    Expression          => Alloc_Node)));
 
@@ -6752,11 +6737,16 @@ package body Exp_Ch6 is
 
          Set_Enclosing_Sec_Stack_Return (N);
 
+         --  Nothing else to do for a return object
+
+         if Comes_From_Extended_Return_Statement (N) then
+            null;
+
          --  Optimize the case where the result is a function call that also
          --  returns on the secondary stack. In this case the result is already
          --  on the secondary stack and no further processing is required.
 
-         if Exp_Is_Function_Call
+         elsif Exp_Is_Function_Call
            and then Needs_Secondary_Stack (Exp_Typ)
          then
             --  Remove side effects from the expression now so that other parts
@@ -6781,7 +6771,7 @@ package body Exp_Ch6 is
 
          --    type Ann is access R_Type;
          --    for Ann'Storage_pool use ss_pool;
-         --    Rnn : Ann := new Exp_Typ'(Exp);
+         --    Rnn : constant Ann := new Exp_Typ'(Exp);
          --    return Rnn.all;
 
          --  And we do the same for class-wide types that are not potentially
@@ -6805,7 +6795,6 @@ package body Exp_Ch6 is
 
             begin
                Mutate_Ekind (Acc_Typ, E_Access_Type);
-
                Set_Associated_Storage_Pool (Acc_Typ, RTE (RE_SS_Pool));
 
                --  This is an allocator for the secondary stack, and it's fine
@@ -6835,6 +6824,7 @@ package body Exp_Ch6 is
 
                  Make_Object_Declaration (Loc,
                    Defining_Identifier => Temp,
+                   Constant_Present    => True,
                    Object_Definition   => New_Occurrence_Of (Acc_Typ, Loc),
                    Expression          => Alloc_Node)));
 
@@ -7570,9 +7560,10 @@ package body Exp_Ch6 is
 
             Remove_Side_Effects (A);
 
-            if Is_Controlling_Actual (A)
-              and then Etype (F) /= Etype (A)
-            then
+            --  Ensure matching types to avoid reporting spurious errors since
+            --  the called helper may have been built for a parent type.
+
+            if Etype (F) /= Etype (A) then
                Append_To (Actuals,
                  Unchecked_Convert_To (Etype (F), New_Copy_Tree (A)));
             else
@@ -7780,10 +7771,10 @@ package body Exp_Ch6 is
          return False;
       end if;
 
-      --  If the function is imported from a foreign language, we don't do
-      --  build-in-place, whereas Import (Ada) functions can do it. Note also
-      --  that it is OK for a build-in-place function to return a type with a
-      --  foreign convention because the machinery ensures there is no copying.
+      --  We never use build-in-place if the convention is other than Ada,
+      --  but note that it is OK for a build-in-place function to return a
+      --  type with a foreign convention because the machinery ensures there
+      --  is no copying.
 
       return (Kind in E_Function | E_Generic_Function
                or else
@@ -7899,6 +7890,16 @@ package body Exp_Ch6 is
         and then Is_Build_In_Place_Function (Return_Applies_To (Scope (E)));
    end Is_Build_In_Place_Return_Object;
 
+   -----------------------------------
+   -- Is_By_Reference_Return_Object --
+   -----------------------------------
+
+   function Is_By_Reference_Return_Object (E : Entity_Id) return Boolean is
+   begin
+      return Is_Return_Object (E)
+        and then Is_By_Reference_Type (Etype (Return_Applies_To (Scope (E))));
+   end Is_By_Reference_Return_Object;
+
    -----------------------
    -- Is_Null_Procedure --
    -----------------------
@@ -7957,6 +7958,28 @@ package body Exp_Ch6 is
          return False;
       end if;
    end Is_Null_Procedure;
+
+   --------------------------------------
+   -- Is_Secondary_Stack_Return_Object --
+   --------------------------------------
+
+   function Is_Secondary_Stack_Return_Object (E : Entity_Id) return Boolean is
+   begin
+      return Is_Return_Object (E)
+        and then Needs_Secondary_Stack (Etype (Return_Applies_To (Scope (E))));
+   end Is_Secondary_Stack_Return_Object;
+
+   ------------------------------
+   -- Is_Special_Return_Object --
+   ------------------------------
+
+   function Is_Special_Return_Object (E : Entity_Id) return Boolean is
+   begin
+      return Is_Build_In_Place_Return_Object (E)
+         or else Is_Secondary_Stack_Return_Object (E)
+         or else (Back_End_Return_Slot
+                   and then Is_By_Reference_Return_Object (E));
+   end Is_Special_Return_Object;
 
    -------------------------------------------
    -- Make_Build_In_Place_Call_In_Allocator --
@@ -9367,6 +9390,10 @@ package body Exp_Ch6 is
       Preserve_Comes_From_Source (Orig_Id, Orig_Decl);
 
       Set_Comes_From_Source (New_Id, False);
+
+      --  Preserve aliased indication
+
+      Set_Is_Aliased (Orig_Id, Is_Aliased (New_Id));
    end Replace_Renaming_Declaration_Id;
 
    ---------------------------------

@@ -1,5 +1,5 @@
 /* Loop unswitching.
-   Copyright (C) 2004-2022 Free Software Foundation, Inc.
+   Copyright (C) 2004-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -263,8 +263,10 @@ init_loop_unswitch_info (class loop *&loop, unswitch_predicate *&hottest,
 
   /* Unswitch only nests with no sibling loops.  */
   class loop *outer_loop = loop;
+  unsigned max_depth = param_max_unswitch_depth;
   while (loop_outer (outer_loop)->num != 0
-	 && !loop_outer (outer_loop)->inner->next)
+	 && !loop_outer (outer_loop)->inner->next
+	 && --max_depth != 0)
     outer_loop = loop_outer (outer_loop);
   hottest = NULL;
   hottest_bb = NULL;

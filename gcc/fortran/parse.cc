@@ -3934,7 +3934,7 @@ match_deferred_characteristics (gfc_typespec * ts)
   m = gfc_match_prefix (ts);
   gfc_buffer_error (false);
 
-  if (ts->type == BT_DERIVED)
+  if (ts->type == BT_DERIVED || ts->type == BT_CLASS)
     {
       ts->kind = 0;
 
@@ -4015,7 +4015,7 @@ parse_spec (gfc_statement st)
       gfc_symbol* proc = gfc_current_ns->proc_name;
       gcc_assert (proc);
 
-      if (proc->result->ts.type == BT_UNKNOWN)
+      if (proc->result && proc->result->ts.type == BT_UNKNOWN)
 	function_result_typed = true;
     }
 
@@ -4215,7 +4215,7 @@ declSt:
   if (bad_characteristic)
     {
       ts = &gfc_current_block ()->result->ts;
-      if (ts->type != BT_DERIVED)
+      if (ts->type != BT_DERIVED && ts->type != BT_CLASS)
 	gfc_error ("Bad kind expression for function %qs at %L",
 		   gfc_current_block ()->name,
 		   &gfc_current_block ()->declared_at);

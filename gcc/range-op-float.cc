@@ -1,5 +1,5 @@
 /* Floating point range operators.
-   Copyright (C) 2022 Free Software Foundation, Inc.
+   Copyright (C) 2022-2023 Free Software Foundation, Inc.
    Contributed by Aldy Hernandez <aldyh@redhat.com>.
 
 This file is part of GCC.
@@ -254,10 +254,21 @@ frange_nextafter (enum machine_mode mode,
 		  REAL_VALUE_TYPE &value,
 		  const REAL_VALUE_TYPE &inf)
 {
-  const real_format *fmt = REAL_MODE_FORMAT (mode);
-  REAL_VALUE_TYPE tmp;
-  real_nextafter (&tmp, fmt, &value, &inf);
-  value = tmp;
+  if (MODE_COMPOSITE_P (mode)
+      && (real_isdenormal (&value, mode) || real_iszero (&value)))
+    {
+      // IBM extended denormals only have DFmode precision.
+      REAL_VALUE_TYPE tmp, tmp2;
+      real_convert (&tmp2, DFmode, &value);
+      real_nextafter (&tmp, REAL_MODE_FORMAT (DFmode), &tmp2, &inf);
+      real_convert (&value, mode, &tmp);
+    }
+  else
+    {
+      REAL_VALUE_TYPE tmp;
+      real_nextafter (&tmp, REAL_MODE_FORMAT (mode), &value, &inf);
+      value = tmp;
+    }
 }
 
 // Like real_arithmetic, but round the result to INF if the operation
@@ -287,25 +298,77 @@ frange_arithmetic (enum tree_code code, tree type,
 
   // Be extra careful if there may be discrepancies between the
   // compile and runtime results.
-  if ((mode_composite || (real_isneg (&inf) ? real_less (&result, &value)
-			  : !real_less (&value, &result)))
-      && (inexact || !real_identical (&result, &value)))
+  bool round = false;
+  if (mode_composite)
+    round = true;
+  else
     {
-      if (mode_composite)
+      bool low = real_isneg (&inf);
+      round = (low ? !real_less (&result, &value)
+		   : !real_less (&value, &result));
+      if (real_isinf (&result, !low)
+	  && !real_isinf (&value)
+	  && !flag_rounding_math)
 	{
-	  if (real_isdenormal (&result, mode)
-	      || real_iszero (&result))
+	  // Use just [+INF, +INF] rather than [MAX, +INF]
+	  // even if value is larger than MAX and rounds to
+	  // nearest to +INF.  Similarly just [-INF, -INF]
+	  // rather than [-INF, +MAX] even if value is smaller
+	  // than -MAX and rounds to nearest to -INF.
+	  // Unless INEXACT is true, in that case we need some
+	  // extra buffer.
+	  if (!inexact)
+	    round = false;
+	  else
 	    {
-	      // IBM extended denormals only have DFmode precision.
-	      REAL_VALUE_TYPE tmp;
-	      real_convert (&tmp, DFmode, &value);
-	      frange_nextafter (DFmode, tmp, inf);
-	      real_convert (&result, mode, &tmp);
-	      return;
+	      REAL_VALUE_TYPE tmp = result, tmp2;
+	      frange_nextafter (mode, tmp, inf);
+	      // TMP is at this point the maximum representable
+	      // number.
+	      real_arithmetic (&tmp2, MINUS_EXPR, &value, &tmp);
+	      if (real_isneg (&tmp2) != low
+		  && (REAL_EXP (&tmp2) - REAL_EXP (&tmp)
+		      >= 2 - REAL_MODE_FORMAT (mode)->p))
+		round = false;
 	    }
 	}
-      frange_nextafter (mode, result, inf);
     }
+  if (round && (inexact || !real_identical (&result, &value)))
+    {
+      if (mode_composite
+	  && (real_isdenormal (&result, mode) || real_iszero (&result)))
+	{
+	  // IBM extended denormals only have DFmode precision.
+	  REAL_VALUE_TYPE tmp, tmp2;
+	  real_convert (&tmp2, DFmode, &value);
+	  real_nextafter (&tmp, REAL_MODE_FORMAT (DFmode), &tmp2, &inf);
+	  real_convert (&result, mode, &tmp);
+	}
+      else
+	frange_nextafter (mode, result, inf);
+    }
+  if (mode_composite)
+    switch (code)
+      {
+      case PLUS_EXPR:
+      case MINUS_EXPR:
+	// ibm-ldouble-format documents 1ulp for + and -.
+	frange_nextafter (mode, result, inf);
+	break;
+      case MULT_EXPR:
+	// ibm-ldouble-format documents 2ulps for *.
+	frange_nextafter (mode, result, inf);
+	frange_nextafter (mode, result, inf);
+	break;
+      case RDIV_EXPR:
+	// ibm-ldouble-format documents 3ulps for /.
+	frange_nextafter (mode, result, inf);
+	frange_nextafter (mode, result, inf);
+	frange_nextafter (mode, result, inf);
+	break;
+      default:
+	break;
+      }
 }
 
 // Crop R to [-INF, MAX] where MAX is the maximum representable number
@@ -327,6 +390,18 @@ frange_drop_ninf (frange &r, tree type)
 {
   REAL_VALUE_TYPE min = real_min_representable (type);
   frange tmp (type, min, r.upper_bound ());
+  r.intersect (tmp);
+}
+
+// Crop R to [MIN, MAX] where MAX is the maximum representable number
+// for TYPE and MIN the minimum representable number for TYPE.
+
+static inline void
+frange_drop_infs (frange &r, tree type)
+{
+  REAL_VALUE_TYPE max = real_max_representable (type);
+  REAL_VALUE_TYPE min = real_min_representable (type);
+  frange tmp (type, min, max);
   r.intersect (tmp);
 }
 
@@ -1883,7 +1958,7 @@ foperator_unordered_equal::op1_range (frange &r, tree type,
 
 static bool
 float_binary_op_range_finish (bool ret, frange &r, tree type,
-			      const frange &lhs)
+			      const frange &lhs, bool div_op2 = false)
 {
   if (!ret)
     return false;
@@ -1904,7 +1979,20 @@ float_binary_op_range_finish (bool ret, frange &r, tree type,
   // If lhs isn't NAN, then neither operand could be NAN,
   // even if the reverse operation does introduce a maybe_nan.
   if (!lhs.maybe_isnan ())
-    r.clear_nan ();
+    {
+      r.clear_nan ();
+      if (div_op2
+	  ? !(real_compare (LE_EXPR, &lhs.lower_bound (), &dconst0)
+	      && real_compare (GE_EXPR, &lhs.upper_bound (), &dconst0))
+	  : !(real_isinf (&lhs.lower_bound ())
+	      || real_isinf (&lhs.upper_bound ())))
+	// For reverse + or - or * or op1 of /, if result is finite, then
+	// r must be finite too, as X + INF or X - INF or X * INF or
+	// INF / X is always +-INF or NAN.  For op2 of /, if result is
+	// non-zero and not NAN, r must be finite, as X / INF is always
+	// 0 or NAN.
+	frange_drop_infs (r, type);
+    }
   // If lhs is a maybe or known NAN, the operand could be
   // NAN.
   else
@@ -2143,8 +2231,32 @@ public:
     range_op_handler rdiv (RDIV_EXPR, type);
     if (!rdiv)
       return false;
-    return float_binary_op_range_finish (rdiv.fold_range (r, type, lhs, op2),
-					 r, type, lhs);
+    bool ret = rdiv.fold_range (r, type, lhs, op2);
+    if (ret == false)
+      return false;
+    if (lhs.known_isnan () || op2.known_isnan () || op2.undefined_p ())
+      return float_binary_op_range_finish (ret, r, type, lhs);
+    const REAL_VALUE_TYPE &lhs_lb = lhs.lower_bound ();
+    const REAL_VALUE_TYPE &lhs_ub = lhs.upper_bound ();
+    const REAL_VALUE_TYPE &op2_lb = op2.lower_bound ();
+    const REAL_VALUE_TYPE &op2_ub = op2.upper_bound ();
+    if ((contains_zero_p (lhs_lb, lhs_ub) && contains_zero_p (op2_lb, op2_ub))
+	|| ((real_isinf (&lhs_lb) || real_isinf (&lhs_ub))
+	    && (real_isinf (&op2_lb) || real_isinf (&op2_ub))))
+      {
+	// If both lhs and op2 could be zeros or both could be infinities,
+	// we don't know anything about op1 except maybe for the sign
+	// and perhaps if it can be NAN or not.
+	REAL_VALUE_TYPE lb, ub;
+	int signbit_known = signbit_known_p (lhs_lb, lhs_ub, op2_lb, op2_ub);
+	zero_to_inf_range (lb, ub, signbit_known);
+	r.set (type, lb, ub);
+      }
+    // Otherwise, if op2 is a singleton INF and lhs doesn't include INF,
+    // or if lhs must be zero and op2 doesn't include zero, it would be
+    // UNDEFINED, while rdiv.fold_range computes a zero or singleton INF
+    // range.  Those are supersets of UNDEFINED, so let's keep that way.
+    return float_binary_op_range_finish (ret, r, type, lhs);
   }
   virtual bool op2_range (frange &r, tree type,
 			  const frange &lhs,
@@ -2271,9 +2383,29 @@ public:
   {
     if (lhs.undefined_p ())
       return false;
-    return float_binary_op_range_finish (fop_mult.fold_range (r, type, lhs,
-							      op2),
-					 r, type, lhs);
+    bool ret = fop_mult.fold_range (r, type, lhs, op2);
+    if (!ret)
+      return ret;
+    if (lhs.known_isnan () || op2.known_isnan () || op2.undefined_p ())
+      return float_binary_op_range_finish (ret, r, type, lhs);
+    const REAL_VALUE_TYPE &lhs_lb = lhs.lower_bound ();
+    const REAL_VALUE_TYPE &lhs_ub = lhs.upper_bound ();
+    const REAL_VALUE_TYPE &op2_lb = op2.lower_bound ();
+    const REAL_VALUE_TYPE &op2_ub = op2.upper_bound ();
+    if ((contains_zero_p (lhs_lb, lhs_ub)
+	 && (real_isinf (&op2_lb) || real_isinf (&op2_ub)))
+	|| ((contains_zero_p (op2_lb, op2_ub))
+	    && (real_isinf (&lhs_lb) || real_isinf (&lhs_ub))))
+      {
+	// If both lhs could be zero and op2 infinity or vice versa,
+	// we don't know anything about op1 except maybe for the sign
+	// and perhaps if it can be NAN or not.
+	REAL_VALUE_TYPE lb, ub;
+	int signbit_known = signbit_known_p (lhs_lb, lhs_ub, op2_lb, op2_ub);
+	zero_to_inf_range (lb, ub, signbit_known);
+	r.set (type, lb, ub);
+      }
+    return float_binary_op_range_finish (ret, r, type, lhs);
   }
   virtual bool op2_range (frange &r, tree type,
 			  const frange &lhs,
@@ -2282,8 +2414,28 @@ public:
   {
     if (lhs.undefined_p ())
       return false;
-    return float_binary_op_range_finish (fold_range (r, type, op1, lhs),
-					 r, type, lhs);
+    bool ret = fold_range (r, type, op1, lhs);
+    if (!ret)
+      return ret;
+    if (lhs.known_isnan () || op1.known_isnan () || op1.undefined_p ())
+      return float_binary_op_range_finish (ret, r, type, lhs, true);
+    const REAL_VALUE_TYPE &lhs_lb = lhs.lower_bound ();
+    const REAL_VALUE_TYPE &lhs_ub = lhs.upper_bound ();
+    const REAL_VALUE_TYPE &op1_lb = op1.lower_bound ();
+    const REAL_VALUE_TYPE &op1_ub = op1.upper_bound ();
+    if ((contains_zero_p (lhs_lb, lhs_ub) && contains_zero_p (op1_lb, op1_ub))
+	|| ((real_isinf (&lhs_lb) || real_isinf (&lhs_ub))
+	    && (real_isinf (&op1_lb) || real_isinf (&op1_ub))))
+      {
+	// If both lhs and op1 could be zeros or both could be infinities,
+	// we don't know anything about op2 except maybe for the sign
+	// and perhaps if it can be NAN or not.
+	REAL_VALUE_TYPE lb, ub;
+	int signbit_known = signbit_known_p (lhs_lb, lhs_ub, op1_lb, op1_ub);
+	zero_to_inf_range (lb, ub, signbit_known);
+	r.set (type, lb, ub);
+      }
+    return float_binary_op_range_finish (ret, r, type, lhs, true);
   }
 private:
   void rv_fold (REAL_VALUE_TYPE &lb, REAL_VALUE_TYPE &ub, bool &maybe_nan,
@@ -2296,7 +2448,7 @@ private:
   {
     // +-0.0 / +-0.0 or +-INF / +-INF is a known NAN.
     if ((zero_p (lh_lb, lh_ub) && zero_p (rh_lb, rh_ub))
-	|| (singleton_inf_p (lh_lb, lh_ub) || singleton_inf_p (rh_lb, rh_ub)))
+	|| (singleton_inf_p (lh_lb, lh_ub) && singleton_inf_p (rh_lb, rh_ub)))
       {
 	real_nan (&lb, "", 0, TYPE_MODE (type));
 	ub = lb;

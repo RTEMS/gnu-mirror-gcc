@@ -12796,7 +12796,9 @@ __atomic_store_n(&lockvar, 0, __ATOMIC_RELEASE|__ATOMIC_HLE_RELEASE);
 @end smallexample
 
 @node Object Size Checking
-@section Object Size Checking Built-in Functions
+@section Object Size Checking
+
+@subsection Object Size Checking Built-in Functions
 @findex __builtin_object_size
 @findex __builtin_dynamic_object_size
 @findex __builtin___memcpy_chk
@@ -12878,11 +12880,17 @@ which objects @var{ptr} points to at compile time are the same as in the case
 of @code{__builtin_object_size}.
 @end deftypefn
 
-There are built-in functions added for many common string operation
-functions, e.g., for @code{memcpy} @code{__builtin___memcpy_chk}
-built-in is provided.  This built-in has an additional last argument,
-which is the number of bytes remaining in the object the @var{dest}
-argument points to or @code{(size_t) -1} if the size is not known.
+@subsection Object Size Checking and Source Fortification
+
+Hardening of function calls using the @code{_FORTIFY_SOURCE} macro is
+one of the key uses of the object size checking built-in functions.  To
+make implementation of these features more convenient and improve
+optimization and diagnostics, there are built-in functions added for
+many common string operation functions, e.g., for @code{memcpy}
+@code{__builtin___memcpy_chk} built-in is provided.  This built-in has
+an additional last argument, which is the number of bytes remaining in
+the object the @var{dest} argument points to or @code{(size_t) -1} if
+the size is not known.
 
 The built-in functions are optimized into the normal string functions
 like @code{memcpy} if the last argument is @code{(size_t) -1} or if
@@ -14291,8 +14299,14 @@ and GCC does not issue a warning.
 @end deftypefn
 
 @deftypefn {Built-in Function}{size_t} __builtin_object_size (const void * @var{ptr}, int @var{type})
-Returns the size of an object pointed to by @var{ptr}.  @xref{Object Size
-Checking}, for a detailed description of the function.
+Returns a constant size estimate of an object pointed to by @var{ptr}.
+@xref{Object Size Checking}, for a detailed description of the function.
+@end deftypefn
+
+@deftypefn {Built-in Function}{size_t} __builtin_dynamic_object_size (const void * @var{ptr}, int @var{type})
+Similar to @code{__builtin_object_size} except that the return value
+need not be a constant.  @xref{Object Size Checking}, for a detailed
+description of the function.
 @end deftypefn
 
 @deftypefn {Built-in Function} double __builtin_huge_val (void)
@@ -21103,7 +21117,9 @@ Returns the value that is currently set in the @samp{tp} register.
 @end deftypefn
 
 @deftypefn {Built-in Function}  void __builtin_riscv_pause (void)
-Generates the @code{pause} (hint) machine instruction.
+Generates the @code{pause} (hint) machine instruction.  This implies the
+Xgnuzihintpausestate extension, which redefines the @code{pause} instruction to
+change architectural state.
 @end deftypefn
 
 @node RX Built-in Functions
@@ -21897,18 +21913,6 @@ AMD Family 19h Zen version 3.
 
 @item znver4
 AMD Family 19h Zen version 4.
-
-@item x86-64
-Baseline x86-64 microarchitecture level (as defined in x86-64 psABI).
-
-@item x86-64-v2
-x86-64-v2 microarchitecture level.
-
-@item x86-64-v3
-x86-64-v3 microarchitecture level.
-
-@item x86-64-v4
-x86-64-v4 microarchitecture level.
 @end table
 
 Here is an example:
@@ -22002,6 +22006,16 @@ VPCLMULQDQ instructions.
 AVX512VNNI instructions.
 @item avx512bitalg
 AVX512BITALG instructions.
+@item x86-64
+Baseline x86-64 microarchitecture level (as defined in x86-64 psABI).
+@item x86-64-v2
+x86-64-v2 microarchitecture level.
+@item x86-64-v3
+x86-64-v3 microarchitecture level.
+@item x86-64-v4
+x86-64-v4 microarchitecture level.
+
+
 @end table
 
 Here is an example:

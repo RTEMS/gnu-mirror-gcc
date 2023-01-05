@@ -127,8 +127,12 @@ binding_key::make (store_manager *mgr, const region *r)
     {
       bit_size_t bit_size;
       if (r->get_bit_size (&bit_size))
-	return mgr->get_concrete_binding (offset.get_bit_offset (),
-					  bit_size);
+	{
+	  /* Must be non-empty.  */
+	  gcc_assert (bit_size > 0);
+	  return mgr->get_concrete_binding (offset.get_bit_offset (),
+					    bit_size);
+	}
       else
 	return mgr->get_symbolic_binding (r);
     }
@@ -907,6 +911,8 @@ binding_map::apply_ctor_val_to_range (const region *parent_reg,
     return false;
   bit_offset_t start_bit_offset = min_offset.get_bit_offset ();
   store_manager *smgr = mgr->get_store_manager ();
+  if (max_element->empty_p ())
+    return false;
   const binding_key *max_element_key = binding_key::make (smgr, max_element);
   if (max_element_key->symbolic_p ())
     return false;
@@ -946,6 +952,8 @@ binding_map::apply_ctor_pair_to_child_region (const region *parent_reg,
   else
     {
       const svalue *sval = get_svalue_for_ctor_val (val, mgr);
+      if (child_reg->empty_p ())
+	return false;
       const binding_key *k
 	= binding_key::make (mgr->get_store_manager (), child_reg);
       /* Handle the case where we have an unknown size for child_reg
@@ -1343,6 +1351,8 @@ binding_cluster::bind (store_manager *mgr,
       return;
     }
 
+  if (reg->empty_p ())
+    return;
   const binding_key *binding = binding_key::make (mgr, reg);
   bind_key (binding, sval);
 }
@@ -1415,6 +1425,8 @@ void
 binding_cluster::purge_region (store_manager *mgr, const region *reg)
 {
   gcc_assert (reg->get_kind () == RK_DECL);
+  if (reg->empty_p ())
+    return;
   const binding_key *binding
     = binding_key::make (mgr, const_cast<region *> (reg));
   m_map.remove (binding);
@@ -1464,6 +1476,9 @@ binding_cluster::mark_region_as_unknown (store_manager *mgr,
 					 const region *reg_for_overlap,
 					 uncertainty_t *uncertainty)
 {
+  if (reg_to_bind->empty_p ())
+    return;
+
   remove_overlapping_bindings (mgr, reg_for_overlap, uncertainty);
 
   /* Add a default binding to "unknown".  */
@@ -1516,6 +1531,8 @@ const svalue *
 binding_cluster::get_binding (store_manager *mgr,
 			      const region *reg) const
 {
+  if (reg->empty_p ())
+    return NULL;
   const binding_key *reg_binding = binding_key::make (mgr, reg);
   const svalue *sval = m_map.get (reg_binding);
   if (sval)
@@ -1655,6 +1672,9 @@ binding_cluster::maybe_get_compound_binding (store_manager *mgr,
     return NULL;
   region_offset reg_offset = reg->get_offset (mgr->get_svalue_manager ());
   if (reg_offset.symbolic_p ())
+    return NULL;
+
+  if (reg->empty_p ())
     return NULL;
 
   region_model_manager *sval_mgr = mgr->get_svalue_manager ();
@@ -1800,6 +1820,8 @@ binding_cluster::remove_overlapping_bindings (store_manager *mgr,
 					      const region *reg,
 					      uncertainty_t *uncertainty)
 {
+  if (reg->empty_p ())
+    return;
   const binding_key *reg_binding = binding_key::make (mgr, reg);
 
   const region *cluster_base_reg = get_base_region ();
@@ -2007,11 +2029,14 @@ binding_cluster::on_unknown_fncall (const gcall *call,
     {
       m_map.empty ();
 
-      /* Bind it to a new "conjured" value using CALL.  */
-      const svalue *sval
-	= mgr->get_svalue_manager ()->get_or_create_conjured_svalue
+      if (!m_base_region->empty_p ())
+	{
+	  /* Bind it to a new "conjured" value using CALL.  */
+	  const svalue *sval
+	    = mgr->get_svalue_manager ()->get_or_create_conjured_svalue
 	    (m_base_region->get_type (), call, m_base_region, p);
-      bind (mgr, m_base_region, sval);
+	  bind (mgr, m_base_region, sval);
+	}
 
       m_touched = true;
     }
@@ -2146,6 +2171,9 @@ binding_cluster::maybe_get_simple_value (store_manager *mgr) const
     return NULL;
 
   if (m_map.elements () != 1)
+    return NULL;
+
+  if (m_base_region->empty_p ())
     return NULL;
 
   const binding_key *key = binding_key::make (mgr, m_base_region);
@@ -2742,6 +2770,10 @@ store::purge_region (store_manager *mgr, const region *reg)
 void
 store::fill_region (store_manager *mgr, const region *reg, const svalue *sval)
 {
+  /* Filling an empty region is a no-op.  */
+  if (reg->empty_p ())
+    return;
+
   const region *base_reg = reg->get_base_region ();
   if (base_reg->symbolic_for_unknown_ptr_p ()
       || !base_reg->tracked_p ())

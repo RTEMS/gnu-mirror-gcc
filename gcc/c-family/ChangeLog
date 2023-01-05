@@ -1,3 +1,55 @@
+2023-01-03  Florian Weimer  <fweimer@redhat.com>
+
+	* c-cppbuiltin.cc (c_cpp_builtins): Define
+	__LIBGCC_DWARF_CIE_DATA_ALIGNMENT__.
+
+2023-01-03  Florian Weimer  <fweimer@redhat.com>
+
+	Revert:
+	2023-01-03  Florian Weimer  <fweimer@redhat.com>
+
+	* c-cppbuiltin.cc (__LIBGCC_DWARF_REG_SIZES_CONSTANT__):
+	Define if constant is known.
+
+2023-01-03  Florian Weimer  <fweimer@redhat.com>
+
+	Revert:
+	2023-01-02  Florian Weimer  <fweimer@redhat.com>
+
+	* c-cppbuiltin.cc (c_cpp_builtins): Define
+	__LIBGCC_DWARF_CIE_DATA_ALIGNMENT__.
+
+2023-01-02  Florian Weimer  <fweimer@redhat.com>
+
+	* c-cppbuiltin.cc (c_cpp_builtins): Define
+	__LIBGCC_DWARF_CIE_DATA_ALIGNMENT__.
+
+2023-01-02  Florian Weimer  <fweimer@redhat.com>
+
+	* c-cppbuiltin.cc (__LIBGCC_DWARF_REG_SIZES_CONSTANT__):
+	Define if constant is known.
+
+2022-12-19  Marek Polacek  <polacek@redhat.com>
+
+	PR c/98487
+	* c-format.cc (check_function_format): Use get_attribute_name.
+
+2022-12-16  Qing Zhao  <qing.zhao@oracle.com>
+
+	* c.opt (Wstrict-flex-arrays): New option.
+
+2022-12-02  Andrew MacLeod  <amacleod@redhat.com>
+
+	* c-attribs.cc (handle_deprecated_attribute): Use type when
+	using TYPE_NAME.
+
+2022-12-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/84469
+	* c-omp.cc (c_omp_is_loop_iterator): For range for with structured
+	binding return TREE_VEC_LENGTH (d->declv) even if decl is equal
+	to any of the structured binding decls.
+
 2022-11-30  Iskander Shakirzyanov  <iskander@ispras.ru>
 	    Franz Sirl  <Franz.Sirl-kernel@lauterbach.com>
 
@@ -13794,7 +13846,7 @@
 	* c-common.c: Include gt-c-family-c-common.h.
 	* c-pragma.c: Include gt-c-family-c-pragma.h.
 
-Copyright (C) 2010-2022 Free Software Foundation, Inc.
+Copyright (C) 2010-2023 Free Software Foundation, Inc.
 
 Copying and distribution of this file, with or without modification,
 are permitted in any medium without royalty provided the copyright
