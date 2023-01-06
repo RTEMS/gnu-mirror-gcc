@@ -1,3 +1,185 @@
+==================== Patch #9, work104 branch ====================
+Allow for FP types with the same precision.
+
+2022-01-06   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-modes.def (rs6000-modes.h): Remove inclusion.
+	(IFmode): Rework set up to use FRACTIONAL_FLOAT_MODE_NO_WIDEN.  Use 128
+	as the precision.
+	(KFmode): Likewise.
+	(TFmode): Set the precision to 128.  Adjust the format of TFmode based
+	on the -mabi={ibm,ieee}longdouble option.
+	* config/rs6000/rs6000-modes.h: Delete.
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Use 128
+	bits as the precision for 128-bit float, instead of using a special
+	values for the 3 different 128-bit FP modes.  Move resetting the format
+	of TFmode to rs6000-modes.def.
+	* config/rs6000/rs6000.h (rs6000-modes.h): Remove inclusion.
+	* config/rs6000/t-rs6000 (TM_H): Don't add rs6000-modes.h.
+	* expr.cc (convert_mode_scalar): Don't abort if we are converting
+	floating point modes that are the same precision but use different
+	encodings.
+	* genmodes.cc (struct mode_data): Add normal_widen field.
+	(blank_mode): Likewise.
+	(FRACTIONAL_FLOAT_MODE): Add support for NO_WIDEN capability.
+	(FRACTIONAL_FLOAT_MODE_NO_WIDEN): New macro.
+	(make_float_mode): Add support for NO_WIDEN capability.
+	(cmp_modes): Likewise.
+	(emit_mode_wider): Likewise.
+	* machmode.def (FRACTIONAL_FLOAT_MODE_NO_WIDEN): Document.
+
+==================== Patch #4, work104 branch ====================
+Update float 128-bit conversions, PR target/107299.
+
+This patch fixes two tests that are still failing when long double is IEEE
+128-bit after the previous 2 patches for PR target/107299 have been applied.
+The tests are:
+
+	gcc.target/powerpc/convert-fp-128.c
+	gcc.target/powerpc/pr85657-3.c
+
+This patch is a rewrite of the patch submitted on August 18th:
+
+| https://gcc.gnu.org/pipermail/gcc-patches/2022-August/599988.html
+
+This patch reworks the conversions between 128-bit binary floating point types.
+Previously, we would call rs6000_expand_float128_convert to do all conversions.
+Now, we only define the conversions between the same representation that turn
+into a NOP.  The appropriate extend or truncate insn is generated, and after
+register allocation, it is converted to a move.
+
+This patch also fixes two places where we want to override the external name
+for the conversion function, and the wrong optab was used.  Previously,
+rs6000_expand_float128_convert would handle the move or generate the call as
+needed.  Now, it lets the machine independent code generate the call.  But if
+we use the machine independent code to generate the call, we need to update the
+name for two optabs where a truncate would be used in terms of converting
+between the modes.  This patch updates those two optabs.
+
+I tested this patch on:
+
+    1)	LE Power10 using --with-cpu=power10 --with-long-double-format=ieee
+    2)	LE Power10 using --with-cpu=power10 --with-long-double-format=ibm
+    3)	LE Power9  using --with-cpu=power9  --with-long-double-format=ibm
+    4)	BE Power8  using --with-cpu=power8  --with-long-double-format=ibm
+
+In the past I have also tested this exact patch on the following systems:
+
+    1)	LE Power10 using --with-cpu=power9  --with-long-double-format=ibm
+    2)	LE Power10 using --with-cpu=power8  --with-long-double-format=ibm
+    3)	LE Power10 using --with-cpu=power10 --with-long-double-format=ibm
+
+There were no regressions in the bootstrap process or running the tests (after
+applying all 3 patches for PR target/107299).  Can I check this patch into the
+trunk?
+
+2022-01-04   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/107299
+	* config/rs6000/rs6000.cc (init_float128_ieee): Use the correct
+	float_extend or float_truncate optab based on how the machine converts
+	between IEEE 128-bit and IBM 128-bit.
+	* config/rs6000/rs6000.md (IFKF): Delete.
+	(IFKF_reg): Delete.
+	(extendiftf2): Rewrite to be a move if IFmode and TFmode are both IBM
+	128-bit.  Do not run if TFmode is IEEE 128-bit.
+	(extendifkf2): Delete.
+	(extendtfkf2): Delete.
+	(extendtfif2): Delete.
+	(trunciftf2): Delete.
+	(truncifkf2): Delete.
+	(trunckftf2): Delete.
+	(extendkftf2): Implement conversion of IEEE 128-bit types as a move.
+	(trunctfif2): Delete.
+	(trunctfkf2): Implement conversion of IEEE 128-bit types as a move.
+	(extend<mode>tf2_internal): Delete.
+	(extendtf<mode>2_internal): Delete.
+
+==================== Patch #2, work104 branch ====================
+PR target/107299
+
+2022-12-27  Kewen Lin  <linkw@linux.ibm.com>
+
+gcc/ChangeLog:
+
+        * tree.cc (build_common_tree_nodes): Remove workaround for rs6000
+        KFmode.
+
+==================== Patch #1, work104 branch ====================
+Rework 128-bit complex multiply and divide.
+
+This patch reworks how the complex multiply and divide built-in functions are
+done.  Previously we created built-in declarations for doing long double complex
+multiply and divide when long double is IEEE 128-bit.  The old code also did not
+support __ibm128 complex multiply and divide if long double is IEEE 128-bit.
+
+In terms of history, I wrote the original code just as I was starting to test
+GCC on systems where IEEE 128-bit long double was the default.  At the time, we
+had not yet started mangling the built-in function names as a way to bridge
+going from a system with 128-bit IBM long double to 128-bin IEEE long double.
+
+The original code depends on there only being two 128-bit types invovled.  With
+the next patch in this series, this assumption will no longer be true.  When
+long double is IEEE 128-bit, there will be 2 IEEE 128-bit types (one for the
+explicit __float128/_Float128 type and one for long double).
+
+The problem is we cannot create two separate built-in functions that resolve to
+the same name.  This is a requirement of add_builtin_function and the C front
+end.  That means for the 3 possible modes (IFmode, KFmode, and TFmode), you can
+only use 2 of them.
+
+This code does not create the built-in declaration with the changed name.
+Instead, it uses the TARGET_MANGLE_DECL_ASSEMBLER_NAME hook to change the name
+before it is written out to the assembler file like it now does for all of the
+other long double built-in functions.
+
+When I wrote these patches, I discovered that __ibm128 complex multiply and
+divide had originally not been supported if long double is IEEE 128-bit as it
+would generate calls to __mulic3 and __divic3.  I added tests in the testsuite
+to verify that the correct name (i.e. __multc3 and __divtc3) is used in this
+case.
+
+I had previously sent this patch out on November 1st.  Compared to that version,
+this version no longer disables the special mapping when you are building
+libgcc, as it turns out we don't need it.
+
+I tested all 3 patchs for PR target/107299 on:
+
+    1)	LE Power10 using --with-cpu=power10 --with-long-double-format=ieee
+    2)	LE Power10 using --with-cpu=power10 --with-long-double-format=ibm
+    3)	LE Power9  using --with-cpu=power9  --with-long-double-format=ibm
+    4)	BE Power8  using --with-cpu=power8  --with-long-double-format=ibm
+
+Once all 3 patches have been applied, we can once again build GCC when long
+double is IEEE 128-bit.  There were no other regressions with these patches.
+Can I check these patches into the trunk?
+
+2023-01-04   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/107299
+	* config/rs6000/rs6000.cc (create_complex_muldiv): Delete.
+	(init_float128_ieee): Delete code to switch complex multiply and divide
+	for long double.
+	(complex_multiply_builtin_code): New helper function.
+	(complex_divide_builtin_code): Likewise.
+	(rs6000_mangle_decl_assembler_name): Add support for mangling the name
+	of complex 128-bit multiply and divide built-in functions.
+
+gcc/testsuite/
+
+	PR target/107299
+	* gcc.target/powerpc/divic3-1.c: New test.
+	* gcc.target/powerpc/divic3-2.c: Likewise.
+	* gcc.target/powerpc/mulic3-1.c: Likewise.
+	* gcc.target/powerpc/mulic3-2.c: Likewise.
+
+==================== Basline ====================
 2023-01-03   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
