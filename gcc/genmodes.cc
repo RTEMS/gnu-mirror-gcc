@@ -79,6 +79,8 @@ struct mode_data
 				   adjustment */
   unsigned int int_n;		/* If nonzero, then __int<INT_N> will be defined */
   bool boolean;
+  bool no_widen;		/* Whether the type should not be listed in the
+				   mode_wider and mode_2xwider tables.  */
 };
 
 static struct mode_data *modes[MAX_MODE_CLASS];
@@ -90,7 +92,7 @@ static const struct mode_data blank_mode = {
   0, -1U, -1U, -1U, -1U,
   0, 0, 0, 0, 0, 0,
   "<unknown>", 0, 0, 0, 0, false, false, 0,
-  false
+  false, false
 };
 
 static htab_t modes_by_name;
@@ -658,18 +660,22 @@ make_fixed_point_mode (enum mode_class cl,
 
 #define FLOAT_MODE(N, Y, F)             FRACTIONAL_FLOAT_MODE (N, -1U, Y, F)
 #define FRACTIONAL_FLOAT_MODE(N, B, Y, F) \
-  make_float_mode (#N, B, Y, #F, __FILE__, __LINE__)
+  make_float_mode (#N, B, Y, #F, __FILE__, __LINE__, false)
+#define FRACTIONAL_FLOAT_MODE_NO_WIDEN(N, B, Y, F) \
+  make_float_mode (#N, B, Y, #F, __FILE__, __LINE__, true)
 
 static void
 make_float_mode (const char *name,
 		 unsigned int precision, unsigned int bytesize,
 		 const char *format,
-		 const char *file, unsigned int line)
+		 const char *file, unsigned int line,
+		 bool no_widen)
 {
   struct mode_data *m = new_mode (MODE_FLOAT, name, file, line);
   m->bytesize = bytesize;
   m->precision = precision;
   m->format = format;
+  m->no_widen = no_widen;
 }
 
 #define DECIMAL_FLOAT_MODE(N, Y, F)	\
@@ -1552,6 +1558,8 @@ emit_mode_wider (void)
 	  || m->cl == MODE_UACCUM)
 	for (m2 = m->wider; m2 && m2 != void_mode; m2 = m2->wider)
 	  {
+	    if (m2->no_widen)
+	      continue;
 	    if (m2->bytesize == m->bytesize
 		&& m2->precision == m->precision)
 	      continue;
@@ -1576,6 +1584,8 @@ emit_mode_wider (void)
 	   m2 && m2 != void_mode;
 	   m2 = m2->wider)
 	{
+	  if (m2->no_widen)
+	    continue;
 	  if (m2->bytesize < 2 * m->bytesize)
 	    continue;
 	  if (m->precision != (unsigned int) -1)
