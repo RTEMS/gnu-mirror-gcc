@@ -1,3 +1,77 @@
+2023-01-05  Roger Sayle  <roger@nextmovesoftware.com>
+
+	Revert:
+	2023-01-05  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* gcc.target/i386/cmov10.c: New test case.
+
+2023-01-05  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/108275
+	* g++.dg/parse/access14.C: New test.
+
+2023-01-05  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* lib/gm2.exp (gm2_init_minx): New procedure.
+	(gm2_init_min): New procedure calls gm2_init_min with
+	dialect flags.
+	* gm2/link/min/pass/tiny.mod: New test case.
+	* gm2/link/min/pass/link-min-pass.exp: New file.
+
+2023-01-04  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/108282
+	* g++.dg/cpp2a/concepts-requires34.C: New test.
+
+2023-01-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/108206
+	* g++.dg/template/pr108206.C: New test.
+
+2023-01-04  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* gm2/iso/pass/realbitscast.mod: Disable REAL96 on Darwin.
+
+2023-01-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/108253
+	* g++.dg/opt/pr108253.C: New test.
+
+2023-01-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/108237
+	* gcc.c-torture/compile/pr108237.c: New test.
+
+2023-01-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/108256
+	* c-c++-common/ubsan/pr108256.c: New test.
+
+2023-01-03  David Edelsohn  <dje.gcc@gmail.com>
+
+	* g++.dg/modules/modules.exp: Skip on AIX.
+	* gcc.target/powerpc/pr99708.c: Skip on AIX.
+
+2023-01-03  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* g++.dg/gomp/target-simd-clone-1.C: Tweak to test
+	that the unused clone is GC'ed.
+	* gcc.dg/gomp/target-simd-clone-1.c: Likewise.
+
+2023-01-03  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* gcc.target/i386/cmov10.c: New test case.
+
+2023-01-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/108264
+	* gcc.dg/pr108264.c: New test.
+
+2023-01-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/108263
+	* gcc.dg/pr108263.c: New test.
+
 2023-01-01  Roger Sayle  <roger@nextmovesoftware.com>
 	    Uroš Bizjak  <ubizjak@gmail.com>
 

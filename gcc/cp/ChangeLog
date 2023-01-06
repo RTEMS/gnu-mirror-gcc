@@ -1,3 +1,27 @@
+2023-01-05  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/108275
+	* parser.cc (cp_parser_class_head): Use dk_deferred instead of
+	dk_no_check when parsing the class name.
+
+2023-01-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/108286
+	* semantics.cc (finish_omp_target_clauses): Ignore clauses other than
+	OMP_CLAUSE_MAP.
+
+2023-01-04  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/108282
+	* decl2.cc (mark_single_function): Ignore mark_used failure
+	only in a non-SFINAE context rather than in a SFINAE one.
+
+2023-01-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/108206
+	* decl.cc (merge_default_template_args): Return false if either
+	new_parm or old_parm are erroneous.
+
 
 Copyright (C) 2023 Free Software Foundation, Inc.
 

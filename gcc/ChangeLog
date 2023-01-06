@@ -1,3 +1,197 @@
+2023-01-05  Roger Sayle  <roger@nextmovesoftware.com>
+
+	Revert:
+	2023-01-03  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* config/i386/i386-expand.cc (ix86_expand_int_movcc): Rewrite
+	RTL expansion to allow condition (mask) to be shared/reused,
+	by avoiding overwriting pseudos and adding REG_EQUAL notes.
+
+2023-01-05  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* common.opt: Add -static-libgm2.
+	* config/darwin.h (LINK_SPEC): Handle static-libgm2.
+	* doc/gm2.texi: Document static-libgm2.
+	* gcc.cc (driver_handle_option): Allow static-libgm2.
+
+2023-01-05  Tejas Joshi  <TejasSanjay.Joshi@amd.com>
+
+	* common/config/i386/i386-common.cc (processor_alias_table):
+	Use CPU_ZNVER4 for znver4.
+	* config/i386/i386.md: Add znver4.md.
+	* config/i386/znver4.md: New.
+
+2023-01-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/108253
+	* tree-vrp.cc (maybe_set_nonzero_bits): Handle var with pointer
+	types.
+
+2023-01-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/108237
+	* generic-match-head.cc: Include tree-pass.h.
+	(canonicalize_math_p, optimize_vectors_before_lowering_p): Define
+	to false if cfun and cfun->curr_properties has PROP_gimple_opt_math
+	resp. PROP_gimple_lvec property set.
+
+2023-01-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/108256
+	* convert.cc (do_narrow): Punt for MULT_EXPR if original
+	type doesn't wrap around and -fsanitize=signed-integer-overflow
+	is on.
+	* fold-const.cc (fold_unary_loc) <CASE_CONVERT>: Likewise.
+
+2023-01-04  Hu, Lin1  <lin1.hu@intel.com>
+
+	* common/config/i386/cpuinfo.h (get_intel_cpu): Handle Emeraldrapids.
+	* common/config/i386/i386-common.cc: Add Emeraldrapids.
+
+2023-01-04  Hu, Lin1  <lin1.hu@intel.com>
+
+	* common/config/i386/cpuinfo.h (get_intel_cpu): Remove case 0xb5
+	for meteorlake.
+
+2023-01-03  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* cgraph.h (struct cgraph_node): Add gc_candidate bit, modify
+	default constructor to initialize it.
+	* cgraphunit.cc (expand_all_functions): Save gc_candidate functions
+	for last and iterate to handle recursive calls.  Delete leftover
+	candidates at the end.
+	* omp-simd-clone.cc (simd_clone_create): Set gc_candidate bit
+	on local clones.
+	* tree-vect-stmts.cc (vectorizable_simd_clone_call): Clear
+	gc_candidate bit when a clone is used.
+
+2023-01-03  Florian Weimer  <fweimer@redhat.com>
+
+	Revert:
+	2023-01-02  Florian Weimer  <fweimer@redhat.com>
+
+	* dwarf2cfi.cc (init_return_column_size): Remove.
+	(init_one_dwarf_reg_size): Adjust.
+	(generate_dwarf_reg_sizes): New function.  Extracted
+	from expand_builtin_init_dwarf_reg_sizes.
+	(expand_builtin_init_dwarf_reg_sizes): Call
+	generate_dwarf_reg_sizes.
+	* target.def (init_dwarf_reg_sizes_extra): Adjust
+	hook signature.
+	* config/msp430/msp430.cc
+	(msp430_init_dwarf_reg_sizes_extra): Adjust.
+	* config/rs6000/rs6000.cc
+	(rs6000_init_dwarf_reg_sizes_extra): Likewise.
+	* doc/tm.texi: Update.
+
+2023-01-03  Florian Weimer  <fweimer@redhat.com>
+
+	Revert:
+	2023-01-02  Florian Weimer  <fweimer@redhat.com>
+
+	* debug.h (dwarf_reg_sizes_constant): Declare.
+	* dwarf2cfi.cc (dwarf_reg_sizes_constant): New function.
+
+2023-01-03  Siddhesh Poyarekar  <siddhesh@gotplt.org>
+
+	PR tree-optimization/105043
+	* doc/extend.texi (Object Size Checking): Split out into two
+	subsections and mention _FORTIFY_SOURCE.
+
+2023-01-03  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* config/i386/i386-expand.cc (ix86_expand_int_movcc): Rewrite
+	RTL expansion to allow condition (mask) to be shared/reused,
+	by avoiding overwriting pseudos and adding REG_EQUAL notes.
+
+2023-01-03  Roger Sayle  <roger@nextmovesoftware.com>
+
+	PR target/108229
+	* config/i386/i386-features.cc
+	(general_scalar_chain::compute_convert_gain) <case PLUS>: Consider
+	the gain/cost of converting a MEM operand.
+
+2023-01-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/108264
+	* expr.cc (store_expr): For stores into SUBREG_PROMOTED_* targets
+	from source which doesn't have scalar integral mode first convert
+	it to outer_mode.
+
+2023-01-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/108263
+	* cfgrtl.cc (fixup_reorder_chain): Avoid trying to redirect
+	asm goto to EXIT.
+
+2023-01-02  Alexander Monakov  <amonakov@ispras.ru>
+
+	PR target/87832
+	* config/i386/lujiazui.md (lujiazui_div): New automaton.
+	(lua_div): New unit.
+	(lua_idiv_qi): Correct unit in the reservation.
+	(lua_idiv_qi_load): Ditto.
+	(lua_idiv_hi): Ditto.
+	(lua_idiv_hi_load): Ditto.
+	(lua_idiv_si): Ditto.
+	(lua_idiv_si_load): Ditto.
+	(lua_idiv_di): Ditto.
+	(lua_idiv_di_load): Ditto.
+	(lua_fdiv_SF): Ditto.
+	(lua_fdiv_SF_load): Ditto.
+	(lua_fdiv_DF): Ditto.
+	(lua_fdiv_DF_load): Ditto.
+	(lua_fdiv_XF): Ditto.
+	(lua_fdiv_XF_load): Ditto.
+	(lua_ssediv_SF): Ditto.
+	(lua_ssediv_load_SF): Ditto.
+	(lua_ssediv_V4SF): Ditto.
+	(lua_ssediv_load_V4SF): Ditto.
+	(lua_ssediv_V8SF): Ditto.
+	(lua_ssediv_load_V8SF): Ditto.
+	(lua_ssediv_SD): Ditto.
+	(lua_ssediv_load_SD): Ditto.
+	(lua_ssediv_V2DF): Ditto.
+	(lua_ssediv_load_V2DF): Ditto.
+	(lua_ssediv_V4DF): Ditto.
+	(lua_ssediv_load_V4DF): Ditto.
+
+2023-01-02  Florian Weimer  <fweimer@redhat.com>
+
+	* debug.h (dwarf_reg_sizes_constant): Declare.
+	* dwarf2cfi.cc (dwarf_reg_sizes_constant): New function.
+
+2023-01-02  Florian Weimer  <fweimer@redhat.com>
+
+	* dwarf2cfi.cc (init_return_column_size): Remove.
+	(init_one_dwarf_reg_size): Adjust.
+	(generate_dwarf_reg_sizes): New function.  Extracted
+	from expand_builtin_init_dwarf_reg_sizes.
+	(expand_builtin_init_dwarf_reg_sizes): Call
+	generate_dwarf_reg_sizes.
+	* target.def (init_dwarf_reg_sizes_extra): Adjust
+	hook signature.
+	* config/msp430/msp430.cc
+	(msp430_init_dwarf_reg_sizes_extra): Adjust.
+	* config/rs6000/rs6000.cc
+	(rs6000_init_dwarf_reg_sizes_extra): Likewise.
+	* doc/tm.texi: Update.
+
+2023-01-02  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.cc (process_command): Update copyright notice dates.
+	* gcov-dump.cc (print_version): Ditto.
+	* gcov.cc (print_version): Ditto.
+	* gcov-tool.cc (print_version): Ditto.
+	* gengtype.cc (create_file): Ditto.
+	* doc/cpp.texi: Bump @copying's copyright year.
+	* doc/cppinternals.texi: Ditto.
+	* doc/gcc.texi: Ditto.
+	* doc/gccint.texi: Ditto.
+	* doc/gcov.texi: Ditto.
+	* doc/install.texi: Ditto.
+	* doc/invoke.texi: Ditto.
+
 2023-01-01  Roger Sayle  <roger@nextmovesoftware.com>
 	    Uroš Bizjak  <ubizjak@gmail.com>
 

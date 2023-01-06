@@ -2502,6 +2502,7 @@ GLIBCXX_3.4.31 {
     _ZNKSt6chrono9tzdb_list14const_iteratordeEv;
     _ZNSt6chrono9tzdb_list14const_iteratorppEv;
     _ZNSt6chrono9tzdb_list14const_iteratorppEi;
+    _ZN9__gnu_cxx21zoneinfo_dir_overrideEv;
 
 } GLIBCXX_3.4.30;
 
