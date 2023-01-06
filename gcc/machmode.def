@@ -90,12 +90,6 @@ along with GCC; see the file COPYING3.  If not see
 	storage, but with only PRECISION significant bits, using
 	floating point format FORMAT.
 
-     FRACTIONAL_FLOAT_MODE_NO_WIDEN (MODE, PRECISION, BYTESIZE, FORMAT);
-        declares MODE to be of class FLOAT, BYTESIZE bytes wide in
-	storage, but with only PRECISION significant bits, using
-	floating point format FORMAT.  Unlike FRACTIONAL_FLOAT_MODE,
-	MODE is not listed in the mode_wider and mode_2xwider tables.
-
      DECIMAL_FLOAT_MODE (MODE, BYTESIZE, FORMAT);
 	declares MODE to be of class DECIMAL_FLOAT and BYTESIZE bytes
 	wide.  All of the bits of its representation are significant.
