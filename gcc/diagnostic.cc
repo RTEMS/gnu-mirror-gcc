@@ -2277,6 +2277,9 @@ diagnostic_output_format_init (diagnostic_context *context,
 			       const char *base_file_name,
 			       enum diagnostics_output_format format)
 {
+  if (base_file_name == NULL)
+    return;
+
   switch (format)
     {
     default:
