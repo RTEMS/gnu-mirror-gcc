@@ -1,3 +1,13 @@
+==================== Patch #10, work104 branch ====================
+Fixup __ibm128 to long double conversion.
+
+2022-01-06   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.md (init_float128_ieee): Update code for
+	conversion used in reworking using 128 bit precision.
+
 ==================== Patch #9, work104 branch ====================
 Allow for FP types with the same precision.
 
