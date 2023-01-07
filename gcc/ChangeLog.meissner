@@ -1,15 +1,27 @@
-==================== Patch #10, work104 branch ====================
-Fixup __ibm128 to long double conversion.
-
-2022-01-06   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/rs6000.md (init_float128_ieee): Update code for
-	conversion used in reworking using 128 bit precision.
-
-==================== Patch #9, work104 branch ====================
+==================== Patch #21, work104 branch ====================
 Allow for FP types with the same precision.
+
+This patch allows 2 or more floating point modes to have the same precision.
+The PowerPC has 3 128-bit floating point types (IFmode that uses the IBM
+extended double format, KFmode that uses the IEEE 128-bit format, and TFmode
+that can eithe use the IBM extended format or the IEEE 128-bit format depending
+on the switches used when compiling the module and switches used to configure
+the compiler.
+
+In the past, we needed to use 3 different precisions to separate these types.
+
+This patch adds a new macro (FRACTIONAL_FLOAT_MODE_NO_WIDEN) that a machine
+description can use to say this particular mode is not a standard floating point
+mode.  The machine independent part of the compiler will not automatically widen
+other floating point modes to these special modes.  In the case of the PowerPC,
+IFmode and KFmode use this no warn mode creation, while TFmode uses the normal
+creation.
+
+I also moved changing the TFmode format from ieee to ibm to rs6000-modes.def
+from rs6000.cc.
+
+We used to have an include file defining the special precisions used for the 3
+modes, and this include file is now deleted.
 
 2022-01-06   Michael Meissner  <meissner@linux.ibm.com>
 
@@ -40,86 +52,7 @@ gcc/
 	(emit_mode_wider): Likewise.
 	* machmode.def (FRACTIONAL_FLOAT_MODE_NO_WIDEN): Document.
 
-==================== Patch #4, work104 branch ====================
-Update float 128-bit conversions, PR target/107299.
-
-This patch fixes two tests that are still failing when long double is IEEE
-128-bit after the previous 2 patches for PR target/107299 have been applied.
-The tests are:
-
-	gcc.target/powerpc/convert-fp-128.c
-	gcc.target/powerpc/pr85657-3.c
-
-This patch is a rewrite of the patch submitted on August 18th:
-
-| https://gcc.gnu.org/pipermail/gcc-patches/2022-August/599988.html
-
-This patch reworks the conversions between 128-bit binary floating point types.
-Previously, we would call rs6000_expand_float128_convert to do all conversions.
-Now, we only define the conversions between the same representation that turn
-into a NOP.  The appropriate extend or truncate insn is generated, and after
-register allocation, it is converted to a move.
-
-This patch also fixes two places where we want to override the external name
-for the conversion function, and the wrong optab was used.  Previously,
-rs6000_expand_float128_convert would handle the move or generate the call as
-needed.  Now, it lets the machine independent code generate the call.  But if
-we use the machine independent code to generate the call, we need to update the
-name for two optabs where a truncate would be used in terms of converting
-between the modes.  This patch updates those two optabs.
-
-I tested this patch on:
-
-    1)	LE Power10 using --with-cpu=power10 --with-long-double-format=ieee
-    2)	LE Power10 using --with-cpu=power10 --with-long-double-format=ibm
-    3)	LE Power9  using --with-cpu=power9  --with-long-double-format=ibm
-    4)	BE Power8  using --with-cpu=power8  --with-long-double-format=ibm
-
-In the past I have also tested this exact patch on the following systems:
-
-    1)	LE Power10 using --with-cpu=power9  --with-long-double-format=ibm
-    2)	LE Power10 using --with-cpu=power8  --with-long-double-format=ibm
-    3)	LE Power10 using --with-cpu=power10 --with-long-double-format=ibm
-
-There were no regressions in the bootstrap process or running the tests (after
-applying all 3 patches for PR target/107299).  Can I check this patch into the
-trunk?
-
-2022-01-04   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	PR target/107299
-	* config/rs6000/rs6000.cc (init_float128_ieee): Use the correct
-	float_extend or float_truncate optab based on how the machine converts
-	between IEEE 128-bit and IBM 128-bit.
-	* config/rs6000/rs6000.md (IFKF): Delete.
-	(IFKF_reg): Delete.
-	(extendiftf2): Rewrite to be a move if IFmode and TFmode are both IBM
-	128-bit.  Do not run if TFmode is IEEE 128-bit.
-	(extendifkf2): Delete.
-	(extendtfkf2): Delete.
-	(extendtfif2): Delete.
-	(trunciftf2): Delete.
-	(truncifkf2): Delete.
-	(trunckftf2): Delete.
-	(extendkftf2): Implement conversion of IEEE 128-bit types as a move.
-	(trunctfif2): Delete.
-	(trunctfkf2): Implement conversion of IEEE 128-bit types as a move.
-	(extend<mode>tf2_internal): Delete.
-	(extendtf<mode>2_internal): Delete.
-
-==================== Patch #2, work104 branch ====================
-PR target/107299
-
-2022-12-27  Kewen Lin  <linkw@linux.ibm.com>
-
-gcc/ChangeLog:
-
-        * tree.cc (build_common_tree_nodes): Remove workaround for rs6000
-        KFmode.
-
-==================== Patch #1, work104 branch ====================
+==================== Patch #20, work104 branch ====================
 Rework 128-bit complex multiply and divide.
 
 This patch reworks how the complex multiply and divide built-in functions are
@@ -168,7 +101,7 @@ Once all 3 patches have been applied, we can once again build GCC when long
 double is IEEE 128-bit.  There were no other regressions with these patches.
 Can I check these patches into the trunk?
 
-2023-01-04   Michael Meissner  <meissner@linux.ibm.com>
+2023-01-06   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
