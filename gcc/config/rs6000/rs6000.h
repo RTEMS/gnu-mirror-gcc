@@ -30,6 +30,11 @@
 #include "config/rs6000/rs6000-opts.h"
 #endif
 
+/* 128-bit floating point precision values.  */
+#ifndef RS6000_MODES_H
+#include "config/rs6000/rs6000-modes.h"
+#endif
+
 /* Definitions for the object file format.  These are set at
    compile-time.  */
 
