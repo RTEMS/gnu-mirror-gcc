@@ -97,7 +97,7 @@ struct loop_exit_hasher : ggc_ptr_hash<loop_exit>
 struct GTY(()) histogram_counters{
     gcov_type sum;
     int histogram_size;
-    vec<gcov_type, va_gc> *hist=NULL;
+    vec<gcov_type, va_heap> * GTY((skip)) hist;
 };
 
 // quantil function for the distribution
