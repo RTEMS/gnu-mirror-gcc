@@ -1,3 +1,29 @@
+==================== Patch #24, work104 branch ====================
+
+Use unique precisions for 128-bit floating point on Fortran.
+
+2022-01-09   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-modes.def (IFmode): If we are compiling for
+	Fortran, use unqiue precisions for 128-bit floating point.
+	(KFmode): Likewise.
+	(TFmode): Likewise.
+	* config/rs6000/rs6000.opt (UNIQUE_FLOAT128_PRECISION): New target
+	variable.
+	* genmodes.cc (struct mode_data): Add field for adjusting precision.
+	(blank_mode): Likewise.
+	(need_precision_adj): New variable to support ADJUST_PRECISION.
+	(ADJUST_PRECISION): New macro.
+	(mode_unit_precision_inline): Add support for ADJUST_PRECISION.
+	(emit_insn_modes_h): Likewise.
+	(emit_mode_precision): Likewise.
+	(emit_mode_unit_precision): Likewise.
+	(emit_mode_adjustments): Likewise.
+	* machmode.def (ADJUST_PRECISION): Document usage.
+	* machmode.h (mode_unit_precision): Add support for ADJUST_PRECISION.
+
 ==================== Patch #23, work104 branch ====================
 
 PR target/107299
