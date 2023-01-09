@@ -24,16 +24,30 @@
    the float_mode_for_size function will only return TFmode if the size is 128
    bits.  */
 
+/* Fortran needs to have precisions of 126..128 to differentiate between IEEE
+   and IBM 128-bit floating point.  The values used here are what GCC 12 used
+   for the precisions.  */
+#define UNIQUE_PRECISION_IFmode  128
+#define UNIQUE_PRECISION_TFmode  127
+#define UNIQUE_PRECISION_KFmode  126
+
 /* IBM 128-bit floating point.  */
 FRACTIONAL_FLOAT_MODE_NO_WIDEN (IF, 128, 16, ibm_extended_format);
+ADJUST_PRECISION (IF,
+		  UNIQUE_FLOAT128_PRECISION ? UNIQUE_PRECISION_IFmode : 128);
 
 /* Explicit IEEE 128-bit floating point.  */
 FRACTIONAL_FLOAT_MODE_NO_WIDEN (KF, 128, 16, ieee_quad_format);
+ADJUST_PRECISION (KF,
+		  UNIQUE_FLOAT128_PRECISION ? UNIQUE_PRECISION_KFmode : 128);
 
 /* 128-bit floating point, either IBM 128-bit or IEEE 128-bit.  This is
    adjusted in rs6000_option_override_internal to be the appropriate floating
    point type.  */
 FRACTIONAL_FLOAT_MODE (TF, 128, 16, ieee_quad_format);
+ADJUST_PRECISION (TF,
+		  UNIQUE_FLOAT128_PRECISION ? UNIQUE_PRECISION_TFmode : 128);
+
 ADJUST_FLOAT_FORMAT (TF, (TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD
 			  ? &ibm_extended_format
 			  : &ieee_quad_format));
