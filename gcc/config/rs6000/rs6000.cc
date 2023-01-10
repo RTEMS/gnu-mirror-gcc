@@ -4115,7 +4115,7 @@ rs6000_option_override_internal (bool global_init_p)
      128 into the precision used for TFmode.  */
   int default_long_double_size = (RS6000_DEFAULT_LONG_DOUBLE_SIZE == 64
 				  ? 64
-				  : 128);
+				  : FLOAT_PRECISION_TFmode);
 
   /* Set long double size before the IEEE 128-bit tests.  */
   if (!OPTION_SET_P (rs6000_long_double_type_size))
@@ -4127,6 +4127,10 @@ rs6000_option_override_internal (bool global_init_p)
       else
 	rs6000_long_double_type_size = default_long_double_size;
     }
+  else if (rs6000_long_double_type_size == FLOAT_PRECISION_TFmode)
+    ; /* The option value can be seen when cl_target_option_restore is called.  */
+  else if (rs6000_long_double_type_size == 128)
+    rs6000_long_double_type_size = FLOAT_PRECISION_TFmode;
 
   /* Set -mabi=ieeelongdouble on some old targets.  In the future, power server
      systems will also set long double to be IEEE 128-bit.  AIX and Darwin
@@ -4168,10 +4172,6 @@ rs6000_option_override_internal (bool global_init_p)
      unless the user used the explicit -mfloat128.  In GCC 8, we enable both
      the keyword as well as the type.  */
   TARGET_FLOAT128_TYPE = TARGET_FLOAT128_ENABLE_TYPE && TARGET_VSX;
-
-/* Fortran needs to have precisions of 126..128 to differentiate between IEEE
-   and IBM 128-bit floating point.  */
-  UNIQUE_FLOAT128_PRECISION = lang_GNU_Fortran ();
 
   /* IEEE 128-bit floating point requires VSX support.  */
   if (TARGET_FLOAT128_KEYWORD)
@@ -4561,6 +4561,9 @@ rs6000_option_override_internal (bool global_init_p)
       if (TARGET_XL_COMPAT)
 	flag_signed_bitfields = 0;
 #endif
+
+      if (TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD)
+	REAL_MODE_FORMAT (TFmode) = &ibm_extended_format;
 
       ASM_GENERATE_INTERNAL_LABEL (toc_label_name, "LCTOC", 1);
 
@@ -11142,6 +11145,26 @@ init_float128_ibm (machine_mode mode)
     }
 }
 
+/* Create a decl for either complex long double multiply or complex long double
+   divide when long double is IEEE 128-bit floating point.  We can't use
+   __multc3 and __divtc3 because the original long double using IBM extended
+   double used those names.  The complex multiply/divide functions are encoded
+   as builtin functions with a complex result and 4 scalar inputs.  */
+
+static void
+create_complex_muldiv (const char *name, built_in_function fncode, tree fntype)
+{
+  tree fndecl = add_builtin_function (name, fntype, fncode, BUILT_IN_NORMAL,
+				      name, NULL_TREE);
+
+  set_builtin_decl (fncode, fndecl, true);
+
+  if (TARGET_DEBUG_BUILTIN)
+    fprintf (stderr, "create complex %s, fncode: %d\n", name, (int) fncode);
+
+  return;
+}
+
 /* Set up IEEE 128-bit floating point routines.  Use different names if the
    arguments can be passed in a vector register.  The historical PowerPC
    implementation of IEEE 128-bit floating point used _q_<op> for the names, so
@@ -11153,6 +11176,32 @@ init_float128_ieee (machine_mode mode)
 {
   if (FLOAT128_VECTOR_P (mode))
     {
+      static bool complex_muldiv_init_p = false;
+
+      /* Set up to call __mulkc3 and __divkc3 under -mabi=ieeelongdouble.  If
+	 we have clone or target attributes, this will be called a second
+	 time.  We want to create the built-in function only once.  */
+     if (mode == TFmode && TARGET_IEEEQUAD && !complex_muldiv_init_p)
+       {
+	 complex_muldiv_init_p = true;
+	 built_in_function fncode_mul =
+	   (built_in_function) (BUILT_IN_COMPLEX_MUL_MIN + TCmode
+				- MIN_MODE_COMPLEX_FLOAT);
+	 built_in_function fncode_div =
+	   (built_in_function) (BUILT_IN_COMPLEX_DIV_MIN + TCmode
+				- MIN_MODE_COMPLEX_FLOAT);
+
+	 tree fntype = build_function_type_list (complex_long_double_type_node,
+						 long_double_type_node,
+						 long_double_type_node,
+						 long_double_type_node,
+						 long_double_type_node,
+						 NULL_TREE);
+
+	 create_complex_muldiv ("__mulkc3", fncode_mul, fntype);
+	 create_complex_muldiv ("__divkc3", fncode_div, fntype);
+       }
+
       set_optab_libfunc (add_optab, mode, "__addkf3");
       set_optab_libfunc (sub_optab, mode, "__subkf3");
       set_optab_libfunc (neg_optab, mode, "__negkf2");
@@ -11179,7 +11228,7 @@ init_float128_ieee (machine_mode mode)
       if (mode != TFmode && FLOAT128_IBM_P (TFmode))
 	set_conv_libfunc (sext_optab, mode, TFmode, "__trunctfkf2");
 
-      set_conv_libfunc (sext_optab, IFmode, mode, "__extendkftf2");
+      set_conv_libfunc (trunc_optab, IFmode, mode, "__extendkftf2");
       if (mode != TFmode && FLOAT128_IBM_P (TFmode))
 	set_conv_libfunc (trunc_optab, TFmode, mode, "__extendkftf2");
 
@@ -28170,25 +28219,6 @@ rs6000_starting_frame_offset (void)
   return RS6000_STARTING_FRAME_OFFSET;
 }
 
-/* Internal function to return the built-in function id for the complex
-   multiply operation for a given mode.  */
-
-static inline built_in_function
-complex_multiply_builtin_code (machine_mode mode)
-{
-  return (built_in_function) (BUILT_IN_COMPLEX_MUL_MIN + mode
-			      - MIN_MODE_COMPLEX_FLOAT);
-}
-
-/* Internal function to return the built-in function id for the complex divide
-   operation for a given mode.  */
-
-static inline built_in_function
-complex_divide_builtin_code (machine_mode mode)
-{
-  return (built_in_function) (BUILT_IN_COMPLEX_DIV_MIN + mode
-			      - MIN_MODE_COMPLEX_FLOAT);
-}
 
 /* On 64-bit Linux and Freebsd systems, possibly switch the long double library
    function names from <foo>l to <foo>f128 if the default long double type is
@@ -28207,53 +28237,11 @@ complex_divide_builtin_code (machine_mode mode)
    only do this transformation if the __float128 type is enabled.  This
    prevents us from doing the transformation on older 32-bit ports that might
    have enabled using IEEE 128-bit floating point as the default long double
-   type.
-
-   We also use the TARGET_MANGLE_DECL_ASSEMBLER_NAME hook to change the
-   function names used for complex multiply and divide to the appropriate
-   names.  */
+   type.  */
 
 static tree
 rs6000_mangle_decl_assembler_name (tree decl, tree id)
 {
-  /* Handle complex multiply/divide.  For IEEE 128-bit, use __mulkc3 or
-     __divkc3 and for IBM 128-bit use __multc3 and __divtc3.  */
-  if (TARGET_FLOAT128_TYPE
-      && TREE_CODE (decl) == FUNCTION_DECL
-      && DECL_IS_UNDECLARED_BUILTIN (decl)
-      && DECL_BUILT_IN_CLASS (decl) == BUILT_IN_NORMAL)
-    {
-      built_in_function id = DECL_FUNCTION_CODE (decl);
-      const char *newname = NULL;
-
-      if (id == complex_multiply_builtin_code (KCmode))
-	newname = "__mulkc3";
-
-      else if (id == complex_multiply_builtin_code (ICmode))
-	newname = "__multc3";
-
-      else if (id == complex_multiply_builtin_code (TCmode))
-	newname = (TARGET_IEEEQUAD) ? "__mulkc3" : "__multc3";
-
-      else if (id == complex_divide_builtin_code (KCmode))
-	newname = "__divkc3";
-
-      else if (id == complex_divide_builtin_code (ICmode))
-	newname = "__divtc3";
-
-      else if (id == complex_divide_builtin_code (TCmode))
-	newname = (TARGET_IEEEQUAD) ? "__divkc3" : "__divtc3";
-
-      if (newname)
-	{
-	  if (TARGET_DEBUG_BUILTIN)
-	    fprintf (stderr, "Map complex mul/div => %s\n", newname);
-
-	  return get_identifier (newname);
-	}
-    }
-
-  /* Map long double built-in functions if long double is IEEE 128-bit.  */
   if (TARGET_FLOAT128_TYPE && TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128
       && TREE_CODE (decl) == FUNCTION_DECL
       && DECL_IS_UNDECLARED_BUILTIN (decl)

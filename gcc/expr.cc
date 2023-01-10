@@ -345,8 +345,10 @@ convert_mode_scalar (rtx to, rtx from, int unsignedp)
 		   != GET_MODE_PRECISION (to_mode))
 		  || (DECIMAL_FLOAT_MODE_P (from_mode)
 		      != DECIMAL_FLOAT_MODE_P (to_mode))
-		  || (REAL_MODE_FORMAT (from_mode)
-		      != REAL_MODE_FORMAT (to_mode)));
+		  || (REAL_MODE_FORMAT (from_mode) == &arm_bfloat_half_format
+		      && REAL_MODE_FORMAT (to_mode) == &ieee_half_format)
+		  || (REAL_MODE_FORMAT (to_mode) == &arm_bfloat_half_format
+		      && REAL_MODE_FORMAT (from_mode) == &ieee_half_format));
 
       if (GET_MODE_PRECISION (from_mode) == GET_MODE_PRECISION (to_mode))
 	/* Conversion between decimal float and binary float, same size.  */

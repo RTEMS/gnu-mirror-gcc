@@ -108,14 +108,6 @@ unsigned char x_TARGET_FLOAT128_TYPE
 Variable
 unsigned char TARGET_FLOAT128_TYPE
 
-;; Whether each of the 3 128-bit floating point modes (IFmode, KFmode, and
-;; TFmode) have a unique precision number, or whether they all use 128.  C
-;; and C++ prefer the precision to be 128, but fortran prefers to have
-;; separate precisions to differentiate between IBM and IEEE 128-bit floating
-;; point.
-TargetVariable
-bool UNIQUE_FLOAT128_PRECISION
-
 ;; This option existed in the past, but now is always on.
 mpowerpc
 Target RejectNegative Undocumented Ignore
