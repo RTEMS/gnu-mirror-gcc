@@ -79,6 +79,10 @@ struct mode_data
 				   adjustment */
   unsigned int int_n;		/* If nonzero, then __int<INT_N> will be defined */
   bool boolean;
+  bool normal_widen;		/* Whether the type should be listed in the
+				   mode_wider and mode_2xwider tables.  */
+  bool need_precision_adj;	/* true if this mode needs dynamic precision
+				   adjustment */
 };
 
 static struct mode_data *modes[MAX_MODE_CLASS];
@@ -90,7 +94,7 @@ static const struct mode_data blank_mode = {
   0, -1U, -1U, -1U, -1U,
   0, 0, 0, 0, 0, 0,
   "<unknown>", 0, 0, 0, 0, false, false, 0,
-  false
+  false, true, false
 };
 
 static htab_t modes_by_name;
@@ -114,6 +118,7 @@ static struct mode_adjust *adj_alignment;
 static struct mode_adjust *adj_format;
 static struct mode_adjust *adj_ibit;
 static struct mode_adjust *adj_fbit;
+static struct mode_adjust *adj_precision;
 
 /* Mode class operations.  */
 static enum mode_class
@@ -658,18 +663,22 @@ make_fixed_point_mode (enum mode_class cl,
 
 #define FLOAT_MODE(N, Y, F)             FRACTIONAL_FLOAT_MODE (N, -1U, Y, F)
 #define FRACTIONAL_FLOAT_MODE(N, B, Y, F) \
-  make_float_mode (#N, B, Y, #F, __FILE__, __LINE__)
+  make_float_mode (#N, B, Y, #F, __FILE__, __LINE__, true)
+#define FRACTIONAL_FLOAT_MODE_NO_WIDEN(N, B, Y, F) \
+  make_float_mode (#N, B, Y, #F, __FILE__, __LINE__, false)
 
 static void
 make_float_mode (const char *name,
 		 unsigned int precision, unsigned int bytesize,
 		 const char *format,
-		 const char *file, unsigned int line)
+		 const char *file, unsigned int line,
+		 bool normal_widen)
 {
   struct mode_data *m = new_mode (MODE_FLOAT, name, file, line);
   m->bytesize = bytesize;
   m->precision = precision;
   m->format = format;
+  m->normal_widen = normal_widen;
 }
 
 #define DECIMAL_FLOAT_MODE(N, Y, F)	\
@@ -822,6 +831,7 @@ make_vector_mode (enum mode_class bclass,
 #define ADJUST_FLOAT_FORMAT(M, X)    _ADD_ADJUST (format, M, X, FLOAT, FLOAT)
 #define ADJUST_IBIT(M, X)  _ADD_ADJUST (ibit, M, X, ACCUM, UACCUM)
 #define ADJUST_FBIT(M, X)  _ADD_ADJUST (fbit, M, X, FRACT, UACCUM)
+#define ADJUST_PRECISION(M, X)  _ADD_ADJUST (precision, M, X, FLOAT, FLOAT)
 
 static int bits_per_unit;
 static int max_bitsize_mode_any_int;
@@ -871,7 +881,13 @@ create_modes (void)
    they have the same bytesize; this is the right thing because
    the precision must always be smaller than the bytesize * BITS_PER_UNIT.
    We don't have to do anything special to get this done -- an unset
-   precision shows up as (unsigned int)-1, i.e. UINT_MAX.  */
+   precision shows up as (unsigned int)-1, i.e. UINT_MAX.
+
+   If a mode is listed as no widen, sort it after the modes that are allowed as
+   widening types.  This is for machine dependent floating point types that we
+   don't want to promotion.  In particular on the PowerPC there are 2 different
+   128-bit floating point types (IBM and IEEE) and there are values in each
+   type that can't be represented in the other type.  */
 static int
 cmp_modes (const void *a, const void *b)
 {
@@ -891,6 +907,11 @@ cmp_modes (const void *a, const void *b)
   if (m->precision > n->precision)
     return 1;
   else if (m->precision < n->precision)
+    return -1;
+
+  if (!m->normal_widen && n->normal_widen)
+    return 1;
+  else if (m->normal_widen && !n->normal_widen)
     return -1;
 
   if (!m->component && !n->component)
@@ -1212,7 +1233,8 @@ extern __inline__ __attribute__((__always_inline__, __gnu_inline__))\n\
 unsigned short\n\
 mode_unit_precision_inline (machine_mode mode)\n\
 {\n\
-  extern const unsigned short mode_unit_precision[NUM_MACHINE_MODES];\n\
+  extern CONST_MODE_PRECISION unsigned short \n\
+    mode_unit_precision[NUM_MACHINE_MODES];\n\
   gcc_assert (mode >= 0 && mode < NUM_MACHINE_MODES);\n\
   switch (mode)\n\
     {");
@@ -1360,7 +1382,8 @@ enum machine_mode\n{");
 
   /* I can't think of a better idea, can you?  */
   printf ("#define CONST_MODE_NUNITS%s\n", adj_nunits ? "" : " const");
-  printf ("#define CONST_MODE_PRECISION%s\n", adj_nunits ? "" : " const");
+  printf ("#define CONST_MODE_PRECISION%s\n",
+	  adj_precision || adj_nunits ? "" : " const");
   printf ("#define CONST_MODE_SIZE%s\n",
 	  adj_bytesize || adj_nunits ? "" : " const");
   printf ("#define CONST_MODE_UNIT_SIZE%s\n", adj_bytesize ? "" : " const");
@@ -1479,7 +1502,7 @@ emit_mode_precision (void)
   struct mode_data *m;
 
   print_maybe_const_decl ("%spoly_uint16_pod", "mode_precision",
-			  "NUM_MACHINE_MODES", adj_nunits);
+			  "NUM_MACHINE_MODES", adj_precision || adj_nunits);
 
   for_all_modes (c, m)
     if (m->precision != (unsigned int)-1)
@@ -1541,17 +1564,20 @@ emit_mode_wider (void)
     {
       struct mode_data *m2 = 0;
 
-      if (m->cl == MODE_INT
-	  || m->cl == MODE_PARTIAL_INT
-	  || m->cl == MODE_FLOAT
-	  || m->cl == MODE_DECIMAL_FLOAT
-	  || m->cl == MODE_COMPLEX_FLOAT
-	  || m->cl == MODE_FRACT
-	  || m->cl == MODE_UFRACT
-	  || m->cl == MODE_ACCUM
-	  || m->cl == MODE_UACCUM)
+      if (m->normal_widen
+	  && (m->cl == MODE_INT
+	      || m->cl == MODE_PARTIAL_INT
+	      || m->cl == MODE_FLOAT
+	      || m->cl == MODE_DECIMAL_FLOAT
+	      || m->cl == MODE_COMPLEX_FLOAT
+	      || m->cl == MODE_FRACT
+	      || m->cl == MODE_UFRACT
+	      || m->cl == MODE_ACCUM
+	      || m->cl == MODE_UACCUM))
 	for (m2 = m->wider; m2 && m2 != void_mode; m2 = m2->wider)
 	  {
+	    if (!m2->normal_widen)
+	      continue;
 	    if (m2->bytesize == m->bytesize
 		&& m2->precision == m->precision)
 	      continue;
@@ -1576,6 +1602,8 @@ emit_mode_wider (void)
 	   m2 && m2 != void_mode;
 	   m2 = m2->wider)
 	{
+	  if (!m2->normal_widen)
+	    continue;
 	  if (m2->bytesize < 2 * m->bytesize)
 	    continue;
 	  if (m->precision != (unsigned int) -1)
@@ -1699,7 +1727,8 @@ emit_mode_unit_precision (void)
   int c;
   struct mode_data *m;
 
-  print_decl ("unsigned short", "mode_unit_precision", "NUM_MACHINE_MODES");
+  print_maybe_const_decl ("%sunsigned short", "mode_unit_precision",
+			  "NUM_MACHINE_MODES", adj_precision);
 
   for_all_modes (c, m)
     {
@@ -1962,6 +1991,49 @@ emit_mode_adjustments (void)
   for (a = adj_format; a; a = a->next)
     printf ("\n  /* %s:%d */\n  REAL_MODE_FORMAT (E_%smode) = %s;\n",
 	    a->file, a->line, a->mode->name, a->adjustment);
+
+
+  /* Precision adjustments propagate too.  */
+  for (a = adj_precision; a; a = a->next)
+    {
+      printf ("\n  /* %s:%d */\n  s = %s;\n",
+	      a->file, a->line, a->adjustment);
+      printf ("  mode_precision[E_%smode] = s;\n", a->mode->name);
+      printf ("  mode_unit_precision[E_%smode] = s;\n", a->mode->name);
+
+      for (m = a->mode->contained; m; m = m->next_cont)
+	{
+	  switch (m->cl)
+	    {
+	    case MODE_COMPLEX_INT:
+	    case MODE_COMPLEX_FLOAT:
+	      printf ("  mode_precision[E_%smode] = 2*s;\n", m->name);
+	      printf ("  mode_unit_precision[E_%smode] = s;\n", m->name);
+	      break;
+
+	    case MODE_VECTOR_BOOL:
+	      /* Changes to BImode should not affect vector booleans.  */
+	      break;
+
+	    case MODE_VECTOR_INT:
+	    case MODE_VECTOR_FLOAT:
+	    case MODE_VECTOR_FRACT:
+	    case MODE_VECTOR_UFRACT:
+	    case MODE_VECTOR_ACCUM:
+	    case MODE_VECTOR_UACCUM:
+	      printf ("  mode_precision[E_%smode] = %d*s;\n",
+		      m->name, m->ncomponents);
+	      printf ("  mode_unit_precision[E_%smode] = s;\n", m->name);
+	      break;
+
+	    default:
+	      internal_error (
+	      "mode %s is neither vector nor complex but contains %s",
+	      m->name, a->mode->name);
+	      /* NOTREACHED */
+	    }
+	}
+    }
 
   puts ("}");
 }
