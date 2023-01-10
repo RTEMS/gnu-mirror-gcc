@@ -1,3 +1,15 @@
+==================== Patch #25, work104 branch ====================
+
+Tweak setting precision.
+
+2022-01-09   Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Make unqiue
+	float128 precision a user switch.
+	* config/rs6000/rs6000.opt (-munique-float128-precision): Likewise.
+	* genmodes.cc (emit_mode_adjustments): Set mode_precision as well as
+	mode_unit_precision.
+
 ==================== Patch #24, work104 branch ====================
 
 Use unique precisions for 128-bit floating point on Fortran.
