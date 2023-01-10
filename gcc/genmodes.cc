@@ -1998,6 +1998,7 @@ emit_mode_adjustments (void)
     {
       printf ("\n  /* %s:%d */\n  s = %s;\n",
 	      a->file, a->line, a->adjustment);
+      printf ("  mode_precision[E_%smode] = s;\n", a->mode->name);
       printf ("  mode_unit_precision[E_%smode] = s;\n", a->mode->name);
 
       for (m = a->mode->contained; m; m = m->next_cont)
@@ -2006,7 +2007,8 @@ emit_mode_adjustments (void)
 	    {
 	    case MODE_COMPLEX_INT:
 	    case MODE_COMPLEX_FLOAT:
-	      printf ("  mode_unit_precision[E_%smode] = s;\n", m->name);
+	      printf ("  mode_precision[E_%smode] = 2*s;\n", m->name);
+	      printf ("  mode_unit_precision[E_%smode] = 2*s;\n", m->name);
 	      break;
 
 	    case MODE_VECTOR_BOOL:
@@ -2019,6 +2021,7 @@ emit_mode_adjustments (void)
 	    case MODE_VECTOR_UFRACT:
 	    case MODE_VECTOR_ACCUM:
 	    case MODE_VECTOR_UACCUM:
+	      printf ("  mode_precision[E_%smode] = s;\n", m->name);
 	      printf ("  mode_unit_precision[E_%smode] = %d*s;\n",
 		      m->name, m->ncomponents);
 	      break;

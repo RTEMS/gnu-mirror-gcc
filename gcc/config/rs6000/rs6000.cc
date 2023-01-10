@@ -4171,7 +4171,8 @@ rs6000_option_override_internal (bool global_init_p)
 
 /* Fortran needs to have precisions of 126..128 to differentiate between IEEE
    and IBM 128-bit floating point.  */
-  UNIQUE_FLOAT128_PRECISION = lang_GNU_Fortran ();
+  if (!OPTION_SET_P (UNIQUE_FLOAT128_PRECISION))
+    UNIQUE_FLOAT128_PRECISION = lang_GNU_Fortran ();
 
   /* IEEE 128-bit floating point requires VSX support.  */
   if (TARGET_FLOAT128_KEYWORD)
