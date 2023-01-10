@@ -1,53 +1,4 @@
-==================== Patch #26, work104 branch ====================
-
-Undo part of last patch.
-
-2022-01-10   Michael Meissner  <meissner@linux.ibm.com>
-
-	* config/rs6000/rs6000.cc: Revert last patch.
-	* config/rs6000/rs6000.opt: Likewise.
-	* genmodes.cc (emit_mode_adjustments): Fix complex mode_unit_precision
-	if precision is adjusted.
-
-==================== Patch #25, work104 branch ====================
-
-Tweak setting precision.
-
-2022-01-09   Michael Meissner  <meissner@linux.ibm.com>
-
-	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Make unqiue
-	float128 precision a user switch.
-	* config/rs6000/rs6000.opt (-munique-float128-precision): Likewise.
-	* genmodes.cc (emit_mode_adjustments): Set mode_precision as well as
-	mode_unit_precision.
-
-==================== Patch #24, work104 branch ====================
-
-Use unique precisions for 128-bit floating point on Fortran.
-
-2022-01-09   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/rs6000-modes.def (IFmode): If we are compiling for
-	Fortran, use unqiue precisions for 128-bit floating point.
-	(KFmode): Likewise.
-	(TFmode): Likewise.
-	* config/rs6000/rs6000.opt (UNIQUE_FLOAT128_PRECISION): New target
-	variable.
-	* genmodes.cc (struct mode_data): Add field for adjusting precision.
-	(blank_mode): Likewise.
-	(need_precision_adj): New variable to support ADJUST_PRECISION.
-	(ADJUST_PRECISION): New macro.
-	(mode_unit_precision_inline): Add support for ADJUST_PRECISION.
-	(emit_insn_modes_h): Likewise.
-	(emit_mode_precision): Likewise.
-	(emit_mode_unit_precision): Likewise.
-	(emit_mode_adjustments): Likewise.
-	* machmode.def (ADJUST_PRECISION): Document usage.
-	* machmode.h (mode_unit_precision): Add support for ADJUST_PRECISION.
-
-==================== Patch #23, work104 branch ====================
+==================== Patch #33, work104 branch ====================
 
 PR target/107299
 
@@ -58,7 +9,7 @@ gcc/ChangeLog:
         * tree.cc (build_common_tree_nodes): Remove workaround for rs6000
         KFmode.
 
-==================== Patch #22, work104 branch ====================
+==================== Patch #32, work104 branch ====================
 
 Update float 128-bit conversions, PR target/107299.
 
@@ -92,7 +43,7 @@ one built-in function from a FLOAT_TRUNCATE to a FLOAT_EXTEND, which is needed
 by the previous patch to genmodes.cc to allow allow the same precision to be
 used for various modes.
 
-2022-01-06   Michael Meissner  <meissner@linux.ibm.com>
+2022-01-10   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -116,62 +67,65 @@ gcc/
 	(extend<mode>tf2_internal): Delete.
 	(extendtf<mode>2_internal): Delete.
 
-==================== Patch #21, work104 branch ====================
+==================== Patch #31, work104 branch ====================
 
-Allow for FP types with the same precision.
+Improve PowerPC 128-bit floating point precision support.
 
-This patch allows 2 or more floating point modes to have the same precision.
-The PowerPC has 3 128-bit floating point types (IFmode that uses the IBM
-extended double format, KFmode that uses the IEEE 128-bit format, and TFmode
-that can eithe use the IBM extended format or the IEEE 128-bit format depending
-on the switches used when compiling the module and switches used to configure
-the compiler.
+This patch improves the code for the 3 PowerPC 128-bit floating point types.
 
-In the past, we needed to use 3 different precisions to separate these types.
+There are two main additions with this patch:
 
-This patch adds a new macro (FRACTIONAL_FLOAT_MODE_NO_WIDEN) that a machine
-description can use to say this particular mode is not a standard floating point
-mode.  The machine independent part of the compiler will not automatically widen
-other floating point modes to these special modes.  In the case of the PowerPC,
-IFmode and KFmode use this no warn mode creation, while TFmode uses the normal
-creation.
+    1)	Allow the backend to adjust the precision of the 3 types at runtime.
+	This allows us to use the same precision for both long double and
+	for either __float128 or __ibm128 types.  By having the same precision,
+	it makes it easier for the machine independent part of the compiler to
+	realize that these modes are talking to the same representation.
+
+    2)	Prevent __ibm128 and __float128 from being considered in the automatic
+	widening that the compiler does.  This way, you don't have the
+	possibility that IFmode (__ibm128) will be widened to TFmode or KFmode,
+	even there is hardware to support the IEEE 128-bit operations.
+
+Fortran depends on the current precision values to identify whether the
+current floating point type is IBM extended double or IEEE 128-bit.  While it
+might be nice to fix this in the future so that can just set the precision of
+all 3 modes to be 128, I decided to not make this incompatible change and break
+Fortran.
 
 I also moved changing the TFmode format from ieee to ibm to rs6000-modes.def
 from rs6000.cc.
 
-We used to have an include file defining the special precisions used for the 3
-modes, and this include file is now deleted.
-
-2022-01-06   Michael Meissner  <meissner@linux.ibm.com>
+2022-01-10   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
-	* config/rs6000/rs6000-modes.def (rs6000-modes.h): Remove inclusion.
-	(IFmode): Rework set up to use FRACTIONAL_FLOAT_MODE_NO_WIDEN.  Use 128
-	as the precision.
+	* config/rs6000/rs6000-modes.def (IFmode): Rework to use
+	FRACTIONAL_FLOAT_MODE_NO_WIDEN.  Adjust the precision if long double
+	uses the same representation.
 	(KFmode): Likewise.
-	(TFmode): Set the precision to 128.  Adjust the format of TFmode based
-	on the -mabi={ibm,ieee}longdouble option.
-	* config/rs6000/rs6000-modes.h: Delete.
-	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Use 128
-	bits as the precision for 128-bit float, instead of using a special
-	values for the 3 different 128-bit FP modes.  Move resetting the format
-	of TFmode to rs6000-modes.def.
-	* config/rs6000/rs6000.h (rs6000-modes.h): Remove inclusion.
-	* config/rs6000/t-rs6000 (TM_H): Don't add rs6000-modes.h.
+	(TFmode): Rework to use FRACTIONAL_FLOAT_MODE_NO_WIDEN.  Adjust the
+	format of TFmode based on the -mabi={ibm,ieee}longdouble option.
 	* expr.cc (convert_mode_scalar): Don't abort if we are converting
 	floating point modes that are the same precision but use different
 	encodings.
-	* genmodes.cc (struct mode_data): Add normal_widen field.
+	* genmodes.cc (struct mode_data): Add support for no widening and
+	adjusting precision.
 	(blank_mode): Likewise.
-	(FRACTIONAL_FLOAT_MODE): Add support for NO_WIDEN capability.
+	(FRACTIONAL_FLOAT_MODE): Add support for no widening capability.
 	(FRACTIONAL_FLOAT_MODE_NO_WIDEN): New macro.
-	(make_float_mode): Add support for NO_WIDEN capability.
+	(make_float_mode): Add support for no widening capability.
 	(cmp_modes): Likewise.
-	(emit_mode_wider): Likewise.
+	(emit_mode_unit_precision_inline): Add support for adjusting the
+	precision.
+	(emit_insn_modes_h): Likewise.
+	(emit_mode_wider): Add support for no widening capability.
+	(emit_mode_unit_precision): Add support for adjusting the precision.
+	(emit_mode_adjustments): Likewise.
 	* machmode.def (FRACTIONAL_FLOAT_MODE_NO_WIDEN): Document.
+	* machmode.h (mode_unit_precision): Add suport for adjusting the
+	precision.
 
-==================== Patch #20, work104 branch ====================
+==================== Patch #30, work104 branch ====================
 
 Rework 128-bit complex multiply and divide.
 
@@ -221,7 +175,7 @@ Once all 3 patches have been applied, we can once again build GCC when long
 double is IEEE 128-bit.  There were no other regressions with these patches.
 Can I check these patches into the trunk?
 
-2023-01-06   Michael Meissner  <meissner@linux.ibm.com>
+2023-01-10   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
