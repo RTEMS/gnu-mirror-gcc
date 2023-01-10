@@ -108,6 +108,14 @@ unsigned char x_TARGET_FLOAT128_TYPE
 Variable
 unsigned char TARGET_FLOAT128_TYPE
 
+;; Whether each of the 3 128-bit floating point modes (IFmode, KFmode, and
+;; TFmode) have a unique precision number, or whether they all use 128.  C
+;; and C++ prefer the precision to be 128, but fortran prefers to have
+;; separate precisions to differentiate between IBM and IEEE 128-bit floating
+;; point.
+TargetVariable
+bool UNIQUE_FLOAT128_PRECISION
+
 ;; This option existed in the past, but now is always on.
 mpowerpc
 Target RejectNegative Undocumented Ignore
@@ -548,15 +556,6 @@ Enable default conversions between __float128 & long double.
 mstack-protector-guard=
 Target RejectNegative Joined Enum(stack_protector_guard) Var(rs6000_stack_protector_guard) Init(SSP_TLS)
 Use given stack-protector guard.
-
-;; Whether each of the 3 128-bit floating point modes (IFmode, KFmode, and
-;; TFmode) have a unique precision number, or whether they all use 128.  C
-;; and C++ prefer the precision to be 128, but fortran prefers to have
-;; separate precisions to differentiate between IBM and IEEE 128-bit floating
-;; point.
-munique-float128-precision
-Target Undocumented Var(UNIQUE_FLOAT128_PRECISION)
-Each 128-bit floating point type gets a unqiue precision.
 
 Enum
 Name(stack_protector_guard) Type(enum stack_protector_guard)

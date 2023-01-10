@@ -2008,7 +2008,7 @@ emit_mode_adjustments (void)
 	    case MODE_COMPLEX_INT:
 	    case MODE_COMPLEX_FLOAT:
 	      printf ("  mode_precision[E_%smode] = 2*s;\n", m->name);
-	      printf ("  mode_unit_precision[E_%smode] = 2*s;\n", m->name);
+	      printf ("  mode_unit_precision[E_%smode] = s;\n", m->name);
 	      break;
 
 	    case MODE_VECTOR_BOOL:
