@@ -1,3 +1,14 @@
+==================== Patch #26, work104 branch ====================
+
+Undo part of last patch.
+
+2022-01-10   Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.cc: Revert last patch.
+	* config/rs6000/rs6000.opt: Likewise.
+	* genmodes.cc (emit_mode_adjustments): Fix complex mode_unit_precision
+	if precision is adjusted.
+
 ==================== Patch #25, work104 branch ====================
 
 Tweak setting precision.
