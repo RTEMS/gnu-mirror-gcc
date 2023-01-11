@@ -730,25 +730,28 @@ rs6000_init_builtins (void)
 
   if (TARGET_FLOAT128_TYPE)
     {
-      if (TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128)
-	ieee128_float_type_node = long_double_type_node;
-      else
+      /* In the past we used long_double_type_node when long double was IEEE
+	 128-bit.  However, this means that the _Float128 type
+	 (i.e. float128_type_node) is a different type from __float128
+	 (i.e. ieee128_float_type_nonde).  This leads to some corner cases,
+	 such as processing signaling NaNs with the nansf128 built-in function
+	 (which returns a _Float128 value) and assign it to a long double or
+	 __float128 value.  The two explicit IEEE 128-bit types should always
+	 use the same internal type.
+
+	 For C we only need to register the __ieee128 name for it.  For C++, we
+	 create a distinct type which will mangle differently (u9__ieee128)
+	 vs. _Float128 (DF128_) and behave backwards compatibly.  */
+      if (float128t_type_node == NULL_TREE)
 	{
-	  /* For C we only need to register the __ieee128 name for
-	     it.  For C++, we create a distinct type which will mangle
-	     differently (u9__ieee128) vs. _Float128 (DF128_) and behave
-	     backwards compatibly.  */
-	  if (float128t_type_node == NULL_TREE)
-	    {
-	      float128t_type_node = make_node (REAL_TYPE);
-	      TYPE_PRECISION (float128t_type_node)
-		= TYPE_PRECISION (float128_type_node);
-	      layout_type (float128t_type_node);
-	      SET_TYPE_MODE (float128t_type_node,
-			     TYPE_MODE (float128_type_node));
-	    }
-	  ieee128_float_type_node = float128t_type_node;
+	  float128t_type_node = make_node (REAL_TYPE);
+	  TYPE_PRECISION (float128t_type_node)
+	    = TYPE_PRECISION (float128_type_node);
+	  layout_type (float128t_type_node);
+	  SET_TYPE_MODE (float128t_type_node,
+			 TYPE_MODE (float128_type_node));
 	}
+      ieee128_float_type_node = float128t_type_node;
       t = build_qualified_type (ieee128_float_type_node, TYPE_QUAL_CONST);
       lang_hooks.types.register_builtin_type (ieee128_float_type_node,
 					      "__ieee128");
@@ -3265,13 +3268,13 @@ htm_expand_builtin (bifdata *bifaddr, rs6000_gen_builtins fcode,
 
 /* Expand an expression EXP that calls a built-in function,
    with result going to TARGET if that's convenient
-   (and in mode MODE if that's convenient).
+   (and in mode RETURN_MODE if that's convenient).
    SUBTARGET may be used as the target for computing one of EXP's operands.
    IGNORE is nonzero if the value is to be ignored.
    Use the new builtin infrastructure.  */
 rtx
 rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
-		       machine_mode /* mode */, int ignore)
+		       machine_mode return_mode, int ignore)
 {
   tree fndecl = TREE_OPERAND (CALL_EXPR_FN (exp), 0);
   enum rs6000_gen_builtins fcode
@@ -3287,78 +3290,99 @@ rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
   size_t uns_fcode = (size_t)fcode;
   enum insn_code icode = rs6000_builtin_info[uns_fcode].icode;
 
-  /* TODO: The following commentary and code is inherited from the original
-     builtin processing code.  The commentary is a bit confusing, with the
-     intent being that KFmode is always IEEE-128, IFmode is always IBM
-     double-double, and TFmode is the current long double.  The code is
-     confusing in that it converts from KFmode to TFmode pattern names,
-     when the other direction is more intuitive.  Try to address this.  */
+  /* For 128-bit long double, we may need both the KFmode built-in functions
+     and IFmode built-in functions to the equivalent TFmode built-in function,
+     if either a TFmode result is expected or any of the arguments use
+     TFmode.  */
+  if (TARGET_LONG_DOUBLE_128)
+    {
+      bool uses_tf_mode = return_mode == TFmode;
+      if (!uses_tf_mode)
+	{
+	  call_expr_arg_iterator iter;
+	  tree arg;
+	  FOR_EACH_CALL_EXPR_ARG (arg, iter, exp)
+	    {
+	      if (arg != error_mark_node
+		  && TYPE_MODE (TREE_TYPE (arg)) == TFmode)
+		{
+		  uses_tf_mode = true;
+		  break;
+		}
+	    }
+	}
 
-  /* We have two different modes (KFmode, TFmode) that are the IEEE
-     128-bit floating point type, depending on whether long double is the
-     IBM extended double (KFmode) or long double is IEEE 128-bit (TFmode).
-     It is simpler if we only define one variant of the built-in function,
-     and switch the code when defining it, rather than defining two built-
-     ins and using the overload table in rs6000-c.cc to switch between the
-     two.  If we don't have the proper assembler, don't do this switch
-     because CODE_FOR_*kf* and CODE_FOR_*tf* will be CODE_FOR_nothing.  */
-  if (FLOAT128_IEEE_P (TFmode))
-    switch (icode)
-      {
-      case CODE_FOR_sqrtkf2_odd:
-	icode = CODE_FOR_sqrttf2_odd;
-	break;
-      case CODE_FOR_trunckfdf2_odd:
-	icode = CODE_FOR_trunctfdf2_odd;
-	break;
-      case CODE_FOR_addkf3_odd:
-	icode = CODE_FOR_addtf3_odd;
-	break;
-      case CODE_FOR_subkf3_odd:
-	icode = CODE_FOR_subtf3_odd;
-	break;
-      case CODE_FOR_mulkf3_odd:
-	icode = CODE_FOR_multf3_odd;
-	break;
-      case CODE_FOR_divkf3_odd:
-	icode = CODE_FOR_divtf3_odd;
-	break;
-      case CODE_FOR_fmakf4_odd:
-	icode = CODE_FOR_fmatf4_odd;
-	break;
-      case CODE_FOR_xsxexpqp_kf:
-	icode = CODE_FOR_xsxexpqp_tf;
-	break;
-      case CODE_FOR_xsxsigqp_kf:
-	icode = CODE_FOR_xsxsigqp_tf;
-	break;
-      case CODE_FOR_xststdcnegqp_kf:
-	icode = CODE_FOR_xststdcnegqp_tf;
-	break;
-      case CODE_FOR_xsiexpqp_kf:
-	icode = CODE_FOR_xsiexpqp_tf;
-	break;
-      case CODE_FOR_xsiexpqpf_kf:
-	icode = CODE_FOR_xsiexpqpf_tf;
-	break;
-      case CODE_FOR_xststdcqp_kf:
-	icode = CODE_FOR_xststdcqp_tf;
-	break;
-      case CODE_FOR_xscmpexpqp_eq_kf:
-	icode = CODE_FOR_xscmpexpqp_eq_tf;
-	break;
-      case CODE_FOR_xscmpexpqp_lt_kf:
-	icode = CODE_FOR_xscmpexpqp_lt_tf;
-	break;
-      case CODE_FOR_xscmpexpqp_gt_kf:
-	icode = CODE_FOR_xscmpexpqp_gt_tf;
-	break;
-      case CODE_FOR_xscmpexpqp_unordered_kf:
-	icode = CODE_FOR_xscmpexpqp_unordered_tf;
-	break;
-      default:
-	break;
-      }
+      /* Convert KFmode built-in functions to TFmode when long double is IEEE
+	 128-bit.  */
+      if (uses_tf_mode && FLOAT128_IEEE_P (TFmode))
+	switch (icode)
+	  {
+	  case CODE_FOR_sqrtkf2_odd:
+	    icode = CODE_FOR_sqrttf2_odd;
+	    break;
+	  case CODE_FOR_trunckfdf2_odd:
+	    icode = CODE_FOR_trunctfdf2_odd;
+	    break;
+	  case CODE_FOR_addkf3_odd:
+	    icode = CODE_FOR_addtf3_odd;
+	    break;
+	  case CODE_FOR_subkf3_odd:
+	    icode = CODE_FOR_subtf3_odd;
+	    break;
+	  case CODE_FOR_mulkf3_odd:
+	    icode = CODE_FOR_multf3_odd;
+	    break;
+	  case CODE_FOR_divkf3_odd:
+	    icode = CODE_FOR_divtf3_odd;
+	    break;
+	  case CODE_FOR_fmakf4_odd:
+	    icode = CODE_FOR_fmatf4_odd;
+	    break;
+	  case CODE_FOR_xsxexpqp_kf:
+	    icode = CODE_FOR_xsxexpqp_tf;
+	    break;
+	  case CODE_FOR_xsxsigqp_kf:
+	    icode = CODE_FOR_xsxsigqp_tf;
+	    break;
+	  case CODE_FOR_xststdcnegqp_kf:
+	    icode = CODE_FOR_xststdcnegqp_tf;
+	    break;
+	  case CODE_FOR_xsiexpqp_kf:
+	    icode = CODE_FOR_xsiexpqp_tf;
+	    break;
+	  case CODE_FOR_xsiexpqpf_kf:
+	    icode = CODE_FOR_xsiexpqpf_tf;
+	    break;
+	  case CODE_FOR_xststdcqp_kf:
+	    icode = CODE_FOR_xststdcqp_tf;
+	    break;
+	  case CODE_FOR_xscmpexpqp_eq_kf:
+	    icode = CODE_FOR_xscmpexpqp_eq_tf;
+	    break;
+	  case CODE_FOR_xscmpexpqp_lt_kf:
+	    icode = CODE_FOR_xscmpexpqp_lt_tf;
+	    break;
+	  case CODE_FOR_xscmpexpqp_gt_kf:
+	    icode = CODE_FOR_xscmpexpqp_gt_tf;
+	    break;
+	  case CODE_FOR_xscmpexpqp_unordered_kf:
+	    icode = CODE_FOR_xscmpexpqp_unordered_tf;
+	    break;
+	  default:
+	    break;
+	  }
+
+      /* Convert IFmode built-in functions to TFmode when long double is IBM
+	 128-bit.  */
+      else if (uses_tf_mode && FLOAT128_IBM_P (TFmode))
+	{
+	  if (icode == CODE_FOR_packif)
+	    icode = CODE_FOR_packtf;
+
+	  else if (icode == CODE_FOR_unpackif)
+	    icode = CODE_FOR_unpacktf;
+	}
+    }
 
   /* In case of "#pragma target" changes, we initialize all builtins
      but check for actual availability now, during expand time.  For
@@ -3481,18 +3505,6 @@ rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
 
   if (bif_is_ibm128 (*bifaddr) && TARGET_LONG_DOUBLE_128 && !TARGET_IEEEQUAD)
     {
-      if (fcode == RS6000_BIF_PACK_IF)
-	{
-	  icode = CODE_FOR_packtf;
-	  fcode = RS6000_BIF_PACK_TF;
-	  uns_fcode = (size_t) fcode;
-	}
-      else if (fcode == RS6000_BIF_UNPACK_IF)
-	{
-	  icode = CODE_FOR_unpacktf;
-	  fcode = RS6000_BIF_UNPACK_TF;
-	  uns_fcode = (size_t) fcode;
-	}
     }
 
   /* TRUE iff the built-in function returns void.  */
@@ -3647,7 +3659,24 @@ rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
 
   for (int i = 0; i < nargs; i++)
     if (!insn_data[icode].operand[i+k].predicate (op[i], mode[i+k]))
-      op[i] = copy_to_mode_reg (mode[i+k], op[i]);
+      {
+	/* If the predicate failed because the modes are different, do a
+	   convert instead of copy_to_mode_reg, since copy_to_mode_reg will
+	   abort in this case.  The modes might be different if we have two
+	   different 128-bit floating point modes (i.e. KFmode/TFmode if long
+	   double is IEEE 128-bit and IFmode/TFmode if long double is IBM
+	   128-bit).  */
+	machine_mode mode_insn = mode[i+k];
+	machine_mode mode_op = GET_MODE (op[i]);
+	if (mode_insn != mode_op && mode_op != VOIDmode)
+	  {
+	    rtx tmp = gen_reg_rtx (mode_insn);
+	    convert_move (tmp, op[i], 0);
+	    op[i] = tmp;
+	  }
+	else
+	  op[i] = copy_to_mode_reg (mode_insn, op[i]);
+      }
 
   rtx pat;
 
