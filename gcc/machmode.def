@@ -90,6 +90,12 @@ along with GCC; see the file COPYING3.  If not see
 	storage, but with only PRECISION significant bits, using
 	floating point format FORMAT.
 
+     FRACTIONAL_FLOAT_MODE_NO_WIDEN (MODE, PRECISION, BYTESIZE, FORMAT);
+        declares MODE to be of class FLOAT, BYTESIZE bytes wide in
+	storage, but with only PRECISION significant bits, using
+	floating point format FORMAT.  Unlike FRACTIONAL_FLOAT_MODE,
+	MODE is not listed in the mode_wider and mode_2xwider tables.
+
      DECIMAL_FLOAT_MODE (MODE, BYTESIZE, FORMAT);
 	declares MODE to be of class DECIMAL_FLOAT and BYTESIZE bytes
 	wide.  All of the bits of its representation are significant.
@@ -171,9 +177,10 @@ along with GCC; see the file COPYING3.  If not see
      ADJUST_FLOAT_FORMAT (MODE, EXPR);
      ADJUST_IBIT (MODE, EXPR);
      ADJUST_FBIT (MODE, EXPR);
-	Arrange for the byte size, alignment, floating point format, ibit,
-	or fbit of MODE to be adjustable at run time.  EXPR will be executed
-	once after processing all command line options, and should
+     ADJUST_PRECISION (MODE, EXPR);
+	Arrange for the byte size, alignment, floating point format, ibit, fbit
+	or precision mode of MODE to be adjustable at run time.  EXPR will be
+	executed once after processing all command line options, and should
 	evaluate to the desired byte size, alignment, format, ibit or fbit.
 
 	Unlike a FORMAT argument, if you are adjusting a float format
