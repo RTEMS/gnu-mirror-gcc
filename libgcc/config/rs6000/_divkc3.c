@@ -26,13 +26,9 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include "soft-fp.h"
 #include "quad-float128.h"
 
-#ifndef __LONG_DOUBLE_IEEE128__
-#error "_divkc3 must be compiled with -mabi=ieeelongdouble"
-#endif
-
-#define COPYSIGN(x,y) __builtin_copysignl (x, y)
-#define INFINITY __builtin_infl ()
-#define FABS(x) __builtin_fabsl (x)
+#define COPYSIGN(x,y) __builtin_copysignf128 (x, y)
+#define INFINITY __builtin_inff128 ()
+#define FABS __builtin_fabsf128
 #define isnan __builtin_isnan
 #define isinf __builtin_isinf
 #define isfinite __builtin_isfinite
@@ -41,17 +37,25 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define __divkc3 __divkc3_sw
 #endif
 
+#ifndef __LONG_DOUBLE_IEEE128__
+#define RBIG   (__LIBGCC_KF_MAX__ / 2)
+#define RMIN   (__LIBGCC_KF_MIN__)
+#define RMIN2  (__LIBGCC_KF_EPSILON__)
+#define RMINSCAL (1 / __LIBGCC_KF_EPSILON__)
+#define RMAX2  (RBIG * RMIN2)
+#else
 #define RBIG   (__LIBGCC_TF_MAX__ / 2)
 #define RMIN   (__LIBGCC_TF_MIN__)
 #define RMIN2  (__LIBGCC_TF_EPSILON__)
 #define RMINSCAL (1 / __LIBGCC_TF_EPSILON__)
 #define RMAX2  (RBIG * RMIN2)
+#endif
 
-_Complex long double
-__divkc3 (long double a, long double b, long double c, long double d)
+TCtype
+__divkc3 (TFtype a, TFtype b, TFtype c, TFtype d)
 {
-  long double denom, ratio, x, y;
-  _Complex long double res;
+  TFtype denom, ratio, x, y;
+  TCtype res;
 
   /* long double has significant potential underflow/overflow errors that
      can be greatly reduced with a limited number of tests and adjustments.
