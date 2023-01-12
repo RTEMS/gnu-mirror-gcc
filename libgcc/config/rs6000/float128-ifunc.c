@@ -45,6 +45,10 @@
 #error "This module must not be compiled with IEEE 128-bit hardware support"
 #endif
 
+#ifndef __LONG_DOUBLE_IEEE128__
+#error "float128-ifunc must be compiled with -mabi=ieeelongdouble"
+#endif
+
 #define SW_OR_HW(SW, HW) (__builtin_cpu_supports ("ieee128") ? HW : SW)
 #ifdef FLOAT128_HW_INSNS_ISA3_1
 #define SW_OR_HW_ISA3_1(SW, HW) (__builtin_cpu_supports ("arch_3_1") ? HW : SW)
@@ -354,8 +358,10 @@ IBM128_TYPE __extendkftf2 (TFtype)
 TFtype __trunctfkf2 (IBM128_TYPE)
   __attribute__ ((__ifunc__ ("__trunctfkf2_resolve")));
 
-TCtype __mulkc3 (TFtype, TFtype, TFtype, TFtype)
+_Complex long double __mulkc3 (long double, long double,
+			       long double, long double)
   __attribute__ ((__ifunc__ ("__mulkc3_resolve")));
 
-TCtype __divkc3 (TFtype, TFtype, TFtype, TFtype)
+_Complex long double __divkc3 (long double, long double,
+			       long double, long double)
   __attribute__ ((__ifunc__ ("__divkc3_resolve")));
