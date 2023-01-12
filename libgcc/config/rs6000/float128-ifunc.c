@@ -45,6 +45,10 @@
 #error "This module must not be compiled with IEEE 128-bit hardware support"
 #endif
 
+#ifndef __LONG_DOUBLE_IEEE128__
+#error "float128-ifunc.c needs to be compiled with -mabi=ieeelongdouble."
+#endif
+
 #define SW_OR_HW(SW, HW) (__builtin_cpu_supports ("ieee128") ? HW : SW)
 #ifdef FLOAT128_HW_INSNS_ISA3_1
 #define SW_OR_HW_ISA3_1(SW, HW) (__builtin_cpu_supports ("arch_3_1") ? HW : SW)
