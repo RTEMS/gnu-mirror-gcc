@@ -1,3 +1,16 @@
+2023-01-12  Lewis Hyatt  <lhyatt@gmail.com>
+
+	PR preprocessor/108244
+	* c-pragma.cc (c_register_pragma_1): Don't attempt to register any
+	deferred pragmas if -fdirectives-only.
+	(init_pragma): Likewise.
+
+2023-01-09  Martin Liska  <mliska@suse.cz>
+
+	PR c/107993
+	* c-attribs.cc (handle_target_clones_attribute): Check for
+	string constant for all target_clone attribute values.
+
 2023-01-03  Florian Weimer  <fweimer@redhat.com>
 
 	* c-cppbuiltin.cc (c_cpp_builtins): Define
