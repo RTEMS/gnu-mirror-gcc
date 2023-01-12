@@ -27,6 +27,7 @@ as well.
 
 2023-01-12   Michael Meissner  <meissner@linux.ibm.com>
 
+	PR target/107299
 	* config/rs6000/_divkc3.c (COPYSIGN): Use the correct built-in depending
 	on whether TFmode is _Float128 or long double.
 	(INFINITY): Likewise.
