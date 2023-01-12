@@ -1,12 +1,43 @@
-==================== work105y, patch #1 ====================
+==================== work105y, patch #2 ====================
 
-Patch libgcc to always use _Float128 and _Complex _Float128 on PowerPC.
+PR target/107299: Use _Float128 and _Complex _Float128 types for PowerPC libgcc
 
-2023-01-11   Michael Meissner  <meissner@linux.ibm.com>
+This patch tells GCC to use the _Float128 and _Complex _Float128 types when
+building the IEEE 128-bit support in libgcc.  At the moment, we cannot build
+GCC when the target uses IEEE 128-bit long doubles, such as building the
+compiler for a native Fedora 36 system.  The build dies when it is trying to
+build the _mulkc3.c module.
 
+The _mulkc3 and _divkc3 modules were written before the _Float128 and _Complex
+_Float128 types were available.  These routines had to use the mode attributes
+to get access to the __float128 complex type.  Unfortunately, with the current
+implementation of __float128, _Float128, and long double in the PowerPC
+backend, this code now breaks if long double is IEEE 128-bit.
+
+Originally I had hoped that we could fix the underlying problem with the
+compiler.  But that has become more complex than than I originally thought.  I
+believe the compiler should be fixed to avoid the breakage.
+
+This patch is a much simpler patch, and it avoids the problem by allowing the
+machine depenendent parts of libgcc to override the definition of TFtype
+(128-bit IEEE scalar) and TCtype (128-bit IEEE _Complex).  This allows us to use
+_Float128 and _Complex _Float128 when long double is IBM extended and plain long
+double when IEEE 128-bit is used.  We need to adjust the built-in functions used
+as well.
+
+2023-01-12   Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/_divkc3.c (COPYSIGN): Use the correct built-in depending
+	on whether TFmode is _Float128 or long double.
+	(INFINITY): Likewise.
+	(FABS): Likewise.
+	* config/rs6000/_mulkc3.c (COPYSIGN): Likewise.
+	(INFINITY): Likewise.
 	* config/rs6000/quad-float128.h (TF): Delete definition.
-	(TFtype): Define to be _Float128.
-	(TCtype): Change to be _Complex _Float128.
+	(TFtype): Define to be _Float128 or long double.
+	(TCtype): Define to be _Complex _Float128 or _Complex long double.
+	(__mulkc3): Delete definition since these are built-in functions.
+	(__divkc3): Likewise.
 	* libgcc2.h (TFtype): Allow MD code to override definition.
 	(TCtype): Likewise.
 	* soft-fp/quad.h (TFtype): Likewise.
