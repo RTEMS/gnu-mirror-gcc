@@ -26,17 +26,9 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include "soft-fp.h"
 #include "quad-float128.h"
 
-#ifndef __LONG_DOUBLE_IEEE128__
 #define COPYSIGN(x,y) __builtin_copysignf128 (x, y)
 #define INFINITY __builtin_inff128 ()
-#define FABS(x) __builtin_fabsf128 (x)
-
-#else
-#define COPYSIGN(x,y) __builtin_copysignl (x, y)
-#define INFINITY __builtin_infl ()
-#define FABS(x) __builtin_fabsl (x)
-#endif
-
+#define FABS __builtin_fabsf128
 #define isnan __builtin_isnan
 #define isinf __builtin_isinf
 #define isfinite __builtin_isfinite
