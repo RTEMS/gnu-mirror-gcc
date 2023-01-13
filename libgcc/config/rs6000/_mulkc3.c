@@ -26,8 +26,12 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include "soft-fp.h"
 #include "quad-float128.h"
 
-#define COPYSIGN(x,y) __builtin_copysignf128 (x, y)
-#define INFINITY __builtin_inff128 ()
+#ifndef __LONG_DOUBLE_IEEE128__
+#error "_mulkc3.c must be compiled with -mabi=ieeelongdouble"
+#endif
+
+#define COPYSIGN(x,y) __builtin_copysignl (x, y)
+#define INFINITY __builtin_infl ()
 #define isnan __builtin_isnan
 #define isinf __builtin_isinf
 

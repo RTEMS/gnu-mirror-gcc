@@ -26,6 +26,7 @@ fp128_sed_hw		= -hw
 FP128_CFLAGS_HW		 = -Wno-type-limits -mvsx -mfloat128 \
 			   -mpower8-vector -mpower9-vector \
 			   -mfloat128-hardware -mno-gnu-attribute \
+			   -mabi=ieeelongdouble -Wno-psabi \
 			   -I$(srcdir)/soft-fp \
 			   -I$(srcdir)/config/rs6000 \
 			   $(FLOAT128_HW_INSNS)

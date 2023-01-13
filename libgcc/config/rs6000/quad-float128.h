@@ -27,21 +27,14 @@
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
 
-/* quad.h defines the TFtype type by:
-   typedef float TFtype __attribute__ ((mode (TF)));
-
-   This define forces it to use KFmode (aka, ieee 128-bit floating point).
-   However, when the compiler's default is changed so that long double is IEEE
-   128-bit floating point, we need to go back to using TFmode and TCmode.  */
+/* Override quad.h's definitions for 128-bit floating point type.  */
 #ifndef __LONG_DOUBLE_IEEE128__
-#define TF KF
-
-/* We also need TCtype to represent complex ieee 128-bit float for
-   __mulkc3 and __divkc3.  */
-typedef __complex float TCtype __attribute__ ((mode (KC)));
+#define TFtype _Float128
+#define TCtype _Complex _Float128
 
 #else
-typedef __complex float TCtype __attribute__ ((mode (TC)));
+#define TFtype long double
+#define TCtype _Complex long double
 #endif
 
 /* Force the use of the VSX instruction set.  */
@@ -100,8 +93,6 @@ extern UTItype_ppc __fixunskfti_sw (TFtype);
 #endif
 extern IBM128_TYPE __extendkftf2_sw (TFtype);
 extern TFtype __trunctfkf2_sw (IBM128_TYPE);
-extern TCtype __mulkc3_sw (TFtype, TFtype, TFtype, TFtype);
-extern TCtype __divkc3_sw (TFtype, TFtype, TFtype, TFtype);
 
 #ifdef _ARCH_PPC64
 extern TItype_ppc __fixkfti (TFtype);
@@ -146,8 +137,6 @@ extern UTItype_ppc __fixunskfti_hw (TFtype);
 #endif
 extern IBM128_TYPE __extendkftf2_hw (TFtype);
 extern TFtype __trunctfkf2_hw (IBM128_TYPE);
-extern TCtype __mulkc3_hw (TFtype, TFtype, TFtype, TFtype);
-extern TCtype __divkc3_hw (TFtype, TFtype, TFtype, TFtype);
 
 /* Ifunc function declarations, to automatically switch between software
    emulation and hardware support.  */
@@ -187,9 +176,16 @@ extern UTItype_ppc __fixunskfti (TFtype);
 extern IBM128_TYPE __extendkftf2 (TFtype);
 extern TFtype __trunctfkf2 (IBM128_TYPE);
 
-/* Complex __float128 built on __float128 interfaces.  */
+#ifdef __LONG_DOUBLE_IEEE128__
+/* Only declare complex multiply/divide support functions if long double is
+   IEEE 128-bit.  Otherwise the compiler will issue type mismatch warnings.  */
+extern TCtype __mulkc3_sw (TFtype, TFtype, TFtype, TFtype);
+extern TCtype __divkc3_sw (TFtype, TFtype, TFtype, TFtype);
+extern TCtype __mulkc3_hw (TFtype, TFtype, TFtype, TFtype);
+extern TCtype __divkc3_hw (TFtype, TFtype, TFtype, TFtype);
 extern TCtype __mulkc3 (TFtype, TFtype, TFtype, TFtype);
 extern TCtype __divkc3 (TFtype, TFtype, TFtype, TFtype);
+#endif
 
 /* Convert IEEE 128-bit floating point to/from string.  We explicitly use
    _Float128 instead of TFmode because _strtokf and _strfromkf must be compiled
