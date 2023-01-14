@@ -930,13 +930,14 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
         if (act_count[t]){
            lp->counters=ggc_alloc<histogram_counters>();
            gcov_type sum=0;
+           lp->counters->hist=NULL;
+           vec_safe_grow_cleared(lp->counters->hist,param_profile_histogram_size);
            for (int i=0;i<param_profile_histogram_size;++i){
                auto hst=lp->counters->hist;
                (*hst)[i]=act_count[t][i];
                sum+=act_count[t][i];
            }
            lp->counters->sum=sum;
-           vec_safe_grow_cleared(lp->counters->hist,param_profile_histogram_size);
         }
         continue;
       }
