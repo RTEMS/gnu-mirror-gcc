@@ -141,14 +141,17 @@
 static rtx_insn *
 aarch64_speculation_clobber_sp ()
 {
-  rtx sp = gen_rtx_REG (DImode, SP_REGNUM);
+  rtx sp = gen_rtx_REG (Pmode, SP_REGNUM);
   rtx tracker = gen_rtx_REG (DImode, SPECULATION_TRACKER_REGNUM);
   rtx scratch = gen_rtx_REG (DImode, SPECULATION_SCRATCH_REGNUM);
 
   start_sequence ();
-  emit_insn (gen_rtx_SET (scratch, sp));
+  emit_insn (gen_rtx_SET (scratch, drop_capability (sp)));
   emit_insn (gen_anddi3 (scratch, scratch, tracker));
-  emit_insn (gen_rtx_SET (sp, scratch));
+  if (CAPABILITY_MODE_P (Pmode))
+    emit_insn (gen_replace_address_value_cadi (sp, sp, scratch));
+  else
+    emit_insn (gen_rtx_SET (sp, scratch));
   rtx_insn *seq = get_insns ();
   end_sequence ();
   return seq;
