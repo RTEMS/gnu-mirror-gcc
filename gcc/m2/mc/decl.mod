@@ -1,6 +1,6 @@
 (* decl.mod declaration nodes used to create the AST.
 
-Copyright (C) 2015-2022 Free Software Foundation, Inc.
+Copyright (C) 2015-2023 Free Software Foundation, Inc.
 Contributed by Gaius Mulley <gaius@glam.ac.uk>.
 
 This file is part of GNU Modula-2.
@@ -22,7 +22,7 @@ along with GNU Modula-2; see the file COPYING3.  If not see
 IMPLEMENTATION MODULE decl ; (*!m2pim*)
 
 FROM ASCII IMPORT lf, tab ;
-FROM symbolKey IMPORT symbolTree, initTree, getSymKey, putSymKey, foreachNodeDo ;
+FROM symbolKey IMPORT NulKey, symbolTree, initTree, getSymKey, putSymKey, foreachNodeDo ;
 FROM mcDebug IMPORT assert ;
 FROM Storage IMPORT ALLOCATE, DEALLOCATE ;
 FROM nameKey IMPORT NulName, makeKey, lengthKey, makekey, keyToCharStar ;
@@ -2936,7 +2936,7 @@ BEGIN
                (* ensure that field, n, is in the parents Local Symbols.  *)
                IF tag#NulName
                THEN
-                  IF getSymKey (recordF.localSymbols, tag) = NulName
+                  IF getSymKey (recordF.localSymbols, tag) = NulKey
                   THEN
                      putSymKey (recordF.localSymbols, tag, n)
                   ELSE

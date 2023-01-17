@@ -1,6 +1,6 @@
 (* M2Quads.mod generates quadruples.
 
-Copyright (C) 2001-2022 Free Software Foundation, Inc.
+Copyright (C) 2001-2023 Free Software Foundation, Inc.
 Contributed by Gaius Mulley <gaius.mulley@southwales.ac.uk>.
 
 This file is part of GNU Modula-2.
@@ -6327,7 +6327,10 @@ BEGIN
    ELSIF IsVar(Sym)
    THEN
       Type := GetDType(Sym) ;
-      IF IsUnbounded(Type)
+      IF Type = NulSym
+      THEN
+         MetaErrorT1 (tok, '{%1ad} has no type and cannot be passed to a VAR formal parameter', Sym)
+      ELSIF IsUnbounded(Type)
       THEN
          IF Type = GetSType (UnboundedSym)
          THEN
@@ -6382,7 +6385,10 @@ BEGIN
    ELSIF IsVar (Sym)
    THEN
       Type := GetDType (Sym) ;
-      IF IsUnbounded (Type)
+      IF Type = NulSym
+      THEN
+         MetaErrorT1 (tok, '{%1ad} has no type and cannot be passed to a non VAR formal parameter', Sym)
+      ELSIF IsUnbounded (Type)
       THEN
          UnboundedNonVarLinkToArray (tok, Sym, ArraySym, UnboundedSym, ParamType, dim)
       ELSIF IsArray (Type) OR IsGenericSystemType (ParamType)
@@ -11386,7 +11392,10 @@ VAR
 BEGIN
    PopTFrwtok (Sym1, Type1, rw, exprtok) ;
    Type1 := SkipType (Type1) ;
-   IF IsUnknown (Sym1)
+   IF Type1 = NulSym
+   THEN
+      MetaErrorT1 (ptrtok, '{%1ad} has no type and therefore cannot be dereferenced by ^', Sym1)
+   ELSIF IsUnknown (Sym1)
    THEN
       MetaError1 ('{%1EMad} is undefined and therefore {%1ad}^ cannot be resolved', Sym1)
    ELSIF IsPointer (Type1)
@@ -12872,13 +12881,16 @@ END BuildRelOp ;
                   |------------|          |------------|
 *)
 
-PROCEDURE BuildNot ;
+PROCEDURE BuildNot (notTokPos: CARDINAL) ;
 VAR
-   t, f: CARDINAL ;
+   combinedTok,
+   exprTokPos : CARDINAL ;
+   t, f       : CARDINAL ;
 BEGIN
    CheckBooleanId ;
-   PopBool (t, f) ;
-   PushBool (f, t)
+   PopBooltok (t, f, exprTokPos) ;
+   combinedTok := MakeVirtualTok (notTokPos, notTokPos, exprTokPos) ;
+   PushBooltok (f, t, combinedTok)
 END BuildNot ;
 
 
@@ -13662,11 +13674,11 @@ END OperandTtok ;
 
 
 (*
-   PopBool - Pops a True and a False exit quad number from the True/False
-             stack.
+   PopBooltok - Pops a True and a False exit quad number from the True/False
+                stack.
 *)
 
-PROCEDURE PopBool (VAR True, False: CARDINAL) ;
+PROCEDURE PopBooltok (VAR True, False: CARDINAL; VAR tokno: CARDINAL) ;
 VAR
    f: BoolFrame ;
 BEGIN
@@ -13674,9 +13686,47 @@ BEGIN
    WITH f^ DO
       True := TrueExit ;
       False := FalseExit ;
+      tokno := tokenno ;
       Assert (BooleanOp)
    END ;
    DISPOSE (f)
+END PopBooltok ;
+
+
+(*
+   PushBooltok - Push a True and a False exit quad numbers onto the
+                 True/False stack.
+*)
+
+PROCEDURE PushBooltok (True, False: CARDINAL; tokno: CARDINAL) ;
+VAR
+   f: BoolFrame ;
+BEGIN
+   Assert (True<=NextQuad) ;
+   Assert (False<=NextQuad) ;
+   f := newBoolFrame () ;
+   WITH f^ DO
+      TrueExit := True ;
+      FalseExit := False ;
+      BooleanOp := TRUE ;
+      tokenno := tokno ;
+      Annotation := NIL
+   END ;
+   PushAddress (BoolStack, f) ;
+   Annotate ('<q%1d>|<q%2d>||true quad|false quad')
+END PushBooltok ;
+
+
+(*
+   PopBool - Pops a True and a False exit quad number from the True/False
+             stack.
+*)
+
+PROCEDURE PopBool (VAR True, False: CARDINAL) ;
+VAR
+   tokno: CARDINAL ;
+BEGIN
+   PopBooltok (True, False, tokno)
 END PopBool ;
 
 
@@ -13686,20 +13736,8 @@ END PopBool ;
 *)
 
 PROCEDURE PushBool (True, False: CARDINAL) ;
-VAR
-   f: BoolFrame ;
 BEGIN
-   Assert(True<=NextQuad) ;
-   Assert(False<=NextQuad) ;
-   NEW(f) ;
-   WITH f^ DO
-      TrueExit := True ;
-      FalseExit := False ;
-      BooleanOp := TRUE ;
-      Annotation := NIL
-   END ;
-   PushAddress (BoolStack, f) ;
-   Annotate ('<q%1d>|<q%2d>||true quad|false quad')
+   PushBooltok (True, False, UnknownTokenNo)
 END PushBool ;
 
 
@@ -14571,7 +14609,7 @@ PROCEDURE newBoolFrame () : BoolFrame ;
 VAR
    f: BoolFrame ;
 BEGIN
-   NEW(f) ;
+   NEW (f) ;
    WITH f^ DO
       TrueExit   := 0 ;
       FalseExit  := 0 ;
@@ -14618,7 +14656,7 @@ BEGIN
    WITH f^ DO
       TrueExit := True
    END ;
-   PushAddress(BoolStack, f)
+   PushAddress (BoolStack, f)
 END PushT ;
 
 
@@ -14630,7 +14668,7 @@ PROCEDURE PopT (VAR True: WORD) ;
 VAR
    f: BoolFrame ;
 BEGIN
-   f := PopAddress(BoolStack) ;
+   f := PopAddress (BoolStack) ;
    WITH f^ DO
       True := TrueExit ;
       Assert(NOT BooleanOp)

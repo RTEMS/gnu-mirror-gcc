@@ -1,6 +1,6 @@
 /* Glibc.c provides access to some libc functions.
 
-Copyright (C) 2016-2022 Free Software Foundation, Inc.
+Copyright (C) 2016-2023 Free Software Foundation, Inc.
 Contributed by Gaius Mulley <gaius@glam.ac.uk>.
 
 This file is part of GNU Modula-2.
@@ -75,6 +75,20 @@ int
 libc_strlen (char *s)
 {
   return strlen (s);
+}
+
+EXTERN
+time_t
+libc_time (time_t *buf)
+{
+  return time (buf);
+}
+
+EXTERN
+void *
+libc_localtime (time_t *epochtime)
+{
+  return localtime (epochtime);
 }
 
 EXTERN

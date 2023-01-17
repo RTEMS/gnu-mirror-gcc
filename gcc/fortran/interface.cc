@@ -1,5 +1,5 @@
 /* Deal with interfaces.
-   Copyright (C) 2000-2022 Free Software Foundation, Inc.
+   Copyright (C) 2000-2023 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of GCC.
@@ -2858,7 +2858,8 @@ get_expr_storage_size (gfc_expr *e)
   if (e->ts.type == BT_CHARACTER)
     {
       if (e->ts.u.cl && e->ts.u.cl->length
-          && e->ts.u.cl->length->expr_type == EXPR_CONSTANT)
+	  && e->ts.u.cl->length->expr_type == EXPR_CONSTANT
+	  && e->ts.u.cl->length->ts.type == BT_INTEGER)
 	strlen = mpz_get_si (e->ts.u.cl->length->value.integer);
       else if (e->expr_type == EXPR_CONSTANT
 	       && (e->ts.u.cl == NULL || e->ts.u.cl->length == NULL))

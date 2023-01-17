@@ -1,6 +1,6 @@
 (* M2LexBuf.mod provides a buffer for m2.lex.
 
-Copyright (C) 2001-2022 Free Software Foundation, Inc.
+Copyright (C) 2001-2023 Free Software Foundation, Inc.
 Contributed by Gaius Mulley <gaius.mulley@southwales.ac.uk>.
 
 This file is part of GNU Modula-2.
@@ -1117,7 +1117,8 @@ END PrintTokenNo ;
 
 
 (*
-   isSrcToken -
+   isSrcToken - returns TRUE if tokenno is associated with
+                program source code.
 *)
 
 PROCEDURE isSrcToken (tokenno: CARDINAL) : BOOLEAN ;
@@ -1138,10 +1139,6 @@ VAR
    bufLeft, bufRight: TokenBucket ;
    lc, ll, lr       : location_t ;
 BEGIN
-   IF FALSE
-   THEN
-      RETURN caret
-   END ;
    IF isSrcToken (caret) AND isSrcToken (left) AND isSrcToken (right)
    THEN
       lc := TokenToLocation (caret) ;
