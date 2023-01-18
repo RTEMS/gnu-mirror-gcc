@@ -30,11 +30,18 @@ fp128_dec_funcs		= _kf_to_sd _kf_to_dd _kf_to_td \
 ibm128_dec_funcs	= _tf_to_sd _tf_to_dd _tf_to_td \
 			  _sd_to_tf _dd_to_tf _td_to_tf
 
+# Complex IEEE 128-bit multiply/divide support.
+fp128_cmuldiv            = _mulkc3 _divkc3
+fp128_cmuldiv_static_obj = $(addsuffix $(objext),$(fp128_cmuldiv))
+fp128_cmuldiv_shared_obj = $(addsuffix _s$(objext),$(fp128_cmuldiv))
+fp128_cmuldiv_obj        = $(fp128_cmuldiv_shared_obj) \
+                           $(fp128_cmuldiv_static_obj)
+
 # New functions for software emulation
 fp128_ppc_funcs		= floattikf-sw floatuntikf-sw \
 			  fixkfti-sw fixunskfti-sw \
 			  extendkftf2-sw trunctfkf2-sw \
-			  sfp-exceptions _mulkc3 _divkc3 _powikf2
+			  sfp-exceptions $(fp128_cmuldiv) _powikf2
 
 ifeq ($(decimal_float),yes)
 fp128_ppc_funcs        += $(fp128_dec_funcs)
@@ -99,6 +106,12 @@ IBM128_CFLAGS_DECIMAL	= -mno-gnu-attribute -Wno-psabi -mabi=ibmlongdouble
 
 $(fp128_dec_objs)	: INTERNAL_CFLAGS += $(FP128_CFLAGS_DECIMAL)
 $(ibm128_dec_objs)	: INTERNAL_CFLAGS += $(IBM128_CFLAGS_DECIMAL)
+
+# Force IEEE 128-bit complex multiply/divide support to be built with IEEE
+# 128-bit long double.
+FP128_CFLAGS_CMULDIV	= -Wno-psabi -mabi=ieeelongdouble
+
+$(fp128_cmuldiv_objs)	: INTERNAL_CFLAGS += $(FP128_CFLAGS_CMULDIV)
 
 $(fp128_softfp_src) : $(srcdir)/soft-fp/$(subst -sw,,$(subst kf,tf,$@)) $(fp128_dep)
 	@src="$(srcdir)/soft-fp/$(subst -sw,,$(subst kf,tf,$@))"; \
