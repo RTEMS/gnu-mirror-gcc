@@ -26,19 +26,9 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include "soft-fp.h"
 #include "quad-float128.h"
 
-/* Use the correct built-ins depending on whether long double is IEEE 128-bit
-   or IBM 128-bit.  */
-#ifndef __LONG_DOUBLE_IEEE128__
 #define COPYSIGN(x,y) __builtin_copysignf128 (x, y)
 #define INFINITY __builtin_inff128 ()
 #define FABS __builtin_fabsf128
-
-#else
-#define COPYSIGN(x,y) __builtin_copysignl (x, y)
-#define INFINITY __builtin_infl ()
-#define FABS __builtin_fabsl
-#endif
-
 #define isnan __builtin_isnan
 #define isinf __builtin_isinf
 #define isfinite __builtin_isfinite
@@ -61,14 +51,11 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define RMAX2  (RBIG * RMIN2)
 #endif
 
-TCtype_cmuldiv
-__divkc3 (TFtype_cmuldiv a,
-	  TFtype_cmuldiv b,
-	  TFtype_cmuldiv c,
-	  TFtype_cmuldiv d)
+TCtype
+__divkc3 (TFtype a, TFtype b, TFtype c, TFtype d)
 {
-  TFtype_cmuldiv denom, ratio, x, y;
-  TCtype_cmuldiv res;
+  TFtype denom, ratio, x, y;
+  TCtype res;
 
   /* long double has significant potential underflow/overflow errors that
      can be greatly reduced with a limited number of tests and adjustments.

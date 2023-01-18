@@ -30,28 +30,18 @@
 /* quad.h defines the TFtype type by:
    typedef float TFtype __attribute__ ((mode (TF)));
 
-   These two defines override the machine independent files that use
-   __attribute__((mode(TF))) and __attribute__((mode(TC))) to create the IEEE
-   128-bit scalar and complex types.  */
+   This define forces it to use KFmode (aka, ieee 128-bit floating point).
+   However, when the compiler's default is changed so that long double is IEEE
+   128-bit floating point, we need to go back to using TFmode and TCmode.  */
 #ifndef __LONG_DOUBLE_IEEE128__
 #define TF KF
-#define TC KC
-#endif
 
-/* Special types for IEEE 128-bit floating point complex multiply/divide
-   support.  We need to use _Float128 or long double specifically so that the
-   compiler doesn't complain about different types when we do the declaration.
-   __mulkc3 and __divkc3 are built-in functions with pre-defined types.  Using
-   __attribute__ mode creates a different type internally, and the compiler
-   complains when you issue the declaration when the original type used
-   _Float128 or long double.  */
-#ifdef __LONG_DOUBLE_IEEE128__
-#define TFtype_cmuldiv long double
-#define TCtype_cmuldiv _Complex long double
+/* We also need TCtype to represent complex ieee 128-bit float for
+   __mulkc3 and __divkc3.  */
+typedef __complex float TCtype __attribute__ ((mode (KC)));
 
 #else
-#define TFtype_cmuldiv _Float128
-#define TCtype_cmuldiv _Complex _Float128
+typedef __complex float TCtype __attribute__ ((mode (TC)));
 #endif
 
 /* Force the use of the VSX instruction set.  */
@@ -110,10 +100,8 @@ extern UTItype_ppc __fixunskfti_sw (TFtype);
 #endif
 extern IBM128_TYPE __extendkftf2_sw (TFtype);
 extern TFtype __trunctfkf2_sw (IBM128_TYPE);
-extern TCtype_cmuldiv __mulkc3_sw (TFtype_cmuldiv, TFtype_cmuldiv,
-				   TFtype_cmuldiv, TFtype_cmuldiv);
-extern TCtype_cmuldiv __divkc3_sw (TFtype_cmuldiv, TFtype_cmuldiv,
-				   TFtype_cmuldiv, TFtype_cmuldiv);
+extern TCtype __mulkc3_sw (TFtype, TFtype, TFtype, TFtype);
+extern TCtype __divkc3_sw (TFtype, TFtype, TFtype, TFtype);
 
 #ifdef _ARCH_PPC64
 extern TItype_ppc __fixkfti (TFtype);
@@ -158,10 +146,8 @@ extern UTItype_ppc __fixunskfti_hw (TFtype);
 #endif
 extern IBM128_TYPE __extendkftf2_hw (TFtype);
 extern TFtype __trunctfkf2_hw (IBM128_TYPE);
-extern TCtype_cmuldiv __mulkc3_hw (TFtype_cmuldiv, TFtype_cmuldiv,
-				   TFtype_cmuldiv, TFtype_cmuldiv);
-extern TCtype_cmuldiv __divkc3_hw (TFtype_cmuldiv, TFtype_cmuldiv,
-				   TFtype_cmuldiv, TFtype_cmuldiv);
+extern TCtype __mulkc3_hw (TFtype, TFtype, TFtype, TFtype);
+extern TCtype __divkc3_hw (TFtype, TFtype, TFtype, TFtype);
 
 /* Ifunc function declarations, to automatically switch between software
    emulation and hardware support.  */
@@ -202,10 +188,8 @@ extern IBM128_TYPE __extendkftf2 (TFtype);
 extern TFtype __trunctfkf2 (IBM128_TYPE);
 
 /* Complex __float128 built on __float128 interfaces.  */
-extern TCtype_cmuldiv __mulkc3 (TFtype_cmuldiv, TFtype_cmuldiv,
-				TFtype_cmuldiv, TFtype_cmuldiv);
-extern TCtype_cmuldiv __divkc3 (TFtype_cmuldiv, TFtype_cmuldiv,
-				TFtype_cmuldiv, TFtype_cmuldiv);
+extern TCtype __mulkc3 (TFtype, TFtype, TFtype, TFtype);
+extern TCtype __divkc3 (TFtype, TFtype, TFtype, TFtype);
 
 /* Convert IEEE 128-bit floating point to/from string.  We explicitly use
    _Float128 instead of TFmode because _strtokf and _strfromkf must be compiled

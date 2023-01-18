@@ -26,17 +26,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include "soft-fp.h"
 #include "quad-float128.h"
 
-/* Use the correct built-ins depending on whether long double is IEEE 128-bit
-   or IBM 128-bit.  */
-#ifndef __LONG_DOUBLE_IEEE128__
 #define COPYSIGN(x,y) __builtin_copysignf128 (x, y)
 #define INFINITY __builtin_inff128 ()
-
-#else
-#define COPYSIGN(x,y) __builtin_copysignl (x, y)
-#define INFINITY __builtin_infl ()
-#endif
-
 #define isnan __builtin_isnan
 #define isinf __builtin_isinf
 
@@ -44,14 +35,11 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define __mulkc3 __mulkc3_sw
 #endif
 
-TCtype_cmuldiv
-__mulkc3 (TFtype_cmuldiv a,
-	  TFtype_cmuldiv b,
-	  TFtype_cmuldiv c,
-	  TFtype_cmuldiv d)
+TCtype
+__mulkc3 (TFtype a, TFtype b, TFtype c, TFtype d)
 {
-  TFtype_cmuldiv ac, bd, ad, bc, x, y;
-  TCtype_cmuldiv res;
+  TFtype ac, bd, ad, bc, x, y;
+  TCtype res;
 
   ac = a * c;
   bd = b * d;
