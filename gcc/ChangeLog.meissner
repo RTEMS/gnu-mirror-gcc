@@ -1,22 +1,6 @@
-==================== work106, patch #2 ====================
+==================== work106, patch #3 ====================
 
-PR target/107299: Use _Float128 and _Complex _Float128 for PowerPC libgcc IEEE 128-bit
-
-2023-01-17   Michael Meissner  <meissner@linux.ibm.com>
-
-	PR target/107299
-	* config/rs6000/quad-float128.h (TF): Remove definition.
-	(TFtype): New macro, use _Float128.
-	(TCtype): Change to macro, use _Complex _Float128.
-	(__mulkc3): Remove declaration.
-	(__divkc3): Likewise.
-	* libgcc2.h (TFtype): Allow md files to override this.
-	(TCtype): Likewise.
-	* soft-fp/quad.h (TFtype): Likewise.
-
-==================== work106, patch #1 was reverted ====================
-
-PR target/107299: Update IEEE 128-bit types for PowerPC libgcc
+PR target/107299: Update IEEE 128-bit types in PowerPC libgcc.
 
 This patch updates the IEEE 128-bit types in libgcc.
 
@@ -27,10 +11,6 @@ build dies when it is trying to build the _mulkc3.c and _divkc3 modules.
 This patch changes the IEEE 128-bit type (TFtype) in the IEEE 128-bit support
 to use either _Float128 or long double.  Previously we would use the __float128
 type.  In addition, the TCtype will use the same type along with _Complex.
-
-I changed the libgcc build so that the IEEE 128-bit support is now compiled
-with -mabi=ieeelongdouble.  For the _mulkc3 and _divkc3, I explicitly use long
-double and long double _Complex to avoid type mismatch errors.
 
 While it is desirable to ultimately have __float128 and _Float128 use the same
 internal type and mode within GCC, at present if you use the option
@@ -45,34 +25,45 @@ fix the compiler at some point, but right now, this is preventing people on
 Fedora 36 systems from building compilers where the default long double is IEEE
 128-bit.
 
-2023-01-12   Michael Meissner  <meissner@linux.ibm.com>
+I changed the three functions that deal with complex multiply and complex divide
+support (_mulkc3, _divkc3, and float128-ifunc) to always be compiled with IEEE
+128-bit long double.  This is to be type correct, and avoid mismatch declaration
+errors from the compiler.
+
+2023-01-17   Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/107299
-	* config/rs6000/_divkc3.c (toplevel): Add assertion for building with
-	-mabi=ieeelongdouble.  Remove code supporting -mabi=ibmlongdouble.
-	(COPYSIGN): Use the long double built-in.
+	* config/rs6000/_divkc3.c (top level): Require that long double is IEEE
+	128-bit.
+	(COPYSIGN): Use long double built-in.
 	(INFINITY): Likewise.
 	(FABS): Likewise.
-	* config/rs6000/_mulkc3.c (toplevel): Add assertion for building with
-	-mabi=ieeelongdouble.
-	(COPYSIGN): Use the long double built-in.
+	(RBIG): Use TFmode constants, not KFmode.
+	(RMIN): Likewise.
+	(RMIN2): Likewise.
+	(RMINSCAL): Likewise.
+	(RMAX2): Likewise.
+	* config/rs6000/_mulkc3.c (top level): Require that long double is IEEE
+	128-bit.
+	(COPYSIGN): Use long double built-in.
 	(INFINITY): Likewise.
-	* config/rs6000/float128-ifunc.c (toplevel): Add assertion for building
-	with -mabi=ieeelongdouble.
-	* config/rs6000/quad-float128.h (TF): Delete definition.
-	(TFtype): Define to be _Float128 or long double.
-	(TCtype): Define to be _Complex _Float128 or _Complex long double.
-	(__mulkc3_sw): Only declare function if -mabi=ieeelongdouble.
+	* config/rs6000/quad-float128.h (TF): Remove definition.
+	(TFtype): New macro, use _Float128 or long double.
+	(TCtype): Change to macro, use _Complex _Float128 or _Complex long
+	double.
+	(__mulkc3_sw): Only declare if long double is IEEE 128-bit.
 	(__divkc3_sw): Likewise.
 	(__mulkc3_hw): Likewise.
 	(__divkc3_hw): Likewise.
 	(__mulkc3): Likewise.
 	(__divkc3): Likewise.
-	* config/rs6000/t-float128 (FP128_CFLAGS_SW): Add -mabi=ieeelongdouble.
-	* config/rs6000/t-float128-hw (FP128_CFLAGS_HW): Likewise.
-	* libgcc2.h (TFtype): Allow MD code to override definition.
+	* libgcc2.h (TFtype): Allow md files to override this.
 	(TCtype): Likewise.
 	* soft-fp/quad.h (TFtype): Likewise.
+
+==================== work106, patch #2 was reverted ====================
+
+==================== work106, patch #1 was reverted ====================
 
 ==================== work106, branch head ====================
 
