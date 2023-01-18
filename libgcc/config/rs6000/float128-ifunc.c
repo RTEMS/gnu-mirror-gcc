@@ -354,8 +354,10 @@ IBM128_TYPE __extendkftf2 (TFtype)
 TFtype __trunctfkf2 (IBM128_TYPE)
   __attribute__ ((__ifunc__ ("__trunctfkf2_resolve")));
 
-TCtype __mulkc3 (TFtype, TFtype, TFtype, TFtype)
+TCtype_cmuldiv __mulkc3 (TFtype_cmuldiv, TFtype_cmuldiv,
+			 TFtype_cmuldiv, TFtype_cmuldiv)
   __attribute__ ((__ifunc__ ("__mulkc3_resolve")));
 
-TCtype __divkc3 (TFtype, TFtype, TFtype, TFtype)
+TCtype_cmuldiv __divkc3 (TFtype_cmuldiv, TFtype_cmuldiv,
+			 TFtype_cmuldiv, TFtype_cmuldiv)
   __attribute__ ((__ifunc__ ("__divkc3_resolve")));
