@@ -1,4 +1,4 @@
-==================== work106, patch #3 ====================
+==================== work106, patch #4 ====================
 
 PR target/107299: Update IEEE 128-bit types in PowerPC libgcc.
 
@@ -30,7 +30,7 @@ support (_mulkc3, _divkc3, and float128-ifunc) to always be compiled with IEEE
 128-bit long double.  This is to be type correct, and avoid mismatch declaration
 errors from the compiler.
 
-2023-01-17   Michael Meissner  <meissner@linux.ibm.com>
+2023-01-18   Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/107299
 	* config/rs6000/_divkc3.c (top level): Require that long double is IEEE
@@ -57,9 +57,27 @@ errors from the compiler.
 	(__divkc3_hw): Likewise.
 	(__mulkc3): Likewise.
 	(__divkc3): Likewise.
+	* config/rs6000/t-rs6000 (fp128_cmuldiv): Add support to build IEEE
+	128-bit complex multiply/divide with explicit IEEE-128 long double.
+	(fp128_cmuldiv_static_obj): Likewise.
+	(fp128_cmuldiv_shared_obj): Likewise.
+	(fp128_cmuldiv_obj): Likewise.
+	(fp128_ppc_funcs): Likewise.
+	(FP128_CFLAGS_CMULDIV): Likewise.
+	* config/rs6000/t-rs6000-hw (fp128_hardfp_src): Delete, unused.
+	(fp128_cmuldiv_funcs): Add support to build IEEE 128-bit complex
+	multiply/divide with explicit IEEE-128 long double.
+	(fp128_cmuldiv_static_obj): Likewise.
+	(fp128_cmuldiv_shared_obj): Likewise.
+	(fp128_cmuldiv_obj): Likewise.
+	(fp128_hw_funcs): Likewise.
+	(fp128_ifunc_funcs): Delete, unused.
+	(fp128_ifunc_src): Likewise.
 	* libgcc2.h (TFtype): Allow md files to override this.
 	(TCtype): Likewise.
 	* soft-fp/quad.h (TFtype): Likewise.
+
+==================== work106, patch #3 was reverted ====================
 
 ==================== work106, patch #2 was reverted ====================
 
