@@ -111,7 +111,7 @@ $(ibm128_dec_objs)	: INTERNAL_CFLAGS += $(IBM128_CFLAGS_DECIMAL)
 # 128-bit long double.
 FP128_CFLAGS_CMULDIV	= -Wno-psabi -mabi=ieeelongdouble
 
-$(fp128_cmuldiv_objs)	: INTERNAL_CFLAGS += $(FP128_CFLAGS_CMULDIV)
+$(fp128_cmuldiv_obj)	: INTERNAL_CFLAGS += $(FP128_CFLAGS_CMULDIV)
 
 $(fp128_softfp_src) : $(srcdir)/soft-fp/$(subst -sw,,$(subst kf,tf,$@)) $(fp128_dep)
 	@src="$(srcdir)/soft-fp/$(subst -sw,,$(subst kf,tf,$@))"; \
