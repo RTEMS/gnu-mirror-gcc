@@ -1,4 +1,143 @@
+==================== dmf007, patch #2 ====================
+
+Rework 128-bit complex multiply and divide.
+
+This patch reworks how the complex multiply and divide built-in functions are
+done.  Previously we created built-in declarations for doing long double complex
+multiply and divide when long double is IEEE 128-bit.  The old code also did not
+support __ibm128 complex multiply and divide if long double is IEEE 128-bit.
+
+In terms of history, I wrote the original code just as I was starting to test
+GCC on systems where IEEE 128-bit long double was the default.  At the time, we
+had not yet started mangling the built-in function names as a way to bridge
+going from a system with 128-bit IBM long double to 128-bin IEEE long double.
+
+The original code depends on there only being two 128-bit types invovled.  With
+the next patch in this series, this assumption will no longer be true.  When
+long double is IEEE 128-bit, there will be 2 IEEE 128-bit types (one for the
+explicit __float128/_Float128 type and one for long double).
+
+The problem is we cannot create two separate built-in functions that resolve to
+the same name.  This is a requirement of add_builtin_function and the C front
+end.  That means for the 3 possible modes (IFmode, KFmode, and TFmode), you can
+only use 2 of them.
+
+This code does not create the built-in declaration with the changed name.
+Instead, it uses the TARGET_MANGLE_DECL_ASSEMBLER_NAME hook to change the name
+before it is written out to the assembler file like it now does for all of the
+other long double built-in functions.
+
+When I wrote these patches, I discovered that __ibm128 complex multiply and
+divide had originally not been supported if long double is IEEE 128-bit as it
+would generate calls to __mulic3 and __divic3.  I added tests in the testsuite
+to verify that the correct name (i.e. __multc3 and __divtc3) is used in this
+case.
+
+I had previously sent this patch out on November 1st.  Compared to that version,
+this version no longer disables the special mapping when you are building
+libgcc, as it turns out we don't need it.
+
+I tested all 3 patchs for PR target/107299 on:
+
+    1)	LE Power10 using --with-cpu=power10 --with-long-double-format=ieee
+    2)	LE Power10 using --with-cpu=power10 --with-long-double-format=ibm
+    3)	LE Power9  using --with-cpu=power9  --with-long-double-format=ibm
+    4)	BE Power8  using --with-cpu=power8  --with-long-double-format=ibm
+
+Once all 3 patches have been applied, we can once again build GCC when long
+double is IEEE 128-bit.  There were no other regressions with these patches.
+Can I check these patches into the trunk?
+
+2023-01-20   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/107299
+	* config/rs6000/rs6000.cc (create_complex_muldiv): Delete.
+	(init_float128_ieee): Delete code to switch complex multiply and divide
+	for long double.
+	(complex_multiply_builtin_code): New helper function.
+	(complex_divide_builtin_code): Likewise.
+	(rs6000_mangle_decl_assembler_name): Add support for mangling the name
+	of complex 128-bit multiply and divide built-in functions.
+
+gcc/testsuite/
+
+	PR target/107299
+	* gcc.target/powerpc/divic3-1.c: New test.
+	* gcc.target/powerpc/divic3-2.c: Likewise.
+	* gcc.target/powerpc/mulic3-1.c: Likewise.
+	* gcc.target/powerpc/mulic3-2.c: Likewise.
+
+==================== dmf007, patch #1 ====================
+
+PR target/107299: Fix build issue when long double is IEEE 128-bit
+
+This patch updates the IEEE 128-bit types used in libgcc.
+
+At the moment, we cannot build GCC when the target uses IEEE 128-bit long
+doubles, such as building the compiler for a native Fedora 36 system.  The
+build dies when it is trying to build the _mulkc3.c and _divkc3 modules.
+
+This patch changes libgcc to use long double for the IEEE 128-bit base type if
+long double is IEEE 128-bit, and it uses _Float128 otherwise.  The built-in
+functions are adjusted to be the correct version based on the IEEE 128-bit base
+type used.
+
+While it is desirable to ultimately have __float128 and _Float128 use the same
+internal type and mode within GCC, at present if you use the option
+-mabi=ieeelongdouble, the __float128 type will use the long double type and not
+the _Float128 type.  We get an internal compiler error if we combine the
+signbitf128 built-in with a long double type.
+
+I've gone through several iterations of trying to fix this within GCC, and
+there are various problems that have come up.  I developed this alternative
+patch that changes libgcc so that it does not tickle the issue.  I hope we can
+fix the compiler at some point, but right now, this is preventing people on
+Fedora 36 systems from building compilers where the default long double is IEEE
+128-bit.
+
+I have built a GCC compiler tool chain on the following platforms and there
+were no regressions caused by these patches.
+
+    *	Power10 little endian, IBM long double, --with-cpu=power10
+
+    *	Power9 little endian, IBM long double, --with-cpu=power9
+
+    *	Power8 big endian, IBM long double, --with-cpu=power8, both
+	32-bit/64-bit tests.
+
+In addition, I have built a GCC compiler tool chain on the following systems
+with IEEE 128-bit long double as the default.  Comparing the test suite runs to
+the runs for the toolchain with IBM long double as the default, I only get the
+expected differences (C++ modules test fail on IEEE long double, 3 Fortran
+tests pass on IEEE long double that fail on IBM long double, C test pr105334.c
+fails, and C test fp128_conversions.c fails on power10):
+
+    *	Power10 little endian, IEEE long double, --with-cpu=power10
+
+    *	Power9 little endian, IEEE long double, --with-cpu=power9
+
+Can I check this change into the master branch?
+
+2023-01-20   Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/107299
+	* config/rs6000/_divkc3.c (COPYSIGN): Use the correct built-in based on
+	whether long double is IBM or IEEE.
+	(INFINITY): Likewise.
+	(FABS): Likewise.
+	* config/rs6000/_mulkc3.c (COPYSIGN): Likewise.
+	(INFINITY): Likewise.
+	* config/rs6000/quad-float128.h (TF): Remove definition.
+	(TFtype): Define to be long double or _Float128.
+	(TCtype): Define to be _Complex long double or _Complex _Float128.
+	* libgcc2.h (TFtype): Allow machine config files to override this.
+	(TCtype): Likewise.
+	* soft-fp/quad.h (TFtype): Likewise.
+
+==================== dmf007, branch head ====================
+
 2023-01-20   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-
