@@ -1,3 +1,74 @@
+==================== work107, patch #2 ====================
+
+Rework 128-bit complex multiply and divide.
+
+This patch reworks how the complex multiply and divide built-in functions are
+done.  Previously we created built-in declarations for doing long double complex
+multiply and divide when long double is IEEE 128-bit.  The old code also did not
+support __ibm128 complex multiply and divide if long double is IEEE 128-bit.
+
+In terms of history, I wrote the original code just as I was starting to test
+GCC on systems where IEEE 128-bit long double was the default.  At the time, we
+had not yet started mangling the built-in function names as a way to bridge
+going from a system with 128-bit IBM long double to 128-bin IEEE long double.
+
+The original code depends on there only being two 128-bit types invovled.  With
+the next patch in this series, this assumption will no longer be true.  When
+long double is IEEE 128-bit, there will be 2 IEEE 128-bit types (one for the
+explicit __float128/_Float128 type and one for long double).
+
+The problem is we cannot create two separate built-in functions that resolve to
+the same name.  This is a requirement of add_builtin_function and the C front
+end.  That means for the 3 possible modes (IFmode, KFmode, and TFmode), you can
+only use 2 of them.
+
+This code does not create the built-in declaration with the changed name.
+Instead, it uses the TARGET_MANGLE_DECL_ASSEMBLER_NAME hook to change the name
+before it is written out to the assembler file like it now does for all of the
+other long double built-in functions.
+
+When I wrote these patches, I discovered that __ibm128 complex multiply and
+divide had originally not been supported if long double is IEEE 128-bit as it
+would generate calls to __mulic3 and __divic3.  I added tests in the testsuite
+to verify that the correct name (i.e. __multc3 and __divtc3) is used in this
+case.
+
+I had previously sent this patch out on November 1st.  Compared to that version,
+this version no longer disables the special mapping when you are building
+libgcc, as it turns out we don't need it.
+
+I tested all 3 patchs for PR target/107299 on:
+
+    1)	LE Power10 using --with-cpu=power10 --with-long-double-format=ieee
+    2)	LE Power10 using --with-cpu=power10 --with-long-double-format=ibm
+    3)	LE Power9  using --with-cpu=power9  --with-long-double-format=ibm
+    4)	BE Power8  using --with-cpu=power8  --with-long-double-format=ibm
+
+Once all 3 patches have been applied, we can once again build GCC when long
+double is IEEE 128-bit.  There were no other regressions with these patches.
+Can I check these patches into the trunk?
+
+2023-01-20   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/107299
+	* config/rs6000/rs6000.cc (create_complex_muldiv): Delete.
+	(init_float128_ieee): Delete code to switch complex multiply and divide
+	for long double.
+	(complex_multiply_builtin_code): New helper function.
+	(complex_divide_builtin_code): Likewise.
+	(rs6000_mangle_decl_assembler_name): Add support for mangling the name
+	of complex 128-bit multiply and divide built-in functions.
+
+gcc/testsuite/
+
+	PR target/107299
+	* gcc.target/powerpc/divic3-1.c: New test.
+	* gcc.target/powerpc/divic3-2.c: Likewise.
+	* gcc.target/powerpc/mulic3-1.c: Likewise.
+	* gcc.target/powerpc/mulic3-2.c: Likewise.
+
 ==================== work107, patch #1 ====================
 
 PR target/107299: Fix build issue when long double is IEEE 128-bit
