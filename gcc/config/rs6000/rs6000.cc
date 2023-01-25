@@ -11188,7 +11188,7 @@ init_float128_ieee (machine_mode mode)
       if (mode != TFmode && FLOAT128_IBM_P (TFmode))
 	set_conv_libfunc (sext_optab, mode, TFmode, "__trunctfkf2");
 
-      set_conv_libfunc (trunc_optab, IFmode, mode, "__extendkftf2");
+      set_conv_libfunc (sext_optab, IFmode, mode, "__extendkftf2");
       if (mode != TFmode && FLOAT128_IBM_P (TFmode))
 	set_conv_libfunc (trunc_optab, TFmode, mode, "__extendkftf2");
 
