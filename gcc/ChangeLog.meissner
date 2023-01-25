@@ -1,3 +1,34 @@
+==================== work107, patch #20 ====================
+
+Improve PowerPC 128-bit floating point types.
+
+This patch prevents __ibm128 and __float128 from being considered in the
+automatic widening that the compiler does.  This way, you don't have the
+possibility that IFmode (__ibm128) will be widened to TFmode or KFmode, even
+there is hardware to support the IEEE 128-bit operations.
+
+I also moved changing the TFmode format from ieee to ibm to rs6000-modes.def
+from rs6000.cc.
+
+2022-01-24   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-modes.def (IFmode): Rework to use
+	FRACTIONAL_FLOAT_MODE_NO_WIDEN.
+	(KFmode): Likewise.
+	* expr.cc (convert_mode_scalar): Don't abort if we are converting
+	floating point modes that are the same precision but use different
+	encodings.
+	* genmodes.cc (struct mode_data): Add support for no widening.
+	(blank_mode): Likewise.
+	(FRACTIONAL_FLOAT_MODE): Add support for no widening capability.
+	(FRACTIONAL_FLOAT_MODE_NO_WIDEN): New macro.
+	(make_float_mode): Add support for no widening capability.
+	(cmp_modes): Likewise.
+	(emit_mode_wider): Add support for no widening capability.
+	* machmode.def (FRACTIONAL_FLOAT_MODE_NO_WIDEN): Document.
+
 ==================== work107, rebase 1/23 ====================
 
 ==================== work107, patch #2 ====================
