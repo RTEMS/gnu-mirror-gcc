@@ -1,3 +1,23 @@
+==================== work107, patch #22 ====================
+
+Update fp conversions #2
+
+2022-01-24   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.md (any_fp_cvt): New code iterator.
+	(fp_cvt): New code attribute.
+	(extendkftf2): Replace with <fp_cvt>kftf2.
+	(trunctfkf2): Replace with <fp_cvt>tfkf2.
+	(extendiftf2): Replace with <fp_cvt>iftf2.
+	(trunctfif2): Replace with <fp_cvt>tfif2.
+	(<fp_cvt>kftf2): Add both float_extend and float_truncate versions to
+	convert between 128-bit floating point types with the same format..
+	(<fp_cvt>tfkf2): Likewise.
+	(<fp_cvt>iftf2): Likewise.
+	(<fp_cvt>tfif2): Likewise.
+
 ==================== work107, patch #21 ====================
 
 Update float 128-bit conversions, PR target/107299.
