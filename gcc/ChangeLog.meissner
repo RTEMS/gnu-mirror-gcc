@@ -1,3 +1,54 @@
+==================== work107, patch #21 ====================
+
+Update float 128-bit conversions, PR target/107299.
+
+This patch is a rewrite of the patch submitted on August 18th:
+
+| https://gcc.gnu.org/pipermail/gcc-patches/2022-August/599988.html
+
+This patch reworks the conversions between 128-bit binary floating point types.
+Previously, we would call rs6000_expand_float128_convert to do all conversions.
+Now, we only define the conversions between the same representation that turn
+into a NOP.  The appropriate extend or truncate insn is generated, and after
+register allocation, it is converted to a move.
+
+This patch also fixes two places where we want to override the external name
+for the conversion function, and the wrong optab was used.  Previously,
+rs6000_expand_float128_convert would handle the move or generate the call as
+needed.  Now, it lets the machine independent code generate the call.  But if
+we use the machine independent code to generate the call, we need to update the
+name for two optabs where a truncate would be used in terms of converting
+between the modes.  This patch updates those two optabs.
+
+This patch was previously submitted on December 14th, 2022.  This patch changes
+one built-in function from a FLOAT_TRUNCATE to a FLOAT_EXTEND, which is needed
+by the previous patch to genmodes.cc to allow allow the same precision to be
+used for various modes.
+
+2022-01-24   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/107299
+	* config/rs6000/rs6000.cc (init_float128_ieee): Use the correct
+	float_extend or float_truncate optab based on how the machine converts
+	between IEEE 128-bit and IBM 128-bit.
+	* config/rs6000/rs6000.md (IFKF): Delete.
+	(IFKF_reg): Delete.
+	(extendiftf2): Rewrite to be a move if IFmode and TFmode are both IBM
+	128-bit.  Do not run if TFmode is IEEE 128-bit.
+	(extendifkf2): Delete.
+	(extendtfkf2): Delete.
+	(extendtfif2): Delete.
+	(trunciftf2): Delete.
+	(truncifkf2): Delete.
+	(trunckftf2): Delete.
+	(extendkftf2): Implement conversion of IEEE 128-bit types as a move.
+	(trunctfif2): Delete.
+	(trunctfkf2): Implement conversion of IEEE 128-bit types as a move.
+	(extend<mode>tf2_internal): Delete.
+	(extendtf<mode>2_internal): Delete.
+
 ==================== work107, patch #20 ====================
 
 Improve PowerPC 128-bit floating point types.
