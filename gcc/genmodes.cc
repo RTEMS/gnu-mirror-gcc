@@ -79,6 +79,8 @@ struct mode_data
 				   adjustment */
   unsigned int int_n;		/* If nonzero, then __int<INT_N> will be defined */
   bool boolean;
+  bool normal_widen;		/* Whether the type should be listed in the
+				   mode_wider and mode_2xwider tables.  */
 };
 
 static struct mode_data *modes[MAX_MODE_CLASS];
@@ -90,7 +92,7 @@ static const struct mode_data blank_mode = {
   0, -1U, -1U, -1U, -1U,
   0, 0, 0, 0, 0, 0,
   "<unknown>", 0, 0, 0, 0, false, false, 0,
-  false
+  false, true
 };
 
 static htab_t modes_by_name;
@@ -658,18 +660,22 @@ make_fixed_point_mode (enum mode_class cl,
 
 #define FLOAT_MODE(N, Y, F)             FRACTIONAL_FLOAT_MODE (N, -1U, Y, F)
 #define FRACTIONAL_FLOAT_MODE(N, B, Y, F) \
-  make_float_mode (#N, B, Y, #F, __FILE__, __LINE__)
+  make_float_mode (#N, B, Y, #F, __FILE__, __LINE__, true)
+#define FRACTIONAL_FLOAT_MODE_NO_WIDEN(N, B, Y, F) \
+  make_float_mode (#N, B, Y, #F, __FILE__, __LINE__, false)
 
 static void
 make_float_mode (const char *name,
 		 unsigned int precision, unsigned int bytesize,
 		 const char *format,
-		 const char *file, unsigned int line)
+		 const char *file, unsigned int line,
+		 bool normal_widen)
 {
   struct mode_data *m = new_mode (MODE_FLOAT, name, file, line);
   m->bytesize = bytesize;
   m->precision = precision;
   m->format = format;
+  m->normal_widen = normal_widen;
 }
 
 #define DECIMAL_FLOAT_MODE(N, Y, F)	\
@@ -871,7 +877,18 @@ create_modes (void)
    they have the same bytesize; this is the right thing because
    the precision must always be smaller than the bytesize * BITS_PER_UNIT.
    We don't have to do anything special to get this done -- an unset
-   precision shows up as (unsigned int)-1, i.e. UINT_MAX.  */
+   precision shows up as (unsigned int)-1, i.e. UINT_MAX.
+
+   If a mode is listed as no widen, sort it after the modes that are allowed as
+   widening types.  This is for machine dependent floating point types that we
+   don't want to automatically promote.
+
+   In particular on the PowerPC there are 2 different explicit 128-bit floating
+   point types (IBM and IEEE) and long double which coult be either of those
+   types.  We don't want automatic promotion between these types, because there
+   are values in each type that can't be represented in the other type.  On the
+   PowerPC, other types can be promotoed to long double, but not to the
+   explicit IEEE or IBM 128-bit types.  */
 static int
 cmp_modes (const void *a, const void *b)
 {
@@ -891,6 +908,11 @@ cmp_modes (const void *a, const void *b)
   if (m->precision > n->precision)
     return 1;
   else if (m->precision < n->precision)
+    return -1;
+
+  if (!m->normal_widen && n->normal_widen)
+    return 1;
+  else if (m->normal_widen && !n->normal_widen)
     return -1;
 
   if (!m->component && !n->component)
@@ -1541,17 +1563,20 @@ emit_mode_wider (void)
     {
       struct mode_data *m2 = 0;
 
-      if (m->cl == MODE_INT
-	  || m->cl == MODE_PARTIAL_INT
-	  || m->cl == MODE_FLOAT
-	  || m->cl == MODE_DECIMAL_FLOAT
-	  || m->cl == MODE_COMPLEX_FLOAT
-	  || m->cl == MODE_FRACT
-	  || m->cl == MODE_UFRACT
-	  || m->cl == MODE_ACCUM
-	  || m->cl == MODE_UACCUM)
+      if (m->normal_widen
+	  && (m->cl == MODE_INT
+	      || m->cl == MODE_PARTIAL_INT
+	      || m->cl == MODE_FLOAT
+	      || m->cl == MODE_DECIMAL_FLOAT
+	      || m->cl == MODE_COMPLEX_FLOAT
+	      || m->cl == MODE_FRACT
+	      || m->cl == MODE_UFRACT
+	      || m->cl == MODE_ACCUM
+	      || m->cl == MODE_UACCUM))
 	for (m2 = m->wider; m2 && m2 != void_mode; m2 = m2->wider)
 	  {
+	    if (!m2->normal_widen)
+	      continue;
 	    if (m2->bytesize == m->bytesize
 		&& m2->precision == m->precision)
 	      continue;
@@ -1576,6 +1601,8 @@ emit_mode_wider (void)
 	   m2 && m2 != void_mode;
 	   m2 = m2->wider)
 	{
+	  if (!m2->normal_widen)
+	    continue;
 	  if (m2->bytesize < 2 * m->bytesize)
 	    continue;
 	  if (m->precision != (unsigned int) -1)

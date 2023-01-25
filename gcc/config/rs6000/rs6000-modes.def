@@ -42,10 +42,12 @@
 #endif
 
 /* IBM 128-bit floating point.  */
-FRACTIONAL_FLOAT_MODE (IF, FLOAT_PRECISION_IFmode, 16, ibm_extended_format);
+FRACTIONAL_FLOAT_MODE_NO_WIDEN (IF, FLOAT_PRECISION_IFmode, 16,
+				ibm_extended_format);
 
 /* Explicit IEEE 128-bit floating point.  */
-FRACTIONAL_FLOAT_MODE (KF, FLOAT_PRECISION_KFmode, 16, ieee_quad_format);
+FRACTIONAL_FLOAT_MODE_NO_WIDEN (KF, FLOAT_PRECISION_KFmode, 16,
+				ieee_quad_format);
 
 /* 128-bit floating point, either IBM 128-bit or IEEE 128-bit.  This is
    adjusted in rs6000_option_override_internal to be the appropriate floating
