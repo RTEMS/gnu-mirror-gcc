@@ -179,3 +179,4 @@ FAIL: gcc.dg/guality/pr54693-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-obje
 FAIL: gcc.dg/guality/pr54693-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 21 z == 30 - 3 * i
 FAIL: gcc.dg/fold-overflow-1.c scan-assembler-times 2139095040 2
 FAIL: gcc.dg/pr95115.c execution test
+FAIL: gcc.target/i386/pr89618.c scan-tree-dump vect "LOOP VECTORIZED"
