@@ -1,5 +1,5 @@
 /* Common hooks for RISC-V.
-   Copyright (C) 2016-2022 Free Software Foundation, Inc.
+   Copyright (C) 2016-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1538,7 +1538,7 @@ riscv_check_conds (
 
   for (itr = conds.begin (); itr != conds.end (); ++itr)
     {
-      /* We'll check march= and mabi= in ohter place.  */
+      /* We'll check march= and mabi= in other place.  */
       if (prefixed_with (*itr, "march=") || prefixed_with (*itr, "mabi="))
 	continue;
 

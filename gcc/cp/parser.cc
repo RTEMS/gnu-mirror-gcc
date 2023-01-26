@@ -1,5 +1,5 @@
 /* -*- C++ -*- Parser.
-   Copyright (C) 2000-2022 Free Software Foundation, Inc.
+   Copyright (C) 2000-2023 Free Software Foundation, Inc.
    Written by Mark Mitchell <mark@codesourcery.com>.
 
    This file is part of GCC.
@@ -705,7 +705,7 @@ cp_lexer_new_main (void)
   /* It's possible that parsing the first pragma will load a PCH file,
      which is a GC collection point.  So we have to do that before
      allocating any memory.  */
-  cp_lexer_get_preprocessor_token (0, &token);
+  cp_lexer_get_preprocessor_token (C_LEX_STRING_NO_JOIN, &token);
   cp_parser_initial_pragma (&token);
   c_common_no_more_pch ();
 
@@ -10224,7 +10224,10 @@ cp_parser_binary_expression (cp_parser* parser, bool cast_p,
 		      || (TREE_CODE (TREE_TYPE (TREE_OPERAND (current.lhs, 0)))
 			  != BOOLEAN_TYPE))))
 	  /* Avoid warning for !!b == y where b is boolean.  */
-	  && (!DECL_P (tree_strip_any_location_wrapper (current.lhs))
+	  && (!(DECL_P (tree_strip_any_location_wrapper (current.lhs))
+		|| (TREE_CODE (current.lhs) == NON_LVALUE_EXPR
+		    && DECL_P (tree_strip_any_location_wrapper
+					    (TREE_OPERAND (current.lhs, 0)))))
 	      || TREE_TYPE (current.lhs) == NULL_TREE
 	      || TREE_CODE (TREE_TYPE (current.lhs)) != BOOLEAN_TYPE))
 	warn_logical_not_parentheses (current.loc, current.tree_type,
@@ -21670,6 +21673,13 @@ cp_parser_using_declaration (cp_parser* parser,
 
   cp_warn_deprecated_use_scopes (qscope);
 
+  if (access_declaration_p
+      && !MAYBE_CLASS_TYPE_P (qscope)
+      && TREE_CODE (qscope) != ENUMERAL_TYPE)
+    /* If the qualifying scope of an access-declaration isn't a class
+       or enumeration type then it can't be valid.  */
+    cp_parser_simulate_error (parser);
+
   if (access_declaration_p && cp_parser_error_occurred (parser))
     /* Something has already gone wrong; there's no need to parse
        further.  Since an error has occurred, the return value of
@@ -21698,7 +21708,36 @@ cp_parser_using_declaration (cp_parser* parser,
 	pedwarn (ell->location, OPT_Wc__17_extensions,
 		 "pack expansion in using-declaration only available "
 		 "with %<-std=c++17%> or %<-std=gnu++17%>");
-      qscope = make_pack_expansion (qscope);
+
+      /* A parameter pack can appear in the qualifying scope, and/or in the
+	 terminal name (if naming a conversion function).  Logically they're
+	 part of a single pack expansion of the overall USING_DECL, but we
+	 express them as separate pack expansions within the USING_DECL since
+	 we can't create a pack expansion over a USING_DECL.  */
+      bool saw_parm_pack = false;
+      if (uses_parameter_packs (qscope))
+	{
+	  qscope = make_pack_expansion (qscope);
+	  saw_parm_pack = true;
+	}
+      if (identifier_p (identifier)
+	  && IDENTIFIER_CONV_OP_P (identifier)
+	  && uses_parameter_packs (TREE_TYPE (identifier)))
+	{
+	  identifier = make_conv_op_name (make_pack_expansion
+					  (TREE_TYPE (identifier)));
+	  saw_parm_pack = true;
+	}
+      if (!saw_parm_pack)
+	{
+	  /* Issue an error in terms using a SCOPE_REF that includes both
+	     components.  */
+	  tree name
+	    = build_qualified_name (NULL_TREE, qscope, identifier, false);
+	  make_pack_expansion (name);
+	  gcc_assert (seen_error ());
+	  qscope = identifier = error_mark_node;
+	}
     }
 
   /* The function we call to handle a using-declaration is different
@@ -25445,6 +25484,7 @@ cp_parser_braced_list (cp_parser* parser, bool* non_constant_p)
   location_t finish_loc = cp_lexer_peek_token (parser->lexer)->location;
   braces.require_close (parser);
   TREE_TYPE (initializer) = init_list_type_node;
+  recompute_constructor_flags (initializer);
 
   cp_expr result (initializer);
   /* Build a location of the form:
@@ -26519,7 +26559,23 @@ cp_parser_class_head (cp_parser* parser,
   if (cp_parser_global_scope_opt (parser, /*current_scope_valid_p=*/false))
     qualified_p = true;
 
-  push_deferring_access_checks (dk_no_check);
+  /* It is OK to define an inaccessible class; for example:
+
+       class A { class B; };
+       class A::B {};
+
+     So we want to ignore access when parsing the class name.
+     However, we might be tentatively parsing what is really an
+     elaborated-type-specifier naming a template-id, e.g.
+
+       struct C<&D::m> c;
+
+     In this case the tentative parse as a class-head will fail, but not
+     before cp_parser_template_id splices in a CPP_TEMPLATE_ID token.
+     Since dk_no_check is sticky, we must instead use dk_deferred so that
+     any such CPP_TEMPLATE_ID token created during this tentative parse
+     will correctly capture the access checks imposed by the template-id . */
+  push_deferring_access_checks (dk_deferred);
 
   /* Determine the name of the class.  Begin by looking for an
      optional nested-name-specifier.  */
@@ -26545,11 +26601,6 @@ cp_parser_class_head (cp_parser* parser,
 
 	 The proposed resolution for Core Issue 180 says that wherever
 	 you see `class T::X' you should treat `X' as a type-name.
-
-	 It is OK to define an inaccessible class; for example:
-
-	   class A { class B; };
-	   class A::B {};
 
 	 We do not know if we will see a class-name, or a
 	 template-name.  We look for a class-name first, in case the

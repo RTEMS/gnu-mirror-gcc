@@ -1,5 +1,5 @@
 /* Classes for analyzer diagnostics.
-   Copyright (C) 2019-2022 Free Software Foundation, Inc.
+   Copyright (C) 2019-2023 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -131,13 +131,15 @@ struct return_of_state : public event_desc
 struct final_event : public event_desc
 {
   final_event (bool colorize,
-	       tree expr, state_machine::state_t state)
+	       tree expr, state_machine::state_t state,
+	       const warning_event &event)
   : event_desc (colorize),
-    m_expr (expr), m_state (state)
+    m_expr (expr), m_state (state), m_event (event)
   {}
 
   tree m_expr;
   state_machine::state_t m_state;
+  const warning_event &m_event;
 };
 
 } /* end of namespace evdesc */

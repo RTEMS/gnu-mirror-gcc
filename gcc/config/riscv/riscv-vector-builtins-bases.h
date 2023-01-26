@@ -1,5 +1,5 @@
 /* function_base declaration for RISC-V 'V' Extension for GNU compiler.
-   Copyright (C) 2022-2022 Free Software Foundation, Inc.
+   Copyright (C) 2022-2023 Free Software Foundation, Inc.
    Contributed by Ju-Zhe Zhong (juzhe.zhong@rivai.ai), RiVAI Technologies Ltd.
 
    This file is part of GCC.
@@ -26,6 +26,8 @@ namespace riscv_vector {
 namespace bases {
 extern const function_base *const vsetvl;
 extern const function_base *const vsetvlmax;
+extern const function_base *const vle;
+extern const function_base *const vse;
 }
 
 } // end namespace riscv_vector

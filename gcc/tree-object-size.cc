@@ -1,5 +1,5 @@
 /* __builtin_object_size (ptr, object_size_type) computation
-   Copyright (C) 2004-2022 Free Software Foundation, Inc.
+   Copyright (C) 2004-2023 Free Software Foundation, Inc.
    Contributed by Jakub Jelinek <jakub@redhat.com>
 
 This file is part of GCC.
@@ -412,7 +412,9 @@ compute_object_offset (const_tree expr, const_tree var)
 	return base;
 
       t = TREE_OPERAND (expr, 1);
-      off = size_binop (PLUS_EXPR, DECL_FIELD_OFFSET (t),
+      off = size_binop (PLUS_EXPR,
+			(TREE_OPERAND (expr, 2) ? TREE_OPERAND (expr, 2)
+			 : DECL_FIELD_OFFSET (t)),
 			size_int (tree_to_uhwi (DECL_FIELD_BIT_OFFSET (t))
 				  / BITS_PER_UNIT));
       break;

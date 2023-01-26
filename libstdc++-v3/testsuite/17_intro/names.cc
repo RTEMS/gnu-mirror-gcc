@@ -1,4 +1,4 @@
-// Copyright (C) 2017-2022 Free Software Foundation, Inc.
+// Copyright (C) 2017-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -204,6 +204,17 @@
 #define Value			Value is not a reserved name
 #define ValueT			ValueT is not a reserved name
 #define ValueType		ValueType is not a reserved name
+
+#ifndef _WIN32
+// Windows SAL annotations
+#define _In_			cannot be used as an identifier
+#define _Inout_			cannot be used as an identifier
+#define _Out_			cannot be used as an identifier
+#define _Reserved_		cannot be used as an identifier
+#define __inout			cannot be used as an identifier
+#define __in_opt		cannot be used as an identifier
+#define __out_opt		cannot be used as an identifier
+#endif
 
 #ifdef _AIX
 // See https://gcc.gnu.org/ml/libstdc++/2017-03/msg00015.html

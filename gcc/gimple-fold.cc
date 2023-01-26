@@ -1,5 +1,5 @@
 /* Statement simplification on GIMPLE.
-   Copyright (C) 2010-2022 Free Software Foundation, Inc.
+   Copyright (C) 2010-2023 Free Software Foundation, Inc.
    Split out from tree-ssa-ccp.cc.
 
 This file is part of GCC.
@@ -591,7 +591,7 @@ fold_gimple_assign (gimple_stmt_iterator *si)
    If the statement has a lhs the last stmt in the sequence is expected
    to assign to that lhs.  */
 
-static void
+void
 gsi_replace_with_seq_vops (gimple_stmt_iterator *si_p, gimple_seq stmts)
 {
   gimple *stmt = gsi_stmt (*si_p);

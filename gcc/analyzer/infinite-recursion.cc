@@ -1,5 +1,5 @@
 /* Detection of infinite recursion.
-   Copyright (C) 2022 Free Software Foundation, Inc.
+   Copyright (C) 2022-2023 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -182,7 +182,7 @@ public:
   /* Customize the location where the warning_event appears, putting
      it at the topmost entrypoint to the function.  */
   void add_final_event (const state_machine *,
-			const exploded_node *,
+			const exploded_node *enode,
 			const gimple *,
 			tree,
 			state_machine::state_t,
@@ -195,6 +195,7 @@ public:
 			  ()->get_start_location (),
 			m_callee_fndecl,
 			m_new_entry_enode->get_stack_depth ()),
+	enode,
 	NULL, NULL, NULL));
   }
 
