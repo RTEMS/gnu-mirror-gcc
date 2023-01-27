@@ -84,7 +84,7 @@ public:
   }
 };
 
-/* Implements vle.v/vse.v codegen.  */
+/* Implements vle.v/vse.v/vlm.v/vsm.v codegen.  */
 template <bool STORE_P>
 class loadstore : public function_base
 {
@@ -106,7 +106,7 @@ class loadstore : public function_base
   rtx expand (function_expander &e) const override
   {
     if (STORE_P)
-      return e.use_contiguous_store_insn (code_for_pred_mov (e.vector_mode ()));
+      return e.use_contiguous_store_insn (code_for_pred_store (e.vector_mode ()));
     else
       return e.use_contiguous_load_insn (code_for_pred_mov (e.vector_mode ()));
   }
@@ -116,6 +116,8 @@ static CONSTEXPR const vsetvl<false> vsetvl_obj;
 static CONSTEXPR const vsetvl<true> vsetvlmax_obj;
 static CONSTEXPR const loadstore<false> vle_obj;
 static CONSTEXPR const loadstore<true> vse_obj;
+static CONSTEXPR const loadstore<false> vlm_obj;
+static CONSTEXPR const loadstore<true> vsm_obj;
 
 /* Declare the function base NAME, pointing it to an instance
    of class <NAME>_obj.  */
@@ -126,5 +128,7 @@ BASE (vsetvl)
 BASE (vsetvlmax)
 BASE (vle)
 BASE (vse)
+BASE (vlm)
+BASE (vsm)
 
 } // end namespace riscv_vector

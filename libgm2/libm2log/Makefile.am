@@ -24,10 +24,10 @@ VPATH = . @srcdir@ @srcdir@/../../gcc/m2/gm2-libs-pim
 # Multilib support.
 MAKEOVERRIDES=
 
-version := $(shell $(CC) -dumpversion)
+gcc_version := $(shell @get_gcc_base_ver@ $(top_srcdir)/../gcc/BASE-VER)
 
 # Directory in which the compiler finds libraries etc.
-libsubdir = $(libdir)/gcc/$(target_alias)/$(version)
+libsubdir = $(libdir)/gcc/$(target_alias)/$(gcc_version)
 # Used to install the shared libgcc.
 slibdir = @slibdir@
 
@@ -149,21 +149,21 @@ M2LIBDIR = /m2/m2log/
 	$(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(GM2_FOR_TARGET) -c $(CFLAGS_FOR_TARGET) $(LIBCFLAGS) $(libm2log_la_M2FLAGS) $< -o $@
 
 install-data-local: force
-	mkdir -p $(DESTDIR)$(inst_libdir)/$(MULTIDIR)$(M2LIBDIR)
-	$(INSTALL_DATA) .libs/libm2log.la $(DESTDIR)$(inst_libdir)/$(MULTIDIR)$(M2LIBDIR)
-	chmod 644 $(DESTDIR)$(inst_libdir)/$(MULTIDIR)$(M2LIBDIR)libm2log.la
-	$(INSTALL_DATA) .libs/libm2log.a $(DESTDIR)$(inst_libdir)/$(MULTIDIR)$(M2LIBDIR)
-	chmod 644 $(DESTDIR)$(inst_libdir)/$(MULTIDIR)$(M2LIBDIR)libm2log.a
-	$(RANLIB) $(DESTDIR)$(inst_libdir)/$(MULTIDIR)$(M2LIBDIR)libm2log.a
+	mkdir -p $(DESTDIR)$(inst_libdir)/$(M2LIBDIR)
+	$(INSTALL_DATA) .libs/libm2log.la $(DESTDIR)$(inst_libdir)/$(M2LIBDIR)
+	chmod 644 $(DESTDIR)$(inst_libdir)/$(M2LIBDIR)libm2log.la
+	$(INSTALL_DATA) .libs/libm2log.a $(DESTDIR)$(inst_libdir)/$(M2LIBDIR)
+	chmod 644 $(DESTDIR)$(inst_libdir)/$(M2LIBDIR)libm2log.a
+	$(RANLIB) $(DESTDIR)$(inst_libdir)/$(M2LIBDIR)libm2log.a
 	for i in $(M2DEFS) $(M2MODS) ; do \
            if [ -f $$i ] ; then \
-              $(INSTALL_DATA) $$i '$(DESTDIR)$(inst_libdir)/$(MULTIDIR)$(M2LIBDIR)'; \
+              $(INSTALL_DATA) $$i '$(DESTDIR)$(inst_libdir)/$(M2LIBDIR)'; \
            elif [ -f @srcdir@/../../gcc/m2/gm2-libs-pim/$$i ] ; then \
-              $(INSTALL_DATA) @srcdir@/../../gcc/m2/gm2-libs-pim/$$i '$(DESTDIR)$(inst_libdir)/$(MULTIDIR)$(M2LIBDIR)'; \
+              $(INSTALL_DATA) @srcdir@/../../gcc/m2/gm2-libs-pim/$$i '$(DESTDIR)$(inst_libdir)/$(M2LIBDIR)'; \
            else \
               echo "cannot find $$i" ; exit 1 ; \
            fi ; \
-           chmod 644 $(DESTDIR)$(inst_libdir)/$(MULTIDIR)$(M2LIBDIR)$$i ; \
+           chmod 644 $(DESTDIR)$(inst_libdir)/$(M2LIBDIR)$$i ; \
 	done
 
 force:
