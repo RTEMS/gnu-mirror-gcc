@@ -447,8 +447,6 @@ rs6000_target_modify_macros (bool define_p, HOST_WIDE_INT flags)
     rs6000_define_or_undefine_macro (define_p, "_ARCH_PWR9");
   if ((flags & OPTION_MASK_POWER10) != 0)
     rs6000_define_or_undefine_macro (define_p, "_ARCH_PWR10");
-  if ((flags & OPTION_MASK_FUTURE) != 0)
-    rs6000_define_or_undefine_macro (define_p, "_ARCH_PWR_FUTURE");
   if ((flags & OPTION_MASK_SOFT_FLOAT) != 0)
     rs6000_define_or_undefine_macro (define_p, "_SOFT_FLOAT");
   if ((flags & OPTION_MASK_RECIP_PRECISION) != 0)
@@ -600,9 +598,6 @@ rs6000_target_modify_macros (bool define_p, HOST_WIDE_INT flags)
   /* Tell the user if we support the MMA instructions.  */
   if ((flags & OPTION_MASK_MMA) != 0)
     rs6000_define_or_undefine_macro (define_p, "__MMA__");
-  /* Tell the user if we support the dense math instructions.  */
-  if ((flags & OPTION_MASK_DENSE_MATH) != 0)
-    rs6000_define_or_undefine_macro (define_p, "__PPC_DMR__");
   /* Whether pc-relative code is being generated.  */
   if ((flags & OPTION_MASK_PCREL) != 0)
     rs6000_define_or_undefine_macro (define_p, "__PCREL__");
