@@ -1,4 +1,4 @@
-==================== dmf007, patch #37 was reverted ====================
+==================== dmf007, patch #37 ====================
 
 Support load/store vector with right length.
 
@@ -37,7 +37,7 @@ gcc/testsuite/
 
 	* gcc.target/powerpc/lxvrl.c: New test.
 
-==================== dmf007, patch #36 was reverted ====================
+==================== dmf007, patch #36 ====================
 
 Add saturating subtract built-ins.
 
@@ -87,7 +87,7 @@ gcc/testsuite/
 	* lib/target-supports.exp (check_effective_target_powerpc_future_ok):
 	New effective target.
 
-==================== dmf007, patch #35 was reverted ====================
+==================== dmf007, patch #35 ====================
 
 PowerPC: Add support for 1,024 bit DMR registers.
 
@@ -106,11 +106,6 @@ since there are no load/store dense math instructions.  I added the new keyword
 '__dmr' to create 1,024 bit types that can be loaded into DMRs.  At present, I
 don't have aliases for __dmr512 and __dmr1024 that we've discussed internally.
 
-At present, the tree constant propigation patch does not work with 1,024 bit
-DMRs.  I believe this is due to the CCP pass not skipping opaque modes.  I hope
-once this patch is committed, we can work on the machine independent changes to
-allow the CCP pass not to issue an internal error when a DMR is used.
-
 The patches have been tested on the following platforms.  I added the patches
 for PR target/107299 that I submitted on November 2nd before doing the builds so
 that GCC would build on systems using IEEE 128-bit long double.
@@ -126,7 +121,7 @@ tests:
 
 Can I check this patch into the GCC 13 master branch?
 
-2023-01-27   Michael Meissner  <meissner@linux.ibm.com>
+2023-01-28   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -175,7 +170,7 @@ gcc/testsuite/
 
 	* gcc.target/powerpc/dm-1024bit.c: New test.
 
-==================== dmf007, patch #34 was reverted ====================
+==================== dmf007, patch #34 ====================
 
 PowerPC: Switch to dense math names for all MMA operations.
 
@@ -235,7 +230,7 @@ gcc/testsuite/
 	* lib/target-supports.exp (check_effective_target_ppc_dmr_ok): New
 	target test.
 
-==================== dmf007, patch #33 was reverted ====================
+==================== dmf007, patch #33 ====================
 
 PowerPC: Make MMA insns support DMR registers.
 
@@ -294,7 +289,7 @@ gcc/
 	prime the DMR registers or the xxmfacc instruction to de-prime
 	instructions if we have dense math register support.
 
-==================== dmf007, patch #32 was reverted ====================
+==================== dmf007, patch #32 ====================
 
 PowerPC: Add support for accumulators in DMR registers.
 
@@ -422,7 +417,7 @@ gcc/
 	* config/rs6000/rs6000.opt (-mdense-math): New switch.
 	* doc/md.texi (PowerPC constraints): Document wD constraint.
 
-==================== dmf007, patch #31 was reverted ====================
+==================== dmf007, patch #31 ====================
 
 PowerPC: Make -mcpu=future enable -mblock-ops-vector-pair.
 
@@ -455,7 +450,7 @@ gcc/
 	-mblock-ops-vector-pair.
 	(POWERPC_MASKS): Likewise.
 
-==================== dmf007, patch #30 was reverted ====================
+==================== dmf007, patch #30 ====================
 
 PowerPC: Add -mcpu=future.
 
