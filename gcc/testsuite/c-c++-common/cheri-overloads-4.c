@@ -1,5 +1,5 @@
 /* { dg-require-effective-target cheri_capability_any } */
-/* { dg-options "-W -Wall -Wconversion" } */
+/* { dg-options "-W -Wall -Wconversion -Wsign-conversion" } */
 
 #include <stddef.h>
 #include <string.h>
@@ -77,7 +77,7 @@ intcap_ret_voidp (__intcap_t a, __uintcap_t b)
 int *__capability
 intp_intcap (int *__capability a, __intcap_t b)
 {
-  return __builtin_cheri_cap_build (a, b); /* { dg-warning {may change the sign} "" { xfail c++ } } */
+  return __builtin_cheri_cap_build (a, b); /* { dg-warning {may change the sign} "" } */
 }
 
 int *__capability
@@ -90,7 +90,7 @@ intp_intp (int *__capability a, int *__capability b)
 int *__capability
 intp_int64 (int *__capability a, int64_t b)
 {
-  return __builtin_cheri_cap_build (a, b); /* { dg-warning {may change the sign} "" { xfail c++ } } */
+  return __builtin_cheri_cap_build (a, b); /* { dg-warning {may change the sign} "" } */
 }
 
 int *__capability
