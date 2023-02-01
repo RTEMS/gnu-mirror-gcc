@@ -188,7 +188,7 @@ main (int argc, char *argv[])
   return ret;
 }
 
-/* { dg-final { scan-assembler {\mdmsetaccz\M}      } } */
+/* { dg-final { scan-assembler {\mdmsetdmrz\M}      } } */
 /* { dg-final { scan-assembler {\mdmxvf64gerpp\M}   } } */
 /* { dg-final { scan-assembler {\mdmxxextfdmr512\M} } } */
 
