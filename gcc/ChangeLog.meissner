@@ -1,16 +1,6 @@
-==================== dmf007, patch #39 ====================
+==================== dmf007, patch #40 ====================
 
-Fix dmr test.
-
-2023-02-01   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/testsuite/
-
-	* gcc.target/powerpc/dm-double-test.s: Fix test to use dmsetdmrz.
-
-==================== dmf007, patch #38 ====================
-
-Bump up precision size to 11 bits.
+Bump up precision size to 16 bits.
 
 The new __dmr type that is being added as a possible future PowerPC instruction
 set bumps into a structure field size issue.  The size of the __dmr type is 1024 bits.
@@ -28,13 +18,27 @@ before the two shifts, while the PowerPC always returns 0.  In the ccp pass, the
 original input is -1, and so it worked.  When I did the runs on the PowerPC, the
 result was 0, which ultimately led to the failure.
 
-2023-01-31   Michael Meissner  <meissner@linux.ibm.com>
+2023-02-01   Richard Biener  <rguenther@suse.de>
+	     Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
+	PR middle-end/108623
 	* hwint.h (sext_hwi): Add assertion against precision 0.
-	* tree-core.h (tree_type_common): Bump up precision field by 1 bit, and
-	reduce contains_placeholder_bits to 1 bit.
+	* tree-core.h (tree_type_common): Bump up precision field to 16 bits.
+	Align bit fields > 1 bit to at least an 8-bit boundary.
+
+==================== dmf007, patch #39 ====================
+
+Fix dmr test.
+
+2023-02-01   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/dm-double-test.s: Fix test to use dmsetdmrz.
+
+==================== dmf007, patch #38 was reverted ====================
 
 ==================== dmf007, patch #37 ====================
 
