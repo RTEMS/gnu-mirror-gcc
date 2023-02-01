@@ -1686,12 +1686,12 @@ struct GTY(()) tree_type_common {
   tree attributes;
   unsigned int uid;
 
-  unsigned int precision : 10;
+  unsigned int precision : 11;
   unsigned no_force_blk_flag : 1;
   unsigned needs_constructing_flag : 1;
   unsigned transparent_aggr_flag : 1;
   unsigned restrict_flag : 1;
-  unsigned contains_placeholder_bits : 2;
+  unsigned contains_placeholder_bits : 1;
 
   ENUM_BITFIELD(machine_mode) mode : 8;
 
