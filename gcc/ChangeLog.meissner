@@ -1,3 +1,31 @@
+==================== dmf007, patch #38 ====================
+
+Bump up precision size to 11 bits.
+
+The new __dmr type that is being added as a possible future PowerPC instruction
+set bumps into a structure field size issue.  The size of the __dmr type is 1024 bits.
+The precision field in tree_type_common is currently 10 bits, so if you store
+1,024 into field, you get a 0 back.  When you get 0 in the precision field, the
+ccp pass passes this 0 to sext_hwi in hwint.h.  That function in turn generates
+a shift that is equal to the host wide int bit size, which is undefined as
+machine dependent for shifting in C/C++.
+
+      int shift = HOST_BITS_PER_WIDE_INT - prec;
+      return ((HOST_WIDE_INT) ((unsigned HOST_WIDE_INT) src << shift)) >> shift;
+
+It turns out the x86_64 where I first did my tests returns the original input
+before the two shifts, while the PowerPC always returns 0.  In the ccp pass, the
+original input is -1, and so it worked.  When I did the runs on the PowerPC, the
+result was 0, which ultimately led to the failure.
+
+2023-01-31   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* hwint.h (sext_hwi): Add assertion against precision 0.
+	* tree-core.h (tree_type_common): Bump up precision field by 1 bit, and
+	reduce contains_placeholder_bits to 1 bit.
+
 ==================== dmf007, patch #37 ====================
 
 Support load/store vector with right length.
