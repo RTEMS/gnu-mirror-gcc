@@ -1,3 +1,13 @@
+==================== dmf007, patch #39 ====================
+
+Fix dmr test.
+
+2023-02-01   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/dm-double-test.s: Fix test to use dmsetdmrz.
+
 ==================== dmf007, patch #38 ====================
 
 Bump up precision size to 11 bits.
