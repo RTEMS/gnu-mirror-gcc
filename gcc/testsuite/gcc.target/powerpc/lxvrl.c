@@ -1,5 +1,6 @@
 /* { dg-do compile } */
 /* { dg-require-effective-target powerpc_future_ok } */
+/* { dg-require-effective-target lp64 } */
 /* { dg-options "-mdejagnu-cpu=future -O2" } */
 
 /* Test whether the lxvrl and stxvrl instructions are generated for
