@@ -1,5 +1,20 @@
 ==================== dmf007, patch #40 ====================
 
+Update lxvrl test for 32-bit.
+
+2023-02-01   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-string.c (expand_block_move): Only generate LXVL
+	and STXVL moves on 64-bit, since the pattern is not enabled on 32-bit.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/lxvrl.c: Restrict test to 64-bit.
+
+==================== dmf007, patch #40 ====================
+
 Bump up precision size to 16 bits.
 
 The new __dmr type that is being added as a possible future PowerPC instruction
