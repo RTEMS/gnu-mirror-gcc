@@ -17,7 +17,7 @@ the tradiational IBM double double format.  Assuming the other 6 patches for
 -mcpu=future are checked in (or at least the first patch), can I check this
 patch into the master branch for GCC 13.
 
-2023-02-02   Michael Meissner  <meissner@linux.ibm.com>
+2023-02-03   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -75,7 +75,7 @@ the tradiational IBM double double format.  Assuming the other 6 patches for
 -mcpu=future are checked in (or at least the first patch), can I check this
 patch into the master branch for GCC 13?
 
-2023-02-02   Michael Meissner  <meissner@linux.ibm.com>
+2023-02-03   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
