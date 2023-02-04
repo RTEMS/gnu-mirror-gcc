@@ -438,7 +438,7 @@ rs6000_return_in_memory (const_tree type, const_tree fntype ATTRIBUTE_UNUSED)
       && !cfun->machine->mma_return_type_error
       && TREE_TYPE (cfun->decl) == fntype
       && (TYPE_MODE (type) == OOmode || TYPE_MODE (type) == XOmode
-	  || TYPE_MODE (type) == TDOmode))
+	  || TYPE_MODE (type) == V8TImode))
     {
       /* Record we have now handled function CFUN, so the next time we
 	 are called, we do not re-report the same error.  */
@@ -1642,7 +1642,7 @@ rs6000_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
       return NULL_RTX;
     }
 
-  if (mode == TDOmode)
+  if (mode == V8TImode)
     {
       if (TYPE_CANONICAL (type) != NULL_TREE)
 	type = TYPE_CANONICAL (type);

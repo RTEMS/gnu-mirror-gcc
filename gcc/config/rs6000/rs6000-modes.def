@@ -88,5 +88,8 @@ OPAQUE_MODE (OO, 32);
 OPAQUE_MODE (XO, 64);
 
 /* Modes used by __dmr.  */
-OPAQUE_MODE (TDO, 128);
+/* OPAQUE_MODE (TDO, 128); */
+VECTOR_MODE (INT, TI, 8);	/* V8TI  */
+
+
 
