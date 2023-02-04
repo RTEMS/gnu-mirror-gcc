@@ -801,10 +801,10 @@ rs6000_init_builtins (void)
   ptr_vector_quad_type_node = build_pointer_type (t);
 
   dmr_type_node = make_node (OPAQUE_TYPE);
-  SET_TYPE_MODE (dmr_type_node, V8TImode);
-  TYPE_SIZE (dmr_type_node) = bitsize_int (GET_MODE_BITSIZE (V8TImode));
-  TYPE_PRECISION (dmr_type_node) = GET_MODE_BITSIZE (V8TImode);
-  TYPE_SIZE_UNIT (dmr_type_node) = size_int (GET_MODE_SIZE (V8TImode));
+  SET_TYPE_MODE (dmr_type_node, TDOmode);
+  TYPE_SIZE (dmr_type_node) = bitsize_int (GET_MODE_BITSIZE (TDOmode));
+  TYPE_PRECISION (dmr_type_node) = GET_MODE_BITSIZE (TDOmode);
+  TYPE_SIZE_UNIT (dmr_type_node) = size_int (GET_MODE_SIZE (TDOmode));
   SET_TYPE_ALIGN (dmr_type_node, 512);
   TYPE_USER_ALIGN (dmr_type_node) = 0;
   lang_hooks.types.register_builtin_type (dmr_type_node, "__dmr");
