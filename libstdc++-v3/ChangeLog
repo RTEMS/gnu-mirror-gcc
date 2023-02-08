@@ -1,3 +1,254 @@
+2023-02-06  Arsen Arsenović  <arsen@aarsen.me>
+
+	* doc/xml/manual/using.xml: Document newly-freestanding
+	headers and the effect of the -ffreestanding flag.
+	* doc/xml/manual/status_cxx2023.xml: Document P1642R11 as
+	completed.
+	* doc/xml/manual/configure.xml: Document that hosted installs
+	respect __STDC_HOSTED__.
+	* doc/xml/manual/test.xml: Document how to run tests in
+	freestanding mode.
+	* doc/html/*: Regenerate.
+
+2023-02-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/ranges_algo.h (__find_last_fn): Rename T to _Tp.
+	(__find_last_if_fn): Likewise.
+
+2023-02-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/type_traits: Add diagnostic pragmas around
+	references to deprecated std::aligned_storage and
+	std::aligned_union traits.
+	* testsuite/20_util/aligned_storage/requirements/alias_decl.cc:
+	Add dg-warning for et c++23.
+	* testsuite/20_util/aligned_storage/requirements/explicit_instantiation.cc:
+	Likewise.
+	* testsuite/20_util/aligned_storage/value.cc: Likewise.
+	* testsuite/20_util/aligned_union/1.cc: Likewise.
+	* testsuite/20_util/aligned_union/requirements/alias_decl.cc:
+	Likewise.
+
+2023-02-06  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	* doc/doxygen/user.cfg.in (PREDEFINED): Add new macros.
+	* include/bits/c++config (_GLIBCXX23_DEPRECATED)
+	(_GLIBCXX23_DEPRECATED_SUGGEST): New macros.
+	* include/std/type_traits (aligned_storage, aligned_union)
+	(aligned_storage_t, aligned_union_t): Deprecate for C++23.
+	* testsuite/20_util/aligned_storage/deprecated-2b.cc: New test.
+	* testsuite/20_util/aligned_union/deprecated-2b.cc: New test.
+
+2023-02-06  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	* doc/doxygen/user.cfg.in (PREDEFINED): Update macros.
+	* include/bits/c++config (_GLIBCXX20_DEPRECATED): Make
+	consistent with other 'deprecated' macros.
+	* include/std/type_traits (is_pod, is_pod_v): Use
+	_GLIBCXX20_DEPRECATED_SUGGEST instead.
+
+2023-02-06  Arsen Arsenović  <arsen@aarsen.me>
+
+	* Makefile.am [!_GLIBCXX_HOSTED]: Enable src/ subdirectory.
+	* Makefile.in: Regenerate.
+	* src/Makefile.am [!_GLIBCXX_HOSTED]: Omit compatibility files.
+	There's no history to be compatible with.
+	* src/c++11/Makefile.am [!_GLIBCXX_HOSTED]: Omit hosted-only
+	source files from the build.
+	* src/c++17/Makefile.am [!_GLIBCXX_HOSTED]: Likewise.
+	* src/c++20/Makefile.am [!_GLIBCXX_HOSTED]: Likewise.
+	* src/c++98/Makefile.am [!_GLIBCXX_HOSTED]: Likewise.
+	* src/Makefile.in: Regenerate.
+	* src/c++11/Makefile.in: Regenerate.
+	* src/c++17/Makefile.in: Regenerate.
+	* src/c++20/Makefile.in: Regenerate.
+	* src/c++98/Makefile.in: Regenerate.
+
+2023-02-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/Makefile.am [GLIBCXX_HOSTED] (SUBDIRS): Do not add
+	filesystem, libbacktrace and experimental.
+	* src/Makefile.in: Regenerate.
+
+2023-02-04  Hans-Peter Nilsson  <hp@axis.com>
+
+	PR libstdc++/108672
+	* include/pstl/unseq_backend_simd.h (__simd_or): Use __INT32_TYPE__
+	instead of int32_t.
+
+2023-02-04  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* doc/xml/manual/documentation_hacking.xml: Adjust link to pdftex.
+	* doc/html/manual/documentation_hacking.html: Regenerate.
+
+2023-02-04  François Dumont  <fdumont@gcc.gnu.org>
+
+	* include/bits/basic_string.h (operator=(basic_string&&)): Transfer move-to
+	storage to the move-from instance when allocators are equal.
+	* testsuite/21_strings/basic_string/allocator/char/move_assign.cc (test04):
+	New test case.
+
+2023-02-03  Samuel Thibault  <samuel.thibault@gnu.org>
+
+	* config/os/gnu-linux/os_defines.h [!__linux__]
+	(_GLIBCXX_NATIVE_THREAD_ID, _GLIBCXX_GTHREAD_USE_WEAK): Do not define.
+
+2023-02-03  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/ranges_algo.h (__find_last_fn, find_last):
+	Define.
+	(__find_last_if_fn, find_last_if): Define.
+	(__find_last_if_not_fn, find_last_if_not): Define.
+	* testsuite/25_algorithms/find_last/1.cc: New test.
+	* testsuite/25_algorithms/find_last_if/1.cc: New test.
+	* testsuite/25_algorithms/find_last_if_not/1.cc: New test.
+
+2023-02-03  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/ranges_algo.h (out_value_result): Define.
+	(iota_result): Define.
+	(__iota_fn, iota): Define.
+	* testsuite/25_algorithms/iota/1.cc: New test.
+
+2023-02-03  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/ranges_algo.h (__contains_fn, contains): Define.
+	(__contains_subrange_fn, contains_subrange): Define.
+	* testsuite/25_algorithms/contains/1.cc: New test.
+	* testsuite/25_algorithms/contains_subrange/1.cc: New test.
+
+2023-02-02  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* doc/xml/manual/abi.xml: Tweak link to ABIcheck project.
+	* doc/html/manual/abi.html: Regenerate.
+
+2023-02-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/filesystem/ops-common.h [AVR] (__unsupported): Always use
+	errc::function_not_supported instead of errc::not_supported.
+
+2023-02-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/sstream  (basic_stringbuf::view): Define for old
+	std::string ABI.
+	(basic_istringstream::view, basic_0stringstream::view)
+	(basic_stringstream::view): Likewise.
+	* testsuite/27_io/basic_istringstream/view/char/1.cc: Remove
+	{ dg-require-effective-target cxx11_abi }.
+	* testsuite/27_io/basic_istringstream/view/wchar_t/1.cc:
+	Likewise.
+	* testsuite/27_io/basic_ostringstream/view/char/1.cc: Likewise.
+	* testsuite/27_io/basic_ostringstream/view/wchar_t/1.cc:
+	Likewise.
+	* testsuite/27_io/basic_stringbuf/view/char/1.cc: Likewise.
+	* testsuite/27_io/basic_stringbuf/view/wchar_t/1.cc: Likewise.
+	* testsuite/27_io/basic_stringstream/view/char/1.cc: Likewise.
+	* testsuite/27_io/basic_stringstream/view/wchar_t/1.cc:
+	Likewise.
+
+2023-02-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/108636
+	* config/abi/pre/gnu.ver (GLIBCXX_3.4.31): Export shared_ptr
+	conversion operators for directory iterator comparisons with
+	std::default_sentinel_t.
+	* include/bits/fs_path.h (path::path(string_view, _Type))
+	(path::_Cmpt::_Cmpt(string_view, _Type, size_t)): Move inline
+	definitions to ...
+	* src/c++17/fs_path.cc: ... here.
+	* testsuite/27_io/filesystem/path/108636.cc: New test.
+
+2023-02-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/variant (variant::operator=): Implement resolution
+	of LWG 3585.
+	* testsuite/20_util/variant/lwg3585.cc: New test.
+
+2023-02-02  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* doc/xml/manual/using_exceptions.xml: Update a www.open-std.org
+	link to https.
+	* doc/html/manual/using_exceptions.html: Regenerate.
+
+2023-02-02  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* doc/xml/manual/debug.xml: Fix link to online GDB manual.
+	* doc/html/manual/debug.html: Regenerate.
+
+2023-02-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++11/random.cc (random_device::_M_fini): Do not try to
+	close the file handle if the target doesn't support the
+	/dev/random and /dev/urandom files.
+
+2023-02-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* config/os/generic/error_constants.h (errc::value_too_large)
+	[__AVR__]: Define.
+	* src/c++11/system_error.cc
+	(system_category::default_error_condition) [__AVR__]: Only match
+	recognize values equal to EDOM, ERANGE, ENOSYS and EINTR.
+	* src/c++17/fs_ops.cc (fs::current_path) [__AVR__]: Do not check
+	for ENOENT etc. in switch.
+	(fs::remove_all) [__AVR__]: Likewise.
+	* src/filesystem/ops-common.h [__AVR__]: Do not use POSIX open,
+	close etc.
+
+2023-02-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* acinclude.m4 (GLIBCXX_ZONEINFO_DIR) [avr-*-*, msp430-*-*]: Set
+	embed_zoneinfo=no
+	* configure: Regenerate.
+
+2023-02-01  Hans-Peter Nilsson  <hp@axis.com>
+
+	PR testsuite/108632
+	* testsuite/std/time/hh_mm_ss/1.cc (size): Add empty
+	struct at end of S0.
+
+2023-01-30  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* doc/xml/manual/shared_ptr.xml: Move links from both
+	http://open-std.org and http://www.open-std.org to
+	https://www.open-std.org.
+	* doc/html/manual/memory.html: Regenerate.
+
+2023-01-28  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* doc/xml/manual/appendix_contributing.xml: Adjust link to
+	ISO C++ standard at ANSI.
+	Move link to www.open-std.org to https.
+	* doc/html/manual/appendix_contributing.html: Regenerate.
+
+2023-01-28  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* doc/xml/manual/documentation_hacking.xml: Move sourceforge.net
+	links to https.
+	* doc/html/manual/documentation_hacking.html: Regenerate.
+
+2023-01-28  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* doc/xml/manual/abi.xml: Update www.open-std.org link to https.
+	* doc/html/manual/abi.html: Regenerate.
+
+2023-01-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libstdc++/108568
+	* testsuite/17_intro/names.cc (__unused): For linux or GNU hurd
+	include features.h if present and then check __GLIBC__ and
+	__GLIBC_MINOR__ macros for glibc prior to 2.19, instead of testing
+	__GLIBC_PREREQ which isn't defined yet.
+
+2023-01-27  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++20/tzdb.cc (tzdata_stream): Use constant instead of
+	string literal.
+
+2023-01-27  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/108554
+	* testsuite/23_containers/map/modifiers/108554.cc: Use dg-bogus.
+
 2023-01-26  Jonathan Wakely  <jwakely@redhat.com>
 
 	* src/c++20/tzdb.cc (operator>>(istream&, ZoneInfo&)): Allow

@@ -286,6 +286,33 @@
 	    (match_test "GET_CODE (op) == UNSPEC
 			 && (XINT (op, 1) == UNSPEC_VUNDEF)"))))
 
+(define_predicate "vector_arith_operand"
+  (ior (match_operand 0 "register_operand")
+       (and (match_code "const_vector")
+            (match_test "riscv_vector::const_vec_all_same_in_range_p (op, -16, 15)"))))
+
+(define_predicate "vector_neg_arith_operand"
+  (ior (match_operand 0 "register_operand")
+       (and (match_code "const_vector")
+            (match_test "riscv_vector::const_vec_all_same_in_range_p (op, -15, 16)"))))
+
+(define_predicate "vector_shift_operand"
+  (ior (match_operand 0 "register_operand")
+       (and (match_code "const_vector")
+            (match_test "riscv_vector::const_vec_all_same_in_range_p (op, 0, 31)"))))
+
+;; pmode_reg_or_uimm5_operand can be used by vsll.vx/vsrl.vx/vsra.vx instructions.
+;; Since it has the same predicate with vector_length_operand which allows register
+;; or immediate (0 ~ 31), we define this predicate same as vector_length_operand here.
+;; We don't use vector_length_operand directly to predicate vsll.vx/vsrl.vx/vsra.vx
+;; since it may be confusing.
+(define_special_predicate "pmode_reg_or_uimm5_operand"
+  (match_operand 0 "vector_length_operand"))
+
+(define_special_predicate "pmode_reg_or_0_operand"
+  (ior (match_operand 0 "const_0_operand")
+       (match_operand 0 "pmode_register_operand")))
+
 ;; The scalar operand can be directly broadcast by RVV instructions.
 (define_predicate "direct_broadcast_operand"
   (ior (match_operand 0 "register_operand")

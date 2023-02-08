@@ -1243,8 +1243,8 @@ public:
     auto base_type = base->get_base ();
     auto other_base_type = type.get_base ();
 
-    bool mutability_match = base->is_mutable () == type.is_mutable ();
-    if (!mutability_match)
+    bool mutability_ok = base->is_mutable () ? type.is_mutable () : true;
+    if (!mutability_ok)
       {
 	BaseCmp::visit (type);
 	return;
@@ -1357,6 +1357,8 @@ public:
   // both of these types are compatible so we mostly care about the number of
   // generic arguments
   void visit (const ParamType &) override { ok = true; }
+
+  void visit (const TupleType &) override { ok = true; }
 
   void visit (const InferType &) override { ok = true; }
 

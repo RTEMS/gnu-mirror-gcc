@@ -24,12 +24,14 @@
 #include "rust-hir-map.h"
 #include "rust-token.h"
 #include "rust-location.h"
+#include "rust-diagnostics.h"
 
 namespace Rust {
 // TODO: remove typedefs and make actual types for these
 typedef std::string Identifier;
 typedef int TupleIndex;
 struct Session;
+struct MacroExpander;
 
 namespace AST {
 // foward decl: ast visitor
@@ -950,6 +952,8 @@ public:
 
   virtual Location get_locus () const = 0;
 
+  virtual bool is_literal () const { return false; }
+
   // HACK: strictly not needed, but faster than full downcast clone
   virtual bool is_expr_without_block () const = 0;
 
@@ -1470,6 +1474,7 @@ private:
   // One way of parsing the macro. Probably not applicable for all macros.
   std::vector<std::unique_ptr<MetaItemInner> > parsed_items;
   bool parsed_to_meta_item = false;
+  MacroExpander *expander = nullptr;
 
 public:
   std::string as_string () const;
@@ -1494,6 +1499,7 @@ public:
     path = other.path;
     token_tree = other.token_tree;
     parsed_to_meta_item = other.parsed_to_meta_item;
+    expander = other.expander;
 
     parsed_items.reserve (other.parsed_items.size ());
     for (const auto &e : other.parsed_items)
@@ -1521,6 +1527,13 @@ public:
   // TODO: this mutable getter seems kinda dodgy
   SimplePath &get_path () { return path; }
   const SimplePath &get_path () const { return path; }
+
+  void set_expander (MacroExpander *new_expander) { expander = new_expander; }
+  MacroExpander *get_expander ()
+  {
+    rust_assert (expander);
+    return expander;
+  }
 
   void
   set_meta_item_output (std::vector<std::unique_ptr<MetaItemInner> > new_items)
@@ -1818,7 +1831,7 @@ public:
     return true;
   }
 
-  std::string as_string ()
+  std::string as_string () const
   {
     switch (kind)
       {
@@ -1869,9 +1882,44 @@ private:
 
   bool is_single_fragment () const { return nodes.size () == 1; }
 
-  bool is_single_fragment_kind (SingleASTNode::NodeType kind) const
+  bool is_single_fragment_of_kind (SingleASTNode::NodeType expected) const
   {
-    return is_single_fragment () && nodes[0].get_kind () == kind;
+    return is_single_fragment () && nodes[0].get_kind () == expected;
+  }
+
+  void assert_single_fragment (SingleASTNode::NodeType expected) const
+  {
+    static const std::map<SingleASTNode::NodeType, const char *> str_map = {
+      {SingleASTNode::NodeType::IMPL, "impl"},
+      {SingleASTNode::NodeType::ITEM, "item"},
+      {SingleASTNode::NodeType::TYPE, "type"},
+      {SingleASTNode::NodeType::EXPRESSION, "expr"},
+      {SingleASTNode::NodeType::STMT, "stmt"},
+      {SingleASTNode::NodeType::EXTERN, "extern"},
+      {SingleASTNode::NodeType::TRAIT, "trait"},
+      {SingleASTNode::NodeType::TRAIT_IMPL, "trait impl"},
+    };
+
+    auto actual = nodes[0].get_kind ();
+    auto fail = false;
+
+    if (!is_single_fragment ())
+      {
+	rust_error_at (Location (), "fragment is not single");
+	fail = true;
+      }
+
+    if (actual != expected)
+      {
+	rust_error_at (
+	  Location (),
+	  "invalid fragment operation: expected %qs node, got %qs node",
+	  str_map.find (expected)->second,
+	  str_map.find (nodes[0].get_kind ())->second);
+	fail = true;
+      }
+
+    rust_assert (!fail);
   }
 
 public:
@@ -1913,15 +1961,25 @@ public:
 
   bool should_expand () const { return !is_error (); }
 
+  bool is_expression_fragment () const
+  {
+    return is_single_fragment_of_kind (SingleASTNode::NodeType::EXPRESSION);
+  }
+
+  bool is_type_fragment () const
+  {
+    return is_single_fragment_of_kind (SingleASTNode::NodeType::TYPE);
+  }
+
   std::unique_ptr<Expr> take_expression_fragment ()
   {
-    rust_assert (is_single_fragment_kind (SingleASTNode::NodeType::EXPRESSION));
+    assert_single_fragment (SingleASTNode::NodeType::EXPRESSION);
     return nodes[0].take_expr ();
   }
 
   std::unique_ptr<Type> take_type_fragment ()
   {
-    rust_assert (is_single_fragment_kind (SingleASTNode::NodeType::TYPE));
+    assert_single_fragment (SingleASTNode::NodeType::TYPE);
     return nodes[0].take_type ();
   }
 

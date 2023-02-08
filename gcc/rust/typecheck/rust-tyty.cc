@@ -27,6 +27,7 @@
 #include "rust-substitution-mapper.h"
 #include "rust-hir-trait-ref.h"
 #include "rust-hir-type-bounds.h"
+#include "options.h"
 
 namespace Rust {
 namespace TyTy {
@@ -207,9 +208,6 @@ void
 BaseType::inherit_bounds (
   const std::vector<TyTy::TypeBoundPredicate> &specified_bounds)
 {
-  // FIXME
-  // 1. This needs to union the bounds
-  // 2. Do some checking for trait polarity to ensure compatibility
   for (auto &bound : specified_bounds)
     {
       add_bound (bound);
@@ -293,6 +291,33 @@ BaseType::destructure () const
     }
 
   return x;
+}
+
+std::string
+BaseType::mappings_str () const
+{
+  std::string buffer = "Ref: " + std::to_string (get_ref ())
+		       + " TyRef: " + std::to_string (get_ty_ref ());
+  buffer += "[";
+  for (auto &ref : combined)
+    buffer += std::to_string (ref) + ",";
+  buffer += "]";
+  return "(" + buffer + ")";
+}
+
+std::string
+BaseType::debug_str () const
+{
+  // return TypeKindFormat::to_string (get_kind ()) + ":" + as_string () + ":"
+  //        + mappings_str () + ":" + bounds_as_string ();
+  return get_name ();
+}
+
+void
+BaseType::debug () const
+{
+  rust_debug ("[%p] %s", static_cast<const void *> (this),
+	      debug_str ().c_str ());
 }
 
 TyVar::TyVar (HirId ref) : ref (ref)
@@ -559,14 +584,14 @@ StructFieldType *
 StructFieldType::clone () const
 {
   return new StructFieldType (get_ref (), get_name (),
-			      get_field_type ()->clone ());
+			      get_field_type ()->clone (), locus);
 }
 
 StructFieldType *
 StructFieldType::monomorphized_clone () const
 {
   return new StructFieldType (get_ref (), get_name (),
-			      get_field_type ()->monomorphized_clone ());
+			      get_field_type ()->monomorphized_clone (), locus);
 }
 
 bool
@@ -724,6 +749,40 @@ SubstitutionRef::get_mappings_from_generic_args (HIR::GenericArgs &args)
     }
 
   return SubstitutionArgumentMappings (mappings, args.get_locus ());
+}
+
+BaseType *
+SubstitutionRef::infer_substitions (Location locus)
+{
+  std::vector<SubstitutionArg> args;
+  std::map<std::string, BaseType *> argument_mappings;
+  for (auto &p : get_substs ())
+    {
+      if (p.needs_substitution ())
+	{
+	  const std::string &symbol = p.get_param_ty ()->get_symbol ();
+	  auto it = argument_mappings.find (symbol);
+	  bool have_mapping = it != argument_mappings.end ();
+
+	  if (have_mapping)
+	    {
+	      args.push_back (SubstitutionArg (&p, it->second));
+	    }
+	  else
+	    {
+	      TyVar infer_var = TyVar::get_implicit_infer_var (locus);
+	      args.push_back (SubstitutionArg (&p, infer_var.get_tyty ()));
+	      argument_mappings[symbol] = infer_var.get_tyty ();
+	    }
+	}
+      else
+	{
+	  args.push_back (SubstitutionArg (&p, p.get_param_ty ()->resolve ()));
+	}
+    }
+
+  SubstitutionArgumentMappings infer_arguments (std::move (args), locus);
+  return handle_substitions (std::move (infer_arguments));
 }
 
 SubstitutionArgumentMappings
@@ -1158,11 +1217,29 @@ TupleType::accept_vis (TyConstVisitor &vis) const
 std::string
 TupleType::as_string () const
 {
+  size_t i = 0;
   std::string fields_buffer;
   for (const TyVar &field : get_fields ())
     {
       fields_buffer += field.get_tyty ()->as_string ();
-      fields_buffer += ", ";
+      bool has_next = (i + 1) < get_fields ().size ();
+      fields_buffer += has_next ? ", " : "";
+      i++;
+    }
+  return "(" + fields_buffer + ")";
+}
+
+std::string
+TupleType::get_name () const
+{
+  size_t i = 0;
+  std::string fields_buffer;
+  for (const TyVar &field : get_fields ())
+    {
+      fields_buffer += field.get_tyty ()->as_string ();
+      bool has_next = (i + 1) < get_fields ().size ();
+      fields_buffer += has_next ? ", " : "";
+      i++;
     }
   return "(" + fields_buffer + ")";
 }
@@ -2193,6 +2270,13 @@ ReferenceType::as_string () const
 	 + get_base ()->as_string ();
 }
 
+std::string
+ReferenceType::get_name () const
+{
+  return std::string ("&") + (is_mutable () ? "mut" : "") + " "
+	 + get_base ()->get_name ();
+}
+
 BaseType *
 ReferenceType::unify (BaseType *other)
 {
@@ -2274,6 +2358,13 @@ PointerType::as_string () const
 {
   return std::string ("* ") + (is_mutable () ? "mut" : "const") + " "
 	 + get_base ()->as_string ();
+}
+
+std::string
+PointerType::get_name () const
+{
+  return std::string ("* ") + (is_mutable () ? "mut" : "const") + " "
+	 + get_base ()->get_name ();
 }
 
 BaseType *
@@ -2419,7 +2510,13 @@ ParamType::resolve () const
 	break;
 
       TyVar v (rr->get_ty_ref ());
-      r = v.get_tyty ();
+      BaseType *n = v.get_tyty ();
+
+      // fix infinite loop
+      if (r == n)
+	break;
+
+      r = n;
     }
 
   if (r->get_kind () == TypeKind::PARAM && (r->get_ref () == r->get_ty_ref ()))

@@ -58,6 +58,7 @@ namespace Rust {
 const char *kLexDumpFile = "gccrs.lex.dump";
 const char *kASTDumpFile = "gccrs.ast.dump";
 const char *kASTPrettyDumpFile = "gccrs.ast-pretty.dump";
+const char *kASTPrettyDumpFileExpanded = "gccrs.ast-pretty-expanded.dump";
 const char *kASTExpandedDumpFile = "gccrs.ast-expanded.dump";
 const char *kHIRDumpFile = "gccrs.hir.dump";
 const char *kHIRPrettyDumpFile = "gccrs.hir-pretty.dump";
@@ -222,7 +223,9 @@ Session::handle_option (
     case OPT_frust_edition_:
       options.set_edition (flag_rust_edition);
       break;
-
+    case OPT_frust_compile_until_:
+      options.set_compile_step (flag_rust_compile_until);
+      break;
     case OPT_frust_metadata_output_:
       options.set_metadata_output (arg);
       break;
@@ -446,6 +449,8 @@ Session::compile_crate (const char *filename)
       return;
     }
 
+  auto last_step = options.get_compile_until ();
+
   // parse file here
   /* create lexer and parser - these are file-specific and so aren't instance
    * variables */
@@ -502,7 +507,7 @@ Session::compile_crate (const char *filename)
 
   // If -fsyntax-only was passed, we can just skip the remaining passes.
   // Parsing errors are already emitted in `parse_crate()`
-  if (flag_syntax_only)
+  if (flag_syntax_only || last_step == CompileOptions::CompileStep::Ast)
     return;
 
   // register plugins pipeline stage
@@ -521,7 +526,13 @@ Session::compile_crate (const char *filename)
       // TODO: what do I dump here? injected crate names?
     }
 
+  if (last_step == CompileOptions::CompileStep::AttributeCheck)
+    return;
+
   Analysis::AttributeChecker ().go (parsed_crate);
+
+  if (last_step == CompileOptions::CompileStep::Expansion)
+    return;
 
   // expansion pipeline stage
   expansion (parsed_crate);
@@ -531,8 +542,12 @@ Session::compile_crate (const char *filename)
       // dump AST with expanded stuff
       rust_debug ("BEGIN POST-EXPANSION AST DUMP");
       dump_ast_expanded (parser, parsed_crate);
+      dump_ast_pretty (parsed_crate, true);
       rust_debug ("END POST-EXPANSION AST DUMP");
     }
+
+  if (last_step == CompileOptions::CompileStep::NameResolution)
+    return;
 
   // resolution pipeline stage
   Resolver::NameResolution::Resolve (parsed_crate);
@@ -542,6 +557,9 @@ Session::compile_crate (const char *filename)
     }
 
   if (saw_errors ())
+    return;
+
+  if (last_step == CompileOptions::CompileStep::Lowering)
     return;
 
   // lower AST to HIR
@@ -561,6 +579,9 @@ Session::compile_crate (const char *filename)
       dump_hir_pretty (hir);
     }
 
+  if (last_step == CompileOptions::CompileStep::TypeCheck)
+    return;
+
   // type resolve
   Resolver::TypeResolution::Resolve (hir);
   if (options.dump_option_enabled (CompileOptions::TYPE_RESOLUTION_DUMP))
@@ -571,15 +592,28 @@ Session::compile_crate (const char *filename)
   if (saw_errors ())
     return;
 
+  if (last_step == CompileOptions::CompileStep::Privacy)
+    return;
+
   // Various HIR error passes. The privacy pass happens before the unsafe checks
   Privacy::Resolver::resolve (hir);
   if (saw_errors ())
     return;
 
+  if (last_step == CompileOptions::CompileStep::Unsafety)
+    return;
+
   HIR::UnsafeChecker ().go (hir);
+
+  if (last_step == CompileOptions::CompileStep::Const)
+    return;
+
   HIR::ConstChecker ().go (hir);
 
   if (saw_errors ())
+    return;
+
+  if (last_step == CompileOptions::CompileStep::Compilation)
     return;
 
   // do compile to gcc generic
@@ -832,10 +866,14 @@ Session::dump_ast (Parser<Lexer> &parser, AST::Crate &crate) const
 }
 
 void
-Session::dump_ast_pretty (AST::Crate &crate) const
+Session::dump_ast_pretty (AST::Crate &crate, bool expanded) const
 {
   std::ofstream out;
-  out.open (kASTPrettyDumpFile);
+  if (expanded)
+    out.open (kASTPrettyDumpFileExpanded);
+  else
+    out.open (kASTPrettyDumpFile);
+
   if (out.fail ())
     {
       rust_error_at (Linemap::unknown_location (), "cannot open %s:%m; ignored",

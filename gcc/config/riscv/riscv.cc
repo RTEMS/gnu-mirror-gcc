@@ -293,7 +293,7 @@ const enum reg_class riscv_regno_to_class[FIRST_PSEUDO_REGISTER] = {
   FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
   FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
   FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
-  FRAME_REGS,	FRAME_REGS,	VL_REGS,	VTYPE_REGS,
+  FRAME_REGS,	FRAME_REGS,	NO_REGS,	NO_REGS,
   NO_REGS,	NO_REGS,	NO_REGS,	NO_REGS,
   NO_REGS,	NO_REGS,	NO_REGS,	NO_REGS,
   NO_REGS,	NO_REGS,	NO_REGS,	NO_REGS,
@@ -4242,6 +4242,16 @@ riscv_print_operand (FILE *file, rtx op, int letter)
 	  output_operand_lossage ("invalid vector constant");
 	break;
       }
+      case 'V': {
+	rtx elt;
+	if (!const_vec_duplicate_p (op, &elt))
+	  output_operand_lossage ("invalid vector constant");
+	else if (satisfies_constraint_vj (op))
+	  asm_fprintf (file, "%wd", -INTVAL (elt));
+	else
+	  output_operand_lossage ("invalid vector constant");
+	break;
+      }
       case 'm': {
 	if (riscv_v_ext_vector_mode_p (mode))
 	  {
@@ -5820,12 +5830,6 @@ riscv_class_max_nregs (reg_class_t rclass, machine_mode mode)
 
   if (reg_class_subset_p (rclass, V_REGS))
     return riscv_hard_regno_nregs (V_REG_FIRST, mode);
-
-  if (reg_class_subset_p (rclass, VL_REGS))
-    return 1;
-
-  if (reg_class_subset_p (rclass, VTYPE_REGS))
-    return 1;
 
   return 0;
 }

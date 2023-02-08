@@ -2808,14 +2808,6 @@ static const struct attribute_spec aarch64_attribute_table[] =
   { NULL,                 0, 0, false, false, false, false, NULL, NULL }
 };
 
-/* An ISA extension in the co-processor and main instruction set space.  */
-struct aarch64_option_extension
-{
-  const char *const name;
-  const unsigned long flags_on;
-  const unsigned long flags_off;
-};
-
 typedef enum aarch64_cond_code
 {
   AARCH64_EQ = 0, AARCH64_NE, AARCH64_CS, AARCH64_CC, AARCH64_MI, AARCH64_PL,
@@ -13022,7 +13014,7 @@ aarch64_output_casesi (rtx *operands)
 int
 aarch64_uxt_size (int shift, HOST_WIDE_INT mask)
 {
-  if (shift >= 0 && shift <= 3)
+  if (shift >= 0 && shift <= 4)
     {
       int size;
       for (size = 8; size <= 32; size *= 2)
@@ -25704,6 +25696,7 @@ aarch_macro_fusion_pair_p (rtx_insn *prev, rtx_insn *curr)
 	  && CONST_INT_P (XEXP (curr_src, 1))
 	  && INTVAL (XEXP (curr_src, 1)) == polarity
 	  && REG_P (XEXP (curr_src, 0))
+	  && REG_P (SET_DEST (prev_set))
 	  && REGNO (SET_DEST (prev_set)) == REGNO (XEXP (curr_src, 0)))
 	return true;
     }

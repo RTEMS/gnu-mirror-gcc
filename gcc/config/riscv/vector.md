@@ -28,13 +28,6 @@
 
 (include "vector-iterators.md")
 
-(define_c_enum "unspec" [
-  UNSPEC_VSETVL
-  UNSPEC_VUNDEF
-  UNSPEC_VPREDICATE
-  UNSPEC_VLMAX
-])
-
 (define_constants [
    (INVALID_ATTRIBUTE            255)
 ])
@@ -148,7 +141,8 @@
 
 ;; It is valid for instruction that require sew/lmul ratio.
 (define_attr "ratio" ""
-  (cond [(eq_attr "type" "vimov,vfmov")
+  (cond [(eq_attr "type" "vimov,vfmov,vldux,vldox,vstux,vstox,\
+			  vialu,vshift,vicmp,vimul,vidiv,vsalu")
 	   (const_int INVALID_ATTRIBUTE)
 	 (eq_attr "mode" "VNx1QI,VNx1BI")
 	   (symbol_ref "riscv_vector::get_ratio(E_VNx1QImode)")
@@ -198,53 +192,76 @@
 
 ;; The index of operand[] to get the merge op.
 (define_attr "merge_op_idx" ""
-	(cond [(eq_attr "type" "vlde,vimov,vfmov,vldm,vlds,vmalu")
+	(cond [(eq_attr "type" "vlde,vimov,vfmov,vldm,vlds,vmalu,vldux,vldox,\
+				vialu,vshift,vicmp,vimul,vidiv,vsalu")
 	 (const_int 2)]
 	(const_int INVALID_ATTRIBUTE)))
 
 ;; The index of operand[] to get the avl op.
 (define_attr "vl_op_idx" ""
-	(cond [(eq_attr "type" "vlde,vste,vimov,vfmov,vldm,vstm,vlds,vmalu")
-	 (const_int 4)]
-	(const_int INVALID_ATTRIBUTE)))
+  (cond [(eq_attr "type" "vlde,vste,vimov,vfmov,vldm,vstm,vmalu,vsts,vstux,vstox")
+	   (const_int 4)
 
-;; The index of operand[] to get the tail policy op.
-(define_attr "tail_policy_op_idx" ""
-  (cond [(eq_attr "type" "vlde,vste,vimov,vfmov,vlds")
-	 (const_int 5)]
-	(const_int INVALID_ATTRIBUTE)))
+	 ;; If operands[3] of "vlds" is not vector mode, it is pred_broadcast.
+	 ;; wheras it is pred_strided_load if operands[3] is vector mode.
+         (eq_attr "type" "vlds")
+	   (if_then_else (match_test "VECTOR_MODE_P (GET_MODE (operands[3]))")
+             (const_int 5)
+             (const_int 4))
 
-;; The index of operand[] to get the mask policy op.
-(define_attr "mask_policy_op_idx" ""
-  (cond [(eq_attr "type" "vlde,vste,vlds")
-	 (const_int 6)]
-	(const_int INVALID_ATTRIBUTE)))
-
-;; The index of operand[] to get the mask policy op.
-(define_attr "avl_type_op_idx" ""
-  (cond [(eq_attr "type" "vlde,vlde,vste,vimov,vimov,vimov,vfmov,vlds,vlds")
-	 (const_int 7)
-	 (eq_attr "type" "vldm,vstm,vimov,vmalu,vmalu")
-	 (const_int 5)]
-	(const_int INVALID_ATTRIBUTE)))
+	 (eq_attr "type" "vldux,vldox,vialu,vshift,vicmp,vimul,vidiv,vsalu")
+	   (const_int 5)]
+  (const_int INVALID_ATTRIBUTE)))
 
 ;; The tail policy op value.
 (define_attr "ta" ""
-  (cond [(eq_attr "type" "vlde,vimov,vfmov,vlds")
-	   (symbol_ref "riscv_vector::get_ta(operands[5])")]
+  (cond [(eq_attr "type" "vlde,vimov,vfmov")
+	   (symbol_ref "riscv_vector::get_ta(operands[5])")
+
+	 ;; If operands[3] of "vlds" is not vector mode, it is pred_broadcast.
+	 ;; wheras it is pred_strided_load if operands[3] is vector mode.
+	 (eq_attr "type" "vlds")
+	   (if_then_else (match_test "VECTOR_MODE_P (GET_MODE (operands[3]))")
+	     (symbol_ref "riscv_vector::get_ta(operands[6])")
+	     (symbol_ref "riscv_vector::get_ta(operands[5])"))
+
+	 (eq_attr "type" "vldux,vldox,vialu,vshift,vicmp,vimul,vidiv,vsalu")
+	   (symbol_ref "riscv_vector::get_ta(operands[6])")]
 	(const_int INVALID_ATTRIBUTE)))
 
 ;; The mask policy op value.
 (define_attr "ma" ""
-  (cond [(eq_attr "type" "vlde,vlds")
-	   (symbol_ref "riscv_vector::get_ma(operands[6])")]
+  (cond [(eq_attr "type" "vlde")
+	   (symbol_ref "riscv_vector::get_ma(operands[6])")
+
+	 ;; If operands[3] of "vlds" is not vector mode, it is pred_broadcast.
+	 ;; wheras it is pred_strided_load if operands[3] is vector mode.
+	 (eq_attr "type" "vlds")
+	   (if_then_else (match_test "VECTOR_MODE_P (GET_MODE (operands[3]))")
+	     (symbol_ref "riscv_vector::get_ma(operands[7])")
+	     (symbol_ref "riscv_vector::get_ma(operands[6])"))
+
+	 (eq_attr "type" "vldux,vldox,vialu,vshift,vicmp,vimul,vidiv,vsalu")
+	   (symbol_ref "riscv_vector::get_ma(operands[7])")]
 	(const_int INVALID_ATTRIBUTE)))
 
 ;; The avl type value.
 (define_attr "avl_type" ""
-  (cond [(eq_attr "type" "vlde,vlde,vste,vimov,vimov,vimov,vfmov,vlds,vlds")
+  (cond [(eq_attr "type" "vlde,vlde,vste,vimov,vimov,vimov,vfmov")
 	   (symbol_ref "INTVAL (operands[7])")
 	 (eq_attr "type" "vldm,vstm,vimov,vmalu,vmalu")
+	   (symbol_ref "INTVAL (operands[5])")
+
+	 ;; If operands[3] of "vlds" is not vector mode, it is pred_broadcast.
+	 ;; wheras it is pred_strided_load if operands[3] is vector mode.
+	 (eq_attr "type" "vlds")
+	   (if_then_else (match_test "VECTOR_MODE_P (GET_MODE (operands[3]))")
+	     (const_int INVALID_ATTRIBUTE)
+	     (symbol_ref "INTVAL (operands[7])"))
+
+	 (eq_attr "type" "vldux,vldox,vialu,vshift,vicmp,vimul,vidiv,vsalu")
+	   (symbol_ref "INTVAL (operands[8])")
+	 (eq_attr "type" "vstux,vstox")
 	   (symbol_ref "INTVAL (operands[5])")]
 	(const_int INVALID_ATTRIBUTE)))
 
@@ -779,4 +796,386 @@
    vlse<sew>.v\t%0,%3,zero,%1.t
    vlse<sew>.v\t%0,%3,zero"
   [(set_attr "type" "vimov,vfmov,vlds,vlds")
+   (set_attr "mode" "<MODE>")])
+
+;; -------------------------------------------------------------------------------
+;; ---- Predicated Strided loads/stores
+;; -------------------------------------------------------------------------------
+;; Includes:
+;; - 7.5. Vector Strided Instructions
+;; -------------------------------------------------------------------------------
+
+(define_insn "@pred_strided_load<mode>"
+  [(set (match_operand:V 0 "register_operand"              "=vr,    vr,    vd")
+	(if_then_else:V
+	  (unspec:<VM>
+	    [(match_operand:<VM> 1 "vector_mask_operand" "vmWc1,   Wc1,    vm")
+	     (match_operand 5 "vector_length_operand"    "   rK,    rK,    rK")
+	     (match_operand 6 "const_int_operand"        "    i,     i,     i")
+	     (match_operand 7 "const_int_operand"        "    i,     i,     i")
+	     (reg:SI VL_REGNUM)
+	     (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)
+	  (unspec:V
+	    [(match_operand:V 3 "memory_operand"         "    m,     m,     m")
+	     (match_operand 4 "pmode_reg_or_0_operand"   "   rJ,    rJ,    rJ")] UNSPEC_STRIDED)
+	  (match_operand:V 2 "vector_merge_operand"      "    0,    vu,    vu")))]
+  "TARGET_VECTOR"
+  "vlse<sew>.v\t%0,%3,%z4%p1"
+  [(set_attr "type" "vlds")
+   (set_attr "mode" "<MODE>")])
+
+(define_insn "@pred_strided_store<mode>"
+  [(set (match_operand:V 0 "memory_operand"                 "+m")
+	(if_then_else:V
+	  (unspec:<VM>
+	    [(match_operand:<VM> 1 "vector_mask_operand" "vmWc1")
+	     (match_operand 4 "vector_length_operand"    "   rK")
+	     (reg:SI VL_REGNUM)
+	     (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)
+	  (unspec:V
+	    [(match_operand 2 "pmode_reg_or_0_operand"   "   rJ")
+	     (match_operand:V 3 "register_operand"       "   vr")] UNSPEC_STRIDED)
+	  (match_dup 0)))]
+  "TARGET_VECTOR"
+  "vsse<sew>.v\t%3,%0,%z2%p1"
+  [(set_attr "type" "vsts")
+   (set_attr "mode" "<MODE>")])
+
+;; -------------------------------------------------------------------------------
+;; ---- Predicated indexed loads/stores
+;; -------------------------------------------------------------------------------
+;; Includes:
+;; - 7.6. Vector Indexed Instructions
+;; -------------------------------------------------------------------------------
+
+(define_insn "@pred_indexed_<order>load<VNX1_QHSD:mode><VNX1_QHSDI:mode>"
+  [(set (match_operand:VNX1_QHSD 0 "register_operand"      "=&vr")
+	(if_then_else:VNX1_QHSD
+	  (unspec:<VM>
+	    [(match_operand:<VM> 1 "vector_mask_operand"  "vmWc1")
+	     (match_operand 5 "vector_length_operand"     "   rK")
+	     (match_operand 6 "const_int_operand"         "    i")
+	     (match_operand 7 "const_int_operand"         "    i")
+	     (match_operand 8 "const_int_operand"         "    i")
+	     (reg:SI VL_REGNUM)
+	     (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)
+	  (unspec:VNX1_QHSD
+	    [(match_operand 3 "pmode_register_operand"    "    r")
+	     (mem:BLK (scratch))
+	     (match_operand:VNX1_QHSDI 4 "register_operand" " vr")] ORDER)
+	  (match_operand:VNX1_QHSD 2 "vector_merge_operand" "0vu")))]
+  "TARGET_VECTOR"
+  "vl<order>xei<VNX1_QHSDI:sew>.v\t%0,(%3),%4%p1"
+  [(set_attr "type" "vld<order>x")
+   (set_attr "mode" "<VNX1_QHSD:MODE>")])
+
+(define_insn "@pred_indexed_<order>store<VNX1_QHSD:mode><VNX1_QHSDI:mode>"
+  [(set (mem:BLK (scratch))
+	(unspec:BLK
+	  [(unspec:<VM>
+	    [(match_operand:<VM> 0 "vector_mask_operand" "vmWc1")
+	     (match_operand 4 "vector_length_operand"    "   rK")
+	     (match_operand 5 "const_int_operand"        "    i")
+	     (reg:SI VL_REGNUM)
+	     (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)
+	   (match_operand 1 "pmode_register_operand"      "   r")
+	   (match_operand:VNX1_QHSDI 2 "register_operand" "  vr")
+	   (match_operand:VNX1_QHSD 3 "register_operand"  "  vr")] ORDER))]
+  "TARGET_VECTOR"
+  "vs<order>xei<VNX1_QHSDI:sew>.v\t%3,(%1),%2%p0"
+  [(set_attr "type" "vst<order>x")
+   (set_attr "mode" "<VNX1_QHSD:MODE>")])
+
+(define_insn "@pred_indexed_<order>load<VNX2_QHSD:mode><VNX2_QHSDI:mode>"
+  [(set (match_operand:VNX2_QHSD 0 "register_operand"      "=&vr")
+	(if_then_else:VNX2_QHSD
+	  (unspec:<VM>
+	    [(match_operand:<VM> 1 "vector_mask_operand"  "vmWc1")
+	     (match_operand 5 "vector_length_operand"     "   rK")
+	     (match_operand 6 "const_int_operand"         "    i")
+	     (match_operand 7 "const_int_operand"         "    i")
+	     (match_operand 8 "const_int_operand"         "    i")
+	     (reg:SI VL_REGNUM)
+	     (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)
+	  (unspec:VNX2_QHSD
+	    [(match_operand 3 "pmode_register_operand"    "    r")
+	     (mem:BLK (scratch))
+	     (match_operand:VNX2_QHSDI 4 "register_operand" " vr")] ORDER)
+	  (match_operand:VNX2_QHSD 2 "vector_merge_operand" "0vu")))]
+  "TARGET_VECTOR"
+  "vl<order>xei<VNX2_QHSDI:sew>.v\t%0,(%3),%4%p1"
+  [(set_attr "type" "vld<order>x")
+   (set_attr "mode" "<VNX2_QHSD:MODE>")])
+
+(define_insn "@pred_indexed_<order>store<VNX2_QHSD:mode><VNX2_QHSDI:mode>"
+  [(set (mem:BLK (scratch))
+	(unspec:BLK
+	  [(unspec:<VM>
+	    [(match_operand:<VM> 0 "vector_mask_operand" "vmWc1")
+	     (match_operand 4 "vector_length_operand"    "   rK")
+	     (match_operand 5 "const_int_operand"        "    i")
+	     (reg:SI VL_REGNUM)
+	     (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)
+	   (match_operand 1 "pmode_register_operand"      "   r")
+	   (match_operand:VNX2_QHSDI 2 "register_operand" "  vr")
+	   (match_operand:VNX2_QHSD 3 "register_operand"  "  vr")] ORDER))]
+  "TARGET_VECTOR"
+  "vs<order>xei<VNX2_QHSDI:sew>.v\t%3,(%1),%2%p0"
+  [(set_attr "type" "vst<order>x")
+   (set_attr "mode" "<VNX2_QHSD:MODE>")])
+
+(define_insn "@pred_indexed_<order>load<VNX4_QHSD:mode><VNX4_QHSDI:mode>"
+  [(set (match_operand:VNX4_QHSD 0 "register_operand"      "=&vr")
+	(if_then_else:VNX4_QHSD
+	  (unspec:<VM>
+	    [(match_operand:<VM> 1 "vector_mask_operand"  "vmWc1")
+	     (match_operand 5 "vector_length_operand"     "   rK")
+	     (match_operand 6 "const_int_operand"         "    i")
+	     (match_operand 7 "const_int_operand"         "    i")
+	     (match_operand 8 "const_int_operand"         "    i")
+	     (reg:SI VL_REGNUM)
+	     (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)
+	  (unspec:VNX4_QHSD
+	    [(match_operand 3 "pmode_register_operand"    "    r")
+	     (mem:BLK (scratch))
+	     (match_operand:VNX4_QHSDI 4 "register_operand" " vr")] ORDER)
+	  (match_operand:VNX4_QHSD 2 "vector_merge_operand" "0vu")))]
+  "TARGET_VECTOR"
+  "vl<order>xei<VNX4_QHSDI:sew>.v\t%0,(%3),%4%p1"
+  [(set_attr "type" "vld<order>x")
+   (set_attr "mode" "<VNX4_QHSD:MODE>")])
+
+(define_insn "@pred_indexed_<order>store<VNX4_QHSD:mode><VNX4_QHSDI:mode>"
+  [(set (mem:BLK (scratch))
+	(unspec:BLK
+	  [(unspec:<VM>
+	    [(match_operand:<VM> 0 "vector_mask_operand" "vmWc1")
+	     (match_operand 4 "vector_length_operand"    "   rK")
+	     (match_operand 5 "const_int_operand"        "    i")
+	     (reg:SI VL_REGNUM)
+	     (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)
+	   (match_operand 1 "pmode_register_operand"      "   r")
+	   (match_operand:VNX4_QHSDI 2 "register_operand" "  vr")
+	   (match_operand:VNX4_QHSD 3 "register_operand"  "  vr")] ORDER))]
+  "TARGET_VECTOR"
+  "vs<order>xei<VNX4_QHSDI:sew>.v\t%3,(%1),%2%p0"
+  [(set_attr "type" "vst<order>x")
+   (set_attr "mode" "<VNX4_QHSD:MODE>")])
+
+(define_insn "@pred_indexed_<order>load<VNX8_QHSD:mode><VNX8_QHSDI:mode>"
+  [(set (match_operand:VNX8_QHSD 0 "register_operand"      "=&vr")
+	(if_then_else:VNX8_QHSD
+	  (unspec:<VM>
+	    [(match_operand:<VM> 1 "vector_mask_operand"  "vmWc1")
+	     (match_operand 5 "vector_length_operand"     "   rK")
+	     (match_operand 6 "const_int_operand"         "    i")
+	     (match_operand 7 "const_int_operand"         "    i")
+	     (match_operand 8 "const_int_operand"         "    i")
+	     (reg:SI VL_REGNUM)
+	     (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)
+	  (unspec:VNX8_QHSD
+	    [(match_operand 3 "pmode_register_operand"    "    r")
+	     (mem:BLK (scratch))
+	     (match_operand:VNX8_QHSDI 4 "register_operand" " vr")] ORDER)
+	  (match_operand:VNX8_QHSD 2 "vector_merge_operand" "0vu")))]
+  "TARGET_VECTOR"
+  "vl<order>xei<VNX8_QHSDI:sew>.v\t%0,(%3),%4%p1"
+  [(set_attr "type" "vld<order>x")
+   (set_attr "mode" "<VNX8_QHSD:MODE>")])
+
+(define_insn "@pred_indexed_<order>store<VNX8_QHSD:mode><VNX8_QHSDI:mode>"
+  [(set (mem:BLK (scratch))
+	(unspec:BLK
+	  [(unspec:<VM>
+	    [(match_operand:<VM> 0 "vector_mask_operand" "vmWc1")
+	     (match_operand 4 "vector_length_operand"    "   rK")
+	     (match_operand 5 "const_int_operand"        "    i")
+	     (reg:SI VL_REGNUM)
+	     (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)
+	   (match_operand 1 "pmode_register_operand"      "   r")
+	   (match_operand:VNX8_QHSDI 2 "register_operand" "  vr")
+	   (match_operand:VNX8_QHSD 3 "register_operand"  "  vr")] ORDER))]
+  "TARGET_VECTOR"
+  "vs<order>xei<VNX8_QHSDI:sew>.v\t%3,(%1),%2%p0"
+  [(set_attr "type" "vst<order>x")
+   (set_attr "mode" "<VNX8_QHSD:MODE>")])
+
+(define_insn "@pred_indexed_<order>load<VNX16_QHS:mode><VNX16_QHSI:mode>"
+  [(set (match_operand:VNX16_QHS 0 "register_operand"      "=&vr")
+	(if_then_else:VNX16_QHS
+	  (unspec:<VM>
+	    [(match_operand:<VM> 1 "vector_mask_operand"  "vmWc1")
+	     (match_operand 5 "vector_length_operand"     "   rK")
+	     (match_operand 6 "const_int_operand"         "    i")
+	     (match_operand 7 "const_int_operand"         "    i")
+	     (match_operand 8 "const_int_operand"         "    i")
+	     (reg:SI VL_REGNUM)
+	     (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)
+	  (unspec:VNX16_QHS
+	    [(match_operand 3 "pmode_register_operand"    "    r")
+	     (mem:BLK (scratch))
+	     (match_operand:VNX16_QHSI 4 "register_operand" " vr")] ORDER)
+	  (match_operand:VNX16_QHS 2 "vector_merge_operand" "0vu")))]
+  "TARGET_VECTOR"
+  "vl<order>xei<VNX16_QHSI:sew>.v\t%0,(%3),%4%p1"
+  [(set_attr "type" "vld<order>x")
+   (set_attr "mode" "<VNX16_QHS:MODE>")])
+
+(define_insn "@pred_indexed_<order>store<VNX16_QHS:mode><VNX16_QHSI:mode>"
+  [(set (mem:BLK (scratch))
+	(unspec:BLK
+	  [(unspec:<VM>
+	    [(match_operand:<VM> 0 "vector_mask_operand" "vmWc1")
+	     (match_operand 4 "vector_length_operand"    "   rK")
+	     (match_operand 5 "const_int_operand"        "    i")
+	     (reg:SI VL_REGNUM)
+	     (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)
+	   (match_operand 1 "pmode_register_operand"      "   r")
+	   (match_operand:VNX16_QHSI 2 "register_operand" "  vr")
+	   (match_operand:VNX16_QHS 3 "register_operand"  "  vr")] ORDER))]
+  "TARGET_VECTOR"
+  "vs<order>xei<VNX16_QHSI:sew>.v\t%3,(%1),%2%p0"
+  [(set_attr "type" "vst<order>x")
+   (set_attr "mode" "<VNX16_QHS:MODE>")])
+
+(define_insn "@pred_indexed_<order>load<VNX32_QH:mode><VNX32_QHI:mode>"
+  [(set (match_operand:VNX32_QH 0 "register_operand"      "=&vr")
+	(if_then_else:VNX32_QH
+	  (unspec:<VM>
+	    [(match_operand:<VM> 1 "vector_mask_operand"  "vmWc1")
+	     (match_operand 5 "vector_length_operand"     "   rK")
+	     (match_operand 6 "const_int_operand"         "    i")
+	     (match_operand 7 "const_int_operand"         "    i")
+	     (match_operand 8 "const_int_operand"         "    i")
+	     (reg:SI VL_REGNUM)
+	     (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)
+	  (unspec:VNX32_QH
+	    [(match_operand 3 "pmode_register_operand"    "    r")
+	     (mem:BLK (scratch))
+	     (match_operand:VNX32_QHI 4 "register_operand"  " vr")] ORDER)
+	  (match_operand:VNX32_QH 2 "vector_merge_operand"  "0vu")))]
+  "TARGET_VECTOR"
+  "vl<order>xei<VNX32_QHI:sew>.v\t%0,(%3),%4%p1"
+  [(set_attr "type" "vld<order>x")
+   (set_attr "mode" "<VNX32_QH:MODE>")])
+
+(define_insn "@pred_indexed_<order>store<VNX32_QH:mode><VNX32_QHI:mode>"
+  [(set (mem:BLK (scratch))
+	(unspec:BLK
+	  [(unspec:<VM>
+	    [(match_operand:<VM> 0 "vector_mask_operand" "vmWc1")
+	     (match_operand 4 "vector_length_operand"    "   rK")
+	     (match_operand 5 "const_int_operand"        "    i")
+	     (reg:SI VL_REGNUM)
+	     (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)
+	   (match_operand 1 "pmode_register_operand"      "   r")
+	   (match_operand:VNX32_QHI 2 "register_operand"  "  vr")
+	   (match_operand:VNX32_QH 3 "register_operand"   "  vr")] ORDER))]
+  "TARGET_VECTOR"
+  "vs<order>xei<VNX32_QHI:sew>.v\t%3,(%1),%2%p0"
+  [(set_attr "type" "vst<order>x")
+   (set_attr "mode" "<VNX32_QH:MODE>")])
+
+(define_insn "@pred_indexed_<order>load<VNX64_Q:mode><VNX64_Q:mode>"
+  [(set (match_operand:VNX64_Q 0 "register_operand"      "=&vr")
+	(if_then_else:VNX64_Q
+	  (unspec:<VM>
+	    [(match_operand:<VM> 1 "vector_mask_operand"  "vmWc1")
+	     (match_operand 5 "vector_length_operand"     "   rK")
+	     (match_operand 6 "const_int_operand"         "    i")
+	     (match_operand 7 "const_int_operand"         "    i")
+	     (match_operand 8 "const_int_operand"         "    i")
+	     (reg:SI VL_REGNUM)
+	     (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)
+	  (unspec:VNX64_Q
+	    [(match_operand 3 "pmode_register_operand"    "    r")
+	     (mem:BLK (scratch))
+	     (match_operand:VNX64_Q 4 "register_operand"    " vr")] ORDER)
+	  (match_operand:VNX64_Q 2 "vector_merge_operand"   "0vu")))]
+  "TARGET_VECTOR"
+  "vl<order>xei<VNX64_Q:sew>.v\t%0,(%3),%4%p1"
+  [(set_attr "type" "vld<order>x")
+   (set_attr "mode" "<VNX64_Q:MODE>")])
+
+(define_insn "@pred_indexed_<order>store<VNX64_Q:mode><VNX64_Q:mode>"
+  [(set (mem:BLK (scratch))
+	(unspec:BLK
+	  [(unspec:<VM>
+	    [(match_operand:<VM> 0 "vector_mask_operand" "vmWc1")
+	     (match_operand 4 "vector_length_operand"    "   rK")
+	     (match_operand 5 "const_int_operand"        "    i")
+	     (reg:SI VL_REGNUM)
+	     (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)
+	   (match_operand 1 "pmode_register_operand"      "   r")
+	   (match_operand:VNX64_Q 2 "register_operand"    "  vr")
+	   (match_operand:VNX64_Q 3 "register_operand"    "  vr")] ORDER))]
+  "TARGET_VECTOR"
+  "vs<order>xei<VNX64_Q:sew>.v\t%3,(%1),%2%p0"
+  [(set_attr "type" "vst<order>x")
+   (set_attr "mode" "<VNX64_Q:MODE>")])
+
+;; -------------------------------------------------------------------------------
+;; ---- Predicated integer binary operations
+;; -------------------------------------------------------------------------------
+;; Includes:
+;; - 11.1 Vector Single-Width Integer Add and Subtract
+;; - 11.5 Vector Bitwise Logical Instructions
+;; - 11.6 Vector Single-Width Bit Shift Instructions
+;; - 11.9 Vector Integer Min/Max Instructions
+;; - 11.11 Vector Integer Divide Instructions
+;; - 12.1 Vector Single-Width Saturating Add and Subtract
+;; -------------------------------------------------------------------------------
+
+(define_insn "@pred_<optab><mode>"
+  [(set (match_operand:VI 0 "register_operand"           "=vd, vr, vd, vr, vd, vr")
+	(if_then_else:VI
+	  (unspec:<VM>
+	    [(match_operand:<VM> 1 "vector_mask_operand" " vm,Wc1, vm,Wc1, vm,Wc1")
+	     (match_operand 5 "vector_length_operand"    " rK, rK, rK, rK, rK, rK")
+	     (match_operand 6 "const_int_operand"        "  i,  i,  i,  i,  i,  i")
+	     (match_operand 7 "const_int_operand"        "  i,  i,  i,  i,  i,  i")
+	     (match_operand 8 "const_int_operand"        "  i,  i,  i,  i,  i,  i")
+	     (reg:SI VL_REGNUM)
+	     (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)
+	  (any_int_binop:VI
+	    (match_operand:VI 3 "<binop_rhs1_predicate>" "<binop_rhs1_constraint>")
+	    (match_operand:VI 4 "<binop_rhs2_predicate>" "<binop_rhs2_constraint>"))
+	  (match_operand:VI 2 "vector_merge_operand"     "0vu,0vu,0vu,0vu,0vu,0vu")))]
+  "TARGET_VECTOR"
+  "@
+   v<insn>.vv\t%0,%3,%4%p1
+   v<insn>.vv\t%0,%3,%4%p1
+   v<binop_imm_rhs1_insn>\t%0,<binop_imm_rhs1_op>%p1
+   v<binop_imm_rhs1_insn>\t%0,<binop_imm_rhs1_op>%p1
+   v<binop_imm_rhs2_insn>\t%0,<binop_imm_rhs2_op>%p1
+   v<binop_imm_rhs2_insn>\t%0,<binop_imm_rhs2_op>%p1"
+  [(set_attr "type" "<int_binop_insn_type>")
+   (set_attr "mode" "<MODE>")])
+
+;; vx instructions patterns.
+;; Note: Unlike vv patterns, we should split them since they are variant.
+;; For vsll.vx/vsra.vx/vsrl.vx the scalar mode should be Pmode wheras the
+;; scalar mode is inner mode of the RVV mode for other vx patterns.
+(define_insn "@pred_<optab><mode>_scalar"
+  [(set (match_operand:VI 0 "register_operand"            "=vd, vr, vd, vr")
+	(if_then_else:VI
+	  (unspec:<VM>
+	    [(match_operand:<VM> 1 "vector_mask_operand" "  vm,Wc1, vm,Wc1")
+	     (match_operand 5 "vector_length_operand"    "  rK, rK, rK, rK")
+	     (match_operand 6 "const_int_operand"        "   i,  i,  i,  i")
+	     (match_operand 7 "const_int_operand"        "   i,  i,  i,  i")
+	     (match_operand 8 "const_int_operand"        "   i,  i,  i,  i")
+	     (reg:SI VL_REGNUM)
+	     (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)
+	  (any_shift:VI
+	    (match_operand:VI 3 "register_operand"        " vr, vr, vr, vr")
+	    (match_operand 4 "pmode_reg_or_uimm5_operand" "  r,  r,  K,  K"))
+	  (match_operand:VI 2 "vector_merge_operand"      "0vu,0vu,0vu,0vu")))]
+  "TARGET_VECTOR"
+  "@
+   v<insn>.vx\t%0,%3,%4%p1
+   v<insn>.vx\t%0,%3,%4%p1
+   v<insn>.vi\t%0,%3,%4%p1
+   v<insn>.vi\t%0,%3,%4%p1"
+  [(set_attr "type" "vshift")
    (set_attr "mode" "<MODE>")])

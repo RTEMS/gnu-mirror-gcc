@@ -7428,7 +7428,6 @@ extern bool any_type_dependent_arguments_p      (const vec<tree, va_gc> *);
 extern bool any_type_dependent_elements_p       (const_tree);
 extern bool type_dependent_expression_p_push	(tree);
 extern bool value_dependent_expression_p	(tree);
-extern bool instantiation_dependent_expression_p (tree);
 extern bool instantiation_dependent_uneval_expression_p (tree);
 extern bool any_value_dependent_elements_p      (const_tree);
 extern bool dependent_omp_for_p			(tree, tree, tree, tree);
@@ -7903,6 +7902,7 @@ extern tree lookup_maybe_add			(tree fns, tree lookup,
 extern int is_overloaded_fn			(tree) ATTRIBUTE_PURE;
 extern bool really_overloaded_fn		(tree) ATTRIBUTE_PURE;
 extern tree dependent_name			(tree);
+extern tree call_expr_dependent_name		(tree);
 extern tree maybe_get_fns			(tree) ATTRIBUTE_PURE;
 extern tree get_fns				(tree) ATTRIBUTE_PURE;
 extern tree get_first_fn			(tree) ATTRIBUTE_PURE;
