@@ -59,6 +59,7 @@ static tree ignore_attribute (tree *, tree, tree, int, bool *);
 
 static tree handle_format_attribute (tree *, tree, tree, int, bool *);
 static tree handle_fnspec_attribute (tree *, tree, tree, int, bool *);
+static tree handle_cheri_capability_attribute (tree *, tree, tree, int, bool *);
 static tree handle_format_arg_attribute (tree *, tree, tree, int, bool *);
 
 /* Helper to define attribute exclusions.  */
@@ -130,6 +131,8 @@ const struct attribute_spec lto_attribute_table[] =
 			      handle_type_generic_attribute, NULL },
   { "fn spec",	 	      1, 1, false, true, true, false,
 			      handle_fnspec_attribute, NULL },
+  { "cheri capability",	      0, 0, false, true, false, true,
+			      handle_cheri_capability_attribute, NULL, },
   { "transaction_pure",	      0, 0, false, true, true, false,
 			      handle_transaction_pure_attribute, NULL },
   /* For internal use only.  The leading '*' both prevents its usage in
@@ -580,6 +583,28 @@ handle_fnspec_attribute (tree *node ATTRIBUTE_UNUSED, tree ARG_UNUSED (name),
   gcc_assert (args
 	      && TREE_CODE (TREE_VALUE (args)) == STRING_CST
 	      && !TREE_CHAIN (args));
+  return NULL_TREE;
+}
+
+/* Apply the "cheri capability" attribute; follows the function of the same
+   name from c-family/c-attribs.c.  */
+
+static tree
+handle_cheri_capability_attribute (tree *node, tree, tree, int,
+				   bool *no_add_attrs)
+{
+  *no_add_attrs = true;
+
+  gcc_assert (targetm.capability_mode ().exists ()
+	      && TREE_CODE (*node) == POINTER_TYPE);
+
+  if (!capability_type_p (*node))
+    {
+      tree attrs = tree_cons (get_identifier ("cheri capability"),
+			      NULL_TREE, TYPE_ATTRIBUTES (*node));
+      *node = build_type_attribute_variant (*node, attrs);
+    }
+
   return NULL_TREE;
 }
 

@@ -432,7 +432,7 @@ composite_type (tree t1, tree t2)
 	tree pointed_to_1 = TREE_TYPE (t1);
 	tree pointed_to_2 = TREE_TYPE (t2);
 	tree target = composite_type (pointed_to_1, pointed_to_2);
-        t1 = build_pointer_type_for_mode (target, TYPE_MODE (t1), false);
+	t1 = change_pointer_target_type (t1, target);
 	t1 = build_type_attribute_variant (t1, attributes);
 	return qualify_type (t1, t2);
       }
@@ -5462,8 +5462,10 @@ build_conditional_expr (location_t colon_loc, tree ifexp, bool ifexp_bcp,
 	    pedwarn (colon_loc, OPT_Wpedantic,
 		     "ISO C forbids conditional expr between "
 		     "%<void *%> and function pointer");
-	  result_type = build_pointer_type (qualify_type (TREE_TYPE (type1),
-							  TREE_TYPE (type2)));
+
+	  result_type = qualify_type (TREE_TYPE (type1), TREE_TYPE (type2));
+	  result_type = change_pointer_target_type (type2, result_type);
+	  result_type = common_pointer_type (type1, result_type);
 	}
       else if (VOID_TYPE_P (TREE_TYPE (type2))
 	       && !TYPE_ATOMIC (TREE_TYPE (type2)))
@@ -5479,8 +5481,10 @@ build_conditional_expr (location_t colon_loc, tree ifexp, bool ifexp_bcp,
 	    pedwarn (colon_loc, OPT_Wpedantic,
 		     "ISO C forbids conditional expr between "
 		     "%<void *%> and function pointer");
-	  result_type = build_pointer_type (qualify_type (TREE_TYPE (type2),
-							  TREE_TYPE (type1)));
+
+	  result_type = qualify_type (TREE_TYPE (type2), TREE_TYPE (type1));
+	  result_type = change_pointer_target_type (type1, result_type);
+	  result_type = common_pointer_type (result_type, type2);
 	}
       /* Objective-C pointer comparisons are a bit more lenient.  */
       else if (objc_have_common_type (type1, type2, -3, NULL_TREE))
@@ -5496,8 +5500,21 @@ build_conditional_expr (location_t colon_loc, tree ifexp, bool ifexp_bcp,
 	  else
 	    pedwarn (colon_loc, 0,
 		     "pointer type mismatch in conditional expression");
-	  result_type = build_pointer_type
-			  (build_qualified_type (void_type_node, qual));
+
+	  tree tgt = build_qualified_type (void_type_node, qual);
+	  tree t1 = change_pointer_target_type (type1, tgt);
+	  tree t2 = change_pointer_target_type (type2, tgt);
+	  result_type = common_pointer_type (t1, t2);
+	}
+
+      if (capability_type_p (type1) != capability_type_p (type2))
+	{
+	  gcc_assert (capability_type_p (result_type));
+	  tree noncap_type = capability_type_p (type1) ? type2 : type1;
+	  location_t noncap_loc = (noncap_type == type2) ? op2_loc : op1_loc;
+	  warning_at (noncap_loc, OPT_Wcheri_implicit_pointer_conversion_to_cap,
+		      "converting non-capability type %qT to capability type "
+		      "%qT without an explicit cast", noncap_type, result_type);
 	}
     }
   else if (code1 == POINTER_TYPE

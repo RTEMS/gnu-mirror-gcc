@@ -463,6 +463,14 @@ pp_c_specifier_qualifier_list (c_pretty_printer *pp, tree t)
 	else if (!c_dialect_cxx ())
 	  pp_c_whitespace (pp);
 	pp_ptr_operator (pp, t);
+
+	/* Print __capability annotations only if pointers aren't
+	   capabilities by default.  */
+	if (capability_type_p (t) && !capability_type_p (ptr_type_node))
+	  {
+	    pp_c_whitespace (pp);
+	    pp_string (pp, "__capability");
+	  }
       }
       break;
 

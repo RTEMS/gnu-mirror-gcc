@@ -8108,10 +8108,19 @@ tree
 addr_expr_type (tree_code code, tree op_type)
 {
   gcc_assert (ADDR_EXPR_CODE_P (code) && TYPE_P (op_type));
-  auto as = TYPE_ADDR_SPACE (op_type);
-  bool is_capability = (code == CAP_ADDR_EXPR);
-  auto ptr_mode = targetm.addr_space.pointer_mode (as, is_capability);
-  return build_pointer_type_for_mode (op_type, ptr_mode, false);
+  tree t = build_pointer_type (op_type);
+
+  /* If pointers aren't capabilities by default, and we want a
+     capability type, apply the "cheri capability" attribute.  */
+  if (code == CAP_ADDR_EXPR && !capability_type_p (t))
+    {
+      tree attrs = build_tree_list (get_identifier ("cheri capability"),
+				    NULL_TREE);
+      if (decl_attributes (&t, attrs, 0))
+	gcc_unreachable ();
+    }
+
+  return t;
 }
 
 /* Try building a capability pointer to TO_TYPE.  Return error_mark_node
@@ -10620,11 +10629,12 @@ build_common_tree_nodes (bool signed_char)
 		  == intcap_type_node);
       gcc_assert (build_intcap_type_for_mode (cap_mode, 1)
 		  == uintcap_type_node);
-      cap_ptr_type_node = build_pointer_type_for_mode (void_type_node,
-						       cap_mode, false);
+      cap_ptr_type_node
+	= try_building_capability_pointer_type (void_type_node);
       cap_const_ptr_type_node
-	= build_pointer_type_for_mode
-	      (build_type_variant (void_type_node, 1, 0), cap_mode, false);
+	= change_pointer_target_type (cap_ptr_type_node,
+				      build_type_variant (void_type_node,
+							  1, 0));
     }
 
   float_type_node = make_node (REAL_TYPE);
@@ -14151,6 +14161,18 @@ capability_type_p (const_tree t)
   /* We should only be seeing pointers as capabilities at the moment.  */
   gcc_assert (POINTER_TYPE_P (t) || TREE_CODE (t) == NULLPTR_TYPE
 	      || INTCAP_TYPE_P (t) || AGGREGATE_TYPE_P (t));
+
+  if (CHECKING_P
+      && targetm.capability_mode ().exists ()
+      && POINTER_TYPE_P (t)
+      && t != ptr_type_node
+      && !capability_type_p (ptr_type_node))
+    {
+      /* For hybrid, we want the invariant that all capability pointers
+	 have the "cheri capability" attribute.  */
+      gcc_assert (lookup_attribute ("cheri capability", TYPE_ATTRIBUTES (t)));
+    }
+
   return (POINTER_TYPE_P (t) || TREE_CODE (t) == NULLPTR_TYPE
 	  || INTCAP_TYPE_P (t));
 }
@@ -16390,6 +16412,23 @@ test_escaped_strings (void)
   pp_line_cutoff (global_dc->printer) = saved_cutoff;
 }
 
+static tree
+force_build_capability_pointer_type (tree target)
+{
+  if (!targetm.capability_mode ().exists ())
+    {
+      /* Typically the selftests will be run without any target options, so
+	 we'll usually end up in this branch.  We still want to run the
+	 capability-relevant selftests in this case, though, so here we just
+	 force building a pointer with underlying capability mode.  */
+      return build_pointer_type_for_mode (target, CADImode, false);
+    }
+
+  /* Otherwise, we're running the selftests with target options that make us a
+     real capability target.  Build the capability type properly.  */
+  return try_building_capability_pointer_type (target);
+}
+
 static void
 test_fold_drop_capability (void)
 {
@@ -16429,7 +16468,7 @@ test_fold_drop_capability (void)
 	tcc_statement ??
 	*/
   tree cap_pointer_type
-    = build_pointer_type_for_mode (integer_type_node, CADImode, false);
+    = force_build_capability_pointer_type (integer_type_node);
   tree cap_pointer_cst = build_int_cst (cap_pointer_type, 0);
   tree pointer_offset_type = noncapability_type (TREE_TYPE (cap_pointer_cst));
   tree pointer_offset_type2 = noncapability_type (cap_pointer_type);
@@ -16475,7 +16514,7 @@ static void
 test_capability_type_manipulation (void)
 {
   tree cap_pointer_type
-    = build_pointer_type_for_mode (integer_type_node, CADImode, false);
+    = force_build_capability_pointer_type (integer_type_node);
   ASSERT_EQ (true, capability_type_p (cap_pointer_type));
   ASSERT_EQ (false, capability_type_p (integer_type_node));
   ASSERT_EQ (false, capability_type_p (NULL_TREE));
@@ -16494,7 +16533,7 @@ static void
 test_fold_build_replace_address_value (void)
 {
   tree cap_pointer_type
-    = build_pointer_type_for_mode (integer_type_node, CADImode, false);
+    = force_build_capability_pointer_type (integer_type_node);
   /* BASE_TEST is designed to test only values (and not metadata bits).  */
 #define BASE_TEST(CV, NEW) \
   { \
@@ -16522,7 +16561,7 @@ test_fold_build_replace_address_value (void)
 static void
 test_maybe_cap_all_onesp (void)
 {
-  tree ty = build_pointer_type_for_mode (integer_type_node, CADImode, false);
+  tree ty = force_build_capability_pointer_type (integer_type_node);
 
   ASSERT_FALSE (maybe_cap_all_onesp (build_int_cst (ty, 0)));
   ASSERT_FALSE (maybe_cap_all_onesp (build_int_cst (ty, 42)));

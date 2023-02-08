@@ -79,6 +79,7 @@ void bar2 ()
 int *cond1 (int *a, int * __capability b)
 {
   return a ? b : a;  /* { dg-warning {converting capability pointer to non-capability pointer without an explicit cast} } */
+  /* { dg-warning {converting non-capability type 'int \*' to capability type 'int \* __capability' without an explicit cast} "" { target *-*-* } .-1 } */
 }
 // TO capability
 int * __capability cond2 (int *a, int *  b)
