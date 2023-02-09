@@ -10960,10 +10960,16 @@ cp_parser_trait (cp_parser* parser, enum rid keyword)
   matching_parens parens;
   parens.require_open (parser);
 
-  {
-    type_id_in_expr_sentinel s (parser);
-    type1 = cp_parser_type_id (parser);
-  }
+  if (kind == CPTK_IS_DEDUCIBLE)
+    {
+      type1 = cp_parser_template_name (parser, false, true, false,
+				       none_type, nullptr);
+    }
+  else
+    {
+      type_id_in_expr_sentinel s (parser);
+      type1 = cp_parser_type_id (parser);
+    }
 
   if (type1 == error_mark_node)
     return error_mark_node;

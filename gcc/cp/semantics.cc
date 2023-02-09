@@ -12040,6 +12040,9 @@ trait_expr_value (cp_trait_kind kind, tree type1, tree type2)
     case CPTK_REF_CONVERTS_FROM_TEMPORARY:
       return ref_xes_from_temporary (type1, type2, /*direct_init=*/false);
 
+    case CPTK_IS_DEDUCIBLE:
+      return type_targs_deducible_from (type1, type2);
+
 #define DEFTRAIT_TYPE(CODE, NAME, ARITY) \
     case CPTK_##CODE:
 #include "cp-trait.def"
@@ -12194,6 +12197,11 @@ finish_trait_expr (location_t loc, cp_trait_kind kind, tree type1, tree type2)
 	  && TREE_CODE (type2) != VOID_TYPE
 	  && !complete_type_or_else (type2, NULL_TREE))
 	/* We already issued an error.  */
+	return error_mark_node;
+      break;
+
+    case CPTK_IS_DEDUCIBLE:
+      if (!DECL_TYPE_TEMPLATE_P (type1))
 	return error_mark_node;
       break;
 
