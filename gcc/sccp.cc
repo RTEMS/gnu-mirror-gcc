@@ -33,10 +33,13 @@ along with GCC; see the file COPYING3.  If not see
 #include "hash-set.h"
 #include <algorithm>
 #include "ssa-iterators.h"
+#include "gimple-fold.h"
+#include "gimplify.h"
 
 // DEBUG
 #include <iostream>
 #include "gimple-pretty-print.h"
+#include "print-tree.h"
 
 /* State of vertex during tarjan computation.
 
@@ -66,14 +69,10 @@ struct vertex
 };
 
 static bool
-may_generate_useful_copy (gimple *stmt)
+stmt_may_generate_copy (gimple *stmt)
 {
   if (gimple_code (stmt) == GIMPLE_PHI)
     return true;
-  else
-    return false;
-    //return !SSA_NAME_OCCURS_IN_ABNORMAL_PHI (gimple_phi_result (stmt));
-  //  return true; // TODO
 
   if (gimple_code (stmt) != GIMPLE_ASSIGN)
     return false;
@@ -81,24 +80,33 @@ may_generate_useful_copy (gimple *stmt)
   /* If the statement has volatile operands, it won't generate a
      useful copy.  */
   if (gimple_has_volatile_ops (stmt))
-    return false; // TODO Mozna tu nemusi byt
+    return false; // TODO Maybe doesn't have to be here
 
   /* Statements with loads and/or stores will never generate a useful copy.  */
   if (gimple_store_p (stmt) || gimple_assign_load_p (stmt))
     return false;
 
+  //return gimple_assign_copy_p (stmt); // TODO
+
+  if (!gimple_assign_single_p (stmt))
+    return false;
+
   /* If the assignment is from a constant it generates a useful copy.  */
-  /* TODO
-  if (gimple_assign_single_p (stmt)
-      && is_gimple_min_invariant (gimple_assign_rhs1 (stmt)))
+  if (is_gimple_min_invariant (gimple_assign_rhs1 (stmt)))
     return true;
-  */
 
   /* Otherwise, the only statements that generate useful copies are
      assignments whose single SSA use doesn't flow through abnormal
      edges.  */
   tree rhs = single_ssa_tree_operand (stmt, SSA_OP_USE);
-  return (rhs && !SSA_NAME_OCCURS_IN_ABNORMAL_PHI (rhs));
+
+  /* TODO Comment.  */
+  if (!is_gimple_val (gimple_assign_rhs1 (stmt)))
+    return false;
+
+  return rhs;
+  //return (rhs && !SSA_NAME_OCCURS_IN_ABNORMAL_PHI (rhs)); TODO Pokud
+  //necheckovat abnormal
 }
 
 /* Set 'using' flag of gimple statement to true.
@@ -162,6 +170,56 @@ tarjan_stmts_to_vertices (auto_vec<gimple *> &stmts)
   return result;
 }
 
+static void
+tarjan_visit_neighbor (tree neigh_tree, unsigned parent_vxnum,
+		       auto_vec<vertex> &vs, auto_vec<unsigned> &worklist)
+{
+  if (TREE_CODE (neigh_tree) != SSA_NAME)
+    return; /* Skip any neighbor that isn't an SSA name.  */
+
+  gimple *neigh_stmt = SSA_NAME_DEF_STMT (neigh_tree);
+
+  /* Skip neighbors outside the induced subgraph that Tarjan currently works
+     with. */
+  if (!tarjan_is_using (neigh_stmt))
+    return;
+  unsigned neigh_vxnum = tarjan_vxnum (neigh_stmt);
+
+  gcc_checking_assert (stmt_may_generate_copy (neigh_stmt));
+
+  vstate neigh_state = vs[neigh_vxnum].state;
+  vstate parent_state = vs[parent_vxnum].state;
+  if (parent_state == vopen) /* We're currently opening parent.  */
+    {
+      /* Put unvisited neighbors on worklist. Update lowlink of parent
+	 vertex according to indices of neighbors present on stack.  */
+      switch (neigh_state)
+	{
+	case unvisited:
+	  worklist.safe_push (neigh_vxnum);
+	  break;
+	case vopen:
+	case closed:
+	  vs[parent_vxnum].lowlink = std::min (vs[parent_vxnum].lowlink,
+					       vs[neigh_vxnum].index);
+	  break;
+	case in_scc:
+	  /* Ignore these edges.  */
+	  break;
+	}
+    }
+  else if (parent_state == closed) /* We're currently closing parent.  */
+    {
+      /* Update lowlink of parent vertex according to lowlinks of
+	 children of parent (in terms of DFS tree).  */
+      if (neigh_state == closed)
+	{
+	  vs[parent_vxnum].lowlink = std::min (vs[parent_vxnum].lowlink,
+					       vs[neigh_vxnum].lowlink);
+	}
+    }
+}
+
 /* Nonrecursive implementation of Tarjan's algorithm for computing strongly
    connected components in a graph. Statements are vertices. Edges lead from a
    copy stmt p using another copy stmt q to the stmt being used (p -> q when q
@@ -219,57 +277,29 @@ tarjan_compute_sccs (auto_vec<gimple *> &copy_stmts)
 	  vs[i].state = closed;
 	}
 
-      /* Iterate over neighbors of this vertex.  */
-      ssa_op_iter iter;
-      use_operand_p use_p;
-      FOR_EACH_PHI_OR_STMT_USE (use_p, stmt, iter, SSA_OP_ALL_USES)
+      /* Visit neighbors of this vertex.  */
+      tree op;
+      gphi *phi;
+      switch (gimple_code (stmt))
 	{
-	  tree op_var = USE_FROM_PTR (use_p);
-
-	  if (TREE_CODE (op_var) != SSA_NAME)
-	    continue; /* Skip any operand that isn't an SSA name.  */
-
-	  gimple *op_stmt = SSA_NAME_DEF_STMT (op_var);
-
-	  /* Skip operands not from the induced subgraph. */
-	  if (!tarjan_is_using (op_stmt))
-	    continue;
-	  unsigned op_i = tarjan_vxnum (op_stmt);
-
-	  /* This should hold if only copy stmts were given to this
-	     function. */
-	  gcc_checking_assert (may_generate_useful_copy (op_stmt));
-
-	  if (state == unvisited)
-	    {
-	      /* Put unvisited neighbors on worklist. Update lowlink of this
-	         vertex according to indices of neighbors present on stack.  */
-	      switch (vs[op_i].state)
-		{
-		case unvisited:
-		  worklist.safe_push (op_i);
-		  break;
-		case vopen:
-		case closed:
-		  vs[i].lowlink = std::min (vs[i].lowlink, vs[op_i].index);
-		  break;
-		case in_scc:
-		  /* Ignore these edges.  */
-		  break;
-		}
-	    }
-	  else if (state == vopen)
-	    {
-	      /* Update lowlink of this vertex according to lowlinks of
-	         children of this vertex (in terms of DFS tree).  */
-	      if (vs[op_i].state == closed)
-		{
-		  vs[i].lowlink = std::min (vs[i].lowlink, vs[op_i].lowlink);
-		}
-	    }
+	  case GIMPLE_PHI:
+	    phi = as_a <gphi *> (stmt);
+	    unsigned j;
+	    for (j = 0; j < gimple_phi_num_args (phi); j++)
+	      {
+		op = gimple_phi_arg_def (phi, j);
+		tarjan_visit_neighbor (op, i, vs, worklist);
+	      }
+	    break;
+	  case GIMPLE_ASSIGN:
+	    op = gimple_assign_rhs1 (stmt);
+	    tarjan_visit_neighbor (op, i, vs, worklist);
+	    break;
+	  default:
+	    gcc_unreachable ();
 	}
 
-      /* If we just closed a root vertex of an scc, pop scc from stack.  */
+      /* If we've just closed a root vertex of an scc, pop scc from stack.  */
       if (state == vopen && vs[i].lowlink == vs[i].index)
 	{
 	  vec<gimple *> scc = vNULL;
@@ -299,7 +329,58 @@ tarjan_compute_sccs (auto_vec<gimple *> &copy_stmts)
       tarjan_clear_using (s);
     }
 
+  // DEBUG
+  /* Write out sccs
+  for (vec<gimple *> scc : sccs)
+    {
+      for (gimple *s : scc)
+	{
+	  debug_gimple_stmt (s);
+	}
+      std::cerr << std::endl;
+    }
+  */
+
   return sccs;
+}
+
+static bool
+may_propagate (tree get_replaced, tree replace_by)
+{
+  if (TREE_CODE (replace_by) != SSA_NAME ||
+      !SSA_NAME_OCCURS_IN_ABNORMAL_PHI (replace_by));
+}
+
+static void
+replace_use_by (tree get_replaced, tree replace_by)
+{
+  if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (get_replaced)
+      && TREE_CODE (replace_by) == SSA_NAME)
+    SSA_NAME_OCCURS_IN_ABNORMAL_PHI (replace_by) = 1;
+
+  /* Replace each occurence of 'get_replaced' by 'replace_by'.  */
+  use_operand_p use_p;
+  imm_use_iterator iter;
+  gimple *use_stmt;
+  FOR_EACH_IMM_USE_STMT (use_stmt, iter, get_replaced)
+    {
+      FOR_EACH_IMM_USE_ON_STMT (use_p, iter)
+	SET_USE (use_p, unshare_expr (replace_by));
+
+      /* Recompute tree invariant.  */
+      if (gimple_assign_single_p (use_stmt))
+	{
+	  tree rhs = gimple_assign_rhs1 (use_stmt);
+
+	  if (TREE_CODE (rhs) == ADDR_EXPR)
+	    recompute_tree_invariant_for_addr_expr (rhs);
+	}
+
+      /* Cleanup.  */
+      gimple_stmt_iterator gsi = gsi_for_stmt (use_stmt);
+      fold_stmt_inplace (&gsi);
+      update_stmt (use_stmt);
+    }
 }
 
 /* Modify all usages of PHIs in a given SCC to instead reference a given
@@ -310,7 +391,7 @@ replace_scc_by_value (vec<gimple *> scc, tree replace_by)
 {
   // DEBUG
   /*
-  if (scc.length () >= 5)
+  if (scc.length () >= 1)
     {
       std::cerr << "Replacing SCC of length " << scc.length () << std::endl;
     }
@@ -320,20 +401,8 @@ replace_scc_by_value (vec<gimple *> scc, tree replace_by)
     {
       tree get_replaced = gimple_get_lhs (stmt);
 
-      if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (get_replaced)
-	  && TREE_CODE (replace_by) == SSA_NAME)
-	SSA_NAME_OCCURS_IN_ABNORMAL_PHI (replace_by) = 1;
-
-      /* Replace each occurence of copy stmts LHS by value 'replace_by'.  */
-      use_operand_p use_p;
-      imm_use_iterator iter;
-      gimple *use_stmt;
-      FOR_EACH_IMM_USE_STMT (use_stmt, iter, get_replaced)
-	{
-	  FOR_EACH_IMM_USE_ON_STMT (use_p, iter)
-	    SET_USE (use_p, replace_by);
-	  update_stmt (use_stmt);
-	}
+      if (may_propagate (get_replaced, replace_by))
+	replace_use_by (get_replaced, replace_by);
     }
 }
 
@@ -358,6 +427,27 @@ remove_zero_uses_phis ()
 	  else
 	    gsi_next (&pi);
 	}
+    }
+}
+
+static void
+sccp_visit_op (tree op, hash_set<tree> &outer_ops, hash_set<gimple *> &scc_set,
+	       bool &is_inner, tree &last_outer_op)
+{
+  bool op_in_scc = false;
+
+  if (TREE_CODE (op) == SSA_NAME)
+    {
+      gimple *op_stmt = SSA_NAME_DEF_STMT (op);
+      if (scc_set.contains (op_stmt))
+	op_in_scc = true;
+    }
+
+  if (!op_in_scc)
+    {
+      outer_ops.add (op);
+      last_outer_op = op;
+      is_inner = false;
     }
 }
 
@@ -390,27 +480,27 @@ sccp_propagate (auto_vec<gimple *> &copy_stmts)
 	{
 	  bool is_inner = true;
 
-	  ssa_op_iter iter;
-	  use_operand_p use_p;
-	  FOR_EACH_PHI_OR_STMT_USE (use_p, stmt, iter, SSA_OP_ALL_USES)
+	  gphi *phi;
+	  tree op;
+	  switch (gimple_code (stmt))
 	    {
-	      //std::cerr << "Argument" << std::endl; // DEBUG
-	      tree op_var = USE_FROM_PTR (use_p);
-	      bool op_in_scc = false;
-
-	      if (TREE_CODE (op_var) == SSA_NAME)
-		{
-		  gimple *op_stmt = SSA_NAME_DEF_STMT (op_var);
-		  if (scc_set.contains (op_stmt))
-		    op_in_scc = true;
-		}
-
-	      if (!op_in_scc)
-		{
-		  outer_ops.add (op_var);
-		  last_outer_op = op_var;
-		  is_inner = false;
-		}
+	      case GIMPLE_PHI:
+		phi = as_a <gphi *> (stmt);
+		unsigned j;
+		for (j = 0; j < gimple_phi_num_args (phi); j++)
+		  {
+		    op = gimple_phi_arg_def (phi, j);
+		    sccp_visit_op (op, outer_ops, scc_set, is_inner,
+				   last_outer_op);
+		  }
+		break;
+	      case GIMPLE_ASSIGN:
+		op = gimple_assign_rhs1 (stmt);
+		sccp_visit_op (op, outer_ops, scc_set, is_inner,
+			       last_outer_op);
+		break;
+	      default:
+		gcc_unreachable ();
 	    }
 
 	  if (is_inner)
@@ -419,23 +509,12 @@ sccp_propagate (auto_vec<gimple *> &copy_stmts)
 	    }
 	}
 
-      // DEBUG
-      /*
-      for (gimple *s : scc)
-	{
-	  debug_gimple_stmt (s);
-	}
-      */
-
       if (outer_ops.elements () == 1)
 	{
 	  /* The only operand in outer_ops.  */
 	  tree outer_op = last_outer_op;
 
-	  /* Now replace (Unless replacing by abnormal PHI!)  */
-	  if (!(TREE_CODE (outer_op) == SSA_NAME &&
-	      SSA_NAME_OCCURS_IN_ABNORMAL_PHI (outer_op)))
-	    replace_scc_by_value (scc, outer_op);
+	  replace_scc_by_value (scc, outer_op);
 	}
       else if (outer_ops.elements () > 1)
 	{
@@ -454,13 +533,15 @@ sccp_propagate (auto_vec<gimple *> &copy_stmts)
       scc.release ();
     }
 
+  /* We want to remove dead MEM PHIs because memory is in FUD SSA and the dead
+     PHIs would break the FUD property.  */
   remove_zero_uses_phis ();
 }
 
 /* Return all statements in cfun that may be useful.  */
 
 static auto_vec<gimple *>
-get_all_may_generate_useful_copy (void)
+get_all_stmt_may_generate_copy (void)
 {
   auto_vec<gimple *> result;
 
@@ -471,16 +552,22 @@ get_all_may_generate_useful_copy (void)
       for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
 	{
 	  gimple *s = gsi_stmt (gsi);
-	  if (may_generate_useful_copy (s))
-	    result.safe_push (s);
+	  if (stmt_may_generate_copy (s))
+	    {
+	      result.safe_push (s);
+	      //debug_gimple_stmt (s); // DEBUG
+	    }
 	}
 
       gphi_iterator pi;
       for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
 	{
 	  gimple *s = pi.phi ();
-	  if (may_generate_useful_copy (s))
-	    result.safe_push (s);
+	  if (stmt_may_generate_copy (s))
+	    {
+	      result.safe_push (s);
+	      //debug_gimple_stmt (s); // DEBUG
+	    }
 	}
     }
 
@@ -542,40 +629,10 @@ public:
 unsigned
 pass_sccp::execute (function *)
 {
+  //std::cerr << std::endl << "FUNCTION" << std::endl; // DEBUG
   init_sccp ();
-
-  // DEBUG
-  /*
-  std::cerr << "Before:" << std::endl;
-  basic_block bb;
-  FOR_EACH_BB_FN (bb, cfun)
-    {
-      gphi_iterator pi;
-      for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
-	{
-	  gphi *phi = pi.phi ();
-	  debug_gimple_stmt (phi);
-	}
-    }
-  */
-
-  auto_vec<gimple *> stmts = get_all_may_generate_useful_copy ();
+  auto_vec<gimple *> stmts = get_all_stmt_may_generate_copy ();
   sccp_propagate (stmts);
-
-  // DEBUG
-  /*
-  std::cerr << "After:" << std::endl;
-  FOR_EACH_BB_FN (bb, cfun)
-    {
-      gphi_iterator pi;
-      for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
-	{
-	  gphi *phi = pi.phi ();
-	  debug_gimple_stmt (phi);
-	}
-    }
-  */
-
   finalize_sccp ();
 
   return 0;
