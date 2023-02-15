@@ -1,3 +1,771 @@
+2023-02-15  Hans-Peter Nilsson  <hp@axis.com>
+
+	* reload1.cc (gen_reload): Correct rtx parameter for fatal_insn
+	"failure trying to reload" call.
+
+2023-02-15  Hans-Peter Nilsson  <hp@axis.com>
+
+	* gdbinit.in (phrs): New command.
+	* sel-sched-dump.cc (debug_hard_reg_set): Remove debug-function.
+	* ira-color.cc (debug_hard_reg_set): New, calling print_hard_reg_set.
+
+2023-02-14  David Faust  <david.faust@oracle.com>
+
+	PR target/108790
+	* config/bpf/constraints.md (q): New memory constraint.
+	* config/bpf/bpf.md (zero_extendhidi2): Use it here.
+	(zero_extendqidi2): Likewise.
+	(zero_extendsidi2): Likewise.
+	(*mov<MM:mode>): Likewise.
+
+2023-02-14  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/108355
+	PR tree-optimization/96921
+	* match.pd: Add pattern for "1 - bool_val".
+
+2023-02-14  Richard Biener  <rguenther@suse.de>
+
+	* tree-ssa-sccvn.cc (vn_phi_compute_hash): Key skipping
+	basic block index hashing on the availability of ->cclhs.
+	(vn_phi_eq): Avoid re-doing sanity checks for CSE but
+	rely on ->cclhs availability.
+	(vn_phi_lookup): Set ->cclhs only when we are eventually
+	going to CSE the PHI.
+	(vn_phi_insert): Likewise.
+
+2023-02-14  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gimplify.cc (gimplify_save_expr): Add missing guard.
+
+2023-02-14  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/108782
+	* tree-vect-loop.cc (vect_phi_first_order_recurrence_p):
+	Make sure we're not vectorizing an inner loop.
+
+2023-02-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/108777
+	* params.opt (-param=asan-kernel-mem-intrinsic-prefix=): New param.
+	* asan.h (asan_memfn_rtl): Declare.
+	* asan.cc (asan_memfn_rtls): New variable.
+	(asan_memfn_rtl): New function.
+	* builtins.cc (expand_builtin): If
+	param_asan_kernel_mem_intrinsic_prefix and function is
+	kernel-{,hw}address sanitized, emit calls to
+	__{,hw}asan_{memcpy,memmove,memset} rather than
+	{memcpy,memmove,memset}.  Use sanitize_flags_p (SANITIZE_ADDRESS)
+	instead of flag_sanitize & SANITIZE_ADDRESS to check if
+	asan_intercepted_p functions shouldn't be expanded inline.
+
+2023-02-14  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/96373
+	* tree-vect-stmts.cc (vectorizable_operation): Predicate trapping
+	operations on the loop mask.  Reject partial vectors if this isn't
+	possible.
+
+2023-02-13  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR rtl-optimization/108681
+	* lra-spills.cc (lra_final_code_change): Extend subreg replacement
+	code to handle bare uses and clobbers.
+
+2023-02-13  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	* ira.cc (ira_update_equiv_info_by_shuffle_insn): Clear equiv
+	caller_save_p flag when clearing defined_p flag.
+	(setup_reg_equiv): Ditto.
+	* lra-constraints.cc (lra_constraints): Ditto.
+
+2023-02-13  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/108516
+	* config/i386/predicates.md (extr_register_operand):
+	New special predicate.
+	* config/i386/i386.md (*extv<mode>): Use extr_register_operand
+	as operand 1 predicate.
+	(*exzv<mode>): Ditto.
+	(*extendqi<SWI24:mode>_ext_1): New insn pattern.
+
+2023-02-13  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/28614
+	* tree-ssa-sccvn.cc (can_track_predicate_on_edge): Avoid
+	walking all edges in most cases.
+	(vn_nary_op_insert_pieces_predicated): Avoid repeated
+	calls to can_track_predicate_on_edge unless checking is
+	enabled.
+	(process_bb): Instead call it once here for each edge
+	we register possibly multiple predicates on.
+
+2023-02-13  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/108691
+	* tree-cfg.cc (notice_special_calls): When the CFG is built
+	honor gimple_call_ctrl_altering_p.
+	* cfgexpand.cc (expand_call_stmt): Clear cfun->calls_setjmp
+	temporarily if the call is not control-altering.
+	* calls.cc (emit_call_1): Do not add REG_SETJMP if
+	cfun->calls_setjmp is not set.  Do not alter cfun->calls_setjmp.
+
+2023-02-13  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	PR target/108102
+	* config/s390/s390.cc (s390_bb_fallthru_entry_likely): Remove.
+	(struct s390_sched_state): Initialise to zero.
+	(s390_sched_variable_issue): For better debuggability also emit
+	the current side.
+	(s390_sched_init): Unconditionally reset scheduler state.
+
+2023-02-13  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* ifcvt.h (noce_if_info::cond_inverted): New field.
+	* ifcvt.cc (cond_move_convert_if_block): Swap the then and else
+	values when cond_inverted is true.
+	(noce_find_if_block): Allow the condition to be inverted when
+	handling conditional moves.
+
+2023-02-13  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	* config/s390/predicates.md (execute_operation): Use
+	constrain_operands instead of extract_constrain_insn in order to
+	determine wheter there exists a valid alternative.
+
+2023-02-13  Claudiu Zissulescu  <claziss@gmail.com>
+
+	* common/config/arc/arc-common.cc (arc_option_optimization_table):
+	Remove millicode from list.
+
+2023-02-13  Martin Liska  <mliska@suse.cz>
+
+	* doc/invoke.texi: Document ira-simple-lra-insn-threshold.
+
+2023-02-13  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/106722
+	* tree-ssa-dce.cc (mark_last_stmt_necessary): Return
+	whether we marked a stmt.
+	(mark_control_dependent_edges_necessary): When
+	mark_last_stmt_necessary didn't mark any stmt make sure
+	to mark its control dependent edges.
+	(propagate_necessity): Likewise.
+
+2023-02-13  Kito Cheng  <kito.cheng@sifive.com>
+
+	* config/riscv/riscv.h (RISCV_DWARF_VLENB): New.
+	(DWARF_FRAME_REGISTERS): New.
+	(DWARF_REG_TO_UNWIND_COLUMN): New.
+
+2023-02-12  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* doc/sourcebuild.texi: Remove (broken) direct reference to
+	"The GNU configure and build system".
+
+2023-02-12  Jin Ma  <jinma@linux.alibaba.com>
+
+	* config/riscv/riscv.cc (riscv_adjust_libcall_cfi_prologue): Change
+	gen_add3_insn to gen_rtx_SET.
+	(riscv_adjust_libcall_cfi_epilogue): Likewise.
+
+2023-02-12  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/riscv-vector-builtins-bases.cc (class sat_op): New class.
+	(class vnclip): Ditto.
+	(BASE): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.h: Ditto.
+	* config/riscv/riscv-vector-builtins-functions.def (vaadd): Ditto.
+	(vasub): Ditto.
+	(vaaddu): Ditto.
+	(vasubu): Ditto.
+	(vsmul): Ditto.
+	(vssra): Ditto.
+	(vssrl): Ditto.
+	(vnclipu): Ditto.
+	(vnclip): Ditto.
+	* config/riscv/vector-iterators.md (su): Add instruction.
+	(aadd): Ditto.
+	(vaalu): Ditto.
+	* config/riscv/vector.md (@pred_<sat_op><mode>): New pattern.
+	(@pred_<sat_op><mode>_scalar): Ditto.
+	(*pred_<sat_op><mode>_scalar): Ditto.
+	(*pred_<sat_op><mode>_extended_scalar): Ditto.
+	(@pred_narrow_clip<v_su><mode>): Ditto.
+	(@pred_narrow_clip<v_su><mode>_scalar): Ditto.
+
+2023-02-12  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/constraints.md (Wbr): Remove unused constraint.
+	* config/riscv/predicates.md: Fix move operand predicate.
+	* config/riscv/riscv-vector-builtins-bases.cc (class vnshift): New class.
+	(class vncvt_x): Ditto.
+	(class vmerge): Ditto.
+	(class vmv_v): Ditto.
+	(BASE): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.h: Ditto.
+	* config/riscv/riscv-vector-builtins-functions.def (vsra): Ditto.
+	(vsrl): Ditto.
+	(vnsrl): Ditto.
+	(vnsra): Ditto.
+	(vncvt_x): Ditto.
+	(vmerge): Ditto.
+	(vmv_v): Ditto.
+	* config/riscv/riscv-vector-builtins-shapes.cc (struct narrow_alu_def): Ditto.
+	(struct move_def): Ditto.
+	(SHAPE): Ditto.
+	* config/riscv/riscv-vector-builtins-shapes.h: Ditto.
+	* config/riscv/riscv-vector-builtins.cc (DEF_RVV_WEXTI_OPS): New variable.
+	(DEF_RVV_WEXTU_OPS): Ditto
+	* config/riscv/riscv-vector-builtins.def (x_x_w): Fix type for suffix.
+	(v_v): Ditto.
+	(v_x): Ditto.
+	(x_w): Ditto.
+	(x): Ditto.
+	* config/riscv/riscv.cc (riscv_print_operand): Refine ASM printting rule.
+	* config/riscv/vector-iterators.md (nmsac):New iterator.
+	(nmsub): New iterator.
+	* config/riscv/vector.md (@pred_merge<mode>): New pattern.
+	(@pred_merge<mode>_scalar): New pattern.
+	(*pred_merge<mode>_scalar): New pattern.
+	(*pred_merge<mode>_extended_scalar): New pattern.
+	(@pred_narrow_<optab><mode>): New pattern.
+	(@pred_narrow_<optab><mode>_scalar): New pattern.
+	(@pred_trunc<mode>): New pattern.
+
+2023-02-12  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/riscv-vector-builtins-bases.cc (class vmadc): New class.
+	(class vmsbc): Ditto.
+	(BASE): Define new class.
+	* config/riscv/riscv-vector-builtins-bases.h: Ditto.
+	* config/riscv/riscv-vector-builtins-functions.def (vmadc): New define.
+	(vmsbc): Ditto.
+	* config/riscv/riscv-vector-builtins-shapes.cc (struct return_mask_def):
+	New class.
+	(SHAPE): Ditto.
+	* config/riscv/riscv-vector-builtins-shapes.h: Ditto.
+	* config/riscv/riscv-vector-builtins.cc
+	(function_expander::use_exact_insn): Adjust for new support
+	* config/riscv/riscv-vector-builtins.h
+	(function_base::has_merge_operand_p): New function.
+	* config/riscv/vector-iterators.md: New iterator.
+	* config/riscv/vector.md (@pred_madc<mode>): New pattern.
+	(@pred_msbc<mode>): Ditto.
+	(@pred_madc<mode>_scalar): Ditto.
+	(@pred_msbc<mode>_scalar): Ditto.
+	(*pred_madc<mode>_scalar): Ditto.
+	(*pred_madc<mode>_extended_scalar): Ditto.
+	(*pred_msbc<mode>_scalar): Ditto.
+	(*pred_msbc<mode>_extended_scalar): Ditto.
+	(@pred_madc<mode>_overflow): Ditto.
+	(@pred_msbc<mode>_overflow): Ditto.
+	(@pred_madc<mode>_overflow_scalar): Ditto.
+	(@pred_msbc<mode>_overflow_scalar): Ditto.
+	(*pred_madc<mode>_overflow_scalar): Ditto.
+	(*pred_madc<mode>_overflow_extended_scalar): Ditto.
+	(*pred_msbc<mode>_overflow_scalar): Ditto.
+	(*pred_msbc<mode>_overflow_extended_scalar): Ditto.
+
+2023-02-12  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/riscv-protos.h (simm5_p): Add vadc/vsbc support.
+	* config/riscv/riscv-v.cc (simm32_p): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.cc (class vadc): New class.
+	(class vsbc): Ditto.
+	(BASE): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.h: Ditto.
+	* config/riscv/riscv-vector-builtins-functions.def (vadc): Ditto.
+	(vsbc): Ditto.
+	* config/riscv/riscv-vector-builtins-shapes.cc
+	(struct no_mask_policy_def): Ditto.
+	(SHAPE): Ditto.
+	* config/riscv/riscv-vector-builtins-shapes.h: Ditto.
+	* config/riscv/riscv-vector-builtins.cc
+	(rvv_arg_type_info::get_base_vector_type): Add vadc/vsbc support.
+	(rvv_arg_type_info::get_tree_type): Ditto.
+	(function_expander::use_exact_insn): Ditto.
+	* config/riscv/riscv-vector-builtins.h (enum rvv_base_type): Ditto.
+	(function_base::use_mask_predication_p): New function.
+	* config/riscv/vector-iterators.md: New iterator.
+	* config/riscv/vector.md (@pred_adc<mode>): New pattern.
+	(@pred_sbc<mode>): Ditto.
+	(@pred_adc<mode>_scalar): Ditto.
+	(@pred_sbc<mode>_scalar): Ditto.
+	(*pred_adc<mode>_scalar): Ditto.
+	(*pred_adc<mode>_extended_scalar): Ditto.
+	(*pred_sbc<mode>_scalar): Ditto.
+	(*pred_sbc<mode>_extended_scalar): Ditto.
+
+2023-02-12  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/vector.md: use "zero" reg.
+
+2023-02-12  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/riscv-vector-builtins-bases.cc (class widen_binop): New
+	class.
+	(class vwmulsu): Ditto.
+	(class vwcvt): Ditto.
+	(BASE): Add integer widening support.
+	* config/riscv/riscv-vector-builtins-bases.h: Ditto
+	* config/riscv/riscv-vector-builtins-functions.def (vwadd): New class.
+	(vwsub): New class.
+	(vwmul): New class.
+	(vwmulu): New class.
+	(vwmulsu): New class.
+	(vwaddu): New class.
+	(vwsubu): New class.
+	(vwcvt_x): New class.
+	(vwcvtu_x): New class.
+	* config/riscv/riscv-vector-builtins-shapes.cc (struct alu_def): New
+	class.
+	(struct widen_alu_def): New class.
+	(SHAPE): New class.
+	* config/riscv/riscv-vector-builtins-shapes.h: New class.
+	* config/riscv/riscv-vector-builtins.cc
+	(rvv_arg_type_info::get_base_vector_type): Add integer widening support.
+	(rvv_arg_type_info::get_tree_type): Ditto.
+	* config/riscv/riscv-vector-builtins.def (x_x_v): Change into "x_v"
+	(x_v): Ditto.
+	* config/riscv/riscv-vector-builtins.h (enum rvv_base_type): Add integer
+	widening support.
+	* config/riscv/riscv-vsetvl.cc (change_insn): Fix reg_equal use bug.
+	* config/riscv/riscv.h (X0_REGNUM): New constant.
+	* config/riscv/vector-iterators.md: New iterators.
+	* config/riscv/vector.md
+	(@pred_dual_widen_<any_widen_binop:optab><any_extend:su><mode>): New
+	pattern.
+	(@pred_dual_widen_<any_widen_binop:optab><any_extend:su><mode>_scalar):
+	Ditto.
+	(@pred_single_widen_<plus_minus:optab><any_extend:su><mode>): Ditto.
+	(@pred_single_widen_<plus_minus:optab><any_extend:su><mode>_scalar):
+	Ditto.
+	(@pred_widen_mulsu<mode>): Ditto.
+	(@pred_widen_mulsu<mode>_scalar): Ditto.
+	(@pred_<optab><mode>): Ditto.
+
+2023-02-12  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+	    kito-cheng  <kito.cheng@sifive.com>
+
+	* common/config/riscv/riscv-common.cc: Add flag for 'V' extension.
+	* config/riscv/riscv-vector-builtins-bases.cc (class vmulh): New class.
+	(BASE): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.h: Ditto.
+	* config/riscv/riscv-vector-builtins-functions.def (vmulh): Add vmulh
+	API support.
+	(vmulhu): Ditto.
+	(vmulhsu): Ditto.
+	* config/riscv/riscv-vector-builtins-types.def (DEF_RVV_FULL_V_I_OPS):
+	New macro.
+	(DEF_RVV_FULL_V_U_OPS): Ditto.
+	(vint8mf8_t): Ditto.
+	(vint8mf4_t): Ditto.
+	(vint8mf2_t): Ditto.
+	(vint8m1_t): Ditto.
+	(vint8m2_t): Ditto.
+	(vint8m4_t): Ditto.
+	(vint8m8_t): Ditto.
+	(vint16mf4_t): Ditto.
+	(vint16mf2_t): Ditto.
+	(vint16m1_t): Ditto.
+	(vint16m2_t): Ditto.
+	(vint16m4_t): Ditto.
+	(vint16m8_t): Ditto.
+	(vint32mf2_t): Ditto.
+	(vint32m1_t): Ditto.
+	(vint32m2_t): Ditto.
+	(vint32m4_t): Ditto.
+	(vint32m8_t): Ditto.
+	(vint64m1_t): Ditto.
+	(vint64m2_t): Ditto.
+	(vint64m4_t): Ditto.
+	(vint64m8_t): Ditto.
+	(vuint8mf8_t): Ditto.
+	(vuint8mf4_t): Ditto.
+	(vuint8mf2_t): Ditto.
+	(vuint8m1_t): Ditto.
+	(vuint8m2_t): Ditto.
+	(vuint8m4_t): Ditto.
+	(vuint8m8_t): Ditto.
+	(vuint16mf4_t): Ditto.
+	(vuint16mf2_t): Ditto.
+	(vuint16m1_t): Ditto.
+	(vuint16m2_t): Ditto.
+	(vuint16m4_t): Ditto.
+	(vuint16m8_t): Ditto.
+	(vuint32mf2_t): Ditto.
+	(vuint32m1_t): Ditto.
+	(vuint32m2_t): Ditto.
+	(vuint32m4_t): Ditto.
+	(vuint32m8_t): Ditto.
+	(vuint64m1_t): Ditto.
+	(vuint64m2_t): Ditto.
+	(vuint64m4_t): Ditto.
+	(vuint64m8_t): Ditto.
+	* config/riscv/riscv-vector-builtins.cc (DEF_RVV_FULL_V_I_OPS): Ditto.
+	(DEF_RVV_FULL_V_U_OPS): Ditto.
+	(check_required_extensions): Add vmulh support.
+	(rvv_arg_type_info::get_tree_type): Ditto.
+	* config/riscv/riscv-vector-builtins.h (RVV_REQUIRE_FULL_V): Ditto.
+	(enum rvv_base_type): Ditto.
+	* config/riscv/riscv.opt: Add 'V' extension flag.
+	* config/riscv/vector-iterators.md (su): New iterator.
+	* config/riscv/vector.md (@pred_mulh<v_su><mode>): New pattern.
+	(@pred_mulh<v_su><mode>_scalar): Ditto.
+	(*pred_mulh<v_su><mode>_scalar): Ditto.
+	(*pred_mulh<v_su><mode>_extended_scalar): Ditto.
+
+2023-02-12  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/iterators.md: Add sign_extend/zero_extend.
+	* config/riscv/riscv-vector-builtins-bases.cc (class ext): New class.
+	(BASE): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.h: Add vsext/vzext support.
+	* config/riscv/riscv-vector-builtins-functions.def (vsext): New macro
+	define.
+	(vzext): Ditto.
+	* config/riscv/riscv-vector-builtins-shapes.cc (struct alu_def): Adjust
+	for vsext/vzext support.
+	* config/riscv/riscv-vector-builtins-types.def (DEF_RVV_WEXTI_OPS): New
+	macro define.
+	(DEF_RVV_QEXTI_OPS): Ditto.
+	(DEF_RVV_OEXTI_OPS): Ditto.
+	(DEF_RVV_WEXTU_OPS): Ditto.
+	(DEF_RVV_QEXTU_OPS): Ditto.
+	(DEF_RVV_OEXTU_OPS): Ditto.
+	(vint16mf4_t): Ditto.
+	(vint16mf2_t): Ditto.
+	(vint16m1_t): Ditto.
+	(vint16m2_t): Ditto.
+	(vint16m4_t): Ditto.
+	(vint16m8_t): Ditto.
+	(vint32mf2_t): Ditto.
+	(vint32m1_t): Ditto.
+	(vint32m2_t): Ditto.
+	(vint32m4_t): Ditto.
+	(vint32m8_t): Ditto.
+	(vint64m1_t): Ditto.
+	(vint64m2_t): Ditto.
+	(vint64m4_t): Ditto.
+	(vint64m8_t): Ditto.
+	(vuint16mf4_t): Ditto.
+	(vuint16mf2_t): Ditto.
+	(vuint16m1_t): Ditto.
+	(vuint16m2_t): Ditto.
+	(vuint16m4_t): Ditto.
+	(vuint16m8_t): Ditto.
+	(vuint32mf2_t): Ditto.
+	(vuint32m1_t): Ditto.
+	(vuint32m2_t): Ditto.
+	(vuint32m4_t): Ditto.
+	(vuint32m8_t): Ditto.
+	(vuint64m1_t): Ditto.
+	(vuint64m2_t): Ditto.
+	(vuint64m4_t): Ditto.
+	(vuint64m8_t): Ditto.
+	* config/riscv/riscv-vector-builtins.cc (DEF_RVV_WEXTI_OPS): Ditto.
+	(DEF_RVV_QEXTI_OPS): Ditto.
+	(DEF_RVV_OEXTI_OPS): Ditto.
+	(DEF_RVV_WEXTU_OPS): Ditto.
+	(DEF_RVV_QEXTU_OPS): Ditto.
+	(DEF_RVV_OEXTU_OPS): Ditto.
+	(rvv_arg_type_info::get_base_vector_type): Add sign_exted/zero_extend
+	support.
+	(rvv_arg_type_info::get_tree_type): Ditto.
+	* config/riscv/riscv-vector-builtins.h (enum rvv_base_type): Ditto.
+	* config/riscv/vector-iterators.md (z): New attribute.
+	* config/riscv/vector.md (@pred_<optab><mode>_vf2): New pattern.
+	(@pred_<optab><mode>_vf4): Ditto.
+	(@pred_<optab><mode>_vf8): Ditto.
+
+2023-02-12  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/iterators.md: Add saturating Addition && Subtraction.
+	* config/riscv/riscv-v.cc (has_vi_variant_p): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.cc (BASE): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.h: Ditto.
+	* config/riscv/riscv-vector-builtins-functions.def (vsadd): New def.
+	(vssub): Ditto.
+	(vsaddu): Ditto.
+	(vssubu): Ditto.
+	* config/riscv/vector-iterators.md (sll.vi): Adjust for Saturating
+	support.
+	(sll.vv): Ditto.
+	(%3,%v4): Ditto.
+	(%3,%4): Ditto.
+	* config/riscv/vector.md (@pred_<optab><mode>): New pattern.
+	(@pred_<optab><mode>_scalar): New pattern.
+	(*pred_<optab><mode>_scalar): New pattern.
+	(*pred_<optab><mode>_extended_scalar): New pattern.
+
+2023-02-12  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/iterators.md: Add neg and not.
+	* config/riscv/riscv-vector-builtins-bases.cc (class unop): New class.
+	(BASE): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.h: Ditto.
+	* config/riscv/riscv-vector-builtins-functions.def (vadd): Rename binop
+	into alu.
+	(vsub): Ditto.
+	(vand): Ditto.
+	(vor): Ditto.
+	(vxor): Ditto.
+	(vsll): Ditto.
+	(vsra): Ditto.
+	(vsrl): Ditto.
+	(vmin): Ditto.
+	(vmax): Ditto.
+	(vminu): Ditto.
+	(vmaxu): Ditto.
+	(vmul): Ditto.
+	(vdiv): Ditto.
+	(vrem): Ditto.
+	(vdivu): Ditto.
+	(vremu): Ditto.
+	(vrsub): Ditto.
+	(vneg): Ditto.
+	(vnot): Ditto.
+	* config/riscv/riscv-vector-builtins-shapes.cc (struct binop_def): Ditto.
+	(struct alu_def): Ditto.
+	(SHAPE): Ditto.
+	* config/riscv/riscv-vector-builtins-shapes.h: Ditto.
+	* config/riscv/riscv-vector-builtins.cc: Support unary C/C/++.
+	* config/riscv/vector-iterators.md: New iterator.
+	* config/riscv/vector.md (@pred_<optab><mode>): New pattern
+
+2023-02-12  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/riscv-vsetvl.cc (pass_vsetvl::compute_probabilities): Skip exit block.
+
+2023-02-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR ipa/108605
+	* ipa-cp.cc (ipa_agg_value_from_jfunc): Return NULL_TREE also if
+	item->offset bit position is too large to be representable as
+	unsigned int byte position.
+
+2023-02-11  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* doc/extend.texi (Other Builtins): Adjust link to WG14 N965.
+
+2023-02-10  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	* ira.cc (update_equiv_regs): Set up ira_reg_equiv for
+	valid_combine only when ira_use_lra_p is true.
+
+2023-02-10  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	* params.opt (ira-simple-lra-insn-threshold): Add new param.
+	* ira.cc (ira): Use the param to switch on simple LRA.
+
+2023-02-10  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/108687
+	* gimple-range-cache.cc (ranger_cache::range_on_edge): Revert
+	back to RFD_NONE mode for calculations.
+	(ranger_cache::propagate_cache): Call the internal edge range API
+	with RFD_READ_ONLY instead of changing the external routine.
+
+2023-02-10  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/108520
+	* gimple-range-infer.cc (check_assume_func): Invoke
+	gimple_range_global directly instead using global_range_query.
+	* value-query.cc (get_range_global): Add function context and
+	avoid calling nonnull_arg_p if not cfun.
+	(gimple_range_global): Add function context pointer.
+	* value-query.h (imple_range_global): Add function context.
+
+2023-02-10  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/constraints.md (Wdm): Adjust constraint.
+	(Wbr): New constraint.
+	* config/riscv/predicates.md (reg_or_int_operand): New predicate.
+	* config/riscv/riscv-protos.h (emit_pred_op): Remove function.
+	(emit_vlmax_op): New function.
+	(emit_nonvlmax_op): Ditto.
+	(simm32_p): Ditto.
+	(neg_simm5_p): Ditto.
+	(has_vi_variant_p): Ditto.
+	* config/riscv/riscv-v.cc (emit_pred_op): Adjust function.
+	(emit_vlmax_op): New function.
+	(emit_nonvlmax_op): Ditto.
+	(expand_const_vector): Adjust function.
+	(legitimize_move): Ditto.
+	(simm32_p): New function.
+	(simm5_p): Ditto.
+	(neg_simm5_p): Ditto.
+	(has_vi_variant_p): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.cc (class vrsub): New class.
+	(BASE): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.h: Ditto.
+	* config/riscv/riscv-vector-builtins-functions.def (vmin): Remove
+	unsigned cases.
+	(vmax): Ditto.
+	(vminu): Remove signed cases.
+	(vmaxu): Ditto.
+	(vdiv): Remove unsigned cases.
+	(vrem): Ditto.
+	(vdivu): Remove signed cases.
+	(vremu): Ditto.
+	(vadd): Adjust.
+	(vsub): Ditto.
+	(vrsub): New class.
+	(vand): Adjust.
+	(vor): Ditto.
+	(vxor): Ditto.
+	(vmul): Ditto.
+	* config/riscv/riscv-vector-builtins.cc (DEF_RVV_U_OPS): New macro.
+	* config/riscv/riscv.h: change VL/VTYPE as fixed reg.
+	* config/riscv/vector-iterators.md: New iterators.
+	* config/riscv/vector.md (@pred_broadcast<mode>): Adjust pattern for vx
+	support.
+	(@pred_<optab><mode>_scalar): New pattern.
+	(@pred_sub<mode>_reverse_scalar): Ditto.
+	(*pred_<optab><mode>_scalar): Ditto.
+	(*pred_<optab><mode>_extended_scalar): Ditto.
+	(*pred_sub<mode>_reverse_scalar): Ditto.
+	(*pred_sub<mode>_extended_reverse_scalar): Ditto.
+
+2023-02-10  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/108724
+	* tree-vect-stmts.cc (vectorizable_operation): Avoid
+	using word_mode vectors when vector lowering will
+	decompose them to elementwise operations.
+
+2023-02-10  Jakub Jelinek  <jakub@redhat.com>
+
+	Revert:
+	2023-02-09  Martin Liska  <mliska@suse.cz>
+
+	PR target/100758
+	* doc/extend.texi: Document that the function
+	does not work correctly for old VIA processors.
+
+2023-02-10  Andrew Pinski  <apinski@marvell.com>
+	    Andrew Macleod   <amacleod@redhat.com>
+
+	PR tree-optimization/108684
+	* tree-ssa-dce.cc (simple_dce_from_worklist):
+	Check all ssa names and not just non-vdef ones
+	before accepting the inline-asm.
+	Call unlink_stmt_vdef on the statement before
+	removing it.
+
+2023-02-09  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	* ira.h (struct ira_reg_equiv_s): Add new field caller_save_p.
+	* ira.cc (validate_equiv_mem): Check memref address variance.
+	(no_equiv): Clear caller_save_p flag.
+	(update_equiv_regs): Define caller save equivalence for
+	valid_combine.
+	(setup_reg_equiv): Clear defined_p flag for caller save equivalence.
+	* lra-constraints.cc (lra_copy_reg_equiv): Add new arg
+	call_save_p.  Use caller save equivalence depending on the arg.
+	(split_reg): Adjust the call.
+
+2023-02-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/100758
+	* common/config/i386/cpuinfo.h (get_zhaoxin_cpu): Formatting fixes.
+	(cpu_indicator_init): Call get_available_features for all CPUs with
+	max_level >= 1, rather than just Intel, AMD or Zhaoxin.  Formatting
+	fixes.
+
+2023-02-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/108688
+	* match.pd (bit_field_ref [bit_insert]): Simplify BIT_FIELD_REF
+	of BIT_INSERT_EXPR extracting exactly all inserted bits even
+	when without mode precision.  Formatting fixes.
+
+2023-02-09  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/108688
+	* match.pd (bit_field_ref [bit_insert]): Avoid generating
+	BIT_FIELD_REFs of non-mode-precision integral operands.
+
+2023-02-09  Martin Liska  <mliska@suse.cz>
+
+	PR target/100758
+	* doc/extend.texi: Document that the function
+	does not work correctly for old VIA processors.
+
+2023-02-09  Andreas Schwab  <schwab@suse.de>
+
+	* lto-wrapper.cc (merge_and_complain): Handle
+	-funwind-tables and -fasynchronous-unwind-tables.
+	(append_compiler_options): Likewise.
+
+2023-02-09  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/26854
+	* tree-into-ssa.cc (update_ssa): Turn blocks_to_update to tree
+	view around insert_updated_phi_nodes_for.
+	* tree-ssa-alias.cc (maybe_skip_until): Allocate visited bitmap
+	in tree view.
+	(walk_aliased_vdefs_1): Likewise.
+
+2023-02-08  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* doc/include/gpl_v3.texi: Change fsf.org to www.fsf.org.
+
+2023-02-08  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
+
+	PR target/108505
+	* config.gcc (tm_mlib_file): Define new variable.
+
+2023-02-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/108692
+	* tree-vect-patterns.cc (vect_widened_op_tree): If rhs_code is
+	widened_code which is different from code, don't call
+	vect_look_through_possible_promotion but instead just check op is
+	SSA_NAME with integral type for which vect_is_simple_use is true
+	and call set_op on this_unprom.
+
+2023-02-08  Andrea Corallo  <andrea.corallo@arm.com>
+
+	* config/aarch64/aarch64-protos.h (aarch_ra_sign_key): Remove
+	declaration.
+	* config/aarch64/aarch64.cc (aarch_ra_sign_key): Remove
+	definition.
+	* config/aarch64/aarch64.opt (aarch64_ra_sign_key): Rename
+	to 'aarch_ra_sign_key'.
+	* config/arm/aarch-common.cc (aarch_ra_sign_key): Remove
+	declaration.
+	* config/arm/arm-protos.h (aarch_ra_sign_key): Likewise.
+	* config/arm/arm.cc (enum aarch_key_type): Remove definition.
+	* config/arm/arm.opt: Define.
+
+2023-02-08  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/108316
+	* tree-vect-stmts.cc (get_load_store_type): When using
+	internal functions for gather/scatter, make sure that the type
+	of the offset argument is consistent with the offset vector type.
+
+2023-02-08  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	Revert:
+	2023-02-07  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	* ira.h (struct ira_reg_equiv_s): Add new field caller_save_p.
+	* ira.cc (validate_equiv_mem): Check memref address variance.
+	(update_equiv_regs): Define caller save equivalence for
+	valid_combine.
+	(setup_reg_equiv): Clear defined_p flag for caller save equivalence.
+	* lra-constraints.cc (lra_copy_reg_equiv): Add new arg
+	call_save_p.  Use caller save equivalence depending on the arg.
+	(split_reg): Adjust the call.
+
+2023-02-08  Jakub Jelinek  <jakub@redhat.com>
+
+	* tree.def (SAD_EXPR): Remove outdated comment about missing
+	WIDEN_MINUS_EXPR.
+
 2023-02-07  Marek Polacek  <polacek@redhat.com>
 
 	* doc/invoke.texi: Update -fchar8_t documentation.

@@ -1,3 +1,22 @@
+2023-02-10  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/108745
+	* sm-malloc.cc (deref_before_check::emit): Reject the warning if
+	the check occurs within a macro defintion.
+
+2023-02-09  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/108733
+	* state-purge.cc (get_candidate_for_purging): Add ADDR_EXPR
+	and MEM_REF.
+
+2023-02-08  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/108704
+	* state-purge.cc (state_purge_per_decl::process_point_backwards):
+	Don't stop processing the decl if it's fully overwritten by
+	this stmt if it's also used by this stmt.
+
 2023-02-07  David Malcolm  <dmalcolm@redhat.com>
 
 	PR analyzer/108661

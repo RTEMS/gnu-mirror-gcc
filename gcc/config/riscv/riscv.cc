@@ -4229,17 +4229,46 @@ riscv_print_operand (FILE *file, rtx op, int letter)
 
   switch (letter)
     {
+      case 'o': {
+	/* Print 'OP' variant for RVV instructions.
+	   1. If the operand is VECTOR REG, we print 'v'(vnsrl.wv).
+	   2. If the operand is CONST_INT/CONST_VECTOR, we print 'i'(vnsrl.wi).
+	   3. If the operand is SCALAR REG, we print 'x'(vnsrl.wx).  */
+	if (riscv_v_ext_vector_mode_p (mode))
+	  {
+	    if (REG_P (op))
+	      asm_fprintf (file, "v");
+	    else if (CONST_VECTOR_P (op))
+	      asm_fprintf (file, "i");
+	    else
+	      output_operand_lossage ("invalid vector operand");
+	  }
+	else
+	  {
+	    if (CONST_INT_P (op))
+	      asm_fprintf (file, "i");
+	    else
+	      asm_fprintf (file, "x");
+	  }
+	break;
+      }
       case 'v': {
 	rtx elt;
 
-	if (!const_vec_duplicate_p (op, &elt))
-	  output_operand_lossage ("invalid vector constant");
-	else if (satisfies_constraint_Wc0 (op))
-	  asm_fprintf (file, "0");
-	else if (satisfies_constraint_vi (op))
-	  asm_fprintf (file, "%wd", INTVAL (elt));
+	if (REG_P (op))
+	  asm_fprintf (file, "%s", reg_names[REGNO (op)]);
 	else
-	  output_operand_lossage ("invalid vector constant");
+	  {
+	    if (!const_vec_duplicate_p (op, &elt))
+	      output_operand_lossage ("invalid vector constant");
+	    else if (satisfies_constraint_Wc0 (op))
+	      asm_fprintf (file, "0");
+	    else if (satisfies_constraint_vi (op)
+		     || satisfies_constraint_vj (op))
+	      asm_fprintf (file, "%wd", INTVAL (elt));
+	    else
+	      output_operand_lossage ("invalid vector constant");
+	  }
 	break;
       }
       case 'V': {
@@ -4346,6 +4375,10 @@ riscv_print_operand (FILE *file, rtx op, int letter)
     case 'i':
       if (code != REG)
         fputs ("i", file);
+      break;
+
+    case 'B':
+      fputs (GET_RTX_NAME (code), file);
       break;
 
     case 'S':
@@ -5054,8 +5087,9 @@ riscv_adjust_libcall_cfi_prologue ()
       }
 
   /* Debug info for adjust sp.  */
-  adjust_sp_rtx = gen_add3_insn (stack_pointer_rtx,
-				 stack_pointer_rtx, GEN_INT (-saved_size));
+  adjust_sp_rtx =
+    gen_rtx_SET (stack_pointer_rtx,
+		 gen_rtx_PLUS (GET_MODE(stack_pointer_rtx), stack_pointer_rtx, GEN_INT (-saved_size)));
   dwarf = alloc_reg_note (REG_CFA_ADJUST_CFA, adjust_sp_rtx,
 			  dwarf);
   return dwarf;
@@ -5176,8 +5210,9 @@ riscv_adjust_libcall_cfi_epilogue ()
   int saved_size = cfun->machine->frame.save_libcall_adjustment;
 
   /* Debug info for adjust sp.  */
-  adjust_sp_rtx = gen_add3_insn (stack_pointer_rtx,
-				 stack_pointer_rtx, GEN_INT (saved_size));
+  adjust_sp_rtx =
+    gen_rtx_SET (stack_pointer_rtx,
+		 gen_rtx_PLUS (GET_MODE(stack_pointer_rtx), stack_pointer_rtx, GEN_INT (saved_size)));
   dwarf = alloc_reg_note (REG_CFA_ADJUST_CFA, adjust_sp_rtx,
 			  dwarf);
 

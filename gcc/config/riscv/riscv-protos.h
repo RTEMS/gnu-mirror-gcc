@@ -121,6 +121,8 @@ extern void riscv_run_selftests (void);
 
 namespace riscv_vector {
 #define RVV_VLMAX gen_rtx_REG (Pmode, X0_REGNUM)
+#define RVV_VUNDEF(MODE)                                                       \
+  gen_rtx_UNSPEC (MODE, gen_rtvec (1, const0_rtx), UNSPEC_VUNDEF)
 enum vlmul_type
 {
   LMUL_1 = 0,
@@ -149,7 +151,8 @@ extern tree builtin_decl (unsigned, bool);
 extern rtx expand_builtin (unsigned int, tree, rtx);
 extern bool const_vec_all_same_in_range_p (rtx, HOST_WIDE_INT, HOST_WIDE_INT);
 extern bool legitimize_move (rtx, rtx, machine_mode);
-extern void emit_pred_op (unsigned, rtx, rtx, machine_mode);
+extern void emit_vlmax_op (unsigned, rtx, rtx, machine_mode);
+extern void emit_nonvlmax_op (unsigned, rtx, rtx, rtx, machine_mode);
 extern enum vlmul_type get_vlmul (machine_mode);
 extern unsigned int get_ratio (machine_mode);
 extern int get_ta (rtx);
@@ -173,6 +176,12 @@ enum tail_policy get_prefer_tail_policy ();
 enum mask_policy get_prefer_mask_policy ();
 rtx get_avl_type_rtx (enum avl_type);
 opt_machine_mode get_vector_mode (scalar_mode, poly_uint64);
+extern bool simm32_p (rtx);
+extern bool simm5_p (rtx);
+extern bool neg_simm5_p (rtx);
+#ifdef RTX_CODE
+extern bool has_vi_variant_p (rtx_code, rtx);
+#endif
 }
 
 /* We classify builtin types into two classes:

@@ -162,7 +162,7 @@
  (and (match_code "const_vector")
       (match_test "op == CONSTM1_RTX (GET_MODE (op))")))
 
-(define_constraint "Wdm"
+(define_memory_constraint "Wdm"
   "Vector duplicate memory operand"
-  (and (match_operand 0 "memory_operand")
+  (and (match_code "mem")
        (match_code "reg" "0")))

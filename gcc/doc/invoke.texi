@@ -15511,6 +15511,9 @@ available alternatives for preferred register class even if it has
 found some choice with an appropriate register class and respect the
 found qualified matching constraint.
 
+@item ira-simple-lra-insn-threshold
+Approximate function insn number in 1K units triggering simple local RA.
+
 @item lra-inheritance-ebb-probability-cutoff
 LRA tries to reuse values reloaded in registers in subsequent insns.
 This optimization is called inheritance.  EBB is used as a region to
@@ -15805,6 +15808,10 @@ If number of memory accesses in function being instrumented
 is greater or equal to this number, use callbacks instead of inline checks.
 E.g. to disable inline code use
 @option{--param asan-instrumentation-with-call-threshold=0}.
+
+@item asan-kernel-mem-intrinsic-prefix
+Prefix calls to memcpy, memset and memmove with __asan_ or __hwasan_
+for -fsanitize=kernel-address or -fsanitize=kernel-hwaddress.
 
 @item hwasan-instrument-stack
 Enable hwasan instrumentation of statically sized stack-allocated variables.
