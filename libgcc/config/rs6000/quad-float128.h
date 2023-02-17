@@ -27,21 +27,14 @@
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
 
-/* quad.h defines the TFtype type by:
-   typedef float TFtype __attribute__ ((mode (TF)));
-
-   This define forces it to use KFmode (aka, ieee 128-bit floating point).
-   However, when the compiler's default is changed so that long double is IEEE
-   128-bit floating point, we need to go back to using TFmode and TCmode.  */
-#ifndef __LONG_DOUBLE_IEEE128__
-#define TF KF
-
-/* We also need TCtype to represent complex ieee 128-bit float for
-   __mulkc3 and __divkc3.  */
-typedef __complex float TCtype __attribute__ ((mode (KC)));
+/* Override the types for IEEE 128-bit scalar and complex.  */
+#ifdef __LONG_DOUBLE_IEEE128__
+#define TFtype long double
+#define TCtype _Complex long double
 
 #else
-typedef __complex float TCtype __attribute__ ((mode (TC)));
+#define TFtype _Float128
+#define TCtype _Complex _Float128
 #endif
 
 /* Force the use of the VSX instruction set.  */
