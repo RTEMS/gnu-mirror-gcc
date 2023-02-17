@@ -3287,7 +3287,12 @@ asan_add_global (tree decl, tree type, vec<constructor_elt, va_gc> *v)
     pp_string (&asan_pp, "<unknown>");
   str_cst = asan_pp_string (&asan_pp);
 
-  pp_string (&module_name_pp, main_input_filename);
+  const_tree tu = get_ultimate_context ((const_tree)decl);
+  if (tu != NULL_TREE)
+    pp_string (&module_name_pp, IDENTIFIER_POINTER (DECL_NAME (tu)));
+  else
+    pp_string (&module_name_pp, aux_base_name);
+
   module_name_cst = asan_pp_string (&module_name_pp);
 
   if (asan_needs_local_alias (decl))
