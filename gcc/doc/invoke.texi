@@ -4282,6 +4282,10 @@ b->f();
 @noindent
 fails to compile.
 
+In cases where the different signatures are not an accident, the
+simplest solution is to add a using-declaration to the derived class
+to un-hide the base function, e.g. add @code{using A::f;} to @code{B}.
+
 The optional level suffix controls the behavior when all the
 declarations in the derived class override virtual functions in the
 base class, even if not all of the base functions are overridden:
@@ -6083,7 +6087,7 @@ Options} and @ref{Objective-C and Objective-C++ Dialect Options}.
 -Wunused-label     @gol
 -Wunused-value     @gol
 -Wunused-variable  @gol
--Wuse-after-free=3  @gol
+-Wuse-after-free=2  @gol
 -Wvla-parameter @r{(C and Objective-C only)} @gol
 -Wvolatile-register-var  @gol
 -Wzero-length-bounds}
@@ -14674,8 +14678,8 @@ The names of specific parameters, and the meaning of the values, are
 tied to the internals of the compiler, and are subject to change
 without notice in future releases.
 
-In order to get minimal, maximal and default value of a parameter,
-one can use @option{--help=param -Q} options.
+In order to get the minimal, maximal and default values of a parameter,
+use the @option{--help=param -Q} options.
 
 In each case, the @var{value} is an integer.  The following choices
 of @var{name} are recognized for all targets:
@@ -22884,7 +22888,7 @@ points to.
 The startup code from libgcc never sets @code{EIND}.
 Notice that startup code is a blend of code from libgcc and AVR-LibC.
 For the impact of AVR-LibC on @code{EIND}, see the
-@w{@uref{http://nongnu.org/avr-libc/user-manual/,AVR-LibC user manual}}.
+@w{@uref{https://www.nongnu.org/avr-libc/user-manual/,AVR-LibC user manual}}.
 
 @item
 It is legitimate for user-specific startup code to set up @code{EIND}

@@ -92,8 +92,8 @@
   (and (match_code "reg")
        (match_test "MASK_REGNO_P (REGNO (op))")))
 
-;; Match a DI, SI or HImode register operand for extract op.
-(define_special_predicate "extr_register_operand"
+;; Match a DI, SI or HImode register operand.
+(define_special_predicate "int248_register_operand"
   (and (match_operand 0 "register_operand")
        (ior (and (match_test "TARGET_64BIT")
 		 (match_test "GET_MODE (op) == DImode"))
@@ -108,6 +108,20 @@
 	    (match_test "GET_MODE (op) == SImode")
 	    (match_test "GET_MODE (op) == HImode")
 	    (match_test "GET_MODE (op) == QImode"))))
+
+;; Match nonimmediate operand, but exclude non-constant addresses for x86_64.
+(define_predicate "nonimm_x64constmem_operand"
+  (ior (match_operand 0 "register_operand")
+       (and (match_operand 0 "memory_operand")
+	    (ior (not (match_test "TARGET_64BIT"))
+		 (match_test "constant_address_p (XEXP (op, 0))")))))
+
+;; Match general operand, but exclude non-constant addresses for x86_64.
+(define_predicate "general_x64constmem_operand"
+  (ior (match_operand 0 "nonmemory_operand")
+       (and (match_operand 0 "memory_operand")
+	    (ior (not (match_test "TARGET_64BIT"))
+		 (match_test "constant_address_p (XEXP (op, 0))")))))
 
 ;; Match register operands, but include memory operands for TARGET_SSE_MATH.
 (define_predicate "register_ssemem_operand"
