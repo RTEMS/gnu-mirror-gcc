@@ -79,7 +79,13 @@ stmt_may_generate_copy (gimple *stmt)
 
       /* No OCCURS_IN_ABNORMAL_PHI SSA names in lhs nor rhs.  */
       if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (gimple_phi_result (phi)))
-	return false;
+	{
+	  /*
+	  debug_gimple_stmt (stmt); // DEBUG
+	  std::cerr << "1" << std::endl; // DEBUG
+	  */
+	  return false;
+	}
 
       unsigned i;
       for (i = 0; i < gimple_phi_num_args (phi); i++)
@@ -87,34 +93,80 @@ stmt_may_generate_copy (gimple *stmt)
 	  tree op = gimple_phi_arg_def (phi, i);
 	  if (TREE_CODE (op) == SSA_NAME &&
 	      SSA_NAME_OCCURS_IN_ABNORMAL_PHI (op))
-	    return false;
+	    {
+	      /*
+	      debug_gimple_stmt (stmt); // DEBUG
+	      std::cerr << "2" << std::endl; // DEBUG
+	      */
+	      return false;
+	    }
 	}
 
+      /*
+      debug_gimple_stmt (stmt); // DEBUG
+      std::cerr << "ok" << std::endl; // DEBUG
+      */
       return true;
     }
 
   if (gimple_code (stmt) != GIMPLE_ASSIGN)
-    return false;
+    {
+      /*
+      debug_gimple_stmt (stmt); // DEBUG
+      std::cerr << "3" << std::endl; // DEBUG
+      */
+      return false;
+    }
 
   /* If the statement has volatile operands, it won't generate a
      useful copy.  */
   if (gimple_has_volatile_ops (stmt))
-    return false; // TODO Maybe doesn't have to be here
+    {
+      /*
+      debug_gimple_stmt (stmt); // DEBUG
+      std::cerr << "4" << std::endl; // DEBUG
+      */
+      return false; // TODO Maybe doesn't have to be here
+    }
 
   /* Statements with loads and/or stores will never generate a useful copy.  */
   if (gimple_store_p (stmt) || gimple_assign_load_p (stmt))
-    return false;
+    {
+      /*
+      debug_gimple_stmt (stmt); // DEBUG
+      std::cerr << "5" << std::endl; // DEBUG
+      */
+      return false;
+    }
 
   if (!gimple_assign_single_p (stmt))
-    return false;
+    {
+      /*
+      debug_gimple_stmt (stmt); // DEBUG
+      std::cerr << "6" << std::endl; // DEBUG
+      */
+      return false;
+    }
 
   tree lhs = gimple_assign_lhs (stmt);
   if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (lhs))
-    return false;
+    {
+      /*
+      debug_gimple_stmt (stmt); // DEBUG
+      std::cerr << "7" << std::endl; // DEBUG
+      */
+      return false;
+    }
 
   /* If the assignment is from a constant it generates a useful copy.  */
   if (is_gimple_min_invariant (gimple_assign_rhs1 (stmt)))
-    return true;
+    {
+      /*
+      debug_gimple_stmt (stmt); // DEBUG
+      std::cerr << "ok" << std::endl; // DEBUG
+      */
+      return true;
+    }
 
   /* Otherwise, the only statements that generate useful copies are
      assignments whose single SSA use doesn't flow through abnormal
@@ -123,9 +175,37 @@ stmt_may_generate_copy (gimple *stmt)
 
   /* TODO Comment.  */
   if (!is_gimple_val (gimple_assign_rhs1 (stmt)))
-    return false;
+    {
+      /*
+      debug_gimple_stmt (stmt); // DEBUG
+      std::cerr << "8" << std::endl; // DEBUG
+      */
+      return false;
+    }
 
-  return (rhs && !SSA_NAME_OCCURS_IN_ABNORMAL_PHI (rhs));
+  if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (rhs))
+    {
+      /*
+      debug_gimple_stmt (stmt); // DEBUG
+      std::cerr << "9" << std::endl; // DEBUG
+      */
+      return false;
+    }
+
+  if (!rhs)
+    {
+      /*
+      debug_gimple_stmt (stmt); // DEBUG
+      std::cerr << "10" << std::endl; // DEBUG
+      */
+      return false;
+    }
+
+  /*
+  debug_gimple_stmt (stmt); // DEBUG
+  std::cerr << "ok" << std::endl; // DEBUG
+  */
+  return true;
 }
 
 /* Set 'using' flag of gimple statement to true.
@@ -372,10 +452,6 @@ may_propagate (tree get_replaced, tree replace_by)
 static void
 replace_use_by (tree get_replaced, tree replace_by)
 {
-  if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (get_replaced)
-      && TREE_CODE (replace_by) == SSA_NAME)
-    SSA_NAME_OCCURS_IN_ABNORMAL_PHI (replace_by) = 1;
-
   /* Replace each occurence of 'get_replaced' by 'replace_by'.  */
   use_operand_p use_p;
   imm_use_iterator iter;
@@ -408,10 +484,12 @@ static void
 replace_scc_by_value (vec<gimple *> scc, tree replace_by)
 {
   // DEBUG
+  /*
   if (scc.length () >= 1)
     {
       std::cerr << "Replacing SCC of length " << scc.length () << std::endl;
     }
+  */
 
   for (gimple *stmt : scc)
     {
@@ -569,10 +647,7 @@ get_all_stmt_may_generate_copy (void)
 	{
 	  gimple *s = gsi_stmt (gsi);
 	  if (stmt_may_generate_copy (s))
-	    {
-	      result.safe_push (s);
-	      //debug_gimple_stmt (s); // DEBUG
-	    }
+	    result.safe_push (s);
 	}
 
       gphi_iterator pi;
@@ -580,12 +655,11 @@ get_all_stmt_may_generate_copy (void)
 	{
 	  gimple *s = pi.phi ();
 	  if (stmt_may_generate_copy (s))
-	    {
-	      result.safe_push (s);
-	      //debug_gimple_stmt (s); // DEBUG
-	    }
+	    result.safe_push (s);
 	}
     }
+
+  //std::cerr << std::endl << "- - - -" << std::endl << std::endl; // DEBUG
 
   return result;
 }
@@ -603,6 +677,13 @@ init_sccp (void)
       for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
 	{
 	  gimple* stmt = gsi_stmt (gsi);
+	  tarjan_clear_using (stmt);
+	}
+
+      gphi_iterator pi;
+      for (pi = gsi_start_phis (bb); !gsi_end_p (pi); gsi_next (&pi))
+	{
+	  gimple *stmt = pi.phi ();
 	  tarjan_clear_using (stmt);
 	}
     }
