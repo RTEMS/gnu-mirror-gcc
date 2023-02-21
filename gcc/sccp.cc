@@ -71,8 +71,27 @@ struct vertex
 static bool
 stmt_may_generate_copy (gimple *stmt)
 {
+  // TODO: Napis sem "TODO jsme moc konzervativni, mozna by se nejak daly
+  // uvazovat i PHIcka s OCCURS_IN_ABNORMAL parametry
   if (gimple_code (stmt) == GIMPLE_PHI)
-    return true;
+    {
+      gphi *phi = as_a <gphi *> (stmt);
+
+      /* No OCCURS_IN_ABNORMAL_PHI SSA names in lhs nor rhs.  */
+      if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (gimple_phi_result (phi)))
+	return false;
+
+      unsigned i;
+      for (i = 0; i < gimple_phi_num_args (phi); i++)
+	{
+	  tree op = gimple_phi_arg_def (phi, i);
+	  if (TREE_CODE (op) == SSA_NAME &&
+	      SSA_NAME_OCCURS_IN_ABNORMAL_PHI (op))
+	    return false;
+	}
+
+      return true;
+    }
 
   if (gimple_code (stmt) != GIMPLE_ASSIGN)
     return false;
@@ -86,9 +105,11 @@ stmt_may_generate_copy (gimple *stmt)
   if (gimple_store_p (stmt) || gimple_assign_load_p (stmt))
     return false;
 
-  //return gimple_assign_copy_p (stmt); // TODO
-
   if (!gimple_assign_single_p (stmt))
+    return false;
+
+  tree lhs = gimple_assign_lhs (stmt);
+  if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (lhs))
     return false;
 
   /* If the assignment is from a constant it generates a useful copy.  */
@@ -104,9 +125,7 @@ stmt_may_generate_copy (gimple *stmt)
   if (!is_gimple_val (gimple_assign_rhs1 (stmt)))
     return false;
 
-  return rhs;
-  //return (rhs && !SSA_NAME_OCCURS_IN_ABNORMAL_PHI (rhs)); TODO Pokud
-  //necheckovat abnormal
+  return (rhs && !SSA_NAME_OCCURS_IN_ABNORMAL_PHI (rhs));
 }
 
 /* Set 'using' flag of gimple statement to true.
@@ -347,8 +366,7 @@ tarjan_compute_sccs (auto_vec<gimple *> &copy_stmts)
 static bool
 may_propagate (tree get_replaced, tree replace_by)
 {
-  if (TREE_CODE (replace_by) != SSA_NAME ||
-      !SSA_NAME_OCCURS_IN_ABNORMAL_PHI (replace_by));
+  return true;
 }
 
 static void
@@ -390,12 +408,10 @@ static void
 replace_scc_by_value (vec<gimple *> scc, tree replace_by)
 {
   // DEBUG
-  /*
   if (scc.length () >= 1)
     {
       std::cerr << "Replacing SCC of length " << scc.length () << std::endl;
     }
-  */
 
   for (gimple *stmt : scc)
     {
