@@ -277,7 +277,7 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
         ++i){
   	  fprintf (dump_file, "Histogram counter histogram%" PRId64
 	     ":%" PRId64 ".\n",
-	     (int64_t) 1>>i,
+	     (int64_t) 1<<i,
 	     (int64_t) hist->hvalue.counters[(param_profile_histogram_size_lin-lin2_log)+i]);
         }
       }
