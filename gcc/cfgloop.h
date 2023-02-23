@@ -297,7 +297,7 @@ public:
      reused.  */
   basic_block former_header;
 
-  histogram_counters* counters=NULL;
+  histogram_counters* counters;
 };
 
 /* Set if the loop is known to be infinite.  */

@@ -1037,20 +1037,22 @@ try_peel_loop (class loop *loop,
   npeel = estimated_loop_iterations_int (loop);
 
   // linear part most common number
-  //bool histogram_peeling=loop->counters!=NULL;
-  //if (histogram_peeling){
-  //  gcov_type max=0;
-  //  int most_common=-1;
-  //  for (int i=0;i<8; i++){
-  //      if (loop->counters->hist[i]>=max){
-  //          most_common=i;
-  //      }
-  //  }
-  //  if (most_common>0)
-  //  {
-  //      npeel=most_common+1;
-  //  }
-  //}
+  // peels if in linear portion there is more then 90% of iterations
+  bool histogram_peeling=loop->counters!=NULL;
+  if (histogram_peeling){
+    gcov_type psum=0;
+    gcov_type sum=loop->counters->sum;
+    if (sum!=0){
+    for (int i=0;i<param_profile_histogram_size_lin; i++){
+        psum+=(*(loop->counters->hist))[i];
+        if ((100*psum)/sum>=90)
+        {
+            npeel=i;
+            continue;
+        }
+    }
+    }
+  }
 
   if (npeel < 0)
     npeel = likely_max_loop_iterations_int (loop);
