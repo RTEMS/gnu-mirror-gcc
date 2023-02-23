@@ -35,6 +35,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "ssa-iterators.h"
 #include "gimple-fold.h"
 #include "gimplify.h"
+#include "tree-cfg.h"
 
 // DEBUG
 #include <iostream>
@@ -443,12 +444,6 @@ tarjan_compute_sccs (auto_vec<gimple *> &copy_stmts)
   return sccs;
 }
 
-static bool
-may_propagate (tree get_replaced, tree replace_by)
-{
-  return true;
-}
-
 static void
 replace_use_by (tree get_replaced, tree replace_by)
 {
@@ -494,9 +489,7 @@ replace_scc_by_value (vec<gimple *> scc, tree replace_by)
   for (gimple *stmt : scc)
     {
       tree get_replaced = gimple_get_lhs (stmt);
-
-      if (may_propagate (get_replaced, replace_by))
-	replace_use_by (get_replaced, replace_by);
+      replace_use_by (get_replaced, replace_by);
     }
 }
 
@@ -694,6 +687,11 @@ init_sccp (void)
 static void
 finalize_sccp (void)
 {
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      gimple_purge_dead_eh_edges (bb);
+    }
 }
 
 namespace {
