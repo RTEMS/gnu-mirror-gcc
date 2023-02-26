@@ -26,97 +26,128 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include "libgcov.h"
 #if !defined(inhibit_libc)
 
+#ifndef floor_log2
+
+/*
+ * If value is less then 8 we increment corresponding counter
+ * otherwise we take its logarithm and increment corresponding counter
+ */
+
+/* For convenience, define 0 -> word_size.  */
+static inline int
+clz_hwi (gcov_type_unsigned x)
+{
+  if (x == 0)
+    return sizeof(gcov_type_unsigned)*8;
+  if (sizeof(gcov_type_unsigned)==sizeof(long))
+    return __builtin_clzl (x);
+  if (sizeof(gcov_type_unsigned)==sizeof(long long))
+    return __builtin_clzll (x);
+  else
+    return __builtin_clz (x);
+}
+
+static inline gcov_type_unsigned
+floor_log2 (gcov_type_unsigned x)
+{
+  return sizeof(gcov_type_unsigned)*8 - clz_hwi (x)-1;
+}
+
+#endif
+
 #ifdef L_gcov_histogram_profiler
 /*
  * If value is less then 8 we increment corresponding counter
  * otherwise we take its logarithm and increment corresponding counter
  */
 
-/* For convenience, define 0 -> word_size.  */
-static inline int
-clz_hwi (gcov_type x)
-{
-  if (x == 0)
-    return 64;
-# if HOST_BITS_PER_WIDE_INT == HOST_BITS_PER_LONG
-  return __builtin_clzl (x);
-# elif HOST_BITS_PER_WIDE_INT == HOST_BITS_PER_LONGLONG
-  return __builtin_clzll (x);
-# else
-  return __builtin_clz (x);
-# endif
-}
-
-static inline int
-floor_log2 (gcov_type x)
-{
-  return 63 - clz_hwi (x);
-}
-
 void
-__gcov_histogram_profiler (gcov_type *counters, gcov_type value)
+__gcov_histogram_profiler (gcov_type *counters, gcov_type value, gcov_type hist_sizes)
 {
-  if (value>=0 && value<8){
+  fprintf (stderr, "profiling:Skip\n");
+  assert(hist_sizes>=0 && value>=0);
+  gcov_type_unsigned hist_size=hist_sizes;
+  gcov_type_unsigned u_value=value;
+  gcov_type_unsigned tot_size=hist_size>>32;
+  gcov_type_unsigned lin_size=hist_size & ((((gcov_type_unsigned)1)<<32)-1);
+  if (u_value<lin_size){
     counters[value]++;
   }else{
-    gcc_assert(value>0);
-    int pow2=floor_log2(value);
-    counters[pow2+5]++;
+    gcov_type_unsigned pow2=floor_log2(u_value);
+    gcov_type_unsigned lin_pow2=floor_log2(lin_size-1);
+    if ((lin_pow2-lin_size)+tot_size>pow2){
+        counters[pow2+(lin_size-lin_pow2)-1]++;
+    } else {
+        counters[tot_size-1]++;
+    }
   }
 }
 
-//  if (value>=0 && value<param_profile_histogram_size_lin){
-//    counters[value]++;
-//  }else{
-//    gcc_assert(value>0);
-//    int pow2=floor_log2(value);
-//    counters[pow2+(param_profile_histogram_size_lin-floor_log2
-//            (param_profile_histogram_size_lin))]++;
-//  }
+
 
 #endif
 
 
 #if defined(L_gcov_histogram_profiler_atomic) && GCOV_SUPPORTS_ATOMIC
 
-/*
- * If value is less then 8 we increment corresponding counter
- * otherwise we take its logarithm and increment corresponding counter
- */
-
-/* For convenience, define 0 -> word_size.  */
-static inline int
-clz_hwi2 (gcov_type x)
-{
-  if (x == 0)
-    return 64;
-# if HOST_BITS_PER_WIDE_INT == HOST_BITS_PER_LONG
-  return __builtin_clzl (x);
-# elif HOST_BITS_PER_WIDE_INT == HOST_BITS_PER_LONGLONG
-  return __builtin_clzll (x);
-# else
-  return __builtin_clz (x);
-# endif
-}
-
-static inline int
-floor_log2_2 (gcov_type x)
-{
-  return 63 - clz_hwi2 (x);
-}
-
-
 void
-__gcov_histogram_profiler_atomic (gcov_type *counters, gcov_type value)
+__gcov_histogram_profiler_atomic (gcov_type *counters, gcov_type value, gcov_type hist_sizes)
 {
-  if (value>=0 && value<8){
+  fprintf (stderr, "profiling:Skip\n");
+  assert(hist_sizes>=0 && value>=0);
+  gcov_type_unsigned hist_size=hist_sizes;
+  gcov_type_unsigned u_value=value;
+  gcov_type_unsigned tot_size=hist_size>>32;
+  gcov_type_unsigned lin_size=hist_size & ((((gcov_type_unsigned)1)<<32)-1);
+  if (u_value<lin_size){
     __atomic_fetch_add (&counters[value], 1, __ATOMIC_RELAXED);
   }else{
-    gcc_assert(value>0);
-    int pow2=floor_log2_2(value);
-    __atomic_fetch_add (&counters[pow2+5], 1, __ATOMIC_RELAXED);
+    gcov_type_unsigned pow2=floor_log2(u_value);
+    gcov_type_unsigned lin_pow2=floor_log2(lin_size-1);
+    if ((lin_pow2-lin_size)+tot_size>pow2){
+        __atomic_fetch_add (&counters[pow2+(lin_size-lin_pow2)-1], 1, __ATOMIC_RELAXED);
+    } else {
+        __atomic_fetch_add (&counters[tot_size-1], 1, __ATOMIC_RELAXED);
+    }
   }
 }
+
+
+
+
+// /* For convenience, define 0 -> word_size.  */
+// static inline int
+// clz_hwi2 (gcov_type x)
+// {
+//   if (x == 0)
+//     return 64;
+// # if HOST_BITS_PER_WIDE_INT == HOST_BITS_PER_LONG
+//   return __builtin_clzl (x);
+// # elif HOST_BITS_PER_WIDE_INT == HOST_BITS_PER_LONGLONG
+//   return __builtin_clzll (x);
+// # else
+//   return __builtin_clz (x);
+// # endif
+// }
+// 
+// static inline int
+// floor_log2_2 (gcov_type x)
+// {
+//   return 63 - clz_hwi2 (x);
+// }
+// 
+// 
+// void
+// __gcov_histogram_profiler_atomic (gcov_type *counters, gcov_type value, gcov_type hist_sizes)
+// {
+//   if (value>=0 && value<8){
+//     __atomic_fetch_add (&counters[value], 1, __ATOMIC_RELAXED);
+//   }else{
+//     gcc_assert(value>0);
+//     int pow2=floor_log2_2(value);
+//     __atomic_fetch_add (&counters[pow2+5], 1, __ATOMIC_RELAXED);
+//   }
+// }
 
 #endif
 
