@@ -36,6 +36,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-fold.h"
 #include "gimplify.h"
 #include "tree-cfg.h"
+#include "tree-ssa-propagate.h"
 
 // DEBUG
 #include <iostream>
@@ -445,7 +446,8 @@ tarjan_compute_sccs (auto_vec<gimple *> &copy_stmts)
 }
 
 static void
-replace_use_by (tree get_replaced, tree replace_by)
+replace_use_by (tree get_replaced, tree replace_by, bitmap need_eh_cleanup,
+		bitmap need_ab_cleanup, vec<gimple *> stmts_to_fixup)
 {
   /* Replace each occurence of 'get_replaced' by 'replace_by'.  */
   use_operand_p use_p;
@@ -467,7 +469,10 @@ replace_use_by (tree get_replaced, tree replace_by)
 
       /* Cleanup.  */
       gimple_stmt_iterator gsi = gsi_for_stmt (use_stmt);
-      fold_stmt_inplace (&gsi);
+      fold_stmt (&gsi);
+      cleanup_after_replace (use_stmt, gsi_stmt (gsi), need_eh_cleanup,
+			     need_ab_cleanup, stmts_to_fixup,
+			     false, false);
       update_stmt (use_stmt);
     }
 }
@@ -476,7 +481,9 @@ replace_use_by (tree get_replaced, tree replace_by)
    variable.  */
 
 static void
-replace_scc_by_value (vec<gimple *> scc, tree replace_by)
+replace_scc_by_value (vec<gimple *> scc, tree replace_by, bitmap
+		      need_eh_cleanup, bitmap need_ab_cleanup, vec<gimple *>
+		      stmts_to_fixup)
 {
   // DEBUG
   /*
@@ -489,7 +496,8 @@ replace_scc_by_value (vec<gimple *> scc, tree replace_by)
   for (gimple *stmt : scc)
     {
       tree get_replaced = gimple_get_lhs (stmt);
-      replace_use_by (get_replaced, replace_by);
+      replace_use_by (get_replaced, replace_by, need_eh_cleanup,
+		      need_ab_cleanup, stmts_to_fixup);
     }
 }
 
@@ -548,6 +556,11 @@ sccp_propagate (auto_vec<gimple *> &copy_stmts)
   auto_vec<vec<gimple *>> worklist;
   worklist = tarjan_compute_sccs (copy_stmts);
 
+  /* Prepare data structs for cleanup after stmt modification.  */
+  bitmap need_eh_cleanup = BITMAP_ALLOC (NULL);
+  bitmap need_ab_cleanup = BITMAP_ALLOC (NULL);
+  vec<gimple *> stmts_to_fixup = vNULL;
+
   while (!worklist.is_empty ())
     {
       vec<gimple *> scc = worklist.pop ();
@@ -601,7 +614,8 @@ sccp_propagate (auto_vec<gimple *> &copy_stmts)
 	  /* The only operand in outer_ops.  */
 	  tree outer_op = last_outer_op;
 
-	  replace_scc_by_value (scc, outer_op);
+	  replace_scc_by_value (scc, outer_op, need_eh_cleanup,
+				need_ab_cleanup, stmts_to_fixup);
 	}
       else if (outer_ops.elements () > 1)
 	{
@@ -619,6 +633,14 @@ sccp_propagate (auto_vec<gimple *> &copy_stmts)
 
       scc.release ();
     }
+
+  cleanup_after_all_replaces_done (need_eh_cleanup, need_ab_cleanup,
+				   stmts_to_fixup);
+
+  /* Remove data structs for cleanup after stmt modification.  */
+  BITMAP_FREE (need_eh_cleanup);
+  BITMAP_FREE (need_ab_cleanup);
+  // TODO Should I free the vec? Or is it freed automatically?
 
   /* We want to remove dead MEM PHIs because memory is in FUD SSA and the dead
      PHIs would break the FUD property.  */

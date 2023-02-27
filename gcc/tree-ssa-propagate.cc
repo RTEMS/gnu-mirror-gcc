@@ -129,7 +129,6 @@ static vec<gimple *> uid_to_stmt;
 /* Current RPO index in the iteration.  */
 static int curr_order;
 
-
 /* We have just defined a new value for VAR.  If IS_VARYING is true,
    add all immediate uses of VAR to VARYING_SSA_EDGES, otherwise add
    them to INTERESTING_SSA_EDGES.  */
@@ -905,31 +904,9 @@ substitute_and_fold_dom_walker::before_dom_children (basic_block bb)
 	{
 	  foreach_new_stmt_in_bb (prev_gsi, i);
 
-	  /* If we cleaned up EH information from the statement,
-	     remove EH edges.  */
-	  if (maybe_clean_or_replace_eh_stmt (old_stmt, stmt))
-	    bitmap_set_bit (need_eh_cleanup, bb->index);
-
-	  /* If we turned a call with possible abnormal control transfer
-	     into one that doesn't, remove abnormal edges.  */
-	  if (can_make_abnormal_goto
-	      && !stmt_can_make_abnormal_goto (stmt))
-	    bitmap_set_bit (need_ab_cleanup, bb->index);
-
-	  /* If we turned a not noreturn call into a noreturn one
-	     schedule it for fixup.  */
-	  if (!was_noreturn
-	      && is_gimple_call (stmt)
-	      && gimple_call_noreturn_p (stmt))
-	    stmts_to_fixup.safe_push (stmt);
-
-	  if (gimple_assign_single_p (stmt))
-	    {
-	      tree rhs = gimple_assign_rhs1 (stmt);
-
-	      if (TREE_CODE (rhs) == ADDR_EXPR)
-		recompute_tree_invariant_for_addr_expr (rhs);
-	    }
+	  cleanup_after_replace (old_stmt, stmt, need_eh_cleanup,
+				 need_ab_cleanup, stmts_to_fixup,
+				 can_make_abnormal_goto, was_noreturn);
 
 	  /* Determine what needs to be done to update the SSA form.  */
 	  update_stmt_if_modified (stmt);
@@ -1021,26 +998,9 @@ substitute_and_fold_engine::substitute_and_fold (basic_block block)
 	}
     }
 
-  if (!bitmap_empty_p (walker.need_eh_cleanup))
-    gimple_purge_all_dead_eh_edges (walker.need_eh_cleanup);
-  if (!bitmap_empty_p (walker.need_ab_cleanup))
-    gimple_purge_all_dead_abnormal_call_edges (walker.need_ab_cleanup);
-
-  /* Fixup stmts that became noreturn calls.  This may require splitting
-     blocks and thus isn't possible during the dominator walk.  Do this
-     in reverse order so we don't inadvertedly remove a stmt we want to
-     fixup by visiting a dominating now noreturn call first.  */
-  while (!walker.stmts_to_fixup.is_empty ())
-    {
-      gimple *stmt = walker.stmts_to_fixup.pop ();
-      if (dump_file && dump_flags & TDF_DETAILS)
-	{
-	  fprintf (dump_file, "Fixing up noreturn call ");
-	  print_gimple_stmt (dump_file, stmt, 0);
-	  fprintf (dump_file, "\n");
-	}
-      fixup_noreturn_call (stmt);
-    }
+  cleanup_after_all_replaces_done (walker.need_eh_cleanup,
+				   walker.need_ab_cleanup,
+				   walker.stmts_to_fixup);
 
   statistics_counter_event (cfun, "Constants propagated",
 			    prop_stats.num_const_prop);
@@ -1320,4 +1280,68 @@ clean_up_loop_closed_phi (function *fun)
     }
 
   return 0;
+}
+
+/* TODO Comment.  */
+
+void
+cleanup_after_replace (gimple *old_stmt, gimple *stmt, bitmap need_eh_cleanup,
+		       bitmap need_ab_cleanup, vec<gimple *> stmts_to_fixup,
+		       bool can_make_abnormal_goto, bool was_noreturn)
+{
+  basic_block bb = old_stmt->bb;
+
+  /* If we cleaned up EH information from the statement,
+     remove EH edges.  */
+  if (maybe_clean_or_replace_eh_stmt (old_stmt, stmt))
+    bitmap_set_bit (need_eh_cleanup, bb->index);
+
+  /* If we turned a call with possible abnormal control transfer
+     into one that doesn't, remove abnormal edges.  */
+  if (can_make_abnormal_goto
+      && !stmt_can_make_abnormal_goto (stmt))
+    bitmap_set_bit (need_ab_cleanup, bb->index);
+
+  /* If we turned a not noreturn call into a noreturn one
+     schedule it for fixup.  */
+  if (!was_noreturn
+      && is_gimple_call (stmt)
+      && gimple_call_noreturn_p (stmt))
+    stmts_to_fixup.safe_push (stmt);
+
+  if (gimple_assign_single_p (stmt))
+    {
+      tree rhs = gimple_assign_rhs1 (stmt);
+
+      if (TREE_CODE (rhs) == ADDR_EXPR)
+	recompute_tree_invariant_for_addr_expr (rhs);
+    }
+}
+
+/* TODO Comment.  */
+
+void
+cleanup_after_all_replaces_done (bitmap need_eh_cleanup, bitmap
+				 need_ab_cleanup, vec<gimple *> stmts_to_fixup)
+{
+  if (!bitmap_empty_p (need_eh_cleanup))
+    gimple_purge_all_dead_eh_edges (need_eh_cleanup);
+  if (!bitmap_empty_p (need_ab_cleanup))
+    gimple_purge_all_dead_abnormal_call_edges (need_ab_cleanup);
+
+  /* Fixup stmts that became noreturn calls.  This may require splitting
+     blocks and thus isn't possible during the dominator walk.  Do this
+     in reverse order so we don't inadvertedly remove a stmt we want to
+     fixup by visiting a dominating now noreturn call first.  */
+  while (!stmts_to_fixup.is_empty ())
+    {
+      gimple *stmt = stmts_to_fixup.pop ();
+      if (dump_file && dump_flags & TDF_DETAILS)
+	{
+	  fprintf (dump_file, "Fixing up noreturn call ");
+	  print_gimple_stmt (dump_file, stmt, 0);
+	  fprintf (dump_file, "\n");
+	}
+      fixup_noreturn_call (stmt);
+    }
 }

@@ -72,6 +72,13 @@ extern void propagate_value (use_operand_p, tree);
 extern void replace_exp (use_operand_p, tree);
 extern void propagate_tree_value (tree *, tree);
 extern void propagate_tree_value_into_stmt (gimple_stmt_iterator *, tree);
+extern void cleanup_after_replace (gimple *old_stmt, gimple *stmt, bitmap
+				   need_eh_cleanup, bitmap need_ab_cleanup,
+				   vec<gimple *> stmts_to_fixup, bool
+				   can_make_abnormal_goto, bool was_noreturn);
+extern void cleanup_after_all_replaces_done (bitmap need_eh_cleanup, bitmap
+					     need_ab_cleanup, vec<gimple *>
+					     stms_to_fixup);
 
 /* Public interface into the SSA propagation engine.  Clients should inherit
    from this class and provide their own visitors.  */
