@@ -1,3 +1,14 @@
+==================== dmf009 branch, patch #20 ====================
+
+Improve 64->128 bit zero extension on PowerPC
+
+2023-02-17   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/108958
+	* gcc/config/rs6000.md (zero_extendditi2): New insn.
+
 ==================== work109 branch, patch #17 ====================
 
 Add saturating subtract built-ins.
