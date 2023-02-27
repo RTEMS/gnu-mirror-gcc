@@ -64,8 +64,7 @@ floor_log2 (gcov_type_unsigned x)
 void
 __gcov_histogram_profiler (gcov_type *counters, gcov_type value, gcov_type hist_sizes)
 {
-  fprintf (stderr, "profiling:Skip\n");
-  assert(hist_sizes>=0 && value>=0);
+  gcc_assert(hist_sizes>=0 && value>=0);
   gcov_type_unsigned hist_size=hist_sizes;
   gcov_type_unsigned u_value=value;
   gcov_type_unsigned tot_size=hist_size>>32;
@@ -93,8 +92,7 @@ __gcov_histogram_profiler (gcov_type *counters, gcov_type value, gcov_type hist_
 void
 __gcov_histogram_profiler_atomic (gcov_type *counters, gcov_type value, gcov_type hist_sizes)
 {
-  fprintf (stderr, "profiling:Skip\n");
-  assert(hist_sizes>=0 && value>=0);
+  gcc_assert(hist_sizes>=0 && value>=0);
   gcov_type_unsigned hist_size=hist_sizes;
   gcov_type_unsigned u_value=value;
   gcov_type_unsigned tot_size=hist_size>>32;
