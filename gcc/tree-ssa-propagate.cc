@@ -1288,7 +1288,7 @@ cleanup_after_replace (gimple *old_stmt, gimple *stmt, bitmap need_eh_cleanup,
 		       bitmap need_ab_cleanup, vec<gimple *> stmts_to_fixup,
 		       bool can_make_abnormal_goto, bool was_noreturn)
 {
-  basic_block bb = old_stmt->bb;
+  basic_block bb = stmt->bb;
 
   /* If we cleaned up EH information from the statement,
      remove EH edges.  */
