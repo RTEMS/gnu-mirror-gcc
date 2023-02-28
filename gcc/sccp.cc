@@ -473,7 +473,7 @@ replace_use_by (tree get_replaced, tree replace_by, bitmap need_eh_cleanup,
       cleanup_after_replace (use_stmt, gsi_stmt (gsi), need_eh_cleanup,
 			     need_ab_cleanup, stmts_to_fixup,
 			     false, false);
-      update_stmt (use_stmt);
+      update_stmt (gsi_stmt (gsi));
     }
 }
 
@@ -640,6 +640,8 @@ sccp_propagate (auto_vec<gimple *> &copy_stmts)
   /* Remove data structs for cleanup after stmt modification.  */
   BITMAP_FREE (need_eh_cleanup);
   BITMAP_FREE (need_ab_cleanup);
+  vec_free (stmts_to_fixup);
+  
   // TODO Should I free the vec? Or is it freed automatically?
 
   /* We want to remove dead MEM PHIs because memory is in FUD SSA and the dead
