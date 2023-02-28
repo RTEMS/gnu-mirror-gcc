@@ -455,6 +455,14 @@ replace_use_by (tree get_replaced, tree replace_by, bitmap need_eh_cleanup,
   gimple *use_stmt;
   FOR_EACH_IMM_USE_STMT (use_stmt, iter, get_replaced)
     {
+      bool was_noreturn = false;
+      bool can_make_abnormal_goto = false;
+      if (is_gimple_call (use_stmt))
+	{
+	  was_noreturn = gimple_call_noreturn_p (use_stmt);
+	  can_make_abnormal_goto = stmt_can_make_abnormal_goto (use_stmt);
+	}
+
       FOR_EACH_IMM_USE_ON_STMT (use_p, iter)
 	SET_USE (use_p, unshare_expr (replace_by));
 
@@ -472,8 +480,7 @@ replace_use_by (tree get_replaced, tree replace_by, bitmap need_eh_cleanup,
       fold_stmt (&gsi);
       cleanup_after_replace (use_stmt, gsi_stmt (gsi), need_eh_cleanup,
 			     need_ab_cleanup, stmts_to_fixup,
-			     false, false);
-      update_stmt (gsi_stmt (gsi));
+			     can_make_abnormal_goto, was_noreturn);
     }
 }
 

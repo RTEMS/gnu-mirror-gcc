@@ -909,7 +909,6 @@ substitute_and_fold_dom_walker::before_dom_children (basic_block bb)
 				 can_make_abnormal_goto, was_noreturn);
 
 	  /* Determine what needs to be done to update the SSA form.  */
-	  update_stmt_if_modified (stmt);
 	  if (!is_gimple_debug (stmt))
 	    something_changed = true;
 	}
@@ -1316,6 +1315,8 @@ cleanup_after_replace (gimple *old_stmt, gimple *stmt, bitmap need_eh_cleanup,
       if (TREE_CODE (rhs) == ADDR_EXPR)
 	recompute_tree_invariant_for_addr_expr (rhs);
     }
+
+  update_stmt_if_modified (stmt);
 }
 
 /* TODO Comment.  */
