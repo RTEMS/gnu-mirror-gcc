@@ -882,6 +882,10 @@ Total size of the histogram counter for profile feedback.
 Common Joined UInteger Var(param_profile_histogram_size_lin) Init(8) Param Optimization
 Size of the linear portion of the histogram counter for profile feedback.
 
+-param=profile-histogram-peel-prcnt=
+Common Joined UInteger Var(param_profile_histogram_peel_prcnt) Init(90) Param Optimization
+Peeles if can eliminate at least this percentage of iterations.
+
 -param=profile-func-internal-id=
 Common Joined UInteger Var(param_profile_func_internal_id) IntegerRange(0, 1) Param
 Use internal function id in profile lookup.

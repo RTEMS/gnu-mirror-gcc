@@ -1045,10 +1045,15 @@ try_peel_loop (class loop *loop,
     if (sum!=0){
     for (int i=0;i<param_profile_histogram_size_lin; i++){
         psum+=(*(loop->counters->hist))[i];
-        if ((100*psum)/sum>=90)
+        if ((100*psum)/sum>=param_profile_histogram_peel_prcnt)
         {
-            npeel=i;
-            continue;
+            if (i==param_profile_histogram_size_lin-1 && i!=0){
+                // Last linear counter absorbs iterations smaller then next power of 2
+                npeel=(1<<floor_log2(param_profile_histogram_size_lin-1))-1;
+            } else {
+                npeel=i;
+            }
+            break;
         }
     }
     }
