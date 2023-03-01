@@ -647,7 +647,7 @@ sccp_propagate (auto_vec<gimple *> &copy_stmts)
   /* Remove data structs for cleanup after stmt modification.  */
   BITMAP_FREE (need_eh_cleanup);
   BITMAP_FREE (need_ab_cleanup);
-  vec_free (stmts_to_fixup);
+  stmts_to_fixup.release ();
   
   // TODO Should I free the vec? Or is it freed automatically?
 
