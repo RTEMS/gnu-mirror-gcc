@@ -1316,8 +1316,7 @@ cleanup_after_replace (gimple *old_stmt, gimple *stmt, bitmap need_eh_cleanup,
 	recompute_tree_invariant_for_addr_expr (rhs);
     }
 
-  //update_stmt_if_modified (stmt); TODO
-  update_stmt (stmt);
+  update_stmt_if_modified (stmt);
 }
 
 /* TODO Comment.  */

@@ -478,6 +478,7 @@ replace_use_by (tree get_replaced, tree replace_by, bitmap need_eh_cleanup,
       /* Cleanup.  */
       gimple_stmt_iterator gsi = gsi_for_stmt (use_stmt);
       fold_stmt (&gsi);
+      gimple_set_modified (gsi_stmt (gsi), true);
       cleanup_after_replace (use_stmt, gsi_stmt (gsi), need_eh_cleanup,
 			     need_ab_cleanup, stmts_to_fixup,
 			     can_make_abnormal_goto, was_noreturn);
