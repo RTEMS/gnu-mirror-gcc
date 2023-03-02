@@ -648,8 +648,6 @@ sccp_propagate (auto_vec<gimple *> &copy_stmts)
   BITMAP_FREE (need_eh_cleanup);
   BITMAP_FREE (need_ab_cleanup);
   stmts_to_fixup.release ();
-  
-  // TODO Should I free the vec? Or is it freed automatically?
 
   /* We want to remove dead MEM PHIs because memory is in FUD SSA and the dead
      PHIs would break the FUD property.  */
