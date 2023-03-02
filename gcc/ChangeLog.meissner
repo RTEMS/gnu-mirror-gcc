@@ -2,12 +2,17 @@
 
 Improve 64->128 bit zero extension on PowerPC
 
-2023-02-17   Michael Meissner  <meissner@linux.ibm.com>
+2023-03-02   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
 	PR target/108958
 	* gcc/config/rs6000.md (zero_extendditi2): New insn.
+
+gcc/testsuite/
+
+	PR target/108958
+	* gcc.target/powerpc/zero-extend-di-ti.c: New test.
 
 ==================== work109 branch, patch #2 ====================
 
