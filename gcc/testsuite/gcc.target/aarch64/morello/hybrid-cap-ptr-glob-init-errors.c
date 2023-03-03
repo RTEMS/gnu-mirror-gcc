@@ -9,7 +9,6 @@ __intcap_t intcapvar;
 __uintcap_t uintcapvar;
 
 /* First test a number of simple assignments from something to a capability pointer.  */
-int * __capability a2 = (int *) 0; /* { dg-error "initializer element is not valid for capability type" } */
 int * __capability b2 = (int *) 1; /* { dg-error "initializer element is not valid for capability type" } */
 /* { dg-warning "converting non-capability pointer to capability pointer without an explicit cast" "" { target *-*-* } .-1 } */
 int * __capability c2 = (int *) x; /* { dg-warning "cast to pointer from integer of different size" } */

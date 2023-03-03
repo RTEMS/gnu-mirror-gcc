@@ -5510,11 +5510,18 @@ build_conditional_expr (location_t colon_loc, tree ifexp, bool ifexp_bcp,
       if (capability_type_p (type1) != capability_type_p (type2))
 	{
 	  gcc_assert (capability_type_p (result_type));
-	  tree noncap_type = capability_type_p (type1) ? type2 : type1;
-	  location_t noncap_loc = (noncap_type == type2) ? op2_loc : op1_loc;
-	  warning_at (noncap_loc, OPT_Wcheri_implicit_pointer_conversion_to_cap,
-		      "converting non-capability type %qT to capability type "
-		      "%qT without an explicit cast", noncap_type, result_type);
+	  const bool cap1 = capability_type_p (type1);
+	  tree noncap_op = cap1 ? op2 : op1;
+	  if (!integer_zerop (noncap_op))
+	    {
+	      tree noncap_type = cap1 ? type2 : type1;
+	      location_t noncap_loc = cap1 ? op2_loc : op1_loc;
+	      warning_at (noncap_loc,
+			  OPT_Wcheri_implicit_pointer_conversion_to_cap,
+			  "converting non-capability type %qT to capability "
+			  "type %qT without an explicit cast",
+			   noncap_type, result_type);
+	    }
 	}
     }
   else if (code1 == POINTER_TYPE

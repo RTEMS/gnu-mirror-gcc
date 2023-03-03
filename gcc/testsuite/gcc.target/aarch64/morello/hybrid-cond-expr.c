@@ -126,3 +126,15 @@ void * __capability void7 (int x19, void * __capability p19, struct S2 * __capab
   return x19 ? p19 : &q19->a;
 }
 /* { dg-final { scan-tree-dump-times {return x19 == 0 \? \(void \* __capability\) &q19->a : p19;} 1 "original" } } */
+
+char * __capability null1 (int x20, char * __capability p20)
+{
+  return x20 ? p20 : (void *)0;
+}
+/* { dg-final { scan-tree-dump-times {return x20 != 0 \? p20 : 0B;} 1 "original" } } */
+
+char * __capability null2 (int x21, char * __capability p21)
+{
+  return x21 ? (void *)0 : p21;
+}
+/* { dg-final { scan-tree-dump-times {return x21 == 0 \? p21 : 0B;} 1 "original" } } */

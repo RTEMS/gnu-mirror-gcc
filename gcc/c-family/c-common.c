@@ -2689,8 +2689,16 @@ c_common_cap_from_ptr (tree type, tree ptr_expr)
     int_expr = c_fully_fold (int_expr, false, NULL);
 
   location_t loc = EXPR_LOCATION (int_expr);
-  tree ret = fold_build_replace_address_value_loc
-	       (loc, build_cap_global_data_get_loc (loc, type), int_expr);
+
+  tree ret;
+  if (integer_zerop (int_expr))
+    /* Converting from null pointer should give null capability.  */
+    ret = build_zero_cst (type);
+  else
+    {
+      ret = build_cap_global_data_get_loc (loc, type);
+      ret = fold_build_replace_address_value_loc (loc, ret, int_expr);
+    }
 
   return ret;
 }
