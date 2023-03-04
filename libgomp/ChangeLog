@@ -1,3 +1,37 @@
+2023-03-02  Kwok Cheung Yeung  <kcy@codesourcery.com>
+	    Paul-Antoine Arras  <pa@codesourcery.com>
+
+	* testsuite/libgomp.c/simd-math-1.c: New testcase.
+
+2023-03-01  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR middle-end/108546
+	* testsuite/libgomp.fortran/is_device_ptr-3.f90: New test.
+	* testsuite/libgomp.fortran/use_device_ptr-optional-4.f90: New test.
+
+2023-02-22  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* testsuite/libgomp.fortran/alloc-10.f90: Use
+	'-Wno-complain-wrong-lang'.
+	* testsuite/libgomp.fortran/alloc-11.f90: Likewise.
+	* testsuite/libgomp.fortran/alloc-7.f90: Likewise.
+	* testsuite/libgomp.fortran/alloc-9.f90: Likewise.
+	* testsuite/libgomp.fortran/allocate-1.f90: Likewise.
+	* testsuite/libgomp.fortran/depend-4.f90: Likewise.
+	* testsuite/libgomp.fortran/depend-5.f90: Likewise.
+	* testsuite/libgomp.fortran/depend-6.f90: Likewise.
+	* testsuite/libgomp.fortran/depend-7.f90: Likewise.
+	* testsuite/libgomp.fortran/depend-inoutset-1.f90: Likewise.
+	* testsuite/libgomp.fortran/examples-4/declare_target-1.f90:
+	Likewise.
+	* testsuite/libgomp.fortran/examples-4/declare_target-2.f90:
+	Likewise.
+	* testsuite/libgomp.fortran/order-reproducible-1.f90: Likewise.
+	* testsuite/libgomp.fortran/order-reproducible-2.f90: Likewise.
+	* testsuite/libgomp.oacc-fortran/parallel-dims.f90: Likewise.
+	* testsuite/libgomp.fortran/task-detach-6.f90: Remove left-over
+	'dg-prune-output'.
+
 2023-02-16  Jakub Jelinek  <jakub@redhat.com>
 
 	* libgomp.texi: Fix typos - theads -> threads.

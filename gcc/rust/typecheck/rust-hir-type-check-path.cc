@@ -337,7 +337,7 @@ TypeCheckExpr::resolve_segments (NodeId root_resolved_node_id,
 	  return;
 	}
 
-      auto &candidate = candidates.at (0);
+      auto &candidate = *candidates.begin ();
       prev_segment = tyseg;
       tyseg = candidate.ty;
 
@@ -460,6 +460,11 @@ TypeCheckExpr::resolve_segments (NodeId root_resolved_node_id,
 	     resolved_node_id))
     {
       resolver->insert_resolved_type (expr_mappings.get_nodeid (),
+				      resolved_node_id);
+    }
+  else
+    {
+      resolver->insert_resolved_misc (expr_mappings.get_nodeid (),
 				      resolved_node_id);
     }
 

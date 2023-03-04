@@ -34473,14 +34473,32 @@ class_decl_loc_t::diag_mismatched_tags (tree type_decl)
 	 be (and inevitably is) at index zero.  */
       tree spec = specialization_of (type);
       cdlguide = class2loc.get (spec);
+      /* It's possible that we didn't find SPEC.  Consider:
+
+	   template<typename T> struct A {
+	     template<typename U> struct W { };
+	   };
+	   struct A<int>::W<int> w; // #1
+
+	 where while parsing A and #1 we've stashed
+	   A<T>
+	   A<T>::W<U>
+	   A<int>::W<int>
+	 into CLASS2LOC.  If TYPE is A<int>::W<int>, specialization_of
+	 will yield A<int>::W<U> which may be in CLASS2LOC if we had
+	 an A<int> class specialization, but otherwise won't be in it.
+	 So try to look up A<T>::W<U>.  */
+      if (!cdlguide)
+	{
+	  spec = DECL_TEMPLATE_RESULT (most_general_template (spec));
+	  cdlguide = class2loc.get (spec);
+	}
+      /* Now we really should have found something.  */
       gcc_assert (cdlguide != NULL);
     }
-  else
-    {
-      /* Skip declarations that consistently use the same class-key.  */
-      if (def_class_key != none_type)
-	return;
-    }
+  /* Skip declarations that consistently use the same class-key.  */
+  else if (def_class_key != none_type)
+    return;
 
   /* Set if a definition for the class has been seen.  */
   const bool def_p = cdlguide->def_p ();
@@ -43312,7 +43330,9 @@ cp_convert_omp_range_for (tree &this_pre_body, vec<tree, va_gc> *for_block,
 	     name but the DECL_VALUE_EXPR will be dependent.  Hide those
 	     from folding of other loop initializers e.g. for warning
 	     purposes until cp_finish_omp_range_for.  */
-	  gcc_checking_assert (DECL_HAS_VALUE_EXPR_P (decomp_first_name));
+	  gcc_checking_assert (DECL_HAS_VALUE_EXPR_P (decomp_first_name)
+			       || (TREE_TYPE (decomp_first_name)
+				   == error_mark_node));
 	  DECL_HAS_VALUE_EXPR_P (decomp_first_name) = 0;
 	}
       TREE_VEC_ELT (v, i + 3) = decomp_first_name;
@@ -43345,7 +43365,8 @@ cp_finish_omp_range_for (tree orig, tree begin)
 	  tree d = decomp_first_name;
 	  for (unsigned i = 0; i < decomp_cnt; i++)
 	    {
-	      DECL_HAS_VALUE_EXPR_P (d) = 1;
+	      if (TREE_TYPE (d) != error_mark_node)
+		DECL_HAS_VALUE_EXPR_P (d) = 1;
 	      d = DECL_CHAIN (d);
 	    }
 	}

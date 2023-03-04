@@ -2137,12 +2137,13 @@ Parser<ManagedTokenSource>::parse_visibility ()
       return AST::Visibility::create_private ();
     }
 
+  auto vis_loc = lexer.peek_token ()->get_locus ();
   lexer.skip_token ();
 
   // create simple pub visibility if no parentheses
   if (lexer.peek_token ()->get_id () != LEFT_PAREN)
     {
-      return AST::Visibility::create_public ();
+      return AST::Visibility::create_public (vis_loc);
       // or whatever
     }
 
@@ -2158,19 +2159,19 @@ Parser<ManagedTokenSource>::parse_visibility ()
 
       skip_token (RIGHT_PAREN);
 
-      return AST::Visibility::create_crate (path_loc);
+      return AST::Visibility::create_crate (path_loc, vis_loc);
     case SELF:
       lexer.skip_token ();
 
       skip_token (RIGHT_PAREN);
 
-      return AST::Visibility::create_self (path_loc);
+      return AST::Visibility::create_self (path_loc, vis_loc);
     case SUPER:
       lexer.skip_token ();
 
       skip_token (RIGHT_PAREN);
 
-      return AST::Visibility::create_super (path_loc);
+      return AST::Visibility::create_super (path_loc, vis_loc);
       case IN: {
 	lexer.skip_token ();
 
@@ -2188,7 +2189,7 @@ Parser<ManagedTokenSource>::parse_visibility ()
 
 	skip_token (RIGHT_PAREN);
 
-	return AST::Visibility::create_in_path (std::move (path));
+	return AST::Visibility::create_in_path (std::move (path), vis_loc);
       }
     default:
       add_error (Error (t->get_locus (), "unexpected token %qs in visibility",
@@ -11738,10 +11739,17 @@ Parser<ManagedTokenSource>::parse_stmt_or_expr_without_block ()
 	    // must be expression statement
 	    lexer.skip_token ();
 
-	    std::unique_ptr<AST::ExprStmtWithoutBlock> stmt (
-	      new AST::ExprStmtWithoutBlock (std::move (expr),
-					     t->get_locus ()));
-	    return ExprOrStmt (std::move (stmt));
+	    if (expr)
+	      {
+		std::unique_ptr<AST::ExprStmtWithoutBlock> stmt (
+		  new AST::ExprStmtWithoutBlock (std::move (expr),
+						 t->get_locus ()));
+		return ExprOrStmt (std::move (stmt));
+	      }
+	    else
+	      {
+		return ExprOrStmt::create_error ();
+	      }
 	  }
 
 	// return expression
@@ -14887,47 +14895,6 @@ Parser<ManagedTokenSource>::done_end ()
 {
   const_TokenPtr t = lexer.peek_token ();
   return (t->get_id () == RIGHT_CURLY || t->get_id () == END_OF_FILE);
-}
-
-// Dumps lexer output to stderr.
-template <typename ManagedTokenSource>
-void
-Parser<ManagedTokenSource>::debug_dump_lex_output (std::ostream &out)
-{
-  /* TODO: a better implementation of "lexer dump" (as in dump what was
-   * actually tokenised) would actually be to "write" a token to a file every
-   * time skip_token() here was called. This would reflect the parser
-   * modifications to the token stream, such as fixing the template angle
-   * brackets. */
-
-  const_TokenPtr tok = lexer.peek_token ();
-
-  while (true)
-    {
-      if (tok->get_id () == Rust::END_OF_FILE)
-	break;
-
-      bool has_text = tok->get_id () == Rust::IDENTIFIER
-		      || tok->get_id () == Rust::INT_LITERAL
-		      || tok->get_id () == Rust::FLOAT_LITERAL
-		      || tok->get_id () == Rust::STRING_LITERAL
-		      || tok->get_id () == Rust::CHAR_LITERAL
-		      || tok->get_id () == Rust::BYTE_STRING_LITERAL
-		      || tok->get_id () == Rust::BYTE_CHAR_LITERAL;
-
-      Location loc = tok->get_locus ();
-
-      out << "<id=";
-      out << tok->token_id_to_str ();
-      out << has_text ? (std::string (", text=") + tok->get_str ()
-			 + std::string (", typehint=")
-			 + std::string (tok->get_type_hint_str ()))
-		      : "";
-      out << lexer.get_line_map ()->to_string (loc);
-
-      lexer.skip_token ();
-      tok = lexer.peek_token ();
-    }
 }
 
 // Parses crate and dumps AST to stderr, recursively.

@@ -81,8 +81,6 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 bool
 potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 				 tsubst_flags_t flags);
-inline tree
-get_nth_callarg (tree t, int n);
 tree
 unshare_constructor (tree t MEM_STAT_DECL);
 void
@@ -3081,7 +3079,7 @@ rs_bind_parameters_in_call (const constexpr_ctx *ctx, tree t, tree fun,
       tree type = parms ? TREE_TYPE (parms) : void_type_node;
       if (parms && DECL_BY_REFERENCE (parms))
 	type = TREE_TYPE (type);
-      x = get_nth_callarg (t, i);
+      x = CALL_EXPR_ARG (t, i);
 
       if (TREE_ADDRESSABLE (type))
 	/* Undo convert_for_arg_passing work here.  */
@@ -3658,49 +3656,48 @@ eval_call_expression (const constexpr_ctx *ctx, tree t, bool lval,
    whose constructor we are processing.  Add the initializer to the vector
    and return true to indicate success.  */
 
-static bool
-build_anon_member_initialization (tree member, tree init,
-				  vec<constructor_elt, va_gc> **vec_outer)
-{
-  /* MEMBER presents the relevant fields from the inside out, but we need
-     to build up the initializer from the outside in so that we can reuse
-     previously built CONSTRUCTORs if this is, say, the second field in an
-     anonymous struct.  So we use a vec as a stack.  */
-  auto_vec<tree, 2> fields;
-  do
-    {
-      fields.safe_push (TREE_OPERAND (member, 1));
-      member = TREE_OPERAND (member, 0);
-    }
-  while (ANON_AGGR_TYPE_P (TREE_TYPE (member))
-	 && TREE_CODE (member) == COMPONENT_REF);
-
-  /* VEC has the constructor elements vector for the context of FIELD.
-     If FIELD is an anonymous aggregate, we will push inside it.  */
-  vec<constructor_elt, va_gc> **vec = vec_outer;
-  tree field;
-  while (field = fields.pop (), ANON_AGGR_TYPE_P (TREE_TYPE (field)))
-    {
-      tree ctor;
-      /* If there is already an outer constructor entry for the anonymous
-	 aggregate FIELD, use it; otherwise, insert one.  */
-      if (vec_safe_is_empty (*vec) || (*vec)->last ().index != field)
-	{
-	  ctor = build_constructor (TREE_TYPE (field), NULL);
-	  CONSTRUCTOR_APPEND_ELT (*vec, field, ctor);
-	}
-      else
-	ctor = (*vec)->last ().value;
-      vec = &CONSTRUCTOR_ELTS (ctor);
-    }
-
-  /* Now we're at the innermost field, the one that isn't an anonymous
-     aggregate.  Add its initializer to the CONSTRUCTOR and we're done.  */
-  gcc_assert (fields.is_empty ());
-  CONSTRUCTOR_APPEND_ELT (*vec, field, init);
-
-  return true;
-}
+// static bool
+// build_anon_member_initialization (tree member, tree init,
+// 				  vec<constructor_elt, va_gc> **vec_outer)
+// {
+//   /* MEMBER presents the relevant fields from the inside out, but we need
+//      to build up the initializer from the outside in so that we can reuse
+//      previously built CONSTRUCTORs if this is, say, the second field in an
+//      anonymous struct.  So we use a vec as a stack.  */
+//   auto_vec<tree, 2> fields;
+//   do
+//     {
+//       fields.safe_push (TREE_OPERAND (member, 1));
+//       member = TREE_OPERAND (member, 0);
+//   } while (ANON_AGGR_TYPE_P (TREE_TYPE (member))
+// 	   && TREE_CODE (member) == COMPONENT_REF);
+//
+//   /* VEC has the constructor elements vector for the context of FIELD.
+//      If FIELD is an anonymous aggregate, we will push inside it.  */
+//   vec<constructor_elt, va_gc> **vec = vec_outer;
+//   tree field;
+//   while (field = fields.pop (), ANON_AGGR_TYPE_P (TREE_TYPE (field)))
+//     {
+//       tree ctor;
+//       /* If there is already an outer constructor entry for the anonymous
+// 	 aggregate FIELD, use it; otherwise, insert one.  */
+//       if (vec_safe_is_empty (*vec) || (*vec)->last ().index != field)
+// 	{
+// 	  ctor = build_constructor (TREE_TYPE (field), NULL);
+// 	  CONSTRUCTOR_APPEND_ELT (*vec, field, ctor);
+// 	}
+//       else
+// 	ctor = (*vec)->last ().value;
+//       vec = &CONSTRUCTOR_ELTS (ctor);
+//     }
+//
+//   /* Now we're at the innermost field, the one that isn't an anonymous
+//      aggregate.  Add its initializer to the CONSTRUCTOR and we're done.  */
+//   gcc_assert (fields.is_empty ());
+//   CONSTRUCTOR_APPEND_ELT (*vec, field, init);
+//
+//   return true;
+// }
 
 ///* V is a vector of constructor elements built up for the base and member
 //   initializers of a constructor for TYPE.  They need to be in increasing
@@ -3750,7 +3747,7 @@ build_anon_member_initialization (tree member, tree init,
 static bool
 build_data_member_initialization (tree t, vec<constructor_elt, va_gc> **vec)
 {
-  tree member, init;
+  tree member;
   if (TREE_CODE (t) == CLEANUP_POINT_EXPR)
     t = TREE_OPERAND (t, 0);
   if (TREE_CODE (t) == EXPR_STMT)
@@ -3835,7 +3832,8 @@ build_data_member_initialization (tree t, vec<constructor_elt, va_gc> **vec)
 	member = TREE_OPERAND (member, 1);
       else if (ANON_AGGR_TYPE_P (TREE_TYPE (aggr)))
 	/* Initializing a member of an anonymous union.  */
-	return build_anon_member_initialization (member, init, vec);
+	rust_sorry_at (Location (), "cannot handle value initialization yet");
+      // return build_anon_member_initialization (member, init, vec);
       else
 	/* We're initializing a vtable pointer in a base.  Leave it as
 	   COMPONENT_REF so we remember the path to get to the vfield.  */
@@ -3845,9 +3843,11 @@ build_data_member_initialization (tree t, vec<constructor_elt, va_gc> **vec)
   /* Value-initialization can produce multiple initializers for the
      same field; use the last one.  */
   if (!vec_safe_is_empty (*vec) && (*vec)->last ().index == member)
-    (*vec)->last ().value = init;
+    rust_sorry_at (Location (), "cannot handle value initialization yet");
+  // (*vec)->last ().value = init;
   else
-    CONSTRUCTOR_APPEND_ELT (*vec, member, init);
+    rust_sorry_at (Location (), "cannot handle value initialization yet");
+  // CONSTRUCTOR_APPEND_ELT (*vec, member, init);
   return true;
 }
 
@@ -3994,8 +3994,7 @@ constexpr_fn_retval (const constexpr_ctx *ctx, tree body)
 // return an aggregate constant.  If UNSHARE_P, return an unshared
 // copy of the initializer.
 static tree
-constant_value_1 (tree decl, bool strict_p, bool return_aggregate_cst_ok_p,
-		  bool unshare_p)
+constant_value_1 (tree decl, bool, bool, bool unshare_p)
 {
   while (TREE_CODE (decl) == CONST_DECL)
     {
@@ -4077,17 +4076,6 @@ bool
 maybe_constexpr_fn (tree t)
 {
   return (DECL_DECLARED_CONSTEXPR_P (t));
-}
-
-// forked from gcc/cp/constexpr.cc get_nth_callarg
-
-/* We have an expression tree T that represents a call, either CALL_EXPR.
-  Return the Nth argument.  */
-
-inline tree
-get_nth_callarg (tree t, int n)
-{
-  return CALL_EXPR_ARG (t, n);
 }
 
 // forked from gcc/cp/constexpr.cc var_in_maybe_constexpr_fn
@@ -5807,7 +5795,7 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 		if (DECL_NONSTATIC_MEMBER_FUNCTION_P (fun)
 		    && !DECL_CONSTRUCTOR_P (fun))
 		  {
-		    tree x = get_nth_callarg (t, 0);
+		    tree x = CALL_EXPR_ARG (t, 0);
 
 		    /* Don't require an immediately constant value, as
 		       constexpr substitution might not use the value.  */
@@ -5836,7 +5824,7 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 	  }
 	for (; i < nargs; ++i)
 	  {
-	    tree x = get_nth_callarg (t, i);
+	    tree x = CALL_EXPR_ARG (t, i);
 	    /* In a template, reference arguments haven't been converted to
 	       REFERENCE_TYPE and we might not even know if the parameter
 	       is a reference, so accept lvalue constants too.  */
@@ -6476,8 +6464,7 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 /* Like maybe_constant_init but first fully instantiate the argument.  */
 
 tree
-fold_non_dependent_init (tree t,
-			 tsubst_flags_t complain /*=tf_warning_or_error*/,
+fold_non_dependent_init (tree t, tsubst_flags_t /*=tf_warning_or_error*/,
 			 bool manifestly_const_eval /*=false*/,
 			 tree object /* = NULL_TREE */)
 {

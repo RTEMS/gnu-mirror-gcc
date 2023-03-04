@@ -1,3 +1,917 @@
+2023-03-03  Alexandre Oliva  <oliva@adacore.com>
+
+	* gimple-ssa-warn-access.cc
+	(pass_waccess::check_dangling_stores): Skip non-stores.
+
+2023-03-03  Alexandre Oliva  <oliva@adacore.com>
+
+	* config/arm/vfp.md (*thumb2_movsi_vfp): Drop blank after tab
+	after vmsr and vmrs, and lower the case of P0.
+
+2023-03-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR middle-end/109006
+	* gdbhooks.py (VecPrinter): Handle vec<T> as well as vec<T>*.
+
+2023-03-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR middle-end/109006
+	* gdbhooks.py (VecPrinter): Adjust for new vec layout.
+
+2023-03-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/108986
+	* gimple-ssa-warn-access.cc (pass_waccess::maybe_check_access_sizes):
+	Return immediately if OPT_Wnonnull or OPT_Wstringop_overflow_ is
+	suppressed on stmt.  For [static %E] warning, print access_nelts
+	rather than access_size.  Fix up comment wording.
+
+2023-03-03  Robin Dapp  <rdapp@linux.ibm.com>
+
+	* config/s390/driver-native.cc (s390_host_detect_local_cpu): Use
+	arch14 instead of z16.
+
+2023-03-03  Anthony Green  <green@moxielogic.com>
+
+	* config/moxie/moxie.cc (TARGET_LRA_P): Remove.
+
+2023-03-03  Anthony Green  <green@moxielogic.com>
+
+	* config/moxie/constraints.md (A, B, W): Change
+	define_constraint to define_memory_constraint.
+
+2023-03-03  Xi Ruoyao  <xry111@xry111.site>
+
+	* toplev.cc (process_options): Fix the spelling of
+	"-fstack-clash-protection".
+
+2023-03-03  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109002
+	* tree-ssa-pre.cc (compute_partial_antic_aux): Properly
+	PHI-translate ANTIC_IN.
+
+2023-03-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/108988
+	* gimple-fold.cc (gimple_fold_builtin_fputs): Fold len to
+	size_type_node before passing it as argument to fwrite.  Formatting
+	fixes.
+
+2023-03-03  Richard Biener  <rguenther@suse.de>
+
+	PR target/108738
+	* config/i386/i386.opt (--param x86-stv-max-visits): New param.
+	* doc/invoke.texi (--param x86-stv-max-visits): Document it.
+	* config/i386/i386-features.h (scalar_chain::max_visits): New.
+	(scalar_chain::build): Add bitmap parameter, return boolean.
+	(scalar_chain::add_insn): Likewise.
+	(scalar_chain::analyze_register_chain): Likewise.
+	* config/i386/i386-features.cc (scalar_chain::scalar_chain):
+	Initialize max_visits.
+	(scalar_chain::analyze_register_chain): When we exhaust
+	max_visits, abort.  Also abort when running into any
+	disallowed insn.
+	(scalar_chain::add_insn): Propagate abort.
+	(scalar_chain::build): Likewise.  When aborting amend
+	the set of disallowed insn with the insns set.
+	(convert_scalars_to_vector): Adjust.  Do not convert aborted
+	chains.
+
+2023-03-03  Richard Biener  <rguenther@suse.de>
+
+	PR debug/108772
+	* dwarf2out.cc (dwarf2out_late_global_decl): Do not
+	generate a DIE for a function scope static.
+
+2023-03-03  Alexandre Oliva  <oliva@adacore.com>
+
+	* config/vx-common.h (WINT_TYPE): Alias to "wchar_t".
+
+2023-03-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/108883
+	* target.h (emit_support_tinfos_callback): New typedef.
+	* targhooks.h (default_emit_support_tinfos): Declare.
+	* targhooks.cc (default_emit_support_tinfos): New function.
+	* target.def (emit_support_tinfos): New target hook.
+	* doc/tm.texi.in (emit_support_tinfos): Document it.
+	* doc/tm.texi: Regenerated.
+	* config/i386/i386.cc (ix86_emit_support_tinfos): New function.
+	(TARGET_EMIT_SUPPORT_TINFOS): Redefine.
+
+2023-03-02  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	* ira-costs.cc: Include print-rtl.h.
+	(record_reg_classes, scan_one_insn): Add code to print debug info.
+	(record_operand_costs): Find and use smaller cost for hard reg
+	move.
+
+2023-03-02  Kwok Cheung Yeung  <kcy@codesourcery.com>
+	    Paul-Antoine Arras  <pa@codesourcery.com>
+
+	* builtins.cc (mathfn_built_in_explicit): New.
+	* config/gcn/gcn.cc: Include case-cfn-macros.h.
+	(mathfn_built_in_explicit): Add prototype.
+	(gcn_vectorize_builtin_vectorized_function): New.
+	(gcn_libc_has_function): New.
+	(TARGET_LIBC_HAS_FUNCTION): Define.
+	(TARGET_VECTORIZE_BUILTIN_VECTORIZED_FUNCTION): Define.
+
+2023-03-02  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/108979
+	* tree-vect-stmts.cc (vectorizable_operation): Don't mask
+	operations on invariants.
+
+2023-03-02  Robin Dapp  <rdapp@linux.ibm.com>
+
+	* config/s390/predicates.md (vll_bias_operand): Add -1 bias.
+	* config/s390/s390.cc (s390_option_override_internal): Make
+	partial vector usage the default from z13 on.
+	* config/s390/vector.md (len_load_v16qi): Add.
+	(len_store_v16qi): Add.
+
+2023-03-02  Andre Vieira  <andre.simoesdiasvieira@arm.com>
+
+	* simplify-rtx.cc (simplify_context::simplify_subreg): Use byte instead
+	of constant 0 offset.
+
+2023-03-02  Robert Suchanek  <robert.suchanek@imgtec.com>
+
+	* config/mips/mips.cc (mips_set_text_contents_type): Use HOST_WIDE_INT
+	instead of long.
+	* config/mips/mips-protos.h (mips_set_text_contents_type): Likewise.
+
+2023-03-02  Junxian Zhu  <zhujunxian@oss.cipunited.com>
+
+	* config.gcc: add -with-{no-}msa build option.
+	* config/mips/mips.h: Likewise.
+	* doc/install.texi: Likewise.
+
+2023-03-02  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/108603
+	* explow.cc (convert_memory_address_addr_space_1): Only wrap
+	the result of a recursive call in a CONST if no instructions
+	were emitted.
+
+2023-03-02  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/108430
+	* tree-vect-stmts.cc (vectorizable_condition): Fix handling
+	of inverted condition.
+
+2023-03-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/108934
+	* fold-const.cc (native_interpret_expr) <case REAL_CST>: Before memcmp
+	comparison copy the bytes from ptr to a temporary buffer and clearing
+	padding bits in there.
+
+2023-03-01  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR middle-end/108545
+	* gimplify.cc (struct tree_operand_hash_no_se): New.
+	(omp_index_mapping_groups_1, omp_index_mapping_groups,
+	omp_reindex_mapping_groups, omp_mapped_by_containing_struct,
+	omp_tsort_mapping_groups_1, omp_tsort_mapping_groups,
+	oacc_resolve_clause_dependencies, omp_build_struct_sibling_lists,
+	gimplify_scan_omp_clauses): Use tree_operand_hash_no_se instead
+	of tree_operand_hash.
+
+2023-03-01  LIU Hao  <lh_mouse@126.com>
+
+	PR pch/14940
+	* config/i386/host-mingw32.cc (mingw32_gt_pch_get_address):
+	Remove the size limit `pch_VA_max_size`
+
+2023-03-01  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR middle-end/108546
+	* omp-low.cc (lower_omp_target): Remove optional handling
+	on the receiver side, i.e. inside target (data), for
+	use_device_ptr.
+
+2023-03-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/108967
+	* cfgexpand.cc (expand_debug_expr): Handle WIDEN_{PLUS,MINUS}_EXPR
+	and VEC_WIDEN_{PLUS,MINUS}_{HI,LO}_EXPR.
+
+2023-03-01  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/108970
+	* tree-vect-loop-manip.cc (slpeel_can_duplicate_loop_p):
+	Check we can copy the BBs.
+	(slpeel_tree_duplicate_loop_to_edge_cfg): Avoid redundant
+	check.
+	(vect_do_peeling): Streamline error handling.
+
+2023-03-01  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/108950
+	* tree-vect-patterns.cc (vect_recog_widen_sum_pattern):
+	Check oprnd0 is defined in the loop.
+	* tree-vect-loop.cc (vectorizable_reduction): Record all
+	operands vector types, compute that of invariants and
+	properly update their SLP nodes.
+
+2023-03-01  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/108240
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Allow
+	implicit powerpc64 setting to be unset if 64 bit is enabled implicitly.
+
+2023-02-28  Qing Zhao  <qing.zhao@oracle.com>
+
+	PR middle-end/107411
+	PR middle-end/107411
+	* gimplify.cc (gimple_add_init_for_auto_var): Use sprintf to replace
+	xasprintf.
+	* tree-ssa-uninit.cc (warn_uninit): Handle the case when the
+	LHS varaible of a .DEFERRED_INIT call doesn't have a DECL_NAME.
+
+2023-02-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/108894
+	* ubsan.cc (ubsan_expand_bounds_ifn): Emit index >= bound
+	comparison rather than index > bound.
+	* gimple-fold.cc (gimple_fold_call): Use tree_int_cst_lt
+	rather than tree_int_cst_le for IFN_UBSAN_BOUND comparison.
+	* doc/invoke.texi (-fsanitize=bounds): Document that whether
+	flexible array member-like arrays are instrumented or not depends
+	on -fstrict-flex-arrays* options of strict_flex_array attributes.
+	(-fsanitize=bounds-strict): Document that flexible array members
+	are not instrumented.
+
+2023-02-27  Uroš Bizjak  <ubizjak@gmail.com>
+
+	PR target/108922
+	Revert:
+	* config/i386/i386.md (fmodxf3): Enable for flag_finite_math_only only.
+	(fmod<mode>3): Ditto.
+	(fpremxf4_i387): Ditto.
+	(reminderxf3): Ditto.
+	(reminder<mode>3): Ditto.
+	(fprem1xf4_i387): Ditto.
+
+2023-02-27  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* simplify-rtx.cc (simplify_unary_operation_1) <case FFS>: Avoid
+	generating FFS with mismatched operand and result modes, by using
+	an explicit SIGN_EXTEND/ZERO_EXTEND.
+	<case POPCOUNT>: Likewise, for POPCOUNT of ZERO_EXTEND.
+	<case PARITY>: Likewise, for PARITY of {ZERO,SIGN}_EXTEND.
+
+2023-02-27  Patrick Palka  <ppalka@redhat.com>
+
+	* hash-table.h (gt_pch_nx(hash_table<D>)): Remove static.
+	* lra-int.h (lra_change_class): Likewise.
+	* recog.h (which_op_alt): Likewise.
+	* sel-sched-ir.h (sel_bb_empty_or_nop_p): Declare inline
+	instead of static.
+
+2023-02-27  Takayuki 'January June' Suwa  <jjsuwa_sys3175@yahoo.co.jp>
+
+	* config/xtensa/xtensa-protos.h (xtensa_match_CLAMPS_imms_p):
+	New prototype.
+	* config/xtensa/xtensa.cc (xtensa_match_CLAMPS_imms_p):
+	New function.
+	* config/xtensa/xtensa.h (TARGET_CLAMPS): New macro definition.
+	* config/xtensa/xtensa.md (*xtensa_clamps): New insn pattern.
+
+2023-02-27  Max Filippov  <jcmvbkbc@gmail.com>
+
+	* config/xtensa/xtensa-dynconfig.cc (xtensa_get_config_v2)
+	(xtensa_get_config_v3): New functions.
+
+2023-02-27  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64-simd.md (aarch64_abs<mode>): Fix typo in comment.
+
+2023-02-27  Lulu Cheng  <chenglulu@loongson.cn>
+
+	* config/host-linux.cc (TRY_EMPTY_VM_SPACE): Modify the value of
+	the macro to 0x1000000000.
+
+2023-02-25  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/108261
+	* doc/gm2.texi (-fm2-pathname): New option documented.
+	(-fm2-pathnameI): New option documented.
+	(-fm2-prefix=): New option documented.
+	(-fruntime-modules=): Update default module list.
+
+2023-02-25  Max Filippov  <jcmvbkbc@gmail.com>
+
+	PR target/108919
+	* config/xtensa/xtensa-protos.h
+	(xtensa_prepare_expand_call): Rename to xtensa_expand_call.
+	* config/xtensa/xtensa.cc (xtensa_prepare_expand_call): Rename
+	to xtensa_expand_call.
+	(xtensa_expand_call): Emit the call and add a clobber expression
+	for the static chain to it in case of windowed ABI.
+	* config/xtensa/xtensa.md (call, call_value, sibcall)
+	(sibcall_value): Call xtensa_expand_call and complete expansion
+	right after that call.
+
+2023-02-24  Richard Biener  <rguenther@suse.de>
+
+	* vec.h (vec<T, A, vl_embed>::m_vecdata): Remove.
+	(vec<T, A, vl_embed>::m_vecpfx): Align as T to avoid
+	changing alignment of vec<T, A, vl_embed> and simplifying
+	address.
+	(vec<T, A, vl_embed>::address): Compute as this + 1.
+	(vec<T, A, vl_embed>::embedded_size): Use sizeof the
+	vector instead of the offset of the m_vecdata member.
+	(auto_vec<T, N>::m_data): Turn storage into
+	uninitialized unsigned char.
+	(auto_vec<T, N>::auto_vec): Allow allocation of one
+	stack member.  Initialize m_vec in a special way to
+	avoid later stringop overflow diagnostics.
+	* vec.cc (test_auto_alias): New.
+	(vec_cc_tests): Call it.
+
+2023-02-24  Richard Biener  <rguenther@suse.de>
+
+	* vec.h (vec<T, A, vl_embed>::lower_bound): Adjust to
+	take a const reference to the object, use address to
+	access data.
+	(vec<T, A, vl_embed>::contains): Use address to access data.
+	(vec<T, A, vl_embed>::operator[]): Use address instead of
+	m_vecdata to access data.
+	(vec<T, A, vl_embed>::iterate): Likewise.
+	(vec<T, A, vl_embed>::copy): Likewise.
+	(vec<T, A, vl_embed>::quick_push): Likewise.
+	(vec<T, A, vl_embed>::pop): Likewise.
+	(vec<T, A, vl_embed>::quick_insert): Likewise.
+	(vec<T, A, vl_embed>::ordered_remove): Likewise.
+	(vec<T, A, vl_embed>::unordered_remove): Likewise.
+	(vec<T, A, vl_embed>::block_remove): Likewise.
+	(vec<T, A, vl_heap>::address): Likewise.
+
+2023-02-24  Martin Liska  <mliska@suse.cz>
+
+	PR sanitizer/108834
+	* asan.cc (asan_add_global): Use proper TU name for normal
+	global variables (and aux_base_name for the artificial one).
+
+2023-02-24  Jakub Jelinek  <jakub@redhat.com>
+
+	* config/i386/i386-builtin.def: Update description of BDESC
+	and BDESC_FIRST in file comment to include mask2.
+
+2023-02-24  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64-cores.def (FLAGS): Update comment.
+
+2023-02-24  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/108854
+	* cgraphclones.cc (duplicate_thunk_for_node): If no parameter
+	changes are needed, copy at least DECL_ARGUMENTS PARM_DECL
+	nodes and adjust their DECL_CONTEXT.
+
+2023-02-24  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/108881
+	* config/i386/i386-builtin.def (__builtin_ia32_cvtne2ps2bf16_v16bf,
+	__builtin_ia32_cvtne2ps2bf16_v16bf_mask,
+	__builtin_ia32_cvtne2ps2bf16_v16bf_maskz,
+	__builtin_ia32_cvtne2ps2bf16_v8bf,
+	__builtin_ia32_cvtne2ps2bf16_v8bf_mask,
+	__builtin_ia32_cvtne2ps2bf16_v8bf_maskz,
+	__builtin_ia32_cvtneps2bf16_v8sf_mask,
+	__builtin_ia32_cvtneps2bf16_v8sf_maskz,
+	__builtin_ia32_cvtneps2bf16_v4sf_mask,
+	__builtin_ia32_cvtneps2bf16_v4sf_maskz,
+	__builtin_ia32_dpbf16ps_v8sf, __builtin_ia32_dpbf16ps_v8sf_mask,
+	__builtin_ia32_dpbf16ps_v8sf_maskz, __builtin_ia32_dpbf16ps_v4sf,
+	__builtin_ia32_dpbf16ps_v4sf_mask,
+	__builtin_ia32_dpbf16ps_v4sf_maskz): Require also
+	OPTION_MASK_ISA_AVX512VL.
+
+2023-02-24  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	* config/riscv/t-rtems: Keep only -mcmodel=medany 64-bit multilibs.
+	Add non-compact 32-bit multilibs.
+
+2023-02-24  Junxian Zhu  <zhujunxian@oss.cipunited.com>
+
+	* config/mips/mips.md (*clo<mode>2): New pattern.
+
+2023-02-24  Prachi Godbole  <prachi.godbole@imgtec.com>
+
+	* config/mips/mips.h (machine_function): New variable
+	use_hazard_barrier_return_p.
+	* config/mips/mips.md (UNSPEC_JRHB): New unspec.
+	(mips_hb_return_internal): New insn pattern.
+	* config/mips/mips.cc (mips_attribute_table): Add attribute
+	use_hazard_barrier_return.
+	(mips_use_hazard_barrier_return_p): New static function.
+	(mips_function_attr_inlinable_p): Likewise.
+	(mips_compute_frame_info): Set use_hazard_barrier_return_p.
+	Emit error for unsupported architecture choice.
+	(mips_function_ok_for_sibcall, mips_can_use_return_insn):
+	Return false for use_hazard_barrier_return.
+	(mips_expand_epilogue): Emit hazard barrier return.
+	* doc/extend.texi: Document use_hazard_barrier_return.
+
+2023-02-23  Max Filippov  <jcmvbkbc@gmail.com>
+
+	* config/xtensa/xtensa-dynconfig.cc (config.h, system.h)
+	(coretypes.h, diagnostic.h, intl.h): Use "..." instead of <...>
+	for the gcc-internal headers.
+
+2023-02-23  Max Filippov  <jcmvbkbc@gmail.com>
+
+	* config/xtensa/t-xtensa (xtensa-dynconfig.o): Use $(COMPILE)
+	and $(POSTCOMPILE) instead of manual dependency listing.
+	* config/xtensa/xtensa-dynconfig.c: Rename to ...
+	* config/xtensa/xtensa-dynconfig.cc: ... this.
+
+2023-02-23  Arsen Arsenović  <arsen@aarsen.me>
+
+	* doc/cfg.texi: Reorder index entries around @items.
+	* doc/cpp.texi: Ditto.
+	* doc/cppenv.texi: Ditto.
+	* doc/cppopts.texi: Ditto.
+	* doc/generic.texi: Ditto.
+	* doc/install.texi: Ditto.
+	* doc/extend.texi: Ditto.
+	* doc/invoke.texi: Ditto.
+	* doc/md.texi: Ditto.
+	* doc/rtl.texi: Ditto.
+	* doc/tm.texi.in: Ditto.
+	* doc/trouble.texi: Ditto.
+	* doc/tm.texi: Regenerate.
+
+2023-02-23  Takayuki 'January June' Suwa  <jjsuwa_sys3175@yahoo.co.jp>
+
+	* config/xtensa/xtensa.md: New peephole2 pattern that eliminates
+	the occurrence of general-purpose register used only once and for
+	transferring intermediate value.
+
+2023-02-23  Takayuki 'January June' Suwa  <jjsuwa_sys3175@yahoo.co.jp>
+
+	* config/xtensa/xtensa.cc (machine_function): Add new member
+	'eliminated_callee_saved_bmp'.
+	(xtensa_can_eliminate_callee_saved_reg_p): New function to
+	determine whether the register can be eliminated or not.
+	(xtensa_expand_prologue): Add invoking the above function and
+	elimination the use of callee-saved register by using its stack
+	slot through the stack pointer (or the frame pointer if needed)
+	directly.
+	(xtensa_expand_prologue): Modify to not emit register restoration
+	insn from its stack slot if the register is already eliminated.
+
+2023-02-23  Jakub Jelinek  <jakub@redhat.com>
+
+	PR translation/108890
+	* config/xtensa/xtensa-dynconfig.c (xtensa_load_config): Drop _()s
+	around fatal_error format strings.
+
+2023-02-23  Richard Biener  <rguenther@suse.de>
+
+	* tree-ssa-structalias.cc (handle_lhs_call): Do not
+	re-create rhsc, only truncate it.
+
+2023-02-23  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/106258
+	* ipa-prop.cc (try_make_edge_direct_virtual_call): Handle
+	BUILT_IN_UNREACHABLE_TRAP like BUILT_IN_UNREACHABLE.
+
+2023-02-23  Richard Biener  <rguenther@suse.de>
+
+	* tree-if-conv.cc (tree_if_conversion): Properly manage
+	memory of refs and the contained data references.
+
+2023-02-23  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/108888
+	* tree-if-conv.cc (if_convertible_stmt_p): Set PLF_2 on
+	calls to predicate.
+	(predicate_statements): Only predicate calls with PLF_2.
+
+2023-02-23  Takayuki 'January June' Suwa  <jjsuwa_sys3175@yahoo.co.jp>
+
+	* config/xtensa/xtensa.md
+	(zero_cost_loop_start, zero_cost_loop_end, loop_end):
+	Add missing "SI:" to PLUS RTXes.
+
+2023-02-23  Max Filippov  <jcmvbkbc@gmail.com>
+
+	PR target/108876
+	* config/xtensa/xtensa.cc (xtensa_expand_epilogue):
+	Emit (use (reg:SI A0_REG)) at the end in the sibling call
+	(i.e. the same place as (return) in the normal call).
+
+2023-02-23  Max Filippov  <jcmvbkbc@gmail.com>
+
+	Revert:
+	2023-02-21  Max Filippov  <jcmvbkbc@gmail.com>
+
+	PR target/108876
+	* config/xtensa/xtensa.cc (xtensa_expand_epilogue): Drop emit_use
+	for A0_REG.
+	* config/xtensa/xtensa.md (sibcall, sibcall_internal)
+	(sibcall_value, sibcall_value_internal): Add 'use' expression
+	for A0_REG.
+
+2023-02-23  Arsen Arsenović  <arsen@aarsen.me>
+
+	* doc/cppdiropts.texi: Reorder @opindex commands to precede
+	@items they relate to.
+	* doc/cppopts.texi: Ditto.
+	* doc/cppwarnopts.texi: Ditto.
+	* doc/invoke.texi: Ditto.
+	* doc/lto.texi: Ditto.
+
+2023-02-22  Andrew Stubbs  <ams@codesourcery.com>
+
+	* internal-fn.cc (expand_MASK_CALL): New.
+	* internal-fn.def (MASK_CALL): New.
+	* internal-fn.h (expand_MASK_CALL): New prototype.
+	* omp-simd-clone.cc (simd_clone_adjust_argument_types): Set vector_type
+	for mask arguments also.
+	* tree-if-conv.cc: Include cgraph.h.
+	(if_convertible_stmt_p): Do if conversions for calls to SIMD calls.
+	(predicate_statements): Convert functions to IFN_MASK_CALL.
+	* tree-vect-loop.cc (vect_get_datarefs_in_loop): Recognise
+	IFN_MASK_CALL as a SIMD function call.
+	* tree-vect-stmts.cc (vectorizable_simd_clone_call): Handle
+	IFN_MASK_CALL as an inbranch SIMD function call.
+	Generate the mask vector arguments.
+
+2023-02-22  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/riscv-vector-builtins-bases.cc (class reducop): New class.
+	(class widen_reducop): Ditto.
+	(class freducop): Ditto.
+	(class widen_freducop): Ditto.
+	(BASE): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.h: Ditto.
+	* config/riscv/riscv-vector-builtins-functions.def (vredsum): Add reduction support.
+	(vredmaxu): Ditto.
+	(vredmax): Ditto.
+	(vredminu): Ditto.
+	(vredmin): Ditto.
+	(vredand): Ditto.
+	(vredor): Ditto.
+	(vredxor): Ditto.
+	(vwredsum): Ditto.
+	(vwredsumu): Ditto.
+	(vfredusum): Ditto.
+	(vfredosum): Ditto.
+	(vfredmax): Ditto.
+	(vfredmin): Ditto.
+	(vfwredosum): Ditto.
+	(vfwredusum): Ditto.
+	* config/riscv/riscv-vector-builtins-shapes.cc (struct reduc_alu_def): Ditto.
+	(SHAPE): Ditto.
+	* config/riscv/riscv-vector-builtins-shapes.h: Ditto.
+	* config/riscv/riscv-vector-builtins-types.def (DEF_RVV_WI_OPS): New macro.
+	(DEF_RVV_WU_OPS): Ditto.
+	(DEF_RVV_WF_OPS): Ditto.
+	(vint8mf8_t): Ditto.
+	(vint8mf4_t): Ditto.
+	(vint8mf2_t): Ditto.
+	(vint8m1_t): Ditto.
+	(vint8m2_t): Ditto.
+	(vint8m4_t): Ditto.
+	(vint8m8_t): Ditto.
+	(vint16mf4_t): Ditto.
+	(vint16mf2_t): Ditto.
+	(vint16m1_t): Ditto.
+	(vint16m2_t): Ditto.
+	(vint16m4_t): Ditto.
+	(vint16m8_t): Ditto.
+	(vint32mf2_t): Ditto.
+	(vint32m1_t): Ditto.
+	(vint32m2_t): Ditto.
+	(vint32m4_t): Ditto.
+	(vint32m8_t): Ditto.
+	(vuint8mf8_t): Ditto.
+	(vuint8mf4_t): Ditto.
+	(vuint8mf2_t): Ditto.
+	(vuint8m1_t): Ditto.
+	(vuint8m2_t): Ditto.
+	(vuint8m4_t): Ditto.
+	(vuint8m8_t): Ditto.
+	(vuint16mf4_t): Ditto.
+	(vuint16mf2_t): Ditto.
+	(vuint16m1_t): Ditto.
+	(vuint16m2_t): Ditto.
+	(vuint16m4_t): Ditto.
+	(vuint16m8_t): Ditto.
+	(vuint32mf2_t): Ditto.
+	(vuint32m1_t): Ditto.
+	(vuint32m2_t): Ditto.
+	(vuint32m4_t): Ditto.
+	(vuint32m8_t): Ditto.
+	(vfloat32mf2_t): Ditto.
+	(vfloat32m1_t): Ditto.
+	(vfloat32m2_t): Ditto.
+	(vfloat32m4_t): Ditto.
+	(vfloat32m8_t): Ditto.
+	* config/riscv/riscv-vector-builtins.cc (DEF_RVV_WI_OPS): Ditto.
+	(DEF_RVV_WU_OPS): Ditto.
+	(DEF_RVV_WF_OPS): Ditto.
+	(required_extensions_p): Add reduction support.
+	(rvv_arg_type_info::get_base_vector_type): Ditto.
+	(rvv_arg_type_info::get_tree_type): Ditto.
+	* config/riscv/riscv-vector-builtins.h (enum rvv_base_type): Ditto.
+	* config/riscv/riscv.md: Ditto.
+	* config/riscv/vector-iterators.md (minu): Ditto.
+	* config/riscv/vector.md (@pred_reduc_<reduc><mode><vlmul1>): New patern.
+	(@pred_reduc_<reduc><mode><vlmul1_zve32>): Ditto.
+	(@pred_widen_reduc_plus<v_su><mode><vwlmul1>): Ditto.
+	(@pred_widen_reduc_plus<v_su><mode><vwlmul1_zve32>):Ditto.
+	(@pred_reduc_plus<order><mode><vlmul1>): Ditto.
+	(@pred_reduc_plus<order><mode><vlmul1_zve32>): Ditto.
+	(@pred_widen_reduc_plus<order><mode><vwlmul1>): Ditto.
+
+2023-02-22  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/iterators.md: New iterator.
+	* config/riscv/riscv-vector-builtins-bases.cc (class widen_binop): New class.
+	(enum ternop_type): New enum.
+	(class vmacc): New class.
+	(class imac): Ditto.
+	(class vnmsac): Ditto.
+	(enum widen_ternop_type): New enum.
+	(class vmadd): Ditto.
+	(class vnmsub): Ditto.
+	(class iwmac): Ditto.
+	(class vwmacc): Ditto.
+	(class vwmaccu): Ditto.
+	(class vwmaccsu): Ditto.
+	(class vwmaccus): Ditto.
+	(class reverse_binop): Ditto.
+	(class vfmacc): Ditto.
+	(class vfnmsac): Ditto.
+	(class vfmadd): Ditto.
+	(class vfnmsub): Ditto.
+	(class vfnmacc): Ditto.
+	(class vfmsac): Ditto.
+	(class vfnmadd): Ditto.
+	(class vfmsub): Ditto.
+	(class vfwmacc): Ditto.
+	(class vfwnmacc): Ditto.
+	(class vfwmsac): Ditto.
+	(class vfwnmsac): Ditto.
+	(class float_misc): Ditto.
+	(class fcmp): Ditto.
+	(class vfclass): Ditto.
+	(class vfcvt_x): Ditto.
+	(class vfcvt_rtz_x): Ditto.
+	(class vfcvt_f): Ditto.
+	(class vfwcvt_x): Ditto.
+	(class vfwcvt_rtz_x): Ditto.
+	(class vfwcvt_f): Ditto.
+	(class vfncvt_x): Ditto.
+	(class vfncvt_rtz_x): Ditto.
+	(class vfncvt_f): Ditto.
+	(class vfncvt_rod_f): Ditto.
+	(BASE): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.h:
+	* config/riscv/riscv-vector-builtins-functions.def (vzext): Ditto.
+	(vsext): Ditto.
+	(vfadd): Ditto.
+	(vfsub): Ditto.
+	(vfrsub): Ditto.
+	(vfwadd): Ditto.
+	(vfwsub): Ditto.
+	(vfmul): Ditto.
+	(vfdiv): Ditto.
+	(vfrdiv): Ditto.
+	(vfwmul): Ditto.
+	(vfmacc): Ditto.
+	(vfnmsac): Ditto.
+	(vfmadd): Ditto.
+	(vfnmsub): Ditto.
+	(vfnmacc): Ditto.
+	(vfmsac): Ditto.
+	(vfnmadd): Ditto.
+	(vfmsub): Ditto.
+	(vfwmacc): Ditto.
+	(vfwnmacc): Ditto.
+	(vfwmsac): Ditto.
+	(vfwnmsac): Ditto.
+	(vfsqrt): Ditto.
+	(vfrsqrt7): Ditto.
+	(vfrec7): Ditto.
+	(vfmin): Ditto.
+	(vfmax): Ditto.
+	(vfsgnj): Ditto.
+	(vfsgnjn): Ditto.
+	(vfsgnjx): Ditto.
+	(vfneg): Ditto.
+	(vfabs): Ditto.
+	(vmfeq): Ditto.
+	(vmfne): Ditto.
+	(vmflt): Ditto.
+	(vmfle): Ditto.
+	(vmfgt): Ditto.
+	(vmfge): Ditto.
+	(vfclass): Ditto.
+	(vfmerge): Ditto.
+	(vfmv_v): Ditto.
+	(vfcvt_x): Ditto.
+	(vfcvt_xu): Ditto.
+	(vfcvt_rtz_x): Ditto.
+	(vfcvt_rtz_xu): Ditto.
+	(vfcvt_f): Ditto.
+	(vfwcvt_x): Ditto.
+	(vfwcvt_xu): Ditto.
+	(vfwcvt_rtz_x): Ditto.
+	(vfwcvt_rtz_xu): Ditto.
+	(vfwcvt_f): Ditto.
+	(vfncvt_x): Ditto.
+	(vfncvt_xu): Ditto.
+	(vfncvt_rtz_x): Ditto.
+	(vfncvt_rtz_xu): Ditto.
+	(vfncvt_f): Ditto.
+	(vfncvt_rod_f): Ditto.
+	* config/riscv/riscv-vector-builtins-shapes.cc (struct alu_def): Ditto.
+	(struct move_def): Ditto.
+	* config/riscv/riscv-vector-builtins-types.def (DEF_RVV_WEXTF_OPS): New macro.
+	(DEF_RVV_CONVERT_I_OPS): Ditto.
+	(DEF_RVV_CONVERT_U_OPS): Ditto.
+	(DEF_RVV_WCONVERT_I_OPS): Ditto.
+	(DEF_RVV_WCONVERT_U_OPS): Ditto.
+	(DEF_RVV_WCONVERT_F_OPS): Ditto.
+	(vfloat64m1_t): Ditto.
+	(vfloat64m2_t): Ditto.
+	(vfloat64m4_t): Ditto.
+	(vfloat64m8_t): Ditto.
+	(vint32mf2_t): Ditto.
+	(vint32m1_t): Ditto.
+	(vint32m2_t): Ditto.
+	(vint32m4_t): Ditto.
+	(vint32m8_t): Ditto.
+	(vint64m1_t): Ditto.
+	(vint64m2_t): Ditto.
+	(vint64m4_t): Ditto.
+	(vint64m8_t): Ditto.
+	(vuint32mf2_t): Ditto.
+	(vuint32m1_t): Ditto.
+	(vuint32m2_t): Ditto.
+	(vuint32m4_t): Ditto.
+	(vuint32m8_t): Ditto.
+	(vuint64m1_t): Ditto.
+	(vuint64m2_t): Ditto.
+	(vuint64m4_t): Ditto.
+	(vuint64m8_t): Ditto.
+	* config/riscv/riscv-vector-builtins.cc (DEF_RVV_CONVERT_I_OPS): Ditto.
+	(DEF_RVV_CONVERT_U_OPS): Ditto.
+	(DEF_RVV_WCONVERT_I_OPS): Ditto.
+	(DEF_RVV_WCONVERT_U_OPS): Ditto.
+	(DEF_RVV_WCONVERT_F_OPS): Ditto.
+	(DEF_RVV_F_OPS): Ditto.
+	(DEF_RVV_WEXTF_OPS): Ditto.
+	(required_extensions_p): Adjust for floating-point support.
+	(check_required_extensions): Ditto.
+	(unsigned_base_type_p): Ditto.
+	(get_mode_for_bitsize): Ditto.
+	(rvv_arg_type_info::get_base_vector_type): Ditto.
+	(rvv_arg_type_info::get_tree_type): Ditto.
+	* config/riscv/riscv-vector-builtins.def (v_f): New define.
+	(f): New define.
+	(f_v): New define.
+	(xu_v): New define.
+	(f_w): New define.
+	(xu_w): New define.
+	* config/riscv/riscv-vector-builtins.h (enum rvv_base_type): New enum.
+	(function_expander::arg_mode): New function.
+	* config/riscv/vector-iterators.md (sof): New iterator.
+	(vfrecp): Ditto.
+	(copysign): Ditto.
+	(n): Ditto.
+	(msac): Ditto.
+	(msub): Ditto.
+	(fixuns_trunc): Ditto.
+	(floatuns): Ditto.
+	* config/riscv/vector.md (@pred_broadcast<mode>): New pattern.
+	(@pred_<optab><mode>): Ditto.
+	(@pred_<optab><mode>_scalar): Ditto.
+	(@pred_<optab><mode>_reverse_scalar): Ditto.
+	(@pred_<copysign><mode>): Ditto.
+	(@pred_<copysign><mode>_scalar): Ditto.
+	(@pred_mul_<optab><mode>): Ditto.
+	(pred_mul_<optab><mode>_undef_merge): Ditto.
+	(*pred_<madd_nmsub><mode>): Ditto.
+	(*pred_<macc_nmsac><mode>): Ditto.
+	(*pred_mul_<optab><mode>): Ditto.
+	(@pred_mul_<optab><mode>_scalar): Ditto.
+	(*pred_mul_<optab><mode>_undef_merge_scalar): Ditto.
+	(*pred_<madd_nmsub><mode>_scalar): Ditto.
+	(*pred_<macc_nmsac><mode>_scalar): Ditto.
+	(*pred_mul_<optab><mode>_scalar): Ditto.
+	(@pred_neg_mul_<optab><mode>): Ditto.
+	(pred_neg_mul_<optab><mode>_undef_merge): Ditto.
+	(*pred_<nmadd_msub><mode>): Ditto.
+	(*pred_<nmacc_msac><mode>): Ditto.
+	(*pred_neg_mul_<optab><mode>): Ditto.
+	(@pred_neg_mul_<optab><mode>_scalar): Ditto.
+	(*pred_neg_mul_<optab><mode>_undef_merge_scalar): Ditto.
+	(*pred_<nmadd_msub><mode>_scalar): Ditto.
+	(*pred_<nmacc_msac><mode>_scalar): Ditto.
+	(*pred_neg_mul_<optab><mode>_scalar): Ditto.
+	(@pred_<misc_op><mode>): Ditto.
+	(@pred_class<mode>): Ditto.
+	(@pred_dual_widen_<optab><mode>): Ditto.
+	(@pred_dual_widen_<optab><mode>_scalar): Ditto.
+	(@pred_single_widen_<plus_minus:optab><mode>): Ditto.
+	(@pred_single_widen_<plus_minus:optab><mode>_scalar): Ditto.
+	(@pred_widen_mul_<optab><mode>): Ditto.
+	(@pred_widen_mul_<optab><mode>_scalar): Ditto.
+	(@pred_widen_neg_mul_<optab><mode>): Ditto.
+	(@pred_widen_neg_mul_<optab><mode>_scalar): Ditto.
+	(@pred_cmp<mode>): Ditto.
+	(*pred_cmp<mode>): Ditto.
+	(*pred_cmp<mode>_narrow): Ditto.
+	(@pred_cmp<mode>_scalar): Ditto.
+	(*pred_cmp<mode>_scalar): Ditto.
+	(*pred_cmp<mode>_scalar_narrow): Ditto.
+	(@pred_eqne<mode>_scalar): Ditto.
+	(*pred_eqne<mode>_scalar): Ditto.
+	(*pred_eqne<mode>_scalar_narrow): Ditto.
+	(@pred_merge<mode>_scalar): Ditto.
+	(@pred_fcvt_x<v_su>_f<mode>): Ditto.
+	(@pred_<fix_cvt><mode>): Ditto.
+	(@pred_<float_cvt><mode>): Ditto.
+	(@pred_widen_fcvt_x<v_su>_f<mode>): Ditto.
+	(@pred_widen_<fix_cvt><mode>): Ditto.
+	(@pred_widen_<float_cvt><mode>): Ditto.
+	(@pred_extend<mode>): Ditto.
+	(@pred_narrow_fcvt_x<v_su>_f<mode>): Ditto.
+	(@pred_narrow_<fix_cvt><mode>): Ditto.
+	(@pred_narrow_<float_cvt><mode>): Ditto.
+	(@pred_trunc<mode>): Ditto.
+	(@pred_rod_trunc<mode>): Ditto.
+
+2023-02-22  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/106258
+	* cgraph.cc (cgraph_edge::redirect_call_stmt_to_callee,
+	cgraph_update_edges_for_call_stmt_node, cgraph_node::verify_node):
+	Handle BUILT_IN_UNREACHABLE_TRAP like BUILT_IN_UNREACHABLE.
+	* cgraphclones.cc (cgraph_node::create_clone): Likewise.
+
+2023-02-22  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* common.opt (-Wcomplain-wrong-lang): New.
+	* doc/invoke.texi (-Wno-complain-wrong-lang): Document it.
+	* opts-common.cc (prune_options): Handle it.
+	* opts-global.cc (complain_wrong_lang): Use it.
+
+2023-02-21  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/108830
+	* doc/invoke.texi: Document -fno-analyzer-suppress-followups.
+
+2023-02-21  Max Filippov  <jcmvbkbc@gmail.com>
+
+	PR target/108876
+	* config/xtensa/xtensa.cc (xtensa_expand_epilogue): Drop emit_use
+	for A0_REG.
+	* config/xtensa/xtensa.md (sibcall, sibcall_internal)
+	(sibcall_value, sibcall_value_internal): Add 'use' expression
+	for A0_REG.
+
+2023-02-21  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/108691
+	* tree-ssa-dce.cc (eliminate_unnecessary_stmts): Remove
+	assert about calls_setjmp not becoming true when it was false.
+
+2023-02-21  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/108793
+	* tree-ssa-loop-niter.cc (number_of_iterations_until_wrap):
+	Use convert operands to niter_type when computing num.
+
+2023-02-21  Richard Biener  <rguenther@suse.de>
+
+	Revert:
+	2023-02-13  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/108691
+	* tree-cfg.cc (notice_special_calls): When the CFG is built
+	honor gimple_call_ctrl_altering_p.
+	* cfgexpand.cc (expand_call_stmt): Clear cfun->calls_setjmp
+	temporarily if the call is not control-altering.
+	* calls.cc (emit_call_1): Do not add REG_SETJMP if
+	cfun->calls_setjmp is not set.  Do not alter cfun->calls_setjmp.
+
+2023-02-21  Takayuki 'January June' Suwa  <jjsuwa_sys3175@yahoo.co.jp>
+
+	* config/xtensa/xtensa.cc (xtensa_call_save_reg): Change to return
+	true if register A0 (return address register) when -Og is specified.
+
 2023-02-20  Uroš Bizjak  <ubizjak@gmail.com>
 
 	* config/i386/predicates.md

@@ -43,7 +43,7 @@ class PathExpr;
 // rust-path.h
 class PathIdentSegment;
 struct GenericArgsBinding;
-struct GenericArgs;
+class GenericArgs;
 class PathExprSegment;
 class PathPattern;
 class PathInExpression;
@@ -94,9 +94,7 @@ class MethodCallExpr;
 class FieldAccessExpr;
 struct ClosureParam;
 class ClosureExpr;
-class ClosureExprInner;
 class BlockExpr;
-class ClosureExprInnerTyped;
 class ContinueExpr;
 class BreakExpr;
 class RangeExpr;

@@ -1,3 +1,241 @@
+2023-03-03  Alexandre Oliva  <oliva@adacore.com>
+
+	* testsuite/30_threads/async/async.cc (test04): Initialize
+	steady_start, renamed from steady_begin, next to slow_start.
+	Increase tolerance for final wait.
+
+2023-03-03  Alexandre Oliva  <oliva@adacore.com>
+
+	* testsuite/libstdc++-prettyprinters/80276.cc: Add
+	std::string to debug info.
+	* testsuite/libstdc++-prettyprinters/libfundts.cc: Likewise.
+
+2023-03-03  Alexandre Oliva  <oliva@adacore.com>
+
+	PR libstdc++/104852
+	PR libstdc++/95989
+	PR libstdc++/52590
+	* include/bits/std_thread.h (thread::_M_thread_deps): New
+	static implicitly-inline member function.
+	(std::thread template ctor): Pass it to _M_start_thread.
+	* src/c++11/thread.cc (thread::_M_start_thread): Name depend
+	parameter, force it live on entry.
+
+2023-03-03  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* config/abi/post/i386-solaris/baseline_symbols.txt: Regenerate.
+	* config/abi/post/i386-solaris/amd64/baseline_symbols.txt:
+	Likewise.
+	* config/abi/post/sparc-solaris/baseline_symbols.txt: Likewise.
+	* config/abi/post/sparc-solaris/sparcv9/baseline_symbols.txt:
+	Likewise.
+
+2023-03-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/cow_string.h: Fix typo in comment.
+
+2023-03-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++20/tzdb.cc (chrono::tzdb::current_zone()) Use "UTC" if
+	current time zone cannot be determined.
+	* testsuite/std/time/tzdb/1.cc: Remove conditions based on
+	HAVE_TZDB macro and test all members unconditionally.
+
+2023-02-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/108952
+	* include/bits/uses_allocator_args.h
+	(uses_allocator_construction_args): Implement LWG 3527.
+	* testsuite/20_util/pair/astuple/get-2.cc: New test.
+	* testsuite/20_util/scoped_allocator/108952.cc: New test.
+	* testsuite/20_util/uses_allocator/lwg3527.cc: New test.
+
+2023-02-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/108846
+	* include/bits/stl_algobase.h (__copy_move<false, false, RA>)
+	Add __assign_one static member function.
+	(__copy_move<true, false, RA>): Likewise.
+	(__copy_move<IsMove, true, RA>): Do not use memmove for a single
+	value.
+	(__copy_move_backward<IsMove, true, RA>): Likewise.
+	* testsuite/25_algorithms/copy/108846.cc: New test.
+	* testsuite/25_algorithms/copy_backward/108846.cc: New test.
+	* testsuite/25_algorithms/copy_n/108846.cc: New test.
+	* testsuite/25_algorithms/move/108846.cc: New test.
+	* testsuite/25_algorithms/move_backward/108846.cc: New test.
+
+2023-02-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++11/codecvt.cc: Add [[likely]] and [[unlikely]]
+	attributes.
+
+2023-02-27  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/basic_ios.h (basic_ios::_M_setstate): Add
+	caveat to comment.
+	* include/bits/basic_string.h (resize_and_overwrite): Add
+	doxygen comment.
+
+2023-02-24  Matthias Kretz  <m.kretz@gsi.de>
+
+	* include/experimental/bits/simd.h: Line breaks and indenting
+	fixed to follow the libstdc++ standard.
+	* include/experimental/bits/simd_builtin.h: Likewise.
+	* include/experimental/bits/simd_fixed_size.h: Likewise.
+	* include/experimental/bits/simd_neon.h: Likewise.
+	* include/experimental/bits/simd_ppc.h: Likewise.
+	* include/experimental/bits/simd_scalar.h: Likewise.
+	* include/experimental/bits/simd_x86.h: Likewise.
+
+2023-02-24  Matthias Kretz  <m.kretz@gsi.de>
+
+	PR libstdc++/108030
+	* include/experimental/bits/simd_fixed_size.h
+	(_SimdImplFixedSize::_S_broadcast): Replace inline with
+	_GLIBCXX_SIMD_INTRINSIC.
+	(_SimdImplFixedSize::_S_generate): Likewise.
+	(_SimdImplFixedSize::_S_load): Likewise.
+	(_SimdImplFixedSize::_S_masked_load): Likewise.
+	(_SimdImplFixedSize::_S_store): Likewise.
+	(_SimdImplFixedSize::_S_masked_store): Likewise.
+	(_SimdImplFixedSize::_S_min): Likewise.
+	(_SimdImplFixedSize::_S_max): Likewise.
+	(_SimdImplFixedSize::_S_complement): Likewise.
+	(_SimdImplFixedSize::_S_unary_minus): Likewise.
+	(_SimdImplFixedSize::_S_plus): Likewise.
+	(_SimdImplFixedSize::_S_minus): Likewise.
+	(_SimdImplFixedSize::_S_multiplies): Likewise.
+	(_SimdImplFixedSize::_S_divides): Likewise.
+	(_SimdImplFixedSize::_S_modulus): Likewise.
+	(_SimdImplFixedSize::_S_bit_and): Likewise.
+	(_SimdImplFixedSize::_S_bit_or): Likewise.
+	(_SimdImplFixedSize::_S_bit_xor): Likewise.
+	(_SimdImplFixedSize::_S_bit_shift_left): Likewise.
+	(_SimdImplFixedSize::_S_bit_shift_right): Likewise.
+	(_SimdImplFixedSize::_S_remquo): Add inline keyword (to be
+	explicit about not always-inline, yet).
+	(_SimdImplFixedSize::_S_isinf): Likewise.
+	(_SimdImplFixedSize::_S_isfinite): Likewise.
+	(_SimdImplFixedSize::_S_isnan): Likewise.
+	(_SimdImplFixedSize::_S_isnormal): Likewise.
+	(_SimdImplFixedSize::_S_signbit): Likewise.
+
+2023-02-24  Matthias Kretz  <m.kretz@gsi.de>
+
+	PR libstdc++/108856
+	* include/experimental/bits/simd_builtin.h
+	(_SimdImplBuiltin::_S_masked_unary): More efficient
+	implementation of masked inc-/decrement for integers and floats
+	without AVX2.
+	* include/experimental/bits/simd_x86.h
+	(_SimdImplX86::_S_masked_unary): New. Use AVX512 masked subtract
+	builtins for masked inc-/decrement.
+
+2023-02-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/experimental/executor (executor): Constrain template
+	constructors.
+
+2023-02-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/experimental/internet (basic_endpoint): Add missing
+	constexpr to comparison operators.
+	* testsuite/experimental/net/internet/endpoint/cons.cc: New test.
+
+2023-02-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/experimental/internet (network_v4::netmask()): Avoid
+	undefined shift.
+	(network_v4::broadcast()): Optimize and fix for targets with
+	uint_least32_t wider than 32 bits.
+	(network_v4::to_string(const Allocator&)): Fix for custom
+	allocators and optimize using to_chars.
+	(operator==(const network_v4&, const network_v4&)): Add missing
+	constexpr.
+	(operator==(const network_v6&, const network_v6&)): Likewise.
+	* testsuite/experimental/net/internet/network/v4/cons.cc: New test.
+	* testsuite/experimental/net/internet/network/v4/members.cc: New test.
+
+2023-02-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/experimental/internet (address_4(const bytes_type&)):
+	Use __builtin_bit_cast if available, otherwise convert to
+	network byte order.
+	(address_v4::to_bytes()): Likewise, but convert from network
+	byte order.
+	* testsuite/experimental/net/internet/address/v4/cons.cc: Fix
+	incorrect tests. Check for constexpr too.
+	* testsuite/experimental/net/internet/address/v4/creation.cc:
+	Likewise.
+	* testsuite/experimental/net/internet/address/v4/members.cc:
+	Check that bytes_type is a standard-layout type.
+
+2023-02-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/experimental/internet (address_v4::to_string):
+	Optimize.
+	* testsuite/experimental/net/internet/address/v4/members.cc:
+	Check more addresses.
+
+2023-02-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/ext/aligned_buffer.h (__aligned_buffer): Add
+	diagnostic pragmas.
+
+2023-02-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/std/format/arguments/lwg3810.cc: Move dg-options
+	before dg-do.
+
+2023-02-23  Matthias Kretz  <m.kretz@gsi.de>
+
+	* testsuite/experimental/simd/tests/reductions.cc: Introduce
+	max_distance as the type-dependent max error.
+
+2023-02-23  Matthias Kretz  <m.kretz@gsi.de>
+
+	* include/experimental/bits/simd_builtin.h (_S_set): Compare as
+	int. The actual range of these indexes is very small.
+
+2023-02-23  Matthias Kretz  <m.kretz@gsi.de>
+
+	* include/experimental/bits/simd_x86.h (_S_bit_shift_left)
+	(_S_bit_shift_right): Declare constexpr. The implementation was
+	already expecting constexpr evaluation.
+
+2023-02-23  Matthias Kretz  <m.kretz@gsi.de>
+
+	PR libstdc++/108030
+	* include/experimental/bits/simd_detail.h
+	(_GLIBCXX_SIMD_ALWAYS_INLINE_LAMBDA): Define as empty for
+	__clang__.
+
+2023-02-23  Matthias Kretz  <m.kretz@gsi.de>
+
+	PR libstdc++/108030
+	* include/experimental/bits/simd.h (__vector_broadcast):
+	Implement via __vector_broadcast_impl instead of
+	__call_with_n_evaluations + 2 lambdas.
+	(__vector_broadcast_impl): New.
+
+2023-02-22  Alexandre Oliva  <oliva@adacore.com>
+
+	* src/c++11/shared_ptr.cc (__gnu_internal::get_mutex):
+	Avoid destruction of the mutex pool.
+
+2023-02-22  Alexandre Oliva  <oliva@adacore.com>
+
+	* testsuite/27_io/basic_ofstream/open/char/noreplace.cc: xfail
+	on vxworks.
+	* testsuite/27_io/basic_ofstream/open/wchar_t/noreplace.cc:
+	Likewise.
+
+2023-02-22  Alexandre Oliva  <oliva@adacore.com>
+
+	* testsuite/17_intro/names.cc: Undef func on vxworks >= 7 in
+	kernel mode.
+
 2023-02-20  Andreas Schwab  <schwab@linux-m68k.org>
 
 	* config/abi/post/m68k-linux-gnu/baseline_symbols.txt: Update.

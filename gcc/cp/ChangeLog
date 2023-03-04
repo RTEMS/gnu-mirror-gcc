@@ -1,3 +1,127 @@
+2023-03-03  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/108998
+	* pt.cc (el_data::skipped_trees): New data member.
+	(extract_locals_r): Push to skipped_trees any unevaluated
+	contexts that we skipped over.
+	(extract_local_specs): For the second walk, start from each
+	tree in skipped_trees.
+
+2023-03-03  Alexandre Oliva  <oliva@adacore.com>
+
+	* typeck.cc (cp_build_binary_op): Suppress redundant warning
+	for pfn null test in pmfn test with vbit-in-delta.
+
+2023-03-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/108883
+	* cp-tree.h (enum cp_tree_index): Remove CPTI_FALLBACK_DFLOAT*_TYPE
+	enumerators.
+	(fallback_dfloat32_type, fallback_dfloat64_type,
+	fallback_dfloat128_type): Remove.
+	* rtti.cc (emit_support_tinfo_1): If not emitted already, call
+	emit_tinfo_decl and remove from unemitted_tinfo_decls right away.
+	(emit_support_tinfos): Move &dfloat*_type_node from fundamentals array
+	into new fundamentals_with_fallback array.  Call emit_support_tinfo_1
+	on elements of that array too, with the difference that if
+	the type is NULL, use a fallback REAL_TYPE for it temporarily.
+	Drop the !targetm.decimal_float_supported_p () handling.  Call
+	targetm.emit_support_tinfos at the end.
+	* mangle.cc (write_builtin_type): Remove references to
+	fallback_dfloat*_type.  Handle bfloat16_type_node mangling.
+
+2023-03-02  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/108243
+	PR c++/97553
+	* cp-gimplify.cc (cp_fully_fold): Add an internal overload that
+	additionally takes and propagate an mce_value parameter, and
+	define the existing public overload in terms of it.
+	(cp_fully_fold_init): Pass mce_false to cp_fully_fold.
+
+2023-03-02  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/108243
+	* constexpr.cc (maybe_constant_init_1): Override
+	manifestly_const_eval to true if is_static.
+
+2023-03-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/108716
+	* cp-gimplify.cc (cp_genericize_r) <case USING_STMT>: Set
+	DECL_SOURCE_LOCATION on IMPORTED_DECL to expression location
+	of USING_STMT or input_location.
+
+2023-03-02  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/106259
+	* parser.cc (class_decl_loc_t::diag_mismatched_tags): If the first
+	lookup of SPEC didn't find anything, try to look for
+	most_general_template.
+
+2023-03-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/105839
+	* parser.cc (cp_convert_omp_range_for): Allow in assert
+	decomp_first_name without DECL_HAS_VALUE_EXPR_P if it has
+	error_mark_node type.
+	(cp_finish_omp_range_for): Don't set DECL_HAS_VALUE_EXPR_P back
+	on decls which have error_mark_node type.
+
+2023-03-01  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/107574
+	* constexpr.cc (cxx_eval_constant_expression): Emit an error when
+	a PTRMEM_CST cannot be evaluated.
+
+2023-03-01  Patrick Palka  <ppalka@redhat.com>
+
+	* pt.cc (tsubst_scope): Define.
+	(tsubst_decl) <case USING_DECL>: Call tsubst_scope instead of
+	calling tsubst_scope with tf_qualifying_scope set.
+	(tsubst_qualified_id): Call tsubst_scope instead of
+	calling tsubst with tf_qualifying_scope set.
+	(tsubst_copy): Immediately delegate to tsubst for all TYPE_P
+	trees.  Remove tf_qualifying_scope manipulation.
+	<case SCOPE_REF>: Call tsubst_scope instead of calling
+	tsubst with tf_qualifying_scope set.
+
+2023-03-01  Patrick Palka  <ppalka@redhat.com>
+	    Jason Merrill  <jason@redhat.com>
+
+	PR c++/108219
+	PR c++/108218
+	* constexpr.cc (fold_to_constant): Define.
+	(maybe_constant_value): Move up early exit test for unevaluated
+	operands.  Try reducing an unevaluated operand to a constant via
+	fold_to_constant.
+	(fold_non_dependent_expr_template): Add early exit test for
+	CONSTANT_CLASS_P nodes.  Try reducing an unevaluated operand
+	to a constant via fold_to_constant.
+	* cp-tree.h (fold_to_constant): Declare.
+
+2023-03-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/108606
+	* constexpr.cc (potential_constant_expression_1) <case DECL_EXPR>:
+	Only recurse on DECL_INITIAL (tmp) if tmp is a VAR_DECL, otherwise
+	just return true.
+
+2023-02-28  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/108848
+	* pt.cc (finish_template_variable): Move dependence check
+	to here from ...
+	(lookup_and_finish_template_variable): ... here.
+	* semantics.cc (finish_id_expression_1): Call
+	finish_template_variable sooner, before (and regardless of) the
+	type_dependent_expression_p test.
+
+2023-02-28  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/108550
+	* pt.cc (lookup_and_finish_template_variable): Clear tf_partial.
+
 2023-02-20  Marek Polacek  <polacek@redhat.com>
 
 	PR c++/101073

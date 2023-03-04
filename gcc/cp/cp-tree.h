@@ -235,10 +235,6 @@ enum cp_tree_index
 
     CPTI_PSEUDO_CONTRACT_VIOLATION,
 
-    CPTI_FALLBACK_DFLOAT32_TYPE,
-    CPTI_FALLBACK_DFLOAT64_TYPE,
-    CPTI_FALLBACK_DFLOAT128_TYPE,
-
     CPTI_MAX
 };
 
@@ -397,13 +393,6 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
    access nodes in tree.h.  */
 
 #define access_default_node		null_node
-
-/* Variant of dfloat{32,64,128}_type_node only used for fundamental
-   rtti purposes if DFP is disabled.  */
-#define fallback_dfloat32_type		cp_global_trees[CPTI_FALLBACK_DFLOAT32_TYPE]
-#define fallback_dfloat64_type		cp_global_trees[CPTI_FALLBACK_DFLOAT64_TYPE]
-#define fallback_dfloat128_type		cp_global_trees[CPTI_FALLBACK_DFLOAT128_TYPE]
-
 
 #include "name-lookup.h"
 
@@ -8516,6 +8505,7 @@ extern tree fold_non_dependent_init		(tree,
 						 tsubst_flags_t = tf_warning_or_error,
 						 bool = false, tree = NULL_TREE);
 extern tree fold_simple				(tree);
+extern tree fold_to_constant			(tree);
 extern bool reduced_constant_expression_p       (tree);
 extern bool is_instantiation_of_constexpr       (tree);
 extern bool var_in_constexpr_fn                 (tree);

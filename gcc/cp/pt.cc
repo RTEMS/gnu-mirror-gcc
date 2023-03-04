@@ -206,6 +206,7 @@ static bool dependent_template_arg_p (tree);
 static bool dependent_type_p_r (tree);
 static tree tsubst_copy	(tree, tree, tsubst_flags_t, tree);
 static tree tsubst_decl (tree, tree, tsubst_flags_t);
+static tree tsubst_scope (tree, tree, tsubst_flags_t, tree);
 static void perform_instantiation_time_access_checks (tree, tree);
 static tree listify (tree);
 static tree listify_autos (tree, tree);
@@ -10317,13 +10318,20 @@ lookup_template_variable (tree templ, tree arglist)
   return build2 (TEMPLATE_ID_EXPR, NULL_TREE, templ, arglist);
 }
 
-/* Instantiate a variable declaration from a TEMPLATE_ID_EXPR for use. */
+/* Instantiate a variable declaration from a TEMPLATE_ID_EXPR if it's
+   not dependent.  */
 
 tree
 finish_template_variable (tree var, tsubst_flags_t complain)
 {
   tree templ = TREE_OPERAND (var, 0);
   tree arglist = TREE_OPERAND (var, 1);
+
+  /* If the template or arguments are dependent, then we
+     can't resolve the TEMPLATE_ID_EXPR yet.  */
+  if (TMPL_PARMS_DEPTH (DECL_TEMPLATE_PARMS (templ)) != 1
+      || any_dependent_template_arguments_p (arglist))
+    return var;
 
   tree parms = DECL_TEMPLATE_PARMS (templ);
   arglist = coerce_template_parms (parms, arglist, templ, complain);
@@ -10352,13 +10360,14 @@ lookup_and_finish_template_variable (tree templ, tree targs,
 				     tsubst_flags_t complain)
 {
   tree var = lookup_template_variable (templ, targs);
-  if (TMPL_PARMS_DEPTH (DECL_TEMPLATE_PARMS (templ)) == 1
-      && !any_dependent_template_arguments_p (targs))
-    {
-      var = finish_template_variable (var, complain);
-      mark_used (var);
-    }
-
+  /* We may be called while doing a partial substitution, but the
+     type of the variable template may be auto, in which case we
+     will call do_auto_deduction in mark_used (which clears tf_partial)
+     and the auto must be properly reduced at that time for the
+     deduction to work.  */
+  complain &= ~tf_partial;
+  var = finish_template_variable (var, complain);
+  mark_used (var);
   return convert_from_reference (var);
 }
 
@@ -13043,6 +13052,8 @@ public:
   tsubst_flags_t complain;
   /* True iff we don't want to walk into unevaluated contexts.  */
   bool skip_unevaluated_operands = false;
+  /* The unevaluated contexts that we avoided walking.  */
+  auto_vec<tree> skipped_trees;
 
   el_data (tsubst_flags_t c)
     : extra (NULL_TREE), complain (c) {}
@@ -13057,6 +13068,7 @@ extract_locals_r (tree *tp, int *walk_subtrees, void *data_)
   if (data.skip_unevaluated_operands
       && unevaluated_p (TREE_CODE (*tp)))
     {
+      data.skipped_trees.safe_push (*tp);
       *walk_subtrees = 0;
       return NULL_TREE;
     }
@@ -13159,8 +13171,13 @@ extract_local_specs (tree pattern, tsubst_flags_t complain)
      context).  */
   data.skip_unevaluated_operands = true;
   cp_walk_tree (&pattern, extract_locals_r, &data, &data.visited);
+  /* Now walk the unevaluated contexts we skipped the first time around.  */
   data.skip_unevaluated_operands = false;
-  cp_walk_tree (&pattern, extract_locals_r, &data, &data.visited);
+  for (tree t : data.skipped_trees)
+    {
+      data.visited.remove (t);
+      cp_walk_tree (&t, extract_locals_r, &data, &data.visited);
+    }
   return data.extra;
 }
 
@@ -15002,9 +15019,7 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain)
 	      variadic_p = true;
 	    }
 	  else
-	    scope = tsubst_copy (scope, args,
-				 complain | tf_qualifying_scope,
-				 in_decl);
+	    scope = tsubst_scope (scope, args, complain, in_decl);
 
 	  tree name = DECL_NAME (t);
 	  if (IDENTIFIER_CONV_OP_P (name)
@@ -16617,6 +16632,16 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
     }
 }
 
+/* Convenience wrapper over tsubst for substituting into the LHS
+   of the :: scope resolution operator.  */
+
+static tree
+tsubst_scope (tree t, tree args, tsubst_flags_t complain, tree in_decl)
+{
+  gcc_checking_assert (TYPE_P (t));
+  return tsubst (t, args, complain | tf_qualifying_scope, in_decl);
+}
+
 /* OLDFNS is a lookup set of member functions from some class template, and
    NEWFNS is a lookup set of member functions from NEWTYPE, a specialization
    of that class template.  Return the subset of NEWFNS which are
@@ -16881,7 +16906,7 @@ tsubst_qualified_id (tree qualified_id, tree args,
   scope = TREE_OPERAND (qualified_id, 0);
   if (args)
     {
-      scope = tsubst (scope, args, complain | tf_qualifying_scope, in_decl);
+      scope = tsubst_scope (scope, args, complain, in_decl);
       expr = tsubst_copy (name, args, complain, in_decl);
     }
   else
@@ -17127,8 +17152,8 @@ tsubst_copy (tree t, tree args, tsubst_flags_t complain, tree in_decl)
   if (t == NULL_TREE || t == error_mark_node || args == NULL_TREE)
     return t;
 
-  tsubst_flags_t qualifying_scope_flag = (complain & tf_qualifying_scope);
-  complain &= ~tf_qualifying_scope;
+  if (TYPE_P (t))
+    return tsubst (t, args, complain, in_decl);
 
   if (tree d = maybe_dependent_member_ref (t, args, complain, in_decl))
     return d;
@@ -17603,8 +17628,7 @@ tsubst_copy (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 
     case SCOPE_REF:
       {
-	tree op0 = tsubst_copy (TREE_OPERAND (t, 0), args,
-				complain | tf_qualifying_scope, in_decl);
+	tree op0 = tsubst_scope (TREE_OPERAND (t, 0), args, complain, in_decl);
 	tree op1 = tsubst_copy (TREE_OPERAND (t, 1), args, complain, in_decl);
 	return build_qualified_name (/*type=*/NULL_TREE, op0, op1,
 				     QUALIFIED_NAME_IS_TEMPLATE (t));
@@ -17700,26 +17724,9 @@ tsubst_copy (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	return tree_cons (purpose, value, chain);
       }
 
-    case RECORD_TYPE:
-    case UNION_TYPE:
-    case ENUMERAL_TYPE:
-    case INTEGER_TYPE:
-    case TEMPLATE_TYPE_PARM:
-    case TEMPLATE_TEMPLATE_PARM:
-    case BOUND_TEMPLATE_TEMPLATE_PARM:
     case TEMPLATE_PARM_INDEX:
-    case POINTER_TYPE:
-    case REFERENCE_TYPE:
-    case OFFSET_TYPE:
-    case FUNCTION_TYPE:
-    case METHOD_TYPE:
-    case ARRAY_TYPE:
-    case TYPENAME_TYPE:
-    case UNBOUND_CLASS_TEMPLATE:
-    case TYPEOF_TYPE:
-    case DECLTYPE_TYPE:
     case TYPE_DECL:
-      return tsubst (t, args, complain | qualifying_scope_flag, in_decl);
+      return tsubst (t, args, complain, in_decl);
 
     case USING_DECL:
       t = DECL_NAME (t);
