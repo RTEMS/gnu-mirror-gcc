@@ -737,6 +737,7 @@ gfc_finish_var_decl (tree decl, gfc_symbol * sym)
   /* Keep variables larger than max-stack-var-size off stack.  */
   if (!(sym->ns->proc_name && sym->ns->proc_name->attr.recursive)
       && !sym->attr.automatic
+      && !sym->attr.associate_var
       && sym->attr.save != SAVE_EXPLICIT
       && sym->attr.save != SAVE_IMPLICIT
       && INTEGER_CST_P (DECL_SIZE_UNIT (decl))
@@ -5605,6 +5606,7 @@ generate_coarray_sym_init (gfc_symbol *sym)
 
   if (sym->attr.dummy || sym->attr.allocatable || !sym->attr.codimension
       || sym->attr.use_assoc || !sym->attr.referenced
+      || sym->attr.associate_var
       || sym->attr.select_type_temporary)
     return;
 

@@ -1,3 +1,437 @@
+2023-02-24  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	Backported from master:
+	2023-02-24  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	* config/riscv/t-rtems: Keep only -mcmodel=medany 64-bit multilibs.
+	Add non-compact 32-bit multilibs.
+
+2023-02-20  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2023-02-06  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/104921
+	* config/aarch64/aarch64-simd.md (aarch64_bfmlal<bt>_lane<q>v4sf):
+	Use correct constraint for operand 3.
+
+2023-02-13  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2023-01-18  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/108348
+	* config/rs6000/rs6000.c (rs6000_opaque_type_invalid_use_p): Add the
+	support for invalid uses of MMA opaque type in function arguments.
+
+2023-02-13  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2023-01-16  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/108272
+	* config/rs6000/rs6000.c (rs6000_opaque_type_invalid_use_p): Add the
+	support for invalid uses in inline asm, factor out the checking and
+	erroring to lambda function check_and_error_invalid_use.
+
+2023-02-07  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-09-02  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/106809
+	* tree-ssa-sccvn.c (dominaged_by_p_w_unex): Check we have
+	more than one successor before doing extra work.
+
+2023-02-03  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2022-12-01  Alex Coplan  <alex.coplan@arm.com>
+
+	* varasm.c (assemble_variable): Fix type confusion bug when
+	checking for ".vtable_map_vars" section.
+
+2023-01-26  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-11-11  Richard Biener  <rguenther@suse.de>
+		    Nikita Voronov  <nik_1357@mail.ru>
+
+	PR tree-optimization/107554
+	* tree-ssa-strlen.c (strlen_pass::count_nonzero_bytes):
+	Use unsigned HOST_WIDE_INT type for the strlen.
+
+2023-01-26  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-10-21  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/107323
+	* tree-loop-distribution.c (pg_unmark_merged_alias_ddrs):
+	New function.
+	(loop_distribution::break_alias_scc_partitions): Revert
+	postorder save/restore from the PR94125 fix.  Instead
+	make sure to not ignore edges from SCCs we are going to
+	merge.
+
+2023-01-26  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-10-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/107107
+	* tree-ssa-sccvn.c (visit_reference_op_store): Do not
+	affect value-numbering when doing the tail merging
+	MODIFY_EXPR lookup.
+
+2023-01-26  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-09-14  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/106934
+	* tree-ssa.c (non_rewritable_mem_ref_base): Avoid BIT_FIELD_REFs
+	of bitfields.
+	(maybe_rewrite_mem_ref_base): Likewise.
+
+2023-01-25  Christophe Lyon  <christophe.lyon@arm.com>
+
+	Backported from master:
+	2023-01-12  Christophe Lyon  <christophe.lyon@arm.com>
+		    Richard Sandiford  <richard.sandiford@arm.com>
+
+	* config/aarch64/aarch64.c (aarch64_function_arg_alignment): Fix
+	comment.
+	(aarch64_layout_arg): Factorize warning conditions.
+	(aarch64_function_arg_boundary): Fix typo.
+	* function.c (currently_expanding_function_start): New variable.
+	(expand_function_start): Handle
+	currently_expanding_function_start.
+	* function.h (currently_expanding_function_start): Declare.
+
+2023-01-24  Sergei Trofimovich  <siarheit@google.com>
+
+	Backported from master:
+	2022-08-16  Sergei Trofimovich  <siarheit@google.com>
+
+	PR driver/106624
+	* gcc.c (driver::detect_jobserver): Allocate storage xputenv()
+	argument using xstrdup().
+
+2023-01-05  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/106736
+	* config/rs6000/mma.md (define_expand movoo): Call function
+	rs6000_opaque_type_invalid_use_p to check and emit error message for
+	the invalid use of opaque type.
+	(define_expand movxo): Likewise.
+	* config/rs6000/rs6000-protos.h
+	(rs6000_opaque_type_invalid_use_p): New function declaration.
+	(currently_expanding_gimple_stmt): New extern declaration.
+	* config/rs6000/rs6000.c (rs6000_opaque_type_invalid_use_p): New
+	function.
+
+2022-12-22  Martin Liska  <mliska@suse.cz>
+
+	Backported from master:
+	2022-08-10  Martin Liska  <mliska@suse.cz>
+
+	* opts-jobserver.h: Add one member.
+	* opts-common.c (jobserver_info::jobserver_info): Parse FIFO
+	format of --jobserver-auth.
+
+2022-12-22  Martin Liska  <mliska@suse.cz>
+
+	Backported from master:
+	2022-08-10  Martin Liska  <mliska@suse.cz>
+
+	* gcc.c (driver::detect_jobserver): Remove and move to
+	jobserver.h.
+	* lto-wrapper.c (jobserver_active_p): Likewise.
+	(run_gcc): Likewise.
+	* opts-jobserver.h: New file.
+	* opts-common.c (jobserver_info::jobserver_info): New function.
+
+2022-12-15  Sebastian Pop  <spop@amazon.com>
+
+	PR target/98776
+	* config/aarch64/aarch64-protos.h (aarch64_output_patchable_area):
+	Declared.
+	* config/aarch64/aarch64.c (aarch64_print_patchable_function_entry):
+	Emit an UNSPECV_PATCHABLE_AREA pseudo instruction.
+	(aarch64_output_patchable_area): New.
+	* config/aarch64/aarch64.md (UNSPECV_PATCHABLE_AREA): New.
+	(patchable_area): Define.
+
+2022-12-01  liuhongt  <hongtao.liu@intel.com>
+
+	PR target/107863
+	* config/i386/i386-expand.c (ix86_expand_vec_set_builtin):
+	Convert op1 to target mode whenever mode mismatch.
+
+2022-11-30  John David Anglin  <danglin@gcc.gnu.org>
+
+	* config/pa/pa.md (addvdi3): Force operand 2 to a register.
+	Remove "addi,tsv,*" instruction from unamed pattern.
+	(subvdi3): Force operand 1 to a register.
+	Remove "subi,tsv" instruction from from unamed pattern.
+
+2022-11-29  Max Filippov  <jcmvbkbc@gmail.com>
+
+	Backported from master:
+	2022-11-08  Max Filippov  <jcmvbkbc@gmail.com>
+
+	PR rtl-optimization/107482
+	* ira-color.c (assign_hard_reg): Only call
+	update_costs_from_copies when retry_p is false.
+
+2022-11-19  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2022-11-19  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* config/nvptx/nvptx.h (STARTFILE_SPEC): Fix 'crt0.o' for
+	'-mmainkernel'.
+
+2022-11-14  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/107485
+	* tree-inline.c (remap_gimple_stmt): Use correct type for
+	split out condition of [VEC_]COND_EXPRs.
+
+2022-11-08  H.J. Lu  <hjl.tools@gmail.com>
+
+	Backported from master:
+	2022-10-25  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/107304
+	* expr.c (get_inner_reference): Always use TYPE_MODE for vector
+	field with vector raw mode.
+
+2022-11-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2022-11-05  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR c/41041
+	* doc/cppopts.texi: Document -fwide-exec-charset defaults
+	correctly.
+
+2022-10-25  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	Backported from master:
+	2022-10-19  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	PR target/106355
+	* config/s390/s390.c (s390_call_saved_register_used): For a
+	parameter with BLKmode fix determining number of consecutive
+	registers.
+
+2022-10-25  Martin Liska  <mliska@suse.cz>
+
+	Backported from master:
+	2022-10-24  Martin Liska  <mliska@suse.cz>
+
+	PR target/107364
+	* common/config/i386/i386-cpuinfo.h (enum processor_vendor):
+	  Reorder enum values as BUILTIN_VENDOR_MAX should not point
+	  in the middle of the valid enum values.
+
+2022-10-21  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR target/107336
+	* optabs.c (expand_vec_cond_expr): Query both VCOND and VCONDU for
+	EQ and NE.
+
+2022-10-21  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2022-10-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* config/aarch64/aarch64-sve.md (*aarch64_brk<brk_op>_cc): Remove
+	merging alternative.
+	(*aarch64_brk<brk_op>_ptest): Likewise.
+
+2022-10-21  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2022-10-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* config/aarch64/iterators.md (SVE_BRKP): New iterator.
+	* config/aarch64/aarch64-sve.md (*aarch64_brkn_cc): New pattern.
+	(*aarch64_brkn_ptest): Likewise.
+	(*aarch64_brk<brk_op>_cc): Restrict to SVE_BRKP.
+	(*aarch64_brk<brk_op>_ptest): Likewise.
+
+2022-10-21  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* config/aarch64/aarch64.h (AARCH64_FL_FOR_ARCH8_3): Add
+	AARCH64_FL_RCPC.
+	(AARCH64_ISA_RCPC): New macro.
+	* config/aarch64/aarch64-cores.def (thunderx3t110, zeus, neoverse-v1)
+	(neoverse-512tvb, saphira): Remove RCPC from these Armv8.3-A+ cores.
+	* config/aarch64/aarch64-c.c (aarch64_update_cpp_builtins): Define
+	__ARM_FEATURE_RCPC when appropriate.
+
+2022-10-20  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2022-09-26  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/96072
+	* config/rs6000/rs6000-logue.c (rs6000_emit_epilogue): Update the
+	condition for adding REG_CFA_DEF_CFA reg note with
+	frame_pointer_needed_indeed.
+
+2022-10-17  Pat Haugen  <pthaugen@linux.ibm.com>
+
+	PR target/99685
+	* config/rs6000/rs6000-call.c (rs6000_function_arg_advance_1): Bump
+	register count when not splitting IEEE 128-bit Complex.
+
+2022-10-14  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-08-10  Richard Biener  <rguenther@suse.de>
+
+	PR lto/106540
+	PR lto/106334
+	* lto-streamer-in.c (lto_read_tree_1): Use lto_input_tree_1
+	to input DECL_INITIAL, avoiding to commit drefs.
+
+2022-10-14  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-08-10  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/106513
+	* gimple-ssa-store-merging.c (do_shift_rotate): Use uint64_t
+	for head_marker.
+
+2022-10-14  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-07-19  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/106331
+	* builtins.c (get_memory_rtx): Compute alignment from
+	the original address and set MEM_OFFSET to unknown when
+	we create a MEM_EXPR from the base object of the address.
+
+2022-10-14  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-07-01  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/106131
+	* tree-ssa-sccvn.c (vn_reference_lookup_3): Force alias-set
+	zero when offsetting the read looking through an aggregate
+	copy.
+
+2022-10-14  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-06-29  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/106112
+	* tree-ssa-sccvn.c (valueized_wider_op): Properly extend
+	a constant operand according to its type.
+
+2022-10-14  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR target/107248
+	* config/sparc/sparc.c (sparc_expand_prologue): Emit a frame
+	blockage for leaf functions.
+	(sparc_flat_expand_prologue): Emit frame instead of full blockage.
+	(sparc_expand_epilogue): Emit a frame blockage for leaf functions.
+	(sparc_flat_expand_epilogue): Emit frame instead of full blockage.
+
+2022-10-03  Sergei Trofimovich  <siarheit@google.com>
+
+	Backported from master:
+	2022-10-03  Sergei Trofimovich  <siarheit@google.com>
+
+	PR target/107064
+	* config/i386/t-i386: Add build-time dependencies against
+	i386-builtin-types.inc to i386-builtins.o, i386-expand.o,
+	i386-features.o.
+
+2022-09-28  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64-cores.def (neoverse-v2): New entry.
+	* config/aarch64/aarch64-tune.md: Regenerate.
+	* doc/invoke.texi (AArch64 Options): Document neoverse-v2.
+
+2022-09-21  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2022-09-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/106491
+	* config/aarch64/aarch64-sve-builtins.cc (scalar_types)
+	(acle_vector_types, acle_svpattern, acle_svprfop): Add GTY
+	markup to (new) extern declarations instead of to the main
+	definition.
+
+2022-09-14  Tom de Vries  <tdevries@suse.de>
+
+	Backported from master:
+	2022-02-01  Tom de Vries  <tdevries@suse.de>
+
+	* config/nvptx/nvptx.c (nvptx_single): Use nvptx_uniform_warp_check.
+	* config/nvptx/nvptx.md (define_c_enum "unspecv"): Add
+	UNSPECV_UNIFORM_WARP_CHECK.
+	(define_insn "nvptx_uniform_warp_check"): New define_insn.
+
+2022-09-14  Tom de Vries  <tdevries@suse.de>
+
+	Backported from master:
+	2022-02-01  Tom de Vries  <tdevries@suse.de>
+
+	* config/nvptx/nvptx.c (nvptx_single): Use nvptx_warpsync.
+	* config/nvptx/nvptx.md (define_c_enum "unspecv"): Add
+	UNSPECV_WARPSYNC.
+	(define_insn "nvptx_warpsync"): New define_insn.
+
+2022-09-14  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* config/nvptx/nvptx.h (TARGET_PTX_6_0): '#define' to 'false'.
+
+2022-09-13  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2022-09-01  Peter Bergner  <bergner@linux.ibm.com>
+
+	PR target/101322
+	* config/rs6000/rs6000-call.c (rs6000_gimple_fold_mma_builtin):
+	Enforce the use of a valid MMA pointer type.
+
+2022-09-08  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	* config/rs6000/rtems.h (CPP_OS_DEFAULT_SPEC): Define __PPC_VRSAVE__ if
+	-mvrsave is present.
+	* config/rs6000/t-rtems: Add -mvrsave multilib variants for
+	-mcpu=e6500.
+
+2022-08-30  Peter Bergner  <bergner@linux.ibm.com>
+
+	Backported from master:
+	2022-08-28  Peter Bergner  <bergner@linux.ibm.com>
+
+	PR target/106017
+	* config/rs6000/rs6000.c (rs6000_invalid_conversion): Remove handling
+	of MMA pointer conversions.
+
+2022-08-24  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2022-08-16  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/103353
+	* config/rs6000/mma.md (define_expand movpoi): Move TARGET_MMA condition
+	check to preparation statements and add handlings for !TARGET_MMA.
+	(define_expand movpxi): Likewise.
+
 2022-08-16  Segher Boessenkool  <segher@kernel.crashing.org>
 
 	Backported from master:
