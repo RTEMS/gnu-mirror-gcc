@@ -48,7 +48,8 @@ foo (int i, unsigned int u, double d, char *s, void *p, int *n,
   printf ("%lc", lc);
   printf ("%ls", ls);
   printf ("%lf%lF%le%lE%lg%lG%la%lA", d, d, d, d, d, d, d, d);
-  printf ("%lp", p); /* { dg-warning "length|C" "bad use of %l" } */
+  printf ("%lp", p); /* { dg-warning "length|C" "bad use of %l" {target {! aarch64_capability_any}} } */
+  /* { dg-warning {format '%lp' expects argument of type 'void \* __capability'} "" {target {cheri_capability_hybrid}} .-1 } */
   printf ("%lld%lli%llo%llu%llx%llX", ll, ll, ull, ull, ull, ull);
   printf ("%lln", lln);
   printf ("%llf", d); /* { dg-warning "length" "bad use of %ll" } */
@@ -154,7 +155,7 @@ foo (int i, unsigned int u, double d, char *s, void *p, int *n,
   printf ("%#u", u); /* { dg-warning "flag" "bad use of # flag" } */
   printf ("%#c", i); /* { dg-warning "flag" "bad use of # flag" } */
   printf ("%#s", s); /* { dg-warning "flag" "bad use of # flag" } */
-  printf ("%#p", p); /* { dg-warning "flag" "bad use of # flag" } */
+  printf ("%#p", p); /* { dg-warning "flag" "bad use of # flag" {target {! aarch64_capability_any}} } */
   printf ("%#n", n); /* { dg-warning "flag" "bad use of # flag" } */
   /* Uses of the 0 flag.  */
   printf ("%08d%08i%08o%08u%08x%08X%08e%08E%08f%08F%08g%08G%08a%08A", i, i,

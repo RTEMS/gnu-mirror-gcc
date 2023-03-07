@@ -91,7 +91,8 @@ foo (int i, int i1, int i2, unsigned int u, double d, char *s, void *p,
   printf (" %lE", d); /* { dg-warning "15:length|C" "bad use of %l" } */
   printf (" %lg", d); /* { dg-warning "15:length|C" "bad use of %l" } */
   printf (" %lG", d); /* { dg-warning "15:length|C" "bad use of %l" } */
-  printf (" %lp", p); /* { dg-warning "15:length|C" "bad use of %l" } */
+  printf (" %lp", p); /* { dg-warning "15:length|C" "bad use of %l" {target {! aarch64_capability_any}} } */
+  /* { dg-warning {format '%lp' expects argument of type 'void \* __capability'} "" {target {cheri_capability_hybrid}} .-1 } */
   /* These next two were added in C94, but should be objected to in C90.
      For the first one, GCC has wanted wchar_t instead of the correct C94
      and C99 wint_t.
@@ -153,7 +154,7 @@ foo (int i, int i1, int i2, unsigned int u, double d, char *s, void *p,
   printf ("%#u", u); /* { dg-warning "14:flag" "bad use of # flag" } */
   printf ("%#c", i); /* { dg-warning "14:flag" "bad use of # flag" } */
   printf ("%#s", s); /* { dg-warning "14:flag" "bad use of # flag" } */
-  printf ("%#p", p); /* { dg-warning "14:flag" "bad use of # flag" } */
+  printf ("%#p", p); /* { dg-warning "14:flag" "bad use of # flag" {target {! aarch64_capability_any}} } */
   printf ("%#n", n); /* { dg-warning "14:flag" "bad use of # flag" } */
   /* Uses of the 0 flag.  */
   printf ("%08d%08i%08o%08u%08x%08X%08e%08E%08f%08g%08G", i, i, u, u, u, u,

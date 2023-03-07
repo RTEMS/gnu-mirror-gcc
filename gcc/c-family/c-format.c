@@ -706,7 +706,7 @@ static const format_char_info print_char_table[] =
   { "eE",  0, STD_C89, { T89_D,   BADLEN,  BADLEN,  T99_D,   BADLEN,  T89_LD,  BADLEN,  BADLEN,  BADLEN,  TEX_D32, TEX_D64, TEX_D128 }, "-wp0 +#I",  "",   NULL },
   { "c",   0, STD_C89, { T89_I,   BADLEN,  BADLEN,  T94_WI,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN }, "-w",        "",   NULL },
   { "s",   1, STD_C89, { T89_C,   BADLEN,  BADLEN,  T94_W,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN }, "-wp",       "cR", NULL },
-  { "p",   1, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN }, "-w",        "c",  NULL },
+  { "p",   0, STD_C89, { T89_PTR, BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN }, "-w",        "c",  NULL },
   { "n",   1, STD_C89, { T89_I,   T99_SC,  T89_S,   T89_L,   T9L_LL,  BADLEN,  T99_SST, T99_PD,  T99_IM,  BADLEN,  BADLEN,  BADLEN }, "",          "W",  NULL },
   /* C99 conversion specifiers.  */
   { "F",   0, STD_C99, { T99_D,   BADLEN,  BADLEN,  T99_D,   BADLEN,  T99_LD,  BADLEN,  BADLEN,  BADLEN,  TEX_D32, TEX_D64, TEX_D128 }, "-wp0 +#'I", "",   NULL },
@@ -4201,6 +4201,19 @@ check_format_types (const substring_loc &fmt_loc,
       if (i < types->pointer_count)
 	continue;
 
+      tree orig_wanted_type = wanted_type;
+
+      /* If we're looking for a pointer type and we have a suitable
+	 pointer type, look through to the target types.  */
+      if (POINTER_TYPE_P (wanted_type)
+	  && POINTER_TYPE_P (cur_type)
+	  && capability_type_p (wanted_type) == capability_type_p (cur_type))
+	{
+	  cur_type = TREE_TYPE (cur_type);
+	  wanted_type = TREE_TYPE (wanted_type);
+	  i++;
+	}
+
       cur_type = TYPE_MAIN_VARIANT (cur_type);
 
       /* Check whether the argument type is a character type.  This leniency
@@ -4262,7 +4275,7 @@ check_format_types (const substring_loc &fmt_loc,
 	continue;
       /* Now we have a type mismatch.  */
       format_type_warning (fmt_loc, param_loc, types,
-			   wanted_type, orig_cur_type, fki,
+			   orig_wanted_type, orig_cur_type, fki,
 			   offset_to_type_start, conversion_char);
     }
 }
@@ -4796,6 +4809,44 @@ find_length_info_modifier_index (const format_length_info *fli, int c)
   gcc_unreachable ();
 }
 
+static void
+init_cheri_printf_info ()
+{
+  static bool cheri_init_done = false;
+  if (cheri_init_done)
+    return;
+
+  gcc_assert (dynamic_format_types[printf_format_type].conversion_specs
+	      == print_char_table);
+
+  format_char_info *new_print_char_table
+    = (format_char_info *) xmemdup (print_char_table,
+				    sizeof (print_char_table),
+				    sizeof (print_char_table));
+
+  const unsigned num_entries
+    = sizeof (print_char_table) / sizeof (format_char_info);
+
+  format_char_info *p = new_print_char_table;
+  format_char_info *end = p + num_entries;
+  for (; p < end; p++)
+    {
+      if (strcmp (p->format_chars, "p"))
+	continue;
+
+      /* Allow the '#' flag to be used on the 'p' conversion specifier.  */
+      gcc_assert (!strcmp (p->flag_chars, "-w"));
+      p->flag_chars = "-w#";
+      p->types[FMT_LEN_l].type = &cap_ptr_type_node;
+      break;
+    }
+  gcc_assert (p < end);
+
+  dynamic_format_types[printf_format_type].conversion_specs
+    = new_print_char_table;
+  cheri_init_done = true;
+}
+
 /* Determine the type of HOST_WIDE_INT in the code being compiled for
    use in GCC's __asm_fprintf__ custom format attribute.  You must
    have set dynamic_format_types before calling this function.  */
@@ -5252,6 +5303,19 @@ handle_format_attribute (tree *node, tree atname, tree args,
 	init_dynamic_diag_info ();
       else
 	gcc_unreachable ();
+    }
+
+  /* Take CHERI printf extensions into account.  */
+  if (info.format_type == printf_format_type && cap_ptr_type_node)
+    {
+      /* Our first time through, we have to make sure that our
+	 format_type data is allocated dynamically and is modifiable.  */
+      if (!dynamic_format_types)
+	format_types = dynamic_format_types = (format_kind_info *)
+	  xmemdup (format_types_orig, sizeof (format_types_orig),
+		   sizeof (format_types_orig));
+
+      init_cheri_printf_info ();
     }
 
   return NULL_TREE;

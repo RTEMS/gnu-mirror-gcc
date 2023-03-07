@@ -301,11 +301,13 @@ struct format_kind_info
 #define T_UC	&unsigned_char_type_node
 #define T99_UC	{ STD_C99, NULL, T_UC }
 #define T_V	&void_type_node
+#define T_PTR	&ptr_type_node
 #define T89_G   { STD_C89, NULL, &local_gimple_ptr_node }
 #define T_CGRAPH_NODE   { STD_C89, NULL, &local_cgraph_node_ptr_node }
 #define T_EVENT_PTR    { STD_C89, NULL, &local_event_ptr_node }
 #define T89_T   { STD_C89, NULL, &local_tree_type_node }
 #define T89_V	{ STD_C89, NULL, T_V }
+#define T89_PTR { STD_C89, NULL, T_PTR }
 #define T_W	&wchar_type_node
 #define T94_W	{ STD_C94, "wchar_t", T_W }
 #define TEX_W	{ STD_EXT, "wchar_t", T_W }
