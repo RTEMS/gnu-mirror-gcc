@@ -2185,3 +2185,76 @@ loops_list::walk_loop_tree (class loop *root, unsigned flags)
     this->to_visit.quick_push (root->num);
 }
 
+void histogram_counters_minus_upper_bound (histogram_counters* hist_c, gcov_type_unsigned difference){
+    if (hist_c==NULL || difference==0)
+        return;
+    auto hist=*(hist_c->hist);
+    unsigned int lin_size=param_profile_histogram_size_lin;
+    unsigned int lin_pow2=floor_log2(lin_size-1);
+    unsigned int tot_size=param_profile_histogram_size;
+    gcov_type_unsigned  log_diff=floor_log2(difference);
+    unsigned int i=1;
+    for(; i<lin_size-1 &&  i<tot_size-1; i++){
+        if (i<=difference){
+            hist[0]+=hist[i];
+        } else {
+            hist[i-difference]+=hist[i];
+        }
+        hist[i]=0;
+    }
+    // we try to restore some of the linear histogram
+    // for the last linear counter containing also lesser values then nearest pow2
+    // assumption is uniform
+    gcov_type_unsigned upper_bound_lin=(1<<(ceil_log2(lin_size)-1));
+    if (lin_size>2 && difference<upper_bound_lin && i<tot_size-1){
+        gcov_type_unsigned lin_size_val=hist[lin_size-1]/((upper_bound_lin-1)-(lin_size-2));
+        for (int j=int(i)-int(difference);j<gcov_type(upper_bound_lin)-gcov_type(difference)+1
+                && j<int(lin_size)-1;i++) {
+            if (j<0) {
+                hist[0]+=lin_size_val;
+            } else {
+                hist[j]+=lin_size_val;
+            }
+            hist[lin_size-1]-=lin_size_val;
+        }
+        i++;
+    }
+    // Index where difference would be placed
+    unsigned diff_index=log_diff+(lin_size-lin_pow2)-1;
+    for (; i<diff_index && difference<lin_size && i<tot_size-1;i++){
+        hist[0]+=hist[i];
+        hist[i]=0;
+    }
+    for (; i<tot_size-1 && (1<<(i-diff_index+2))<10000;i++){
+        // We assume uniform distribution
+        // tot_size -1 should not be touched We know little about it
+        gcov_type_unsigned share=hist[i]/(1<<(i-diff_index+2));
+        hist[i-1]+=share;
+        hist[i]-=share;
+    }
+}
+
+void histogram_counters_div_upper_bound (histogram_counters* hist_c, unsigned int divisor){
+    if (hist_c==NULL || divisor<2)
+        return;
+    auto hist=*(hist_c->hist);
+    unsigned int lin_size=param_profile_histogram_size_lin;
+    unsigned int tot_size=param_profile_histogram_size;
+    gcov_type_unsigned  log_div=floor_log2(divisor);
+    unsigned int i=1;
+    for(; i<lin_size-1 && i<tot_size-1; i++){
+        hist[i/divisor]+=hist[i];
+        hist[i]=0;
+    }
+
+    for (;i<tot_size-1;i++){
+        gcov_type_unsigned upper_diff=((1<<(ceil_log2(lin_size)+i-lin_size))-1)/divisor;
+        if (upper_diff<lin_size-1 && lin_size>1){
+            hist[upper_diff==0 ? 1 : upper_diff]+=hist[i];
+            hist[i]=0;
+        } else {
+            hist[i-log_div>0?i-log_div : 1]+=hist[i];
+            hist[i]=0;
+        }
+    }
+}

@@ -1047,7 +1047,8 @@ try_peel_loop (class loop *loop,
         psum+=(*(loop->counters->hist))[i];
         if ((100*psum)/sum>=param_profile_histogram_peel_prcnt)
         {
-            if (i==param_profile_histogram_size_lin-1 && i!=0){
+            if (i==param_profile_histogram_size_lin-1 && i!=0 && 
+                    param_profile_histogram_size_lin!=param_profile_histogram_size){
                 // Last linear counter absorbs iterations smaller then next power of 2
                 npeel=(1<<floor_log2(param_profile_histogram_size_lin-1))-1;
             } else {
@@ -1142,6 +1143,7 @@ try_peel_loop (class loop *loop,
     }
   if (loop->any_upper_bound)
     {
+      histogram_counters_minus_upper_bound(loop->counters,npeel);
       if (wi::ltu_p (npeel, loop->nb_iterations_upper_bound))
         loop->nb_iterations_upper_bound -= npeel;
       else
