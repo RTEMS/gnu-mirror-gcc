@@ -12,7 +12,7 @@ Instead, it uses the TARGET_MANGLE_DECL_ASSEMBLER_NAME hook to change the name
 before it is written out to the assembler file like it now does for all of the
 other long double built-in functions.
 
-2023-03-08   Michael Meissner  <meissner@linux.ibm.com>
+2023-03-09   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
