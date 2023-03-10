@@ -2869,7 +2869,11 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 
   /* We used to shortcut trivial constructor/op= here, but nowadays
      we can only get a trivial function here with -fno-elide-constructors.  */
-  gcc_checking_assert (!trivial_fn_p (fun) || !flag_elide_constructors);
+  gcc_checking_assert (!trivial_fn_p (fun)
+		       || !flag_elide_constructors
+		       /* We don't elide constructors when processing
+			  a noexcept-expression.  */
+		       || cp_noexcept_operand);
 
   bool non_constant_args = false;
   new_call.bindings
@@ -9179,8 +9183,12 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 	  }
 	else if (fun)
           {
-	    if (RECUR (fun, rval))
-	      /* Might end up being a constant function pointer.  */;
+	    if (RECUR (fun, FUNCTION_POINTER_TYPE_P (fun) ? rval : any))
+	      /* Might end up being a constant function pointer.  But it
+		 could also be a function object with constexpr op(), so
+		 we pass 'any' so that the underlying VAR_DECL is deemed
+		 as potentially-constant even though it wasn't declared
+		 constexpr.  */;
 	    else
 	      return false;
           }

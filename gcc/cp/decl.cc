@@ -693,6 +693,7 @@ poplevel (int keep, int reverse, int functionbody)
 		else
 		  warning_at (DECL_SOURCE_LOCATION (decl),
 			      OPT_Wunused_variable, "unused variable %qD", decl);
+		suppress_warning (decl, OPT_Wunused_variable);
 	      }
 	    else if (DECL_CONTEXT (decl) == current_function_decl
 		     // For -Wunused-but-set-variable leave references alone.
@@ -8684,8 +8685,10 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
 
       if (var_definition_p
 	  /* With -fmerge-all-constants, gimplify_init_constructor
-	     might add TREE_STATIC to the variable.  */
-	  && (TREE_STATIC (decl) || flag_merge_constants >= 2))
+	     might add TREE_STATIC to aggregate variables.  */
+	  && (TREE_STATIC (decl)
+	      || (flag_merge_constants >= 2
+		  && AGGREGATE_TYPE_P (type))))
 	{
 	  /* If a TREE_READONLY variable needs initialization
 	     at runtime, it is no longer readonly and we need to
@@ -12440,10 +12443,15 @@ grokdeclarator (const cp_declarator *declarator,
 	{
 	  if (typedef_decl)
 	    {
-	      pedwarn (loc, OPT_Wpedantic, "%qs specified with %qT",
-		       key, type);
+	      pedwarn (loc, OPT_Wpedantic, "%qs specified with %qD",
+		       key, typedef_decl);
 	      ok = !flag_pedantic_errors;
-	      type = DECL_ORIGINAL_TYPE (typedef_decl);
+	      if (is_typedef_decl (typedef_decl))
+		type = DECL_ORIGINAL_TYPE (typedef_decl);
+	      else
+		/* PR108099: __int128_t comes from c_common_nodes_and_builtins,
+		   and is not built as a typedef.  */
+		type = TREE_TYPE (typedef_decl);
 	      typedef_decl = NULL_TREE;
 	    }
 	  else if (declspecs->decltype_p)

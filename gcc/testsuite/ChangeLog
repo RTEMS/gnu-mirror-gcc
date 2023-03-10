@@ -1,3 +1,472 @@
+2023-03-09  Jason Merrill  <jason@redhat.com>
+
+	PR c++/108773
+	* g++.dg/cpp0x/initlist-array18.C: New test.
+	* g++.dg/cpp0x/initlist-array19.C: New test.
+
+2023-03-09  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/102671
+	PR analyzer/105755
+	PR analyzer/108251
+	PR analyzer/108400
+	* gcc.dg/analyzer/null-deref-pr102671-1.c: New test, reduced
+	from Emacs.
+	* gcc.dg/analyzer/null-deref-pr102671-2.c: Likewise.
+	* gcc.dg/analyzer/null-deref-pr105755.c: Likewise.
+	* gcc.dg/analyzer/null-deref-pr108251-smp_fetch_ssl_fc_has_early-O2.c:
+	New test, reduced from haproxy's src/ssl_sample.c.
+	* gcc.dg/analyzer/null-deref-pr108251-smp_fetch_ssl_fc_has_early.c:
+	Likewise.
+	* gcc.dg/analyzer/null-deref-pr108400-SoftEtherVPN-WebUi.c: New
+	test, reduced from SoftEtherVPN's src/Cedar/WebUI.c.
+
+2023-03-09  Tamar Christina  <tamar.christina@arm.com>
+
+	* gcc.target/aarch64/tbz_2.c: New test.
+	* gcc.target/aarch64/tbz_3.c: New test.
+
+2023-03-09  Jason Merrill  <jason@redhat.com>
+
+	DR 2664
+	PR c++/102529
+	* g++.dg/DRs/dr2664.C: New test.
+	* g++.dg/cpp2a/class-deduction-alias15.C: New test.
+
+2023-03-09  Jason Merrill  <jason@redhat.com>
+	    Michael Spertus  <mike@spertus.com>
+
+	PR c++/105841
+	* g++.dg/cpp2a/class-deduction-alias14.C: New test.
+
+2023-03-09  Jason Merrill  <jason@redhat.com>
+
+	* g++.dg/ext/is_deducible1.C: Guard with
+	__has_builtin (__is_deducible).
+
+2023-03-09  Jason Merrill  <jason@redhat.com>
+
+	PR c++/105841
+	* g++.dg/ext/is_deducible1.C: New test.
+
+2023-03-09  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	* gcc.target/aarch64/pr108999.c: New.
+
+2023-03-09  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/108995
+	* gcc.dg/ubsan/pr108995.c: New testcase.
+
+2023-03-09  Jakub Jelinek  <jakub@redhat.com>
+	    Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109008
+	* gcc.c-torture/execute/ieee/pr109008.c: New test.
+
+2023-03-08  Kewen Lin  <linkw@linux.ibm.com>
+
+	* gcc.target/powerpc/ppc-fortran/ppc-fortran.exp: Override
+	gcc_{warning,error}_prefix with Fortran specific one used in
+	gfortran_init.
+
+2023-03-08  Kewen Lin  <linkw@linux.ibm.com>
+
+	* gcc.target/powerpc/bfp/scalar-test-data-class-14.c: Adjust with
+	int128 effective target requirement.
+	* gcc.target/powerpc/bfp/scalar-test-data-class-15.c: Likewise.
+
+2023-03-08  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR testsuite/108729
+	* gcc.target/powerpc/bfp/scalar-test-data-class-12.c: Adjust with
+	has_arch_ppc64 effective target.
+	* gcc.target/powerpc/bfp/vec-test-data-class-9.c: Likewise.
+
+2023-03-08  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR testsuite/108730
+	* gcc.target/powerpc/bfp/scalar-test-neg-8.c: Adjust with lp64
+	effective target requirement.
+
+2023-03-08  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR testsuite/108813
+	* gcc.target/powerpc/pr101384-2.c: Adjust with xxspltib.
+
+2023-03-08  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR testsuite/108810
+	* gcc.target/powerpc/fold-vec-extract-double.p9.c (testd_cst): Adjust
+	the extracted index for BE.
+
+2023-03-08  Jeff Law  <jlaw@ventanamicro>
+
+	* gcc.target/mips/msa-ds.c: Fix over eager pattern matching.
+
+2023-03-08  Hans-Peter Nilsson  <hp@axis.com>
+
+	* gcc.dg/analyzer/omp-parallel-for-get-min.c,
+	gcc.dg/analyzer/omp-parallel-for-1.c: Require effective target fopenmp.
+
+2023-03-07  Jason Merrill  <jason@redhat.com>
+
+	PR c++/108526
+	PR c++/106651
+	* g++.dg/cpp23/static-operator-call5.C: Pass -g.
+
+2023-03-07  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/107532
+	* g++.dg/warn/Wdangling-reference8.C: New test.
+	* g++.dg/warn/Wdangling-reference9.C: New test.
+
+2023-03-07  Robin Dapp  <rdapp@linux.ibm.com>
+
+	* gcc.dg/vect/slp-3.c: Add '{ ... }'.
+
+2023-03-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/109042
+	* g++.dg/rtti/pr109042.C: New test.
+
+2023-03-07  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/109030
+	* g++.dg/cpp0x/noexcept77.C: New test.
+
+2023-03-07  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/107939
+	* g++.dg/cpp1y/var-templ74.C: Remove dg-error.
+	* g++.dg/cpp1y/var-templ77.C: New test.
+
+2023-03-07  Pan Li  <pan2.li@intel.com>
+	    Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/108185
+	PR target/108654
+	* gcc.target/riscv/rvv/base/pr108185-1.c: New test.
+	* gcc.target/riscv/rvv/base/pr108185-2.c: New test.
+	* gcc.target/riscv/rvv/base/pr108185-3.c: New test.
+	* gcc.target/riscv/rvv/base/pr108185-4.c: New test.
+	* gcc.target/riscv/rvv/base/pr108185-5.c: New test.
+	* gcc.target/riscv/rvv/base/pr108185-6.c: New test.
+	* gcc.target/riscv/rvv/base/pr108185-7.c: New test.
+	* gcc.target/riscv/rvv/base/pr108185-8.c: New test.
+
+2023-03-07  Xi Ruoyao  <xry111@xry111.site>
+
+	* gcc.target/aarch64/shrink_wrap_1.c (dg-options): Add
+	-fno-stack-protector.
+	* gcc.target/aarch64/stack-check-cfa-1.c (dg-options): Add
+	-fno-stack-protector.
+	* gcc.target/aarch64/stack-check-cfa-2.c (dg-options): Add
+	-fno-stack-protector.
+	* gcc.target/aarch64/test_frame_17.c (dg-options): Add
+	-fno-stack-protector.
+
+2023-03-07  Xi Ruoyao  <xry111@xry111.site>
+
+	* gcc.target/aarch64/pr104005.c (dg-options): Add
+	-fno-stack-protector.
+
+2023-03-07  Xi Ruoyao  <xry111@xry111.site>
+
+	* gcc.target/aarch64/auto-init-7.c (dg-options): Add
+	-fno-stack-protector.
+
+2023-03-07  Xi Ruoyao  <xry111@xry111.site>
+
+	* gcc.target/aarch64/pr103147-10.c (dg-options): Add
+	-fno-stack-protector.
+	* g++.target/aarch64/pr103147-10.C: Likewise.
+
+2023-03-07  Xi Ruoyao  <xry111@xry111.site>
+
+	* gcc.target/aarch64/sve/pcs/aarch64-sve-pcs.exp (sve_flags):
+	Add -fno-stack-protector.
+
+2023-03-07  Xi Ruoyao  <xry111@xry111.site>
+
+	PR testsuite/70150
+	* gcc.target/aarch64/fuse_adrp_add_1.c (dg-options): Add
+	-fno-pie.
+
+2023-03-07  Xi Ruoyao  <xry111@xry111.site>
+
+	PR testsuite/70150
+	* gcc.dg/tls/pr78796.c (dg-additional-options): Add -fno-pie
+	-no-pie for aarch64-*-*.
+	* gcc.target/aarch64/pr63304_1.c (dg-options): Add -fno-pie.
+	* gcc.target/aarch64/pr70120-2.c (dg-options): Add -fno-pie.
+	* gcc.target/aarch64/pr78733.c (dg-options): Add -fno-pie.
+	* gcc.target/aarch64/pr79041-2.c (dg-options): Add -fno-pie.
+	* gcc.target/aarch64/pr94530.c (dg-options): Add -fno-pie.
+	* gcc.target/aarch64/pr94577.c (dg-options): Add -fno-pie.
+	* gcc.target/aarch64/reload-valid-spoff.c (dg-options): Add
+	-fno-pie.
+
+2023-03-07  Xi Ruoyao  <xry111@xry111.site>
+
+	PR testsuite/70150
+	* gcc.target/aarch64/aapcs64/aapcs64.exp (additional_flags):
+	Add -fno-pie -no-pie.
+
+2023-03-07  Hans-Peter Nilsson  <hp@axis.com>
+
+	* lib/target-supports.exp (check_compile): Support scanning tree-dumps.
+
+2023-03-07  Hans-Peter Nilsson  <hp@axis.com>
+
+	* gcc.dg/plugin/must-tail-call-1.c, gcc.dg/plugin/must-tail-call-2.c:
+	Gate on effective target tail_call.
+
+2023-03-07  Hans-Peter Nilsson  <hp@axis.com>
+
+	* lib/target-supports.exp (check_effective_target_tail_call): New.
+
+2023-03-07  Hans-Peter Nilsson  <hp@axis.com>
+
+	* gcc.dg/analyzer/allocation-size-multiline-3.c: Handle
+	int32_t being "long int".
+
+2023-03-07  Hans-Peter Nilsson  <hp@axis.com>
+
+	* lib/multiline.exp (_build_multiline_regex): Map
+	"{re:" to "(", similarly ")?" from ":re?}" and the
+	same without question mark.
+
+2023-03-06  Paul-Antoine Arras  <pa@codesourcery.com>
+
+	* gcc.target/gcn/cond_fmaxnm_1.c: New test.
+	* gcc.target/gcn/cond_fmaxnm_1_run.c: New test.
+	* gcc.target/gcn/cond_fmaxnm_2.c: New test.
+	* gcc.target/gcn/cond_fmaxnm_2_run.c: New test.
+	* gcc.target/gcn/cond_fmaxnm_3.c: New test.
+	* gcc.target/gcn/cond_fmaxnm_3_run.c: New test.
+	* gcc.target/gcn/cond_fmaxnm_4.c: New test.
+	* gcc.target/gcn/cond_fmaxnm_4_run.c: New test.
+	* gcc.target/gcn/cond_fmaxnm_5.c: New test.
+	* gcc.target/gcn/cond_fmaxnm_5_run.c: New test.
+	* gcc.target/gcn/cond_fmaxnm_6.c: New test.
+	* gcc.target/gcn/cond_fmaxnm_6_run.c: New test.
+	* gcc.target/gcn/cond_fmaxnm_7.c: New test.
+	* gcc.target/gcn/cond_fmaxnm_7_run.c: New test.
+	* gcc.target/gcn/cond_fmaxnm_8.c: New test.
+	* gcc.target/gcn/cond_fmaxnm_8_run.c: New test.
+	* gcc.target/gcn/cond_fminnm_1.c: New test.
+	* gcc.target/gcn/cond_fminnm_1_run.c: New test.
+	* gcc.target/gcn/cond_fminnm_2.c: New test.
+	* gcc.target/gcn/cond_fminnm_2_run.c: New test.
+	* gcc.target/gcn/cond_fminnm_3.c: New test.
+	* gcc.target/gcn/cond_fminnm_3_run.c: New test.
+	* gcc.target/gcn/cond_fminnm_4.c: New test.
+	* gcc.target/gcn/cond_fminnm_4_run.c: New test.
+	* gcc.target/gcn/cond_fminnm_5.c: New test.
+	* gcc.target/gcn/cond_fminnm_5_run.c: New test.
+	* gcc.target/gcn/cond_fminnm_6.c: New test.
+	* gcc.target/gcn/cond_fminnm_6_run.c: New test.
+	* gcc.target/gcn/cond_fminnm_7.c: New test.
+	* gcc.target/gcn/cond_fminnm_7_run.c: New test.
+	* gcc.target/gcn/cond_fminnm_8.c: New test.
+	* gcc.target/gcn/cond_fminnm_8_run.c: New test.
+	* gcc.target/gcn/cond_smax_1.c: New test.
+	* gcc.target/gcn/cond_smax_1_run.c: New test.
+	* gcc.target/gcn/cond_smin_1.c: New test.
+	* gcc.target/gcn/cond_smin_1_run.c: New test.
+	* gcc.target/gcn/cond_umax_1.c: New test.
+	* gcc.target/gcn/cond_umax_1_run.c: New test.
+	* gcc.target/gcn/cond_umin_1.c: New test.
+	* gcc.target/gcn/cond_umin_1_run.c: New test.
+	* gcc.target/gcn/smax_1.c: New test.
+	* gcc.target/gcn/smax_1_run.c: New test.
+	* gcc.target/gcn/smin_1.c: New test.
+	* gcc.target/gcn/smin_1_run.c: New test.
+	* gcc.target/gcn/umax_1.c: New test.
+	* gcc.target/gcn/umax_1_run.c: New test.
+	* gcc.target/gcn/umin_1.c: New test.
+	* gcc.target/gcn/umin_1_run.c: New test.
+
+2023-03-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109025
+	* gcc.dg/vect/pr109025.c: New testcase.
+
+2023-03-06  Xi Ruoyao  <xry111@xry111.site>
+
+	* gcc.target/loongarch/prolog-opt.c (dg-options): Add
+	-fno-stack-protector.
+	* gcc.target/loongarch/stack-check-cfa-1.c (dg-options):
+	Likewise.
+	* gcc.target/loongarch/stack-check-cfa-2.c (dg-options):
+	Likewise.
+
+2023-03-06  Xi Ruoyao  <xry111@xry111.site>
+
+	PR target/109000
+	* gcc.target/loongarch/flt-abi-isa-1.c: New test.
+	* gcc.target/loongarch/flt-abi-isa-2.c: New test.
+	* gcc.target/loongarch/flt-abi-isa-3.c: New test.
+	* gcc.target/loongarch/flt-abi-isa-4.c: New test.
+
+2023-03-05  Harald Anlauf  <anlauf@gmx.de>
+	    Tobias Burnus   <tobias@codesourcery.com>
+
+	PR fortran/106856
+	* gfortran.dg/interface_41.f90: Remove dg-pattern from valid testcase.
+	* gfortran.dg/class_74.f90: New test.
+	* gfortran.dg/class_75.f90: New test.
+
+2023-03-05  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.dg/vect/slp-perm-8.c: Fix up syntax error in
+	scan-tree-dump-times target selector.
+
+2023-03-05  Liao Shihua  <shihua@iscas.ac.cn>
+	    SiYu Wu  <siyu@isrc.iscas.ac.cn>
+
+	* gcc.target/riscv/zksed32.c: New test.
+	* gcc.target/riscv/zksed64.c: New test.
+	* gcc.target/riscv/zksh32.c: New test.
+	* gcc.target/riscv/zksh64.c: New test.
+
+2023-03-05  Liao Shihua  <shihua@iscas.ac.cn>
+	    SiYu Wu  <siyu@isrc.iscas.ac.cn>
+
+	* gcc.target/riscv/zknh-sha256.c: New test.
+	* gcc.target/riscv/zknh-sha512-32.c: New test.
+	* gcc.target/riscv/zknh-sha512-64.c: New test.
+
+2023-03-05  Liao Shihua  <shihua@iscas.ac.cn>
+	    SiYu Wu  <siyu@isrc.iscas.ac.cn>
+
+	* gcc.target/riscv/zknd32.c: New test.
+	* gcc.target/riscv/zknd64.c: New test.
+	* gcc.target/riscv/zkne32.c: New test.
+	* gcc.target/riscv/zkne64.c: New test.
+
+2023-03-05  Liao Shihua  <shihua@iscas.ac.cn>
+	    SiYu Wu  <siyu@isrc.iscas.ac.cn>
+
+	* gcc.target/riscv/zbkb32.c: New test.
+	* gcc.target/riscv/zbkb64.c: New test.
+	* gcc.target/riscv/zbkc32.c: New test.
+	* gcc.target/riscv/zbkc64.c: New test.
+	* gcc.target/riscv/zbkx32.c: New test.
+	* gcc.target/riscv/zbkx64.c: New test.
+
+2023-03-05  Vineet Gupta  <vineetg@rivosinc.com>
+
+	* gcc.target/riscv/zba-shNadd-07.c: f2(i*783) now generates MUL vs.
+	5 insn sh1add+slli+add+slli+sub.
+	* gcc.target/riscv/pr108987.c: New test.
+
+2023-03-05  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+	    kito-cheng  <kito.cheng@sifive.com>
+
+	* gcc.target/riscv/rvv/base/vlmul_v.c: New test.
+
+2023-03-05  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/base/binop_vx_constraint-167.c: New test.
+	* gcc.target/riscv/rvv/base/binop_vx_constraint-168.c: New test.
+	* gcc.target/riscv/rvv/base/binop_vx_constraint-169.c: New test.
+	* gcc.target/riscv/rvv/base/binop_vx_constraint-170.c: New test.
+	* gcc.target/riscv/rvv/base/binop_vx_constraint-171.c: New test.
+	* gcc.target/riscv/rvv/base/binop_vx_constraint-172.c: New test.
+	* gcc.target/riscv/rvv/base/binop_vx_constraint-173.c: New test.
+	* gcc.target/riscv/rvv/base/binop_vx_constraint-174.c: New test.
+
+2023-03-05  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/base/scalar_move-1.c: New test.
+	* gcc.target/riscv/rvv/base/scalar_move-2.c: New test.
+	* gcc.target/riscv/rvv/base/scalar_move-3.c: New test.
+	* gcc.target/riscv/rvv/base/scalar_move-4.c: New test.
+	* gcc.target/riscv/rvv/base/scalar_move-5.c: New test.
+	* gcc.target/riscv/rvv/base/scalar_move-6.c: New test.
+	* gcc.target/riscv/rvv/base/scalar_move-7.c: New test.
+	* gcc.target/riscv/rvv/base/scalar_move-8.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-100.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-101.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-78.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-79.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-80.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-81.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-82.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-83.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-84.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-85.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-86.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-87.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-88.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-89.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-90.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-91.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-92.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-93.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-94.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-95.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-96.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-97.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-98.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-99.c: New test.
+
+2023-03-05  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-10.c: Adjust test.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-11.c: Ditto.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-12.c: Ditto.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-15.c: Ditto.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-18.c: Ditto.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-9.c: Ditto.
+
+2023-03-05  Lin Sinan  <sinan.lin@linux.alibaba.com>
+
+	* gcc.target/riscv/zbb-min-max-03.c: New test.
+
+2023-03-04  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.dg/vect/slp-3.c: Fix up syntax errors in scan-tree-dump-times
+	target selectors.
+	* gcc.dg/vect/slp-multitypes-11.c: Likewise.
+
+2023-03-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/107465
+	* c-c++-common/Wsign-compare-2.c (f18): New test.
+
+2023-03-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/107465
+	* c-c++-common/Wsign-compare-2.c: New test.
+	* c-c++-common/pr107465.c: New test.
+
+2023-03-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/107846
+	* gcc.dg/pr107846.c: New test.
+
+2023-03-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/108702
+	* g++.dg/ext/stmtexpr19.C: Use dg-do link rather than dg-do compile.
+
+2023-03-04  Hans-Peter Nilsson  <hp@axis.com>
+
+	* gcc.dg/ipa/pr77653.c: Skip for cris-*-*.
+
+2023-03-04  Hans-Peter Nilsson  <hp@axis.com>
+
+	* gcc.dg/ifcvt-4.c: Add cris-*-* to skip list.
+
+2023-03-04  Hans-Peter Nilsson  <hp@axis.com>
+
+	* g++.dg/cpp0x/pr84497.C: Handle USER_LABEL_PREFIX == "_" on
+	scan-assembler identifiers.
+	* gcc.dg/debug/btf/btf-enum64-1.c, gcc.dg/ipa/symver1.c: Ditto.
+
 2023-03-03  David Malcolm  <dmalcolm@redhat.com>
 
 	PR analyzer/109016

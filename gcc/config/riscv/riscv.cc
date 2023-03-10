@@ -1003,6 +1003,18 @@ riscv_v_adjust_nunits (machine_mode mode, int scale)
   return scale;
 }
 
+/* Call from ADJUST_PRECISION in riscv-modes.def.  Return the correct
+   PRECISION size for corresponding machine_mode.  */
+
+poly_int64
+riscv_v_adjust_precision (machine_mode mode, int scale)
+{
+  if (riscv_v_ext_vector_mode_p (mode))
+    return riscv_vector_chunks * scale;
+
+  return scale;
+}
+
 /* Return true if X is a valid address for machine mode MODE.  If it is,
    fill in INFO appropriately.  STRICT_P is true if REG_OK_STRICT is in
    effect.  */
@@ -2527,7 +2539,8 @@ riscv_rtx_costs (rtx x, machine_mode mode, int outer_code, int opno ATTRIBUTE_UN
 	  && GET_CODE (XEXP (x, 0)) == MULT
 	  && REG_P (XEXP (XEXP (x, 0), 0))
 	  && CONST_INT_P (XEXP (XEXP (x, 0), 1))
-	  && IN_RANGE (pow2p_hwi (INTVAL (XEXP (XEXP (x, 0), 1))), 1, 3))
+	  && pow2p_hwi (INTVAL (XEXP (XEXP (x, 0), 1)))
+	  && IN_RANGE (exact_log2 (INTVAL (XEXP (XEXP (x, 0), 1))), 1, 3))
 	{
 	  *total = COSTS_N_INSNS (1);
 	  return true;
@@ -7067,6 +7080,9 @@ riscv_shamt_matches_mask_p (int shamt, HOST_WIDE_INT mask)
 
 #undef TARGET_BUILTIN_DECL
 #define TARGET_BUILTIN_DECL riscv_builtin_decl
+
+#undef TARGET_GIMPLE_FOLD_BUILTIN
+#define TARGET_GIMPLE_FOLD_BUILTIN riscv_gimple_fold_builtin
 
 #undef TARGET_EXPAND_BUILTIN
 #define TARGET_EXPAND_BUILTIN riscv_expand_builtin

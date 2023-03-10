@@ -87,6 +87,7 @@ proc check_compile {basename type contents args} {
 	assembly { set output ${basename}[pid].s }
 	object { set output ${basename}[pid].o }
 	executable { set output ${basename}[pid].exe }
+	"tree-*" -
 	"rtl-*" {
 	    set output ${basename}[pid].s
 	    lappend options "additional_flags=-fdump-$type"
@@ -107,6 +108,9 @@ proc check_compile {basename type contents args} {
     # file is created won't work.
     if [regexp "rtl-(.*)" $type dummy rtl_type] {
 	set scan_output "[glob $src.\[0-9\]\[0-9\]\[0-9\]r.$rtl_type]"
+	file delete $output
+    } elseif [regexp "tree-(.*)" $type dummy tree_type] {
+	set scan_output "[glob $src.\[0-9\]\[0-9\]\[0-9\]t.$tree_type]"
 	file delete $output
     }
 
@@ -11678,6 +11682,15 @@ proc check_effective_target_frame_pointer_for_non_leaf { } {
   }
 
   return 0
+}
+
+# Return 1 if the target can perform tail-call optimizations of the
+# most trivial type.
+proc check_effective_target_tail_call { } {
+    return [check_no_messages_and_pattern tail_call ",SIBCALL" rtl-expand {
+	__attribute__((__noipa__)) void foo (void) { }
+	__attribute__((__noipa__)) void bar (void) { foo(); }
+    } {-O2 -fdump-rtl-expand-all}] ;# The "SIBCALL" note requires a detailed dump.
 }
 
 # Return 1 if the target's calling sequence or its ABI

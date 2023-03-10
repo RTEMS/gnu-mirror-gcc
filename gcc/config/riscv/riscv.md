@@ -242,6 +242,7 @@
 ;; bitmanip	bit manipulation instructions
 ;; rotate   rotation instructions
 ;; atomic   atomic instructions
+;; crypto cryptography instructions
 ;; Classification of RVV instructions which will be added to each RVV .md pattern and used by scheduler.
 ;; rdvlenb     vector byte length vlenb csrr read
 ;; rdvl        vector length vl csrr read
@@ -311,7 +312,7 @@
 ;; viwred      vector widening integer reduction instructions
 ;; vfredu      vector single-width floating-point un-ordered reduction instruction
 ;; vfredo      vector single-width floating-point ordered reduction instruction
-;; vfwredu      vector widening floating-point un-ordered reduction instruction
+;; vfwredu     vector widening floating-point un-ordered reduction instruction
 ;; vfwredo     vector widening floating-point ordered reduction instruction
 ;; 15. Vector mask instructions
 ;; vmalu       vector mask-register logical instructions
@@ -321,21 +322,24 @@
 ;; vmiota      vector iota
 ;; vmidx       vector element index instruction
 ;; 16. Vector permutation instructions
-;; vimovvx     integer scalar move instructions
-;; vimovxv     integer scalar move instructions
-;; vfmovvf     floating-point scalar move instructions
-;; vfmovfv     floating-point scalar move instructions
-;; vislide     vector slide instructions
-;; vislide1    vector slide instructions
-;; vfslide1    vector slide instructions
-;; vgather     vector register gather instructions
-;; vcompress   vector compress instruction
-;; vmov        whole vector register move
+;; vimovvx      integer scalar move instructions
+;; vimovxv      integer scalar move instructions
+;; vfmovvf      floating-point scalar move instructions
+;; vfmovfv      floating-point scalar move instructions
+;; vslideup     vector slide instructions
+;; vslidedown   vector slide instructions
+;; vislide1up   vector slide instructions
+;; vislide1down vector slide instructions
+;; vfslide1up   vector slide instructions
+;; vfslide1down vector slide instructions
+;; vgather      vector register gather instructions
+;; vcompress    vector compress instruction
+;; vmov         whole vector register move
 (define_attr "type"
   "unknown,branch,jump,call,load,fpload,store,fpstore,
    mtc,mfc,const,arith,logical,shift,slt,imul,idiv,move,fmove,fadd,fmul,
    fmadd,fdiv,fcmp,fcvt,fsqrt,multi,auipc,sfb_alu,nop,ghost,bitmanip,rotate,
-   atomic,rdvlenb,rdvl,vsetvl,vlde,vste,vldm,vstm,vlds,vsts,
+   atomic,crypto,rdvlenb,rdvl,vsetvl,vlde,vste,vldm,vstm,vlds,vsts,
    vldux,vldox,vstux,vstox,vldff,vldr,vstr,
    vialu,viwalu,vext,vicalu,vshift,vnshift,vicmp,viminmax,
    vimul,vidiv,viwmul,vimuladd,viwmuladd,vimerge,vimov,
@@ -346,7 +350,8 @@
    vfwcvtftof,vfncvtitof,vfncvtftoi,vfncvtftof,
    vired,viwred,vfredu,vfredo,vfwredu,vfwredo,
    vmalu,vmpop,vmffs,vmsfs,vmiota,vmidx,vimovvx,vimovxv,vfmovvf,vfmovfv,
-   vislide,vislide1,vfslide1,vgather,vcompress,vmov"
+   vslideup,vslidedown,vislide1up,vislide1down,vfslide1up,vfslide1down,
+   vgather,vcompress,vmov"
   (cond [(eq_attr "got" "load") (const_string "load")
 
 	 ;; If a doubleword move uses these expensive instructions,
@@ -1358,7 +1363,9 @@
   [(set (match_operand:DI     0 "register_operand"     "=r,r")
 	(zero_extend:DI
 	    (match_operand:SI 1 "nonimmediate_operand" " r,m")))]
-  "TARGET_64BIT && !TARGET_ZBA"
+  "TARGET_64BIT && !TARGET_ZBA
+   && !(REG_P (operands[1])
+        && REGNO (operands[1]) == VL_REGNUM)"
   "@
    #
    lwu\t%0,%1"
@@ -1738,7 +1745,9 @@
   [(set (match_operand:SI 0 "nonimmediate_operand" "=r,r,r, m,  *f,*f,*r,*m,r")
 	(match_operand:SI 1 "move_operand"         " r,T,m,rJ,*r*J,*m,*f,*f,vp"))]
   "(register_operand (operands[0], SImode)
-    || reg_or_0_operand (operands[1], SImode))"
+    || reg_or_0_operand (operands[1], SImode))
+    && !(register_operand (operands[1], SImode)
+         && REGNO (operands[1]) == VL_REGNUM)"
   { return riscv_output_move (operands[0], operands[1]); }
   [(set_attr "move_type" "move,const,load,store,mtc,fpload,mfc,fpstore,rdvlenb")
    (set_attr "mode" "SI")
@@ -3088,6 +3097,7 @@
 )
 
 (include "bitmanip.md")
+(include "crypto.md")
 (include "sync.md")
 (include "peephole.md")
 (include "pic.md")

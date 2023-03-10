@@ -5674,7 +5674,21 @@ expand_fix (rtx to, rtx from, int unsignedp)
 	    rtx_insn *last = get_last_insn ();
 	    rtx from1 = from;
 	    if (fmode != GET_MODE (from))
-	      from1 = convert_to_mode (fmode, from, 0);
+	      {
+		if (REAL_MODE_FORMAT (GET_MODE (from))
+		    == &arm_bfloat_half_format
+		    && REAL_MODE_FORMAT (fmode) == &ieee_single_format)
+		  /* The BF -> SF conversions can be just a shift, doesn't
+		     need to handle sNANs.  */
+		  {
+		    int save_flag_finite_math_only = flag_finite_math_only;
+		    flag_finite_math_only = true;
+		    from1 = convert_to_mode (fmode, from, 0);
+		    flag_finite_math_only = save_flag_finite_math_only;
+		  }
+		else
+		  from1 = convert_to_mode (fmode, from, 0);
+	      }
 
 	    if (must_trunc)
 	      {
@@ -5746,7 +5760,21 @@ expand_fix (rtx to, rtx from, int unsignedp)
 	    lab2 = gen_label_rtx ();
 
 	    if (fmode != GET_MODE (from))
-	      from = convert_to_mode (fmode, from, 0);
+	      {
+		if (REAL_MODE_FORMAT (GET_MODE (from))
+		    == &arm_bfloat_half_format
+		    && REAL_MODE_FORMAT (fmode) == &ieee_single_format)
+		  /* The BF -> SF conversions can be just a shift, doesn't
+		     need to handle sNANs.  */
+		  {
+		    int save_flag_finite_math_only = flag_finite_math_only;
+		    flag_finite_math_only = true;
+		    from = convert_to_mode (fmode, from, 0);
+		    flag_finite_math_only = save_flag_finite_math_only;
+		  }
+		else
+		  from = convert_to_mode (fmode, from, 0);
+	      }
 
 	    /* See if we need to do the subtraction.  */
 	    do_pending_stack_adjust ();
@@ -5789,6 +5817,22 @@ expand_fix (rtx to, rtx from, int unsignedp)
 	    return;
 	  }
       }
+
+#ifdef HAVE_SFmode
+  if (REAL_MODE_FORMAT (GET_MODE (from)) == &arm_bfloat_half_format
+      && REAL_MODE_FORMAT (SFmode) == &ieee_single_format)
+    /* We don't have BF -> TI library functions, use BF -> SF -> TI
+       instead but the BF -> SF conversion can be just a shift, doesn't
+       need to handle sNANs.  */
+    {
+      int save_flag_finite_math_only = flag_finite_math_only;
+      flag_finite_math_only = true;
+      from = convert_to_mode (SFmode, from, 0);
+      flag_finite_math_only = save_flag_finite_math_only;
+      expand_fix (to, from, unsignedp);
+      return;
+    }
+#endif
 
   /* We can't do it with an insn, so use a library call.  But first ensure
      that the mode of TO is at least as wide as SImode, since those are the
@@ -8091,6 +8135,11 @@ maybe_gen_insn (enum insn_code icode, unsigned int nops,
       return GEN_FCN (icode) (ops[0].value, ops[1].value, ops[2].value,
 			      ops[3].value, ops[4].value, ops[5].value,
 			      ops[6].value, ops[7].value, ops[8].value);
+    case 10:
+      return GEN_FCN (icode) (ops[0].value, ops[1].value, ops[2].value,
+			      ops[3].value, ops[4].value, ops[5].value,
+			      ops[6].value, ops[7].value, ops[8].value,
+			      ops[9].value);
     }
   gcc_unreachable ();
 }
