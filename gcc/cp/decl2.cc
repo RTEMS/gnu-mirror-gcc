@@ -1,5 +1,5 @@
 /* Process declarations and variables for C++ compiler.
-   Copyright (C) 1988-2022 Free Software Foundation, Inc.
+   Copyright (C) 1988-2023 Free Software Foundation, Inc.
    Hacked by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GCC.
@@ -4982,7 +4982,7 @@ c_parse_final_cleanups (void)
 	 get emitted.  */
       for (i = unemitted_tinfo_decls->length ();
 	   unemitted_tinfo_decls->iterate (--i, &t);)
-	if (emit_tinfo_decl (t))
+	if (DECL_INITIAL (t) || emit_tinfo_decl (t))
 	  {
 	    reconsider = true;
 	    unemitted_tinfo_decls->unordered_remove (i);

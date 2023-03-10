@@ -1,5 +1,5 @@
 /* Subroutines for insn-output.cc for Tensilica's Xtensa architecture.
-   Copyright (C) 2001-2022 Free Software Foundation, Inc.
+   Copyright (C) 2001-2023 Free Software Foundation, Inc.
    Contributed by Bob Wilson (bwilson@tensilica.com) at Tensilica.
 
 This file is part of GCC.
@@ -104,18 +104,8 @@ struct GTY(()) machine_function
   bool frame_laid_out;
   bool epilogue_done;
   bool inhibit_logues_a1_adjusts;
-};
-
-/* Vector, indexed by hard register number, which contains 1 for a
-   register that is allowable in a candidate for leaf function
-   treatment.  */
-
-const char xtensa_leaf_regs[FIRST_PSEUDO_REGISTER] =
-{
-  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-  1, 1, 1,
-  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-  1
+  rtx last_logues_a9_content;
+  HOST_WIDE_INT eliminated_callee_saved_bmp;
 };
 
 static void xtensa_option_override (void);
@@ -2193,8 +2183,10 @@ xtensa_emit_movcc (bool inverted, bool isfp, bool isbool, rtx *operands)
 
 
 void
-xtensa_prepare_expand_call (int callop, rtx *operands)
+xtensa_expand_call (int callop, rtx *operands)
 {
+  rtx call;
+  rtx_insn *call_insn;
   rtx addr = XEXP (operands[callop], 0);
 
   if (flag_pic && SYMBOL_REF_P (addr)
@@ -2211,6 +2203,27 @@ xtensa_prepare_expand_call (int callop, rtx *operands)
 				 gen_rtx_REG (Pmode, A8_REG),
 				 Pmode);
       XEXP (operands[callop], 0) = reg;
+    }
+
+  call = gen_rtx_CALL (VOIDmode, operands[callop], operands[callop + 1]);
+
+  if (callop)
+    call = gen_rtx_SET (operands[0], call);
+
+  call_insn = emit_call_insn (call);
+
+  if (TARGET_WINDOWED_ABI)
+    {
+      /*
+       * Windowed xtensa ABI specifies that static chain pointer is passed
+       * in memory below the caller's stack pointer, which means that the
+       * callee may clobber it if it's a non-leaf function.
+       * Add the clobber expression for the static chain to the function call
+       * expression list so that it is not assumed to be live across the call.
+       */
+      rtx clob = gen_rtx_CLOBBER (Pmode, xtensa_static_chain (NULL, false));
+      CALL_INSN_FUNCTION_USAGE (call_insn) =
+	gen_rtx_EXPR_LIST (Pmode, clob, CALL_INSN_FUNCTION_USAGE (call_insn));
     }
 }
 
@@ -2515,6 +2528,99 @@ xtensa_split_DI_reg_imm (rtx *operands)
   operands[2] = gen_highpart (SImode, operands[0]);
   operands[1] = lowpart;
   operands[0] = gen_lowpart (SImode, operands[0]);
+}
+
+
+/* Try to split an integer value into what are suitable for two consecutive
+   immediate addition instructions, ADDI or ADDMI.  */
+
+static bool
+xtensa_split_imm_two_addends (HOST_WIDE_INT imm, HOST_WIDE_INT v[2])
+{
+  HOST_WIDE_INT v0, v1;
+
+  if (imm < -32768)
+    v0 = -32768, v1 = imm + 32768;
+  else if (imm > 32512)
+    v0 = 32512, v1 = imm - 32512;
+  else if (TARGET_DENSITY && xtensa_simm12b (imm))
+    /* A pair of MOVI(.N) and ADD.N is one or two bytes less than two
+       immediate additions if TARGET_DENSITY.  */
+    return false;
+  else
+    v0 = (imm + 128) & ~255L, v1 = imm - v0;
+
+  if (xtensa_simm8 (v1) || xtensa_simm8x256 (v1))
+    {
+      v[0] = v0, v[1] = v1;
+      return true;
+    }
+
+  return false;
+}
+
+
+/* Helper function for integer immediate addition with scratch register
+   as needed, that splits and emits either up to two ADDI/ADDMI machine
+   instructions or an addition by register following an integer immediate
+   load (which may later be transformed by constantsynth).
+
+   If 'scratch' is NULL_RTX but still needed, a new pseudo-register will
+   be allocated.  Thus, after the reload/LRA pass, the specified scratch
+   register must be a hard one.  */
+
+static bool
+xtensa_emit_add_imm (rtx dst, rtx src, HOST_WIDE_INT imm, rtx scratch,
+		     bool need_note)
+{
+  bool retval = false;
+  HOST_WIDE_INT v[2];
+  rtx_insn *insn;
+
+  if (imm == 0)
+    return false;
+
+  if (xtensa_simm8 (imm) || xtensa_simm8x256 (imm))
+    insn = emit_insn (gen_addsi3 (dst, src, GEN_INT (imm)));
+  else if (xtensa_split_imm_two_addends (imm, v))
+    {
+      if (!scratch)
+	scratch = gen_reg_rtx (SImode);
+      emit_insn (gen_addsi3 (scratch, src, GEN_INT (v[0])));
+      insn = emit_insn (gen_addsi3 (dst, scratch, GEN_INT (v[1])));
+    }
+  else
+    {
+      if (scratch)
+	emit_move_insn (scratch, GEN_INT (imm));
+      else
+	scratch = force_reg (SImode, GEN_INT (imm));
+      retval = true;
+      insn = emit_insn (gen_addsi3 (dst, src, scratch));
+    }
+
+  if (need_note)
+    {
+      rtx note_rtx = gen_rtx_SET (dst, plus_constant (Pmode, src, imm));
+
+      RTX_FRAME_RELATED_P (insn) = 1;
+      add_reg_note (insn, REG_FRAME_RELATED_EXPR, note_rtx);
+    }
+
+  return retval;
+}
+
+
+/* Return true if the constants used in the application of smin() following
+   smax() meet the specifications of the CLAMPS machine instruction.  */
+bool
+xtensa_match_CLAMPS_imms_p (rtx cst_max, rtx cst_min)
+{
+  int max, min;
+
+  return IN_RANGE (max = exact_log2 (-INTVAL (cst_max)), 7, 22)
+	 && IN_RANGE (min = exact_log2 (INTVAL (cst_min) + 1), 7, 22)
+	 && max == min;
 }
 
 
@@ -3154,8 +3260,11 @@ xtensa_call_save_reg (int regno)
     return false;
 
   if (regno == A0_REG)
-    return crtl->profile || !crtl->is_leaf || crtl->calls_eh_return ||
-      df_regs_ever_live_p (regno);
+    /* Ensure the return address to be saved to the stack slot in order
+       to assist stack dump analysis when -Og is specified.  */
+    return optimize_debug
+	   || crtl->profile || !crtl->is_leaf || crtl->calls_eh_return
+	   || df_regs_ever_live_p (regno);
 
   if (crtl->calls_eh_return && IN_RANGE (regno, 2, 3))
     return true;
@@ -3245,41 +3354,93 @@ xtensa_initial_elimination_offset (int from, int to ATTRIBUTE_UNUSED)
 static void
 xtensa_emit_adjust_stack_ptr (HOST_WIDE_INT offset, int flags)
 {
+  rtx src, scratch;
   rtx_insn *insn;
-  rtx ptr = (flags & ADJUST_SP_FRAME_PTR) ? hard_frame_pointer_rtx
-					  : stack_pointer_rtx;
 
   if (cfun->machine->inhibit_logues_a1_adjusts)
     return;
 
-  if (xtensa_simm8 (offset)
-      || xtensa_simm8x256 (offset))
-    insn = emit_insn (gen_addsi3 (stack_pointer_rtx, ptr, GEN_INT (offset)));
-  else
-    {
-      rtx tmp_reg = gen_rtx_REG (Pmode, A9_REG);
+  src = (flags & ADJUST_SP_FRAME_PTR)
+	 ? hard_frame_pointer_rtx : stack_pointer_rtx;
+  scratch = gen_rtx_REG (Pmode, A9_REG);
 
-      if (offset < 0)
+  if (df && DF_REG_DEF_COUNT (A9_REG) == 0
+      && cfun->machine->last_logues_a9_content
+      && -INTVAL (cfun->machine->last_logues_a9_content) == offset)
+    {
+      insn = emit_insn (gen_subsi3 (stack_pointer_rtx, src, scratch));
+      if (flags & ADJUST_SP_NEED_NOTE)
 	{
-	  emit_move_insn (tmp_reg, GEN_INT (-offset));
-	  insn = emit_insn (gen_subsi3 (stack_pointer_rtx, ptr, tmp_reg));
-	}
-      else
-	{
-	  emit_move_insn (tmp_reg, GEN_INT (offset));
-	  insn = emit_insn (gen_addsi3 (stack_pointer_rtx, ptr,	tmp_reg));
+	  rtx note_rtx = gen_rtx_SET (stack_pointer_rtx,
+				      plus_constant (Pmode, src, offset));
+
+	  RTX_FRAME_RELATED_P (insn) = 1;
+	  add_reg_note (insn, REG_FRAME_RELATED_EXPR, note_rtx);
 	}
     }
+  else if (xtensa_emit_add_imm (stack_pointer_rtx, src, offset, scratch,
+				(flags & ADJUST_SP_NEED_NOTE)))
+    cfun->machine->last_logues_a9_content = GEN_INT (offset);
+}
 
-  if (flags & ADJUST_SP_NEED_NOTE)
-    {
-      rtx note_rtx = gen_rtx_SET (stack_pointer_rtx,
-				  plus_constant (Pmode, stack_pointer_rtx,
-						 offset));
+static bool
+xtensa_can_eliminate_callee_saved_reg_p (unsigned int regno,
+					 rtx_insn **p_insnS,
+					 rtx_insn **p_insnR)
+{
+  df_ref ref;
+  rtx_insn *insn, *insnS = NULL, *insnR = NULL;
+  rtx pattern;
 
-      RTX_FRAME_RELATED_P (insn) = 1;
-      add_reg_note (insn, REG_FRAME_RELATED_EXPR, note_rtx);
-    }
+  if (!optimize || !df || call_used_or_fixed_reg_p (regno))
+    return false;
+
+  for (ref = DF_REG_DEF_CHAIN (regno);
+       ref; ref = DF_REF_NEXT_REG (ref))
+    if (DF_REF_CLASS (ref) != DF_REF_REGULAR
+	|| DEBUG_INSN_P (insn = DF_REF_INSN (ref)))
+      continue;
+    else if (GET_CODE (pattern = PATTERN (insn)) == SET
+	     && REG_P (SET_DEST (pattern))
+	     && REGNO (SET_DEST (pattern)) == regno
+	     && REG_NREGS (SET_DEST (pattern)) == 1
+	     && REG_P (SET_SRC (pattern))
+	     && REGNO (SET_SRC (pattern)) != A1_REG)
+      {
+	if (insnS)
+	  return false;
+	insnS = insn;
+	continue;
+      }
+    else
+      return false;
+
+  for (ref = DF_REG_USE_CHAIN (regno);
+       ref; ref = DF_REF_NEXT_REG (ref))
+    if (DF_REF_CLASS (ref) != DF_REF_REGULAR
+	|| DEBUG_INSN_P (insn = DF_REF_INSN (ref)))
+      continue;
+    else if (GET_CODE (pattern = PATTERN (insn)) == SET
+	     && REG_P (SET_SRC (pattern))
+	     && REGNO (SET_SRC (pattern)) == regno
+	     && REG_NREGS (SET_SRC (pattern)) == 1
+	     && REG_P (SET_DEST (pattern))
+	     && REGNO (SET_DEST (pattern)) != A1_REG)
+      {
+	if (insnR)
+	  return false;
+	insnR = insn;
+	continue;
+      }
+    else
+      return false;
+
+  if (!insnS || !insnR)
+    return false;
+
+  *p_insnS = insnS, *p_insnR = insnR;
+
+  return true;
 }
 
 /* minimum frame = reg save area (4 words) plus static chain (1 word)
@@ -3307,8 +3468,9 @@ xtensa_expand_prologue (void)
 	  /* Use a8 as a temporary since a0-a7 may be live.  */
 	  rtx tmp_reg = gen_rtx_REG (Pmode, A8_REG);
 	  emit_insn (gen_entry (GEN_INT (MIN_FRAME_SIZE)));
-	  emit_move_insn (tmp_reg, GEN_INT (total_size - MIN_FRAME_SIZE));
-	  emit_insn (gen_subsi3 (tmp_reg, stack_pointer_rtx, tmp_reg));
+	  xtensa_emit_add_imm (tmp_reg, stack_pointer_rtx,
+			       MIN_FRAME_SIZE - total_size,
+			       tmp_reg, false);
 	  insn = emit_insn (gen_movsi (stack_pointer_rtx, tmp_reg));
 	}
     }
@@ -3320,6 +3482,7 @@ xtensa_expand_prologue (void)
       df_ref ref;
       bool stack_pointer_needed = frame_pointer_needed
 				  || crtl->calls_eh_return;
+      bool large_stack_needed;
 
       /* Check if the function body really needs the stack pointer.  */
       if (!stack_pointer_needed && df)
@@ -3368,23 +3531,41 @@ xtensa_expand_prologue (void)
 	    }
 	}
 
+      large_stack_needed = total_size > 1024
+			   || (!callee_save_size && total_size > 128);
       for (regno = 0; regno < FIRST_PSEUDO_REGISTER; ++regno)
-	{
-	  if (xtensa_call_save_reg(regno))
-	    {
-	      rtx x = gen_rtx_PLUS (Pmode, stack_pointer_rtx, GEN_INT (offset));
-	      rtx mem = gen_frame_mem (SImode, x);
-	      rtx reg = gen_rtx_REG (SImode, regno);
+	if (xtensa_call_save_reg(regno))
+	  {
+	    rtx x = gen_rtx_PLUS (Pmode,
+				  stack_pointer_rtx, GEN_INT (offset));
+	    rtx mem = gen_frame_mem (SImode, x);
+	    rtx_insn *insnS, *insnR;
 
-	      offset -= UNITS_PER_WORD;
-	      insn = emit_move_insn (mem, reg);
-	      RTX_FRAME_RELATED_P (insn) = 1;
-	      add_reg_note (insn, REG_FRAME_RELATED_EXPR,
-			    gen_rtx_SET (mem, reg));
-	    }
-	}
-      if (total_size > 1024
-	  || (!callee_save_size && total_size > 128))
+	    if (!large_stack_needed
+		&& xtensa_can_eliminate_callee_saved_reg_p (regno,
+							    &insnS, &insnR))
+	      {
+		if (frame_pointer_needed)
+		  mem = replace_rtx (mem, stack_pointer_rtx,
+				     hard_frame_pointer_rtx);
+		SET_DEST (PATTERN (insnS)) = mem;
+		df_insn_rescan (insnS);
+		SET_SRC (PATTERN (insnR)) = copy_rtx (mem);
+		df_insn_rescan (insnR);
+		cfun->machine->eliminated_callee_saved_bmp |= 1 << regno;
+	      }
+	    else
+	      {
+		rtx reg = gen_rtx_REG (SImode, regno);
+
+		insn = emit_move_insn (mem, reg);
+		RTX_FRAME_RELATED_P (insn) = 1;
+		add_reg_note (insn, REG_FRAME_RELATED_EXPR,
+			      gen_rtx_SET (mem, reg));
+	      }
+	    offset -= UNITS_PER_WORD;
+	  }
+      if (large_stack_needed)
 	xtensa_emit_adjust_stack_ptr (callee_save_size - total_size,
 				      ADJUST_SP_NEED_NOTE);
     }
@@ -3473,18 +3654,18 @@ xtensa_expand_epilogue (bool sibcall_p)
 	emit_insn (gen_blockage ());
 
       for (regno = 0; regno < FIRST_PSEUDO_REGISTER; ++regno)
-	{
-	  if (xtensa_call_save_reg(regno))
-	    {
-	      rtx x = gen_rtx_PLUS (Pmode, stack_pointer_rtx, GEN_INT (offset));
-
-	      offset -= UNITS_PER_WORD;
-	      emit_move_insn (gen_rtx_REG (SImode, regno),
-			      gen_frame_mem (SImode, x));
-	    }
-	}
-      if (sibcall_p)
-	emit_use (gen_rtx_REG (SImode, A0_REG));
+	if (xtensa_call_save_reg(regno))
+	  {
+	    if (! (cfun->machine->eliminated_callee_saved_bmp
+		   & (1 << regno)))
+	      {
+		rtx x = gen_rtx_PLUS (Pmode,
+				      stack_pointer_rtx, GEN_INT (offset));
+		emit_move_insn (gen_rtx_REG (SImode, regno),
+				gen_frame_mem (SImode, x));
+	      }
+	    offset -= UNITS_PER_WORD;
+	  }
 
       if (cfun->machine->current_frame_size > 0)
 	{
@@ -3510,7 +3691,9 @@ xtensa_expand_epilogue (bool sibcall_p)
 				  EH_RETURN_STACKADJ_RTX));
     }
   cfun->machine->epilogue_done = true;
-  if (!sibcall_p)
+  if (sibcall_p)
+    emit_use (gen_rtx_REG (SImode, A0_REG));
+  else
     emit_jump_insn (gen_return ());
 }
 
@@ -3540,8 +3723,8 @@ xtensa_set_return_address (rtx address, rtx scratch)
 
   if (total_size > 1024)
     {
-      emit_move_insn (scratch, GEN_INT (total_size - UNITS_PER_WORD));
-      emit_insn (gen_addsi3 (scratch, frame, scratch));
+      xtensa_emit_add_imm (scratch, frame, total_size - UNITS_PER_WORD,
+			   scratch, false);
       a0_addr = scratch;
     }
 
@@ -4066,58 +4249,25 @@ xtensa_secondary_reload (bool in_p, rtx x, reg_class_t rclass,
   return NO_REGS;
 }
 
+/* Called once at the start of IRA, by ADJUST_REG_ALLOC_ORDER.  */
 
 void
-order_regs_for_local_alloc (void)
+xtensa_adjust_reg_alloc_order (void)
 {
-  if (!leaf_function_p ())
-    {
-      static const int reg_nonleaf_alloc_order[FIRST_PSEUDO_REGISTER] =
+  static const int reg_windowed_alloc_order[FIRST_PSEUDO_REGISTER] =
 	REG_ALLOC_ORDER;
-      static const int reg_nonleaf_alloc_order_call0[FIRST_PSEUDO_REGISTER] =
-	{
-	  11, 10,  9,  8,  7,  6,  5,  4,  3,  2, 12, 13, 14, 15,
-	  18,
-	  19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
-	  0,  1, 16, 17,
-	  35,
-	};
+  static const int reg_call0_alloc_order[FIRST_PSEUDO_REGISTER] =
+  {
+     9, 10, 11,  7,  6,  5,  4,  3,  2,  8,  0, 12, 13, 14, 15,
+    18,
+    19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
+     1, 16, 17,
+    35,
+  };
 
-      memcpy (reg_alloc_order, TARGET_WINDOWED_ABI ?
-	      reg_nonleaf_alloc_order : reg_nonleaf_alloc_order_call0,
-	      FIRST_PSEUDO_REGISTER * sizeof (int));
-    }
-  else
-    {
-      int i, num_arg_regs;
-      int nxt = 0;
-
-      /* Use the AR registers in increasing order (skipping a0 and a1)
-	 but save the incoming argument registers for a last resort.  */
-      num_arg_regs = crtl->args.info.arg_words;
-      if (num_arg_regs > MAX_ARGS_IN_REGISTERS)
-	num_arg_regs = MAX_ARGS_IN_REGISTERS;
-      for (i = GP_ARG_FIRST; i < 16 - num_arg_regs; i++)
-	reg_alloc_order[nxt++] = i + num_arg_regs;
-      for (i = 0; i < num_arg_regs; i++)
-	reg_alloc_order[nxt++] = GP_ARG_FIRST + i;
-
-      /* List the coprocessor registers in order.  */
-      for (i = 0; i < BR_REG_NUM; i++)
-	reg_alloc_order[nxt++] = BR_REG_FIRST + i;
-
-      /* List the FP registers in order for now.  */
-      for (i = 0; i < 16; i++)
-	reg_alloc_order[nxt++] = FP_REG_FIRST + i;
-
-      /* GCC requires that we list *all* the registers....  */
-      reg_alloc_order[nxt++] = 0;	/* a0 = return address */
-      reg_alloc_order[nxt++] = 1;	/* a1 = stack pointer */
-      reg_alloc_order[nxt++] = 16;	/* pseudo frame pointer */
-      reg_alloc_order[nxt++] = 17;	/* pseudo arg pointer */
-
-      reg_alloc_order[nxt++] = ACC_REG_FIRST;	/* MAC16 accumulator */
-    }
+  memcpy (reg_alloc_order, TARGET_WINDOWED_ABI ?
+	  reg_windowed_alloc_order : reg_call0_alloc_order,
+	  FIRST_PSEUDO_REGISTER * sizeof (int));
 }
 
 
@@ -4445,13 +4595,15 @@ xtensa_insn_cost (rtx_insn *insn, bool speed)
 {
   if (!(recog_memoized (insn) < 0))
     {
-      int len = get_attr_length (insn), n = (len + 2) / 3;
+      int len = get_attr_length (insn);
 
       if (len == 0)
 	return COSTS_N_INSNS (0);
 
       if (speed)  /* For speed cost.  */
 	{
+	  int n = (len + 2) / 3;
+
 	  /* "L32R" may be particular slow (implementation-dependent).  */
 	  if (xtensa_is_insn_L32R_p (insn))
 	    return COSTS_N_INSNS (1 + xtensa_extra_l32r_costs);
@@ -4498,10 +4650,11 @@ xtensa_insn_cost (rtx_insn *insn, bool speed)
 	    {
 	      /* "L32R" itself plus constant in litpool.  */
 	      if (xtensa_is_insn_L32R_p (insn))
-		return COSTS_N_INSNS (2) + 1;
+		len = 3 + 4;
 
-	      /* Consider ".n" short instructions.  */
-	      return COSTS_N_INSNS (n) - (n * 3 - len);
+	      /* Consider fractional instruction length (for example, ".n"
+		 short instructions or "L32R" litpool constants.  */
+	      return (COSTS_N_INSNS (len) + 1) / 3;
 	    }
 	}
     }
@@ -5101,15 +5254,7 @@ xtensa_output_mi_thunk (FILE *file, tree thunk ATTRIBUTE_UNUSED,
   this_rtx = gen_rtx_REG (Pmode, A0_REG + this_reg_no);
 
   if (delta)
-    {
-      if (xtensa_simm8 (delta))
-	emit_insn (gen_addsi3 (this_rtx, this_rtx, GEN_INT (delta)));
-      else
-	{
-	  emit_move_insn (temp0, GEN_INT (delta));
-	  emit_insn (gen_addsi3 (this_rtx, this_rtx, temp0));
-	}
-    }
+    xtensa_emit_add_imm (this_rtx, this_rtx, delta, temp0, false);
 
   if (vcall_offset)
     {
@@ -5119,13 +5264,8 @@ xtensa_output_mi_thunk (FILE *file, tree thunk ATTRIBUTE_UNUSED,
       emit_move_insn (temp0, gen_rtx_MEM (Pmode, this_rtx));
       if (xtensa_uimm8x4 (vcall_offset))
 	addr = plus_constant (Pmode, temp0, vcall_offset);
-      else if (xtensa_simm8 (vcall_offset))
-	emit_insn (gen_addsi3 (temp1, temp0, GEN_INT (vcall_offset)));
       else
-	{
-	  emit_move_insn (temp1, GEN_INT (vcall_offset));
-	  emit_insn (gen_addsi3 (temp1, temp0, temp1));
-	}
+	xtensa_emit_add_imm (temp1, temp0, vcall_offset, temp1, false);
       emit_move_insn (temp1, gen_rtx_MEM (Pmode, addr));
       emit_insn (gen_add2_insn (this_rtx, temp1));
     }

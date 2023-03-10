@@ -1,5 +1,5 @@
 ;; Machine description for AArch64 architecture.
-;; Copyright (C) 2009-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2009-2023 Free Software Foundation, Inc.
 ;; Contributed by ARM Ltd.
 ;;
 ;; This file is part of GCC.
@@ -891,7 +891,7 @@
     if (aarch64_return_address_signing_enabled ()
 	&& (TARGET_PAUTH))
       {
-	if (aarch64_ra_sign_key == AARCH64_KEY_B)
+	if (aarch_ra_sign_key == AARCH_KEY_B)
 	  ret = "retab";
 	else
 	  ret = "retaa";
@@ -949,8 +949,8 @@
 
 (define_expand "tbranch_<code><mode>3"
   [(set (pc) (if_then_else
-              (EQL (match_operand:ALLI 0 "register_operand")
-                   (match_operand 1 "aarch64_simd_shift_imm_<mode>"))
+              (EQL (match_operand:SHORT 0 "register_operand")
+                   (match_operand 1 "const0_operand"))
               (label_ref (match_operand 2 ""))
               (pc)))]
   ""
@@ -4457,8 +4457,9 @@
   {
     if (aarch64_sve_cnt_immediate (operands[1], <MODE>mode))
       std::swap (operands[1], operands[2]);
-    else if (!aarch64_sve_cnt_immediate (operands[2], <MODE>mode)
-	     && TARGET_CSSC)
+    else if (aarch64_sve_cnt_immediate (operands[2], <MODE>mode))
+      ;
+    else if (TARGET_CSSC)
       {
 	if (aarch64_uminmax_immediate (operands[1], <MODE>mode))
 	  std::swap (operands[1], operands[2]);

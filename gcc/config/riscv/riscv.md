@@ -1,5 +1,5 @@
 ;; Machine description for RISC-V for GNU compiler.
-;; Copyright (C) 2011-2022 Free Software Foundation, Inc.
+;; Copyright (C) 2011-2023 Free Software Foundation, Inc.
 ;; Contributed by Andrew Waterman (andrew@sifive.com).
 ;; Based on MIPS target for GNU compiler.
 
@@ -242,6 +242,7 @@
 ;; bitmanip	bit manipulation instructions
 ;; rotate   rotation instructions
 ;; atomic   atomic instructions
+;; crypto cryptography instructions
 ;; Classification of RVV instructions which will be added to each RVV .md pattern and used by scheduler.
 ;; rdvlenb     vector byte length vlenb csrr read
 ;; rdvl        vector length vl csrr read
@@ -267,7 +268,8 @@
 ;; vicalu      vector arithmetic with carry or borrow instructions
 ;; vshift      vector single-width bit shift instructions
 ;; vnshift     vector narrowing integer shift instructions
-;; vicmp       vector integer comparison/min/max instructions
+;; viminmax    vector integer min/max instructions
+;; vicmp       vector integer comparison instructions
 ;; vimul       vector single-width integer multiply instructions
 ;; vidiv       vector single-width integer divide instructions
 ;; viwmul      vector widening integer multiply instructions
@@ -291,7 +293,8 @@
 ;; vfwmuladd   vector widening floating-point multiply-add instructions
 ;; vfsqrt      vector floating-point square-root instructions
 ;; vfrecp      vector floating-point reciprocal square-root instructions
-;; vfcmp       vector floating-point comparison/min/max instructions
+;; vfminmax    vector floating-point min/max instructions
+;; vfcmp       vector floating-point comparison instructions
 ;; vfsgnj      vector floating-point sign-injection instructions
 ;; vfclass     vector floating-point classify instruction
 ;; vfmerge     vector floating-point merge instruction
@@ -307,9 +310,9 @@
 ;; 14. Vector reduction operations
 ;; vired       vector single-width integer reduction instructions
 ;; viwred      vector widening integer reduction instructions
-;; vfred       vector single-width floating-point un-ordered reduction instruction
+;; vfredu      vector single-width floating-point un-ordered reduction instruction
 ;; vfredo      vector single-width floating-point ordered reduction instruction
-;; vfwred      vector widening floating-point un-ordered reduction instruction
+;; vfwredu     vector widening floating-point un-ordered reduction instruction
 ;; vfwredo     vector widening floating-point ordered reduction instruction
 ;; 15. Vector mask instructions
 ;; vmalu       vector mask-register logical instructions
@@ -319,32 +322,36 @@
 ;; vmiota      vector iota
 ;; vmidx       vector element index instruction
 ;; 16. Vector permutation instructions
-;; vimovvx     integer scalar move instructions
-;; vimovxv     integer scalar move instructions
-;; vfmovvf     floating-point scalar move instructions
-;; vfmovfv     floating-point scalar move instructions
-;; vislide     vector slide instructions
-;; vislide1    vector slide instructions
-;; vfslide1    vector slide instructions
-;; vgather     vector register gather instructions
-;; vcompress   vector compress instruction
-;; vmov        whole vector register move
+;; vimovvx      integer scalar move instructions
+;; vimovxv      integer scalar move instructions
+;; vfmovvf      floating-point scalar move instructions
+;; vfmovfv      floating-point scalar move instructions
+;; vslideup     vector slide instructions
+;; vslidedown   vector slide instructions
+;; vislide1up   vector slide instructions
+;; vislide1down vector slide instructions
+;; vfslide1up   vector slide instructions
+;; vfslide1down vector slide instructions
+;; vgather      vector register gather instructions
+;; vcompress    vector compress instruction
+;; vmov         whole vector register move
 (define_attr "type"
   "unknown,branch,jump,call,load,fpload,store,fpstore,
    mtc,mfc,const,arith,logical,shift,slt,imul,idiv,move,fmove,fadd,fmul,
    fmadd,fdiv,fcmp,fcvt,fsqrt,multi,auipc,sfb_alu,nop,ghost,bitmanip,rotate,
-   atomic,rdvlenb,rdvl,vsetvl,vlde,vste,vldm,vstm,vlds,vsts,
+   atomic,crypto,rdvlenb,rdvl,vsetvl,vlde,vste,vldm,vstm,vlds,vsts,
    vldux,vldox,vstux,vstox,vldff,vldr,vstr,
-   vialu,viwalu,vext,vicalu,vshift,vnshift,vicmp,
+   vialu,viwalu,vext,vicalu,vshift,vnshift,vicmp,viminmax,
    vimul,vidiv,viwmul,vimuladd,viwmuladd,vimerge,vimov,
    vsalu,vaalu,vsmul,vsshift,vnclip,
    vfalu,vfwalu,vfmul,vfdiv,vfwmul,vfmuladd,vfwmuladd,vfsqrt,vfrecp,
-   vfcmp,vfsgnj,vfclass,vfmerge,vfmov,
+   vfcmp,vfminmax,vfsgnj,vfclass,vfmerge,vfmov,
    vfcvtitof,vfcvtftoi,vfwcvtitof,vfwcvtftoi,
    vfwcvtftof,vfncvtitof,vfncvtftoi,vfncvtftof,
-   vired,viwred,vfred,vfredo,vfwred,vfwredo,
+   vired,viwred,vfredu,vfredo,vfwredu,vfwredo,
    vmalu,vmpop,vmffs,vmsfs,vmiota,vmidx,vimovvx,vimovxv,vfmovvf,vfmovfv,
-   vislide,vislide1,vfslide1,vgather,vcompress,vmov"
+   vslideup,vslidedown,vislide1up,vislide1down,vfslide1up,vfslide1down,
+   vgather,vcompress,vmov"
   (cond [(eq_attr "got" "load") (const_string "load")
 
 	 ;; If a doubleword move uses these expensive instructions,
@@ -1356,7 +1363,9 @@
   [(set (match_operand:DI     0 "register_operand"     "=r,r")
 	(zero_extend:DI
 	    (match_operand:SI 1 "nonimmediate_operand" " r,m")))]
-  "TARGET_64BIT && !TARGET_ZBA"
+  "TARGET_64BIT && !TARGET_ZBA
+   && !(REG_P (operands[1])
+        && REGNO (operands[1]) == VL_REGNUM)"
   "@
    #
    lwu\t%0,%1"
@@ -1736,7 +1745,9 @@
   [(set (match_operand:SI 0 "nonimmediate_operand" "=r,r,r, m,  *f,*f,*r,*m,r")
 	(match_operand:SI 1 "move_operand"         " r,T,m,rJ,*r*J,*m,*f,*f,vp"))]
   "(register_operand (operands[0], SImode)
-    || reg_or_0_operand (operands[1], SImode))"
+    || reg_or_0_operand (operands[1], SImode))
+    && !(register_operand (operands[1], SImode)
+         && REGNO (operands[1]) == VL_REGNUM)"
   { return riscv_output_move (operands[0], operands[1]); }
   [(set_attr "move_type" "move,const,load,store,mtc,fpload,mfc,fpstore,rdvlenb")
    (set_attr "mode" "SI")
@@ -3064,7 +3075,7 @@
 )
 
 (define_insn "prefetch"
-  [(prefetch (match_operand 0 "address_operand" "p")
+  [(prefetch (match_operand 0 "address_operand" "r")
              (match_operand 1 "imm5_operand" "i")
              (match_operand 2 "const_int_operand" "n"))]
   "TARGET_ZICBOP"
@@ -3078,7 +3089,7 @@
 })
 
 (define_insn "riscv_prefetchi_<mode>"
-  [(unspec_volatile:X [(match_operand:X 0 "address_operand" "p")
+  [(unspec_volatile:X [(match_operand:X 0 "address_operand" "r")
               (match_operand:X 1 "imm5_operand" "i")]
               UNSPECV_PREI)]
   "TARGET_ZICBOP"
@@ -3086,6 +3097,7 @@
 )
 
 (include "bitmanip.md")
+(include "crypto.md")
 (include "sync.md")
 (include "peephole.md")
 (include "pic.md")

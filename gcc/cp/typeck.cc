@@ -1,5 +1,5 @@
 /* Build expressions with type checking for C++ compiler.
-   Copyright (C) 1987-2022 Free Software Foundation, Inc.
+   Copyright (C) 1987-2023 Free Software Foundation, Inc.
    Hacked by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GCC.
@@ -5455,10 +5455,7 @@ cp_build_binary_op (const op_location_t &location,
 		 point, so we have to dig out the original type to find out if
 		 it was unsigned.  */
 	      tree stripped_op1 = tree_strip_any_location_wrapper (op1);
-	      shorten = ((TREE_CODE (op0) == NOP_EXPR
-			  && TYPE_UNSIGNED (TREE_TYPE (TREE_OPERAND (op0, 0))))
-			 || (TREE_CODE (stripped_op1) == INTEGER_CST
-			     && ! integer_all_onesp (stripped_op1)));
+	      shorten = may_shorten_divmod (op0, stripped_op1);
 	    }
 
 	  common = 1;
@@ -5491,10 +5488,7 @@ cp_build_binary_op (const op_location_t &location,
 	     quotient can't be represented in the computation mode.  We shorten
 	     only if unsigned or if dividing by something we know != -1.  */
 	  tree stripped_op1 = tree_strip_any_location_wrapper (op1);
-	  shorten = ((TREE_CODE (op0) == NOP_EXPR
-		      && TYPE_UNSIGNED (TREE_TYPE (TREE_OPERAND (op0, 0))))
-		     || (TREE_CODE (stripped_op1) == INTEGER_CST
-			 && ! integer_all_onesp (stripped_op1)));
+	  shorten = may_shorten_divmod (op0, stripped_op1);
 	  common = 1;
 	}
       break;
@@ -5786,11 +5780,18 @@ cp_build_binary_op (const op_location_t &location,
 
 	      pfn0 = pfn_from_ptrmemfunc (op0);
 	      delta0 = delta_from_ptrmemfunc (op0);
-	      e1 = cp_build_binary_op (location,
-				       EQ_EXPR,
-	  			       pfn0,
-				       build_zero_cst (TREE_TYPE (pfn0)),
-				       complain);
+	      {
+		/* If we will warn below about a null-address compare
+		   involving the orig_op0 ptrmemfunc, we'd likely also
+		   warn about the pfn0's null-address compare, and
+		   that would be redundant, so suppress it.  */
+		warning_sentinel ws (warn_address);
+		e1 = cp_build_binary_op (location,
+					 EQ_EXPR,
+					 pfn0,
+					 build_zero_cst (TREE_TYPE (pfn0)),
+					 complain);
+	      }
 	      e2 = cp_build_binary_op (location,
 				       BIT_AND_EXPR,
 				       delta0,

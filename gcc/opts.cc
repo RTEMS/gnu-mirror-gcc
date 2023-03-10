@@ -34,9 +34,13 @@ along with GCC; see the file COPYING3.  If not see
 #include "diagnostic-color.h"
 #include "version.h"
 #include "selftest.h"
+#include "file-prefix-map.h"
 
 /* In this file all option sets are explicit.  */
 #undef OPTION_SET_P
+
+/* Set by -fcanon-prefix-map.  */
+bool flag_canon_prefix_map;
 
 static void set_Wstrict_aliasing (struct gcc_options *opts, int onoff);
 
@@ -2246,7 +2250,14 @@ parse_sanitizer_options (const char *p, location_t loc, int scode,
 		  flags |= sanitizer_opts[i].flag;
 	      }
 	    else
-	      flags &= ~sanitizer_opts[i].flag;
+	      {
+		flags &= ~sanitizer_opts[i].flag;
+		/* Don't always clear SANITIZE_ADDRESS if it was previously
+		   set: -fsanitize=address -fno-sanitize=kernel-address should
+		   leave SANITIZE_ADDRESS set.  */
+		if (flags & (SANITIZE_KERNEL_ADDRESS | SANITIZE_USER_ADDRESS))
+		  flags |= SANITIZE_ADDRESS;
+	      }
 	    found = true;
 	    break;
 	  }
@@ -2810,6 +2821,10 @@ common_handle_option (struct gcc_options *opts,
     case OPT_ffile_prefix_map_:
     case OPT_fprofile_prefix_map_:
       /* Deferred.  */
+      break;
+
+    case OPT_fcanon_prefix_map:
+      flag_canon_prefix_map = value;
       break;
 
     case OPT_fcallgraph_info:
@@ -3718,6 +3733,7 @@ gen_command_line_string (cl_decoded_option *options,
       case OPT_fmacro_prefix_map_:
       case OPT_ffile_prefix_map_:
       case OPT_fprofile_prefix_map_:
+      case OPT_fcanon_prefix_map:
       case OPT_fcompare_debug:
       case OPT_fchecking:
       case OPT_fchecking_:

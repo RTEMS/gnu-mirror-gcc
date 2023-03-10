@@ -1,7 +1,7 @@
 /* Threads compatibility routines for libgcc2 and libobjc.  */
 /* Compile this one with gcc.  */
 
-/* Copyright (C) 1999-2022 Free Software Foundation, Inc.
+/* Copyright (C) 1999-2023 Free Software Foundation, Inc.
    Contributed by Mumit Khan <khan@xraylith.wisc.edu>.
 
 This file is part of GCC.
@@ -380,6 +380,14 @@ typedef struct timespec __gthread_time_t;
   __gthread_recursive_mutex_init_function
 #define __GTHREAD_COND_INIT_FUNCTION __gthread_cond_init_function
 #define __GTHREAD_TIME_INIT {0, 0}
+
+// Libstdc++ std::basic_filebuf needs the old definition of __gthread_mutex_t
+// for layout purposes, but doesn't actually use it.
+typedef struct {
+  long __unused1;
+  void *__unused2;
+} __gthr_win32_legacy_mutex_t;
+#define __GTHREAD_LEGACY_MUTEX_T __gthr_win32_legacy_mutex_t
 
 #if defined (_WIN32) && !defined(__CYGWIN__)
 #define MINGW32_SUPPORTS_MT_EH 1

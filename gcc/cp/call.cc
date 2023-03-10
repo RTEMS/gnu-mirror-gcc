@@ -1,5 +1,5 @@
 /* Functions related to invoking -*- C++ -*- methods and overloaded functions.
-   Copyright (C) 1987-2022 Free Software Foundation, Inc.
+   Copyright (C) 1987-2023 Free Software Foundation, Inc.
    Contributed by Michael Tiemann (tiemann@cygnus.com) and
    modified by Brendan Kehoe (brendan@cygnus.com).
 
@@ -4285,7 +4285,8 @@ maybe_init_list_as_array (tree elttype, tree init)
 static tree
 maybe_init_list_as_range (tree fn, tree expr)
 {
-  if (BRACE_ENCLOSED_INITIALIZER_P (expr)
+  if (!processing_template_decl
+      && BRACE_ENCLOSED_INITIALIZER_P (expr)
       && is_list_ctor (fn)
       && decl_in_std_namespace_p (fn))
     {
@@ -4580,7 +4581,7 @@ build_user_type_conversion_1 (tree totype, tree expr, int flags,
   if (tree iters = maybe_init_list_as_range (cand->fn, expr))
     if (z_candidate *cand2
 	= build_user_type_conversion_1 (totype, iters, flags, tf_none))
-      if (cand2->viable == 1)
+      if (cand2->viable == 1 && !is_list_ctor (cand2->fn))
 	{
 	  cand = cand2;
 	  expr = iters;
@@ -5186,7 +5187,7 @@ build_operator_new_call (tree fnname, vec<tree, va_gc> **args,
    or static operator(), in which cases the source expression
    would be `obj[...]' or `obj(...)'.  */
 
-static tree
+tree
 keep_unused_object_arg (tree result, tree obj, tree fn)
 {
   if (result == NULL_TREE
@@ -7334,7 +7335,7 @@ build_new_op (const op_location_t &loc, enum tree_code code, int flags,
     case TRUTH_ORIF_EXPR:
     case TRUTH_AND_EXPR:
     case TRUTH_OR_EXPR:
-      if (complain & tf_warning)
+      if ((complain & tf_warning) && !processing_template_decl)
 	warn_logical_operator (loc, code, boolean_type_node,
 			       code_orig_arg1, arg1,
 			       code_orig_arg2, arg2);
@@ -8862,12 +8863,14 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
     return error_mark_node;
 
   warning_sentinel w (warn_zero_as_null_pointer_constant);
-  if (TREE_CODE (expr) == EXCESS_PRECISION_EXPR)
-    expr = TREE_OPERAND (expr, 0);
   if (issue_conversion_warnings)
     expr = cp_convert_and_check (totype, expr, complain);
   else
-    expr = cp_convert (totype, expr, complain);
+    {
+      if (TREE_CODE (expr) == EXCESS_PRECISION_EXPR)
+	expr = TREE_OPERAND (expr, 0);
+      expr = cp_convert (totype, expr, complain);
+    }
 
   return expr;
 }
@@ -12539,6 +12542,8 @@ joust_maybe_elide_copy (z_candidate *&cand)
   if (!DECL_COPY_CONSTRUCTOR_P (fn) && !DECL_MOVE_CONSTRUCTOR_P (fn))
     return false;
   conversion *conv = cand->convs[0];
+  if (conv->kind == ck_ambig)
+    return false;
   gcc_checking_assert (conv->kind == ck_ref_bind);
   conv = next_conversion (conv);
   if (conv->kind == ck_user && !TYPE_REF_P (conv->type))
@@ -13580,7 +13585,7 @@ set_up_extended_ref_temp (tree decl, tree expr, vec<tree, va_gc> **cleanups,
 
   /* If the initializer is constant, put it in DECL_INITIAL so we get
      static initialization and use in constant expressions.  */
-  init = maybe_constant_init (expr);
+  init = maybe_constant_init (expr, var, /*manifestly_const_eval=*/true);
   /* As in store_init_value.  */
   init = cp_fully_fold (init);
   if (TREE_CONSTANT (init))
@@ -13774,6 +13779,52 @@ std_pair_ref_ref_p (tree t)
   return true;
 }
 
+/* Return true if a class CTYPE is either std::reference_wrapper or
+   std::ref_view, or a reference wrapper class.  We consider a class
+   a reference wrapper class if it has a reference member and a
+   constructor taking the same reference type.  */
+
+static bool
+reference_like_class_p (tree ctype)
+{
+  if (!CLASS_TYPE_P (ctype))
+    return false;
+
+  /* Also accept a std::pair<const T&, const T&>.  */
+  if (std_pair_ref_ref_p (ctype))
+    return true;
+
+  tree tdecl = TYPE_NAME (TYPE_MAIN_VARIANT (ctype));
+  if (decl_in_std_namespace_p (tdecl))
+    {
+      tree name = DECL_NAME (tdecl);
+      return (name
+	      && (id_equal (name, "reference_wrapper")
+		  || id_equal (name, "ref_view")));
+    }
+  for (tree fields = TYPE_FIELDS (ctype);
+       fields;
+       fields = DECL_CHAIN (fields))
+    {
+      if (TREE_CODE (fields) != FIELD_DECL || DECL_ARTIFICIAL (fields))
+	continue;
+      tree type = TREE_TYPE (fields);
+      if (!TYPE_REF_P (type))
+	continue;
+      /* OK, the field is a reference member.  Do we have a constructor
+	 taking its type?  */
+      for (tree fn : ovl_range (CLASSTYPE_CONSTRUCTORS (ctype)))
+	{
+	  tree args = FUNCTION_FIRST_USER_PARMTYPE (fn);
+	  if (args
+	      && same_type_p (TREE_VALUE (args), type)
+	      && TREE_CHAIN (args) == void_list_node)
+	    return true;
+	}
+    }
+  return false;
+}
+
 /* Helper for maybe_warn_dangling_reference to find a problematic CALL_EXPR
    that initializes the LHS (and at least one of its arguments represents
    a temporary, as outlined in maybe_warn_dangling_reference), or NULL_TREE
@@ -13788,12 +13839,37 @@ std_pair_ref_ref_p (tree t)
      const int& y = (f(1), 42); // NULL_TREE
      const int& z = f(f(1)); // f(f(1))
 
-   EXPR is the initializer.  */
+   EXPR is the initializer.  If ARG_P is true, we're processing an argument
+   to a function; the point is to distinguish between, for example,
+
+     Ref::inner (&TARGET_EXPR <D.2839, F::foo (fm)>)
+
+   where we shouldn't warn, and
+
+     Ref::inner (&TARGET_EXPR <D.2908, F::foo (&TARGET_EXPR <...>)>)
+
+   where we should warn (Ref is a reference_like_class_p so we see through
+   it.  */
 
 static tree
-do_warn_dangling_reference (tree expr)
+do_warn_dangling_reference (tree expr, bool arg_p)
 {
   STRIP_NOPS (expr);
+
+  if (arg_p && expr_represents_temporary_p (expr))
+    {
+      /* An attempt to reduce the number of -Wdangling-reference
+	 false positives concerning reference wrappers (c++/107532).
+	 When we encounter a reference_like_class_p, we don't warn
+	 just yet; instead, we keep recursing to see if there were
+	 any temporaries behind the reference-wrapper class.  */
+      tree e = expr;
+      while (handled_component_p (e))
+	e = TREE_OPERAND (e, 0);
+      if (!reference_like_class_p (TREE_TYPE (e)))
+	return expr;
+    }
+
   switch (TREE_CODE (expr))
     {
     case CALL_EXPR:
@@ -13826,7 +13902,7 @@ do_warn_dangling_reference (tree expr)
 	     std::pair<const int&, const int&> v = std::minmax(1, 2);
 	   which also creates a dangling reference, because std::minmax
 	   returns std::pair<const T&, const T&>(b, a).  */
-	if (!(TYPE_REF_OBJ_P (rettype) || std_pair_ref_ref_p (rettype)))
+	if (!(TYPE_REF_OBJ_P (rettype) || reference_like_class_p (rettype)))
 	  return NULL_TREE;
 
 	/* Here we're looking to see if any of the arguments is a temporary
@@ -13839,14 +13915,13 @@ do_warn_dangling_reference (tree expr)
 	    if (!DECL_NONSTATIC_MEMBER_FUNCTION_P (fndecl)
 		&& !TYPE_REF_P (TREE_TYPE (arg)))
 	      continue;
-	    /* It could also be another call taking a temporary and returning
-	       it and initializing this reference parameter.  */
-	    if (do_warn_dangling_reference (arg))
-	      return expr;
 	    STRIP_NOPS (arg);
 	    if (TREE_CODE (arg) == ADDR_EXPR)
 	      arg = TREE_OPERAND (arg, 0);
-	    if (expr_represents_temporary_p (arg))
+	    /* Recurse to see if the argument is a temporary.  It could also
+	       be another call taking a temporary and returning it and
+	       initializing this reference parameter.  */
+	    if (do_warn_dangling_reference (arg, /*arg_p=*/true))
 	      return expr;
 	  /* Don't warn about member function like:
 	      std::any a(...);
@@ -13863,15 +13938,15 @@ do_warn_dangling_reference (tree expr)
 	return NULL_TREE;
       }
     case COMPOUND_EXPR:
-      return do_warn_dangling_reference (TREE_OPERAND (expr, 1));
+      return do_warn_dangling_reference (TREE_OPERAND (expr, 1), arg_p);
     case COND_EXPR:
-      if (tree t = do_warn_dangling_reference (TREE_OPERAND (expr, 1)))
+      if (tree t = do_warn_dangling_reference (TREE_OPERAND (expr, 1), arg_p))
 	return t;
-      return do_warn_dangling_reference (TREE_OPERAND (expr, 2));
+      return do_warn_dangling_reference (TREE_OPERAND (expr, 2), arg_p);
     case PAREN_EXPR:
-      return do_warn_dangling_reference (TREE_OPERAND (expr, 0));
+      return do_warn_dangling_reference (TREE_OPERAND (expr, 0), arg_p);
     case TARGET_EXPR:
-      return do_warn_dangling_reference (TARGET_EXPR_INITIAL (expr));
+      return do_warn_dangling_reference (TARGET_EXPR_INITIAL (expr), arg_p);
     default:
       return NULL_TREE;
     }
@@ -13914,7 +13989,7 @@ maybe_warn_dangling_reference (const_tree decl, tree init)
     = make_temp_override (global_dc->dc_warn_system_headers,
 			  (!in_system_header_at (DECL_SOURCE_LOCATION (decl))
 			   || global_dc->dc_warn_system_headers));
-  if (tree call = do_warn_dangling_reference (init))
+  if (tree call = do_warn_dangling_reference (init, /*arg_p=*/false))
     {
       auto_diagnostic_group d;
       if (warning_at (DECL_SOURCE_LOCATION (decl), OPT_Wdangling_reference,
@@ -13949,6 +14024,34 @@ static tree
 extend_ref_init_temps_1 (tree decl, tree init, vec<tree, va_gc> **cleanups,
 			 tree *cond_guard)
 {
+  /* CWG1299 (C++20): The temporary object to which the reference is bound or
+     the temporary object that is the complete object of a subobject to which
+     the reference is bound persists for the lifetime of the reference if the
+     glvalue to which the reference is bound was obtained through one of the
+     following:
+     - a temporary materialization conversion ([conv.rval]),
+     - ( expression ), where expression is one of these expressions,
+     - subscripting ([expr.sub]) of an array operand, where that operand is one
+       of these expressions,
+     - a class member access ([expr.ref]) using the . operator where the left
+       operand is one of these expressions and the right operand designates a
+       non-static data member of non-reference type,
+     - a pointer-to-member operation ([expr.mptr.oper]) using the .* operator
+       where the left operand is one of these expressions and the right operand
+       is a pointer to data member of non-reference type,
+     - a const_cast ([expr.const.cast]), static_cast ([expr.static.cast]),
+       dynamic_cast ([expr.dynamic.cast]), or reinterpret_cast
+       ([expr.reinterpret.cast]) converting, without a user-defined conversion,
+       a glvalue operand that is one of these expressions to a glvalue that
+       refers to the object designated by the operand, or to its complete
+       object or a subobject thereof,
+     - a conditional expression ([expr.cond]) that is a glvalue where the
+       second or third operand is one of these expressions, or
+     - a comma expression ([expr.comma]) that is a glvalue where the right
+       operand is one of these expressions.  */
+
+  /* FIXME several cases are still handled wrong (101572, 81420).  */
+
   tree sub = init;
   tree *p;
   STRIP_NOPS (sub);
@@ -13956,6 +14059,16 @@ extend_ref_init_temps_1 (tree decl, tree init, vec<tree, va_gc> **cleanups,
     {
       TREE_OPERAND (sub, 1)
 	= extend_ref_init_temps_1 (decl, TREE_OPERAND (sub, 1), cleanups,
+				   cond_guard);
+      return init;
+    }
+  if (TREE_CODE (sub) == POINTER_PLUS_EXPR
+      && TYPE_PTRDATAMEM_P (TREE_TYPE (tree_strip_nop_conversions
+				       (TREE_OPERAND (sub, 1)))))
+    {
+      /* A pointer-to-member operation.  */
+      TREE_OPERAND (sub, 0)
+	= extend_ref_init_temps_1 (decl, TREE_OPERAND (sub, 0), cleanups,
 				   cond_guard);
       return init;
     }

@@ -1,6 +1,6 @@
 // thread -*- C++ -*-
 
-// Copyright (C) 2008-2022 Free Software Foundation, Inc.
+// Copyright (C) 2008-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -35,6 +35,7 @@
 # ifdef _GLIBCXX_HAVE_SLEEP
 #  include <unistd.h>
 # elif defined(_GLIBCXX_USE_WIN32_SLEEP)
+#  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
 # elif defined _GLIBCXX_NO_SLEEP && defined _GLIBCXX_HAS_GTHREADS
 // We expect to be able to sleep for targets that support multiple threads:
@@ -63,7 +64,7 @@ static inline int get_nprocs()
 }
 # define _GLIBCXX_NPROCS get_nprocs()
 #elif defined(_GLIBCXX_USE_GET_NPROCS_WIN32)
-#define WIN32_LEAN_AND_MEAN
+# define WIN32_LEAN_AND_MEAN
 # include <windows.h>
 static inline int get_nprocs()
 {
@@ -79,6 +80,7 @@ static inline int get_nprocs()
 # include <unistd.h>
 # define _GLIBCXX_NPROCS sysconf(_SC_NPROC_ONLN)
 #elif defined(_WIN32)
+# define WIN32_LEAN_AND_MEAN
 # include <windows.h>
 static inline int get_nprocs()
 {
@@ -152,8 +154,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   }
 
   void
-  thread::_M_start_thread(_State_ptr state, void (*)())
+  thread::_M_start_thread(_State_ptr state, void (*depend)())
   {
+    // Make sure it's not optimized out, not even with LTO.
+    asm ("" : : "rm" (depend));
+
     if (!__gthread_active_p())
       {
 #if __cpp_exceptions
@@ -188,8 +193,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   }
 
   void
-  thread::_M_start_thread(__shared_base_type __b, void (*)())
+  thread::_M_start_thread(__shared_base_type __b, void (*depend)())
   {
+    // Make sure it's not optimized out, not even with LTO.
+    asm ("" : : "rm" (depend));
+
     auto ptr = __b.get();
     // Create a reference cycle that will be broken in the new thread.
     ptr->_M_this_ptr = std::move(__b);

@@ -1,5 +1,5 @@
 /* Handling for the known behavior of various specific functions.
-   Copyright (C) 2020-2022 Free Software Foundation, Inc.
+   Copyright (C) 2020-2023 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -778,6 +778,34 @@ kf_strchr::impl_call_post (const call_details &cd) const
     }
 }
 
+/* Handler for "sprintf".
+     int sprintf(char *str, const char *format, ...);
+*/
+
+class kf_sprintf : public known_function
+{
+public:
+  bool matches_call_types_p (const call_details &cd) const final override
+  {
+    return (cd.num_args () >= 2
+	    && cd.arg_is_pointer_p (0)
+	    && cd.arg_is_pointer_p (1));
+  }
+
+  void impl_call_pre (const call_details &cd) const final override
+  {
+    /* For now, merely assume that the destination buffer gets set to a
+       new svalue.  */
+    region_model *model = cd.get_model ();
+    region_model_context *ctxt = cd.get_ctxt ();
+    const svalue *dst_ptr = cd.get_arg_svalue (0);
+    const region *dst_reg
+      = model->deref_rvalue (dst_ptr, cd.get_arg_tree (0), ctxt);
+    const svalue *content = cd.get_or_create_conjured_svalue (dst_reg);
+    model->set_value (dst_reg, content, ctxt);
+  }
+};
+
 /* Handler for "__builtin_stack_restore".  */
 
 class kf_stack_restore : public known_function
@@ -851,6 +879,32 @@ kf_strcpy::impl_call_pre (const call_details &cd) const
   model->set_value (sized_dest_reg, src_contents_sval, cd.get_ctxt ());
 }
 
+/* Handler for "strdup" and "__builtin_strdup".  */
+
+class kf_strdup : public known_function
+{
+public:
+  bool matches_call_types_p (const call_details &cd) const final override
+  {
+    return (cd.num_args () == 1 && cd.arg_is_pointer_p (0));
+  }
+  void impl_call_pre (const call_details &cd) const final override
+  {
+    region_model *model = cd.get_model ();
+    region_model_manager *mgr = cd.get_manager ();
+    /* Ideally we'd get the size here, and simulate copying the bytes.  */
+    const region *new_reg
+      = model->get_or_create_region_for_heap_alloc (NULL, cd.get_ctxt ());
+    model->mark_region_as_unknown (new_reg, NULL);
+    if (cd.get_lhs_type ())
+      {
+	const svalue *ptr_sval
+	  = mgr->get_ptr_svalue (cd.get_lhs_type (), new_reg);
+	cd.maybe_set_lhs (ptr_sval);
+      }
+  }
+};
+
 /* Handle the on_call_pre part of "strlen".  */
 
 class kf_strlen : public known_function
@@ -891,6 +945,32 @@ kf_strlen::impl_call_pre (const call_details &cd) const
     }
   /* Otherwise a conjured value.  */
 }
+
+/* Handler for "strndup" and "__builtin_strndup".  */
+
+class kf_strndup : public known_function
+{
+public:
+  bool matches_call_types_p (const call_details &cd) const final override
+  {
+    return (cd.num_args () == 2 && cd.arg_is_pointer_p (0));
+  }
+  void impl_call_pre (const call_details &cd) const final override
+  {
+    region_model *model = cd.get_model ();
+    region_model_manager *mgr = cd.get_manager ();
+    /* Ideally we'd get the size here, and simulate copying the bytes.  */
+    const region *new_reg
+      = model->get_or_create_region_for_heap_alloc (NULL, cd.get_ctxt ());
+    model->mark_region_as_unknown (new_reg, NULL);
+    if (cd.get_lhs_type ())
+      {
+	const svalue *ptr_sval
+	  = mgr->get_ptr_svalue (cd.get_lhs_type (), new_reg);
+	cd.maybe_set_lhs (ptr_sval);
+      }
+  }
+};
 
 class kf_ubsan_bounds : public internal_known_function
 {
@@ -938,11 +1018,14 @@ register_known_functions (known_function_manager &kfm)
     kfm.add (BUILT_IN_MEMSET, make_unique<kf_memset> ());
     kfm.add (BUILT_IN_MEMSET_CHK, make_unique<kf_memset> ());
     kfm.add (BUILT_IN_REALLOC, make_unique<kf_realloc> ());
+    kfm.add (BUILT_IN_SPRINTF, make_unique<kf_sprintf> ());
     kfm.add (BUILT_IN_STACK_RESTORE, make_unique<kf_stack_restore> ());
     kfm.add (BUILT_IN_STACK_SAVE, make_unique<kf_stack_save> ());
     kfm.add (BUILT_IN_STRCHR, make_unique<kf_strchr> ());
     kfm.add (BUILT_IN_STRCPY, make_unique<kf_strcpy> (2));
     kfm.add (BUILT_IN_STRCPY_CHK, make_unique<kf_strcpy> (3));
+    kfm.add (BUILT_IN_STRDUP, make_unique<kf_strdup> ());
+    kfm.add (BUILT_IN_STRNDUP, make_unique<kf_strndup> ());
     kfm.add (BUILT_IN_STRLEN, make_unique<kf_strlen> ());
 
     register_varargs_builtins (kfm);
@@ -951,6 +1034,8 @@ register_known_functions (known_function_manager &kfm)
   /* Known builtins and C standard library functions.  */
   {
     kfm.add ("memset", make_unique<kf_memset> ());
+    kfm.add ("strdup", make_unique<kf_strdup> ());
+    kfm.add ("strndup", make_unique<kf_strndup> ());
   }
 
   /* Known POSIX functions, and some non-standard extensions.  */
@@ -977,9 +1062,11 @@ register_known_functions (known_function_manager &kfm)
        and OS X like this:
 	 extern int * __error(void);
 	 #define errno (*__error())
+       and similarly __errno for newlib.
        Add these as synonyms for "__errno_location".  */
     kfm.add ("___errno", make_unique<kf_errno_location> ());
     kfm.add ("__error", make_unique<kf_errno_location> ());
+    kfm.add ("__errno", make_unique<kf_errno_location> ());
   }
 
   /* Language-specific support functions.  */

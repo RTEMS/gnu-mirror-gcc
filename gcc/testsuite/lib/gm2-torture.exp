@@ -1,4 +1,4 @@
-# Copyright (C) 2003-2020 Free Software Foundation, Inc.
+# Copyright (C) 2003-2023 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,6 +20,35 @@
 
 load_lib file-format.exp
 load_lib target-libpath.exp
+load_lib timeout.exp
+load_lib timeout-dg.exp
+
+
+if {[info exists individual_timeout]} {
+    set gm2_previous_timeout $individual_timeout
+} else {
+    set gm2_previous_timeout 10
+}
+
+
+# We should be able to complete any test in 10 seconds.
+dg-timeout S 10
+
+
+# only push one level.
+
+proc gm2_push_timeout { secs } {
+    global individual_timeout
+    set individual_timeout $secs
+}
+
+
+proc gm2_pop_timeout { } {
+    global individual_timeout
+    global gm2_previous_timeout
+    set individual_timeout $gm2_previous_timeout
+}
+
 
 # The default option list can be overridden by
 # TORTURE_OPTIONS="{ { list1 } ... { listN } }"
@@ -74,9 +103,9 @@ if ![info exists TORTURE_OPTIONS] {
 # OPTION is the specific compiler flag we're testing (eg: -O2).
 #
 proc gm2-torture-compile { src option } {
-    global output
-    global srcdir tmpdir
-    global host_triplet
+    global output;
+    global srcdir tmpdir;
+    global host_triplet;
 
     set output "$tmpdir/[file tail [file rootname $src]].o"
 
@@ -108,7 +137,7 @@ proc gm2-torture-compile { src option } {
 #
 
 proc gm2_check_compile_fail {testcase option objname gcc_output} {
-    global tool
+    global tool;
     set fatal_signal "*cc: Internal compiler error: program*got fatal signal"
 
     if [string match "$fatal_signal 6" $gcc_output] then {
@@ -165,9 +194,9 @@ proc gm2_check_compile_fail {testcase option objname gcc_output} {
 # OPTION is the specific compiler flag we're testing (eg: -O2).
 #
 proc gm2-torture-compile-fail { src option } {
-    global output
-    global srcdir tmpdir
-    global host_triplet
+    global output;
+    global srcdir tmpdir;
+    global host_triplet;
 
     # puts stderr "gm2-torture-compile-fail:  ${option}\n"
     set output "$tmpdir/[file tail [file rootname $src]].o"
@@ -272,6 +301,7 @@ proc gm2-torture-execute { sources args success } {
 
 	set options ""
 	lappend options "additional_flags=$option"
+	lappend options "timeout=[timeout_value]"
 	if { $additional_flags != "" } {
 	    lappend options "additional_flags=$additional_flags"
 	}
@@ -290,6 +320,7 @@ proc gm2-torture-execute { sources args success } {
 	# now link the test
 	set options ${option};
 
+	lappend options "timeout=[timeout_value]"
 	if { [llength ${args}] > 0 } {
 	    lappend options "additional_flags=[lindex ${args} 0]"
 	}
@@ -441,7 +472,7 @@ proc search_for { file pattern } {
 # to more than 14 chars.
 #
 proc gm2-torture { args } {
-    global srcdir subdir compiler_conditional_xfail_data TORTURE_OPTIONS
+    global srcdir subdir compiler_conditional_xfail_data TORTURE_OPTIONS;
 
     set src [lindex $args 0];
     if { [llength $args] > 1 } {
@@ -495,7 +526,7 @@ proc gm2-torture { args } {
 # to more than 14 chars.
 #
 proc gm2-torture-fail { args } {
-    global srcdir subdir compiler_conditional_xfail_data TORTURE_OPTIONS
+    global srcdir subdir compiler_conditional_xfail_data TORTURE_OPTIONS;
 
     set src [lindex $args 0];
     if { [llength $args] > 1 } {

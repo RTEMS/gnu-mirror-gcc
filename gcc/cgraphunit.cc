@@ -1000,7 +1000,7 @@ walk_polymorphic_call_targets (hash_set<void *> *reachable_call_targets,
     = possible_polymorphic_call_targets
 	(edge, &final, &cache_token);
 
-  if (!reachable_call_targets->add (cache_token))
+  if (cache_token != NULL && !reachable_call_targets->add (cache_token))
     {
       if (symtab->dump_file)
 	dump_possible_polymorphic_call_targets 
@@ -1087,8 +1087,6 @@ check_global_declaration (symtab_node *snode)
       else
 	warning (OPT_Wunused_function, "%q+F declared %<static%> but never "
 				       "defined", decl);
-      /* This symbol is effectively an "extern" declaration now.  */
-      TREE_PUBLIC (decl) = 1;
     }
 
   /* Warn about static fns or vars defined but not used.  */
@@ -1122,6 +1120,7 @@ check_global_declaration (symtab_node *snode)
       && (TREE_CODE (decl) != FUNCTION_DECL
 	  || (!DECL_STATIC_CONSTRUCTOR (decl)
 	      && !DECL_STATIC_DESTRUCTOR (decl)))
+      && (! VAR_P (decl) || !warning_suppressed_p (decl, OPT_Wunused_variable))
       /* Otherwise, ask the language.  */
       && lang_hooks.decls.warn_unused_global (decl))
     warning_at (DECL_SOURCE_LOCATION (decl),

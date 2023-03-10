@@ -1,6 +1,6 @@
 \input texinfo
 @c -*-texinfo-*-
-@c Copyright (C) 2001-2022 Free Software Foundation, Inc.
+@c Copyright (C) 2001-2023 Free Software Foundation, Inc.
 @c This is part of the GM2 manual.
 
 @c User level documentation for GNU Modula-2
@@ -15,7 +15,7 @@
 @include gcc-common.texi
 
 @c Copyright years for this manual.
-@set copyrights-gm2 1999-2022
+@set copyrights-gm2 1999-2023
 
 @copying
 @c man begin COPYRIGHT
@@ -73,7 +73,7 @@ Boston, MA 02110-1301, USA@*
 * License::          License of GNU Modula-2
 * Copying::          GNU Public License V3.
 * Contributing::     Contributing to GNU Modula-2
-* Internals::        GNU Modula-2 internals.
+@c * Internals::        GNU Modula-2 internals.
 * EBNF::             EBNF of GNU Modula-2
 * Libraries::        PIM and ISO library definitions.
 * Indices::          Document and function indices.
@@ -89,7 +89,7 @@ Boston, MA 02110-1301, USA@*
 * Features::              GNU Modula-2 Features
 @end menu
 
-@node What is GNU Modula-2, Why use GNU Modula-2, , Using
+@node What is GNU Modula-2, Why use GNU Modula-2, , Overview
 @section What is GNU Modula-2
 
 GNU Modula-2 is a @uref{http://gcc.gnu.org/frontends.html, front end}
@@ -115,7 +115,7 @@ technology - programming languages - part 1: Modula-2 Language,
 ISO/IEC 10514-1 (1996)'
 }
 
-@node Why use GNU Modula-2, Release map, What is GNU Modula-2, Using
+@node Why use GNU Modula-2, Development, What is GNU Modula-2, Overview
 @section Why use GNU Modula-2
 
 There are a number of advantages of using GNU Modula-2 rather than
@@ -149,25 +149,13 @@ directory for a sub directory @code{foo} containing the library
 contents.  The library module search path is altered accordingly
 for compile and link.
 
-@node Release map, Development, Why use GNU Modula-2, Using
-@section Release map
-
-GNU Modula-2 is now part of GCC and therefore will adopt the GCC
-release schedule.  It is intended that GNU Modula-2 implement more of
-the GCC builtins (vararg access) and GCC features.
-
-There is an intention to implement the ISO generics and the M2R10
-dialect of Modula-2.  It will also implement all language changes.  If
-you wish to see something different please email
-@email{gm2@@nongnu.org} with your ideas.
-
-@node Development, Features, Release map, Using
+@node Development, Features, Why use GNU Modula-2, Overview
 @section How to get source code using git
 
 GNU Modula-2 is now in the @url{https://gcc.gnu.org/git.html, GCC git
 tree}.
 
-@node Features, Documentation, Development, Using
+@node Features, , Development, Overview
 @section GNU Modula-2 Features
 
 @itemize @bullet
@@ -230,99 +218,7 @@ such as the AVR and the ARM).
 
 @end itemize
 
-@node Documentation, Regression tests, Features, Using
-@section Documentation
-
-The GNU Modula-2 documentation is available on line
-@url{https://www.nongnu.org/gm2/homepage.html,at the gm2 homepage}
-or in the pdf, info, html file format.
-
-@node Regression tests, Limitations, Documentation, Using
-@section Regression tests for gm2 in the repository
-
-The regression testsuite can be run from the gcc build directory:
-
-@example
-$ cd build-gcc
-$ make check -j 24
-@end example
-
-which runs the complete testsuite for all compilers using 24 parallel
-invocations of the compiler.  Individual language testsuites can be
-run by specifying the language, for example the Modula-2 testsuite can
-be run using:
-
-@example
-$ cd build-gcc
-$ make check-m2 -j 24
-@end example
-
-Finally the results of the testsuite can be emailed to the
-@url{https://gcc.gnu.org/lists.html, gcc-testresults} list using the
-@file{test_summary} script found in the gcc source tree:
-
-@example
-$ @samp{directory to the sources}/contrib/test_summary
-@end example
-
-@node Limitations, Objectives, Regression tests, Using
-@section Limitations
-
-Logitech compatibility library is incomplete.  The principle modules
-for this platform exist however for a comprehensive list of completed
-modules please check the documentation
-@url{gm2.html}.
-
-@node Objectives, FAQ, , Using
-@section Objectives
-
-@itemize @bullet
-
-@item
-The intention of GNU Modula-2 is to provide a production Modula-2
-front end to GCC.
-
-@item
-It should support all Niklaus Wirth PIM Dialects [234] and also ISO
-Modula-2 including a re-implementation of all the ISO modules.
-
-@item
-There should be an easy interface to C.
-
-@item
-Exploit the features of GCC.
-
-@item
-Listen to the requests of the users.
-@end itemize
-
-@node FAQ, Community, Objectives, Using
-@section FAQ
-
-@subsection Why use the C++ exception mechanism in GCC, rather than a bespoke Modula-2 mechanism?
-
-The C++ mechanism is tried and tested, it also provides GNU Modula-2
-with the ability to link with C++ modules and via swig it can raise
-Python exceptions.
-
-@node Community, Other languages, FAQ, Using
-@section Community
-
-You can subscribe to the GNU Modula-2 mailing by sending an
-email to:
-@email{gm2-subscribe@@nongnu.org}
-or by
-@url{http://lists.nongnu.org/mailman/listinfo/gm2}.
-The mailing list contents can be viewed
-@url{http://lists.gnu.org/archive/html/gm2}.
-
-@node Other languages, , Community, Using
-@section Other languages for GCC
-
-These exist and can be found on the frontends web page on the
-@uref{http://gcc.gnu.org/frontends.html, gcc web site}.
-
-@node Using, , Community, Top
+@node Using, License, Overview, Top
 @chapter Using GNU Modula-2
 
 @menu
@@ -347,21 +243,17 @@ These exist and can be found on the frontends web page on the
 * Built-ins::             Accessing GNU Modula-2 Built-ins.
 * The PIM system module:: SYSTEM data types and procedures.
 * The ISO system module:: SYSTEM data types, procedures and run time.
-* Other languages::       Other languages for GCC.
-* What is GNU Modula-2::  Brief description of GNU Modula-2.
-* Why use GNU Modula-2::  Advantages of GNU Modula-2.
-@ifnothtml
+@c @ifnothtml
 @c omit these nodes if generating gm2 webpage as these are hand written.
 * Release map:: Release map.
-* Development:: Development.
-* Features:: Features of the implementation.
 * Documentation:: Placeholder for how to access the documentation online.
 * Regression tests:: How to run the testsuite.
 * Limitations:: Current limitations.
 * Objectives:: Objectives of the implementation.
 * FAQ:: Frequently asked questions.
 * Community:: How to join the community.
-@end ifnothtml
+* Other languages:: Other languages for GCC.
+@c @end ifnothtml
 @end menu
 
 This document contains the user and design issues relevant to the
@@ -427,7 +319,7 @@ add the @samp{-v} flag at the command line, for example:
 This displays the sub processes initiated by @samp{gm2} which can be useful
 when trouble shooting.}
 
-@node Compiler options, Elementary data types, Example usage, Using
+@node Compiler options, Linking, Example usage, Using
 @section Compiler options
 
 This section describes the compiler options specific to GNU Modula-2
@@ -573,6 +465,10 @@ the they provide the base modules which all other dialects utilize.
 The option @samp{-fno-libs=-} disables the @samp{gm2} driver from
 modifying the search and library paths.
 
+@item -static-libgm2
+On systems that provide the m2 runtimes as both shared and static libraries,
+this option forces the use of the static version.
+
 @c flocation=
 @c Modula-2 Joined
 @c set all location values to a specific value (internal switch)
@@ -588,8 +484,20 @@ where multiple @code{END} keywords are mapped onto a sequence of
 @item -fm2-lower-case
 render keywords in error messages using lower case.
 
+@item -fm2-pathname=
+specify the module mangled prefix name for all modules in the
+following include paths.
+
+@item -fm2-pathnameI
+for internal use only: used by the driver to copy the user facing -I
+option.
+
 @item -fm2-plugin
 insert plugin to identify run time errors at compile time (default on).
+
+@item -fm2-prefix=
+specify the module mangled prefix name.  All exported symbols from a
+definition module will have the prefix name.
 
 @item -fm2-statistics
 generates quadruple information: number of quadruples generated,
@@ -671,12 +579,13 @@ via @samp{-fno-return}.
 @item -fruntime-modules=
 specify, using a comma separated list, the run time modules and their
 order.  These modules will initialized first before any other modules
-in the application dependency.  By default the run time modules list is
-set to @code{Storage,SYSTEM,M2RTS,RTExceptions,IOLink}.  Note that
-these modules will only be linked into your executable if they are
-required.  So adding a long list of dependent modules will not effect
-the size of the executable it merely states the initialization order
-should they be required.
+in the application dependency.  By default the run time modules list
+is set to @code{m2iso:RTentity,m2iso:Storage,m2iso:SYSTEM,}
+@code{m2iso:M2RTS,m2iso:RTExceptions,m2iso:IOLink}.  Note that these
+modules will only be linked into your executable if they are required.
+Adding a long list of dependent modules will not effect the size of
+the executable it merely states the initialization order should they
+be required.
 
 @item -fscaffold-dynamic
 the option ensures that @samp{gm2} will generate a dynamic scaffold
@@ -800,7 +709,88 @@ generate code to detect whole number overflow and underflow.
 
 @c man end
 
-@node Elementary data types, Standard procedures, Compiler options, Using
+@node Linking, Elementary data types, Compiler options, Using
+
+This section describes the linking related options.  There are three
+linking strategies available which are dynamic scaffold, static
+scaffold and user defined.  The dynamic scaffold is enabled by default
+and each module will register itself to the run time @samp{M2RTS} via
+a constructor.  The static scaffold mechanism will invoke each modules
+@samp{_init} and @samp{_finish} function in turn via a sequence of
+calls from within @samp{main}.  Lastly the user defined strategy
+can be implemented by turning off the dynamic and static options via
+@samp{-fno-scaffold-dynamic} and @samp{-fno-scaffold-static}.
+
+In the simple test below:
+
+@example
+$ gm2 hello.mod
+@end example
+
+the driver will add the options @samp{-fscaffold-dynamic} and
+@samp{-fgen-module-list=-} which generate a list of application
+modules and also creates the @samp{main} function with calls to
+@samp{M2RTS}.  It can be useful to add the option @samp{-fsources}
+which displays the source files as they are parsed and summarizes
+whether the source file is required for compilation or linking.
+
+If you wish to split the above command line into a compile and link
+then you could use these steps:
+
+@example
+$ gm2 -c -fscaffold-main hello.mod
+$ gm2 hello.o
+@end example
+
+The @samp{-fscaffold-main} informs the compiler to generate the
+@samp{main} function and scaffold.  You can enable the environment
+variable @samp{GCC_M2LINK_RTFLAG} to trace the construction and
+destruction of the application.  The values for
+@samp{GCC_M2LINK_RTFLAG} are shown in the table below:
+
+@example
+value   | meaning
+=================
+all     | turn on all flags below
+module  | trace modules as they register themselves
+hex     | display the hex address of the init/fini functions
+warning | show any warnings
+pre     | generate module list prior to dependency resolution
+dep     | trace module dependency resolution
+post    | generate module list after dependency resolution
+force   | generate a module list after dependency and forced
+        | ordering is complete
+@end example
+
+The values can be combined using a comma separated list.
+
+One of the advantages of the dynamic scaffold is that the driver
+behaves in a similar way to the other front end drivers.
+For example consider a small project consisting of 4 definition
+implementation modules (@samp{a.def}, @samp{a.mod}, @samp{b.def},
+@samp{b.mod}, @samp{c.def}, @samp{c.mod}, @samp{d.def}, @samp{d.mod})
+and a program module @samp{program.mod}.
+
+To link this project we could:
+
+@example
+$ gm2 -g -c a.mod
+$ gm2 -g -c b.mod
+$ gm2 -g -c c.mod
+$ gm2 -g -c d.mod
+$ gm2 -g program.mod a.o b.o c.o d.o
+@end example
+
+The module initialization sequence is defined by the ISO standard to
+follow the import graph traversal.  The initialization order is the
+order in which the corresponding separate modules finish the
+processing of their import lists.
+
+However, if required, you can override this using
+@samp{-fruntime-modules=a,b,c,d} for example which forces the
+initialization sequence to @samp{a}, @samp{b}, @samp{c} and @samp{d}.
+
+@node Elementary data types, Standard procedures, Linking, Using
 @section Elementary data types
 
 This section describes the elementary data types supported by GNU
@@ -1847,85 +1837,6 @@ and @code{f} are type compatible and will produce run time checking
 code to test whether the address range of their respective contents
 intersect.
 
-@node Linking, Building a shared library, Unbounded by reference, Using
-
-This section describes the linking related options.  There are three
-linking strategies available which are dynamic scaffold, static
-scaffold and user defined.  The dynamic scaffold is enabled by default
-and each module will register itself to the run time @samp{M2RTS} via
-a constructor.  The static scaffold mechanism will invoke each modules
-@samp{_init} and @samp{_finish} function in turn via a sequence of
-calls from within @samp{main}.  Lastly the user defined strategy
-can be implemented by turning off the dynamic and static options via
-@samp{-fno-scaffold-dynamic} and @samp{-fno-scaffold-static}.
-
-In the simple test below:
-
-@example
-$ gm2 hello.mod
-@end example
-
-the driver will add the options @samp{-fscaffold-dynamic} and
-@samp{-fgen-module-list=-} which generate a list of application
-modules and also creates the @samp{main} function with calls to
-@samp{M2RTS}.  It can be useful to add the option @samp{-fsources}
-which displays the source files as they are parsed and summarizes
-whether the source file is required for compilation or linking.
-
-If you wish to split the above command line into a compile and link
-then you could use these steps:
-
-@example
-$ gm2 -c -fscaffold-main hello.mod
-$ gm2 hello.o
-@end example
-
-The @samp{-fscaffold-main} informs the compiler to generate the
-@samp{main} function and scaffold.  You can enable the environment
-variable @samp{GCC_M2LINK_RTFLAG} to trace the construction and
-destruction of the application.  The values for
-@samp{GCC_M2LINK_RTFLAG} are shown in the table below:
-
-@example
-value   | meaning
-=================
-all     | turn on all flags below
-module  | trace modules as they register themselves
-pre     | generate module list prior to dependency resolution
-dep     | trace module dependency resolution
-post    | generate module list after dependency resolution
-force   | generate a module list after dependency and forced
-        | ordering is complete
-@end example
-
-The values can be combined using a comma separated list.
-
-One of the advantages of the dynamic scaffold is that the driver
-behaves in a similar way to the other front end drivers.
-For example consider a small project consisting of 4 definition
-implementation modules (@samp{a.def}, @samp{a.mod}, @samp{b.def},
-@samp{b.mod}, @samp{c.def}, @samp{c.mod}, @samp{d.def}, @samp{d.mod})
-and a program module @samp{program.mod}.
-
-To link this project we could:
-
-@example
-$ gm2 -g -c a.mod
-$ gm2 -g -c b.mod
-$ gm2 -g -c c.mod
-$ gm2 -g -c d.mod
-$ gm2 -g program.mod a.o b.o c.o d.o
-@end example
-
-The module initialization sequence is defined by the ISO standard to
-follow the import graph traversal.  The initialization order is the
-order in which the corresponding separate modules finish the
-processing of their import lists.
-
-However, if required, you can override this using
-@samp{-fruntime-modules=a,b,c,d} for example which forces the
-initialization sequence to @samp{a}, @samp{b}, @samp{c} and @samp{d}.
-
 @node Building a shared library, Interface for Python, Unbounded by reference, Using
 @section Building a shared library
 
@@ -2729,7 +2640,7 @@ There are also a variety of fixed sized @code{INTEGER} and
 @code{CARDINAL} types.  The variety of the fixed sized types will
 depend upon the target architecture.
 
-@node The ISO system module, , The PIM system module, Using
+@node The ISO system module, Release map, The PIM system module, Using
 @section The ISO system module
 
 @include m2/SYSTEM-iso.texi
@@ -2746,7 +2657,111 @@ There are also a variety of fixed sized @code{INTEGER} and
 @code{CARDINAL} types.  The variety of the fixed sized types will
 depend upon the target architecture.
 
-@node License, Copying, The ISO system module, Top
+@node Release map, Documentation, The ISO system module, Using
+@section Release map
+
+GNU Modula-2 is now part of GCC and therefore will adopt the GCC
+release schedule.  It is intended that GNU Modula-2 implement more of
+the GCC builtins (vararg access) and GCC features.
+
+There is an intention to implement the ISO generics and the M2R10
+dialect of Modula-2.  It will also implement all language changes.  If
+you wish to see something different please email
+@email{gm2@@nongnu.org} with your ideas.
+
+@node Documentation, Regression tests, Release map, Using
+@section Documentation
+
+The GNU Modula-2 documentation is available on line
+@url{https://gcc.gnu.org/onlinedocs}
+or in the pdf, info, html file format.
+
+@node Regression tests, Limitations, Documentation, Using
+@section Regression tests for gm2 in the repository
+
+The regression testsuite can be run from the gcc build directory:
+
+@example
+$ cd build-gcc
+$ make check -j 24
+@end example
+
+which runs the complete testsuite for all compilers using 24 parallel
+invocations of the compiler.  Individual language testsuites can be
+run by specifying the language, for example the Modula-2 testsuite can
+be run using:
+
+@example
+$ cd build-gcc
+$ make check-m2 -j 24
+@end example
+
+Finally the results of the testsuite can be emailed to the
+@url{https://gcc.gnu.org/lists.html, gcc-testresults} list using the
+@file{test_summary} script found in the gcc source tree:
+
+@example
+$ @samp{directory to the sources}/contrib/test_summary
+@end example
+
+@node Limitations, Objectives, Regression tests, Using
+@section Limitations
+
+Logitech compatibility library is incomplete.  The principle modules
+for this platform exist however for a comprehensive list of completed
+modules please check the documentation
+@url{gm2.html}.
+
+@node Objectives, FAQ, Limitations, Using
+@section Objectives
+
+@itemize @bullet
+
+@item
+The intention of GNU Modula-2 is to provide a production Modula-2
+front end to GCC.
+
+@item
+It should support all Niklaus Wirth PIM Dialects [234] and also ISO
+Modula-2 including a re-implementation of all the ISO modules.
+
+@item
+There should be an easy interface to C.
+
+@item
+Exploit the features of GCC.
+
+@item
+Listen to the requests of the users.
+@end itemize
+
+@node FAQ, Community, Objectives, Using
+@section FAQ
+
+@subsection Why use the C++ exception mechanism in GCC, rather than a bespoke Modula-2 mechanism?
+
+The C++ mechanism is tried and tested, it also provides GNU Modula-2
+with the ability to link with C++ modules and via swig it can raise
+Python exceptions.
+
+@node Community, Other languages, FAQ, Using
+@section Community
+
+You can subscribe to the GNU Modula-2 mailing by sending an
+email to:
+@email{gm2-subscribe@@nongnu.org}
+or by
+@url{http://lists.nongnu.org/mailman/listinfo/gm2}.
+The mailing list contents can be viewed
+@url{http://lists.gnu.org/archive/html/gm2}.
+
+@node Other languages, , Community, Using
+@section Other languages for GCC
+
+These exist and can be found on the frontends web page on the
+@uref{http://gcc.gnu.org/frontends.html, gcc web site}.
+
+@node License, , ,
 @section License of GNU Modula-2
 
 GNU Modula-2 is free software, the compiler is held under the GPL v3
@@ -2766,10 +2781,10 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 More information on how these licenses work is available
 @uref{http://www.gnu.org/licenses/licenses.html} on the GNU web site.
 
-@c Copying node is inside the gpl_v3.texi
-@include gpl_v3.texi
+@node Copying, , ,
+@include gpl_v3_without_node.texi
 
-@node Contributing, Internals, Copying, Top
+@node Contributing, , ,
 @section Contributing to GNU Modula-2
 
 Please do and please read the GNU Emacs info under
@@ -2788,12 +2803,12 @@ coding.  The mailing list may be subscribed via a web interface
 
 Many thanks and enjoy your coding!
 
-@node Internals, EBNF, Contributing, Top
+@c @node Internals, , ,
 
-This section is still being written.
+@c This section is still being written.
 @c @include gm2-internals.texi
 
-@node EBNF, Libraries, Internals, Top
+@node EBNF, , ,
 @chapter EBNF of GNU Modula-2
 
 This chapter contains the EBNF of GNU Modula-2.  This grammar currently
@@ -2807,14 +2822,14 @@ phase.
 
 @include m2/gm2-ebnf.texi
 
-@node Libraries, Indices, EBNF, Top
+@node Libraries, , ,
 @chapter PIM and ISO library definitions
 
 This chapter contains M2F, PIM and ISO libraries.
 
 @include m2/gm2-libs.texi
 
-@node Indices, , Libraries, Top
+@node Indices, , ,
 @section Indices
 
 @ifhtml
@@ -2823,11 +2838,11 @@ This chapter contains M2F, PIM and ISO libraries.
 * Functions::   Function, constants, types, ebnf indices.
 @end menu
 
-@node Contents, Functions, ,
+@node Contents, , ,
 @section Section and subsections
 @printindex cp
 
-@node Functions, , Contents,
+@node Functions, , ,
 @section Function, constants, types, ebnf indices.
 @end ifhtml
 

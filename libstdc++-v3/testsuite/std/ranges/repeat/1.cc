@@ -5,6 +5,10 @@
 #include <algorithm>
 #include <testsuite_hooks.h>
 
+#if __cpp_lib_ranges_repeat != 202207L
+# error "Feature-test macro __cpp_lib_ranges_repeat has wrong value in <ranges>"
+#endif
+
 namespace ranges = std::ranges;
 namespace views = std::views;
 
@@ -116,6 +120,13 @@ test04()
   return true;
 }
 
+void
+test05()
+{
+  // LWG 3796
+  ranges::repeat_view<int> r;
+}
+
 int
 main()
 {
@@ -123,4 +134,5 @@ main()
   static_assert(test02());
   static_assert(test03());
   static_assert(test04());
+  test05();
 }
