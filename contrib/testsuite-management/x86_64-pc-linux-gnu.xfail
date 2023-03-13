@@ -180,3 +180,7 @@ FAIL: gcc.dg/guality/pr54693-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-obje
 FAIL: gcc.dg/fold-overflow-1.c scan-assembler-times 2139095040 2
 FAIL: gcc.dg/pr95115.c execution test
 FAIL: gcc.target/i386/pr89618.c scan-tree-dump vect "LOOP VECTORIZED"
+FAIL: gcc.dg/mla_1.c (test for excess errors)
+UNRESOLVED: g++.dg/cpp2a/concepts-lambda3.C -std=c++14 compilation failed to produce executable
+UNRESOLVED: g++.dg/cpp2a/concepts-lambda3.C -std=c++17 compilation failed to produce executable
+UNRESOLVED: g++.dg/cpp2a/concepts-lambda3.C -std=c++98 compilation failed to produce executable
