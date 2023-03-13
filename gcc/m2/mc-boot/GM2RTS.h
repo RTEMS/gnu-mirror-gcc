@@ -34,6 +34,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #   ifdef __cplusplus
 extern "C" {
 #   endif
+#include <stdbool.h>
 #   if !defined (PROC_D)
 #      define PROC_D
        typedef void (*PROC_t) (void);
@@ -53,8 +54,8 @@ typedef struct M2RTS_ArgCVEnvP_p M2RTS_ArgCVEnvP;
 typedef void (*M2RTS_ArgCVEnvP_t) (int, void *, void *);
 struct M2RTS_ArgCVEnvP_p { M2RTS_ArgCVEnvP_t proc; };
 
-EXTERN void M2RTS_ConstructModules (void * applicationmodule, int argc, void * argv, void * envp);
-EXTERN void M2RTS_DeconstructModules (void * applicationmodule, int argc, void * argv, void * envp);
+EXTERN void M2RTS_ConstructModules (void * applicationmodule, void * libname, int argc, void * argv, void * envp);
+EXTERN void M2RTS_DeconstructModules (void * applicationmodule, void * libname, int argc, void * argv, void * envp);
 
 /*
    RegisterModule - adds module name to the list of outstanding
@@ -62,14 +63,14 @@ EXTERN void M2RTS_DeconstructModules (void * applicationmodule, int argc, void *
                     explored to determine initialization order.
 */
 
-EXTERN void M2RTS_RegisterModule (void * name, M2RTS_ArgCVEnvP init, M2RTS_ArgCVEnvP fini, PROC dependencies);
+EXTERN void M2RTS_RegisterModule (void * name, void * libname, M2RTS_ArgCVEnvP init, M2RTS_ArgCVEnvP fini, PROC dependencies);
 
 /*
    RequestDependant - used to specify that modulename is dependant upon
                       module dependantmodule.
 */
 
-EXTERN void M2RTS_RequestDependant (void * modulename, void * dependantmodule);
+EXTERN void M2RTS_RequestDependant (void * modulename, void * libname, void * dependantmodule, void * dependantlibname);
 
 /*
    InstallTerminationProcedure - installs a procedure, p, which will
@@ -79,7 +80,7 @@ EXTERN void M2RTS_RequestDependant (void * modulename, void * dependantmodule);
                                  procedure is installed.
 */
 
-EXTERN unsigned int M2RTS_InstallTerminationProcedure (PROC p);
+EXTERN bool M2RTS_InstallTerminationProcedure (PROC p);
 
 /*
    ExecuteInitialProcedures - executes the initial procedures installed
@@ -94,7 +95,7 @@ EXTERN void M2RTS_ExecuteInitialProcedures (void);
                              program module.
 */
 
-EXTERN unsigned int M2RTS_InstallInitialProcedure (PROC p);
+EXTERN bool M2RTS_InstallInitialProcedure (PROC p);
 
 /*
    ExecuteTerminationProcedures - calls each installed termination procedure
@@ -138,7 +139,7 @@ EXTERN void M2RTS_Halt (const char *filename_, unsigned int _filename_high, unsi
            to stderr and calls exit (1).
 */
 
-EXTERN void M2RTS_HaltC (void * filename, unsigned int line, void * function, void * description);
+EXTERN void M2RTS_HaltC (void * filename, unsigned int line, void * function, void * description) __attribute__ ((noreturn));
 
 /*
    ExitOnHalt - if HALT is executed then call exit with the exit code, e.
@@ -159,30 +160,30 @@ EXTERN void M2RTS_ErrorMessage (const char *message_, unsigned int _message_high
 */
 
 EXTERN unsigned int M2RTS_Length (const char *a_, unsigned int _a_high);
-EXTERN void M2RTS_AssignmentException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_ReturnException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_IncException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_DecException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_InclException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_ExclException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_ShiftException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_RotateException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_StaticArraySubscriptException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_DynamicArraySubscriptException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_ForLoopBeginException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_ForLoopToException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_ForLoopEndException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_PointerNilException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_NoReturnException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_CaseException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_WholeNonPosDivException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_WholeNonPosModException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_WholeZeroDivException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_WholeZeroRemException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_WholeValueException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_RealValueException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_ParameterException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
-EXTERN void M2RTS_NoException (void * filename, unsigned int line, unsigned int column, void * scope, void * message);
+EXTERN void M2RTS_AssignmentException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_ReturnException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_IncException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_DecException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_InclException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_ExclException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_ShiftException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_RotateException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_StaticArraySubscriptException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_DynamicArraySubscriptException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_ForLoopBeginException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_ForLoopToException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_ForLoopEndException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_PointerNilException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_NoReturnException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_CaseException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_WholeNonPosDivException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_WholeNonPosModException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_WholeZeroDivException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_WholeZeroRemException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_WholeValueException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_RealValueException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_ParameterException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
+EXTERN void M2RTS_NoException (void * filename, unsigned int line, unsigned int column, void * scope, void * message) __attribute__ ((noreturn));
 #   ifdef __cplusplus
 }
 #   endif

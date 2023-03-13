@@ -1494,8 +1494,9 @@ number_of_iterations_until_wrap (class loop *loop, tree type, affine_iv *iv0,
       if (integer_zerop (assumptions))
 	return false;
 
-      num = fold_build2 (MINUS_EXPR, niter_type, wide_int_to_tree (type, max),
-			 iv1->base);
+      num = fold_build2 (MINUS_EXPR, niter_type,
+			 wide_int_to_tree (niter_type, max),
+			 fold_convert (niter_type, iv1->base));
 
       /* When base has the form iv + 1, if we know iv >= n, then iv + 1 < n
 	 only when iv + 1 overflows, i.e. when iv == TYPE_VALUE_MAX.  */
@@ -1531,8 +1532,9 @@ number_of_iterations_until_wrap (class loop *loop, tree type, affine_iv *iv0,
       if (integer_zerop (assumptions))
 	return false;
 
-      num = fold_build2 (MINUS_EXPR, niter_type, iv0->base,
-			 wide_int_to_tree (type, min));
+      num = fold_build2 (MINUS_EXPR, niter_type,
+			 fold_convert (niter_type, iv0->base),
+			 wide_int_to_tree (niter_type, min));
       low = min;
       if (TREE_CODE (iv0->base) == INTEGER_CST)
 	high = wi::to_wide (iv0->base) + 1;
@@ -1546,7 +1548,6 @@ number_of_iterations_until_wrap (class loop *loop, tree type, affine_iv *iv0,
 
   /* (delta + step - 1) / step */
   step = fold_convert (niter_type, step);
-  num = fold_convert (niter_type, num);
   num = fold_build2 (PLUS_EXPR, niter_type, num, step);
   niter->niter = fold_build2 (FLOOR_DIV_EXPR, niter_type, num, step);
 
@@ -2354,7 +2355,8 @@ number_of_iterations_cltz (loop_p loop, edge exit,
       gimple *and_stmt = SSA_NAME_DEF_STMT (gimple_cond_lhs (cond_stmt));
       if (!is_gimple_assign (and_stmt)
 	  || gimple_assign_rhs_code (and_stmt) != BIT_AND_EXPR
-	  || !integer_pow2p (gimple_assign_rhs2 (and_stmt)))
+	  || !integer_pow2p (gimple_assign_rhs2 (and_stmt))
+	  || TREE_CODE (gimple_assign_rhs1 (and_stmt)) != SSA_NAME)
 	return false;
 
       checked_bit = tree_log2 (gimple_assign_rhs2 (and_stmt));
@@ -2382,7 +2384,8 @@ number_of_iterations_cltz (loop_p loop, edge exit,
 	     precision.  */
 	  iv_2 = gimple_assign_rhs1 (test_value_stmt);
 	  tree rhs_type = TREE_TYPE (iv_2);
-	  if (TREE_CODE (rhs_type) != INTEGER_TYPE
+	  if (TREE_CODE (iv_2) != SSA_NAME
+	      || TREE_CODE (rhs_type) != INTEGER_TYPE
 	      || (TYPE_PRECISION (rhs_type)
 		  != TYPE_PRECISION (test_value_type)))
 	    return false;

@@ -1,3 +1,62 @@
+2023-03-12  Jakub Jelinek  <jakub@redhat.com>
+
+	* config/aarch64/t-softfp (softfp_extensions): Add bfsf.
+	(softfp_truncations): Add tfbf dfbf sfbf hfbf.
+	(softfp_extras): Add floatdibf floatundibf floattibf floatuntibf.
+	* config/aarch64/libgcc-softfp.ver (GCC_13.0.0): Export
+	__extendbfsf2 and __trunc{s,d,t,h}fbf2.
+	* config/aarch64/sfp-machine.h (_FP_NANFRAC_B, _FP_NANSIGN_B): Define.
+	* soft-fp/floatundibf.c: New file.
+	* soft-fp/floatdibf.c: New file.
+
+2023-03-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/107703
+	* soft-fp/floattibf.c: New file.
+	* soft-fp/floatuntibf.c: New file.
+	* config/i386/libgcc-glibc.ver: Export __float{,un}tibf @ GCC_13.0.0.
+	* config/i386/64/t-softfp (softfp_extras): Add floattibf and
+	floatuntibf.
+	(CFLAGS-floattibf.c, CFLAGS-floatunstibf.c): Add -msse2.
+
+2023-03-08  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR libgcc/108727
+	* config/rs6000/morestack.S (__morestack): Use PARAMS for new stack
+	bump size.
+
+2023-03-06   Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/107299
+	* config/rs6000/_divkc3.c (COPYSIGN): Use the correct built-in based on
+	whether long double is IBM or IEEE.
+	(INFINITY): Likewise.
+	(FABS): Likewise.
+	* config/rs6000/_mulkc3.c (COPYSIGN): Likewise.
+	(INFINITY): Likewise.
+	* config/rs6000/quad-float128.h (TF): Remove definition.
+	(TFtype): Define to be long double or _Float128.
+	(TCtype): Define to be _Complex long double or _Complex _Float128.
+	* libgcc2.h (TFtype): Allow machine config files to override this.
+	(TCtype): Likewise.
+	* soft-fp/quad.h (TFtype): Likewise.
+
+2023-02-13  Kito Cheng  <kito.cheng@sifive.com>
+
+	* config.host (riscv*-*-*): Add config/riscv/value-unwind.h.
+	* config/riscv/value-unwind.h: New.
+
+2023-02-03  Christophe Lyon  <christophe.lyon@arm.com>
+
+	* config/arm/pr-support.c (__gnu_unwind_execute): Use
+	TARGET_HAVE_PACBTI to define set_pac and set_pac_sp.
+
+2023-01-30  Flavio Cruz  <flaviocruz@gmail.com>
+
+	* config.host: Recognize x86_64-*-gnu* targets.
+	* config/i386/gnu-unwind.h: Update to handle __x86_64__ with a
+	TODO for now.
+
 2023-01-23  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
 
 	* config/arm/pr-support.c (__gnu_unwind_execute): Decode opcode

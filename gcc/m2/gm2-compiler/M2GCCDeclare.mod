@@ -105,7 +105,7 @@ FROM SymbolTable IMPORT NulSym,
                         IsAModula2Type, UsesVarArgs,
                         GetSymName, GetParent,
                         GetDeclaredMod, GetVarBackEndType,
-                        GetProcedureBeginEnd,
+                        GetProcedureBeginEnd, IsProcedureNoReturn,
                         GetString, GetStringLength, IsConstString,
                         IsConstStringM2, IsConstStringC, IsConstStringM2nul, IsConstStringCnul,
                         GetAlignment, IsDeclaredPacked, PutDeclaredPacked,
@@ -179,7 +179,7 @@ FROM m2type IMPORT MarkFunctionReferenced, BuildStartRecord, BuildStartVarient, 
                    SetRecordFieldOffset, ChainOn, BuildEndRecord, BuildFieldRecord,
                    BuildEndFieldVarient, BuildArrayIndexType, BuildEndFunctionType,
                    BuildSetType, BuildEndVarient, BuildEndArrayType, InitFunctionTypeParameters,
-                   BuildProcTypeParameterDeclaration,
+                   BuildProcTypeParameterDeclaration, DeclareKnownType,
                    ValueOutOfTypeRange, ExceedsTypeRange ;
 
 FROM m2convert IMPORT BuildConvert ;
@@ -2347,6 +2347,7 @@ END IsExternalToWholeProgram ;
 
 PROCEDURE DeclareProcedureToGccWholeProgram (Sym: CARDINAL) ;
 VAR
+   returnType,
    GccParam  : Tree ;
    scope,
    Son,
@@ -2391,20 +2392,17 @@ BEGIN
       PushBinding(scope) ;
       IF GetSType(Sym)=NulSym
       THEN
-         PreAddModGcc(Sym, BuildEndFunctionDeclaration(begin, end,
-                                                       KeyToCharStar(GetFullSymName(Sym)),
-                                                       NIL,
-                                                       IsExternalToWholeProgram(Sym),
-                                                       IsProcedureGccNested(Sym),
-                                                       IsExported(GetModuleWhereDeclared(Sym), Sym)))
+         returnType := NIL
       ELSE
-         PreAddModGcc(Sym, BuildEndFunctionDeclaration(begin, end,
-                                                       KeyToCharStar(GetFullSymName(Sym)),
-                                                       Mod2Gcc(GetSType(Sym)),
-                                                       IsExternalToWholeProgram(Sym),
-                                                       IsProcedureGccNested(Sym),
-                                                       IsExported(GetModuleWhereDeclared(Sym), Sym)))
+         returnType := Mod2Gcc(GetSType(Sym))
       END ;
+      PreAddModGcc(Sym, BuildEndFunctionDeclaration(begin, end,
+                                                    KeyToCharStar(GetFullSymName(Sym)),
+                                                    returnType,
+                                                    IsExternalToWholeProgram(Sym),
+                                                    IsProcedureGccNested(Sym),
+                                                    IsExported(GetModuleWhereDeclared(Sym), Sym),
+                                                    IsProcedureNoReturn(Sym))) ;
       PopBinding(scope) ;
       WatchRemoveList(Sym, todolist) ;
       WatchIncludeList(Sym, fullydeclared)
@@ -2481,7 +2479,8 @@ BEGIN
                                                       IsExternal (Sym),  (* Extern relative to the main module.  *)
                                                       IsProcedureGccNested (Sym),
                                                       (* Exported from the module where it was declared.  *)
-                                                      IsExported (GetModuleWhereDeclared (Sym), Sym) OR IsExtern (Sym))) ;
+                                                      IsExported (GetModuleWhereDeclared (Sym), Sym) OR IsExtern (Sym),
+                                                      IsProcedureNoReturn(Sym))) ;
       PopBinding(scope) ;
       WatchRemoveList(Sym, todolist) ;
       WatchIncludeList(Sym, fullydeclared)
@@ -5021,7 +5020,8 @@ BEGIN
       RETURN( min )
    ELSIF GetSType(type)=NulSym
    THEN
-      MetaError1('unable to obtain the MIN value for type {%1as}', type)
+      MetaError1('unable to obtain the MIN value for type {%1as}', type) ;
+      RETURN NulSym
    ELSE
       RETURN( GetTypeMin(GetSType(type)) )
    END
@@ -5059,7 +5059,8 @@ BEGIN
       RETURN( max )
    ELSIF GetSType(type)=NulSym
    THEN
-      MetaError1('unable to obtain the MAX value for type {%1as}', type)
+      MetaError1('unable to obtain the MAX value for type {%1as}', type) ;
+      RETURN NulSym
    ELSE
       RETURN( GetTypeMax(GetSType(type)) )
    END

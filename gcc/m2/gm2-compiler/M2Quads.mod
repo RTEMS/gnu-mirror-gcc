@@ -126,7 +126,7 @@ FROM SymbolTable IMPORT ModeOfAddr, GetMode, PutMode, GetSymName, IsUnknown,
                         GetUnboundedHighOffset,
 
                         ForeachFieldEnumerationDo, ForeachLocalSymDo,
-                        GetExported, PutImported, GetSym,
+                        GetExported, PutImported, GetSym, GetLibName,
                         IsUnused,
                         NulSym ;
 
@@ -2259,7 +2259,8 @@ END SafeRequestSym ;
 
 (*
    callRequestDependant - create a call:
-                          RequestDependant (GetSymName (modulesym), GetSymName (depModuleSym));
+                          RequestDependant (GetSymName (modulesym), GetLibName (modulesym),
+                                            GetSymName (depModuleSym), GetLibName (depModuleSym));
 *)
 
 PROCEDURE callRequestDependant (tokno: CARDINAL;
@@ -2273,17 +2274,28 @@ BEGIN
    PushT (1) ;
    BuildAdrFunction ;
 
+   PushTF (Adr, Address) ;
+   PushTtok (MakeConstLitString (tokno, GetLibName (moduleSym)), tokno) ;
+   PushT (1) ;
+   BuildAdrFunction ;
+
    IF depModuleSym = NulSym
    THEN
+      PushTF (Nil, Address) ;
       PushTF (Nil, Address)
    ELSE
       PushTF (Adr, Address) ;
       PushTtok (MakeConstLitString (tokno, GetSymName (depModuleSym)), tokno) ;
       PushT (1) ;
+      BuildAdrFunction ;
+
+      PushTF (Adr, Address) ;
+      PushTtok (MakeConstLitString (tokno, GetLibName (depModuleSym)), tokno) ;
+      PushT (1) ;
       BuildAdrFunction
    END ;
 
-   PushT (2) ;
+   PushT (4) ;
    BuildProcedureCall (tokno)
 END callRequestDependant ;
 
@@ -2344,8 +2356,8 @@ END ForeachImportedModuleDo ;
                         static void
                         dependencies (void)
                         {
-                           M2RTS_RequestDependant (module_name, "b");
-                           M2RTS_RequestDependant (module_name, NULL);
+                           M2RTS_RequestDependant (module_name, libname, "b", "b libname");
+                           M2RTS_RequestDependant (module_name, libname, NULL, NULL);
                         }
 *)
 
@@ -2469,6 +2481,7 @@ BEGIN
             }
             catch (...) {
                RTExceptions_DefaultErrorCatch ();
+               return 0;
             }
          }
       *)
@@ -2492,10 +2505,11 @@ BEGIN
       PushTtok (RequestSym (tokno, MakeKey ("envp")), tokno) ;
       PushT (3) ;
       BuildProcedureCall (tokno) ;
-
       PushZero (tokno, Integer) ;
       BuildReturn (tokno) ;
       BuildExcept (tokno) ;
+      PushZero (tokno, Integer) ;
+      BuildReturn (tokno) ;
       EndScope ;
       BuildProcedureEnd ;
       PopN (1)
@@ -2517,7 +2531,7 @@ BEGIN
       (* int
          _M2_init (int argc, char *argv[], char *envp[])
          {
-            M2RTS_ConstructModules (module_name, argc, argv, envp);
+            M2RTS_ConstructModules (module_name, libname, argc, argv, envp);
          }  *)
       PushT (initFunction) ;
       BuildProcedureStart ;
@@ -2547,10 +2561,15 @@ BEGIN
             PushT(1) ;
             BuildAdrFunction ;
 
+            PushTF(Adr, Address) ;
+            PushTtok (MakeConstLitString (tok, GetLibName (moduleSym)), tok) ;
+            PushT(1) ;
+            BuildAdrFunction ;
+
             PushTtok (SafeRequestSym (tok, MakeKey ("argc")), tok) ;
             PushTtok (SafeRequestSym (tok, MakeKey ("argv")), tok) ;
             PushTtok (SafeRequestSym (tok, MakeKey ("envp")), tok) ;
-            PushT (4) ;
+            PushT (5) ;
             BuildProcedureCall (tok) ;
          END
       ELSIF ScaffoldStatic
@@ -2602,10 +2621,15 @@ BEGIN
             PushT(1) ;
             BuildAdrFunction ;
 
+            PushTF(Adr, Address) ;
+            PushTtok (MakeConstLitString (tok, GetLibName (moduleSym)), tok) ;
+            PushT(1) ;
+            BuildAdrFunction ;
+
             PushTtok (SafeRequestSym (tok, MakeKey ("argc")), tok) ;
             PushTtok (SafeRequestSym (tok, MakeKey ("argv")), tok) ;
             PushTtok (SafeRequestSym (tok, MakeKey ("envp")), tok) ;
-            PushT (4) ;
+            PushT (5) ;
             BuildProcedureCall (tok)
          END
       ELSIF ScaffoldStatic
@@ -2628,7 +2652,7 @@ END BuildM2FiniFunction ;
                          void
                          ctorFunction ()
                          {
-                           M2RTS_RegisterModule (GetSymName (moduleSym),
+                           M2RTS_RegisterModule (GetSymName (moduleSym), GetLibName (moduleSym),
                                                  init, fini, dependencies);
                          }
 *)
@@ -2661,10 +2685,15 @@ BEGIN
             PushT (1) ;
             BuildAdrFunction ;
 
+            PushTF (Adr, Address) ;
+            PushTtok (MakeConstLitString (tok, GetLibName (moduleSym)), tok) ;
+            PushT (1) ;
+            BuildAdrFunction ;
+
             PushTtok (init, tok) ;
             PushTtok (fini, tok) ;
             PushTtok (dep, tok) ;
-            PushT (4) ;
+            PushT (5) ;
             BuildProcedureCall (tok)
          END ;
          EndScope ;
@@ -6675,6 +6704,8 @@ BEGIN
    ELSIF IsVar (Sym) OR IsType (Sym)
    THEN
       RETURN GetItemPointedTo (GetSType (Sym))
+   ELSE
+      InternalError ('expecting a pointer or variable symbol')
    END
 END GetItemPointedTo ;
 
@@ -9295,8 +9326,9 @@ BEGIN
    ELSIF GetSType (type) = NulSym
    THEN
       MetaErrorT1 (tok,
-                   'unable to obtain the {%AkMIN} value for type {%1Aad}', type)
+                   'unable to obtain the {%AkMIN} value for type {%1Aad}', type) ;
       (* non recoverable error.  *)
+      InternalError ('MetaErrorT1 {%AkMIN} should call abort')
    ELSE
       RETURN GetTypeMin (tok, func, GetSType (type))
    END
@@ -9332,8 +9364,9 @@ BEGIN
    ELSIF GetSType (type) = NulSym
    THEN
       MetaErrorT1 (tok,
-                   'unable to obtain the {%AkMAX} value for type {%1Aad}', type)
+                   'unable to obtain the {%AkMAX} value for type {%1Aad}', type) ;
       (* non recoverable error.  *)
+      InternalError ('MetaErrorT1 {%AkMAX} should call abort')
    ELSE
       RETURN GetTypeMax (tok, func, GetSType (type))
    END
@@ -9450,7 +9483,7 @@ BEGIN
          MetaErrorT1 (vartok,
                       'parameter to {%AkMAX} must be a type or a variable, seen {%1Aad}',
                       Var)
-         (* non recoverable error.  *)
+         (* non recoverable error.  *) ;
       END
    ELSE
       (* we dont know the type therefore cannot fake a return.  *)

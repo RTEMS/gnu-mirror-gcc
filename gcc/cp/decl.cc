@@ -693,6 +693,7 @@ poplevel (int keep, int reverse, int functionbody)
 		else
 		  warning_at (DECL_SOURCE_LOCATION (decl),
 			      OPT_Wunused_variable, "unused variable %qD", decl);
+		suppress_warning (decl, OPT_Wunused_variable);
 	      }
 	    else if (DECL_CONTEXT (decl) == current_function_decl
 		     // For -Wunused-but-set-variable leave references alone.
@@ -4305,9 +4306,10 @@ make_typename_type (tree context, tree name, enum tag_types tag_type,
      member of the current instantiation or a non-dependent base;
      lookup will stop when we hit a dependent base.  */
   if (!dependent_scope_p (context))
-    /* We should only set WANT_TYPE when we're a nested typename type.
-       Then we can give better diagnostics if we find a non-type.  */
-    t = lookup_field (context, name, 2, /*want_type=*/true);
+    {
+      bool want_type = (complain & tf_qualifying_scope);
+      t = lookup_member (context, name, /*protect=*/2, want_type, complain);
+    }
   else
     t = NULL_TREE;
 
@@ -4359,7 +4361,7 @@ make_typename_type (tree context, tree name, enum tag_types tag_type,
       else
 	{
 	  if (complain & tf_error)
-	    error ("%<typename %T::%D%> names %q#T, which is not a type",
+	    error ("%<typename %T::%D%> names %q#D, which is not a type",
 		   context, name, t);
 	  return error_mark_node;
 	}
@@ -8683,8 +8685,10 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
 
       if (var_definition_p
 	  /* With -fmerge-all-constants, gimplify_init_constructor
-	     might add TREE_STATIC to the variable.  */
-	  && (TREE_STATIC (decl) || flag_merge_constants >= 2))
+	     might add TREE_STATIC to aggregate variables.  */
+	  && (TREE_STATIC (decl)
+	      || (flag_merge_constants >= 2
+		  && AGGREGATE_TYPE_P (type))))
 	{
 	  /* If a TREE_READONLY variable needs initialization
 	     at runtime, it is no longer readonly and we need to
@@ -11372,7 +11376,7 @@ compute_array_index_type_loc (location_t name_loc, tree name, tree size,
 				    cp_convert (ssizetype, integer_one_node,
 						complain),
 				    complain);
-	itype = maybe_constant_value (itype, NULL_TREE, true);
+	itype = maybe_constant_value (itype, NULL_TREE, mce_true);
       }
 
       if (!TREE_CONSTANT (itype))
@@ -12439,10 +12443,15 @@ grokdeclarator (const cp_declarator *declarator,
 	{
 	  if (typedef_decl)
 	    {
-	      pedwarn (loc, OPT_Wpedantic, "%qs specified with %qT",
-		       key, type);
+	      pedwarn (loc, OPT_Wpedantic, "%qs specified with %qD",
+		       key, typedef_decl);
 	      ok = !flag_pedantic_errors;
-	      type = DECL_ORIGINAL_TYPE (typedef_decl);
+	      if (is_typedef_decl (typedef_decl))
+		type = DECL_ORIGINAL_TYPE (typedef_decl);
+	      else
+		/* PR108099: __int128_t comes from c_common_nodes_and_builtins,
+		   and is not built as a typedef.  */
+		type = TREE_TYPE (typedef_decl);
 	      typedef_decl = NULL_TREE;
 	    }
 	  else if (declspecs->decltype_p)

@@ -2759,8 +2759,6 @@ static const struct processor all_cores[] =
   {NULL, aarch64_none, aarch64_none, aarch64_no_arch, 0, NULL}
 };
 
-enum aarch_key_type aarch_ra_sign_key = AARCH_KEY_A;
-
 /* The current tuning set.  */
 struct tune_params aarch64_tune_params = generic_tunings;
 
@@ -2806,14 +2804,6 @@ static const struct attribute_spec aarch64_attribute_table[] =
   { "SVE type",		  3, 3, false, true,  false, true,  NULL, NULL },
   { "SVE sizeless type",  0, 0, false, true,  false, true,  NULL, NULL },
   { NULL,                 0, 0, false, false, false, false, NULL, NULL }
-};
-
-/* An ISA extension in the co-processor and main instruction set space.  */
-struct aarch64_option_extension
-{
-  const char *const name;
-  const unsigned long flags_on;
-  const unsigned long flags_off;
 };
 
 typedef enum aarch64_cond_code
@@ -3855,6 +3845,19 @@ aarch64_vectorize_related_mode (machine_mode vector_mode,
     }
 
   return default_vectorize_related_mode (vector_mode, element_mode, nunits);
+}
+
+/* Implement TARGET_VECTORIZE_PREFERRED_DIV_AS_SHIFTS_OVER_MULT.  */
+
+static bool
+aarch64_vectorize_preferred_div_as_shifts_over_mult (const_tree type)
+{
+  machine_mode mode = TYPE_MODE (type);
+  unsigned int vec_flags = aarch64_classify_vector_mode (mode);
+  bool sve_p = (vec_flags & VEC_ANY_SVE);
+  bool simd_p = (vec_flags & VEC_ADVSIMD);
+
+  return (sve_p && TARGET_SVE2) || (simd_p && TARGET_SIMD);
 }
 
 /* Implement TARGET_PREFERRED_ELSE_VALUE.  For binary operations,
@@ -13022,7 +13025,7 @@ aarch64_output_casesi (rtx *operands)
 int
 aarch64_uxt_size (int shift, HOST_WIDE_INT mask)
 {
-  if (shift >= 0 && shift <= 3)
+  if (shift >= 0 && shift <= 4)
     {
       int size;
       for (size = 8; size <= 32; size *= 2)
@@ -19868,7 +19871,7 @@ aarch64_gimplify_va_arg_expr (tree valist, tree type, gimple_seq *pre_p,
 	  field_ptr_t = aarch64_fp16_ptr_type_node;
 	  break;
 	case E_BFmode:
-	  field_t = aarch64_bf16_type_node;
+	  field_t = bfloat16_type_node;
 	  field_ptr_t = aarch64_bf16_ptr_type_node;
 	  break;
 	case E_V2SImode:
@@ -24371,46 +24374,6 @@ aarch64_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
 
   return ret;
 }
-
-/* Implement TARGET_VECTORIZE_CAN_SPECIAL_DIV_BY_CONST.  */
-
-bool
-aarch64_vectorize_can_special_div_by_constant (enum tree_code code,
-					       tree vectype, wide_int cst,
-					       rtx *output, rtx in0, rtx in1)
-{
-  if (code != TRUNC_DIV_EXPR
-      || !TYPE_UNSIGNED (vectype))
-    return false;
-
-  machine_mode mode = TYPE_MODE (vectype);
-  unsigned int flags = aarch64_classify_vector_mode (mode);
-  if ((flags & VEC_ANY_SVE) && !TARGET_SVE2)
-    return false;
-
-  int pow = wi::exact_log2 (cst + 1);
-  auto insn_code = maybe_code_for_aarch64_bitmask_udiv3 (TYPE_MODE (vectype));
-  /* SVE actually has a div operator, we may have gotten here through
-     that route.  */
-  if (pow != (int) (element_precision (vectype) / 2)
-      || insn_code == CODE_FOR_nothing)
-    return false;
-
-  /* We can use the optimized pattern.  */
-  if (in0 == NULL_RTX && in1 == NULL_RTX)
-    return true;
-
-  gcc_assert (output);
-
-  expand_operand ops[3];
-  create_output_operand (&ops[0], *output, mode);
-  create_input_operand (&ops[1], in0, mode);
-  create_fixed_operand (&ops[2], in1);
-  expand_insn (insn_code, 3, ops);
-  *output = ops[0].value;
-  return true;
-}
-
 /* Generate a byte permute mask for a register of mode MODE,
    which has NUNITS units.  */
 
@@ -25704,6 +25667,7 @@ aarch_macro_fusion_pair_p (rtx_insn *prev, rtx_insn *curr)
 	  && CONST_INT_P (XEXP (curr_src, 1))
 	  && INTVAL (XEXP (curr_src, 1)) == polarity
 	  && REG_P (XEXP (curr_src, 0))
+	  && REG_P (SET_DEST (prev_set))
 	  && REGNO (SET_DEST (prev_set)) == REGNO (XEXP (curr_src, 0)))
 	return true;
     }
@@ -26597,18 +26561,18 @@ aarch64_dwarf_poly_indeterminate_value (unsigned int i, unsigned int *factor,
 }
 
 /* Implement TARGET_LIBGCC_FLOATING_POINT_MODE_SUPPORTED_P - return TRUE
-   if MODE is HFmode, and punt to the generic implementation otherwise.  */
+   if MODE is [BH]Fmode, and punt to the generic implementation otherwise.  */
 
 static bool
 aarch64_libgcc_floating_mode_supported_p (scalar_float_mode mode)
 {
-  return (mode == HFmode
+  return ((mode == HFmode || mode == BFmode)
 	  ? true
 	  : default_libgcc_floating_mode_supported_p (mode));
 }
 
 /* Implement TARGET_SCALAR_MODE_SUPPORTED_P - return TRUE
-   if MODE is HFmode, and punt to the generic implementation otherwise.  */
+   if MODE is [BH]Fmode, and punt to the generic implementation otherwise.  */
 
 static bool
 aarch64_scalar_mode_supported_p (scalar_mode mode)
@@ -26616,7 +26580,7 @@ aarch64_scalar_mode_supported_p (scalar_mode mode)
   if (DECIMAL_FLOAT_MODE_P (mode))
     return default_decimal_float_supported_p ();
 
-  return (mode == HFmode
+  return ((mode == HFmode || mode == BFmode)
 	  ? true
 	  : default_scalar_mode_supported_p (mode));
 }
@@ -27084,39 +27048,6 @@ aarch64_stack_protect_guard (void)
   return NULL_TREE;
 }
 
-/* Return the diagnostic message string if conversion from FROMTYPE to
-   TOTYPE is not allowed, NULL otherwise.  */
-
-static const char *
-aarch64_invalid_conversion (const_tree fromtype, const_tree totype)
-{
-  if (element_mode (fromtype) != element_mode (totype))
-    {
-      /* Do no allow conversions to/from BFmode scalar types.  */
-      if (TYPE_MODE (fromtype) == BFmode)
-	return N_("invalid conversion from type %<bfloat16_t%>");
-      if (TYPE_MODE (totype) == BFmode)
-	return N_("invalid conversion to type %<bfloat16_t%>");
-    }
-
-  /* Conversion allowed.  */
-  return NULL;
-}
-
-/* Return the diagnostic message string if the unary operation OP is
-   not permitted on TYPE, NULL otherwise.  */
-
-static const char *
-aarch64_invalid_unary_op (int op, const_tree type)
-{
-  /* Reject all single-operand operations on BFmode except for &.  */
-  if (element_mode (type) == BFmode && op != ADDR_EXPR)
-    return N_("operation not permitted on type %<bfloat16_t%>");
-
-  /* Operation allowed.  */
-  return NULL;
-}
-
 /* Return the diagnostic message string if the binary operation OP is
    not permitted on TYPE1 and TYPE2, NULL otherwise.  */
 
@@ -27124,11 +27055,6 @@ static const char *
 aarch64_invalid_binary_op (int op ATTRIBUTE_UNUSED, const_tree type1,
 			   const_tree type2)
 {
-  /* Reject all 2-operand operations on BFmode.  */
-  if (element_mode (type1) == BFmode
-      || element_mode (type2) == BFmode)
-    return N_("operation not permitted on type %<bfloat16_t%>");
-
   if (VECTOR_TYPE_P (type1)
       && VECTOR_TYPE_P (type2)
       && !TYPE_INDIVISIBLE_P (type1)
@@ -27725,12 +27651,6 @@ aarch64_libgcc_floating_mode_supported_p
 #undef TARGET_MANGLE_TYPE
 #define TARGET_MANGLE_TYPE aarch64_mangle_type
 
-#undef TARGET_INVALID_CONVERSION
-#define TARGET_INVALID_CONVERSION aarch64_invalid_conversion
-
-#undef TARGET_INVALID_UNARY_OP
-#define TARGET_INVALID_UNARY_OP aarch64_invalid_unary_op
-
 #undef TARGET_INVALID_BINARY_OP
 #define TARGET_INVALID_BINARY_OP aarch64_invalid_binary_op
 
@@ -27911,12 +27831,12 @@ aarch64_libgcc_floating_mode_supported_p
 #undef TARGET_MAX_ANCHOR_OFFSET
 #define TARGET_MAX_ANCHOR_OFFSET 4095
 
+#undef TARGET_VECTORIZE_PREFERRED_DIV_AS_SHIFTS_OVER_MULT
+#define TARGET_VECTORIZE_PREFERRED_DIV_AS_SHIFTS_OVER_MULT \
+  aarch64_vectorize_preferred_div_as_shifts_over_mult
+
 #undef TARGET_VECTOR_ALIGNMENT
 #define TARGET_VECTOR_ALIGNMENT aarch64_simd_vector_alignment
-
-#undef TARGET_VECTORIZE_CAN_SPECIAL_DIV_BY_CONST
-#define TARGET_VECTORIZE_CAN_SPECIAL_DIV_BY_CONST \
-  aarch64_vectorize_can_special_div_by_constant
 
 #undef TARGET_VECTORIZE_PREFERRED_VECTOR_ALIGNMENT
 #define TARGET_VECTORIZE_PREFERRED_VECTOR_ALIGNMENT \

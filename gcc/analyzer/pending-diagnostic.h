@@ -173,6 +173,10 @@ class pending_diagnostic
      having to generate feasible execution paths for them).  */
   virtual int get_controlling_option () const = 0;
 
+  /* Vfunc to give the diagnostic the chance to terminate the execution
+     path being explored.  By default, don't terminate the path.  */
+  virtual bool terminate_path_p () const { return false; }
+
   /* Vfunc for emitting the diagnostic.  The rich_location will have been
      populated with a diagnostic_path.
      Return true if a diagnostic is actually emitted.  */
@@ -346,6 +350,16 @@ class pending_diagnostic
   virtual void mark_interesting_stuff (interesting_t *)
   {
     /* Default no-op implementation.  */
+  }
+
+  /* Vfunc to give diagnostic subclasses the opportunity to reject diagnostics
+     by imposing their own additional feasibility checks on the path to a
+     given feasible_node.  */
+  virtual bool check_valid_fpath_p (const feasible_node &,
+				    const gimple *) const
+  {
+    /* Default implementation: accept this path.  */
+    return true;
   }
 };
 

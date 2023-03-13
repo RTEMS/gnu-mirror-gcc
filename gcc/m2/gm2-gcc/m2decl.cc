@@ -48,7 +48,7 @@ m2decl_DeclareM2linkStaticInitialization (location_t location,
   m2block_pushGlobalScope ();
   /* Generate: int M2LINK_StaticInitialization = ScaffoldStatic;  */
   tree init = m2decl_BuildIntegerConstant (ScaffoldStatic);
-  tree static_init = m2decl_DeclareKnownVariable (location, "M2LINK_StaticInitialization",
+  tree static_init = m2decl_DeclareKnownVariable (location, "m2pim_M2LINK_StaticInitialization",
 						  integer_type_node,
 						  TRUE, FALSE, FALSE, TRUE, NULL_TREE, init);
   m2block_popGlobalScope ();
@@ -65,7 +65,7 @@ m2decl_DeclareM2linkForcedModuleInitOrder (location_t location,
   tree ptr_to_char = build_pointer_type (char_type_node);
   TYPE_READONLY (ptr_to_char) = TRUE;
   tree init = m2decl_BuildPtrToTypeString (location, RuntimeOverride, ptr_to_char);
-  tree forced_order = m2decl_DeclareKnownVariable (location, "M2LINK_ForcedModuleInitOrder",
+  tree forced_order = m2decl_DeclareKnownVariable (location, "m2pim_M2LINK_ForcedModuleInitOrder",
 						   ptr_to_char,
 						   TRUE, FALSE, FALSE, TRUE, NULL_TREE, init);
   m2block_popGlobalScope ();
@@ -77,8 +77,8 @@ m2decl_DeclareM2linkForcedModuleInitOrder (location_t location,
 
 tree
 m2decl_DeclareKnownVariable (location_t location, const char *name, tree type,
-                             int exported, int imported, int istemporary,
-                             int isglobal, tree scope, tree initial)
+                             bool exported, bool imported, bool istemporary,
+                             bool isglobal, tree scope, tree initial)
 {
   tree id;
   tree decl;
@@ -165,7 +165,7 @@ m2decl_DeclareKnownConstant (location_t location, tree type, tree value)
 
 tree
 m2decl_BuildParameterDeclaration (location_t location, char *name, tree type,
-                                  int isreference)
+                                  bool isreference)
 {
   tree parm_decl;
 
@@ -210,8 +210,8 @@ m2decl_BuildStartFunctionDeclaration (int uses_varargs)
 tree
 m2decl_BuildEndFunctionDeclaration (location_t location_begin,
                                     location_t location_end, const char *name,
-                                    tree returntype, int isexternal,
-                                    int isnested, int ispublic)
+                                    tree returntype, bool isexternal,
+                                    bool isnested, bool ispublic, bool isnoreturn)
 {
   tree fntype;
   tree fndecl;
@@ -244,6 +244,7 @@ m2decl_BuildEndFunctionDeclaration (location_t location_begin,
       = build_decl (location_end, RESULT_DECL, NULL_TREE, returntype);
   DECL_CONTEXT (DECL_RESULT (fndecl)) = fndecl;
   TREE_TYPE (fndecl) = fntype;
+  TREE_THIS_VOLATILE (fndecl) = isnoreturn;
 
   DECL_SOURCE_LOCATION (fndecl) = location_begin;
 
@@ -289,7 +290,7 @@ m2decl_DeclareModuleCtor (tree decl)
 void
 m2decl_DetermineSizeOfConstant (location_t location,
 				const char *str, unsigned int base,
-                                int *needsLong, int *needsUnsigned)
+                                bool *needsLong, bool *needsUnsigned)
 {
   unsigned int ulow;
   int high;
@@ -310,8 +311,8 @@ m2decl_BuildConstLiteralNumber (location_t location, const char *str, unsigned i
   unsigned HOST_WIDE_INT low;
   HOST_WIDE_INT high;
   HOST_WIDE_INT ival[3];
-  int overflow = m2expr_interpret_integer (str, base, &low, &high);
-  int needLong, needUnsigned;
+  bool overflow = m2expr_interpret_integer (str, base, &low, &high);
+  bool needLong, needUnsigned;
 
   ival[0] = low;
   ival[1] = high;

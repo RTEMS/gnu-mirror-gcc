@@ -31,6 +31,8 @@ along with GNU Modula-2; see the file COPYING3.  If not see
 #include "gcc.h"
 #include "opts.h"
 #include "vec.h"
+#include <vector>
+#include <string>
 
 #include "m2/gm2config.h"
 
@@ -129,8 +131,6 @@ static const char *library_abbrev[maxlib]
    -flibs=m2pim,m2iso respectively.  This provides a match between
    the dialect of Modula-2 and the library set.  */
 
-static const char *add_include (const char *libpath, const char *library);
-
 static bool seen_scaffold_static = false;
 static bool seen_scaffold_dynamic = false;
 static bool seen_scaffold_main = false;
@@ -150,9 +150,41 @@ static void append_arg (const struct cl_decoded_option *);
 /* The new argument list will be built here.  */
 static unsigned int gm2_newargc;
 static struct cl_decoded_option *gm2_new_decoded_options;
-static const char *full_libraries = NULL;
 static const char *libraries = NULL;  /* Abbreviated libraries.  */
+static const char *m2_path_name = "";
 
+typedef struct named_path_s {
+  std::vector<const char*>path;
+  const char *name;
+} named_path;
+
+static std::vector<named_path>Ipaths;
+
+
+static void
+push_back_Ipath (const char *arg)
+{
+  if (Ipaths.empty ())
+    {
+      named_path np;
+      np.path.push_back (arg);
+      np.name = m2_path_name;
+      Ipaths.push_back (np);
+    }
+  else
+    {
+      if (strcmp (Ipaths.back ().name,
+		  m2_path_name) == 0)
+	Ipaths.back ().path.push_back (arg);
+      else
+	{
+	  named_path np;
+	  np.path.push_back (arg);
+	  np.name = m2_path_name;
+	  Ipaths.push_back (np);
+	}
+    }
+}
 
 /* Return whether strings S1 and S2 are both NULL or both the same
    string.  */
@@ -239,31 +271,6 @@ safe_strdup (const char *s)
   if (s != NULL)
     return xstrdup (s);
   return NULL;
-}
-
-static char *
-concat_option (char *dest, const char *pre, const char *path, const char *post)
-{
-  if (dest == NULL)
-    {
-      dest = (char *) xmalloc (strlen (pre) + strlen (path) + strlen (post) + 1);
-      strcpy (dest, pre);
-      strcat (dest, path);
-      strcat (dest, post);
-      return dest;
-    }
-  else
-    {
-      char *result = (char *) xmalloc (strlen (dest) + strlen (pre)
-				       + strlen (path) + strlen (post) + 1 + 1);
-      strcpy (result, dest);
-      strcat (result, " ");
-      strcat (result, pre);
-      strcat (result, path);
-      strcat (result, post);
-      free (dest);
-      return result;
-    }
 }
 
 /* add_default_libs adds the -l option which is derived from the
@@ -370,6 +377,24 @@ convert_abbreviations (const char *libraries)
   return full_libraries;
 }
 
+/* add_m2_I_path appends -fm2-pathname and -fm2-pathnameI options to
+   the command line which are contructed in the saved Ipaths.  */
+
+static void
+add_m2_I_path (void)
+{
+  for (auto np : Ipaths)
+    {
+      if (strcmp (np.name, "") == 0)
+	append_option (OPT_fm2_pathname_, safe_strdup ("-"), 1);
+      else
+	  append_option (OPT_fm2_pathname_, safe_strdup (np.name), 1);
+      for (auto *s : np.path)
+	append_option (OPT_fm2_pathnameI, safe_strdup (s), 1);
+    }
+  Ipaths.clear();
+}
+
 
 void
 lang_specific_driver (struct cl_decoded_option **in_decoded_options,
@@ -457,6 +482,7 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
   fprintf (stderr, "\n");
 #endif
 
+  // add_spec_function ("m2I", add_m2_I_path);
   gm2_xargc = argc;
   gm2_x_decoded_options = decoded_options;
   gm2_newargc = 0;
@@ -542,7 +568,14 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 	  seen_uselist = true;
 	  uselist = decoded_options[i].value;
 	  break;
-
+	case OPT_fm2_pathname_:
+	  args[i] |= SKIPOPT; /* We will add the option if it is needed.  */
+	  m2_path_name = decoded_options[i].arg;
+	  break;
+	case OPT_I:
+	  args[i] |= SKIPOPT; /* We will add the option if it is needed.  */
+	  push_back_Ipath (decoded_options[i].arg);
+	  break;
 	case OPT_nostdlib:
 	case OPT_nostdlib__:
 	case OPT_nodefaultlibs:
@@ -698,6 +731,7 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 #endif
     }
 
+  add_m2_I_path ();
   /* We now add in extra arguments to facilitate a successful link.
      Note that the libraries are added to the end of the link here
      and also placed earlier into the link by lang-specs.h.  Possibly

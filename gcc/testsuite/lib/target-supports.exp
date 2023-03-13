@@ -59,6 +59,10 @@ proc check_compile {basename type contents args} {
     } else {
 	set options ""
     }
+    # Silence "command-line option [...] is valid for [...] but not for [...]"
+    # that we may easily run into here, if more than one language is involved.
+    lappend options additional_flags=-Wno-complain-wrong-lang
+
     switch -glob -- $contents {
 	"*/\\* Assembly*" { set src ${basename}[pid].S }
 	"*! Fortran*" { set src ${basename}[pid].f90 }
@@ -83,6 +87,7 @@ proc check_compile {basename type contents args} {
 	assembly { set output ${basename}[pid].s }
 	object { set output ${basename}[pid].o }
 	executable { set output ${basename}[pid].exe }
+	"tree-*" -
 	"rtl-*" {
 	    set output ${basename}[pid].s
 	    lappend options "additional_flags=-fdump-$type"
@@ -103,6 +108,9 @@ proc check_compile {basename type contents args} {
     # file is created won't work.
     if [regexp "rtl-(.*)" $type dummy rtl_type] {
 	set scan_output "[glob $src.\[0-9\]\[0-9\]\[0-9\]r.$rtl_type]"
+	file delete $output
+    } elseif [regexp "tree-(.*)" $type dummy tree_type] {
+	set scan_output "[glob $src.\[0-9\]\[0-9\]\[0-9\]t.$tree_type]"
 	file delete $output
     }
 
@@ -2872,6 +2880,12 @@ proc check_fork_available {} {
 	# tell as we're doing partial links for kernel modules.
 	return 0
      }    
+    if { [istarget cris-*-*] } {
+	# Compiling and linking works, and an executable running e.g.
+	# gcc.dg/torture/ftrapv-1.c works on now-historical hardware,
+	# but the GNU simulator emits an error for the fork syscall.
+	return [check_effective_target_hw]
+    }
     return [check_function_available "fork"]
 }
 
@@ -7774,7 +7788,8 @@ proc check_effective_target_vect_fully_masked { } {
 # @code{len_store} optabs.
 
 proc check_effective_target_vect_len_load_store { } {
-    return [check_effective_target_has_arch_pwr9]
+    return [expr { [check_effective_target_has_arch_pwr9]
+      || [check_effective_target_s390_vx] }]
 }
 
 # Return the value of parameter vect-partial-vector-usage specified for
@@ -11675,6 +11690,15 @@ proc check_effective_target_frame_pointer_for_non_leaf { } {
   return 0
 }
 
+# Return 1 if the target can perform tail-call optimizations of the
+# most trivial type.
+proc check_effective_target_tail_call { } {
+    return [check_no_messages_and_pattern tail_call ",SIBCALL" rtl-expand {
+	__attribute__((__noipa__)) void foo (void) { }
+	__attribute__((__noipa__)) void bar (void) { foo(); }
+    } {-O2 -fdump-rtl-expand-all}] ;# The "SIBCALL" note requires a detailed dump.
+}
+
 # Return 1 if the target's calling sequence or its ABI
 # create implicit stack probes at or prior to function entry.
 proc check_effective_target_caller_implicit_probes { } {
@@ -12192,7 +12216,7 @@ proc check_effective_target_o_flag_in_section { } {
 # return 1 if LRA is supported.
 
 proc check_effective_target_lra { } {
-    if { [istarget hppa*-*-*] } {
+    if { [istarget hppa*-*-*] || [istarget cris-*-*] } {
 	return 0
     }
     return 1
@@ -12295,4 +12319,14 @@ proc check_is_prog_name_available { prog } {
     }
 
     return 1
+}
+
+# returns 1 if target does selects a readonly section for const volatile variables.
+proc check_effective_target_const_volatile_readonly_section { } {
+
+    if { [istarget powerpc-*-*]
+    	  || [check-flags { "" { powerpc64-*-* } { -m32 } }] } {
+	return 0
+    }
+  return 1
 }

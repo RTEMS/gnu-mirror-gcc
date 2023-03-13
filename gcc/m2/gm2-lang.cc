@@ -49,12 +49,18 @@ static int insideCppArgs = FALSE;
 /* We default to pim in the absence of fiso.  */
 static bool iso = false;
 
+typedef struct named_path_s {
+  std::vector<const char*>path;
+  const char *name;
+} named_path;
+
+
 /* The language include paths are based on the libraries in use.  */
 static bool allow_libraries = true;
 static const char *flibs = nullptr;
 static const char *iprefix = nullptr;
 static const char *imultilib = nullptr;
-static std::vector<const char*>Ipaths;
+static std::vector<named_path>Ipaths;
 static std::vector<const char*>isystem;
 static std::vector<const char*>iquote;
 
@@ -137,9 +143,7 @@ gm2_langhook_init (void)
 static unsigned int
 gm2_langhook_option_lang_mask (void)
 {
-  /* We need to process some driver options and pass through some C
-     ones to build our preprocessing lines.  */
-  return CL_ModulaX2 | CL_C | CL_DRIVER;
+  return CL_ModulaX2;
 }
 
 /* Initialize the options structure.  */
@@ -262,21 +266,22 @@ gm2_langhook_init_options (unsigned int decoded_options_count,
 	     For now skip all plugins to avoid fails with the m2 one.  */
 	  break;
 
-	/* Preprocessor arguments with a following filename.  */
+	/* Preprocessor arguments with a following filename, we add these
+	   back to the main file preprocess line, but not to dependents
+	   TODO Handle MF.  */
 	case OPT_MD:
+	  M2Options_SetMD (arg);
+	  break;
 	case OPT_MMD:
-	  /* Save the filename associated with the MD/MMD which will also
-	     mark the option as used.  FIXME: maybe we should diagnose a
-	     missing filename here, rather than assert.  */
-	  gcc_checking_assert (i+1 < decoded_options_count);
-	  gcc_checking_assert (decoded_options[i+1].opt_index
-			       == OPT_SPECIAL_input_file);
-	  /* Pick up the following filename.  */
-	  arg = decoded_options[i+1].arg;
-	  if (code == OPT_MD)
-	    M2Options_SetMD (arg);
-	  else
-	    M2Options_SetMMD (arg);
+	  M2Options_SetMMD (arg);
+	  break;
+
+	/* Modula 2 claimed options we pass to the preprocessor.  */
+	case OPT_ansi:
+	case OPT_traditional_cpp:
+	  if (building_cpp_command)
+	    M2Options_CppArg (opt, arg, (option->flags & CL_JOINED)
+			      && !(option->flags & CL_SEPARATE));
 	  break;
 
 	/* Options we act on and also pass to the preprocessor.  */
@@ -286,16 +291,19 @@ gm2_langhook_init_options (unsigned int decoded_options_count,
 	    M2Options_CppArg (opt, arg, (option->flags & CL_JOINED)
 			      && !(option->flags & CL_SEPARATE));
 	  break;
+	case OPT_quiet:
+	  M2Options_SetQuiet (value);
+	  if (building_cpp_command)
+	    M2Options_CppArg (opt, arg, (option->flags & CL_JOINED)
+			      && !(option->flags & CL_SEPARATE));
+	  break;
 	case OPT_v:
 	  M2Options_SetVerbose (value);
 	  /* FALLTHROUGH */
 	default:
+	  /* We handled input files above.  */
 	  if (code >= N_OPTS)
-	    {
-	      // FIXME remove debug.
-	      fprintf(stderr, "%s : %s\n", opt, (arg ? arg : ""));
-	      break;
-	    }
+	    break;
 	  /* Do not pass Modula-2 args to the preprocessor, any that we care
 	     about here should already have been handled above.  */
 	  if (option->flags & CL_ModulaX2)
@@ -317,6 +325,31 @@ is_cpp_filename (unsigned int i)
   return filename_cpp[i];
 }
 
+static void
+push_back_Ipath (const char *arg)
+{
+  if (Ipaths.empty ())
+    {
+      named_path np;
+      np.path.push_back (arg);
+      np.name = xstrdup (M2Options_GetM2PathName ());
+      Ipaths.push_back (np);
+    }
+  else
+    {
+      if (strcmp (Ipaths.back ().name,
+		  M2Options_GetM2PathName ()) == 0)
+	Ipaths.back ().path.push_back (arg);
+      else
+	{
+	  named_path np;
+	  np.path.push_back (arg);
+	  np.name = xstrdup (M2Options_GetM2PathName ());
+	  Ipaths.push_back (np);
+	}
+    }
+}
+
 /* Handle gm2 specific options.  Return 0 if we didn't do anything.  */
 
 bool
@@ -328,7 +361,6 @@ gm2_langhook_handle_option (
   enum opt_code code = (enum opt_code)scode;
 
   const struct cl_option *option = &cl_options[scode];
-  const char *opt = (const char *)option->opt_text;
   /* ignore file names.  */
   if (code == N_OPTS)
     return 1;
@@ -336,7 +368,7 @@ gm2_langhook_handle_option (
   switch (code)
     {
     case OPT_I:
-      Ipaths.push_back (arg);
+      push_back_Ipath (arg);
       return 1;
     case OPT_fiso:
       M2Options_SetISO (value);
@@ -516,6 +548,24 @@ gm2_langhook_handle_option (
       M2Options_SetM2g (value);
       return 1;
       break;
+    case OPT_fm2_pathname_:
+      if (strcmp (arg, "-") == 0)
+	M2Options_SetM2PathName ("");
+      else
+	M2Options_SetM2PathName (arg);
+      return 1;
+      break;
+    case OPT_fm2_pathnameI:
+      push_back_Ipath (arg);
+      return 1;
+      break;
+    case OPT_fm2_prefix_:
+      if (strcmp (arg, "-") == 0)
+	M2Options_SetM2Prefix ("");
+      else
+	M2Options_SetM2Prefix (arg);
+      return 1;
+      break;
     case OPT_iprefix:
       iprefix = arg;
       return 1;
@@ -536,9 +586,6 @@ gm2_langhook_handle_option (
       /* Otherwise, ignored, at least for now. */
       return 1;
       break;
-    case OPT_quiet:
-      M2Options_SetQuiet (value);
-      return 1;
     case OPT_fm2_whole_program:
       M2Options_SetWholeProgram (value);
       return 1;
@@ -560,20 +607,19 @@ gm2_langhook_handle_option (
         }
       else
         return 0;
-    case OPT_o:
-      /* Options we ignore, always.  */
-      return 1;
     default:
       if (insideCppArgs)
-	/* Already handled.  */
+	/* Handled in gm2_langhook_init_options ().  */
 	return 1;
       else if (option->flags & CL_DRIVER)
-	/* Ignore driver options we do not specifically use.  */
+	/* Driver options (unless specifically claimed above) should be handled
+	   in gm2_langhook_init_options ().  */
 	return 1;
       else if (option->flags & CL_C)
-	/* Ignore C options we do not specifically use.  */
+	/* C options (unless specifically claimed above) should be handled
+	   in gm2_langhook_init_options ().  */
 	return 1;
-      return 0;
+      break;
     }
   return 0;
 }
@@ -611,6 +657,7 @@ add_one_import_path (const char *libname)
   strcat (lib, "m2");
   strcat (lib, dir_sep);
   strcat (lib, libname);
+  M2Options_SetM2PathName (libname);
   M2Options_SetSearchPath (lib);
 }
 
@@ -672,8 +719,12 @@ gm2_langhook_post_options (const char **pfilename)
   for (auto *s : iquote)
     M2Options_SetSearchPath (s);
   iquote.clear();
-  for (auto *s : Ipaths)
-    M2Options_SetSearchPath (s);
+  for (auto np : Ipaths)
+    {
+      M2Options_SetM2PathName (np.name);
+      for (auto *s : np.path)
+	M2Options_SetSearchPath (s);
+    }
   Ipaths.clear();
   for (auto *s : isystem)
     M2Options_SetSearchPath (s);
@@ -982,7 +1033,7 @@ convert_loc (location_t location, tree type, tree expr)
     {
     case VOID_TYPE:
     case BOOLEAN_TYPE:
-      return fold_convert (type, expr);
+      return fold (convert_to_integer (type, expr));
     case INTEGER_TYPE:
       return fold (convert_to_integer (type, expr));
     case POINTER_TYPE:

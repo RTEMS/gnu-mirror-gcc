@@ -34,6 +34,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #   ifdef __cplusplus
 extern "C" {
 #   endif
+#include <stdbool.h>
 #   if !defined (PROC_D)
 #      define PROC_D
        typedef void (*PROC_t) (void);
@@ -41,6 +42,7 @@ extern "C" {
 #   endif
 
 #   include "GSYSTEM.h"
+#   include "GRTentity.h"
 
 #   if defined (_RTco_C)
 #      define EXTERN

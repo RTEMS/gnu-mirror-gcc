@@ -1531,6 +1531,7 @@ gfc_copy_class_to_class (tree from, tree to, tree nelems, bool unlimited)
 	    name = (const char *)(DECL_NAME (to)->identifier.id.str);
 
 	  from_len = gfc_conv_descriptor_size (from_data, 1);
+	  from_len = fold_convert (TREE_TYPE (orig_nelems), from_len);
 	  tmp = fold_build2_loc (input_location, NE_EXPR,
 				  logical_type_node, from_len, orig_nelems);
 	  msg = xasprintf ("Array bound mismatch for dimension %d "
@@ -5673,6 +5674,9 @@ gfc_conv_gfc_desc_to_cfi_desc (gfc_se *parmse, gfc_expr *e, gfc_symbol *fsym)
   gfc_add_modify (&block, tmp,
 		  build_int_cst (TREE_TYPE (tmp), attr));
 
+  /* The cfi-base_addr assignment could be skipped for 'pointer, intent(out)'.
+     That is very sensible for undefined pointers, but the C code might assume
+     that the pointer retains the value, in particular, if it was NULL.  */
   if (e->rank == 0)
     {
       tmp = gfc_get_cfi_desc_base_addr (cfi);
@@ -5694,6 +5698,9 @@ gfc_conv_gfc_desc_to_cfi_desc (gfc_se *parmse, gfc_expr *e, gfc_symbol *fsym)
       tmp2 = gfc_get_cfi_desc_elem_len (cfi);
       gfc_add_modify (&block, tmp2, fold_convert (TREE_TYPE (tmp2), tmp));
     }
+
+  if (fsym->attr.pointer && fsym->attr.intent == INTENT_OUT)
+    goto done;
 
   /* When allocatable + intent out, free the cfi descriptor.  */
   if (fsym->attr.allocatable && fsym->attr.intent == INTENT_OUT)

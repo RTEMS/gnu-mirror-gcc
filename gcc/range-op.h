@@ -109,6 +109,12 @@ protected:
 			 const wide_int &rh_lb,
 			 const wide_int &rh_ub) const;
 
+  // Called by fold range to split small subranges into parts when op1 == op2
+  void wi_fold_in_parts_equiv (irange &r, tree type,
+			       const wide_int &lb,
+			       const wide_int &ub,
+			       unsigned limit) const;
+
   // Tree code of the range operator or ERROR_MARK if unknown.
   tree_code m_code;
 };
@@ -305,4 +311,8 @@ private:
 // This holds the range op table for floating point operations.
 extern floating_op_table *floating_tree_table;
 
+extern range_operator *ptr_op_widen_mult_signed;
+extern range_operator *ptr_op_widen_mult_unsigned;
+extern range_operator *ptr_op_widen_plus_signed;
+extern range_operator *ptr_op_widen_plus_unsigned;
 #endif // GCC_RANGE_OP_H
