@@ -11067,13 +11067,8 @@ vect_transform_loop (loop_vec_info loop_vinfo, gimple *loop_vectorized_call)
 			    lowest_vf) - 1
 	   : wi::udiv_floor (loop->nb_iterations_upper_bound + bias_for_lowest,
 			     lowest_vf) - 1);
-    if (final_iter_may_be_partial){
-        histogram_counters_div_upper_bound(loop->counters,lowest_vf);
-        histogram_counters_minus_upper_bound(loop->counters,1);
-    } else {
-        histogram_counters_div_upper_bound(loop->counters,lowest_vf);
-        histogram_counters_minus_upper_bound(loop->counters,1);
-    }
+    histogram_counters_div_upper_bound(loop->counters,lowest_vf);
+    histogram_counters_minus_upper_bound(loop->counters,1);
       if (main_vinfo
 	  /* Both peeling for alignment and peeling for gaps can end up
 	     with the scalar epilogue running for more than VF-1 iterations.  */
