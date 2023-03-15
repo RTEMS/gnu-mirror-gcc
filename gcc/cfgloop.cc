@@ -2185,16 +2185,35 @@ loops_list::walk_loop_tree (class loop *root, unsigned flags)
     this->to_visit.quick_push (root->num);
 }
 
+unsigned int hist_index(gcov_type_unsigned val){
+    unsigned int lin_size=param_profile_histogram_size_lin;
+    unsigned int tot_size=param_profile_histogram_size;
+    if (val<lin_size){
+        return val;
+    }else{
+      gcov_type_unsigned pow2=floor_log2(val);
+      gcov_type_unsigned lin_pow2=floor_log2(lin_size-1);
+      if ((lin_pow2-lin_size)+tot_size>pow2){
+          return pow2+(lin_size-lin_pow2)-1;
+      } else {
+          return tot_size-1;
+      }
+    }
+}
+
 void histogram_counters_minus_upper_bound (histogram_counters* hist_c, gcov_type_unsigned difference){
-    if (hist_c==NULL || difference==0)
+    if (!hist_c || difference==0)
         return;
     auto hist=*(hist_c->hist);
     unsigned int lin_size=param_profile_histogram_size_lin;
-    unsigned int lin_pow2=floor_log2(lin_size-1);
     unsigned int tot_size=param_profile_histogram_size;
-    gcov_type_unsigned  log_diff=floor_log2(difference);
+
+    // next power of 2 for linear hist
+    unsigned int lin_size_upp=1<<ceil_log2(lin_size);
+    // If the last linear counter does not contain other iterations
+    unsigned int last_lin=(lin_size_upp==lin_size?0:1);
     unsigned int i=1;
-    for(; i<lin_size-1 &&  i<tot_size-1; i++){
+    for(; i<lin_size-last_lin; i++){
         if (i<=difference){
             hist[0]+=hist[i];
         } else {
@@ -2202,35 +2221,25 @@ void histogram_counters_minus_upper_bound (histogram_counters* hist_c, gcov_type
         }
         hist[i]=0;
     }
-    // we try to restore some of the linear histogram
-    // for the last linear counter containing also lesser values then nearest pow2
-    // assumption is uniform
-    gcov_type_unsigned upper_bound_lin=(1<<(ceil_log2(lin_size)-1));
-    if (lin_size>2 && difference<upper_bound_lin && i<tot_size-1){
-        gcov_type_unsigned lin_size_val=hist[lin_size-1]/((upper_bound_lin-1)-(lin_size-2));
-        for (int j=int(i)-int(difference);j<gcov_type(upper_bound_lin)-gcov_type(difference)+1
-                && j<int(lin_size)-1;i++) {
-            if (j<0) {
-                hist[0]+=lin_size_val;
-            } else {
-                hist[j]+=lin_size_val;
-            }
-            hist[lin_size-1]-=lin_size_val;
-        }
-        i++;
-    }
-    // Index where difference would be placed
-    unsigned diff_index=log_diff+(lin_size-lin_pow2)-1;
-    for (; i<diff_index && difference<lin_size && i<tot_size-1;i++){
+    // next pow2
+    gcov_type_unsigned pow2=((gcov_type_unsigned)1)<<(ceil_log2(lin_size)+i+1-lin_size);
+    // we null all counters that cannot transfer to non-zero counts
+    for (;pow2-1<difference && i<tot_size-1;++i){
         hist[0]+=hist[i];
         hist[i]=0;
+        pow2=pow2<<1;
     }
-    for (; i<tot_size-1 && (1<<(i-diff_index+2))<10000;i++){
-        // We assume uniform distribution
-        // tot_size -1 should not be touched We know little about it
-        gcov_type_unsigned share=hist[i]/(1<<(i-diff_index+2));
-        hist[i-1]+=share;
-        hist[i]-=share;
+    // reset to actual value
+    // lower half of the pow2 is added to index hald-difference, other half stays
+    for (;i<tot_size-1;++i){
+        gcov_type_unsigned half=(pow2>>1) + (pow2 >> 2);
+        int64_t diff=hist[i]/2;
+        unsigned int ind=hist_index(half>=difference?half-difference:0);
+        if (ind==i)
+            return;
+        hist[ind]+=diff;
+        hist[i]-=diff;
+        pow2<<=1;
     }
 }
 
