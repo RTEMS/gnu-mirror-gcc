@@ -2249,7 +2249,6 @@ void histogram_counters_div_upper_bound (histogram_counters* hist_c, unsigned in
     auto hist=*(hist_c->hist);
     unsigned int lin_size=param_profile_histogram_size_lin;
     unsigned int tot_size=param_profile_histogram_size;
-    gcov_type_unsigned  log_div=floor_log2(divisor);
     unsigned int i=1;
     for(; i<lin_size-1 && i<tot_size-1; i++){
         hist[i/divisor]+=hist[i];
@@ -2257,13 +2256,10 @@ void histogram_counters_div_upper_bound (histogram_counters* hist_c, unsigned in
     }
 
     for (;i<tot_size-1;i++){
-        gcov_type_unsigned upper_diff=((1<<(ceil_log2(lin_size)+i-lin_size))-1)/divisor;
-        if (upper_diff<lin_size-1 && lin_size>1){
-            hist[upper_diff==0 ? 1 : upper_diff]+=hist[i];
-            hist[i]=0;
-        } else {
-            hist[i-log_div>0?i-log_div : 1]+=hist[i];
-            hist[i]=0;
-        }
+        gcov_type_unsigned upper_pow2=((gcov_type_unsigned)1)<<(ceil_log2(lin_size)+i+1-lin_size);
+        gcov_type_unsigned half=(upper_pow2>>2)+(upper_pow2>>1);
+        unsigned int ind=hist_index(half/divisor);
+        hist[ind]+=hist[i];
+        hist[i]=0;
     }
 }
