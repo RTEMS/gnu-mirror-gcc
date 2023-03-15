@@ -1047,13 +1047,7 @@ try_peel_loop (class loop *loop,
         psum+=(*(loop->counters->hist))[i];
         if ((100*psum)/sum>=param_profile_histogram_peel_prcnt)
         {
-            if (i==param_profile_histogram_size_lin-1 && i!=0 && 
-                    param_profile_histogram_size_lin!=param_profile_histogram_size){
-                // Last linear counter absorbs iterations smaller then next power of 2
-                npeel=(1<<floor_log2(param_profile_histogram_size_lin-1))-1;
-            } else {
-                npeel=i;
-            }
+            npeel=i;
             break;
         }
     }
