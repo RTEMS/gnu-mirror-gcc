@@ -1,3 +1,35 @@
+==================== Branch work111, patch #21 ====================
+
+Fix splat of extract for long long and double.
+
+2023-03-15   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/99293
+	* gcc/config/vsx.md (vsx_splat_extract_<mode>): New combiner insn.
+
+gcc/testsuite/
+
+	PR target/108958
+	* gcc.target/powerpc/pr99293.c: New test.
+
+==================== Branch work111, patch #20 ====================
+
+Improve 64->128 bit zero extension on PowerPC
+
+2023-03-15   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/108958
+	* gcc/config/rs6000.md (zero_extendditi2): New insn.
+
+gcc/testsuite/
+
+	PR target/108958
+	* gcc.target/powerpc/zero-extend-di-ti.c: New test.
+
 ==================== Branch work111, patch #1 ====================
 
 Rework 128-bit complex multiply and divide.
