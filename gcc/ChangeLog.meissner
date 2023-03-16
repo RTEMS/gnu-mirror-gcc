@@ -2,7 +2,7 @@
 
 Make load/cmp fusion know about prefixed loads.
 
-2023-03-15   Michael Meissner  <meissner@linux.ibm.com>
+2023-03-16   Michael Meissner  <meissner@linux.ibm.com>
              Aaron Sawdey  <acsawdey@linux.ibm.com>
 
 gcc/
@@ -20,6 +20,7 @@ gcc/testsuite/
 
 	PR target/105325
 	* g++.target/powerpc/pr105325.C: New test.
+	* gcc.target/powerpc/fusion-p10-ldcmpi.c: Adjust insn counts.
 
 ==================== Branch work111, patch #21 ====================
 
