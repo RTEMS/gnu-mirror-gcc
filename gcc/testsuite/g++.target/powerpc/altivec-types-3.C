@@ -1,14 +1,26 @@
-/* { dg-do compile } */
-/* { dg-require-effective-target powerpc_altivec_ok } */
+/* { dg-do assemble } */
 /* { dg-require-effective-target lp64 } */
-/* { dg-options "-maltivec -mno-vsx" } */
+/* { dg-options "-O -fstack-protector-all" } */
+/* { dg-require-effective-target powerpc_prefixed_addr -mdejagnu-cpu=power10 } */
 
-/* These should be rejected for 64-bit code.  */
+// If -fstack-protector-all is on, the load fusion code would generate a 'lwa'
+// instead of a 'plwz' instruction with a large offset.
 
-__vector long vl;			/* { dg-error "invalid for 64" } */
-__vector unsigned long vul;		/* { dg-error "invalid for 64" } */
-__vector signed long vsl;		/* { dg-error "invalid for 64" } */
-__vector __bool long int vbli;		/* { dg-error "invalid for 64" } */
-__vector long int vli;			/* { dg-error "invalid for 64" } */
-__vector unsigned long int vuli;	/* { dg-error "invalid for 64" } */
-__vector signed long int vsli;		/* { dg-error "invalid for 64" } */
+#ifndef NUM
+#define NUM 10000
+#endif
+
+struct Ath__array1D {
+  int _current;
+  int getCnt() { return _current; }
+};
+struct extMeasure {
+  int _mapTable[NUM];
+  Ath__array1D _metRCTable;
+};
+void measureRC() {
+  extMeasure m;
+  for (; m._metRCTable.getCnt();)
+    for (;;)
+      ;
+}

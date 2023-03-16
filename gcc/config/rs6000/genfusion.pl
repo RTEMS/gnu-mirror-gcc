@@ -73,13 +73,22 @@ sub gen_ld_cmpi_p10
 	  $mempred = "non_update_memory_operand";
 	  if ( $ccmode eq 'CC' ) {
 	      next CCMODE if $lmode eq 'QI';
-	      if ( $lmode eq 'DI' || $lmode eq 'SI' ) {
+	      if ( $lmode eq 'HI' ) {
+		  $np = "NON_PREFIXED_D";
+		  $mempred = "non_update_memory_operand";
+		  $echr = "a";
+	      } elsif ( $lmode eq 'SI' ) {
+		  # ld and lwa are both DS-FORM.
+		  $np = "NON_PREFIXED_DS";
+		  $mempred = "lwa_operand";
+		  $echr = "a";
+	      } elsif ( $lmode eq 'DI' ) {
 		  # ld and lwa are both DS-FORM.
 		  $np = "NON_PREFIXED_DS";
 		  $mempred = "ds_form_mem_operand";
+		  $echr = "";
 	      }
 	      $cmpl = "";
-	      $echr = "a";
 	      $constpred = "const_m1_to_1_operand";
 	  } else {
 	      if ( $lmode eq 'DI' ) {
@@ -137,6 +146,11 @@ sub gen_ld_cmpi_p10
 	  print "  \"\"\n";
 	  print "  [(set_attr \"type\" \"fused_load_cmpi\")\n";
 	  print "   (set_attr \"cost\" \"8\")\n";
+
+	  if ($extend eq "sign") {
+		  print "   (set_attr \"sign_extend\" \"yes\")\n";
+	  }
+
 	  print "   (set_attr \"length\" \"8\")])\n";
 	  print "\n";
       }
