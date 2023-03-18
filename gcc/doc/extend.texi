@@ -2611,8 +2611,11 @@ the @code{puts} function, or the second and third arguments to
 the @code{memcpy} function.
 
 @smallexample
-__attribute__ ((access (read_only, 1))) int puts (const char*);
-__attribute__ ((access (read_only, 2, 3))) void* memcpy (void*, const void*, size_t);
+__attribute__ ((access (read_only, 1)))
+int puts (const char*);
+
+__attribute__ ((access (read_only, 2, 3)))
+void* memcpy (void*, const void*, size_t);
 @end smallexample
 
 The @code{read_write} access mode applies to arguments of pointer types
@@ -2624,7 +2627,8 @@ of the use of the @code{read_write} access mode is the first argument to
 the @code{strcat} function.
 
 @smallexample
-__attribute__ ((access (read_write, 1), access (read_only, 2))) char* strcat (char*, const char*);
+__attribute__ ((access (read_write, 1), access (read_only, 2)))
+char* strcat (char*, const char*);
 @end smallexample
 
 The @code{write_only} access mode applies to arguments of pointer types
@@ -2636,8 +2640,11 @@ the @code{strcpy} function, or the first two arguments to the @code{fgets}
 function.
 
 @smallexample
-__attribute__ ((access (write_only, 1), access (read_only, 2))) char* strcpy (char*, const char*);
-__attribute__ ((access (write_only, 1, 2), access (read_write, 3))) int fgets (char*, int, FILE*);
+__attribute__ ((access (write_only, 1), access (read_only, 2)))
+char* strcpy (char*, const char*);
+
+__attribute__ ((access (write_only, 1, 2), access (read_write, 3)))
+int fgets (char*, int, FILE*);
 @end smallexample
 
 The access mode @code{none} specifies that the pointer to which it applies
@@ -3444,22 +3451,23 @@ deallocation pairs marked with the @code{malloc}.  In particular:
 @itemize @bullet
 
 @item
-The analyzer will emit a @option{-Wanalyzer-mismatching-deallocation}
+The analyzer emits a @option{-Wanalyzer-mismatching-deallocation}
 diagnostic if there is an execution path in which the result of an
 allocation call is passed to a different deallocator.
 
 @item
-The analyzer will emit a @option{-Wanalyzer-double-free}
+The analyzer emits a @option{-Wanalyzer-double-free}
 diagnostic if there is an execution path in which a value is passed
 more than once to a deallocation call.
 
 @item
-The analyzer will consider the possibility that an allocation function
-could fail and return NULL.  It will emit
-@option{-Wanalyzer-possible-null-dereference} and
-@option{-Wanalyzer-possible-null-argument} diagnostics if there are
+The analyzer considers the possibility that an allocation function
+could fail and return null.  If there are
 execution paths in which an unchecked result of an allocation call is
-dereferenced or passed to a function requiring a non-null argument.
+dereferenced or passed to a function requiring a non-null argument,
+it emits
+@option{-Wanalyzer-possible-null-dereference} and
+@option{-Wanalyzer-possible-null-argument} diagnostics.
 If the allocator always returns non-null, use
 @code{__attribute__ ((returns_nonnull))} to suppress these warnings.
 For example:
@@ -3469,26 +3477,26 @@ char *xstrdup (const char *)
 @end smallexample
 
 @item
-The analyzer will emit a @option{-Wanalyzer-use-after-free}
+The analyzer emits a @option{-Wanalyzer-use-after-free}
 diagnostic if there is an execution path in which the memory passed
 by pointer to a deallocation call is used after the deallocation.
 
 @item
-The analyzer will emit a @option{-Wanalyzer-malloc-leak} diagnostic if
+The analyzer emits a @option{-Wanalyzer-malloc-leak} diagnostic if
 there is an execution path in which the result of an allocation call
 is leaked (without being passed to the deallocation function).
 
 @item
-The analyzer will emit a @option{-Wanalyzer-free-of-non-heap} diagnostic
+The analyzer emits a @option{-Wanalyzer-free-of-non-heap} diagnostic
 if a deallocation function is used on a global or on-stack variable.
 
 @end itemize
 
-The analyzer assumes that deallocators can gracefully handle the @code{NULL}
+The analyzer assumes that deallocators can gracefully handle the null
 pointer.  If this is not the case, the deallocator can be marked with
 @code{__attribute__((nonnull))} so that @option{-fanalyzer} can emit
 a @option{-Wanalyzer-possible-null-argument} diagnostic for code paths
-in which the deallocator is called with NULL.
+in which the deallocator is called with null.
 
 @cindex @code{no_icf} function attribute
 @item no_icf
@@ -7906,7 +7914,7 @@ of the data but not how this data is accessed.
 In order to read data located with the @code{progmem} attribute
 (inline) assembler must be used.
 @smallexample
-/* Use custom macros from @w{@uref{http://nongnu.org/avr-libc/user-manual/,AVR-LibC}} */
+/* Use custom macros from AVR-LibC */
 #include <avr/pgmspace.h> 
 
 /* Locate var in flash memory */
@@ -9196,7 +9204,7 @@ have to optimize it to just @code{return 42 + 42;}.
 This section describes the syntax with which @code{__attribute__} may be
 used, and the constructs to which attribute specifiers bind, for the C
 language.  Some details may vary for C++ and Objective-C@.  Because of
-infelicities in the grammar for attributes, some forms described here
+limitations in the grammar for attributes, some forms described here
 may not be successfully parsed in all cases.
 
 There are some problems with the semantics of attributes in C++.  For
@@ -11039,7 +11047,7 @@ lab:
 @noindent
 The following table shows the modifiers supported by all targets and their effects:
 
-@multitable {Modifier} {Description} {Example}
+@multitable @columnfractions 0.15 0.7 0.15
 @headitem Modifier @tab Description @tab Example
 @item @code{c}
 @tab Require a constant operand and print the constant expression with no punctuation.
@@ -15707,23 +15715,23 @@ void __builtin_bfin_ssync (void);
 
 The following built-in functions are available for eBPF targets.
 
-@deftypefn {Built-in Function} unsigned long long __builtin_bpf_load_byte (unsigned long long @var{offset})
+@deftypefn {Built-in Function} {unsigned long long} __builtin_bpf_load_byte (unsigned long long @var{offset})
 Load a byte from the @code{struct sk_buff} packet data pointed by the register @code{%r6} and return it.
 @end deftypefn
 
-@deftypefn {Built-in Function} unsigned long long __builtin_bpf_load_half (unsigned long long @var{offset})
-Load 16-bits from the @code{struct sk_buff} packet data pointed by the register @code{%r6} and return it.
+@deftypefn {Built-in Function} {unsigned long long} __builtin_bpf_load_half (unsigned long long @var{offset})
+Load 16 bits from the @code{struct sk_buff} packet data pointed by the register @code{%r6} and return it.
 @end deftypefn
 
-@deftypefn {Built-in Function} unsigned long long __builtin_bpf_load_word (unsigned long long @var{offset})
-Load 32-bits from the @code{struct sk_buff} packet data pointed by the register @code{%r6} and return it.
+@deftypefn {Built-in Function} {unsigned long long} __builtin_bpf_load_word (unsigned long long @var{offset})
+Load 32 bits from the @code{struct sk_buff} packet data pointed by the register @code{%r6} and return it.
 @end deftypefn
 
-@deftypefn {Built-in Function} void * __builtin_preserve_access_index (@var{expr})
+@deftypefn {Built-in Function} {void *} __builtin_preserve_access_index (@var{expr})
 BPF Compile Once-Run Everywhere (CO-RE) support. Instruct GCC to generate CO-RE relocation records for any accesses to aggregate data structures (struct, union, array types) in @var{expr}. This builtin is otherwise transparent, the return value is whatever @var{expr} evaluates to. It is also overloaded: @var{expr} may be of any type (not necessarily a pointer), the return type is the same. Has no effect if @code{-mco-re} is not in effect (either specified or implied).
 @end deftypefn
 
-@deftypefn {Built-in Function} unsigned int __builtin_preserve_field_info (@var{expr}, unsigned int @var{kind})
+@deftypefn {Built-in Function} {unsigned int} __builtin_preserve_field_info (@var{expr}, unsigned int @var{kind})
 BPF Compile Once-Run Everywhere (CO-RE) support. This builtin is used to
 extract information to aid in struct/union relocations.  @var{expr} is
 an access to a field of a struct or union. Depending on @var{kind}, different
@@ -15731,15 +15739,15 @@ information is returned to the program. A CO-RE relocation for the access in
 @var{expr} with kind @var{kind} is recorded if @code{-mco-re} is in effect.
 
 The following values are supported for @var{kind}:
-@table @var
+@table @code
 @item FIELD_BYTE_OFFSET = 0
 The returned value is the offset, in bytes, of the field from the
-beginning of the containing structure. For bitfields, the byte offset
+beginning of the containing structure. For bit-fields, this is the byte offset
 of the containing word.
 
 @item FIELD_BYTE_SIZE = 1
-The returned value is the size, in bytes, of the field. For bitfields,
-the size in bytes of the containing word.
+The returned value is the size, in bytes, of the field. For bit-fields,
+this is the size in bytes of the containing word.
 
 @item FIELD_EXISTENCE = 2
 The returned value is 1 if the field exists, 0 otherwise. Always 1 at
@@ -15751,25 +15759,26 @@ The returned value is 1 if the field is signed, 0 otherwise.
 @item FIELD_LSHIFT_U64 = 4
 @itemx FIELD_RSHIFT_U64 = 5
 The returned value is the number of bits of left- or right-shifting
-respectively needed in order to recover the original value of the field,
-after it has been loaded by a read of FIELD_BYTE_SIZE bytes into an
-unsigned 64-bit value. Primarily useful for reading bitfield values
-from structures which may change between kernel versions.
+(respectively) needed in order to recover the original value of the field,
+after it has been loaded by a read of @code{FIELD_BYTE_SIZE} bytes into an
+unsigned 64-bit value. Primarily useful for reading bit-field values
+from structures that may change between kernel versions.
 
 @end table
 
 Note that the return value is a constant which is known at
-compile-time. If the field has a variable offset then
-FIELD_BYTE_OFFSET, FIELD_LSHIFT_U64 and FIELD_RSHIFT_U64 are not
-supported. Similarly, if the field has a variable size then
-FIELD_BYTE_SIZE, FIELD_LSHIFT_U64 and FIELD_RSHIFT_U64 are not
-supported.
+compile time. If the field has a variable offset then
+@code{FIELD_BYTE_OFFSET}, @code{FIELD_LSHIFT_U64},
+and @code{FIELD_RSHIFT_U64} are not supported.
+Similarly, if the field has a variable size then
+@code{FIELD_BYTE_SIZE}, @code{FIELD_LSHIFT_U64},
+and @code{FIELD_RSHIFT_U64} are not supported.
 
-For example, __builtin_preserve_field_info can be used to reliably
-extract bitfield values from a structure which may change between
+For example, @code{__builtin_preserve_field_info} can be used to reliably
+extract bit-field values from a structure that may change between
 kernel versions:
 
-@example
+@smallexample
 struct S
 @{
   short a;
@@ -15781,8 +15790,10 @@ int
 read_y (struct S *arg)
 @{
   unsigned long long val;
-  unsigned int offset = __builtin_preserve_field_info (arg->y, FIELD_BYTE_OFFSET);
-  unsigned int size = __builtin_presrve_field_info (arg->y, FIELD_BYTE_SIZE);
+  unsigned int offset
+    = __builtin_preserve_field_info (arg->y, FIELD_BYTE_OFFSET);
+  unsigned int size
+    = __builtin_preserve_field_info (arg->y, FIELD_BYTE_SIZE);
 
   /* Read size bytes from arg + offset into val.  */
   bpf_probe_read (&val, size, arg + offset);
@@ -15790,14 +15801,15 @@ read_y (struct S *arg)
   val <<= __builtin_preserve_field_info (arg->y, FIELD_LSHIFT_U64);
 
   if (__builtin_preserve_field_info (arg->y, FIELD_SIGNEDNESS))
-    val = ((long long) val >> __builtin_preserve_field_info (arg->y, FIELD_RSHIFT_U64));
+    val = ((long long) val
+           >> __builtin_preserve_field_info (arg->y, FIELD_RSHIFT_U64));
   else
     val >>= __builtin_preserve_field_info (arg->y, FIELD_RSHIFT_U64);
 
   return val;
 @}
 
-@end example
+@end smallexample
 @end deftypefn
 
 @node FR-V Built-in Functions

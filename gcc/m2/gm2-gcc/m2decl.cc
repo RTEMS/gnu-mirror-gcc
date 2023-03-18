@@ -77,8 +77,8 @@ m2decl_DeclareM2linkForcedModuleInitOrder (location_t location,
 
 tree
 m2decl_DeclareKnownVariable (location_t location, const char *name, tree type,
-                             int exported, int imported, int istemporary,
-                             int isglobal, tree scope, tree initial)
+                             bool exported, bool imported, bool istemporary,
+                             bool isglobal, tree scope, tree initial)
 {
   tree id;
   tree decl;
@@ -165,7 +165,7 @@ m2decl_DeclareKnownConstant (location_t location, tree type, tree value)
 
 tree
 m2decl_BuildParameterDeclaration (location_t location, char *name, tree type,
-                                  int isreference)
+                                  bool isreference)
 {
   tree parm_decl;
 
@@ -210,8 +210,8 @@ m2decl_BuildStartFunctionDeclaration (int uses_varargs)
 tree
 m2decl_BuildEndFunctionDeclaration (location_t location_begin,
                                     location_t location_end, const char *name,
-                                    tree returntype, int isexternal,
-                                    int isnested, int ispublic, int isnoreturn)
+                                    tree returntype, bool isexternal,
+                                    bool isnested, bool ispublic, bool isnoreturn)
 {
   tree fntype;
   tree fndecl;
@@ -283,21 +283,23 @@ m2decl_DeclareModuleCtor (tree decl)
   return decl;
 }
 
-
 /* DetermineSizeOfConstant - given, str, and, base, fill in needsLong
    and needsUnsigned appropriately.  */
 
-void
+bool
 m2decl_DetermineSizeOfConstant (location_t location,
 				const char *str, unsigned int base,
-                                int *needsLong, int *needsUnsigned)
+                                bool *needsLong, bool *needsUnsigned,
+				bool issueError)
 {
   unsigned int ulow;
   int high;
-  int overflow = m2expr_interpret_m2_integer (str, base, &ulow, &high,
-					      needsLong, needsUnsigned);
-  if (overflow)
+  bool overflow = m2expr_interpret_m2_integer (location,
+					       str, base, &ulow, &high,
+					       needsLong, needsUnsigned);
+  if (overflow && issueError)
     error_at (location, "constant %qs is too large", str);
+  return overflow;
 }
 
 /* BuildConstLiteralNumber - returns a GCC TREE built from the
@@ -305,14 +307,15 @@ m2decl_DetermineSizeOfConstant (location_t location,
    Modula-2.  It always returns a positive value.  */
 
 tree
-m2decl_BuildConstLiteralNumber (location_t location, const char *str, unsigned int base)
+m2decl_BuildConstLiteralNumber (location_t location, const char *str,
+				unsigned int base, bool issueError)
 {
   tree value, type;
   unsigned HOST_WIDE_INT low;
   HOST_WIDE_INT high;
   HOST_WIDE_INT ival[3];
-  int overflow = m2expr_interpret_integer (str, base, &low, &high);
-  int needLong, needUnsigned;
+  bool overflow = m2expr_interpret_integer (location, str, base, &low, &high);
+  bool needLong, needUnsigned;
 
   ival[0] = low;
   ival[1] = high;
@@ -320,8 +323,9 @@ m2decl_BuildConstLiteralNumber (location_t location, const char *str, unsigned i
 
   widest_int wval = widest_int::from_array (ival, 3);
 
-  m2decl_DetermineSizeOfConstant (location, str, base, &needLong, &needUnsigned);
-
+  bool overflow_m2 = m2decl_DetermineSizeOfConstant (location, str, base,
+						     &needLong, &needUnsigned,
+						     issueError);
   if (needUnsigned && needLong)
     type = m2type_GetM2LongCardType ();
   else
@@ -329,7 +333,7 @@ m2decl_BuildConstLiteralNumber (location_t location, const char *str, unsigned i
 
   value = wide_int_to_tree (type, wval);
 
-  if (overflow || m2expr_TreeOverflow (value))
+  if (issueError && (overflow || overflow_m2 || m2expr_TreeOverflow (value)))
     error_at (location, "constant %qs is too large", str);
 
   return m2block_RememberConstant (value);

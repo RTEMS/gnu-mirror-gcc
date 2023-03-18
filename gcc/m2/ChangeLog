@@ -1,3 +1,415 @@
+2023-03-17  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109032
+	* gm2-gcc/m2expr.cc: Correct ? : order in comments.
+	(m2expr_BuildDivM2): Improve comment.
+	* lang.opt: Improve option descriptions.
+
+2023-03-17  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109102
+	* gm2-gcc/m2builtins.cc (ASSERT): Change format specifier to
+	use %qs rather than quotes.
+
+2023-03-17  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2-compiler/M2AsmUtil.mod (SymNeedsModulePrefix):
+	Re-implemented.
+	* gm2-libs/SysStorage.mod (enableTrace): Disable tracing.
+
+2023-03-16  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2-compiler/SymbolKey.mod (PutSymKey): Halt parameters
+	reordered.
+	(DelSymKey): Ditto.
+	* gm2-compiler/ppg.mod (GetEpsilon): Ditto.
+	(GetReachEnd): Ditto.
+	(GetFollow): Ditto.
+	(CodeCondition): Ditto.
+	(CodeThenDo): Ditto.
+	(CodeEnd): Ditto.
+	(RecoverCondition): Ditto.
+	(ConditionIndent): Ditto.
+	* gm2-libs-ch/m2rts.h (M2RTS_Halt): Ditto.
+	* gm2-libs-coroutines/Executive.mod (Assert): Ditto.
+	(Resume): Remove redundant comments.
+	(Wait): Remove redundant comments.
+	* gm2-libs-coroutines/SYSTEM.mod (TRANSFER): Halt parameters
+	reordered.
+	(IOTransferHandler): Ditto.
+	(Finished): Ditto.
+	(localInit): Ditto.
+	* gm2-libs-coroutines/TimerHandler.mod (WaitOn): Halt parameters
+	reordered.
+	(Cancel): Ditto.
+	(ReArmEvent): Ditto.
+	(OnActiveQueue): Ditto.
+	* gm2-libs-iso/COROUTINES.mod (NEWCOROUTINE): Ditto.
+	(Transfer): Ditto.
+	(IOTRANSFER): Ditto.
+	* gm2-libs-iso/EXCEPTIONS.mod (RAISE): Correct Halt parameters.
+	* gm2-libs-iso/M2RTS.def (Halt): Halt parameters reordered.
+	(HaltC): Ditto.
+	* gm2-libs-iso/M2RTS.mod: Ditto.
+	* gm2-libs-iso/RTentity.mod (PutKey): Ditto.
+	(DelKey): Ditto.
+	(findChildAndParent): Ditto.
+	(assert): Ditto.
+	* gm2-libs-iso/Storage.mod (ALLOCATE): Add DebugTrace.
+	Add UseMallocFree test.
+	(DEALLOCATE): Add DebugTrace.  Add UseMallocFree test.
+	(assert): Halt parameters reordered.
+	* gm2-libs-log/Termbase.mod (Read): Ditto.
+	(KeyPressed): Ditto.
+	(Write): Ditto.
+	(Init): Ditto.
+	* gm2-libs/Debug.def (Halt): Halt parameters reordered.
+	* gm2-libs/Debug.mod (Halt): Ditto.
+	* gm2-libs/DynamicStrings.def (PopAllocation): Improve comment.
+	* gm2-libs/DynamicStrings.mod (PopAllocation): Improve comment.
+	Halt parameters reordered.
+	* gm2-libs/M2RTS.def (Halt): Ditto.
+	(HaltC): Ditto.
+	* gm2-libs/M2RTS.mod (Halt): Ditto.
+	(HaltC): Ditto.
+	* gm2-libs/PushBackInput.mod (PutStr): Ditto.
+	(PutString): Ditto.
+	(PutCh): Ditto.
+	* gm2-libs/RTExceptions.mod (GetBaseExceptionBlock): Ditto.
+	* gm2-libs/RTint.mod (ReArmTimeVector): Ditto.
+	(GetTimeVector): Ditto.
+	(AttachVector): Ditto.
+	(IncludeVector): Ditto.
+	(Listen): Ditto.
+	* gm2-libs/SysStorage.mod (ALLOCATE): Ditto.
+	(DEALLOCATE): Ditto.
+	(REALLOCATE): Ditto.
+	* gm2-libs-coroutines/Debug.def: Removed.
+	* gm2-libs-coroutines/Debug.mod: Removed.
+
+2023-03-16  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* Make-lang.in: Rename target-independent to
+	target-independent/m2.
+	* target-independent/readme.txt: Update.
+	* target-independent/m2/gm2-ebnf.texi: New file.
+	* target-independent/m2/gpl_v3_without_node.texi: New file.
+	* target-independent/Builtins.texi: Rename ...
+	* target-independent/m2/Builtins.texi: ... to this.
+	* target-independent/SYSTEM-iso.texi: Rename ...
+	* target-independent/m2/SYSTEM-iso.texi: ... to this.
+	* target-independent/SYSTEM-pim.texi: Rename ...
+	* target-independent/m2/SYSTEM-pim.texi: ... to this.
+	* target-independent/gm2-libs.texi: Rename ...
+	* target-independent/m2/gm2-libs.texi: ... to this.
+
+2023-03-15  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109125
+	* gm2-libs-ch/dtoa.cc (dtoa_strtod): Replace int with bool.
+	* gm2-libs-ch/ldtoa.cc (ldtoa_strtold): Replace int with bool.
+
+2023-03-14  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109125
+	* gm2-libs-ch/cgetopt.c (cgetopt_SetOption): Replace int
+	for bool.
+	* gm2-libs-ch/termios.c (doSetUnset): Replace int for bool.
+	* gm2-libs/Builtins.mod (isfinitef): Correct typo in return
+	statement.
+
+2023-03-13  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109103
+	* gm2-compiler/M2ALU.def (PushString): New parameter issueError.
+	* gm2-compiler/M2ALU.mod (PushString): New parameter issueError.
+	* gm2-compiler/SymbolTable.mod (PushString): New parameter issueError.
+	* gm2-gcc/m2decl.cc (m2decl_DetermineSizeOfConstant): Pass
+	location to interpret_m2_integer.
+	(m2decl_BuildConstLiteralNumber): New parameter issueError.
+	* gm2-gcc/m2expr.cc (m2expr_IsTrue): Replace int with bool.
+	(m2expr_IsFalse): Replace int with bool.
+	(m2expr_AreConstantsEqual): Replace int with bool.
+	(m2expr_BuildBinaryForeachWordDo): Call m2linemap_internal_error_at.
+	(append_digit): Ditto.
+	(m2expr_interpret_integer): Add location parameter.
+	(append_m2_digit): Call m2linemap_internal_error_at.
+	(m2expr_interpret_m2_integer): Add location parameter.
+	(m2expr_GetSizeOf): Replace sizeof with SIZE in error message.
+	* gm2-gcc/m2expr.h (m2expr_AreRealOrComplexConstantsEqual):
+	Replace int with bool.
+	(m2expr_AreConstantsEqual): Ditto.
+	(m2expr_IsFalse): Ditto.
+	(m2expr_IsTrue): Ditto.
+	(m2expr_interpret_integer): Add location parameter.
+	(m2expr_interpret_m2_integer): Add location parameter.
+	* gm2-gcc/m2linemap.cc (mformat_value): New function.
+	(expand_format): New function.
+	(expand_message): New function.
+	(gm2_internal_error_at): New function.
+	(m2linemap_internal_error_at): New function.
+	* gm2-gcc/m2linemap.h (m2linemap_internal_error_at): New function.
+	* gm2-gcc/m2options.h (M2Options_SetISO): Replace int with bool.
+	(M2Options_SetPIM): Ditto.
+	(M2Options_SetPIM2): Ditto.
+	(M2Options_SetPIM3): Ditto.
+	(M2Options_SetPIM4): Ditto.
+	(M2Options_SetFloatValueCheck): Ditto.
+	(M2Options_SetWholeValueCheck): Ditto.
+	(M2Options_GetISO): Ditto.
+	(M2Options_GetPIM): Ditto.
+	(M2Options_GetPIM2): Ditto.
+	(M2Options_GetPIM3): Ditto.
+	(M2Options_GetPIM4): Ditto.
+	(M2Options_GetPositiveModFloor): Ditto.
+	(M2Options_GetFloatValueCheck): Ditto.
+	(M2Options_GetWholeValueCheck): Ditto.
+	(M2Options_Setc): Ditto.
+	(M2Options_Getc): Ditto.
+	(M2Options_SetPPOnly): Ditto.
+	(M2Options_GetPPOnly): Ditto.
+	(M2Options_SetUselist): Ditto.
+	(M2Options_SetAutoInit): Ditto.
+	(M2Options_SetPositiveModFloor): Ditto.
+	(M2Options_SetNilCheck): Ditto.
+	(M2Options_SetWholeDiv): Ditto.
+	(M2Options_SetIndex): Ditto.
+	(M2Options_SetRange): Ditto.
+	(M2Options_SetReturnCheck): Ditto.
+	(M2Options_SetCaseCheck): Ditto.
+	(M2Options_SetCheckAll): Ditto.
+	(M2Options_SetExceptions): Ditto.
+	(M2Options_SetStyle): Ditto.
+	(M2Options_SetPedantic): Ditto.
+	(M2Options_SetPedanticParamNames): Ditto.
+	(M2Options_SetPedanticCast): Ditto.
+	(M2Options_SetExtendedOpaque): Ditto.
+	(M2Options_SetVerboseUnbounded): Ditto.
+	(M2Options_SetXCode): Ditto.
+	(M2Options_SetCompilerDebugging): Ditto.
+	(M2Options_SetQuadDebugging): Ditto.
+	(M2Options_SetDebugTraceQuad): Ditto.
+	(M2Options_SetDebugTraceAPI): Ditto.
+	(M2Options_SetSources): Ditto.
+	(M2Options_SetUnboundedByReference): Ditto.
+	(M2Options_SetDumpSystemExports): Ditto.
+	(M2Options_SetOptimizing): Ditto.
+	(M2Options_SetQuiet): Ditto.
+	(M2Options_SetCC1Quiet): Ditto.
+	(M2Options_SetCpp): Ditto.
+	(M2Options_SetSwig): Ditto.
+	(M2Options_SetWholeProgram): Ditto.
+	(M2Options_SetDebugFunctionLineNumbers): Ditto.
+	(M2Options_SetGenerateStatementNote): Ditto.
+	(M2Options_GetCpp): Ditto.
+	(M2Options_GetM2g): Ditto.
+	(M2Options_SetM2g): Ditto.
+	(M2Options_SetLowerCaseKeywords): Ditto.
+	(M2Options_SetVerbose): Ditto.
+	(M2Options_SetUnusedVariableChecking): Ditto.
+	(M2Options_SetUnusedParameterChecking): Ditto.
+	(M2Options_SetStrictTypeChecking): Ditto.
+	(M2Options_SetWall): Ditto.
+	(M2Options_SetSaveTemps): Ditto.
+	(M2Options_GetSaveTemps): Ditto.
+	(M2Options_SetScaffoldStatic): Ditto.
+	(M2Options_SetScaffoldDynamic): Ditto.
+	(M2Options_SetScaffoldMain): Ditto.
+	(M2Options_SetGenModuleList): Ditto.
+	(M2Options_SetShared): Ditto.
+	* gm2-libs-ch/M2LINK.c: Ditto.
+	* gm2-libs-ch/m2rts.h (M2RTS_RequestDependant): Replace
+	const char * with const void *.
+	(M2RTS_RegisterModule): Ditto.
+	(M2RTS_ConstructModules): Ditto.
+	* gm2-gcc/m2decl.def (DetermineSizeOfConstant): New parameter
+	issueError.
+	* gm2-gcc/m2decl.h (DetermineSizeOfConstant): New parameter
+	issueError.
+
+2023-03-12  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109089
+	* gm2-compiler/M2GCCDeclare.mod (DeclareKnownType): Import.
+	* gm2-gcc/gcc-consolidation.h (stdbool.h): Include.
+	* gm2-gcc/init.h (defined): Change block start.
+	* gm2-gcc/m2block.cc: Change FALSE to false, change TRUE to true.
+	* gm2-gcc/m2block.h: Change int to bool.
+	* gm2-gcc/m2builtins.cc: Ditto.
+	* gm2-gcc/m2builtins.h: Ditto.
+	* gm2-gcc/m2convert.cc: Change FALSE to false, TRUE to true and
+	int to bool.
+	* gm2-gcc/m2convert.h: Change int to bool.
+	* gm2-gcc/m2decl.cc: Change int to bool.
+	* gm2-gcc/m2decl.h: Change int to bool.
+	* gm2-gcc/m2expr.cc: Change FALSE to false, TRUE to true and
+	int to bool.
+	* gm2-gcc/m2expr.h: Change int to bool.
+	* gm2-gcc/m2statement.cc: Change FALSE to false, TRUE to true and
+	int to bool.
+	* gm2-gcc/m2statement.h: Change int to bool.
+	* gm2-gcc/m2top.cc: Change int to bool.
+	* gm2-gcc/m2top.h: Change int to bool.
+	* gm2-gcc/m2tree.cc: Change int to bool.
+	* gm2-gcc/m2tree.h: Change int to bool.
+	* gm2-gcc/m2type.cc: Change int to bool.
+	* gm2-gcc/m2type.h: Change int to bool.
+	* gm2-lang.cc (convert_loc): Call convert_to_integer for BOOLEAN_TYPE.
+	* gm2-libs/Builtins.def (isfinitef): Change return value from
+	BOOLEAN to INTEGER.
+	(isfinite): Ditto.
+	(isfinitel): Ditto.
+	* gm2-libs/Builtins.mod (isfinitef): Change return value from
+	BOOLEAN to INTEGER.
+	(isfinite): Ditto.
+	(isfinitel): Ditto.
+	* mc-boot/GASCII.cc: Rebuild.
+	* mc-boot/GASCII.h: Rebuild.
+	* mc-boot/GArgs.cc: Rebuild.
+	* mc-boot/GArgs.h: Rebuild.
+	* mc-boot/GAssertion.cc: Rebuild.
+	* mc-boot/GAssertion.h: Rebuild.
+	* mc-boot/GBreak.cc: Rebuild.
+	* mc-boot/GBreak.h: Rebuild.
+	* mc-boot/GCOROUTINES.h: Rebuild.
+	* mc-boot/GCmdArgs.cc: Rebuild.
+	* mc-boot/GCmdArgs.h: Rebuild.
+	* mc-boot/GDebug.cc: Rebuild.
+	* mc-boot/GDebug.h: Rebuild.
+	* mc-boot/GDynamicStrings.cc: Rebuild.
+	* mc-boot/GDynamicStrings.h: Rebuild.
+	* mc-boot/GEnvironment.cc: Rebuild.
+	* mc-boot/GEnvironment.h: Rebuild.
+	* mc-boot/GFIO.cc: Rebuild.
+	* mc-boot/GFIO.h: Rebuild.
+	* mc-boot/GFormatStrings.cc: Rebuild.
+	* mc-boot/GFormatStrings.h: Rebuild.
+	* mc-boot/GFpuIO.cc: Rebuild.
+	* mc-boot/GFpuIO.h: Rebuild.
+	* mc-boot/GIO.cc: Rebuild.
+	* mc-boot/GIO.h: Rebuild.
+	* mc-boot/GIndexing.cc: Rebuild.
+	* mc-boot/GIndexing.h: Rebuild.
+	* mc-boot/GM2Dependent.cc: Rebuild.
+	* mc-boot/GM2Dependent.h: Rebuild.
+	* mc-boot/GM2EXCEPTION.cc: Rebuild.
+	* mc-boot/GM2EXCEPTION.h: Rebuild.
+	* mc-boot/GM2LINK.h: Rebuild.
+	* mc-boot/GM2RTS.cc: Rebuild.
+	* mc-boot/GM2RTS.h: Rebuild.
+	* mc-boot/GMemUtils.cc: Rebuild.
+	* mc-boot/GMemUtils.h: Rebuild.
+	* mc-boot/GNumberIO.cc: Rebuild.
+	* mc-boot/GNumberIO.h: Rebuild.
+	* mc-boot/GPushBackInput.cc: Rebuild.
+	* mc-boot/GPushBackInput.h: Rebuild.
+	* mc-boot/GRTExceptions.cc: Rebuild.
+	* mc-boot/GRTExceptions.h: Rebuild.
+	* mc-boot/GRTco.h: Rebuild.
+	* mc-boot/GRTentity.h: Rebuild.
+	* mc-boot/GRTint.cc: Rebuild.
+	* mc-boot/GRTint.h: Rebuild.
+	* mc-boot/GSArgs.cc: Rebuild.
+	* mc-boot/GSArgs.h: Rebuild.
+	* mc-boot/GSFIO.cc: Rebuild.
+	* mc-boot/GSFIO.h: Rebuild.
+	* mc-boot/GSYSTEM.h: Rebuild.
+	* mc-boot/GSelective.h: Rebuild.
+	* mc-boot/GStdIO.cc: Rebuild.
+	* mc-boot/GStdIO.h: Rebuild.
+	* mc-boot/GStorage.cc: Rebuild.
+	* mc-boot/GStorage.h: Rebuild.
+	* mc-boot/GStrCase.cc: Rebuild.
+	* mc-boot/GStrCase.h: Rebuild.
+	* mc-boot/GStrIO.cc: Rebuild.
+	* mc-boot/GStrIO.h: Rebuild.
+	* mc-boot/GStrLib.cc: Rebuild.
+	* mc-boot/GStrLib.h: Rebuild.
+	* mc-boot/GStringConvert.cc: Rebuild.
+	* mc-boot/GStringConvert.h: Rebuild.
+	* mc-boot/GSysExceptions.h: Rebuild.
+	* mc-boot/GSysStorage.cc: Rebuild.
+	* mc-boot/GSysStorage.h: Rebuild.
+	* mc-boot/GTimeString.cc: Rebuild.
+	* mc-boot/GTimeString.h: Rebuild.
+	* mc-boot/GUnixArgs.h: Rebuild.
+	* mc-boot/Galists.cc: Rebuild.
+	* mc-boot/Galists.h: Rebuild.
+	* mc-boot/Gdecl.cc: Rebuild.
+	* mc-boot/Gdecl.h: Rebuild.
+	* mc-boot/Gdtoa.h: Rebuild.
+	* mc-boot/Gerrno.h: Rebuild.
+	* mc-boot/Gkeyc.cc: Rebuild.
+	* mc-boot/Gkeyc.h: Rebuild.
+	* mc-boot/Gldtoa.h: Rebuild.
+	* mc-boot/Glibc.h: Rebuild.
+	* mc-boot/Glibm.h: Rebuild.
+	* mc-boot/Glists.cc: Rebuild.
+	* mc-boot/Glists.h: Rebuild.
+	* mc-boot/GmcComment.cc: Rebuild.
+	* mc-boot/GmcComment.h: Rebuild.
+	* mc-boot/GmcComp.cc: Rebuild.
+	* mc-boot/GmcComp.h: Rebuild.
+	* mc-boot/GmcDebug.cc: Rebuild.
+	* mc-boot/GmcDebug.h: Rebuild.
+	* mc-boot/GmcError.cc: Rebuild.
+	* mc-boot/GmcError.h: Rebuild.
+	* mc-boot/GmcFileName.cc: Rebuild.
+	* mc-boot/GmcFileName.h: Rebuild.
+	* mc-boot/GmcLexBuf.cc: Rebuild.
+	* mc-boot/GmcLexBuf.h: Rebuild.
+	* mc-boot/GmcMetaError.cc: Rebuild.
+	* mc-boot/GmcMetaError.h: Rebuild.
+	* mc-boot/GmcOptions.cc: Rebuild.
+	* mc-boot/GmcOptions.h: Rebuild.
+	* mc-boot/GmcPreprocess.cc: Rebuild.
+	* mc-boot/GmcPreprocess.h: Rebuild.
+	* mc-boot/GmcPretty.cc: Rebuild.
+	* mc-boot/GmcPretty.h: Rebuild.
+	* mc-boot/GmcPrintf.cc: Rebuild.
+	* mc-boot/GmcPrintf.h: Rebuild.
+	* mc-boot/GmcQuiet.cc: Rebuild.
+	* mc-boot/GmcQuiet.h: Rebuild.
+	* mc-boot/GmcReserved.cc: Rebuild.
+	* mc-boot/GmcReserved.h: Rebuild.
+	* mc-boot/GmcSearch.cc: Rebuild.
+	* mc-boot/GmcSearch.h: Rebuild.
+	* mc-boot/GmcStack.cc: Rebuild.
+	* mc-boot/GmcStack.h: Rebuild.
+	* mc-boot/GmcStream.cc: Rebuild.
+	* mc-boot/GmcStream.h: Rebuild.
+	* mc-boot/Gmcflex.h: Rebuild.
+	* mc-boot/Gmcp1.cc: Rebuild.
+	* mc-boot/Gmcp1.h: Rebuild.
+	* mc-boot/Gmcp2.cc: Rebuild.
+	* mc-boot/Gmcp2.h: Rebuild.
+	* mc-boot/Gmcp3.cc: Rebuild.
+	* mc-boot/Gmcp3.h: Rebuild.
+	* mc-boot/Gmcp4.cc: Rebuild.
+	* mc-boot/Gmcp4.h: Rebuild.
+	* mc-boot/Gmcp5.cc: Rebuild.
+	* mc-boot/Gmcp5.h: Rebuild.
+	* mc-boot/GnameKey.cc: Rebuild.
+	* mc-boot/GnameKey.h: Rebuild.
+	* mc-boot/GsymbolKey.cc: Rebuild.
+	* mc-boot/GsymbolKey.h: Rebuild.
+	* mc-boot/Gtermios.h: Rebuild.
+	* mc-boot/Gtop.cc: Rebuild.
+	* mc-boot/Gvarargs.cc: Rebuild.
+	* mc-boot/Gvarargs.h: Rebuild.
+	* mc-boot/Gwlists.cc: Rebuild.
+	* mc-boot/Gwlists.h: Rebuild.
+	* mc-boot/Gwrapc.h: Rebuild.
+	* mc/decl.mod (doBoolC): New procedure.
+	(doBaseC): Call doBoolC.
+	* mc/keyc.mod: Import useBool.
+	(genBool): New procedure.
+	(genDefs): Call genBool.
+	* mc/mcOptions.def (useBool): New procedure.
+	* mc/mcOptions.mod (useBool): New procedure.
+	(useBoolType): New variable.
+	(optionIs): Assign useBoolType to TRUE.
+
 2023-03-04  Gaius Mulley  <gaiusmod2@gmail.com>
 
 	* mc-boot-ch/GBuiltins.cc: New file.
