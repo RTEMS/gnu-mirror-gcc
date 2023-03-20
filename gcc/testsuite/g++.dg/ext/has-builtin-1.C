@@ -146,3 +146,6 @@
 #if !__has_builtin (__remove_cvref)
 # error "__has_builtin (__remove_cvref) failed"
 #endif
+#if !__has_builtin (__remove_pointer)
+# error "__has_builtin (__remove_pointer) failed"
+#endif
