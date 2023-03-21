@@ -146,3 +146,6 @@
 #if !__has_builtin (__remove_cvref)
 # error "__has_builtin (__remove_cvref) failed"
 #endif
+#if !__has_builtin (__is_unsigned)
+# error "__has_builtin (__is_unsigned) failed"
+#endif
