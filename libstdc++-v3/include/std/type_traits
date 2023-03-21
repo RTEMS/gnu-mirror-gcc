@@ -884,10 +884,17 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     { };
 
   /// is_unsigned
+#if __has_builtin(__is_unsigned)
+  template<typename _Tp>
+    struct is_unsigned
+    : public __bool_constant<__is_unsigned(_Tp)>
+    { };
+#else
   template<typename _Tp>
     struct is_unsigned
     : public __and_<is_arithmetic<_Tp>, __not_<is_signed<_Tp>>>::type
     { };
+#endif
 
   /// @cond undocumented
   template<typename _Tp, typename _Up = _Tp&&>
