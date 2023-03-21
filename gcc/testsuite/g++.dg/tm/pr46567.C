@@ -403,7 +403,7 @@ namespace __gnu_cxx __attribute__ ((__visibility__ ("default"))) {
     {
       static const _Value __min = (((_Value)(-1) < 0) ? (_Value)1 << (sizeof(_Value) * 8 - ((_Value)(-1) < 0)) : (_Value)0);
       static const _Value __max = (((_Value)(-1) < 0) ? (((((_Value)1 << ((sizeof(_Value) * 8 - ((_Value)(-1) < 0)) - 1)) - 1) << 1) + 1) : ~(_Value)0);
-      static const bool __is_signed = ((_Value)(-1) < 0);
+      static const bool ____is_signed = ((_Value)(-1) < 0);
       static const int __digits = (sizeof(_Value) * 8 - ((_Value)(-1) < 0));
     };
   template<typename _Value>
@@ -411,21 +411,21 @@ namespace __gnu_cxx __attribute__ ((__visibility__ ("default"))) {
   template<typename _Value>
     const _Value __numeric_traits_integer<_Value>::__max;
   template<typename _Value>
-    const bool __numeric_traits_integer<_Value>::__is_signed;
+    const bool __numeric_traits_integer<_Value>::____is_signed;
   template<typename _Value>
     const int __numeric_traits_integer<_Value>::__digits;
   template<typename _Value>
     struct __numeric_traits_floating
     {
       static const int __max_digits10 = (2 + (std::__are_same<_Value, float>::__value ? 24 : std::__are_same<_Value, double>::__value ? 53 : 64) * 3010 / 10000);
-      static const bool __is_signed = true;
+      static const bool ____is_signed = true;
       static const int __digits10 = (std::__are_same<_Value, float>::__value ? 6 : std::__are_same<_Value, double>::__value ? 15 : 18);
       static const int __max_exponent10 = (std::__are_same<_Value, float>::__value ? 38 : std::__are_same<_Value, double>::__value ? 308 : 4932);
     };
   template<typename _Value>
     const int __numeric_traits_floating<_Value>::__max_digits10;
   template<typename _Value>
-    const bool __numeric_traits_floating<_Value>::__is_signed;
+    const bool __numeric_traits_floating<_Value>::____is_signed;
   template<typename _Value>
     const int __numeric_traits_floating<_Value>::__digits10;
   template<typename _Value>
@@ -1513,8 +1513,8 @@ namespace std __attribute__ ((__visibility__ ("default"))) {
       typedef typename iterator_traits<_II2>::value_type _ValueType2;
       const bool __simple =
  (__is_byte<_ValueType1>::__value && __is_byte<_ValueType2>::__value
-  && !__gnu_cxx::__numeric_traits<_ValueType1>::__is_signed
-  && !__gnu_cxx::__numeric_traits<_ValueType2>::__is_signed
+  && !__gnu_cxx::__numeric_traits<_ValueType1>::____is_signed
+  && !__gnu_cxx::__numeric_traits<_ValueType2>::____is_signed
   && __is_pointer<_II1>::__value
   && __is_pointer<_II2>::__value);
       return std::__lexicographical_compare<__simple>::__lc(__first1, __last1,

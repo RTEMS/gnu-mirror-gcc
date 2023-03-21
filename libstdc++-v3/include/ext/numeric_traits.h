@@ -67,15 +67,15 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       // NB: these two are also available in std::numeric_limits as compile
       // time constants, but <limits> is big and we can avoid including it.
-      static const bool __is_signed = (_Value)(-1) < 0;
+      static const bool ____is_signed = (_Value)(-1) < 0;
       static const int __digits
-	= __is_integer_nonstrict<_Value>::__width - __is_signed;
+	= __is_integer_nonstrict<_Value>::__width - ____is_signed;
 
       // The initializers must be constants so that __max and __min are too.
-      static const _Value __max = __is_signed
+      static const _Value __max = ____is_signed
 	? (((((_Value)1 << (__digits - 1)) - 1) << 1) + 1)
 	: ~(_Value)0;
-      static const _Value __min = __is_signed ? -__max - 1 : (_Value)0;
+      static const _Value __min = ____is_signed ? -__max - 1 : (_Value)0;
     };
 
   template<typename _Value>
@@ -85,7 +85,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     const _Value __numeric_traits_integer<_Value>::__max;
 
   template<typename _Value>
-    const bool __numeric_traits_integer<_Value>::__is_signed;
+    const bool __numeric_traits_integer<_Value>::____is_signed;
 
   template<typename _Value>
     const int __numeric_traits_integer<_Value>::__digits;
@@ -161,7 +161,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       static const int __max_digits10 = __glibcxx_max_digits10(_Value);
 
       // See above comment...
-      static const bool __is_signed = true;
+      static const bool ____is_signed = true;
       static const int __digits10 = __glibcxx_digits10(_Value);
       static const int __max_exponent10 = __glibcxx_max_exponent10(_Value);
     };
@@ -170,7 +170,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     const int __numeric_traits_floating<_Value>::__max_digits10;
 
   template<typename _Value>
-    const bool __numeric_traits_floating<_Value>::__is_signed;
+    const bool __numeric_traits_floating<_Value>::____is_signed;
 
   template<typename _Value>
     const int __numeric_traits_floating<_Value>::__digits10;
@@ -210,7 +210,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     struct __numeric_traits_floating<__ibm128>
     {
       static const int __max_digits10 = 33;
-      static const bool __is_signed = true;
+      static const bool ____is_signed = true;
       static const int __digits10 = 31;
       static const int __max_exponent10 = 308;
     };
@@ -224,7 +224,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     struct __numeric_traits_floating<__ieee128>
     {
       static const int __max_digits10 = 36;
-      static const bool __is_signed = true;
+      static const bool ____is_signed = true;
       static const int __digits10 = 33;
       static const int __max_exponent10 = 4932;
     };

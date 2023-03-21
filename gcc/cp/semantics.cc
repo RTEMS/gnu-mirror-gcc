@@ -12118,6 +12118,9 @@ trait_expr_value (cp_trait_kind kind, tree type1, tree type2)
     case CPTK_IS_UNION:
       return type_code1 == UNION_TYPE;
 
+    case CPTK_IS_SIGNED:
+      return ARITHMETIC_TYPE_P (type1) && TYPE_SIGN (type1) == SIGNED;
+
     case CPTK_IS_ASSIGNABLE:
       return is_xible (MODIFY_EXPR, type1, type2);
 
@@ -12296,6 +12299,7 @@ finish_trait_expr (location_t loc, cp_trait_kind kind, tree type1, tree type2)
     case CPTK_IS_ENUM:
     case CPTK_IS_UNION:
     case CPTK_IS_SAME:
+    case CPTK_IS_SIGNED:
       break;
 
     case CPTK_IS_LAYOUT_COMPATIBLE:

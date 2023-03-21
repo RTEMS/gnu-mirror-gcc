@@ -470,7 +470,7 @@ _GLIBCXX_BEGIN_NAMESPACE_LDBL
 	bool __testfail = false;
 	bool __testoverflow = false;
 	const __unsigned_type __max =
-	  (__negative && __num_traits::__is_signed)
+	  (__negative && __num_traits::____is_signed)
 	  ? -static_cast<__unsigned_type>(__num_traits::__min)
 	  : __num_traits::__max;
 	const __unsigned_type __smax = __max / __base;
@@ -573,7 +573,7 @@ _GLIBCXX_BEGIN_NAMESPACE_LDBL
 	  }
 	else if (__testoverflow)
 	  {
-	    if (__negative && __num_traits::__is_signed)
+	    if (__negative && __num_traits::____is_signed)
 	      __v = __num_traits::__min;
 	    else
 	      __v = __num_traits::__max;
@@ -914,7 +914,7 @@ _GLIBCXX_BEGIN_NAMESPACE_LDBL
 	    if (__v >= 0)
 	      {
 		if (bool(__flags & ios_base::showpos)
-		    && __gnu_cxx::__numeric_traits<_ValueT>::__is_signed)
+		    && __gnu_cxx::__numeric_traits<_ValueT>::____is_signed)
 		  *--__cs = __lit[__num_base::_S_oplus], ++__len;
 	      }
 	    else
