@@ -28,11 +28,6 @@ prefixed attribute correctly will correctly split the insns.
 gcc/
 
 	PR target/105325
-	* gcc/config/rs6000/genfusion.pl (gen_ld_cmpi_p10): Improve generation
-	of the ld and lwa instructions which use the DS encoding instead of D.
-	Use the YZ constraint for these loads.	Handle prefixed loads better.
-	Set the sign_extend attribute as appropriate.
-	* gcc/config/rs6000/fusion.md: Regenerate.
 	* gcc/config/rs6000/rs6000.md (prefixed attribute): Add fused_load_cmpi
 	instructions to the list of instructions that might have a prefixed load
 	instruction.
@@ -41,7 +36,6 @@ gcc/testsuite/
 
 	PR target/105325
 	* g++.target/powerpc/pr105325.C: New test.
-	* gcc.target/powerpc/fusion-p10-ldcmpi.c: Adjust insn counts.
 
 ==================== Branch work112, baseline ====================
 
