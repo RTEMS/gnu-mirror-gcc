@@ -12079,6 +12079,9 @@ trait_expr_value (cp_trait_kind kind, tree type1, tree type2)
     case CPTK_IS_ENUM:
       return type_code1 == ENUMERAL_TYPE;
 
+    case CPTK_IS_VOLATILE:
+      return CP_TYPE_VOLATILE_P (type1);
+
     case CPTK_IS_FINAL:
       return CLASS_TYPE_P (type1) && CLASSTYPE_FINAL (type1);
 
@@ -12296,6 +12299,7 @@ finish_trait_expr (location_t loc, cp_trait_kind kind, tree type1, tree type2)
     case CPTK_IS_ENUM:
     case CPTK_IS_UNION:
     case CPTK_IS_SAME:
+    case CPTK_IS_VOLATILE:
       break;
 
     case CPTK_IS_LAYOUT_COMPATIBLE:
