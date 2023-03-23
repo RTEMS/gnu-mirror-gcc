@@ -45,6 +45,7 @@ DEF_TARGET_INSN (call_value, (rtx x0, rtx x1, rtx opt2, rtx opt3, rtx opt4))
 DEF_TARGET_INSN (call_value_pop, (rtx x0, rtx x1, rtx opt2, rtx opt3,
 				  rtx opt4))
 DEF_TARGET_INSN (cap_global_data_get, (rtx x0))
+DEF_TARGET_INSN (cap_global_data_derive, (rtx x0, rtx x1))
 DEF_TARGET_INSN (cap_program_counter_get, (rtx x0))
 DEF_TARGET_INSN (cap_representable_alignment_mask, (rtx x0, rtx x1))
 DEF_TARGET_INSN (cap_round_representable_length, (rtx x0, rtx x1))

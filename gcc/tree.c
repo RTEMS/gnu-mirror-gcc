@@ -8169,9 +8169,10 @@ build_replace_address_value_loc (location_t loc, tree c, tree cv)
    used on non-capability -> capability conversions.  */
 
 tree
-build_cap_global_data_get_loc (location_t loc, tree type)
+build_cap_global_data_derive_loc (location_t loc, tree type, tree ptr)
 {
-  return build_call_expr_internal_loc (loc, IFN_CAP_GLOBAL_DATA_GET, type, 0);
+  return build_call_expr_internal_loc (loc, IFN_CAP_GLOBAL_DATA_DERIVE,
+				       type, 1, ptr);
 }
 
 /* Same as build_pointer_type_for_mode, but for REFERENCE_TYPE.  */

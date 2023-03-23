@@ -447,6 +447,15 @@
   "cvtp\\t%0, %1"
 )
 
+(define_insn "cap_global_data_derive"
+  [(set (match_operand:CADI 0 "register_operand" "=r")
+	(unspec:CADI [
+	  (match_operand:DI 1 "register_operand" "r")
+	] UNSPEC_CHERI_DDC_DERIVE_CAP))]
+  "TARGET_MORELLO"
+  "cvtdz\\t%0, %1"
+)
+
 (define_expand "cap_program_counter_get"
   [(match_operand:CADI 0 "register_operand")]
   "TARGET_MORELLO"

@@ -2675,7 +2675,8 @@ tree
 c_common_cap_from_ptr (tree type, tree ptr_expr)
 {
   gcc_assert (POINTER_TYPE_P (TREE_TYPE (ptr_expr))
-	      && capability_type_p (type));
+	      && capability_type_p (type)
+	      && !capability_type_p (TREE_TYPE (ptr_expr)));
    /* MORELLO TODO address spaces.
    * Need to do special handling for capabilities, but also need to do special
    * handling for address spaces, capability handling is usually done in
@@ -2683,24 +2684,17 @@ c_common_cap_from_ptr (tree type, tree ptr_expr)
    * `convert_to_pointer_1`.  */
   gcc_assert (TYPE_ADDR_SPACE (TREE_TYPE (type))
 		  == TYPE_ADDR_SPACE (TREE_TYPE (TREE_TYPE (ptr_expr))));
-  tree int_expr = convert (noncapability_type (type), ptr_expr);
 
   if (!c_dialect_cxx ())
-    int_expr = c_fully_fold (int_expr, false, NULL);
+    ptr_expr = c_fully_fold (ptr_expr, false, NULL);
 
-  location_t loc = EXPR_LOCATION (int_expr);
+  location_t loc = EXPR_LOCATION (ptr_expr);
 
-  tree ret;
-  if (integer_zerop (int_expr))
+  if (integer_zerop (ptr_expr))
     /* Converting from null pointer should give null capability.  */
-    ret = build_zero_cst (type);
+    return build_zero_cst (type);
   else
-    {
-      ret = build_cap_global_data_get_loc (loc, type);
-      ret = fold_build_replace_address_value_loc (loc, ret, int_expr);
-    }
-
-  return ret;
+    return build_cap_global_data_derive_loc (loc, type, ptr_expr);
 }
 
 
