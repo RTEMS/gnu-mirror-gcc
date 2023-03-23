@@ -158,6 +158,7 @@
     UNSPEC_CHERI_OFFSET_SET
     UNSPEC_CHERI_PERMS_GET
     UNSPEC_CHERI_PTR_TO_CAP_OFFSET
+    UNSPEC_CHERI_PCC_DERIVE_CAP
     UNSPEC_CHERI_REPR_ALIGN_MASK
     UNSPEC_CHERI_ROUND_REPR_LEN
     UNSPEC_CHERI_SEAL
@@ -334,7 +335,7 @@
     UNSPECV_TSTART		; Represent transaction start.
     UNSPECV_TCOMMIT		; Represent transaction commit.
     UNSPECV_TCANCEL		; Represent transaction cancel.
-    UNSPECV_CHERI_PC_GET	; Represent CHERI PC get
+    UNSPECV_GET_PC		; Represent getting the PC.
     UNSPEC_RNDR			; Represent RNDR
     UNSPEC_RNDRRS		; Represent RNDRRS
   ]

@@ -430,12 +430,38 @@
   "gcperm\\t%0, %1"
 )
 
-(define_insn "cap_program_counter_get"
-  [(set (match_operand:CADI 0 "register_operand" "=r")
-        (unspec_volatile:CADI [(const_int 0)]
-            UNSPECV_CHERI_PC_GET))]
+(define_insn "aarch64_program_counter_get_<mode>"
+  [(set (match_operand:P 0 "register_operand" "=r")
+	(unspec_volatile:P [(const_int 0)]
+	    UNSPECV_GET_PC))]
   "TARGET_MORELLO"
   "adr\\t%0, #0"
+)
+
+(define_insn "cap_pcc_derive"
+  [(set (match_operand:CADI 0 "register_operand" "=r")
+	(unspec:CADI [
+	    (match_operand:DI 1 "register_operand" "r")
+	  ] UNSPEC_CHERI_PCC_DERIVE_CAP))]
+  "TARGET_MORELLO"
+  "cvtp\\t%0, %1"
+)
+
+(define_expand "cap_program_counter_get"
+  [(match_operand:CADI 0 "register_operand")]
+  "TARGET_MORELLO"
+  {
+    if (Pmode == CADImode)
+      emit_insn (gen_aarch64_program_counter_get_cadi (operands[0]));
+    else
+      {
+	gcc_assert (Pmode == DImode && TARGET_CAPABILITY_HYBRID);
+	rtx tmp = gen_reg_rtx (DImode);
+	emit_insn (gen_aarch64_program_counter_get_di (tmp));
+	emit_insn (gen_cap_pcc_derive (operands[0], tmp));
+      }
+    DONE;
+  }
 )
 
 (define_insn "cap_seal_entry_cadi"
