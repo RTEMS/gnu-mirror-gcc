@@ -34,7 +34,7 @@ FROM M2Scaffold IMPORT DeclareScaffold, mainFunction, initFunction,
 FROM M2MetaError IMPORT MetaError0, MetaError1, MetaError2, MetaError3,
                         MetaErrors1, MetaErrors2, MetaErrors3,
                         MetaErrorT0, MetaErrorT1, MetaErrorT2,
-                        MetaErrorsT1, MetaErrorsT2,
+                        MetaErrorsT1, MetaErrorsT2, MetaErrorT3,
                         MetaErrorStringT0, MetaErrorStringT1,
                         MetaErrorString1, MetaErrorString2,
                         MetaErrorN1, MetaErrorN2,
@@ -209,7 +209,8 @@ FROM M2Options IMPORT NilChecking,
                       GenerateLineDebug, Exceptions,
                       Profiling, Coding, Optimizing,
                       ScaffoldDynamic, ScaffoldStatic, cflag,
-                      ScaffoldMain, SharedFlag, WholeProgram ;
+                      ScaffoldMain, SharedFlag, WholeProgram,
+                      GetRuntimeModuleOverride ;
 
 FROM M2Pass IMPORT IsPassCodeGeneration, IsNoPass ;
 
@@ -2531,7 +2532,8 @@ BEGIN
       (* int
          _M2_init (int argc, char *argv[], char *envp[])
          {
-            M2RTS_ConstructModules (module_name, libname, argc, argv, envp);
+            M2RTS_ConstructModules (module_name, libname,
+                                    overrideliborder, argc, argv, envp);
          }  *)
       PushT (initFunction) ;
       BuildProcedureStart ;
@@ -2566,10 +2568,17 @@ BEGIN
             PushT(1) ;
             BuildAdrFunction ;
 
+            PushTF(Adr, Address) ;
+            PushTtok (MakeConstLitString (tok,
+                                          makekey (GetRuntimeModuleOverride ())),
+                      tok) ;
+            PushT(1) ;
+            BuildAdrFunction ;
+
             PushTtok (SafeRequestSym (tok, MakeKey ("argc")), tok) ;
             PushTtok (SafeRequestSym (tok, MakeKey ("argv")), tok) ;
             PushTtok (SafeRequestSym (tok, MakeKey ("envp")), tok) ;
-            PushT (5) ;
+            PushT (6) ;
             BuildProcedureCall (tok) ;
          END
       ELSIF ScaffoldStatic
@@ -7483,7 +7492,7 @@ BEGIN
    IF CompilerDebugging
    THEN
       printf2 ('procsym = %d  token = %d\n', ProcSym, functok) ;
-      ErrorStringAt (InitString ('constant function'), functok)
+      (* ErrorStringAt (InitString ('constant function'), functok) *)
    END ;
    PushT (NoOfParam) ;
    IF (ProcSym # Convert) AND
@@ -12055,7 +12064,12 @@ VAR
 BEGIN
    PopT (type) ;   (* we ignore the type as we already have the constructor symbol from pass C *)
    GetConstructorFromFifoQueue (constValue) ;
-   Assert (type = GetSType (constValue)) ;
+   IF type # GetSType (constValue)
+   THEN
+      MetaErrorT3 (cbratokpos,
+                   '{%E}the constructor type is {%1ad} and this is different from the constant {%2ad} which has a type {%2tad}',
+                   type, constValue, constValue)
+   END ;
    PushTtok (constValue, cbratokpos) ;
    PushConstructor (type)
 END BuildConstructorStart ;

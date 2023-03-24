@@ -4212,7 +4212,7 @@ builtin_memset_read_str (void *data, void *prev,
 	return const_vec;
 
       /* Use the move expander with CONST_VECTOR.  */
-      target = targetm.gen_memset_scratch_rtx (mode);
+      target = gen_reg_rtx (mode);
       emit_move_insn (target, const_vec);
       return target;
     }
@@ -4256,7 +4256,7 @@ builtin_memset_gen_str (void *data, void *prev,
 	 the memset expander.  */
       insn_code icode = optab_handler (vec_duplicate_optab, mode);
 
-      target = targetm.gen_memset_scratch_rtx (mode);
+      target = gen_reg_rtx (mode);
       class expand_operand ops[2];
       create_output_operand (&ops[0], target, mode);
       create_input_operand (&ops[1], (rtx) data, QImode);
@@ -7178,8 +7178,8 @@ inline_expand_builtin_bytecmp (tree exp, rtx target)
   bool is_ncmp = (fcode == BUILT_IN_STRNCMP || fcode == BUILT_IN_MEMCMP);
 
   /* Do NOT apply this inlining expansion when optimizing for size or
-     optimization level below 2.  */
-  if (optimize < 2 || optimize_insn_for_size_p ())
+     optimization level below 2 or if unused *cmp hasn't been DCEd.  */
+  if (optimize < 2 || optimize_insn_for_size_p () || target == const0_rtx)
     return NULL_RTX;
 
   gcc_checking_assert (fcode == BUILT_IN_STRCMP

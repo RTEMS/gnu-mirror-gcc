@@ -4069,10 +4069,14 @@ find_parameter_packs_r (tree *tp, int *walk_subtrees, void* data)
     case TAG_DEFN:
       t = TREE_TYPE (t);
       if (CLASS_TYPE_P (t))
-	/* Local class, need to look through the whole definition.  */
-	for (tree bb : BINFO_BASE_BINFOS (TYPE_BINFO (t)))
-	  cp_walk_tree (&BINFO_TYPE (bb), &find_parameter_packs_r,
-			ppd, ppd->visited);
+	{
+	  /* Local class, need to look through the whole definition.
+	     TYPE_BINFO might be unset for a partial instantiation.  */
+	  if (TYPE_BINFO (t))
+	    for (tree bb : BINFO_BASE_BINFOS (TYPE_BINFO (t)))
+	      cp_walk_tree (&BINFO_TYPE (bb), &find_parameter_packs_r,
+			    ppd, ppd->visited);
+	}
       else
 	/* Enum, look at the values.  */
 	for (tree l = TYPE_VALUES (t); l; l = TREE_CHAIN (l))
@@ -24635,8 +24639,9 @@ unify (tree tparms, tree targs, tree parm, tree arg, int strict,
 	  if ((strict & UNIFY_ALLOW_INTEGER)
 	      && TREE_TYPE (targ) && TREE_TYPE (arg)
 	      && CP_INTEGRAL_TYPE_P (TREE_TYPE (targ)))
-	    /* We're deducing from an array bound, the type doesn't matter.  */
-	    arg = fold_convert (TREE_TYPE (targ), arg);
+	    /* We're deducing from an array bound, the type doesn't matter.
+	       This conversion should match the one below.  */
+	    arg = fold (build_nop (TREE_TYPE (targ), arg));
 	  int x = !cp_tree_equal (targ, arg);
 	  if (x)
 	    unify_inconsistency (explain_p, parm, targ, arg);
@@ -24684,7 +24689,8 @@ unify (tree tparms, tree targs, tree parm, tree arg, int strict,
 	       && CP_INTEGRAL_TYPE_P (tparm))
 	/* Convert the ARG to the type of PARM; the deduced non-type
 	   template argument must exactly match the types of the
-	   corresponding parameter.  */
+	   corresponding parameter.  This conversion should match the
+	   one above.  */
 	arg = fold (build_nop (tparm, arg));
       else if (uses_template_parms (tparm))
 	{

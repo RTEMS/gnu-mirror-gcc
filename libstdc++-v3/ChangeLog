@@ -1,3 +1,82 @@
+2023-03-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/shared_ptr_atomic.h (atomic::operator=(nullptr_t)):
+	Add overload, as per LWG 3893.
+	* testsuite/20_util/shared_ptr/atomic/atomic_shared_ptr.cc:
+	Check assignment from nullptr.
+
+2023-03-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/format (formatter<const charT[N], charT>): Do not
+	define partial speclialization, as per LWG 3833.
+	* testsuite/std/format/formatter/requirements.cc: Check it.
+
+2023-03-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/utility (__cpp_lib_constexpr_algorithms): Define,
+	as per LWG 3792.
+	* testsuite/20_util/exchange/constexpr.cc: Check for it.
+
+2023-03-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/version (__cpp_lib_format): Define.
+	* testsuite/std/format/functions/format.cc: Check it.
+
+2023-03-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/basic_string.tcc (basic_string::resize_and_overwrite):
+	Pass rvalues to the callback, as now allowed by LWG 3645.
+	Enforce preconditions on the return value.
+	* testsuite/21_strings/basic_string/capacity/char/resize_and_overwrite.cc:
+	Adjust.
+
+2023-03-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/format: Add a comment noting that the resolution
+	of LWG 3720 has been applied..
+
+2023-03-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/regex.h (match_results): Add allocator-extended
+	copy and move constructors, as per LWG 2195.
+	* testsuite/28_regex/match_results/ctors/char/alloc.cc: New test.
+
+2023-03-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/stream_iterator.h (istream_iterator): Add
+	constexpr to copy constructor, as per LWG 3600.
+	* testsuite/24_iterators/istream_iterator/cons/constexpr.cc:
+	Check copy construction.
+
+2023-03-21  Matthias Kretz  <m.kretz@gsi.de>
+
+	* include/experimental/bits/simd_x86.h
+	(_SimdImplX86::_S_divides): Replace test for __GCC_IEC_559 == 0
+	with __RECIPROCAL_MATH__.
+
+2023-03-21  Matthias Kretz  <m.kretz@gsi.de>
+
+	* include/experimental/bits/simd_detail.h: Don't define
+	_GLIBCXX_SIMD_WORKAROUND_PR90993 for Clang.
+	* include/experimental/bits/simd_x86.h (_S_divides): Remove
+	check for __clang__.
+
+2023-03-21  Matthias Kretz  <m.kretz@gsi.de>
+
+	* include/experimental/bits/simd_detail.h: Don't declare the
+	simd API as constexpr with Clang.
+	* include/experimental/bits/simd_x86.h (__movm): New.
+	(_S_blend_avx512): Resolve FIXME. Implement blend using __movm
+	and ?:.
+	(_SimdImplX86::_S_masked_unary): Clang does not implement the
+	same builtins. Implement the function using __movm, ?:, and -
+	operators on vector_size types instead.
+
+2023-03-21  Matthias Kretz  <m.kretz@gsi.de>
+
+	* testsuite/experimental/simd/tests/operators.cc: Clang doesn't
+	define __GCC_IEC_559. Use __STDC_IEC_559__ instead.
+
 2023-03-20  Jonathan Wakely  <jwakely@redhat.com>
 
 	* src/filesystem/ops-common.h (get_temp_directory_from_env): Fix

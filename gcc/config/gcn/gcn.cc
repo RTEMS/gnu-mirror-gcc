@@ -492,6 +492,15 @@ gcn_class_max_nregs (reg_class_t rclass, machine_mode mode)
     }
   else if (rclass == VCC_CONDITIONAL_REG && mode == BImode)
     return 2;
+
+  /* Vector modes in SGPRs are not supposed to happen (disallowed by
+     gcn_hard_regno_mode_ok), but there are some patterns that have an "Sv"
+     constraint and are used by splitters, post-reload.
+     This ensures that we don't accidentally mark the following 63 scalar
+     registers as "live".  */
+  if (rclass == SGPR_REGS && VECTOR_MODE_P (mode))
+    return CEIL (GET_MODE_SIZE (GET_MODE_INNER (mode)), 4);
+
   return CEIL (GET_MODE_SIZE (mode), 4);
 }
 
@@ -1421,6 +1430,24 @@ CODE_FOR_OP (reload_out)
 
 #undef CODE_FOR_OP
 #undef CODE_FOR
+
+/* Return true if OP is a PARALLEL of CONST_INTs that form a linear
+   series with step STEP.  */
+
+bool
+gcn_stepped_zero_int_parallel_p (rtx op, int step)
+{
+  if (GET_CODE (op) != PARALLEL || !CONST_INT_P (XVECEXP (op, 0, 0)))
+    return false;
+
+  unsigned HOST_WIDE_INT base = 0;
+  for (int i = 0; i < XVECLEN (op, 0); ++i)
+    if (!CONST_INT_P (XVECEXP (op, 0, i))
+	|| UINTVAL (XVECEXP (op, 0, i)) != base + i * step)
+      return false;
+
+  return true;
+}
 
 /* }}}  */
 /* {{{ Addresses, pointers and moves.  */
@@ -3221,6 +3248,10 @@ move_callee_saved_registers (rtx sp, machine_function *offsets,
       emit_insn (move_vectors);
       emit_insn (move_scalars);
     }
+
+  /* This happens when a new register becomes "live" after reload.
+     Check your splitters!  */
+  gcc_assert (offset <= offsets->callee_saves);
 }
 
 /* Generate prologue.  Called from gen_prologue during pro_and_epilogue pass.
@@ -5011,6 +5042,79 @@ gcn_vector_alignment_reachable (const_tree ARG_UNUSED (type), bool is_packed)
   /* Vectors which aren't in packed structures will not be less aligned than
      the natural alignment of their element type, so this is safe.  */
   return !is_packed;
+}
+
+/* Generate DPP pairwise swap instruction.
+   This instruction swaps the values in each even lane with the value in the
+   next one:
+     a, b, c, d -> b, a, d, c.
+   The opcode is given by INSN.  */
+
+char *
+gcn_expand_dpp_swap_pairs_insn (machine_mode mode, const char *insn,
+				int ARG_UNUSED (unspec))
+{
+  static char buf[128];
+  const char *dpp;
+
+  /* Add the DPP modifiers.  */
+  dpp = "quad_perm:[1,0,3,2]";
+
+  if (vgpr_2reg_mode_p (mode))
+    sprintf (buf, "%s\t%%L0, %%L1 %s\n\t%s\t%%H0, %%H1 %s",
+	     insn, dpp, insn, dpp);
+  else
+    sprintf (buf, "%s\t%%0, %%1 %s", insn, dpp);
+
+  return buf;
+}
+
+/* Generate DPP distribute even instruction.
+   This instruction copies the value in each even lane to the next one:
+     a, b, c, d -> a, a, c, c.
+   The opcode is given by INSN.  */
+
+char *
+gcn_expand_dpp_distribute_even_insn (machine_mode mode, const char *insn,
+				     int ARG_UNUSED (unspec))
+{
+  static char buf[128];
+  const char *dpp;
+
+  /* Add the DPP modifiers.  */
+  dpp = "quad_perm:[0,0,2,2]";
+
+  if (vgpr_2reg_mode_p (mode))
+    sprintf (buf, "%s\t%%L0, %%L1 %s\n\t%s\t%%H0, %%H1 %s",
+	     insn, dpp, insn, dpp);
+  else
+    sprintf (buf, "%s\t%%0, %%1 %s", insn, dpp);
+
+  return buf;
+}
+
+/* Generate DPP distribute odd instruction.
+   This isntruction copies the value in each odd lane to the previous one:
+     a, b, c, d -> b, b, d, d.
+   The opcode is given by INSN.  */
+
+char *
+gcn_expand_dpp_distribute_odd_insn (machine_mode mode, const char *insn,
+				    int ARG_UNUSED (unspec))
+{
+  static char buf[128];
+  const char *dpp;
+
+  /* Add the DPP modifiers.  */
+  dpp = "quad_perm:[1,1,3,3]";
+
+  if (vgpr_2reg_mode_p (mode))
+    sprintf (buf, "%s\t%%L0, %%L1 %s\n\t%s\t%%H0, %%H1 %s",
+	     insn, dpp, insn, dpp);
+  else
+    sprintf (buf, "%s\t%%0, %%1 %s", insn, dpp);
+
+  return buf;
 }
 
 /* Generate DPP instructions used for vector reductions.
