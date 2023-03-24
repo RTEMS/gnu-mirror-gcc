@@ -1,8 +1,25 @@
+==================== Branch work115, patch #21 ====================
+
+Improve 64->128 bit zero extension on PowerPC
+
+2023-03-24   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/108958
+	* gcc/config/rs6000.md (zero_extendditi2): New insn.
+
+gcc/testsuite/
+
+	PR target/108958
+	* gcc.target/powerpc/zero-extend-di-ti.c: New test.
+	* gcc.target/powerpc/builtins-1.c: Update insn count.
+
 ==================== Branch work115, patch #20 ====================
 
 Fix splat of extract for long long and double.
 
-2023-03-23   Michael Meissner  <meissner@linux.ibm.com>
+2023-03-24   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -12,7 +29,7 @@ gcc/
 
 gcc/testsuite/
 
-	PR target/108958
+	PR target/99293
 	* gcc.target/powerpc/pr99293.c: New test.
 
 ==================== Branch work115, patch #1 ====================
