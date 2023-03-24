@@ -1,3 +1,47 @@
+==================== Branch work116, patch #1 ====================
+
+Make load/cmp fusion know about prefixed loads.
+
+The issue with the bug is the power10 load GPR + cmpi -1/0/1 fusion
+optimization generates illegal assembler code.
+
+Ultimately the code was dying because the fusion load + compare -1/0/1 patterns
+did not handle the possibility that the load might be prefixed.
+
+The main cause is the constraints for the individual loads in the fusion did not
+match the machine.  In particular, LWA is a ds format instruction when it is
+unprefixed.  The code did not also set the prefixed attribute correctly.
+
+This patch rewrites the genfusion.pl script so that it will have more accurate
+constraints for the LWA and LD instructions (which are DS instructions).  The
+updated genfusion.pl was then run to update fusion.md.  Finally, the code for
+the "prefixed" attribute is modified so that it considers load + compare
+immediate patterns to be like the normal load insns in checking whether
+operand[1] is a prefixed instruction.
+
+I posted a version of patch on March 21st.  This patch makes some code changes
+suggested in the genfusion.pl code.
+
+2023-03-21   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/105325
+	* gcc/config/rs6000/genfusion.pl (gen_ld_cmpi_p10): Improve generation
+	of the ld and lwa instructions which use the DS encoding instead of D.
+	Use the YZ constraint for these loads.	Handle prefixed loads better.
+	Set the sign_extend attribute as appropriate.
+	* gcc/config/rs6000/fusion.md: Regenerate.
+	* gcc/config/rs6000/rs6000.md (prefixed attribute): Add fused_load_cmpi
+	instructions to the list of instructions that might have a prefixed load
+	instruction.
+
+gcc/testsuite/
+
+	PR target/105325
+	* g++.target/powerpc/pr105325.C: New test.
+	* gcc.target/powerpc/fusion-p10-ldcmpi.c: Adjust insn counts.
+
 ==================== Branch work116, baseline ====================
 
 2023-03-24   Michael Meissner  <meissner@linux.ibm.com>
