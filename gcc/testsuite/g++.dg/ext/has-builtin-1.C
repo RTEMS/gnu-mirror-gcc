@@ -149,3 +149,6 @@
 #if !__has_builtin (__is_reference)
 # error "__has_builtin (__is_reference) failed"
 #endif
+#if !__has_builtin (__is_function)
+# error "__has_builtin (__is_function) failed"
+#endif
