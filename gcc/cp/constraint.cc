@@ -3705,6 +3705,9 @@ diagnose_trait_expr (tree expr, tree args)
     case CPTK_HAS_VIRTUAL_DESTRUCTOR:
       inform (loc, "  %qT does not have a virtual destructor", t1);
       break;
+    case CPTK_IS_REFERENCE:
+      inform (loc, "  %qT is not a reference", t1);
+      break;
     case CPTK_IS_ABSTRACT:
       inform (loc, "  %qT is not an abstract class", t1);
       break;
