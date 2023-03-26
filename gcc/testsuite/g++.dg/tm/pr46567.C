@@ -72,13 +72,13 @@ namespace std __attribute__ ((__visibility__ ("default"))) {
       typedef __true_type __type;
     };
   template<typename _Tp>
-    struct __is_void
+    struct ____is_void
     {
       enum { __value = 0 };
       typedef __false_type __type;
     };
   template<>
-    struct __is_void<void>
+    struct ____is_void<void>
     {
       enum { __value = 1 };
       typedef __true_type __type;
@@ -222,7 +222,7 @@ namespace std __attribute__ ((__visibility__ ("default"))) {
     { };
   template<typename _Tp>
     struct __is_fundamental
-    : public __traitor<__is_void<_Tp>, __is_arithmetic<_Tp> >
+    : public __traitor<____is_void<_Tp>, __is_arithmetic<_Tp> >
     { };
   template<typename _Tp>
     struct __is_scalar

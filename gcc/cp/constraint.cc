@@ -3757,6 +3757,9 @@ diagnose_trait_expr (tree expr, tree args)
     case CPTK_IS_FUNCTION:
       inform (loc, "  %qT is not a function", t1);
       break;
+    case CPTK_IS_VOID:
+      inform (loc, "  %qT is not a void type", t1);
+      break;
     case CPTK_IS_AGGREGATE:
       inform (loc, "  %qT is not an aggregate", t1);
       break;

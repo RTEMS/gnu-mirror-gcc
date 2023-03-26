@@ -3166,8 +3166,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
    * @{
    * @ingroup variable_templates
    */
+#if __has_builtin(__is_void)
+template <typename _Tp>
+  inline constexpr bool is_void_v = __is_void(_Tp);
+#else
 template <typename _Tp>
   inline constexpr bool is_void_v = is_void<_Tp>::value;
+#endif
+
 template <typename _Tp>
   inline constexpr bool is_null_pointer_v = is_null_pointer<_Tp>::value;
 template <typename _Tp>
