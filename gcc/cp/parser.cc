@@ -10157,7 +10157,10 @@ cp_parser_binary_expression (cp_parser* parser, bool cast_p,
 		      || (TREE_CODE (TREE_TYPE (TREE_OPERAND (current.lhs, 0)))
 			  != BOOLEAN_TYPE))))
 	  /* Avoid warning for !!b == y where b is boolean.  */
-	  && (!DECL_P (tree_strip_any_location_wrapper (current.lhs))
+	  && (!(DECL_P (tree_strip_any_location_wrapper (current.lhs))
+		|| (TREE_CODE (current.lhs) == NON_LVALUE_EXPR
+		    && DECL_P (tree_strip_any_location_wrapper
+					    (TREE_OPERAND (current.lhs, 0)))))
 	      || TREE_TYPE (current.lhs) == NULL_TREE
 	      || TREE_CODE (TREE_TYPE (current.lhs)) != BOOLEAN_TYPE))
 	warn_logical_not_parentheses (current.loc, current.tree_type,
@@ -33667,14 +33670,32 @@ class_decl_loc_t::diag_mismatched_tags (tree type_decl)
 	 be (and inevitably is) at index zero.  */
       tree spec = specialization_of (type);
       cdlguide = class2loc.get (spec);
+      /* It's possible that we didn't find SPEC.  Consider:
+
+	   template<typename T> struct A {
+	     template<typename U> struct W { };
+	   };
+	   struct A<int>::W<int> w; // #1
+
+	 where while parsing A and #1 we've stashed
+	   A<T>
+	   A<T>::W<U>
+	   A<int>::W<int>
+	 into CLASS2LOC.  If TYPE is A<int>::W<int>, specialization_of
+	 will yield A<int>::W<U> which may be in CLASS2LOC if we had
+	 an A<int> class specialization, but otherwise won't be in it.
+	 So try to look up A<T>::W<U>.  */
+      if (!cdlguide)
+	{
+	  spec = DECL_TEMPLATE_RESULT (most_general_template (spec));
+	  cdlguide = class2loc.get (spec);
+	}
+      /* Now we really should have found something.  */
       gcc_assert (cdlguide != NULL);
     }
-  else
-    {
-      /* Skip declarations that consistently use the same class-key.  */
-      if (def_class_key != none_type)
-	return;
-    }
+  /* Skip declarations that consistently use the same class-key.  */
+  else if (def_class_key != none_type)
+    return;
 
   /* Set if a definition for the class has been seen.  */
   const bool def_p = cdlguide->def_p ();

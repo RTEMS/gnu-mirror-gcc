@@ -6818,7 +6818,9 @@ ix86_compute_frame_layout (void)
 	 stack clash protections are enabled and the allocated frame is
 	 larger than the probe interval, then use pushes to save
 	 callee saved registers.  */
-      || (flag_stack_clash_protection && to_allocate > get_probe_interval ()))
+      || (flag_stack_clash_protection
+	  && !ix86_target_stack_probe ()
+	  && to_allocate > get_probe_interval ()))
     frame->save_regs_using_mov = false;
 
   if (ix86_using_red_zone ()
@@ -8703,8 +8705,11 @@ ix86_expand_prologue (void)
       sse_registers_saved = true;
     }
 
-  /* If stack clash protection is requested, then probe the stack.  */
-  if (allocate >= 0 && flag_stack_clash_protection)
+  /* If stack clash protection is requested, then probe the stack, unless it
+     is already probed on the target.  */
+  if (allocate >= 0
+      && flag_stack_clash_protection
+      && !ix86_target_stack_probe ())
     {
       ix86_adjust_stack_and_probe (allocate, int_registers_saved, false);
       allocate = 0;
@@ -18918,6 +18923,13 @@ ix86_vectorize_builtin_scatter (const_tree vectype,
   if (!TARGET_AVX512F)
     return NULL_TREE;
 
+  if (known_eq (TYPE_VECTOR_SUBPARTS (vectype), 2u)
+      ? !TARGET_USE_SCATTER_2PARTS
+      : (known_eq (TYPE_VECTOR_SUBPARTS (vectype), 4u)
+	 ? !TARGET_USE_SCATTER_4PARTS
+	 : !TARGET_USE_SCATTER))
+    return NULL_TREE;
+
   if ((TREE_CODE (index_type) != INTEGER_TYPE
        && !POINTER_TYPE_P (index_type))
       || (TYPE_MODE (index_type) != SImode
@@ -20218,10 +20230,13 @@ ix86_vec_cost (machine_mode mode, int cost)
 
   if (GET_MODE_BITSIZE (mode) == 128
       && TARGET_SSE_SPLIT_REGS)
-    return cost * 2;
-  if (GET_MODE_BITSIZE (mode) > 128
+    return cost * GET_MODE_BITSIZE (mode) / 64;
+  else if (GET_MODE_BITSIZE (mode) > 128
       && TARGET_AVX256_SPLIT_REGS)
     return cost * GET_MODE_BITSIZE (mode) / 128;
+  else if (GET_MODE_BITSIZE (mode) > 256
+      && TARGET_AVX512_SPLIT_REGS)
+    return cost * GET_MODE_BITSIZE (mode) / 256;
   return cost;
 }
 
@@ -22798,12 +22813,14 @@ ix86_reassociation_width (unsigned int op, machine_mode mode)
       /* Integer vector instructions execute in FP unit
 	 and can execute 3 additions and one multiplication per cycle.  */
       if ((ix86_tune == PROCESSOR_ZNVER1 || ix86_tune == PROCESSOR_ZNVER2
-	   || ix86_tune == PROCESSOR_ZNVER3)
+	   || ix86_tune == PROCESSOR_ZNVER3 || ix86_tune == PROCESSOR_ZNVER4)
    	  && INTEGRAL_MODE_P (mode) && op != PLUS && op != MINUS)
 	return 1;
 
       /* Account for targets that splits wide vectors into multiple parts.  */
-      if (TARGET_AVX256_SPLIT_REGS && GET_MODE_BITSIZE (mode) > 128)
+      if (TARGET_AVX512_SPLIT_REGS && GET_MODE_BITSIZE (mode) > 256)
+	div = GET_MODE_BITSIZE (mode) / 256;
+      else if (TARGET_AVX256_SPLIT_REGS && GET_MODE_BITSIZE (mode) > 128)
 	div = GET_MODE_BITSIZE (mode) / 128;
       else if (TARGET_SSE_SPLIT_REGS && GET_MODE_BITSIZE (mode) > 64)
 	div = GET_MODE_BITSIZE (mode) / 64;

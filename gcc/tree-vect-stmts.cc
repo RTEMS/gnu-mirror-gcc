@@ -6274,6 +6274,20 @@ vectorizable_operation (vec_info *vinfo,
       return false;
     }
 
+  /* ???  We should instead expand the operations here, instead of
+     relying on vector lowering which has this hard cap on the number
+     of vector elements below it performs elementwise operations.  */
+  if (using_emulated_vectors_p
+      && (code == PLUS_EXPR || code == MINUS_EXPR || code == NEGATE_EXPR)
+      && ((BITS_PER_WORD / vector_element_bits (vectype)) < 4
+	  || maybe_lt (nunits_out, 4U)))
+    {
+      if (dump_enabled_p ())
+	dump_printf (MSG_NOTE, "not using word mode for +- and less than "
+		     "four vector elements\n");
+      return false;
+    }
+
   int reduc_idx = STMT_VINFO_REDUC_IDX (stmt_info);
   vec_loop_masks *masks = (loop_vinfo ? &LOOP_VINFO_MASKS (loop_vinfo) : NULL);
   internal_fn cond_fn = get_conditional_internal_fn (code);
@@ -9202,6 +9216,7 @@ vectorizable_load (vec_info *vinfo,
       unsigned int group_el = 0;
       unsigned HOST_WIDE_INT
 	elsz = tree_to_uhwi (TYPE_SIZE_UNIT (TREE_TYPE (vectype)));
+      unsigned int n_groups = 0;
       for (j = 0; j < ncopies; j++)
 	{
 	  if (nloads > 1)
@@ -9223,12 +9238,19 @@ vectorizable_load (vec_info *vinfo,
 	      if (! slp
 		  || group_el == group_size)
 		{
-		  tree newoff = copy_ssa_name (running_off);
-		  gimple *incr = gimple_build_assign (newoff, POINTER_PLUS_EXPR,
-						      running_off, stride_step);
-		  vect_finish_stmt_generation (vinfo, stmt_info, incr, gsi);
-
-		  running_off = newoff;
+		  n_groups++;
+		  /* When doing SLP make sure to not load elements from
+		     the next vector iteration, those will not be accessed
+		     so just use the last element again.  See PR107451.  */
+		  if (!slp || known_lt (n_groups, vf))
+		    {
+		      tree newoff = copy_ssa_name (running_off);
+		      gimple *incr
+			= gimple_build_assign (newoff, POINTER_PLUS_EXPR,
+					       running_off, stride_step);
+		      vect_finish_stmt_generation (vinfo, stmt_info, incr, gsi);
+		      running_off = newoff;
+		    }
 		  group_el = 0;
 		}
 	    }

@@ -691,6 +691,7 @@ poplevel (int keep, int reverse, int functionbody)
 		else
 		  warning_at (DECL_SOURCE_LOCATION (decl),
 			      OPT_Wunused_variable, "unused variable %qD", decl);
+		suppress_warning (decl, OPT_Wunused_variable);
 	      }
 	    else if (DECL_CONTEXT (decl) == current_function_decl
 		     // For -Wunused-but-set-variable leave references alone.
@@ -954,9 +955,7 @@ static bool
 function_requirements_equivalent_p (tree newfn, tree oldfn)
 {
   /* In the concepts TS, the combined constraints are compared.  */
-  if (cxx_dialect < cxx20
-      && (DECL_TEMPLATE_SPECIALIZATION (newfn)
-	  <= DECL_TEMPLATE_SPECIALIZATION (oldfn)))
+  if (cxx_dialect < cxx20)
     {
       tree ci1 = get_constraints (oldfn);
       tree ci2 = get_constraints (newfn);
@@ -1490,6 +1489,8 @@ merge_default_template_args (tree new_parms, tree old_parms, bool class_p)
       tree old_parm = TREE_VALUE (TREE_VEC_ELT (old_parms, i));
       tree& new_default = TREE_PURPOSE (TREE_VEC_ELT (new_parms, i));
       tree& old_default = TREE_PURPOSE (TREE_VEC_ELT (old_parms, i));
+      if (error_operand_p (new_parm) || error_operand_p (old_parm))
+	return false;
       if (new_default != NULL_TREE && old_default != NULL_TREE)
 	{
 	  auto_diagnostic_group d;
@@ -8238,6 +8239,14 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
 	      && !TYPE_REF_P (type))
 	    TREE_CONSTANT (decl) = 1;
 	}
+      /* This is handled mostly by gimplify.cc, but we have to deal with
+	 not warning about int x = x; as it is a GCC extension to turn off
+	 this warning but only if warn_init_self is zero.  */
+      if (!DECL_EXTERNAL (decl)
+	  && !TREE_STATIC (decl)
+	  && decl == tree_strip_any_location_wrapper (init)
+	  && !warning_enabled_at (DECL_SOURCE_LOCATION (decl), OPT_Winit_self))
+	suppress_warning (decl, OPT_Winit_self);
     }
 
   if (flag_openmp
@@ -8512,8 +8521,10 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
 
       if (var_definition_p
 	  /* With -fmerge-all-constants, gimplify_init_constructor
-	     might add TREE_STATIC to the variable.  */
-	  && (TREE_STATIC (decl) || flag_merge_constants >= 2))
+	     might add TREE_STATIC to aggregate variables.  */
+	  && (TREE_STATIC (decl)
+	      || (flag_merge_constants >= 2
+		  && AGGREGATE_TYPE_P (type))))
 	{
 	  /* If a TREE_READONLY variable needs initialization
 	     at runtime, it is no longer readonly and we need to
@@ -12963,7 +12974,7 @@ grokdeclarator (const cp_declarator *declarator,
 			  "an array", name);
 		return error_mark_node;
 	      }
-	    if (constinit_p)
+	    if (constinit_p && funcdecl_p)
 	      {
 		error_at (declspecs->locations[ds_constinit],
 			  "%<constinit%> on function return type is not "

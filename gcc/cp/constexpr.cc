@@ -5735,7 +5735,8 @@ cxx_eval_store_expression (const constexpr_ctx *ctx, tree t,
 	  *valp = build_constructor (type, NULL);
 	  CONSTRUCTOR_NO_CLEARING (*valp) = no_zero_init;
 	}
-      else if (TREE_CODE (*valp) == STRING_CST)
+      else if (STRIP_ANY_LOCATION_WRAPPER (*valp),
+	       TREE_CODE (*valp) == STRING_CST)
 	{
 	  /* An array was initialized with a string constant, and now
 	     we're writing into one of its elements.  Explode the
@@ -7310,7 +7311,18 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 	  }
 
 	if (TREE_CODE (op) == PTRMEM_CST && !TYPE_PTRMEM_P (type))
-	  op = cplus_expand_constant (op);
+	  {
+	    op = cplus_expand_constant (op);
+	    if (TREE_CODE (op) == PTRMEM_CST)
+	      {
+		if (!ctx->quiet)
+		  error_at (loc, "%qE is not a constant expression when the "
+			    "class %qT is still incomplete", op,
+			    PTRMEM_CST_CLASS (op));
+		*non_constant_p = true;
+		return t;
+	      }
+	  }
 
 	if (TREE_CODE (op) == PTRMEM_CST && tcode == NOP_EXPR)
 	  {
@@ -7596,6 +7608,51 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 	  return t;
 	}
       r = cxx_eval_bit_cast (ctx, t, non_constant_p, overflow_p);
+      break;
+
+    case OMP_PARALLEL:
+    case OMP_TASK:
+    case OMP_FOR:
+    case OMP_SIMD:
+    case OMP_DISTRIBUTE:
+    case OMP_TASKLOOP:
+    case OMP_LOOP:
+    case OMP_TEAMS:
+    case OMP_TARGET_DATA:
+    case OMP_TARGET:
+    case OMP_SECTIONS:
+    case OMP_ORDERED:
+    case OMP_CRITICAL:
+    case OMP_SINGLE:
+    case OMP_SCAN:
+    case OMP_SCOPE:
+    case OMP_SECTION:
+    case OMP_MASTER:
+    case OMP_MASKED:
+    case OMP_TASKGROUP:
+    case OMP_TARGET_UPDATE:
+    case OMP_TARGET_ENTER_DATA:
+    case OMP_TARGET_EXIT_DATA:
+    case OMP_ATOMIC:
+    case OMP_ATOMIC_READ:
+    case OMP_ATOMIC_CAPTURE_OLD:
+    case OMP_ATOMIC_CAPTURE_NEW:
+    case OMP_DEPOBJ:
+    case OACC_PARALLEL:
+    case OACC_KERNELS:
+    case OACC_SERIAL:
+    case OACC_DATA:
+    case OACC_HOST_DATA:
+    case OACC_LOOP:
+    case OACC_CACHE:
+    case OACC_DECLARE:
+    case OACC_ENTER_DATA:
+    case OACC_EXIT_DATA:
+    case OACC_UPDATE:
+      if (!ctx->quiet)
+	error_at (EXPR_LOCATION (t),
+		  "statement is not a constant expression");
+      *non_constant_p = true;
       break;
 
     default:
@@ -8114,6 +8171,10 @@ maybe_constant_value (tree t, tree decl, bool manifestly_const_eval)
       r = *cached;
       if (r != t)
 	{
+	  /* Clear processing_template_decl for sake of break_out_target_exprs;
+	     entries in the cv_cache are non-templated.  */
+	  processing_template_decl_sentinel ptds;
+
 	  r = break_out_target_exprs (r, /*clear_loc*/true);
 	  protected_set_expr_location (r, EXPR_LOCATION (t));
 	}
@@ -8690,8 +8751,12 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 	  }
 	else if (fun)
           {
-	    if (RECUR (fun, rval))
-	      /* Might end up being a constant function pointer.  */;
+	    if (RECUR (fun, FUNCTION_POINTER_TYPE_P (fun) ? rval : any))
+	      /* Might end up being a constant function pointer.  But it
+		 could also be a function object with constexpr op(), so
+		 we pass 'any' so that the underlying VAR_DECL is deemed
+		 as potentially-constant even though it wasn't declared
+		 constexpr.  */;
 	    else
 	      return false;
           }
@@ -9041,6 +9106,8 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
     case OMP_ORDERED:
     case OMP_CRITICAL:
     case OMP_SINGLE:
+    case OMP_SCAN:
+    case OMP_SCOPE:
     case OMP_SECTION:
     case OMP_MASTER:
     case OMP_MASKED:

@@ -1004,6 +1004,20 @@ cp_fold_r (tree *stmt_p, int *walk_subtrees, void *data_)
 	  *stmt_p = stmt = cxx_constant_value (stmt);
       break;
 
+    case VAR_DECL:
+      /* In initializers replace anon union artificial VAR_DECLs
+	 with their DECL_VALUE_EXPRs, as nothing will do it later.
+	 Ditto for structured bindings.  */
+      if (!data->genericize
+	  && DECL_HAS_VALUE_EXPR_P (stmt)
+	  && (DECL_ANON_UNION_VAR_P (stmt)
+	      || (DECL_DECOMPOSITION_P (stmt) && DECL_DECOMP_BASE (stmt))))
+	{
+	  *stmt_p = stmt = unshare_expr (DECL_VALUE_EXPR (stmt));
+	  break;
+	}
+      break;
+
     default:
       break;
     }
@@ -1434,6 +1448,8 @@ cp_genericize_r (tree *stmt_p, int *walk_subtrees, void *data)
 		tree using_directive = make_node (IMPORTED_DECL);
 		TREE_TYPE (using_directive) = void_type_node;
 		DECL_CONTEXT (using_directive) = current_function_decl;
+		DECL_SOURCE_LOCATION (using_directive)
+		  = cp_expr_loc_or_input_loc (stmt);
 
 		IMPORTED_DECL_ASSOCIATED_DECL (using_directive) = decl;
 		DECL_CHAIN (using_directive) = BLOCK_VARS (block);

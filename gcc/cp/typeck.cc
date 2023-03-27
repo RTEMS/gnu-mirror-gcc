@@ -1627,7 +1627,7 @@ similar_type_p (tree type1, tree type2)
    the common initial sequence.  */
 
 bool
-next_common_initial_seqence (tree &memb1, tree &memb2)
+next_common_initial_sequence (tree &memb1, tree &memb2)
 {
   while (memb1)
     {
@@ -1719,7 +1719,7 @@ layout_compatible_type_p (tree type1, tree type2)
 	{
 	  while (1)
 	    {
-	      if (!next_common_initial_seqence (field1, field2))
+	      if (!next_common_initial_sequence (field1, field2))
 		return false;
 	      if (field1 == NULL_TREE)
 		return true;
@@ -5212,7 +5212,12 @@ cp_build_binary_op (const op_location_t &location,
 		 it was unsigned.  */
 	      tree stripped_op1 = tree_strip_any_location_wrapper (op1);
 	      shorten = ((TREE_CODE (op0) == NOP_EXPR
-			  && TYPE_UNSIGNED (TREE_TYPE (TREE_OPERAND (op0, 0))))
+			  && INTEGRAL_TYPE_P (TREE_TYPE (TREE_OPERAND (op0,
+								       0)))
+			  && TYPE_UNSIGNED (TREE_TYPE (TREE_OPERAND (op0, 0)))
+			  && (TYPE_PRECISION (TREE_TYPE (TREE_OPERAND (op0,
+								       0)))
+			      < TYPE_PRECISION (type0)))
 			 || (TREE_CODE (stripped_op1) == INTEGER_CST
 			     && ! integer_all_onesp (stripped_op1)));
 	    }
@@ -5248,7 +5253,10 @@ cp_build_binary_op (const op_location_t &location,
 	     only if unsigned or if dividing by something we know != -1.  */
 	  tree stripped_op1 = tree_strip_any_location_wrapper (op1);
 	  shorten = ((TREE_CODE (op0) == NOP_EXPR
-		      && TYPE_UNSIGNED (TREE_TYPE (TREE_OPERAND (op0, 0))))
+		      && INTEGRAL_TYPE_P (TREE_TYPE (TREE_OPERAND (op0, 0)))
+		      && TYPE_UNSIGNED (TREE_TYPE (TREE_OPERAND (op0, 0)))
+		      && (TYPE_PRECISION (TREE_TYPE (TREE_OPERAND (op0, 0)))
+			  < TYPE_PRECISION (type0)))
 		     || (TREE_CODE (stripped_op1) == INTEGER_CST
 			 && ! integer_all_onesp (stripped_op1)));
 	  common = 1;
@@ -5921,8 +5929,9 @@ cp_build_binary_op (const op_location_t &location,
       tree_code orig_code0 = TREE_CODE (orig_type0);
       tree orig_type1 = TREE_TYPE (orig_op1);
       tree_code orig_code1 = TREE_CODE (orig_type1);
-      if (!result_type)
-	/* Nope.  */;
+      if (!result_type || result_type == error_mark_node)
+	/* Nope.  */
+	result_type = NULL_TREE;
       else if ((orig_code0 == BOOLEAN_TYPE) != (orig_code1 == BOOLEAN_TYPE))
 	/* "If one of the operands is of type bool and the other is not, the
 	   program is ill-formed."  */
@@ -7086,9 +7095,13 @@ cp_build_unary_op (enum tree_code code, tree xarg, bool noconvert,
 				   build_zero_cst (TREE_TYPE (arg)), complain);
       arg = perform_implicit_conversion (boolean_type_node, arg,
 					 complain);
-      val = invert_truthvalue_loc (location, arg);
       if (arg != error_mark_node)
-	return val;
+	{
+	  val = invert_truthvalue_loc (location, arg);
+	  if (obvalue_p (val))
+	    val = non_lvalue_loc (location, val);
+	  return val;
+	}
       errstring = _("in argument to unary !");
       break;
 

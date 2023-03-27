@@ -2920,13 +2920,18 @@ finish_call_expr (tree fn, vec<tree, va_gc> **args, bool disallow_virtual,
       if (TREE_CODE (result) == CALL_EXPR
 	  && really_overloaded_fn (orig_fn))
 	{
-	  orig_fn = CALL_EXPR_FN (result);
-	  if (TREE_CODE (orig_fn) == COMPONENT_REF)
+	  tree sel_fn = CALL_EXPR_FN (result);
+	  if (TREE_CODE (sel_fn) == COMPONENT_REF)
 	    {
 	      /* The non-dependent result of build_new_method_call.  */
-	      orig_fn = TREE_OPERAND (orig_fn, 1);
-	      gcc_assert (BASELINK_P (orig_fn));
+	      sel_fn = TREE_OPERAND (sel_fn, 1);
+	      gcc_assert (BASELINK_P (sel_fn));
 	    }
+	  else if (TREE_CODE (sel_fn) == ADDR_EXPR)
+	    /* Our original callee wasn't wrapped in an ADDR_EXPR,
+	       so strip this ADDR_EXPR added by build_over_call.  */
+	    sel_fn = TREE_OPERAND (sel_fn, 0);
+	  orig_fn = sel_fn;
 	}
 
       result = build_call_vec (TREE_TYPE (result), orig_fn, orig_args);
@@ -9690,7 +9695,9 @@ finish_omp_target_clauses (location_t loc, tree body, tree *clauses_ptr)
 
 	for (tree c = *clauses_ptr; c; c = OMP_CLAUSE_CHAIN (c))
 	  {
-	    /* If map(this->ptr[:N] already exists, avoid creating another
+	    if (OMP_CLAUSE_CODE (c) != OMP_CLAUSE_MAP)
+	      continue;
+	    /* If map(this->ptr[:N]) already exists, avoid creating another
 	       such map.  */
 	    tree decl = OMP_CLAUSE_DECL (c);
 	    if ((TREE_CODE (decl) == INDIRECT_REF
@@ -11600,7 +11607,7 @@ is_corresponding_member_aggr (location_t loc, tree basetype1, tree membertype1,
   tree ret = boolean_false_node;
   while (1)
     {
-      bool r = next_common_initial_seqence (field1, field2);
+      bool r = next_common_initial_sequence (field1, field2);
       if (field1 == NULL_TREE || field2 == NULL_TREE)
 	break;
       if (r

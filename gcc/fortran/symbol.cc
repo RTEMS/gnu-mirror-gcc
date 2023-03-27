@@ -1108,6 +1108,12 @@ gfc_add_contiguous (symbol_attribute *attr, const char *name, locus *where)
   if (check_used (attr, name, where))
     return false;
 
+  if (attr->contiguous)
+    {
+      duplicate_attr ("CONTIGUOUS", where);
+      return false;
+    }
+
   attr->contiguous = 1;
   return gfc_check_conflict (attr, name, where);
 }
@@ -3755,7 +3761,11 @@ free_old_symbol (gfc_symbol *sym)
   if (sym->old_symbol == NULL)
     return;
 
-  if (sym->old_symbol->as != sym->as)
+  if (sym->old_symbol->as != NULL
+      && sym->old_symbol->as != sym->as
+      && !(sym->ts.type == BT_CLASS
+	   && sym->ts.u.derived->attr.is_class
+	   && sym->old_symbol->as == CLASS_DATA (sym)->as))
     gfc_free_array_spec (sym->old_symbol->as);
 
   if (sym->old_symbol->value != sym->value)
