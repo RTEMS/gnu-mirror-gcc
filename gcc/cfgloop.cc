@@ -2186,19 +2186,28 @@ loops_list::walk_loop_tree (class loop *root, unsigned flags)
 }
 
 unsigned int hist_index(gcov_type_unsigned val){
-    unsigned int lin_size=param_profile_histogram_size_lin;
-    unsigned int tot_size=param_profile_histogram_size;
-    if (val<lin_size){
-        return val;
-    }else{
-      gcov_type_unsigned pow2=floor_log2(val);
-      gcov_type_unsigned lin_pow2=floor_log2(lin_size-1);
-      if ((lin_pow2-lin_size)+tot_size>pow2){
-          return pow2+(lin_size-lin_pow2)-1;
-      } else {
-          return tot_size-1;
-      }
-    }
+   unsigned int lin_size = param_profile_histogram_size_lin;
+   unsigned int tot_size = param_profile_histogram_size;
+   if (val < lin_size)
+     {
+       return val;
+     }
+   else
+     {
+       gcov_type_unsigned pow2 = floor_log2 (val);
+       gcov_type_unsigned lin_pow2 = floor_log2 (lin_size - 1);
+       if (lin_size<tot_size && pow2==lin_pow2){
+           return lin_size;
+       }
+       if (tot_size > pow2 + ((lin_size - 1) - lin_pow2))
+         {
+           return pow2 + ((lin_size - 1)- lin_pow2);
+         }
+       else
+         {
+           return tot_size - 1;
+         }
+     }
 }
 
 void histogram_counters_minus_upper_bound (histogram_counters* hist_c, gcov_type_unsigned difference){
@@ -2207,13 +2216,9 @@ void histogram_counters_minus_upper_bound (histogram_counters* hist_c, gcov_type
     auto hist=*(hist_c->hist);
     unsigned int lin_size=param_profile_histogram_size_lin;
     unsigned int tot_size=param_profile_histogram_size;
-
-    // next power of 2 for linear hist
-    unsigned int lin_size_upp=1<<ceil_log2(lin_size);
     // If the last linear counter does not contain other iterations
-    unsigned int last_lin=(lin_size_upp==lin_size?0:1);
     unsigned int i=1;
-    for(; i<lin_size-last_lin; i++){
+    for(; i<lin_size; i++){
         if (i<=difference){
             hist[0]+=hist[i];
         } else {
@@ -2250,7 +2255,7 @@ void histogram_counters_div_upper_bound (histogram_counters* hist_c, unsigned in
     unsigned int lin_size=param_profile_histogram_size_lin;
     unsigned int tot_size=param_profile_histogram_size;
     unsigned int i=1;
-    for(; i<lin_size-1 && i<tot_size-1; i++){
+    for(; i<lin_size && i<tot_size-1; i++){
         hist[i/divisor]+=hist[i];
         hist[i]=0;
     }

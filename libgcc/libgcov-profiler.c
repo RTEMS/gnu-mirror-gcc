@@ -74,11 +74,13 @@ __gcov_histogram_profiler (gcov_type *counters, gcov_type value, gcov_type hist_
   }else{
     gcov_type_unsigned pow2=floor_log2(u_value);
     gcov_type_unsigned lin_pow2=floor_log2(lin_size-1);
-    if ((lin_pow2-lin_size)+tot_size>pow2){
+    if (lin_size<tot_size && pow2==lin_pow2){
+        counters[lin_size]++;
+    } else { if ((lin_pow2-lin_size)+tot_size>pow2){
         counters[pow2+(lin_size-lin_pow2)-1]++;
     } else {
         counters[tot_size-1]++;
-    }
+    }}
   }
 }
 
