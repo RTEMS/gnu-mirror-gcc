@@ -56,7 +56,7 @@ sub mode_to_ldst_char
 sub gen_ld_cmpi_p10
 {
     my ($lmode, $ldst, $clobbermode, $result, $cmpl, $echr, $constpred,
-	$ccmode, $extend, $resultmode);
+	$mempred, $ccmode, $np, $extend, $resultmode);
   LMODE: foreach $lmode ('DI','SI','HI','QI') {
       $ldst = mode_to_ldst_char($lmode);
       $clobbermode = $lmode;
@@ -69,36 +69,23 @@ sub gen_ld_cmpi_p10
 	# Don't allow EXTQI because that would allow HI result which we can't do.
 	$result = "GPR" if $result eq "EXTQI";
       CCMODE: foreach $ccmode ('CC','CCUNS') {
-	  my $np = "NON_PREFIXED_D";
-	  my $mempred = "non_update_memory_operand";
-	  my $constraint = "m";
+	  $np = "NON_PREFIXED_D";
+	  $mempred = "non_update_memory_operand";
 	  if ( $ccmode eq 'CC' ) {
 	      next CCMODE if $lmode eq 'QI';
-	      if ( $lmode eq 'HI' ) {
-		  $np = "NON_PREFIXED_D";
-		  $mempred = "non_update_memory_operand";
-		  $echr = "a";
-	      } elsif ( $lmode eq 'SI' ) {
-		  # ld is DS-FORM.
-		  $np = "NON_PREFIXED_DS";
-		  $mempred = "lwa_operand";
-		  $echr = "a";
-		  $constraint = "YZ";
-	      } elsif ( $lmode eq 'DI' ) {
-		  # lwa is DS-FORM.
+	      if ( $lmode eq 'DI' || $lmode eq 'SI' ) {
+		  # ld and lwa are both DS-FORM.
 		  $np = "NON_PREFIXED_DS";
 		  $mempred = "ds_form_mem_operand";
-		  $echr = "";
-		  $constraint = "YZ";
 	      }
 	      $cmpl = "";
+	      $echr = "a";
 	      $constpred = "const_m1_to_1_operand";
 	  } else {
 	      if ( $lmode eq 'DI' ) {
 		  # ld is DS-form, but lwz is not.
 		  $np = "NON_PREFIXED_DS";
 		  $mempred = "ds_form_mem_operand";
-		  $constraint = "YZ";
 	      }
 	      $cmpl = "l";
 	      $echr = "z";
@@ -121,7 +108,7 @@ sub gen_ld_cmpi_p10
 
 	  print "(define_insn_and_split \"*l${ldst}${echr}_cmp${cmpl}di_cr0_${lmode}_${result}_${ccmode}_${extend}\"\n";
 	  print "  [(set (match_operand:${ccmode} 2 \"cc_reg_operand\" \"=x\")\n";
-	  print "        (compare:${ccmode} (match_operand:${lmode} 1 \"${mempred}\" \"${constraint}\")\n";
+	  print "        (compare:${ccmode} (match_operand:${lmode} 1 \"${mempred}\" \"m\")\n";
 	  if ($ccmode eq 'CCUNS') { print "   "; }
 	  print "                    (match_operand:${lmode} 3 \"${constpred}\" \"n\")))\n";
 	  if ($result eq 'clobber') {
@@ -150,11 +137,6 @@ sub gen_ld_cmpi_p10
 	  print "  \"\"\n";
 	  print "  [(set_attr \"type\" \"fused_load_cmpi\")\n";
 	  print "   (set_attr \"cost\" \"8\")\n";
-
-	  if ($extend eq "sign") {
-		  print "   (set_attr \"sign_extend\" \"yes\")\n";
-	  }
-
 	  print "   (set_attr \"length\" \"8\")])\n";
 	  print "\n";
       }
