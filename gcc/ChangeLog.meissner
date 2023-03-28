@@ -1,4 +1,4 @@
-==================== Branch work116-dmf, patch #1 ====================
+==================== Branch work116-dmf, patch #2 ====================
 
 Make load/cmp fusion know about prefixed loads.
 
@@ -19,10 +19,11 @@ the "prefixed" attribute is modified so that it considers load + compare
 immediate patterns to be like the normal load insns in checking whether
 operand[1] is a prefixed instruction.
 
-I posted a version of patch on March 21st.  This patch makes some code changes
-suggested in the genfusion.pl code.
+I posted a version of patch on March 21st and a second version on March 24th.
+This patch makes some code changes suggested in the genfusion.pl code.  The
+fusion.md that is produced by genfusion.pl is the same in all 3 versions.
 
-2023-03-21   Michael Meissner  <meissner@linux.ibm.com>
+2023-03-27   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -41,6 +42,8 @@ gcc/testsuite/
 	PR target/105325
 	* g++.target/powerpc/pr105325.C: New test.
 	* gcc.target/powerpc/fusion-p10-ldcmpi.c: Adjust insn counts.
+
+==================== Branch work116-dmf, patch #1 was reverted ====================
 
 ==================== Branch work116-dmf, baseline ====================
 

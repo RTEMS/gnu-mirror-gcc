@@ -56,7 +56,7 @@ sub mode_to_ldst_char
 sub gen_ld_cmpi_p10
 {
     my ($lmode, $ldst, $clobbermode, $result, $cmpl, $echr, $constpred,
-	$ccmode, $extend, $resultmode);
+	$mempred, $ccmode, $np, $extend, $resultmode, $constraint);
   LMODE: foreach $lmode ('DI','SI','HI','QI') {
       $ldst = mode_to_ldst_char($lmode);
       $clobbermode = $lmode;
@@ -69,23 +69,21 @@ sub gen_ld_cmpi_p10
 	# Don't allow EXTQI because that would allow HI result which we can't do.
 	$result = "GPR" if $result eq "EXTQI";
       CCMODE: foreach $ccmode ('CC','CCUNS') {
-	  my $np = "NON_PREFIXED_D";
-	  my $mempred = "non_update_memory_operand";
-	  my $constraint = "m";
 	  if ( $ccmode eq 'CC' ) {
 	      next CCMODE if $lmode eq 'QI';
 	      if ( $lmode eq 'HI' ) {
 		  $np = "NON_PREFIXED_D";
 		  $mempred = "non_update_memory_operand";
 		  $echr = "a";
+		  $constraint = "m";
 	      } elsif ( $lmode eq 'SI' ) {
-		  # ld is DS-FORM.
+		  # lwa is DS-FORM.
 		  $np = "NON_PREFIXED_DS";
 		  $mempred = "lwa_operand";
 		  $echr = "a";
 		  $constraint = "YZ";
 	      } elsif ( $lmode eq 'DI' ) {
-		  # lwa is DS-FORM.
+		  # ld is DS-FORM.
 		  $np = "NON_PREFIXED_DS";
 		  $mempred = "ds_form_mem_operand";
 		  $echr = "";
@@ -95,10 +93,14 @@ sub gen_ld_cmpi_p10
 	      $constpred = "const_m1_to_1_operand";
 	  } else {
 	      if ( $lmode eq 'DI' ) {
-		  # ld is DS-form, but lwz is not.
+		  # ld is DS-form
 		  $np = "NON_PREFIXED_DS";
 		  $mempred = "ds_form_mem_operand";
 		  $constraint = "YZ";
+	      } else {
+		  $np = "NON_PREFIXED_D";
+		  $mempred = "non_update_memory_operand";
+		  $constraint = "m";
 	      }
 	      $cmpl = "l";
 	      $echr = "z";
