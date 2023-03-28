@@ -1036,21 +1036,33 @@ try_peel_loop (class loop *loop,
   /* Check if there is an estimate on the number of iterations.  */
   npeel = estimated_loop_iterations_int (loop);
 
-  // linear part most common number
-  // peels if in linear portion there is more then 90% of iterations
   bool histogram_peeling=loop->counters!=NULL;
   if (histogram_peeling){
-    gcov_type psum=0;
     gcov_type sum=loop->counters->sum;
     if (sum!=0){
-    for (int i=0;i<param_profile_histogram_size_lin; i++){
-        psum+=(*(loop->counters->hist))[i];
-        if ((100*psum)/sum>=param_profile_histogram_peel_prcnt)
-        {
-            npeel=i;
-            break;
-        }
-    }
+      auto_vec<int> good_peels;
+      gcov_type psum=0;
+      int good_percentage=param_profile_histogram_peel_prcnt;
+      for (int i=0;i<param_profile_histogram_size_lin; i++){
+          psum+=(*(loop->counters->hist))[i];
+          // iteration has enough cumulated in partial sum and itself has at least 1 percent
+          if ((100*psum)/sum>=good_percentage && (*(loop->counters->hist))[i]*100/sum>0)
+          {
+              good_peels.safe_push(i);
+          }
+          good_percentage+=param_profile_histogram_peel_prcnt;
+          printf("%d \n", good_percentage);
+      }
+      if (good_peels.length()>0){
+          npeel=good_peels[good_peels.length()-1];
+          good_peels.pop();
+      }
+      // we find the greatest number to peel without taking up too much memory
+      while (good_peels.length()>0 && ((maxiter >= 0 && maxiter <= npeel) || (npeel >
+                      param_max_peel_times - 1))){
+          npeel=good_peels[good_peels.length()-1];
+          good_peels.pop();
+      }
     }
   }
 
@@ -1074,6 +1086,7 @@ try_peel_loop (class loop *loop,
   /* We want to peel estimated number of iterations + 1 (so we never
      enter the loop on quick path).  Check against PARAM_MAX_PEEL_TIMES
      and be sure to avoid overflows.  */
+
   if (npeel > param_max_peel_times - 1)
     {
       if (dump_file)
