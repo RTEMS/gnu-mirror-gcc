@@ -1,4 +1,4 @@
-==================== Branch work116, patch #1 ====================
+==================== Branch work116, patch #2 ====================
 
 Make load/cmp fusion know about prefixed loads.
 
