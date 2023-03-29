@@ -875,7 +875,7 @@ Common Joined UInteger Var(param_prefetch_minimum_stride) Init(-1) Param Optimiz
 The minimum constant stride beyond which we should use prefetch hints for.
 
 -param=profile-histogram-size=
-Common Joined UInteger Var(param_profile_histogram_size) Init(69) IntegerRange(0, 255) Param Optimization
+Common Joined UInteger Var(param_profile_histogram_size) Init(15) IntegerRange(0, 255) Param Optimization
 Total size of the histogram counter for profile feedback.
 
 -param=profile-histogram-size-lin=

@@ -1035,7 +1035,7 @@ try_peel_loop (class loop *loop,
 
   /* Check if there is an estimate on the number of iterations.  */
   npeel = estimated_loop_iterations_int (loop);
-
+  auto_vec<int> good_peels;
   bool histogram_peeling=loop->counters!=NULL;
   if (histogram_peeling && loop->counters->sum!=0){
       gcov_type sum=loop->counters->sum;
@@ -1044,16 +1044,21 @@ try_peel_loop (class loop *loop,
       for (int i=0;i<param_profile_histogram_size_lin; i++){
           psum+=(*(loop->counters->hist))[i];
           // iteration has enough cumulated in partial sum and itself has at least 1 percent
-          if ((100*psum)/sum>=good_percentage && (*(loop->counters->hist))[i]*100/sum>0)
+          if ((100*psum)/sum>=good_percentage)
           {
-              int last=npeel;
-              npeel=i;
-            if ((maxiter >= 0 && maxiter <= npeel) || (npeel > param_max_peel_times - 1)) {
-               npeel=last;
+            good_peels.safe_push(i);
+            if ((maxiter >= 0 && maxiter <= good_peels.last()) ||
+                    (good_peels.last() > param_max_peel_times - 1)) {
+                good_peels.pop();
                break;
             }
-          good_percentage+=param_profile_histogram_peel_prcnt;
+            good_percentage=0;
+            psum=0;
           }
+          good_percentage+=param_profile_histogram_peel_prcnt;
+      }
+      if (!good_peels.is_empty()){
+          npeel=good_peels.pop();
       }
   }
 
@@ -1090,6 +1095,12 @@ try_peel_loop (class loop *loop,
   /* Check peeled loops size.  */
   tree_estimate_loop_size (loop, exit, NULL, &size,
 			   param_max_peeled_insns);
+  while (!good_peels.is_empty() && 
+          (estimated_peeled_sequence_size (&size, (int) npeel) > param_max_peeled_insns))
+  {
+    npeel=good_peels.pop()++;
+  }
+
   if ((peeled_size = estimated_peeled_sequence_size (&size, (int) npeel))
       > param_max_peeled_insns)
     {
