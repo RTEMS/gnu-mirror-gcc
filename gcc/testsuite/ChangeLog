@@ -1,3 +1,227 @@
+2023-03-28  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* gfortran.dg/weak-2.f90: Enable for nvptx target.
+
+2023-03-28  David Malcolm  <dmalcolm@redhat.com>
+
+	PR c/107002
+	* c-c++-common/Wxor-used-as-pow-1.c: Add macro test.
+	* c-c++-common/Wxor-used-as-pow-pr107002-0.c: New test.
+	* c-c++-common/Wxor-used-as-pow-pr107002-1.c: New test.
+	* c-c++-common/Wxor-used-as-pow-pr107002-2.c: New test.
+
+2023-03-28  Jason Merrill  <jason@redhat.com>
+
+	PR c++/107163
+	* g++.dg/warn/Wsequence-point-5.C: New test.
+
+2023-03-28  Kito Cheng  <kito.cheng@sifive.com>
+
+	PR target/109312
+	* gcc.target/riscv/predef-__riscv_v_intrinsic.c: New test.
+
+2023-03-28  Alexander Monakov  <amonakov@ispras.ru>
+
+	PR rtl-optimization/109187
+	* gcc.dg/pr109187.c: New test.
+
+2023-03-28  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/109265
+	PR tree-optimization/109274
+	* gcc.dg/pr109274.c: New.
+	* gfortran.dg/pr109265.f90: New.
+
+2023-03-28  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/107087
+	* g++.dg/pr107087.C: New testcase.
+
+2023-03-28  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/109072
+	* gcc.target/aarch64/pr109072_1.c: New test.
+	* gcc.target/aarch64/pr109072_2.c: Likewise.
+
+2023-03-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/106190
+	* gcc.dg/asan/pr106190.c: New test.
+
+2023-03-28  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gcc.target/sparc/20230328-1.c: New test.
+	* gcc.target/sparc/20230328-2.c: Likewise.
+	* gcc.target/sparc/20230328-3.c: Likewise.
+	* gcc.target/sparc/20230328-4.c: Likewise.
+
+2023-03-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/109276
+	* gcc.target/i386/pr109276.c: New test.
+
+2023-03-28  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gcc.target/sparc/20230328-1.c: New test.
+	* gcc.target/sparc/20230328-2.c: Likewise.
+	* gcc.target/sparc/20230328-3.c: Likewise.
+	* gcc.target/sparc/20230328-4.c: Likewise.
+
+2023-03-28  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* lib/target-supports.exp (add_options_for_weak_undefined): Escape
+	brackets.
+	* gcc.dg/visibility-22.c: Add weak_undefined options.
+
+2023-03-27  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/54498
+	* g++.dg/torture/pr54498.C: New testcase.
+
+2023-03-27  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/108357
+	* gcc.dg/tree-ssa/pr108357.c: New testcase.
+
+2023-03-27  Martin Liska  <mliska@suse.cz>
+
+	* lib/verify-sarif-file.py: Use apostrophes instead
+	of double quotes.
+
+2023-03-27  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/109167
+	* gcc.target/powerpc/pr109167.c: New test.
+
+2023-03-27  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/109082
+	* gcc.target/powerpc/pr109082.c: New test.
+
+2023-03-26  Andreas Schwab  <schwab@linux-m68k.org>
+
+	PR target/106282
+	* gcc.target/m68k/tls-gd-off.c: New.
+	* gcc.target/m68k/tls-ie-off.c: New.
+	* gcc.target/m68k/tls-ld-off.c: New.
+	* gcc.target/m68k/tls-ld-xtls-off.c: New.
+	* gcc.target/m68k/tls-le-off.c: New.
+	* gcc.target/m68k/tls-le-xtls-off.c: New.
+	* gcc.target/m68k/tls-ld.c: Make pattern less strict.
+	* gcc.target/m68k/tls-le.c: Likewise.
+
+2023-03-26  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/109230
+	* gcc.dg/pr109230.c: New test.
+
+2023-03-26  Jakub Jelinek  <jakub@redhat.com>
+
+	PR ipa/105685
+	* c-c++-common/cold-2.c: New test.
+
+2023-03-25  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/109098
+	* c-c++-common/diagnostic-format-sarif-file-1.c: Add
+	verify-sarif-file directive.
+	* c-c++-common/diagnostic-format-sarif-file-2.c: Likewise.
+	* c-c++-common/diagnostic-format-sarif-file-3.c: Likewise.
+	* c-c++-common/diagnostic-format-sarif-file-4.c: Likewise.
+	* c-c++-common/diagnostic-format-sarif-file-Wbidi-chars.c: New
+	test case, adapted from Wbidi-chars-1.c.
+	* c-c++-common/diagnostic-format-sarif-file-bad-utf8-pr109098-1.c:
+	New test case.
+	* c-c++-common/diagnostic-format-sarif-file-bad-utf8-pr109098-2.c:
+	New test case.
+	* c-c++-common/diagnostic-format-sarif-file-bad-utf8-pr109098-3.c:
+	New test case, adapted from cpp/Winvalid-utf8-1.c.
+	* c-c++-common/diagnostic-format-sarif-file-valid-CP850.c: New
+	test case, adapted from gcc.dg/diagnostic-input-charset-1.c.
+	* gcc.dg/plugin/crash-test-ice-sarif.c: Add verify-sarif-file
+	directive.
+	* gcc.dg/plugin/crash-test-write-though-null-sarif.c: Likewise.
+	* gcc.dg/plugin/diagnostic-test-paths-5.c: Likewise.
+	* lib/scansarif.exp (verify-sarif-file): New procedure.
+	* lib/verify-sarif-file.py: New support script.
+
+2023-03-24  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/106969
+	* g++.dg/lookup/name-clash11.C: Fix ASSERT macro definition in
+	C++98 mode.
+	* g++.dg/lookup/this2.C: New test.
+
+2023-03-24  Jason Merrill  <jason@redhat.com>
+
+	PR c++/105481
+	* g++.dg/cpp0x/fntmpdefarg-partial1.C: New test.
+
+2023-03-24  David Malcolm  <dmalcolm@redhat.com>
+
+	PR other/109163
+	* c-c++-common/diagnostic-format-json-1.c: Update comment.
+	* c-c++-common/diagnostic-format-json-2.c: Likewise.
+	* c-c++-common/diagnostic-format-json-3.c: Likewise.
+	* c-c++-common/diagnostic-format-json-4.c: Likewise.
+	* c-c++-common/diagnostic-format-json-5.c: Rewrite regexps.
+	* c-c++-common/diagnostic-format-json-stderr-1.c: Update comment.
+
+2023-03-24  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/109238
+	* gcc.dg/pr109238.c: New.
+
+2023-03-24  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/106912
+	* gcc.dg/profile-generate-4.c: New testcase.
+
+2023-03-24  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2/projects/iso/small/run/pass/iso-extended-opaque-run-pass.exp:
+	Compile object for stressset.mod and testlib.mod.  Add test so
+	that we only link these	objects with test application objects.
+
+2023-03-24  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/109137
+	* gcc.target/i386/pr109137.c: Remove -m32 from dg-options, instead
+	require ia32 effective target.  Only add -fPIC for fpic effective
+	target.  Remove #include <string.h>, use __builtin_memset instead of
+	memset.
+
+2023-03-24  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/99739
+	* gcc.dg/tree-ssa/pr99739.c: New test.
+
+2023-03-24  Alexandre Oliva  <oliva@adacore.com>
+
+	* lib/target-supports.exp (add_options_for_weak_undefined):
+	New.
+	(check_effective_target_weak_undefined): Use it.
+	(check_effective_target_posix_memalign): New.
+	* gcc.dg/torture/pr53922.c: Drop skips and custom options in
+	favor of effective target requirement and added options for
+	weak_undefined symbols.
+	* gcc.dg/torture/pr90020.c: Likewise.
+	* gcc.dg/addr_equal-1.c: Likewise.
+	* gcc.target/aarch64/aapcs64/aapcs64.exp: Likewise, for
+	abitest.S-using tests.
+	* gcc.dg/torture/pr60092.c: Likewise, but in favor of
+	posix_memalign tests.
+	* gcc.dg/vect/vect-tail-nomask-1.c: Likewise.
+
+2023-03-24  Haochen Gui  <guihaoc@gcc.gnu.org>
+	    Tobias Burnus  <tobias@codesourcery.com>
+
+	PR target/103628
+	* gfortran.dg/assumed_size_refs_2.f90: Check "Cannot simplify
+	expression" error.
+	* gfortran.dg/unpack_field_1.f90: Likewise.
+	* gfortran.dg/pr103628.f90: New.
+
 2023-03-23  Jason Merrill  <jason@redhat.com>
 
 	PR c++/105996
