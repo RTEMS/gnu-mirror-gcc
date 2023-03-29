@@ -939,6 +939,7 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
            }
            lp->counters->sum=sum;
         }
+        act_count[t] += hist->n_counters;
         continue;
       }
 

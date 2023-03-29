@@ -1037,10 +1037,8 @@ try_peel_loop (class loop *loop,
   npeel = estimated_loop_iterations_int (loop);
 
   bool histogram_peeling=loop->counters!=NULL;
-  if (histogram_peeling){
-    gcov_type sum=loop->counters->sum;
-    if (sum!=0){
-      auto_vec<int> good_peels;
+  if (histogram_peeling && loop->counters->sum!=0){
+      gcov_type sum=loop->counters->sum;
       gcov_type psum=0;
       int good_percentage=param_profile_histogram_peel_prcnt;
       for (int i=0;i<param_profile_histogram_size_lin; i++){
@@ -1048,22 +1046,15 @@ try_peel_loop (class loop *loop,
           // iteration has enough cumulated in partial sum and itself has at least 1 percent
           if ((100*psum)/sum>=good_percentage && (*(loop->counters->hist))[i]*100/sum>0)
           {
-              good_peels.safe_push(i);
-          }
+              int last=npeel;
+              npeel=i;
+            if ((maxiter >= 0 && maxiter <= npeel) || (npeel > param_max_peel_times - 1)) {
+               npeel=last;
+               break;
+            }
           good_percentage+=param_profile_histogram_peel_prcnt;
-          printf("%d \n", good_percentage);
+          }
       }
-      if (good_peels.length()>0){
-          npeel=good_peels[good_peels.length()-1];
-          good_peels.pop();
-      }
-      // we find the greatest number to peel without taking up too much memory
-      while (good_peels.length()>0 && ((maxiter >= 0 && maxiter <= npeel) || (npeel >
-                      param_max_peel_times - 1))){
-          npeel=good_peels[good_peels.length()-1];
-          good_peels.pop();
-      }
-    }
   }
 
   if (npeel < 0)
