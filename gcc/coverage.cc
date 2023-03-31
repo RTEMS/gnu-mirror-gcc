@@ -112,7 +112,7 @@ static char *bbg_file_name;
 static unsigned bbg_file_stamp;
 
 /* Name of the count data (gcda) file.  */
-static char *da_file_name;
+static const char *da_file_name;
 
 /* The names of merge functions for counters.  */
 #define STR(str) #str
@@ -1259,8 +1259,6 @@ coverage_init (const char *filename)
 #else
   const char *separator = "/";
 #endif
-  int len = strlen (filename);
-  int prefix_len = 0;
 
   /* Since coverage_init is invoked very early, before the pass
      manager, we need to set up the dumping explicitly. This is
@@ -1289,26 +1287,19 @@ coverage_init (const char *filename)
 			 "prefix %qs", filename, profile_prefix_path);
 	    }
 	  filename = mangle_path (filename);
-	  len = strlen (filename);
 	}
       else
 	profile_data_prefix = getpwd ();
     }
 
-  if (profile_data_prefix)
-    prefix_len = strlen (profile_data_prefix);
-
   /* Name of da file.  */
-  da_file_name = XNEWVEC (char, len + strlen (GCOV_DATA_SUFFIX)
-			  + prefix_len + 2);
-
   if (profile_data_prefix)
-    {
-      memcpy (da_file_name, profile_data_prefix, prefix_len);
-      da_file_name[prefix_len++] = *separator;
-    }
-  memcpy (da_file_name + prefix_len, filename, len);
-  strcpy (da_file_name + prefix_len + len, GCOV_DATA_SUFFIX);
+    da_file_name = concat (profile_data_prefix, separator, filename,
+			   GCOV_DATA_SUFFIX, NULL);
+  else
+    da_file_name = concat (filename, GCOV_DATA_SUFFIX, NULL);
+
+  da_file_name = remap_profile_filename (da_file_name);
 
   bbg_file_stamp = local_tick;
   if (flag_auto_profile)
@@ -1385,7 +1376,6 @@ coverage_finish (void)
       coverage_obj_finish (fn_ctor, object_checksum);
     }
 
-  XDELETEVEC (da_file_name);
   da_file_name = NULL;
 }
 
