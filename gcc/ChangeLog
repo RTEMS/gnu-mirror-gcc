@@ -1,3 +1,164 @@
+2023-03-31  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	* lra-constraints.cc: (combine_reload_insn): New function.
+
+2023-03-31  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/91645
+	* range-op-float.cc (foperator_unordered_lt::fold_range,
+	foperator_unordered_le::fold_range,
+	foperator_unordered_gt::fold_range,
+	foperator_unordered_ge::fold_range,
+	foperator_unordered_equal::fold_range): Call the ordered
+	fold_range on ranges with cleared NaNs.
+	* value-query.cc (range_query::get_tree_range): Handle also
+	COMPARISON_CLASS_P trees.
+
+2023-03-31  Kito Cheng  <kito.cheng@sifive.com>
+	    Andrew Pinski  <pinskia@gmail.com>
+
+	PR target/109328
+	* config/riscv/t-riscv: Add missing dependencies.
+
+2023-03-31  liuhongt  <hongtao.liu@intel.com>
+
+	* config/i386/i386.cc (inline_memory_move_cost): Return 100
+	for MASK_REGS when MODE_SIZE > 8.
+
+2023-03-31  liuhongt  <hongtao.liu@intel.com>
+
+	PR target/85048
+	* config/i386/i386-builtin.def (BDESC): Adjust icode name from
+	ufloat/ufix to floatuns/fixuns.
+	* config/i386/i386-expand.cc
+	(ix86_expand_vector_convert_uns_vsivsf): Adjust comments.
+	* config/i386/sse.md
+	(ufloat<sseintvecmodelower><mode>2<mask_name><round_name>):
+	Renamed	to ..
+	(<mask_codefor>floatuns<sseintvecmodelower><mode>2<mask_name><round_name>):.. this.
+	(<mask_codefor><avx512>_ufix_notrunc<sf2simodelower><mode><mask_name><round_name>):
+	Renamed to ..
+	(<mask_codefor><avx512>_fixuns_notrunc<sf2simodelower><mode><mask_name><round_name>):
+	.. this.
+	(<fixsuffix>fix_truncv16sfv16si2<mask_name><round_saeonly_name>):
+	Renamed to ..
+	(fix<fixunssuffix>_truncv16sfv16si2<mask_name><round_saeonly_name>):.. this.
+	(ufloat<si2dfmodelower><mode>2<mask_name>): Renamed to ..
+	(floatuns<si2dfmodelower><mode>2<mask_name>): .. this.
+	(ufloatv2siv2df2<mask_name>): Renamed to ..
+	(<mask_codefor>floatunsv2siv2df2<mask_name>): .. this.
+	(ufix_notrunc<mode><si2dfmodelower>2<mask_name><round_name>):
+	Renamed to ..
+	(fixuns_notrunc<mode><si2dfmodelower>2<mask_name><round_name>):
+	.. this.
+	(ufix_notruncv2dfv2si2): Renamed to ..
+	(fixuns_notruncv2dfv2si2):.. this.
+	(ufix_notruncv2dfv2si2_mask): Renamed to ..
+	(fixuns_notruncv2dfv2si2_mask): .. this.
+	(*ufix_notruncv2dfv2si2_mask_1): Renamed to ..
+	(*fixuns_notruncv2dfv2si2_mask_1): .. this.
+	(ufix_truncv2dfv2si2): Renamed to ..
+	(*fixuns_truncv2dfv2si2): .. this.
+	(ufix_truncv2dfv2si2_mask): Renamed to ..
+	(fixuns_truncv2dfv2si2_mask): .. this.
+	(*ufix_truncv2dfv2si2_mask_1): Renamed to ..
+	(*fixuns_truncv2dfv2si2_mask_1): .. this.
+	(ufix_truncv4dfv4si2<mask_name>): Renamed to ..
+	(fixuns_truncv4dfv4si2<mask_name>): .. this.
+	(ufix_notrunc<mode><sseintvecmodelower>2<mask_name><round_name>):
+	Renamed to ..
+	(fixuns_notrunc<mode><sseintvecmodelower>2<mask_name><round_name>):
+	.. this.
+	(ufix_trunc<mode><sseintvecmodelower>2<mask_name>): Renamed to ..
+	(<mask_codefor>fixuns_trunc<mode><sseintvecmodelower>2<mask_name>):
+	.. this.
+
+2023-03-30  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/109154
+	* gimple-range-gori.cc (gori_compute::may_recompute_p): Add depth limit.
+	* gimple-range-gori.h (may_recompute_p): Add depth param.
+	* params.opt (ranger-recompute-depth): New param.
+
+2023-03-30  Jason Merrill  <jason@redhat.com>
+
+	PR c++/107897
+	PR c++/108887
+	* cgraph.h: Move reset() from cgraph_node to symtab_node.
+	* cgraphunit.cc (symtab_node::reset): Adjust.  Also call
+	remove_from_same_comdat_group.
+
+2023-03-30  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/107561
+	* gimple-ssa-warn-access.cc (get_size_range): Add flags
+	argument and pass it on.
+	(check_access): When querying for the size range pass
+	SR_ALLOW_ZERO when the known destination size is zero.
+
+2023-03-30  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109342
+	* tree-ssa-sccvn.cc (vn_nary_op_get_predicated_value): New
+	overload for edge.  When that edge is a backedge use
+	dominated_by_p directly.
+
+2023-03-30  liuhongt  <hongtao.liu@intel.com>
+
+	* config/i386/i386-expand.cc (expand_vec_perm_blend): Generate
+	vpblendd instead of vpblendw for V4SI under avx2.
+
+2023-03-29  Hans-Peter Nilsson  <hp@axis.com>
+
+	* config/cris/cris.cc (cris_rtx_costs) [CONST_INT]: Return 0
+	for many quick operands, for register-sized modes.
+
+2023-03-29  Jiawei  <jiawei@iscas.ac.cn>
+
+	* common/config/riscv/riscv-common.cc (riscv_subset_list::parse):
+	New check.
+
+2023-03-29  Martin Liska  <mliska@suse.cz>
+
+	PR bootstrap/109310
+	* configure.ac: Emit a warning for deprecated option
+	--enable-link-mutex.
+	* configure: Regenerate.
+
+2023-03-29  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109331
+	* tree-ssa-forwprop.cc (pass_forwprop::execute): When we
+	discover a taken edge make sure to cleanup the CFG.
+
+2023-03-29  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109327
+	* tree-ssa-forwprop.cc (pass_forwprop::execute): Deal with
+	already removed stmts when draining to_remove.
+
+2023-03-29  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/106124
+	* dwarf2out.cc (lookup_type_die): Reset TREE_ASM_WRITTEN
+	so we can re-create the DIE for the type if required.
+
+2023-03-29  Jakub Jelinek  <jakub@redhat.com>
+	    Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109301
+	* tree-ssa-math-opts.cc (pass_data_cse_sincos): Change
+	properties_provided from PROP_gimple_opt_math to 0.
+	(pass_data_expand_powcabs): Change properties_provided from 0 to
+	PROP_gimple_opt_math.
+
+2023-03-29  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109154
+	* tree-if-conv.cc (gen_phi_arg_condition): Handle single
+	inverted condition specially by inverting at the caller.
+	(gen_phi_arg_condition): Swap COND_EXPR arms if requested.
+
 2023-03-28  David Malcolm  <dmalcolm@redhat.com>
 
 	PR c/107002

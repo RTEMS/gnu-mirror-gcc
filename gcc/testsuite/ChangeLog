@@ -1,3 +1,126 @@
+2023-03-31  Jakub Jelinek  <jakub@redhat.com>
+
+	PR analyzer/107396
+	* gcc.dg/analyzer/pipe-glibc.c (read_from_pie, write_to_pipe): Exit
+	if fdopen returns NULL.
+
+2023-03-31  Andrew MacLeod  <amacleod@redhat.com>
+
+	* g++.dg/warn/Wstringop-overflow-4.C: Always check bogus message.
+	* gcc.dg/tree-ssa/pr23109.c: Disable better recomputations.
+
+2023-03-31  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	* gcc.target/i386/pr109052-2.c: New.
+
+2023-03-31  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/91645
+	* gcc.target/i386/pr103559-1.c: New test.
+	* gcc.target/i386/pr103559-2.c: New test.
+	* gcc.target/i386/pr103559-3.c: New test.
+	* gcc.target/i386/pr103559-4.c: New test.
+
+2023-03-31  Jonathan Yong  <10walls@gmail.com>
+
+	* c-c++-common/Warray-bounds.c: Fix excess warnings on
+	LLP64.
+
+2023-03-31  liuhongt  <hongtao.liu@intel.com>
+
+	* g++.target/i386/pr85048.C: New test.
+
+2023-03-30  Jason Merrill  <jason@redhat.com>
+
+	PR c++/105452
+	* g++.dg/lookup/anon8.C: New test.
+
+2023-03-30  Jason Merrill  <jason@redhat.com>
+
+	PR c++/105221
+	* g++.dg/cpp1z/noexcept-type27.C: New test.
+
+2023-03-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/109319
+	* g++.dg/cpp23/subscript14.C: New test.
+
+2023-03-30  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/109154
+	* gcc.dg/Walloca-13.c: Remove bogus warning that is now fixed.
+
+2023-03-30  Jason Merrill  <jason@redhat.com>
+
+	PR c++/107897
+	PR c++/108887
+	* g++.dg/cpp2a/concepts-lambda3.C: Use -flto if supported.
+	* g++.dg/cpp0x/lambda/lambda-mangle7.C: New test.
+
+2023-03-30  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/107561
+	* g++.dg/pr71488.C: Remove XFAILed bogus diagnostic again.
+	* g++.dg/warn/Warray-bounds-16.C: Likewise.
+
+2023-03-30  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109342
+	* g++.dg/torture/pr109342.C: New testcase.
+
+2023-03-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/109278
+	* g++.dg/cpp23/ext-floating15.C: New test.
+
+2023-03-30  liuhongt  <hongtao.liu@intel.com>
+
+	* gcc.target/i386/pr88828-0.c: Adjust testcase.
+
+2023-03-29  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109336
+	* gm2/link/nondefaultext/pass/hello.md: New test.
+	* gm2/link/nondefaultext/pass/liba.dm: New test.
+	* gm2/link/nondefaultext/pass/liba.md: New test.
+	* gm2/link/nondefaultext/pass/link-nondefaultext-pass.exp: New test.
+
+2023-03-29  Jiawei  <jiawei@iscas.ac.cn>
+
+	* gcc.target/riscv/arch-19.c: New test.
+
+2023-03-29  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109331
+	* gcc.dg/torture/pr109331.c: New testcase.
+
+2023-03-29  Richard Biener  <rguenther@suse.de>
+
+	* g++.dg/pr94920.C: Scan forwprop1 instead of optimized.
+
+2023-03-29  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109327
+	* gcc.dg/pr109327.c: New testcase.
+
+2023-03-29  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/106124
+	* g++.dg/gomp/pr106124.C: New testcase.
+
+2023-03-29  Jakub Jelinek  <jakub@redhat.com>
+	    Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109301
+	* gcc.dg/pr109301.c: New test.
+
+2023-03-29  Jason Merrill  <jason@redhat.com>
+
+	PR c++/109321
+	PR c++/109320
+	* g++.dg/cpp2a/class-deduction-alias16.C: New test.
+	* g++.dg/cpp2a/class-deduction-alias17.C: New test.
+
 2023-03-28  Thomas Schwinge  <thomas@codesourcery.com>
 
 	* gfortran.dg/weak-2.f90: Enable for nvptx target.

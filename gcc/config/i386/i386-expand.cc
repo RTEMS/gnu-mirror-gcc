@@ -2033,7 +2033,7 @@ ix86_expand_vector_convert_uns_vsivsf (rtx target, rtx val)
 }
 
 /* Adjust a V*SFmode/V*DFmode value VAL so that *sfix_trunc* resp. fix_trunc*
-   pattern can be used on it instead of *ufix_trunc* resp. fixuns_trunc*.
+   pattern can be used on it instead of fixuns_trunc*.
    This is done by doing just signed conversion if < 0x1p31, and otherwise by
    subtracting 0x1p31 first and xoring in 0x80000000 from *XORP afterwards.  */
 
@@ -19069,10 +19069,20 @@ expand_vec_perm_blend (struct expand_vec_perm_d *d)
       goto do_subreg;
 
     case E_V4SImode:
-      for (i = 0; i < 4; ++i)
-	mask |= (d->perm[i] >= 4 ? 3 : 0) << (i * 2);
-      vmode = V8HImode;
-      goto do_subreg;
+      if (TARGET_AVX2)
+	{
+	  /* Use vpblendd instead of vpblendw.  */
+	  for (i = 0; i < nelt; ++i)
+	    mask |= ((unsigned HOST_WIDE_INT) (d->perm[i] >= nelt)) << i;
+	  break;
+	}
+      else
+	{
+	  for (i = 0; i < 4; ++i)
+	    mask |= (d->perm[i] >= 4 ? 3 : 0) << (i * 2);
+	  vmode = V8HImode;
+	  goto do_subreg;
+	}
 
     case E_V16QImode:
       /* See if bytes move in pairs so we can use pblendw with

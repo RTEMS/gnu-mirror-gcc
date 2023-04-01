@@ -474,11 +474,23 @@ grok_array_decl (location_t loc, tree array_expr, tree index_exp,
 					     &overload, complain);
 		}
 	      else
-		/* If it would be valid albeit deprecated expression in C++20,
-		   just pedwarn on it and treat it as if wrapped in ().  */
-		pedwarn (loc, OPT_Wcomma_subscript,
-			 "top-level comma expression in array subscript "
-			 "changed meaning in C++23");
+		{
+		  /* If it would be valid albeit deprecated expression in
+		     C++20, just pedwarn on it and treat it as if wrapped
+		     in ().  */
+		  pedwarn (loc, OPT_Wcomma_subscript,
+			   "top-level comma expression in array subscript "
+			   "changed meaning in C++23");
+		  if (processing_template_decl)
+		    {
+		      orig_index_exp
+			= build_x_compound_expr_from_vec (orig_index_exp_list,
+							  NULL, complain);
+		      if (orig_index_exp == error_mark_node)
+			expr = error_mark_node;
+		      release_tree_vector (orig_index_exp_list);
+		    }
+		}
 	    }
 	}
     }
@@ -519,6 +531,15 @@ grok_array_decl (location_t loc, tree array_expr, tree index_exp,
 	      return error_mark_node;
 	    }
 	  index_exp = idx;
+	  if (processing_template_decl)
+	    {
+	      orig_index_exp
+		= build_x_compound_expr_from_vec (orig_index_exp_list,
+						  NULL, complain);
+	      release_tree_vector (orig_index_exp_list);
+	      if (orig_index_exp == error_mark_node)
+		return error_mark_node;
+	    }
 	}
 
       if (TREE_CODE (TREE_TYPE (index_exp)) == ARRAY_TYPE)
@@ -4742,15 +4763,24 @@ record_mangling (tree decl, bool need_warning)
     = mangled_decls->find_slot_with_hash (id, IDENTIFIER_HASH_VALUE (id),
 					  INSERT);
 
-  /* If this is already an alias, remove the alias, because the real
+  /* If this is already an alias, cancel the alias, because the real
      decl takes precedence.  */
   if (*slot && DECL_ARTIFICIAL (*slot) && DECL_IGNORED_P (*slot))
-    if (symtab_node *n = symtab_node::get (*slot))
-      if (n->cpp_implicit_alias)
+    {
+      if (symtab_node *n = symtab_node::get (*slot))
 	{
-	  n->remove ();
-	  *slot = NULL_TREE;
+	  if (n->cpp_implicit_alias)
+	    /* Actually removing the node isn't safe if other code is already
+	       holding a pointer to it, so just neutralize it.  */
+	    n->reset ();
 	}
+      else
+	/* analyze_functions might have already removed the alias from the
+	   symbol table if it's internal.  */
+	gcc_checking_assert (!TREE_PUBLIC (*slot));
+
+      *slot = NULL_TREE;
+    }
 
   if (!*slot)
     *slot = decl;
