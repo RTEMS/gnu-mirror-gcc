@@ -1148,11 +1148,29 @@ duplicate_loop_body_to_header_edge (class loop *loop, edge e,
 	}
 
       scale_step = XNEWVEC (profile_probability, ndupl);
-
+    // If we have histogram then we know precise probabilities for peeling
+    // is_latch means unrolling
+    if (!loop->counters || is_latch) {
       for (i = 1; i <= ndupl; i++)
 	scale_step[i - 1] = bitmap_bit_p (wont_exit, i)
 				? prob_pass_wont_exit
 				: prob_pass_thru;
+    } else {
+        gcov_type psum=0;
+        for (i = 0; i < ndupl && i<(unsigned int)param_profile_histogram_size_lin; i++){
+            psum+=(*loop->counters->hist)[i];
+            scale_step[i] = profile_probability::always() - 
+            (psum ? profile_probability::always()/loop->counters->sum/psum 
+                : profile_probability::never());
+        }
+        ++i;
+        for (; i <= ndupl; i++)
+        scale_step[i - 1] = bitmap_bit_p (wont_exit, i)
+                  ? prob_pass_wont_exit
+                  : prob_pass_thru;
+        // should rescale
+          
+    }
 
       /* Complete peeling is special as the probability of exit in last
 	 copy becomes 1.  */

@@ -1044,7 +1044,8 @@ try_peel_loop (class loop *loop,
       for (int i=0;i<param_profile_histogram_size_lin; i++){
           psum+=(*(loop->counters->hist))[i];
           // iteration has enough cumulated in partial sum and itself has at least 1 percent
-          if ((100*psum)/sum>=good_percentage)
+          // or we have complete peeling
+          if ((100*psum)/sum>=good_percentage || psum==sum)
           {
             good_peels.safe_push(i);
             if ((maxiter >= 0 && maxiter <= good_peels.last()) ||
