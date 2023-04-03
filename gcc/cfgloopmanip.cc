@@ -1157,11 +1157,14 @@ duplicate_loop_body_to_header_edge (class loop *loop, edge e,
 				: prob_pass_thru;
     } else {
         gcov_type psum=0;
-        for (i = 0; i < ndupl && i<(unsigned int)param_profile_histogram_size_lin; i++){
-            psum+=(*loop->counters->hist)[i];
+        gcov_type sum=loop->counters->sum;
+        for (i = 0; i < ndupl && i<(unsigned int)param_profile_histogram_size_lin
+                && sum!=psum; i++){
             scale_step[i] = profile_probability::always() - 
-            (psum ? profile_probability::always()/loop->counters->sum/psum 
-                : profile_probability::never());
+            ((*loop->counters->hist)[i] ? profile_probability::always()
+             /(loop->counters->sum-psum) * (*loop->counters->hist)[i] 
+            : profile_probability::never());
+            psum+=(*loop->counters->hist)[i];
         }
         ++i;
         for (; i <= ndupl; i++)
