@@ -1,3 +1,82 @@
+2023-04-03  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/109303
+	* ipa-prop.cc (determine_known_aggregate_parts): Check that the
+	offset + size will be representable in unsigned int.
+
+2023-04-03  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* configure.ac (ZSTD_LIB): Move before zstd.h check.
+	Unset gcc_cv_header_zstd_h without libzstd.
+	* configure: Regenerate.
+
+2023-04-03  Martin Liska  <mliska@suse.cz>
+
+	* doc/invoke.texi: Document new param.
+
+2023-04-03  Cupertino Miranda  <cupertino.miranda@oracle.com>
+
+	* doc/sourcebuild.texi (const_volatile_readonly_section): Document
+	new check_effective_target function.
+
+2023-04-03  Li Xu  <xuli1@eswincomputing.com>
+
+	* config/riscv/riscv-vector-builtins.def (vuint32m8_t): Fix typo.
+	(vfloat32m8_t): Likewise
+
+2023-04-03  liuhongt  <hongtao.liu@intel.com>
+
+	* doc/md.texi: Document signbitm2.
+
+2023-04-02  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+	    kito-cheng  <kito.cheng@sifive.com>
+
+	* config/riscv/vector.md: Fix RA constraint.
+
+2023-04-02  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/riscv-protos.h (gen_avl_for_scalar_move): New function.
+	* config/riscv/riscv-v.cc (gen_avl_for_scalar_move): New function.
+	* config/riscv/vector.md: Fix scalar move bug.
+
+2023-04-01  Jakub Jelinek  <jakub@redhat.com>
+
+	* range-op-float.cc (foperator_equal::fold_range): If at least
+	one of the op ranges is not singleton and neither is NaN and all
+	4 bounds are zero, return [1, 1].
+	(foperator_not_equal::fold_range): In the same case return [0, 0].
+
+2023-04-01  Jakub Jelinek  <jakub@redhat.com>
+
+	* range-op-float.cc (foperator_equal::fold_range): Perform the
+	non-singleton handling regardless of maybe_isnan (op1, op2).
+	(foperator_not_equal::fold_range): Likewise.
+	(foperator_lt::fold_range, foperator_le::fold_range,
+	foperator_gt::fold_range, foperator_ge::fold_range): Perform the
+	real_* comparison check which results in range_false (type)
+	even if maybe_isnan (op1, op2).  Simplify.
+	(foperator_ltgt): New class.
+	(fop_ltgt): New variable.
+	(floating_op_table::floating_op_table): Handle LTGT_EXPR using
+	fop_ltgt.
+
+2023-04-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/109254
+	* builtins.cc (apply_args_size): If targetm.calls.get_raw_arg_mode
+	returns VOIDmode, handle it like if the register isn't used for
+	passing arguments at all.
+	(apply_result_size): If targetm.calls.get_raw_result_mode returns
+	VOIDmode, handle it like if the register isn't used for returning
+	results at all.
+	* target.def (get_raw_result_mode, get_raw_arg_mode): Document what it
+	means to return VOIDmode.
+	* doc/tm.texi: Regenerated.
+	* config/aarch64/aarch64.cc (aarch64_function_value_regno_p): Return
+	TARGET_SVE for P0_REGNUM.
+	(aarch64_function_arg_regno_p): Also return true for p0-p3.
+	(aarch64_get_reg_raw_mode): Return VOIDmode for PR_REGNUM_P regs.
+
 2023-03-31  Vladimir N. Makarov  <vmakarov@redhat.com>
 
 	* lra-constraints.cc: (combine_reload_insn): New function.
