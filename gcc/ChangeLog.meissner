@@ -1,3 +1,28 @@
+==================== Branch work117, patch #1 ====================
+
+Do not generate fmaddfp and fnmsubfp
+
+The Altivec instructions fmaddfp and fnmsubfp have different rounding behaviors
+than the VSX xvmaddsp and xvnmsubsp instructions.  In particular, generating
+these instructions seems to break Eigen.
+
+2023-04-05   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/70243
+	* config/rs6000/altivec.md (altivec_fmav4sf4): Add a test to prevent
+	fmaddfp and fnmsubfp from being generated on VSX systems.
+	(altivec_vnmsubfp): Likewise.
+	* config/rs6000/rs6000.md (vsx_fmav4sf4): Do not generate fmaddfp or
+	fnmsubfp.
+	(vsx_nfmsv4sf4): Likewise.
+
+gcc/testsuite/
+
+	PR target/70243
+	* gcc.target/powerpc/pr70243.c: New test.
+
 ==================== Branch work117, baseline ====================
 
 2023-04-05   Michael Meissner  <meissner@linux.ibm.com>
