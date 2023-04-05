@@ -2234,18 +2234,18 @@ void histogram_counters_minus_upper_bound (histogram_counters* hist_c, gcov_type
         hist[i]=0;
         pow2=pow2<<1;
     }
-    // we want to change at least 1/(1<<portion) of iterations
-    int portion =1;
-    // reset to actual value
-    // lower half of the pow2 is added to index hald-difference, other half stays
+    // we want to change index 1/(1<<portion) of iterations
+    int portion=1;
     for (;i<tot_size-1 && portion<10;++i){
-        gcov_type_unsigned half=(pow2>>1) + (pow2 >> (1+portion));
-        unsigned int ind=hist_index(half>=difference?half-difference:0);
+        // we take a sample point and suppose by uniform distribution that all
+        // lesser iterations move same as this point
+        gcov_type_unsigned point=(pow2>>1) + (pow2 >> (1+portion));
+        unsigned int ind=hist_index(point>=difference?point-difference:0);
         while (ind==i){
             // if nothing changes we decrease the portion of iteration changed
             ++portion;
-            half=(pow2>>1) + (pow2 >> (1+portion));
-            ind=hist_index(half>=difference?half-difference:0);
+            point=(pow2>>1) + (pow2 >> (1+portion));
+            ind=hist_index(point>=difference?point-difference:0);
         }
         int64_t diff=hist[i]/(1<<portion);
         hist[ind]+=diff;
