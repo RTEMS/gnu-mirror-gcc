@@ -2214,12 +2214,14 @@ void histogram_counters_minus_upper_bound (histogram_counters* hist_c, gcov_type
     if (!hist_c || difference==0)
         return;
     auto& hist=*(hist_c->hist);
+    auto& sum=*(hist_c->sum);
     unsigned int lin_size=param_profile_histogram_size_lin;
     unsigned int tot_size=param_profile_histogram_size;
     // If the last linear counter does not contain other iterations
     unsigned int i=1;
     for(; i<lin_size; i++){
         if (i<=difference){
+            sum-=hist[0];
             hist[0]=hist[i];
         } else {
             hist[i-difference]+=hist[i];
@@ -2230,6 +2232,7 @@ void histogram_counters_minus_upper_bound (histogram_counters* hist_c, gcov_type
     gcov_type_unsigned pow2=((gcov_type_unsigned)1)<<(ceil_log2(lin_size)+i+1-lin_size);
     // we null all counters that cannot transfer to non-zero counts
     for (;pow2-1<difference && i<tot_size-1;++i){
+        sum-=hist[0];
         hist[0]=hist[i];
         hist[i]=0;
         pow2=pow2<<1;
