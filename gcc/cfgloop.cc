@@ -2213,14 +2213,14 @@ unsigned int hist_index(gcov_type_unsigned val){
 void histogram_counters_minus_upper_bound (histogram_counters* hist_c, gcov_type_unsigned difference){
     if (!hist_c || difference==0)
         return;
-    auto hist=*(hist_c->hist);
+    auto& hist=*(hist_c->hist);
     unsigned int lin_size=param_profile_histogram_size_lin;
     unsigned int tot_size=param_profile_histogram_size;
     // If the last linear counter does not contain other iterations
     unsigned int i=1;
     for(; i<lin_size; i++){
         if (i<=difference){
-            hist[0]+=hist[i];
+            hist[0]=hist[i];
         } else {
             hist[i-difference]+=hist[i];
         }
@@ -2230,18 +2230,24 @@ void histogram_counters_minus_upper_bound (histogram_counters* hist_c, gcov_type
     gcov_type_unsigned pow2=((gcov_type_unsigned)1)<<(ceil_log2(lin_size)+i+1-lin_size);
     // we null all counters that cannot transfer to non-zero counts
     for (;pow2-1<difference && i<tot_size-1;++i){
-        hist[0]+=hist[i];
+        hist[0]=hist[i];
         hist[i]=0;
         pow2=pow2<<1;
     }
+    // we want to change at least 1/(1<<portion) of iterations
+    int portion =1;
     // reset to actual value
     // lower half of the pow2 is added to index hald-difference, other half stays
-    for (;i<tot_size-1;++i){
-        gcov_type_unsigned half=(pow2>>1) + (pow2 >> 2);
-        int64_t diff=hist[i]/2;
+    for (;i<tot_size-1 && portion<10;++i){
+        gcov_type_unsigned half=(pow2>>1) + (pow2 >> (1+portion));
         unsigned int ind=hist_index(half>=difference?half-difference:0);
-        if (ind==i)
-            return;
+        while (ind==i){
+            // if nothing changes we decrease the portion of iteration changed
+            ++portion;
+            half=(pow2>>1) + (pow2 >> (1+portion));
+            ind=hist_index(half>=difference?half-difference:0);
+        }
+        int64_t diff=hist[i]/(1<<portion);
         hist[ind]+=diff;
         hist[i]-=diff;
         pow2<<=1;
@@ -2251,7 +2257,7 @@ void histogram_counters_minus_upper_bound (histogram_counters* hist_c, gcov_type
 void histogram_counters_div_upper_bound (histogram_counters* hist_c, unsigned int divisor){
     if (hist_c==NULL || divisor<2)
         return;
-    auto hist=*(hist_c->hist);
+    auto& hist=*(hist_c->hist);
     unsigned int lin_size=param_profile_histogram_size_lin;
     unsigned int tot_size=param_profile_histogram_size;
     unsigned int i=1;

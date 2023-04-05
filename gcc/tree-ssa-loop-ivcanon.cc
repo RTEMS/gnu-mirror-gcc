@@ -1096,10 +1096,13 @@ try_peel_loop (class loop *loop,
   /* Check peeled loops size.  */
   tree_estimate_loop_size (loop, exit, NULL, &size,
 			   param_max_peeled_insns);
+  // maybe we need to again tree_estimate_loop_size?
+  // or wrong loading
   while (!good_peels.is_empty() && 
           (estimated_peeled_sequence_size (&size, (int) npeel) > param_max_peeled_insns))
   {
-    npeel=good_peels.pop()++;
+    npeel=good_peels.pop();
+    ++npeel;
   }
 
   if ((peeled_size = estimated_peeled_sequence_size (&size, (int) npeel))
