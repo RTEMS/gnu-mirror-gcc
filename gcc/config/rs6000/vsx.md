@@ -2025,8 +2025,7 @@
    xvmaddasp %x0,%x1,%x2
    xvmaddmsp %x0,%x1,%x3
    vmaddfp %0,%1,%2,%3"
-  [(set_attr "type" "vecfloat")
-   (set_attr "isa" "*,*,fastmath")])
+  [(set_attr "type" "vecfloat")])
 
 (define_insn "*vsx_fmav2df4"
   [(set (match_operand:V2DF 0 "vsx_register_operand" "=wa,wa")
@@ -2079,8 +2078,7 @@
    xvnmsubasp %x0,%x1,%x2
    xvnmsubmsp %x0,%x1,%x3
    vnmsubfp %0,%1,%2,%3"
-  [(set_attr "type" "vecfloat")
-   (set_attr "isa" "*,*,fastmath")])
+  [(set_attr "type" "vecfloat")])
 
 (define_insn "*vsx_nfmsv2df4"
   [(set (match_operand:V2DF 0 "vsx_register_operand" "=wa,wa")
