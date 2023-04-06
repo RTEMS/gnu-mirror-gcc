@@ -4892,6 +4892,10 @@ extern bool integer_all_onesp (const_tree);
 
 extern bool maybe_cap_all_onesp (const_tree);
 
+/* Test if CAP_CST has any nonzero metadata bits.  */
+
+extern bool cap_cst_metadatap (const_tree);
+
 /* integer_minus_onep (tree x) is nonzero if X is an integer constant of
    value -1.  */
 

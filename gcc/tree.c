@@ -2686,6 +2686,21 @@ integer_all_onesp (const_tree expr)
 	  == wi::to_wide (expr));
 }
 
+/* Test if CAP_CST has any nonzero metadata bits.  */
+
+bool
+cap_cst_metadatap (const_tree cap_cst)
+{
+  gcc_assert (TREE_CODE (cap_cst) == INTEGER_CST
+	      && capability_type_p (TREE_TYPE (cap_cst)));
+
+  tree cap_type = TREE_TYPE (cap_cst);
+  unsigned HOST_WIDE_INT cap_prec = TYPE_CAP_PRECISION (cap_type);
+  unsigned HOST_WIDE_INT noncap_prec = TYPE_NONCAP_PRECISION (cap_type);
+  wide_int w = wi::to_wide (cap_cst, cap_prec);
+  return wi::min_precision (w, UNSIGNED) > noncap_prec;
+}
+
 /* Return 1 if EXPR is either INTEGER_ALL_ONESP, or a constant capability
    containing all 1's in the bits of its value and all 0 in the bits of its
    metadata.
@@ -16588,6 +16603,66 @@ test_maybe_cap_all_onesp (void)
     }
 }
 
+static void
+test_cap_cst_metadatap (void)
+{
+  tree uintcap = uintcap_type_node;
+  if (!uintcap)
+    uintcap = build_intcap_type_for_mode (CADImode, 1);
+  ASSERT_TRUE (uintcap != NULL_TREE);
+
+  tree intcap = intcap_type_node;
+  if (!intcap)
+    intcap = build_intcap_type_for_mode (CADImode, 0);
+  ASSERT_TRUE (intcap != NULL_TREE);
+
+  tree types[] = {
+      force_build_capability_pointer_type (void_type_node),
+      uintcap,
+      intcap
+  };
+  tree t;
+  for (auto type : types)
+    {
+      tree noncap_type = noncapability_type (type);
+
+      t = build_zero_cst (type);
+      ASSERT_FALSE (cap_cst_metadatap (t));
+
+      tree cv = build_int_cst (noncap_type, 42);
+      t = fold_build_replace_address_value (t, cv);
+      ASSERT_FALSE (cap_cst_metadatap (t));
+
+      cv = build_int_cst (noncap_type, -1);
+      t = fold_build_replace_address_value (t, cv);
+      ASSERT_FALSE (cap_cst_metadatap (t));
+
+      const unsigned HOST_WIDE_INT cap_prec = TYPE_CAP_PRECISION (type);
+      const unsigned HOST_WIDE_INT noncap_prec = TYPE_NONCAP_PRECISION (type);
+
+      if (cap_prec > noncap_prec)
+	{
+	  /* Pick a bit in the middle of the metadata to set.  */
+	  const auto bit_to_set = (cap_prec + noncap_prec) / 2;
+
+	  auto bit = wi::uhwi (1, cap_prec);
+	  auto amt = wi::uhwi (bit_to_set - 1, cap_prec);
+	  auto res = wi::bit_or (wi::zero (cap_prec), wi::lshift (bit, amt));
+	  t = wide_int_to_tree (type, res);
+	  ASSERT_TRUE (cap_cst_metadatap (t));
+
+	  /* Changing the address value shouldn't matter.  */
+	  cv = build_int_cst (noncap_type, 42);
+	  t = fold_build_replace_address_value (t, cv);
+	  ASSERT_TRUE (cap_cst_metadatap (t));
+
+	  cv = build_int_cst (noncap_type, -1);
+	  t = fold_build_replace_address_value (t, cv);
+	  ASSERT_TRUE (cap_cst_metadatap (t));
+	}
+    }
+}
+
 /* Run all of the selftests within this file.  */
 
 void
@@ -16596,6 +16671,7 @@ tree_c_tests ()
   test_fold_build_replace_address_value ();
   test_capability_type_manipulation ();
   test_maybe_cap_all_onesp ();
+  test_cap_cst_metadatap ();
   test_integer_constants ();
   test_identifiers ();
   test_labels ();

@@ -13670,7 +13670,8 @@ fold_replace_address_value_1 (location_t loc, tree c, tree cv)
 	  of the number, with the rest being unset.  */
       wide_int mask = wi::mask (noncap_prec, 0, cap_prec);
       wide_int masked_cap = wi::bit_and_not (cap_orig, mask);
-      wide_int res = wi::bit_or (masked_cap, new_value);
+      wide_int masked_cv = wi::bit_and (new_value, mask);
+      wide_int res = wi::bit_or (masked_cap, masked_cv);
       /* Replacing address value.  Only want something marked as overflow if
 	 the original value was overflowed.  No way to cause an overflow here.
        */

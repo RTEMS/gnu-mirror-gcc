@@ -1995,6 +1995,7 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
 	  pp_string (pp, ") ");
 	}
       if (TREE_CODE (TREE_TYPE (node)) == POINTER_TYPE
+	  && TREE_INT_CST_NUNITS (node) == 1
 	  && ! (flags & TDF_GIMPLE))
 	{
 	  /* In the case of a pointer, one may want to divide by the

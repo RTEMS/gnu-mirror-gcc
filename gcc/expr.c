@@ -10752,8 +10752,20 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 	   GET_MODE_PRECISION (TYPE_MODE (type)), we need to extend from
 	   the former to the latter according to the signedness of the
 	   type.  */
+	scalar_int_mode int_mode;
+	if (capability_type_p (type) && cap_cst_metadatap (exp))
+	  {
+	    /* Capability constants with nonzero metadata bits need special
+	       treatment and must be loaded from the constant pool.  */
+	    int_mode = int_mode_for_mode (TYPE_MODE (type)).require ();
+	    const auto prec = GET_MODE_PRECISION (int_mode);
+	    temp = immed_wide_int_const (wi::to_wide (exp, prec), int_mode);
+	    temp = force_const_mem (int_mode, temp);
+	    temp = adjust_address (temp, TYPE_MODE (type), 0);
+	    return temp;
+	  }
 	tree noncap_type = noncapability_type (type);
-	scalar_int_mode int_mode = SCALAR_INT_TYPE_MODE (noncap_type);
+	int_mode = SCALAR_INT_TYPE_MODE (noncap_type);
 	temp = immed_wide_int_const
 	  (wi::to_wide (exp, GET_MODE_PRECISION (int_mode)), int_mode);
 	if (capability_type_p (type))
