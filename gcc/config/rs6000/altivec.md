@@ -750,15 +750,12 @@
 
 ;; Fused multiply add.
 
-;; If we are using VSX instructions, do not generate the vmaddfp instruction
-;; since is has different rounding behavior than the xvmaddsp instruction.
-
 (define_insn "*altivec_fmav4sf4"
   [(set (match_operand:V4SF 0 "register_operand" "=v")
 	(fma:V4SF (match_operand:V4SF 1 "register_operand" "v")
 		  (match_operand:V4SF 2 "register_operand" "v")
 		  (match_operand:V4SF 3 "register_operand" "v")))]
-  "VECTOR_UNIT_ALTIVEC_P (V4SFmode) && !TARGET_VSX"
+  "VECTOR_UNIT_ALTIVEC_P (V4SFmode)"
   "vmaddfp %0,%1,%2,%3"
   [(set_attr "type" "vecfloat")])
 
@@ -987,8 +984,6 @@
   [(set_attr "type" "vecsimple")])
 
 ;; Fused multiply subtract 
-;; If we are using VSX instructions, do not generate the vnmsubfp instruction
-;; since is has different rounding behavior than the xvnmsubsp instruction.
 (define_insn "*altivec_vnmsubfp"
   [(set (match_operand:V4SF 0 "register_operand" "=v")
 	(neg:V4SF
@@ -996,7 +991,7 @@
 		   (match_operand:V4SF 2 "register_operand" "v")
 		   (neg:V4SF
 		    (match_operand:V4SF 3 "register_operand" "v")))))]
-  "VECTOR_UNIT_ALTIVEC_P (V4SFmode) && !TARGET_VSX"
+  "VECTOR_UNIT_ALTIVEC_P (V4SFmode)"
   "vnmsubfp %0,%1,%2,%3"
   [(set_attr "type" "vecfloat")])
 
