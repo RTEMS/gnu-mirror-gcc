@@ -1,4 +1,4 @@
-==================== Branch work117, patch #1 ====================
+==================== Branch work117, patch #2 ====================
 
 Do not generate fmaddfp and fnmsubfp
 
@@ -6,22 +6,45 @@ The Altivec instructions fmaddfp and fnmsubfp have different rounding behaviors
 than the VSX xvmaddsp and xvnmsubsp instructions.  In particular, generating
 these instructions seems to break Eigen.
 
-2023-04-05   Michael Meissner  <meissner@linux.ibm.com>
+GCC has generated the Altivec fmaddfp and fnmsubfp instructions on VSX systems
+as an alternative to the xsmadd{a,m}sp and xsnmsub{a,m}sp instructions.  The
+advantage  of the Altivec instructions is that they are 4 operand instructions
+(i.e. the target register does not have to overlap with one of the input
+registers).  The advantage is it can eliminate an extra move instruction.  The
+disadvantage is it does round the same was as the VSX instructions.
+
+This patch eliminates the generation of the Altivec fmaddfp and fnmsubfp
+instructions as alternatives in the VSX instruction insn support, and in the
+Altivec insns it adds a test to prevent the insn from being used if VSX is
+available.  I also added a test to the regression test suite.
+
+I have done bootstrap builds on power9 little endian (with both IEEE long
+double and IBM long double).  I have also done the builds and test on a power8
+big endian system (testing both 32-bit and 64-bit code generation).  Chip has
+verified that it fixes the problem that Eigen encountered.  Can I check this
+into the master GCC branch?  After a burn-in period, can I check this patch
+into the active GCC branches?
+
+Thanks in advance.
+
+2023-04-06   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
 	PR target/70243
-	* config/rs6000/altivec.md (altivec_fmav4sf4): Add a test to prevent
-	fmaddfp and fnmsubfp from being generated on VSX systems.
-	(altivec_vnmsubfp): Likewise.
-	* config/rs6000/rs6000.md (vsx_fmav4sf4): Do not generate fmaddfp or
-	fnmsubfp.
+	* config/rs6000/rs6000.md (isa attribute): Add fastmath.
+	(enabled attribute): Add support for fastmath.
+	* config/rs6000/vsx.md (vsx_fmav4sf4): Set the isa attribute to
+	fastmath to disable Altivec instruction generatins normally.
 	(vsx_nfmsv4sf4): Likewise.
 
 gcc/testsuite/
 
 	PR target/70243
 	* gcc.target/powerpc/pr70243.c: New test.
+	* gcc.target/powerpc/pr70243-2.c: New test.
+
+==================== Branch work117, patch #1 was reverted ====================
 
 ==================== Branch work117, baseline ====================
 
