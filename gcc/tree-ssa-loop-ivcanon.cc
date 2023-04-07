@@ -1039,21 +1039,23 @@ try_peel_loop (class loop *loop,
   bool histogram_peeling=loop->counters!=NULL;
   if (histogram_peeling && loop->counters->sum!=0){
       gcov_type sum=loop->counters->sum;
+      gcov_type rest=sum;
       gcov_type psum=0;
       int good_percentage=param_profile_histogram_peel_prcnt;
       for (int i=0;i<param_profile_histogram_size_lin; i++){
           psum+=(*(loop->counters->hist))[i];
           // iteration has enough cumulated in partial sum and itself has at least 1 percent
           // or we have complete peeling
-          if ((100*psum)/sum>=good_percentage || psum==sum)
+          if ((100*psum)/sum>=good_percentage || 0==rest)
           {
             good_peels.safe_push(i);
             if ((maxiter >= 0 && maxiter <= good_peels.last()) ||
-                    (good_peels.last() > param_max_peel_times - 1)) {
+                    (good_peels.last() > param_max_peel_times - 1) || rest==0) {
                 good_peels.pop();
                break;
             }
             good_percentage=0;
+            rest-=psum;
             psum=0;
           }
           good_percentage+=param_profile_histogram_peel_prcnt;
