@@ -2009,11 +2009,12 @@
   "x<VSv>tsqrt<sd>p %0,%x1"
   [(set_attr "type" "<VStype_simple>")])
 
-;; Fused vector multiply/add instructions. Support the classical Altivec
-;; versions of fma, which allows the target to be a separate register from the
-;; 3 inputs.  Under VSX, the target must be either the addend or the first
-;; multiply.
-
+;; Fused vector multiply/add instructions. Under VSX, the target must be either
+;; the addend or the first multiply.  If the user used -Ofast, also support the
+;; classical VMX versions of fma (vmaddfp and vnmsubfp), which allows the
+;; target to be a separate register from the 3 inputs.  This restriction is due
+;; to the fact that vmaddfp and vnmsubfp have different rounding behaviors
+;; compared to xvmadd{a,m}sp or xvnmsub{a,m}sp.
 (define_insn "*vsx_fmav4sf4"
   [(set (match_operand:V4SF 0 "vsx_register_operand" "=wa,wa,v")
 	(fma:V4SF
@@ -2025,7 +2026,8 @@
    xvmaddasp %x0,%x1,%x2
    xvmaddmsp %x0,%x1,%x3
    vmaddfp %0,%1,%2,%3"
-  [(set_attr "type" "vecfloat")])
+  [(set_attr "type" "vecfloat")
+   (set_attr "isa" "*,*,fastmath")])
 
 (define_insn "*vsx_fmav2df4"
   [(set (match_operand:V2DF 0 "vsx_register_operand" "=wa,wa")
@@ -2078,7 +2080,8 @@
    xvnmsubasp %x0,%x1,%x2
    xvnmsubmsp %x0,%x1,%x3
    vnmsubfp %0,%1,%2,%3"
-  [(set_attr "type" "vecfloat")])
+  [(set_attr "type" "vecfloat")
+   (set_attr "isa" "*,*,fastmath")])
 
 (define_insn "*vsx_nfmsv2df4"
   [(set (match_operand:V2DF 0 "vsx_register_operand" "=wa,wa")
