@@ -1,3 +1,33 @@
+==================== Branch work117, patch #4 ====================
+
+Do not generate vmaddfp and vnmsubfp
+
+The Altivec instructions vmaddfp and vnmsubfp have different rounding behaviors
+than the VSX xvmaddsp and xvnmsubsp instructions.  In particular, generating
+these instructions seems to break Eigen on big endian systems.
+
+I have done bootstrap builds on power9 little endian (with both IEEE long
+double and IBM long double).  I have also done the builds and test on a power8
+big endian system (testing both 32-bit and 64-bit code generation).  Chip has
+verified that it fixes the problem that Eigen encountered.  Can I check this
+into the master GCC branch?  After a burn-in period, can I check this patch
+into the active GCC branches?
+
+Thanks in advance.
+
+2023-04-07   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/70243
+	* config/rs6000/rs6000.md (vsx_fmav4sf4): Do not generate vmaddfp.
+	(vsx_nfmsv4sf4): Do not generate vnmsubfp.
+
+gcc/testsuite/
+
+	PR target/70243
+	* gcc.target/powerpc/pr70243.c: New test.
+
 ==================== Branch work117, patch #3 was reverted ====================
 
 ==================== Branch work117, patch #2 was reverted ====================
