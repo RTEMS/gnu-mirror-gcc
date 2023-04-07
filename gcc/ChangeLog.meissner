@@ -1,22 +1,42 @@
 ==================== Branch work117, patch #2 ====================
 
-Do not generate fmaddfp and fnmsubfp
+PR target/70243: Do not generate vmaddfp and vnmsubfp
 
-The Altivec instructions fmaddfp and fnmsubfp have different rounding behaviors
-than the VSX xvmaddsp and xvnmsubsp instructions.  In particular, generating
-these instructions seems to break Eigen.
+This is version 2 of the patch.  The first version was posted on April 6th.
 
-GCC has generated the Altivec fmaddfp and fnmsubfp instructions on VSX systems
-as an alternative to the xsmadd{a,m}sp and xsnmsub{a,m}sp instructions.  The
-advantage  of the Altivec instructions is that they are 4 operand instructions
-(i.e. the target register does not have to overlap with one of the input
-registers).  The advantage is it can eliminate an extra move instruction.  The
-disadvantage is it does round the same was as the VSX instructions.
+In this version, I eliminated the changes to Altivec.md that added checks to
+altivec_fmav4sf4 and altivec_vnmsubfp.  After writing the code, I remembered
+that VECTOR_UNIT_ALTIVEC_P that is used by those insns will not be true if the
+VSX instruction set is enabled, so no additional test is needed.
 
-This patch eliminates the generation of the Altivec fmaddfp and fnmsubfp
-instructions as alternatives in the VSX instruction insn support, and in the
-Altivec insns it adds a test to prevent the insn from being used if VSX is
-available.  I also added a test to the regression test suite.
+As we discussed in a private chat room, I modified the code to generate vmaddfp
+and vnmsubfp if -Ofast (-ffast-math) is used.  This allows the compiler to
+eliminate the extra move if the user does not care about strict floating point
+code generation, but it generates only the VSX instructions in the normal
+case.
+
+I reworked the examples and split them into two tests to test both the normal
+case when -Ofast is not used and when it is used.
+
+I also fixed the instructions mentioned in the comments to be the actual
+instructions (vmaddfp and vnmsubfp) instead of fmaddfp and fnmsubdp.  Sorry
+about tat.
+
+The AltiVec (VMX) instructions vmaddfp and vnmsubfp have different rounding
+behaviors than the VSX xvmadd{a,m}sp and xvnmsub{a,m}sp instructions.  In
+particular, generating these instructions seems to break Eigen.
+
+The bug is that GCC has generated the VMX vmaddfp and vnmsubfp instructions on
+VSX systems as an alternative to the xsmadd{a,m}sp and xsnmsub{a,m}sp
+instructions.  The advantage of the VMX instructions is that they are 4 operand
+instructions (i.e. the target register does not have to overlap with one of the
+input registers).  This can mean that the compiler can eliminate an extra move
+instruction. The disadvantage of generating these instructions is it does not
+round the same was as the VSX instructions.
+
+This patch will only generate the VMX vmaddfp and vnmsubfp instructions as
+alternatives in the VSX instruction insn support if -Ofast (-ffast-math) is
+used.  I also added 2 tests to the regression suite.
 
 I have done bootstrap builds on power9 little endian (with both IEEE long
 double and IBM long double).  I have also done the builds and test on a power8
@@ -27,7 +47,7 @@ into the active GCC branches?
 
 Thanks in advance.
 
-2023-04-06   Michael Meissner  <meissner@linux.ibm.com>
+2023-04-07   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -43,6 +63,8 @@ gcc/testsuite/
 	PR target/70243
 	* gcc.target/powerpc/pr70243.c: New test.
 	* gcc.target/powerpc/pr70243-2.c: New test.
+
+==================== Branch work117, patch #2 was reverted ====================
 
 ==================== Branch work117, patch #1 was reverted ====================
 
