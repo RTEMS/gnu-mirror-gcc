@@ -1147,6 +1147,7 @@ try_peel_loop (class loop *loop,
       fprintf (dump_file, "Peeled loop %d, %i times.\n",
 	       loop->num, (int) npeel);
     }
+  // ASLJKJLDSADHASDLJASKLDJASLKDJLSAKJDDSALJDSLK
   if (loop->any_estimate)
     {
       if (wi::ltu_p (npeel, loop->nb_iterations_estimate))
@@ -1156,12 +1157,14 @@ try_peel_loop (class loop *loop,
     }
   if (loop->any_upper_bound)
     {
-      histogram_counters_minus_upper_bound(loop->counters,npeel);
       if (wi::ltu_p (npeel, loop->nb_iterations_upper_bound))
         loop->nb_iterations_upper_bound -= npeel;
       else
         loop->nb_iterations_upper_bound = 0;
     }
+  if (loop->counters){
+       histogram_counters_minus_upper_bound(loop->counters,npeel);
+  }
   if (loop->any_likely_upper_bound)
     {
       if (wi::ltu_p (npeel, loop->nb_iterations_likely_upper_bound))
@@ -1173,6 +1176,7 @@ try_peel_loop (class loop *loop,
 	  loop->nb_iterations_likely_upper_bound = 0;
 	}
     }
+
   profile_count entry_count = profile_count::zero ();
 
   edge e;

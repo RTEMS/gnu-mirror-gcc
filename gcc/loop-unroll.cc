@@ -533,7 +533,9 @@ unroll_loop_constant_iterations (class loop *loop)
 	  desc->noloop_assumptions = NULL_RTX;
 	  desc->niter -= exit_mod;
 	  loop->nb_iterations_upper_bound -= exit_mod;
-      histogram_counters_minus_upper_bound(loop->counters,exit_mod);
+      if (loop->counters){
+          histogram_counters_minus_upper_bound(loop->counters,exit_mod);
+      }
 	  if (loop->any_estimate
 	      && wi::leu_p (exit_mod, loop->nb_iterations_estimate))
 	    loop->nb_iterations_estimate -= exit_mod;
@@ -579,7 +581,9 @@ unroll_loop_constant_iterations (class loop *loop)
 
 	  desc->niter -= exit_mod + 1;
 	  loop->nb_iterations_upper_bound -= exit_mod + 1;
-      histogram_counters_minus_upper_bound(loop->counters,exit_mod+1);
+      if (loop->counters){
+          histogram_counters_minus_upper_bound(loop->counters,exit_mod+1);
+      }
 	  if (loop->any_estimate
 	      && wi::leu_p (exit_mod + 1, loop->nb_iterations_estimate))
 	    loop->nb_iterations_estimate -= exit_mod + 1;
@@ -634,7 +638,9 @@ unroll_loop_constant_iterations (class loop *loop)
   desc->niter /= max_unroll + 1;
   loop->nb_iterations_upper_bound
     = wi::udiv_trunc (loop->nb_iterations_upper_bound, max_unroll + 1);
-  histogram_counters_div_upper_bound(loop->counters,exit_mod);
+  if (loop->counters){
+      histogram_counters_div_upper_bound(loop->counters,exit_mod);
+  }
   if (loop->any_estimate)
     loop->nb_iterations_estimate
       = wi::udiv_trunc (loop->nb_iterations_estimate, max_unroll + 1);
@@ -1098,7 +1104,9 @@ unroll_loop_runtime_iterations (class loop *loop)
 			 gen_int_mode (max_unroll + 1, desc->mode));
   loop->nb_iterations_upper_bound
     = wi::udiv_trunc (loop->nb_iterations_upper_bound, max_unroll + 1);
-  histogram_counters_div_upper_bound(loop->counters, max_unroll + 1);
+  if (loop->counters){
+      histogram_counters_div_upper_bound(loop->counters, max_unroll + 1);
+  }
   if (loop->any_estimate)
     loop->nb_iterations_estimate
       = wi::udiv_trunc (loop->nb_iterations_estimate, max_unroll + 1);
@@ -1111,7 +1119,9 @@ unroll_loop_runtime_iterations (class loop *loop)
 	simplify_gen_binary (MINUS, desc->mode, desc->niter_expr, const1_rtx);
       desc->noloop_assumptions = NULL_RTX;
       --loop->nb_iterations_upper_bound;
-      histogram_counters_minus_upper_bound(loop->counters,1);
+      if (loop->counters){
+          histogram_counters_minus_upper_bound(loop->counters,1);
+      }
       if (loop->any_estimate
 	  && loop->nb_iterations_estimate != 0)
 	--loop->nb_iterations_estimate;
