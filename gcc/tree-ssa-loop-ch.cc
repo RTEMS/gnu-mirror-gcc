@@ -455,6 +455,7 @@ ch_base::copy_headers (function *fun)
 
       exit = NULL;
       n_bbs = 0;
+      // auto prob_enters_loop=profile_probability::guessed_always();
       while (should_duplicate_loop_header_p (header, loop, &remaining_limit))
 	{
 	  if (dump_file && (dump_flags & TDF_DETAILS))
@@ -466,9 +467,12 @@ ch_base::copy_headers (function *fun)
 	    exit = EDGE_SUCC (header, 0);
 	  else
 	    exit = EDGE_SUCC (header, 1);
+      // if (exit){
+      //       prob_enters_loop*=exit->probability;
+      // }
 	  bbs[n_bbs++] = header;
 	  gcc_assert (bbs_size > n_bbs);
-	  header = exit->dest;
+      header = exit->dest;
 	}
 
       if (!exit)
@@ -555,6 +559,11 @@ ch_base::copy_headers (function *fun)
 	    fprintf (dump_file, "Loop %d is still not do-while loop.\n",
 		     loop->num);
 	}
+      // if it is unlikely that after header copy the iterations enter the loop it
+      // behaves like peeling 1 time
+      // if (prob_enters_loop<profile_probability::very_unlikely() || remaining_limit>=0){
+      //     adjust_loop_estimates_minus(loop, 1);
+      // }
 
       changed = true;
     }
