@@ -1164,8 +1164,10 @@ duplicate_loop_body_to_header_edge (class loop *loop, edge e,
             ((*loop->counters->hist)[i] ? profile_probability::always()
              /(loop->counters->sum-psum) * (*loop->counters->hist)[i] 
             : profile_probability::never());
-            // we do not know whether it was adjusted so we assume so
-            scale_step[i].adjusted();
+            // we set whether it was adjusted or is still precise
+            if (loop->counters->adjusted) {
+                scale_step[i].adjusted();
+            }
             psum+=(*loop->counters->hist)[i];
         }
         ++i;

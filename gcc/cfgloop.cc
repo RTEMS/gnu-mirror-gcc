@@ -2214,7 +2214,8 @@ void histogram_counters_minus_upper_bound (histogram_counters* hist_c, gcov_type
     if (!hist_c || difference==0)
         return;
     auto& hist=*(hist_c->hist);
-    auto& sum=*(hist_c->sum);
+    hist_c->adjusted=true;
+    auto& sum=hist_c->sum;
     unsigned int lin_size=param_profile_histogram_size_lin;
     unsigned int tot_size=param_profile_histogram_size;
     // If the last linear counter does not contain other iterations
@@ -2261,6 +2262,7 @@ void histogram_counters_div_upper_bound (histogram_counters* hist_c, unsigned in
     if (hist_c==NULL || divisor<2)
         return;
     auto& hist=*(hist_c->hist);
+    hist_c->adjusted=true;
     unsigned int lin_size=param_profile_histogram_size_lin;
     unsigned int tot_size=param_profile_histogram_size;
     unsigned int i=1;

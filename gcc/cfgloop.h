@@ -95,6 +95,7 @@ struct loop_exit_hasher : ggc_ptr_hash<loop_exit>
 // Information about histogram of the loop from profiling
 
 struct GTY(()) histogram_counters{
+    bool adjusted;
     gcov_type sum;
     vec<gcov_type, va_heap, vl_embed> * GTY((skip)) hist;
 };
