@@ -2210,8 +2210,9 @@ unsigned int hist_index(gcov_type_unsigned val){
      }
 }
 
-void histogram_counters_minus_upper_bound (histogram_counters* hist_c, gcov_type_unsigned difference){
-    if (!hist_c || difference==0)
+void histogram_counters_minus_upper_bound (histogram_counters* hist_c,
+        gcov_type_unsigned difference){
+    if (difference==0 || hist_c->sum==0)
         return;
     auto& hist=*(hist_c->hist);
     hist_c->adjusted=true;
@@ -2259,7 +2260,7 @@ void histogram_counters_minus_upper_bound (histogram_counters* hist_c, gcov_type
 }
 
 void histogram_counters_div_upper_bound (histogram_counters* hist_c, unsigned int divisor){
-    if (hist_c==NULL || divisor<2)
+    if (hist_c->sum==0 || divisor<2)
         return;
     auto& hist=*(hist_c->hist);
     hist_c->adjusted=true;
@@ -2277,5 +2278,40 @@ void histogram_counters_div_upper_bound (histogram_counters* hist_c, unsigned in
         unsigned int ind=hist_index(half/divisor);
         hist[ind]+=hist[i];
         hist[i]=0;
+    }
+
+}
+
+// adjust estimates after peeling npeel times
+// also used in copy header optimization
+void adjust_loop_estimates_minus ( class loop* loop, unsigned HOST_WIDE_INT npeel)
+{
+  if (loop->any_estimate)
+    {
+      if (wi::ltu_p (npeel, loop->nb_iterations_estimate))
+        loop->nb_iterations_estimate -= npeel;
+      else
+	loop->nb_iterations_estimate = 0;
+    }
+  if (loop->any_upper_bound)
+    {
+      if (wi::ltu_p (npeel, loop->nb_iterations_upper_bound))
+        loop->nb_iterations_upper_bound -= npeel;
+      else
+        loop->nb_iterations_upper_bound = 0;
+    }
+  if (loop->counters){
+       histogram_counters_minus_upper_bound(loop->counters,npeel);
+  }
+  if (loop->any_likely_upper_bound)
+    {
+      if (wi::ltu_p (npeel, loop->nb_iterations_likely_upper_bound))
+	loop->nb_iterations_likely_upper_bound -= npeel;
+      else
+	{
+	  loop->any_estimate = true;
+	  loop->nb_iterations_estimate = 0;
+	  loop->nb_iterations_likely_upper_bound = 0;
+	}
     }
 }

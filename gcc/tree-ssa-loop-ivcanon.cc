@@ -1099,7 +1099,7 @@ try_peel_loop (class loop *loop,
   // maybe we need to again tree_estimate_loop_size?
   // or wrong loading
   while (!good_peels.is_empty() && 
-          (estimated_peeled_sequence_size (&size, (int) npeel) > param_max_peeled_insns))
+          ((int)estimated_peeled_sequence_size (&size, (int) npeel) > param_max_peeled_insns))
   {
     npeel=good_peels.pop();
     ++npeel;
@@ -1147,35 +1147,9 @@ try_peel_loop (class loop *loop,
       fprintf (dump_file, "Peeled loop %d, %i times.\n",
 	       loop->num, (int) npeel);
     }
-  // ASLJKJLDSADHASDLJASKLDJASLKDJLSAKJDDSALJDSLK
-  if (loop->any_estimate)
-    {
-      if (wi::ltu_p (npeel, loop->nb_iterations_estimate))
-        loop->nb_iterations_estimate -= npeel;
-      else
-	loop->nb_iterations_estimate = 0;
-    }
-  if (loop->any_upper_bound)
-    {
-      if (wi::ltu_p (npeel, loop->nb_iterations_upper_bound))
-        loop->nb_iterations_upper_bound -= npeel;
-      else
-        loop->nb_iterations_upper_bound = 0;
-    }
-  if (loop->counters){
-       histogram_counters_minus_upper_bound(loop->counters,npeel);
-  }
-  if (loop->any_likely_upper_bound)
-    {
-      if (wi::ltu_p (npeel, loop->nb_iterations_likely_upper_bound))
-	loop->nb_iterations_likely_upper_bound -= npeel;
-      else
-	{
-	  loop->any_estimate = true;
-	  loop->nb_iterations_estimate = 0;
-	  loop->nb_iterations_likely_upper_bound = 0;
-	}
-    }
+
+  // adjust loop estimates for peeling npeel times
+  adjust_loop_estimates_minus(loop, npeel);
 
   profile_count entry_count = profile_count::zero ();
 
@@ -1194,6 +1168,7 @@ try_peel_loop (class loop *loop,
   bitmap_set_bit (peeled_loops, loop->num);
   return true;
 }
+
 /* Adds a canonical induction variable to LOOP if suitable.
    CREATE_IV is true if we may create a new iv.  UL determines
    which loops we are allowed to completely unroll.  If TRY_EVAL is true, we try
