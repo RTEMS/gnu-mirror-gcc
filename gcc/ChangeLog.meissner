@@ -2,6 +2,12 @@
 
 Do not generate vmaddfp and vnmsubfp
 
+This is version 3 of the patch.  This is essentially version 1 with the removal
+of changes to altivec.md, and cleanup of the comments.
+
+Version 2 generated the vmaddfp and vnmsubfp instructions if -Ofast was used,
+and those changes are deleted in this patch.
+
 The Altivec instructions vmaddfp and vnmsubfp have different rounding behaviors
 than the VSX xvmaddsp and xvnmsubsp instructions.  In particular, generating
 these instructions seems to break Eigen on big endian systems.
