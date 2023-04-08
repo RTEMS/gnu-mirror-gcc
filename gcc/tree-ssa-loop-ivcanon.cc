@@ -1036,6 +1036,8 @@ try_peel_loop (class loop *loop,
   /* Check if there is an estimate on the number of iterations.  */
   npeel = estimated_loop_iterations_int (loop);
   auto_vec<int> good_peels;
+  auto_vec<int> prcnt;
+  prcnt.safe_push(0);
   bool histogram_peeling=loop->counters!=NULL;
   if (histogram_peeling && loop->counters->sum!=0){
       gcov_type sum=loop->counters->sum;
@@ -1048,10 +1050,12 @@ try_peel_loop (class loop *loop,
           // or we have complete peeling
           if ((100*psum)/sum>=good_percentage || 0==rest)
           {
+            prcnt.safe_push(prcnt.last()+(100*psum)/sum);
             good_peels.safe_push(i);
             if ((maxiter >= 0 && maxiter <= good_peels.last()) ||
                     (good_peels.last() > param_max_peel_times - 1) || rest==0) {
                 good_peels.pop();
+                prcnt.pop();
                break;
             }
             good_percentage=0;
@@ -1098,11 +1102,14 @@ try_peel_loop (class loop *loop,
   /* Check peeled loops size.  */
   tree_estimate_loop_size (loop, exit, NULL, &size,
 			   param_max_peeled_insns);
-  // maybe we need to again tree_estimate_loop_size?
-  // or wrong loading
-  while (!good_peels.is_empty() && 
-          ((int)estimated_peeled_sequence_size (&size, (int) npeel) > param_max_peeled_insns))
+  // we want to peel the max_peeled_insns 
+  // if we peel percentage corresponding the whole linear section
+  while (!good_peels.is_empty() && ((int)estimated_peeled_sequence_size (&size,
+                  (int) npeel) * (param_profile_histogram_size_lin *
+                      param_profile_histogram_peel_prcnt) >
+              param_max_peeled_insns * (prcnt.last())))
   {
+    prcnt.pop();
     npeel=good_peels.pop();
     ++npeel;
   }
