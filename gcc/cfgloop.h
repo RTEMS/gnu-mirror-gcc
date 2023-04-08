@@ -931,7 +931,8 @@ extern int bb_loop_depth (const_basic_block);
 extern void histogram_counters_minus_upper_bound 
     (histogram_counters* hist_c, gcov_type_unsigned difference);
 extern void histogram_counters_div_upper_bound (histogram_counters* hist_c, unsigned int divisor);
-extern void adjust_loop_estimates_minus ( class loop* loop, unsigned HOST_WIDE_INT npeel);
+extern void adjust_loop_estimates_minus ( class loop* loop, unsigned
+        HOST_WIDE_INT npeel, bool precise);
 
 /* Converts VAL to widest_int.  */
 

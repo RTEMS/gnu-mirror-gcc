@@ -1048,7 +1048,7 @@ try_peel_loop (class loop *loop,
           psum+=(*(loop->counters->hist))[i];
           // iteration has enough cumulated in partial sum and itself has at least 1 percent
           // or we have complete peeling
-          if ((100*psum)/sum>=good_percentage || 0==rest)
+          if ((100*psum)/sum>=good_percentage || psum==rest)
           {
             prcnt.safe_push(prcnt.last()+(100*psum)/sum);
             good_peels.safe_push(i);
@@ -1158,7 +1158,7 @@ try_peel_loop (class loop *loop,
     }
 
   // adjust loop estimates for peeling npeel times
-  adjust_loop_estimates_minus(loop, npeel);
+  adjust_loop_estimates_minus(loop, npeel, true);
 
   profile_count entry_count = profile_count::zero ();
 

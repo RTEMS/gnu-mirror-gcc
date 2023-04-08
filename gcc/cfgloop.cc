@@ -2284,7 +2284,7 @@ void histogram_counters_div_upper_bound (histogram_counters* hist_c, unsigned in
 
 // adjust estimates after peeling npeel times
 // also used in copy header optimization
-void adjust_loop_estimates_minus ( class loop* loop, unsigned HOST_WIDE_INT npeel)
+void adjust_loop_estimates_minus ( class loop* loop, unsigned HOST_WIDE_INT npeel, bool precise)
 {
   if (loop->any_estimate)
     {
@@ -2293,7 +2293,7 @@ void adjust_loop_estimates_minus ( class loop* loop, unsigned HOST_WIDE_INT npee
       else
 	loop->nb_iterations_estimate = 0;
     }
-  if (loop->any_upper_bound)
+  if (loop->any_upper_bound && precise)
     {
       if (wi::ltu_p (npeel, loop->nb_iterations_upper_bound))
         loop->nb_iterations_upper_bound -= npeel;
