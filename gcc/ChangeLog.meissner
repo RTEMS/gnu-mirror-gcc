@@ -1,5 +1,22 @@
 ==================== Branch work118, patch #1 ====================
 
+Fix splat of extract for long long and double.
+
+2023-04-11   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/99293
+	* gcc/config/rs6000/vsx.md (vsx_splat_extract_<mode>): New combiner
+	insn.
+
+gcc/testsuite/
+
+	PR target/108958
+	* gcc.target/powerpc/pr99293.c: New test.
+
+==================== Branch work118, patch #1 ====================
+
 Make load/cmp fusion know about prefixed loads.
 
 The issue with the bug is the power10 load GPR + cmpi -1/0/1 fusion
