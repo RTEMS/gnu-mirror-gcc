@@ -1,4 +1,20 @@
-==================== Branch work118-dmf, patch #1 ====================
+==================== Branch work118-dmf, patch #21 ====================
+
+Improve 64->128 bit zero extension on PowerPC
+
+2023-03-24   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/108958
+	* gcc/config/rs6000.md (zero_extendditi2): New insn.
+
+gcc/testsuite/
+
+	PR target/108958
+	* gcc.target/powerpc/zero-extend-di-ti.c: New test.
+
+==================== Branch work118-dmf, patch #20 ====================
 
 Fix splat of extract for long long and double.
 
