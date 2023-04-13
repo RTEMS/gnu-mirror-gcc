@@ -3983,23 +3983,48 @@
 }
   [(set_attr "type" "mfvsr")])
 
-;; Optimize extracting a single scalar element from memory.
-(define_insn_and_split "*vsx_extract_<mode>_load"
-  [(set (match_operand:<VEC_base> 0 "register_operand" "=r")
-	(vec_select:<VEC_base>
-	 (match_operand:VSX_EXTRACT_I 1 "memory_operand" "m")
-	 (parallel [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>" "n")])))
-   (clobber (match_scratch:DI 3 "=&b"))]
+;; Extract a V4SI element from memory with constant element number.
+(define_insn_and_split "*vsx_extract_v4si_load"
+  [(set (match_operand:SI 0 "register_operand" "=r,wa")
+	(vec_select:SI
+	 (match_operand:V4SI 1 "memory_operand" "m,m")
+	 (parallel [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>" "n,n")])))
+   (clobber (match_scratch:DI 3 "=&b,&b"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
-  "&& reload_completed"
+  "&& 1"
   [(set (match_dup 0) (match_dup 4))]
 {
+  if (GET_CODE (operands[3]) == SCRATCH)
+    operands[3] = gen_reg_rtx (DImode);
+
   operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
 					   operands[3], <VEC_base>mode);
 }
   [(set_attr "type" "load")
    (set_attr "length" "8")])
+
+;; Extract a V8HI/V16QI element from memory with constant element number.
+(define_insn_and_split "*vsx_extract_<mode>_load"
+  [(set (match_operand:<VEC_base> 0 "register_operand" "=r,v")
+	(vec_select:<VEC_base>
+	 (match_operand:VSX_EXTRACT_I2 1 "memory_operand" "m,m")
+	 (parallel [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>" "n,n")])))
+   (clobber (match_scratch:DI 3 "=&b,&b"))]
+  "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0) (match_dup 4))]
+{
+  if (GET_CODE (operands[3]) == SCRATCH)
+    operands[3] = gen_reg_rtx (DImode);
+
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
+					   operands[3], <VEC_base>mode);
+}
+  [(set_attr "type" "load")
+   (set_attr "length" "8")
+   (set_attr "isa" "*,p9v"])
 
 ;; Variable V16QI/V8HI/V4SI extract from a register
 (define_insn_and_split "vsx_extract_<mode>_var"
