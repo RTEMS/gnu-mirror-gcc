@@ -959,6 +959,12 @@ copy_loop_info (class loop *loop, class loop *target)
   target->finite_p = loop->finite_p;
   target->unroll = loop->unroll;
   target->owned_clique = loop->owned_clique;
+  if (loop->counters){
+    target->counters = ggc_alloc<histogram_counters>();
+    target->counters->sum=loop->counters->sum;
+    target->counters->adjusted=loop->counters->adjusted;
+    target->counters->hist=vec_safe_copy(loop->counters->hist);
+  }
 }
 
 /* Copies copy of LOOP as subloop of TARGET loop, placing newly

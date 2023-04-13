@@ -1066,6 +1066,7 @@ try_peel_loop (class loop *loop,
       }
       if (!good_peels.is_empty()){
           npeel=good_peels.pop();
+          // we do not pop() prcnt because we want it to be last for current iteration
       }
   }
 

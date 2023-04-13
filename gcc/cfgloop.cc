@@ -2288,10 +2288,10 @@ void adjust_loop_estimates_minus ( class loop* loop, unsigned HOST_WIDE_INT npee
 {
   if (loop->any_estimate)
     {
-      if (wi::ltu_p (npeel, loop->nb_iterations_estimate))
+      if (wi::leu_p (npeel, loop->nb_iterations_estimate))
         loop->nb_iterations_estimate -= npeel;
       else
-	loop->nb_iterations_estimate = 0;
+        loop->any_estimate = false;
     }
   if (loop->any_upper_bound && precise)
     {
