@@ -2210,10 +2210,16 @@ unsigned int hist_index(gcov_type_unsigned val){
      }
 }
 
-void histogram_counters_minus_upper_bound (histogram_counters* hist_c,
+void histogram_counters_minus_upper_bound (histogram_counters* &hist_c,
         gcov_type_unsigned difference){
-    if (difference==0 || hist_c->sum==0)
+    if (difference==0 || !hist_c)
         return;
+    if (hist_c->sum==0){
+        va_heap::release(hist_c->hist);
+        ggc_free (hist_c);
+        hist_c=NULL;
+        return;
+    }
     auto& hist=*(hist_c->hist);
     hist_c->adjusted=true;
     auto& sum=hist_c->sum;
@@ -2239,6 +2245,13 @@ void histogram_counters_minus_upper_bound (histogram_counters* hist_c,
         hist[i]=0;
         pow2=pow2<<1;
     }
+    // if there are no more iterations we do not care
+    if (hist_c->sum==0){
+        va_heap::release(hist_c->hist);
+        ggc_free (hist_c);
+        hist_c=NULL;
+        return;
+    }
     // we want to change index 1/(1<<portion) of iterations
     int portion=1;
     for (;i<tot_size-1 && portion<10;++i){
@@ -2259,9 +2272,15 @@ void histogram_counters_minus_upper_bound (histogram_counters* hist_c,
     }
 }
 
-void histogram_counters_div_upper_bound (histogram_counters* hist_c, unsigned int divisor){
-    if (hist_c->sum==0 || divisor<2)
+void histogram_counters_div_upper_bound (histogram_counters* &hist_c, unsigned int divisor){
+    if (divisor<2 || !hist_c)
         return;
+    if (hist_c->sum==0){
+        va_heap::release(hist_c->hist);
+        ggc_free (hist_c);
+        hist_c=NULL;
+        return;
+    }
     auto& hist=*(hist_c->hist);
     hist_c->adjusted=true;
     unsigned int lin_size=param_profile_histogram_size_lin;

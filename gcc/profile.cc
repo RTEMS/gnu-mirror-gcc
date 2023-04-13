@@ -939,6 +939,11 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
                sum+=act_count[t][i];
            }
            lp->counters->sum=sum;
+           if (sum==0){
+               va_heap::release(lp->counters->hist);
+               ggc_free (lp->counters);
+               lp->counters=NULL;
+           }
         }
         act_count[t] += hist->n_counters;
         continue;

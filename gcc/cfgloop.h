@@ -929,8 +929,8 @@ extern bool get_max_loop_iterations (const class loop *loop, widest_int *nit);
 extern bool get_likely_max_loop_iterations (class loop *loop, widest_int *nit);
 extern int bb_loop_depth (const_basic_block);
 extern void histogram_counters_minus_upper_bound 
-    (histogram_counters* hist_c, gcov_type_unsigned difference);
-extern void histogram_counters_div_upper_bound (histogram_counters* hist_c, unsigned int divisor);
+    (histogram_counters*& hist_c, gcov_type_unsigned difference);
+extern void histogram_counters_div_upper_bound (histogram_counters*& hist_c, unsigned int divisor);
 extern void adjust_loop_estimates_minus ( class loop* loop, unsigned
         HOST_WIDE_INT npeel, bool precise);
 
