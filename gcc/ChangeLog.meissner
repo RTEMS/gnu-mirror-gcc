@@ -1,3 +1,16 @@
+==================== Branch work118, patch #55 ====================
+
+Add sign/zero extension to vec_extract with variable element number.
+
+2023-04-14   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (VSX_EXTRACT_SIGN): New iterator.
+	(vsx_extract_<mode>_var_load): Update length.
+	(vsx_extract_<mode>_var_load_to_sdi): New insn.
+	(vsx_extract_<mode>_var_load_to_udi): New insn.
+
 ==================== Branch work118, patch #54 ====================
 
 Add conversions fro V4SI vec_extract
