@@ -1,3 +1,93 @@
+==================== Branch work118, patch #54 ====================
+
+Add conversions fro V4SI vec_extract
+
+This patch adds combiner insns to fold in sign and zero extension of vec_extract
+of V4SI with a constant element when expanding to DImode.  It also adds in
+combiner insns to create SFmdoe and DFmode.
+
+2023-04-14   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4si_load_to_<su>di): New insn.
+	(vsx_extract_v4si_load_to_<mode>): New insn.
+	(vsx_extract_v4si_load_to_uns<mode>): New insn.
+
+==================== Branch work118, patch #53 ====================
+
+Allow vec_extract of int vectors to vector registers
+
+2023-04-14   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4si_load): New insn, split off from
+	vsx_extract_<mode>_load to handle loading SImode into vector registers
+	from V4SImode.
+	(vsx_extract_<mode>_load): Restrict to V8HI and V16QI.  Add support to
+	load the element into vector registers.
+
+==================== Branch work118, patch #52 ====================
+
+Improve vec_extract of V4SF from memory with variable element.
+
+2023-04-14   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4sf_var_load): Allow split before
+	register allocation.
+	(vsx_extract_v4sf_to_df_var_load): New insn.
+
+
+==================== Branch work118, patch #51 ====================
+
+Improve vec_extract of V4SF from memory with constant element.
+
+2023-04-14   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (get_vector_offset): Allow being called before
+	register allocation.
+	(adjust_vec_address_pcrel): Likewise.
+	(rs6000_adjust_vec_address): Likewise.
+	* config/rs6000/vsx.md (vsx_extract_v4sf_load): Allow split before
+	register allocation.
+	(vsx_extract_v4sf_to_df_load): New insn.
+
+==================== Branch work118, patch #50 ====================
+
+Fix typo in insn name.
+
+In doing other work, I noticed that there was an insn:
+
+	vsx_extract_v4sf_<mode>_load
+
+Which did not have an iterator.  I removed the useless <mode>.
+
+2023-04-14   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4sf_load): Rename from
+	vsx_extract_v4sf_<mode>_load.
+
+==================== Branch work118, patch #42 was reverted ====================
+
+==================== Branch work118, patch #41 was reverted ====================
+
+==================== Branch work118, patch #40 was reverted ====================
+
+==================== Branch work118, patch #33 was reverted ====================
+
+==================== Branch work118, patch #32 was reverted ====================
+
+==================== Branch work118, patch #31 was reverted ====================
+
+==================== Branch work118, patch #30 was reverted ====================
+
 ==================== Branch work118, patch #22 was reverted ====================
 
 ==================== Branch work118, patch #21 ====================
