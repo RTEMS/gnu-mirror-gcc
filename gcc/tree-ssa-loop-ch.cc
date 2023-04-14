@@ -462,7 +462,6 @@ ch_base::copy_headers (function *fun)
       edge_iterator ei;
       FOR_EACH_EDGE (e, ei, loop->header->preds)
         entry_count += e->count ();
-      auto prob_enters_loop=profile_probability::guessed_always();
       while (should_duplicate_loop_header_p (header, loop, &remaining_limit))
 	{
 	  if (dump_file && (dump_flags & TDF_DETAILS))

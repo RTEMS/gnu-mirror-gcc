@@ -2184,7 +2184,7 @@ output_cfg (struct output_block *ob, struct function *fn)
       streamer_write_hwi (ob, loop->counters!=NULL);
       if (loop->counters) {
           streamer_write_gcov_count (ob, loop->counters->sum);
-          for (unsigned int i=0; i<param_profile_histogram_size; ++i) {
+          for (unsigned int i=0; i<(unsigned int) param_profile_histogram_size; ++i) {
             streamer_write_gcov_count (ob, (*loop->counters->hist)[i]);
           }
       }
