@@ -3989,6 +3989,75 @@
   [(set_attr "type" "load,load,fpload,fpload")
    (set_attr "length" "4,8,4,8")])
 
+;; Extract a V4SI element from memory with constant element number and convert
+;; it to DImode with zero or sign extension.
+(define_insn_and_split "*vsx_extract_v4si_load_to_<su>di"
+  [(set (match_operand:DI 0 "register_operand" "=r,r,wa,wa")
+	(any_extend:DI
+	 (vec_select:SI
+	  (match_operand:V4SI 1 "memory_operand" "YZ,m,Z,Q")
+	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "0,n,0,n")]))))
+   (clobber (match_scratch:DI 3 "=X,&b,X,&b"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(any_extend:DI (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
+					   operands[3], SImode);
+}
+  [(set_attr "type" "load,load,fpload,fpload")
+   (set_attr "length" "4,8,4,8")])
+
+;; Extract a V4SI element from memory with constant element number and convert
+;; it to SFmode or DFmode using signed conversion
+(define_insn_and_split "*vsx_extract_v4si_load_to_<mode>"
+  [(set (match_operand:SFDF 0 "register_operand" "=wa")
+	(float:SFDF
+	 (vec_select:SI
+	  (match_operand:V4SI 1 "memory_operand" "m")
+	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "n")]))))
+   (clobber (match_scratch:DI 3 "=&b"))
+   (clobber (match_scratch:DI 4 "=wa"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 4)
+	(sign_extend:DI (match_dup 5)))
+   (set (match_dup 0)
+	(float:SFDF (match_dup 4)))]
+{
+  operands[5] = rs6000_adjust_vec_address (operands[4], operands[1], operands[2],
+					   operands[3], SImode);
+}
+  [(set_attr "type" "fpload")
+   (set_attr "length" "12")])
+
+;; Extract a V4SI element from memory with constant element number and convert
+;; it to SFmode or DFmode using unsigned conversion
+(define_insn_and_split "*vsx_extract_v4si_load_to_uns<mode>"
+  [(set (match_operand:SFDF 0 "register_operand" "=wa")
+	(unsigned_float:SFDF
+	 (vec_select:SI
+	  (match_operand:V4SI 1 "memory_operand" "m")
+	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "n")]))))
+   (clobber (match_scratch:DI 3 "=&b"))
+   (clobber (match_scratch:DI 4 "=wa"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 4)
+	(zero_extend:DI (match_dup 5)))
+   (set (match_dup 0)
+	(unsigned_float:SFDF (match_dup 4)))]
+{
+  operands[5] = rs6000_adjust_vec_address (operands[4], operands[1], operands[2],
+					   operands[3], SImode);
+}
+  [(set_attr "type" "fpload")
+   (set_attr "length" "12")])
+
 ;; Extract a V8HI/V16QI element from memory with constant element number.
 (define_insn_and_split "*vsx_extract_<mode>_load"
   [(set (match_operand:<VEC_base> 0 "register_operand" "=r,r,v,v")
