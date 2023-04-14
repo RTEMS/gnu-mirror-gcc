@@ -1506,10 +1506,8 @@ allocate_dynamic_stack_space (rtx size, unsigned size_align,
     }
   else
     {
-      rtx tmp = force_reg (POmode, size);
-      rtx target = gen_reg_rtx (POmode);
-      emit_insn (gen_cap_round_representable_length (target, tmp));
-      size = target;
+      size = expand_unop (POmode, cap_round_representable_length_optab,
+			  size, NULL_RTX, 1);
     }
 
   bounds_size = size;
@@ -1579,10 +1577,9 @@ allocate_dynamic_stack_space (rtx size, unsigned size_align,
       emit_move_insn (saved_top, cap_aligned);
 
       /* Get the mask which describes the alignment we need.  */
-      rtx size_rtx = force_reg (POmode, orig_size);
-      cheri_alignment_mask = gen_reg_rtx (POmode);
-      emit_insn (gen_cap_representable_alignment_mask
-		 (cheri_alignment_mask, size_rtx));
+      cheri_alignment_mask = expand_unop (POmode,
+					  cap_representable_alignment_mask_optab,
+					  orig_size, NULL_RTX, 1);
 
       /* Use that mask to apply the relevant alignment to our pointer onto the
 	 stack.  */

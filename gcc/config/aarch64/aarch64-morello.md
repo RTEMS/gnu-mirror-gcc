@@ -197,7 +197,7 @@
   "gclen\\t%0, %1"
 )
 
-(define_insn "cap_representable_alignment_mask"
+(define_insn "cap_representable_alignment_mask_di"
   [(set (match_operand:DI 0 "register_operand" "=r")
         (unspec:DI [(match_operand:DI 1 "register_operand" "r")]
             UNSPEC_CHERI_REPR_ALIGN_MASK)
@@ -206,7 +206,7 @@
   "rrmask\\t%0, %1"
 )
 
-(define_insn "cap_round_representable_length"
+(define_insn "cap_round_representable_length_di"
   [(set (match_operand:DI 0 "register_operand" "=r")
         (unspec:DI [(match_operand:DI 1 "register_operand" "r")]
            UNSPEC_CHERI_ROUND_REPR_LEN)
