@@ -23,16 +23,16 @@ along with GCC; see the file COPYING3.  If not see
 /* Supported histogram types.  */
 enum hist_type
 {
-  HIST_TYPE_INTERVAL,	/* Measures histogram of values inside a specified
-			   interval.  */
-  HIST_TYPE_POW2,	/* Histogram of power of 2 values.  */
-  HIST_TYPE_TOPN_VALUES, /* Tries to identify the N most common values.  */
-  HIST_TYPE_INDIR_CALL,   /* Tries to identify the function that is (almost)
+  HIST_TYPE_INTERVAL,	  /* Measures histogram of values inside a specified
+			     interval.  */
+  HIST_TYPE_POW2,	  /* Histogram of power of 2 values.  */
+  HIST_TYPE_TOPN_VALUES,  /* Tries to identify the N most common values.  */
+  HIST_TYPE_INDIR_CALL,	  /* Tries to identify the function that is (almost)
 			    called in indirect call */
-  HIST_TYPE_AVERAGE,	/* Compute average value (sum of all values).  */
-  HIST_TYPE_IOR,	/* Used to compute expected alignment.  */
+  HIST_TYPE_AVERAGE,	  /* Compute average value (sum of all values).  */
+  HIST_TYPE_IOR,	  /* Used to compute expected alignment.  */
   HIST_TYPE_TIME_PROFILE, /* Used for time profile */
-  HIST_TYPE_HISTOGRAM,	/* used values histogram */
+  HIST_TYPE_HISTOGRAM,	  /* used values histogram */
   HIST_TYPE_MAX
 };
 
@@ -75,9 +75,9 @@ typedef vec<histogram_value> histogram_values;
 extern void gimple_find_values_to_profile (histogram_values *);
 extern bool gimple_value_profile_transformations (void);
 
-histogram_value gimple_alloc_histogram_value (struct function *, enum hist_type,
-					      gimple *stmt = NULL,
-					      tree value = NULL);
+histogram_value
+gimple_alloc_histogram_value (struct function *, enum hist_type,
+			      gimple *stmt = NULL, tree value = NULL);
 histogram_value gimple_histogram_value (struct function *, gimple *);
 histogram_value gimple_histogram_value_of_type (struct function *, gimple *,
 						enum hist_type);
@@ -102,7 +102,8 @@ extern void gimple_init_gcov_profiler (void);
 extern void gimple_gen_edge_profiler (int, edge);
 extern void gimple_gen_interval_profiler (histogram_value, unsigned);
 extern void gimple_gen_pow2_profiler (histogram_value, unsigned);
-extern void gimple_gen_histogram_profiler (histogram_value, unsigned);
+extern void
+gimple_gen_histogram_profiler (histogram_value, unsigned);
 extern void gimple_gen_topn_values_profiler (histogram_value, unsigned);
 extern void gimple_gen_ic_profiler (histogram_value, unsigned);
 extern void gimple_gen_ic_func_profiler (void);

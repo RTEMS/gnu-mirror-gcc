@@ -126,9 +126,9 @@ gimple_alloc_histogram_value (struct function *fun ATTRIBUTE_UNUSED,
 
 histogram_value
 gimple_alloc_histogram_value_loop (struct function *fun ATTRIBUTE_UNUSED,
-			      enum hist_type type, tree value, class loop *lp)
+				   enum hist_type type, tree value,
+				   class loop *lp)
 {
-
    histogram_value hist = (histogram_value) xcalloc (1, sizeof (*hist));
    hist->hvalue.value = value;
    hist->hvalue.stmt = NULL;
@@ -264,23 +264,28 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
 	}
       break;
     case HIST_TYPE_HISTOGRAM:
-      if (hist->hvalue.counters){
-        for (int i=0; i<=param_profile_histogram_size_lin; ++i){
-  	  fprintf (dump_file, "Histogram counter histogram%" PRId64
-	     ":%" PRId64 ".\n",
-	     (int64_t) i,
-	     (int64_t) hist->hvalue.counters[i]);
-        }
-        int lin2_log=floor_log2 (param_profile_histogram_size_lin);
-        for (int64_t i=lin2_log;
-                i<param_profile_histogram_size-param_profile_histogram_size_lin+lin2_log;
-        ++i){
-  	  fprintf (dump_file, "Histogram counter histogram%" PRId64
-	     ":%" PRId64 ".\n",
-	     (int64_t) 1<<i,
-	     (int64_t) hist->hvalue.counters[(param_profile_histogram_size_lin-lin2_log)+i]);
-        }
-      }
+      if (hist->hvalue.counters)
+	{
+	  for (int i = 0; i <= param_profile_histogram_size_lin; ++i)
+	    {
+	      fprintf (dump_file,
+		       "Histogram counter histogram%" PRId64 ":%" PRId64 ".\n",
+		       (int64_t) i, (int64_t) hist->hvalue.counters[i]);
+	    }
+	  int lin2_log = floor_log2 (param_profile_histogram_size_lin);
+	  for (int64_t i = lin2_log;
+	       i < param_profile_histogram_size
+		     - param_profile_histogram_size_lin + lin2_log;
+	       ++i)
+	    {
+	      fprintf (
+		dump_file,
+		"Histogram counter histogram%" PRId64 ":%" PRId64 ".\n",
+		(int64_t) 1 << i,
+		(int64_t) hist->hvalue
+		  .counters[(param_profile_histogram_size_lin - lin2_log) + i]);
+	    }
+	}
       break;
 
     case HIST_TYPE_POW2:
@@ -399,7 +404,7 @@ stream_in_histogram_value (class lto_input_block *ib, gimple *stmt)
 	  ncounters = new_val->hdata.intvl.steps + 2;
 	  break;
 
-    case HIST_TYPE_HISTOGRAM:
+	case HIST_TYPE_HISTOGRAM:
 	  ncounters = param_profile_histogram_size;
 	  break;
 	case HIST_TYPE_POW2:
@@ -1836,13 +1841,14 @@ gimple_divmod_values_to_profile (gimple *stmt, histogram_values *values)
       divisor = gimple_assign_rhs2 (stmt);
       op0 = gimple_assign_rhs1 (stmt);
 
-      if (TREE_CODE (divisor) == SSA_NAME){
-	/* Check for the case where the divisor is the same value most
-	   of the time.  */
-	values->safe_push (gimple_alloc_histogram_value (cfun,
-							 HIST_TYPE_TOPN_VALUES,
-							 stmt, divisor));
-      }
+      if (TREE_CODE (divisor) == SSA_NAME)
+	{
+	  /* Check for the case where the divisor is the same value most
+	     of the time.  */
+	  values->safe_push (
+	    gimple_alloc_histogram_value (cfun, HIST_TYPE_TOPN_VALUES, stmt,
+					  divisor));
+	}
 
       /* For mod, check whether it is not often a noop (or replaceable by
 	 a few subtractions).  */
@@ -1930,17 +1936,20 @@ gimple_stringops_values_to_profile (gimple *gs, histogram_values *values)
 }
 
 static void
-gimple_histogram_values_to_profile(function *fun, histogram_values * values){
-    for (auto loop : loops_list (fun, 0)){
-         tree var;
-         gimple_stmt_iterator gsi;
-         
-         gsi = gsi_start_bb (loop->latch);
-         create_iv (build_int_cst_type (get_gcov_type(), 0), build_int_cst (get_gcov_type(), 1), NULL_TREE,
-             loop, &gsi, true, &var, NULL);
-         values->safe_push (gimple_alloc_histogram_value_loop (fun,
-                                         HIST_TYPE_HISTOGRAM,
-                                         var, loop));
+gimple_histogram_values_to_profile (function *fun, histogram_values *values)
+{
+  for (auto loop : loops_list (fun, 0))
+    {
+      tree var;
+      gimple_stmt_iterator gsi;
+
+      gsi = gsi_start_bb (loop->latch);
+      create_iv (build_int_cst_type (get_gcov_type (), 0),
+		 build_int_cst (get_gcov_type (), 1), NULL_TREE, loop, &gsi,
+		 true, &var, NULL);
+      values->safe_push (gimple_alloc_histogram_value_loop (fun,
+							    HIST_TYPE_HISTOGRAM,
+							    var, loop));
     }
 }
 
@@ -1963,7 +1972,7 @@ gimple_find_values_to_profile (histogram_values *values)
   unsigned i;
   histogram_value hist = NULL;
   values->create (0);
-  gimple_histogram_values_to_profile(cfun, values);
+  gimple_histogram_values_to_profile (cfun, values);
   FOR_EACH_BB_FN (bb, cfun)
     for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
       gimple_values_to_profile (gsi_stmt (gsi), values);

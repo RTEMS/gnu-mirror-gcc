@@ -188,7 +188,7 @@ instrument_values (histogram_values values)
 	case HIST_TYPE_TIME_PROFILE:
 	  gimple_gen_time_profiler (t);
 	  break;
-      
+
 	case HIST_TYPE_HISTOGRAM:
 	  gimple_gen_histogram_profiler (hist, t);
 	  break;
@@ -919,35 +919,38 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
       bool topn_p = (hist->type == HIST_TYPE_TOPN_VALUES
 		     || hist->type == HIST_TYPE_INDIR_CALL);
 
-
       /* Histogram profiler counter is not related to any statement,
-         so that we have to read the counter and set the value to
-         the corresponding loop  */
+	 so that we have to read the counter and set the value to
+	 the corresponding loop  */
 
       if (hist->type == HIST_TYPE_HISTOGRAM)
-      {
-        auto lp = hist->hvalue.lp;
-        if (act_count[t]){
-           lp->counters=ggc_alloc<histogram_counters>();
-           gcov_type sum=0;
-           lp->counters->adjusted=false;
-           lp->counters->hist=NULL;
-           vec_safe_grow_cleared(lp->counters->hist,param_profile_histogram_size);
-           for (int i=0;i<param_profile_histogram_size;++i){
-               auto hst=lp->counters->hist;
-               (*hst)[i]=act_count[t][i];
-               sum+=act_count[t][i];
-           }
-           lp->counters->sum=sum;
-           if (sum==0){
-               va_heap::release(lp->counters->hist);
-               ggc_free (lp->counters);
-               lp->counters=NULL;
-           }
-        }
-        act_count[t] += hist->n_counters;
-        continue;
-      }
+	{
+	  auto lp = hist->hvalue.lp;
+	  if (act_count[t])
+	    {
+	      lp->counters = ggc_alloc<histogram_counters> ();
+	      gcov_type sum = 0;
+	      lp->counters->adjusted = false;
+	      lp->counters->hist = NULL;
+	      vec_safe_grow_cleared (lp->counters->hist,
+				     param_profile_histogram_size);
+	      for (int i = 0; i < param_profile_histogram_size; ++i)
+		{
+		  auto hst = lp->counters->hist;
+		  (*hst)[i] = act_count[t][i];
+		  sum += act_count[t][i];
+		}
+	      lp->counters->sum = sum;
+	      if (sum == 0)
+		{
+		  va_heap::release (lp->counters->hist);
+		  ggc_free (lp->counters);
+		  lp->counters = NULL;
+		}
+	    }
+	  act_count[t] += hist->n_counters;
+	  continue;
+	}
 
       /* TOP N counter uses variable number of counters.  */
       if (topn_p)
@@ -983,7 +986,6 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
 	    else
 	      hist->hvalue.counters[j] = 0;
 	}
-
 
       /* Time profiler counter is not related to any statement,
          so that we have to read the counter and set the value to
@@ -1567,7 +1569,7 @@ branch_prob (bool thunk)
       if (flag_profile_values)
 	instrument_values (values);
     }
-      /* Commit changes done by instrumentation.  */
+  /* Commit changes done by instrumentation.  */
   gsi_commit_edge_inserts ();
 
   free_aux_for_edges ();
@@ -1593,8 +1595,8 @@ branch_prob (bool thunk)
 	  }
       compute_function_frequency ();
     }
-   loop_optimizer_finalize ();
-   free_dominance_info (CDI_DOMINATORS);
+  loop_optimizer_finalize ();
+  free_dominance_info (CDI_DOMINATORS);
 }
 
 /* Union find algorithm implementation for the basic blocks using

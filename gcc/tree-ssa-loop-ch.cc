@@ -461,7 +461,7 @@ ch_base::copy_headers (function *fun)
       edge e;
       edge_iterator ei;
       FOR_EACH_EDGE (e, ei, loop->header->preds)
-        entry_count += e->count ();
+	entry_count += e->count ();
       while (should_duplicate_loop_header_p (header, loop, &remaining_limit))
 	{
 	  if (dump_file && (dump_flags & TDF_DETAILS))
@@ -470,20 +470,20 @@ ch_base::copy_headers (function *fun)
 	  /* Find a successor of header that is inside a loop; i.e. the new
 	     header after the condition is copied.  */
 	  if (flow_bb_inside_loop_p (loop, EDGE_SUCC (header, 0)->dest))
-      {
-        nonexit = EDGE_SUCC (header, 0);
-        exit = EDGE_SUCC (header, 1);
-      }
-      else
-      {
-        nonexit = EDGE_SUCC (header, 1);
-        exit = EDGE_SUCC (header, 0);
-      }
-      exit_count += exit->count ();
-      nexits++;
+	    {
+	      nonexit = EDGE_SUCC (header, 0);
+	      exit = EDGE_SUCC (header, 1);
+	    }
+	  else
+	    {
+	      nonexit = EDGE_SUCC (header, 1);
+	      exit = EDGE_SUCC (header, 0);
+	    }
+	  exit_count += exit->count ();
+	  nexits++;
 	  bbs[n_bbs++] = header;
 	  gcc_assert (bbs_size > n_bbs);
-      header = nonexit->dest;
+	  header = nonexit->dest;
 	}
 
       if (!nonexit)
@@ -570,13 +570,13 @@ ch_base::copy_headers (function *fun)
 	    fprintf (dump_file, "Loop %d is still not do-while loop.\n",
 		     loop->num);
 	}
-      // if it is unlikely that after header copy the iterations enter the loop it
-      // behaves like peeling 1 time
+      // if it is unlikely that after header copy the iterations enter the loop
+      // it behaves like peeling 1 time
       auto_vec<edge> exits = get_loop_exit_edges (loop);
-      if (nexits == (int)exits.length ())
-           adjust_loop_estimates_minus(loop, 1, true);
+      if (nexits == (int) exits.length ())
+	adjust_loop_estimates_minus (loop, 1, true);
       else if (exit_count >= entry_count.apply_scale (9, 10))
-          adjust_loop_estimates_minus(loop, 1, false);
+	adjust_loop_estimates_minus (loop, 1, false);
 
       changed = true;
     }

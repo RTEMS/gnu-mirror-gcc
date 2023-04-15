@@ -1774,7 +1774,7 @@ loop_preheader_edge (const class loop *loop)
   edge_iterator ei;
 
   gcc_assert (loops_state_satisfies_p (LOOPS_HAVE_PREHEADERS)
-           && ! loops_state_satisfies_p (LOOPS_MAY_HAVE_MULTIPLE_LATCHES));
+	      && !loops_state_satisfies_p (LOOPS_MAY_HAVE_MULTIPLE_LATCHES));
 
   FOR_EACH_EDGE (e, ei, loop->header->preds)
     if (e->src != loop->latch)
@@ -2185,143 +2185,168 @@ loops_list::walk_loop_tree (class loop *root, unsigned flags)
     this->to_visit.quick_push (root->num);
 }
 
-unsigned int hist_index(gcov_type_unsigned val){
-   unsigned int lin_size = param_profile_histogram_size_lin;
-   unsigned int tot_size = param_profile_histogram_size;
-   if (val < lin_size)
-     {
-       return val;
-     }
-   else
-     {
-       gcov_type_unsigned pow2 = floor_log2 (val);
-       gcov_type_unsigned lin_pow2 = floor_log2 (lin_size - 1);
-       if (lin_size<tot_size && pow2==lin_pow2){
-           return lin_size;
-       }
-       if (tot_size > pow2 + ((lin_size - 1) - lin_pow2))
-         {
-           return pow2 + ((lin_size - 1)- lin_pow2);
-         }
-       else
-         {
-           return tot_size - 1;
-         }
-     }
-}
-
-void histogram_counters_minus_upper_bound (histogram_counters* &hist_c,
-        gcov_type_unsigned difference){
-    if (difference==0 || !hist_c)
-        return;
-    if (hist_c->sum==0){
-        va_heap::release(hist_c->hist);
-        ggc_free (hist_c);
-        hist_c=NULL;
-        return;
+unsigned int
+hist_index (gcov_type_unsigned val)
+{
+  unsigned int lin_size = param_profile_histogram_size_lin;
+  unsigned int tot_size = param_profile_histogram_size;
+  if (val < lin_size)
+    {
+      return val;
     }
-    auto& hist=*(hist_c->hist);
-    hist_c->adjusted=true;
-    auto& sum=hist_c->sum;
-    unsigned int lin_size=param_profile_histogram_size_lin;
-    unsigned int tot_size=param_profile_histogram_size;
-    // If the last linear counter does not contain other iterations
-    unsigned int i=1;
-    for(; i<lin_size; i++){
-        if (i<=difference){
-            sum-=hist[0];
-            hist[0]=hist[i];
-        } else {
-            hist[i-difference]+=hist[i];
-        }
-        hist[i]=0;
-    }
-    // next pow2
-    gcov_type_unsigned pow2=((gcov_type_unsigned)1)<<(ceil_log2(lin_size)+i+1-lin_size);
-    // we null all counters that cannot transfer to non-zero counts
-    for (;pow2-1<difference && i<tot_size-1;++i){
-        sum-=hist[0];
-        hist[0]=hist[i];
-        hist[i]=0;
-        pow2=pow2<<1;
-    }
-    // if there are no more iterations we do not care
-    if (hist_c->sum==0){
-        va_heap::release(hist_c->hist);
-        ggc_free (hist_c);
-        hist_c=NULL;
-        return;
-    }
-    // we want to change index 1/(1<<portion) of iterations
-    int portion=1;
-    for (;i<tot_size-1 && portion<10;++i){
-        // we take a sample point and suppose by uniform distribution that all
-        // lesser iterations move same as this point
-        gcov_type_unsigned point=(pow2>>1) + (pow2 >> (1+portion));
-        unsigned int ind=hist_index(point>=difference?point-difference:0);
-        while (ind==i){
-            // if nothing changes we decrease the portion of iteration changed
-            ++portion;
-            point=(pow2>>1) + (pow2 >> (1+portion));
-            ind=hist_index(point>=difference?point-difference:0);
-        }
-        int64_t diff=hist[i]/(1<<portion);
-        hist[ind]+=diff;
-        hist[i]-=diff;
-        pow2<<=1;
+  else
+    {
+      gcov_type_unsigned pow2 = floor_log2 (val);
+      gcov_type_unsigned lin_pow2 = floor_log2 (lin_size - 1);
+      if (lin_size < tot_size && pow2 == lin_pow2)
+	{
+	  return lin_size;
+	}
+      if (tot_size > pow2 + ((lin_size - 1) - lin_pow2))
+	{
+	  return pow2 + ((lin_size - 1) - lin_pow2);
+	}
+      else
+	{
+	  return tot_size - 1;
+	}
     }
 }
 
-void histogram_counters_div_upper_bound (histogram_counters* &hist_c, unsigned int divisor){
-    if (divisor<2 || !hist_c)
-        return;
-    if (hist_c->sum==0){
-        va_heap::release(hist_c->hist);
-        ggc_free (hist_c);
-        hist_c=NULL;
-        return;
+void
+histogram_counters_minus_upper_bound (histogram_counters *&hist_c,
+				      gcov_type_unsigned difference)
+{
+  if (difference == 0 || !hist_c)
+    return;
+  if (hist_c->sum == 0)
+    {
+      va_heap::release (hist_c->hist);
+      ggc_free (hist_c);
+      hist_c = NULL;
+      return;
     }
-    auto& hist=*(hist_c->hist);
-    hist_c->adjusted=true;
-    unsigned int lin_size=param_profile_histogram_size_lin;
-    unsigned int tot_size=param_profile_histogram_size;
-    unsigned int i=1;
-    for(; i<lin_size && i<tot_size-1; i++){
-        hist[i/divisor]+=hist[i];
-        hist[i]=0;
+  auto &hist = *(hist_c->hist);
+  hist_c->adjusted = true;
+  auto &sum = hist_c->sum;
+  unsigned int lin_size = param_profile_histogram_size_lin;
+  unsigned int tot_size = param_profile_histogram_size;
+  // If the last linear counter does not contain other iterations
+  unsigned int i = 1;
+  for (; i < lin_size; i++)
+    {
+      if (i <= difference)
+	{
+	  sum -= hist[0];
+	  hist[0] = hist[i];
+	}
+      else
+	{
+	  hist[i - difference] += hist[i];
+	}
+      hist[i] = 0;
+    }
+  // next pow2
+  gcov_type_unsigned pow2 = ((gcov_type_unsigned) 1)
+			    << (ceil_log2 (lin_size) + i + 1 - lin_size);
+  // we null all counters that cannot transfer to non-zero counts
+  for (; pow2 - 1 < difference && i < tot_size - 1; ++i)
+    {
+      sum -= hist[0];
+      hist[0] = hist[i];
+      hist[i] = 0;
+      pow2 = pow2 << 1;
+    }
+  // if there are no more iterations we do not care
+  if (hist_c->sum == 0)
+    {
+      va_heap::release (hist_c->hist);
+      ggc_free (hist_c);
+      hist_c = NULL;
+      return;
+    }
+  // we want to change index 1/(1<<portion) of iterations
+  int portion = 1;
+  for (; i < tot_size - 1 && portion < 10; ++i)
+    {
+      // we take a sample point and suppose by uniform distribution that all
+      // lesser iterations move same as this point
+      gcov_type_unsigned point = (pow2 >> 1) + (pow2 >> (1 + portion));
+      unsigned int ind
+	= hist_index (point >= difference ? point - difference : 0);
+      while (ind == i)
+	{
+	  // if nothing changes we decrease the portion of iteration changed
+	  ++portion;
+	  point = (pow2 >> 1) + (pow2 >> (1 + portion));
+	  ind = hist_index (point >= difference ? point - difference : 0);
+	}
+      int64_t diff = hist[i] / (1 << portion);
+      hist[ind] += diff;
+      hist[i] -= diff;
+      pow2 <<= 1;
+    }
+}
+
+void
+histogram_counters_div_upper_bound (histogram_counters *&hist_c,
+				    unsigned int divisor)
+{
+  if (divisor < 2 || !hist_c)
+    return;
+  if (hist_c->sum == 0)
+    {
+      va_heap::release (hist_c->hist);
+      ggc_free (hist_c);
+      hist_c = NULL;
+      return;
+    }
+  auto &hist = *(hist_c->hist);
+  hist_c->adjusted = true;
+  unsigned int lin_size = param_profile_histogram_size_lin;
+  unsigned int tot_size = param_profile_histogram_size;
+  unsigned int i = 1;
+  for (; i < lin_size && i < tot_size - 1; i++)
+    {
+      hist[i / divisor] += hist[i];
+      hist[i] = 0;
     }
 
-    for (;i<tot_size-1;i++){
-        gcov_type_unsigned upper_pow2=((gcov_type_unsigned)1)<<(ceil_log2(lin_size)+i+1-lin_size);
-        gcov_type_unsigned half=(upper_pow2>>2)+(upper_pow2>>1);
-        unsigned int ind=hist_index(half/divisor);
-        hist[ind]+=hist[i];
-        hist[i]=0;
+  for (; i < tot_size - 1; i++)
+    {
+      gcov_type_unsigned upper_pow2
+	= ((gcov_type_unsigned) 1) << (ceil_log2 (lin_size) + i + 1 - lin_size);
+      gcov_type_unsigned half = (upper_pow2 >> 2) + (upper_pow2 >> 1);
+      unsigned int ind = hist_index (half / divisor);
+      hist[ind] += hist[i];
+      hist[i] = 0;
     }
-
 }
 
 // adjust estimates after peeling npeel times
 // also used in copy header optimization
-void adjust_loop_estimates_minus ( class loop* loop, unsigned HOST_WIDE_INT npeel, bool precise)
+void
+adjust_loop_estimates_minus (class loop *loop, unsigned HOST_WIDE_INT npeel,
+			     bool precise)
 {
   if (loop->any_estimate)
     {
       if (wi::leu_p (npeel, loop->nb_iterations_estimate))
-        loop->nb_iterations_estimate -= npeel;
+	loop->nb_iterations_estimate -= npeel;
       else
-        loop->any_estimate = false;
+	loop->any_estimate = false;
     }
   if (loop->any_upper_bound && precise)
     {
       if (wi::ltu_p (npeel, loop->nb_iterations_upper_bound))
-        loop->nb_iterations_upper_bound -= npeel;
+	loop->nb_iterations_upper_bound -= npeel;
       else
-        loop->nb_iterations_upper_bound = 0;
+	loop->nb_iterations_upper_bound = 0;
     }
-  if (loop->counters){
-       histogram_counters_minus_upper_bound(loop->counters,npeel);
-  }
+  if (loop->counters)
+    {
+      histogram_counters_minus_upper_bound (loop->counters, npeel);
+    }
   if (loop->any_likely_upper_bound)
     {
       if (wi::ltu_p (npeel, loop->nb_iterations_likely_upper_bound))

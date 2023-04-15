@@ -66,7 +66,7 @@ along with GCC; see the file COPYING3.  If not see
 static GTY(()) tree gcov_type_node;
 static GTY(()) tree tree_interval_profiler_fn;
 static GTY(()) tree tree_pow2_profiler_fn;
-static GTY(()) tree tree_histogram_profiler_fn;
+static GTY (()) tree tree_histogram_profiler_fn;
 static GTY(()) tree tree_topn_values_profiler_fn;
 static GTY(()) tree tree_indirect_call_profiler_fn;
 static GTY(()) tree tree_average_profiler_fn;
@@ -169,11 +169,11 @@ gimple_init_gcov_profiler (void)
 
       /* void (*) (gcov_type *, gcov_type)  */
       histogram_profiler_fn_type
-	      = build_function_type_list (void_type_node,
-					  gcov_type_ptr, gcov_type_node, gcov_type_node,
-					  NULL_TREE);
+	= build_function_type_list (void_type_node, gcov_type_ptr,
+				    gcov_type_node, gcov_type_node, NULL_TREE);
       fn_name = concat ("__gcov_histogram_profiler", fn_suffix, NULL);
-      tree_histogram_profiler_fn = build_fn_decl (fn_name, histogram_profiler_fn_type);
+      tree_histogram_profiler_fn
+	= build_fn_decl (fn_name, histogram_profiler_fn_type);
       free (CONST_CAST (char *, fn_name));
       TREE_NOTHROW (tree_histogram_profiler_fn) = 1;
       DECL_ATTRIBUTES (tree_histogram_profiler_fn)
@@ -357,24 +357,29 @@ gimple_gen_pow2_profiler (histogram_value value, unsigned tag)
 }
 
 void
-gimple_gen_histogram_profiler (histogram_value value, unsigned tag) // , edge_def* edge
+gimple_gen_histogram_profiler (histogram_value value,
+			       unsigned tag) // , edge_def* edge
 {
   gimple *stmt = value->hvalue.stmt;
-  gcc_assert(!stmt);
+  gcc_assert (!stmt);
   auto lp = value->hvalue.lp;
-  gcc_assert(lp);
+  gcc_assert (lp);
   tree ref_ptr = tree_coverage_counter_addr (tag, 0);
-  tree hist_size = build_int_cst_type (gcov_type_node,
-				   param_profile_histogram_size_lin | (gcov_type(param_profile_histogram_size)<<32));
+  tree hist_size
+    = build_int_cst_type (gcov_type_node,
+			  param_profile_histogram_size_lin
+			    | (gcov_type (param_profile_histogram_size) << 32));
   gcall *call;
   auto_vec<edge> exits = get_loop_exit_edges (lp);
-  for ( auto exit : exits ){
-       if (!(exit->flags & (EDGE_COMPLEX | EDGE_FAKE))) {
-          call = gimple_build_call (tree_histogram_profiler_fn, 3, ref_ptr,
-                  value->hvalue.value, hist_size);
-          gsi_insert_seq_on_edge (exit, call);
-       }
-  }
+  for (auto exit : exits)
+    {
+      if (!(exit->flags & (EDGE_COMPLEX | EDGE_FAKE)))
+	{
+	  call = gimple_build_call (tree_histogram_profiler_fn, 3, ref_ptr,
+				    value->hvalue.value, hist_size);
+	  gsi_insert_seq_on_edge (exit, call);
+	}
+    }
 }
 
 /* Output instructions as GIMPLE trees for code to find the most N common

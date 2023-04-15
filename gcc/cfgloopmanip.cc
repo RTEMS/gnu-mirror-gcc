@@ -959,12 +959,13 @@ copy_loop_info (class loop *loop, class loop *target)
   target->finite_p = loop->finite_p;
   target->unroll = loop->unroll;
   target->owned_clique = loop->owned_clique;
-  if (loop->counters){
-    target->counters = ggc_alloc<histogram_counters>();
-    target->counters->sum=loop->counters->sum;
-    target->counters->adjusted=loop->counters->adjusted;
-    target->counters->hist=vec_safe_copy(loop->counters->hist);
-  }
+  if (loop->counters)
+    {
+      target->counters = ggc_alloc<histogram_counters> ();
+      target->counters->sum = loop->counters->sum;
+      target->counters->adjusted = loop->counters->adjusted;
+      target->counters->hist = vec_safe_copy (loop->counters->hist);
+    }
 }
 
 /* Copies copy of LOOP as subloop of TARGET loop, placing newly
@@ -1154,36 +1155,44 @@ duplicate_loop_body_to_header_edge (class loop *loop, edge e,
 	}
 
       scale_step = XNEWVEC (profile_probability, ndupl);
-    // If we have histogram then we know precise probabilities for peeling
-    // is_latch means unrolling
-    if (!loop->counters || is_latch) {
-      for (i = 1; i <= ndupl; i++)
-	scale_step[i - 1] = bitmap_bit_p (wont_exit, i)
-				? prob_pass_wont_exit
-				: prob_pass_thru;
-    } else {
-        gcov_type psum=0;
-        gcov_type sum=loop->counters->sum;
-        for (i = 0; i < ndupl && i<(unsigned int)param_profile_histogram_size_lin
-                && sum!=psum; i++){
-            scale_step[i] = profile_probability::always() - 
-            ((*loop->counters->hist)[i] ? profile_probability::always()
-             /(loop->counters->sum-psum) * (*loop->counters->hist)[i] 
-            : profile_probability::never());
-            // we set whether it was adjusted or is still precise
-            if (loop->counters->adjusted) {
-                scale_step[i].adjusted();
-            }
-            psum+=(*loop->counters->hist)[i];
-        }
-        ++i;
-        for (; i <= ndupl; i++)
-        scale_step[i - 1] = bitmap_bit_p (wont_exit, i)
-                  ? prob_pass_wont_exit
-                  : prob_pass_thru;
-        // should rescale
-          
-    }
+      // If we have histogram then we know precise probabilities for peeling
+      // is_latch means unrolling
+      if (!loop->counters || is_latch)
+	{
+	  for (i = 1; i <= ndupl; i++)
+	    scale_step[i - 1] = bitmap_bit_p (wont_exit, i)
+				  ? prob_pass_wont_exit
+				  : prob_pass_thru;
+	}
+      else
+	{
+	  gcov_type psum = 0;
+	  gcov_type sum = loop->counters->sum;
+	  for (i = 0;
+	       i < ndupl && i < (unsigned int) param_profile_histogram_size_lin
+	       && sum != psum;
+	       i++)
+	    {
+	      scale_step[i] = profile_probability::always ()
+			      - ((*loop->counters->hist)[i]
+				   ? profile_probability::always ()
+				       / (loop->counters->sum - psum)
+				       * (*loop->counters->hist)[i]
+				   : profile_probability::never ());
+	      // we set whether it was adjusted or is still precise
+	      if (loop->counters->adjusted)
+		{
+		  scale_step[i].adjusted ();
+		}
+	      psum += (*loop->counters->hist)[i];
+	    }
+	  ++i;
+	  for (; i <= ndupl; i++)
+	    scale_step[i - 1] = bitmap_bit_p (wont_exit, i)
+				  ? prob_pass_wont_exit
+				  : prob_pass_thru;
+	  // should rescale
+	}
 
       /* Complete peeling is special as the probability of exit in last
 	 copy becomes 1.  */

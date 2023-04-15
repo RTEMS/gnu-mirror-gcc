@@ -2181,13 +2181,16 @@ output_cfg (struct output_block *ob, struct function *fn)
       streamer_write_hwi (ob, loop->any_estimate);
       if (loop->any_estimate)
 	streamer_write_widest_int (ob, loop->nb_iterations_estimate);
-      streamer_write_hwi (ob, loop->counters!=NULL);
-      if (loop->counters) {
-          streamer_write_gcov_count (ob, loop->counters->sum);
-          for (unsigned int i=0; i<(unsigned int) param_profile_histogram_size; ++i) {
-            streamer_write_gcov_count (ob, (*loop->counters->hist)[i]);
-          }
-      }
+      streamer_write_hwi (ob, loop->counters != NULL);
+      if (loop->counters)
+	{
+	  streamer_write_gcov_count (ob, loop->counters->sum);
+	  for (unsigned int i = 0;
+	       i < (unsigned int) param_profile_histogram_size; ++i)
+	    {
+	      streamer_write_gcov_count (ob, (*loop->counters->hist)[i]);
+	    }
+	}
 
       /* Write OMP SIMD related info.  */
       streamer_write_hwi (ob, loop->safelen);

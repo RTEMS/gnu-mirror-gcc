@@ -126,7 +126,7 @@ create_iv (tree base, tree step, tree var, class loop *loop,
   if (stmts)
     {
       if (!pe)
-       pe = loop_preheader_edge (loop);
+	pe = loop_preheader_edge (loop);
       gsi_insert_seq_on_edge_immediate (pe, stmts);
     }
 
@@ -159,21 +159,22 @@ create_iv (tree base, tree step, tree var, class loop *loop,
   if (stmts)
     {
       if (!pe)
-       pe = loop_preheader_edge (loop);
+	pe = loop_preheader_edge (loop);
       gsi_insert_seq_on_edge_immediate (pe, stmts);
     }
 
   phi = create_phi_node (vb, loop->header);
   FOR_EACH_EDGE (e, ei, loop->header->preds)
-  {
-      if (e==loop_latch_edge (loop)){
-          add_phi_arg (phi, va, loop_latch_edge (loop), UNKNOWN_LOCATION);
-      }
+    {
+      if (e == loop_latch_edge (loop))
+	{
+	  add_phi_arg (phi, va, loop_latch_edge (loop), UNKNOWN_LOCATION);
+	}
       else
-      {
-          add_phi_arg (phi, initial, e, UNKNOWN_LOCATION);
-      }
-  }
+	{
+	  add_phi_arg (phi, initial, e, UNKNOWN_LOCATION);
+	}
+    }
 }
 
 /* Return the innermost superloop LOOP of USE_LOOP that is a superloop of

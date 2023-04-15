@@ -1126,17 +1126,19 @@ input_cfg (class lto_input_block *ib, class data_in *data_in,
       loop->any_estimate = streamer_read_hwi (ib);
       if (loop->any_estimate)
 	loop->nb_iterations_estimate = streamer_read_widest_int (ib);
-    // whether the loop has histogram counter
-    if (streamer_read_hwi (ib)){
-       loop->counters=ggc_alloc<histogram_counters>();
-       loop->counters->sum=streamer_read_gcov_count (ib);
-       loop->counters->hist=NULL;
-       vec_safe_grow_cleared(loop->counters->hist,param_profile_histogram_size);
-       for (int i=0;i<param_profile_histogram_size;++i){
-           (*loop->counters->hist)[i]=streamer_read_gcov_count (ib);
-       }
-    }
-
+      // whether the loop has histogram counter
+      if (streamer_read_hwi (ib))
+	{
+	  loop->counters = ggc_alloc<histogram_counters> ();
+	  loop->counters->sum = streamer_read_gcov_count (ib);
+	  loop->counters->hist = NULL;
+	  vec_safe_grow_cleared (loop->counters->hist,
+				 param_profile_histogram_size);
+	  for (int i = 0; i < param_profile_histogram_size; ++i)
+	    {
+	      (*loop->counters->hist)[i] = streamer_read_gcov_count (ib);
+	    }
+	}
 
       /* Read OMP SIMD related info.  */
       loop->safelen = streamer_read_hwi (ib);
