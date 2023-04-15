@@ -1066,7 +1066,7 @@ try_peel_loop (class loop *loop,
 	      rest -= psum;
 	      psum = 0;
 	    }
-	  good_percentage += param_profile_histogram_peel_prcnt;
+      good_percentage = MIN (100, good_percentage + param_profile_histogram_peel_prcnt);
 	}
       if (!good_peels.is_empty ())
 	{
@@ -1113,7 +1113,7 @@ try_peel_loop (class loop *loop,
   // if we peel percentage corresponding the whole linear section
   while (!good_peels.is_empty ()
 	 && ((int) estimated_peeled_sequence_size (&size, (int) npeel)
-	       * (param_profile_histogram_size_lin
+	       * MIN (100, param_profile_histogram_size_lin
 		  * param_profile_histogram_peel_prcnt)
 	     > param_max_peeled_insns * (prcnt.last ())))
     {
