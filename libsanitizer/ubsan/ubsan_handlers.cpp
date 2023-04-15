@@ -433,6 +433,33 @@ void __ubsan::__ubsan_handle_missing_return(UnreachableData *Data) {
   Die();
 }
 
+static void handleVMBoundsMismatch(VMBoundsMismatchData *Data, ValueHandle Bound1,
+				   ValueHandle Bound2, ReportOptions Opts) {
+  SourceLocation Loc = Data->Loc.acquire();
+  ErrorType ET = ErrorType::NonPositiveVLAIndex;
+
+  if (ignoreReport(Loc, Opts, ET))
+    return;
+
+  ScopedReport R(Opts, Loc, ET);
+
+  Diag(Loc, DL_Error, ET, "bound %0 of type %1 does not match bound %2 of type %3")
+      << Value(Data->IndexType, Bound2) << Data->ToType
+      << Value(Data->IndexType, Bound1) << Data->FromType;
+}
+
+void __ubsan::__ubsan_handle_vm_bounds_mismatch(VMBoundsMismatchData *Data,
+                                                ValueHandle Bound1, ValueHandle Bound2) {
+  GET_REPORT_OPTIONS(false);
+  handleVMBoundsMismatch(Data, Bound1, Bound2, Opts);
+}
+void __ubsan::__ubsan_handle_vm_bounds_mismatch_abort(VMBoundsMismatchData *Data,
+                                                          ValueHandle Bound1, ValueHandle Bound2) {
+  GET_REPORT_OPTIONS(true);
+  handleVMBoundsMismatch(Data, Bound1, Bound2, Opts);
+  Die();
+}
+
 static void handleVLABoundNotPositive(VLABoundData *Data, ValueHandle Bound,
                                       ReportOptions Opts) {
   SourceLocation Loc = Data->Loc.acquire();

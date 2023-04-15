@@ -94,6 +94,9 @@ struct comptypes_data;
 static int tagged_types_tu_compatible_p (const_tree, const_tree,
 					 struct comptypes_data *);
 static int comp_target_types (location_t, tree, tree);
+struct instrument_data;
+static int comp_target_types_instr (location_t, tree, tree,
+				    vec<struct instrument_data, va_gc> *);
 static int function_types_compatible_p (const_tree, const_tree,
 					struct comptypes_data *);
 static int type_lists_compatible_p (const_tree, const_tree,
@@ -106,6 +109,9 @@ static tree pointer_diff (location_t, tree, tree, tree *);
 static tree convert_for_assignment (location_t, location_t, tree, tree, tree,
 				    enum impl_conv, bool, tree, tree, int,
 				    int = 0);
+static tree convert_for_assignment_instrument (location_t, location_t, tree, tree, tree,
+				    enum impl_conv, bool, tree, tree, int, int,
+				    vec<struct instrument_data, va_gc> *);
 static tree valid_compound_expr_initializer (tree, tree);
 static void push_string (const char *);
 static void push_member_name (tree);
@@ -1042,10 +1048,18 @@ common_type (tree t1, tree t2)
   return c_common_type (t1, t2);
 }
 
+struct instrument_data {
+
+  tree t1;
+  tree t2;
+};
+
 struct comptypes_data {
 
   bool enum_and_int_p;
   bool different_types_p;
+
+  vec<struct instrument_data, va_gc>* instr_vec;
 };
 
 /* Return 1 if TYPE1 and TYPE2 are compatible types for assignment
@@ -1069,19 +1083,29 @@ comptypes (tree type1, tree type2)
 /* Like comptypes, but if it returns non-zero because enum and int are
    compatible, it sets *ENUM_AND_INT_P to true.  */
 
-int
-comptypes_check_enum_int (tree type1, tree type2, bool *enum_and_int_p)
+static int
+comptypes_check_enum_int_instr (tree type1, tree type2, bool *enum_and_int_p,
+				vec<struct instrument_data, va_gc> *instr_vec)
 {
   const struct tagged_tu_seen_cache * tagged_tu_seen_base1 = tagged_tu_seen_base;
   int val;
 
   struct comptypes_data data = { };
+
+  data.instr_vec = instr_vec;
+
   val = comptypes_internal (type1, type2, &data);
   *enum_and_int_p = data.enum_and_int_p;
 
   free_all_tagged_tu_seen_up_to (tagged_tu_seen_base1);
 
   return val;
+}
+
+int
+comptypes_check_enum_int (tree type1, tree type2, bool *enum_and_int_p)
+{
+  return comptypes_check_enum_int_instr (type1, type2, enum_and_int_p, NULL);
 }
 
 /* Like comptypes, but if it returns nonzero for different types, it
@@ -1252,7 +1276,16 @@ comptypes_internal (const_tree type1, const_tree type2,
 	if (d1_variable != d2_variable)
 	  data->different_types_p = true;
 	if (d1_variable || d2_variable)
-	  break;
+	  {
+	    if (NULL != data->instr_vec)
+	      {
+		struct instrument_data id;
+		id.t1 = TYPE_MAIN_VARIANT (t2);
+		id.t2 = TYPE_MAIN_VARIANT (t1);
+		vec_safe_push(data->instr_vec, id);
+	      }
+	    break;
+	  }
 	if (d1_zero && d2_zero)
 	  break;
 	if (d1_zero || d2_zero
@@ -1299,7 +1332,8 @@ comptypes_internal (const_tree type1, const_tree type2,
    subset of the other.  */
 
 static int
-comp_target_types (location_t location, tree ttl, tree ttr)
+comp_target_types_instr (location_t location, tree ttl, tree ttr,
+			 vec<struct instrument_data, va_gc> *instr_vec)
 {
   int val;
   int val_ped;
@@ -1333,8 +1367,7 @@ comp_target_types (location_t location, tree ttl, tree ttr)
 	 ? c_build_qualified_type (TYPE_MAIN_VARIANT (mvr), TYPE_QUAL_ATOMIC)
 	 : TYPE_MAIN_VARIANT (mvr));
 
-  enum_and_int_p = false;
-  val = comptypes_check_enum_int (mvl, mvr, &enum_and_int_p);
+  val = comptypes_check_enum_int_instr (mvl, mvr, &enum_and_int_p, instr_vec);
 
   if (val == 1 && val_ped != 1)
     pedwarn_c11 (location, OPT_Wpedantic, "invalid use of pointers to arrays with different qualifiers "
@@ -1349,6 +1382,13 @@ comp_target_types (location_t location, tree ttl, tree ttr)
 
   return val;
 }
+
+static int
+comp_target_types (location_t location, tree ttl, tree ttr)
+{
+  return comp_target_types_instr (location, ttl, ttr, NULL);
+}
+
 
 /* Subroutines of `comptypes'.  */
 
@@ -1694,8 +1734,14 @@ function_types_compatible_p (const_tree f1, const_tree f2,
       return val;
     }
 
-  /* Both types have argument lists: compare them and propagate results.  */
+  /* Both types have argument lists: compare them and propagate results.
+     Turn off UBSan instrumentation for bounds as these are all arrays
+     of unspecified bound.  */
+  auto instr_vec_tmp = data->instr_vec;
+  data->instr_vec = NULL;
   val1 = type_lists_compatible_p (args1, args2, data);
+  data->instr_vec = instr_vec_tmp;
+
   return val1 != 1 ? val1 : val;
 }
 
@@ -3518,10 +3564,11 @@ convert_argument (location_t ploc, tree function, tree fundecl,
   if (excess_precision)
     val = build1 (EXCESS_PRECISION_EXPR, valtype, val);
 
-  tree parmval = convert_for_assignment (ploc, ploc, type,
-					 val, origtype, ic_argpass,
-					 npc, fundecl, function,
-					 parmnum + 1, warnopt);
+  tree parmval = convert_for_assignment_instrument (ploc, ploc, type,
+						    val, origtype, ic_argpass,
+						    npc, fundecl, function,
+						    parmnum + 1, warnopt,
+						    NULL);
 
   if (targetm.calls.promote_prototypes (fundecl ? TREE_TYPE (fundecl) : 0)
       && INTEGRAL_TYPE_P (type)
@@ -3530,6 +3577,26 @@ convert_argument (location_t ploc, tree function, tree fundecl,
 
   return parmval;
 }
+
+
+/* Process all constraints for variably-modified types.  */
+
+static tree
+process_vm_constraints (location_t location,
+			vec<struct instrument_data, va_gc> *instr_vec)
+{
+  unsigned int i;
+  struct instrument_data* d;
+  tree instr_expr = void_node;
+
+  FOR_EACH_VEC_SAFE_ELT (instr_vec, i, d)
+    {
+      tree in = ubsan_instrument_vm_assign (location, d->t1, d->t2);
+      instr_expr = fold_build2 (COMPOUND_EXPR, void_type_node, in, instr_expr);
+    }
+  return instr_expr;
+}
+
 
 /* Convert the argument expressions in the vector VALUES
    to the types in the list TYPELIST.
@@ -6859,7 +6926,44 @@ static tree
 convert_for_assignment (location_t location, location_t expr_loc, tree type,
 			tree rhs, tree origtype, enum impl_conv errtype,
 			bool null_pointer_constant, tree fundecl,
-			tree function, int parmnum, int warnopt /* = 0 */)
+			tree function, int parmnum, int warnopt)
+{
+  vec<struct instrument_data, va_gc> *instr_vec = NULL;
+
+  if (sanitize_flags_p (SANITIZE_VLA)
+      && (ic_init_const != errtype))
+    vec_alloc (instr_vec, 10);
+
+  tree ret = convert_for_assignment_instrument (location, expr_loc, type,
+						rhs, origtype, errtype,
+						null_pointer_constant, fundecl,
+						function, parmnum, warnopt,
+						instr_vec);
+  if (instr_vec)
+    {
+      if (ret && error_mark_node != ret && 0 < vec_safe_length (instr_vec))
+	{
+	  /* We have to make sure that the rhs is evaluated first,
+	     because we may use size expressions in it to check bounds.  */
+	  tree instr_expr = process_vm_constraints (location, instr_vec);
+	  if (void_node != instr_expr)
+	    {
+	      ret = save_expr (ret);
+	      instr_expr = fold_build2 (COMPOUND_EXPR, void_type_node, ret, instr_expr);
+	      ret = fold_build2 (COMPOUND_EXPR, TREE_TYPE (ret), instr_expr, ret);
+	    }
+	}
+      vec_free (instr_vec);
+    }
+  return ret;
+}
+
+static tree
+convert_for_assignment_instrument (location_t location, location_t expr_loc, tree type,
+			tree rhs, tree origtype, enum impl_conv errtype,
+			bool null_pointer_constant, tree fundecl,
+			tree function, int parmnum, int warnopt,
+			vec<struct instrument_data, va_gc>* instr_vec)
 {
   enum tree_code codel = TREE_CODE (type);
   tree orig_rhs = rhs;
@@ -7103,11 +7207,11 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
       rhs = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (rhs)), rhs);
       SET_EXPR_LOCATION (rhs, location);
 
-      rhs = convert_for_assignment (location, expr_loc,
-				    build_pointer_type (TREE_TYPE (type)),
-				    rhs, origtype, errtype,
-				    null_pointer_constant, fundecl, function,
-				    parmnum, warnopt);
+      rhs = convert_for_assignment_instrument (location, expr_loc,
+					       build_pointer_type (TREE_TYPE (type)),
+					       rhs, origtype, errtype,
+					       null_pointer_constant, fundecl, function,
+					       parmnum, warnopt, instr_vec);
       if (rhs == error_mark_node)
 	return error_mark_node;
 
@@ -7488,7 +7592,7 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 	 Meanwhile, the lhs target must have all the qualifiers of the rhs.  */
       if ((VOID_TYPE_P (ttl) && !TYPE_ATOMIC (ttl))
 	  || (VOID_TYPE_P (ttr) && !TYPE_ATOMIC (ttr))
-	  || (target_cmp = comp_target_types (location, type, rhstype))
+	  || (target_cmp = comp_target_types_instr (location, type, rhstype, instr_vec))
 	  || is_opaque_pointer
 	  || ((c_common_unsigned_type (mvl)
 	       == c_common_unsigned_type (mvr))

@@ -107,6 +107,17 @@ struct VLABoundData {
 /// \brief Handle a VLA with a non-positive bound.
 RECOVERABLE(vla_bound_not_positive, VLABoundData *Data, ValueHandle Bound)
 
+struct VMBoundsMismatchData {
+  SourceLocation Loc;
+  const TypeDescriptor &FromType;
+  const TypeDescriptor &ToType;
+  const TypeDescriptor &IndexType;
+};
+
+/// \brief Handle a VM types with run-time bounds mismatch
+RECOVERABLE(vm_bounds_mismatch, VMBoundsMismatchData *Data, ValueHandle Bound1, ValueHandle Bound2)
+
+
 // Keeping this around for binary compatibility with (sanitized) programs
 // compiled with older compilers.
 struct FloatCastOverflowData {

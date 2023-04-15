@@ -334,6 +334,48 @@ ubsan_instrument_vla (location_t loc, tree size)
   return t;
 }
 
+/* Instrument assignment of variably modified types.  */
+
+tree
+ubsan_instrument_vm_assign (location_t loc, tree a, tree b)
+{
+  tree t, tt;
+
+  gcc_assert (TREE_CODE (a) == ARRAY_TYPE);
+  gcc_assert (TREE_CODE (b) == ARRAY_TYPE);
+
+  tree as = TYPE_MAX_VALUE (TYPE_DOMAIN (a));
+  tree bs = TYPE_MAX_VALUE (TYPE_DOMAIN (b));
+
+  as = fold_build2 (PLUS_EXPR, sizetype, as, size_one_node);
+  bs = fold_build2 (PLUS_EXPR, sizetype, bs, size_one_node);
+
+  t = build2 (NE_EXPR, boolean_type_node, as, bs);
+  if (flag_sanitize_trap & SANITIZE_VLA)
+    tt = build_call_expr_loc (loc, builtin_decl_explicit (BUILT_IN_TRAP), 0);
+  else
+    {
+      tree data = ubsan_create_data ("__ubsan_vm_data", 1, &loc,
+				     ubsan_type_descriptor (a, UBSAN_PRINT_ARRAY),
+				     ubsan_type_descriptor (b, UBSAN_PRINT_ARRAY),
+				     ubsan_type_descriptor (sizetype),
+				     NULL_TREE, NULL_TREE);
+      data = build_fold_addr_expr_loc (loc, data);
+      enum built_in_function bcode
+	= (flag_sanitize_recover & SANITIZE_VLA)
+	  ? BUILT_IN_UBSAN_HANDLE_VM_BOUNDS_MISMATCH
+	  : BUILT_IN_UBSAN_HANDLE_VM_BOUNDS_MISMATCH_ABORT;
+      tt = builtin_decl_explicit (bcode);
+      tt = build_call_expr_loc (loc, tt, 3, data,
+				ubsan_encode_value (as),
+				ubsan_encode_value (bs));
+    }
+  t = build3 (COND_EXPR, void_type_node, t, tt, void_node);
+
+  return t;
+}
+
+
 /* Instrument missing return in C++ functions returning non-void.  */
 
 tree
