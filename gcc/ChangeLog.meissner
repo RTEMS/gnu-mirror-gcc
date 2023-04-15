@@ -1,35 +1,27 @@
-==================== Branch work118, patch #55 ====================
+==================== Branch work118, patch #67 was reverted ====================
 
-Add sign/zero extension to vec_extract with variable element number.
+==================== Branch work118, patch #66 was reverted ====================
 
-2023-04-14   Michael Meissner  <meissner@linux.ibm.com>
+==================== Branch work118, patch #65 ====================
 
-gcc/
+Add float/double conversions fro V4SI vec_extract
 
-	* config/rs6000/vsx.md (VSX_EXTRACT_SIGN): New iterator.
-	(vsx_extract_<mode>_var_load): Update length.
-	(vsx_extract_<mode>_var_load_to_sdi): New insn.
-	(vsx_extract_<mode>_var_load_to_udi): New insn.
-
-==================== Branch work118, patch #54 ====================
-
-Add conversions fro V4SI vec_extract
-
-This patch adds combiner insns to fold in sign and zero extension of vec_extract
-of V4SI with a constant element when expanding to DImode.  It also adds in
-combiner insns to create SFmdoe and DFmode.
+This patch adds combiner insns to fold in conversion to float or double (both
+signed and unsigned) of V4SI vec_extract with a constant element.  With this
+patch, GCC will load the SImode value directly into the vector register with
+LFIWZX or LFIWAX instead of doing a LWZ and then moving the value over with a
+direct move before the floating point conversion.
 
 2023-04-14   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
-	* config/rs6000/vsx.md (vsx_extract_v4si_load_to_<su>di): New insn.
-	(vsx_extract_v4si_load_to_<mode>): New insn.
-	(vsx_extract_v4si_load_to_uns<mode>): New insn.
+	* config/rs6000/rs6000.md (SIGN_ZERO): New code attribute.
+	* config/rs6000/vsx.md (vsx_extract_v4si_load_to_<mode>): New insn.
 
-==================== Branch work118, patch #53 ====================
+==================== Branch work118, patch #64 ====================
 
-Allow vec_extract of int vectors to vector registers
+Allow vec_extract of int vectors to target vector registers
 
 2023-04-14   Michael Meissner  <meissner@linux.ibm.com>
 
@@ -41,22 +33,35 @@ gcc/
 	(vsx_extract_<mode>_load): Restrict to V8HI and V16QI.  Add support to
 	load the element into vector registers.
 
-==================== Branch work118, patch #52 ====================
+==================== Branch work118, patch #63 ====================
 
-Improve vec_extract of V4SF from memory with variable element.
+Add double convert combiner to vsx_extract for variable index.
+
+This patch adds a combine insn that merges loading up a vec_extract of V4SFmode
+where the element number is variable combined with a conversion to DFmode.
 
 2023-04-14   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
-	* config/rs6000/vsx.md (vsx_extract_v4sf_var_load): Allow split before
-	register allocation.
-	(vsx_extract_v4sf_to_df_var_load): New insn.
+	* config/rs6000/vsx.md (vsx_extract_v4sf_to_df_load): New insn.
 
+==================== Branch work118, patch #62 ====================
 
-==================== Branch work118, patch #51 ====================
+Add double convert combiner to vsx_extract for constant index.
 
-Improve vec_extract of V4SF from memory with constant element.
+This patch adds a combine insn that merges loading up a vec_extract of V4SFmode
+where the element number is constant combined with a conversion to DFmode.
+
+2023-04-14   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4sf_to_df_load): New insn.
+
+==================== Branch work118, patch #61 ====================
+
+Allow vec_extract support functions to be called before reload.
 
 2023-04-14   Michael Meissner  <meissner@linux.ibm.com>
 
@@ -66,11 +71,8 @@ gcc/
 	register allocation.
 	(adjust_vec_address_pcrel): Likewise.
 	(rs6000_adjust_vec_address): Likewise.
-	* config/rs6000/vsx.md (vsx_extract_v4sf_load): Allow split before
-	register allocation.
-	(vsx_extract_v4sf_to_df_load): New insn.
 
-==================== Branch work118, patch #50 ====================
+==================== Branch work118, patch #60 ====================
 
 Fix typo in insn name.
 
@@ -86,6 +88,18 @@ gcc/
 
 	* config/rs6000/vsx.md (vsx_extract_v4sf_load): Rename from
 	vsx_extract_v4sf_<mode>_load.
+
+==================== Branch work118, patch #55 was reverted ====================
+
+==================== Branch work118, patch #54 was reverted ====================
+
+==================== Branch work118, patch #53 was reverted ====================
+
+==================== Branch work118, patch #52 was reverted ====================
+
+==================== Branch work118, patch #51 was reverted ====================
+
+==================== Branch work118, patch #50 was reveted ====================
 
 ==================== Branch work118, patch #42 was reverted ====================
 
