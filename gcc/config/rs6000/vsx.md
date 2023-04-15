@@ -4098,6 +4098,28 @@
   [(set_attr "type" "load")
    (set_attr "length" "12")])
 
+;; V16QI/V8HI/V4SI extract from memory with zero extension
+(define_insn_and_split "*vsx_extract_<mode>_var_load_to_udi"
+  [(set (match_operand:DI 0 "gpc_reg_operand" "=r,v")
+	(zero_extend:DI
+	 (unspec:<VEC_base>
+	  [(match_operand:VSX_EXTRACT_I2 1 "memory_operand" "Q,Q")
+	   (match_operand:DI 2 "gpc_reg_operand" "r,r")]
+	 UNSPEC_VSX_EXTRACT)))
+   (clobber (match_scratch:DI 3 "=&b,&b"))]
+  "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(zero_extend:DI (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
+					   operands[3], <VEC_base>mode);
+}
+  [(set_attr "type" "load,fpload")
+   (set_attr "length" "12")
+   (set_attr "isa" "*,p9v")])
+
 ;; V8HI/V4SI extract from memory with sign extension
 (define_insn_and_split "*vsx_extract_<mode>_var_load_to_sdi"
   [(set (match_operand:DI 0 "gpc_reg_operand" "=r,v")
