@@ -4010,6 +4010,31 @@
   [(set_attr "type" "load,load,fpload,fpload")
    (set_attr "length" "4,8,4,8")])
 
+;; Extract a V4SI element from memory with constant element number and convert
+;; it to SFmode or DFmode using signed conversion
+(define_insn_and_split "*vsx_extract_v4si_load_to_<mode>"
+  [(set (match_operand:SFDF 0 "register_operand" "=wa")
+	(any_float:SFDF
+	 (vec_select:SI
+	  (match_operand:V4SI 1 "memory_operand" "m")
+	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "n")]))))
+   (clobber (match_scratch:DI 3 "=&b"))
+   (clobber (match_scratch:DI 4 "=wa"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 4)
+	(match_dup 5))
+   (set (match_dup 0)
+	(any_float:SFDF (match_dup 4)))]
+{
+  rtx new_mem = rs6000_adjust_vec_address (operands[4], operands[1], operands[2],
+					   operands[3], SImode);
+  operands[5] = gen_rtx_<SIGN_ZERO>_EXTEND (DImode, new_mem);
+}
+  [(set_attr "type" "fpload")
+   (set_attr "length" "12")])
+
 ;; Extract a V8HI/V16QI element from memory with constant element number.
 (define_insn_and_split "*vsx_extract_<mode>_load"
   [(set (match_operand:<VEC_base> 0 "register_operand" "=r,r,v,v")
