@@ -233,6 +233,9 @@
 					   || (FLOAT128_IEEE_P (TFmode)
 					       && TARGET_FLOAT128_HW)")])
 
+;; Vector modes that we can extract with sign extension to GPR registers
+(define_mode_iterator VSX_EXTRACT_SIGN [V4SI V8HI])
+
 ;; Mode iterator for binary floating types that have a direct conversion
 ;; from 64-bit integer to floating point
 (define_mode_iterator FL_CONV [SF
@@ -4074,7 +4077,9 @@
 }
   [(set_attr "isa" "p9v,*")])
 
-;; Variable V16QI/V8HI/V4SI extract from memory
+;; V16QI/V8HI/V4SI extract from memory with a variable element number.  The
+;; length includes the AND to keep the element number in bounds and shifting
+;; the value for indexing by HI/SI elements.
 (define_insn_and_split "*vsx_extract_<mode>_var_load"
   [(set (match_operand:<VEC_base> 0 "gpc_reg_operand" "=r")
 	(unspec:<VEC_base>
@@ -4090,7 +4095,30 @@
   operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
 					   operands[3], <VEC_base>mode);
 }
-  [(set_attr "type" "load")])
+  [(set_attr "type" "load")
+   (set_attr "length" "12")])
+
+;; V8HI/V4SI extract from memory with sign extension
+(define_insn_and_split "*vsx_extract_<mode>_var_load_to_sdi"
+  [(set (match_operand:DI 0 "gpc_reg_operand" "=r,v")
+	(sign_extend:DI
+	 (unspec:<VEC_base>
+	  [(match_operand:VSX_EXTRACT_SIGN 1 "memory_operand" "Q,Q")
+	   (match_operand:DI 2 "gpc_reg_operand" "r,r")]
+	 UNSPEC_VSX_EXTRACT)))
+   (clobber (match_scratch:DI 3 "=&b,&b"))]
+  "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(sign_extend:DI (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
+					   operands[3], <VEC_base>mode);
+}
+  [(set_attr "type" "load,fpload")
+   (set_attr "length" "12,16")
+   (set_attr "isa" "*,p9v")])
 
 ;; ISA 3.1 extract
 (define_expand "vextractl<mode>"
