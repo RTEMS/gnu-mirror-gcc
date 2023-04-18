@@ -2308,7 +2308,8 @@ histogram_counters_div_upper_bound (histogram_counters *&hist_c,
   unsigned int i = 1;
   for (; i < lin_size && i < tot_size - 1; i++)
     {
-      hist[i / divisor] += hist[i];
+      // we want to take the roof of the division
+      hist[i / divisor + MIN (1, i % divisor)] += hist[i];
       hist[i] = 0;
     }
 
@@ -2318,7 +2319,8 @@ histogram_counters_div_upper_bound (histogram_counters *&hist_c,
 	= ((gcov_type_unsigned) 1) << (ceil_log2 (lin_size) + i + 1 - lin_size);
       gcov_type_unsigned half = (upper_pow2 >> 2) + (upper_pow2 >> 1);
       unsigned int ind = hist_index (half / divisor);
-      hist[ind] += hist[i];
+      // hist is allways different then i since we know divisor>1
+      hist[ind] += hist[MIN (1, i)];
       hist[i] = 0;
     }
 }
