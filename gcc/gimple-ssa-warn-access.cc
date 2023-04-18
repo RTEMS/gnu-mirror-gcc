@@ -4173,8 +4173,9 @@ pass_waccess::check_pointer_uses (gimple *stmt, tree ptr,
 
   auto_bitmap visited;
 
-  auto_vec<tree> pointers;
-  pointers.safe_push (ptr);
+  auto_vec<tree, 8> pointers;
+  pointers.quick_push (ptr);
+  hash_map<tree, int> *phi_map = nullptr;
 
   /* Starting with PTR, iterate over POINTERS added by the loop, and
      either warn for their uses in basic blocks dominated by the STMT
@@ -4241,19 +4242,49 @@ pass_waccess::check_pointer_uses (gimple *stmt, tree ptr,
 	      tree_code code = gimple_cond_code (cond);
 	      equality = code == EQ_EXPR || code == NE_EXPR;
 	    }
-	  else if (gimple_code (use_stmt) == GIMPLE_PHI)
+	  else if (gphi *phi = dyn_cast <gphi *> (use_stmt))
 	    {
 	      /* Only add a PHI result to POINTERS if all its
-		 operands are related to PTR, otherwise continue.  */
-	      tree lhs = gimple_phi_result (use_stmt);
-	      if (!pointers_related_p (stmt, lhs, ptr, m_ptr_qry))
-		continue;
-
-	      if (TREE_CODE (lhs) == SSA_NAME)
+		 operands are related to PTR, otherwise continue.  The
+		 PHI result is related once we've reached all arguments
+		 through this iteration.  That also means any invariant
+		 argument will make the PHI not related.  For arguments
+		 flowing over natural loop backedges we are optimistic
+		 (and diagnose the first iteration).  */
+	      tree lhs = gimple_phi_result (phi);
+	      if (!phi_map)
+		phi_map = new hash_map<tree, int>;
+	      bool existed_p;
+	      int &related = phi_map->get_or_insert (lhs, &existed_p);
+	      if (!existed_p)
 		{
-		  pointers.safe_push (lhs);
-		  continue;
+		  related = gimple_phi_num_args (phi) - 1;
+		  for (unsigned j = 0; j < gimple_phi_num_args (phi); ++j)
+		    {
+		      if ((unsigned) phi_arg_index_from_use (use_p) == j)
+			continue;
+		      tree arg = gimple_phi_arg_def (phi, j);
+		      edge e = gimple_phi_arg_edge (phi, j);
+		      basic_block arg_bb;
+		      if (dominated_by_p (CDI_DOMINATORS, e->src, e->dest)
+			  /* Make sure we are not forward visiting a
+			     backedge argument.  */
+			  && (TREE_CODE (arg) != SSA_NAME
+			      || (!SSA_NAME_IS_DEFAULT_DEF (arg)
+				  && ((arg_bb
+					 = gimple_bb (SSA_NAME_DEF_STMT (arg)))
+				      != e->dest)
+				  && !dominated_by_p (CDI_DOMINATORS,
+						      e->dest, arg_bb))))
+			related--;
+		    }
 		}
+	      else
+		related--;
+
+	      if (related == 0)
+		pointers.safe_push (lhs);
+	      continue;
 	    }
 
 	  /* Warn if USE_STMT is dominated by the deallocation STMT.
@@ -4292,6 +4323,9 @@ pass_waccess::check_pointer_uses (gimple *stmt, tree ptr,
 	    }
 	}
     }
+
+  if (phi_map)
+    delete phi_map;
 }
 
 /* Check call STMT for invalid accesses.  */
@@ -4528,39 +4562,34 @@ pass_waccess::check_dangling_stores (basic_block bb,
       if (!m_ptr_qry.get_ref (lhs, stmt, &lhs_ref, 0))
 	continue;
 
-      if (auto_var_p (lhs_ref.ref))
-	continue;
-
-      if (DECL_P (lhs_ref.ref))
+      if (TREE_CODE (lhs_ref.ref) == MEM_REF)
 	{
-	  if (!POINTER_TYPE_P (TREE_TYPE (lhs_ref.ref))
-	      || lhs_ref.deref > 0)
-	    continue;
+	  lhs_ref.ref = TREE_OPERAND (lhs_ref.ref, 0);
+	  ++lhs_ref.deref;
 	}
-      else if (TREE_CODE (lhs_ref.ref) == SSA_NAME)
+      if (TREE_CODE (lhs_ref.ref) == ADDR_EXPR)
+	{
+	  lhs_ref.ref = TREE_OPERAND (lhs_ref.ref, 0);
+	  --lhs_ref.deref;
+	}
+      if (TREE_CODE (lhs_ref.ref) == SSA_NAME)
 	{
 	  gimple *def_stmt = SSA_NAME_DEF_STMT (lhs_ref.ref);
 	  if (!gimple_nop_p (def_stmt))
 	    /* Avoid looking at or before stores into unknown objects.  */
 	    return;
 
-	  tree var = SSA_NAME_VAR (lhs_ref.ref);
-	  if (TREE_CODE (var) == PARM_DECL && DECL_BY_REFERENCE (var))
-	    /* Avoid by-value arguments transformed into by-reference.  */
-	    continue;
+	  lhs_ref.ref = SSA_NAME_VAR (lhs_ref.ref);
+	}
 
-	}
-      else if (TREE_CODE (lhs_ref.ref) == MEM_REF)
-	{
-	  tree arg = TREE_OPERAND (lhs_ref.ref, 0);
-	  if (TREE_CODE (arg) == SSA_NAME)
-	    {
-	      gimple *def_stmt = SSA_NAME_DEF_STMT (arg);
-	      if (!gimple_nop_p (def_stmt))
-		return;
-	    }
-	}
+      if (TREE_CODE (lhs_ref.ref) == PARM_DECL
+	  && (lhs_ref.deref - DECL_BY_REFERENCE (lhs_ref.ref)) > 0)
+	/* Assignment through a (real) pointer/reference parameter.  */;
+      else if (TREE_CODE (lhs_ref.ref) == VAR_DECL
+	       && !auto_var_p (lhs_ref.ref))
+	/* Assignment to/through a non-local variable.  */;
       else
+	/* Something else, don't warn.  */
 	continue;
 
       if (stores.add (lhs_ref.ref))
@@ -4587,13 +4616,8 @@ pass_waccess::check_dangling_stores (basic_block bb,
 	  location_t loc = DECL_SOURCE_LOCATION (rhs_ref.ref);
 	  inform (loc, "%qD declared here", rhs_ref.ref);
 
-	  if (DECL_P (lhs_ref.ref))
-	    loc = DECL_SOURCE_LOCATION (lhs_ref.ref);
-	  else if (EXPR_HAS_LOCATION (lhs_ref.ref))
-	    loc = EXPR_LOCATION (lhs_ref.ref);
-
-	  if (loc != UNKNOWN_LOCATION)
-	    inform (loc, "%qE declared here", lhs_ref.ref);
+	  loc = DECL_SOURCE_LOCATION (lhs_ref.ref);
+	  inform (loc, "%qD declared here", lhs_ref.ref);
 	}
     }
 

@@ -16232,7 +16232,6 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	  {
 	  case TEMPLATE_TYPE_PARM:
 	  case TEMPLATE_TEMPLATE_PARM:
-	  case BOUND_TEMPLATE_TEMPLATE_PARM:
 	    if (cp_type_quals (t))
 	      {
 		r = tsubst (TYPE_MAIN_VARIANT (t), args, complain, in_decl);
@@ -16274,30 +16273,32 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 		       only instantiated during satisfaction.  */
 		    PLACEHOLDER_TYPE_CONSTRAINTS_INFO (r) = ci;
 
-		if (code == BOUND_TEMPLATE_TEMPLATE_PARM)
-		  {
-		    tree tinfo = TYPE_TEMPLATE_INFO (t);
-		    /* We might need to substitute into the types of non-type
-		       template parameters.  */
-		    tree tmpl = tsubst (TI_TEMPLATE (tinfo), args,
-					complain, in_decl);
-		    if (tmpl == error_mark_node)
-		      return error_mark_node;
-		    tree argvec = tsubst (TI_ARGS (tinfo), args,
-					  complain, in_decl);
-		    if (argvec == error_mark_node)
-		      return error_mark_node;
-
-		    TEMPLATE_TEMPLATE_PARM_TEMPLATE_INFO (r)
-		      = build_template_info (tmpl, argvec);
-		  }
-
 		if (TYPE_STRUCTURAL_EQUALITY_P (t))
 		  SET_TYPE_STRUCTURAL_EQUALITY (r);
 		else
 		  TYPE_CANONICAL (r) = canonical_type_parameter (r);
 	      }
 	    break;
+
+	  case BOUND_TEMPLATE_TEMPLATE_PARM:
+	    {
+	      tree tinfo = TYPE_TEMPLATE_INFO (t);
+	      /* We might need to substitute into the types of non-type
+		 template parameters.  This also lowers the level of
+		 the ttp appropriately.  */
+	      tree tmpl = tsubst (TI_TEMPLATE (tinfo), args,
+				  complain, in_decl);
+	      if (tmpl == error_mark_node)
+		return error_mark_node;
+	      tree argvec = tsubst (TI_ARGS (tinfo), args,
+				    complain, in_decl);
+	      if (argvec == error_mark_node)
+		return error_mark_node;
+	      r = lookup_template_class (tmpl, argvec, in_decl, NULL_TREE,
+					 /*entering_scope=*/false, complain);
+	      r = cp_build_qualified_type (r, cp_type_quals (t), complain);
+	      break;
+	    }
 
 	  case TEMPLATE_PARM_INDEX:
 	    /* OK, now substitute the type of the non-type parameter.  We
@@ -16580,9 +16581,16 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	      return error_mark_node;
 	  }
 
+	/* FIXME: TYPENAME_IS_CLASS_P conflates 'class' vs 'struct' vs 'union'
+	   tags.  TYPENAME_TYPE should probably remember the exact tag that
+	   was written.  */
+	enum tag_types tag_type
+	  = TYPENAME_IS_CLASS_P (t) ? class_type
+	  : TYPENAME_IS_ENUM_P (t) ? enum_type
+	  : typename_type;
 	tsubst_flags_t tcomplain = complain | tf_keep_type_decl;
 	tcomplain |= tst_ok_flag | qualifying_scope_flag;
-	f = make_typename_type (ctx, f, typename_type, tcomplain);
+	f = make_typename_type (ctx, f, tag_type, tcomplain);
 	if (f == error_mark_node)
 	  return f;
 	if (TREE_CODE (f) == TYPE_DECL)

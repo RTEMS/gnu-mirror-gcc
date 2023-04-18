@@ -25,7 +25,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "rust-session-manager.h"
 #include "rust-lex.h"
 #include "rust-parse.h"
-#include "operator.h"
+#include "rust-operators.h"
 
 /* Compilation unit used for various AST-related functions that would make
  * the headers too long if they were defined inline and don't receive any
@@ -1284,6 +1284,7 @@ MacroRulesDefinition::as_string () const
   // get outer attrs
   str += append_attributes (outer_attrs, OUTER);
 
+  // TODO: deal with macro_2_0
   str += "macro_rules!";
 
   str += rule_name;
@@ -1322,6 +1323,12 @@ std::string
 MacroInvocation::as_string () const
 {
   std::string str = "MacroInvocation: ";
+  auto is_builtin = kind == InvocKind::Builtin;
+
+  if (is_builtin)
+    str += "[builtin] ";
+  else
+    str += "[regular] ";
 
   str += append_attributes (outer_attrs, OUTER);
 
@@ -1329,6 +1336,16 @@ MacroInvocation::as_string () const
 
   str += "\n has semicolon: ";
   str += has_semicolon () ? "true" : "false";
+
+  if (is_builtin)
+    {
+      str += "[PENDING EAGER INVOCATIONS]: ";
+      for (auto &pending : pending_eager_invocs)
+	{
+	  str += pending->as_string ();
+	  str += "\n";
+	}
+    }
 
   return str;
 }
@@ -2682,6 +2699,17 @@ SlicePattern::as_string () const
   std::string str ("SlicePattern: ");
 
   for (const auto &pattern : items)
+    str += "\n " + pattern->as_string ();
+
+  return str;
+}
+
+std::string
+AltPattern::as_string () const
+{
+  std::string str ("AltPattern: ");
+
+  for (const auto &pattern : alts)
     str += "\n " + pattern->as_string ();
 
   return str;
@@ -4056,7 +4084,7 @@ Module::load_items ()
   inner_attrs = parser.parse_inner_attributes ();
   auto parsed_items = parser.parse_items ();
   for (const auto &error : parser.get_errors ())
-    error.emit_error ();
+    error.emit ();
 
   items = std::move (parsed_items);
   kind = ModuleKind::LOADED;
@@ -5628,6 +5656,12 @@ GroupedPattern::accept_vis (ASTVisitor &vis)
 
 void
 SlicePattern::accept_vis (ASTVisitor &vis)
+{
+  vis.visit (*this);
+}
+
+void
+AltPattern::accept_vis (ASTVisitor &vis)
 {
   vis.visit (*this);
 }
