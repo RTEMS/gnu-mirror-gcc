@@ -3980,6 +3980,51 @@
   [(set_attr "type" "load,load,fpload,fpload")
    (set_attr "length" "4,8,4,8")])
 
+;; Extract a V8HI/V16QI element from memory with constant element number and
+;; convert it to DImode with zero extension.
+(define_insn_and_split "*vsx_extract_<mode>_load_to_udi"
+  [(set (match_operand:DI 0 "register_operand" "=r,r,v,v")
+	(zero_extend:DI
+	 (vec_select:<VEC_base>
+	  (match_operand:VSX_EXTRACT_I2 1 "memory_operand" "YZ,m,Z,Q")
+	  (parallel
+	   [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>" "0,n,0,n")]))))
+   (clobber (match_scratch:DI 3 "=X,&b,X,&b"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(zero_extend:DI (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
+					   operands[3], <VEC_base>mode);
+}
+  [(set_attr "type" "load,load,fpload,fpload")
+   (set_attr "length" "4,8,4,8")
+   (set_attr "isa" "*,*,p9v,p9v")])
+
+;; Extract a V8HI element from memory with constant element number and
+;; convert it to DImode with sign extension.
+(define_insn_and_split "*vsx_extract_v8hi_load_to_sdi"
+  [(set (match_operand:DI 0 "register_operand" "=r,r")
+	(sign_extend:DI
+	 (vec_select:HI
+	  (match_operand:V8HI 1 "memory_operand" "YZ,m")
+	  (parallel
+	   [(match_operand:QI 2 "const_0_to_7_operand" "0,n")]))))
+   (clobber (match_scratch:DI 3 "=X,&b"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(sign_extend:DI (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
+					   operands[3], HImode);
+}
+  [(set_attr "type" "load,load")
+   (set_attr "length" "4,8")])
+
 ;; Extract a V4SI element from memory with constant element number and convert
 ;; it to SFmode, DFmode, KFmode, or possibly TFmode using either signed or
 ;; unsigned conversion.
