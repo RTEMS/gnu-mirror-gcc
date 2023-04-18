@@ -1,4 +1,26 @@
-==================== Branch work119, patch #21 ====================
+==================== Branch work119, patch #23 ====================
+
+Optimize V8HI/V16QI vec_extract from memory with constant element number
+
+This patch adds combiner insns to fold in conversion to DImode from vec_extract
+of a V8HI or V16QI variable with constant element number.  With this patch, GCC
+will directly emit LHA, LHZ, or LBZ without needing an instruction to do the
+sign or zero extension.
+
+
+2023-04-18   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_<mode>_load_to_udi): New insn.
+	(sx_extract_v8hi_load_to_sd): New insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-char-1.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-short-1.c: New file.
+
+==================== Branch work119, patch #22 ====================
 
 Add float/double conversions fro V4SI vec_extract
 
