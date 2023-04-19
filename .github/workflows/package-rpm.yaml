@@ -33,7 +33,7 @@ on:
 jobs:
   package:
     container: cblmariner2preview.azurecr.io/base/core:2.0
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     steps:
 
       # We need to install a minimum number of packages to run the workflow: git and ca-certificates.

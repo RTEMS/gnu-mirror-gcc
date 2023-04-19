@@ -47,7 +47,7 @@ on:
 
 jobs:
   init:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     outputs:
       config: ${{ steps.printNoSecretJson.outputs.noSecretConfigJson }}
       matrixTestSet: ${{ steps.printGCCTestSet.outputs.testSet }}
@@ -103,7 +103,7 @@ jobs:
       matrix: ${{fromJSON(needs.init.outputs.matrixTestSet)}}
       # Avoid cancelling other matrix chunks even if one fails
       fail-fast: false        
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     steps:
       - run: echo ${{needs.init.outputs.output1}} ${{needs.init.outputs.output2}}
       - run: echo $GITHUB_CONTEXT
