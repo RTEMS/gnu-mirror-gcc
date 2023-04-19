@@ -40,7 +40,7 @@ on:
 jobs:
   gcc-master-build:
     name: Build the latest gcc/master toolchain
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     outputs:
       config: ${{ steps.printNoSecretJson.outputs.noSecretConfigJson }}
       masterSHA: ${{ steps.printCurrentSHA.outputs.currentSHA }}
@@ -131,7 +131,7 @@ jobs:
       # Avoid cancelling other matrix chunks even if one fails
       fail-fast: false
 
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -193,7 +193,7 @@ jobs:
   parse-failures:
     name: Parse failures and start build and test runs with gcc/master merged into vendor/microsoft/main
     needs: [gcc-master-test, gcc-master-build]
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     outputs:
       newBranchName: ${{ steps.setBranchName.outputs.newBranchName }}
     steps:
@@ -312,7 +312,7 @@ jobs:
   wait-build:
     name: Waiting on build with gcc/master merged into vendor/microsoft/main
     needs: [parse-failures]
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     outputs: 
       newFailuresPatchExists: ${{ steps.check_failures_patch.outputs.files_exists }}
     steps:
@@ -350,7 +350,7 @@ jobs:
   wait-test:
     name: Waiting on tests with gcc/master merged into vendor/microsoft/main
     needs: [parse-failures, wait-build, gcc-master-build]
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     outputs: 
       newFailuresPatchExists: ${{ steps.check_failures_patch.outputs.files_exists }}
     steps:
