@@ -1,72 +1,66 @@
-==================== Branch work119, patch #23 ====================
+==================== Branch work119, patch #45 was reverted ====================
 
-Optimize V8HI/V16QI vec_extract from memory with constant element number
+Fold conversion to float into V4SI vsx_extract from memory.
 
-This patch adds combiner insns to fold in conversion to DImode from vec_extract
-of a V8HI or V16QI variable with constant element number.  With this patch, GCC
-will directly emit LHA, LHZ, or LBZ without needing an instruction to do the
-sign or zero extension.
-
+This patch folds conversion to floating point of vsx_extract from memory of V4SI
+elements where the element number is constant.  This code optimizes things so it
+will load the integer with LFIWAX or LFIWZX directly into a vector register
+rather than loading it into a GPR and doing a direct move operation.
 
 2023-04-18   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
-	* config/rs6000/vsx.md (vsx_extract_<mode>_load_to_udi): New insn.
-	(sx_extract_v8hi_load_to_sd): New insn.
+	* config/rs6000/vsx.md (SIGN_ZERO_EXTEND): New mode attribute.
+	(vsx_extract_v4si_load_to_<uns><mode>): New insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-int-2.c: New file.
+
+==================== Branch work119, patch #44 was reverted ====================
+
+==================== Branch work119, patch #43 ====================
+
+Fold sign or zero convert into vsx_extract from memory.
+
+This patch folds sign or zero convert operations into vsx_extract from memory
+where the element number is constant.
+
+2023-04-18   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (VSX_EXTRACT_ISIGN): New mode attribute.
+	(vsx_extract_<mode>_load_to_udi): New insn.
+	(vsx_extract_<mode>_load_to_sdi): New insn.
+	(vsx_extract_v8hi_load_to_<su>si): New insn.
 
 gcc/testsuite/
 
 	* gcc.target/powerpc/vec-extract-mem-char-1.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-int-1.c: New file.
 	* gcc.target/powerpc/vec-extract-mem-short-1.c: New file.
 
-==================== Branch work119, patch #22 ====================
+==================== Branch work119, patch #42 ====================
 
-Add float/double conversions fro V4SI vec_extract
-
-This patch adds combiner insns to fold in conversion to float, double, or the
-IEEE 128-bit types (both signed and unsigned) of V4SI vec_extract with a
-constant element.  With this patch, GCC will load the SImode value directly into
-the vector register with LFIWZX or LFIWAX instead of doing a LWZ and then moving
-the value over with a direct move before the floating point conversion.
+Allow vec_extract to load vector registers.
 
 2023-04-18   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
-	* config/rs6000/vsx.md (SIGN_ZERO): New code attribute.
-	(FL_CONSTRAINT): New code attribute.
-	(vsx_extract_v4si_load_to_<uns><mode): New insn.
+	* config/rs6000/vsx.md (VSX_EX_ISA): New mode attribute
+	(vsx_extract_<mode>_load): Allow vec_extract of integer types with a
+	constant element number to load into vector registers.  Allow splitting
+	before register allocation.
 
-gcc/testsuite/
+==================== Branch work119, patch #41 ====================
 
-	* gcc.target/powerpc/vec-extract-mem-int-3.c: New file.
-
-==================== Branch work119, patch #21 ====================
-
-Add sign/zero conversions for V4SI vec_extract
-
-This patch adds combiner insns to fold in sign and zero extension of vec_extract
-of V4SI with a constant element when expanding to DImode.
-
-2023-04-18   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/vsx.md (vsx_extract_v4si_load_to_<su>di): New insn.
-
-gcc/testsuite/
-
-	* gcc.target/powerpc/vec-extract-mem-int-2.c: New test.
-
-==================== Branch work119, patch #21 ====================
-
-Enhance vec_extract from int memory with constant element numbers.
+Combine vec_extract of V4SF with DF convert.
 
 This patch adds a combine insn that merges loading up a vec_extract of V4SFmode
 where the element number is constant combined with a conversion to DFmode.
-Without this patch, the compiler would load the value into a GPR register and
-then do a direct move if it needs the value in a vector register.
 
 2023-04-18   Michael Meissner  <meissner@linux.ibm.com>
 
@@ -74,9 +68,28 @@ gcc/
 
 	* config/rs6000/vsx.md (vsx_extract_v4sf_to_df_load): New insn.
 
-gcc/testsuite/
+==================== Branch work119, patch #40 ====================
 
-	* gcc.target/powerpc/vec-extract-mem-int-1.c: New test.
+Allow vec_extract support functions to be called before reload.
+
+2023-04-19   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (get_vector_offset): Allow being called before
+	register allocation.
+	(adjust_vec_address_pcrel): Likewise.
+	(rs6000_adjust_vec_address): Likewise.
+
+==================== Branch work119, patch #33 was reverted ====================
+
+==================== Branch work119, patch #32 was reverted ====================
+
+==================== Branch work119, patch #31 was reverted ====================
+
+==================== Branch work119, patch #30 was reverted ====================
+
+==================== Branch work119, patch #23 was reverted ====================
 
 ==================== Branch work119, patch #22 ====================
 
@@ -88,7 +101,7 @@ In doing other work, I noticed that there was an insn:
 
 Which did not have an iterator.  I removed the useless <mode>.
 
-2023-04-17   Michael Meissner  <meissner@linux.ibm.com>
+2023-04-18   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
