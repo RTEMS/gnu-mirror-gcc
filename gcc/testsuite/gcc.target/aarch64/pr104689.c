@@ -98,6 +98,7 @@ asm(""
 "unusual_no_pac_ret:\n"
 "	.cfi_startproc\n"
 "	" SET_RA_STATE_0 "\n"
+"	bti	c\n"
 "	stp	x29, x30, [sp, -16]!\n"
 "	.cfi_def_cfa_offset 16\n"
 "	.cfi_offset 29, -16\n"
@@ -121,7 +122,7 @@ static void f2_pac_ret (void)
   die ();
 }
 
-__attribute__((target("branch-protection=none")))
+__attribute__((target("branch-protection=bti")))
 static void f1_no_pac_ret (void)
 {
   unusual_pac_ret (f2_pac_ret);
