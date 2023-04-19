@@ -53,21 +53,46 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-phinodes.h"
 #include "insert-gimple-ssa.h"
 
+void
+hphi::replace_op_by (hstmt_left *op, hstmt_left *replace_by)
+{
+  if (op_p == NULL)
+    return;
+
+  unsigned i;
+  for (i = 0; i < num_ops; i++)
+    {
+      if ((*op_p)[i].s == op)
+	(*op_p)[i].s = replace_by;
+    }
+}
+
+void
+hstmt_assign::replace_op_by (hstmt_left *op, hstmt_left *replace_by)
+{
+  unsigned i;
+  for (i = 0; i < val->num_ops; i++)
+    {
+      if (val->op[i] == op)
+	val->op[i] = replace_by;
+    }
+}
+
 gimple *
 hstmt_assign::to_gimple (void)
 {
   gcc_checking_assert (ssa != NULL_TREE);
 
-  tree op1 = op[1];
+  tree op1 = val->op[1]->ssa;
   tree op2 = NULL_TREE;
   tree op3 = NULL_TREE;
 
-  if (num_ops >= 2)
-    op2 = op[2];
-  if (num_ops >= 3)
-    op3 = op[3];
+  if (val->num_ops >= 2)
+    op2 = val->op[2]->ssa;
+  if (val->num_ops >= 3)
+    op3 = val->op[3]->ssa;
 
-  return gimple_build_assign (lhs, code, op1, op2, op3);
+  return gimple_build_assign (ssa, val->code, op1, op2, op3);
 }
 
 hack_tuple &
@@ -79,6 +104,8 @@ hack_ssa_builder::tuple_alloc (enum tree_code code, unsigned num_ops)
   size_t size = sizeof (hack_tuple) +
     (num_ops - 1) * sizeof (class hack_lvalue *);
   hack_tuple *result = XNEWVAR (struct hack_tuple, size);
+
+  result->code = code;
 
   allocated_tuples.safe_push (result);
 
@@ -112,9 +139,9 @@ void
 hack_ssa_builder::append_assign (basic_block bb, hack_lvalue &left,
 				 hack_tuple &right)
 {
-  hstmt *stmt;
+  hstmt_left *stmt;
 
-  hack_tuple_internal *val = tuple_to_internal (right);
+  hack_tuple_internal *val = tuple_to_internal (bb, &right);
   stmt = tuple_lookup (bb, val);
   if (stmt == NULL)
     {
@@ -126,7 +153,7 @@ hack_ssa_builder::append_assign (basic_block bb, hack_lvalue &left,
       append_stmt (bb, stmt);
       tuple_register (bb, stmt);
 
-      /* Update users list of appropriate stmts.  */
+      /* Update uses list of appropriate stmts.  */
       unsigned i;
       for (i = 0; i < val->num_ops; i++)
 	{
@@ -134,13 +161,13 @@ hack_ssa_builder::append_assign (basic_block bb, hack_lvalue &left,
 	  val->op[i]->uses.safe_push (stmt);
 	}
     }
-  write_variable (bb, left, stmt);
+  write_variable (bb, &left, stmt);
 }
 
 edge
 hack_ssa_builder::hack_make_edge (basic_block src, basic_block dest, int flags)
 {
-  gcc_checking_assert (filled_bbs.contains (bb->index) &&
+  gcc_checking_assert (filled_bbs.contains (src->index) &&
 		       "Successors can only be added to a filled BB");
   return make_edge (src, dest, flags);
 }
@@ -148,13 +175,13 @@ hack_ssa_builder::hack_make_edge (basic_block src, basic_block dest, int flags)
 void
 hack_ssa_builder::seal_block (basic_block bb)
 {
-  sealed_bbs.put (bb->index);
+  sealed_bbs.add (bb->index);
 }
 
 void
 hack_ssa_builder::set_block_filled (basic_block bb)
 {
-  filled_bbs.put (bb->index);
+  filled_bbs.add (bb->index);
 }
 
 void
@@ -182,16 +209,16 @@ hack_ssa_builder::finalize (void)
 	{
 	  if (!s->killed)
 	    {
-	      hstmt_left *ls = dyn_cast<hstmt_left> (s);
-	      if (!ls == NULL)
-		commit_ssa_name (bb, s);
+	      hstmt_left *ls = dyn_cast<hstmt_left *> (s);
+	      if (ls != NULL)
+		commit_ssa_name (ls);
 	    }
 	}
       for (hphi *p : record.phi_list)
 	{
 	  if (!p->killed)
 	    {
-	      commit_ssa_name (bb, p);
+	      commit_ssa_name (p);
 	    }
 	}
     }
@@ -233,39 +260,37 @@ hack_ssa_builder::finalize (void)
 	}
       record.stmt_list.release ();
       record.phi_list.release ();
-      record.curr_def.release ();
-      record.tuple_provider.release ();
-      record.curr_ssa.release ();
-      XDELETE (record);
+      //record.curr_def.release ();
+      //record.tuple_provider.release ();
+      //XDELETE (record); TODO Pass records with pointers
     }
-  for (hack_lvalue l : allocated_locals)
+  for (hack_lvalue *l : allocated_locals)
     XDELETE (l);
-  for (hack_tuple t : allocated_tuples)
+  for (hack_tuple *t : allocated_tuples)
     XDELETE (t);
-  for (hack_tuple_internal t : allocated_internal)
+  for (hack_tuple_internal *t : allocated_internal)
     XDELETE (t);
-  seen_bbs.release ();
-  allocated_locals.release ();
-  allocated_tuples.release ();
-  allocated_internal.release ();
-  bb_record_map.release ();
-  sealed_bbs.release ();
-  filled_bbs.release ();
-  incomplete_phis.release ();
+  //seen_bbs.release ();
+  //allocated_locals.release ();
+  //allocated_tuples.release ();
+  //allocated_internal.release ();
+  //bb_record_map.release ();
+  //sealed_bbs.release ();
+  //filled_bbs.release ();
+  //incomplete_phis.release ();
 }
 
 tree
 hack_ssa_builder::ssa_name_from_lvalue (basic_block bb, hack_lvalue &var)
 {
   gcc_checking_assert (finalized && "SSA builder has to be finalized");
-  hack_bb bb_record = get_bb_record (bb);
-  return *(bb_record.curr_ssa.get (&var));
+  return read_variable (bb, &var)->ssa;
 }
 
 hack_bb &
 hack_ssa_builder::get_bb_record (basic_block bb)
 {
-  seen_bbs.put (bb);
+  seen_bbs.add (bb);
 
   hack_bb *record = bb_record_map.get (bb->index);
   if (record == NULL)
@@ -279,8 +304,8 @@ hack_ssa_builder::get_bb_record (basic_block bb)
 hack_tuple_internal *
 hack_ssa_builder::tuple_to_internal (basic_block bb, hack_tuple *tuple)
 {
-  gcc_checking_assert (num_ops >= 1 && "Tuples of size <1 not allowed");
-  gcc_checking_assert (num_ops <= 3 && "Tuples of size >3 not allowed");
+  gcc_checking_assert (tuple->num_ops >= 1 && "Tuples of size <1 not allowed");
+  gcc_checking_assert (tuple->num_ops <= 3 && "Tuples of size >3 not allowed");
 
   size_t size = sizeof (hack_tuple_internal) +
     (tuple->num_ops - 1) * sizeof (class hstmt_left *);
@@ -289,7 +314,7 @@ hack_ssa_builder::tuple_to_internal (basic_block bb, hack_tuple *tuple)
   unsigned i;
   for (i = 0; i < tuple->num_ops; i++)
     {
-      stmt_left *s = read_variable (tuple->op[i]);
+      hstmt_left *s = read_variable (bb, tuple->op[i]); // TODO
       result->op[i] = s;
     }
 
@@ -308,7 +333,7 @@ hack_ssa_builder::append_stmt (basic_block bb, hstmt *stmt)
 }
 
 hphi *
-hack_ssa_builder::add_empty_phi (basic_block bb, hack_lvalue *var);
+hack_ssa_builder::add_empty_phi (basic_block bb, hack_lvalue *var)
 {
   hphi *p = XNEW (class hphi);
   p->var = var;
@@ -324,40 +349,40 @@ hack_ssa_builder::add_empty_phi (basic_block bb, hack_lvalue *var);
 void
 hack_ssa_builder::commit_ssa_name (hstmt_left *s)
 {
-  tree ssa = make_ssa_name (s->var.var_tree);
+  tree ssa = make_ssa_name (s->var->var_tree);
   s->ssa = ssa;
 }
 
 void
 hack_ssa_builder::commit_phi (basic_block bb, hphi *hp)
 {
-  hack_bb *record = get_bb_record (bb);
-  gphi *gp = create_phi_node (hp->var->var_decl, bb);
+  hack_bb record = get_bb_record (bb);
+  gphi *gp = create_phi_node (hp->var->var_tree, bb);
 
-  gcc_checking_assert (hp.op_p != NULL && "PHI has to be completed");
+  gcc_checking_assert (hp->op_p != NULL && "PHI has to be completed");
 
   unsigned i;
-  for (i = 0; i < hp->tuple->num_ops; i++)
+  for (i = 0; i < hp->num_ops; i++)
     {
-      hack_edge_stmt *op = *(hp->op);
-      hstmt_left *s = op[i].s;
-      edge e = op[i].e;
+      hstmt_left *s = hp->get_op (i);
+      edge e = hp->get_edge (i);
       hack_lvalue *l = s->var;
-      tree t = record->curr_ssa.get (l->index); // TODO Nechci pro tohle metodu?
-      add_phi_arg (gp, t, e, UNKNOWN_LOCATION);
+      tree ssa = hp->ssa;
+      add_phi_arg (gp, ssa, e, UNKNOWN_LOCATION);
     }
 }
 
 void
 hack_ssa_builder::commit_stmt (gimple_stmt_iterator *gsi, hstmt *hs)
 {
+  gcc_checking_assert (!hs->is_phi ());
+
   gimple *s = hs->to_gimple ();
   gsi_insert_after (gsi, s, GSI_NEW_STMT);
-  get_bb_record (gsi->bb)->curr_ssa.put (hs.var, lhs);
 }
 
 void
-hack_ssa_builder::complete_phi (basic_block bb, hack_lvalue var, hphi *phi)
+hack_ssa_builder::complete_phi (basic_block bb, hack_lvalue *var, hphi *phi)
 {
   gcc_checking_assert (sealed_bbs.contains (bb->index) &&
 		       "Only sealed BBs contain complete PHIs");
@@ -378,8 +403,8 @@ hack_ssa_builder::complete_phi (basic_block bb, hack_lvalue var, hphi *phi)
       op[i].e = e;
       op[i].s = s;
 
-      /* Update users list.  */
-      s->users.safe_push (phi);
+      /* Update uses list.  */
+      s->uses.safe_push (phi);
 
       i++;
     }
@@ -387,17 +412,50 @@ hack_ssa_builder::complete_phi (basic_block bb, hack_lvalue var, hphi *phi)
   phi->num_ops = num_ops;
   phi->op_p = &op;
   
-  try_remove_trivial_phi (bb, *phi);
+  try_remove_trivial_phi (phi);
 }
 
 void
-hack_ssa_builder::try_remove_trivial_phi (basic_block bb, hphi *phi)
+hack_ssa_builder::replace_uses (hstmt_left *to_replace, hstmt_left *replace_by)
 {
-  // TODO Potřebuju users
+  for (hstmt *s : to_replace->uses)
+    {
+      s->replace_op_by (to_replace, replace_by);
+    }
 }
 
 void
-hack_ssa_builder::write_variable (basic_block bb, hack_lvalue var,
+hack_ssa_builder::try_remove_trivial_phi (hphi *phi)
+{
+//  hack_lvalue *same = NULL;
+//
+//  unsigned i;
+//  for (i = 0; i < phi->num_ops; i++)
+//    {
+//      hack_lvalue *op = phi->get_op (i);
+//      if (op != same || dyn_cast<hphi *> (op) == phi)
+//	continue; /* Unique value or self-reference.  */
+//      if (same != NULL)
+//	return; /* The PHI merges at least two values: not trivial.  */
+//      same = op;
+//    }
+//  if (same == NULL)
+//    {
+//      return; /* The PHI is unreachable or in the start block.  */
+//    }
+//  
+//  phi->killed = true;
+//  replace_uses (phi, same);
+//
+//  for (hstmt *s : phi->uses)
+//    {
+//      if (s->is_phi ())
+//	try_remove_trivial_phi (as_as<hphi *> (s));
+//    }
+}
+
+void
+hack_ssa_builder::write_variable (basic_block bb, hack_lvalue *var,
 				  hstmt_left *stmt)
 {
   hack_bb record = get_bb_record (bb);
@@ -405,7 +463,7 @@ hack_ssa_builder::write_variable (basic_block bb, hack_lvalue var,
 }
 
 hstmt_left *
-hack_ssa_builder::read_variable (basic_block bb, hack_lvalue var)
+hack_ssa_builder::read_variable (basic_block bb, hack_lvalue *var)
 {
   hack_bb record = get_bb_record (bb);
   hstmt_left **stmt_p = record.curr_def.get (var);
@@ -415,7 +473,7 @@ hack_ssa_builder::read_variable (basic_block bb, hack_lvalue var)
 }
 
 hstmt_left *
-hack_ssa_builder::read_variable_recursive (basic_block bb, hack_lvalue var)
+hack_ssa_builder::read_variable_recursive (basic_block bb, hack_lvalue *var)
 {
   hstmt_left *stmt;
 
@@ -429,9 +487,9 @@ hack_ssa_builder::read_variable_recursive (basic_block bb, hack_lvalue var)
     {
       stmt = read_variable (single_pred (bb), var);
     }
-  else if (má vůbec predecessors)
+  else if (EDGE_COUNT (bb->preds) > 0)
     {
-      hphi *phi = add_empty_phi (var);
+      hphi *phi = add_empty_phi (bb, var);
       stmt = phi;
       complete_phi (bb, var, phi);
     }
@@ -448,17 +506,19 @@ hack_ssa_builder::read_variable_recursive (basic_block bb, hack_lvalue var)
 void
 hack_ssa_builder::tuple_register (basic_block bb, hstmt_left *stmt)
 {
-  hack_bb record = get_bb_record (bb);
-  record.tuple_provider.put (stmt->val, stmt);
+//  hack_bb record = get_bb_record (bb);
+//  record.tuple_provider.put (stmt->val, stmt);
+  // TODO
 }
 
 hstmt_left *
-hack_ssa_builder::tuple_lookup (basic_block bb, hack_tuple_internal val)
+hack_ssa_builder::tuple_lookup (basic_block bb, hack_tuple_internal *val)
 {
-  hack_bb record = get_bb_record (bb);
-  hstmt_left **stmt_p = record.tuple_provider.get (val);
-  if (stmt_p == NULL)
-    return NULL;
-  else
-    return *stmt_p;
+//  hack_bb record = get_bb_record (bb);
+//  hstmt_left **stmt_p = record.tuple_provider.get (val);
+//  if (stmt_p == NULL)
+//    return NULL;
+//  else
+//    return *stmt_p;
+  // TODO
 }

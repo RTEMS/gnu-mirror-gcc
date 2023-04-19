@@ -42,7 +42,7 @@ class hack_ssa_builder;
 struct hack_edge_stmt // TODO Nechci spíš pair?
 {
   edge e;
-  hstmt *s;
+  hstmt_left *s;
 };
 
 class hstmt
@@ -52,6 +52,7 @@ class hstmt
 
     virtual bool is_phi (void);
     virtual gimple *to_gimple (void);
+    virtual void replace_op_by (hstmt_left *op, hstmt_left *replace_by);
 };
 
 class hstmt_left : public hstmt
@@ -59,6 +60,7 @@ class hstmt_left : public hstmt
   public:
     hack_lvalue *var;
     vec<hstmt *> uses; // TODO Nahradit obstack strukturou?
+    tree ssa;
 };
 
 class hphi : public hstmt_left
@@ -69,6 +71,22 @@ class hphi : public hstmt_left
     hack_edge_stmt **op_p; /* Pointer to the array of operands. NULL if PHI
 			      incomplete.  */
 
+    hstmt_left *get_op (unsigned i)
+      {
+	gcc_checking_assert (op_p != NULL && "PHI has to be completed");
+	gcc_checking_assert (i < num_ops);
+
+	return (*op_p)[i].s;
+      }
+
+    edge get_edge (unsigned i)
+      {
+	gcc_checking_assert (op_p != NULL && "PHI has to be completed");
+	gcc_checking_assert (i < num_ops);
+
+	return (*op_p)[i].e;
+      }
+
     virtual bool is_phi (void) override
       {
 	return true;
@@ -78,6 +96,8 @@ class hphi : public hstmt_left
       {
 	return NULL;
       }
+
+    virtual void replace_op_by (hstmt_left *op, hstmt_left *replace_by) override;
 };
 
 class hstmt_nonphi : public hstmt_left
@@ -95,6 +115,7 @@ class hstmt_assign : public hstmt_nonphi
     hack_tuple_internal *val;
 
     virtual gimple *to_gimple (void) override;
+    virtual void replace_op_by (hstmt_left *op, hstmt_left *replace_by) override;
 };
 
 class hack_tuple_internal
@@ -107,18 +128,17 @@ class hack_tuple_internal
 
 struct hack_bb
 {
-  vec<hstmt_nonphi *> stmt_list;
+  vec<hstmt *> stmt_list;
   vec<hphi *> phi_list;
   hash_map<hack_lvalue *, hstmt_left *> curr_def;
   hash_map<hack_tuple_internal *, hstmt_left *> tuple_provider; // TODO Jmeno
-  hash_map<hack_lvalue *, tree> curr_ssa;
 };
 
 // -- API STRUCTS --
 
 class hack_rvalue { };
 
-class hack_tuple : public hack_rvalue
+class hack_tuple
 {
   public:
     enum tree_code code;
@@ -173,23 +193,23 @@ class hack_ssa_builder
 
   hack_bb &get_bb_record (basic_block bb);
   hack_tuple_internal *tuple_to_internal (basic_block bb, hack_tuple *tuple);
-
-  void append_stmt (basic_block bb, hstmt_nonphi *stmt);
+  void append_stmt (basic_block bb, hstmt *stmt);
   hphi *add_empty_phi (basic_block bb, hack_lvalue *var);
 
   void commit_ssa_name (hstmt_left *s);
   void commit_phi (basic_block bb, hphi *hp);
-  void commit_stmt (gimple_stmt_iterator *gsi, hstmt_nonphi *hs);
+  void commit_stmt (gimple_stmt_iterator *gsi, hstmt *hs);
 
-  void complete_phi (basic_block bb, hack_lvalue &var, hphi *phi);
-  void try_remove_trivial_phi (basic_block bb, hphi *phi);
+  void complete_phi (basic_block bb, hack_lvalue *var, hphi *phi);
+  void replace_uses (hstmt_left *to_replace, hstmt_left *replace_by);
+  void try_remove_trivial_phi (hphi *phi);
 
-  void write_variable (basic_block bb, hack_lvalue &var, hstmt_left *stmt);
-  hstmt_left *read_variable (basic_block bb, hack_lvalue &var);
-  hstmt_left *read_variable_recursive (basic_block bb, hack_lvalue &var);
+  void write_variable (basic_block bb, hack_lvalue *var, hstmt_left *stmt);
+  hstmt_left *read_variable (basic_block bb, hack_lvalue *var);
+  hstmt_left *read_variable_recursive (basic_block bb, hack_lvalue *var);
 
   void tuple_register (basic_block bb, hstmt_left *stmt);
-  hstmt_left *tuple_lookup (basic_block bb, hack_tuple_internal val);
+  hstmt_left *tuple_lookup (basic_block bb, hack_tuple_internal *val);
 
   void run_final_optimizations (void);
 };
