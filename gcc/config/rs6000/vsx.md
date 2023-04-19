@@ -251,17 +251,6 @@
 			       (TF "TARGET_FLOAT128_HW
 				    && FLOAT128_IEEE_P (TFmode)")])
 
-;; Constraint to use for floating point types that a direct conversion
-;; from 64-bit integer to floating point.
-(define_mode_attr FL_CONSTRAINT [(SF "wa")
-				 (DF "wa")
-				 (KF "v")
-				 (TF "v")])
-
-;; Whether to use SIGN or ZERO when depending on the floating point conversion.
-(define_code_attr SIGN_ZERO_EXTEND [(float          "SIGN_EXTEND")
-				    (unsigned_float "ZERO_EXTEND")])
-
 ;; Iterator for the 2 short vector types to do a splat from an integer
 (define_mode_iterator VSX_SPLAT_I [V16QI V8HI])
 
@@ -4062,35 +4051,6 @@
    (set_attr "length" "4,4,12,8,12")
    (set_attr "isa" "*,*,*,p9v,p9v")])
 
-;; Extract a V4SI element from memory with constant element number and convert
-;; it to SFmode, DFmode, KFmode, or possibly TFmode using either signed or
-;; unsigned conversion.
-(define_insn_and_split "*vsx_extract_v4si_load_to_<uns><mode>"
-  [(set (match_operand:FL_CONV 0 "register_operand" "=<FL_CONSTRAINT>,<FL_CONSTRAINT>")
-	(any_float:FL_CONV
-	 (vec_select:SI
-	  (match_operand:V4SI 1 "memory_operand" "m,m")
-	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "n,n")]))))
-   (clobber (match_scratch:DI 3 "=&b,&b"))
-   (clobber (match_scratch:DI 4 "=f,v"))]
-  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_POWERPC64"
-  "#"
-  "&& reload_completed"
-  [(set (match_dup 4)
-	(match_dup 5))
-   (set (match_dup 0)
-	(any_float:FL_CONV (match_dup 4)))]
-{
-  if (GET_CODE (operands[4]) == SCRATCH)
-    operands[4] = gen_reg_rtx (DImode);
-
-  rtx new_mem = rs6000_adjust_vec_address (operands[4], operands[1], operands[2],
-					   operands[3], SImode);
-  operands[5] = gen_rtx_<SIGN_ZERO_EXTEND> (DImode, new_mem);
-}
-  [(set_attr "type" "fpload")
-   (set_attr "length" "12")
-   (set_attr "isa" "*,p8v")])
 
 ;; Variable V16QI/V8HI/V4SI extract from a register
 (define_insn_and_split "vsx_extract_<mode>_var"
