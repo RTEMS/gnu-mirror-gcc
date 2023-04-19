@@ -5,7 +5,7 @@
 
 volatile int zero = 0;
 
-__attribute__((noinline, target("branch-protection=none")))
+__attribute__((noinline, target("branch-protection=bti")))
 void unwind (void)
 {
   if (zero == 0)
@@ -22,7 +22,7 @@ int test (int z)
     // autiasp -> cfi_negate_ra_state: RA_signing_SP -> RA_no_signing
     return 1;
   } else {
-    // 2nd cfi_negate_ra_state because the CFI directives are processed linearily.
+    // 2nd cfi_negate_ra_state because the CFI directives are processed linearly.
     // At this point, the unwinder would believe that the address is not signed
     // due to the previous return. That's why the compiler has to emit second
     // cfi_negate_ra_state to mean that the return address is still signed.
@@ -33,7 +33,7 @@ int test (int z)
   }
 }
 
-__attribute__((target("branch-protection=none")))
+__attribute__((target("branch-protection=bti")))
 int main ()
 {
   try {
