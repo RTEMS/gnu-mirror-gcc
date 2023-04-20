@@ -1,4 +1,17 @@
-==================== Branch work119, patch #45 was reverted ====================
+==================== Branch work119, patch #46 ====================
+
+Combine variable element vec_extract of V4SF with DF convert.
+
+This patch adds a combine insn that merges loading up a vec_extract of V4SFmode
+where the element number is variable combined with a conversion to DFmode.
+
+2023-04-20   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4sf_var_load_to_df): New insn.
+
+==================== Branch work119, patch #45 ====================
 
 Fold conversion to float into V4SI vsx_extract from memory.
 
