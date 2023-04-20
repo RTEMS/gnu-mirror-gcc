@@ -207,6 +207,10 @@
 (define_mode_iterator VSX_EXTRACT_I2 [V16QI V8HI])
 (define_mode_iterator VSX_EXTRACT_I4 [V16QI V8HI V4SI V2DI])
 
+;; Iterator for vector extract/insert of small integer vectors that can be sign
+;; extended with the load.
+(define_mode_iterator VSX_EXTRACT_ISIGN  [V8HI V4SI])
+
 (define_mode_attr VSX_EXTRACT_WIDTH [(V16QI "b")
 		  		     (V8HI "h")
 				     (V4SI "w")])
@@ -3980,6 +3984,73 @@
   [(set_attr "type" "load,load,load,fpload,fpload")
    (set_attr "length" "4,4,8,4,8")
    (set_attr "isa" "*,*,*,<VSX_EX_ISA>,<VSX_EX_ISA>")])
+
+;; Extract a V16QI/V8HI/V4SI element from memory with a constant element number
+;; and zero extend it to DImode.
+(define_insn_and_split "*vsx_extract_<mode>_load_to_udi"
+  [(set (match_operand:DI 0 "register_operand" "=r,r,r,<VSX_EX>,<VSX_EX>")
+	(zero_extend:DI
+	 (vec_select:<VEC_base>
+	  (match_operand:VSX_EXTRACT_I 1 "memory_operand" "m,o,m,Z,Q")
+	  (parallel [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>" "0,n,n,0,n")]))))
+   (clobber (match_scratch:DI 3 "=X,X,&b,X,&b"))]
+  "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_POWERPC64"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(zero_extend:DI (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
+					   operands[3], <VEC_base>mode);
+}
+  [(set_attr "type" "load,load,load,fpload,fpload")
+   (set_attr "length" "4,4,8,4,8")
+   (set_attr "isa" "*,*,*,<VSX_EX_ISA>,<VSX_EX_ISA>")])
+
+;; Extract a V16QI/V8HI/V4SI element from memory with a constant element number
+;; and sign extend it to DImode.
+(define_insn_and_split "*vsx_extract_<mode>_load_to_sdi"
+  [(set (match_operand:DI 0 "register_operand" "=r,r,r,<VSX_EX>,<VSX_EX>")
+	(sign_extend:DI
+	 (vec_select:<VEC_base>
+	  (match_operand:VSX_EXTRACT_ISIGN 1 "memory_operand" "m,o,m,Z,Q")
+	  (parallel [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>" "0,n,n,0,n")]))))
+   (clobber (match_scratch:DI 3 "=X,X,&b,X,&b"))]
+  "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_POWERPC64"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(sign_extend:DI (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
+					   operands[3], <VEC_base>mode);
+}
+  [(set_attr "type" "load,load,load,fpload,fpload")
+   (set_attr "length" "4,4,12,8,12")
+   (set_attr "isa" "*,*,*,<VSX_EX_ISA>,<VSX_EX_ISA>")])
+
+;; Extract a V8HI element from memory with a constant element number
+;; and zero or sign extend it to SImode.
+(define_insn_and_split "*vsx_extract_v8hi_load_to_<su>si"
+  [(set (match_operand:SI 0 "register_operand" "=r,r,r,v,v")
+	(any_extend:SI
+	 (vec_select:HI
+	  (match_operand:V8HI 1 "memory_operand" "m,o,m,Z,Q")
+	  (parallel [(match_operand:QI 2 "const_0_to_7_operand" "0,n,n,0,n")]))))
+   (clobber (match_scratch:DI 3 "=X,X,&b,X,&b"))]
+  "VECTOR_MEM_VSX_P (V8HImode) && TARGET_POWERPC64"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(any_extend:SI (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
+					   operands[3], HImode);
+}
+  [(set_attr "type" "load,load,load,fpload,fpload")
+   (set_attr "length" "4,4,12,8,12")
+   (set_attr "isa" "*,*,*,p9v,p9v")])
+
 
 ;; Variable V16QI/V8HI/V4SI extract from a register
 (define_insn_and_split "vsx_extract_<mode>_var"
