@@ -875,15 +875,15 @@ Common Joined UInteger Var(param_prefetch_minimum_stride) Init(-1) Param Optimiz
 The minimum constant stride beyond which we should use prefetch hints for.
 
 -param=profile-histogram-size=
-Common Joined UInteger Var(param_profile_histogram_size) Init(15) IntegerRange(0, 255) Param Optimization
+Common Joined UInteger Var(param_profile_histogram_size) Init(18) IntegerRange(0, 255) Param Optimization
 Total size of the histogram counter for profile feedback.
 
 -param=profile-histogram-size-lin=
-Common Joined UInteger Var(param_profile_histogram_size_lin) Init(8) IntegerRange(0, 255) Param Optimization
+Common Joined UInteger Var(param_profile_histogram_size_lin) Init(16) IntegerRange(0, 255) Param Optimization
 Size of the linear portion of the histogram counter for profile feedback. Less then total size
 
 -param=profile-histogram-peel-prcnt=
-Common Joined UInteger Var(param_profile_histogram_peel_prcnt) Init(11) Param Optimization
+Common Joined UInteger Var(param_profile_histogram_peel_prcnt) Init(6) Param Optimization
 Peels if it can eliminate at least this percentage per 1 peeling.
 
 -param=profile-func-internal-id=
