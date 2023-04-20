@@ -89,7 +89,25 @@ gcc/
 
 ==================== Branch work119, patch #30 was reverted ====================
 
-==================== Branch work119, patch #23 was reverted ====================
+==================== Branch work119, patch #23 ====================
+
+PR target/101169 - Fix test suite insn counts
+
+Adjust insn counts.
+
+2023-04-20   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	PR target/101169
+	* gcc.target/powerpc/fold-vec-extract-char.p7.c: Update insn count.
+	* gcc.target/powerpc/fold-vec-extract-double.p7.c: Likewise.
+	* gcc.target/powerpc/fold-vec-extract-float.p7.c: Likewise.
+	* gcc.target/powerpc/fold-vec-extract-float.p8.c: Likewise.
+	* gcc.target/powerpc/fold-vec-extract-int.p7.c: Likewise.
+	* gcc.target/powerpc/fold-vec-extract-int.p8.c: Likewise.
+	* gcc.target/powerpc/fold-vec-extract-short.p7.c: Likewise.
+	* gcc.target/powerpc/fold-vec-extract-short.p8.c: Likewise.
 
 ==================== Branch work119, patch #22 ====================
 
