@@ -4214,6 +4214,36 @@
    (set_attr "length" "12,16,16,20")
    (set_attr "isa" "*,*,p9v,p9v")])
 
+;; Extract a V4SI element from memory with variable element number and convert
+;; it to SFmode or DFmode using either signed or unsigned conversion.
+(define_insn_and_split "*vsx_extract_v4si_load_to_<uns><mode>"
+  [(set (match_operand:SFDF 0 "register_operand" "=wa,wa")
+	(any_float:SFDF
+	 (unspec:SI
+	  [(match_operand:V4SI 1 "memory_operand" "Q,Q")
+	   (match_operand:DI 2 "gpc_reg_operand" "r,r")]
+	  UNSPEC_VSX_EXTRACT)))
+   (clobber (match_scratch:DI 3 "=&b,&b"))
+   (clobber (match_scratch:DI 4 "=f,v"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_POWERPC64"
+  "#"
+  "&& 1"
+  [(set (match_dup 4)
+	(match_dup 5))
+   (set (match_dup 0)
+	(float:SFDF (match_dup 4)))]
+{
+  if (GET_CODE (operands[4]) == SCRATCH)
+    operands[4] = gen_reg_rtx (DImode);
+
+  rtx new_mem = rs6000_adjust_vec_address (operands[4], operands[1], operands[2],
+					   operands[3], SImode);
+  operands[5] = gen_rtx_<SIGN_ZERO_EXTEND> (DImode, new_mem);
+}
+  [(set_attr "type" "fpload")
+   (set_attr "length" "20")
+   (set_attr "isa" "*,p8v")])
+
 ;; ISA 3.1 extract
 (define_expand "vextractl<mode>"
   [(set (match_operand:V2DI 0 "altivec_register_operand")
