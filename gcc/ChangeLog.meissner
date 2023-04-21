@@ -1,8 +1,49 @@
+==================== Branch work119, patch #49 ====================
+
+Fold sign or zero extension into vsx_extract from memory with variable element.
+
+This patch folds conversion to floating point of vsx_extract from memory of V4SI
+elements where the element number is constant.  This code optimizes things so it
+will load the integer with LFIWAX or LFIWZX directly into a vector register
+rather than loading it into a GPR and doing a direct move operation.
+
+2023-04-21   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4si_var_load_to_<uns><mode>): New
+	insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-int-4.c: New file.
+
+==================== Branch work119, patch #48 ====================
+
+Fold sign or zero convert into variable vsx_extract from memory.
+
+This patch folds sign or zero convert operations into vsx_extract from memory
+where the element number is constant.
+
+2023-04-21   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_<mode>_var_load_to_udi): New insn.
+	(vsx_extract_<mode>_var_load_to_sdi): New insn.
+	(vsx_extract_v8hi_var_load_to_<su>si): New insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-char-2.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-int-3.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-short-2.c: New file.
+
 ==================== Branch work119, patch #47 ====================
 
 Allow vec_extract with variable element number to load vector registers.
 
-2023-04-20   Michael Meissner  <meissner@linux.ibm.com>
+2023-04-21   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -17,7 +58,7 @@ Combine variable element vec_extract of V4SF with DF convert.
 This patch adds a combine insn that merges loading up a vec_extract of V4SFmode
 where the element number is variable combined with a conversion to DFmode.
 
-2023-04-20   Michael Meissner  <meissner@linux.ibm.com>
+2023-04-21   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -52,7 +93,7 @@ Fold sign or zero convert into vsx_extract from memory.
 This patch folds sign or zero convert operations into vsx_extract from memory
 where the element number is constant.
 
-2023-04-18   Michael Meissner  <meissner@linux.ibm.com>
+2023-04-21   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
