@@ -4,7 +4,7 @@ PR target/101169 - Fix test suite insn counts
 
 Adjust insn counts.
 
-2023-04-20   Michael Meissner  <meissner@linux.ibm.com>
+2023-04-21   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/testsuite/
 
