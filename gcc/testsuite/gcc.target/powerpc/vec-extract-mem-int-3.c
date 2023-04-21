@@ -22,8 +22,5 @@ extract_uns_v4si_var (vector unsigned int *p, size_t n)
 
 /* { dg-final { scan-assembler-times {\mlwax\M}   1 } } */
 /* { dg-final { scan-assembler-times {\mlwzx\M}   1 } } */
-/* { dg-final { scan-assembler-not   {\mextsw\M}    } } */
-
-/* There are 2 rldicl's to make the variable element number, but there is not a
-   third one to do the zero extension.  */
 /* { dg-final { scan-assembler-times {\mrldicl\M} 2 } } */
+/* { dg-final { scan-assembler-not   {\mextsw\M}    } } */
