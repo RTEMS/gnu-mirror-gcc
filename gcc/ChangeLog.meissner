@@ -1,3 +1,40 @@
+==================== Branch work119-dmf, patch #23 ====================
+
+PR target/101169 - Fix test suite insn counts
+
+Adjust insn counts.
+
+2023-04-20   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	PR target/101169
+	* gcc.target/powerpc/fold-vec-extract-char.p7.c: Update insn count.
+	* gcc.target/powerpc/fold-vec-extract-double.p7.c: Likewise.
+	* gcc.target/powerpc/fold-vec-extract-float.p7.c: Likewise.
+	* gcc.target/powerpc/fold-vec-extract-float.p8.c: Likewise.
+	* gcc.target/powerpc/fold-vec-extract-int.p7.c: Likewise.
+	* gcc.target/powerpc/fold-vec-extract-int.p8.c: Likewise.
+	* gcc.target/powerpc/fold-vec-extract-short.p7.c: Likewise.
+	* gcc.target/powerpc/fold-vec-extract-short.p8.c: Likewise.
+
+==================== Branch work119-dmf, patch #22 ====================
+
+Fix typo in insn name.
+
+In doing other work, I noticed that there was an insn:
+
+	vsx_extract_v4sf_<mode>_load
+
+Which did not have an iterator.  I removed the useless <mode>.
+
+2023-04-18   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4sf_load): Rename from
+	vsx_extract_v4sf_<mode>_load.
+
 ==================== Branch work119-dmf, patch #21 ====================
 
 Improve 64->128 bit zero extension on PowerPC
