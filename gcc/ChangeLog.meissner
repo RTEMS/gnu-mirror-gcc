@@ -1,8 +1,60 @@
-==================== Branch work119, patch #52 was reverted ====================
+==================== Branch work119, patch #52 ====================
 
-==================== Branch work119, patch #51 was reverted ====================
+Improve vec_extract of V4SF with variable element number.
 
-==================== Branch work119, patch #50 was reverted ====================
+This patch adds a combine insn that merges loading up a vec_extract of V4SFmode
+where the element number is variable combined with a conversion to DFmode.
+
+I also modified the insn for vec_extract of V4SFmode where the element number is
+variable to split before register allocation.
+
+2023-04-21   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4sf_var_load): Allow split before
+	register allocation.
+	(vsx_extract_v4sf_var_load_to_df): New insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-float-2.c: New test.
+
+==================== Branch work119, patch #51 ====================
+
+Combine vec_extract of V4SF with DF convert.
+
+This patch adds a combine insn that merges loading up a vec_extract of V4SFmode
+where the element number is constant combined with a conversion to DFmode.
+
+In addition, I changed the vec_extract of V4SFmode where the element number is
+constant without conversion to do the split before register allocation.  I also
+simplified the alternatives.
+
+2023-04-21   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4sf_load): Allow split before
+	register allocation.
+	(vsx_extract_v4sf_to_df_load): New insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-float-1.c: New test.
+
+==================== Branch work119, patch #50 ====================
+
+Allow vec_extract support functions to be called before reload.
+
+2023-04-21   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (get_vector_offset): Allow being called before
+	register allocation.
+	(adjust_vec_address_pcrel): Likewise.
+	(rs6000_adjust_vec_address): Likewise.
 
 ==================== Branch work119, patch #49 was reverted ====================
 
