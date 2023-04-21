@@ -1,3 +1,15 @@
+==================== Branch work119, patch #47 ====================
+
+Allow vec_extract with variable element number to load vector registers.
+
+2023-04-20   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_<mode>_var_load): Allow vec_extract
+	of integer types with a variable element number to load into vector
+	registers.  Allow splitting before register allocation.
+
 ==================== Branch work119, patch #46 ====================
 
 Combine variable element vec_extract of V4SF with DF convert.
