@@ -3,7 +3,7 @@
 /* { dg-require-effective-target powerpc_vsx_ok } */
 
 /* Test to verify that the vec_extract with constant element numbers can load
-   SImode and fold the sign/extension into the load.  */
+   HImode and fold the sign/extension into the load.  */
 
 #include <altivec.h>
 
