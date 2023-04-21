@@ -1,3 +1,25 @@
+==================== Branch work119, patch #52 ====================
+
+Improve vec_extract of V4SF with variable element number.
+
+This patch adds a combine insn that merges loading up a vec_extract of V4SFmode
+where the element number is variable combined with a conversion to DFmode.
+
+I also modified the insn for vec_extract of V4SFmode where the element number is
+variable to split before register allocation.
+
+2023-04-21   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4sf_var_load): Allow split before
+	register allocation.
+	(vsx_extract_v4sf_var_load_to_df): New insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-float-2.c: New test.
+
 ==================== Branch work119, patch #51 ====================
 
 Combine vec_extract of V4SF with DF convert.
@@ -6,7 +28,8 @@ This patch adds a combine insn that merges loading up a vec_extract of V4SFmode
 where the element number is constant combined with a conversion to DFmode.
 
 In addition, I changed the vec_extract of V4SFmode where the element number is
-constant without conversion to do the split before register allocation.
+constant without conversion to do the split before register allocation.  I also
+simplified the alternatives.
 
 2023-04-21   Michael Meissner  <meissner@linux.ibm.com>
 
