@@ -3549,45 +3549,23 @@
   [(set_attr "length" "8")
    (set_attr "type" "fp")])
 
-;; V4SF extract from memory convert to DFmode with constant element number.  If
-;; the element number is 0, we don't need a temporary register.
 (define_insn_and_split "*vsx_extract_v4sf_load"
-  [(set (match_operand:SF 0 "register_operand" "=wa,wa,?r,?r")
+  [(set (match_operand:SF 0 "register_operand" "=f,v,v,?r")
 	(vec_select:SF
-	 (match_operand:V4SF 1 "memory_operand" "m,Q,m,Q")
-	 (parallel
-	  [(match_operand:QI 2 "const_0_to_3_operand" "O,n,O,n")])))
-   (clobber (match_scratch:P 3 "=X,&b,X,&b"))]
+	 (match_operand:V4SF 1 "memory_operand" "m,Z,m,m")
+	 (parallel [(match_operand:QI 2 "const_0_to_3_operand" "n,n,n,n")])))
+   (clobber (match_scratch:P 3 "=&b,&b,&b,&b"))]
   "VECTOR_MEM_VSX_P (V4SFmode)"
   "#"
-  "&& 1"
+  "&& reload_completed"
   [(set (match_dup 0) (match_dup 4))]
 {
   operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
 					   operands[3], SFmode);
 }
-  [(set_attr "type" "fpload,fpload,load,load")
-   (set_attr "length" "4,8,4,8")])
-
-;; V4SF extract from memory and convert to DFmode with constant element number.
-(define_insn_and_split "*vsx_extract_v4sf_load_to_df"
-  [(set (match_operand:DF 0 "register_operand" "=wa,wa")
-	(float_extend:DF
-	 (vec_select:SF
-	  (match_operand:V4SF 1 "memory_operand" "m,Q")
-	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "O,n")]))))
-   (clobber (match_scratch:P 3 "=X,&b"))]
-  "VECTOR_MEM_VSX_P (V4SFmode)"
-  "#"
-  "&& 1"
-  [(set (match_dup 0)
-	(float_extend:DF (match_dup 4)))]
-{
-  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
-					   operands[3], SFmode);
-}
-  [(set_attr "type" "fpload")
-   (set_attr "length" "4,8")])
+  [(set_attr "type" "fpload,fpload,fpload,load")
+   (set_attr "length" "8")
+   (set_attr "isa" "*,p7v,p9v,*")])
 
 ;; Variable V4SF extract from a register
 (define_insn_and_split "vsx_extract_v4sf_var"
@@ -3616,32 +3594,13 @@
    (clobber (match_scratch:DI 3 "=&b,&b"))]
   "VECTOR_MEM_VSX_P (V4SFmode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
-  "&& 1"
+  "&& reload_completed"
   [(set (match_dup 0) (match_dup 4))]
 {
   operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
 					   operands[3], SFmode);
 }
   [(set_attr "type" "fpload,load")])
-
-;; V4SF extract from memory with variable element number and convert to DFmode.
-(define_insn_and_split "*vsx_extract_v4sf_var_load_to_df"
-  [(set (match_operand:DF 0 "gpc_reg_operand" "=wa")
-	(float_extend:DF
-	 (unspec:SF [(match_operand:V4SF 1 "memory_operand" "Q")
-		     (match_operand:DI 2 "gpc_reg_operand" "r")]
-		    UNSPEC_VSX_EXTRACT)))
-   (clobber (match_scratch:DI 3 "=&b"))]
-  "VECTOR_MEM_VSX_P (V4SFmode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& 1"
-  [(set (match_dup 0)
-	(float_extend:DF (match_dup 4)))]
-{
-  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
-					   operands[3], SFmode);
-}
-  [(set_attr "type" "fpload")])
 
 ;; Expand the builtin form of xxpermdi to canonical rtl.
 (define_expand "vsx_xxpermdi_<mode>"
