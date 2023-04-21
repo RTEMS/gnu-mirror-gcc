@@ -1,3 +1,15 @@
+2023-04-20  Alejandro Colomar  <alx.manpages@gmail.com>
+
+	* doc/extend.texi (Common Function Attributes): Remove duplicate
+	word.
+
+2023-04-19  Christophe Lyon  <christophe.lyon@arm.com>
+
+	Backported from master:
+	2023-04-19  Christophe Lyon  <christophe.lyon@arm.com>
+
+	* doc/install.texi (enable-decimal-float): Add AArch64.
+
 2023-04-18  Kito Cheng  <kito.cheng@sifive.com>
 
 	Backported from master:
