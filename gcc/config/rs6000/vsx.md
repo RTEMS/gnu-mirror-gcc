@@ -4019,6 +4019,27 @@
   [(set_attr "type" "load,load,fpload,fpload")
    (set_attr "length" "8")])
 
+;; Extract a V8HI element from memory with a constant element number and sign
+;; or zero extend it to either SImode or DImode.
+(define_insn_and_split "*vsx_extract_v8hi_load_to_<su><mode>"
+  [(set (match_operand:GPR 0 "register_operand" "=r,r")
+	(any_extend:GPR
+	 (vec_select:HI
+	  (match_operand:V8HI 1 "memory_operand" "m,Q")
+	  (parallel [(match_operand:QI 2 "const_0_to_7_operand" "O,n")]))))
+   (clobber (match_scratch:DI 3 "=X,&b"))]
+  "VECTOR_MEM_VSX_P (V8HImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(any_extend:GPR (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
+					   operands[3], HImode);
+}
+  [(set_attr "type" "load")
+   (set_attr "length" "8")])
+
 ;; Variable V16QI/V8HI/V4SI extract from a register
 (define_insn_and_split "vsx_extract_<mode>_var"
   [(set (match_operand:<VEC_base> 0 "gpc_reg_operand" "=r,r")
