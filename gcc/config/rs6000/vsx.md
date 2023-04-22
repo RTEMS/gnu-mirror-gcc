@@ -3998,6 +3998,27 @@
    (set_attr "length" "8")
    (set_attr "isa" "*,*,<VSX_EX_ISA>,<VSX_EX_ISA>")])
 
+;; Extract a V4SI element from memory with a constant element number and sign
+;; or zero extend it to DImode.
+(define_insn_and_split "*vsx_extract_v4si_load_to_<su>di"
+  [(set (match_operand:DI 0 "register_operand" "=r,r,wa,wa")
+	(any_extend:DI
+	 (vec_select:SI
+	  (match_operand:V4SI 1 "memory_operand" "m,Q,Z,Q")
+	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "O,n,O,n")]))))
+   (clobber (match_scratch:DI 3 "=X,&b,X,&b"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(any_extend:DI (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
+					   operands[3], SImode);
+}
+  [(set_attr "type" "load,load,fpload,fpload")
+   (set_attr "length" "8")])
+
 ;; Variable V16QI/V8HI/V4SI extract from a register
 (define_insn_and_split "vsx_extract_<mode>_var"
   [(set (match_operand:<VEC_base> 0 "gpc_reg_operand" "=r,r")
