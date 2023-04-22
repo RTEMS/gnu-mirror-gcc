@@ -4083,12 +4083,12 @@
 
 ;; Variable V16QI/V8HI/V4SI extract from memory
 (define_insn_and_split "*vsx_extract_<mode>_var_load"
-  [(set (match_operand:<VEC_base> 0 "gpc_reg_operand" "=r")
+  [(set (match_operand:<VEC_base> 0 "gpc_reg_operand" "=r,<VSX_EX>")
 	(unspec:<VEC_base>
-	 [(match_operand:VSX_EXTRACT_I 1 "memory_operand" "Q")
-	  (match_operand:DI 2 "gpc_reg_operand" "r")]
+	 [(match_operand:VSX_EXTRACT_I 1 "memory_operand" "Q,Q")
+	  (match_operand:DI 2 "gpc_reg_operand" "r,r")]
 	 UNSPEC_VSX_EXTRACT))
-   (clobber (match_scratch:DI 3 "=&b"))]
+   (clobber (match_scratch:DI 3 "=&b,&b"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
   "&& reload_completed"
@@ -4097,7 +4097,8 @@
   operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
 					   operands[3], <VEC_base>mode);
 }
-  [(set_attr "type" "load")])
+  [(set_attr "type" "load")
+   (set_attr "isa" "*,<VSX_EX_ISA>")])
 
 ;; ISA 3.1 extract
 (define_expand "vextractl<mode>"
