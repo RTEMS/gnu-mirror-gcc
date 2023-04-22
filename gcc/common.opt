@@ -2291,6 +2291,10 @@ fpeel-loops
 Common Var(flag_peel_loops) Optimization
 Perform loop peeling.
 
+fuse-histograms-in-peeling
+Common Var(flag_use_histogram_in_peeling) Init(1) Optimization
+Use histograms in loop peelings.
+
 fpeephole
 Common Var(flag_no_peephole,0) Optimization
 Enable machine specific peephole optimizations.

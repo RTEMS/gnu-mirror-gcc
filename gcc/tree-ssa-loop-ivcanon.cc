@@ -1102,7 +1102,7 @@ try_peel_loop (class loop *loop,
   auto_vec<int> good_peels;
   auto_vec<int> prcnt;
   prcnt.safe_push (0);
-  bool histogram_peeling = loop->counters != NULL;
+  bool histogram_peeling = flag_use_histogram_in_peeling && (loop->counters != NULL);
   if (!loop->counters && loop->header->count.reliable_p ()
       && loop->header->count.nonzero_p ()
       && dump_enabled_p ())
