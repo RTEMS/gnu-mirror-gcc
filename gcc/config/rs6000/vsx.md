@@ -4040,6 +4040,27 @@
   [(set_attr "type" "load")
    (set_attr "length" "8")])
 
+;; Extract a V16QI element from memory with a constant element number and
+;; zero extend it to either SImode or DImode.
+(define_insn_and_split "*vsx_extract_v16qi_load_to_u<mode>"
+  [(set (match_operand:GPR 0 "register_operand" "=r,r")
+	(zero_extend:GPR
+	 (vec_select:QI
+	  (match_operand:V16QI 1 "memory_operand" "m,Q")
+	  (parallel [(match_operand:QI 2 "const_0_to_15_operand" "O,n")]))))
+   (clobber (match_scratch:DI 3 "=X,&b"))]
+  "VECTOR_MEM_VSX_P (V8HImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(zero_extend:GPR (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
+					   operands[3], QImode);
+}
+  [(set_attr "type" "load")
+   (set_attr "length" "8")])
+
 ;; Variable V16QI/V8HI/V4SI extract from a register
 (define_insn_and_split "vsx_extract_<mode>_var"
   [(set (match_operand:<VEC_base> 0 "gpc_reg_operand" "=r,r")
