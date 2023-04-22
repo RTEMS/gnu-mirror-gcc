@@ -4142,6 +4142,27 @@
 }
   [(set_attr "type" "load")])
 
+;; Extract a V16QI element from memory with a variable element number and zero
+;; extend it to either SImode or DImode.
+(define_insn_and_split "*vsx_extract_v16qi_var_load_to_u<mode>"
+  [(set (match_operand:GPR 0 "gpc_reg_operand" "=r")
+	(zero_extend:GPR
+	 (unspec:SI
+	  [(match_operand:V16QI 1 "memory_operand" "Q")
+	   (match_operand:DI 2 "gpc_reg_operand" "r")]
+	  UNSPEC_VSX_EXTRACT)))
+   (clobber (match_scratch:DI 3 "=&b"))]
+  "VECTOR_MEM_VSX_P (V8HImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(zero_extend:GPR (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
+					   operands[3], QImode);
+}
+  [(set_attr "type" "load")])
+
 ;; ISA 3.1 extract
 (define_expand "vextractl<mode>"
   [(set (match_operand:V2DI 0 "altivec_register_operand")
