@@ -989,7 +989,7 @@ estimated_peeled_sequence_size (struct loop_size *size,
 static bool
 try_peel_loop (class loop *loop,
 	       edge exit, tree niter, bool may_be_zero,
-	       HOST_WIDE_INT maxiter)
+	       HOST_WIDE_INT maxiter, dump_user_location_t locus)
 {
   HOST_WIDE_INT npeel;
   struct loop_size size;
@@ -1035,10 +1035,25 @@ try_peel_loop (class loop *loop,
 
   /* Check if there is an estimate on the number of iterations.  */
   npeel = estimated_loop_iterations_int (loop);
+  if (npeel < 0)
+    npeel = likely_max_loop_iterations_int (loop);
+  if (npeel >= 0 && maxiter >= 0 && maxiter <= npeel)
+    {
+      if (dump_file)
+	fprintf (dump_file, "Not peeling: upper bound is known so can "
+		 "unroll completely\n");
+      return false;
+    }
   auto_vec<int> good_peels;
   auto_vec<int> prcnt;
   prcnt.safe_push (0);
   bool histogram_peeling = loop->counters != NULL;
+  if (!loop->counters && loop->header->count.reliable_p ()
+      && loop->header->count.nonzero_p ()
+      && dump_enabled_p ())
+    dump_printf_loc (MSG_MISSED_OPTIMIZATION | MSG_PRIORITY_USER_FACING, locus,
+		     "missing loop histogram for loop %d.\n", loop->num);
+  HOST_WIDE_INT nonhistogram_npeel = npeel + 1;
   if (histogram_peeling && loop->counters->sum != 0)
     {
       gcov_type sum = loop->counters->sum;
@@ -1077,19 +1092,10 @@ try_peel_loop (class loop *loop,
     }
 
   if (npeel < 0)
-    npeel = likely_max_loop_iterations_int (loop);
-  if (npeel < 0)
     {
       if (dump_file)
         fprintf (dump_file, "Not peeling: number of iterations is not "
 	         "estimated\n");
-      return false;
-    }
-  if (maxiter >= 0 && maxiter <= npeel)
-    {
-      if (dump_file)
-	fprintf (dump_file, "Not peeling: upper bound is known so can "
-		 "unroll completely\n");
       return false;
     }
 
@@ -1165,7 +1171,19 @@ try_peel_loop (class loop *loop,
 	       loop->num, (int) npeel);
     }
 
-  // adjust loop estimates for peeling npeel times
+  if (dump_enabled_p ())
+    {
+      if (nonhistogram_npeel != npeel)
+	dump_printf_loc (MSG_OPTIMIZED_LOCATIONS | MSG_PRIORITY_USER_FACING, locus,
+			 "peeled loop %d, %i times using histogram (without histogram would peel %i times).\n", loop->num, (int)npeel, (int)nonhistogram_npeel);
+      else if (histogram_peeling)
+	dump_printf_loc (MSG_OPTIMIZED_LOCATIONS | MSG_PRIORITY_USER_FACING, locus,
+			 "peeled loop %d, %i times with histogram.\n", loop->num, (int)npeel);
+      else
+	dump_printf_loc (MSG_OPTIMIZED_LOCATIONS | MSG_PRIORITY_USER_FACING, locus,
+			 "peeled loop %d, %i times.\n", loop->num, (int)npeel);
+    }
+
   adjust_loop_estimates_minus (loop, npeel, true);
 
   profile_count entry_count = profile_count::zero ();
@@ -1309,7 +1327,7 @@ canonicalize_loop_induction_variables (class loop *loop,
 	create_canonical_iv (loop, exit, iv_niter);
     }
   if (ul == UL_ALL)
-    modified |= try_peel_loop (loop, exit, niter, may_be_zero, maxiter);
+    modified |= try_peel_loop (loop, exit, niter, may_be_zero, maxiter, locus);
 
   return modified;
 }
