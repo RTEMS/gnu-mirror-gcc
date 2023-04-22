@@ -461,7 +461,8 @@ ch_base::copy_headers (function *fun)
       edge e;
       edge_iterator ei;
       FOR_EACH_EDGE (e, ei, loop->header->preds)
-	entry_count += e->count ();
+	if (e->src != loop->latch)
+	  entry_count += e->count ();
       while (should_duplicate_loop_header_p (header, loop, &remaining_limit))
 	{
 	  if (dump_file && (dump_flags & TDF_DETAILS))
@@ -498,8 +499,11 @@ ch_base::copy_headers (function *fun)
 
       /* Ensure that the header will have just the latch as a predecessor
 	 inside the loop.  */
-      if (!single_pred_p (exit->dest))
-	exit = single_pred_edge (split_edge (exit));
+      if (!single_pred_p (nonexit->dest))
+	{
+	  header = split_edge (nonexit);
+	  exit = single_pred_edge (header);
+	}
 
       entry = loop_preheader_edge (loop);
 
@@ -560,18 +564,17 @@ ch_base::copy_headers (function *fun)
       /* Update header of the loop.  */
       loop->header = header;
       /* Find correct latch.  We only duplicate chain of conditionals so
-         there should be precisely two edges to the new header.  One entry
-         edge and one to latch.  */
+	 there should be precisely two edges to the new header.  One entry
+	 edge and one to latch.  */
       FOR_EACH_EDGE (e, ei, loop->header->preds)
-       if (header != e->src)
-         {
-           loop->latch = e->src;
-           break;
-         }
-      /* Ensure that the latch and the preheader is simple (we know that they
-	 are not now, since there was the loop exit condition.  */
-      split_edge (loop_preheader_edge (loop));
-      split_edge (loop_latch_edge (loop));
+	if (header != e->src)
+	  {
+	    loop->latch = e->src;
+	    break;
+	  }
+      /* Ensure that the latch is simple.  */
+      if (!single_succ_p (loop_latch_edge (loop)->src))
+	split_edge (loop_latch_edge (loop));
 
       if (dump_file && (dump_flags & TDF_DETAILS))
 	{
@@ -580,22 +583,91 @@ ch_base::copy_headers (function *fun)
 	  else
 	    fprintf (dump_file, "Loop %d is still not do-while loop.\n",
 		     loop->num);
+	  fprintf (dump_file, "Exit count: ");
+	  exit_count.dump (dump_file);
+	  fprintf (dump_file, "\nEntry count: ");
+	  entry_count.dump (dump_file);
+	  fprintf (dump_file, "\n");
 	}
-      // if it is unlikely that after header copy the iterations enter the loop
-      // it behaves like peeling 1 time
+
+      /* We possibly decreased number of itrations by 1.  */
       auto_vec<edge> exits = get_loop_exit_edges (loop);
-      if (nexits == (int) exits.length ())
-	adjust_loop_estimates_minus (loop, 1, true);
+      bool precise = (nexits == (int) exits.length ());
+      if (!get_max_loop_iterations_int (loop))
+	{
+	  if (dump_file && (dump_flags & TDF_DETAILS))
+	    fprintf (dump_file, "Loop %d no longer loops.\n", loop->num);
+	  /* TODO: We can unloop like in tree-ssa-loop-ivcanon.  */
+	  precise = false;
+	}
+      /* Check that loop may not terminate in other way than via
+	 basic blocks we duplicated.  */
+      if (precise)
+	{
+	  basic_block *bbs = get_loop_body (loop);
+	  for (unsigned i = 0; i < loop->num_nodes && precise; ++i)
+	   {
+	     basic_block bb = bbs[i];
+	     bool found_exit = false;
+	     FOR_EACH_EDGE (e, ei, bb->succs)
+	      if (!flow_bb_inside_loop_p (loop, e->dest))
+		{
+		  found_exit = true;
+		  break;
+		}
+	     /* If BB has exit, it was duplicated.  */
+	     if (found_exit)
+	       continue;
+	     /* Give up on irreducible loops.  */
+	     if (bb->flags & BB_IRREDUCIBLE_LOOP)
+	       {
+		 precise = false;
+		 break;
+	       }
+	     /* Check that inner loops are finite.  */
+	     for (class loop *l = bb->loop_father; l != loop && precise;
+		  l = loop_outer (l))
+	       if (!l->finite_p)
+		 {
+		   precise = false;
+		   break;
+		 }
+	     /* Verify that there is no statement that may be terminate
+		execution in a way not visible to CFG.  */
+	     for (gimple_stmt_iterator bsi = gsi_start_bb (bb);
+		  !gsi_end_p (bsi); gsi_next (&bsi))
+	       if (stmt_can_terminate_bb_p (gsi_stmt (bsi)))
+		 precise = false;
+	   }
+	}
+      if (precise)
+	{
+	  if (dump_file && (dump_flags & TDF_DETAILS))
+	    fprintf (dump_file,
+		     "Peeled all exits:"
+		     " decreased number of iterations of loop %d by 1.\n",
+		     loop->num);
+	  adjust_loop_info_after_peeling (loop, 1, true);
+	}
       else if (exit_count >= entry_count.apply_scale (9, 10))
-	adjust_loop_estimates_minus (loop, 1, false);
+	{
+	  if (dump_file && (dump_flags & TDF_DETAILS))
+	    fprintf (dump_file,
+		     "Peeled likely exits: likely decreased number "
+		     "of iterations of loop %d by 1.\n", loop->num);
+	  adjust_loop_info_after_peeling (loop, 1, false);
+	}
+      else if (dump_file && (dump_flags & TDF_DETAILS))
+	fprintf (dump_file,
+		 "Not decreased number"
+		 " of iterations of loop %d; likely exits remains.\n",
+		 loop->num);
 
       changed = true;
     }
 
   if (changed)
     {
-      if (flag_checking)
-       verify_loop_structure ();
       update_ssa (TODO_update_ssa);
       /* After updating SSA form perform CSE on the loop header
 	 copies.  This is esp. required for the pass before
