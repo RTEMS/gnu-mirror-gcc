@@ -4100,6 +4100,27 @@
   [(set_attr "type" "load,fpload")
    (set_attr "isa" "*,<VSX_EX_ISA>")])
 
+;; V4SI extract from memory with a variable element number converted to DImode
+(define_insn_and_split "*vsx_extract_v4si_var_load_to_<su>di"
+  [(set (match_operand:DI 0 "gpc_reg_operand" "=r,wa")
+	(any_extend:DI
+	 (unspec:SI
+	  [(match_operand:V4SI 1 "memory_operand" "Q,Q")
+	   (match_operand:DI 2 "gpc_reg_operand" "r,r")]
+	  UNSPEC_VSX_EXTRACT)))
+   (clobber (match_scratch:DI 3 "=&b,&b"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(any_extend:DI (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
+					   operands[3], SImode);
+}
+  [(set_attr "type" "load,fpload")
+   (set_attr "isa" "*,p8v")])
+
 ;; ISA 3.1 extract
 (define_expand "vextractl<mode>"
   [(set (match_operand:V2DI 0 "altivec_register_operand")
