@@ -247,6 +247,13 @@
 			       (TF "TARGET_FLOAT128_HW
 				    && FLOAT128_IEEE_P (TFmode)")])
 
+;; Mode attribute to give the constraint for floating point when used
+;; with FL_CONV modes.
+(define_mode_attr FL_CONV_REG [(SF "wa")
+			       (DF "wa")
+			       (KF "v")
+			       (TF "v")])
+
 ;; Iterator for the 2 short vector types to do a splat from an integer
 (define_mode_iterator VSX_SPLAT_I [V16QI V8HI])
 
@@ -4060,6 +4067,105 @@
 }
   [(set_attr "type" "load")
    (set_attr "length" "8")])
+
+;; Extract a V4SI/V8HI/V16QI element from memory with a constant element number
+;; and convert it to unsigned float.
+(define_insn_and_split "*vsx_extract_<VSX_EXTRACT_I:mode>_load_to_u<FL_CONV:mode>"
+  [(set (match_operand:FL_CONV 0 "register_operand" "=<FL_CONV:FL_CONV_REG>")
+	(unsigned_float:FL_CONV
+	 (vec_select:<VSX_EXTRACT_I:VEC_base>
+	  (match_operand:VSX_EXTRACT_I 1 "memory_operand" "Q")
+	  (parallel [(match_operand:QI 2 "const_int_operand" "n")]))))
+   (clobber (match_scratch:DI 3 "=&b"))
+   (clobber (match_scratch:DI 4 "=<VSX_EX>"))]
+  "VECTOR_MEM_VSX_P (<VSX_EXTRACT_I:MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& 1"
+  [(set (match_dup 4)
+	(zero_extend:DI (match_dup 5)))
+   (set (match_dup 0)
+	(float:FL_CONV (match_dup 4)))]
+{
+  machine_mode base_mode = <VSX_EXTRACT_I:VEC_base>mode;
+
+  if (GET_CODE (operands[3]) == SCRATCH)
+    operands[3] = gen_reg_rtx (DImode);
+  if (GET_CODE (operands[4]) == SCRATCH)
+    operands[4] = gen_reg_rtx (DImode);
+
+  operands[5] = rs6000_adjust_vec_address (operands[0], operands[1],
+					   operands[2], operands[3],
+					   base_mode);
+}
+  [(set_attr "type" "fpload")
+   (set_attr "length" "8")])
+
+;; Extract a V4SI element from memory with a constant element number and
+;; convert it to signed float.
+(define_insn_and_split "*vsx_extract_v4si_load_to_s<mode>"
+  [(set (match_operand:FL_CONV 0 "register_operand" "=<FL_CONV_REG>")
+	(float:FL_CONV
+	 (vec_select:SI
+	  (match_operand:V4SI 1 "memory_operand" "Q")
+	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "n")]))))
+   (clobber (match_scratch:DI 3 "=&b"))
+   (clobber (match_scratch:DI 4 "=<FL_CONV_REG>"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& 1"
+  [(set (match_dup 4)
+	(sign_extend:DI (match_dup 5)))
+   (set (match_dup 0)
+	(float:FL_CONV (match_dup 4)))]
+{
+  if (GET_CODE (operands[3]) == SCRATCH)
+    operands[3] = gen_reg_rtx (DImode);
+  if (GET_CODE (operands[4]) == SCRATCH)
+    operands[4] = gen_reg_rtx (DImode);
+
+  operands[5] = rs6000_adjust_vec_address (operands[0], operands[1],
+					   operands[2], operands[3],
+					   SImode);
+}
+  [(set_attr "type" "fpload")
+   (set_attr "length" "8")])
+
+;; Extract a V8HI element from memory with a constant element number and
+;; convert it to signed float.  While we could do this via a LXSIHZX
+;; instruction followed by VEXTSB2D, it is better to do a LWA and MTVSRD
+;; instruction.
+(define_insn_and_split "*vsx_extract_v8hi_load_to_s<mode>"
+  [(set (match_operand:FL_CONV 0 "register_operand" "=<FL_CONV_REG>,<FL_CONV_REG>")
+	(float:FL_CONV
+	 (vec_select:HI
+	  (match_operand:V8HI 1 "memory_operand" "m,Qo")
+	  (parallel [(match_operand:QI 2 "const_0_to_7_operand" "O,n")]))))
+   (clobber (match_scratch:DI 3 "=X,&b"))
+   (clobber (match_scratch:DI 4 "=&r,&r"))
+   (clobber (match_scratch:DI 5 "=<FL_CONV_REG>,<FL_CONV_REG>"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& 1"
+  [(set (match_dup 4)
+	(sign_extend:DI (match_dup 6)))
+   (set (match_dup 5)
+	(match_dup 4))
+   (set (match_dup 0)
+	(float:FL_CONV (match_dup 5)))]
+{
+  if (GET_CODE (operands[3]) == SCRATCH)
+    operands[3] = gen_reg_rtx (DImode);
+  if (GET_CODE (operands[4]) == SCRATCH)
+    operands[4] = gen_reg_rtx (DImode);
+  if (GET_CODE (operands[5]) == SCRATCH)
+    operands[5] = gen_reg_rtx (DImode);
+
+  operands[6] = rs6000_adjust_vec_address (operands[0], operands[1],
+					   operands[2], operands[3],
+					   HImode);
+}
+  [(set_attr "type" "load")
+   (set_attr "length" "12")])
 
 ;; Variable V16QI/V8HI/V4SI extract from a register
 (define_insn_and_split "vsx_extract_<mode>_var"
