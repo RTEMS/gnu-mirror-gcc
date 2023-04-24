@@ -1,70 +1,24 @@
-==================== Branch work119, patch #62 ====================
+==================== Branch work119, patch #72 was reverted ====================
 
-Add vec_extract test cases.
+==================== Branch work119, patch #71 was reverted ====================
 
-This patch adds test cases to verify that the vec_extract optimizations in
-include sign/zero extension with the load are generating code.
+==================== Branch work119, patch #70 was reverted ====================
 
-2023-04-21   Michael Meissner  <meissner@linux.ibm.com>
+==================== Branch work119, patch #69 was reverted ====================
 
-gcc/testsuite/
+==================== Branch work119, patch #68 was reverted ====================
 
-	* gcc.target/powerpc/vec-extract-mem-char-1.c: New test.
-	* gcc.target/powerpc/vec-extract-mem-int-1.c: New test.
-	* gcc.target/powerpc/vec-extract-mem-short-1.c: New test.
+==================== Branch work119, patch #67 was reverted ====================
 
+==================== Branch work119, patch #66 was reverted ====================
 
-==================== Branch work119, patch #62 ====================
+==================== Branch work119, patch #65 was reverted ====================
 
-Fold V16QI vsx_extract from memory with constant element with zero extension.
+==================== Branch work119, patch #64 was reverted ====================
 
-This patch folds V16QI vsx_extract from memory where the element number is
-constant with zero extension to SImode/DImode.
+==================== Branch work119, patch #63 was reverted ====================
 
-2023-04-21   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/vsx.md (vsx_extract_v16qi_load_to_u<mode>): New insn.
-
-==================== Branch work119, patch #62 ====================
-
-Fold V8HI vsx_extract from memory with constant element with sign/zero extension.
-
-This patch folds V8HI vsx_extract from memory where the element number is
-constant with sign or zero extension to SImode/DImode.
-
-2023-04-21   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/vsx.md (vsx_extract_v8hi_load_to_<su><mode>): New insn.
-
-==================== Branch work119, patch #62 ====================
-
-Fold V4SI sign or zero extension into vsx_extract from memory with constant element.
-
-This patch folds V4SI vsx_extract from memory where the element number is
-constant with sign or zero extension to DImode.
-
-2023-04-21   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/vsx.md (vsx_extract_v4si_load_to_<su>di): New insn.
-
-==================== Branch work119, patch #62 ====================
-
-Allow integer vec_extract to load vector registers.
-
-2023-04-21   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/vsx.md (VSX_EX_ISA): New mode attribute
-	(vsx_extract_<mode>_load): Allow vec_extract of integer types with a
-	constant element number to load into vector registers.  Don't require a
-	base register temporary if the element number is 0.
+==================== Branch work119, patch #62 was reverted ====================
 
 ==================== Branch work119, patch #61 ====================
 
