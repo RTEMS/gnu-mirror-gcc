@@ -2189,7 +2189,7 @@ unsigned int
 hist_index (gcov_type_unsigned val)
 {
   unsigned int lin_size = param_profile_histogram_size_lin;
-  unsigned int tot_size = param_profile_histogram_size;
+  unsigned int tot_size = lin_size + param_profile_histogram_size_exp;
   if (val < lin_size)
     {
       return val;
@@ -2230,7 +2230,8 @@ histogram_counters_minus_upper_bound (histogram_counters *&hist_c,
   hist_c->adjusted = true;
   auto &sum = hist_c->sum;
   unsigned int lin_size = param_profile_histogram_size_lin;
-  unsigned int tot_size = param_profile_histogram_size;
+  unsigned int tot_size
+    = param_profile_histogram_size_lin + param_profile_histogram_size_exp;
   // If the last linear counter does not contain other iterations
   unsigned int i = 1;
   for (; i < lin_size; i++)
@@ -2304,7 +2305,8 @@ histogram_counters_div_upper_bound (histogram_counters *&hist_c,
   auto &hist = *(hist_c->hist);
   hist_c->adjusted = true;
   unsigned int lin_size = param_profile_histogram_size_lin;
-  unsigned int tot_size = param_profile_histogram_size;
+  unsigned int tot_size
+    = param_profile_histogram_size_lin + param_profile_histogram_size_exp;
   unsigned int i = 1;
   for (; i < lin_size && i < tot_size - 1; i++)
     {

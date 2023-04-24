@@ -62,9 +62,10 @@ void __gcov_histogram_profiler(gcov_type *counters, gcov_type value,
   gcc_assert(hist_sizes >= 0 && value >= 0);
   gcov_type_unsigned hist_size = hist_sizes;
   gcov_type_unsigned u_value = value;
-  gcov_type_unsigned tot_size = hist_size >> 32;
+  gcov_type_unsigned exp_size = hist_size >> 32;
   gcov_type_unsigned lin_size =
       hist_size & ((((gcov_type_unsigned)1) << 32) - 1);
+  gcov_type_unsigned tot_size = exp_size + lin_size;
   if (u_value < lin_size) {
     counters[value]++;
   } else {
@@ -91,9 +92,10 @@ void __gcov_histogram_profiler_atomic(gcov_type *counters, gcov_type value,
   gcc_assert(hist_sizes >= 0 && value >= 0);
   gcov_type_unsigned hist_size = hist_sizes;
   gcov_type_unsigned u_value = value;
-  gcov_type_unsigned tot_size = hist_size >> 32;
+  gcov_type_unsigned exp_size = hist_size >> 32;
   gcov_type_unsigned lin_size =
       hist_size & ((((gcov_type_unsigned)1) << 32) - 1);
+  gcov_type_unsigned tot_size = lin_size + tot_size;
   if (u_value < lin_size) {
     __atomic_fetch_add(&counters[value], 1, __ATOMIC_RELAXED);
   } else {

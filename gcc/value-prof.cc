@@ -274,9 +274,7 @@ dump_histogram_value (FILE *dump_file, histogram_value hist)
 	    }
 	  int lin2_log = floor_log2 (param_profile_histogram_size_lin);
 	  for (int64_t i = lin2_log;
-	       i < param_profile_histogram_size
-		     - param_profile_histogram_size_lin + lin2_log;
-	       ++i)
+	       i < param_profile_histogram_size_exp + lin2_log; ++i)
 	    {
 	      fprintf (
 		dump_file,
@@ -405,7 +403,8 @@ stream_in_histogram_value (class lto_input_block *ib, gimple *stmt)
 	  break;
 
 	case HIST_TYPE_HISTOGRAM:
-	  ncounters = param_profile_histogram_size;
+	  ncounters = param_profile_histogram_size_lin
+		      + param_profile_histogram_size_exp;
 	  break;
 	case HIST_TYPE_POW2:
 	case HIST_TYPE_AVERAGE:
@@ -2010,7 +2009,8 @@ gimple_find_values_to_profile (histogram_values *values)
 	  break;
 
 	case HIST_TYPE_HISTOGRAM:
-	  hist->n_counters = param_profile_histogram_size;
+	  hist->n_counters = param_profile_histogram_size_lin
+			     + param_profile_histogram_size_exp;
 	  break;
 
 	default:

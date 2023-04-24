@@ -365,10 +365,9 @@ gimple_gen_histogram_profiler (histogram_value value,
   auto lp = value->hvalue.lp;
   gcc_assert (lp);
   tree ref_ptr = tree_coverage_counter_addr (tag, 0);
-  tree hist_size
-    = build_int_cst_type (gcov_type_node,
-			  param_profile_histogram_size_lin
-			    | (gcov_type (param_profile_histogram_size) << 32));
+  tree hist_size = build_int_cst_type (
+    gcov_type_node, param_profile_histogram_size_lin
+		      | (gcov_type (param_profile_histogram_size_exp) << 32));
   gcall *call;
   auto_vec<edge> exits = get_loop_exit_edges (lp);
   for (auto exit : exits)

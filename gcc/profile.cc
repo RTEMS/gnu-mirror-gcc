@@ -933,8 +933,11 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
 	      lp->counters->adjusted = false;
 	      lp->counters->hist = NULL;
 	      vec_safe_grow_cleared (lp->counters->hist,
-				     param_profile_histogram_size);
-	      for (int i = 0; i < param_profile_histogram_size; ++i)
+				     param_profile_histogram_size_lin
+				       + param_profile_histogram_size_exp);
+	      for (int i = 0; i < param_profile_histogram_size_lin
+				    + param_profile_histogram_size_exp;
+		   ++i)
 		{
 		  auto hst = lp->counters->hist;
 		  (*hst)[i] = act_count[t][i];

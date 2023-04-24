@@ -1133,8 +1133,11 @@ input_cfg (class lto_input_block *ib, class data_in *data_in,
 	  loop->counters->sum = streamer_read_gcov_count (ib);
 	  loop->counters->hist = NULL;
 	  vec_safe_grow_cleared (loop->counters->hist,
-				 param_profile_histogram_size);
-	  for (int i = 0; i < param_profile_histogram_size; ++i)
+				 param_profile_histogram_size_lin
+				   + param_profile_histogram_size_exp);
+	  for (int i = 0; i < param_profile_histogram_size_lin
+				+ param_profile_histogram_size_exp;
+	       ++i)
 	    {
 	      (*loop->counters->hist)[i] = streamer_read_gcov_count (ib);
 	    }
