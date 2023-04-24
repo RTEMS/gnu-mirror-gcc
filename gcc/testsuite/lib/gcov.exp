@@ -133,12 +133,12 @@ proc verify-branches { testname testcase file } {
 			set shouldbe [lreplace $shouldbe $i $i [expr 100 - $num]]
 		    }
 		}
-	    } elseif [regexp "branch +\[0-9\]+ taken (-\[0-9\]+)%" "$line" \
+	    } elseif [regexp "branch +taken (-\[0-9\]+)%" "$line" \
 			all taken] {
 		# Percentages should never be negative.
 		fail "$testname line $n: negative percentage: $taken"
 		incr failed
-	    } elseif [regexp "branch +\[0-9\]+ taken (\[0-9\]+)%" "$line" \
+	    } elseif [regexp "branch +taken (\[0-9\]+)%" "$line" \
 			all taken] {
 		#send_user "$n: taken = $taken\n"
 		# Percentages should never be greater than 100.
@@ -213,12 +213,12 @@ proc verify-calls { testname testcase file } {
 		}
 	        # Record the percentages to check for.
 		set shouldbe $new_shouldbe
-	    } elseif [regexp "call +\[0-9\]+ returned (-\[0-9\]+)%" "$line" \
+	    } elseif [regexp "call +returned (-\[0-9\]+)%" "$line" \
 			all returns] {
 		# Percentages should never be negative.
 		fail "$testname line $n: negative percentage: $returns"
 		incr failed
-	    } elseif [regexp "call +\[0-9\]+ returned (\[0-9\]+)%" "$line" \
+	    } elseif [regexp "call +returned (\[0-9\]+)%" "$line" \
 			all returns] {
 		# For branches we check that percentages are not greater than
 		# 100 but call return percentages can be, as for setjmp(), so

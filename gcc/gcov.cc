@@ -663,7 +663,6 @@ static void file_summary (const coverage_info *);
 static const char *format_gcov (gcov_type, gcov_type, int);
 static void accumulate_line_counts (source_info *);
 static void output_gcov_file (const char *, source_info *);
-static int output_branch_count (FILE *, int, const arc_info *);
 static void output_lines (FILE *, const source_info *);
 static string make_gcov_file_name (const char *, const char *);
 static char *mangle_name (const char *);
@@ -2891,32 +2890,29 @@ accumulate_line_counts (source_info *src)
       }
 }
 
-/* Output information about ARC number IX.  Returns nonzero if
-   anything is output.  */
+/* Output information about ARC.  */
 
-static int
-output_branch_count (FILE *gcov_file, int ix, const arc_info *arc)
+static void
+output_branch_count (FILE *gcov_file, const arc_info *arc)
 {
   if (arc->is_call_non_return)
     {
       if (arc->src->count)
-	{
-	  fnotice (gcov_file, "call   %2d returned %s\n", ix,
-		   format_gcov (arc->src->count - arc->count,
-				arc->src->count, -flag_counts));
-	}
+	fnotice (gcov_file, "call      returned %s\n",
+		 format_gcov (arc->src->count - arc->count,
+			      arc->src->count, -flag_counts));
       else
-	fnotice (gcov_file, "call   %2d never executed\n", ix);
+	fnotice (gcov_file, "call      never executed\n");
     }
   else if (!arc->is_unconditional)
     {
       if (arc->src->count)
-	fnotice (gcov_file, "branch %2d taken %s%s", ix,
+	fnotice (gcov_file, "branch    taken %s%s",
 		 format_gcov (arc->count, arc->src->count, -flag_counts),
 		 arc->fall_through ? " (fallthrough)"
 		 : arc->is_throw ? " (throw)" : "");
       else
-	fnotice (gcov_file, "branch %2d never executed%s", ix,
+	fnotice (gcov_file, "branch    never executed%s",
 		 (arc->fall_through ? " (fallthrough)"
 		  : arc->is_throw ? " (throw)" : ""));
 
@@ -2928,14 +2924,11 @@ output_branch_count (FILE *gcov_file, int ix, const arc_info *arc)
   else if (flag_unconditional && !arc->dst->is_call_return)
     {
       if (arc->src->count)
-	fnotice (gcov_file, "unconditional %2d taken %s\n", ix,
+	fnotice (gcov_file, "unconditional    taken %s\n",
 		 format_gcov (arc->count, arc->src->count, -flag_counts));
       else
-	fnotice (gcov_file, "unconditional %2d never executed\n", ix);
+	fnotice (gcov_file, "unconditional    never executed\n");
     }
-  else
-    return 0;
-  return 1;
 }
 
 static const char *
@@ -3082,10 +3075,6 @@ output_line_details (FILE *f, const line_info *line, unsigned line_num)
 {
   if (flag_all_blocks)
     {
-      arc_info *arc;
-      int ix, jx;
-
-      ix = jx = 0;
       for (vector<block_info *>::const_iterator it = line->blocks.begin ();
 	   it != line->blocks.end (); it++)
 	{
@@ -3095,25 +3084,20 @@ output_line_details (FILE *f, const line_info *line, unsigned line_num)
 				     (*it)->exceptional, false,
 				     (*it)->count, line_num,
 				     "%%%%%", "$$$$$", 0);
-	      fprintf (f, "-block %2d", ix++);
+	      fprintf (f, "-block %d", (*it)->id);
 	      if (flag_verbose)
 		fprintf (f, " (BB %u)", (*it)->id);
 	      fprintf (f, "\n");
 	    }
 	  if (flag_branches)
-	    for (arc = (*it)->succ; arc; arc = arc->succ_next)
-	      jx += output_branch_count (f, jx, arc);
+	    for (arc_info *arc = (*it)->succ; arc; arc = arc->succ_next)
+	      output_branch_count (f, arc);
 	}
     }
   else if (flag_branches)
-    {
-      int ix;
-
-      ix = 0;
-      for (vector<arc_info *>::const_iterator it = line->branches.begin ();
-	   it != line->branches.end (); it++)
-	ix += output_branch_count (f, ix, (*it));
-    }
+    for (vector<arc_info *>::const_iterator it = line->branches.begin ();
+	 it != line->branches.end (); it++)
+      output_branch_count (f, *it);
 }
 
 /* Output detail statistics about function FN to file F.  */
