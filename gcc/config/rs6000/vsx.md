@@ -223,12 +223,6 @@
 			  (V8HI  "v")
 			  (V4SI  "wa")])
 
-;; Mode attribute to give the isa constraint for accessing Altivec registers
-;; with vector extract and insert operations.
-(define_mode_attr VSX_EX_ISA [(V16QI "p9v")
-			      (V8HI  "p9v")
-			      (V4SI  "p8v")])
-
 ;; Mode iterator for binary floating types other than double to
 ;; optimize convert to that floating point type from an extract
 ;; of an integer type
@@ -246,13 +240,6 @@
 			       (KF "TARGET_FLOAT128_HW")
 			       (TF "TARGET_FLOAT128_HW
 				    && FLOAT128_IEEE_P (TFmode)")])
-
-;; Mode attribute to give the constraint for floating point when used
-;; with FL_CONV modes.
-(define_mode_attr FL_CONV_REG [(SF "wa")
-			       (DF "wa")
-			       (KF "v")
-			       (TF "v")])
 
 ;; Iterator for the 2 short vector types to do a splat from an integer
 (define_mode_iterator VSX_SPLAT_I [V16QI V8HI])
@@ -3984,15 +3971,13 @@
 }
   [(set_attr "type" "mfvsr")])
 
-;; Extract a V16QI/V8HI/V4SI element from memory with a constant element
-;; number.  If the element number is 0, we don't need a temporary base
-;; register.  For vector registers, we require X-form addressing.
+;; Optimize extracting a single scalar element from memory.
 (define_insn_and_split "*vsx_extract_<mode>_load"
-  [(set (match_operand:<VEC_base> 0 "register_operand" "=r,r,<VSX_EX>,<VSX_EX>")
+  [(set (match_operand:<VEC_base> 0 "register_operand" "=r")
 	(vec_select:<VEC_base>
-	 (match_operand:VSX_EXTRACT_I 1 "memory_operand" "m,Q,Z,Q")
-	 (parallel [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>" "O,n,O,n")])))
-   (clobber (match_scratch:DI 3 "=X,&b,X,&b"))]
+	 (match_operand:VSX_EXTRACT_I 1 "memory_operand" "m")
+	 (parallel [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>" "n")])))
+   (clobber (match_scratch:DI 3 "=&b"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
   "&& reload_completed"
@@ -4001,171 +3986,8 @@
   operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
 					   operands[3], <VEC_base>mode);
 }
-  [(set_attr "type" "load,load,fpload,fpload")
-   (set_attr "length" "8")
-   (set_attr "isa" "*,*,<VSX_EX_ISA>,<VSX_EX_ISA>")])
-
-;; Extract a V4SI element from memory with a constant element number and sign
-;; or zero extend it to DImode.
-(define_insn_and_split "*vsx_extract_v4si_load_to_<su>di"
-  [(set (match_operand:DI 0 "register_operand" "=r,r,wa,wa")
-	(any_extend:DI
-	 (vec_select:SI
-	  (match_operand:V4SI 1 "memory_operand" "m,Q,Z,Q")
-	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "O,n,O,n")]))))
-   (clobber (match_scratch:DI 3 "=X,&b,X,&b"))]
-  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& reload_completed"
-  [(set (match_dup 0)
-	(any_extend:DI (match_dup 4)))]
-{
-  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
-					   operands[3], SImode);
-}
-  [(set_attr "type" "load,load,fpload,fpload")
-   (set_attr "length" "8")])
-
-;; Extract a V8HI element from memory with a constant element number and sign
-;; or zero extend it to either SImode or DImode.
-(define_insn_and_split "*vsx_extract_v8hi_load_to_<su><mode>"
-  [(set (match_operand:GPR 0 "register_operand" "=r,r")
-	(any_extend:GPR
-	 (vec_select:HI
-	  (match_operand:V8HI 1 "memory_operand" "m,Q")
-	  (parallel [(match_operand:QI 2 "const_0_to_7_operand" "O,n")]))))
-   (clobber (match_scratch:DI 3 "=X,&b"))]
-  "VECTOR_MEM_VSX_P (V8HImode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& reload_completed"
-  [(set (match_dup 0)
-	(any_extend:GPR (match_dup 4)))]
-{
-  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
-					   operands[3], HImode);
-}
   [(set_attr "type" "load")
    (set_attr "length" "8")])
-
-;; Extract a V16QI element from memory with a constant element number and
-;; zero extend it to either SImode or DImode.
-(define_insn_and_split "*vsx_extract_v16qi_load_to_u<mode>"
-  [(set (match_operand:GPR 0 "register_operand" "=r,r")
-	(zero_extend:GPR
-	 (vec_select:QI
-	  (match_operand:V16QI 1 "memory_operand" "m,Q")
-	  (parallel [(match_operand:QI 2 "const_0_to_15_operand" "O,n")]))))
-   (clobber (match_scratch:DI 3 "=X,&b"))]
-  "VECTOR_MEM_VSX_P (V8HImode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& reload_completed"
-  [(set (match_dup 0)
-	(zero_extend:GPR (match_dup 4)))]
-{
-  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
-					   operands[3], QImode);
-}
-  [(set_attr "type" "load")
-   (set_attr "length" "8")])
-
-;; Extract a V4SI/V8HI/V16QI element from memory with a constant element number
-;; and convert it to unsigned float.
-(define_insn_and_split "*vsx_extract_<VSX_EXTRACT_I:mode>_load_to_u<FL_CONV:mode>"
-  [(set (match_operand:FL_CONV 0 "register_operand" "=<FL_CONV:FL_CONV_REG>")
-	(unsigned_float:FL_CONV
-	 (vec_select:<VSX_EXTRACT_I:VEC_base>
-	  (match_operand:VSX_EXTRACT_I 1 "memory_operand" "Q")
-	  (parallel [(match_operand:QI 2 "const_int_operand" "n")]))))
-   (clobber (match_scratch:DI 3 "=&b"))
-   (clobber (match_scratch:DI 4 "=<VSX_EX>"))]
-  "VECTOR_MEM_VSX_P (<VSX_EXTRACT_I:MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& 1"
-  [(set (match_dup 4)
-	(zero_extend:DI (match_dup 5)))
-   (set (match_dup 0)
-	(float:FL_CONV (match_dup 4)))]
-{
-  machine_mode base_mode = <VSX_EXTRACT_I:VEC_base>mode;
-
-  if (GET_CODE (operands[3]) == SCRATCH)
-    operands[3] = gen_reg_rtx (DImode);
-  if (GET_CODE (operands[4]) == SCRATCH)
-    operands[4] = gen_reg_rtx (DImode);
-
-  operands[5] = rs6000_adjust_vec_address (operands[0], operands[1],
-					   operands[2], operands[3],
-					   base_mode);
-}
-  [(set_attr "type" "fpload")
-   (set_attr "length" "8")])
-
-;; Extract a V4SI element from memory with a constant element number and
-;; convert it to signed float.
-(define_insn_and_split "*vsx_extract_v4si_load_to_s<mode>"
-  [(set (match_operand:FL_CONV 0 "register_operand" "=<FL_CONV_REG>")
-	(float:FL_CONV
-	 (vec_select:SI
-	  (match_operand:V4SI 1 "memory_operand" "Q")
-	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "n")]))))
-   (clobber (match_scratch:DI 3 "=&b"))
-   (clobber (match_scratch:DI 4 "=<FL_CONV_REG>"))]
-  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& 1"
-  [(set (match_dup 4)
-	(sign_extend:DI (match_dup 5)))
-   (set (match_dup 0)
-	(float:FL_CONV (match_dup 4)))]
-{
-  if (GET_CODE (operands[3]) == SCRATCH)
-    operands[3] = gen_reg_rtx (DImode);
-  if (GET_CODE (operands[4]) == SCRATCH)
-    operands[4] = gen_reg_rtx (DImode);
-
-  operands[5] = rs6000_adjust_vec_address (operands[0], operands[1],
-					   operands[2], operands[3],
-					   SImode);
-}
-  [(set_attr "type" "fpload")
-   (set_attr "length" "8")])
-
-;; Extract a V8HI element from memory with a constant element number and
-;; convert it to signed float.  While we could do this via a LXSIHZX
-;; instruction followed by VEXTSB2D, it is better to do a LWA and MTVSRD
-;; instruction.
-(define_insn_and_split "*vsx_extract_v8hi_load_to_s<mode>"
-  [(set (match_operand:FL_CONV 0 "register_operand" "=<FL_CONV_REG>,<FL_CONV_REG>")
-	(float:FL_CONV
-	 (vec_select:HI
-	  (match_operand:V8HI 1 "memory_operand" "m,Qo")
-	  (parallel [(match_operand:QI 2 "const_0_to_7_operand" "O,n")]))))
-   (clobber (match_scratch:DI 3 "=X,&b"))
-   (clobber (match_scratch:DI 4 "=&r,&r"))
-   (clobber (match_scratch:DI 5 "=<FL_CONV_REG>,<FL_CONV_REG>"))]
-  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& 1"
-  [(set (match_dup 4)
-	(sign_extend:DI (match_dup 6)))
-   (set (match_dup 5)
-	(match_dup 4))
-   (set (match_dup 0)
-	(float:FL_CONV (match_dup 5)))]
-{
-  if (GET_CODE (operands[3]) == SCRATCH)
-    operands[3] = gen_reg_rtx (DImode);
-  if (GET_CODE (operands[4]) == SCRATCH)
-    operands[4] = gen_reg_rtx (DImode);
-  if (GET_CODE (operands[5]) == SCRATCH)
-    operands[5] = gen_reg_rtx (DImode);
-
-  operands[6] = rs6000_adjust_vec_address (operands[0], operands[1],
-					   operands[2], operands[3],
-					   HImode);
-}
-  [(set_attr "type" "load")
-   (set_attr "length" "12")])
 
 ;; Variable V16QI/V8HI/V4SI extract from a register
 (define_insn_and_split "vsx_extract_<mode>_var"
@@ -4189,12 +4011,12 @@
 
 ;; Variable V16QI/V8HI/V4SI extract from memory
 (define_insn_and_split "*vsx_extract_<mode>_var_load"
-  [(set (match_operand:<VEC_base> 0 "gpc_reg_operand" "=r,<VSX_EX>")
+  [(set (match_operand:<VEC_base> 0 "gpc_reg_operand" "=r")
 	(unspec:<VEC_base>
-	 [(match_operand:VSX_EXTRACT_I 1 "memory_operand" "Q,Q")
-	  (match_operand:DI 2 "gpc_reg_operand" "r,r")]
+	 [(match_operand:VSX_EXTRACT_I 1 "memory_operand" "Q")
+	  (match_operand:DI 2 "gpc_reg_operand" "r")]
 	 UNSPEC_VSX_EXTRACT))
-   (clobber (match_scratch:DI 3 "=&b,&b"))]
+   (clobber (match_scratch:DI 3 "=&b"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
   "&& reload_completed"
@@ -4203,173 +4025,7 @@
   operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
 					   operands[3], <VEC_base>mode);
 }
-  [(set_attr "type" "load,fpload")
-   (set_attr "isa" "*,<VSX_EX_ISA>")])
-
-;; V4SI extract from memory with a variable element number converted to DImode
-(define_insn_and_split "*vsx_extract_v4si_var_load_to_<su>di"
-  [(set (match_operand:DI 0 "gpc_reg_operand" "=r,wa")
-	(any_extend:DI
-	 (unspec:SI
-	  [(match_operand:V4SI 1 "memory_operand" "Q,Q")
-	   (match_operand:DI 2 "gpc_reg_operand" "r,r")]
-	  UNSPEC_VSX_EXTRACT)))
-   (clobber (match_scratch:DI 3 "=&b,&b"))]
-  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& reload_completed"
-  [(set (match_dup 0)
-	(any_extend:DI (match_dup 4)))]
-{
-  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
-					   operands[3], SImode);
-}
-  [(set_attr "type" "load,fpload")
-   (set_attr "isa" "*,p8v")])
-
-;; Extract a V8HI element from memory with a variable element number and sign
-;; or zero extend it to either SImode or DImode.
-(define_insn_and_split "*vsx_extract_v8hi_var_load_to_<su><mode>"
-  [(set (match_operand:GPR 0 "gpc_reg_operand" "=r")
-	(any_extend:GPR
-	 (unspec:SI
-	  [(match_operand:V8HI 1 "memory_operand" "Q")
-	   (match_operand:DI 2 "gpc_reg_operand" "r")]
-	  UNSPEC_VSX_EXTRACT)))
-   (clobber (match_scratch:DI 3 "=&b"))]
-  "VECTOR_MEM_VSX_P (V8HImode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& reload_completed"
-  [(set (match_dup 0)
-	(any_extend:GPR (match_dup 4)))]
-{
-  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
-					   operands[3], HImode);
-}
   [(set_attr "type" "load")])
-
-;; Extract a V16QI element from memory with a variable element number and zero
-;; extend it to either SImode or DImode.
-(define_insn_and_split "*vsx_extract_v16qi_var_load_to_u<mode>"
-  [(set (match_operand:GPR 0 "gpc_reg_operand" "=r")
-	(zero_extend:GPR
-	 (unspec:SI
-	  [(match_operand:V16QI 1 "memory_operand" "Q")
-	   (match_operand:DI 2 "gpc_reg_operand" "r")]
-	  UNSPEC_VSX_EXTRACT)))
-   (clobber (match_scratch:DI 3 "=&b"))]
-  "VECTOR_MEM_VSX_P (V8HImode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& reload_completed"
-  [(set (match_dup 0)
-	(zero_extend:GPR (match_dup 4)))]
-{
-  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
-					   operands[3], QImode);
-}
-  [(set_attr "type" "load")])
-
-;; Extract a V4SI/V8HI/V16QI element from memory with a variable element number
-;; and convert it to unsigned float.
-(define_insn_and_split "*vsx_extract_<VSX_EXTRACT_I:mode>_var_load_to_u<FL_CONV:mode>"
-  [(set (match_operand:FL_CONV 0 "register_operand" "=<FL_CONV:FL_CONV_REG>")
-	(unsigned_float:FL_CONV
-	 (unspec:<VSX_EXTRACT_I:VEC_base>
-	  [(match_operand:VSX_EXTRACT_I 1 "memory_operand" "Q")
-	   (match_operand:QI 2 "register_operand" "r")]
-	  UNSPEC_VSX_EXTRACT)))
-   (clobber (match_scratch:DI 3 "=&b"))
-   (clobber (match_scratch:DI 4 "=<VSX_EX>"))]
-  "VECTOR_MEM_VSX_P (<VSX_EXTRACT_I:MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& 1"
-  [(set (match_dup 4)
-	(zero_extend:DI (match_dup 5)))
-   (set (match_dup 0)
-	(float:FL_CONV (match_dup 4)))]
-{
-  machine_mode base_mode = <VSX_EXTRACT_I:VEC_base>mode;
-
-  if (GET_CODE (operands[3]) == SCRATCH)
-    operands[3] = gen_reg_rtx (DImode);
-  if (GET_CODE (operands[4]) == SCRATCH)
-    operands[4] = gen_reg_rtx (DImode);
-
-  operands[5] = rs6000_adjust_vec_address (operands[0], operands[1],
-					   operands[2], operands[3],
-					   base_mode);
-}
-  [(set_attr "type" "fpload")
-   (set_attr "length" "8")])
-
-;; Extract a V4SI element from memory with a constant element number and
-;; convert it to signed float.
-(define_insn_and_split "*vsx_extract_v4si_var_load_to_s<mode>"
-  [(set (match_operand:FL_CONV 0 "register_operand" "=<FL_CONV_REG>")
-	(float:FL_CONV
-	 (unspec:SI
-	  [(match_operand:V4SI 1 "memory_operand" "Q")
-	   (match_operand:QI 2 "register_operand" "r")]
-	  UNSPEC_VSX_EXTRACT)))
-   (clobber (match_scratch:DI 3 "=&b"))
-   (clobber (match_scratch:DI 4 "=<FL_CONV_REG>"))]
-  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& 1"
-  [(set (match_dup 4)
-	(sign_extend:DI (match_dup 5)))
-   (set (match_dup 0)
-	(float:FL_CONV (match_dup 4)))]
-{
-  if (GET_CODE (operands[3]) == SCRATCH)
-    operands[3] = gen_reg_rtx (DImode);
-  if (GET_CODE (operands[4]) == SCRATCH)
-    operands[4] = gen_reg_rtx (DImode);
-
-  operands[5] = rs6000_adjust_vec_address (operands[0], operands[1],
-					   operands[2], operands[3],
-					   SImode);
-}
-  [(set_attr "type" "fpload")
-   (set_attr "length" "8")])
-
-;; Extract a V8HI element from memory with a constant element number and
-;; convert it to signed float.  While we could do this via a LXSIHZX
-;; instruction followed by VEXTSB2D, it is better to do a LWA and MTVSRD
-;; instruction.
-(define_insn_and_split "*vsx_extract_v8hi_var_load_to_s<mode>"
-  [(set (match_operand:FL_CONV 0 "register_operand" "=<FL_CONV_REG>")
-	(float:FL_CONV
-	 (unspec:HI
-	  [(match_operand:V8HI 1 "memory_operand" "Q")
-	   (match_operand:DI 2 "register_operand" "r")]
-	  UNSPEC_VSX_EXTRACT)))
-   (clobber (match_scratch:DI 3 "=&b"))
-   (clobber (match_scratch:DI 4 "=&r"))
-   (clobber (match_scratch:DI 5 "=<FL_CONV_REG>"))]
-  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& 1"
-  [(set (match_dup 4)
-	(sign_extend:DI (match_dup 6)))
-   (set (match_dup 5)
-	(match_dup 4))
-   (set (match_dup 0)
-	(float:FL_CONV (match_dup 5)))]
-{
-  if (GET_CODE (operands[3]) == SCRATCH)
-    operands[3] = gen_reg_rtx (DImode);
-  if (GET_CODE (operands[4]) == SCRATCH)
-    operands[4] = gen_reg_rtx (DImode);
-  if (GET_CODE (operands[5]) == SCRATCH)
-    operands[5] = gen_reg_rtx (DImode);
-
-  operands[6] = rs6000_adjust_vec_address (operands[0], operands[1],
-					   operands[2], operands[3],
-					   HImode);
-}
-  [(set_attr "type" "load")
-   (set_attr "length" "12")])
 
 ;; ISA 3.1 extract
 (define_expand "vextractl<mode>"
