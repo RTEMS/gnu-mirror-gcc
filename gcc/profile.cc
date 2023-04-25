@@ -930,23 +930,33 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
 	    {
 	      lp->counters = ggc_alloc<histogram_counters> ();
 	      gcov_type sum = 0;
+	      unsigned int tot_size = param_profile_histogram_size_lin
+				      + param_profile_histogram_size_exp;
 	      lp->counters->adjusted = false;
 	      lp->counters->hist = NULL;
-	      vec_safe_grow_cleared (lp->counters->hist,
-				     param_profile_histogram_size_lin
-				       + param_profile_histogram_size_exp);
-	      for (int i = 0; i < param_profile_histogram_size_lin
-				    + param_profile_histogram_size_exp;
-		   ++i)
+	      // iteration vector
+	      vec_safe_grow_cleared (lp->counters->hist, tot_size);
+	      for (int i = 0; i < (int) tot_size; ++i)
 		{
 		  auto hst = lp->counters->hist;
 		  (*hst)[i] = act_count[t][i];
 		  sum += act_count[t][i];
 		}
 	      lp->counters->sum = sum;
+
+	      // modular vector
+	      lp->counters->mod = NULL;
+	      vec_safe_grow_cleared (lp->counters->mod,
+				     param_profile_histogram_size_mod);
+	      for (int j = 0; j < param_profile_histogram_size_mod; ++j)
+		{
+		  auto mod = lp->counters->mod;
+		  (*mod)[j] = act_count[t][j + tot_size];
+		}
 	      if (sum == 0)
 		{
 		  va_heap::release (lp->counters->hist);
+		  va_heap::release (lp->counters->mod);
 		  ggc_free (lp->counters);
 		  lp->counters = NULL;
 		}

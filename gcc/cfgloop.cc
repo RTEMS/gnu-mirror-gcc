@@ -201,6 +201,9 @@ flow_loop_free (class loop *loop)
   ggc_free (loop->exits);
   if (loop->counters)
     {
+      va_heap::release (loop->counters->hist);
+      if (loop->counters->mod)
+	va_heap::release (loop->counters->mod);
       ggc_free (loop->counters);
     }
   ggc_free (loop);
@@ -2219,7 +2222,7 @@ histogram_counters_minus_upper_bound (histogram_counters *&hist_c,
 {
   if (difference == 0 || !hist_c)
     return;
-  if (hist_c->sum == 0)
+  if (hist_c->sum == 0 && !hist_c->mod)
     {
       va_heap::release (hist_c->hist);
       ggc_free (hist_c);
@@ -2259,7 +2262,7 @@ histogram_counters_minus_upper_bound (histogram_counters *&hist_c,
       pow2 = pow2 << 1;
     }
   // if there are no more iterations we do not care
-  if (hist_c->sum == 0)
+  if (hist_c->sum == 0 && !hist_c->mod)
     {
       va_heap::release (hist_c->hist);
       ggc_free (hist_c);
@@ -2287,6 +2290,21 @@ histogram_counters_minus_upper_bound (histogram_counters *&hist_c,
       hist[i] -= diff;
       pow2 <<= 1;
     }
+  if (hist_c->mod)
+    {
+      auto &mod_h = *(hist_c->mod);
+      unsigned int mod_size = param_profile_histogram_size_mod;
+      // rotate the values by the difference
+      auto_vec<gcov_type> temp;
+      for (unsigned int j = 0; j < mod_size; ++j)
+	{
+	  temp.safe_push (mod_h[j]);
+	}
+      for (unsigned int j = 0; j < mod_size; ++j)
+	{
+	  mod_h[j] = temp[(mod_size + j - (difference % mod_size)) % mod_size];
+	}
+    }
 }
 
 void
@@ -2298,6 +2316,8 @@ histogram_counters_div_upper_bound (histogram_counters *&hist_c,
   if (hist_c->sum == 0)
     {
       va_heap::release (hist_c->hist);
+      if (hist_c->mod)
+	va_heap::release (hist_c->mod);
       ggc_free (hist_c);
       hist_c = NULL;
       return;
@@ -2324,6 +2344,15 @@ histogram_counters_div_upper_bound (histogram_counters *&hist_c,
       // hist is allways different then i since we know divisor>1
       hist[ind] += hist[MIN (1, i)];
       hist[i] = 0;
+    }
+  // we do not try to maintain modulo info when dividing since it is often
+  // impossible
+  // TODO we can sometimes save this if the divisor and the mod_size are
+  // co-prime
+  if (hist_c->mod)
+    {
+      va_heap::release (hist_c->mod);
+      hist_c->mod = NULL;
     }
 }
 

@@ -1132,14 +1132,25 @@ input_cfg (class lto_input_block *ib, class data_in *data_in,
 	  loop->counters = ggc_alloc<histogram_counters> ();
 	  loop->counters->sum = streamer_read_gcov_count (ib);
 	  loop->counters->hist = NULL;
-	  vec_safe_grow_cleared (loop->counters->hist,
-				 param_profile_histogram_size_lin
-				   + param_profile_histogram_size_exp);
+	  loop->counters->mod = NULL;
+	  vec_safe_grow (loop->counters->hist,
+			 param_profile_histogram_size_lin
+			   + param_profile_histogram_size_exp);
 	  for (int i = 0; i < param_profile_histogram_size_lin
 				+ param_profile_histogram_size_exp;
 	       ++i)
 	    {
 	      (*loop->counters->hist)[i] = streamer_read_gcov_count (ib);
+	    }
+	  // do we have modulos
+	  if (streamer_read_hwi (ib))
+	    {
+	      vec_safe_grow (loop->counters->mod,
+			     param_profile_histogram_size_mod);
+	      for (int i = 0; i < param_profile_histogram_size_mod; ++i)
+		{
+		  (*loop->counters->mod)[i] = streamer_read_gcov_count (ib);
+		}
 	    }
 	}
 

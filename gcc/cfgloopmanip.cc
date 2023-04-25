@@ -965,6 +965,8 @@ copy_loop_info (class loop *loop, class loop *target)
       target->counters->sum = loop->counters->sum;
       target->counters->adjusted = loop->counters->adjusted;
       target->counters->hist = vec_safe_copy (loop->counters->hist);
+      if (loop->counters->mod)
+	target->counters->mod = vec_safe_copy (loop->counters->mod);
     }
 }
 

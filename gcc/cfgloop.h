@@ -99,6 +99,7 @@ struct GTY (()) histogram_counters
   bool adjusted;
   gcov_type sum;
   vec<gcov_type, va_heap, vl_embed> *GTY ((skip)) hist;
+  vec<gcov_type, va_heap, vl_embed> *GTY ((skip)) mod;
 };
 
 typedef class loop *loop_p;

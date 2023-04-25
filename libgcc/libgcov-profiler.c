@@ -62,10 +62,13 @@ void __gcov_histogram_profiler(gcov_type *counters, gcov_type value,
   gcc_assert(hist_sizes >= 0 && value >= 0);
   gcov_type_unsigned hist_size = hist_sizes;
   gcov_type_unsigned u_value = value;
-  gcov_type_unsigned exp_size = hist_size >> 32;
-  gcov_type_unsigned lin_size =
-      hist_size & ((((gcov_type_unsigned)1) << 32) - 1);
+  // uncode section sizes
+  gcov_type_unsigned mask = (((gcov_type_unsigned)1) << 10) - 1;
+  gcov_type_unsigned lin_size = hist_size & mask;
+  gcov_type_unsigned exp_size = (hist_size >> 10) & mask;
+  gcov_type_unsigned mod_size = hist_size >> 20;
   gcov_type_unsigned tot_size = exp_size + lin_size;
+  // add to the regular histogram
   if (u_value < lin_size) {
     counters[value]++;
   } else {
@@ -81,6 +84,8 @@ void __gcov_histogram_profiler(gcov_type *counters, gcov_type value,
       }
     }
   }
+  // add to the modular histogram
+  counters[tot_size + (u_value % mod_size)]++;
 }
 
 #endif
@@ -92,10 +97,13 @@ void __gcov_histogram_profiler_atomic(gcov_type *counters, gcov_type value,
   gcc_assert(hist_sizes >= 0 && value >= 0);
   gcov_type_unsigned hist_size = hist_sizes;
   gcov_type_unsigned u_value = value;
-  gcov_type_unsigned exp_size = hist_size >> 32;
-  gcov_type_unsigned lin_size =
-      hist_size & ((((gcov_type_unsigned)1) << 32) - 1);
-  gcov_type_unsigned tot_size = lin_size + tot_size;
+  // uncode section sizes
+  gcov_type_unsigned mask = (((gcov_type_unsigned)1) << 10) - 1;
+  gcov_type_unsigned lin_size = hist_size & mask;
+  gcov_type_unsigned exp_size = (hist_size >> 10) & mask;
+  gcov_type_unsigned mod_size = hist_size >> 20;
+  gcov_type_unsigned tot_size = exp_size + lin_size;
+  // add to the regular histogram
   if (u_value < lin_size) {
     __atomic_fetch_add(&counters[value], 1, __ATOMIC_RELAXED);
   } else {
@@ -108,6 +116,9 @@ void __gcov_histogram_profiler_atomic(gcov_type *counters, gcov_type value,
       __atomic_fetch_add(&counters[tot_size - 1], 1, __ATOMIC_RELAXED);
     }
   }
+  // add to the modular histogram
+  __atomic_fetch_add(&counters[tot_size + (u_value % mod_size)], 1,
+                     __ATOMIC_RELAXED);
 }
 
 #endif
