@@ -1,3 +1,49 @@
+==================== Branch work119, patch #81 was reverted ====================
+
+Allow consant element vec_extract to be zero or sign extended
+
+This patch allows vec_extract of V4SI, V8HI, and V16QI vector types with a
+constant element number to be zero extended.  It also allows vec_extract of V4SI
+and V8HI vector types with constant element number to be sign extended.
+
+2023-04-24   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4si_load_to_<su>d): New insn.
+	(vsx_extract_<VSX_EXTRACT_I2:mode>_load_to_u<GPR:mode>): New insn.
+	(vsx_extract_v8hi_load_to_z<mode>): New insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-char-1.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-int-1.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-int-2.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-short-1.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-short-2.c: New file.
+
+==================== Branch work119, patch #80 was reverted ====================
+
+Allow consant element vec_extract to be loaded into vector registers.
+
+This patch allows vec_extract of V4SI, V8HI, and V16QI vector types with a
+constant element number to be loaded into vector registers directly.  It also
+will be split before register allocation.
+
+This patch also adds support to rs6000_adjust_vec_address to allow it to be run
+before register allocation.
+
+2023-04-24   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (get_vector_offset): Allow being called before
+	register allocation.
+	(adjust_vec_address_pcrel): Likewise.
+	(rs6000_adjust_vec_address): Likewise.
+	* config/rs6000/vsx.md (VSX_EX_ISA): New mode attribute.
+	(vsx_extract_<mode>_load): Allow vector registers to be loaded.
+
 ==================== Branch work119, patch #72 was reverted ====================
 
 ==================== Branch work119, patch #71 was reverted ====================
