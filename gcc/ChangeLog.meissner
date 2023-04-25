@@ -6,7 +6,7 @@ This patch allows vec_extract of V4SI, V8HI, and V16QI vector types with a
 variable element number to be loaded with sign or zero extension, and GCC will
 not generate a separate zero/sign extension instruction.
 
-2023-04-24   Michael Meissner  <meissner@linux.ibm.com>
+2023-04-25   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -28,7 +28,7 @@ This patch allows vec_extract of V4SI, V8HI, and V16QI vector types with a
 variable element number to be loaded into vector registers directly.  It also
 will be split before register allocation.
 
-2023-04-24   Michael Meissner  <meissner@linux.ibm.com>
+2023-04-25   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -43,7 +43,7 @@ This patch allows vec_extract of V4SI, V8HI, and V16QI vector types with a
 constant element number to be zero extended.  It also allows vec_extract of V4SI
 and V8HI vector types with constant element number to be sign extended.
 
-2023-04-24   Michael Meissner  <meissner@linux.ibm.com>
+2023-04-25   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
