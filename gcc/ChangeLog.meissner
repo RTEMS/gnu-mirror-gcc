@@ -1,3 +1,40 @@
+==================== Branch work119, patch #83 ====================
+
+Allow variable element vec_extract to be sign or zero extended
+
+This patch allows vec_extract of V4SI, V8HI, and V16QI vector types with a
+variable element number to be loaded with sign or zero extension, and GCC will
+not generate a separate zero/sign extension instruction.
+
+2023-04-24   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4si_var_load_to_<su>di): New insn.
+	(vsx_extract_<VSX_EXTRACT_I2:mode>_var_load_to_u<GPR:mode>): New insn.
+	(vsx_extract_v8hi_var_load_to_s<mode>): New insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-int-3.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-short-3.c: New file.
+
+
+==================== Branch work119, patch #82 ====================
+
+Allow variable element vec_extract to be loaded into vector registers.
+
+This patch allows vec_extract of V4SI, V8HI, and V16QI vector types with a
+variable element number to be loaded into vector registers directly.  It also
+will be split before register allocation.
+
+2023-04-24   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_<mode>_var_load): Allow vector
+	registers to be loaded.  Split before register allocation.
+
 ==================== Branch work119, patch #81 ====================
 
 Allow consant element vec_extract to be zero or sign extended
