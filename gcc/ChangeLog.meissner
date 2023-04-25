@@ -12,7 +12,7 @@ gcc/
 
 	* config/rs6000/vsx.md (vsx_extract_v4si_load_to_<su>d): New insn.
 	(vsx_extract_<VSX_EXTRACT_I2:mode>_load_to_u<GPR:mode>): New insn.
-	(vsx_extract_v8hi_load_to_z<mode>): New insn.
+	(vsx_extract_v8hi_load_to_s<mode>): New insn.
 
 gcc/testsuite/
 
