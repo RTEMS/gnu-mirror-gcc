@@ -4000,6 +4000,73 @@
    (set_attr "length" "*,*,8,*,8")
    (set_attr "isa" "*,*,*,<VSX_EX_ISA>,<VSX_EX_ISA>")])
 
+;; Fold extracting a V4SI element with a constant element with either sign or
+;; zero extension to DImode.
+(define_insn_and_split "*vsx_extract_v4si_load_to_<su>di"
+  [(set (match_operand:DI 0 "register_operand" "=r,r,r,wa,wa")
+	(any_extend:DI
+	 (vec_select:SI
+	  (match_operand:V4SI 1 "memory_operand" "m,o,Q,Z,Q")
+	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "O,n,n,O,n")]))))
+   (clobber (match_scratch:DI 3 "=X,X,&b,X,&b"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(any_extend:DI (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1],
+					   operands[2], operands[3],
+					   SImode);
+}
+  [(set_attr "type" "load,load,load,fpload,fpload")
+   (set_attr "length" "*,*,8,*,8")])
+
+;; Fold extracting a V8HI/V4SI element with a constant element with zero
+;; extension to either DImode or SImode.
+(define_insn_and_split "*vsx_extract_<VSX_EXTRACT_I2:mode>_load_to_z<GPR:mode>"
+  [(set (match_operand:GPR 0 "register_operand" "=r,r,r,v,v")
+	(zero_extend:GPR
+	 (vec_select:<VEC_base>
+	  (match_operand:VSX_EXTRACT_I2 1 "memory_operand" "m,o,Q,Z,Q")
+	  (parallel [(match_operand:QI 2 "const_int_operand" "O,n,n,O,n")]))))
+   (clobber (match_scratch:DI 3 "=X,X,&b,X,&b"))]
+  "VECTOR_MEM_VSX_P (<VSX_EXTRACT_I2:MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(zero_extend:GPR (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1],
+					   operands[2], operands[3],
+					   <VSX_EXTRACT_I2:VEC_base>mode);
+}
+  [(set_attr "type" "load,load,load,fpload,fpload")
+   (set_attr "length" "*,*,8,*,8")
+   (set_attr "isa" "*,*,*,p9v,p9v")])
+
+;; Fold extracting a V8HI element with a constant element with sign extension
+;; to either DImode or SImode.
+(define_insn_and_split "*vsx_extract_v8hi_load_to_z<mode>"
+  [(set (match_operand:GPR 0 "register_operand" "=r,r,r")
+	(sign_extend:GPR
+	 (vec_select:HI
+	  (match_operand:V8HI 1 "memory_operand" "m,o,Q")
+	  (parallel [(match_operand:QI 2 "const_int_operand" "O,n,n")]))))
+   (clobber (match_scratch:DI 3 "=X,X,&b"))]
+  "VECTOR_MEM_VSX_P (V8HImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(sign_extend:GPR (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1],
+					   operands[2], operands[3],
+					   HImode);
+}
+  [(set_attr "type" "load")
+   (set_attr "length" "*,*,8")])
+
 ;; Variable V16QI/V8HI/V4SI extract from a register
 (define_insn_and_split "vsx_extract_<mode>_var"
   [(set (match_operand:<VEC_base> 0 "gpc_reg_operand" "=r,r")
