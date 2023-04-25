@@ -1,4 +1,4 @@
-==================== Branch work119, patch #81 was reverted ====================
+==================== Branch work119, patch #81 ====================
 
 Allow consant element vec_extract to be zero or sign extended
 
@@ -22,7 +22,7 @@ gcc/testsuite/
 	* gcc.target/powerpc/vec-extract-mem-short-1.c: New file.
 	* gcc.target/powerpc/vec-extract-mem-short-2.c: New file.
 
-==================== Branch work119, patch #80 was reverted ====================
+==================== Branch work119, patch #80 ====================
 
 Allow consant element vec_extract to be loaded into vector registers.
 
