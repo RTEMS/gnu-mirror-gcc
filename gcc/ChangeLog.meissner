@@ -279,7 +279,7 @@ I put this code into the master branch, and after a waiting period, apply it to
 the GCC 12 and GCC 11 branches (the bug does show up in those branches, and the
 patch applies without change).
 
-2023-04-17   Michael Meissner  <meissner@linux.ibm.com>
+2023-04-26   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
