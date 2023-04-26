@@ -237,25 +237,33 @@ gcc/testsuite/
 
 ==================== Branch work119, patch #1 ====================
 
-Make load/cmp fusion know about prefixed loads.
+PR target/105325: Make load/cmp fusion know about prefixed loads.
 
-I posted a version of patch on March 21st and a second version on March 24th.
-This patch makes some code changes suggested in the genfusion.pl code from the
-last 2 patch submissions.  The fusion.md that is produced by genfusion.pl is
-the same in all 3 versions.
+I posted a version of patch on March 21st, a second version on March 24th, and
+the third version on March 28th.
 
-I changed the genfusion.pl to match the suggestion for code layout.  I also
-used the correct comment for each of the instructions (in the 2nd patch, the
-when I rewrote the comments about ld and lwa being DS format instructions, I
-had put the ld comment in the section handling lwa, and vice versa).
+The V4 patch just adds a new condition to the new test case.  Previously, I was
+using 'powerpc_prefixed_addr' to determine whether the GCC compiler would
+automatically generate prefixed addresses.  The V4 version also adds a check
+for 'power10_ok'.  Power10_ok is needed in case the compiler could generate
+prefixed addresses, but the assembler does not support prefixed instructions.
 
-I also removed lp64 from the new test.  When I first added the prefixed code,
-it was only done for 64-bit, but now it is allowed for 32-bit.  However, the
-case that shows up (lwa) would not hit in 32-bit, since it only generates lwz
-and not lwa.  It also would not generate ld.  But the test does pass when it is
-built with -m32.
+The V3 patch makes some code changes suggested in the genfusion.pl code from
+the last 2 patch submissions.  The fusion.md that is produced by genfusion.pl
+is the same in all 3 versions.
 
-The issue with the bug is the power10 load GPR + cmpi -1/0/1 fusion
+In V3, I changed the genfusion.pl to match the suggestion for code layout.  I
+also used the correct comment for each of the instructions (in the 2nd patch,
+the when I rewrote the comments about ld and lwa being DS format instructions,
+I had put the ld comment in the section handling lwa, and vice versa).
+
+In V3, I also removed lp64 from the new test.  When I first added the prefixed
+code, it was only done for 64-bit, but now it is allowed for 32-bit.  However,
+the case that shows up (lwa) would not hit in 32-bit, since it only generates
+lwz and not lwa.  It also would not generate ld.  But the test does pass when
+it is built with -m32.
+
+The issue with the original bug is the power10 load GPR + cmpi -1/0/1 fusion
 optimization generates illegal assembler code.
 
 Ultimately the code was dying because the fusion load + compare -1/0/1 patterns
@@ -274,10 +282,15 @@ operand[1] is a prefixed instruction.
 
 I have tested this code on a power9 little endian system (with long double
 being IEEE 128-bit and IBM 128-bit), a power10 little endian system, and a
-power8 big endian system, testing both 32-bit and 64-bit code generation.  Can
-I put this code into the master branch, and after a waiting period, apply it to
-the GCC 12 and GCC 11 branches (the bug does show up in those branches, and the
-patch applies without change).
+power8 big endian system, testing both 32-bit and 64-bit code generation.
+
+For the V4 changes I also built the compiler on a big endian system with an
+older assembler, and I verified that the pr105325.C test was listed as
+unsupported.
+
+Can I put this code into the master branch, and after a waiting period, apply
+it to the GCC 12 and GCC 11 branches (the bug does show up in those branches,
+and the patch applies without change).
 
 2023-04-26   Michael Meissner  <meissner@linux.ibm.com>
 
