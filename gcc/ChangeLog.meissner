@@ -7,10 +7,10 @@ floating point by loading the value directly to the vector register, and then
 doing the conversion instead of loading the value to a GPR and then doing a
 direct move:
 
-	* vector int
-	* vector unsigned int
-	* vector unsigned short
-	* vector unsigned char
+	vector int
+	vector unsigned int
+	vector unsigned short
+	vector unsigned char
 
 2023-04-26   Michael Meissner  <meissner@linux.ibm.com>
 
