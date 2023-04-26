@@ -837,10 +837,10 @@ enum data_align { align_abi, align_opt, align_both };
 #define FIRST_PSEUDO_REGISTER 111
 
 /* Use standard DWARF numbering for DWARF debugging information.  */
-#define DBX_REGISTER_NUMBER(REGNO) rs6000_dbx_register_number ((REGNO), 0)
+#define DBX_REGISTER_NUMBER(REGNO, MODE) rs6000_dbx_register_number ((REGNO), 0)
 
 /* Use gcc hard register numbering for eh_frame.  */
-#define DWARF_FRAME_REGNUM(REGNO) (REGNO)
+#define DWARF_FRAME_REGNUM(REGNO, MODE) (REGNO)
 
 /* Map register numbers held in the call frame info that gcc has
    collected using DWARF_FRAME_REGNUM to those that should be output in
@@ -2215,7 +2215,7 @@ extern char rs6000_reg_names[][8];	/* register names (0 vs. %r0).  */
    mechanism.  */
 
 #define INCOMING_RETURN_ADDR_RTX   gen_rtx_REG (Pmode, LR_REGNO)
-#define DWARF_FRAME_RETURN_COLUMN  DWARF_FRAME_REGNUM (LR_REGNO)
+#define DWARF_FRAME_RETURN_COLUMN  DWARF_FRAME_REGNUM (LR_REGNO, Pmode)
 
 /* Describe how we implement __builtin_eh_return.  */
 #define EH_RETURN_DATA_REGNO(N) ((N) < 4 ? (N) + 3 : INVALID_REGNUM)

@@ -1342,7 +1342,7 @@ do { \
 #define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
 
 /* How to renumber registers for dbx and gdb.  */
-#define DBX_REGISTER_NUMBER(REGNO)				\
+#define DBX_REGISTER_NUMBER(REGNO, MODE)				\
   ((TARGET_MULMAC_32BY16_SET && (REGNO) >= 56 && (REGNO) <= 57) \
    ? ((REGNO) ^ !TARGET_BIG_ENDIAN)				\
    : (TARGET_MUL64_SET && (REGNO) >= 57 && (REGNO) <= 58)	\
@@ -1352,7 +1352,7 @@ do { \
    : (REGNO))
 
 /* Use gcc hard register numbering for eh_frame.  */
-#define DWARF_FRAME_REGNUM(REG) (REG)
+#define DWARF_FRAME_REGNUM(REG, MODE) (REG, MODE)
 
 /* Map register numbers held in the call frame info that gcc has
    collected using DWARF_FRAME_REGNUM to those that should be output
@@ -1366,7 +1366,7 @@ do { \
       : 57 + !!TARGET_MULMAC_32BY16_SET) /* MLO */		\
    : (REGNO))
 
-#define DWARF_FRAME_RETURN_COLUMN 	DWARF_FRAME_REGNUM (31)
+#define DWARF_FRAME_RETURN_COLUMN 	DWARF_FRAME_REGNUM (31, Pmode)
 
 #define INCOMING_RETURN_ADDR_RTX  gen_rtx_REG (Pmode, 31)
 

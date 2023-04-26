@@ -164,7 +164,7 @@ extern enum pipeline_type microblaze_pipe;
 /* Debug stuff.  */
 
 /* How to renumber registers for dbx and gdb.  */
-#define DBX_REGISTER_NUMBER(REGNO) microblaze_dbx_regno[(REGNO)]
+#define DBX_REGISTER_NUMBER(REGNO, MODE) microblaze_dbx_regno[(REGNO)]
 
 /* Generate DWARF exception handling info.  */
 #define DWARF2_UNWIND_INFO 1

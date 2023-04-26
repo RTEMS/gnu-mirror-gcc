@@ -37,7 +37,7 @@ along with GCC; see the file COPYING3.  If not see
 			crtbegin.o%s"
 
 #undef DBX_REGISTER_NUMBER
-#define DBX_REGISTER_NUMBER(n) \
+#define DBX_REGISTER_NUMBER(n, mode) \
   (TARGET_64BIT ? dbx64_register_map[n] : svr4_dbx_register_map[n])
 
 /* The routine used to output sequences of byte values.  We use a special

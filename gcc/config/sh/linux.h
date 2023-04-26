@@ -114,7 +114,7 @@ along with GCC; see the file COPYING3.  If not see
    this slot must be set.  To do this, we redefine DBX_REGISTER_NUMBER
    so as to return itself for 16.  */
 #undef DBX_REGISTER_NUMBER
-#define DBX_REGISTER_NUMBER(REGNO) \
+#define DBX_REGISTER_NUMBER(REGNO, MODE) \
   (((REGNO) == 16) ? 16 : SH_DBX_REGISTER_NUMBER (REGNO))
 
 /* Install the __sync libcalls.  */

@@ -80,7 +80,7 @@ along with GCC; see the file COPYING3.  If not see
 #endif
 
 #undef DBX_REGISTER_NUMBER
-#define DBX_REGISTER_NUMBER(n)				\
+#define DBX_REGISTER_NUMBER(n, mode)				\
   (TARGET_64BIT ? dbx64_register_map[n]			\
    : (write_symbols == DWARF2_DEBUG			\
       ? svr4_dbx_register_map[n] : dbx_register_map[n]))
@@ -89,7 +89,7 @@ along with GCC; see the file COPYING3.  If not see
    target, always use the svr4_dbx_register_map for DWARF .eh_frame
    even if we don't use DWARF .debug_frame. */
 #undef DWARF_FRAME_REGNUM
-#define DWARF_FRAME_REGNUM(n)				\
+#define DWARF_FRAME_REGNUM(n, mode)				\
   (TARGET_64BIT ? dbx64_register_map[(n)]		\
 		: svr4_dbx_register_map[(n)])
 

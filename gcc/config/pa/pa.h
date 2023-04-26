@@ -409,7 +409,7 @@ extern rtx hppa_pic_save_rtx (void);
    prologue.  You only need to define this macro if you want to support
    call frame debugging information like that provided by DWARF 2.  */
 #define INCOMING_RETURN_ADDR_RTX (gen_rtx_REG (word_mode, 2))
-#define DWARF_FRAME_RETURN_COLUMN (DWARF_FRAME_REGNUM (2))
+#define DWARF_FRAME_RETURN_COLUMN (DWARF_FRAME_REGNUM (2, Pmode))
 
 /* A C expression whose value is an integer giving a DWARF 2 column
    number that may be used as an alternate return column.  This should

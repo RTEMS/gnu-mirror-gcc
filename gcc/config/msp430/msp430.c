@@ -2661,7 +2661,7 @@ msp430_init_dwarf_reg_sizes_extra (tree address)
 
   for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
     {
-      unsigned int dnum = DWARF_FRAME_REGNUM (i);
+      unsigned int dnum = DWARF_FRAME_REGNUM (i, VOIDmode);
       unsigned int rnum = DWARF2_FRAME_REG_OUT (dnum, 1);
 
       if (rnum < DWARF_FRAME_REGISTERS)

@@ -172,13 +172,13 @@ along with GCC; see the file COPYING3.  If not see
    Registers 32 - 59 are mapped to 72, 74, 76 ...
 
    Register 60 is mapped to 32.  */
-#define DBX_REGISTER_NUMBER(REGNO) \
+#define DBX_REGISTER_NUMBER(REGNO, MODE) \
   ((REGNO) <= 31 ? (REGNO) : ((REGNO) < 60 ? (REGNO - 32) * 2 + 72 : 32))
 
 /* We must not use the DBX register numbers for the DWARF 2 CFA column
    numbers because that maps to numbers beyond FIRST_PSEUDO_REGISTER.
    Instead use the identity mapping.  */
-#define DWARF_FRAME_REGNUM(REG) REG
+#define DWARF_FRAME_REGNUM(REG, MODE) REG
 
 /* Define the classes of registers for register constraints in the
    machine description.  Also define ranges of constants.

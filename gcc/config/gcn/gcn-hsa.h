@@ -103,4 +103,4 @@ extern const char *last_arg_spec_function (int argc, const char **argv);
 #define DWARF2_DEBUGGING_INFO      1
 #define DWARF2_ASM_LINE_DEBUG_INFO 1
 #define EH_FRAME_THROUGH_COLLECT2  1
-#define DBX_REGISTER_NUMBER(REGNO) gcn_dwarf_register_number (REGNO)
+#define DBX_REGISTER_NUMBER(REGNO, MODE) gcn_dwarf_register_number (REGNO)

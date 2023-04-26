@@ -1058,7 +1058,7 @@ extern const int arm_arch_cde_coproc_bits[];
 /* VFP (VFP3) adds 32 (64) + 1 VFPCC.  */
 #define FIRST_PSEUDO_REGISTER   107
 
-#define DBX_REGISTER_NUMBER(REGNO) arm_dbx_register_number (REGNO)
+#define DBX_REGISTER_NUMBER(REGNO,MODE) arm_dbx_register_number (REGNO)
 
 /* Value should be nonzero if functions must have frame pointers.
    Zero means the frame pointer need not be set up (and parms may be accessed
@@ -2263,7 +2263,7 @@ extern int making_const_table;
    dwarf2 unwind information.  This also enables the table driven
    mechanism.  */
 #define INCOMING_RETURN_ADDR_RTX	gen_rtx_REG (Pmode, LR_REGNUM)
-#define DWARF_FRAME_RETURN_COLUMN	DWARF_FRAME_REGNUM (LR_REGNUM)
+#define DWARF_FRAME_RETURN_COLUMN	DWARF_FRAME_REGNUM (LR_REGNUM, Pmode)
 
 /* Used to mask out junk bits from the return address, such as
    processor state, interrupt status, condition codes and the like.  */

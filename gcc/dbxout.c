@@ -2993,6 +2993,7 @@ dbxout_symbol_location (tree decl, tree type, const char *suffix, rtx home)
   rtx addr = 0;
   int number = 0;
   int regno = -1;
+  machine_mode regmode ATTRIBUTE_UNUSED;
 
   /* Don't mention a variable at all
      if it was completely optimized into nothingness.
@@ -3016,6 +3017,7 @@ dbxout_symbol_location (tree decl, tree type, const char *suffix, rtx home)
   if (REG_P (home))
     {
       regno = REGNO (home);
+      regmode = GET_MODE (home);
       if (regno >= FIRST_PSEUDO_REGISTER)
 	return 0;
     }
@@ -3120,7 +3122,7 @@ dbxout_symbol_location (tree decl, tree type, const char *suffix, rtx home)
     {
       letter = 'r';
       code = N_RSYM;
-      number = DBX_REGISTER_NUMBER (regno);
+      number = DBX_REGISTER_NUMBER (regno, regmode);
     }
   else if (MEM_P (home)
 	   && (MEM_P (XEXP (home, 0))
@@ -3144,7 +3146,9 @@ dbxout_symbol_location (tree decl, tree type, const char *suffix, rtx home)
 	  code = N_RSYM;
 	  if (REGNO (XEXP (home, 0)) >= FIRST_PSEUDO_REGISTER)
 	    return 0;
-	  number = DBX_REGISTER_NUMBER (REGNO (XEXP (home, 0)));
+
+	  regmode = GET_MODE (XEXP (home, 0));
+	  number = DBX_REGISTER_NUMBER (REGNO (XEXP (home, 0)), regmode);
 	}
       else
 	{
@@ -3539,7 +3543,7 @@ dbxout_parms (tree parms)
 	    else
 	      best_rtl = DECL_INCOMING_RTL (parms);
 
-	    number = DBX_REGISTER_NUMBER (REGNO (best_rtl));
+	    number = DBX_REGISTER_NUMBER (REGNO (best_rtl), GET_MODE (best_rtl));
 	  }
 	else if (MEM_P (DECL_RTL (parms))
 		 && REG_P (XEXP (DECL_RTL (parms), 0))

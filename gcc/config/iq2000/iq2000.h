@@ -567,7 +567,7 @@ enum delay_type
 
 
 /* The mapping from gcc register number to DWARF 2 CFA column number.  */
-#define DWARF_FRAME_REGNUM(REG)        (REG)
+#define DWARF_FRAME_REGNUM(REG, MODE)        (REG)
 
 /* The DWARF 2 CFA column which tracks the return address.  */
 #define DWARF_FRAME_RETURN_COLUMN (GP_REG_FIRST + 31)

@@ -221,7 +221,7 @@ while (0)
    16 to 23 as they do in the compiler.  */
 
 #undef DBX_REGISTER_NUMBER
-#define DBX_REGISTER_NUMBER(REGNO) ((REGNO) < 16 ? (REGNO) : (REGNO) + 2)
+#define DBX_REGISTER_NUMBER(REGNO, MODE) ((REGNO) < 16 ? (REGNO) : (REGNO) + 2)
 
 
 /* 1 if N is a possible register number for a function value.  For

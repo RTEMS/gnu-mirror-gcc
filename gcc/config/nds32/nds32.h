@@ -1323,7 +1323,7 @@ enum reg_class
    If this RTL is REG, you should also define
    DWARF_FRAME_RETURN_COLUMN to DWARF_FRAME_REGNUM (REGNO).  */
 #define INCOMING_RETURN_ADDR_RTX    gen_rtx_REG (Pmode, LP_REGNUM)
-#define DWARF_FRAME_RETURN_COLUMN   DWARF_FRAME_REGNUM (LP_REGNUM)
+#define DWARF_FRAME_RETURN_COLUMN   DWARF_FRAME_REGNUM (LP_REGNUM, Pmode)
 
 /* Use $r0 $r1 to pass exception handling information.  */
 #define EH_RETURN_DATA_REGNO(N) (((N) < 2) ? (N) : INVALID_REGNUM)
@@ -1332,7 +1332,7 @@ enum reg_class
    This is used to unwind the stack to an exception handler's call frame.  */
 #define EH_RETURN_STACKADJ_RTX gen_rtx_REG (Pmode, 2)
 
-#define DBX_REGISTER_NUMBER(REGNO) nds32_dbx_register_number (REGNO)
+#define DBX_REGISTER_NUMBER(REGNO, MODE) nds32_dbx_register_number (REGNO)
 
 #define STACK_POINTER_REGNUM SP_REGNUM
 

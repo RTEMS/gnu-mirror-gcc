@@ -129,7 +129,7 @@ along with GCC; see the file COPYING3.  If not see
 #define PTRDIFF_TYPE "int"
 
 #undef DBX_REGISTER_NUMBER
-#define DBX_REGISTER_NUMBER(n) svr4_dbx_register_map[n]
+#define DBX_REGISTER_NUMBER(n, mode) svr4_dbx_register_map[n]
 
 /* Default to pcc-struct-return.  */
 #define DEFAULT_PCC_STRUCT_RETURN 1

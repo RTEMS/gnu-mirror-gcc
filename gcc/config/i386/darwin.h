@@ -290,7 +290,7 @@ along with GCC; see the file COPYING3.  If not see
    register numbers for STABS.  Fortunately for 64-bit code the
    default and the standard are the same.  */
 #undef DBX_REGISTER_NUMBER
-#define DBX_REGISTER_NUMBER(n) 					\
+#define DBX_REGISTER_NUMBER(n, mode) 					\
   (TARGET_64BIT ? dbx64_register_map[n]				\
    : write_symbols == DWARF2_DEBUG ? svr4_dbx_register_map[n]	\
    : dbx_register_map[n])

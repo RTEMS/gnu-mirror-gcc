@@ -260,7 +260,7 @@ struct GTY(()) machine_function
 #undef ASM_APP_OFF
 #define ASM_APP_OFF "\t// #NO_APP \n"
 
-#define DBX_REGISTER_NUMBER(N) N
+#define DBX_REGISTER_NUMBER(N, MODE) N
 
 #define TEXT_SECTION_ASM_OP ""
 #define DATA_SECTION_ASM_OP ""

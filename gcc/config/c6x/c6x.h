@@ -312,7 +312,7 @@ enum reg_class
 /* Before the prologue, the return address is in the B3 register.  */
 #define RETURN_ADDR_REGNO REG_B3
 #define INCOMING_RETURN_ADDR_RTX gen_rtx_REG (Pmode, RETURN_ADDR_REGNO)
-#define DWARF_FRAME_RETURN_COLUMN	DWARF_FRAME_REGNUM (RETURN_ADDR_REGNO)
+#define DWARF_FRAME_RETURN_COLUMN DWARF_FRAME_REGNUM (RETURN_ADDR_REGNO, Pmode)
 
 #define RETURN_ADDR_RTX(COUNT, FRAME) c6x_return_addr_rtx (COUNT)
 
@@ -503,7 +503,7 @@ struct GTY(()) machine_function
     "B24", "B25", "B26", "B27", "B28", "B29", "B30", "B31",	\
     "FP", "ARGP", "ILC" }
 
-#define DBX_REGISTER_NUMBER(N) (dbx_register_map[(N)])
+#define DBX_REGISTER_NUMBER(N, MODE) (dbx_register_map[(N)])
 
 extern unsigned const dbx_register_map[FIRST_PSEUDO_REGISTER];
 

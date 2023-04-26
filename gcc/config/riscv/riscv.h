@@ -83,7 +83,7 @@ extern const char *riscv_expand_arch (int argc, const char **argv);
 #define DWARF_CIE_DATA_ALIGNMENT -4
 
 /* The mapping from gcc register number to DWARF 2 CFA column number.  */
-#define DWARF_FRAME_REGNUM(REGNO) \
+#define DWARF_FRAME_REGNUM(REGNO, MODE) \
   (GP_REG_P (REGNO) || FP_REG_P (REGNO) ? REGNO : INVALID_REGNUM)
 
 /* The DWARF 2 CFA column which tracks the return address.  */

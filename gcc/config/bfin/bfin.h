@@ -744,7 +744,7 @@ typedef struct {
 
 #define RETURN_ADDR_RTX(COUNT, FRAME) bfin_return_addr_rtx (COUNT)
 
-#define DWARF_FRAME_RETURN_COLUMN DWARF_FRAME_REGNUM (REG_RETS)
+#define DWARF_FRAME_RETURN_COLUMN DWARF_FRAME_REGNUM (REG_RETS, Pmode)
 
 /* Call instructions don't modify the stack pointer on the Blackfin.  */
 #define INCOMING_FRAME_SP_OFFSET 0
@@ -1097,7 +1097,7 @@ extern rtx bfin_cc_rtx, bfin_rets_rtx;
 #define SET_ASM_OP              ".set "
 
 /* DBX register number for a given compiler register number */
-#define DBX_REGISTER_NUMBER(REGNO)  (REGNO) 
+#define DBX_REGISTER_NUMBER(REGNO, MODE)  (REGNO)
 
 #define SIZE_ASM_OP     "\t.size\t"
 

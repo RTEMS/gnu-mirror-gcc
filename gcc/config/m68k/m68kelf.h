@@ -101,7 +101,7 @@ do {								\
    are 0-7, a0-a8 are 8-15, and fp0-fp7 are 16-23.  */
 
 #undef DBX_REGISTER_NUMBER
-#define DBX_REGISTER_NUMBER(REGNO) (REGNO)
+#define DBX_REGISTER_NUMBER(REGNO, MODE) (REGNO)
 
 #if 0
 /* SVR4 m68k assembler is bitching on the `comm i,1,1' which askes for 

@@ -413,7 +413,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    registers.  */
 #ifndef DWARF_FRAME_RETURN_COLUMN
 #ifdef PC_REGNUM
-#define DWARF_FRAME_RETURN_COLUMN	DWARF_FRAME_REGNUM (PC_REGNUM)
+#define DWARF_FRAME_RETURN_COLUMN	DWARF_FRAME_REGNUM (PC_REGNUM, Pmode)
 #else
 #define DWARF_FRAME_RETURN_COLUMN	DWARF_FRAME_REGISTERS
 #endif
@@ -423,13 +423,13 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    no renumbering is necessary.  */
 
 #ifndef DBX_REGISTER_NUMBER
-#define DBX_REGISTER_NUMBER(REGNO) (REGNO)
+#define DBX_REGISTER_NUMBER(REGNO, MODE) (REGNO)
 #endif
 
 /* The mapping from gcc register number to DWARF 2 CFA column number.
    By default, we just provide columns for all registers.  */
 #ifndef DWARF_FRAME_REGNUM
-#define DWARF_FRAME_REGNUM(REG) DBX_REGISTER_NUMBER (REG)
+#define DWARF_FRAME_REGNUM(REG, MODE) DBX_REGISTER_NUMBER (REG, MODE)
 #endif
 
 /* The mapping from dwarf CFA reg number to internal dwarf reg numbers.  */

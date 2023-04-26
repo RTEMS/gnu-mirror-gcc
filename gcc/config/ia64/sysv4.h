@@ -103,7 +103,7 @@ do {						\
 #undef FINI_SECTION_ASM_OP
 #define FINI_SECTION_ASM_OP	"\t.section\t.fini,\"ax\",\"progbits\""
 
-#define DBX_REGISTER_NUMBER(REGNO) \
+#define DBX_REGISTER_NUMBER(REGNO, MODE) \
   ia64_dbx_register_number(REGNO)
 
 #undef SIZE_TYPE

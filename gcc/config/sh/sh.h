@@ -1659,7 +1659,7 @@ extern bool current_function_interrupt;
    to match gdb.  */
 /* expand_builtin_init_dwarf_reg_sizes uses this to test if a
    register exists, so we should return -1 for invalid register numbers.  */
-#define DBX_REGISTER_NUMBER(REGNO) SH_DBX_REGISTER_NUMBER (REGNO)
+#define DBX_REGISTER_NUMBER(REGNO, MODE) SH_DBX_REGISTER_NUMBER (REGNO)
 
 #define SH_DBX_REGISTER_NUMBER(REGNO) \
   (IN_RANGE ((REGNO), \
@@ -1820,7 +1820,7 @@ extern tree *sh_deferred_function_attributes_tail;
 
 #define EPILOGUE_USES(REGNO) (TARGET_FPU_ANY && REGNO == FPSCR_REG)
 
-#define DWARF_FRAME_RETURN_COLUMN (DWARF_FRAME_REGNUM (PR_REG))
+#define DWARF_FRAME_RETURN_COLUMN (DWARF_FRAME_REGNUM (PR_REG, VOIDmode))
 
 #define EH_RETURN_DATA_REGNO(N)	((N) < 4 ? (N) + 4U : INVALID_REGNUM)
 

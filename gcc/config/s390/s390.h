@@ -681,7 +681,7 @@ extern const enum reg_class regclass_map[FIRST_PSEUDO_REGISTER];
 /* Define the dwarf register mapping.
    v16-v31 -> 68-83
    rX      -> X      otherwise  */
-#define DBX_REGISTER_NUMBER(regno)				\
+#define DBX_REGISTER_NUMBER(regno, mode)				\
   (((regno) >= 38 && (regno) <= 53) ? (regno) + 30 : (regno))
 
 /* Frame registers.  */

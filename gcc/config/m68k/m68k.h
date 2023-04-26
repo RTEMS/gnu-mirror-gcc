@@ -707,7 +707,7 @@ __transfer_from_trampoline ()					\
 
 /* On the Sun-3, the floating point registers have numbers
    18 to 25, not 16 to 23 as they do in the compiler.  */
-#define DBX_REGISTER_NUMBER(REGNO) ((REGNO) < 16 ? (REGNO) : (REGNO) + 2)
+#define DBX_REGISTER_NUMBER(REGNO, MODE) ((REGNO) < 16 ? (REGNO) : (REGNO) + 2)
 
 /* Before the prologue, RA is at 0(%sp).  */
 #define INCOMING_RETURN_ADDR_RTX \
@@ -723,7 +723,7 @@ __transfer_from_trampoline ()					\
 /* We must not use the DBX register numbers for the DWARF 2 CFA column
    numbers because that maps to numbers beyond FIRST_PSEUDO_REGISTER.
    Instead use the identity mapping.  */
-#define DWARF_FRAME_REGNUM(REG) \
+#define DWARF_FRAME_REGNUM(REG, MODE) \
   (INT_REGNO_P (REG) || FP_REGNO_P (REG) ? (REG) : INVALID_REGNUM)
 
 /* The return column was originally 24, but gcc used 25 for a while too.

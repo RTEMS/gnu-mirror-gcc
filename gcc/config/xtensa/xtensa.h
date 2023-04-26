@@ -211,7 +211,7 @@ along with GCC; see the file COPYING3.  If not see
 #define FIRST_PSEUDO_REGISTER 36
 
 /* Return the stabs register number to use for REGNO.  */
-#define DBX_REGISTER_NUMBER(REGNO) xtensa_dbx_register_number (REGNO)
+#define DBX_REGISTER_NUMBER(REGNO, MODE) xtensa_dbx_register_number (REGNO)
 
 /* 1 for registers that have pervasive standard uses
    and are not available for the register allocator.  */
@@ -773,7 +773,7 @@ typedef struct xtensa_args
    still be specified in DWARF so that DW_AT_frame_base is set correctly
    for debugging.  */
 #define INCOMING_RETURN_ADDR_RTX gen_rtx_REG (Pmode, 0)
-#define DWARF_FRAME_RETURN_COLUMN DWARF_FRAME_REGNUM (0)
+#define DWARF_FRAME_RETURN_COLUMN DWARF_FRAME_REGNUM (0, Pmode)
 #define DWARF_ALT_FRAME_RETURN_COLUMN 16
 #define DWARF_FRAME_REGISTERS (DWARF_ALT_FRAME_RETURN_COLUMN		\
 			       + (TARGET_WINDOWED_ABI ? 0 : 1))

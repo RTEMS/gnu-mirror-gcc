@@ -1251,7 +1251,7 @@ do {									\
   plus_constant (word_mode, \
 		 gen_rtx_REG (word_mode, INCOMING_RETURN_ADDR_REGNUM), 8)
 #define DWARF_FRAME_RETURN_COLUMN \
-  DWARF_FRAME_REGNUM (INCOMING_RETURN_ADDR_REGNUM)
+  DWARF_FRAME_REGNUM (INCOMING_RETURN_ADDR_REGNUM, Pmode)
 
 /* The offset from the incoming value of %sp to the top of the stack frame
    for the current function.  On sparc64, we have to account for the stack

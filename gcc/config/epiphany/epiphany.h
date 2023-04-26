@@ -561,7 +561,8 @@ typedef struct GTY (()) machine_function
   (count ? NULL_RTX \
    : gen_rtx_UNSPEC (SImode, gen_rtvec (1, const0_rtx), UNSPEC_RETURN_ADDR))
 
-#define DWARF_FRAME_RETURN_COLUMN DWARF_FRAME_REGNUM (EPIPHANY_RETURN_REGNO)
+#define DWARF_FRAME_RETURN_COLUMN \
+  DWARF_FRAME_REGNUM (EPIPHANY_RETURN_REGNO, Pmode)
 
 /* Trampolines.
    An epiphany trampoline looks like this:

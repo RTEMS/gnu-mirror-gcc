@@ -491,7 +491,7 @@ do {                                                            \
 /* Debugging.  */
 /*-------------*/
 
-#define DBX_REGISTER_NUMBER(REGNO) (REGNO)
+#define DBX_REGISTER_NUMBER(REGNO, MODE) (REGNO)
 
 #define DEFAULT_GDB_EXTENSIONS 1
 

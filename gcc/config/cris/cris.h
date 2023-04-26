@@ -562,7 +562,7 @@ enum reg_class
 #define INIT_EXPANDERS cris_init_expanders ()
 
 /* FIXME: Move this to right node (it's not documented properly yet).  */
-#define DWARF_FRAME_RETURN_COLUMN DWARF_FRAME_REGNUM (CRIS_SRP_REGNUM)
+#define DWARF_FRAME_RETURN_COLUMN DWARF_FRAME_REGNUM (CRIS_SRP_REGNUM, Pmode)
 
 /* FIXME: Move this to right node (it's not documented properly yet).
    FIXME: Check what alignment we can assume regarding
@@ -576,7 +576,7 @@ enum reg_class
    need in dwarf2out.c:expand_builtin_init_dwarf_reg_sizes.  Right now, I
    don't see that we need exact correspondence between DWARF *frame*
    registers and DBX_REGISTER_NUMBER, so map them onto GCC registers.  */
-#define DWARF_FRAME_REGNUM(REG) (REG)
+#define DWARF_FRAME_REGNUM(REG, MODE) (REG)
 
 /* Node: Stack Checking */
 /* (no definitions) FIXME: Check.  */
@@ -885,7 +885,7 @@ struct cum_args {int regs;};
 
 /* Node: All Debuggers */
 
-#define DBX_REGISTER_NUMBER(REGNO)				\
+#define DBX_REGISTER_NUMBER(REGNO, MODE)				\
  ((REGNO) == CRIS_SRP_REGNUM ? CRIS_CANONICAL_SRP_REGNUM :	\
   (REGNO) == CRIS_MOF_REGNUM ? CRIS_CANONICAL_MOF_REGNUM :	\
   (REGNO) == CRIS_CC0_REGNUM ? CRIS_CANONICAL_CC0_REGNUM :	\

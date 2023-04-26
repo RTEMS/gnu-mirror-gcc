@@ -1717,7 +1717,7 @@ fprintf (STREAM, "\t.word .L%d\n", VALUE)
    instead of inline unwinders and __unwind_function in the non-setjmp case.  */
 #define DWARF2_UNWIND_INFO 1
 
-#define DWARF_FRAME_RETURN_COLUMN DWARF_FRAME_REGNUM (LR_REGNO)
+#define DWARF_FRAME_RETURN_COLUMN DWARF_FRAME_REGNUM (LR_REGNO, Pmode)
 
 /* Assembler Commands for Alignment.  */
 
@@ -1754,7 +1754,7 @@ fprintf (STREAM, "\t.word .L%d\n", VALUE)
    actual register numbering scheme.
 
    This declaration is required.  */
-#define DBX_REGISTER_NUMBER(REGNO) (REGNO)
+#define DBX_REGISTER_NUMBER(REGNO, MODE) (REGNO)
 
 #undef  PREFERRED_DEBUGGING_TYPE
 #define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG

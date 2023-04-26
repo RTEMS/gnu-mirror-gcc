@@ -2155,7 +2155,7 @@ do {							\
 
 /* How to renumber registers for dbx and gdb.  */
 
-#define DBX_REGISTER_NUMBER(N) \
+#define DBX_REGISTER_NUMBER(N, MODE) \
   (TARGET_64BIT ? dbx64_register_map[(N)] : dbx_register_map[(N)])
 
 extern int const dbx_register_map[FIRST_PSEUDO_REGISTER];

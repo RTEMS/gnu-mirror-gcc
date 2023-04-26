@@ -458,7 +458,7 @@ enum reg_class
    Nowhere except in the code does it say it *has* to be in the range
    0..255, or else it will be truncated.  That goes for the default too.  */
 #define DWARF_FRAME_RETURN_COLUMN \
- DWARF_FRAME_REGNUM (MMIX_INCOMING_RETURN_ADDRESS_REGNUM)
+ DWARF_FRAME_REGNUM (MMIX_INCOMING_RETURN_ADDRESS_REGNUM, Pmode)
 
 /* No return address is stored there.  */
 #define INCOMING_FRAME_SP_OFFSET 0
@@ -757,7 +757,7 @@ typedef struct { int regs; int lib; } CUMULATIVE_ARGS;
 
 /* Node: All Debuggers */
 
-#define DBX_REGISTER_NUMBER(REGNO) \
+#define DBX_REGISTER_NUMBER(REGNO, MODE) \
  mmix_dbx_register_number (REGNO)
 
 

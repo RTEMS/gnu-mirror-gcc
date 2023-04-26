@@ -1531,10 +1531,10 @@ FP_ASM_SPEC "\
 #define DBX_CONTIN_LENGTH 1500
 
 /* How to renumber registers for dbx and gdb.  */
-#define DBX_REGISTER_NUMBER(REGNO) mips_dbx_regno[REGNO]
+#define DBX_REGISTER_NUMBER(REGNO, MODE) mips_dbx_regno[REGNO]
 
 /* The mapping from gcc register number to DWARF 2 CFA column number.  */
-#define DWARF_FRAME_REGNUM(REGNO) mips_dwarf_regno[REGNO]
+#define DWARF_FRAME_REGNUM(REGNO, MODE) mips_dwarf_regno[REGNO]
 
 /* The DWARF 2 CFA column which tracks the return address.  */
 #define DWARF_FRAME_RETURN_COLUMN RETURN_ADDR_REGNUM
