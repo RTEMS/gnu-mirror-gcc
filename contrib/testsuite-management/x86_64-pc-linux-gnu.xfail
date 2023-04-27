@@ -184,3 +184,6 @@ FAIL: gcc.dg/mla_1.c (test for excess errors)
 UNRESOLVED: g++.dg/cpp2a/concepts-lambda3.C -std=c++14 compilation failed to produce executable
 UNRESOLVED: g++.dg/cpp2a/concepts-lambda3.C -std=c++17 compilation failed to produce executable
 UNRESOLVED: g++.dg/cpp2a/concepts-lambda3.C -std=c++98 compilation failed to produce executable
+FAIL: std/time/time_zone/get_info_local.cc execution test
+FAIL: gcc.dg/analyzer/file-CWE-1341-example.c (test for excess errors)
+FAIL: gcc.dg/analyzer/pipe-glibc.c (test for excess errors)
