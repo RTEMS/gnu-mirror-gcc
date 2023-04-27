@@ -26,6 +26,7 @@ import globals
 from common import *
 from downloadBuildArtifact import *
 import sys
+import os
 
 # subclass JSONEncoder to convert the Config object into JSON
 class ConfigEncoder(JSONEncoder):
@@ -73,7 +74,10 @@ class Config(object):
         configJson = json.dumps(newConfig, cls=ConfigEncoder)
 
         # Output for Github to pick up output for future steps
-        print("::set-output name=configJson::" + configJson)
+        name = 'configJson'
+        value = configJson
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+            print(f'{name}={value}', file=fh)
 
         # Set global config object
         globals.configObj = newConfig
@@ -88,7 +92,10 @@ class Config(object):
         configJson = json.dumps(globals.configObj, cls=ConfigEncoder)
 
         # Output for Github to pick up output for future jobs
-        print("::set-output name=noSecretConfigJson::" + configJson)
+        name = 'noSecretConfigJson'
+        value = configJson
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+            print(f'{name}={value}', file=fh)
 
     @staticmethod
     def PrintNoSecretConfigJsonFromJson(configJson):

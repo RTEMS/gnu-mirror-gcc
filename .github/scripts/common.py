@@ -25,6 +25,7 @@ import logging
 import subprocess
 import requests
 import time
+import os
 
 # Exception class to raise when a basic workflow error happens
 class WorkflowError(Exception):
@@ -50,7 +51,10 @@ def GetandPrintCurrentSHA():
     res = subprocess.run('git rev-parse HEAD', shell=True, check=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
     # Output for Github to pick up output for future jobs
-    print("::set-output name=currentSHA::" + str(res.stdout, 'utf-8'))
+    name = 'currentSHA'
+    value = str(res.stdout, 'utf-8')
+    with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+        print(f'{name}={value}', file=fh)
 
 def SendGetRestCmd(restCmd, restArgs, restHeader):
     logger = GetLogger()

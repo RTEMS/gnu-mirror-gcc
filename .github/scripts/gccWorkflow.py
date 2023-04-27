@@ -43,7 +43,11 @@ class GccWorkflow(object):
             "testSet" : ["check-target-libstdc++-v3", "check-gcc-c++", "check-gcc-c", "check-target-libgomp", "check-target-libitm", "check-target-libatomic"]
         }
         dictionaryJson = json.dumps(dictionary)
-        print("::set-output name=testSet::" + dictionaryJson)
+
+        name = 'testSet'
+        value = dictionaryJson
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+            print(f'{name}={value}', file=fh)
 
     # Runs the configure script to set up gcc configuration environment prior to building and running tests
     # Creates the objdir directory as part of this process
