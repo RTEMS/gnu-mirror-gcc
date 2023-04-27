@@ -187,3 +187,25 @@ UNRESOLVED: g++.dg/cpp2a/concepts-lambda3.C -std=c++98 compilation failed to pro
 FAIL: std/time/time_zone/get_info_local.cc execution test
 FAIL: gcc.dg/analyzer/file-CWE-1341-example.c (test for excess errors)
 FAIL: gcc.dg/analyzer/pipe-glibc.c (test for excess errors)
+FAIL: 23_containers/vector/bool/allocator/copy.cc (test for excess errors)
+FAIL: gcc.dg/guality/pr43051-1.c -O1  -DPREVENT_OPTIMIZATION  line 34 c == &a[0]
+FAIL: gcc.dg/guality/pr43051-1.c -O1  -DPREVENT_OPTIMIZATION  line 39 c == &a[0]
+FAIL: gcc.dg/guality/pr54693-2.c -O1  -DPREVENT_OPTIMIZATION  line 21 i == v + 1
+FAIL: gcc.dg/guality/pr54693-2.c -O2  -DPREVENT_OPTIMIZATION  line 21 i == v + 1
+FAIL: gcc.dg/guality/pr54693-2.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION line 21 i == v + 1
+FAIL: gcc.dg/guality/pr54693-2.c -O3 -g  -DPREVENT_OPTIMIZATION  line 21 i == v + 1
+FAIL: gcc.dg/guality/pr54693.c -O1  -DPREVENT_OPTIMIZATION  line 22 i == c - 48
+FAIL: gcc.dg/guality/pr54693.c -O2  -DPREVENT_OPTIMIZATION  line 22 i == c - 48
+FAIL: gcc.dg/guality/pr54693.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION line 22 i == c - 48
+FAIL: gcc.dg/guality/pr54693.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 22 i == c - 48
+FAIL: gcc.dg/guality/pr54693.c -O3 -fomit-frame-pointer -funroll-loops -fpeel-loops -ftracer -finline-functions  -DPREVENT_OPTIMIZATION  line 22 i == c - 48
+FAIL: gcc.dg/guality/pr54693.c -O3 -g  -DPREVENT_OPTIMIZATION  line 22 i == c - 48
+FAIL: gcc.dg/guality/pr54693.c -Os  -DPREVENT_OPTIMIZATION  line 22 i == c - 48
+FAIL: gcc.dg/guality/pr89463.c -O1  -DPREVENT_OPTIMIZATION  line 23 i + 1 == 7
+FAIL: gcc.dg/guality/pr90074.c -O1  -DPREVENT_OPTIMIZATION  line 28 c + 1 == 2
+FAIL: gcc.dg/guality/pr90074.c -O1  -DPREVENT_OPTIMIZATION  line 28 i + 1 == 8
+FAIL: gcc.dg/guality/pr90716.c -O1  -DPREVENT_OPTIMIZATION  line 23 j + 1 == 9
+FAIL: gcc.dg/guality/pr90716.c -O2  -DPREVENT_OPTIMIZATION  line 23 j + 1 == 9
+FAIL: gcc.dg/guality/pr90716.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION line 23 j + 1 == 9
+FAIL: gcc.dg/guality/pr90716.c -Os  -DPREVENT_OPTIMIZATION  line 23 j + 1 == 9
+FAIL: gcc.target/i386/pr45685.c scan-assembler-times cmov 6
