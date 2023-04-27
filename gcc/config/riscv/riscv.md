@@ -100,6 +100,10 @@
 
   ;; Zihintpause unspec
   UNSPECV_PAUSE
+
+  ;; XTheadFmv unspec
+  UNSPEC_XTHEADFMV
+  UNSPEC_XTHEADFMV_HW
 ])
 
 (define_constants
@@ -159,13 +163,13 @@
 
 ;; Main data type used by the insn
 (define_attr "mode" "unknown,none,QI,HI,SI,DI,TI,HF,SF,DF,TF,
-  VNx1BI,VNx2BI,VNx4BI,VNx8BI,VNx16BI,VNx32BI,VNx64BI,
-  VNx1QI,VNx2QI,VNx4QI,VNx8QI,VNx16QI,VNx32QI,VNx64QI,
-  VNx1HI,VNx2HI,VNx4HI,VNx8HI,VNx16HI,VNx32HI,
-  VNx1SI,VNx2SI,VNx4SI,VNx8SI,VNx16SI,
-  VNx1DI,VNx2DI,VNx4DI,VNx8DI,
-  VNx1SF,VNx2SF,VNx4SF,VNx8SF,VNx16SF,
-  VNx1DF,VNx2DF,VNx4DF,VNx8DF"
+  VNx1BI,VNx2BI,VNx4BI,VNx8BI,VNx16BI,VNx32BI,VNx64BI,VNx128BI,
+  VNx1QI,VNx2QI,VNx4QI,VNx8QI,VNx16QI,VNx32QI,VNx64QI,VNx128QI,
+  VNx1HI,VNx2HI,VNx4HI,VNx8HI,VNx16HI,VNx32HI,VNx64HI,
+  VNx1SI,VNx2SI,VNx4SI,VNx8SI,VNx16SI,VNx32SI,
+  VNx1DI,VNx2DI,VNx4DI,VNx8DI,VNx16DI,
+  VNx1SF,VNx2SF,VNx4SF,VNx8SF,VNx16SF,VNx32SF,
+  VNx1DF,VNx2DF,VNx4DF,VNx8DF,VNx16DF"
   (const_string "unknown"))
 
 ;; True if the main data type is twice the size of a word.
@@ -242,6 +246,7 @@
 ;; bitmanip	bit manipulation instructions
 ;; rotate   rotation instructions
 ;; atomic   atomic instructions
+;; condmove	conditional moves
 ;; crypto cryptography instructions
 ;; Classification of RVV instructions which will be added to each RVV .md pattern and used by scheduler.
 ;; rdvlenb     vector byte length vlenb csrr read
@@ -339,7 +344,8 @@
   "unknown,branch,jump,call,load,fpload,store,fpstore,
    mtc,mfc,const,arith,logical,shift,slt,imul,idiv,move,fmove,fadd,fmul,
    fmadd,fdiv,fcmp,fcvt,fsqrt,multi,auipc,sfb_alu,nop,ghost,bitmanip,rotate,
-   atomic,crypto,rdvlenb,rdvl,vsetvl,vlde,vste,vldm,vstm,vlds,vsts,
+   min,max,minu,maxu,clz,ctz,cpop,
+   atomic,condmove,crypto,rdvlenb,rdvl,vsetvl,vlde,vste,vldm,vstm,vlds,vsts,
    vldux,vldox,vstux,vstox,vldff,vldr,vstr,
    vialu,viwalu,vext,vicalu,vshift,vnshift,vicmp,viminmax,
    vimul,vidiv,viwmul,vimuladd,viwmuladd,vimerge,vimov,
@@ -1364,8 +1370,8 @@
 	(zero_extend:DI
 	    (match_operand:SI 1 "nonimmediate_operand" " r,m")))]
   "TARGET_64BIT && !TARGET_ZBA
-   && !(REG_P (operands[1])
-        && REGNO (operands[1]) == VL_REGNUM)"
+   && !(register_operand (operands[1], SImode)
+        && reg_or_subregno (operands[1]) == VL_REGNUM)"
   "@
    #
    lwu\t%0,%1"
@@ -1663,7 +1669,7 @@
   [(const_int 0)]
 {
   riscv_move_integer (operands[2], operands[0], INTVAL (operands[1]),
-		      <GPR:MODE>mode, TRUE);
+		      <GPR:MODE>mode);
   DONE;
 })
 
@@ -1672,11 +1678,11 @@
   [(set (match_operand:P 0 "register_operand")
 	(match_operand:P 1))
    (clobber (match_operand:P 2 "register_operand"))]
-  "riscv_split_symbol (operands[2], operands[1], MAX_MACHINE_MODE, NULL, TRUE)"
+  "riscv_split_symbol (operands[2], operands[1], MAX_MACHINE_MODE, NULL)"
   [(set (match_dup 0) (match_dup 3))]
 {
   riscv_split_symbol (operands[2], operands[1],
-		      MAX_MACHINE_MODE, &operands[3], TRUE);
+		      MAX_MACHINE_MODE, &operands[3]);
 })
 
 ;; Pretend to have the ability to load complex const_int in order to get
@@ -1693,7 +1699,7 @@
   [(const_int 0)]
 {
   riscv_move_integer (operands[0], operands[0], INTVAL (operands[1]),
-                      <MODE>mode, TRUE);
+                      <MODE>mode);
   DONE;
 })
 
@@ -1747,7 +1753,7 @@
   "(register_operand (operands[0], SImode)
     || reg_or_0_operand (operands[1], SImode))
     && !(register_operand (operands[1], SImode)
-         && REGNO (operands[1]) == VL_REGNUM)"
+         && reg_or_subregno (operands[1]) == VL_REGNUM)"
   { return riscv_output_move (operands[0], operands[1]); }
   [(set_attr "move_type" "move,const,load,store,mtc,fpload,mfc,fpstore,rdvlenb")
    (set_attr "mode" "SI")
@@ -1864,16 +1870,17 @@
     DONE;
 })
 
+
 ;; In RV32, we lack fmv.x.d and fmv.d.x.  Go through memory instead.
 ;; (However, we can still use fcvt.d.w to zero a floating-point register.)
 (define_insn "*movdf_hardfloat_rv32"
-  [(set (match_operand:DF 0 "nonimmediate_operand" "=f,f,f,m,m,  *r,*r,*m")
-	(match_operand:DF 1 "move_operand"         " f,G,m,f,G,*r*G,*m,*r"))]
+  [(set (match_operand:DF 0 "nonimmediate_operand" "=f,f,f,m,m,*th_f_fmv,*th_r_fmv,  *r,*r,*m")
+	(match_operand:DF 1 "move_operand"         " f,G,m,f,G,*th_r_fmv,*th_f_fmv,*r*G,*m,*r"))]
   "!TARGET_64BIT && TARGET_DOUBLE_FLOAT
    && (register_operand (operands[0], DFmode)
        || reg_or_0_operand (operands[1], DFmode))"
   { return riscv_output_move (operands[0], operands[1]); }
-  [(set_attr "move_type" "fmove,mtc,fpload,fpstore,store,move,load,store")
+  [(set_attr "move_type" "fmove,mtc,fpload,fpstore,store,mtc,mfc,move,load,store")
    (set_attr "mode" "DF")])
 
 (define_insn "*movdf_hardfloat_rv64"
@@ -2317,17 +2324,15 @@
 (define_expand "mov<mode>cc"
   [(set (match_operand:GPR 0 "register_operand")
 	(if_then_else:GPR (match_operand 1 "comparison_operator")
-			  (match_operand:GPR 2 "register_operand")
+			  (match_operand:GPR 2 "reg_or_0_operand")
 			  (match_operand:GPR 3 "sfb_alu_operand")))]
-  "TARGET_SFB_ALU"
+  "TARGET_SFB_ALU || TARGET_XTHEADCONDMOV"
 {
-  rtx cmp = operands[1];
-  /* We only handle word mode integer compares for now.  */
-  if (GET_MODE (XEXP (cmp, 0)) != word_mode)
+  if (riscv_expand_conditional_move (operands[0], operands[1],
+				     operands[2], operands[3]))
+    DONE;
+  else
     FAIL;
-  riscv_expand_conditional_move (operands[0], operands[2], operands[3],
-				 GET_CODE (cmp), XEXP (cmp, 0), XEXP (cmp, 1));
-  DONE;
 })
 
 (define_insn "*mov<GPR:mode><X:mode>cc"
@@ -3096,6 +3101,44 @@
   "prefetch.i\t%a0"
 )
 
+(define_expand "extv<mode>"
+  [(set (match_operand:GPR 0 "register_operand" "=r")
+	(sign_extract:GPR (match_operand:GPR 1 "register_operand" "r")
+			 (match_operand 2 "const_int_operand")
+			 (match_operand 3 "const_int_operand")))]
+  "TARGET_XTHEADBB"
+)
+
+(define_expand "extzv<mode>"
+  [(set (match_operand:GPR 0 "register_operand" "=r")
+	(zero_extract:GPR (match_operand:GPR 1 "register_operand" "r")
+			 (match_operand 2 "const_int_operand")
+			 (match_operand 3 "const_int_operand")))]
+  "TARGET_XTHEADBB"
+{
+  if (TARGET_XTHEADBB
+      && (INTVAL (operands[2]) < 8) && (INTVAL (operands[3]) == 0))
+    FAIL;
+})
+
+(define_expand "maddhisi4"
+  [(set (match_operand:SI 0 "register_operand")
+	(plus:SI
+	  (mult:SI (sign_extend:SI (match_operand:HI 1 "register_operand"))
+		   (sign_extend:SI (match_operand:HI 2 "register_operand")))
+	  (match_operand:SI 3 "register_operand")))]
+  "TARGET_XTHEADMAC"
+)
+
+(define_expand "msubhisi4"
+  [(set (match_operand:SI 0 "register_operand")
+	(minus:SI
+	  (match_operand:SI 3 "register_operand")
+	  (mult:SI (sign_extend:SI (match_operand:HI 1 "register_operand"))
+		   (sign_extend:SI (match_operand:HI 2 "register_operand")))))]
+  "TARGET_XTHEADMAC"
+)
+
 (include "bitmanip.md")
 (include "crypto.md")
 (include "sync.md")
@@ -3103,4 +3146,5 @@
 (include "pic.md")
 (include "generic.md")
 (include "sifive-7.md")
+(include "thead.md")
 (include "vector.md")

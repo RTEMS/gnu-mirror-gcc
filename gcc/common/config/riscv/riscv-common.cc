@@ -222,6 +222,19 @@ static const struct riscv_ext_version riscv_ext_version_table[] =
   {"svinval", ISA_SPEC_CLASS_NONE, 1, 0},
   {"svnapot", ISA_SPEC_CLASS_NONE, 1, 0},
 
+  {"xtheadba", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"xtheadbb", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"xtheadbs", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"xtheadcmo", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"xtheadcondmov", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"xtheadfmemidx", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"xtheadfmv", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"xtheadint", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"xtheadmac", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"xtheadmemidx", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"xtheadmempair", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"xtheadsync", ISA_SPEC_CLASS_NONE, 1, 0},
+
   /* Terminate the list.  */
   {NULL, ISA_SPEC_CLASS_NONE, 0, 0}
 };
@@ -385,10 +398,10 @@ multi_letter_subset_rank (const std::string &subset)
   char multiletter_class = subset[0];
   switch (multiletter_class)
     {
-    case 's':
+    case 'z':
       high_order = 0;
       break;
-    case 'z':
+    case 's':
       high_order = 1;
       break;
     case 'x':
@@ -1108,14 +1121,14 @@ riscv_subset_list::parse (const char *arch, location_t loc)
   if (p == NULL)
     goto fail;
 
-  /* Parsing supervisor extension.  */
-  p = subset_list->parse_multiletter_ext (p, "s", "supervisor extension");
+  /* Parsing sub-extensions.  */
+  p = subset_list->parse_multiletter_ext (p, "z", "sub-extension");
 
   if (p == NULL)
     goto fail;
 
-  /* Parsing sub-extensions.  */
-  p = subset_list->parse_multiletter_ext (p, "z", "sub-extension");
+  /* Parsing supervisor extension.  */
+  p = subset_list->parse_multiletter_ext (p, "s", "supervisor extension");
 
   if (p == NULL)
     goto fail;
@@ -1139,6 +1152,10 @@ riscv_subset_list::parse (const char *arch, location_t loc)
     }
 
   subset_list->handle_combine_ext ();
+
+  if (subset_list->lookup ("zfinx") && subset_list->lookup ("f"))
+    error_at (loc, "%<-march=%s%>: z*inx conflicts with floating-point "
+		   "extensions", arch);
 
   return subset_list;
 
@@ -1247,6 +1264,19 @@ static const riscv_ext_flag_table_t riscv_ext_flag_table[] =
 
   {"svinval", &gcc_options::x_riscv_sv_subext, MASK_SVINVAL},
   {"svnapot", &gcc_options::x_riscv_sv_subext, MASK_SVNAPOT},
+
+  {"xtheadba",      &gcc_options::x_riscv_xthead_subext, MASK_XTHEADBA},
+  {"xtheadbb",      &gcc_options::x_riscv_xthead_subext, MASK_XTHEADBB},
+  {"xtheadbs",      &gcc_options::x_riscv_xthead_subext, MASK_XTHEADBS},
+  {"xtheadcmo",     &gcc_options::x_riscv_xthead_subext, MASK_XTHEADCMO},
+  {"xtheadcondmov", &gcc_options::x_riscv_xthead_subext, MASK_XTHEADCONDMOV},
+  {"xtheadfmemidx", &gcc_options::x_riscv_xthead_subext, MASK_XTHEADFMEMIDX},
+  {"xtheadfmv",     &gcc_options::x_riscv_xthead_subext, MASK_XTHEADFMV},
+  {"xtheadint",     &gcc_options::x_riscv_xthead_subext, MASK_XTHEADINT},
+  {"xtheadmac",     &gcc_options::x_riscv_xthead_subext, MASK_XTHEADMAC},
+  {"xtheadmemidx",  &gcc_options::x_riscv_xthead_subext, MASK_XTHEADMEMIDX},
+  {"xtheadmempair", &gcc_options::x_riscv_xthead_subext, MASK_XTHEADMEMPAIR},
+  {"xtheadsync",    &gcc_options::x_riscv_xthead_subext, MASK_XTHEADSYNC},
 
   {NULL, NULL, 0}
 };

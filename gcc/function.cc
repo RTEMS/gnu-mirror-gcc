@@ -1838,8 +1838,7 @@ instantiate_decl_rtl (rtx x)
   addr = XEXP (x, 0);
   if (CONSTANT_P (addr)
       || (REG_P (addr)
-	  && (REGNO (addr) < FIRST_VIRTUAL_REGISTER
-	      || REGNO (addr) > LAST_VIRTUAL_REGISTER)))
+	  && !VIRTUAL_REGISTER_P (addr)))
     return;
 
   instantiate_virtual_regs_in_rtx (&XEXP (x, 0));
@@ -4891,7 +4890,7 @@ allocate_struct_function (tree fndecl, bool abstract_p)
    instead of just setting it.  */
 
 void
-push_struct_function (tree fndecl)
+push_struct_function (tree fndecl, bool abstract_p)
 {
   /* When in_dummy_function we might be in the middle of a pop_cfun and
      current_function_decl and cfun may not match.  */
@@ -4900,7 +4899,7 @@ push_struct_function (tree fndecl)
 	      || (cfun && current_function_decl == cfun->decl));
   cfun_stack.safe_push (cfun);
   current_function_decl = fndecl;
-  allocate_struct_function (fndecl, false);
+  allocate_struct_function (fndecl, abstract_p);
 }
 
 /* Reset crtl and other non-struct-function variables to defaults as

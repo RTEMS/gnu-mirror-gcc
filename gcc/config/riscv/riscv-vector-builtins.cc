@@ -107,7 +107,8 @@ const char *const operand_suffixes[NUM_OP_TYPES] = {
 
 /* Static information about type suffix for each RVV type.  */
 const rvv_builtin_suffixes type_suffixes[NUM_VECTOR_TYPES + 1] = {
-#define DEF_RVV_TYPE(NAME, NCHARS, ABI_NAME, SCALAR_TYPE, VECTOR_MODE,         \
+#define DEF_RVV_TYPE(NAME, NCHARS, ABI_NAME, SCALAR_TYPE,                      \
+		     VECTOR_MODE_MIN_VLEN_128, VECTOR_MODE_MIN_VLEN_64,        \
 		     VECTOR_MODE_MIN_VLEN_32, VECTOR_SUFFIX, SCALAR_SUFFIX,    \
 		     VSETVL_SUFFIX)                                            \
   {#VECTOR_SUFFIX, #SCALAR_SUFFIX, #VSETVL_SUFFIX},
@@ -2130,6 +2131,13 @@ static CONSTEXPR const rvv_op_info p_none_void_ops
      rvv_arg_type_info (RVV_BASE_size), /* Return type */
      void_args /* Args */};
 
+/* A static operand information for unsigned long func () function registration. */
+static CONSTEXPR const rvv_op_info ul_none_void_ops
+  = {none_ops,				/* Types */
+     OP_TYPE_none,			/* Suffix */
+     rvv_arg_type_info (RVV_BASE_unsigned_long), /* Return type */
+     void_args /* Args */};
+
 /* A list of all RVV base function types.  */
 static CONSTEXPR const function_type_info function_types[] = {
 #define DEF_RVV_TYPE_INDEX(VECTOR, MASK, SIGNED, UNSIGNED, EEW8_INDEX, EEW16_INDEX, \
@@ -2305,6 +2313,10 @@ register_builtin_type (vector_type_index type, tree eltype, machine_mode mode)
   builtin_types[type].scalar = eltype;
   builtin_types[type].scalar_ptr = build_pointer_type (eltype);
   builtin_types[type].scalar_const_ptr = build_const_pointer (eltype);
+  /* TODO: We currently just skip the register of the illegal RVV type.
+     Ideally, we should report error message more friendly instead of
+     reporting "unknown" type. Support more friendly error message in
+     the future.  */
   if (!riscv_v_ext_vector_mode_p (mode))
     return;
 
@@ -2339,10 +2351,12 @@ register_builtin_types ()
   tree int64_type_node = get_typenode_from_name (INT64_TYPE);
 
   machine_mode mode;
-#define DEF_RVV_TYPE(NAME, NCHARS, ABI_NAME, SCALAR_TYPE, VECTOR_MODE,         \
+#define DEF_RVV_TYPE(NAME, NCHARS, ABI_NAME, SCALAR_TYPE,                      \
+		     VECTOR_MODE_MIN_VLEN_128, VECTOR_MODE_MIN_VLEN_64,        \
 		     VECTOR_MODE_MIN_VLEN_32, ARGS...)                         \
-  mode = TARGET_MIN_VLEN > 32 ? VECTOR_MODE##mode                              \
-			      : VECTOR_MODE_MIN_VLEN_32##mode;                 \
+  mode = TARGET_MIN_VLEN >= 128	 ? VECTOR_MODE_MIN_VLEN_128##mode              \
+	 : TARGET_MIN_VLEN >= 64 ? VECTOR_MODE_MIN_VLEN_64##mode               \
+				 : VECTOR_MODE_MIN_VLEN_32##mode;              \
   register_builtin_type (VECTOR_TYPE_##NAME, SCALAR_TYPE##_type_node, mode);
 #include "riscv-vector-builtins.def"
 }
@@ -2355,6 +2369,10 @@ register_vector_type (vector_type_index type)
 
   /* When vectype is NULL, the corresponding builtin type
      is disabled according to '-march'.  */
+  /* TODO: We currently just skip the register of the illegal RVV type.
+     Ideally, we should report error message more friendly instead of
+     reporting "unknown" type. Support more friendly error message in
+     the future.  */
   if (!vectype)
     return;
   tree id = get_identifier (vector_types[type].name);
@@ -2445,12 +2463,14 @@ check_required_extensions (const function_instance &instance)
     riscv_isa_flags |= RVV_REQUIRE_ELEN_FP_32;
   if (TARGET_VECTOR_ELEN_FP_64)
     riscv_isa_flags |= RVV_REQUIRE_ELEN_FP_64;
-  if (TARGET_MIN_VLEN > 32)
-    riscv_isa_flags |= RVV_REQUIRE_ZVE64;
+  if (TARGET_VECTOR_ELEN_64)
+    riscv_isa_flags |= RVV_REQUIRE_ELEN_64;
   if (TARGET_64BIT)
     riscv_isa_flags |= RVV_REQUIRE_RV64BIT;
   if (TARGET_FULL_V)
     riscv_isa_flags |= RVV_REQUIRE_FULL_V;
+  if (TARGET_MIN_VLEN > 32)
+    riscv_isa_flags |= RVV_REQUIRE_MIN_VLEN_64;
 
   uint64_t missing_extensions = required_extensions & ~riscv_isa_flags;
   if (missing_extensions != 0)
@@ -3084,6 +3104,15 @@ function_expander::use_compare_insn (rtx_code rcode, insn_code icode)
 
   rtx op1 = expand_normal (CALL_EXPR_ARG (exp, arg_offset++));
   rtx op2 = expand_normal (CALL_EXPR_ARG (exp, arg_offset++));
+  if (!insn_operand_matches (icode, opno + 1, op1))
+    op1 = force_reg (mode, op1);
+  if (!insn_operand_matches (icode, opno + 2, op2))
+    {
+      if (VECTOR_MODE_P (GET_MODE (op2)))
+	op2 = force_reg (mode, op2);
+      else
+	op2 = force_reg (GET_MODE_INNER (mode), op2);
+    }
   rtx comparison = gen_rtx_fmt_ee (rcode, mask_mode, op1, op2);
   if (!VECTOR_MODE_P (GET_MODE (op2)))
     comparison = gen_rtx_fmt_ee (rcode, mask_mode, op1,
@@ -3120,7 +3149,6 @@ function_expander::use_ternop_insn (bool vd_accum_p, insn_code icode)
   rtx vd = expand_normal (CALL_EXPR_ARG (exp, arg_offset++));
   rtx vs1 = expand_normal (CALL_EXPR_ARG (exp, arg_offset++));
   rtx vs2 = expand_normal (CALL_EXPR_ARG (exp, arg_offset++));
-  rtx merge = use_real_merge_p (pred) ? vd : RVV_VUNDEF (mode);
 
   if (VECTOR_MODE_P (GET_MODE (vs1)))
     {
@@ -3130,7 +3158,7 @@ function_expander::use_ternop_insn (bool vd_accum_p, insn_code icode)
       add_input_operand (mode, vs2);
       if (vd_accum_p)
 	add_input_operand (mode, vd);
-      add_input_operand (mode, merge);
+      add_input_operand (mode, vd);
     }
   else
     {
@@ -3145,7 +3173,7 @@ function_expander::use_ternop_insn (bool vd_accum_p, insn_code icode)
 	  add_input_operand (mode, vd);
 	  add_input_operand (mode, vs2);
 	}
-      add_input_operand (mode, merge);
+      add_input_operand (mode, vd);
     }
 
   for (int argno = arg_offset; argno < call_expr_nargs (exp); argno++)
@@ -3162,8 +3190,6 @@ function_expander::use_ternop_insn (bool vd_accum_p, insn_code icode)
 rtx
 function_expander::use_widen_ternop_insn (insn_code icode)
 {
-  machine_mode mode = TYPE_MODE (builtin_types[type.index].vector);
-
   /* Record the offset to get the argument.  */
   int arg_offset = 0;
 
@@ -3172,16 +3198,8 @@ function_expander::use_widen_ternop_insn (insn_code icode)
   else
     add_all_one_mask_operand (mask_mode ());
 
-  rtx merge = RVV_VUNDEF (mode);
-  if (use_real_merge_p (pred))
-    merge = expand_normal (CALL_EXPR_ARG (exp, arg_offset));
-
   for (int argno = arg_offset; argno < call_expr_nargs (exp); argno++)
-    {
-      if (argno == call_expr_nargs (exp) - 1)
-	add_input_operand (mode, merge);
-      add_input_operand (argno);
-    }
+    add_input_operand (argno);
 
   add_input_operand (Pmode, get_tail_policy_for_pred (pred));
   add_input_operand (Pmode, get_mask_policy_for_pred (pred));

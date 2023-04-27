@@ -268,17 +268,34 @@
   ""
   "cbw %0")
 
+(define_insn "extendhisi2"
+  [(set (match_operand:SI 0 "register_operand" "=r")
+	(sign_extend:SI (match_operand:HI 1 "register_operand" "0")))]
+  ""
+  "mov %h0,%0 | asr %h0,#15"
+  [(set_attr "length" "4")
+   (set_attr "psw_operand" "clobber")])
+
 (define_insn "zero_extendqihi2"
-  [(set (match_operand:HI                 0 "register_operand" 	   "=e,r")
-	(zero_extend:HI (match_operand:QI 1 "nonimmediate_operand" "m,0")))]
+  [(set (match_operand:HI                 0 "register_operand" 	   "=e,T,r")
+	(zero_extend:HI (match_operand:QI 1 "nonimmediate_operand" "m,0,0")))]
   ""
   "@
-   mov.b %0, %1
-   shl %0,#8\n\tshr %0,#8"
-  [(set_attr "psw_operand" "nop,0")
+   mov.b %0,%1
+   and Rx,#255
+   shl %0,#8 | shr %0,#8"
+  [(set_attr "psw_operand" "nop,nop,0")
    (set_attr_alternative "length"
 	     [(const_int 4)
-	      (const_int 8)])])
+	      (const_int 2)
+	      (const_int 4)])])
+
+(define_insn "zero_extendhisi2"
+  [(set (match_operand:SI 0 "register_operand" "=r")
+	(zero_extend:SI (match_operand:HI 1 "register_operand" "0")))]
+  ""
+  "mov %h0,#0"
+  [(set_attr "psw_operand" "clobber")])
 
 ;; ::::::::::::::::::::
 ;; ::
@@ -1248,3 +1265,39 @@
   "bp %1,#7,%l0"
   [(set_attr "length" "4")
    (set_attr "psw_operand" "nop")])
+
+(define_insn "bswaphi2"
+  [(set (match_operand:HI 0 "register_operand" "=r")
+	(bswap:HI (match_operand:HI 1 "register_operand" "0")))]
+  ""
+  "swpb %0")
+
+(define_insn "bswapsi2"
+  [(set (match_operand:SI 0 "register_operand" "=r")
+	(bswap:SI (match_operand:SI 1 "register_operand" "0")))]
+  ""
+  "swpb %0 | swpb %h0 | swpw %0,%h0"
+  [(set_attr "length" "6")])
+
+(define_insn "swaphi"
+  [(set (match_operand:HI 0 "register_operand" "+r")
+	(match_operand:HI 1 "register_operand" "+r"))
+   (set (match_dup 1)
+	(match_dup 0))]
+  ""
+  "swpw %0,%1")
+
+(define_peephole2
+  [(set (match_operand:HI 0 "register_operand")
+	(match_operand:HI 1 "register_operand"))
+   (set (match_dup 1)
+	(match_operand:HI 2 "register_operand"))
+   (set (match_dup 2)
+	(match_dup 0))]
+  "REGNO (operands[0]) != REGNO (operands[1])
+   && REGNO (operands[0]) != REGNO (operands[2])
+   && REGNO (operands[1]) != REGNO (operands[2])
+   && peep2_reg_dead_p (3, operands[0])"
+  [(parallel [(set (match_dup 2) (match_dup 1))
+              (set (match_dup 1) (match_dup 2))])])
+

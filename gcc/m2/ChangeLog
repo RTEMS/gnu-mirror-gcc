@@ -1,3 +1,556 @@
+2023-04-26  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/108121
+	* gm2-compiler/M2ALU.mod (Less): Reformatted.
+	* gm2-compiler/SymbolTable.mod (DetermineSizeOfConstant): Remove
+	from import.
+	(ConstantStringExceedsZType): Import.
+	(GetConstLitType): Re-implement using ConstantStringExceedsZType.
+	* gm2-gcc/m2decl.cc (m2decl_DetermineSizeOfConstant): Remove.
+	(m2decl_ConstantStringExceedsZType): New function.
+	(m2decl_BuildConstLiteralNumber): Re-implement.
+	* gm2-gcc/m2decl.def (DetermineSizeOfConstant): Remove.
+	(ConstantStringExceedsZType): New function.
+	* gm2-gcc/m2decl.h (m2decl_DetermineSizeOfConstant): Remove.
+	(m2decl_ConstantStringExceedsZType): New function.
+	* gm2-gcc/m2expr.cc (append_digit): Remove.
+	(m2expr_interpret_integer): Remove.
+	(append_m2_digit): Remove.
+	(m2expr_StrToWideInt): New function.
+	(m2expr_interpret_m2_integer): Remove.
+	* gm2-gcc/m2expr.def (CheckConstStrZtypeRange): New function.
+	* gm2-gcc/m2expr.h (m2expr_StrToWideInt): New function.
+	* gm2-gcc/m2type.cc (build_m2_word64_type_node): New function.
+	(build_m2_ztype_node): New function.
+	(m2type_InitBaseTypes): Call build_m2_ztype_node.
+	* gm2-lang.cc (gm2_type_for_size): Re-write using early returns.
+
+2023-04-21  Arsen Arsenović  <arsen@aarsen.me>
+
+	* Make-lang.in: Remove references to $(P).
+	* Make-maintainer.in: Ditto.
+
+2023-04-21  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109586
+	* gm2-gcc/m2tree.cc (m2tree_IsAConstant): Add (TREE_CODE
+	(t) == CONSTRUCTOR) to expression.
+
+2023-04-13  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109488
+	* lang.opt: Fix typo "maybe" to "may be".
+
+2023-04-13  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2-compiler/M2ALU.def (PopChar): New procedure function.
+	* gm2-compiler/M2ALU.mod (PopChar): New procedure function.
+	* gm2-compiler/M2GCCDeclare.mod (PromoteToString): Detect
+	a single constant char and build a C string.
+	* gm2-compiler/M2GenGCC.mod (IsConstStr): New procedure
+	function.
+	(GetStr): New procedure function.
+	(FoldAdd): Use IsConstStr.
+	* gm2-compiler/M2Quads.mod: Formatting changes.
+	* gm2-gcc/m2expr.cc (m2expr_GetCstInteger): New function.
+	* gm2-gcc/m2expr.def (GetCstInteger): New procedure function.
+	* gm2-gcc/m2expr.h (m2expr_GetCstInteger): New prototype.
+
+2023-04-05  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109423
+	* gm2-compiler/M2Base.def (Unbounded): Remove.
+	* gm2-compiler/M2Error.def (ErrorAbort0): Add noreturn
+	attribute.
+	* gm2-compiler/M2Quads.mod (BuildInclProcedure): Correct
+	error format string.
+	(BuildExceptProcedure): Correct error format string.
+	(BuildAdrFunction): Call PutWriteQuad when taking the
+	address of a variable.
+	* gm2-libs-ch/SysExceptions.c (_M2_SysExceptions_init): Add
+	parameters.
+	* gm2-libs-ch/wrapc.c (_M2_wrapc_init): Add parameters.
+	* gm2-libs/DynamicStrings.mod (DumpStringInfo): Remove t.
+	(PopAllocationExemption): Remove f.
+	* gm2-libs/FIO.mod (BufferedWrite): Remove result.
+	* gm2-libs/FormatStrings.mod (Copy): Remove endpos and
+	afterperc.
+	(HandlePercent): Remove result.
+	* gm2-libs/Indexing.mod (RemoveIndiceFromIndex): Remove k.
+	* gm2-libs/M2Dependent.mod (CreateModule): Remove p0
+	and p1.
+	(DumpModuleData): Remove mptr.
+	(ConstructModules): Remove nulp.
+	* gm2-libs/RTExceptions.mod (PopHandler): Remove i.
+	* gm2-libs/RTint.mod (Listen): Remove b4s, b4m, afs
+	and afm.
+	* gm2-libs/SFIO.mod (ReadS): Remove c.
+	* gm2-libs/StringConvert.mod (doDecimalPlaces): Remove
+	whole and fraction.
+
+2023-04-03  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109388
+	* gm2-compiler/M2GCCDeclare.mod (DoVariableDeclaration):
+	Remove second parameter module.  Adjust all callers to
+	remove the second parameter.
+	* gm2-compiler/PHBuild.bnf (CheckAndInsert): Remove.
+	(InStopSet): Remove.
+	(PeepToken): Remove.
+	(PushQualident): Remove.
+	(SimpleDes): Remove.
+	(ActualParameters): Remove.
+
+2023-04-02  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109336
+	* Make-lang.in (GM2_O): Set to -O0.
+	(GM2_LIBS): Remove target libraries and replace with build libs.
+	(BUILD-LIBS): New declaration.
+	(m2/gm2-libs/libgm2.a): New rule.
+	(m2/gm2-libs/%.o): New rule.
+	(m2/gm2-libs/choosetemp.o): New rule.
+	* gm2-compiler/M2ColorString.mod (append): Use ADR rather than
+	implicit conversion.
+	* gm2-compiler/M2Comp.mod (Compile): Add qprintf messages for when
+	a source file is not found.  Improve comments and formatting.
+	* gm2-libs-ch/cgetopt.c (cgetopt_cgetopt_long): Remove
+	ansi-decl.h.  Add getopt.h.
+	(cgetopt_cgetopt_long_only): Change cgetopt_ to getopt_.
+	* gm2spec.cc (lang_specific_driver): Do not skip -fmod=.
+	Remove comment.
+
+2023-03-29  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109336
+	PR modula2/109315
+	* gm2-compiler/M2FileName.mod (CalculateFileName): Simplified by
+	ensuring the extension contains the ".".
+	(CalculateStemName): Re-formatted.
+	(ExtractExtension): Re-formatted.
+	(ExtractModule): Re-formatted.
+	* gm2-compiler/M2Options.def (setdefextension): Add block comment.
+	(setmodextension): Add block comment.  Re-formatted.
+	* gm2-compiler/M2Options.mod (setdefextension): Add block comment.
+	(setmodextension): Add block comment.  Re-formatted.
+	* gm2-compiler/M2Search.mod (FindSourceDefFile): Use
+	DefaultDefExt.
+	(DefaultDefExt): New constant.
+	(DefaultModExt): New constant.
+	(FindSourceModFile): Use DefaultModExt.
+	* gm2-gcc/m2decl.cc (m2decl_DeclareKnownVariable): Correct
+	spelling.
+	* gm2spec.cc (M2SOURCE): New constant.
+	(LANGSPEC): New value.
+	(MATHLIB): New value.
+	(WITHLIBC): New value.
+	(SKIPOPT): New value.
+	(lang_specific_driver): Replace seen_module_extension bool with
+	module_extension char *.  Detect -fmod= and remember extension.
+	Use the extension to detect modula-2 source and mark it as such.
+
+2023-03-23  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109264
+	* gm2-compiler/M2Quads.mod (BuildConstFunctionCall): Comment
+	out ErrorString in debugging block.
+	(BuildConstructorStart): Replace Assert with a call to
+	MetaErrorT3.  Import MetaErrorT3.
+	* gm2-compiler/PCSymBuild.mod (buildConstFunction): Rename
+	local variables.
+	(WalkFunctionParam): Remove test for IsEnumeration when
+	resolving MIN or MAX parameters.
+	* gm2-compiler/PHBuild.bnf (BlockAssert): New procedure.
+	(ErrorArrayat): New procedure.
+	(Expect): Renamed parameter t to tok.
+	(PushQualident): New rule.
+	(ConstSetOrQualidentOrFunction): Force AutoOn.
+	(TypeDeclaration): Add debugging assert.
+	(SimpleType): Add debugging assert.
+	(DefaultRecordAttributes): New rule (and bugfix).
+	(FieldPragmaExpression): New rule (and bugfix).
+	(PragmaConstExpression): New rule (and bugfix).
+	(SetOrDesignatorOrFunction): Add debugging assert.
+	(Block): Add debugging assert.
+	* gm2-gcc/m2expr.cc (m2expr_ConstantExpressionWarning): int
+	to bool.
+	* gm2-gcc/m2expr.h (m2expr_TreeOverflow): int to bool.
+	(m2expr_GetBooleanTrue): Remove.
+	(m2expr_GetBooleanFalse): Remove.
+	* gm2-gcc/m2options.h (M2Options_SetStatistics): Replace
+	int with bool.
+
+2023-03-22  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109248
+	* Make-lang.in (m2/pge-boot/%.o): Add CFLAGS and CXXFLAGS for C
+	and C++ compiles.
+	* gm2spec.cc (add_m2_I_path): Indentation.
+	(lang_specific_driver): New variable seen_pathname.
+	Detect -fm2-pathname.  If not seen then push_back_Ipath (".").
+	Change non iso library path to "m2cor,m2log,m2pim,m2iso".
+
+2023-03-22  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/107630
+	* Make-lang.in (m2/stage2/cc1gm2$(exeext)): Remove
+	m2/gm2-libs-boot/M2LINK.o.
+	(m2/stage1/cc1gm2$(exeext)): Ditto.
+	(GM2-LIBS-BOOT-DEFS): Remove M2LINK.def.
+	(GM2-LIBS-DEFS): Ditto.
+	(m2/mc-boot/$(SRC_PREFIX)%.o): Replace CXX_FLAGS with CXXFLAGS.
+	(m2/mc-boot-ch/$(SRC_PREFIX)%.o): Ditto.
+	(m2/mc-boot/main.o): Ditto.
+	(mcflex.o): Add $(CFLAGS).
+	(m2/gm2-libs-boot/M2LINK.o): Remove rule.
+	* gm2-compiler/M2GCCDeclare.def (DeclareM2linkGlobals): Remove.
+	* gm2-compiler/M2GCCDeclare.mod: (M2LinkEntry): Remove.
+	(M2LinkIndex): Remove.
+	(DoVariableDeclaration): Remove initial and call to
+	AddEntryM2Link.
+	(AddEntryM2Link): Remove.
+	(GetEntryM2Link): Remove.
+	(DeclareM2linkGlobals): Remove.
+	(DetectM2LinkInitial): Remove.
+	(InitM2LinkModule): Remove.
+	* gm2-compiler/M2GenGCC.mod (CodeFinallyEnd): Remove call to
+	DeclareM2linkGlobals.
+	* gm2-compiler/M2Quads.mod (BuildM2InitFunction): Add extra
+	parameter containing runtime module override to ConstructModules.
+	* gm2-compiler/M2Scaffold.mod: Update comment describing
+	ConstructModules.
+	* gm2-gcc/m2decl.cc (m2decl_DeclareM2linkForcedModuleInitOrder):
+	Remove.
+	* gm2-libs-iso/M2RTS.def (ConstructModules): Add overrideliborder
+	parameter.
+	* gm2-libs-iso/M2RTS.mod: Add overrideliborder parameter.
+	* gm2-libs/M2Dependent.def (ConstructModules): Add overrideliborder
+	parameter.
+	* gm2-libs/M2Dependent.mod (ConstructModules): Add overrideliborder
+	parameter.
+	* gm2-libs/M2RTS.def (ConstructModules): Add overrideliborder parameter.
+	* gm2-libs/M2RTS.mod (ConstructModules): Add overrideliborder
+	parameter.
+	* gm2-libs/M2LINK.def: Removed.
+
+2023-03-21  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* Make-lang.in (m2/mc-boot/$(SRC_PREFIX)%.o): Add $(CXXFLAGS).
+	(m2/mc-boot-ch/$(SRC_PREFIX)%.o): Add $(CXXFLAGS).
+	(m2/mc-boot-ch/$(SRC_PREFIX)%.o): Add $(CXXFLAGS).
+	(m2/mc-boot/main.o): Add $(CXXFLAGS).
+
+2023-03-19  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* Make-maintainer.in (gm2.maintainer-clean): Remove.
+	(gm2.maintainer-help): Add gm2.maintainer-tools,
+	gm2.maintainer-doc.  Remove gm2.maintainer-clean.
+	Change target-independent directory to target-independent/m2.
+	* gm2-compiler/ppg.mod: Correct __FILE_ typo to __FILE__.
+	* gm2-compiler/M2Options.def (SetAutoInit): Update comment.
+	* gm2-compiler/M2Options.mod (SetAutoInit): Update comment.
+	* gm2-gcc/m2color.cc (m2color_colorize_start): Rename name_len
+	to _name_high.
+	* gm2-gcc/m2color.def (colorize_start): change ARRAY OF CHAR to
+	ADDRESS and add _name_high.
+	* gm2-gcc/m2decl.cc (m2decl_BuildStartFunctionDeclaration): Change
+	int to bool.
+	* gm2-gcc/m2decl.h (m2decl_BuildStartFunctionDeclaration): Change
+	int to bool.
+	* gm2-gcc/m2expr.cc (m2expr_BuildBinarySetDo): Change int to bool.
+	(m2expr_BuildIfConstInVar): Change int to bool.
+	(m2expr_BuildIfNotConstInVar): Change int to bool.
+	(m2expr_BuildIfVarInVar): Change int to bool.
+	(m2expr_BuildIfNotVarInVar): Change int to bool.
+	(m2expr_BuildForeachWordInSetDoIfExpr): Change int to bool.
+	* gm2-gcc/m2expr.h (m2expr_BuildIfNotVarInVar): Change int to bool.
+	(m2expr_BuildIfVarInVar): Change int to bool.
+	(m2expr_BuildIfNotConstInVar): Change int to bool.
+	(m2expr_BuildIfConstInVar): Change int to bool.
+	* gm2-gcc/m2options.h (M2Options_SetAutoInit): Change int to bool.
+	(M2Options_SetNilCheck): Change int to bool.
+	(M2Options_SetReturnCheck): Change int to bool.
+	(M2Options_SetCaseCheck): Change int to bool.
+	(M2Options_SetCheckAll): Change int to bool.
+	(M2Options_SetVerboseUnbounded): Change int to bool.
+	(M2Options_SetUnboundedByReference): Change int to bool.
+	(M2Options_SetOptimizing): Change int to bool.
+	(M2Options_SetQuiet): Change int to bool.
+	(M2Options_SetCpp): Change int to bool.
+	(M2Options_SetM2g): Change int to bool.
+	(M2Options_SetLowerCaseKeywords): Change int to bool.
+	(M2Options_SetVerbose): Change int to bool.
+	* gm2-gcc/m2treelib.cc (m2treelib_get_rvalue): Change int to bool.
+	(m2treelib_get_field_no): Change int to bool.
+	(m2treelib_get_set_value): Change int to bool.
+	(m2treelib_get_set_address): Change int to bool.
+	(m2treelib_get_set_address_if_var): Change int to bool.
+	* gm2-gcc/m2treelib.def (get_set_address_if_var): Change int to bool.
+	(get_set_address): Change int to bool.
+	(get_set_value): Change int to bool.
+	(get_field_no): Change int to bool.
+	(get_rvalue): Change int to bool.
+	* gm2-gcc/m2treelib.h (m2treelib_get_field_no): Change int to bool.
+	(m2treelib_get_set_value): Change int to bool.
+	(m2treelib_get_set_address): Change int to bool.
+	(m2treelib_get_set_address_if_var): Change int to bool.
+	* gm2-gcc/m2type.cc (m2type_BuildEndFunctionType): Change int to bool.
+	* gm2-gcc/m2type.h (m2type_BuildEndFunctionType): Change int to bool.
+	* gm2-libs-ch/dtoa.cc (dtoa_calcsign): Change int to bool.
+	* gm2-libs-ch/ldtoa.cc (dtoa_calcsign): Change int to bool.
+	(ldtoa_ldtoa): Change int to bool.
+	* m2.flex (functionInfo): Change int to bool.
+	(pushFunction): Change parameter from int to bool.
+	* mc-boot/GDebug.cc (Debug_Halt): Rebuild.
+	* mc-boot/GDebug.h (Debug_Halt): Rebuild.
+	* mc-boot/GDynamicStrings.cc: Rebuild.
+	* mc-boot/GDynamicStrings.h: Rebuild.
+	* mc-boot/GFIO.cc: Rebuild.
+	* mc-boot/GM2RTS.cc: Rebuild.
+	* mc-boot/GM2RTS.h: Rebuild.
+	* mc-boot/GPushBackInput.cc: Rebuild.
+	* mc-boot/GRTExceptions.cc: Rebuild.
+	* mc-boot/GRTint.cc: Rebuild.
+	* mc-boot/GSysStorage.cc: Rebuild.
+	* mc-boot/Gdecl.cc: Rebuild.
+	* mc-boot/GsymbolKey.cc: Rebuild.
+	* mc/symbolKey.mod: Rebuild.
+	* target-independent/m2/Builtins.texi: Rebuild.
+	* target-independent/m2/SYSTEM-iso.texi: Rebuild.
+	* target-independent/m2/SYSTEM-pim.texi: Rebuild.
+	* target-independent/m2/gm2-libs.texi: Rebuild.
+	* tools-src/def2doc.py (PIM_Log): Change gm2-libs-pim to
+	gm2-lib-log.
+
+2023-03-17  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109032
+	* gm2-gcc/m2expr.cc: Correct ? : order in comments.
+	(m2expr_BuildDivM2): Improve comment.
+	* lang.opt: Improve option descriptions.
+
+2023-03-17  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109102
+	* gm2-gcc/m2builtins.cc (ASSERT): Change format specifier to
+	use %qs rather than quotes.
+
+2023-03-17  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2-compiler/M2AsmUtil.mod (SymNeedsModulePrefix):
+	Re-implemented.
+	* gm2-libs/SysStorage.mod (enableTrace): Disable tracing.
+
+2023-03-16  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2-compiler/SymbolKey.mod (PutSymKey): Halt parameters
+	reordered.
+	(DelSymKey): Ditto.
+	* gm2-compiler/ppg.mod (GetEpsilon): Ditto.
+	(GetReachEnd): Ditto.
+	(GetFollow): Ditto.
+	(CodeCondition): Ditto.
+	(CodeThenDo): Ditto.
+	(CodeEnd): Ditto.
+	(RecoverCondition): Ditto.
+	(ConditionIndent): Ditto.
+	* gm2-libs-ch/m2rts.h (M2RTS_Halt): Ditto.
+	* gm2-libs-coroutines/Executive.mod (Assert): Ditto.
+	(Resume): Remove redundant comments.
+	(Wait): Remove redundant comments.
+	* gm2-libs-coroutines/SYSTEM.mod (TRANSFER): Halt parameters
+	reordered.
+	(IOTransferHandler): Ditto.
+	(Finished): Ditto.
+	(localInit): Ditto.
+	* gm2-libs-coroutines/TimerHandler.mod (WaitOn): Halt parameters
+	reordered.
+	(Cancel): Ditto.
+	(ReArmEvent): Ditto.
+	(OnActiveQueue): Ditto.
+	* gm2-libs-iso/COROUTINES.mod (NEWCOROUTINE): Ditto.
+	(Transfer): Ditto.
+	(IOTRANSFER): Ditto.
+	* gm2-libs-iso/EXCEPTIONS.mod (RAISE): Correct Halt parameters.
+	* gm2-libs-iso/M2RTS.def (Halt): Halt parameters reordered.
+	(HaltC): Ditto.
+	* gm2-libs-iso/M2RTS.mod: Ditto.
+	* gm2-libs-iso/RTentity.mod (PutKey): Ditto.
+	(DelKey): Ditto.
+	(findChildAndParent): Ditto.
+	(assert): Ditto.
+	* gm2-libs-iso/Storage.mod (ALLOCATE): Add DebugTrace.
+	Add UseMallocFree test.
+	(DEALLOCATE): Add DebugTrace.  Add UseMallocFree test.
+	(assert): Halt parameters reordered.
+	* gm2-libs-log/Termbase.mod (Read): Ditto.
+	(KeyPressed): Ditto.
+	(Write): Ditto.
+	(Init): Ditto.
+	* gm2-libs/Debug.def (Halt): Halt parameters reordered.
+	* gm2-libs/Debug.mod (Halt): Ditto.
+	* gm2-libs/DynamicStrings.def (PopAllocation): Improve comment.
+	* gm2-libs/DynamicStrings.mod (PopAllocation): Improve comment.
+	Halt parameters reordered.
+	* gm2-libs/M2RTS.def (Halt): Ditto.
+	(HaltC): Ditto.
+	* gm2-libs/M2RTS.mod (Halt): Ditto.
+	(HaltC): Ditto.
+	* gm2-libs/PushBackInput.mod (PutStr): Ditto.
+	(PutString): Ditto.
+	(PutCh): Ditto.
+	* gm2-libs/RTExceptions.mod (GetBaseExceptionBlock): Ditto.
+	* gm2-libs/RTint.mod (ReArmTimeVector): Ditto.
+	(GetTimeVector): Ditto.
+	(AttachVector): Ditto.
+	(IncludeVector): Ditto.
+	(Listen): Ditto.
+	* gm2-libs/SysStorage.mod (ALLOCATE): Ditto.
+	(DEALLOCATE): Ditto.
+	(REALLOCATE): Ditto.
+	* gm2-libs-coroutines/Debug.def: Removed.
+	* gm2-libs-coroutines/Debug.mod: Removed.
+
+2023-03-16  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* Make-lang.in: Rename target-independent to
+	target-independent/m2.
+	* target-independent/readme.txt: Update.
+	* target-independent/m2/gm2-ebnf.texi: New file.
+	* target-independent/m2/gpl_v3_without_node.texi: New file.
+	* target-independent/Builtins.texi: Rename ...
+	* target-independent/m2/Builtins.texi: ... to this.
+	* target-independent/SYSTEM-iso.texi: Rename ...
+	* target-independent/m2/SYSTEM-iso.texi: ... to this.
+	* target-independent/SYSTEM-pim.texi: Rename ...
+	* target-independent/m2/SYSTEM-pim.texi: ... to this.
+	* target-independent/gm2-libs.texi: Rename ...
+	* target-independent/m2/gm2-libs.texi: ... to this.
+
+2023-03-15  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109125
+	* gm2-libs-ch/dtoa.cc (dtoa_strtod): Replace int with bool.
+	* gm2-libs-ch/ldtoa.cc (ldtoa_strtold): Replace int with bool.
+
+2023-03-14  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109125
+	* gm2-libs-ch/cgetopt.c (cgetopt_SetOption): Replace int
+	for bool.
+	* gm2-libs-ch/termios.c (doSetUnset): Replace int for bool.
+	* gm2-libs/Builtins.mod (isfinitef): Correct typo in return
+	statement.
+
+2023-03-13  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109103
+	* gm2-compiler/M2ALU.def (PushString): New parameter issueError.
+	* gm2-compiler/M2ALU.mod (PushString): New parameter issueError.
+	* gm2-compiler/SymbolTable.mod (PushString): New parameter issueError.
+	* gm2-gcc/m2decl.cc (m2decl_DetermineSizeOfConstant): Pass
+	location to interpret_m2_integer.
+	(m2decl_BuildConstLiteralNumber): New parameter issueError.
+	* gm2-gcc/m2expr.cc (m2expr_IsTrue): Replace int with bool.
+	(m2expr_IsFalse): Replace int with bool.
+	(m2expr_AreConstantsEqual): Replace int with bool.
+	(m2expr_BuildBinaryForeachWordDo): Call m2linemap_internal_error_at.
+	(append_digit): Ditto.
+	(m2expr_interpret_integer): Add location parameter.
+	(append_m2_digit): Call m2linemap_internal_error_at.
+	(m2expr_interpret_m2_integer): Add location parameter.
+	(m2expr_GetSizeOf): Replace sizeof with SIZE in error message.
+	* gm2-gcc/m2expr.h (m2expr_AreRealOrComplexConstantsEqual):
+	Replace int with bool.
+	(m2expr_AreConstantsEqual): Ditto.
+	(m2expr_IsFalse): Ditto.
+	(m2expr_IsTrue): Ditto.
+	(m2expr_interpret_integer): Add location parameter.
+	(m2expr_interpret_m2_integer): Add location parameter.
+	* gm2-gcc/m2linemap.cc (mformat_value): New function.
+	(expand_format): New function.
+	(expand_message): New function.
+	(gm2_internal_error_at): New function.
+	(m2linemap_internal_error_at): New function.
+	* gm2-gcc/m2linemap.h (m2linemap_internal_error_at): New function.
+	* gm2-gcc/m2options.h (M2Options_SetISO): Replace int with bool.
+	(M2Options_SetPIM): Ditto.
+	(M2Options_SetPIM2): Ditto.
+	(M2Options_SetPIM3): Ditto.
+	(M2Options_SetPIM4): Ditto.
+	(M2Options_SetFloatValueCheck): Ditto.
+	(M2Options_SetWholeValueCheck): Ditto.
+	(M2Options_GetISO): Ditto.
+	(M2Options_GetPIM): Ditto.
+	(M2Options_GetPIM2): Ditto.
+	(M2Options_GetPIM3): Ditto.
+	(M2Options_GetPIM4): Ditto.
+	(M2Options_GetPositiveModFloor): Ditto.
+	(M2Options_GetFloatValueCheck): Ditto.
+	(M2Options_GetWholeValueCheck): Ditto.
+	(M2Options_Setc): Ditto.
+	(M2Options_Getc): Ditto.
+	(M2Options_SetPPOnly): Ditto.
+	(M2Options_GetPPOnly): Ditto.
+	(M2Options_SetUselist): Ditto.
+	(M2Options_SetAutoInit): Ditto.
+	(M2Options_SetPositiveModFloor): Ditto.
+	(M2Options_SetNilCheck): Ditto.
+	(M2Options_SetWholeDiv): Ditto.
+	(M2Options_SetIndex): Ditto.
+	(M2Options_SetRange): Ditto.
+	(M2Options_SetReturnCheck): Ditto.
+	(M2Options_SetCaseCheck): Ditto.
+	(M2Options_SetCheckAll): Ditto.
+	(M2Options_SetExceptions): Ditto.
+	(M2Options_SetStyle): Ditto.
+	(M2Options_SetPedantic): Ditto.
+	(M2Options_SetPedanticParamNames): Ditto.
+	(M2Options_SetPedanticCast): Ditto.
+	(M2Options_SetExtendedOpaque): Ditto.
+	(M2Options_SetVerboseUnbounded): Ditto.
+	(M2Options_SetXCode): Ditto.
+	(M2Options_SetCompilerDebugging): Ditto.
+	(M2Options_SetQuadDebugging): Ditto.
+	(M2Options_SetDebugTraceQuad): Ditto.
+	(M2Options_SetDebugTraceAPI): Ditto.
+	(M2Options_SetSources): Ditto.
+	(M2Options_SetUnboundedByReference): Ditto.
+	(M2Options_SetDumpSystemExports): Ditto.
+	(M2Options_SetOptimizing): Ditto.
+	(M2Options_SetQuiet): Ditto.
+	(M2Options_SetCC1Quiet): Ditto.
+	(M2Options_SetCpp): Ditto.
+	(M2Options_SetSwig): Ditto.
+	(M2Options_SetWholeProgram): Ditto.
+	(M2Options_SetDebugFunctionLineNumbers): Ditto.
+	(M2Options_SetGenerateStatementNote): Ditto.
+	(M2Options_GetCpp): Ditto.
+	(M2Options_GetM2g): Ditto.
+	(M2Options_SetM2g): Ditto.
+	(M2Options_SetLowerCaseKeywords): Ditto.
+	(M2Options_SetVerbose): Ditto.
+	(M2Options_SetUnusedVariableChecking): Ditto.
+	(M2Options_SetUnusedParameterChecking): Ditto.
+	(M2Options_SetStrictTypeChecking): Ditto.
+	(M2Options_SetWall): Ditto.
+	(M2Options_SetSaveTemps): Ditto.
+	(M2Options_GetSaveTemps): Ditto.
+	(M2Options_SetScaffoldStatic): Ditto.
+	(M2Options_SetScaffoldDynamic): Ditto.
+	(M2Options_SetScaffoldMain): Ditto.
+	(M2Options_SetGenModuleList): Ditto.
+	(M2Options_SetShared): Ditto.
+	* gm2-libs-ch/M2LINK.c: Ditto.
+	* gm2-libs-ch/m2rts.h (M2RTS_RequestDependant): Replace
+	const char * with const void *.
+	(M2RTS_RegisterModule): Ditto.
+	(M2RTS_ConstructModules): Ditto.
+	* gm2-gcc/m2decl.def (DetermineSizeOfConstant): New parameter
+	issueError.
+	* gm2-gcc/m2decl.h (DetermineSizeOfConstant): New parameter
+	issueError.
+
 2023-03-12  Gaius Mulley  <gaiusmod2@gmail.com>
 
 	PR modula2/109089

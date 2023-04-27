@@ -98,6 +98,15 @@ private:
   expand_operand m_ops[MAX_OPERANDS];
 };
 
+static unsigned
+get_sew (machine_mode mode)
+{
+  unsigned int sew = GET_MODE_CLASS (mode) == MODE_VECTOR_BOOL
+		       ? 8
+		       : GET_MODE_BITSIZE (GET_MODE_INNER (mode));
+  return sew;
+}
+
 /* Return true if X is a const_vector with all duplicate elements, which is in
    the range between MINVAL and MAXVAL.  */
 bool
@@ -109,24 +118,28 @@ const_vec_all_same_in_range_p (rtx x, HOST_WIDE_INT minval,
 	  && IN_RANGE (INTVAL (elt), minval, maxval));
 }
 
-static rtx
-emit_vlmax_vsetvl (machine_mode vmode)
+/* Emit a vlmax vsetvl instruction.  This should only be used when
+   optimization is disabled or after vsetvl insertion pass.  */
+void
+emit_hard_vlmax_vsetvl (machine_mode vmode, rtx vl)
 {
-  rtx vl = gen_reg_rtx (Pmode);
-  unsigned int sew = GET_MODE_CLASS (vmode) == MODE_VECTOR_BOOL
-		       ? 8
-		       : GET_MODE_BITSIZE (GET_MODE_INNER (vmode));
+  unsigned int sew = get_sew (vmode);
+  emit_insn (gen_vsetvl (Pmode, vl, RVV_VLMAX, gen_int_mode (sew, Pmode),
+			 gen_int_mode (get_vlmul (vmode), Pmode), const0_rtx,
+			 const0_rtx));
+}
+
+void
+emit_vlmax_vsetvl (machine_mode vmode, rtx vl)
+{
+  unsigned int sew = get_sew (vmode);
   enum vlmul_type vlmul = get_vlmul (vmode);
   unsigned int ratio = calculate_ratio (sew, vlmul);
 
   if (!optimize)
-    emit_insn (gen_vsetvl (Pmode, vl, RVV_VLMAX, gen_int_mode (sew, Pmode),
-			   gen_int_mode (get_vlmul (vmode), Pmode), const0_rtx,
-			   const0_rtx));
+    emit_hard_vlmax_vsetvl (vmode, vl);
   else
     emit_insn (gen_vlmax_avl (Pmode, vl, gen_int_mode (ratio, Pmode)));
-
-  return vl;
 }
 
 /* Calculate SEW/LMUL ratio.  */
@@ -166,7 +179,7 @@ calculate_ratio (unsigned int sew, enum vlmul_type vlmul)
 /* Emit an RVV unmask && vl mov from SRC to DEST.  */
 static void
 emit_pred_op (unsigned icode, rtx mask, rtx dest, rtx src, rtx len,
-	      machine_mode mask_mode)
+	      machine_mode mask_mode, bool vlmax_p)
 {
   insn_expander<8> e;
   machine_mode mode = GET_MODE (dest);
@@ -186,17 +199,18 @@ emit_pred_op (unsigned icode, rtx mask, rtx dest, rtx src, rtx len,
     e.add_input_operand (len, Pmode);
   else
     {
-      rtx vlmax = emit_vlmax_vsetvl (mode);
+      rtx vlmax = gen_reg_rtx (Pmode);
+      emit_vlmax_vsetvl (mode, vlmax);
       e.add_input_operand (vlmax, Pmode);
     }
 
   if (GET_MODE_CLASS (mode) != MODE_VECTOR_BOOL)
     e.add_policy_operand (get_prefer_tail_policy (), get_prefer_mask_policy ());
 
-  if (len)
-    e.add_avl_type_operand (avl_type::NONVLMAX);
-  else
+  if (vlmax_p)
     e.add_avl_type_operand (avl_type::VLMAX);
+  else
+    e.add_avl_type_operand (avl_type::NONVLMAX);
 
   e.expand ((enum insn_code) icode, MEM_P (dest) || MEM_P (src));
 }
@@ -204,14 +218,21 @@ emit_pred_op (unsigned icode, rtx mask, rtx dest, rtx src, rtx len,
 void
 emit_vlmax_op (unsigned icode, rtx dest, rtx src, machine_mode mask_mode)
 {
-  emit_pred_op (icode, NULL_RTX, dest, src, NULL_RTX, mask_mode);
+  emit_pred_op (icode, NULL_RTX, dest, src, NULL_RTX, mask_mode, true);
+}
+
+void
+emit_vlmax_op (unsigned icode, rtx dest, rtx src, rtx len,
+	       machine_mode mask_mode)
+{
+  emit_pred_op (icode, NULL_RTX, dest, src, len, mask_mode, true);
 }
 
 void
 emit_nonvlmax_op (unsigned icode, rtx dest, rtx src, rtx len,
 		  machine_mode mask_mode)
 {
-  emit_pred_op (icode, NULL_RTX, dest, src, len, mask_mode);
+  emit_pred_op (icode, NULL_RTX, dest, src, len, mask_mode, false);
 }
 
 static void
@@ -265,6 +286,20 @@ legitimize_move (rtx dest, rtx src, machine_mode mask_mode)
       expand_const_vector (dest, src, mask_mode);
       return true;
     }
+
+  /* In order to decrease the memory traffic, we don't use whole register
+   * load/store for the LMUL less than 1 and mask mode, so those case will
+   * require one extra general purpose register, but it's not allowed during LRA
+   * process, so we have a special move pattern used for LRA, which will defer
+   * the expansion after LRA.  */
+  if ((known_lt (GET_MODE_SIZE (mode), BYTES_PER_RISCV_VECTOR)
+       || GET_MODE_CLASS (mode) == MODE_VECTOR_BOOL)
+      && lra_in_progress)
+    {
+      emit_insn (gen_mov_lra (mode, Pmode, dest, src));
+      return true;
+    }
+
   if (known_ge (GET_MODE_SIZE (mode), BYTES_PER_RISCV_VECTOR)
       && GET_MODE_CLASS (mode) != MODE_VECTOR_BOOL)
     {
@@ -274,6 +309,13 @@ legitimize_move (rtx dest, rtx src, machine_mode mask_mode)
 
       return false;
     }
+
+  if (register_operand (src, mode) && register_operand (dest, mode))
+    {
+      emit_insn (gen_rtx_SET (dest, src));
+      return true;
+    }
+
   if (!register_operand (src, mode) && !register_operand (dest, mode))
     {
       rtx tmp = gen_reg_rtx (mode);
@@ -283,6 +325,10 @@ legitimize_move (rtx dest, rtx src, machine_mode mask_mode)
 	emit_move_insn (tmp, src);
       src = tmp;
     }
+
+  if (satisfies_constraint_vu (src))
+    return false;
+
   emit_vlmax_op (code_for_pred_mov (mode), dest, src, mask_mode);
   return true;
 }
@@ -294,14 +340,19 @@ struct mode_vtype_group
   uint8_t ratio_for_min_vlen32[NUM_MACHINE_MODES];
   enum vlmul_type vlmul_for_min_vlen64[NUM_MACHINE_MODES];
   uint8_t ratio_for_min_vlen64[NUM_MACHINE_MODES];
+  enum vlmul_type vlmul_for_for_vlen128[NUM_MACHINE_MODES];
+  uint8_t ratio_for_for_vlen128[NUM_MACHINE_MODES];
   mode_vtype_group ()
   {
 #define ENTRY(MODE, REQUIREMENT, VLMUL_FOR_MIN_VLEN32, RATIO_FOR_MIN_VLEN32,   \
-	      VLMUL_FOR_MIN_VLEN64, RATIO_FOR_MIN_VLEN64)                      \
+	      VLMUL_FOR_MIN_VLEN64, RATIO_FOR_MIN_VLEN64,                      \
+	      VLMUL_FOR_FOR_VLEN128, RATIO_FOR_FOR_VLEN128)                    \
   vlmul_for_min_vlen32[MODE##mode] = VLMUL_FOR_MIN_VLEN32;                     \
   ratio_for_min_vlen32[MODE##mode] = RATIO_FOR_MIN_VLEN32;                     \
   vlmul_for_min_vlen64[MODE##mode] = VLMUL_FOR_MIN_VLEN64;                     \
-  ratio_for_min_vlen64[MODE##mode] = RATIO_FOR_MIN_VLEN64;
+  ratio_for_min_vlen64[MODE##mode] = RATIO_FOR_MIN_VLEN64;                     \
+  vlmul_for_for_vlen128[MODE##mode] = VLMUL_FOR_FOR_VLEN128;                   \
+  ratio_for_for_vlen128[MODE##mode] = RATIO_FOR_FOR_VLEN128;
 #include "riscv-vector-switch.def"
   }
 };
@@ -312,7 +363,9 @@ static mode_vtype_group mode_vtype_infos;
 enum vlmul_type
 get_vlmul (machine_mode mode)
 {
-  if (TARGET_MIN_VLEN == 32)
+  if (TARGET_MIN_VLEN >= 128)
+    return mode_vtype_infos.vlmul_for_for_vlen128[mode];
+  else if (TARGET_MIN_VLEN == 32)
     return mode_vtype_infos.vlmul_for_min_vlen32[mode];
   else
     return mode_vtype_infos.vlmul_for_min_vlen64[mode];
@@ -322,7 +375,9 @@ get_vlmul (machine_mode mode)
 unsigned int
 get_ratio (machine_mode mode)
 {
-  if (TARGET_MIN_VLEN == 32)
+  if (TARGET_MIN_VLEN >= 128)
+    return mode_vtype_infos.ratio_for_for_vlen128[mode];
+  else if (TARGET_MIN_VLEN == 32)
     return mode_vtype_infos.ratio_for_min_vlen32[mode];
   else
     return mode_vtype_infos.ratio_for_min_vlen64[mode];
@@ -536,9 +591,7 @@ force_vector_length_operand (rtx vl)
 static rtx
 gen_no_side_effects_vsetvl_rtx (machine_mode vmode, rtx vl, rtx avl)
 {
-  unsigned int sew = GET_MODE_CLASS (vmode) == MODE_VECTOR_BOOL
-		       ? 8
-		       : GET_MODE_BITSIZE (GET_MODE_INNER (vmode));
+  unsigned int sew = get_sew (vmode);
   return gen_vsetvl_no_side_effects (Pmode, vl, avl, gen_int_mode (sew, Pmode),
 				     gen_int_mode (get_vlmul (vmode), Pmode),
 				     const0_rtx, const0_rtx);
@@ -664,6 +717,29 @@ slide1_sew64_helper (int unspec, machine_mode mode, machine_mode demote_mode,
 			       force_vector_length_operand (ops[5]), ops[6],
 			       ops[8]));
   return true;
+}
+
+rtx
+gen_avl_for_scalar_move (rtx avl)
+{
+  /* AVL for scalar move has different behavior between 0 and large than 0.  */
+  if (CONST_INT_P (avl))
+    {
+      /* So we could just set AVL to 1 for any constant other than 0.  */
+      if (rtx_equal_p (avl, const0_rtx))
+	return const0_rtx;
+      else
+	return const1_rtx;
+    }
+  else
+    {
+      /* For non-constant value, we set any non zero value to 1 by
+	 `sgtu new_avl,input_avl,zero` + `vsetvli`.  */
+      rtx tmp = gen_reg_rtx (Pmode);
+      emit_insn (
+	gen_rtx_SET (tmp, gen_rtx_fmt_ee (GTU, Pmode, avl, const0_rtx)));
+      return tmp;
+    }
 }
 
 } // namespace riscv_vector

@@ -6030,6 +6030,17 @@ floating-point mode.
 
 This pattern is not allowed to @code{FAIL}.
 
+@cindex @code{signbit@var{m}2} instruction pattern
+@item @samp{signbit@var{m}2}
+Store the sign bit of floating-point operand 1 in operand 0.
+@var{m} is either a scalar or vector mode.  When it is a scalar,
+operand 1 has mode @var{m} but operand 0 must have mode @code{SImode}.
+When @var{m} is a vector, operand 1 has the mode @var{m}.
+operand 0's mode should be an vector integer mode which has
+the same number of elements and the same size as mode @var{m}.
+
+This pattern is not allowed to @code{FAIL}.
+
 @cindex @code{significand@var{m}2} instruction pattern
 @item @samp{significand@var{m}2}
 Store the significand of floating-point operand 1 in operand 0.
@@ -8756,21 +8767,21 @@ insns that don't.  Instead, write two separate @code{define_split}
 definitions, one for the insns that are valid and one for the insns that
 are not valid.
 
-The splitter is allowed to split jump instructions into sequence of
-jumps or create new jumps in while splitting non-jump instructions.  As
-the control flow graph and branch prediction information needs to be updated,
-several restriction apply.
+The splitter is allowed to split jump instructions into a sequence of jumps or
+create new jumps while splitting non-jump instructions.  As the control flow
+graph and branch prediction information needs to be updated after the splitter
+runs, several restrictions apply.
 
-Splitting of jump instruction into sequence that over by another jump
-instruction is always valid, as compiler expect identical behavior of new
-jump.  When new sequence contains multiple jump instructions or new labels,
-more assistance is needed.  Splitter is required to create only unconditional
-jumps, or simple conditional jump instructions.  Additionally it must attach a
-@code{REG_BR_PROB} note to each conditional jump.  A global variable
-@code{split_branch_probability} holds the probability of the original branch in case
-it was a simple conditional jump, @minus{}1 otherwise.  To simplify
-recomputing of edge frequencies, the new sequence is required to have only
-forward jumps to the newly created labels.
+Splitting of a jump instruction into a sequence that has another jump
+instruction to the same label is always valid, as the compiler expects
+identical behavior of the new jump.  When the new sequence contains multiple
+jump instructions or new labels, more assistance is needed.  The splitter is
+permitted to create only unconditional jumps, or simple conditional jump
+instructions.  Additionally it must attach a @code{REG_BR_PROB} note to each
+conditional jump.  A global variable @code{split_branch_probability} holds the
+probability of the original branch in case it was a simple conditional jump,
+@minus{}1 otherwise.  To simplify recomputing of edge frequencies, the new
+sequence is permitted to have only forward jumps to the newly-created labels.
 
 @findex define_insn_and_split
 For the common case where the pattern of a define_split exactly matches the
@@ -8952,8 +8963,7 @@ It looks like:
 
 @smallexample
 
-(include
-  @var{pathname})
+(include @var{pathname})
 @end smallexample
 
 For example:

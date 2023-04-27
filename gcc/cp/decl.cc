@@ -4307,7 +4307,17 @@ make_typename_type (tree context, tree name, enum tag_types tag_type,
      lookup will stop when we hit a dependent base.  */
   if (!dependent_scope_p (context))
     {
-      bool want_type = (complain & tf_qualifying_scope);
+      /* We generally don't ignore non-types during TYPENAME_TYPE lookup
+	 (as per [temp.res.general]/3), unless
+	   - the tag corresponds to a class-key or 'enum' so
+	     [basic.lookup.elab] applies, or
+	   - the tag corresponds to scope_type or tf_qualifying_scope is
+	     set so [basic.lookup.qual]/1 applies.
+	 TODO: If we'd set/track the scope_type tag thoroughly on all
+	 TYPENAME_TYPEs that are followed by :: then we wouldn't need the
+	 tf_qualifying_scope flag.  */
+      bool want_type = (tag_type != none_type && tag_type != typename_type)
+	|| (complain & tf_qualifying_scope);
       t = lookup_member (context, name, /*protect=*/2, want_type, complain);
     }
   else
@@ -8276,7 +8286,20 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
 	      return;
 	    }
 
-	  gcc_assert (CLASS_PLACEHOLDER_TEMPLATE (auto_node));
+	  if (CLASS_PLACEHOLDER_TEMPLATE (auto_node))
+	    /* Class deduction with no initializer is OK.  */;
+	  else
+	    {
+	      /* Ordinary auto deduction without an initializer, a situation
+		 which grokdeclarator already detects and rejects for the most
+		 part.  But we can still get here if we're instantiating a
+		 variable template before we've fully parsed (and attached) its
+		 initializer, e.g. template<class> auto x = x<int>;  */
+	      error_at (DECL_SOURCE_LOCATION (decl),
+			"declaration of %q#D has no initializer", decl);
+	      TREE_TYPE (decl) = error_mark_node;
+	      return;
+	    }
 	}
       d_init = init;
       if (d_init)
@@ -8705,6 +8728,18 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
 	  /* Likewise if it needs destruction.  */
 	  if (!decl_maybe_constant_destruction (decl, type))
 	    TREE_READONLY (decl) = 0;
+	}
+      else if (VAR_P (decl)
+	       && CP_DECL_THREAD_LOCAL_P (decl)
+	       && (!DECL_EXTERNAL (decl) || flag_extern_tls_init)
+	       && (was_readonly || TREE_READONLY (decl))
+	       && var_needs_tls_wrapper (decl))
+	{
+	  /* TLS variables need dynamic initialization by the TLS wrapper
+	     function, we don't want to hoist accesses to it before the
+	     wrapper.  */
+	  was_readonly = 0;
+	  TREE_READONLY (decl) = 0;
 	}
 
       make_rtl_for_nonlocal_decl (decl, init, asmspec);
@@ -12443,16 +12478,14 @@ grokdeclarator (const cp_declarator *declarator,
 	{
 	  if (typedef_decl)
 	    {
-	      pedwarn (loc, OPT_Wpedantic, "%qs specified with %qD",
+	      pedwarn (loc, OPT_Wpedantic,
+		       "%qs specified with typedef-name %qD",
 		       key, typedef_decl);
 	      ok = !flag_pedantic_errors;
+	      /* PR108099: __int128_t comes from c_common_nodes_and_builtins,
+		 and is not built as a typedef.  */
 	      if (is_typedef_decl (typedef_decl))
 		type = DECL_ORIGINAL_TYPE (typedef_decl);
-	      else
-		/* PR108099: __int128_t comes from c_common_nodes_and_builtins,
-		   and is not built as a typedef.  */
-		type = TREE_TYPE (typedef_decl);
-	      typedef_decl = NULL_TREE;
 	    }
 	  else if (declspecs->decltype_p)
 	    error_at (loc, "%qs specified with %<decltype%>", key);
@@ -12505,7 +12538,7 @@ grokdeclarator (const cp_declarator *declarator,
       else if (type == char_type_node)
 	type = unsigned_char_type_node;
       else if (typedef_decl)
-	type = unsigned_type_for (type);
+	type = c_common_unsigned_type (type);
       else
 	type = unsigned_type_node;
     }
@@ -12519,6 +12552,8 @@ grokdeclarator (const cp_declarator *declarator,
     type = long_integer_type_node;
   else if (short_p)
     type = short_integer_type_node;
+  else if (signed_p && typedef_decl)
+    type = c_common_signed_type (type);
 
   if (decl_spec_seq_has_spec_p (declspecs, ds_complex))
     {
@@ -14393,7 +14428,8 @@ grokdeclarator (const cp_declarator *declarator,
 		cplus_decl_attributes (&decl, *attrlist, 0);
 		*attrlist = NULL_TREE;
 
-		decl = do_friend (ctype, unqualified_id, decl,
+		tree scope = ctype ? ctype : in_namespace;
+		decl = do_friend (scope, unqualified_id, decl,
 				  flags, funcdef_flag);
 		return decl;
 	      }

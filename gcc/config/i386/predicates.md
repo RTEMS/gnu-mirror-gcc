@@ -702,7 +702,7 @@
   return register_no_elim_operand (op, mode);
 })
 
-;; True for any non-virtual or eliminable register.  Used in places where
+;; True for any non-virtual and non-eliminable register.  Used in places where
 ;; instantiation of such a register may cause the pattern to not be recognized.
 (define_predicate "register_no_elim_operand"
   (match_operand 0 "register_operand")
@@ -717,8 +717,7 @@
 
   return !(op == arg_pointer_rtx
 	   || op == frame_pointer_rtx
-	   || IN_RANGE (REGNO (op),
-			FIRST_PSEUDO_REGISTER, LAST_VIRTUAL_REGISTER));
+	   || VIRTUAL_REGISTER_P (op));
 })
 
 ;; Similarly, but include the stack pointer.  This is used to prevent esp
@@ -729,10 +728,11 @@
   if (SUBREG_P (op))
     op = SUBREG_REG (op);
 
+  unsigned int regno = REGNO (op);
   if (reload_completed)
-    return REG_OK_FOR_INDEX_STRICT_P (op);
+    return REGNO_OK_FOR_INDEX_P (regno);
   else
-    return REG_OK_FOR_INDEX_NONSTRICT_P (op);
+    return REGNO_OK_FOR_INDEX_NONSTRICT_P (regno);
 })
 
 ;; Return false if this is any eliminable register.  Otherwise general_operand.
@@ -1683,6 +1683,9 @@
 
 (define_predicate "compare_operator"
   (match_code "compare"))
+
+(define_predicate "extract_operator"
+  (match_code "zero_extract,sign_extract"))
 
 ;; Return true if OP is a memory operand, aligned to
 ;; less than its natural alignment.

@@ -912,7 +912,7 @@ cfun_returns (tree decl)
   edge e;
   FOR_EACH_EDGE (e, ei, EXIT_BLOCK_PTR_FOR_FN (cfun)->preds)
     {
-      greturn *ret = safe_dyn_cast <greturn *> (last_stmt (e->src));
+      greturn *ret = safe_dyn_cast <greturn *> (*gsi_last_bb (e->src));
       if (!ret)
 	continue;
       if (gimple_return_retval (ret) == decl)
@@ -5595,8 +5595,7 @@ vectorizable_assignment (vec_info *vinfo,
 		       GET_MODE_SIZE (TYPE_MODE (vectype_in)))))
     return false;
 
-  if (VECTOR_BOOLEAN_TYPE_P (vectype)
-      && !VECTOR_BOOLEAN_TYPE_P (vectype_in))
+  if (VECTOR_BOOLEAN_TYPE_P (vectype) != VECTOR_BOOLEAN_TYPE_P (vectype_in))
     {
       if (dump_enabled_p ())
 	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
@@ -10510,7 +10509,7 @@ vectorizable_condition (vec_info *vinfo,
     = STMT_VINFO_REDUC_DEF (vect_orig_stmt (stmt_info)) != NULL;
   if (for_reduction)
     {
-      if (STMT_SLP_TYPE (stmt_info))
+      if (slp_node)
 	return false;
       reduc_info = info_for_reduction (vinfo, stmt_info);
       reduction_type = STMT_VINFO_REDUC_TYPE (reduc_info);

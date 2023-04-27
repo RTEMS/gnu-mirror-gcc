@@ -34,7 +34,7 @@ FROM M2Scaffold IMPORT DeclareScaffold, mainFunction, initFunction,
 FROM M2MetaError IMPORT MetaError0, MetaError1, MetaError2, MetaError3,
                         MetaErrors1, MetaErrors2, MetaErrors3,
                         MetaErrorT0, MetaErrorT1, MetaErrorT2,
-                        MetaErrorsT1, MetaErrorsT2,
+                        MetaErrorsT1, MetaErrorsT2, MetaErrorT3,
                         MetaErrorStringT0, MetaErrorStringT1,
                         MetaErrorString1, MetaErrorString2,
                         MetaErrorN1, MetaErrorN2,
@@ -209,7 +209,8 @@ FROM M2Options IMPORT NilChecking,
                       GenerateLineDebug, Exceptions,
                       Profiling, Coding, Optimizing,
                       ScaffoldDynamic, ScaffoldStatic, cflag,
-                      ScaffoldMain, SharedFlag, WholeProgram ;
+                      ScaffoldMain, SharedFlag, WholeProgram,
+                      GetRuntimeModuleOverride ;
 
 FROM M2Pass IMPORT IsPassCodeGeneration, IsNoPass ;
 
@@ -584,7 +585,7 @@ BEGIN
                        END
 
       END ;
-      i := GetNextQuad(i)
+      i := GetNextQuad (i)
    END ;
    InternalError ('fix this for the sake of efficiency..')
 END IsBackReference ;
@@ -685,7 +686,7 @@ BEGIN
                        END
 
       END ;
-      i := GetNextQuad(i)
+      i := GetNextQuad (i)
    END ;
    InternalError ('fix this for the sake of efficiency..')
 END IsBackReferenceConditional ;
@@ -2531,7 +2532,8 @@ BEGIN
       (* int
          _M2_init (int argc, char *argv[], char *envp[])
          {
-            M2RTS_ConstructModules (module_name, libname, argc, argv, envp);
+            M2RTS_ConstructModules (module_name, libname,
+                                    overrideliborder, argc, argv, envp);
          }  *)
       PushT (initFunction) ;
       BuildProcedureStart ;
@@ -2566,10 +2568,17 @@ BEGIN
             PushT(1) ;
             BuildAdrFunction ;
 
+            PushTF(Adr, Address) ;
+            PushTtok (MakeConstLitString (tok,
+                                          makekey (GetRuntimeModuleOverride ())),
+                      tok) ;
+            PushT(1) ;
+            BuildAdrFunction ;
+
             PushTtok (SafeRequestSym (tok, MakeKey ("argc")), tok) ;
             PushTtok (SafeRequestSym (tok, MakeKey ("argv")), tok) ;
             PushTtok (SafeRequestSym (tok, MakeKey ("envp")), tok) ;
-            PushT (5) ;
+            PushT (6) ;
             BuildProcedureCall (tok) ;
          END
       ELSIF ScaffoldStatic
@@ -7223,12 +7232,12 @@ BEGIN
             GenQuadO (proctok, InclOp, VarSym, NulSym, DerefSym, FALSE)
          ELSE
             MetaErrorT1 (proctok,
-                         'the first parameter to {%EkINCL} must be a set variable but is {%E1d}',
+                         'the first parameter to {%EkINCL} must be a set variable but is {%1Ed}',
                          VarSym)
          END
       ELSE
          MetaErrorT1 (proctok,
-                      'base procedure {%EkINCL} expects a variable as a parameter but is {%E1d}',
+                      'base procedure {%EkINCL} expects a variable as a parameter but is {%1Ed}',
                       VarSym)
       END
    ELSE
@@ -7289,12 +7298,12 @@ BEGIN
             GenQuadO (proctok, ExclOp, VarSym, NulSym, DerefSym, FALSE)
          ELSE
             MetaErrorT1 (proctok,
-                         'the first parameter to {%EkEXCL} must be a set variable but is {%E1d}',
+                         'the first parameter to {%EkEXCL} must be a set variable but is {%1Ed}',
                          VarSym)
          END
       ELSE
          MetaErrorT1 (proctok,
-                      'base procedure {%EkEXCL} expects a variable as a parameter but is {%E1d}',
+                      'base procedure {%EkEXCL} expects a variable as a parameter but is {%1Ed}',
                       VarSym)
       END
    ELSE
@@ -7483,7 +7492,7 @@ BEGIN
    IF CompilerDebugging
    THEN
       printf2 ('procsym = %d  token = %d\n', ProcSym, functok) ;
-      ErrorStringAt (InitString ('constant function'), functok)
+      (* ErrorStringAt (InitString ('constant function'), functok) *)
    END ;
    PushT (NoOfParam) ;
    IF (ProcSym # Convert) AND
@@ -9987,6 +9996,7 @@ BEGIN
          ELSE
             GenQuadO (combinedTok, AddrOp, returnVar, NulSym, OperandT (1), FALSE)
          END ;
+         PutWriteQuad (OperandT (1), GetMode (OperandT (1)), NextQuad-1) ;
          rw := OperandMergeRW (1) ;
          Assert (IsLegal (rw))
       END ;
@@ -12055,7 +12065,12 @@ VAR
 BEGIN
    PopT (type) ;   (* we ignore the type as we already have the constructor symbol from pass C *)
    GetConstructorFromFifoQueue (constValue) ;
-   Assert (type = GetSType (constValue)) ;
+   IF type # GetSType (constValue)
+   THEN
+      MetaErrorT3 (cbratokpos,
+                   '{%E}the constructor type is {%1ad} and this is different from the constant {%2ad} which has a type {%2tad}',
+                   type, constValue, constValue)
+   END ;
    PushTtok (constValue, cbratokpos) ;
    PushConstructor (type)
 END BuildConstructorStart ;

@@ -118,9 +118,11 @@ struct ipa_vr_ggc_hash_traits : public ggc_cache_remove <value_range *>
   static hashval_t
   hash (const value_range *p)
     {
-      inchash::hash hstate (p->kind ());
-      inchash::add_expr (p->min (), hstate);
-      inchash::add_expr (p->max (), hstate);
+      tree min, max;
+      value_range_kind kind = get_legacy_range (*p, min, max);
+      inchash::hash hstate (kind);
+      inchash::add_expr (min, hstate);
+      inchash::add_expr (max, hstate);
       return hstate.end ();
     }
   static bool
@@ -347,6 +349,8 @@ ipa_print_node_jump_functions_for_edge (FILE *f, struct cgraph_edge *cs)
 	    }
 	  if (jump_func->value.pass_through.agg_preserved)
 	    fprintf (f, ", agg_preserved");
+	  if (jump_func->value.pass_through.refdesc_decremented)
+	    fprintf (f, ", refdesc_decremented");
 	  fprintf (f, "\n");
 	}
       else if (type == IPA_JF_ANCESTOR)
@@ -433,13 +437,8 @@ ipa_print_node_jump_functions_for_edge (FILE *f, struct cgraph_edge *cs)
 
       if (jump_func->m_vr)
 	{
-	  fprintf (f, "         VR  ");
-	  fprintf (f, "%s[",
-		   (jump_func->m_vr->kind () == VR_ANTI_RANGE) ? "~" : "");
-	  print_decs (wi::to_wide (jump_func->m_vr->min ()), f);
-	  fprintf (f, ", ");
-	  print_decs (wi::to_wide (jump_func->m_vr->max ()), f);
-	  fprintf (f, "]\n");
+	  jump_func->m_vr->dump (f);
+	  fprintf (f, "\n");
 	}
       else
 	fprintf (f, "         Unknown VR\n");
@@ -572,6 +571,7 @@ ipa_set_jf_simple_pass_through (struct ipa_jump_func *jfunc, int formal_id,
   jfunc->value.pass_through.formal_id = formal_id;
   jfunc->value.pass_through.operation = NOP_EXPR;
   jfunc->value.pass_through.agg_preserved = agg_preserved;
+  jfunc->value.pass_through.refdesc_decremented = false;
 }
 
 /* Set JFUNC to be an unary pass through jump function.  */
@@ -585,6 +585,7 @@ ipa_set_jf_unary_pass_through (struct ipa_jump_func *jfunc, int formal_id,
   jfunc->value.pass_through.formal_id = formal_id;
   jfunc->value.pass_through.operation = operation;
   jfunc->value.pass_through.agg_preserved = false;
+  jfunc->value.pass_through.refdesc_decremented = false;
 }
 /* Set JFUNC to be an arithmetic pass through jump function.  */
 
@@ -597,6 +598,7 @@ ipa_set_jf_arith_pass_through (struct ipa_jump_func *jfunc, int formal_id,
   jfunc->value.pass_through.formal_id = formal_id;
   jfunc->value.pass_through.operation = operation;
   jfunc->value.pass_through.agg_preserved = false;
+  jfunc->value.pass_through.refdesc_decremented = false;
 }
 
 /* Set JFUNC to be an ancestor jump function.  */
@@ -1526,7 +1528,7 @@ compute_complex_ancestor_jump_func (struct ipa_func_body_info *fbi,
 				    gcall *call, gphi *phi)
 {
   HOST_WIDE_INT offset;
-  gimple *assign, *cond;
+  gimple *assign;
   basic_block phi_bb, assign_bb, cond_bb;
   tree tmp, parm, expr, obj;
   int index, i;
@@ -1559,9 +1561,8 @@ compute_complex_ancestor_jump_func (struct ipa_func_body_info *fbi,
     return;
 
   cond_bb = single_pred (assign_bb);
-  cond = last_stmt (cond_bb);
+  gcond *cond = safe_dyn_cast <gcond *> (*gsi_last_bb (cond_bb));
   if (!cond
-      || gimple_code (cond) != GIMPLE_COND
       || gimple_cond_code (cond) != NE_EXPR
       || gimple_cond_lhs (cond) != parm
       || !integer_zerop (gimple_cond_rhs (cond)))
@@ -2086,7 +2087,12 @@ determine_known_aggregate_parts (struct ipa_func_body_info *fbi,
 	     whether its value is clobbered any other dominating one.  */
 	  if ((content->value.pass_through.formal_id >= 0
 	       || content->value.pass_through.operand)
-	      && !clobber_by_agg_contents_list_p (all_list, content))
+	      && !clobber_by_agg_contents_list_p (all_list, content)
+	      /* Since IPA-CP stores results with unsigned int offsets, we can
+		 discard those which would not fit now before we stream them to
+		 WPA.  */
+	      && (content->offset + content->size - arg_offset
+		  <= (HOST_WIDE_INT) UINT_MAX * BITS_PER_UNIT))
 	    {
 	      struct ipa_known_agg_contents_list *copy
 			= XALLOCA (struct ipa_known_agg_contents_list);
@@ -2314,9 +2320,8 @@ ipa_compute_jump_functions_for_edge (struct ipa_func_body_info *fbi,
 	      && get_range_query (cfun)->range_of_expr (vr, arg)
 	      && !vr.undefined_p ())
 	    {
-	      value_range resvr;
-	      range_fold_unary_expr (&resvr, NOP_EXPR, param_type,
-				     &vr, TREE_TYPE (arg));
+	      value_range resvr = vr;
+	      range_cast (resvr, param_type);
 	      if (!resvr.undefined_p () && !resvr.varying_p ())
 		ipa_set_jfunc_vr (jfunc, &resvr);
 	      else
@@ -2671,8 +2676,8 @@ ipa_analyze_indirect_call_uses (struct ipa_func_body_info *fbi, gcall *call,
   /* Third, let's see that the branching is done depending on the least
      significant bit of the pfn. */
 
-  gimple *branch = last_stmt (bb);
-  if (!branch || gimple_code (branch) != GIMPLE_COND)
+  gcond *branch = safe_dyn_cast <gcond *> (*gsi_last_bb (bb));
+  if (!branch)
     return;
 
   if ((gimple_cond_code (branch) != NE_EXPR
@@ -3309,7 +3314,13 @@ update_jump_functions_after_inlining (struct cgraph_edge *cs,
 		  ipa_set_jf_unknown (dst);
 		  break;
 		case IPA_JF_CONST:
-		  ipa_set_jf_cst_copy (dst, src);
+		  {
+		    bool rd = ipa_get_jf_pass_through_refdesc_decremented (dst);
+		    ipa_set_jf_cst_copy (dst, src);
+		    if (rd)
+		      ipa_zap_jf_refdesc (dst);
+		  }
+
 		  break;
 
 		case IPA_JF_PASS_THROUGH:
@@ -3666,7 +3677,7 @@ remove_described_reference (symtab_node *symbol, struct ipa_cst_ref_desc *rdesc)
   if (!origin)
     return false;
   to_del = origin->caller->find_reference (symbol, origin->call_stmt,
-					   origin->lto_stmt_uid);
+					   origin->lto_stmt_uid, IPA_REF_ADDR);
   if (!to_del)
     return false;
 
@@ -3849,8 +3860,8 @@ try_make_edge_direct_virtual_call (struct cgraph_edge *ie,
 	  if (can_refer)
 	    {
 	      if (!t
-		  || fndecl_built_in_p (t, BUILT_IN_UNREACHABLE)
-		  || fndecl_built_in_p (t, BUILT_IN_UNREACHABLE_TRAP)
+		  || fndecl_built_in_p (t, BUILT_IN_UNREACHABLE,
+					   BUILT_IN_UNREACHABLE_TRAP)
 		  || !possible_polymorphic_call_target_p
 		       (ie, cgraph_node::get (t)))
 		{
@@ -4125,7 +4136,8 @@ propagate_controlled_uses (struct cgraph_edge *cs)
       struct ipa_jump_func *jf = ipa_get_ith_jump_func (args, i);
       struct ipa_cst_ref_desc *rdesc;
 
-      if (jf->type == IPA_JF_PASS_THROUGH)
+      if (jf->type == IPA_JF_PASS_THROUGH
+	  && !ipa_get_jf_pass_through_refdesc_decremented (jf))
 	{
 	  int src_idx, c, d;
 	  src_idx = ipa_get_jf_pass_through_formal_id (jf);
@@ -4153,7 +4165,8 @@ propagate_controlled_uses (struct cgraph_edge *cs)
 	      if (t && TREE_CODE (t) == ADDR_EXPR
 		  && TREE_CODE (TREE_OPERAND (t, 0)) == FUNCTION_DECL
 		  && (n = cgraph_node::get (TREE_OPERAND (t, 0)))
-		  && (ref = new_root->find_reference (n, NULL, 0)))
+		  && (ref = new_root->find_reference (n, NULL, 0,
+						      IPA_REF_ADDR)))
 		{
 		  if (dump_file)
 		    fprintf (dump_file, "ipa-prop: Removing cloning-created "
@@ -4201,7 +4214,7 @@ propagate_controlled_uses (struct cgraph_edge *cs)
 			 && clone != rdesc->cs->caller)
 		    {
 		      struct ipa_ref *ref;
-		      ref = clone->find_reference (n, NULL, 0);
+		      ref = clone->find_reference (n, NULL, 0, IPA_REF_ADDR);
 		      if (ref)
 			{
 			  if (dump_file)
@@ -4427,7 +4440,8 @@ ipa_edge_args_sum_t::duplicate (cgraph_edge *src, cgraph_edge *dst,
 		   gcc_checking_assert (n);
 		   ipa_ref *ref
 		     = src->caller->find_reference (n, src->call_stmt,
-						    src->lto_stmt_uid);
+						    src->lto_stmt_uid,
+						    IPA_REF_ADDR);
 		   gcc_checking_assert (ref);
 		   dst->caller->clone_reference (ref, ref->stmt);
 
@@ -4687,6 +4701,7 @@ ipa_write_jump_function (struct output_block *ob,
 	  streamer_write_uhwi (ob, jump_func->value.pass_through.formal_id);
 	  bp = bitpack_create (ob->main_stream);
 	  bp_pack_value (&bp, jump_func->value.pass_through.agg_preserved, 1);
+	  gcc_assert (!jump_func->value.pass_through.refdesc_decremented);
 	  streamer_write_bitpack (&bp);
 	}
       else if (TREE_CODE_CLASS (jump_func->value.pass_through.operation)
@@ -4765,10 +4780,12 @@ ipa_write_jump_function (struct output_block *ob,
   streamer_write_bitpack (&bp);
   if (jump_func->m_vr)
     {
+      tree min, max;
+      value_range_kind kind = get_legacy_range (*jump_func->m_vr, min, max);
       streamer_write_enum (ob->main_stream, value_rang_type,
-			   VR_LAST, jump_func->m_vr->kind ());
-      stream_write_tree (ob, jump_func->m_vr->min (), true);
-      stream_write_tree (ob, jump_func->m_vr->max (), true);
+			   VR_LAST, kind);
+      stream_write_tree (ob, min, true);
+      stream_write_tree (ob, max, true);
     }
 }
 

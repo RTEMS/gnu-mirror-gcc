@@ -99,11 +99,17 @@
 ;; Double vector modes suitable for moving.  Includes BFmode.
 (define_mode_iterator VDMOV [V8QI V4HI V4HF V4BF V2SI V2SF])
 
+;; 64-bit modes for operations that implicitly clear the top bits of a Q reg.
+(define_mode_iterator VDZ [V8QI V4HI V4HF V4BF V2SI V2SF DI DF])
+
 ;; All modes stored in registers d0-d31.
 (define_mode_iterator DREG [V8QI V4HI V4HF V2SI V2SF DF])
 
 ;; Copy of the above.
 (define_mode_iterator DREG2 [V8QI V4HI V4HF V2SI V2SF DF])
+
+;; Advanced SIMD modes for integer divides.
+(define_mode_iterator VQDIV [V4SI V2DI])
 
 ;; All modes suitable to store/load pair (2 elements) using STP/LDP.
 (define_mode_iterator VP_2E [V2SI V2SF V2DI V2DF])
@@ -1017,6 +1023,9 @@
 ;; Likewise for load/store pair.
 (define_mode_attr ldpstp_sz [(SI "8") (DI "16")])
 
+;; Size of element access for STP/LDP-generated vectors.
+(define_mode_attr ldpstp_vel_sz [(V2SI "8") (V2SF "8") (V2DI "16") (V2DF "16")])
+
 ;; For inequal width int to float conversion
 (define_mode_attr w1 [(HF "w") (SF "w") (DF "x")])
 (define_mode_attr w2 [(HF "x") (SF "x") (DF "w")])
@@ -1414,6 +1423,8 @@
 			(VNx8HI  "v8hi") (VNx8HF "v8hf") (VNx8BF "v8bf")
 			(VNx4SI  "v4si") (VNx4SF "v4sf")
 			(VNx2DI  "v2di") (VNx2DF "v2df")])
+
+(define_mode_attr vnx [(V4SI "vnx4si") (V2DI "vnx2di")])
 
 ;; 64-bit container modes the inner or scalar source mode.
 (define_mode_attr VCOND [(HI "V4HI") (SI "V2SI")
@@ -2432,6 +2443,8 @@
 			  (umax "max")
 			  (umin "min")])
 
+(define_code_attr maxminand [(smax "bic") (smin "and")])
+
 ;; MLA/MLS attributes.
 (define_code_attr as [(ss_plus "a") (ss_minus "s")])
 
@@ -2561,18 +2574,6 @@
 ;; -------------------------------------------------------------------
 ;; Int Iterators.
 ;; -------------------------------------------------------------------
-
-;; The unspec codes for the SABAL, UABAL AdvancedSIMD instructions.
-(define_int_iterator ABAL [UNSPEC_SABAL UNSPEC_UABAL])
-
-;; The unspec codes for the SABDL, UABDL AdvancedSIMD instructions.
-(define_int_iterator ABDL [UNSPEC_SABDL UNSPEC_UABDL])
-
-;; The unspec codes for the SABAL2, UABAL2 AdvancedSIMD instructions.
-(define_int_iterator ABAL2 [UNSPEC_SABAL2 UNSPEC_UABAL2])
-
-;; The unspec codes for the SABDL2, UABDL2 AdvancedSIMD instructions.
-(define_int_iterator ABDL2 [UNSPEC_SABDL2 UNSPEC_UABDL2])
 
 ;; The unspec codes for the SADALP, UADALP AdvancedSIMD instructions.
 (define_int_iterator ADALP [UNSPEC_SADALP UNSPEC_UADALP])
@@ -3355,10 +3356,6 @@
 		      (UNSPEC_SRHADD "sr") (UNSPEC_URHADD "ur")
 		      (UNSPEC_SHSUB "s") (UNSPEC_UHSUB "u")
 		      (UNSPEC_ADDHN "") (UNSPEC_RADDHN "r")
-		      (UNSPEC_SABAL "s") (UNSPEC_UABAL "u")
-		      (UNSPEC_SABAL2 "s") (UNSPEC_UABAL2 "u")
-		      (UNSPEC_SABDL "s") (UNSPEC_UABDL "u")
-		      (UNSPEC_SABDL2 "s") (UNSPEC_UABDL2 "u")
 		      (UNSPEC_SADALP "s") (UNSPEC_UADALP "u")
 		      (UNSPEC_SUBHN "") (UNSPEC_RSUBHN "r")
 		      (UNSPEC_USQADD "us") (UNSPEC_SUQADD "su")

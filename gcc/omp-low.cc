@@ -3992,8 +3992,7 @@ scan_omp_1_op (tree *tp, int *walk_subtrees, void *data)
 static bool
 setjmp_or_longjmp_p (const_tree fndecl)
 {
-  if (fndecl_built_in_p (fndecl, BUILT_IN_SETJMP)
-      || fndecl_built_in_p (fndecl, BUILT_IN_LONGJMP))
+  if (fndecl_built_in_p (fndecl, BUILT_IN_SETJMP, BUILT_IN_LONGJMP))
     return true;
 
   tree declname = DECL_NAME (fndecl);
@@ -4082,6 +4081,7 @@ omp_runtime_api_call (const_tree fndecl)
       "get_thread_num",
       "get_wtick",
       "get_wtime",
+      "in_explicit_task",
       "in_final",
       "in_parallel",
       "init_lock",

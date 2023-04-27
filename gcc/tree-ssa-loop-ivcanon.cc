@@ -98,7 +98,7 @@ create_canonical_iv (class loop *loop, edge exit, tree niter,
       fprintf (dump_file, " iterations.\n");
     }
 
-  cond = as_a <gcond *> (last_stmt (exit->src));
+  cond = as_a <gcond *> (*gsi_last_bb (exit->src));
   in = EDGE_SUCC (exit->src, 0);
   if (in == exit)
     in = EDGE_SUCC (exit->src, 1);
@@ -263,7 +263,7 @@ tree_estimate_loop_size (class loop *loop, edge exit, edge edge_to_cancel,
 	    {
 	      /* Exit conditional.  */
 	      if (exit && body[i] == exit->src
-		  && stmt == last_stmt (exit->src))
+		  && stmt == *gsi_last_bb (exit->src))
 		{
 		  if (dump_file && (dump_flags & TDF_DETAILS))
 		    fprintf (dump_file, "   Exit condition will be eliminated "
@@ -271,7 +271,7 @@ tree_estimate_loop_size (class loop *loop, edge exit, edge edge_to_cancel,
 		  likely_eliminated_peeled = true;
 		}
 	      if (edge_to_cancel && body[i] == edge_to_cancel->src
-		  && stmt == last_stmt (edge_to_cancel->src))
+		  && stmt == *gsi_last_bb (edge_to_cancel->src))
 		{
 		  if (dump_file && (dump_flags & TDF_DETAILS))
 		    fprintf (dump_file, "   Exit condition will be eliminated "
@@ -923,7 +923,7 @@ try_unroll_loop_completely (class loop *loop,
   /* Remove the conditional from the last copy of the loop.  */
   if (edge_to_cancel)
     {
-      gcond *cond = as_a <gcond *> (last_stmt (edge_to_cancel->src));
+      gcond *cond = as_a <gcond *> (*gsi_last_bb (edge_to_cancel->src));
       force_edge_cold (edge_to_cancel, true);
       if (edge_to_cancel->flags & EDGE_TRUE_VALUE)
 	gimple_cond_make_false (cond);
@@ -978,6 +978,56 @@ estimated_peeled_sequence_size (struct loop_size *size,
 {
   return MAX (npeel * (HOST_WIDE_INT) (size->overall
 			     	       - size->eliminated_by_peeling), 1);
+}
+
+/* Update loop estimates after peeling LOOP by NPEEL.
+   If PRECISE is false only likely exists were duplicated and thus
+   do not update any estimates that are supposed to be always reliable.  */
+void
+adjust_loop_info_after_peeling (class loop *loop, int npeel, bool precise)
+{
+  if (loop->any_estimate)
+    {
+      /* Since peeling is mostly about loops where first few
+	 iterations are special, it is not quite correct to
+	 assume that the remaining iterations will behave
+	 the same way.  However we do not have better info
+	 so update the esitmate, since it is likely better
+	 than keeping it as it is.
+
+	 Remove it if it looks wrong.
+
+	 TODO: We likely want to special case the situation where
+	 peeling is optimizing out exit edges and only update
+	 estimates here.  */
+      if (wi::leu_p (npeel, loop->nb_iterations_estimate))
+	loop->nb_iterations_estimate -= npeel;
+      else
+	loop->any_estimate = false;
+    }
+  if (loop->any_upper_bound && precise)
+    {
+      if (wi::leu_p (npeel, loop->nb_iterations_upper_bound))
+	loop->nb_iterations_upper_bound -= npeel;
+      else
+	{
+	  /* Peeling maximal number of iterations or more
+	     makes no sense and is a bug.
+	     We should peel completely.  */
+	  gcc_unreachable ();
+	}
+    }
+  if (loop->any_likely_upper_bound)
+    {
+      if (wi::leu_p (npeel, loop->nb_iterations_likely_upper_bound))
+	loop->nb_iterations_likely_upper_bound -= npeel;
+      else
+	{
+	  loop->any_estimate = true;
+	  loop->nb_iterations_estimate = 0;
+	  loop->nb_iterations_likely_upper_bound = 0;
+	}
+    }
 }
 
 /* If the loop is expected to iterate N times and is
@@ -1109,31 +1159,7 @@ try_peel_loop (class loop *loop,
       fprintf (dump_file, "Peeled loop %d, %i times.\n",
 	       loop->num, (int) npeel);
     }
-  if (loop->any_estimate)
-    {
-      if (wi::ltu_p (npeel, loop->nb_iterations_estimate))
-        loop->nb_iterations_estimate -= npeel;
-      else
-	loop->nb_iterations_estimate = 0;
-    }
-  if (loop->any_upper_bound)
-    {
-      if (wi::ltu_p (npeel, loop->nb_iterations_upper_bound))
-        loop->nb_iterations_upper_bound -= npeel;
-      else
-        loop->nb_iterations_upper_bound = 0;
-    }
-  if (loop->any_likely_upper_bound)
-    {
-      if (wi::ltu_p (npeel, loop->nb_iterations_likely_upper_bound))
-	loop->nb_iterations_likely_upper_bound -= npeel;
-      else
-	{
-	  loop->any_estimate = true;
-	  loop->nb_iterations_estimate = 0;
-	  loop->nb_iterations_likely_upper_bound = 0;
-	}
-    }
+  adjust_loop_info_after_peeling (loop, npeel, true);
   profile_count entry_count = profile_count::zero ();
 
   edge e;

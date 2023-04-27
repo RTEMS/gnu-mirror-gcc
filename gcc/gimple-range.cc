@@ -349,7 +349,7 @@ gimple_ranger::prefill_name (vrange &r, tree name)
     m_stmt_list.safe_push (name);
 }
 
-// This routine will seed the global cache with most of the depnedencies of
+// This routine will seed the global cache with most of the dependencies of
 // NAME.  This prevents excessive call depth through the normal API.
 
 void
@@ -448,7 +448,7 @@ gimple_ranger::prefill_stmt_dependencies (tree ssa)
 
 
 // This routine will invoke the gimple fold_stmt routine, providing context to
-// range_of_expr calls via an private interal API.
+// range_of_expr calls via an private internal API.
 
 bool
 gimple_ranger::fold_stmt (gimple_stmt_iterator *gsi, tree (*valueize) (tree))
@@ -505,7 +505,7 @@ gimple_ranger::register_transitive_inferred_ranges (basic_block bb)
     {
       gimple *s = gsi_stmt (si);
       tree lhs = gimple_get_lhs (s);
-      // If the LHS alreayd has an inferred effect, leave it be.
+      // If the LHS already has an inferred effect, leave it be.
       if (!gimple_range_ssa_p (lhs) || infer.has_range_p (lhs, bb))
 	continue;
       // Pick up global value.
@@ -737,7 +737,7 @@ disable_ranger (struct function *fun)
 bool
 assume_query::assume_range_p (vrange &r, tree name)
 {
-  if (global.get_global_range (r, name))
+  if (global.get_range (r, name))
     return !r.varying_p ();
   return false;
 }
@@ -750,13 +750,13 @@ assume_query::range_of_expr (vrange &r, tree expr, gimple *stmt)
   if (!gimple_range_ssa_p (expr))
     return get_tree_range (r, expr, stmt);
 
-  if (!global.get_global_range (r, expr))
+  if (!global.get_range (r, expr))
     r.set_varying (TREE_TYPE (expr));
   return true;
 }
 
 // If the current function returns an integral value, and has a single return
-// statement, it will calculate any SSA_NAMES is can determine ranges forr
+// statement, it will calculate any SSA_NAMES it can determine ranges for
 // assuming the function returns 1.
 
 assume_query::assume_query ()
@@ -781,7 +781,7 @@ assume_query::assume_query ()
 
       unsigned prec = TYPE_PRECISION (lhs_type);
       int_range<2> lhs_range (lhs_type, wi::one (prec), wi::one (prec));
-      global.set_global_range (op, lhs_range);
+      global.set_range (op, lhs_range);
 
       gimple *def = SSA_NAME_DEF_STMT (op);
       if (!def || gimple_get_lhs (def) != op)
@@ -802,9 +802,9 @@ assume_query::calculate_op (tree op, gimple *s, vrange &lhs, fur_source &src)
       && !op_range.varying_p ())
     {
       Value_Range range (TREE_TYPE (op));
-      if (global.get_global_range (range, op))
+      if (global.get_range (range, op))
 	op_range.intersect (range);
-      global.set_global_range (op, op_range);
+      global.set_range (op, op_range);
       gimple *def_stmt = SSA_NAME_DEF_STMT (op);
       if (def_stmt && gimple_get_lhs (def_stmt) == op)
 	calculate_stmt (def_stmt, op_range, src);
@@ -813,7 +813,7 @@ assume_query::calculate_op (tree op, gimple *s, vrange &lhs, fur_source &src)
 
 // Evaluate PHI statement, using the provided LHS range.
 // Check each constant argument predecessor if it can be taken
-// provide LHS to any symbolic argmeuents, and process their def statements.
+// provide LHS to any symbolic arguments, and process their def statements.
 
 void
 assume_query::calculate_phi (gphi *phi, vrange &lhs_range, fur_source &src)
@@ -827,9 +827,9 @@ assume_query::calculate_phi (gphi *phi, vrange &lhs_range, fur_source &src)
 	  // A symbol arg will be the LHS value.
 	  arg_range = lhs_range;
 	  range_cast (arg_range, TREE_TYPE (arg));
-	  if (!global.get_global_range (arg_range, arg))
+	  if (!global.get_range (arg_range, arg))
 	    {
-	      global.set_global_range (arg, arg_range);
+	      global.set_range (arg, arg_range);
 	      gimple *def_stmt = SSA_NAME_DEF_STMT (arg);
 	      if (def_stmt && gimple_get_lhs (def_stmt) == arg)
 		calculate_stmt (def_stmt, arg_range, src);

@@ -3005,6 +3005,8 @@ typedef struct gfc_code
       /* Take the array specification from expr3 to allocate arrays
 	 without an explicit array specification.  */
       unsigned arr_spec_from_expr3:1;
+      /* expr3 is not explicit  */
+      unsigned expr3_not_explicit:1;
     }
     alloc;
 
@@ -3331,6 +3333,7 @@ void gfc_internal_error (const char *, ...) ATTRIBUTE_NORETURN ATTRIBUTE_GCC_GFC
 void gfc_clear_error (void);
 bool gfc_error_check (void);
 bool gfc_error_flag_test (void);
+bool gfc_buffered_p (void);
 
 notification gfc_notification_std (int);
 bool gfc_notify_std (int, const char *, ...) ATTRIBUTE_GCC_GFC(2,3);
@@ -3931,6 +3934,7 @@ gfc_typebound_proc* gfc_find_typebound_intrinsic_op (gfc_symbol*, bool*,
 						     locus*);
 gfc_symtree* gfc_get_tbp_symtree (gfc_symtree**, const char*);
 bool gfc_is_finalizable (gfc_symbol *, gfc_expr **);
+bool gfc_may_be_finalized (gfc_typespec);
 
 #define CLASS_DATA(sym) sym->ts.u.derived->components
 #define UNLIMITED_POLY(sym) \

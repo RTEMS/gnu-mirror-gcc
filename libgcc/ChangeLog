@@ -1,3 +1,40 @@
+2023-04-27  Hans-Peter Nilsson  <hp@axis.com>
+
+	* config/cris/t-cris (HOST_LIBGCC2_CFLAGS): Add
+	-DTARGET_HAS_NO_HW_DIVIDE.
+
+2023-04-26  Patrick O'Neill  <patrick@rivosinc.com>
+
+	PR target/104338
+	* config/riscv/atomic.c: Add reference to duplicate logic.
+
+2023-04-08  Tetsuma Hoshino  <t-hoshino@pony-e.jp>
+
+	PR target/109402
+	* config/v850/lib1funcs.S (___muldi3): Remove unnecessary
+	stack manipulations.
+
+2023-04-05  John David Anglin  <danglin@gcc.gnu.org>
+
+	PR target/109374
+	* config/pa/milli64.S (RETURN_COLUMN): Define.
+	($$divI): Add CFI directives.
+	($$divU): Likewise.
+	($$remI): Likewise.
+	($$remU): Likewise.
+
+2023-03-19  Stafford Horne  <shorne@gmail.com>
+
+	* config/or1k/sfp-machine.h (FP_HANDLE_EXCEPTIONS): Remove
+	statement clearing existing exceptions.
+
+2023-03-13  Max Filippov  <jcmvbkbc@gmail.com>
+
+	* config/xtensa/crti.S: Add .note.GNU-stack section on linux.
+	* config/xtensa/crtn.S: Likewise.
+	* config/xtensa/lib1funcs.S: Likewise.
+	* config/xtensa/lib2funcs.S: Likewise.
+
 2023-03-12  Jakub Jelinek  <jakub@redhat.com>
 
 	* config/aarch64/t-softfp (softfp_extensions): Add bfsf.

@@ -4820,13 +4820,15 @@ nothing when you use @option{-freg-struct-return} mode.
 @deftypefn {Target Hook} fixed_size_mode TARGET_GET_RAW_RESULT_MODE (int @var{regno})
 This target hook returns the mode to be used when accessing raw return
 registers in @code{__builtin_return}.  Define this macro if the value
-in @var{reg_raw_mode} is not correct.
+in @var{reg_raw_mode} is not correct.  Use @code{VOIDmode} if a register
+should be ignored for @code{__builtin_return} purposes.
 @end deftypefn
 
 @deftypefn {Target Hook} fixed_size_mode TARGET_GET_RAW_ARG_MODE (int @var{regno})
 This target hook returns the mode to be used when accessing raw argument
 registers in @code{__builtin_apply_args}.  Define this macro if the value
-in @var{reg_raw_mode} is not correct.
+in @var{reg_raw_mode} is not correct.  Use @code{VOIDmode} if a register
+should be ignored for @code{__builtin_apply_args} purposes.
 @end deftypefn
 
 @deftypefn {Target Hook} bool TARGET_EMPTY_RECORD_P (const_tree @var{type})
@@ -11999,13 +12001,6 @@ This function prepares to emit a conditional comparison within a sequence
  be appropriate for passing to @code{gen_ccmp_next} or @code{cbranch_optab}.
  @var{code} is the @code{rtx_code} of the compare for @var{op0} and @var{op1}.
  @var{bit_code} is @code{AND} or @code{IOR}, which is the op on the compares.
-@end deftypefn
-
-@deftypefn {Target Hook} rtx TARGET_GEN_MEMSET_SCRATCH_RTX (machine_mode @var{mode})
-This hook should return an rtx for a scratch register in @var{mode} to
-be used when expanding memset calls.  The backend can use a hard scratch
-register to avoid stack realignment when expanding memset.  The default
-is @code{gen_reg_rtx}.
 @end deftypefn
 
 @deftypefn {Target Hook} unsigned TARGET_LOOP_UNROLL_ADJUST (unsigned @var{nunroll}, class loop *@var{loop})

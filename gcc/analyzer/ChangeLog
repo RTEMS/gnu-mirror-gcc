@@ -1,3 +1,25 @@
+2023-03-22  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/109239
+	* program-point.cc: Include "analyzer/inlining-iterator.h".
+	(program_point::effectively_intraprocedural_p): New function.
+	* program-point.h (program_point::effectively_intraprocedural_p):
+	New decl.
+	* sm-malloc.cc (deref_before_check::emit): Use it when rejecting
+	interprocedural cases, so that we reject interprocedural cases
+	that have become intraprocedural due to inlining.
+
+2023-03-18  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/109094
+	* region-model.cc (region_model::on_longjmp): Pass false for
+	new "eval_return_svalue" param of pop_frame.
+	(region_model::pop_frame): Add new "eval_return_svalue" param and
+	use it to suppress the call to get_rvalue on the result when
+	needed by on_longjmp.
+	* region-model.h (region_model::pop_frame): Add new
+	"eval_return_svalue" param.
+
 2023-03-10  David Malcolm  <dmalcolm@redhat.com>
 
 	PR analyzer/109059

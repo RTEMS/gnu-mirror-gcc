@@ -76,7 +76,7 @@ FROM M2Base IMPORT MixTypes, InitBase, Char, Integer, LongReal,
                    Cardinal, LongInt, LongCard, ZType, RType ;
 
 FROM M2System IMPORT Address ;
-FROM m2decl IMPORT DetermineSizeOfConstant ;
+FROM m2decl IMPORT ConstantStringExceedsZType ;
 FROM m2tree IMPORT Tree ;
 FROM m2linemap IMPORT BuiltinsLocation ;
 FROM StrLib IMPORT StrEqual ;
@@ -819,7 +819,7 @@ TYPE
                SetSym              : Set              : SymSet |
                ProcedureSym        : Procedure        : SymProcedure |
                ProcTypeSym         : ProcType         : SymProcType |
-               ImportStatementSym        : ImportStatement        : SymImportStatement |
+               ImportStatementSym  : ImportStatement  : SymImportStatement |
                ImportSym           : Import           : SymImport |
                GnuAsmSym           : GnuAsm           : SymGnuAsm |
                InterfaceSym        : Interface        : SymInterface |
@@ -4758,12 +4758,17 @@ END MakeConstant ;
 
 PROCEDURE MakeConstLit (tok: CARDINAL; constName: Name; constType: CARDINAL) : CARDINAL ;
 VAR
-   pSym: PtrToSymbol ;
-   Sym : CARDINAL ;
+   pSym      : PtrToSymbol ;
+   Sym       : CARDINAL ;
+   issueError,
+   overflow  : BOOLEAN ;
 BEGIN
+   issueError := TRUE ;
+   overflow := FALSE ;
    IF constType=NulSym
    THEN
-      constType := GetConstLitType (tok, constName)
+      constType := GetConstLitType (tok, constName, overflow, issueError) ;
+      issueError := NOT overflow
    END ;
    NewSym (Sym) ;
    pSym := GetPsym (Sym) ;
@@ -4773,7 +4778,7 @@ BEGIN
 
       ConstLitSym : ConstLit.name := constName ;
                     ConstLit.Value := InitValue () ;
-                    PushString (tok, constName) ;
+                    PushString (tok, constName, issueError) ;
                     PopInto (ConstLit.Value) ;
                     ConstLit.Type := constType ;
                     ConstLit.IsSet := FALSE ;
@@ -6368,12 +6373,11 @@ END IsHiddenType ;
                      depending upon their value.
 *)
 
-PROCEDURE GetConstLitType (tok: CARDINAL; name: Name) : CARDINAL ;
+PROCEDURE GetConstLitType (tok: CARDINAL; name: Name;
+                           VAR overflow: BOOLEAN; issueError: BOOLEAN) : CARDINAL ;
 VAR
-   loc          : location_t ;
-   s            : String ;
-   needsLong,
-   needsUnsigned: BOOLEAN ;
+   loc: location_t ;
+   s  : String ;
 BEGIN
    s := InitStringCharStar (KeyToCharStar (name)) ;
    IF char (s, -1) = 'C'
@@ -6389,27 +6393,14 @@ BEGIN
       loc := TokenToLocation (tok) ;
       CASE char (s, -1) OF
 
-      'H':  DetermineSizeOfConstant (loc, string (s), 16,
-                                     needsLong, needsUnsigned) |
-      'B':  DetermineSizeOfConstant (loc, string (s), 8,
-                                     needsLong, needsUnsigned) |
-      'A':  DetermineSizeOfConstant (loc, string (s), 2,
-                                     needsLong, needsUnsigned)
+      'H':  overflow := ConstantStringExceedsZType (loc, string (s), 16, issueError) |
+      'B':  overflow := ConstantStringExceedsZType (loc, string (s), 8, issueError) |
+      'A':  overflow := ConstantStringExceedsZType (loc, string (s), 2, issueError)
 
       ELSE
-         DetermineSizeOfConstant (loc, string (s), 10,
-                                  needsLong, needsUnsigned)
+         overflow := ConstantStringExceedsZType (loc, string (s), 10, issueError)
       END ;
       s := KillString (s) ;
-(*
-      IF needsLong AND needsUnsigned
-      THEN
-         RETURN LongCard
-      ELSIF needsLong AND (NOT needsUnsigned)
-      THEN
-         RETURN LongInt
-      END ;
-*)
       RETURN ZType
    END
 END GetConstLitType ;

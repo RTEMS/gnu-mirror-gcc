@@ -96,6 +96,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "i386-expand.h"
 #include "i386-features.h"
 #include "function-abi.h"
+#include "rtl-error.h"
 
 /* This file should be included last.  */
 #include "target-def.h"
@@ -11034,8 +11035,9 @@ ix86_legitimate_address_p (machine_mode, rtx addr, bool strict)
       if (reg == NULL_RTX)
 	return false;
 
-      if ((strict && ! REG_OK_FOR_BASE_STRICT_P (reg))
-	  || (! strict && ! REG_OK_FOR_BASE_NONSTRICT_P (reg)))
+      unsigned int regno = REGNO (reg);
+      if ((strict && !REGNO_OK_FOR_BASE_P (regno))
+	  || (!strict && !REGNO_OK_FOR_BASE_NONSTRICT_P (regno)))
 	/* Base is not valid.  */
 	return false;
     }
@@ -11048,8 +11050,9 @@ ix86_legitimate_address_p (machine_mode, rtx addr, bool strict)
       if (reg == NULL_RTX)
 	return false;
 
-      if ((strict && ! REG_OK_FOR_INDEX_STRICT_P (reg))
-	  || (! strict && ! REG_OK_FOR_INDEX_NONSTRICT_P (reg)))
+      unsigned int regno = REGNO (reg);
+      if ((strict && !REGNO_OK_FOR_INDEX_P (regno))
+	  || (!strict && !REGNO_OK_FOR_INDEX_NONSTRICT_P (regno)))
 	/* Index is not valid.  */
 	return false;
     }
@@ -13218,7 +13221,13 @@ ix86_print_operand (FILE *file, rtx x, int code)
 	    }
 
 	  if (GET_MODE_CLASS (GET_MODE (x)) == MODE_FLOAT)
-	    warning (0, "non-integer operand used with operand code %<z%>");
+	    {
+	      if (this_is_asm_operands)
+		warning_for_asm (this_is_asm_operands,
+				 "non-integer operand used with operand code %<z%>");
+	      else
+		warning (0, "non-integer operand used with operand code %<z%>");
+	    }
 	  /* FALLTHRU */
 
 	case 'Z':
@@ -13281,11 +13290,12 @@ ix86_print_operand (FILE *file, rtx x, int code)
 	  else
 	    {
 	      output_operand_lossage ("invalid operand type used with "
-				      "operand code 'Z'");
+				      "operand code '%c'", code);
 	      return;
 	    }
 
-	  output_operand_lossage ("invalid operand size for operand code 'Z'");
+	  output_operand_lossage ("invalid operand size for operand code '%c'",
+				  code);
 	  return;
 
 	case 'd':
@@ -16682,10 +16692,18 @@ assign_386_stack_local (machine_mode mode, enum ix86_stack_slot n)
     if (s->mode == mode && s->n == n)
       return validize_mem (copy_rtx (s->rtl));
 
+  int align = 0;
+  /* For DImode with SLOT_FLOATxFDI_387 use 32-bit
+     alignment with -m32 -mpreferred-stack-boundary=2.  */
+  if (mode == DImode
+      && !TARGET_64BIT
+      && n == SLOT_FLOATxFDI_387
+      && ix86_preferred_stack_boundary < GET_MODE_ALIGNMENT (DImode))
+    align = 32;
   s = ggc_alloc<stack_local_entry> ();
   s->n = n;
   s->mode = mode;
-  s->rtl = assign_stack_local (mode, GET_MODE_SIZE (mode), 0);
+  s->rtl = assign_stack_local (mode, GET_MODE_SIZE (mode), align);
 
   s->next = ix86_stack_locals;
   ix86_stack_locals = s;
@@ -19839,9 +19857,12 @@ inline_memory_move_cost (machine_mode mode, enum reg_class regclass, int in)
 	  index = 1;
 	  break;
 	/* DImode loads and stores assumed to cost the same as SImode.  */
-	default:
+	case 4:
+	case 8:
 	  index = 2;
 	  break;
+	default:
+	  return 100;
 	}
 
       if (in == 2)
@@ -24197,15 +24218,6 @@ ix86_optab_supported_p (int op, machine_mode mode1, machine_mode,
     }
 }
 
-/* Implement the TARGET_GEN_MEMSET_SCRATCH_RTX hook.  Return a scratch
-   register in MODE for vector load and store.  */
-
-rtx
-ix86_gen_scratch_sse_rtx (machine_mode mode)
-{
-  return gen_reg_rtx (mode);
-}
-
 /* Address space support.
 
    This is not "far pointers" in the 16-bit sense, but an easy way
@@ -25252,9 +25264,6 @@ static bool ix86_libc_has_fast_function (int fcode ATTRIBUTE_UNUSED)
 
 #undef TARGET_LIBC_HAS_FAST_FUNCTION
 #define TARGET_LIBC_HAS_FAST_FUNCTION ix86_libc_has_fast_function
-
-#undef TARGET_GEN_MEMSET_SCRATCH_RTX
-#define TARGET_GEN_MEMSET_SCRATCH_RTX ix86_gen_scratch_sse_rtx
 
 #if CHECKING_P
 #undef TARGET_RUN_TARGET_SELFTESTS

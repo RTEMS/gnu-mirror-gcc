@@ -281,6 +281,8 @@ private:
 /* The current code model.  */
 enum aarch64_code_model aarch64_cmodel;
 
+enum aarch64_tp_reg aarch64_tpidr_register;
+
 /* The number of 64-bit elements in an SVE vector.  */
 poly_uint16 aarch64_sve_vg;
 
@@ -1132,7 +1134,7 @@ static const struct cpu_vector_cost thunderx3t110_vector_cost =
 
 static const advsimd_vec_cost ampere1_advsimd_vector_cost =
 {
-  3, /* int_stmt_cost  */
+  1, /* int_stmt_cost  */
   3, /* fp_stmt_cost  */
   0, /* ld2_st2_permute_cost  */
   0, /* ld3_st3_permute_cost  */
@@ -1148,17 +1150,17 @@ static const advsimd_vec_cost ampere1_advsimd_vector_cost =
   8, /* store_elt_extra_cost  */
   6, /* vec_to_scalar_cost  */
   7, /* scalar_to_vec_cost  */
-  5, /* align_load_cost  */
-  5, /* unalign_load_cost  */
-  2, /* unalign_store_cost  */
-  2  /* store_cost  */
+  4, /* align_load_cost  */
+  4, /* unalign_load_cost  */
+  1, /* unalign_store_cost  */
+  1  /* store_cost  */
 };
 
 /* Ampere-1 costs for vector insn classes.  */
 static const struct cpu_vector_cost ampere1_vector_cost =
 {
   1, /* scalar_int_stmt_cost  */
-  1, /* scalar_fp_stmt_cost  */
+  3, /* scalar_fp_stmt_cost  */
   4, /* scalar_load_cost  */
   1, /* scalar_store_cost  */
   1, /* cond_taken_branch_cost  */
@@ -1933,7 +1935,7 @@ static const struct tune_params ampere1_tunings =
   2,	/* min_div_recip_mul_df.  */
   0,	/* max_case_values.  */
   tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
-  (AARCH64_EXTRA_TUNE_NONE),		/* tune_flags.  */
+  (AARCH64_EXTRA_TUNE_NO_LDP_COMBINE),	/* tune_flags.  */
   &ampere1_prefetch_tune
 };
 
@@ -1971,7 +1973,7 @@ static const struct tune_params ampere1a_tunings =
   2,	/* min_div_recip_mul_df.  */
   0,	/* max_case_values.  */
   tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
-  (AARCH64_EXTRA_TUNE_NONE),		/* tune_flags.  */
+  (AARCH64_EXTRA_TUNE_NO_LDP_COMBINE),	/* tune_flags.  */
   &ampere1_prefetch_tune
 };
 
@@ -7388,6 +7390,9 @@ aarch64_function_value_regno_p (const unsigned int regno)
   if (regno >= V0_REGNUM && regno < V0_REGNUM + HA_MAX_NUM_FLDS)
     return TARGET_FLOAT;
 
+  if (regno >= P0_REGNUM && regno < P0_REGNUM + HA_MAX_NUM_FLDS)
+    return TARGET_SVE;
+
   return false;
 }
 
@@ -7481,7 +7486,20 @@ aarch64_function_arg_alignment (machine_mode mode, const_tree type,
   gcc_assert (TYPE_MODE (type) == mode);
 
   if (!AGGREGATE_TYPE_P (type))
-    return TYPE_ALIGN (TYPE_MAIN_VARIANT (type));
+    {
+      /* The ABI alignment is the natural alignment of the type, without
+	 any attributes applied.  Normally this is the alignment of the
+	 TYPE_MAIN_VARIANT, but not always; see PR108910 for a counterexample.
+	 For now we just handle the known exceptions explicitly.  */
+      type = TYPE_MAIN_VARIANT (type);
+      if (POINTER_TYPE_P (type))
+	{
+	  gcc_assert (known_eq (POINTER_SIZE, GET_MODE_BITSIZE (mode)));
+	  return POINTER_SIZE;
+	}
+      gcc_assert (!TYPE_USER_ALIGN (type));
+      return TYPE_ALIGN (type);
+    }
 
   if (TREE_CODE (type) == ARRAY_TYPE)
     return TYPE_ALIGN (TREE_TYPE (type));
@@ -7959,7 +7977,8 @@ bool
 aarch64_function_arg_regno_p (unsigned regno)
 {
   return ((GP_REGNUM_P (regno) && regno < R0_REGNUM + NUM_ARG_REGS)
-	  || (FP_REGNUM_P (regno) && regno < V0_REGNUM + NUM_FP_ARG_REGS));
+	  || (FP_REGNUM_P (regno) && regno < V0_REGNUM + NUM_FP_ARG_REGS)
+	  || (PR_REGNUM_P (regno) && regno < P0_REGNUM + NUM_PR_ARG_REGS));
 }
 
 /* Implement FUNCTION_ARG_BOUNDARY.  Every parameter gets at least
@@ -7995,6 +8014,10 @@ aarch64_get_reg_raw_mode (int regno)
        for SVE types are fundamentally incompatible with the
        __builtin_return/__builtin_apply interface.  */
     return as_a <fixed_size_mode> (V16QImode);
+  if (PR_REGNUM_P (regno))
+    /* For SVE PR regs, indicate that they should be ignored for
+       __builtin_apply/__builtin_return.  */
+    return as_a <fixed_size_mode> (VOIDmode);
   return default_get_reg_raw_mode (regno);
 }
 
@@ -13799,6 +13822,31 @@ aarch64_masks_and_shift_for_bfi_p (scalar_int_mode mode,
   return (t == (t & -t));
 }
 
+/* Return true if X is an RTX representing an operation in the ABD family
+   of instructions.  */
+
+static bool
+aarch64_abd_rtx_p (rtx x)
+{
+  if (GET_CODE (x) != MINUS)
+    return false;
+  rtx max_arm = XEXP (x, 0);
+  rtx min_arm = XEXP (x, 1);
+  if (GET_CODE (max_arm) != SMAX && GET_CODE (max_arm) != UMAX)
+    return false;
+  bool signed_p = GET_CODE (max_arm) == SMAX;
+  if (signed_p && GET_CODE (min_arm) != SMIN)
+    return false;
+  else if (!signed_p && GET_CODE (min_arm) != UMIN)
+    return false;
+
+  rtx maxop0 = XEXP (max_arm, 0);
+  rtx maxop1 = XEXP (max_arm, 1);
+  rtx minop0 = XEXP (min_arm, 0);
+  rtx minop1 = XEXP (min_arm, 1);
+  return rtx_equal_p (maxop0, minop0) && rtx_equal_p (maxop1, minop1);
+}
+
 /* Calculate the cost of calculating X, storing it in *COST.  Result
    is true if the total cost of the operation has now been calculated.  */
 static bool
@@ -14195,11 +14243,20 @@ aarch64_rtx_costs (rtx x, machine_mode mode, int outer ATTRIBUTE_UNUSED,
 cost_minus:
 	if (VECTOR_MODE_P (mode))
 	  {
-	    /* SUBL2 and SUBW2.  */
 	    unsigned int vec_flags = aarch64_classify_vector_mode (mode);
 	    if (TARGET_SIMD && (vec_flags & VEC_ADVSIMD))
 	      {
-		/* The select-operand-high-half versions of the sub instruction
+		/* Recognise the SABD and UABD operation here.
+		   Recursion from the PLUS case will catch the accumulating
+		   forms.  */
+		if (aarch64_abd_rtx_p (x))
+		  {
+		    if (speed)
+		      *cost += extra_cost->vect.alu;
+		    return true;
+		  }
+		  /* SUBL2 and SUBW2.
+		   The select-operand-high-half versions of the sub instruction
 		   have the same cost as the regular three vector version -
 		   don't add the costs of the select into the costs of the sub.
 		   */
@@ -14657,6 +14714,10 @@ cost_plus:
 	}
       return false;
 
+    case ROTATE:
+    case ROTATERT:
+    case LSHIFTRT:
+    case ASHIFTRT:
     case ASHIFT:
       op0 = XEXP (x, 0);
       op1 = XEXP (x, 1);
@@ -14672,8 +14733,8 @@ cost_plus:
 		}
 	      else
 		{
-		  /* LSL (immediate), UBMF, UBFIZ and friends.  These are all
-		     aliases.  */
+		  /* LSL (immediate), ASR (immediate), UBMF, UBFIZ and friends.
+		     These are all aliases.  */
 		  *cost += extra_cost->alu.shift;
 		}
 	    }
@@ -14697,9 +14758,13 @@ cost_plus:
 	  else
 	    {
 	      if (speed)
-		/* LSLV.  */
+		/* LSLV, ASRV.  */
 		*cost += extra_cost->alu.shift_reg;
 
+	       /* The register shift amount may be in a shorter mode expressed
+		  as a lowpart SUBREG.  For costing purposes just look inside.  */
+	      if (SUBREG_P (op1) && subreg_lowpart_p (op1))
+		op1 = SUBREG_REG (op1);
 	      if (GET_CODE (op1) == AND && REG_P (XEXP (op1, 0))
 		  && CONST_INT_P (XEXP (op1, 1))
 		  && known_eq (INTVAL (XEXP (op1, 1)),
@@ -14713,55 +14778,6 @@ cost_plus:
 	    }
 	  return false;  /* All arguments need to be in registers.  */
         }
-
-    case ROTATE:
-    case ROTATERT:
-    case LSHIFTRT:
-    case ASHIFTRT:
-      op0 = XEXP (x, 0);
-      op1 = XEXP (x, 1);
-
-      if (CONST_INT_P (op1))
-	{
-	  /* ASR (immediate) and friends.  */
-	  if (speed)
-	    {
-	      if (VECTOR_MODE_P (mode))
-		*cost += extra_cost->vect.alu;
-	      else
-		*cost += extra_cost->alu.shift;
-	    }
-
-	  *cost += rtx_cost (op0, mode, (enum rtx_code) code, 0, speed);
-	  return true;
-	}
-      else
-	{
-	  if (VECTOR_MODE_P (mode))
-	    {
-	      if (speed)
-		/* Vector shift (register).  */
-		*cost += extra_cost->vect.alu;
-	    }
-	  else
-	    {
-	      if (speed)
-		/* ASR (register) and friends.  */
-		*cost += extra_cost->alu.shift_reg;
-
-	      if (GET_CODE (op1) == AND && REG_P (XEXP (op1, 0))
-		  && CONST_INT_P (XEXP (op1, 1))
-		  && known_eq (INTVAL (XEXP (op1, 1)),
-			       GET_MODE_BITSIZE (mode) - 1))
-		{
-		  *cost += rtx_cost (op0, mode, (rtx_code) code, 0, speed);
-		  /* We already demanded XEXP (op1, 0) to be REG_P, so
-		     don't recurse into it.  */
-		  return true;
-		}
-	    }
-	  return false;  /* All arguments need to be in registers.  */
-	}
 
     case SYMBOL_REF:
 
@@ -15661,6 +15677,33 @@ aarch64_first_cycle_multipass_dfa_lookahead_guard (rtx_insn *insn,
 
 /* Vectorizer cost model target hooks.  */
 
+/* If a vld1 from address ADDR should be recorded in vector_load_decls,
+   return the decl that should be recorded.  Return null otherwise.  */
+tree
+aarch64_vector_load_decl (tree addr)
+{
+  if (TREE_CODE (addr) != ADDR_EXPR)
+    return NULL_TREE;
+  tree base = get_base_address (TREE_OPERAND (addr, 0));
+  if (TREE_CODE (base) != VAR_DECL)
+    return NULL_TREE;
+  return base;
+}
+
+/* Return true if STMT_INFO accesses a decl that is known to be the
+   argument to a vld1 in the same function.  */
+static bool
+aarch64_accesses_vector_load_decl_p (stmt_vec_info stmt_info)
+{
+  if (!cfun->machine->vector_load_decls)
+    return false;
+  auto dr = STMT_VINFO_DATA_REF (stmt_info);
+  if (!dr)
+    return false;
+  tree decl = aarch64_vector_load_decl (DR_BASE_ADDRESS (dr));
+  return decl && cfun->machine->vector_load_decls->contains (decl);
+}
+
 /* Information about how the CPU would issue the scalar, Advanced SIMD
    or SVE version of a vector loop, using the scheme defined by the
    aarch64_base_vec_issue_info hierarchy of structures.  */
@@ -15890,6 +15933,20 @@ private:
   /* This loop uses an average operation that is not supported by SVE, but is
      supported by Advanced SIMD and SVE2.  */
   bool m_has_avg = false;
+
+  /* True if the vector body contains a store to a decl and if the
+     function is known to have a vld1 from the same decl.
+
+     In the Advanced SIMD ACLE, the recommended endian-agnostic way of
+     initializing a vector is:
+
+       float f[4] = { elts };
+       float32x4_t x = vld1q_f32(f);
+
+     We should strongly prefer vectorization of the initialization of f,
+     so that the store to f and the load back can be optimized away,
+     leaving a vectorization of { elts }.  */
+  bool m_stores_to_vector_load_decl = false;
 
   /* - If M_VEC_FLAGS is zero then we're costing the original scalar code.
      - If M_VEC_FLAGS & VEC_ADVSIMD is nonzero then we're costing Advanced
@@ -16907,6 +16964,18 @@ aarch64_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
 	    }
 	}
     }
+
+  /* If the statement stores to a decl that is known to be the argument
+     to a vld1 in the same function, ignore the store for costing purposes.
+     See the comment above m_stores_to_vector_load_decl for more details.  */
+  if (stmt_info
+      && (kind == vector_store || kind == unaligned_store)
+      && aarch64_accesses_vector_load_decl_p (stmt_info))
+    {
+      stmt_cost = 0;
+      m_stores_to_vector_load_decl = true;
+    }
+
   return record_stmt_cost (stmt_info, where, (count * stmt_cost).ceil ());
 }
 
@@ -17196,12 +17265,21 @@ aarch64_vector_costs::finish_cost (const vector_costs *uncast_scalar_costs)
 
   /* Apply the heuristic described above m_stp_sequence_cost.  Prefer
      the scalar code in the event of a tie, since there is more chance
-     of scalar code being optimized with surrounding operations.  */
+     of scalar code being optimized with surrounding operations.
+
+     In addition, if the vector body is a simple store to a decl that
+     is elsewhere loaded using vld1, strongly prefer the vector form,
+     to the extent of giving the prologue a zero cost.  See the comment
+     above m_stores_to_vector_load_decl for details.  */
   if (!loop_vinfo
       && scalar_costs
-      && m_stp_sequence_cost != ~0U
-      && m_stp_sequence_cost >= scalar_costs->m_stp_sequence_cost)
-    m_costs[vect_body] = 2 * scalar_costs->total_cost ();
+      && m_stp_sequence_cost != ~0U)
+    {
+      if (m_stores_to_vector_load_decl)
+	m_costs[vect_prologue] = 0;
+      else if (m_stp_sequence_cost >= scalar_costs->m_stp_sequence_cost)
+	m_costs[vect_body] = 2 * scalar_costs->total_cost ();
+    }
 
   vector_costs::finish_cost (scalar_costs);
 }
@@ -17847,6 +17925,7 @@ aarch64_override_options_internal (struct gcc_options *opts)
 
   initialize_aarch64_code_model (opts);
   initialize_aarch64_tls_size (opts);
+  aarch64_tpidr_register = opts->x_aarch64_tpidr_reg;
 
   int queue_depth = 0;
   switch (aarch64_tune_params.autoprefetcher_model)
@@ -18056,6 +18135,12 @@ aarch64_validate_mcpu (const char *str, const struct processor **res,
       case AARCH_PARSE_INVALID_ARG:
 	error ("unknown value %qs for %<-mcpu%>", str);
 	aarch64_print_hint_for_core (str);
+	/* A common user error is confusing -march and -mcpu.
+	   If the -mcpu string matches a known architecture then suggest
+	   -march=.  */
+	parse_res = aarch64_parse_arch (str, res, isa_flags, &invalid_extension);
+	if (parse_res == AARCH_PARSE_OK)
+	  inform (input_location, "did you mean %<-march=%s%>?", str);
 	break;
       case AARCH_PARSE_INVALID_FEATURE:
 	error ("invalid feature modifier %qs in %<-mcpu=%s%>",
@@ -21920,7 +22005,7 @@ aarch64_simd_dup_constant (rtx vals)
   /* We can load this constant by using DUP and a constant in a
      single ARM register.  This will be cheaper than a vector
      load.  */
-  x = copy_to_mode_reg (inner_mode, x);
+  x = force_reg (inner_mode, x);
   return gen_vec_duplicate (mode, x);
 }
 
@@ -22034,7 +22119,7 @@ aarch64_expand_vector_init (rtx target, rtx vals)
   /* Splat a single non-constant element if we can.  */
   if (all_same)
     {
-      rtx x = copy_to_mode_reg (inner_mode, v0);
+      rtx x = force_reg (inner_mode, v0);
       aarch64_emit_move (target, gen_vec_duplicate (mode, x));
       return;
     }
@@ -22142,12 +22227,12 @@ aarch64_expand_vector_init (rtx target, rtx vals)
 	     vector register.  For big-endian we want that position to hold
 	     the last element of VALS.  */
 	  maxelement = BYTES_BIG_ENDIAN ? n_elts - 1 : 0;
-	  rtx x = copy_to_mode_reg (inner_mode, XVECEXP (vals, 0, maxelement));
+	  rtx x = force_reg (inner_mode, XVECEXP (vals, 0, maxelement));
 	  aarch64_emit_move (target, lowpart_subreg (mode, x, inner_mode));
 	}
       else
 	{
-	  rtx x = copy_to_mode_reg (inner_mode, XVECEXP (vals, 0, maxelement));
+	  rtx x = force_reg (inner_mode, XVECEXP (vals, 0, maxelement));
 	  aarch64_emit_move (target, gen_vec_duplicate (mode, x));
 	}
 
@@ -22157,7 +22242,7 @@ aarch64_expand_vector_init (rtx target, rtx vals)
 	  rtx x = XVECEXP (vals, 0, i);
 	  if (matches[i][0] == maxelement)
 	    continue;
-	  x = copy_to_mode_reg (inner_mode, x);
+	  x = force_reg (inner_mode, x);
 	  emit_insn (GEN_FCN (icode) (target, x, GEN_INT (i)));
 	}
       return;
@@ -22201,7 +22286,7 @@ aarch64_expand_vector_init (rtx target, rtx vals)
       rtx x = XVECEXP (vals, 0, i);
       if (CONST_INT_P (x) || CONST_DOUBLE_P (x))
 	continue;
-      x = copy_to_mode_reg (inner_mode, x);
+      x = force_reg (inner_mode, x);
       emit_insn (GEN_FCN (icode) (target, x, GEN_INT (i)));
     }
 }
@@ -25970,6 +26055,20 @@ aarch64_operands_ok_for_ldpstp (rtx *operands, bool load,
   enum reg_class rclass_1, rclass_2;
   rtx mem_1, mem_2, reg_1, reg_2;
 
+  /* Allow the tuning structure to disable LDP instruction formation
+     from combining instructions (e.g., in peephole2).
+     TODO: Implement fine-grained tuning control for LDP and STP:
+	   1. control policies for load and store separately;
+	   2. support the following policies:
+	      - default (use what is in the tuning structure)
+	      - always
+	      - never
+	      - aligned (only if the compiler can prove that the
+		load will be aligned to 2 * element_size)  */
+  if (load && (aarch64_tune_params.extra_tuning_flags
+	       & AARCH64_EXTRA_TUNE_NO_LDP_COMBINE))
+    return false;
+
   if (load)
     {
       mem_1 = operands[1];
@@ -27350,6 +27449,20 @@ aarch64_indirect_call_asm (rtx addr)
     }
   else
    output_asm_insn ("blr\t%0", &addr);
+  return "";
+}
+
+/* Emit the assembly instruction to load the thread pointer into DEST.
+   Select between different tpidr_elN registers depending on -mtp= setting.  */
+
+const char *
+aarch64_output_load_tp (rtx dest)
+{
+  const char *tpidrs[] = {"tpidr_el0", "tpidr_el1", "tpidr_el2", "tpidr_el3"};
+  char buffer[64];
+  snprintf (buffer, sizeof (buffer), "mrs\t%%0, %s",
+	    tpidrs[aarch64_tpidr_register]);
+  output_asm_insn (buffer, &dest);
   return "";
 }
 

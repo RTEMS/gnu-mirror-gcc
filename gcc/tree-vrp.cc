@@ -75,7 +75,7 @@ public:
   ~remove_unreachable () { m_list.release (); }
   void maybe_register_block (basic_block bb);
   bool remove_and_update_globals (bool final_p);
-  vec<edge> m_list;
+  vec<std::pair<int, int> > m_list;
   gimple_ranger &m_ranger;
 };
 
@@ -103,9 +103,9 @@ remove_unreachable::maybe_register_block (basic_block bb)
     return;
 
   if (un0)
-    m_list.safe_push (e1);
+    m_list.safe_push (std::make_pair (e1->src->index, e1->dest->index));
   else
-    m_list.safe_push (e0);
+    m_list.safe_push (std::make_pair (e0->src->index, e0->dest->index));
 }
 
 // Process the edges in the list, change the conditions and removing any
@@ -132,7 +132,12 @@ remove_unreachable::remove_and_update_globals (bool final_p)
   auto_bitmap all_exports;
   for (i = 0; i < m_list.length (); i++)
     {
-      edge e = m_list[i];
+      auto eb = m_list[i];
+      basic_block src = BASIC_BLOCK_FOR_FN (cfun, eb.first);
+      basic_block dest = BASIC_BLOCK_FOR_FN (cfun, eb.second);
+      if (!src || !dest)
+	continue;
+      edge e = find_edge (src, dest);
       gimple *s = gimple_outgoing_range_stmt_p (e->src);
       gcc_checking_assert (gimple_code (s) == GIMPLE_COND);
       bool lhs_p = TREE_CODE (gimple_cond_lhs (s)) == SSA_NAME;
@@ -145,7 +150,9 @@ remove_unreachable::remove_and_update_globals (bool final_p)
       // If this is already a constant condition, don't look either
       if (!lhs_p && !rhs_p)
 	continue;
-
+      // Do not remove addresses early. ie if (x == &y)
+      if (!final_p && lhs_p && TREE_CODE (gimple_cond_rhs (s)) == ADDR_EXPR)
+	continue;
       bool dominate_exit_p = true;
       FOR_EACH_GORI_EXPORT_NAME (m_ranger.gori (), e->src, name)
 	{
@@ -156,7 +163,7 @@ remove_unreachable::remove_and_update_globals (bool final_p)
 	  m_ranger.range_on_entry (ex, EXIT_BLOCK_PTR_FOR_FN (cfun), name);
 	  // If the range produced by this __builtin_unreachacble expression
 	  // is not fully reflected in the range at exit, then it does not
-	  // dominate the exit of the funciton.
+	  // dominate the exit of the function.
 	  if (ex.intersect (r))
 	    dominate_exit_p = false;
 	}
@@ -179,7 +186,7 @@ remove_unreachable::remove_and_update_globals (bool final_p)
 
   if (bitmap_empty_p (all_exports))
     return false;
-  // Invoke DCE on all exported names to elimnate dead feeding defs
+  // Invoke DCE on all exported names to eliminate dead feeding defs.
   auto_bitmap dce;
   bitmap_copy (dce, all_exports);
   // Don't attempt to DCE parameters.
@@ -233,7 +240,7 @@ remove_unreachable::remove_and_update_globals (bool final_p)
   return change;
 }
 
-/* VR_TYPE describes a range with mininum value *MIN and maximum
+/* VR_TYPE describes a range with minimum value *MIN and maximum
    value *MAX.  Restrict the range to the set of values that have
    no bits set outside NONZERO_BITS.  Update *MIN and *MAX and
    return the new range type.
@@ -303,15 +310,6 @@ intersect_range_with_nonzero_bits (enum value_range_kind vr_type,
       gcc_checking_assert (wi::le_p (*min, *max, sgn));
     }
   return vr_type;
-}
-
-/* Return true if max and min of VR are INTEGER_CST.  It's not necessary
-   a singleton.  */
-
-bool
-range_int_cst_p (const value_range *vr)
-{
-  return (vr->kind () == VR_RANGE && range_has_numeric_bounds_p (vr));
 }
 
 /* Return the single symbol (an SSA_NAME) contained in T if any, or NULL_TREE
@@ -578,92 +576,6 @@ compare_values (tree val1, tree val2)
 {
   bool sop;
   return compare_values_warnv (val1, val2, &sop);
-}
-
-/* If the types passed are supported, return TRUE, otherwise set VR to
-   VARYING and return FALSE.  */
-
-static bool
-supported_types_p (value_range *vr,
-		   tree type0,
-		   tree = NULL)
-{
-  if (!value_range::supports_p (type0))
-    {
-      vr->set_varying (type0);
-      return false;
-    }
-  return true;
-}
-
-/* If any of the ranges passed are defined, return TRUE, otherwise set
-   VR to UNDEFINED and return FALSE.  */
-
-static bool
-defined_ranges_p (value_range *vr,
-		  const value_range *vr0, const value_range *vr1 = NULL)
-{
-  if (vr0->undefined_p () && (!vr1 || vr1->undefined_p ()))
-    {
-      vr->set_undefined ();
-      return false;
-    }
-  return true;
-}
-
-/* Perform a binary operation on a pair of ranges.  */
-
-void
-range_fold_binary_expr (value_range *vr,
-			enum tree_code code,
-			tree expr_type,
-			const value_range *vr0_,
-			const value_range *vr1_)
-{
-  if (!supported_types_p (vr, expr_type)
-      || !defined_ranges_p (vr, vr0_, vr1_))
-    return;
-  range_op_handler op (code, expr_type);
-  if (!op)
-    {
-      vr->set_varying (expr_type);
-      return;
-    }
-
-  value_range vr0 (*vr0_);
-  value_range vr1 (*vr1_);
-  if (vr0.undefined_p ())
-    vr0.set_varying (expr_type);
-  if (vr1.undefined_p ())
-    vr1.set_varying (expr_type);
-  vr0.normalize_addresses ();
-  vr1.normalize_addresses ();
-  if (!op.fold_range (*vr, expr_type, vr0, vr1))
-    vr->set_varying (expr_type);
-}
-
-/* Perform a unary operation on a range.  */
-
-void
-range_fold_unary_expr (value_range *vr,
-		       enum tree_code code, tree expr_type,
-		       const value_range *vr0,
-		       tree vr0_type)
-{
-  if (!supported_types_p (vr, expr_type, vr0_type)
-      || !defined_ranges_p (vr, vr0))
-    return;
-  range_op_handler op (code, expr_type);
-  if (!op)
-    {
-      vr->set_varying (expr_type);
-      return;
-    }
-
-  value_range vr0_cst (*vr0);
-  vr0_cst.normalize_addresses ();
-  if (!op.fold_range (*vr, expr_type, vr0_cst, value_range (expr_type)))
-    vr->set_varying (expr_type);
 }
 
 /* Helper for overflow_comparison_p

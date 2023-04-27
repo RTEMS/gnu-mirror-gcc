@@ -41,6 +41,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "internal-fn.h"
 #include "stringpool.h"
 #include "attribs.h"
+#include "decl.h"
 #include "gcc-rich-location.h"
 
 /* The various kinds of conversion.  */
@@ -3612,7 +3613,9 @@ add_template_candidate_real (struct z_candidate **candidates, tree tmpl,
   /* Now the explicit specifier might have been deduced; check if this
      declaration is explicit.  If it is and we're ignoring non-converting
      constructors, don't add this function to the set of candidates.  */
-  if ((flags & LOOKUP_ONLYCONVERTING) && DECL_NONCONVERTING_P (fn))
+  if (((flags & (LOOKUP_ONLYCONVERTING|LOOKUP_LIST_INIT_CTOR))
+       == LOOKUP_ONLYCONVERTING)
+      && DECL_NONCONVERTING_P (fn))
     return NULL;
 
   if (DECL_CONSTRUCTOR_P (fn) && nargs == 2)
@@ -8293,7 +8296,7 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
 	  || SCALAR_TYPE_P (totype))
       && convs->kind != ck_base)
     {
-      bool complained = false;
+      int complained = 0;
       conversion *t = convs;
 
       /* Give a helpful error if this is bad because of excess braces.  */
@@ -8325,14 +8328,18 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
 							    totype))
 	  {
 	  case 2:
-	    pedwarn (loc, 0, "converting to %qH from %qI with greater "
-			     "conversion rank", totype, TREE_TYPE (expr));
-	    complained = true;
+	    if (pedwarn (loc, 0, "converting to %qH from %qI with greater "
+				 "conversion rank", totype, TREE_TYPE (expr)))
+	      complained = 1;
+	    else if (!complained)
+	      complained = -1;
 	    break;
 	  case 3:
-	    pedwarn (loc, 0, "converting to %qH from %qI with unordered "
-			     "conversion ranks", totype, TREE_TYPE (expr));
-	    complained = true;
+	    if (pedwarn (loc, 0, "converting to %qH from %qI with unordered "
+				 "conversion ranks", totype, TREE_TYPE (expr)))
+	      complained = 1;
+	    else if (!complained)
+	      complained = -1;
 	    break;
 	  default:
 	    break;
@@ -8386,7 +8393,7 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
 				  "invalid conversion from %qH to %qI",
 				  TREE_TYPE (expr), totype);
 	}
-      if (complained)
+      if (complained == 1)
 	maybe_inform_about_fndecl_for_bogus_argument_init (fn, argnum);
 
       return cp_convert (totype, expr, complain);
@@ -10411,10 +10418,11 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
     }
   else
     {
-      /* If FN is marked deprecated, then we've already issued a deprecated-use
-	 warning from mark_used above, so avoid redundantly issuing another one
-	 from build_addr_func.  */
-      warning_sentinel w (warn_deprecated_decl);
+      /* If FN is marked deprecated or unavailable, then we've already
+	 issued a diagnostic from mark_used above, so avoid redundantly
+	 issuing another one from build_addr_func.  */
+      auto w = make_temp_override (deprecated_state,
+				   UNAVAILABLE_DEPRECATED_SUPPRESS);
 
       fn = build_addr_func (fn, complain);
       if (fn == error_mark_node)
@@ -13781,8 +13789,31 @@ std_pair_ref_ref_p (tree t)
 
 /* Return true if a class CTYPE is either std::reference_wrapper or
    std::ref_view, or a reference wrapper class.  We consider a class
-   a reference wrapper class if it has a reference member and a
-   constructor taking the same reference type.  */
+   a reference wrapper class if it has a reference member.  We no
+   longer check that it has a constructor taking the same reference type
+   since that approach still generated too many false positives.  */
+
+static bool
+class_has_reference_member_p (tree t)
+{
+  for (tree fields = TYPE_FIELDS (t);
+       fields;
+       fields = DECL_CHAIN (fields))
+    if (TREE_CODE (fields) == FIELD_DECL
+	&& !DECL_ARTIFICIAL (fields)
+	&& TYPE_REF_P (TREE_TYPE (fields)))
+      return true;
+  return false;
+}
+
+/* A wrapper for the above suitable as a callback for dfs_walk_once.  */
+
+static tree
+class_has_reference_member_p_r (tree binfo, void *)
+{
+  return (class_has_reference_member_p (BINFO_TYPE (binfo))
+	  ? integer_one_node : NULL_TREE);
+}
 
 static bool
 reference_like_class_p (tree ctype)
@@ -13798,30 +13829,19 @@ reference_like_class_p (tree ctype)
   if (decl_in_std_namespace_p (tdecl))
     {
       tree name = DECL_NAME (tdecl);
-      return (name
-	      && (id_equal (name, "reference_wrapper")
-		  || id_equal (name, "ref_view")));
+      if (name
+	  && (id_equal (name, "reference_wrapper")
+	      || id_equal (name, "span")
+	      || id_equal (name, "ref_view")))
+	return true;
     }
-  for (tree fields = TYPE_FIELDS (ctype);
-       fields;
-       fields = DECL_CHAIN (fields))
-    {
-      if (TREE_CODE (fields) != FIELD_DECL || DECL_ARTIFICIAL (fields))
-	continue;
-      tree type = TREE_TYPE (fields);
-      if (!TYPE_REF_P (type))
-	continue;
-      /* OK, the field is a reference member.  Do we have a constructor
-	 taking its type?  */
-      for (tree fn : ovl_range (CLASSTYPE_CONSTRUCTORS (ctype)))
-	{
-	  tree args = FUNCTION_FIRST_USER_PARMTYPE (fn);
-	  if (args
-	      && same_type_p (TREE_VALUE (args), type)
-	      && TREE_CHAIN (args) == void_list_node)
-	    return true;
-	}
-    }
+
+  /* Some classes, such as std::tuple, have the reference member in its
+     (non-direct) base class.  */
+  if (dfs_walk_once (TYPE_BINFO (ctype), class_has_reference_member_p_r,
+		     nullptr, nullptr))
+    return true;
+
   return false;
 }
 

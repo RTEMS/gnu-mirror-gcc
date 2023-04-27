@@ -44,22 +44,23 @@ extern int riscv_const_insns (rtx);
 extern int riscv_split_const_insns (rtx);
 extern int riscv_load_store_insns (rtx, rtx_insn *);
 extern rtx riscv_emit_move (rtx, rtx);
-extern bool riscv_split_symbol (rtx, rtx, machine_mode, rtx *, bool);
+extern bool riscv_split_symbol (rtx, rtx, machine_mode, rtx *);
 extern bool riscv_split_symbol_type (enum riscv_symbol_type);
 extern rtx riscv_unspec_address (rtx, enum riscv_symbol_type);
-extern void riscv_move_integer (rtx, rtx, HOST_WIDE_INT, machine_mode, bool);
+extern void riscv_move_integer (rtx, rtx, HOST_WIDE_INT, machine_mode);
 extern bool riscv_legitimize_move (machine_mode, rtx, rtx);
 extern rtx riscv_subword (rtx, bool);
 extern bool riscv_split_64bit_move_p (rtx, rtx);
 extern void riscv_split_doubleword_move (rtx, rtx);
 extern const char *riscv_output_move (rtx, rtx);
 extern const char *riscv_output_return ();
+
 #ifdef RTX_CODE
 extern void riscv_expand_int_scc (rtx, enum rtx_code, rtx, rtx);
 extern void riscv_expand_float_scc (rtx, enum rtx_code, rtx, rtx);
 extern void riscv_expand_conditional_branch (rtx, enum rtx_code, rtx, rtx);
-extern void riscv_expand_conditional_move (rtx, rtx, rtx, rtx_code, rtx, rtx);
 #endif
+extern bool riscv_expand_conditional_move (rtx, rtx, rtx, rtx);
 extern rtx riscv_legitimize_call_address (rtx);
 extern void riscv_set_return_address (rtx, rtx);
 extern bool riscv_expand_block_move (rtx, rtx, rtx);
@@ -78,6 +79,8 @@ extern void riscv_reinit (void);
 extern poly_uint64 riscv_regmode_natural_size (machine_mode);
 extern bool riscv_v_ext_vector_mode_p (machine_mode);
 extern bool riscv_shamt_matches_mask_p (int, HOST_WIDE_INT);
+extern void riscv_subword_address (rtx, rtx *, rtx *, rtx *, rtx *);
+extern void riscv_lshift_subword (machine_mode, rtx, rtx, rtx *);
 
 /* Routines implemented in riscv-c.cc.  */
 void riscv_cpu_cpp_builtins (cpp_reader *);
@@ -157,7 +160,10 @@ bool check_builtin_call (location_t, vec<location_t>, unsigned int,
 			   tree, unsigned int, tree *);
 bool const_vec_all_same_in_range_p (rtx, HOST_WIDE_INT, HOST_WIDE_INT);
 bool legitimize_move (rtx, rtx, machine_mode);
+void emit_vlmax_vsetvl (machine_mode, rtx);
+void emit_hard_vlmax_vsetvl (machine_mode, rtx);
 void emit_vlmax_op (unsigned, rtx, rtx, machine_mode);
+void emit_vlmax_op (unsigned, rtx, rtx, rtx, machine_mode);
 void emit_nonvlmax_op (unsigned, rtx, rtx, rtx, machine_mode);
 enum vlmul_type get_vlmul (machine_mode);
 unsigned int get_ratio (machine_mode);
@@ -202,6 +208,7 @@ enum vlen_enum
 };
 bool slide1_sew64_helper (int, machine_mode, machine_mode,
 			  machine_mode, rtx *);
+rtx gen_avl_for_scalar_move (rtx);
 }
 
 /* We classify builtin types into two classes:
@@ -218,5 +225,18 @@ const unsigned int RISCV_BUILTIN_SHIFT = 1;
 
 /* Mask that selects the riscv_builtin_class part of a function code.  */
 const unsigned int RISCV_BUILTIN_CLASS = (1 << RISCV_BUILTIN_SHIFT) - 1;
+
+/* Routines implemented in thead.cc.  */
+extern bool th_mempair_operands_p (rtx[4], bool, machine_mode);
+extern void th_mempair_order_operands (rtx[4], bool, machine_mode);
+extern void th_mempair_prepare_save_restore_operands (rtx[4], bool,
+						      machine_mode,
+						      int, HOST_WIDE_INT,
+						      int, HOST_WIDE_INT);
+extern void th_mempair_save_restore_regs (rtx[4], bool, machine_mode);
+#ifdef RTX_CODE
+extern const char*
+th_mempair_output_move (rtx[4], bool, machine_mode, RTX_CODE);
+#endif
 
 #endif /* ! GCC_RISCV_PROTOS_H */

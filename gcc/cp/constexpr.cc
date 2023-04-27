@@ -6033,7 +6033,8 @@ cxx_eval_store_expression (const constexpr_ctx *ctx, tree t,
 	  *valp = build_constructor (type, NULL);
 	  CONSTRUCTOR_NO_CLEARING (*valp) = no_zero_init;
 	}
-      else if (TREE_CODE (*valp) == STRING_CST)
+      else if (STRIP_ANY_LOCATION_WRAPPER (*valp),
+	       TREE_CODE (*valp) == STRING_CST)
 	{
 	  /* An array was initialized with a string constant, and now
 	     we're writing into one of its elements.  Explode the
@@ -7229,16 +7230,23 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 					  non_constant_p, overflow_p);
 	if (*non_constant_p)
 	  break;
-	/* Adjust the type of the result to the type of the temporary.  */
-	r = adjust_temp_type (type, r);
+	/* If the initializer is complex, evaluate it to initialize slot.  */
+	bool is_complex = target_expr_needs_replace (t);
+	if (!is_complex)
+	  {
+	    r = unshare_constructor (r);
+	    /* Adjust the type of the result to the type of the temporary.  */
+	    r = adjust_temp_type (type, r);
+	    ctx->global->put_value (slot, r);
+	  }
 	if (TARGET_EXPR_CLEANUP (t) && !CLEANUP_EH_ONLY (t))
 	  ctx->global->cleanups->safe_push (TARGET_EXPR_CLEANUP (t));
-	r = unshare_constructor (r);
-	ctx->global->put_value (slot, r);
 	if (ctx->save_exprs)
 	  ctx->save_exprs->safe_push (slot);
 	if (lval)
 	  return slot;
+	if (is_complex)
+	  r = ctx->global->get_value (slot);
       }
       break;
 
@@ -8795,6 +8803,10 @@ maybe_constant_init_1 (tree t, tree decl, bool allow_non_constant,
 			&& (TREE_STATIC (decl) || DECL_EXTERNAL (decl)));
       if (is_static)
 	manifestly_const_eval = true;
+
+      if (cp_unevaluated_operand && !manifestly_const_eval)
+	return fold_to_constant (t);
+
       t = cxx_eval_outermost_constant_expr (t, allow_non_constant, !is_static,
 					    mce_value (manifestly_const_eval),
 					    false, decl);

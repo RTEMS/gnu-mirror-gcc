@@ -309,6 +309,26 @@ public:
   }
 } op_cfn_constant_p;
 
+// Implement range operator for integral/pointer functions returning
+// the first argument.
+class cfn_pass_through_arg1 : public range_operator
+{
+public:
+  using range_operator::fold_range;
+  virtual bool fold_range (irange &r, tree, const irange &lh,
+			   const irange &, relation_trio) const
+  {
+    r = lh;
+    return true;
+  }
+  virtual bool op1_range (irange &r, tree, const irange &lhs,
+			  const irange &, relation_trio) const
+  {
+    r = lhs;
+    return true;
+  }
+} op_cfn_pass_through_arg1;
+
 // Implement range operator for CFN_BUILT_IN_SIGNBIT.
 class cfn_signbit : public range_operator_float
 {
@@ -340,8 +360,6 @@ public:
       }
     if (!lhs.contains_p (build_zero_cst (lhs.type ())))
       {
-	REAL_VALUE_TYPE dconstm0 = dconst0;
-	dconstm0.sign = 1;
 	r.set (type, frange_val_min (type), dconstm0);
 	r.update_nan (true);
 	return true;
@@ -523,7 +541,7 @@ cfn_clz::fold_range (irange &r, tree type, const irange &lh,
   // argument is 0, but that is undefined behavior.
   //
   // For __builtin_c[lt]z* consider argument of 0 always undefined
-  // behavior, for internal fns depending on C?Z_DEFINED_ALUE_AT_ZERO.
+  // behavior, for internal fns depending on C?Z_DEFINED_VALUE_AT_ZERO.
   if (lh.undefined_p ())
     return false;
   int prec = TYPE_PRECISION (lh.type ());
@@ -964,6 +982,13 @@ gimple_range_op_handler::maybe_builtin_call ()
     CASE_CFN_PARITY:
       m_valid = true;
       m_int = &op_cfn_parity;
+      break;
+
+    case CFN_BUILT_IN_EXPECT:
+    case CFN_BUILT_IN_EXPECT_WITH_PROBABILITY:
+      m_valid = true;
+      m_op1 = gimple_call_arg (call, 0);
+      m_int = &op_cfn_pass_through_arg1;
       break;
 
     default:
