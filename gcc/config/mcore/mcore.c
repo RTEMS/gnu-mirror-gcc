@@ -137,7 +137,8 @@ static rtx        mcore_function_arg            (cumulative_args_t,
 static void       mcore_function_arg_advance    (cumulative_args_t,
 						 const function_arg_info &);
 static unsigned int mcore_function_arg_boundary (machine_mode,
-						 const_tree);
+						 const_tree,
+						 bool);
 static void       mcore_asm_trampoline_template (FILE *);
 static void       mcore_trampoline_init		(rtx, tree, rtx);
 static bool       mcore_warn_func_return        (tree);
@@ -2828,7 +2829,8 @@ mcore_function_arg_advance (cumulative_args_t cum_v,
 
 static unsigned int
 mcore_function_arg_boundary (machine_mode mode,
-			     const_tree type ATTRIBUTE_UNUSED)
+			     const_tree type ATTRIBUTE_UNUSED,
+			     bool)
 {
   /* Doubles must be aligned to an 8 byte boundary.  */
   return (mode != BLKmode && GET_MODE_SIZE (mode) == 8

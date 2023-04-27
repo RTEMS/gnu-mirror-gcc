@@ -563,7 +563,8 @@ nvptx_function_arg_advance (cumulative_args_t cum_v, const function_arg_info &)
    been promoted and/or converted to invisible reference.  */
 
 static unsigned
-nvptx_function_arg_boundary (machine_mode mode, const_tree ARG_UNUSED (type))
+nvptx_function_arg_boundary (machine_mode mode, const_tree ARG_UNUSED (type),
+			     bool)
 {
   return GET_MODE_ALIGNMENT (mode);
 }

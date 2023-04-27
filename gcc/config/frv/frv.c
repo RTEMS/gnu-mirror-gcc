@@ -388,7 +388,8 @@ static rtx frv_function_incoming_arg (cumulative_args_t,
 static void frv_function_arg_advance (cumulative_args_t,
 				      const function_arg_info &);
 static unsigned int frv_function_arg_boundary	(machine_mode,
-						 const_tree);
+						 const_tree,
+						 bool);
 static void frv_output_dwarf_dtprel		(FILE *, int, rtx)
   ATTRIBUTE_UNUSED;
 static reg_class_t frv_secondary_reload		(bool, rtx, reg_class_t,
@@ -3089,7 +3090,8 @@ frv_must_pass_in_stack (const function_arg_info &arg)
 
 static unsigned int
 frv_function_arg_boundary (machine_mode mode ATTRIBUTE_UNUSED,
-                           const_tree type ATTRIBUTE_UNUSED)
+			   const_tree type ATTRIBUTE_UNUSED,
+			   bool)
 {
   return BITS_PER_WORD;
 }

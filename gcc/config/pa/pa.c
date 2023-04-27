@@ -171,7 +171,7 @@ static void pa_function_arg_advance (cumulative_args_t,
 				     const function_arg_info &);
 static rtx pa_function_arg (cumulative_args_t, const function_arg_info &);
 static pad_direction pa_function_arg_padding (machine_mode, const_tree);
-static unsigned int pa_function_arg_boundary (machine_mode, const_tree);
+static unsigned int pa_function_arg_boundary (machine_mode, const_tree, bool);
 static struct machine_function * pa_init_machine_status (void);
 static reg_class_t pa_secondary_reload (bool, rtx, reg_class_t,
 					machine_mode,
@@ -186,7 +186,7 @@ static machine_mode pa_promote_function_mode (const_tree,
 static void pa_asm_trampoline_template (FILE *);
 static void pa_trampoline_init (rtx, tree, rtx);
 static rtx pa_trampoline_adjust_address (rtx);
-static rtx pa_delegitimize_address (rtx);
+static rtx pa_delegitimize_address (rtx, bool);
 static bool pa_print_operand_punct_valid_p (unsigned char);
 static rtx pa_internal_arg_pointer (void);
 static bool pa_can_eliminate (const int, const int);
@@ -9738,7 +9738,7 @@ pa_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
 /* Arguments larger than one word are double word aligned.  */
 
 static unsigned int
-pa_function_arg_boundary (machine_mode mode, const_tree type)
+pa_function_arg_boundary (machine_mode mode, const_tree type, bool)
 {
   bool singleword = (type
 		     ? (integer_zerop (TYPE_SIZE (type))
@@ -10334,7 +10334,7 @@ pa_trampoline_adjust_address (rtx addr)
 }
 
 static rtx
-pa_delegitimize_address (rtx orig_x)
+pa_delegitimize_address (rtx orig_x, bool)
 {
   rtx x = delegitimize_mem_from_attrs (orig_x);
 

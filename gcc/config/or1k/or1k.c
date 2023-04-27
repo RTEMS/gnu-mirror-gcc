@@ -852,7 +852,7 @@ or1k_legitimize_address (rtx x, rtx /* oldx */, machine_mode)
    into a direct symbol reference.  */
 
 static rtx
-or1k_delegitimize_address (rtx x)
+or1k_delegitimize_address (rtx x, bool)
 {
   if (GET_CODE (x) == UNSPEC)
     {

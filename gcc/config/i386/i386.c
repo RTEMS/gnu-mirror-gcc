@@ -405,7 +405,8 @@ static bool ext_80387_constants_init;
 static rtx ix86_function_value (const_tree, const_tree, bool);
 static bool ix86_function_value_regno_p (const unsigned int);
 static unsigned int ix86_function_arg_boundary (machine_mode,
-						const_tree);
+						const_tree,
+						bool);
 static rtx ix86_static_chain (const_tree, bool);
 static int ix86_function_regparm (const_tree, const_tree);
 static void ix86_compute_frame_layout (void);
@@ -2896,7 +2897,7 @@ function_arg_advance_64 (CUMULATIVE_ARGS *cum, machine_mode mode,
     }
   else
     {
-      int align = ix86_function_arg_boundary (mode, type) / BITS_PER_WORD;
+      int align = ix86_function_arg_boundary (mode, type, named) / BITS_PER_WORD;
       cum->words = ROUND_UP (cum->words, align);
       cum->words += words;
       return 0;
@@ -3460,7 +3461,7 @@ ix86_contains_aligned_value_p (const_tree type)
    specified mode and type.  */
 
 static unsigned int
-ix86_function_arg_boundary (machine_mode mode, const_tree type)
+ix86_function_arg_boundary (machine_mode mode, const_tree type, bool)
 {
   unsigned int align;
   if (type)
@@ -4535,7 +4536,7 @@ ix86_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
      alignment is beyond MAX_SUPPORTED_STACK_ALIGNMENT, it will be
      aligned at MAX_SUPPORTED_STACK_ALIGNMENT.  We will match callee
      here with caller.  */
-  arg_boundary = ix86_function_arg_boundary (VOIDmode, type);
+  arg_boundary = ix86_function_arg_boundary (VOIDmode, type, false);
   if ((unsigned int) arg_boundary > MAX_SUPPORTED_STACK_ALIGNMENT)
     arg_boundary = MAX_SUPPORTED_STACK_ALIGNMENT;
 
@@ -12005,7 +12006,7 @@ ix86_delegitimize_address_1 (rtx x, bool base_term_p)
 /* The normal instantiation of the above template.  */
 
 static rtx
-ix86_delegitimize_address (rtx x)
+ix86_delegitimize_address (rtx x, bool)
 {
   return ix86_delegitimize_address_1 (x, false);
 }

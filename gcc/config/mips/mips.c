@@ -1162,7 +1162,7 @@ static const struct mips_rtx_cost_data
 static rtx mips_find_pic_call_symbol (rtx_insn *, rtx, bool);
 static int mips_register_move_cost (machine_mode, reg_class_t,
 				    reg_class_t);
-static unsigned int mips_function_arg_boundary (machine_mode, const_tree);
+static unsigned int mips_function_arg_boundary (machine_mode, const_tree, bool);
 static rtx mips_gen_const_int_vector_shuffle (machine_mode, int);
 
 /* This hash table keeps track of implicit "mips16" and "nomips16" attributes
@@ -5922,7 +5922,7 @@ mips_get_arg_info (struct mips_arg_info *info, const CUMULATIVE_ARGS *cum,
     }
 
   /* See whether the argument has doubleword alignment.  */
-  doubleword_aligned_p = (mips_function_arg_boundary (mode, type)
+  doubleword_aligned_p = (mips_function_arg_boundary (mode, type, named)
 			  > BITS_PER_WORD);
 
   /* Set REG_OFFSET to the register count we're interested in.
@@ -6154,7 +6154,7 @@ mips_arg_partial_bytes (cumulative_args_t cum, const function_arg_info &arg)
    to STACK_BOUNDARY bits if the type requires it.  */
 
 static unsigned int
-mips_function_arg_boundary (machine_mode mode, const_tree type)
+mips_function_arg_boundary (machine_mode mode, const_tree type, bool)
 {
   unsigned int alignment;
 
@@ -6780,7 +6780,7 @@ mips_std_gimplify_va_arg_expr (tree valist, tree type, gimple_seq *pre_p,
     type = build_pointer_type (type);
 
   align = PARM_BOUNDARY / BITS_PER_UNIT;
-  boundary = targetm.calls.function_arg_boundary (TYPE_MODE (type), type);
+  boundary = targetm.calls.function_arg_boundary (TYPE_MODE (type), type, false);
 
   /* When we align parameter on stack for caller, if the parameter
      alignment is beyond MAX_SUPPORTED_STACK_ALIGNMENT, it will be

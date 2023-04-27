@@ -197,7 +197,7 @@ static rtx arm_function_arg (cumulative_args_t, const function_arg_info &);
 static void arm_function_arg_advance (cumulative_args_t,
 				      const function_arg_info &);
 static pad_direction arm_function_arg_padding (machine_mode, const_tree);
-static unsigned int arm_function_arg_boundary (machine_mode, const_tree);
+static unsigned int arm_function_arg_boundary (machine_mode, const_tree, bool);
 static rtx aapcs_allocate_return_reg (machine_mode, const_tree,
 				      const_tree);
 static rtx aapcs_libcall_value (machine_mode);
@@ -7118,7 +7118,7 @@ arm_function_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
 }
 
 static unsigned int
-arm_function_arg_boundary (machine_mode mode, const_tree type)
+arm_function_arg_boundary (machine_mode mode, const_tree type, bool)
 {
   if (!ARM_DOUBLEWORD_ALIGN)
     return PARM_BOUNDARY;

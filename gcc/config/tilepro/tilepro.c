@@ -153,7 +153,7 @@ tilepro_return_in_memory (const_tree type, const_tree fndecl ATTRIBUTE_UNUSED)
 
 /* Implement TARGET_FUNCTION_ARG_BOUNDARY.  */
 static unsigned int
-tilepro_function_arg_boundary (machine_mode mode, const_tree type)
+tilepro_function_arg_boundary (machine_mode mode, const_tree type, bool)
 {
   unsigned int alignment;
 
@@ -179,7 +179,7 @@ tilepro_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
 
   /* See whether the argument has doubleword alignment.  */
   doubleword_aligned_p =
-    tilepro_function_arg_boundary (arg.mode, arg.type) > BITS_PER_WORD;
+    tilepro_function_arg_boundary (arg.mode, arg.type, arg.named) > BITS_PER_WORD;
 
   if (doubleword_aligned_p)
     cum += cum & 1;
@@ -207,7 +207,7 @@ tilepro_function_arg_advance (cumulative_args_t cum_v,
 
   /* See whether the argument has doubleword alignment.  */
   doubleword_aligned_p =
-    tilepro_function_arg_boundary (arg.mode, arg.type) > BITS_PER_WORD;
+    tilepro_function_arg_boundary (arg.mode, arg.type, arg.named) > BITS_PER_WORD;
 
   if (doubleword_aligned_p)
     *cum += *cum & 1;
@@ -1136,7 +1136,7 @@ tilepro_legitimize_address (rtx x, rtx oldx ATTRIBUTE_UNUSED,
 
 /* Implement TARGET_DELEGITIMIZE_ADDRESS.  */
 static rtx
-tilepro_delegitimize_address (rtx x)
+tilepro_delegitimize_address (rtx x, bool)
 {
   x = delegitimize_mem_from_attrs (x);
 

@@ -657,7 +657,7 @@ arc_sched_issue_rate (void)
 
 /* TARGET_PRESERVE_RELOAD_P is still awaiting patch re-evaluation / review.  */
 static bool arc_preserve_reload_p (rtx in) ATTRIBUTE_UNUSED;
-static rtx arc_delegitimize_address (rtx);
+static rtx arc_delegitimize_address (rtx, bool);
 static bool arc_can_follow_jump (const rtx_insn *follower,
 				 const rtx_insn *followee);
 
@@ -9829,7 +9829,7 @@ arc_delegitimize_address_0 (rtx op)
 }
 
 static rtx
-arc_delegitimize_address (rtx orig_x)
+arc_delegitimize_address (rtx orig_x, bool)
 {
   rtx x = orig_x;
 

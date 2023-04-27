@@ -6581,7 +6581,7 @@ rs6000_function_arg_padding (machine_mode mode, const_tree type)
    Quadword align large synthetic vector types.   */
 
 unsigned int
-rs6000_function_arg_boundary (machine_mode mode, const_tree type)
+rs6000_function_arg_boundary (machine_mode mode, const_tree type, bool)
 {
   machine_mode elt_mode;
   int n_elts;
@@ -6663,11 +6663,11 @@ rs6000_parm_offset (void)
 
 static unsigned int
 rs6000_parm_start (machine_mode mode, const_tree type,
-		   unsigned int nwords)
+		   bool named, unsigned int nwords)
 {
   unsigned int align;
 
-  align = rs6000_function_arg_boundary (mode, type) / PARM_BOUNDARY - 1;
+  align = rs6000_function_arg_boundary (mode, type, named) / PARM_BOUNDARY - 1;
   return nwords + (-(rs6000_parm_offset () + nwords) & align);
 }
 
@@ -7033,7 +7033,7 @@ rs6000_function_arg_advance_1 (CUMULATIVE_ARGS *cum, machine_mode mode,
     {
       int n_words = rs6000_arg_size (mode, type);
       int start_words = cum->words;
-      int align_words = rs6000_parm_start (mode, type, start_words);
+      int align_words = rs6000_parm_start (mode, type, named, start_words);
 
       cum->words = align_words + n_words;
 
@@ -7567,7 +7567,7 @@ rs6000_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
     }
   else
     {
-      int align_words = rs6000_parm_start (mode, type, cum->words);
+      int align_words = rs6000_parm_start (mode, type, named, cum->words);
 
       /* _Decimal128 must be passed in an even/odd float register pair.
 	 This assumes that the register number is odd when fregno is odd.  */
@@ -7711,7 +7711,7 @@ rs6000_arg_partial_bytes (cumulative_args_t cum_v,
   if (TARGET_MACHO && rs6000_darwin64_struct_check_p (arg.mode, arg.type))
     return 0;
 
-  align_words = rs6000_parm_start (arg.mode, arg.type, cum->words);
+  align_words = rs6000_parm_start (arg.mode, arg.type, arg.named, cum->words);
 
   if (USE_FP_FOR_ARG_P (cum, elt_mode)
       && !(TARGET_AIX && !TARGET_ELF && arg.aggregate_type_p ()))
@@ -8376,7 +8376,7 @@ rs6000_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
       unsigned HOST_WIDE_INT align, boundary;
       tree valist_tmp = get_initialized_tmp_var (valist, pre_p, NULL);
       align = PARM_BOUNDARY / BITS_PER_UNIT;
-      boundary = rs6000_function_arg_boundary (TYPE_MODE (type), type);
+      boundary = rs6000_function_arg_boundary (TYPE_MODE (type), type, false);
       if (boundary > MAX_SUPPORTED_STACK_ALIGNMENT)
 	boundary = MAX_SUPPORTED_STACK_ALIGNMENT;
       boundary /= BITS_PER_UNIT;

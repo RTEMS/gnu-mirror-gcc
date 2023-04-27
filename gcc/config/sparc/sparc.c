@@ -652,7 +652,7 @@ static bool sparc_tls_referenced_p (rtx);
 static rtx sparc_legitimize_tls_address (rtx);
 static rtx sparc_legitimize_pic_address (rtx, rtx);
 static rtx sparc_legitimize_address (rtx, rtx, machine_mode);
-static rtx sparc_delegitimize_address (rtx);
+static rtx sparc_delegitimize_address (rtx, bool);
 static bool sparc_mode_dependent_address_p (const_rtx, addr_space_t);
 static bool sparc_pass_by_reference (cumulative_args_t,
 				     const function_arg_info &);
@@ -663,7 +663,8 @@ static rtx sparc_function_incoming_arg (cumulative_args_t,
 					const function_arg_info &);
 static pad_direction sparc_function_arg_padding (machine_mode, const_tree);
 static unsigned int sparc_function_arg_boundary (machine_mode,
-						 const_tree);
+						 const_tree,
+						 bool);
 static int sparc_arg_partial_bytes (cumulative_args_t,
 				    const function_arg_info &);
 static bool sparc_return_in_memory (const_tree, const_tree);
@@ -5023,7 +5024,7 @@ sparc_legitimize_address (rtx x, rtx oldx ATTRIBUTE_UNUSED,
 /* Delegitimize an address that was legitimized by the above function.  */
 
 static rtx
-sparc_delegitimize_address (rtx x)
+sparc_delegitimize_address (rtx x, bool)
 {
   x = delegitimize_mem_from_attrs (x);
 
@@ -7527,7 +7528,7 @@ sparc_function_incoming_arg (cumulative_args_t cum,
 /* For sparc64, objects requiring 16 byte alignment are passed that way.  */
 
 static unsigned int
-sparc_function_arg_boundary (machine_mode mode, const_tree type)
+sparc_function_arg_boundary (machine_mode mode, const_tree type, bool)
 {
   return ((TARGET_ARCH64
 	   && (GET_MODE_ALIGNMENT (mode) == 128

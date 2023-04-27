@@ -2053,7 +2053,7 @@ nds32_function_arg_advance (cumulative_args_t ca,
 }
 
 static unsigned int
-nds32_function_arg_boundary (machine_mode mode, const_tree type)
+nds32_function_arg_boundary (machine_mode mode, const_tree type, bool)
 {
   return (nds32_needs_double_word_align (mode, type)
 	  ? NDS32_DOUBLE_WORD_ALIGNMENT
@@ -2884,7 +2884,7 @@ nds32_legitimate_constant_p (machine_mode mode, rtx x)
 
 /* Reorgnize the UNSPEC CONST and return its direct symbol.  */
 static rtx
-nds32_delegitimize_address (rtx x)
+nds32_delegitimize_address (rtx x, bool)
 {
   x = delegitimize_mem_from_attrs (x);
 

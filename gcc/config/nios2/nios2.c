@@ -2696,7 +2696,7 @@ nios2_legitimize_address (rtx x, rtx oldx ATTRIBUTE_UNUSED,
 }
 
 static rtx
-nios2_delegitimize_address (rtx x)
+nios2_delegitimize_address (rtx x, bool)
 {
   x = delegitimize_mem_from_attrs (x);
 

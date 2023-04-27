@@ -2454,7 +2454,7 @@ riscv_expand_conditional_move (rtx dest, rtx cons, rtx alt, rtx_code code,
    to PREFERRED_STACK_BOUNDARY bits if the type requires it.  */
 
 static unsigned int
-riscv_function_arg_boundary (machine_mode mode, const_tree type)
+riscv_function_arg_boundary (machine_mode mode, const_tree type, bool)
 {
   unsigned int alignment;
 
@@ -2765,7 +2765,7 @@ riscv_get_arg_info (struct riscv_arg_info *info, const CUMULATIVE_ARGS *cum,
   unsigned num_bytes, num_words;
   unsigned fpr_base = return_p ? FP_RETURN : FP_ARG_FIRST;
   unsigned gpr_base = return_p ? GP_RETURN : GP_ARG_FIRST;
-  unsigned alignment = riscv_function_arg_boundary (mode, type);
+  unsigned alignment = riscv_function_arg_boundary (mode, type, named);
 
   memset (info, 0, sizeof (*info));
   info->gpr_offset = cum->num_gprs;

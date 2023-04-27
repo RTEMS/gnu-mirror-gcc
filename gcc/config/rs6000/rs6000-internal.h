@@ -153,7 +153,7 @@ extern bool rs6000_pass_by_reference (cumulative_args_t,
 extern void setup_incoming_varargs (cumulative_args_t,
 				    const function_arg_info &, int *, int);
 extern unsigned int rs6000_function_arg_boundary (machine_mode mode,
-						  const_tree type);
+						  const_tree type, bool named);
 extern bool rs6000_must_pass_in_stack (const function_arg_info &);
 extern int rs6000_arg_partial_bytes (cumulative_args_t,
 				     const function_arg_info &);

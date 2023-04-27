@@ -8519,7 +8519,7 @@ rs6000_real_tls_symbol_ref_p (rtx x)
    and turn them back into a direct symbol reference.  */
 
 static rtx
-rs6000_delegitimize_address (rtx orig_x)
+rs6000_delegitimize_address (rtx orig_x, bool)
 {
   rtx x, y, offset;
 

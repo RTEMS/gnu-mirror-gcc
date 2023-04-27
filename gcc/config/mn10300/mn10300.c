@@ -2081,7 +2081,7 @@ mn10300_legitimate_constant_p (machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 /* Undo pic address legitimization for the benefit of debug info.  */
 
 static rtx
-mn10300_delegitimize_address (rtx orig_x)
+mn10300_delegitimize_address (rtx orig_x, bool)
 {
   rtx x = orig_x, ret, addend = NULL;
   bool need_mem;

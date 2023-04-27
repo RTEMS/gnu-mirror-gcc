@@ -1767,7 +1767,8 @@ rl78_function_arg_advance (cumulative_args_t cum_v,
 
 static unsigned int
 rl78_function_arg_boundary (machine_mode mode ATTRIBUTE_UNUSED,
-			    const_tree type ATTRIBUTE_UNUSED)
+			    const_tree type ATTRIBUTE_UNUSED,
+			    bool)
 {
   return 16;
 }

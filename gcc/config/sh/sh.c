@@ -268,7 +268,7 @@ static reg_class_t sh_secondary_reload (bool, rtx, reg_class_t,
                                         struct secondary_reload_info *);
 static bool sh_legitimate_address_p (machine_mode, rtx, bool);
 static rtx sh_legitimize_address (rtx, rtx, machine_mode);
-static rtx sh_delegitimize_address (rtx);
+static rtx sh_delegitimize_address (rtx, bool);
 static bool sh_cannot_substitute_mem_equiv_p (rtx);
 static bool sh_legitimize_address_displacement (rtx *, rtx *,
 						poly_int64, machine_mode);
@@ -9338,7 +9338,7 @@ sh_legitimize_reload_address (rtx *p, machine_mode mode, int opnum,
    general assembler lossage, recognize various UNSPEC sequences
    and turn them back into a direct symbol reference.  */
 static rtx
-sh_delegitimize_address (rtx orig_x)
+sh_delegitimize_address (rtx orig_x, bool)
 {
   orig_x = delegitimize_mem_from_attrs (orig_x);
 

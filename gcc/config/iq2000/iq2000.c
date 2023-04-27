@@ -168,7 +168,8 @@ static void iq2000_function_arg_advance (cumulative_args_t,
 					 const function_arg_info &);
 static pad_direction iq2000_function_arg_padding (machine_mode, const_tree);
 static unsigned int iq2000_function_arg_boundary (machine_mode,
-						  const_tree);
+						  const_tree,
+						  bool);
 static void iq2000_va_start	      (tree, rtx);
 static bool iq2000_legitimate_address_p (machine_mode, rtx, bool);
 static bool iq2000_can_eliminate      (const int, const int);
@@ -1401,7 +1402,7 @@ iq2000_function_arg_padding (machine_mode mode, const_tree type)
 }
 
 static unsigned int
-iq2000_function_arg_boundary (machine_mode mode, const_tree type)
+iq2000_function_arg_boundary (machine_mode mode, const_tree type, bool)
 {
   return (type != NULL_TREE
 	  ? (TYPE_ALIGN (type) <= PARM_BOUNDARY

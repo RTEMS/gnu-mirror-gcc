@@ -201,7 +201,7 @@ tilegx_mode_rep_extended (scalar_int_mode mode, scalar_int_mode mode_rep)
 
 /* Implement TARGET_FUNCTION_ARG_BOUNDARY.  */
 static unsigned int
-tilegx_function_arg_boundary (machine_mode mode, const_tree type)
+tilegx_function_arg_boundary (machine_mode mode, const_tree type, bool)
 {
   unsigned int alignment;
 
@@ -227,7 +227,7 @@ tilegx_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
 
   /* See whether the argument has doubleword alignment.  */
   doubleword_aligned_p =
-    tilegx_function_arg_boundary (arg.mode, arg.type) > BITS_PER_WORD;
+    tilegx_function_arg_boundary (arg.mode, arg.type, arg.named) > BITS_PER_WORD;
 
   if (doubleword_aligned_p)
     cum += cum & 1;
@@ -1372,7 +1372,7 @@ tilegx_legitimize_address (rtx x, rtx oldx ATTRIBUTE_UNUSED,
 
 /* Implement TARGET_DELEGITIMIZE_ADDRESS.  */
 static rtx
-tilegx_delegitimize_address (rtx x)
+tilegx_delegitimize_address (rtx x, bool)
 {
   x = delegitimize_mem_from_attrs (x);
 

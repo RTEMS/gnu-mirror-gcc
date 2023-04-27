@@ -7439,7 +7439,7 @@ s390_mangle_type (const_tree type)
    and turn them back into a direct symbol reference.  */
 
 static rtx
-s390_delegitimize_address (rtx orig_x)
+s390_delegitimize_address (rtx orig_x, bool)
 {
   rtx x, y;
 

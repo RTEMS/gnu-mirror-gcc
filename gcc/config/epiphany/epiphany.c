@@ -695,13 +695,13 @@ gen_compare_reg (machine_mode cmode, enum rtx_code code,
    : ROUND_ADVANCE (GET_MODE_SIZE (MODE)))
 
 /* Round CUM up to the necessary point for argument MODE/TYPE.  */
-#define ROUND_ADVANCE_CUM(CUM, MODE, TYPE) \
-  (epiphany_function_arg_boundary ((MODE), (TYPE)) > BITS_PER_WORD \
+#define ROUND_ADVANCE_CUM(CUM, MODE, TYPE, NAMED) \
+  (epiphany_function_arg_boundary ((MODE), (TYPE), (NAMED)) > BITS_PER_WORD \
    ? (((CUM) + 1) & ~1)	\
    : (CUM))
 
 static unsigned int
-epiphany_function_arg_boundary (machine_mode mode, const_tree type)
+epiphany_function_arg_boundary (machine_mode mode, const_tree type, bool)
 {
   if ((type ? TYPE_ALIGN (type) : GET_MODE_BITSIZE (mode)) <= PARM_BOUNDARY)
     return PARM_BOUNDARY;
@@ -728,7 +728,7 @@ epiphany_setup_incoming_varargs (cumulative_args_t cum,
   gcc_assert (arg.mode != BLKmode);
 
   next_cum = *get_cumulative_args (cum);
-  next_cum = (ROUND_ADVANCE_CUM (next_cum, arg.mode, arg.type)
+  next_cum = (ROUND_ADVANCE_CUM (next_cum, arg.mode, arg.type, arg.named)
 	      + ROUND_ADVANCE_ARG (arg.mode, arg.type));
   first_anon_arg = next_cum;
 
@@ -753,7 +753,7 @@ epiphany_arg_partial_bytes (cumulative_args_t cum,
   gcc_assert (!epiphany_pass_by_reference (cum, arg));
 
   rounded_cum = ROUND_ADVANCE_CUM (*get_cumulative_args (cum),
-				   arg.mode, arg.type);
+				   arg.mode, arg.type, arg.named);
   if (rounded_cum < MAX_EPIPHANY_PARM_REGS)
     {
       words = MAX_EPIPHANY_PARM_REGS - rounded_cum;
@@ -2263,8 +2263,9 @@ epiphany_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
 {
   CUMULATIVE_ARGS cum = *get_cumulative_args (cum_v);
 
-  if (PASS_IN_REG_P (cum, arg.mode, arg.type))
-    return gen_rtx_REG (arg.mode, ROUND_ADVANCE_CUM (cum, arg.mode, arg.type));
+  if (PASS_IN_REG_P (cum, arg.mode, arg.type, arg.named))
+    return gen_rtx_REG (arg.mode, ROUND_ADVANCE_CUM (cum, arg.mode, arg.type,
+						     arg.named));
   return 0;
 }
 
@@ -2275,7 +2276,7 @@ epiphany_function_arg_advance (cumulative_args_t cum_v,
 {
   CUMULATIVE_ARGS *cum = get_cumulative_args (cum_v);
 
-  *cum = (ROUND_ADVANCE_CUM (*cum, arg.mode, arg.type)
+  *cum = (ROUND_ADVANCE_CUM (*cum, arg.mode, arg.type, arg.named)
 	  + ROUND_ADVANCE_ARG (arg.mode, arg.type));
 }
 

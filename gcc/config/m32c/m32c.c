@@ -81,7 +81,7 @@ static bool m32c_pass_by_reference (cumulative_args_t,
 				    const function_arg_info &);
 static void m32c_function_arg_advance (cumulative_args_t,
 				       const function_arg_info &);
-static unsigned int m32c_function_arg_boundary (machine_mode, const_tree);
+static unsigned int m32c_function_arg_boundary (machine_mode, const_tree, bool);
 static int m32c_pushm_popm (Push_Pop_Type);
 static bool m32c_strict_argument_naming (cumulative_args_t);
 static rtx m32c_struct_value_rtx (tree, int);
@@ -1413,7 +1413,8 @@ m32c_function_arg_advance (cumulative_args_t ca_v,
 #define TARGET_FUNCTION_ARG_BOUNDARY m32c_function_arg_boundary
 static unsigned int
 m32c_function_arg_boundary (machine_mode mode ATTRIBUTE_UNUSED,
-			    const_tree type ATTRIBUTE_UNUSED)
+			    const_tree type ATTRIBUTE_UNUSED,
+			    bool)
 {
   return (TARGET_A16 ? 8 : 16);
 }

@@ -210,7 +210,8 @@ static void ia64_function_arg_advance (cumulative_args_t,
 				       const function_arg_info &);
 static pad_direction ia64_function_arg_padding (machine_mode, const_tree);
 static unsigned int ia64_function_arg_boundary (machine_mode,
-						const_tree);
+						const_tree,
+						bool);
 static bool ia64_function_ok_for_sibcall (tree, tree);
 static bool ia64_return_in_memory (const_tree, const_tree);
 static rtx ia64_function_value (const_tree, const_tree, bool);
@@ -5099,7 +5100,7 @@ ia64_function_arg_advance (cumulative_args_t cum_v,
    even though their normal alignment is 8 bytes.  See ia64_function_arg.  */
 
 static unsigned int
-ia64_function_arg_boundary (machine_mode mode, const_tree type)
+ia64_function_arg_boundary (machine_mode mode, const_tree type, bool)
 {
   if (mode == TFmode && TARGET_HPUX && TARGET_ILP32)
     return PARM_BOUNDARY * 2;

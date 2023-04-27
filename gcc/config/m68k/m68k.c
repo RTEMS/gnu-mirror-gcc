@@ -181,7 +181,7 @@ static bool m68k_return_in_memory (const_tree, const_tree);
 static void m68k_output_dwarf_dtprel (FILE *, int, rtx) ATTRIBUTE_UNUSED;
 static void m68k_trampoline_init (rtx, tree, rtx);
 static poly_int64 m68k_return_pops_args (tree, tree, poly_int64);
-static rtx m68k_delegitimize_address (rtx);
+static rtx m68k_delegitimize_address (rtx, bool);
 static void m68k_function_arg_advance (cumulative_args_t,
 				       const function_arg_info &);
 static rtx m68k_function_arg (cumulative_args_t, const function_arg_info &);
@@ -5132,7 +5132,7 @@ m68k_output_dwarf_dtprel (FILE *file, int size, rtx x)
    and turn them back into a direct symbol reference.  */
 
 static rtx
-m68k_delegitimize_address (rtx orig_x)
+m68k_delegitimize_address (rtx orig_x, bool)
 {
   rtx x;
   struct m68k_address addr;

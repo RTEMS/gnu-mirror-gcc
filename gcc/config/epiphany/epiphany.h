@@ -523,8 +523,8 @@ typedef struct GTY (()) machine_function
    This macro is only used in this file.  */
 /* We must use partial argument passing because of the chosen mode
    of varargs handling.  */
-#define PASS_IN_REG_P(CUM, MODE, TYPE) \
-  (ROUND_ADVANCE_CUM ((CUM), (MODE), (TYPE)) < MAX_EPIPHANY_PARM_REGS)
+#define PASS_IN_REG_P(CUM, MODE, TYPE, NAMED) \
+  (ROUND_ADVANCE_CUM ((CUM), (MODE), (TYPE), (NAMED)) < MAX_EPIPHANY_PARM_REGS)
 
 /* Tell GCC to use TARGET_RETURN_IN_MEMORY.  */
 #define DEFAULT_PCC_STRUCT_RETURN 0

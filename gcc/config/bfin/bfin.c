@@ -1212,7 +1212,7 @@ bfin_return_addr_rtx (int count)
 }
 
 static rtx
-bfin_delegitimize_address (rtx orig_x)
+bfin_delegitimize_address (rtx orig_x, bool)
 {
   rtx x = orig_x;
 
