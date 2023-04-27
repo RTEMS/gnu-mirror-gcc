@@ -1,0 +1,189 @@
+FAIL: gcc.dg/guality/pr36728-2.c -O3 -g  -DPREVENT_OPTIMIZATION  line 18 arg3 == 3
+FAIL: gcc.dg/guality/pr36728-2.c -O3 -g  -DPREVENT_OPTIMIZATION  line 18 arg4 == 4
+FAIL: gcc.dg/guality/pr36728-2.c -O3 -g  -DPREVENT_OPTIMIZATION  line 18 arg5 == 5
+FAIL: gcc.dg/guality/pr36728-2.c -O3 -g  -DPREVENT_OPTIMIZATION  line 18 arg6 == 6
+FAIL: gcc.dg/guality/pr36728-2.c -O3 -g  -DPREVENT_OPTIMIZATION  line 18 arg7 == 30
+FAIL: gcc.dg/guality/pr36728-4.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 14 y == 2
+FAIL: gcc.dg/guality/pr36728-4.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 16 y == 2
+FAIL: gcc.dg/guality/pr36728-4.c -O3 -g  -DPREVENT_OPTIMIZATION  line 14 y == 2
+FAIL: gcc.dg/guality/pr36728-4.c -O3 -g  -DPREVENT_OPTIMIZATION  line 16 y == 2
+XPASS: gcc.dg/guality/pr41353-1.c -Og -DPREVENT_OPTIMIZATION  line 28 j == 28 + 37
+FAIL: gcc.dg/guality/pr41616-1.c -O2  -DPREVENT_OPTIMIZATION  execution test
+FAIL: gcc.dg/guality/pr41616-1.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION execution test
+FAIL: gcc.dg/guality/pr41616-1.c -O3 -g  -DPREVENT_OPTIMIZATION  execution test
+FAIL: gcc.dg/guality/pr54519-1.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION line 20 y == 25
+FAIL: gcc.dg/guality/pr54519-1.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION line 20 z == 6
+FAIL: gcc.dg/guality/pr54519-1.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION line 23 y == 117
+FAIL: gcc.dg/guality/pr54519-1.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION line 23 z == 8
+FAIL: gcc.dg/guality/pr54519-1.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 20 y == 25
+FAIL: gcc.dg/guality/pr54519-1.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 20 z == 6
+FAIL: gcc.dg/guality/pr54519-1.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 23 y == 117
+FAIL: gcc.dg/guality/pr54519-1.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 23 z == 8
+FAIL: gcc.dg/guality/pr54519-2.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION line 17 y == 25
+FAIL: gcc.dg/guality/pr54519-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 17 y == 25
+FAIL: gcc.dg/guality/pr54519-3.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION line 23 y == 117
+FAIL: gcc.dg/guality/pr54519-3.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION line 23 z == 8
+FAIL: gcc.dg/guality/pr54519-3.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 23 y == 117
+FAIL: gcc.dg/guality/pr54519-3.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 23 z == 8
+FAIL: gcc.dg/guality/pr54519-4.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION line 17 y == 25
+FAIL: gcc.dg/guality/pr54519-4.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 17 y == 25
+FAIL: gcc.dg/guality/pr54519-5.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION line 17 y == 25
+FAIL: gcc.dg/guality/pr54519-5.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 17 y == 25
+FAIL: gcc.dg/guality/pr54519-6.c -Os  -DPREVENT_OPTIMIZATION  line 11 x == 2
+FAIL: gcc.dg/guality/pr56154-1.c -Og -DPREVENT_OPTIMIZATION  line pr56154-1.c:20 x.a == 6
+FAIL: gcc.dg/guality/pr59776.c -Og -DPREVENT_OPTIMIZATION  line pr59776.c:17 s1.f == 5.0
+FAIL: gcc.dg/guality/pr59776.c -Og -DPREVENT_OPTIMIZATION  line pr59776.c:17 s1.g == 6.0
+FAIL: gcc.dg/guality/pr59776.c -Og -DPREVENT_OPTIMIZATION  line pr59776.c:17 s2.f == 0.0
+FAIL: gcc.dg/guality/pr59776.c -Og -DPREVENT_OPTIMIZATION  line pr59776.c:20 s1.f == 5.0
+FAIL: gcc.dg/guality/pr59776.c -Og -DPREVENT_OPTIMIZATION  line pr59776.c:20 s1.g == 6.0
+FAIL: gcc.dg/guality/pr59776.c -Og -DPREVENT_OPTIMIZATION  line pr59776.c:20 s2.f == 5.0
+FAIL: gcc.dg/guality/pr90074.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 28 c + 1 == 2
+FAIL: gcc.dg/guality/pr90074.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 28 i + 1 == 8
+FAIL: gcc.dg/guality/pr90716.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 23 j + 1 == 9
+FAIL: gcc.dg/guality/sra-1.c -O2  -DPREVENT_OPTIMIZATION  line 43 a.j == 14
+FAIL: gcc.dg/guality/sra-1.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION line 43 a.j == 14
+FAIL: gcc.dg/guality/sra-1.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 21 a.i == 4
+FAIL: gcc.dg/guality/sra-1.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 21 a.j == 14
+FAIL: gcc.dg/guality/sra-1.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 32 a[0] == 4
+FAIL: gcc.dg/guality/sra-1.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 32 a[1] == 14
+FAIL: gcc.dg/guality/sra-1.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 43 a.i == 4
+FAIL: gcc.dg/guality/sra-1.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 43 a.j == 14
+FAIL: gcc.dg/guality/sra-1.c -O3 -g  -DPREVENT_OPTIMIZATION  line 43 a.j == 14
+FAIL: gcc.dg/guality/sra-1.c -Os  -DPREVENT_OPTIMIZATION  line 43 a.j == 14
+FAIL: gcc.dg/guality/sra-1.c -Og -DPREVENT_OPTIMIZATION  line 21 a.i == 4
+FAIL: gcc.dg/guality/sra-1.c -Og -DPREVENT_OPTIMIZATION  line 21 a.j == 14
+FAIL: gcc.dg/guality/sra-1.c -Og -DPREVENT_OPTIMIZATION  line 32 a[0] == 4
+FAIL: gcc.dg/guality/sra-1.c -Og -DPREVENT_OPTIMIZATION  line 32 a[1] == 14
+FAIL: gcc.dg/guality/sra-1.c -Og -DPREVENT_OPTIMIZATION  line 43 a.i == 4
+FAIL: gcc.dg/guality/sra-1.c -Og -DPREVENT_OPTIMIZATION  line 43 a.j == 14
+FAIL: gcc.dg/guality/vla-1.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 24 i == 5
+FAIL: gcc.dg/guality/vla-1.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 24 sizeof (a) == 17 * sizeof (short)
+FAIL: g++.dg/guality/pr55665.C -O2 -flto -fno-use-linker-plugin -flto-partition=none  line 23 p == 40
+XPASS: gcc.dg/guality/example.c -O0  execution test
+XPASS: gcc.dg/guality/example.c -O1  -DPREVENT_OPTIMIZATION  execution test
+XPASS: gcc.dg/guality/example.c -Og -DPREVENT_OPTIMIZATION  execution test
+XPASS: gcc.dg/guality/guality.c -O0  execution test
+XPASS: gcc.dg/guality/guality.c -O1  -DPREVENT_OPTIMIZATION  execution test
+XPASS: gcc.dg/guality/guality.c -O2  -DPREVENT_OPTIMIZATION  execution test
+XPASS: gcc.dg/guality/guality.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION execution test
+XPASS: gcc.dg/guality/guality.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION execution test
+XPASS: gcc.dg/guality/guality.c -O3 -g  -DPREVENT_OPTIMIZATION  execution test
+XPASS: gcc.dg/guality/guality.c -Os  -DPREVENT_OPTIMIZATION  execution test
+XPASS: gcc.dg/guality/guality.c -Og -DPREVENT_OPTIMIZATION  execution test
+XPASS: gcc.dg/guality/inline-params.c -O2  -DPREVENT_OPTIMIZATION  execution test
+XPASS: gcc.dg/guality/inline-params.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION execution test
+XPASS: gcc.dg/guality/inline-params.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION execution test
+XPASS: gcc.dg/guality/inline-params.c -O3 -g  -DPREVENT_OPTIMIZATION  execution test
+XPASS: gcc.dg/guality/inline-params.c -Os  -DPREVENT_OPTIMIZATION  execution test
+FAIL: gcc.dg/guality/loop-1.c -O3 -fomit-frame-pointer -funroll-loops -fpeel-loops -ftracer -finline-functions  -DPREVENT_OPTIMIZATION  line 20 i == 1
+FAIL: gcc.dg/guality/pr36728-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 16 arg1 == 1
+FAIL: gcc.dg/guality/pr36728-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 16 arg2 == 2
+FAIL: gcc.dg/guality/pr36728-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 16 arg3 == 3
+FAIL: gcc.dg/guality/pr36728-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 16 arg4 == 4
+FAIL: gcc.dg/guality/pr36728-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 16 arg5 == 5
+FAIL: gcc.dg/guality/pr36728-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 16 arg6 == 6
+FAIL: gcc.dg/guality/pr36728-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 16 arg7 == 30
+FAIL: gcc.dg/guality/pr36728-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 18 arg1 == 1
+FAIL: gcc.dg/guality/pr36728-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 18 arg2 == 2
+FAIL: gcc.dg/guality/pr36728-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 18 arg3 == 3
+FAIL: gcc.dg/guality/pr36728-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 18 arg4 == 4
+FAIL: gcc.dg/guality/pr36728-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 18 arg5 == 5
+FAIL: gcc.dg/guality/pr36728-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 18 arg6 == 6
+FAIL: gcc.dg/guality/pr36728-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 18 arg7 == 30
+FAIL: gcc.dg/guality/pr36728-2.c -O3 -g  -DPREVENT_OPTIMIZATION  line 16 arg1 == 1
+FAIL: gcc.dg/guality/pr36728-2.c -O3 -g  -DPREVENT_OPTIMIZATION  line 16 arg2 == 2
+FAIL: gcc.dg/guality/pr36728-2.c -O3 -g  -DPREVENT_OPTIMIZATION  line 16 arg3 == 3
+FAIL: gcc.dg/guality/pr36728-2.c -O3 -g  -DPREVENT_OPTIMIZATION  line 16 arg4 == 4
+FAIL: gcc.dg/guality/pr36728-2.c -O3 -g  -DPREVENT_OPTIMIZATION  line 16 arg5 == 5
+FAIL: gcc.dg/guality/pr36728-2.c -O3 -g  -DPREVENT_OPTIMIZATION  line 16 arg6 == 6
+FAIL: gcc.dg/guality/pr36728-2.c -O3 -g  -DPREVENT_OPTIMIZATION  line 16 arg7 == 30
+FAIL: gcc.dg/guality/pr36728-2.c -O3 -g  -DPREVENT_OPTIMIZATION  line 18 arg1 == 1
+FAIL: gcc.dg/guality/pr36728-2.c -O3 -g  -DPREVENT_OPTIMIZATION  line 18 arg2 == 2
+FAIL: gcc.dg/guality/pr54519-3.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION line 20 y == 25
+FAIL: gcc.dg/guality/pr54519-3.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION line 20 z == 6
+FAIL: gcc.dg/guality/pr54519-3.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 20 y == 25
+FAIL: gcc.dg/guality/pr54519-3.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 20 z == 6
+FAIL: gcc.c-torture/execute/fprintf-2.c -O3 -g  (test for excess errors)
+FAIL: gcc.c-torture/execute/printf-2.c -O3 -g  (test for excess errors)
+FAIL: gcc.c-torture/execute/user-printf.c -O3 -g  (test for excess errors)
+FAIL: gcc.target/i386/pr97642-2.c (test for excess errors)
+UNRESOLVED: gcc.target/i386/pr97642-2.c compilation failed to produce executable
+FAIL: 30_threads/jthread/95989.cc execution test
+FAIL: g++.dg/tsan/pthread_cond_clockwait.C -O0  (test for excess errors)
+FAIL: g++.dg/tsan/pthread_cond_clockwait.C -O2  (test for excess errors)
+UNRESOLVED: g++.dg/tsan/pthread_cond_clockwait.C -O0  compilation failed to produce executable
+UNRESOLVED: g++.dg/tsan/pthread_cond_clockwait.C -O2  compilation failed to produce executable
+FAIL: gcc.dg/guality/pr54200.c -Og -DPREVENT_OPTIMIZATION  line 20 z == 3
+XPASS: gcc.dg/guality/ipa-sra-1.c -O0  line 15 k == 3
+XPASS: gcc.dg/guality/ipa-sra-1.c -O1  -DPREVENT_OPTIMIZATION  line 15 k == 3
+XPASS: gcc.dg/guality/ipa-sra-1.c -Og -DPREVENT_OPTIMIZATION  line 15 k == 3
+FAIL: g++.dg/vect/pr92595.cc -std=c++14 (internal compiler error: in operator[], at vec.h:889)
+FAIL: g++.dg/vect/pr92595.cc -std=c++2a (test for excess errors)
+FAIL: gcc.dg/guality/pr43051-1.c -O3 -fomit-frame-pointer -funroll-loops -fpeel-loops -ftracer -finline-functions  -DPREVENT_OPTIMIZATION  line 34 c == &a[0]
+FAIL: gcc.dg/guality/pr43051-1.c -O3 -fomit-frame-pointer -funroll-loops -fpeel-loops -ftracer -finline-functions  -DPREVENT_OPTIMIZATION  line 39 c == &a[0]
+FAIL: gcc.dg/vect/vect-tail-nomask-1.c -flto -ffat-lto-objects  scan-tree-dump-times vect "LOOP EPILOGUE VECTORIZED \\(MODE=V16QI\\)" 2
+FAIL: gcc.dg/vect/vect-tail-nomask-1.c scan-tree-dump-times vect "LOOP EPILOGUE VECTORIZED \\(MODE=V16QI\\)" 2
+FAIL: gcc.target/i386/pr88531-1b.c scan-assembler-times vgatherqpd 4
+FAIL: gcc.target/i386/pr88531-1b.c scan-assembler-times vmulpd 4
+FAIL: gcc.target/i386/pr88531-1c.c scan-assembler-times vgatherqpd 4
+FAIL: gcc.target/i386/pr88531-1c.c scan-assembler-times vmulpd 4
+FAIL: gcc.target/i386/pr88531-2b.c scan-assembler-times vmulps 2
+FAIL: gcc.target/i386/pr88531-2c.c scan-assembler-times vmulps 2
+FAIL: gcc.target/i386/vect-reduc-1.c scan-assembler-times padd 5
+FAIL: gcc.target/i386/vect-reduc-1.c scan-tree-dump vect "LOOP EPILOGUE VECTORIZED"
+ERROR: g++.dg/gcov/gcov-17.C : error executing dg-final: can't read "script": no such variable
+ERROR: g++.dg/gcov/pr98273.C : error executing dg-final: can't read "script": no such variable
+FAIL: g++.dg/asan/asan_test.C -O2  (test for excess errors)
+FAIL: g++.dg/cpp0x/constexpr-compare2.C -std=c++14 (test for excess errors)
+FAIL: g++.dg/cpp0x/constexpr-compare2.C -std=c++17 (test for excess errors)
+FAIL: g++.dg/cpp0x/constexpr-compare2.C -std=c++20 (test for excess errors)
+FAIL: g++.dg/warn/pr104025.C -std=gnu++14 (test for excess errors)
+FAIL: g++.dg/warn/pr104025.C -std=gnu++17 (test for excess errors)
+FAIL: g++.dg/warn/pr104025.C -std=gnu++20 (test for excess errors)
+FAIL: g++.dg/warn/pr104025.C -std=gnu++98 (test for excess errors)
+UNRESOLVED: g++.dg/asan/asan_test.C -O2  compilation failed to produce executable
+FAIL: g++.dg/cpp0x/variadic-alias3.C -std=c++17 (internal compiler error: in hashtab_chk_error, at hash-table.cc:137)
+FAIL: g++.dg/cpp0x/variadic-alias3.C -std=c++17 (test for excess errors)
+FAIL: gcc.target/i386/auto-init-4.c scan-assembler-times long\t-16843010 5
+FAIL: gcc.dg/pr23911.c scan-tree-dump-times dce3 "__complex__ \\(1.0e\\+0, 0.0\\)" 2
+FAIL: gcc.dg/pr56837.c scan-tree-dump-times optimized "memset ..c, 68, 16384.;" 1
+XPASS: g++.dg/warn/Wstringop-overflow-4.C -std=gnu++14  (test for bogus messages, line 198)
+XPASS: g++.dg/warn/Wstringop-overflow-4.C -std=gnu++17  (test for bogus messages, line 198)
+XPASS: g++.dg/warn/Wstringop-overflow-4.C -std=gnu++20  (test for bogus messages, line 198)
+FAIL: g++.dg/modules/xtreme-header-2_b.C -std=c++17 (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header-2_b.C -std=c++2a (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header-2_b.C -std=c++2b (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header-4_b.C -std=c++17 (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header-4_b.C -std=c++2a (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header-4_b.C -std=c++2b (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header_b.C -std=c++17 (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header_b.C -std=c++2a (test for excess errors)
+FAIL: g++.dg/modules/xtreme-header_b.C -std=c++2b (test for excess errors)
+FAIL: gcc.dg/tree-prof/cmpsf-1.c scan-tree-dump-not dom2 "Invalid sum"
+FAIL: libstdc++-prettyprinters/48362.cc print t2
+FAIL: libstdc++-prettyprinters/cxx11.cc print rtpl
+FAIL: libstdc++-prettyprinters/cxx11.cc print tpl
+FAIL: g++.dg/abi/pure-virtual1.C -std=c++14 (test for excess errors)
+FAIL: g++.dg/abi/pure-virtual1.C -std=c++17 (test for excess errors)
+FAIL: g++.dg/abi/pure-virtual1.C -std=c++20 (test for excess errors)
+FAIL: g++.dg/abi/pure-virtual1.C -std=c++98 (test for excess errors)
+FAIL: c-c++-common/goacc/struct-component-kind-1.c -std=c++14  at line 68 (test for errors, line 67)
+FAIL: c-c++-common/goacc/struct-component-kind-1.c -std=c++17  at line 68 (test for errors, line 67)
+FAIL: c-c++-common/goacc/struct-component-kind-1.c -std=c++20  at line 68 (test for errors, line 67)
+FAIL: c-c++-common/goacc/struct-component-kind-1.c -std=c++98  at line 68 (test for errors, line 67)
+FAIL: c-c++-common/goacc/struct-component-kind-1.c at line 68 (test for errors, line 67)
+FAIL: gcc.dg/tree-ssa/forwprop-19.c scan-tree-dump-not forwprop1 "VEC_PERM_EXPR"
+FAIL: g++.dg/pr71488.C (test for excess errors)
+FAIL: gcc.dg/guality/pr54693-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 21 x == 10 - i
+FAIL: gcc.dg/guality/pr54693-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 21 y == 20 - 2 * i
+FAIL: gcc.dg/guality/pr54693-2.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 21 z == 30 - 3 * i
+FAIL: gcc.dg/fold-overflow-1.c scan-assembler-times 2139095040 2
+FAIL: gcc.dg/pr95115.c execution test
+FAIL: gcc.target/i386/pr89618.c scan-tree-dump vect "LOOP VECTORIZED"
+FAIL: gcc.dg/mla_1.c (test for excess errors)
+UNRESOLVED: g++.dg/cpp2a/concepts-lambda3.C -std=c++14 compilation failed to produce executable
+UNRESOLVED: g++.dg/cpp2a/concepts-lambda3.C -std=c++17 compilation failed to produce executable
+UNRESOLVED: g++.dg/cpp2a/concepts-lambda3.C -std=c++98 compilation failed to produce executable
+FAIL: std/time/time_zone/get_info_local.cc execution test
+FAIL: gcc.dg/analyzer/file-CWE-1341-example.c (test for excess errors)
+FAIL: gcc.dg/analyzer/pipe-glibc.c (test for excess errors)
