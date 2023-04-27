@@ -53,14 +53,14 @@ jobs:
       matrixTestSet: ${{ steps.printGCCTestSet.outputs.testSet }}
     steps:
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
           submodules: recursive
           lfs: true
 
       - name: Setup Python 3.7
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v4
         with:
           python-version: 3.7
 
@@ -110,14 +110,14 @@ jobs:
         env:
           GITHUB_CONTEXT: ${{ toJson(github) }}
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
           submodules: recursive
           lfs: true
 
       - name: Setup Python 3.7
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v4
         with:
           python-version: 3.7
         
@@ -140,7 +140,7 @@ jobs:
         run: mv ../objdir objdir
 
       - name: Upload build output
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.testSet }}_logs
           path: objdir/logs
