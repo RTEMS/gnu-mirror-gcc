@@ -822,7 +822,8 @@ default_function_incoming_arg (cumulative_args_t, const function_arg_info &)
 
 unsigned int
 default_function_arg_boundary (machine_mode mode ATTRIBUTE_UNUSED,
-			       const_tree type ATTRIBUTE_UNUSED)
+			       const_tree type ATTRIBUTE_UNUSED,
+			       bool)
 {
   return PARM_BOUNDARY;
 }

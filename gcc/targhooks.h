@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 #define GCC_TARGHOOKS_H
 
 extern bool default_legitimate_address_p (machine_mode, rtx, bool);
+extern bool default_mode_strict_alignment (machine_mode);
 
 extern void default_external_libcall (rtx);
 extern rtx default_legitimize_address (rtx, rtx, machine_mode);
@@ -74,6 +75,7 @@ extern void default_print_operand (FILE *, rtx, int);
 extern void default_print_operand_address (FILE *, machine_mode, rtx);
 extern bool default_print_operand_punct_valid_p (unsigned char);
 extern tree default_mangle_assembler_name (const char *);
+extern void default_do_cfi_startproc (FILE *, tree);
 
 extern machine_mode default_translate_mode_attribute (machine_mode);
 extern bool default_scalar_mode_supported_p (scalar_mode);
@@ -100,8 +102,9 @@ extern tree default_builtin_reciprocal (tree);
 
 extern HOST_WIDE_INT default_static_rtx_alignment (machine_mode);
 extern HOST_WIDE_INT default_constant_alignment (const_tree, HOST_WIDE_INT);
-extern HOST_WIDE_INT default_data_padding_size (unsigned HOST_WIDE_INT,
-						unsigned HOST_WIDE_INT, const_tree);
+extern unsigned HOST_WIDE_INT default_data_padding_size (unsigned HOST_WIDE_INT,
+							 unsigned HOST_WIDE_INT,
+							 const_tree);
 extern HOST_WIDE_INT constant_alignment_word_strings (const_tree,
 						      HOST_WIDE_INT);
 extern HOST_WIDE_INT default_vector_alignment (const_tree);
@@ -158,7 +161,8 @@ extern rtx default_function_arg (cumulative_args_t, const function_arg_info &);
 extern rtx default_function_incoming_arg (cumulative_args_t,
 					  const function_arg_info &);
 extern unsigned int default_function_arg_boundary (machine_mode,
-						   const_tree);
+						   const_tree,
+						   bool);
 extern unsigned int default_function_arg_round_boundary (machine_mode,
 							 const_tree);
 extern bool hook_bool_const_rtx_commutative_p (const_rtx, int);
