@@ -2050,10 +2050,21 @@ add_init_expr_to_sym (const char *name, gfc_expr **initp, locus *var_locus)
 	  /* The shape may be NULL for EXPR_ARRAY, set it.  */
 	  if (init->shape == NULL)
 	    {
-	      gcc_assert (init->expr_type == EXPR_ARRAY);
+	      if (init->expr_type != EXPR_ARRAY)
+		{
+		  gfc_error ("Bad shape of initializer at %L", &init->where);
+		  return false;
+		}
+
 	      init->shape = gfc_get_shape (1);
 	      if (!gfc_array_size (init, &init->shape[0]))
-		  gfc_internal_error ("gfc_array_size failed");
+		{
+		  gfc_error ("Cannot determine shape of initializer at %L",
+			     &init->where);
+		  free (init->shape);
+		  init->shape = NULL;
+		  return false;
+		}
 	    }
 
 	  for (dim = 0; dim < sym->as->rank; ++dim)
@@ -9891,9 +9902,10 @@ gfc_match_modproc (void)
   gfc_namespace *module_ns;
   gfc_interface *old_interface_head, *interface;
 
-  if ((gfc_state_stack->state != COMP_INTERFACE
-       && gfc_state_stack->state != COMP_CONTAINS)
-      || gfc_state_stack->previous == NULL
+  if (gfc_state_stack->previous == NULL
+      || (gfc_state_stack->state != COMP_INTERFACE
+	  && (gfc_state_stack->state != COMP_CONTAINS
+	      || gfc_state_stack->previous->state != COMP_INTERFACE))
       || current_interface.type == INTERFACE_NAMELESS
       || current_interface.type == INTERFACE_ABSTRACT)
     {

@@ -1,3 +1,533 @@
+2023-04-24  Haochen Gui  <guihaoc@gcc.gnu.org>
+
+	PR target/108812
+	* gcc.target/powerpc/p9-sign_extend-runnable.c: Set corresponding
+	expected vectors for Big Endian.
+	* gcc.target/powerpc/int_128bit-runnable.c: Likewise.
+
+2023-04-22  Jason Merrill  <jason@redhat.com>
+
+	PR c++/107163
+	* g++.dg/warn/Wsequence-point-5.C: New test.
+
+2023-04-22  Jason Merrill  <jason@redhat.com>
+
+	PR c++/105996
+	* g++.dg/cpp0x/constexpr-pmf3.C: New test.
+
+2023-04-22  Jason Merrill  <jason@redhat.com>
+
+	PR c++/108975
+	* g++.dg/cpp0x/lambda/lambda-const11.C: New test.
+
+2023-04-22  Jason Merrill  <jason@redhat.com>
+
+	PR c++/69410
+	* g++.dg/lookup/friend24.C: New test.
+
+2023-04-22  Jason Merrill  <jason@redhat.com>
+
+	PR c++/101869
+	* g++.dg/cpp0x/enum43.C: New test.
+
+2023-04-22  Jason Merrill  <jason@redhat.com>
+
+	PR c++/105406
+	* g++.dg/coroutines/co-await-moveonly1.C: New test.
+
+2023-04-22  Jason Merrill  <jason@redhat.com>
+
+	PR c++/103871
+	PR c++/98056
+	* g++.dg/coroutines/co-await-initlist1.C: New test.
+
+2023-04-22  Jason Merrill  <jason@redhat.com>
+
+	PR c++/108468
+	* g++.dg/cpp1y/var-templ78.C: New test.
+
+2023-04-18  Philipp Tomsich  <philipp.tomsich@vrull.eu>
+
+	Backported from master:
+	2023-01-31  Philipp Tomsich  <philipp.tomsich@vrull.eu>
+
+	PR target/108589
+	* gcc.target/aarch64/pr108589.c: New test.
+
+2023-04-17  Philipp Tomsich  <philipp.tomsich@vrull.eu>
+
+	Backported from master:
+	2023-04-17  Philipp Tomsich  <philipp.tomsich@vrull.eu>
+		    Di Zhao  <di.zhao@amperecomputing.com>
+
+	* gcc.target/aarch64/ampere1-no_ldp_combine.c: New test.
+
+2023-04-17  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-05-05  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/105484
+	* gcc.dg/torture/pr105484.c: New testcase.
+
+2023-04-17  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-02-09  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/104464
+	* gcc.dg/pr104464.c: New testcase.
+
+2023-04-17  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-02-09  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/104450
+	* g++.dg/torture/pr104450.C: New testcase.
+
+2023-04-17  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2023-04-04  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/108699
+	* gcc.target/powerpc/p9-vparity.c: Add scan-assembler-not for vpopcntb
+	to distinguish parity byte from parity.
+	* gcc.target/powerpc/pr108699.c: New test.
+
+2023-04-16  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-04-14  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/109511
+	* gfortran.dg/set_exponent_1.f90: New test.
+
+2023-04-11  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/109067
+	* gcc.target/powerpc/divic3-1.c: New test.  Backport from master,
+	3/20/2023.
+	* gcc.target/powerpc/divic3-2.c: Likewise.
+	* gcc.target/powerpc/mulic3-1.c: Likewise.
+	* gcc.target/powerpc/mulic3-2.c: Likewise.
+
+2023-03-28  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gcc.target/sparc/20230328-1.c: New test.
+	* gcc.target/sparc/20230328-2.c: Likewise.
+	* gcc.target/sparc/20230328-3.c: Likewise.
+	* gcc.target/sparc/20230328-4.c: Likewise.
+
+2023-03-24  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-03-21  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/99036
+	* gfortran.dg/pr99036.f90: New test.
+
+2023-03-24  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-03-20  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/109186
+	* gfortran.dg/nearest_6.f90: New test.
+
+2023-03-24  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-03-19  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/85877
+	* gfortran.dg/pr85877.f90: New test.
+
+2023-03-17  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-03-11  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/106945
+	* gfortran.dg/pr106945.f90: New test.
+
+2023-03-17  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-03-10  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/104332
+	* gfortran.dg/bind_c_usage_34.f90: New test.
+
+2023-03-14  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	Backported from master:
+	2023-03-14  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/109108
+	* gdc.dg/torture/torture.exp (srcdir): New proc.
+	* gdc.dg/torture/imports/pr109108.d: New test.
+	* gdc.dg/torture/pr109108.d: New test.
+
+2023-03-13  Arsen Arsenović  <arsen@aarsen.me>
+
+	PR c++/106188
+	PR c++/106713
+	* g++.dg/coroutines/pr106188.C: New test.
+
+2023-03-05  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-02-27  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/108937
+	* gfortran.dg/ibits_2.f90: New test.
+
+2023-03-05  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-02-22  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/96024
+	* gfortran.dg/pr96024.f90: New test.
+
+2023-03-05  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-02-21  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/96025
+	* gfortran.dg/pr96025.f90: New test.
+
+2023-03-03  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	Backported from master:
+	2023-03-03  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/108877
+	* gdc.dg/imports/pr108877a.d: New test.
+	* gdc.dg/pr108877.d: New test.
+
+2023-02-27  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2023-02-14  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/96373
+	* gcc.target/powerpc/p9-vec-length-epil-1.c: Add -fno-trapping-math.
+	* gcc.target/powerpc/p9-vec-length-epil-2.c: Likewise.
+	* gcc.target/powerpc/p9-vec-length-epil-3.c: Likewise.
+	* gcc.target/powerpc/p9-vec-length-epil-4.c: Likewise.
+	* gcc.target/powerpc/p9-vec-length-epil-5.c: Likewise.
+	* gcc.target/powerpc/p9-vec-length-epil-6.c: Likewise.
+	* gcc.target/powerpc/p9-vec-length-epil-8.c: Likewise.
+	* gcc.target/powerpc/p9-vec-length-full-1.c: Likewise.
+	* gcc.target/powerpc/p9-vec-length-full-2.c: Likewise.
+	* gcc.target/powerpc/p9-vec-length-full-3.c: Likewise.
+	* gcc.target/powerpc/p9-vec-length-full-4.c: Likewise.
+	* gcc.target/powerpc/p9-vec-length-full-5.c: Likewise.
+	* gcc.target/powerpc/p9-vec-length-full-6.c: Likewise.
+	* gcc.target/powerpc/p9-vec-length-full-8.c: Likewise.
+	* gcc.target/powerpc/pr96373.c: New test.
+
+2023-02-20  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2023-02-06  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/104921
+	* gcc.target/aarch64/pr104921-1.c: New test.
+	* gcc.target/aarch64/pr104921-2.c: New test.
+	* gcc.target/aarch64/pr104921.x: Include file for new tests.
+
+2023-02-15  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2023-02-15  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/106675
+	* g++.dg/cpp0x/overload-conv-5.C: New test.
+
+2023-02-13  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2023-01-18  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/108348
+	* gcc.target/powerpc/pr108348-1.c: New test.
+	* gcc.target/powerpc/pr108348-2.c: New test.
+
+2023-02-13  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2023-01-16  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/108272
+	* gcc.target/powerpc/pr108272-1.c: New test.
+	* gcc.target/powerpc/pr108272-2.c: New test.
+	* gcc.target/powerpc/pr108272-3.c: New test.
+	* gcc.target/powerpc/pr108272-4.c: New test.
+
+2023-02-10  Steve Kargl  <kargl@gcc.gnu.org>
+
+	Backported from master:
+	2023-02-08  Steve Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/103259
+	* gfortran.dg/pr103259.f90: New test.
+
+2023-02-10  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-02-07  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/95107
+	* gfortran.dg/save_7.f90: New test.
+
+2023-02-10  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-02-01  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/108609
+	* gfortran.dg/pr108527.f90: Adjust test pattern.
+
+2023-02-10  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-01-28  Harald Anlauf  <anlauf@gmx.de>
+		    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/108527
+	* gfortran.dg/pr108527.f90: New test.
+
+2023-02-07  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-09-02  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/106809
+	* gcc.dg/torture/pr106809.c: New testcase.
+
+2023-02-04  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-01-24  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/108529
+	* gfortran.dg/pr108529.f90: New test.
+
+2023-02-04  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-07-14  Harald Anlauf  <anlauf@gmx.de>
+		    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/106209
+	* gfortran.dg/pr106209.f90: New test.
+
+2023-02-04  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-01-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/108501
+	* gfortran.dg/pr108501.f90: New test.
+
+2023-02-04  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-01-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/108502
+	* gfortran.dg/pr108502.f90: New test.
+
+2023-02-04  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-01-17  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/108421
+	* gfortran.dg/pr108421.f90: New test.
+
+2023-02-04  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-01-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/108420
+	* gfortran.dg/pr108420.f90: New test.
+
+2023-02-04  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-01-28  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/108453
+	* gfortran.dg/common_27.f90: New test.
+
+2023-01-26  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-11-14  Richard Biener  <rguenther@suse.de>
+
+	* gcc.dg/pr107554.c: Restrict to lp64.
+
+2023-01-25  Christophe Lyon  <christophe.lyon@arm.com>
+
+	Backported from master:
+	2023-01-12  Christophe Lyon  <christophe.lyon@arm.com>
+		    Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/bitfield-abi-warning-align16-O2.c: New test.
+	* gcc.target/aarch64/bitfield-abi-warning-align16-O2-extra.c: New
+	test.
+	* gcc.target/aarch64/bitfield-abi-warning-align32-O2.c: New test.
+	* gcc.target/aarch64/bitfield-abi-warning-align32-O2-extra.c: New
+	test.
+	* gcc.target/aarch64/bitfield-abi-warning-align8-O2.c: New test.
+	* gcc.target/aarch64/bitfield-abi-warning.h: New test.
+	* g++.target/aarch64/bitfield-abi-warning-align16-O2.C: New test.
+	* g++.target/aarch64/bitfield-abi-warning-align16-O2-extra.C: New
+	test.
+	* g++.target/aarch64/bitfield-abi-warning-align32-O2.C: New test.
+	* g++.target/aarch64/bitfield-abi-warning-align32-O2-extra.C: New
+	test.
+	* g++.target/aarch64/bitfield-abi-warning-align8-O2.C: New test.
+	* g++.target/aarch64/bitfield-abi-warning.h: New test.
+
+2023-01-24  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-11-11  Richard Biener  <rguenther@suse.de>
+		    Nikita Voronov  <nik_1357@mail.ru>
+
+	PR tree-optimization/107554
+	* gcc.dg/pr107554.c: New testcase.
+
+2023-01-24  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-10-21  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/107323
+	* gcc.dg/tree-ssa/pr107323.c: New testcase.
+
+2023-01-24  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-10-14  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/107254
+	* gfortran.dg/vect/pr107254.f90: New testcase.
+
+2023-01-24  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-10-11  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/107212
+	* gcc.dg/vect/pr107212-1.c: New testcase.
+	* gcc.dg/vect/pr107212-2.c: Likewise.
+
+2023-01-11  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gcc.dg/sso-17.c: New test.
+
+2023-01-10  Stam Markianos-Wright  <stam.markianos-wright@arm.com>
+
+	Backported from master:
+	2022-12-30  Stam Markianos-Wright  <stam.markianos-wright@arm.com>
+
+	PR target/107714
+	* gcc.target/arm/mve/intrinsics/vldst24q_reg_offset.c: New test.
+
+2023-01-08  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-12-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/108131
+	* gfortran.dg/pr103505.f90: Adjust expected patterns.
+	* gfortran.dg/pr108131.f90: New test.
+
+2023-01-06  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	Backported from master:
+	2021-12-29  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	PR testsuite/47334
+	PR testsuite/103823
+	* lib/prune.exp: Prune some warnings related to LTO and
+	visibility.
+
+2023-01-06  Martin Liska  <mliska@suse.cz>
+
+	Backported from master:
+	2021-05-12  Martin Liska  <mliska@suse.cz>
+
+	* lib/lto.exp: When running tests without jobserver, one can see
+	the following warning for tests that use 1to1 partitioning.
+
+2023-01-05  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/106736
+	* gcc.target/powerpc/pr106736-1.c: New test.
+	* gcc.target/powerpc/pr106736-2.c: Likewise.
+	* gcc.target/powerpc/pr106736-3.c: Likewise.
+	* gcc.target/powerpc/pr106736-4.c: Likewise.
+	* gcc.target/powerpc/pr106736-5.c: Likewise.
+
+2022-12-24  John David Anglin  <danglin@gcc.gnu.org>
+
+	* g++.dg/guality/guality.exp: Skip on hppa*-*-hpux*.
+	* gcc.dg/guality/guality.exp: Likewise.
+	* gfortran.dg/guality/guality.exp: Likewise.
+
+2022-12-18  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2022-12-09  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/107872
+	* gfortran.dg/pr107872.f90: New test.
+
+2022-12-16  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2021-10-28  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/102780
+	PR c++/108138
+	* g++.dg/cpp1z/fold13.C: New test.
+
+2022-12-15  Sebastian Pop  <spop@amazon.com>
+
+	PR target/98776
+	* gcc.target/aarch64/pr98776.c: New.
+	* gcc.target/aarch64/pr92424-2.c: Adjust pattern.
+	* gcc.target/aarch64/pr92424-3.c: Adjust pattern.
+
+2022-12-12  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2022-10-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/107107
+	* gcc.dg/pr107107.c: New testcase.
+
+2022-12-11  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	Backported from master:
+	2022-12-11  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/108050
+	* gdc.dg/imports/pr108050/mod1.d: New.
+	* gdc.dg/imports/pr108050/mod2.d: New.
+	* gdc.dg/imports/pr108050/package.d: New.
+	* gdc.dg/pr108050.d: New test.
+
 2022-12-01  liuhongt  <hongtao.liu@intel.com>
 
 	* gcc.target/i386/pr107863.c: New test.
