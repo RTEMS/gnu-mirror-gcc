@@ -1,35 +1,4 @@
-==================== Branch work119, patch #84 ====================
-
-Allow constant element vec_extract to be converted to floating point
-
-This patch allows vec_extract of the following types to be converted to
-floating point by loading the value directly to the vector register, and then
-doing the conversion instead of loading the value to a GPR and then doing a
-direct move:
-
-	vector int
-	vector unsigned int
-	vector unsigned short
-	vector unsigned char
-
-2023-04-26   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/rs6000.md (fp_int_extend): New code attribute.
-	* config/rs6000/vsx.md (vsx_extract_v4si_load_to_<uns><mode>): New
-	* insn.
-	* vsx_extract_<VSX_EXTRACT_I2:mode>_load_to_uns<SFDF:mode>: New insn.
-
-gcc/testsuite/
-
-	* gcc.target/powerpc/vec-extract-mem-char-2.c: New file.
-	* gcc.target/powerpc/vec-extract-mem-int-4.c: New file.
-	* gcc.target/powerpc/vec-extract-mem-int_5.c: New file.
-	* gcc.target/powerpc/vec-extract-mem-short-4.c: New file.
-
-
-==================== Branch work119, patch #83 ====================
+==================== Branch work119, patch #96 ====================
 
 Allow variable element vec_extract to be sign or zero extended
 
@@ -37,7 +6,7 @@ This patch allows vec_extract of V4SI, V8HI, and V16QI vector types with a
 variable element number to be loaded with sign or zero extension, and GCC will
 not generate a separate zero/sign extension instruction.
 
-2023-04-26   Michael Meissner  <meissner@linux.ibm.com>
+2023-04-27   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -51,7 +20,7 @@ gcc/testsuite/
 	* gcc.target/powerpc/vec-extract-mem-short-3.c: New file.
 
 
-==================== Branch work119, patch #82 ====================
+==================== Branch work119, patch #95 ====================
 
 Allow variable element vec_extract to be loaded into vector registers.
 
@@ -59,14 +28,14 @@ This patch allows vec_extract of V4SI, V8HI, and V16QI vector types with a
 variable element number to be loaded into vector registers directly.  It also
 will be split before register allocation.
 
-2023-04-26   Michael Meissner  <meissner@linux.ibm.com>
+2023-04-27   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
 	* config/rs6000/vsx.md (vsx_extract_<mode>_var_load): Allow vector
 	registers to be loaded.  Split before register allocation.
 
-==================== Branch work119, patch #81 ====================
+==================== Branch work119, patch #94 ====================
 
 Allow consant element vec_extract to be zero or sign extended
 
@@ -74,7 +43,7 @@ This patch allows vec_extract of V4SI, V8HI, and V16QI vector types with a
 constant element number to be zero extended.  It also allows vec_extract of V4SI
 and V8HI vector types with constant element number to be sign extended.
 
-2023-04-26   Michael Meissner  <meissner@linux.ibm.com>
+2023-04-27   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -90,7 +59,7 @@ gcc/testsuite/
 	* gcc.target/powerpc/vec-extract-mem-short-1.c: New file.
 	* gcc.target/powerpc/vec-extract-mem-short-2.c: New file.
 
-==================== Branch work119, patch #80 ====================
+==================== Branch work119, patch #93 ====================
 
 Allow consant element vec_extract to be loaded into vector registers.
 
@@ -98,19 +67,95 @@ This patch allows vec_extract of V4SI, V8HI, and V16QI vector types with a
 constant element number to be loaded into vector registers directly.  It also
 will be split before register allocation.
 
-This patch also adds support to rs6000_adjust_vec_address to allow it to be run
-before register allocation.
-
-2023-04-24   Michael Meissner  <meissner@linux.ibm.com>
+2023-04-27   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
-	* config/rs6000/rs6000.cc (get_vector_offset): Allow being called before
+	* config/rs6000/vsx.md (VSX_EX_ISA): New mode attribute.
+	(vsx_extract_<mode>_load): Allow vector registers to be loaded.  Do insn
+	split before register allocation.
+
+==================== Branch work119, patch #92 ====================
+
+Optimize vec_extract of V4SF with variable element number being converted to DF
+
+This patch adds a combiner insn to include the conversion of float to double
+within the memory address when vec_extract of V4SF with a variable element
+number is done.
+
+In addition, the patch allows the split of vec_extract of V4SF with a variable
+element number to occur before register allocation.
+
+2023-04-27   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4sf_var_load): Allow split before
 	register allocation.
+	(vsx_extract_v4sf_var_load_to_df): New insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-float-2.c: New file.
+
+==================== Branch work119, patch #91 ====================
+
+Optimize vec_extract of V4SF from memory with constant element numbers.
+
+This patch updates vec_extract of V4SF from memory with constant element
+numbers.
+
+This patch changes the splits so that they can be done before register
+allocation.
+
+This patch corrects the ISA for loading SF values to altivec registers to be
+power8 vector, and not power7.
+
+This patch adds a combiner patch to combine loading up a SF element and
+converting it to double.
+
+2023-04-27   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* gcc/config/rs6000/vsx.md (vsx_extract_v4sf_load): Allow splitting
+	before register allocation.  Fix ISA for loading up SFmode values to
+	traditional Altivec registers.
+	(vsx_extract_v4sf_load_to_df): New insn.
+
+gc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-float-1.c: New file.
+
+==================== Branch work119, patch #90 ====================
+
+Allow vec_extract from memory support functions before reload
+
+In the succeeding patches, I will be modifying the various vec_extract insns to
+allow the split to occur before register allocation.  This patch goes through
+the support function rs6000_adjust_vec_address and the functions it calls to
+allow them to be called before register allocation.  The places that take a
+scratch register will allocate a new pseudo register if they are passed a
+SCRATCH register.
+
+2023-04-27   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (get_vector_offset): Allow function to be
+	called before register allocation.
 	(adjust_vec_address_pcrel): Likewise.
 	(rs6000_adjust_vec_address): Likewise.
-	* config/rs6000/vsx.md (VSX_EX_ISA): New mode attribute.
-	(vsx_extract_<mode>_load): Allow vector registers to be loaded.
+
+==================== Branch work119, patch #84 was reverted ====================
+
+==================== Branch work119, patch #83 was reverted ====================
+
+==================== Branch work119, patch #82 was reverted ====================
+
+==================== Branch work119, patch #81 was reverted ====================
+
+==================== Branch work119, patch #80 was reverted ====================
 
 ==================== Branch work119, patch #72 was reverted ====================
 
@@ -134,31 +179,9 @@ gcc/
 
 ==================== Branch work119, patch #62 was reverted ====================
 
-==================== Branch work119, patch #61 ====================
+==================== Branch work119, patch #61 was reverted ====================
 
-Combine vec_extract of V4SF with DF convert with variable element.
-
-This patch adds a combine insn that merges loading up a vec_extract of V4SFmode
-where the element number is variable combined with a conversion to DFmode.
-
-2023-04-21   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/vsx.md (vsx_extract_v4sf_var_load_to_df): New insn.
-
-==================== Branch work119, patch #60 ====================
-
-Combine vec_extract of V4SF with DF convert with constant element number.
-
-This patch adds a combine insn that merges loading up a vec_extract of V4SFmode
-where the element number is constant combined with a conversion to DFmode.
-
-2023-04-21   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/vsx.md (vsx_extract_v4sf_to_df_load): New insn.
+==================== Branch work119, patch #60 was reverted ====================
 
 ==================== Branch work119, patch #52 was reverted ====================
 
