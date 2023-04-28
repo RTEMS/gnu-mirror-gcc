@@ -2046,7 +2046,7 @@ emit_common (tree decl ATTRIBUTE_UNUSED,
 	     unsigned HOST_WIDE_INT size ATTRIBUTE_UNUSED,
 	     unsigned HOST_WIDE_INT rounded ATTRIBUTE_UNUSED)
 {
-#if defined(ASM_OUTPUT_ALIGNED_DECL_LOCAL) || defined(ASM_OUTPUT_ALIGNED_LOCAL)
+#if defined(ASM_OUTPUT_ALIGNED_DECL_COMMON) || defined(ASM_OUTPUT_ALIGNED_COMMON)
   unsigned HOST_WIDE_INT align
     = alignment_pad_from_bits (size, get_variable_align (decl), decl);
 #endif
@@ -2559,10 +2559,14 @@ void
 assemble_object_type_and_size (FILE *file, const char *name,
 			       HOST_WIDE_INT size)
 {
+#ifdef ASM_OUTPUT_TYPE_DIRECTIVE
   ASM_OUTPUT_TYPE_DIRECTIVE (file, name, "object");
+#endif
+#ifdef ASM_OUTPUT_SIZE_DIRECTIVE
   if (flag_inhibit_size_directive)
     return;
   ASM_OUTPUT_SIZE_DIRECTIVE (file, name, size);
+#endif
 }
 
 /* Set the symbol_referenced flag for ID.  */
