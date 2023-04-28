@@ -4043,62 +4043,6 @@
    (set_attr "length" "8")
    (set_attr "isa" "*,p9v")])
 
-;; Fold extracting a V4SI element with a constant element with either sign or
-;; zero extension to SFmode or DFmode into LFIWAX/LFIWZX and FCFID.
-(define_insn_and_split "*vsx_extract_v4si_load_to_<uns><mode>"
-  [(set (match_operand:SFDF 0 "register_operand" "=wa")
-	(any_float:SFDF
-	 (vec_select:SI
-	  (match_operand:V4SI 1 "non_altivec_memory_operand" "Q")
-	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "n")]))))
-   (clobber (match_scratch:DI 3 "=&b"))
-   (clobber (match_scratch:DI 4 "=wa"))]
-  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& 1"
-  [(set (match_dup 4)
-	(<fp_int_extend>:DI (match_dup 5)))
-   (set (match_dup 0)
-	(float:SFDF (match_dup 4)))]
-{
-  if (GET_CODE (operands[4]) == SCRATCH)
-    operands[4] = gen_reg_rtx (DImode);
-  
-  operands[5] = rs6000_adjust_vec_address (operands[0], operands[1],
-					   operands[2], operands[3],
-					   SImode);
-}
-  [(set_attr "type" "fpload")
-   (set_attr "length" "12")])
-
-;; Fold extracting a V8HI/V16QI element with a constant element with zero
-;; extension to SFmode or DFmode into LXSIBZX/LXSIHZX and FCFID
-(define_insn_and_split "*vsx_extract_<VSX_EXTRACT_I2:mode>_load_to_uns<SFDF:mode>"
-  [(set (match_operand:SFDF 0 "register_operand" "=wa,wa")
-	(unsigned_float:SFDF
-	 (vec_select:<VSX_EXTRACT_I2:VEC_base>
-	  (match_operand:VSX_EXTRACT_I2 1 "memory_operand" "Z,Q")
-	  (parallel [(match_operand:QI 2 "const_int_operand" "O,n")]))))
-   (clobber (match_scratch:DI 3 "=X,&b"))
-   (clobber (match_scratch:DI 4 "=v,v"))]
-  "VECTOR_MEM_VSX_P (<VSX_EXTRACT_I2:MODE>mode) && TARGET_P9_VECTOR"
-  "#"
-  "&& 1"
-  [(set (match_dup 4)
-	(zero_extend:DI (match_dup 5)))
-   (set (match_dup 0)
-	(float:SFDF (match_dup 4)))]
-{
-  if (GET_CODE (operands[4]) == SCRATCH)
-    operands[4] = gen_reg_rtx (DImode);
-  
-  operands[5] = rs6000_adjust_vec_address (operands[0], operands[1],
-					   operands[2], operands[3],
-					   <VSX_EXTRACT_I2:VEC_base>mode);
-}
-  [(set_attr "type" "fpload")
-   (set_attr "length" "8,12")])
-
 ;; Fold extracting a V8HI element with a constant element with sign extension
 ;; to either DImode or SImode.
 (define_insn_and_split "*vsx_extract_v8hi_load_to_s<mode>"
