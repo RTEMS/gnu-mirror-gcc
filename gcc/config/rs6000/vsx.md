@@ -3549,12 +3549,22 @@
   [(set_attr "length" "8")
    (set_attr "type" "fp")])
 
+;; V4SF extract from memory with constant element number.
+;; Alternatives:
+;;    1: Load FPR, index 0, normal address, no address change.
+;;    2: Load FPR, index 0-3, offsettable address, element folded into addr.
+;;    3: Load FPR, index 0-3, single register, offset in op[3].
+;;    4: Load VMX, index 0, x-form, power8, no address change.
+;;    5: Load VMX, index 0-3, single register, power8, offset in op[3].
+;;    6: Load VMX, index 0, normal address, power9, no address change.
+;;    7: Load VMX, index 0-3, offsettable address, power9, element in addr.
+;;    8: Load GPR, index 0-3, single register, offset in op[3].
 (define_insn_and_split "*vsx_extract_v4sf_load"
-  [(set (match_operand:SF 0 "register_operand" "=f,v,v,?r")
+  [(set (match_operand:SF 0 "register_operand" "=f,f,f,v,v,v,v,?r")
 	(vec_select:SF
-	 (match_operand:V4SF 1 "memory_operand" "m,Z,m,m")
-	 (parallel [(match_operand:QI 2 "const_0_to_3_operand" "n,n,n,n")])))
-   (clobber (match_scratch:P 3 "=&b,&b,&b,&b"))]
+	 (match_operand:V4SF 1 "memory_operand" "m,o,Q,Z,Q,m,o,Q")
+	 (parallel [(match_operand:QI 2 "const_0_to_3_operand" "O,n,n,O,n,O,n,n")])))
+   (clobber (match_scratch:P 3 "=X,X,&b,X,&b,X,X,&b"))]
   "VECTOR_MEM_VSX_P (V4SFmode)"
   "#"
   "&& reload_completed"
@@ -3563,9 +3573,38 @@
   operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
 					   operands[3], SFmode);
 }
-  [(set_attr "type" "fpload,fpload,fpload,load")
-   (set_attr "length" "8")
-   (set_attr "isa" "*,p7v,p9v,*")])
+  [(set_attr "type" "fpload,fpload,fpload,fpload,fpload,fpload,fpload,load")
+   (set_attr "length" "4,4,8,4,8,4,4,8")
+   (set_attr "isa" "*,*,*,p8v,p8v,p9v,p9v,*")])
+
+;; V4SF extract from memory with constant element number and convert to DFmode.
+;; Alternatives:
+;;    1: Load FPR, index 0, normal address, no address change.
+;;    2: Load FPR, index 0-3, offsettable address, element folded into addr.
+;;    3: Load FPR, index 0-3, single register, offset in op[3].
+;;    4: Load VMX, index 0, x-form, power8, no address change.
+;;    5: Load VMX, index 0-3, single register, power8, offset in op[3].
+;;    6: Load VMX, index 0, normal address, power9, no address change.
+;;    7: Load VMX, index 0-3, offsettable address, power9, element in addr.
+(define_insn_and_split "*vsx_extract_v4sf_load_to_df"
+  [(set (match_operand:DF 0 "register_operand" "=f,f,f,v,v,v,v")
+	(float_extend:DF
+	 (vec_select:SF
+	  (match_operand:V4SF 1 "memory_operand" "m,o,Q,Z,Q,m,o")
+	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "O,n,n,O,n,O,n")]))))
+   (clobber (match_scratch:P 3 "=X,X,&b,X,&b,X,&b"))]
+  "VECTOR_MEM_VSX_P (V4SFmode)"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(float_extend:DF (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
+					   operands[3], SFmode);
+}
+  [(set_attr "type" "fpload")
+   (set_attr "length" "4,4,8,4,8,4,4")
+   (set_attr "isa" "*,*,*,p8v,p8v,p9v,p9v")])
 
 ;; Variable V4SF extract from a register
 (define_insn_and_split "vsx_extract_v4sf_var"
