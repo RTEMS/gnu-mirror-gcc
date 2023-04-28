@@ -12,7 +12,7 @@ direct move:
 	vector unsigned short
 	vector unsigned char
 
-2023-04-27   Michael Meissner  <meissner@linux.ibm.com>
+2023-04-28   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
