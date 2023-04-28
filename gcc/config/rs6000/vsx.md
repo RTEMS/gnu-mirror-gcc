@@ -223,6 +223,12 @@
 			  (V8HI  "v")
 			  (V4SI  "wa")])
 
+;; Mode attribute to give the isa constraint for accessing Altivec registers
+;; with vector extract and insert operations.
+(define_mode_attr VSX_EX_ISA [(V16QI "p9v")
+			      (V8HI  "p9v")
+			      (V4SI  "p8v")])
+
 ;; Mode iterator for binary floating types other than double to
 ;; optimize convert to that floating point type from an extract
 ;; of an integer type
@@ -3971,23 +3977,26 @@
 }
   [(set_attr "type" "mfvsr")])
 
-;; Optimize extracting a single scalar element from memory.
+;; Extract a V16QI/V8HI/V4SI element from memory with a constant element
+;; number.  For vector registers, we require X-form addressing.
 (define_insn_and_split "*vsx_extract_<mode>_load"
-  [(set (match_operand:<VEC_base> 0 "register_operand" "=r")
+  [(set (match_operand:<VEC_base> 0 "register_operand" "=r,<VSX_EX>")
 	(vec_select:<VEC_base>
-	 (match_operand:VSX_EXTRACT_I 1 "memory_operand" "m")
-	 (parallel [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>" "n")])))
-   (clobber (match_scratch:DI 3 "=&b"))]
+	 (match_operand:VSX_EXTRACT_I 1 "memory_operand" "m,Q")
+	 (parallel [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>" "n,n")])))
+   (clobber (match_scratch:DI 3 "=&b,&b"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
-  "&& reload_completed"
+  "&& 1"
   [(set (match_dup 0) (match_dup 4))]
 {
-  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
-					   operands[3], <VEC_base>mode);
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1],
+					   operands[2], operands[3],
+					   <VEC_base>mode);
 }
-  [(set_attr "type" "load")
-   (set_attr "length" "8")])
+  [(set_attr "type" "load,fpload")
+   (set_attr "length" "8")
+   (set_attr "isa" "*,<VSX_EX_ISA>")])
 
 ;; Variable V16QI/V8HI/V4SI extract from a register
 (define_insn_and_split "vsx_extract_<mode>_var"
