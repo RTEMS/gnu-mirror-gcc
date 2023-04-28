@@ -957,16 +957,6 @@
   return memory_operand (op, mode);
 })
 
-;; Anything that matches memory_operand but does not match
-;; altivec_indexed_or_indirect_operand.  This used by vec_extract memory
-;; optimizations.
-(define_predicate "non_altivec_memory_operand"
-  (match_code "mem")
-{
-  return (memory_operand (op, mode)
-	  && !altivec_indexed_or_indirect_operand (op, mode));
-})
-
 ;; Return 1 if the operand is a MEM with an indexed-form address.
 (define_special_predicate "indexed_address_mem"
   (match_test "(MEM_P (op)
