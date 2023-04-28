@@ -1,16 +1,47 @@
-==================== Branch work119, patch #97 ====================
+==================== Branch work119, patch #107 ====================
 
-Allow constant element vec_extract to be converted to floating point
+Optimize variable element vec_extract to be converted to floating point
 
-This patch allows vec_extract of the following types to be converted to
-floating point by loading the value directly to the vector register, and then
-doing the conversion instead of loading the value to a GPR and then doing a
-direct move:
+This patch allows vec_extract with a variable element of the following types to
+be converted to floating point by loading the value directly to the vector
+register, and then doing the conversion instead of loading the value to a GPR
+and then doing a direct move:
 
-	vector int
-	vector unsigned int
-	vector unsigned short
-	vector unsigned char
+vector int
+vector unsigned int
+vector unsigned short
+vector unsigned char
+
+2023-04-28   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4si_var_load_to_<uns><mode>): New
+	insn.
+	* vsx_extract_<VSX_EXTRACT_I2:mode>_var_load_to_uns<SFDF:mode>: New
+	insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-char-3.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-int-6.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-int_7.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-short-5.c: New file.
+
+
+==================== Branch work119, patch #106 ====================
+
+Optimize constant element vec_extract to be converted to floating point
+
+This patch allows vec_extract with a constant element of the following types to
+be converted to floating point by loading the value directly to the vector
+register, and then doing the conversion instead of loading the value to a GPR
+and then doing a direct move:
+
+vector int
+vector unsigned int
+vector unsigned short
+vector unsigned char
 
 2023-04-28   Michael Meissner  <meissner@linux.ibm.com>
 
@@ -18,7 +49,7 @@ gcc/
 
 	* config/rs6000/rs6000.md (fp_int_extend): New code attribute.
 	* config/rs6000/vsx.md (vsx_extract_v4si_load_to_<uns><mode>): New
-	* insn.
+	insn.
 	* vsx_extract_<VSX_EXTRACT_I2:mode>_load_to_uns<SFDF:mode>: New insn.
 
 gcc/testsuite/
@@ -28,7 +59,7 @@ gcc/testsuite/
 	* gcc.target/powerpc/vec-extract-mem-int_5.c: New file.
 	* gcc.target/powerpc/vec-extract-mem-short-4.c: New file.
 
-==================== Branch work119, patch #96 ====================
+==================== Branch work119, patch #105 ====================
 
 Allow variable element vec_extract to be sign or zero extended
 
@@ -49,22 +80,26 @@ gcc/testsuite/
 	* gcc.target/powerpc/vec-extract-mem-int-3.c: New file.
 	* gcc.target/powerpc/vec-extract-mem-short-3.c: New file.
 
-==================== Branch work119, patch #95 ====================
+
+==================== Branch work119, patch #104 ====================
 
 Allow variable element vec_extract to be loaded into vector registers.
 
 This patch allows vec_extract of V4SI, V8HI, and V16QI vector types with a
 variable element number to be loaded into vector registers directly.  It also
-will be split before register allocation.
+will be split before register allocation.  In doing so, I restricted the
+optimization to only occur if the memory address did not use an Altivec style
+address with AND -16.
 
 2023-04-27   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
 	* config/rs6000/vsx.md (vsx_extract_<mode>_var_load): Allow vector
-	registers to be loaded.  Split before register allocation.
+	registers to be loaded.  Split before register allocation.  Restrict
+	vector addresses to not use Altivec addressing.
 
-==================== Branch work119, patch #94 ====================
+==================== Branch work119, patch #103 ====================
 
 Allow consant element vec_extract to be zero or sign extended
 
@@ -72,11 +107,11 @@ This patch allows vec_extract of V4SI, V8HI, and V16QI vector types with a
 constant element number to be zero extended.  It also allows vec_extract of V4SI
 and V8HI vector types with constant element number to be sign extended.
 
-2023-04-27   Michael Meissner  <meissner@linux.ibm.com>
+2023-04-28   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
-	* config/rs6000/vsx.md (vsx_extract_v4si_load_to_<su>d): New insn.
+	* config/rs6000/vsx.md (vsx_extract_v4si_load_to_<su>di): New insn.
 	(vsx_extract_<VSX_EXTRACT_I2:mode>_load_to_u<GPR:mode>): New insn.
 	(vsx_extract_v8hi_load_to_s<mode>): New insn.
 
@@ -88,23 +123,26 @@ gcc/testsuite/
 	* gcc.target/powerpc/vec-extract-mem-short-1.c: New file.
 	* gcc.target/powerpc/vec-extract-mem-short-2.c: New file.
 
-==================== Branch work119, patch #93 ====================
+==================== Branch work119, patch #102 ====================
 
 Allow consant element vec_extract to be loaded into vector registers.
 
 This patch allows vec_extract of V4SI, V8HI, and V16QI vector types with a
 constant element number to be loaded into vector registers directly.  It also
-will be split before register allocation.
+will be split before register allocation.  In doing so, I restricted the
+optimization to only occur if the memory address did not use an Altivec style
+address with AND -16.
 
-2023-04-27   Michael Meissner  <meissner@linux.ibm.com>
+2023-04-28   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
 	* config/rs6000/vsx.md (VSX_EX_ISA): New mode attribute.
 	(vsx_extract_<mode>_load): Allow vector registers to be loaded.  Do insn
-	split before register allocation.
+	split before register allocation.  Restrict vector addresses to not use
+	Altivec addressing.
 
-==================== Branch work119, patch #92 ====================
+==================== Branch work119, patch #101 ====================
 
 Optimize vec_extract of V4SF with variable element number being converted to DF
 
@@ -113,21 +151,24 @@ within the memory address when vec_extract of V4SF with a variable element
 number is done.
 
 In addition, the patch allows the split of vec_extract of V4SF with a variable
-element number to occur before register allocation.
+element number to occur before register allocation.  In doing so, I restricted
+the optimization to only occur if the memory address did not use an Altivec
+style address with AND -16.
 
-2023-04-27   Michael Meissner  <meissner@linux.ibm.com>
+2023-04-28   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
 	* config/rs6000/vsx.md (vsx_extract_v4sf_var_load): Allow split before
-	register allocation.
+	register allocation.  Restrict memory addresses to not using Altivec
+	memory addresses.
 	(vsx_extract_v4sf_var_load_to_df): New insn.
 
 gcc/testsuite/
 
 	* gcc.target/powerpc/vec-extract-mem-float-2.c: New file.
 
-==================== Branch work119, patch #91 ====================
+==================== Branch work119, patch #100 ====================
 
 Optimize vec_extract of V4SF from memory with constant element numbers.
 
@@ -143,108 +184,48 @@ power8 vector, and not power7.
 This patch adds a combiner patch to combine loading up a SF element and
 converting it to double.
 
-2023-04-27   Michael Meissner  <meissner@linux.ibm.com>
+In order to do the splitting before register allocation, I modified the various
+vec_extract insns to allow the split to occur before register allocation.  This
+patch goes through the support function rs6000_adjust_vec_address and the
+functions it calls to allow them to be called before register allocation.  The
+places that take a scratch register will allocate a new pseudo register if they
+are passed a SCRATCH register.
+
+I also added a new predicate that checks if the operand is a normal memory
+address but not an Altivec vector addresses (i.e. with an AND -16).  These
+addresses are used in power8 as part of the vector swap optimization.  In the
+past, because we use the 'Q' constraint, ira/reload would handle the AND
+etc. so that the address was only a single register.
+
+2023-04-28   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
+	* config/rs6000/predicates.md (non_altivec_memory_operand): New
+	predicate.
+	* config/rs6000/rs6000.cc (get_vector_offset): Allow function to be
+	called before register allocation.
+	(adjust_vec_address_pcrel): Likewise.
+	(rs6000_adjust_vec_address): Likewise.
 	* gcc/config/rs6000/vsx.md (vsx_extract_v4sf_load): Allow splitting
 	before register allocation.  Fix ISA for loading up SFmode values to
-	traditional Altivec registers.
+	traditional Altivec registers.  Require that the memory being optimized
+	does not use Altivec memory addresses.
 	(vsx_extract_v4sf_load_to_df): New insn.
 
 gc/testsuite/
 
 	* gcc.target/powerpc/vec-extract-mem-float-1.c: New file.
 
-==================== Branch work119, patch #90 ====================
+==================== Branch work119, patches #90-97 were reverted ====================
 
-Allow vec_extract from memory support functions before reload
+==================== Branch work119, patches #80-84 were reverted ====================
 
-In the succeeding patches, I will be modifying the various vec_extract insns to
-allow the split to occur before register allocation.  This patch goes through
-the support function rs6000_adjust_vec_address and the functions it calls to
-allow them to be called before register allocation.  The places that take a
-scratch register will allocate a new pseudo register if they are passed a
-SCRATCH register.
+==================== Branch work119, patches #70-60 were reverted ====================
 
-2023-04-27   Michael Meissner  <meissner@linux.ibm.com>
+==================== Branch work119, patches #50-40 were reverted ====================
 
-gcc/
-
-	* config/rs6000/rs6000.cc (get_vector_offset): Allow function to be
-	called before register allocation.
-	(adjust_vec_address_pcrel): Likewise.
-	(rs6000_adjust_vec_address): Likewise.
-
-==================== Branch work119, patch #84 was reverted ====================
-
-==================== Branch work119, patch #83 was reverted ====================
-
-==================== Branch work119, patch #82 was reverted ====================
-
-==================== Branch work119, patch #81 was reverted ====================
-
-==================== Branch work119, patch #80 was reverted ====================
-
-==================== Branch work119, patch #72 was reverted ====================
-
-==================== Branch work119, patch #71 was reverted ====================
-
-==================== Branch work119, patch #70 was reverted ====================
-
-==================== Branch work119, patch #69 was reverted ====================
-
-==================== Branch work119, patch #68 was reverted ====================
-
-==================== Branch work119, patch #67 was reverted ====================
-
-==================== Branch work119, patch #66 was reverted ====================
-
-==================== Branch work119, patch #65 was reverted ====================
-
-==================== Branch work119, patch #64 was reverted ====================
-
-==================== Branch work119, patch #63 was reverted ====================
-
-==================== Branch work119, patch #62 was reverted ====================
-
-==================== Branch work119, patch #61 was reverted ====================
-
-==================== Branch work119, patch #60 was reverted ====================
-
-==================== Branch work119, patch #52 was reverted ====================
-
-==================== Branch work119, patch #51 was reverted ====================
-
-==================== Branch work119, patch #50 was reverted ====================
-
-==================== Branch work119, patch #49 was reverted ====================
-
-==================== Branch work119, patch #48 was reverted ====================
-
-==================== Branch work119, patch #47 was reverted ====================
-
-==================== Branch work119, patch #46 was reverted ====================
-
-==================== Branch work119, patch #45 was reverted ====================
-
-==================== Branch work119, patch #44 was reverted ====================
-
-==================== Branch work119, patch #43 was reverted ====================
-
-==================== Branch work119, patch #42 was reverted ====================
-
-==================== Branch work119, patch #41 was reverted ====================
-
-==================== Branch work119, patch #40 was reverted ====================
-
-==================== Branch work119, patch #33 was reverted ====================
-
-==================== Branch work119, patch #32 was reverted ====================
-
-==================== Branch work119, patch #31 was reverted ====================
-
-==================== Branch work119, patch #30 was reverted ====================
+==================== Branch work119, patches #30-33 were reverted ====================
 
 ==================== Branch work119, patch #23 ====================
 
