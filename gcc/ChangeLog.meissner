@@ -1,11 +1,11 @@
-==================== Branch work119, patch #107 ====================
+==================== Branch work119, patch #127 ====================
 
 Optimize variable element vec_extract to be converted to floating point
 
-This patch allows vec_extract with a variable element of the following types to
-be converted to floating point by loading the value directly to the vector
-register, and then doing the conversion instead of loading the value to a GPR
-and then doing a direct move:
+This patch optimizes vec_extract with a variable element number of the following
+types to be converted to floating point by loading the value directly to the
+vector register, and then doing the conversion instead of loading the value to a
+GPR and then doing a direct move:
 
 vector int
 vector unsigned int
@@ -17,26 +17,23 @@ vector unsigned char
 gcc/
 
 	* config/rs6000/vsx.md (vsx_extract_v4si_var_load_to_<uns><mode>): New
-	insn.
+	* insn.
 	* vsx_extract_<VSX_EXTRACT_I2:mode>_var_load_to_uns<SFDF:mode>: New
 	insn.
 
 gcc/testsuite/
 
-	* gcc.target/powerpc/vec-extract-mem-char-3.c: New file.
 	* gcc.target/powerpc/vec-extract-mem-int-6.c: New file.
 	* gcc.target/powerpc/vec-extract-mem-int_7.c: New file.
-	* gcc.target/powerpc/vec-extract-mem-short-5.c: New file.
 
+==================== Branch work119, patch #126 ====================
 
-==================== Branch work119, patch #106 ====================
+Allow constant element vec_extract to be converted to floating point
 
-Optimize constant element vec_extract to be converted to floating point
-
-This patch allows vec_extract with a constant element of the following types to
-be converted to floating point by loading the value directly to the vector
-register, and then doing the conversion instead of loading the value to a GPR
-and then doing a direct move:
+This patch allows vec_extract of the following types to be converted to
+floating point by loading the value directly to the vector register, and then
+doing the conversion instead of loading the value to a GPR and then doing a
+direct move:
 
 vector int
 vector unsigned int
@@ -49,7 +46,7 @@ gcc/
 
 	* config/rs6000/rs6000.md (fp_int_extend): New code attribute.
 	* config/rs6000/vsx.md (vsx_extract_v4si_load_to_<uns><mode>): New
-	insn.
+	* insn.
 	* vsx_extract_<VSX_EXTRACT_I2:mode>_load_to_uns<SFDF:mode>: New insn.
 
 gcc/testsuite/
@@ -59,7 +56,7 @@ gcc/testsuite/
 	* gcc.target/powerpc/vec-extract-mem-int_5.c: New file.
 	* gcc.target/powerpc/vec-extract-mem-short-4.c: New file.
 
-==================== Branch work119, patch #105 ====================
+==================== Branch work119, patch #125 ====================
 
 Allow variable element vec_extract to be sign or zero extended
 
@@ -80,28 +77,23 @@ gcc/testsuite/
 	* gcc.target/powerpc/vec-extract-mem-int-3.c: New file.
 	* gcc.target/powerpc/vec-extract-mem-short-3.c: New file.
 
-
-==================== Branch work119, patch #104 ====================
+==================== Branch work119, patch #124 ====================
 
 Allow variable element vec_extract to be loaded into vector registers.
 
 This patch allows vec_extract of V4SI, V8HI, and V16QI vector types with a
-variable element number to be loaded into vector registers directly.  It also
-will be split before register allocation.  In doing so, I restricted the
-optimization to only occur if the memory address did not use an Altivec style
-address with AND -16.
+variable element number to be loaded into vector registers directly.
 
-2023-04-27   Michael Meissner  <meissner@linux.ibm.com>
+2023-04-28   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
 	* config/rs6000/vsx.md (vsx_extract_<mode>_var_load): Allow vector
-	registers to be loaded.  Split before register allocation.  Restrict
-	vector addresses to not use Altivec addressing.
+	registers to be loaded.
 
-==================== Branch work119, patch #103 ====================
+==================== Branch work119, patch #123 ====================
 
-Allow consant element vec_extract to be zero or sign extended
+Optimize sign and zero extension of vec_extract from memory with constant element
 
 This patch allows vec_extract of V4SI, V8HI, and V16QI vector types with a
 constant element number to be zero extended.  It also allows vec_extract of V4SI
@@ -111,7 +103,7 @@ and V8HI vector types with constant element number to be sign extended.
 
 gcc/
 
-	* config/rs6000/vsx.md (vsx_extract_v4si_load_to_<su>di): New insn.
+	* config/rs6000/vsx.md (vsx_extract_v4si_load_to_<su>d): New insn.
 	(vsx_extract_<VSX_EXTRACT_I2:mode>_load_to_u<GPR:mode>): New insn.
 	(vsx_extract_v8hi_load_to_s<mode>): New insn.
 
@@ -123,26 +115,27 @@ gcc/testsuite/
 	* gcc.target/powerpc/vec-extract-mem-short-1.c: New file.
 	* gcc.target/powerpc/vec-extract-mem-short-2.c: New file.
 
-==================== Branch work119, patch #102 ====================
+==================== Branch work119, patch #122 ====================
 
 Allow consant element vec_extract to be loaded into vector registers.
 
 This patch allows vec_extract of V4SI, V8HI, and V16QI vector types with a
-constant element number to be loaded into vector registers directly.  It also
-will be split before register allocation.  In doing so, I restricted the
-optimization to only occur if the memory address did not use an Altivec style
-address with AND -16.
+constant element number to be loaded into vector registers directly.
+
+This patch also adds support for optimzing 0 element number to not need a base
+register tempoary.  Likewise, if we have an offsettable address, we don't need
+to allocate a scratch register.
 
 2023-04-28   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
 	* config/rs6000/vsx.md (VSX_EX_ISA): New mode attribute.
-	(vsx_extract_<mode>_load): Allow vector registers to be loaded.  Do insn
-	split before register allocation.  Restrict vector addresses to not use
-	Altivec addressing.
+	(vsx_extract_<mode>_load): Allow vector registers to be loaded.  Add
+	optimizations for loading up element 0 and/or with an offsettable
+	address.
 
-==================== Branch work119, patch #101 ====================
+==================== Branch work119, patch #121 ====================
 
 Optimize vec_extract of V4SF with variable element number being converted to DF
 
@@ -150,33 +143,27 @@ This patch adds a combiner insn to include the conversion of float to double
 within the memory address when vec_extract of V4SF with a variable element
 number is done.
 
-In addition, the patch allows the split of vec_extract of V4SF with a variable
-element number to occur before register allocation.  In doing so, I restricted
-the optimization to only occur if the memory address did not use an Altivec
-style address with AND -16.
+It also removes the '?' from the 'r' constraint so that if the SFmode is needed
+in a GPR, it doesn't have to load it to the vector unit and then store it.
 
 2023-04-28   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
-	* config/rs6000/vsx.md (vsx_extract_v4sf_var_load): Allow split before
-	register allocation.  Restrict memory addresses to not using Altivec
-	memory addresses.
+	* config/rs6000/vsx.md (vsx_extract_v4sf_var_load): Remove '?' from 'r'
+	constraint.
 	(vsx_extract_v4sf_var_load_to_df): New insn.
 
 gcc/testsuite/
 
 	* gcc.target/powerpc/vec-extract-mem-float-2.c: New file.
 
-==================== Branch work119, patch #100 ====================
+==================== Branch work119, patch #120 ====================
 
 Optimize vec_extract of V4SF from memory with constant element numbers.
 
 This patch updates vec_extract of V4SF from memory with constant element
 numbers.
-
-This patch changes the splits so that they can be done before register
-allocation.
 
 This patch corrects the ISA for loading SF values to altivec registers to be
 power8 vector, and not power7.
@@ -184,38 +171,24 @@ power8 vector, and not power7.
 This patch adds a combiner patch to combine loading up a SF element and
 converting it to double.
 
-In order to do the splitting before register allocation, I modified the various
-vec_extract insns to allow the split to occur before register allocation.  This
-patch goes through the support function rs6000_adjust_vec_address and the
-functions it calls to allow them to be called before register allocation.  The
-places that take a scratch register will allocate a new pseudo register if they
-are passed a SCRATCH register.
-
-I also added a new predicate that checks if the operand is a normal memory
-address but not an Altivec vector addresses (i.e. with an AND -16).  These
-addresses are used in power8 as part of the vector swap optimization.  In the
-past, because we use the 'Q' constraint, ira/reload would handle the AND
-etc. so that the address was only a single register.
+It also removes the '?' from the 'r' constraint so that if the SFmode is needed
+in a GPR, it doesn't have to load it to the vector unit and then store it.
 
 2023-04-28   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
-	* config/rs6000/predicates.md (non_altivec_memory_operand): New
-	predicate.
-	* config/rs6000/rs6000.cc (get_vector_offset): Allow function to be
-	called before register allocation.
-	(adjust_vec_address_pcrel): Likewise.
-	(rs6000_adjust_vec_address): Likewise.
-	* gcc/config/rs6000/vsx.md (vsx_extract_v4sf_load): Allow splitting
-	before register allocation.  Fix ISA for loading up SFmode values to
-	traditional Altivec registers.  Require that the memory being optimized
-	does not use Altivec memory addresses.
+	* gcc/config/rs6000/vsx.md (vsx_extract_v4sf_load): Fix ISA for loading
+	up SFmode values with x-form addresses.  Remove ? from 'r' constraint.
 	(vsx_extract_v4sf_load_to_df): New insn.
 
 gc/testsuite/
 
 	* gcc.target/powerpc/vec-extract-mem-float-1.c: New file.
+
+==================== Branch work119, patche #110-113 were reverted ====================
+
+==================== Branch work119, patche #100-107 were reverted ====================
 
 ==================== Branch work119, patches #90-97 were reverted ====================
 
