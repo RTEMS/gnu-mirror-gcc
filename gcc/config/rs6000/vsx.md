@@ -4027,7 +4027,7 @@
   [(set (match_operand:<VEC_base> 0 "register_operand"
 			"=r,     r,     r,      wa,           wa")
 	(vec_select:<VEC_base>
-	 (match_operand:VSX_EXTRACT_I 1 "vec_extract_memory_operand"
+	 (match_operand:VSX_EXTRACT_I 1 "memory_operand"
 			"m,      o,     m,      Z,            Q")
 	 (parallel [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>"
 			"O,      n,     n,      O,            n")])))
@@ -4035,7 +4035,7 @@
 			"=X,     X,     &b,     X,            &b"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
-  "&& 1"
+  "&& reload_completed"
   [(set (match_dup 0) (match_dup 4))]
 {
   operands[4] = rs6000_adjust_vec_address (operands[0], operands[1],
@@ -4060,7 +4060,7 @@
 			"=r,     r,     r,      wa,      wa")
 	(any_extend:DI
 	 (vec_select:SI
-	  (match_operand:V4SI 1 "vec_extract_memory_operand"
+	  (match_operand:V4SI 1 "memory_operand"
 			"m,      o,     m,      Z,       Q")
 	  (parallel [(match_operand:QI 2 "const_0_to_3_operand"
 			"O,      n,     n,      O,       n")]))))
@@ -4068,7 +4068,7 @@
 			"=X,     X,     &b,     X,       &b"))]
   "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
-  "&& 1"
+  "&& reload_completed"
   [(set (match_dup 0)
 	(any_extend:DI (match_dup 4)))]
 {
@@ -4093,7 +4093,7 @@
 			"=r,     r,     r,      v,       v")
 	(zero_extend:GPR
 	 (vec_select:<VEC_base>
-	  (match_operand:VSX_EXTRACT_I2 1 "vec_extract_memory_operand"
+	  (match_operand:VSX_EXTRACT_I2 1 "memory_operand"
 			"m,      o,     m,      Z,       Q")
 	  (parallel [(match_operand:QI 2 "const_int_operand"
 			"O,      n,     n,      O,       n")]))))
@@ -4101,7 +4101,7 @@
 			"=X,     X,     &b,     X,       &b"))]
   "VECTOR_MEM_VSX_P (<VSX_EXTRACT_I2:MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
-  "&& 1"
+  "&& reload_completed"
   [(set (match_dup 0)
 	(zero_extend:GPR (match_dup 4)))]
 {
@@ -4173,12 +4173,12 @@
   [(set (match_operand:GPR 0 "register_operand" "=r,r,r")
 	(sign_extend:GPR
 	 (vec_select:HI
-	  (match_operand:V8HI 1 "vec_extract_memory_operand" "m,o,m")
+	  (match_operand:V8HI 1 "memory_operand" "m,o,m")
 	  (parallel [(match_operand:QI 2 "const_int_operand" "O,n,n")]))))
    (clobber (match_scratch:DI 3 "=X,X,&b"))]
   "VECTOR_MEM_VSX_P (V8HImode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
-  "&& 1"
+  "&& reload_completed"
   [(set (match_dup 0)
 	(sign_extend:GPR (match_dup 4)))]
 {
@@ -4219,7 +4219,7 @@
    (clobber (match_scratch:DI 3 "=&b,&b"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
-  "&& 1"
+  "&& reload_completed"
   [(set (match_dup 0) (match_dup 4))]
 {
   operands[4] = rs6000_adjust_vec_address (operands[0], operands[1],
@@ -4240,7 +4240,7 @@
    (clobber (match_scratch:DI 3 "=&b,&b"))]
   "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
-  "&& 1"
+  "&& reload_completed"
   [(set (match_dup 0)
 	(any_extend:DI (match_dup 4)))]
 {
@@ -4262,7 +4262,7 @@
    (clobber (match_scratch:DI 3 "=&b,&b"))]
   "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
-  "&& 1"
+  "&& reload_completed"
   [(set (match_dup 0)
 	(zero_extend:GPR (match_dup 4)))]
 {
@@ -4285,7 +4285,7 @@
    (clobber (match_scratch:DI 3 "=&b"))]
   "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
-  "&& 1"
+  "&& reload_completed"
   [(set (match_dup 0)
 	(sign_extend:GPR (match_dup 4)))]
 {
