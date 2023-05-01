@@ -994,6 +994,19 @@
   return memory_operand (op, mode);
 })
 
+;; Return true if the address can be used in optimizing vec_extract from memory
+;; operations.  We don't allow update memory addresses or Altivec style vector
+;; addresses.
+(define_predicate "vec_extract_memory_operand"
+  (match_code "mem")
+{
+  if (update_address_mem (op, mode))
+    return 0;
+  if (altivec_indexed_or_indirect_operand (op, mode))
+    return 0;
+  return memory_operand (op, mode);
+})
+
 ;; Return 1 if the operand is a MEM with an indexed-form address.
 (define_special_predicate "indexed_address_mem"
   (match_test "(MEM_P (op)
