@@ -44,6 +44,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "builtins.h"
 #include "cfgloop.h"
 #include "tree-ssa-loop-manip.h"
+#include "tree-ssa-loop.h"
+#include "tree-ssa-loop-niter.h"
 
 /* In this file value profile based optimizations are placed.  Currently the
    following optimizations are implemented (for more detailed descriptions
@@ -1952,6 +1954,38 @@ gimple_histogram_values_to_profile (function *fun, histogram_values *values)
     {
       tree var;
       gimple_stmt_iterator gsi;
+      edge exit_edge = NULL;
+      auto_vec<edge> exits = get_loop_exit_edges (loop);
+      bool complex_exit = false;
+      bool exit_found = false;
+
+      /* If loop has only exits that can not be instrumented,
+	 we can not profile histograms.  */
+      for (auto exit : exits)
+	if (exit->flags & EDGE_FAKE)
+	  ;
+	else if (exit->flags & EDGE_COMPLEX)
+	  complex_exit = true;
+	else
+	  {
+	    if (!exit_found)
+	      exit_edge = exit;
+	    else
+	      exit_edge = NULL;
+	    exit_found = true;
+	    break;
+	  }
+      if (!exit_found)
+	continue;
+
+      /* If there is only one non-fake exit edge, see if we know number of
+	 iterations.  */
+      tree niter;
+      edge ex;
+      if (!complex_exit && exit_edge
+	  && (niter = find_loop_niter (loop, &ex))
+	  && TREE_CODE (niter) == INTEGER_CST)
+	continue;
 
       gsi = gsi_start_bb (loop->latch);
       create_iv (build_int_cst_type (get_gcov_type (), 0),

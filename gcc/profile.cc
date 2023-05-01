@@ -66,6 +66,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgloop.h"
 #include "sreal.h"
 #include "file-prefix-map.h"
+#include "tree-scalar-evolution.h"
 
 #include "profile.h"
 
@@ -1227,7 +1228,8 @@ branch_prob (bool thunk)
   total_num_times_called++;
 
   calculate_dominance_info (CDI_DOMINATORS);
-  loop_optimizer_init (LOOPS_HAVE_SIMPLE_LATCHES);
+  loop_optimizer_init (LOOPS_NORMAL);
+  scev_initialize ();
 
   flow_call_edges_add (NULL);
   add_noreturn_fake_exit_edges ();
@@ -1590,6 +1592,7 @@ branch_prob (bool thunk)
   values.release ();
   free_edge_list (el);
   coverage_end_function (lineno_checksum, cfg_checksum);
+  scev_finalize ();
   if (flag_branch_probabilities
       && (profile_status_for_fn (cfun) == PROFILE_READ))
     {
