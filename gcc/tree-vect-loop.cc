@@ -2109,9 +2109,10 @@ vect_analyze_loop_costing (loop_vec_info loop_vinfo,
   if (LOOP_VINFO_EPILOGUE_P (loop_vinfo))
     estimated_niter
       = vect_vf_for_cost (LOOP_VINFO_ORIG_LOOP_INFO (loop_vinfo)) - 1;
-  else if (use_estimate)
+  else
     {
-      estimated_niter = estimated_stmt_executions_int (loop);
+      if (use_estimate)
+	estimated_niter = estimated_stmt_executions_int (loop);
       if (estimated_niter == -1)
 	estimated_niter = likely_max_stmt_executions_int (loop);
     }
