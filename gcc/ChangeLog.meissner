@@ -1,3 +1,33 @@
+==================== Branch work119, patch #130 ====================
+
+Split vec_extract from memory before reload for V16QI/V8HI/V4SI with constant elements.
+
+This patch goes through the support function rs6000_adjust_vec_address and the
+functions it calls to allow them to be called before register allocation.  The
+places that take a scratch register will allocate a new pseudo register if they
+are passed a SCRATCH register.
+
+It then changes the vec_extract support for V16QI/V8HI/V4SI with constant
+element numbers to be split before register allocation.
+
+2023-04-27   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (get_vector_offset): Allow function to be
+	called before register allocation.
+	(adjust_vec_address_pcrel): Likewise.
+	(rs6000_adjust_vec_address): Likewise.
+	* config/rs6000/vsx.md (vsx_extract_<mode>_load): Split before register
+	allocation.
+	(vsx_extract_v4si_load_to_<su>di): Likewise.
+	(vsx_extract_<VSX_EXTRACT_I2:mode>_load_to_u<GPR:mode>): Likewise.
+	(*vsx_extract_v8hi_load_to_s<mode>): Likewise.
+	(vsx_extract_<mode>_var_load): Likewise.
+	(vsx_extract_v4si_var_load_to_<su>di): Likewise.
+	(vsx_extract_<VSX_EXTRACT_I2:mode>_var_load_to_u<GPR:mode>): Likewise.
+	(vsx_extract_v8hi_var_load_to_s<mode>): Likewise.
+
 ==================== Branch work119, patch #127 ====================
 
 Optimize variable element vec_extract to be converted to floating point
