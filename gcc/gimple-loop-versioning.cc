@@ -41,6 +41,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-into-ssa.h"
 #include "gimple-range.h"
 #include "tree-cfg.h"
+#include "tree-ssa-loop-niter.h"
+#include "tree-pretty-print.h"
 
 namespace {
 
@@ -1808,3 +1810,4 @@ make_pass_loop_versioning (gcc::context *ctxt)
 {
   return new pass_loop_versioning (ctxt);
 }
+

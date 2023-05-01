@@ -229,6 +229,7 @@ along with GCC; see the file COPYING3.  If not see
       NEXT_PASS (pass_merge_phi);
       NEXT_PASS (pass_phiopt, false /* early_p */);
       NEXT_PASS (pass_tail_recursion);
+      NEXT_PASS (pass_loop_histogram_versioning);
       NEXT_PASS (pass_ch);
       NEXT_PASS (pass_lower_complex);
       NEXT_PASS (pass_sra);
@@ -275,6 +276,7 @@ along with GCC; see the file COPYING3.  If not see
           /* Before loop_init we rewrite no longer addressed locals into SSA
 	     form if possible.  */
 	  NEXT_PASS (pass_tree_loop_init);
+          //NEXT_PASS (pass_loop_histogram_versioning);
 	  NEXT_PASS (pass_tree_unswitch);
 	  NEXT_PASS (pass_scev_cprop);
 	  NEXT_PASS (pass_loop_split);
