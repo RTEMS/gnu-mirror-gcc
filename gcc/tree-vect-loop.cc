@@ -11139,6 +11139,9 @@ vect_transform_loop (loop_vec_info loop_vinfo, gimple *loop_vectorized_call)
 			  assumed_vf) - 1
 	 : wi::udiv_floor (loop->nb_iterations_estimate + bias_for_assumed,
 			   assumed_vf) - 1);
+  /* TODO: Fix profile after vectorization.  */
+  if (loop->counters)
+    loop->counters = NULL;
 
   if (dump_enabled_p ())
     {

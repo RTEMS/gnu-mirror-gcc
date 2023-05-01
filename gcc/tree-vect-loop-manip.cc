@@ -2941,6 +2941,10 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
       /* Prolog iterates at most bound_prolog times, latch iterates at
 	 most bound_prolog - 1 times.  */
       record_niter_bound (prolog, bound_prolog - 1, false, true);
+      /* TODO: Update counters or at least release vectors.
+         We do not produce prologs on modern x86 targets we test on
+         so this is not important for proof of concept.  */
+      prolog->counters = NULL;
       delete_update_ssa ();
       adjust_vec_debug_stmts ();
       scev_reset ();
@@ -3077,6 +3081,8 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
 	  /* -1 to convert loop iterations to latch iterations.  */
 	  record_niter_bound (epilog, bound - 1, false, true);
 	}
+      /* TODO: Compute epilog histograms or at least release the counters.  */
+      epilog->counters = NULL;
 
       delete_update_ssa ();
       adjust_vec_debug_stmts ();
