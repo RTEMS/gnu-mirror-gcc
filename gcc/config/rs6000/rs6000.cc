@@ -7686,13 +7686,9 @@ get_vector_offset (rtx mem, rtx element, rtx base_tmp, unsigned scalar_size)
   if (CONST_INT_P (element))
     return GEN_INT (INTVAL (element) * scalar_size);
 
-  if (GET_CODE (base_tmp) == SCRATCH)
-    base_tmp = gen_reg_rtx (Pmode);
-
-  /* After register allocation, all insns should use the 'Q' constraint
-     (address is a single register) if the element number is not a
-     constant.  */
-  gcc_assert (can_create_pseudo_p () || satisfies_constraint_Q (mem));
+  /* All insns should use the 'Q' constraint (address is a single register) if
+     the element number is not a constant.  */
+  gcc_assert (satisfies_constraint_Q (mem));
 
   /* Mask the element to make sure the element number is between 0 and the
      maximum number of elements - 1 so that we don't generate an address
@@ -7708,9 +7704,6 @@ get_vector_offset (rtx mem, rtx element, rtx base_tmp, unsigned scalar_size)
   if (shift > 0)
     {
       rtx shift_op = gen_rtx_ASHIFT (Pmode, base_tmp, GEN_INT (shift));
-      if (can_create_pseudo_p ())
-	base_tmp = gen_reg_rtx (Pmode);
-
       emit_insn (gen_rtx_SET (base_tmp, shift_op));
     }
 
@@ -7754,9 +7747,6 @@ adjust_vec_address_pcrel (rtx addr, rtx element_offset, rtx base_tmp)
 
       else
 	{
-	  if (GET_CODE (base_tmp) == SCRATCH)
-	    base_tmp = gen_reg_rtx (Pmode);
-
 	  emit_move_insn (base_tmp, addr);
 	  new_addr = gen_rtx_PLUS (Pmode, base_tmp, element_offset);
 	}
@@ -7779,8 +7769,9 @@ adjust_vec_address_pcrel (rtx addr, rtx element_offset, rtx base_tmp)
    temporary (BASE_TMP) to fixup the address.  Return the new memory address
    that is valid for reads or writes to a given register (SCALAR_REG).
 
-   The temporary BASE_TMP might be set multiple times with this code if this is
-   called after register allocation.  */
+   This function is expected to be called after reload is completed when we are
+   splitting insns.  The temporary BASE_TMP might be set multiple times with
+   this code.  */
 
 rtx
 rs6000_adjust_vec_address (rtx scalar_reg,
@@ -7793,11 +7784,8 @@ rs6000_adjust_vec_address (rtx scalar_reg,
   rtx addr = XEXP (mem, 0);
   rtx new_addr;
 
-  if (GET_CODE (base_tmp) != SCRATCH)
-    {
-      gcc_assert (!reg_mentioned_p (base_tmp, addr));
-      gcc_assert (!reg_mentioned_p (base_tmp, element));
-    }
+  gcc_assert (!reg_mentioned_p (base_tmp, addr));
+  gcc_assert (!reg_mentioned_p (base_tmp, element));
 
   /* Vector addresses should not have PRE_INC, PRE_DEC, or PRE_MODIFY.  */
   gcc_assert (GET_RTX_CLASS (GET_CODE (addr)) != RTX_AUTOINC);
@@ -7853,72 +7841,33 @@ rs6000_adjust_vec_address (rtx scalar_reg,
 	     offset, it has the benefit that if D-FORM instructions are
 	     allowed, the offset is part of the memory access to the vector
 	     element. */
-	  if (GET_CODE (base_tmp) == SCRATCH)
-	    base_tmp = gen_reg_rtx (Pmode);
-
 	  emit_insn (gen_rtx_SET (base_tmp, gen_rtx_PLUS (Pmode, op0, op1)));
 	  new_addr = gen_rtx_PLUS (Pmode, base_tmp, element_offset);
 	}
     }
 
-  /* Deal with Altivec style addresses.  These come up on the power8 when GCC
-     generates the Altivec load/store (LVX and STVX) to eliminate byte swapping
-     the vectors.  */
-  else if (GET_CODE (addr) == AND
-	   && CONST_INT_P (XEXP (addr, 1))
-	   && INTVAL (XEXP (addr, 1)) == -16)
-    {
-      rtx op0 = XEXP (addr, 0);
-      rtx op1 = XEXP (addr, 1);
-
-      if (GET_CODE (base_tmp) == SCRATCH)
-	base_tmp = gen_reg_rtx (Pmode);
-
-      /* Is this reg+reg?  */
-      if (GET_CODE (op0) == PLUS)
-	{
-	  rtx plus_tmp = (can_create_pseudo_p ()
-			  ? gen_reg_rtx (Pmode)
-			  : base_tmp);
-
-	  emit_insn (gen_rtx_SET (plus_tmp, op0));
-	  op0 = plus_tmp;
-	}
-
-      emit_insn (gen_rtx_SET (base_tmp,
-			      gen_rtx_AND (Pmode, op0, op1)));
-      new_addr = base_tmp;
-    }
-
   else
     {
-      if (GET_CODE (base_tmp) == SCRATCH)
-	base_tmp = gen_reg_rtx (Pmode);
-
-      emit_insn (gen_rtx_SET (base_tmp, addr));
+      emit_move_insn (base_tmp, addr);
       new_addr = gen_rtx_PLUS (Pmode, base_tmp, element_offset);
     }
 
-    /* If register allocation has been done and the address isn't valid, move
-       the address into the temporary base register.  Some reasons it could not
-       be valid include:
+    /* If the address isn't valid, move the address into the temporary base
+       register.  Some reasons it could not be valid include:
 
        The address offset overflowed the 16 or 34 bit offset size;
        We need to use a DS-FORM load, and the bottom 2 bits are non-zero;
        We need to use a DQ-FORM load, and the bottom 4 bits are non-zero;
        Only X_FORM loads can be done, and the address is D_FORM.  */
 
-  if (!can_create_pseudo_p ())
-    {
-      enum insn_form iform
-	= address_to_insn_form (new_addr, scalar_mode,
-				reg_to_non_prefixed (scalar_reg, scalar_mode));
+  enum insn_form iform
+    = address_to_insn_form (new_addr, scalar_mode,
+			    reg_to_non_prefixed (scalar_reg, scalar_mode));
 
-      if (iform == INSN_FORM_BAD)
-	{
-	  emit_move_insn (base_tmp, new_addr);
-	  new_addr = base_tmp;
-	}
+  if (iform == INSN_FORM_BAD)
+    {
+      emit_move_insn (base_tmp, new_addr);
+      new_addr = base_tmp;
     }
 
   return change_address (mem, scalar_mode, new_addr);

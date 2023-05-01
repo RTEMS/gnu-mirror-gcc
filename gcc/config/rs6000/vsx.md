@@ -4035,7 +4035,7 @@
 			"=X,     X,     &b,     X,            &b"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
-  "&& 1"
+  "&& reload_completed"
   [(set (match_dup 0) (match_dup 4))]
 {
   operands[4] = rs6000_adjust_vec_address (operands[0], operands[1],
@@ -4068,7 +4068,7 @@
 			"=X,     X,     &b,     X,       &b"))]
   "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
-  "&& 1"
+  "&& reload_completed"
   [(set (match_dup 0)
 	(any_extend:DI (match_dup 4)))]
 {
@@ -4101,7 +4101,7 @@
 			"=X,     X,     &b,     X,       &b"))]
   "VECTOR_MEM_VSX_P (<VSX_EXTRACT_I2:MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
-  "&& 1"
+  "&& reload_completed"
   [(set (match_dup 0)
 	(zero_extend:GPR (match_dup 4)))]
 {
