@@ -1115,6 +1115,7 @@ try_peel_loop (class loop *loop,
       gcov_type rest = sum;
       gcov_type psum = 0;
       int good_percentage = param_profile_histogram_peel_prcnt;
+      /* TODO: Fix.  Profile size needs to be stored in the counters.  */
       for (int i = 0; i < param_profile_histogram_size_lin; i++)
 	{
 	  psum += (*(loop->counters->hist))[i];

@@ -2070,6 +2070,37 @@ vect_analyze_loop_costing (loop_vec_info loop_vinfo,
       return 0;
     }
 
+  bool use_estimate = true;
+  /* With histogram we can determine how often the vectorized loop will be
+     reached.  */
+  if (loop->counters
+      /* TODO: For epilogue we can compute new histogram.  */
+      && !LOOP_VINFO_EPILOGUE_P (loop_vinfo)
+      && loop->counters->sum
+      /* TODO: Fix.  Profile size needs to be stored in the counters.  */
+      && min_profitable_estimate <= param_profile_histogram_size_lin)
+    {
+      gcov_type psum = 0;
+      for (int i = 0; i < min_profitable_estimate; i++)
+	psum += (*(loop->counters->hist))[i];
+      /* TODO: This is less precise than needed.  If histogram was also
+	 storing number of executions of the loop header (which may
+	 be different from loop->header->count if i.e. inlining happen).
+	 We could compute expected nunber of execution of the vectorized
+	 loop.  */
+      if (psum == loop->counters->sum
+	  || !maybe_hot_count_p (cfun, loop->header->count.apply_scale
+				  (loop->counters->sum - psum,
+				   loop->counters->sum)))
+	{
+	  dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+			   "not vectorized: according to loop histogram "
+			   "the vectorized loop would be cold.\n");
+	  return 0;
+	}
+      use_estimate = false;
+    }
+
   HOST_WIDE_INT estimated_niter;
 
   /* If we are vectorizing an epilogue then we know the maximum number of
@@ -2078,7 +2109,7 @@ vect_analyze_loop_costing (loop_vec_info loop_vinfo,
   if (LOOP_VINFO_EPILOGUE_P (loop_vinfo))
     estimated_niter
       = vect_vf_for_cost (LOOP_VINFO_ORIG_LOOP_INFO (loop_vinfo)) - 1;
-  else
+  else if (use_estimate)
     {
       estimated_niter = estimated_stmt_executions_int (loop);
       if (estimated_niter == -1)
