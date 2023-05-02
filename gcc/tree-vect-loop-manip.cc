@@ -2944,7 +2944,14 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
       /* TODO: Update counters or at least release vectors.
          We do not produce prologs on modern x86 targets we test on
          so this is not important for proof of concept.  */
-      prolog->counters = NULL;
+      if (prolog->counters)
+	{
+	  va_heap::release (prolog->counters->lin);
+	  va_heap::release (prolog->counters->exp);
+	  if (prolog->counters->mod)
+	    va_heap::release (prolog->counters->mod);
+	  prolog->counters = NULL;
+	}
       delete_update_ssa ();
       adjust_vec_debug_stmts ();
       scev_reset ();
@@ -3082,7 +3089,14 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
 	  record_niter_bound (epilog, bound - 1, false, true);
 	}
       /* TODO: Compute epilog histograms or at least release the counters.  */
-      epilog->counters = NULL;
+      if (epilog->counters)
+	{
+	  va_heap::release (epilog->counters->lin);
+	  va_heap::release (epilog->counters->exp);
+	  if (epilog->counters->mod)
+	    va_heap::release (epilog->counters->mod);
+	  epilog->counters = NULL;
+	}
 
       delete_update_ssa ();
       adjust_vec_debug_stmts ();

@@ -1109,16 +1109,16 @@ try_peel_loop (class loop *loop,
     dump_printf_loc (MSG_MISSED_OPTIMIZATION | MSG_PRIORITY_USER_FACING, locus,
 		     "missing loop histogram for loop %d.\n", loop->num);
   HOST_WIDE_INT nonhistogram_npeel = npeel + 1;
-  if (histogram_peeling && loop->counters->sum != 0)
+  if (histogram_peeling && loop->counters->sum != 0
+      && loop->counters->lin->length ())
     {
       gcov_type sum = loop->counters->sum;
       gcov_type rest = sum;
       gcov_type psum = 0;
       int good_percentage = param_profile_histogram_peel_prcnt;
-      /* TODO: Fix.  Profile size needs to be stored in the counters.  */
-      for (int i = 0; i < param_profile_histogram_size_lin; i++)
+      for (int i = 0; i < loop->counters->lin->length (); i++)
 	{
-	  psum += (*(loop->counters->hist))[i];
+	  psum += (*(loop->counters->lin))[i];
 	  // iteration has enough cumulated in partial sum and itself has at
 	  // least 1 percent or we have complete peeling
 	  if ((100 * psum) / sum >= good_percentage || psum == rest)

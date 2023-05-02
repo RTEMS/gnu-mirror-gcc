@@ -964,7 +964,8 @@ copy_loop_info (class loop *loop, class loop *target)
       target->counters = ggc_alloc<histogram_counters> ();
       target->counters->sum = loop->counters->sum;
       target->counters->adjusted = loop->counters->adjusted;
-      target->counters->hist = vec_safe_copy (loop->counters->hist);
+      target->counters->lin = vec_safe_copy (loop->counters->lin);
+      target->counters->exp = vec_safe_copy (loop->counters->exp);
       if (loop->counters->mod)
 	target->counters->mod = vec_safe_copy (loop->counters->mod);
     }
@@ -1176,17 +1177,17 @@ duplicate_loop_body_to_header_edge (class loop *loop, edge e,
 	       i++)
 	    {
 	      scale_step[i] = profile_probability::always ()
-			      - ((*loop->counters->hist)[i]
+			      - ((*loop->counters->lin)[i]
 				   ? profile_probability::always ()
 				       / (loop->counters->sum - psum)
-				       * (*loop->counters->hist)[i]
+				       * (*loop->counters->lin)[i]
 				   : profile_probability::never ());
 	      // we set whether it was adjusted or is still precise
 	      if (loop->counters->adjusted)
 		{
 		  scale_step[i].adjusted ();
 		}
-	      psum += (*loop->counters->hist)[i];
+	      psum += (*loop->counters->lin)[i];
 	    }
 	  ++i;
 	  for (; i <= ndupl; i++)

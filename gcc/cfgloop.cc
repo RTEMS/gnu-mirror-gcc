@@ -201,7 +201,8 @@ flow_loop_free (class loop *loop)
   ggc_free (loop->exits);
   if (loop->counters)
     {
-      va_heap::release (loop->counters->hist);
+      va_heap::release (loop->counters->lin);
+      va_heap::release (loop->counters->exp);
       if (loop->counters->mod)
 	va_heap::release (loop->counters->mod);
       ggc_free (loop->counters);
@@ -2224,60 +2225,60 @@ histogram_counters_minus_upper_bound (histogram_counters *&hist_c,
     return;
   if (hist_c->sum == 0 && !hist_c->mod)
     {
-      va_heap::release (hist_c->hist);
+      va_heap::release (hist_c->lin);
+      va_heap::release (hist_c->exp);
       ggc_free (hist_c);
       hist_c = NULL;
       return;
     }
-  auto &hist = *(hist_c->hist);
+  auto &lin = *(hist_c->lin);
+  auto &exp = *(hist_c->exp);
   hist_c->adjusted = true;
   auto &sum = hist_c->sum;
   unsigned int lin_size = param_profile_histogram_size_lin;
-  unsigned int tot_size
-    = param_profile_histogram_size_lin + param_profile_histogram_size_exp;
   // If the last linear counter does not contain other iterations
-  unsigned int i = 1;
-  for (; i < lin_size; i++)
+  unsigned int i = 0;
+  for (; i < difference && i < lin.length (); ++i)
     {
-      if (i <= difference)
-	{
-	  sum -= hist[0];
-	  hist[0] = hist[i];
-	}
-      else
-	{
-	  hist[i - difference] += hist[i];
-	}
-      hist[i] = 0;
+      sum -= lin[i];
+      lin[i] = 0;
     }
+  for (; i < lin.length (); ++i)
+    {
+      lin[i - difference] = lin[i];
+      lin[i] = 0;
+    }
+  lin.truncate (lin.length () > difference ? lin.length () - difference : 0);
   // next pow2
   gcov_type_unsigned pow2 = ((gcov_type_unsigned) 1)
 			    << (ceil_log2 (lin_size) + i + 1 - lin_size);
+  i = 0;
   // we null all counters that cannot transfer to non-zero counts
-  for (; pow2 - 1 < difference && i < tot_size - 1; ++i)
+  for (; pow2 - 1 < difference && i < exp.length () - 1; ++i)
     {
-      sum -= hist[0];
-      hist[0] = hist[i];
-      hist[i] = 0;
+      sum -= exp[0];
+      exp[0] = exp[i];
+      exp[i] = 0;
       pow2 = pow2 << 1;
     }
   // if there are no more iterations we do not care
   if (hist_c->sum == 0 && !hist_c->mod)
     {
-      va_heap::release (hist_c->hist);
+      va_heap::release (hist_c->lin);
+      va_heap::release (hist_c->exp);
       ggc_free (hist_c);
       hist_c = NULL;
       return;
     }
   // we want to change index 1/(1<<portion) of iterations
   int portion = 1;
-  for (; i < tot_size - 1 && portion < 10; ++i)
+  for (; i < exp.length () - 1 && portion < 10; ++i)
     {
       // we take a sample point and suppose by uniform distribution that all
       // lesser iterations move same as this point
       gcov_type_unsigned point = (pow2 >> 1) + (pow2 >> (1 + portion));
       unsigned int ind
-	= hist_index (point >= difference ? point - difference : 0);
+	= point >= difference ? hist_index (point - difference) : 0;
       while (ind == i)
 	{
 	  // if nothing changes we decrease the portion of iteration changed
@@ -2285,9 +2286,9 @@ histogram_counters_minus_upper_bound (histogram_counters *&hist_c,
 	  point = (pow2 >> 1) + (pow2 >> (1 + portion));
 	  ind = hist_index (point >= difference ? point - difference : 0);
 	}
-      int64_t diff = hist[i] / (1 << portion);
-      hist[ind] += diff;
-      hist[i] -= diff;
+      int64_t diff = exp[i] / (1 << portion);
+      exp[ind > lin_size ? ind - lin_size : 0] += diff;
+      exp[i] -= diff;
       pow2 <<= 1;
     }
   if (hist_c->mod)
@@ -2315,25 +2316,30 @@ histogram_counters_div_upper_bound (histogram_counters *&hist_c,
     return;
   if (hist_c->sum == 0)
     {
-      va_heap::release (hist_c->hist);
+      va_heap::release (hist_c->lin);
+      va_heap::release (hist_c->exp);
       if (hist_c->mod)
 	va_heap::release (hist_c->mod);
       ggc_free (hist_c);
       hist_c = NULL;
       return;
     }
-  auto &hist = *(hist_c->hist);
+  auto &lin = *(hist_c->lin);
+  auto &exp = *(hist_c->exp);
   hist_c->adjusted = true;
   unsigned int lin_size = param_profile_histogram_size_lin;
   unsigned int tot_size
     = param_profile_histogram_size_lin + param_profile_histogram_size_exp;
   unsigned int i = 1;
-  for (; i < lin_size && i < tot_size - 1; i++)
+  for (; i < lin.length (); i++)
     {
       // we want to take the roof of the division
-      hist[i / divisor + MIN (1, i % divisor)] += hist[i];
-      hist[i] = 0;
+      lin[i / divisor + MIN (1, i % divisor)] += lin[i];
+      lin[i] = 0;
     }
+  lin.truncate (lin.length () ? (lin.length () - 1) / divisor
+				  + MIN (1, (lin.length () - 1) % divisor) + 1
+			      : 0);
 
   for (; i < tot_size - 1; i++)
     {
@@ -2342,8 +2348,8 @@ histogram_counters_div_upper_bound (histogram_counters *&hist_c,
       gcov_type_unsigned half = (upper_pow2 >> 2) + (upper_pow2 >> 1);
       unsigned int ind = hist_index (half / divisor);
       // hist is allways different then i since we know divisor>1
-      hist[ind] += hist[MIN (1, i)];
-      hist[i] = 0;
+      exp[ind > lin_size ? ind - lin_size : 0] += exp[i];
+      exp[i] = 0;
     }
   // we do not try to maintain modulo info when dividing since it is often
   // impossible

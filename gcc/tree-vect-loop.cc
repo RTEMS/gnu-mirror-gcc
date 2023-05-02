@@ -2081,8 +2081,10 @@ vect_analyze_loop_costing (loop_vec_info loop_vinfo,
       && min_profitable_estimate <= param_profile_histogram_size_lin)
     {
       gcov_type psum = 0;
-      for (int i = 0; i < min_profitable_estimate; i++)
-	psum += (*(loop->counters->hist))[i];
+      for (int i = 0; i < min_profitable_estimate
+		      && i < (int) loop->counters->lin->length ();
+	   i++)
+	psum += (*(loop->counters->lin))[i];
       /* TODO: This is less precise than needed.  If histogram was also
 	 storing number of executions of the loop header (which may
 	 be different from loop->header->count if i.e. inlining happen).
@@ -11141,7 +11143,13 @@ vect_transform_loop (loop_vec_info loop_vinfo, gimple *loop_vectorized_call)
 			   assumed_vf) - 1);
   /* TODO: Fix profile after vectorization.  */
   if (loop->counters)
-    loop->counters = NULL;
+    {
+      va_heap::release (loop->counters->lin);
+      va_heap::release (loop->counters->exp);
+      if (loop->counters->mod)
+      va_heap::release (loop->counters->mod);
+      loop->counters = NULL;
+    }
 
   if (dump_enabled_p ())
     {

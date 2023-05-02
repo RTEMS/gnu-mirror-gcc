@@ -112,9 +112,9 @@ pass_loop_histogram_versioning::execute (function *fn)
       /* Look for dominating iteration count.  */
       for (int i = 0; i < param_profile_histogram_size_lin; i++)
 	{
-	  if ((*(loop->counters->hist))[i] > best_val)
+	  if ((*(loop->counters->lin))[i] > best_val)
 	    {
-	      best_val = (*(loop->counters->hist))[i];
+	      best_val = (*(loop->counters->lin))[i];
 	      best_iters = i;
 	    }
 	}
@@ -238,7 +238,7 @@ pass_loop_histogram_versioning::execute (function *fn)
       /* Update counters of non-optiized loop.
          TODO: also recompute estimated number of itraitons
 	 instead of droping it bellow.  */
-      (*(loop->counters->hist))[best_iters] = 0;
+      (*(loop->counters->lin))[best_iters] = 0;
       loop->counters->sum -= best_val;
       loop->any_estimate = false;
       changed = true;

@@ -2185,12 +2185,15 @@ output_cfg (struct output_block *ob, struct function *fn)
       if (loop->counters)
 	{
 	  streamer_write_gcov_count (ob, loop->counters->sum);
-	  for (unsigned int i = 0;
-	       i < (unsigned int) (param_profile_histogram_size_lin
-				   + param_profile_histogram_size_exp);
-	       ++i)
+	  streamer_write_hwi (ob, loop->counters->lin->length ());
+	  for (unsigned int i = 0; i < loop->counters->lin->length (); ++i)
 	    {
-	      streamer_write_gcov_count (ob, (*loop->counters->hist)[i]);
+	      streamer_write_gcov_count (ob, (*loop->counters->lin)[i]);
+	    }
+	  for (unsigned int i = 0;
+	       i < (unsigned int) param_profile_histogram_size_exp; ++i)
+	    {
+	      streamer_write_gcov_count (ob, (*loop->counters->exp)[i]);
 	    }
 	  streamer_write_hwi (ob, loop->counters->mod != NULL);
 	  if (loop->counters->mod)

@@ -934,12 +934,22 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
 	      unsigned int tot_size = param_profile_histogram_size_lin
 				      + param_profile_histogram_size_exp;
 	      lp->counters->adjusted = false;
-	      lp->counters->hist = NULL;
+	      lp->counters->lin = NULL;
+	      lp->counters->exp = NULL;
 	      // iteration vector
-	      vec_safe_grow_cleared (lp->counters->hist, tot_size);
-	      for (int i = 0; i < (int) tot_size; ++i)
+	      vec_safe_grow_cleared (lp->counters->lin,
+				     param_profile_histogram_size_lin);
+	      vec_safe_grow_cleared (lp->counters->exp,
+				     param_profile_histogram_size_exp);
+	      for (int i = 0; i < (int) param_profile_histogram_size_lin; ++i)
 		{
-		  auto hst = lp->counters->hist;
+		  auto hst = lp->counters->lin;
+		  (*hst)[i] = act_count[t][i];
+		  sum += act_count[t][i];
+		}
+	      for (int i = 0; i < (int) param_profile_histogram_size_exp; ++i)
+		{
+		  auto hst = lp->counters->exp;
 		  (*hst)[i] = act_count[t][i];
 		  sum += act_count[t][i];
 		}
@@ -956,7 +966,8 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
 		}
 	      if (sum == 0)
 		{
-		  va_heap::release (lp->counters->hist);
+		  va_heap::release (lp->counters->lin);
+		  va_heap::release (lp->counters->exp);
 		  va_heap::release (lp->counters->mod);
 		  ggc_free (lp->counters);
 		  lp->counters = NULL;
