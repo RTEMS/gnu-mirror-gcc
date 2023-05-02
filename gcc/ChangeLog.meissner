@@ -189,7 +189,7 @@ gc/testsuite/
 
 	* gcc.target/powerpc/vec-extract-mem-float-1.c: New file.
 
-==================== Branch work120, patch #3 ====================
+==================== Branch work120, patch #4 ====================
 
 Fix typo in insn name.
 
@@ -206,7 +206,7 @@ gcc/
 	* config/rs6000/vsx.md (vsx_extract_v4sf_load): Rename from
 	vsx_extract_v4sf_<mode>_load.
 
-==================== Branch work120, patch #2 ====================
+==================== Branch work120, patch #3 ====================
 
 Improve 64->128 bit zero extension on PowerPC
 
@@ -222,7 +222,7 @@ gcc/testsuite/
 	PR target/108958
 	* gcc.target/powerpc/zero-extend-di-ti.c: New test.
 
-==================== Branch work120, patch #1 ====================
+==================== Branch work120, patch #2 ====================
 
 Fix splat of extract for long long and double.
 
