@@ -277,7 +277,6 @@ ctz_or_zero (unsigned HOST_WIDE_INT x)
 inline HOST_WIDE_INT
 sext_hwi (HOST_WIDE_INT src, unsigned int prec)
 {
-  gcc_checking_assert (prec != 0);
   if (prec == HOST_BITS_PER_WIDE_INT)
     return src;
   else
