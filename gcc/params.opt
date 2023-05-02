@@ -879,11 +879,11 @@ Common Joined UInteger Var(param_profile_histogram_size_exp) Init(1) IntegerRang
 Size of additional counters in exponential intervals after the linear section.
 
 -param=profile-histogram-size-mod=
-Common Joined UInteger Var(param_profile_histogram_size_mod) Init(32) IntegerRange(0, 255) Param Optimization
+Common Joined UInteger Var(param_profile_histogram_size_mod) Init(32) IntegerRange(1, 255) Param Optimization
 Counts the modulo of loop iterations by its size.
 
 -param=profile-histogram-size-lin=
-Common Joined UInteger Var(param_profile_histogram_size_lin) Init(16) IntegerRange(0, 255) Param Optimization
+Common Joined UInteger Var(param_profile_histogram_size_lin) Init(16) IntegerRange(1, 255) Param Optimization
 Size of the linear portion of the histogram counter for profile feedback.
 
 -param=profile-histogram-peel-prcnt=
