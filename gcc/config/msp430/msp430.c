@@ -469,7 +469,7 @@ msp430_addr_space_pointer_mode (addr_space_t addrspace, bool = false)
 #undef  TARGET_UNWIND_WORD_MODE
 #define TARGET_UNWIND_WORD_MODE msp430_unwind_word_mode
 
-static scalar_int_mode
+static scalar_addr_mode
 msp430_unwind_word_mode (void)
 {
   /* This needs to match msp430_init_dwarf_reg_sizes_extra (below).  */

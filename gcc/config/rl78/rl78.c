@@ -4760,7 +4760,7 @@ rl78_asm_out_integer (rtx x, unsigned int size, int aligned_p)
 #undef  TARGET_UNWIND_WORD_MODE
 #define TARGET_UNWIND_WORD_MODE rl78_unwind_word_mode
 
-static scalar_int_mode
+static scalar_addr_mode
 rl78_unwind_word_mode (void)
 {
   return HImode;

@@ -2867,7 +2867,7 @@ pru_set_current_function (tree fndecl)
 /* Implement TARGET_UNWIND_WORD_MODE.
 
    Since PRU is really a 32-bit CPU, the default word_mode is not suitable.  */
-static scalar_int_mode
+static scalar_addr_mode
 pru_unwind_word_mode (void)
 {
   return SImode;
