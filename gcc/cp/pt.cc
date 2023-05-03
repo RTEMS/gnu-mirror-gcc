@@ -12285,40 +12285,19 @@ instantiate_class_template (tree type)
 		   Ignore it; it will be regenerated when needed.  */
 		continue;
 
-	      bool class_template_p = (TREE_CODE (t) != ENUMERAL_TYPE
-				       && TYPE_LANG_SPECIFIC (t)
-				       && CLASSTYPE_IS_TEMPLATE (t));
+	      /* If the member is a class template, we've
+		 already substituted its type.  */
+	      if (CLASS_TYPE_P (t)
+		  && CLASSTYPE_IS_TEMPLATE (t))
+		continue;
 
-	      /* If the member is a class template, then -- even after
-		 substitution -- there may be dependent types in the
-		 template argument list for the class.  We increment
-		 PROCESSING_TEMPLATE_DECL so that dependent_type_p, as
-		 that function will assume that no types are dependent
-		 when outside of a template.  */
-	      if (class_template_p)
-		++processing_template_decl;
 	      tree newtag = tsubst (t, args, tf_error, NULL_TREE);
-	      if (class_template_p)
-		--processing_template_decl;
 	      if (newtag == error_mark_node)
 		continue;
 
 	      if (TREE_CODE (newtag) != ENUMERAL_TYPE)
 		{
 		  tree name = TYPE_IDENTIFIER (t);
-
-		  if (class_template_p)
-		    /* Unfortunately, lookup_template_class sets
-		       CLASSTYPE_IMPLICIT_INSTANTIATION for a partial
-		       instantiation (i.e., for the type of a member
-		       template class nested within a template class.)
-		       This behavior is required for
-		       maybe_process_partial_specialization to work
-		       correctly, but is not accurate in this case;
-		       the TAG is not an instantiation of anything.
-		       (The corresponding TEMPLATE_DECL is an
-		       instantiation, but the TYPE is not.) */
-		    CLASSTYPE_USE_TEMPLATE (newtag) = 0;
 
 		  /* Now, install the tag.  We don't use pushtag
 		     because that does too much work -- creating an
@@ -14750,7 +14729,10 @@ tsubst_template_decl (tree t, tree args, tsubst_flags_t complain,
       /* For a partial specialization, we need to keep pointing to
 	 the primary template.  */
       if (!DECL_TEMPLATE_SPECIALIZATION (t))
-	CLASSTYPE_TI_TEMPLATE (inner) = r;
+	{
+	  CLASSTYPE_TI_TEMPLATE (inner) = r;
+	  CLASSTYPE_USE_TEMPLATE (inner) = 0;
+	}
 
       DECL_TI_ARGS (r) = CLASSTYPE_TI_ARGS (inner);
       inner = TYPE_MAIN_DECL (inner);
@@ -26815,20 +26797,7 @@ instantiate_body (tree pattern, tree args, tree d, bool nested_p)
   if (current_function_decl)
     save_omp_privatization_clauses (omp_privatization_save);
 
-  bool push_to_top
-    = !(current_function_decl
-	&& !LAMBDA_FUNCTION_P (d)
-	&& decl_function_context (d) == current_function_decl);
-
-  if (push_to_top)
-    push_to_top_level ();
-  else
-    {
-      gcc_assert (!processing_template_decl);
-      push_function_context ();
-      cp_unevaluated_operand = 0;
-      c_inhibit_evaluation_warnings = 0;
-    }
+  bool push_to_top = maybe_push_to_top_level (d);
 
   mark_template_arguments_used (pattern, args);
 
@@ -26942,10 +26911,7 @@ instantiate_body (tree pattern, tree args, tree d, bool nested_p)
   if (!nested_p)
     TI_PENDING_TEMPLATE_FLAG (DECL_TEMPLATE_INFO (d)) = 0;
 
-  if (push_to_top)
-    pop_from_top_level ();
-  else
-    pop_function_context ();
+  maybe_pop_from_top_level (push_to_top);
 
   if (current_function_decl)
     restore_omp_privatization_clauses (omp_privatization_save);

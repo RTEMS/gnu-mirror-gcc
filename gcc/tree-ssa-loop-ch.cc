@@ -79,15 +79,15 @@ entry_loop_condition_is_static (class loop *l, gimple_ranger *ranger)
   if (!loop_exit_edge_p (l, true_e) && !loop_exit_edge_p (l, false_e))
     return false;
 
-  tree desired_static_value;
+  int_range<1> desired_static_range;
   if (loop_exit_edge_p (l, true_e))
-    desired_static_value = boolean_false_node;
+    desired_static_range = range_false ();
   else
-    desired_static_value = boolean_true_node;
+    desired_static_range = range_true ();
 
   int_range<2> r;
   edge_range_query (r, e, last, *ranger);
-  return r == int_range<2> (desired_static_value, desired_static_value);
+  return r == desired_static_range;
 }
 
 /* Check whether we should duplicate HEADER of LOOP.  At most *LIMIT
@@ -396,6 +396,8 @@ ch_base::copy_headers (function *fun)
 
   auto_vec<loop_p> candidates;
   auto_vec<std::pair<edge, loop_p> > copied;
+  auto_vec<class loop *> loops_to_unloop;
+  auto_vec<int> loops_to_unloop_nunroll;
 
   mark_dfs_back_edges ();
   gimple_ranger *ranger = new gimple_ranger;
@@ -408,6 +410,14 @@ ch_base::copy_headers (function *fun)
 		 "Analyzing loop %i\n", loop->num);
 
       header = loop->header;
+      if (!get_max_loop_iterations_int (loop))
+	{
+	  if (dump_file && (dump_flags & TDF_DETAILS))
+	    fprintf (dump_file, "Loop %d never loops.\n", loop->num);
+	  loops_to_unloop.safe_push (loop);
+	  loops_to_unloop_nunroll.safe_push (0);
+	  continue;
+	}
 
       /* If the loop is already a do-while style one (either because it was
 	 written as such, or because jump threading transformed it into one),
@@ -593,13 +603,6 @@ ch_base::copy_headers (function *fun)
       /* We possibly decreased number of itrations by 1.  */
       auto_vec<edge> exits = get_loop_exit_edges (loop);
       bool precise = (nexits == (int) exits.length ());
-      if (!get_max_loop_iterations_int (loop))
-	{
-	  if (dump_file && (dump_flags & TDF_DETAILS))
-	    fprintf (dump_file, "Loop %d no longer loops.\n", loop->num);
-	  /* TODO: We can unloop like in tree-ssa-loop-ivcanon.  */
-	  precise = false;
-	}
       /* Check that loop may not terminate in other way than via
 	 basic blocks we duplicated.  */
       if (precise)
@@ -640,7 +643,15 @@ ch_base::copy_headers (function *fun)
 		 precise = false;
 	   }
 	}
-      if (precise)
+      if (precise
+	  && get_max_loop_iterations_int (loop) == 1)
+	{
+	  if (dump_file && (dump_flags & TDF_DETAILS))
+	    fprintf (dump_file, "Loop %d no longer loops.\n", loop->num);
+	  loops_to_unloop.safe_push (loop);
+	  loops_to_unloop_nunroll.safe_push (0);
+	}
+      else if (precise)
 	{
 	  if (dump_file && (dump_flags & TDF_DETAILS))
 	    fprintf (dump_file,
@@ -687,6 +698,12 @@ ch_base::copy_headers (function *fun)
 	  do_rpo_vn (cfun, entry, exit_bbs);
 	  BITMAP_FREE (exit_bbs);
 	}
+    }
+  if (!loops_to_unloop.is_empty ())
+    {
+      bool irred_invalidated;
+      unloop_loops (loops_to_unloop, loops_to_unloop_nunroll, NULL, &irred_invalidated);
+      changed = true;
     }
   free (bbs);
   free (copied_bbs);

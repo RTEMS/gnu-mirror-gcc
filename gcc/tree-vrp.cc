@@ -367,30 +367,6 @@ get_single_symbol (tree t, bool *neg, tree *inv)
   return t;
 }
 
-/* Return
-   1 if VAL < VAL2
-   0 if !(VAL < VAL2)
-   -2 if those are incomparable.  */
-int
-operand_less_p (tree val, tree val2)
-{
-  /* LT is folded faster than GE and others.  Inline the common case.  */
-  if (TREE_CODE (val) == INTEGER_CST && TREE_CODE (val2) == INTEGER_CST)
-    return tree_int_cst_lt (val, val2);
-  else if (TREE_CODE (val) == SSA_NAME && TREE_CODE (val2) == SSA_NAME)
-    return val == val2 ? 0 : -2;
-  else
-    {
-      int cmp = compare_values (val, val2);
-      if (cmp == -1)
-	return 1;
-      else if (cmp == 0 || cmp == 1)
-	return 0;
-      else
-	return -2;
-    }
-}
-
 /* Compare two values VAL1 and VAL2.  Return
 
    	-2 if VAL1 and VAL2 cannot be compared at compile-time,
@@ -851,6 +827,8 @@ find_case_label_range (gswitch *switch_stmt, const irange *range_of_op)
   size_t i, j;
   tree op = gimple_switch_index (switch_stmt);
   tree type = TREE_TYPE (op);
+  unsigned prec = TYPE_PRECISION (type);
+  signop sign = TYPE_SIGN (type);
   tree tmin = wide_int_to_tree (type, range_of_op->lower_bound ());
   tree tmax = wide_int_to_tree (type, range_of_op->upper_bound ());
   find_case_label_range (switch_stmt, tmin, tmax, &i, &j);
@@ -861,7 +839,11 @@ find_case_label_range (gswitch *switch_stmt, const irange *range_of_op)
       tree label = gimple_switch_label (switch_stmt, i);
       tree case_high
 	= CASE_HIGH (label) ? CASE_HIGH (label) : CASE_LOW (label);
-      int_range_max label_range (CASE_LOW (label), case_high);
+      wide_int wlow = wi::to_wide (CASE_LOW (label));
+      wide_int whigh = wi::to_wide (case_high);
+      int_range_max label_range (type,
+				 wide_int::from (wlow, prec, sign),
+				 wide_int::from (whigh, prec, sign));
       if (!types_compatible_p (label_range.type (), range_of_op->type ()))
 	range_cast (label_range, range_of_op->type ());
       label_range.intersect (*range_of_op);
@@ -885,7 +867,9 @@ find_case_label_range (gswitch *switch_stmt, const irange *range_of_op)
       tree case_high = CASE_HIGH (max_label);
       if (!case_high)
 	case_high = CASE_LOW (max_label);
-      int_range_max label_range (CASE_LOW (min_label), case_high);
+      int_range_max label_range (TREE_TYPE (CASE_LOW (min_label)),
+				 wi::to_wide (CASE_LOW (min_label)),
+				 wi::to_wide (case_high));
       if (!types_compatible_p (label_range.type (), range_of_op->type ()))
 	range_cast (label_range, range_of_op->type ());
       label_range.intersect (*range_of_op);

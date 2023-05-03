@@ -1943,8 +1943,9 @@ ipa_value_range_from_jfunc (ipa_node_params *info, cgraph_edge *cs,
       if (!(*sum->m_vr)[idx].known)
 	return vr;
       tree vr_type = ipa_get_type (info, idx);
-      value_range srcvr (wide_int_to_tree (vr_type, (*sum->m_vr)[idx].min),
-			 wide_int_to_tree (vr_type, (*sum->m_vr)[idx].max),
+      value_range srcvr (vr_type,
+			 (*sum->m_vr)[idx].min,
+			 (*sum->m_vr)[idx].max,
 			 (*sum->m_vr)[idx].type);
 
       enum tree_code operation = ipa_get_jf_pass_through_operation (jfunc);
@@ -1963,8 +1964,10 @@ ipa_value_range_from_jfunc (ipa_node_params *info, cgraph_edge *cs,
 	{
 	  value_range op_res, res;
 	  tree op = ipa_get_jf_pass_through_operand (jfunc);
-	  value_range op_vr (op, op);
+	  value_range op_vr;
 	  range_op_handler handler (operation, vr_type);
+
+	  ipa_range_set_and_normalize (op_vr, op);
 
 	  if (!handler
 	      || !op_res.supports_type_p (vr_type)
@@ -2757,9 +2760,11 @@ propagate_vr_across_jump_function (cgraph_edge *cs, ipa_jump_func *jfunc,
       else if (!ipa_edge_within_scc (cs))
 	{
 	  tree op = ipa_get_jf_pass_through_operand (jfunc);
-	  value_range op_vr (op, op);
+	  value_range op_vr;
 	  value_range op_res,res;
 	  range_op_handler handler (operation, operand_type);
+
+	  ipa_range_set_and_normalize (op_vr, op);
 
 	  if (!handler
 	      || !op_res.supports_type_p (operand_type)
@@ -2795,7 +2800,8 @@ propagate_vr_across_jump_function (cgraph_edge *cs, ipa_jump_func *jfunc,
 	  if (TREE_OVERFLOW_P (val))
 	    val = drop_tree_overflow (val);
 
-	  value_range tmpvr (val, val);
+	  value_range tmpvr (TREE_TYPE (val),
+			     wi::to_wide (val), wi::to_wide (val));
 	  return dest_lat->meet_with (&tmpvr);
 	}
     }
@@ -6200,7 +6206,7 @@ decide_about_value (struct cgraph_node *node, int index, HOST_WIDE_INT offset,
    necessary.  */
 
 static inline bool
-ipa_range_contains_p (const irange &r, tree val)
+ipa_range_contains_p (const vrange &r, tree val)
 {
   if (r.undefined_p ())
     return false;

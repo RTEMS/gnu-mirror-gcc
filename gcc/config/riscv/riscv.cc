@@ -236,6 +236,7 @@ struct riscv_tune_param
   unsigned short memory_cost;
   unsigned short fmv_cost;
   bool slow_unaligned_access;
+  bool use_divmod_expansion;
 };
 
 /* Information about one micro-arch we know about.  */
@@ -323,6 +324,7 @@ static const struct riscv_tune_param rocket_tune_info = {
   5,						/* memory_cost */
   8,						/* fmv_cost */
   true,						/* slow_unaligned_access */
+  false,					/* use_divmod_expansion */
 };
 
 /* Costs to use when optimizing for Sifive 7 Series.  */
@@ -337,6 +339,7 @@ static const struct riscv_tune_param sifive_7_tune_info = {
   3,						/* memory_cost */
   8,						/* fmv_cost */
   true,						/* slow_unaligned_access */
+  false,					/* use_divmod_expansion */
 };
 
 /* Costs to use when optimizing for T-HEAD c906.  */
@@ -351,6 +354,7 @@ static const struct riscv_tune_param thead_c906_tune_info = {
   5,            /* memory_cost */
   8,		/* fmv_cost */
   false,            /* slow_unaligned_access */
+  false		/* use_divmod_expansion */
 };
 
 /* Costs to use when optimizing for size.  */
@@ -365,6 +369,7 @@ static const struct riscv_tune_param optimize_size_tune_info = {
   2,						/* memory_cost */
   8,						/* fmv_cost */
   false,					/* slow_unaligned_access */
+  false,					/* use_divmod_expansion */
 };
 
 static tree riscv_handle_fndecl_attribute (tree *, tree, tree, int, bool *);
@@ -4289,6 +4294,36 @@ riscv_print_operand_reloc (FILE *file, rtx op, bool hi_reloc)
   fputc (')', file);
 }
 
+/* Return the memory model that encapuslates both given models.  */
+
+enum memmodel
+riscv_union_memmodels (enum memmodel model1, enum memmodel model2)
+{
+  model1 = memmodel_base (model1);
+  model2 = memmodel_base (model2);
+
+  enum memmodel weaker = model1 <= model2 ? model1: model2;
+  enum memmodel stronger = model1 > model2 ? model1: model2;
+
+  switch (stronger)
+    {
+      case MEMMODEL_SEQ_CST:
+      case MEMMODEL_ACQ_REL:
+	return stronger;
+      case MEMMODEL_RELEASE:
+	if (weaker == MEMMODEL_ACQUIRE || weaker == MEMMODEL_CONSUME)
+	  return MEMMODEL_ACQ_REL;
+	else
+	  return stronger;
+      case MEMMODEL_ACQUIRE:
+      case MEMMODEL_CONSUME:
+      case MEMMODEL_RELAXED:
+	return stronger;
+      default:
+	gcc_unreachable ();
+    }
+}
+
 /* Return true if the .AQ suffix should be added to an AMO to implement the
    acquire portion of memory model MODEL.  */
 
@@ -4299,14 +4334,11 @@ riscv_memmodel_needs_amo_acquire (enum memmodel model)
     {
       case MEMMODEL_ACQ_REL:
       case MEMMODEL_SEQ_CST:
-      case MEMMODEL_SYNC_SEQ_CST:
       case MEMMODEL_ACQUIRE:
       case MEMMODEL_CONSUME:
-      case MEMMODEL_SYNC_ACQUIRE:
 	return true;
 
       case MEMMODEL_RELEASE:
-      case MEMMODEL_SYNC_RELEASE:
       case MEMMODEL_RELAXED:
 	return false;
 
@@ -4315,24 +4347,21 @@ riscv_memmodel_needs_amo_acquire (enum memmodel model)
     }
 }
 
-/* Return true if a FENCE should be emitted to before a memory access to
-   implement the release portion of memory model MODEL.  */
+/* Return true if the .RL suffix should be added to an AMO to implement the
+   release portion of memory model MODEL.  */
 
 static bool
-riscv_memmodel_needs_release_fence (enum memmodel model)
+riscv_memmodel_needs_amo_release (enum memmodel model)
 {
   switch (model)
     {
       case MEMMODEL_ACQ_REL:
       case MEMMODEL_SEQ_CST:
-      case MEMMODEL_SYNC_SEQ_CST:
       case MEMMODEL_RELEASE:
-      case MEMMODEL_SYNC_RELEASE:
 	return true;
 
       case MEMMODEL_ACQUIRE:
       case MEMMODEL_CONSUME:
-      case MEMMODEL_SYNC_ACQUIRE:
       case MEMMODEL_RELAXED:
 	return false;
 
@@ -4348,7 +4377,8 @@ riscv_memmodel_needs_release_fence (enum memmodel model)
    'R'	Print the low-part relocation associated with OP.
    'C'	Print the integer branch condition for comparison OP.
    'A'	Print the atomic operation suffix for memory model OP.
-   'F'	Print a FENCE if the memory model requires a release.
+   'I'	Print the LR suffix for memory model OP.
+   'J'	Print the SC suffix for memory model OP.
    'z'	Print x0 if OP is zero, otherwise print OP normally.
    'i'	Print i if the operand is not a register.
    'S'	Print shift-index of single-bit mask OP.
@@ -4371,6 +4401,7 @@ riscv_print_operand (FILE *file, rtx op, int letter)
     }
   machine_mode mode = GET_MODE (op);
   enum rtx_code code = GET_CODE (op);
+  const enum memmodel model = memmodel_base (INTVAL (op));
 
   switch (letter)
     {
@@ -4508,13 +4539,25 @@ riscv_print_operand (FILE *file, rtx op, int letter)
       break;
 
     case 'A':
-      if (riscv_memmodel_needs_amo_acquire ((enum memmodel) INTVAL (op)))
+      if (riscv_memmodel_needs_amo_acquire (model)
+	  && riscv_memmodel_needs_amo_release (model))
+	fputs (".aqrl", file);
+      else if (riscv_memmodel_needs_amo_acquire (model))
+	fputs (".aq", file);
+      else if (riscv_memmodel_needs_amo_release (model))
+	fputs (".rl", file);
+      break;
+
+    case 'I':
+      if (model == MEMMODEL_SEQ_CST)
+	fputs (".aqrl", file);
+      else if (riscv_memmodel_needs_amo_acquire (model))
 	fputs (".aq", file);
       break;
 
-    case 'F':
-      if (riscv_memmodel_needs_release_fence ((enum memmodel) INTVAL (op)))
-	fputs ("fence iorw,ow; ", file);
+    case 'J':
+      if (riscv_memmodel_needs_amo_release (model))
+	fputs (".rl", file);
       break;
 
     case 'i':
@@ -4775,12 +4818,27 @@ riscv_save_reg_p (unsigned int regno)
   return false;
 }
 
+/* Return TRUE if a libcall to save/restore GPRs should be
+   avoided.  FALSE otherwise.  */
+static bool
+riscv_avoid_save_libcall (void)
+{
+  if (!TARGET_SAVE_RESTORE
+      || crtl->calls_eh_return
+      || frame_pointer_needed
+      || cfun->machine->interrupt_handler_p
+      || cfun->machine->varargs_size != 0
+      || crtl->args.pretend_args_size != 0)
+    return true;
+
+  return false;
+}
+
 /* Determine whether to call GPR save/restore routines.  */
 static bool
 riscv_use_save_libcall (const struct riscv_frame_info *frame)
 {
-  if (!TARGET_SAVE_RESTORE || crtl->calls_eh_return || frame_pointer_needed
-      || cfun->machine->interrupt_handler_p)
+  if (riscv_avoid_save_libcall ())
     return false;
 
   return frame->save_libcall_adjustment != 0;
@@ -4860,7 +4918,7 @@ riscv_compute_frame_info (void)
   struct riscv_frame_info *frame;
   poly_int64 offset;
   bool interrupt_save_prologue_temp = false;
-  unsigned int regno, i, num_x_saved = 0, num_f_saved = 0;
+  unsigned int regno, i, num_x_saved = 0, num_f_saved = 0, x_save_size = 0;
 
   frame = &cfun->machine->frame;
 
@@ -4898,6 +4956,24 @@ riscv_compute_frame_info (void)
 	    frame->fmask |= 1 << (regno - FP_REG_FIRST), num_f_saved++;
     }
 
+  if (frame->mask)
+    {
+      x_save_size = riscv_stack_align (num_x_saved * UNITS_PER_WORD);
+      unsigned num_save_restore = 1 + riscv_save_libcall_count (frame->mask);
+
+      /* Only use save/restore routines if they don't alter the stack size.  */
+      if (riscv_stack_align (num_save_restore * UNITS_PER_WORD) == x_save_size
+          && !riscv_avoid_save_libcall ())
+	{
+	  /* Libcall saves/restores 3 registers at once, so we need to
+	     allocate 12 bytes for callee-saved register.  */
+	  if (TARGET_RVE)
+	    x_save_size = 3 * UNITS_PER_WORD;
+
+	  frame->save_libcall_adjustment = x_save_size;
+	}
+    }
+
   /* At the bottom of the frame are any outgoing stack arguments. */
   offset = riscv_stack_align (crtl->outgoing_args_size);
   /* Next are local stack variables. */
@@ -4910,23 +4986,7 @@ riscv_compute_frame_info (void)
   frame->fp_sp_offset = offset - UNITS_PER_FP_REG;
   /* Next are the callee-saved GPRs. */
   if (frame->mask)
-    {
-      unsigned x_save_size = riscv_stack_align (num_x_saved * UNITS_PER_WORD);
-      unsigned num_save_restore = 1 + riscv_save_libcall_count (frame->mask);
-
-      /* Only use save/restore routines if they don't alter the stack size.  */
-      if (riscv_stack_align (num_save_restore * UNITS_PER_WORD) == x_save_size)
-	{
-	  /* Libcall saves/restores 3 registers at once, so we need to
-	     allocate 12 bytes for callee-saved register.  */
-	  if (TARGET_RVE)
-	    x_save_size = 3 * UNITS_PER_WORD;
-
-	  frame->save_libcall_adjustment = x_save_size;
-	}
-
-      offset += x_save_size;
-    }
+    offset += x_save_size;
   frame->gp_sp_offset = offset - UNITS_PER_WORD;
   /* The hard frame pointer points above the callee-saved GPRs. */
   frame->hard_frame_pointer_offset = offset;
@@ -4938,11 +4998,8 @@ riscv_compute_frame_info (void)
      padding.  */
   frame->arg_pointer_offset = offset - crtl->args.pretend_args_size;
   frame->total_size = offset;
-  /* Next points the incoming stack pointer and any incoming arguments. */
 
-  /* Only use save/restore routines when the GPRs are atop the frame.  */
-  if (known_ne (frame->hard_frame_pointer_offset, frame->total_size))
-    frame->save_libcall_adjustment = 0;
+  /* Next points the incoming stack pointer and any incoming arguments. */
 }
 
 /* Make sure that we're not trying to eliminate to the wrong hard frame
@@ -7208,6 +7265,16 @@ riscv_lshift_subword (machine_mode mode, rtx value, rtx shift,
 
   emit_move_insn (*shifted_value, gen_rtx_ASHIFT (SImode, value_reg,
 						  gen_lowpart (QImode, shift)));
+}
+
+/* Return TRUE if we should use the divmod expander, FALSE otherwise.  This
+   allows the behavior to be tuned for specific implementations as well as
+   when optimizing for size.  */
+
+bool
+riscv_use_divmod_expander (void)
+{
+  return tune_param->use_divmod_expansion;
 }
 
 /* Initialize the GCC target structure.  */

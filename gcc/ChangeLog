@@ -1,3 +1,894 @@
+2023-05-02  Andrew Pinski  <apinski@marvell.com>
+
+	* tree-ssa-phiopt.cc (move_stmt): New function.
+	(match_simplify_replacement): Use move_stmt instead
+	of the inlined version.
+
+2023-05-02  Andrew Pinski  <apinski@marvell.com>
+
+	* match.pd (a != 0 ? CLRSB(a) : CST -> CLRSB(a)): New
+	pattern.
+
+2023-05-02  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/109702
+	* match.pd: Fix "a != 0 ? FUNC(a) : CST" patterns
+	for FUNC of POPCOUNT BSWAP FFS PARITY CLZ and CTZ.
+
+2023-05-02  Andrew Pinski  <apinski@marvell.com>
+
+	PR target/109657
+	* config/aarch64/aarch64.md (*cmov<mode>_insn_m1): New
+	insn_and_split pattern.
+
+2023-05-02  Patrick O'Neill  <patrick@rivosinc.com>
+
+	* config/riscv/sync.md (atomic_load<mode>): Implement atomic
+	load mapping.
+
+2023-05-02  Patrick O'Neill  <patrick@rivosinc.com>
+
+	* config/riscv/sync.md (mem_thread_fence_1): Change fence
+	depending on the given memory model.
+
+2023-05-02  Patrick O'Neill  <patrick@rivosinc.com>
+
+	* config/riscv/riscv-protos.h (riscv_union_memmodels): Expose
+	riscv_union_memmodels function to sync.md.
+	* config/riscv/riscv.cc (riscv_union_memmodels): Add function to
+	get the union of two memmodels in sync.md.
+	(riscv_print_operand): Add %I and %J flags that output the
+	optimal LR/SC flag bits for a given memory model.
+	* config/riscv/sync.md: Remove static .aqrl bits on LR op/.rl
+	bits on SC op and replace with optimized %I, %J flags.
+
+2023-05-02  Patrick O'Neill  <patrick@rivosinc.com>
+
+	* config/riscv/riscv.cc
+	(riscv_memmodel_needs_amo_release): Change function name.
+	(riscv_print_operand): Remove unneeded %F case.
+	* config/riscv/sync.md: Remove unneeded fences.
+
+2023-05-02  Patrick O'Neill  <patrick@rivosinc.com>
+
+	PR target/89835
+	* config/riscv/sync.md (atomic_store<mode>): Use simple store
+	instruction in combination with fence(s).
+
+2023-05-02  Patrick O'Neill  <patrick@rivosinc.com>
+
+	* config/riscv/riscv.cc (riscv_print_operand): Change behavior
+	of %A to include release bits.
+
+2023-05-02  Patrick O'Neill  <patrick@rivosinc.com>
+
+	* config/riscv/sync.md (atomic_cas_value_strong<mode>): Change
+	FENCE/LR.aq/SC.aq into sequentially consistent LR.aqrl/SC.rl
+	pair.
+
+2023-05-02  Patrick O'Neill  <patrick@rivosinc.com>
+
+	* config/riscv/sync.md: Change LR.aq/SC.rl pairs into
+	sequentially consistent LR.aqrl/SC.rl pairs.
+
+2023-05-02  Patrick O'Neill  <patrick@rivosinc.com>
+
+	* config/riscv/riscv.cc: Remove MEMMODEL_SYNC_* cases and
+	sanitize memmodel input with memmodel_base.
+
+2023-05-02  Yanzhang Wang  <yanzhang.wang@intel.com>
+	    Pan Li  <pan2.li@intel.com>
+
+	PR target/109617
+	* config/riscv/vector-iterators.md: Support VNx2HI and VNX4DI when MIN_VLEN >= 128.
+
+2023-05-02  Romain Naour  <romain.naour@gmail.com>
+
+	* config/riscv/genrvv-type-indexer.cc: Use log2 from the C header, without
+	the namespace.
+
+2023-05-02  Martin Liska  <mliska@suse.cz>
+
+	* doc/invoke.texi: Update documentation based on param.opt file.
+
+2023-05-02  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109672
+	* tree-vect-stmts.cc (vectorizable_operation): For plus,
+	minus and negate always check the vector mode is word mode.
+
+2023-05-01  Andrew Pinski  <apinski@marvell.com>
+
+	* tree-ssa-phiopt.cc: Update comment about
+	how the transformation are implemented.
+
+2023-05-01  Jeff Law  <jlaw@ventanamicro>
+
+	* config/stormy16/stormy16.cc (TARGET_LRA_P): Remove defintion.
+
+2023-05-01  Jeff Law  <jlaw@ventanamicro>
+
+	* config/cris/cris.cc (TARGET_LRA_P): Remove.
+	* config/epiphany/epiphany.cc (TARGET_LRA_P): Remove.
+	* config/iq2000/iq2000.cc (TARGET_LRA_P): Remove.
+	* config/m32r/m32r.cc (TARGET_LRA_P): Remove.
+	* config/microblaze/microblaze.cc (TARGET_LRA_P): Remove.
+	* config/mmix/mmix.cc (TARGET_LRA_P): Remove.
+
+2023-05-01  Rasmus Villemoes  <rasmus.villemoes@prevas.dk>
+
+	* print-tree.h (PRINT_DECL_REMAP_DEBUG): New flag.
+	* print-tree.cc (print_decl_identifier): Implement it.
+	* toplev.cc (output_stack_usage_1): Use it.
+
+2023-05-01  Aldy Hernandez  <aldyh@redhat.com>
+
+	* value-range.h (class int_range): Remove gt_ggc_mx and gt_pch_nx
+	friends.
+
+2023-05-01  Aldy Hernandez  <aldyh@redhat.com>
+
+	* value-range.h (irange::set_nonzero): Inline.
+
+2023-05-01  Aldy Hernandez  <aldyh@redhat.com>
+
+	* gimple-range-op.cc (cfn_ffs::fold_range): Use the correct
+	precision.
+	* gimple-ssa-warn-alloca.cc (alloca_call_type): Use <2> for
+	invalid_range, as it is an inverse range.
+	* tree-vrp.cc (find_case_label_range): Avoid trees.
+	* value-range.cc (irange::irange_set): Delete.
+	(irange::irange_set_1bit_anti_range): Delete.
+	(irange::irange_set_anti_range): Delete.
+	(irange::set): Cleanup.
+	* value-range.h (class irange): Remove irange_set,
+	irange_set_anti_range, irange_set_1bit_anti_range.
+	(irange::set_undefined): Remove set to m_type.
+
+2023-05-01  Aldy Hernandez  <aldyh@redhat.com>
+
+	* range-op.cc (update_known_bitmask): Adjust for irange containing
+	wide_ints internally.
+	* tree-ssanames.cc (set_nonzero_bits): Same.
+	* tree-ssanames.h (set_nonzero_bits): Same.
+	* value-range-storage.cc (irange_storage::set_irange): Same.
+	(irange_storage::get_irange): Same.
+	* value-range.cc (irange::operator=): Same.
+	(irange::irange_set): Same.
+	(irange::irange_set_1bit_anti_range): Same.
+	(irange::irange_set_anti_range): Same.
+	(irange::set): Same.
+	(irange::verify_range): Same.
+	(irange::contains_p): Same.
+	(irange::irange_single_pair_union): Same.
+	(irange::union_): Same.
+	(irange::irange_contains_p): Same.
+	(irange::intersect): Same.
+	(irange::invert): Same.
+	(irange::set_range_from_nonzero_bits): Same.
+	(irange::set_nonzero_bits): Same.
+	(mask_to_wi): Same.
+	(irange::intersect_nonzero_bits): Same.
+	(irange::union_nonzero_bits): Same.
+	(gt_ggc_mx): Same.
+	(gt_pch_nx): Same.
+	(tree_range): Same.
+	(range_tests_strict_enum): Same.
+	(range_tests_misc): Same.
+	(range_tests_nonzero_bits): Same.
+	* value-range.h (irange::type): Same.
+	(irange::varying_compatible_p): Same.
+	(irange::irange): Same.
+	(int_range::int_range): Same.
+	(irange::set_undefined): Same.
+	(irange::set_varying): Same.
+	(irange::lower_bound): Same.
+	(irange::upper_bound): Same.
+
+2023-05-01  Aldy Hernandez  <aldyh@redhat.com>
+
+	* gimple-range-fold.cc (tree_lower_bound): Delete.
+	(tree_upper_bound): Delete.
+	(vrp_val_max): Delete.
+	(vrp_val_min): Delete.
+	(fold_using_range::range_of_ssa_name_with_loop_info): Call
+	range_of_var_in_loop.
+	* vr-values.cc (valid_value_p): Delete.
+	(fix_overflow): Delete.
+	(get_scev_info): New.
+	(bounds_of_var_in_loop): Refactor into...
+	(induction_variable_may_overflow_p): ...this,
+	(range_from_loop_direction): ...and this,
+	(range_of_var_in_loop): ...and this.
+	* vr-values.h (bounds_of_var_in_loop): Delete.
+	(range_of_var_in_loop): New.
+
+2023-05-01  Aldy Hernandez  <aldyh@redhat.com>
+
+	* gimple-range-fold.cc (adjust_pointer_diff_expr): Rewrite with
+	irange_val*.
+	(vrp_val_max): New.
+	(vrp_val_min): New.
+	* gimple-range-op.cc (cfn_strlen::fold_range): Use irange_val_*.
+	* range-op.cc (max_limit): Same.
+	(min_limit): Same.
+	(plus_minus_ranges): Same.
+	(operator_rshift::op1_range): Same.
+	(operator_cast::inside_domain_p): Same.
+	* value-range.cc (vrp_val_is_max): Delete.
+	(vrp_val_is_min): Delete.
+	(range_tests_misc): Use irange_val_*.
+	* value-range.h (vrp_val_is_min): Delete.
+	(vrp_val_is_max): Delete.
+	(vrp_val_max): Delete.
+	(irange_val_min): New.
+	(vrp_val_min): Delete.
+	(irange_val_max): New.
+	* vr-values.cc (check_for_binary_op_overflow): Use irange_val_*.
+
+2023-05-01  Aldy Hernandez  <aldyh@redhat.com>
+
+	* fold-const.cc (expr_not_equal_to): Convert to irange wide_int API.
+	* gimple-fold.cc (size_must_be_zero_p): Same.
+	* gimple-loop-versioning.cc
+	(loop_versioning::prune_loop_conditions): Same.
+	* gimple-range-edge.cc (gcond_edge_range): Same.
+	(gimple_outgoing_range::calc_switch_ranges): Same.
+	* gimple-range-fold.cc (adjust_imagpart_expr): Same.
+	(adjust_realpart_expr): Same.
+	(fold_using_range::range_of_address): Same.
+	(fold_using_range::relation_fold_and_or): Same.
+	* gimple-range-gori.cc (gori_compute::gori_compute): Same.
+	(range_is_either_true_or_false): Same.
+	* gimple-range-op.cc (cfn_toupper_tolower::get_letter_range): Same.
+	(cfn_clz::fold_range): Same.
+	(cfn_ctz::fold_range): Same.
+	* gimple-range-tests.cc (class test_expr_eval): Same.
+	* gimple-ssa-warn-alloca.cc (alloca_call_type): Same.
+	* ipa-cp.cc (ipa_value_range_from_jfunc): Same.
+	(propagate_vr_across_jump_function): Same.
+	(decide_whether_version_node): Same.
+	* ipa-prop.cc (ipa_get_value_range): Same.
+	* ipa-prop.h (ipa_range_set_and_normalize): Same.
+	* range-op.cc (get_shift_range): Same.
+	(value_range_from_overflowed_bounds): Same.
+	(value_range_with_overflow): Same.
+	(create_possibly_reversed_range): Same.
+	(equal_op1_op2_relation): Same.
+	(not_equal_op1_op2_relation): Same.
+	(lt_op1_op2_relation): Same.
+	(le_op1_op2_relation): Same.
+	(gt_op1_op2_relation): Same.
+	(ge_op1_op2_relation): Same.
+	(operator_mult::op1_range): Same.
+	(operator_exact_divide::op1_range): Same.
+	(operator_lshift::op1_range): Same.
+	(operator_rshift::op1_range): Same.
+	(operator_cast::op1_range): Same.
+	(operator_logical_and::fold_range): Same.
+	(set_nonzero_range_from_mask): Same.
+	(operator_bitwise_or::op1_range): Same.
+	(operator_bitwise_xor::op1_range): Same.
+	(operator_addr_expr::fold_range): Same.
+	(pointer_plus_operator::wi_fold): Same.
+	(pointer_or_operator::op1_range): Same.
+	(INT): Same.
+	(UINT): Same.
+	(INT16): Same.
+	(UINT16): Same.
+	(SCHAR): Same.
+	(UCHAR): Same.
+	(range_op_cast_tests): Same.
+	(range_op_lshift_tests): Same.
+	(range_op_rshift_tests): Same.
+	(range_op_bitwise_and_tests): Same.
+	(range_relational_tests): Same.
+	* range.cc (range_zero): Same.
+	(range_nonzero): Same.
+	* range.h (range_true): Same.
+	(range_false): Same.
+	(range_true_and_false): Same.
+	* tree-data-ref.cc (split_constant_offset_1): Same.
+	* tree-ssa-loop-ch.cc (entry_loop_condition_is_static): Same.
+	* tree-ssa-loop-unswitch.cc (struct unswitch_predicate): Same.
+	(find_unswitching_predicates_for_bb): Same.
+	* tree-ssa-phiopt.cc (value_replacement): Same.
+	* tree-ssa-threadbackward.cc
+	(back_threader::find_taken_edge_cond): Same.
+	* tree-ssanames.cc (ssa_name_has_boolean_range): Same.
+	* tree-vrp.cc (find_case_label_range): Same.
+	* value-query.cc (range_query::get_tree_range): Same.
+	* value-range.cc (irange::set_nonnegative): Same.
+	(frange::contains_p): Same.
+	(frange::singleton_p): Same.
+	(frange::internal_singleton_p): Same.
+	(irange::irange_set): Same.
+	(irange::irange_set_1bit_anti_range): Same.
+	(irange::irange_set_anti_range): Same.
+	(irange::set): Same.
+	(irange::operator==): Same.
+	(irange::singleton_p): Same.
+	(irange::contains_p): Same.
+	(irange::set_range_from_nonzero_bits): Same.
+	(DEFINE_INT_RANGE_INSTANCE): Same.
+	(INT): Same.
+	(UINT): Same.
+	(SCHAR): Same.
+	(UINT128): Same.
+	(UCHAR): Same.
+	(range): New.
+	(tree_range): New.
+	(range_int): New.
+	(range_uint): New.
+	(range_uint128): New.
+	(range_uchar): New.
+	(range_char): New.
+	(build_range3): Convert to irange wide_int API.
+	(range_tests_irange3): Same.
+	(range_tests_int_range_max): Same.
+	(range_tests_strict_enum): Same.
+	(range_tests_misc): Same.
+	(range_tests_nonzero_bits): Same.
+	(range_tests_nan): Same.
+	(range_tests_signed_zeros): Same.
+	* value-range.h (Value_Range::Value_Range): Same.
+	(irange::set): Same.
+	(irange::nonzero_p): Same.
+	(irange::contains_p): Same.
+	(range_includes_zero_p): Same.
+	(irange::set_nonzero): Same.
+	(irange::set_zero): Same.
+	(contains_zero_p): Same.
+	(frange::contains_p): Same.
+	* vr-values.cc
+	(simplify_using_ranges::op_with_boolean_value_range_p): Same.
+	(bounds_of_var_in_loop): Same.
+	(simplify_using_ranges::legacy_fold_cond_overflow): Same.
+
+2023-05-01  Aldy Hernandez  <aldyh@redhat.com>
+
+	* value-range.cc (irange::irange_union): Rename to...
+	(irange::union_): ...this.
+	(irange::irange_intersect): Rename to...
+	(irange::intersect): ...this.
+	* value-range.h (irange::union_): Delete.
+	(irange::intersect): Delete.
+
+2023-05-01  Aldy Hernandez  <aldyh@redhat.com>
+
+	* vr-values.cc (bounds_of_var_in_loop): Convert to irange API.
+
+2023-05-01  Aldy Hernandez  <aldyh@redhat.com>
+
+	* vr-values.cc (check_for_binary_op_overflow): Tidy up by using
+	ranger API.
+	(compare_ranges): Delete.
+	(compare_range_with_value): Delete.
+	(bounds_of_var_in_loop): Tidy up by using ranger API.
+	(simplify_using_ranges::fold_cond_with_ops): Cleanup and rename
+	from vrp_evaluate_conditional_warnv_with_ops_using_ranges.
+	(simplify_using_ranges::legacy_fold_cond_overflow): Remove
+	strict_overflow_p and only_ranges.
+	(simplify_using_ranges::legacy_fold_cond): Adjust call to
+	legacy_fold_cond_overflow.
+	(simplify_using_ranges::simplify_abs_using_ranges): Adjust for
+	rename.
+	(range_fits_type_p): Rename value_range to irange.
+	* vr-values.h (range_fits_type_p): Adjust prototype.
+
+2023-05-01  Aldy Hernandez  <aldyh@redhat.com>
+
+	* value-range.cc (irange::irange_set_anti_range): Remove uses of
+	tree_lower_bound and tree_upper_bound.
+	(irange::verify_range): Same.
+	(irange::operator==): Same.
+	(irange::singleton_p): Same.
+	* value-range.h (irange::tree_lower_bound): Delete.
+	(irange::tree_upper_bound): Delete.
+	(irange::lower_bound): Delete.
+	(irange::upper_bound): Delete.
+	(irange::zero_p): Remove uses of tree_lower_bound and
+	tree_upper_bound.
+
+2023-05-01  Aldy Hernandez  <aldyh@redhat.com>
+
+	* tree-ssa-loop-niter.cc (refine_value_range_using_guard): Remove
+	kind() call.
+	(determine_value_range): Same.
+	(record_nonwrapping_iv): Same.
+	(infer_loop_bounds_from_signedness): Same.
+	(scev_var_range_cant_overflow): Same.
+	* tree-vrp.cc (operand_less_p): Delete.
+	* tree-vrp.h (operand_less_p): Delete.
+	* value-range.cc (get_legacy_range): Remove uses of deprecated API.
+	(irange::value_inside_range): Delete.
+	* value-range.h (vrange::kind): Delete.
+	(irange::num_pairs): Remove check of m_kind.
+	(irange::min): Delete.
+	(irange::max): Delete.
+
+2023-05-01  Aldy Hernandez  <aldyh@redhat.com>
+
+	* gimple-fold.cc (maybe_fold_comparisons_from_match_pd): Adjust
+	for vrange_storage.
+	* gimple-range-cache.cc (sbr_vector::sbr_vector): Same.
+	(sbr_vector::grow): Same.
+	(sbr_vector::set_bb_range): Same.
+	(sbr_vector::get_bb_range): Same.
+	(sbr_sparse_bitmap::sbr_sparse_bitmap): Same.
+	(sbr_sparse_bitmap::set_bb_range): Same.
+	(sbr_sparse_bitmap::get_bb_range): Same.
+	(block_range_cache::block_range_cache): Same.
+	(ssa_global_cache::ssa_global_cache): Same.
+	(ssa_global_cache::get_global_range): Same.
+	(ssa_global_cache::set_global_range): Same.
+	* gimple-range-cache.h: Same.
+	* gimple-range-edge.cc
+	(gimple_outgoing_range::gimple_outgoing_range): Same.
+	(gimple_outgoing_range::switch_edge_range): Same.
+	(gimple_outgoing_range::calc_switch_ranges): Same.
+	* gimple-range-edge.h: Same.
+	* gimple-range-infer.cc
+	(infer_range_manager::infer_range_manager): Same.
+	(infer_range_manager::get_nonzero): Same.
+	(infer_range_manager::maybe_adjust_range): Same.
+	(infer_range_manager::add_range): Same.
+	* gimple-range-infer.h: Rename obstack_vrange_allocator to
+	vrange_allocator.
+	* tree-core.h (struct irange_storage_slot): Remove.
+	(struct tree_ssa_name): Remove irange_info and frange_info.  Make
+	range_info a pointer to vrange_storage.
+	* tree-ssanames.cc (range_info_fits_p): Adjust for vrange_storage.
+	(range_info_alloc): Same.
+	(range_info_free): Same.
+	(range_info_get_range): Same.
+	(range_info_set_range): Same.
+	(get_nonzero_bits): Same.
+	* value-query.cc (get_ssa_name_range_info): Same.
+	* value-range-storage.cc (class vrange_internal_alloc): New.
+	(class vrange_obstack_alloc): New.
+	(class vrange_ggc_alloc): New.
+	(vrange_allocator::vrange_allocator): New.
+	(vrange_allocator::~vrange_allocator): New.
+	(vrange_storage::alloc_slot): New.
+	(vrange_allocator::alloc): New.
+	(vrange_allocator::free): New.
+	(vrange_allocator::clone): New.
+	(vrange_allocator::clone_varying): New.
+	(vrange_allocator::clone_undefined): New.
+	(vrange_storage::alloc): New.
+	(vrange_storage::set_vrange): Remove slot argument.
+	(vrange_storage::get_vrange): Same.
+	(vrange_storage::fits_p): Same.
+	(vrange_storage::equal_p): New.
+	(irange_storage::write_lengths_address): New.
+	(irange_storage::lengths_address): New.
+	(irange_storage_slot::alloc_slot): Remove.
+	(irange_storage::alloc): New.
+	(irange_storage_slot::irange_storage_slot): Remove.
+	(irange_storage::irange_storage): New.
+	(write_wide_int): New.
+	(irange_storage_slot::set_irange): Remove.
+	(irange_storage::set_irange): New.
+	(read_wide_int): New.
+	(irange_storage_slot::get_irange): Remove.
+	(irange_storage::get_irange): New.
+	(irange_storage_slot::size): Remove.
+	(irange_storage::equal_p): New.
+	(irange_storage_slot::num_wide_ints_needed): Remove.
+	(irange_storage::size): New.
+	(irange_storage_slot::fits_p): Remove.
+	(irange_storage::fits_p): New.
+	(irange_storage_slot::dump): Remove.
+	(irange_storage::dump): New.
+	(frange_storage_slot::alloc_slot): Remove.
+	(frange_storage::alloc): New.
+	(frange_storage_slot::set_frange): Remove.
+	(frange_storage::set_frange): New.
+	(frange_storage_slot::get_frange): Remove.
+	(frange_storage::get_frange): New.
+	(frange_storage_slot::fits_p): Remove.
+	(frange_storage::equal_p): New.
+	(frange_storage::fits_p): New.
+	(ggc_vrange_allocator): New.
+	(ggc_alloc_vrange_storage): New.
+	* value-range-storage.h (class vrange_storage): Rewrite.
+	(class irange_storage): Rewrite.
+	(class frange_storage): Rewrite.
+	(class obstack_vrange_allocator): Remove.
+	(class ggc_vrange_allocator): Remove.
+	(vrange_allocator::alloc_vrange): Remove.
+	(vrange_allocator::alloc_irange): Remove.
+	(vrange_allocator::alloc_frange): Remove.
+	(ggc_alloc_vrange_storage): New.
+	* value-range.h (class irange): Rename vrange_allocator to
+	irange_storage.
+	(class frange): Same.
+
+2023-04-30  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* config/stormy16/stormy16.md (neghi2): Rewrite pattern using
+	inc to avoid clobbering the carry flag.
+
+2023-04-30  Andrew Pinski  <apinski@marvell.com>
+
+	* match.pd: Add patterns for "a != 0 ? FUNC(a) : CST"
+	for FUNC of POPCOUNT BSWAP FFS PARITY CLZ and CTZ.
+
+2023-04-30  Andrew Pinski  <apinski@marvell.com>
+
+	* tree-ssa-phiopt.cc (empty_bb_or_one_feeding_into_p):
+	Allow some builtin/internal function calls which
+	are known not to trap/throw.
+	(phiopt_worker::match_simplify_replacement):
+	Use name instead of getting the lhs again.
+
+2023-04-30  Joakim Nohlgård  <joakim@nohlgard.se>
+
+	* configure: Regenerate.
+	* configure.ac: Use ld -r in the check for HAVE_LD_RO_RW_SECTION_MIXING
+
+2023-04-29  Hans-Peter Nilsson  <hp@axis.com>
+
+	* reload1.cc (emit_insn_if_valid_for_reload_1): Rename from
+	emit_insn_if_valid_for_reload.
+	(emit_insn_if_valid_for_reload): Call new helper, and if a SET fails
+	to be recognized, also try emitting a parallel that clobbers
+	TARGET_FLAGS_REGNUM, as applicable.
+
+2023-04-29  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* config/stormy16/stormy16.md (neghi2): Convert from a define_expand
+	to a define_insn.
+	(*rotatehi_1): New define_insn for efficient 2 insn sequence.
+	(*rotatehi_8, *rotaterthi_8): New define_insn to emit a swpb.
+
+2023-04-29  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* config/stormy16/stormy16.md (any_lshift): New code iterator.
+	(any_or_plus): Likewise.
+	(any_rotate): Likewise.
+	(*<any_lshift>_and_internal): New define_insn_and_split to
+	recognize a logical shift followed by an AND, and split it
+	again after reload.
+	(*swpn): New define_insn matching xstormy16's swpn.
+	(*swpn_zext): New define_insn recognizing swpn followed by
+	zero_extendqihi2, i.e. with the high byte set to zero.
+	(*swpn_sext): Likewise, for swpn followed by cbw.
+	(*swpn_sext_2): Likewise, for an alternate RTL form.
+	(*swpn_zext_ior): A pre-reload splitter so that an swpn+zext+ior
+	sequence is split in the correct place to recognize the *swpn_zext
+	followed by any_or_plus (ior, xor or plus) instruction.
+
+2023-04-29  Mikael Pettersson  <mikpelinux@gmail.com>
+
+	PR target/105525
+	* config.gcc (vax-*-linux*): Add glibc-stdint.h.
+	(lm32-*-uclinux*): Likewise.
+
+2023-04-29  Fei Gao  <gaofei@eswincomputing.com>
+
+	* config/riscv/riscv.cc (riscv_avoid_save_libcall): helper function
+	for riscv_use_save_libcall.
+	(riscv_use_save_libcall): call riscv_avoid_save_libcall.
+	(riscv_compute_frame_info): restructure to decouple stack allocation
+	for rv32e w/o save-restore.
+
+2023-04-28  Eugene Rozenfeld  <erozen@microsoft.com>
+
+	* doc/install.texi: Fix documentation typo
+
+2023-04-28  Matevos Mehrabyan  <matevosmehrabyan@gmail.com>
+
+	* config/riscv/iterators.md (only_div, paired_mod): New iterators.
+	(u): Add div/udiv cases.
+	* config/riscv/riscv-protos.h (riscv_use_divmod_expander): Prototype.
+	* config/riscv/riscv.cc (struct riscv_tune_param): Add field for
+	divmod expansion.
+	(rocket_tune_info, sifive_7_tune_info): Initialize new field.
+	(thead_c906_tune_info): Likewise.
+	(optimize_size_tune_info): Likewise.
+	(riscv_use_divmod_expander): New function.
+	* config/riscv/riscv.md (<u>divmod<mode>4): New expander.
+
+2023-04-28  Karen Sargsyan  <karen1999411@gmail.com>
+
+	* config/riscv/bitmanip.md: Added clmulr instruction.
+	* config/riscv/riscv-builtins.cc (AVAIL): Add new.
+	* config/riscv/riscv.md: (UNSPEC_CLMULR): Add new unspec type.
+	(type): Add clmul
+	* config/riscv/riscv-cmo.def: Added built-in function for clmulr.
+	* config/riscv/crypto.md: Move clmul[h] instructions to bitmanip.md.
+	* config/riscv/riscv-scalar-crypto.def: Move clmul[h] built-in
+	functions to riscv-cmo.def.
+	* config/riscv/generic.md: Add clmul to list of instructions
+	using the generic_imul reservation.
+
+2023-04-28  Jivan Hakobyan  <jivanhakobyan9@gmail.com>
+
+	* config/riscv/bitmanip.md: Added expanders for minu/maxu instructions
+
+2023-04-28  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/100958
+	* tree-ssa-phiopt.cc (two_value_replacement): Remove.
+	(pass_phiopt::execute): Don't call two_value_replacement.
+	* match.pd (a !=/== CST1 ? CST2 : CST3): Add pattern to
+	handle what two_value_replacement did.
+
+2023-04-28  Andrew Pinski  <apinski@marvell.com>
+
+	* match.pd: Add patterns for
+	"(A CMP B) ? MIN/MAX<A, C> : MIN/MAX <B, C>".
+
+2023-04-28  Andrew Pinski  <apinski@marvell.com>
+
+	* match.pd: Factor out the deciding the min/max from
+	the "(cond (cmp (convert1? x) c1) (convert2? x) c2)"
+	pattern to ...
+	* fold-const.cc (minmax_from_comparison): this new function.
+	* fold-const.h (minmax_from_comparison): New prototype.
+
+2023-04-28  Roger Sayle  <roger@nextmovesoftware.com>
+
+	PR rtl-optimization/109476
+	* lower-subreg.cc: Include explow.h for force_reg.
+	(find_decomposable_shift_zext): Pass an additional SPEED_P argument.
+	If decomposing a suitable LSHIFTRT and we're not splitting
+	ZERO_EXTEND (based on the current SPEED_P), then use a ZERO_EXTEND
+	instead of setting a high part SUBREG to zero, which helps combine.
+	(decompose_multiword_subregs): Update call to resolve_shift_zext.
+
+2023-04-28  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-data-refs.cc (vect_analyze_data_refs): Always
+	consider scatters.
+	* tree-vect-stmts.cc (vect_model_store_cost): Pass in the
+	gather-scatter info and cost emulated scatters accordingly.
+	(get_load_store_type): Support emulated scatters.
+	(vectorizable_store): Likewise.  Emulate them by extracting
+	scalar offsets and data, doing scalar stores.
+
+2023-04-28  Richard Biener  <rguenther@suse.de>
+
+	* config/i386/i386.cc (ix86_vector_costs::add_stmt_cost):
+	Tame down element extracts and scalar loads for gather/scatter
+	similar to elementwise strided accesses.
+
+2023-04-28  Pan Li  <pan2.li@intel.com>
+	    kito-cheng  <kito.cheng@sifive.com>
+
+	* config/riscv/vector.md: Add new define split to perform
+	the simplification.
+
+2023-04-28  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/109652
+	* ipa-param-manipulation.cc
+	(ipa_param_body_adjustments::modify_expression): Allow
+	conversion of a register to a non-register type.  Elide
+	conversions inside BIT_FIELD_REFs.
+
+2023-04-28  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109644
+	* tree-cfg.cc (verify_types_in_gimple_reference): Check
+	register constraints on the outermost VIEW_CONVERT_EXPR
+	only.  Do not allow register or invariant bases on
+	multi-level or possibly variable index handled components.
+
+2023-04-28  Richard Biener  <rguenther@suse.de>
+
+	* gimplify.cc (gimplify_compound_lval): When there's a
+	non-register type produced by one of the handled component
+	operations make sure we get a non-register base.
+
+2023-04-28  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/108752
+	* tree-vect-generic.cc (build_replicated_const): Rename
+	to build_replicated_int_cst and move to tree.{h,cc}.
+	(do_plus_minus): Adjust.
+	(do_negate): Likewise.
+	* tree-vect-stmts.cc (vectorizable_operation): Emit emulated
+	arithmetic vector operations in lowered form.
+	* tree.h (build_replicated_int_cst): Declare.
+	* tree.cc (build_replicated_int_cst): Moved from
+	tree-vect-generic.cc build_replicated_const.
+
+2023-04-28  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/99195
+	* config/aarch64/aarch64-simd.md (aarch64_rbit<mode>): Rename to...
+	(aarch64_rbit<mode><vczle><vczbe>): ... This.
+	(neg<mode>2): Rename to...
+	(neg<mode>2<vczle><vczbe>): ... This.
+	(abs<mode>2): Rename to...
+	(abs<mode>2<vczle><vczbe>): ... This.
+	(aarch64_abs<mode>): Rename to...
+	(aarch64_abs<mode><vczle><vczbe>): ... This.
+	(one_cmpl<mode>2): Rename to...
+	(one_cmpl<mode>2<vczle><vczbe>): ... This.
+	(clrsb<mode>2): Rename to...
+	(clrsb<mode>2<vczle><vczbe>): ... This.
+	(clz<mode>2): Rename to...
+	(clz<mode>2<vczle><vczbe>): ... This.
+	(popcount<mode>2): Rename to...
+	(popcount<mode>2<vczle><vczbe>): ... This.
+
+2023-04-28  Jakub Jelinek  <jakub@redhat.com>
+
+	* gimple-range-op.cc (class cfn_sqrt): New type.
+	(op_cfn_sqrt): New variable.
+	(gimple_range_op_handler::maybe_builtin_call): Handle
+	CASE_CFN_SQRT{,_FN}.
+
+2023-04-28  Aldy Hernandez  <aldyh@redhat.com>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	* value-range.h (frange_nextafter): Declare.
+	* gimple-range-op.cc (class cfn_sincos): New.
+	(op_cfn_sin, op_cfn_cos): New variables.
+	(gimple_range_op_handler::maybe_builtin_call): Handle
+	CASE_CFN_{SIN,COS}{,_FN}.
+
+2023-04-28  Jakub Jelinek  <jakub@redhat.com>
+
+	* target.def (libm_function_max_error): New target hook.
+	* doc/tm.texi.in (TARGET_LIBM_FUNCTION_MAX_ERROR): Add.
+	* doc/tm.texi: Regenerated.
+	* targhooks.h (default_libm_function_max_error,
+	glibc_linux_libm_function_max_error): Declare.
+	* targhooks.cc: Include case-cfn-macros.h.
+	(default_libm_function_max_error,
+	glibc_linux_libm_function_max_error): New functions.
+	* config/linux.h (TARGET_LIBM_FUNCTION_MAX_ERROR): Redefine.
+	* config/linux-protos.h (linux_libm_function_max_error): Declare.
+	* config/linux.cc: Include target.h and targhooks.h.
+	(linux_libm_function_max_error): New function.
+	* config/arc/arc.cc: Include targhooks.h and case-cfn-macros.h.
+	(arc_libm_function_max_error): New function.
+	(TARGET_LIBM_FUNCTION_MAX_ERROR): Redefine.
+	* config/i386/i386.cc (ix86_libc_has_fast_function): Formatting fix.
+	(ix86_libm_function_max_error): New function.
+	(TARGET_LIBM_FUNCTION_MAX_ERROR): Redefine.
+	* config/rs6000/rs6000-protos.h
+	(rs6000_linux_libm_function_max_error): Declare.
+	* config/rs6000/rs6000-linux.cc: Include target.h, targhooks.h, tree.h
+	and case-cfn-macros.h.
+	(rs6000_linux_libm_function_max_error): New function.
+	* config/rs6000/linux.h (TARGET_LIBM_FUNCTION_MAX_ERROR): Redefine.
+	* config/rs6000/linux64.h (TARGET_LIBM_FUNCTION_MAX_ERROR): Redefine.
+	* config/or1k/or1k.cc: Include targhooks.h and case-cfn-macros.h.
+	(or1k_libm_function_max_error): New function.
+	(TARGET_LIBM_FUNCTION_MAX_ERROR): Redefine.
+
+2023-04-28  Alexandre Oliva  <oliva@adacore.com>
+
+	* gimple-harden-conditionals.cc (insert_edge_check_and_trap):
+	Move detach value calls...
+	(pass_harden_conditional_branches::execute): ... here.
+	(pass_harden_compares::execute): Detach values before
+	compares.
+
+2023-04-27  Andrew Stubbs  <ams@codesourcery.com>
+
+	* config/gcn/gcn-valu.md (cmul<conj_op><mode>3): Use gcn_gen_undef.
+	(cml<addsub_as><mode>4): Likewise.
+	(vec_addsub<mode>3): Likewise.
+	(cadd<rot><mode>3): Likewise.
+	(vec_fmaddsub<mode>4): Likewise.
+	(vec_fmsubadd<mode>4): Likewise, and use sub for the odd lanes.
+
+2023-04-27  Andrew Pinski  <apinski@marvell.com>
+
+	* tree-ssa-phiopt.cc (phiopt_early_allow): Allow for
+	up to 2 min/max expressions in the sequence/match code.
+
+2023-04-27  Andrew Pinski  <apinski@marvell.com>
+
+	* rtlanal.cc (may_trap_p_1): Treat SMIN/SMAX similar as
+	COMPARISON.
+	* tree-eh.cc (operation_could_trap_helper_p): Treate
+	MIN_EXPR/MAX_EXPR similar as other comparisons.
+
+2023-04-27  Andrew Pinski  <apinski@marvell.com>
+
+	* tree-ssa-phiopt.cc (cond_store_replacement): Remove
+	prototype.
+	(cond_if_else_store_replacement): Likewise.
+	(get_non_trapping): Likewise.
+	(store_elim_worker): Move into ...
+	(pass_cselim::execute): This.
+
+2023-04-27  Andrew Pinski  <apinski@marvell.com>
+
+	* tree-ssa-phiopt.cc (two_value_replacement): Remove
+	prototype.
+	(match_simplify_replacement): Likewise.
+	(factor_out_conditional_conversion): Likewise.
+	(value_replacement): Likewise.
+	(minmax_replacement): Likewise.
+	(spaceship_replacement): Likewise.
+	(cond_removal_in_builtin_zero_pattern): Likewise.
+	(hoist_adjacent_loads): Likewise.
+	(tree_ssa_phiopt_worker): Move into ...
+	(pass_phiopt::execute): this.
+
+2023-04-27  Andrew Pinski  <apinski@marvell.com>
+
+	* tree-ssa-phiopt.cc (tree_ssa_phiopt_worker): Remove
+	do_store_elim argument and split that part out to ...
+	(store_elim_worker): This new function.
+	(pass_cselim::execute): Call store_elim_worker.
+	(pass_phiopt::execute): Update call to tree_ssa_phiopt_worker.
+
+2023-04-27  Jan Hubicka  <jh@suse.cz>
+
+	* cfgloopmanip.h (unloop_loops): Export.
+	* tree-ssa-loop-ch.cc (ch_base::copy_headers): Unloop loops
+	that no longer loop.
+	* tree-ssa-loop-ivcanon.cc (unloop_loops): Export; do not free
+	vectors of loops to unloop.
+	(canonicalize_induction_variables): Free vectors here.
+	(tree_unroll_loops_completely): Free vectors here.
+
+2023-04-27  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109170
+	* gimple-range-op.cc (gimple_range_op_handler::maybe_builtin_call):
+	Handle __builtin_expect and similar via cfn_pass_through_arg1
+	and inspecting the calls fnspec.
+	* builtins.cc (builtin_fnspec): Handle BUILT_IN_EXPECT
+	and BUILT_IN_EXPECT_WITH_PROBABILITY.
+
+2023-04-27  Alexandre Oliva  <oliva@adacore.com>
+
+	* genmultilib: Use CONFIG_SHELL to run sub-scripts.
+
+2023-04-27  Aldy Hernandez  <aldyh@redhat.com>
+
+	PR tree-optimization/109639
+	* ipa-cp.cc (ipa_value_range_from_jfunc): Normalize range.
+	(propagate_vr_across_jump_function): Same.
+	* ipa-fnsummary.cc (evaluate_conditions_for_known_args): Same.
+	* ipa-prop.h (ipa_range_set_and_normalize): New.
+	* value-range.cc (irange::set): Assert min and max are INTEGER_CST.
+
+2023-04-27  Richard Biener  <rguenther@suse.de>
+
+	* match.pd (BIT_FIELD_REF CONSTRUCTOR@0 @1 @2): Do not
+	create a CTOR operand in the result when simplifying GIMPLE.
+
+2023-04-27  Richard Biener  <rguenther@suse.de>
+
+	* gimplify.cc (gimplify_compound_lval): When the base
+	gimplified to a register make sure to split up chains
+	of operations.
+
+2023-04-27  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/109607
+	* ipa-param-manipulation.h
+	(ipa_param_body_adjustments::modify_expression): Add extra_stmts
+	argument.
+	* ipa-param-manipulation.cc
+	(ipa_param_body_adjustments::modify_expression): Likewise.
+	When we need a conversion and the replacement is a register
+	split the conversion out.
+	(ipa_param_body_adjustments::modify_assignment): Pass
+	extra_stmts to RHS modify_expression.
+
+2023-04-27  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/extend.texi (Zero Length): Describe example.
+
+2023-04-27  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109594
+	* tree-ssa.cc (non_rewritable_mem_ref_base): Constrain
+	what we rewrite to a register based on the above.
+
 2023-04-26  Patrick O'Neill  <patrick@rivosinc.com>
 
 	* config/riscv/riscv.cc: Fix whitespace.
@@ -109,10 +1000,12 @@
 	PR target/104338
 	* config/riscv/riscv-protos.h: Add helper function stubs.
 	* config/riscv/riscv.cc: Add helper functions for subword masking.
-	* config/riscv/riscv.opt: Add command-line flag.
+	* config/riscv/riscv.opt: Add command-line flags -minline-atomics and
+	-mno-inline-atomics.
 	* config/riscv/sync.md: Add masking logic and inline asm for fetch_and_op,
 	fetch_and_nand, CAS, and exchange ops.
-	* doc/invoke.texi: Add blurb regarding command-line flag.
+	* doc/invoke.texi: Add blurb regarding new command-line flags
+	-minline-atomics and -mno-inline-atomics.
 
 2023-04-26  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
 

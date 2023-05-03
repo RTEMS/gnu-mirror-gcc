@@ -65,6 +65,11 @@
 
   ;; OR-COMBINE
   UNSPEC_ORC_B
+
+  ;; Zbc unspecs
+  UNSPEC_CLMUL
+  UNSPEC_CLMULH
+  UNSPEC_CLMULR
 ])
 
 (define_c_enum "unspecv" [
@@ -244,6 +249,7 @@
 ;; nop		no operation
 ;; ghost	an instruction that produces no real code
 ;; bitmanip	bit manipulation instructions
+;; clmul    clmul, clmulh, clmulr
 ;; rotate   rotation instructions
 ;; atomic   atomic instructions
 ;; condmove	conditional moves
@@ -344,7 +350,7 @@
   "unknown,branch,jump,call,load,fpload,store,fpstore,
    mtc,mfc,const,arith,logical,shift,slt,imul,idiv,move,fmove,fadd,fmul,
    fmadd,fdiv,fcmp,fcvt,fsqrt,multi,auipc,sfb_alu,nop,ghost,bitmanip,rotate,
-   min,max,minu,maxu,clz,ctz,cpop,
+   clmul,min,max,minu,maxu,clz,ctz,cpop,
    atomic,condmove,crypto,rdvlenb,rdvl,vsetvl,vlde,vste,vldm,vstm,vlds,vsts,
    vldux,vldox,vstux,vstox,vldff,vldr,vstr,
    vialu,viwalu,vext,vicalu,vshift,vnshift,vicmp,viminmax,
@@ -1056,6 +1062,22 @@
   "<insn>%i2\t%0,%1,%2"
   [(set_attr "type" "idiv")
    (set_attr "mode" "DI")])
+
+(define_expand "<u>divmod<mode>4"
+  [(parallel
+     [(set (match_operand:GPR 0 "register_operand")
+           (only_div:GPR (match_operand:GPR 1 "register_operand")
+                         (match_operand:GPR 2 "register_operand")))
+      (set (match_operand:GPR 3 "register_operand")
+           (<paired_mod>:GPR (match_dup 1) (match_dup 2)))])]
+  "TARGET_DIV && riscv_use_divmod_expander ()"
+  {
+      rtx tmp = gen_reg_rtx (<MODE>mode);
+      emit_insn (gen_<u>div<GPR:mode>3 (operands[0], operands[1], operands[2]));
+      emit_insn (gen_mul<GPR:mode>3 (tmp, operands[0], operands[2]));
+      emit_insn (gen_sub<GPR:mode>3 (operands[3], operands[1], tmp));
+      DONE;
+  })
 
 (define_insn "*<optab>si3_extended"
   [(set (match_operand:DI                 0 "register_operand" "=r")

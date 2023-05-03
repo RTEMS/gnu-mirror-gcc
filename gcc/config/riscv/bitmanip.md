@@ -401,7 +401,30 @@
   DONE;
 })
 
-(define_insn "<bitmanip_optab><mode>3"
+(define_expand "<bitmanip_optab>di3"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+        (bitmanip_minmax:DI (match_operand:DI 1 "register_operand" "r")
+                            (match_operand:DI 2 "register_operand" "r")))]
+  "TARGET_64BIT && TARGET_ZBB")
+
+(define_expand "<bitmanip_optab>si3"
+  [(set (match_operand:SI 0 "register_operand" "=r")
+        (bitmanip_minmax:SI (match_operand:SI 1 "register_operand" "r")
+                            (match_operand:SI 2 "register_operand" "r")))]
+  "TARGET_ZBB"
+{
+  if (TARGET_64BIT)
+    {
+      rtx t = gen_reg_rtx (DImode);
+      operands[1] = force_reg (DImode, gen_rtx_SIGN_EXTEND (DImode, operands[1]));
+      operands[2] = force_reg (DImode, gen_rtx_SIGN_EXTEND (DImode, operands[2]));
+      emit_insn (gen_<bitmanip_optab>di3 (t, operands[1], operands[2]));
+      emit_move_insn (operands[0], gen_lowpart (SImode, t));
+      DONE;
+    }
+})
+
+(define_insn "*<bitmanip_optab><mode>3"
   [(set (match_operand:X 0 "register_operand" "=r")
         (bitmanip_minmax:X (match_operand:X 1 "register_operand" "r")
 			   (match_operand:X 2 "reg_or_0_operand" "rJ")))]
@@ -696,3 +719,32 @@
    operands[8] = GEN_INT (setbit);
    operands[9] = GEN_INT (clearbit);
 })
+
+;; ZBKC or ZBC extension
+(define_insn "riscv_clmul_<mode>"
+  [(set (match_operand:X 0 "register_operand" "=r")
+        (unspec:X [(match_operand:X 1 "register_operand" "r")
+                  (match_operand:X 2 "register_operand" "r")]
+                  UNSPEC_CLMUL))]
+  "TARGET_ZBKC || TARGET_ZBC"
+  "clmul\t%0,%1,%2"
+  [(set_attr "type" "clmul")])
+
+(define_insn "riscv_clmulh_<mode>"
+  [(set (match_operand:X 0 "register_operand" "=r")
+        (unspec:X [(match_operand:X 1 "register_operand" "r")
+                  (match_operand:X 2 "register_operand" "r")]
+                  UNSPEC_CLMULH))]
+  "TARGET_ZBKC || TARGET_ZBC"
+  "clmulh\t%0,%1,%2"
+  [(set_attr "type" "clmul")])
+
+;; ZBC extension
+(define_insn "riscv_clmulr_<mode>"
+  [(set (match_operand:X 0 "register_operand" "=r")
+        (unspec:X [(match_operand:X 1 "register_operand" "r")
+                  (match_operand:X 2 "register_operand" "r")]
+                  UNSPEC_CLMULR))]
+  "TARGET_ZBC"
+  "clmulr\t%0,%1,%2"
+  [(set_attr "type" "clmul")])

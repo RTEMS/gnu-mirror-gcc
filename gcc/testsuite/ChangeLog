@@ -1,3 +1,274 @@
+2023-05-02  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/109702
+	* gcc.dg/tree-ssa/phi-opt-25b.c: New test.
+
+2023-05-02  Andrew Pinski  <apinski@marvell.com>
+
+	PR target/109657
+	* gcc.target/aarch64/csinv-2.c: New test.
+
+2023-05-02  Jason Merrill  <jason@redhat.com>
+
+	PR c++/109678
+	* g++.dg/cpp1z/variant1.C: New test.
+
+2023-05-02  Patrick O'Neill  <patrick@rivosinc.com>
+
+	* gcc.target/riscv/amo-table-a-6-amo-add-1.c: New test.
+	* gcc.target/riscv/amo-table-a-6-amo-add-2.c: New test.
+	* gcc.target/riscv/amo-table-a-6-amo-add-3.c: New test.
+	* gcc.target/riscv/amo-table-a-6-amo-add-4.c: New test.
+	* gcc.target/riscv/amo-table-a-6-amo-add-5.c: New test.
+	* gcc.target/riscv/amo-table-a-6-compare-exchange-1.c: New test.
+	* gcc.target/riscv/amo-table-a-6-compare-exchange-2.c: New test.
+	* gcc.target/riscv/amo-table-a-6-compare-exchange-3.c: New test.
+	* gcc.target/riscv/amo-table-a-6-compare-exchange-4.c: New test.
+	* gcc.target/riscv/amo-table-a-6-compare-exchange-5.c: New test.
+	* gcc.target/riscv/amo-table-a-6-compare-exchange-6.c: New test.
+	* gcc.target/riscv/amo-table-a-6-compare-exchange-7.c: New test.
+	* gcc.target/riscv/amo-table-a-6-fence-1.c: New test.
+	* gcc.target/riscv/amo-table-a-6-fence-2.c: New test.
+	* gcc.target/riscv/amo-table-a-6-fence-3.c: New test.
+	* gcc.target/riscv/amo-table-a-6-fence-4.c: New test.
+	* gcc.target/riscv/amo-table-a-6-fence-5.c: New test.
+	* gcc.target/riscv/amo-table-a-6-load-1.c: New test.
+	* gcc.target/riscv/amo-table-a-6-load-2.c: New test.
+	* gcc.target/riscv/amo-table-a-6-load-3.c: New test.
+	* gcc.target/riscv/amo-table-a-6-store-1.c: New test.
+	* gcc.target/riscv/amo-table-a-6-store-2.c: New test.
+	* gcc.target/riscv/amo-table-a-6-store-compat-3.c: New test.
+	* gcc.target/riscv/amo-table-a-6-subword-amo-add-1.c: New test.
+	* gcc.target/riscv/amo-table-a-6-subword-amo-add-2.c: New test.
+	* gcc.target/riscv/amo-table-a-6-subword-amo-add-3.c: New test.
+	* gcc.target/riscv/amo-table-a-6-subword-amo-add-4.c: New test.
+	* gcc.target/riscv/amo-table-a-6-subword-amo-add-5.c: New test.
+
+2023-05-02  Patrick O'Neill  <patrick@rivosinc.com>
+
+	PR target/89835
+	* gcc.target/riscv/pr89835.c: New test.
+
+2023-05-02  Yanzhang Wang  <yanzhang.wang@intel.com>
+	    Pan Li  <pan2.li@intel.com>
+
+	PR target/109617
+	* gcc.target/riscv/rvv/base/vlmul_ext-1.c: New test.
+
+2023-05-02  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/109506
+	* g++.dg/cpp0x/nsdmi-template26.C: New test.
+
+2023-05-02  Richard Biener  <rguenther@suse.de>
+
+	* gcc.target/i386/pr88531-2a.c: Skip scanning for ia32.
+	* gcc.target/i386/pr88531-2b.c: Likewise.
+	* gcc.target/i386/pr88531-2c.c: Likewise.
+	* gcc.target/i386/pr89618-2.c: Likewise.  Disable AVX512.
+
+2023-05-01  Jason Merrill  <jason@redhat.com>
+
+	PR c++/109666
+	* g++.dg/cpp0x/nsdmi-array2.C: New test.
+
+2023-04-30  Jeff Law  <jlaw@ventanamicro>
+
+	Revert:
+	2023-04-30  Longjun Luo  <luolongjuna@gmail.com>
+
+	* gcc.dg/builtin-redefine.c: Test for redefintion warnings
+	for __LINE__.
+	* gcc.dg/builtin-redefine-1.c: New test.
+
+2023-04-30  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* gcc.target/xstormy16/neghi2.c: Update expected implementation.
+
+2023-04-30  Andrew Pinski  <apinski@marvell.com>
+
+	* gcc.dg/init-bad-1.c: Update error message.
+	* gcc.dg/init-bad-2.c: Likewise.
+	* gcc.dg/init-bad-3.c: Likewise.
+	* gcc.dg/init-excess-3.c: Likewise.
+	* gcc.dg/pr61096-1.c: Likewise.
+
+2023-04-30  Andrew Pinski  <apinski@marvell.com>
+
+	PR c/107926
+	* gcc.dg/init-excess-3.c: New test.
+
+2023-04-30  Martin Liska  <mliska@suse.cz>
+
+	* c-c++-common/hwasan/asan-pr70541.c: Adjust wording of expected
+	output.
+	* c-c++-common/hwasan/heap-overflow.c: Likewise.
+	* c-c++-common/hwasan/sanity-check-pure-c.c: Likewise.
+	* c-c++-common/hwasan/use-after-free.c: Likewise.
+
+2023-04-30  Longjun Luo  <luolongjuna@gmail.com>
+
+	* gcc.dg/builtin-redefine.c: Test for redefintion warnings
+	for __LINE__.
+	* gcc.dg/builtin-redefine-1.c: New test.
+
+2023-04-30  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2/pim/run/pass/constlitbase.mod: New test.
+
+2023-04-29  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* gcc.target/xstormy16/neghi2.c: New test case.
+	* gcc.target/xstormy16/rotatehi-1.c: Likewise.
+
+2023-04-29  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* gcc.target/xstormy16/swpn-1.c: New QImode test case.
+	* gcc.target/xstormy16/swpn-2.c: New zero_extend test case.
+	* gcc.target/xstormy16/swpn-3.c: New sign_extend test case.
+	* gcc.target/xstormy16/swpn-4.c: New HImode test case.
+
+2023-04-29  Jeff Law  <jlaw@ventanamicro>
+
+	* gcc.target/mips/mips-ps-type-2.c: Adjust branch cost to
+	encourage if-conversion.  Skip for -Os.
+	* gcc.target/mips/movcc-3.c: Similarly.
+
+2023-04-29  Fei Gao  <gaofei@eswincomputing.com>
+
+	* gcc.target/riscv/rv32e_stack.c: New test.
+
+2023-04-28  Hans-Peter Nilsson  <hp@axis.com>
+
+	* lib/scanasm.exp (parse_function_bodies): Set fluff to include
+	empty lines (besides optionally leading whitespace).
+
+2023-04-28  Matevos Mehrabyan  <matevosmehrabyan@gmail.com>
+
+	* gcc.target/riscv/divmod-1.c: New testcase.
+	* gcc.target/riscv/divmod-2.c: New testcase.
+
+2023-04-28  Karen Sargsyan  <karen1999411@gmail.com>
+
+	* gcc.target/riscv/zbc32.c: New test.
+	* gcc.target/riscv/zbc64.c: New test.
+
+2023-04-28  Jivan Hakobyan  <jivanhakobyan9@gmail.com>
+
+	* gcc.target/riscv/zbb-min-max-02.c: Updated scanning check.
+	* gcc.target/riscv/zbb-min-max-03.c: New tests.
+
+2023-04-28  Andrew Pinski  <apinski@marvell.com>
+
+	* gcc.dg/tree-ssa/minmax-16.c: Update testcase slightly.
+	* gcc.dg/tree-ssa/split-path-1.c: Also disable tree-loop-if-convert
+	as that now does the combining.
+
+2023-04-28  Roger Sayle  <roger@nextmovesoftware.com>
+
+	PR rtl-optimization/109476
+	* gcc.target/avr/mmcu/pr109476.c: New test case.
+
+2023-04-28  Richard Biener  <rguenther@suse.de>
+
+	* gcc.dg/vect/pr25413a.c: Un-XFAIL everywhere.
+	* gcc.dg/vect/vect-71.c: Likewise.
+	* gcc.dg/vect/tsvc/vect-tsvc-s4113.c: Likewise.
+	* gcc.dg/vect/tsvc/vect-tsvc-s491.c: Likewise.
+	* gcc.dg/vect/tsvc/vect-tsvc-vas.c: Likewise.
+
+2023-04-28  Richard Biener  <rguenther@suse.de>
+
+	* gcc.target/i386/pr89618-2.c: New testcase.
+	* gcc.target/i386/pr88531-2b.c: Adjust.
+	* gcc.target/i386/pr88531-2c.c: Likewise.
+
+2023-04-28  Pan Li  <pan2.li@intel.com>
+	    kito-cheng  <kito.cheng@sifive.com>
+
+	* gcc.target/riscv/rvv/base/integer_compare_insn_shortcut.c: New test.
+
+2023-04-28  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/109652
+	* gcc.dg/torture/pr109652.c: New testcase.
+
+2023-04-28  Julian Brown  <julian@codesourcery.com>
+
+	PR fortran/109622
+	* gfortran.dg/goacc/attach-descriptor.f90: Adjust expected output.
+
+2023-04-28  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/99195
+	* gcc.target/aarch64/simd/pr99195_1.c: Add tests for unary integer ops.
+
+2023-04-28  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.dg/tree-ssa/range-sqrt.c: New test.
+	* gfortran.dg/ieee/ieee_6.f90: Make x volatile to avoid
+	ranger optimizing sqrt (-1) call away because it is only used in
+	test for whether it returns NaN.
+
+2023-04-28  Aldy Hernandez  <aldyh@redhat.com>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.dg/tree-ssa/range-sincos.c: New test.
+
+2023-04-28  Jan Beulich  <jbeulich@suse.com>
+
+	* g++.dg/modules/alias-1_b.C: Add -fno-canonical-system-headers.
+	* g++.dg/modules/alias-1_d.C: Likewise.
+	* g++.dg/modules/alias-1_e.C: Likewise.
+	* g++.dg/modules/alias-1_f.C: Likewise.
+	* g++.dg/modules/cpp-6_c.C: Likewise.
+	* g++.dg/modules/dir-only-2_b.C: Likewise.
+
+2023-04-28  Jan Beulich  <jbeulich@suse.com>
+
+	* g++.dg/modules/bad-mapper-3.C: Relax failure pattern.
+
+2023-04-28  Alexandre Oliva  <oliva@adacore.com>
+
+	* c-c++-common/torture/harden-cond-comp.c: New.
+
+2023-04-27  Jason Merrill  <jason@redhat.com>
+
+	* g++.dg/template/copy1.C: Adjust error lines.
+
+2023-04-27  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/read-thread-pointer.c: Add required tls.
+
+2023-04-27  Aldy Hernandez  <aldyh@redhat.com>
+
+	PR tree-optimization/109639
+	* gcc.dg/tree-ssa/pr109639.c: New file.
+	* gcc.dg/tree-ssa/pr109643.c: New file.
+
+2023-04-27  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/109607
+	* g++.dg/torture/pr109607.C: New testcase.
+
+2023-04-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/109409
+	* gcc.dg/pr109409.c: New test.
+
+2023-04-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/107682
+	PR c/109412
+	* gcc.dg/pr109412.c: New test.
+
+2023-04-27  Jan Beulich  <jbeulich@suse.com>
+
+	* c-c++-common/patchable_function_entry-decl.c: Special-case
+	RISC-V.
+	* c-c++-common/patchable_function_entry-default.c: Likewise.
+	* c-c++-common/patchable_function_entry-definition.c: Likewise.
+
 2023-04-26  Jason Merrill  <jason@redhat.com>
 
 	PR c++/69836
