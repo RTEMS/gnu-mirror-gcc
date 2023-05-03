@@ -1470,6 +1470,7 @@ OBJS = \
 	inchash.o \
 	incpath.o \
 	init-regs.o \
+	insert-gimple-ssa.o \
 	internal-fn.o \
 	ipa-cp.o \
 	ipa-sra.o \
@@ -1664,6 +1665,7 @@ OBJS = \
 	tree-ssa-ccp.o \
 	tree-ssa-coalesce.o \
 	tree-ssa-copy.o \
+	insert-gimple-ssa-tests.o \
 	tree-ssa-dce.o \
 	tree-ssa-dom.o \
 	tree-ssa-dse.o \

@@ -18,9 +18,32 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+// Z tree-into-ssa.cc TODO Ubrat
+#include "config.h"
+#include "system.h"
 #include "coretypes.h"
+#include "backend.h"
+#include "rtl.h"
 #include "tree.h"
-#include "insert-gimple-ssa.h"
+#include "gimple.h"
+#include "tree-pass.h"
+#include "ssa.h"
+#include "gimple-pretty-print.h"
+#include "diagnostic-core.h"
+#include "langhooks.h"
+#include "cfganal.h"
+#include "gimple-iterator.h"
+#include "tree-cfg.h"
+#include "tree-into-ssa.h"
+#include "tree-dfa.h"
+#include "tree-ssa.h"
+#include "domwalk.h"
+#include "statistics.h"
+#include "stringpool.h"
+#include "attribs.h"
+#include "asan.h"
+#include "attr-fnspec.h"
+
 #include "vec.h"
 #include "hash-map.h"
 #include "hash-set.h"
@@ -28,268 +51,667 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-iterator.h"
 #include "tree-ssanames.h"
 #include "tree-phinodes.h"
+#include "insert-gimple-ssa.h"
 
-class hack_ssa_builder
+/* Replace hack PHI operand.  */
+
+void
+hphi::replace_op_by (hstmt_left *op, hstmt_left *replace_by)
 {
-public:
-    hack_lvalue new_local (type type, optionally name)
+  if (this->op == NULL)
+    return;
+
+  unsigned i;
+  for (i = 0; i < num_ops; i++)
     {
-      hack_lvalue local;
-      local.index = next_index;
-      next_index++;
-      local.var_decl = build_decl (..., VAR_DECL, ...); // TODO How to build
-      return local;
-    }
-
-    void add_assignment (basic_block bb, hack_lvalue left, hack_rvalue right)
-    {
-      hack_stmt_assign stmt;
-      stmt.value = rvalue_to_rvalue_vn (right);
-      append_stmt (bb, stmt);
-      write_variable (bb, left, stmt);
-    }
-
-    void seal_block (basic_block bb)
-    {
-      sealed_bbs.add (bb->index);
-    }
-
-    void set_block_filled (basic_block bb)
-    {
-      filled_bbs.add (bb->index);
-      convert_to_gimple_bb (bb);
-    }
-
-    tree ssa_name_from_lvalue (basic_block bb, hack_lvalue var)
-    {
-      gcc_checking_assert (filled_bbs.contains (bb->index));
-      return curr_ssa.get (bb->index).get (var);
-    }
-
-private:
-    int next_index = 0; // TODO Ohandlovat, když je proměnných fakt hodně
-    hash_map<int, hash_map<hack_lvalue, *hack_stmt>> curr_defs;
-    hash_map<int, hash_map<hack_lvalue, tree>> curr_ssa;
-    hash_map<int, vec<hack_stmt>> stmt_lists;
-    hash_map<int, vec<hack_phi>> phi_lists;
-    hash_set<int> sealed_bbs;
-    hash_set<hack_phi> incomplete_phis;
-
-    hash_map<hack_lvalue, *hack_stmt> get_bb_map (basic_block bb)
-    {
-      hash_map<hack_lvalue, *hack_stmt> *bb_map;
-      bb_map = curr_def.get (bb->index);
-      if (bb_map == NULL)
-	{
-	  // TODO Jak vyrábět hash mapy
-	  bb_map = new hash_map<hack_lvalue, *hack_stmt>;
-	  curr_def.put (bb->index, bb_map);
-	}
-      return *bb_map;
-    }
-
-    vec<hack_stmt> get_stmt_list (basic_block bb)
-    {
-      vec<hack_stmt> *stmt_list;
-      stmt_list = stmt_lists.get (bb->index);
-      if (stmt_list == NULL)
-	{
-	  vec<hack_stmt> foo; // TODO Rozmyslet, jak tady budou fungovat
-			      // pointery
-	  stmt_list = &foo;
-	  stmt_lists.put (bb->index, stmt_list);
-	}
-      return *stmt_list;
-    }
-
-    vec<hack_stmt> get_phi_list (basic_block bb)
-    {
-      vec<hack_phi> *phi_list;
-      phi_list = phi_lists.get (bb->index);
-      if (phi_list == NULL)
-	{
-	  vec<hack_phi> foo; // TODO Rozmyslet, jak tady budou fungovat
-			      // pointery
-	  phi_list = &foo;
-	  phi_lists.put (bb->index, phi_list);
-	}
-      return *phi_list;
-    }
-
-    hash_map<...> get_curr_ssa (basic_block bb)
-    {
-      // TODO -||-
-    }
-
-    hack_rvalue rvalue_to_rvalue_vn (hack_rvalue val)
-    {
-      // TODO Tohle ještě bude třeba rozmyslet - i s objektovým návrhem
-      if (val je hack_lvalue)
-	{
-	  hack_stmt *s = read_variable (val);
-	  return s;
-	}
-      else
-	{
-	  hack_rvalue_vn val_vn;
-	  val_vn.op = val.op; // Operátor
-	  val_vn.left = rvalue_to_rvalue_vn (val.left);
-	  val_vn.right = rvalue_to_rvalue_vn (val.right);
-
-	  // TODO Neměl bych tu chybu nějak propagovat?
-	  gcc_checking_assert (val_vn.left != NULL);
-	  gcc_checking_assert (val_vn.right != NULL);
-
-	  return val_vn;
-	  // TODO Rozmyslet: Přeci ne vše bude binární
-	}
-    }
-
-    void append_stmt (basic_block bb, hack_stmt stmt)
-    {
-      vec<hack_stmt> stmt_list = get_stmt_list (bb);
-      stmt_list.safe_push (stmt);
-    }
-
-    void add_phi (basic_block bb, hack_phi phi)
-    {
-      vec<hack_phi> phi_list = get_phi_list (bb);
-      phi_list.safe_push (phi);
-    }
-
-    tree rvalue_to_tree (hack_rvalue val)
-    {
-      // TODO
-      // Foldneš jeden typ stromu do jiného typu stromu
-      // Je tu vlastně šance narazit na nezkonvertovaný stmt? Pokud ano, asi je
-      // třeba zkonvertovat ho
-    }
-
-    void convert_to_gimple_phi (basic_block bb, hack_phi hp)
-    {
-      tree lhs = make_ssa_name (hp.var.type);
-      gphi *phi = create_phi_node (hp.var, bb);
-      for (int i = 0; i < hp.operands.length (); i++)
-	{
-	  hack_stmt hs = hp.operands [i];
-	  edge e = hp.edges [i];
-
-	  gcc_checking_assert (hs->ssa != NULL_TREE); /* Predecessor blocks
-							 should be filled */
-
-	  add_phi_arg (phi, hs->ssa, e, UNKNOWN_LOCATION); // TODO Location?
-	}
-
-      get_curr_ssa (gsi->bb)->put (hp.val, lhs);
-    }
-
-    /* Contrary to the name, this actually converts AND inserts the stmt  */
-    void convert_to_gimple_stmt (gimple_stmt_iterator *gsi, hack_stmt hs)
-    {
-      // TODO Vyrábí se takhle assign s novým ssa jménem? Bude po tomhle
-      // možné z SSA jména získat tenhle assign?
-      tree lhs = make_ssa_name (hs.var.type);
-      tree rhs = rvalue_to_tree (hs.val);
-      gimple *s = gimple_build_assign (lhs, rhs);
-      gsi_insert_after (&gsi, s, GSI_NEW_STMT);
-
-      get_curr_ssa (gsi->bb)->put (hs.val, lhs);
-    }
-
-    void convert_to_gimple_bb (basic_block bb)
-    {
-      // NOTE Predecessors jsou filled. Pokud tenhle blok je sealed, jsou
-      // dokonce všichni k dispozici. Tedy teď mám dostupné všechny definice,
-      // které kdy budu moct mít dostupné.
-      // NOTE Ou! Protože jsou predecessors filled, jsou taky converted.
-
-      // TODO Prozatím předpokládám, že vše je assignment
-      // TODO Při vytváření LHS SSA jmen jim neassignuji VAR_DECL
-
-      for (hack_phi phi : get_phi_list (bb))
-      {
-	convert_to_gimple_phi (phi);
-      }
-
-      gimple_stmt_iterator gsi;
-      gsi = gsi_start_bb (bb);
-      for (hack_stmt hs : get_stmt_list (bb))
-      {
-	convert_to_gimple_stmt (&gsi, hs);
-      }
-    }
-
-    void add_phi_operand (edge e, hack_phi phi)
-    {
-      basic_block bb_pred = e->dest; // TODO Nemělo by tady být src místo dest?
-
-      gcc_checking_assert (phi.operands.is_empty ());
-
-      phi.operands.safe_push (read_variable (bb_pred, var));
-      phi.edges.safe_push (e);
-    }
-
-    hack_phi add_phi_operands (basic_block bb, hack_lvalue var, hack_phi phi)
-    {
-      // TODO Tuhle funkci by to chtělo přejmenovat. Teď kinda koliduje s
-      // funkcemi z tree-phinodes.cc
-      edge e;
-      edge_iterator ei;
-
-      // TODO Proč ta závorka navíc?
-      for (ei = ei_start (bb->preds); (e = ei_safe_edge (ei)); ei_next (&ei))
-	{
-	  add_phi_operand (e, phi);
-	}
-    }
-
-    void write_variable (basic_block bb, hack_lvalue var, *hack_stmt *stmt)
-    {
-      hash_map<hack_lvalue, *hack_stmt> *bb_map = get_bb_map (bb);
-      bb_map->put (var, stmt);
-    }
-
-    hack_stmt *read_variable (basic_block bb, hack_lvalue var)
-    {
-      hash_map<hack_lvalue, *hack_stmt> *bb_map = get_bb_map (bb);
-      hack_stmt **stmt_p = bb_map->get (var);
-      if (stmt_p == NULL)
-	{
-	  return read_variable_recursive (bb, var);
-	}
-      return *stmt_p;
-    }
-
-    hack_stmt *read_variable_recursive (basic_block bb, hack_lvalue var)
-    {
-      hack_stmt *stmt;
-
-      if (!sealed_bbs.contains (bb->index))
-	{
-	  hack_phi phi;
-	  stmt = phi;
-	  incomplete_phis.add (op);
-	  append_stmt (bb, stmt);
-	}
-      else if (single_pred_p (bb))
-	{
-	  stmt = read_variable (single_pred (bb), var);
-	}
-      else if (má vůbec predecessors) // TODO
-	{
-	  hack_phi phi;
-	  stmt = phi;
-	  // TODO Proč tady vlastně dělám write_variable 2x?
-	  write_variable (bb, var, stmt);
-	  stmt = add_phi_operands (var, stmt); // TODO Tady mi nesedí typy
-	}
-      else
-	{
-	  // TODO Řeším takhle správně, že definici nenajdu?
-	  return NULL;
-	}
-
-      write_variable (bb, var, stmt);
-      return stmt;
+      if (this->op[i].s == op)
+	this->op[i].s = replace_by;
     }
 }
+
+/* Replace hack assign operand.  */
+
+void
+hstmt_assign::replace_op_by (hstmt_left *op, hstmt_left *replace_by)
+{
+  unsigned i;
+  for (i = 0; i < val->num_ops; i++)
+    {
+      if (val->op[i] == op)
+	val->op[i] = replace_by;
+    }
+}
+
+/* Replace hack cond lhs/rhs.  */
+
+void
+hstmt_cond::replace_op_by (hstmt_left *op, hstmt_left *replace_by)
+{
+  if (lhs == op)
+    lhs = replace_by;
+  if (rhs == op)
+    rhs = replace_by;
+}
+
+gimple *
+hstmt_assign::to_gimple (void)
+{
+  gcc_assert (ssa != NULL_TREE);
+  gcc_assert (val->op[0] != NULL);
+
+  tree op1 = val->op[0]->ssa;
+  tree op2 = NULL_TREE;
+  tree op3 = NULL_TREE;
+
+  gcc_assert (op1 != NULL);
+
+  if (val->num_ops >= 2)
+    {
+      op2 = val->op[1]->ssa;
+      gcc_assert (op2 != NULL);
+    }
+  if (val->num_ops >= 3)
+    {
+      op3 = val->op[2]->ssa;
+      gcc_assert (op3 != NULL);
+    }
+
+  return gimple_build_assign (ssa, val->code, op1, op2, op3);
+}
+
+gimple *
+hstmt_cond::to_gimple (void)
+{
+  gcc_assert (lhs->ssa != NULL);
+  gcc_assert (rhs->ssa != NULL);
+
+  return gimple_build_cond (pred_code, lhs->ssa, rhs->ssa, NULL, NULL);
+}
+
+/* When commiting to gimple, just compute SSA name. Outvar stmts are
+   virtual. */
+
+gimple *
+hstmt_outvar::to_gimple (void)
+{
+  gcc_assert (rhs != NULL);
+  gcc_assert (rhs->ssa != NULL);
+
+  outvar->type_or_ssa_value = rhs->ssa;
+  return NULL;
+}
+
+hvar &
+hack_ssa_builder::new_local (tree type)
+{
+  gcc_assert (type != NULL_TREE);
+
+  hvar *local = XNEW (struct hvar);
+  local->index = next_index;
+  local->code = LOCAL;
+  local->type_or_ssa_value = type;
+  next_index++;
+  allocated_hvars.safe_push (local);
+  return *local;
+}
+
+hvar &
+hack_ssa_builder::new_invar (tree ssa)
+{
+  gcc_assert (ssa != NULL_TREE);
+
+  hvar *invar = XNEW (struct hvar);
+  invar->index = next_const_index;
+  invar->code = INVAR;
+  invar->type_or_ssa_value = ssa;
+  next_const_index++;
+
+  hstmt_const *stmt = new hstmt_const (invar);
+  stmt->ssa = ssa; // TODO Elegantněji
+
+  const_list.safe_push (stmt);
+  allocated_hvars.safe_push (invar);
+
+  return *invar;
+}
+
+/* Build and append hack assign to a basic block.  */
+
+void
+hack_ssa_builder::append_assign (basic_block bb, enum tree_code code,
+				 hvar &left, hvar &op1)
+{
+  append_assign1 (bb, code, &left, &op1, NULL, NULL, 1);
+}
+
+void
+hack_ssa_builder::append_assign (basic_block bb, enum tree_code code,
+				 hvar &left, hvar &op1,
+				 hvar &op2)
+{
+  append_assign1 (bb, code, &left, &op1, &op2, NULL, 2);
+}
+
+void
+hack_ssa_builder::append_assign (basic_block bb, enum tree_code code,
+				 hvar &left, hvar &op1,
+				 hvar &op2, hvar &op3)
+{
+  append_assign1 (bb, code, &left, &op1, &op2, &op3, 3);
+}
+
+/* Build and append hack cond to a basic block.  */
+
+void
+hack_ssa_builder::append_cond (basic_block bb, enum tree_code pred_code,
+			      hvar &left, hvar &right)
+{
+  hstmt_left *stmt_l = read_variable (bb, &left);
+  hstmt_left *stmt_r = read_variable (bb, &right);
+
+  hstmt_cond *stmt = new hstmt_cond (pred_code, stmt_l, stmt_r);
+  append_stmt (bb, stmt);
+  set_block_filled (bb); /* There are no more stmts after cond.  */
+
+  /* Update uses list of appropriate stmts.  */
+  stmt_l->uses.safe_push (stmt);
+  stmt_r->uses.safe_push (stmt);
+}
+
+/* Build and append hack outvar to a basic block.
+
+   Outvar stmts are virtual. They represent places in generated code where user
+   will want to know SSA name of a LOCAL hack var. Outvars should be the only
+   way to extract SSA names from generated code. */
+
+hvar &
+hack_ssa_builder::append_outvar (basic_block bb, hvar &local)
+{
+  hvar *outvar = XNEW (struct hvar);
+  outvar->index = next_index;
+  outvar->code = OUTVAR;
+  outvar->type_or_ssa_value = NULL;
+  next_index++;
+
+  hstmt_outvar *stmt = new hstmt_outvar (outvar, read_variable (bb, &local));
+  append_stmt (bb, stmt);
+
+  allocated_hvars.safe_push (outvar);
+  
+  return *outvar;
+}
+
+/* Wrapper around 'make_edge ()'.
+
+   Edges should only be added to filled blocks. This wrapper checks that
+   condition.  */
+
+edge
+hack_ssa_builder::hack_make_edge (basic_block src, basic_block dest, int flags)
+{
+  gcc_assert (filled_bbs.contains (src) &&
+		       "Successors can only be added to a filled BB");
+  return make_edge (src, dest, flags);
+}
+
+/* See the Braun alg paper for what 'sealed' means.  */
+
+void
+hack_ssa_builder::seal_block (basic_block bb)
+{
+  sealed_bbs.add (bb);
+}
+
+/* See the Braun alg paper for what 'filled' means.  */
+
+void
+hack_ssa_builder::set_block_filled (basic_block bb)
+{
+  filled_bbs.add (bb);
+}
+
+/* Finalize building of SSA code. Call this after all statements have been
+   placed. Extract SSA names from OUTVARs afterwards. Then, dispose of the
+   builder. */
+
+void
+hack_ssa_builder::finalize (void)
+{
+  run_final_optimizations ();
+
+  /* Fill and seal remaining bbs.  */
+  for (basic_block bb : seen_bbs)
+    { // TODO Nechci jen checking assert?
+      if (!filled_bbs.contains (bb))
+	set_block_filled (bb);
+    }
+  for (basic_block bb : seen_bbs)
+    {
+      if (!sealed_bbs.contains (bb))
+	seal_block (bb);
+    }
+
+  /* Commit everything.  */
+  for (basic_block bb : seen_bbs)
+    {
+      hack_bb *record = get_bb_record (bb);
+      for (hstmt *s : record->stmt_list)
+	{
+	  if (!s->killed)
+	    {
+	      hstmt_left *ls = dyn_cast<hstmt_left *> (s);
+	      if (ls != NULL)
+		commit_ssa_name (ls);
+	    }
+	}
+      for (hphi *p : record->phi_list)
+	{
+	  if (!p->killed)
+	    {
+	      commit_ssa_name (p);
+	    }
+	}
+    }
+  for (basic_block bb : seen_bbs)
+    {
+      gimple_stmt_iterator gsi = gsi_start_bb (bb);
+      hack_bb *record = get_bb_record (bb);
+      for (hstmt *s : record->stmt_list)
+	{
+	  if (!s->killed)
+	    {
+	      commit_stmt (&gsi, s);
+	    }
+	}
+      for (hphi *p : record->phi_list)
+	{
+	  if (!p->killed)
+	    {
+	      commit_phi (bb, p);
+	    }
+	}
+    }
+}
+
+void
+hack_ssa_builder::dispose (void)
+{
+  for (basic_block bb : seen_bbs)
+    {
+      hack_bb *record = get_bb_record (bb);
+      for (hstmt *s : record->stmt_list)
+	{
+	  hstmt_left *ls = dyn_cast<hstmt_left *> (s);
+	  if (ls != NULL)
+	    ls->uses.release ();
+	  delete s;
+	}
+      for (hphi *p : record->phi_list)
+	{
+	  XDELETEVEC (p->op); /* Delete op array. Is separate from PHI.  */
+	  delete p;
+	}
+      delete record;
+    }
+  for (hvar *v : allocated_hvars)
+    XDELETE (v);
+  for (hack_tuple_internal *t : allocated_internal)
+    XDELETE (t);
+}
+
+/* Extracts SSA name from outvar. Outvars represent places where user wants SSA
+   name of a LOCAL hack var to be computed. Call this after finalizing but
+   before disposing.
+
+   Store outvars as references, otherwise they won't contain SSA names after
+   finalizing. */
+
+tree
+hack_ssa_builder::ssa_from_outvar (hvar &outvar)
+{
+  gcc_assert (finalized && "SSA builder has to be finalized");
+  gcc_assert (outvar.code == OUTVAR);
+  return outvar.type_or_ssa_value;
+}
+
+void
+hack_ssa_builder::append_assign1 (basic_block bb, enum tree_code code,
+				  hvar *left, hvar *op1,
+				  hvar *op2, hvar *op3,
+				  unsigned num_ops)
+{
+  hstmt_left *stmt;
+
+  hack_tuple_internal *val = tuple_alloc (code, num_ops);
+  gcc_assert (op1 != NULL);
+  tuple_set_operand (0, val, read_variable (bb, op1));
+  if (op2 != NULL)
+    {
+      tuple_set_operand (1, val, read_variable (bb, op2));
+      if (op3 != NULL)
+	tuple_set_operand (2, val, read_variable (bb, op3));
+    }
+
+  stmt = tuple_lookup (bb, val);
+  if (stmt == NULL)
+    {
+      /* Assign with equivalent tuple not found. Create a new one.  */
+      hstmt_assign *assign = new hstmt_assign (left, val);
+      append_stmt (bb, assign);
+      tuple_register (bb, assign);
+
+      /* Update uses list of appropriate stmts.  */
+      unsigned i;
+      for (i = 0; i < val->num_ops; i++)
+	{
+	  // TODO Neměl bych kontrolovat, jestli není killed?
+	  val->op[i]->uses.safe_push (assign);
+	}
+
+      stmt = assign;
+    }
+  write_variable (bb, left, stmt);
+}
+
+/* Return record of basic block bb. If builder doesn't have the record yet,
+   create it.  */
+
+hack_bb *
+hack_ssa_builder::get_bb_record (basic_block bb)
+{
+  seen_bbs.add (bb);
+
+  hack_bb **record_p = bb_record_map.get (bb);
+  if (record_p == NULL)
+    {
+      hack_bb *record = new hack_bb ();
+      bb_record_map.put (bb, record);
+      return record;
+    }
+  return *record_p;
+}
+
+hack_tuple_internal *
+hack_ssa_builder::tuple_alloc (enum tree_code code, unsigned num_ops)
+{
+  gcc_assert (num_ops >= 1 && "Tuples of size <1 not allowed");
+  gcc_assert (num_ops <= 3 && "Tuples of size >3 not allowed");
+
+  size_t size = sizeof (hack_tuple_internal) +
+    (num_ops - 1) * sizeof (struct hstmt_left *);
+  hack_tuple_internal *result = XNEWVAR (struct hack_tuple_internal, size);
+
+  result->num_ops = num_ops;
+  result->code = code;
+
+  allocated_internal.safe_push (result);
+
+  return result;
+}
+
+void
+hack_ssa_builder::tuple_set_operand (unsigned op_num,
+				     hack_tuple_internal *tuple,
+				     hstmt_left *op)
+{
+  tuple->op[op_num] = op;
+}
+
+void
+hack_ssa_builder::append_stmt (basic_block bb, hstmt *stmt)
+{
+  gcc_assert (dyn_cast<hphi *> (stmt) == NULL);
+
+  hack_bb *record = get_bb_record (bb);
+  record->stmt_list.safe_push (stmt);
+}
+
+hphi *
+hack_ssa_builder::add_empty_phi (basic_block bb, hvar *var)
+{
+  hphi *p = new hphi (var);
+  hack_bb *record = get_bb_record (bb);
+  record->phi_list.safe_push (p);
+  return p;
+}
+
+/* Create and assign SSA name to a hack statement. This has to be done for all
+   hack statements before commiting any hack statements to gimple
+   statements.  */
+
+void
+hack_ssa_builder::commit_ssa_name (hstmt_left *s)
+{
+  switch (s->var->code)
+    {
+      case LOCAL:
+	s->ssa = make_ssa_name (s->var->type_or_ssa_value);
+	break;
+      case INVAR:
+	gcc_unreachable (); /* Invars already have SSA value.  */
+      case OUTVAR:
+	gcc_unreachable (); /* Outvars shouldn't be present in hstmt_left.  */
+    }
+}
+
+/* Commit hack PHI to gimple PHI (build gimple stmt and add it to bb)
+
+   PHIs are commited separate from other statements since gimple PHIs are
+   stored differently to gimple stmts.  */
+
+void
+hack_ssa_builder::commit_phi (basic_block bb, hphi *hp)
+{
+  gcc_assert (hp->op != NULL && "PHI has to be completed");
+
+  gphi *gp = create_phi_node (hp->ssa, bb);
+
+  unsigned i;
+  for (i = 0; i < hp->num_ops; i++)
+    {
+      hstmt_left *s = hp->get_op (i);
+      edge e = hp->get_edge (i);
+
+      gcc_assert (s->ssa != NULL && "SSA names have to be assigned");
+
+      add_phi_arg (gp, s->ssa, e, UNKNOWN_LOCATION);
+    }
+}
+
+/* Commit hack stmt to gimple stmt (build gimple stmt and add to to bb).  */
+
+void
+hack_ssa_builder::commit_stmt (gimple_stmt_iterator *gsi, hstmt *hs)
+{
+  gcc_assert (dyn_cast<hphi *> (hs) == NULL);
+
+  gimple *s = hs->to_gimple ();
+  if (s != NULL) /* Some hack stmts (outvars) are just virtual.  */
+    gsi_insert_after (gsi, s, GSI_NEW_STMT);
+}
+
+/* Complete hack PHI. Populate its arguments with stmts defining var in
+   predecessors of bb. This makes completed PHI out of empty PHI.  */
+
+void
+hack_ssa_builder::complete_phi (basic_block bb, hvar *var, hphi *phi)
+{
+  gcc_assert (sealed_bbs.contains (bb) &&
+		       "Only sealed BBs contain complete PHIs");
+
+  edge e;
+  edge_iterator ei;
+
+  /* Alloc operand array.  */
+  unsigned num_ops = EDGE_COUNT (bb->preds);
+  hack_edge_stmt *op = XNEWVEC (hack_edge_stmt, num_ops);
+  
+  /* Set operands.  */
+  unsigned i = 0;
+  for (ei = ei_start (bb->preds); (e = ei_safe_edge (ei)); ei_next (&ei))
+    {
+      basic_block bb_pred = e->src;
+      hstmt_left *s = read_variable (bb_pred, var);
+      op[i].e = e;
+      op[i].s = s;
+
+      /* Update uses list.  */
+      s->uses.safe_push (phi);
+
+      i++;
+    }
+
+  phi->num_ops = num_ops;
+  phi->op = op;
+  
+  try_remove_trivial_phi (phi);
+}
+
+/* Replace uses of stmt. Typically called when killing a statement to replace
+   its uses by an equivalent statement. Optimalizations make use of this
+   method.  */
+
+void
+hack_ssa_builder::replace_uses (hstmt_left *to_replace, hstmt_left *replace_by)
+{
+  for (hstmt *s : to_replace->uses)
+    {
+      s->replace_op_by (to_replace, replace_by);
+    }
+}
+
+/* Remove PHI if it is trivial (feeds into itself and from one other
+   source).  */
+
+void
+hack_ssa_builder::try_remove_trivial_phi (hphi *phi)
+{
+  hstmt_left *same = NULL;
+
+  gcc_assert (phi->op != NULL &&
+	      "PHI must be completed before triviality can be determined");
+
+  unsigned i;
+  for (i = 0; i < phi->num_ops; i++)
+    {
+      hstmt_left *op = phi->get_op (i);
+      if (op == same || dyn_cast<hphi *> (op) == phi)
+	continue; /* Unique value or self-reference.  */
+      if (same != NULL)
+	return; /* The PHI merges at least two values: not trivial.  */
+      same = op;
+    }
+  if (same == NULL)
+    {
+      gcc_unreachable (); /* The PHI is unreachable or in the start block.  */
+    }
+  
+  phi->killed = true;
+  replace_uses (phi, same);
+
+  for (hstmt *s : phi->uses)
+    {
+      hphi *p = dyn_cast<hphi *> (s);
+      if (p != NULL)
+	try_remove_trivial_phi (p);
+    }
+}
+
+/* See Braun alg paper for explanation of this method.  */
+
+void
+hack_ssa_builder::write_variable (basic_block bb, hvar *var,
+				  hstmt_left *stmt)
+{
+  hack_bb *record = get_bb_record (bb);
+  record->curr_def.put (var, stmt);
+}
+
+/* See Braun alg paper for explanation of this method.
+
+   There's a modification. Braun et al. only consider variables I call LOCAL.
+   This implementation also handles INVAR variables.  */
+
+hstmt_left *
+hack_ssa_builder::read_variable (basic_block bb, hvar *var)
+{
+  if (var->code == INVAR)
+    {
+      return const_list[var->index];
+    }
+
+  hack_bb *record = get_bb_record (bb);
+  hstmt_left **stmt_p = record->curr_def.get (var);
+  if (stmt_p == NULL)
+    return read_variable_recursive (bb, var);
+  return *stmt_p;
+}
+
+/* See Braun alg paper for explanation of this method.  */
+
+hstmt_left *
+hack_ssa_builder::read_variable_recursive (basic_block bb, hvar *var)
+{
+  hstmt_left *stmt;
+
+  if (!sealed_bbs.contains (bb))
+    {
+      hphi *phi = add_empty_phi (bb, var);
+      stmt = phi;
+      incomplete_phis.add (phi);
+    }
+  else if (single_pred_p (bb))
+    {
+      stmt = read_variable (single_pred (bb), var);
+    }
+  else if (EDGE_COUNT (bb->preds) > 0)
+    {
+      hphi *phi = add_empty_phi (bb, var);
+      stmt = phi;
+      complete_phi (bb, var, phi);
+    }
+  else
+    {
+      // TODO Řeším takhle správně, že definici nenajdu?
+      gcc_unreachable (); /* Couldn't find definition of variable.  */
+    }
+
+  write_variable (bb, var, stmt);
+  return stmt;
+}
+
+/* Register a tuple. Remember right side of an assignment and the assignment
+   hack stmt so that equivalent assigns can be later optimized away.  */
+
+void
+hack_ssa_builder::tuple_register (basic_block bb, hstmt_assign *stmt)
+{
+  /*
+  hack_bb *record = get_bb_record (bb);
+  record->tuple_provider.put (*stmt->val, stmt);
+  */
+}
+
+/* Look up a tuple. Recall if we've already seen assign with equivalent right
+   side and if we did, return the assign.  */
+
+hstmt_assign *
+hack_ssa_builder::tuple_lookup (basic_block bb, hack_tuple_internal *val)
+{
+  /*
+  hack_bb *record = get_bb_record (bb);
+  hstmt_assign **stmt_p = record->tuple_provider.get (*val);
+  if (stmt_p == NULL)
+    return NULL;
+  else
+    return *stmt_p;
+  */
+  return NULL;
+}
+
+/* Run final optimizations. Run the optimzalizations that should be done right
+   before commiting everything to gimple. This will include the Braun et al.
+   SCC algorithm.  */
+
+void
+hack_ssa_builder::run_final_optimizations (void) { }

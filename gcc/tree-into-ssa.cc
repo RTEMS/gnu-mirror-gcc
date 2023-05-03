@@ -2522,6 +2522,8 @@ pass_build_ssa::execute (function *fun)
   /* Initialize operand data structures.  */
   init_ssa_operands (fun);
 
+  // BEGIN TOHLE ZHRUBA NAHRADIM
+
   /* Initialize internal data needed by the renamer.  */
   init_ssa_renamer ();
 
@@ -2558,6 +2560,8 @@ pass_build_ssa::execute (function *fun)
   interesting_blocks = NULL;
 
   fini_ssa_renamer ();
+
+  // END TOHLE ZHRUBA NAHRADIM
 
   /* Try to get rid of all gimplifier generated temporaries by making
      its SSA names anonymous.  This way we can garbage collect them
