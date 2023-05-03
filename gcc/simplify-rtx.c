@@ -8172,31 +8172,48 @@ test_capability_plus_constant ()
   ASSERT_TRUE (constant_cap_p (x, 42));
 }
 
-static void
-test_pointer_plus_simplifications ()
+/* Helper function for tests involving simplifications
+   on capability hard regs.  */
+
+static bool cap_hard_reg_test_setup (rtx *c0, rtx *r0, rtx *r1)
 {
-  rtx r0 = gen_rtx_REG (DImode, 4);
-  rtx r1 = gen_rtx_REG (DImode, 10);
-  rtx r2 = gen_rtx_REG (DImode, 12);
-  rtx c0 = gen_rtx_REG (CADImode, 4);
+  const auto maybe_cap_mode = targetm.capability_mode ();
+  if (!maybe_cap_mode.exists ())
+    return false;
+
+  const machine_mode cap_mode = maybe_cap_mode.require ();
+  const machine_mode int_mode = noncapability_mode (cap_mode);
+
+  /* Arbitrary register numbers.  */
+  const unsigned regno0 = 4;
+  const unsigned regno1 = 10;
+
+  if (!targetm.hard_regno_mode_ok (regno0, cap_mode)
+      || !targetm.hard_regno_mode_ok (regno0, int_mode)
+      || !targetm.hard_regno_mode_ok (regno1, int_mode))
+    return false;
+
+  *c0 = gen_rtx_REG (cap_mode, regno0);
+  *r0 = gen_rtx_REG (int_mode, regno0);
+  *r1 = gen_rtx_REG (int_mode, regno1);
+  return true;
+}
+
+static void
+test_pointer_plus_hard_regs ()
+{
+  rtx c0, r0, r1;
+  if (!cap_hard_reg_test_setup (&c0, &r0, &r1))
+    return;
 
   /* Simplify to PLUS: no further folding possible.  */
   rtx x = simplify_binary_operation (POINTER_PLUS,
 				     DImode,
 				     r0, r1);
-
   ASSERT_EQ (GET_CODE (x), PLUS);
   ASSERT_EQ (GET_MODE (x), DImode);
   ASSERT_EQ (XEXP (x, 0), r0);
   ASSERT_EQ (XEXP (x, 1), r1);
-
-
-  /* Simplify to PLUS and then fold the PLUS.  */
-  ASSERT_EQ (simplify_binary_operation (POINTER_PLUS,
-					DImode,
-					const0_rtx,
-					const0_rtx), const0_rtx);
-
 
   /* (pointer_plus:M B 0) -> B */
   ASSERT_EQ (simplify_binary_operation (POINTER_PLUS,
@@ -8204,9 +8221,7 @@ test_pointer_plus_simplifications ()
 					c0, const0_rtx), c0);
 
   /* (pointer_plus:M B (minus:OM CV B.CV))
-       -> (replace_address_value:M B CV)
-
-     first for hard regs...  */
+       -> (replace_address_value:M B CV)  */
   x = simplify_binary_operation (POINTER_PLUS,
 				 CADImode, c0,
 				 gen_rtx_MINUS (DImode, r1, r0));
@@ -8214,21 +8229,6 @@ test_pointer_plus_simplifications ()
   ASSERT_EQ (GET_MODE (x), CADImode);
   ASSERT_EQ (XEXP (x, 0), c0);
   ASSERT_EQ (XEXP (x, 1), r1);
-
-  /* ... and now for pseudos.  */
-  rtx p_r1 = gen_rtx_REG (DImode, FIRST_PSEUDO_REGISTER+1);
-  rtx p_c0 = gen_rtx_REG (CADImode, FIRST_PSEUDO_REGISTER);
-  rtx p_c0_di = gen_lowpart_SUBREG (DImode, p_c0);
-
-  x = simplify_binary_operation (POINTER_PLUS,
-				 CADImode, p_c0,
-				 gen_rtx_MINUS (DImode, p_r1, p_c0_di));
-  ASSERT_EQ (GET_CODE (x), REPLACE_ADDRESS_VALUE);
-  ASSERT_EQ (GET_MODE (x), CADImode);
-  ASSERT_EQ (XEXP (x, 0), p_c0);
-  ASSERT_EQ (XEXP (x, 1), p_r1);
-
-  // TODO: test recursive simplification for the above rule.
 
   /* pointer_plus -> align_address_down.  */
   x = simplify_gen_binary (POINTER_PLUS, CADImode, c0,
@@ -8245,7 +8245,7 @@ test_pointer_plus_simplifications ()
        --> (replace_address_value:M B (plus:OM CV OFF)).  */
   x = simplify_gen_binary (POINTER_PLUS, CADImode,
 			   gen_rtx_REPLACE_ADDRESS_VALUE (CADImode, c0, r1),
-			   r2);
+			   const1_rtx);
   ASSERT_EQ (GET_CODE (x), REPLACE_ADDRESS_VALUE);
   ASSERT_EQ (GET_MODE (x), CADImode);
   ASSERT_EQ (XEXP (x, 0), c0);
@@ -8253,20 +8253,47 @@ test_pointer_plus_simplifications ()
 
   x = XEXP (x, 1);
   ASSERT_EQ (XEXP (x, 0), r1);
-  ASSERT_EQ (XEXP (x, 1), r2);
+  ASSERT_EQ (XEXP (x, 1), const1_rtx);
 
   /* (pointer_plus:M (pointer_plus:M B OFF1) OFF2)
      --> (pointer_plus:M B (plus:OM OFF1 OFF2)).  */
   x = simplify_gen_binary (POINTER_PLUS, CADImode,
 			   gen_rtx_POINTER_PLUS (CADImode, c0, r1),
-			   r2);
+			   const1_rtx);
   ASSERT_EQ (GET_CODE (x), POINTER_PLUS);
   ASSERT_EQ (GET_MODE (x), CADImode);
   ASSERT_EQ (XEXP (x, 0), c0);
   x = XEXP (x, 1);
   ASSERT_EQ (GET_CODE (x), PLUS);
   ASSERT_EQ (XEXP (x, 0), r1);
-  ASSERT_EQ (XEXP (x, 1), r2);
+  ASSERT_EQ (XEXP (x, 1), const1_rtx);
+}
+
+static void
+test_pointer_plus_simplifications ()
+{
+  test_pointer_plus_hard_regs ();
+
+  /* Simplify to PLUS and then fold the PLUS.  */
+  ASSERT_EQ (simplify_binary_operation (POINTER_PLUS,
+					DImode,
+					const0_rtx,
+					const0_rtx), const0_rtx);
+
+  /* (pointer_plus:M B (minus:OM CV B.CV))
+       -> (replace_address_value:M B CV)  */
+  rtx p_r1 = gen_rtx_REG (DImode, FIRST_PSEUDO_REGISTER+1);
+  rtx p_c0 = gen_rtx_REG (CADImode, FIRST_PSEUDO_REGISTER);
+  rtx p_c0_di = gen_lowpart_SUBREG (DImode, p_c0);
+  rtx x;
+
+  x = simplify_binary_operation (POINTER_PLUS,
+				 CADImode, p_c0,
+				 gen_rtx_MINUS (DImode, p_r1, p_c0_di));
+  ASSERT_EQ (GET_CODE (x), REPLACE_ADDRESS_VALUE);
+  ASSERT_EQ (GET_MODE (x), CADImode);
+  ASSERT_EQ (XEXP (x, 0), p_c0);
+  ASSERT_EQ (XEXP (x, 1), p_r1);
 
   /* (pointer_plus:M B (const_int OFF)) --> plus_constant (M, B, OFF).  */
   rtx ptr_42 = gen_rtx_CONST (CADImode,
@@ -8279,15 +8306,14 @@ test_pointer_plus_simplifications ()
 }
 
 static void
-test_replace_address_value_simplifications ()
+test_replace_address_value_hard_regs ()
 {
-  machine_mode cm, om;
-  cm = CADImode;
-  om = DImode;
+  rtx c0, r0, r1, x;
+  if (!cap_hard_reg_test_setup (&c0, &r0, &r1))
+    return;
 
-  rtx c0 = gen_rtx_REG (cm, 4);
-  rtx r0 = gen_rtx_REG (om, 4);
-  rtx r1 = gen_rtx_REG (om, 8);
+  machine_mode cm = GET_MODE (c0);
+  machine_mode om = GET_MODE (r0);
 
   /* Collapse to RHS if mode is a scalar_int_mode.  */
   ASSERT_EQ (simplify_gen_binary (REPLACE_ADDRESS_VALUE,
@@ -8296,13 +8322,6 @@ test_replace_address_value_simplifications ()
   /* (replace_address_value:M B B.CV) --> B.  */
   ASSERT_EQ (simplify_gen_binary (REPLACE_ADDRESS_VALUE,
 				  cm, c0, r0), c0);
-
-  /* (replace_address_value:M (const_null:M) CV)
-     --> (pointer_plus:M (const_null:M) CV).  */
-  rtx x = simplify_gen_binary (REPLACE_ADDRESS_VALUE,
-			       cm, CONST0_RTX (cm),
-			       GEN_INT (42));
-  ASSERT_TRUE (constant_cap_p (x, 42));
 
   /* (replace_address_value:M B (and:OM B.CV (const_int C)))
      --> (align_address_down:M B (const_int -C))
@@ -8337,6 +8356,23 @@ test_replace_address_value_simplifications ()
 
       /* TODO: test case with side effects?  */
     }
+}
+
+static void
+test_replace_address_value_simplifications ()
+{
+  test_replace_address_value_hard_regs ();
+
+  machine_mode cm, om;
+  cm = CADImode;
+  om = DImode;
+
+  /* (replace_address_value:M (const_null:M) CV)
+     --> (pointer_plus:M (const_null:M) CV).  */
+  rtx x = simplify_gen_binary (REPLACE_ADDRESS_VALUE,
+			       cm, CONST0_RTX (cm),
+			       GEN_INT (42));
+  ASSERT_TRUE (constant_cap_p (x, 42));
 
   /* (replace_address_value:M C (plus:OM C.CV X))
      --> (pointer_plus:M C X)
