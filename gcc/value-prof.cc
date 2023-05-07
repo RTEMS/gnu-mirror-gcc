@@ -1971,9 +1971,11 @@ gimple_histogram_values_to_profile (function *fun, histogram_values *values)
 	    if (!exit_found)
 	      exit_edge = exit;
 	    else
-	      exit_edge = NULL;
+	      {
+		exit_edge = NULL;
+		break;
+	      }
 	    exit_found = true;
-	    break;
 	  }
       if (!exit_found)
 	continue;
