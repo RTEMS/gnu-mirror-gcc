@@ -1172,7 +1172,7 @@ duplicate_loop_body_to_header_edge (class loop *loop, edge e,
 	  gcov_type psum = 0;
 	  gcov_type sum = loop->counters->sum;
 	  for (i = 0;
-	       i < ndupl && i < (unsigned int) param_profile_histogram_size_lin
+	       i < ndupl && i < (unsigned int) loop->counters->lin->length ()
 	       && sum != psum;
 	       i++)
 	    {

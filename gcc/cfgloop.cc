@@ -2190,10 +2190,9 @@ loops_list::walk_loop_tree (class loop *root, unsigned flags)
 }
 
 unsigned int
-hist_index (gcov_type_unsigned val)
+hist_index (gcov_type_unsigned val, unsigned int lin_size, unsigned int exp_size)
 {
-  unsigned int lin_size = param_profile_histogram_size_lin;
-  unsigned int tot_size = lin_size + param_profile_histogram_size_exp;
+  unsigned int tot_size = lin_size + exp_size;
   if (val < lin_size)
     {
       return val;
@@ -2235,7 +2234,8 @@ histogram_counters_minus_upper_bound (histogram_counters *&hist_c,
   auto &exp = *(hist_c->exp);
   hist_c->adjusted = true;
   auto &sum = hist_c->sum;
-  unsigned int lin_size = param_profile_histogram_size_lin;
+  unsigned int lin_size = lin.length ();
+  unsigned int exp_size = exp.length ();
   // If the last linear counter does not contain other iterations
   unsigned int i = 0;
   for (; i < difference && i < lin.length (); ++i)
@@ -2278,13 +2278,14 @@ histogram_counters_minus_upper_bound (histogram_counters *&hist_c,
       // lesser iterations move same as this point
       gcov_type_unsigned point = (pow2 >> 1) + (pow2 >> (1 + portion));
       unsigned int ind
-	= point >= difference ? hist_index (point - difference) : 0;
+	= point >= difference
+		   ? hist_index (point - difference, lin_size, exp_size) : 0;
       while (ind == i)
 	{
 	  // if nothing changes we decrease the portion of iteration changed
 	  ++portion;
 	  point = (pow2 >> 1) + (pow2 >> (1 + portion));
-	  ind = hist_index (point >= difference ? point - difference : 0);
+	  ind = hist_index (point >= difference ? point - difference : 0, lin_size, exp_size);
 	}
       int64_t diff = exp[i] / (1 << portion);
       exp[ind > lin_size ? ind - lin_size : 0] += diff;
@@ -2294,7 +2295,7 @@ histogram_counters_minus_upper_bound (histogram_counters *&hist_c,
   if (hist_c->mod)
     {
       auto &mod_h = *(hist_c->mod);
-      unsigned int mod_size = param_profile_histogram_size_mod;
+      unsigned int mod_size = mod_h.length ();
       // rotate the values by the difference
       auto_vec<gcov_type> temp;
       for (unsigned int j = 0; j < mod_size; ++j)
@@ -2327,9 +2328,9 @@ histogram_counters_div_upper_bound (histogram_counters *&hist_c,
   auto &lin = *(hist_c->lin);
   auto &exp = *(hist_c->exp);
   hist_c->adjusted = true;
-  unsigned int lin_size = param_profile_histogram_size_lin;
-  unsigned int tot_size
-    = param_profile_histogram_size_lin + param_profile_histogram_size_exp;
+  unsigned int lin_size = lin.length ();
+  unsigned int exp_size = exp.length ();
+  unsigned int tot_size = lin_size + exp_size;
   unsigned int i = 1;
   for (; i < lin.length (); i++)
     {
@@ -2346,7 +2347,7 @@ histogram_counters_div_upper_bound (histogram_counters *&hist_c,
       gcov_type_unsigned upper_pow2
 	= ((gcov_type_unsigned) 1) << (ceil_log2 (lin_size) + i + 1 - lin_size);
       gcov_type_unsigned half = (upper_pow2 >> 2) + (upper_pow2 >> 1);
-      unsigned int ind = hist_index (half / divisor);
+      unsigned int ind = hist_index (half / divisor, lin_size, exp_size);
       // hist is allways different then i since we know divisor>1
       exp[ind > lin_size ? ind - lin_size : 0] += exp[i];
       exp[i] = 0;

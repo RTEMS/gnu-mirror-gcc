@@ -110,7 +110,7 @@ pass_loop_histogram_versioning::execute (function *fn)
       gcov_type best_val = 0;
 
       /* Look for dominating iteration count.  */
-      for (int i = 0; i < param_profile_histogram_size_lin; i++)
+      for (int i = 0; i < loop->counters->lin->length (); i++)
 	{
 	  if ((*(loop->counters->lin))[i] > best_val)
 	    {
