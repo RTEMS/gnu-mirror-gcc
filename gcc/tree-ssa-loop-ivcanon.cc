@@ -1035,6 +1035,20 @@ adjust_loop_info_after_peeling (class loop *loop, int npeel, bool precise)
     }
 }
 
+/* Return, in percent, probability that loop will end in first N iterations.  */
+
+static int
+loop_histogram_percentage (class loop *loop, int n)
+{
+  gcov_type sum = loop->counters->sum;
+  gcov_type psum = 0;
+  if (n > (int)loop->counters->lin->length ())
+    return -1;
+  for (int i = 0; i < n; i++)
+    psum += (*loop->counters->lin)[i];
+  return RDIV (psum * 100, sum);
+}
+
 /* If the loop is expected to iterate N times and is
    small enough, duplicate the loop body N+1 times before
    the loop itself.  This way the hot path will never
@@ -1221,23 +1235,45 @@ try_peel_loop (class loop *loop,
       return false;
     }
   free_original_copy_tables ();
-  if (dump_file && (dump_flags & TDF_DETAILS))
-    {
-      fprintf (dump_file, "Peeled loop %d, %i times.\n",
-	       loop->num, (int) npeel);
-    }
 
   if (dump_enabled_p ())
     {
-      if (nonhistogram_npeel != npeel)
-	dump_printf_loc (MSG_OPTIMIZED_LOCATIONS | MSG_PRIORITY_USER_FACING, locus,
-			 "peeled loop %d, %i times using histogram (without histogram would peel %i times).\n", loop->num, (int)npeel, (int)nonhistogram_npeel);
-      else if (histogram_peeling)
-	dump_printf_loc (MSG_OPTIMIZED_LOCATIONS | MSG_PRIORITY_USER_FACING, locus,
-			 "peeled loop %d, %i times with histogram.\n", loop->num, (int)npeel);
+      bool close = false;
+      if (histogram_peeling)
+	{
+	  dump_printf_loc (MSG_OPTIMIZED_LOCATIONS | MSG_PRIORITY_USER_FACING, locus,
+			   "peeled loop %d, %i times with histogram, %i%% of executions",
+			   loop->num, (int)npeel, loop_histogram_percentage (loop, npeel));
+	  if (nonhistogram_npeel != npeel)
+	    {
+	      dump_printf (MSG_OPTIMIZED_LOCATIONS | MSG_PRIORITY_USER_FACING,
+			   " (without histogram would try to peel %i times",
+			   (int)nonhistogram_npeel);
+	      int p = loop_histogram_percentage (loop, nonhistogram_npeel);
+	      if (p >= 0)
+		dump_printf (MSG_OPTIMIZED_LOCATIONS | MSG_PRIORITY_USER_FACING,
+			     ", %i%% of executions", p);
+	      close = true;
+	    }
+	}
       else
 	dump_printf_loc (MSG_OPTIMIZED_LOCATIONS | MSG_PRIORITY_USER_FACING, locus,
-			 "peeled loop %d, %i times.\n", loop->num, (int)npeel);
+			 "peeled loop %d, %i times", loop->num, (int)npeel);
+      if (profile_info && loop->header->count.ipa ().initialized_p ())
+	{
+	  if (!close)
+	    dump_printf (MSG_OPTIMIZED_LOCATIONS | MSG_PRIORITY_USER_FACING, " (");
+	  else
+	    dump_printf (MSG_OPTIMIZED_LOCATIONS | MSG_PRIORITY_USER_FACING, "; ");
+	  close = true;
+	  dump_printf (MSG_OPTIMIZED_LOCATIONS | MSG_PRIORITY_USER_FACING,
+		       "header execution count %wd",
+		       (HOST_WIDE_INT)loop->header->count.ipa ().to_gcov_type ());
+	}
+      if (close)
+	dump_printf (MSG_OPTIMIZED_LOCATIONS | MSG_PRIORITY_USER_FACING, ")\n");
+      else
+	dump_printf (MSG_OPTIMIZED_LOCATIONS | MSG_PRIORITY_USER_FACING, "\n");
     }
 
   adjust_loop_info_after_peeling (loop, npeel, true);
@@ -1708,7 +1744,7 @@ pass_complete_unroll::execute (function *fun)
      re-peeling the same loop multiple times.  */
   if (flag_peel_loops)
     peeled_loops = BITMAP_ALLOC (NULL);
-  unsigned int val = tree_unroll_loops_completely (flag_cunroll_grow_size, 
+  unsigned int val = tree_unroll_loops_completely (flag_cunroll_grow_size,
 						   true);
   if (peeled_loops)
     {
