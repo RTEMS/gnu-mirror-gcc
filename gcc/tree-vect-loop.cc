@@ -2077,8 +2077,7 @@ vect_analyze_loop_costing (loop_vec_info loop_vinfo,
       /* TODO: For epilogue we can compute new histogram.  */
       && !LOOP_VINFO_EPILOGUE_P (loop_vinfo)
       && loop->counters->sum
-      /* TODO: Fix.  Profile size needs to be stored in the counters.  */
-      && min_profitable_estimate <= param_profile_histogram_size_lin)
+      && min_profitable_estimate <= (int)loop->counters->lin->length ())
     {
       gcov_type psum = 0;
       for (int i = 0; i < min_profitable_estimate
