@@ -1106,13 +1106,6 @@ try_peel_loop (class loop *loop,
   npeel = estimated_loop_iterations_int (loop);
   if (npeel < 0)
     npeel = likely_max_loop_iterations_int (loop);
-  if (npeel >= 0 && maxiter >= 0 && maxiter <= npeel)
-    {
-      if (dump_file)
-	fprintf (dump_file, "Not peeling: upper bound is known so can "
-		 "unroll completely\n");
-      return false;
-    }
   auto_vec<int> good_peels;
   auto_vec<int> prcnt;
   prcnt.safe_push (0);
@@ -1130,34 +1123,53 @@ try_peel_loop (class loop *loop,
       gcov_type rest = sum;
       gcov_type psum = 0;
       int good_percentage = param_profile_histogram_peel_prcnt;
-      for (int i = 0; i < loop->counters->lin->length (); i++)
+      for (int i = 0; i < (int)loop->counters->lin->length (); i++)
 	{
 	  psum += (*(loop->counters->lin))[i];
+	  if ((maxiter >= 0 && maxiter <= i)
+	      || (i >= param_max_peel_times - 1)
+	      || rest == 0)
+	    break;
 	  // iteration has enough cumulated in partial sum and itself has at
 	  // least 1 percent or we have complete peeling
 	  if ((100 * psum) / sum >= good_percentage || psum == rest)
 	    {
 	      prcnt.safe_push (prcnt.last () + (100 * psum) / sum);
 	      good_peels.safe_push (i);
-	      if ((maxiter >= 0 && maxiter <= good_peels.last ())
-		  || (good_peels.last () > param_max_peel_times - 1)
-		  || rest == 0)
-		{
-		  good_peels.pop ();
-		  prcnt.pop ();
-		  break;
-		}
 	      good_percentage = 0;
 	      rest -= psum;
 	      psum = 0;
 	    }
-      good_percentage = MIN (100, good_percentage + param_profile_histogram_peel_prcnt);
+	  good_percentage = MIN (100, good_percentage + param_profile_histogram_peel_prcnt);
 	}
       if (!good_peels.is_empty ())
 	{
 	  npeel = good_peels.pop ();
 	  // we do not pop() prcnt because we want it to be last for current
 	  // iteration
+	}
+      else
+	{
+	  if (dump_file)
+	    fprintf (dump_file,
+		     "Not peeling: found no good candidates in th ehistogram\n");
+	  return false;
+	}
+    }
+  else
+    {
+      if (!flag_peel_loops_without_histogram)
+	{
+	  if (dump_file)
+	    fprintf (dump_file, "Not peeling: histogram is not available\n");
+	  return false;
+	}
+      if (npeel >= 0 && maxiter >= 0 && maxiter <= npeel)
+	{
+	  if (dump_file)
+	    fprintf (dump_file, "Not peeling: upper bound is known so can "
+		     "unroll completely\n");
+	  return false;
 	}
     }
 
