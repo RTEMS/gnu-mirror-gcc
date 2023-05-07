@@ -950,8 +950,8 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
 	      for (int i = 0; i < (int) param_profile_histogram_size_exp; ++i)
 		{
 		  auto hst = lp->counters->exp;
-		  (*hst)[i] = act_count[t][i];
-		  sum += act_count[t][i];
+		  (*hst)[i] = act_count[t][i + param_profile_histogram_size_lin];
+		  sum += act_count[t][i + param_profile_histogram_size_lin];
 		}
 	      lp->counters->sum = sum;
 
@@ -972,13 +972,11 @@ compute_value_histograms (histogram_values values, unsigned cfg_checksum,
 		  ggc_free (lp->counters);
 		  lp->counters = NULL;
 		}
+	      act_count[t] += hist->n_counters;
 	    }
-	  act_count[t] += hist->n_counters;
-	  continue;
 	}
-
       /* TOP N counter uses variable number of counters.  */
-      if (topn_p)
+      else if (topn_p)
 	{
 	  unsigned total_size;
 	  if (act_count[t])
