@@ -1,3 +1,48 @@
+==================== Branch work121, patch #2 ====================
+
+PR target/105325: Fix power10_fusion
+
+This patch applies stricter predicates and constraints for LD and LWA
+instructions with power10 fusion.  These instructions are DS-form instructions,
+which means that the bottom 2 bits of the address must be 0.  In the past, we
+did not use the stricter predicates and constraints, and if the user used the
+-fstack-protector option, it would generate a non-prefixed load instruction
+whose offset was too big if the stack is large.
+
+2023-05-08   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/105325
+	* config/rs6000/genfusion.pl (print_ld_cmpi_p10): Use "YZ" constraints
+	for DS-form loads.  Set the sign_extend attribute for loads that do sign
+	extension.  Use the lwa_operand predicator for the LWA instruction.
+	* config/rs6000/fusion.md: Regenerate.
+
+gcc/testsuite/
+
+	PR target/105325
+	* g++.target/powerpc/pr105325.C: New test.
+	* gcc.target/powerpc/fusion-p10-ldcmpi.c: Adjust insn counts.
+
+
+==================== Branch work121, patch #1 ====================
+
+Rewrite genfusion.pl's gen_ld_cmpi_p10 function.
+
+This patch rewrites the gen_ld_cmpi_p10 function to be clearer.  The resulting
+fusion.md file is exactly the same in this patch.  The next patch in this series
+will fix PR target/105325.
+
+2023-05-08   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/105325
+	* config/rs6000/genfusion.pl (print_ld_cmpi_p10): New function, split
+	off from gen_ld_cmpi_p10.
+	(gen_ld_cmpi_p10): Rewrite completely.
+
 ==================== Branch work121, baseline ====================
 
 2023-05-08   Michael Meissner  <meissner@linux.ibm.com>
