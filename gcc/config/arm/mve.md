@@ -92,7 +92,7 @@
 ;; [vst4q])
 ;;
 (define_insn "mve_vst4q<mode>"
-  [(set (match_operand:XI 0 "neon_struct_operand" "=Um")
+  [(set (match_operand:XI 0 "mve_struct_operand" "=Ug")
 	(unspec:XI [(match_operand:XI 1 "s_register_operand" "w")
 		    (unspec:MVE_VLD_ST [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
 	 VST4Q))
@@ -834,8 +834,9 @@
 (define_insn "mve_vcmp<mve_cmp_op>q_n_<mode>"
   [
    (set (match_operand:<MVE_VPRED> 0 "vpr_register_operand" "=Up")
-	(MVE_COMPARISONS:<MVE_VPRED> (match_operand:MVE_2 1 "s_register_operand" "w")
-		    (match_operand:<V_elem> 2 "s_register_operand" "r")))
+	(MVE_COMPARISONS:<MVE_VPRED>
+	 (match_operand:MVE_2 1 "s_register_operand" "w")
+	 (vec_duplicate:MVE_2 (match_operand:<V_elem> 2 "s_register_operand" "r"))))
   ]
   "TARGET_HAVE_MVE"
   "vcmp.<mve_cmp_type>%#<V_sz_elem>	<mve_cmp_op>, %q1, %2"
@@ -1924,8 +1925,9 @@
 (define_insn "@mve_vcmp<mve_cmp_op>q_n_f<mode>"
   [
    (set (match_operand:<MVE_VPRED> 0 "vpr_register_operand" "=Up")
-	(MVE_FP_COMPARISONS:<MVE_VPRED> (match_operand:MVE_0 1 "s_register_operand" "w")
-			       (match_operand:<V_elem> 2 "s_register_operand" "r")))
+	(MVE_FP_COMPARISONS:<MVE_VPRED>
+	 (match_operand:MVE_0 1 "s_register_operand" "w")
+	 (vec_duplicate:MVE_0 (match_operand:<V_elem> 2 "s_register_operand" "r"))))
   ]
   "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
   "vcmp.f%#<V_sz_elem>	<mve_cmp_op>, %q1, %2"
@@ -9952,7 +9954,7 @@
 ;; [vst2q])
 ;;
 (define_insn "mve_vst2q<mode>"
-  [(set (match_operand:OI 0 "neon_struct_operand" "=Um")
+  [(set (match_operand:OI 0 "mve_struct_operand" "=Ug")
 	(unspec:OI [(match_operand:OI 1 "s_register_operand" "w")
 		    (unspec:MVE_VLD_ST [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
 	 VST2Q))
@@ -9981,7 +9983,7 @@
 ;;
 (define_insn "mve_vld2q<mode>"
   [(set (match_operand:OI 0 "s_register_operand" "=w")
-	(unspec:OI [(match_operand:OI 1 "neon_struct_operand" "Um")
+	(unspec:OI [(match_operand:OI 1 "mve_struct_operand" "Ug")
 		    (unspec:MVE_VLD_ST [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
 	 VLD2Q))
   ]
@@ -10009,7 +10011,7 @@
 ;;
 (define_insn "mve_vld4q<mode>"
   [(set (match_operand:XI 0 "s_register_operand" "=w")
-	(unspec:XI [(match_operand:XI 1 "neon_struct_operand" "Um")
+	(unspec:XI [(match_operand:XI 1 "mve_struct_operand" "Ug")
 		    (unspec:MVE_VLD_ST [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
 	 VLD4Q))
   ]

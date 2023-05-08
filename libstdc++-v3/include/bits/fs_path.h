@@ -599,12 +599,7 @@ namespace __detail
       _Multi = 0, _Root_name, _Root_dir, _Filename
     };
 
-    path(basic_string_view<value_type> __str, _Type __type)
-    : _M_pathname(__str)
-    {
-      __glibcxx_assert(__type != _Type::_Multi);
-      _M_cmpts.type(__type);
-    }
+    path(basic_string_view<value_type> __str, _Type __type);
 
     enum class _Split { _Stem, _Extension };
 
@@ -737,7 +732,14 @@ namespace __detail
   /// @{
   /// @relates std::filesystem::path
 
+#if __cpp_concepts >= 201907L
+  // Workaround for PR libstdc++/106201
+  inline void
+  swap(same_as<path> auto& __lhs, same_as<path> auto& __rhs) noexcept
+  { __lhs.swap(__rhs); }
+#else
   inline void swap(path& __lhs, path& __rhs) noexcept { __lhs.swap(__rhs); }
+#endif
 
   size_t hash_value(const path& __p) noexcept;
 
@@ -852,8 +854,7 @@ namespace __detail
 
   struct path::_Cmpt : path
   {
-    _Cmpt(basic_string_view<value_type> __s, _Type __t, size_t __pos)
-      : path(__s, __t), _M_pos(__pos) { }
+    _Cmpt(basic_string_view<value_type> __s, _Type __t, size_t __pos);
 
     _Cmpt() : _M_pos(-1) { }
 
@@ -1281,9 +1282,9 @@ namespace __detail
       {
 	if (_M_pathname.back() == preferred_separator)
 	  return {};
-	auto& __last = *--end();
-	if (__last._M_type() == _Type::_Filename)
-	  return __last;
+	auto __last = --end();
+	if (__last->_M_type() == _Type::_Filename)
+	  return *__last;
       }
     return {};
   }
