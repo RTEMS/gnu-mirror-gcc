@@ -16,7 +16,7 @@ gcc/
 	PR target/105325
 	* config/rs6000/genfusion.pl (print_ld_cmpi_p10): Use "YZ" constraints
 	for DS-form loads.  Set the sign_extend attribute for loads that do sign
-	extension.  Use the lwa_operand predicator for the LWA instruction.
+	extension.  Use the lwa_operand predicate for the LWA instruction.
 	* config/rs6000/fusion.md: Regenerate.
 
 gcc/testsuite/
