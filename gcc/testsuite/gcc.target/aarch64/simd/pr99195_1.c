@@ -41,17 +41,35 @@ OPFIVE (T, IS, OS, S, OP2, OP3, OP4, OP5, OP6)
 FUNC (T, IS, OS, OP1, S)                \
 OPSIX (T, IS, OS, S, OP2, OP3, OP4, OP5, OP6, OP7)
 
+#define OPEIGHT(T,IS,OS,S,OP1,OP2,OP3,OP4,OP5,OP6,OP7,OP8)        \
+OPTHREE (T, IS, OS, S, OP1, OP2, OP3)                \
+OPFIVE (T, IS, OS, S, OP4, OP5, OP6, OP7, OP8)
+
+#define OPTEN(T,IS,OS,S,OP1,OP2,OP3,OP4,OP5,OP6,OP7,OP8,OP9,OP10)        \
+OPFIVE (T, IS, OS, S, OP1, OP2, OP3, OP4, OP5)                \
+OPFIVE (T, IS, OS, S, OP6, OP7, OP8, OP9, OP10)
+
 #define OPELEVEN(T,IS,OS,S,OP1,OP2,OP3,OP4,OP5,OP6,OP7,OP8,OP9,OP10,OP11)        \
 OPFIVE (T, IS, OS, S, OP1, OP2, OP3, OP4, OP5)                \
 OPSIX (T, IS, OS, S, OP6, OP7, OP8, OP9, OP10, OP11)
 
-OPELEVEN (int8, 8, 16, s8, padd, add, sub, mul, and, orr, eor, orn, bic, max, min)
-OPELEVEN (int16, 4, 8, s16, padd, add, sub, mul, and, orr, eor, orn, bic, max, min)
-OPELEVEN (int32, 2, 4, s32, padd, add, sub, mul, and, orr, eor, orn, bic, max, min)
+#define OPFOURTEEN(T,IS,OS,S,OP1,OP2,OP3,OP4,OP5,OP6,OP7,OP8,OP9,OP10,OP11,OP12,OP13,OP14)        \
+OPSEVEN (T, IS, OS, S, OP1, OP2, OP3, OP4, OP5, OP6, OP7)                \
+OPSEVEN (T, IS, OS, S, OP8, OP9, OP10, OP11, OP12, OP13, OP14)
 
-OPELEVEN (uint8, 8, 16, u8, padd, add, sub, mul, and, orr, eor, orn, bic, max, min)
-OPELEVEN (uint16, 4, 8, u16, padd, add, sub, mul, and, orr, eor, orn, bic, max, min)
-OPELEVEN (uint32, 2, 4, u32, padd, add, sub, mul, and, orr, eor, orn, bic, max, min)
+#define OPSEVENTEEN(T,IS,OS,S,OP1,OP2,OP3,OP4,OP5,OP6,OP7,OP8,OP9,OP10,OP11,OP12,OP13,OP14,OP15,OP16,OP17)        \
+OPSEVEN (T, IS, OS, S, OP1, OP2, OP3, OP4, OP5, OP6, OP7)                \
+OPTEN (T, IS, OS, S, OP8, OP9, OP10, OP11, OP12, OP13, OP14, OP15, OP16, OP17)
+
+OPSEVENTEEN (int8, 8, 16, s8, padd, add, sub, mul, and, orr, eor, orn, bic, max, min, hadd, rhadd, hsub, abd, pmax, pmin)
+OPSEVENTEEN (int16, 4, 8, s16, padd, add, sub, mul, and, orr, eor, orn, bic, max, min, hadd, rhadd, hsub, abd, pmax, pmin)
+OPSEVENTEEN (int32, 2, 4, s32, padd, add, sub, mul, and, orr, eor, orn, bic, max, min, hadd, rhadd, hsub, abd, pmax, pmin)
+
+OPSEVENTEEN (uint8, 8, 16, u8, padd, add, sub, mul, and, orr, eor, orn, bic, max, min, hadd, rhadd, hsub, abd, pmax, pmin)
+OPSEVENTEEN (uint16, 4, 8, u16, padd, add, sub, mul, and, orr, eor, orn, bic, max, min, hadd, rhadd, hsub, abd, pmax, pmin)
+OPSEVENTEEN (uint32, 2, 4, u32, padd, add, sub, mul, and, orr, eor, orn, bic, max, min, hadd, rhadd, hsub, abd, pmax, pmin)
+
+OPFOURTEEN (float32, 2, 4, f32, add, padd, sub, mul, div, max, maxnm, min, minnm, abd, pmax, pmin, pmaxnm, pminnm)
 
 #define UNARY(OT,IT,OP,S)			\
 OT                                              \
@@ -71,6 +89,7 @@ OPFIVE (uint8, 8, 16, u8, rbit, clz, cnt, cls, mvn)
 OPTHREE (uint16, 4, 8, u16, clz, cls, mvn)
 OPTHREE (uint32, 2, 4, u32, clz, cls, mvn)
 
+OPTEN (float32, 2, 4, f32, neg, abs, sqrt, rnd, rndi, rndm, rnda, rndn, rndp, rndx)
 /* { dg-final { scan-assembler-not {\tfmov\t} } }  */
 /* { dg-final { scan-assembler-not {\tmov\t} } }  */
 

@@ -669,21 +669,6 @@
 ])
 
 ;;
-;; [vsubq_n_f])
-;;
-(define_insn "mve_vsubq_n_f<mode>"
-  [
-   (set (match_operand:MVE_0 0 "s_register_operand" "=w")
-	(unspec:MVE_0 [(match_operand:MVE_0 1 "s_register_operand" "w")
-		       (match_operand:<V_elem> 2 "s_register_operand" "r")]
-	 VSUBQ_N_F))
-  ]
-  "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
-  "vsub.f<V_sz_elem>\t%q0, %q1, %2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
 ;; [vbrsrq_n_f])
 ;;
 (define_insn "mve_vbrsrq_n_f<mode>"
@@ -715,12 +700,12 @@
 
 ;; [vcreateq_f])
 ;;
-(define_insn "mve_vcreateq_f<mode>"
+(define_insn "@mve_<mve_insn>q_f<mode>"
   [
    (set (match_operand:MVE_0 0 "s_register_operand" "=w")
 	(unspec:MVE_0 [(match_operand:DI 1 "s_register_operand" "r")
 		       (match_operand:DI 2 "s_register_operand" "r")]
-	 VCREATEQ_F))
+	 MVE_FP_CREATE_ONLY))
   ]
   "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
   "vmov %q0[2], %q0[0], %Q1, %Q2\;vmov %q0[3], %q0[1], %R1, %R2"
@@ -730,7 +715,7 @@
 ;;
 ;; [vcreateq_u, vcreateq_s])
 ;;
-(define_insn "mve_vcreateq_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_<supf><mode>"
   [
    (set (match_operand:MVE_1 0 "s_register_operand" "=w")
 	(unspec:MVE_1 [(match_operand:DI 1 "s_register_operand" "r")
@@ -743,18 +728,19 @@
    (set_attr "length""8")])
 
 ;;
-;; [vshrq_n_s, vshrq_n_u])
+;; [vrshrq_n_s, vrshrq_n_u]
+;; [vshrq_n_s, vshrq_n_u]
 ;;
 ;; Version that takes an immediate as operand 2.
-(define_insn "mve_vshrq_n_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_n_<supf><mode>"
   [
    (set (match_operand:MVE_2 0 "s_register_operand" "=w")
 	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
 		       (match_operand:SI 2 "<MVE_pred2>" "<MVE_constraint2>")]
-	 VSHRQ_N))
+	 MVE_VSHRQ_N))
   ]
   "TARGET_HAVE_MVE"
-  "vshr.<supf><V_sz_elem>\t%q0, %q1, %2"
+  "<mve_insn>.<supf><V_sz_elem>\t%q0, %q1, %2"
   [(set_attr "type" "mve_move")
 ])
 
@@ -855,32 +841,46 @@
 ;; See vec-common.md
 
 ;;
-;; [vabdq_s, vabdq_u])
+;; [vabdq_s, vabdq_u]
+;; [vhaddq_s, vhaddq_u]
+;; [vhsubq_s, vhsubq_u]
+;; [vmulhq_s, vmulhq_u]
+;; [vqaddq_u, vqaddq_s]
+;; [vqdmulhq_s]
+;; [vqrdmulhq_s]
+;; [vqrshlq_s, vqrshlq_u]
+;; [vqshlq_s, vqshlq_u]
+;; [vqsubq_u, vqsubq_s]
+;; [vrhaddq_s, vrhaddq_u]
+;; [vrmulhq_s, vrmulhq_u]
+;; [vrshlq_s, vrshlq_u]
 ;;
-(define_insn "mve_vabdq_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_<supf><mode>"
   [
    (set (match_operand:MVE_2 0 "s_register_operand" "=w")
 	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
 		       (match_operand:MVE_2 2 "s_register_operand" "w")]
-	 VABDQ))
+	 MVE_INT_SU_BINARY))
   ]
   "TARGET_HAVE_MVE"
-  "vabd.<supf>%#<V_sz_elem>	%q0, %q1, %q2"
+  "<mve_insn>.<supf>%#<V_sz_elem>\t%q0, %q1, %q2"
   [(set_attr "type" "mve_move")
 ])
 
 ;;
-;; [vaddq_n_s, vaddq_n_u])
+;; [vaddq_n_s, vaddq_n_u]
+;; [vsubq_n_s, vsubq_n_u]
+;; [vmulq_n_s, vmulq_n_u]
 ;;
-(define_insn "mve_vaddq_n_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_n_<supf><mode>"
   [
    (set (match_operand:MVE_2 0 "s_register_operand" "=w")
 	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
 		       (match_operand:<V_elem> 2 "s_register_operand" "r")]
-	 VADDQ_N))
+	 MVE_INT_N_BINARY))
   ]
   "TARGET_HAVE_MVE"
-  "vadd.i%#<V_sz_elem>\t%q0, %q1, %2"
+  "<mve_insn>.i%#<V_sz_elem>\t%q0, %q1, %2"
   [(set_attr "type" "mve_move")
 ])
 
@@ -1027,32 +1027,22 @@
 )
 
 ;;
-;; [vhaddq_n_u, vhaddq_n_s])
+;; [vhaddq_n_u, vhaddq_n_s]
+;; [vhsubq_n_u, vhsubq_n_s]
+;; [vqaddq_n_s, vqaddq_n_u]
+;; [vqdmulhq_n_s]
+;; [vqrdmulhq_n_s]
+;; [vqsubq_n_s, vqsubq_n_u]
 ;;
-(define_insn "mve_vhaddq_n_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_n_<supf><mode>"
   [
    (set (match_operand:MVE_2 0 "s_register_operand" "=w")
 	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
 		       (match_operand:<V_elem> 2 "s_register_operand" "r")]
-	 VHADDQ_N))
+	 MVE_INT_SU_N_BINARY))
   ]
   "TARGET_HAVE_MVE"
-  "vhadd.<supf>%#<V_sz_elem>\t%q0, %q1, %2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vhaddq_s, vhaddq_u])
-;;
-(define_insn "@mve_vhaddq_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")]
-	 VHADDQ))
-  ]
-  "TARGET_HAVE_MVE"
-  "vhadd.<supf>%#<V_sz_elem>\t%q0, %q1, %q2"
+  "<mve_insn>.<supf>%#<V_sz_elem>\t%q0, %q1, %2"
   [(set_attr "type" "mve_move")
 ])
 
@@ -1087,36 +1077,6 @@
 ])
 
 ;;
-;; [vhsubq_n_u, vhsubq_n_s])
-;;
-(define_insn "mve_vhsubq_n_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:<V_elem> 2 "s_register_operand" "r")]
-	 VHSUBQ_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vhsub.<supf>%#<V_sz_elem>\t%q0, %q1, %2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vhsubq_s, vhsubq_u])
-;;
-(define_insn "mve_vhsubq_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")]
-	 VHSUBQ))
-  ]
-  "TARGET_HAVE_MVE"
-  "vhsub.<supf>%#<V_sz_elem>\t%q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
 ;; [vmaxaq_s])
 ;;
 (define_insn "mve_vmaxaq_s<mode>"
@@ -1147,29 +1107,20 @@
 ])
 
 ;;
-;; [vmaxq_u, vmaxq_s])
+;; [vmaxq_u, vmaxq_s]
+;; [vminq_s, vminq_u]
 ;;
-(define_insn "mve_vmaxq_s<mode>"
+(define_insn "mve_<max_min_su_str>q_<max_min_supf><mode>"
   [
    (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(smax:MVE_2 (match_operand:MVE_2 1 "s_register_operand" "w")
+	(MAX_MIN_SU:MVE_2 (match_operand:MVE_2 1 "s_register_operand" "w")
 		    (match_operand:MVE_2 2 "s_register_operand" "w")))
   ]
   "TARGET_HAVE_MVE"
-  "vmax.%#<V_s_elem>\t%q0, %q1, %q2"
+  "<max_min_su_str>.<max_min_supf>%#<V_sz_elem>\t%q0, %q1, %q2"
   [(set_attr "type" "mve_move")
 ])
 
-(define_insn "mve_vmaxq_u<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(umax:MVE_2 (match_operand:MVE_2 1 "s_register_operand" "w")
-		    (match_operand:MVE_2 2 "s_register_operand" "w")))
-  ]
-  "TARGET_HAVE_MVE"
-  "vmax.%#<V_u_elem>\t%q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
 
 ;;
 ;; [vmaxvq_u, vmaxvq_s])
@@ -1213,31 +1164,6 @@
   ]
   "TARGET_HAVE_MVE"
   "vminav.s%#<V_sz_elem>\t%0, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vminq_s, vminq_u])
-;;
-(define_insn "mve_vminq_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(smin:MVE_2 (match_operand:MVE_2 1 "s_register_operand" "w")
-		    (match_operand:MVE_2 2 "s_register_operand" "w")))
-  ]
-  "TARGET_HAVE_MVE"
-  "vmin.%#<V_s_elem>\t%q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-(define_insn "mve_vminq_u<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(umin:MVE_2 (match_operand:MVE_2 1 "s_register_operand" "w")
-		    (match_operand:MVE_2 2 "s_register_operand" "w")))
-  ]
-  "TARGET_HAVE_MVE"
-  "vmin.%#<V_u_elem>\t%q0, %q1, %q2"
   [(set_attr "type" "mve_move")
 ])
 
@@ -1317,21 +1243,6 @@
 ])
 
 ;;
-;; [vmulhq_s, vmulhq_u])
-;;
-(define_insn "mve_vmulhq_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")]
-	 VMULHQ))
-  ]
-  "TARGET_HAVE_MVE"
-  "vmulh.<supf>%#<V_sz_elem>\t%q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
 ;; [vmullbq_int_u, vmullbq_int_s])
 ;;
 (define_insn "mve_vmullbq_int_<supf><mode>"
@@ -1362,43 +1273,18 @@
 ])
 
 ;;
-;; [vmulq_n_u, vmulq_n_s])
+;; [vaddq_s, vaddq_u]
+;; [vmulq_u, vmulq_s]
+;; [vsubq_s, vsubq_u]
 ;;
-(define_insn "mve_vmulq_n_<supf><mode>"
+(define_insn "mve_<mve_addsubmul>q<mode>"
   [
    (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:<V_elem> 2 "s_register_operand" "r")]
-	 VMULQ_N))
+	(MVE_INT_BINARY_RTX:MVE_2 (match_operand:MVE_2 1 "s_register_operand" "w")
+			      (match_operand:MVE_2 2 "s_register_operand" "w")))
   ]
   "TARGET_HAVE_MVE"
-  "vmul.i%#<V_sz_elem>\t%q0, %q1, %2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vmulq_u, vmulq_s])
-;;
-(define_insn "mve_vmulq_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")]
-	 VMULQ))
-  ]
-  "TARGET_HAVE_MVE"
-  "vmul.i%#<V_sz_elem>\t%q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-(define_insn "mve_vmulq<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(mult:MVE_2 (match_operand:MVE_2 1 "s_register_operand" "w")
-		    (match_operand:MVE_2 2 "s_register_operand" "w")))
-  ]
-  "TARGET_HAVE_MVE"
-  "vmul.i%#<V_sz_elem>\t%q0, %q1, %q2"
+  "<mve_addsubmul>.i%#<V_sz_elem>\t%q0, %q1, %q2"
   [(set_attr "type" "mve_move")
 ])
 
@@ -1454,167 +1340,50 @@
 )
 
 ;;
-;; [vqaddq_n_s, vqaddq_n_u])
+;; [vqrshlq_n_s, vqrshlq_n_u]
+;; [vrshlq_n_u, vrshlq_n_s]
 ;;
-(define_insn "mve_vqaddq_n_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:<V_elem> 2 "s_register_operand" "r")]
-	 VQADDQ_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vqadd.<supf>%#<V_sz_elem>\t%q0, %q1, %2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vqaddq_u, vqaddq_s])
-;;
-(define_insn "mve_vqaddq_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")]
-	 VQADDQ))
-  ]
-  "TARGET_HAVE_MVE"
-  "vqadd.<supf>%#<V_sz_elem>\t%q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vqdmulhq_n_s])
-;;
-(define_insn "mve_vqdmulhq_n_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:<V_elem> 2 "s_register_operand" "r")]
-	 VQDMULHQ_N_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vqdmulh.s%#<V_sz_elem>\t%q0, %q1, %2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vqdmulhq_s])
-;;
-(define_insn "mve_vqdmulhq_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")]
-	 VQDMULHQ_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vqdmulh.s%#<V_sz_elem>\t%q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vqrdmulhq_n_s])
-;;
-(define_insn "mve_vqrdmulhq_n_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:<V_elem> 2 "s_register_operand" "r")]
-	 VQRDMULHQ_N_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vqrdmulh.s%#<V_sz_elem>\t%q0, %q1, %2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vqrdmulhq_s])
-;;
-(define_insn "mve_vqrdmulhq_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")]
-	 VQRDMULHQ_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vqrdmulh.s%#<V_sz_elem>\t%q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vqrshlq_n_s, vqrshlq_n_u])
-;;
-(define_insn "mve_vqrshlq_n_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_n_<supf><mode>"
   [
    (set (match_operand:MVE_2 0 "s_register_operand" "=w")
 	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
 		       (match_operand:SI 2 "s_register_operand" "r")]
-	 VQRSHLQ_N))
+	 MVE_RSHIFT_N))
   ]
   "TARGET_HAVE_MVE"
-  "vqrshl.<supf>%#<V_sz_elem>\t%q0, %2"
+  "<mve_insn>.<supf>%#<V_sz_elem>\t%q0, %2"
   [(set_attr "type" "mve_move")
 ])
 
 ;;
-;; [vqrshlq_s, vqrshlq_u])
+;; [vqshlq_n_s, vqshlq_n_u]
+;; [vshlq_n_u, vshlq_n_s]
 ;;
-(define_insn "mve_vqrshlq_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")]
-	 VQRSHLQ))
-  ]
-  "TARGET_HAVE_MVE"
-  "vqrshl.<supf>%#<V_sz_elem>\t%q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vqshlq_n_s, vqshlq_n_u])
-;;
-(define_insn "mve_vqshlq_n_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_n_<supf><mode>"
   [
    (set (match_operand:MVE_2 0 "s_register_operand" "=w")
 	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
 		       (match_operand:SI 2 "immediate_operand" "i")]
-	 VQSHLQ_N))
+	 MVE_SHIFT_N))
   ]
   "TARGET_HAVE_MVE"
-  "vqshl.<supf>%#<V_sz_elem>\t%q0, %q1, %2"
+  "<mve_insn>.<supf>%#<V_sz_elem>\t%q0, %q1, %2"
   [(set_attr "type" "mve_move")
 ])
 
 ;;
-;; [vqshlq_r_u, vqshlq_r_s])
+;; [vqshlq_r_u, vqshlq_r_s]
+;; [vshlq_r_s, vshlq_r_u]
 ;;
-(define_insn "mve_vqshlq_r_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_r_<supf><mode>"
   [
    (set (match_operand:MVE_2 0 "s_register_operand" "=w")
 	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
 		       (match_operand:SI 2 "s_register_operand" "r")]
-	 VQSHLQ_R))
+	 MVE_SHIFT_R))
   ]
   "TARGET_HAVE_MVE"
-  "vqshl.<supf>%#<V_sz_elem>\t%q0, %2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vqshlq_s, vqshlq_u])
-;;
-(define_insn "mve_vqshlq_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")]
-	 VQSHLQ))
-  ]
-  "TARGET_HAVE_MVE"
-  "vqshl.<supf>%#<V_sz_elem>\t%q0, %q1, %q2"
+  "<mve_insn>.<supf>%#<V_sz_elem>\t%q0, %2"
   [(set_attr "type" "mve_move")
 ])
 
@@ -1634,193 +1403,17 @@
 ])
 
 ;;
-;; [vqsubq_n_s, vqsubq_n_u])
+;; [vabdq_f]
 ;;
-(define_insn "mve_vqsubq_n_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:<V_elem> 2 "s_register_operand" "r")]
-	 VQSUBQ_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vqsub.<supf>%#<V_sz_elem>\t%q0, %q1, %2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vqsubq_u, vqsubq_s])
-;;
-(define_insn "mve_vqsubq_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")]
-	 VQSUBQ))
-  ]
-  "TARGET_HAVE_MVE"
-  "vqsub.<supf>%#<V_sz_elem>\t%q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vrhaddq_s, vrhaddq_u])
-;;
-(define_insn "@mve_vrhaddq_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")]
-	 VRHADDQ))
-  ]
-  "TARGET_HAVE_MVE"
-  "vrhadd.<supf>%#<V_sz_elem>\t%q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vrmulhq_s, vrmulhq_u])
-;;
-(define_insn "mve_vrmulhq_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")]
-	 VRMULHQ))
-  ]
-  "TARGET_HAVE_MVE"
-  "vrmulh.<supf>%#<V_sz_elem>\t%q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vrshlq_n_u, vrshlq_n_s])
-;;
-(define_insn "mve_vrshlq_n_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:SI 2 "s_register_operand" "r")]
-	 VRSHLQ_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vrshl.<supf>%#<V_sz_elem>\t%q0, %2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vrshlq_s, vrshlq_u])
-;;
-(define_insn "mve_vrshlq_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")]
-	 VRSHLQ))
-  ]
-  "TARGET_HAVE_MVE"
-  "vrshl.<supf>%#<V_sz_elem>\t%q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vrshrq_n_s, vrshrq_n_u])
-;;
-(define_insn "mve_vrshrq_n_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:SI 2 "<MVE_pred2>" "<MVE_constraint2>")]
-	 VRSHRQ_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vrshr.<supf>%#<V_sz_elem>\t%q0, %q1, %2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vshlq_n_u, vshlq_n_s])
-;;
-(define_insn "mve_vshlq_n_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:SI 2 "immediate_operand" "i")]
-	 VSHLQ_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vshl.<supf>%#<V_sz_elem>\t%q0, %q1, %2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vshlq_r_s, vshlq_r_u])
-;;
-(define_insn "mve_vshlq_r_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:SI 2 "s_register_operand" "r")]
-	 VSHLQ_R))
-  ]
-  "TARGET_HAVE_MVE"
-  "vshl.<supf>%#<V_sz_elem>\t%q0, %2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vsubq_n_s, vsubq_n_u])
-;;
-(define_insn "mve_vsubq_n_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:<V_elem> 2 "s_register_operand" "r")]
-	 VSUBQ_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vsub.i%#<V_sz_elem>\t%q0, %q1, %2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vsubq_s, vsubq_u])
-;;
-(define_insn "mve_vsubq_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "w")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")]
-	 VSUBQ))
-  ]
-  "TARGET_HAVE_MVE"
-  "vsub.i%#<V_sz_elem>\t%q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-(define_insn "mve_vsubq<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(minus:MVE_2 (match_operand:MVE_2 1 "s_register_operand" "w")
-		     (match_operand:MVE_2 2 "s_register_operand" "w")))
-  ]
-  "TARGET_HAVE_MVE"
-  "vsub.i%#<V_sz_elem>\t%q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vabdq_f])
-;;
-(define_insn "mve_vabdq_f<mode>"
+(define_insn "@mve_<mve_insn>q_f<mode>"
   [
    (set (match_operand:MVE_0 0 "s_register_operand" "=w")
 	(unspec:MVE_0 [(match_operand:MVE_0 1 "s_register_operand" "w")
 		       (match_operand:MVE_0 2 "s_register_operand" "w")]
-	 VABDQ_F))
+	 MVE_FP_VABDQ_ONLY))
   ]
   "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
-  "vabd.f%#<V_sz_elem>	%q0, %q1, %q2"
+  "<mve_insn>.f%#<V_sz_elem>\t%q0, %q1, %q2"
   [(set_attr "type" "mve_move")
 ])
 
@@ -1840,17 +1433,19 @@
 ])
 
 ;;
-;; [vaddq_n_f])
+;; [vaddq_n_f]
+;; [vsubq_n_f]
+;; [vmulq_n_f]
 ;;
-(define_insn "mve_vaddq_n_f<mode>"
+(define_insn "@mve_<mve_insn>q_n_f<mode>"
   [
    (set (match_operand:MVE_0 0 "s_register_operand" "=w")
 	(unspec:MVE_0 [(match_operand:MVE_0 1 "s_register_operand" "w")
 		       (match_operand:<V_elem> 2 "s_register_operand" "r")]
-	 VADDQ_N_F))
+	 MVE_FP_N_BINARY))
   ]
   "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
-  "vadd.f%#<V_sz_elem>\t%q0, %q1, %2"
+  "<mve_insn>.f%#<V_sz_elem>\t%q0, %q1, %2"
   [(set_attr "type" "mve_move")
 ])
 
@@ -1879,21 +1474,6 @@
   ]
   "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
   "vbic %q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vbicq_n_s, vbicq_n_u])
-;;
-(define_insn "mve_vbicq_n_<supf><mode>"
-  [
-   (set (match_operand:MVE_5 0 "s_register_operand" "=w")
-	(unspec:MVE_5 [(match_operand:MVE_5 1 "s_register_operand" "0")
-		       (match_operand:SI 2 "immediate_operand" "i")]
-	 VBICQ_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vbic.i%#<V_sz_elem>	%q0, %2"
   [(set_attr "type" "mve_move")
 ])
 
@@ -2224,31 +1804,18 @@
 ])
 
 ;;
-;; [vmulq_f])
+;; [vaddq_f]
+;; [vmulq_f]
+;; [vsubq_f]
 ;;
-(define_insn "mve_vmulq_f<mode>"
+(define_insn "mve_<mve_addsubmul>q_f<mode>"
   [
    (set (match_operand:MVE_0 0 "s_register_operand" "=w")
-	(mult:MVE_0 (match_operand:MVE_0 1 "s_register_operand" "w")
+	(MVE_INT_BINARY_RTX:MVE_0 (match_operand:MVE_0 1 "s_register_operand" "w")
 		    (match_operand:MVE_0 2 "s_register_operand" "w")))
   ]
   "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
-  "vmul.f%#<V_sz_elem>	%q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vmulq_n_f])
-;;
-(define_insn "mve_vmulq_n_f<mode>"
-  [
-   (set (match_operand:MVE_0 0 "s_register_operand" "=w")
-	(unspec:MVE_0 [(match_operand:MVE_0 1 "s_register_operand" "w")
-		       (match_operand:<V_elem> 2 "s_register_operand" "r")]
-	 VMULQ_N_F))
-  ]
-  "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
-  "vmul.f%#<V_sz_elem>	%q0, %q1, %2"
+  "<mve_addsubmul>.f%#<V_sz_elem>\t%q0, %q1, %q2"
   [(set_attr "type" "mve_move")
 ])
 
@@ -2281,17 +1848,18 @@
 ])
 
 ;;
-;; [vorrq_n_u, vorrq_n_s])
+;; [vbicq_n_s, vbicq_n_u]
+;; [vorrq_n_u, vorrq_n_s]
 ;;
-(define_insn "mve_vorrq_n_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_n_<supf><mode>"
   [
    (set (match_operand:MVE_5 0 "s_register_operand" "=w")
 	(unspec:MVE_5 [(match_operand:MVE_5 1 "s_register_operand" "0")
 		       (match_operand:SI 2 "immediate_operand" "i")]
-	 VORRQ_N))
+	 MVE_INT_N_BINARY_LOGIC))
   ]
   "TARGET_HAVE_MVE"
-  "vorr.i%#<V_sz_elem>	%q0, %2"
+  "<mve_insn>.i%#<V_sz_elem>	%q0, %2"
   [(set_attr "type" "mve_move")
 ])
 
@@ -2491,20 +2059,6 @@
 ])
 
 ;;
-;; [vsubq_f])
-;;
-(define_insn "mve_vsubq_f<mode>"
-  [
-   (set (match_operand:MVE_0 0 "s_register_operand" "=w")
-	(minus:MVE_0 (match_operand:MVE_0 1 "s_register_operand" "w")
-		     (match_operand:MVE_0 2 "s_register_operand" "w")))
-  ]
-  "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
-  "vsub.f%#<V_sz_elem>\t%q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
 ;; [vmulltq_poly_p])
 ;;
 (define_insn "mve_vmulltq_poly_p<mode>"
@@ -2550,21 +2104,6 @@
 ])
 
 ;;
-;; [vbicq_m_n_s, vbicq_m_n_u])
-;;
-(define_insn "mve_vbicq_m_n_<supf><mode>"
-  [
-   (set (match_operand:MVE_5 0 "s_register_operand" "=w")
-	(unspec:MVE_5 [(match_operand:MVE_5 1 "s_register_operand" "0")
-		       (match_operand:SI 2 "immediate_operand" "i")
-		       (match_operand:<MVE_VPRED> 3 "vpr_register_operand" "Up")]
-	 VBICQ_M_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vbict.i%#<V_sz_elem>	%q0, %2"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-;;
 ;; [vcmpeqq_m_f])
 ;;
 (define_insn "mve_vcmpeqq_m_f<mode>"
@@ -2609,36 +2148,34 @@
   "vpst\;vcvtt.f%#<V_sz_elem>.<supf>%#<V_sz_elem>	 %q0, %q2"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
+
 ;;
-;; [vqrshrnbq_n_u, vqrshrnbq_n_s])
+;; [vqrshrnbq_n_u, vqrshrnbq_n_s]
+;; [vqrshrntq_n_u, vqrshrntq_n_s]
+;; [vqrshrunbq_n_s]
+;; [vqrshruntq_n_s]
+;; [vqshrnbq_n_u, vqshrnbq_n_s]
+;; [vqshrntq_n_u, vqshrntq_n_s]
+;; [vqshrunbq_n_s]
+;; [vqshruntq_n_s]
+;; [vrshrnbq_n_s, vrshrnbq_n_u]
+;; [vrshrntq_n_u, vrshrntq_n_s]
+;; [vshrnbq_n_u, vshrnbq_n_s]
+;; [vshrntq_n_s, vshrntq_n_u]
 ;;
-(define_insn "mve_vqrshrnbq_n_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_n_<supf><mode>"
   [
    (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
 	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
 				 (match_operand:MVE_5 2 "s_register_operand" "w")
 				 (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")]
-	 VQRSHRNBQ_N))
+	 MVE_SHRN_N))
   ]
   "TARGET_HAVE_MVE"
-  "vqrshrnb.<supf>%#<V_sz_elem>	%q0, %q2, %3"
+  "<mve_insn>.<isu>%#<V_sz_elem>\t%q0, %q2, %3"
   [(set_attr "type" "mve_move")
 ])
-;;
-;; [vqrshrunbq_n_s])
-;;
-(define_insn "mve_vqrshrunbq_n_s<mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-				 (match_operand:MVE_5 2 "s_register_operand" "w")
-				 (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")]
-	 VQRSHRUNBQ_N_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vqrshrunb.s%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-])
+
 ;;
 ;; [vrmlaldavhaq_s vrmlaldavhaq_u])
 ;;
@@ -3469,34 +3006,36 @@
 ])
 
 ;;
-;; [vqrshlq_m_n_s, vqrshlq_m_n_u])
+;; [vqrshlq_m_n_s, vqrshlq_m_n_u]
+;; [vrshlq_m_n_s, vrshlq_m_n_u]
 ;;
-(define_insn "mve_vqrshlq_m_n_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_m_n_<supf><mode>"
   [
    (set (match_operand:MVE_2 0 "s_register_operand" "=w")
 	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
 		       (match_operand:SI 2 "s_register_operand" "r")
 		       (match_operand:<MVE_VPRED> 3 "vpr_register_operand" "Up")]
-	 VQRSHLQ_M_N))
+	 MVE_RSHIFT_M_N))
   ]
   "TARGET_HAVE_MVE"
-  "vpst\;vqrshlt.<supf>%#<V_sz_elem>	%q0, %2"
+  "vpst\;<mve_insn>t.<supf>%#<V_sz_elem>\t%q0, %2"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
 
 ;;
-;; [vqshlq_m_r_u, vqshlq_m_r_s])
+;; [vqshlq_m_r_u, vqshlq_m_r_s]
+;; [vshlq_m_r_u, vshlq_m_r_s]
 ;;
-(define_insn "mve_vqshlq_m_r_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_m_r_<supf><mode>"
   [
    (set (match_operand:MVE_2 0 "s_register_operand" "=w")
 	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
 		       (match_operand:SI 2 "s_register_operand" "r")
 		       (match_operand:<MVE_VPRED> 3 "vpr_register_operand" "Up")]
-	 VQSHLQ_M_R))
+	 MVE_SHIFT_M_R))
   ]
   "TARGET_HAVE_MVE"
-  "vpst\;vqshlt.<supf>%#<V_sz_elem>\t%q0, %2"
+  "vpst\;<mve_insn>t.<supf>%#<V_sz_elem>\t%q0, %2"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
 
@@ -3513,38 +3052,6 @@
   ]
   "TARGET_HAVE_MVE"
   "vpst\;vrev64t.%#<V_sz_elem>\t%q0, %q2"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vrshlq_m_n_s, vrshlq_m_n_u])
-;;
-(define_insn "mve_vrshlq_m_n_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:SI 2 "s_register_operand" "r")
-		       (match_operand:<MVE_VPRED> 3 "vpr_register_operand" "Up")]
-	 VRSHLQ_M_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vrshlt.<supf>%#<V_sz_elem>\t%q0, %2"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vshlq_m_r_u, vshlq_m_r_s])
-;;
-(define_insn "mve_vshlq_m_r_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:SI 2 "s_register_operand" "r")
-		       (match_operand:<MVE_VPRED> 3 "vpr_register_operand" "Up")]
-	 VSHLQ_M_R))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vshlt.<supf>%#<V_sz_elem>\t%q0, %2"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
 
@@ -4373,20 +3880,22 @@
    (set_attr "length""8")])
 
 ;;
-;; [vorrq_m_n_s, vorrq_m_n_u])
+;; [vbicq_m_n_s, vbicq_m_n_u]
+;; [vorrq_m_n_s, vorrq_m_n_u]
 ;;
-(define_insn "mve_vorrq_m_n_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_m_n_<supf><mode>"
   [
    (set (match_operand:MVE_5 0 "s_register_operand" "=w")
 	(unspec:MVE_5 [(match_operand:MVE_5 1 "s_register_operand" "0")
 		       (match_operand:SI 2 "immediate_operand" "i")
 		       (match_operand:<MVE_VPRED> 3 "vpr_register_operand" "Up")]
-	 VORRQ_M_N))
+	 MVE_INT_M_N_BINARY_LOGIC))
   ]
   "TARGET_HAVE_MVE"
-  "vpst\;vorrt.i%#<V_sz_elem>	%q0, %2"
+  "vpst\;<mve_insn>t.i%#<V_sz_elem>	%q0, %2"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
+
 ;;
 ;; [vpselq_f])
 ;;
@@ -4466,102 +3975,6 @@
   "vpst\;vqmovuntt.s%#<V_sz_elem>	%q0, %q2"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
-
-;;
-;; [vqrshrntq_n_u, vqrshrntq_n_s])
-;;
-(define_insn "mve_vqrshrntq_n_<supf><mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")]
-	 VQRSHRNTQ_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vqrshrnt.<supf>%#<V_sz_elem>	%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vqrshruntq_n_s])
-;;
-(define_insn "mve_vqrshruntq_n_s<mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")]
-	 VQRSHRUNTQ_N_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vqrshrunt.s%#<V_sz_elem>	%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vqshrnbq_n_u, vqshrnbq_n_s])
-;;
-(define_insn "mve_vqshrnbq_n_<supf><mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")]
-	 VQSHRNBQ_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vqshrnb.<supf>%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vqshrntq_n_u, vqshrntq_n_s])
-;;
-(define_insn "mve_vqshrntq_n_<supf><mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")]
-	 VQSHRNTQ_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vqshrnt.<supf>%#<V_sz_elem>	%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vqshrunbq_n_s])
-;;
-(define_insn "mve_vqshrunbq_n_s<mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")]
-	 VQSHRUNBQ_N_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vqshrunb.s%#<V_sz_elem>	%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vqshruntq_n_s])
-;;
-(define_insn "mve_vqshruntq_n_s<mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")]
-	 VQSHRUNTQ_N_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vqshrunt.s%#<V_sz_elem>	%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-])
 
 ;;
 ;; [vrev32q_m_f])
@@ -4772,70 +4185,6 @@
    (set_attr "length""8")])
 
 ;;
-;; [vrshrnbq_n_s, vrshrnbq_n_u])
-;;
-(define_insn "mve_vrshrnbq_n_<supf><mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")]
-	 VRSHRNBQ_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vrshrnb.i%#<V_sz_elem>	%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vrshrntq_n_u, vrshrntq_n_s])
-;;
-(define_insn "mve_vrshrntq_n_<supf><mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")]
-	 VRSHRNTQ_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vrshrnt.i%#<V_sz_elem>	%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vshrnbq_n_u, vshrnbq_n_s])
-;;
-(define_insn "mve_vshrnbq_n_<supf><mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")]
-	 VSHRNBQ_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vshrnb.i%#<V_sz_elem>	%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vshrntq_n_s, vshrntq_n_u])
-;;
-(define_insn "mve_vshrntq_n_<supf><mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-				 (match_operand:MVE_5 2 "s_register_operand" "w")
-				 (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")]
-	 VSHRNTQ_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vshrnt.i%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-])
-
-;;
 ;; [vcvtmq_m_s, vcvtmq_m_u])
 ;;
 (define_insn "mve_vcvtmq_m_<supf><mode>"
@@ -4999,23 +4348,6 @@
    (set_attr "length" "8")])
 
 ;;
-;; [vshlq_m_s, vshlq_m_u])
-;;
-(define_insn "mve_vshlq_m_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VSHLQ_M))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vshlt.<supf>%#<V_sz_elem>\t%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length" "8")])
-
-;;
 ;; [vsriq_m_n_s, vsriq_m_n_u])
 ;;
 (define_insn "mve_vsriq_m_n_<supf><mode>"
@@ -5029,23 +4361,6 @@
   ]
   "TARGET_HAVE_MVE"
   "vpst\;vsrit.%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length" "8")])
-
-;;
-;; [vsubq_m_u, vsubq_m_s])
-;;
-(define_insn "mve_vsubq_m_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VSUBQ_M))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vsubt.i%#<V_sz_elem>\t%q0, %q2, %q3"
   [(set_attr "type" "mve_move")
    (set_attr "length" "8")])
 
@@ -5065,88 +4380,102 @@
   "vpst\;vcvtt.f%#<V_sz_elem>.<supf>%#<V_sz_elem>\t%q0, %q2, %3"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
+
 ;;
-;; [vabdq_m_s, vabdq_m_u])
+;; [vabdq_m_s, vabdq_m_u]
+;; [vhaddq_m_s, vhaddq_m_u]
+;; [vhsubq_m_s, vhsubq_m_u]
+;; [vmaxq_m_s, vmaxq_m_u]
+;; [vminq_m_s, vminq_m_u]
+;; [vmulhq_m_s, vmulhq_m_u]
+;; [vqaddq_m_u, vqaddq_m_s]
+;; [vqdmladhq_m_s]
+;; [vqdmladhxq_m_s]
+;; [vqdmlsdhq_m_s]
+;; [vqdmlsdhxq_m_s]
+;; [vqdmulhq_m_s]
+;; [vqrdmladhq_m_s]
+;; [vqrdmladhxq_m_s]
+;; [vqrdmlsdhq_m_s]
+;; [vqrdmlsdhxq_m_s]
+;; [vqrdmulhq_m_s]
+;; [vqrshlq_m_u, vqrshlq_m_s]
+;; [vqshlq_m_u, vqshlq_m_s]
+;; [vqsubq_m_u, vqsubq_m_s]
+;; [vrhaddq_m_u, vrhaddq_m_s]
+;; [vrmulhq_m_u, vrmulhq_m_s]
+;; [vrshlq_m_s, vrshlq_m_u]
+;; [vshlq_m_s, vshlq_m_u]
 ;;
-(define_insn "mve_vabdq_m_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_m_<supf><mode>"
   [
    (set (match_operand:MVE_2 0 "s_register_operand" "=w")
 	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
 		       (match_operand:MVE_2 2 "s_register_operand" "w")
 		       (match_operand:MVE_2 3 "s_register_operand" "w")
 		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VABDQ_M))
+	 MVE_INT_SU_M_BINARY))
   ]
   "TARGET_HAVE_MVE"
-  "vpst\;vabdt.<supf>%#<V_sz_elem>	%q0, %q2, %q3"
+  "vpst\;<mve_insn>t.<supf>%#<V_sz_elem>\t%q0, %q2, %q3"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
 
 ;;
-;; [vaddq_m_n_s, vaddq_m_n_u])
+;; [vaddq_m_n_s, vaddq_m_n_u]
+;; [vsubq_m_n_s, vsubq_m_n_u]
+;; [vmulq_m_n_s, vmulq_m_n_u]
 ;;
-(define_insn "mve_vaddq_m_n_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_m_n_<supf><mode>"
   [
    (set (match_operand:MVE_2 0 "s_register_operand" "=w")
 	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
 		       (match_operand:MVE_2 2 "s_register_operand" "w")
 		       (match_operand:<V_elem> 3 "s_register_operand" "r")
 		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VADDQ_M_N))
+	 MVE_INT_M_N_BINARY))
   ]
   "TARGET_HAVE_MVE"
-  "vpst\;vaddt.i%#<V_sz_elem>	%q0, %q2, %3"
+  "vpst\;<mve_insn>t.i%#<V_sz_elem>	%q0, %q2, %3"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
 
 ;;
-;; [vaddq_m_u, vaddq_m_s])
+;; [vaddq_m_u, vaddq_m_s]
+;; [vsubq_m_u, vsubq_m_s]
+;; [vmulq_m_u, vmulq_m_s]
 ;;
-(define_insn "mve_vaddq_m_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_m_<supf><mode>"
   [
    (set (match_operand:MVE_2 0 "s_register_operand" "=w")
 	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
 		       (match_operand:MVE_2 2 "s_register_operand" "w")
 		       (match_operand:MVE_2 3 "s_register_operand" "w")
 		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VADDQ_M))
+	 MVE_INT_M_BINARY))
   ]
   "TARGET_HAVE_MVE"
-  "vpst\;vaddt.i%#<V_sz_elem>	%q0, %q2, %q3"
+  "vpst\;<mve_insn>t.i%#<V_sz_elem>	%q0, %q2, %q3"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
 
 ;;
-;; [vandq_m_u, vandq_m_s])
+;; [vandq_m_u, vandq_m_s]
+;; [vbicq_m_u, vbicq_m_s]
+;; [veorq_m_u, veorq_m_s]
+;; [vorrq_m_u, vorrq_m_s]
 ;;
-(define_insn "mve_vandq_m_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_m_<supf><mode>"
   [
    (set (match_operand:MVE_2 0 "s_register_operand" "=w")
 	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
 		       (match_operand:MVE_2 2 "s_register_operand" "w")
 		       (match_operand:MVE_2 3 "s_register_operand" "w")
 		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VANDQ_M))
+	 MVE_INT_M_BINARY_LOGIC))
   ]
   "TARGET_HAVE_MVE"
-  "vpst\;vandt %q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vbicq_m_u, vbicq_m_s])
-;;
-(define_insn "mve_vbicq_m_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VBICQ_M))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vbict %q0, %q2, %q3"
+  "vpst\;<mve_insn>t %q0, %q2, %q3"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
 
@@ -5202,124 +4531,34 @@
    (set_attr "length""8")])
 
 ;;
-;; [veorq_m_s, veorq_m_u])
+;; [vhaddq_m_n_s, vhaddq_m_n_u]
+;; [vhsubq_m_n_s, vhsubq_m_n_u]
+;; [vmlaq_m_n_s, vmlaq_m_n_u]
+;; [vmlasq_m_n_u, vmlasq_m_n_s]
+;; [vqaddq_m_n_u, vqaddq_m_n_s]
+;; [vqdmlahq_m_n_s]
+;; [vqdmlashq_m_n_s]
+;; [vqdmulhq_m_n_s]
+;; [vqrdmlahq_m_n_s]
+;; [vqrdmlashq_m_n_s]
+;; [vqrdmulhq_m_n_s]
+;; [vqsubq_m_n_u, vqsubq_m_n_s]
 ;;
-(define_insn "mve_veorq_m_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VEORQ_M))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;veort %q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vhaddq_m_n_s, vhaddq_m_n_u])
-;;
-(define_insn "mve_vhaddq_m_n_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_m_n_<supf><mode>"
   [
    (set (match_operand:MVE_2 0 "s_register_operand" "=w")
 	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
 		       (match_operand:MVE_2 2 "s_register_operand" "w")
 		       (match_operand:<V_elem> 3 "s_register_operand" "r")
 		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VHADDQ_M_N))
+	 MVE_INT_SU_M_N_BINARY))
   ]
   "TARGET_HAVE_MVE"
-  "vpst\;vhaddt.<supf>%#<V_sz_elem>	%q0, %q2, %3"
+  "vpst\;<mve_insn>t.<supf>%#<V_sz_elem>\t%q0, %q2, %3"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
 
 ;;
-;; [vhaddq_m_s, vhaddq_m_u])
-;;
-(define_insn "mve_vhaddq_m_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VHADDQ_M))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vhaddt.<supf>%#<V_sz_elem>	%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vhsubq_m_n_s, vhsubq_m_n_u])
-;;
-(define_insn "mve_vhsubq_m_n_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:<V_elem> 3 "s_register_operand" "r")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VHSUBQ_M_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vhsubt.<supf>%#<V_sz_elem>	%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vhsubq_m_s, vhsubq_m_u])
-;;
-(define_insn "mve_vhsubq_m_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VHSUBQ_M))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vhsubt.<supf>%#<V_sz_elem>	%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vmaxq_m_s, vmaxq_m_u])
-;;
-(define_insn "mve_vmaxq_m_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VMAXQ_M))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vmaxt.<supf>%#<V_sz_elem>	%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vminq_m_s, vminq_m_u])
-;;
-(define_insn "mve_vminq_m_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VMINQ_M))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vmint.<supf>%#<V_sz_elem>	%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
 ;;
 ;; [vmladavaq_p_u, vmladavaq_p_s])
 ;;
@@ -5334,57 +4573,6 @@
   ]
   "TARGET_HAVE_MVE"
   "vpst\;vmladavat.<supf>%#<V_sz_elem>	%0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vmlaq_m_n_s, vmlaq_m_n_u])
-;;
-(define_insn "mve_vmlaq_m_n_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:<V_elem> 3 "s_register_operand" "r")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VMLAQ_M_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vmlat.<supf>%#<V_sz_elem>	%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vmlasq_m_n_u, vmlasq_m_n_s])
-;;
-(define_insn "mve_vmlasq_m_n_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:<V_elem> 3 "s_register_operand" "r")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VMLASQ_M_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vmlast.<supf>%#<V_sz_elem>	%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vmulhq_m_s, vmulhq_m_u])
-;;
-(define_insn "mve_vmulhq_m_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VMULHQ_M))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vmulht.<supf>%#<V_sz_elem>	%q0, %q2, %q3"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
 
@@ -5423,40 +4611,6 @@
    (set_attr "length""8")])
 
 ;;
-;; [vmulq_m_n_u, vmulq_m_n_s])
-;;
-(define_insn "mve_vmulq_m_n_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:<V_elem> 3 "s_register_operand" "r")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VMULQ_M_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vmult.i%#<V_sz_elem>	%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vmulq_m_s, vmulq_m_u])
-;;
-(define_insn "mve_vmulq_m_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VMULQ_M))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vmult.i%#<V_sz_elem>	%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
 ;; [vornq_m_u, vornq_m_s])
 ;;
 (define_insn "mve_vornq_m_<supf><mode>"
@@ -5474,308 +4628,38 @@
    (set_attr "length""8")])
 
 ;;
-;; [vorrq_m_s, vorrq_m_u])
+;; [vqshlq_m_n_s, vqshlq_m_n_u]
+;; [vshlq_m_n_s, vshlq_m_n_u]
 ;;
-(define_insn "mve_vorrq_m_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VORRQ_M))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vorrt %q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqaddq_m_n_u, vqaddq_m_n_s])
-;;
-(define_insn "mve_vqaddq_m_n_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:<V_elem> 3 "s_register_operand" "r")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQADDQ_M_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqaddt.<supf>%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqaddq_m_u, vqaddq_m_s])
-;;
-(define_insn "mve_vqaddq_m_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQADDQ_M))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqaddt.<supf>%#<V_sz_elem>\t%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqdmlahq_m_n_s])
-;;
-(define_insn "mve_vqdmlahq_m_n_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:<V_elem> 3 "s_register_operand" "r")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQDMLAHQ_M_N_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqdmlaht.s%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqdmlashq_m_n_s])
-;;
-(define_insn "mve_vqdmlashq_m_n_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:<V_elem> 3 "s_register_operand" "r")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQDMLASHQ_M_N_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqdmlasht.s%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqrdmlahq_m_n_s])
-;;
-(define_insn "mve_vqrdmlahq_m_n_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:<V_elem> 3 "s_register_operand" "r")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQRDMLAHQ_M_N_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqrdmlaht.s%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqrdmlashq_m_n_s])
-;;
-(define_insn "mve_vqrdmlashq_m_n_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:<V_elem> 3 "s_register_operand" "r")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQRDMLASHQ_M_N_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqrdmlasht.s%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqrshlq_m_u, vqrshlq_m_s])
-;;
-(define_insn "mve_vqrshlq_m_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQRSHLQ_M))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqrshlt.<supf>%#<V_sz_elem>\t%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqshlq_m_n_s, vqshlq_m_n_u])
-;;
-(define_insn "mve_vqshlq_m_n_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_m_n_<supf><mode>"
   [
    (set (match_operand:MVE_2 0 "s_register_operand" "=w")
 	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
 		       (match_operand:MVE_2 2 "s_register_operand" "w")
 		       (match_operand:SI 3 "immediate_operand" "i")
 		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQSHLQ_M_N))
+	 MVE_SHIFT_M_N))
   ]
   "TARGET_HAVE_MVE"
-  "vpst\;vqshlt.<supf>%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqshlq_m_u, vqshlq_m_s])
-;;
-(define_insn "mve_vqshlq_m_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQSHLQ_M))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqshlt.<supf>%#<V_sz_elem>\t%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqsubq_m_n_u, vqsubq_m_n_s])
-;;
-(define_insn "mve_vqsubq_m_n_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:<V_elem> 3 "s_register_operand" "r")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQSUBQ_M_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqsubt.<supf>%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqsubq_m_u, vqsubq_m_s])
-;;
-(define_insn "mve_vqsubq_m_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQSUBQ_M))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqsubt.<supf>%#<V_sz_elem>\t%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vrhaddq_m_u, vrhaddq_m_s])
-;;
-(define_insn "mve_vrhaddq_m_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VRHADDQ_M))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vrhaddt.<supf>%#<V_sz_elem>\t%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vrmulhq_m_u, vrmulhq_m_s])
-;;
-(define_insn "mve_vrmulhq_m_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VRMULHQ_M))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vrmulht.<supf>%#<V_sz_elem>\t%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vrshlq_m_s, vrshlq_m_u])
-;;
-(define_insn "mve_vrshlq_m_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VRSHLQ_M))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vrshlt.<supf>%#<V_sz_elem>\t%q0, %q2, %q3"
+  "vpst\;<mve_insn>t.<supf>%#<V_sz_elem>\t%q0, %q2, %3"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
 
 ;;
 ;; [vrshrq_m_n_s, vrshrq_m_n_u])
-;;
-(define_insn "mve_vrshrq_m_n_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred2>" "<MVE_constraint2>")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VRSHRQ_M_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vrshrt.<supf>%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vshlq_m_n_s, vshlq_m_n_u])
-;;
-(define_insn "mve_vshlq_m_n_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "immediate_operand" "i")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VSHLQ_M_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vshlt.<supf>%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
 ;; [vshrq_m_n_s, vshrq_m_n_u])
 ;;
-(define_insn "mve_vshrq_m_n_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_m_n_<supf><mode>"
   [
    (set (match_operand:MVE_2 0 "s_register_operand" "=w")
 	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
 		       (match_operand:MVE_2 2 "s_register_operand" "w")
 		       (match_operand:SI 3 "<MVE_pred2>" "<MVE_constraint2>")
 		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VSHRQ_M_N))
+	 MVE_VSHRQ_M_N))
   ]
   "TARGET_HAVE_MVE"
-  "vpst\;vshrt.<supf>%#<V_sz_elem>\t%q0, %q2, %3"
+  "vpst\;<mve_insn>t.<supf>%#<V_sz_elem>\t%q0, %q2, %3"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
 
@@ -5793,23 +4677,6 @@
   ]
   "TARGET_HAVE_MVE"
   "vpst\;vslit.%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vsubq_m_n_s, vsubq_m_n_u])
-;;
-(define_insn "mve_vsubq_m_n_<supf><mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:<V_elem> 3 "s_register_operand" "r")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VSUBQ_M_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vsubt.i%#<V_sz_elem>\t%q0, %q2, %3"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
 
@@ -5899,210 +4766,6 @@
    (set_attr "length""8")])
 
 ;;
-;; [vqdmladhq_m_s])
-;;
-(define_insn "mve_vqdmladhq_m_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQDMLADHQ_M_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqdmladht.s%#<V_sz_elem>\t%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqdmladhxq_m_s])
-;;
-(define_insn "mve_vqdmladhxq_m_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQDMLADHXQ_M_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqdmladhxt.s%#<V_sz_elem>\t%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqdmlsdhq_m_s])
-;;
-(define_insn "mve_vqdmlsdhq_m_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQDMLSDHQ_M_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqdmlsdht.s%#<V_sz_elem>\t%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqdmlsdhxq_m_s])
-;;
-(define_insn "mve_vqdmlsdhxq_m_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQDMLSDHXQ_M_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqdmlsdhxt.s%#<V_sz_elem>\t%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqdmulhq_m_n_s])
-;;
-(define_insn "mve_vqdmulhq_m_n_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:<V_elem> 3 "s_register_operand" "r")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQDMULHQ_M_N_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqdmulht.s%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqdmulhq_m_s])
-;;
-(define_insn "mve_vqdmulhq_m_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQDMULHQ_M_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqdmulht.s%#<V_sz_elem>\t%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqrdmladhq_m_s])
-;;
-(define_insn "mve_vqrdmladhq_m_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQRDMLADHQ_M_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqrdmladht.s%#<V_sz_elem>\t%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqrdmladhxq_m_s])
-;;
-(define_insn "mve_vqrdmladhxq_m_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQRDMLADHXQ_M_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqrdmladhxt.s%#<V_sz_elem>\t%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqrdmlsdhq_m_s])
-;;
-(define_insn "mve_vqrdmlsdhq_m_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQRDMLSDHQ_M_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqrdmlsdht.s%#<V_sz_elem>\t%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqrdmlsdhxq_m_s])
-;;
-(define_insn "mve_vqrdmlsdhxq_m_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQRDMLSDHXQ_M_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqrdmlsdhxt.s%#<V_sz_elem>\t%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqrdmulhq_m_n_s])
-;;
-(define_insn "mve_vqrdmulhq_m_n_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:<V_elem> 3 "s_register_operand" "r")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQRDMULHQ_M_N_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqrdmulht.s%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqrdmulhq_m_s])
-;;
-(define_insn "mve_vqrdmulhq_m_s<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(unspec:MVE_2 [(match_operand:MVE_2 1 "s_register_operand" "0")
-		       (match_operand:MVE_2 2 "s_register_operand" "w")
-		       (match_operand:MVE_2 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQRDMULHQ_M_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqrdmulht.s%#<V_sz_elem>\t%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
 ;; [vmlaldavaq_p_u, vmlaldavaq_p_s])
 ;;
 (define_insn "mve_vmlaldavaq_p_<supf><mode>"
@@ -6137,70 +4800,30 @@
    (set_attr "length""8")])
 
 ;;
-;; [vqrshrnbq_m_n_u, vqrshrnbq_m_n_s])
+;; [vqrshrnbq_m_n_u, vqrshrnbq_m_n_s]
+;; [vqrshrntq_m_n_s, vqrshrntq_m_n_u]
+;; [vqrshrunbq_m_n_s]
+;; [vqrshruntq_m_n_s]
+;; [vqshrnbq_m_n_u, vqshrnbq_m_n_s]
+;; [vqshrntq_m_n_s, vqshrntq_m_n_u]
+;; [vqshrunbq_m_n_s]
+;; [vqshruntq_m_n_s]
+;; [vrshrnbq_m_n_u, vrshrnbq_m_n_s]
+;; [vrshrntq_m_n_u, vrshrntq_m_n_s]
+;; [vshrnbq_m_n_s, vshrnbq_m_n_u]
+;; [vshrntq_m_n_s, vshrntq_m_n_u]
 ;;
-(define_insn "mve_vqrshrnbq_m_n_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_m_n_<supf><mode>"
   [
    (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
 	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQRSHRNBQ_M_N))
+				 (match_operand:MVE_5 2 "s_register_operand" "w")
+				 (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")
+				 (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
+	 MVE_SHRN_M_N))
   ]
   "TARGET_HAVE_MVE"
-  "vpst\;vqrshrnbt.<supf>%#<V_sz_elem>	%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqrshrntq_m_n_s, vqrshrntq_m_n_u])
-;;
-(define_insn "mve_vqrshrntq_m_n_<supf><mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQRSHRNTQ_M_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqrshrntt.<supf>%#<V_sz_elem>	%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqshrnbq_m_n_u, vqshrnbq_m_n_s])
-;;
-(define_insn "mve_vqshrnbq_m_n_<supf><mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQSHRNBQ_M_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\n\tvqshrnbt.<supf>%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqshrntq_m_n_s, vqshrntq_m_n_u])
-;;
-(define_insn "mve_vqshrntq_m_n_<supf><mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQSHRNTQ_M_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqshrntt.<supf>%#<V_sz_elem>\t%q0, %q2, %3"
+  "vpst\;<mve_insn>t.<isu>%#<V_sz_elem>\t%q0, %q2, %3"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
 
@@ -6218,40 +4841,6 @@
   ]
   "TARGET_HAVE_MVE"
   "vpst\;vrmlaldavhat.s32\t%Q0, %R0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vrshrnbq_m_n_u, vrshrnbq_m_n_s])
-;;
-(define_insn "mve_vrshrnbq_m_n_<supf><mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VRSHRNBQ_M_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vrshrnbt.i%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vrshrntq_m_n_u, vrshrntq_m_n_s])
-;;
-(define_insn "mve_vrshrntq_m_n_<supf><mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VRSHRNTQ_M_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vrshrntt.i%#<V_sz_elem>\t%q0, %q2, %3"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
 
@@ -6286,40 +4875,6 @@
   ]
   "TARGET_HAVE_MVE"
   "vpst\;vshlltt.<supf>%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vshrnbq_m_n_s, vshrnbq_m_n_u])
-;;
-(define_insn "mve_vshrnbq_m_n_<supf><mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VSHRNBQ_M_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vshrnbt.i%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vshrntq_m_n_s, vshrntq_m_n_u])
-;;
-(define_insn "mve_vshrntq_m_n_<supf><mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VSHRNTQ_M_N))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vshrntt.i%#<V_sz_elem>\t%q0, %q2, %3"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
 
@@ -6460,74 +5015,6 @@
    (set_attr "length""8")])
 
 ;;
-;; [vqrshrunbq_m_n_s])
-;;
-(define_insn "mve_vqrshrunbq_m_n_s<mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQRSHRUNBQ_M_N_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqrshrunbt.s%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqrshruntq_m_n_s])
-;;
-(define_insn "mve_vqrshruntq_m_n_s<mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQRSHRUNTQ_M_N_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqrshruntt.s%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqshrunbq_m_n_s])
-;;
-(define_insn "mve_vqshrunbq_m_n_s<mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQSHRUNBQ_M_N_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqshrunbt.s%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vqshruntq_m_n_s])
-;;
-(define_insn "mve_vqshruntq_m_n_s<mode>"
-  [
-   (set (match_operand:<V_narrow_pack> 0 "s_register_operand" "=w")
-	(unspec:<V_narrow_pack> [(match_operand:<V_narrow_pack> 1 "s_register_operand" "0")
-		       (match_operand:MVE_5 2 "s_register_operand" "w")
-		       (match_operand:SI 3 "<MVE_pred3>" "<MVE_constraint3>")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VQSHRUNTQ_M_N_S))
-  ]
-  "TARGET_HAVE_MVE"
-  "vpst\;vqshruntt.s%#<V_sz_elem>\t%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
 ;; [vrmlaldavhaq_p_u])
 ;;
 (define_insn "mve_vrmlaldavhaq_p_uv4si"
@@ -6594,88 +5081,63 @@
   "vpst\;vrmlsldavhaxt.s32\t%Q0, %R0, %q2, %q3"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
+
 ;;
-;; [vabdq_m_f])
+;; [vabdq_m_f]
+;; [vaddq_m_f]
+;; [vsubq_m_f]
+;; [vmulq_m_f]
 ;;
-(define_insn "mve_vabdq_m_f<mode>"
+(define_insn "@mve_<mve_insn>q_m_f<mode>"
   [
    (set (match_operand:MVE_0 0 "s_register_operand" "=w")
 	(unspec:MVE_0 [(match_operand:MVE_0 1 "s_register_operand" "0")
 		       (match_operand:MVE_0 2 "s_register_operand" "w")
 		       (match_operand:MVE_0 3 "s_register_operand" "w")
 		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VABDQ_M_F))
+	 MVE_FP_M_BINARY))
   ]
   "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
-  "vpst\;vabdt.f%#<V_sz_elem>	%q0, %q2, %q3"
+  "vpst\;<mve_insn>t.f%#<V_sz_elem>	%q0, %q2, %q3"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
 
 ;;
-;; [vaddq_m_f])
+;; [vaddq_m_n_f]
+;; [vsubq_m_n_f]
+;; [vmulq_m_n_f]
 ;;
-(define_insn "mve_vaddq_m_f<mode>"
-  [
-   (set (match_operand:MVE_0 0 "s_register_operand" "=w")
-	(unspec:MVE_0 [(match_operand:MVE_0 1 "s_register_operand" "0")
-		       (match_operand:MVE_0 2 "s_register_operand" "w")
-		       (match_operand:MVE_0 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VADDQ_M_F))
-  ]
-  "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
-  "vpst\;vaddt.f%#<V_sz_elem>	%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vaddq_m_n_f])
-;;
-(define_insn "mve_vaddq_m_n_f<mode>"
+(define_insn "@mve_<mve_insn>q_m_n_f<mode>"
   [
    (set (match_operand:MVE_0 0 "s_register_operand" "=w")
 	(unspec:MVE_0 [(match_operand:MVE_0 1 "s_register_operand" "0")
 		       (match_operand:MVE_0 2 "s_register_operand" "w")
 		       (match_operand:<V_elem> 3 "s_register_operand" "r")
 		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VADDQ_M_N_F))
+	 MVE_FP_M_N_BINARY))
   ]
   "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
-  "vpst\;vaddt.f%#<V_sz_elem>	%q0, %q2, %3"
+  "vpst\;<mve_insn>t.f%#<V_sz_elem>	%q0, %q2, %3"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
 
 ;;
-;; [vandq_m_f])
+;; [vandq_m_f]
+;; [vbicq_m_f]
+;; [veorq_m_f]
+;; [vorrq_m_f]
 ;;
-(define_insn "mve_vandq_m_f<mode>"
+(define_insn "@mve_<mve_insn>q_m_f<mode>"
   [
    (set (match_operand:MVE_0 0 "s_register_operand" "=w")
 	(unspec:MVE_0 [(match_operand:MVE_0 1 "s_register_operand" "0")
 		       (match_operand:MVE_0 2 "s_register_operand" "w")
 		       (match_operand:MVE_0 3 "s_register_operand" "w")
 		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VANDQ_M_F))
+	 MVE_FP_M_BINARY_LOGIC))
   ]
   "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
-  "vpst\;vandt %q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vbicq_m_f])
-;;
-(define_insn "mve_vbicq_m_f<mode>"
-  [
-   (set (match_operand:MVE_0 0 "s_register_operand" "=w")
-	(unspec:MVE_0 [(match_operand:MVE_0 1 "s_register_operand" "0")
-		       (match_operand:MVE_0 2 "s_register_operand" "w")
-		       (match_operand:MVE_0 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VBICQ_M_F))
-  ]
-  "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
-  "vpst\;vbict %q0, %q2, %q3"
+  "vpst\;<mve_insn>t %q0, %q2, %q3"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
 
@@ -6867,23 +5329,6 @@
    (set_attr "length""8")])
 
 ;;
-;; [veorq_m_f])
-;;
-(define_insn "mve_veorq_m_f<mode>"
-  [
-   (set (match_operand:MVE_0 0 "s_register_operand" "=w")
-	(unspec:MVE_0 [(match_operand:MVE_0 1 "s_register_operand" "0")
-		       (match_operand:MVE_0 2 "s_register_operand" "w")
-		       (match_operand:MVE_0 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VEORQ_M_F))
-  ]
-  "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
-  "vpst\;veort %q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
 ;; [vfmaq_m_f])
 ;;
 (define_insn "mve_vfmaq_m_f<mode>"
@@ -6986,40 +5431,6 @@
    (set_attr "length""8")])
 
 ;;
-;; [vmulq_m_f])
-;;
-(define_insn "mve_vmulq_m_f<mode>"
-  [
-   (set (match_operand:MVE_0 0 "s_register_operand" "=w")
-	(unspec:MVE_0 [(match_operand:MVE_0 1 "s_register_operand" "0")
-		       (match_operand:MVE_0 2 "s_register_operand" "w")
-		       (match_operand:MVE_0 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VMULQ_M_F))
-  ]
-  "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
-  "vpst\;vmult.f%#<V_sz_elem>	%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vmulq_m_n_f])
-;;
-(define_insn "mve_vmulq_m_n_f<mode>"
-  [
-   (set (match_operand:MVE_0 0 "s_register_operand" "=w")
-	(unspec:MVE_0 [(match_operand:MVE_0 1 "s_register_operand" "0")
-		       (match_operand:MVE_0 2 "s_register_operand" "w")
-		       (match_operand:<V_elem> 3 "s_register_operand" "r")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VMULQ_M_N_F))
-  ]
-  "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
-  "vpst\;vmult.f%#<V_sz_elem>	%q0, %q2, %3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
 ;; [vornq_m_f])
 ;;
 (define_insn "mve_vornq_m_f<mode>"
@@ -7033,57 +5444,6 @@
   ]
   "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
   "vpst\;vornt %q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vorrq_m_f])
-;;
-(define_insn "mve_vorrq_m_f<mode>"
-  [
-   (set (match_operand:MVE_0 0 "s_register_operand" "=w")
-	(unspec:MVE_0 [(match_operand:MVE_0 1 "s_register_operand" "0")
-		       (match_operand:MVE_0 2 "s_register_operand" "w")
-		       (match_operand:MVE_0 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VORRQ_M_F))
-  ]
-  "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
-  "vpst\;vorrt %q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vsubq_m_f])
-;;
-(define_insn "mve_vsubq_m_f<mode>"
-  [
-   (set (match_operand:MVE_0 0 "s_register_operand" "=w")
-	(unspec:MVE_0 [(match_operand:MVE_0 1 "s_register_operand" "0")
-		       (match_operand:MVE_0 2 "s_register_operand" "w")
-		       (match_operand:MVE_0 3 "s_register_operand" "w")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VSUBQ_M_F))
-  ]
-  "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
-  "vpst\;vsubt.f%#<V_sz_elem>\t%q0, %q2, %q3"
-  [(set_attr "type" "mve_move")
-   (set_attr "length""8")])
-
-;;
-;; [vsubq_m_n_f])
-;;
-(define_insn "mve_vsubq_m_n_f<mode>"
-  [
-   (set (match_operand:MVE_0 0 "s_register_operand" "=w")
-	(unspec:MVE_0 [(match_operand:MVE_0 1 "s_register_operand" "0")
-		       (match_operand:MVE_0 2 "s_register_operand" "w")
-		       (match_operand:<V_elem> 3 "s_register_operand" "r")
-		       (match_operand:<MVE_VPRED> 4 "vpr_register_operand" "Up")]
-	 VSUBQ_M_N_F))
-  ]
-  "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
-  "vpst\;vsubt.f%#<V_sz_elem>\t%q0, %q2, %3"
   [(set_attr "type" "mve_move")
    (set_attr "length""8")])
 
@@ -8928,34 +7288,6 @@
   [(set_attr "length" "4")])
 
 ;;
-;; [vaddq_s, vaddq_u])
-;;
-(define_insn "mve_vaddq<mode>"
-  [
-   (set (match_operand:MVE_2 0 "s_register_operand" "=w")
-	(plus:MVE_2 (match_operand:MVE_2 1 "s_register_operand" "w")
-		    (match_operand:MVE_2 2 "s_register_operand" "w")))
-  ]
-  "TARGET_HAVE_MVE"
-  "vadd.i%#<V_sz_elem>\t%q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
-;; [vaddq_f])
-;;
-(define_insn "mve_vaddq_f<mode>"
-  [
-   (set (match_operand:MVE_0 0 "s_register_operand" "=w")
-	(plus:MVE_0 (match_operand:MVE_0 1 "s_register_operand" "w")
-		    (match_operand:MVE_0 2 "s_register_operand" "w")))
-  ]
-  "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
-  "vadd.f%#<V_sz_elem>\t%q0, %q1, %q2"
-  [(set_attr "type" "mve_move")
-])
-
-;;
 ;; [vidupq_n_u])
 ;;
 (define_expand "mve_vidupq_n_u<mode>"
@@ -10561,3 +8893,21 @@
     }
   DONE;
 })
+
+;; Reinterpret operand 1 in operand 0's mode, without changing its contents.
+(define_expand "@arm_mve_reinterpret<mode>"
+  [(set (match_operand:MVE_vecs 0 "register_operand")
+	(unspec:MVE_vecs
+	  [(match_operand 1 "arm_any_register_operand")]
+	  REINTERPRET))]
+  "(TARGET_HAVE_MVE && VALID_MVE_SI_MODE (<MODE>mode))
+    || (TARGET_HAVE_MVE_FLOAT && VALID_MVE_SF_MODE (<MODE>mode))"
+  {
+    machine_mode src_mode = GET_MODE (operands[1]);
+    if (targetm.can_change_mode_class (<MODE>mode, src_mode, VFP_REGS))
+      {
+	emit_move_insn (operands[0], gen_lowpart (<MODE>mode, operands[1]));
+	DONE;
+      }
+  }
+)

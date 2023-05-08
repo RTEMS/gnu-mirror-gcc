@@ -60,6 +60,15 @@ along with GCC; see the file COPYING3.  If not see
 #include "opts.h"
 #include "tm-constrs.h"
 #include "rtl-iter.h"
+#include "gimple.h"
+#include "cfghooks.h"
+#include "cfgloop.h"
+#include "cfgrtl.h"
+#include "sel-sched.h"
+#include "fold-const.h"
+#include "gimple-iterator.h"
+#include "gimple-expr.h"
+#include "tree-vectorizer.h"
 
 /* This file should be included last.  */
 #include "target-def.h"
@@ -997,13 +1006,39 @@ riscv_v_ext_vector_mode_p (machine_mode mode)
   return false;
 }
 
+/* Return true if mode is the RVV enabled tuple mode.  */
+
+bool
+riscv_v_ext_tuple_mode_p (machine_mode mode)
+{
+#define TUPLE_ENTRY(MODE, REQUIREMENT, ...)                                    \
+  case MODE##mode:                                                             \
+    return REQUIREMENT;
+  switch (mode)
+    {
+#include "riscv-vector-switch.def"
+    default:
+      return false;
+    }
+
+  return false;
+}
+
+/* Return true if it is either RVV vector mode or RVV tuple mode.  */
+
+static bool
+riscv_v_ext_mode_p (machine_mode mode)
+{
+  return riscv_v_ext_vector_mode_p (mode) || riscv_v_ext_tuple_mode_p (mode);
+}
+
 /* Call from ADJUST_NUNITS in riscv-modes.def. Return the correct
    NUNITS size for corresponding machine_mode.  */
 
 poly_int64
 riscv_v_adjust_nunits (machine_mode mode, int scale)
 {
-  if (riscv_v_ext_vector_mode_p (mode))
+  if (riscv_v_ext_mode_p (mode))
     return riscv_vector_chunks * scale;
   return scale;
 }
@@ -1061,7 +1096,7 @@ riscv_classify_address (struct riscv_address_info *info, rtx x,
 
     case PLUS:
       /* RVV load/store disallow any offset.  */
-      if (riscv_v_ext_vector_mode_p (mode))
+      if (riscv_v_ext_mode_p (mode))
 	return false;
 
       info->type = ADDRESS_REG;
@@ -1072,7 +1107,7 @@ riscv_classify_address (struct riscv_address_info *info, rtx x,
 
     case LO_SUM:
       /* RVV load/store disallow LO_SUM.  */
-      if (riscv_v_ext_vector_mode_p (mode))
+      if (riscv_v_ext_mode_p (mode))
 	return false;
 
       info->type = ADDRESS_LO_SUM;
@@ -1107,7 +1142,7 @@ riscv_classify_address (struct riscv_address_info *info, rtx x,
 	 | vs1r.v  v24,0(a0)					    |
 	 +----------------------------------------------------------+
 	 This behavior will benefit the underlying RVV auto vectorization.  */
-      if (riscv_v_ext_vector_mode_p (mode))
+      if (riscv_v_ext_mode_p (mode))
 	return x == const0_rtx;
 
       /* Small-integer addresses don't occur very often, but they
@@ -2229,7 +2264,7 @@ riscv_immediate_operand_p (int code, HOST_WIDE_INT x)
 static int
 riscv_binary_cost (rtx x, int single_insns, int double_insns)
 {
-  if (!riscv_v_ext_vector_mode_p (GET_MODE (x))
+  if (!riscv_v_ext_mode_p (GET_MODE (x))
       && GET_MODE_SIZE (GET_MODE (x)).to_constant () == UNITS_PER_WORD * 2)
     return COSTS_N_INSNS (double_insns);
   return COSTS_N_INSNS (single_insns);
@@ -2279,7 +2314,7 @@ riscv_rtx_costs (rtx x, machine_mode mode, int outer_code, int opno ATTRIBUTE_UN
 {
   /* TODO: We set RVV instruction cost as 1 by default.
      Cost Model need to be well analyzed and supported in the future. */
-  if (riscv_v_ext_vector_mode_p (mode))
+  if (riscv_v_ext_mode_p (mode))
     {
       *total = COSTS_N_INSNS (1);
       return true;
@@ -3765,6 +3800,13 @@ riscv_get_arg_info (struct riscv_arg_info *info, const CUMULATIVE_ARGS *cum,
   info->gpr_offset = cum->num_gprs;
   info->fpr_offset = cum->num_fprs;
 
+  /* TODO: Currently, it will cause an ICE for --param
+     riscv-autovec-preference=fixed-vlmax. So, we just return NULL_RTX here
+     let GCC generate loads/stores. Ideally, we should either warn the user not
+     to use an RVV vector type as function argument or support the calling
+     convention directly.  */
+  if (riscv_v_ext_mode_p (mode))
+    return NULL_RTX;
   if (named)
     {
       riscv_aggregate_field fields[2];
@@ -5956,7 +5998,7 @@ static bool
 riscv_secondary_memory_needed (machine_mode mode, reg_class_t class1,
 			       reg_class_t class2)
 {
-  return (!riscv_v_ext_vector_mode_p (mode)
+  return (!riscv_v_ext_mode_p (mode)
 	  && GET_MODE_SIZE (mode).to_constant () > UNITS_PER_WORD
 	  && (class1 == FP_REGS) != (class2 == FP_REGS)
 	  && !TARGET_XTHEADFMV);
@@ -5990,6 +6032,22 @@ riscv_hard_regno_nregs (unsigned int regno, machine_mode mode)
       return exact_div (GET_MODE_SIZE (mode), UNITS_PER_V_REG).to_constant ();
     }
 
+  /* For tuple modes, the number of register = NF * LMUL.  */
+  if (riscv_v_ext_tuple_mode_p (mode))
+    {
+      unsigned int nf = riscv_vector::get_nf (mode);
+      machine_mode subpart_mode = riscv_vector::get_subpart_mode (mode);
+      poly_int64 size = GET_MODE_SIZE (subpart_mode);
+      gcc_assert (known_eq (size * nf, GET_MODE_SIZE (mode)));
+      if (maybe_lt (size, UNITS_PER_V_REG))
+	return nf;
+      else
+	{
+	  unsigned int lmul = exact_div (size, UNITS_PER_V_REG).to_constant ();
+	  return nf * lmul;
+	}
+    }
+
   /* mode for VL or VTYPE are just a marker, not holding value,
      so it always consume one register.  */
   if (regno == VTYPE_REGNUM || regno == VL_REGNUM)
@@ -6015,7 +6073,7 @@ riscv_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
 
   if (GP_REG_P (regno))
     {
-      if (riscv_v_ext_vector_mode_p (mode))
+      if (riscv_v_ext_mode_p (mode))
 	return false;
 
       if (!GP_REG_P (regno + nregs - 1))
@@ -6023,7 +6081,7 @@ riscv_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
     }
   else if (FP_REG_P (regno))
     {
-      if (riscv_v_ext_vector_mode_p (mode))
+      if (riscv_v_ext_mode_p (mode))
 	return false;
 
       if (!FP_REG_P (regno + nregs - 1))
@@ -6042,7 +6100,7 @@ riscv_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
     }
   else if (V_REG_P (regno))
     {
-      if (!riscv_v_ext_vector_mode_p (mode))
+      if (!riscv_v_ext_mode_p (mode))
 	return false;
 
       if (!V_REG_P (regno + nregs - 1))
@@ -6051,8 +6109,12 @@ riscv_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
       /* 3.3.2. LMUL = 2,4,8, register numbers should be multiple of 2,4,8.
 	 but for mask vector register, register numbers can be any number. */
       int lmul = 1;
-      if (known_gt (GET_MODE_SIZE (mode), UNITS_PER_V_REG))
-	lmul = exact_div (GET_MODE_SIZE (mode), UNITS_PER_V_REG).to_constant ();
+      machine_mode rvv_mode = mode;
+      if (riscv_v_ext_tuple_mode_p (rvv_mode))
+	rvv_mode = riscv_vector::get_subpart_mode (rvv_mode);
+      poly_int64 size = GET_MODE_SIZE (rvv_mode);
+      if (known_gt (size, UNITS_PER_V_REG))
+	lmul = exact_div (size, UNITS_PER_V_REG).to_constant ();
       if (lmul != 1)
 	return ((regno % lmul) == 0);
     }
@@ -6288,7 +6350,15 @@ riscv_convert_vector_bits (void)
      to set RVV mode size. The RVV machine modes size are run-time constant if
      TARGET_VECTOR is enabled. The RVV machine modes size remains default
      compile-time constant if TARGET_VECTOR is disabled.  */
-  return TARGET_VECTOR ? poly_uint16 (1, 1) : 1;
+  if (TARGET_VECTOR)
+    {
+      if (riscv_autovec_preference == RVV_FIXED_VLMAX)
+	return (int) TARGET_MIN_VLEN / (riscv_bytes_per_vector_chunk * 8);
+      else
+	return poly_uint16 (1, 1);
+    }
+  else
+    return 1;
 }
 
 /* Implement TARGET_OPTION_OVERRIDE.  */
@@ -7075,7 +7145,7 @@ static bool
 riscv_vector_mode_supported_p (machine_mode mode)
 {
   if (TARGET_VECTOR)
-    return riscv_v_ext_vector_mode_p (mode);
+    return riscv_v_ext_mode_p (mode);
 
   return false;
 }
@@ -7117,8 +7187,17 @@ riscv_regmode_natural_size (machine_mode mode)
      anything smaller than that.  */
   /* ??? For now, only do this for variable-width RVV registers.
      Doing it for constant-sized registers breaks lower-subreg.c.  */
-  if (!riscv_vector_chunks.is_constant () && riscv_v_ext_vector_mode_p (mode))
-    return BYTES_PER_RISCV_VECTOR;
+  if (!riscv_vector_chunks.is_constant () && riscv_v_ext_mode_p (mode))
+    {
+      if (riscv_v_ext_tuple_mode_p (mode))
+	{
+	  poly_uint64 size
+	    = GET_MODE_SIZE (riscv_vector::get_subpart_mode (mode));
+	  if (known_lt (size, BYTES_PER_RISCV_VECTOR))
+	    return size;
+	}
+      return BYTES_PER_RISCV_VECTOR;
+    }
   return UNITS_PER_WORD;
 }
 
@@ -7136,6 +7215,101 @@ riscv_dwarf_poly_indeterminate_value (unsigned int i, unsigned int *factor,
   *factor = riscv_bytes_per_vector_chunk;
   *offset = 1;
   return RISCV_DWARF_VLENB;
+}
+
+/* Implement TARGET_ESTIMATED_POLY_VALUE.
+   Look into the tuning structure for an estimate.
+   KIND specifies the type of requested estimate: min, max or likely.
+   For cores with a known RVV width all three estimates are the same.
+   For generic RVV tuning we want to distinguish the maximum estimate from
+   the minimum and likely ones.
+   The likely estimate is the same as the minimum in that case to give a
+   conservative behavior of auto-vectorizing with RVV when it is a win
+   even for 128-bit RVV.
+   When RVV width information is available VAL.coeffs[1] is multiplied by
+   the number of VQ chunks over the initial Advanced SIMD 128 bits.  */
+
+static HOST_WIDE_INT
+riscv_estimated_poly_value (poly_int64 val,
+			    poly_value_estimate_kind kind = POLY_VALUE_LIKELY)
+{
+  unsigned int width_source = BITS_PER_RISCV_VECTOR.is_constant ()
+    ? (unsigned int) BITS_PER_RISCV_VECTOR.to_constant ()
+    : (unsigned int) RVV_SCALABLE;
+
+  /* If there is no core-specific information then the minimum and likely
+     values are based on 128-bit vectors and the maximum is based on
+     the architectural maximum of 65536 bits.  */
+  if (width_source == RVV_SCALABLE)
+    switch (kind)
+      {
+      case POLY_VALUE_MIN:
+      case POLY_VALUE_LIKELY:
+	return val.coeffs[0];
+
+      case POLY_VALUE_MAX:
+	return val.coeffs[0] + val.coeffs[1] * 15;
+      }
+
+  /* Allow BITS_PER_RISCV_VECTOR to be a bitmask of different VL, treating the
+     lowest as likely.  This could be made more general if future -mtune
+     options need it to be.  */
+  if (kind == POLY_VALUE_MAX)
+    width_source = 1 << floor_log2 (width_source);
+  else
+    width_source = least_bit_hwi (width_source);
+
+  /* If the core provides width information, use that.  */
+  HOST_WIDE_INT over_128 = width_source - 128;
+  return val.coeffs[0] + val.coeffs[1] * over_128 / 128;
+}
+
+bool
+riscv_support_vector_misalignment (machine_mode mode,
+				   const_tree type ATTRIBUTE_UNUSED,
+				   int misalignment,
+				   bool is_packed ATTRIBUTE_UNUSED)
+{
+  if (TARGET_VECTOR)
+    {
+      if (STRICT_ALIGNMENT)
+	{
+	  /* Return if movmisalign pattern is not supported for this mode.  */
+	  if (optab_handler (movmisalign_optab, mode) == CODE_FOR_nothing)
+	    return false;
+
+	  /* Misalignment factor is unknown at compile time.  */
+	  if (misalignment == -1)
+	    return false;
+	}
+      return true;
+    }
+
+  return default_builtin_support_vector_misalignment (mode, type, misalignment,
+						      is_packed);
+}
+
+/* Implement TARGET_VECTORIZE_GET_MASK_MODE.  */
+
+static opt_machine_mode
+riscv_get_mask_mode (machine_mode mode)
+{
+  machine_mode mask_mode = VOIDmode;
+  if (TARGET_VECTOR
+      && riscv_vector::riscv_vector_get_mask_mode (mode).exists (&mask_mode))
+    return mask_mode;
+
+  return default_get_mask_mode (mode);
+}
+
+/* Implement TARGET_VECTORIZE_EMPTY_MASK_IS_EXPENSIVE.  Assume for now that
+   it isn't worth branching around empty masked ops (including masked
+   stores).  */
+
+static bool
+riscv_empty_mask_is_expensive (unsigned)
+{
+  return false;
 }
 
 /* Return true if a shift-amount matches the trailing cleared bits on
@@ -7218,6 +7392,19 @@ riscv_zero_call_used_regs (HARD_REG_SET need_zeroed_hardregs)
 							& ~zeroed_hardregs);
 }
 
+/* Implement target hook TARGET_ARRAY_MODE.  */
+
+static opt_machine_mode
+riscv_array_mode (machine_mode mode, unsigned HOST_WIDE_INT nelems)
+{
+  machine_mode vmode;
+  if (TARGET_VECTOR
+      && riscv_vector::get_tuple_mode (mode, nelems).exists (&vmode))
+    return vmode;
+
+  return opt_machine_mode ();
+}
+
 /* Given memory reference MEM, expand code to compute the aligned
    memory address, shift and mask values and store them into
    *ALIGNED_MEM, *SHIFT, *MASK and *NOT_MASK.  */
@@ -7275,6 +7462,17 @@ bool
 riscv_use_divmod_expander (void)
 {
   return tune_param->use_divmod_expansion;
+}
+
+/* Implement TARGET_VECTORIZE_PREFERRED_SIMD_MODE.  */
+
+static machine_mode
+riscv_preferred_simd_mode (scalar_mode mode)
+{
+  if (TARGET_VECTOR)
+    return riscv_vector::preferred_simd_mode (mode);
+
+  return word_mode;
 }
 
 /* Initialize the GCC target structure.  */
@@ -7522,14 +7720,32 @@ riscv_use_divmod_expander (void)
 #undef TARGET_VERIFY_TYPE_CONTEXT
 #define TARGET_VERIFY_TYPE_CONTEXT riscv_verify_type_context
 
+#undef TARGET_ESTIMATED_POLY_VALUE
+#define TARGET_ESTIMATED_POLY_VALUE riscv_estimated_poly_value
+
+#undef TARGET_VECTORIZE_GET_MASK_MODE
+#define TARGET_VECTORIZE_GET_MASK_MODE riscv_get_mask_mode
+
+#undef TARGET_VECTORIZE_EMPTY_MASK_IS_EXPENSIVE
+#define TARGET_VECTORIZE_EMPTY_MASK_IS_EXPENSIVE riscv_empty_mask_is_expensive
+
 #undef TARGET_VECTOR_ALIGNMENT
 #define TARGET_VECTOR_ALIGNMENT riscv_vector_alignment
+
+#undef TARGET_VECTORIZE_SUPPORT_VECTOR_MISALIGNMENT
+#define TARGET_VECTORIZE_SUPPORT_VECTOR_MISALIGNMENT riscv_support_vector_misalignment
 
 #undef TARGET_DWARF_POLY_INDETERMINATE_VALUE
 #define TARGET_DWARF_POLY_INDETERMINATE_VALUE riscv_dwarf_poly_indeterminate_value
 
 #undef TARGET_ZERO_CALL_USED_REGS
 #define TARGET_ZERO_CALL_USED_REGS riscv_zero_call_used_regs
+
+#undef TARGET_ARRAY_MODE
+#define TARGET_ARRAY_MODE riscv_array_mode
+
+#undef TARGET_VECTORIZE_PREFERRED_SIMD_MODE
+#define TARGET_VECTORIZE_PREFERRED_SIMD_MODE riscv_preferred_simd_mode
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

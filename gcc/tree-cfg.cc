@@ -1236,7 +1236,7 @@ assign_discriminators (void)
 	    curr_discr = next_discriminator_for_locus (curr_locus);
 	}
 
-      gimple *last = last_stmt (bb);
+      gimple *last = last_nondebug_stmt (bb);
       location_t locus = last ? gimple_location (last) : UNKNOWN_LOCATION;
       if (locus == UNKNOWN_LOCATION)
 	continue;
@@ -1246,7 +1246,7 @@ assign_discriminators (void)
       FOR_EACH_EDGE (e, ei, bb->succs)
 	{
 	  gimple *first = first_non_label_stmt (e->dest);
-	  gimple *last = last_stmt (e->dest);
+	  gimple *last = last_nondebug_stmt (e->dest);
 
 	  gimple *stmt_on_same_line = NULL;
 	  if (first && same_line_p (locus, &locus_e,
@@ -1860,7 +1860,7 @@ group_case_labels_stmt (gswitch *stmt)
 	     -Wreturn-type can be diagnosed.  We'll optimize it later
 	     during switchconv pass or any other cfg cleanup.  */
 	  && (gimple_in_ssa_p (cfun)
-	      || (LOCATION_LOCUS (gimple_location (last_stmt (base_bb)))
+	      || (LOCATION_LOCUS (gimple_location (last_nondebug_stmt (base_bb)))
 		  != BUILTINS_LOCATION)))
 	{
 	  edge base_edge = find_edge (gimple_bb (stmt), base_bb);
@@ -2941,7 +2941,7 @@ first_non_label_stmt (basic_block bb)
 /* Return the last statement in basic block BB.  */
 
 gimple *
-last_stmt (basic_block bb)
+last_nondebug_stmt (basic_block bb)
 {
   gimple_stmt_iterator i = gsi_last_bb (bb);
   gimple *stmt = NULL;
@@ -6409,7 +6409,7 @@ gimple_split_block_before_cond_jump (basic_block bb)
 static bool
 gimple_can_duplicate_bb_p (const_basic_block bb)
 {
-  gimple *last = last_stmt (CONST_CAST_BB (bb));
+  gimple *last = last_nondebug_stmt (CONST_CAST_BB (bb));
 
   /* Do checks that can only fail for the last stmt, to minimize the work in the
      stmt loop.  */
@@ -6802,6 +6802,32 @@ bb_part_of_region_p (basic_block bb, basic_block* bbs, unsigned n_region)
   return false;
 }
 
+
+/* For each PHI in BB, copy the argument associated with SRC_E to TGT_E.
+   Assuming the argument exists, just does not have a value.  */
+
+void
+copy_phi_arg_into_existing_phi (edge src_e, edge tgt_e)
+{
+  int src_idx = src_e->dest_idx;
+  int tgt_idx = tgt_e->dest_idx;
+
+  /* Iterate over each PHI in e->dest.  */
+  for (gphi_iterator gsi = gsi_start_phis (src_e->dest),
+			   gsi2 = gsi_start_phis (tgt_e->dest);
+       !gsi_end_p (gsi);
+       gsi_next (&gsi), gsi_next (&gsi2))
+    {
+      gphi *src_phi = gsi.phi ();
+      gphi *dest_phi = gsi2.phi ();
+      tree val = gimple_phi_arg_def (src_phi, src_idx);
+      location_t locus = gimple_phi_arg_location (src_phi, src_idx);
+
+      SET_PHI_ARG_DEF (dest_phi, tgt_idx, val);
+      gimple_phi_arg_set_location (dest_phi, tgt_idx, locus);
+    }
+}
+
 /* Duplicates REGION consisting of N_REGION blocks.  The new blocks
    are stored to REGION_COPY in the same order in that they appear
    in REGION, if REGION_COPY is not NULL.  ENTRY is the entry to
@@ -6847,9 +6873,6 @@ gimple_duplicate_sese_tail (edge entry, edge exit,
   gimple_stmt_iterator gsi;
   edge sorig, snew;
   basic_block exit_bb;
-  gphi_iterator psi;
-  gphi *phi;
-  tree def;
   class loop *target, *aloop, *cloop;
 
   gcc_assert (EDGE_COUNT (exit->src->succs) == 2);
@@ -6947,14 +6970,7 @@ gimple_duplicate_sese_tail (edge entry, edge exit,
 	gcc_assert (single_succ_edge (region_copy[i]));
 	e = redirect_edge_and_branch (single_succ_edge (region_copy[i]), exit_bb);
 	PENDING_STMT (e) = NULL;
-	for (psi = gsi_start_phis (exit_bb);
-	     !gsi_end_p (psi);
-	     gsi_next (&psi))
-	  {
-	    phi = psi.phi ();
-	    def = PHI_ARG_DEF (phi, nexits[0]->dest_idx);
-	    add_phi_arg (phi, def, e, gimple_phi_arg_location_from_edge (phi, e));
-	  }
+	copy_phi_arg_into_existing_phi (nexits[0], e);
       }
   e = redirect_edge_and_branch (nexits[1], nexits[0]->dest);
   PENDING_STMT (e) = NULL;
@@ -9954,7 +9970,7 @@ execute_fixup_cfg (void)
 	 when inlining a noreturn call that does in fact return.  */
       if (EDGE_COUNT (bb->succs) == 0)
 	{
-	  gimple *stmt = last_stmt (bb);
+	  gimple *stmt = last_nondebug_stmt (bb);
 	  if (!stmt
 	      || (!is_ctrl_stmt (stmt)
 		  && (!is_gimple_call (stmt)

@@ -357,14 +357,14 @@
     }
 })
 
-(define_insn "mve_vshlq_<supf><mode>"
+(define_insn "@mve_<mve_insn>q_<supf><mode>"
   [(set (match_operand:VDQIW 0 "s_register_operand" "=w,w")
 	(unspec:VDQIW [(match_operand:VDQIW 1 "s_register_operand" "w,w")
 		       (match_operand:VDQIW 2 "imm_lshift_or_reg_neon" "w,Ds")]
 	 VSHLQ))]
   "ARM_HAVE_<MODE>_ARITH && !TARGET_REALLY_IWMMXT"
   "@
-   vshl.<supf>%#<V_sz_elem>\t%<V_reg>0, %<V_reg>1, %<V_reg>2
+   <mve_insn>.<supf>%#<V_sz_elem>\t%<V_reg>0, %<V_reg>1, %<V_reg>2
    * return neon_output_shift_immediate (\"vshl\", 'i', &operands[2], <MODE>mode, VALID_NEON_QREG_MODE (<MODE>mode), true);"
   [(set_attr "type" "neon_shift_reg<q>, neon_shift_imm<q>")]
 )
@@ -573,7 +573,7 @@
   "ARM_HAVE_<MODE>_ARITH"
 {
   if (TARGET_HAVE_MVE)
-    emit_insn (gen_mve_vhaddq (VHADDQ_S, <MODE>mode,
+    emit_insn (gen_mve_q (VHADDQ_S, VHADDQ_S, <MODE>mode,
 			       operands[0], operands[1], operands[2]));
   else
     emit_insn (gen_neon_vhadd (UNSPEC_VHADD_S, UNSPEC_VHADD_S, <MODE>mode,
@@ -588,7 +588,7 @@
   "ARM_HAVE_<MODE>_ARITH"
 {
   if (TARGET_HAVE_MVE)
-    emit_insn (gen_mve_vhaddq (VHADDQ_U, <MODE>mode,
+    emit_insn (gen_mve_q (VHADDQ_U, VHADDQ_U, <MODE>mode,
 			       operands[0], operands[1], operands[2]));
   else
     emit_insn (gen_neon_vhadd (UNSPEC_VHADD_U, UNSPEC_VHADD_U, <MODE>mode,
@@ -603,7 +603,7 @@
   "ARM_HAVE_<MODE>_ARITH"
 {
   if (TARGET_HAVE_MVE)
-    emit_insn (gen_mve_vrhaddq (VRHADDQ_S, <MODE>mode,
+    emit_insn (gen_mve_q (VRHADDQ_S, VRHADDQ_S, <MODE>mode,
 				operands[0], operands[1], operands[2]));
   else
     emit_insn (gen_neon_vhadd (UNSPEC_VRHADD_S, UNSPEC_VRHADD_S, <MODE>mode,
@@ -618,7 +618,7 @@
   "ARM_HAVE_<MODE>_ARITH"
 {
   if (TARGET_HAVE_MVE)
-    emit_insn (gen_mve_vrhaddq (VRHADDQ_U, <MODE>mode,
+    emit_insn (gen_mve_q (VRHADDQ_U, VRHADDQ_U, <MODE>mode,
 				operands[0], operands[1], operands[2]));
   else
     emit_insn (gen_neon_vhadd (UNSPEC_VRHADD_U, UNSPEC_VRHADD_U, <MODE>mode,

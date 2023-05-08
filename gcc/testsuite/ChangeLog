@@ -1,3 +1,316 @@
+2023-05-07  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/85979
+	* g++.dg/diagnostic/alignof4.C: New test.
+
+2023-05-07  Patrick Palka  <ppalka@redhat.com>
+
+	DR 2256
+	PR c++/103091
+	* g++.old-deja/g++.other/init9.C: Don't expect diagnostics for
+	goto made valid by DR 2256.
+	* g++.dg/init/goto4.C: New test.
+
+2023-05-07  Patrick Palka  <ppalka@redhat.com>
+
+	* g++.dg/cpp2a/concepts-alias6.C: New test.
+
+2023-05-07  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/98283
+	* g++.dg/cpp1y/paren6.C: New test.
+
+2023-05-07  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/109651
+	* g++.dg/cpp2a/lambda-generic-ttp1.C: New test.
+	* g++.dg/cpp2a/lambda-generic-ttp2.C: New test.
+
+2023-05-07  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/109480
+	* g++.dg/template/non-dependent25a.C: New test.
+
+2023-05-07  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/109480
+	* g++.dg/cpp0x/noexcept59.C: Make e() constexpr so that the
+	expected "without object" diagnostic isn't replaced by a
+	"call to non-constexpr function" diagnostic.
+	* g++.dg/template/non-dependent25.C: New test.
+
+2023-05-07  Jiufu Guo  <guojiufu@linux.ibm.com>
+
+	* gcc.target/powerpc/parall_5insn_const.c: New test.
+
+2023-05-07  Roger Sayle  <roger@nextmovesoftware.com>
+
+	PR target/43644
+	* gcc.target/i386/pr43644.c: New test case.
+
+2023-05-06  Xi Ruoyao  <xry111@xry111.site>
+
+	* gcc.target/loongarch/shrink-wrap.c: New test.
+
+2023-05-06  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/rvv.exp: Add testcases for RVV auto-vectorization.
+	* gcc.target/riscv/rvv/autovec/fixed-vlmax-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/partial/single_rgroup-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/partial/single_rgroup-1.h: New test.
+	* gcc.target/riscv/rvv/autovec/partial/single_rgroup_run-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/scalable-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/template-1.h: New test.
+	* gcc.target/riscv/rvv/autovec/v-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/v-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve32f-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve32f-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve32f-3.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve32f_zvl128b-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve32f_zvl128b-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve32x-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve32x-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve32x-3.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve32x_zvl128b-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve32x_zvl128b-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve64d-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve64d-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve64d-3.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve64d_zvl128b-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve64d_zvl128b-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve64f-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve64f-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve64f-3.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve64f_zvl128b-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve64f_zvl128b-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve64x-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve64x-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve64x-3.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve64x_zvl128b-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/zve64x_zvl128b-2.c: New test.
+
+2023-05-06  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	PR fortran/109662
+	* gfortran.dg/pr109662.f90: New test.
+
+2023-05-06  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.dg/tree-ssa/range-sincos-2.c: New test.
+
+2023-05-06  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/109748
+	* gcc.target/riscv/rvv/vsetvl/pr109748.c: New test.
+
+2023-05-06  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.dg/tree-ssa/range-sqrt-2.c: New test.
+
+2023-05-06  Hans-Peter Nilsson  <hp@axis.com>
+
+	* gcc.target/cris/peep2-addsplit1.c: New test.
+
+2023-05-05  Hans-Peter Nilsson  <hp@axis.com>
+
+	* gcc.target/cris/peep2-movandsplit1.c: New test.
+
+2023-05-05  Hans-Peter Nilsson  <hp@axis.com>
+
+	* gcc.target/cris/peep2-lsrandsplit1.c,
+	gcc.target/cris/peep2-movulsr2.c: New tests.
+
+2023-05-05  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/109641
+	* gfortran.dg/overload_5.f90: New test.
+
+2023-05-05  Pan Li  <pan2.li@intel.com>
+	    Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/base/zero_base_load_store_optimization.c:
+	Adjust indexed load/store check condition.
+
+2023-05-05  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/base/integer_compare_insn_shortcut.c:
+	Adjust test check condition.
+
+2023-05-05  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/109615
+	* gcc.target/riscv/rvv/vsetvl/avl_single-74.c: Adapt testcase.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-11.c: Ditto.
+	* gcc.target/riscv/rvv/vsetvl/pr109615.c: New test.
+
+2023-05-05  Uros Bizjak  <ubizjak@gmail.com>
+
+	* gcc.target/i386/sse2-mmx-mult-vec.c: New test.
+
+2023-05-05  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/109732
+	* gcc.dg/pr109732.c: New test.
+	* gcc.dg/pr109732-1.c: New test.
+
+2023-05-05  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/109722
+	* gcc.dg/tree-ssa/abs-1.c: New test.
+
+2023-05-04  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109729
+	* gm2/pim/run/pass/ForChar.mod: New test.
+
+2023-05-04  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* gcc.target/aarch64/simd/pr99195_4.c: New test.
+
+2023-05-04  Julian Brown  <julian@codesourcery.com>
+
+	PR fortran/109622
+	* gfortran.dg/goacc/pr109622-5.f90: New test.
+	* gfortran.dg/goacc/pr109622-6.f90: New test.
+
+2023-05-04  Andrew Pinski  <apinski@marvell.com>
+
+	* gcc.dg/tree-ssa/minmax-15.c: Update test.
+	* gcc.dg/tree-ssa/minmax-16.c: Update test.
+	* gcc.dg/tree-ssa/minmax-3.c: Update test.
+	* gcc.dg/tree-ssa/minmax-4.c: Update test.
+	* gcc.dg/tree-ssa/minmax-5.c: Update test.
+	* gcc.dg/tree-ssa/minmax-8.c: Update test.
+
+2023-05-04  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/99195
+	* gcc.target/aarch64/simd/pr99195_3.c: New test.
+
+2023-05-04  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/99195
+	* gcc.target/aarch64/simd/pr99195_1.c: Add testing for more binary ops.
+	* gcc.target/aarch64/simd/pr99195_2.c: Add testing for more binary ops.
+
+2023-05-04  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109724
+	* g++.dg/torture/pr109724.C: New testcase.
+
+2023-05-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/109676
+	* g++.target/i386/pr109676.C: New test.
+
+2023-05-04  Hans-Peter Nilsson  <hp@axis.com>
+
+	* gcc.target/cris/peep2-andsplit1.c: New test.
+	* gcc.target/cris/peep2-andu1.c, gcc.target/cris/peep2-andu2.c,
+	gcc.target/cris/peep2-xsrand.c, gcc.target/cris/peep2-xsrand2.c:
+	Adjust values to avoid interference with "opsplit1" with AND.  Add
+	whitespace to match-strings that may be confused with identifiers
+	or file names.
+
+2023-05-03  Jason Merrill  <jason@redhat.com>
+
+	PR c++/91618
+	PR c++/109649
+	* g++.dg/template/friend77.C: New test.
+
+2023-05-03  Aldy Hernandez  <aldyh@redhat.com>
+
+	PR tree-optimization/109711
+	* gcc.dg/tree-ssa/pr109711-1.c: New file.
+	* gcc.dg/tree-ssa/pr109711-2.c: New file.
+
+2023-05-03  Alexander Monakov  <amonakov@ispras.ru>
+
+	PR sanitizer/90746
+	* gcc.dg/sancov/basic0.c: Verify absence of tailcall.
+
+2023-05-03  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* g++.target/aarch64/pr109661-1.C: New test.
+	* g++.target/aarch64/pr109661-2.C: Likewise.
+	* g++.target/aarch64/pr109661-3.C: Likewise.
+	* g++.target/aarch64/pr109661-4.C: Likewise.
+	* gcc.target/aarch64/pr109661-1.c: Likewise.
+
+2023-05-03  Murray Steele  <murray.steele@arm.com>
+	    Christophe Lyon  <christophe.lyon@arm.com>
+
+	* g++.target/arm/mve.exp: Add general-c++ and general directories.
+	* g++.target/arm/mve/general-c++/nomve_fp_1.c: New test.
+	* g++.target/arm/mve/general-c++/vreinterpretq_1.C: New test.
+	* gcc.target/arm/mve/general-c/nomve_fp_1.c: New test.
+	* gcc.target/arm/mve/general-c/vreinterpretq_1.c: New test.
+
+2023-05-03  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/base/abi-10.c: New test.
+	* gcc.target/riscv/rvv/base/abi-11.c: New test.
+	* gcc.target/riscv/rvv/base/abi-12.c: New test.
+	* gcc.target/riscv/rvv/base/abi-13.c: New test.
+	* gcc.target/riscv/rvv/base/abi-14.c: New test.
+	* gcc.target/riscv/rvv/base/abi-15.c: New test.
+	* gcc.target/riscv/rvv/base/abi-16.c: New test.
+	* gcc.target/riscv/rvv/base/abi-8.c: New test.
+	* gcc.target/riscv/rvv/base/abi-9.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-1.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-10.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-11.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-12.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-13.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-14.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-15.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-16.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-17.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-18.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-19.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-2.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-20.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-21.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-22.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-23.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-24.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-25.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-26.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-27.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-3.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-4.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-5.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-6.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-7.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-8.c: New test.
+	* gcc.target/riscv/rvv/base/tuple-9.c: New test.
+	* gcc.target/riscv/rvv/base/user-10.c: New test.
+	* gcc.target/riscv/rvv/base/user-11.c: New test.
+	* gcc.target/riscv/rvv/base/user-12.c: New test.
+	* gcc.target/riscv/rvv/base/user-13.c: New test.
+	* gcc.target/riscv/rvv/base/user-14.c: New test.
+	* gcc.target/riscv/rvv/base/user-15.c: New test.
+	* gcc.target/riscv/rvv/base/user-7.c: New test.
+	* gcc.target/riscv/rvv/base/user-8.c: New test.
+	* gcc.target/riscv/rvv/base/user-9.c: New test.
+
+2023-05-03  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/99195
+	* gcc.target/aarch64/simd/pr99195_1.c: Add tests for halving and rounding
+	add/sub intrinsics.
+
+2023-05-03  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/99195
+	* gcc.target/aarch64/simd/pr99195_1.c: Add testing for some unary
+	and binary floating-point ops.
+	* gcc.target/aarch64/simd/pr99195_2.c: New test.
+
+2023-05-03  Jason Merrill  <jason@redhat.com>
+
+	* g++.dg/template/nontype12.C: Check for duplicate error.
+
 2023-05-02  Andrew Pinski  <apinski@marvell.com>
 
 	PR tree-optimization/109702

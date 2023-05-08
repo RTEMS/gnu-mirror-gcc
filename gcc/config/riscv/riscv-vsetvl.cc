@@ -200,7 +200,9 @@ scalar_move_insn_p (rtx_insn *rinsn)
 static bool
 fault_first_load_p (rtx_insn *rinsn)
 {
-  return recog_memoized (rinsn) >= 0 && get_attr_type (rinsn) == TYPE_VLDFF;
+  return recog_memoized (rinsn) >= 0
+	 && (get_attr_type (rinsn) == TYPE_VLDFF
+	     || get_attr_type (rinsn) == TYPE_VLSEGDFF);
 }
 
 /* Return true if the instruction is read vl instruction.  */
@@ -1054,51 +1056,6 @@ change_vsetvl_insn (const insn_info *insn, const vector_insn_info &info)
   change_insn (rinsn, new_pat);
 }
 
-static void
-local_eliminate_vsetvl_insn (const vector_insn_info &dem)
-{
-  const insn_info *insn = dem.get_insn ();
-  if (!insn || insn->is_artificial ())
-    return;
-  rtx_insn *rinsn = insn->rtl ();
-  const bb_info *bb = insn->bb ();
-  if (vsetvl_insn_p (rinsn))
-    {
-      rtx vl = get_vl (rinsn);
-      for (insn_info *i = insn->next_nondebug_insn ();
-	   real_insn_and_same_bb_p (i, bb); i = i->next_nondebug_insn ())
-	{
-	  if (i->is_call () || i->is_asm ()
-	      || find_access (i->defs (), VL_REGNUM)
-	      || find_access (i->defs (), VTYPE_REGNUM))
-	    return;
-
-	  if (has_vtype_op (i->rtl ()))
-	    {
-	      if (!vsetvl_discard_result_insn_p (PREV_INSN (i->rtl ())))
-		return;
-	      rtx avl = get_avl (i->rtl ());
-	      if (avl != vl)
-		return;
-	      set_info *def = find_access (i->uses (), REGNO (avl))->def ();
-	      if (def->insn () != insn)
-		return;
-
-	      vector_insn_info new_info;
-	      new_info.parse_insn (i);
-	      if (!new_info.skip_avl_compatible_p (dem))
-		return;
-
-	      new_info.set_avl_info (dem.get_avl_info ());
-	      new_info = dem.merge (new_info, LOCAL_MERGE);
-	      change_vsetvl_insn (insn, new_info);
-	      eliminate_insn (PREV_INSN (i->rtl ()));
-	      return;
-	    }
-	}
-    }
-}
-
 static bool
 source_equal_p (insn_info *insn1, insn_info *insn2)
 {
@@ -1674,72 +1631,29 @@ avl_info::single_source_equal_p (const avl_info &other) const
 bool
 avl_info::multiple_source_equal_p (const avl_info &other) const
 {
-  /* TODO: We don't do too much optimization here since it's
-     too complicated in case of analyzing the PHI node.
+  /* When the def info is same in RTL_SSA namespace, it's safe
+     to consider they are avl compatible.  */
+  if (m_source == other.get_source ())
+    return true;
 
-     For example:
-       void f (void * restrict in, void * restrict out, int n, int m, int cond)
-	{
-	  size_t vl;
-	  switch (cond)
-	  {
-	  case 1:
-	    vl = 100;
-	    break;
-	  case 2:
-	    vl = *(size_t*)(in + 100);
-	    break;
-	  case 3:
-	    {
-	      size_t new_vl = *(size_t*)(in + 500);
-	      size_t new_vl2 = *(size_t*)(in + 600);
-	      vl = new_vl + new_vl2 + 777;
-	      break;
-	    }
-	  default:
-	    vl = 4000;
-	    break;
-	  }
-	  for (size_t i = 0; i < n; i++)
-	    {
-	      vint8mf8_t v = __riscv_vle8_v_i8mf8 (in + i, vl);
-	      __riscv_vse8_v_i8mf8 (out + i, v, vl);
+  /* We only consider handle PHI node.  */
+  if (!m_source->insn ()->is_phi () || !other.get_source ()->insn ()->is_phi ())
+    return false;
 
-	      vint8mf8_t v2 = __riscv_vle8_v_i8mf8_tu (v, in + i + 100, vl);
-	      __riscv_vse8_v_i8mf8 (out + i + 100, v2, vl);
-	    }
+  phi_info *phi1 = as_a<phi_info *> (m_source);
+  phi_info *phi2 = as_a<phi_info *> (other.get_source ());
 
-	  size_t vl2;
-	  switch (cond)
-	  {
-	  case 1:
-	    vl2 = 100;
-	    break;
-	  case 2:
-	    vl2 = *(size_t*)(in + 100);
-	    break;
-	  case 3:
-	    {
-	      size_t new_vl = *(size_t*)(in + 500);
-	      size_t new_vl2 = *(size_t*)(in + 600);
-	      vl2 = new_vl + new_vl2 + 777;
-	      break;
-	    }
-	  default:
-	    vl2 = 4000;
-	    break;
-	  }
-	  for (size_t i = 0; i < m; i++)
-	    {
-	      vint8mf8_t v = __riscv_vle8_v_i8mf8 (in + i + 300, vl2);
-	      __riscv_vse8_v_i8mf8 (out + i + 300, v, vl2);
-	      vint8mf8_t v2 = __riscv_vle8_v_i8mf8_tu (v, in + i + 200, vl2);
-	      __riscv_vse8_v_i8mf8 (out + i + 200, v2, vl2);
-	    }
-	}
-     Such case may not be necessary to optimize since the codes of defining
-     vl and vl2 are redundant.  */
-  return m_source == other.get_source ();
+  if (phi1->is_degenerate () && phi2->is_degenerate ())
+    {
+      /* Degenerate PHI means the PHI node only have one input.  */
+
+      /* If both PHI nodes have the same single input in use list.
+	 We consider they are AVL compatible.  */
+      if (phi1->input_value (0) == phi2->input_value (0))
+	return true;
+    }
+  /* TODO: We can support more optimization cases in the future.  */
+  return false;
 }
 
 avl_info &
@@ -2715,6 +2629,7 @@ private:
   void pre_vsetvl (void);
 
   /* Phase 5.  */
+  void local_eliminate_vsetvl_insn (const vector_insn_info &) const;
   void cleanup_insns (void) const;
 
   /* Phase 6.  */
@@ -4034,6 +3949,62 @@ pass_vsetvl::pre_vsetvl (void)
   bool need_commit = commit_vsetvls ();
   if (need_commit)
     commit_edge_insertions ();
+}
+
+/* Local user vsetvl optimizaiton:
+
+     Case 1:
+       vsetvl a5,a4,e8,mf8
+       ...
+       vsetvl zero,a5,e8,mf8 --> Eliminate directly.
+
+     Case 2:
+       vsetvl a5,a4,e8,mf8    --> vsetvl a5,a4,e32,mf2
+       ...
+       vsetvl zero,a5,e32,mf2 --> Eliminate directly.  */
+void
+pass_vsetvl::local_eliminate_vsetvl_insn (const vector_insn_info &dem) const
+{
+  const insn_info *insn = dem.get_insn ();
+  if (!insn || insn->is_artificial ())
+    return;
+  rtx_insn *rinsn = insn->rtl ();
+  const bb_info *bb = insn->bb ();
+  if (vsetvl_insn_p (rinsn))
+    {
+      rtx vl = get_vl (rinsn);
+      for (insn_info *i = insn->next_nondebug_insn ();
+	   real_insn_and_same_bb_p (i, bb); i = i->next_nondebug_insn ())
+	{
+	  if (i->is_call () || i->is_asm ()
+	      || find_access (i->defs (), VL_REGNUM)
+	      || find_access (i->defs (), VTYPE_REGNUM))
+	    return;
+
+	  if (has_vtype_op (i->rtl ()))
+	    {
+	      if (!vsetvl_discard_result_insn_p (PREV_INSN (i->rtl ())))
+		return;
+	      rtx avl = get_avl (i->rtl ());
+	      if (avl != vl)
+		return;
+	      set_info *def = find_access (i->uses (), REGNO (avl))->def ();
+	      if (def->insn () != insn)
+		return;
+
+	      vector_insn_info new_info
+		= m_vector_manager->vector_insn_infos[i->uid ()];
+	      if (!new_info.skip_avl_compatible_p (dem))
+		return;
+
+	      new_info.set_avl_info (dem.get_avl_info ());
+	      new_info = dem.merge (new_info, LOCAL_MERGE);
+	      change_vsetvl_insn (insn, new_info);
+	      eliminate_insn (PREV_INSN (i->rtl ()));
+	      return;
+	    }
+	}
+    }
 }
 
 /* Before VSETVL PASS, RVV instructions pattern is depending on AVL operand

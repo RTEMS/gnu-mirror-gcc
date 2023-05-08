@@ -4550,7 +4550,12 @@ reduce_template_parm_level (tree index, tree type, int levels, tree args,
   if (TEMPLATE_PARM_DESCENDANTS (index) == NULL_TREE
       || (TEMPLATE_PARM_LEVEL (TEMPLATE_PARM_DESCENDANTS (index))
 	  != TEMPLATE_PARM_LEVEL (index) - levels)
-      || !same_type_p (type, TREE_TYPE (TEMPLATE_PARM_DESCENDANTS (index))))
+      || !(TREE_CODE (type) == TEMPLATE_TEMPLATE_PARM
+	   ? (comp_template_parms
+	      (DECL_TEMPLATE_PARMS (TYPE_NAME (type)),
+	       DECL_TEMPLATE_PARMS (TEMPLATE_PARM_DECL
+				    (TEMPLATE_PARM_DESCENDANTS (index)))))
+	   : same_type_p (type, TREE_TYPE (TEMPLATE_PARM_DESCENDANTS (index)))))
     {
       tree orig_decl = TEMPLATE_PARM_DECL (index);
 
@@ -4982,9 +4987,7 @@ outer_template_args (tree tmpl)
     return args;
   if (TMPL_ARGS_DEPTH (args) == 1)
     return NULL_TREE;
-  args = copy_node (args);
-  --TREE_VEC_LENGTH (args);
-  return args;
+  return strip_innermost_template_args (args, 1);
 }
 
 /* Update the declared TYPE by doing any lookups which were thought to be
@@ -7875,7 +7878,8 @@ coerce_template_args_for_ttp (tree templ, tree arglist,
   else if (current_template_parms)
     {
       /* This is an argument of the current template, so we haven't set
-	 DECL_CONTEXT yet.  */
+	 DECL_CONTEXT yet.  We can also get here when level-lowering a
+	 bound ttp. */
       tree relevant_template_parms;
 
       /* Parameter levels that are greater than the level of the given
@@ -14609,7 +14613,7 @@ tsubst_function_decl (tree t, tree args, tsubst_flags_t complain,
 
 static tree
 tsubst_template_decl (tree t, tree args, tsubst_flags_t complain,
-		      tree lambda_fntype)
+		      tree lambda_fntype, tree lambda_tparms)
 {
   /* We can get here when processing a member function template,
      member class template, or template template parameter.  */
@@ -14699,8 +14703,10 @@ tsubst_template_decl (tree t, tree args, tsubst_flags_t complain,
   auto tparm_guard = make_temp_override (current_template_parms);
   DECL_TEMPLATE_PARMS (r)
     = current_template_parms
-    = tsubst_template_parms (DECL_TEMPLATE_PARMS (t), args,
-			     complain);
+    = (lambda_tparms
+       ? lambda_tparms
+       : tsubst_template_parms (DECL_TEMPLATE_PARMS (t), args,
+				complain));
 
   bool class_p = false;
   tree inner = decl;
@@ -14871,7 +14877,9 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain)
   switch (TREE_CODE (t))
     {
     case TEMPLATE_DECL:
-      r = tsubst_template_decl (t, args, complain, /*lambda*/NULL_TREE);
+      r = tsubst_template_decl (t, args, complain,
+				/*lambda_fntype=*/NULL_TREE,
+				/*lambda_tparms=*/NULL_TREE);
       break;
 
     case FUNCTION_DECL:
@@ -20116,12 +20124,24 @@ tsubst_lambda_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 		  ? DECL_TI_TEMPLATE (oldfn)
 		  : NULL_TREE);
 
-  tree fntype = static_fn_type (oldfn);
+  tree tparms = NULL_TREE;
   if (oldtmpl)
-    ++processing_template_decl;
+    tparms = tsubst_template_parms (DECL_TEMPLATE_PARMS (oldtmpl), args, complain);
+
+  tree fntype = static_fn_type (oldfn);
+
+  tree saved_ctp = current_template_parms;
+  if (oldtmpl)
+    {
+      ++processing_template_decl;
+      current_template_parms = tparms;
+    }
   fntype = tsubst (fntype, args, complain, in_decl);
   if (oldtmpl)
-    --processing_template_decl;
+    {
+      current_template_parms = saved_ctp;
+      --processing_template_decl;
+    }
 
   if (fntype == error_mark_node)
     r = error_mark_node;
@@ -20137,7 +20157,8 @@ tsubst_lambda_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 				 type_memfn_quals (fntype),
 				 type_memfn_rqual (fntype));
       tree inst = (oldtmpl
-		   ? tsubst_template_decl (oldtmpl, args, complain, fntype)
+		   ? tsubst_template_decl (oldtmpl, args, complain,
+					   fntype, tparms)
 		   : tsubst_function_decl (oldfn, args, complain, fntype));
       if (inst == error_mark_node)
 	{
@@ -21497,8 +21518,8 @@ tsubst_copy_and_build (tree t,
 	r = finish_class_member_access_expr (object, member,
 					     /*template_p=*/false,
 					     complain);
-	if (TREE_CODE (r) == COMPONENT_REF)
-	  REF_PARENTHESIZED_P (r) = REF_PARENTHESIZED_P (t);
+	if (REF_PARENTHESIZED_P (t))
+	  r = force_paren_expr (r);
 	RETURN (r);
       }
 
@@ -22160,11 +22181,11 @@ instantiate_alias_template (tree tmpl, tree args, tsubst_flags_t complain)
 
   args = coerce_template_parms (DECL_TEMPLATE_PARMS (tmpl),
 				args, tmpl, complain);
+  if (args == error_mark_node)
+    return error_mark_node;
 
   /* FIXME check for satisfaction in check_instantiated_args.  */
-  if (flag_concepts
-      && !any_dependent_template_arguments_p (args)
-      && !constraints_satisfied_p (tmpl, args))
+  if (!constraints_satisfied_p (tmpl, args))
     {
       if (complain & tf_error)
 	{
@@ -27056,12 +27077,6 @@ instantiate_decl (tree d, bool defer_ok, bool expl_inst_class_mem_p)
 	pattern_defined = ! DECL_EXTERNAL (code_pattern);
     }
 
-  /* Any local class members should be instantiated from the TAG_DEFN
-     with defer_ok == 0.  */
-  gcc_checking_assert (!defer_ok || !pattern_defined
-		       || !decl_function_context (d)
-		       || LAMBDA_TYPE_P (DECL_CONTEXT (d)));
-
   /* We may be in the middle of deferred access check.  Disable it now.  */
   push_deferring_access_checks (dk_no_deferred);
 
@@ -28617,14 +28632,13 @@ type_dependent_expression_p_push (tree expr)
 bool
 any_type_dependent_arguments_p (const vec<tree, va_gc> *args)
 {
-  unsigned int i;
-  tree arg;
+  if (!processing_template_decl || !args)
+    return false;
 
-  FOR_EACH_VEC_SAFE_ELT (args, i, arg)
-    {
-      if (type_dependent_expression_p (arg))
-	return true;
-    }
+  for (tree arg : *args)
+    if (type_dependent_expression_p (arg))
+      return true;
+
   return false;
 }
 
@@ -28787,19 +28801,16 @@ any_template_arguments_need_structural_equality_p (tree args)
 bool
 any_dependent_template_arguments_p (const_tree args)
 {
-  int i;
-  int j;
-
-  if (!args)
-    return false;
   if (args == error_mark_node)
     return true;
+  if (!processing_template_decl || !args)
+    return false;
 
-  for (i = 0; i < TMPL_ARGS_DEPTH (args); ++i)
+  for (int i = 0, depth = TMPL_ARGS_DEPTH (args); i < depth; ++i)
     {
       const_tree level = TMPL_ARGS_LEVEL (args, i + 1);
-      for (j = 0; j < TREE_VEC_LENGTH (level); ++j)
-	if (dependent_template_arg_p (TREE_VEC_ELT (level, j)))
+      for (tree arg : tree_vec_range (CONST_CAST_TREE (level)))
+	if (dependent_template_arg_p (arg))
 	  return true;
     }
 

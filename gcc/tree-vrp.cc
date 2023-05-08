@@ -650,18 +650,17 @@ void
 maybe_set_nonzero_bits (edge e, tree var)
 {
   basic_block cond_bb = e->src;
-  gimple *stmt = last_stmt (cond_bb);
+  gcond *cond = safe_dyn_cast <gcond *> (*gsi_last_bb (cond_bb));
   tree cst;
 
-  if (stmt == NULL
-      || gimple_code (stmt) != GIMPLE_COND
-      || gimple_cond_code (stmt) != ((e->flags & EDGE_TRUE_VALUE)
+  if (cond == NULL
+      || gimple_cond_code (cond) != ((e->flags & EDGE_TRUE_VALUE)
 				     ? EQ_EXPR : NE_EXPR)
-      || TREE_CODE (gimple_cond_lhs (stmt)) != SSA_NAME
-      || !integer_zerop (gimple_cond_rhs (stmt)))
+      || TREE_CODE (gimple_cond_lhs (cond)) != SSA_NAME
+      || !integer_zerop (gimple_cond_rhs (cond)))
     return;
 
-  stmt = SSA_NAME_DEF_STMT (gimple_cond_lhs (stmt));
+  gimple *stmt = SSA_NAME_DEF_STMT (gimple_cond_lhs (cond));
   if (!is_gimple_assign (stmt)
       || gimple_assign_rhs_code (stmt) != BIT_AND_EXPR
       || TREE_CODE (gimple_assign_rhs2 (stmt)) != INTEGER_CST)
@@ -943,7 +942,7 @@ public:
     for (gphi_iterator gsi = gsi_start_phis (bb); !gsi_end_p (gsi);
 	 gsi_next (&gsi))
       m_ranger->register_inferred_ranges (gsi.phi ());
-    m_last_bb_stmt = last_stmt (bb);
+    m_last_bb_stmt = last_nondebug_stmt (bb);
   }
 
   void post_fold_bb (basic_block bb) override

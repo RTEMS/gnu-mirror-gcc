@@ -38,7 +38,6 @@ public:
 private:
   DISABLE_COPY_AND_ASSIGN (vrange_allocator);
   class vrange_internal_alloc *m_alloc;
-  bool m_gc;
 };
 
 // Efficient memory storage for a vrange.
@@ -54,7 +53,7 @@ public:
   void get_vrange (vrange &r, tree type) const;
   void set_vrange (const vrange &r);
   bool fits_p (const vrange &r) const;
-  bool equal_p (const vrange &r, tree type) const;
+  bool equal_p (const vrange &r) const;
 protected:
   // Stack initialization disallowed.
   vrange_storage () { }
@@ -68,7 +67,7 @@ public:
   static irange_storage *alloc (vrange_internal_alloc &, const irange &);
   void set_irange (const irange &r);
   void get_irange (irange &r, tree type) const;
-  bool equal_p (const irange &r, tree type) const;
+  bool equal_p (const irange &r) const;
   bool fits_p (const irange &r) const;
   void dump () const;
 private:
@@ -111,7 +110,7 @@ class frange_storage : public vrange_storage
   static frange_storage *alloc (vrange_internal_alloc &, const frange &r);
   void set_frange (const frange &r);
   void get_frange (frange &r, tree type) const;
-  bool equal_p (const frange &r, tree type) const;
+  bool equal_p (const frange &r) const;
   bool fits_p (const frange &) const;
  private:
   frange_storage (const frange &r) { set_frange (r); }

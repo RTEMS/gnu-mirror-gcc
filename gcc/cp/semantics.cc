@@ -346,7 +346,7 @@ enforce_access (tree basetype_path, tree decl, tree diag_decl,
     }
 
   tree cs = current_scope ();
-  if (processing_template_decl
+  if (current_template_parms
       && (CLASS_TYPE_P (cs) || TREE_CODE (cs) == FUNCTION_DECL))
     if (tree template_info = get_template_info (cs))
       {
@@ -2070,7 +2070,7 @@ finish_mem_initializers (tree mem_inits)
    right result.  If EVEN_UNEVAL, do this even in unevaluated context.  */
 
 tree
-force_paren_expr (tree expr, bool even_uneval)
+force_paren_expr (tree expr, bool even_uneval /* = false */)
 {
   /* This is only needed for decltype(auto) in C++14.  */
   if (cxx_dialect < cxx14)
