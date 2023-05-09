@@ -785,6 +785,8 @@ enum aarch64_builtins
   AARCH64_RBIT,
   AARCH64_RBITL,
   AARCH64_RBITLL,
+  /* Armv8.9-A / Armv9.4-A builtins.  */
+  AARCH64_BUILTIN_CHKFEAT,
   AARCH64_BUILTIN_MAX
 };
 
@@ -2017,6 +2019,12 @@ aarch64_general_init_builtins (void)
   if (TARGET_MEMTAG)
     aarch64_init_memtag_builtins ();
 
+  tree ftype_chkfeat
+    = build_function_type_list (uint64_type_node, uint64_type_node, NULL);
+  aarch64_builtin_decls[AARCH64_BUILTIN_CHKFEAT]
+    = aarch64_general_add_builtin ("__builtin_aarch64_chkfeat", ftype_chkfeat,
+				   AARCH64_BUILTIN_CHKFEAT);
+
   if (in_lto_p)
     handle_arm_acle_h ();
 }
@@ -2809,6 +2817,16 @@ aarch64_general_expand_builtin (unsigned int fcode, tree exp, rtx target,
     case AARCH64_BUILTIN_RNG_RNDR:
     case AARCH64_BUILTIN_RNG_RNDRRS:
       return aarch64_expand_rng_builtin (exp, target, fcode, ignore);
+
+    case AARCH64_BUILTIN_CHKFEAT:
+      {
+	rtx x16_reg = gen_rtx_REG (DImode, R16_REGNUM);
+	op0 = expand_normal (CALL_EXPR_ARG (exp, 0));
+	emit_move_insn (x16_reg, op0);
+	expand_insn (CODE_FOR_aarch64_chkfeat, 0, 0);
+	emit_move_insn (target, x16_reg);
+	return target;
+      }
     }
 
   if (fcode >= AARCH64_SIMD_BUILTIN_BASE && fcode <= AARCH64_SIMD_BUILTIN_MAX)
