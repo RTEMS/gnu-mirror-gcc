@@ -85,12 +85,11 @@ sub print_ld_cmpi_p10
   # DI-mode doesn't do sign/zero extension.
   my $echr = ($lmode eq "DI") ? "" : $a_or_z;
 
-  # Handle DS vs. D format memory.  Special case using lwa_operand for SImode.
-  my $ds_load = ($lmode eq "SI") ? "lwa_operand" : "ds_form_mem_operand";
-  my ($np, $constraint, $mempred)
+  # Handle DS vs. D format memory.
+  my ($np, $mempred)
 	= (($mem_format eq "ds")
-	   ? ("NON_PREFIXED_DS", "YZ", $ds_load)
-	   : ("NON_PREFIXED_D",  "m",  "non_update_memory_operand"));
+	   ? ("NON_PREFIXED_DS", "ds_form_mem_operand")
+	   : ("NON_PREFIXED_D",  "non_update_memory_operand"));
 
   # Break long print statements into smaller lines.
   my $info = join (" ",
@@ -101,7 +100,7 @@ sub print_ld_cmpi_p10
 		   "l${ldst}${echr}_cmp${cmpl}di_cr0_${lmode}",
 		   "_${result}_${ccmode}_${extend}");
 
-  my $cmp_op1 = "(match_operand:${lmode} 1 \"${mempred}\" \"${constraint}\")";
+  my $cmp_op1 = "(match_operand:${lmode} 1 \"${mempred}\" \"m\")";
 
   my $spaces = " " x (length ($ccmode) + 18);
 
@@ -149,12 +148,6 @@ sub print_ld_cmpi_p10
   print "  \"\"\n";
   print "  [(set_attr \"type\" \"fused_load_cmpi\")\n";
   print "   (set_attr \"cost\" \"8\")\n";
-
-  if ($extend eq "sign")
-    {
-      print "   (set_attr \"sign_extend\" \"yes\")\n";
-    }
-
   print "   (set_attr \"length\" \"8\")])\n";
   print "\n";
 }
