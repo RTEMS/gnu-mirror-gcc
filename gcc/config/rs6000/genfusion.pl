@@ -45,51 +45,29 @@ print <<'EOF';
 
 EOF
 
-sub mode_to_ldst_char
-{
-    my ($mode) = @_;
-    my %x = (DI => 'd', SI => 'w', HI => 'h', QI => 'b');
-    return $x{$mode} if exists $x{$mode};
-    return '?';
-}
-
 # Print the insns for load and compare with -1/0/1.
 # Arguments:
-# lmode      -- integer mode ("DI", "SI", "HI", or "QI").
+# lmode      -- Integer mode ("DI", "SI", "HI", or "QI").
 # result     -- "clobber", "GPR", or $lmode
-# ccmode     -- sign vs. unsigned ("CC" or "CCUNS").
-# mem_format -- memory format ("d" or "ds").
+# ccmode     -- Sign vs. unsigned ("CC" or "CCUNS").
+# mem_format -- Memory format ("d" or "ds").
+# cmpl       -- Suffix for compare ("l" or "")
+# const_pred -- Predicate for constant (i.e. -1/0/1 or 0/1).
+# extend     -- "sign", "zero", or "none".
+# echr       -- Suffix for load ("a", "z", or "").
+# load       -- Load instruction (i.e. "ld", "lwa", "lwz", etc.)
+# np         -- enum non_prefixed_form for memory type
+# constraint -- constraint to use
+# mem_pred   -- predicate for the memory operation
 
 sub print_ld_cmpi_p10
 {
-  my ($lmode, $result, $ccmode, $mem_format) = @_;
-
-  my $ldst = mode_to_ldst_char($lmode);
-
-  # Set various things based on whether the comparisons are signed or
-  # unsigned.
-  my ($cmpl, $const_pred, $sign_zero, $a_or_z)
-	  = (($ccmode eq "CCUNS")
-	     ? ("l", "const_0_to_1_operand",  "zero", "z")
-	     : ("",  "const_m1_to_1_operand", "sign", "a"));
+  my ($lmode, $result, $ccmode, $cmpl, $const_pred,
+      $extend, $load, $np, $constraint, $mem_pred) = @_;
 
   # For clobber, we need a SI/DI reg in case we split because we have to
   # sign/zero extend.
-  my $clobbermode = ($lmode =~ m/^(QI|HI)$/) ? "GPR" : $lmode;
-
-  # We always need extension if result > lmode.
-  my $extend = (($result =~ m/^EXT/
-		 || $result eq "GPR"
-		 || $clobbermode eq "GPR") ? $sign_zero : "none");
-
-  # DI-mode doesn't do sign/zero extension.
-  my $echr = ($lmode eq "DI") ? "" : $a_or_z;
-
-  # Handle DS vs. D format memory.
-  my ($np, $mempred)
-	= (($mem_format eq "ds")
-	   ? ("NON_PREFIXED_DS", "ds_form_mem_operand")
-	   : ("NON_PREFIXED_D",  "non_update_memory_operand"));
+  my $clobbermode = ($lmode =~ m/^[HQ]I$/) ? "GPR" : $lmode;
 
   # Break long print statements into smaller lines.
   my $info = join (" ",
@@ -97,10 +75,10 @@ sub print_ld_cmpi_p10
 		   "compare mode is ${ccmode} extend is ${extend}");
 
   my $name = join ("",
-		   "l${ldst}${echr}_cmp${cmpl}di_cr0_${lmode}",
+		   "${load}_cmp${cmpl}di_cr0_${lmode}",
 		   "_${result}_${ccmode}_${extend}");
 
-  my $cmp_op1 = "(match_operand:${lmode} 1 \"${mempred}\" \"m\")";
+  my $cmp_op1 = "(match_operand:${lmode} 1 \"${mem_pred}\" \"${constraint}\")";
 
   my $spaces = " " x (length ($ccmode) + 18);
 
@@ -125,8 +103,11 @@ sub print_ld_cmpi_p10
       print "   (set ${load_op0} ${load_op1})]\n";
     }
 
+  # Do not match prefixed loads.  The machine only fuses non-prefixed loads
+  # with compare immediate.  Take into account whether the load is a ds-form
+  # or a d-form instruction.
   print "  \"(TARGET_P10_FUSION)\"\n";
-  print "  \"l${ldst}${echr}%X1 %0,%1\\;cmp${cmpl}di %2,%0,%3\"\n";
+  print "  \"${load}%X1 %0,%1\\;cmp${cmpl}di %2,%0,%3\"\n";
   print "  \"&& reload_completed\n";
   print "   && (cc_reg_not_cr0_operand (operands[2], CCmode)\n";
   print "       || !address_is_non_pfx_d_or_x (XEXP (operands[1], 0),\n";
@@ -148,38 +129,95 @@ sub print_ld_cmpi_p10
   print "  \"\"\n";
   print "  [(set_attr \"type\" \"fused_load_cmpi\")\n";
   print "   (set_attr \"cost\" \"8\")\n";
+
+  if ($extend eq "sign")
+    {
+      print "   (set_attr \"sign_extend\" \"yes\")\n";
+    }
+
   print "   (set_attr \"length\" \"8\")])\n";
   print "\n";
 }
 
 sub gen_ld_cmpi_p10
 {
-  my ($lmode, $result, $mempred, $np, $mem_format);
+  my ($lmode, $result, $mem_format, $extend);
 
-  foreach $lmode ("DI","SI", "HI", "QI")
+  # Map mode to load instruction
+  my %signed_load = ("DI" => "ld",
+		     "SI" => "lwa",
+		     "HI" => "lha");
+
+  my %unsigned_load = ("DI" => "ld",
+		       "SI" => "lwz",
+		       "HI" => "lhz",
+		       "QI" => "lbz");
+
+  # Memory predicate to use.  For LWA, use the special LWA_OPERAND.
+  my %signed_memory_predicate = ("DI" => "ds_form_mem_operand",
+				 "SI" => "lwa_operand",
+				 "HI" => "non_update_memory_operand");
+
+  my %unsigned_memory_predicate = ("DI" => "ds_form_mem_operand",
+				   "SI" => "non_update_memory_operand",
+				   "HI" => "non_update_memory_operand",
+				   "QI" => "non_update_memory_operand");
+
+  # Internal format of the memory instruction (enum non_prefixed_form) to use.
+  my %np = ("ds" => "NON_PREFIXED_DS",
+	    "d"  => "NON_PREFIXED_D");
+
+  # Constraint to use.
+  my %constraint = ("ds" => "YZ",
+		    "d"  => "m");
+
+  # Result modes to use. Clobber is used when you are comparing the load to
+  # -1/0/1, but you are not using it otherwise.  EXTDI does not exist. We
+  # cannot directly use HI/QI results because we only have word and double word
+  # compared.  For promotion, don't allow EXTQI because that would allow HI
+  # results which we can't do (use GPR instead).
+  my %result_modes = ("DI" => ["clobber", "DI"],
+		      "SI" => ["clobber", "SI", "EXTSI" ],
+		      "HI" => ["clobber", "EXTHI" ],
+		      "QI" => ["clobber", "GPR" ]);
+
+  foreach $lmode ("DI", "SI", "HI", "QI")
     {
-      foreach $result ("clobber", $lmode, "EXT${lmode}")
+      foreach $result (@{ $result_modes{$lmode} })
 	{
-	  # EXTDI does not exist, and we cannot directly produce HI/QI results.
-	  next				if ($result =~ m/^(EXTDI|HI|QI)$/);
-
-	  # Don't allow EXTQI because that would allow HI result which we can't do.
-	  $result = "GPR"		if ($result eq "EXTQI");
-
-	  # Handle CCmode (sign extended compares to -1, 0, or 1).  We don't have
-	  # a LBA instruction, so skip QImode.  Both LD and LWA are DS-form
-	  # instructions.
+	  # Handle CCmode (sign extended compares to -1, 0, or 1).  We don't
+	  # have  a LBA instruction, so skip QImode.  Both LD and LWA are
+	  # DS-form instructions for signed loads.
 	  if ($lmode ne "QI")
 	    {
-	      $mem_format = ($lmode =~ m/^(DI|SI)$/) ? "ds" : "d";
-	      print_ld_cmpi_p10 ($lmode, $result, "CC", $mem_format);
+	      $mem_format = ($lmode =~ m/^[DS]I$/) ? "ds" : "d";
+	      $extend = (($lmode eq "DI"
+			  || $lmode eq $result
+			  || ($lmode eq "SI" && $result eq "clobber"))
+			 ? "none"
+			 : "sign");
+
+	      print_ld_cmpi_p10 ($lmode, $result, "CC", "",
+				 "const_m1_to_1_operand", $extend,
+				 $signed_load{$lmode}, $np{$mem_format},
+				 $constraint{$mem_format},
+				 $signed_memory_predicate{$lmode});
 	    }
 
 	  # Handle CCUNS mode (zero extended compares to 0 or 1.
-	  # ld is DS-form, but lwz is not.
+	  # LD is DS-form, but LWZ is not for unsigned loads.
 	  $mem_format = ($lmode eq "DI") ? "ds" : "d";
+	  $extend = (($lmode eq "DI"
+		      || $lmode eq $result
+		      || ($lmode eq "SI" && $result eq "clobber"))
+		     ? "none"
+		     : "zero");
 
-	  print_ld_cmpi_p10 ($lmode, $result, "CCUNS", $mem_format);
+	  print_ld_cmpi_p10 ($lmode, $result, "CCUNS", "l",
+			     "const_0_to_1_operand", $extend,
+			     $unsigned_load{$lmode}, $np{$mem_format},
+			     $constraint{$mem_format},
+			     $unsigned_memory_predicate{$lmode});
 	}
     }
 }
