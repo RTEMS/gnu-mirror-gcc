@@ -379,6 +379,9 @@
     UNSPECV_BTI_J		; Represent BTI j.
     UNSPECV_BTI_JC		; Represent BTI jc.
     UNSPECV_CHKFEAT		; Represent CHKFEAT X16.
+    UNSPECV_GCSPR		; Represent MRS Xn, GCSPR_EL0
+    UNSPECV_GCSPOPM		; Represent GCSPOPM.
+    UNSPECV_GCSSS		; Represent GCSSS1 and GCSSS2.
     UNSPECV_TSTART		; Represent transaction start.
     UNSPECV_TCOMMIT		; Represent transaction commit.
     UNSPECV_TCANCEL		; Represent transaction cancel.
@@ -8265,6 +8268,38 @@
         (unspec_volatile:DI [(reg:DI R16_REGNUM)] UNSPECV_CHKFEAT))]
   ""
   "hint\\t40 // chkfeat x16"
+)
+
+;; Guarded Control Stack (GCS) instructions
+(define_insn "aarch64_load_gcspr"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+	(unspec_volatile:DI [(const_int 0)] UNSPECV_GCSPR))]
+  ""
+  "mrs\\t%0, s3_3_c2_c5_1 // gcspr_el0"
+  [(set_attr "type" "mrs")]
+)
+
+(define_insn "aarch64_gcspopm"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+	(unspec_volatile:DI [(const_int 0)] UNSPECV_GCSPOPM))]
+  ""
+  "mov\\t%0, 0\;sysl\\t%0, #3, c7, c7, #1 // gcspopm"
+  [(set_attr "length" "8")]
+)
+
+(define_insn "aarch64_gcspopm_xzr"
+  [(unspec_volatile [(const_int 0)] UNSPECV_GCSPOPM)]
+  ""
+  "sysl\\txzr, #3, c7, c7, #1 // gcspopm"
+)
+
+(define_insn "aarch64_gcsss"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+	(unspec_volatile:DI [(match_operand:DI 1 "register_operand" "r")]
+	  UNSPECV_GCSSS))]
+  ""
+  "sys\\t#3, c7, c7, #2, %1 // gcsss1\;mov\\t%0, 0\;sysl\\t%0, #3, c7, c7, #3 // gcsss2"
+  [(set_attr "length" "12")]
 )
 
 ;; AdvSIMD Stuff
