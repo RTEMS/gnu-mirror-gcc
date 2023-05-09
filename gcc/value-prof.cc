@@ -1950,6 +1950,8 @@ gimple_stringops_values_to_profile (gimple *gs, histogram_values *values)
 static void
 gimple_histogram_values_to_profile (function *fun, histogram_values *values)
 {
+  if (!flag_profile_loops)
+    return;
   for (auto loop : loops_list (fun, 0))
     {
       tree var;

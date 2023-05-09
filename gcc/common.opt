@@ -2293,7 +2293,11 @@ Perform loop peeling.
 
 fuse-histograms-in-peeling
 Common Var(flag_use_histogram_in_peeling) Init(1) Optimization
-Use histograms in loop peelings.
+Use histograms in loop peeling heuristics.
+
+fpeel-loops-without-histogram
+Common Var(flag_peel_loops_without_histogram) Init(1) Optimization
+Peel also loop with no loop histogram.
 
 fpeephole
 Common Var(flag_no_peephole,0) Optimization
@@ -2391,6 +2395,10 @@ Enum(profile_reproducibility) String(multithreaded) Value(PROFILE_REPRODUCIBILIT
 fprofile-reproducible=
 Common Joined RejectNegative Var(flag_profile_reproducible) Enum(profile_reproducibility) Init(PROFILE_REPRODUCIBILITY_SERIAL)
 -fprofile-reproducible=[serial|parallel-runs|multithreaded]	Control level of reproducibility of profile gathered by -fprofile-generate.
+
+fprofile-loops
+Common Var(flag_profile_loops) Init(1) Optimization
+Profile loop histograms.
 
 Enum
 Name(profile_update) Type(enum profile_update) UnknownError(unknown profile update method %qs)

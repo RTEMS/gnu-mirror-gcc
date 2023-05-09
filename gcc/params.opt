@@ -426,6 +426,10 @@ The maximum number of instructions in an inner loop that is being considered for
 Common Joined UInteger Var(param_loop_versioning_max_outer_insns) Init(100) Param Optimization
 The maximum number of instructions in an outer loop that is being considered for versioning, on top of the instructions in inner loops.
 
+-param=loop-versioning-histogram_prcnts=
+Common Joined UInteger Var(param_loop_versioning_histogram_prcnt) Init(30) Param Optimization
+Percentage of the dominating iteration count required for versioning.
+
 -param=lra-inheritance-ebb-probability-cutoff=
 Common Joined UInteger Var(param_lra_inheritance_ebb_probability_cutoff) Init(40) IntegerRange(0, 100) Param Optimization
 Minimal fall-through edge probability in percentage used to add BB to inheritance EBB in LRA.
@@ -889,6 +893,10 @@ Size of the linear portion of the histogram counter for profile feedback.
 -param=profile-histogram-peel-prcnt=
 Common Joined UInteger Var(param_profile_histogram_peel_prcnt) Init(6) Param Optimization
 Peels if it can eliminate at least this percentage per 1 peeling.
+
+-param=profile-histogram-peel-overall-prcnt=
+Common Joined UInteger Var(param_profile_histogram_peel_overall_prcnt) Init(30) Param Optimization
+Peels if it can eliminate at least this percentage of executions of the loop.
 
 -param=profile-func-internal-id=
 Common Joined UInteger Var(param_profile_func_internal_id) IntegerRange(0, 1) Param

@@ -1122,17 +1122,22 @@ try_peel_loop (class loop *loop,
       gcov_type sum = loop->counters->sum;
       gcov_type rest = sum;
       gcov_type psum = 0;
+      gcov_type osum = 0;
       int good_percentage = param_profile_histogram_peel_prcnt;
+      int good_overall_percentage = param_profile_histogram_peel_overall_prcnt;
       for (int i = 0; i < (int)loop->counters->lin->length (); i++)
 	{
-	  psum += (*(loop->counters->lin))[i];
+	  gcov_type e = (*(loop->counters->lin))[i];
+	  psum += e;
+	  osum += e;
 	  if ((maxiter >= 0 && maxiter <= i)
 	      || (i >= param_max_peel_times - 1)
 	      || rest == 0)
 	    break;
 	  // iteration has enough cumulated in partial sum and itself has at
 	  // least 1 percent or we have complete peeling
-	  if ((100 * psum) / sum >= good_percentage || psum == rest)
+	  if (e && ((100 * psum) / sum >= good_percentage || psum == rest)
+	      && ((100 * osum) / sum) >= good_overall_percentage)
 	    {
 	      prcnt.safe_push (prcnt.last () + (100 * psum) / sum);
 	      good_peels.safe_push (i);
@@ -1152,7 +1157,7 @@ try_peel_loop (class loop *loop,
 	{
 	  if (dump_file)
 	    fprintf (dump_file,
-		     "Not peeling: found no good candidates in th ehistogram\n");
+		     "Not peeling: found no good candidates in the histogram\n");
 	  return false;
 	}
     }

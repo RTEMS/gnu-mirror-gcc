@@ -118,7 +118,7 @@ pass_loop_histogram_versioning::execute (function *fn)
 	      best_iters = i;
 	    }
 	}
-      if (best_val <= 0 || best_val < loop->counters->sum * 9 / 10)
+      if (best_val <= 0 || best_val < loop->counters->sum * param_loop_versioning_histogram_prcnt / 100)
 	continue;
       if (dump_file)
 	fprintf (dump_file, "Loop %i has dominating number of iterations %i\n",
