@@ -790,6 +790,9 @@ enum aarch64_builtins
   AARCH64_PLIX,
   /* Armv8.9-A / Armv9.4-A builtins.  */
   AARCH64_BUILTIN_CHKFEAT,
+  AARCH64_BUILTIN_GCSPR,
+  AARCH64_BUILTIN_GCSPOPM,
+  AARCH64_BUILTIN_GCSSS,
   AARCH64_BUILTIN_MAX
 };
 
@@ -2041,6 +2044,29 @@ aarch64_init_fpsr_fpcr_builtins (void)
 				   AARCH64_BUILTIN_SET_FPSR64);
 }
 
+/* Add builtins for Guarded Control Stack instructions.  */
+
+static void
+aarch64_init_gcs_builtins (void)
+{
+  tree ftype;
+
+  ftype = build_function_type_list (ptr_type_node, NULL);
+  aarch64_builtin_decls[AARCH64_BUILTIN_GCSPR]
+    = aarch64_general_add_builtin ("__builtin_aarch64_gcspr", ftype,
+				   AARCH64_BUILTIN_GCSPR);
+
+  ftype = build_function_type_list (uint64_type_node, NULL);
+  aarch64_builtin_decls[AARCH64_BUILTIN_GCSPOPM]
+    = aarch64_general_add_builtin ("__builtin_aarch64_gcspopm", ftype,
+				   AARCH64_BUILTIN_GCSPOPM);
+
+  ftype = build_function_type_list (ptr_type_node, ptr_type_node, NULL);
+  aarch64_builtin_decls[AARCH64_BUILTIN_GCSSS]
+    = aarch64_general_add_builtin ("__builtin_aarch64_gcsss", ftype,
+				   AARCH64_BUILTIN_GCSSS);
+}
+
 /* Initialize all builtins in the AARCH64_BUILTIN_GENERAL group.  */
 
 void
@@ -2091,6 +2117,8 @@ aarch64_general_init_builtins (void)
   aarch64_builtin_decls[AARCH64_BUILTIN_CHKFEAT]
     = aarch64_general_add_builtin ("__builtin_aarch64_chkfeat", ftype_chkfeat,
 				   AARCH64_BUILTIN_CHKFEAT);
+
+  aarch64_init_gcs_builtins ();
 
   if (in_lto_p)
     handle_arm_acle_h ();
@@ -3020,6 +3048,43 @@ aarch64_expand_fpsr_fpcr_getter (enum insn_code icode, machine_mode mode,
   return op.value;
 }
 
+/* Expand GCS builtin EXP with code FCODE, putting the result
+   int TARGET.  If IGNORE is true the return value is ignored.  */
+
+rtx
+aarch64_expand_gcs_builtin (tree exp, rtx target, int fcode, int ignore)
+{
+  if (fcode == AARCH64_BUILTIN_GCSPR)
+    {
+      expand_operand op;
+      create_output_operand (&op, target, DImode);
+      expand_insn (CODE_FOR_aarch64_load_gcspr, 1, &op);
+      return op.value;
+    }
+  if (fcode == AARCH64_BUILTIN_GCSPOPM && ignore)
+    {
+      expand_insn (CODE_FOR_aarch64_gcspopm_xzr, 0, 0);
+      return target;
+    }
+  if (fcode == AARCH64_BUILTIN_GCSPOPM)
+    {
+      expand_operand op;
+      create_output_operand (&op, target, Pmode);
+      expand_insn (CODE_FOR_aarch64_gcspopm, 1, &op);
+      return op.value;
+    }
+  if (fcode == AARCH64_BUILTIN_GCSSS)
+    {
+      expand_operand ops[2];
+      rtx op1 = expand_normal (CALL_EXPR_ARG (exp, 0));
+      create_output_operand (&ops[0], target, Pmode);
+      create_input_operand (&ops[1], op1, Pmode);
+      expand_insn (CODE_FOR_aarch64_gcsss, 2, ops);
+      return ops[0].value;
+    }
+  gcc_unreachable ();
+}
+
 /* Expand an expression EXP that calls built-in function FCODE,
    with result going to TARGET if that's convenient.  IGNORE is true
    if the result of the builtin is ignored.  */
@@ -3155,6 +3220,11 @@ aarch64_general_expand_builtin (unsigned int fcode, tree exp, rtx target,
 	emit_move_insn (target, x16_reg);
 	return target;
       }
+
+    case AARCH64_BUILTIN_GCSPR:
+    case AARCH64_BUILTIN_GCSPOPM:
+    case AARCH64_BUILTIN_GCSSS:
+      return aarch64_expand_gcs_builtin (exp, target, fcode, ignore);
     }
 
   if (fcode >= AARCH64_SIMD_BUILTIN_BASE && fcode <= AARCH64_SIMD_BUILTIN_MAX)
