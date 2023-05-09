@@ -1,6 +1,6 @@
-==================== Branch work121, patch #2 ====================
+==================== Branch work121, patch #5 ====================
 
-PR target/105325: Fix power10_fusion
+PR target/105325: Fix memory constraints for power10 fusion
 
 This patch applies stricter predicates and constraints for LD and LWA
 instructions with power10 fusion.  These instructions are DS-form instructions,
@@ -9,7 +9,7 @@ did not use the stricter predicates and constraints, and if the user used the
 -fstack-protector option, it would generate a non-prefixed load instruction
 whose offset was too big if the stack is large.
 
-2023-05-08   Michael Meissner  <meissner@linux.ibm.com>
+2023-05-09   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -26,22 +26,29 @@ gcc/testsuite/
 	* gcc.target/powerpc/fusion-p10-ldcmpi.c: Adjust insn counts.
 
 
-==================== Branch work121, patch #1 ====================
+==================== Branch work121, patch #4 ====================
 
-Rewrite genfusion.pl's gen_ld_cmpi_p10 function.
+PR target/105325, Rewrite genfusion.pl's gen_ld_cmpi_p10 function.
 
 This patch rewrites the gen_ld_cmpi_p10 function to be clearer.  The resulting
-fusion.md file is exactly the same in this patch.  The next patch in this series
-will fix PR target/105325.
+fusion.md file that this patch generates is exactly the same as the previous
+version of genfusion.pl.  The next patch in this series will fix PR
+target/105325.
 
-2023-05-08   Michael Meissner  <meissner@linux.ibm.com>
+2023-05-09   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
 	PR target/105325
-	* config/rs6000/genfusion.pl (print_ld_cmpi_p10): New function, split
-	off from gen_ld_cmpi_p10.
+	* config/rs6000/genfusion.pl (mode_to_ldst_char): Delete.
+	(print_ld_cmpi_p10): New function, split off from gen_ld_cmpi_p10.
 	(gen_ld_cmpi_p10): Rewrite completely.
+
+==================== Branch work121, patch #3 was reverted ====================
+
+==================== Branch work121, patch #2 was reverted ====================
+
+==================== Branch work121, patch #1 was reverted ====================
 
 ==================== Branch work121, baseline ====================
 
