@@ -129,6 +129,12 @@ sub print_ld_cmpi_p10
   print "  \"\"\n";
   print "  [(set_attr \"type\" \"fused_load_cmpi\")\n";
   print "   (set_attr \"cost\" \"8\")\n";
+
+  if ($extend eq "sign")
+    {
+      print "   (set_attr \"sign_extend\" \"yes\")\n";
+    }
+
   print "   (set_attr \"length\" \"8\")])\n";
   print "\n";
 }
@@ -149,7 +155,7 @@ sub gen_ld_cmpi_p10
 
   # Memory predicate to use.  For LWA, use the special LWA_OPERAND.
   my %signed_memory_predicate = ("DI" => "ds_form_mem_operand",
-				 "SI" => "ds_form_mem_operand",
+				 "SI" => "lwa_operand",
 				 "HI" => "non_update_memory_operand");
 
   my %unsigned_memory_predicate = ("DI" => "ds_form_mem_operand",
@@ -160,6 +166,10 @@ sub gen_ld_cmpi_p10
   # Internal format of the memory instruction (enum non_prefixed_form) to use.
   my %np = ("ds" => "NON_PREFIXED_DS",
 	    "d"  => "NON_PREFIXED_D");
+
+  # Constraint to use.
+  my %constraint = ("ds" => "YZ",
+		    "d"  => "m");
 
   # Result modes to use. Clobber is used when you are comparing the load to
   # -1/0/1, but you are not using it otherwise.  EXTDI does not exist. We
@@ -189,7 +199,8 @@ sub gen_ld_cmpi_p10
 
 	      print_ld_cmpi_p10 ($lmode, $result, "CC", "",
 				 "const_m1_to_1_operand", $extend,
-				 $signed_load{$lmode}, $np{$mem_format}, "m",
+				 $signed_load{$lmode}, $np{$mem_format},
+				 $constraint{$mem_format},
 				 $signed_memory_predicate{$lmode});
 	    }
 
@@ -204,7 +215,8 @@ sub gen_ld_cmpi_p10
 
 	  print_ld_cmpi_p10 ($lmode, $result, "CCUNS", "l",
 			     "const_0_to_1_operand", $extend,
-			     $unsigned_load{$lmode}, $np{$mem_format}, "m",
+			     $unsigned_load{$lmode}, $np{$mem_format},
+			     $constraint{$mem_format},
 			     $unsigned_memory_predicate{$lmode});
 	}
     }
