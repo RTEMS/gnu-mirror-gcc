@@ -2102,7 +2102,7 @@ vect_analyze_loop_costing (loop_vec_info loop_vinfo,
       use_estimate = false;
     }
 
-  HOST_WIDE_INT estimated_niter;
+  HOST_WIDE_INT estimated_niter = -1;
 
   /* If we are vectorizing an epilogue then we know the maximum number of
      scalar iterations it will cover is at least one lower than the

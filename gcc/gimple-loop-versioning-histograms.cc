@@ -110,7 +110,7 @@ pass_loop_histogram_versioning::execute (function *fn)
       gcov_type best_val = 0;
 
       /* Look for dominating iteration count.  */
-      for (int i = 0; i < loop->counters->lin->length (); i++)
+      for (int i = 0; i < (int)loop->counters->lin->length (); i++)
 	{
 	  if ((*(loop->counters->lin))[i] > best_val)
 	    {
@@ -247,7 +247,7 @@ pass_loop_histogram_versioning::execute (function *fn)
 			 "loop %i versioned based on histogram "
 			 "for %i iterations (header execution count %d)\n",
 			 loop->num, best_iters,
-			 optimized_loop->header->count.to_gcov_type ());
+			 (int)optimized_loop->header->count.to_gcov_type ());
     }
   free_numbers_of_iterations_estimates (cfun);
   scev_finalize ();
