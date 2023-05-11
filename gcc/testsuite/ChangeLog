@@ -1,3 +1,200 @@
+2023-05-10  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-05-10  Richard Biener  <rguenther@suse.de>
+
+	* g++.dg/torture/pr106922.C: Force _GLIBCXX_USE_CXX11_ABI to 1.
+
+2023-05-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-05-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/109756
+	* g++.dg/cpp23/attr-assume11.C: New test.
+
+2023-05-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-05-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/109778
+	* gcc.dg/lto/pr109778_0.c: New test.
+	* gcc.dg/lto/pr109778_1.c: New file.
+
+2023-05-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-05-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/109778
+	* gcc.c-torture/execute/pr109778.c: New test.
+
+2023-05-09  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2023-04-26  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/109069
+	* gcc.target/powerpc/pr109069-1.c: New test.
+	* gcc.target/powerpc/pr109069-2-run.c: New test.
+	* gcc.target/powerpc/pr109069-2.c: New test.
+	* gcc.target/powerpc/pr109069-2.h: New test.
+
+2023-05-05  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2023-05-02  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/109506
+	* g++.dg/cpp0x/nsdmi-template26.C: New test.
+
+2023-05-05  Julian Brown  <julian@codesourcery.com>
+
+	Backported from master:
+	2023-05-04  Julian Brown  <julian@codesourcery.com>
+
+	PR fortran/109622
+	* gfortran.dg/goacc/pr109622-5.f90: New test.
+	* gfortran.dg/goacc/pr109622-6.f90: New test.
+
+2023-05-05  Julian Brown  <julian@codesourcery.com>
+
+	Backported from master:
+	2023-04-28  Julian Brown  <julian@codesourcery.com>
+
+	PR fortran/109622
+	* gfortran.dg/goacc/attach-descriptor.f90: Adjust expected output.
+
+2023-05-04  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-05-04  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109724
+	* g++.dg/torture/pr109724.C: New testcase.
+
+2023-05-04  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-05-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/109676
+	* g++.target/i386/pr109676.C: New test.
+
+2023-05-04  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	Backported from master:
+	2023-04-20  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+		    kito-cheng  <kito.cheng@sifive.com>
+
+	PR target/109535
+	* g++.target/riscv/rvv/base/pr109535.C: New test.
+	* gcc.target/riscv/rvv/base/pr109535.c: New test.
+
+2023-05-02  Jason Merrill  <jason@redhat.com>
+
+	PR c++/109666
+	* g++.dg/cpp0x/nsdmi-array2.C: New test.
+
+2023-05-02  Jason Merrill  <jason@redhat.com>
+
+	PR c++/108099
+	* g++.dg/ext/int128-8.C: New test.
+	* g++.dg/ext/unsigned-typedef2.C: New test.
+	* g++.dg/ext/unsigned-typedef3.C: New test.
+
+2023-05-02  Jan Beulich  <jbeulich@suse.com>
+
+	* c-c++-common/patchable_function_entry-decl.c: Special-case
+	RISC-V.
+	* c-c++-common/patchable_function_entry-default.c: Likewise.
+	* c-c++-common/patchable_function_entry-definition.c: Likewise.
+
+2023-04-27  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-04-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/109409
+	* gcc.dg/pr109409.c: New test.
+
+2023-04-27  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-04-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/107682
+	PR c/109412
+	* gcc.dg/pr109412.c: New test.
+
+2023-04-26  Andrew Stubbs  <ams@codesourcery.com>
+
+	Backported from master:
+	2023-04-20  Andrew Stubbs  <ams@codesourcery.com>
+
+	* lib/target-supports.exp
+	(check_effective_target_vect_call_copysignf): Add amdgcn.
+	(check_effective_target_vect_call_sqrtf): Add amdgcn.
+	(check_effective_target_vect_call_ceilf): Add amdgcn.
+	(check_effective_target_vect_call_floor): Add amdgcn.
+	(check_effective_target_vect_logical_reduc): Add amdgcn.
+
+2023-04-26  Andrew Stubbs  <ams@codesourcery.com>
+
+	Backported from master:
+	2023-04-18  Andrew Stubbs  <ams@codesourcery.com>
+
+	* gcc.target/gcn/fpdiv.c: Remove the -ffast-math requirement.
+
+2023-04-26  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-04-25  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109609
+	* gcc.dg/torture/pr109609.c: New testcase.
+
+2023-04-26  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-04-25  Richard Biener  <rguenther@suse.de>
+
+	PR rtl-optimization/109585
+	* gcc.dg/torture/pr109585.c: New testcase.
+
+2023-04-26  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-04-21  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/109573
+	* g++.dg/vect/pr109573.cc: New testcase.
+
+2023-04-26  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-04-25  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.dg/cpp23/ext-floating2.C: Add dg-add-options for
+	float16, float32, float64 and float128.
+
+2023-04-26  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-04-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/109278
+	* g++.dg/cpp23/ext-floating15.C: Add dg-add-options float128.
+
+2023-04-26  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-04-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/107041
+	* gcc.dg/goacc/pr107041.c: New test.
+
 2023-04-26  Release Manager
 
 	* GCC 13.1.0 released.
