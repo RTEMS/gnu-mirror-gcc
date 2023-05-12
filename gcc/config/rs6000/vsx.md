@@ -223,12 +223,6 @@
 			  (V8HI  "v")
 			  (V4SI  "wa")])
 
-;; Mode attribute to give the isa constraint for accessing Altivec registers
-;; with vector extract and insert operations.
-(define_mode_attr VSX_EX_ISA [(V16QI "p9v")
-			      (V8HI  "p9v")
-			      (V4SI  "p8v")])
-
 ;; Mode iterator for binary floating types other than double to
 ;; optimize convert to that floating point type from an extract
 ;; of an integer type
@@ -3555,33 +3549,12 @@
   [(set_attr "length" "8")
    (set_attr "type" "fp")])
 
-;; V4SF extract from memory with constant element number.
-;; Alternatives:
-;;       Reg:  Ele:  Cpu: Addr:                 need scratch
-;;    1: FPR   0     any  normal address        no
-;;    2: FPR   1-3   any  offsettable address   no
-;;    3: FPR   1-3   any  single register       yes
-;;    4: VMX   0     p8   reg+reg or reg        no
-;;    5: VMX   1-3   p8   single register       yes
-;;    6: VMX   0     p9   normal address        no
-;;    7: VMX   1-3   p9   offsettable address   no
-;;    8: GPR   0     any  normal address        no
-;;    9: GPR   0-3   any  offsettable address   no
-;;   10: GPR   0-3   any  single register       yes
 (define_insn_and_split "*vsx_extract_v4sf_load"
-  [(set (match_operand:SF 0 "register_operand"
-		"=f,     f,      f,      v,      v,      v,      v,
-		 r,      r,      r")
+  [(set (match_operand:SF 0 "register_operand" "=f,v,v,?r")
 	(vec_select:SF
-	 (match_operand:V4SF 1 "memory_operand"
-		"m,      o,      Q,      Z,      Q,      m,      o,
-		 m,      o,      Q")
-	 (parallel [(match_operand:QI 2 "const_0_to_3_operand"
-		"O,      n,      n,      O,      n,      O,      n,
-		 O,      n,      n")])))
-   (clobber (match_scratch:P 3
-		 "=X,    X,      &b,     X,      &b,     X,      X,
-		  X,      X,      &b"))]
+	 (match_operand:V4SF 1 "memory_operand" "m,Z,m,m")
+	 (parallel [(match_operand:QI 2 "const_0_to_3_operand" "n,n,n,n")])))
+   (clobber (match_scratch:P 3 "=&b,&b,&b,&b"))]
   "VECTOR_MEM_VSX_P (V4SFmode)"
   "#"
   "&& reload_completed"
@@ -3590,47 +3563,9 @@
   operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
 					   operands[3], SFmode);
 }
-  [(set_attr "type"
-		"fpload, fpload, fpload, fpload, fpload, fpload, fpload,
-		 load,   load,   load")
-   (set_attr "isa"
-		"*,      *,      *,      p8v,    p8v,    p9v,    p9v,
-		 *,      *,      *")])
-
-;; V4SF extract from memory with constant element number and convert to DFmode.
-;; Alternatives:
-;;       Reg:  Ele:  Cpu: Addr:                 need scratch
-;;    1: FPR   0     any  normal address        no
-;;    2: FPR   1-3   any  offsettable address   no
-;;    3: FPR   1-3   any  single register       yes
-;;    4: VMX   0     p8   reg+reg or reg        no
-;;    5: VMX   1-3   p8   single register       yes
-;;    6: VMX   0     p9   normal address        no
-;;    7: VMX   1-3   p9   offsettable address   no
-(define_insn_and_split "*vsx_extract_v4sf_load_to_df"
-  [(set (match_operand:DF 0 "register_operand"
-		"=f,     f,      f,      v,      v,      v,      v")
-	(float_extend:DF
-	 (vec_select:SF
-	  (match_operand:V4SF 1 "memory_operand"
-		"m,      o,      Q,      Z,      Q,      m,      o")
-	  (parallel [(match_operand:QI 2 "const_0_to_3_operand"
-		 "=X,    X,      &b,     X,      &b,     X,      X")]))))
-   (clobber (match_scratch:P 3
-		 "=X,    X,      &b,     X,      &b,     X,      X"))]
-  "VECTOR_MEM_VSX_P (V4SFmode)"
-  "#"
-  "&& reload_completed"
-  [(set (match_dup 0)
-	(float_extend:DF (match_dup 4)))]
-{
-  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
-					   operands[3], SFmode);
-}
-  [(set_attr "type"
-		"fpload, fpload, fpload, fpload, fpload, fpload, fpload")
-   (set_attr "isa"
-		"*,      *,      *,      p8v,    p8v,    p9v,    p9v")])
+  [(set_attr "type" "fpload,fpload,fpload,load")
+   (set_attr "length" "8")
+   (set_attr "isa" "*,p7v,p9v,*")])
 
 ;; Variable V4SF extract from a register
 (define_insn_and_split "vsx_extract_v4sf_var"
@@ -3652,7 +3587,7 @@
 
 ;; Variable V4SF extract from memory
 (define_insn_and_split "*vsx_extract_v4sf_var_load"
-  [(set (match_operand:SF 0 "gpc_reg_operand" "=wa,r")
+  [(set (match_operand:SF 0 "gpc_reg_operand" "=wa,?r")
 	(unspec:SF [(match_operand:V4SF 1 "memory_operand" "Q,Q")
 		    (match_operand:DI 2 "gpc_reg_operand" "r,r")]
 		   UNSPEC_VSX_EXTRACT))
@@ -3666,25 +3601,6 @@
 					   operands[3], SFmode);
 }
   [(set_attr "type" "fpload,load")])
-
-;; V4SF extract from memory with variable element number and convert to DFmode.
-(define_insn_and_split "*vsx_extract_v4sf_var_load_to_df"
-  [(set (match_operand:DF 0 "gpc_reg_operand" "=wa")
-	(float_extend:DF
-	 (unspec:SF [(match_operand:V4SF 1 "memory_operand" "Q")
-		     (match_operand:DI 2 "gpc_reg_operand" "r")]
-		    UNSPEC_VSX_EXTRACT)))
-   (clobber (match_scratch:DI 3 "=&b"))]
-  "VECTOR_MEM_VSX_P (V4SFmode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& reload_completed"
-  [(set (match_dup 0)
-	(float_extend:DF (match_dup 4)))]
-{
-  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
-					   operands[3], SFmode);
-}
-  [(set_attr "type" "fpload")])
 
 ;; Expand the builtin form of xxpermdi to canonical rtl.
 (define_expand "vsx_xxpermdi_<mode>"
@@ -4052,89 +3968,21 @@
 }
   [(set_attr "isa" "p9v,*")])
 
-;; Variable V16QI/V8HI/V4SI extract from memory.
+;; Variable V16QI/V8HI/V4SI extract from memory
 (define_insn_and_split "*vsx_extract_<mode>_var_load"
-  [(set (match_operand:<VEC_base> 0 "gpc_reg_operand" "=r,wa")
+  [(set (match_operand:<VEC_base> 0 "gpc_reg_operand" "=r")
 	(unspec:<VEC_base>
-	 [(match_operand:VSX_EXTRACT_I 1 "memory_operand" "Q,Q")
-	  (match_operand:DI 2 "gpc_reg_operand" "r,r")]
+	 [(match_operand:VSX_EXTRACT_I 1 "memory_operand" "Q")
+	  (match_operand:DI 2 "gpc_reg_operand" "r")]
 	 UNSPEC_VSX_EXTRACT))
-   (clobber (match_scratch:DI 3 "=&b,&b"))]
+   (clobber (match_scratch:DI 3 "=&b"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
   "&& reload_completed"
   [(set (match_dup 0) (match_dup 4))]
 {
-  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1],
-					   operands[2], operands[3],
-					   <VEC_base>mode);
-}
-  [(set_attr "type" "load,fpload")
-   (set_attr "isa" "*,<VSX_EX_ISA>")])
-
-;; Variable V4SI extract from memory with sign or zero conversion to DImode.
-(define_insn_and_split "*vsx_extract_v4si_var_load_to_<su>di"
-  [(set (match_operand:DI 0 "gpc_reg_operand" "=r,wa")
-	(any_extend:DI
-	 (unspec:SI
-	  [(match_operand:V4SI 1 "memory_operand" "Q,Q")
-	   (match_operand:DI 2 "gpc_reg_operand" "r,r")]
-	  UNSPEC_VSX_EXTRACT)))
-   (clobber (match_scratch:DI 3 "=&b,&b"))]
-  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& reload_completed"
-  [(set (match_dup 0)
-	(any_extend:DI (match_dup 4)))]
-{
-  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1],
-					   operands[2], operands[3],
-					   SImode);
-}
-  [(set_attr "type" "load,fpload")])
-
-;; Variable V8HI/V16QI extract from memory with zero conversion to either
-;; SImode or DImode.
-(define_insn_and_split "*vsx_extract_<VSX_EXTRACT_I2:mode>_var_load_to_u<GPR:mode>"
-  [(set (match_operand:GPR 0 "gpc_reg_operand" "=r,wa")
-	(zero_extend:GPR
-	 (unspec:<VSX_EXTRACT_I2:MODE>
-	  [(match_operand:VSX_EXTRACT_I2 1 "memory_operand" "Q,Q")
-	   (match_operand:DI 2 "gpc_reg_operand" "r,r")]
-	  UNSPEC_VSX_EXTRACT)))
-   (clobber (match_scratch:DI 3 "=&b,&b"))]
-  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& reload_completed"
-  [(set (match_dup 0)
-	(zero_extend:GPR (match_dup 4)))]
-{
-  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1],
-					   operands[2], operands[3],
-					   <VSX_EXTRACT_I2:MODE>mode);
-}
-  [(set_attr "type" "load,fpload")
-   (set_attr "isa" "*,p9v")])
-
-;; Variable V8HI extract from memory with sign conversion to either
-;; SImode or DImode.
-(define_insn_and_split "*vsx_extract_v8hi_var_load_to_s<mode>"
-  [(set (match_operand:GPR 0 "gpc_reg_operand" "=r")
-	(sign_extend:GPR
-	 (unspec:HI
-	  [(match_operand:V8HI 1 "memory_operand" "Q")
-	   (match_operand:DI 2 "gpc_reg_operand" "r")]
-	  UNSPEC_VSX_EXTRACT)))
-   (clobber (match_scratch:DI 3 "=&b"))]
-  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
-  "#"
-  "&& reload_completed"
-  [(set (match_dup 0)
-	(sign_extend:GPR (match_dup 4)))]
-{
-  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1],
-					   operands[2], operands[3],
-					   HImode);
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
+					   operands[3], <VEC_base>mode);
 }
   [(set_attr "type" "load")])
 
