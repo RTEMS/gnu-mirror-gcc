@@ -1,3 +1,5 @@
+==================== Branch work121, rebase up to 5/12/2023 ====================
+
 ==================== Branch work121, patch #5 ====================
 
 PR target/105325: Fix memory constraints for power10 fusion
@@ -9,7 +11,16 @@ did not use the stricter predicates and constraints, and if the user used the
 -fstack-protector option, it would generate a non-prefixed load instruction
 whose offset was too big if the stack is large.
 
-2023-05-09   Michael Meissner  <meissner@linux.ibm.com>
+This patch has been tested on:
+
+    * Little endian power9 with both IEEE and IBM long double
+    * Little endian power10
+    * Big endian power8 using both 32-bit and 64-bit code generation.
+
+Can I check this into the master branch?  Assuming I can check this in, I will
+also commit to the active GCC branches after a burn-in period.
+
+2023-05-10   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -25,17 +36,26 @@ gcc/testsuite/
 	* g++.target/powerpc/pr105325.C: New test.
 	* gcc.target/powerpc/fusion-p10-ldcmpi.c: Adjust insn counts.
 
-
 ==================== Branch work121, patch #4 ====================
 
 PR target/105325, Rewrite genfusion.pl's gen_ld_cmpi_p10 function.
 
-This patch rewrites the gen_ld_cmpi_p10 function to be clearer.  The resulting
-fusion.md file that this patch generates is exactly the same as the previous
-version of genfusion.pl.  The next patch in this series will fix PR
-target/105325.
+This patch rewrites the gen_ld_cmpi_p10 function in genfusion.pl to be clearer.
+The resulting fusion.md file that this patch generates is exactly the same
+output that the previous version of genfusion.pl generated.  The next patch in
+this series will fix PR target/105325 (provide correct predicates and
+constraints for power10 fusion of load and compare immediate).
 
-2023-05-09   Michael Meissner  <meissner@linux.ibm.com>
+This patch has been tested on:
+
+    * Little endian power9 with both IEEE and IBM long double
+    * Little endian power10
+    * Big endian power8 using both 32-bit and 64-bit code generation.
+
+Can I check this into the master branch?  Assuming I can check this in, I will
+also commit to the active GCC branches after a burn-in period.
+
+2023-05-10   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
