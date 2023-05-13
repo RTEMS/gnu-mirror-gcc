@@ -954,7 +954,50 @@ gimple_mod_pow2 (gassign *stmt, profile_probability prob, gcov_type count, gcov_
 
   hack_ssa_builder builder;
   hvar *op1 = builder.new_invar (gimple_assign_rhs1 (stmt));
-  // TADY JSEM SKONČIL
+  hvar *op2 = builder.new_invar (gimple_assign_rhs2 (stmt));
+  hvar *one = builder.new_invar (build_one_cst (optype));
+  hvar *tmp = builder.new_local (optype);
+  hvar *tmp2 = builder.new_local (optype);
+  hvar *result = builder.new_local (optype);
+  
+  /* bb1.  */
+  builder.set_block_sealed (bb1);
+  builder.append_assign (bb1, MINUS_EXPR, op2, one);
+  builder.append_assign (bb1, BIT_AND_EXPR, tmp2, tmp, op2);
+  builder.set_block_filled (bb1);
+
+  /* bb2 (false branch).  */
+  builder.set_block_sealed (bb2);
+  builder.append_assign (bb2, BIT_AND_EXPR, result, op1, tmp);
+  builder.set_block_filled (bb2);
+
+  /* bb3 (true branch).  */
+  builder.set_block_sealed (bb3);
+  builder.append_assign (bb3, TRUNC_MOD_EXPR, result, op1, op2);
+  builder.set_block_filled (bb3);
+
+  /* bb4.  */
+  builder.set_block_sealed (bb4);
+  hvar *out = builder.append_outvar (bb4, result);
+  builder.set_block_filled (bb4);
+
+  builder.finalize ();
+  tree ret = builder.ssa_from_outvar (out);
+  builder.release ();
+
+  /* Set probabilities and counts.  */
+
+  e12->probability = prob;
+  e13->probability = prob.invert ();
+  e24->probability = profile_probability::always ();
+  e34->probability = profile_probability::always ();
+  e45->probability = profile_probability::always ();
+  bb2->count = profile_count::from_gcov_type (count);
+  bb3->count = profile_count::from_gcov_type (all - count);
+  bb4->count = profile_count::from_gcov_type (all);
+  bb5->count = profile_count::from_gcov_type (all);
+
+  return ret;
 }
 
 /* Do transform 2) on INSN if applicable.  */
