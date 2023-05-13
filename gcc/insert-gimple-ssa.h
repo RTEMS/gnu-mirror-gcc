@@ -25,9 +25,9 @@ along with GCC; see the file COPYING3.  If not see
 
 // -- FORWARD DECLARATION --
 
-struct hack_edge_stmt;
+struct hphi_edge;
 class hstmt;
-class hstmt_left;
+class hstmt_with_lhs;
 class hphi;
 class hstmt_assign;
 struct hack_tuple_internal;
@@ -41,6 +41,7 @@ class hack_ssa_builder;
 
    INVAR .. Incoming variable. Represents SSA name that generated code uses but
 	    originates outside of it
+   MEMORY .. Represents a memory access. Handles storage refs.
    LOCAL .. Local variable. Analogous to a var_decl. Represents a variable used
             only inside the generated code.
    OUTVAR .. Outgoing variable. Doesn't represent an actual object. Represents
@@ -50,6 +51,7 @@ class hack_ssa_builder;
 enum hvar_code
 {
   INVAR,
+  MEMORY,
   LOCAL,
   OUTVAR
 };
@@ -59,12 +61,17 @@ struct hvar
   int index; /* Index only has meaning for INVARs. It is assigned to LOCALs and
 		OUTVARs too, however.  */
   enum hvar_code code;
-  tree type_or_ssa_value; /* type for LOCAL, ssa for INVAR. OUTVAR has
+  tree type_or_ssa_value; /* type for LOCAL, ssa for INVAR, OUTVAR has
 			     NULL_TREE until finalization when it gets an ssa
-			     name.  */
+			     name, MEMORY has a storage ref.  */
 };
 
 // -- INTERNAL STRUCTS --
+
+class hack_storage_ref { };
+class hack_array_ref : hack_storage_ref { };
+class hack_component_ref : hack_storage_ref { };
+class hack_mem_ref : hack_storage_ref { };
 
 enum hstmt_code
 {
@@ -73,12 +80,6 @@ enum hstmt_code
   HSTMT_CONST,
   HSTMT_COND,
   HSTMT_OUTVAR
-};
-
-struct hack_edge_stmt // TODO Nechci spíš pair?
-{
-  edge e;
-  hstmt_left *s;
 };
 
 /* Hack statement
@@ -96,12 +97,12 @@ class hstmt
 
     /* Builds and returns gimple representation of this stmt or NULL if this
        stmt is purely virtual (as in the case of hstmt_outvar).  */
-    virtual gimple *to_gimple (void) { }
+    virtual gimple *to_gimple (void) { return NULL; }
 
-    /* When substituting one definition (represented by hstmt_left *) by
+    /* When substituting one definition (represented by hstmt_with_lhs *) by
        another, this method should be called on all relevant stmts. This is
-       usually done by traversing the 'uses' vector of 'hstmt_left' stmts.  */
-    virtual void replace_op_by (hstmt_left *op, hstmt_left *replace_by) { }
+       usually done by traversing the 'uses' vector of 'hstmt_with_lhs' stmts.  */
+    virtual void replace_op_by (hstmt_with_lhs *, hstmt_with_lhs *) { }
 };
 
 /* Hack statement with left side
@@ -110,10 +111,10 @@ class hstmt
    Has vector to keep track of stmts using this stmt.
    When commiting to GIMPLE, 'ssa' field should be defined.  */
 
-class hstmt_left : public hstmt
+class hstmt_with_lhs : public hstmt
 {
   public:
-    hstmt_left (hstmt_code code, hvar *var) : hstmt (code), var (var)
+    hstmt_with_lhs (hstmt_code code, hvar *var) : hstmt (code), var (var)
       {
 	// TODO Možnost, že var je NULL, když stmt levou stranu nemá
 	gcc_checking_assert (var->code == LOCAL);
@@ -126,16 +127,22 @@ class hstmt_left : public hstmt
 
 /* Hack PHI.  */
 
-class hphi : public hstmt_left
+struct hphi_edge
+{
+  edge e;
+  hstmt_with_lhs *s;
+};
+
+class hphi : public hstmt_with_lhs
 {
   public:
     unsigned num_ops = 0;
-    hack_edge_stmt *op = NULL; /* Array of operands. Not embedded into object.
-				  NULL if PHI incomplete.  */
+    hphi_edge *op = NULL; /* Array of operands. Not embedded into object. NULL
+			     if PHI incomplete.  */
 
-    hphi (hvar *var) : hstmt_left (HPHI, var) { }
+    hphi (hvar *var) : hstmt_with_lhs (HPHI, var) { }
 
-    hstmt_left *get_op (unsigned i)
+    hstmt_with_lhs *get_op (unsigned i)
       {
 	gcc_checking_assert (op != NULL && "PHI has to be completed");
 	gcc_checking_assert (i < num_ops);
@@ -156,23 +163,23 @@ class hphi : public hstmt_left
 	return NULL;
       }
 
-    virtual void replace_op_by (hstmt_left *op, hstmt_left *replace_by) override;
+    virtual void replace_op_by (hstmt_with_lhs *op, hstmt_with_lhs *replace_by) override;
 };
 
 /* Hack assign stmt.
 
    'val' contains the tuple of rhs operands along with a rhs code. */
 
-class hstmt_assign : public hstmt_left
+class hstmt_assign : public hstmt_with_lhs
 {
   public:
     hack_tuple_internal *val;
 
     hstmt_assign (hvar *var, hack_tuple_internal *val) :
-      hstmt_left (HSTMT_ASSIGN, var), val (val) { }
+      hstmt_with_lhs (HSTMT_ASSIGN, var), val (val) { }
 
     virtual gimple *to_gimple (void) override;
-    virtual void replace_op_by (hstmt_left *op, hstmt_left *replace_by) override;
+    virtual void replace_op_by (hstmt_with_lhs *op, hstmt_with_lhs *replace_by) override;
 };
 
 /* Hack const stmt (will rename this to hack invar stmt)
@@ -182,10 +189,10 @@ class hstmt_assign : public hstmt_left
 
    'var' should be only INVAR.  */
 
-class hstmt_const : public hstmt_left
+class hstmt_const : public hstmt_with_lhs
 {
   public:
-    hstmt_const (hvar *var) : hstmt_left (HSTMT_CONST, var) { }
+    hstmt_const (hvar *var) : hstmt_with_lhs (HSTMT_CONST, var) { }
 };
 
 /* Hack cond stmt.  */
@@ -194,14 +201,14 @@ class hstmt_cond : public hstmt
 {
   public:
     enum tree_code pred_code;
-    hstmt_left *lhs;
-    hstmt_left *rhs;
+    hstmt_with_lhs *lhs;
+    hstmt_with_lhs *rhs;
 
-    hstmt_cond (enum tree_code pred_code, hstmt_left *lhs, hstmt_left *rhs)
+    hstmt_cond (enum tree_code pred_code, hstmt_with_lhs *lhs, hstmt_with_lhs *rhs)
       : hstmt (HSTMT_COND), pred_code (pred_code), lhs (lhs), rhs (rhs) { }
 
     virtual gimple *to_gimple (void) override;
-    virtual void replace_op_by (hstmt_left *op, hstmt_left *replace_by) override;
+    virtual void replace_op_by (hstmt_with_lhs *op, hstmt_with_lhs *replace_by) override;
 };
 
 /* Hack outvar stmt
@@ -215,9 +222,9 @@ class hstmt_outvar : public hstmt
 {
   public:
     hvar *outvar;
-    hstmt_left *rhs;
+    hstmt_with_lhs *rhs;
 
-    hstmt_outvar (hvar *outvar, hstmt_left *rhs) :
+    hstmt_outvar (hvar *outvar, hstmt_with_lhs *rhs) :
       hstmt (HSTMT_OUTVAR), outvar (outvar), rhs (rhs) { }
 
     virtual gimple *to_gimple (void) override;
@@ -232,12 +239,12 @@ struct hack_tuple_internal
 {
   enum tree_code code;
   unsigned num_ops;
-  hstmt_left *op[1];  /* Trailing array idiom.  */
+  hstmt_with_lhs *op[1];  /* Trailing array idiom.  */
 };
 
-/* TODO
 template<>
 struct default_hash_traits<hack_tuple_internal>
+  : typed_noop_remove <hack_tuple_internal>
 {
   typedef hack_tuple_internal compare_type;
   typedef hack_tuple_internal value_type;
@@ -250,7 +257,7 @@ struct default_hash_traits<hack_tuple_internal>
     unsigned i;
     for (i = 0; i < v.num_ops; i++)
       {
-	h.add_int (v.op[i]);
+	h.add_ptr (v.op[i]);
       }
     return h.end ();
   }
@@ -272,15 +279,12 @@ struct default_hash_traits<hack_tuple_internal>
   }
 
   static inline void mark_deleted (value_type &) { }
-
-  static inline bool is_deleted (const value_type &)
-  {
-    return false;
-  }
-
+  static inline bool is_deleted (const value_type &) { return false; }
   static inline void remove (value_type &) { }
+  static inline bool is_empty (value_type) { return true; }
+  static inline void mark_empty (value_type &) { }
+  static const bool empty_zero_p = true;
 };
-*/
 
 /* Hack basic block record
 
@@ -291,14 +295,16 @@ class hack_bb
   public:
     vec<hstmt *> stmt_list = vNULL;
     vec<hphi *> phi_list = vNULL;
-    hash_map<hvar *, hstmt_left *> curr_def;  /* See the Braun alg paper for
+    hash_map<hvar *, hstmt_with_lhs *> curr_def;  /* See the Braun alg paper for
 						 what 'curr_def' means.  */
+    hash_set<hphi *> incomplete_phis; /* See Braun alg paper for explanation of
+					 incomplete PHIs.  */
 
     /* Remembers seen tuples (rhs of assigns) and which statements contain
        them. Will be used for build-time optimizations.
 
        TODO Rename this.  */
-    //hash_map<hack_tuple_internal, hstmt_assign *> tuple_provider;
+    hash_map<hack_tuple_internal, hstmt_assign *> tuple_provider;
 };
 
 // -- SSA BUILDER --
@@ -306,30 +312,29 @@ class hack_bb
 /* Hack SSA builder
 
    Main class. Create CFG structure, initialize builder, add statements,
-   finalize, extract SSA names, dispose.  */
+   finalize, extract SSA names, release.  */
 
 class hack_ssa_builder
 {
  public:
-  hvar &new_local (tree type);
-  hvar &new_invar (tree ssa);
-  void append_assign (basic_block bb, enum tree_code code, hvar &left,
-		      hvar &op1);
-  void append_assign (basic_block bb, enum tree_code code, hvar &left,
-		      hvar &op1, hvar &op2);
-  void append_assign (basic_block bb, enum tree_code code, hvar &left,
-		      hvar &op1, hvar &op2, hvar &op3);
+  hvar *new_local (tree type);
+  hvar *new_invar (tree ssa);
+  void append_assign (basic_block bb, enum tree_code code, hvar *left,
+		      hvar *op1);
+  void append_assign (basic_block bb, enum tree_code code, hvar *left,
+		      hvar *op1, hvar *op2);
+  void append_assign (basic_block bb, enum tree_code code, hvar *left,
+		      hvar *op1, hvar *op2, hvar *op3);
   void append_cond (basic_block bb, enum tree_code pred_code,
-		    hvar &left, hvar &right);
-  hvar &append_outvar (basic_block bb, hvar &local);
-  edge hack_make_edge (basic_block src, basic_block dest, int flags);
+		    hvar *left, hvar *right);
+  hvar *append_outvar (basic_block bb, hvar *local);
 
-  void seal_block (basic_block bb);
+  void set_block_sealed (basic_block bb);
   void set_block_filled (basic_block bb);
 
   void finalize (void);
-  void dispose (void); // TODO Možná destruktor?
-  tree ssa_from_outvar (hvar &var);
+  void release (void); // TODO Možná destruktor?
+  tree ssa_from_outvar (hvar *var);
 
  private:
   bool finalized = false;  /* Have all hack stmts been placed yet?  */
@@ -350,8 +355,6 @@ class hack_ssa_builder
   hash_map<basic_block, hack_bb *> bb_record_map;
   hash_set<basic_block> sealed_bbs;
   hash_set<basic_block> filled_bbs;
-  hash_set<hphi *> incomplete_phis; /* See Braun alg paper for explanation of
-				       incomplete PHIs.  */
 
   void append_assign1 (basic_block bb, enum tree_code code, hvar *left,
 		       hvar *op1, hvar *op2, hvar *op3,
@@ -360,21 +363,21 @@ class hack_ssa_builder
   hack_bb *get_bb_record (basic_block bb);
   hack_tuple_internal *tuple_alloc (enum tree_code code, unsigned num_ops);
   void tuple_set_operand (unsigned op_num, hack_tuple_internal *tuple,
-			  hstmt_left *op);
+			  hstmt_with_lhs *op);
   void append_stmt (basic_block bb, hstmt *stmt);
   hphi *add_empty_phi (basic_block bb, hvar *var);
 
-  void commit_ssa_name (hstmt_left *s);
+  void commit_ssa_name (hstmt_with_lhs *s);
   void commit_phi (basic_block bb, hphi *hp);
   void commit_stmt (gimple_stmt_iterator *gsi, hstmt *hs);
 
-  void complete_phi (basic_block bb, hvar *var, hphi *phi);
-  void replace_uses (hstmt_left *to_replace, hstmt_left *replace_by);
+  void complete_phi (basic_block bb, hphi *phi);
+  void replace_uses (hstmt_with_lhs *to_replace, hstmt_with_lhs *replace_by);
   void try_remove_trivial_phi (hphi *phi);
 
-  void write_variable (basic_block bb, hvar *var, hstmt_left *stmt);
-  hstmt_left *read_variable (basic_block bb, hvar *var);
-  hstmt_left *read_variable_recursive (basic_block bb, hvar *var);
+  void write_variable (basic_block bb, hvar *var, hstmt_with_lhs *stmt);
+  hstmt_with_lhs *read_variable (basic_block bb, hvar *var);
+  hstmt_with_lhs *read_variable_recursive (basic_block bb, hvar *var);
 
   void tuple_register (basic_block bb, hstmt_assign *stmt);
   hstmt_assign *tuple_lookup (basic_block bb, hack_tuple_internal *val);
@@ -385,7 +388,7 @@ class hack_ssa_builder
 // -- dyn_cast STUFF --
 
 template<>
-struct is_a_helper<hstmt_left *> : static_is_a_helper<hstmt_left *>
+struct is_a_helper<hstmt_with_lhs *> : static_is_a_helper<hstmt_with_lhs *>
 {
   static inline bool test (const hstmt *p)
     {

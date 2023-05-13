@@ -56,7 +56,7 @@ along with GCC; see the file COPYING3.  If not see
 /* Replace hack PHI operand.  */
 
 void
-hphi::replace_op_by (hstmt_left *op, hstmt_left *replace_by)
+hphi::replace_op_by (hstmt_with_lhs *op, hstmt_with_lhs *replace_by)
 {
   if (this->op == NULL)
     return;
@@ -72,7 +72,7 @@ hphi::replace_op_by (hstmt_left *op, hstmt_left *replace_by)
 /* Replace hack assign operand.  */
 
 void
-hstmt_assign::replace_op_by (hstmt_left *op, hstmt_left *replace_by)
+hstmt_assign::replace_op_by (hstmt_with_lhs *op, hstmt_with_lhs *replace_by)
 {
   unsigned i;
   for (i = 0; i < val->num_ops; i++)
@@ -85,7 +85,7 @@ hstmt_assign::replace_op_by (hstmt_left *op, hstmt_left *replace_by)
 /* Replace hack cond lhs/rhs.  */
 
 void
-hstmt_cond::replace_op_by (hstmt_left *op, hstmt_left *replace_by)
+hstmt_cond::replace_op_by (hstmt_with_lhs *op, hstmt_with_lhs *replace_by)
 {
   if (lhs == op)
     lhs = replace_by;
@@ -141,7 +141,7 @@ hstmt_outvar::to_gimple (void)
   return NULL;
 }
 
-hvar &
+hvar *
 hack_ssa_builder::new_local (tree type)
 {
   gcc_assert (type != NULL_TREE);
@@ -152,10 +152,10 @@ hack_ssa_builder::new_local (tree type)
   local->type_or_ssa_value = type;
   next_index++;
   allocated_hvars.safe_push (local);
-  return *local;
+  return local;
 }
 
-hvar &
+hvar *
 hack_ssa_builder::new_invar (tree ssa)
 {
   gcc_assert (ssa != NULL_TREE);
@@ -172,42 +172,42 @@ hack_ssa_builder::new_invar (tree ssa)
   const_list.safe_push (stmt);
   allocated_hvars.safe_push (invar);
 
-  return *invar;
+  return invar;
 }
 
 /* Build and append hack assign to a basic block.  */
 
 void
 hack_ssa_builder::append_assign (basic_block bb, enum tree_code code,
-				 hvar &left, hvar &op1)
+				 hvar *left, hvar *op1)
 {
-  append_assign1 (bb, code, &left, &op1, NULL, NULL, 1);
+  append_assign1 (bb, code, left, op1, NULL, NULL, 1);
 }
 
 void
 hack_ssa_builder::append_assign (basic_block bb, enum tree_code code,
-				 hvar &left, hvar &op1,
-				 hvar &op2)
+				 hvar *left, hvar *op1,
+				 hvar *op2)
 {
-  append_assign1 (bb, code, &left, &op1, &op2, NULL, 2);
+  append_assign1 (bb, code, left, op1, op2, NULL, 2);
 }
 
 void
 hack_ssa_builder::append_assign (basic_block bb, enum tree_code code,
-				 hvar &left, hvar &op1,
-				 hvar &op2, hvar &op3)
+				 hvar *left, hvar *op1,
+				 hvar *op2, hvar *op3)
 {
-  append_assign1 (bb, code, &left, &op1, &op2, &op3, 3);
+  append_assign1 (bb, code, left, op1, op2, op3, 3);
 }
 
 /* Build and append hack cond to a basic block.  */
 
 void
 hack_ssa_builder::append_cond (basic_block bb, enum tree_code pred_code,
-			      hvar &left, hvar &right)
+			      hvar *left, hvar *right)
 {
-  hstmt_left *stmt_l = read_variable (bb, &left);
-  hstmt_left *stmt_r = read_variable (bb, &right);
+  hstmt_with_lhs *stmt_l = read_variable (bb, left);
+  hstmt_with_lhs *stmt_r = read_variable (bb, right);
 
   hstmt_cond *stmt = new hstmt_cond (pred_code, stmt_l, stmt_r);
   append_stmt (bb, stmt);
@@ -224,8 +224,8 @@ hack_ssa_builder::append_cond (basic_block bb, enum tree_code pred_code,
    will want to know SSA name of a LOCAL hack var. Outvars should be the only
    way to extract SSA names from generated code. */
 
-hvar &
-hack_ssa_builder::append_outvar (basic_block bb, hvar &local)
+hvar *
+hack_ssa_builder::append_outvar (basic_block bb, hvar *local)
 {
   hvar *outvar = XNEW (struct hvar);
   outvar->index = next_index;
@@ -233,32 +233,25 @@ hack_ssa_builder::append_outvar (basic_block bb, hvar &local)
   outvar->type_or_ssa_value = NULL;
   next_index++;
 
-  hstmt_outvar *stmt = new hstmt_outvar (outvar, read_variable (bb, &local));
+  hstmt_outvar *stmt = new hstmt_outvar (outvar, read_variable (bb, local));
   append_stmt (bb, stmt);
 
   allocated_hvars.safe_push (outvar);
   
-  return *outvar;
-}
-
-/* Wrapper around 'make_edge ()'.
-
-   Edges should only be added to filled blocks. This wrapper checks that
-   condition.  */
-
-edge
-hack_ssa_builder::hack_make_edge (basic_block src, basic_block dest, int flags)
-{
-  gcc_assert (filled_bbs.contains (src) &&
-		       "Successors can only be added to a filled BB");
-  return make_edge (src, dest, flags);
+  return outvar;
 }
 
 /* See the Braun alg paper for what 'sealed' means.  */
 
 void
-hack_ssa_builder::seal_block (basic_block bb)
+hack_ssa_builder::set_block_sealed (basic_block bb)
 {
+  hack_bb *record = get_bb_record (bb);
+  for (hphi *p : record->incomplete_phis)
+    {
+      complete_phi (bb, p);
+    }
+
   sealed_bbs.add (bb);
 }
 
@@ -271,7 +264,7 @@ hack_ssa_builder::set_block_filled (basic_block bb)
 }
 
 /* Finalize building of SSA code. Call this after all statements have been
-   placed. Extract SSA names from OUTVARs afterwards. Then, dispose of the
+   placed. Extract SSA names from OUTVARs afterwards. Then, release of the
    builder. */
 
 void
@@ -288,7 +281,7 @@ hack_ssa_builder::finalize (void)
   for (basic_block bb : seen_bbs)
     {
       if (!sealed_bbs.contains (bb))
-	seal_block (bb);
+	set_block_sealed (bb);
     }
 
   /* Commit everything.  */
@@ -299,7 +292,7 @@ hack_ssa_builder::finalize (void)
 	{
 	  if (!s->killed)
 	    {
-	      hstmt_left *ls = dyn_cast<hstmt_left *> (s);
+	      hstmt_with_lhs *ls = dyn_cast<hstmt_with_lhs *> (s);
 	      if (ls != NULL)
 		commit_ssa_name (ls);
 	    }
@@ -314,7 +307,7 @@ hack_ssa_builder::finalize (void)
     }
   for (basic_block bb : seen_bbs)
     {
-      gimple_stmt_iterator gsi = gsi_start_bb (bb);
+      gimple_stmt_iterator gsi = gsi_last_bb (bb);
       hack_bb *record = get_bb_record (bb);
       for (hstmt *s : record->stmt_list)
 	{
@@ -334,14 +327,14 @@ hack_ssa_builder::finalize (void)
 }
 
 void
-hack_ssa_builder::dispose (void)
+hack_ssa_builder::release (void)
 {
   for (basic_block bb : seen_bbs)
     {
       hack_bb *record = get_bb_record (bb);
       for (hstmt *s : record->stmt_list)
 	{
-	  hstmt_left *ls = dyn_cast<hstmt_left *> (s);
+	  hstmt_with_lhs *ls = dyn_cast<hstmt_with_lhs *> (s);
 	  if (ls != NULL)
 	    ls->uses.release ();
 	  delete s;
@@ -367,11 +360,11 @@ hack_ssa_builder::dispose (void)
    finalizing. */
 
 tree
-hack_ssa_builder::ssa_from_outvar (hvar &outvar)
+hack_ssa_builder::ssa_from_outvar (hvar *outvar)
 {
   gcc_assert (finalized && "SSA builder has to be finalized");
-  gcc_assert (outvar.code == OUTVAR);
-  return outvar.type_or_ssa_value;
+  gcc_assert (outvar->code == OUTVAR);
+  return outvar->type_or_ssa_value;
 }
 
 void
@@ -380,7 +373,7 @@ hack_ssa_builder::append_assign1 (basic_block bb, enum tree_code code,
 				  hvar *op2, hvar *op3,
 				  unsigned num_ops)
 {
-  hstmt_left *stmt;
+  hstmt_with_lhs *stmt;
 
   hack_tuple_internal *val = tuple_alloc (code, num_ops);
   gcc_assert (op1 != NULL);
@@ -438,7 +431,7 @@ hack_ssa_builder::tuple_alloc (enum tree_code code, unsigned num_ops)
   gcc_assert (num_ops <= 3 && "Tuples of size >3 not allowed");
 
   size_t size = sizeof (hack_tuple_internal) +
-    (num_ops - 1) * sizeof (struct hstmt_left *);
+    (num_ops - 1) * sizeof (struct hstmt_with_lhs *);
   hack_tuple_internal *result = XNEWVAR (struct hack_tuple_internal, size);
 
   result->num_ops = num_ops;
@@ -452,7 +445,7 @@ hack_ssa_builder::tuple_alloc (enum tree_code code, unsigned num_ops)
 void
 hack_ssa_builder::tuple_set_operand (unsigned op_num,
 				     hack_tuple_internal *tuple,
-				     hstmt_left *op)
+				     hstmt_with_lhs *op)
 {
   tuple->op[op_num] = op;
 }
@@ -480,7 +473,7 @@ hack_ssa_builder::add_empty_phi (basic_block bb, hvar *var)
    statements.  */
 
 void
-hack_ssa_builder::commit_ssa_name (hstmt_left *s)
+hack_ssa_builder::commit_ssa_name (hstmt_with_lhs *s)
 {
   switch (s->var->code)
     {
@@ -490,7 +483,7 @@ hack_ssa_builder::commit_ssa_name (hstmt_left *s)
       case INVAR:
 	gcc_unreachable (); /* Invars already have SSA value.  */
       case OUTVAR:
-	gcc_unreachable (); /* Outvars shouldn't be present in hstmt_left.  */
+	gcc_unreachable (); /* Outvars shouldn't be present in hstmt_with_lhs.  */
     }
 }
 
@@ -509,7 +502,7 @@ hack_ssa_builder::commit_phi (basic_block bb, hphi *hp)
   unsigned i;
   for (i = 0; i < hp->num_ops; i++)
     {
-      hstmt_left *s = hp->get_op (i);
+      hstmt_with_lhs *s = hp->get_op (i);
       edge e = hp->get_edge (i);
 
       gcc_assert (s->ssa != NULL && "SSA names have to be assigned");
@@ -534,24 +527,26 @@ hack_ssa_builder::commit_stmt (gimple_stmt_iterator *gsi, hstmt *hs)
    predecessors of bb. This makes completed PHI out of empty PHI.  */
 
 void
-hack_ssa_builder::complete_phi (basic_block bb, hvar *var, hphi *phi)
+hack_ssa_builder::complete_phi (basic_block bb, hphi *phi)
 {
-  gcc_assert (sealed_bbs.contains (bb) &&
-		       "Only sealed BBs contain complete PHIs");
+  gcc_assert (sealed_bbs.contains (bb)
+	      && "Only sealed BBs contain complete PHIs");
+
+  hvar* var = phi->var;
 
   edge e;
   edge_iterator ei;
 
   /* Alloc operand array.  */
   unsigned num_ops = EDGE_COUNT (bb->preds);
-  hack_edge_stmt *op = XNEWVEC (hack_edge_stmt, num_ops);
+  hphi_edge *op = XNEWVEC (hphi_edge, num_ops);
   
   /* Set operands.  */
   unsigned i = 0;
   for (ei = ei_start (bb->preds); (e = ei_safe_edge (ei)); ei_next (&ei))
     {
       basic_block bb_pred = e->src;
-      hstmt_left *s = read_variable (bb_pred, var);
+      hstmt_with_lhs *s = read_variable (bb_pred, var);
       op[i].e = e;
       op[i].s = s;
 
@@ -572,7 +567,7 @@ hack_ssa_builder::complete_phi (basic_block bb, hvar *var, hphi *phi)
    method.  */
 
 void
-hack_ssa_builder::replace_uses (hstmt_left *to_replace, hstmt_left *replace_by)
+hack_ssa_builder::replace_uses (hstmt_with_lhs *to_replace, hstmt_with_lhs *replace_by)
 {
   for (hstmt *s : to_replace->uses)
     {
@@ -586,15 +581,15 @@ hack_ssa_builder::replace_uses (hstmt_left *to_replace, hstmt_left *replace_by)
 void
 hack_ssa_builder::try_remove_trivial_phi (hphi *phi)
 {
-  hstmt_left *same = NULL;
+  hstmt_with_lhs *same = NULL;
 
-  gcc_assert (phi->op != NULL &&
-	      "PHI must be completed before triviality can be determined");
+  gcc_assert (phi->op != NULL
+	      && "PHI must be completed before triviality can be determined");
 
   unsigned i;
   for (i = 0; i < phi->num_ops; i++)
     {
-      hstmt_left *op = phi->get_op (i);
+      hstmt_with_lhs *op = phi->get_op (i);
       if (op == same || dyn_cast<hphi *> (op) == phi)
 	continue; /* Unique value or self-reference.  */
       if (same != NULL)
@@ -621,7 +616,7 @@ hack_ssa_builder::try_remove_trivial_phi (hphi *phi)
 
 void
 hack_ssa_builder::write_variable (basic_block bb, hvar *var,
-				  hstmt_left *stmt)
+				  hstmt_with_lhs *stmt)
 {
   hack_bb *record = get_bb_record (bb);
   record->curr_def.put (var, stmt);
@@ -632,7 +627,7 @@ hack_ssa_builder::write_variable (basic_block bb, hvar *var,
    There's a modification. Braun et al. only consider variables I call LOCAL.
    This implementation also handles INVAR variables.  */
 
-hstmt_left *
+hstmt_with_lhs *
 hack_ssa_builder::read_variable (basic_block bb, hvar *var)
 {
   if (var->code == INVAR)
@@ -641,7 +636,7 @@ hack_ssa_builder::read_variable (basic_block bb, hvar *var)
     }
 
   hack_bb *record = get_bb_record (bb);
-  hstmt_left **stmt_p = record->curr_def.get (var);
+  hstmt_with_lhs **stmt_p = record->curr_def.get (var);
   if (stmt_p == NULL)
     return read_variable_recursive (bb, var);
   return *stmt_p;
@@ -649,16 +644,17 @@ hack_ssa_builder::read_variable (basic_block bb, hvar *var)
 
 /* See Braun alg paper for explanation of this method.  */
 
-hstmt_left *
+hstmt_with_lhs *
 hack_ssa_builder::read_variable_recursive (basic_block bb, hvar *var)
 {
-  hstmt_left *stmt;
+  hstmt_with_lhs *stmt;
 
   if (!sealed_bbs.contains (bb))
     {
       hphi *phi = add_empty_phi (bb, var);
       stmt = phi;
-      incomplete_phis.add (phi);
+      hack_bb *record = get_bb_record (bb);
+      record->incomplete_phis.add (phi);
     }
   else if (single_pred_p (bb))
     {
@@ -668,7 +664,7 @@ hack_ssa_builder::read_variable_recursive (basic_block bb, hvar *var)
     {
       hphi *phi = add_empty_phi (bb, var);
       stmt = phi;
-      complete_phi (bb, var, phi);
+      complete_phi (bb, phi);
     }
   else
     {
@@ -686,10 +682,8 @@ hack_ssa_builder::read_variable_recursive (basic_block bb, hvar *var)
 void
 hack_ssa_builder::tuple_register (basic_block bb, hstmt_assign *stmt)
 {
-  /*
   hack_bb *record = get_bb_record (bb);
   record->tuple_provider.put (*stmt->val, stmt);
-  */
 }
 
 /* Look up a tuple. Recall if we've already seen assign with equivalent right
@@ -698,15 +692,12 @@ hack_ssa_builder::tuple_register (basic_block bb, hstmt_assign *stmt)
 hstmt_assign *
 hack_ssa_builder::tuple_lookup (basic_block bb, hack_tuple_internal *val)
 {
-  /*
   hack_bb *record = get_bb_record (bb);
   hstmt_assign **stmt_p = record->tuple_provider.get (*val);
   if (stmt_p == NULL)
     return NULL;
   else
     return *stmt_p;
-  */
-  return NULL;
 }
 
 /* Run final optimizations. Run the optimzalizations that should be done right

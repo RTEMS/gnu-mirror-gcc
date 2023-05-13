@@ -43,6 +43,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "dumpfile.h"
 #include "builtins.h"
 
+#include "insert-gimple-ssa.h"
+#include <iostream>
+
 /* In this file value profile based optimizations are placed.  Currently the
    following optimizations are implemented (for more detailed descriptions
    see comments at value_profile_transformations):
@@ -663,72 +666,99 @@ static tree
 gimple_divmod_fixed_value (gassign *stmt, tree value, profile_probability prob,
 			   gcov_type count, gcov_type all)
 {
-  gassign *stmt1, *stmt2;
-  gcond *stmt3;
-  tree tmp0, tmp1, tmp2;
-  gimple *bb1end, *bb2end, *bb3end;
-  basic_block bb, bb2, bb3, bb4;
-  tree optype, op1, op2;
-  edge e12, e13, e23, e24, e34;
-  gimple_stmt_iterator gsi;
-
   gcc_assert (is_gimple_assign (stmt)
 	      && (gimple_assign_rhs_code (stmt) == TRUNC_DIV_EXPR
 		  || gimple_assign_rhs_code (stmt) == TRUNC_MOD_EXPR));
 
-  optype = TREE_TYPE (gimple_assign_lhs (stmt));
-  op1 = gimple_assign_rhs1 (stmt);
-  op2 = gimple_assign_rhs2 (stmt);
+  /* Prepare CFG.
 
-  bb = gimple_bb (stmt);
-  gsi = gsi_for_stmt (stmt);
+     1
+     |\
+     F T (false/true)
+     | |
+     2 3
+     |/
+     4
+     |
+     5 <- original stmt here  */
 
-  tmp0 = make_temp_ssa_name (optype, NULL, "PROF");
-  tmp1 = make_temp_ssa_name (optype, NULL, "PROF");
-  stmt1 = gimple_build_assign (tmp0, fold_convert (optype, value));
-  stmt2 = gimple_build_assign (tmp1, op2);
-  stmt3 = gimple_build_cond (NE_EXPR, tmp1, tmp0, NULL_TREE, NULL_TREE);
-  gsi_insert_before (&gsi, stmt1, GSI_SAME_STMT);
-  gsi_insert_before (&gsi, stmt2, GSI_SAME_STMT);
-  gsi_insert_before (&gsi, stmt3, GSI_SAME_STMT);
-  bb1end = stmt3;
+  basic_block bb1, bb2, bb3, bb4, bb5;
+  bb1 = gimple_bb (stmt);
+  bb5 = split_block (bb1, stmt)->dest;
+  bb2 = split_edge (single_succ_edge (bb1));
+  bb3 = split_edge (single_succ_edge (bb2));
+  bb4 = split_edge (single_succ_edge (bb3));
 
-  tmp2 = create_tmp_reg (optype, "PROF");
-  stmt1 = gimple_build_assign (tmp2, gimple_assign_rhs_code (stmt), op1, tmp0);
-  gsi_insert_before (&gsi, stmt1, GSI_SAME_STMT);
-  bb2end = stmt1;
+  edge e12, e13, e24, e34, e45; /* Names respect the final CFG.  */
+  e12 = single_succ_edge (bb1);
+  e12->flags = EDGE_FALSE_VALUE;
+  e24 = single_succ_edge (bb2);
+  e34 = single_succ_edge (bb3);
+  redirect_edge_succ (e24, bb4);
+  e13 = make_edge (bb1, bb3, EDGE_TRUE_VALUE);
+  e45 = single_succ_edge (bb4);
 
-  stmt1 = gimple_build_assign (tmp2, gimple_assign_rhs_code (stmt), op1, op2);
-  gsi_insert_before (&gsi, stmt1, GSI_SAME_STMT);
-  bb3end = stmt1;
+  /* Move orig stmt to start of bb5.  */
+  gimple_stmt_iterator gsi1, gsi2;
+  gsi1 = gsi_for_stmt (stmt);
+  gsi2 = gsi_start_bb (bb5);
+  gsi_move_before (&gsi1, &gsi2);
 
-  /* Fix CFG. */
-  /* Edge e23 connects bb2 to bb3, etc. */
-  e12 = split_block (bb, bb1end);
-  bb2 = e12->dest;
-  bb2->count = profile_count::from_gcov_type (count);
-  e23 = split_block (bb2, bb2end);
-  bb3 = e23->dest;
-  bb3->count = profile_count::from_gcov_type (all - count);
-  e34 = split_block (bb3, bb3end);
-  bb4 = e34->dest;
-  bb4->count = profile_count::from_gcov_type (all);
+  /* Insert statements using insert API.
 
-  e12->flags &= ~EDGE_FALLTHRU;
-  e12->flags |= EDGE_FALSE_VALUE;
+     if (op2 != value)
+       tmp = op1 / op2
+     else
+       tmp = op1 / value
+
+     (or with modulo instead of division)  */
+
+  tree optype = TREE_TYPE (gimple_assign_lhs (stmt));
+  enum tree_code code = gimple_assign_rhs_code (stmt);
+
+  hack_ssa_builder builder;
+  hvar *op1 = builder.new_invar (gimple_assign_rhs1 (stmt));
+  hvar *op2 = builder.new_invar (gimple_assign_rhs2 (stmt));
+  hvar *value_as_invar = builder.new_invar (value);
+  hvar *tmp = builder.new_local (optype);
+
+  /* bb1.  */
+  builder.set_block_sealed (bb1);
+  builder.append_cond (bb1, NE_EXPR, op2, value_as_invar);
+  builder.set_block_filled (bb1);
+
+  /* bb2 (false branch).  */
+  builder.set_block_sealed (bb2);
+  builder.append_assign (bb2, code, tmp, op1, value_as_invar);
+  builder.set_block_filled (bb2);
+
+  /* bb3 (true branch).  */
+  builder.set_block_sealed (bb3);
+  builder.append_assign (bb3, code, tmp, op1, op2);
+  builder.set_block_filled (bb2);
+
+  /* bb4.  */
+  builder.set_block_sealed (bb4);
+  hvar *out = builder.append_outvar (bb4, tmp);
+  builder.set_block_filled (bb4);
+
+  builder.finalize ();
+  tree ret = builder.ssa_from_outvar (out);
+  builder.release ();
+
+  /* Set probabilities and counts.  */
+
   e12->probability = prob;
-
-  e13 = make_edge (bb, bb3, EDGE_TRUE_VALUE);
   e13->probability = prob.invert ();
-
-  remove_edge (e23);
-
-  e24 = make_edge (bb2, bb4, EDGE_FALLTHRU);
   e24->probability = profile_probability::always ();
-
   e34->probability = profile_probability::always ();
+  e45->probability = profile_probability::always ();
+  bb2->count = profile_count::from_gcov_type (count);
+  bb3->count = profile_count::from_gcov_type (all - count);
+  bb4->count = profile_count::from_gcov_type (all);
+  bb5->count = profile_count::from_gcov_type (all);
 
-  return tmp2;
+  return ret;
 }
 
 /* Return the n-th value count of TOPN_VALUE histogram.  If
@@ -874,76 +904,57 @@ gimple_divmod_fixed_value_transform (gimple_stmt_iterator *si)
 static tree
 gimple_mod_pow2 (gassign *stmt, profile_probability prob, gcov_type count, gcov_type all)
 {
-  gassign *stmt1, *stmt2, *stmt3;
-  gcond *stmt4;
-  tree tmp2, tmp3;
-  gimple *bb1end, *bb2end, *bb3end;
-  basic_block bb, bb2, bb3, bb4;
-  tree optype, op1, op2;
-  edge e12, e13, e23, e24, e34;
-  gimple_stmt_iterator gsi;
-  tree result;
-
   gcc_assert (is_gimple_assign (stmt)
 	      && gimple_assign_rhs_code (stmt) == TRUNC_MOD_EXPR);
 
-  optype = TREE_TYPE (gimple_assign_lhs (stmt));
-  op1 = gimple_assign_rhs1 (stmt);
-  op2 = gimple_assign_rhs2 (stmt);
+  /* Prepare CFG.
 
-  bb = gimple_bb (stmt);
-  gsi = gsi_for_stmt (stmt);
+     1
+     |\
+     F T (false/true)
+     | |
+     2 3
+     |/
+     4
+     |
+     5 <- original stmt here  */
 
-  result = create_tmp_reg (optype, "PROF");
-  tmp2 = make_temp_ssa_name (optype, NULL, "PROF");
-  tmp3 = make_temp_ssa_name (optype, NULL, "PROF");
-  stmt2 = gimple_build_assign (tmp2, PLUS_EXPR, op2,
-			       build_int_cst (optype, -1));
-  stmt3 = gimple_build_assign (tmp3, BIT_AND_EXPR, tmp2, op2);
-  stmt4 = gimple_build_cond (NE_EXPR, tmp3, build_int_cst (optype, 0),
-			     NULL_TREE, NULL_TREE);
-  gsi_insert_before (&gsi, stmt2, GSI_SAME_STMT);
-  gsi_insert_before (&gsi, stmt3, GSI_SAME_STMT);
-  gsi_insert_before (&gsi, stmt4, GSI_SAME_STMT);
-  bb1end = stmt4;
+  basic_block bb1, bb2, bb3, bb4, bb5;
+  bb1 = gimple_bb (stmt);
+  bb5 = split_block (bb1, stmt)->dest;
+  bb2 = split_edge (single_succ_edge (bb1));
+  bb3 = split_edge (single_succ_edge (bb2));
+  bb4 = split_edge (single_succ_edge (bb3));
 
-  /* tmp2 == op2-1 inherited from previous block.  */
-  stmt1 = gimple_build_assign (result, BIT_AND_EXPR, op1, tmp2);
-  gsi_insert_before (&gsi, stmt1, GSI_SAME_STMT);
-  bb2end = stmt1;
+  edge e12, e13, e24, e34, e45; /* Names respect the final CFG.  */
+  e12 = single_succ_edge (bb1);
+  e12->flags = EDGE_FALSE_VALUE;
+  e24 = single_succ_edge (bb2);
+  e34 = single_succ_edge (bb3);
+  redirect_edge_succ (e24, bb4);
+  e13 = make_edge (bb1, bb3, EDGE_TRUE_VALUE);
+  e45 = single_succ_edge (bb4);
 
-  stmt1 = gimple_build_assign (result, gimple_assign_rhs_code (stmt),
-			       op1, op2);
-  gsi_insert_before (&gsi, stmt1, GSI_SAME_STMT);
-  bb3end = stmt1;
+  /* Move orig stmt to start of bb5.  */
+  gimple_stmt_iterator gsi1, gsi2;
+  gsi1 = gsi_for_stmt (stmt);
+  gsi2 = gsi_start_bb (bb5);
+  gsi_move_before (&gsi1, &gsi2);
 
-  /* Fix CFG. */
-  /* Edge e23 connects bb2 to bb3, etc. */
-  e12 = split_block (bb, bb1end);
-  bb2 = e12->dest;
-  bb2->count = profile_count::from_gcov_type (count);
-  e23 = split_block (bb2, bb2end);
-  bb3 = e23->dest;
-  bb3->count = profile_count::from_gcov_type (all - count);
-  e34 = split_block (bb3, bb3end);
-  bb4 = e34->dest;
-  bb4->count = profile_count::from_gcov_type (all);
+  /* Insert statements using insert API.
 
-  e12->flags &= ~EDGE_FALLTHRU;
-  e12->flags |= EDGE_FALSE_VALUE;
-  e12->probability = prob;
+     tmp = op2 - 1
+     tmp2 = tmp & op2
+     if (tmp2 != 0)
+       result = op1 mod op2
+     else
+       result = op1 & tmp  */
 
-  e13 = make_edge (bb, bb3, EDGE_TRUE_VALUE);
-  e13->probability = prob.invert ();
+  tree optype = TREE_TYPE (gimple_assign_lhs (stmt));
 
-  remove_edge (e23);
-
-  e24 = make_edge (bb2, bb4, EDGE_FALLTHRU);
-  e24->probability = profile_probability::always ();
-
-  e34->probability = profile_probability::always ();
-
-  return result;
+  hack_ssa_builder builder;
+  hvar *op1 = builder.new_invar (gimple_assign_rhs1 (stmt));
+  // TADY JSEM SKONČIL
 }
 
 /* Do transform 2) on INSN if applicable.  */
