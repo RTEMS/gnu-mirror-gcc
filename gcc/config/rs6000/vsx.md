@@ -4287,6 +4287,58 @@
 }
   [(set_attr "type" "load")])
 
+;; Fold extracting a V4SI element with a variable element with either sign or
+;; zero extension to SFmode or DFmode into LFIWAX/LFIWZX and FCFID.
+(define_insn_and_split "*vsx_extract_v4si_var_load_to_<uns><mode>"
+  [(set (match_operand:SFDF 0 "register_operand" "=wa")
+	(any_float:SFDF
+	 (unspec:SI
+	  [(match_operand:V4SI 1 "memory_operand" "Q")
+	   (match_operand:DI 2 "register_operand" "r")]
+	  UNSPEC_VSX_EXTRACT)))
+   (clobber (match_scratch:DI 3 "=&b"))
+   (clobber (match_scratch:DI 4 "=wa"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 4)
+	(<fp_int_extend>:DI (match_dup 5)))
+   (set (match_dup 0)
+	(float:SFDF (match_dup 4)))]
+{
+  operands[5] = rs6000_adjust_vec_address (operands[0], operands[1],
+					   operands[2], operands[3],
+					   SImode);
+}
+  [(set_attr "type" "fpload")
+   (set_attr "length" "8")])
+
+;; Fold extracting a V8HI/V16QI element with a variable element with zero
+;; extension to SFmode or DFmode into LXSIBZX/LXSIHZX and FCFID
+(define_insn_and_split "*vsx_extract_<VSX_EXTRACT_I2:mode>_var_load_to_uns<SFDF:mode>"
+  [(set (match_operand:SFDF 0 "register_operand" "=wa")
+	(unsigned_float:SFDF
+	 (unspec:<VSX_EXTRACT_I2:VEC_base>
+	  [(match_operand:VSX_EXTRACT_I2 1 "memory_operand" "Q")
+	   (match_operand:DI 2 "register_operand" "r")]
+	  UNSPEC_VSX_EXTRACT)))
+   (clobber (match_scratch:DI 3 "=&b"))
+   (clobber (match_scratch:DI 4 "=v"))]
+  "VECTOR_MEM_VSX_P (<VSX_EXTRACT_I2:MODE>mode) && TARGET_P9_VECTOR"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 4)
+	(zero_extend:DI (match_dup 5)))
+   (set (match_dup 0)
+	(float:SFDF (match_dup 4)))]
+{
+  operands[5] = rs6000_adjust_vec_address (operands[0], operands[1],
+					   operands[2], operands[3],
+					   <VSX_EXTRACT_I2:VEC_base>mode);
+}
+  [(set_attr "type" "fpload")
+   (set_attr "length" "8")])
+
 ;; ISA 3.1 extract
 (define_expand "vextractl<mode>"
   [(set (match_operand:V2DI 0 "altivec_register_operand")
