@@ -272,7 +272,7 @@ hack_ssa_builder::finalize (void)
 {
   run_final_optimizations ();
 
-  /* Fill and seal remaining bbs.  */
+  /* Fill and seal remaining bbs.  */ // TODO Pořadí by mělo být obráceně
   for (basic_block bb : seen_bbs)
     { // TODO Nechci jen checking assert?
       if (!filled_bbs.contains (bb))
@@ -630,6 +630,7 @@ hack_ssa_builder::write_variable (basic_block bb, hvar *var,
 hstmt_with_lhs *
 hack_ssa_builder::read_variable (basic_block bb, hvar *var)
 {
+  gcc_assert (var->code == LOCAL || var->code == INVAR || var->code == MEMORY);
   if (var->code == INVAR)
     {
       return const_list[var->index];
@@ -669,6 +670,7 @@ hack_ssa_builder::read_variable_recursive (basic_block bb, hvar *var)
   else
     {
       // TODO Řeším takhle správně, že definici nenajdu?
+      std::cerr << "Didn't find a definition" << std::endl;
       gcc_unreachable (); /* Couldn't find definition of variable.  */
     }
 

@@ -117,7 +117,7 @@ class hstmt_with_lhs : public hstmt
     hstmt_with_lhs (hstmt_code code, hvar *var) : hstmt (code), var (var)
       {
 	// TODO Možnost, že var je NULL, když stmt levou stranu nemá
-	gcc_checking_assert (var->code == LOCAL);
+	gcc_assert (var != NULL && var->code == LOCAL);
       }
 
     hvar *var;
@@ -144,16 +144,16 @@ class hphi : public hstmt_with_lhs
 
     hstmt_with_lhs *get_op (unsigned i)
       {
-	gcc_checking_assert (op != NULL && "PHI has to be completed");
-	gcc_checking_assert (i < num_ops);
+	gcc_assert (op != NULL && "PHI has to be completed");
+	gcc_assert (i < num_ops);
 
 	return op[i].s;
       }
 
     edge get_edge (unsigned i)
       {
-	gcc_checking_assert (op != NULL && "PHI has to be completed");
-	gcc_checking_assert (i < num_ops);
+	gcc_assert (op != NULL && "PHI has to be completed");
+	gcc_assert (i < num_ops);
 
 	return op[i].e;
       }

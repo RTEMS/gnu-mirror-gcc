@@ -691,7 +691,8 @@ gimple_divmod_fixed_value (gassign *stmt, tree value, profile_probability prob,
 
   edge e12, e13, e24, e34, e45; /* Names respect the final CFG.  */
   e12 = single_succ_edge (bb1);
-  e12->flags = EDGE_FALSE_VALUE;
+  e12->flags &= ~EDGE_FALLTHRU;
+  e12->flags |= EDGE_FALSE_VALUE;
   e24 = single_succ_edge (bb2);
   e34 = single_succ_edge (bb3);
   redirect_edge_succ (e24, bb4);
@@ -928,7 +929,8 @@ gimple_mod_pow2 (gassign *stmt, profile_probability prob, gcov_type count, gcov_
 
   edge e12, e13, e24, e34, e45; /* Names respect the final CFG.  */
   e12 = single_succ_edge (bb1);
-  e12->flags = EDGE_FALSE_VALUE;
+  e12->flags &= ~EDGE_FALLTHRU;
+  e12->flags |= EDGE_FALSE_VALUE;
   e24 = single_succ_edge (bb2);
   e34 = single_succ_edge (bb3);
   redirect_edge_succ (e24, bb4);
@@ -955,6 +957,7 @@ gimple_mod_pow2 (gassign *stmt, profile_probability prob, gcov_type count, gcov_
   hack_ssa_builder builder;
   hvar *op1 = builder.new_invar (gimple_assign_rhs1 (stmt));
   hvar *op2 = builder.new_invar (gimple_assign_rhs2 (stmt));
+  hvar *zero = builder.new_invar (build_zero_cst (optype));
   hvar *one = builder.new_invar (build_one_cst (optype));
   hvar *tmp = builder.new_local (optype);
   hvar *tmp2 = builder.new_local (optype);
@@ -962,8 +965,9 @@ gimple_mod_pow2 (gassign *stmt, profile_probability prob, gcov_type count, gcov_
   
   /* bb1.  */
   builder.set_block_sealed (bb1);
-  builder.append_assign (bb1, MINUS_EXPR, op2, one);
+  builder.append_assign (bb1, MINUS_EXPR, tmp, op2, one);
   builder.append_assign (bb1, BIT_AND_EXPR, tmp2, tmp, op2);
+  builder.append_cond (bb1, NE_EXPR, tmp2, zero);
   builder.set_block_filled (bb1);
 
   /* bb2 (false branch).  */
@@ -1078,91 +1082,160 @@ gimple_mod_subtract (gassign *stmt, profile_probability prob1,
 		     profile_probability prob2, int ncounts,
 		     gcov_type count1, gcov_type count2, gcov_type all)
 {
-  gassign *stmt1;
-  gimple *stmt2;
-  gcond *stmt3;
-  tree tmp1;
-  gimple *bb1end, *bb2end = NULL, *bb3end;
-  basic_block bb, bb2, bb3, bb4;
-  tree optype, op1, op2;
-  edge e12, e23 = 0, e24, e34, e14;
-  gimple_stmt_iterator gsi;
-  tree result;
-
   gcc_assert (is_gimple_assign (stmt)
 	      && gimple_assign_rhs_code (stmt) == TRUNC_MOD_EXPR);
+  /* Prepare CFG.
+     For ncounts=0, BB2 is left out and the false edge from 1 leads to 3.
 
-  optype = TREE_TYPE (gimple_assign_lhs (stmt));
-  op1 = gimple_assign_rhs1 (stmt);
-  op2 = gimple_assign_rhs2 (stmt);
+     1
+     |\
+     F T
+     | |
+     2 |
+    .. |
+   T F |
+   . . |
+   . 3 |
+    .|/
+     4
+     |
+     5 <- original stmt here  */
 
-  bb = gimple_bb (stmt);
-  gsi = gsi_for_stmt (stmt);
+  basic_block bb1, bb2 = NULL, bb3, bb4, bb5;
+  edge e12or13, e14, e23 = NULL, e24 = NULL, e34, e45;
 
-  result = create_tmp_reg (optype, "PROF");
-  tmp1 = make_temp_ssa_name (optype, NULL, "PROF");
-  stmt1 = gimple_build_assign (result, op1);
-  stmt2 = gimple_build_assign (tmp1, op2);
-  stmt3 = gimple_build_cond (LT_EXPR, result, tmp1, NULL_TREE, NULL_TREE);
-  gsi_insert_before (&gsi, stmt1, GSI_SAME_STMT);
-  gsi_insert_before (&gsi, stmt2, GSI_SAME_STMT);
-  gsi_insert_before (&gsi, stmt3, GSI_SAME_STMT);
-  bb1end = stmt3;
-
-  if (ncounts)	/* Assumed to be 0 or 1 */
+  if (ncounts) /* Assumed to be 0 or 1.  */
     {
-      stmt1 = gimple_build_assign (result, MINUS_EXPR, result, tmp1);
-      stmt2 = gimple_build_cond (LT_EXPR, result, tmp1, NULL_TREE, NULL_TREE);
-      gsi_insert_before (&gsi, stmt1, GSI_SAME_STMT);
-      gsi_insert_before (&gsi, stmt2, GSI_SAME_STMT);
-      bb2end = stmt2;
-    }
+      bb1 = gimple_bb (stmt);
+      bb5 = split_block (bb1, stmt)->dest;
+      bb2 = split_edge (single_succ_edge (bb1));
+      bb3 = split_edge (single_succ_edge (bb2));
+      bb4 = split_edge (single_succ_edge (bb3));
 
-  /* Fallback case. */
-  stmt1 = gimple_build_assign (result, gimple_assign_rhs_code (stmt),
-			       result, tmp1);
-  gsi_insert_before (&gsi, stmt1, GSI_SAME_STMT);
-  bb3end = stmt1;
-
-  /* Fix CFG. */
-  /* Edge e23 connects bb2 to bb3, etc. */
-  /* However block 3 is optional; if it is not there, references
-     to 3 really refer to block 2. */
-  e12 = split_block (bb, bb1end);
-  bb2 = e12->dest;
-  bb2->count = profile_count::from_gcov_type (all - count1);
-
-  if (ncounts)	/* Assumed to be 0 or 1.  */
-    {
-      e23 = split_block (bb2, bb2end);
-      bb3 = e23->dest;
-      bb3->count = profile_count::from_gcov_type (all - count1 - count2);
-    }
-
-  e34 = split_block (ncounts ? bb3 : bb2, bb3end);
-  bb4 = e34->dest;
-  bb4->count = profile_count::from_gcov_type (all);
-
-  e12->flags &= ~EDGE_FALLTHRU;
-  e12->flags |= EDGE_FALSE_VALUE;
-  e12->probability = prob1.invert ();
-
-  e14 = make_edge (bb, bb4, EDGE_TRUE_VALUE);
-  e14->probability = prob1;
-
-  if (ncounts)  /* Assumed to be 0 or 1.  */
-    {
+      e12or13 = single_succ_edge (bb1);
+      e12or13->flags &= ~EDGE_FALLTHRU;
+      e12or13->flags |= EDGE_FALSE_VALUE;
+      e14 = make_edge (bb1, bb4, EDGE_TRUE_VALUE);
+      e23 = single_succ_edge (bb2);
       e23->flags &= ~EDGE_FALLTHRU;
       e23->flags |= EDGE_FALSE_VALUE;
-      e23->probability = prob2.invert ();
-
       e24 = make_edge (bb2, bb4, EDGE_TRUE_VALUE);
-      e24->probability = prob2;
+      e34 = single_succ_edge (bb3);
+      e45 = single_succ_edge (bb4);
+    }
+  else
+    {
+      bb1 = gimple_bb (stmt);
+      bb5 = split_block (bb1, stmt)->dest;
+      bb3 = split_edge (single_succ_edge (bb1));
+      bb4 = split_edge (single_succ_edge (bb3));
+
+      e12or13 = single_succ_edge (bb1);
+      e12or13->flags &= ~EDGE_FALLTHRU;
+      e12or13->flags |= EDGE_FALSE_VALUE;
+      e14 = make_edge (bb1, bb4, EDGE_TRUE_VALUE);
+      e34 = single_succ_edge (bb3);
+      e45 = single_succ_edge (bb4);
     }
 
-  e34->probability = profile_probability::always ();
+  /* Move orig stmt to start of bb5.  */
+  gimple_stmt_iterator gsi1, gsi2;
+  gsi1 = gsi_for_stmt (stmt);
+  gsi2 = gsi_start_bb (bb5);
+  gsi_move_before (&gsi1, &gsi2);
 
-  return result;
+  /* Insert statements using insert API.
+
+     For ncounts=1:
+
+     result = op1
+     if result < op2
+       {
+       }
+     else
+       {
+         result -= op2
+	 if result < op2
+	   {
+	   }
+	 else
+	   {
+	     result = op1 mod op2
+	   }
+       }
+
+     For ncounts=0:
+
+     result = op1
+     if result < op2
+       {
+         result = op1
+       }
+     else
+       {
+	 result = op1 mod op2
+       }  */
+
+  tree optype = TREE_TYPE (gimple_assign_lhs (stmt));
+
+  hack_ssa_builder builder;
+  hvar *op1 = builder.new_invar (gimple_assign_rhs1 (stmt));
+  hvar *op2 = builder.new_invar (gimple_assign_rhs2 (stmt));
+  hvar *result = builder.new_local (optype);
+
+  /* bb1.  */
+  builder.set_block_sealed (bb1);
+  builder.append_assign (bb1, NOP_EXPR, result, op1);
+  builder.append_cond (bb1, LT_EXPR, result, op2);
+  builder.set_block_filled (bb1);
+
+  if (ncounts) /* Assumed to be 0 or 1.  */
+    {
+      /* bb2 (optional).  */
+      builder.set_block_sealed (bb2);
+      builder.append_assign (bb2, MINUS_EXPR, result, result, op2);
+      builder.append_cond (bb2, LT_EXPR, result, op2);
+      builder.set_block_filled (bb2);
+    }
+
+  /* bb3.  */
+  builder.set_block_sealed (bb3);
+  builder.append_assign (bb3, TRUNC_MOD_EXPR, result, op1, op2);
+  builder.set_block_filled (bb3);
+
+  /* bb4.  */
+  builder.set_block_sealed (bb4);
+  hvar *out = builder.append_outvar (bb4, result);
+  builder.set_block_filled (bb4);
+
+  builder.finalize ();
+  tree ret = builder.ssa_from_outvar (out);
+  builder.release ();
+
+  /* Set probabilities and counts.  */
+  if (ncounts) /* Assumed to be 0 or 1.  */
+    {
+      e12or13->probability = prob1;
+      e14->probability = prob1.invert ();
+      e23->probability = prob2;
+      e24->probability = prob2.invert ();
+      e34->probability = profile_probability::always ();
+      e45->probability = profile_probability::always ();
+      bb2->count = profile_count::from_gcov_type (count1);
+      bb3->count = profile_count::from_gcov_type (count2);
+      bb4->count = profile_count::from_gcov_type (all);
+    }
+  else
+    {
+      e12or13->probability = prob1;
+      e14->probability = prob1.invert ();
+      e34->probability = profile_probability::always ();
+      e45->probability = profile_probability::always ();
+      bb3->count = profile_count::from_gcov_type (count1);
+      bb4->count = profile_count::from_gcov_type (all);
+    }
+
+  return ret;
 }
 
 /* Do transforms 3) and 4) on the statement pointed-to by SI if applicable.  */
