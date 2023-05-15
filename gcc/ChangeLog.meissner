@@ -1,3 +1,273 @@
+==================== Branch work121, patch #36 ====================
+
+Optimize variable element vec_extract to be converted to floating point
+
+This patch optimizes vec_extract with a variable element number of the following
+types to be converted to floating point by loading the value directly to the
+vector register, and then doing the conversion instead of loading the value to a
+GPR and then doing a direct move:
+
+vector int
+vector unsigned int
+vector unsigned short
+vector unsigned char
+
+2023-05-18   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4si_var_load_to_<uns><mode>): New
+	* insn.
+	* vsx_extract_<VSX_EXTRACT_I2:mode>_var_load_to_uns<SFDF:mode>: New
+	insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-int-6.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-int_7.c: New file.
+
+==================== Branch work121, patch #35 ====================
+
+Allow constant element vec_extract to be converted to floating point
+
+This patch allows vec_extract of the following types to be converted to
+floating point by loading the value directly to the vector register, and then
+doing the conversion instead of loading the value to a GPR and then doing a
+direct move:
+
+vector int
+vector unsigned int
+vector unsigned short
+vector unsigned char
+
+2023-05-15   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.md (fp_int_extend): New code attribute.
+	* config/rs6000/vsx.md (vsx_extract_v4si_load_to_<uns><mode>): New
+	insn.
+	(vsx_extract_<VSX_EXTRACT_I2:mode>_load_to_uns<SFDF:mode>: New insn.
+	(vsx_extract_v4si_var_load_to_<uns><mode>): New insn.
+	(vsx_extract_<VSX_EXTRACT_I2:mode>_var_load_to_uns<SFDF:mode>): New
+	insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-char-2.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-int-4.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-int_5.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-short-4.c: New file.
+
+==================== Branch work121, patch #34 ====================
+
+Allow variable element vec_extract to be sign or zero extended
+
+This patch allows vec_extract of V4SI, V8HI, and V16QI vector types with a
+variable element number to be loaded with sign or zero extension, and GCC will
+not generate a separate zero/sign extension instruction.
+
+2023-05-15   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4si_var_load_to_<su>di): New insn.
+	(vsx_extract_<VSX_EXTRACT_I2:mode>_var_load_to_u<GPR:mode>): New insn.
+	(vsx_extract_v8hi_var_load_to_s<mode>): New insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-int-3.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-short-3.c: New file.
+
+==================== Branch work121, patch #33 ====================
+
+Optimize vec_extract of small integer vectors with constant element from memory
+
+This patch optimizes vec_extract of small integer vectors (V16QI/V8HI/V4SI)
+using a constant element where the vector is in memory.  This patch combines the
+sign or zero extension of the vec_extract with the load.
+
+In addition, it also optimizes the load with sign/zero extension when the result
+is going into vector registers and the machine supports such combined load
+operations.
+
+V4SImode is optimized for both sign and zero extension to DImode where the
+target is either a GPR or a vector register.
+
+V8HImode is optimized for sign extension to either SImode or DImode when the
+target is a GPR register.  V8HImode is also optimized for zero extension when
+the target is a vector register on a power9/power10 system.  While you can do an
+unsigned HImode to a vector register and then do a VEXTSH2D instruction, I
+believe it it better to do a LHA and then a direct move operation.
+
+V16QImode is optimized for zero extension to either SImode or DImode when the
+target is a GPR register.  V16QImode is also optimized for zero extension when
+the target is a vector register on a power9/power19 system.  Since the PowerPC
+machine does not have a signed load byte instruction, I didn't implement a
+combine insn for this case.
+
+2023-05-15   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4si_load_to_<su>di): New combiner
+	insn.
+	(vsx_extract_<VSX_EXTRACT_I2:mode>_load_to_u<GPR:mode>): Likewise.
+	(vsx_extract_v8hi_load_to_s<mode>): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-char-1.c: New test.
+	* gcc.target/powerpc/vec-extract-mem-int-1.c: New test.
+	* gcc.target/powerpc/vec-extract-mem-int-2.c: New test.
+	* gcc.target/powerpc/vec-extract-mem-short-1.c: New test.
+	* gcc.target/powerpc/vec-extract-mem-short-2.c: New test.
+
+==================== Branch work121, patch #32 ====================
+
+Add alternatives for vec_extract with constant element loading from memory.
+
+This patch expands the alternatives for doing vec_extract of V4SI, V8HI, and
+V16QI vectors with a constant offset when the vector is in memory.  If the
+element number is 0 or we are using offsettable addressing for loading up GPR
+registers we don't need to allocate a temporary base register.  We can fold the
+offset from the vec_extract into the normal address.
+
+I also added alternatives to load the values into vector registers.  If we load
+the value into vector registers, we require X-form addressing.
+
+2023-05-12   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (VSX_EX_ISA): New mode attribute.
+	(vsx_extract_<mode>_load): Add more alternatives for memory options.
+	Allow the load to load up vector registers if needed.
+
+==================== Branch work121, patch #31 ====================
+
+Optimize vec_extract of V4SF with variable element number being converted to DF
+
+This patch adds a combiner insn to include the conversion of float to double
+within the memory address when vec_extract of V4SF with a variable element
+number is done.
+
+It also removes the '?' from the 'r' constraint so that if the SFmode is needed
+in a GPR, it doesn't have to load it to the vector unit, store it on the stack,
+and reload it into a GPR register.
+
+2023-05-12   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4sf_var_load): Remove '?' from 'r'
+	constraint.
+	(vsx_extract_v4sf_var_load_to_df): New insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-float-2.c: New file.
+
+==================== Branch work121, patch #30 ====================
+
+Optimize vec_extract of V4SF from memory with constant element numbers.
+
+This patch updates vec_extract of V4SF from memory with constant element
+numbers.
+
+I went through the alternatives, and I added alternatives to dentote when we
+don't need to allocate a temporary base register.  These cases include
+extracting element 0, and extracting elements 1-3 where we can use offsetable
+addresses.
+
+I added alternatives for power8 and power9 units to account for the expanded
+addressing on these machines (power8 can load SFmode into Altivec registers with
+x-form addressing, and power9 can use offsettable adressing to load up Altivec
+registers.
+
+This patch corrects the ISA for loading SF values to altivec registers to be
+power8 vector, and not power7.
+
+This patch adds a combiner patch to combine loading up a SF element and
+converting it to double.
+
+It also removes the '?' from the 'r' constraint so that if the SFmode is needed
+in a GPR, it doesn't have to load it to the vector unit, store it, and then
+reload it into the GPR register.
+
+2023-05-12   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* gcc/config/rs6000/vsx.md (vsx_extract_v4sf_load): Fix ISA for loading
+	up SFmode values with x-form addresses.  Remove ? from 'r' constraint.
+	Add more alternatives to prevent requiring a temporary base register if
+	we don't need the temporary.
+	(vsx_extract_v4sf_load_to_df): New insn.
+
+gc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-float-1.c: New file.
+
+==================== Branch work121, patch #22 ====================
+
+Fix typo in insn name.
+
+In doing other work, I noticed that there was an insn:
+
+	vsx_extract_v4sf_<mode>_load
+
+Which did not have an iterator.  I removed the useless <mode>.
+
+2023-05-12   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4sf_load): Rename from
+	vsx_extract_v4sf_<mode>_load.
+
+==================== Branch work121, patch #21 ====================
+
+Improve 64->128 bit zero extension on PowerPC
+
+2023-05-12   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/108958
+	* gcc/config/rs6000.md (zero_extendditi2): New insn.
+
+gcc/testsuite/
+
+	PR target/108958
+	* gcc.target/powerpc/zero-extend-di-ti.c: New test.
+
+==================== Branch work121, patch #20 ====================
+
+Optimize vec_splats of vec_extract for long long and double.
+
+This patch optimizes cases like:
+
+	vector double v1, v2;
+	/* ... */
+	v2 = vec_splats (vec_extract (v1, 0);	/* or  */
+	v2 = vec_splats (vec_extract (v1, 1);
+
+2023-05-12   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/99293
+	* gcc/config/rs6000/vsx.md (vsx_splat_extract_<mode>): New combiner
+	insn.
+
+gcc/testsuite/
+
+	PR target/108958
+	* gcc.target/powerpc/pr99293.c: New test.
+	* gcc.target/powerpc/builtins-1.c: Update insn count.
+
 ==================== Branch work121, rebase up to 5/12/2023 ====================
 
 ==================== Branch work121, patch #5 ====================
