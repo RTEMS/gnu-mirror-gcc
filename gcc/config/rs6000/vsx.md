@@ -4151,21 +4151,89 @@
 }
   [(set_attr "isa" "p9v,*")])
 
-;; Variable V16QI/V8HI/V4SI extract from memory
+;; Variable V16QI/V8HI/V4SI extract from memory.
 (define_insn_and_split "*vsx_extract_<mode>_var_load"
-  [(set (match_operand:<VEC_base> 0 "gpc_reg_operand" "=r")
+  [(set (match_operand:<VEC_base> 0 "gpc_reg_operand" "=r,wa")
 	(unspec:<VEC_base>
-	 [(match_operand:VSX_EXTRACT_I 1 "memory_operand" "Q")
-	  (match_operand:DI 2 "gpc_reg_operand" "r")]
+	 [(match_operand:VSX_EXTRACT_I 1 "memory_operand" "Q,Q")
+	  (match_operand:DI 2 "gpc_reg_operand" "r,r")]
 	 UNSPEC_VSX_EXTRACT))
-   (clobber (match_scratch:DI 3 "=&b"))]
+   (clobber (match_scratch:DI 3 "=&b,&b"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
   "&& reload_completed"
   [(set (match_dup 0) (match_dup 4))]
 {
-  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1], operands[2],
-					   operands[3], <VEC_base>mode);
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1],
+					   operands[2], operands[3],
+					   <VEC_base>mode);
+}
+  [(set_attr "type" "load,fpload")
+   (set_attr "isa" "*,<VSX_EX_ISA>")])
+
+;; Variable V4SI extract from memory with sign or zero conversion to DImode.
+(define_insn_and_split "*vsx_extract_v4si_var_load_to_<su>di"
+  [(set (match_operand:DI 0 "gpc_reg_operand" "=r,wa")
+	(any_extend:DI
+	 (unspec:SI
+	  [(match_operand:V4SI 1 "memory_operand" "Q,Q")
+	   (match_operand:DI 2 "gpc_reg_operand" "r,r")]
+	  UNSPEC_VSX_EXTRACT)))
+   (clobber (match_scratch:DI 3 "=&b,&b"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(any_extend:DI (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1],
+					   operands[2], operands[3],
+					   SImode);
+}
+  [(set_attr "type" "load,fpload")])
+
+;; Variable V8HI/V16QI extract from memory with zero conversion to either
+;; SImode or DImode.
+(define_insn_and_split "*vsx_extract_<VSX_EXTRACT_I2:mode>_var_load_to_u<GPR:mode>"
+  [(set (match_operand:GPR 0 "gpc_reg_operand" "=r,wa")
+	(zero_extend:GPR
+	 (unspec:<VSX_EXTRACT_I2:MODE>
+	  [(match_operand:VSX_EXTRACT_I2 1 "memory_operand" "Q,Q")
+	   (match_operand:DI 2 "gpc_reg_operand" "r,r")]
+	  UNSPEC_VSX_EXTRACT)))
+   (clobber (match_scratch:DI 3 "=&b,&b"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(zero_extend:GPR (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1],
+					   operands[2], operands[3],
+					   <VSX_EXTRACT_I2:MODE>mode);
+}
+  [(set_attr "type" "load,fpload")
+   (set_attr "isa" "*,p9v")])
+
+;; Variable V8HI extract from memory with sign conversion to either
+;; SImode or DImode.
+(define_insn_and_split "*vsx_extract_v8hi_var_load_to_s<mode>"
+  [(set (match_operand:GPR 0 "gpc_reg_operand" "=r")
+	(sign_extend:GPR
+	 (unspec:HI
+	  [(match_operand:V8HI 1 "memory_operand" "Q")
+	   (match_operand:DI 2 "gpc_reg_operand" "r")]
+	  UNSPEC_VSX_EXTRACT)))
+   (clobber (match_scratch:DI 3 "=&b"))]
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(sign_extend:GPR (match_dup 4)))]
+{
+  operands[4] = rs6000_adjust_vec_address (operands[0], operands[1],
+					   operands[2], operands[3],
+					   HImode);
 }
   [(set_attr "type" "load")])
 
