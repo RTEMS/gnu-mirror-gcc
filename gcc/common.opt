@@ -2193,6 +2193,10 @@ freschedule-modulo-scheduled-loops
 Common Var(flag_resched_modulo_sched) Optimization
 Enable/Disable the traditional scheduling in loops that already passed modulo scheduling.
 
+fnew-intossa
+Common Var(flag_new_intossa) Optimization
+Enable new SSA construction
+
 fnon-call-exceptions
 Common Var(flag_non_call_exceptions) Optimization
 Support synchronous non-call exceptions.

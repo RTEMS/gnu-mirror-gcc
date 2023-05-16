@@ -42,6 +42,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 #include "asan.h"
 #include "attr-fnspec.h"
+#include "insert-gimple-ssa.h"
+#include "print-tree.h"
 
 #define PERCENT(x,y) ((float)(x) * 100.0 / (float)(y))
 
@@ -2459,6 +2461,97 @@ fini_ssa_renamer (void)
   cfun->gimple_df->in_ssa_p = true;
 }
 
+hash_map<tree,hvar *> *var_map;
+
+static hvar *
+get_op (hack_ssa_builder &builder, tree op)
+{
+  bool existed;
+  if (!op)
+    return NULL;
+  hvar *&ret = var_map->get_or_insert (op, &existed);
+  if (existed)
+    return ret;
+  if (is_gimple_min_invariant (op))
+    ret = builder.new_invar (op);
+  else if (is_gimple_reg (op))
+    ret = builder.new_local (op);
+  else
+    gcc_unreachable ();
+  return ret;
+}
+
+static void
+new_intossa ()
+{
+  hack_ssa_builder builder;
+
+  basic_block bb;
+
+  var_map = new hash_map<tree,hvar *>;
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      gimple_stmt_iterator gsi;
+      builder.set_block_sealed (bb);
+
+      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi);)
+	{
+	  gimple *stmt = gsi_stmt (gsi);
+	  switch (gimple_code (stmt))
+	    {
+	    case GIMPLE_ASSIGN:
+	      switch (get_gimple_rhs_class (gimple_assign_rhs_code (stmt)))
+		{
+		case GIMPLE_UNARY_RHS:
+		case GIMPLE_SINGLE_RHS:
+		  builder.append_assign (bb, gimple_assign_rhs_code (stmt),
+					 get_op (builder, gimple_assign_lhs (stmt)),
+					 get_op (builder, gimple_assign_rhs1 (stmt)));
+		  break;
+		case GIMPLE_BINARY_RHS:
+		  builder.append_assign (bb, gimple_assign_rhs_code (stmt),
+					 get_op (builder, gimple_assign_lhs (stmt)),
+					 get_op (builder, gimple_assign_rhs1 (stmt)),
+					 get_op (builder, gimple_assign_rhs2 (stmt)));
+		  break;
+		case GIMPLE_TERNARY_RHS:
+		  builder.append_assign (bb, gimple_assign_rhs_code (stmt),
+					 get_op (builder, gimple_assign_lhs (stmt)),
+					 get_op (builder, gimple_assign_rhs1 (stmt)),
+					 get_op (builder, gimple_assign_rhs2 (stmt)),
+					 get_op (builder, gimple_assign_rhs3 (stmt)));
+		  break;
+		case GIMPLE_INVALID_RHS:
+		  gcc_unreachable ();
+		}
+	      gsi_remove (&gsi, true);
+	      break;
+	    case GIMPLE_COND:
+	      builder.append_cond (bb, gimple_cond_code (stmt),
+				   get_op (builder, gimple_cond_lhs (stmt)),
+				   get_op (builder, gimple_cond_rhs (stmt)));
+	      gsi_remove (&gsi, true);
+	      break;
+	    case GIMPLE_RETURN:
+	      update_stmt (stmt);
+	      builder.append_return (bb, get_op (builder, gimple_return_retval (as_a <greturn *>(stmt))));
+	      gsi_remove (&gsi, true);
+	      break;
+	    default:
+	      debug_gimple_stmt (stmt);
+	      gcc_unreachable ();
+	    }
+	}
+      builder.set_block_filled (bb);
+    }
+  fini_ssa_renamer ();
+  builder.finalize ();
+  builder.release ();
+  mark_virtual_operands_for_renaming (cfun);
+  update_ssa (TODO_update_ssa_only_virtuals);
+  delete var_map;
+}
+
 /* Main entry point into the SSA builder.  The renaming process
    proceeds in four main phases:
 
@@ -2522,46 +2615,47 @@ pass_build_ssa::execute (function *fun)
   /* Initialize operand data structures.  */
   init_ssa_operands (fun);
 
-  // BEGIN TOHLE ZHRUBA NAHRADIM
+  if (flag_new_intossa)
+    new_intossa ();
+  else
+    {
+      /* Initialize internal data needed by the renamer.  */
+      init_ssa_renamer ();
 
-  /* Initialize internal data needed by the renamer.  */
-  init_ssa_renamer ();
+      /* Initialize the set of interesting blocks.  The callback
+	 mark_def_sites will add to this set those blocks that the renamer
+	 should process.  */
+      interesting_blocks = sbitmap_alloc (last_basic_block_for_fn (fun));
+      bitmap_clear (interesting_blocks);
 
-  /* Initialize the set of interesting blocks.  The callback
-     mark_def_sites will add to this set those blocks that the renamer
-     should process.  */
-  interesting_blocks = sbitmap_alloc (last_basic_block_for_fn (fun));
-  bitmap_clear (interesting_blocks);
+      /* Initialize dominance frontier.  */
+      dfs = XNEWVEC (bitmap_head, last_basic_block_for_fn (fun));
+      FOR_EACH_BB_FN (bb, fun)
+	bitmap_initialize (&dfs[bb->index], &bitmap_default_obstack);
 
-  /* Initialize dominance frontier.  */
-  dfs = XNEWVEC (bitmap_head, last_basic_block_for_fn (fun));
-  FOR_EACH_BB_FN (bb, fun)
-    bitmap_initialize (&dfs[bb->index], &bitmap_default_obstack);
+      /* 1- Compute dominance frontiers.  */
+      calculate_dominance_info (CDI_DOMINATORS);
+      compute_dominance_frontiers (dfs);
 
-  /* 1- Compute dominance frontiers.  */
-  calculate_dominance_info (CDI_DOMINATORS);
-  compute_dominance_frontiers (dfs);
+      /* 2- Find and mark definition sites.  */
+      mark_def_dom_walker (CDI_DOMINATORS).walk (fun->cfg->x_entry_block_ptr);
 
-  /* 2- Find and mark definition sites.  */
-  mark_def_dom_walker (CDI_DOMINATORS).walk (fun->cfg->x_entry_block_ptr);
+      /* 3- Insert PHI nodes at dominance frontiers of definition blocks.  */
+      insert_phi_nodes (dfs);
 
-  /* 3- Insert PHI nodes at dominance frontiers of definition blocks.  */
-  insert_phi_nodes (dfs);
+      /* 4- Rename all the blocks.  */
+      rewrite_blocks (ENTRY_BLOCK_PTR_FOR_FN (fun), REWRITE_ALL);
 
-  /* 4- Rename all the blocks.  */
-  rewrite_blocks (ENTRY_BLOCK_PTR_FOR_FN (fun), REWRITE_ALL);
+      /* Free allocated memory.  */
+      FOR_EACH_BB_FN (bb, fun)
+	bitmap_clear (&dfs[bb->index]);
+      free (dfs);
 
-  /* Free allocated memory.  */
-  FOR_EACH_BB_FN (bb, fun)
-    bitmap_clear (&dfs[bb->index]);
-  free (dfs);
+      sbitmap_free (interesting_blocks);
+      interesting_blocks = NULL;
 
-  sbitmap_free (interesting_blocks);
-  interesting_blocks = NULL;
-
-  fini_ssa_renamer ();
-
-  // END TOHLE ZHRUBA NAHRADIM
+      fini_ssa_renamer ();
+    }
 
   /* Try to get rid of all gimplifier generated temporaries by making
      its SSA names anonymous.  This way we can garbage collect them
