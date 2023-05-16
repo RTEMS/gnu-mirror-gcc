@@ -720,7 +720,7 @@ gimple_divmod_fixed_value (gassign *stmt, tree value, profile_probability prob,
   hack_ssa_builder builder;
   hvar *op1 = builder.new_invar (gimple_assign_rhs1 (stmt));
   hvar *op2 = builder.new_invar (gimple_assign_rhs2 (stmt));
-  hvar *value_as_invar = builder.new_invar (value);
+  hvar *value_as_invar = builder.new_invar (fold_convert (optype, value));
   hvar *tmp = builder.new_local (optype);
 
   /* bb1.  */
@@ -1227,8 +1227,8 @@ gimple_mod_subtract (gassign *stmt, profile_probability prob1,
     }
   else
     {
-      e12or13->probability = prob1;
-      e14->probability = prob1.invert ();
+      e12or13->probability = prob1.invert ();
+      e14->probability = prob1;
       e34->probability = profile_probability::always ();
       e45->probability = profile_probability::always ();
       bb3->count = profile_count::from_gcov_type (count1);
@@ -1313,7 +1313,11 @@ gimple_mod_subtract_transform (gimple_stmt_iterator *si)
   if (all > 0)
     {
       prob1 = profile_probability::probability_in_gcov_type (count1, all);
-      prob2 = profile_probability::probability_in_gcov_type (count2, all);
+      if (all == count1)
+	prob2 = profile_probability::even ();
+      else
+	prob2 = profile_probability::probability_in_gcov_type (count2, all -
+							       count1);
     }
   else
     {
