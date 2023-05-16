@@ -246,13 +246,13 @@ hack_ssa_builder::append_outvar (basic_block bb, hvar *local)
 void
 hack_ssa_builder::set_block_sealed (basic_block bb)
 {
+  sealed_bbs.add (bb);
+
   hack_bb *record = get_bb_record (bb);
   for (hphi *p : record->incomplete_phis)
     {
       complete_phi (bb, p);
     }
-
-  sealed_bbs.add (bb);
 }
 
 /* See the Braun alg paper for what 'filled' means.  */
@@ -324,6 +324,8 @@ hack_ssa_builder::finalize (void)
 	    }
 	}
     }
+
+  finalized = true;
 }
 
 void
@@ -684,8 +686,10 @@ hack_ssa_builder::read_variable_recursive (basic_block bb, hvar *var)
 void
 hack_ssa_builder::tuple_register (basic_block bb, hstmt_assign *stmt)
 {
+  /*
   hack_bb *record = get_bb_record (bb);
   record->tuple_provider.put (*stmt->val, stmt);
+  */
 }
 
 /* Look up a tuple. Recall if we've already seen assign with equivalent right
@@ -694,12 +698,15 @@ hack_ssa_builder::tuple_register (basic_block bb, hstmt_assign *stmt)
 hstmt_assign *
 hack_ssa_builder::tuple_lookup (basic_block bb, hack_tuple_internal *val)
 {
+  /*
   hack_bb *record = get_bb_record (bb);
   hstmt_assign **stmt_p = record->tuple_provider.get (*val);
   if (stmt_p == NULL)
     return NULL;
   else
     return *stmt_p;
+  */
+  return NULL;
 }
 
 /* Run final optimizations. Run the optimzalizations that should be done right

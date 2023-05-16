@@ -114,11 +114,7 @@ class hstmt
 class hstmt_with_lhs : public hstmt
 {
   public:
-    hstmt_with_lhs (hstmt_code code, hvar *var) : hstmt (code), var (var)
-      {
-	// TODO Možnost, že var je NULL, když stmt levou stranu nemá
-	gcc_assert (var != NULL && var->code == LOCAL);
-      }
+    hstmt_with_lhs (hstmt_code code, hvar *var) : hstmt (code), var (var) { }
 
     hvar *var;
     vec<hstmt *> uses = vNULL; // TODO Nahradit obstack-friendly strukturou?
@@ -140,20 +136,23 @@ class hphi : public hstmt_with_lhs
     hphi_edge *op = NULL; /* Array of operands. Not embedded into object. NULL
 			     if PHI incomplete.  */
 
-    hphi (hvar *var) : hstmt_with_lhs (HPHI, var) { }
+    hphi (hvar *var) : hstmt_with_lhs (HPHI, var)
+      {
+	gcc_checking_assert (var->code == LOCAL);
+      }
 
     hstmt_with_lhs *get_op (unsigned i)
       {
-	gcc_assert (op != NULL && "PHI has to be completed");
-	gcc_assert (i < num_ops);
+	gcc_checking_assert (op != NULL && "PHI has to be completed");
+	gcc_checking_assert (i < num_ops);
 
 	return op[i].s;
       }
 
     edge get_edge (unsigned i)
       {
-	gcc_assert (op != NULL && "PHI has to be completed");
-	gcc_assert (i < num_ops);
+	gcc_checking_assert (op != NULL && "PHI has to be completed");
+	gcc_checking_assert (i < num_ops);
 
 	return op[i].e;
       }
@@ -176,7 +175,10 @@ class hstmt_assign : public hstmt_with_lhs
     hack_tuple_internal *val;
 
     hstmt_assign (hvar *var, hack_tuple_internal *val) :
-      hstmt_with_lhs (HSTMT_ASSIGN, var), val (val) { }
+      hstmt_with_lhs (HSTMT_ASSIGN, var), val (val)
+      {
+	gcc_checking_assert (var->code == LOCAL);
+      }
 
     virtual gimple *to_gimple (void) override;
     virtual void replace_op_by (hstmt_with_lhs *op, hstmt_with_lhs *replace_by) override;
@@ -192,7 +194,10 @@ class hstmt_assign : public hstmt_with_lhs
 class hstmt_const : public hstmt_with_lhs
 {
   public:
-    hstmt_const (hvar *var) : hstmt_with_lhs (HSTMT_CONST, var) { }
+    hstmt_const (hvar *var) : hstmt_with_lhs (HSTMT_CONST, var)
+      {
+	gcc_checking_assert (var->code == INVAR);
+      }
 };
 
 /* Hack cond stmt.  */

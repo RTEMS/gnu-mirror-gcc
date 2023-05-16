@@ -330,7 +330,7 @@ pass_insert_test::execute (function *)
     {
       //expand_abs_expr (stmt);
       //insert_mock_loop (stmt);
-      insert_redundant_stmts (stmt);
+      //insert_redundant_stmts (stmt);
     }
 
   free_dominance_info (CDI_DOMINATORS);
