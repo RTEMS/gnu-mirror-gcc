@@ -79,7 +79,8 @@ enum hstmt_code
   HSTMT_ASSIGN,
   HSTMT_CONST,
   HSTMT_COND,
-  HSTMT_OUTVAR
+  HSTMT_OUTVAR,
+  HSTMT_RETURN
 };
 
 /* Hack statement
@@ -235,6 +236,19 @@ class hstmt_outvar : public hstmt
     virtual gimple *to_gimple (void) override;
 };
 
+/* TODO Description.  */
+
+class hstmt_return : public hstmt
+{
+  public:
+    hstmt_with_lhs *retval;
+
+    hstmt_return (hstmt_with_lhs *retval) :
+      hstmt (HSTMT_RETURN), retval (retval) { }
+
+    virtual gimple *to_gimple (void) override;
+};
+
 /* Hack internal tuple
 
    Right side of assign statements. I may merge this into 'hstmt_assign'
@@ -332,6 +346,7 @@ class hack_ssa_builder
 		      hvar *op1, hvar *op2, hvar *op3);
   void append_cond (basic_block bb, enum tree_code pred_code,
 		    hvar *left, hvar *right);
+  void append_return (basic_block bb, hvar *retval);
   hvar *append_outvar (basic_block bb, hvar *local);
 
   void set_block_sealed (basic_block bb);

@@ -141,6 +141,12 @@ hstmt_outvar::to_gimple (void)
   return NULL;
 }
 
+gimple *
+hstmt_return::to_gimple (void)
+{
+  return gimple_build_return (retval->ssa);
+}
+
 hvar *
 hack_ssa_builder::new_local (tree type)
 {
@@ -239,6 +245,15 @@ hack_ssa_builder::append_outvar (basic_block bb, hvar *local)
   allocated_hvars.safe_push (outvar);
   
   return outvar;
+}
+
+/* TODO Describe.  */
+
+void
+hack_ssa_builder::append_return (basic_block bb, hvar *retval)
+{
+  hstmt_return *stmt = new hstmt_return (read_variable (bb, retval));
+  append_stmt (bb, stmt);
 }
 
 /* See the Braun alg paper for what 'sealed' means.  */
