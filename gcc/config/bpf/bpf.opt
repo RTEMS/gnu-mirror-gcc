@@ -146,6 +146,10 @@ mjmp32
 Target Var(bpf_has_jmp32) Init(-1)
 Enable 32-bit jump instructions.
 
+mv3-atomics
+Target Var(bpf_has_v3_atomics) Init(-1)
+Enable general atomic operations introduced in v3 ISA.
+
 mcpu=
 Target RejectNegative Joined Var(bpf_isa) Enum(bpf_isa) Init(ISA_V3)
 
