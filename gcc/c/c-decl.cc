@@ -8410,6 +8410,9 @@ get_parm_info (bool ellipsis, tree expr)
 		 declared types.  The back end may override this later.  */
 	      DECL_ARG_TYPE (decl) = type;
 	      types = tree_cons (0, type, types);
+
+	      /* Record the decl for use of UBSan bounds checking.  */
+	      TREE_PURPOSE (types) = decl;
 	    }
 	  break;
 

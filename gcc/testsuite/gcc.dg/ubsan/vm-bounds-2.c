@@ -31,7 +31,7 @@ void f(void)
 
 	int u = 3; int v = 4;
 	char a[u][v];
-	(1 ? f1 : f2)(u, v, a);
+	(1 ? f1 : f2)(u, v, a);	/* { dg-warning "Function call not instrumented." } */
 }
 
 /* size expression in parameter */

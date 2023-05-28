@@ -3602,9 +3602,20 @@ process_vm_constraints (location_t location,
 	}
       else
 	{
-	  /* Functions called via pointers are not yet supported.  */
-	  return void_node;
+	  while (FUNCTION_TYPE != TREE_CODE (function))
+	    function = TREE_TYPE (function);
+
+	  args = TREE_PURPOSE (TYPE_ARG_TYPES (function));
+
+	  if (!args)
+	    {
+	      /* FIXME: this can happen when forming composite types for the
+		 conditional operator.  */
+	      warning_at (location, 0, "Function call not instrumented.");
+	      return void_node;
+	    }
 	}
+      gcc_assert (PARM_DECL == TREE_CODE (args));
     }
 
   FOR_EACH_VEC_SAFE_ELT (instr_vec, i, d)
