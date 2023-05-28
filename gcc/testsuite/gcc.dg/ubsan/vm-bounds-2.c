@@ -51,6 +51,6 @@ int c(int u, char (*a)[u]) { }
 int d(void)
 {
 	char a[3];
-	c(3, &a);
+	c(3, &a);		/* { dg-warning "Function call not instrumented." } */
 }
 

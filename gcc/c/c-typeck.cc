@@ -3408,7 +3408,8 @@ static tree
 convert_argument (location_t ploc, tree function, tree fundecl,
 		  tree type, tree origtype, tree val, tree valtype,
 		  bool npc, tree rname, int parmnum, int argnum,
-		  bool excess_precision, int warnopt)
+		  bool excess_precision, int warnopt,
+		  vec<struct instrument_data, va_gc> *instr_vec)
 {
   /* Formal parm type is specified by a function prototype.  */
 
@@ -3568,7 +3569,7 @@ convert_argument (location_t ploc, tree function, tree fundecl,
 						    val, origtype, ic_argpass,
 						    npc, fundecl, function,
 						    parmnum + 1, warnopt,
-						    NULL);
+						    instr_vec);
 
   if (targetm.calls.promote_prototypes (fundecl ? TREE_TYPE (fundecl) : 0)
       && INTEGRAL_TYPE_P (type)
@@ -3583,15 +3584,111 @@ convert_argument (location_t ploc, tree function, tree fundecl,
 
 static tree
 process_vm_constraints (location_t location,
-			vec<struct instrument_data, va_gc> *instr_vec)
+			vec<struct instrument_data, va_gc> *instr_vec,
+			tree function, tree fundecl, vec<tree, va_gc> *values)
 {
   unsigned int i;
   struct instrument_data* d;
   tree instr_expr = void_node;
+  tree args = NULL;
+
+  /* Find the arguments for the function declaration / type.  */
+  if (function)
+    {
+      if (FUNCTION_DECL == TREE_CODE (function))
+	{
+	  fundecl = function;
+	  args = DECL_ARGUMENTS (fundecl);
+	}
+      else
+	{
+	  /* Functions called via pointers are not yet supported.  */
+	  return void_node;
+	}
+    }
 
   FOR_EACH_VEC_SAFE_ELT (instr_vec, i, d)
     {
-      tree in = ubsan_instrument_vm_assign (location, d->t1, d->t2);
+      tree t1 = d->t1;
+      tree t2 = d->t2;
+
+      gcc_assert (ARRAY_TYPE == TREE_CODE (t1));
+      gcc_assert (ARRAY_TYPE == TREE_CODE (t2));
+
+      tree as = TYPE_MAX_VALUE (TYPE_DOMAIN (t1));
+      tree bs = TYPE_MAX_VALUE (TYPE_DOMAIN (t2));
+
+      gcc_assert (as);
+      gcc_assert (bs);
+
+      as = fold_build2 (PLUS_EXPR, sizetype, as, size_one_node);
+      bs = fold_build2 (PLUS_EXPR, sizetype, bs, size_one_node);
+
+      if (function)
+	{
+
+	  if (INTEGER_CST == TREE_CODE (bs))
+	    goto cont;
+
+	  if (NOP_EXPR == TREE_CODE (bs)
+	      && SAVE_EXPR == TREE_CODE (TREE_OPERAND (bs, 0)))
+	    {
+	      tree bs1 = TREE_OPERAND (bs, 0);
+	      tree bs2 = TREE_OPERAND (bs1, 0);
+
+	      /* Another parameter of the current functions.  */
+	      if (PARM_DECL == TREE_CODE (bs2)
+		  && (DECL_CONTEXT (bs2) == fundecl
+		      || DECL_CONTEXT (bs2) == NULL))
+		{
+		  tree arg = args;
+		  int pos = 0;
+		  while (arg)
+		   {
+		     if (arg == bs2)
+		       {
+			 bs = (*values)[pos];
+			 bs = save_expr (bs);
+			 bs = build1 (NOP_EXPR, sizetype, bs);
+			 break;
+		       }
+		     pos++;
+		     arg = DECL_CHAIN (arg);
+		   }
+		  if (!arg)
+		    goto giveup;
+		  goto cont;
+		}
+
+	      /*  A parameter of an enclosing function.  */
+	      if (PARM_DECL == TREE_CODE (bs2)
+		  && DECL_CONTEXT (bs2) != fundecl)
+		{
+		  bs2 = unshare_expr (bs2);
+		  bs1 = save_expr (bs2);
+		  bs = build1 (NOP_EXPR, sizetype, bs1);
+		  goto cont;
+		}
+
+	      /*  A variable with enclosing scope.  */
+	      if (VAR_DECL == TREE_CODE (bs2))
+		{
+		  bs2 = unshare_expr (bs2);
+		  bs1 = save_expr (bs2);
+		  bs = build1 (NOP_EXPR, sizetype, bs1);
+		  goto cont;
+		}
+	    }
+	giveup:
+	  /*  Give up.  If we do not understand a size expression, we can
+	      also not instrument any of the others because it may have
+	      side effects affecting them.  (We could restart and instrument
+	      the only the ones with integer constants.)   */
+	    warning_at (location, 0, "Function call not instrumented.");
+	    return void_node;
+	}
+cont:
+      tree in = ubsan_instrument_vm_assign (location, t1, as, t2, bs);
       instr_expr = fold_build2 (COMPOUND_EXPR, void_type_node, in, instr_expr);
     }
   return instr_expr;
@@ -3689,6 +3786,11 @@ convert_arguments (location_t loc, vec<location_t> arg_loc, tree typelist,
 	    break;
 	  }
     }
+
+  vec<struct instrument_data, va_gc> *instr_vec = NULL;
+
+  if (sanitize_flags_p (SANITIZE_VLA))
+    vec_alloc (instr_vec, 20);
 
   /* Scan the given expressions (VALUES) and types (TYPELIST), producing
      individual converted arguments.  */
@@ -3802,7 +3904,7 @@ convert_arguments (location_t loc, vec<location_t> arg_loc, tree typelist,
 	  tree origtype = (!origtypes) ? NULL_TREE : (*origtypes)[parmnum];
 	  parmval = convert_argument (ploc, function, fundecl, type, origtype,
 				      val, valtype, npc, rname, parmnum, argnum,
-				      excess_precision, 0);
+				      excess_precision, 0, instr_vec);
 	}
       else if (promote_float_arg)
         {
@@ -3855,7 +3957,7 @@ convert_arguments (location_t loc, vec<location_t> arg_loc, tree typelist,
 	  convert_argument (ploc, function, fundecl, builtin_type, origtype,
 			    val, valtype, npc, rname, parmnum, argnum,
 			    excess_precision,
-			    OPT_Wbuiltin_declaration_mismatch);
+			    OPT_Wbuiltin_declaration_mismatch, NULL);
 	}
 
       if (typetail)
@@ -3866,6 +3968,22 @@ convert_arguments (location_t loc, vec<location_t> arg_loc, tree typelist,
     }
 
   gcc_assert (parmnum == vec_safe_length (values));
+
+  if (0 < parmnum && instr_vec && 0 < vec_safe_length (instr_vec))
+    {
+      tree instr_expr = process_vm_constraints (loc, instr_vec, function, fundecl, values);
+      /* We have to make sure that all parameters are evaluated first,
+	 because we may use size expressions in it to check bounds.  */
+      if (void_node != instr_expr)
+	{
+	  tree parmval = (*values)[0];
+	  parmval = save_expr (parmval);
+	  instr_expr = fold_build2 (COMPOUND_EXPR, void_type_node, parmval, instr_expr);
+	  parmval = fold_build2 (COMPOUND_EXPR, TREE_TYPE (parmval), instr_expr, parmval);
+	  (*values)[0] = parmval;
+	}
+      vec_free (instr_vec);
+    }
 
   if (typetail != NULL_TREE && TREE_VALUE (typetail) != void_type_node)
     {
@@ -6945,7 +7063,7 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 	{
 	  /* We have to make sure that the rhs is evaluated first,
 	     because we may use size expressions in it to check bounds.  */
-	  tree instr_expr = process_vm_constraints (location, instr_vec);
+	  tree instr_expr = process_vm_constraints (location, instr_vec, NULL, NULL, NULL);
 	  if (void_node != instr_expr)
 	    {
 	      ret = save_expr (ret);

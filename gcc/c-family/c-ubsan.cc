@@ -337,18 +337,12 @@ ubsan_instrument_vla (location_t loc, tree size)
 /* Instrument assignment of variably modified types.  */
 
 tree
-ubsan_instrument_vm_assign (location_t loc, tree a, tree b)
+ubsan_instrument_vm_assign (location_t loc, tree a, tree as, tree b, tree bs)
 {
   tree t, tt;
 
   gcc_assert (TREE_CODE (a) == ARRAY_TYPE);
   gcc_assert (TREE_CODE (b) == ARRAY_TYPE);
-
-  tree as = TYPE_MAX_VALUE (TYPE_DOMAIN (a));
-  tree bs = TYPE_MAX_VALUE (TYPE_DOMAIN (b));
-
-  as = fold_build2 (PLUS_EXPR, sizetype, as, size_one_node);
-  bs = fold_build2 (PLUS_EXPR, sizetype, bs, size_one_node);
 
   t = build2 (NE_EXPR, boolean_type_node, as, bs);
   if (flag_sanitize_trap & SANITIZE_VLA)
