@@ -4594,41 +4594,44 @@ dominated_by_p_w_unex (basic_block bb1, basic_block bb2, bool allow_back)
     }
 
   /* Iterate to the single executable bb2 successor.  */
-  edge succe = NULL;
-  FOR_EACH_EDGE (e, ei, bb2->succs)
-    if ((e->flags & EDGE_EXECUTABLE)
-	|| (!allow_back && (e->flags & EDGE_DFS_BACK)))
-      {
-	if (succe)
-	  {
-	    succe = NULL;
-	    break;
-	  }
-	succe = e;
-      }
-  if (succe)
+  if (EDGE_COUNT (bb2->succs) > 1)
     {
-      /* Verify the reached block is only reached through succe.
-	 If there is only one edge we can spare us the dominator
-	 check and iterate directly.  */
-      if (EDGE_COUNT (succe->dest->preds) > 1)
-	{
-	  FOR_EACH_EDGE (e, ei, succe->dest->preds)
-	    if (e != succe
-		&& ((e->flags & EDGE_EXECUTABLE)
-		    || (!allow_back && (e->flags & EDGE_DFS_BACK))))
+      edge succe = NULL;
+      FOR_EACH_EDGE (e, ei, bb2->succs)
+	if ((e->flags & EDGE_EXECUTABLE)
+	    || (!allow_back && (e->flags & EDGE_DFS_BACK)))
+	  {
+	    if (succe)
 	      {
 		succe = NULL;
 		break;
 	      }
-	}
+	    succe = e;
+	  }
       if (succe)
 	{
-	  bb2 = succe->dest;
+	  /* Verify the reached block is only reached through succe.
+	     If there is only one edge we can spare us the dominator
+	     check and iterate directly.  */
+	  if (EDGE_COUNT (succe->dest->preds) > 1)
+	    {
+	      FOR_EACH_EDGE (e, ei, succe->dest->preds)
+		if (e != succe
+		    && ((e->flags & EDGE_EXECUTABLE)
+			|| (!allow_back && (e->flags & EDGE_DFS_BACK))))
+		  {
+		    succe = NULL;
+		    break;
+		  }
+	    }
+	  if (succe)
+	    {
+	      bb2 = succe->dest;
 
-	  /* Re-do the dominance check with changed bb2.  */
-	  if (dominated_by_p (CDI_DOMINATORS, bb1, bb2))
-	    return true;
+	      /* Re-do the dominance check with changed bb2.  */
+	      if (dominated_by_p (CDI_DOMINATORS, bb1, bb2))
+		return true;
+	    }
 	}
     }
 
@@ -5247,19 +5250,6 @@ visit_reference_op_store (tree lhs, tree op, gimple *stmt)
 
   if (!resultsame)
     {
-      /* Only perform the following when being called from PRE
-	 which embeds tail merging.  */
-      if (default_vn_walk_kind == VN_WALK)
-	{
-	  assign = build2 (MODIFY_EXPR, TREE_TYPE (lhs), lhs, op);
-	  vn_reference_lookup (assign, vuse, VN_NOWALK, &vnresult, false);
-	  if (vnresult)
-	    {
-	      VN_INFO (vdef)->visited = true;
-	      return set_ssa_val_to (vdef, vnresult->result_vdef);
-	    }
-	}
-
       if (dump_file && (dump_flags & TDF_DETAILS))
 	{
 	  fprintf (dump_file, "No store match\n");
@@ -5284,7 +5274,9 @@ visit_reference_op_store (tree lhs, tree op, gimple *stmt)
       if (default_vn_walk_kind == VN_WALK)
 	{
 	  assign = build2 (MODIFY_EXPR, TREE_TYPE (lhs), lhs, op);
-	  vn_reference_insert (assign, lhs, vuse, vdef);
+	  vn_reference_lookup (assign, vuse, VN_NOWALK, &vnresult, false);
+	  if (!vnresult)
+	    vn_reference_insert (assign, lhs, vuse, vdef);
 	}
     }
   else
@@ -5796,6 +5788,13 @@ expressions_equal_p (tree e1, tree e2)
   /* If either one is VN_TOP consider them equal.  */
   if (e1 == VN_TOP || e2 == VN_TOP)
     return true;
+
+  /* If only one of them is null, they cannot be equal.  While in general
+     this should not happen for operations like TARGET_MEM_REF some
+     operands are optional and an identity value we could substitute
+     has differing semantics.  */
+  if (!e1 || !e2)
+    return false;
 
   /* SSA_NAME compare pointer equal.  */
   if (TREE_CODE (e1) == SSA_NAME || TREE_CODE (e2) == SSA_NAME)

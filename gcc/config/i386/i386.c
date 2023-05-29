@@ -6617,7 +6617,9 @@ ix86_compute_frame_layout (void)
 	 stack clash protections are enabled and the allocated frame is
 	 larger than the probe interval, then use pushes to save
 	 callee saved registers.  */
-      || (flag_stack_clash_protection && to_allocate > get_probe_interval ()))
+      || (flag_stack_clash_protection
+	  && !ix86_target_stack_probe ()
+	  && to_allocate > get_probe_interval ()))
     frame->save_regs_using_mov = false;
 
   if (ix86_using_red_zone ()
@@ -8492,8 +8494,11 @@ ix86_expand_prologue (void)
       sse_registers_saved = true;
     }
 
-  /* If stack clash protection is requested, then probe the stack.  */
-  if (allocate >= 0 && flag_stack_clash_protection)
+  /* If stack clash protection is requested, then probe the stack, unless it
+     is already probed on the target.  */
+  if (allocate >= 0
+      && flag_stack_clash_protection
+      && !ix86_target_stack_probe ())
     {
       ix86_adjust_stack_and_probe (allocate, int_registers_saved, false);
       allocate = 0;
@@ -16212,10 +16217,18 @@ assign_386_stack_local (machine_mode mode, enum ix86_stack_slot n)
     if (s->mode == mode && s->n == n)
       return validize_mem (copy_rtx (s->rtl));
 
+  int align = 0;
+  /* For DImode with SLOT_FLOATxFDI_387 use 32-bit
+     alignment with -m32 -mpreferred-stack-boundary=2.  */
+  if (mode == DImode
+      && !TARGET_64BIT
+      && n == SLOT_FLOATxFDI_387
+      && ix86_preferred_stack_boundary < GET_MODE_ALIGNMENT (DImode))
+    align = 32;
   s = ggc_alloc<stack_local_entry> ();
   s->n = n;
   s->mode = mode;
-  s->rtl = assign_stack_local (mode, GET_MODE_SIZE (mode), 0);
+  s->rtl = assign_stack_local (mode, GET_MODE_SIZE (mode), align);
 
   s->next = ix86_stack_locals;
   ix86_stack_locals = s;

@@ -1,3 +1,273 @@
+2023-05-29  Release Manager
+
+	* GCC 11.4.0 released.
+
+2023-05-20  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-05-15  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/109846
+	* expr.c (gfc_check_vardef_context): Check appropriate pointer
+	attribute for CLASS vs. non-CLASS function result in variable
+	definition context.
+
+2023-05-02  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-02-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/108451
+	* trans-decl.c (gfc_trans_use_stmts): Call clear_slot before
+	doing continue.
+
+2023-05-02  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-01-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/108349
+	* f95-lang.c (gfc_init_builtin_function): Fix up function types
+	for BUILT_IN_REALLOC and BUILT_IN_SINCOS{F,,L}.  Formatting fixes.
+
+2023-04-16  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-04-14  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/109511
+	* simplify.c (gfc_simplify_set_exponent): Fix implementation of
+	compile-time simplification of intrinsic SET_EXPONENT for argument
+	X < 1 and for I < 0.
+
+2023-04-02  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	* dump-parse-tree.c (get_c_type_name): Fix "long_long"
+	type name to be "long long".
+
+2023-04-02  Andrew Pinski  <apinski@marvell.com>
+
+	* dump-parse-tree.c (get_c_type_name): Fix "long_long"
+	type name to be "long long". Add a comment on why adding
+	2 to the name too.
+
+2023-03-24  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-03-21  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/99036
+	* decl.c (gfc_match_modproc): Reject MODULE PROCEDURE if not in a
+	generic module interface.
+
+2023-03-24  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-03-20  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/109186
+	* simplify.c (gfc_simplify_nearest): Fix off-by-one error in setting
+	up real kind-specific maximum exponent for mpfr.
+
+2023-03-24  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-03-19  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/85877
+	* resolve.c (resolve_fl_procedure): Check for an explicit interface
+	of procedures with the BIND(C) attribute (F2018:15.4.2.2).
+
+2023-03-17  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-03-11  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/106945
+	* trans-expr.c (gfc_copy_class_to_class): Convert element counts in
+	bounds check to common type for comparison.
+
+2023-03-17  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-03-10  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/104332
+	* resolve.c (resolve_symbol): Avoid NULL pointer dereference while
+	checking a symbol with the BIND(C) attribute.
+
+2023-03-09  Tobias Burnus  <tobias@codesourcery.com>
+
+	Backported from master:
+	2023-03-01  Tobias Burnus  <tobias@codesourcery.com>
+
+	PR middle-end/108546
+	* trans-openmp.c (gfc_trans_omp_clauses): Fix mapping of
+	type(C_ptr) variables.
+
+2023-03-05  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-02-27  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/108937
+	* trans-intrinsic.c (gfc_conv_intrinsic_ibits): Handle corner case
+	LEN argument of IBITS equal to BITSIZE(I).
+
+2023-03-05  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-02-22  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/96024
+	* resolve.c (resolve_component): The type of a CHARACTER length
+	expression must be INTEGER.
+
+2023-03-05  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-02-21  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/96025
+	* parse.c (check_function_result_typed): Improve type check of
+	specification expression for character length and return status.
+	(parse_spec): Use status from above.
+	* resolve.c (resolve_fntype): Prevent use of invalid specification
+	expression for character length.
+
+2023-02-10  Steve Kargl  <kargl@gcc.gnu.org>
+
+	Backported from master:
+	2023-02-08  Steve Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/103259
+	* resolve.c (resolve_common_vars): Avoid NULL pointer dereference
+	when a symbol's location is not set.
+
+2023-02-10  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-02-07  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/95107
+	* trans-decl.c (gfc_finish_var_decl): With -fno-automatic, do not
+	make ASSOCIATE variables TREE_STATIC.
+
+2023-02-10  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-02-01  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/108609
+	* expr.c (find_array_section): Add check to prevent interpreting an
+	mpz non-integer constant as an integer.
+
+2023-02-10  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-01-28  Harald Anlauf  <anlauf@gmx.de>
+		    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/108527
+	* resolve.c (compare_bound_int): Expression to compare must be of
+	type INTEGER.
+	(compare_bound_mpz_t): Likewise.
+	(check_dimension): Fix comment on checks applied to array section
+	and clean up associated logic.
+
+2023-02-04  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-01-24  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/108529
+	* simplify.c (simplify_transformation): Do not try to simplify
+	transformational intrinsic when the ARRAY argument has a NULL shape.
+
+2023-02-04  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-07-14  Harald Anlauf  <anlauf@gmx.de>
+		    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/106209
+	* decl.c (add_init_expr_to_sym): Handle bad initializers for
+	implied-shape arrays.
+
+2023-02-04  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-01-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/108501
+	* interface.c (get_expr_storage_size): Check array subscript triplets
+	that we actually have integer values before trying to extract with
+	mpz_get_si.
+
+2023-02-04  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-01-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/108502
+	* dependency.c (gfc_check_dependency): Prevent NULL pointer
+	dereference while recursively checking expressions.
+
+2023-02-04  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-01-17  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/108421
+	* interface.c (get_expr_storage_size): Check that we actually have
+	an integer value before trying to extract it with mpz_get_si.
+
+2023-02-04  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-01-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/108420
+	* iresolve.c (check_charlen_present): Preserve character length if
+	there is no array constructor.
+
+2023-02-04  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-01-28  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/108453
+	* match.c (gfc_match_common): A USE associated name shall not appear
+	in a COMMON block (F2018:C8121).
+
+2023-01-08  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-12-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/108131
+	* array.c (match_array_element_spec): Avoid too early simplification
+	of matched array element specs that can lead to a misinterpretation
+	when used as array bounds in array declarations.
+
+2022-12-18  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2022-12-09  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/107872
+	* resolve.c (derived_inaccessible): Skip over allocatable components
+	to prevent an infinite loop.
+
+2022-11-25  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2022-11-18  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/107576
+	* interface.c (gfc_procedure_use): Reject NULL as actual argument
+	when there is no explicit procedure interface.
+
 2022-10-29  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
 
 	Backported from master:

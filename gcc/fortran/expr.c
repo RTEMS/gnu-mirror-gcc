@@ -1549,7 +1549,11 @@ find_array_section (gfc_expr *expr, gfc_ref *ref)
       lower = ref->u.ar.as->lower[d];
       upper = ref->u.ar.as->upper[d];
 
-      if (!lower || !upper)
+      if (!lower || !upper
+	  || lower->expr_type != EXPR_CONSTANT
+	  || upper->expr_type != EXPR_CONSTANT
+	  || lower->ts.type != BT_INTEGER
+	  || upper->ts.type != BT_INTEGER)
 	{
 	  t = false;
 	  goto cleanup;
@@ -6231,7 +6235,7 @@ gfc_check_vardef_context (gfc_expr* e, bool pointer, bool alloc_obj,
       && !(sym->attr.flavor == FL_PROCEDURE && sym == sym->result)
       && !(sym->attr.flavor == FL_PROCEDURE && sym->attr.proc_pointer)
       && !(sym->attr.flavor == FL_PROCEDURE
-	   && sym->attr.function && sym->attr.pointer))
+	   && sym->attr.function && attr.pointer))
     {
       if (context)
 	gfc_error ("%qs in variable definition context (%s) at %L is not"
