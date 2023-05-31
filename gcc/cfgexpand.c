@@ -1573,14 +1573,15 @@ defer_stack_allocation (tree var, bool toplevel)
   tree size_unit = TREE_CODE (var) == SSA_NAME
     ? TYPE_SIZE_UNIT (TREE_TYPE (var))
     : DECL_SIZE_UNIT (var);
+
   poly_uint64 size;
+  if (!poly_int_tree_p (size_unit, &size))
+    gcc_unreachable ();
 
   /* Whether the variable is small enough for immediate allocation not to be
      a problem with regard to the frame size.  */
   bool smallish
-    = (poly_int_tree_p (size_unit, &size)
-       && (estimated_poly_value (size)
-	   < param_min_size_for_stack_sharing));
+    = (estimated_poly_value (size) < param_min_size_for_stack_sharing);
 
   /* If stack protection is enabled, *all* stack variables must be deferred,
      so that we can re-order the strings to the top of the frame.
