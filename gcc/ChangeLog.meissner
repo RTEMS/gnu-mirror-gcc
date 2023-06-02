@@ -1,30 +1,4 @@
-==================== Branch work121, patch #40 ====================
-
-PR target/89213 - Optimize vector shift by a constant.
-
-On power9 and power10 systems, optimize vector shifts by a constant, taking
-advantage that the shift instructions only look at the bits within the element.
-
-2023-06-02  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	PR target/89213
-	* config/rs6000/altivec.md (UNSPEC_VECTOR_SHIFT): New unspec.
-	(VSHIFT_MODE): New mode iterator.
-	(vshift_code): New code iterator.
-	(vshift_attr): New code attribute.
-	(altivec_<mode>_<vshift_attr>_const): New pattern to optimize
-	vector long long/int shifts by a constant.
-	(altivec_<mode>_shift_const): New helper insn to load up a
-	constant used by the shift operation.
-	* config/rs6000/predicates.md (vector_shift_constant): New
-	predicate.
-
-gcc/testsuite/
-
-	PR target/89213
-	* gcc.target/powerpc/pr89213.c: New test.
+==================== Branch work121, patch #40 was reverted ====================
 
 ==================== Branch work121, patch #37 ====================
 
