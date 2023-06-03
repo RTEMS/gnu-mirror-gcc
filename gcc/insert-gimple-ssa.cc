@@ -96,24 +96,24 @@ hstmt_cond::replace_op_by (hstmt_with_lhs *op, hstmt_with_lhs *replace_by)
 gimple *
 hstmt_assign::to_gimple (void)
 {
-  gcc_assert (ssa != NULL_TREE);
-  gcc_assert (val->op[0] != NULL);
+  gcc_checking_assert (ssa != NULL_TREE);
+  gcc_checking_assert (val->op[0] != NULL);
 
   tree op1 = val->op[0]->ssa;
   tree op2 = NULL_TREE;
   tree op3 = NULL_TREE;
 
-  gcc_assert (op1 != NULL);
+  gcc_checking_assert (op1 != NULL);
 
   if (val->num_ops >= 2)
     {
       op2 = val->op[1]->ssa;
-      gcc_assert (op2 != NULL);
+      gcc_checking_assert (op2 != NULL);
     }
   if (val->num_ops >= 3)
     {
       op3 = val->op[2]->ssa;
-      gcc_assert (op3 != NULL);
+      gcc_checking_assert (op3 != NULL);
     }
 
   return gimple_build_assign (ssa, val->code, op1, op2, op3);
@@ -122,8 +122,8 @@ hstmt_assign::to_gimple (void)
 gimple *
 hstmt_cond::to_gimple (void)
 {
-  gcc_assert (lhs->ssa != NULL);
-  gcc_assert (rhs->ssa != NULL);
+  gcc_checking_assert (lhs->ssa != NULL);
+  gcc_checking_assert (rhs->ssa != NULL);
 
   return gimple_build_cond (pred_code, lhs->ssa, rhs->ssa, NULL, NULL);
 }
@@ -134,8 +134,8 @@ hstmt_cond::to_gimple (void)
 gimple *
 hstmt_outvar::to_gimple (void)
 {
-  gcc_assert (rhs != NULL);
-  gcc_assert (rhs->ssa != NULL);
+  gcc_checking_assert (rhs != NULL);
+  gcc_checking_assert (rhs->ssa != NULL);
 
   outvar->type_or_ssa_value = rhs->ssa;
   return NULL;
@@ -150,7 +150,7 @@ hstmt_return::to_gimple (void)
 hvar *
 hack_ssa_builder::new_local (tree type)
 {
-  gcc_assert (type != NULL_TREE);
+  gcc_checking_assert (type != NULL_TREE);
 
   hvar *local = XNEW (struct hvar);
   local->index = next_index;
@@ -164,7 +164,7 @@ hack_ssa_builder::new_local (tree type)
 hvar *
 hack_ssa_builder::new_invar (tree ssa)
 {
-  gcc_assert (ssa != NULL_TREE);
+  gcc_checking_assert (ssa != NULL_TREE);
 
   hvar *invar = XNEW (struct hvar);
   invar->index = next_const_index;
@@ -379,8 +379,8 @@ hack_ssa_builder::release (void)
 tree
 hack_ssa_builder::ssa_from_outvar (hvar *outvar)
 {
-  gcc_assert (finalized && "SSA builder has to be finalized");
-  gcc_assert (outvar->code == OUTVAR);
+  gcc_checking_assert (finalized && "SSA builder has to be finalized");
+  gcc_checking_assert (outvar->code == OUTVAR);
   return outvar->type_or_ssa_value;
 }
 
@@ -393,7 +393,7 @@ hack_ssa_builder::append_assign1 (basic_block bb, enum tree_code code,
   hstmt_with_lhs *stmt;
 
   hack_tuple_internal *val = tuple_alloc (code, num_ops);
-  gcc_assert (op1 != NULL);
+  gcc_checking_assert (op1 != NULL);
   tuple_set_operand (0, val, read_variable (bb, op1));
   if (op2 != NULL)
     {
@@ -444,8 +444,8 @@ hack_ssa_builder::get_bb_record (basic_block bb)
 hack_tuple_internal *
 hack_ssa_builder::tuple_alloc (enum tree_code code, unsigned num_ops)
 {
-  gcc_assert (num_ops >= 1 && "Tuples of size <1 not allowed");
-  gcc_assert (num_ops <= 3 && "Tuples of size >3 not allowed");
+  gcc_checking_assert (num_ops >= 1 && "Tuples of size <1 not allowed");
+  gcc_checking_assert (num_ops <= 3 && "Tuples of size >3 not allowed");
 
   size_t size = sizeof (hack_tuple_internal) +
     (num_ops - 1) * sizeof (struct hstmt_with_lhs *);
@@ -470,7 +470,7 @@ hack_ssa_builder::tuple_set_operand (unsigned op_num,
 void
 hack_ssa_builder::append_stmt (basic_block bb, hstmt *stmt)
 {
-  gcc_assert (dyn_cast<hphi *> (stmt) == NULL);
+  gcc_checking_assert (dyn_cast<hphi *> (stmt) == NULL);
 
   hack_bb *record = get_bb_record (bb);
   record->stmt_list.safe_push (stmt);
@@ -512,7 +512,7 @@ hack_ssa_builder::commit_ssa_name (hstmt_with_lhs *s)
 void
 hack_ssa_builder::commit_phi (basic_block bb, hphi *hp)
 {
-  gcc_assert (hp->op != NULL && "PHI has to be completed");
+  gcc_checking_assert (hp->op != NULL && "PHI has to be completed");
 
   gphi *gp = create_phi_node (hp->ssa, bb);
 
@@ -522,7 +522,7 @@ hack_ssa_builder::commit_phi (basic_block bb, hphi *hp)
       hstmt_with_lhs *s = hp->get_op (i);
       edge e = hp->get_edge (i);
 
-      gcc_assert (s->ssa != NULL && "SSA names have to be assigned");
+      gcc_checking_assert (s->ssa != NULL && "SSA names have to be assigned");
 
       add_phi_arg (gp, s->ssa, e, UNKNOWN_LOCATION);
     }
@@ -533,7 +533,7 @@ hack_ssa_builder::commit_phi (basic_block bb, hphi *hp)
 void
 hack_ssa_builder::commit_stmt (gimple_stmt_iterator *gsi, hstmt *hs)
 {
-  gcc_assert (dyn_cast<hphi *> (hs) == NULL);
+  gcc_checking_assert (dyn_cast<hphi *> (hs) == NULL);
 
   gimple *s = hs->to_gimple ();
   if (s != NULL) /* Some hack stmts (outvars) are just virtual.  */
@@ -546,7 +546,7 @@ hack_ssa_builder::commit_stmt (gimple_stmt_iterator *gsi, hstmt *hs)
 void
 hack_ssa_builder::complete_phi (basic_block bb, hphi *phi)
 {
-  gcc_assert (sealed_bbs.contains (bb)
+  gcc_checking_assert (sealed_bbs.contains (bb)
 	      && "Only sealed BBs contain complete PHIs");
 
   hvar* var = phi->var;
@@ -600,7 +600,7 @@ hack_ssa_builder::try_remove_trivial_phi (hphi *phi)
 {
   hstmt_with_lhs *same = NULL;
 
-  gcc_assert (phi->op != NULL
+  gcc_checking_assert (phi->op != NULL
 	      && "PHI must be completed before triviality can be determined");
 
   unsigned i;
@@ -647,7 +647,8 @@ hack_ssa_builder::write_variable (basic_block bb, hvar *var,
 hstmt_with_lhs *
 hack_ssa_builder::read_variable (basic_block bb, hvar *var)
 {
-  gcc_assert (var->code == LOCAL || var->code == INVAR || var->code == MEMORY);
+  // TODO add MEMORY
+  gcc_checking_assert (var->code == LOCAL || var->code == INVAR);
   if (var->code == INVAR)
     {
       return const_list[var->index];
@@ -687,7 +688,6 @@ hack_ssa_builder::read_variable_recursive (basic_block bb, hvar *var)
   else
     {
       // TODO Řeším takhle správně, že definici nenajdu?
-      std::cerr << "Didn't find a definition" << std::endl;
       gcc_unreachable (); /* Couldn't find definition of variable.  */
     }
 
