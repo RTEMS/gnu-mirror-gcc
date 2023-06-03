@@ -17,7 +17,7 @@ Given the vector shift instructions only look at the bottom 5 or 6 bits of the
 shift value, we can load the constant via VSPLTISW or XXSPLTIB instructions and
 eliminate the sign extend instructions (VEXTSW2D, VEXTSB2D, and VEXTSB2W).
 
-2023-06-02  Michael Meissner  <meissner@linux.ibm.com>
+2023-06-03  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -34,6 +34,7 @@ gcc/testsuite/
 
 	PR target/89213
 	* gcc.target/powerpc/pr89213.c: New test.
+	* gcc.target/powerpc/vec-rlmi-rlnm.c: Update insn count.
 
 ==================== Branch work121, patch #37 ====================
 
