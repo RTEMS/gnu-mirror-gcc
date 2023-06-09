@@ -15,9 +15,28 @@ There are several problems with the current GCC:
 	SImode as the mode.  You need to pass in DImode instead of SImode.  This
 	is to allow lwz to be treated differently than lwa.
 
+    3)	The rules for automatically setting the prefixed attribute were not
+	checking that these fused load and compare immediate fusion operations
+	might have prefixed addresses.
+
+    4)	We should use lwa_operand for lwa instead of ds_form_mem_operand.  The
+	lwa_operand has some additional checks for the lwa instruction.
+
 The fix is to modify genfusion.pl that it sets the "YZ" constraint instead of
-"m" for the ld and lwa instructions.  And to pass DImode to the
-address_is_non_pfx_d_or_x function for lwa.
+"m" for the ld and lwa instructions.
+
+This patch also passes DImode to the address_is_non_pfx_d_or_x function for the
+lwa instruction so that it properly cheks for DS form restrictions when
+splitting the insn because it won't fuse.
+
+This patch also modifies the prefixed attribute so that it checks load + compare
+immediate instructions for be a load instruction.  This means that the
+lwa_cmpdi_cr0_SI_clobber_CC_none insn must ask for a DImode scratch register
+instead of SImode scratch register and also set the sign_extend attribute.  The
+code for checking if a load is a lwa expects that the register is DImode, the
+memory is SImode, and the sign_extend attribute is set.
+
+I also added a test case for this condition.
 
 2023-06-08   Michael Meissner  <meissner@linux.ibm.com>
 
@@ -26,10 +45,14 @@ gcc/
 	* config/rs6000/genfusion.pl (gen_ld_cmpi_p10_one): Fix problems that
 	allowed prefixed lwa to be generated.
 	* config/rs6000/fusion.md: Regenerate.
+	* config/rs6000/rs6000.md (prefixed attribute): Add support for load
+	plus compare immediate fused insns.
 
 gcc/testsuite/
 
 	* g++.target/powerpc/pr105325.C: New test.
+
+==================== Branch work122, patch #5 was reverted ====================
 
 ==================== Branch work122, patch #4 was reverted ====================
 
