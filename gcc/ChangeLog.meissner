@@ -42,29 +42,34 @@ The solution involves:
     1)	Don't use ds_form_mem_operand for ld and lwa, always use
 	non_update_memory_operand.
 
-    2)	Delete ds_form_mem_operand since it is no longer use.
+    2)	Delete ds_form_mem_operand since it is no longer used.
 
     3)	Use the "YZ" constraints for ld/lwa instead of "m".
 
-    4)	Insure that the insn will be recognized as having a prefixed operand
-	(and hence the instruction length is 16 bytes instead of 8 bytes).
+    4)	If we don't need to sign extend the lwa, convert it to lwz, and use
+	cmpwi instead of cmpdi.  Adjust the insn name to reflect the code
+	generate.
 
-	4a) Set the prefixed and maybe_prefix attributes to know that
+    5)	Insure that the insn using lwa will be recognized as having a prefixed
+	operand (and hence the instruction length is 16 bytes instead of 8
+	bytes).
+
+	5a) Set the prefixed and maybe_prefix attributes to know that
 	    fused_load_cmpi are also load insns;
 
-	4b) In the case where we are just setting CC and not using the memory
+	5b) In the case where we are just setting CC and not using the memory
 	    afterward, set the clobber to use a DI register, and put an
 	    explicit sign_extend operation in the split;
 
-	4c) Set the sign_extend attribute to "yes".
+	5c) Set the sign_extend attribute to "yes".
 
-	4d) 4a-4c are the things that prefixed_load_p in rs6000.cc checks to
+	5d) 5a-5c are the things that prefixed_load_p in rs6000.cc checks to
 	    ensure that lwa is treated as a ds-form instruction and not as
 	    a d-form instruction (i.e. lwz).
 
-    5)	Add a new test case for this case.
+    6)	Add a new test case for this case.
 
-    6)	Adjust the insn counts in fusion-p10-ldcmpi.c.  Because we are no
+    7)	Adjust the insn counts in fusion-p10-ldcmpi.c.  Because we are no
 	longer using ds_form_mem_operand, the ld and lwa instructions will fuse
 	x-form (reg+reg) addresses in addition ds-form (reg+offset or reg).
 
