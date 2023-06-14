@@ -1,3 +1,127 @@
+==================== Branch work122-vpair, patch #8 from main patches ====================
+
+Fix power10 fusion and -fstack-protector, PR target/105325
+
+This patch fixes an issue where if you use the -fstack-protector and
+-mcpu=power10 options and you have a large stack frame, the GCC compiler will
+generate a LWA instruction with a large offset.
+
+The important thing in the bug is that -fstack-protector is used, but it could
+potentially happen with fused load-compare to any stack location when the stack
+frame is larger than 32K without -fstack-protector.
+
+Here is the initial fused initial insn that was created.  It refers to the
+stack location based off of the virtrual frame pointer:
+
+(insn 6 5 7 2 (parallel [
+            (set (reg:CC 119)
+                 (compare:CC (mem/c:SI (plus:DI (reg/f:DI 110 sfp)
+                                                (const_int -4))
+                             (const_int 0 [0])))
+            (clobber (scratch:DI))
+        ])
+     (nil))
+
+After the stack size is finalized, the frame pointer removed, and the post
+reload phase is run, the insn is now:
+
+(insn 6 5 7 2 (parallel [
+            (set (reg:CC 100 0 [119])
+                 (compare:CC (mem/c:SI (plus:DI (reg/f:DI 1 1)
+                                                (const_int 40044))
+                             (const_int 0 [0])))
+            (clobber (reg:DI 9 9 [120]))
+        ])
+     (nil))
+
+When the split2 pass is run after reload has finished the ds_form_mem_operand
+predicate that was used for lwa and ld no longer returns true.  This means that
+since the operand predicates aren't recognized, it won't be split.  Thus, it
+goes all of the way to final.  The automatic prefix instruction support was not
+run because the type was changed from "load" to "fused_load_cmpi".  This meant
+that it was assume that the insn was only 8 bytes, and that we did not need to
+prefer the lwa with a 'p'.
+
+The solution involves:
+
+    1)	Don't use ds_form_mem_operand for ld and lwa, always use
+	non_update_memory_operand.
+
+    2)	Delete ds_form_mem_operand since it is no longer used.
+
+    3)	Use the "YZ" constraints for ld/lwa instead of "m".
+
+    4)	If we don't need to sign extend the lwa, convert it to lwz, and use
+	cmpwi instead of cmpdi.  Adjust the insn name to reflect the code
+	generate.
+
+    5)	Insure that the insn using lwa will be recognized as having a prefixed
+	operand (and hence the instruction length is 16 bytes instead of 8
+	bytes).
+
+	5a) Set the prefixed and maybe_prefix attributes to know that
+	    fused_load_cmpi are also load insns;
+
+	5b) In the case where we are just setting CC and not using the memory
+	    afterward, set the clobber to use a DI register, and put an
+	    explicit sign_extend operation in the split;
+
+	5c) Set the sign_extend attribute to "yes".
+
+	5d) 5a-5c are the things that prefixed_load_p in rs6000.cc checks to
+	    ensure that lwa is treated as a ds-form instruction and not as
+	    a d-form instruction (i.e. lwz).
+
+    6)	Add a new test case for this case.
+
+    7)	Adjust the insn counts in fusion-p10-ldcmpi.c.  Because we are no
+	longer using ds_form_mem_operand, the ld and lwa instructions will fuse
+	x-form (reg+reg) addresses in addition ds-form (reg+offset or reg).
+
+I have built bootstrap compilers and tested them on the following environments.
+There were no regressions in any of the runs.
+
+	Little endian power10, long double is IBM 128-bit
+	Little endian power9, long double is IBM 128-bit
+	Little endian power9, long double is IEEE 128-bit
+	Big endian power8, long double is IBM 128-bit (32/64-bit tests run)
+
+Can I check this patch into the master GCC branch?  After a waiting period, once
+the previous changes to genfusion.pl are checked in, can I install this patch in
+previous GCC compilers?
+
+2023-06-12   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/genfusion.pl (gen_ld_cmpi_p10_one): Fix problems that
+	allowed prefixed lwa to be generated.
+	* config/rs6000/fusion.md: Regenerate.
+	* config/rs6000/predicates.md (ds_form_mem_operand): Delete.
+	* config/rs6000/rs6000.md (prefixed attribute): Add support for load
+	plus compare immediate fused insns.
+	(maybe_prefixed): Likewise.
+
+gcc/testsuite/
+
+	* g++.target/powerpc/pr105325.C: New test.
+	* gcc/testsuite/gcc.target/powerpc/fusion-p10-ldcmpi.c: Update insn
+	counts.
+
+==================== Branch work122-vpair, patch #7 from main patches was reverted ====================
+
+==================== Branch work122-vpair, patch #6 from main patches was reverted ====================
+
+==================== Branch work122-vpair, patch #5 from main patches was reverted ====================
+
+==================== Branch work122-vpair, patch #4 from main patches was reverted ====================
+
+==================== Branch work122-vpair, patch #3 from main patches was reverted ====================
+
+==================== Branch work122-vpair, patch #2 from main patches was reverted ====================
+
+==================== Branch work122-vpair, patch #1 from main patches was reverted ====================
+
 ==================== Branch work122-vpair, baseline ====================
 
 2023-06-06   Michael Meissner  <meissner@linux.ibm.com>
