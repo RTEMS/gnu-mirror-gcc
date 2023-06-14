@@ -70,8 +70,8 @@ if { $orig_environment_saved == 0 } {
 # Some torture-options cause intermediate code output, unusable for
 # testing using e.g. scan-assembler.  In this variable are the options
 # how to force it, when needed.
-global gcc_force_conventional_output
-set gcc_force_conventional_output ""
+global gcc_set_required_options
+set gcc_set_required_options ""
 
 if [info exists TORTURE_OPTIONS] {
     set DG_TORTURE_OPTIONS $TORTURE_OPTIONS
@@ -92,7 +92,7 @@ if [info exists TORTURE_OPTIONS] {
 	{ -Os } ]
 
     if [check_effective_target_lto] {
-        set gcc_force_conventional_output "-ffat-lto-objects"
+        set gcc_set_required_options "-ffat-lto-objects"
     }
 }
 
@@ -568,11 +568,15 @@ proc search_for { file pattern } {
 proc gcc-dg-runtest { testcases flags default-extra-flags } {
     global runtests
 
+    # Some callers initialize torture testing themselves; don't override those.
+    set existing_torture_init [torture-init-done]
+    if { $existing_torture_init == 0 } {
+	torture-init
+    }
     # Some callers set torture options themselves; don't override those.
     set existing_torture_options [torture-options-exist]
     if { $existing_torture_options == 0 } {
 	global DG_TORTURE_OPTIONS LTO_TORTURE_OPTIONS
-	torture-init
 	set-torture-options $DG_TORTURE_OPTIONS [list {}] $LTO_TORTURE_OPTIONS
     }
     dump-torture-options
@@ -603,7 +607,7 @@ proc gcc-dg-runtest { testcases flags default-extra-flags } {
 	}
     }
 
-    if { $existing_torture_options == 0 } {
+    if { $existing_torture_init == 0 } {
 	torture-finish
     }
 }

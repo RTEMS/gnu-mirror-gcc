@@ -358,6 +358,8 @@ gomp_to_device_kind_p (int kind)
     case GOMP_MAP_FORCE_ALLOC:
     case GOMP_MAP_FORCE_FROM:
     case GOMP_MAP_ALWAYS_FROM:
+    case GOMP_MAP_ALWAYS_PRESENT_FROM:
+    case GOMP_MAP_FORCE_PRESENT:
       return false;
     default:
       return true;
@@ -593,7 +595,7 @@ gomp_map_vars_existing (struct gomp_device_descr *devicep,
   else
     tgt_var->length = newn->host_end - newn->host_start;
 
-  if ((kind & GOMP_MAP_FLAG_FORCE)
+  if (GOMP_MAP_FORCE_P (kind)
       /* For implicit maps, old contained in new is valid.  */
       || !(implicit_subset
 	   /* Otherwise, new contained inside old is considered valid.  */
@@ -1697,20 +1699,26 @@ gomp_map_vars_internal (struct gomp_device_descr *devicep,
 		    i = j - 1;
 		    break;
 		  case GOMP_MAP_FORCE_PRESENT:
+		  case GOMP_MAP_ALWAYS_PRESENT_TO:
+		  case GOMP_MAP_ALWAYS_PRESENT_FROM:
+		  case GOMP_MAP_ALWAYS_PRESENT_TOFROM:
 		    {
 		      /* We already looked up the memory region above and it
 			 was missing.  */
 		      size_t size = k->host_end - k->host_start;
 		      gomp_mutex_unlock (&devicep->lock);
 #ifdef HAVE_INTTYPES_H
-		      gomp_fatal ("present clause: !acc_is_present (%p, "
-				  "%"PRIu64" (0x%"PRIx64"))",
-				  (void *) k->host_start,
-				  (uint64_t) size, (uint64_t) size);
+		      gomp_fatal ("present clause: not present on the device "
+				  "(addr: %p, size: %"PRIu64" (0x%"PRIx64"), "
+				  "dev: %d)", (void *) k->host_start,
+				  (uint64_t) size, (uint64_t) size,
+				  devicep->target_id);
 #else
-		      gomp_fatal ("present clause: !acc_is_present (%p, "
-				  "%lu (0x%lx))", (void *) k->host_start,
-				  (unsigned long) size, (unsigned long) size);
+		      gomp_fatal ("present clause: not present on the device "
+				  "(addr: %p, size: %lu (0x%lx), dev: %d)",
+				  (void *) k->host_start,
+				  (unsigned long) size, (unsigned long) size,
+				  devicep->target_id);
 #endif
 		    }
 		    break;
@@ -2122,6 +2130,29 @@ gomp_update (struct gomp_device_descr *devicep, size_t mapnum, void **hostaddrs,
 				      false, NULL);
 		if (GOMP_MAP_COPY_FROM_P (kind & typemask))
 		  gomp_copy_dev2host (devicep, NULL, hostaddr, devaddr, size);
+	      }
+	  }
+	else
+	  {
+	    int kind = get_kind (short_mapkind, kinds, i);
+
+	    if (GOMP_MAP_PRESENT_P (kind))
+	      {
+		/* We already looked up the memory region above and it
+		   was missing.  */
+		gomp_mutex_unlock (&devicep->lock);
+#ifdef HAVE_INTTYPES_H
+		gomp_fatal ("present clause: not present on the device "
+			    "(addr: %p, size: %"PRIu64" (0x%"PRIx64"), "
+			    "dev: %d)", (void *) hostaddrs[i],
+			    (uint64_t) sizes[i], (uint64_t) sizes[i],
+			    devicep->target_id);
+#else
+		gomp_fatal ("present clause: not present on the device "
+			    "(addr: %p, size: %lu (0x%lx), dev: %d)",
+			    (void *) hostaddrs[i], (unsigned long) sizes[i],
+			    (unsigned long) sizes[i], devicep->target_id);
+#endif
 	      }
 	  }
       }
@@ -3422,7 +3453,8 @@ gomp_target_rev (uint64_t fn_ptr, uint64_t mapnum, uint64_t devaddrs_ptr,
 	      case GOMP_MAP_DELETE:
 	      case GOMP_MAP_RELEASE:
 	      case GOMP_MAP_DELETE_ZERO_LEN_ARRAY_SECTION:
-		/* Assume it is present; look it up - but ignore otherwise. */
+		/* Assume it is present; look it up - but ignore unless the
+		   present clause is there. */
 	      case GOMP_MAP_ALLOC:
 	      case GOMP_MAP_FROM:
 	      case GOMP_MAP_FORCE_ALLOC:
@@ -3434,6 +3466,10 @@ gomp_target_rev (uint64_t fn_ptr, uint64_t mapnum, uint64_t devaddrs_ptr,
 	      case GOMP_MAP_FORCE_TOFROM:
 	      case GOMP_MAP_ALWAYS_TO:
 	      case GOMP_MAP_ALWAYS_TOFROM:
+	      case GOMP_MAP_FORCE_PRESENT:
+	      case GOMP_MAP_ALWAYS_PRESENT_FROM:
+	      case GOMP_MAP_ALWAYS_PRESENT_TO:
+	      case GOMP_MAP_ALWAYS_PRESENT_TOFROM:
 	      case GOMP_MAP_ZERO_LEN_ARRAY_SECTION:
 		cdata[i].devaddr = devaddrs[i];
 		bool zero_len = (kind == GOMP_MAP_DELETE_ZERO_LEN_ARRAY_SECTION
@@ -3454,7 +3490,23 @@ gomp_target_rev (uint64_t fn_ptr, uint64_t mapnum, uint64_t devaddrs_ptr,
 					      devaddrs[i] + sizes[i], zero_len);
 		    cdata[i].present = n2 != NULL;
 		  }
-		if (!cdata[i].present
+		if (!cdata[i].present && GOMP_MAP_PRESENT_P (kind))
+		  {
+		    gomp_mutex_unlock (&devicep->lock);
+#ifdef HAVE_INTTYPES_H
+		    gomp_fatal ("present clause: no corresponding data on "
+				"parent device at %p with size %"PRIu64,
+				(void *) (uintptr_t) devaddrs[i],
+				(uint64_t) sizes[i]);
+#else
+		    gomp_fatal ("present clause: no corresponding data on "
+				"parent device at %p with size %lu",
+				(void *) (uintptr_t) devaddrs[i],
+				(unsigned long) sizes[i]);
+#endif
+		    break;
+		  }
+		else if (!cdata[i].present
 		    && kind != GOMP_MAP_DELETE
 		    && kind != GOMP_MAP_RELEASE
 		    && kind != GOMP_MAP_DELETE_ZERO_LEN_ARRAY_SECTION)
@@ -3472,8 +3524,7 @@ gomp_target_rev (uint64_t fn_ptr, uint64_t mapnum, uint64_t devaddrs_ptr,
 		     && (kind == GOMP_MAP_TO || kind == GOMP_MAP_TOFROM))
 		    || kind == GOMP_MAP_FORCE_TO
 		    || kind == GOMP_MAP_FORCE_TOFROM
-		    || kind == GOMP_MAP_ALWAYS_TO
-		    || kind == GOMP_MAP_ALWAYS_TOFROM)
+		    || GOMP_MAP_ALWAYS_TO_P (kind))
 		  {
 		    gomp_copy_dev2host (devicep, aq,
 					(void *) (uintptr_t) devaddrs[i],
@@ -3658,6 +3709,8 @@ gomp_target_rev (uint64_t fn_ptr, uint64_t mapnum, uint64_t devaddrs_ptr,
 	      case GOMP_MAP_FORCE_TOFROM:
 	      case GOMP_MAP_ALWAYS_FROM:
 	      case GOMP_MAP_ALWAYS_TOFROM:
+	      case GOMP_MAP_ALWAYS_PRESENT_FROM:
+	      case GOMP_MAP_ALWAYS_PRESENT_TOFROM:
 		copy = true;
 		/* FALLTHRU */
 	      case GOMP_MAP_FROM:

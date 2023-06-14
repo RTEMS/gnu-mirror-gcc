@@ -110,9 +110,9 @@
 )
 
 (define_expand "smin<mode>3"
-  [(set (match_operand:VALLW 0 "s_register_operand")
-	(smin:VALLW (match_operand:VALLW 1 "s_register_operand")
-		    (match_operand:VALLW 2 "s_register_operand")))]
+  [(set (match_operand:VDQWH 0 "s_register_operand")
+	(smin:VDQWH (match_operand:VDQWH 1 "s_register_operand")
+		    (match_operand:VDQWH 2 "s_register_operand")))]
    "ARM_HAVE_<MODE>_ARITH"
 )
 
@@ -124,9 +124,9 @@
 )
 
 (define_expand "smax<mode>3"
-  [(set (match_operand:VALLW 0 "s_register_operand")
-	(smax:VALLW (match_operand:VALLW 1 "s_register_operand")
-		    (match_operand:VALLW 2 "s_register_operand")))]
+  [(set (match_operand:VDQWH 0 "s_register_operand")
+	(smax:VDQWH (match_operand:VDQWH 1 "s_register_operand")
+		    (match_operand:VDQWH 2 "s_register_operand")))]
    "ARM_HAVE_<MODE>_ARITH"
 )
 
@@ -559,7 +559,7 @@
       /* vaddv generates a 32 bits accumulator.  */
       rtx op0 = gen_reg_rtx (SImode);
 
-      emit_insn (gen_mve_vaddvq (VADDVQ_S, <MODE>mode, op0, operands[1]));
+      emit_insn (gen_mve_q (VADDVQ_S, VADDVQ_S, <MODE>mode, op0, operands[1]));
       emit_move_insn (operands[0], gen_lowpart (<V_elem>mode, op0));
     }
 

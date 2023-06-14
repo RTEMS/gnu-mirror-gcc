@@ -91,6 +91,14 @@ enum riscv_multilib_select_kind {
   select_by_abi,
 };
 
+/* ENTITIES in mode switching.  */
+enum riscv_entity
+{
+  RISCV_VXRM = 0,
+  RISCV_FRM,
+  MAX_RISCV_ENTITIES
+};
+
 #define MASK_ZICSR    (1 << 0)
 #define MASK_ZIFENCEI (1 << 1)
 
@@ -146,6 +154,8 @@ enum riscv_multilib_select_kind {
 #define MASK_VECTOR_ELEN_64    (1 << 1)
 #define MASK_VECTOR_ELEN_FP_32 (1 << 2)
 #define MASK_VECTOR_ELEN_FP_64 (1 << 3)
+/* Align the bit index to riscv-vector-builtins.h.  */
+#define MASK_VECTOR_ELEN_FP_16 (1 << 6)
 
 #define TARGET_VECTOR_ELEN_32 \
   ((riscv_vector_elen_flags & MASK_VECTOR_ELEN_32) != 0)
@@ -155,6 +165,8 @@ enum riscv_multilib_select_kind {
   ((riscv_vector_elen_flags & MASK_VECTOR_ELEN_FP_32) != 0)
 #define TARGET_VECTOR_ELEN_FP_64 \
   ((riscv_vector_elen_flags & MASK_VECTOR_ELEN_FP_64) != 0)
+#define TARGET_VECTOR_ELEN_FP_16 \
+  ((riscv_vector_elen_flags & MASK_VECTOR_ELEN_FP_16) != 0)
 
 #define MASK_ZVL32B    (1 <<  0)
 #define MASK_ZVL64B    (1 <<  1)
@@ -192,9 +204,13 @@ enum riscv_multilib_select_kind {
 
 #define MASK_ZFHMIN   (1 << 0)
 #define MASK_ZFH      (1 << 1)
+#define MASK_ZVFHMIN  (1 << 2)
+#define MASK_ZVFH     (1 << 3)
 
-#define TARGET_ZFHMIN ((riscv_zf_subext & MASK_ZFHMIN) != 0)
-#define TARGET_ZFH    ((riscv_zf_subext & MASK_ZFH) != 0)
+#define TARGET_ZFHMIN  ((riscv_zf_subext & MASK_ZFHMIN) != 0)
+#define TARGET_ZFH     ((riscv_zf_subext & MASK_ZFH) != 0)
+#define TARGET_ZVFHMIN ((riscv_zf_subext & MASK_ZVFHMIN) != 0)
+#define TARGET_ZVFH    ((riscv_zf_subext & MASK_ZVFH) != 0)
 
 #define MASK_ZMMUL      (1 << 0)
 #define TARGET_ZMMUL    ((riscv_zm_subext & MASK_ZMMUL) != 0)

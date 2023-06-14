@@ -945,10 +945,10 @@ compare_type_sizes (tree type1, tree type2)
   /* Be conservative for arrays and vectors.  We want to support partial
      overlap on int[3] and int[3] as tested in gcc.dg/torture/alias-2.c.  */
   while (TREE_CODE (type1) == ARRAY_TYPE
-	 || TREE_CODE (type1) == VECTOR_TYPE)
+	 || VECTOR_TYPE_P (type1))
     type1 = TREE_TYPE (type1);
   while (TREE_CODE (type2) == ARRAY_TYPE
-	 || TREE_CODE (type2) == VECTOR_TYPE)
+	 || VECTOR_TYPE_P (type2))
     type2 = TREE_TYPE (type2);
   return compare_sizes (TYPE_SIZE (type1), TYPE_SIZE (type2));
 }
@@ -2829,6 +2829,9 @@ ref_maybe_used_by_call_p_1 (gcall *call, ao_ref *ref, bool tbaa_p)
 	      ao_ref_init_from_ptr_and_size (&rhs_ref,
 					     gimple_call_arg (call, 0),
 					     TYPE_SIZE_UNIT (TREE_TYPE (lhs)));
+	      /* We cannot make this a known-size access since otherwise
+		 we disambiguate against refs to decls that are smaller.  */
+	      rhs_ref.size = -1;
 	      rhs_ref.ref_alias_set = rhs_ref.base_alias_set
 		= tbaa_p ? get_deref_alias_set (TREE_TYPE
 					(gimple_call_arg (call, 1))) : 0;
@@ -3072,6 +3075,9 @@ call_may_clobber_ref_p_1 (gcall *call, ao_ref *ref, bool tbaa_p)
 	  ao_ref lhs_ref;
 	  ao_ref_init_from_ptr_and_size (&lhs_ref, gimple_call_arg (call, 0),
 					 TYPE_SIZE_UNIT (TREE_TYPE (rhs)));
+	  /* We cannot make this a known-size access since otherwise
+	     we disambiguate against refs to decls that are smaller.  */
+	  lhs_ref.size = -1;
 	  lhs_ref.ref_alias_set = lhs_ref.base_alias_set
 	    = tbaa_p ? get_deref_alias_set
 				   (TREE_TYPE (gimple_call_arg (call, 1))) : 0;

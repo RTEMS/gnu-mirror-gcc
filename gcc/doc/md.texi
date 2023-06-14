@@ -4974,6 +4974,28 @@ for (i = 1; i < operand3; i++)
   operand0[i] = operand0[i - 1] && (operand1 + i < operand2);
 @end smallexample
 
+@cindex @code{select_vl@var{m}} instruction pattern
+@item @code{select_vl@var{m}}
+Set operand 0 to the number of scalar iterations that should be handled
+by one iteration of a vector loop.  Operand 1 is the total number of
+scalar iterations that the loop needs to process and operand 2 is a
+maximum bound on the result (also known as the maximum ``vectorization
+factor'').
+
+The maximum value of operand 0 is given by:
+@smallexample
+operand0 = MIN (operand1, operand2)
+@end smallexample
+However, targets might choose a lower value than this, based on
+target-specific criteria.  Each iteration of the vector loop might
+therefore process a different number of scalar iterations, which in turn
+means that induction variables will have a variable step.  Because of
+this, it is generally not useful to define this instruction if it will
+always calculate the maximum value.
+
+This optab is only useful on targets that implement @samp{len_load_@var{m}}
+and/or @samp{len_store_@var{m}}.
+
 @cindex @code{check_raw_ptrs@var{m}} instruction pattern
 @item @samp{check_raw_ptrs@var{m}}
 Check whether, given two pointers @var{a} and @var{b} and a length @var{len},
@@ -11502,11 +11524,10 @@ The construct:
 @end smallexample
 
 defines a pseudo integer constant @var{name} that can be instantiated as
-@var{inti} if condition @var{condi} is true.  Each @var{int} must have the
-same rtx format.  @xref{RTL Classes}.  Int iterators can appear in only
-those rtx fields that have 'i', 'n', 'w', or 'p' as the specifier.  This
-means that each @var{int} has to be a constant defined using define_constant
-or define_c_enum.
+@var{inti} if condition @var{condi} is true.  Int iterators can appear in
+only those rtx fields that have `i', `n', `w', or `p' as the specifier.
+This means that each @var{int} has to be a constant defined using
+@samp{define_constant} or @samp{define_c_enum}.
 
 As with mode and code iterators, each pattern that uses @var{name} will be
 expanded @var{n} times, once with all uses of @var{name} replaced by
@@ -11517,8 +11538,12 @@ It is possible to define attributes for ints as well as for codes and modes.
 Attributes are defined using:
 
 @smallexample
-(define_int_attr @var{name} [(@var{int1} "@var{value1}") @dots{} (@var{intn} "@var{valuen}")])
+(define_int_attr @var{attr_name} [(@var{int1} "@var{value1}") @dots{} (@var{intn} "@var{valuen}")])
 @end smallexample
+
+In additon to these user-defined attributes, it is possible to use
+@samp{<@var{name}>} to refer to the current expansion of iterator
+@var{name} (such as @var{int1}, @var{int2}, and so on).
 
 Here's an example of int iterators in action, taken from the ARM port:
 

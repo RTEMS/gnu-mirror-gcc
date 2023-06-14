@@ -53,6 +53,7 @@ with Ada.Strings.Text_Buffers;
 
 package Ada.Strings.Superbounded with SPARK_Mode is
    pragma Preelaborate;
+   pragma Annotate (GNATprove, Always_Return, Superbounded);
 
    --  Type Bounded_String in Ada.Strings.Bounded.Generic_Bounded_Length is
    --  derived from Super_String, with the constraint of the maximum length.
@@ -68,7 +69,7 @@ package Ada.Strings.Superbounded with SPARK_Mode is
       --  Leaving it out is more efficient.
    end record
    with
-     Predicate =>
+     Ghost_Predicate =>
        Current_Length <= Max_Length
          and then Data (1 .. Current_Length)'Initialized,
      Put_Image => Put_Image;
@@ -1406,6 +1407,9 @@ package Ada.Strings.Superbounded with SPARK_Mode is
             Super_Element (Super_Translate'Result, K) =
               Mapping (Super_Element (Source, K))),
      Global => null;
+   pragma Annotate (GNATprove, False_Positive,
+                    "call via access-to-subprogram",
+                    "function Mapping must always terminate");
 
    procedure Super_Translate
      (Source  : in out Super_String;
@@ -1418,6 +1422,9 @@ package Ada.Strings.Superbounded with SPARK_Mode is
             Super_Element (Source, K) =
               Mapping (Super_Element (Source'Old, K))),
      Global => null;
+   pragma Annotate (GNATprove, False_Positive,
+                    "call via access-to-subprogram",
+                    "function Mapping must always terminate");
 
    ---------------------------------------
    -- String Transformation Subprograms --
