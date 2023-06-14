@@ -209,3 +209,15 @@ FAIL: gcc.dg/guality/pr90716.c -O2  -DPREVENT_OPTIMIZATION  line 23 j + 1 == 9
 FAIL: gcc.dg/guality/pr90716.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION line 23 j + 1 == 9
 FAIL: gcc.dg/guality/pr90716.c -Os  -DPREVENT_OPTIMIZATION  line 23 j + 1 == 9
 FAIL: gcc.target/i386/pr45685.c scan-assembler-times cmov 6
+FAIL: g++.dg/analyzer/pr100244.C -std=c++14  (test for warnings, line 17)
+FAIL: g++.dg/analyzer/pr100244.C -std=c++17  (test for warnings, line 17)
+FAIL: g++.dg/analyzer/pr100244.C -std=c++20  (test for warnings, line 17)
+FAIL: g++.dg/opt/pr91838.C -std=c++14  scan-assembler pxor\\s+%xmm0,\\s+%xmm0
+FAIL: g++.dg/opt/pr91838.C -std=c++17  scan-assembler pxor\\s+%xmm0,\\s+%xmm0
+FAIL: g++.dg/opt/pr91838.C -std=c++20  scan-assembler pxor\\s+%xmm0,\\s+%xmm0
+FAIL: gcc.dg/analyzer/pr101962.c (test for warnings, line 19)
+FAIL: gcc.target/i386/avx-vpackuswb-1.c execution test
+FAIL: gcc.target/i386/avx2-vpackssdw-2.c execution test
+FAIL: gcc.target/i386/avx2-vpackusdw-2.c execution test
+FAIL: gcc.target/i386/avx2-vpackuswb-2.c execution test
+FAIL: gcc.target/i386/sse2-packuswb-1.c execution test
