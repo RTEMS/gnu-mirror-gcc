@@ -1,3 +1,288 @@
+2023-06-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-06-13  Richard Biener  <rguenther@suse.de>
+
+	* tree-ssa-alias.cc (ref_maybe_used_by_call_p_1): For
+	.MASK_LOAD and friends set the size of the access to unknown.
+
+2023-06-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-06-12  Richard Biener  <rguenther@suse.de>
+
+	* tree-ssa-alias.cc (call_may_clobber_ref_p_1): For
+	.MASK_STORE and friend set the size of the access to
+	unknown.
+
+2023-06-13  Alexandre Oliva  <oliva@adacore.com>
+
+	Backported from master:
+	2023-06-13  Alexandre Oliva  <oliva@adacore.com>
+
+	* range-op-float.cc (frange_nextafter): Drop inline.
+	(frelop_early_resolve): Add static.
+	(frange_float): Likewise.
+
+2023-06-12  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-06-12  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/110200
+	* genmatch.cc (expr::gen_transform): Put braces around
+	the if arm for the (convert ...) short-cut.
+
+2023-06-10  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/109650
+	PR target/92729
+	Backport from 2023-05-10 master r14-1688.
+	* config/avr/avr-passes.def (avr_pass_ifelse): Insert new pass.
+	* config/avr/avr.cc (avr_pass_ifelse): New RTL pass.
+	(avr_pass_data_ifelse): New pass_data for it.
+	(make_avr_pass_ifelse, avr_redundant_compare, avr_cbranch_cost)
+	(avr_canonicalize_comparison, avr_out_plus_set_ZN)
+	(avr_out_cmp_ext): New functions.
+	(compare_condtition): Make sure REG_CC dies in the branch insn.
+	(avr_rtx_costs_1): Add computation of cbranch costs.
+	(avr_adjust_insn_length) [ADJUST_LEN_ADD_SET_ZN, ADJUST_LEN_CMP_ZEXT]:
+	[ADJUST_LEN_CMP_SEXT]Handle them.
+	(TARGET_CANONICALIZE_COMPARISON): New define.
+	(avr_simplify_comparison_p, compare_diff_p, avr_compare_pattern)
+	(avr_reorg_remove_redundant_compare, avr_reorg): Remove functions.
+	(TARGET_MACHINE_DEPENDENT_REORG): Remove define.
+	* config/avr/avr-protos.h (avr_simplify_comparison_p): Remove proto.
+	(make_avr_pass_ifelse, avr_out_plus_set_ZN, cc_reg_rtx)
+	(avr_out_cmp_zext): New Protos
+	* config/avr/avr.md (branch, difficult_branch): Don't split insns.
+	(*cbranchhi.zero-extend.0", *cbranchhi.zero-extend.1")
+	(*swapped_tst<mode>, *add.for.eqne.<mode>): New insns.
+	(*cbranch<mode>4): Rename to cbranch<mode>4_insn.
+	(define_peephole): Add dead_or_set_regno_p(insn,REG_CC) as needed.
+	(define_deephole2): Add peep2_regno_dead_p(*,REG_CC) as needed.
+	Add new RTL peepholes for decrement-and-branch and *swapped_tst<mode>.
+	Rework signtest-and-branch peepholes for *sbrx_branch<mode>.
+	(adjust_len) [add_set_ZN, cmp_zext]: New.
+	(QIPSI): New mode iterator.
+	(ALLs1, ALLs2, ALLs4, ALLs234): New mode iterators.
+	(gelt): New code iterator.
+	(gelt_eqne): New code attribute.
+	(rvbranch, *rvbranch, difficult_rvbranch, *difficult_rvbranch)
+	(branch_unspec, *negated_tst<mode>, *reversed_tst<mode>)
+	(*cmpqi_sign_extend): Remove insns.
+	(define_c_enum "unspec") [UNSPEC_IDENTITY]: Remove.
+	* config/avr/avr-dimode.md (cbranch<mode>4): Canonicalize comparisons.
+	* config/avr/predicates.md (scratch_or_d_register_operand): New.
+	* config/avr/constraints.md (Yxx): New constraint.
+
+2023-06-09  Andrew Pinski  <apinski@marvell.com>
+
+	Backported from master:
+	2023-06-09  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/110165
+	PR tree-optimization/110166
+	* match.pd (zero_one_valued_p): Don't accept
+	signed 1-bit integers.
+
+2023-06-09  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-06-09  Richard Biener  <rguenther@suse.de>
+
+	* match.pd (two conversions in a row): Use element_precision
+	to DTRT for VECTOR_TYPE.
+
+2023-06-09  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backported from master:
+	2023-06-02  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR target/110044
+	* config/rs6000/rs6000.cc (darwin_rs6000_special_round_type_align):
+	Make sure that we do not have a cap on field alignment before altering
+	the struct layout based on the type alignment of the first entry.
+
+2023-06-09  liuhongt  <hongtao.liu@intel.com>
+
+	PR target/110108
+	* config/i386/i386.cc (ix86_gimple_fold_builtin): Explicitly
+	view_convert_expr mask to signed type when folding pblendvb
+	builtins.
+
+2023-06-08  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2023-05-24  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/109939
+	* config/arm/arm-builtins.cc (SAT_BINOP_UNSIGNED_IMM_QUALIFIERS): Use
+	qualifier_none for the return operand.
+
+2023-06-07  Jeevitha Palanisamy  <jeevitha@linux.ibm.com>
+
+	Backported from master:
+	2023-06-06  Jeevitha Palanisamy  <jeevitha@linux.ibm.com>
+
+	PR target/106907
+	* config/rs6000/rs6000.cc (vec_const_128bit_to_bytes): Remove
+	duplicate expression.
+
+2023-06-07  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2023-05-25  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/109800
+	* config/arm/arm.md (movdf): Generate temporary pseudo in DImode
+	instead of DFmode.
+	* config/arm/vfp.md (no_literal_pool_df_immediate): Rather than punning an
+	lvalue DFmode pseudo into DImode, use a DImode pseudo and pun it into
+	DFmode as an rvalue.
+
+2023-06-06  Andrew Pinski  <apinski@marvell.com>
+
+	Backported from master:
+	2023-06-05  Andrew Pinski  <apinski@marvell.com>
+
+	PR bootstrap/110085
+	* Makefile.in (clean): Remove the removing of
+	MULTILIB_DIR/MULTILIB_OPTIONS directories.
+
+2023-06-02  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/110088
+	* config/avr/avr.md: Add an RTL peephole to optimize operations on
+	non-LD_REGS after a move from LD_REGS.
+	(piaop): New code iterator.
+
+2023-06-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2023-06-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR target/109954
+	* doc/invoke.texi (x86 Options): Fix description of -m32 option.
+
+2023-05-30  Andreas Schwab  <schwab@suse.de>
+
+	PR target/110036
+	* config/riscv/riscv.cc (riscv_asan_shadow_offset): Update to
+	match libsanitizer.
+
+2023-05-29  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	Backported from master:
+	2023-04-21  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/109547
+	* config/riscv/riscv-vsetvl.cc (local_eliminate_vsetvl_insn): New function.
+	(vector_insn_info::skip_avl_compatible_p): Ditto.
+	(vector_insn_info::merge): Remove default value.
+	(pass_vsetvl::compute_local_backward_infos): Ditto.
+	(pass_vsetvl::cleanup_insns): Add local vsetvl elimination.
+	* config/riscv/riscv-vsetvl.h: Ditto.
+
+2023-05-29  Kito Cheng  <kito.cheng@sifive.com>
+
+	Backported from master:
+	2023-05-16  Kito Cheng  <kito.cheng@sifive.com>
+
+	* common/config/riscv/riscv-common.cc (riscv_compute_multilib):
+	Fix wrong select_kind...
+
+2023-05-29  Kito Cheng  <kito.cheng@sifive.com>
+
+	Backported from master:
+	2023-05-12  Kito Cheng  <kito.cheng@sifive.com>
+
+	* common/config/riscv/riscv-common.cc (riscv_select_multilib_by_abi):
+	Drop unused parameter.
+	(riscv_select_multilib): Ditto.
+	(riscv_compute_multilib): Update call site of
+	riscv_select_multilib_by_abi and riscv_select_multilib_by_abi.
+
+2023-05-29  Kito Cheng  <kito.cheng@sifive.com>
+
+	Backported from master:
+	2023-05-08  Kito Cheng  <kito.cheng@sifive.com>
+
+	* common/config/riscv/riscv-common.cc (riscv_select_multilib_by_abi): New.
+	(riscv_select_multilib): New.
+	(riscv_compute_multilib): Extract logic to riscv_select_multilib and
+	also handle select_by_abi.
+	* config/riscv/elf.h (RISCV_USE_CUSTOMISED_MULTI_LIB): Change it
+	to select_by_abi_arch_cmodel from 1.
+	* config/riscv/linux.h (RISCV_USE_CUSTOMISED_MULTI_LIB): Define.
+	* config/riscv/riscv-opts.h (enum riscv_multilib_select_kind): New.
+
+2023-05-29  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	Backported from master:
+	2023-05-29  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/vector.md: Fix vimuladd instruction bug.
+
+2023-05-25  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/104327
+	* config/avr/avr.cc (avr_can_inline_p): New static function.
+	(TARGET_CAN_INLINE_P): Define to that function.
+
+2023-05-25  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/82931
+	* config/avr/avr.md (*movbitqi.0): Rename to *movbit<mode>.0-6.
+	Handle any bit position and use mode QISI.
+	* config/avr/avr.cc (avr_rtx_costs_1) [IOR]: Return a cost
+	of 2 insns for bit-transfer of respective style.
+
+2023-05-23  Georg-Johann Lay  <avr@gjlay.de>
+
+	* config/avr/avr.cc (avr_insn_cost): New static function.
+	(TARGET_INSN_COST): Define to that function.
+
+2023-05-23  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* fold-const.cc (native_encode_initializer) <CONSTRUCTOR>: Apply the
+	specific treatment for bit-fields only if they have an integral type
+	and filter out non-integral bit-fields that do not start and end on
+	a byte boundary.
+
+2023-05-22  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-05-21  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/109505
+	* match.pd ((x | CST1) & CST2 -> (x & CST2) | (CST1 & CST2),
+	Combine successive equal operations with constants,
+	(A +- CST1) +- CST2 -> A + CST3, (CST1 - A) +- CST2 -> CST3 - A,
+	CST1 - (CST2 - A) -> CST3 + A): Use ! on ops with 2 CONSTANT_CLASS_P
+	operands.
+
+2023-05-22  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2023-05-17  Kewen Lin  <linkw@linux.ibm.com>
+
+	* tree-vect-loop.cc (vect_analyze_loop_1): Don't retry analysis with
+	suggested unroll factor once the previous analysis fails.
+
+2023-05-20  Triffid Hunter  <triffid.hunter@gmail.com>
+
+	PR target/105753
+	Backport from 2023-05-20 https://gcc.gnu.org/r14-1016
+	* config/avr/avr.md (divmodpsi, udivmodpsi, divmodsi, udivmodsi):
+	Remove superfluous "parallel" in insn pattern.
+	([u]divmod<mode>4): Tidy code.  Use gcc_unreachable() instead of
+	printing error text to assembly.
+
+2023-05-19  Andreas Schwab  <schwab@suse.de>
+
+	* config/riscv/linux.h (LIB_SPEC): Don't redefine.
+
 2023-05-18  Stam Markianos-Wright  <stam.markianos-wright@arm.com>
 
 	* config/arm/arm_mve.h: (__ARM_mve_typeid): Add more pointer types.

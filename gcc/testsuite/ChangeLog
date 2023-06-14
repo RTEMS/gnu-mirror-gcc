@@ -1,3 +1,123 @@
+2023-06-10  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/109650
+	Backport from 2023-05-10 master r14-1688.
+	* gcc.target/avr/torture/pr109650-1.c: New test.
+	* gcc.target/avr/torture/pr109650-2.c: New test.
+
+2023-06-09  Andrew Pinski  <apinski@marvell.com>
+
+	Backported from master:
+	2023-06-09  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/110165
+	PR tree-optimization/110166
+	* gcc.c-torture/execute/pr110165-1.c: New test.
+	* gcc.c-torture/execute/pr110166-1.c: New test.
+
+2023-06-09  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backported from master:
+	2023-06-02  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR target/110044
+	* gcc.target/powerpc/darwin-abi-13-0.c: New test.
+	* gcc.target/powerpc/darwin-abi-13-1.c: New test.
+	* gcc.target/powerpc/darwin-abi-13-2.c: New test.
+	* gcc.target/powerpc/darwin-structs-0.h: New test.
+
+2023-06-09  liuhongt  <hongtao.liu@intel.com>
+
+	* gcc.target/i386/pr110108-2.c: New test.
+
+2023-06-08  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backported from master:
+	2023-05-24  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/109939
+	* gcc.target/arm/pr109939.c: New test.
+
+2023-06-07  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2023-05-25  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/109800
+	* gcc.target/arm/pure-code/pr109800.c: New test.
+
+2023-06-05  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	Backported from master:
+	2023-06-05  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* gdc.dg/Wmismatched_enum.d: New test.
+
+2023-06-03  Steve Kargl  <kargl@gcc.gnu.org>
+
+	Backported from master:
+	2023-06-02  Steve Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/100607
+	* gfortran.dg/select_rank_6.f90: New test.
+
+2023-05-30  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	Backported from master:
+	2023-05-30  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	* gcc.target/arm/mve/intrinsics/mve_intrinsic_type_overloads-int.c:
+	Support both definitions of int32_t.
+
+2023-05-29  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	Backported from master:
+	2023-04-21  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/109547
+	* gcc.target/riscv/rvv/vsetvl/pr109547.c: New.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-17.c: Update scan
+	condition.
+
+2023-05-25  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/82931
+	* gcc.target/avr/pr82931.c: New test.
+
+2023-05-23  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/opt101.adb: New test.
+	* gnat.dg/opt101_pkg.ads: New helper.
+
+2023-05-22  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-05-21  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/109505
+	* gcc.target/aarch64/sve/pr109505.c: New test.
+
+2023-05-20  Triffid Hunter  <triffid.hunter@gmail.com>
+
+	PR target/105753
+	Backport from 2023-05-20 https://gcc.gnu.org/r14-1016
+	* gcc.target/avr/torture/pr105753.c: New test.
+
+2023-05-19  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2023-05-16  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/109871
+	* g++.dg/cpp2a/desig27.C: New test.
+
+2023-05-19  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2023-05-15  Patrick Palka  <ppalka@redhat.com>
+
+	* g++.dg/cpp23/feat-cxx2b.C: Test __cpp_auto_cast.
+
 2023-05-18  Harald Anlauf  <anlauf@gmx.de>
 
 	Backported from master:

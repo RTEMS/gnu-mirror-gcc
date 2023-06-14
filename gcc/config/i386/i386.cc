@@ -5358,19 +5358,19 @@ standard_sse_constant_opcode (rtx_insn *insn, rtx *operands)
       if (GET_MODE_SIZE (mode) == 64)
 	{
 	  gcc_assert (TARGET_AVX512F);
-	  return "vpcmpeqd \t %t0, %t0, %t0";
+	  return "vpcmpeqd\t%t0, %t0, %t0";
 	}
       else if (GET_MODE_SIZE (mode) == 32)
 	{
 	  gcc_assert (TARGET_AVX);
-	  return "vpcmpeqd \t %x0, %x0, %x0";
+	  return "vpcmpeqd\t%x0, %x0, %x0";
 	}
       gcc_unreachable ();
     }
   else if (vector_all_ones_zero_extend_quarter_operand (x, mode))
     {
       gcc_assert (TARGET_AVX512F);
-      return "vpcmpeqd \t %x0, %x0, %x0";
+      return "vpcmpeqd\t%x0, %x0, %x0";
     }
 
   gcc_unreachable ();
@@ -18537,8 +18537,10 @@ ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 	      tree itype = GET_MODE_INNER (TYPE_MODE (type)) == E_SFmode
 		? intSI_type_node : intDI_type_node;
 	      type = get_same_sized_vectype (itype, type);
-	      arg2 = gimple_build (&stmts, VIEW_CONVERT_EXPR, type, arg2);
 	    }
+	  else
+	    type = signed_type_for (type);
+	  arg2 = gimple_build (&stmts, VIEW_CONVERT_EXPR, type, arg2);
 	  tree zero_vec = build_zero_cst (type);
 	  tree cmp_type = truth_type_for (type);
 	  tree cmp = gimple_build (&stmts, LT_EXPR, cmp_type, arg2, zero_vec);
