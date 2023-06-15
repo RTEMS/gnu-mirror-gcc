@@ -4622,6 +4622,20 @@ aarch64_needs_frame_chain (void)
   return aarch64_use_frame_pointer;
 }
 
+/* Return true if the current function should save registers above
+   the locals area, rather than below it.  */
+
+static bool
+aarch64_save_regs_above_locals_p ()
+{
+  /* When using stack smash protection, make sure that the canary slot
+     comes between the locals and the saved registers.  Otherwise,
+     it would be possible for a carefully sized smash attack to change
+     the saved registers (particularly LR and FP) without reaching the
+     canary.  */
+  return crtl->stack_protect_guard;
+}
+
 /* Mark the registers that need to be saved by the callee and calculate
    the size of the callee-saved registers area and frame record (both FP
    and LR may be omitted).  */
@@ -4685,6 +4699,16 @@ aarch64_layout_frame (void)
       }
 
   cfun->machine->frame.bytes_below_hard_fp = crtl->outgoing_args_size;
+
+  bool regs_at_top_p = aarch64_save_regs_above_locals_p ();
+
+  if (regs_at_top_p)
+    {
+      cfun->machine->frame.bytes_below_hard_fp += get_frame_size ();
+      cfun->machine->frame.bytes_below_hard_fp
+	= aligned_upper_bound (cfun->machine->frame.bytes_below_hard_fp,
+			       STACK_BOUNDARY / BITS_PER_UNIT);
+    }
 
 #define ALLOCATE_GPR_SLOT(REGNO)					\
   do									\
@@ -4758,9 +4782,11 @@ aarch64_layout_frame (void)
   HOST_WIDE_INT varargs_and_saved_regs_size
     = offset + cfun->machine->frame.saved_varargs_size;
 
+  cfun->machine->frame.bytes_above_hard_fp = varargs_and_saved_regs_size;
+  if (!regs_at_top_p)
+    cfun->machine->frame.bytes_above_hard_fp += get_frame_size ();
   cfun->machine->frame.bytes_above_hard_fp
-    = aligned_upper_bound (varargs_and_saved_regs_size
-			   + get_frame_size (),
+    = aligned_upper_bound (cfun->machine->frame.bytes_above_hard_fp,
 			   STACK_BOUNDARY / BITS_PER_UNIT);
 
   /* Both these values are already aligned.  */
@@ -4772,6 +4798,9 @@ aarch64_layout_frame (void)
 
   cfun->machine->frame.bytes_above_locals
     = cfun->machine->frame.saved_varargs_size;
+  if (regs_at_top_p)
+    cfun->machine->frame.bytes_above_locals
+      += cfun->machine->frame.saved_regs_size;
 
   cfun->machine->frame.initial_adjust = 0;
   cfun->machine->frame.final_adjust = 0;
@@ -5764,10 +5793,10 @@ aarch64_add_cfa_expression (rtx_insn *insn, unsigned int reg,
 	|  for register varargs         |
 	|                               |
 	+-------------------------------+
-	|  local variables              | <-- frame_pointer_rtx
+	|  local variables (1)          | <-- frame_pointer_rtx
 	|                               |
 	+-------------------------------+
-	|  padding                      | \
+	|  padding (1)                  | \
 	+-------------------------------+  |
 	|  callee-saved registers       |  | frame.saved_regs_size
 	+-------------------------------+  |
@@ -5775,6 +5804,10 @@ aarch64_add_cfa_expression (rtx_insn *insn, unsigned int reg,
 	+-------------------------------+  |
 	|  FP'                          | / <- hard_frame_pointer_rtx (aligned)
         +-------------------------------+
+	|  local variables (2)          |
+	+-------------------------------+
+	|  padding (2)                  |
+	+-------------------------------+
 	|  dynamic allocation           |
 	+-------------------------------+
 	|  padding                      |
@@ -5783,6 +5816,9 @@ aarch64_add_cfa_expression (rtx_insn *insn, unsigned int reg,
         |                               |
 	+-------------------------------+
 	|                               | <-- stack_pointer_rtx (aligned)
+
+   The regions marked (1) and (2) are mutually exclusive.  (2) is used
+   when aarch64_save_regs_above_locals_p is true.
 
    Dynamic stack allocations via alloca() decrease stack_pointer_rtx
    but leave frame_pointer_rtx and hard_frame_pointer_rtx
@@ -5937,6 +5973,8 @@ aarch64_expand_prologue (void)
      that is assumed by the called.  */
   aarch64_allocate_and_probe_stack_space (tmp1_rtx, tmp0_rtx, final_adjust,
 					  !frame_pointer_needed, true);
+  if (emit_frame_chain && maybe_ne (final_adjust, 0))
+    emit_insn (gen_stack_tie (stack_pointer_rtx, hard_frame_pointer_rtx));
 }
 
 /* Return TRUE if we can use a simple_return insn.
