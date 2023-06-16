@@ -4152,6 +4152,20 @@
   v256 __builtin_mult_f64_vpair (v256, v256);
     MULT_F64_VPAIR vpair_MULT_V2DF {mma,pair}
 
+  float __builtin_neg_f32_scalar (float);
+    NEG_F32_SCALAR nothing {}
+  vf __builtin_neg_f32_vector (vf);
+    NEG_F32_VECTOR nothing {}
+  v256 __builtin_neg_f32_vpair (v256);
+    NEG_F32_VPAIR vpair_NEG_V4SF {mma,pair}
+
+  double __builtin_neg_f64_scalar (double);
+    NEG_F64_SCALAR nothing {}
+  vd __builtin_neg_f64_vector (vd);
+    NEG_F64_VECTOR nothing {}
+  v256 __builtin_neg_f64_vpair (v256);
+    NEG_F64_VPAIR vpair_NEG_V2DF {mma,pair}
+
   float __builtin_reduce_f32_scalar (float);
     REDUCE_F32_SCALAR nothing {}
   float __builtin_reduce_f32_vector (vf);

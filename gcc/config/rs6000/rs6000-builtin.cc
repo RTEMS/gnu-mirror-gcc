@@ -2295,6 +2295,21 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 	return true;
       }
 
+    case RS6000_BIF_NEG_F32_SCALAR:
+    case RS6000_BIF_NEG_F32_VECTOR:
+    case RS6000_BIF_NEG_F64_SCALAR:
+    case RS6000_BIF_NEG_F64_VECTOR:
+      {
+	location_t loc = gimple_location (stmt);
+	lhs = gimple_call_lhs (stmt);
+	arg0 = gimple_call_arg (stmt, 0);
+	tree t = build1 (NEGATE_EXPR, TREE_TYPE (lhs), arg0);
+	g = gimple_build_assign (lhs, t);
+	gimple_set_location (g, loc);
+	gsi_replace (gsi, g, true);
+	return true;
+      }
+
     case RS6000_BIF_REDUCE_F32_SCALAR:
     case RS6000_BIF_REDUCE_F64_SCALAR:
       {
