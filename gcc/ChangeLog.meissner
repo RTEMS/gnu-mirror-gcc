@@ -1,3 +1,19 @@
+==================== Branch work122-vpair, patch #43 ====================
+
+Optimize vector pair negation with abs and fma.
+
+2023-06-16   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (UNSPEC_PAIR_NEG): New iterator.
+	(pairabs): New mode attribute.
+	(pairfma): Likewise.
+	(vpair_NABS_<pairmode>): New insns.
+	(vpair_FMS_<pairmode>): Likewise.
+	(vpair_NFMA_<pairmode>): Likewise.
+	(vpair_NFMS_<pairmode>): Likewise.
+
 ==================== Branch work122-vpair, patch #42 ====================
 
 Add negate support.
