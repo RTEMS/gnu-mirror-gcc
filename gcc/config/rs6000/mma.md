@@ -91,6 +91,18 @@
    UNSPEC_MMA_XVI8GER4SPP
    UNSPEC_MMA_XXMFACC
    UNSPEC_MMA_XXMTACC
+   UNSPEC_PAIR_ABS_F32
+   UNSPEC_PAIR_ABS_F64
+   UNSPEC_PAIR_ADD_F32
+   UNSPEC_PAIR_ADD_F64
+   UNSPEC_PAIR_FMA_F32
+   UNSPEC_PAIR_FMA_F64
+   UNSPEC_PAIR_MULT_F32
+   UNSPEC_PAIR_MULT_F64
+   UNSPEC_PAIR_SCALE_F32
+   UNSPEC_PAIR_SCALE_F64
+   UNSPEC_PAIR_SUB_F32
+   UNSPEC_PAIR_SUB_F64
   ])
 
 (define_c_enum "unspecv"
@@ -262,6 +274,46 @@
 
 (define_int_attr avvi4i4i4	[(UNSPEC_MMA_PMXVI8GER4PP	"pmxvi8ger4pp")
 				 (UNSPEC_MMA_PMXVI8GER4SPP	"pmxvi8ger4spp")])
+
+(define_int_iterator UNSPEC_PAIR_1OPS	[UNSPEC_PAIR_ABS_F32
+					 UNSPEC_PAIR_ABS_F64])
+
+(define_int_iterator UNSPEC_PAIR_2OPS	[UNSPEC_PAIR_ADD_F32
+					 UNSPEC_PAIR_ADD_F64
+					 UNSPEC_PAIR_MULT_F32
+					 UNSPEC_PAIR_MULT_F64
+					 UNSPEC_PAIR_SUB_F32
+					 UNSPEC_PAIR_SUB_F64])
+
+(define_int_iterator UNSPEC_PAIR_3OPS	[UNSPEC_PAIR_FMA_F32
+					 UNSPEC_PAIR_FMA_F64])
+
+(define_int_iterator UNSPEC_PAIR_SCALE	[UNSPEC_PAIR_SCALE_F32
+					 UNSPEC_PAIR_SCALE_F64])
+
+(define_int_attr pairop		[(UNSPEC_PAIR_ABS_F32		"ABS")
+				 (UNSPEC_PAIR_ABS_F64		"ABS")
+				 (UNSPEC_PAIR_ADD_F32		"PLUS")
+				 (UNSPEC_PAIR_ADD_F64		"PLUS")
+				 (UNSPEC_PAIR_FMA_F32		"FMA")
+				 (UNSPEC_PAIR_FMA_F64		"FMA")
+				 (UNSPEC_PAIR_MULT_F32		"MULT")
+				 (UNSPEC_PAIR_MULT_F64		"MULT")
+				 (UNSPEC_PAIR_SUB_F32		"MINUS")
+				 (UNSPEC_PAIR_SUB_F64		"MINUS")])
+
+(define_int_attr pairmode	[(UNSPEC_PAIR_ABS_F32           "V4SF")
+				 (UNSPEC_PAIR_ABS_F64		"V2DF")
+				 (UNSPEC_PAIR_ADD_F32		"V4SF")
+				 (UNSPEC_PAIR_ADD_F64		"V2DF")
+				 (UNSPEC_PAIR_FMA_F32		"V4SF")
+				 (UNSPEC_PAIR_FMA_F64		"V2DF")
+				 (UNSPEC_PAIR_MULT_F32		"V4SF")
+				 (UNSPEC_PAIR_MULT_F64		"V2DF")
+				 (UNSPEC_PAIR_SCALE_F32		"V4SF")
+				 (UNSPEC_PAIR_SCALE_F64		"V2DF")
+				 (UNSPEC_PAIR_SUB_F32		"V4SF")
+				 (UNSPEC_PAIR_SUB_F64		"V2DF")])
 
 
 ;; Vector pair support.  OOmode can only live in VSRs.
@@ -690,3 +742,112 @@
   "<avvi4i4i4> %A0,%x2,%x3,%4,%5,%6"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")])
+
+
+(define_insn "vpair_<pairop>_<pairmode>"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=?wa")
+	(unspec:OO [(match_operand:OO 1 "vsx_register_operand" "wa")]
+		   UNSPEC_PAIR_1OPS))]
+  "TARGET_MMA"
+  "#")
+
+(define_split
+  [(set (match_operand:OO 0 "vsx_register_operand")
+	(unspec:OO [(match_operand:OO 1 "vsx_register_operand")]
+		   UNSPEC_PAIR_1OPS))]
+  "TARGET_MMA && reload_completed"
+  [(const_int 0)]
+{
+  enum machine_mode mode = <pairmode>mode;
+  for (long i = 0; i < 2; i++)
+    {
+      rtx op0 = gen_rtx_REG (mode, reg_or_subregno (operands[0]) + i);
+      rtx op1 = gen_rtx_REG (mode, reg_or_subregno (operands[1]) + i);
+      emit_insn (gen_rtx_SET (op0, gen_rtx_<pairop> (mode, op1)));
+    }
+  DONE;
+})
+
+(define_insn "vpair_<pairop>_<pairmode>"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=?wa")
+	(unspec:OO [(match_operand:OO 1 "vsx_register_operand" "wa")
+		    (match_operand:OO 2 "vsx_register_operand" "wa")]
+		   UNSPEC_PAIR_2OPS))]
+  "TARGET_MMA"
+  "#")
+
+(define_split
+  [(set (match_operand:OO 0 "vsx_register_operand")
+	(unspec:OO [(match_operand:OO 1 "vsx_register_operand")
+		    (match_operand:OO 2 "vsx_register_operand")]
+		   UNSPEC_PAIR_2OPS))]
+  "TARGET_MMA && reload_completed"
+  [(const_int 0)]
+{
+  enum machine_mode mode = <pairmode>mode;
+  for (long i = 0; i < 2; i++)
+    {
+      rtx op0 = gen_rtx_REG (mode, reg_or_subregno (operands[0]) + i);
+      rtx op1 = gen_rtx_REG (mode, reg_or_subregno (operands[1]) + i);
+      rtx op2 = gen_rtx_REG (mode, reg_or_subregno (operands[2]) + i);
+      emit_insn (gen_rtx_SET (op0, gen_rtx_<pairop> (mode, op1, op2)));
+    }
+  DONE;
+})
+
+(define_insn "vpair_<pairop>_<pairmode>"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa,v")
+	(unspec:OO [(match_operand:OO 1 "vsx_register_operand" "%wa,wa,v")
+		    (match_operand:OO 2 "vsx_register_operand" "wa,0,v")
+		    (match_operand:OO 3 "vsx_register_operand" "0,wa,v")]
+		   UNSPEC_PAIR_3OPS))]
+  "TARGET_MMA"
+  "#")
+
+(define_split
+  [(set (match_operand:OO 0 "vsx_register_operand")
+	(unspec:OO [(match_operand:OO 1 "vsx_register_operand")
+		    (match_operand:OO 2 "vsx_register_operand")
+		    (match_operand:OO 3 "vsx_register_operand")]
+		   UNSPEC_PAIR_3OPS))]
+  "TARGET_MMA && reload_completed"
+  [(const_int 0)]
+{
+  enum machine_mode mode = <pairmode>mode;
+  for (long i = 0; i < 2; i++)
+    {
+      rtx op0 = gen_rtx_REG (mode, reg_or_subregno (operands[0]) + i);
+      rtx op1 = gen_rtx_REG (mode, reg_or_subregno (operands[1]) + i);
+      rtx op2 = gen_rtx_REG (mode, reg_or_subregno (operands[2]) + i);
+      rtx op3 = gen_rtx_REG (mode, reg_or_subregno (operands[3]) + i);
+      emit_insn (gen_rtx_SET (op0, gen_rtx_<pairop> (mode, op1, op2, op3)));
+    }
+  DONE;
+})
+
+(define_insn "vpair_SCALE_<pairmode>"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=?wa")
+	(unspec:OO [(match_operand:<pairmode> 1 "vsx_register_operand" "wa")
+		    (match_operand:OO 2 "vsx_register_operand" "wa")]
+		   UNSPEC_PAIR_SCALE))]
+  "TARGET_MMA"
+  "#")
+
+(define_split
+  [(set (match_operand:OO 0 "vsx_register_operand")
+	(unspec:OO [(match_operand:<pairmode> 1 "vsx_register_operand")
+		    (match_operand:OO 2 "vsx_register_operand")]
+		   UNSPEC_PAIR_SCALE))]
+  "TARGET_MMA && reload_completed"
+  [(const_int 0)]
+{
+  enum machine_mode mode = <pairmode>mode;
+  rtx op1 = gen_rtx_REG (<pairmode>mode, reg_or_subregno (operands[1]));
+  for (long i = 0; i < 2; i++)
+    {
+      rtx op0 = gen_rtx_REG (mode, reg_or_subregno (operands[0]) + i);
+      rtx op2 = gen_rtx_REG (mode, reg_or_subregno (operands[2]) + i);
+      emit_insn (gen_rtx_SET (op0, gen_rtx_MULT (mode, op1, op2)));
+    }
+  DONE;
+})

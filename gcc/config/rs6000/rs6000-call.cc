@@ -432,12 +432,12 @@ rs6000_discover_homogeneous_aggregate (machine_mode mode, const_tree type,
 bool
 rs6000_return_in_memory (const_tree type, const_tree fntype ATTRIBUTE_UNUSED)
 {
-  /* We do not allow MMA types being used as return values.  Only report
+  /* We do not allow MMA QUAD types being used as return values.  Only report
      the invalid return value usage the first time we encounter it.  */
   if (cfun
       && !cfun->machine->mma_return_type_error
       && TREE_TYPE (cfun->decl) == fntype
-      && (TYPE_MODE (type) == OOmode || TYPE_MODE (type) == XOmode))
+      && TYPE_MODE (type) == XOmode)
     {
       /* Record we have now handled function CFUN, so the next time we
 	 are called, we do not re-report the same error.  */
@@ -1109,6 +1109,9 @@ rs6000_function_arg_advance_1 (CUMULATIVE_ARGS *cum, machine_mode mode,
 	      && TREE_CODE (type) == COMPLEX_TYPE && elt_mode == KCmode)
 	    cum->vregno++;
 
+	  if (type && TREE_CODE (type) == OPAQUE_TYPE && elt_mode == OOmode)
+	    cum->vregno++;
+
 	  if (!TARGET_ALTIVEC)
 	    error ("cannot pass argument in vector register because"
 		   " altivec instructions are disabled, use %qs"
@@ -1631,8 +1634,8 @@ rs6000_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
   machine_mode elt_mode;
   int n_elts;
 
-  /* We do not allow MMA types being used as function arguments.  */
-  if (mode == OOmode || mode == XOmode)
+  /* We do not allow MMA QUAD types being used as function arguments.  */
+  if (mode == XOmode)
     {
       if (TYPE_CANONICAL (type) != NULL_TREE)
 	type = TYPE_CANONICAL (type);
