@@ -1,3 +1,73 @@
+==================== Branch work122-vpair, patch #40 ====================
+
+Initial vector pair arithmetic support.
+
+2023-06-16   Peter Bergner  <bergner@linux.ibm.com>
+             Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (UNSPEC_PAIR_ABS_F32): New unspec.
+	(UNSPEC_PAIR_ABS_F64): Likewise.
+	(UNSPEC_PAIR_ADD_F32): Likewise.
+	(UNSPEC_PAIR_ADD_F64): Likewise.
+	(UNSPEC_PAIR_FMA_F32): Likewise.
+	(UNSPEC_PAIR_FMA_F64): Likewise.
+	(UNSPEC_PAIR_MULT_F32): Likewise.
+	(UNSPEC_PAIR_MULT_F64): Likewise.
+	(UNSPEC_PAIR_SCALE_F32): Likewise.
+	(UNSPEC_PAIR_SCALE_F64): Likewise.
+	(UNSPEC_PAIR_SUB_F32): Likewise.
+	(UNSPEC_PAIR_SUB_F64): Likewise.
+	(UNSPEC_PAIR_1OPS): New iterator.
+	(UNSPEC_PAIR_2OPS): Likewise.
+	(UNSPEC_PAIR_3OPS): Likewise.
+	(UNSPEC_PAIR_SCALE): Likewise.
+	(pairop): Likewise.
+	(pairmode): Likewise.
+	(vpair_<pairop>_<pairmode>): New insns for unary, binary, and trinary
+	operations.
+	(vpair_<pairop>_<pairmode> splitter): New splitters.
+	(vpair_SCALE_<pairmode>): New insn.
+	(vpair_SCALE_<pairmode> splitter): New splitter.
+	* config/rs6000/rs6000-builtin.cc (rs6000_gimple_fold_builtin): Add
+	vector pair arithmetic support.
+	* config/rs6000/rs6000-builtins.def (__builtin_abs_f32_scalar): New
+	vector pair arithmetic built-in functions.
+	(__builtin_abs_f64_scalar): Likewise.
+	(__builtin_add_f32_scalar): Likewise.
+	(__builtin_add_f64_scalar): Likewise.
+	(__builtin_mult_f32_scalar): Likewise.
+	(__builtin_mult_f64_scalar): Likewise.
+	(__builtin_reduce_f32_scalar): Likewise.
+	(__builtin_reduce_f64_scalar): Likewise.
+	(__builtin_scale_f32_scalar): Likewise.
+	(__builtin_scale_f64_scalar): Likewise.
+	(__builtin_sub_f32_scalar): Likewise.
+	(__builtin_sub_f64_scalar): Likewise.
+	(__builtin_fma_f32_scalar): Likewise.
+	(__builtin_fma_f64_scalar): Likewise.
+	* config/rs6000/rs6000-call.cc (rs6000_return_in_memory): Allow
+	returning and passing vector pair in calls.
+	(rs6000_function_arg_advance_1): Likewise.
+	(rs6000_function_arg): Likewise.
+	* config/rs6000/rs6000-overload.def (__builtin_abs_f32): Add vector pair
+	arithmetic overload built-in functions.
+	(__builtin_abs_f64): Likewise.
+	(__builtin_add_f32): Likewise.
+	(__builtin_add_f64): Likewise.
+	(__builtin_mult_f32): Likewise.
+	(__builtin_mult_f64): Likewise.
+	(__builtin_reduce_f32): Likewise.
+	(__builtin_reduce_f64): Likewise.
+	(__builtin_scale_f32): Likewise.
+	(__builtin_scale_f64): Likewise.
+	(__builtin_sub_f32): Likewise.
+	(__builtin_sub_f64): Likewise.
+	(__builtin_fma_f32): Likewise.
+	(__builtin_fma_f64): Likewise.
+
+
 ==================== Branch work122-vpair, patch #8 from main patches ====================
 
 Fix power10 fusion and -fstack-protector, PR target/105325
