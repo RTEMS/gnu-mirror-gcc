@@ -1,3 +1,29 @@
+==================== Branch work122-vpair, patch #42 ====================
+
+Add negate support.
+
+2023-06-16   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (UNSPEC_PAIR_NEG_F32): New unspec.
+	(UNSPEC_PAIR_NEG_F64): Likewise.
+	(UNSPEC_PAIR_1OPS): Add negate operators.
+	(pairop): Likewise.
+	(pairmode): Likewise.
+	* config/rs6000/rs6000-builtin.cc (rs6000_gimple_fold_builtin): Add
+	support for negation.
+	* config/rs6000/rs6000-builtins.def (__builtin_neg_f32_scalar): New
+	built-in function.
+	(__builtin_neg_f32_vector): Likewise.
+	(__builtin_neg_f32_vpair): Likewise.
+	(__builtin_neg_f64_scalar): Likewise.
+	(__builtin_neg_f64_vector): Likewise.
+	(__builtin_neg_f64_vpair): Likewise.
+	* config/rs6000/rs6000-overload.def (__builtin_neg_f32): New overloaded
+	built-in functions.
+	(__builtin_neg_f64): Likewise.
+
 ==================== Branch work122-vpair, patch #41 ====================
 
 Combine define_insn and define_split
