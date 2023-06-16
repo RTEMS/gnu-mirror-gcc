@@ -2901,8 +2901,10 @@ aarch64_layout_frame (void)
   else if (cfun->machine->frame.wb_candidate1 != INVALID_REGNUM)
     max_push_offset = 256;
 
-  if (cfun->machine->frame.frame_size < max_push_offset
-      && crtl->outgoing_args_size == 0)
+  if (cfun->machine->frame.saved_regs_size == 0)
+    cfun->machine->frame.initial_adjust = cfun->machine->frame.frame_size;
+  else if (cfun->machine->frame.frame_size < max_push_offset
+	   && crtl->outgoing_args_size == 0)
     {
       /* Simple, small frame with no outgoing arguments:
 	 stp reg1, reg2, [sp, -frame_size]!
