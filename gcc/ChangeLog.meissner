@@ -1,3 +1,15 @@
+==================== Branch work122-vpair, patch #41 ====================
+
+Combine define_insn and define_split
+
+2023-06-16   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (vpair_<pairop>_<pairmode>): Combine define_insns
+	and splitters into define_insn_and_split.  Set insn length.
+	(vpair_SCALE_<pairmode>): New insn.
+
 ==================== Branch work122-vpair, patch #40 ====================
 
 Initial vector pair arithmetic support.
