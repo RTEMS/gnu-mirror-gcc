@@ -1,3 +1,16 @@
+==================== Branch work122-vpair, patch #44 ====================
+
+Simplify making overloaded fp built-in functions.
+
+2023-06-16   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (fold_builtin_overload_fp): New helper
+	function.
+	(rs6000_gimple_fold_builtin): Move common code for built-in overloaded
+	floating point functions  into fold_builtin_overload_fp.
+
 ==================== Branch work122-vpair, patch #43 ====================
 
 Optimize vector pair negation with abs and fma.
