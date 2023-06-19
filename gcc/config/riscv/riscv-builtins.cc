@@ -38,6 +38,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "expr.h"
 #include "langhooks.h"
 #include "tm_p.h"
+#include "backend.h"
+#include "gimple.h"
+#include "gimple-iterator.h"
 
 /* Macros to create an enumeration identifier for a function prototype.  */
 #define RISCV_FTYPE_NAME0(A) RISCV_##A##_FTYPE
@@ -102,8 +105,6 @@ AVAIL (prefetchi32, TARGET_ZICBOP && !TARGET_64BIT)
 AVAIL (prefetchi64, TARGET_ZICBOP && TARGET_64BIT)
 AVAIL (crypto_zbkb32, TARGET_ZBKB && !TARGET_64BIT)
 AVAIL (crypto_zbkb64, TARGET_ZBKB && TARGET_64BIT)
-AVAIL (crypto_zbkc32, TARGET_ZBKC && !TARGET_64BIT)
-AVAIL (crypto_zbkc64, TARGET_ZBKC && TARGET_64BIT)
 AVAIL (crypto_zbkx32, TARGET_ZBKX && !TARGET_64BIT)
 AVAIL (crypto_zbkx64, TARGET_ZBKX && TARGET_64BIT)
 AVAIL (crypto_zknd32, TARGET_ZKND && !TARGET_64BIT)
@@ -117,6 +118,10 @@ AVAIL (crypto_zksh32, TARGET_ZKSH && !TARGET_64BIT)
 AVAIL (crypto_zksh64, TARGET_ZKSH && TARGET_64BIT)
 AVAIL (crypto_zksed32, TARGET_ZKSED && !TARGET_64BIT)
 AVAIL (crypto_zksed64, TARGET_ZKSED && TARGET_64BIT)
+AVAIL (clmul_zbkc32_or_zbc32, (TARGET_ZBKC || TARGET_ZBC) && !TARGET_64BIT)
+AVAIL (clmul_zbkc64_or_zbc64, (TARGET_ZBKC || TARGET_ZBC) && TARGET_64BIT)
+AVAIL (clmulr_zbc32, TARGET_ZBC && !TARGET_64BIT)
+AVAIL (clmulr_zbc64, TARGET_ZBC && TARGET_64BIT)
 AVAIL (always,     (!0))
 
 /* Construct a riscv_builtin_description from the given arguments.
@@ -330,6 +335,34 @@ riscv_expand_builtin_direct (enum insn_code icode, rtx target, tree exp,
     riscv_prepare_builtin_arg (&ops[opno++], exp, argno);
 
   return riscv_expand_builtin_insn (icode, opno, ops, has_target_p);
+}
+
+/* Implement TARGET_GIMPLE_FOLD_BUILTIN.  */
+
+bool
+riscv_gimple_fold_builtin (gimple_stmt_iterator *gsi)
+{
+  gcall *stmt = as_a<gcall *> (gsi_stmt (*gsi));
+  tree fndecl = gimple_call_fndecl (stmt);
+  unsigned int code = DECL_MD_FUNCTION_CODE (fndecl);
+  unsigned int subcode = code >> RISCV_BUILTIN_SHIFT;
+  gimple *new_stmt = NULL;
+  switch (code & RISCV_BUILTIN_CLASS)
+    {
+    case RISCV_BUILTIN_GENERAL:
+      new_stmt = NULL;
+      break;
+
+    case RISCV_BUILTIN_VECTOR:
+      new_stmt = riscv_vector::gimple_fold_builtin (subcode, gsi, stmt);
+      break;
+    }
+
+  if (!new_stmt)
+    return false;
+
+  gsi_replace (gsi, new_stmt, false);
+  return true;
 }
 
 /* Implement TARGET_EXPAND_BUILTIN.  */

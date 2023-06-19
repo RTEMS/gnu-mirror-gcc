@@ -46,10 +46,12 @@ array_bounds_checker::array_bounds_checker (struct function *func,
   /* No-op.  */
 }
 
-const value_range *
-array_bounds_checker::get_value_range (const_tree op, gimple *stmt)
+void
+array_bounds_checker::get_value_range (irange &r, const_tree op, gimple *stmt)
 {
-  return m_ptr_qry.rvals->get_value_range (op, stmt);
+  if (m_ptr_qry.rvals->range_of_expr (r, const_cast<tree> (op), stmt))
+    return;
+  r.set_varying (TREE_TYPE (op));
 }
 
 /* Try to determine the DECL that REF refers to.  Return the DECL or
@@ -264,6 +266,7 @@ check_out_of_bounds_and_warn (location_t location, tree ref,
 			      bool ignore_off_by_one, bool for_array_bound,
 			      bool *out_of_bound)
 {
+  tree min, max;
   tree low_bound = array_ref_low_bound (ref);
   tree artype = TREE_TYPE (TREE_OPERAND (ref, 0));
 
@@ -282,7 +285,7 @@ check_out_of_bounds_and_warn (location_t location, tree ref,
 
   if (warned)
     ; /* Do nothing.  */
-  else if (vr && vr->kind () == VR_ANTI_RANGE)
+  else if (get_legacy_range (*vr, min, max) == VR_ANTI_RANGE)
     {
       if (up_bound
 	  && TREE_CODE (up_sub) == INTEGER_CST
@@ -370,20 +373,22 @@ array_bounds_checker::check_array_ref (location_t location, tree ref,
   tree up_sub = low_sub_org;
   tree low_sub = low_sub_org;
 
-  const value_range *vr = NULL;
+  value_range vr;
   if (TREE_CODE (low_sub_org) == SSA_NAME)
     {
-      vr = get_value_range (low_sub_org, stmt);
-      if (!vr->undefined_p () && !vr->varying_p ())
+      get_value_range (vr, low_sub_org, stmt);
+      if (!vr.undefined_p () && !vr.varying_p ())
 	{
-	  low_sub = vr->kind () == VR_RANGE ? vr->max () : vr->min ();
-	  up_sub = vr->kind () == VR_RANGE ? vr->min () : vr->max ();
+	  tree min, max;
+	  value_range_kind kind = get_legacy_range (vr, min, max);
+	  low_sub = kind == VR_RANGE ? max : min;
+	  up_sub = kind == VR_RANGE ? min : max;
 	}
     }
 
   warned = check_out_of_bounds_and_warn (location, ref,
 					 low_sub_org, low_sub, up_sub,
-					 up_bound, up_bound_p1, vr,
+					 up_bound, up_bound_p1, &vr,
 					 ignore_off_by_one, warn_array_bounds,
 					 &out_of_bound);
 
@@ -397,27 +402,38 @@ array_bounds_checker::check_array_ref (location_t location, tree ref,
 			       "of an interior zero-length array %qT")),
 			 low_sub, artype);
 
-  if (warned || out_of_bound)
+  if (warned && dump_file && (dump_flags & TDF_DETAILS))
     {
-      if (warned && dump_file && (dump_flags & TDF_DETAILS))
+      fprintf (dump_file, "Array bound warning for ");
+      dump_generic_expr (MSG_NOTE, TDF_SLIM, ref);
+      fprintf (dump_file, "\n");
+    }
+
+   /* Issue warnings for -Wstrict-flex-arrays according to the level of
+      flag_strict_flex_arrays.  */
+  if (out_of_bound && warn_strict_flex_arrays
+      && (sam == special_array_member::trail_0
+	  || sam == special_array_member::trail_1
+	  || sam == special_array_member::trail_n)
+      && DECL_NOT_FLEXARRAY (afield_decl))
+    {
+      bool warned1
+	= warning_at (location, OPT_Wstrict_flex_arrays,
+		      "trailing array %qT should not be used as "
+		      "a flexible array member",
+		      artype);
+
+      if (warned1 && dump_file && (dump_flags & TDF_DETAILS))
 	{
-	  fprintf (dump_file, "Array bound warning for ");
+	  fprintf (dump_file, "Trailing non flexible-like array bound warning for ");
 	  dump_generic_expr (MSG_NOTE, TDF_SLIM, ref);
 	  fprintf (dump_file, "\n");
 	}
+      warned |= warned1;
+    }
 
-      /* issue warnings for -Wstrict-flex-arrays according to the level of
-	 flag_strict_flex_arrays.  */
-      if ((out_of_bound && warn_strict_flex_arrays)
-	  && (((sam == special_array_member::trail_0)
-		|| (sam == special_array_member::trail_1)
-		|| (sam == special_array_member::trail_n))
-	      && DECL_NOT_FLEXARRAY (afield_decl)))
-	      warned = warning_at (location, OPT_Wstrict_flex_arrays,
-				   "trailing array %qT should not be used as "
-				   "a flexible array member",
-				   artype);
-
+  if (warned)
+    {
       /* Avoid more warnings when checking more significant subscripts
 	 of the same expression.  */
       ref = TREE_OPERAND (ref, 0);

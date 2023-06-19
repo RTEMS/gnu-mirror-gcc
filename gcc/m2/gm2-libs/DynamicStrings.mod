@@ -26,7 +26,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 IMPLEMENTATION MODULE DynamicStrings ;
 
-FROM libc IMPORT strlen, strncpy, write, exit ;
+FROM libc IMPORT strlen, strncpy, write, exit, snprintf ;
 FROM StrLib IMPORT StrLen ;
 FROM Storage IMPORT ALLOCATE, DEALLOCATE ;
 FROM Assertion IMPORT Assert ;
@@ -129,8 +129,6 @@ END writeNspace ;
 *)
 
 PROCEDURE DumpStringInfo (s: String; i: CARDINAL) ;
-VAR
-   t: String ;
 BEGIN
    IF s # NIL
    THEN
@@ -153,8 +151,8 @@ END stop ;
 
 (*
    PopAllocationExemption - test to see that all strings are deallocated, except
-                            string, e, since the last push.
-                            Then it pops to the previous allocation/deallocation
+                            string e since the last push.
+                            Post-condition: it pops to the previous allocation/deallocation
                             lists.
 
                             If halt is true then the application terminates
@@ -164,7 +162,6 @@ END stop ;
 PROCEDURE PopAllocationExemption (halt: BOOLEAN; e: String) : String ;
 VAR
    s: String ;
-   f: frame ;
    b: BOOLEAN ;
 BEGIN
    Init ;
@@ -173,8 +170,8 @@ BEGIN
       IF frameHead = NIL
       THEN
          stop ;
-         Halt (__FILE__, __LINE__, __FUNCTION__,
-               "mismatched number of PopAllocation's compared to PushAllocation's")
+         Halt ("mismatched number of PopAllocation's compared to PushAllocation's",
+               __FILE__, __FUNCTION__, __LINE__) ;
          (* writeString ("mismatched number of PopAllocation's compared to PushAllocation's") *)
       ELSE
          IF frameHead^.alloc # NIL
@@ -414,12 +411,15 @@ END writeLongcard ;
 
 
 (*
-   writeAddress -
+   writeAddress - writes out the address of a with a C style hex prefix.
 *)
 
 PROCEDURE writeAddress (a: ADDRESS) ;
+VAR
+   buffer: ARRAY [0..30] OF CHAR ;
 BEGIN
-   writeLongcard (VAL (LONGCARD, a))
+   snprintf (ADR (buffer), SIZE (buffer), "0x%", a) ;
+   writeString (buffer) ;
 END writeAddress ;
 
 

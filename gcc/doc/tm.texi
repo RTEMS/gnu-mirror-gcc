@@ -4456,9 +4456,21 @@ code in @file{optabs.cc}.
 @end deftypefn
 
 @deftypefn {Target Hook} bool TARGET_VECTOR_MODE_SUPPORTED_P (machine_mode @var{mode})
-Define this to return nonzero if the port is prepared to handle
+Define this to return nonzero if the current target is prepared to handle
 insns involving vector mode @var{mode}.  At the very least, it
 must have move patterns for this mode.
+@end deftypefn
+
+@deftypefn {Target Hook} bool TARGET_VECTOR_MODE_SUPPORTED_ANY_TARGET_P (machine_mode @var{mode})
+Define this to return nonzero if the port is prepared to handle
+insns involving vector mode @var{mode} in any target configuration.
+Returning @var{true} means that the mode can be used as the @samp{TYPE_MODE}
+for vector types.
+
+The default version of this hook returns true.  The final mode assigned to
+@samp{TYPE_MODE} will also be checked against
+@code{TARGET_VECTOR_MODE_SUPPORTED_P} to take target configuration into
+account.
 @end deftypefn
 
 @deftypefn {Target Hook} bool TARGET_COMPATIBLE_VECTOR_TYPES_P (const_tree @var{type1}, const_tree @var{type2})
@@ -4820,13 +4832,15 @@ nothing when you use @option{-freg-struct-return} mode.
 @deftypefn {Target Hook} fixed_size_mode TARGET_GET_RAW_RESULT_MODE (int @var{regno})
 This target hook returns the mode to be used when accessing raw return
 registers in @code{__builtin_return}.  Define this macro if the value
-in @var{reg_raw_mode} is not correct.
+in @var{reg_raw_mode} is not correct.  Use @code{VOIDmode} if a register
+should be ignored for @code{__builtin_return} purposes.
 @end deftypefn
 
 @deftypefn {Target Hook} fixed_size_mode TARGET_GET_RAW_ARG_MODE (int @var{regno})
 This target hook returns the mode to be used when accessing raw argument
 registers in @code{__builtin_apply_args}.  Define this macro if the value
-in @var{reg_raw_mode} is not correct.
+in @var{reg_raw_mode} is not correct.  Use @code{VOIDmode} if a register
+should be ignored for @code{__builtin_apply_args} purposes.
 @end deftypefn
 
 @deftypefn {Target Hook} bool TARGET_EMPTY_RECORD_P (const_tree @var{type})
@@ -5758,6 +5772,21 @@ This hook determines whether a function from a class of functions
 @code{(enum function_class)}@var{fcode} has a fast implementation.
 @end deftypefn
 
+@deftypefn {Target Hook} unsigned TARGET_LIBM_FUNCTION_MAX_ERROR (unsigned @var{cfn}, machine_mode @var{mode}, bool @var{boundary_p})
+This hook determines expected maximum errors for math functions measured
+in ulps (units of the last place).  0 means 0.5ulps precision (correctly
+rounded).  ~0U means unknown errors.  The @code{combined_fn} @var{cfn}
+argument should identify just which math built-in function it is rather than
+its variant, @var{mode} the variant in terms of floating-point machine mode.
+The hook should also take into account @code{flag_rounding_math} whether it
+is maximum error just in default rounding mode, or in all possible rounding
+modes.  @var{boundary_p} is @code{true} for maximum errors on intrinsic math
+boundaries of functions rather than errors inside of the usual result ranges
+of the functions.  E.g.@ the sin/cos function finite result is in between
+-1.0 and 1.0 inclusive, with @var{boundary_p} true the function returns how
+many ulps below or above those boundaries result could be.
+@end deftypefn
+
 @defmac NEXT_OBJC_RUNTIME
 Set this macro to 1 to use the "NeXT" Objective-C message sending conventions
 by default.  This calling convention involves passing the object, the selector
@@ -6146,20 +6175,12 @@ instruction pattern.  There is no need for the hook to handle these two
 implementation approaches itself.
 @end deftypefn
 
-@deftypefn {Target Hook} bool TARGET_VECTORIZE_CAN_SPECIAL_DIV_BY_CONST (enum @var{tree_code}, tree @var{vectype}, wide_int @var{constant}, rtx *@var{output}, rtx @var{in0}, rtx @var{in1})
-This hook is used to test whether the target has a special method of
-division of vectors of type @var{vectype} using the value @var{constant},
-and producing a vector of type @var{vectype}.  The division
-will then not be decomposed by the vectorizer and kept as a div.
-
-When the hook is being used to test whether the target supports a special
-divide, @var{in0}, @var{in1}, and @var{output} are all null.  When the hook
-is being used to emit a division, @var{in0} and @var{in1} are the source
-vectors of type @var{vecttype} and @var{output} is the destination vector of
-type @var{vectype}.
-
-Return true if the operation is possible, emitting instructions for it
-if rtxes are provided and updating @var{output}.
+@deftypefn {Target Hook} bool TARGET_VECTORIZE_PREFERRED_DIV_AS_SHIFTS_OVER_MULT (const_tree @var{type})
+Sometimes it is possible to implement a vector division using a sequence
+of two addition-shift pairs, giving four instructions in total.
+Return true if taking this approach for @var{vectype} is likely
+to be better than using a sequence involving highpart multiplication.
+Default is false if @code{can_mult_highpart_p}, otherwise true.
 @end deftypefn
 
 @deftypefn {Target Hook} tree TARGET_VECTORIZE_BUILTIN_VECTORIZED_FUNCTION (unsigned @var{code}, tree @var{vec_type_out}, tree @var{vec_type_in})
@@ -12007,13 +12028,6 @@ This function prepares to emit a conditional comparison within a sequence
  be appropriate for passing to @code{gen_ccmp_next} or @code{cbranch_optab}.
  @var{code} is the @code{rtx_code} of the compare for @var{op0} and @var{op1}.
  @var{bit_code} is @code{AND} or @code{IOR}, which is the op on the compares.
-@end deftypefn
-
-@deftypefn {Target Hook} rtx TARGET_GEN_MEMSET_SCRATCH_RTX (machine_mode @var{mode})
-This hook should return an rtx for a scratch register in @var{mode} to
-be used when expanding memset calls.  The backend can use a hard scratch
-register to avoid stack realignment when expanding memset.  The default
-is @code{gen_reg_rtx}.
 @end deftypefn
 
 @deftypefn {Target Hook} unsigned TARGET_LOOP_UNROLL_ADJUST (unsigned @var{nunroll}, class loop *@var{loop})

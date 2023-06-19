@@ -58,6 +58,54 @@ enum lst_type
   LST_INDEXED,
 };
 
+/* Helper function to fold vleff and vlsegff.  */
+static gimple *
+fold_fault_load (gimple_folder &f)
+{
+  /* fold fault_load (const *base, size_t *new_vl, size_t vl)
+
+     ====> fault_load (const *base, size_t vl)
+	   new_vl = MEM_REF[read_vl ()].  */
+
+  auto_vec<tree> vargs (gimple_call_num_args (f.call) - 1);
+
+  for (unsigned i = 0; i < gimple_call_num_args (f.call); i++)
+    {
+      /* Exclude size_t *new_vl argument.  */
+      if (i == gimple_call_num_args (f.call) - 2)
+	continue;
+
+      vargs.quick_push (gimple_call_arg (f.call, i));
+    }
+
+  gimple *repl = gimple_build_call_vec (gimple_call_fn (f.call), vargs);
+  gimple_call_set_lhs (repl, f.lhs);
+
+  /* Handle size_t *new_vl by read_vl.  */
+  tree new_vl = gimple_call_arg (f.call, gimple_call_num_args (f.call) - 2);
+  if (integer_zerop (new_vl))
+    {
+      /* This case happens when user passes the nullptr to new_vl argument.
+	 In this case, we just need to ignore the new_vl argument and return
+	 fault_load instruction directly. */
+      return repl;
+    }
+
+  tree tmp_var = create_tmp_var (size_type_node, "new_vl");
+  tree decl = get_read_vl_decl ();
+  gimple *g = gimple_build_call (decl, 0);
+  gimple_call_set_lhs (g, tmp_var);
+  tree indirect
+    = fold_build2 (MEM_REF, size_type_node,
+		   gimple_call_arg (f.call, gimple_call_num_args (f.call) - 2),
+		   build_int_cst (build_pointer_type (size_type_node), 0));
+  gassign *assign = gimple_build_assign (indirect, tmp_var);
+
+  gsi_insert_after (f.gsi, assign, GSI_SAME_STMT);
+  gsi_insert_after (f.gsi, g, GSI_SAME_STMT);
+  return repl;
+}
+
 /* Implements vsetvl<mode> && vsetvlmax<mode>.  */
 template<bool VLMAX_P>
 class vsetvl : public function_base
@@ -116,7 +164,7 @@ public:
   {
     if (STORE_P || LST_TYPE == LST_INDEXED)
       return true;
-    return pred != PRED_TYPE_none && pred != PRED_TYPE_mu;
+    return pred != PRED_TYPE_none;
   }
 
   rtx expand (function_expander &e) const override
@@ -129,9 +177,57 @@ public:
 	    code_for_pred_indexed_store (unspec, e.vector_mode (),
 					 e.index_mode ()));
 	else
-	  return e.use_exact_insn (
-	    code_for_pred_indexed_load (unspec, e.vector_mode (),
-					e.index_mode ()));
+	  {
+	    unsigned src_eew_bitsize
+	      = GET_MODE_BITSIZE (GET_MODE_INNER (e.index_mode ()));
+	    unsigned dst_eew_bitsize
+	      = GET_MODE_BITSIZE (GET_MODE_INNER (e.vector_mode ()));
+	    if (dst_eew_bitsize == src_eew_bitsize)
+	      return e.use_exact_insn (
+		code_for_pred_indexed_load_same_eew (unspec, e.vector_mode ()));
+	    else if (dst_eew_bitsize > src_eew_bitsize)
+	      {
+		unsigned factor = dst_eew_bitsize / src_eew_bitsize;
+		switch (factor)
+		  {
+		  case 2:
+		    return e.use_exact_insn (
+		      code_for_pred_indexed_load_x2_greater_eew (
+			unspec, e.vector_mode ()));
+		  case 4:
+		    return e.use_exact_insn (
+		      code_for_pred_indexed_load_x4_greater_eew (
+			unspec, e.vector_mode ()));
+		  case 8:
+		    return e.use_exact_insn (
+		      code_for_pred_indexed_load_x8_greater_eew (
+			unspec, e.vector_mode ()));
+		  default:
+		    gcc_unreachable ();
+		  }
+	      }
+	    else
+	      {
+		unsigned factor = src_eew_bitsize / dst_eew_bitsize;
+		switch (factor)
+		  {
+		  case 2:
+		    return e.use_exact_insn (
+		      code_for_pred_indexed_load_x2_smaller_eew (
+			unspec, e.vector_mode ()));
+		  case 4:
+		    return e.use_exact_insn (
+		      code_for_pred_indexed_load_x4_smaller_eew (
+			unspec, e.vector_mode ()));
+		  case 8:
+		    return e.use_exact_insn (
+		      code_for_pred_indexed_load_x8_smaller_eew (
+			unspec, e.vector_mode ()));
+		  default:
+		    gcc_unreachable ();
+		  }
+	      }
+	  }
       }
     else if (LST_TYPE == LST_STRIDED)
       {
@@ -164,6 +260,12 @@ template<rtx_code CODE>
 class binop : public function_base
 {
 public:
+  bool has_rounding_mode_operand_p () const override
+  {
+    return CODE == SS_PLUS || CODE == SS_MINUS || CODE == US_PLUS
+	   || CODE == US_MINUS;
+  }
+
   rtx expand (function_expander &e) const override
   {
     switch (e.op_info->op)
@@ -259,8 +361,12 @@ public:
 	return e.use_exact_insn (
 	  code_for_pred_dual_widen_scalar (CODE1, CODE2, e.vector_mode ()));
       case OP_TYPE_wv:
-	return e.use_exact_insn (
-	  code_for_pred_single_widen (CODE1, CODE2, e.vector_mode ()));
+	if (CODE1 == PLUS)
+	  return e.use_exact_insn (
+	    code_for_pred_single_widen_add (CODE2, e.vector_mode ()));
+	else
+	  return e.use_exact_insn (
+	    code_for_pred_single_widen_sub (CODE2, e.vector_mode ()));
       case OP_TYPE_wx:
 	return e.use_exact_insn (
 	  code_for_pred_single_widen_scalar (CODE1, CODE2, e.vector_mode ()));
@@ -500,6 +606,8 @@ template<int UNSPEC>
 class sat_op : public function_base
 {
 public:
+  bool has_rounding_mode_operand_p () const override { return true; }
+
   rtx expand (function_expander &e) const override
   {
     switch (e.op_info->op)
@@ -520,6 +628,8 @@ template<int UNSPEC>
 class vnclip : public function_base
 {
 public:
+  bool has_rounding_mode_operand_p () const override { return true; }
+
   rtx expand (function_expander &e) const override
   {
     switch (e.op_info->op)
@@ -579,12 +689,11 @@ public:
   rtx expand (function_expander &e) const override
   {
     if (e.op_info->op == OP_TYPE_vx)
-      return e.use_ternop_insn (true,
-				code_for_pred_mul_scalar (PLUS,
-							  e.vector_mode ()));
+      return e.use_ternop_insn (true, code_for_pred_mul_plus_scalar (
+					e.vector_mode ()));
     if (e.op_info->op == OP_TYPE_vv)
       return e.use_ternop_insn (true,
-				code_for_pred_mul (PLUS, e.vector_mode ()));
+				code_for_pred_mul_plus (e.vector_mode ()));
     gcc_unreachable ();
   }
 };
@@ -597,12 +706,11 @@ public:
   rtx expand (function_expander &e) const override
   {
     if (e.op_info->op == OP_TYPE_vx)
-      return e.use_ternop_insn (true,
-				code_for_pred_mul_scalar (MINUS,
-							  e.vector_mode ()));
+      return e.use_ternop_insn (true, code_for_pred_minus_mul_scalar (
+					e.vector_mode ()));
     if (e.op_info->op == OP_TYPE_vv)
       return e.use_ternop_insn (true,
-				code_for_pred_mul (MINUS, e.vector_mode ()));
+				code_for_pred_minus_mul (e.vector_mode ()));
     gcc_unreachable ();
   }
 };
@@ -615,12 +723,11 @@ public:
   rtx expand (function_expander &e) const override
   {
     if (e.op_info->op == OP_TYPE_vx)
-      return e.use_ternop_insn (false,
-				code_for_pred_mul_scalar (PLUS,
-							  e.vector_mode ()));
+      return e.use_ternop_insn (false, code_for_pred_mul_plus_scalar (
+					 e.vector_mode ()));
     if (e.op_info->op == OP_TYPE_vv)
       return e.use_ternop_insn (false,
-				code_for_pred_mul (PLUS, e.vector_mode ()));
+				code_for_pred_mul_plus (e.vector_mode ()));
     gcc_unreachable ();
   }
 };
@@ -633,16 +740,14 @@ public:
   rtx expand (function_expander &e) const override
   {
     if (e.op_info->op == OP_TYPE_vx)
-      return e.use_ternop_insn (false,
-				code_for_pred_mul_scalar (MINUS,
-							  e.vector_mode ()));
+      return e.use_ternop_insn (false, code_for_pred_minus_mul_scalar (
+					 e.vector_mode ()));
     if (e.op_info->op == OP_TYPE_vv)
       return e.use_ternop_insn (false,
-				code_for_pred_mul (MINUS, e.vector_mode ()));
+				code_for_pred_minus_mul (e.vector_mode ()));
     gcc_unreachable ();
   }
 };
-
 
 /* Implements vwmacc<su><su>.  */
 class vwmacc : public function_base
@@ -862,7 +967,7 @@ public:
   bool can_be_overloaded_p (enum predication_type_index pred) const override
   {
     return pred == PRED_TYPE_tu || pred == PRED_TYPE_tum
-	   || pred == PRED_TYPE_tumu;
+	   || pred == PRED_TYPE_tumu || pred == PRED_TYPE_mu;
   }
 
   rtx expand (function_expander &e) const override
@@ -878,7 +983,7 @@ public:
   bool can_be_overloaded_p (enum predication_type_index pred) const override
   {
     return pred == PRED_TYPE_tu || pred == PRED_TYPE_tum
-	   || pred == PRED_TYPE_tumu;
+	   || pred == PRED_TYPE_tumu || pred == PRED_TYPE_mu;
   }
 
   rtx expand (function_expander &e) const override
@@ -925,12 +1030,11 @@ public:
   rtx expand (function_expander &e) const override
   {
     if (e.op_info->op == OP_TYPE_vf)
-      return e.use_ternop_insn (true,
-				code_for_pred_mul_scalar (MINUS,
-							  e.vector_mode ()));
+      return e.use_ternop_insn (
+	true, code_for_pred_mul_neg_scalar (PLUS, e.vector_mode ()));
     if (e.op_info->op == OP_TYPE_vv)
       return e.use_ternop_insn (true,
-				code_for_pred_mul (MINUS, e.vector_mode ()));
+				code_for_pred_mul_neg (PLUS, e.vector_mode ()));
     gcc_unreachable ();
   }
 };
@@ -961,12 +1065,11 @@ public:
   rtx expand (function_expander &e) const override
   {
     if (e.op_info->op == OP_TYPE_vf)
-      return e.use_ternop_insn (false,
-				code_for_pred_mul_scalar (MINUS,
-							  e.vector_mode ()));
+      return e.use_ternop_insn (
+	false, code_for_pred_mul_neg_scalar (PLUS, e.vector_mode ()));
     if (e.op_info->op == OP_TYPE_vv)
       return e.use_ternop_insn (false,
-				code_for_pred_mul (MINUS, e.vector_mode ()));
+				code_for_pred_mul_neg (PLUS, e.vector_mode ()));
     gcc_unreachable ();
   }
 };
@@ -980,10 +1083,10 @@ public:
   {
     if (e.op_info->op == OP_TYPE_vf)
       return e.use_ternop_insn (
-	true, code_for_pred_neg_mul_scalar (PLUS, e.vector_mode ()));
+	true, code_for_pred_mul_neg_scalar (MINUS, e.vector_mode ()));
     if (e.op_info->op == OP_TYPE_vv)
       return e.use_ternop_insn (true,
-				code_for_pred_neg_mul (PLUS, e.vector_mode ()));
+				code_for_pred_mul_neg (MINUS, e.vector_mode ()));
     gcc_unreachable ();
   }
 };
@@ -996,11 +1099,12 @@ public:
   rtx expand (function_expander &e) const override
   {
     if (e.op_info->op == OP_TYPE_vf)
-      return e.use_ternop_insn (
-	true, code_for_pred_neg_mul_scalar (MINUS, e.vector_mode ()));
+      return e.use_ternop_insn (true,
+				code_for_pred_mul_scalar (MINUS,
+							  e.vector_mode ()));
     if (e.op_info->op == OP_TYPE_vv)
-      return e.use_ternop_insn (true, code_for_pred_neg_mul (MINUS,
-							     e.vector_mode ()));
+      return e.use_ternop_insn (true,
+				code_for_pred_mul (MINUS, e.vector_mode ()));
     gcc_unreachable ();
   }
 };
@@ -1014,10 +1118,10 @@ public:
   {
     if (e.op_info->op == OP_TYPE_vf)
       return e.use_ternop_insn (
-	false, code_for_pred_neg_mul_scalar (PLUS, e.vector_mode ()));
+	false, code_for_pred_mul_neg_scalar (MINUS, e.vector_mode ()));
     if (e.op_info->op == OP_TYPE_vv)
       return e.use_ternop_insn (false,
-				code_for_pred_neg_mul (PLUS, e.vector_mode ()));
+				code_for_pred_mul_neg (MINUS, e.vector_mode ()));
     gcc_unreachable ();
   }
 };
@@ -1030,12 +1134,12 @@ public:
   rtx expand (function_expander &e) const override
   {
     if (e.op_info->op == OP_TYPE_vf)
-      return e.use_ternop_insn (
-	false, code_for_pred_neg_mul_scalar (MINUS, e.vector_mode ()));
+      return e.use_ternop_insn (false,
+				code_for_pred_mul_scalar (MINUS,
+							  e.vector_mode ()));
     if (e.op_info->op == OP_TYPE_vv)
       return e.use_ternop_insn (false,
-				code_for_pred_neg_mul (MINUS,
-						       e.vector_mode ()));
+				code_for_pred_mul (MINUS, e.vector_mode ()));
     gcc_unreachable ();
   }
 };
@@ -1066,10 +1170,10 @@ public:
   {
     if (e.op_info->op == OP_TYPE_vf)
       return e.use_widen_ternop_insn (
-	code_for_pred_widen_neg_mul_scalar (PLUS, e.vector_mode ()));
+	code_for_pred_widen_mul_neg_scalar (MINUS, e.vector_mode ()));
     if (e.op_info->op == OP_TYPE_vv)
       return e.use_widen_ternop_insn (
-	code_for_pred_widen_neg_mul (PLUS, e.vector_mode ()));
+	code_for_pred_widen_mul_neg (MINUS, e.vector_mode ()));
     gcc_unreachable ();
   }
 };
@@ -1083,10 +1187,10 @@ public:
   {
     if (e.op_info->op == OP_TYPE_vf)
       return e.use_widen_ternop_insn (
-	code_for_pred_widen_neg_mul_scalar (MINUS, e.vector_mode ()));
+	code_for_pred_widen_mul_scalar (MINUS, e.vector_mode ()));
     if (e.op_info->op == OP_TYPE_vv)
       return e.use_widen_ternop_insn (
-	code_for_pred_widen_neg_mul (MINUS, e.vector_mode ()));
+	code_for_pred_widen_mul (MINUS, e.vector_mode ()));
     gcc_unreachable ();
   }
 };
@@ -1100,10 +1204,10 @@ public:
   {
     if (e.op_info->op == OP_TYPE_vf)
       return e.use_widen_ternop_insn (
-	code_for_pred_widen_mul_scalar (MINUS, e.vector_mode ()));
+	code_for_pred_widen_mul_neg_scalar (PLUS, e.vector_mode ()));
     if (e.op_info->op == OP_TYPE_vv)
       return e.use_widen_ternop_insn (
-	code_for_pred_widen_mul (MINUS, e.vector_mode ()));
+	code_for_pred_widen_mul_neg (PLUS, e.vector_mode ()));
     gcc_unreachable ();
   }
 };
@@ -1292,8 +1396,17 @@ public:
 
   rtx expand (function_expander &e) const override
   {
-    return e.use_exact_insn (
-      code_for_pred_reduc (CODE, e.vector_mode (), e.vector_mode ()));
+    machine_mode mode = e.vector_mode ();
+    machine_mode ret_mode = e.ret_mode ();
+
+    /* TODO: we will use ret_mode after all types of PR110265 are addressed.  */
+    if ((GET_MODE_CLASS (mode) == MODE_VECTOR_FLOAT)
+       || GET_MODE_INNER (mode) != GET_MODE_INNER (ret_mode))
+      return e.use_exact_insn (
+	code_for_pred_reduc (CODE, e.vector_mode (), e.vector_mode ()));
+    else
+      return e.use_exact_insn (
+	code_for_pred_reduc (CODE, e.vector_mode (), e.ret_mode ()));
   }
 };
 
@@ -1461,30 +1574,10 @@ public:
 
   rtx expand (function_expander &e) const override
   {
-    e.add_input_operand (0);
-    switch (e.op_info->ret.base_type)
-      {
-      case RVV_BASE_vlmul_ext_x2:
-	return e.generate_insn (
-	  code_for_vlmul_extx2 (e.vector_mode ()));
-      case RVV_BASE_vlmul_ext_x4:
-	return e.generate_insn (
-	  code_for_vlmul_extx4 (e.vector_mode ()));
-      case RVV_BASE_vlmul_ext_x8:
-	return e.generate_insn (
-	  code_for_vlmul_extx8 (e.vector_mode ()));
-      case RVV_BASE_vlmul_ext_x16:
-	return e.generate_insn (
-	  code_for_vlmul_extx16 (e.vector_mode ()));
-      case RVV_BASE_vlmul_ext_x32:
-	return e.generate_insn (
-	  code_for_vlmul_extx32 (e.vector_mode ()));
-      case RVV_BASE_vlmul_ext_x64:
-	return e.generate_insn (
-	  code_for_vlmul_extx64 (e.vector_mode ()));
-      default:
-	gcc_unreachable ();
-      }
+    tree arg = CALL_EXPR_ARG (e.exp, 0);
+    rtx src = expand_normal (arg);
+    emit_insn (gen_rtx_SET (gen_lowpart (e.vector_mode (), e.target), src));
+    return e.target;
   }
 };
 
@@ -1506,9 +1599,40 @@ class vset : public function_base
 public:
   bool apply_vl_p () const override { return false; }
 
+  gimple *fold (gimple_folder &f) const override
+  {
+    tree rhs_tuple = gimple_call_arg (f.call, 0);
+    /* LMUL > 1 non-tuple vector types are not structure,
+       we can't use __val[index] to set the subpart.  */
+    if (!riscv_v_ext_tuple_mode_p (TYPE_MODE (TREE_TYPE (rhs_tuple))))
+      return NULL;
+    tree index = gimple_call_arg (f.call, 1);
+    tree rhs_vector = gimple_call_arg (f.call, 2);
+
+    /* Replace the call with two statements: a copy of the full tuple
+       to the call result, followed by an update of the individual vector.
+
+       The fold routines expect the replacement statement to have the
+       same lhs as the original call, so return the copy statement
+       rather than the field update.  */
+    gassign *copy = gimple_build_assign (unshare_expr (f.lhs), rhs_tuple);
+
+    /* Get a reference to the individual vector.  */
+    tree field = tuple_type_field (TREE_TYPE (f.lhs));
+    tree lhs_array
+      = build3 (COMPONENT_REF, TREE_TYPE (field), f.lhs, field, NULL_TREE);
+    tree lhs_vector = build4 (ARRAY_REF, TREE_TYPE (rhs_vector), lhs_array,
+			      index, NULL_TREE, NULL_TREE);
+    gassign *update = gimple_build_assign (lhs_vector, rhs_vector);
+    gsi_insert_after (f.gsi, update, GSI_SAME_STMT);
+
+    return copy;
+  }
+
   rtx expand (function_expander &e) const override
   {
     rtx dest = expand_normal (CALL_EXPR_ARG (e.exp, 0));
+    gcc_assert (riscv_v_ext_vector_mode_p (GET_MODE (dest)));
     rtx index = expand_normal (CALL_EXPR_ARG (e.exp, 1));
     rtx src = expand_normal (CALL_EXPR_ARG (e.exp, 2));
     poly_int64 offset = INTVAL (index) * GET_MODE_SIZE (GET_MODE (src));
@@ -1525,14 +1649,250 @@ class vget : public function_base
 public:
   bool apply_vl_p () const override { return false; }
 
+  gimple *fold (gimple_folder &f) const override
+  {
+    /* Fold into a normal gimple component access.  */
+    tree rhs_tuple = gimple_call_arg (f.call, 0);
+    /* LMUL > 1 non-tuple vector types are not structure,
+       we can't use __val[index] to get the subpart.  */
+    if (!riscv_v_ext_tuple_mode_p (TYPE_MODE (TREE_TYPE (rhs_tuple))))
+      return NULL;
+    tree index = gimple_call_arg (f.call, 1);
+    tree field = tuple_type_field (TREE_TYPE (rhs_tuple));
+    tree rhs_array
+      = build3 (COMPONENT_REF, TREE_TYPE (field), rhs_tuple, field, NULL_TREE);
+    tree rhs_vector = build4 (ARRAY_REF, TREE_TYPE (f.lhs), rhs_array, index,
+			      NULL_TREE, NULL_TREE);
+    return gimple_build_assign (f.lhs, rhs_vector);
+  }
+
   rtx expand (function_expander &e) const override
   {
     rtx src = expand_normal (CALL_EXPR_ARG (e.exp, 0));
+    gcc_assert (riscv_v_ext_vector_mode_p (GET_MODE (src)));
     rtx index = expand_normal (CALL_EXPR_ARG (e.exp, 1));
-    poly_int64 offset = INTVAL (index) * GET_MODE_SIZE (GET_MODE (src));
+    poly_int64 offset = INTVAL (index) * GET_MODE_SIZE (GET_MODE (e.target));
     rtx subreg
       = simplify_gen_subreg (GET_MODE (e.target), src, GET_MODE (src), offset);
     return subreg;
+  }
+};
+
+class read_vl : public function_base
+{
+public:
+  unsigned int call_properties (const function_instance &) const override
+  {
+    return CP_READ_CSR;
+  }
+
+  rtx expand (function_expander &e) const override
+  {
+    if (Pmode == SImode)
+      emit_insn (gen_read_vlsi (e.target));
+    else
+      emit_insn (gen_read_vldi_zero_extend (e.target));
+    return e.target;
+  }
+};
+
+class vleff : public function_base
+{
+public:
+  unsigned int call_properties (const function_instance &) const override
+  {
+    return CP_READ_MEMORY | CP_WRITE_CSR;
+  }
+
+  bool can_be_overloaded_p (enum predication_type_index pred) const override
+  {
+    return pred != PRED_TYPE_none;
+  }
+
+  gimple *fold (gimple_folder &f) const override
+  {
+    return fold_fault_load (f);
+  }
+
+  rtx expand (function_expander &e) const override
+  {
+    return e.use_contiguous_load_insn (
+      code_for_pred_fault_load (e.vector_mode ()));
+  }
+};
+
+/* Implements vlenb.  */
+class vlenb : public function_base
+{
+public:
+  bool apply_vl_p () const override { return false; }
+
+  rtx expand (function_expander &e) const override
+  {
+    machine_mode mode = GET_MODE (e.target);
+    rtx vlenb = gen_int_mode (BYTES_PER_RISCV_VECTOR, mode);
+    emit_move_insn (e.target, vlenb);
+    return e.target;
+  }
+};
+
+/* Implements vlseg.v.  */
+class vlseg : public function_base
+{
+public:
+  unsigned int call_properties (const function_instance &) const override
+  {
+    return CP_READ_MEMORY;
+  }
+
+  bool can_be_overloaded_p (enum predication_type_index pred) const override
+  {
+    return pred != PRED_TYPE_none;
+  }
+
+  rtx expand (function_expander &e) const override
+  {
+    return e.use_exact_insn (
+      code_for_pred_unit_strided_load (e.vector_mode ()));
+  }
+};
+
+/* Implements vsseg.v.  */
+class vsseg : public function_base
+{
+public:
+  bool apply_tail_policy_p () const override { return false; }
+  bool apply_mask_policy_p () const override { return false; }
+
+  unsigned int call_properties (const function_instance &) const override
+  {
+    return CP_WRITE_MEMORY;
+  }
+
+  bool can_be_overloaded_p (enum predication_type_index) const override
+  {
+    return true;
+  }
+
+  rtx expand (function_expander &e) const override
+  {
+    return e.use_exact_insn (
+      code_for_pred_unit_strided_store (e.vector_mode ()));
+  }
+};
+
+/* Implements vlsseg.v.  */
+class vlsseg : public function_base
+{
+public:
+  unsigned int call_properties (const function_instance &) const override
+  {
+    return CP_READ_MEMORY;
+  }
+
+  bool can_be_overloaded_p (enum predication_type_index pred) const override
+  {
+    return pred != PRED_TYPE_none;
+  }
+
+  rtx expand (function_expander &e) const override
+  {
+    return e.use_exact_insn (
+      code_for_pred_strided_load (e.vector_mode ()));
+  }
+};
+
+/* Implements vssseg.v.  */
+class vssseg : public function_base
+{
+public:
+  bool apply_tail_policy_p () const override { return false; }
+  bool apply_mask_policy_p () const override { return false; }
+
+  unsigned int call_properties (const function_instance &) const override
+  {
+    return CP_WRITE_MEMORY;
+  }
+
+  bool can_be_overloaded_p (enum predication_type_index) const override
+  {
+    return true;
+  }
+
+  rtx expand (function_expander &e) const override
+  {
+    return e.use_exact_insn (
+      code_for_pred_strided_store (e.vector_mode ()));
+  }
+};
+
+template<int UNSPEC>
+class seg_indexed_load : public function_base
+{
+public:
+  unsigned int call_properties (const function_instance &) const override
+  {
+    return CP_READ_MEMORY;
+  }
+
+  bool can_be_overloaded_p (enum predication_type_index) const override
+  {
+    return true;
+  }
+
+  rtx expand (function_expander &e) const override
+  {
+    return e.use_exact_insn (
+      code_for_pred_indexed_load (UNSPEC, e.vector_mode (), e.index_mode ()));
+  }
+};
+
+template<int UNSPEC>
+class seg_indexed_store : public function_base
+{
+public:
+  bool apply_tail_policy_p () const override { return false; }
+  bool apply_mask_policy_p () const override { return false; }
+
+  unsigned int call_properties (const function_instance &) const override
+  {
+    return CP_WRITE_MEMORY;
+  }
+
+  bool can_be_overloaded_p (enum predication_type_index) const override
+  {
+    return true;
+  }
+
+  rtx expand (function_expander &e) const override
+  {
+    return e.use_exact_insn (
+      code_for_pred_indexed_store (UNSPEC, e.vector_mode (), e.index_mode ()));
+  }
+};
+
+/* Implements vlsegff.v.  */
+class vlsegff : public function_base
+{
+public:
+  unsigned int call_properties (const function_instance &) const override
+  {
+    return CP_READ_MEMORY | CP_WRITE_CSR;
+  }
+
+  bool can_be_overloaded_p (enum predication_type_index pred) const override
+  {
+    return pred != PRED_TYPE_none;
+  }
+
+  gimple *fold (gimple_folder &f) const override
+  {
+    return fold_fault_load (f);
+  }
+
+  rtx expand (function_expander &e) const override
+  {
+    return e.use_exact_insn (code_for_pred_fault_load (e.vector_mode ()));
   }
 };
 
@@ -1744,6 +2104,18 @@ static CONSTEXPR const vlmul_ext vlmul_ext_obj;
 static CONSTEXPR const vlmul_trunc vlmul_trunc_obj;
 static CONSTEXPR const vset vset_obj;
 static CONSTEXPR const vget vget_obj;
+static CONSTEXPR const read_vl read_vl_obj;
+static CONSTEXPR const vleff vleff_obj;
+static CONSTEXPR const vlenb vlenb_obj;
+static CONSTEXPR const vlseg vlseg_obj;
+static CONSTEXPR const vsseg vsseg_obj;
+static CONSTEXPR const vlsseg vlsseg_obj;
+static CONSTEXPR const vssseg vssseg_obj;
+static CONSTEXPR const seg_indexed_load<UNSPEC_UNORDERED> vluxseg_obj;
+static CONSTEXPR const seg_indexed_load<UNSPEC_ORDERED> vloxseg_obj;
+static CONSTEXPR const seg_indexed_store<UNSPEC_UNORDERED> vsuxseg_obj;
+static CONSTEXPR const seg_indexed_store<UNSPEC_ORDERED> vsoxseg_obj;
+static CONSTEXPR const vlsegff vlsegff_obj;
 
 /* Declare the function base NAME, pointing it to an instance
    of class <NAME>_obj.  */
@@ -1958,5 +2330,17 @@ BASE (vlmul_ext)
 BASE (vlmul_trunc)
 BASE (vset)
 BASE (vget)
+BASE (read_vl)
+BASE (vleff)
+BASE (vlenb)
+BASE (vlseg)
+BASE (vsseg)
+BASE (vlsseg)
+BASE (vssseg)
+BASE (vluxseg)
+BASE (vloxseg)
+BASE (vsuxseg)
+BASE (vsoxseg)
+BASE (vlsegff)
 
 } // end namespace riscv_vector

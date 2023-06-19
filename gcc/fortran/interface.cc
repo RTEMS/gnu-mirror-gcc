@@ -2349,6 +2349,7 @@ compare_parameter (gfc_symbol *formal, gfc_expr *actual,
   char err[200];
   gfc_component *ppc;
   bool codimension = false;
+  gfc_array_spec *formal_as;
 
   /* If the formal arg has type BT_VOID, it's to one of the iso_c_binding
      procs c_f_pointer or c_f_procpointer, and we need to accept most
@@ -2360,7 +2361,23 @@ compare_parameter (gfc_symbol *formal, gfc_expr *actual,
       && formal->ts.u.derived && formal->ts.u.derived->ts.is_iso_c
       && actual->ts.type == BT_DERIVED
       && actual->ts.u.derived && actual->ts.u.derived->ts.is_iso_c)
-    return true;
+    {
+      if (formal->ts.u.derived->intmod_sym_id
+	  != actual->ts.u.derived->intmod_sym_id)
+	return false;
+
+      if (ranks_must_agree
+	  && symbol_rank (formal) != actual->rank
+	  && symbol_rank (formal) != -1)
+	{
+	  if (where)
+	    argument_rank_mismatch (formal->name, &actual->where,
+				    symbol_rank (formal), actual->rank,
+				    NULL);
+	  return false;
+	}
+      return true;
+    }
 
   if (formal->ts.type == BT_CLASS && actual->ts.type == BT_DERIVED)
     /* Make sure the vtab symbol is present when
@@ -2540,6 +2557,9 @@ compare_parameter (gfc_symbol *formal, gfc_expr *actual,
       return false;
     }
 
+  formal_as = (formal->ts.type == BT_CLASS
+	       ? CLASS_DATA (formal)->as : formal->as);
+
   if (codimension && formal->attr.allocatable)
     {
       gfc_ref *last = NULL;
@@ -2650,10 +2670,10 @@ compare_parameter (gfc_symbol *formal, gfc_expr *actual,
   if (symbol_rank (formal) == actual->rank || symbol_rank (formal) == -1)
     return true;
 
-  rank_check = where != NULL && !is_elemental && formal->as
-	       && (formal->as->type == AS_ASSUMED_SHAPE
-		   || formal->as->type == AS_DEFERRED)
-	       && actual->expr_type != EXPR_NULL;
+  rank_check = where != NULL && !is_elemental && formal_as
+    && (formal_as->type == AS_ASSUMED_SHAPE
+	|| formal_as->type == AS_DEFERRED)
+    && actual->expr_type != EXPR_NULL;
 
   /* Skip rank checks for NO_ARG_CHECK.  */
   if (formal->attr.ext_attr & (1 << EXT_ATTR_NO_ARG_CHECK))
@@ -2662,14 +2682,20 @@ compare_parameter (gfc_symbol *formal, gfc_expr *actual,
   /* Scalar & coindexed, see: F2008, Section 12.5.2.4.  */
   if (rank_check || ranks_must_agree
       || (formal->attr.pointer && actual->expr_type != EXPR_NULL)
-      || (actual->rank != 0 && !(is_elemental || formal->attr.dimension))
+      || (actual->rank != 0
+	  && !(is_elemental || formal->attr.dimension
+	       || (formal->ts.type == BT_CLASS
+		   && CLASS_DATA (formal)->attr.dimension)))
       || (actual->rank == 0
 	  && ((formal->ts.type == BT_CLASS
 	       && CLASS_DATA (formal)->as->type == AS_ASSUMED_SHAPE)
 	      || (formal->ts.type != BT_CLASS
 		   && formal->as->type == AS_ASSUMED_SHAPE))
 	  && actual->expr_type != EXPR_NULL)
-      || (actual->rank == 0 && formal->attr.dimension
+      || (actual->rank == 0
+	  && (formal->attr.dimension
+	      || (formal->ts.type == BT_CLASS
+		  && CLASS_DATA (formal)->attr.dimension))
 	  && gfc_is_coindexed (actual))
       /* Assumed-rank actual argument; F2018 C838.  */
       || actual->rank == -1)
@@ -2690,7 +2716,10 @@ compare_parameter (gfc_symbol *formal, gfc_expr *actual,
 	}
       return false;
     }
-  else if (actual->rank != 0 && (is_elemental || formal->attr.dimension))
+  else if (actual->rank != 0
+	   && (is_elemental || formal->attr.dimension
+	       || (formal->ts.type == BT_CLASS
+		   && CLASS_DATA (formal)->attr.dimension)))
     return true;
 
   /* At this point, we are considering a scalar passed to an array.   This
@@ -3283,6 +3312,16 @@ gfc_compare_actual_formal (gfc_actual_arglist **ap, gfc_formal_arglist *formal,
 	    }
 	}
 
+      if (UNLIMITED_POLY (a->expr)
+	  && !(f->sym->ts.type == BT_ASSUMED || UNLIMITED_POLY (f->sym)))
+	{
+	  gfc_error ("Unlimited polymorphic actual argument at %L is not "
+		     "matched with either an unlimited polymorphic or "
+		     "assumed type dummy argument", &a->expr->where);
+	  ok = false;
+	  goto match;
+	}
+
       /* Special case for character arguments.  For allocatable, pointer
 	 and assumed-shape dummies, the string length needs to match
 	 exactly.  */
@@ -3604,6 +3643,18 @@ gfc_compare_actual_formal (gfc_actual_arglist **ap, gfc_formal_arglist *formal,
 	{
 	  if (where)
 	    gfc_error ("Actual argument for %qs must be ALLOCATABLE at %L",
+		       f->sym->name, &a->expr->where);
+	  ok = false;
+	  goto match;
+	}
+
+      if (a->expr->expr_type == EXPR_FUNCTION
+	  && a->expr->value.function.esym
+	  && f->sym->attr.allocatable)
+	{
+	  if (where)
+	    gfc_error ("Actual argument for %qs at %L is a function result "
+		       "and the dummy argument is ALLOCATABLE",
 		       f->sym->name, &a->expr->where);
 	  ok = false;
 	  goto match;

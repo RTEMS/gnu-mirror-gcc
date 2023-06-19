@@ -1599,7 +1599,7 @@ underlying_complex_expr (tree type, tree expr)
   /* Build a constructor from the real and imaginary parts.  */
   if (COMPLEX_FLOAT_TYPE_P (TREE_TYPE (expr)) &&
       (!INDIRECT_REF_P (expr)
-       || !CONVERT_EXPR_CODE_P (TREE_CODE (TREE_OPERAND (expr, 0)))))
+       || !CONVERT_EXPR_P (TREE_OPERAND (expr, 0))))
     {
       vec <constructor_elt, va_gc> *ve = NULL;
       CONSTRUCTOR_APPEND_ELT (ve, TYPE_FIELDS (type),
@@ -2706,6 +2706,11 @@ build_frame_type (tree ffi, FuncDeclaration *fd)
       TREE_ADDRESSABLE (field) = TREE_ADDRESSABLE (vsym);
       DECL_NONADDRESSABLE_P (field) = !TREE_ADDRESSABLE (vsym);
       TREE_THIS_VOLATILE (field) = TREE_THIS_VOLATILE (vsym);
+      SET_DECL_ALIGN (field, DECL_ALIGN (vsym));
+
+      /* Update alignment for frame record type.  */
+      if (TYPE_ALIGN (frame_rec_type) < DECL_ALIGN (field))
+	SET_TYPE_ALIGN (frame_rec_type, DECL_ALIGN (field));
 
       if (DECL_LANG_NRVO (vsym))
 	{

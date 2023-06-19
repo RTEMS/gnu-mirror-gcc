@@ -152,7 +152,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       // NB: Need an array of char_type[__capacity], plus a terminating
       // null char_type() element.
-      return _Alloc_traits::allocate(_M_get_allocator(), __capacity + 1);
+      return _S_allocate(_M_get_allocator(), __capacity + 1);
     }
 
   // NB: This is the special case for Input Iterators, used in
@@ -376,8 +376,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       else if (__length < __capacity)
 	try
 	  {
-	    pointer __tmp
-	      = _Alloc_traits::allocate(_M_get_allocator(), __length + 1);
+	    pointer __tmp = _S_allocate(_M_get_allocator(), __length + 1);
 	    this->_S_copy(__tmp, _M_data(), __length + 1);
 	    _M_dispose();
 	    _M_data(__tmp);
@@ -521,8 +520,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #if __cpp_lib_is_constant_evaluated
 	  if (std::is_constant_evaluated())
 	    {
-	      auto __newp = _Alloc_traits::allocate(_M_get_allocator(),
-						    __new_size);
+	      auto __newp = _S_allocate(_M_get_allocator(), __new_size);
 	      _S_copy(__newp, this->_M_data(), __pos);
 	      _S_copy(__newp + __pos, __s, __len2);
 	      _S_copy(__newp + __pos + __len2, __p + __len1, __how_much);
@@ -592,9 +590,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	size_type _M_r;
       };
       _Terminator __term{this};
-      const size_type __n2 [[maybe_unused]] = __n;
-      __term._M_r = std::move(__op)(__p, __n);
-      _GLIBCXX_DEBUG_ASSERT(__term._M_r >= 0 && __term._M_r <= __n2);
+      auto __r = std::move(__op)(auto(__p), auto(__n));
+      static_assert(ranges::__detail::__is_integer_like<decltype(__r)>);
+      _GLIBCXX_DEBUG_ASSERT(__r >= 0 && __r <= __n);
+      __term._M_r = size_type(__r);
+      if (__term._M_r > __n)
+	__builtin_unreachable();
     }
 #endif // C++23
 

@@ -1,3 +1,148 @@
+2023-06-07  Florian Weimer  <fweimer@redhat.com>
+
+	PR libgcc/109712
+	* unwind-dw2-fde-dip.c (find_fde_tail): Correct fast path for
+	parsing eh_frame.
+
+2023-06-05  Kewen Lin  <linkw@linux.ibm.com>
+
+	* config/i386/morestack.S: Use @init_array rather than
+	@progbits for section type of section .init_array.
+	* config/rs6000/morestack.S: Likewise.
+	* config/s390/morestack.S: Likewise.
+
+2023-06-05  YunQiang Su  <yunqiang.su@cipunited.com>
+
+	* config/mips/lib1funcs.S: New file.
+	define __speculation_barrier and include mips16.S.
+	* config/mips/t-mips: define LIB1ASMSRC as mips/lib1funcs.S.
+	define LIB1ASMFUNCS as _speculation_barrier.
+	set version info for __speculation_barrier.
+	* config/mips/libgcc-mips.ver: New file.
+	* config/mips/t-mips16: don't define LIB1ASMSRC as mips16.S
+	included in lib1funcs.S now.
+
+2023-06-03  Thomas Neumann  <tneumann@users.sourceforge.net>
+
+	PR libgcc/109670
+	* unwind-dw2-fde.c: Fix radix sort buffer management.
+
+2023-06-03  Thomas Neumann  <tneumann@users.sourceforge.net>
+
+	PR libgcc/109685
+	* unwind-dw2-fde.c: Free sort array in atomic fast path.
+
+2023-05-19  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config.host: Arrange to set min Darwin OS versions from
+	the configured host version.
+	* config/darwin10-unwind-find-enc-func.c: Do not use current
+	headers, but declare the nexessary structures locally to the
+	versions in use for Mac OSX 10.6.
+	* config/t-darwin: Amend to handle configured min OS
+	versions.
+	* config/t-darwin-min-1: New.
+	* config/t-darwin-min-5: New.
+	* config/t-darwin-min-8: New.
+
+2023-05-15  Thomas Neumann  <tneumann@users.sourceforge.net>
+
+	* unwind-dw2-fde.c: Fix assert in non-atomic path.
+
+2023-05-15  Sören Tempel  <soeren+git@soeren-tempel.net>
+
+	* unwind-dw2-fde.c: Accept empty ranges when deregistering frames.
+
+2023-05-02  Patrick O'Neill  <patrick@rivosinc.com>
+
+	* config/riscv/atomic.c: Change LR.aq/SC.rl pairs into
+	sequentially consistent LR.aqrl/SC.rl pairs.
+
+2023-05-01  Dimitar Dimitrov  <dimitar@dinux.eu>
+
+	* config/pru/t-pru (HOST_LIBGCC2_CFLAGS): Add
+	-DTARGET_HAS_NO_HW_DIVIDE.
+
+2023-04-27  Hans-Peter Nilsson  <hp@axis.com>
+
+	* config/cris/t-cris (HOST_LIBGCC2_CFLAGS): Add
+	-DTARGET_HAS_NO_HW_DIVIDE.
+
+2023-04-26  Patrick O'Neill  <patrick@rivosinc.com>
+
+	PR target/104338
+	* config/riscv/atomic.c: Add reference to duplicate logic.
+
+2023-04-08  Tetsuma Hoshino  <t-hoshino@pony-e.jp>
+
+	PR target/109402
+	* config/v850/lib1funcs.S (___muldi3): Remove unnecessary
+	stack manipulations.
+
+2023-04-05  John David Anglin  <danglin@gcc.gnu.org>
+
+	PR target/109374
+	* config/pa/milli64.S (RETURN_COLUMN): Define.
+	($$divI): Add CFI directives.
+	($$divU): Likewise.
+	($$remI): Likewise.
+	($$remU): Likewise.
+
+2023-03-19  Stafford Horne  <shorne@gmail.com>
+
+	* config/or1k/sfp-machine.h (FP_HANDLE_EXCEPTIONS): Remove
+	statement clearing existing exceptions.
+
+2023-03-13  Max Filippov  <jcmvbkbc@gmail.com>
+
+	* config/xtensa/crti.S: Add .note.GNU-stack section on linux.
+	* config/xtensa/crtn.S: Likewise.
+	* config/xtensa/lib1funcs.S: Likewise.
+	* config/xtensa/lib2funcs.S: Likewise.
+
+2023-03-12  Jakub Jelinek  <jakub@redhat.com>
+
+	* config/aarch64/t-softfp (softfp_extensions): Add bfsf.
+	(softfp_truncations): Add tfbf dfbf sfbf hfbf.
+	(softfp_extras): Add floatdibf floatundibf floattibf floatuntibf.
+	* config/aarch64/libgcc-softfp.ver (GCC_13.0.0): Export
+	__extendbfsf2 and __trunc{s,d,t,h}fbf2.
+	* config/aarch64/sfp-machine.h (_FP_NANFRAC_B, _FP_NANSIGN_B): Define.
+	* soft-fp/floatundibf.c: New file.
+	* soft-fp/floatdibf.c: New file.
+
+2023-03-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/107703
+	* soft-fp/floattibf.c: New file.
+	* soft-fp/floatuntibf.c: New file.
+	* config/i386/libgcc-glibc.ver: Export __float{,un}tibf @ GCC_13.0.0.
+	* config/i386/64/t-softfp (softfp_extras): Add floattibf and
+	floatuntibf.
+	(CFLAGS-floattibf.c, CFLAGS-floatunstibf.c): Add -msse2.
+
+2023-03-08  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR libgcc/108727
+	* config/rs6000/morestack.S (__morestack): Use PARAMS for new stack
+	bump size.
+
+2023-03-06   Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/107299
+	* config/rs6000/_divkc3.c (COPYSIGN): Use the correct built-in based on
+	whether long double is IBM or IEEE.
+	(INFINITY): Likewise.
+	(FABS): Likewise.
+	* config/rs6000/_mulkc3.c (COPYSIGN): Likewise.
+	(INFINITY): Likewise.
+	* config/rs6000/quad-float128.h (TF): Remove definition.
+	(TFtype): Define to be long double or _Float128.
+	(TCtype): Define to be _Complex long double or _Complex _Float128.
+	* libgcc2.h (TFtype): Allow machine config files to override this.
+	(TCtype): Likewise.
+	* soft-fp/quad.h (TFtype): Likewise.
+
 2023-02-13  Kito Cheng  <kito.cheng@sifive.com>
 
 	* config.host (riscv*-*-*): Add config/riscv/value-unwind.h.

@@ -204,10 +204,6 @@
     UNSPEC_PRLG_STK
     UNSPEC_REV
     UNSPEC_RBIT
-    UNSPEC_SABAL
-    UNSPEC_SABAL2
-    UNSPEC_SABDL
-    UNSPEC_SABDL2
     UNSPEC_SADALP
     UNSPEC_SCVTF
     UNSPEC_SETMEM
@@ -228,10 +224,6 @@
     UNSPEC_TLSLE24
     UNSPEC_TLSLE32
     UNSPEC_TLSLE48
-    UNSPEC_UABAL
-    UNSPEC_UABAL2
-    UNSPEC_UABDL
-    UNSPEC_UABDL2
     UNSPEC_UADALP
     UNSPEC_UCVTF
     UNSPEC_USHL_2S
@@ -239,7 +231,6 @@
     UNSPEC_SSP_SYSREG
     UNSPEC_SP_SET
     UNSPEC_SP_TEST
-    UNSPEC_RSHRN
     UNSPEC_RSQRT
     UNSPEC_RSQRTE
     UNSPEC_RSQRTS
@@ -949,8 +940,8 @@
 
 (define_expand "tbranch_<code><mode>3"
   [(set (pc) (if_then_else
-              (EQL (match_operand:ALLI 0 "register_operand")
-                   (match_operand 1 "aarch64_simd_shift_imm_<mode>"))
+              (EQL (match_operand:SHORT 0 "register_operand")
+                   (match_operand 1 "const0_operand"))
               (label_ref (match_operand 2 ""))
               (pc)))]
   ""
@@ -1219,36 +1210,18 @@
 	(match_operand:SHORT 1 "aarch64_mov_operand"  " r,M,D<hq>,Usv,m,m,rZ,w,w,rZ,w"))]
   "(register_operand (operands[0], <MODE>mode)
     || aarch64_reg_or_zero (operands[1], <MODE>mode))"
-{
-   switch (which_alternative)
-     {
-     case 0:
-       return "mov\t%w0, %w1";
-     case 1:
-       return "mov\t%w0, %1";
-     case 2:
-       return aarch64_output_scalar_simd_mov_immediate (operands[1],
-							<MODE>mode);
-     case 3:
-       return aarch64_output_sve_cnt_immediate (\"cnt\", \"%x0\", operands[1]);
-     case 4:
-       return "ldr<size>\t%w0, %1";
-     case 5:
-       return "ldr\t%<size>0, %1";
-     case 6:
-       return "str<size>\t%w1, %0";
-     case 7:
-       return "str\t%<size>1, %0";
-     case 8:
-       return TARGET_SIMD ? "umov\t%w0, %1.<v>[0]" : "fmov\t%w0, %s1";
-     case 9:
-       return TARGET_SIMD ? "dup\t%0.<Vallxd>, %w1" : "fmov\t%s0, %w1";
-     case 10:
-       return TARGET_SIMD ? "dup\t%<Vetype>0, %1.<v>[0]" : "fmov\t%s0, %s1";
-     default:
-       gcc_unreachable ();
-     }
-}
+  "@
+   mov\t%w0, %w1
+   mov\t%w0, %1
+   * return aarch64_output_scalar_simd_mov_immediate (operands[1], <MODE>mode);
+   * return aarch64_output_sve_cnt_immediate (\"cnt\", \"%x0\", operands[1]);
+   ldr<size>\t%w0, %1
+   ldr\t%<size>0, %1
+   str<size>\t%w1, %0
+   str\t%<size>1, %0
+   * return TARGET_SIMD ? \"umov\t%w0, %1.<v>[0]\" : \"fmov\t%w0, %s1\";
+   * return TARGET_SIMD ? \"dup\t%0.<Vallxd>, %w1\" : \"fmov\t%s0, %w1\";
+   * return TARGET_SIMD ? \"dup\t%<Vetype>0, %1.<v>[0]\" : \"fmov\t%s0, %s1\";"
   ;; The "mov_imm" type for CNT is just a placeholder.
   [(set_attr "type" "mov_reg,mov_imm,neon_move,mov_imm,load_4,load_4,store_4,
 		     store_4,neon_to_gp<q>,neon_from_gp<q>,neon_dup")
@@ -4203,6 +4176,27 @@
   [(set_attr "type" "csel, csel, csel, csel, csel, mov_imm, mov_imm")]
 )
 
+;; There are two canonical forms for `cmp ? -1 : a`.
+;; This is the second form and is here to help combine.
+;; Support `-(cmp) | a` into `cmp ? -1 : a` to be canonical in the backend.
+(define_insn_and_split "*cmov<mode>_insn_m1"
+  [(set (match_operand:GPI 0 "register_operand" "=r")
+        (ior:GPI
+	 (neg:GPI
+	  (match_operator:GPI 1 "aarch64_comparison_operator"
+	   [(match_operand 2 "cc_register" "") (const_int 0)]))
+	 (match_operand 3 "register_operand" "r")))]
+  ""
+  "#"
+  "&& true"
+  [(set (match_dup 0)
+	(if_then_else:GPI (match_dup 1)
+			  (const_int -1)
+			  (match_dup 3)))]
+  {}
+  [(set_attr "type" "csel")]
+)
+
 (define_insn "*cmovdi_insn_uxtw"
   [(set (match_operand:DI 0 "register_operand" "=r")
 	(if_then_else:DI
@@ -4412,17 +4406,6 @@
   [(set_attr "type" "csel")]
 )
 
-(define_insn "aarch64_umax<mode>3_insn"
-  [(set (match_operand:GPI 0 "register_operand" "=r,r")
-        (umax:GPI (match_operand:GPI 1 "register_operand" "r,r")
-		(match_operand:GPI 2 "aarch64_uminmax_operand" "r,Uum")))]
-  "TARGET_CSSC"
-  "@
-   umax\\t%<w>0, %<w>1, %<w>2
-   umax\\t%<w>0, %<w>1, %2"
-  [(set_attr "type" "alu_sreg,alu_imm")]
-)
-
 ;; If X can be loaded by a single CNT[BHWD] instruction,
 ;;
 ;;    A = UMAX (B, X)
@@ -4466,8 +4449,8 @@
 	operands[1] = force_reg (<MODE>mode, operands[1]);
 	if (!aarch64_uminmax_operand (operands[2], <MODE>mode))
 	  operands[2] = force_reg (<MODE>mode, operands[2]);
-	emit_insn (gen_aarch64_umax<mode>3_insn (operands[0], operands[1],
-						 operands[2]));
+	emit_move_insn (operands[0], gen_rtx_UMAX (<MODE>mode, operands[1],
+						   operands[2]));
 	DONE;
       }
     else
@@ -4654,6 +4637,29 @@
   return "<LOGICAL:logical>\\t%<w>0, %<w>3, %<w>1, <SHIFT:shift> %2";
 }
   [(set_attr "type" "logic_shift_imm")]
+)
+
+(define_split
+  [(set (match_operand:GPI 0 "register_operand")
+	(LOGICAL_OR_PLUS:GPI
+	  (and:GPI
+	    (lshiftrt:GPI (match_operand:GPI 1 "register_operand")
+			  (match_operand:QI 2 "aarch64_shift_imm_<mode>"))
+	    (match_operand:GPI 3 "aarch64_logical_immediate"))
+	  (match_operand:GPI 4 "register_operand")))]
+  "can_create_pseudo_p ()
+   && aarch64_bitmask_imm (UINTVAL (operands[3]) << UINTVAL (operands[2]),
+			   <MODE>mode)"
+  [(set (match_dup 5) (and:GPI (match_dup 1) (match_dup 6)))
+   (set (match_dup 0) (LOGICAL_OR_PLUS:GPI
+		       (lshiftrt:GPI (match_dup 5) (match_dup 2))
+                       (match_dup 4)))]
+  {
+    operands[5] = gen_reg_rtx (<MODE>mode);
+    operands[6]
+      = gen_int_mode (UINTVAL (operands[3]) << UINTVAL (operands[2]),
+		      <MODE>mode);
+  }
 )
 
 (define_split
@@ -5838,6 +5844,25 @@
   operands[3] = force_reg (<MODE>mode, value);
 })
 
+(define_insn "*insv_reg<mode>_<SUBDI_BITS>"
+  [(set (zero_extract:GPI (match_operand:GPI 0 "register_operand" "+r,w,?w")
+			  (const_int SUBDI_BITS)
+			  (match_operand 1 "const_int_operand"))
+	(match_operand:GPI 2 "register_operand" "r,w,r"))]
+  "multiple_p (UINTVAL (operands[1]), <SUBDI_BITS>)
+   && UINTVAL (operands[1]) + <SUBDI_BITS> <= <GPI:sizen>"
+  {
+    if (which_alternative == 0)
+      return "bfi\t%<w>0, %<w>2, %1, <SUBDI_BITS>";
+
+    operands[1] = gen_int_mode (UINTVAL (operands[1]) / <SUBDI_BITS>, SImode);
+    if (which_alternative == 1)
+      return "ins\t%0.<bits_etype>[%1], %2.<bits_etype>[0]";
+    return "ins\t%0.<bits_etype>[%1], %w2";
+  }
+  [(set_attr "type" "bfm,neon_ins_q,neon_ins_q")]
+)
+
 (define_insn "*insv_reg<mode>"
   [(set (zero_extract:GPI (match_operand:GPI 0 "register_operand" "+r")
 			  (match_operand 1 "const_int_operand" "n")
@@ -5850,6 +5875,27 @@
   [(set_attr "type" "bfm")]
 )
 
+(define_insn_and_split "*aarch64_bfi<GPI:mode><ALLX:mode>_<SUBDI_BITS>"
+  [(set (zero_extract:GPI (match_operand:GPI 0 "register_operand" "+r,w,?w")
+			  (const_int SUBDI_BITS)
+			  (match_operand 1 "const_int_operand"))
+	(zero_extend:GPI (match_operand:ALLX 2  "register_operand" "r,w,r")))]
+  "<SUBDI_BITS> <= <ALLX:sizen>
+   && multiple_p (UINTVAL (operands[1]), <SUBDI_BITS>)
+   && UINTVAL (operands[1]) + <SUBDI_BITS> <= <GPI:sizen>"
+  "#"
+  "&& 1"
+  [(set (zero_extract:GPI (match_dup 0)
+			  (const_int SUBDI_BITS)
+			  (match_dup 1))
+	(match_dup 2))]
+  {
+    operands[2] = lowpart_subreg (<GPI:MODE>mode, operands[2],
+				  <ALLX:MODE>mode);
+  }
+  [(set_attr "type" "bfm,neon_ins_q,neon_ins_q")]
+)
+
 (define_insn "*aarch64_bfi<GPI:mode><ALLX:mode>4"
   [(set (zero_extract:GPI (match_operand:GPI 0 "register_operand" "+r")
 			  (match_operand 1 "const_int_operand" "n")
@@ -5858,6 +5904,28 @@
   "UINTVAL (operands[1]) <= <ALLX:sizen>"
   "bfi\\t%<GPI:w>0, %<GPI:w>3, %2, %1"
   [(set_attr "type" "bfm")]
+)
+
+(define_insn_and_split "*aarch64_bfidi<ALLX:mode>_subreg_<SUBDI_BITS>"
+  [(set (zero_extract:DI (match_operand:DI 0 "register_operand" "+r,w,?w")
+			 (const_int SUBDI_BITS)
+			 (match_operand 1 "const_int_operand"))
+	(match_operator:DI 2 "subreg_lowpart_operator"
+	  [(zero_extend:SI
+	     (match_operand:ALLX 3  "register_operand" "r,w,r"))]))]
+  "<SUBDI_BITS> <= <ALLX:sizen>
+   && multiple_p (UINTVAL (operands[1]), <SUBDI_BITS>)
+   && UINTVAL (operands[1]) + <SUBDI_BITS> <= 64"
+  "#"
+  "&& 1"
+  [(set (zero_extract:DI (match_dup 0)
+			 (const_int SUBDI_BITS)
+			 (match_dup 1))
+	(match_dup 2))]
+  {
+    operands[2] = lowpart_subreg (DImode, operands[3], <ALLX:MODE>mode);
+  }
+  [(set_attr "type" "bfm,neon_ins_q,neon_ins_q")]
 )
 
 ;;  Match a bfi instruction where the shift of OP3 means that we are
@@ -6097,13 +6165,6 @@
   [(set_attr "type" "rev")]
 )
 
-(define_insn "@aarch64_rev16<mode>"
-  [(set (match_operand:GPI 0 "register_operand" "=r")
-	(unspec:GPI [(match_operand:GPI 1 "register_operand" "r")] UNSPEC_REV))]
-  ""
-  "rev16\\t%<w>0, %<w>1"
-  [(set_attr "type" "rev")])
-
 (define_insn "*aarch64_bfxil<mode>"
   [(set (match_operand:GPI 0 "register_operand" "=r,r")
     (ior:GPI (and:GPI (match_operand:GPI 1 "register_operand" "r,0")
@@ -6160,7 +6221,7 @@
 ;; operations within an IOR/AND RTX, therefore we have two patterns matching
 ;; each valid permutation.
 
-(define_insn "rev16<mode>2"
+(define_insn "aarch64_rev16<mode>2_alt1"
   [(set (match_operand:GPI 0 "register_operand" "=r")
         (ior:GPI (and:GPI (ashift:GPI (match_operand:GPI 1 "register_operand" "r")
                                       (const_int 8))
@@ -6174,7 +6235,7 @@
   [(set_attr "type" "rev")]
 )
 
-(define_insn "rev16<mode>2_alt"
+(define_insn "*aarch64_rev16<mode>2_alt2"
   [(set (match_operand:GPI 0 "register_operand" "=r")
         (ior:GPI (and:GPI (lshiftrt:GPI (match_operand:GPI 1 "register_operand" "r")
                                         (const_int 8))
@@ -6188,6 +6249,16 @@
   [(set_attr "type" "rev")]
 )
 
+;; Similar pattern to match (rotate (bswap) 16)
+(define_insn "aarch64_rev16si2_alt3"
+  [(set (match_operand:SI 0 "register_operand" "=r")
+        (rotate:SI (bswap:SI (match_operand:SI 1 "register_operand" "r"))
+                   (const_int 16)))]
+  ""
+  "rev16\\t%w0, %w1"
+  [(set_attr "type" "rev")]
+)
+
 ;; zero_extend version of above
 (define_insn "*bswapsi2_uxtw"
   [(set (match_operand:DI 0 "register_operand" "=r")
@@ -6195,6 +6266,21 @@
   ""
   "rev\\t%w0, %w1"
   [(set_attr "type" "rev")]
+)
+
+;; Expander for __rev16 intrinsics.  We have organic RTL patterns for rev16 above.
+;; Use this expander to just create the shift constants needed.
+(define_expand "@aarch64_rev16<mode>"
+  [(match_operand:GPI 0 "register_operand")
+   (match_operand:GPI 1 "register_operand")]
+  ""
+  {
+    rtx left = gen_int_mode (HOST_WIDE_INT_C (0xff00ff00ff00ff00), <MODE>mode);
+    rtx right = gen_int_mode (HOST_WIDE_INT_C (0xff00ff00ff00ff), <MODE>mode);
+    emit_insn (gen_aarch64_rev16<mode>2_alt1 (operands[0], operands[1],
+					      right, left));
+    DONE;
+  }
 )
 
 ;; -------------------------------------------------------------------
@@ -6728,15 +6814,46 @@
   [(set_attr "type" "ffarith<stype>")]
 )
 
-(define_insn "<optab><mode>3"
+;; Expander for integer smin, smax, umin.  Mainly used to generate
+;; straightforward RTL for TARGET_CSSC.  When that is not available
+;; FAIL and let the generic expanders generate the CMP + CSEL sequences,
+;; except for the SMIN and SMAX with zero cases, for which we have a
+;; single instruction even for the base architecture.
+(define_expand "<optab><mode>3"
+  [(set (match_operand:GPI 0 "register_operand")
+        (MAXMIN_NOUMAX:GPI
+	  (match_operand:GPI 1 "register_operand")
+	  (match_operand:GPI 2 "aarch64_<su>minmax_operand")))]
+  ""
+  {
+    if (!TARGET_CSSC)
+      {
+	if (operands[2] != CONST0_RTX (<MODE>mode)
+	    || !(<CODE> == SMAX || <CODE> == SMIN))
+	  FAIL;
+      }
+  }
+)
+
+(define_insn "*aarch64_<optab><mode>3_cssc"
   [(set (match_operand:GPI 0 "register_operand" "=r,r")
-        (MAXMIN_NOUMAX:GPI (match_operand:GPI 1 "register_operand" "r,r")
+        (MAXMIN:GPI (match_operand:GPI 1 "register_operand" "r,r")
 		(match_operand:GPI 2 "aarch64_<su>minmax_operand" "r,U<su>m")))]
   "TARGET_CSSC"
   "@
    <optab>\\t%<w>0, %<w>1, %<w>2
    <optab>\\t%<w>0, %<w>1, %2"
   [(set_attr "type" "alu_sreg,alu_imm")]
+)
+
+(define_insn "*aarch64_<optab><mode>3_zero"
+  [(set (match_operand:GPI 0 "register_operand" "=r")
+        (FMAXMIN:GPI
+	  (match_operand:GPI 1 "register_operand" "r")
+	  (const_int 0)))]
+  ""
+  "<maxminand>\\t%<w>0, %<w>1, %<w>1, asr <sizem1>";
+  [(set_attr "type" "logic_shift_imm")]
 )
 
 ;; Given that smax/smin do not specify the result when either input is NaN,
@@ -7046,7 +7163,7 @@
   [(set (match_operand:DI 0 "register_operand" "=r")
 	(unspec:DI [(const_int 0)] UNSPEC_TLS))]
   ""
-  "mrs\\t%0, tpidr_el0"
+  "* return aarch64_output_load_tp (operands[0]);"
   [(set_attr "type" "mrs")]
 )
 
@@ -7801,9 +7918,9 @@
 ;; Load/Store 64-bit (LS64) instructions.
 (define_insn "ld64b"
   [(set (match_operand:V8DI 0 "register_operand" "=r")
-        (unspec_volatile:V8DI
-          [(mem:V8DI (match_operand:DI 1 "register_operand" "r"))]
-            UNSPEC_LD64B)
+	(unspec_volatile:V8DI
+	  [(mem:V8DI (match_operand:DI 1 "register_operand" "r"))]
+	    UNSPEC_LD64B)
   )]
   "TARGET_LS64"
   "ld64b\\t%0, [%1]"
@@ -7811,9 +7928,9 @@
 )
 
 (define_insn "st64b"
-  [(set (mem:V8DI (match_operand:DI 0 "register_operand" "=r"))
-        (unspec_volatile:V8DI [(match_operand:V8DI 1 "register_operand" "r")]
-            UNSPEC_ST64B)
+  [(set (mem:V8DI (match_operand:DI 0 "register_operand" "r"))
+	(unspec_volatile:V8DI [(match_operand:V8DI 1 "register_operand" "r")]
+	    UNSPEC_ST64B)
   )]
   "TARGET_LS64"
   "st64b\\t%1, [%0]"
@@ -7822,10 +7939,10 @@
 
 (define_insn "st64bv"
   [(set (match_operand:DI 0 "register_operand" "=r")
-        (unspec_volatile:DI [(const_int 0)] UNSPEC_ST64BV_RET))
+	(unspec_volatile:DI [(const_int 0)] UNSPEC_ST64BV_RET))
    (set (mem:V8DI (match_operand:DI 1 "register_operand" "r"))
-        (unspec_volatile:V8DI [(match_operand:V8DI 2 "register_operand" "r")]
-            UNSPEC_ST64BV)
+	(unspec_volatile:V8DI [(match_operand:V8DI 2 "register_operand" "r")]
+	    UNSPEC_ST64BV)
   )]
   "TARGET_LS64"
   "st64bv\\t%0, %2, [%1]"
@@ -7834,10 +7951,10 @@
 
 (define_insn "st64bv0"
   [(set (match_operand:DI 0 "register_operand" "=r")
-        (unspec_volatile:DI [(const_int 0)] UNSPEC_ST64BV0_RET))
+	(unspec_volatile:DI [(const_int 0)] UNSPEC_ST64BV0_RET))
    (set (mem:V8DI (match_operand:DI 1 "register_operand" "r"))
-        (unspec_volatile:V8DI [(match_operand:V8DI 2 "register_operand" "r")]
-            UNSPEC_ST64BV0)
+	(unspec_volatile:V8DI [(match_operand:V8DI 2 "register_operand" "r")]
+	    UNSPEC_ST64BV0)
   )]
   "TARGET_LS64"
   "st64bv0\\t%0, %2, [%1]"

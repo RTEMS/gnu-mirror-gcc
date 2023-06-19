@@ -3657,6 +3657,15 @@
 	  UNSPEC_PRED_X))]
   "TARGET_SVE"
   {
+    /* SVE2 supports the MUL (vectors, unpredicated) form.  Emit the simple
+       pattern for it here rather than splitting off the MULT expander
+       separately.  */
+    if (TARGET_SVE2 && <CODE> == MULT)
+      {
+	emit_move_insn (operands[0], gen_rtx_MULT (<MODE>mode,
+						   operands[1], operands[2]));
+	DONE;
+      }
     operands[3] = aarch64_ptrue_reg (<VPRED>mode);
   }
 )
@@ -3992,7 +4001,7 @@
 ;; -------------------------------------------------------------------------
 
 ;; Unpredicated integer absolute difference.
-(define_expand "<su>abd<mode>_3"
+(define_expand "<su>abd<mode>3"
   [(use (match_operand:SVE_I 0 "register_operand"))
    (USMAX:SVE_I
      (match_operand:SVE_I 1 "register_operand")
@@ -6955,16 +6964,16 @@
 ;; [SU]ABD	diff.b, p0/m, op1.b, op2.b
 ;; MOVPRFX	op0, op3	// If necessary
 ;; UDOT		op0.s, diff.b, ones.b
-(define_expand "<sur>sad<vsi2qi>"
+(define_expand "<su>sad<vsi2qi>"
   [(use (match_operand:SVE_FULL_SDI 0 "register_operand"))
-   (unspec:<VSI2QI> [(use (match_operand:<VSI2QI> 1 "register_operand"))
-		    (use (match_operand:<VSI2QI> 2 "register_operand"))] ABAL)
+   (USMAX:<VSI2QI> (match_operand:<VSI2QI> 1 "register_operand")
+		   (match_operand:<VSI2QI> 2 "register_operand"))
    (use (match_operand:SVE_FULL_SDI 3 "register_operand"))]
   "TARGET_SVE"
   {
     rtx ones = force_reg (<VSI2QI>mode, CONST1_RTX (<VSI2QI>mode));
     rtx diff = gen_reg_rtx (<VSI2QI>mode);
-    emit_insn (gen_<sur>abd<vsi2qi>_3 (diff, operands[1], operands[2]));
+    emit_insn (gen_<su>abd<vsi2qi>3 (diff, operands[1], operands[2]));
     emit_insn (gen_udot_prod<vsi2qi> (operands[0], diff, ones, operands[3]));
     DONE;
   }
@@ -7615,7 +7624,7 @@
 (define_insn "*vcond_mask_<mode><vpred>"
   [(set (match_operand:SVE_ALL 0 "register_operand" "=w, w, w, w, ?w, ?&w, ?&w")
 	(unspec:SVE_ALL
-	  [(match_operand:<VPRED> 3 "register_operand" "Upa, Upa, Upa, Upa, Upl, Upl, Upl")
+	  [(match_operand:<VPRED> 3 "register_operand" "Upa, Upa, Upa, Upa, Upl, Upa, Upa")
 	   (match_operand:SVE_ALL 1 "aarch64_sve_reg_or_dup_imm" "w, vss, vss, Ufc, Ufc, vss, Ufc")
 	   (match_operand:SVE_ALL 2 "aarch64_simd_reg_or_zero" "w, 0, Dz, 0, Dz, w, w")]
 	  UNSPEC_SEL))]

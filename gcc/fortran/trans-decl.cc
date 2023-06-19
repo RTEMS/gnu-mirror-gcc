@@ -483,7 +483,7 @@ gfc_set_decl_assembler_name (tree decl, tree name)
 
 /* Returns true if a variable of specified size should go on the stack.  */
 
-int
+bool
 gfc_can_put_var_on_stack (tree size)
 {
   unsigned HOST_WIDE_INT low;
@@ -558,7 +558,7 @@ gfc_finish_decl (tree decl)
     return;
 
   if (DECL_SIZE (decl) == NULL_TREE
-      && TYPE_SIZE (TREE_TYPE (decl)) != NULL_TREE)
+      && COMPLETE_TYPE_P (TREE_TYPE (decl)))
     layout_decl (decl, 0);
 
   /* A few consistency checks.  */
@@ -1791,6 +1791,9 @@ gfc_get_symbol_decl (gfc_symbol * sym)
       return decl;
     }
 
+  if (sym->ts.type == BT_UNKNOWN)
+    gfc_fatal_error ("%s at %C has no default type", sym->name);
+
   if (sym->attr.intrinsic)
     gfc_internal_error ("intrinsic variable which isn't a procedure");
 
@@ -1824,6 +1827,8 @@ gfc_get_symbol_decl (gfc_symbol * sym)
   /* Add attributes to variables.  Functions are handled elsewhere.  */
   attributes = add_attributes_to_decl (sym->attr, NULL_TREE);
   decl_attributes (&decl, attributes, 0);
+  if (sym->ts.deferred && VAR_P (length))
+    decl_attributes (&length, attributes, 0);
 
   /* Symbols from modules should have their assembler names mangled.
      This is done here rather than in gfc_finish_var_decl because it
@@ -1886,7 +1891,7 @@ gfc_get_symbol_decl (gfc_symbol * sym)
       length = fold_convert (gfc_charlen_type_node, length);
       gfc_finish_var_decl (length, sym);
       if (!sym->attr.associate_var
-	  && TREE_CODE (length) == VAR_DECL
+	  && VAR_P (length)
 	  && sym->value && sym->value->expr_type != EXPR_NULL
 	  && sym->value->ts.u.cl->length)
 	{
@@ -4345,6 +4350,8 @@ init_intent_out_dt (gfc_symbol * proc_sym, gfc_wrapped_block * block)
   gfc_formal_arglist *f;
   tree tmp;
   tree present;
+  gfc_symbol *s;
+  bool dealloc_with_value = false;
 
   gfc_init_block (&init);
   for (f = gfc_sym_get_dummy_args (proc_sym); f; f = f->next)
@@ -4352,42 +4359,52 @@ init_intent_out_dt (gfc_symbol * proc_sym, gfc_wrapped_block * block)
 	&& !f->sym->attr.pointer
 	&& f->sym->ts.type == BT_DERIVED)
       {
+	s = f->sym;
 	tmp = NULL_TREE;
 
 	/* Note: Allocatables are excluded as they are already handled
 	   by the caller.  */
 	if (!f->sym->attr.allocatable
-	    && gfc_is_finalizable (f->sym->ts.u.derived, NULL))
+	    && gfc_is_finalizable (s->ts.u.derived, NULL))
 	  {
 	    stmtblock_t block;
 	    gfc_expr *e;
 
 	    gfc_init_block (&block);
-	    f->sym->attr.referenced = 1;
-	    e = gfc_lval_expr_from_sym (f->sym);
+	    s->attr.referenced = 1;
+	    e = gfc_lval_expr_from_sym (s);
 	    gfc_add_finalizer_call (&block, e);
 	    gfc_free_expr (e);
 	    tmp = gfc_finish_block (&block);
 	  }
 
-	if (tmp == NULL_TREE && !f->sym->attr.allocatable
-	    && f->sym->ts.u.derived->attr.alloc_comp && !f->sym->value)
-	  tmp = gfc_deallocate_alloc_comp (f->sym->ts.u.derived,
-					   f->sym->backend_decl,
-					   f->sym->as ? f->sym->as->rank : 0);
-
-	if (tmp != NULL_TREE && (f->sym->attr.optional
-				 || f->sym->ns->proc_name->attr.entry_master))
+	/* Note: Allocatables are excluded as they are already handled
+	   by the caller.  */
+	if (tmp == NULL_TREE && !s->attr.allocatable
+	    && s->ts.u.derived->attr.alloc_comp)
 	  {
-	    present = gfc_conv_expr_present (f->sym);
+	    tmp = gfc_deallocate_alloc_comp (s->ts.u.derived,
+					     s->backend_decl,
+					     s->as ? s->as->rank : 0);
+	    dealloc_with_value = s->value;
+	  }
+
+	if (tmp != NULL_TREE && (s->attr.optional
+				 || s->ns->proc_name->attr.entry_master))
+	  {
+	    present = gfc_conv_expr_present (s);
 	    tmp = build3_loc (input_location, COND_EXPR, TREE_TYPE (tmp),
 			      present, tmp, build_empty_stmt (input_location));
 	  }
 
-	if (tmp != NULL_TREE)
+	if (tmp != NULL_TREE && !dealloc_with_value)
 	  gfc_add_expr_to_block (&init, tmp);
-	else if (f->sym->value && !f->sym->attr.allocatable)
-	  gfc_init_default_dt (f->sym, &init, true);
+	else if (s->value && !s->attr.allocatable)
+	  {
+	    gfc_add_expr_to_block (&init, tmp);
+	    gfc_init_default_dt (s, &init, false);
+	    dealloc_with_value = false;
+	  }
       }
     else if (f->sym && f->sym->attr.intent == INTENT_OUT
 	     && f->sym->ts.type == BT_CLASS
@@ -4411,10 +4428,8 @@ init_intent_out_dt (gfc_symbol * proc_sym, gfc_wrapped_block * block)
 			      present, tmp,
 			      build_empty_stmt (input_location));
 	  }
-
 	gfc_add_expr_to_block (&init, tmp);
       }
-
   gfc_add_init_cleanup (block, gfc_finish_block (&init), NULL_TREE);
 }
 
@@ -7155,9 +7170,6 @@ gfc_conv_cfi_to_gfc (stmtblock_t *init, stmtblock_t *finally,
 			   size_var, LT_EXPR, build_int_cst (TREE_TYPE (idx), 1),
 			   gfc_finish_block (&loop_body));
       /* if (cond) { block2 }  */
-      tmp = fold_build2_loc (input_location, MODIFY_EXPR, void_type_node,
-			     data, fold_convert (TREE_TYPE (data),
-						 null_pointer_node));
       tmp = build3_v (COND_EXPR, cond_var, gfc_finish_block (&block2),
 		      build_empty_stmt (input_location));
       gfc_add_expr_to_block (&block, tmp);
@@ -7531,6 +7543,7 @@ gfc_generate_function_code (gfc_namespace * ns)
     }
 
   trans_function_start (sym);
+  gfc_current_locus = sym->declared_at;
 
   gfc_init_block (&init);
   gfc_init_block (&cleanup);
@@ -7610,7 +7623,7 @@ gfc_generate_function_code (gfc_namespace * ns)
 	  desc = desc_p;
 	else if (!GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (TREE_TYPE (desc_p))))
 	  {
-	    /* Character(len=*) explict-size/assumed-size array. */
+	    /* Character(len=*) explicit-size/assumed-size array. */
 	    desc = desc_p;
 	    gfc_build_qualified_array (desc, fsym);
 	  }

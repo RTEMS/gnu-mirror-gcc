@@ -17,7 +17,7 @@
 
 SUFFIXES = .c .cc .mod .def .o .obj .lo .a .la
 
-ACLOCAL_AMFLAGS = -I . -I .. -I ../config
+ACLOCAL_AMFLAGS = -I .. -I ../config
 
 VPATH = . @srcdir@ @srcdir@/../../gcc/m2/gm2-libs-coroutines
 
@@ -97,11 +97,11 @@ FLAGS_TO_PASS = $(AM_MAKEFLAGS)
 
 
 if BUILD_CORLIB
-M2DEFS = Debug.def  Executive.def \
+M2DEFS = Executive.def \
          KeyBoardLEDs.def  SYSTEM.def \
          TimerHandler.def
 
-M2MODS = Debug.mod  Executive.mod \
+M2MODS = Executive.mod \
          SYSTEM.mod  TimerHandler.mod
 
 toolexeclib_LTLIBRARIES = libm2cor.la

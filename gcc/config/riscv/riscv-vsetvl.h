@@ -31,6 +31,7 @@ enum vsetvl_type
   VSETVL_NORMAL,
   VSETVL_VTYPE_CHANGE_ONLY,
   VSETVL_DISCARD_RESULT,
+  NUM_VSETVL_TYPE
 };
 
 enum emit_type
@@ -289,13 +290,6 @@ private:
      definition of AVL.  */
   rtl_ssa::insn_info *m_insn;
 
-  /* Parse the instruction to get VL/VTYPE information and demanding
-   * information.  */
-  /* This is only called by simple_vsetvl subroutine when optimize == 0.
-     Since RTL_SSA can not be enabled when optimize == 0, we don't initialize
-     the m_insn.  */
-  void parse_insn (rtx_insn *);
-
   friend class vector_infos_manager;
 
 public:
@@ -304,11 +298,16 @@ public:
       m_insn (nullptr)
   {}
 
+  /* Parse the instruction to get VL/VTYPE information and demanding
+   * information.  */
+  /* This is only called by simple_vsetvl subroutine when optimize == 0.
+     Since RTL_SSA can not be enabled when optimize == 0, we don't initialize
+     the m_insn.  */
+  void parse_insn (rtx_insn *);
   /* This is only called by lazy_vsetvl subroutine when optimize > 0.
      We use RTL_SSA framework to initialize the insn_info.  */
   void parse_insn (rtl_ssa::insn_info *);
 
-  bool operator> (const vector_insn_info &) const;
   bool operator>= (const vector_insn_info &) const;
   bool operator== (const vector_insn_info &) const;
 
@@ -380,6 +379,7 @@ public:
   void fuse_mask_policy (const vector_insn_info &, const vector_insn_info &);
 
   bool compatible_p (const vector_insn_info &) const;
+  bool skip_avl_compatible_p (const vector_insn_info &) const;
   bool compatible_avl_p (const vl_vtype_info &) const;
   bool compatible_avl_p (const avl_info &) const;
   bool compatible_vtype_p (const vl_vtype_info &) const;
@@ -392,6 +392,7 @@ public:
   {
     return gen_rtx_REG (Pmode, get_avl_source ()->regno ());
   }
+  bool update_fault_first_load_avl (rtl_ssa::insn_info *);
 
   void dump (FILE *) const;
 };
@@ -449,6 +450,30 @@ public:
   /* Return true if all expression set in bitmap are same ratio.  */
   bool all_same_ratio_p (sbitmap) const;
 
+  bool all_empty_predecessor_p (const basic_block) const;
+  bool all_avail_in_compatible_p (const basic_block) const;
+
+  bool to_delete_p (rtx_insn *rinsn)
+  {
+    if (to_delete_vsetvls.contains (rinsn))
+      {
+	to_delete_vsetvls.remove (rinsn);
+	if (to_refine_vsetvls.contains (rinsn))
+	  to_refine_vsetvls.remove (rinsn);
+	return true;
+      }
+    return false;
+  }
+  bool to_refine_p (rtx_insn *rinsn)
+  {
+    if (to_refine_vsetvls.contains (rinsn))
+      {
+	to_refine_vsetvls.remove (rinsn);
+	return true;
+      }
+    return false;
+  }
+
   void release (void);
   void create_bitmap_vectors (void);
   void free_bitmap_vectors (void);
@@ -479,6 +504,14 @@ struct demands_cond
   using CONDITION_TYPE
     = bool (*) (const vector_insn_info &, const vector_insn_info &);
   CONDITION_TYPE incompatible_p;
+  bool dual_incompatible_p (const vector_insn_info &info1,
+			    const vector_insn_info &info2) const
+  {
+    return ((pair.match_cond_p (info1.get_demands (), info2.get_demands ())
+	     && incompatible_p (info1, info2))
+	    || (pair.match_cond_p (info2.get_demands (), info1.get_demands ())
+		&& incompatible_p (info2, info1)));
+  }
 };
 
 struct demands_fuse_rule

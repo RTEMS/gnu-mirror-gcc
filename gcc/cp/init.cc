@@ -189,14 +189,20 @@ build_zero_init_1 (tree type, tree nelts, bool static_storage_p,
     init = build_zero_cst (type);
   else if (RECORD_OR_UNION_CODE_P (TREE_CODE (type)))
     {
-      tree field;
+      tree field, next;
       vec<constructor_elt, va_gc> *v = NULL;
 
       /* Iterate over the fields, building initializations.  */
-      for (field = TYPE_FIELDS (type); field; field = DECL_CHAIN (field))
+      for (field = TYPE_FIELDS (type); field; field = next)
 	{
+	  next = DECL_CHAIN (field);
+
 	  if (TREE_CODE (field) != FIELD_DECL)
 	    continue;
+
+	  /* For unions, only the first field is initialized.  */
+	  if (TREE_CODE (type) == UNION_TYPE)
+	    next = NULL_TREE;
 
 	  if (TREE_TYPE (field) == error_mark_node)
 	    continue;
@@ -211,6 +217,11 @@ build_zero_init_1 (tree type, tree nelts, bool static_storage_p,
 		  && !tree_int_cst_lt (bitpos, field_size))
 		continue;
 	    }
+
+	  /* Don't add zero width bitfields.  */
+	  if (DECL_C_BIT_FIELD (field)
+	      && integer_zerop (DECL_SIZE (field)))
+	    continue;
 
 	  /* Note that for class types there will be FIELD_DECLs
 	     corresponding to base classes as well.  Thus, iterating
@@ -230,10 +241,6 @@ build_zero_init_1 (tree type, tree nelts, bool static_storage_p,
 	      if (value)
 		CONSTRUCTOR_APPEND_ELT(v, field, value);
 	    }
-
-	  /* For unions, only the first field is initialized.  */
-	  if (TREE_CODE (type) == UNION_TYPE)
-	    break;
 	}
 
       /* Build a constructor to contain the initializations.  */
@@ -561,26 +568,22 @@ perform_target_ctor (tree init)
   return init;
 }
 
-/* Return the non-static data initializer for FIELD_DECL MEMBER.  */
-
-static GTY((cache)) decl_tree_cache_map *nsdmi_inst;
+/* Instantiate the default member initializer of MEMBER, if needed.
+   Only get_nsdmi should use the return value of this function.  */
 
 tree
-get_nsdmi (tree member, bool in_ctor, tsubst_flags_t complain)
+maybe_instantiate_nsdmi_init (tree member, tsubst_flags_t complain)
 {
-  tree init;
-  tree save_ccp = current_class_ptr;
-  tree save_ccr = current_class_ref;
-  
-  if (DECL_LANG_SPECIFIC (member) && DECL_TEMPLATE_INFO (member))
+  tree init = DECL_INITIAL (member);
+
+  /* tsubst_decl uses void_node to indicate an uninstantiated DMI.  */
+  if (init == void_node)
     {
       init = DECL_INITIAL (DECL_TI_TEMPLATE (member));
       location_t expr_loc
 	= cp_expr_loc_or_loc (init, DECL_SOURCE_LOCATION (member));
       if (TREE_CODE (init) == DEFERRED_PARSE)
 	/* Unparsed.  */;
-      else if (tree *slot = hash_map_safe_get (nsdmi_inst, member))
-	init = *slot;
       /* Check recursive instantiation.  */
       else if (DECL_INSTANTIATING_NSDMI_P (member))
 	{
@@ -599,17 +602,11 @@ get_nsdmi (tree member, bool in_ctor, tsubst_flags_t complain)
 	  DECL_INSTANTIATING_NSDMI_P (member) = 1;
 
 	  bool pushed = false;
-	  tree ctx = DECL_CONTEXT (member);
+	  tree ctx = type_context_for_name_lookup (member);
 
-	  processing_template_decl_sentinel ptds (/*reset*/false);
+	  bool push_to_top = maybe_push_to_top_level (member);
 	  if (!currently_open_class (ctx))
 	    {
-	      if (!LOCAL_CLASS_P (ctx))
-		push_to_top_level ();
-	      else
-		/* push_to_top_level would lose the necessary function context,
-		   just reset processing_template_decl.  */
-		processing_template_decl = 0;
 	      push_nested_class (ctx);
 	      push_deferring_access_checks (dk_no_deferred);
 	      pushed = true;
@@ -629,21 +626,31 @@ get_nsdmi (tree member, bool in_ctor, tsubst_flags_t complain)
 	  DECL_INSTANTIATING_NSDMI_P (member) = 0;
 
 	  if (init != error_mark_node)
-	    hash_map_safe_put<hm_ggc> (nsdmi_inst, member, init);
+	    DECL_INITIAL (member) = init;
 
 	  if (pushed)
 	    {
 	      pop_deferring_access_checks ();
 	      pop_nested_class ();
-	      if (!LOCAL_CLASS_P (ctx))
-		pop_from_top_level ();
 	    }
+	  maybe_pop_from_top_level (push_to_top);
 
 	  input_location = sloc;
 	}
     }
-  else
-    init = DECL_INITIAL (member);
+
+  return init;
+}
+
+/* Return the non-static data initializer for FIELD_DECL MEMBER.  */
+
+tree
+get_nsdmi (tree member, bool in_ctor, tsubst_flags_t complain)
+{
+  tree save_ccp = current_class_ptr;
+  tree save_ccr = current_class_ref;
+
+  tree init = maybe_instantiate_nsdmi_init (member, complain);
 
   if (init && TREE_CODE (init) == DEFERRED_PARSE)
     {
@@ -4330,8 +4337,54 @@ find_temps_r (tree *tp, int *walk_subtrees, void *data)
   return NULL_TREE;
 }
 
+/* walk_tree callback to collect temporaries in an expression that
+   are allocator arguments to standard library classes.  */
+
+static tree
+find_allocator_temps_r (tree *tp, int *walk_subtrees, void *data)
+{
+  vec<tree*> &temps = *static_cast<auto_vec<tree*> *>(data);
+  tree t = *tp;
+  if (TYPE_P (t))
+    {
+      *walk_subtrees = 0;
+      return NULL_TREE;
+    }
+
+  /* If this is a call to a constructor for a std:: class, look for
+     a reference-to-allocator argument.  */
+  tree fn = cp_get_callee_fndecl_nofold (t);
+  if (fn && DECL_CONSTRUCTOR_P (fn)
+      && decl_in_std_namespace_p (TYPE_NAME (DECL_CONTEXT (fn))))
+    {
+      int nargs = call_expr_nargs (t);
+      for (int i = 1; i < nargs; ++i)
+	{
+	  tree arg = get_nth_callarg (t, i);
+	  tree atype = TREE_TYPE (arg);
+	  if (TREE_CODE (atype) == REFERENCE_TYPE
+	      && is_std_allocator (TREE_TYPE (atype)))
+	    {
+	      STRIP_NOPS (arg);
+	      if (TREE_CODE (arg) == ADDR_EXPR)
+		{
+		  tree *ap = &TREE_OPERAND (arg, 0);
+		  if (TREE_CODE (*ap) == TARGET_EXPR)
+		    temps.safe_push (ap);
+		}
+	    }
+	}
+    }
+
+  return NULL_TREE;
+}
+
 /* If INIT initializes a standard library class, and involves a temporary
-   std::allocator<T>, return a pointer to the temp.
+   std::allocator<T>, use ALLOC_OBJ for all such temporaries.
+
+   Note that this can clobber the input to build_vec_init; no unsharing is
+   done.  To make this safe we use the TARGET_EXPR in all places rather than
+   pulling out the TARGET_EXPR_SLOT.
 
    Used by build_vec_init when initializing an array of e.g. strings to reuse
    the same temporary allocator for all of the strings.  We can do this because
@@ -4341,22 +4394,18 @@ find_temps_r (tree *tp, int *walk_subtrees, void *data)
    ??? Add an attribute to allow users to assert the same property for other
    classes, i.e. one object of the type is interchangeable with any other?  */
 
-static tree*
-find_allocator_temp (tree init)
+static void
+combine_allocator_temps (tree &init, tree &alloc_obj)
 {
-  if (TREE_CODE (init) == EXPR_STMT)
-    init = EXPR_STMT_EXPR (init);
-  if (TREE_CODE (init) == CONVERT_EXPR)
-    init = TREE_OPERAND (init, 0);
-  tree type = TREE_TYPE (init);
-  if (!CLASS_TYPE_P (type) || !decl_in_std_namespace_p (TYPE_NAME (type)))
-    return NULL;
   auto_vec<tree*> temps;
-  cp_walk_tree_without_duplicates (&init, find_temps_r, &temps);
+  cp_walk_tree_without_duplicates (&init, find_allocator_temps_r, &temps);
   for (tree *p : temps)
-    if (is_std_allocator (TREE_TYPE (*p)))
-      return p;
-  return NULL;
+    {
+      if (!alloc_obj)
+	alloc_obj = *p;
+      else
+	*p = alloc_obj;
+    }
 }
 
 /* `build_vec_init' returns tree structure that performs
@@ -4426,7 +4475,9 @@ build_vec_init (tree base, tree maxindex, tree init,
   /* Look through the TARGET_EXPR around a compound literal.  */
   if (init && TREE_CODE (init) == TARGET_EXPR
       && TREE_CODE (TARGET_EXPR_INITIAL (init)) == CONSTRUCTOR
-      && from_array != 2)
+      && from_array != 2
+      && (same_type_ignoring_top_level_qualifiers_p
+	  (TREE_TYPE (init), atype)))
     init = TARGET_EXPR_INITIAL (init);
 
   if (tree vi = get_vec_init_expr (init))
@@ -4552,7 +4603,14 @@ build_vec_init (tree base, tree maxindex, tree init,
     {
       if (lvalue_kind (init) & clk_rvalueref)
 	xvalue = true;
-      base2 = decay_conversion (init, complain);
+      if (TREE_CODE (init) == TARGET_EXPR)
+	{
+	  /* Avoid error in decay_conversion.  */
+	  base2 = decay_conversion (TARGET_EXPR_SLOT (init), complain);
+	  base2 = cp_build_compound_expr (init, base2, tf_none);
+	}
+      else
+	base2 = decay_conversion (init, complain);
       if (base2 == error_mark_node)
 	return error_mark_node;
       itype = TREE_TYPE (base2);
@@ -4694,13 +4752,7 @@ build_vec_init (tree base, tree maxindex, tree init,
 	  if (one_init)
 	    {
 	      /* Only create one std::allocator temporary.  */
-	      if (tree *this_alloc = find_allocator_temp (one_init))
-		{
-		  if (alloc_obj)
-		    *this_alloc = alloc_obj;
-		  else
-		    alloc_obj = TARGET_EXPR_SLOT (*this_alloc);
-		}
+	      combine_allocator_temps (one_init, alloc_obj);
 	      finish_expr_stmt (one_init);
 	    }
 

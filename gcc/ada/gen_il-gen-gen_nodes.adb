@@ -401,8 +401,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
    Cc (N_Function_Call, N_Subprogram_Call,
        (Sy (Name, Node_Id, Default_Empty),
         Sy (Parameter_Associations, List_Id, Default_No_List),
-        Sm (Is_Expanded_Build_In_Place_Call, Flag),
-        Sm (No_Side_Effect_Removal, Flag)));
+        Sm (Is_Expanded_Build_In_Place_Call, Flag)));
 
    Cc (N_Procedure_Call_Statement, N_Subprogram_Call,
        (Sy (Name, Node_Id, Default_Empty),
@@ -531,7 +530,8 @@ begin -- Gen_IL.Gen.Gen_Nodes
    Cc (N_Range, N_Subexpr,
        (Sy (Low_Bound, Node_Id),
         Sy (High_Bound, Node_Id),
-        Sy (Includes_Infinities, Flag)));
+        Sm (Cannot_Be_Superflat, Flag),
+        Sm (Includes_Infinities, Flag)));
 
    Cc (N_Reference, N_Subexpr,
        (Sy (Prefix, Node_Id)));
@@ -969,6 +969,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sm (Is_Elaboration_Code, Flag),
         Sm (Is_SPARK_Mode_On_Node, Flag),
         Sm (No_Ctrl_Actions, Flag),
+        Sm (No_Finalize_Actions, Flag),
         Sm (Suppress_Assignment_Checks, Flag)));
 
    Cc (N_Asynchronous_Select, N_Statement_Other_Than_Procedure_Call,
@@ -1344,7 +1345,8 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sy (Declarations, List_Id, Default_No_List),
         Sy (Handled_Statement_Sequence, Node_Id, Default_Empty),
         Sy (At_End_Proc, Node_Id, Default_Empty),
-        Sm (Activation_Chain_Entity, Node_Id)));
+        Sm (Activation_Chain_Entity, Node_Id),
+        Sm (Corresponding_Spec, Node_Id)));
 
    Cc (N_Entry_Call_Alternative, Node_Kind,
        (Sy (Entry_Call_Statement, Node_Id),
@@ -1604,7 +1606,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sm (Dcheck_Function, Node_Id),
         Sm (Enclosing_Variant, Node_Id),
         Sm (Has_SP_Choice, Flag),
-        Sm (Present_Expr, Valid_Uint)));
+        Sm (Present_Expr, Uint)));
 
    Cc (N_Variant_Part, Node_Kind,
        (Sy (Name, Node_Id, Default_Empty),

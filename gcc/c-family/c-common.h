@@ -790,7 +790,7 @@ extern bool override_libcpp_locations;
 inline bool
 gnu_vector_type_p (const_tree type)
 {
-  return TREE_CODE (type) == VECTOR_TYPE && !TYPE_INDIVISIBLE_P (type);
+  return VECTOR_TYPE_P (type) && !TYPE_INDIVISIBLE_P (type);
 }
 
 struct visibility_flags
@@ -1524,7 +1524,7 @@ extern void warn_for_multistatement_macros (location_t, location_t,
 
 extern void check_for_xor_used_as_pow (location_t lhs_loc, tree lhs_val,
 				       location_t operator_loc,
-				       tree rhs_val);
+				       location_t rhs_loc, tree rhs_val);
 
 /* In c-attribs.cc.  */
 extern bool attribute_takes_identifier_p (const_tree);

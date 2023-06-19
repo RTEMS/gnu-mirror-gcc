@@ -25,6 +25,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "options.h"
 #include "gfortran.h"
 #include "intrinsic.h"
+#include "diagnostic.h" /* For errorcount.  */
 
 /* Namespace to hold the resolved symbols for intrinsic subroutines.  */
 static gfc_namespace *gfc_intrinsic_namespace;
@@ -1106,7 +1107,7 @@ gfc_find_subroutine (const char *name)
 /* Given a string, figure out if it is the name of a generic intrinsic
    function or not.  */
 
-int
+bool
 gfc_generic_intrinsic (const char *name)
 {
   gfc_intrinsic_sym *sym;
@@ -1119,7 +1120,7 @@ gfc_generic_intrinsic (const char *name)
 /* Given a string, figure out if it is the name of a specific
    intrinsic function or not.  */
 
-int
+bool
 gfc_specific_intrinsic (const char *name)
 {
   gfc_intrinsic_sym *sym;
@@ -1131,7 +1132,7 @@ gfc_specific_intrinsic (const char *name)
 
 /* Given a string, figure out if it is the name of an intrinsic function
    or subroutine allowed as an actual argument or not.  */
-int
+bool
 gfc_intrinsic_actual_ok (const char *name, const bool subroutine_flag)
 {
   gfc_intrinsic_sym *sym;
@@ -3309,7 +3310,7 @@ add_functions (void)
   make_generic ("loc", GFC_ISYM_LOC, GFC_STD_GNU);
 
 
-  /* The next of intrinsic subprogram are the degree trignometric functions.
+  /* The next of intrinsic subprogram are the degree trigonometric functions.
      These were hidden behind the -fdec-math option, but are now simply
      included as extensions to the set of intrinsic subprograms.  */
 
@@ -4620,6 +4621,7 @@ do_simplify (gfc_intrinsic_sym *specific, gfc_expr *e)
 {
   gfc_expr *result, *a1, *a2, *a3, *a4, *a5, *a6;
   gfc_actual_arglist *arg;
+  int old_errorcount = errorcount;
 
   /* Max and min require special handling due to the variable number
      of args.  */
@@ -4708,7 +4710,12 @@ do_simplify (gfc_intrinsic_sym *specific, gfc_expr *e)
 
 finish:
   if (result == &gfc_bad_expr)
-    return false;
+    {
+      if (errorcount == old_errorcount
+	  && (!gfc_buffered_p () || !gfc_error_flag_test ()))
+       gfc_error ("Cannot simplify expression at %L", &e->where);
+      return false;
+    }
 
   if (result == NULL)
     resolve_intrinsic (specific, e);	/* Must call at run-time */

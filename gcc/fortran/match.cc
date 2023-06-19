@@ -5534,17 +5534,20 @@ gfc_free_namelist (gfc_namelist *name)
 /* Free an OpenMP namelist structure.  */
 
 void
-gfc_free_omp_namelist (gfc_omp_namelist *name, bool free_ns, bool free_align)
+gfc_free_omp_namelist (gfc_omp_namelist *name, bool free_ns,
+		       bool free_align_allocator)
 {
   gfc_omp_namelist *n;
 
   for (; name; name = n)
     {
       gfc_free_expr (name->expr);
-      if (free_align)
+      if (free_align_allocator)
 	gfc_free_expr (name->u.align);
       if (free_ns)
 	gfc_free_namespace (name->u2.ns);
+      else if (free_align_allocator)
+	gfc_free_expr (name->u2.allocator);
       else if (name->u2.udr)
 	{
 	  if (name->u2.udr->combiner)
@@ -5736,7 +5739,7 @@ gfc_match_equivalence (void)
 
   /* EQUIVALENCE has been matched.  After gobbling any possible whitespace,
      the next character needs to be '('.  Check that here, and return
-     MATCH_NO for a variable of the form equivalencej.  */
+     MATCH_NO for a variable of the form equivalence.  */
   gfc_gobble_whitespace ();
   c = gfc_peek_ascii_char ();
   if (c != '(')

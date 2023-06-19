@@ -1,3 +1,55 @@
+2023-06-15  Marek Polacek  <polacek@redhat.com>
+
+	* configure.ac (--enable-host-shared): Don't set PICFLAG here.
+	(--enable-host-pie): New check.  Set PICFLAG after this check.
+	* configure: Regenerate.
+
+2023-06-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR preprocessor/80753
+	* files.cc (struct _cpp_file): Add deferred_error bitfield.
+	(_cpp_find_file): When finding a file in cache with deferred_error
+	set in _cpp_FFK_NORMAL mode, call open_file_failed and clear the flag.
+	Set deferred_error in _cpp_FFK_HAS_INCLUDE mode if open_file_failed
+	hasn't been called.
+
+2023-04-30  Jeff Law  <jlaw@ventanamicro>
+
+	Revert:
+	2023-04-30  Longjun Luo  <luolongjuna@gmail.com>
+
+	* init.cc (builtin_array): Do not always warn for a redefinition
+	of __LINE__.
+
+2023-04-30  Longjun Luo  <luolongjuna@gmail.com>
+
+	* init.cc (builtin_array): Do not always warn for a redefinition
+	of __LINE__.
+
+2023-03-25  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/109098
+	* charset.cc (cpp_valid_utf8_p): New function.
+	* include/cpplib.h (cpp_valid_utf8_p): New prototype.
+
+2023-03-16  Jakub Jelinek  <jakub@redhat.com>
+
+	* makeucnid.cc (write_copyright): Update Unicode copyright years
+	up to 2022.
+	* makeuname2c.cc (write_copyright): Likewise.
+	* ucnid.h: Regenerated.
+	* uname2c.h: Regenerated.
+
+2023-03-13  Lewis Hyatt  <lhyatt@gmail.com>
+
+	PR preprocessor/67046
+	* directives.cc (_cpp_do__Pragma): Increment pfile->keep_tokens to
+	ensure the returned string token is valid.
+
+2023-03-13  Lewis Hyatt  <lhyatt@gmail.com>
+
+	* generated_cpp_wcwidth.h: Regenerated for Unicode 15.
+
 2022-12-07  Joseph Myers  <joseph@codesourcery.com>
 
 	* init.cc (lang_defaults): Enable va_opt for STDC2X.

@@ -1106,9 +1106,8 @@ expand_doubleword_mod (machine_mode mode, rtx op0, rtx op1, bool unsignedp)
 		return NULL_RTX;
 	    }
 	}
-      rtx remainder = expand_divmod (1, TRUNC_MOD_EXPR, word_mode, NULL, NULL,
-				     sum, gen_int_mode (INTVAL (op1),
-							word_mode),
+      rtx remainder = expand_divmod (1, TRUNC_MOD_EXPR, word_mode, sum,
+				     gen_int_mode (INTVAL (op1), word_mode),
 				     NULL_RTX, 1, OPTAB_DIRECT);
       if (remainder == NULL_RTX)
 	return NULL_RTX;
@@ -1211,8 +1210,8 @@ expand_doubleword_divmod (machine_mode mode, rtx op0, rtx op1, rtx *rem,
 
   if (op11 != const1_rtx)
     {
-      rtx rem2 = expand_divmod (1, TRUNC_MOD_EXPR, mode, NULL, NULL, quot1,
-				op11, NULL_RTX, unsignedp, OPTAB_DIRECT);
+      rtx rem2 = expand_divmod (1, TRUNC_MOD_EXPR, mode, quot1, op11,
+				NULL_RTX, unsignedp, OPTAB_DIRECT);
       if (rem2 == NULL_RTX)
 	return NULL_RTX;
 
@@ -1226,8 +1225,8 @@ expand_doubleword_divmod (machine_mode mode, rtx op0, rtx op1, rtx *rem,
       if (rem2 == NULL_RTX)
 	return NULL_RTX;
 
-      rtx quot2 = expand_divmod (0, TRUNC_DIV_EXPR, mode, NULL, NULL, quot1,
-				 op11, NULL_RTX, unsignedp, OPTAB_DIRECT);
+      rtx quot2 = expand_divmod (0, TRUNC_DIV_EXPR, mode, quot1, op11,
+				 NULL_RTX, unsignedp, OPTAB_DIRECT);
       if (quot2 == NULL_RTX)
 	return NULL_RTX;
 
@@ -1315,7 +1314,17 @@ commutative_optab_p (optab binoptab)
 	  || binoptab == smul_widen_optab
 	  || binoptab == umul_widen_optab
 	  || binoptab == smul_highpart_optab
-	  || binoptab == umul_highpart_optab);
+	  || binoptab == umul_highpart_optab
+	  || binoptab == vec_widen_sadd_optab
+	  || binoptab == vec_widen_uadd_optab
+	  || binoptab == vec_widen_sadd_hi_optab
+	  || binoptab == vec_widen_sadd_lo_optab
+	  || binoptab == vec_widen_uadd_hi_optab
+	  || binoptab == vec_widen_uadd_lo_optab
+	  || binoptab == vec_widen_sadd_even_optab
+	  || binoptab == vec_widen_sadd_odd_optab
+	  || binoptab == vec_widen_uadd_even_optab
+	  || binoptab == vec_widen_uadd_odd_optab);
 }
 
 /* X is to be used in mode MODE as operand OPN to BINOPTAB.  If we're
@@ -2688,10 +2697,14 @@ expand_clrsb_using_clz (scalar_int_mode mode, rtx op0, rtx target)
   return temp;
 }
 
-/* Try calculating clz of a double-word quantity as two clz's of word-sized
-   quantities, choosing which based on whether the high word is nonzero.  */
+static rtx expand_ffs (scalar_int_mode, rtx, rtx);
+
+/* Try calculating clz, ctz or ffs of a double-word quantity as two clz, ctz or
+   ffs operations on word-sized quantities, choosing which based on whether the
+   high (for clz) or low (for ctz and ffs) word is nonzero.  */
 static rtx
-expand_doubleword_clz (scalar_int_mode mode, rtx op0, rtx target)
+expand_doubleword_clz_ctz_ffs (scalar_int_mode mode, rtx op0, rtx target,
+			       optab unoptab)
 {
   rtx xop0 = force_reg (mode, op0);
   rtx subhi = gen_highpart (word_mode, xop0);
@@ -2700,6 +2713,7 @@ expand_doubleword_clz (scalar_int_mode mode, rtx op0, rtx target)
   rtx_code_label *after_label = gen_label_rtx ();
   rtx_insn *seq;
   rtx temp, result;
+  int addend = 0;
 
   /* If we were not given a target, use a word_mode register, not a
      'mode' register.  The result will fit, and nobody is expecting
@@ -2712,6 +2726,9 @@ expand_doubleword_clz (scalar_int_mode mode, rtx op0, rtx target)
      'target' to tag a REG_EQUAL note on.  */
   result = gen_reg_rtx (word_mode);
 
+  if (unoptab != clz_optab)
+    std::swap (subhi, sublo);
+
   start_sequence ();
 
   /* If the high word is not equal to zero,
@@ -2719,7 +2736,13 @@ expand_doubleword_clz (scalar_int_mode mode, rtx op0, rtx target)
   emit_cmp_and_jump_insns (subhi, CONST0_RTX (word_mode), EQ, 0,
 			   word_mode, true, hi0_label);
 
-  temp = expand_unop_direct (word_mode, clz_optab, subhi, result, true);
+  if (optab_handler (unoptab, word_mode) != CODE_FOR_nothing)
+    temp = expand_unop_direct (word_mode, unoptab, subhi, result, true);
+  else
+    {
+      gcc_assert (unoptab == ffs_optab);
+      temp = expand_ffs (word_mode, subhi, result);
+    }
   if (!temp)
     goto fail;
 
@@ -2730,14 +2753,32 @@ expand_doubleword_clz (scalar_int_mode mode, rtx op0, rtx target)
   emit_barrier ();
 
   /* Else clz of the full value is clz of the low word plus the number
-     of bits in the high word.  */
+     of bits in the high word.  Similarly for ctz/ffs of the high word,
+     except that ffs should be 0 when both words are zero.  */
   emit_label (hi0_label);
 
-  temp = expand_unop_direct (word_mode, clz_optab, sublo, 0, true);
+  if (unoptab == ffs_optab)
+    {
+      convert_move (result, const0_rtx, true);
+      emit_cmp_and_jump_insns (sublo, CONST0_RTX (word_mode), EQ, 0,
+			       word_mode, true, after_label);
+    }
+
+  if (optab_handler (unoptab, word_mode) != CODE_FOR_nothing)
+    temp = expand_unop_direct (word_mode, unoptab, sublo, NULL_RTX, true);
+  else
+    {
+      gcc_assert (unoptab == ffs_optab);
+      temp = expand_unop_direct (word_mode, ctz_optab, sublo, NULL_RTX, true);
+      addend = 1;
+    }
+
   if (!temp)
     goto fail;
+
   temp = expand_binop (word_mode, add_optab, temp,
-		       gen_int_mode (GET_MODE_BITSIZE (word_mode), word_mode),
+		       gen_int_mode (GET_MODE_BITSIZE (word_mode) + addend,
+				     word_mode),
 		       result, true, OPTAB_DIRECT);
   if (!temp)
     goto fail;
@@ -2750,7 +2791,7 @@ expand_doubleword_clz (scalar_int_mode mode, rtx op0, rtx target)
   seq = get_insns ();
   end_sequence ();
 
-  add_equal_note (seq, target, CLZ, xop0, NULL_RTX, mode);
+  add_equal_note (seq, target, optab_to_code (unoptab), xop0, NULL_RTX, mode);
   emit_insn (seq);
   return target;
 
@@ -3243,7 +3284,8 @@ expand_unop (machine_mode mode, optab unoptab, rtx op0, rtx target,
 	  if (GET_MODE_SIZE (int_mode) == 2 * UNITS_PER_WORD
 	      && optab_handler (unoptab, word_mode) != CODE_FOR_nothing)
 	    {
-	      temp = expand_doubleword_clz (int_mode, op0, target);
+	      temp = expand_doubleword_clz_ctz_ffs (int_mode, op0, target,
+						    unoptab);
 	      if (temp)
 		return temp;
 	    }
@@ -3487,6 +3529,18 @@ expand_unop (machine_mode mode, optab unoptab, rtx op0, rtx target,
   if (unoptab == ctz_optab && is_a <scalar_int_mode> (mode, &int_mode))
     {
       temp = expand_ctz (int_mode, op0, target);
+      if (temp)
+	return temp;
+    }
+
+  if ((unoptab == ctz_optab || unoptab == ffs_optab)
+      && optimize_insn_for_speed_p ()
+      && is_a <scalar_int_mode> (mode, &int_mode)
+      && GET_MODE_SIZE (int_mode) == 2 * UNITS_PER_WORD
+      && (optab_handler (unoptab, word_mode) != CODE_FOR_nothing
+	  || optab_handler (ctz_optab, word_mode) != CODE_FOR_nothing))
+    {
+      temp = expand_doubleword_clz_ctz_ffs (int_mode, op0, target, unoptab);
       if (temp)
 	return temp;
     }
@@ -5674,7 +5728,21 @@ expand_fix (rtx to, rtx from, int unsignedp)
 	    rtx_insn *last = get_last_insn ();
 	    rtx from1 = from;
 	    if (fmode != GET_MODE (from))
-	      from1 = convert_to_mode (fmode, from, 0);
+	      {
+		if (REAL_MODE_FORMAT (GET_MODE (from))
+		    == &arm_bfloat_half_format
+		    && REAL_MODE_FORMAT (fmode) == &ieee_single_format)
+		  /* The BF -> SF conversions can be just a shift, doesn't
+		     need to handle sNANs.  */
+		  {
+		    int save_flag_finite_math_only = flag_finite_math_only;
+		    flag_finite_math_only = true;
+		    from1 = convert_to_mode (fmode, from, 0);
+		    flag_finite_math_only = save_flag_finite_math_only;
+		  }
+		else
+		  from1 = convert_to_mode (fmode, from, 0);
+	      }
 
 	    if (must_trunc)
 	      {
@@ -5746,7 +5814,21 @@ expand_fix (rtx to, rtx from, int unsignedp)
 	    lab2 = gen_label_rtx ();
 
 	    if (fmode != GET_MODE (from))
-	      from = convert_to_mode (fmode, from, 0);
+	      {
+		if (REAL_MODE_FORMAT (GET_MODE (from))
+		    == &arm_bfloat_half_format
+		    && REAL_MODE_FORMAT (fmode) == &ieee_single_format)
+		  /* The BF -> SF conversions can be just a shift, doesn't
+		     need to handle sNANs.  */
+		  {
+		    int save_flag_finite_math_only = flag_finite_math_only;
+		    flag_finite_math_only = true;
+		    from = convert_to_mode (fmode, from, 0);
+		    flag_finite_math_only = save_flag_finite_math_only;
+		  }
+		else
+		  from = convert_to_mode (fmode, from, 0);
+	      }
 
 	    /* See if we need to do the subtraction.  */
 	    do_pending_stack_adjust ();
@@ -5789,6 +5871,22 @@ expand_fix (rtx to, rtx from, int unsignedp)
 	    return;
 	  }
       }
+
+#ifdef HAVE_SFmode
+  if (REAL_MODE_FORMAT (GET_MODE (from)) == &arm_bfloat_half_format
+      && REAL_MODE_FORMAT (SFmode) == &ieee_single_format)
+    /* We don't have BF -> TI library functions, use BF -> SF -> TI
+       instead but the BF -> SF conversion can be just a shift, doesn't
+       need to handle sNANs.  */
+    {
+      int save_flag_finite_math_only = flag_finite_math_only;
+      flag_finite_math_only = true;
+      from = convert_to_mode (SFmode, from, 0);
+      flag_finite_math_only = save_flag_finite_math_only;
+      expand_fix (to, from, unsignedp);
+      return;
+    }
+#endif
 
   /* We can't do it with an insn, so use a library call.  But first ensure
      that the mode of TO is at least as wide as SImode, since those are the
@@ -8091,6 +8189,16 @@ maybe_gen_insn (enum insn_code icode, unsigned int nops,
       return GEN_FCN (icode) (ops[0].value, ops[1].value, ops[2].value,
 			      ops[3].value, ops[4].value, ops[5].value,
 			      ops[6].value, ops[7].value, ops[8].value);
+    case 10:
+      return GEN_FCN (icode) (ops[0].value, ops[1].value, ops[2].value,
+			      ops[3].value, ops[4].value, ops[5].value,
+			      ops[6].value, ops[7].value, ops[8].value,
+			      ops[9].value);
+    case 11:
+      return GEN_FCN (icode) (ops[0].value, ops[1].value, ops[2].value,
+			      ops[3].value, ops[4].value, ops[5].value,
+			      ops[6].value, ops[7].value, ops[8].value,
+			      ops[9].value, ops[10].value);
     }
   gcc_unreachable ();
 }
