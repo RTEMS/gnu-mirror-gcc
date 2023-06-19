@@ -1066,4 +1066,6 @@ extern bool aarch64_harden_sls_blr_p (void);
 
 extern void aarch64_output_patchable_area (unsigned int, bool);
 
+extern bool aarch64_gcs_enabled ();
+
 #endif /* GCC_AARCH64_PROTOS_H */

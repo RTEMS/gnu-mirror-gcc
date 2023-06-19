@@ -4379,7 +4379,7 @@ AS_HELP_STRING([--disable-standard-branch-protection],
       [
         case $enableval in
           yes)
-            tm_defines="${tm_defines} TARGET_ENABLE_BTI=1 TARGET_ENABLE_PAC_RET=1"
+            tm_defines="${tm_defines} TARGET_ENABLE_BTI=1 TARGET_ENABLE_PAC_RET=1 TARGET_ENABLE_GCS=1"
             ;;
           no)
             ;;
