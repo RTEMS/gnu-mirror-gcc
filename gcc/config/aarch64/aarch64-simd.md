@@ -3910,6 +3910,37 @@
   DONE;
 })
 
+;; Avdanced SIMD lacks a vector != comparison, but this is a quite common
+;; operation.  To not pay the penalty for inverting == we can map our any
+;; comparisons to all i.e. any(~x) => all(x).
+(define_insn_and_split "*cbranchnev4si"
+  [(set (pc)
+    (if_then_else
+      (ne (subreg:DI
+	    (unspec:V4SI
+	      [(not:V4SI (match_operand:V4SI 0 "register_operand" "w"))
+	       (not:V4SI (match_dup 0))]
+		UNSPEC_UMAXV) 0)
+	   (const_int 0))
+	(label_ref (match_operand 1 ""))
+	(pc)))
+    (clobber (match_scratch:DI 2 "=w"))]
+  "TARGET_SIMD && false"
+  "#"
+  "&& true"
+  [(set (match_dup 2)
+	(unspec:V4SI [(match_dup 0) (match_dup 0)] UNSPEC_UMINV))
+   (set (pc)
+    (if_then_else
+      (eq (subreg:DI (match_dup 2) 0)
+	  (const_int 0))
+	(label_ref (match_dup 1))
+	(pc)))]
+{
+  if (can_create_pseudo_p ())
+    operands[2] = gen_reg_rtx (V4SImode);
+})
+
 ;; Patterns comparing two vectors to produce a mask.
 
 (define_expand "vec_cmp<mode><mode>"
