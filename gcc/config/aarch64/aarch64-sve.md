@@ -8123,6 +8123,105 @@
   "cmp<cmp_op>\t%0.<Vetype>, %1/z, %2.<Vetype>, %3.d"
 )
 
+;; Predicated integer comparisons over Advanced SIMD arguments in which only
+;; the flags result is interesting.
+(define_insn "*aarch64_pred_cmp<UCOMPARISONS:cmp_op><mode><EQL:code>_neon_ptest"
+  [(set (reg:CC_NZC CC_REGNUM)
+	(unspec:CC_NZC
+	  [(match_operand:VNx16BI 1 "register_operand" "Upl")
+	   (match_operand 4)
+	   (match_operand:SI 5 "aarch64_sve_ptrue_flag")
+	   (unspec:VNx4BI
+	     [(match_operand:VNx4BI 6 "register_operand" "Upl")
+	      (match_operand:SI 7 "aarch64_sve_ptrue_flag")
+	      (EQL:VNx4BI
+		(subreg:SVE_FULL_BHSI
+		 (neg:<V128>
+		  (UCOMPARISONS:<V128>
+		   (match_operand:<V128> 2 "register_operand" "w")
+		   (match_operand:<V128> 3 "aarch64_simd_reg_or_zero" "w"))) 0)
+		(match_operand:SVE_FULL_BHSI 8 "aarch64_simd_imm_zero" "Dz"))]
+	     UNSPEC_PRED_Z)]
+	  UNSPEC_PTEST))
+   (clobber (match_scratch:VNx4BI 0 "=Upa"))]
+  "TARGET_SVE
+   && aarch64_sve_same_pred_for_ptest_p (&operands[4], &operands[6])"
+{
+  operands[2] = lowpart_subreg (<MODE>mode, operands[2], <V128>mode);
+  operands[3] = lowpart_subreg (<MODE>mode, operands[3], <V128>mode);
+  if (EQ == <EQL:CODE>)
+    std::swap (operands[2], operands[3]);
+
+  return "cmp<UCOMPARISONS:cmp_op>\t%0.<Vetype>, %1/z, %2.<Vetype>, %3.<Vetype>";
+}
+)
+
+;; Predicated integer comparisons over Advanced SIMD arguments in which only
+;; the flags result is interesting.
+(define_insn "*aarch64_pred_cmpeq<mode><EQL:code>_neon_ptest"
+  [(set (reg:CC_NZC CC_REGNUM)
+	(unspec:CC_NZC
+	  [(match_operand:VNx16BI 1 "register_operand" "Upl")
+	   (match_operand 4)
+	   (match_operand:SI 5 "aarch64_sve_ptrue_flag")
+	   (unspec:VNx4BI
+	     [(match_operand:VNx4BI 6 "register_operand" "Upl")
+	      (match_operand:SI 7 "aarch64_sve_ptrue_flag")
+	      (EQL:VNx4BI
+		(subreg:SVE_FULL_BHSI
+		 (neg:<V128>
+		  (eq:<V128>
+		   (match_operand:<V128> 2 "register_operand" "w")
+		   (match_operand:<V128> 3 "aarch64_simd_reg_or_zero" "w"))) 0)
+		(match_operand:SVE_FULL_BHSI 8 "aarch64_simd_imm_zero" "Dz"))]
+	     UNSPEC_PRED_Z)]
+	  UNSPEC_PTEST))
+   (clobber (match_scratch:VNx4BI 0 "=Upa"))]
+  "TARGET_SVE
+   && aarch64_sve_same_pred_for_ptest_p (&operands[4], &operands[6])"
+{
+  operands[2] = lowpart_subreg (<MODE>mode, operands[2], <V128>mode);
+  operands[3] = lowpart_subreg (<MODE>mode, operands[3], <V128>mode);
+  if (EQ == <EQL:CODE>)
+    std::swap (operands[2], operands[3]);
+
+  return "cmpeq\t%0.<Vetype>, %1/z, %2.<Vetype>, %3.<Vetype>";
+}
+)
+
+;; Same as the above but version for == and !=
+(define_insn "*aarch64_pred_cmpne<mode><EQL:code>_neon_ptest"
+  [(set (reg:CC_NZC CC_REGNUM)
+	(unspec:CC_NZC
+	  [(match_operand:VNx16BI 1 "register_operand" "Upl")
+	   (match_operand 4)
+	   (match_operand:SI 5 "aarch64_sve_ptrue_flag")
+	   (unspec:VNx4BI
+	     [(match_operand:VNx4BI 6 "register_operand" "Upl")
+	      (match_operand:SI 7 "aarch64_sve_ptrue_flag")
+	      (EQL:VNx4BI
+		(subreg:SVE_FULL_BHSI
+		 (plus:<V128>
+		  (eq:<V128>
+		   (match_operand:<V128> 2 "register_operand" "w")
+		   (match_operand:<V128> 3 "aarch64_simd_reg_or_zero" "w"))
+		  (match_operand:<V128> 9 "aarch64_simd_imm_minus_one" "i")) 0)
+		(match_operand:SVE_FULL_BHSI 8 "aarch64_simd_imm_zero" "Dz"))]
+	     UNSPEC_PRED_Z)]
+	  UNSPEC_PTEST))
+   (clobber (match_scratch:VNx4BI 0 "=Upa"))]
+  "TARGET_SVE
+   && aarch64_sve_same_pred_for_ptest_p (&operands[4], &operands[6])"
+{
+  operands[2] = lowpart_subreg (<MODE>mode, operands[2], <V128>mode);
+  operands[3] = lowpart_subreg (<MODE>mode, operands[3], <V128>mode);
+  if (EQ == <EQL:CODE>)
+    std::swap (operands[2], operands[3]);
+
+  return "cmpne\t%0.<Vetype>, %1/z, %2.<Vetype>, %3.<Vetype>";
+}
+)
+
 ;; -------------------------------------------------------------------------
 ;; ---- [INT] While tests
 ;; -------------------------------------------------------------------------
@@ -8602,7 +8701,7 @@
 )
 
 ;; See "Description of UNSPEC_PTEST" above for details.
-(define_insn "aarch64_ptest<mode>"
+(define_insn "@aarch64_ptest<mode>"
   [(set (reg:CC_NZC CC_REGNUM)
 	(unspec:CC_NZC [(match_operand:VNx16BI 0 "register_operand" "Upa")
 			(match_operand 1)

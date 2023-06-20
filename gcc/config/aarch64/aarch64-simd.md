@@ -3883,31 +3883,58 @@
   "TARGET_SIMD"
 {
   auto code = GET_CODE (operands[0]);
-  rtx tmp = operands[1];
-
-  /* If comparing against a non-zero vector we have to do a comparison first
-     so we can have a != 0 comparison with the result.  */
-  if (operands[2] != CONST0_RTX (<MODE>mode))
-    emit_insn (gen_vec_cmp<mode><mode> (tmp, operands[0], operands[1],
-					operands[2]));
-
-  /* For 64-bit vectors we need no reductions.  */
-  if (known_eq (128, GET_MODE_BITSIZE (<MODE>mode)))
+  /* If SVE is available, lets borrow some instructions.  We will optimize
+     these further later in combine.  */
+  if (TARGET_SVE)
     {
-      /* Always reduce using a V4SI.  */
-      rtx reduc = gen_lowpart (V4SImode, tmp);
-      rtx res = gen_reg_rtx (V4SImode);
-      emit_insn (gen_aarch64_umaxpv4si (res, reduc, reduc));
-      emit_move_insn (tmp, gen_lowpart (<MODE>mode, res));
+      machine_mode full_mode = aarch64_full_sve_mode (<VEL>mode).require ();
+      rtx in1 = lowpart_subreg (full_mode, operands[1], <MODE>mode);
+      rtx in2 = lowpart_subreg (full_mode, operands[2], <MODE>mode);
+
+      machine_mode pred_mode = aarch64_sve_pred_mode (full_mode);
+      rtx_vector_builder builder (VNx16BImode, 16, 2);
+      for (unsigned int i = 0; i < 16; ++i)
+	builder.quick_push (CONST1_RTX (BImode));
+      for (unsigned int i = 0; i < 16; ++i)
+	builder.quick_push (CONST0_RTX (BImode));
+      rtx ptrue = force_reg (VNx16BImode, builder.build ());
+      rtx cast_ptrue = gen_lowpart (pred_mode, ptrue);
+      rtx ptrue_flag = gen_int_mode (SVE_KNOWN_PTRUE, SImode);
+
+      rtx tmp = gen_reg_rtx (pred_mode);
+      aarch64_expand_sve_vec_cmp_int (tmp, reverse_condition (code), in1, in2);
+      emit_insn (gen_aarch64_ptest (pred_mode, ptrue, cast_ptrue, ptrue_flag, tmp));
+      operands[1] = gen_rtx_REG (CC_NZCmode, CC_REGNUM);
+      operands[2] = const0_rtx;
     }
+  else
+    {
+      rtx tmp = operands[1];
 
-  rtx val = gen_reg_rtx (DImode);
-  emit_move_insn (val, gen_lowpart (DImode, tmp));
+      /* If comparing against a non-zero vector we have to do a comparison first
+	 so we can have a != 0 comparison with the result.  */
+      if (operands[2] != CONST0_RTX (<MODE>mode))
+	emit_insn (gen_vec_cmp<mode><mode> (tmp, operands[0], operands[1],
+					    operands[2]));
 
-  rtx cc_reg = aarch64_gen_compare_reg (code, val, const0_rtx);
-  rtx cmp_rtx = gen_rtx_fmt_ee (code, DImode, cc_reg, const0_rtx);
-  emit_jump_insn (gen_condjump (cmp_rtx, cc_reg, operands[3]));
-  DONE;
+      /* For 64-bit vectors we need no reductions.  */
+      if (known_eq (128, GET_MODE_BITSIZE (<MODE>mode)))
+	{
+	  /* Always reduce using a V4SI.  */
+	  rtx reduc = gen_lowpart (V4SImode, tmp);
+	  rtx res = gen_reg_rtx (V4SImode);
+	  emit_insn (gen_aarch64_umaxpv4si (res, reduc, reduc));
+	  emit_move_insn (tmp, gen_lowpart (<MODE>mode, res));
+	}
+
+      rtx val = gen_reg_rtx (DImode);
+      emit_move_insn (val, gen_lowpart (DImode, tmp));
+
+      rtx cc_reg = aarch64_gen_compare_reg (code, val, const0_rtx);
+      rtx cmp_rtx = gen_rtx_fmt_ee (code, DImode, cc_reg, const0_rtx);
+      emit_jump_insn (gen_condjump (cmp_rtx, cc_reg, operands[3]));
+      DONE;
+    }
 })
 
 ;; Avdanced SIMD lacks a vector != comparison, but this is a quite common

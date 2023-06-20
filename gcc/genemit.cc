@@ -895,6 +895,7 @@ from the machine description file `md'.  */\n\n");
   fprintf (file, "#include \"tm-constrs.h\"\n");
   fprintf (file, "#include \"ggc.h\"\n");
   fprintf (file, "#include \"target.h\"\n\n");
+  fprintf (file, "#include \"rtx-vector-builder.h\"\n\n");
 }
 
 auto_vec<const char *, 10> output_files;
