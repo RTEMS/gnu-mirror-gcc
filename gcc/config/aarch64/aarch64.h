@@ -575,9 +575,9 @@ struct GTY (()) aarch64_frame
      STACK_BOUNDARY.  */
   HOST_WIDE_INT bytes_above_hard_fp;
 
-  /* The size of the frame.  This value is the offset from base of the
-   * frame (incomming SP) to the stack_pointer.  This value is always
-   * a multiple of STACK_BOUNDARY.  */
+  /* The size of the frame, i.e. the number of bytes between the bottom
+     of the outgoing arguments and the incoming SP.  This value is always
+     a multiple of STACK_BOUNDARY.  */
   HOST_WIDE_INT frame_size;
 
   /* The size of the initial stack adjustment before saving callee-saves.  */
