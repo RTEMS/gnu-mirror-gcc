@@ -4078,6 +4078,7 @@ proc check_effective_target_vect_early_break { } {
     return [check_cached_effective_target_indexed vect_early_break {
       expr {
 	[istarget aarch64*-*-*]
+	|| [check_effective_target_arm_neon_ok]
 	}}]
 }
 # Return 1 if the target supports hardware vectorization of complex additions of
