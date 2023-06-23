@@ -1,4 +1,4 @@
-==================== Branch work123, merge up 06/23/2023 ====================
+==================== Branch work123, merge up 06/23/2023 (patch #1 included) ====================
 
 ==================== Branch work123, patch #1 ====================
 
@@ -66,10 +66,12 @@ The solution involves:
 	longer using ds_form_mem_operand, the ld and lwa instructions will fuse
 	x-form (reg+reg) addresses in addition ds-form (reg+offset or reg).
 
-2023-06-22   Michael Meissner  <meissner@linux.ibm.com>
+2023-06-23   Michael Meissner  <meissner@linux.ibm.com>
+
 
 gcc/
 
+	PR target/105325
 	* config/rs6000/genfusion.pl (gen_ld_cmpi_p10_one): Fix problems that
 	allowed prefixed lwa to be generated.
 	* config/rs6000/fusion.md: Regenerate.
@@ -80,9 +82,11 @@ gcc/
 
 gcc/testsuite/
 
+	PR target/105325
 	* g++.target/powerpc/pr105325.C: New test.
-	* gcc/testsuite/gcc.target/powerpc/fusion-p10-ldcmpi.c: Update insn
-	counts.
+	* cc.target/powerpc/fusion-p10-ldcmpi.c: Update insn counts.
+
+Co-Authored-By: Aaron Sawdey  <acsawdey@linux.ibm.com>
 
 ==================== Branch work123, baseline ====================
 
