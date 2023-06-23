@@ -1,3 +1,87 @@
+==================== Branch work123, patch #1 ====================
+
+Fix power10 fusion bug with prefixed loads, PR target/105325
+
+This changes fixes PR target/105325.  PR target/105325 is a bug where an
+invalid lwa instruction is generated due to power10 fusion of a load
+instruction to a GPR and an compare immediate instruction with the immediate
+being -1, 0, or 1.
+
+In some cases, when the load instruction is done, the GCC compiler would
+generate a load instruction with an offset that was too large to fit into the
+normal load instruction.
+
+In particular, loads from the stack might originally have a small offset, so
+that the load is not a prefixed load.  However, after the stack is set up, and
+register allocation has been done, the offset now is large enough that we would
+have to use a prefixed load instruction.
+
+The support for prefixed loads did not consider that patterns with a fused load
+and compare might have a prefixed address.  Without this support, the proper
+prefixed load won't be generated.
+
+In the original code, when the split2 pass is run after reload has finished the
+ds_form_mem_operand predicate that was used for lwa and ld no longer returns
+true.  When the pattern was created, ds_form_mem_operand recognized the insn as
+being valid since the offset was small.  But after register allocation,
+ds_form_mem_operand did not return true.  Because it didn't return true, the
+insn could not be split.  Since the insn was not split and the prefix support
+did not indicate a prefixed instruction was used, the wrong load is generated.
+
+The solution involves:
+
+    1)	Don't use ds_form_mem_operand for ld and lwa, always use
+	non_update_memory_operand.
+
+    2)	Delete ds_form_mem_operand since it is no longer used.
+
+    3)	Use the "YZ" constraints for ld/lwa instead of "m".
+
+    4)	If we don't need to sign extend the lwa, convert it to lwz, and use
+	cmpwi instead of cmpdi.  Adjust the insn name to reflect the code
+	generate.
+
+    5)	Insure that the insn using lwa will be recognized as having a prefixed
+	operand (and hence the insn length will be 16 bytes instead of 8
+	bytes).
+
+	5a) Set the prefixed and maybe_prefix attributes to know that
+	    fused_load_cmpi are also load insns;
+
+	5b) In the case where we are just setting CC and not using the memory
+	    afterward, set the clobber to use a DI register, and put an
+	    explicit sign_extend operation in the split;
+
+	5c) Set the sign_extend attribute to "yes" for lwa.
+
+	5d) 5a-5c are the things that prefixed_load_p in rs6000.cc checks to
+	    ensure that lwa is treated as a ds-form instruction and not as
+	    a d-form instruction (i.e. lwz).
+
+    6)	Add a new test case for this case.
+
+    7)	Adjust the insn counts in fusion-p10-ldcmpi.c.  Because we are no
+	longer using ds_form_mem_operand, the ld and lwa instructions will fuse
+	x-form (reg+reg) addresses in addition ds-form (reg+offset or reg).
+
+2023-06-22   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/genfusion.pl (gen_ld_cmpi_p10_one): Fix problems that
+	allowed prefixed lwa to be generated.
+	* config/rs6000/fusion.md: Regenerate.
+	* config/rs6000/predicates.md (ds_form_mem_operand): Delete.
+	* config/rs6000/rs6000.md (prefixed attribute): Add support for load
+	plus compare immediate fused insns.
+	(maybe_prefixed): Likewise.
+
+gcc/testsuite/
+
+	* g++.target/powerpc/pr105325.C: New test.
+	* gcc/testsuite/gcc.target/powerpc/fusion-p10-ldcmpi.c: Update insn
+	counts.
+
 ==================== Branch work123, baseline ====================
 
 2023-06-22   Michael Meissner  <meissner@linux.ibm.com>
