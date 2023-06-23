@@ -6603,6 +6603,21 @@
   DONE;
 })
 
+(define_expand "cbranch<mode>4"
+  [(set (pc) (if_then_else
+	      (match_operator 0 "expandable_comparison_operator"
+	       [(match_operand:MVE_7 1 "register_operand")
+	        (match_operand:MVE_7 2 "zero_operand")])
+	      (label_ref (match_operand 3 "" ""))
+	      (pc)))]
+  "TARGET_HAVE_MVE"
+{
+  rtx val = gen_reg_rtx (SImode);
+  emit_move_insn (val, gen_lowpart (SImode, operands[1]));
+  emit_jump_insn (gen_cbranchsi4 (operands[0], val, const0_rtx, operands[3]));
+  DONE;
+})
+
 ;; Reinterpret operand 1 in operand 0's mode, without changing its contents.
 (define_expand "@arm_mve_reinterpret<mode>"
   [(set (match_operand:MVE_vecs 0 "register_operand")

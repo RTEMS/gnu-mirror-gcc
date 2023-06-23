@@ -4079,6 +4079,8 @@ proc check_effective_target_vect_early_break { } {
       expr {
 	[istarget aarch64*-*-*]
 	|| [check_effective_target_arm_neon_ok]
+	|| ([check_effective_target_arm_v8_1m_mve_fp_ok]
+	     && [check_effective_target_arm_little_endian])
 	}}]
 }
 # Return 1 if the target supports hardware vectorization of complex additions of

@@ -11883,6 +11883,15 @@ arm_rtx_costs_internal (rtx x, enum rtx_code code, enum rtx_code outer_code,
 	   || TARGET_HAVE_MVE)
 	  && simd_immediate_valid_for_move (x, mode, NULL, NULL))
 	*cost = COSTS_N_INSNS (1);
+      else if (TARGET_HAVE_MVE
+	       && outer_code == COMPARE
+	       && VALID_MVE_PRED_MODE (mode))
+	/* MVE allows very limited instructions on VPT.P0,  however comparisons
+	   to 0 do not require us to materialze this constant or require a
+	   predicate comparison as we can go through SImode.  For that reason
+	   allow P0 CMP 0 as a cheap operation such that the 0 isn't forced to
+	   registers as we can't compare two predicates.  */
+	*cost = COSTS_N_INSNS (1);
       else
 	*cost = COSTS_N_INSNS (4);
       return true;
