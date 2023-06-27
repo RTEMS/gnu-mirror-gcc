@@ -5506,6 +5506,8 @@ aarch64_allocate_and_probe_stack_space (rtx temp1, rtx temp2,
   HOST_WIDE_INT guard_size
     = 1 << PARAM_VALUE (PARAM_STACK_CLASH_PROTECTION_GUARD_SIZE);
   HOST_WIDE_INT guard_used_by_caller = STACK_CLASH_CALLER_GUARD;
+  HOST_WIDE_INT byte_sp_alignment = STACK_BOUNDARY / BITS_PER_UNIT;
+  gcc_assert (multiple_p (poly_size, byte_sp_alignment));
   /* When doing the final adjustment for the outgoing argument size we can't
      assume that LR was saved at position 0.  So subtract it's offset from the
      ABI safe buffer so that we don't accidentally allow an adjustment that
@@ -5513,7 +5515,9 @@ aarch64_allocate_and_probe_stack_space (rtx temp1, rtx temp2,
      probing.  */
   HOST_WIDE_INT min_probe_threshold
     = final_adjustment_p
-      ? guard_used_by_caller - cfun->machine->frame.reg_offset[LR_REGNUM]
+      ? (guard_used_by_caller
+	 + byte_sp_alignment
+	 - cfun->machine->frame.reg_offset[LR_REGNUM])
       : guard_size - guard_used_by_caller;
 
   poly_int64 frame_size = cfun->machine->frame.frame_size;
