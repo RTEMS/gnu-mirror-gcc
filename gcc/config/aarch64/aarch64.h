@@ -570,10 +570,10 @@ struct GTY (()) aarch64_frame
      STACK_BOUNDARY.  */
   HOST_WIDE_INT bytes_above_locals;
 
-  /* Offset from the base of the frame (incomming SP) to the
-     hard_frame_pointer.  This value is always a multiple of
+  /* The number of bytes between the hard_frame_pointer and the top of
+     the frame (the incomming SP).  This value is always a multiple of
      STACK_BOUNDARY.  */
-  HOST_WIDE_INT hard_fp_offset;
+  HOST_WIDE_INT bytes_above_hard_fp;
 
   /* The size of the frame.  This value is the offset from base of the
    * frame (incomming SP) to the stack_pointer.  This value is always
