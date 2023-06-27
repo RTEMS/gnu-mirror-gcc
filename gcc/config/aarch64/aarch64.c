@@ -4686,15 +4686,31 @@ aarch64_layout_frame (void)
 
   cfun->machine->frame.bytes_below_hard_fp = crtl->outgoing_args_size;
 
+#define ALLOCATE_GPR_SLOT(REGNO)					\
+  do									\
+    {									\
+      cfun->machine->frame.reg_offset[REGNO] = offset;			\
+      if (cfun->machine->frame.wb_candidate1 == INVALID_REGNUM)		\
+	cfun->machine->frame.wb_candidate1 = (REGNO);			\
+      else if (cfun->machine->frame.wb_candidate2 == INVALID_REGNUM)	\
+	cfun->machine->frame.wb_candidate2 = (REGNO);			\
+      offset += UNITS_PER_WORD;						\
+    }									\
+  while (0)
+
   if (cfun->machine->frame.emit_frame_chain)
     {
       /* FP and LR are placed in the linkage record.  */
-      cfun->machine->frame.reg_offset[R29_REGNUM] = 0;
-      cfun->machine->frame.wb_candidate1 = R29_REGNUM;
-      cfun->machine->frame.reg_offset[R30_REGNUM] = UNITS_PER_WORD;
-      cfun->machine->frame.wb_candidate2 = R30_REGNUM;
-      offset = 2 * UNITS_PER_WORD;
+      ALLOCATE_GPR_SLOT (R29_REGNUM);
+      ALLOCATE_GPR_SLOT (R30_REGNUM);
     }
+  else if (flag_stack_clash_protection
+	   && cfun->machine->frame.reg_offset[R30_REGNUM] == SLOT_REQUIRED)
+    /* Put the LR save slot first, since it makes a good choice of probe
+       for stack clash purposes.  The idea is that the link register usually
+       has to be saved before a call anyway, and so we lose little by
+       stopping it from being individually shrink-wrapped.  */
+    ALLOCATE_GPR_SLOT (R30_REGNUM);
 
   /* With stack-clash, LR must be saved in non-leaf functions.  */
   gcc_assert (crtl->is_leaf
@@ -4704,14 +4720,9 @@ aarch64_layout_frame (void)
   /* Now assign stack slots for them.  */
   for (regno = R0_REGNUM; regno <= R30_REGNUM; regno++)
     if (cfun->machine->frame.reg_offset[regno] == SLOT_REQUIRED)
-      {
-	cfun->machine->frame.reg_offset[regno] = offset;
-	if (cfun->machine->frame.wb_candidate1 == INVALID_REGNUM)
-	  cfun->machine->frame.wb_candidate1 = regno;
-	else if (cfun->machine->frame.wb_candidate2 == INVALID_REGNUM)
-	  cfun->machine->frame.wb_candidate2 = regno;
-	offset += UNITS_PER_WORD;
-      }
+      ALLOCATE_GPR_SLOT (regno);
+
+#undef ALLOCATE_GPR_SLOT
 
   HOST_WIDE_INT max_int_offset = offset;
   offset = ROUND_UP (offset, STACK_BOUNDARY / BITS_PER_UNIT);
@@ -5508,16 +5519,9 @@ aarch64_allocate_and_probe_stack_space (rtx temp1, rtx temp2,
   HOST_WIDE_INT guard_used_by_caller = STACK_CLASH_CALLER_GUARD;
   HOST_WIDE_INT byte_sp_alignment = STACK_BOUNDARY / BITS_PER_UNIT;
   gcc_assert (multiple_p (poly_size, byte_sp_alignment));
-  /* When doing the final adjustment for the outgoing argument size we can't
-     assume that LR was saved at position 0.  So subtract it's offset from the
-     ABI safe buffer so that we don't accidentally allow an adjustment that
-     would result in an allocation larger than the ABI buffer without
-     probing.  */
   HOST_WIDE_INT min_probe_threshold
     = final_adjustment_p
-      ? (guard_used_by_caller
-	 + byte_sp_alignment
-	 - cfun->machine->frame.reg_offset[LR_REGNUM])
+      ? guard_used_by_caller + byte_sp_alignment
       : guard_size - guard_used_by_caller;
 
   poly_int64 frame_size = cfun->machine->frame.frame_size;
@@ -5697,8 +5701,8 @@ aarch64_allocate_and_probe_stack_space (rtx temp1, rtx temp2,
       if (final_adjustment_p && rounded_size != 0)
 	min_probe_threshold = 0;
       /* If doing a small final adjustment, we always probe at offset 0.
-	 This is done to avoid issues when LR is not at position 0 or when
-	 the final adjustment is smaller than the probing offset.  */
+	 This is done to avoid issues when the final adjustment is smaller
+	 than the probing offset.  */
       else if (final_adjustment_p && rounded_size == 0)
 	residual_probe_offset = 0;
 
