@@ -137,28 +137,54 @@ hstmt_outvar::to_gimple (void)
   gcc_checking_assert (rhs != NULL);
   gcc_checking_assert (rhs->ssa != NULL);
 
-  outvar->type_or_ssa_value = rhs->ssa;
+  outvar->t = rhs->ssa;
   return NULL;
 }
 
 gimple *
 hstmt_return::to_gimple (void)
 {
-  return gimple_build_return (retval->ssa);
+  if (!retval) /* Operandless return.  */
+    return gimple_build_return (NULL_TREE);
+  else
+    return gimple_build_return (retval->ssa);
 }
 
+/* Create a new LOCAL hack variable.
+
+   Accepts VAR_DECL, PARM_DECL and type trees.
+   Passing type tree means creating an anonymous variable.  */
+
 hvar *
-hack_ssa_builder::new_local (tree type)
+hack_ssa_builder::new_local (tree type_or_var)
 {
-  gcc_checking_assert (type != NULL_TREE);
+  gcc_checking_assert (type_or_var != NULL_TREE);
 
   hvar *local = XNEW (struct hvar);
   local->index = next_index;
   local->code = LOCAL;
-  local->type_or_ssa_value = type;
+  local->t = type_or_var;
+  local->default_def = NULL;
   next_index++;
   allocated_hvars.safe_push (local);
   return local;
+}
+
+hvar *
+hack_ssa_builder::new_param (tree var)
+{
+  hvar *param = XNEW (struct hvar);
+  param->index = next_index;
+  param->code = PARAM;
+  param->t = var;
+  next_index++;
+
+  tree ssa = get_or_create_ssa_default_def (cfun, var);
+  param->default_def = new hstmt_const (param, ssa);
+
+  allocated_hvars.safe_push (param);
+
+  return param;
 }
 
 hvar *
@@ -169,13 +195,11 @@ hack_ssa_builder::new_invar (tree ssa)
   hvar *invar = XNEW (struct hvar);
   invar->index = next_const_index;
   invar->code = INVAR;
-  invar->type_or_ssa_value = ssa;
+  invar->t = NULL_TREE;
   next_const_index++;
 
-  hstmt_const *stmt = new hstmt_const (invar);
-  stmt->ssa = ssa; // TODO Elegantněji
+  invar->default_def = new hstmt_const (invar, ssa);
 
-  const_list.safe_push (stmt);
   allocated_hvars.safe_push (invar);
 
   return invar;
@@ -236,7 +260,8 @@ hack_ssa_builder::append_outvar (basic_block bb, hvar *local)
   hvar *outvar = XNEW (struct hvar);
   outvar->index = next_index;
   outvar->code = OUTVAR;
-  outvar->type_or_ssa_value = NULL;
+  outvar->t = NULL_TREE;
+  outvar->default_def = NULL;
   next_index++;
 
   hstmt_outvar *stmt = new hstmt_outvar (outvar, read_variable (bb, local));
@@ -247,13 +272,24 @@ hack_ssa_builder::append_outvar (basic_block bb, hvar *local)
   return outvar;
 }
 
-/* TODO Describe.  */
+/* Build and append hack return to a basic block.
+
+   Sets block as filled.  */
+
+void
+hack_ssa_builder::append_return (basic_block bb)
+{
+  hstmt_return *stmt = new hstmt_return ();
+  append_stmt (bb, stmt);
+  set_block_filled (bb);
+}
 
 void
 hack_ssa_builder::append_return (basic_block bb, hvar *retval)
 {
   hstmt_return *stmt = new hstmt_return (read_variable (bb, retval));
   append_stmt (bb, stmt);
+  set_block_filled (bb);
 }
 
 /* See the Braun alg paper for what 'sealed' means.  */
@@ -381,7 +417,7 @@ hack_ssa_builder::ssa_from_outvar (hvar *outvar)
 {
   gcc_checking_assert (finalized && "SSA builder has to be finalized");
   gcc_checking_assert (outvar->code == OUTVAR);
-  return outvar->type_or_ssa_value;
+  return outvar->t;
 }
 
 void
@@ -495,12 +531,15 @@ hack_ssa_builder::commit_ssa_name (hstmt_with_lhs *s)
   switch (s->var->code)
     {
       case LOCAL:
-	s->ssa = make_ssa_name (s->var->type_or_ssa_value);
+      case PARAM:
+	s->ssa = make_ssa_name (s->var->t);
 	break;
+      case MEMORY:
+	gcc_unreachable (); /* TODO implement memory.  */
       case INVAR:
 	gcc_unreachable (); /* Invars already have SSA value.  */
       case OUTVAR:
-	gcc_unreachable (); /* Outvars shouldn't be present in hstmt_with_lhs.  */
+	gcc_unreachable (); /* hstmt_with_lhs shouldn't contain outvars.  */
     }
 }
 
@@ -647,11 +686,10 @@ hack_ssa_builder::write_variable (basic_block bb, hvar *var,
 hstmt_with_lhs *
 hack_ssa_builder::read_variable (basic_block bb, hvar *var)
 {
-  // TODO add MEMORY
-  gcc_checking_assert (var->code == LOCAL || var->code == INVAR);
+  gcc_checking_assert (var->code != OUTVAR);
   if (var->code == INVAR)
     {
-      return const_list[var->index];
+      return var->default_def;
     }
 
   hack_bb *record = get_bb_record (bb);
@@ -687,7 +725,11 @@ hack_ssa_builder::read_variable_recursive (basic_block bb, hvar *var)
     }
   else
     {
-      // TODO Řeším takhle správně, že definici nenajdu?
+      /* Reached a bb without predecesors.  */
+      if (var->code == PARAM)
+	{
+	  return var->default_def;
+	}
       gcc_unreachable (); /* Couldn't find definition of variable.  */
     }
 

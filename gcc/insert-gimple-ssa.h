@@ -30,6 +30,7 @@ class hstmt;
 class hstmt_with_lhs;
 class hphi;
 class hstmt_assign;
+class hstmt_const;
 struct hack_tuple_internal;
 class hack_bb;
 struct hvar;
@@ -53,17 +54,21 @@ enum hvar_code
   INVAR,
   MEMORY,
   LOCAL,
-  OUTVAR
+  OUTVAR,
+  PARAM
 };
 
 struct hvar
 {
-  int index; /* Index only has meaning for INVARs. It is assigned to LOCALs and
-		OUTVARs too, however.  */
+  int index; // TODO Remove. Not currently used.
   enum hvar_code code;
-  tree type_or_ssa_value; /* type for LOCAL, ssa for INVAR, OUTVAR has
-			     NULL_TREE until finalization when it gets an ssa
-			     name, MEMORY has a storage ref.  */
+  tree t; /* LOCAL           ... VAR_DECL
+	     anonymous LOCAL ... type
+	     PARAM           ... PARM_DECL
+	     INVAR           ... null
+	     OUTVAR          ... null or SSA name when finalized
+	     MEMORY          ... MEM_REF.  */
+  hstmt_const *default_def; /* PARAMs and INVARs.  */
 };
 
 // -- INTERNAL STRUCTS --
@@ -115,11 +120,16 @@ class hstmt
 class hstmt_with_lhs : public hstmt
 {
   public:
-    hstmt_with_lhs (hstmt_code code, hvar *var) : hstmt (code), var (var) { }
+    hstmt_with_lhs (hstmt_code code, hvar *var, tree ssa) :
+      hstmt (code), var (var), ssa (ssa) { }
+    hstmt_with_lhs (hstmt_code code, hvar *var) : hstmt (code), var (var)
+      {
+	ssa = NULL_TREE;
+      }
 
     hvar *var;
     vec<hstmt *> uses = vNULL; // TODO Nahradit obstack-friendly strukturou?
-    tree ssa = NULL_TREE;
+    tree ssa;
 };
 
 /* Hack PHI.  */
@@ -178,7 +188,7 @@ class hstmt_assign : public hstmt_with_lhs
     hstmt_assign (hvar *var, hack_tuple_internal *val) :
       hstmt_with_lhs (HSTMT_ASSIGN, var), val (val)
       {
-	gcc_checking_assert (var->code == LOCAL);
+	gcc_checking_assert (var->code == LOCAL || var->code == PARAM);
       }
 
     virtual gimple *to_gimple (void) override;
@@ -190,14 +200,15 @@ class hstmt_assign : public hstmt_with_lhs
    Virtual statement representing values originating outside the code we're
    building.
 
-   'var' should be only INVAR.  */
+   'var' should be only INVAR. TODO Update description */
 
 class hstmt_const : public hstmt_with_lhs
 {
   public:
-    hstmt_const (hvar *var) : hstmt_with_lhs (HSTMT_CONST, var)
+    hstmt_const (hvar *var, tree ssa)
+      : hstmt_with_lhs (HSTMT_CONST, var, ssa)
       {
-	gcc_checking_assert (var->code == INVAR);
+	gcc_checking_assert (var->code == INVAR || var->code == PARAM);
       }
 };
 
@@ -242,6 +253,9 @@ class hstmt_return : public hstmt
 {
   public:
     hstmt_with_lhs *retval;
+
+    hstmt_return () :
+      hstmt (HSTMT_RETURN), retval (NULL) { }
 
     hstmt_return (hstmt_with_lhs *retval) :
       hstmt (HSTMT_RETURN), retval (retval) { }
@@ -338,6 +352,7 @@ class hack_ssa_builder
  public:
   hvar *new_local (tree type);
   hvar *new_invar (tree ssa);
+  hvar *new_param (tree var);
   void append_assign (basic_block bb, enum tree_code code, hvar *left,
 		      hvar *op1);
   void append_assign (basic_block bb, enum tree_code code, hvar *left,
@@ -346,6 +361,7 @@ class hack_ssa_builder
 		      hvar *op1, hvar *op2, hvar *op3);
   void append_cond (basic_block bb, enum tree_code pred_code,
 		    hvar *left, hvar *right);
+  void append_return (basic_block bb);
   void append_return (basic_block bb, hvar *retval);
   hvar *append_outvar (basic_block bb, hvar *local);
 
@@ -368,9 +384,6 @@ class hack_ssa_builder
   vec<hvar *> allocated_hvars = vNULL;
   vec<hack_tuple_internal *> allocated_internal = vNULL;
 
-  vec<hstmt_const *> const_list = vNULL; /* Links INVAR hack vars and their
-					    respective hack stmts together
-					    using INVAR indexes.  */
   hash_set<basic_block> seen_bbs;
   hash_map<basic_block, hack_bb *> bb_record_map;
   hash_set<basic_block> sealed_bbs;

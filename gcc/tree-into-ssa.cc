@@ -2474,7 +2474,12 @@ get_op (hack_ssa_builder &builder, tree op)
   if (is_gimple_min_invariant (op))
     ret = builder.new_invar (op);
   else if (is_gimple_reg (op))
-    ret = builder.new_local (op);
+    {
+      if (TREE_CODE (op) == PARM_DECL)
+	ret = builder.new_param (op);
+      else
+        ret = builder.new_local (op);
+    }
   else
     gcc_unreachable ();
   return ret;
@@ -2485,8 +2490,9 @@ new_intossa ()
 {
   hack_ssa_builder builder;
 
-  basic_block bb;
+  builder.set_block_sealed (ENTRY_BLOCK_PTR_FOR_FN (cfun));
 
+  basic_block bb;
   var_map = new hash_map<tree,hvar *>;
   FOR_EACH_BB_FN (bb, cfun)
     {
@@ -2496,6 +2502,7 @@ new_intossa ()
       for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi);)
 	{
 	  gimple *stmt = gsi_stmt (gsi);
+	  tree retval;
 	  switch (gimple_code (stmt))
 	    {
 	    case GIMPLE_ASSIGN:
@@ -2533,7 +2540,11 @@ new_intossa ()
 	      break;
 	    case GIMPLE_RETURN:
 	      update_stmt (stmt);
-	      builder.append_return (bb, get_op (builder, gimple_return_retval (as_a <greturn *>(stmt))));
+	      retval = gimple_return_retval (as_a <greturn *>(stmt));
+	      if (retval == NULL_TREE)
+		builder.append_return (bb);
+	      else
+		builder.append_return (bb, get_op (builder, retval));
 	      gsi_remove (&gsi, true);
 	      break;
 	    default:
@@ -2614,7 +2625,7 @@ pass_build_ssa::execute (function *fun)
   /* Initialize operand data structures.  */
   init_ssa_operands (fun);
 
-  if (flag_new_intossa)
+  if (true) // TODO DEBUG
     new_intossa ();
   else
     {

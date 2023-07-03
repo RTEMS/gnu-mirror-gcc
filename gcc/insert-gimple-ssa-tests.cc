@@ -329,8 +329,22 @@ pass_insert_test::execute (function *)
   for (gimple *stmt : stmts_to_replace)
     {
       //expand_abs_expr (stmt);
-      //insert_mock_loop (stmt);
+      insert_mock_loop (stmt);
       //insert_redundant_stmts (stmt);
+    }
+
+  /* Update modified stmts.  */
+  FOR_EACH_BB_FN (bb, cfun)
+    {
+      gimple_stmt_iterator gsi;
+      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+	{
+	  gimple *stmt = gsi_stmt (gsi);
+	  if (gimple_modified_p (stmt))
+	    {
+	      update_stmt (stmt);
+	    }
+	}
     }
 
   free_dominance_info (CDI_DOMINATORS);
