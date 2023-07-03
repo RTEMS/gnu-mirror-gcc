@@ -3751,6 +3751,9 @@ diagnose_trait_expr (tree expr, tree args)
     case CPTK_IS_UNION:
       inform (loc, "  %qT is not a union", t1);
       break;
+    case CPTK_IS_SCALAR:
+      inform (loc, "  %qT is not a scalar type", t1);
+      break;
     case CPTK_IS_AGGREGATE:
       inform (loc, "  %qT is not an aggregate", t1);
       break;

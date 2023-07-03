@@ -225,7 +225,7 @@ namespace std __attribute__ ((__visibility__ ("default"))) {
     : public __traitor<__is_void<_Tp>, __is_arithmetic<_Tp> >
     { };
   template<typename _Tp>
-    struct __is_scalar
+    struct ____is_scalar
     : public __traitor<__is_arithmetic<_Tp>, __is_pointer<_Tp> >
     { };
   template<typename _Tp>
@@ -1325,7 +1325,7 @@ namespace std __attribute__ ((__visibility__ ("default"))) {
     }
   template<typename _ForwardIterator, typename _Tp>
     inline typename
-    __gnu_cxx::__enable_if<!__is_scalar<_Tp>::__value, void>::__type
+    __gnu_cxx::__enable_if<!____is_scalar<_Tp>::__value, void>::__type
     __fill_a(_ForwardIterator __first, _ForwardIterator __last,
        const _Tp& __value)
     {
@@ -1334,7 +1334,7 @@ namespace std __attribute__ ((__visibility__ ("default"))) {
     }
   template<typename _ForwardIterator, typename _Tp>
     inline typename
-    __gnu_cxx::__enable_if<__is_scalar<_Tp>::__value, void>::__type
+    __gnu_cxx::__enable_if<____is_scalar<_Tp>::__value, void>::__type
     __fill_a(_ForwardIterator __first, _ForwardIterator __last,
       const _Tp& __value)
     {
@@ -1362,7 +1362,7 @@ namespace std __attribute__ ((__visibility__ ("default"))) {
     }
   template<typename _OutputIterator, typename _Size, typename _Tp>
     inline typename
-    __gnu_cxx::__enable_if<!__is_scalar<_Tp>::__value, _OutputIterator>::__type
+    __gnu_cxx::__enable_if<!____is_scalar<_Tp>::__value, _OutputIterator>::__type
     __fill_n_a(_OutputIterator __first, _Size __n, const _Tp& __value)
     {
       for (; __n > 0; --__n, ++__first)
@@ -1371,7 +1371,7 @@ namespace std __attribute__ ((__visibility__ ("default"))) {
     }
   template<typename _OutputIterator, typename _Size, typename _Tp>
     inline typename
-    __gnu_cxx::__enable_if<__is_scalar<_Tp>::__value, _OutputIterator>::__type
+    __gnu_cxx::__enable_if<____is_scalar<_Tp>::__value, _OutputIterator>::__type
     __fill_n_a(_OutputIterator __first, _Size __n, const _Tp& __value)
     {
       const _Tp __tmp = __value;

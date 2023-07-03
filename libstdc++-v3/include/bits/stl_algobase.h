@@ -911,7 +911,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
   template<typename _ForwardIterator, typename _Tp>
     _GLIBCXX20_CONSTEXPR
     inline typename
-    __gnu_cxx::__enable_if<!__is_scalar<_Tp>::__value, void>::__type
+    __gnu_cxx::__enable_if<!____is_scalar<_Tp>::__value, void>::__type
     __fill_a1(_ForwardIterator __first, _ForwardIterator __last,
 	      const _Tp& __value)
     {
@@ -922,7 +922,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
   template<typename _ForwardIterator, typename _Tp>
     _GLIBCXX20_CONSTEXPR
     inline typename
-    __gnu_cxx::__enable_if<__is_scalar<_Tp>::__value, void>::__type
+    __gnu_cxx::__enable_if<____is_scalar<_Tp>::__value, void>::__type
     __fill_a1(_ForwardIterator __first, _ForwardIterator __last,
 	      const _Tp& __value)
     {
@@ -1060,7 +1060,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
   template<typename _OutputIterator, typename _Size, typename _Tp>
     _GLIBCXX20_CONSTEXPR
     inline typename
-    __gnu_cxx::__enable_if<!__is_scalar<_Tp>::__value, _OutputIterator>::__type
+    __gnu_cxx::__enable_if<!____is_scalar<_Tp>::__value, _OutputIterator>::__type
     __fill_n_a1(_OutputIterator __first, _Size __n, const _Tp& __value)
     {
       for (; __n > 0; --__n, (void) ++__first)
@@ -1071,7 +1071,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
   template<typename _OutputIterator, typename _Size, typename _Tp>
     _GLIBCXX20_CONSTEXPR
     inline typename
-    __gnu_cxx::__enable_if<__is_scalar<_Tp>::__value, _OutputIterator>::__type
+    __gnu_cxx::__enable_if<____is_scalar<_Tp>::__value, _OutputIterator>::__type
     __fill_n_a1(_OutputIterator __first, _Size __n, const _Tp& __value)
     {
       const _Tp __tmp = __value;

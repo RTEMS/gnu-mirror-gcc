@@ -90,7 +90,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     inline void
     __valarray_default_construct(_Tp* __b, _Tp* __e)
     {
-      _Array_default_ctor<_Tp, __is_scalar<_Tp>::__value>::_S_do_it(__b, __e);
+      _Array_default_ctor<_Tp, ____is_scalar<_Tp>::__value>::_S_do_it(__b, __e);
     }
 
   // Turn a raw-memory into an array of _Tp filled with __t

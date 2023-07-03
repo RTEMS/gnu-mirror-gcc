@@ -389,7 +389,7 @@ __INT_N(__GLIBCXX_TYPE_INT_N_3)
   // A scalar type is an arithmetic type or a pointer type
   // 
   template<typename _Tp>
-    struct __is_scalar
+    struct ____is_scalar
     : public __traitor<__is_arithmetic<_Tp>, __is_pointer<_Tp> >
     { };
 

@@ -27,7 +27,7 @@ namespace std __attribute__ ((__visibility__ ("default"))) {
     };
     template<typename _Tp>     struct __is_arithmetic     : public __traitor<__is_integer<_Tp>, __is_floating<_Tp> >     {
     };
-    template<typename _Tp>     struct __is_scalar     : public __traitor<__is_arithmetic<_Tp>, __is_pointer<_Tp> >     {
+    template<typename _Tp>     struct ____is_scalar     : public __traitor<__is_arithmetic<_Tp>, __is_pointer<_Tp> >     {
     };
 }
 namespace __gnu_cxx __attribute__ ((__visibility__ ("default"))) {
@@ -54,7 +54,7 @@ namespace std __attribute__ ((__visibility__ ("default"))) {
     };
     template<typename _Iterator>     inline typename _Niter_base<_Iterator>::iterator_type     __niter_base(_Iterator __it)     {
     }
-    template<typename _OutputIterator, typename _Size, typename _Tp>     inline typename     __gnu_cxx::__enable_if<!__is_scalar<_Tp>::__value, _OutputIterator>::__type     __fill_n_a(_OutputIterator __first, _Size __n, const _Tp& __value)     {
+    template<typename _OutputIterator, typename _Size, typename _Tp>     inline typename     __gnu_cxx::__enable_if<!____is_scalar<_Tp>::__value, _OutputIterator>::__type     __fill_n_a(_OutputIterator __first, _Size __n, const _Tp& __value)     {
 	for (__decltype(__n + 0) __niter = __n;
 	     __niter > 0;
 	     --__niter, ++__first)  *__first = __value;
