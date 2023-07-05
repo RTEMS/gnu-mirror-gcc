@@ -31,7 +31,9 @@ class hstmt_with_lhs;
 class hphi;
 class hstmt_assign;
 class hstmt_const;
+class hstmt_call;
 struct hack_tuple_internal;
+struct hack_tuple_fn;
 class hack_bb;
 struct hvar;
 class hack_ssa_builder;
@@ -85,7 +87,8 @@ enum hstmt_code
   HSTMT_CONST,
   HSTMT_COND,
   HSTMT_OUTVAR,
-  HSTMT_RETURN
+  HSTMT_RETURN,
+  HSTMT_CALL
 };
 
 /* Hack statement
@@ -192,7 +195,8 @@ class hstmt_assign : public hstmt_with_lhs
       }
 
     virtual gimple *to_gimple (void) override;
-    virtual void replace_op_by (hstmt_with_lhs *op, hstmt_with_lhs *replace_by) override;
+    virtual void replace_op_by (hstmt_with_lhs *op, hstmt_with_lhs *replace_by)
+      override;
 };
 
 /* Hack const stmt (will rename this to hack invar stmt)
@@ -254,13 +258,28 @@ class hstmt_return : public hstmt
   public:
     hstmt_with_lhs *retval;
 
-    hstmt_return () :
+    hstmt_return (void) :
       hstmt (HSTMT_RETURN), retval (NULL) { }
 
     hstmt_return (hstmt_with_lhs *retval) :
       hstmt (HSTMT_RETURN), retval (retval) { }
 
     virtual gimple *to_gimple (void) override;
+};
+
+/* TODO Description.  */
+
+class hstmt_call : public hstmt_with_lhs
+{
+  public:
+    hack_tuple_fn *val;
+
+    hstmt_call (hvar *var, hack_tuple_fn *val)
+      : hstmt_with_lhs (HSTMT_CALL, var), val (val) { }
+
+    virtual gimple *to_gimple (void) override;
+    virtual void replace_op_by (hstmt_with_lhs *op, hstmt_with_lhs *replace_by)
+      override;
 };
 
 /* Hack internal tuple
@@ -271,6 +290,15 @@ class hstmt_return : public hstmt
 struct hack_tuple_internal
 {
   enum tree_code code;
+  unsigned num_ops;
+  hstmt_with_lhs *op[1];  /* Trailing array idiom.  */
+};
+
+/* TODO Describe  */
+
+struct hack_tuple_fn
+{
+  tree fn;
   unsigned num_ops;
   hstmt_with_lhs *op[1];  /* Trailing array idiom.  */
 };
@@ -363,6 +391,9 @@ class hack_ssa_builder
 		    hvar *left, hvar *right);
   void append_return (basic_block bb);
   void append_return (basic_block bb, hvar *retval);
+  void append_call_vec (basic_block bb, tree fn, hvar *left,
+		 	const vec<hvar *> &args);
+  void append_call_vec (basic_block bb, tree fn, const vec<hvar *> &args);
   hvar *append_outvar (basic_block bb, hvar *local);
 
   void set_block_sealed (basic_block bb);
@@ -383,6 +414,7 @@ class hack_ssa_builder
      Will become obsolete when allocation on obstack is implemented.  */
   vec<hvar *> allocated_hvars = vNULL;
   vec<hack_tuple_internal *> allocated_internal = vNULL;
+  vec<hack_tuple_fn *> allocated_tuples_fn = vNULL;
 
   hash_set<basic_block> seen_bbs;
   hash_map<basic_block, hack_bb *> bb_record_map;
@@ -395,8 +427,11 @@ class hack_ssa_builder
 
   hack_bb *get_bb_record (basic_block bb);
   hack_tuple_internal *tuple_alloc (enum tree_code code, unsigned num_ops);
+  hack_tuple_fn *tuple_alloc_fn (tree fn, unsigned num_ops);
   void tuple_set_operand (unsigned op_num, hack_tuple_internal *tuple,
 			  hstmt_with_lhs *op);
+  void tuple_set_operand_fn (unsigned op_num, hack_tuple_fn *tuple,
+			     hstmt_with_lhs *op);
   void append_stmt (basic_block bb, hstmt *stmt);
   hphi *add_empty_phi (basic_block bb, hvar *var);
 
@@ -431,6 +466,7 @@ struct is_a_helper<hstmt_with_lhs *> : static_is_a_helper<hstmt_with_lhs *>
 	case HSTMT_ASSIGN:
 	case HPHI:
 	case HSTMT_CONST:
+	case HSTMT_CALL:
 	  return true;
 	default:
 	  return false;

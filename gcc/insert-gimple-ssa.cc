@@ -93,6 +93,19 @@ hstmt_cond::replace_op_by (hstmt_with_lhs *op, hstmt_with_lhs *replace_by)
     rhs = replace_by;
 }
 
+/* Replace hack call operand.  */
+
+void
+hstmt_call::replace_op_by (hstmt_with_lhs *op, hstmt_with_lhs *replace_by)
+{
+  unsigned i;
+  for (i = 0; i < val->num_ops; i++)
+    {
+      if (val->op[i] == op)
+	val->op[i] = replace_by;
+    }
+}
+
 gimple *
 hstmt_assign::to_gimple (void)
 {
@@ -148,6 +161,24 @@ hstmt_return::to_gimple (void)
     return gimple_build_return (NULL_TREE);
   else
     return gimple_build_return (retval->ssa);
+}
+
+gimple *
+hstmt_call::to_gimple (void)
+{
+  vec<tree> ssa_args = vNULL; /* TODO We know how much to allocate.  */
+  unsigned i;
+  for (i = 0; i < val->num_ops; i++)
+    {
+      ssa_args.safe_push (val->op[i]->ssa);
+    }
+
+  gimple *call = gimple_build_call_vec (val->fn, ssa_args);
+  if (var != NULL)
+    gimple_call_set_lhs (call, ssa);
+
+  ssa_args.release ();
+  return call;
 }
 
 /* Create a new LOCAL hack variable.
@@ -268,6 +299,10 @@ hack_ssa_builder::append_outvar (basic_block bb, hvar *local)
   append_stmt (bb, stmt);
 
   allocated_hvars.safe_push (outvar);
+
+  /* Update uses list of appropriate stmts.  */
+  stmt->rhs->uses.safe_push (stmt);
+  // TODO Neměl bych kontrolovat, jestli není killed?
   
   return outvar;
 }
@@ -290,6 +325,46 @@ hack_ssa_builder::append_return (basic_block bb, hvar *retval)
   hstmt_return *stmt = new hstmt_return (read_variable (bb, retval));
   append_stmt (bb, stmt);
   set_block_filled (bb);
+
+  /* Update uses list of appropriate stmts.  */
+  stmt->retval->uses.safe_push (stmt);
+  // TODO Neměl bych kontrolovat, jestli není killed?
+}
+
+/* Build and append hack call to a basic block.  */
+
+void hack_ssa_builder::append_call_vec (basic_block bb, tree fn, hvar *left,
+					const vec<hvar *> &args)
+{
+  unsigned num_ops = args.length ();
+  hack_tuple_fn *val = tuple_alloc_fn (fn, num_ops);
+
+  unsigned i;
+  for (i = 0; i < num_ops; i++)
+    {
+      hvar *arg = args[i];
+      gcc_checking_assert (arg->code != OUTVAR);
+      tuple_set_operand_fn (i, val, read_variable (bb, arg));
+    }
+
+  hstmt_call *call = new hstmt_call (left, val);
+  append_stmt (bb, call);
+
+  /* Update uses list of appropriate stmts.  */
+  for (i = 0; i < val->num_ops; i++)
+    {
+      // TODO Neměl bych kontrolovat, jestli není killed?
+      val->op[i]->uses.safe_push (call);
+    }
+
+  write_variable (bb, left, call);
+}
+
+void
+hack_ssa_builder::append_call_vec (basic_block bb, tree fn,
+				   const vec<hvar *> &args)
+{
+  append_call_vec (bb, fn, NULL, args);
 }
 
 /* See the Braun alg paper for what 'sealed' means.  */
@@ -403,6 +478,8 @@ hack_ssa_builder::release (void)
     XDELETE (v);
   for (hack_tuple_internal *t : allocated_internal)
     XDELETE (t);
+  for (hack_tuple_fn *t : allocated_tuples_fn)
+    XDELETE (t);
 }
 
 /* Extracts SSA name from outvar. Outvars represent places where user wants SSA
@@ -495,10 +572,35 @@ hack_ssa_builder::tuple_alloc (enum tree_code code, unsigned num_ops)
   return result;
 }
 
+hack_tuple_fn *
+hack_ssa_builder::tuple_alloc_fn (tree fn, unsigned num_ops)
+{
+  gcc_checking_assert (num_ops >= 1 && "Tuples of size <1 not allowed");
+
+  size_t size = sizeof (hack_tuple_fn) +
+    (num_ops - 1) * sizeof (struct hstmt_with_lhs *);
+  hack_tuple_fn *result = XNEWVAR (struct hack_tuple_fn, size);
+
+  result->num_ops = num_ops;
+  result->fn = fn;
+
+  allocated_tuples_fn.safe_push (result);
+
+  return result;
+}
+
 void
 hack_ssa_builder::tuple_set_operand (unsigned op_num,
 				     hack_tuple_internal *tuple,
 				     hstmt_with_lhs *op)
+{
+  tuple->op[op_num] = op;
+}
+
+void
+hack_ssa_builder::tuple_set_operand_fn (unsigned op_num,
+					hack_tuple_fn *tuple,
+					hstmt_with_lhs *op)
 {
   tuple->op[op_num] = op;
 }
@@ -528,6 +630,9 @@ hack_ssa_builder::add_empty_phi (basic_block bb, hvar *var)
 void
 hack_ssa_builder::commit_ssa_name (hstmt_with_lhs *s)
 {
+  if (s->var == NULL) /* This statement doesn't have lhs.  */
+    return;
+
   switch (s->var->code)
     {
       case LOCAL:
@@ -725,7 +830,7 @@ hack_ssa_builder::read_variable_recursive (basic_block bb, hvar *var)
     }
   else
     {
-      /* Reached a bb without predecesors.  */
+      /* Reached a bb without predecessors.  */
       if (var->code == PARAM)
 	{
 	  return var->default_def;

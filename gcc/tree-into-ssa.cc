@@ -2502,7 +2502,6 @@ new_intossa ()
       for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi);)
 	{
 	  gimple *stmt = gsi_stmt (gsi);
-	  tree retval;
 	  switch (gimple_code (stmt))
 	    {
 	    case GIMPLE_ASSIGN:
@@ -2539,13 +2538,35 @@ new_intossa ()
 	      gsi_remove (&gsi, true);
 	      break;
 	    case GIMPLE_RETURN:
-	      update_stmt (stmt);
-	      retval = gimple_return_retval (as_a <greturn *>(stmt));
-	      if (retval == NULL_TREE)
-		builder.append_return (bb);
-	      else
-		builder.append_return (bb, get_op (builder, retval));
-	      gsi_remove (&gsi, true);
+	      {
+		update_stmt (stmt);
+		tree retval = gimple_return_retval (as_a <greturn *>(stmt));
+		if (retval == NULL_TREE)
+		  builder.append_return (bb);
+		else
+		  builder.append_return (bb, get_op (builder, retval));
+		gsi_remove (&gsi, true);
+	      }
+	      break;
+	    case GIMPLE_CALL:
+	      {
+		unsigned num_args = gimple_call_num_args (stmt);
+		vec<hvar *> args = vNULL; /* TODO We know how much to allocate.  */
+		hvar *lhs = get_op (builder, gimple_call_lhs (stmt));
+		tree fn = gimple_call_fn (stmt);
+
+		unsigned i;
+		for (i = 0; i < num_args; i++)
+		  {
+		    tree arg = gimple_call_arg (stmt, i);
+		    args.safe_push (get_op (builder, arg));
+		  }
+
+		builder.append_call_vec (bb, fn, lhs, args);
+		gsi_remove (&gsi, true);
+
+		args.release ();
+	      }
 	      break;
 	    default:
 	      debug_gimple_stmt (stmt);
