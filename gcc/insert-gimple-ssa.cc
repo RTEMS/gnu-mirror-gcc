@@ -575,8 +575,6 @@ hack_ssa_builder::tuple_alloc (enum tree_code code, unsigned num_ops)
 hack_tuple_fn *
 hack_ssa_builder::tuple_alloc_fn (tree fn, unsigned num_ops)
 {
-  gcc_checking_assert (num_ops >= 1 && "Tuples of size <1 not allowed");
-
   size_t size = sizeof (hack_tuple_fn) +
     (num_ops - 1) * sizeof (struct hstmt_with_lhs *);
   hack_tuple_fn *result = XNEWVAR (struct hack_tuple_fn, size);

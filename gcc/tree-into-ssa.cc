@@ -2646,7 +2646,7 @@ pass_build_ssa::execute (function *fun)
   /* Initialize operand data structures.  */
   init_ssa_operands (fun);
 
-  if (true) // TODO DEBUG
+  if (flag_new_intossa) // TODO DEBUG
     new_intossa ();
   else
     {
