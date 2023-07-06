@@ -1,3 +1,36 @@
+==================== Branch work124-sfsplat, patch #101 ====================
+
+Fix warning.
+
+
+2023-07-06  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-p10sfopt.cc (process_chain_from_load): Comment
+	out dump_printf that causes a warning, preventing the compiler from
+	boostraping.
+
+==================== Branch work124-sfsplat, patch #100 ====================
+
+Initial SFsplat changes
+
+
+2023-07-06   Kewen Lin  <linkw@linux.ibm.com>
+	     Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+        * config.gcc: File changed.
+        * config/rs6000/rs6000-builtin.cc: File changed.
+        * config/rs6000/rs6000-builtins.def: File changed.
+        * config/rs6000/rs6000-p10sfopt.cc: New file.
+        * config/rs6000/rs6000-passes.def: File changed.
+        * config/rs6000/rs6000-protos.h: File changed.
+        * config/rs6000/rs6000.opt: File changed.
+        * config/rs6000/t-rs6000: File changed.
+        * config/rs6000/vsx.md: File changed.
+
 ==================== Branch work124-sfsplat, baseline ====================
 
 2023-07-06   Michael Meissner  <meissner@linux.ibm.com>
