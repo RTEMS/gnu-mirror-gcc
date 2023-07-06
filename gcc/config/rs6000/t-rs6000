@@ -35,6 +35,10 @@ rs6000-p8swap.o: $(srcdir)/config/rs6000/rs6000-p8swap.cc
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
+rs6000-p10sfopt.o: $(srcdir)/config/rs6000/rs6000-p10sfopt.cc
+	$(COMPILE) $<
+	$(POSTCOMPILE)
+
 rs6000-d.o: $(srcdir)/config/rs6000/rs6000-d.cc
 	$(COMPILE) $<
 	$(POSTCOMPILE)

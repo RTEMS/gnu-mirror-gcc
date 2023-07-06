@@ -2751,6 +2751,10 @@ ldv_expand_builtin (rtx target, insn_code icode, rtx *op, machine_mode tmode)
       || !insn_data[icode].operand[0].predicate (target, tmode))
     target = gen_reg_rtx (tmode);
 
+  /* FIXME: To align with the mode in bif pattern.  */
+  if (icode == CODE_FOR_vsx_lxvwsx_v4sf)
+    tmode = SFmode;
+
   op[1] = copy_to_mode_reg (Pmode, op[1]);
 
   /* These CELL built-ins use BLKmode instead of tmode for historical
@@ -2894,6 +2898,10 @@ static rtx
 stv_expand_builtin (insn_code icode, rtx *op,
 		    machine_mode tmode, machine_mode smode)
 {
+  /* FIXME: To align with the mode in bif pattern.  */
+  if (icode == CODE_FOR_vsx_stxsiwx_v4sf)
+    tmode = SFmode;
+
   op[2] = copy_to_mode_reg (Pmode, op[2]);
 
   /* For STVX, express the RTL accurately by ANDing the address with -16.
@@ -3708,4 +3716,16 @@ rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
 
   emit_insn (pat);
   return target;
+}
+
+tree
+rs6000_get_lxvwsx_v4sf_decl ()
+{
+  return rs6000_builtin_decls[RS6000_BIF_LXVWSX_V4SF];
+}
+
+tree
+rs6000_get_stxsiwx_v4sf_decl ()
+{
+  return rs6000_builtin_decls[RS6000_BIF_STXSIWX_V4SF];
 }

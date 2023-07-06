@@ -2810,6 +2810,11 @@
       __builtin_vsx_scalar_cmp_exp_qp_unordered (_Float128, _Float128);
     VSCEQPUO xscmpexpqp_unordered_kf {}
 
+  vf __builtin_vsx_lxvwsx (signed long, const float *);
+    LXVWSX_V4SF vsx_lxvwsx_v4sf {ldvec}
+
+  void __builtin_vsx_stxsiwx (vf, signed long, const float *);
+    STXSIWX_V4SF vsx_stxsiwx_v4sf {stvec}
 
 ; Miscellaneous P9 functions
 [power9]

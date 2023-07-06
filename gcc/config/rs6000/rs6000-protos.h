@@ -341,9 +341,11 @@ extern unsigned rs6000_linux_libm_function_max_error (unsigned, machine_mode,
 /* Pass management.  */
 namespace gcc { class context; }
 class rtl_opt_pass;
+class gimple_opt_pass;
 
 extern rtl_opt_pass *make_pass_analyze_swaps (gcc::context *);
 extern rtl_opt_pass *make_pass_pcrel_opt (gcc::context *);
+extern gimple_opt_pass *make_pass_rs6000_p10sfopt (gcc::context *);
 extern bool rs6000_sum_of_two_registers_p (const_rtx expr);
 extern bool rs6000_quadword_masked_address_p (const_rtx exp);
 extern rtx rs6000_gen_lvx (enum machine_mode, rtx, rtx);
@@ -352,4 +354,7 @@ extern rtx rs6000_gen_stvx (enum machine_mode, rtx, rtx);
 extern void rs6000_emit_xxspltidp_v2df (rtx, long value);
 extern gimple *currently_expanding_gimple_stmt;
 extern bool rs6000_opaque_type_invalid_use_p (gimple *);
+
+extern tree rs6000_get_lxvwsx_v4sf_decl ();
+extern tree rs6000_get_stxsiwx_v4sf_decl ();
 #endif  /* rs6000-protos.h */

@@ -6618,3 +6618,21 @@
   "vmsumcud %0,%1,%2,%3"
   [(set_attr "type" "veccomplex")]
 )
+
+(define_insn "vsx_lxvwsx_v4sf"
+ [(set (match_operand:V4SF 0 "vsx_register_operand" "=wa")
+       (vec_duplicate:V4SF
+	  (match_operand:SF 1 "memory_operand" "Z")))]
+ "TARGET_P9_VECTOR"
+ "lxvwsx %x0,%y1"
+ [(set_attr "type" "vecload")])
+
+(define_insn "vsx_stxsiwx_v4sf"
+ [(set (match_operand:SF 0 "memory_operand" "=Z")
+       (unspec:SF
+	  [(match_operand:V4SF 1 "vsx_register_operand" "wa")]
+	  UNSPEC_STFIWX))]
+ "TARGET_P9_VECTOR"
+ "stxsiwx %x1,%y0"
+ [(set_attr "type" "fpstore")])
+
