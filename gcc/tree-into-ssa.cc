@@ -2575,7 +2575,6 @@ new_intossa ()
 	}
       builder.set_block_filled (bb);
     }
-  fini_ssa_renamer ();
   builder.finalize ();
   builder.release ();
   mark_virtual_operands_for_renaming (cfun);

@@ -112,6 +112,8 @@ class hstmt
        another, this method should be called on all relevant stmts. This is
        usually done by traversing the 'uses' vector of 'hstmt_with_lhs' stmts.  */
     virtual void replace_op_by (hstmt_with_lhs *, hstmt_with_lhs *) { }
+    
+    virtual ~hstmt () { }
 };
 
 /* Hack statement with left side
@@ -129,6 +131,8 @@ class hstmt_with_lhs : public hstmt
       {
 	ssa = NULL_TREE;
       }
+
+    ~hstmt_with_lhs () { }
 
     hvar *var;
     vec<hstmt *> uses = vNULL; // TODO Nahradit obstack-friendly strukturou?
@@ -177,6 +181,8 @@ class hphi : public hstmt_with_lhs
       }
 
     virtual void replace_op_by (hstmt_with_lhs *op, hstmt_with_lhs *replace_by) override;
+
+    ~hphi () { }
 };
 
 /* Hack assign stmt.
@@ -197,6 +203,8 @@ class hstmt_assign : public hstmt_with_lhs
     virtual gimple *to_gimple (void) override;
     virtual void replace_op_by (hstmt_with_lhs *op, hstmt_with_lhs *replace_by)
       override;
+
+    ~hstmt_assign () { }
 };
 
 /* Hack const stmt (will rename this to hack invar stmt)
@@ -214,6 +222,8 @@ class hstmt_const : public hstmt_with_lhs
       {
 	gcc_checking_assert (var->code == INVAR || var->code == PARAM);
       }
+
+    ~hstmt_const () { }
 };
 
 /* Hack cond stmt.  */
@@ -230,6 +240,8 @@ class hstmt_cond : public hstmt
 
     virtual gimple *to_gimple (void) override;
     virtual void replace_op_by (hstmt_with_lhs *op, hstmt_with_lhs *replace_by) override;
+
+    ~hstmt_cond () { }
 };
 
 /* Hack outvar stmt
@@ -249,6 +261,8 @@ class hstmt_outvar : public hstmt
       hstmt (HSTMT_OUTVAR), outvar (outvar), rhs (rhs) { }
 
     virtual gimple *to_gimple (void) override;
+
+    ~hstmt_outvar () { }
 };
 
 /* TODO Description.  */
@@ -265,6 +279,8 @@ class hstmt_return : public hstmt
       hstmt (HSTMT_RETURN), retval (retval) { }
 
     virtual gimple *to_gimple (void) override;
+
+    ~hstmt_return () { }
 };
 
 /* TODO Description.  */
@@ -280,6 +296,8 @@ class hstmt_call : public hstmt_with_lhs
     virtual gimple *to_gimple (void) override;
     virtual void replace_op_by (hstmt_with_lhs *op, hstmt_with_lhs *replace_by)
       override;
+
+    ~hstmt_call () { }
 };
 
 /* Hack internal tuple

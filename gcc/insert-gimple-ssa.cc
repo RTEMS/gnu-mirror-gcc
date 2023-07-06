@@ -575,8 +575,12 @@ hack_ssa_builder::tuple_alloc (enum tree_code code, unsigned num_ops)
 hack_tuple_fn *
 hack_ssa_builder::tuple_alloc_fn (tree fn, unsigned num_ops)
 {
-  size_t size = sizeof (hack_tuple_fn) +
-    (num_ops - 1) * sizeof (struct hstmt_with_lhs *);
+  size_t size;
+  if (num_ops > 0)
+    size = sizeof (hack_tuple_fn) +
+      (num_ops - 1) * sizeof (struct hstmt_with_lhs *);
+  else
+    size = sizeof (hack_tuple_fn);
   hack_tuple_fn *result = XNEWVAR (struct hack_tuple_fn, size);
 
   result->num_ops = num_ops;
