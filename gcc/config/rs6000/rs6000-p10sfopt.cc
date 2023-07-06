@@ -502,7 +502,7 @@ process_chain_from_load (gimple *stmt)
       dump_printf (MSG_NOTE, "Succeed to get a chain from gimple %G", stmt);
       for (gimple *i : chain)
 	dump_printf (MSG_NOTE, "  -> %G", i);
-      dump_printf (MSG_NOTE, "");
+      // dump_printf (MSG_NOTE, "");
     }
 
   /* This chain is fine to be optimized, create the corresponding
