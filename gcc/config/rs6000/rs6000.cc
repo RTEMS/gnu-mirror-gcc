@@ -4253,6 +4253,13 @@ rs6000_option_override_internal (bool global_init_p)
       rs6000_isa_flags &= ~OPTION_MASK_PCREL;
     }
 
+  /* Enable -mp10-sf-opt by default on power10 if we are optimizing for
+     speed.  */
+  if (TARGET_POWER10
+      && optimize_function_for_speed_p (cfun)
+      && (rs6000_isa_flags_explicit & OPTION_MASK_P10_SF_OPT) == 0)
+    rs6000_isa_flags |= OPTION_MASK_P10_SF_OPT;
+
   /* Print the options after updating the defaults.  */
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after defaults", rs6000_isa_flags);
@@ -24225,6 +24232,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "modulo",			OPTION_MASK_MODULO,		false, true  },
   { "mulhw",			OPTION_MASK_MULHW,		false, true  },
   { "multiple",			OPTION_MASK_MULTIPLE,		false, true  },
+  { "p10-sf-opt",		OPTION_MASK_P10_SF_OPT,		false, true  },
   { "pcrel",			OPTION_MASK_PCREL,		false, true  },
   { "pcrel-opt",		OPTION_MASK_PCREL_OPT,		false, true  },
   { "popcntb",			OPTION_MASK_POPCNTB,		false, true  },

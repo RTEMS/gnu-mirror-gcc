@@ -519,7 +519,7 @@ process_chain_from_load (gimple *stmt)
 unsigned int
 pass_rs6000_p10sfopt::execute (function *fun)
 {
-  if (!rs6000_p10_sf_opt)
+  if (!TARGET_P10_SF_OPT)
     return 0;
 
   // fprintf (stderr, "Enable pass rs6000 p10sfopt.\n");
