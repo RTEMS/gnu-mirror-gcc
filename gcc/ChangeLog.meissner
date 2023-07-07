@@ -1,3 +1,21 @@
+==================== Branch work124-sfsplat, patch #102 ====================
+
+Set -mp10-sf-opt by default for power10 with optimization
+
+
+2023-07-06  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Add
+	-mp10-sf-opt.
+	* config/rs6000/rs6000-p10sfopt.cc (pass_rs6000_p10sfopt::execute): Test
+	TARGET_P10_SF_OPT.
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Set
+	-mp10-sf-opt by default on power10 systems with optimization.
+	(rs6000_opt_masks): Add -mp10-sf-opt.
+	* config/rs6000/rs6000.opt (-mp10-sf-opt): Convert to use ISA mask.
+
 ==================== Branch work124-sfsplat, patch #101 ====================
 
 Fix warning.
