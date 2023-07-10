@@ -314,6 +314,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     struct is_void<const volatile void>
     : public true_type { };
 
+#if __has_builtin(__is_integral)
+  /// is_integral
+  template<typename _Tp>
+    struct __is_integral_helper
+    : public __bool_constant<__is_integral(_Tp)>
+    { };
+#else
   /// @cond undocumented
   template<typename>
     struct __is_integral_helper
@@ -387,6 +394,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<>
     struct __is_integral_helper<unsigned long long>
     : public true_type { };
+#endif
 
   // Conditionalizing on __STRICT_ANSI__ here will break any port that
   // uses one of these types for size_t.
@@ -3156,8 +3164,15 @@ template <typename _Tp>
   inline constexpr bool is_void_v = is_void<_Tp>::value;
 template <typename _Tp>
   inline constexpr bool is_null_pointer_v = is_null_pointer<_Tp>::value;
+
+#if __has_builtin(__is_integral)
+template <typename _Tp>
+  inline constexpr bool is_integral_v = __is_integral(_Tp);
+#else
 template <typename _Tp>
   inline constexpr bool is_integral_v = is_integral<_Tp>::value;
+#endif
+
 template <typename _Tp>
   inline constexpr bool is_floating_point_v = is_floating_point<_Tp>::value;
 
