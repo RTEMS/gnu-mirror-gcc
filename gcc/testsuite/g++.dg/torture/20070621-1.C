@@ -18,7 +18,7 @@ namespace std __attribute__ ((__visibility__ ("default"))) {
         enum {
   __value = 0 };
       };
-    template<typename _Tp>     struct __is_pointer     {
+    template<typename _Tp>     struct ____is_pointer     {
         enum {
   __value = 0 };
       };
@@ -49,7 +49,7 @@ namespace std __attribute__ ((__visibility__ ("default"))) {
     template<typename _II1, typename _II2>     inline bool     __equal_aux(_II1 __first1, _II1 __last1, _II2 __first2)     {
         typedef typename iterator_traits<_II1>::value_type _ValueType1;
         typedef typename iterator_traits<_II2>::value_type _ValueType2;
-        const bool __simple = (__is_integer<_ValueType1>::__value                       && __is_pointer<_II1>::__value                       && __is_pointer<_II2>::__value         && __are_same<_ValueType1, _ValueType2>::__value);
+        const bool __simple = (__is_integer<_ValueType1>::__value                       && ____is_pointer<_II1>::__value                       && ____is_pointer<_II2>::__value         && __are_same<_ValueType1, _ValueType2>::__value);
         return std::__equal<__simple>::equal(__first1, __last1, __first2);
       }
     template<typename _II1, typename _II2>     inline bool     equal(_II1 __first1, _II1 __last1, _II2 __first2)     {

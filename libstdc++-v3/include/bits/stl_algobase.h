@@ -1214,7 +1214,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
     {
       typedef typename iterator_traits<_II1>::value_type _ValueType1;
       const bool __simple = ((__is_integer<_ValueType1>::__value
-			      || __is_pointer<_ValueType1>::__value)
+			      || ____is_pointer<_ValueType1>::__value)
 			     && __memcmpable<_II1, _II2>::__value);
       return std::__equal<__simple>::equal(__first1, __last1, __first2);
     }
@@ -1377,8 +1377,8 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
       typedef typename iterator_traits<_II2>::value_type _ValueType2;
       const bool __simple =
 	(__is_memcmp_ordered_with<_ValueType1, _ValueType2>::__value
-	 && __is_pointer<_II1>::__value
-	 && __is_pointer<_II2>::__value
+	 && ____is_pointer<_II1>::__value
+	 && ____is_pointer<_II2>::__value
 #if __cplusplus > 201703L && __cpp_lib_concepts
 	 // For C++20 iterator_traits<volatile T*>::value_type is non-volatile
 	 // so __is_byte<T> could be true, but we can't use memcmp with

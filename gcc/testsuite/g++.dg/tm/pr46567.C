@@ -192,13 +192,13 @@ namespace std __attribute__ ((__visibility__ ("default"))) {
       typedef __true_type __type;
     };
   template<typename _Tp>
-    struct __is_pointer
+    struct ____is_pointer
     {
       enum { __value = 0 };
       typedef __false_type __type;
     };
   template<typename _Tp>
-    struct __is_pointer<_Tp*>
+    struct ____is_pointer<_Tp*>
     {
       enum { __value = 1 };
       typedef __true_type __type;
@@ -226,7 +226,7 @@ namespace std __attribute__ ((__visibility__ ("default"))) {
     { };
   template<typename _Tp>
     struct __is_scalar
-    : public __traitor<__is_arithmetic<_Tp>, __is_pointer<_Tp> >
+    : public __traitor<__is_arithmetic<_Tp>, ____is_pointer<_Tp> >
     { };
   template<typename _Tp>
     struct __is_char
@@ -1202,8 +1202,8 @@ namespace std __attribute__ ((__visibility__ ("default"))) {
       typedef typename iterator_traits<_OI>::value_type _ValueTypeO;
       typedef typename iterator_traits<_II>::iterator_category _Category;
       const bool __simple = (__is_pod(_ValueTypeI)
-		      && __is_pointer<_II>::__value
-		      && __is_pointer<_OI>::__value
+		      && ____is_pointer<_II>::__value
+		      && ____is_pointer<_OI>::__value
 	&& __are_same<_ValueTypeI, _ValueTypeO>::__value);
       return std::__copy_move<_IsMove, __simple,
 		       _Category>::__copy_m(__first, __last, __result);
@@ -1294,8 +1294,8 @@ namespace std __attribute__ ((__visibility__ ("default"))) {
       typedef typename iterator_traits<_BI2>::value_type _ValueType2;
       typedef typename iterator_traits<_BI1>::iterator_category _Category;
       const bool __simple = (__is_pod(_ValueType1)
-		      && __is_pointer<_BI1>::__value
-		      && __is_pointer<_BI2>::__value
+		      && ____is_pointer<_BI1>::__value
+		      && ____is_pointer<_BI2>::__value
 	&& __are_same<_ValueType1, _ValueType2>::__value);
       return std::__copy_move_backward<_IsMove, __simple,
 				_Category>::__copy_move_b(__first,
@@ -1426,8 +1426,8 @@ namespace std __attribute__ ((__visibility__ ("default"))) {
       typedef typename iterator_traits<_II1>::value_type _ValueType1;
       typedef typename iterator_traits<_II2>::value_type _ValueType2;
       const bool __simple = (__is_integer<_ValueType1>::__value
-		      && __is_pointer<_II1>::__value
-		      && __is_pointer<_II2>::__value
+		      && ____is_pointer<_II1>::__value
+		      && ____is_pointer<_II2>::__value
 	&& __are_same<_ValueType1, _ValueType2>::__value);
       return std::__equal<__simple>::equal(__first1, __last1, __first2);
     }
@@ -1515,8 +1515,8 @@ namespace std __attribute__ ((__visibility__ ("default"))) {
  (__is_byte<_ValueType1>::__value && __is_byte<_ValueType2>::__value
   && !__gnu_cxx::__numeric_traits<_ValueType1>::__is_signed
   && !__gnu_cxx::__numeric_traits<_ValueType2>::__is_signed
-  && __is_pointer<_II1>::__value
-  && __is_pointer<_II2>::__value);
+  && ____is_pointer<_II1>::__value
+  && ____is_pointer<_II2>::__value);
       return std::__lexicographical_compare<__simple>::__lc(__first1, __last1,
 	   __first2, __last2);
     }

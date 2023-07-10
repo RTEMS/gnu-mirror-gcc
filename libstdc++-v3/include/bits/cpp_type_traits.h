@@ -364,14 +364,14 @@ __INT_N(__GLIBCXX_TYPE_INT_N_3)
   // Pointer types
   //
   template<typename _Tp>
-    struct __is_pointer
+    struct ____is_pointer
     {
       enum { __value = 0 };
       typedef __false_type __type;
     };
 
   template<typename _Tp>
-    struct __is_pointer<_Tp*>
+    struct ____is_pointer<_Tp*>
     {
       enum { __value = 1 };
       typedef __true_type __type;
@@ -390,7 +390,7 @@ __INT_N(__GLIBCXX_TYPE_INT_N_3)
   // 
   template<typename _Tp>
     struct __is_scalar
-    : public __traitor<__is_arithmetic<_Tp>, __is_pointer<_Tp> >
+    : public __traitor<__is_arithmetic<_Tp>, ____is_pointer<_Tp> >
     { };
 
   //

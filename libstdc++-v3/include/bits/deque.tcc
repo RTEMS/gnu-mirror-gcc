@@ -1273,7 +1273,7 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
     {
       const bool __simple =
 	(__is_memcmp_ordered_with<_Tp1, _Tp2>::__value
-	 && __is_pointer<_Ptr>::__value
+	 && ____is_pointer<_Ptr>::__value
 #if __cplusplus > 201703L && __cpp_lib_concepts
 	 // For C++20 iterator_traits<volatile T*>::value_type is non-volatile
 	 // so __is_byte<T> could be true, but we can't use memcmp with
@@ -1329,8 +1329,8 @@ _GLIBCXX_END_NAMESPACE_CONTAINER
     {
       const bool __simple =
 	(__is_memcmp_ordered_with<_Tp1, _Tp2>::__value
-	 && __is_pointer<_Ptr1>::__value
-	 && __is_pointer<_Ptr2>::__value
+	 && ____is_pointer<_Ptr1>::__value
+	 && ____is_pointer<_Ptr2>::__value
 #if __cplusplus > 201703L && __cpp_lib_concepts
 	 // For C++20 iterator_traits<volatile T*>::value_type is non-volatile
 	 // so __is_byte<T> could be true, but we can't use memcmp with
