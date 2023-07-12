@@ -1,3 +1,44 @@
+==================== Branch work124, patch #20 ====================
+
+Optimize vec_extract of V4SF from memory with constant element numbers.
+
+This patch updates vec_extract of V4SF from memory with constant element
+numbers.
+
+I went through the alternatives, and I added alternatives to denote when we
+don't need to allocate a temporary base register.  These cases include
+extracting element 0, and extracting elements 1-3 where we can use offsetable
+addresses.
+
+I added alternatives for power8 and power9 units to account for the expanded
+addressing on these machines (power8 can load SFmode into Altivec registers with
+x-form addressing, and power9 can use offsettable adressing to load up Altivec
+registers.
+
+This patch corrects the ISA test for loading SF values to altivec registers to
+be power8 vector, and not power7.
+
+This patch adds a combiner patch to combine loading up a SF element and
+converting it to double.
+
+It also removes the '?' from the 'r' constraint so that if the SFmode is needed
+in a GPR, it doesn't have to load it to the vector unit, store it, and then
+reload it into the GPR register.
+
+2023-07-11   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* gcc/config/rs6000/vsx.md (vsx_extract_v4sf_load): Fix ISA for loading
+	up SFmode values with x-form addresses.  Remove ? from 'r' constraint.
+	Add more alternatives to prevent requiring a temporary base register if
+	we don't need the temporary.
+	(vsx_extract_v4sf_load_to_df): New insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-float-1.c: New file.
+
 ==================== Branch work124, patch #3 ====================
 
 Fix typo in insn name.
@@ -8,7 +49,7 @@ In doing other work, I noticed that there was an insn:
 
 Which did not have an iterator.  I removed the useless <mode>.
 
-2023-07-07  Michael Meissner  <meissner@linux.ibm.com>
+2023-07-11  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -28,7 +69,7 @@ This patch adds a new zero_extendditi2 insn which optimizes moving a GPR to a
 vector register using the mtvsrdd instruction with RA=0, and using lxvrdx to
 load a 64-bit value into the bottom 64-bits of the vector register.
 
-2023-07-07  Michael Meissner  <meissner@linux.ibm.com>
+2023-07-11  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -71,7 +112,7 @@ With this patch, GCC generates:
 	blr
 
 
-2023-07-07  Michael Meissner  <meissner@linux.ibm.com>
+2023-07-11  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
