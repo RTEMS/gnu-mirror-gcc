@@ -1,3 +1,27 @@
+==================== Branch work124, patch #21 ====================
+
+Optimize vec_extract of V4SF with variable element number being converted to DF
+
+This patch adds a combiner insn to include the conversion of float to double
+within the memory address when vec_extract of V4SF with a variable element
+number is done.
+
+It also removes the '?' from the 'r' constraint so that if the SFmode is needed
+in a GPR, it doesn't have to load it to the vector unit, store it on the stack,
+and reload it into a GPR register.
+
+2023-07-11   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_extract_v4sf_var_load): Remove '?' from 'r'
+	constraint.
+	(vsx_extract_v4sf_var_load_to_df): New insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-float-2.c: New file.
+
 ==================== Branch work124, patch #20 ====================
 
 Optimize vec_extract of V4SF from memory with constant element numbers.
