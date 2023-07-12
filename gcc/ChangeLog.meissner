@@ -1,3 +1,40 @@
+==================== Branch work124, patch #22 ====================
+
+Add alternatives for vec_extract with constant element loading from memory.
+
+This patch expands the alternatives for doing vec_extract of V4SI, V8HI, and
+V16QI vectors with a constant offset when the vector is in memory.  If the
+element number is 0 or we are using offsettable addressing for loading up GPR
+registers we don't need to allocate a temporary base register.  We can fold the
+offset from the vec_extract into the normal address.
+
+I also added alternatives to load the values into vector registers.  If we load
+the value into vector registers, we require X-form addressing.
+
+I added the VSX_EX_ISA mode attribute to distinguish that we can load 32-bit
+integers on a power8 system to vector registers, but we need a power9 system to
+be able to load 8-bit or 16-bit integers.
+
+In general, loading up small integer values with vec_extract into the vector
+registers explicitly is likely not done that much.  However, this will be needed
+in later patches when we want to combine loading up a small integer value into a
+vector register with sign/zero extension.  This happens when we want to do a
+vec_extract of a smal integer value and convert it to floating point.
+
+2023-07-11   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (VSX_EX_ISA): New mode attribute.
+	(vsx_extract_<mode>_load): Add more alternatives for memory options.
+	Allow the load to load up vector registers if needed.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-char-1.c: New test.
+	* gcc.target/powerpc/vec-extract-mem-int-1.c: New test.
+	* gcc.target/powerpc/vec-extract-mem-short-1.c: New test.
+
 ==================== Branch work124, patch #21 ====================
 
 Optimize vec_extract of V4SF with variable element number being converted to DF
