@@ -1,3 +1,34 @@
+==================== Branch work124, patch #23 ====================
+
+Allow constant element vec_extract to be converted to floating point
+
+This patch allows vec_extract of the following types to be converted to
+floating point by loading the value directly to the vector register, and then
+doing the conversion instead of loading the value to a GPR and then doing a
+direct move:
+
+vector int
+vector unsigned int
+vector unsigned short
+vector unsigned char
+
+2023-07-12   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.md (fp_int_extend): New code attribute.
+	* config/rs6000/vsx.md (vsx_extract_v4si_load_to_<uns><mode>): New
+	insn.
+	(vsx_extract_<VSX_EXTRACT_I2:mode>_load_to_uns<SFDF:mode>): New insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vec-extract-mem-char-2.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-int-2.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-int_3.c: New file.
+	* gcc.target/powerpc/vec-extract-mem-short-2.c: New file.
+
+
 ==================== Branch work124, patch #22 ====================
 
 Add alternatives for vec_extract with constant element loading from memory.
