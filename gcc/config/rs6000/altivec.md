@@ -171,6 +171,7 @@
    UNSPEC_VSTRIL
    UNSPEC_SLDB
    UNSPEC_SRDB
+   UNSPEC_VECTOR_SHIFT
 ])
 
 (define_c_enum "unspecv"
@@ -238,6 +239,10 @@
 
 ;; Vector negate
 (define_mode_iterator VNEG [V4SI V2DI])
+
+;; Vector shift by constant vector optimizations
+(define_mode_iterator V4SI_V2DI		[V4SI V2DI])
+(define_code_iterator vshift_code	[ashift ashiftrt lshiftrt])
 
 ;; Vector move instructions.
 (define_insn "*altivec_mov<mode>"
@@ -2075,6 +2080,54 @@
 		     UNSPEC_VSRO))]
   "TARGET_ALTIVEC"
   "vsro %0,%1,%2"
+  [(set_attr "type" "vecperm")])
+
+;; Optimize V2DI/V4SI shifts by constants.  We don't have a VSPLTISD or
+;; VSPLTISW instruction, but we can use XXSPLITB to load constants that would
+;; be used by shifts.  The shift instructions only looking at the bits needed
+;; to do the shift.
+
+(define_insn_and_split "*altivec_<code>_const_<mode>"
+  [(set (match_operand:V4SI_V2DI 0 "register_operand" "=v")
+	(vshift_code:V4SI_V2DI
+	 (match_operand:V4SI_V2DI 1 "register_operand" "v")
+	 (match_operand:V4SI_V2DI 2 "vector_shift_constant" "")))
+   (clobber (match_scratch:V4SI_V2DI 3 "=&v"))]
+  "TARGET_P8_VECTOR"
+  "#"
+  "&& 1"
+  [(set (match_dup 3)
+	(unspec:V4SI_V2DI [(match_dup 4)] UNSPEC_VECTOR_SHIFT))
+   (set (match_dup 0)
+	(vshift_code:V4SI_V2DI (match_dup 1)
+			       (match_dup 3)))]
+{
+  rtx vec_const = operands[2];
+
+  if (GET_CODE (operands[3]) == SCRATCH)
+    operands[3] = gen_reg_rtx (<MODE>mode);
+
+  if (GET_CODE (vec_const) == CONST_VECTOR)
+    operands[4] = CONST_VECTOR_ELT (vec_const, 0);
+
+  else if (GET_CODE (vec_const) == VEC_DUPLICATE)
+    operands[4] = XEXP (vec_const, 0);
+
+  else
+    gcc_unreachable ();
+})
+
+(define_insn "*altivec_shift_const_<mode>"
+  [(set (match_operand:V4SI_V2DI 0 "register_operand" "=v")
+	(unspec:V4SI_V2DI [(match_operand 1 "const_int_operand" "n")]
+			    UNSPEC_VECTOR_SHIFT))]
+  "(TARGET_P8_VECTOR && UINTVAL (operands[1]) <= 15)
+    || (TARGET_P9_VECTOR && UINTVAL (operands[1]) <= 63)"
+{
+  return (UINTVAL (operands[1]) <= 15
+	  ? "vspltisw %0,%1"
+	  : "xxspltib %x0,%1");
+}
   [(set_attr "type" "vecperm")])
 
 (define_insn "altivec_vsum4ubs"
