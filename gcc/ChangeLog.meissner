@@ -1,3 +1,41 @@
+==================== Branch work124, patch #25 ====================
+
+PR target/89213 - Optimize vector shift by a constant.
+
+Optimize vector shifts by a constant, taking advantage that the shift
+instructions only look at the bits within the element.
+
+The PowerPC doesn't have a VSPLTID instruction.  This meant that if we are doing
+a V2DI shift of 0..15, we had to do VSPLTIW and VEXTSW2D instructions to load
+the constant into the vector register.
+
+Similarly for V4SI and V2DI, if we wanted to shift more than 15 bits, we would
+generate XXSPLTIB and VEXTSB2D or VEXTSB2W instructions to load the constant
+into the vector register.
+
+Given the vector shift instructions only look at the bottom 5 or 6 bits of the
+shift value, we can load the constant via VSPLTISW or XXSPLTIB instructions and
+eliminate the sign extend instructions (VEXTSW2D, VEXTSB2D, and VEXTSB2W).
+
+2023-07-13  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/89213
+	* config/rs6000/altivec.md (UNSPEC_VECTOR_SHIFT): New unspec.
+	(V4SI_V2DI): New mode iterator.
+	(vshift_code): New code iterator.
+	(altivec_<code>_const_<mode): New insns.
+	(altivec_shift_const_<mode>): New insns.
+	* config/rs6000/predicates.md (vector_shift_constant): New
+	predicate.
+
+gcc/testsuite/
+
+	PR target/89213
+	* gcc.target/powerpc/pr89213.c: New test.
+	* gcc.target/powerpc/vec-rlmi-rlnm.c: Update insn count.
+
 ==================== Branch work124, patch #24 ====================
 
 Update fold-vec-extract insn counts on 32-bit big endian
