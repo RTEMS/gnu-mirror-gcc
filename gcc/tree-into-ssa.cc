@@ -2463,25 +2463,67 @@ fini_ssa_renamer (void)
 hash_map<tree,hvar *> *var_map;
 
 static hvar *
-get_op (hack_ssa_builder &builder, tree op)
+get_op (hack_ssa_builder &builder, tree op, basic_block bb)
 {
   bool existed;
   if (!op)
     return NULL;
-  hvar *&ret = var_map->get_or_insert (op, &existed);
+  hvar *&ret = var_map->get_or_insert (op, &existed); // TODO S timhle bacha na
+						      // mem pristupy
   if (existed)
     return ret;
   if (is_gimple_min_invariant (op))
     ret = builder.new_invar (op);
   else if (is_gimple_reg (op))
     {
-      if (TREE_CODE (op) == PARM_DECL)
-	ret = builder.new_param (op);
-      else
-        ret = builder.new_local (op);
+      switch (TREE_CODE (op))
+	{
+	case VAR_DECL:
+	  ret = builder.new_local (op);
+	  break;
+	case PARM_DECL:
+	  ret = builder.new_param (op);
+	  break;
+	case SSA_NAME: // TODO Dělám tohle správně? Nerozbije se to?
+	  ret = builder.new_invar (op);
+	  break;
+	default:
+	  gcc_unreachable ();
+	}
     }
   else
-    gcc_unreachable ();
+    {
+      switch (TREE_CODE (op))
+	{
+	case ARRAY_REF:
+	case COMPONENT_REF:
+	case MEM_REF:
+	  {
+	    vec<tree> vars = extract_operands_to_be_renamed (op);
+	    auto_vec<hvar *, 8> hvars;
+	    for (tree v : vars)
+	      hvars.safe_push (get_op (builder, v, bb));
+	    ret = builder.append_handled_component (bb, op, hvars);
+	    vars.release ();
+	  }
+	  break;
+	case VAR_DECL:
+	case PARM_DECL:
+	  {
+	    /* Not a handled component, just a simple memory access.  */
+	    ret = builder.new_invar (op);
+	  }
+	  break;
+	case CONSTRUCTOR:
+	  {
+	    /* For CLOBBERing arrays??? TODO  */
+	    ret = builder.new_invar (op);
+	  }
+	  break;
+	default:
+	  gcc_unreachable (); /* Not implemented.  */
+	}
+    }
   return ret;
 }
 
@@ -2510,21 +2552,21 @@ new_intossa ()
 		case GIMPLE_UNARY_RHS:
 		case GIMPLE_SINGLE_RHS:
 		  builder.append_assign (bb, gimple_assign_rhs_code (stmt),
-					 get_op (builder, gimple_assign_lhs (stmt)),
-					 get_op (builder, gimple_assign_rhs1 (stmt)));
+					 get_op (builder, gimple_assign_lhs (stmt), bb),
+					 get_op (builder, gimple_assign_rhs1 (stmt), bb));
 		  break;
 		case GIMPLE_BINARY_RHS:
 		  builder.append_assign (bb, gimple_assign_rhs_code (stmt),
-					 get_op (builder, gimple_assign_lhs (stmt)),
-					 get_op (builder, gimple_assign_rhs1 (stmt)),
-					 get_op (builder, gimple_assign_rhs2 (stmt)));
+					 get_op (builder, gimple_assign_lhs (stmt), bb),
+					 get_op (builder, gimple_assign_rhs1 (stmt), bb),
+					 get_op (builder, gimple_assign_rhs2 (stmt), bb));
 		  break;
 		case GIMPLE_TERNARY_RHS:
 		  builder.append_assign (bb, gimple_assign_rhs_code (stmt),
-					 get_op (builder, gimple_assign_lhs (stmt)),
-					 get_op (builder, gimple_assign_rhs1 (stmt)),
-					 get_op (builder, gimple_assign_rhs2 (stmt)),
-					 get_op (builder, gimple_assign_rhs3 (stmt)));
+					 get_op (builder, gimple_assign_lhs (stmt), bb),
+					 get_op (builder, gimple_assign_rhs1 (stmt), bb),
+					 get_op (builder, gimple_assign_rhs2 (stmt), bb),
+					 get_op (builder, gimple_assign_rhs3 (stmt), bb));
 		  break;
 		case GIMPLE_INVALID_RHS:
 		  gcc_unreachable ();
@@ -2533,8 +2575,8 @@ new_intossa ()
 	      break;
 	    case GIMPLE_COND:
 	      builder.append_cond (bb, gimple_cond_code (stmt),
-				   get_op (builder, gimple_cond_lhs (stmt)),
-				   get_op (builder, gimple_cond_rhs (stmt)));
+				   get_op (builder, gimple_cond_lhs (stmt), bb),
+				   get_op (builder, gimple_cond_rhs (stmt), bb));
 	      gsi_remove (&gsi, true);
 	      break;
 	    case GIMPLE_RETURN:
@@ -2544,7 +2586,7 @@ new_intossa ()
 		if (retval == NULL_TREE)
 		  builder.append_return (bb);
 		else
-		  builder.append_return (bb, get_op (builder, retval));
+		  builder.append_return (bb, get_op (builder, retval, bb));
 		gsi_remove (&gsi, true);
 	      }
 	      break;
@@ -2552,14 +2594,14 @@ new_intossa ()
 	      {
 		unsigned num_args = gimple_call_num_args (stmt);
 		vec<hvar *> args = vNULL; /* TODO We know how much to allocate.  */
-		hvar *lhs = get_op (builder, gimple_call_lhs (stmt));
+		hvar *lhs = get_op (builder, gimple_call_lhs (stmt), bb);
 		tree fn = gimple_call_fn (stmt);
 
 		unsigned i;
 		for (i = 0; i < num_args; i++)
 		  {
 		    tree arg = gimple_call_arg (stmt, i);
-		    args.safe_push (get_op (builder, arg));
+		    args.safe_push (get_op (builder, arg, bb));
 		  }
 
 		builder.append_call_vec (bb, fn, lhs, args);
@@ -2645,7 +2687,7 @@ pass_build_ssa::execute (function *fun)
   /* Initialize operand data structures.  */
   init_ssa_operands (fun);
 
-  if (flag_new_intossa) // TODO DEBUG
+  if (flag_new_intossa)
     new_intossa ();
   else
     {

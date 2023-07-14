@@ -106,6 +106,20 @@ hstmt_call::replace_op_by (hstmt_with_lhs *op, hstmt_with_lhs *replace_by)
     }
 }
 
+/* Replace hack handled component operand.  */
+
+void
+hstmt_handled_component::replace_op_by (hstmt_with_lhs *op,
+					hstmt_with_lhs *replace_by)
+{
+  unsigned i;
+  for (i = 0; i < operands.length (); i++)
+    {
+      if (operands[i] == op)
+	operands[i] = replace_by;
+    }
+}
+
 gimple *
 hstmt_assign::to_gimple (void)
 {
@@ -181,6 +195,60 @@ hstmt_call::to_gimple (void)
   return call;
 }
 
+/* When commiting to gimple, just update handled component. Handled component
+   stmts are virtual.
+
+   It is crucial that operands to be converted are stored in preorder and that
+   this function visits them in the same order as
+   'extract_operands_to_be_renamed ()'.  */
+
+gimple *
+hstmt_handled_component::to_gimple (void)
+{
+  tree ref = var->t;
+  operands.reverse (); /* So that we can pop in the order elements were pushed.  */
+
+  while (true)
+    {
+      tree op;
+
+      switch (TREE_CODE (ref))
+	{
+	  case ARRAY_REF:
+	    op = TREE_OPERAND (ref, 1);
+	    if (op == error_mark_node)
+	      TREE_OPERAND (ref, 1) = operands.pop ()->ssa;
+	    break;
+	  case COMPONENT_REF:
+	    op = TREE_OPERAND (ref, 2);
+	    if (op == error_mark_node)
+	      TREE_OPERAND (ref, 2) = operands.pop ()->ssa;
+	    break;
+	  case MEM_REF:
+	    op = TREE_OPERAND (ref, 1);
+	    if (op == error_mark_node)
+	      TREE_OPERAND (ref, 1) = operands.pop ()->ssa;
+	    break;
+	  default:
+	    gcc_unreachable (); /* Not implemented.  */
+	}
+
+      op = TREE_OPERAND (ref, 0);
+      if (op != error_mark_node)
+	{
+	  /* This means op is a handled component.  */
+	  ref = op;
+	}
+      else
+	{
+	  TREE_OPERAND (ref, 0) = operands.pop ()->ssa;
+	  break;
+	}
+    }
+
+    return NULL;
+}
+
 /* Create a new LOCAL hack variable.
 
    Accepts VAR_DECL, PARM_DECL and type trees.
@@ -195,7 +263,17 @@ hack_ssa_builder::new_local (tree type_or_var)
   local->index = next_index;
   local->code = LOCAL;
   local->t = type_or_var;
-  local->default_def = NULL;
+  /* If local isn't anonymous, assign it a default definition. This is
+     necessary for code that uses uninitialized variables.  */
+  if (TREE_CODE (type_or_var) == VAR_DECL)
+    {
+      tree ssa = get_or_create_ssa_default_def (cfun, type_or_var);
+      local->default_def = new hstmt_const (local, ssa);
+    }
+  else
+    {
+      local->default_def = NULL;
+    }
   next_index++;
   allocated_hvars.safe_push (local);
   return local;
@@ -229,7 +307,9 @@ hack_ssa_builder::new_invar (tree ssa)
   invar->t = NULL_TREE;
   next_const_index++;
 
-  invar->default_def = new hstmt_const (invar, ssa);
+  hstmt_const *stmt = new hstmt_const (invar, ssa);
+  invar->default_def = stmt;
+  const_stmts.safe_push (stmt);
 
   allocated_hvars.safe_push (invar);
 
@@ -277,34 +357,6 @@ hack_ssa_builder::append_cond (basic_block bb, enum tree_code pred_code,
   /* Update uses list of appropriate stmts.  */
   stmt_l->uses.safe_push (stmt);
   stmt_r->uses.safe_push (stmt);
-}
-
-/* Build and append hack outvar to a basic block.
-
-   Outvar stmts are virtual. They represent places in generated code where user
-   will want to know SSA name of a LOCAL hack var. Outvars should be the only
-   way to extract SSA names from generated code. */
-
-hvar *
-hack_ssa_builder::append_outvar (basic_block bb, hvar *local)
-{
-  hvar *outvar = XNEW (struct hvar);
-  outvar->index = next_index;
-  outvar->code = OUTVAR;
-  outvar->t = NULL_TREE;
-  outvar->default_def = NULL;
-  next_index++;
-
-  hstmt_outvar *stmt = new hstmt_outvar (outvar, read_variable (bb, local));
-  append_stmt (bb, stmt);
-
-  allocated_hvars.safe_push (outvar);
-
-  /* Update uses list of appropriate stmts.  */
-  stmt->rhs->uses.safe_push (stmt);
-  // TODO Neměl bych kontrolovat, jestli není killed?
-  
-  return outvar;
 }
 
 /* Build and append hack return to a basic block.
@@ -365,6 +417,77 @@ hack_ssa_builder::append_call_vec (basic_block bb, tree fn,
 				   const vec<hvar *> &args)
 {
   append_call_vec (bb, fn, NULL, args);
+}
+
+/* Build and append hack outvar to a basic block.
+
+   Outvar stmts are virtual. They represent places in generated code where user
+   will want to know SSA name of a LOCAL hack var. Outvars should be the only
+   way to extract SSA names from generated code. */
+
+hvar *
+hack_ssa_builder::append_outvar (basic_block bb, hvar *local)
+{
+  hvar *outvar = XNEW (struct hvar);
+  outvar->index = next_index;
+  outvar->code = OUTVAR;
+  outvar->t = NULL_TREE;
+  outvar->default_def = NULL;
+  next_index++;
+
+  hstmt_outvar *stmt = new hstmt_outvar (outvar, read_variable (bb, local));
+  append_stmt (bb, stmt);
+
+  allocated_hvars.safe_push (outvar);
+
+  /* Update uses list of appropriate stmts.  */
+  stmt->rhs->uses.safe_push (stmt);
+  // TODO Neměl bych kontrolovat, jestli není killed?
+  
+  return outvar;
+}
+
+/* TODO Describe.
+   
+   Only some operands of handled component will have to be renamed. For each of
+   these, operands vector should contain the appropriate hvar and the handled
+   component should have their locations replaced by 'error_mark's. Operands
+   should be ordered in preorder.
+
+   See 'extract_operands_to_be_renamed ()'  */
+
+hvar *
+hack_ssa_builder::append_handled_component (basic_block bb, tree ref,
+					    vec<hvar *> &operands)
+{
+  hstmt_handled_component *stmt = new hstmt_handled_component ();
+  for (hvar *op : operands)
+    {
+      stmt->operands.safe_push (read_variable (bb, op));
+    }
+
+  hvar *memvar = XNEW (struct hvar);
+  memvar->index = next_index;
+  memvar->code = MEMORY;
+  memvar->t = ref;
+  next_index++;
+
+  /* Link statement and MEMORY hvar together.  */
+  memvar->default_def = stmt;
+  stmt->var = memvar;
+
+  append_stmt (bb, stmt);
+
+  allocated_hvars.safe_push (memvar);
+
+  /* Update uses list of appropriate stmts.  */
+  for (hstmt_with_lhs *s : stmt->operands)
+    {
+      // TODO Neměl bych kontrolovat, jestli není killed?
+      s->uses.safe_push (stmt);
+    }
+
+  return memvar;
 }
 
 /* See the Braun alg paper for what 'sealed' means.  */
@@ -480,6 +603,10 @@ hack_ssa_builder::release (void)
     XDELETE (t);
   for (hack_tuple_fn *t : allocated_tuples_fn)
     XDELETE (t);
+  for (hstmt_with_lhs *s : const_stmts)
+    {
+      s->uses.release ();
+    }
 }
 
 /* Extracts SSA name from outvar. Outvars represent places where user wants SSA
@@ -635,6 +762,9 @@ hack_ssa_builder::commit_ssa_name (hstmt_with_lhs *s)
   if (s->var == NULL) /* This statement doesn't have lhs.  */
     return;
 
+  /* Const hstmts already have an ssa value at this point.  */
+  gcc_checking_assert (dyn_cast<hstmt_const *> (s) == NULL);
+
   switch (s->var->code)
     {
       case LOCAL:
@@ -642,11 +772,15 @@ hack_ssa_builder::commit_ssa_name (hstmt_with_lhs *s)
 	s->ssa = make_ssa_name (s->var->t);
 	break;
       case MEMORY:
-	gcc_unreachable (); /* TODO implement memory.  */
+	s->ssa = s->var->t;
+	break;
       case INVAR:
-	gcc_unreachable (); /* Invars already have SSA value.  */
+	/* INVARs have their ssa value stored in corresponding const stmt.  */
+	s->ssa = s->var->default_def->ssa;
+	break;
       case OUTVAR:
-	gcc_unreachable (); /* hstmt_with_lhs shouldn't contain outvars.  */
+	/* OUTVARs should only be present in outvar hstmts.  */
+	gcc_unreachable ();
     }
 }
 
@@ -682,7 +816,7 @@ hack_ssa_builder::commit_stmt (gimple_stmt_iterator *gsi, hstmt *hs)
   gcc_checking_assert (dyn_cast<hphi *> (hs) == NULL);
 
   gimple *s = hs->to_gimple ();
-  if (s != NULL) /* Some hack stmts (outvars) are just virtual.  */
+  if (s) /* Some hack stmts (outvars) are just virtual.  */
     gsi_insert_after (gsi, s, GSI_NEW_STMT);
 }
 
@@ -794,7 +928,7 @@ hstmt_with_lhs *
 hack_ssa_builder::read_variable (basic_block bb, hvar *var)
 {
   gcc_checking_assert (var->code != OUTVAR);
-  if (var->code == INVAR)
+  if (var->code == INVAR || var->code == MEMORY)
     {
       return var->default_def;
     }
@@ -833,7 +967,7 @@ hack_ssa_builder::read_variable_recursive (basic_block bb, hvar *var)
   else
     {
       /* Reached a bb without predecessors.  */
-      if (var->code == PARAM)
+      if (var->code == PARAM || var->code == LOCAL)
 	{
 	  return var->default_def;
 	}
@@ -879,3 +1013,64 @@ hack_ssa_builder::tuple_lookup (basic_block bb, hack_tuple_internal *val)
 
 void
 hack_ssa_builder::run_final_optimizations (void) { }
+
+/* Traverses handled component in preorder. For each operand that will have to
+   be renamed when transitioning to SSA, puts it into a vector and replaces it
+   with 'error_mark'. Finally, returns the gathered operands.  */
+
+vec<tree>
+extract_operands_to_be_renamed (tree ref)
+{
+  vec<tree> ret = vNULL;
+
+  while (true)
+    {
+      tree op;
+
+      switch (TREE_CODE (ref))
+	{
+	  case ARRAY_REF:
+	    gcc_assert (!TREE_OPERAND (ref, 2) &&
+			!TREE_OPERAND (ref, 3)); /* Not implemented.  */
+	    op = TREE_OPERAND (ref, 1);
+	    if (is_gimple_reg (op))
+	      {
+		TREE_OPERAND (ref, 1) = error_mark_node;
+		ret.safe_push (op);
+	      }
+	    break;
+	  case COMPONENT_REF:
+	    op = TREE_OPERAND (ref, 2);
+	    if (is_gimple_reg (op))
+	      {
+		TREE_OPERAND (ref, 2) = error_mark_node;
+		ret.safe_push (op);
+	      }
+	    break;
+	  case MEM_REF:
+	    op = TREE_OPERAND (ref, 1);
+	    if (is_gimple_reg (op))
+	      {
+		TREE_OPERAND (ref, 1) = error_mark_node;
+		ret.safe_push (op);
+	      }
+	    break;
+	  default:
+	    gcc_unreachable (); /* Not implemented.  */
+	}
+
+      op = TREE_OPERAND (ref, 0);
+      if (handled_component_p (op))
+	{
+	  ref = op;
+	}
+      else
+	{
+          TREE_OPERAND (ref, 0) = error_mark_node;
+	  ret.safe_push (op);
+	  break;
+	}
+    }
+
+  return ret;
+}

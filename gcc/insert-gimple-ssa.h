@@ -44,7 +44,7 @@ class hack_ssa_builder;
 
    INVAR .. Incoming variable. Represents SSA name that generated code uses but
 	    originates outside of it
-   MEMORY .. Represents a memory access. Handles storage refs.
+   MEMORY .. Represents a memory access -- a handled component.
    LOCAL .. Local variable. Analogous to a var_decl. Represents a variable used
             only inside the generated code.
    OUTVAR .. Outgoing variable. Doesn't represent an actual object. Represents
@@ -69,16 +69,11 @@ struct hvar
 	     PARAM           ... PARM_DECL
 	     INVAR           ... null
 	     OUTVAR          ... null or SSA name when finalized
-	     MEMORY          ... MEM_REF.  */
-  hstmt_const *default_def; /* PARAMs and INVARs.  */
+	     MEMORY          ... handled component.  */
+  hstmt_with_lhs *default_def; /* PARAM, INVAR and MEMORY.  */
 };
 
 // -- INTERNAL STRUCTS --
-
-class hack_storage_ref { };
-class hack_array_ref : hack_storage_ref { };
-class hack_component_ref : hack_storage_ref { };
-class hack_mem_ref : hack_storage_ref { };
 
 enum hstmt_code
 {
@@ -88,7 +83,8 @@ enum hstmt_code
   HSTMT_COND,
   HSTMT_OUTVAR,
   HSTMT_RETURN,
-  HSTMT_CALL
+  HSTMT_CALL,
+  HSTMT_HANDLED_COMPONENT
 };
 
 /* Hack statement
@@ -194,10 +190,10 @@ class hstmt_assign : public hstmt_with_lhs
   public:
     hack_tuple_internal *val;
 
-    hstmt_assign (hvar *var, hack_tuple_internal *val) :
-      hstmt_with_lhs (HSTMT_ASSIGN, var), val (val)
+    hstmt_assign (hvar *var, hack_tuple_internal *val)
+      : hstmt_with_lhs (HSTMT_ASSIGN, var), val (val)
       {
-	gcc_checking_assert (var->code == LOCAL || var->code == PARAM);
+	gcc_checking_assert (var->code != OUTVAR);
       }
 
     virtual gimple *to_gimple (void) override;
@@ -220,10 +216,27 @@ class hstmt_const : public hstmt_with_lhs
     hstmt_const (hvar *var, tree ssa)
       : hstmt_with_lhs (HSTMT_CONST, var, ssa)
       {
-	gcc_checking_assert (var->code == INVAR || var->code == PARAM);
+	gcc_checking_assert (var->code != OUTVAR && var->code != MEMORY);
       }
 
     ~hstmt_const () { }
+};
+
+/* TODO Describe handled component virtual stmts.  */
+
+class hstmt_handled_component : public hstmt_with_lhs
+{
+  public:
+    vec<hstmt_with_lhs *> operands = vNULL;
+
+    hstmt_handled_component ()
+      : hstmt_with_lhs (HSTMT_HANDLED_COMPONENT, NULL) { }
+
+    virtual gimple *to_gimple (void) override;
+    virtual void replace_op_by (hstmt_with_lhs *op, hstmt_with_lhs *replace_by)
+      override;
+
+    ~hstmt_handled_component () { }
 };
 
 /* Hack cond stmt.  */
@@ -413,6 +426,8 @@ class hack_ssa_builder
 		 	const vec<hvar *> &args);
   void append_call_vec (basic_block bb, tree fn, const vec<hvar *> &args);
   hvar *append_outvar (basic_block bb, hvar *local);
+  hvar *append_handled_component (basic_block bb, tree ref,
+				  vec<hvar *> &operands);
 
   void set_block_sealed (basic_block bb);
   void set_block_filled (basic_block bb);
@@ -438,6 +453,8 @@ class hack_ssa_builder
   hash_map<basic_block, hack_bb *> bb_record_map;
   hash_set<basic_block> sealed_bbs;
   hash_set<basic_block> filled_bbs;
+
+  vec<hstmt_with_lhs *> const_stmts = vNULL;
 
   void append_assign1 (basic_block bb, enum tree_code code, hvar *left,
 		       hvar *op1, hvar *op2, hvar *op3,
@@ -485,6 +502,7 @@ struct is_a_helper<hstmt_with_lhs *> : static_is_a_helper<hstmt_with_lhs *>
 	case HPHI:
 	case HSTMT_CONST:
 	case HSTMT_CALL:
+	case HSTMT_HANDLED_COMPONENT:
 	  return true;
 	default:
 	  return false;
@@ -507,5 +525,25 @@ struct is_a_helper<hphi *> : static_is_a_helper<hphi *>
 	}
     }
 };
+
+template<>
+struct is_a_helper<hstmt_const *> : static_is_a_helper<hstmt_const *>
+{
+  static inline bool test (const hstmt *p)
+    {
+      hstmt_code code = p->code;
+      switch (code)
+	{
+	case HSTMT_CONST:
+	  return true;
+	default:
+	  return false;
+	}
+    }
+};
+
+// -- UTILITY FUNCTIONS --
+
+vec<tree> extract_operands_to_be_renamed (tree ref);
 
 #endif /* GCC_INSERT_GIMPLE_SSA_H */
