@@ -3576,7 +3576,7 @@
   [(set_attr "length" "8")
    (set_attr "type" "fp")])
 
-(define_insn_and_split "*vsx_extract_v4sf_<mode>_load"
+(define_insn_and_split "*vsx_extract_v4sf_load"
   [(set (match_operand:SF 0 "register_operand" "=f,v,v,?r")
 	(vec_select:SF
 	 (match_operand:V4SF 1 "memory_operand" "m,Z,m,m")
