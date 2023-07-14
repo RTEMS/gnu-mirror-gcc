@@ -1,3 +1,121 @@
+==================== Branch work125-vpair, patch #20 ====================
+
+Add f32 and f64 overloaded built-in functions.
+
+This patch provides the initial support for the overload fp built-ins as
+discussed in box note: https://ibm.ent.box.com/notes/978232649866
+
+2023-07-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md: (UNSPEC_PAIR_ABS_F32): New unspec.
+	(UNSPEC_PAIR_ABS_F64): Likewise.
+	(UNSPEC_PAIR_ADD_F32): Likewise.
+	(UNSPEC_PAIR_ADD_F64): Likewise.
+	(UNSPEC_PAIR_FMA_F32): Likewise.
+	(UNSPEC_PAIR_FMA_F64): Likewise.
+	(UNSPEC_PAIR_MULT_F32): Likewise.
+	(UNSPEC_PAIR_MULT_F64): Likewise.
+	(UNSPEC_PAIR_NEG_F32): Likewise.
+	(UNSPEC_PAIR_NEG_F64): Likewise.
+	(UNSPEC_PAIR_SCALE_F32): Likewise.
+	(UNSPEC_PAIR_SCALE_F64): Likewise.
+	(UNSPEC_PAIR_SUB_F32): Likewise.
+	(UNSPEC_PAIR_SUB_F64): Likewise.
+	(UNSPEC_PAIR_1OPS): New iterator.
+	(UNSPEC_PAIR_2OPS): Likewise.
+	(UNSPEC_PAIR_3OPS): Likewise.
+	(UNSPEC_PAIR_SCALE): Likewise.
+	(pairop): New int attribute.
+	(pairmode): Likewise.
+	(UNSPEC_PAIR_NEG): Likewise.
+	(pairabs): Likewise.
+	(pairfma): Likewise.
+	(vpair_<pairop>_<pairmode>): New insn.
+	(vpair_<pairop>_<pairmode>): Likewise.
+	(vpair_<pairop>_<pairmode>): Likewise.
+	(vpair_SCALE_<pairmode>): Likewise.
+	(vpair_NABS_<pairmode>): Likewise.
+	(vpair_FMS_<pairmode): Likewise.
+	(vpair_NFMA_<pairmode>): Likewise.
+	(vpair_NFMS_<pairmode>"): Likewise.
+	* config/rs6000/rs6000-builtin.cc (fold_builtin_overload_fp): New helper
+	function.
+	(rs6000_gimple_fold_builtin): Add overloaded fp built-in function
+	support.
+	* config/rs6000/rs6000-builtins.def (__builtin_abs_f32_scalar): New
+	built-in function.
+	(__builtin_abs_f32_vector): Likewise.
+	(__builtin_abs_f32_vpair): Likewise.
+	(__builtin_abs_f64_scalar): Likewise.
+	(__builtin_abs_f64_vector): Likewise.
+	(__builtin_abs_f64_vpair): Likewise.
+	(__builtin_add_f32_scalar): Likewise.
+	(__builtin_add_f32_vector): Likewise.
+	(__builtin_add_f32_vpair): Likewise.
+	(__builtin_add_f64_scalar): Likewise.
+	(__builtin_add_f64_vector): Likewise.
+	(__builtin_add_f64_vpair): Likewise.
+	(__builtin_mult_f32_scalar): Likewise.
+	(__builtin_mult_f32_vector): Likewise.
+	(__builtin_mult_f32_vpair): Likewise.
+	(__builtin_mult_f64_scalar): Likewise.
+	(__builtin_mult_f64_vector): Likewise.
+	(__builtin_mult_f64_vpair): Likewise.
+	(__builtin_neg_f32_scalar): Likewise.
+	(__builtin_neg_f32_vector): Likewise.
+	(__builtin_neg_f32_vpair): Likewise.
+	(__builtin_neg_f64_scalar): Likewise.
+	(__builtin_neg_f64_vector): Likewise.
+	(__builtin_neg_f64_vpair): Likewise.
+	(__builtin_reduce_f32_scalar): Likewise.
+	(__builtin_reduce_f32_vector): Likewise.
+	(__builtin_reduce_f32_vpair): Likewise.
+	(__builtin_reduce_f64_scalar): Likewise.
+	(__builtin_reduce_f64_vector): Likewise.
+	(__builtin_reduce_f64_vpair): Likewise.
+	(__builtin_scale_f32_scalar): Likewise.
+	(__builtin_scale_f32_vector): Likewise.
+	(__builtin_scale_f32_vpair): Likewise.
+	(__builtin_scale_f64_scalar): Likewise.
+	(__builtin_scale_f64_vector): Likewise.
+	(__builtin_scale_f64_vpair): Likewise.
+	(__builtin_scale_v2df_vpair): Likewise.
+	(__builtin_sub_f32_scalar): Likewise.
+	(__builtin_sub_f32_vector): Likewise.
+	(__builtin_sub_f32_vpair): Likewise.
+	(__builtin_sub_f64_scalar): Likewise.
+	(__builtin_sub_f64_vector): Likewise.
+	(__builtin_sub_f64_vpair): Likewise.
+	(__builtin_fma_f32_scalar): Likewise.
+	(__builtin_fma_f32_vector): Likewise.
+	(__builtin_fma_f32_vpair): Likewise.
+	(__builtin_fma_f64_scalar): Likewise.
+	(__builtin_fma_f64_vector): Likewise.
+	(__builtin_fma_f64_vpair): Likewise.
+	* config/rs6000/rs6000-call.c (rs6000_return_in_memory): Allow
+	vector_pairs as arguments, but not vector_quads.
+	(rs6000_function_arg_advance_1): Likewise.
+	(rs6000_function_arg): Likewise.
+	* config/rs6000/rs6000-overload.def (__builtin_abs_f32): New overloaded
+	function.
+	(__builtin_abs_f64): Likewise.
+	(__builtin_add_f32): Likewise.
+	(__builtin_add_f64): Likewise.
+	(__builtin_mult_f32): Likewise.
+	(__builtin_mult_f64): Likewise.
+	(__builtin_neg_f32): Likewise.
+	(__builtin_neg_f64): Likewise.
+	(__builtin_reduce_f32): Likewise.
+	(__builtin_reduce_f64): Likewise.
+	(__builtin_scale_f32): Likewise.
+	(__builtin_scale_f64): Likewise.
+	(__builtin_sub_f32): Likewise.
+	(__builtin_sub_f64): Likewise.
+	(__builtin_fma_f32): Likewise.
+	(__builtin_fma_f64): Likewise.
+
 ==================== Branch work125-vpair, patch #9 ====================
 
 PR target/89213 - Optimize vector shift by a constant.
