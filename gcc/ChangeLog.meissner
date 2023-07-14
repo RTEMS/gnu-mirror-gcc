@@ -358,7 +358,7 @@ gcc/testsuite/
 	* gcc.target/powerpc/builtins-1.c: Update insn count.
 
 
-==================== Branch work125, baseline ====================
+==================== Branch work125-vpair, baseline ====================
 
 2023-07-14   Michael Meissner  <meissner@linux.ibm.com>
 
