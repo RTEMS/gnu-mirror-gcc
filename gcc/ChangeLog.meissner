@@ -1,4 +1,4 @@
-==================== Branch work125, patch #9 ====================
+==================== Branch work125-vpair, patch #9 ====================
 
 PR target/89213 - Optimize vector shift by a constant.
 
@@ -46,7 +46,7 @@ gcc/testsuite/
 	* gcc.target/powerpc/pr89213.c: New test.
 	* gcc.target/powerpc/vec-rlmi-rlnm.c: Update insn count.
 
-==================== Branch work125, patch #8 ====================
+==================== Branch work125-vpair, patch #8 ====================
 
 Update fold-vec-extract insn counts on 32-bit big endian
 
@@ -78,7 +78,7 @@ gcc/testsuite/
 	* gcc.target/powerpc/fold-vec-extract-short.p7.c: Likewise.
 	* gcc.target/powerpc/fold-vec-extract-short.p8.c: Likewise.
 
-==================== Branch work125, patch #7 ====================
+==================== Branch work125-vpair, patch #7 ====================
 
 Allow constant element vec_extract to be converted to floating point
 
@@ -118,7 +118,7 @@ gcc/testsuite/
 	* gcc.target/powerpc/vec-extract-mem-int_3.c: New file.
 	* gcc.target/powerpc/vec-extract-mem-short-2.c: New file.
 
-==================== Branch work125, patch #6 ====================
+==================== Branch work125-vpair, patch #6 ====================
 
 Add alternatives for vec_extract with constant element loading from memory.
 
@@ -165,7 +165,7 @@ gcc/testsuite/
 	* gcc.target/powerpc/vec-extract-mem-int-1.c: New test.
 	* gcc.target/powerpc/vec-extract-mem-short-1.c: New test.
 
-==================== Branch work125, patch #5 ====================
+==================== Branch work125-vpair, patch #5 ====================
 
 Optimize vec_extract of V4SF with variable element number being converted to DF
 
@@ -189,7 +189,7 @@ gcc/testsuite/
 
 	* gcc.target/powerpc/vec-extract-mem-float-2.c: New file.
 
-==================== Branch work125, patch #4 ====================
+==================== Branch work125-vpair, patch #4 ====================
 
 Optimize vec_extract of V4SF from memory with constant element numbers.
 
@@ -240,7 +240,7 @@ gcc/testsuite/
 
 	* gcc.target/powerpc/vec-extract-mem-float-1.c: New file.
 
-==================== Branch work125, patch #3 ====================
+==================== Branch work125-vpair, patch #3 ====================
 
 Fix typo in insn name.
 
@@ -267,7 +267,7 @@ gcc/
 	* config/rs6000/vsx.md (vsx_extract_v4sf_load): Rename from
 	vsx_extract_v4sf_<mode>_load.
 
-==================== Branch work125, patch #2 ====================
+==================== Branch work125-vpair, patch #2 ====================
 
 Improve 64->128 bit zero extension on PowerPC (PR target/108958)
 
@@ -302,7 +302,7 @@ gcc/testsuite/
 	PR target/108958
 	* gcc.target/powerpc/pr108958.c: New test.
 
-==================== Branch work125, patch #1 ====================
+==================== Branch work125-vpair, patch #1 ====================
 
 Optimize vec_splats of vec_extract for V2DI/V2DF (PR target/99293)
 
