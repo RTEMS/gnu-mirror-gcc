@@ -4116,3 +4116,123 @@
 
   void __builtin_vsx_stxvp (v256, unsigned long, const v256 *);
     STXVP nothing {mma,pair}
+
+; __vector_pair operations
+
+  float __builtin_abs_f32_scalar (float);
+    ABS_F32_SCALAR nothing {}
+  vf __builtin_abs_f32_vector (vf);
+    ABS_F32_VECTOR nothing {}
+  v256 __builtin_abs_f32_vpair (v256);
+    ABS_F32_VPAIR vpair_ABS_V4SF {mma,pair}
+
+  double __builtin_abs_f64_scalar (double);
+    ABS_F64_SCALAR nothing {}
+  vd __builtin_abs_f64_vector (vd);
+    ABS_F64_VECTOR nothing {}
+  v256 __builtin_abs_f64_vpair (v256);
+    ABS_F64_VPAIR vpair_ABS_V2DF {mma,pair}
+
+  float __builtin_add_f32_scalar (float, float);
+    ADD_F32_SCALAR nothing {}
+  vf __builtin_add_f32_vector (vf, vf);
+    ADD_F32_VECTOR nothing {}
+  v256 __builtin_add_f32_vpair (v256, v256);
+    ADD_F32_VPAIR vpair_PLUS_V4SF {mma,pair}
+
+  double __builtin_add_f64_scalar (double, double);
+    ADD_F64_SCALAR nothing {}
+  vd __builtin_add_f64_vector (vd, vd);
+    ADD_F64_VECTOR nothing {}
+  v256 __builtin_add_f64_vpair (v256, v256);
+    ADD_F64_VPAIR vpair_PLUS_V2DF {mma,pair}
+
+  float __builtin_mult_f32_scalar (float, float);
+    MULT_F32_SCALAR nothing {}
+  vf __builtin_mult_f32_vector (vf, vf);
+    MULT_F32_VECTOR nothing {}
+  v256 __builtin_mult_f32_vpair (v256, v256);
+    MULT_F32_VPAIR vpair_MULT_V4SF {mma,pair}
+
+  double __builtin_mult_f64_scalar (double, double);
+    MULT_F64_SCALAR nothing {}
+  vd __builtin_mult_f64_vector (vd, vd);
+    MULT_F64_VECTOR nothing {}
+  v256 __builtin_mult_f64_vpair (v256, v256);
+    MULT_F64_VPAIR vpair_MULT_V2DF {mma,pair}
+
+  float __builtin_neg_f32_scalar (float);
+    NEG_F32_SCALAR nothing {}
+  vf __builtin_neg_f32_vector (vf);
+    NEG_F32_VECTOR nothing {}
+  v256 __builtin_neg_f32_vpair (v256);
+    NEG_F32_VPAIR vpair_NEG_V4SF {mma,pair}
+
+  double __builtin_neg_f64_scalar (double);
+    NEG_F64_SCALAR nothing {}
+  vd __builtin_neg_f64_vector (vd);
+    NEG_F64_VECTOR nothing {}
+  v256 __builtin_neg_f64_vpair (v256);
+    NEG_F64_VPAIR vpair_NEG_V2DF {mma,pair}
+
+  float __builtin_reduce_f32_scalar (float);
+    REDUCE_F32_SCALAR nothing {}
+  float __builtin_reduce_f32_vector (vf);
+    REDUCE_F32_VECTOR nothing {}
+  float __builtin_reduce_f32_vpair (v256);
+    REDUCE_F32_VPAIR nothing {mma,pair}
+;   REDUCE_F32_VPAIR vpair_REDUCE_V4SF {mma,pair}
+
+  double __builtin_reduce_f64_scalar (double);
+    REDUCE_F64_SCALAR nothing {}
+  double __builtin_reduce_f64_vector (vd);
+    REDUCE_F64_VECTOR nothing {}
+  double __builtin_reduce_f64_vpair (v256);
+    REDUCE_F64_VPAIR nothing {mma,pair}
+;   REDUCE_F64_VPAIR vpair_REDUCE_V2DF {mma,pair}
+
+  float __builtin_scale_f32_scalar (float, float);
+    SCALE_F32_SCALAR nothing {}
+  vf __builtin_scale_f32_vector (float, vf);
+    SCALE_F32_VECTOR nothing {}
+  v256 __builtin_scale_f32_vpair (float, v256);
+    SCALE_F32_VPAIR nothing {mma,pair}
+  v256 __builtin_scale_v4sf_vpair (vf, v256);
+    SCALE_V4SF_VPAIR vpair_SCALE_V4SF {mma,pair}
+
+  double __builtin_scale_f64_scalar (double, double);
+    SCALE_F64_SCALAR nothing {}
+  vd __builtin_scale_f64_vector (double, vd);
+    SCALE_F64_VECTOR nothing {}
+  v256 __builtin_scale_f64_vpair (double, v256);
+    SCALE_F64_VPAIR nothing {mma,pair}
+  v256 __builtin_scale_v2df_vpair (vd, v256);
+    SCALE_V2DF_VPAIR vpair_SCALE_V2DF {mma,pair}
+
+  float __builtin_sub_f32_scalar (float, float);
+    SUB_F32_SCALAR nothing {}
+  vf __builtin_sub_f32_vector (vf, vf);
+    SUB_F32_VECTOR nothing {}
+  v256 __builtin_sub_f32_vpair (v256, v256);
+    SUB_F32_VPAIR vpair_MINUS_V4SF {mma,pair}
+
+  double __builtin_sub_f64_scalar (double, double);
+    SUB_F64_SCALAR nothing {}
+  vd __builtin_sub_f64_vector (vd, vd);
+    SUB_F64_VECTOR nothing {}
+  v256 __builtin_sub_f64_vpair (v256, v256);
+    SUB_F64_VPAIR vpair_MINUS_V2DF {mma,pair}
+
+  float __builtin_fma_f32_scalar (float, float, float);
+    FMA_F32_SCALAR nothing {}
+  vf __builtin_fma_f32_vector (vf, vf, vf);
+    FMA_F32_VECTOR nothing {}
+  v256 __builtin_fma_f32_vpair (v256, v256, v256);
+    FMA_F32_VPAIR vpair_FMA_V4SF {mma,pair}
+
+  double __builtin_fma_f64_scalar (double, double, double);
+    FMA_F64_SCALAR nothing {}
+  vd __builtin_fma_f64_vector (vd, vd, vd);
+    FMA_F64_VECTOR nothing {}
+  v256 __builtin_fma_f64_vpair (v256, v256, v256);
+    FMA_F64_VPAIR vpair_FMA_V2DF {mma,pair}

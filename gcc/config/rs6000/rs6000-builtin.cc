@@ -1261,6 +1261,37 @@ rs6000_gimple_fold_mma_builtin (gimple_stmt_iterator *gsi,
   return true;
 }
 
+/* Helper function to fold the overloaded fp functions for the scalar and
+   vector types that support the operation directly.  */
+
+static void
+fold_builtin_overload_fp (gimple_stmt_iterator *gsi,
+			  gimple *stmt,
+			  enum tree_code code)
+{
+  location_t loc = gimple_location (stmt);
+  tree lhs = gimple_call_lhs (stmt);
+  tree t;
+
+  if (code == ABS_EXPR || code == NEGATE_EXPR)
+    {
+      tree arg0 = gimple_call_arg (stmt, 0);
+      t = build1 (code, TREE_TYPE (lhs), arg0);
+    }
+
+  else
+    {
+      tree arg0 = gimple_call_arg (stmt, 0);
+      tree arg1 = gimple_call_arg (stmt, 1);
+      t = build2 (code, TREE_TYPE (lhs), arg0, arg1);
+    }
+
+  gimple *g = gimple_build_assign (lhs, t);
+  gimple_set_location (g, loc);
+  gsi_replace (gsi, g, true);
+  return;
+}
+
 /* Fold a machine-dependent built-in in GIMPLE.  (For folding into
    a constant, use rs6000_fold_builtin.)  */
 bool
@@ -2224,6 +2255,181 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 				  TREE_TYPE (lhs), lhs_ptype);
 	gsi_insert_seq_before (gsi, stmts, GSI_SAME_STMT);
 	g = gimple_build_assign (lhs, temp);
+	gimple_set_location (g, loc);
+	gsi_replace (gsi, g, true);
+	return true;
+      }
+
+    case RS6000_BIF_ABS_F32_SCALAR:
+    case RS6000_BIF_ABS_F32_VECTOR:
+    case RS6000_BIF_ABS_F64_SCALAR:
+    case RS6000_BIF_ABS_F64_VECTOR:
+      fold_builtin_overload_fp (gsi, stmt, ABS_EXPR);
+      return true;
+
+    case RS6000_BIF_ADD_F32_SCALAR:
+    case RS6000_BIF_ADD_F32_VECTOR:
+    case RS6000_BIF_ADD_F64_SCALAR:
+    case RS6000_BIF_ADD_F64_VECTOR:
+      fold_builtin_overload_fp (gsi, stmt, PLUS_EXPR);
+      return true;
+
+    case RS6000_BIF_FMA_F32_SCALAR:
+    case RS6000_BIF_FMA_F32_VECTOR:
+    case RS6000_BIF_FMA_F64_SCALAR:
+    case RS6000_BIF_FMA_F64_VECTOR:
+      {
+	lhs = gimple_call_lhs (stmt);
+	arg0 = gimple_call_arg (stmt, 0);
+	arg1 = gimple_call_arg (stmt, 1);
+	tree arg2 = gimple_call_arg (stmt, 2);
+	gcall *g = gimple_build_call_internal (IFN_FMA, 3, arg0, arg1, arg2);
+	gimple_call_set_lhs (g, lhs);
+	gimple_call_set_nothrow (g, true);
+	gimple_set_location (g, gimple_location (stmt));
+	gsi_replace (gsi, g, true);
+	return true;
+      }
+
+    case RS6000_BIF_MULT_F32_SCALAR:
+    case RS6000_BIF_MULT_F32_VECTOR:
+    case RS6000_BIF_MULT_F64_SCALAR:
+    case RS6000_BIF_MULT_F64_VECTOR:
+    case RS6000_BIF_SCALE_F32_SCALAR:
+    case RS6000_BIF_SCALE_F64_SCALAR:
+      fold_builtin_overload_fp (gsi, stmt, MULT_EXPR);
+      return true;
+
+    case RS6000_BIF_NEG_F32_SCALAR:
+    case RS6000_BIF_NEG_F32_VECTOR:
+    case RS6000_BIF_NEG_F64_SCALAR:
+    case RS6000_BIF_NEG_F64_VECTOR:
+      fold_builtin_overload_fp (gsi, stmt, NEGATE_EXPR);
+      return true;
+
+    case RS6000_BIF_REDUCE_F32_SCALAR:
+    case RS6000_BIF_REDUCE_F64_SCALAR:
+      {
+	location_t loc = gimple_location (stmt);
+	lhs = gimple_call_lhs (stmt);
+	arg0 = gimple_call_arg (stmt, 0);
+	g = gimple_build_assign (lhs, arg0);
+	gimple_set_location (g, loc);
+	gsi_replace (gsi, g, true);
+	return true;
+      }
+
+    case RS6000_BIF_REDUCE_F32_VECTOR:
+      {
+	gimple_seq new_seq = NULL;
+	push_gimplify_context (true);
+	lhs = gimple_call_lhs (stmt);
+	arg0 = gimple_call_arg (stmt, 0);
+	tree lhs_type = TREE_TYPE (lhs);
+	tree shift_decl = rs6000_builtin_decls[RS6000_BIF_VSLDOI_4SF];
+	tree shift4 = create_tmp_reg_or_ssa_name (V4SF_type_node);
+	tree shift8 = create_tmp_reg_or_ssa_name (V4SF_type_node);
+	tree sum4 = create_tmp_reg_or_ssa_name (V4SF_type_node);
+	tree sum8 = create_tmp_reg_or_ssa_name (V4SF_type_node);
+	tree s4 = build_int_cstu (uint16_type_node, 4);
+	tree s8 = build_int_cstu (uint16_type_node, 8);
+	gimple *new_call = gimple_build_call (shift_decl, 3, arg0, arg0, s8);
+	gimple_call_set_lhs (new_call, shift8);
+	gimple_seq_add_stmt (&new_seq, new_call);
+	gimplify_assign (sum8, build2 (PLUS_EXPR, lhs_type, arg0, shift8), &new_seq);
+	new_call = gimple_build_call (shift_decl, 3, sum8, sum8, s4);
+	gimple_call_set_lhs (new_call, shift4);
+	gimple_seq_add_stmt (&new_seq, new_call);
+	gimplify_assign (sum4, build2 (PLUS_EXPR, lhs_type, sum8, shift4), &new_seq);
+	tree size = build_int_cst (bitsizetype, 32);
+	tree offset = build_int_cst (bitsizetype, 96);
+	gimplify_assign (lhs, build3 (BIT_FIELD_REF, lhs_type, sum4, size, offset), &new_seq);
+	pop_gimplify_context (NULL);
+	gsi_replace_with_seq (gsi, new_seq, true);
+	return true;
+      }
+
+    case RS6000_BIF_REDUCE_F64_VECTOR:
+      {
+	gimple_seq new_seq = NULL;
+	push_gimplify_context (true);
+	lhs = gimple_call_lhs (stmt);
+	arg0 = gimple_call_arg (stmt, 0);
+	tree lhs_type = TREE_TYPE (lhs);
+	tree shift_decl = rs6000_builtin_decls[RS6000_BIF_VSLDOI_2DF];
+	tree shift8 = create_tmp_reg_or_ssa_name (V2DF_type_node);
+	tree sum8 = create_tmp_reg_or_ssa_name (V2DF_type_node);
+	tree s8 = build_int_cstu (uint16_type_node, 8);
+	gimple *new_call = gimple_build_call (shift_decl, 3, arg0, arg0, s8);
+	gimple_call_set_lhs (new_call, shift8);
+	gimple_seq_add_stmt (&new_seq, new_call);
+	gimplify_assign (sum8, build2 (PLUS_EXPR, lhs_type, arg0, shift8), &new_seq);
+	tree size = build_int_cst (bitsizetype, 64);
+	tree offset = build_int_cst (bitsizetype, 64);
+	gimplify_assign (lhs, build3 (BIT_FIELD_REF, lhs_type, sum8, size, offset), &new_seq);
+	pop_gimplify_context (NULL);
+	gsi_replace_with_seq (gsi, new_seq, true);
+	return true;
+      }
+
+    case RS6000_BIF_SCALE_F32_VECTOR:
+    case RS6000_BIF_SCALE_F64_VECTOR:
+      {
+	gimple_seq new_seq = NULL;
+	push_gimplify_context (true);
+	lhs = gimple_call_lhs (stmt);
+	arg0 = gimple_call_arg (stmt, 0);
+	arg1 = gimple_call_arg (stmt, 1);
+	tree lhs_type = TREE_TYPE (lhs);
+	tree splat = create_tmp_reg_or_ssa_name (lhs_type);
+	gimplify_assign (splat, build_vector_from_val (lhs_type, arg0), &new_seq);
+	gimplify_assign (lhs, build2 (MULT_EXPR, TREE_TYPE (lhs), splat, arg1), &new_seq);
+	pop_gimplify_context (NULL);
+	gsi_replace_with_seq (gsi, new_seq, true);
+	return true;
+      }
+
+    case RS6000_BIF_SCALE_F32_VPAIR:
+    case RS6000_BIF_SCALE_F64_VPAIR:
+      {
+	gimple_seq new_seq = NULL;
+	push_gimplify_context (true);
+	lhs = gimple_call_lhs (stmt);
+	arg0 = gimple_call_arg (stmt, 0);
+	arg1 = gimple_call_arg (stmt, 1);
+	tree scale_type, new_decl;
+
+	if (fn_code == RS6000_BIF_SCALE_F32_VPAIR)
+	  {
+	    scale_type = V4SF_type_node;
+	    new_decl = rs6000_builtin_decls[RS6000_BIF_SCALE_V4SF_VPAIR];
+	  }
+	else
+	  {
+	    scale_type = V2DF_type_node;
+	    new_decl = rs6000_builtin_decls[RS6000_BIF_SCALE_V2DF_VPAIR];
+	  }
+	tree splat = create_tmp_reg_or_ssa_name (scale_type);
+	gimplify_assign (splat, build_vector_from_val (scale_type, arg0), &new_seq);
+	gimple *new_call = gimple_build_call (new_decl, 2, splat, arg1);
+	gimple_call_set_lhs (new_call, lhs);
+	gimple_seq_add_stmt (&new_seq, new_call);
+	pop_gimplify_context (NULL);
+	gsi_replace_with_seq (gsi, new_seq, true);
+	return true;
+      }
+
+    case RS6000_BIF_SUB_F32_SCALAR:
+    case RS6000_BIF_SUB_F32_VECTOR:
+    case RS6000_BIF_SUB_F64_SCALAR:
+    case RS6000_BIF_SUB_F64_VECTOR:
+      {
+	location_t loc = gimple_location (stmt);
+	lhs = gimple_call_lhs (stmt);
+	arg0 = gimple_call_arg (stmt, 0);
+	arg1 = gimple_call_arg (stmt, 1);
+	tree t = build2 (MINUS_EXPR, TREE_TYPE (lhs), arg0, arg1);
+	g = gimple_build_assign (lhs, t);
 	gimple_set_location (g, loc);
 	gsi_replace (gsi, g, true);
 	return true;
