@@ -16,6 +16,6 @@ TEST (float, float, flt, 32)
 /* { dg-final { scan-assembler-times {\mfnabs\M|\mxsnabsdp\M}        1 } } */
 /* { dg-final { scan-assembler-times {\mfneg\M|\mxsnegdp\M}          1 } } */
 /* { dg-final { scan-assembler-times {\mfnmadds\M|\mxsmadd[am]sp\M}  1 } } */
-/* { dg-final { scan-assembler-times {\mfnmsub\M|\mxsnmsub[am]sp\M}  1 } } */
+/* { dg-final { scan-assembler-times {\mfnmsubs\M|\mxsnmsub[am]sp\M}  1 } } */
 /* { dg-final { scan-assembler-times {\mfsubs\M|\mxssubsp\M}         1 } } */
 /* { dg-final { scan-assembler-not   {\mbl\M}                          } } */
