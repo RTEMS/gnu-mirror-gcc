@@ -373,8 +373,8 @@ struct default_hash_traits<hack_tuple_internal>
   static inline void mark_deleted (value_type &) { }
   static inline bool is_deleted (const value_type &) { return false; }
   static inline void remove (value_type &) { }
-  static inline bool is_empty (value_type) { return true; }
-  static inline void mark_empty (value_type &) { }
+  static inline bool is_empty (const value_type &v) { return v.code == ERROR_MARK; }
+  static inline void mark_empty (value_type &v) { v.code = ERROR_MARK; }
   static const bool empty_zero_p = true;
 };
 
