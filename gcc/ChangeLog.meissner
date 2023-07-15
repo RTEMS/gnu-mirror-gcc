@@ -1,3 +1,17 @@
+==================== Branch work125-vpair, patch #22 ====================
+
+Fix typos in tests.
+
+2023-07-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/fp-overload-f32-scalar.c: Fix typos.
+	* gcc.target/powerpc/fp-overload-f32-vpair.c: Likewise.
+	* gcc.target/powerpc/fp-overload-f64-scalar.c: Likewise.
+	* gcc.target/powerpc/fp-overload-f64-vector.c: Likewise.
+	* gcc.target/powerpc/fp-overload-f64-vpair.c: Likewise.
+
 ==================== Branch work125-vpair, patch #21 ====================
 
 Fix reduction, add tests.
