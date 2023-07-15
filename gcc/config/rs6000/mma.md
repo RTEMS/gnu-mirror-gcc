@@ -101,6 +101,8 @@
    UNSPEC_PAIR_MULT_F64
    UNSPEC_PAIR_NEG_F32
    UNSPEC_PAIR_NEG_F64
+   UNSPEC_PAIR_REDUCE_F32
+   UNSPEC_PAIR_REDUCE_F64
    UNSPEC_PAIR_SCALE_F32
    UNSPEC_PAIR_SCALE_F64
    UNSPEC_PAIR_SUB_F32
@@ -826,6 +828,66 @@
   DONE;
 }
   [(set_attr "length" "8")])
+
+;; Reduction for a vector pair of V4SF vectors
+(define_insn_and_split "vpair_REDUCE_V4SF"
+  [(set (match_operand:SF 0 "vsx_register_operand" "=wa")
+	(unspec:SF [(match_operand:OO 1 "vsx_register_operand" "v")]
+		   UNSPEC_PAIR_REDUCE_F32))
+   (clobber (match_scratch:V4SF 2 "=&v"))
+   (clobber (match_scratch:V4SF 3 "=&v"))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(pc)]
+{
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  rtx tmp1 = operands[2];
+  rtx tmp2 = operands[3];
+  unsigned r = reg_or_subregno (op1);
+  rtx op1_hi = gen_rtx_REG (V4SFmode, r);
+  rtx op1_lo = gen_rtx_REG (V4SFmode, r + 1);
+
+  emit_insn (gen_addv4sf3 (tmp1, op1_hi, op1_lo));
+  emit_insn (gen_altivec_vsldoi_v4sf (tmp2, tmp1, tmp1, GEN_INT (8)));
+  emit_insn (gen_addv4sf3 (tmp2, tmp1, tmp2));
+  emit_insn (gen_altivec_vsldoi_v4sf (tmp1, tmp2, tmp2, GEN_INT (4)));
+  emit_insn (gen_addv4sf3 (tmp2, tmp1, tmp2));
+  emit_insn (gen_vsx_xscvspdp_scalar2 (op0, tmp2));
+  DONE;
+}
+  [(set_attr "length" "24")])
+
+
+;; Reduction for a vector pair of V2DF vectors
+(define_insn_and_split "vpair_REDUCE_V2DF"
+  [(set (match_operand:DF 0 "vsx_register_operand" "=&wa")
+	(unspec:DF [(match_operand:OO 1 "vsx_register_operand" "wa")]
+		   UNSPEC_PAIR_REDUCE_F64))
+   (clobber (match_scratch:DF 2 "=&wa"))
+   (clobber (match_scratch:V2DF 3 "=&wa"))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 3)
+	(plus:V2DF (match_dup 4)
+		   (match_dup 5)))
+   (set (match_dup 2)
+	(vec_select:DF (match_dup 3)
+		       (parallel [(match_dup 6)])))
+   (set (match_dup 0)
+	(plus:DF (match_dup 7)
+		 (match_dup 2)))]
+{
+  unsigned reg1 = REGNO (operands[1]);
+  unsigned reg3 = REGNO (operands[3]);
+
+  operands[4] = gen_rtx_REG (V2DFmode, reg1);
+  operands[5] = gen_rtx_REG (V2DFmode, reg1 + 1);
+  operands[6] = GEN_INT (BYTES_BIG_ENDIAN ? 1 : 0);
+  operands[7] = gen_rtx_REG (DFmode, reg3);
+})
 
 (define_insn_and_split "vpair_SCALE_<pairmode>"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")

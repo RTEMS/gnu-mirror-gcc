@@ -4180,16 +4180,14 @@
   float __builtin_reduce_f32_vector (vf);
     REDUCE_F32_VECTOR nothing {}
   float __builtin_reduce_f32_vpair (v256);
-    REDUCE_F32_VPAIR nothing {mma,pair}
-;   REDUCE_F32_VPAIR vpair_REDUCE_V4SF {mma,pair}
+    REDUCE_F32_VPAIR vpair_REDUCE_V4SF {mma,pair}
 
   double __builtin_reduce_f64_scalar (double);
     REDUCE_F64_SCALAR nothing {}
   double __builtin_reduce_f64_vector (vd);
     REDUCE_F64_VECTOR nothing {}
   double __builtin_reduce_f64_vpair (v256);
-    REDUCE_F64_VPAIR nothing {mma,pair}
-;   REDUCE_F64_VPAIR vpair_REDUCE_V2DF {mma,pair}
+    REDUCE_F64_VPAIR vpair_REDUCE_V2DF {mma,pair}
 
   float __builtin_scale_f32_scalar (float, float);
     SCALE_F32_SCALAR nothing {}
