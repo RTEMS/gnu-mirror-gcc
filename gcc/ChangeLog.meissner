@@ -1,3 +1,29 @@
+==================== Branch work125-vpair, patch #21 ====================
+
+Fix reduction, add tests.
+
+2023-07-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (UNSPEC_PAIR_REDUCE_F32): New unspec.
+	(UNSPEC_PAIR_REDUCE_F64): New unspec.
+	(vpair_REDUCE_V4SF): New insn.
+	(vpair_REDUCE_V2DF): New insn.
+	* config/rs6000/rs6000-builtins.def (__builtin_reduce_f32_vpair): Update
+	to use the insn.
+	(__builtin_reduce_f64_vpair): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/fp-overload-f32-scalar.c: New test.
+	* gcc.target/powerpc/fp-overload-f32-vector.c: Likewise.
+	* gcc.target/powerpc/fp-overload-f32-vpair.c: Likewise.
+	* gcc.target/powerpc/fp-overload-f64-scalar.c: Likewise.
+	* gcc.target/powerpc/fp-overload-f64-vector.c: Likewise.
+	* gcc.target/powerpc/fp-overload-f64-vpair.c: Likewise.
+	* gcc.target/powerpc/fp-overload-f32.h: New include file.
+
 ==================== Branch work125-vpair, patch #20 ====================
 
 Add f32 and f64 overloaded built-in functions.
