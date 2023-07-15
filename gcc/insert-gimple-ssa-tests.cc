@@ -320,7 +320,7 @@ pass_insert_test::execute (function *)
 	      if (rhs_code == ABS_EXPR)
 		{
 		  stmts_to_replace.safe_push (stmt);
-		  std::cerr << "Found ABS_EXPR" << std::endl; // DEBUG
+		  //std::cerr << "Found ABS_EXPR" << std::endl; // DEBUG
 		}
 	    }
 	}
@@ -329,7 +329,7 @@ pass_insert_test::execute (function *)
   for (gimple *stmt : stmts_to_replace)
     {
       //expand_abs_expr (stmt);
-      insert_mock_loop (stmt);
+      //insert_mock_loop (stmt);
       //insert_redundant_stmts (stmt);
     }
 

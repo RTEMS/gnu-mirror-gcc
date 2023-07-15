@@ -322,7 +322,7 @@ struct hack_tuple_internal
 {
   enum tree_code code;
   unsigned num_ops;
-  hstmt_with_lhs *op[1];  /* Trailing array idiom.  */
+  hstmt_with_lhs *op[3];
 };
 
 /* TODO Describe  */
@@ -333,6 +333,8 @@ struct hack_tuple_fn
   unsigned num_ops;
   hstmt_with_lhs *op[1];  /* Trailing array idiom.  */
 };
+
+/* TODO Describe.  */
 
 template<>
 struct default_hash_traits<hack_tuple_internal>
@@ -360,8 +362,6 @@ struct default_hash_traits<hack_tuple_internal>
     bool b = true;
     b &= existing.code == candidate.code;
     b &= existing.num_ops == candidate.num_ops;
-    if (!b)
-      return b;
     unsigned i;
     for (i = 0; i < existing.num_ops; i++)
       {
