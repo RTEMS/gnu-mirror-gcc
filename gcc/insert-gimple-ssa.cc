@@ -1008,6 +1008,14 @@ hack_ssa_builder::tuple_lookup (basic_block bb, hack_tuple_internal *val)
 void
 hack_ssa_builder::run_final_optimizations (void) { }
 
+/* TODO describe.  */
+
+static bool
+handled_component_or_mem_ref_p (tree t)
+{
+  return handled_component_p (t) || TREE_CODE (t) == MEM_REF;
+}
+
 /* Traverses handled component in preorder. For each operand that will have to
    be renamed when transitioning to SSA, puts it into a vector and replaces it
    with 'error_mark'. Finally, returns the gathered operands.  */
@@ -1054,7 +1062,7 @@ extract_operands_to_be_renamed (tree ref)
 	}
 
       op = TREE_OPERAND (ref, 0);
-      if (handled_component_p (op))
+      if (handled_component_or_mem_ref_p (op))
 	{
 	  ref = op;
 	}
