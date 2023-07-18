@@ -1842,7 +1842,7 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
 
   /* Vector pair modes need even/odd VSX register pairs.  Only allow vector
      registers.  */
-  if (mode == OOmode)
+  if (VECTOR_PAIR_MODE_P (mode))
     return (TARGET_MMA && VSX_REGNO_P (regno) && (regno & 1) == 0);
 
   /* MMA accumulator modes need FPR registers divisible by 4.  */
@@ -1963,8 +1963,8 @@ rs6000_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
 static bool
 rs6000_modes_tieable_p (machine_mode mode1, machine_mode mode2)
 {
-  if (mode1 == PTImode || mode1 == OOmode || mode1 == XOmode
-      || mode2 == PTImode || mode2 == OOmode || mode2 == XOmode)
+  if (mode1 == PTImode || VECTOR_PAIR_MODE_P (mode1) || mode1 == XOmode
+      || mode2 == PTImode || VECTOR_PAIR_MODE_P (mode2) || mode2 == XOmode)
     return mode1 == mode2;
 
   if (ALTIVEC_OR_VSX_VECTOR_MODE (mode1))
@@ -2712,13 +2712,13 @@ rs6000_setup_reg_addr_masks (void)
 	     since it will be broken into two vector moves.  Vector quads can
 	     only do offset loads.  */
 	  else if ((addr_mask != 0) && TARGET_MMA
-		   && (m2 == OOmode || m2 == XOmode))
+		   && (VECTOR_PAIR_MODE_P (m2) || m2 == XOmode))
 	    {
 	      addr_mask |= RELOAD_REG_OFFSET;
 	      if (rc == RELOAD_REG_FPR || rc == RELOAD_REG_VMX)
 		{
 		  addr_mask |= RELOAD_REG_QUAD_OFFSET;
-		  if (m2 == OOmode)
+		  if (VECTOR_PAIR_MODE_P (m2))
 		    addr_mask |= RELOAD_REG_INDEXED;
 		}
 	    }
@@ -2931,6 +2931,14 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
       rs6000_vector_mem[OOmode] = VECTOR_VSX;
       rs6000_vector_align[OOmode] = 256;
 
+      rs6000_vector_unit[V8SFmode] = VECTOR_NONE;
+      rs6000_vector_mem[V8SFmode] = VECTOR_VSX;
+      rs6000_vector_align[V8SFmode] = 256;
+
+      rs6000_vector_unit[V4DFmode] = VECTOR_NONE;
+      rs6000_vector_mem[V4DFmode] = VECTOR_VSX;
+      rs6000_vector_align[V4DFmode] = 256;
+
       rs6000_vector_unit[XOmode] = VECTOR_NONE;
       rs6000_vector_mem[XOmode] = VECTOR_VSX;
       rs6000_vector_align[XOmode] = 512;
@@ -3064,6 +3072,10 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 		{
 		  reg_addr[OOmode].reload_store = CODE_FOR_reload_oo_di_store;
 		  reg_addr[OOmode].reload_load = CODE_FOR_reload_oo_di_load;
+		  reg_addr[V8SFmode].reload_store = CODE_FOR_reload_v8sf_di_store;
+		  reg_addr[V8SFmode].reload_load = CODE_FOR_reload_v8sf_di_load;
+		  reg_addr[V4DFmode].reload_store = CODE_FOR_reload_v4df_di_store;
+		  reg_addr[V4DFmode].reload_load = CODE_FOR_reload_v4df_di_load;
 		  reg_addr[XOmode].reload_store = CODE_FOR_reload_xo_di_store;
 		  reg_addr[XOmode].reload_load = CODE_FOR_reload_xo_di_load;
 		}
@@ -8669,6 +8681,8 @@ reg_offset_addressing_ok_p (machine_mode mode)
       /* The vector pair/quad types support offset addressing if the
 	 underlying vectors support offset addressing.  */
     case E_OOmode:
+    case E_V8SFmode:
+    case E_V4DFmode:
     case E_XOmode:
       return TARGET_MMA;
 
@@ -10971,7 +10985,7 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
     case E_XOmode:
       if (CONST_INT_P (operands[1]) && INTVAL (operands[1]) != 0)
 	error ("%qs is an opaque type, and you cannot set it to other values",
-	       (mode == OOmode) ? "__vector_pair" : "__vector_quad");
+	       (VECTOR_PAIR_MODE_P (mode)) ? "__vector_pair" : "__vector_quad");
       break;
 
     case E_SImode:
@@ -13216,7 +13230,7 @@ rs6000_preferred_reload_class (rtx x, enum reg_class rclass)
      the GPR registers.  */
   if (rclass == GEN_OR_FLOAT_REGS)
     {
-      if (mode == OOmode)
+      if (VECTOR_PAIR_MODE_P (mode))
 	return VSX_REGS;
 
       if (mode == XOmode)
@@ -27184,7 +27198,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
     }
   /* If we have a vector pair/quad mode, split it into two/four separate
      vectors.  */
-  else if (mode == OOmode || mode == XOmode)
+  else if (VECTOR_PAIR_MODE_P (mode) || mode == XOmode)
     reg_mode = V1TImode;
   else if (FP_REGNO_P (reg))
     reg_mode = DECIMAL_FLOAT_MODE_P (mode) ? DDmode :
@@ -27236,7 +27250,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
      below.  This means the last register gets the first memory
      location.  We also need to be careful of using the right register
      numbers if we are splitting XO to OO.  */
-  if (mode == OOmode || mode == XOmode)
+  if (VECTOR_PAIR_MODE_P (mode) || mode == XOmode)
     {
       nregs = hard_regno_nregs (reg, mode);
       int reg_mode_nregs = hard_regno_nregs (reg, reg_mode);
@@ -27296,7 +27310,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 	  gcc_assert (REG_P (dst));
 	  if (GET_MODE (src) == XOmode)
 	    gcc_assert (FP_REGNO_P (REGNO (dst)));
-	  if (GET_MODE (src) == OOmode)
+	  if (VECTOR_PAIR_MODE_P (GET_MODE (src)))
 	    gcc_assert (VSX_REGNO_P (REGNO (dst)));
 
 	  int nvecs = XVECLEN (src, 0);
@@ -27371,7 +27385,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 	 overlap.  */
       int i;
       /* XO/OO are opaque so cannot use subregs. */
-      if (mode == OOmode || mode == XOmode )
+      if (VECTOR_PAIR_MODE_P (mode) || mode == XOmode )
 	{
 	  for (i = nregs - 1; i >= 0; i--)
 	    {
@@ -27545,7 +27559,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 	    continue;
 
 	  /* XO/OO are opaque so cannot use subregs. */
-	  if (mode == OOmode || mode == XOmode )
+	  if (VECTOR_PAIR_MODE_P (mode) || mode == XOmode )
 	    {
 	      rtx dst_i = gen_rtx_REG (reg_mode, REGNO (dst) + j);
 	      rtx src_i = gen_rtx_REG (reg_mode, REGNO (src) + j);
@@ -28536,6 +28550,14 @@ rs6000_invalid_conversion (const_tree fromtype, const_tree totype)
 	return N_("invalid conversion from type %<__vector_pair%>");
       if (tomode == OOmode)
 	return N_("invalid conversion to type %<__vector_pair%>");
+      if (frommode == V8SFmode)
+	return N_("invalid conversion from type %<V8SF%>");
+      if (tomode == V8SFmode)
+	return N_("invalid conversion to type %<V8SF%>");
+      if (frommode == V4DFmode)
+	return N_("invalid conversion from type %<V4DF%>");
+      if (tomode == V4DFmode)
+	return N_("invalid conversion to type %<V4DF%>");
     }
 
   /* Conversion allowed.  */

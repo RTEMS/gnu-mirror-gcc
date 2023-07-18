@@ -264,10 +264,35 @@
 				 (UNSPEC_MMA_PMXVI8GER4SPP	"pmxvi8ger4spp")])
 
 
+;; Iterators for the vector pair mode (OOmode is the main one, but we allow
+;; V8SF and V4DF for use with the overloaded built-in functions).
+(define_mode_iterator VPAIR [OO
+			     (V8SF "TARGET_MMA")
+			     (V4DF "TARGET_MMA")])
+
+;; Iterator doing unary/binary arithmetic on vector pairs
+(define_code_iterator VPAIR_UNARY  [neg abs])
+(define_code_iterator VPAIR_BINARY [plus minus mult div])
+
+;; Give the insn name from the opertion
+(define_code_attr vpair_op [(neg   "neg")
+			    (abs   "abs")
+			    (plus  "add")
+			    (minus "sub")
+			    (mult  "mul")
+			    (div   "div")])
+
+;; Arithmetic types for vector pair
+(define_mode_iterator VPAIR_ARITH [V8SF V4DF])
+
+;; Map vector pair to vector
+(define_mode_attr VPAIR_VECT [(V8SF "V4SF")
+			      (V4DF "V2DF")])
+
 ;; Vector pair support.  OOmode can only live in VSRs.
-(define_expand "movoo"
-  [(set (match_operand:OO 0 "nonimmediate_operand")
-	(match_operand:OO 1 "input_operand"))]
+(define_expand "mov<mode>"
+  [(set (match_operand:VPAIR 0 "nonimmediate_operand")
+	(match_operand:VPAIR 1 "input_operand"))]
   ""
 {
   if (TARGET_MMA)
@@ -292,12 +317,12 @@
     gcc_assert (false);
 })
 
-(define_insn_and_split "*movoo"
-  [(set (match_operand:OO 0 "nonimmediate_operand" "=wa,m,wa")
-	(match_operand:OO 1 "input_operand" "m,wa,wa"))]
+(define_insn_and_split "*mov<mode>"
+  [(set (match_operand:VPAIR 0 "nonimmediate_operand" "=wa,m,wa")
+	(match_operand:VPAIR 1 "input_operand" "m,wa,wa"))]
   "TARGET_MMA
-   && (gpc_reg_operand (operands[0], OOmode)
-       || gpc_reg_operand (operands[1], OOmode))"
+   && (gpc_reg_operand (operands[0], <MODE>mode)
+       || gpc_reg_operand (operands[1], <MODE>mode))"
   "@
    lxvp%X1 %x0,%1
    stxvp%X0 %x1,%0
@@ -690,3 +715,54 @@
   "<avvi4i4i4> %A0,%x2,%x3,%4,%5,%6"
   [(set_attr "type" "mma")
    (set_attr "prefixed" "yes")])
+
+
+;; Provide for vector pair floating point arithmetic
+(define_insn_and_split "<vpair_op><mode>2"
+  [(set (match_operand:VPAIR_ARITH 0 "vsx_register_operand" "=wa")
+	(VPAIR_UNARY:VPAIR_ARITH
+	 (match_operand:VPAIR_ARITH 1 "vsx_register_operand" "wa")))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 2) (VPAIR_UNARY:<VPAIR_VECT> (match_dup 3)))
+   (set (match_dup 4) (VPAIR_UNARY:<VPAIR_VECT> (match_dup 5)))]
+{
+  unsigned reg0 = reg_or_subregno (operands[0]);
+  unsigned reg1 = reg_or_subregno (operands[1]);
+
+  operands[2] = gen_rtx_REG (<VPAIR_VECT>mode, reg0);
+  operands[3] = gen_rtx_REG (<VPAIR_VECT>mode, reg1);
+  operands[4] = gen_rtx_REG (<VPAIR_VECT>mode, reg0 + 1);
+  operands[5] = gen_rtx_REG (<VPAIR_VECT>mode, reg1 + 1);
+}
+  [(set_attr "length" "8")])
+
+(define_insn_and_split "<vpair_op><mode>3"
+  [(set (match_operand:VPAIR_ARITH 0 "vsx_register_operand" "=wa")
+	(VPAIR_BINARY:VPAIR_ARITH
+	 (match_operand:VPAIR_ARITH 1 "vsx_register_operand" "wa")
+	 (match_operand:VPAIR_ARITH 2 "vsx_register_operand" "wa")))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 3)
+	(VPAIR_BINARY:<VPAIR_VECT> (match_dup 4)
+				   (match_dup 5)))
+   (set (match_dup 6)
+	(VPAIR_BINARY:<VPAIR_VECT> (match_dup 7)
+				   (match_dup 8)))]
+{
+  unsigned reg0 = reg_or_subregno (operands[0]);
+  unsigned reg1 = reg_or_subregno (operands[1]);
+  unsigned reg2 = reg_or_subregno (operands[2]);
+
+  operands[3] = gen_rtx_REG (<VPAIR_VECT>mode, reg0);
+  operands[4] = gen_rtx_REG (<VPAIR_VECT>mode, reg1);
+  operands[5] = gen_rtx_REG (<VPAIR_VECT>mode, reg2);
+
+  operands[6] = gen_rtx_REG (<VPAIR_VECT>mode, reg0 + 1);
+  operands[7] = gen_rtx_REG (<VPAIR_VECT>mode, reg1 + 1);
+  operands[8] = gen_rtx_REG (<VPAIR_VECT>mode, reg2 + 1);
+}
+  [(set_attr "length" "8")])
