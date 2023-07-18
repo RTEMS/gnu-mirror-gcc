@@ -1,3 +1,65 @@
+==================== Branch work127-vpair, patch #21 ====================
+
+Update V8SF and V4DF support.
+
+2023-07-18  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (VPAIR): Remove OOmode.
+	(VPAIN_ARITH): Delete.
+	(VPAIR_UNARY): Add sqrt.
+	(vpair_op): Likewise.
+	(movoo): Separate movoo from movv8sf and movv4df.
+	(mov<mode>, VPAIR iterator): Likewise.
+	(<vpair_op><mode>2): Use VPAIR, not VPAIR_ARITH.
+	(nabs<mode>2): New insn.
+	(<vpair_op><mode>3): Use VPAIR, not VPAIR_ARITH.
+	(fma<mode>4, VPAIR iterator): New insn.
+	(fms<mode>4, VPAIR iterator): Likewise.
+	(nfma<mode>4, VPAIR iterator): Likewise.
+	(nfms<mode>4, VPAIR iterator): Likewise.
+	* config/rs6000/predicates.md (easy_vector_constant): For now, don't
+	allow any non-zero vector constant for V8SFmode or V4DFmode.
+	* config/rs6000/rs6000.cc (rs6000_emit_move): Add support for V8SFmode
+	and V4DFmode.
+
+==================== Branch work127-vpair, patch #20 ====================
+
+Add vector pair support for V8SF and V4DF.
+
+This patch implements the basic floating point operations using vector pair for
+floats and doubles, using the vector_size attribute.
+
+2023-07-18  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (VPAIR): New mode iterator.
+	(VPAIR_UNARY): New code iterator.
+	(VPAIR_BINARY): Likewise.
+	(vpair_op): New code attribute.
+	(VPAIR_ARITH): New mode iterator.
+	(VPAIR_VECT): New mode attribute.
+	(mov<mode>): Convert movoo to movoo, movv8sf, and movf4df.
+	(<vpair_op><mode>2): Implement vector pair unary operations.
+	(<vpair_op><mode>3): Implement vector pair binary operations.
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Treat
+	V8SFmode and V4DFmode like OOmode.
+	(rs6000_modes_tieable_p): Likewise.
+	(rs6000_setup_reg_addr_masks): Likewise.
+	(rs6000_init_hard_regno_mode_ok): Likewise.
+	(reg_offset_addressing_ok_p): Likewise.
+	(rs6000_emit_move): Likewise.
+	(rs6000_preferred_reload_class): Likewise.
+	(rs6000_split_multireg_move): Likewise.
+	(rs6000_invalid_conversion): Likewise.
+	* config/rs6000/rs6000.h (VECTOR_PAIR_MODE_P): New macro.
+	* config/rs6000/rs6000.md (RELOAD): Set up reload handlers for V8SFmode
+	and V4DFmode.
+
+==================== Branch work127-vpair, setup ====================
+
 2023-07-17  Michael Meissner  <github@the-meissners.org>
 
 	* REVISION: Change branch name.
