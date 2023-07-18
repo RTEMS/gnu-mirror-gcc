@@ -10971,8 +10971,10 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
 
     case E_V16QImode:
     case E_V8HImode:
+    case E_V8SFmode:
     case E_V4SFmode:
     case E_V4SImode:
+    case E_V4DFmode:
     case E_V2DFmode:
     case E_V2DImode:
     case E_V1TImode:

@@ -729,6 +729,9 @@
       if (zero_constant (op, mode) || all_ones_constant (op, mode))
 	return true;
 
+      if (GET_MODE_SIZE (mode) != 16)
+	return false;
+
       /* Constants that can be generated with ISA 3.1 instructions are
          easy.  */
       vec_const_128bit_type vsx_const;
