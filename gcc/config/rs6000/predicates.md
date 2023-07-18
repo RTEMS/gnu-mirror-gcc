@@ -635,10 +635,22 @@
 ;; constants that need to be loaded into vector registers, the instructions
 ;; don't work well with TImode variables assigned a constant.  This is because
 ;; the 64-bit scalar constants are splatted into both halves of the register.
+;;
+;; Also handle vector pair constants by splitting the constant into 2 separate
+;; constants that will be loaded into each separate vector.
 
 (define_predicate "vsx_prefixed_constant"
   (match_code "const_double,const_vector,vec_duplicate")
 {
+  rtx vpair_hi, vpair_lo;
+
+  /* If this is a vpair constant, break the constant into 2 separate vectors.
+     In this case, we allow either constant to be an easy altivec constant.  */
+  if (CONST_VECTOR_P (op) && VECTOR_PAIR_MODE_P (mode) && TARGET_MMA
+      && rs6000_split_vpair_constant (op, &vpair_hi, &vpair_lo))
+    return (easy_vector_constant (vpair_hi, GET_MODE (vpair_hi))
+            && easy_vector_constant (vpair_lo, GET_MODE (vpair_lo)));
+
   /* If we can generate the constant with a few Altivec instructions, don't
       generate a prefixed instruction.  */
   if (CONST_VECTOR_P (op) && easy_altivec_constant (op, mode))
@@ -716,11 +728,22 @@
   return num_insns == 1;
 })
 
-;; Return 1 if the operand is a CONST_VECTOR and can be loaded into a
-;; vector register without using memory.
+;; Return 1 if the operand is a CONST_VECTOR and can be loaded into a vector
+;; register without using memory.  If this is a vector pair constant, see if
+;; the constants for each vector register can be loaded.
 (define_predicate "easy_vector_constant"
   (match_code "const_vector")
 {
+  rtx vpair_hi, vpair_lo;
+
+  if (VECTOR_PAIR_MODE_P (mode) && TARGET_MMA
+      && rs6000_split_vpair_constant (op, &vpair_hi, &vpair_lo))
+    return (easy_vector_constant (vpair_hi, GET_MODE (vpair_hi))
+            && easy_vector_constant (vpair_lo, GET_MODE (vpair_lo)));
+
+  if (GET_MODE_SIZE (mode) != 16)
+    return false;
+
   if (VECTOR_MEM_ALTIVEC_OR_VSX_P (mode))
     {
       int value = 256;
@@ -728,9 +751,6 @@
 
       if (zero_constant (op, mode) || all_ones_constant (op, mode))
 	return true;
-
-      if (GET_MODE_SIZE (mode) != 16)
-	return false;
 
       /* Constants that can be generated with ISA 3.1 instructions are
          easy.  */

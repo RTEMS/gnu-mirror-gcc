@@ -326,14 +326,15 @@
 })
 
 (define_insn_and_split "*mov<mode>"
-  [(set (match_operand:VPAIR 0 "nonimmediate_operand" "=wa,m,wa,wa")
-	(match_operand:VPAIR 1 "input_operand" "m,wa,wa,j"))]
+  [(set (match_operand:VPAIR 0 "nonimmediate_operand" "=wa,m,wa,wa,wa")
+	(match_operand:VPAIR 1 "input_operand" "m,wa,wa,j,eP"))]
   "TARGET_MMA
    && (gpc_reg_operand (operands[0], <MODE>mode)
        || gpc_reg_operand (operands[1], <MODE>mode))"
   "@
    lxvp%X1 %x0,%1
    stxvp%X0 %x1,%0
+   #
    #
    #"
   "&& reload_completed
@@ -343,9 +344,9 @@
   rs6000_split_multireg_move (operands[0], operands[1]);
   DONE;
 }
-  [(set_attr "type" "vecload,vecstore,veclogical,veclogical")
+  [(set_attr "type" "vecload,vecstore,veclogical,vecperm,vecperm")
    (set_attr "size" "256")
-   (set_attr "length" "*,*,8")])
+   (set_attr "length" "*,*,8,8,40")])
 
 
 ;; Vector quad support.  XOmode can only live in FPRs.

@@ -27167,6 +27167,54 @@ rs6000_split_logical (rtx operands[3],
   return;
 }
 
+/* Split a vector constant for a type that can be held into a vector register
+   pair into 2 separate constants that can be held in a single vector register.
+   Return true if we can split the constant.  */
+
+bool
+rs6000_split_vpair_constant (rtx op, rtx *high, rtx *low)
+{
+  *high = *low = NULL_RTX;
+  if (!CONST_VECTOR_P (op))
+    return false;
+
+  if (GET_MODE (op) == V8SFmode)
+    {
+      rtvec hi_vec = gen_rtvec (4,
+				CONST_VECTOR_ELT (op, 0),
+				CONST_VECTOR_ELT (op, 1),
+				CONST_VECTOR_ELT (op, 2),
+				CONST_VECTOR_ELT (op, 3));
+
+      rtvec lo_vec = gen_rtvec (4,
+				CONST_VECTOR_ELT (op, 4),
+				CONST_VECTOR_ELT (op, 5),
+				CONST_VECTOR_ELT (op, 6),
+				CONST_VECTOR_ELT (op, 7));
+
+      *high = gen_rtx_CONST_VECTOR (V4SFmode, hi_vec);
+      *low = gen_rtx_CONST_VECTOR (V4SFmode, lo_vec);
+      return true;
+    }
+
+  else if (GET_MODE (op) == V4DFmode)
+    {
+      rtvec hi_vec = gen_rtvec (2,
+				CONST_VECTOR_ELT (op, 0),
+				CONST_VECTOR_ELT (op, 1));
+
+      rtvec lo_vec = gen_rtvec (2,
+				CONST_VECTOR_ELT (op, 3),
+				CONST_VECTOR_ELT (op, 4));
+
+      *high = gen_rtx_CONST_VECTOR (V2DFmode, hi_vec);
+      *low = gen_rtx_CONST_VECTOR (V2DFmode, lo_vec);
+      return true;
+    }
+
+  return false;
+}
+
 /* Emit instructions to move SRC to DST.  Called by splitters for
    multi-register moves.  It will emit at most one instruction for
    each register that is accessed; that is, it won't emit li/lis pairs
@@ -27185,6 +27233,8 @@ rs6000_split_multireg_move (rtx dst, rtx src)
   int reg_mode_size;
   /* The number of registers that will be moved.  */
   int nregs;
+  /* Hi/lo values for splitting vector pair constants.  */
+  rtx vpair_hi, vpair_lo;
 
   reg = REG_P (dst) ? REGNO (dst) : REGNO (src);
   mode = GET_MODE (dst);
@@ -27213,6 +27263,29 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 
   gcc_assert (reg_mode_size * nregs == GET_MODE_SIZE (mode));
 
+  /* Handle vector pair constants.  */
+  if (CONST_VECTOR_P (src) && VECTOR_PAIR_MODE_P (mode) && TARGET_MMA
+      && rs6000_split_vpair_constant (src, &vpair_hi, &vpair_lo)
+      && VSX_REGNO_P (reg))
+    {
+      reg_mode = GET_MODE (vpair_hi);
+      rtx reg_hi = gen_rtx_REG (reg_mode, reg);
+      rtx reg_lo = gen_rtx_REG (reg_mode, reg + 1);
+
+      emit_move_insn (reg_hi, vpair_hi);
+
+      /* 0.0 is easy.  For other constants, copy the high register into the low
+	 register if the two sets of constants are equal.  This means we won't
+	 be doing back to back prefixed load immediate instructions.  */
+      if (rtx_equal_p (vpair_hi, vpair_lo)
+	  && !rtx_equal_p (vpair_hi, CONST0_RTX (reg_mode)))
+	emit_move_insn (reg_lo, reg_hi);
+      else
+	emit_move_insn (reg_lo, vpair_lo);
+      
+      return;
+    }
+      
   /* TDmode residing in FP registers is special, since the ISA requires that
      the lower-numbered word of a register pair is always the most significant
      word, even in little-endian mode.  This does not match the usual subreg
