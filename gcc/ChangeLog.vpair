@@ -1,3 +1,24 @@
+==================== Branch work127-vpair, patch #22 ====================
+
+Add V8SF and V4DF constants.
+
+2023-07-18  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/constraints.md (eP constraint): Update comment.
+	* config/rs6000/mma.md (mov<mode>, VPAIR iterator): Add spport for
+	loading constants.
+	* config/rs6000/predicates.md (vsx_prefixed_constant): Handle V8SFmode
+	and V4DFmode constants.
+	(easy_vector_constant): Update V8SFmode and V4DFmode support.
+	* config/rs6000/rs6000-protos.h (rs6000_split_vpair_constant): New
+	declaration.
+	* config/rs6000/rs6000.cc (rs6000_split_vpair_constant): New helper
+	function.
+	(rs6000_split_multireg_move): Handle splitting a vector pair constant
+	into 2 separate vector instructions.
+
 ==================== Branch work127-vpair, patch #21 ====================
 
 Update V8SF and V4DF support.
