@@ -1,3 +1,8 @@
+2023-07-17  Michael Meissner  <github@the-meissners.org>
+
+	* REVISION: Change branch name.
+	Pull in patches #1-7 from the main branch.
+
 ==================== Branch work127-vpair, baseline ====================
 
 2023-07-17   Michael Meissner  <meissner@linux.ibm.com>
