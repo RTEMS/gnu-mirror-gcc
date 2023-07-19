@@ -1,3 +1,13 @@
+Add initial V8SF and V4DF vector extract.
+
+2023-07-18  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector.md (VEC_E): Add V8SF and V4DF.
+	(VEC_base): Likewise.
+	(VEC_base_l): Likewise.
+
 ==================== Branch work127-vpair, patch #23 ====================
 
 Add movoo insn deleted by accident.
