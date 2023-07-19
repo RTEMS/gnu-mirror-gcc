@@ -1,3 +1,17 @@
+==================== Branch work127-vpair, patch #25 ====================
+
+Add v4df extract support.
+
+2023-07-19  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_expand_vector_extract): Add support to
+	extract v4df with a constant index.
+	* config/rs6000/vsx.md (vsx_extract_v4df): New insn.
+
+==================== Branch work127-vpair, patch #24 ====================
+
 Add initial V8SF and V4DF vector extract.
 
 2023-07-18  Michael Meissner  <meissner@linux.ibm.com>
