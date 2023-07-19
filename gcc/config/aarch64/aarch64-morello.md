@@ -177,6 +177,45 @@
   adrp\\t%0, %A1"
 )
 
+(define_insn_and_split "*movcadi_nonzero_aarch64"
+  [(set (match_operand:CADI 0 "register_operand"    "=r,r")
+	(const:CADI
+	  (pointer_plus:CADI
+	    (const_null:CADI)
+	    (match_operand:DI 1 "const_int_operand" " N,M"))))]
+  ""
+  "@
+   mov\\t%x0, %1
+   mov\\t%w0, %1"
+   "(!aarch64_move_imm (INTVAL (operands[1]), DImode))"
+   [(const_int 0)]
+   "{
+       aarch64_expand_mov_immediate (operands[0], operands[1]);
+       DONE;
+    }"
+  [(set_attr "type" "mov_imm,mov_imm")
+   (set_attr "arch" "*,*")]
+)
+
+(define_insn "insv_immcadi"
+  [(set (match_operand:CADI 0 "register_operand" "=r")
+	 (pointer_plus:CADI
+	   (const_null:CADI)
+	   (ior:DI
+	     (and:DI
+	       (match_operand:DI 1 "register_operand" "0")
+	       (match_operand 2 "const_int_operand" "n"))
+	     (match_operand 3 "const_int_operand" "n"))))]
+  "aarch64_get_movk_shift_from_mask (operands[2]) != -1
+   && (UINTVAL (operands[3]) & ~UINTVAL (operands[2])) == UINTVAL (operands[3])"
+  {
+     operands[2] = GEN_INT (aarch64_get_movk_shift_from_mask (operands[2]));
+     operands[3] = GEN_INT (UINTVAL (operands[3]) >> UINTVAL (operands[2]));
+     return "movk\\t%x0, %X3, lsl %2";
+  }
+  [(set_attr "type" "mov_imm")]
+)
+
 ;; CHERI builtins helpers.
 
 (define_insn "cap_base_get_cadi"

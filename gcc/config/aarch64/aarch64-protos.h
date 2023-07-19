@@ -663,6 +663,8 @@ void aarch64_split_128bit_move (rtx, rtx);
 
 bool aarch64_split_128bit_move_p (rtx, rtx);
 
+int aarch64_get_movk_shift_from_mask (rtx);
+
 bool aarch64_mov128_immediate (rtx);
 
 void aarch64_split_simd_combine (rtx, rtx, rtx);

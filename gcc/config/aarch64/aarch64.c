@@ -4466,21 +4466,60 @@ aarch64_output_sve_vector_inc_dec (const char *operands, rtx x)
 					     factor, nelts_per_vq);
 }
 
+int
+aarch64_get_movk_shift_from_mask (rtx mask)
+{
+  unsigned HOST_WIDE_INT imask = ~UINTVAL (mask);
+  for (int i = 0; i < 64; i += 16)
+    if (imask == HOST_WIDE_INT_UC (0xFFFF) << i)
+      return i;
+  return -1;
+}
+
 static int
 aarch64_internal_mov_immediate (rtx dest, rtx imm, bool generate,
-				scalar_int_mode mode)
+				scalar_addr_mode mode)
 {
   int i;
   unsigned HOST_WIDE_INT val, val2, mask;
   int one_match, zero_match;
   int num_insns;
 
+  machine_mode noncap_mode = noncapability_mode (mode);
   val = INTVAL (imm);
 
-  if (aarch64_move_imm (val, mode))
+  auto mov_imm_gen_rtx = [&] (rtx imm)
+    {
+      if (mode == CADImode)
+	imm = gen_pointer_plus (mode, CONST0_RTX (mode), imm);
+
+      emit_insn (gen_rtx_SET (dest, imm));
+    };
+
+  auto insv_imm_gen_rtx = [&] (int shift)
+    {
+      rtx insn;
+      rtx shift_rtx = GEN_INT (shift);
+      rtx val_rtx = GEN_INT ((val >> shift) & 0xffff);
+
+      if (mode == SImode)
+	insn = gen_insv_immsi (dest, shift_rtx, val_rtx);
+      else if (mode == CADImode)
+	{
+	  HOST_WIDE_INT mask = ~((HOST_WIDE_INT) 0xffff << shift);
+	  insn = gen_insv_immcadi (dest, drop_capability (dest), GEN_INT (mask),
+				   GEN_INT (val & ~mask));
+	}
+      else
+	insn = gen_insv_immdi (dest, shift_rtx, val_rtx);
+
+      emit_insn (insn);
+    };
+
+  if (aarch64_move_imm (val, noncap_mode))
     {
       if (generate)
-	emit_insn (gen_rtx_SET (dest, imm));
+	mov_imm_gen_rtx (imm);
       return 1;
     }
 
@@ -4488,12 +4527,12 @@ aarch64_internal_mov_immediate (rtx dest, rtx imm, bool generate,
      (with XXXX non-zero). In that case check to see if the move can be done in
      a smaller mode.  */
   val2 = val & 0xffffffff;
-  if (mode == DImode
+  if (noncap_mode == DImode
       && aarch64_move_imm (val2, SImode)
       && (((val >> 32) & 0xffff) == 0 || (val >> 48) == 0))
     {
       if (generate)
-	emit_insn (gen_rtx_SET (dest, GEN_INT (val2)));
+	mov_imm_gen_rtx (GEN_INT (val2));
 
       /* Check if we have to emit a second instruction by checking to see
          if any of the upper 32 bits of the original DI mode value is set.  */
@@ -4503,8 +4542,7 @@ aarch64_internal_mov_immediate (rtx dest, rtx imm, bool generate,
       i = (val >> 48) ? 48 : 32;
 
       if (generate)
-	 emit_insn (gen_insv_immdi (dest, GEN_INT (i),
-				    GEN_INT ((val >> i) & 0xffff)));
+	insv_imm_gen_rtx (i);
 
       return 2;
     }
@@ -4513,13 +4551,8 @@ aarch64_internal_mov_immediate (rtx dest, rtx imm, bool generate,
     {
       if (generate)
 	{
-	  emit_insn (gen_rtx_SET (dest, GEN_INT (val & 0xffff)));
-	  if (mode == SImode)
-	    emit_insn (gen_insv_immsi (dest, GEN_INT (16),
-				       GEN_INT ((val >> 16) & 0xffff)));
-	  else
-	    emit_insn (gen_insv_immdi (dest, GEN_INT (16),
-				       GEN_INT ((val >> 16) & 0xffff)));
+	  mov_imm_gen_rtx (GEN_INT (val & 0xffff));
+	  insv_imm_gen_rtx (16);
 	}
       return 2;
     }
@@ -4556,9 +4589,8 @@ aarch64_internal_mov_immediate (rtx dest, rtx imm, bool generate,
 	{
 	  if (generate)
 	    {
-	      emit_insn (gen_rtx_SET (dest, GEN_INT (val2)));
-	      emit_insn (gen_insv_immdi (dest, GEN_INT (i),
-					 GEN_INT ((val >> i) & 0xffff)));
+	      mov_imm_gen_rtx (GEN_INT (val2));
+	      insv_imm_gen_rtx (i);
 	    }
 	  return 2;
 	}
@@ -4574,16 +4606,16 @@ aarch64_internal_mov_immediate (rtx dest, rtx imm, bool generate,
   i = (val2 & mask) != 0 ? 0 : (val2 & (mask << 16)) != 0 ? 16 : 32;
 
   if (generate)
-    emit_insn (gen_rtx_SET (dest, GEN_INT (one_match > zero_match
-					   ? (val | ~(mask << i))
-					   : (val & (mask << i)))));
+    mov_imm_gen_rtx (GEN_INT (one_match > zero_match
+			      ? (val | ~(mask << i))
+			      : (val & (mask << i))));
+
   for (i += 16; i < 64; i += 16)
     {
       if ((val2 & (mask << i)) == 0)
 	continue;
       if (generate)
-	emit_insn (gen_insv_immdi (dest, GEN_INT (i),
-				   GEN_INT ((val >> i) & 0xffff)));
+	insv_imm_gen_rtx (i);
       num_insns ++;
     }
 
@@ -5555,22 +5587,23 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
 {
   machine_mode mode = GET_MODE (dest);
 
+  /* If we have (const (plus symbol offset)), separate out the offset
+	before we start classifying the symbol.  */
+  poly_int64 offset;
+  rtx base = strip_offset (imm, &offset);
+
   /* Check on what type of symbol it is.  */
   scalar_addr_mode addr_mode;
   if ((GET_CODE (imm) == SYMBOL_REF
        || GET_CODE (imm) == LABEL_REF
        || GET_CODE (imm) == CONST
        || GET_CODE (imm) == CONST_POLY_INT)
-      && is_a <scalar_addr_mode> (mode, &addr_mode))
+      && is_a <scalar_addr_mode> (mode, &addr_mode)
+      && !(CONST0_RTX (mode) == base && CAPABILITY_MODE_P (mode)))
     {
       rtx mem, sym;
-      poly_int64 offset;
       HOST_WIDE_INT const_offset;
       enum aarch64_symbol_type sty;
-
-      /* If we have (const (plus symbol offset)), separate out the offset
-	 before we start classifying the symbol.  */
-      rtx base = strip_offset (imm, &offset);
 
       /* We must always add an offset involving VL separately, rather than
 	 folding it into the relocation.  */
@@ -5762,8 +5795,8 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
 	    return;
 	  }
 
-      /* Handle CONST_NULL.  */
-      if (CAPABILITY_MODE_P (mode) && imm == CONST0_RTX (mode))
+      /* Handle capability constants.  */
+      if (CAPABILITY_MODE_P (mode) && base == CONST0_RTX (mode))
 	{
 	  emit_insn (gen_rtx_SET (dest, imm));
 	  return;
@@ -5775,9 +5808,8 @@ aarch64_expand_mov_immediate (rtx dest, rtx imm)
       return;
     }
 
-  /* MORELLO TODO: scalar_addr_mode here?  */
   aarch64_internal_mov_immediate (dest, imm, true,
-				  as_a <scalar_int_mode> (mode));
+				  as_a <scalar_addr_mode> (mode));
 }
 
 /* Emit an SVE predicated move from SRC to DEST.  PRED is a predicate
@@ -17363,6 +17395,9 @@ aarch64_legitimate_constant_p (machine_mode mode, rtx x)
   x = strip_offset (x, &offset);
   if (!offset.is_constant () && aarch64_offset_temporaries (true, offset) > 0)
     return false;
+
+  if (CONST0_RTX (mode) == x && mode == CADImode)
+    return true;
 
   /* Do not allow const (plus (anchor_symbol, const_int)).  */
   if (maybe_ne (offset, 0) && SYMBOL_REF_P (x) && SYMBOL_REF_ANCHOR_P (x))
