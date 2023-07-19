@@ -3548,6 +3548,36 @@
 }
   [(set_attr "type" "fpload,load")])
 
+;; Extract DF from vector pair
+(define_insn "vsx_extract_v4df"
+  [(set (match_operand:DF 0 "gpc_reg_operand" "=wa")
+	(vec_select:DF
+	 (match_operand:V4DF 1 "gpc_reg_operand" "wa")
+	 (parallel
+	  [(match_operand:QI 2 "const_0_to_3_operand" "n")])))]
+  "TARGET_MMA"
+{
+  unsigned int r = reg_or_subregno (operands[1]);
+  HOST_WIDE_INT index = INTVAL (operands[2]);
+  if ((BYTES_BIG_ENDIAN && index > 1)
+      || (!BYTES_BIG_ENDIAN && index < 2))
+    r++;
+
+  operands[3] = gen_rtx_REG (DFmode, r);
+  if ((index % 2) == 0)
+    {
+      /* value is in the high part of the register.  */
+      if (r == reg_or_subregno (operands[0]))
+	return ASM_COMMENT_START " vec_extract to same register (%x0)";
+
+      return "xxlor %x0,%x3,%x3";
+    }
+  else
+    /* value is in the low part of the register.  */
+    return "xxpermdi %x0,%x3,%x3,3";
+}
+  [(set_attr "type" "vecperm")])
+
 ;; Extract a SF element from V4SF
 (define_insn_and_split "vsx_extract_v4sf"
   [(set (match_operand:SF 0 "vsx_register_operand" "=wa")

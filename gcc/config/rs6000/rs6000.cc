@@ -7640,6 +7640,12 @@ rs6000_expand_vector_extract (rtx target, rtx vec, rtx elt)
 	      return;
 	    }
 	  break;
+	case E_V4DFmode:
+	  if (TARGET_MMA)
+	    {
+	      emit_insn (gen_vsx_extract_v4df (target, vec, elt));
+	      return;
+	    }
 	}
     }
   else if (VECTOR_MEM_VSX_P (mode) && !CONST_INT_P (elt)
