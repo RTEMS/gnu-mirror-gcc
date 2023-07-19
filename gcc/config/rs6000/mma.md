@@ -316,6 +316,28 @@
     gcc_assert (false);
 })
 
+(define_insn_and_split "*movoo"
+  [(set (match_operand:OO 0 "nonimmediate_operand" "=wa,m,wa")
+	(match_operand:OO 1 "input_operand" "m,wa,wa"))]
+  "TARGET_MMA
+   && (gpc_reg_operand (operands[0], OOmode)
+       || gpc_reg_operand (operands[1], OOmode))"
+  "@
+   lxvp%X1 %x0,%1
+   stxvp%X0 %x1,%0
+   #"
+  "&& reload_completed
+   && (!MEM_P (operands[0]) && !MEM_P (operands[1]))"
+  [(const_int 0)]
+{
+  rs6000_split_multireg_move (operands[0], operands[1]);
+  DONE;
+}
+  [(set_attr "type" "vecload,vecstore,veclogical")
+   (set_attr "size" "256")
+   (set_attr "length" "*,*,8")])
+
+;; Support for V8SFmode and V4DFmode.
 (define_expand "mov<mode>"
   [(set (match_operand:VPAIR 0 "nonimmediate_operand")
 	(match_operand:VPAIR 1 "input_operand"))]
