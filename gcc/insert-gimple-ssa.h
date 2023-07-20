@@ -1,4 +1,7 @@
-/* TODO Popis
+/* Hack code generation API.
+
+   Generates GIMPLE in SSA form.
+
    Copyright (C) 2023-2023 Free Software Foundation, Inc.
    Contributed by Filip Kastl <filip.kastl@gmail.com>
 
@@ -45,11 +48,12 @@ class hack_ssa_builder;
    INVAR .. Incoming variable. Represents SSA name that generated code uses but
 	    originates outside of it
    MEMORY .. Represents a memory access -- a handled component.
-   LOCAL .. Local variable. Analogous to a var_decl. Represents a variable used
-            only inside the generated code.
+   LOCAL .. Local variable. Analogous to a VAR_DECL tree. Represents a variable
+	    used only inside the generated code.
    OUTVAR .. Outgoing variable. Doesn't represent an actual object. Represents
 	     a point where user of API will want to know SSA name of a LOCAL
-	     variable.  */
+	     variable.
+   PARAM .. Parameter of cfun. Analogous to a PARM_DECL tree.  */
 
 enum hvar_code
 {
@@ -62,7 +66,7 @@ enum hvar_code
 
 struct hvar
 {
-  int index; // TODO Remove. Not currently used.
+  int index; /* Not currently used.  */
   enum hvar_code code;
   tree t; /* LOCAL           ... VAR_DECL
 	     anonymous LOCAL ... type
@@ -70,7 +74,7 @@ struct hvar
 	     INVAR           ... null
 	     OUTVAR          ... null or SSA name when finalized
 	     MEMORY          ... handled component.  */
-  hstmt_with_lhs *default_def; /* PARAM, INVAR and MEMORY.  */
+  hstmt_with_lhs *default_def; /* For PARAM, INVAR and MEMORY.  */
 };
 
 // -- INTERNAL STRUCTS --
@@ -101,7 +105,7 @@ class hstmt
     hstmt (hstmt_code code) : code (code) { }
 
     /* Builds and returns gimple representation of this stmt or NULL if this
-       stmt is purely virtual (as in the case of hstmt_outvar).  */
+       stmt is purely virtual (for example hstmt_outvar is virtual).  */
     virtual gimple *to_gimple (void) { return NULL; }
 
     /* When substituting one definition (represented by hstmt_with_lhs *) by
@@ -131,7 +135,7 @@ class hstmt_with_lhs : public hstmt
     ~hstmt_with_lhs () { }
 
     hvar *var;
-    vec<hstmt *> uses = vNULL; // TODO Nahradit obstack-friendly strukturou?
+    vec<hstmt *> uses = vNULL;
     tree ssa;
 };
 
@@ -147,12 +151,12 @@ class hphi : public hstmt_with_lhs
 {
   public:
     unsigned num_ops = 0;
-    hphi_edge *op = NULL; /* Array of operands. Not embedded into object. NULL
-			     if PHI incomplete.  */
+    hphi_edge *op = NULL; /* Array of operands. Not embedded into the object.
+			     NULL if PHI incomplete.  */
 
     hphi (hvar *var) : hstmt_with_lhs (HPHI, var)
       {
-	gcc_checking_assert (var->code == LOCAL);
+	gcc_checking_assert (var->code == LOCAL || var->code == PARAM);
       }
 
     hstmt_with_lhs *get_op (unsigned i)
@@ -203,12 +207,10 @@ class hstmt_assign : public hstmt_with_lhs
     ~hstmt_assign () { }
 };
 
-/* Hack const stmt (will rename this to hack invar stmt)
+/* Hack const stmt
    
    Virtual statement representing values originating outside the code we're
-   building.
-
-   'var' should be only INVAR. TODO Update description */
+   building.  */
 
 class hstmt_const : public hstmt_with_lhs
 {
@@ -222,7 +224,9 @@ class hstmt_const : public hstmt_with_lhs
     ~hstmt_const () { }
 };
 
-/* TODO Describe handled component virtual stmts.  */
+/* Hack handled component stmt
+
+   Virtual statement representing a memory access.  */
 
 class hstmt_handled_component : public hstmt_with_lhs
 {
@@ -278,7 +282,7 @@ class hstmt_outvar : public hstmt
     ~hstmt_outvar () { }
 };
 
-/* TODO Description.  */
+/* Hack return stmt.  */
 
 class hstmt_return : public hstmt
 {
@@ -296,7 +300,7 @@ class hstmt_return : public hstmt
     ~hstmt_return () { }
 };
 
-/* TODO Description.  */
+/* Hack function call stmt.  */
 
 class hstmt_call : public hstmt_with_lhs
 {
@@ -313,9 +317,9 @@ class hstmt_call : public hstmt_with_lhs
     ~hstmt_call () { }
 };
 
-/* Hack internal tuple
+/* Hack internal tuple.
 
-   Right side of assign statements. I may merge this into 'hstmt_assign'
+   Right hand side of assign statements. I may merge this into 'hstmt_assign'
    later.  */
 
 struct hack_tuple_internal
@@ -325,7 +329,9 @@ struct hack_tuple_internal
   hstmt_with_lhs *op[3];
 };
 
-/* TODO Describe  */
+/* Hack internal tuple for function calls.
+
+   Right hand side of function call statements.  */
 
 struct hack_tuple_fn
 {
@@ -334,7 +340,7 @@ struct hack_tuple_fn
   hstmt_with_lhs *op[1];  /* Trailing array idiom.  */
 };
 
-/* TODO Describe.  */
+/* Hash traits on which redundancy elimination is based.  */
 
 template<>
 struct default_hash_traits<hack_tuple_internal>
@@ -388,14 +394,14 @@ class hack_bb
     vec<hstmt *> stmt_list = vNULL;
     vec<hphi *> phi_list = vNULL;
     hash_map<hvar *, hstmt_with_lhs *> curr_def;  /* See the Braun alg paper for
-						 what 'curr_def' means.  */
+						     what 'curr_def' means.  */
     hash_set<hphi *> incomplete_phis; /* See Braun alg paper for explanation of
 					 incomplete PHIs.  */
 
     /* Remembers seen tuples (rhs of assigns) and which statements contain
-       them. Will be used for build-time optimizations.
+       them. Used for build-time redundancy elimination.
 
-       TODO Rename this.  */
+       Should probably get renamed.  */
     hash_map<hack_tuple_internal, hstmt_assign *> tuple_provider;
 };
 
@@ -403,8 +409,8 @@ class hack_bb
 
 /* Hack SSA builder
 
-   Main class. Create CFG structure, initialize builder, add statements,
-   finalize, extract SSA names, release.  */
+   Main class. Usage of the API: Create CFG structure, initialize builder, add
+   statements, finalize, extract SSA names, release.  */
 
 class hack_ssa_builder
 {
@@ -433,7 +439,7 @@ class hack_ssa_builder
   void set_block_filled (basic_block bb);
 
   void finalize (void);
-  void release (void); // TODO Možná destruktor?
+  void release (void);
   tree ssa_from_outvar (hvar *var);
 
  private:
@@ -441,7 +447,8 @@ class hack_ssa_builder
   unsigned next_index = 0;  /* Incrementing counter of LOCAL and OUTVAR
 			       indexes. These indexes currently aren't
 			       used.  */
-  unsigned next_const_index = 0; /* Incrementing counter of INVAR indexes.  */
+  unsigned next_const_index = 0; /* Incrementing counter of INVAR indexes.
+				    These indexes currently aren't used.  */
 
   /* Data structures used to keep track of structs to eventually free.
      Will become obsolete when allocation on obstack is implemented.  */

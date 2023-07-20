@@ -1,4 +1,7 @@
-/* TODO Popis
+/* Hack code generation API.
+
+   Generates GIMPLE in SSA form.
+   
    Copyright (C) 2023-2023 Free Software Foundation, Inc.
    Contributed by Filip Kastl <filip.kastl@gmail.com>
 
@@ -18,7 +21,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-// Z tree-into-ssa.cc TODO Ubrat
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -43,7 +45,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 #include "asan.h"
 #include "attr-fnspec.h"
-
 #include "vec.h"
 #include "hash-map.h"
 #include "hash-set.h"
@@ -52,6 +53,14 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssanames.h"
 #include "tree-phinodes.h"
 #include "insert-gimple-ssa.h"
+
+/* Is the tree a handled component or a MEM_REF?  */
+
+static bool
+handled_component_or_mem_ref_p (tree t)
+{
+  return handled_component_p (t) || TREE_CODE (t) == MEM_REF;
+}
 
 /* Replace hack PHI operand.  */
 
@@ -180,7 +189,7 @@ hstmt_return::to_gimple (void)
 gimple *
 hstmt_call::to_gimple (void)
 {
-  vec<tree> ssa_args = vNULL; /* TODO We know how much to allocate.  */
+  vec<tree> ssa_args = vNULL;
   unsigned i;
   for (i = 0; i < val->num_ops; i++)
     {
@@ -225,25 +234,21 @@ hstmt_handled_component::to_gimple (void)
 	      TREE_OPERAND (ref, 2) = operands.pop ()->ssa;
 	    break;
 	  case MEM_REF:
-	    op = TREE_OPERAND (ref, 1);
+	    op = TREE_OPERAND (ref, 0);
 	    if (op == error_mark_node)
-	      TREE_OPERAND (ref, 1) = operands.pop ()->ssa;
+	      TREE_OPERAND (ref, 0) = operands.pop ()->ssa;
+	    break;
+	  case ADDR_EXPR:
 	    break;
 	  default:
 	    gcc_unreachable (); /* Not implemented.  */
 	}
 
       op = TREE_OPERAND (ref, 0);
-      if (op != error_mark_node)
-	{
-	  /* This means op is a handled component.  */
-	  ref = op;
-	}
+      if (handled_component_or_mem_ref_p (op))
+	ref = op;
       else
-	{
-	  TREE_OPERAND (ref, 0) = operands.pop ()->ssa;
-	  break;
-	}
+	break;
     }
 
     return NULL;
@@ -380,7 +385,6 @@ hack_ssa_builder::append_return (basic_block bb, hvar *retval)
 
   /* Update uses list of appropriate stmts.  */
   stmt->retval->uses.safe_push (stmt);
-  // TODO Neměl bych kontrolovat, jestli není killed?
 }
 
 /* Build and append hack call to a basic block.  */
@@ -405,11 +409,11 @@ void hack_ssa_builder::append_call_vec (basic_block bb, tree fn, hvar *left,
   /* Update uses list of appropriate stmts.  */
   for (i = 0; i < val->num_ops; i++)
     {
-      // TODO Neměl bych kontrolovat, jestli není killed?
       val->op[i]->uses.safe_push (call);
     }
 
-  write_variable (bb, left, call);
+  if (left)
+    write_variable (bb, left, call);
 }
 
 void
@@ -442,12 +446,13 @@ hack_ssa_builder::append_outvar (basic_block bb, hvar *local)
 
   /* Update uses list of appropriate stmts.  */
   stmt->rhs->uses.safe_push (stmt);
-  // TODO Neměl bych kontrolovat, jestli není killed?
   
   return outvar;
 }
 
-/* TODO Describe.
+/* Build and append hack handled component stmt to a basic block.
+
+   This statement is virtual. It represents a memory access.
    
    Only some operands of handled component will have to be renamed. For each of
    these, operands vector should contain the appropriate hvar and the handled
@@ -483,7 +488,6 @@ hack_ssa_builder::append_handled_component (basic_block bb, tree ref,
   /* Update uses list of appropriate stmts.  */
   for (hstmt_with_lhs *s : stmt->operands)
     {
-      // TODO Neměl bych kontrolovat, jestli není killed?
       s->uses.safe_push (stmt);
     }
 
@@ -521,9 +525,9 @@ hack_ssa_builder::finalize (void)
 {
   run_final_optimizations ();
 
-  /* Fill and seal remaining bbs.  */ // TODO Pořadí by mělo být obráceně
+  /* Fill and seal remaining bbs.  */
   for (basic_block bb : seen_bbs)
-    { // TODO Nechci jen checking assert?
+    {
       if (!filled_bbs.contains (bb))
 	set_block_filled (bb);
     }
@@ -654,7 +658,6 @@ hack_ssa_builder::append_assign1 (basic_block bb, enum tree_code code,
       unsigned i;
       for (i = 0; i < val->num_ops; i++)
 	{
-	  // TODO Neměl bych kontrolovat, jestli není killed?
 	  val->op[i]->uses.safe_push (assign);
 	}
 
@@ -1008,14 +1011,6 @@ hack_ssa_builder::tuple_lookup (basic_block bb, hack_tuple_internal *val)
 void
 hack_ssa_builder::run_final_optimizations (void) { }
 
-/* TODO describe.  */
-
-static bool
-handled_component_or_mem_ref_p (tree t)
-{
-  return handled_component_p (t) || TREE_CODE (t) == MEM_REF;
-}
-
 /* Traverses handled component in preorder. For each operand that will have to
    be renamed when transitioning to SSA, puts it into a vector and replaces it
    with 'error_mark'. Finally, returns the gathered operands.  */
@@ -1035,7 +1030,7 @@ extract_operands_to_be_renamed (tree ref)
 	    gcc_assert (!TREE_OPERAND (ref, 2) &&
 			!TREE_OPERAND (ref, 3)); /* Not implemented.  */
 	    op = TREE_OPERAND (ref, 1);
-	    if (is_gimple_reg (op))
+	    if (op && is_gimple_reg (op))
 	      {
 		TREE_OPERAND (ref, 1) = error_mark_node;
 		ret.safe_push (op);
@@ -1050,12 +1045,14 @@ extract_operands_to_be_renamed (tree ref)
 	      }
 	    break;
 	  case MEM_REF:
-	    op = TREE_OPERAND (ref, 1);
+	    op = TREE_OPERAND (ref, 0);
 	    if (is_gimple_reg (op))
 	      {
-		TREE_OPERAND (ref, 1) = error_mark_node;
+		TREE_OPERAND (ref, 0) = error_mark_node;
 		ret.safe_push (op);
 	      }
+	    break;
+	  case ADDR_EXPR:
 	    break;
 	  default:
 	    gcc_unreachable (); /* Not implemented.  */
@@ -1063,15 +1060,9 @@ extract_operands_to_be_renamed (tree ref)
 
       op = TREE_OPERAND (ref, 0);
       if (handled_component_or_mem_ref_p (op))
-	{
-	  ref = op;
-	}
+	ref = op;
       else
-	{
-          TREE_OPERAND (ref, 0) = error_mark_node;
-	  ret.safe_push (op);
-	  break;
-	}
+	break;
     }
 
   return ret;
