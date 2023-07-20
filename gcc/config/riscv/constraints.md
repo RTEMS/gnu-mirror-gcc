@@ -93,7 +93,7 @@
 
 ;; Floating-point constant +0.0, used for FCVT-based moves when FMV is
 ;; not available in RV32.
-(define_constraint "G"
+(define_constraint "G0p"
   "@internal"
   (and (match_code "const_double")
        (match_test "op == CONST0_RTX (mode)")))

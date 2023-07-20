@@ -1734,8 +1734,8 @@
 })
 
 (define_insn "*movhf_hardfloat"
-  [(set (match_operand:HF 0 "nonimmediate_operand" "=f,f,f,m,m,*f,*r,  *r,*r,*m")
-	(match_operand:HF 1 "move_operand"         " f,G,m,f,G,*r,*f,*G*r,*m,*r"))]
+  [(set (match_operand:HF 0 "nonimmediate_operand" "=f,  f,f,m,  m,*f,*r,    *r,*r,*m")
+	(match_operand:HF 1 "move_operand"         " f,G0p,m,f,G0p,*r,*f,*G0p*r,*m,*r"))]
   "TARGET_ZFHMIN
    && (register_operand (operands[0], HFmode)
        || reg_or_0_operand (operands[1], HFmode))"
@@ -1744,8 +1744,8 @@
    (set_attr "mode" "HF")])
 
 (define_insn "*movhf_softfloat"
-  [(set (match_operand:HF 0 "nonimmediate_operand" "=f, r,r,m,*f,*r")
-	(match_operand:HF 1 "move_operand"         " f,Gr,m,r,*r,*f"))]
+  [(set (match_operand:HF 0 "nonimmediate_operand" "=f,   r,r,m,*f,*r")
+	(match_operand:HF 1 "move_operand"         " f,G0pr,m,r,*r,*f"))]
   "!TARGET_ZFHMIN
    && (register_operand (operands[0], HFmode)
        || reg_or_0_operand (operands[1], HFmode))"
@@ -2065,8 +2065,8 @@
 })
 
 (define_insn "*movsf_hardfloat"
-  [(set (match_operand:SF 0 "nonimmediate_operand" "=f,f,f,m,m,*f,*r,  *r,*r,*m")
-	(match_operand:SF 1 "move_operand"         " f,G,m,f,G,*r,*f,*G*r,*m,*r"))]
+  [(set (match_operand:SF 0 "nonimmediate_operand" "=f,  f,f,m,  m,*f,*r,    *r,*r,*m")
+	(match_operand:SF 1 "move_operand"         " f,G0p,m,f,G0p,*r,*f,*G0p*r,*m,*r"))]
   "TARGET_HARD_FLOAT
    && (register_operand (operands[0], SFmode)
        || reg_or_0_operand (operands[1], SFmode))"
@@ -2075,8 +2075,8 @@
    (set_attr "mode" "SF")])
 
 (define_insn "*movsf_softfloat"
-  [(set (match_operand:SF 0 "nonimmediate_operand" "= r,r,m")
-	(match_operand:SF 1 "move_operand"         " Gr,m,r"))]
+  [(set (match_operand:SF 0 "nonimmediate_operand" "=   r,r,m")
+	(match_operand:SF 1 "move_operand"         " G0pr,m,r"))]
   "!TARGET_HARD_FLOAT
    && (register_operand (operands[0], SFmode)
        || reg_or_0_operand (operands[1], SFmode))"
@@ -2099,8 +2099,8 @@
 ;; In RV32, we lack fmv.x.d and fmv.d.x.  Go through memory instead.
 ;; (However, we can still use fcvt.d.w to zero a floating-point register.)
 (define_insn "*movdf_hardfloat_rv32"
-  [(set (match_operand:DF 0 "nonimmediate_operand" "=f,f,f,m,m,*th_f_fmv,*th_r_fmv,  *r,*r,*m")
-	(match_operand:DF 1 "move_operand"         " f,G,m,f,G,*th_r_fmv,*th_f_fmv,*r*G,*m,*r"))]
+  [(set (match_operand:DF 0 "nonimmediate_operand" "=f,  f,f,m,  m,*th_f_fmv,*th_r_fmv,    *r,*r,*m")
+	(match_operand:DF 1 "move_operand"         " f,G0p,m,f,G0p,*th_r_fmv,*th_f_fmv,*r*G0p,*m,*r"))]
   "!TARGET_64BIT && TARGET_DOUBLE_FLOAT
    && (register_operand (operands[0], DFmode)
        || reg_or_0_operand (operands[1], DFmode))"
@@ -2109,8 +2109,8 @@
    (set_attr "mode" "DF")])
 
 (define_insn "*movdf_hardfloat_rv64"
-  [(set (match_operand:DF 0 "nonimmediate_operand" "=f,f,f,m,m,*f,*r,  *r,*r,*m")
-	(match_operand:DF 1 "move_operand"         " f,G,m,f,G,*r,*f,*r*G,*m,*r"))]
+  [(set (match_operand:DF 0 "nonimmediate_operand" "=f,  f,f,m,  m,*f,*r,    *r,*r,*m")
+	(match_operand:DF 1 "move_operand"         " f,G0p,m,f,G0p,*r,*f,*r*G0p,*m,*r"))]
   "TARGET_64BIT && TARGET_DOUBLE_FLOAT
    && (register_operand (operands[0], DFmode)
        || reg_or_0_operand (operands[1], DFmode))"
@@ -2119,8 +2119,8 @@
    (set_attr "mode" "DF")])
 
 (define_insn "*movdf_softfloat"
-  [(set (match_operand:DF 0 "nonimmediate_operand" "= r,r, m")
-	(match_operand:DF 1 "move_operand"         " rG,m,rG"))]
+  [(set (match_operand:DF 0 "nonimmediate_operand" "=   r,r,   m")
+	(match_operand:DF 1 "move_operand"         " rG0p,m,rG0p"))]
   "!TARGET_DOUBLE_FLOAT
    && (register_operand (operands[0], DFmode)
        || reg_or_0_operand (operands[1], DFmode))"
