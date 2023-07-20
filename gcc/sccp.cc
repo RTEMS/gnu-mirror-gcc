@@ -18,8 +18,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-// TODO: Description
-
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -37,11 +35,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimplify.h"
 #include "tree-cfg.h"
 #include "tree-ssa-propagate.h"
-
-// DEBUG
-#include <iostream>
-#include "gimple-pretty-print.h"
-#include "print-tree.h"
 
 /* State of vertex during tarjan computation.
 
@@ -73,8 +66,6 @@ struct vertex
 static bool
 stmt_may_generate_copy (gimple *stmt)
 {
-  // TODO: Napis sem "TODO jsme moc konzervativni, mozna by se nejak daly
-  // uvazovat i PHIcka s OCCURS_IN_ABNORMAL parametry
   if (gimple_code (stmt) == GIMPLE_PHI)
     {
       gphi *phi = as_a <gphi *> (stmt);
@@ -82,10 +73,6 @@ stmt_may_generate_copy (gimple *stmt)
       /* No OCCURS_IN_ABNORMAL_PHI SSA names in lhs nor rhs.  */
       if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (gimple_phi_result (phi)))
 	{
-	  /*
-	  debug_gimple_stmt (stmt); // DEBUG
-	  std::cerr << "1" << std::endl; // DEBUG
-	  */
 	  return false;
 	}
 
@@ -96,27 +83,15 @@ stmt_may_generate_copy (gimple *stmt)
 	  if (TREE_CODE (op) == SSA_NAME &&
 	      SSA_NAME_OCCURS_IN_ABNORMAL_PHI (op))
 	    {
-	      /*
-	      debug_gimple_stmt (stmt); // DEBUG
-	      std::cerr << "2" << std::endl; // DEBUG
-	      */
 	      return false;
 	    }
 	}
 
-      /*
-      debug_gimple_stmt (stmt); // DEBUG
-      std::cerr << "ok" << std::endl; // DEBUG
-      */
       return true;
     }
 
   if (gimple_code (stmt) != GIMPLE_ASSIGN)
     {
-      /*
-      debug_gimple_stmt (stmt); // DEBUG
-      std::cerr << "3" << std::endl; // DEBUG
-      */
       return false;
     }
 
@@ -124,49 +99,29 @@ stmt_may_generate_copy (gimple *stmt)
      useful copy.  */
   if (gimple_has_volatile_ops (stmt))
     {
-      /*
-      debug_gimple_stmt (stmt); // DEBUG
-      std::cerr << "4" << std::endl; // DEBUG
-      */
-      return false; // TODO Maybe doesn't have to be here
+      return false;
     }
 
   /* Statements with loads and/or stores will never generate a useful copy.  */
   if (gimple_store_p (stmt) || gimple_assign_load_p (stmt))
     {
-      /*
-      debug_gimple_stmt (stmt); // DEBUG
-      std::cerr << "5" << std::endl; // DEBUG
-      */
       return false;
     }
 
   if (!gimple_assign_single_p (stmt))
     {
-      /*
-      debug_gimple_stmt (stmt); // DEBUG
-      std::cerr << "6" << std::endl; // DEBUG
-      */
       return false;
     }
 
   tree lhs = gimple_assign_lhs (stmt);
   if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (lhs))
     {
-      /*
-      debug_gimple_stmt (stmt); // DEBUG
-      std::cerr << "7" << std::endl; // DEBUG
-      */
       return false;
     }
 
   /* If the assignment is from a constant it generates a useful copy.  */
   if (is_gimple_min_invariant (gimple_assign_rhs1 (stmt)))
     {
-      /*
-      debug_gimple_stmt (stmt); // DEBUG
-      std::cerr << "ok" << std::endl; // DEBUG
-      */
       return true;
     }
 
@@ -175,38 +130,21 @@ stmt_may_generate_copy (gimple *stmt)
      edges.  */
   tree rhs = single_ssa_tree_operand (stmt, SSA_OP_USE);
 
-  /* TODO Comment.  */
   if (!is_gimple_val (gimple_assign_rhs1 (stmt)))
     {
-      /*
-      debug_gimple_stmt (stmt); // DEBUG
-      std::cerr << "8" << std::endl; // DEBUG
-      */
       return false;
     }
 
   if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (rhs))
     {
-      /*
-      debug_gimple_stmt (stmt); // DEBUG
-      std::cerr << "9" << std::endl; // DEBUG
-      */
       return false;
     }
 
   if (!rhs)
     {
-      /*
-      debug_gimple_stmt (stmt); // DEBUG
-      std::cerr << "10" << std::endl; // DEBUG
-      */
       return false;
     }
 
-  /*
-  debug_gimple_stmt (stmt); // DEBUG
-  std::cerr << "ok" << std::endl; // DEBUG
-  */
   return true;
 }
 
@@ -429,18 +367,6 @@ tarjan_compute_sccs (auto_vec<gimple *> &copy_stmts)
       gimple *s = v.stmt;
       tarjan_clear_using (s);
     }
-
-  // DEBUG
-  /* Write out sccs
-  for (vec<gimple *> scc : sccs)
-    {
-      for (gimple *s : scc)
-	{
-	  debug_gimple_stmt (s);
-	}
-      std::cerr << std::endl;
-    }
-  */
 
   return sccs;
 }
@@ -682,8 +608,6 @@ get_all_stmt_may_generate_copy (void)
 	}
     }
 
-  //std::cerr << std::endl << "- - - -" << std::endl << std::endl; // DEBUG
-
   return result;
 }
 
@@ -754,7 +678,6 @@ public:
 unsigned
 pass_sccp::execute (function *)
 {
-  //std::cerr << std::endl << "FUNCTION" << std::endl; // DEBUG
   init_sccp ();
   auto_vec<gimple *> stmts = get_all_stmt_may_generate_copy ();
   sccp_propagate (stmts);

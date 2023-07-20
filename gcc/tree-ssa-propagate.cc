@@ -1281,8 +1281,6 @@ clean_up_loop_closed_phi (function *fun)
   return 0;
 }
 
-/* TODO Comment.  */
-
 void
 cleanup_after_replace (gimple *old_stmt, gimple *stmt, bitmap need_eh_cleanup,
 		       bitmap need_ab_cleanup, vec<gimple *> stmts_to_fixup,
@@ -1318,8 +1316,6 @@ cleanup_after_replace (gimple *old_stmt, gimple *stmt, bitmap need_eh_cleanup,
 
   update_stmt_if_modified (stmt);
 }
-
-/* TODO Comment.  */
 
 void
 cleanup_after_all_replaces_done (bitmap need_eh_cleanup, bitmap
