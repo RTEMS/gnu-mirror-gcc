@@ -1274,7 +1274,8 @@ riscv_const_insns (rtx x)
 
     case CONST_DOUBLE:
       /* We can use x0 to load floating-point zero.  */
-      return x == CONST0_RTX (GET_MODE (x)) ? 1 : 0;
+      return riscv_const_double_p0_or_m0_rtx(x) ? 1 : 0;
+
     case CONST_VECTOR:
       {
 	/* TODO: This is not accurate, we will need to
@@ -2142,6 +2143,22 @@ riscv_v_adjust_scalable_frame (rtx target, poly_int64 offset, bool epilogue)
   REG_NOTES (insn) = dwarf;
 }
 
+/* Return TRUE if rtx X is a FP constant 0.0 or -0.0.  */
+bool
+riscv_const_double_p0_or_m0_rtx (rtx x)
+{
+  const REAL_VALUE_TYPE *r;
+
+  if (GET_CODE (x) != CONST_DOUBLE)
+    return false;
+
+  r = CONST_DOUBLE_REAL_VALUE (x);
+  if (real_equal (r, &dconst0) || REAL_VALUE_MINUS_ZERO (*r))
+    return true;
+
+  return false;
+}
+
 /* If (set DEST SRC) is not a valid move instruction, emit an equivalent
    sequence that is valid.  */
 
@@ -2217,7 +2234,9 @@ riscv_legitimize_move (machine_mode mode, rtx dest, rtx src)
       return true;
     }
 
-  if (!register_operand (dest, mode) && !reg_or_0_operand (src, mode))
+  if (!register_operand (dest, mode)
+      && !reg_or_0_operand (src, mode)
+      && !riscv_const_double_p0_or_m0_rtx(src))
     {
       rtx reg;
 
