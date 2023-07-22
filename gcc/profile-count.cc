@@ -87,10 +87,16 @@ const char *profile_quality_display_names[] =
 /* Dump THIS to BUFFER.  */
 
 void
-profile_count::dump (char *buffer) const
+profile_count::dump (char *buffer, struct function *fun) const
 {
   if (!initialized_p ())
     sprintf (buffer, "uninitialized");
+  else if (fun && initialized_p ()
+	   && fun->cfg
+	   && ENTRY_BLOCK_PTR_FOR_FN (fun)->count.initialized_p ())
+    sprintf (buffer, "%" PRId64 " (%s, freq %.4f)", m_val,
+	     profile_quality_display_names[m_quality],
+	     to_sreal_scale (ENTRY_BLOCK_PTR_FOR_FN (fun)->count).to_double ());
   else
     sprintf (buffer, "%" PRId64 " (%s)", m_val,
 	     profile_quality_display_names[m_quality]);
@@ -99,10 +105,10 @@ profile_count::dump (char *buffer) const
 /* Dump THIS to F.  */
 
 void
-profile_count::dump (FILE *f) const
+profile_count::dump (FILE *f, struct function *fun) const
 {
   char buffer[64];
-  dump (buffer);
+  dump (buffer, fun);
   fputs (buffer, f);
 }
 
@@ -111,7 +117,7 @@ profile_count::dump (FILE *f) const
 void
 profile_count::debug () const
 {
-  dump (stderr);
+  dump (stderr, cfun);
   fprintf (stderr, "\n");
 }
 
@@ -325,6 +331,13 @@ profile_count::to_cgraph_frequency (profile_count entry_bb_count) const
 sreal
 profile_count::to_sreal_scale (profile_count in, bool *known) const
 {
+  if (*this == zero ()
+      && !(in == zero ()))
+  {
+    if (known)
+      *known = true;
+    return 0;
+  }
   if (!initialized_p () || !in.initialized_p ())
     {
       if (known)
@@ -333,32 +346,13 @@ profile_count::to_sreal_scale (profile_count in, bool *known) const
     }
   if (known)
     *known = true;
-  /* Watch for cases where one count is IPA and other is not.  */
-  if (in.ipa ().initialized_p ())
-    {
-      gcc_checking_assert (ipa ().initialized_p ());
-      /* If current count is inter-procedurally 0 and IN is inter-procedurally
-	 non-zero, return 0.  */
-      if (in.ipa ().nonzero_p ()
-	  && !ipa().nonzero_p ())
-	return 0;
-    }
-  else 
-    /* We can handle correctly 0 IPA count within locally estimated
-       profile, but otherwise we are lost and this should not happen.   */
-    gcc_checking_assert (!ipa ().initialized_p () || !ipa ().nonzero_p ());
-  if (*this == zero ())
-    return 0;
-  if (m_val == in.m_val)
+  if (*this == in)
     return 1;
   gcc_checking_assert (compatible_p (in));
-
+  if (m_val == in.m_val)
+    return 1;
   if (!in.m_val)
-    {
-      if (!m_val)
-	return 1;
-      return m_val * 4;
-    }
+    return m_val * 4;
   return (sreal)m_val / (sreal)in.m_val;
 }
 

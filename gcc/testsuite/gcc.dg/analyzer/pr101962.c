@@ -16,7 +16,7 @@ maybe_inc_int_ptr (int *ptr)
 int
 test_1 (void)
 {
-  int stack; /* { dg-message "region created on stack here" } */
+  int stack;
   int *a = &stack;
   a = maybe_inc_int_ptr (a);
   a = maybe_inc_int_ptr (a);
@@ -24,7 +24,6 @@ test_1 (void)
   __analyzer_eval (a != NULL); /* { dg-warning "TRUE" } */
   return *a; /* { dg-line test_1 } */
 
-  /* { dg-warning "use of uninitialized value '\\*a'" "warning" { target *-*-* } test_1 } */
   /* { dg-warning "stack-based buffer over-read" "warning" { target *-*-* } test_1 } */
 }
 

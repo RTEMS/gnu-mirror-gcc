@@ -139,6 +139,7 @@ along with GCC; see the file COPYING3.  If not see
 #define m_TREMONT (HOST_WIDE_INT_1U<<PROCESSOR_TREMONT)
 #define m_SIERRAFOREST (HOST_WIDE_INT_1U<<PROCESSOR_SIERRAFOREST)
 #define m_GRANDRIDGE (HOST_WIDE_INT_1U<<PROCESSOR_GRANDRIDGE)
+#define m_ARROWLAKE (HOST_WIDE_INT_1U<<PROCESSOR_ARROWLAKE)
 #define m_CORE_ATOM (m_SIERRAFOREST | m_GRANDRIDGE)
 #define m_INTEL (HOST_WIDE_INT_1U<<PROCESSOR_INTEL)
 
@@ -238,7 +239,12 @@ static struct ix86_target_opts isa2_opts[] =
   { "-mcmpccxadd",      OPTION_MASK_ISA2_CMPCCXADD },
   { "-mamx-fp16",       OPTION_MASK_ISA2_AMX_FP16 },
   { "-mprefetchi",      OPTION_MASK_ISA2_PREFETCHI },
-  { "-mraoint", 	OPTION_MASK_ISA2_RAOINT }
+  { "-mraoint", 	OPTION_MASK_ISA2_RAOINT },
+  { "-mamx-complex",	OPTION_MASK_ISA2_AMX_COMPLEX },
+  { "-mavxvnniint16",	OPTION_MASK_ISA2_AVXVNNIINT16 },
+  { "-msm3",		OPTION_MASK_ISA2_SM3 },
+  { "-msha512",		OPTION_MASK_ISA2_SHA512 },
+  { "-msm4",            OPTION_MASK_ISA2_SM4 }
 };
 static struct ix86_target_opts isa_opts[] =
 {
@@ -766,6 +772,7 @@ static const struct processor_costs *processor_cost_table[] =
   &alderlake_cost,
   &icelake_cost,
   &icelake_cost,
+  &alderlake_cost,
   &intel_cost,
   &lujiazui_cost,
   &geode_cost,
@@ -1089,6 +1096,11 @@ ix86_valid_target_attribute_inner_p (tree fndecl, tree args, char *p_strings[],
     IX86_ATTR_ISA ("amx-fp16", OPT_mamx_fp16),
     IX86_ATTR_ISA ("prefetchi",   OPT_mprefetchi),
     IX86_ATTR_ISA ("raoint", OPT_mraoint),
+    IX86_ATTR_ISA ("amx-complex", OPT_mamx_complex),
+    IX86_ATTR_ISA ("avxvnniint16", OPT_mavxvnniint16),
+    IX86_ATTR_ISA ("sm3", OPT_msm3),
+    IX86_ATTR_ISA ("sha512", OPT_msha512),
+    IX86_ATTR_ISA ("sm4", OPT_msm4),
 
     /* enum options */
     IX86_ATTR_ENUM ("fpmath=",	OPT_mfpmath_),
@@ -1398,7 +1410,11 @@ ix86_valid_target_attribute_tree (tree fndecl, tree args,
       if (option_strings[IX86_FUNCTION_SPECIFIC_TUNE])
 	opts->x_ix86_tune_string
 	  = ggc_strdup (option_strings[IX86_FUNCTION_SPECIFIC_TUNE]);
-      else if (orig_tune_defaulted)
+      /* If we have explicit arch string and no tune string specified, set
+	 tune_string to NULL and later it will be overriden by arch_string
+	 so target clones can get proper optimization.  */
+      else if (option_strings[IX86_FUNCTION_SPECIFIC_ARCH]
+	       || orig_tune_defaulted)
 	opts->x_ix86_tune_string = NULL;
 
       /* If fpmath= is not set, and we now have sse2 on 32-bit, use it.  */
@@ -2725,7 +2741,9 @@ ix86_option_override_internal (bool main_args_p,
     sorry ("%<-mcall-ms2sysv-xlogues%> isn%'t currently supported with SEH");
 
   if (!(opts_set->x_target_flags & MASK_VZEROUPPER)
-      && TARGET_EMIT_VZEROUPPER)
+      && TARGET_EMIT_VZEROUPPER
+      && flag_expensive_optimizations
+      && !optimize_size)
     opts->x_target_flags |= MASK_VZEROUPPER;
   if (!(opts_set->x_target_flags & MASK_STV))
     opts->x_target_flags |= MASK_STV;

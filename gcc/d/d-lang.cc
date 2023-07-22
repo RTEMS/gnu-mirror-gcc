@@ -293,7 +293,7 @@ d_init_options (unsigned int, cl_decoded_option *decoded_options)
   /* Set default values.  */
   global._init ();
 
-  global.vendor = lang_hooks.name;
+  global.compileEnv.vendor = lang_hooks.name;
   global.params.argv0 = xstrdup (decoded_options[0].arg);
   global.params.errorLimit = flag_max_errors;
 
@@ -558,12 +558,11 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
 
     case OPT_fpreview_all:
       global.params.ehnogc = value;
-      global.params.useDIP25 = FeatureState::enabled;
       global.params.useDIP1000 = FeatureState::enabled;
       global.params.useDIP1021 = value;
       global.params.bitfields = value;
       global.params.dtorFields = FeatureState::enabled;
-      global.params.fieldwise = value;
+      global.params.fieldwise = FeatureState::enabled;
       global.params.fixAliasThis = value;
       global.params.previewIn = value;
       global.params.fix16997 = value;
@@ -590,16 +589,12 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       global.params.useDIP1021 = value;
       break;
 
-    case OPT_fpreview_dip25:
-      global.params.useDIP25 = FeatureState::enabled;
-      break;
-
     case OPT_fpreview_dtorfields:
       global.params.dtorFields = FeatureState::enabled;
       break;
 
     case OPT_fpreview_fieldwise:
-      global.params.fieldwise = value;
+      global.params.fieldwise = FeatureState::enabled;
       break;
 
     case OPT_fpreview_fixaliasthis:
@@ -636,17 +631,12 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
 
     case OPT_frevert_all:
       global.params.useDIP1000 = FeatureState::disabled;
-      global.params.useDIP25 = FeatureState::disabled;
       global.params.dtorFields = FeatureState::disabled;
       global.params.fix16997 = !value;
       break;
 
     case OPT_frevert_dip1000:
       global.params.useDIP1000 = FeatureState::disabled;
-      break;
-
-    case OPT_frevert_dip25:
-      global.params.useDIP25 = FeatureState::disabled;
       break;
 
     case OPT_frevert_dtorfields:
@@ -911,10 +901,6 @@ d_post_options (const char ** fn)
   if (global.params.useDIP1021)
     global.params.useDIP1000 = FeatureState::enabled;
 
-  /* Enabling DIP1000 implies DIP25.  */
-  if (global.params.useDIP1000 == FeatureState::enabled)
-    global.params.useDIP25 = FeatureState::enabled;
-
   /* Keep in sync with existing -fbounds-check flag.  */
   flag_bounds_check = (global.params.useArrayBounds == CHECKENABLEon);
 
@@ -947,6 +933,12 @@ d_post_options (const char ** fn)
     global.params.dihdr.fullOutput = true;
 
   global.params.obj = !flag_syntax_only;
+
+  /* The front-end parser only has access to `compileEnv', synchronize its
+     fields with params.  */
+  global.compileEnv.previewIn = global.params.previewIn;
+  global.compileEnv.ddocOutput = global.params.ddoc.doOutput;
+  global.compileEnv.shortenedMethods = global.params.shortenedMethods;
 
   /* Add in versions given on the command line.  */
   if (global.params.versionids)

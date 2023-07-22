@@ -356,6 +356,18 @@ proc check_weak_available { } {
     }
 }
 
+# return options to add to enable weak undefined symbols.
+
+proc add_options_for_weak_undefined { flags } {
+    if { [istarget *-*-darwin*] } {
+	lappend flags "-Wl,-undefined,dynamic_lookup"
+	if { [istarget *-*-darwin\[89\]*] } {
+	    lappend flags "-Wl,-flat_namespace"
+	}
+    }
+    return $flags
+}
+
 # return 1 if weak undefined symbols are supported.
 
 proc check_effective_target_weak_undefined { } {
@@ -365,7 +377,7 @@ proc check_effective_target_weak_undefined { } {
     return [check_runtime weak_undefined {
 	extern void foo () __attribute__((weak));
 	int main (void) { if (foo) return 1; return 0; }
-    } ""]
+    } [add_options_for_weak_undefined ""]]
 }
 
 ###############################
@@ -674,7 +686,8 @@ proc check_effective_target_keeps_null_pointer_checks { } {
     if [target_info exists keeps_null_pointer_checks] {
       return 1
     }
-    if { [istarget msp430-*-*] } {
+    if { [istarget msp430-*-*]
+         || [istarget avr-*-*] } {
 	return 1;   
     }
     return 0
@@ -691,7 +704,7 @@ proc check_effective_target_keeps_null_pointer_checks { } {
 # this allows parallelism of 16 and higher of parallel gcc-auto-profile
 proc profopt-perf-wrapper { } {
     global srcdir
-    return "$srcdir/../config/i386/gcc-auto-profile -m8 "
+    return "$srcdir/../config/i386/gcc-auto-profile --all -m8 "
 }
 
 # Return true if profiling is supported on the target.
@@ -1134,6 +1147,17 @@ proc check_effective_target_mmap {} {
 # Return 1 if the target supports sysconf, 0 otherwise.
 
 proc check_effective_target_sysconf {} {
+    # VxWorks has sysconf in rtp mode only, but our way to test can't
+    # tell kernel mode doesn't, as we're doing partial links for
+    # kernel modules.  We can tell by checking for a declaration, or
+    # for some sysconf parm, because configurations that don't offer
+    # sysconf don't have either.
+    if { [istarget *-*-vxworks*] } {
+	return [check_no_compiler_messages sysconfdecl assembly {
+	    #include <unistd.h>
+	    int f() { return sysconf(_SC_PAGESIZE); }
+	}];
+    }
     return [check_function_available "sysconf"]
 }
 
@@ -1152,6 +1176,16 @@ proc add_options_for_dlopen { flags } {
 # Return 1 if the target supports clone, 0 otherwise.
 proc check_effective_target_clone {} {
     return [check_function_available "clone"]
+}
+
+# Return 1 if the target supports posix_memalign, 0 otherwise.
+proc check_effective_target_posix_memalign {} {
+    if { [istarget *-*-vxworks*] } {
+	# VxWorks doesn't have posix_memalign but our way to test
+	# can't tell as we're doing partial links for kernel modules.
+	return 0
+    }
+    return [check_function_available "posix_memalign"]
 }
 
 # Return 1 if the target supports setrlimit, 0 otherwise.
@@ -1758,6 +1792,67 @@ proc check_linker_plugin_available { } {
      int main() { return 0; }
   } "-flto -fuse-linker-plugin"]
 }
+
+# Return 1 if the target has RISC-V vector extension, 0 otherwise.
+# Cache the result.
+
+proc check_effective_target_riscv_vector { } {
+    # Check that we are compiling for v by checking the __riscv_v marco.
+    return [check_no_compiler_messages riscv_vector assembly {
+       #if !defined(__riscv_v)
+       #error "__riscv_v not defined!"
+       #endif
+    }]
+}
+
+# Return 1 if the we can build a vector example with proper -march flags
+# and the current target can execute it, 0 otherwise.  Cache the result.
+
+proc check_effective_target_riscv_vector_hw { } {
+
+    return [check_runtime riscv_vector_hw32 {
+        int main (void)
+        {
+            asm ("vsetivli zero,8,e16,m1,ta,ma");
+            asm ("vadd.vv v8,v8,v16" : : : "v8");
+            return 0;
+        }
+    } "-march=rv32gcv -mabi=ilp32d"] || [check_runtime riscv_vector_hw64 {
+        int main (void)
+        {
+            asm ("vsetivli zero,8,e16,m1,ta,ma");
+            asm ("vadd.vv v8,v8,v16" : : : "v8");
+            return 0;
+        }
+    } "-march=rv64gcv -mabi=lp64d"]
+}
+
+# Return 1 if the we can build a Zvfh vector example with proper -march flags
+# and the current target can execute it, 0 otherwise.  Cache the result.
+
+proc check_effective_target_riscv_zvfh_hw { } {
+    if ![check_effective_target_riscv_vector_hw] then {
+        return 0
+    }
+
+    return [check_runtime riscv_zvfh_hw32 {
+        int main (void)
+        {
+            asm ("vsetivli zero,8,e16,m1,ta,ma");
+            asm ("vfadd.vv v8,v8,v16" : : : "v8");
+            return 0;
+        }
+    } "-march=rv32gcv_zvfh -mabi=ilp32d"]
+    || [check_runtime riscv_zvfh_hw64 {
+        int main (void)
+        {
+            asm ("vsetivli zero,8,e16,m1,ta,ma");
+            asm ("vfadd.vv v8,v8,v16" : : : "v8");
+            return 0;
+        }
+    } "-march=rv64gcv_zvfh -mabi=lp64d"]
+}
+
 
 # Return 1 if the target is RV32, 0 otherwise.  Cache the result.
 
@@ -2879,7 +2974,13 @@ proc check_fork_available {} {
 	# VxWorks doesn't have fork but our way to test can't
 	# tell as we're doing partial links for kernel modules.
 	return 0
-     }    
+    }
+    if { [istarget cris-*-*] } {
+	# Compiling and linking works, and an executable running e.g.
+	# gcc.dg/torture/ftrapv-1.c works on now-historical hardware,
+	# but the GNU simulator emits an error for the fork syscall.
+	return [check_effective_target_hw]
+    }
     return [check_function_available "fork"]
 }
 
@@ -3385,6 +3486,9 @@ proc check_effective_target_floatn_nx_runtime {} {
 proc add_options_for_float16 { flags } {
     if { [istarget arm*-*-*] } {
 	return "$flags -mfp16-format=ieee"
+    }
+    if { [istarget i?86-*-*] || [istarget x86_64-*-*] } {
+	return "$flags -msse2"
     }
     return "$flags"
 }
@@ -5028,6 +5132,14 @@ foreach { armfunc armflag armdefs } {
 	    return "$flags FLAG"
 	}
 
+        proc check_effective_target_arm_arch_FUNC_link { } {
+	    return [check_no_compiler_messages arm_arch_FUNC_link executable {
+		#include <stdint.h>
+		int dummy;
+		int main (void) { return 0; }
+	    } [add_options_for_arm_arch_FUNC ""]]
+	}
+
 	proc check_effective_target_arm_arch_FUNC_multilib { } {
 	    return [check_runtime arm_arch_FUNC_multilib {
 		int
@@ -5805,6 +5917,7 @@ proc add_options_for_arm_v8_2a_bf16_neon { flags } {
 #   arm_v8m_main_cde: Armv8-m CDE (Custom Datapath Extension).
 #   arm_v8m_main_cde_fp: Armv8-m CDE with FP registers.
 #   arm_v8_1m_main_cde_mve: Armv8.1-m CDE with MVE.
+#   arm_v8_1m_main_cde_mve_fp: Armv8.1-m CDE with MVE with FP support.
 # Usage:
 #   /* { dg-require-effective-target arm_v8m_main_cde_ok } */
 #   /* { dg-add-options arm_v8m_main_cde } */
@@ -5862,6 +5975,24 @@ foreach { armfunc armflag armdef arminc } {
 	    }
 	    global et_FUNC_flags
 	    return "$flags $et_FUNC_flags"
+	}
+
+        proc check_effective_target_FUNC_link { } {
+	    if { ! [check_effective_target_FUNC_ok] } {
+		return 0;
+	    }
+	    return [check_no_compiler_messages FUNC_link executable {
+		#if !(DEF)
+		#error "DEF failed"
+		#endif
+		#include <arm_cde.h>
+		INC
+		int
+		main (void)
+		{
+		    return 0;
+		}
+	    } [add_options_for_FUNC ""]]
 	}
 
 	proc check_effective_target_FUNC_multilib { } {
@@ -8392,8 +8523,9 @@ proc check_effective_target_vect_long_mult { } {
 
 proc check_effective_target_vect_int_mod { } {
     return [check_cached_effective_target_indexed vect_int_mod {
-      expr { [istarget powerpc*-*-*]
-	     && [check_effective_target_has_arch_pwr10] }}]
+      expr { ([istarget powerpc*-*-*]
+	      && [check_effective_target_has_arch_pwr10])
+             || [istarget amdgcn-*-*] }}]
 }
 
 # Return 1 if the target supports vector even/odd elements extraction, 0 otherwise.
@@ -8515,7 +8647,8 @@ proc check_effective_target_vect_call_copysignf { } {
     return [check_cached_effective_target_indexed vect_call_copysignf {
       expr { [istarget i?86-*-*] || [istarget x86_64-*-*]
 	     || [istarget powerpc*-*-*]
-	     || [istarget aarch64*-*-*] }}]
+	     || [istarget aarch64*-*-*]
+             || [istarget amdgcn-*-*] }}]
 }
 
 # Return 1 if the target supports hardware square root instructions.
@@ -8551,7 +8684,8 @@ proc check_effective_target_vect_call_sqrtf { } {
 	     || [istarget i?86-*-*] || [istarget x86_64-*-*]
 	     || ([istarget powerpc*-*-*] && [check_vsx_hw_available])
 	     || ([istarget s390*-*-*]
-		 && [check_effective_target_s390_vx]) }}]
+		 && [check_effective_target_s390_vx])
+             || [istarget amdgcn-*-*] }}]
 }
 
 # Return 1 if the target supports vector lrint calls.
@@ -8596,14 +8730,16 @@ proc check_effective_target_vect_call_ceil { } {
 
 proc check_effective_target_vect_call_ceilf { } {
     return [check_cached_effective_target_indexed vect_call_ceilf {
-      expr { [istarget aarch64*-*-*] }}]
+      expr { [istarget aarch64*-*-*]
+	     || [istarget amdgcn-*-*] }}]
 }
 
 # Return 1 if the target supports vector floor calls.
 
 proc check_effective_target_vect_call_floor { } {
     return [check_cached_effective_target_indexed vect_call_floor {
-      expr { [istarget aarch64*-*-*] }}]
+      expr { [istarget aarch64*-*-*]
+	     || [istarget amdgcn-*-*] }}]
 }
 
 # Return 1 if the target supports vector floorf calls.
@@ -8659,7 +8795,8 @@ proc check_effective_target_vect_call_roundf { } {
 # Return 1 if the target supports AND, OR and XOR reduction.
 
 proc check_effective_target_vect_logical_reduc { } {
-    return [check_effective_target_aarch64_sve]
+    return [expr { [check_effective_target_aarch64_sve]
+	           || [istarget amdgcn-*-*] }]
 }
 
 # Return 1 if the target supports the fold_extract_last optab.
@@ -9130,6 +9267,7 @@ proc is-effective-target-keyword { arg } {
 	  "named_sections" { return 1 }
 	  "gc_sections"    { return 1 }
 	  "cxa_atexit"     { return 1 }
+	  "ppc_cpu_supports_hw" { return 1 }
 	  default          { return 0 }
 	}
     }
@@ -9708,6 +9846,72 @@ proc check_effective_target_raoint { } {
 	  return __builtin_ia32_aadd32((int *)__A, __B);
 	}
     } "-mraoint" ]
+}
+
+# Return 1 if amx-complex instructions can be compiled.
+proc check_effective_target_amx_complex { } {
+    return [check_no_compiler_messages amx_complex object {
+	void
+	foo ()
+	{
+	  __asm__ volatile ("tcmmimfp16ps\t%%tmm1, %%tmm2, %%tmm3" ::);
+	}
+    } "-mamx-complex" ]
+}
+
+# Return 1 if avxvnniint16 instructions can be compiled.
+proc check_effective_target_avxvnniint16 { } {
+    return [check_no_compiler_messages avxvnniint16 object {
+	typedef int __v8si __attribute__ ((__vector_size__ (32)));
+	__v8si
+	_mm256_dpwsud_avx_epi32  (__v8si __A, __v8si __B, __v8si __C)
+        {
+	   return __builtin_ia32_vpdpwsud256 (__A, __B, __C);
+	}
+    } "-O0 -mavxvnniint16" ]
+}
+
+# Return 1 if sm3 instructions can be compiled.
+proc check_effective_target_sm3 { } {
+    return [check_no_compiler_messages sm3 object {
+	typedef long long __m128i __attribute__ ((__vector_size__ (16)));
+	typedef int __v4si __attribute__ ((__vector_size__ (16)));
+	__m128i
+	_mm_sm3msg1_epi32 (__m128i __A, __m128i __B, __m128i __C)
+	{
+	  return (__m128i) __builtin_ia32_vsm3msg1 ((__v4si) __A,
+						    (__v4si) __B,
+						    (__v4si) __C);
+	}
+    } "-msm3" ]
+}
+
+# Return 1 if sha512 instructions can be compiled.
+proc check_effective_target_sha512 { } {
+    return [check_no_compiler_messages sha512 object {
+	typedef long long __m256i __attribute__ ((__vector_size__ (32)));
+	typedef long long __v4di __attribute__ ((__vector_size__ (32)));
+	__m256i
+	_mm256_sha512msg2_epi64 (__m256i __A, __m256i __B)
+        {
+	   return (__m256i) __builtin_ia32_vsha512msg2 ((__v4di) __A,
+							(__v4di) __B);
+	}
+    } "-msha512" ]
+}
+
+# Return 1 if sm4 instructions can be compiled.
+proc check_effective_target_sm4 { } {
+    return [check_no_compiler_messages sm4 object {
+        typedef long long __m128i __attribute__ ((__vector_size__ (16)));
+        typedef int __v4si __attribute__ ((__vector_size__ (16)));
+        __m128i
+        _mm_sm4key4_epi32 (__m128i __A, __m128i __B)
+        {
+          return (__m128i) __builtin_ia32_vsm4key4128 ((__v4si) __A,
+						       (__v4si) __B);
+        }
+    } "-msm4" ]
 }
 
 # Return 1 if sse instructions can be compiled.
@@ -10666,7 +10870,35 @@ proc check_effective_target_c++23_only { } {
     return 0
 }
 proc check_effective_target_c++23 { } {
-    return [check_effective_target_c++23_only]
+    if [check_effective_target_c++23_only] {
+	return 1
+    }
+    return [check_effective_target_c++26]
+}
+
+proc check_effective_target_c++23_down { } {
+    if ![check_effective_target_c++] {
+	return 0
+    }
+    return [expr ![check_effective_target_c++26] ]
+}
+
+proc check_effective_target_c++26_only { } {
+    global cxx_default
+    if ![check_effective_target_c++] {
+	return 0
+    }
+    if [check-flags { { } { } { -std=c++26 -std=gnu++26 -std=c++2c -std=gnu++2c } }] {
+	return 1
+    }
+    if { $cxx_default == "c++26" && [check-flags { { } { } { } { -std=* } }] } {
+	return 1
+    }
+    return 0
+}
+
+proc check_effective_target_c++26 { } {
+    return [check_effective_target_c++26_only]
 }
 
 # Check for C++ Concepts support, i.e. -fconcepts flag.
@@ -10818,7 +11050,7 @@ proc check_vect_support_and_set_flags { } {
         } else {
             set dg-do-what-default compile
         }
-    } elseif [istarget "aarch64*-*-*"] {
+    } elseif [istarget aarch64*-*-*] {
         set dg-do-what-default run
     } elseif [istarget s390*-*-*] {
 	# The S/390 backend set a default of 2 for that value.
@@ -10897,7 +11129,7 @@ proc check_effective_target_aarch64_tiny { } {
 # various architecture extensions via the .arch_extension pseudo-op.
 
 foreach { aarch64_ext } { "fp" "simd" "crypto" "crc" "lse" "dotprod" "sve"
-			  "i8mm" "f32mm" "f64mm" "bf16" "sb" "sve2" } {
+			  "i8mm" "f32mm" "f64mm" "bf16" "sb" "sve2" "ls64" } {
     eval [string map [list FUNC $aarch64_ext] {
 	proc check_effective_target_aarch64_asm_FUNC_ok { } {
 	  if { [istarget aarch64*-*-*] } {
@@ -11194,20 +11426,20 @@ proc check_effective_target_branch_cost {} {
 
 # Record that dg-final test TEST requires convential compilation.
 
-proc force_conventional_output_for { test } {
+proc set_required_options_for { test } {
     if { [info proc $test] == "" } {
 	perror "$test does not exist"
 	exit 1
     }
     proc ${test}_required_options {} {
-	global gcc_force_conventional_output
+	global gcc_set_required_options
 	upvar 1 extra_tool_flags extra_tool_flags
 	if {[regexp -- "^scan-assembler" [info level 0]]
 	    && ![string match "*-fident*" $extra_tool_flags]} {
 	    # Do not let .ident confuse assembler scan tests
-	    return [list $gcc_force_conventional_output "-fno-ident"]
+	    return [list $gcc_set_required_options "-fno-ident"]
 	}
-	return $gcc_force_conventional_output
+	return $gcc_set_required_options
     }
 }
 
@@ -11509,7 +11741,8 @@ proc check_effective_target_divmod { } {
     #TODO: Add checks for all targets that have either hardware divmod insn
     # or define libfunc for divmod.
     if { [istarget arm*-*-*]
-	 || [istarget i?86-*-*] || [istarget x86_64-*-*] } {
+	 || [istarget i?86-*-*] || [istarget x86_64-*-*]
+         || [istarget amdgcn-*-*] } {
 	return 1
     }
     return 0
@@ -12210,7 +12443,7 @@ proc check_effective_target_o_flag_in_section { } {
 # return 1 if LRA is supported.
 
 proc check_effective_target_lra { } {
-    if { [istarget hppa*-*-*] || [istarget cris-*-*] } {
+    if { [istarget hppa*-*-*] || [istarget avr-*-*] } {
 	return 0
     }
     return 1
@@ -12313,4 +12546,14 @@ proc check_is_prog_name_available { prog } {
     }
 
     return 1
+}
+
+# returns 1 if target does selects a readonly section for const volatile variables.
+proc check_effective_target_const_volatile_readonly_section { } {
+
+    if { [istarget powerpc-*-*]
+    	  || [check-flags { "" { powerpc64-*-* } { -m32 } }] } {
+	return 0
+    }
+  return 1
 }

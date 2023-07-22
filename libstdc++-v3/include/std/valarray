@@ -893,6 +893,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       size_t __e = __m.size();
       for (size_t __i=0; __i<__e; ++__i)
 	if (__m[__i]) ++__s;
+      __glibcxx_assert(__s <= _M_size);
       return valarray<_Tp>(mask_array<_Tp>(_Array<_Tp>(_M_data), __s,
 					   _Array<bool> (__m)));
     }
@@ -905,6 +906,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       size_t __e = __m.size();
       for (size_t __i=0; __i<__e; ++__i)
 	if (__m[__i]) ++__s;
+      __glibcxx_assert(__s <= _M_size);
       return mask_array<_Tp>(_Array<_Tp>(_M_data), __s, _Array<bool>(__m));
     }
 
@@ -1078,6 +1080,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       return _Expr<_Closure, _Tp>(_Closure(*this, __func));
     }
 
+  /// @cond undocumented
 #define _DEFINE_VALARRAY_UNARY_OPERATOR(_Op, _Name)                     \
   template<typename _Tp>						\
     inline typename valarray<_Tp>::template _UnaryOp<_Name>::_Rt	\
@@ -1204,6 +1207,7 @@ _DEFINE_BINARY_OPERATOR(<=, __less_equal)
 _DEFINE_BINARY_OPERATOR(>=, __greater_equal)
 
 #undef _DEFINE_BINARY_OPERATOR
+  /// @endcond
 
 #if __cplusplus >= 201103L
   /**

@@ -153,7 +153,7 @@ BEGIN
          KeyName := NameKey
       END
    ELSE
-      Halt('symbol already stored', __LINE__, __FILE__)
+      Halt('symbol already stored', __FILE__, __FUNCTION__, __LINE__)
    END
 END PutSymKey ;
 
@@ -220,7 +220,7 @@ BEGIN
       END
    ELSE
       Halt('trying to delete a symbol that is not in the tree - the compiler never expects this to occur',
-            __LINE__, __FILE__)
+           __FILE__, __FUNCTION__, __LINE__)
    END
 END DelSymKey ;
 
@@ -237,7 +237,8 @@ BEGIN
    parent := t ;
    IF t=NIL
    THEN
-      Halt('parameter t should never be NIL', __LINE__, __FILE__)
+      Halt('parameter t should never be NIL',
+           __FILE__, __FUNCTION__, __LINE__)
    END ;
    Assert (t^.Right = NIL) ;
    child := t^.Left ;
@@ -311,7 +312,7 @@ END SearchForAny ;
 
 PROCEDURE ForeachNodeDo (t: SymbolTree; P: PerformOperation) ;
 BEGIN
-   SearchAndDo(t^.Left, P)
+   SearchAndDo (t^.Left, P)
 END ForeachNodeDo ;
 
 
@@ -326,9 +327,9 @@ BEGIN
    IF t#NIL
    THEN
       WITH t^ DO
-         SearchAndDo(Right, P) ;
-         P(KeySym) ;
-         SearchAndDo(Left, P)
+         SearchAndDo (Right, P) ;
+         P (KeySym) ;
+         SearchAndDo (Left, P)
       END
    END
 END SearchAndDo ;

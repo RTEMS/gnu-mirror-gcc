@@ -42,14 +42,15 @@ public:
 
   /* svalue consolidation.  */
   const svalue *get_or_create_constant_svalue (tree cst_expr);
-  const svalue *get_or_create_int_cst (tree type, poly_int64);
+  const svalue *get_or_create_int_cst (tree type, const poly_wide_int_ref &cst);
   const svalue *get_or_create_null_ptr (tree pointer_type);
   const svalue *get_or_create_unknown_svalue (tree type);
   const svalue *get_or_create_setjmp_svalue (const setjmp_record &r,
 					     tree type);
   const svalue *get_or_create_poisoned_svalue (enum poison_kind kind,
 					       tree type);
-  const svalue *get_or_create_initial_value (const region *reg);
+  const svalue *get_or_create_initial_value (const region *reg,
+					     bool check_poisoned = true);
   const svalue *get_ptr_svalue (tree ptr_type, const region *pointee);
   const svalue *get_or_create_unaryop (tree type, enum tree_code op,
 				       const svalue *arg);

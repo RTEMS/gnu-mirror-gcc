@@ -20,7 +20,6 @@ import dmd.root.rootobject;
 import dmd.root.rmem;
 
 import dmd.aggregate;
-import dmd.apply;
 import dmd.arraytypes;
 import dmd.astenums;
 import dmd.declaration;
@@ -115,7 +114,7 @@ struct ObNode
     PtrVarState[] input;  /// variable states on entry to exp
     PtrVarState[] output; /// variable states on exit to exp
 
-    this(ObNode* tryBlock)
+    this(ObNode* tryBlock) scope
     {
         this.tryBlock = tryBlock;
     }
@@ -844,7 +843,7 @@ void toObNodes(ref ObNodes obnodes, Statement s)
             case STMT.Conditional:
             case STMT.While:
             case STMT.Forwarding:
-            case STMT.Compile:
+            case STMT.Mixin:
             case STMT.Peel:
             case STMT.Synchronized:
                 debug printf("s: %s\n", s.toChars());
@@ -1353,7 +1352,7 @@ void genKill(ref ObState obstate, ObNode* ob)
 
             extern (D) this(void delegate(ObNode*, VarDeclaration, Expression, bool) dgWriteVar,
                             void delegate(const ref Loc loc, ObNode* ob, VarDeclaration v, bool mutable) dgReadVar,
-                            ObNode* ob, ref ObState obstate)
+                            ObNode* ob, ref ObState obstate) scope
             {
                 this.dgWriteVar = dgWriteVar;
                 this.dgReadVar  = dgReadVar;
@@ -2058,7 +2057,7 @@ void checkObErrors(ref ObState obstate)
 
             extern (D) this(void delegate(const ref Loc loc, ObNode* ob, VarDeclaration v, bool mutable, PtrVarState[]) dgReadVar,
                             void delegate(ObNode*, PtrVarState[], VarDeclaration, Expression) dgWriteVar,
-                            PtrVarState[] cpvs, ObNode* ob, ref ObState obstate)
+                            PtrVarState[] cpvs, ObNode* ob, ref ObState obstate) scope
             {
                 this.dgReadVar  = dgReadVar;
                 this.dgWriteVar = dgWriteVar;
@@ -2569,7 +2568,7 @@ void checkObErrors(ref ObState obstate)
                 {
                     auto v = obstate.vars[i];
                     if (v.type.hasPointers())
-                        v.error(v.loc, "is left dangling at return");
+                        v.error(v.loc, "is not disposed of before return");
                 }
             }
         }

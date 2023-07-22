@@ -2026,7 +2026,7 @@ private struct ChunkByGroup(alias eq, Range, bool eqEquivalenceAssured)
         }
     }
 
-    // Cannot be a copy constructor due to issue 22239
+    // Cannot be a copy constructor due to https://issues.dlang.org/show_bug.cgi?id=22239
     this(this) @trusted
     {
         import core.lifetime : emplace;
@@ -2128,7 +2128,7 @@ if (isForwardRange!Range)
         }();
     }
 
-    // Cannot be a copy constructor due to issue 22239
+    // Cannot be a copy constructor due to https://issues.dlang.org/show_bug.cgi?id=22239
     this(this) @trusted
     {
         import core.lifetime : emplace;
@@ -2969,10 +2969,24 @@ iterated from the back to the front, the separator will still be consumed from
 front to back, even if it is a bidirectional range too.
  */
 auto joiner(RoR, Separator)(RoR r, Separator sep)
-if (isInputRange!RoR && isInputRange!(ElementType!RoR)
-        && isForwardRange!Separator
-        && is(ElementType!Separator : ElementType!(ElementType!RoR)))
 {
+    static assert(isInputRange!RoR, "The type of RoR '", RoR.stringof
+            , " must be an InputRange (isInputRange!", RoR.stringof, ").");
+    static assert(isInputRange!(ElementType!RoR), "The ElementyType of RoR '"
+            , ElementType!(RoR).stringof, "' must be an InputRange "
+            , "(isInputRange!(ElementType!(", RoR.stringof , "))).");
+    static assert(isForwardRange!Separator, "The type of the Seperator '"
+            , Seperator.stringof, "' must be a ForwardRange (isForwardRange!("
+            , Seperator.stringof, ")).");
+    static assert(is(ElementType!Separator : ElementType!(ElementType!RoR))
+            , "The type of the elements of the separator range does not match "
+            , "the type of the elements that are joined. Separator type '"
+            , ElementType!(Separator).stringof, "' is not implicitly"
+            , "convertible to range element type '"
+            , ElementType!(ElementType!RoR).stringof, "' (is(ElementType!"
+            , Separator.stringof, " : ElementType!(ElementType!", RoR.stringof
+            , "))).");
+
     static struct Result
     {
         private RoR _items;
@@ -3618,18 +3632,18 @@ if (isInputRange!RoR && isInputRange!(ElementType!RoR)
 
 /// Ditto
 auto joiner(RoR)(RoR r)
-if (isInputRange!RoR && isInputRange!(ElementType!RoR))
+if (isInputRange!RoR && isInputRange!(Unqual!(ElementType!RoR)))
 {
     static struct Result
     {
     private:
         RoR _items;
-        ElementType!RoR _current;
+        Unqual!(ElementType!RoR) _current;
         enum isBidirectional = isForwardRange!RoR && isForwardRange!(ElementType!RoR) &&
                                isBidirectionalRange!RoR && isBidirectionalRange!(ElementType!RoR);
         static if (isBidirectional)
         {
-            ElementType!RoR _currentBack;
+            Unqual!(ElementType!RoR) _currentBack;
             bool reachedFinalElement;
         }
 
@@ -4277,6 +4291,28 @@ if (isInputRange!RoR && isInputRange!(ElementType!RoR))
 
     static immutable struct S { int[] array; }
     assert([only(S(null))].joiner.front == S(null));
+}
+
+// https://issues.dlang.org/show_bug.cgi?id=22785
+@safe unittest
+{
+
+    import std.algorithm.iteration : joiner, map;
+    import std.array : array;
+
+    static immutable struct S
+    {
+        int value;
+    }
+
+    static immutable struct T
+    {
+        S[] arr;
+    }
+
+    auto range = [T([S(3)]), T([S(4), S(5)])];
+
+    assert(range.map!"a.arr".joiner.array == [S(3), S(4), S(5)]);
 }
 
 /++
@@ -7903,15 +7939,23 @@ See_Also:
 $(REF nextPermutation, std,algorithm,sorting).
 */
 Permutations!Range permutations(Range)(Range r)
-if (isRandomAccessRange!Range && hasLength!Range)
 {
+    static assert(isRandomAccessRange!Range, Range.stringof,
+            " must be a RandomAccessRange");
+    static assert(hasLength!Range, Range.stringof
+            , " must have a length");
+
     return typeof(return)(r);
 }
 
 /// ditto
 struct Permutations(Range)
-if (isRandomAccessRange!Range && hasLength!Range)
 {
+    static assert(isRandomAccessRange!Range, Range.stringof,
+            " must be a RandomAccessRange");
+    static assert(hasLength!Range, Range.stringof
+            , " must have a length");
+
     private size_t[] _indices, _state;
     private Range _r;
     private bool _empty;

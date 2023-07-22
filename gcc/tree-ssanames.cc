@@ -72,9 +72,6 @@ unsigned int ssa_name_nodes_created;
 #define FREE_SSANAMES(fun) (fun)->gimple_df->free_ssanames
 #define FREE_SSANAMES_QUEUE(fun) (fun)->gimple_df->free_ssanames_queue
 
-static ggc_vrange_allocator ggc_allocator;
-static vrange_storage vstore (&ggc_allocator);
-
 /* Return TRUE if NAME has global range info.  */
 
 inline bool
@@ -89,8 +86,8 @@ inline bool
 range_info_fits_p (tree name, const vrange &r)
 {
   gcc_checking_assert (range_info_p (name));
-  void *mem = SSA_NAME_RANGE_INFO (name);
-  return vrange_storage::fits_p (mem, r);
+  vrange_storage *mem = SSA_NAME_RANGE_INFO (name);
+  return mem->fits_p (r);
 }
 
 /* Allocate a new global range for NAME and set it to R.  Return the
@@ -99,7 +96,7 @@ range_info_fits_p (tree name, const vrange &r)
 inline void *
 range_info_alloc (tree name, const vrange &r)
 {
-  void *mem = vstore.alloc_slot (r);
+  vrange_storage *mem = ggc_alloc_vrange_storage (r);
   SSA_NAME_RANGE_INFO (name) = mem;
   return mem;
 }
@@ -109,16 +106,16 @@ range_info_alloc (tree name, const vrange &r)
 inline void
 range_info_free (tree name)
 {
-  void *mem = SSA_NAME_RANGE_INFO (name);
-  vstore.free (mem);
+  vrange_storage *mem = SSA_NAME_RANGE_INFO (name);
+  ggc_free (mem);
 }
 
 /* Return the global range for NAME in R.  */
 
 inline void
-range_info_get_range (tree name, vrange &r)
+range_info_get_range (const_tree name, vrange &r)
 {
-  vstore.get_vrange (SSA_NAME_RANGE_INFO (name), r, TREE_TYPE (name));
+  SSA_NAME_RANGE_INFO (name)->get_vrange (r, TREE_TYPE (name));
 }
 
 /* Set the global range for NAME from R.  Return TRUE if successfull,
@@ -136,7 +133,7 @@ range_info_set_range (tree name, const vrange &r)
     }
   else
     {
-      vstore.set_vrange (SSA_NAME_RANGE_INFO (name), r);
+      SSA_NAME_RANGE_INFO (name)->set_vrange (r);
       return true;
     }
 }
@@ -459,12 +456,27 @@ set_ptr_nonnull (tree name)
 /* Update the non-zero bits bitmask of NAME.  */
 
 void
-set_nonzero_bits (tree name, const wide_int_ref &mask)
+set_nonzero_bits (tree name, const wide_int &mask)
 {
   gcc_assert (!POINTER_TYPE_P (TREE_TYPE (name)));
 
   int_range<2> r (TREE_TYPE (name));
   r.set_nonzero_bits (mask);
+  set_range_info (name, r);
+}
+
+/* Update the known bits of NAME.
+
+   Zero bits in MASK cover constant values.  Set bits in MASK cover
+   unknown values.  VALUE are the known bits.  */
+
+void
+set_bitmask (tree name, const wide_int &value, const wide_int &mask)
+{
+  gcc_assert (!POINTER_TYPE_P (TREE_TYPE (name)));
+
+  int_range<2> r (TREE_TYPE (name));
+  r.update_bitmask (irange_bitmask (value, mask));
   set_range_info (name, r);
 }
 
@@ -492,12 +504,9 @@ get_nonzero_bits (const_tree name)
   if (!range_info_p (name) || !irange::supports_p (TREE_TYPE (name)))
     return wi::shwi (-1, precision);
 
-  /* Optimization to get at the nonzero bits because we know the
-     storage type.  This saves us measurable time compared to going
-     through vrange_storage.  */
-  irange_storage_slot *ri
-    = static_cast <irange_storage_slot *> (SSA_NAME_RANGE_INFO (name));
-  return ri->get_nonzero_bits ();
+  int_range_max tmp;
+  range_info_get_range (name, tmp);
+  return tmp.get_nonzero_bits ();
 }
 
 /* Return TRUE is OP, an SSA_NAME has a range of values [0..1], false
@@ -528,10 +537,9 @@ ssa_name_has_boolean_range (tree op)
   if (INTEGRAL_TYPE_P (TREE_TYPE (op))
       && (TYPE_PRECISION (TREE_TYPE (op)) > 1))
     {
-      int_range<2> onezero (build_zero_cst (TREE_TYPE (op)),
-			    build_one_cst (TREE_TYPE (op)));
       int_range<2> r;
-      if (get_range_query (cfun)->range_of_expr (r, op) && r == onezero)
+      if (get_range_query (cfun)->range_of_expr (r, op)
+	  && r == range_true_and_false (TREE_TYPE (op)))
 	return true;
 
       if (wi::eq_p (get_nonzero_bits (op), 1))
@@ -922,4 +930,76 @@ gimple_opt_pass *
 make_pass_release_ssa_names (gcc::context *ctxt)
 {
   return new pass_release_ssa_names (ctxt);
+}
+
+/* Save and restore of flow sensitive information. */
+
+/* Save off the flow sensitive info from NAME. */
+
+void
+flow_sensitive_info_storage::save (tree name)
+{
+  gcc_assert (state == 0);
+  if (!POINTER_TYPE_P (TREE_TYPE (name)))
+    {
+      range_info = SSA_NAME_RANGE_INFO (name);
+      state = 1;
+      return;
+    }
+  state = -1;
+  auto ptr_info = SSA_NAME_PTR_INFO (name);
+  if (ptr_info)
+    {
+      align = ptr_info->align;
+      misalign = ptr_info->misalign;
+      null = SSA_NAME_PTR_INFO (name)->pt.null;
+    }
+  else
+    {
+      align = 0;
+      misalign = 0;
+      null = true;
+    }
+}
+
+/* Restore the flow sensitive info from NAME. */
+
+void
+flow_sensitive_info_storage::restore (tree name)
+{
+  gcc_assert (state != 0);
+  if (!POINTER_TYPE_P (TREE_TYPE (name)))
+    {
+      gcc_assert (state == 1);
+      SSA_NAME_RANGE_INFO (name) = range_info;
+      return;
+    }
+  gcc_assert (state == -1);
+  auto ptr_info = SSA_NAME_PTR_INFO (name);
+  /* If there was no flow sensitive info on the pointer
+     just return, there is nothing to restore to.  */
+  if (!ptr_info)
+    return;
+  if (align != 0)
+    set_ptr_info_alignment (ptr_info, align, misalign);
+  else
+    mark_ptr_info_alignment_unknown (ptr_info);
+  SSA_NAME_PTR_INFO (name)->pt.null = null;
+}
+
+/* Save off the flow sensitive info from NAME.
+   And reset the flow sensitive info of NAME. */
+
+void
+flow_sensitive_info_storage::save_and_clear (tree name)
+{
+  save (name);
+  reset_flow_sensitive_info (name);
+}
+
+/* Clear the storage. */
+void
+flow_sensitive_info_storage::clear_storage (void)
+{
+  state = 0;
 }

@@ -582,8 +582,9 @@ public:
     tree ifbody = void_node;
     tree elsebody = void_node;
 
-    /* Build the `then' branch.  */
-    if (s->ifbody)
+    /* Build the `then' branch, don't do code generation when the condition
+       is `if (__ctfe)', as that is always false at run-time.  */
+    if (s->ifbody && !s->isIfCtfeBlock ())
       {
 	push_stmt_list ();
 	this->build_stmt (s->ifbody);
@@ -779,8 +780,8 @@ public:
 
     this->do_label (label);
 
-    if (this->is_return_label (s->ident) && this->func_->fensure != NULL)
-      this->build_stmt (this->func_->fensure);
+    if (this->is_return_label (s->ident) && this->func_->fensure () != NULL)
+      this->build_stmt (this->func_->fensure ());
     else if (s->statement)
       this->build_stmt (s->statement);
   }

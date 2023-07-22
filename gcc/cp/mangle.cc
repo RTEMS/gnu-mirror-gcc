@@ -3312,7 +3312,8 @@ write_expression (tree expr)
   else if (TREE_CODE (expr) == TEMPLATE_ID_EXPR)
     {
       tree fn = TREE_OPERAND (expr, 0);
-      fn = OVL_NAME (fn);
+      if (!identifier_p (fn))
+	fn = OVL_NAME (fn);
       if (IDENTIFIER_ANY_OP_P (fn))
 	write_string ("on");
       write_unqualified_id (fn);
@@ -3401,6 +3402,11 @@ write_expression (tree expr)
 	}
       else
 	write_string ("tr");
+    }
+  else if (code == NOEXCEPT_EXPR)
+    {
+      write_string ("nx");
+      write_expression (TREE_OPERAND (expr, 0));
     }
   else if (code == CONSTRUCTOR)
     {
@@ -3793,7 +3799,7 @@ write_template_arg (tree node)
 	}
     }
 
-  if (TREE_CODE (node) == VAR_DECL && DECL_NTTP_OBJECT_P (node))
+  if (VAR_P (node) && DECL_NTTP_OBJECT_P (node))
     /* We want to mangle the argument, not the var we stored it in.  */
     node = tparm_object_argument (node);
 

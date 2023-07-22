@@ -655,6 +655,10 @@ do_define (cpp_reader *pfile)
 
   if (node)
     {
+      /* This is a better location than pfile->directive_line to store
+	 as the macro location.  */
+      const location_t name_loc = cpp_diagnostic_get_current_location (pfile);
+
       /* If we have been requested to expand comments into macros,
 	 then re-enable saving of comments.  */
       pfile->state.save_comments =
@@ -663,7 +667,7 @@ do_define (cpp_reader *pfile)
       if (pfile->cb.before_define)
 	pfile->cb.before_define (pfile);
 
-      if (_cpp_create_definition (pfile, node))
+      if (_cpp_create_definition (pfile, node, name_loc))
 	if (pfile->cb.define)
 	  pfile->cb.define (pfile, pfile->directive_line, node);
 
@@ -694,9 +698,8 @@ do_undef (cpp_reader *pfile)
 		       "undefining \"%s\"", NODE_NAME (node));
 	  else if (cpp_builtin_macro_p (node)
 		   && CPP_OPTION (pfile, warn_builtin_macro_redefined))
-	    cpp_warning_with_line (pfile, CPP_W_BUILTIN_MACRO_REDEFINED,
-				   pfile->directive_line, 0,
-				   "undefining \"%s\"", NODE_NAME (node));
+	    cpp_warning (pfile, CPP_W_BUILTIN_MACRO_REDEFINED,
+			 "undefining \"%s\"", NODE_NAME (node));
 
 	  if (node->value.macro
 	      && CPP_OPTION (pfile, warn_unused_macros))
@@ -1996,7 +1999,12 @@ destringize_and_run (cpp_reader *pfile, const cpp_string *in,
 int
 _cpp_do__Pragma (cpp_reader *pfile, location_t expansion_loc)
 {
+  /* Make sure we don't invalidate the string token, if the closing parenthesis
+   ended up on a different line.  */
+  ++pfile->keep_tokens;
   const cpp_token *string = get__Pragma_string (pfile);
+  --pfile->keep_tokens;
+
   pfile->directive_result.type = CPP_PADDING;
 
   if (string)
@@ -2637,7 +2645,7 @@ cpp_pop_definition (cpp_reader *pfile, struct def_pragma_macro *c)
       {
 	_cpp_clean_line (pfile);
 	nbuf->sysp = 1;
-	if (!_cpp_create_definition (pfile, h))
+	if (!_cpp_create_definition (pfile, h, 0))
 	  abort ();
 	_cpp_pop_buffer (pfile);
       }

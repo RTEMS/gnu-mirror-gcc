@@ -1035,7 +1035,7 @@ Params:
 
 Bugs:
     The function is explicitly annotated `@nogc` because inference could fail,
-    see $(LINK2 https://issues.dlang.org/show_bug.cgi?id=17084, issue 17084).
+    see $(LINK2 https://issues.dlang.org/show_bug.cgi?id=17084, Bugzilla issue 17084).
 
 Returns: `true` if `source`'s representation embeds a pointer
 that points to `target`'s representation or somewhere inside
@@ -1069,9 +1069,9 @@ as the language is free to assume objects don't have internal pointers
 */
 bool doesPointTo(S, T, Tdummy=void)(auto ref const S source, ref const T target) @nogc @trusted pure nothrow
 if (__traits(isRef, source) || isDynamicArray!S ||
-    is(S : U*, U) || is(S == class))
+    is(S == U*, U) || is(S == class))
 {
-    static if (is(S : U*, U) || is(S == class) || is(S == interface))
+    static if (is(S == U*, U) || is(S == class) || is(S == interface))
     {
         const m = *cast(void**) &source;
         const b = cast(void*) &target;
@@ -1115,9 +1115,9 @@ bool doesPointTo(S, T)(auto ref const shared S source, ref const shared T target
 /// ditto
 bool mayPointTo(S, T, Tdummy=void)(auto ref const S source, ref const T target) @trusted pure nothrow
 if (__traits(isRef, source) || isDynamicArray!S ||
-    is(S : U*, U) || is(S == class))
+    is(S == U*, U) || is(S == class))
 {
-    static if (is(S : U*, U) || is(S == class) || is(S == interface))
+    static if (is(S == U*, U) || is(S == class) || is(S == interface))
     {
         const m = *cast(void**) &source;
         const b = cast(void*) &target;
@@ -1532,21 +1532,6 @@ version (StdUnittest)
     assert( doesPointTo(s, j));
     assert( doesPointTo(cast(int*) s, i));
     assert(!doesPointTo(cast(int*) s, j));
-}
-@safe unittest //more alias this opCast
-{
-    void* p;
-    class A
-    {
-        void* opCast(T)() if (is(T == void*))
-        {
-            return p;
-        }
-        alias foo = opCast!(void*);
-        alias foo this;
-    }
-    assert(!doesPointTo(A.init, p));
-    assert(!mayPointTo(A.init, p));
 }
 
 /+

@@ -47,7 +47,7 @@ FROM M2AsmUtil IMPORT GetFullSymName, GetFullScopeAsmName ;
 FROM M2Batch IMPORT MakeDefinitionSource ;
 FROM NameKey IMPORT Name, MakeKey, NulName, KeyToCharStar, makekey ;
 FROM M2FileName IMPORT CalculateFileName ;
-FROM DynamicStrings IMPORT String, string, InitString, KillString, InitStringCharStar, Mark ;
+FROM DynamicStrings IMPORT String, string, InitString, KillString, InitStringCharStar, InitStringChar, Mark ;
 FROM FormatStrings IMPORT Sprintf1 ;
 FROM M2LexBuf IMPORT TokenToLineNo, FindFileNameFromToken, TokenToLocation, UnknownTokenNo, BuiltinTokenNo ;
 FROM M2MetaError IMPORT MetaError1, MetaError3 ;
@@ -95,7 +95,7 @@ FROM SymbolTable IMPORT NulSym,
                         IsProcedureReachable, IsParameter, IsConstLit,
                         IsDummy, IsVarAParam, IsProcedureVariable,
                         IsGnuAsm, IsGnuAsmVolatile, IsObject, IsTuple,
-                        IsError, IsHiddenType,
+                        IsError, IsHiddenType, IsVarHeap,
                         IsComponent, IsPublic, IsExtern, IsCtor,
       	       	     	GetMainModule, GetBaseModule, GetModule, GetLocalSym,
                         PutModuleFinallyFunction,
@@ -120,7 +120,7 @@ FROM SymbolTable IMPORT NulSym,
                         ForeachLocalSymDo, ForeachFieldEnumerationDo,
       	       	     	ForeachProcedureDo, ForeachModuleDo,
                         ForeachInnerModuleDo, ForeachImportedDo,
-                        ForeachExportedDo ;
+                        ForeachExportedDo, PrintInitialized ;
 
 FROM M2Base IMPORT IsPseudoBaseProcedure, IsPseudoBaseFunction,
                    GetBaseTypeMinMax, MixTypes,
@@ -143,6 +143,7 @@ FROM M2Scope IMPORT ScopeBlock, InitScopeBlock, KillScopeBlock, ForeachScopeBloc
 
 FROM M2ALU IMPORT Addn, Sub, Equ, GreEqu, Gre, Less, PushInt, PushCard, ConvertToType,
                   PushIntegerTree, PopIntegerTree, PopRealTree, ConvertToInt, PopSetTree,
+                  PopChar,
                   IsConstructorDependants, WalkConstructorDependants,
                   PopConstructorTree, PopComplexTree, PutConstructorSolved,
                   ChangeToConstructor, EvaluateValue, TryEvaluateValue ;
@@ -154,9 +155,9 @@ FROM m2linemap IMPORT location_t, BuiltinsLocation ;
 FROM m2decl IMPORT BuildIntegerConstant, BuildStringConstant, BuildCStringConstant,
                    BuildStartFunctionDeclaration,
                    BuildParameterDeclaration, BuildEndFunctionDeclaration,
-                   DeclareKnownVariable, GetBitsPerBitset, BuildPtrToTypeString,
-                   DeclareM2linkStaticInitialization,
-                   DeclareM2linkForcedModuleInitOrder ;
+                   DeclareKnownVariable, GetBitsPerBitset, BuildPtrToTypeString ;
+(*                   DeclareM2linkStaticInitialization,
+                   DeclareM2linkForcedModuleInitOrder ; *)
 
 FROM m2type IMPORT MarkFunctionReferenced, BuildStartRecord, BuildStartVarient, BuildStartFunctionType,
                    BuildStartFieldVarient, BuildStartVarient, BuildStartType, BuildStartArrayType,
@@ -179,7 +180,7 @@ FROM m2type IMPORT MarkFunctionReferenced, BuildStartRecord, BuildStartVarient, 
                    SetRecordFieldOffset, ChainOn, BuildEndRecord, BuildFieldRecord,
                    BuildEndFieldVarient, BuildArrayIndexType, BuildEndFunctionType,
                    BuildSetType, BuildEndVarient, BuildEndArrayType, InitFunctionTypeParameters,
-                   BuildProcTypeParameterDeclaration,
+                   BuildProcTypeParameterDeclaration, DeclareKnownType,
                    ValueOutOfTypeRange, ExceedsTypeRange ;
 
 FROM m2convert IMPORT BuildConvert ;
@@ -204,14 +205,6 @@ CONST
    Debugging = FALSE ;
    Progress  = FALSE ;
    EnableSSA = FALSE ;
-
-TYPE
-   M2LinkEntry = POINTER TO RECORD
-                               var    : CARDINAL ;
-                               gcc    : Tree ;
-                               varname,
-                               modname: Name ;
-                            END ;
 
 VAR
    ToBeSolvedByQuads,               (* constants which must be solved *)
@@ -240,7 +233,6 @@ VAR
    EnumerationIndex    : Index ;
    action              : IsAction ;
    enumDeps            : BOOLEAN ;
-   M2LinkIndex         : Index ;    (* Array of M2LinkEntry.          *)
 
 
 PROCEDURE mystop ; BEGIN END mystop ;
@@ -347,7 +339,6 @@ END DebugSetNumbers ;
                    lists.
 *)
 
-(*
 PROCEDURE AddSymToWatch (sym: WORD) ;
 BEGIN
    IF (sym#NulSym) AND (NOT IsElementInSet(WatchList, sym))
@@ -358,7 +349,6 @@ BEGIN
       FIO.FlushBuffer(FIO.StdOut)
    END
 END AddSymToWatch ;
-*)
 
 
 (*
@@ -417,7 +407,7 @@ BEGIN
 
       tobesolvedbyquads :  doInclude(ToBeSolvedByQuads, "symbol %d -> ToBeSolvedByQuads\n", sym) |
       fullydeclared     :  doInclude(FullyDeclared, "symbol %d -> FullyDeclared\n", sym) ;
-                           IF sym=1265
+                           IF sym=8821
                            THEN
                               mystop
                            END |
@@ -1571,16 +1561,24 @@ END DeclareStringConstant ;
 PROCEDURE PromoteToString (tokenno: CARDINAL; sym: CARDINAL) : Tree ;
 VAR
    size: CARDINAL ;
+   ch  : CHAR ;
 BEGIN
    DeclareConstant (tokenno, sym) ;
-   size := GetStringLength (sym) ;
-   IF size > 1
+   IF IsConst (sym) AND (GetSType (sym) = Char)
    THEN
-      (* will be a string anyway *)
-      RETURN Tree (Mod2Gcc (sym))
+      PushValue (sym) ;
+      ch := PopChar (tokenno) ;
+      RETURN BuildCStringConstant (string (InitStringChar (ch)), 1)
    ELSE
-      RETURN BuildStringConstant (KeyToCharStar (GetString (sym)),
-                                  GetStringLength (sym))
+      size := GetStringLength (sym) ;
+      IF size > 1
+      THEN
+         (* will be a string anyway *)
+         RETURN Tree (Mod2Gcc (sym))
+      ELSE
+         RETURN BuildStringConstant (KeyToCharStar (GetString (sym)),
+                                     GetStringLength (sym))
+      END
    END
 END PromoteToString ;
 
@@ -1612,13 +1610,13 @@ BEGIN
    THEN
       InternalError ('trying to declare the NulSym')
    END ;
-   IF IsConstructor(sym) AND (NOT GccKnowsAbout(sym))
+   IF IsConstructor (sym) AND (NOT GccKnowsAbout (sym))
    THEN
-      WalkConstructor(sym, TraverseDependants) ;
-      DeclareTypesConstantsProceduresInRange(quad, quad) ;
-      Assert(IsConstructorDependants(sym, IsFullyDeclared)) ;
-      PushValue(sym) ;
-      DeclareConstantFromTree(sym, PopConstructorTree(tokenno))
+      WalkConstructor (sym, TraverseDependants) ;
+      DeclareTypesConstantsProceduresInRange (GetScope (sym), quad, quad) ;
+      Assert (IsConstructorDependants (sym, IsFullyDeclared)) ;
+      PushValue (sym) ;
+      DeclareConstantFromTree (sym, PopConstructorTree (tokenno))
    END
 END DeclareConstructor ;
 
@@ -2120,7 +2118,8 @@ END WalkTypeInfo ;
 
 PROCEDURE DeclareUnboundedProcedureParameters (sym: WORD) ;
 VAR
-   son, type,
+   param,
+   type,
    p, i     : CARDINAL ;
    location : location_t ;
 BEGIN
@@ -2131,8 +2130,8 @@ BEGIN
       WHILE i>0 DO
          IF IsUnboundedParam(sym, i)
          THEN
-            son := GetNthParam(sym, i) ;
-            type := GetSType(son) ;
+            param := GetNthParam(sym, i) ;
+            type := GetSType(param) ;
             TraverseDependants(type) ;
             IF GccKnowsAbout(type)
             THEN
@@ -2140,8 +2139,8 @@ BEGIN
                BuildTypeDeclaration(location, Mod2Gcc(type))
             END
          ELSE
-            son := GetNth(sym, i) ;
-            type := GetSType(son) ;
+            param := GetNth(sym, i) ;
+            type := GetSType(param) ;
             TraverseDependants(type)
          END ;
          DEC(i)
@@ -2156,31 +2155,24 @@ END DeclareUnboundedProcedureParameters ;
 
 PROCEDURE WalkUnboundedProcedureParameters (sym: WORD) ;
 VAR
-   son,
+   param,
    type,
    p, i: CARDINAL ;
 BEGIN
-   IF IsProcedure(sym)
+   IF IsProcedure (sym)
    THEN
-      p := NoOfParam(sym) ;
+      p := NoOfParam (sym) ;
       i := p ;
       WHILE i>0 DO
-         IF IsUnboundedParam(sym, i)
+         IF IsUnboundedParam (sym, i)
          THEN
-            son := GetNthParam(sym, i) ;
-            type := GetSType(son) ;
-            WalkTypeInfo(type) ;
-(*
-            type := GetUnboundedRecordType(type) ;
-            Assert(IsRecord(type)) ;
-            RecordNotPacked(type)      (* which is never packed.                   *)
-*)
+            param := GetNthParam (sym, i)
          ELSE
-            son := GetNth(sym, i) ;
-            type := GetSType(son) ;
-            WalkTypeInfo(type)
+            param := GetNth (sym, i)
          END ;
-         DEC(i)
+         type := GetSType (param) ;
+         WalkTypeInfo (type) ;
+         DEC (i)
       END
    END
 END WalkUnboundedProcedureParameters ;
@@ -2541,24 +2533,24 @@ END FoldConstants ;
    DeclareTypesConstantsProceduresInRange -
 *)
 
-PROCEDURE DeclareTypesConstantsProceduresInRange (start, end: CARDINAL) ;
+PROCEDURE DeclareTypesConstantsProceduresInRange (scope, start, end: CARDINAL) ;
 VAR
    n, m: CARDINAL ;
 BEGIN
    IF DisplayQuadruples
    THEN
-      DisplayQuadRange(start, end)
+      DisplayQuadRange (scope, start, end)
    END ;
    REPEAT
       n := NoOfElementsInSet(ToDoList) ;
-      WHILE ResolveConstantExpressions(DeclareConstFully, start, end) DO
+      WHILE ResolveConstantExpressions (DeclareConstFully, start, end) DO
       END ;
       (* we need to evaluate some constant expressions to resolve these types *)
       IF DeclaredOutstandingTypes (FALSE)
       THEN
       END ;
       m := NoOfElementsInSet(ToDoList)
-   UNTIL (NOT ResolveConstantExpressions(DeclareConstFully, start, end)) AND
+   UNTIL (NOT ResolveConstantExpressions (DeclareConstFully, start, end)) AND
          (n=m)
 END DeclareTypesConstantsProceduresInRange ;
 
@@ -2622,16 +2614,16 @@ VAR
    s, t: CARDINAL ;
    sb  : ScopeBlock ;
 BEGIN
-   sb := InitScopeBlock(scope) ;
-   PushBinding(scope) ;
+   sb := InitScopeBlock (scope) ;
+   PushBinding (scope) ;
    REPEAT
-      s := NoOfElementsInSet(ToDoList) ;
+      s := NoOfElementsInSet (ToDoList) ;
       (* ForeachLocalSymDo(scope, DeclareTypeInfo) ; *)
-      ForeachScopeBlockDo(sb, DeclareTypesConstantsProceduresInRange) ;
-      t := NoOfElementsInSet(ToDoList) ;
+      ForeachScopeBlockDo (sb, DeclareTypesConstantsProceduresInRange) ;
+      t := NoOfElementsInSet (ToDoList) ;
    UNTIL s=t ;
-   PopBinding(scope) ;
-   KillScopeBlock(sb)
+   PopBinding (scope) ;
+   KillScopeBlock (sb)
 END DeclareTypesConstantsProcedures ;
 
 
@@ -2693,7 +2685,7 @@ BEGIN
    WalkTypesInProcedure(scope) ;
    DeclareProcedure(scope) ;
    ForeachInnerModuleDo(scope, WalkTypesInModule) ;
-   DeclareTypesConstantsProcedures(scope) ;
+   DeclareTypesConstantsProcedures (scope) ;
    ForeachInnerModuleDo(scope, DeclareTypesConstantsProcedures) ;
    DeclareLocalVariables(scope) ;
    ForeachInnerModuleDo(scope, DeclareModuleVariables) ;
@@ -2797,7 +2789,7 @@ PROCEDURE StartDeclareScope (scope: CARDINAL) ;
 VAR
    n: Name ;
 BEGIN
-   (* AddSymToWatch (1265) ;  *)
+   (* AddSymToWatch (8821) ;  *)
    (* AddSymToWatch (1157) ;  *)  (* watch goes here *)
    (* AddSymToWatch(TryFindSymbol('IOLink', 'DeviceId')) ; *)
    (* AddSymToWatch(819) ; *)
@@ -3162,19 +3154,20 @@ END FindOuterModule ;
 
 
 (*
-   DoVariableDeclaration -
+   DoVariableDeclaration - create a corresponding gcc variable and add the association
+                           between the front end symbol var and the gcc tree.
 *)
 
-PROCEDURE DoVariableDeclaration (var, module: CARDINAL; name: ADDRESS;
+PROCEDURE DoVariableDeclaration (var: CARDINAL; name: ADDRESS;
                                  isImported, isExported,
                                  isTemporary, isGlobal: BOOLEAN;
                                  scope: Tree) ;
 VAR
-   type, initial: Tree ;
-   varType      : CARDINAL ;
-   location     : location_t ;
+   type    : Tree ;
+   varType : CARDINAL ;
+   location: location_t ;
 BEGIN
-   IF IsComponent (var)
+   IF IsComponent (var) OR IsVarHeap (var)
    THEN
       RETURN
    END ;
@@ -3183,7 +3176,7 @@ BEGIN
       (*
         There are two issues to deal with:
 
-        (i)   LeftValue is really a pointer to GetSType(Son), which is built
+        (i)   LeftValue is really a pointer to GetSType (var), which is built
               here.
         (ii)  Front end might have specified the back end use a particular
               data type, in which case we use the specified type.
@@ -3192,7 +3185,7 @@ BEGIN
       varType := SkipType (GetVarBackEndType (var)) ;
       IF varType=NulSym
       THEN
-         (* we have not explicity told back end the type, so build it *)
+         (* We have not explicity told back end the type, so build it.  *)
          varType := GetSType (var) ;
          IF IsVariableAtAddress (var)
          THEN
@@ -3201,6 +3194,7 @@ BEGIN
             type := BuildPointerType (Mod2Gcc (varType))
          END
       ELSE
+         (* We have been requested to use varType.  *)
          type := Mod2Gcc (varType)
       END ;
       Assert (AllDependantsFullyDeclared (varType))
@@ -3208,91 +3202,13 @@ BEGIN
       type := Mod2Gcc (GetDType (var))
    END ;
    location := TokenToLocation (GetDeclaredMod (var)) ;
-   (* The M2LINK module global variables are a special case and have initializers.  *)
-   initial := DetectM2LinkInitial (location, var, module) ;
    PreAddModGcc (var, DeclareKnownVariable (location,
                                             name, type,
                                             isExported, isImported, isTemporary,
-                                            isGlobal, scope, initial)) ;
-   IF initial # NIL
-   THEN
-      (* Remember special case has been created.  *)
-      AddEntryM2Link (var, module, Mod2Gcc (var))
-   END ;
+                                            isGlobal, scope, NIL)) ;
    WatchRemoveList (var, todolist) ;
    WatchIncludeList (var, fullydeclared)
 END DoVariableDeclaration ;
-
-
-(*
-   AddEntryM2Link - remember module_var has been created.
-*)
-
-PROCEDURE AddEntryM2Link (var, module: CARDINAL; gcc: Tree) ;
-VAR
-   entry: M2LinkEntry ;
-BEGIN
-   IF M2LinkIndex = NIL
-   THEN
-      M2LinkIndex := InitIndex (1)
-   END ;
-   NEW (entry) ;
-   entry^.var := var ;
-   entry^.gcc := gcc ;
-   entry^.varname := GetSymName (var) ;
-   entry^.modname := GetSymName (module) ;
-   IncludeIndiceIntoIndex (M2LinkIndex, entry)
-END AddEntryM2Link ;
-
-
-(*
-   GetEntryM2Link - return the gcc tree matching varname modname.
-*)
-
-PROCEDURE GetEntryM2Link (varname, modname: Name) : Tree ;
-VAR
-   entry : M2LinkEntry ;
-   high, i: CARDINAL ;
-BEGIN
-   IF M2LinkIndex # NIL
-   THEN
-      i := 1 ;
-      high := HighIndice (M2LinkIndex) ;
-      WHILE i <= high DO
-         entry := GetIndice (M2LinkIndex, i) ;
-         IF (entry^.varname = varname) AND (entry^.modname = modname)
-         THEN
-            RETURN entry^.gcc
-         END ;
-         INC (i)
-      END
-   END ;
-   RETURN NIL
-END GetEntryM2Link ;
-
-
-(*
-   DeclareM2linkGlobals - will create M2LINK.StaticInitialization
-                          and M2LINK.ForcedModuleInitOrder providing
-                          they have not already been created.
-*)
-
-PROCEDURE DeclareM2linkGlobals (tokenno: CARDINAL) ;
-VAR
-   m2link: Name ;
-BEGIN
-   m2link := MakeKey ('M2LINK') ;
-   IF GetEntryM2Link (MakeKey ('StaticInitialization'), m2link) = NIL
-   THEN
-      Assert (DeclareM2linkStaticInitialization (TokenToLocation (tokenno),
-                                                 VAL (INTEGER, ScaffoldStatic)) # NIL)
-   END ;
-   IF GetEntryM2Link (MakeKey ('ForcedModuleInitOrder'), m2link) = NIL
-   THEN
-      Assert (DeclareM2linkForcedModuleInitOrder (TokenToLocation (tokenno),
-                                                  GetRuntimeModuleOverride ()) # NIL)
-   END ;
-END DeclareM2linkGlobals ;
 
 
 (*
@@ -3330,7 +3246,7 @@ BEGIN
       decl := FindOuterModule (variable) ;
       Assert (AllDependantsFullyDeclared (GetSType (variable))) ;
       PushBinding (ModSym) ;
-      DoVariableDeclaration (variable, decl,
+      DoVariableDeclaration (variable,
                              KeyToCharStar (GetFullSymName (variable)),
                              (* in Modula-2 we are allowed to import from ourselves, but we do not present this to GCC *)
                              IsEffectivelyImported(ModSym, variable) AND (GetMainModule () # decl),
@@ -3341,28 +3257,6 @@ BEGIN
       PopBinding (ModSym)
    END
 END DeclareVariable ;
-
-
-(*
-   DetectM2LinkInitial -
-*)
-
-PROCEDURE DetectM2LinkInitial (location: location_t; variable, decl: CARDINAL) : Tree ;
-BEGIN
-   IF (decl # NulSym) AND WholeProgram AND (GetSymName (decl) = MakeKey ('M2LINK'))
-   THEN
-      IF GetSymName (variable) = MakeKey ('StaticInitialization')
-      THEN
-         RETURN BuildIntegerConstant (VAL (INTEGER, ScaffoldStatic))
-      ELSIF GetSymName (variable) = MakeKey ('ForcedModuleInitOrder')
-      THEN
-         RETURN BuildPtrToTypeString (location,
-                                      GetRuntimeModuleOverride (),
-                                      Mod2Gcc (GetSType (variable)))
-      END
-   END ;
-   RETURN NIL
-END DetectM2LinkInitial ;
 
 
 (*
@@ -3380,7 +3274,7 @@ BEGIN
       decl := FindOuterModule (variable) ;
       Assert (AllDependantsFullyDeclared (GetSType (variable))) ;
       PushBinding (mainModule) ;
-      DoVariableDeclaration (variable, decl,
+      DoVariableDeclaration (variable,
                              KeyToCharStar (GetFullSymName (variable)),
                              (NOT IsSourceSeen (decl)) AND
                              IsEffectivelyImported (mainModule, variable) AND (GetMainModule () # decl),
@@ -3476,7 +3370,7 @@ END DeclareImportedVariablesWholeProgram ;
 PROCEDURE DeclareLocalVariable (var: CARDINAL) ;
 BEGIN
    Assert (AllDependantsFullyDeclared (var)) ;
-   DoVariableDeclaration (var, NulSym,
+   DoVariableDeclaration (var,
                           KeyToCharStar (GetFullSymName (var)),
                           FALSE,  (* local variables cannot be imported *)
                           FALSE,  (* or exported *)
@@ -3520,7 +3414,7 @@ BEGIN
    Var := GetNth (sym, i) ;
    WHILE Var # NulSym DO
       Assert (AllDependantsFullyDeclared (GetSType (Var))) ;
-      DoVariableDeclaration (Var, NulSym,
+      DoVariableDeclaration (Var,
                              KeyToCharStar (GetFullSymName (Var)),
                              FALSE,   (* inner module variables cannot be imported *)
                              FALSE,   (* or exported (as far as GCC is concerned)  *)
@@ -4009,6 +3903,12 @@ BEGIN
       THEN
          printf0('component ')
       END ;
+      IF IsVarHeap (sym)
+      THEN
+         printf0('heap ')
+      END ;
+      printf0 ('\n') ;
+      PrintInitialized (sym) ;
       IncludeType(l, sym)
    ELSIF IsConst(sym)
    THEN
@@ -5327,16 +5227,7 @@ BEGIN
          t := CheckAlignment(t, sym)
       END
    END ;
-   IF GetSymName(sym)#NulName
-   THEN
-      IF Debugging
-      THEN
-         n := GetSymName(sym) ;
-         printf1('declaring type %a\n', n)
-      END ;
-      t := RememberType(t)
-   END ;
-   RETURN( t )
+   RETURN RememberType (t)
 END TypeConstFullyDeclared ;
 
 
@@ -6295,16 +6186,6 @@ END ConstantKnownAndUsed ;
 
 
 (*
-   InitM2LinkModule -
-*)
-
-PROCEDURE InitM2LinkModule ;
-BEGIN
-   M2LinkIndex := NIL
-END InitM2LinkModule ;
-
-
-(*
    InitDeclarations - initializes default types and the source filename.
 *)
 
@@ -6329,6 +6210,5 @@ BEGIN
    EnumerationIndex := InitIndex(1) ;
    IncludeElementIntoSet(WatchList, 8) ;
    HaveInitDefaultTypes := FALSE ;
-   recursionCaught := FALSE ;
-   InitM2LinkModule
+   recursionCaught := FALSE
 END M2GCCDeclare.

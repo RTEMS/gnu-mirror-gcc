@@ -292,7 +292,7 @@ enum class aarch64_feature : unsigned char {
 #define TARGET_RNG (AARCH64_ISA_RNG)
 
 /* Memory Tagging instructions optional to Armv8.5 enabled through +memtag.  */
-#define TARGET_MEMTAG (AARCH64_ISA_V8_5A && AARCH64_ISA_MEMTAG)
+#define TARGET_MEMTAG (AARCH64_ISA_MEMTAG)
 
 /* I8MM instructions are enabled through +i8mm.  */
 #define TARGET_I8MM (AARCH64_ISA_I8MM)
@@ -860,6 +860,7 @@ struct GTY (()) aarch64_frame
   bool is_scs_enabled;
 };
 
+#ifdef hash_set_h
 typedef struct GTY (()) machine_function
 {
   struct aarch64_frame frame;
@@ -868,7 +869,11 @@ typedef struct GTY (()) machine_function
   /* One entry for each general purpose register.  */
   rtx call_via[SP_REGNUM];
   bool label_is_assembled;
+  /* A set of all decls that have been passed to a vld1 intrinsic in the
+     current function.  This is used to help guide the vector cost model.  */
+  hash_set<tree> *vector_load_decls;
 } machine_function;
+#endif
 #endif
 
 /* Which ABI to use.  */
@@ -1237,9 +1242,8 @@ extern const char *aarch64_rewrite_mcpu (int argc, const char **argv);
 extern GTY(()) tree aarch64_fp16_type_node;
 extern GTY(()) tree aarch64_fp16_ptr_type_node;
 
-/* This type is the user-visible __bf16, and a pointer to that type.  Defined
-   in aarch64-builtins.cc.  */
-extern GTY(()) tree aarch64_bf16_type_node;
+/* Pointer to the user-visible __bf16 type.  __bf16 itself is generic
+   bfloat16_type_node.  Defined in aarch64-builtins.cc.  */
 extern GTY(()) tree aarch64_bf16_ptr_type_node;
 
 /* The generic unwind code in libgcc does not initialize the frame pointer.
@@ -1287,5 +1291,15 @@ extern poly_uint16 aarch64_sve_vg;
     ? ROUND_UP (STACK_CLASH_MIN_BYTES_OUTGOING_ARGS,       \
 		STACK_BOUNDARY / BITS_PER_UNIT)		   \
     : (crtl->outgoing_args_size + STACK_POINTER_OFFSET))
+
+/* Filled in by aarch64_adjust_reg_alloc_order, which is called before
+   the first relevant use.  */
+#define REG_ALLOC_ORDER {}
+#define ADJUST_REG_ALLOC_ORDER aarch64_adjust_reg_alloc_order ()
+
+#define AARCH64_VALID_SHRN_OP(T,S)			\
+((T) == TRUNCATE					\
+ || ((T) == US_TRUNCATE && (S) == LSHIFTRT)		\
+ || ((T) == SS_TRUNCATE && (S) == ASHIFTRT))
 
 #endif /* GCC_AARCH64_H */

@@ -465,10 +465,6 @@ that of @samp{@@option} but for man page output a different effect is
 wanted.
 @item @@gccoptlist
 Use for summary lists of options in manuals.
-@item @@gol
-Use at the end of each line inside @samp{@@gccoptlist}.  This is
-necessary to avoid problems with differences in how the
-@samp{@@gccoptlist} macro is handled by different Texinfo formatters.
 @end table
 
 FIXME: describe the @file{texi2pod.pl} input language and magic
@@ -2190,9 +2186,15 @@ the Custom Datapath Extension (CDE) and floating-point (VFP).
 Some multilibs may be incompatible with these options.
 
 @item arm_v8_1m_main_cde_mve
-ARM target supports options to generate instructions from ARMv8.1-M with
+Arm target supports options to generate instructions from Arm.1-M with
 the Custom Datapath Extension (CDE) and M-Profile Vector Extension (MVE).
 Some multilibs may be incompatible with these options.
+
+@item arm_v8_1m_main_cde_mve_fp
+ARM target supports options to generate instructions from ARMv8.1-M
+with the Custom Datapath Extension (CDE) and M-Profile Vector
+Extension (MVE) with floating-point support.  Some multilibs may be
+incompatible with these options.
 
 @item arm_pacbti_hw
 Test system supports executing Pointer Authentication and Branch Target
@@ -2509,6 +2511,9 @@ Target supports the execution of @code{avxneconvert} instructions.
 @item avxvnniint8
 Target supports the execution of @code{avxvnniint8} instructions.
 
+@item avxvnniint16
+Target supports the execution of @code{avxvnniint16} instructions.
+
 @item amx_tile
 Target supports the execution of @code{amx-tile} instructions.
 
@@ -2517,6 +2522,9 @@ Target supports the execution of @code{amx-int8} instructions.
 
 @item amx_bf16
 Target supports the execution of @code{amx-bf16} instructions.
+
+@item amx_complex
+Target supports the execution of @code{amx-complex} instructions.
 
 @item amx_fp16
 Target supports the execution of @code{amx-fp16} instructions.
@@ -2580,6 +2588,15 @@ Target supports the execution of @code{raoint} instructions.
 
 @item rdrand
 Target supports x86 @code{rdrand} instruction.
+
+@item sha512
+Target supports the execution of @code{sha512} instructions.
+
+@item sm3
+Target supports the execution of @code{sm3} instructions.
+
+@item sm4
+Target supports the execution of @code{sm4} instructions.
 
 @item sqrt_insn
 Target has a square root instruction that the compiler can generate.
@@ -2697,6 +2714,9 @@ Target supports Newlib.
 GCC was configured with @code{--enable-newlib-nano-formatted-io}, which reduces
 the code size of Newlib formatted I/O functions.
 
+@item posix_memalign
+Target supports @code{posix_memalign}.
+
 @item pow10
 Target provides @code{pow10} function.
 
@@ -2759,6 +2779,9 @@ Target is a VxWorks RTP.
 
 @item wchar
 Target supports wide characters.
+
+@item weak_undefined
+Target supports weak undefined symbols
 @end table
 
 @subsubsection Other attributes
@@ -2772,6 +2795,9 @@ Target supports automatic stack alignment.
 
 @item branch_cost
 Target supports @option{-branch-cost=N}.
+
+@item const_volatile_readonly_section
+Target places const volatile variables in readonly sections.
 
 @item cxa_atexit
 Target uses @code{__cxa_atexit}.
@@ -3130,6 +3156,9 @@ instructions, if any.
 
 @item tls
 Add the target-specific flags needed to use thread-local storage.
+
+@item weak_undefined
+Add the flags needed to enable support for weak undefined symbols.
 @end table
 
 @node Require Support

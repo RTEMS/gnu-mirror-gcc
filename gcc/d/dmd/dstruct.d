@@ -13,6 +13,8 @@
 
 module dmd.dstruct;
 
+import core.stdc.stdio;
+
 import dmd.aggregate;
 import dmd.arraytypes;
 import dmd.astenums;
@@ -75,7 +77,7 @@ extern (C++) void semanticTypeInfo(Scope* sc, Type t)
     {
         if (sc.intypeof)
             return;
-        if (sc.flags & (SCOPE.ctfe | SCOPE.compile))
+        if (!sc.needsCodegen())
             return;
     }
 
@@ -480,6 +482,16 @@ extern (C++) class StructDeclaration : AggregateDeclaration
         return (ispod == ThreeState.yes);
     }
 
+    /***************************************
+     * Determine if struct has copy construction (copy constructor or postblit)
+     * Returns:
+     *     true if struct has copy construction
+     */
+    final bool hasCopyConstruction()
+    {
+        return postblit || hasCopyCtor;
+    }
+
     override final inout(StructDeclaration) isStructDeclaration() inout @nogc nothrow pure @safe
     {
         return this;
@@ -557,7 +569,7 @@ extern (C++) class StructDeclaration : AggregateDeclaration
  * Returns:
  *      true if it's all binary 0
  */
-private bool _isZeroInit(Expression exp)
+bool _isZeroInit(Expression exp)
 {
     switch (exp.op)
     {
@@ -565,20 +577,22 @@ private bool _isZeroInit(Expression exp)
             return exp.toInteger() == 0;
 
         case EXP.null_:
-        case EXP.false_:
             return true;
 
         case EXP.structLiteral:
         {
-            auto sle = cast(StructLiteralExp) exp;
+            auto sle = exp.isStructLiteralExp();
+            if (sle.sd.isNested())
+                return false;
+            const isCstruct = sle.sd.isCsymbol();  // C structs are default initialized to all zeros
             foreach (i; 0 .. sle.sd.fields.length)
             {
                 auto field = sle.sd.fields[i];
                 if (field.type.size(field.loc))
                 {
-                    auto e = (*sle.elements)[i];
+                    auto e = sle.elements && i < sle.elements.length ? (*sle.elements)[i] : null;
                     if (e ? !_isZeroInit(e)
-                          : !field.type.isZeroInit(field.loc))
+                          : !isCstruct && !field.type.isZeroInit(field.loc))
                         return false;
                 }
             }

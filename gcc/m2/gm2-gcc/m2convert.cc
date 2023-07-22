@@ -91,7 +91,7 @@ unsafe_conversion_p (location_t loc, tree type, tree expr, bool produce_warns)
 
       /* Warn for real constant that is not an exact integer converted to
          integer type.  */
-      if (TREE_CODE (expr_type) == REAL_TYPE
+      if (SCALAR_FLOAT_TYPE_P (expr_type)
           && TREE_CODE (type) == INTEGER_TYPE)
         {
           if (!real_isinteger (TREE_REAL_CST_PTR (expr),
@@ -121,7 +121,7 @@ unsafe_conversion_p (location_t loc, tree type, tree expr, bool produce_warns)
           else
             give_warning = UNSAFE_OTHER;
         }
-      else if (TREE_CODE (type) == REAL_TYPE)
+      else if (SCALAR_FLOAT_TYPE_P (type))
         {
           /* Warn for an integer constant that does not fit into real type.  */
           if (TREE_CODE (expr_type) == INTEGER_TYPE)
@@ -133,7 +133,7 @@ unsafe_conversion_p (location_t loc, tree type, tree expr, bool produce_warns)
 
           /* Warn for a real constant that does not fit into a smaller real
           type.  */
-          else if (TREE_CODE (expr_type) == REAL_TYPE
+	  else if (SCALAR_FLOAT_TYPE_P (expr_type)
                    && TYPE_PRECISION (type) < TYPE_PRECISION (expr_type))
             {
               REAL_VALUE_TYPE a = TREE_REAL_CST (expr);
@@ -145,7 +145,7 @@ unsafe_conversion_p (location_t loc, tree type, tree expr, bool produce_warns)
   else
     {
       /* Warn for real types converted to integer types.  */
-      if (TREE_CODE (expr_type) == REAL_TYPE
+      if (SCALAR_FLOAT_TYPE_P (expr_type)
           && TREE_CODE (type) == INTEGER_TYPE)
         give_warning = UNSAFE_REAL;
 
@@ -352,12 +352,12 @@ converting_ISO_generic (location_t location, tree type, tree value,
 
   if (value_type == type)
     /* We let the caller deal with this.  */
-    return FALSE;
+    return false;
 
   if ((TREE_CODE (value) == INTEGER_CST) && (type == generic_type))
     {
       *result = const_to_ISO_type (location, value, generic_type);
-      return TRUE;
+      return true;
     }
 
   if (same_size_types (location, type, value_type))
@@ -368,7 +368,7 @@ converting_ISO_generic (location_t location, tree type, tree value,
           tree a = build1 (ADDR_EXPR, pt, value);
           tree t = build1 (INDIRECT_REF, type, a);
           *result = build1 (NOP_EXPR, type, t);
-          return TRUE;
+          return true;
         }
       else if (type == generic_type)
         {
@@ -376,10 +376,10 @@ converting_ISO_generic (location_t location, tree type, tree value,
           tree a = build1 (ADDR_EXPR, pt, value);
           tree t = build1 (INDIRECT_REF, type, a);
           *result = build1 (NOP_EXPR, type, t);
-          return TRUE;
+          return true;
         }
     }
-  return FALSE;
+  return false;
 }
 
 /* convert_char_to_array - convert a single char, value, into an
@@ -400,7 +400,7 @@ convert_char_to_array (location_t location, tree type, tree value)
 
   /* Store the initial char.  */
   m2type_BuildArrayConstructorElement (c, value, i);
-  i = m2expr_BuildAdd (location, i, m2decl_BuildIntegerConstant (1), FALSE);
+  i = m2expr_BuildAdd (location, i, m2decl_BuildIntegerConstant (1), false);
 
   /* Now pad out the remaining elements with nul chars.  */
   while (m2expr_CompareTrees (i, n) < 0)
@@ -408,7 +408,7 @@ convert_char_to_array (location_t location, tree type, tree value)
       m2type_BuildArrayConstructorElement (
           c, m2type_BuildCharConstant (location, &nul[0]), i);
       i = m2expr_BuildAdd (location, i, m2decl_BuildIntegerConstant (1),
-                           FALSE);
+                           false);
     }
   return m2type_BuildEndArrayConstructor (c);
 }
@@ -431,7 +431,7 @@ convert_string_to_array (location_t location, tree type, tree value)
 
 tree
 m2convert_BuildConvert (location_t location, tree type, tree value,
-                        int checkOverflow)
+                        bool checkOverflow)
 {
   type = m2tree_skip_type_decl (type);
   tree t;
@@ -444,7 +444,7 @@ m2convert_BuildConvert (location_t location, tree type, tree value,
       && (m2tree_IsOrdinal (type)))
     value = doOrdinal (value);
   else if (TREE_CODE (value) == FUNCTION_DECL && TREE_TYPE (value) != type)
-    value = m2expr_BuildAddr (0, value, FALSE);
+    value = m2expr_BuildAddr (0, value, false);
 
   if (converting_ISO_generic (location, type, value, m2type_GetByteType (), &t)
       || converting_ISO_generic (location, type, value,
@@ -516,35 +516,35 @@ const_to_ISO_aggregate_type (location_t location, tree expr, tree iso_type)
   while (m2expr_CompareTrees (i, n) < 0)
     {
       max_uint = m2expr_BuildMult (location, max_uint,
-                                   m2decl_BuildIntegerConstant (256), FALSE);
+                                   m2decl_BuildIntegerConstant (256), false);
       i = m2expr_BuildAdd (location, i, m2decl_BuildIntegerConstant (1),
-                           FALSE);
+                           false);
     }
   max_uint = m2expr_BuildDivFloor (location, max_uint,
-                                   m2decl_BuildIntegerConstant (2), FALSE);
+                                   m2decl_BuildIntegerConstant (2), false);
 
   if (m2expr_CompareTrees (expr, m2decl_BuildIntegerConstant (0)) < 0)
-    expr = m2expr_BuildAdd (location, expr, max_uint, FALSE);
+    expr = m2expr_BuildAdd (location, expr, max_uint, false);
 
   i = m2decl_BuildIntegerConstant (0);
   c = m2type_BuildStartArrayConstructor (iso_type);
   while (m2expr_CompareTrees (i, n) < 0)
     {
       byte = m2expr_BuildModTrunc (location, expr,
-                                   m2decl_BuildIntegerConstant (256), FALSE);
+                                   m2decl_BuildIntegerConstant (256), false);
       if (BYTES_BIG_ENDIAN)
         m2type_BuildArrayConstructorElement (
             c, m2convert_ToLoc (location, byte),
-            m2expr_BuildSub (location, m2expr_BuildSub (location, n, i, FALSE),
-                             m2decl_BuildIntegerConstant (1), FALSE));
+            m2expr_BuildSub (location, m2expr_BuildSub (location, n, i, false),
+                             m2decl_BuildIntegerConstant (1), false));
       else
         m2type_BuildArrayConstructorElement (
             c, m2convert_ToLoc (location, byte), i);
 
       i = m2expr_BuildAdd (location, i, m2decl_BuildIntegerConstant (1),
-                           FALSE);
+                           false);
       expr = m2expr_BuildDivFloor (location, expr,
-                                   m2decl_BuildIntegerConstant (256), FALSE);
+                                   m2decl_BuildIntegerConstant (256), false);
     }
 
   return m2type_BuildEndArrayConstructor (c);
@@ -568,7 +568,7 @@ m2convert_ConvertConstantAndCheck (location_t location, tree type, tree expr)
     return expr;
 
   if (TREE_CODE (expr) == FUNCTION_DECL)
-    expr = m2expr_BuildAddr (location, expr, FALSE);
+    expr = m2expr_BuildAddr (location, expr, false);
 
   type = m2tree_skip_type_decl (type);
   if (type == m2type_GetByteType () || type == m2type_GetISOLocType ()
@@ -586,7 +586,7 @@ m2convert_ConvertConstantAndCheck (location_t location, tree type, tree expr)
 tree
 m2convert_ToWord (location_t location, tree expr)
 {
-  return m2convert_BuildConvert (location, m2type_GetWordType (), expr, FALSE);
+  return m2convert_BuildConvert (location, m2type_GetWordType (), expr, false);
 }
 
 /* ToCardinal - convert an expression, expr, to a CARDINAL.  */
@@ -595,7 +595,7 @@ tree
 m2convert_ToCardinal (location_t location, tree expr)
 {
   return m2convert_BuildConvert (location, m2type_GetCardinalType (), expr,
-                                 FALSE);
+                                 false);
 }
 
 /* convertToPtr - if the type of tree, t, is not a ptr_type_node then
@@ -608,7 +608,7 @@ m2convert_convertToPtr (location_t location, tree type)
     return type;
   else
     return m2convert_BuildConvert (location, m2type_GetPointerType (), type,
-                                   FALSE);
+                                   false);
 }
 
 /* ToInteger - convert an expression, expr, to an INTEGER.  */
@@ -617,7 +617,7 @@ tree
 m2convert_ToInteger (location_t location, tree expr)
 {
   return m2convert_BuildConvert (location, m2type_GetIntegerType (), expr,
-                                 FALSE);
+                                 false);
 }
 
 /* ToBitset - convert an expression, expr, to a BITSET type.  */
@@ -626,7 +626,7 @@ tree
 m2convert_ToBitset (location_t location, tree expr)
 {
   return m2convert_BuildConvert (location, m2type_GetBitsetType (), expr,
-                                 FALSE);
+                                 false);
 }
 
 /* ToLoc - convert an expression, expr, to a LOC.  */
@@ -635,7 +635,7 @@ tree
 m2convert_ToLoc (location_t location, tree expr)
 {
   return m2convert_BuildConvert (location, m2type_GetISOByteType (), expr,
-                                 FALSE);
+                                 false);
 }
 
 /* GenericToType - converts, expr, into, type, providing that expr is

@@ -407,7 +407,7 @@ MAKEINFO = @MAKEINFO@
 EXPECT = @EXPECT@
 RUNTEST = @RUNTEST@
 
-AUTO_PROFILE = gcc-auto-profile -c 10000000
+AUTO_PROFILE = gcc-auto-profile --all -c 10000000
 
 # This just becomes part of the MAKEINFO definition passed down to
 # sub-makes.  It lets flags be given on the command line while still
@@ -494,6 +494,7 @@ PGO-TRAINING-TARGETS = binutils gas gdb ld sim
 PGO_BUILD_TRAINING = $(addprefix maybe-check-,$(PGO-TRAINING-TARGETS))
 
 CREATE_GCOV = create_gcov
+PROFILE_MERGER = profile_merger
 
 TFLAGS =
 
@@ -557,11 +558,14 @@ STAGEtrain_TFLAGS = $(filter-out -fchecking=1,$(STAGE3_TFLAGS))
 STAGEfeedback_CFLAGS = $(STAGE4_CFLAGS) -fprofile-use -fprofile-reproducible=parallel-runs
 STAGEfeedback_TFLAGS = $(STAGE4_TFLAGS)
 
-STAGEautoprofile_CFLAGS = $(STAGE2_CFLAGS) -g
+STAGEautoprofile_CFLAGS = $(filter-out -gtoggle,$(STAGE2_CFLAGS)) -g
 STAGEautoprofile_TFLAGS = $(STAGE2_TFLAGS)
 
 STAGEautofeedback_CFLAGS = $(STAGE3_CFLAGS)
 STAGEautofeedback_TFLAGS = $(STAGE3_TFLAGS)
+# Disable warnings as errors since inlining decisions with -fauto-profile
+# may result in additional warnings.
+STAGEautofeedback_CONFIGURE_FLAGS = $(filter-out --enable-werror-always,$(STAGE_CONFIGURE_FLAGS))
 
 do-compare = @do_compare@
 do-compare3 = $(do-compare)
@@ -728,7 +732,8 @@ EXTRA_HOST_FLAGS = \
 	'STRIP=$(STRIP)' \
 	'WINDRES=$(WINDRES)' \
 	'WINDMC=$(WINDMC)' \
-	'CREATE_GCOV=$(CREATE_GCOV)'
+	'CREATE_GCOV=$(CREATE_GCOV)' \
+	'PROFILE_MERGER=$(PROFILE_MERGER)'
 
 FLAGS_TO_PASS = $(BASE_FLAGS_TO_PASS) $(EXTRA_HOST_FLAGS)
 

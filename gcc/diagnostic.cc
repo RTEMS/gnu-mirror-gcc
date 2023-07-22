@@ -23,6 +23,7 @@ along with GCC; see the file COPYING3.  If not see
    message module.  */
 
 #include "config.h"
+#define INCLUDE_VECTOR
 #include "system.h"
 #include "coretypes.h"
 #include "version.h"
@@ -35,11 +36,14 @@ along with GCC; see the file COPYING3.  If not see
 #include "diagnostic-metadata.h"
 #include "diagnostic-path.h"
 #include "diagnostic-client-data-hooks.h"
+#include "diagnostic-text-art.h"
+#include "diagnostic-diagram.h"
 #include "edit-context.h"
 #include "selftest.h"
 #include "selftest-diagnostic.h"
 #include "opts.h"
 #include "cpplib.h"
+#include "text-art/theme.h"
 
 #ifdef HAVE_TERMIOS_H
 # include <termios.h>
@@ -241,8 +245,13 @@ diagnostic_initialize (diagnostic_context *context, int n_opts)
   context->begin_group_cb = NULL;
   context->end_group_cb = NULL;
   context->final_cb = default_diagnostic_final_cb;
+  context->ice_handler_cb = NULL;
   context->includes_seen = NULL;
   context->m_client_data_hooks = NULL;
+  context->m_diagrams.m_theme = NULL;
+  context->m_diagrams.m_emission_cb = NULL;
+  diagnostics_text_art_charset_init (context,
+				     DIAGNOSTICS_TEXT_ART_CHARSET_DEFAULT);
 }
 
 /* Maybe initialize the color support. We require clients to do this
@@ -318,6 +327,12 @@ diagnostic_finish (diagnostic_context *context)
 {
   if (context->final_cb)
     context->final_cb (context);
+
+  if (context->m_diagrams.m_theme)
+    {
+      delete context->m_diagrams.m_theme;
+      context->m_diagrams.m_theme = NULL;
+    }
 
   diagnostic_file_cache_fini ();
 
@@ -665,6 +680,18 @@ diagnostic_action_after_output (diagnostic_context *context,
     case DK_ICE:
     case DK_ICE_NOBT:
       {
+	/* Optional callback for attempting to handle ICEs gracefully.  */
+	if (void (*ice_handler_cb) (diagnostic_context *)
+	      = context->ice_handler_cb)
+	  {
+	    /* Clear the callback, to avoid potentially re-entering
+	       the routine if there's a crash within the handler.  */
+	    context->ice_handler_cb = NULL;
+	    ice_handler_cb (context);
+	  }
+	/* The context might have had diagnostic_finish called on
+	   it at this point.  */
+
 	struct backtrace_state *state = NULL;
 	if (diag_kind == DK_ICE)
 	  state = backtrace_create_state (NULL, 0, bt_err_callback, NULL);
@@ -2161,6 +2188,33 @@ internal_error_no_backtrace (const char *gmsgid, ...)
 
   gcc_unreachable ();
 }
+
+/* Emit DIAGRAM to CONTEXT, respecting the output format.  */
+
+void
+diagnostic_emit_diagram (diagnostic_context *context,
+			 const diagnostic_diagram &diagram)
+{
+  if (context->m_diagrams.m_theme == nullptr)
+    return;
+
+  if (context->m_diagrams.m_emission_cb)
+    {
+      context->m_diagrams.m_emission_cb (context, diagram);
+      return;
+    }
+
+  /* Default implementation.  */
+  char *saved_prefix = pp_take_prefix (context->printer);
+  pp_set_prefix (context->printer, NULL);
+  /* Use a newline before and after and a two-space indent
+     to make the diagram stand out a little from the wall of text.  */
+  pp_newline (context->printer);
+  diagram.get_canvas ().print_to_pp (context->printer, "  ");
+  pp_newline (context->printer);
+  pp_set_prefix (context->printer, saved_prefix);
+  pp_flush (context->printer);
+}
 
 /* Special case error functions.  Most are implemented in terms of the
    above, or should be.  */
@@ -2299,6 +2353,38 @@ diagnostic_output_format_init (diagnostic_context *context,
 
     case DIAGNOSTICS_OUTPUT_FORMAT_SARIF_FILE:
       diagnostic_output_format_init_sarif_file (context, base_file_name);
+      break;
+    }
+}
+
+/* Initialize CONTEXT->m_diagrams based on CHARSET.
+   Specifically, make a text_art::theme object for m_diagrams.m_theme,
+   (or NULL for "no diagrams").  */
+
+void
+diagnostics_text_art_charset_init (diagnostic_context *context,
+				   enum diagnostic_text_art_charset charset)
+{
+  delete context->m_diagrams.m_theme;
+  switch (charset)
+    {
+    default:
+      gcc_unreachable ();
+
+    case DIAGNOSTICS_TEXT_ART_CHARSET_NONE:
+      context->m_diagrams.m_theme = NULL;
+      break;
+
+    case DIAGNOSTICS_TEXT_ART_CHARSET_ASCII:
+      context->m_diagrams.m_theme = new text_art::ascii_theme ();
+      break;
+
+    case DIAGNOSTICS_TEXT_ART_CHARSET_UNICODE:
+      context->m_diagrams.m_theme = new text_art::unicode_theme ();
+      break;
+
+    case DIAGNOSTICS_TEXT_ART_CHARSET_EMOJI:
+      context->m_diagrams.m_theme = new text_art::emoji_theme ();
       break;
     }
 }

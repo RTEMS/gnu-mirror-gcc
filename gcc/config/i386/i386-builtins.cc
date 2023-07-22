@@ -279,14 +279,15 @@ def_builtin (HOST_WIDE_INT mask, HOST_WIDE_INT mask2,
       if (((mask2 == 0 || (mask2 & ix86_isa_flags2) != 0)
 	   && (mask == 0 || (mask & ix86_isa_flags) != 0))
 	  || ((mask & OPTION_MASK_ISA_MMX) != 0 && TARGET_MMX_WITH_SSE)
-	  /* "Unified" builtin used by either AVXVNNI/AVXIFMA intrinsics
-	     or AVX512VNNIVL/AVX512IFMAVL non-mask intrinsics should be
-	     defined whenever avxvnni/avxifma or avx512vnni/avxifma &&
-	     avx512vl exist.  */
+	  /* "Unified" builtin used by either AVXVNNI/AVXIFMA/AES intrinsics
+	     or AVX512VNNIVL/AVX512IFMAVL/VAESVL non-mask intrinsics should be
+	     defined whenever avxvnni/avxifma/aes or avx512vnni/avx512ifma/vaes
+	     && avx512vl exist.  */
 	  || (mask2 == OPTION_MASK_ISA2_AVXVNNI)
 	  || (mask2 == OPTION_MASK_ISA2_AVXIFMA)
 	  || (mask2 == (OPTION_MASK_ISA2_AVXNECONVERT
 			| OPTION_MASK_ISA2_AVX512BF16))
+	  || ((mask2 & OPTION_MASK_ISA2_VAES) != 0)
 	  || (lang_hooks.builtin_function
 	      == lang_hooks.builtin_function_ext_scope))
 	{
@@ -661,16 +662,24 @@ ix86_init_mmx_sse_builtins (void)
 	       VOID_FTYPE_UNSIGNED_UNSIGNED, IX86_BUILTIN_MWAIT);
 
   /* AES */
-  def_builtin_const (OPTION_MASK_ISA_AES | OPTION_MASK_ISA_SSE2, 0,
+  def_builtin_const (OPTION_MASK_ISA_AES | OPTION_MASK_ISA_SSE2
+		     | OPTION_MASK_ISA_AVX512VL,
+		     OPTION_MASK_ISA2_VAES,
 		     "__builtin_ia32_aesenc128",
 		     V2DI_FTYPE_V2DI_V2DI, IX86_BUILTIN_AESENC128);
-  def_builtin_const (OPTION_MASK_ISA_AES | OPTION_MASK_ISA_SSE2, 0,
+  def_builtin_const (OPTION_MASK_ISA_AES | OPTION_MASK_ISA_SSE2
+		     | OPTION_MASK_ISA_AVX512VL,
+		     OPTION_MASK_ISA2_VAES,
 		     "__builtin_ia32_aesenclast128",
 		     V2DI_FTYPE_V2DI_V2DI, IX86_BUILTIN_AESENCLAST128);
-  def_builtin_const (OPTION_MASK_ISA_AES | OPTION_MASK_ISA_SSE2, 0,
+  def_builtin_const (OPTION_MASK_ISA_AES | OPTION_MASK_ISA_SSE2
+		     | OPTION_MASK_ISA_AVX512VL,
+		     OPTION_MASK_ISA2_VAES,
 		     "__builtin_ia32_aesdec128",
 		     V2DI_FTYPE_V2DI_V2DI, IX86_BUILTIN_AESDEC128);
-  def_builtin_const (OPTION_MASK_ISA_AES | OPTION_MASK_ISA_SSE2, 0,
+  def_builtin_const (OPTION_MASK_ISA_AES | OPTION_MASK_ISA_SSE2
+		     | OPTION_MASK_ISA_AVX512VL,
+		     OPTION_MASK_ISA2_VAES,
 		     "__builtin_ia32_aesdeclast128",
 		     V2DI_FTYPE_V2DI_V2DI, IX86_BUILTIN_AESDECLAST128);
   def_builtin_const (OPTION_MASK_ISA_AES | OPTION_MASK_ISA_SSE2, 0,
@@ -1367,7 +1376,7 @@ ix86_register_float16_builtin_type (void)
   else
     ix86_float16_type_node = float16_type_node;
 
-  if (!maybe_get_identifier ("_Float16") && TARGET_SSE2)
+  if (!maybe_get_identifier ("_Float16"))
     lang_hooks.types.register_builtin_type (ix86_float16_type_node,
 					    "_Float16");
 }
@@ -1385,7 +1394,7 @@ ix86_register_bf16_builtin_type (void)
   else
     ix86_bf16_type_node = bfloat16_type_node;
 
-  if (!maybe_get_identifier ("__bf16") && TARGET_SSE2)
+  if (!maybe_get_identifier ("__bf16"))
     lang_hooks.types.register_builtin_type (ix86_bf16_type_node, "__bf16");
 }
 

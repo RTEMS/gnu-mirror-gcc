@@ -167,8 +167,8 @@ class TupleDeclaration final : public Declaration
 public:
     Objects *objects;
     TypeTuple *tupletype;       // !=NULL if this is a type tuple
-    bool isexp;                 // true: expression tuple
-    bool building;              // it's growing in AliasAssign semantic
+    d_bool isexp;                 // true: expression tuple
+    d_bool building;              // it's growing in AliasAssign semantic
 
     TupleDeclaration *syntaxCopy(Dsymbol *) override;
     const char *kind() const override;
@@ -229,7 +229,7 @@ class VarDeclaration : public Declaration
 public:
     Initializer *_init;
     FuncDeclarations nestedrefs; // referenced by these lexically nested functions
-    Dsymbol *aliassym;          // if redone as alias to another symbol
+    TupleDeclaration *aliasTuple;  // if `this` is really a tuple of declarations
     VarDeclaration *lastVar;    // Linked list of variables for goto-skips-init detection
     Expression *edtor;          // if !=NULL, does the destruction of the variable
     IntRange *range;            // if !NULL, the variable is known to be within the range
@@ -270,6 +270,14 @@ public:
     bool doNotInferReturn(bool v);
     bool isArgDtorVar() const; // temporary created to handle scope destruction of a function argument
     bool isArgDtorVar(bool v);
+    bool isCmacro() const; // if a C macro turned into a C variable
+    bool isCmacro(bool v);
+#if MARS
+    bool inClosure() const; // is inserted into a GC allocated closure
+    bool inClosure(bool v);
+    bool inAlignSection() const; // is inserted into aligned section on stack
+    bool inAlignSection(bool v);
+#endif
     static VarDeclaration *create(const Loc &loc, Type *t, Identifier *id, Initializer *init, StorageClass storage_class = STCundefined);
     VarDeclaration *syntaxCopy(Dsymbol *) override;
     void setFieldOffset(AggregateDeclaration *ad, FieldState& fieldState, bool isunion) override final;
@@ -526,22 +534,19 @@ enum class BUILTIN : unsigned char
 Expression *eval_builtin(const Loc &loc, FuncDeclaration *fd, Expressions *arguments);
 BUILTIN isBuiltin(FuncDeclaration *fd);
 
+struct ContractInfo;
+
 class FuncDeclaration : public Declaration
 {
 public:
-    Statements *frequires;              // in contracts
-    Ensures *fensures;                  // out contracts
-    Statement *frequire;                // lowered in contract
-    Statement *fensure;                 // lowered out contract
     Statement *fbody;
 
     FuncDeclarations foverrides;        // functions this function overrides
-    FuncDeclaration *fdrequire;         // function that does the in contract
-    FuncDeclaration *fdensure;          // function that does the out contract
 
-    Expressions *fdrequireParams;       // argument list for __require
-    Expressions *fdensureParams;        // argument list for __ensure
+private:
+    ContractInfo *contracts;            // contract information
 
+public:
     const char *mangleString;           // mangled symbol created from mangleExact()
 
     VarDeclaration *vresult;            // result variable for out contracts
@@ -599,7 +604,7 @@ public:
 
     // set if someone took the address of this function
     int tookAddressOf;
-    bool requiresClosure;               // this function needs a closure
+    d_bool requiresClosure;               // this function needs a closure
 
     // local variables in this function which are referenced by nested functions
     VarDeclarations closureVars;
@@ -615,6 +620,9 @@ public:
     FuncDeclarations *inlinedNestedCallees;
 
     AttributeViolation* safetyViolation;
+    AttributeViolation* nogcViolation;
+    AttributeViolation* pureViolation;
+    AttributeViolation* nothrowViolation;
 
     // Formerly FUNCFLAGS
     uint32_t flags;
@@ -634,8 +642,8 @@ public:
     bool inferScope(bool v);
     bool hasCatches() const;
     bool hasCatches(bool v);
-    bool isCompileTimeOnly() const;
-    bool isCompileTimeOnly(bool v);
+    bool skipCodegen() const;
+    bool skipCodegen(bool v);
     bool printf() const;
     bool printf(bool v);
     bool scanf() const;
@@ -664,6 +672,10 @@ public:
     bool isCrtCtor(bool v);
     bool isCrtDtor() const;
     bool isCrtDtor(bool v);
+    bool dllImport() const;
+    bool dllImport(bool v);
+    bool dllExport() const;
+    bool dllExport(bool v);
 
     // Data for a function declaration that is needed for the Objective-C
     // integration.
@@ -671,6 +683,22 @@ public:
 
     static FuncDeclaration *create(const Loc &loc, const Loc &endloc, Identifier *id, StorageClass storage_class, Type *type, bool noreturn = false);
     FuncDeclaration *syntaxCopy(Dsymbol *) override;
+    Statements *frequires();
+    Ensures *fensures();
+    Statement *frequire();
+    Statement *fensure();
+    FuncDeclaration *fdrequire();
+    FuncDeclaration *fdensure();
+    Expressions *fdrequireParams();
+    Expressions *fdensureParams();
+    Statements *frequires(Statements *frs);
+    Ensures *fensures(Statements *fes);
+    Statement *frequire(Statement *fr);
+    Statement *fensure(Statement *fe);
+    FuncDeclaration *fdrequire(FuncDeclaration *fdr);
+    FuncDeclaration *fdensure(FuncDeclaration *fde);
+    Expressions *fdrequireParams(Expressions *fdrp);
+    Expressions *fdensureParams(Expressions *fdep);
     bool functionSemantic();
     bool functionSemantic3();
     bool equals(const RootObject * const o) const override final;
@@ -680,7 +708,7 @@ public:
     BaseClass *overrideInterface();
     bool overloadInsert(Dsymbol *s) override;
     bool inUnittest();
-    MATCH leastAsSpecialized(FuncDeclaration *g);
+    MATCH leastAsSpecialized(FuncDeclaration *g, Identifiers *names);
     LabelDsymbol *searchLabel(Identifier *ident, const Loc &loc);
     int getLevel(FuncDeclaration *fd, int intypeof); // lexical nesting level difference
     int getLevelAndCheck(const Loc &loc, Scope *sc, FuncDeclaration *fd);
@@ -734,7 +762,7 @@ class FuncAliasDeclaration final : public FuncDeclaration
 {
 public:
     FuncDeclaration *funcalias;
-    bool hasOverloads;
+    d_bool hasOverloads;
 
     FuncAliasDeclaration *isFuncAliasDeclaration() override { return this; }
     const char *kind() const override;
@@ -750,7 +778,7 @@ public:
     Type *treq;                         // target of return type inference
 
     // backend
-    bool deferToObj;
+    d_bool deferToObj;
 
     FuncLiteralDeclaration *syntaxCopy(Dsymbol *) override;
     bool isNested() const override;
@@ -770,7 +798,7 @@ public:
 class CtorDeclaration final : public FuncDeclaration
 {
 public:
-    bool isCpCtor;
+    d_bool isCpCtor;
     CtorDeclaration *syntaxCopy(Dsymbol *) override;
     const char *kind() const override;
     const char *toChars() const override;

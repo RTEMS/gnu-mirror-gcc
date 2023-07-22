@@ -1811,10 +1811,16 @@ a value from @code{enum annot_expr_kind}, the third is an @code{INTEGER_CST}.
 @tindex VEC_RSHIFT_EXPR
 @tindex VEC_WIDEN_MULT_HI_EXPR
 @tindex VEC_WIDEN_MULT_LO_EXPR
-@tindex VEC_WIDEN_PLUS_HI_EXPR
-@tindex VEC_WIDEN_PLUS_LO_EXPR
-@tindex VEC_WIDEN_MINUS_HI_EXPR
-@tindex VEC_WIDEN_MINUS_LO_EXPR
+@tindex IFN_VEC_WIDEN_PLUS
+@tindex IFN_VEC_WIDEN_PLUS_HI
+@tindex IFN_VEC_WIDEN_PLUS_LO
+@tindex IFN_VEC_WIDEN_PLUS_EVEN
+@tindex IFN_VEC_WIDEN_PLUS_ODD
+@tindex IFN_VEC_WIDEN_MINUS
+@tindex IFN_VEC_WIDEN_MINUS_HI
+@tindex IFN_VEC_WIDEN_MINUS_LO
+@tindex IFN_VEC_WIDEN_MINUS_EVEN
+@tindex IFN_VEC_WIDEN_MINUS_ODD
 @tindex VEC_UNPACK_HI_EXPR
 @tindex VEC_UNPACK_LO_EXPR
 @tindex VEC_UNPACK_FLOAT_HI_EXPR
@@ -1861,32 +1867,81 @@ vector of @code{N/2} products. In the case of @code{VEC_WIDEN_MULT_LO_EXPR} the
 low @code{N/2} elements of the two vector are multiplied to produce the
 vector of @code{N/2} products.
 
-@item VEC_WIDEN_PLUS_HI_EXPR
-@itemx VEC_WIDEN_PLUS_LO_EXPR
-These nodes represent widening vector addition of the high and low parts of
-the two input vectors, respectively.  Their operands are vectors that contain
-the same number of elements (@code{N}) of the same integral type. The result
-is a vector that contains half as many elements, of an integral type whose size
-is twice as wide.  In the case of @code{VEC_WIDEN_PLUS_HI_EXPR} the high
-@code{N/2} elements of the two vectors are added to produce the vector of
-@code{N/2} products.  In the case of @code{VEC_WIDEN_PLUS_LO_EXPR} the low
-@code{N/2} elements of the two vectors are added to produce the vector of
-@code{N/2} products.
+@item IFN_VEC_WIDEN_PLUS
+This internal function represents widening vector addition of two input
+vectors.  Its operands are vectors that contain the same number of elements
+(@code{N}) of the same integral type.  The result is a vector that contains
+the same amount (@code{N}) of elements, of an integral type whose size is twice
+as wide, as the input vectors.  If the current target does not implement the
+corresponding optabs the vectorizer may choose to split it into either a pair
+of @code{IFN_VEC_WIDEN_PLUS_HI} and @code{IFN_VEC_WIDEN_PLUS_LO} or
+@code{IFN_VEC_WIDEN_PLUS_EVEN} and @code{IFN_VEC_WIDEN_PLUS_ODD}, depending
+on what optabs the target implements.
 
-@item VEC_WIDEN_MINUS_HI_EXPR
-@itemx VEC_WIDEN_MINUS_LO_EXPR
-These nodes represent widening vector subtraction of the high and low parts of
-the two input vectors, respectively.  Their operands are vectors that contain
-the same number of elements (@code{N}) of the same integral type. The high/low
-elements of the second vector are subtracted from the high/low elements of the
-first. The result is a vector that contains half as many elements, of an
-integral type whose size is twice as wide.  In the case of
-@code{VEC_WIDEN_MINUS_HI_EXPR} the high @code{N/2} elements of the second
+@item IFN_VEC_WIDEN_PLUS_HI
+@itemx IFN_VEC_WIDEN_PLUS_LO
+These internal functions represent widening vector addition of the high and low
+parts of the two input vectors, respectively.  Their operands are vectors that
+contain the same number of elements (@code{N}) of the same integral type. The
+result is a vector that contains half as many elements, of an integral type
+whose size is twice as wide.  In the case of @code{IFN_VEC_WIDEN_PLUS_HI} the
+high @code{N/2} elements of the two vectors are added to produce the vector of
+@code{N/2} additions.  In the case of @code{IFN_VEC_WIDEN_PLUS_LO} the low
+@code{N/2} elements of the two vectors are added to produce the vector of
+@code{N/2} additions.
+
+@item IFN_VEC_WIDEN_PLUS_EVEN
+@itemx IFN_VEC_WIDEN_PLUS_ODD
+These internal functions represent widening vector addition of the even and odd
+elements of the two input vectors, respectively.  Their operands are vectors
+that contain the same number of elements (@code{N}) of the same integral type.
+The result is a vector that contains half as many elements, of an integral type
+whose size is twice as wide.  In the case of @code{IFN_VEC_WIDEN_PLUS_EVEN} the
+even @code{N/2} elements of the two vectors are added to produce the vector of
+@code{N/2} additions.  In the case of @code{IFN_VEC_WIDEN_PLUS_ODD} the odd
+@code{N/2} elements of the two vectors are added to produce the vector of
+@code{N/2} additions.
+
+@item IFN_VEC_WIDEN_MINUS
+This internal function represents widening vector subtraction of two input
+vectors.  Its operands are vectors that contain the same number of elements
+(@code{N}) of the same integral type.  The result is a vector that contains
+the same amount (@code{N}) of elements, of an integral type whose size is twice
+as wide, as the input vectors.  If the current target does not implement the
+corresponding optabs the vectorizer may choose to split it into either a pair
+of @code{IFN_VEC_WIDEN_MINUS_HI} and @code{IFN_VEC_WIDEN_MINUS_LO} or
+@code{IFN_VEC_WIDEN_MINUS_EVEN} and @code{IFN_VEC_WIDEN_MINUS_ODD}, depending
+on what optabs the target implements.
+
+@item IFN_VEC_WIDEN_MINUS_HI
+@itemx IFN_VEC_WIDEN_MINUS_LO
+These internal functions represent widening vector subtraction of the high and
+low parts of the two input vectors, respectively.  Their operands are vectors
+that contain the same number of elements (@code{N}) of the same integral type.
+The high/low elements of the second vector are subtracted from the high/low
+elements of the first. The result is a vector that contains half as many
+elements, of an integral type whose size is twice as wide.  In the case of
+@code{IFN_VEC_WIDEN_MINUS_HI} the high @code{N/2} elements of the second
 vector are subtracted from the high @code{N/2} of the first to produce the
-vector of @code{N/2} products.  In the case of
-@code{VEC_WIDEN_MINUS_LO_EXPR} the low @code{N/2} elements of the second
+vector of @code{N/2} subtractions.  In the case of
+@code{IFN_VEC_WIDEN_MINUS_LO} the low @code{N/2} elements of the second
 vector are subtracted from the low @code{N/2} of the first to produce the
-vector of @code{N/2} products.
+vector of @code{N/2} subtractions.
+
+@item IFN_VEC_WIDEN_MINUS_EVEN
+@itemx IFN_VEC_WIDEN_MINUS_ODD
+These internal functions represent widening vector subtraction of the even and
+odd parts of the two input vectors, respectively.  Their operands are vectors
+that contain the same number of elements (@code{N}) of the same integral type.
+The even/odd elements of the second vector are subtracted from the even/odd
+elements of the first. The result is a vector that contains half as many
+elements, of an integral type whose size is twice as wide.  In the case of
+@code{IFN_VEC_WIDEN_MINUS_EVEN} the even @code{N/2} elements of the second
+vector are subtracted from the even @code{N/2} of the first to produce the
+vector of @code{N/2} subtractions.  In the case of
+@code{IFN_VEC_WIDEN_MINUS_ODD} the odd @code{N/2} elements of the second
+vector are subtracted from the odd @code{N/2} of the first to produce the
+vector of @code{N/2} subtractions.
 
 @item VEC_UNPACK_HI_EXPR
 @itemx VEC_UNPACK_LO_EXPR
@@ -2253,6 +2308,10 @@ edge.  Rethrowing the exception is represented using @code{RESX_EXPR}.
 @subsection OpenMP
 @tindex OMP_PARALLEL
 @tindex OMP_FOR
+@tindex OMP_SIMD
+@tindex OMP_DISTRIBUTE
+@tindex OMP_TASKLOOP
+@tindex OMP_LOOP
 @tindex OMP_SECTIONS
 @tindex OMP_SINGLE
 @tindex OMP_SECTION
@@ -2294,37 +2353,71 @@ the @code{VAR_DECL} that contains all the shared values and
 variables.
 
 @item OMP_FOR
+@itemx OMP_SIMD
+@itemx OMP_DISTRIBUTE
+@itemx OMP_TASKLOOP
+@itemx OMP_LOOP
 
-Represents @code{#pragma omp for [clause1 @dots{} clauseN]}.  It has
-six operands:
+Represents @code{#pragma omp for [clause1 @dots{} clauseN]} and
+related loop constructs (respectively).
+
+A single @code{OMP_FOR} node represents an entire nest of collapsed
+loops; as noted below, some of its arguments are vectors of length
+equal to the collapse depth, and the corresponding elements holding
+data specific to a particular loop in the nest.  These vectors are
+numbered from the outside in so that the outermost loop is element 0.
+
+These constructs have seven operands:
 
 Operand @code{OMP_FOR_BODY} contains the loop body.
 
 Operand @code{OMP_FOR_CLAUSES} is the list of clauses
 associated with the directive.
 
-Operand @code{OMP_FOR_INIT} is the loop initialization code of
-the form @code{VAR = N1}.
+Operand @code{OMP_FOR_INIT} is a vector containing iteration
+variable initializations of the form @code{VAR = N1}.
 
-Operand @code{OMP_FOR_COND} is the loop conditional expression
-of the form @code{VAR @{<,>,<=,>=@} N2}.
+Operand @code{OMP_FOR_COND} is vector containing loop
+conditional expressions of the form @code{VAR @{<,>,<=,>=,!=@} N2}.
 
-Operand @code{OMP_FOR_INCR} is the loop index increment of the
-form @code{VAR @{+=,-=@} INCR}.
+Operand @code{OMP_FOR_INCR} is a vector containing loop index
+increment expressions of the form @code{VAR @{+=,-=@} INCR}.
 
 Operand @code{OMP_FOR_PRE_BODY} contains side effect code from
 operands @code{OMP_FOR_INIT}, @code{OMP_FOR_COND} and
-@code{OMP_FOR_INC}.  These side effects are part of the
+@code{OMP_FOR_INCR}.  These side effects are part of the
 @code{OMP_FOR} block but must be evaluated before the start of
-loop body.
+loop body.  @code{OMP_FOR_PRE_BODY} specifically
+includes @code{DECL_EXPR}s for iteration variables that are
+declared in the nested @code{for} loops.
+Note this field is not a vector; it may be null, but otherwise is
+usually a statement list collecting the side effect code from all
+the collapsed loops.
 
-The loop index variable @code{VAR} must be a signed integer variable,
-which is implicitly private to each thread.  Bounds
-@code{N1} and @code{N2} and the increment expression
-@code{INCR} are required to be loop invariant integer
-expressions that are evaluated without any synchronization. The
-evaluation order, frequency of evaluation and side effects are
-unspecified by the standard.
+Operand @code{OMP_FOR_ORIG_DECLS} holds @code{VAR_DECLS} for the
+original user-specified iterator variables in the source code.
+In some cases, like C++ class iterators or range @code{for} with
+decomposition, the @code{for} loop is rewritten by the front end to
+use a temporary iteration variable.  The purpose of this field is to
+make the original variables available to the gimplifier so it can
+adjust their data-sharing attributes and diagnose errors.
+@code{OMP_FOR_ORIG_DECLS} is a vector field, with each element holding
+a list of @code{VAR_DECLS} for the corresponding collapse level.
+
+The loop index variable @code{VAR} must be an integer variable,
+which is implicitly private to each thread.  For rectangular loops,
+the bounds @code{N1} and @code{N2} and the increment expression
+@code{INCR} are required to be loop-invariant integer expressions
+that are evaluated without any synchronization.  The evaluation order,
+frequency of evaluation and side effects are otherwise unspecified
+by the standard.
+
+For non-rectangular loops, in which the bounds of an inner loop depend
+on the index of an outer loop, the bit @code{OMP_FOR_NON_RECTANGULAR}
+must be set.  In this case @code{N1} and @code{N2} are not ordinary
+expressions, but instead a @code{TREE_VEC} with three elements:
+the @code{DECL} for the outer loop variable, a multiplication
+factor, and an offset.
 
 @item OMP_SECTIONS
 

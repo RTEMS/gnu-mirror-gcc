@@ -1632,7 +1632,7 @@ structural_comptypes (tree t1, tree t2, int strict)
     case TRAIT_TYPE:
       if (TRAIT_TYPE_KIND (t1) != TRAIT_TYPE_KIND (t2))
 	return false;
-      if (!same_type_p (TRAIT_TYPE_TYPE1 (t1), TRAIT_TYPE_TYPE1 (t2))
+      if (!cp_tree_equal (TRAIT_TYPE_TYPE1 (t1), TRAIT_TYPE_TYPE1 (t2))
 	  || !cp_tree_equal (TRAIT_TYPE_TYPE2 (t1), TRAIT_TYPE_TYPE2 (t2)))
 	return false;
       break;
@@ -4996,8 +4996,8 @@ do_warn_enum_conversions (location_t loc, enum tree_code code, tree type0,
 	}
     }
   else if ((TREE_CODE (type0) == ENUMERAL_TYPE
-	    && TREE_CODE (type1) == REAL_TYPE)
-	   || (TREE_CODE (type0) == REAL_TYPE
+	    && SCALAR_FLOAT_TYPE_P (type1))
+	   || (SCALAR_FLOAT_TYPE_P (type0)
 	       && TREE_CODE (type1) == ENUMERAL_TYPE))
     {
       const bool enum_first_p = TREE_CODE (type0) == ENUMERAL_TYPE;
@@ -7561,7 +7561,8 @@ cp_build_unary_op (enum tree_code code, tree xarg, bool noconvert,
 	/* [depr.volatile.type] "Postfix ++ and -- expressions and
 	   prefix ++ and -- expressions of volatile-qualified arithmetic
 	   and pointer types are deprecated."  */
-	if (TREE_THIS_VOLATILE (arg) || CP_TYPE_VOLATILE_P (TREE_TYPE (arg)))
+	if ((TREE_THIS_VOLATILE (arg) || CP_TYPE_VOLATILE_P (TREE_TYPE (arg)))
+	    && (complain & tf_warning))
 	  warning_at (location, OPT_Wvolatile,
 		      "%qs expression of %<volatile%>-qualified type is "
 		      "deprecated",
@@ -7592,7 +7593,7 @@ cp_build_unary_op (enum tree_code code, tree xarg, bool noconvert,
 		    return error_mark_node;
 		  }
 		/* Otherwise, [depr.incr.bool] says this is deprecated.  */
-		else
+		else if (complain & tf_warning)
 		  warning_at (location, OPT_Wdeprecated,
 			      "use of an operand of type %qT "
 			      "in %<operator++%> is deprecated",
@@ -9630,6 +9631,8 @@ cp_build_modify_expr (location_t loc, tree lhs, enum tree_code modifycode,
 	}
 
       /* Allow array assignment in compiler-generated code.  */
+      else if (DECL_P (lhs) && DECL_ARTIFICIAL (lhs))
+	/* OK, used by coroutines (co-await-initlist1.C).  */;
       else if (!current_function_decl
 	       || !DECL_DEFAULTED_FN (current_function_decl))
 	{
@@ -9958,18 +9961,15 @@ build_ptrmemfunc (tree type, tree pfn, int force, bool c_cast_p,
       if (n == error_mark_node)
 	return error_mark_node;
 
+      STRIP_ANY_LOCATION_WRAPPER (pfn);
+
       /* We don't have to do any conversion to convert a
 	 pointer-to-member to its own type.  But, we don't want to
 	 just return a PTRMEM_CST if there's an explicit cast; that
 	 cast should make the expression an invalid template argument.  */
-      if (TREE_CODE (pfn) != PTRMEM_CST)
-	{
-	  if (same_type_p (to_type, pfn_type))
-	    return pfn;
-	  else if (integer_zerop (n) && TREE_CODE (pfn) != CONSTRUCTOR)
-	    return build_reinterpret_cast (input_location, to_type, pfn, 
-                                           complain);
-	}
+      if (TREE_CODE (pfn) != PTRMEM_CST
+	  && same_type_p (to_type, pfn_type))
+	return pfn;
 
       if (TREE_SIDE_EFFECTS (pfn))
 	pfn = save_expr (pfn);
@@ -10671,6 +10671,16 @@ can_do_nrvo_p (tree retval, tree functype)
 	  && !TYPE_VOLATILE (TREE_TYPE (retval)));
 }
 
+/* True if we would like to perform NRVO, i.e. can_do_nrvo_p is true and we
+   would otherwise return in memory.  */
+
+static bool
+want_nrvo_p (tree retval, tree functype)
+{
+  return (can_do_nrvo_p (retval, functype)
+	  && aggregate_value_p (functype, current_function_decl));
+}
+
 /* Like can_do_nrvo_p, but we check if we're trying to move a class
    prvalue.  */
 
@@ -11138,11 +11148,15 @@ check_return_expr (tree retval, bool *no_warning)
      So, if this is a value-returning function that always returns the same
      local variable, remember it.
 
-     It might be nice to be more flexible, and choose the first suitable
-     variable even if the function sometimes returns something else, but
-     then we run the risk of clobbering the variable we chose if the other
-     returned expression uses the chosen variable somehow.  And people expect
-     this restriction, anyway.  (jason 2000-11-19)
+     We choose the first suitable variable even if the function sometimes
+     returns something else, but only if the variable is out of scope at the
+     other return sites, or else we run the risk of clobbering the variable we
+     chose if the other returned expression uses the chosen variable somehow.
+
+     We don't currently do this if the first return is a non-variable, as it
+     would be complicated to determine whether an NRV selected later was in
+     scope at the point of the earlier return.  We also don't currently support
+     multiple variables with non-overlapping scopes (53637).
 
      See finish_function and finalize_nrv for the rest of this optimization.  */
   tree bare_retval = NULL_TREE;
@@ -11152,15 +11166,41 @@ check_return_expr (tree retval, bool *no_warning)
       bare_retval = tree_strip_any_location_wrapper (retval);
     }
 
-  bool named_return_value_okay_p = can_do_nrvo_p (bare_retval, functype);
-  if (fn_returns_value_p && flag_elide_constructors)
+  bool named_return_value_okay_p = want_nrvo_p (bare_retval, functype);
+  if (fn_returns_value_p && flag_elide_constructors
+      && current_function_return_value != bare_retval)
     {
       if (named_return_value_okay_p
-          && (current_function_return_value == NULL_TREE
-	      || current_function_return_value == bare_retval))
+	  && current_function_return_value == NULL_TREE)
 	current_function_return_value = bare_retval;
+      else if (current_function_return_value
+	       && VAR_P (current_function_return_value)
+	       && DECL_NAME (current_function_return_value)
+	       && !decl_in_scope_p (current_function_return_value))
+	{
+	  /* The earlier NRV is out of scope at this point, so it's safe to
+	     leave it alone; the current return can't refer to it.  */;
+	  if (named_return_value_okay_p
+	      && !warning_suppressed_p (current_function_decl, OPT_Wnrvo))
+	    {
+	      warning (OPT_Wnrvo, "not eliding copy on return from %qD",
+		       bare_retval);
+	      suppress_warning (current_function_decl, OPT_Wnrvo);
+	    }
+	}
       else
-	current_function_return_value = error_mark_node;
+	{
+	  if ((named_return_value_okay_p
+	       || (current_function_return_value
+		   && current_function_return_value != error_mark_node))
+	      && !warning_suppressed_p (current_function_decl, OPT_Wnrvo))
+	    {
+	      warning (OPT_Wnrvo, "not eliding copy on return in %qD",
+		       current_function_decl);
+	      suppress_warning (current_function_decl, OPT_Wnrvo);
+	    }
+	  current_function_return_value = error_mark_node;
+	}
     }
 
   /* We don't need to do any conversions when there's nothing being
@@ -11237,9 +11277,6 @@ check_return_expr (tree retval, bool *no_warning)
 			 build_zero_cst (TREE_TYPE (retval)));
     }
 
-  if (processing_template_decl)
-    return saved_retval;
-
   /* A naive attempt to reduce the number of -Wdangling-reference false
      positives: if we know that this function can return a variable with
      static storage duration rather than one of its parameters, suppress
@@ -11251,6 +11288,9 @@ check_return_expr (tree retval, bool *no_warning)
       && TREE_STATIC (bare_retval))
     suppress_warning (current_function_decl, OPT_Wdangling_reference);
 
+  if (processing_template_decl)
+    return saved_retval;
+
   /* Actually copy the value returned into the appropriate location.  */
   if (retval && retval != result)
     {
@@ -11260,6 +11300,9 @@ check_return_expr (tree retval, bool *no_warning)
 	retval = post;
       retval = cp_build_init_expr (result, retval);
     }
+
+  if (current_function_return_value == bare_retval)
+    INIT_EXPR_NRV_P (retval) = true;
 
   if (tree set = maybe_set_retval_sentinel ())
     retval = build2 (COMPOUND_EXPR, void_type_node, retval, set);

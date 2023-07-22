@@ -835,7 +835,7 @@ public:
     return OPT_Wanalyzer_mismatching_deallocation;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     auto_diagnostic_group d;
     diagnostic_metadata m;
@@ -914,7 +914,7 @@ public:
     return OPT_Wanalyzer_double_free;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     auto_diagnostic_group d;
     diagnostic_metadata m;
@@ -1010,7 +1010,7 @@ public:
     return OPT_Wanalyzer_possible_null_dereference;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     /* CWE-690: Unchecked Return Value to NULL Pointer Dereference.  */
     diagnostic_metadata m;
@@ -1099,7 +1099,7 @@ public:
     return OPT_Wanalyzer_possible_null_argument;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     /* CWE-690: Unchecked Return Value to NULL Pointer Dereference.  */
     auto_diagnostic_group d;
@@ -1152,7 +1152,7 @@ public:
 
   bool terminate_path_p () const final override { return true; }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     /* CWE-476: NULL Pointer Dereference.  */
     diagnostic_metadata m;
@@ -1207,7 +1207,7 @@ public:
 
   bool terminate_path_p () const final override { return true; }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     /* CWE-476: NULL Pointer Dereference.  */
     auto_diagnostic_group d;
@@ -1264,7 +1264,7 @@ public:
     return OPT_Wanalyzer_use_after_free;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     /* CWE-416: Use After Free.  */
     diagnostic_metadata m;
@@ -1358,7 +1358,7 @@ public:
     return OPT_Wanalyzer_malloc_leak;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     /* "CWE-401: Missing Release of Memory after Effective Lifetime".  */
     diagnostic_metadata m;
@@ -1432,7 +1432,7 @@ public:
     return OPT_Wanalyzer_free_of_non_heap;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     auto_diagnostic_group d;
     diagnostic_metadata m;
@@ -1511,7 +1511,7 @@ public:
     return OPT_Wanalyzer_deref_before_check;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     /* Don't emit the warning if we can't show where the deref
        and the check occur.  */
@@ -1520,10 +1520,11 @@ public:
     if (!m_check_enode)
       return false;
     /* Only emit the warning for intraprocedural cases.  */
-    if (m_deref_enode->get_function () != m_check_enode->get_function ())
-      return false;
-    if (&m_deref_enode->get_point ().get_call_string ()
-	!= &m_check_enode->get_point ().get_call_string ())
+    const program_point &deref_point = m_deref_enode->get_point ();
+    const program_point &check_point = m_check_enode->get_point ();
+
+    if (!program_point::effectively_intraprocedural_p (deref_point,
+						       check_point))
       return false;
 
     /* Reject the warning if the check occurs within a macro defintion.

@@ -1374,7 +1374,7 @@ gfc_get_element_type (tree type)
 
 /* Returns true if the array sym does not require a descriptor.  */
 
-int
+bool
 gfc_is_nodesc_array (gfc_symbol * sym)
 {
   symbol_attribute *array_attr;
@@ -2451,7 +2451,7 @@ gfc_add_field_to_struct (tree context, tree name, tree type, tree **chain)
    the two derived type symbols are "equal", as described
    in 4.4.2 and resolved by gfc_compare_derived_types.  */
 
-int
+bool
 gfc_copy_dt_decls_ifequal (gfc_symbol *from, gfc_symbol *to,
 			   bool from_gsym)
 {
@@ -2940,7 +2940,7 @@ copy_derived_types:
 }
 
 
-int
+bool
 gfc_return_by_reference (gfc_symbol * sym)
 {
   if (!sym->attr.function)
@@ -2962,6 +2962,8 @@ gfc_return_by_reference (gfc_symbol * sym)
      require an explicit interface, as no compatibility problems can
      arise there.  */
   if (flag_f2c && sym->ts.type == BT_COMPLEX
+      && !sym->attr.pointer
+      && !sym->attr.allocatable
       && !sym->attr.intrinsic && !sym->attr.always_explicit)
     return 1;
 
@@ -3273,6 +3275,8 @@ arg_type_list_done:
     type = gfc_get_mixed_entry_union (sym->ns);
   else if (flag_f2c && sym->ts.type == BT_REAL
 	   && sym->ts.kind == gfc_default_real_kind
+	   && !sym->attr.pointer
+	   && !sym->attr.allocatable
 	   && !sym->attr.always_explicit)
     {
       /* Special case: f2c calling conventions require that (scalar)
@@ -3399,7 +3403,7 @@ gfc_type_for_mode (machine_mode mode, int unsignedp)
   else if (GET_MODE_CLASS (mode) == MODE_VECTOR_BOOL
 	   && valid_vector_subparts_p (GET_MODE_NUNITS (mode)))
     {
-      unsigned int elem_bits = vector_element_size (GET_MODE_BITSIZE (mode),
+      unsigned int elem_bits = vector_element_size (GET_MODE_PRECISION (mode),
 						    GET_MODE_NUNITS (mode));
       tree bool_type = build_nonstandard_boolean_type (elem_bits);
       return build_vector_type_for_mode (bool_type, mode);

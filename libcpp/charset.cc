@@ -1864,6 +1864,40 @@ _cpp_valid_utf8 (cpp_reader *pfile,
   return true;
 }
 
+/* Return true iff BUFFER of size NUM_BYTES is validly-encoded UTF-8.  */
+
+extern bool
+cpp_valid_utf8_p (const char *buffer, size_t num_bytes)
+{
+  const uchar *iter = (const uchar *)buffer;
+  size_t bytesleft = num_bytes;
+  while (bytesleft > 0)
+    {
+      /* one_utf8_to_cppchar implements 5-byte and 6 byte sequences as per
+	 RFC 2279, but this has been superceded by RFC 3629, which
+	 restricts UTF-8 to 1-byte through 4-byte sequences, and
+	 states "the octet values C0, C1, F5 to FF never appear".
+
+	 Reject such values.  */
+      if (*iter >= 0xf4)
+	return false;
+
+      cppchar_t cp;
+      int err = one_utf8_to_cppchar (&iter, &bytesleft, &cp);
+      if (err)
+	return false;
+
+      /* Additionally, Unicode declares that all codepoints above 0010FFFF are
+	 invalid because they cannot be represented in UTF-16.
+
+	 Reject such values.*/
+      if (cp > UCS_LIMIT)
+	return false;
+    }
+  /* No problems encountered.  */
+  return true;
+}
+
 /* Subroutine of convert_hex and convert_oct.  N is the representation
    in the execution character set of a numeric escape; write it into the
    string buffer TBUF and update the end-of-string pointer therein.  WIDE
@@ -3120,6 +3154,40 @@ cpp_display_column_to_byte_column (const char *data, int data_length,
   return dw.bytes_processed () + MAX (0, display_col - avail_display);
 }
 
+template <typename PropertyType>
+PropertyType
+get_cppchar_property (cppchar_t c,
+		      const cppchar_t *range_ends,
+		      const PropertyType *range_values,
+		      size_t num_ranges,
+		      PropertyType default_value)
+{
+  if (__builtin_expect (c <= range_ends[0], true))
+    return range_values[0];
+
+  /* Binary search the tables.  */
+  int begin = 1;
+  static const int end = num_ranges;
+  int len = end - begin;
+  do
+    {
+      int half = len/2;
+      int middle = begin + half;
+      if (c > range_ends[middle])
+	{
+	  begin = middle + 1;
+	  len -= half + 1;
+	}
+      else
+	len = half;
+    } while (len);
+
+  if (__builtin_expect (begin != end, true))
+    return range_values[begin];
+
+  return default_value;
+}
+
 /* Our own version of wcwidth().  We don't use the actual wcwidth() in glibc,
    because that will inspect the user's locale, and in particular in an ASCII
    locale, it will not return anything useful for extended characters.  But GCC
@@ -3133,30 +3201,43 @@ cpp_display_column_to_byte_column (const char *data, int data_length,
    diagnostics, they are sufficient.  */
 
 #include "generated_cpp_wcwidth.h"
-int cpp_wcwidth (cppchar_t c)
+
+int
+cpp_wcwidth (cppchar_t c)
 {
-  if (__builtin_expect (c <= wcwidth_range_ends[0], true))
-    return wcwidth_widths[0];
+  const size_t num_ranges
+    = sizeof wcwidth_range_ends / sizeof (*wcwidth_range_ends);
+  return get_cppchar_property<unsigned char > (c,
+					       &wcwidth_range_ends[0],
+					       &wcwidth_widths[0],
+					       num_ranges,
+					       1);
+}
 
-  /* Binary search the tables.  */
-  int begin = 1;
-  static const int end
-      = sizeof wcwidth_range_ends / sizeof (*wcwidth_range_ends);
-  int len = end - begin;
-  do
-    {
-      int half = len/2;
-      int middle = begin + half;
-      if (c > wcwidth_range_ends[middle])
-	{
-	  begin = middle + 1;
-	  len -= half + 1;
-	}
-      else
-	len = half;
-    } while (len);
+#include "combining-chars.inc"
 
-  if (__builtin_expect (begin != end, true))
-    return wcwidth_widths[begin];
-  return 1;
+bool
+cpp_is_combining_char (cppchar_t c)
+{
+  const size_t num_ranges
+    = sizeof combining_range_ends / sizeof (*combining_range_ends);
+  return get_cppchar_property<bool> (c,
+				     &combining_range_ends[0],
+				     &is_combining[0],
+				     num_ranges,
+				     false);
+}
+
+#include "printable-chars.inc"
+
+bool
+cpp_is_printable_char (cppchar_t c)
+{
+  const size_t num_ranges
+    = sizeof printable_range_ends / sizeof (*printable_range_ends);
+  return get_cppchar_property<bool> (c,
+				     &printable_range_ends[0],
+				     &is_printable[0],
+				     num_ranges,
+				     false);
 }

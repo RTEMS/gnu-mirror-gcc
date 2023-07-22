@@ -118,7 +118,7 @@ range_def_chain::in_chain_p (tree name, tree def)
   gcc_checking_assert (gimple_range_ssa_p (def));
   gcc_checking_assert (gimple_range_ssa_p (name));
 
-  // Get the defintion chain for DEF.
+  // Get the definition chain for DEF.
   bitmap chain = get_def_chain (def);
 
   if (chain == NULL)
@@ -182,9 +182,9 @@ range_def_chain::register_dependency (tree name, tree dep, basic_block bb)
 
   // Set the direct dependency cache entries.
   if (!src.ssa1)
-    src.ssa1 = dep;
-  else if (!src.ssa2 && src.ssa1 != dep)
-    src.ssa2 = dep;
+    src.ssa1 = SSA_NAME_VERSION (dep);
+  else if (!src.ssa2 && src.ssa1 != SSA_NAME_VERSION (dep))
+    src.ssa2 = SSA_NAME_VERSION (dep);
 
   // Don't calculate imports or export/dep chains if BB is not provided.
   // This is usually the case for when the temporal cache wants the direct
@@ -341,7 +341,7 @@ range_def_chain::dump (FILE *f, basic_block bb, const char *prefix)
 
    GORI stands for "Generates Outgoing Range Information."
 
-   It utilizes the range_def_chain class to contruct def_chains.
+   It utilizes the range_def_chain class to construct def_chains.
    Information for a basic block is calculated once and stored.  It is
    only calculated the first time a query is made.  If no queries are
    made, there is little overhead.
@@ -469,7 +469,7 @@ gori_map::calculate_gori (basic_block bb)
   if (single_succ_p (bb))
     return;
 
-  // If this block's last statement may generate range informaiton, go
+  // If this block's last statement may generate range information, go
   // calculate it.
   gimple *stmt = gimple_outgoing_range_stmt_p (bb);
   if (!stmt)
@@ -486,7 +486,7 @@ gori_map::calculate_gori (basic_block bb)
   else
     {
       // Do not process switches if they are too large.
-      if (EDGE_COUNT (bb->succs) > (unsigned)param_evrp_switch_limit)
+      if (EDGE_COUNT (bb->succs) > (unsigned)param_vrp_switch_limit)
 	return;
       gswitch *gs = as_a<gswitch *>(stmt);
       name = gimple_range_ssa_p (gimple_switch_index (gs));
@@ -558,12 +558,12 @@ debug (gori_map &g)
 // Construct a gori_compute object.
 
 gori_compute::gori_compute (int not_executable_flag)
-		      : outgoing (param_evrp_switch_limit), tracer ("GORI ")
+		      : outgoing (param_vrp_switch_limit), tracer ("GORI ")
 {
   m_not_executable_flag = not_executable_flag;
   // Create a boolean_type true and false range.
-  m_bool_zero = int_range<2> (boolean_false_node, boolean_false_node);
-  m_bool_one = int_range<2> (boolean_true_node, boolean_true_node);
+  m_bool_zero = range_false ();
+  m_bool_one = range_true ();
   if (dump_file && (param_ranger_debug & RANGER_DEBUG_GORI))
     tracer.enable_trace ();
 }
@@ -588,7 +588,7 @@ gori_compute::compute_operand_range_switch (vrange &r, gswitch *s,
       return true;
     }
 
-  // If op1 is in the defintion chain, pass lhs back.
+  // If op1 is in the definition chain, pass lhs back.
   if (gimple_range_ssa_p (op1) && in_chain_p (name, op1))
     return compute_operand_range (r, SSA_NAME_DEF_STMT (op1), lhs, name, src);
 
@@ -623,26 +623,23 @@ gori_compute::compute_operand_range (vrange &r, gimple *stmt,
   tree op1 = gimple_range_ssa_p (handler.operand1 ());
   tree op2 = gimple_range_ssa_p (handler.operand2 ());
 
-  // If there is a relation, use it instead of any passed in.  This will allow
-  // multiple relations to be processed in compound logicals.
+  // If there is a relation betwen op1 and op2, use it instead as it is
+  // likely to be more applicable.
   if (op1 && op2)
     {
       relation_kind k = handler.op1_op2_relation (lhs);
-      // If there is no relation, and op1 == op2, create a relation.
-      if (!vrel_ptr && k == VREL_VARYING && op1 == op2)
-	k = VREL_EQ;
       if (k != VREL_VARYING)
-       {
-	 vrel.set_relation (k, op1, op2);
-	 vrel_ptr = &vrel;
-       }
+	{
+	  vrel.set_relation (k, op1, op2);
+	  vrel_ptr = &vrel;
+	}
     }
 
   // Handle end of lookup first.
   if (op1 == name)
-    return compute_operand1_range (r, handler, lhs, name, src, vrel_ptr);
+    return compute_operand1_range (r, handler, lhs, src, vrel_ptr);
   if (op2 == name)
-    return compute_operand2_range (r, handler, lhs, name, src, vrel_ptr);
+    return compute_operand2_range (r, handler, lhs, src, vrel_ptr);
 
   // NAME is not in this stmt, but one of the names in it ought to be
   // derived from it.
@@ -653,12 +650,49 @@ gori_compute::compute_operand_range (vrange &r, gimple *stmt,
   if (!op1_in_chain && !op2_in_chain)
     return false;
 
-  // If the lhs doesn't tell us anything and there are no relations, there
-  // is nothing to be learned.
-  if (lhs.varying_p () && !vrel_ptr)
-    return false;
+  // If either operand is in the def chain of the other (or they are equal), it
+  // will be evaluated twice and can result in an exponential time calculation.
+  // Instead just evaluate the one operand.
+  if (op1_in_chain && op2_in_chain)
+    {
+      if (in_chain_p (op1, op2) || op1 == op2)
+	op1_in_chain = false;
+      else if (in_chain_p (op2, op1))
+	op2_in_chain = false;
+    }
 
-  bool res;
+  bool res = false;
+  // If the lhs doesn't tell us anything only a relation can possibly enhance
+  // the result.
+  if (lhs.varying_p ())
+    {
+      if (!vrel_ptr)
+	return false;
+      // If there is a relation (ie: x != y) , it can only be relevant if
+      // a) both elements are in the defchain
+      //    c = x > y   // (x and y are in c's defchain)
+      if (op1_in_chain)
+	res = in_chain_p (vrel_ptr->op1 (), op1)
+	      && in_chain_p (vrel_ptr->op2 (), op1);
+      if (!res && op2_in_chain)
+	res = in_chain_p (vrel_ptr->op1 (), op2)
+	      || in_chain_p (vrel_ptr->op2 (), op2);
+      if (!res)
+	{
+	  // or b) one relation element is in the defchain of the other and the
+	  //       other is the LHS of this stmt.
+	  //  x = y + 2
+	  if (vrel_ptr->op1 () == handler.lhs ()
+	      && (vrel_ptr->op2 () == op1 || vrel_ptr->op2 () == op2))
+	    res = true;
+	  else if (vrel_ptr->op2 () == handler.lhs ()
+		   && (vrel_ptr->op1 () == op1 || vrel_ptr->op1 () == op2))
+	    res = true;
+	}
+      if (!res)
+	return false;
+    }
+
   // Process logicals as they have special handling.
   if (is_gimple_logical_p (stmt))
     {
@@ -691,20 +725,34 @@ gori_compute::compute_operand_range (vrange &r, gimple *stmt,
 			     op1_trange, op1_frange, op2_trange, op2_frange);
       if (idx)
 	tracer.trailer (idx, "compute_operand", res, name, r);
+      return res;
     }
   // Follow the appropriate operands now.
-  else if (op1_in_chain && op2_in_chain)
-    res = compute_operand1_and_operand2_range (r, handler, lhs, name, src,
-					       vrel_ptr);
-  else if (op1_in_chain)
-    res = compute_operand1_range (r, handler, lhs, name, src, vrel_ptr);
-  else if (op2_in_chain)
-    res = compute_operand2_range (r, handler, lhs, name, src, vrel_ptr);
+  if (op1_in_chain && op2_in_chain)
+    return compute_operand1_and_operand2_range (r, handler, lhs, name, src,
+						vrel_ptr);
+  Value_Range vr;
+  gimple *src_stmt;
+  if (op1_in_chain)
+    {
+      vr.set_type (TREE_TYPE (op1));
+      if (!compute_operand1_range (vr, handler, lhs, src, vrel_ptr))
+	return false;
+      src_stmt = SSA_NAME_DEF_STMT (op1);
+    }
   else
-    gcc_unreachable ();
+    {
+      gcc_checking_assert (op2_in_chain);
+      vr.set_type (TREE_TYPE (op2));
+      if (!compute_operand2_range (vr, handler, lhs, src, vrel_ptr))
+	return false;
+      src_stmt = SSA_NAME_DEF_STMT (op2);
+    }
 
+  gcc_checking_assert (src_stmt);
+  // Then feed this range back as the LHS of the defining statement.
+  return compute_operand_range (r, src_stmt, vr, name, src, vrel_ptr);
   // If neither operand is derived, this statement tells us nothing.
-  return res;
 }
 
 
@@ -720,7 +768,8 @@ range_is_either_true_or_false (const irange &r)
   // so true can be ~[0, 0] (i.e. [1,MAX]).
   tree type = r.type ();
   gcc_checking_assert (range_compatible_p (type, boolean_type_node));
-  return (r.singleton_p () || !r.contains_p (build_zero_cst (type)));
+  return (r.singleton_p ()
+	  || !r.contains_p (wi::zero (TYPE_PRECISION (type))));
 }
 
 // Evaluate a binary logical expression by combining the true and
@@ -852,14 +901,14 @@ gori_compute::logical_combine (vrange &r, enum tree_code code,
 	    r.union_ (ft);
 	  }
         break;
-      //  A logical OR combines ranges from 2 boolean conditons.
+      //  A logical OR combines ranges from 2 boolean conditions.
       // 	c_2 = b_1 || b_2
       case TRUTH_OR_EXPR:
       case BIT_IOR_EXPR:
         if (lhs.zero_p ())
 	  {
 	    // An OR operation will only take the FALSE path if both
-	    // operands are false simlulateously, which means they should
+	    // operands are false simultaneously, which means they should
 	    // be intersected.  !(x || y) == !x && !y
 	    r = op1_false;
 	    r.intersect (op2_false);
@@ -950,7 +999,7 @@ gori_compute::compute_logical_operands (vrange &true_range, vrange &false_range,
 // This routine will try to refine the ranges of OP1 and OP2 given a relation
 // K between them.  In order to perform this refinement, one of the operands
 // must be in the definition chain of the other.  The use is refined using
-// op1/op2_range on the statement, and the defintion is then recalculated
+// op1/op2_range on the statement, and the definition is then recalculated
 // using the relation.
 
 bool
@@ -1064,7 +1113,7 @@ gori_compute::refine_using_relation (tree op1, vrange &op1_range,
 bool
 gori_compute::compute_operand1_range (vrange &r,
 				      gimple_range_op_handler &handler,
-				      const vrange &lhs, tree name,
+				      const vrange &lhs,
 				      fur_source &src, value_relation *rel)
 {
   gimple *stmt = handler.stmt ();
@@ -1077,29 +1126,32 @@ gori_compute::compute_operand1_range (vrange &r,
     trio = rel->create_trio (lhs_name, op1, op2);
 
   Value_Range op1_range (TREE_TYPE (op1));
-  Value_Range tmp (TREE_TYPE (op1));
   Value_Range op2_range (op2 ? TREE_TYPE (op2) : TREE_TYPE (op1));
 
   // Fetch the known range for op1 in this block.
   src.get_operand (op1_range, op1);
 
-  // Now range-op calcuate and put that result in r.
+  // Now range-op calculate and put that result in r.
   if (op2)
     {
       src.get_operand (op2_range, op2);
+
       relation_kind op_op = trio.op1_op2 ();
       if (op_op != VREL_VARYING)
 	refine_using_relation (op1, op1_range, op2, op2_range, src, op_op);
 
-      if (!handler.calc_op1 (tmp, lhs, op2_range, trio))
+      // If op1 == op2, create a new trio for just this call.
+      if (op1 == op2 && gimple_range_ssa_p (op1))
+	trio = relation_trio (trio.lhs_op1 (), trio.lhs_op2 (), VREL_EQ);
+      if (!handler.calc_op1 (r, lhs, op2_range, trio))
 	return false;
     }
   else
     {
-      // We pass op1_range to the unary operation.  Nomally it's a
+      // We pass op1_range to the unary operation.  Normally it's a
       // hidden range_for_type parameter, but sometimes having the
       // actual range can result in better information.
-      if (!handler.calc_op1 (tmp, lhs, op1_range, trio))
+      if (!handler.calc_op1 (r, lhs, op1_range, trio))
 	return false;
     }
 
@@ -1122,30 +1174,16 @@ gori_compute::compute_operand1_range (vrange &r,
       tracer.print (idx, "Computes ");
       print_generic_expr (dump_file, op1, TDF_SLIM);
       fprintf (dump_file, " = ");
-      tmp.dump (dump_file);
+      r.dump (dump_file);
       fprintf (dump_file, " intersect Known range : ");
       op1_range.dump (dump_file);
       fputc ('\n', dump_file);
     }
-  // Intersect the calculated result with the known result and return if done.
-  if (op1 == name)
-    {
-      tmp.intersect (op1_range);
-      r = tmp;
-      if (idx)
-	tracer.trailer (idx, "produces ", true, name, r);
-      return true;
-    }
-  // If the calculation continues, we're using op1_range as the new LHS.
-  op1_range.intersect (tmp);
 
+  r.intersect (op1_range);
   if (idx)
-    tracer.trailer (idx, "produces ", true, op1, op1_range);
-  gimple *src_stmt = SSA_NAME_DEF_STMT (op1);
-  gcc_checking_assert (src_stmt);
-
-  // Then feed this range back as the LHS of the defining statement.
-  return compute_operand_range (r, src_stmt, op1_range, name, src, rel);
+    tracer.trailer (idx, "produces ", true, op1, r);
+  return true;
 }
 
 
@@ -1156,7 +1194,7 @@ gori_compute::compute_operand1_range (vrange &r,
 bool
 gori_compute::compute_operand2_range (vrange &r,
 				      gimple_range_op_handler &handler,
-				      const vrange &lhs, tree name,
+				      const vrange &lhs,
 				      fur_source &src, value_relation *rel)
 {
   gimple *stmt = handler.stmt ();
@@ -1166,7 +1204,6 @@ gori_compute::compute_operand2_range (vrange &r,
 
   Value_Range op1_range (TREE_TYPE (op1));
   Value_Range op2_range (TREE_TYPE (op2));
-  Value_Range tmp (TREE_TYPE (op2));
 
   src.get_operand (op1_range, op1);
   src.get_operand (op2_range, op2);
@@ -1175,11 +1212,15 @@ gori_compute::compute_operand2_range (vrange &r,
   if (rel)
     trio = rel->create_trio (lhs_name, op1, op2);
   relation_kind op_op = trio.op1_op2 ();
+
   if (op_op != VREL_VARYING)
     refine_using_relation (op1, op1_range, op2, op2_range, src, op_op);
 
+  // If op1 == op2, create a new trio for this stmt.
+  if (op1 == op2 && gimple_range_ssa_p (op1))
+    trio = relation_trio (trio.lhs_op1 (), trio.lhs_op2 (), VREL_EQ);
   // Intersect with range for op2 based on lhs and op1.
-  if (!handler.calc_op2 (tmp, lhs, op1_range, trio))
+  if (!handler.calc_op2 (r, lhs, op1_range, trio))
     return false;
 
   unsigned idx;
@@ -1201,31 +1242,16 @@ gori_compute::compute_operand2_range (vrange &r,
       tracer.print (idx, "Computes ");
       print_generic_expr (dump_file, op2, TDF_SLIM);
       fprintf (dump_file, " = ");
-      tmp.dump (dump_file);
+      r.dump (dump_file);
       fprintf (dump_file, " intersect Known range : ");
       op2_range.dump (dump_file);
       fputc ('\n', dump_file);
     }
   // Intersect the calculated result with the known result and return if done.
-  if (op2 == name)
-    {
-      tmp.intersect (op2_range);
-      r = tmp;
-      if (idx)
-	tracer.trailer (idx, " produces ", true, NULL_TREE, r);
-      return true;
-    }
-  // If the calculation continues, we're using op2_range as the new LHS.
-  op2_range.intersect (tmp);
-
+  r.intersect (op2_range);
   if (idx)
-    tracer.trailer (idx, " produces ", true, op2, op2_range);
-  gimple *src_stmt = SSA_NAME_DEF_STMT (op2);
-  gcc_checking_assert (src_stmt);
-//  gcc_checking_assert (!is_import_p (op2, find.bb));
-
-  // Then feed this range back as the LHS of the defining statement.
-  return compute_operand_range (r, src_stmt, op2_range, name, src, rel);
+    tracer.trailer (idx, " produces ", true, op2, r);
+  return true;
 }
 
 // Calculate a range for NAME from both operand positions of S
@@ -1243,13 +1269,24 @@ gori_compute::compute_operand1_and_operand2_range (vrange &r,
 {
   Value_Range op_range (TREE_TYPE (name));
 
-  // Calculate a good a range for op2.  Since op1 == op2, this will
-  // have already included whatever the actual range of name is.
-  if (!compute_operand2_range (op_range, handler, lhs, name, src, rel))
+  Value_Range vr (TREE_TYPE (handler.operand2 ()));
+  // Calculate a good a range through op2.
+  if (!compute_operand2_range (vr, handler, lhs, src, rel))
+    return false;
+  gimple *src_stmt = SSA_NAME_DEF_STMT (handler.operand2 ());
+  gcc_checking_assert (src_stmt);
+  // Then feed this range back as the LHS of the defining statement.
+  if (!compute_operand_range (r, src_stmt, vr, name, src, rel))
     return false;
 
   // Now get the range thru op1.
-  if (!compute_operand1_range (r, handler, lhs, name, src, rel))
+  vr.set_type (TREE_TYPE (handler.operand1 ()));
+  if (!compute_operand1_range (vr, handler, lhs, src, rel))
+    return false;
+  src_stmt = SSA_NAME_DEF_STMT (handler.operand1 ());
+  gcc_checking_assert (src_stmt);
+  // Then feed this range back as the LHS of the defining statement.
+  if (!compute_operand_range (op_range, src_stmt, vr, name, src, rel))
     return false;
 
   // Both operands have to be simultaneously true, so perform an intersection.
@@ -1258,15 +1295,17 @@ gori_compute::compute_operand1_and_operand2_range (vrange &r,
 }
 
 // Return TRUE if NAME can be recomputed on any edge exiting BB.  If any
-// direct dependant is exported, it may also change the computed value of NAME.
+// direct dependent is exported, it may also change the computed value of NAME.
 
 bool
-gori_compute::may_recompute_p (tree name, basic_block bb)
+gori_compute::may_recompute_p (tree name, basic_block bb, int depth)
 {
   tree dep1 = depend1 (name);
   tree dep2 = depend2 (name);
 
-  // If the first dependency is not set, there is no recompuation.
+  // If the first dependency is not set, there is no recomputation.
+  // Dependencies reflect original IL, not current state.   Check if the
+  // SSA_NAME is still valid as well.
   if (!dep1)
     return false;
 
@@ -1275,22 +1314,36 @@ gori_compute::may_recompute_p (tree name, basic_block bb)
   if (is_a<gphi *> (s) || gimple_has_side_effects (s))
     return false;
 
-  // If edge is specified, check if NAME can be recalculated on that edge.
-  if (bb)
-    return ((is_export_p (dep1, bb))
-	    || (dep2 && is_export_p (dep2, bb)));
+  if (!dep2)
+    {
+      // -1 indicates a default param, convert it to the real default.
+      if (depth == -1)
+	{
+	  depth = (int)param_ranger_recompute_depth;
+	  gcc_checking_assert (depth >= 1);
+	}
 
-  return (is_export_p (dep1)) || (dep2 && is_export_p (dep2));
+      bool res = (bb ? is_export_p (dep1, bb) : is_export_p (dep1));
+      if (res || depth <= 1)
+	return res;
+      // Check another level of recomputation.
+      return may_recompute_p (dep1, bb, --depth);
+    }
+  // Two dependencies terminate the depth of the search.
+  if (bb)
+    return is_export_p (dep1, bb) || is_export_p (dep2, bb);
+  else
+    return is_export_p (dep1) || is_export_p (dep2);
 }
 
-// Return TRUE if NAME can be recomputed on edge E.  If any direct dependant
+// Return TRUE if NAME can be recomputed on edge E.  If any direct dependent
 // is exported on edge E, it may change the computed value of NAME.
 
 bool
-gori_compute::may_recompute_p (tree name, edge e)
+gori_compute::may_recompute_p (tree name, edge e, int depth)
 {
   gcc_checking_assert (e);
-  return may_recompute_p (name, e->src);
+  return may_recompute_p (name, e->src, depth);
 }
 
 
@@ -1414,7 +1467,7 @@ gori_compute::condexpr_adjust (vrange &r1, vrange &r2, gimple *, tree cond,
   tree type = TREE_TYPE (gimple_assign_rhs1 (cond_def));
   if (!range_compatible_p (type, TREE_TYPE (gimple_assign_rhs2 (cond_def))))
     return false;
-  range_op_handler hand (gimple_assign_rhs_code (cond_def), type);
+  range_op_handler hand (gimple_assign_rhs_code (cond_def));
   if (!hand)
     return false;
 

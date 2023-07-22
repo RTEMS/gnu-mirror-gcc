@@ -341,7 +341,8 @@ class region_model
   function * get_current_function () const;
   void pop_frame (tree result_lvalue,
 		  const svalue **out_result,
-		  region_model_context *ctxt);
+		  region_model_context *ctxt,
+		  bool eval_return_svalue = true);
   int get_stack_depth () const;
   const frame_region *get_frame_at_index (int index) const;
 
@@ -489,6 +490,7 @@ class region_model
 				  region_model_context *ctxt) const;
 
   void check_region_for_write (const region *dest_reg,
+			       const svalue *sval_hint,
 			       region_model_context *ctxt) const;
 
 private:
@@ -552,22 +554,25 @@ private:
 
   void check_for_writable_region (const region* dest_reg,
 				  region_model_context *ctxt) const;
-  void check_region_access (const region *reg,
+  bool check_region_access (const region *reg,
 			    enum access_direction dir,
+			    const svalue *sval_hint,
 			    region_model_context *ctxt) const;
-  void check_region_for_read (const region *src_reg,
+  bool check_region_for_read (const region *src_reg,
 			      region_model_context *ctxt) const;
   void check_region_size (const region *lhs_reg, const svalue *rhs_sval,
 			  region_model_context *ctxt) const;
 
   /* Implemented in bounds-checking.cc  */
-  void check_symbolic_bounds (const region *base_reg,
+  bool check_symbolic_bounds (const region *base_reg,
 			      const svalue *sym_byte_offset,
 			      const svalue *num_bytes_sval,
 			      const svalue *capacity,
 			      enum access_direction dir,
+			      const svalue *sval_hint,
 			      region_model_context *ctxt) const;
-  void check_region_bounds (const region *reg, enum access_direction dir,
+  bool check_region_bounds (const region *reg, enum access_direction dir,
+			    const svalue *sval_hint,
 			    region_model_context *ctxt) const;
 
   void check_call_args (const call_details &cd) const;

@@ -507,7 +507,7 @@ public:
 
   bool terminate_path_p () const final override { return true; }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     switch (m_pkind)
       {
@@ -638,7 +638,7 @@ public:
     return OPT_Wanalyzer_shift_count_negative;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     return warning_at (rich_loc, get_controlling_option (),
 		       "shift by negative count (%qE)", m_count_cst);
@@ -685,7 +685,7 @@ public:
     return OPT_Wanalyzer_shift_count_overflow;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     return warning_at (rich_loc, get_controlling_option (),
 		       "shift by count (%qE) >= precision of type (%qi)",
@@ -860,7 +860,8 @@ region_model::get_gassign_result (const gassign *assign,
 	       or by greater than or equal to the number of bits that exist in
 	       the operand."  */
 	    if (const tree rhs2_cst = rhs2_sval->maybe_get_constant ())
-	      if (TREE_CODE (rhs2_cst) == INTEGER_CST)
+	      if (TREE_CODE (rhs2_cst) == INTEGER_CST
+		  && INTEGRAL_TYPE_P (TREE_TYPE (rhs1)))
 		{
 		  if (tree_int_cst_sgn (rhs2_cst) < 0)
 		    ctxt->warn
@@ -1736,7 +1737,7 @@ check_external_function_for_access_attr (const gcall *call,
 	  tree ptr_tree = gimple_call_arg (call, access->ptrarg);
 	  const svalue *ptr_sval = get_rvalue (ptr_tree, &my_ctxt);
 	  const region *reg = deref_rvalue (ptr_sval, ptr_tree, &my_ctxt);
-	  check_region_for_write (reg, &my_ctxt);
+	  check_region_for_write (reg, nullptr, &my_ctxt);
 	  /* We don't use the size arg for now.  */
 	}
     }
@@ -1952,7 +1953,7 @@ region_model::on_longjmp (const gcall *longjmp_call, const gcall *setjmp_call,
      setjmp was called.  */
   gcc_assert (get_stack_depth () >= setjmp_stack_depth);
   while (get_stack_depth () > setjmp_stack_depth)
-    pop_frame (NULL, NULL, ctxt);
+    pop_frame (NULL, NULL, ctxt, false);
 
   gcc_assert (get_stack_depth () == setjmp_stack_depth);
 
@@ -2092,7 +2093,7 @@ region_model::get_lvalue_1 (path_var pv, region_model_context *ctxt) const
       {
 	gcc_assert (TREE_CODE (expr) == SSA_NAME
 		    || TREE_CODE (expr) == PARM_DECL
-		    || TREE_CODE (expr) == VAR_DECL
+		    || VAR_P (expr)
 		    || TREE_CODE (expr) == RESULT_DECL);
 
 	int stack_index = pv.m_stack_depth;
@@ -2355,30 +2356,7 @@ region_model::get_initial_value_for_global (const region *reg) const
      the initial value of REG can be taken from the initialization value
      of the decl.  */
   if (called_from_main_p () || TREE_READONLY (decl))
-    {
-      /* Attempt to get the initializer value for base_reg.  */
-      if (const svalue *base_reg_init
-	    = base_reg->get_svalue_for_initializer (m_mgr))
-	{
-	  if (reg == base_reg)
-	    return base_reg_init;
-	  else
-	    {
-	      /* Get the value for REG within base_reg_init.  */
-	      binding_cluster c (base_reg);
-	      c.bind (m_mgr->get_store_manager (), base_reg, base_reg_init);
-	      const svalue *sval
-		= c.get_any_binding (m_mgr->get_store_manager (), reg);
-	      if (sval)
-		{
-		  if (reg->get_type ())
-		    sval = m_mgr->get_or_create_cast (reg->get_type (),
-						      sval);
-		  return sval;
-		}
-	    }
-	}
-    }
+    return reg->get_initial_value_at_main (m_mgr);
 
   /* Otherwise, return INIT_VAL(REG).  */
   return m_mgr->get_or_create_initial_value (reg);
@@ -2396,7 +2374,9 @@ region_model::get_store_value (const region *reg,
   if (reg->empty_p ())
     return m_mgr->get_or_create_unknown_svalue (reg->get_type ());
 
-  check_region_for_read (reg, ctxt);
+  bool check_poisoned = true;
+  if (check_region_for_read (reg, ctxt))
+    check_poisoned = false;
 
   /* Special-case: handle var_decls in the constant pool.  */
   if (const decl_region *decl_reg = reg->dyn_cast_decl_region ())
@@ -2449,7 +2429,7 @@ region_model::get_store_value (const region *reg,
       == RK_GLOBALS)
     return get_initial_value_for_global (reg);
 
-  return m_mgr->get_or_create_initial_value (reg);
+  return m_mgr->get_or_create_initial_value (reg, check_poisoned);
 }
 
 /* Return false if REG does not exist, true if it may do.
@@ -2544,8 +2524,8 @@ region_model::deref_rvalue (const svalue *ptr_sval, tree ptr_tree,
 		const poisoned_svalue *poisoned_sval
 		  = as_a <const poisoned_svalue *> (ptr_sval);
 		enum poison_kind pkind = poisoned_sval->get_poison_kind ();
-		ctxt->warn (make_unique<poisoned_value_diagnostic>
-			      (ptr, pkind, NULL, NULL));
+		ctxt->warn (::make_unique<poisoned_value_diagnostic>
+			      (ptr, pkind, nullptr, nullptr));
 	      }
 	  }
       }
@@ -2598,7 +2578,7 @@ public:
     return OPT_Wanalyzer_write_to_const;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     auto_diagnostic_group d;
     bool warned;
@@ -2666,7 +2646,7 @@ public:
     return OPT_Wanalyzer_write_to_string_literal;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     return warning_at (rich_loc, get_controlling_option (),
 		       "write to string literal");
@@ -2764,6 +2744,15 @@ region_model::get_capacity (const region *reg) const
       /* Look through sized regions to get at the capacity
 	 of the underlying regions.  */
       return get_capacity (reg->get_parent_region ());
+    case RK_STRING:
+      {
+	/* "Capacity" here means "size".  */
+	const string_region *string_reg = as_a <const string_region *> (reg);
+	tree string_cst = string_reg->get_string_cst ();
+	return m_mgr->get_or_create_int_cst (size_type_node,
+					     TREE_STRING_LENGTH (string_cst));
+      }
+      break;
     }
 
   if (const svalue *recorded = get_dynamic_extents (reg))
@@ -2802,19 +2791,25 @@ region_model::get_string_size (const region *reg) const
 }
 
 /* If CTXT is non-NULL, use it to warn about any problems accessing REG,
-   using DIR to determine if this access is a read or write.  */
+   using DIR to determine if this access is a read or write.
+   Return TRUE if an OOB access was detected.
+   If SVAL_HINT is non-NULL, use it as a hint in diagnostics
+   about the value that would be written to REG.  */
 
-void
+bool
 region_model::check_region_access (const region *reg,
 				   enum access_direction dir,
+				   const svalue *sval_hint,
 				   region_model_context *ctxt) const
 {
   /* Fail gracefully if CTXT is NULL.  */
   if (!ctxt)
-    return;
+    return false;
 
+  bool oob_access_detected = false;
   check_region_for_taint (reg, dir, ctxt);
-  check_region_bounds (reg, dir, ctxt);
+  if (!check_region_bounds (reg, dir, sval_hint, ctxt))
+    oob_access_detected = true;
 
   switch (dir)
     {
@@ -2827,24 +2822,27 @@ region_model::check_region_access (const region *reg,
       check_for_writable_region (reg, ctxt);
       break;
     }
+  return oob_access_detected;
 }
 
 /* If CTXT is non-NULL, use it to warn about any problems writing to REG.  */
 
 void
 region_model::check_region_for_write (const region *dest_reg,
+				      const svalue *sval_hint,
 				      region_model_context *ctxt) const
 {
-  check_region_access (dest_reg, DIR_WRITE, ctxt);
+  check_region_access (dest_reg, DIR_WRITE, sval_hint, ctxt);
 }
 
-/* If CTXT is non-NULL, use it to warn about any problems reading from REG.  */
+/* If CTXT is non-NULL, use it to warn about any problems reading from REG.
+  Returns TRUE if an OOB read was detected.  */
 
-void
+bool
 region_model::check_region_for_read (const region *src_reg,
 				     region_model_context *ctxt) const
 {
-  check_region_access (src_reg, DIR_READ, ctxt);
+  return check_region_access (src_reg, DIR_READ, NULL, ctxt);
 }
 
 /* Concrete subclass for casts of pointers that lead to trailing bytes.  */
@@ -2880,7 +2878,7 @@ public:
     return OPT_Wanalyzer_allocation_size;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     diagnostic_metadata m;
     m.add_cwe (131);
@@ -2972,7 +2970,7 @@ capacity_compatible_with_type (tree cst, tree pointee_size_tree)
 
    It works by visiting all svalues inside SVAL until it reaches
    atomic nodes.  From those, it goes back up again and adds each
-   node that might be a multiple of SIZE_CST to the RESULT_SET.  */
+   node that is not a multiple of SIZE_CST to the RESULT_SET.  */
 
 class size_visitor : public visitor
 {
@@ -2983,7 +2981,7 @@ public:
     m_root_sval->accept (this);
   }
 
-  bool get_result ()
+  bool is_dubious_capacity ()
   {
     return result_set.contains (m_root_sval);
   }
@@ -2993,22 +2991,10 @@ public:
     check_constant (sval->get_constant (), sval);
   }
 
-  void visit_unknown_svalue (const unknown_svalue *sval ATTRIBUTE_UNUSED)
-    final override
-  {
-    result_set.add (sval);
-  }
-
-  void visit_poisoned_svalue (const poisoned_svalue *sval ATTRIBUTE_UNUSED)
-    final override
-  {
-    result_set.add (sval);
-  }
-
   void visit_unaryop_svalue (const unaryop_svalue *sval) final override
   {
-    const svalue *arg = sval->get_arg ();
-    if (result_set.contains (arg))
+    if (CONVERT_EXPR_CODE_P (sval->get_op ())
+	  && result_set.contains (sval->get_arg ()))
       result_set.add (sval);
   }
 
@@ -3017,28 +3003,24 @@ public:
     const svalue *arg0 = sval->get_arg0 ();
     const svalue *arg1 = sval->get_arg1 ();
 
-    if (sval->get_op () == MULT_EXPR)
+    switch (sval->get_op ())
       {
-	if (result_set.contains (arg0) || result_set.contains (arg1))
-	  result_set.add (sval);
+	case MULT_EXPR:
+	  if (result_set.contains (arg0) && result_set.contains (arg1))
+	    result_set.add (sval);
+	  break;
+	case PLUS_EXPR:
+	case MINUS_EXPR:
+	  if (result_set.contains (arg0) || result_set.contains (arg1))
+	    result_set.add (sval);
+	  break;
+	default:
+	  break;
       }
-    else
-      {
-	if (result_set.contains (arg0) && result_set.contains (arg1))
-	  result_set.add (sval);
-      }
-  }
-
-  void visit_repeated_svalue (const repeated_svalue *sval) final override
-  {
-    sval->get_inner_svalue ()->accept (this);
-    if (result_set.contains (sval->get_inner_svalue ()))
-      result_set.add (sval);
   }
 
   void visit_unmergeable_svalue (const unmergeable_svalue *sval) final override
   {
-    sval->get_arg ()->accept (this);
     if (result_set.contains (sval->get_arg ()))
       result_set.add (sval);
   }
@@ -3048,33 +3030,30 @@ public:
     const svalue *base = sval->get_base_svalue ();
     const svalue *iter = sval->get_iter_svalue ();
 
-    if (result_set.contains (base) && result_set.contains (iter))
+    if (result_set.contains (base) || result_set.contains (iter))
       result_set.add (sval);
   }
 
-  void visit_conjured_svalue (const conjured_svalue *sval ATTRIBUTE_UNUSED)
-    final override
+  void visit_initial_svalue (const initial_svalue *sval) final override
   {
-    equiv_class_id id (-1);
+    equiv_class_id id = equiv_class_id::null ();
     if (m_cm->get_equiv_class_by_svalue (sval, &id))
       {
 	if (tree cst = id.get_obj (*m_cm).get_any_constant ())
 	  check_constant (cst, sval);
-	else
-	  result_set.add (sval);
+      }
+    else if (!m_cm->sval_constrained_p (sval))
+      {
+	result_set.add (sval);
       }
   }
 
-  void visit_asm_output_svalue (const asm_output_svalue *sval ATTRIBUTE_UNUSED)
-    final override
+  void visit_conjured_svalue (const conjured_svalue *sval) final override
   {
-    result_set.add (sval);
-  }
-
-  void visit_const_fn_result_svalue (const const_fn_result_svalue
-				      *sval ATTRIBUTE_UNUSED) final override
-  {
-    result_set.add (sval);
+    equiv_class_id id = equiv_class_id::null ();
+    if (m_cm->get_equiv_class_by_svalue (sval, &id))
+      if (tree cst = id.get_obj (*m_cm).get_any_constant ())
+	check_constant (cst, sval);
   }
 
 private:
@@ -3084,10 +3063,9 @@ private:
       {
       default:
 	/* Assume all unhandled operands are compatible.  */
-	result_set.add (sval);
 	break;
       case INTEGER_CST:
-	if (capacity_compatible_with_type (cst, m_size_cst))
+	if (!capacity_compatible_with_type (cst, m_size_cst))
 	  result_set.add (sval);
 	break;
       }
@@ -3210,7 +3188,7 @@ region_model::check_region_size (const region *lhs_reg, const svalue *rhs_sval,
 	if (!is_struct)
 	  {
 	    size_visitor v (pointee_size_tree, capacity, m_constraints);
-	    if (!v.get_result ())
+	    if (v.is_dubious_capacity ())
 	      {
 		tree expr = get_representative_tree (capacity);
 		ctxt->warn (make_unique <dubious_allocation_size> (lhs_reg,
@@ -3240,7 +3218,7 @@ region_model::set_value (const region *lhs_reg, const svalue *rhs_sval,
 
   check_region_size (lhs_reg, rhs_sval, ctxt);
 
-  check_region_for_write (lhs_reg, ctxt);
+  check_region_for_write (lhs_reg, rhs_sval, ctxt);
 
   m_store.set_value (m_mgr->get_store_manager(), lhs_reg, rhs_sval,
 		     ctxt ? ctxt->get_uncertainty () : NULL);
@@ -3296,8 +3274,10 @@ void
 region_model::mark_region_as_unknown (const region *reg,
 				      uncertainty_t *uncertainty)
 {
+  svalue_set maybe_live_values;
   m_store.mark_region_as_unknown (m_mgr->get_store_manager(), reg,
-				  uncertainty);
+				  uncertainty, &maybe_live_values);
+  m_store.on_maybe_live_values (maybe_live_values);
 }
 
 /* Determine what is known about the condition "LHS_SVAL OP RHS_SVAL" within
@@ -3871,7 +3851,12 @@ region_model::get_representative_path_var_1 (const svalue *sval,
 
   /* Prevent infinite recursion.  */
   if (visited->contains (sval))
-    return path_var (NULL_TREE, 0);
+    {
+      if (sval->get_kind () == SK_CONSTANT)
+	return path_var (sval->maybe_get_constant (), 0);
+      else
+	return path_var (NULL_TREE, 0);
+    }
   visited->add (sval);
 
   /* Handle casts by recursion into get_representative_path_var.  */
@@ -4677,6 +4662,10 @@ region_model::get_current_function () const
    If OUT_RESULT is non-null, copy any return value from the frame
    into *OUT_RESULT.
 
+   If EVAL_RETURN_SVALUE is false, then don't evaluate the return value.
+   This is for use when unwinding frames e.g. due to longjmp, to suppress
+   erroneously reporting uninitialized return values.
+
    Purge the frame region and all its descendent regions.
    Convert any pointers that point into such regions into
    POISON_KIND_POPPED_STACK svalues.  */
@@ -4684,7 +4673,8 @@ region_model::get_current_function () const
 void
 region_model::pop_frame (tree result_lvalue,
 			 const svalue **out_result,
-			 region_model_context *ctxt)
+			 region_model_context *ctxt,
+			 bool eval_return_svalue)
 {
   gcc_assert (m_current_frame);
 
@@ -4698,7 +4688,9 @@ region_model::pop_frame (tree result_lvalue,
   tree fndecl = m_current_frame->get_function ()->decl;
   tree result = DECL_RESULT (fndecl);
   const svalue *retval = NULL;
-  if (result && TREE_TYPE (result) != void_type_node)
+  if (result
+      && TREE_TYPE (result) != void_type_node
+      && eval_return_svalue)
     {
       retval = get_rvalue (result, ctxt);
       if (out_result)
@@ -4710,6 +4702,8 @@ region_model::pop_frame (tree result_lvalue,
 
   if (result_lvalue && retval)
     {
+      gcc_assert (eval_return_svalue);
+
       /* Compute result_dst_reg using RESULT_LVALUE *after* popping
 	 the frame, but before poisoning pointers into the old frame.  */
       const region *result_dst_reg = get_lvalue (result_lvalue, ctxt);
@@ -4967,7 +4961,7 @@ public:
     return same_tree_p (m_arg, ((const float_as_size_arg &) other).m_arg);
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     diagnostic_metadata m;
     bool warned = warning_meta (rich_loc, m, get_controlling_option (),
@@ -5329,7 +5323,7 @@ public:
     return OPT_Wanalyzer_exposure_through_uninit_copy;
   }
 
-  bool emit (rich_location *rich_loc) final override
+  bool emit (rich_location *rich_loc, logger *) final override
   {
     diagnostic_metadata m;
     /* CWE-200: Exposure of Sensitive Information to an Unauthorized Actor.  */

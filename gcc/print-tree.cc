@@ -34,6 +34,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-cfg.h"
 #include "dumpfile.h"
 #include "print-tree.h"
+#include "file-prefix-map.h"
 
 /* Define the hash table of nodes already seen.
    Such nodes are not repeated; brief cross-references are used.  */
@@ -631,6 +632,11 @@ print_node (FILE *file, const char *prefix, tree node, int indent,
 	  && TYPE_CXX_ODR_P (node))
 	fputs (" cxx-odr-p", file);
 
+      if ((code == RECORD_TYPE
+	   || code == UNION_TYPE)
+	  && TYPE_INCLUDES_FLEXARRAY (node))
+	fputs (" includes-flexarray", file);
+
       /* The transparent-union flag is used for different things in
 	 different nodes.  */
       if ((code == UNION_TYPE || code == RECORD_TYPE)
@@ -1065,7 +1071,10 @@ print_decl_identifier (FILE *file, tree decl, int flags)
 	{
 	  expanded_location loc
 	    = expand_location (DECL_SOURCE_LOCATION (decl));
-	  fprintf (file, "%s:%d:%d", loc.file, loc.line, loc.column);
+	  const char *f = flags & PRINT_DECL_REMAP_DEBUG
+	    ? remap_debug_filename (loc.file)
+	    : loc.file;
+	  fprintf (file, "%s:%d:%d", f, loc.line, loc.column);
 	}
       needs_colon = true;
     }

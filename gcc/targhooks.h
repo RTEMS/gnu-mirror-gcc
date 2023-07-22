@@ -53,6 +53,8 @@ extern scalar_int_mode default_unwind_word_mode (void);
 extern unsigned HOST_WIDE_INT default_shift_truncation_mask
   (machine_mode);
 extern unsigned int default_min_divisions_for_recip_mul (machine_mode);
+extern bool default_preferred_div_as_shifts_over_mult
+  (const_tree);
 extern int default_mode_rep_extended (scalar_int_mode, scalar_int_mode);
 
 extern tree default_stack_protect_guard (void);
@@ -211,14 +213,15 @@ extern void default_addr_space_diagnose_usage (addr_space_t, location_t);
 extern rtx default_addr_space_convert (rtx, tree, tree);
 extern unsigned int default_case_values_threshold (void);
 extern bool default_have_conditional_execution (void);
-extern bool default_can_special_div_by_const (enum tree_code, tree, wide_int,
-					      rtx *, rtx, rtx);
 
 extern bool default_libc_has_function (enum function_class, tree);
 extern bool default_libc_has_fast_function (int fcode);
 extern bool no_c99_libc_has_function (enum function_class, tree);
 extern bool gnu_libc_has_function (enum function_class, tree);
 extern bool bsd_libc_has_function (enum function_class, tree);
+extern unsigned default_libm_function_max_error (unsigned, machine_mode, bool);
+extern unsigned glibc_linux_libm_function_max_error (unsigned, machine_mode,
+						     bool);
 
 extern tree default_builtin_tm_load_store (tree);
 

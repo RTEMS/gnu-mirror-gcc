@@ -604,6 +604,11 @@ rs6000_target_modify_macros (bool define_p, HOST_WIDE_INT flags)
   /* Tell the user -mrop-protect is in play.  */
   if (rs6000_rop_protect)
     rs6000_define_or_undefine_macro (define_p, "__ROP_PROTECT__");
+  /* Tell the user __builtin_set_fpscr_rn now returns the FPSCR fields
+     in a double.  Originally the built-in returned void.  */
+  if ((flags & OPTION_MASK_SOFT_FLOAT) == 0)
+    rs6000_define_or_undefine_macro (define_p,
+				     "__SET_FPSCR_RN_RETURNS_FPSCR__");
 }
 
 void
@@ -1929,11 +1934,15 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 	   128-bit variant of built-in function.  */
 	if (GET_MODE_PRECISION (arg1_mode) > 64)
 	  {
-	    /* If first argument is of float variety, choose variant
-	       that expects __ieee128 argument.  Otherwise, expect
-	       __int128 argument.  */
+	    /* If first argument is of float variety, choose the variant that
+	       expects __ieee128 argument.  If the first argument is vector
+	       int, choose the variant that expects vector unsigned
+	       __int128 argument.  Otherwise, expect scalar __int128 argument.
+	    */
 	    if (GET_MODE_CLASS (arg1_mode) == MODE_FLOAT)
 	      instance_code = RS6000_BIF_VSIEQPF;
+	    else if (GET_MODE_CLASS (arg1_mode) == MODE_VECTOR_INT)
+	      instance_code = RS6000_BIF_VSIEQPV;
 	    else
 	      instance_code = RS6000_BIF_VSIEQP;
 	  }

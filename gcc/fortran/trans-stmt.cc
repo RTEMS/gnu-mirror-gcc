@@ -82,7 +82,7 @@ gfc_conv_label_variable (gfc_se * se, gfc_expr * expr)
   if (TREE_CODE (se->expr) == COMPONENT_REF)
     se->expr = TREE_OPERAND (se->expr, 1);
   /* Deals with dummy argument. Get the parameter declaration.  */
-  else if (TREE_CODE (se->expr) == INDIRECT_REF)
+  else if (INDIRECT_REF_P (se->expr))
     se->expr = TREE_OPERAND (se->expr, 0);
 }
 
@@ -444,7 +444,8 @@ gfc_trans_call (gfc_code * code, bool dependency_check,
       else
 	gfc_add_expr_to_block (&se.pre, se.expr);
 
-      gfc_add_block_to_block (&se.pre, &se.post);
+      gfc_add_block_to_block (&se.finalblock, &se.post);
+      gfc_add_block_to_block (&se.pre, &se.finalblock);
     }
 
   else
@@ -469,7 +470,7 @@ gfc_trans_call (gfc_code * code, bool dependency_check,
       gfc_conv_ss_startstride (&loop);
       /* TODO: gfc_conv_loop_setup generates a temporary for vector
 	 subscripts.  This could be prevented in the elemental case
-	 as temporaries are handled separatedly
+	 as temporaries are handled separately
 	 (below in gfc_conv_elemental_dependencies).  */
       if (code->expr1)
 	gfc_conv_loop_setup (&loop, &code->expr1->where);
@@ -543,6 +544,7 @@ gfc_trans_call (gfc_code * code, bool dependency_check,
       gfc_trans_scalarizing_loops (&loop, &body);
       gfc_add_block_to_block (&se.pre, &loop.pre);
       gfc_add_block_to_block (&se.pre, &loop.post);
+      gfc_add_block_to_block (&se.pre, &loopse.finalblock);
       gfc_add_block_to_block (&se.pre, &se.post);
       gfc_cleanup_loop (&loop);
     }
@@ -1928,15 +1930,13 @@ trans_associate_var (gfc_symbol *sym, gfc_wrapped_block *block)
       gfc_conv_expr_descriptor (&se, e);
 
       if (sym->ts.type == BT_CHARACTER
-	  && sym->ts.deferred
 	  && !sym->attr.select_type_temporary
+	  && sym->ts.u.cl->backend_decl
 	  && VAR_P (sym->ts.u.cl->backend_decl)
 	  && se.string_length != sym->ts.u.cl->backend_decl)
-	{
-	  gfc_add_modify (&se.pre, sym->ts.u.cl->backend_decl,
+	gfc_add_modify (&se.pre, sym->ts.u.cl->backend_decl,
 			  fold_convert (TREE_TYPE (sym->ts.u.cl->backend_decl),
 					se.string_length));
-	}
 
       /* If we didn't already do the pointer assignment, set associate-name
 	 descriptor to the one generated for the temporary.  */
@@ -2139,11 +2139,14 @@ trans_associate_var (gfc_symbol *sym, gfc_wrapped_block *block)
 	  tree ctree = gfc_get_class_from_expr (se.expr);
 	  tmp = TREE_TYPE (sym->backend_decl);
 
-	  /* Coarray scalar component expressions can emerge from
-	     the front end as array elements of the _data field.  */
+	  /* F2018:19.5.1.6 "If a selector has the POINTER attribute,
+	     it shall be associated; the associate name is associated
+	     with the target of the pointer and does not have the
+	     POINTER attribute."  */
 	  if (sym->ts.type == BT_CLASS
-	      && e->ts.type == BT_CLASS && e->rank == 0
-	      && !GFC_CLASS_TYPE_P (TREE_TYPE (se.expr)) && ctree)
+	      && e->ts.type == BT_CLASS && e->rank == 0 && ctree
+	      && (!GFC_CLASS_TYPE_P (TREE_TYPE (se.expr))
+		  || CLASS_DATA (e)->attr.class_pointer))
 	    {
 	      tree stmp;
 	      tree dtmp;
@@ -2153,10 +2156,10 @@ trans_associate_var (gfc_symbol *sym, gfc_wrapped_block *block)
 	      ctree = gfc_create_var (dtmp, "class");
 
 	      stmp = gfc_class_data_get (se.expr);
-	      gcc_assert (GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (stmp)));
-
-	      /* Set the fields of the target class variable.  */
-	      stmp = gfc_conv_descriptor_data_get (stmp);
+	      /* Coarray scalar component expressions can emerge from
+		 the front end as array elements of the _data field.  */
+	      if (GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (stmp)))
+		stmp = gfc_conv_descriptor_data_get (stmp);
 	      dtmp = gfc_class_data_get (ctree);
 	      stmp = fold_convert (TREE_TYPE (dtmp), stmp);
 	      gfc_add_modify (&se.pre, dtmp, stmp);
@@ -2170,6 +2173,7 @@ trans_associate_var (gfc_symbol *sym, gfc_wrapped_block *block)
 		  dtmp = gfc_class_len_get (ctree);
 		  stmp = fold_convert (TREE_TYPE (dtmp), stmp);
 		  gfc_add_modify (&se.pre, dtmp, stmp);
+		  need_len_assign = false;
 		}
 	      se.expr = ctree;
 	    }
@@ -2189,6 +2193,7 @@ trans_associate_var (gfc_symbol *sym, gfc_wrapped_block *block)
       gfc_expr *lhs;
       tree res;
       gfc_se se;
+      stmtblock_t final_block;
 
       gfc_init_se (&se, NULL);
 
@@ -2196,6 +2201,15 @@ trans_associate_var (gfc_symbol *sym, gfc_wrapped_block *block)
 	 allocation can take place automatically in gfc_trans_assignment.
 	 The frontend prevents them from being either allocated,
 	 deallocated or reallocated.  */
+      if (sym->ts.type == BT_DERIVED
+	  && sym->ts.u.derived->attr.alloc_comp)
+	{
+	  tmp = sym->backend_decl;
+	  tmp = gfc_nullify_alloc_comp (sym->ts.u.derived, tmp,
+				sym->attr.dimension ? sym->as->rank : 0);
+	  gfc_add_expr_to_block (&se.pre, tmp);
+	}
+
       if (sym->attr.allocatable)
 	{
 	  tmp = sym->backend_decl;
@@ -2206,8 +2220,32 @@ trans_associate_var (gfc_symbol *sym, gfc_wrapped_block *block)
 	}
 
       lhs = gfc_lval_expr_from_sym (sym);
+      lhs->must_finalize = 0;
       res = gfc_trans_assignment (lhs, e, false, true);
       gfc_add_expr_to_block (&se.pre, res);
+
+      gfc_init_block (&final_block);
+
+      if (sym->attr.associate_var
+	  && sym->ts.type == BT_DERIVED
+	  && sym->ts.u.derived->attr.defined_assign_comp
+	  && gfc_may_be_finalized (sym->ts)
+	  && e->expr_type == EXPR_FUNCTION)
+	{
+	  gfc_expr *ef;
+	  ef = gfc_lval_expr_from_sym (sym);
+	  gfc_add_finalizer_call (&final_block, ef);
+	  gfc_free_expr (ef);
+	}
+
+      if (sym->ts.type == BT_DERIVED
+	  && sym->ts.u.derived->attr.alloc_comp)
+	{
+	  tmp = sym->backend_decl;
+	  tmp = gfc_deallocate_alloc_comp (sym->ts.u.derived,
+					   tmp, 0);
+	  gfc_add_expr_to_block (&final_block, tmp);
+	}
 
       tmp = sym->backend_decl;
       if (e->expr_type == EXPR_FUNCTION
@@ -2243,6 +2281,8 @@ trans_associate_var (gfc_symbol *sym, gfc_wrapped_block *block)
       else
 	tmp = NULL_TREE;
 
+      gfc_add_expr_to_block (&final_block, tmp);
+      tmp = gfc_finish_block (&final_block);
       res = gfc_finish_block (&se.pre);
       gfc_add_init_cleanup (block, res, tmp);
       gfc_free_expr (lhs);
@@ -2255,7 +2295,7 @@ trans_associate_var (gfc_symbol *sym, gfc_wrapped_block *block)
       gfc_init_se (&se, NULL);
       if (e->symtree->n.sym->ts.type == BT_CHARACTER)
 	{
-	  /* Deferred strings are dealt with in the preceeding.  */
+	  /* Deferred strings are dealt with in the preceding.  */
 	  gcc_assert (!e->symtree->n.sym->ts.deferred);
 	  tmp = e->symtree->n.sym->ts.u.cl->backend_decl;
 	}
@@ -4065,7 +4105,7 @@ gfc_trans_forall_loop (forall_info *forall_tmp, tree body,
 			      count, build_int_cst (TREE_TYPE (count), 0));
 
       /* PR 83064 means that we cannot use annot_expr_parallel_kind until
-       the autoparallelizer can hande this.  */
+       the autoparallelizer can handle this.  */
       if (forall_tmp->do_concurrent)
 	cond = build3 (ANNOTATE_EXPR, TREE_TYPE (cond), cond,
 		       build_int_cst (integer_type_node,
@@ -6313,7 +6353,7 @@ gfc_trans_allocate (gfc_code * code)
 		}
 	      /* Create a temp variable only for component refs to prevent
 		 having to go through the full deref-chain each time and to
-		 simplfy computation of array properties.  */
+		 simplify computation of array properties.  */
 	      temp_var_needed = TREE_CODE (se.expr) == COMPONENT_REF;
 	    }
 	}
@@ -6347,7 +6387,10 @@ gfc_trans_allocate (gfc_code * code)
 	}
       gfc_add_block_to_block (&block, &se.pre);
       if (code->expr3->must_finalize)
-	gfc_add_block_to_block (&final_block, &se.post);
+	{
+	  gfc_add_block_to_block (&final_block, &se.finalblock);
+	  gfc_add_block_to_block (&final_block, &se.post);
+	}
       else
 	gfc_add_block_to_block (&post, &se.post);
 
@@ -6417,12 +6460,15 @@ gfc_trans_allocate (gfc_code * code)
       /* Deallocate any allocatable components in expressions that use a
 	 temporary object, i.e. are not a simple alias of to an EXPR_VARIABLE.
 	 E.g. temporaries of a function call need freeing of their components
-	 here.  */
+	 here. Explicit derived type allocation of class entities uses expr3
+	 to carry the default initializer. This must not be deallocated or
+	 finalized.  */
       if ((code->expr3->ts.type == BT_DERIVED
 	   || code->expr3->ts.type == BT_CLASS)
 	  && (code->expr3->expr_type != EXPR_VARIABLE || temp_obj_created)
 	  && code->expr3->ts.u.derived->attr.alloc_comp
-	  && !code->expr3->must_finalize)
+	  && !code->expr3->must_finalize
+	  && !code->ext.alloc.expr3_not_explicit)
 	{
 	  tmp = gfc_deallocate_alloc_comp (code->expr3->ts.u.derived,
 					   expr3, code->expr3->rank);
@@ -6582,7 +6628,7 @@ gfc_trans_allocate (gfc_code * code)
 	  && DECL_P (expr3) && DECL_ARTIFICIAL (expr3))
 	{
 	  /* Build a temporary symtree and symbol.  Do not add it to the current
-	     namespace to prevent accidently modifying a colliding
+	     namespace to prevent accidentaly modifying a colliding
 	     symbol's as.  */
 	  newsym = XCNEW (gfc_symtree);
 	  /* The name of the symtree should be unique, because gfc_create_var ()
@@ -7007,8 +7053,13 @@ gfc_trans_allocate (gfc_code * code)
 	  gfc_expr *init_expr = gfc_expr_to_initialize (expr);
 	  gfc_expr *rhs = e3rhs ? e3rhs : gfc_copy_expr (code->expr3);
 	  flag_realloc_lhs = 0;
+
+	  /* Set the symbol to be artificial so that the result is not finalized.  */
+	  init_expr->symtree->n.sym->attr.artificial = 1;
 	  tmp = gfc_trans_assignment (init_expr, rhs, true, false, true,
 				      false);
+	  init_expr->symtree->n.sym->attr.artificial = 0;
+
 	  flag_realloc_lhs = realloc_lhs;
 	  /* Free the expression allocated for init_expr.  */
 	  gfc_free_expr (init_expr);
@@ -7411,7 +7462,8 @@ gfc_trans_deallocate (gfc_code *code)
 	{
 	  tmp = gfc_deallocate_scalar_with_status (se.expr, pstat, label_finish,
 						   false, al->expr,
-						   al->expr->ts, is_coarray);
+						   al->expr->ts, NULL_TREE,
+						   is_coarray);
 	  gfc_add_expr_to_block (&se.pre, tmp);
 
 	  /* Set to zero after deallocation.  */

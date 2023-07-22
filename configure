@@ -687,7 +687,10 @@ extra_host_zlib_configure_flags
 extra_host_libiberty_configure_flags
 stage1_languages
 host_libs_picflag
+PICFLAG
 host_shared
+gcc_host_pie
+host_pie
 extra_linker_plugin_flags
 extra_linker_plugin_configure_flags
 islinc
@@ -830,6 +833,7 @@ enable_isl_version_check
 enable_lto
 enable_linker_plugin_configure_flags
 enable_linker_plugin_flags
+enable_host_pie
 enable_host_shared
 enable_stage1_languages
 enable_objc_gc
@@ -1558,6 +1562,7 @@ Optional Features:
   --enable-linker-plugin-flags=FLAGS
                           additional flags for configuring and building linker
                           plugins [none]
+  --enable-host-pie       build position independent host executables
   --enable-host-shared    build host code as shared libraries
   --enable-stage1-languages[=all]
                           choose additional languages to build during stage1.
@@ -8645,6 +8650,39 @@ fi
 
 
 
+# Handle --enable-host-pie
+# If host PIE executables are the default (or must be forced on) for some host,
+# we must pass that configuration to the gcc directory.
+gcc_host_pie=
+# Check whether --enable-host-pie was given.
+if test "${enable_host_pie+set}" = set; then :
+  enableval=$enable_host_pie; host_pie=$enableval
+ case $host in
+   *-*-darwin2*)
+     if test x$host_pie != xyes ; then
+       # for Darwin20+ this is required.
+       { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: PIE executables are required for the configured host, host-pie setting ignored." >&5
+$as_echo "$as_me: WARNING: PIE executables are required for the configured host, host-pie setting ignored." >&2;}
+       host_pie=yes
+       gcc_host_pie=--enable-host-pie
+     fi ;;
+  *) ;;
+ esac
+else
+  case $host in
+  *-*-darwin2*)
+    # Default to PIE (mandatory for aarch64).
+    host_pie=yes
+    gcc_host_pie=--enable-host-pie
+    ;;
+  *) host_pie=no ;;
+ esac
+fi
+
+
+
+
+
 # Enable --enable-host-shared.
 # Checked early to determine whether jit is an 'all' language
 # Check whether --enable-host-shared was given.
@@ -8654,18 +8692,49 @@ if test "${enable_host_shared+set}" = set; then :
    x86_64-*-darwin* | aarch64-*-darwin*)
      if test x$host_shared != xyes ; then
        # PIC is the default, and actually cannot be switched off.
-       echo configure.ac: warning: PIC code is required for the configured target, host-shared setting ignored. 1>&2
+       { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: PIC code is required for the configured host; host-shared setting ignored." >&5
+$as_echo "$as_me: WARNING: PIC code is required for the configured host; host-shared setting ignored." >&2;}
+       host_shared=yes
+     fi ;;
+   *-*-darwin*)
+     if test x$host_pie = xyes -a x$host_shared != xyes ; then
+       { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: PIC code is required for PIE host executables host-shared setting ignored." >&5
+$as_echo "$as_me: WARNING: PIC code is required for PIE host executables host-shared setting ignored." >&2;}
        host_shared=yes
      fi ;;
   *) ;;
  esac
 else
   case $host in
+  # 64B x86_64 and Aarch64 Darwin default to PIC.
   x86_64-*-darwin* | aarch64-*-darwin*) host_shared=yes ;;
-  *) host_shared=no ;;
+  # 32B and powerpc64 Darwin must use PIC to link PIE exes.
+  *-*-darwin*) host_shared=$host_pie ;;
+  *) host_shared=no;;
  esac
 fi
 
+
+
+
+if test x$host_shared = xyes; then
+  case $host in
+    *-*-darwin*)
+      # Since host shared is the default for 64b Darwin, and also enabled for
+      # host_pie, ensure that we present the PIE flag when host_pie is active.
+      if test x$host_pie = xyes; then
+        PICFLAG=-fPIE
+      fi
+      ;;
+    *)
+      PICFLAG=-fPIC
+      ;;
+  esac
+elif test x$host_pie = xyes; then
+  PICFLAG=-fPIE
+else
+  PICFLAG=
+fi
 
 
 
@@ -8673,7 +8742,7 @@ fi
 # libs (e.g. GMP) in-tree those libs need to be configured to generate PIC
 # code.
 host_libs_picflag=
-if test "$host_shared" = "yes";then
+if test "$host_shared" = "yes" -o "$host_pie" = "yes"; then
 host_libs_picflag='--with-pic'
 fi
 
@@ -9918,7 +9987,9 @@ esac
 # These force 'configure's to be done one at a time, to avoid problems
 # with contention over a shared config.cache.
 rm -f serdep.tmp
+if test "x${enable_serial_build_configure}" = xyes || test "x${enable_serial_host_configure}" = xyes || test "x${enable_serial_target_configure}" = xyes; then
 echo '# serdep.tmp' > serdep.tmp
+fi
 olditem=
 test "x${enable_serial_build_configure}" = xyes &&
 for item in ${build_configdirs} ; do

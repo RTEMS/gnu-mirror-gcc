@@ -230,10 +230,12 @@ region_model_manager::get_or_create_constant_svalue (tree cst_expr)
    for VAL of type TYPE, creating it if necessary.  */
 
 const svalue *
-region_model_manager::get_or_create_int_cst (tree type, poly_int64 val)
+region_model_manager::get_or_create_int_cst (tree type,
+					     const poly_wide_int_ref &cst)
 {
   gcc_assert (type);
-  tree tree_cst = build_int_cst (type, val);
+  gcc_assert (INTEGRAL_TYPE_P (type) || POINTER_TYPE_P (type));
+  tree tree_cst = wide_int_to_tree (type, cst);
   return get_or_create_constant_svalue (tree_cst);
 }
 
@@ -292,9 +294,10 @@ region_model_manager::create_unique_svalue (tree type)
    necessary.  */
 
 const svalue *
-region_model_manager::get_or_create_initial_value (const region *reg)
+region_model_manager::get_or_create_initial_value (const region *reg,
+						   bool check_poisoned)
 {
-  if (!reg->can_have_initial_svalue_p ())
+  if (!reg->can_have_initial_svalue_p () && check_poisoned)
     return get_or_create_poisoned_svalue (POISON_KIND_UNINIT,
 					  reg->get_type ());
 
@@ -507,7 +510,7 @@ get_code_for_cast (tree dst_type, tree src_type)
   if (!src_type)
     return NOP_EXPR;
 
-  if (TREE_CODE (src_type) == REAL_TYPE)
+  if (SCALAR_FLOAT_TYPE_P (src_type))
     {
       if (TREE_CODE (dst_type) == INTEGER_TYPE)
 	return FIX_TRUNC_EXPR;
@@ -531,9 +534,9 @@ region_model_manager::get_or_create_cast (tree type, const svalue *arg)
     return arg;
 
   /* Don't attempt to handle casts involving vector types for now.  */
-  if (TREE_CODE (type) == VECTOR_TYPE
+  if (VECTOR_TYPE_P (type)
       || (arg->get_type ()
-	  && TREE_CODE (arg->get_type ()) == VECTOR_TYPE))
+	  && VECTOR_TYPE_P (arg->get_type ())))
     return get_or_create_unknown_svalue (type);
 
   enum tree_code op = get_code_for_cast (type, arg->get_type ());
@@ -612,7 +615,7 @@ region_model_manager::maybe_fold_binop (tree type, enum tree_code op,
 	  return get_or_create_constant_svalue (result);
     }
 
-  if (FLOAT_TYPE_P (type)
+  if ((type && FLOAT_TYPE_P (type))
       || (arg0->get_type () && FLOAT_TYPE_P (arg0->get_type ()))
       || (arg1->get_type () && FLOAT_TYPE_P (arg1->get_type ())))
     return NULL;
@@ -634,6 +637,11 @@ region_model_manager::maybe_fold_binop (tree type, enum tree_code op,
       /* (0 - VAL) -> -VAL.  */
       if (cst0 && zerop (cst0))
 	return get_or_create_unaryop (type, NEGATE_EXPR, arg1);
+      /* (X + Y) - X -> Y.  */
+      if (const binop_svalue *binop = arg0->dyn_cast_binop_svalue ())
+	if (binop->get_op () == PLUS_EXPR)
+	  if (binop->get_arg0 () == arg1)
+	    return get_or_create_cast (type, binop->get_arg1 ());
       break;
     case MULT_EXPR:
       /* (VAL * 0).  */
@@ -726,10 +734,7 @@ region_model_manager::maybe_fold_binop (tree type, enum tree_code op,
   if (cst1 && associative_tree_code (op))
     if (const binop_svalue *binop = arg0->dyn_cast_binop_svalue ())
       if (binop->get_op () == op
-	  && binop->get_arg1 ()->maybe_get_constant ()
-	  && type == binop->get_type ()
-	  && type == binop->get_arg0 ()->get_type ()
-	  && type == binop->get_arg1 ()->get_type ())
+	  && binop->get_arg1 ()->maybe_get_constant ())
 	return get_or_create_binop
 	  (type, op, binop->get_arg0 (),
 	   get_or_create_binop (type, op,
@@ -747,6 +752,21 @@ region_model_manager::maybe_fold_binop (tree type, enum tree_code op,
 	    (type, op, binop->get_arg0 (),
 	     get_or_create_binop (size_type_node, op,
 				  binop->get_arg1 (), arg1));
+
+  /* Distribute multiplication by a constant through addition/subtraction:
+     (X + Y) * CST => (X * CST) + (Y * CST).  */
+  if (cst1 && op == MULT_EXPR)
+    if (const binop_svalue *binop = arg0->dyn_cast_binop_svalue ())
+      if (binop->get_op () == PLUS_EXPR
+	  || binop->get_op () == MINUS_EXPR)
+	{
+	  return get_or_create_binop
+	    (type, binop->get_op (),
+	     get_or_create_binop (type, op,
+				  binop->get_arg0 (), arg1),
+	     get_or_create_binop (type, op,
+				  binop->get_arg1 (), arg1));
+	}
 
   /* etc.  */
 
@@ -1410,7 +1430,7 @@ region_model_manager::get_region_for_label (tree label)
 const decl_region *
 region_model_manager::get_region_for_global (tree expr)
 {
-  gcc_assert (TREE_CODE (expr) == VAR_DECL);
+  gcc_assert (VAR_P (expr));
 
   decl_region **slot = m_globals_map.get (expr);
   if (slot)

@@ -34,8 +34,9 @@ import core.stdc.stdio;
  *      loc   = the location for reporting line numbers in errors
  *      torig = the type to generate the `TypeInfo` object for
  *      sc    = the scope
+ *      genObjCode = if true, object code will be generated for the obtained TypeInfo
  */
-extern (C++) void genTypeInfo(Expression e, const ref Loc loc, Type torig, Scope* sc)
+extern (C++) void genTypeInfo(Expression e, const ref Loc loc, Type torig, Scope* sc, bool genObjCode = true)
 {
     // printf("genTypeInfo() %s\n", torig.toChars());
 
@@ -46,6 +47,7 @@ extern (C++) void genTypeInfo(Expression e, const ref Loc loc, Type torig, Scope
     {
         if (!global.params.useTypeInfo)
         {
+            global.gag = 0;
             if (e)
                 .error(loc, "expression `%s` uses the GC and cannot be used with switch `-betterC`", e.toChars());
             else
@@ -80,7 +82,7 @@ extern (C++) void genTypeInfo(Expression e, const ref Loc loc, Type torig, Scope
 
         // generate a COMDAT for other TypeInfos not available as builtins in
         // druntime
-        if (!isUnqualifiedClassInfo && !builtinTypeInfo(t))
+        if (!isUnqualifiedClassInfo && !builtinTypeInfo(t) && genObjCode)
         {
             if (sc) // if in semantic() pass
             {
@@ -105,10 +107,11 @@ extern (C++) void genTypeInfo(Expression e, const ref Loc loc, Type torig, Scope
  *      loc = the location for reporting line nunbers in errors
  *      t   = the type to get the type of the `TypeInfo` object for
  *      sc  = the scope
+ *      genObjCode = if true, object code will be generated for the obtained TypeInfo
  * Returns:
  *      The type of the `TypeInfo` object associated with `t`
  */
-extern (C++) Type getTypeInfoType(const ref Loc loc, Type t, Scope* sc);
+extern (C++) Type getTypeInfoType(const ref Loc loc, Type t, Scope* sc, bool genObjCode = true);
 
 private TypeInfoDeclaration getTypeInfoDeclaration(Type t)
 {

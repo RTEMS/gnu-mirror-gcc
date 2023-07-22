@@ -344,7 +344,7 @@ build_base_path (enum tree_code code,
 
   bool uneval = (cp_unevaluated_operand != 0
 		 || processing_template_decl
-		 || in_template_function ());
+		 || in_template_context);
 
   /* For a non-pointer simple base reference, express it as a COMPONENT_REF
      without taking its address (and so causing lambda capture, 91933).  */
@@ -673,7 +673,7 @@ convert_to_base_statically (tree expr, tree base)
 bool
 is_empty_base_ref (tree expr)
 {
-  if (TREE_CODE (expr) == INDIRECT_REF)
+  if (INDIRECT_REF_P (expr))
     expr = TREE_OPERAND (expr, 0);
   if (TREE_CODE (expr) != NOP_EXPR)
     return false;
@@ -6476,7 +6476,15 @@ end_of_class (tree t, eoc_mode mode)
 	     size of the type (usually 1) for computing nvsize.  */
 	  size = TYPE_SIZE_UNIT (TREE_TYPE (field));
 
-	offset = size_binop (PLUS_EXPR, byte_position (field), size);
+	if (DECL_BIT_FIELD_TYPE (field))
+	  {
+	    offset = size_binop (PLUS_EXPR, bit_position (field),
+				 DECL_SIZE (field));
+	    offset = size_binop (CEIL_DIV_EXPR, offset, bitsize_unit_node);
+	    offset = fold_convert (sizetype, offset);
+	  }
+	else
+	  offset = size_binop (PLUS_EXPR, byte_position (field), size);
 	if (tree_int_cst_lt (result, offset))
 	  result = offset;
       }
@@ -8047,7 +8055,7 @@ resolves_to_fixed_type_p (tree instance, int* nonnull)
   /* processing_template_decl can be false in a template if we're in
      instantiate_non_dependent_expr, but we still want to suppress
      this check.  */
-  if (in_template_function ())
+  if (in_template_context)
     {
       /* In a template we only care about the type of the result.  */
       if (nonnull)

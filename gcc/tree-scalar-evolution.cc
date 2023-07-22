@@ -1300,13 +1300,7 @@ get_loop_exit_condition (const class loop *loop)
     fprintf (dump_file, "(get_loop_exit_condition \n  ");
 
   if (exit_edge)
-    {
-      gimple *stmt;
-
-      stmt = last_stmt (exit_edge->src);
-      if (gcond *cond_stmt = safe_dyn_cast <gcond *> (stmt))
-	res = cond_stmt;
-    }
+    res = safe_dyn_cast <gcond *> (*gsi_last_bb (exit_edge->src));
 
   if (dump_file && (dump_flags & TDF_SCEV))
     {
@@ -3038,7 +3032,8 @@ iv_can_overflow_p (class loop *loop, tree type, tree base, tree step)
 
   if (!INTEGRAL_TYPE_P (TREE_TYPE (base))
       || !get_range_query (cfun)->range_of_expr (r, base)
-      || r.kind () != VR_RANGE)
+      || r.varying_p ()
+      || r.undefined_p ())
     return true;
 
   base_min = r.lower_bound ();
@@ -3046,7 +3041,8 @@ iv_can_overflow_p (class loop *loop, tree type, tree base, tree step)
 
   if (!INTEGRAL_TYPE_P (TREE_TYPE (step))
       || !get_range_query (cfun)->range_of_expr (r, step)
-      || r.kind () != VR_RANGE)
+      || r.varying_p ()
+      || r.undefined_p ())
     return true;
 
   step_min = r.lower_bound ();
@@ -3678,6 +3674,7 @@ analyze_and_compute_bitop_with_inv_effect (class loop* loop, tree phidef,
   if (TREE_CODE (match_op[1]) != SSA_NAME
       || !expr_invariant_in_loop_p (loop, match_op[0])
       || !(header_phi = dyn_cast <gphi *> (SSA_NAME_DEF_STMT (match_op[1])))
+      || gimple_bb (header_phi) != loop->header
       || gimple_phi_num_args (header_phi) != 2)
     return NULL_TREE;
 

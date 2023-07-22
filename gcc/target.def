@@ -1868,6 +1868,18 @@ correct for most targets.",
  poly_uint64, (const_tree type),
  default_preferred_vector_alignment)
 
+/* Returns whether the target has a preference for decomposing divisions using
+   shifts rather than multiplies.  */
+DEFHOOK
+(preferred_div_as_shifts_over_mult,
+ "Sometimes it is possible to implement a vector division using a sequence\n\
+of two addition-shift pairs, giving four instructions in total.\n\
+Return true if taking this approach for @var{vectype} is likely\n\
+to be better than using a sequence involving highpart multiplication.\n\
+Default is false if @code{can_mult_highpart_p}, otherwise true.",
+ bool, (const_tree type),
+ default_preferred_div_as_shifts_over_mult)
+
 /* Return true if vector alignment is reachable (by peeling N
    iterations) for the given scalar type.  */
 DEFHOOK
@@ -1904,25 +1916,6 @@ implementation approaches itself.",
  bool, (machine_mode mode, machine_mode op_mode, rtx output, rtx in0, rtx in1,
 	const vec_perm_indices &sel),
  NULL)
-
-DEFHOOK
-(can_special_div_by_const,
- "This hook is used to test whether the target has a special method of\n\
-division of vectors of type @var{vectype} using the value @var{constant},\n\
-and producing a vector of type @var{vectype}.  The division\n\
-will then not be decomposed by the vectorizer and kept as a div.\n\
-\n\
-When the hook is being used to test whether the target supports a special\n\
-divide, @var{in0}, @var{in1}, and @var{output} are all null.  When the hook\n\
-is being used to emit a division, @var{in0} and @var{in1} are the source\n\
-vectors of type @var{vecttype} and @var{output} is the destination vector of\n\
-type @var{vectype}.\n\
-\n\
-Return true if the operation is possible, emitting instructions for it\n\
-if rtxes are provided and updating @var{output}.",
- bool, (enum tree_code, tree vectype, wide_int constant, rtx *output,
-	rtx in0, rtx in1),
- default_can_special_div_by_const)
 
 /* Return true if the target supports misaligned store/load of a
    specific factor denoted in the third parameter.  The last parameter
@@ -2677,6 +2670,23 @@ DEFHOOK
  bool, (int fcode),
  default_libc_has_fast_function)
 
+DEFHOOK
+(libm_function_max_error,
+ "This hook determines expected maximum errors for math functions measured\n\
+in ulps (units of the last place).  0 means 0.5ulps precision (correctly\n\
+rounded).  ~0U means unknown errors.  The @code{combined_fn} @var{cfn}\n\
+argument should identify just which math built-in function it is rather than\n\
+its variant, @var{mode} the variant in terms of floating-point machine mode.\n\
+The hook should also take into account @code{flag_rounding_math} whether it\n\
+is maximum error just in default rounding mode, or in all possible rounding\n\
+modes.  @var{boundary_p} is @code{true} for maximum errors on intrinsic math\n\
+boundaries of functions rather than errors inside of the usual result ranges\n\
+of the functions.  E.g.@ the sin/cos function finite result is in between\n\
+-1.0 and 1.0 inclusive, with @var{boundary_p} true the function returns how\n\
+many ulps below or above those boundaries result could be.",
+ unsigned, (unsigned cfn, machine_mode mode, bool boundary_p),
+ default_libm_function_max_error)
+
 /* True if new jumps cannot be created, to replace existing ones or
    not, at the current point in the compilation.  */
 DEFHOOK
@@ -2744,15 +2754,6 @@ DEFHOOK
  @var{bit_code} is @code{AND} or @code{IOR}, which is the op on the compares.",
  rtx, (rtx_insn **prep_seq, rtx_insn **gen_seq, rtx prev, int cmp_code, tree op0, tree op1, int bit_code),
  NULL)
-
-DEFHOOK
-(gen_memset_scratch_rtx,
- "This hook should return an rtx for a scratch register in @var{mode} to\n\
-be used when expanding memset calls.  The backend can use a hard scratch\n\
-register to avoid stack realignment when expanding memset.  The default\n\
-is @code{gen_reg_rtx}.",
- rtx, (machine_mode mode),
- gen_reg_rtx)
 
 /* Return a new value for loop unroll size.  */
 DEFHOOK
@@ -3490,11 +3491,25 @@ code in @file{optabs.cc}.",
    for further details.  */
 DEFHOOK
 (vector_mode_supported_p,
- "Define this to return nonzero if the port is prepared to handle\n\
+ "Define this to return nonzero if the current target is prepared to handle\n\
 insns involving vector mode @var{mode}.  At the very least, it\n\
 must have move patterns for this mode.",
  bool, (machine_mode mode),
  hook_bool_mode_false)
+
+DEFHOOK
+(vector_mode_supported_any_target_p,
+ "Define this to return nonzero if the port is prepared to handle\n\
+insns involving vector mode @var{mode} in any target configuration.\n\
+Returning @var{true} means that the mode can be used as the @samp{TYPE_MODE}\n\
+for vector types.\n\
+\n\
+The default version of this hook returns true.  The final mode assigned to\n\
+@samp{TYPE_MODE} will also be checked against\n\
+@code{TARGET_VECTOR_MODE_SUPPORTED_P} to take target configuration into\n\
+account.",
+ bool, (machine_mode mode),
+ hook_bool_mode_true)
 
 DEFHOOK
 (compatible_vector_types_p,
@@ -5340,7 +5355,8 @@ DEFHOOK
 (get_raw_result_mode,
  "This target hook returns the mode to be used when accessing raw return\n\
 registers in @code{__builtin_return}.  Define this macro if the value\n\
-in @var{reg_raw_mode} is not correct.",
+in @var{reg_raw_mode} is not correct.  Use @code{VOIDmode} if a register\n\
+should be ignored for @code{__builtin_return} purposes.",
  fixed_size_mode, (int regno),
  default_get_reg_raw_mode)
 
@@ -5350,7 +5366,8 @@ DEFHOOK
 (get_raw_arg_mode,
  "This target hook returns the mode to be used when accessing raw argument\n\
 registers in @code{__builtin_apply_args}.  Define this macro if the value\n\
-in @var{reg_raw_mode} is not correct.",
+in @var{reg_raw_mode} is not correct.  Use @code{VOIDmode} if a register\n\
+should be ignored for @code{__builtin_apply_args} purposes.",
  fixed_size_mode, (int regno),
  default_get_reg_raw_mode)
 

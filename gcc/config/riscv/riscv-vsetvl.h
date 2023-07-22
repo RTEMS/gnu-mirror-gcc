@@ -31,6 +31,7 @@ enum vsetvl_type
   VSETVL_NORMAL,
   VSETVL_VTYPE_CHANGE_ONLY,
   VSETVL_DISCARD_RESULT,
+  NUM_VSETVL_TYPE
 };
 
 enum emit_type
@@ -179,6 +180,7 @@ public:
   bool has_avl_reg () const { return get_value () && REG_P (get_value ()); }
   bool has_avl_no_reg () const { return !get_value (); }
   bool has_non_zero_avl () const;
+  bool has_avl () const { return get_value (); }
 };
 
 /* Basic structure to save VL/VTYPE information.  */
@@ -218,6 +220,7 @@ public:
   bool has_avl_reg () const { return m_avl.has_avl_reg (); }
   bool has_avl_no_reg () const { return m_avl.has_avl_no_reg (); }
   bool has_non_zero_avl () const { return m_avl.has_non_zero_avl (); };
+  bool has_avl () const { return m_avl.has_avl (); }
 
   rtx get_avl () const { return m_avl.get_value (); }
   const avl_info &get_avl_info () const { return m_avl; }
@@ -289,13 +292,6 @@ private:
      definition of AVL.  */
   rtl_ssa::insn_info *m_insn;
 
-  /* Parse the instruction to get VL/VTYPE information and demanding
-   * information.  */
-  /* This is only called by simple_vsetvl subroutine when optimize == 0.
-     Since RTL_SSA can not be enabled when optimize == 0, we don't initialize
-     the m_insn.  */
-  void parse_insn (rtx_insn *);
-
   friend class vector_infos_manager;
 
 public:
@@ -304,6 +300,12 @@ public:
       m_insn (nullptr)
   {}
 
+  /* Parse the instruction to get VL/VTYPE information and demanding
+   * information.  */
+  /* This is only called by simple_vsetvl subroutine when optimize == 0.
+     Since RTL_SSA can not be enabled when optimize == 0, we don't initialize
+     the m_insn.  */
+  void parse_insn (rtx_insn *);
   /* This is only called by lazy_vsetvl subroutine when optimize > 0.
      We use RTL_SSA framework to initialize the insn_info.  */
   void parse_insn (rtl_ssa::insn_info *);
@@ -379,6 +381,7 @@ public:
   void fuse_mask_policy (const vector_insn_info &, const vector_insn_info &);
 
   bool compatible_p (const vector_insn_info &) const;
+  bool skip_avl_compatible_p (const vector_insn_info &) const;
   bool compatible_avl_p (const vl_vtype_info &) const;
   bool compatible_avl_p (const avl_info &) const;
   bool compatible_vtype_p (const vl_vtype_info &) const;
@@ -448,6 +451,30 @@ public:
 
   /* Return true if all expression set in bitmap are same ratio.  */
   bool all_same_ratio_p (sbitmap) const;
+
+  bool all_empty_predecessor_p (const basic_block) const;
+  bool all_avail_in_compatible_p (const basic_block) const;
+
+  bool to_delete_p (rtx_insn *rinsn)
+  {
+    if (to_delete_vsetvls.contains (rinsn))
+      {
+	to_delete_vsetvls.remove (rinsn);
+	if (to_refine_vsetvls.contains (rinsn))
+	  to_refine_vsetvls.remove (rinsn);
+	return true;
+      }
+    return false;
+  }
+  bool to_refine_p (rtx_insn *rinsn)
+  {
+    if (to_refine_vsetvls.contains (rinsn))
+      {
+	to_refine_vsetvls.remove (rinsn);
+	return true;
+      }
+    return false;
+  }
 
   void release (void);
   void create_bitmap_vectors (void);

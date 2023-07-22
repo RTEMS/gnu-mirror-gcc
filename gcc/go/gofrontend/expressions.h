@@ -4364,8 +4364,7 @@ class Slice_value_expression : public Expression
   { return this->type_; }
 
   void
-  do_determine_type(const Type_context*)
-  { }
+  do_determine_type(const Type_context*);
 
   Expression*
   do_copy();
@@ -4410,12 +4409,16 @@ class Slice_info_expression : public Expression
   { return this->slice_info_; }
 
  protected:
+  int
+  do_traverse(Traverse* traverse)
+  { return Expression::traverse(&this->slice_, traverse); }
+
   Type*
   do_type();
 
   void
   do_determine_type(const Type_context*)
-  { }
+  { this->slice_->determine_type_no_context(); }
 
   Expression*
   do_copy()
