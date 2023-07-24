@@ -616,21 +616,6 @@
   "cvtz\\t%0, %1, %2"
 )
 
-(define_insn "cmovcadi_insn"
-  [(set (match_operand:CADI 0 "register_operand" "=r,r,r")
-	(if_then_else:CADI
-	 (match_operator 1 "aarch64_comparison_operator"
-	  [(match_operand 2 "cc_register" "") (const_int 0)])
-	 (match_operand:CADI 3 "aarch64_reg_or_zero" "r,r,Z")
-	 (match_operand:CADI 4 "aarch64_reg_or_zero" "r,Z,r")))]
-  "TARGET_MORELLO"
-  "@
-  csel\\t%0, %3, %4, %m1
-  csel\\t%0, %3, czr, %m1
-  csel\\t%0, %4, czr, %m1"
-  [(set_attr "type" "csel, csel, csel")]
-)
-
 (define_expand "aarch64_cap_subset_test_unseal_or_null_cadi"
   [(match_operand:CADI 0 "register_operand")
    (match_operand:CADI 1 "register_operand")

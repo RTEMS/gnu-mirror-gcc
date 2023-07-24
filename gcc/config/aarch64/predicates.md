@@ -95,9 +95,9 @@
        (match_operand 0 "aarch64_reg_or_zero")))
 
 (define_predicate "aarch64_reg_zero_or_m1_or_1"
-  (and (match_code "reg,subreg,const_int")
+  (and (match_code "reg,subreg,const_int,const_null")
        (ior (match_operand 0 "register_operand")
-	    (ior (match_test "op == const0_rtx")
+	    (ior (match_test "op == CONST0_RTX (GET_MODE (op))")
 		 (ior (match_test "op == constm1_rtx")
 		      (match_test "op == const1_rtx"))))))
 

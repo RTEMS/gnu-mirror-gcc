@@ -4278,13 +4278,13 @@
   "
 )
 
-(define_insn "*cmov<mode>_insn"
-  [(set (match_operand:ALLI 0 "register_operand" "=r,r,r,r,r,r,r")
-	(if_then_else:ALLI
+(define_insn "cmov<mode>_insn"
+  [(set (match_operand:ALLIC 0 "register_operand" "=r,r,r,r,r,r,r")
+	(if_then_else:ALLIC
 	 (match_operator 1 "aarch64_comparison_operator"
 	  [(match_operand 2 "cc_register" "") (const_int 0)])
-	 (match_operand:ALLI 3 "aarch64_reg_zero_or_m1_or_1" "rZ,rZ,UsM,rZ,Ui1,UsM,Ui1")
-	 (match_operand:ALLI 4 "aarch64_reg_zero_or_m1_or_1" "rZ,UsM,rZ,Ui1,rZ,UsM,Ui1")))]
+	 (match_operand:ALLIC 3 "aarch64_reg_zero_or_m1_or_1" "rZ,rZ,UsM,rZ,Ui1,UsM,Ui1")
+	 (match_operand:ALLIC 4 "aarch64_reg_zero_or_m1_or_1" "rZ,UsM,rZ,Ui1,rZ,UsM,Ui1")))]
   "!((operands[3] == const1_rtx && operands[4] == constm1_rtx)
      || (operands[3] == constm1_rtx && operands[4] == const1_rtx))"
   ;; Final two alternatives should be unreachable, but included for completeness
@@ -4347,10 +4347,10 @@
 )
 
 (define_expand "mov<mode>cc"
-  [(set (match_operand:ALLI 0 "register_operand")
-	(if_then_else:ALLI (match_operand 1 "aarch64_comparison_operator")
-			   (match_operand:ALLI 2 "register_operand")
-			   (match_operand:ALLI 3 "register_operand")))]
+  [(set (match_operand:ALLIC 0 "register_operand")
+	(if_then_else:ALLIC (match_operand 1 "aarch64_comparison_operator")
+			   (match_operand:ALLIC 2 "register_operand")
+			   (match_operand:ALLIC 3 "register_operand")))]
   ""
   {
     rtx ccreg;
