@@ -98,6 +98,11 @@
   (and (match_code "const_double")
        (match_test "op == CONST0_RTX (mode)")))
 
+(define_constraint "G0n"
+  "@internal"
+  (and (match_code "const_double")
+       (match_test "riscv_const_double_m0_rtx(op)")))
+
 (define_memory_constraint "A"
   "An address that is held in a general-purpose register."
   (and (match_code "mem")

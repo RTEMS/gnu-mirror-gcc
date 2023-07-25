@@ -2143,6 +2143,22 @@ riscv_v_adjust_scalable_frame (rtx target, poly_int64 offset, bool epilogue)
   REG_NOTES (insn) = dwarf;
 }
 
+/* Return TRUE if rtx X is a FP constant -0.0.  */
+bool
+riscv_const_double_m0_rtx (rtx x)
+{
+  const REAL_VALUE_TYPE *r;
+
+  if (GET_CODE (x) != CONST_DOUBLE)
+    return false;
+
+  r = CONST_DOUBLE_REAL_VALUE (x);
+  if (REAL_VALUE_MINUS_ZERO (*r))
+    return true;
+
+  return false;
+}
+
 /* Return TRUE if rtx X is a FP constant 0.0 or -0.0.  */
 bool
 riscv_const_double_p0_or_m0_rtx (rtx x)

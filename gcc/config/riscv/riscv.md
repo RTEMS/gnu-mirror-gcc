@@ -2109,13 +2109,14 @@
    (set_attr "mode" "DF")])
 
 (define_insn "*movdf_hardfloat_rv64"
-  [(set (match_operand:DF 0 "nonimmediate_operand" "=f,  f,f,m,  m,*f,*r,    *r,*r,*m")
-	(match_operand:DF 1 "move_operand"         " f,G0p,m,f,G0p,*r,*f,*r*G0p,*m,*r"))]
+  [(set (match_operand:DF 0 "nonimmediate_operand" "=f,  f,f,m,  m,*f,*r,    *r,*r,*m,  m")
+	(match_operand:DF 1 "move_operand"         " f,G0p,m,f,G0p,*r,*f,*r*G0p,*m,*r,G0n"))]
   "TARGET_64BIT && TARGET_DOUBLE_FLOAT
    && (register_operand (operands[0], DFmode)
-       || reg_or_0_operand (operands[1], DFmode))"
+       || reg_or_0_operand (operands[1], DFmode)
+       || riscv_const_double_p0_or_m0_rtx (operands[1]))"
   { return riscv_output_move (operands[0], operands[1]); }
-  [(set_attr "move_type" "fmove,mtc,fpload,fpstore,store,mtc,mfc,move,load,store")
+  [(set_attr "move_type" "fmove,mtc,fpload,fpstore,store,mtc,mfc,move,load,store,store")
    (set_attr "mode" "DF")])
 
 (define_insn "*movdf_softfloat"
