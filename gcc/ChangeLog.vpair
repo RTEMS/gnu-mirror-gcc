@@ -1,4 +1,17 @@
-==================== Branch work127-vpair, patch #26 ====================
+==================== Branch work127-vpair, patch #28 ====================
+
+Allow __vector_pair to be returned and passed as an argument.
+
+2023-07-25  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-call.cc (USE_ALTIVEC_FOR_ARG_P): Add support for
+	passing and returning __vector_pair types.
+	(rs6000_return_in_memory): Likewise.
+	(rs6000_function_arg): Likewise.
+
+==================== Branch work127-vpair, patch #27 ====================
 
 Make max insns error easier to debug.
 
