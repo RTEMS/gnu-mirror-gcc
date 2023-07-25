@@ -1,5 +1,16 @@
 ==================== Branch work127-vpair, patch #26 ====================
 
+Make max insns error easier to debug.
+
+2023-07-25  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* lra-constraints.cc (lra_constraints): Print out the insn that we can't
+	reload.
+
+==================== Branch work127-vpair, patch #26 ====================
+
 Add v8sf extract support.
 
 2023-07-19  Michael Meissner  <meissner@linux.ibm.com>
