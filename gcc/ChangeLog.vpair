@@ -1,3 +1,20 @@
+==================== Branch work127-vpair, patch #29 ====================
+
+Replace UNSPEC_COPYSIGN with copysign
+
+2023-07-25  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.md (UNSPEC_COPYSIGN): Delete.
+	(copysign<mode>3_fcpsg): Use copysign RTL instead of UNSPEC.
+	(copysign<mode>3_hard): Likewise.
+	(copysign<mode>3_soft): Likewise.
+	* config/rs6000/vector.md (vector_copysign<mode>3): Use copysign RTL
+	instead of UNSPEC.
+	* config/rs6000/vsx.md (vsx_copysign<mode>3): Use copysign RTL instead
+	of UNSPEC.
+
 ==================== Branch work127-vpair, patch #28 ====================
 
 Allow __vector_pair to be returned and passed as an argument.
