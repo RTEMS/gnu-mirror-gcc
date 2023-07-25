@@ -58,6 +58,7 @@ extern const char *riscv_output_move (rtx, rtx);
 extern const char *riscv_output_return ();
 extern bool riscv_const_double_p0_or_m0_rtx (rtx x);
 extern bool riscv_const_double_m0_rtx (rtx x);
+extern void riscv_move_const_double_m0(rtx dest, rtx src);
 
 #ifdef RTX_CODE
 extern void riscv_expand_int_scc (rtx, enum rtx_code, rtx, rtx);

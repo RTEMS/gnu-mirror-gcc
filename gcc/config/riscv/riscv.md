@@ -2140,6 +2140,16 @@
   DONE;
 })
 
+(define_split
+  [(set (match_operand:DF 0 "nonimmediate_operand")
+	(match_operand:DF 1 "const_double_m0_operand"))]
+  "TARGET_DOUBLE_FLOAT && !reload_completed"
+  [(const_int 0)]
+{
+  riscv_move_const_double_m0(operands[0], operands[1]);
+  DONE;
+})
+
 (define_expand "cpymemsi"
   [(parallel [(set (match_operand:BLK 0 "general_operand")
 		   (match_operand:BLK 1 "general_operand"))

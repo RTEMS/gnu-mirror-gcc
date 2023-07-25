@@ -1889,6 +1889,17 @@ riscv_legitimize_const_move (machine_mode mode, rtx dest, rtx src)
   riscv_emit_move (dest, src);
 }
 
+void
+riscv_move_const_double_m0(rtx mem, rtx src)
+{
+  machine_mode src_mode = DImode; // GET_MODE (src);
+  unsigned HOST_WIDE_INT top_bit_set = (unsigned HOST_WIDE_INT)1 << 63;
+  rtx reg = gen_reg_rtx(src_mode);
+
+  riscv_move_integer(reg, reg, top_bit_set, src_mode);
+  riscv_emit_set (mem, simplify_gen_subreg (GET_MODE (mem), reg, src_mode, 0));
+}
+
 /* Report when we try to do something that requires vector when vector is
    disabled. This is an error of last resort and isn't very high-quality.  It
    usually involves attempts to measure the vector length in some way.  */
