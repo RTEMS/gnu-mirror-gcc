@@ -1,3 +1,32 @@
+==================== Branch work127-vpair, patch #31 ====================
+
+Add V4DF and V8SF copysign.
+
+2023-07-26  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (VPAIR_BINARY): Add copysign.
+	(vpair_op): Likewise.
+
+==================== Branch work127-vpair, patch #30 ====================
+
+Add V4DF and V8SF internal types.
+
+2023-07-26  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.h (RS6000_BTI_V4DF): Add V4DF and V8SF internal
+	types.
+	(RS6000_BTI_V8SF): Likewise.
+	(V4DF_type_node): Likewise.
+	(V8SF_type_node): Likewise.
+	(ptr_V4DF_type_node): Likewise.
+	(ptr_V8SF_type_node): Likewise.
+	* config/rs6000/rs6000-builtin.cc (rs6000_init_builtins): Initialize the
+	V4DF and V8SF types.
+
 ==================== Branch work127-vpair, patch #29 ====================
 
 Replace UNSPEC_COPYSIGN with copysign
