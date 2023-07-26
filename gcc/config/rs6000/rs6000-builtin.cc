@@ -521,6 +521,12 @@ rs6000_init_builtins (void)
     = build_pointer_type (build_qualified_type (V2DF_type_node,
 						TYPE_QUAL_CONST));
 
+  V4DF_type_node = rs6000_vector_type ("__vector_pair double",
+				       double_type_node, 4);
+  ptr_V4DF_type_node
+    = build_pointer_type (build_qualified_type (V4DF_type_node,
+						TYPE_QUAL_CONST));
+
   V4SI_type_node = rs6000_vector_type ("__vector signed int",
 				       intSI_type_node, 4);
   ptr_V4SI_type_node
@@ -530,6 +536,12 @@ rs6000_init_builtins (void)
   V4SF_type_node = rs6000_vector_type ("__vector float", float_type_node, 4);
   ptr_V4SF_type_node
     = build_pointer_type (build_qualified_type (V4SF_type_node,
+						TYPE_QUAL_CONST));
+
+  V8SF_type_node = rs6000_vector_type ("__vector_pair float",
+				       float_type_node, 8);
+  ptr_V8SF_type_node
+    = build_pointer_type (build_qualified_type (V8SF_type_node,
 						TYPE_QUAL_CONST));
 
   V8HI_type_node = rs6000_vector_type ("__vector signed short",

@@ -2216,9 +2216,11 @@ enum rs6000_builtin_type_index
   RS6000_BTI_V1TI,
   RS6000_BTI_V2DI,
   RS6000_BTI_V2DF,
+  RS6000_BTI_V4DF,
   RS6000_BTI_V4HI,
   RS6000_BTI_V4SI,
   RS6000_BTI_V4SF,
+  RS6000_BTI_V8SF,
   RS6000_BTI_V8HI,
   RS6000_BTI_unsigned_V16QI,     /* __vector unsigned char */
   RS6000_BTI_unsigned_V1TI,
@@ -2272,8 +2274,10 @@ enum rs6000_builtin_type_index
   RS6000_BTI_ptr_V1TI,
   RS6000_BTI_ptr_V2DI,
   RS6000_BTI_ptr_V2DF,
+  RS6000_BTI_ptr_V4DF,
   RS6000_BTI_ptr_V4SI,
   RS6000_BTI_ptr_V4SF,
+  RS6000_BTI_ptr_V8SF,
   RS6000_BTI_ptr_V8HI,
   RS6000_BTI_ptr_unsigned_V16QI,
   RS6000_BTI_ptr_unsigned_V1TI,
@@ -2316,9 +2320,11 @@ enum rs6000_builtin_type_index
 #define V1TI_type_node                (rs6000_builtin_types[RS6000_BTI_V1TI])
 #define V2DI_type_node                (rs6000_builtin_types[RS6000_BTI_V2DI])
 #define V2DF_type_node                (rs6000_builtin_types[RS6000_BTI_V2DF])
+#define V4DF_type_node                (rs6000_builtin_types[RS6000_BTI_V4DF])
 #define V4HI_type_node                (rs6000_builtin_types[RS6000_BTI_V4HI])
 #define V4SI_type_node                (rs6000_builtin_types[RS6000_BTI_V4SI])
 #define V4SF_type_node                (rs6000_builtin_types[RS6000_BTI_V4SF])
+#define V8SF_type_node                (rs6000_builtin_types[RS6000_BTI_V8SF])
 #define V8HI_type_node                (rs6000_builtin_types[RS6000_BTI_V8HI])
 #define unsigned_V16QI_type_node      (rs6000_builtin_types[RS6000_BTI_unsigned_V16QI])
 #define unsigned_V1TI_type_node       (rs6000_builtin_types[RS6000_BTI_unsigned_V1TI])
@@ -2367,8 +2373,10 @@ enum rs6000_builtin_type_index
 #define ptr_V1TI_type_node		 (rs6000_builtin_types[RS6000_BTI_ptr_V1TI])
 #define ptr_V2DI_type_node		 (rs6000_builtin_types[RS6000_BTI_ptr_V2DI])
 #define ptr_V2DF_type_node		 (rs6000_builtin_types[RS6000_BTI_ptr_V2DF])
+#define ptr_V4DF_type_node		 (rs6000_builtin_types[RS6000_BTI_ptr_V4DF])
 #define ptr_V4SI_type_node		 (rs6000_builtin_types[RS6000_BTI_ptr_V4SI])
 #define ptr_V4SF_type_node		 (rs6000_builtin_types[RS6000_BTI_ptr_V4SF])
+#define ptr_V8SF_type_node		 (rs6000_builtin_types[RS6000_BTI_ptr_V8SF])
 #define ptr_V8HI_type_node		 (rs6000_builtin_types[RS6000_BTI_ptr_V8HI])
 #define ptr_unsigned_V16QI_type_node	 (rs6000_builtin_types[RS6000_BTI_ptr_unsigned_V16QI])
 #define ptr_unsigned_V1TI_type_node	 (rs6000_builtin_types[RS6000_BTI_ptr_unsigned_V1TI])
