@@ -4116,3 +4116,93 @@
 
   void __builtin_vsx_stxvp (v256, unsigned long, const v256 *);
     STXVP nothing {mma,pair}
+
+  v256 __builtin_vpair_abs_v4df (v256);
+    VPAIR_ABS_V4DF vpair_absv4df2 {mma}
+
+  v256 __builtin_vpair_neg_v4df (v256);
+    VPAIR_NEG_V4DF vpair_negv4df2 {mma}
+
+  v256 __builtin_vpair_nabs_v4df (v256);
+    VPAIR_NABS_V4DF vpair_nabsv4df2 {mma}
+
+  v256 __builtin_vpair_sqrt_v4df (v256);
+    VPAIR_SQRT_V4DF vpair_sqrtv4df2 {mma}
+
+  v256 __builtin_vpair_add_v4df (v256, v256);
+    VPAIR_ADD_V4DF vpair_addv4df3 {mma}
+
+  v256 __builtin_vpair_sub_v4df (v256, v256);
+    VPAIR_SUB_V4DF vpair_subv4df3 {mma}
+
+  v256 __builtin_vpair_mul_v4df (v256, v256);
+    VPAIR_MUL_V4DF vpair_mulv4df3 {mma}
+
+  v256 __builtin_vpair_div_v4df (v256, v256);
+    VPAIR_DIV_V4DF vpair_divv4df3 {mma}
+
+  v256 __builtin_vpair_copysign_v4df (v256, v256);
+    VPAIR_COPYSIGN_V4DF vpair_copysignv4df3 {mma}
+
+  v256 __builtin_vpair_smin_v4df (v256, v256);
+    VPAIR_SMIN_V4DF vpair_sminv4df3 {mma}
+
+  v256 __builtin_vpair_smax_v4df (v256, v256);
+    VPAIR_SMAX_V4DF vpair_smaxv4df3 {mma}
+
+  v256 __builtin_vpair_fma_v4df (v256, v256, v256);
+    VPAIR_FMA_V4DF vpair_fmav4df4 {mma}
+
+  v256 __builtin_vpair_fms_v4df (v256, v256, v256);
+    VPAIR_FMS_V4DF vpair_fmsv4df4 {mma}
+
+  v256 __builtin_vpair_nfma_v4df (v256, v256, v256);
+    VPAIR_NFMA_V4DF vpair_nfmav4df4 {mma}
+
+  v256 __builtin_vpair_nfms_v4df (v256, v256, v256);
+    VPAIR_NFMS_V4DF vpair_nfmsv4df4 {mma}
+
+  v256 __builtin_vpair_abs_v8sf (v256);
+    VPAIR_ABS_V8SF vpair_absv8sf2 {mma}
+
+  v256 __builtin_vpair_neg_v8sf (v256);
+    VPAIR_NEG_V8SF vpair_negv8sf2 {mma}
+
+  v256 __builtin_vpair_nabs_v8sf (v256);
+    VPAIR_NABS_V8SF vpair_nabsv8sf2 {mma}
+
+  v256 __builtin_vpair_sqrt_v8sf (v256);
+    VPAIR_SQRT_V8SF vpair_sqrtv8sf2 {mma}
+
+  v256 __builtin_vpair_add_v8sf (v256, v256);
+    VPAIR_ADD_V8SF vpair_addv8sf3 {mma}
+
+  v256 __builtin_vpair_sub_v8sf (v256, v256);
+    VPAIR_SUB_V8SF vpair_subv8sf3 {mma}
+
+  v256 __builtin_vpair_mul_v8sf (v256, v256);
+    VPAIR_MUL_V8SF vpair_mulv8sf3 {mma}
+
+  v256 __builtin_vpair_div_v8sf (v256, v256);
+    VPAIR_DIV_V8SF vpair_divv8sf3 {mma}
+
+  v256 __builtin_vpair_copysign_v8sf (v256, v256);
+    VPAIR_COPYSIGN_V8SF vpair_copysignv8sf3 {mma}
+
+  v256 __builtin_vpair_fma_v8sf (v256, v256, v256);
+    VPAIR_FMA_V8SF vpair_fmav8sf4 {mma}
+
+  v256 __builtin_vpair_fms_v8sf (v256, v256, v256);
+    VPAIR_FMS_V8SF vpair_fmsv8sf4 {mma}
+
+  v256 __builtin_vpair_nfma_v8sf (v256, v256, v256);
+    VPAIR_NFMA_V8SF vpair_nfmav8sf4 {mma}
+
+  v256 __builtin_vpair_nfms_v8sf (v256, v256, v256);
+    VPAIR_NFMS_V8SF vpair_nfmsv8sf4 {mma}
+
+  v256 __builtin_vpair_smin_v8sf (v256, v256);
+    VPAIR_SMIN_V8SF vpair_sminv8sf3 {mma}
+
+  v256 __builtin_vpair_smax_v8sf (v256, v256);
+    VPAIR_SMAX_V8SF vpair_smaxv8sf3 {mma}
