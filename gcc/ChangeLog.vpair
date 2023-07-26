@@ -1,3 +1,62 @@
+==================== Branch work127-vpair, patch #32 ====================
+
+Add vector pair built-ins; Add min/max vector pair.
+
+2023-07-26  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (UNSPEC_VPAIR_V4DF): New unspec.
+	(UNSPEC_VPAIR_V8SF): Likewise.
+	(VPAIR_BINARY): Add smin and smax.
+	(vpair_op): Likewise.
+	(VPAIR_WRAPPER): New int iterator.
+	(VPAIR_SUBTYPE): New int attribute.
+	(VPAIR_SUBTYPE_LOWER): Likewise.
+	(VPAIR_TYPE_LOWER): Likewise.
+	(vpair_<vpair_op><VPAIR_TYPE_LOWER>2): New wrappers for __vector_pair
+	unary built-in functions.
+	(vpair_nabs<VPAIR_TYPE_LOWER>): New combiner insn for vector pair
+	negative absolute value.
+	(vpair_<vpair_op><VPAIR_TYPE_LOWER>3): New wrappers for __vector_pair
+	binary built-in functions.
+	(vpair_fma<VPAIR_TYPE_LOWER>4): New wrappers for __vector_pair fma
+	built-in functions.
+	(vpair_fms<VPAIR_TYPE_LOWER>4): Likewise.
+	(vpair_nfma<VPAIR_TYPE_LOWER>4): Likewise.
+	(vpair_nfms<VPAIR_TYPE_LOWER>4): Likewise.
+	* config/rs6000/rs6000-builtins.md (__builtin_vpair_abs_v4df): New
+	vector pair built-in function.
+	(__builtin_vpair_neg_v4df): Likewise.
+	(__builtin_vpair_nabs_v4df): Likewise.
+	(__builtin_vpair_sqrt_v4df): Likewise.
+	(__builtin_vpair_add_v4df): Likewise.
+	(__builtin_vpair_sub_v4df): Likewise.
+	(__builtin_vpair_mul_v4df): Likewise.
+	(__builtin_vpair_div_v4df): Likewise.
+	(__builtin_vpair_copysign_v4df): Likewise.
+	(__builtin_vpair_smin_v4df): Likewise.
+	(__builtin_vpair_smax_v4df): Likewise.
+	(__builtin_vpair_fma_v4df): Likewise.
+	(__builtin_vpair_fms_v4df): Likewise.
+	(__builtin_vpair_nfma_v4df): Likewise.
+	(__builtin_vpair_nfms_v4df): Likewise.
+	(__builtin_vpair_abs_v8sf): Likewise.
+	(__builtin_vpair_neg_v8sf): Likewise.
+	(__builtin_vpair_nabs_v8sf): Likewise.
+	(__builtin_vpair_sqrt_v8sf): Likewise.
+	(__builtin_vpair_add_v8sf): Likewise.
+	(__builtin_vpair_sub_v8sf): Likewise.
+	(__builtin_vpair_mul_v8sf): Likewise.
+	(__builtin_vpair_div_v8sf): Likewise.
+	(__builtin_vpair_copysign_v8sf): Likewise.
+	(__builtin_vpair_smin_v8sf): Likewise.
+	(__builtin_vpair_smax_v8sf): Likewise.
+	(__builtin_vpair_fma_v8sf): Likewise.
+	(__builtin_vpair_fms_v8sf): Likewise.
+	(__builtin_vpair_nfma_v8sf): Likewise.
+	(__builtin_vpair_nfms_v8sf): Likewise.
+
 ==================== Branch work127-vpair, patch #31 ====================
 
 Add V4DF and V8SF copysign.
