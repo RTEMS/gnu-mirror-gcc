@@ -270,16 +270,17 @@
 
 ;; Iterator doing unary/binary arithmetic on vector pairs
 (define_code_iterator VPAIR_UNARY  [neg abs sqrt])
-(define_code_iterator VPAIR_BINARY [plus minus mult div])
+(define_code_iterator VPAIR_BINARY [plus minus mult div copysign])
 
 ;; Give the insn name from the opertion
-(define_code_attr vpair_op [(neg   "neg")
-			    (abs   "abs")
-			    (plus  "add")
-			    (minus "sub")
-			    (mult  "mul")
-			    (div   "div")
-			    (sqrt  "sqrt")])
+(define_code_attr vpair_op [(abs      "abs")
+			    (copysign "copysign")
+			    (div      "div")
+			    (minus    "sub")
+			    (mult     "mul")
+			    (neg      "neg")
+			    (plus     "add")
+			    (sqrt     "sqrt")])
 
 ;; Arithmetic types for vector pair
 (define_mode_iterator VPAIR_ARITH [V8SF V4DF])
