@@ -359,16 +359,16 @@
 (define_expand "mov<mode>"
   [(set (match_operand:VPAIR 0 "nonimmediate_operand")
 	(match_operand:VPAIR 1 "input_operand"))]
-  "TARGET_MMA"
+  "TARGET_VPAIR_ARITHMETIC"
 {
   rs6000_emit_move (operands[0], operands[1], <MODE>mode);
   DONE;
 })
 
 (define_insn_and_split "*mov<mode>"
-  [(set (match_operand:VPAIR 0 "nonimmediate_operand" "=wa,m,wa,wa,wa")
-	(match_operand:VPAIR 1 "input_operand" "m,wa,wa,j,eP"))]
-  "TARGET_MMA
+  [(set (match_operand:VPAIR 0 "nonimmediate_operand" "=wa,m, wa,wa,wa")
+	(match_operand:VPAIR 1 "input_operand"          "m,wa,wa,j, eP"))]
+  "TARGET_VPAIR_ARITHMETIC
    && (gpc_reg_operand (operands[0], <MODE>mode)
        || gpc_reg_operand (operands[1], <MODE>mode))"
   "@
@@ -772,7 +772,7 @@
   [(set (match_operand:VPAIR 0 "vsx_register_operand" "=wa")
 	(VPAIR_UNARY:VPAIR
 	 (match_operand:VPAIR 1 "vsx_register_operand" "wa")))]
-  "TARGET_MMA"
+  "TARGET_VPAIR_ARITHMETIC"
   "#"
   "&& reload_completed"
   [(set (match_dup 2) (VPAIR_UNARY:<VPAIR_VECT> (match_dup 3)))
@@ -816,7 +816,7 @@
 	(neg:VPAIR
 	 (abs:VPAIR
 	  (match_operand:VPAIR 1 "vsx_register_operand" "wa"))))]
-  "TARGET_MMA"
+  "TARGET_VPAIR_ARITHMETIC"
   "#"
   "&& reload_completed"
   [(set (match_dup 2)
@@ -871,7 +871,7 @@
 	(VPAIR_BINARY:VPAIR
 	 (match_operand:VPAIR 1 "vsx_register_operand" "wa")
 	 (match_operand:VPAIR 2 "vsx_register_operand" "wa")))]
-  "TARGET_MMA"
+  "TARGET_VPAIR_ARITHMETIC"
   "#"
   "&& reload_completed"
   [(set (match_dup 3)
@@ -933,7 +933,7 @@
 	 (match_operand:VPAIR 1 "vsx_register_operand" "%wa,wa")
 	 (match_operand:VPAIR 2 "vsx_register_operand" "wa,0")
 	 (match_operand:VPAIR 3 "vsx_register_operand" "0,wa")))]
-  "TARGET_MMA"
+  "TARGET_VPAIR_ARITHMETIC"
   "#"
   "&& reload_completed"
   [(set (match_dup 4)
@@ -969,7 +969,7 @@
 	 (match_operand:VPAIR 2 "vsx_register_operand" "wa,0")
 	 (neg:VPAIR
 	  (match_operand:VPAIR 3 "vsx_register_operand" "0,wa"))))]
-  "TARGET_MMA"
+  "TARGET_VPAIR_ARITHMETIC"
   "#"
   "&& reload_completed"
   [(set (match_dup 4)
@@ -1007,7 +1007,7 @@
 	  (match_operand:VPAIR 1 "vsx_register_operand" "%wa,wa")
 	  (match_operand:VPAIR 2 "vsx_register_operand" "wa,0")
 	  (match_operand:VPAIR 3 "vsx_register_operand" "0,wa"))))]
-  "TARGET_MMA"
+  "TARGET_VPAIR_ARITHMETIC"
   "#"
   "&& reload_completed"
   [(set (match_dup 4)
@@ -1046,7 +1046,7 @@
 	  (match_operand:VPAIR 2 "vsx_register_operand" "wa,0")
 	  (neg:VPAIR
 	   (match_operand:VPAIR 3 "vsx_register_operand" "0,wa")))))]
-  "TARGET_MMA"
+  "TARGET_VPAIR_ARITHMETIC"
   "#"
   "&& reload_completed"
   [(set (match_dup 4)

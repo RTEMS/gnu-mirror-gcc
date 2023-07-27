@@ -2931,6 +2931,13 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
       rs6000_vector_mem[OOmode] = VECTOR_VSX;
       rs6000_vector_align[OOmode] = 256;
 
+      rs6000_vector_unit[XOmode] = VECTOR_NONE;
+      rs6000_vector_mem[XOmode] = VECTOR_VSX;
+      rs6000_vector_align[XOmode] = 512;
+    }
+
+  if (TARGET_VPAIR_ARITHMETIC)
+    {
       rs6000_vector_unit[V8SFmode] = VECTOR_NONE;
       rs6000_vector_mem[V8SFmode] = VECTOR_VSX;
       rs6000_vector_align[V8SFmode] = 256;
@@ -2938,10 +2945,6 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
       rs6000_vector_unit[V4DFmode] = VECTOR_NONE;
       rs6000_vector_mem[V4DFmode] = VECTOR_VSX;
       rs6000_vector_align[V4DFmode] = 256;
-
-      rs6000_vector_unit[XOmode] = VECTOR_NONE;
-      rs6000_vector_mem[XOmode] = VECTOR_VSX;
-      rs6000_vector_align[XOmode] = 512;
     }
 
   /* Register class constraints for the constraints that depend on compile
@@ -3072,12 +3075,16 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 		{
 		  reg_addr[OOmode].reload_store = CODE_FOR_reload_oo_di_store;
 		  reg_addr[OOmode].reload_load = CODE_FOR_reload_oo_di_load;
+		  reg_addr[XOmode].reload_store = CODE_FOR_reload_xo_di_store;
+		  reg_addr[XOmode].reload_load = CODE_FOR_reload_xo_di_load;
+		}
+
+	      if (TARGET_VPAIR_ARITHMETIC)
+		{
 		  reg_addr[V8SFmode].reload_store = CODE_FOR_reload_v8sf_di_store;
 		  reg_addr[V8SFmode].reload_load = CODE_FOR_reload_v8sf_di_load;
 		  reg_addr[V4DFmode].reload_store = CODE_FOR_reload_v4df_di_store;
 		  reg_addr[V4DFmode].reload_load = CODE_FOR_reload_v4df_di_load;
-		  reg_addr[XOmode].reload_store = CODE_FOR_reload_xo_di_store;
-		  reg_addr[XOmode].reload_load = CODE_FOR_reload_xo_di_load;
 		}
 	    }
 	}
@@ -4414,6 +4421,16 @@ rs6000_option_override_internal (bool global_init_p)
 	error ("%qs requires %qs", "-mmma", "-mcpu=power10");
 
       rs6000_isa_flags &= ~OPTION_MASK_MMA;
+    }
+
+  /* At present, do not -mvair-arithmetic by default if MMA is available.  Turn
+     off vector pair/mma options on non-power10 systems.  */
+  if (!TARGET_MMA && TARGET_VPAIR_ARITHMETIC)
+    {
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_VPAIR_ARITHMETIC) != 0)
+	error ("%qs requires %qs", "-mvpair-arithmetic", "-mmma");
+
+      rs6000_isa_flags &= ~OPTION_MASK_VPAIR_ARITHMETIC;
     }
 
   /* Enable power10 fusion if we are tuning for power10, even if we aren't
@@ -24275,6 +24292,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "save-toc-indirect",	OPTION_MASK_SAVE_TOC_INDIRECT,	false, true  },
   { "string",			0,				false, true  },
   { "update",			OPTION_MASK_NO_UPDATE,		true , true  },
+  { "vpair-arithmetic",		OPTION_MASK_VPAIR_ARITHMETIC,	false, true  },
   { "vsx",			OPTION_MASK_VSX,		false, true  },
 #ifdef OPTION_MASK_64BIT
 #if TARGET_AIX_OS
