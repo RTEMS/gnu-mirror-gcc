@@ -1,3 +1,33 @@
+==================== Branch work127-vpair, patch #33 ====================
+
+Add -mvpair-arithmetic.
+
+2023-07-26  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (mov<mode>, VPAIR iterator): Enable V4DFmode nd
+	V8SFmode with -mvpair-arithmetic.
+	(<vpair_op><mode>2): Likewise.
+	(nabs<mode>2): Likewise.
+	(<vpair_op><mode>3): Likewise.
+	(fma<mode>4): Likewise.
+	(fms<mode>4): Likewise.
+	(nfma<mode>4): Likewise.
+	(nfms<mode>4): Likewise.
+	* config/rs6000/rs6000-cpus.h (OTHER_POWER10_MASKS): Add
+	-mvpair-arithmetic.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_init_hard_regno_mode_ok): Only
+	initialize the V4DFmode and V8SFmode reload handlers if
+	-mvpair-arithmetic.
+	(rs6000_option_override_internal): Make sure -mma is set if
+	-mvpair-arithmetic.
+	(rs6000_opt_masks): Add -mvpair-arithmetic.
+	* config/rs6000/rs6000.h (VECTOR_ALIGNMENT_P): Add V4DFmode and
+	V8SFmode.
+	* config/rs6000/rs6000.opt (-mvpair-arithmetic): New option.
+
 ==================== Branch work127-vpair, patch #32 ====================
 
 Add vector pair built-ins; Add min/max vector pair.
