@@ -826,7 +826,9 @@ riscv_legitimate_constant_p (machine_mode mode ATTRIBUTE_UNUSED, rtx x)
   return riscv_const_insns (x) > 0;
 }
 
-/* Implement TARGET_CANNOT_FORCE_CONST_MEM.  */
+/* Implement TARGET_CANNOT_FORCE_CONST_MEM.
+   Return true if X cannot (or should not) be spilled to the
+   constant pool.  */
 
 static bool
 riscv_cannot_force_const_mem (machine_mode mode ATTRIBUTE_UNUSED, rtx x)
