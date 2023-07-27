@@ -8107,6 +8107,16 @@ Disable @option{-Walloc-size-larger-than=} warnings.  The option is
 equivalent to @option{-Walloc-size-larger-than=}@samp{SIZE_MAX} or
 larger.
 
+@opindex Wno-alloc-type
+@opindex Walloc-type
+@item -Walloc-type
+Warn about calls to allocation functions decorated with attribute
+@code{alloc_size} that specify insufficient size for the target type of
+the pointer the result is assigned to, including those to the built-in
+forms of the functions @code{aligned_alloc}, @code{alloca},
+@code{calloc},
+@code{malloc}, and @code{realloc}.
+
 @opindex Wno-alloca
 @opindex Walloca
 @item -Walloca
