@@ -497,6 +497,22 @@ AC_DEFUN([GLIBCXX_CHECK_LFS], [
   if test $glibcxx_cv_LFS = yes; then
     AC_DEFINE(_GLIBCXX_USE_LFS, 1, [Define if LFS support is available.])
   fi
+
+  AC_CACHE_CHECK([for fseeko and ftello], glibcxx_cv_posix_lfs, [
+    GCC_TRY_COMPILE_OR_LINK(
+      [#include <stdio.h>
+      ],
+      [FILE* fp;
+       fseeko(fp, 0, SEEK_CUR);
+       ftello(fp);
+      ],
+      [glibcxx_cv_posix_lfs=yes],
+      [glibcxx_cv_posix_lfs=no])
+  ])
+  if test $glibcxx_cv_posix_lfs = yes; then
+    AC_DEFINE(_GLIBCXX_USE_FSEEKO_FTELLO, 1, [Define if fseeko and ftello are available.])
+  fi
+
   CXXFLAGS="$ac_save_CXXFLAGS"
   AC_LANG_RESTORE
 ])
@@ -5201,12 +5217,15 @@ AC_DEFUN([GLIBCXX_ZONEINFO_DIR], [
 	zoneinfo_dir=none
 	;;
     esac
-    case "$host" in
-      avr-*-* | msp430-*-* ) embed_zoneinfo=no ;;
-      *)
-	# Also embed a copy of the tzdata.zi file as a static string.
-	embed_zoneinfo=yes ;;
-    esac
+
+    AC_COMPUTE_INT(glibcxx_cv_at_least_32bit, [__INTPTR_WIDTH__ >= 32])
+    if test "$glibcxx_cv_at_least_32bit" -ne 0; then
+      # Also embed a copy of the tzdata.zi file as a static string.
+      embed_zoneinfo=yes
+    else
+      # The embedded data is too large for 16-bit targets.
+      embed_zoneinfo=no
+    fi
   elif test "x${with_libstdcxx_zoneinfo}" = xno; then
     # Disable tzdb support completely.
     zoneinfo_dir=none
@@ -5244,6 +5263,58 @@ AC_DEFUN([GLIBCXX_ZONEINFO_DIR], [
     AC_DEFINE_UNQUOTED(_GLIBCXX_STATIC_TZDATA, 1,
       [Define if static tzdata should be compiled into the library.])
   fi
+])
+
+dnl
+dnl Check whether lock tables can be aligned to avoid false sharing.
+dnl
+dnl Defines:
+dnl  _GLIBCXX_CAN_ALIGNAS_DESTRUCTIVE_SIZE if objects with static storage
+dnl    duration can be aligned to std::hardware_destructive_interference_size.
+dnl
+AC_DEFUN([GLIBCXX_CHECK_ALIGNAS_CACHELINE], [
+  AC_LANG_SAVE
+  AC_LANG_CPLUSPLUS
+
+  AC_MSG_CHECKING([whether static objects can be aligned to the cacheline size])
+  AC_TRY_COMPILE(, [struct alignas(__GCC_DESTRUCTIVE_SIZE) Aligned { };
+		    alignas(Aligned) static char buf[sizeof(Aligned) * 16];
+		 ], [ac_alignas_cacheline=yes], [ac_alignas_cacheline=no])
+  if test "$ac_alignas_cacheline" = yes; then
+    AC_DEFINE_UNQUOTED(_GLIBCXX_CAN_ALIGNAS_DESTRUCTIVE_SIZE, 1,
+      [Define if global objects can be aligned to
+       std::hardware_destructive_interference_size.])
+  fi
+  AC_MSG_RESULT($ac_alignas_cacheline)
+
+  AC_LANG_RESTORE
+])
+
+dnl
+dnl Check whether iostream initialization should be done in the library,
+dnl using the init_priority attribute.
+dnl
+dnl Defines:
+dnl  _GLIBCXX_USE_INIT_PRIORITY_ATTRIBUTE if GCC supports the init_priority
+dnl    attribute for the target.
+dnl
+AC_DEFUN([GLIBCXX_CHECK_INIT_PRIORITY], [
+AC_LANG_SAVE
+  AC_LANG_CPLUSPLUS
+
+  AC_MSG_CHECKING([whether init_priority attribute is supported])
+  AC_TRY_COMPILE(, [
+  #if ! __has_attribute(init_priority)
+  #error init_priority not supported
+  #endif
+		 ], [ac_init_priority=yes], [ac_init_priority=no])
+  if test "$ac_init_priority" = yes; then
+    AC_DEFINE_UNQUOTED(_GLIBCXX_USE_INIT_PRIORITY_ATTRIBUTE, 1,
+      [Define if init_priority should be used for iostream initialization.])
+  fi
+  AC_MSG_RESULT($ac_init_priority)
+
+  AC_LANG_RESTORE
 ])
 
 # Macros from the top-level gcc directory.

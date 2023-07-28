@@ -9926,16 +9926,27 @@ lookup_template_class (tree d1, tree arglist, tree in_decl, tree context,
 	 template.  */
 
       /* Shortcut looking up the current class scope again.  */
-      if (current_class_type)
-	if (tree ti = CLASSTYPE_TEMPLATE_INFO (current_class_type))
+      for (tree cur = current_nonlambda_class_type ();
+	   cur != NULL_TREE;
+	   cur = get_containing_scope (cur))
+	{
+	  if (!CLASS_TYPE_P (cur))
+	    continue;
+
+	  tree ti = CLASSTYPE_TEMPLATE_INFO (cur);
+	  if (!ti || arg_depth > TMPL_ARGS_DEPTH (TI_ARGS (ti)))
+	    break;
+
 	  if (gen_tmpl == most_general_template (TI_TEMPLATE (ti))
 	      && comp_template_args (arglist, TI_ARGS (ti)))
-	    return current_class_type;
+	    return cur;
+	}
 
       /* Calculate the BOUND_ARGS.  These will be the args that are
 	 actually tsubst'd into the definition to create the
 	 instantiation.  */
-      arglist = coerce_template_parms (parmlist, arglist, gen_tmpl, complain);
+      if (PRIMARY_TEMPLATE_P (gen_tmpl))
+	arglist = coerce_template_parms (parmlist, arglist, gen_tmpl, complain);
 
       if (arglist == error_mark_node)
 	/* We were unable to bind the arguments.  */
@@ -24907,12 +24918,13 @@ unify (tree tparms, tree targs, tree parm, tree arg, int strict,
       /* Types INTEGER_CST and MINUS_EXPR can come from array bounds.  */
       /* Type INTEGER_CST can come from ordinary constant template args.  */
     case INTEGER_CST:
+    case REAL_CST:
       while (CONVERT_EXPR_P (arg))
 	arg = TREE_OPERAND (arg, 0);
 
-      if (TREE_CODE (arg) != INTEGER_CST)
+      if (TREE_CODE (arg) != TREE_CODE (parm))
 	return unify_template_argument_mismatch (explain_p, parm, arg);
-      return (tree_int_cst_equal (parm, arg)
+      return (simple_cst_equal (parm, arg)
 	      ? unify_success (explain_p)
 	      : unify_template_argument_mismatch (explain_p, parm, arg));
 

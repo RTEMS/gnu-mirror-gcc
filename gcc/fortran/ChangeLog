@@ -1,3 +1,49 @@
+2023-07-27  Release Manager
+
+	* GCC 13.2.0 released.
+
+2023-07-18  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-07-17  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/95947
+	PR fortran/110658
+	* trans-expr.cc (gfc_conv_procedure_call): For intrinsic procedures
+	whose result characteristics depends on the first argument and which
+	can be of type character, the character length will not be deferred.
+
+2023-07-14  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-07-11  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/110288
+	* symbol.cc (gfc_copy_formal_args_intr): When deriving the formal
+	argument attributes from the actual ones for intrinsic procedure
+	calls, take special care of CHARACTER arguments that we do not
+	wrongly treat them formally as deferred-length.
+
+2023-07-08  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-07-08  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/110585
+	* arith.cc (gfc_compare_expr): Handle equality comparison of constant
+	complex gfc_expr arguments.
+
+2023-06-29  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-06-13  Harald Anlauf  <anlauf@gmx.de>
+		    Mikael Morin  <mikael@gcc.gnu.org>
+
+	PR fortran/86277
+	* trans-array.cc (gfc_trans_allocate_array_storage): When passing a
+	zero-sized array with fixed (= non-dynamic) size, allocate temporary
+	by the caller, not by the callee.
+
 2023-06-09  Jakub Jelinek  <jakub@redhat.com>
 
 	Backported from master:

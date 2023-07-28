@@ -1,3 +1,79 @@
+2023-07-27  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2023-07-26  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/110809
+	* pt.cc (unify) <case INTEGER_CST>: Generalize to handle
+	REAL_CST as well.
+
+2023-07-27  Release Manager
+
+	* GCC 13.2.0 released.
+
+2023-07-19  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2023-07-18  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/110535
+	* call.cc (add_conv_candidate): Check constraints.
+
+2023-07-19  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2023-06-11  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/110122
+	* pt.cc (lookup_template_class): Extend shortcut for looking up the
+	current class scope to consider outer class scopes too, and use
+	current_nonlambda_class_type instead of current_class_type.  Only
+	call coerce_template_parms when specializing a primary template.
+
+2023-07-17  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2023-07-15  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/110524
+	* mangle.cc (write_expression): Handle TEMPLATE_ID_EXPR
+	whose template is already an IDENTIFIER_NODE.
+
+2023-07-01  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2023-06-29  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/110468
+	* init.cc (maybe_instantiate_nsdmi_init): Mask out all
+	tsubst flags except for tf_warning_or_error.
+
+2023-07-01  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2023-06-29  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/110463
+	* cp-gimplify.cc (cp_fold) <case CONSTRUCTOR>: Propagate
+	CONSTRUCTOR_MUTABLE_POISON.
+
+2023-06-23  Jason Merrill  <jason@redhat.com>
+
+	* call.cc (maybe_init_list_as_array): Build a list.
+
+2023-06-23  Jason Merrill  <jason@redhat.com>
+
+	PR c++/110102
+	* call.cc (maybe_init_list_as_array): Check that the element type is
+	copyable.
+
+2023-06-23  Jason Merrill  <jason@redhat.com>
+
+	DR 2735
+	PR c++/109247
+	* call.cc (sfk_copy_or_move): New.
+	(joust): Add tiebreaker for explicit conv and copy ctor.
+
 2023-05-19  Patrick Palka  <ppalka@redhat.com>
 
 	Backported from master:

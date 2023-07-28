@@ -633,7 +633,8 @@ gen_vsetvl_pat (enum vsetvl_type insn_type, const vl_vtype_info &info, rtx vl)
 }
 
 static rtx
-gen_vsetvl_pat (rtx_insn *rinsn, const vector_insn_info &info)
+gen_vsetvl_pat (rtx_insn *rinsn, const vector_insn_info &info,
+		rtx vl = NULL_RTX)
 {
   rtx new_pat;
   vl_vtype_info new_info = info;
@@ -644,7 +645,7 @@ gen_vsetvl_pat (rtx_insn *rinsn, const vector_insn_info &info)
   if (vsetvl_insn_p (rinsn) || vlmax_avl_p (info.get_avl ()))
     {
       rtx dest = get_vl (rinsn);
-      new_pat = gen_vsetvl_pat (VSETVL_NORMAL, new_info, dest);
+      new_pat = gen_vsetvl_pat (VSETVL_NORMAL, new_info, vl ? vl : dest);
     }
   else if (INSN_CODE (rinsn) == CODE_FOR_vsetvl_vtype_change_only)
     new_pat = gen_vsetvl_pat (VSETVL_VTYPE_CHANGE_ONLY, new_info, NULL_RTX);
@@ -732,7 +733,10 @@ insert_vsetvl (enum emit_type emit_type, rtx_insn *rinsn,
   if (vlmax_avl_p (info.get_avl ()))
     {
       gcc_assert (has_vtype_op (rinsn) || vsetvl_insn_p (rinsn));
-      rtx vl_op = info.get_avl_reg_rtx ();
+      /* For user vsetvli a5, zero, we should use get_vl to get the VL
+	 operand "a5".  */
+      rtx vl_op
+	= vsetvl_insn_p (rinsn) ? get_vl (rinsn) : info.get_avl_reg_rtx ();
       gcc_assert (!vlmax_avl_p (vl_op));
       emit_vsetvl_insn (VSETVL_NORMAL, emit_type, info, vl_op, rinsn);
       return VSETVL_NORMAL;
@@ -923,7 +927,8 @@ change_insn (rtx_insn *rinsn, rtx new_pat)
       print_rtl_single (dump_file, PATTERN (rinsn));
     }
 
-  validate_change (rinsn, &PATTERN (rinsn), new_pat, false);
+  bool change_p = validate_change (rinsn, &PATTERN (rinsn), new_pat, false);
+  gcc_assert (change_p);
 
   if (dump_file)
     {
@@ -1036,7 +1041,8 @@ change_insn (function_info *ssa, insn_change change, insn_info *insn,
 }
 
 static void
-change_vsetvl_insn (const insn_info *insn, const vector_insn_info &info)
+change_vsetvl_insn (const insn_info *insn, const vector_insn_info &info,
+		    rtx vl = NULL_RTX)
 {
   rtx_insn *rinsn;
   if (vector_config_insn_p (insn->rtl ()))
@@ -1050,7 +1056,7 @@ change_vsetvl_insn (const insn_info *insn, const vector_insn_info &info)
       rinsn = PREV_INSN (insn->rtl ());
       gcc_assert (vector_config_insn_p (rinsn));
     }
-  rtx new_pat = gen_vsetvl_pat (rinsn, info);
+  rtx new_pat = gen_vsetvl_pat (rinsn, info, vl);
   change_insn (rinsn, new_pat);
 }
 
@@ -1075,6 +1081,10 @@ local_eliminate_vsetvl_insn (const vector_insn_info &dem)
 
 	  if (has_vtype_op (i->rtl ()))
 	    {
+	      if (!PREV_INSN (i->rtl ()))
+		return;
+	      if (!NONJUMP_INSN_P (PREV_INSN (i->rtl ())))
+		return;
 	      if (!vsetvl_discard_result_insn_p (PREV_INSN (i->rtl ())))
 		return;
 	      rtx avl = get_avl (i->rtl ());
@@ -3324,7 +3334,21 @@ pass_vsetvl::backward_demand_fusion (void)
 				       new_info))
 		continue;
 
-	      change_vsetvl_insn (new_info.get_insn (), new_info);
+	      rtx vl = NULL_RTX;
+	      /* Backward VLMAX VL:
+		   bb 3:
+		     vsetivli zero, 1 ... -> vsetvli t1, zero
+		     vmv.s.x
+		   bb 5:
+		     vsetvli t1, zero ... -> to be elided.
+		     vlse16.v
+
+		   We should forward "t1".  */
+	      if (!block_info.reaching_out.has_avl_reg ()
+		&& vlmax_avl_p (new_info.get_avl ()))
+		vl = get_vl (prop.get_insn ()->rtl ());
+	     change_vsetvl_insn (new_info.get_insn (), new_info, vl);
+
 	      if (block_info.local_dem == block_info.reaching_out)
 		block_info.local_dem = new_info;
 	      block_info.reaching_out = new_info;

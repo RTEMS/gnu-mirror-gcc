@@ -1,3 +1,499 @@
+2023-07-27  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-07-26  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/110755
+	* range-op-float.cc (frange_arithmetic): Change +0 result to -0
+	for PLUS_EXPR or MINUS_EXPR if -frounding-math, inf is negative and
+	it is exact op1 + (-op1) or op1 - op1.
+
+2023-07-27  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-07-26  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/110799
+	* tree-ssa-pre.cc (compute_avail): More thoroughly match
+	up TBAA behavior of redundant loads.
+
+2023-07-27  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-07-24  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/110766
+	* tree-scalar-evolution.cc
+	(analyze_and_compute_bitwise_induction_effect): Check the PHI
+	is defined in the loop header.
+
+2023-07-27  Release Manager
+
+	* GCC 13.2.0 released.
+
+2023-07-20  Andrew Carlotti  <andrew.carlotti@arm.com>
+
+	* config/aarch64/aarch64.h (TARGET_MEMTAG): Remove armv8.5
+	dependency.
+	* config/aarch64/arm_acle.h: Remove unnecessary armv8.x
+	dependencies from target pragmas.
+	* config/aarch64/arm_fp16.h (target): Likewise.
+	* config/aarch64/arm_neon.h (target): Likewise.
+
+2023-07-20  Richard Biener  <rguenther@suse.de>
+
+	Revert:
+	2022-08-09  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* config/i386/i386-features.cc (scalar_chain::convert_compare):
+	Create new pseudos only when/if needed.  Add support for TEST,
+	i.e. (COMPARE (AND x y) (const_int 0)), using UNSPEC_PTEST.
+	When broadcasting V2DImode and V4SImode use new pseudo register.
+	(timode_scalar_chain::convert_op): Do nothing if operand is
+	already V1TImode.  Avoid generating useless SUBREG conversions,
+	i.e. (SUBREG:V1TImode (REG:V1TImode) 0).  Handle CONST_WIDE_INT
+	in addition to CONST_INT by using CONST_SCALAR_INT_P.
+	(convertible_comparison_p): Use CONST_SCALAR_INT_P to match both
+	CONST_WIDE_INT and CONST_INT.  Recognize new *testti_doubleword
+	pattern as an STV candidate.
+	(timode_scalar_to_vector_candidate_p): Allow CONST_SCALAR_INT_P
+	operands in binary logic operations.
+	* config/i386/i386.cc (ix86_rtx_costs) <case UNSPEC>: Add costs
+	for UNSPEC_PTEST; a PTEST that performs an AND has the same cost
+	as regular PTEST, i.e. cost->sse_op.
+	* config/i386/i386.md (*testti_doubleword): New pre-reload
+	define_insn_and_split that recognizes comparison of TI mode AND
+	against zero.
+	* config/i386/sse.md (*ptest<mode>_and): New pre-reload
+	define_insn_and_split that recognizes UNSPEC_PTEST of identical
+	AND operands.
+
+2023-07-20  Haochen Jiang  <haochen.jiang@intel.com>
+
+	* doc/invoke.texi: Remove AVX512VP2INTERSECT in
+	Granite Rapids{, D} from documentation.
+
+2023-07-19  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-07-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/110731
+	* wide-int.cc (wi::divmod_internal): Always unpack dividend and
+	divisor as UNSIGNED regardless of sgn.
+
+2023-07-19  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backported from master:
+	2023-07-13  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR target/110624
+	* config/darwin.h (DARWIN_PLATFORM_ID): New.
+	(LINK_COMMAND_A): Use DARWIN_PLATFORM_ID to pass OS, OS version
+	and SDK data to the static linker.
+
+2023-07-19  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backported from master:
+	2023-07-03  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/darwin.h: Avoid duplicate multiply_defined specs on
+	earlier Darwin versions with shared libgcc.
+
+2023-07-18  Ju-Zhe Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/riscv-vsetvl.cc (gen_vsetvl_pat): Add vl parameter.
+	(change_vsetvl_insn): Ditto.
+	(change_insn): Add validate change as well as assert.
+	(pass_vsetvl::backward_demand_fusion): Allow forward.
+
+2023-07-17  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/110669
+	* tree-scalar-evolution.cc (analyze_and_compute_bitop_with_inv_effect):
+	Check we matched a header PHI.
+
+2023-07-14  Uros Bizjak  <ubizjak@gmail.com>
+
+	Backported from master:
+	2023-07-14  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/110206
+	* fwprop.cc (contains_paradoxical_subreg_p): Move to ...
+	* rtlanal.cc (contains_paradoxical_subreg_p): ... here.
+	* rtlanal.h (contains_paradoxical_subreg_p): Add prototype.
+	* cprop.cc (try_replace_reg): Do not set REG_EQUAL note
+	when the original source contains a paradoxical subreg.
+
+2023-07-14  Oleg Endo  <olegendo@gcc.gnu.org>
+
+	PR target/101469
+	* config/sh/sh.md (peephole2): Handle case where eliminated reg
+	is also	used by the address of the following memory operand.
+
+2023-07-13  Uros Bizjak  <ubizjak@gmail.com>
+
+	Backported from master:
+	2023-07-13  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/106966
+	* config/alpha/alpha.cc (alpha_emit_set_long_const):
+	Always use DImode when constructing long const.
+
+2023-07-12  Mo, Zewei  <zewei.mo@intel.com>
+
+	* common/config/i386/cpuinfo.h
+	(get_intel_cpu): Handle Granite Rapids D.
+	* common/config/i386/i386-common.cc:
+	(processor_alias_table): Add graniterapids-d.
+	* common/config/i386/i386-cpuinfo.h
+	(enum processor_subtypes): Add INTEL_COREI7_GRANITERAPIDS_D.
+	* config.gcc: Add -march=graniterapids-d.
+	* config/i386/driver-i386.cc (host_detect_local_cpu):
+	Handle graniterapids-d.
+	* config/i386/i386.h: (PTA_GRANITERAPIDS_D): New.
+	* doc/extend.texi: Add graniterapids-d.
+	* doc/invoke.texi: Ditto.
+
+2023-07-10  Xi Ruoyao  <xry111@xry111.site>
+
+	Backported from master:
+	2023-07-10  Xi Ruoyao  <xry111@xry111.site>
+
+	PR tree-optimization/110557
+	* tree-vect-patterns.cc (vect_recog_bitfield_ref_pattern):
+	Ensure the output sign-extended if necessary.
+
+2023-07-08  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR c++/110595
+	* doc/invoke.texi (Warning Options): Fix typo.
+
+2023-07-07  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-07-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/110556
+	* tree-ssa-tail-merge.cc (gimple_equal_p): Check
+	assign code and all operands of non-stores.
+
+2023-07-07  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-07-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/110515
+	* tree-ssa-pre.cc (compute_avail): Make code dealing
+	with hoisting loads with different alias-sets more
+	robust.
+
+2023-07-07  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-06-26  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/110392
+	* gimple-predicate-analysis.cc (uninit_analysis::is_use_guarded):
+	Do early exits on true/false predicate only after normalization.
+
+2023-07-07  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-06-26  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/110381
+	* tree-vect-slp.cc (vect_optimize_slp_pass::start_choosing_layouts):
+	Materialize permutes before fold-left reductions.
+
+2023-07-07  Li Xu  <xuli1@eswincomputing.com>
+
+	PR target/110560
+	* config/riscv/riscv-vsetvl.cc (local_eliminate_vsetvl_insn): Fix bug.
+
+2023-07-05  Michael Meissner  <meissner@linux.ibm.com>
+
+	Backported from master:
+	2023-06-23   Michael Meissner  <meissner@linux.ibm.com>
+		    Aaron Sawdey   <acsawdey@linux.ibm.com>
+
+	PR target/105325
+	* config/rs6000/genfusion.pl (gen_ld_cmpi_p10_one): Fix problems that
+	allowed prefixed lwa to be generated.
+	* config/rs6000/fusion.md: Regenerate.
+	* config/rs6000/predicates.md (ds_form_mem_operand): Delete.
+	* config/rs6000/rs6000.md (prefixed attribute): Add support for load
+	plus compare immediate fused insns.
+	(maybe_prefixed): Likewise.
+
+2023-07-05  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	Backported from master:
+	2023-06-06  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* config/rs6000/genfusion.pl (gen_ld_cmpi_p10_one): New, rewritten and
+	split out from...
+	(gen_ld_cmpi_p10): ... this.
+
+2023-07-05  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-07-04  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/110228
+	* tree-ssa-ifcombine.cc (pass_tree_ifcombine::execute):
+	Mark SSA may-undefs.
+	(bb_no_side_effects_p): Check stmt uses for undefs.
+
+2023-07-04  Lili Cui  <lili.cui@intel.com>
+
+	* config/i386/i386.h: Add PTA_ENQCMD and PTA_UINTR to PTA_SIERRAFOREST.
+	* doc/invoke.texi: Update new isa to march=sierraforest and grandridge.
+
+2023-07-03  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gimple-fold.cc (fold_array_ctor_reference): Fix head comment.
+	(fold_nonarray_ctor_reference): Likewise.  Specifically deal
+	with integral bit-fields.
+	(fold_ctor_reference): Make sure that the constructor uses the
+	native storage order.
+
+2023-07-03  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backported from master:
+	2023-07-02  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR target/108743
+	* config/darwin.opt: Add fconstant-cfstrings alias to
+	mconstant-cfstrings.
+	* doc/invoke.texi: Amend invocation descriptions to reflect
+	that the fconstant-cfstrings is a target-option alias and to
+	add the missing mconstant-cfstrings option description to the
+	Darwin section.
+
+2023-06-29  liuhongt  <hongtao.liu@intel.com>
+
+	PR rtl-optimization/110237
+	* config/i386/sse.md (<avx512>_store<mode>_mask): Refine with
+	UNSPEC_MASKMOV.
+	(maskstore<mode><avx512fmaskmodelower): Ditto.
+	(*<avx512>_store<mode>_mask): New define_insn, it's renamed
+	from original <avx512>_store<mode>_mask.
+
+2023-06-29  liuhongt  <hongtao.liu@intel.com>
+
+	PR target/110309
+	* config/i386/sse.md (maskload<mode><avx512fmaskmodelower>):
+	Refine pattern with UNSPEC_MASKLOAD.
+	(maskload<mode><avx512fmaskmodelower>): Ditto.
+	(*<avx512>_load<mode>_mask): Extend mode iterator to
+	VI12HFBF_AVX512VL.
+	(*<avx512>_load<mode>): Ditto.
+
+2023-06-28  Hongyu Wang  <hongyu.wang@intel.com>
+
+	Backported from master:
+	2023-06-26  Hongyu Wang  <hongyu.wang@intel.com>
+
+	* config/i386/i386-options.cc (ix86_valid_target_attribute_tree):
+	Override tune_string with arch_string if tune_string is not
+	explicitly specified.
+
+2023-06-28  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Backported from master:
+	2023-06-02  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR testsuite/66005
+	* doc/install.texi: Document (optional) Perl usage for parallel
+	testing of libgomp.
+
+2023-06-28  liuhongt  <hongtao.liu@intel.com>
+
+	* config/i386/i386-features.cc (pass_insert_vzeroupper:gate):
+	Move flag_expensive_optimizations && !optimize_size to ..
+	* config/i386/i386-options.cc (ix86_option_override_internal):
+	.. this, it makes -mvzeroupper independent of optimization
+	level, but still keeps the behavior of architecture
+	tuning(emit_vzeroupper) unchanged.
+
+2023-06-28  liuhongt  <hongtao.liu@intel.com>
+
+	* config/i386/i386.cc (ix86_invalid_conversion): New function.
+	(TARGET_INVALID_CONVERSION): Define as
+	ix86_invalid_conversion.
+
+2023-06-27  Andrew Pinski  <apinski@marvell.com>
+
+	Backported from master:
+	2023-06-27  Andrew Pinski  <apinski@marvell.com>
+
+	PR middle-end/110420
+	PR middle-end/103979
+	PR middle-end/98619
+	* gimplify.cc (gimplify_asm_expr): Mark asm with labels as volatile.
+
+2023-06-27  Martin Jambor  <mjambor@suse.cz>
+
+	Backported from master:
+	2023-06-27  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/110276
+	* ipa-sra.cc (struct caller_issues): New field there_is_one.
+	(check_for_caller_issues): Set it.
+	(check_all_callers_for_issues): Check it.
+
+2023-06-27  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	Backported from master:
+	2023-06-16  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/110264
+	* config/riscv/riscv-vsetvl.cc (insert_vsetvl): Fix bug.
+
+2023-06-27  Andrew Pinski  <apinski@marvell.com>
+
+	Backported from master:
+	2023-06-27  Andrew Pinski  <apinski@marvell.com>
+
+	* doc/extend.texi (__builtin_alloca_with_align_and_max): Fix
+	defbuiltin usage.
+
+2023-06-23  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-06-19  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/110298
+	* tree-ssa-loop-ivcanon.cc (tree_unroll_loops_completely):
+	Clear number of iterations info before cleaning up the CFG.
+
+2023-06-23  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-06-20  Richard Biener  <rguenther@suse.de>
+
+	PR debug/110295
+	* dwarf2out.cc (process_scope_var): Continue processing
+	the decl after setting a parent in case the existing DIE
+	was in limbo.
+
+2023-06-23  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-06-06  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/110055
+	* gimplify.cc (gimplify_target_expr): Do not emit
+	CLOBBERs for variables which have static storage duration
+	after gimplifying their initializers.
+
+2023-06-23  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-05-31  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/109983
+	PR tree-optimization/109143
+	* tree-ssa-structalias.cc (struct topo_info): Remove.
+	(init_topo_info): Likewise.
+	(free_topo_info): Likewise.
+	(compute_topo_order): Simplify API, put the component
+	with ESCAPED last so it's processed first.
+	(topo_visit): Adjust.
+	(solve_graph): Likewise.
+
+2023-06-20  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2023-06-07  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/110132
+	* config/aarch64/aarch64-builtins.cc (aarch64_general_simulate_builtin):
+	New. Use it ...
+	(aarch64_init_ls64_builtins): ... here. Switch to declaring public ACLE
+	names for builtins.
+	(aarch64_general_init_builtins): Ensure we invoke the arm_acle.h
+	setup if in_lto_p, just like we do for SVE.
+	* config/aarch64/arm_acle.h: (__arm_ld64b): Delete.
+	(__arm_st64b): Delete.
+	(__arm_st64bv): Delete.
+	(__arm_st64bv0): Delete.
+
+2023-06-20  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2023-06-07  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/110100
+	* config/aarch64/aarch64-builtins.cc (aarch64_expand_builtin_ls64):
+	Use input operand for the destination address.
+	* config/aarch64/aarch64.md (st64b): Fix constraint on address
+	operand.
+
+2023-06-20  Alex Coplan  <alex.coplan@arm.com>
+
+	Backported from master:
+	2023-06-07  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/110100
+	* config/aarch64/aarch64-builtins.cc (aarch64_init_ls64_builtins_types):
+	Replace eight consecutive spaces with tabs.
+	(aarch64_init_ls64_builtins): Likewise.
+	(aarch64_expand_builtin_ls64): Likewise.
+	* config/aarch64/aarch64.md (ld64b): Likewise.
+	(st64b): Likewise.
+	(st64bv): Likewise
+	(st64bv0): Likewise.
+
+2023-06-20  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2023-06-12  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/109932
+	* config/rs6000/rs6000-builtins.def (__builtin_pack_vector_int128,
+	__builtin_unpack_vector_int128): Move from stanza power7 to vsx.
+
+2023-06-20  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2023-06-12  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/110011
+	* config/rs6000/rs6000.cc (output_toc): Use the mode of the 128-bit
+	floating constant itself for real_to_target call.
+
+2023-06-16  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	* ira-costs.cc: (find_costs_and_classes): Constrain classes of pic
+	offset table pseudo to a general reg subset.
+
+2023-06-15  Lulu Cheng  <chenglulu@loongson.cn>
+
+	Backported from master:
+	2023-06-15  Lulu Cheng  <chenglulu@loongson.cn>
+		    Andrew Pinski  <apinski@marvell.com>
+
+	PR target/110136
+	* config/loongarch/loongarch.md: Modify the register constraints for template
+	"jumptable" and "indirect_jump" from "r" to "e".
+
+2023-06-14  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-06-13  Jakub Jelinek  <jakub@redhat.com>
+
+	* config/i386/i386.cc (standard_sse_constant_opcode): Remove
+	superfluous spaces around \t for vpcmpeqd.
+
+2023-06-14  liuhongt  <hongtao.liu@intel.com>
+
+	PR target/110227
+	* config/i386/sse.md (mov<mode>_internal>): Use x instead of v
+	for alternative 2 since there's no evex version for vpcmpeqd
+	ymm, ymm, ymm.
+
 2023-06-13  Richard Biener  <rguenther@suse.de>
 
 	Backported from master:
