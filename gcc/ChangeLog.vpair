@@ -1,3 +1,60 @@
+==================== Branch work128-vpair, patch #20 ====================
+
+Add fp built-in overload support.
+
+2023-07-28  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (UNSPEC_VPAIR_V4DF): New unspec.
+	(UNSPEC_VPAIR_V8SF): Likewise.
+	(UNSPEC_REDUCE_F32): Likewise.
+	(UNSPEC_REDUCE_F64): Likewise.
+	(VPAIR_UNARY): New code iterator.
+	(VPAIR_BINARY): Likewise.
+	(vpair_op): New code attribute.
+	(VPAIR_WRAPPER): New int iterator.
+	(VPAIR_VECTOR): New int attribute.
+	(vpair_type): Likewise.
+	(vpair_<vpair_op><vpair_type>2): New insns to support arithmetic
+	operations on vector pairs.
+	(vpair_nabs<vpair_type>2): Likewise.
+	(vpair_<vpair_op><vpair_type>3): Likewise.
+	(vpair_fma<vpair_type>4): Likewise.
+	(vpair_fms<vpair_type>4): Likewise.
+	(vpair_nfma<vpair_type>): Likewise.
+	(vpair_nfms<vpair_type>): Likewise.
+	(reduce_v4sf): Likewise.
+	(reduce_v8sf): Likewise.
+	(reduce_v2df): Likewise.
+	(reduce_v4df): Likewise.
+	* config/rs6000/rs6000-builtin.cc (fold_builtin_overload_fp): New helper
+	function for floating point overloaded built-in functions.
+	(rs6000_gimple_fold_builtin): Add support for floating point overloaded
+	built-in functions that map directly to gimple.
+	* config/rs6000/rs6000-builtins.def (__builtin_*_f32_scalar): New
+	built-in functions for overloaded floating point support.
+	(__builtin_*_f32_vector): Likewise.
+	(__builtin_*_f32_vpair): Likewise.
+	(__builtin_*_f64_scalar): Likewise.
+	(__builtin_*_f64_vector): Likewise.
+	(__builtin_*_f64_vpair): Likewise.
+	* config/rs6000/rs6000-overload.def (__builtin_*_f32): Likewise.
+	(__builtin_*_f64): Likewise.
+	* doc/extend.texi (PowerPC Built-in functions): Document the floating
+	point overloaded built-in function.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/fp-overload-f32-scalar.c: New test.
+	* gcc.target/powerpc/fp-overload-f32-vector.c: Likewise.
+	* gcc.target/powerpc/fp-overload-f32-vpair.c: Likewise.
+	* gcc.target/powerpc/fp-overload-f64-scalar.c: Likewise.
+	* gcc.target/powerpc/fp-overload-f64-vector.c: Likewise.
+	* gcc.target/powerpc/fp-overload-f64-vpair.c: Likewise.
+	* gcc.target/powerpc/fp-overload.h: New include file for fp overloaded
+	built-in functions.
+
 ==================== Branch work128-vpair, baseline ====================
 
 2023-07-28   Michael Meissner  <meissner@linux.ibm.com>
