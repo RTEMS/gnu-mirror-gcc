@@ -1,3 +1,13 @@
+==================== Branch work127-vpair, patch #35 ====================
+
+Update insn counts.
+
+2023-07-28  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/fp-overload-f64-vector.c: Update counts.
+
 ==================== Branch work127-vpair, patch #34 ====================
 
 Rename insns; Add reduction; Add overloads.
