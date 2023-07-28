@@ -1,3 +1,38 @@
+==================== Branch work127-vpair, patch #34 ====================
+
+Rename insns; Add reduction; Add overloads.
+
+2023-07-28  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (UNSPEC_REDUCE_F32): New unspec.
+	(UNSPEC_REDUCE_F64): New unspec.
+	(reduce_v4sf): New insn.
+	(reduce_v8sf): Likewise.
+	(reduce_v2df): Likewise.
+	(reduce_v4df): Likewise.
+	* config/rs6000/rs6000-builtin.cc (fold_builtin_overload_fp): New helper
+	function.
+	(rs6000_gimple_fold_builtin): Add support for the fp overloaded built-in
+	functions.
+	* config/rs6000/rs6000-builtins.def (__builtin*_fp_*): Rename fp
+	overloadd built-in functions.  Add support for reduction built-ins.
+	* config/rs6000/rs6000-overload.def (__builtin_*_f32): Add overloded fp
+	built-in functions.
+	(__builtin_*_f64): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/fp-overload-f32-scalar.c: New test.
+	* gcc.target/powerpc/fp-overload-f32-vector.c: Likewise.
+	* gcc.target/powerpc/fp-overload-f32-vpair.c: Likewise.
+	* gcc.target/powerpc/fp-overload-f64-scalar.c: Likewise.
+	* gcc.target/powerpc/fp-overload-f64-vector.c: Likewise.
+	* gcc.target/powerpc/fp-overload-f64-vpair.c: Likewise.
+	* gcc.target/powerpc/fp-overload.h: New include file for fp overloaded
+	built-in functions.
+
 ==================== Branch work127-vpair, patch #33 ====================
 
 Add -mvpair-arithmetic.
