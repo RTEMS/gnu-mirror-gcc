@@ -6187,3 +6187,181 @@
     VUPKLSW  VUPKLSW_DEPR1
   vbll __builtin_vec_vupklsw (vbi);
     VUPKLSW  VUPKLSW_DEPR2
+
+;; Overloaded floating point built-in functions
+
+[ABS_F32, SKIP, __builtin_abs_f32]
+  float __builtin_abs_f32 (float);
+    ABS_F32_SCALAR
+  vf __builtin_abs_f32 (vf);
+    ABS_F32_VECTOR
+  v256 __builtin_abs_f32 (v256);
+    ABS_F32_VPAIR
+
+[ABS_F64, SKIP, __builtin_abs_f64]
+  double __builtin_abs_f64 (double);
+    ABS_F64_SCALAR
+  vd __builtin_abs_f64 (vd);
+    ABS_F64_VECTOR
+  v256 __builtin_abs_f64 (v256);
+    ABS_F64_VPAIR
+
+[ADD_F32, SKIP, __builtin_add_f32]
+  float __builtin_add_f32 (float, float);
+    ADD_F32_SCALAR
+  vf __builtin_add_f32 (vf, vf);
+    ADD_F32_VECTOR
+  v256 __builtin_add_f32 (v256, v256);
+    ADD_F32_VPAIR
+
+[ADD_F64, SKIP, __builtin_add_f64]
+  double __builtin_add_f64 (double, double);
+    ADD_F64_SCALAR
+  vd __builtin_add_f64 (vd, vd);
+    ADD_F64_VECTOR
+  v256 __builtin_add_f64 (v256, v256);
+    ADD_F64_VPAIR
+
+[COPYSIGN_F32, SKIP, __builtin_copysign_f32]
+  float __builtin_copysign_f32 (float, float);
+    COPYSIGN_F32_SCALAR
+  vf __builtin_copysign_f32 (vf, vf);
+    COPYSIGN_F32_VECTOR
+  v256 __builtin_copysign_f32 (v256, v256);
+    COPYSIGN_F32_VPAIR
+
+[COPYSIGN_F64, SKIP, __builtin_copysign_f64]
+  double __builtin_copysign_f64 (double, double);
+    COPYSIGN_F64_SCALAR
+  vd __builtin_copysign_f64 (vd, vd);
+    COPYSIGN_F64_VECTOR
+  v256 __builtin_copysign_f64 (v256, v256);
+    COPYSIGN_F64_VPAIR
+
+[DIV_F32, SKIP, __builtin_div_f32]
+  float __builtin_div_f32 (float, float);
+    DIV_F32_SCALAR
+  vf __builtin_div_f32 (vf, vf);
+    DIV_F32_VECTOR
+  v256 __builtin_div_f32 (v256, v256);
+    DIV_F32_VPAIR
+
+[DIV_F64, SKIP, __builtin_div_f64]
+  double __builtin_div_f64 (double, double);
+    DIV_F64_SCALAR
+  vd __builtin_div_f64 (vd, vd);
+    DIV_F64_VECTOR
+  v256 __builtin_div_f64 (v256, v256);
+    DIV_F64_VPAIR
+
+[FMA_F32, SKIP, __builtin_fma_f32]
+  float __builtin_fma_f32 (float, float, float);
+    FMA_F32_SCALAR
+  vf __builtin_fma_f32 (vf, vf, vf);
+    FMA_F32_VECTOR
+  v256 __builtin_fma_f32 (v256, v256, v256);
+    FMA_F32_VPAIR
+
+[FMA_F64, SKIP, __builtin_fma_f64]
+  double __builtin_fma_f64 (double, double, double);
+    FMA_F64_SCALAR
+  vd __builtin_fma_f64 (vd, vd, vd);
+    FMA_F64_VECTOR
+  v256 __builtin_fma_f64 (v256, v256, v256);
+    FMA_F64_VPAIR
+
+[MULT_F32, SKIP, __builtin_mult_f32]
+  float __builtin_mult_f32 (float, float);
+    MULT_F32_SCALAR
+  vf __builtin_mult_f32 (vf, vf);
+    MULT_F32_VECTOR
+  v256 __builtin_mult_f32 (v256, v256);
+    MULT_F32_VPAIR
+
+[MULT_F64, SKIP, __builtin_mult_f64]
+  double __builtin_mult_f64 (double, double);
+    MULT_F64_SCALAR
+  vd __builtin_mult_f64 (vd, vd);
+    MULT_F64_VECTOR
+  v256 __builtin_mult_f64 (v256, v256);
+    MULT_F64_VPAIR
+
+[NEG_F32, SKIP, __builtin_neg_f32]
+  float __builtin_neg_f32 (float);
+    NEG_F32_SCALAR
+  vf __builtin_neg_f32 (vf);
+    NEG_F32_VECTOR
+  v256 __builtin_neg_f32 (v256);
+    NEG_F32_VPAIR
+
+[NEG_F64, SKIP, __builtin_neg_f64]
+  double __builtin_neg_f64 (double);
+    NEG_F64_SCALAR
+  vd __builtin_neg_f64 (vd);
+    NEG_F64_VECTOR
+  v256 __builtin_neg_f64 (v256);
+    NEG_F64_VPAIR
+
+[REDUCE_F32, SKIP, __builtin_reduce_f32]
+  float __builtin_reduce_f32 (float);
+    REDUCE_F32_SCALAR
+  float __builtin_reduce_f32 (vf);
+    REDUCE_F32_VECTOR
+  float __builtin_reduce_f32 (v256);
+    REDUCE_F32_VPAIR
+
+[REDUCE_F64, SKIP, __builtin_reduce_f64]
+  double __builtin_reduce_f64 (double);
+    REDUCE_F64_SCALAR
+  double __builtin_reduce_f64 (vd);
+    REDUCE_F64_VECTOR
+  double __builtin_reduce_f64 (v256);
+    REDUCE_F64_VPAIR
+
+[SMAX_F32, SKIP, __builtin_smax_f32]
+  float __builtin_smax_f32 (float, float);
+    SMAX_F32_SCALAR
+  vf __builtin_smax_f32 (vf, vf);
+    SMAX_F32_VECTOR
+  v256 __builtin_smax_f32 (v256, v256);
+    SMAX_F32_VPAIR
+
+[SMAX_F64, SKIP, __builtin_smax_f64]
+  double __builtin_smax_f64 (double, double);
+    SMAX_F64_SCALAR
+  vd __builtin_smax_f64 (vd, vd);
+    SMAX_F64_VECTOR
+  v256 __builtin_smax_f64 (v256, v256);
+    SMAX_F64_VPAIR
+
+[SMIN_F32, SKIP, __builtin_smin_f32]
+  float __builtin_smin_f32 (float, float);
+    SMIN_F32_SCALAR
+  vf __builtin_smin_f32 (vf, vf);
+    SMIN_F32_VECTOR
+  v256 __builtin_smin_f32 (v256, v256);
+    SMIN_F32_VPAIR
+
+[SMIN_F64, SKIP, __builtin_smin_f64]
+  double __builtin_smin_f64 (double, double);
+    SMIN_F64_SCALAR
+  vd __builtin_smin_f64 (vd, vd);
+    SMIN_F64_VECTOR
+  v256 __builtin_smin_f64 (v256, v256);
+    SMIN_F64_VPAIR
+
+[SUB_F32, SKIP, __builtin_sub_f32]
+  float __builtin_sub_f32 (float, float);
+    SUB_F32_SCALAR
+  vf __builtin_sub_f32 (vf, vf);
+    SUB_F32_VECTOR
+  v256 __builtin_sub_f32 (v256, v256);
+    SUB_F32_VPAIR
+
+[SUB_F64, SKIP, __builtin_sub_f64]
+  double __builtin_sub_f64 (double, double);
+    SUB_F64_SCALAR
+  vd __builtin_sub_f64 (vd, vd);
+    SUB_F64_VECTOR
+  v256 __builtin_sub_f64 (v256, v256);
+    SUB_F64_VPAIR
