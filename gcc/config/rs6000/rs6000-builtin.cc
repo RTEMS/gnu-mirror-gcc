@@ -1273,6 +1273,49 @@ rs6000_gimple_fold_mma_builtin (gimple_stmt_iterator *gsi,
   return true;
 }
 
+/* Helper function to fold the overloaded fp functions for the scalar and
+   vector types that support the operation directly.  */
+
+static void
+fold_builtin_overload_fp (gimple_stmt_iterator *gsi,
+			  gimple *stmt,
+			  enum tree_code code,
+			  int nargs)
+{
+  location_t loc = gimple_location (stmt);
+  tree lhs = gimple_call_lhs (stmt);
+  tree t;
+
+  if (nargs == 1)
+    {
+      tree arg0 = gimple_call_arg (stmt, 0);
+      t = build1 (code, TREE_TYPE (lhs), arg0);
+    }
+
+  else if (nargs == 2)
+    {
+      tree arg0 = gimple_call_arg (stmt, 0);
+      tree arg1 = gimple_call_arg (stmt, 1);
+      t = build2 (code, TREE_TYPE (lhs), arg0, arg1);
+    }
+
+  else if (nargs == 3)
+    {
+      tree arg0 = gimple_call_arg (stmt, 0);
+      tree arg1 = gimple_call_arg (stmt, 1);
+      tree arg2 = gimple_call_arg (stmt, 2);
+      t = build3 (code, TREE_TYPE (lhs), arg0, arg1, arg2);
+    }
+
+  else
+    gcc_unreachable ();
+
+  gimple *g = gimple_build_assign (lhs, t);
+  gimple_set_location (g, loc);
+  gsi_replace (gsi, g, true);
+  return;
+}
+
 /* Fold a machine-dependent built-in in GIMPLE.  (For folding into
    a constant, use rs6000_fold_builtin.)  */
 bool
@@ -2240,6 +2283,68 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 	gsi_replace (gsi, g, true);
 	return true;
       }
+
+    case RS6000_BIF_ABS_F32_SCALAR:
+    case RS6000_BIF_ABS_F32_VECTOR:
+    case RS6000_BIF_ABS_F64_SCALAR:
+    case RS6000_BIF_ABS_F64_VECTOR:
+      fold_builtin_overload_fp (gsi, stmt, ABS_EXPR, 1);
+      return true;
+
+    case RS6000_BIF_ADD_F32_SCALAR:
+    case RS6000_BIF_ADD_F32_VECTOR:
+    case RS6000_BIF_ADD_F64_SCALAR:
+    case RS6000_BIF_ADD_F64_VECTOR:
+      fold_builtin_overload_fp (gsi, stmt, PLUS_EXPR, 2);
+      return true;
+
+    case RS6000_BIF_MULT_F32_SCALAR:
+    case RS6000_BIF_MULT_F32_VECTOR:
+    case RS6000_BIF_MULT_F64_SCALAR:
+    case RS6000_BIF_MULT_F64_VECTOR:
+      fold_builtin_overload_fp (gsi, stmt, MULT_EXPR, 2);
+      return true;
+
+    case RS6000_BIF_NEG_F32_SCALAR:
+    case RS6000_BIF_NEG_F32_VECTOR:
+    case RS6000_BIF_NEG_F64_SCALAR:
+    case RS6000_BIF_NEG_F64_VECTOR:
+      fold_builtin_overload_fp (gsi, stmt, NEGATE_EXPR, 1);
+      return true;
+
+    case RS6000_BIF_REDUCE_F32_SCALAR:
+    case RS6000_BIF_REDUCE_F64_SCALAR:
+      {
+	location_t loc = gimple_location (stmt);
+	lhs = gimple_call_lhs (stmt);
+	arg0 = gimple_call_arg (stmt, 0);
+	g = gimple_build_assign (lhs, arg0);
+	gimple_set_location (g, loc);
+	gsi_replace (gsi, g, true);
+	return true;
+      }
+
+    case RS6000_BIF_SMAX_F32_SCALAR:
+    case RS6000_BIF_SMAX_F32_VECTOR:
+    case RS6000_BIF_SMAX_F64_SCALAR:
+    case RS6000_BIF_SMAX_F64_VECTOR:
+      fold_builtin_overload_fp (gsi, stmt, MAX_EXPR, 2);
+      return true;
+
+    case RS6000_BIF_SMIN_F32_SCALAR:
+    case RS6000_BIF_SMIN_F32_VECTOR:
+    case RS6000_BIF_SMIN_F64_SCALAR:
+    case RS6000_BIF_SMIN_F64_VECTOR:
+      fold_builtin_overload_fp (gsi, stmt, MIN_EXPR, 2);
+      return true;
+
+
+    case RS6000_BIF_SUB_F32_SCALAR:
+    case RS6000_BIF_SUB_F32_VECTOR:
+    case RS6000_BIF_SUB_F64_SCALAR:
+    case RS6000_BIF_SUB_F64_VECTOR:
+      fold_builtin_overload_fp (gsi, stmt, MINUS_EXPR, 2);
+      return true;
 
     default:
       if (TARGET_DEBUG_BUILTIN)
