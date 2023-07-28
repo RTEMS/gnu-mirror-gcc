@@ -4117,92 +4117,175 @@
   void __builtin_vsx_stxvp (v256, unsigned long, const v256 *);
     STXVP nothing {mma,pair}
 
-  v256 __builtin_vpair_abs_v4df (v256);
-    VPAIR_ABS_V4DF vpair_absv4df2 {mma}
+; Builtins for overload floating point operations, including scalar and
+; 128-bit vector codes that are converted into direct operations.
+; The 256 codes that are kept in vector pairs insns that are split
+; into separate operations after register allocation.
 
-  v256 __builtin_vpair_neg_v4df (v256);
-    VPAIR_NEG_V4DF vpair_negv4df2 {mma}
+  float __builtin_abs_f32_scalar (float);
+    ABS_F32_SCALAR nothing {}
+  vf __builtin_abs_f32_vector (vf);
+    ABS_F32_VECTOR nothing {}
+  v256 __builtin_abs_f32_vpair (v256);
+    ABS_F32_VPAIR vpair_absv8sf2 {mma}
 
-  v256 __builtin_vpair_nabs_v4df (v256);
-    VPAIR_NABS_V4DF vpair_nabsv4df2 {mma}
+  double __builtin_abs_f64_scalar (double);
+    ABS_F64_SCALAR nothing {}
+  vd __builtin_abs_f64_vector (vd);
+    ABS_F64_VECTOR nothing {}
+  v256 __builtin_abs_f64_vpair (v256);
+    ABS_F64_VPAIR vpair_absv4df2 {mma}
 
-  v256 __builtin_vpair_sqrt_v4df (v256);
-    VPAIR_SQRT_V4DF vpair_sqrtv4df2 {mma}
+  float __builtin_add_f32_scalar (float, float);
+    ADD_F32_SCALAR nothing {}
+  vf __builtin_add_f32_vector (vf, vf);
+    ADD_F32_VECTOR nothing {}
+  v256 __builtin_add_f32_vpair (v256, v256);
+    ADD_F32_VPAIR vpair_addv8sf3 {mma}
 
-  v256 __builtin_vpair_add_v4df (v256, v256);
-    VPAIR_ADD_V4DF vpair_addv4df3 {mma}
+  double __builtin_add_f64_scalar (double, double);
+    ADD_F64_SCALAR nothing {}
+  vd __builtin_add_f64_vector (vd, vd);
+    ADD_F64_VECTOR nothing {}
+  v256 __builtin_add_f64_vpair (v256, v256);
+    ADD_F64_VPAIR vpair_addv4df3 {mma}
 
-  v256 __builtin_vpair_sub_v4df (v256, v256);
-    VPAIR_SUB_V4DF vpair_subv4df3 {mma}
+  float __builtin_copysign_f32_scalar (float, float);
+    COPYSIGN_F32_SCALAR copysignsf3_fcpsgn {}
+  vf __builtin_copysign_f32_vector (vf, vf);
+    COPYSIGN_F32_VECTOR vsx_copysignv4sf3 {}
+  v256 __builtin_copysign_f32_vpair (v256, v256);
+    COPYSIGN_F32_VPAIR vpair_copysignv8sf3 {mma}
 
-  v256 __builtin_vpair_mul_v4df (v256, v256);
-    VPAIR_MUL_V4DF vpair_mulv4df3 {mma}
+  double __builtin_copysign_f64_scalar (double, double);
+    COPYSIGN_F64_SCALAR copysigndf3_fcpsgn {}
+  vd __builtin_copysign_f64_vector (vd, vd);
+    COPYSIGN_F64_VECTOR vsx_copysignv2df3 {}
+  v256 __builtin_copysign_f64_vpair (v256, v256);
+    COPYSIGN_F64_VPAIR vpair_copysignv4df3 {mma}
 
-  v256 __builtin_vpair_div_v4df (v256, v256);
-    VPAIR_DIV_V4DF vpair_divv4df3 {mma}
+  float __builtin_div_f32_scalar (float, float);
+    DIV_F32_SCALAR divsf3 {}
+  vf __builtin_div_f32_vector (vf, vf);
+    DIV_F32_VECTOR divv4sf3 {}
+  v256 __builtin_div_f32_vpair (v256, v256);
+    DIV_F32_VPAIR vpair_divv8sf3 {mma}
 
-  v256 __builtin_vpair_copysign_v4df (v256, v256);
-    VPAIR_COPYSIGN_V4DF vpair_copysignv4df3 {mma}
+  double __builtin_div_f64_scalar (double, double);
+    DIV_F64_SCALAR divdf3 {}
+  vd __builtin_div_f64_vector (vd, vd);
+    DIV_F64_VECTOR divv2df3 {}
+  v256 __builtin_div_f64_vpair (v256, v256);
+    DIV_F64_VPAIR vpair_divv4df3 {mma}
 
-  v256 __builtin_vpair_smin_v4df (v256, v256);
-    VPAIR_SMIN_V4DF vpair_sminv4df3 {mma}
+  float __builtin_fma_f32_scalar (float, float, float);
+    FMA_F32_SCALAR fmasf4 {}
+  vf __builtin_fma_f32_vector (vf, vf, vf);
+    FMA_F32_VECTOR fmav4sf4 {}
+  v256 __builtin_fma_v8sf (v256, v256, v256);
+    FMA_F32_VPAIR vpair_fmav8sf4 {mma}
 
-  v256 __builtin_vpair_smax_v4df (v256, v256);
-    VPAIR_SMAX_V4DF vpair_smaxv4df3 {mma}
+  double __builtin_fma_f64_scalar (double, double, double);
+    FMA_F64_SCALAR fmadf4 {}
+  vd __builtin_fma_f64_vector (vd, vd, vd);
+    FMA_F64_VECTOR fmav2df4 {}
+  v256 __builtin_fma_v4df (v256, v256, v256);
+    FMA_F64_VPAIR vpair_fmav4df4 {mma}
 
-  v256 __builtin_vpair_fma_v4df (v256, v256, v256);
-    VPAIR_FMA_V4DF vpair_fmav4df4 {mma}
+  float __builtin_mult_f32_scalar (float, float);
+    MULT_F32_SCALAR nothing {}
+  vf __builtin_mult_f32_vector (vf, vf);
+    MULT_F32_VECTOR nothing {}
+  v256 __builtin_mult_f32_vpair (v256, v256);
+    MULT_F32_VPAIR vpair_mulv8sf3 {mma}
 
-  v256 __builtin_vpair_fms_v4df (v256, v256, v256);
-    VPAIR_FMS_V4DF vpair_fmsv4df4 {mma}
+  double __builtin_mult_f64_scalar (double, double);
+    MULT_F64_SCALAR nothing {}
+  vd __builtin_mult_f64_vector (vd, vd);
+    MULT_F64_VECTOR nothing {}
+  v256 __builtin_mult_f64_vpair (v256, v256);
+    MULT_F64_VPAIR vpair_mulv4df3 {mma}
 
-  v256 __builtin_vpair_nfma_v4df (v256, v256, v256);
-    VPAIR_NFMA_V4DF vpair_nfmav4df4 {mma}
+  float __builtin_neg_f32_scalar (float);
+    NEG_F32_SCALAR nothing {}
+  vf __builtin_neg_f32_vector (vf);
+    NEG_F32_VECTOR nothing {}
+  v256 __builtin_neg_f32_vpair (v256);
+    NEG_F32_VPAIR vpair_negv8sf2 {mma}
 
-  v256 __builtin_vpair_nfms_v4df (v256, v256, v256);
-    VPAIR_NFMS_V4DF vpair_nfmsv4df4 {mma}
+  double __builtin_neg_f64_scalar (double);
+    NEG_F64_SCALAR nothing {}
+  vd __builtin_neg_f64_vector (vd);
+    NEG_F64_VECTOR nothing {}
+  v256 __builtin_neg_f64_vpair (v256);
+    NEG_F64_VPAIR vpair_negv4df2 {mma}
 
-  v256 __builtin_vpair_abs_v8sf (v256);
-    VPAIR_ABS_V8SF vpair_absv8sf2 {mma}
+  float __builtin_reduce_f32_scalar (float);
+    REDUCE_F32_SCALAR nothing {}
+  float __builtin_reduce_f32_vector (vf);
+    REDUCE_F32_VECTOR reduce_v4sf {}
+  float __builtin_reduce_f32_vpair (v256);
+    REDUCE_F32_VPAIR reduce_v8sf {mma,pair}
 
-  v256 __builtin_vpair_neg_v8sf (v256);
-    VPAIR_NEG_V8SF vpair_negv8sf2 {mma}
+  double __builtin_reduce_f64_scalar (double);
+    REDUCE_F64_SCALAR nothing {}
+  double __builtin_reduce_f64_vector (vd);
+    REDUCE_F64_VECTOR reduce_v2df {}
+  double __builtin_reduce_f64_vpair (v256);
+    REDUCE_F64_VPAIR reduce_v4df {mma,pair}
 
-  v256 __builtin_vpair_nabs_v8sf (v256);
-    VPAIR_NABS_V8SF vpair_nabsv8sf2 {mma}
+  float __builtin_smax_f32_scalar (float, float);
+    SMAX_F32_SCALAR nothing {}
+  vf __builtin_smax_f32_vector (vf, vf);
+    SMAX_F32_VECTOR nothing {}
+  v256 __builtin_smax_f32_vpair (v256, v256);
+    SMAX_F32_VPAIR vpair_smaxv8sf3 {mma}
 
-  v256 __builtin_vpair_sqrt_v8sf (v256);
-    VPAIR_SQRT_V8SF vpair_sqrtv8sf2 {mma}
+  double __builtin_smax_f64_scalar (double, double);
+    SMAX_F64_SCALAR nothing {}
+  vd __builtin_smax_f64_vector (vd, vd);
+    SMAX_F64_VECTOR nothing {}
+  v256 __builtin_smax_f64_vpair (v256, v256);
+    SMAX_F64_VPAIR vpair_smaxv4df3 {mma}
 
-  v256 __builtin_vpair_add_v8sf (v256, v256);
-    VPAIR_ADD_V8SF vpair_addv8sf3 {mma}
+  float __builtin_smin_f32_scalar (float, float);
+    SMIN_F32_SCALAR nothing {}
+  vf __builtin_smin_f32_vector (vf, vf);
+    SMIN_F32_VECTOR nothing {}
+  v256 __builtin_smin_f32_vpair (v256, v256);
+    SMIN_F32_VPAIR vpair_sminv8sf3 {mma}
 
-  v256 __builtin_vpair_sub_v8sf (v256, v256);
-    VPAIR_SUB_V8SF vpair_subv8sf3 {mma}
+  double __builtin_smin_f64_scalar (double, double);
+    SMIN_F64_SCALAR nothing {}
+  vd __builtin_smin_f64_vector (vd, vd);
+    SMIN_F64_VECTOR nothing {}
+  v256 __builtin_smin_f64_vpair (v256, v256);
+    SMIN_F64_VPAIR vpair_sminv4df3 {mma}
 
-  v256 __builtin_vpair_mul_v8sf (v256, v256);
-    VPAIR_MUL_V8SF vpair_mulv8sf3 {mma}
+  float __builtin_sqrt_f32_scalar (float);
+    SQRT_F32_SCALAR nothing {}
+  vf __builtin_sqrt_f32_vector (vf);
+    SQRT_F32_VECTOR nothing {}
+  v256 __builtin_sqrt_f32_vpair (v256);
+    SQRT_F32_VPAIR vpair_sqrtv8sf2 {mma}
 
-  v256 __builtin_vpair_div_v8sf (v256, v256);
-    VPAIR_DIV_V8SF vpair_divv8sf3 {mma}
+  double __builtin_sqrt_f64_scalar (double);
+    SQRT_F64_SCALAR nothing {}
+  vd __builtin_sqrt_f64_vector (vd);
+    SQRT_F64_VECTOR nothing {}
+  v256 __builtin_sqrt_f64_vpair (v256);
+    SQRT_F64_VPAIR vpair_sqrtv4df2 {mma}
 
-  v256 __builtin_vpair_copysign_v8sf (v256, v256);
-    VPAIR_COPYSIGN_V8SF vpair_copysignv8sf3 {mma}
+  float __builtin_sub_f32_scalar (float, float);
+    SUB_F32_SCALAR nothing {}
+  vf __builtin_sub_f32_vector (vf, vf);
+    SUB_F32_VECTOR nothing {}
+  v256 __builtin_sub_f32_vpair (v256, v256);
+    SUB_F32_VPAIR vpair_subv8sf3 {mma}
 
-  v256 __builtin_vpair_fma_v8sf (v256, v256, v256);
-    VPAIR_FMA_V8SF vpair_fmav8sf4 {mma}
-
-  v256 __builtin_vpair_fms_v8sf (v256, v256, v256);
-    VPAIR_FMS_V8SF vpair_fmsv8sf4 {mma}
-
-  v256 __builtin_vpair_nfma_v8sf (v256, v256, v256);
-    VPAIR_NFMA_V8SF vpair_nfmav8sf4 {mma}
-
-  v256 __builtin_vpair_nfms_v8sf (v256, v256, v256);
-    VPAIR_NFMS_V8SF vpair_nfmsv8sf4 {mma}
-
-  v256 __builtin_vpair_smin_v8sf (v256, v256);
-    VPAIR_SMIN_V8SF vpair_sminv8sf3 {mma}
-
-  v256 __builtin_vpair_smax_v8sf (v256, v256);
-    VPAIR_SMAX_V8SF vpair_smaxv8sf3 {mma}
+  double __builtin_sub_f64_scalar (double, double);
+    SUB_F64_SCALAR nothing {}
+  vd __builtin_sub_f64_vector (vd, vd);
+    SUB_F64_VECTOR nothing {}
+  v256 __builtin_sub_f64_vpair (v256, v256);
+    SUB_F64_VPAIR vpair_subv4df3 {mma}
