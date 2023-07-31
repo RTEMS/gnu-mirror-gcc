@@ -255,7 +255,7 @@ maybe_isnan (const frange &op1, const frange &op2)
 // Floating version of relop_early_resolve that takes into account NAN
 // and -ffinite-math-only.
 
-inline bool
+static inline bool
 frelop_early_resolve (irange &r, tree type,
 		      const frange &op1, const frange &op2,
 		      relation_trio rel, relation_kind my_rel)
@@ -272,7 +272,7 @@ frelop_early_resolve (irange &r, tree type,
 
 // Set VALUE to its next real value, or INF if the operation overflows.
 
-inline void
+void
 frange_nextafter (enum machine_mode mode,
 		  REAL_VALUE_TYPE &value,
 		  const REAL_VALUE_TYPE &inf)
@@ -318,6 +318,24 @@ frange_arithmetic (enum tree_code code, tree type,
 
   bool inexact = real_arithmetic (&value, code, &op1, &op2);
   real_convert (&result, mode, &value);
+
+  /* When rounding towards negative infinity, x + (-x) and
+     x - x is -0 rather than +0 real_arithmetic computes.
+     So, when we are looking for lower bound (inf is negative),
+     use -0 rather than +0.  */
+  if (flag_rounding_math
+      && (code == PLUS_EXPR || code == MINUS_EXPR)
+      && !inexact
+      && real_iszero (&result)
+      && !real_isneg (&result)
+      && real_isneg (&inf))
+    {
+      REAL_VALUE_TYPE op2a = op2;
+      if (code == PLUS_EXPR)
+	op2a.sign ^= 1;
+      if (real_isneg (&op1) == real_isneg (&op2a) && real_equal (&op1, &op2a))
+	result.sign = 1;
+    }
 
   // Be extra careful if there may be discrepancies between the
   // compile and runtime results.
@@ -2878,7 +2896,7 @@ namespace selftest
 
 // Build an frange from string endpoints.
 
-inline frange
+static inline frange
 frange_float (const char *lb, const char *ub, tree type = float_type_node)
 {
   REAL_VALUE_TYPE min, max;

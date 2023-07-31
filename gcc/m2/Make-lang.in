@@ -462,7 +462,8 @@ GM2_G=-g -fm2-g
 GM2_CPP=
 # GM2_DEBUG_STRMEM=-fcpp
 GM2_DEBUG_STRMEM=
-GM2_FLAGS=-Wunused-variable -fsoft-check-all \
+GM2_FLAGS=-Wunused-variable -Wuninit-variable-checking \
+ -fsoft-check-all \
  -fno-return -Wreturn-type \
  $(GM2_G) $(GM2_O) \
  -funbounded-by-reference -fpim -fextended-opaque \
@@ -485,7 +486,6 @@ SO=-O0 -g -fPIC
 # Language-specific object files for the gm2 compiler.
 
 GM2_C_OBJS        = m2/gm2-lang.o \
-                    m2/stor-layout.o \
                     m2/m2pp.o \
                     m2/gm2-gcc/m2assert.o \
                     m2/gm2-gcc/m2block.o \
@@ -510,6 +510,9 @@ GM2_LIBS          = m2/gm2-compiler/gm2.a \
 GM2_LIBS_BOOT     = m2/gm2-compiler-boot/gm2.a \
                     m2/gm2-libs-boot/libgm2.a \
                     $(GM2-BOOT-O)
+
+m2_OBJS = $(GM2_C_OBJS) m2/gm2-gcc/rtegraph.o \
+	m2/gm2-compiler-boot/m2flex.o
 
 cc1gm2$(exeext): m2/stage1/cc1gm2$(exeext) $(m2.prev)
 	cp -p $< $@
@@ -569,10 +572,6 @@ m2/gm2-lang.o: $(srcdir)/m2/gm2-lang.cc gt-m2-gm2-lang.h $(GCC_HEADER_DEPENDENCI
 	    -DLIBSUBDIR=\"$(libsubdir)\" \
             $(ALL_CPPFLAGS) $(INCLUDES) $< $(OUTPUT_OPTION)
 
-m2/stor-layout.o: $(srcdir)/stor-layout.cc $(GCC_HEADER_DEPENDENCIES_FOR_M2)
-	$(COMPILER) -c -DSET_WORD_SIZE=INT_TYPE_SIZE $(ALL_COMPILERFLAGS) \
-            $(ALL_CPPFLAGS) $(INCLUDES) $< $(OUTPUT_OPTION)
-
 m2/m2pp.o : $(srcdir)/m2/m2pp.cc $(GCC_HEADER_DEPENDENCIES_FOR_M2)
 	$(COMPILER) -c -g -DGM2 $(ALL_COMPILERFLAGS) \
             $(ALL_CPPFLAGS) $(INCLUDES) $< $(OUTPUT_OPTION)
@@ -583,13 +582,16 @@ m2/gm2-gcc/rtegraph.o: $(srcdir)/m2/gm2-gcc/rtegraph.cc $(GCC_HEADER_DEPENDENCIE
 	$(COMPILER) -c -g $(GM2GCC) $(ALL_COMPILERFLAGS) \
             $(ALL_CPPFLAGS) $(INCLUDES) $< $(OUTPUT_OPTION)
 
-c-family/m2pp.o : $(srcdir)/m2/m2pp.cc $(GCC_HEADER_DEPENDENCIES_FOR_M2)
-	$(COMPILER) -c -g $(ALL_COMPILERFLAGS) \
-            $(ALL_CPPFLAGS) $(INCLUDES) $< $(OUTPUT_OPTION)
-
 m2/gm2-gcc/$(SRC_PREFIX)%.h: $(srcdir)/m2/gm2-gcc/%.def $(MCDEPS)
 	-test -d $(@D) || $(mkinstalldirs) $(@D)
 	$(MC) -o=$@ $(srcdir)/m2/gm2-gcc/$*.def
+
+ifeq ($(HAVE_PYTHON),yes)
+check-format-error:
+	$(PYTHON) $(srcdir)/m2/tools-src/checkmeta.py -s $(srcdir)/m2/gm2-compiler
+else
+check-format-error:
+endif
 
 # The following tables define the source files which are translated into C using mc
 # and defines the system interface C files.
@@ -741,6 +743,7 @@ GM2-COMP-BOOT-DEFS = \
    M2StackWord.def \
    M2Students.def \
    M2Swig.def \
+   M2SymInit.def \
    M2System.def \
    NameKey.def \
    ObjectFiles.def \
@@ -813,6 +816,7 @@ GM2-COMP-BOOT-MODS = \
    M2StackWord.mod \
    M2Students.mod \
    M2Swig.mod \
+   M2SymInit.mod \
    M2System.mod \
    NameKey.mod \
    NameKey.mod \
@@ -1018,6 +1022,7 @@ GM2-COMP-DEFS = \
    M2StackWord.def \
    M2Students.def \
    M2Swig.def \
+   M2SymInit.def \
    M2System.def \
    NameKey.def \
    ObjectFiles.def \
@@ -1087,6 +1092,7 @@ GM2-COMP-MODS = \
    M2StackWord.mod \
    M2Students.mod \
    M2Swig.mod \
+   M2SymInit.mod \
    M2System.mod \
    NameKey.mod \
    ObjectFiles.mod \
@@ -1161,7 +1167,6 @@ MC-LIB-DEFS = \
    IO.def \
    M2Dependent.def \
    M2EXCEPTION.def \
-   M2LINK.def \
    M2RTS.def \
    MemUtils.def \
    NumberIO.def \
@@ -1710,7 +1715,6 @@ BUILD-PGE-O = \
    m2/pge-boot/Glibc.o \
    m2/pge-boot/Gerrno.o \
    m2/pge-boot/GUnixArgs.o \
-   m2/pge-boot/GM2LINK.o \
    m2/pge-boot/Gtermios.o \
    m2/pge-boot/GSysExceptions.o \
    m2/pge-boot/Gabort.o \
