@@ -781,6 +781,25 @@ static const struct cpu_vector_cost a64fx_vector_cost =
   1 /* cond_not_taken_branch_cost  */
 };
 
+/* Ampere-1 costs for vector insn classes.  */
+static const struct cpu_vector_cost ampere1_vector_cost =
+{
+  1, /* scalar_int_stmt_cost  */
+  3, /* scalar_fp_stmt_cost  */
+  4, /* scalar_load_cost  */
+  1, /* scalar_store_cost  */
+  1, /* int_stmt_cost  */
+  3, /* fp_stmt_cost  */
+  2, /* permute_cost  */
+  6, /* vec_to_scalar_cost  */
+  7, /* scalar_to_vec_cost  */
+  4, /* align_load_cost  */
+  4, /* unalign_load_cost  */
+  1, /* unalign_store_cost  */
+  1, /* store_cost  */
+  1, /* cond_taken_branch_cost  */
+  1 /* cond_not_taken_branch_cost  */
+};
 
 /* Generic costs for branch instructions.  */
 static const struct cpu_branch_cost generic_branch_cost =
@@ -919,6 +938,17 @@ static const cpu_prefetch_tune a64fx_prefetch_tune =
   64,			/* l1_cache_size  */
   256,			/* l1_cache_line_size  */
   32768,		/* l2_cache_size  */
+  true,			/* prefetch_dynamic_strides */
+  -1,			/* minimum_stride */
+  -1			/* default_opt_level  */
+};
+
+static const cpu_prefetch_tune ampere1_prefetch_tune =
+{
+  0,			/* num_slots  */
+  64,			/* l1_cache_size  */
+  64,			/* l1_cache_line_size  */
+  2048,			/* l2_cache_size  */
   true,			/* prefetch_dynamic_strides */
   -1,			/* minimum_stride */
   -1			/* default_opt_level  */
@@ -1382,6 +1412,67 @@ static const struct tune_params neoversen1_tunings =
   tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
   (AARCH64_EXTRA_TUNE_NONE),	/* tune_flags.  */
   &generic_prefetch_tune
+};
+
+static const struct tune_params ampere1_tunings =
+{
+  &ampere1_extra_costs,
+  &generic_addrcost_table,
+  &generic_regmove_cost,
+  &ampere1_vector_cost,
+  &generic_branch_cost,
+  &generic_approx_modes,
+  SVE_NOT_IMPLEMENTED, /* sve_width  */
+  4, /* memmov_cost  */
+  4, /* issue_rate  */
+  (AARCH64_FUSE_ADRP_ADD | AARCH64_FUSE_AES_AESMC |
+   AARCH64_FUSE_MOV_MOVK | AARCH64_FUSE_MOVK_MOVK |
+   AARCH64_FUSE_ALU_BRANCH /* adds, ands, bics, ccmp, ccmn */ |
+   AARCH64_FUSE_CMP_BRANCH),
+  /* fusible_ops  */
+  "32",		/* function_align.  */
+  "4",		/* jump_align.  */
+  "32:16",	/* loop_align.  */
+  2,	/* int_reassoc_width.  */
+  4,	/* fp_reassoc_width.  */
+  2,	/* vec_reassoc_width.  */
+  2,	/* min_div_recip_mul_sf.  */
+  2,	/* min_div_recip_mul_df.  */
+  0,	/* max_case_values.  */
+  tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
+  (AARCH64_EXTRA_TUNE_NO_LDP_COMBINE),	/* tune_flags.  */
+  &ampere1_prefetch_tune
+};
+
+static const struct tune_params ampere1a_tunings =
+{
+  &ampere1a_extra_costs,
+  &generic_addrcost_table,
+  &generic_regmove_cost,
+  &ampere1_vector_cost,
+  &generic_branch_cost,
+  &generic_approx_modes,
+  SVE_NOT_IMPLEMENTED, /* sve_width  */
+  4, /* memmov_cost  */
+  4, /* issue_rate  */
+  (AARCH64_FUSE_ADRP_ADD | AARCH64_FUSE_AES_AESMC |
+   AARCH64_FUSE_MOV_MOVK | AARCH64_FUSE_MOVK_MOVK |
+   AARCH64_FUSE_ALU_BRANCH /* adds, ands, bics, ccmp, ccmn */ |
+   AARCH64_FUSE_CMP_BRANCH | AARCH64_FUSE_ALU_CBZ |
+   AARCH64_FUSE_ADDSUB_2REG_CONST1),
+  /* fusible_ops  */
+  "32",		/* function_align.  */
+  "4",		/* jump_align.  */
+  "32:16",	/* loop_align.  */
+  2,	/* int_reassoc_width.  */
+  4,	/* fp_reassoc_width.  */
+  2,	/* vec_reassoc_width.  */
+  2,	/* min_div_recip_mul_sf.  */
+  2,	/* min_div_recip_mul_df.  */
+  0,	/* max_case_values.  */
+  tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
+  (AARCH64_EXTRA_TUNE_NO_LDP_COMBINE),	/* tune_flags.  */
+  &ampere1_prefetch_tune
 };
 
 static const struct tune_params neoversev1_tunings =
@@ -22041,6 +22132,34 @@ aarch_macro_fusion_pair_p (rtx_insn *prev, rtx_insn *curr)
 	}
     }
 
+  /* Fuse A+B+1 and A-B-1 */
+  if (simple_sets_p
+      && aarch64_fusion_enabled_p (AARCH64_FUSE_ADDSUB_2REG_CONST1))
+    {
+      /* We're trying to match:
+	  prev == (set (r0) (plus (r0) (r1)))
+	  curr == (set (r0) (plus (r0) (const_int 1)))
+	or:
+	  prev == (set (r0) (minus (r0) (r1)))
+	  curr == (set (r0) (plus (r0) (const_int -1))) */
+
+      rtx prev_src = SET_SRC (prev_set);
+      rtx curr_src = SET_SRC (curr_set);
+
+      int polarity = 1;
+      if (GET_CODE (prev_src) == MINUS)
+	polarity = -1;
+
+      if (GET_CODE (curr_src) == PLUS
+	  && (GET_CODE (prev_src) == PLUS || GET_CODE (prev_src) == MINUS)
+	  && CONST_INT_P (XEXP (curr_src, 1))
+	  && INTVAL (XEXP (curr_src, 1)) == polarity
+	  && REG_P (XEXP (curr_src, 0))
+	  && REG_P (SET_DEST (prev_set))
+	  && REGNO (SET_DEST (prev_set)) == REGNO (XEXP (curr_src, 0)))
+	return true;
+    }
+
   return false;
 }
 
@@ -22227,6 +22346,12 @@ aarch64_operands_ok_for_ldpstp (rtx *operands, bool load,
   HOST_WIDE_INT offval_1, offval_2, msize;
   enum reg_class rclass_1, rclass_2;
   rtx mem_1, mem_2, reg_1, reg_2, base_1, base_2, offset_1, offset_2;
+
+  /* Allow the tuning structure to disable LDP instruction formation
+     from combining instructions (e.g., in peephole2).  */
+  if (load && (aarch64_tune_params.extra_tuning_flags
+	       & AARCH64_EXTRA_TUNE_NO_LDP_COMBINE))
+    return false;
 
   if (load)
     {

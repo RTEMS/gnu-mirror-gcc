@@ -7420,7 +7420,8 @@ darwin_rs6000_special_round_type_align (tree type, unsigned int computed,
       type = TREE_TYPE (type);
   } while (AGGREGATE_TYPE_P (type));
 
-  if (! AGGREGATE_TYPE_P (type) && type != error_mark_node)
+  if (type != error_mark_node && ! AGGREGATE_TYPE_P (type)
+      && ! TYPE_PACKED (type) && maximum_field_alignment == 0)
     align = MAX (align, TYPE_ALIGN (type));
 
   return align;
@@ -16649,7 +16650,7 @@ output_toc (FILE *file, rtx x, int labelno, machine_mode mode)
       if (DECIMAL_FLOAT_MODE_P (GET_MODE (x)))
 	REAL_VALUE_TO_TARGET_DECIMAL128 (*CONST_DOUBLE_REAL_VALUE (x), k);
       else
-	REAL_VALUE_TO_TARGET_LONG_DOUBLE (*CONST_DOUBLE_REAL_VALUE (x), k);
+	real_to_target (k, CONST_DOUBLE_REAL_VALUE (x), GET_MODE (x));
 
       if (TARGET_64BIT)
 	{
