@@ -361,6 +361,33 @@ struct rs6000_reg_addr {
 
 static struct rs6000_reg_addr reg_addr[NUM_MACHINE_MODES];
 
+/* Vector pair modes that are supported with -mvector-pair.  */
+struct vpair_mode_info {
+  machine_mode vp_mode;			/* vector mode to use.  */
+  enum insn_code reload_di_load;	/* reload input handler, 64-bit.  */
+  enum insn_code reload_di_store;	/* reload output handler, 64-bit.  */
+  enum insn_code reload_si_load;	/* reload input handler, 32-bit.  */
+  enum insn_code reload_si_store;	/* reload output handler, 32-bit.  */
+};
+
+#define VPAIR_MODE_INIT(UC_TYPE, LC_TYPE)				\
+  {									\
+    UC_TYPE,								\
+    CODE_FOR_reload_ ## LC_TYPE ## _di_load,				\
+    CODE_FOR_reload_ ## LC_TYPE ## _di_store,				\
+    CODE_FOR_reload_ ## LC_TYPE ## _si_load,				\
+    CODE_FOR_reload_ ## LC_TYPE ## _si_store,				\
+  }
+
+static const struct vpair_mode_info vpair_modes[] = {
+  VPAIR_MODE_INIT (V32QImode, v32qi),
+  VPAIR_MODE_INIT (V16HImode, v16hi),
+  VPAIR_MODE_INIT (V8SImode,  v8si),
+  VPAIR_MODE_INIT (V4DImode,  v4di),
+  VPAIR_MODE_INIT (V8SFmode,  v8sf),
+  VPAIR_MODE_INIT (V4DFmode,  v4df),
+};
+
 /* Helper function to say whether a mode supports PRE_INC or PRE_DEC.  */
 static inline bool
 mode_supports_pre_incdec_p (machine_mode mode)
@@ -1842,7 +1869,7 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
 
   /* Vector pair modes need even/odd VSX register pairs.  Only allow vector
      registers.  */
-  if (mode == OOmode)
+  if (VECTOR_PAIR_MODE_P (mode))
     return (TARGET_MMA && VSX_REGNO_P (regno) && (regno & 1) == 0);
 
   /* MMA accumulator modes need FPR registers divisible by 4.  */
@@ -1963,8 +1990,8 @@ rs6000_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
 static bool
 rs6000_modes_tieable_p (machine_mode mode1, machine_mode mode2)
 {
-  if (mode1 == PTImode || mode1 == OOmode || mode1 == XOmode
-      || mode2 == PTImode || mode2 == OOmode || mode2 == XOmode)
+  if (mode1 == PTImode || VECTOR_PAIR_MODE_P (mode1) || mode1 == XOmode
+      || mode2 == PTImode || VECTOR_PAIR_MODE_P (mode2) || mode2 == XOmode)
     return mode1 == mode2;
 
   if (ALTIVEC_OR_VSX_VECTOR_MODE (mode1))
@@ -2712,13 +2739,13 @@ rs6000_setup_reg_addr_masks (void)
 	     since it will be broken into two vector moves.  Vector quads can
 	     only do offset loads.  */
 	  else if ((addr_mask != 0) && TARGET_MMA
-		   && (m2 == OOmode || m2 == XOmode))
+		   && (VECTOR_PAIR_MODE_P (m2) || m2 == XOmode))
 	    {
 	      addr_mask |= RELOAD_REG_OFFSET;
 	      if (rc == RELOAD_REG_FPR || rc == RELOAD_REG_VMX)
 		{
 		  addr_mask |= RELOAD_REG_QUAD_OFFSET;
-		  if (m2 == OOmode)
+		  if (VECTOR_PAIR_MODE_P (m2))
 		    addr_mask |= RELOAD_REG_INDEXED;
 		}
 	    }
@@ -2936,6 +2963,17 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
       rs6000_vector_align[XOmode] = 512;
     }
 
+  if (TARGET_VECTOR_PAIR)
+    {
+      for (size_t i = 0; i < ARRAY_SIZE (vpair_modes); i++)
+	{
+	  machine_mode vpair_mode = vpair_modes[i].vp_mode;
+	  rs6000_vector_unit[vpair_mode] = VECTOR_NONE;
+	  rs6000_vector_mem[vpair_mode] = VECTOR_VSX;
+	  rs6000_vector_align[vpair_mode] = 256;
+	}
+    }
+
   /* Register class constraints for the constraints that depend on compile
      switches. When the VSX code was added, different constraints were added
      based on the type (DFmode, V2DFmode, V4SFmode).  For the vector types, all
@@ -3067,6 +3105,18 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 		  reg_addr[XOmode].reload_store = CODE_FOR_reload_xo_di_store;
 		  reg_addr[XOmode].reload_load = CODE_FOR_reload_xo_di_load;
 		}
+
+	      if (TARGET_VECTOR_PAIR)
+		{
+		  for (size_t i = 0; i < ARRAY_SIZE (vpair_modes); i++)
+		    {
+		      machine_mode vm = vpair_modes[i].vp_mode;
+		      reg_addr[vm].reload_store
+			= vpair_modes[i].reload_di_store;
+		      reg_addr[vm].reload_load
+			= vpair_modes[i].reload_di_load;
+		    }
+		}
 	    }
 	}
       else
@@ -3123,6 +3173,18 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 	      reg_addr[DImode].reload_fpr_gpr = CODE_FOR_reload_fpr_from_gprdi;
 	      reg_addr[DDmode].reload_fpr_gpr = CODE_FOR_reload_fpr_from_gprdd;
 	      reg_addr[DFmode].reload_fpr_gpr = CODE_FOR_reload_fpr_from_gprdf;
+	    }
+
+	  if (TARGET_VECTOR_PAIR)
+	    {
+	      for (size_t i = 0; i < ARRAY_SIZE (vpair_modes); i++)
+		{
+		  machine_mode vm = vpair_modes[i].vp_mode;
+		  reg_addr[vm].reload_store
+		    = vpair_modes[i].reload_si_store;
+		  reg_addr[vm].reload_load
+		    = vpair_modes[i].reload_si_load;
+		}
 	    }
 	}
 
@@ -4422,6 +4484,16 @@ rs6000_option_override_internal (bool global_init_p)
       if ((rs6000_isa_flags_explicit & OPTION_MASK_MMA) != 0)
 	error ("%qs requires %qs", "-mmma", "-mvsx");
       rs6000_isa_flags &= ~OPTION_MASK_MMA;
+    }
+
+  /* At present, do not enable -mvector-pair by default if MMA is available.
+     Turn off vector pair/mma options on non-power10 systems.  */
+  if (!TARGET_MMA && TARGET_VECTOR_PAIR)
+    {
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_VECTOR_PAIR) != 0)
+	error ("%qs requires %qs", "-mvector-pair", "-mmma");
+
+      rs6000_isa_flags &= ~OPTION_MASK_VECTOR_PAIR;
     }
 
   if (!TARGET_PCREL && TARGET_PCREL_OPT)
@@ -7628,6 +7700,50 @@ rs6000_expand_vector_extract (rtx target, rtx vec, rtx elt)
 	      return;
 	    }
 	  break;
+#if 0
+	case E_V4DImode:
+	  if (TARGET_MMA)
+	    {
+	      emit_insn (gen_vsx_extract_v4di (target, vec, elt));
+	      return;
+	    }
+	  break;
+	case E_V8SImode:
+	  if (TARGET_MMA)
+	    {
+	      emit_insn (gen_vsx_extract_v8si (target, vec, elt));
+	      return;
+	    }
+	  break;
+	case E_V16HImode:
+	  if (TARGET_MMA)
+	    {
+	      emit_insn (gen_vsx_extract_v16hi (target, vec, elt));
+	      return;
+	    }
+	  break;
+	case E_V32HQmode:
+	  if (TARGET_MMA)
+	    {
+	      emit_insn (gen_vsx_extract_v32qi (target, vec, elt));
+	      return;
+	    }
+	  break;
+#endif
+	case E_V4DFmode:
+	  if (TARGET_MMA)
+	    {
+	      emit_insn (gen_vsx_extract_v4df (target, vec, elt));
+	      return;
+	    }
+	  break;
+	case E_V8SFmode:
+	  if (TARGET_MMA)
+	    {
+	      emit_insn (gen_vsx_extract_v8sf (target, vec, elt));
+	      return;
+	    }
+	  break;
 	}
     }
   else if (VECTOR_MEM_VSX_P (mode) && !CONST_INT_P (elt)
@@ -8669,6 +8785,12 @@ reg_offset_addressing_ok_p (machine_mode mode)
       /* The vector pair/quad types support offset addressing if the
 	 underlying vectors support offset addressing.  */
     case E_OOmode:
+    case E_V8SFmode:
+    case E_V4DFmode:
+    case E_V32QImode:
+    case E_V16HImode:
+    case E_V8SImode:
+    case E_V4DImode:
     case E_XOmode:
       return TARGET_MMA;
 
@@ -10955,11 +11077,17 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
 	operands[1] = force_const_mem (mode, operands[1]);
       break;
 
+    case E_V32QImode:
     case E_V16QImode:
+    case E_V16HImode:
     case E_V8HImode:
+    case E_V8SFmode:
     case E_V4SFmode:
+    case E_V8SImode:
     case E_V4SImode:
+    case E_V4DFmode:
     case E_V2DFmode:
+    case E_V4DImode:
     case E_V2DImode:
     case E_V1TImode:
       if (CONSTANT_P (operands[1])
@@ -10971,7 +11099,7 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
     case E_XOmode:
       if (CONST_INT_P (operands[1]) && INTVAL (operands[1]) != 0)
 	error ("%qs is an opaque type, and you cannot set it to other values",
-	       (mode == OOmode) ? "__vector_pair" : "__vector_quad");
+	       (VECTOR_PAIR_MODE_P (mode)) ? "__vector_pair" : "__vector_quad");
       break;
 
     case E_SImode:
@@ -13216,7 +13344,7 @@ rs6000_preferred_reload_class (rtx x, enum reg_class rclass)
      the GPR registers.  */
   if (rclass == GEN_OR_FLOAT_REGS)
     {
-      if (mode == OOmode)
+      if (VECTOR_PAIR_MODE_P (mode))
 	return VSX_REGS;
 
       if (mode == XOmode)
@@ -24245,6 +24373,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "save-toc-indirect",	OPTION_MASK_SAVE_TOC_INDIRECT,	false, true  },
   { "string",			0,				false, true  },
   { "update",			OPTION_MASK_NO_UPDATE,		true , true  },
+  { "vector-pair",		OPTION_MASK_VECTOR_PAIR,	false, true  },
   { "vsx",			OPTION_MASK_VSX,		false, true  },
 #ifdef OPTION_MASK_64BIT
 #if TARGET_AIX_OS
@@ -27151,6 +27280,54 @@ rs6000_split_logical (rtx operands[3],
   return;
 }
 
+/* Split a vector constant for a type that can be held into a vector register
+   pair into 2 separate constants that can be held in a single vector register.
+   Return true if we can split the constant.  */
+
+bool
+rs6000_split_vpair_constant (rtx op, rtx *high, rtx *low)
+{
+  *high = *low = NULL_RTX;
+  if (!CONST_VECTOR_P (op))
+    return false;
+
+  if (GET_MODE (op) == V8SFmode)
+    {
+      rtvec hi_vec = gen_rtvec (4,
+				CONST_VECTOR_ELT (op, 0),
+				CONST_VECTOR_ELT (op, 1),
+				CONST_VECTOR_ELT (op, 2),
+				CONST_VECTOR_ELT (op, 3));
+
+      rtvec lo_vec = gen_rtvec (4,
+				CONST_VECTOR_ELT (op, 4),
+				CONST_VECTOR_ELT (op, 5),
+				CONST_VECTOR_ELT (op, 6),
+				CONST_VECTOR_ELT (op, 7));
+
+      *high = gen_rtx_CONST_VECTOR (V4SFmode, hi_vec);
+      *low = gen_rtx_CONST_VECTOR (V4SFmode, lo_vec);
+      return true;
+    }
+
+  else if (GET_MODE (op) == V4DFmode)
+    {
+      rtvec hi_vec = gen_rtvec (2,
+				CONST_VECTOR_ELT (op, 0),
+				CONST_VECTOR_ELT (op, 1));
+
+      rtvec lo_vec = gen_rtvec (2,
+				CONST_VECTOR_ELT (op, 3),
+				CONST_VECTOR_ELT (op, 4));
+
+      *high = gen_rtx_CONST_VECTOR (V2DFmode, hi_vec);
+      *low = gen_rtx_CONST_VECTOR (V2DFmode, lo_vec);
+      return true;
+    }
+
+  return false;
+}
+
 /* Emit instructions to move SRC to DST.  Called by splitters for
    multi-register moves.  It will emit at most one instruction for
    each register that is accessed; that is, it won't emit li/lis pairs
@@ -27169,6 +27346,8 @@ rs6000_split_multireg_move (rtx dst, rtx src)
   int reg_mode_size;
   /* The number of registers that will be moved.  */
   int nregs;
+  /* Hi/lo values for splitting vector pair constants.  */
+  rtx vpair_hi, vpair_lo;
 
   reg = REG_P (dst) ? REGNO (dst) : REGNO (src);
   mode = GET_MODE (dst);
@@ -27184,7 +27363,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
     }
   /* If we have a vector pair/quad mode, split it into two/four separate
      vectors.  */
-  else if (mode == OOmode || mode == XOmode)
+  else if (VECTOR_PAIR_MODE_P (mode) || mode == XOmode)
     reg_mode = V1TImode;
   else if (FP_REGNO_P (reg))
     reg_mode = DECIMAL_FLOAT_MODE_P (mode) ? DDmode :
@@ -27197,6 +27376,29 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 
   gcc_assert (reg_mode_size * nregs == GET_MODE_SIZE (mode));
 
+  /* Handle vector pair constants.  */
+  if (CONST_VECTOR_P (src) && VECTOR_PAIR_MODE_P (mode) && TARGET_MMA
+      && rs6000_split_vpair_constant (src, &vpair_hi, &vpair_lo)
+      && VSX_REGNO_P (reg))
+    {
+      reg_mode = GET_MODE (vpair_hi);
+      rtx reg_hi = gen_rtx_REG (reg_mode, reg);
+      rtx reg_lo = gen_rtx_REG (reg_mode, reg + 1);
+
+      emit_move_insn (reg_hi, vpair_hi);
+
+      /* 0.0 is easy.  For other constants, copy the high register into the low
+	 register if the two sets of constants are equal.  This means we won't
+	 be doing back to back prefixed load immediate instructions.  */
+      if (rtx_equal_p (vpair_hi, vpair_lo)
+	  && !rtx_equal_p (vpair_hi, CONST0_RTX (reg_mode)))
+	emit_move_insn (reg_lo, reg_hi);
+      else
+	emit_move_insn (reg_lo, vpair_lo);
+      
+      return;
+    }
+      
   /* TDmode residing in FP registers is special, since the ISA requires that
      the lower-numbered word of a register pair is always the most significant
      word, even in little-endian mode.  This does not match the usual subreg
@@ -27236,7 +27438,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
      below.  This means the last register gets the first memory
      location.  We also need to be careful of using the right register
      numbers if we are splitting XO to OO.  */
-  if (mode == OOmode || mode == XOmode)
+  if (VECTOR_PAIR_MODE_P (mode) || mode == XOmode)
     {
       nregs = hard_regno_nregs (reg, mode);
       int reg_mode_nregs = hard_regno_nregs (reg, reg_mode);
@@ -27296,7 +27498,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 	  gcc_assert (REG_P (dst));
 	  if (GET_MODE (src) == XOmode)
 	    gcc_assert (FP_REGNO_P (REGNO (dst)));
-	  if (GET_MODE (src) == OOmode)
+	  if (VECTOR_PAIR_MODE_P (GET_MODE (src)))
 	    gcc_assert (VSX_REGNO_P (REGNO (dst)));
 
 	  int nvecs = XVECLEN (src, 0);
@@ -27371,7 +27573,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 	 overlap.  */
       int i;
       /* XO/OO are opaque so cannot use subregs. */
-      if (mode == OOmode || mode == XOmode )
+      if (VECTOR_PAIR_MODE_P (mode) || mode == XOmode )
 	{
 	  for (i = nregs - 1; i >= 0; i--)
 	    {
@@ -27545,7 +27747,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 	    continue;
 
 	  /* XO/OO are opaque so cannot use subregs. */
-	  if (mode == OOmode || mode == XOmode )
+	  if (VECTOR_PAIR_MODE_P (mode) || mode == XOmode )
 	    {
 	      rtx dst_i = gen_rtx_REG (reg_mode, REGNO (dst) + j);
 	      rtx src_i = gen_rtx_REG (reg_mode, REGNO (src) + j);
@@ -28536,6 +28738,14 @@ rs6000_invalid_conversion (const_tree fromtype, const_tree totype)
 	return N_("invalid conversion from type %<__vector_pair%>");
       if (tomode == OOmode)
 	return N_("invalid conversion to type %<__vector_pair%>");
+      if (frommode == V8SFmode)
+	return N_("invalid conversion from type %<V8SF%>");
+      if (tomode == V8SFmode)
+	return N_("invalid conversion to type %<V8SF%>");
+      if (frommode == V4DFmode)
+	return N_("invalid conversion from type %<V4DF%>");
+      if (tomode == V4DFmode)
+	return N_("invalid conversion to type %<V4DF%>");
     }
 
   /* Conversion allowed.  */
