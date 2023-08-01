@@ -4106,10 +4106,14 @@ find_parameter_packs_r (tree *tp, int *walk_subtrees, void* data)
     case TAG_DEFN:
       t = TREE_TYPE (t);
       if (CLASS_TYPE_P (t))
-	/* Local class, need to look through the whole definition.  */
-	for (tree bb : BINFO_BASE_BINFOS (TYPE_BINFO (t)))
-	  cp_walk_tree (&BINFO_TYPE (bb), &find_parameter_packs_r,
-			ppd, ppd->visited);
+	{
+	  /* Local class, need to look through the whole definition.
+	     TYPE_BINFO might be unset for a partial instantiation.  */
+	  if (TYPE_BINFO (t))
+	    for (tree bb : BINFO_BASE_BINFOS (TYPE_BINFO (t)))
+	      cp_walk_tree (&BINFO_TYPE (bb), &find_parameter_packs_r,
+			    ppd, ppd->visited);
+	}
       else
 	/* Enum, look at the values.  */
 	for (tree l = TYPE_VALUES (t); l; l = TREE_CHAIN (l))
@@ -8636,7 +8640,7 @@ convert_template_argument (tree parm,
       else if (tree a = type_uses_auto (t))
 	{
 	  t = do_auto_deduction (t, arg, a, complain, adc_unify, args,
-				 LOOKUP_IMPLICIT);
+				 LOOKUP_IMPLICIT, /*tmpl=*/in_decl);
 	  if (t == error_mark_node)
 	    return error_mark_node;
 	}
@@ -11339,9 +11343,10 @@ tsubst_friend_function (tree decl, tree args)
       tree new_friend_template_info = DECL_TEMPLATE_INFO (new_friend);
       tree new_friend_result_template_info = NULL_TREE;
       bool new_friend_is_defn =
-	(DECL_INITIAL (DECL_TEMPLATE_RESULT
-		       (template_for_substitution (new_friend)))
-	 != NULL_TREE);
+	(new_friend_template_info
+	 && (DECL_INITIAL (DECL_TEMPLATE_RESULT
+			   (template_for_substitution (new_friend)))
+	     != NULL_TREE));
       tree not_tmpl = new_friend;
 
       if (TREE_CODE (new_friend) == TEMPLATE_DECL)
@@ -14175,6 +14180,10 @@ tsubst_function_decl (tree t, tree args, tsubst_flags_t complain,
 	  && !LAMBDA_FUNCTION_P (t))
 	return t;
 
+      /* A non-templated friend doesn't get DECL_TEMPLATE_INFO.  */
+      if (non_templated_friend_p (t))
+	goto friend_case;
+
       /* Calculate the most general template of which R is a
 	 specialization.  */
       gen_tmpl = most_general_template (DECL_TI_TEMPLATE (t));
@@ -14220,6 +14229,7 @@ tsubst_function_decl (tree t, tree args, tsubst_flags_t complain,
 	 tsubst_friend_function, and we want only to create a
 	 new decl (R) with appropriate types so that we can call
 	 determine_specialization.  */
+    friend_case:
       gen_tmpl = NULL_TREE;
       argvec = NULL_TREE;
     }
@@ -14415,7 +14425,7 @@ tsubst_function_decl (tree t, tree args, tsubst_flags_t complain,
       /* If this is an instantiation of a member template, clone it.
 	 If it isn't, that'll be handled by
 	 clone_constructors_and_destructors.  */
-      if (PRIMARY_TEMPLATE_P (gen_tmpl))
+      if (gen_tmpl && PRIMARY_TEMPLATE_P (gen_tmpl))
 	clone_cdtor (r, /*update_methods=*/false);
     }
   else if ((complain & tf_error) != 0
@@ -15022,7 +15032,7 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain)
 		if (argvec != error_mark_node)
 		  argvec = (coerce_innermost_template_parms
 			    (DECL_TEMPLATE_PARMS (gen_tmpl),
-			     argvec, t, complain,
+			     argvec, tmpl, complain,
 			     /*all*/true, /*defarg*/true));
 		if (argvec == error_mark_node)
 		  RETURN (error_mark_node);
@@ -19090,7 +19100,10 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl,
 
     case TAG_DEFN:
       tmp = tsubst (TREE_TYPE (t), args, complain, NULL_TREE);
-      if (CLASS_TYPE_P (tmp))
+      if (dependent_type_p (tmp))
+	/* This is a partial instantiation, try again when full.  */
+	add_stmt (build_min (TAG_DEFN, tmp));
+      else if (CLASS_TYPE_P (tmp))
 	{
 	  /* Local classes are not independent templates; they are
 	     instantiated along with their containing function.  And this
@@ -19099,6 +19112,8 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl,
 	  /* Closures are handled by the LAMBDA_EXPR.  */
 	  gcc_assert (!LAMBDA_TYPE_P (TREE_TYPE (t)));
 	  complete_type (tmp);
+	  tree save_ccp = current_class_ptr;
+	  tree save_ccr = current_class_ref;
 	  for (tree fld = TYPE_FIELDS (tmp); fld; fld = DECL_CHAIN (fld))
 	    if ((VAR_P (fld)
 		 || (TREE_CODE (fld) == FUNCTION_DECL
@@ -19106,6 +19121,10 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl,
 		&& DECL_TEMPLATE_INSTANTIATION (fld))
 	      instantiate_decl (fld, /*defer_ok=*/false,
 				/*expl_inst_class=*/false);
+	    else if (TREE_CODE (fld) == FIELD_DECL)
+	      maybe_instantiate_nsdmi_init (fld, tf_warning_or_error);
+	  current_class_ptr = save_ccp;
+	  current_class_ref = save_ccr;
 	}
       break;
 
@@ -23063,14 +23082,24 @@ type_unification_real (tree tparms,
 	  return unify_parameter_deduction_failure (explain_p, tparm);
 	}
 
+      /* During partial ordering, we deduce dependent template args.  */
+      bool any_dependent_targs = false;
+
       /* Now substitute into the default template arguments.  */
       for (i = 0; i < ntparms; i++)
 	{
 	  tree targ = TREE_VEC_ELT (targs, i);
 	  tree tparm = TREE_VEC_ELT (tparms, i);
 
-	  if (targ || tparm == error_mark_node)
+	  if (targ)
+	    {
+	      if (!any_dependent_targs && dependent_template_arg_p (targ))
+		any_dependent_targs = true;
+	      continue;
+	    }
+	  if (tparm == error_mark_node)
 	    continue;
+
 	  tree parm = TREE_VALUE (tparm);
 	  tree arg = TREE_PURPOSE (tparm);
 	  reopen_deferring_access_checks (*checks);
@@ -23105,9 +23134,9 @@ type_unification_real (tree tparms,
 		 do this substitution without processing_template_decl.  This
 		 is important if the default argument contains something that
 		 might be instantiation-dependent like access (87480).  */
-	      processing_template_decl_sentinel s;
+	      processing_template_decl_sentinel s (!any_dependent_targs);
 	      tree substed = NULL_TREE;
-	      if (saw_undeduced == 1)
+	      if (saw_undeduced == 1 && !any_dependent_targs)
 		{
 		  /* First instatiate in template context, in case we still
 		     depend on undeduced template parameters.  */
@@ -23130,7 +23159,7 @@ type_unification_real (tree tparms,
 						 complain, i, NULL_TREE);
 	      else if (saw_undeduced == 1)
 		arg = NULL_TREE;
-	      else
+	      else if (!any_dependent_targs)
 		arg = error_mark_node;
 	    }
 
@@ -23943,6 +23972,8 @@ unify_pack_expansion (tree tparms, tree targs, tree packed_parms,
 	     arguments if it is not otherwise deduced.  */
 	  if (cxx_dialect >= cxx20
 	      && TREE_VEC_LENGTH (new_args) < TREE_VEC_LENGTH (old_args)
+	      /* FIXME This isn't set properly for partial instantiations.  */
+	      && TPARMS_PRIMARY_TEMPLATE (tparms)
 	      && builtin_guide_p (TPARMS_PRIMARY_TEMPLATE (tparms)))
 	    TREE_VEC_LENGTH (old_args) = TREE_VEC_LENGTH (new_args);
 	  if (!comp_template_args (old_args, new_args,
@@ -24428,7 +24459,9 @@ unify (tree tparms, tree targs, tree parm, tree arg, int strict,
 	  if (tree a = type_uses_auto (tparm))
 	    {
 	      tparm = do_auto_deduction (tparm, arg, a,
-					 complain, adc_unify, targs);
+					 complain, adc_unify, targs,
+					 LOOKUP_NORMAL,
+					 TPARMS_PRIMARY_TEMPLATE (tparms));
 	      if (tparm == error_mark_node)
 		return 1;
 	    }
@@ -30313,13 +30346,20 @@ do_class_deduction (tree ptype, tree tmpl, tree init,
    adc_requirement contexts to communicate the necessary template arguments
    to satisfaction.  OUTER_TARGS is ignored in other contexts.
 
-   For partial-concept-ids, extra args may be appended to the list of deduced
-   template arguments prior to determining constraint satisfaction.  */
+   Additionally for adc_unify contexts TMPL is the template for which TYPE
+   is a template parameter type.
+
+   For partial-concept-ids, extra args from OUTER_TARGS, TMPL and the current
+   scope may be appended to the list of deduced template arguments prior to
+   determining constraint satisfaction as appropriate.  */
 
 tree
 do_auto_deduction (tree type, tree init, tree auto_node,
-                   tsubst_flags_t complain, auto_deduction_context context,
-		   tree outer_targs, int flags)
+		   tsubst_flags_t complain /* = tf_warning_or_error */,
+		   auto_deduction_context context /* = adc_unspecified */,
+		   tree outer_targs /* = NULL_TREE */,
+		   int flags /* = LOOKUP_NORMAL */,
+		   tree tmpl /* = NULL_TREE */)
 {
   if (init == error_mark_node)
     return error_mark_node;
@@ -30338,9 +30378,9 @@ do_auto_deduction (tree type, tree init, tree auto_node,
      auto_node.  */
   complain &= ~tf_partial;
 
-  if (tree tmpl = CLASS_PLACEHOLDER_TEMPLATE (auto_node))
+  if (tree ctmpl = CLASS_PLACEHOLDER_TEMPLATE (auto_node))
     /* C++17 class template argument deduction.  */
-    return do_class_deduction (type, tmpl, init, flags, complain);
+    return do_class_deduction (type, ctmpl, init, flags, complain);
 
   if (init == NULL_TREE || TREE_TYPE (init) == NULL_TREE)
     /* Nothing we can do with this, even in deduction context.  */
@@ -30500,7 +30540,10 @@ do_auto_deduction (tree type, tree init, tree auto_node,
 		}
 	    }
 
-      tree full_targs = add_to_template_args (outer_targs, targs);
+      tree full_targs = outer_targs;
+      if (context == adc_unify && tmpl)
+	full_targs = add_outermost_template_args (tmpl, full_targs);
+      full_targs = add_to_template_args (full_targs, targs);
 
       /* HACK: Compensate for callers not always communicating all levels of
 	 outer template arguments by filling in the outermost missing levels

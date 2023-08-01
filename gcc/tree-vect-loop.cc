@@ -2874,7 +2874,7 @@ vect_analyze_loop_1 (class loop *loop, vec_info_shared *shared,
 		     res ? "succeeded" : " failed",
 		     GET_MODE_NAME (loop_vinfo->vector_mode));
 
-  if (!main_loop_vinfo && suggested_unroll_factor > 1)
+  if (res && !main_loop_vinfo && suggested_unroll_factor > 1)
     {
       if (dump_enabled_p ())
 	dump_printf_loc (MSG_NOTE, vect_location,
@@ -6072,9 +6072,12 @@ vect_create_epilog_for_reduction (loop_vec_info loop_vinfo,
 	{
           new_temp = scalar_results[0];
 	  gcc_assert (TREE_CODE (TREE_TYPE (adjustment_def)) != VECTOR_TYPE);
-	  adjustment_def = gimple_convert (&stmts, scalar_type, adjustment_def);
-	  new_temp = gimple_build (&stmts, code, scalar_type,
+	  adjustment_def = gimple_convert (&stmts, TREE_TYPE (vectype),
+					   adjustment_def);
+	  new_temp = gimple_convert (&stmts, TREE_TYPE (vectype), new_temp);
+	  new_temp = gimple_build (&stmts, code, TREE_TYPE (vectype),
 				   new_temp, adjustment_def);
+	  new_temp = gimple_convert (&stmts, scalar_type, new_temp);
 	}
 
       epilog_stmt = gimple_seq_last_stmt (stmts);
@@ -7209,7 +7212,7 @@ vectorizable_reduction (loop_vec_info loop_vinfo,
     }
 
   /* Check extra constraints for variable-length unchained SLP reductions.  */
-  if (STMT_SLP_TYPE (stmt_info)
+  if (slp_node
       && !REDUC_GROUP_FIRST_ELEMENT (stmt_info)
       && !nunits_out.is_constant ())
     {
@@ -9057,9 +9060,10 @@ vectorizable_live_operation (vec_info *vinfo,
 						use_stmt))
 	      {
 		enum tree_code code = gimple_assign_rhs_code (use_stmt);
-		gcc_assert (code == CONSTRUCTOR
-			    || code == VIEW_CONVERT_EXPR
-			    || CONVERT_EXPR_CODE_P (code));
+		gcc_checking_assert (code == SSA_NAME
+				     || code == CONSTRUCTOR
+				     || code == VIEW_CONVERT_EXPR
+				     || CONVERT_EXPR_CODE_P (code));
 		if (dump_enabled_p ())
 		  dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
 				   "Using original scalar computation for "

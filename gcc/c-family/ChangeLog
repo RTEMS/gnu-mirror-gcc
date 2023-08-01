@@ -1,3 +1,32 @@
+2023-05-19  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2023-05-15  Patrick Palka  <ppalka@redhat.com>
+
+	* c-cppbuiltin.cc (c_cpp_builtins): Predefine __cpp_auto_cast
+	for C++23.
+
+2023-05-09  Martin Uecker  <uecker@tugraz.at>
+
+	Backported from master:
+	2023-02-18  Martin Uecker  <uecker@tugraz.at>
+
+	PR c/105660
+	* c-attribs.cc (append_access_attr): Use order of arguments when
+	construction string.
+	(append_access_attr_idxs): Rename and make static.
+	* c-warn.cc (warn_parm_array_mismatch): Add assertion.
+
+2023-05-08  Release Manager
+
+	* GCC 12.3.0 released.
+
+2023-04-18  Jason Merrill  <jason@redhat.com>
+
+	PR c++/107163
+	* c-common.cc (verify_tree): Don't use sequenced handling
+	for COMPONENT_REF.
+
 2023-03-19  Jakub Jelinek  <jakub@redhat.com>
 
 	Backported from master:

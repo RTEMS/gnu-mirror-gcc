@@ -1434,7 +1434,7 @@ See RS/6000 and PowerPC Options.
 -m96bit-long-double  -mlong-double-64  -mlong-double-80  -mlong-double-128 @gol
 -mregparm=@var{num}  -msseregparm @gol
 -mveclibabi=@var{type}  -mvect8-ret-in-mem @gol
--mpc32  -mpc64  -mpc80  -mstackrealign @gol
+-mpc32  -mpc64  -mpc80 -mdaz-ftz -mstackrealign @gol
 -momit-leaf-frame-pointer  -mno-red-zone  -mno-tls-direct-seg-refs @gol
 -mcmodel=@var{code-model}  -mabi=@var{name}  -maddress-mode=@var{mode} @gol
 -m32  -m64  -mx32  -m16  -miamcu  -mlarge-data-threshold=@var{num} @gol
@@ -6647,7 +6647,7 @@ This warning is enabled by @option{-Wall}.
 @item -Wmissing-include-dirs @r{(C, C++, Objective-C, Objective-C++ and Fortran only)}
 @opindex Wmissing-include-dirs
 @opindex Wno-missing-include-dirs
-Warn if a user-supplied include directory does not exist. This opions is disabled
+Warn if a user-supplied include directory does not exist. This option is disabled
 by default for C, C++, Objective-C and Objective-C++. For Fortran, it is partially
 enabled by default by warning for -I and -J, only.
 
@@ -32078,6 +32078,15 @@ are enabled by default; routines in such libraries could suffer significant
 loss of accuracy, typically through so-called ``catastrophic cancellation'',
 when this option is used to set the precision to less than extended precision.
 
+@item -mdaz-ftz
+@opindex mdaz-ftz
+
+The flush-to-zero (FTZ) and denormals-are-zero (DAZ) flags in the MXCSR register
+are used to control floating-point calculations.SSE and AVX instructions
+including scalar and vector instructions could benefit from enabling the FTZ
+and DAZ flags when @option{-mdaz-ftz} is specified. Don't set FTZ/DAZ flags
+when @option{-mno-daz-ftz} is specified.
+
 @item -mstackrealign
 @opindex mstackrealign
 Realign the stack at entry.  On the x86, the @option{-mstackrealign}
@@ -33092,7 +33101,7 @@ on x86-64 processors in 64-bit environments.
 Generate code for a 16-bit, 32-bit or 64-bit environment.
 The @option{-m32} option sets @code{int}, @code{long}, and pointer types
 to 32 bits, and
-generates code that runs on any i386 system.
+generates code that runs in 32-bit mode.
 
 The @option{-m64} option sets @code{int} to 32 bits and @code{long} and pointer
 types to 64 bits, and generates code for the x86-64 architecture.

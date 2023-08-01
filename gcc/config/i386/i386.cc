@@ -16557,10 +16557,18 @@ assign_386_stack_local (machine_mode mode, enum ix86_stack_slot n)
     if (s->mode == mode && s->n == n)
       return validize_mem (copy_rtx (s->rtl));
 
+  int align = 0;
+  /* For DImode with SLOT_FLOATxFDI_387 use 32-bit
+     alignment with -m32 -mpreferred-stack-boundary=2.  */
+  if (mode == DImode
+      && !TARGET_64BIT
+      && n == SLOT_FLOATxFDI_387
+      && ix86_preferred_stack_boundary < GET_MODE_ALIGNMENT (DImode))
+    align = 32;
   s = ggc_alloc<stack_local_entry> ();
   s->n = n;
   s->mode = mode;
-  s->rtl = assign_stack_local (mode, GET_MODE_SIZE (mode), 0);
+  s->rtl = assign_stack_local (mode, GET_MODE_SIZE (mode), align);
 
   s->next = ix86_stack_locals;
   ix86_stack_locals = s;
@@ -18388,8 +18396,10 @@ ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 	      tree itype = GET_MODE_INNER (TYPE_MODE (type)) == E_SFmode
 		? intSI_type_node : intDI_type_node;
 	      type = get_same_sized_vectype (itype, type);
-	      arg2 = gimple_build (&stmts, VIEW_CONVERT_EXPR, type, arg2);
 	    }
+	  else
+	    type = signed_type_for (type);
+	  arg2 = gimple_build (&stmts, VIEW_CONVERT_EXPR, type, arg2);
 	  tree zero_vec = build_zero_cst (type);
 	  tree cmp_type = truth_type_for (type);
 	  tree cmp = gimple_build (&stmts, LT_EXPR, cmp_type, arg2, zero_vec);
@@ -21203,6 +21213,7 @@ x86_output_mi_thunk (FILE *file, tree thunk_fndecl, HOST_WIDE_INT delta,
   rtx this_reg, tmp, fnaddr;
   unsigned int tmp_regno;
   rtx_insn *insn;
+  int saved_flag_force_indirect_call = flag_force_indirect_call;
 
   if (TARGET_64BIT)
     tmp_regno = R10_REG;
@@ -21215,6 +21226,9 @@ x86_output_mi_thunk (FILE *file, tree thunk_fndecl, HOST_WIDE_INT delta,
 	tmp_regno = DX_REG;
       else
 	tmp_regno = CX_REG;
+
+      if (flag_pic)
+  flag_force_indirect_call = 0;
     }
 
   emit_note (NOTE_INSN_PROLOGUE_END);
@@ -21382,6 +21396,8 @@ x86_output_mi_thunk (FILE *file, tree thunk_fndecl, HOST_WIDE_INT delta,
   final (insn, file, 1);
   final_end_function ();
   assemble_end_function (thunk_fndecl, fnname);
+
+  flag_force_indirect_call = saved_flag_force_indirect_call;
 }
 
 static void

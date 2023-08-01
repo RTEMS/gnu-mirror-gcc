@@ -2666,10 +2666,11 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 		  = TINFO_USED_TEMPLATE_ID (new_template_info);
 	    }
 
-	  if (non_templated_friend_p (olddecl))
-	    /* Don't copy tinfo from a non-templated friend (PR105761).  */;
-	  else
-	    DECL_TEMPLATE_INFO (newdecl) = DECL_TEMPLATE_INFO (olddecl);
+	  /* We don't want to copy template info from a non-templated friend
+	     (PR105761), but these shouldn't have DECL_TEMPLATE_INFO now.  */
+	  gcc_checking_assert (!DECL_TEMPLATE_INFO (olddecl)
+			       || !non_templated_friend_p (olddecl));
+	  DECL_TEMPLATE_INFO (newdecl) = DECL_TEMPLATE_INFO (olddecl);
 	}
 
       if (DECL_DECLARES_FUNCTION_P (newdecl))
@@ -8542,6 +8543,18 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
 	  if (!decl_maybe_constant_destruction (decl, type))
 	    TREE_READONLY (decl) = 0;
 	}
+      else if (VAR_P (decl)
+	       && CP_DECL_THREAD_LOCAL_P (decl)
+	       && (!DECL_EXTERNAL (decl) || flag_extern_tls_init)
+	       && (was_readonly || TREE_READONLY (decl))
+	       && var_needs_tls_wrapper (decl))
+	{
+	  /* TLS variables need dynamic initialization by the TLS wrapper
+	     function, we don't want to hoist accesses to it before the
+	     wrapper.  */
+	  was_readonly = 0;
+	  TREE_READONLY (decl) = 0;
+	}
 
       make_rtl_for_nonlocal_decl (decl, init, asmspec);
 
@@ -14189,7 +14202,8 @@ grokdeclarator (const cp_declarator *declarator,
 		      return error_mark_node;
 		  }
 
-		decl = do_friend (ctype, unqualified_id, decl,
+		tree scope = ctype ? ctype : in_namespace;
+		decl = do_friend (scope, unqualified_id, decl,
 				  flags, funcdef_flag);
 		return decl;
 	      }
