@@ -993,7 +993,7 @@ enum data_align { align_abi, align_opt, align_both };
 /* Modes that are not vectors, but require vector alignment.  Treat these like
    vectors in terms of loads and stores.  */
 #define VECTOR_ALIGNMENT_P(MODE)					\
-  (FLOAT128_VECTOR_P (MODE) || VECTOR_PAIR_MODE_P (MODE) || (MODE) == XOmode)
+  (FLOAT128_VECTOR_P (MODE) || (MODE) == OOmode || (MODE) == XOmode)
 
 #define ALTIVEC_VECTOR_MODE(MODE)					\
   ((MODE) == V16QImode							\
@@ -1005,12 +1005,6 @@ enum data_align { align_abi, align_opt, align_both };
 #define ALTIVEC_OR_VSX_VECTOR_MODE(MODE)				\
   (ALTIVEC_VECTOR_MODE (MODE) || VSX_VECTOR_MODE (MODE)			\
    || (MODE) == V2DImode || (MODE) == V1TImode)
-
-/* Whether a mode is held in paired vector registers.  */
-#define VECTOR_PAIR_MODE_P(MODE)					\
-  ((MODE) == OOmode							\
-   || (MODE) == V32QImode || (MODE) == V16HImode || (MODE) == V8SImode	\
-   || (MODE) == V4DImode || (MODE) == V8SFmode || (MODE) == V4DFmode)
 
 /* Post-reload, we can't use any new AltiVec registers, as we already
    emitted the vrsave mask.  */

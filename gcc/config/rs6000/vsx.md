@@ -255,10 +255,6 @@
 (define_mode_iterator VSX_MM [V16QI V8HI V4SI V2DI V1TI])
 (define_mode_iterator VSX_MM4 [V16QI V8HI V4SI V2DI])
 
-;; Iterator for V4SF and V8SF extracts
-(define_mode_iterator V4SF_V8SF [(V4SF "VECTOR_UNIT_VSX_P (V4SFmode)")
-				 (V8SF "TARGET_MMA")])
-
 ;; Longer vec int modes for rotate/mask ops
 ;; and Vector Integer Multiply/Divide/Modulo Instructions
 (define_mode_iterator VIlong [V2DI V4SI])
@@ -3549,66 +3545,22 @@
 }
   [(set_attr "type" "fpload,load")])
 
-;; Extract DF from vector pair
-(define_insn "vsx_extract_v4df"
-  [(set (match_operand:DF 0 "gpc_reg_operand" "=wa")
-	(vec_select:DF
-	 (match_operand:V4DF 1 "gpc_reg_operand" "wa")
-	 (parallel
-	  [(match_operand:QI 2 "const_0_to_3_operand" "n")])))]
-  "TARGET_MMA"
-{
-  unsigned int r = reg_or_subregno (operands[1]);
-  HOST_WIDE_INT index = INTVAL (operands[2]);
-  if ((BYTES_BIG_ENDIAN && index > 1)
-      || (!BYTES_BIG_ENDIAN && index < 2))
-    r++;
-
-  operands[3] = gen_rtx_REG (DFmode, r);
-  if ((index % 2) == 0)
-    {
-      /* value is in the high part of the register.  */
-      if (r == reg_or_subregno (operands[0]))
-	return ASM_COMMENT_START " vec_extract to same register (%x0)";
-
-      return "xxlor %x0,%x3,%x3";
-    }
-  else
-    /* value is in the low part of the register.  */
-    return "xxpermdi %x0,%x3,%x3,3";
-}
-  [(set_attr "type" "vecperm")])
-
-;; Extract a SF element from V4SF or V8SF
-(define_insn_and_split "vsx_extract_<mode>"
+;; Extract a SF element from V4SF
+(define_insn_and_split "vsx_extract_v4sf"
   [(set (match_operand:SF 0 "vsx_register_operand" "=wa")
 	(vec_select:SF
-	 (match_operand:V4SF_V8SF 1 "vsx_register_operand" "wa")
+	 (match_operand:V4SF 1 "vsx_register_operand" "wa")
 	 (parallel [(match_operand:QI 2 "u5bit_cint_operand" "n")])))
-   (clobber (match_scratch:V4SF 3 "=wa"))]
+   (clobber (match_scratch:V4SF 3 "=0"))]
   "VECTOR_UNIT_VSX_P (V4SFmode)"
   "#"
-  "&& (<MODE>mode == V4SFmode || reload_completed)"
+  "&& 1"
   [(const_int 0)]
 {
   rtx op0 = operands[0];
   rtx op1 = operands[1];
   rtx op2 = operands[2];
   rtx op3 = operands[3];
-
-  /* If this is V8SFmode, select the right vector registers.  */
-  if (<MODE>mode == V8SFmode)
-    {
-      unsigned int r = reg_or_subregno (op1);
-      HOST_WIDE_INT index = INTVAL (op2);
-      if ((BYTES_BIG_ENDIAN && index > 3)
-          || (!BYTES_BIG_ENDIAN && index < 4))
-        r++;
-
-      operands[1] = op1 = gen_rtx_REG (V4SFmode, r);
-      operands[2] = op2 = GEN_INT (index & 0x3);
-    }
-
   rtx tmp;
   HOST_WIDE_INT ele = BYTES_BIG_ENDIAN ? INTVAL (op2) : 3 - INTVAL (op2);
 
