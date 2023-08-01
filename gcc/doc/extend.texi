@@ -19150,6 +19150,7 @@ The PVIPR documents the following overloaded functions:
 * PowerPC AltiVec Built-in Functions Available on ISA 2.07::
 * PowerPC AltiVec Built-in Functions Available on ISA 3.0::
 * PowerPC AltiVec Built-in Functions Available on ISA 3.1::
+* PowerPC Floating Point Overloaded Built-in Functions::
 @end menu
 
 @node PowerPC AltiVec Built-in Functions on ISA 2.05
@@ -21100,6 +21101,112 @@ int vec_any_ge (vector signed __int128, vector signed __int128);
 int vec_any_ge (vector unsigned __int128, vector unsigned __int128);
 int vec_any_le (vector signed __int128, vector signed __int128);
 int vec_any_le (vector unsigned __int128, vector unsigned __int128);
+@end smallexample
+
+@node PowerPC Floating Point Overloaded Built-in Functions
+@subsubsection PowerPC Floating Point Overloaded Built-in Functions
+
+The following additional built-in functions are also available for the
+PowerPC family of processors, that allow programmers to use the same
+built-in function to handle scalar, 128-bit vectors, and on Power10
+systems vector pairs.
+
+The following built-in functions handle 32-bit floating point
+operations on all processors where the VSX registers are available:
+
+@smallexample
+float __builtin_abs_f32 (float);
+vector float __builtin_abs_f32 (vector float);
+float __builtin_add_f32 (float, float);
+vector float __builtin_add_f32 (vector float, vector float);
+float __builtin_copysign_f32 (float, float);
+vector float __builtin_copysign_f32 (vector float, vector float);
+float __builtin_div_f32 (float, float);
+vector float __builtin_div_f32 (vector float, vector float);
+float __builtin_fma_f32 (float, float, float);
+vector float __builtin_fma_f32 (vector float, vector float, vector float);
+float __builtin_mult_f32 (float, float);
+vector float __builtin_mult_f32 (vector float, vector float);
+float __builtin_neg_f32 (float);
+vector float __builtin_neg_f32 (vector float);
+float __builtin_smax_f32 (float, float);
+vector float __builtin_smax_f32 (vector float, vector float);
+float __builtin_smin_f32 (float, float);
+vector float __builtin_smin_f32 (vector float, vector float);
+float __builtin_sub_f32 (float, float);
+vector float __builtin_sub_f32 (vector float, vector float);
+@end smallexample
+
+The following built-in functions handle 32-bit floating point
+operations on Power10 systems that support paired vector load and
+store instructions.
+
+@smallexample
+__vector_pair __builtin_abs_f32 (__vector_pair);
+__vector_pair __builtin_add_f32 (__vector_pair, __vector_pair);
+__vector_pair __builtin_copysign_f32 (__vector_pair, __vector_pair);
+__vector_pair __builtin_div_f32 (__vector_pair, __vector_pair);
+__vector_pair __builtin_fma_f32 (__vector_pair, __vector_pair, __vector_pair);
+__vector_pair __builtin_mult_f32 (__vector_pair, __vector_pair);
+__vector_pair __builtin_neg_f32 (__vector_pair);
+__vector_pair __builtin_smax_f32 (__vector_pair, __vector_pair);
+__vector_pair __builtin_smin_f32 (__vector_pair, __vector_pair);
+__vector_pair __builtin_sub_f32 (__vector_pair, __vector_pair);
+@end smallexample
+
+The following built-in functions handle 64-bit floating point
+operations on all processors where the VSX registers are available:
+
+@smallexample
+double __builtin_abs_f64 (double);
+vector double __builtin_abs_f64 (vector double);
+double __builtin_add_f64 (double, double);
+vector double __builtin_add_f64 (vector double, vector double);
+double __builtin_copysign_f64 (double, double);
+vector double __builtin_copysign_f64 (vector double, vector double);
+double __builtin_div_f64 (double, double);
+vector double __builtin_div_f64 (vector double, vector double);
+double __builtin_fma_f64 (double, double, double);
+vector double __builtin_fma_f64 (vector double, vector double, vector double);
+double __builtin_mult_f64 (double, double);
+vector double __builtin_mult_f64 (vector double, vector double);
+double __builtin_neg_f64 (double);
+vector double __builtin_neg_f64 (vector double);
+double __builtin_smax_f64 (double, double);
+vector double __builtin_smax_f64 (vector double, vector double);
+double __builtin_smin_f64 (double, double);
+vector double __builtin_smin_f64 (vector double, vector double);
+double __builtin_sub_f64 (double, double);
+vector double __builtin_sub_f64 (vector double, vector double);
+@end smallexample
+
+The following built-in functions handle 64-bit floating point
+operations on Power10 systems that support paired vector load and
+store instructions.
+
+@smallexample
+__vector_pair __builtin_abs_f64 (__vector_pair);
+__vector_pair __builtin_add_f64 (__vector_pair, __vector_pair);
+__vector_pair __builtin_copysign_f64 (__vector_pair, __vector_pair);
+__vector_pair __builtin_div_f64 (__vector_pair, __vector_pair);
+__vector_pair __builtin_fma_f64 (__vector_pair, __vector_pair, __vector_pair);
+__vector_pair __builtin_mult_f64 (__vector_pair, __vector_pair);
+__vector_pair __builtin_neg_f64 (__vector_pair);
+__vector_pair __builtin_smax_f64 (__vector_pair, __vector_pair);
+__vector_pair __builtin_smin_f64 (__vector_pair, __vector_pair);
+__vector_pair __builtin_sub_f64 (__vector_pair, __vector_pair);
+@end smallexample
+
+The following built-in functions return the sum of all of the elements
+in scalar, vector, and vector pair types.
+
+@smallexample
+float __builtin_reduce_f32 (float);
+float __builtin_reduce_f32 (vector float);
+float __builtin_reduce_f32 (__vector_pair);
+double __builtin_reduce_f64 (double);
+double __builtin_reduce_f64 (vector double);
+double __builtin_reduce_f64 (__vector_pair);
 @end smallexample
 
 
