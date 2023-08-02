@@ -1,3 +1,43 @@
+==================== Branch work129-vpair, patch #22 ====================
+
+Add initial int built-in overload support.
+
+2023-08-01  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (fold_builtin_overload_arith): Rename
+	from fold_builtin_overload_fp.
+	(rs6000_gimple_fold_builtin): Add support for integer overload
+	built-ins.
+	* config/rs6000/rs6000-builtins.def (__builtin_*_i32_*): Add built-in
+	integer functions for overloading.
+	(__builtin_u32_*): Likewise.
+	(__builtin_i64_*): Likewise.
+	(__builtin_u64_*): Likewise.
+	* config/rs6000/rs6000-gen-builtins.cc (MAXOVLDSTANZAS): Bump up to
+	1,024.
+	* config/rs6000/rs6000-overload.def (__builtin_*_i32): Add built-in
+	overloaded integer functions.
+	(__builtin_u32): Likewise.
+	(__builtin_i64): Likewise.
+	(__builtin_u64): Likewise.
+	* config/rs6000/vector-pair.md (VPAIR_FP_UNARY): Rename from
+	VPAIR_UNARY.
+	(VPAIR_FP_BINARY): Rename from VPAIR_BINARY.
+	(VPAIR_INT_BINARY): New code iterator.
+	(vpair_op): Update for integer built-in functions.
+	(vpair_ireg): New code attribute.
+	(vpair_ipred): Likewise.
+	(VPAIR_FP_WRAPPER): Rename from VPAIR_WRAPPER.
+	(VPAIR_INT_WRAPPER): New int iterator.
+	(VPAIR_VECTOR): New int attribute.
+	(vpair_type): New int attribute.
+	(vpair_neg_reg): New int attribute.
+	(floating point insns): Update to use VPAIR_FP_WRAPPER, VPAIR_FP_UNARY,
+	VPAIR_FP_BINARY.
+	(integer insns): Add new integer insns for built-in functions.
+
 ==================== Branch work129-vpair, patch #21 ====================
 
 Add fp built-in overload support.
