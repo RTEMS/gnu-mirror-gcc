@@ -1,3 +1,22 @@
+==================== Branch work129-vpair, patch #23 ====================
+
+Add V2DI and V4DI reduction.
+
+2023-08-02  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_gimple_fold_builtin): Add
+	support for V4DI reduction.
+	* config/rs6000/rs6000-builtins.def (__builtin_reduce_{i,u}64_*):
+	Likewise.
+	* config/rs6000/rs6000-overload.def (__builtin_reduce_{i,u}64):
+	Likewise.
+	* config/rs6000/vector-pair.md (UNSPEC_REDUCE_I64): New unspec.
+	(reduce_v4df): Use reg_or_subregno instead of REGNO.
+	(reduce_v2di): New insn.
+	(reduce_v4di): New insn.
+
 ==================== Branch work129-vpair, patch #22 ====================
 
 Add initial int built-in overload support.
