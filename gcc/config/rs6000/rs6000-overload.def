@@ -6630,3 +6630,19 @@
     XOR_U64_VECTOR
   v256 __builtin_xor_u64 (v256, v256);
     XOR_U64_VPAIR
+
+[REDUCE_I64, SKIP, __builtin_reduce_i64]
+  long long __builtin_reduce_i64 (long long);
+    REDUCE_I64_SCALAR
+  long long __builtin_reduce_i64 (vsll);
+    REDUCE_I64_VECTOR
+  long long __builtin_reduce_i64 (v256);
+    REDUCE_I64_VPAIR
+
+[REDUCE_U64, SKIP, __builtin_reduce_u64]
+  long long __builtin_reduce_u64 (long long);
+    REDUCE_U64_SCALAR
+  long long __builtin_reduce_u64 (vsll);
+    REDUCE_U64_VECTOR
+  long long __builtin_reduce_u64 (v256);
+    REDUCE_U64_VPAIR

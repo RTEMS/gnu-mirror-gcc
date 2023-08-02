@@ -2366,6 +2366,8 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 
     case RS6000_BIF_REDUCE_F32_SCALAR:
     case RS6000_BIF_REDUCE_F64_SCALAR:
+    case RS6000_BIF_REDUCE_I64_SCALAR:
+    case RS6000_BIF_REDUCE_U64_SCALAR:
       {
 	location_t loc = gimple_location (stmt);
 	lhs = gimple_call_lhs (stmt);

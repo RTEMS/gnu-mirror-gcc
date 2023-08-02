@@ -4546,3 +4546,17 @@
     XOR_U64_VECTOR nothing {}
   v256 __builtin_xor_u64_vpair (v256, v256);
     XOR_U64_VPAIR vpair_xorv4di3 {mma}
+
+  long long __builtin_reduce_i64_scalar (long long);
+    REDUCE_I64_SCALAR nothing {}
+  long long  __builtin_reduce_i64_vector (vsll);
+    REDUCE_I64_VECTOR reduce_v2di {}
+  long long __builtin_reduce_i64_vpair (v256);
+    REDUCE_I64_VPAIR reduce_v4di {mma,pair}
+
+  unsigned long long __builtin_reduce_u64_scalar (unsigned long long);
+    REDUCE_U64_SCALAR nothing {}
+  unsigned long long  __builtin_reduce_u64_vector (vull);
+    REDUCE_U64_VECTOR reduce_v2di {}
+  unsigned long long __builtin_reduce_u64_vpair (v256);
+    REDUCE_U64_VPAIR reduce_v4di {mma,pair}

@@ -35,6 +35,7 @@
    UNSPEC_VPAIR_V4DI
    UNSPEC_REDUCE_F32
    UNSPEC_REDUCE_F64
+   UNSPEC_REDUCE_I64
    ])
 
 ;; Iterator doing unary/binary arithmetic on vector pairs
@@ -470,8 +471,8 @@
 	(plus:DF (match_dup 7)
 		 (match_dup 2)))]
 {
-  unsigned reg1 = REGNO (operands[1]);
-  unsigned reg3 = REGNO (operands[3]);
+  unsigned reg1 = reg_or_subregno (operands[1]);
+  unsigned reg3 = reg_or_subregno (operands[3]);
 
   operands[4] = gen_rtx_REG (V2DFmode, reg1);
   operands[5] = gen_rtx_REG (V2DFmode, reg1 + 1);
@@ -580,3 +581,53 @@
 }
   [(set_attr "length" "8")])
 
+;; Reduction for a V2DI vector
+(define_insn_and_split "reduce_v2di"
+  [(set (match_operand:DI 0 "gpc_reg_operand" "=&r")
+	(unspec:DI [(match_operand:V2DI 1 "vsx_register_operand" "wa")]
+		   UNSPEC_REDUCE_I64))
+   (clobber (match_scratch:DI 2 "=&r"))]
+  "TARGET_MMA && TARGET_POWERPC64"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 2)
+	(vec_select:DI (match_dup 1)
+		       (parallel [(const_int 0)])))
+   (set (match_dup 0)
+	(vec_select:DI (match_dup 1)
+		       (parallel [(const_int 1)])))
+   (set (match_dup 0)
+	(plus:DI (match_dup 0)
+		 (match_dup 2)))]
+{
+}
+  [(set_attr "length" "12")])
+
+;; Reduction for a pair of V2DI vectors
+(define_insn_and_split "reduce_v4di"
+  [(set (match_operand:DI 0 "gpc_reg_operand" "=&r")
+	(unspec:DI [(match_operand:OO 1 "altivec_register_operand" "v")]
+		   UNSPEC_REDUCE_I64))
+   (clobber (match_scratch:DI 2 "=&r"))
+   (clobber (match_scratch:V2DI 3 "=&v"))]
+  "TARGET_MMA && TARGET_POWERPC64"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 3)
+	(plus:V2DI (match_dup 4)
+		   (match_dup 5)))
+   (set (match_dup 2)
+	(vec_select:DI (match_dup 3)
+		       (parallel [(const_int 0)])))
+   (set (match_dup 0)
+	(vec_select:DI (match_dup 3)
+		       (parallel [(const_int 1)])))
+   (set (match_dup 0)
+	(plus:DI (match_dup 0)
+		 (match_dup 2)))]
+{
+  unsigned reg1 = reg_or_subregno (operands[1]);
+
+  operands[4] = gen_rtx_REG (V2DImode, reg1);
+  operands[5] = gen_rtx_REG (V2DImode, reg1 + 1);
+})
