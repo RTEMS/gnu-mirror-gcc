@@ -444,7 +444,7 @@ struct ovld_stanza
   char *ifdef;
 };
 
-#define MAXOVLDSTANZAS 512
+#define MAXOVLDSTANZAS 1024
 static ovld_stanza ovld_stanzas[MAXOVLDSTANZAS];
 static int num_ovld_stanzas;
 static int curr_ovld_stanza;

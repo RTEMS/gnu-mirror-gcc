@@ -6365,3 +6365,268 @@
     SUB_F64_VECTOR
   v256 __builtin_sub_f64 (v256, v256);
     SUB_F64_VPAIR
+
+;; Overloaded integer built-in funtions
+[ADD_I32, SKIP, __builtin_add_i32]
+  int __builtin_add_i32 (int, int);
+    ADD_I32_SCALAR
+  vsi __builtin_add_i32 (vsi, vsi);
+    ADD_I32_VECTOR
+  v256 __builtin_add_i32 (v256, v256);
+    ADD_I32_VPAIR
+
+[ADD_U32, SKIP, __builtin_add_u32]
+  unsigned int __builtin_add_u32 (unsigned int, unsigned int);
+    ADD_U32_SCALAR
+  vui __builtin_add_u32 (vui, vui);
+    ADD_U32_VECTOR
+  v256 __builtin_add_u32 (v256, v256);
+    ADD_U32_VPAIR
+
+[ADD_I64, SKIP, __builtin_add_i64]
+  long long __builtin_add_i64 (long long, long long);
+    ADD_I64_SCALAR
+  vsll __builtin_add_i64 (vsll, vsll);
+    ADD_I64_VECTOR
+  v256 __builtin_add_i64 (v256, v256);
+    ADD_I64_VPAIR
+
+[ADD_U64, SKIP, __builtin_add_u64]
+  unsigned long long __builtin_add_u64 (unsigned long long, unsigned long long);
+    ADD_U64_SCALAR
+  vull __builtin_add_u64 (vull, vull);
+    ADD_U64_VECTOR
+  v256 __builtin_add_u64 (v256, v256);
+    ADD_U64_VPAIR
+
+[AND_U32, SKIP, __builtin_and_u32]
+  unsigned int __builtin_and_u32 (unsigned int, unsigned int);
+    AND_U32_SCALAR
+  vui __builtin_and_u32 (vui, vui);
+    AND_U32_VECTOR
+  v256 __builtin_and_u32 (v256, v256);
+    AND_U32_VPAIR
+
+[AND_I64, SKIP, __builtin_and_i64]
+  long long __builtin_and_i64 (long long, long long);
+    AND_I64_SCALAR
+  vsll __builtin_and_i64 (vsll, vsll);
+    AND_I64_VECTOR
+  v256 __builtin_and_i64 (v256, v256);
+    AND_I64_VPAIR
+
+[AND_U64, SKIP, __builtin_and_u64]
+  unsigned long long __builtin_and_u64 (unsigned long long, unsigned long long);
+    AND_U64_SCALAR
+  vull __builtin_and_u64 (vull, vull);
+    AND_U64_VECTOR
+  v256 __builtin_and_u64 (v256, v256);
+    AND_U64_VPAIR
+
+[IOR_U32, SKIP, __builtin_ior_u32]
+  unsigned int __builtin_ior_u32 (unsigned int, unsigned int);
+    IOR_U32_SCALAR
+  vui __builtin_ior_u32 (vui, vui);
+    IOR_U32_VECTOR
+  v256 __builtin_ior_u32 (v256, v256);
+    IOR_U32_VPAIR
+
+[IOR_I64, SKIP, __builtin_ior_i64]
+  long long __builtin_ior_i64 (long long, long long);
+    IOR_I64_SCALAR
+  vsll __builtin_ior_i64 (vsll, vsll);
+    IOR_I64_VECTOR
+  v256 __builtin_ior_i64 (v256, v256);
+    IOR_I64_VPAIR
+
+[IOR_U64, SKIP, __builtin_ior_u64]
+  unsigned long long __builtin_ior_u64 (unsigned long long, unsigned long long);
+    IOR_U64_SCALAR
+  vull __builtin_ior_u64 (vull, vull);
+    IOR_U64_VECTOR
+  v256 __builtin_ior_u64 (v256, v256);
+    IOR_U64_VPAIR
+
+[NEG_I32, SKIP, __builtin_neg_i32]
+  int __builtin_neg_i32 (int);
+    NEG_I32_SCALAR
+  vsi __builtin_neg_i32 (vsi);
+    NEG_I32_VECTOR
+  v256 __builtin_neg_i32 (v256);
+    NEG_I32_VPAIR
+
+[NEG_U32, SKIP, __builtin_neg_u32]
+  unsigned int __builtin_neg_u32 (unsigned int);
+    NEG_U32_SCALAR
+  vui __builtin_neg_u32 (vui);
+    NEG_U32_VECTOR
+  v256 __builtin_neg_u32 (v256);
+    NEG_U32_VPAIR
+
+[NEG_I64, SKIP, __builtin_neg_i64]
+  long long __builtin_neg_i64 (long long);
+    NEG_I64_SCALAR
+  vsll __builtin_neg_i64 (vsll);
+    NEG_I64_VECTOR
+  v256 __builtin_neg_i64 (v256);
+    NEG_I64_VPAIR
+
+[NEG_U64, SKIP, __builtin_neg_u64]
+  unsigned long long __builtin_neg_u64 (unsigned long long);
+    NEG_U64_SCALAR
+  vull __builtin_neg_u64 (vull);
+    NEG_U64_VECTOR
+  v256 __builtin_neg_u64 (v256);
+    NEG_U64_VPAIR
+
+[NOT_I32, SKIP, __builtin_not_i32]
+  int __builtin_not_i32 (int);
+    NOT_I32_SCALAR
+  vsi __builtin_not_i32 (vsi);
+    NOT_I32_VECTOR
+  v256 __builtin_not_i32 (v256);
+    NOT_I32_VPAIR
+
+[NOT_U32, SKIP, __builtin_not_u32]
+  unsigned int __builtin_not_u32 (unsigned int);
+    NOT_U32_SCALAR
+  vui __builtin_not_u32 (vui);
+    NOT_U32_VECTOR
+  v256 __builtin_not_u32 (v256);
+    NOT_U32_VPAIR
+
+[NOT_I64, SKIP, __builtin_not_i64]
+  long long __builtin_not_i64 (long long);
+    NOT_I64_SCALAR
+  vsll __builtin_not_i64 (vsll);
+    NOT_I64_VECTOR
+  v256 __builtin_not_i64 (v256);
+    NOT_I64_VPAIR
+
+[NOT_U64, SKIP, __builtin_not_u64]
+  unsigned long long __builtin_not_u64 (unsigned long long);
+    NOT_U64_SCALAR
+  vull __builtin_not_u64 (vull);
+    NOT_U64_VECTOR
+  v256 __builtin_not_u64 (v256);
+    NOT_U64_VPAIR
+
+[SUB_I32, SKIP, __builtin_sub_i32]
+  int __builtin_sub_i32 (int, int);
+    SUB_I32_SCALAR
+  vsi __builtin_sub_i32 (vsi, vsi);
+    SUB_I32_VECTOR
+  v256 __builtin_sub_i32 (v256, v256);
+    SUB_I32_VPAIR
+
+[SUB_U32, SKIP, __builtin_sub_u32]
+  unsigned int __builtin_sub_u32 (unsigned int, unsigned int);
+    SUB_U32_SCALAR
+  vui __builtin_sub_u32 (vui, vui);
+    SUB_U32_VECTOR
+  v256 __builtin_sub_u32 (v256, v256);
+    SUB_U32_VPAIR
+
+[SUB_I64, SKIP, __builtin_sub_i64]
+  long long __builtin_sub_i64 (long long, long long);
+    SUB_I64_SCALAR
+  vsll __builtin_sub_i64 (vsll, vsll);
+    SUB_I64_VECTOR
+  v256 __builtin_sub_i64 (v256, v256);
+    SUB_I64_VPAIR
+
+[SUB_U64, SKIP, __builtin_sub_u64]
+  unsigned long long __builtin_sub_u64 (unsigned long long, unsigned long long);
+    SUB_U64_SCALAR
+  vull __builtin_sub_u64 (vull, vull);
+    SUB_U64_VECTOR
+  v256 __builtin_sub_u64 (v256, v256);
+    SUB_U64_VPAIR
+
+[SMAX_I32, SKIP, __builtin_smax_i32]
+  int __builtin_smax_i32 (int, int);
+    SMAX_I32_SCALAR
+  vsi __builtin_smax_i32 (vsi, vsi);
+    SMAX_I32_VECTOR
+  v256 __builtin_smax_i32 (v256, v256);
+    SMAX_I32_VPAIR
+
+[SMAX_I64, SKIP, __builtin_smax_i64]
+  long long __builtin_smax_i64 (long long, long long);
+    SMAX_I64_SCALAR
+  vsll __builtin_smax_i64 (vsll, vsll);
+    SMAX_I64_VECTOR
+  v256 __builtin_smax_i64 (v256, v256);
+    SMAX_I64_VPAIR
+
+[SMIN_I32, SKIP, __builtin_smin_i32]
+  int __builtin_smin_i32 (int, int);
+    SMIN_I32_SCALAR
+  vsi __builtin_smin_i32 (vsi, vsi);
+    SMIN_I32_VECTOR
+  v256 __builtin_smin_i32 (v256, v256);
+    SMIN_I32_VPAIR
+
+[SMIN_I64, SKIP, __builtin_smin_i64]
+  long long __builtin_smin_i64 (long long, long long);
+    SMIN_I64_SCALAR
+  vsll __builtin_smin_i64 (vsll, vsll);
+    SMIN_I64_VECTOR
+  v256 __builtin_smin_i64 (v256, v256);
+    SMIN_I64_VPAIR
+
+[UMAX_U32, SKIP, __builtin_umax_u32]
+  unsigned int __builtin_umax_u32 (unsigned int, unsigned int);
+    UMAX_U32_SCALAR
+  vui __builtin_umax_u32 (vui, vui);
+    UMAX_U32_VECTOR
+  v256 __builtin_umax_u32 (v256, v256);
+    UMAX_U32_VPAIR
+
+[UMAX_U64, SKIP, __builtin_umax_u64]
+  unsigned long long __builtin_umax_u64 (unsigned long long, unsigned long long);
+    UMAX_U64_SCALAR
+  vull __builtin_umax_u64 (vull, vull);
+    UMAX_U64_VECTOR
+  v256 __builtin_umax_u64 (v256, v256);
+    UMAX_U64_VPAIR
+
+[UMIN_U32, SKIP, __builtin_umin_u32]
+  unsigned int __builtin_umin_u32 (unsigned int, unsigned int);
+    UMIN_U32_SCALAR
+  vui __builtin_umin_u32 (vui, vui);
+    UMIN_U32_VECTOR
+  v256 __builtin_umin_u32 (v256, v256);
+    UMIN_U32_VPAIR
+
+[UMIN_U64, SKIP, __builtin_umin_u64]
+  unsigned long long __builtin_umin_u64 (unsigned long long, unsigned long long);
+    UMIN_U64_SCALAR
+  vull __builtin_umin_u64 (vull, vull);
+    UMIN_U64_VECTOR
+  v256 __builtin_umin_u64 (v256, v256);
+    UMIN_U64_VPAIR
+
+[XOR_U32, SKIP, __builtin_xor_u32]
+  unsigned int __builtin_xor_u32 (unsigned int, unsigned int);
+    XOR_U32_SCALAR
+  vui __builtin_xor_u32 (vui, vui);
+    XOR_U32_VECTOR
+  v256 __builtin_xor_u32 (v256, v256);
+    XOR_U32_VPAIR
+
+[XOR_I64, SKIP, __builtin_xor_i64]
+  long long __builtin_xor_i64 (long long, long long);
+    XOR_I64_SCALAR
+  vsll __builtin_xor_i64 (vsll, vsll);
+    XOR_I64_VECTOR
+  v256 __builtin_xor_i64 (v256, v256);
+    XOR_I64_VPAIR
+
+[XOR_U64, SKIP, __builtin_xor_u64]
+  unsigned long long __builtin_xor_u64 (unsigned long long, unsigned long long);
+    XOR_U64_SCALAR
+  vull __builtin_xor_u64 (vull, vull);
+    XOR_U64_VECTOR
+  v256 __builtin_xor_u64 (v256, v256);
+    XOR_U64_VPAIR

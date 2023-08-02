@@ -1261,14 +1261,14 @@ rs6000_gimple_fold_mma_builtin (gimple_stmt_iterator *gsi,
   return true;
 }
 
-/* Helper function to fold the overloaded fp functions for the scalar and
-   vector types that support the operation directly.  */
+/* Helper function to fold the overloaded arithmetic functions for the scalar
+   and vector types that support the operation directly.  */
 
 static void
-fold_builtin_overload_fp (gimple_stmt_iterator *gsi,
-			  gimple *stmt,
-			  enum tree_code code,
-			  int nargs)
+fold_builtin_overload_arith (gimple_stmt_iterator *gsi,
+			     gimple *stmt,
+			     enum tree_code code,
+			     int nargs)
 {
   location_t loc = gimple_location (stmt);
   tree lhs = gimple_call_lhs (stmt);
@@ -2280,28 +2280,88 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
     case RS6000_BIF_ABS_F32_VECTOR:
     case RS6000_BIF_ABS_F64_SCALAR:
     case RS6000_BIF_ABS_F64_VECTOR:
-      fold_builtin_overload_fp (gsi, stmt, ABS_EXPR, 1);
+      fold_builtin_overload_arith (gsi, stmt, ABS_EXPR, 1);
       return true;
 
+    case RS6000_BIF_ADD_I32_SCALAR:
+    case RS6000_BIF_ADD_I32_VECTOR:
+    case RS6000_BIF_ADD_I64_SCALAR:
+    case RS6000_BIF_ADD_I64_VECTOR:
     case RS6000_BIF_ADD_F32_SCALAR:
     case RS6000_BIF_ADD_F32_VECTOR:
     case RS6000_BIF_ADD_F64_SCALAR:
     case RS6000_BIF_ADD_F64_VECTOR:
-      fold_builtin_overload_fp (gsi, stmt, PLUS_EXPR, 2);
+    case RS6000_BIF_ADD_U32_SCALAR:
+    case RS6000_BIF_ADD_U32_VECTOR:
+    case RS6000_BIF_ADD_U64_SCALAR:
+    case RS6000_BIF_ADD_U64_VECTOR:
+      fold_builtin_overload_arith (gsi, stmt, PLUS_EXPR, 2);
+      return true;
+
+    case RS6000_BIF_AND_I32_SCALAR:
+    case RS6000_BIF_AND_I32_VECTOR:
+    case RS6000_BIF_AND_I64_SCALAR:
+    case RS6000_BIF_AND_I64_VECTOR:
+    case RS6000_BIF_AND_U32_SCALAR:
+    case RS6000_BIF_AND_U32_VECTOR:
+    case RS6000_BIF_AND_U64_SCALAR:
+    case RS6000_BIF_AND_U64_VECTOR:
+      fold_builtin_overload_arith (gsi, stmt, BIT_AND_EXPR, 2);
+      return true;
+
+    case RS6000_BIF_IOR_I32_SCALAR:
+    case RS6000_BIF_IOR_I32_VECTOR:
+    case RS6000_BIF_IOR_I64_SCALAR:
+    case RS6000_BIF_IOR_I64_VECTOR:
+    case RS6000_BIF_IOR_U32_SCALAR:
+    case RS6000_BIF_IOR_U32_VECTOR:
+    case RS6000_BIF_IOR_U64_SCALAR:
+    case RS6000_BIF_IOR_U64_VECTOR:
+      fold_builtin_overload_arith (gsi, stmt, BIT_IOR_EXPR, 2);
       return true;
 
     case RS6000_BIF_MULT_F32_SCALAR:
     case RS6000_BIF_MULT_F32_VECTOR:
     case RS6000_BIF_MULT_F64_SCALAR:
     case RS6000_BIF_MULT_F64_VECTOR:
-      fold_builtin_overload_fp (gsi, stmt, MULT_EXPR, 2);
+      fold_builtin_overload_arith (gsi, stmt, MULT_EXPR, 2);
       return true;
 
+    case RS6000_BIF_NEG_I32_SCALAR:
+    case RS6000_BIF_NEG_I32_VECTOR:
+    case RS6000_BIF_NEG_I64_SCALAR:
+    case RS6000_BIF_NEG_I64_VECTOR:
     case RS6000_BIF_NEG_F32_SCALAR:
     case RS6000_BIF_NEG_F32_VECTOR:
     case RS6000_BIF_NEG_F64_SCALAR:
     case RS6000_BIF_NEG_F64_VECTOR:
-      fold_builtin_overload_fp (gsi, stmt, NEGATE_EXPR, 1);
+    case RS6000_BIF_NEG_U32_SCALAR:
+    case RS6000_BIF_NEG_U32_VECTOR:
+    case RS6000_BIF_NEG_U64_SCALAR:
+    case RS6000_BIF_NEG_U64_VECTOR:
+      fold_builtin_overload_arith (gsi, stmt, NEGATE_EXPR, 1);
+      return true;
+
+    case RS6000_BIF_NOT_I32_SCALAR:
+    case RS6000_BIF_NOT_I32_VECTOR:
+    case RS6000_BIF_NOT_I64_SCALAR:
+    case RS6000_BIF_NOT_I64_VECTOR:
+    case RS6000_BIF_NOT_U32_SCALAR:
+    case RS6000_BIF_NOT_U32_VECTOR:
+    case RS6000_BIF_NOT_U64_SCALAR:
+    case RS6000_BIF_NOT_U64_VECTOR:
+      fold_builtin_overload_arith (gsi, stmt, BIT_NOT_EXPR, 1);
+      return true;
+
+    case RS6000_BIF_XOR_I32_SCALAR:
+    case RS6000_BIF_XOR_I32_VECTOR:
+    case RS6000_BIF_XOR_I64_SCALAR:
+    case RS6000_BIF_XOR_I64_VECTOR:
+    case RS6000_BIF_XOR_U32_SCALAR:
+    case RS6000_BIF_XOR_U32_VECTOR:
+    case RS6000_BIF_XOR_U64_SCALAR:
+    case RS6000_BIF_XOR_U64_VECTOR:
+      fold_builtin_overload_arith (gsi, stmt, BIT_XOR_EXPR, 2);
       return true;
 
     case RS6000_BIF_REDUCE_F32_SCALAR:
@@ -2316,26 +2376,50 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 	return true;
       }
 
+    case RS6000_BIF_SMAX_I32_SCALAR:
+    case RS6000_BIF_SMAX_I32_VECTOR:
+    case RS6000_BIF_SMAX_I64_SCALAR:
+    case RS6000_BIF_SMAX_I64_VECTOR:
     case RS6000_BIF_SMAX_F32_SCALAR:
     case RS6000_BIF_SMAX_F32_VECTOR:
     case RS6000_BIF_SMAX_F64_SCALAR:
     case RS6000_BIF_SMAX_F64_VECTOR:
-      fold_builtin_overload_fp (gsi, stmt, MAX_EXPR, 2);
+    case RS6000_BIF_UMAX_U32_SCALAR:
+    case RS6000_BIF_UMAX_U32_VECTOR:
+    case RS6000_BIF_UMAX_U64_SCALAR:
+    case RS6000_BIF_UMAX_U64_VECTOR:
+      fold_builtin_overload_arith (gsi, stmt, MAX_EXPR, 2);
       return true;
 
+    case RS6000_BIF_SMIN_I32_SCALAR:
+    case RS6000_BIF_SMIN_I32_VECTOR:
+    case RS6000_BIF_SMIN_I64_SCALAR:
+    case RS6000_BIF_SMIN_I64_VECTOR:
     case RS6000_BIF_SMIN_F32_SCALAR:
     case RS6000_BIF_SMIN_F32_VECTOR:
     case RS6000_BIF_SMIN_F64_SCALAR:
     case RS6000_BIF_SMIN_F64_VECTOR:
-      fold_builtin_overload_fp (gsi, stmt, MIN_EXPR, 2);
+    case RS6000_BIF_UMIN_U32_SCALAR:
+    case RS6000_BIF_UMIN_U32_VECTOR:
+    case RS6000_BIF_UMIN_U64_SCALAR:
+    case RS6000_BIF_UMIN_U64_VECTOR:
+      fold_builtin_overload_arith (gsi, stmt, MIN_EXPR, 2);
       return true;
 
 
+    case RS6000_BIF_SUB_I32_SCALAR:
+    case RS6000_BIF_SUB_I32_VECTOR:
+    case RS6000_BIF_SUB_I64_SCALAR:
+    case RS6000_BIF_SUB_I64_VECTOR:
     case RS6000_BIF_SUB_F32_SCALAR:
     case RS6000_BIF_SUB_F32_VECTOR:
     case RS6000_BIF_SUB_F64_SCALAR:
     case RS6000_BIF_SUB_F64_VECTOR:
-      fold_builtin_overload_fp (gsi, stmt, MINUS_EXPR, 2);
+    case RS6000_BIF_SUB_U32_SCALAR:
+    case RS6000_BIF_SUB_U32_VECTOR:
+    case RS6000_BIF_SUB_U64_SCALAR:
+    case RS6000_BIF_SUB_U64_VECTOR:
+      fold_builtin_overload_arith (gsi, stmt, MINUS_EXPR, 2);
       return true;
 
     default:
