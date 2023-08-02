@@ -253,6 +253,18 @@ bpf_option_override (void)
   if (bpf_has_jmp32 == -1)
     bpf_has_jmp32 = (bpf_isa >= ISA_V3);
 
+  if (bpf_has_v3_atomics == -1)
+    bpf_has_v3_atomics = (bpf_isa >= ISA_V3);
+
+  if (bpf_has_bswap == -1)
+    bpf_has_bswap = (bpf_isa >= ISA_V4);
+
+  if (bpf_has_sdiv == -1)
+    bpf_has_sdiv = (bpf_isa >= ISA_V4);
+
+  if (bpf_has_smov == -1)
+    bpf_has_smov = (bpf_isa >= ISA_V4);
+
   /* Disable -fstack-protector as it is not supported in BPF.  */
   if (flag_stack_protect)
     {
@@ -261,6 +273,9 @@ bpf_option_override (void)
 	      "on this architecture");
       flag_stack_protect = 0;
     }
+
+  /* The BPF target does not support tail call optimization.  */
+  flag_optimize_sibling_calls = 0;
 }
 
 #undef TARGET_OPTION_OVERRIDE
@@ -305,46 +320,6 @@ bpf_target_macros (cpp_reader *pfile)
     builtin_define ("__BPF_BIG_ENDIAN__");
   else
     builtin_define ("__BPF_LITTLE_ENDIAN__");
-
-  /* Define BPF_KERNEL_VERSION_CODE */
-  {
-    const char *version_code;
-    char *kernel_version_code;
-
-    switch (bpf_kernel)
-      {
-      case LINUX_V4_0: version_code = "0x40000"; break;
-      case LINUX_V4_1: version_code = "0x40100"; break;
-      case LINUX_V4_2: version_code = "0x40200"; break;
-      case LINUX_V4_3: version_code = "0x40300"; break;
-      case LINUX_V4_4: version_code = "0x40400"; break;
-      case LINUX_V4_5: version_code = "0x40500"; break;
-      case LINUX_V4_6: version_code = "0x40600"; break;
-      case LINUX_V4_7: version_code = "0x40700"; break;
-      case LINUX_V4_8: version_code = "0x40800"; break;
-      case LINUX_V4_9: version_code = "0x40900"; break;
-      case LINUX_V4_10: version_code = "0x40a00"; break;
-      case LINUX_V4_11: version_code = "0x40b00"; break;
-      case LINUX_V4_12: version_code = "0x40c00"; break;
-      case LINUX_V4_13: version_code = "0x40d00"; break;
-      case LINUX_V4_14: version_code = "0x40e00"; break;
-      case LINUX_V4_15: version_code = "0x40f00"; break;
-      case LINUX_V4_16: version_code = "0x41000"; break;
-      case LINUX_V4_17: version_code = "0x42000"; break;
-      case LINUX_V4_18: version_code = "0x43000"; break;
-      case LINUX_V4_19: version_code = "0x44000"; break;
-      case LINUX_V4_20: version_code = "0x45000"; break;
-      case LINUX_V5_0: version_code = "0x50000"; break;
-      case LINUX_V5_1: version_code = "0x50100"; break;
-      case LINUX_V5_2: version_code = "0x50200"; break;
-      default:
-	gcc_unreachable ();
-      }
-
-    kernel_version_code = ACONCAT (("__BPF_KERNEL_VERSION_CODE__=",
-				    version_code, NULL));
-    builtin_define (kernel_version_code);
-  }
 }
 
 /* Return an RTX representing the place where a function returns or
@@ -967,9 +942,10 @@ bpf_print_operand_address (FILE *file, rtx addr)
   switch (GET_CODE (addr))
     {
     case REG:
-      fprintf (file, asm_dialect == ASM_NORMAL ? "[" : "(");
+      if (asm_dialect == ASM_NORMAL)
+	fprintf (file, "[");
       bpf_print_register (file, addr, 0);
-      fprintf (file, asm_dialect == ASM_NORMAL ? "+0]" : "+0)");
+      fprintf (file, asm_dialect == ASM_NORMAL ? "+0]" : "+0");
       break;
     case PLUS:
       {
@@ -978,11 +954,13 @@ bpf_print_operand_address (FILE *file, rtx addr)
 
 	if (GET_CODE (op0) == REG && GET_CODE (op1) == CONST_INT)
 	  {
-	    fprintf (file, asm_dialect == ASM_NORMAL ? "[" : "(");
+	    if (asm_dialect == ASM_NORMAL)
+	      fprintf (file, "[");
 	    bpf_print_register (file, op0, 0);
 	    fprintf (file, "+");
 	    output_addr_const (file, op1);
-	    fprintf (file, asm_dialect == ASM_NORMAL ? "]" : ")");
+	    if (asm_dialect == ASM_NORMAL)
+	      fprintf (file, "]");
 	  }
 	else
 	  fatal_insn ("invalid address in operand", addr);

@@ -1,3 +1,21 @@
+2023-08-01  Richard Ball  <richard.ball@arm.com>
+
+	* MAINTAINERS: Add myself.
+
+2023-07-31  Andreas Schwab  <schwab@suse.de>
+
+	* configure.ac (GDCFLAGS): Set default from ${CFLAGS}.
+	* configure: Regenerate.
+	* Makefile.in (GDCFLAGS): Substitute @GDCFLAGS@.
+
+2023-07-31  xuli  <xuli1@eswincomputing.com>
+
+	* MAINTAINERS: Add myself.
+
+2023-07-25  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* MAINTAINERS: List myself as "nvptx port" maintainer.
+
 2023-07-21  Cupertino Miranda  <cupertino.miranda@oracle.com>
 
 	* MAINTAINERS: Add myself to write after approval

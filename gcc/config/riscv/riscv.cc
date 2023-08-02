@@ -69,6 +69,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-iterator.h"
 #include "gimple-expr.h"
 #include "tree-vectorizer.h"
+#include "gcse.h"
 
 /* This file should be included last.  */
 #include "target-def.h"
@@ -89,6 +90,12 @@ along with GCC; see the file COPYING3.  If not see
 
 /* True if bit BIT is set in VALUE.  */
 #define BITSET_P(VALUE, BIT) (((VALUE) & (1ULL << (BIT))) != 0)
+
+/* Extract the backup dynamic frm rtl.  */
+#define DYNAMIC_FRM_RTL(c) ((c)->machine->mode_sw_info.dynamic_frm)
+
+/* True the mode switching has static frm, or false.  */
+#define STATIC_FRM_P(c) ((c)->machine->mode_sw_info.static_frm_p)
 
 /* Information about a function's frame layout.  */
 struct GTY(())  riscv_frame_info {
@@ -125,6 +132,22 @@ enum riscv_privilege_levels {
   UNKNOWN_MODE, USER_MODE, SUPERVISOR_MODE, MACHINE_MODE
 };
 
+struct GTY(()) mode_switching_info {
+  /* The RTL variable which stores the dynamic FRM value.  We always use this
+     RTX to restore dynamic FRM rounding mode in mode switching.  */
+  rtx dynamic_frm;
+
+  /* The boolean variables indicates there is at least one static rounding
+     mode instruction in the function or not.  */
+  bool static_frm_p;
+
+  mode_switching_info ()
+    {
+      dynamic_frm = NULL_RTX;
+      static_frm_p = false;
+    }
+};
+
 struct GTY(())  machine_function {
   /* The number of extra stack bytes taken up by register varargs.
      This area is allocated by the callee at the very top of the frame.  */
@@ -148,9 +171,8 @@ struct GTY(())  machine_function {
      not be considered by the prologue and epilogue.  */
   bool reg_is_wrapped_separately[FIRST_PSEUDO_REGISTER];
 
-  /* The RTL variable which stores the dynamic FRM value.  We always use this
-     RTX to restore dynamic FRM rounding mode in mode switching.  */
-  rtx dynamic_frm;
+  /* The mode swithching information for the FRM rounding modes.  */
+  struct mode_switching_info mode_sw_info;
 };
 
 /* Information about a single argument.  */
@@ -1009,12 +1031,31 @@ riscv_v_ext_tuple_mode_p (machine_mode mode)
   return false;
 }
 
+/* Return true if mode is the RVV enabled vls mode.  */
+
+bool
+riscv_v_ext_vls_mode_p (machine_mode mode)
+{
+#define VLS_ENTRY(MODE, REQUIREMENT)                                           \
+  case MODE##mode:                                                             \
+    return REQUIREMENT;
+  switch (mode)
+    {
+#include "riscv-vector-switch.def"
+    default:
+      return false;
+    }
+
+  return false;
+}
+
 /* Return true if it is either RVV vector mode or RVV tuple mode.  */
 
 static bool
 riscv_v_ext_mode_p (machine_mode mode)
 {
-  return riscv_v_ext_vector_mode_p (mode) || riscv_v_ext_tuple_mode_p (mode);
+  return riscv_v_ext_vector_mode_p (mode) || riscv_v_ext_tuple_mode_p (mode)
+	 || riscv_v_ext_vls_mode_p (mode);
 }
 
 /* Call from ADJUST_NUNITS in riscv-modes.def. Return the correct
@@ -4554,6 +4595,32 @@ riscv_memmodel_needs_amo_release (enum memmodel model)
     }
 }
 
+/* Get REGNO alignment of vector mode.
+   The alignment = LMUL when the LMUL >= 1.
+   Otherwise, alignment = 1.  */
+static int
+riscv_get_v_regno_alignment (machine_mode mode)
+{
+  /* 3.3.2. LMUL = 2,4,8, register numbers should be multiple of 2,4,8.
+     but for mask vector register, register numbers can be any number. */
+  int lmul = 1;
+  machine_mode rvv_mode = mode;
+  if (riscv_v_ext_vls_mode_p (rvv_mode))
+    {
+      int size = GET_MODE_BITSIZE (rvv_mode).to_constant ();
+      if (size < TARGET_MIN_VLEN)
+	return 1;
+      else
+	return size / TARGET_MIN_VLEN;
+    }
+  if (riscv_v_ext_tuple_mode_p (rvv_mode))
+    rvv_mode = riscv_vector::get_subpart_mode (rvv_mode);
+  poly_int64 size = GET_MODE_SIZE (rvv_mode);
+  if (known_gt (size, UNITS_PER_V_REG))
+    lmul = exact_div (size, UNITS_PER_V_REG).to_constant ();
+  return lmul;
+}
+
 /* Implement TARGET_PRINT_OPERAND.  The RISCV-specific operand codes are:
 
    'h'	Print the high-part relocation associated with OP, after stripping
@@ -4641,15 +4708,10 @@ riscv_print_operand (FILE *file, rtx op, int letter)
 	break;
       }
       case 'm': {
-	if (riscv_v_ext_vector_mode_p (mode))
+	if (riscv_v_ext_mode_p (mode))
 	  {
 	    /* Calculate lmul according to mode and print the value.  */
-	    poly_int64 size = GET_MODE_SIZE (mode);
-	    unsigned int lmul;
-	    if (known_lt (size, BYTES_PER_RISCV_VECTOR))
-	      lmul = 1;
-	    else
-	      lmul = exact_div (size, BYTES_PER_RISCV_VECTOR).to_constant ();
+	    int lmul = riscv_get_v_regno_alignment (mode);
 	    asm_fprintf (file, "%d", lmul);
 	  }
 	else if (code == CONST_INT)
@@ -6237,6 +6299,16 @@ riscv_hard_regno_nregs (unsigned int regno, machine_mode mode)
 	}
     }
 
+  /* For VLS modes, we allocate registers according to TARGET_MIN_VLEN.  */
+  if (riscv_v_ext_vls_mode_p (mode))
+    {
+      int size = GET_MODE_SIZE (mode).to_constant ();
+      if (size < TARGET_MIN_VLEN)
+	return 1;
+      else
+	return size / TARGET_MIN_VLEN;
+    }
+
   /* mode for VL or VTYPE are just a marker, not holding value,
      so it always consume one register.  */
   if (VTYPE_REG_P (regno) || VL_REG_P (regno) || VXRM_REG_P (regno)
@@ -6296,17 +6368,9 @@ riscv_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
       if (!V_REG_P (regno + nregs - 1))
 	return false;
 
-      /* 3.3.2. LMUL = 2,4,8, register numbers should be multiple of 2,4,8.
-	 but for mask vector register, register numbers can be any number. */
-      int lmul = 1;
-      machine_mode rvv_mode = mode;
-      if (riscv_v_ext_tuple_mode_p (rvv_mode))
-	rvv_mode = riscv_vector::get_subpart_mode (rvv_mode);
-      poly_int64 size = GET_MODE_SIZE (rvv_mode);
-      if (known_gt (size, UNITS_PER_V_REG))
-	lmul = exact_div (size, UNITS_PER_V_REG).to_constant ();
-      if (lmul != 1)
-	return ((regno % lmul) == 0);
+      int regno_alignment = riscv_get_v_regno_alignment (mode);
+      if (regno_alignment != 1)
+	return ((regno % regno_alignment) == 0);
     }
   else if (VTYPE_REG_P (regno) || VL_REG_P (regno) || VXRM_REG_P (regno)
 	   || FRM_REG_P (regno))
@@ -6713,7 +6777,7 @@ riscv_option_override (void)
      We can only allow TARGET_MIN_VLEN * 8 (LMUL) < 65535.  */
   if (TARGET_MIN_VLEN > 4096)
     sorry (
-      "Current RISC-V GCC can not support VLEN > 4096bit for 'V' Extension");
+      "Current RISC-V GCC cannot support VLEN greater than 4096bit for 'V' Extension");
 
   /* Convert -march to a chunks count.  */
   riscv_vector_chunks = riscv_convert_vector_bits ();
@@ -7392,11 +7456,7 @@ riscv_regmode_natural_size (machine_mode mode)
   /* ??? For now, only do this for variable-width RVV registers.
      Doing it for constant-sized registers breaks lower-subreg.c.  */
 
-  /* RVV mask modes always consume a single register.  */
-  if (GET_MODE_CLASS (mode) == MODE_VECTOR_BOOL)
-    return BYTES_PER_RISCV_VECTOR;
-
-  if (!riscv_vector_chunks.is_constant () && riscv_v_ext_mode_p (mode))
+  if (riscv_v_ext_mode_p (mode))
     {
       if (riscv_v_ext_tuple_mode_p (mode))
 	{
@@ -7405,7 +7465,14 @@ riscv_regmode_natural_size (machine_mode mode)
 	  if (known_lt (size, BYTES_PER_RISCV_VECTOR))
 	    return size;
 	}
-      return BYTES_PER_RISCV_VECTOR;
+      else if (riscv_v_ext_vector_mode_p (mode))
+	{
+	  /* RVV mask modes always consume a single register.  */
+	  if (GET_MODE_CLASS (mode) == MODE_VECTOR_BOOL)
+	    return BYTES_PER_RISCV_VECTOR;
+	}
+      if (!GET_MODE_SIZE (mode).is_constant ())
+	return BYTES_PER_RISCV_VECTOR;
     }
   return UNITS_PER_WORD;
 }
@@ -7496,9 +7563,8 @@ riscv_support_vector_misalignment (machine_mode mode,
 static opt_machine_mode
 riscv_get_mask_mode (machine_mode mode)
 {
-  machine_mode mask_mode = VOIDmode;
-  if (TARGET_VECTOR && riscv_vector::get_mask_mode (mode).exists (&mask_mode))
-    return mask_mode;
+  if (TARGET_VECTOR && riscv_v_ext_mode_p (mode))
+    return riscv_vector::get_mask_mode (mode);
 
   return default_get_mask_mode (mode);
 }
@@ -7679,7 +7745,7 @@ riscv_preferred_simd_mode (scalar_mode mode)
 static poly_uint64
 riscv_vectorize_preferred_vector_alignment (const_tree type)
 {
-  if (riscv_v_ext_vector_mode_p (TYPE_MODE (type)))
+  if (riscv_v_ext_mode_p (TYPE_MODE (type)))
     return TYPE_ALIGN (TREE_TYPE (type));
   return TYPE_ALIGN (type);
 }
@@ -7709,9 +7775,13 @@ riscv_static_frm_mode_p (int mode)
 static void
 riscv_emit_frm_mode_set (int mode, int prev_mode)
 {
+  rtx backup_reg = DYNAMIC_FRM_RTL (cfun);
+
+  if (prev_mode == FRM_MODE_DYN_CALL)
+    emit_insn (gen_frrmsi (backup_reg)); /* Backup frm when DYN_CALL.  */
+
   if (mode != prev_mode)
     {
-      rtx backup_reg = cfun->machine->dynamic_frm;
       /* TODO: By design, FRM_MODE_xxx used by mode switch which is
 	 different from the FRM value like FRM_RTZ defined in
 	 riscv-protos.h.  When mode switching we actually need a conversion
@@ -7721,10 +7791,14 @@ riscv_emit_frm_mode_set (int mode, int prev_mode)
 	 and then we leverage this assumption when emit.  */
       rtx frm = gen_int_mode (mode, SImode);
 
-      if (mode == FRM_MODE_DYN_EXIT && prev_mode != FRM_MODE_DYN)
+      if (mode == FRM_MODE_DYN_CALL && prev_mode != FRM_MODE_DYN)
 	/* No need to emit when prev mode is DYN already.  */
-	emit_insn (gen_fsrmsi_restore_exit (backup_reg));
-      else if (mode == FRM_MODE_DYN)
+	emit_insn (gen_fsrmsi_restore_volatile (backup_reg));
+      else if (mode == FRM_MODE_DYN_EXIT && STATIC_FRM_P (cfun)
+	&& prev_mode != FRM_MODE_DYN && prev_mode != FRM_MODE_DYN_CALL)
+	/* No need to emit when prev mode is DYN or DYN_CALL already.  */
+	emit_insn (gen_fsrmsi_restore_volatile (backup_reg));
+      else if (mode == FRM_MODE_DYN && prev_mode != FRM_MODE_DYN_CALL)
 	/* Restore frm value from backup when switch to DYN mode.  */
 	emit_insn (gen_fsrmsi_restore (backup_reg));
       else if (riscv_static_frm_mode_p (mode))
@@ -7753,6 +7827,88 @@ riscv_emit_mode_set (int entity, int mode, int prev_mode,
     }
 }
 
+/* Adjust the FRM_MODE_NONE insn after a call to FRM_MODE_DYN for the
+   underlying emit.  */
+
+static int
+riscv_frm_adjust_mode_after_call (rtx_insn *cur_insn, int mode)
+{
+  rtx_insn *insn = prev_nonnote_nondebug_insn_bb (cur_insn);
+
+  if (insn && CALL_P (insn))
+    return FRM_MODE_DYN;
+
+  return mode;
+}
+
+/* Insert the backup frm insn to the end of the bb if and only if the call
+   is the last insn of this bb.  */
+
+static void
+riscv_frm_emit_after_bb_end (rtx_insn *cur_insn)
+{
+  edge eg;
+  edge_iterator eg_iterator;
+  basic_block bb = BLOCK_FOR_INSN (cur_insn);
+
+  FOR_EACH_EDGE (eg, eg_iterator, bb->succs)
+    {
+      start_sequence ();
+      emit_insn (gen_frrmsi (DYNAMIC_FRM_RTL (cfun)));
+      rtx_insn *backup_insn = get_insns ();
+      end_sequence ();
+
+      if (eg->flags & EDGE_ABNORMAL)
+	insert_insn_end_basic_block (backup_insn, bb);
+      else
+	insert_insn_on_edge (backup_insn, eg);
+    }
+
+  commit_edge_insertions ();
+}
+
+/* Return mode that frm must be switched into
+   prior to the execution of insn.  */
+
+static int
+riscv_frm_mode_needed (rtx_insn *cur_insn, int code)
+{
+  if (!DYNAMIC_FRM_RTL(cfun))
+    {
+      /* The dynamic frm will be initialized only onece during cfun.  */
+      DYNAMIC_FRM_RTL (cfun) = gen_reg_rtx (SImode);
+      emit_insn_at_entry (gen_frrmsi (DYNAMIC_FRM_RTL (cfun)));
+    }
+
+  if (CALL_P (cur_insn))
+    {
+      rtx_insn *insn = next_nonnote_nondebug_insn_bb (cur_insn);
+
+      if (!insn)
+	riscv_frm_emit_after_bb_end (cur_insn);
+
+      return FRM_MODE_DYN_CALL;
+    }
+
+  int mode = code >= 0 ? get_attr_frm_mode (cur_insn) : FRM_MODE_NONE;
+
+  if (mode == FRM_MODE_NONE)
+      /* After meet a call, we need to backup the frm because it may be
+	 updated during the call. Here, for each insn, we will check if
+	 the previous insn is a call or not. When previous insn is call,
+	 there will be 2 cases for the emit mode set.
+
+	 1. Current insn is not MODE_NONE, then the mode switch framework
+	    will do the mode switch from MODE_CALL to MODE_NONE natively.
+	 2. Current insn is MODE_NONE, we need to adjust the MODE_NONE to
+	    the MODE_DYN, and leave the mode switch itself to perform
+	    the emit mode set.
+       */
+    mode = riscv_frm_adjust_mode_after_call (cur_insn, mode);
+
+  return mode;
+}
+
 /* Return mode that entity must be switched into
    prior to the execution of insn.  */
 
@@ -7766,7 +7922,7 @@ riscv_mode_needed (int entity, rtx_insn *insn)
     case RISCV_VXRM:
       return code >= 0 ? get_attr_vxrm_mode (insn) : VXRM_MODE_NONE;
     case RISCV_FRM:
-      return code >= 0 ? get_attr_frm_mode (insn) : FRM_MODE_NONE;
+      return riscv_frm_mode_needed (insn, code);
     default:
       gcc_unreachable ();
     }
@@ -7813,11 +7969,6 @@ frm_unknown_dynamic_p (rtx_insn *insn)
   if (reg_set_p (gen_rtx_REG (SImode, FRM_REGNUM), insn))
     return true;
 
-  /* A CALL function may contain an instruction that modifies the FRM,
-     return true in this situation.  */
-  if (CALL_P (insn))
-    return true;
-
   return false;
 }
 
@@ -7843,6 +7994,11 @@ riscv_vxrm_mode_after (rtx_insn *insn, int mode)
 static int
 riscv_frm_mode_after (rtx_insn *insn, int mode)
 {
+  STATIC_FRM_P (cfun) = STATIC_FRM_P (cfun) || riscv_static_frm_mode_p (mode);
+
+  if (CALL_P (insn))
+    return mode;
+
   if (frm_unknown_dynamic_p (insn))
     return FRM_MODE_DYN;
 
@@ -7883,12 +8039,6 @@ riscv_mode_entry (int entity)
       return VXRM_MODE_NONE;
     case RISCV_FRM:
       {
-	if (!cfun->machine->dynamic_frm)
-	  {
-	    cfun->machine->dynamic_frm = gen_reg_rtx (SImode);
-	    emit_insn_at_entry (gen_frrmsi (cfun->machine->dynamic_frm));
-	  }
-
 	  /* According to RVV 1.0 spec, all vector floating-point operations use
 	     the dynamic rounding mode in the frm register.  Likewise in other
 	     similar places.  */

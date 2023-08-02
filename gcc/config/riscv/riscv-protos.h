@@ -127,6 +127,7 @@ extern void riscv_reinit (void);
 extern poly_uint64 riscv_regmode_natural_size (machine_mode);
 extern bool riscv_v_ext_vector_mode_p (machine_mode);
 extern bool riscv_v_ext_tuple_mode_p (machine_mode);
+extern bool riscv_v_ext_vls_mode_p (machine_mode);
 extern bool riscv_shamt_matches_mask_p (int, HOST_WIDE_INT);
 extern void riscv_subword_address (rtx, rtx *, rtx *, rtx *, rtx *);
 extern void riscv_lshift_subword (machine_mode, rtx, rtx, rtx *);
@@ -199,6 +200,7 @@ enum insn_type
   RVV_GATHER_M_OP = 5,
   RVV_SCATTER_M_OP = 4,
   RVV_REDUCTION_OP = 3,
+  RVV_REDUCTION_TU_OP = RVV_REDUCTION_OP + 2,
 };
 enum vlmul_type
 {
@@ -247,7 +249,7 @@ void emit_vlmax_merge_insn (unsigned, int, rtx *);
 void emit_vlmax_cmp_insn (unsigned, rtx *);
 void emit_vlmax_cmp_mu_insn (unsigned, rtx *);
 void emit_vlmax_masked_mu_insn (unsigned, int, rtx *);
-void emit_scalar_move_insn (unsigned, rtx *);
+void emit_scalar_move_insn (unsigned, rtx *, rtx = 0);
 void emit_nonvlmax_integer_move_insn (unsigned, rtx *, rtx);
 enum vlmul_type get_vlmul (machine_mode);
 unsigned int get_ratio (machine_mode);
@@ -270,6 +272,13 @@ enum mask_policy
   MASK_AGNOSTIC = 1,
   MASK_ANY = 2,
 };
+
+enum class reduction_type
+{
+  UNORDERED,
+  FOLD_LEFT,
+  MASK_LEN_FOLD_LEFT,
+};
 enum tail_policy get_prefer_tail_policy ();
 enum mask_policy get_prefer_mask_policy ();
 rtx get_avl_type_rtx (enum avl_type);
@@ -282,7 +291,8 @@ bool has_vi_variant_p (rtx_code, rtx);
 void expand_vec_cmp (rtx, rtx_code, rtx, rtx);
 bool expand_vec_cmp_float (rtx, rtx_code, rtx, rtx, bool);
 void expand_cond_len_binop (rtx_code, rtx *);
-void expand_reduction (rtx_code, rtx *, rtx);
+void expand_reduction (rtx_code, rtx *, rtx,
+		       reduction_type = reduction_type::UNORDERED);
 #endif
 bool sew64_scalar_helper (rtx *, rtx *, rtx, machine_mode,
 			  bool, void (*)(rtx *, rtx));
@@ -302,7 +312,7 @@ bool slide1_sew64_helper (int, machine_mode, machine_mode,
 rtx gen_avl_for_scalar_move (rtx);
 void expand_tuple_move (rtx *);
 machine_mode preferred_simd_mode (scalar_mode);
-opt_machine_mode get_mask_mode (machine_mode);
+machine_mode get_mask_mode (machine_mode);
 void expand_vec_series (rtx, rtx, rtx);
 void expand_vec_init (rtx, rtx);
 void expand_vec_perm (rtx, rtx, rtx, rtx);

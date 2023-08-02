@@ -1,3 +1,19 @@
+2023-08-01  Lewis Hyatt  <lhyatt@gmail.com>
+
+	* c-parser.cc (pragma_lex_discard_to_eol): New function.
+	(c_init_preprocess): New function.
+
+2023-07-31  Hamza Mahfooz  <someguy@effective-light.com>
+
+	PR c/65213
+	* c-decl.cc (start_decl): Handle
+	-Wmissing-variable-declarations.
+
+2023-07-31  Chung-Lin Tang  <cltang@codesourcery.com>
+
+	* c-parser.cc (c_parser_oacc_host_data): Add checking requiring OpenACC
+	host_data construct to have an use_device clause.
+
 2023-06-29  Qing Zhao  <qing.zhao@oracle.com>
 
 	PR c/77650

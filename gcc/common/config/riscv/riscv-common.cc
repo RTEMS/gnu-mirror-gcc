@@ -183,6 +183,8 @@ static const struct riscv_ext_version riscv_ext_version_table[] =
   {"zifencei", ISA_SPEC_CLASS_20191213, 2, 0},
   {"zifencei", ISA_SPEC_CLASS_20190608, 2, 0},
 
+  {"zicond", ISA_SPEC_CLASS_NONE, 1, 0},
+
   {"zawrs", ISA_SPEC_CLASS_NONE, 1, 0},
 
   {"zba", ISA_SPEC_CLASS_NONE, 1, 0},
@@ -573,7 +575,7 @@ riscv_subset_list::add (const char *subset, int major_version,
   else if (subset[0] == 'z' && !standard_extensions_p (subset))
     {
       error_at (m_loc,
-		"%<-march=%s%>: extension %qs starts with `z` but is "
+		"%<-march=%s%>: extension %qs starts with 'z' but is "
 		"unsupported standard extension",
 		m_arch, subset);
       return;
@@ -581,7 +583,7 @@ riscv_subset_list::add (const char *subset, int major_version,
   else if (subset[0] == 's' && !standard_extensions_p (subset))
     {
       error_at (m_loc,
-		"%<-march=%s%>: extension %qs starts with `s` but is "
+		"%<-march=%s%>: extension %qs starts with 's' but is "
 		"unsupported standard supervisor extension",
 		m_arch, subset);
       return;
@@ -589,7 +591,7 @@ riscv_subset_list::add (const char *subset, int major_version,
   else if (subset[0] == 'x' && !standard_extensions_p (subset))
     {
       error_at (m_loc,
-		"%<-march=%s%>: extension %qs starts with `x` but is "
+		"%<-march=%s%>: extension %qs starts with 'x' but is "
 		"unsupported non-standard extension",
 		m_arch, subset);
       return;
@@ -1316,6 +1318,7 @@ static const riscv_ext_flag_table_t riscv_ext_flag_table[] =
 
   {"zicsr",    &gcc_options::x_riscv_zi_subext, MASK_ZICSR},
   {"zifencei", &gcc_options::x_riscv_zi_subext, MASK_ZIFENCEI},
+  {"zicond",   &gcc_options::x_riscv_zi_subext, MASK_ZICOND},
 
   {"zawrs", &gcc_options::x_riscv_za_subext, MASK_ZAWRS},
 
