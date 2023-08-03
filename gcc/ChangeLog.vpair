@@ -1,3 +1,24 @@
+==================== Branch work130-vpair, patch #20 ====================
+
+Add vector pair built-in functions.
+
+2023-08-03  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair*): New vector pair
+	built-in functions.
+	* config/rs6000/rs6000-call.cc (USE_ALTIVEC_FOR_ARG_P): Allow
+	__vector_pair to be passed and returned.
+	(rs6000_return_in_memory): Likewise.
+	(rs6000_function_arg): Likewise.
+	* config/rs6000/rs6000.md (vector-pair.md): Add new .md file for vector
+	pair built-in support.
+	* config/rs6000/t-rs6000 (MD_INCLUDES): Likewise.
+	* config/rs6000/vector-pair.md: New file.
+	* doc/extend.texi (PowerPC Built-in Functions): Document the vector pair
+	built-in functions.
+
 ==================== Branch work130-vpair, baseline ====================
 
 2023-08-03   Michael Meissner  <meissner@linux.ibm.com>
