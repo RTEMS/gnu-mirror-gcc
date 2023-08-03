@@ -1,3 +1,14 @@
+==================== Branch work129-vpair, patch #24 ====================
+
+Rename scalar/vector/vpair non-overloaded built-ins.
+
+2023-08-03  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def: Rename scalar/vector/vpair
+	non-overloaded built-ins.
+
 ==================== Branch work129-vpair, patch #23 ====================
 
 Add V2DI and V4DI reduction.
