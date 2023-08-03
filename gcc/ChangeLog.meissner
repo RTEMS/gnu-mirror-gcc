@@ -1,3 +1,115 @@
+==================== Branch work130, patch #3 ====================
+
+Replace UNSPEC_COPYSIGN with copysign RTL
+
+When I first implemented COPYSIGN support in the power7 days, we did not have a
+copysign RTL insn, so I had to use UNSPEC to represent the copysign
+instruction.  This patch removes those UNSPECs, and it uses the native RTL
+copysign insn.
+
+2023-07-31  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.md (UNSPEC_COPYSIGN): Delete.
+	(copysign<mode>3_fcpsg): Use copysign RTL instead of UNSPEC.
+	(copysign<mode>3_hard): Likewise.
+	(copysign<mode>3_soft): Likewise.
+	* config/rs6000/vector.md (vector_copysign<mode>3): Use copysign RTL
+	instead of UNSPEC.
+	* config/rs6000/vsx.md (vsx_copysign<mode>3): Use copysign RTL instead
+	of UNSPEC.
+
+==================== Branch work130, patch #2 ====================
+
+Improve 64->128 bit zero extension on PowerPC (PR target/108958)
+
+If we are converting an unsigned DImode to a TImode value, and the TImode value
+will go in a vector register, GCC currently does the DImode to TImode conversion
+in GPR registers, and then moves the value to the vector register via a mtvsrdd
+instruction.
+
+This patch adds a new zero_extendditi2 insn which optimizes moving a GPR to a
+vector register using the mtvsrdd instruction with RA=0, and using lxvrdx to
+load a 64-bit value into the bottom 64-bits of the vector register.
+
+I have tested this patch on the following systems and there was no degration.
+Can I check it into the trunk branch?
+
+    *	Power10, LE, --with-cpu=power10, IBM 128-bit long double
+    *	Power9,  LE, --with-cpu=power9,  IBM 128-bit long double
+    *	Power9,  LE, --with-cpu=power9,  IEEE 128-bit long double
+    *   Power9,  LE, --with-cpu=power9,  64-bit default long double
+    *	Power9,  BE, --with-cpu=power9,  IBM 128-bit long double
+    *	Power8,  BE, --with-cpu=power8,  IBM 128-bit long double
+
+2023-07-31  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/108958
+	* gcc/config/rs6000.md (zero_extendditi2): New insn.
+
+gcc/testsuite/
+
+	PR target/108958
+	* gcc.target/powerpc/pr108958.c: New test.
+
+==================== Branch work130, patch #1 ====================
+
+Optimize vec_splats of vec_extract for V2DI/V2DF (PR target/99293)
+
+This patch optimizes cases like:
+
+	vector double v1, v2;
+	/* ... */
+	v2 = vec_splats (vec_extract (v1, 0);	/* or  */
+	v2 = vec_splats (vec_extract (v1, 1);
+
+Previously:
+
+	vector long long
+	splat_dup_l_0 (vector long long v)
+	{
+	  return __builtin_vec_splats (__builtin_vec_extract (v, 0));
+	}
+
+would generate:
+
+        mfvsrld 9,34
+        mtvsrdd 34,9,9
+        blr
+
+With this patch, GCC generates:
+
+        xxpermdi 34,34,34,3
+	blr
+
+
+I have tested this patch on the following systems and there was no degration.
+Can I check it into the trunk branch?
+
+    *	Power10, LE, --with-cpu=power10, IBM 128-bit long double
+    *	Power9,  LE, --with-cpu=power9,  IBM 128-bit long double
+    *	Power9,  LE, --with-cpu=power9,  IEEE 128-bit long double
+    *   Power9,  LE, --with-cpu=power9,  64-bit default long double
+    *	Power9,  BE, --with-cpu=power9,  IBM 128-bit long double
+    *	Power8,  BE, --with-cpu=power8,  IBM 128-bit long double
+
+2023-07-31  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/99293
+	* gcc/config/rs6000/vsx.md (vsx_splat_extract_<mode>): New combiner
+	insn.
+
+gcc/testsuite/
+
+	PR target/108958
+	* gcc.target/powerpc/pr99293.c: New test.
+	* gcc.target/powerpc/builtins-1.c: Update insn count.
+
 ==================== Branch work130, baseline ====================
 
 2023-08-03   Michael Meissner  <meissner@linux.ibm.com>
