@@ -4122,172 +4122,172 @@
 ; The 256 codes that are kept in vector pairs insns that are split
 ; into separate operations after register allocation.
 
-  float __builtin_abs_f32_scalar (float);
+  float __builtin_scalar_f32_abs (float);
     ABS_F32_SCALAR nothing {}
-  vf __builtin_abs_f32_vector (vf);
+  vf __builtin_vector_f32_abs (vf);
     ABS_F32_VECTOR nothing {}
-  v256 __builtin_abs_f32_vpair (v256);
+  v256 __builtin_vpair_f32_abs (v256);
     ABS_F32_VPAIR vpair_absv8sf2 {mma}
 
-  double __builtin_abs_f64_scalar (double);
+  double __builtin_scalar_f64_abs (double);
     ABS_F64_SCALAR nothing {}
-  vd __builtin_abs_f64_vector (vd);
+  vd __builtin_vector_f64_abs (vd);
     ABS_F64_VECTOR nothing {}
-  v256 __builtin_abs_f64_vpair (v256);
+  v256 __builtin_vpair_f64_abs (v256);
     ABS_F64_VPAIR vpair_absv4df2 {mma}
 
-  float __builtin_add_f32_scalar (float, float);
+  float __builtin_scalar_f32_add (float, float);
     ADD_F32_SCALAR nothing {}
-  vf __builtin_add_f32_vector (vf, vf);
+  vf __builtin_vector_f32_add (vf, vf);
     ADD_F32_VECTOR nothing {}
-  v256 __builtin_add_f32_vpair (v256, v256);
+  v256 __builtin_vpair_f32_add (v256, v256);
     ADD_F32_VPAIR vpair_addv8sf3 {mma}
 
-  double __builtin_add_f64_scalar (double, double);
+  double __builtin_scalar_f64_add (double, double);
     ADD_F64_SCALAR nothing {}
-  vd __builtin_add_f64_vector (vd, vd);
+  vd __builtin_vector_f64_add (vd, vd);
     ADD_F64_VECTOR nothing {}
-  v256 __builtin_add_f64_vpair (v256, v256);
+  v256 __builtin_vpair_f64_add (v256, v256);
     ADD_F64_VPAIR vpair_addv4df3 {mma}
 
-  float __builtin_copysign_f32_scalar (float, float);
+  float __builtin_scalar_f32_copysign (float, float);
     COPYSIGN_F32_SCALAR copysignsf3_fcpsgn {}
-  vf __builtin_copysign_f32_vector (vf, vf);
+  vf __builtin_vector_f32_copysign (vf, vf);
     COPYSIGN_F32_VECTOR vsx_copysignv4sf3 {}
-  v256 __builtin_copysign_f32_vpair (v256, v256);
+  v256 __builtin_vpair_f32_copysign (v256, v256);
     COPYSIGN_F32_VPAIR vpair_copysignv8sf3 {mma}
 
-  double __builtin_copysign_f64_scalar (double, double);
+  double __builtin_scalar_f64_copysign (double, double);
     COPYSIGN_F64_SCALAR copysigndf3_fcpsgn {}
-  vd __builtin_copysign_f64_vector (vd, vd);
+  vd __builtin_vector_f64_copysign (vd, vd);
     COPYSIGN_F64_VECTOR vsx_copysignv2df3 {}
-  v256 __builtin_copysign_f64_vpair (v256, v256);
+  v256 __builtin_vpair_f64_copysign (v256, v256);
     COPYSIGN_F64_VPAIR vpair_copysignv4df3 {mma}
 
-  float __builtin_div_f32_scalar (float, float);
+  float __builtin_scalar_f32_div (float, float);
     DIV_F32_SCALAR divsf3 {}
-  vf __builtin_div_f32_vector (vf, vf);
+  vf __builtin_vector_f32_div (vf, vf);
     DIV_F32_VECTOR divv4sf3 {}
-  v256 __builtin_div_f32_vpair (v256, v256);
+  v256 __builtin_vpair_f32_div (v256, v256);
     DIV_F32_VPAIR vpair_divv8sf3 {mma}
 
-  double __builtin_div_f64_scalar (double, double);
+  double __builtin_scalar_f64_div (double, double);
     DIV_F64_SCALAR divdf3 {}
-  vd __builtin_div_f64_vector (vd, vd);
+  vd __builtin_vector_f64_div (vd, vd);
     DIV_F64_VECTOR divv2df3 {}
-  v256 __builtin_div_f64_vpair (v256, v256);
+  v256 __builtin_vpair_f64_div (v256, v256);
     DIV_F64_VPAIR vpair_divv4df3 {mma}
 
-  float __builtin_fma_f32_scalar (float, float, float);
+  float __builtin_scalar_f32_fma (float, float, float);
     FMA_F32_SCALAR fmasf4 {}
-  vf __builtin_fma_f32_vector (vf, vf, vf);
+  vf __builtin_vector_f32_fma (vf, vf, vf);
     FMA_F32_VECTOR fmav4sf4 {}
-  v256 __builtin_fma_v8sf (v256, v256, v256);
+  v256 __builtin_vpair_f32_fma (v256, v256, v256);
     FMA_F32_VPAIR vpair_fmav8sf4 {mma}
 
-  double __builtin_fma_f64_scalar (double, double, double);
+  double __builtin_scalar_f64_fma (double, double, double);
     FMA_F64_SCALAR fmadf4 {}
-  vd __builtin_fma_f64_vector (vd, vd, vd);
+  vd __builtin_vector_f64_fma (vd, vd, vd);
     FMA_F64_VECTOR fmav2df4 {}
-  v256 __builtin_fma_v4df (v256, v256, v256);
+  v256 __builtin_vpair_f64_fma (v256, v256, v256);
     FMA_F64_VPAIR vpair_fmav4df4 {mma}
 
-  float __builtin_mult_f32_scalar (float, float);
+  float __builtin_scalar_f32_mult (float, float);
     MULT_F32_SCALAR nothing {}
-  vf __builtin_mult_f32_vector (vf, vf);
+  vf __builtin_vector_f32_mult (vf, vf);
     MULT_F32_VECTOR nothing {}
-  v256 __builtin_mult_f32_vpair (v256, v256);
+  v256 __builtin_vpair_f32_mult (v256, v256);
     MULT_F32_VPAIR vpair_mulv8sf3 {mma}
 
-  double __builtin_mult_f64_scalar (double, double);
+  double __builtin_scalar_f64_mult (double, double);
     MULT_F64_SCALAR nothing {}
-  vd __builtin_mult_f64_vector (vd, vd);
+  vd __builtin_vector_f64_mult (vd, vd);
     MULT_F64_VECTOR nothing {}
-  v256 __builtin_mult_f64_vpair (v256, v256);
+  v256 __builtin_vpair_f64_mult (v256, v256);
     MULT_F64_VPAIR vpair_mulv4df3 {mma}
 
-  float __builtin_neg_f32_scalar (float);
+  float __builtin_scalar_f32_neg (float);
     NEG_F32_SCALAR nothing {}
-  vf __builtin_neg_f32_vector (vf);
+  vf __builtin_vector_f32_neg (vf);
     NEG_F32_VECTOR nothing {}
-  v256 __builtin_neg_f32_vpair (v256);
+  v256 __builtin_vpair_f32_neg (v256);
     NEG_F32_VPAIR vpair_negv8sf2 {mma}
 
-  double __builtin_neg_f64_scalar (double);
+  double __builtin_scalar_f64_neg (double);
     NEG_F64_SCALAR nothing {}
-  vd __builtin_neg_f64_vector (vd);
+  vd __builtin_vector_f64_neg (vd);
     NEG_F64_VECTOR nothing {}
-  v256 __builtin_neg_f64_vpair (v256);
+  v256 __builtin_vpair_f64_neg (v256);
     NEG_F64_VPAIR vpair_negv4df2 {mma}
 
-  float __builtin_reduce_f32_scalar (float);
+  float __builtin_scalar_f32_reduce (float);
     REDUCE_F32_SCALAR nothing {}
-  float __builtin_reduce_f32_vector (vf);
+  float __builtin_vector_f32_reduce (vf);
     REDUCE_F32_VECTOR reduce_v4sf {}
-  float __builtin_reduce_f32_vpair (v256);
+  float __builtin_vpair_f32_reduce (v256);
     REDUCE_F32_VPAIR reduce_v8sf {mma,pair}
 
-  double __builtin_reduce_f64_scalar (double);
+  double __builtin_scalar_f64_reduce (double);
     REDUCE_F64_SCALAR nothing {}
-  double __builtin_reduce_f64_vector (vd);
+  double __builtin_vector_f64_reduce (vd);
     REDUCE_F64_VECTOR reduce_v2df {}
-  double __builtin_reduce_f64_vpair (v256);
+  double __builtin_vpair_f64_reduce (v256);
     REDUCE_F64_VPAIR reduce_v4df {mma,pair}
 
-  float __builtin_smax_f32_scalar (float, float);
+  float __builtin_scalar_f32_smax (float, float);
     SMAX_F32_SCALAR nothing {}
-  vf __builtin_smax_f32_vector (vf, vf);
+  vf __builtin_vector_f32_smax (vf, vf);
     SMAX_F32_VECTOR nothing {}
-  v256 __builtin_smax_f32_vpair (v256, v256);
+  v256 __builtin_vpair_f32_smax (v256, v256);
     SMAX_F32_VPAIR vpair_smaxv8sf3 {mma}
 
-  double __builtin_smax_f64_scalar (double, double);
+  double __builtin_scalar_f64_smax (double, double);
     SMAX_F64_SCALAR nothing {}
-  vd __builtin_smax_f64_vector (vd, vd);
+  vd __builtin_vector_f64_smax (vd, vd);
     SMAX_F64_VECTOR nothing {}
-  v256 __builtin_smax_f64_vpair (v256, v256);
+  v256 __builtin_vpair_f64_smax (v256, v256);
     SMAX_F64_VPAIR vpair_smaxv4df3 {mma}
 
-  float __builtin_smin_f32_scalar (float, float);
+  float __builtin_scalar_f32_smin (float, float);
     SMIN_F32_SCALAR nothing {}
-  vf __builtin_smin_f32_vector (vf, vf);
+  vf __builtin_vector_f32_smin (vf, vf);
     SMIN_F32_VECTOR nothing {}
-  v256 __builtin_smin_f32_vpair (v256, v256);
+  v256 __builtin_vpair_f32_smin (v256, v256);
     SMIN_F32_VPAIR vpair_sminv8sf3 {mma}
 
-  double __builtin_smin_f64_scalar (double, double);
+  double __builtin_scalar_f64_smin (double, double);
     SMIN_F64_SCALAR nothing {}
-  vd __builtin_smin_f64_vector (vd, vd);
+  vd __builtin_vector_f64_smin (vd, vd);
     SMIN_F64_VECTOR nothing {}
-  v256 __builtin_smin_f64_vpair (v256, v256);
+  v256 __builtin_vpair_f64_smin (v256, v256);
     SMIN_F64_VPAIR vpair_sminv4df3 {mma}
 
-  float __builtin_sqrt_f32_scalar (float);
+  float __builtin_scalar_f32_sqrt (float);
     SQRT_F32_SCALAR nothing {}
-  vf __builtin_sqrt_f32_vector (vf);
+  vf __builtin_vector_f32_sqrt (vf);
     SQRT_F32_VECTOR nothing {}
-  v256 __builtin_sqrt_f32_vpair (v256);
+  v256 __builtin_vpair_f32_sqrt (v256);
     SQRT_F32_VPAIR vpair_sqrtv8sf2 {mma}
 
-  double __builtin_sqrt_f64_scalar (double);
+  double __builtin_scalar_f64_sqrt (double);
     SQRT_F64_SCALAR nothing {}
-  vd __builtin_sqrt_f64_vector (vd);
+  vd __builtin_vector_f64_sqrt (vd);
     SQRT_F64_VECTOR nothing {}
-  v256 __builtin_sqrt_f64_vpair (v256);
+  v256 __builtin_vpair_f64_sqrt (v256);
     SQRT_F64_VPAIR vpair_sqrtv4df2 {mma}
 
-  float __builtin_sub_f32_scalar (float, float);
+  float __builtin_scalar_f32_sub (float, float);
     SUB_F32_SCALAR nothing {}
-  vf __builtin_sub_f32_vector (vf, vf);
+  vf __builtin_vector_f32_sub (vf, vf);
     SUB_F32_VECTOR nothing {}
-  v256 __builtin_sub_f32_vpair (v256, v256);
+  v256 __builtin_vpair_f32_sub (v256, v256);
     SUB_F32_VPAIR vpair_subv8sf3 {mma}
 
-  double __builtin_sub_f64_scalar (double, double);
+  double __builtin_scalar_f64_sub (double, double);
     SUB_F64_SCALAR nothing {}
-  vd __builtin_sub_f64_vector (vd, vd);
+  vd __builtin_vector_f64_sub (vd, vd);
     SUB_F64_VECTOR nothing {}
-  v256 __builtin_sub_f64_vpair (v256, v256);
+  v256 __builtin_vpair_f64_sub (v256, v256);
     SUB_F64_VPAIR vpair_subv4df3 {mma}
 
 ; Builtins for overload integer operations, including scalar and
@@ -4295,268 +4295,268 @@
 ; The 256 codes that are kept in vector pairs insns that are split
 ; into separate operations after register allocation.
 
-  int __builtin_add_i32_scalar (int, int);
+  int __builtin_scalar_i32_add (int, int);
     ADD_I32_SCALAR nothing {}
-  vsi __builtin_add_i32_vector (vsi, vsi);
+  vsi __builtin_vector_i32_add (vsi, vsi);
     ADD_I32_VECTOR nothing {}
-  v256 __builtin_add_i32_vpair (v256, v256);
+  v256 __builtin_vpair_i32_add (v256, v256);
     ADD_I32_VPAIR vpair_addv8si3 {mma}
 
-  unsigned int __builtin_add_u32_scalar (unsigned int, unsigned int);
+  unsigned int __builtin_scalar_u32_add (unsigned int, unsigned int);
     ADD_U32_SCALAR nothing {}
-  vui __builtin_add_u32_vector (vui, vui);
+  vui __builtin_vector_u32_add (vui, vui);
     ADD_U32_VECTOR nothing {}
-  v256 __builtin_add_u32_vpair (v256, v256);
+  v256 __builtin_vpair_u32_add (v256, v256);
     ADD_U32_VPAIR vpair_addv8si3 {mma}
 
-  long long __builtin_add_i64_scalar (long long, long long);
+  long long __builtin_scalar_i64_add (long long, long long);
     ADD_I64_SCALAR nothing {}
-  vsll __builtin_add_i64_vector (vsll, vsll);
+  vsll __builtin_vector_i64_add (vsll, vsll);
     ADD_I64_VECTOR nothing {}
-  v256 __builtin_add_i64_vpair (v256, v256);
+  v256 __builtin_vpair_i64_add (v256, v256);
     ADD_I64_VPAIR vpair_addv4di3 {mma}
 
-  unsigned long long __builtin_add_u64_scalar (unsigned long long, unsigned long long);
+  unsigned long long __builtin_scalar_u64_add (unsigned long long, unsigned long long);
     ADD_U64_SCALAR nothing {}
-  vull __builtin_add_u64_vector (vull, vull);
+  vull __builtin_vector_u64_add (vull, vull);
     ADD_U64_VECTOR nothing {}
-  v256 __builtin_add_u64_vpair (v256, v256);
+  v256 __builtin_vpair_u64_add (v256, v256);
     ADD_U64_VPAIR vpair_addv4di3 {mma}
 
-  int __builtin_and_i32_scalar (int, int);
+  int __builtin_scalar_i32_and (int, int);
     AND_I32_SCALAR nothing {}
-  vsi __builtin_and_i32_vector (vsi, vsi);
+  vsi __builtin_vector_i32_and (vsi, vsi);
     AND_I32_VECTOR nothing {}
-  v256 __builtin_and_i32_vpair (v256, v256);
+  v256 __builtin_vpair_i32_and (v256, v256);
     AND_I32_VPAIR vpair_andv8si3 {mma}
 
-  unsigned int __builtin_and_u32_scalar (unsigned int, unsigned int);
+  unsigned int __builtin_scalar_u32_and (unsigned int, unsigned int);
     AND_U32_SCALAR nothing {}
-  vui __builtin_and_u32_vector (vui, vui);
+  vui __builtin_vector_u32_and (vui, vui);
     AND_U32_VECTOR nothing {}
-  v256 __builtin_and_u32_vpair (v256, v256);
+  v256 __builtin_vpair_u32_and (v256, v256);
     AND_U32_VPAIR vpair_andv8si3 {mma}
 
-  long long __builtin_and_i64_scalar (long long, long long);
+  long long __builtin_scalar_i64_and (long long, long long);
     AND_I64_SCALAR nothing {}
-  vsll __builtin_and_i64_vector (vsll, vsll);
+  vsll __builtin_vector_i64_and (vsll, vsll);
     AND_I64_VECTOR nothing {}
-  v256 __builtin_and_i64_vpair (v256, v256);
+  v256 __builtin_vpair_i64_and (v256, v256);
     AND_I64_VPAIR vpair_andv4di3 {mma}
 
-  unsigned long long __builtin_and_u64_scalar (unsigned long long, unsigned long long);
+  unsigned long long __builtin_scalar_u64_and (unsigned long long, unsigned long long);
     AND_U64_SCALAR nothing {}
-  vull __builtin_and_u64_vector (vull, vull);
+  vull __builtin_vector_u64_and (vull, vull);
     AND_U64_VECTOR nothing {}
-  v256 __builtin_and_u64_vpair (v256, v256);
+  v256 __builtin_vpair_u64_and (v256, v256);
     AND_U64_VPAIR vpair_andv4di3 {mma}
 
-  int __builtin_ior_i32_scalar (int, int);
+  int __builtin_scalar_i32_ior (int, int);
     IOR_I32_SCALAR nothing {}
-  vsi __builtin_ior_i32_vector (vsi, vsi);
+  vsi __builtin_vector_i32_ior (vsi, vsi);
     IOR_I32_VECTOR nothing {}
-  v256 __builtin_ior_i32_vpair (v256, v256);
+  v256 __builtin_vpair_i32_ior (v256, v256);
     IOR_I32_VPAIR vpair_iorv8si3 {mma}
 
-  unsigned int __builtin_ior_u32_scalar (unsigned int, unsigned int);
+  unsigned int __builtin_scalar_u32_ior (unsigned int, unsigned int);
     IOR_U32_SCALAR nothing {}
-  vui __builtin_ior_u32_vector (vui, vui);
+  vui __builtin_vector_u32_ior (vui, vui);
     IOR_U32_VECTOR nothing {}
-  v256 __builtin_ior_u32_vpair (v256, v256);
+  v256 __builtin_vpair_u32_ior (v256, v256);
     IOR_U32_VPAIR vpair_iorv8si3 {mma}
 
-  long long __builtin_ior_i64_scalar (long long, long long);
+  long long __builtin_scalar_i64_ior (long long, long long);
     IOR_I64_SCALAR nothing {}
-  vsll __builtin_ior_i64_vector (vsll, vsll);
+  vsll __builtin_vector_i64_ior (vsll, vsll);
     IOR_I64_VECTOR nothing {}
-  v256 __builtin_ior_i64_vpair (v256, v256);
+  v256 __builtin_vpair_i64_ior (v256, v256);
     IOR_I64_VPAIR vpair_iorv4di3 {mma}
 
-  unsigned long long __builtin_ior_u64_scalar (unsigned long long, unsigned long long);
+  unsigned long long __builtin_scalar_u64_ior (unsigned long long, unsigned long long);
     IOR_U64_SCALAR nothing {}
-  vull __builtin_ior_u64_vector (vull, vull);
+  vull __builtin_vector_u64_ior (vull, vull);
     IOR_U64_VECTOR nothing {}
-  v256 __builtin_ior_u64_vpair (v256, v256);
+  v256 __builtin_vpair_u64_ior (v256, v256);
     IOR_U64_VPAIR vpair_iorv4di3 {mma}
 
-  int __builtin_neg_i32_scalar (int);
+  int __builtin_scalar_i32_neg (int);
     NEG_I32_SCALAR nothing {}
-  vsi __builtin_neg_i32_vector (vsi);
+  vsi __builtin_vector_i32_neg (vsi);
     NEG_I32_VECTOR nothing {}
-  v256 __builtin_neg_i32_vpair (v256);
+  v256 __builtin_vpair_i32_neg (v256);
     NEG_I32_VPAIR vpair_negv8si2 {mma}
 
-  unsigned int __builtin_neg_u32_scalar (unsigned int);
+  unsigned int __builtin_scalar_u32_neg (unsigned int);
     NEG_U32_SCALAR nothing {}
-  vui __builtin_neg_u32_vector (vui);
+  vui __builtin_vector_u32_neg (vui);
     NEG_U32_VECTOR nothing {}
-  v256 __builtin_neg_u32_vpair (v256);
+  v256 __builtin_vpair_u32_neg (v256);
     NEG_U32_VPAIR vpair_negv8si2 {mma}
 
-  long long __builtin_neg_i64_scalar (long long);
+  long long __builtin_scalar_i64_neg (long long);
     NEG_I64_SCALAR nothing {}
-  vsll __builtin_neg_i64_vector (vsll);
+  vsll __builtin_vector_i64_neg (vsll);
     NEG_I64_VECTOR nothing {}
-  v256 __builtin_neg_i64_vpair (v256);
+  v256 __builtin_vpair_i64_neg (v256);
     NEG_I64_VPAIR vpair_negv8si2 {mma}
 
-  unsigned long long __builtin_neg_u64_scalar (unsigned long long);
+  unsigned long long __builtin_scalar_u64_neg (unsigned long long);
     NEG_U64_SCALAR nothing {}
-  vull __builtin_neg_u64_vector (vull);
+  vull __builtin_vector_u64_neg (vull);
     NEG_U64_VECTOR nothing {}
-  v256 __builtin_neg_u64_vpair (v256);
+  v256 __builtin_vpair_u64_neg (v256);
     NEG_U64_VPAIR vpair_negv4di2 {mma}
 
-  int __builtin_not_i32_scalar (int);
+  int __builtin_scalar_i32_not (int);
     NOT_I32_SCALAR nothing {}
-  vsi __builtin_not_i32_vector (vsi);
+  vsi __builtin_vector_i32_not (vsi);
     NOT_I32_VECTOR nothing {}
-  v256 __builtin_not_i32_vpair (v256);
+  v256 __builtin_vpair_i32_not (v256);
     NOT_I32_VPAIR vpair_notv8si2 {mma}
 
-  unsigned int __builtin_not_u32_scalar (unsigned int);
+  unsigned int __builtin_scalar_u32_not (unsigned int);
     NOT_U32_SCALAR nothing {}
-  vui __builtin_not_u32_vector (vui);
+  vui __builtin_vector_u32_not (vui);
     NOT_U32_VECTOR nothing {}
-  v256 __builtin_not_u32_vpair (v256);
+  v256 __builtin_vpair_u32_not (v256);
     NOT_U32_VPAIR vpair_notv8si2 {mma}
 
-  unsigned long long __builtin_not_i64_scalar (unsigned long long);
+  unsigned long long __builtin_scalar_i64_not (unsigned long long);
     NOT_I64_SCALAR nothing {}
-  vsll __builtin_not_i64_vector (vsll);
+  vsll __builtin_vector_i64_not (vsll);
     NOT_I64_VECTOR nothing {}
-  v256 __builtin_not_i64_vpair (v256);
+  v256 __builtin_vpair_i64_not (v256);
     NOT_I64_VPAIR vpair_notv4di2 {mma}
 
-  unsigned int __builtin_not_u64_scalar (unsigned int);
+  unsigned int __builtin_scalar_u64_not (unsigned int);
     NOT_U64_SCALAR nothing {}
-  vull __builtin_not_u64_vector (vull);
+  vull __builtin_vector_u64_not (vull);
     NOT_U64_VECTOR nothing {}
-  v256 __builtin_not_u64_vpair (v256);
+  v256 __builtin_vpair_u64_not (v256);
     NOT_U64_VPAIR vpair_notv8si2 {mma}
 
-  int __builtin_smax_i32_scalar (int, int);
+  int __builtin_scalar_i32_smax (int, int);
     SMAX_I32_SCALAR nothing {}
-  vsi __builtin_smax_i32_vector (vsi, vsi);
+  vsi __builtin_vector_i32_smax (vsi, vsi);
     SMAX_I32_VECTOR nothing {}
-  v256 __builtin_smax_i32_vpair (v256, v256);
+  v256 __builtin_vpair_i32_smax (v256, v256);
     SMAX_I32_VPAIR vpair_smaxv8si3 {mma}
 
-  long long __builtin_smax_i64_scalar (long long, long long);
+  long long __builtin_scalar_i64_smax (long long, long long);
     SMAX_I64_SCALAR nothing {}
-  vsll __builtin_smax_i64_vector (vsll, vsll);
+  vsll __builtin_vector_i64_smax (vsll, vsll);
     SMAX_I64_VECTOR nothing {}
-  v256 __builtin_smax_i64_vpair (v256, v256);
+  v256 __builtin_vpair_i64_smax (v256, v256);
     SMAX_I64_VPAIR vpair_smaxv4di3 {mma}
 
-  int __builtin_smin_i32_scalar (int, int);
+  int __builtin_scalar_i32_smin (int, int);
     SMIN_I32_SCALAR nothing {}
-  vsi __builtin_smin_i32_vector (vsi, vsi);
+  vsi __builtin_vector_i32_smin (vsi, vsi);
     SMIN_I32_VECTOR nothing {}
-  v256 __builtin_smin_i32_vpair (v256, v256);
+  v256 __builtin_vpair_i32_smin (v256, v256);
     SMIN_I32_VPAIR vpair_sminv8si3 {mma}
 
-  long long __builtin_smin_i64_scalar (long long, long long);
+  long long __builtin_scalar_i64_smin (long long, long long);
     SMIN_I64_SCALAR nothing {}
-  vsll __builtin_smin_i64_vector (vsll, vsll);
+  vsll __builtin_vector_i64_smin (vsll, vsll);
     SMIN_I64_VECTOR nothing {}
-  v256 __builtin_smin_i64_vpair (v256, v256);
+  v256 __builtin_vpair_i64_smin (v256, v256);
     SMIN_I64_VPAIR vpair_sminv4di3 {mma}
 
-  int __builtin_sub_i32_scalar (int, int);
+  int __builtin_scalar_i32_sub (int, int);
     SUB_I32_SCALAR nothing {}
-  vsi __builtin_sub_i32_vector (vsi, vsi);
+  vsi __builtin_vector_i32_sub (vsi, vsi);
     SUB_I32_VECTOR nothing {}
-  v256 __builtin_sub_i32_vpair (v256, v256);
+  v256 __builtin_vpair_i32_sub (v256, v256);
     SUB_I32_VPAIR vpair_subv8si3 {mma}
 
-  unsigned int __builtin_sub_u32_scalar (unsigned int, unsigned int);
+  unsigned int __builtin_scalar_u32_sub (unsigned int, unsigned int);
     SUB_U32_SCALAR nothing {}
-  vui __builtin_sub_u32_vector (vui, vui);
+  vui __builtin_vector_u32_sub (vui, vui);
     SUB_U32_VECTOR nothing {}
-  v256 __builtin_sub_u32_vpair (v256, v256);
+  v256 __builtin_vpair_u32_sub (v256, v256);
     SUB_U32_VPAIR vpair_subv8si3 {mma}
 
-  long long __builtin_sub_i64_scalar (long long, long long);
+  long long __builtin_scalar_i64_sub (long long, long long);
     SUB_I64_SCALAR nothing {}
-  vsll __builtin_sub_i64_vector (vsll, vsll);
+  vsll __builtin_vector_i64_sub (vsll, vsll);
     SUB_I64_VECTOR nothing {}
-  v256 __builtin_sub_i64_vpair (v256, v256);
+  v256 __builtin_vpair_i64_sub (v256, v256);
     SUB_I64_VPAIR vpair_subv4di3 {mma}
 
-  unsigned long long __builtin_sub_u64_scalar (unsigned long long, unsigned long long);
+  unsigned long long __builtin_scalar_u64_sub (unsigned long long, unsigned long long);
     SUB_U64_SCALAR nothing {}
-  vull __builtin_sub_u64_vector (vull, vull);
+  vull __builtin_vector_u64_sub (vull, vull);
     SUB_U64_VECTOR nothing {}
-  v256 __builtin_sub_u64_vpair (v256, v256);
+  v256 __builtin_vpair_u64_sub (v256, v256);
     SUB_U64_VPAIR vpair_subv4di3 {mma}
 
-  unsigned int __builtin_umax_u32_scalar (unsigned int, unsigned int);
+  unsigned int __builtin_scalar_u32_umax (unsigned int, unsigned int);
     UMAX_U32_SCALAR nothing {}
-  vui __builtin_umax_u32_vector (vui, vui);
+  vui __builtin_vector_u32_umax (vui, vui);
     UMAX_U32_VECTOR nothing {}
-  v256 __builtin_umax_u32_vpair (v256, v256);
+  v256 __builtin_vpair_u32_umax (v256, v256);
     UMAX_U32_VPAIR vpair_umaxv8si3 {mma}
 
-  unsigned long long __builtin_umax_u64_scalar (unsigned long long, unsigned long long);
+  unsigned long long __builtin_scalar_u64_umax (unsigned long long, unsigned long long);
     UMAX_U64_SCALAR nothing {}
-  vull __builtin_umax_u64_vector (vull, vull);
+  vull __builtin_vector_u64_umax (vull, vull);
     UMAX_U64_VECTOR nothing {}
-  v256 __builtin_umax_u64_vpair (v256, v256);
+  v256 __builtin_vpair_u64_umax (v256, v256);
     UMAX_U64_VPAIR vpair_umaxv4di3 {mma}
 
-  unsigned int __builtin_umin_u32_scalar (unsigned int, unsigned int);
+  unsigned int __builtin_scalar_u32_umin (unsigned int, unsigned int);
     UMIN_U32_SCALAR nothing {}
-  vui __builtin_umin_u32_vector (vui, vui);
+  vui __builtin_vector_u32_umin (vui, vui);
     UMIN_U32_VECTOR nothing {}
-  v256 __builtin_umin_u32_vpair (v256, v256);
+  v256 __builtin_vpair_u32_umin (v256, v256);
     UMIN_U32_VPAIR vpair_uminv8si3 {mma}
 
-  unsigned long long __builtin_umin_u64_scalar (unsigned long long, unsigned long long);
+  unsigned long long __builtin_scalar_u64_umin (unsigned long long, unsigned long long);
     UMIN_U64_SCALAR nothing {}
-  vull __builtin_umin_u64_vector (vull, vull);
+  vull __builtin_vector_u64_umin (vull, vull);
     UMIN_U64_VECTOR nothing {}
-  v256 __builtin_umin_u64_vpair (v256, v256);
+  v256 __builtin_vpair_u64_umin (v256, v256);
     UMIN_U64_VPAIR vpair_uminv4di3 {mma}
 
-  int __builtin_xor_i32_scalar (int, int);
+  int __builtin_scalar_i32_xor (int, int);
     XOR_I32_SCALAR nothing {}
-  vsi __builtin_xor_i32_vector (vsi, vsi);
+  vsi __builtin_vector_i32_xor (vsi, vsi);
     XOR_I32_VECTOR nothing {}
-  v256 __builtin_xor_i32_vpair (v256, v256);
+  v256 __builtin_vpair_i32_xor (v256, v256);
     XOR_I32_VPAIR vpair_xorv8si3 {mma}
 
-  unsigned int __builtin_xor_u32_scalar (unsigned int, unsigned int);
+  unsigned int __builtin_scalar_u32_xor (unsigned int, unsigned int);
     XOR_U32_SCALAR nothing {}
-  vui __builtin_xor_u32_vector (vui, vui);
+  vui __builtin_vector_u32_xor (vui, vui);
     XOR_U32_VECTOR nothing {}
-  v256 __builtin_xor_u32_vpair (v256, v256);
+  v256 __builtin_vpair_u32_xor (v256, v256);
     XOR_U32_VPAIR vpair_xorv8si3 {mma}
 
-  long long __builtin_xor_i64_scalar (long long, long long);
+  long long __builtin_scalar_i64_xor (long long, long long);
     XOR_I64_SCALAR nothing {}
-  vsll __builtin_xor_i64_vector (vsll, vsll);
+  vsll __builtin_vector_i64_xor (vsll, vsll);
     XOR_I64_VECTOR nothing {}
-  v256 __builtin_xor_i64_vpair (v256, v256);
+  v256 __builtin_vpair_i64_xor (v256, v256);
     XOR_I64_VPAIR vpair_xorv4di3 {mma}
 
-  unsigned long long __builtin_xor_u64_scalar (unsigned long long, unsigned long long);
+  unsigned long long __builtin_scalar_u64_xor (unsigned long long, unsigned long long);
     XOR_U64_SCALAR nothing {}
-  vull __builtin_xor_u64_vector (vull, vull);
+  vull __builtin_vector_u64_xor (vull, vull);
     XOR_U64_VECTOR nothing {}
-  v256 __builtin_xor_u64_vpair (v256, v256);
+  v256 __builtin_vpair_u64_xor (v256, v256);
     XOR_U64_VPAIR vpair_xorv4di3 {mma}
 
-  long long __builtin_reduce_i64_scalar (long long);
+  long long __builtin_scalar_i64_reduce (long long);
     REDUCE_I64_SCALAR nothing {}
-  long long  __builtin_reduce_i64_vector (vsll);
+  long long  __builtin_vector_i64_reduce (vsll);
     REDUCE_I64_VECTOR reduce_v2di {}
-  long long __builtin_reduce_i64_vpair (v256);
+  long long __builtin_vpair_i64_reduce (v256);
     REDUCE_I64_VPAIR reduce_v4di {mma,pair}
 
-  unsigned long long __builtin_reduce_u64_scalar (unsigned long long);
+  unsigned long long __builtin_scalar_u64_reduce (unsigned long long);
     REDUCE_U64_SCALAR nothing {}
-  unsigned long long  __builtin_reduce_u64_vector (vull);
+  unsigned long long  __builtin_vector_u64_reduce (vull);
     REDUCE_U64_VECTOR reduce_v2di {}
-  unsigned long long __builtin_reduce_u64_vpair (v256);
+  unsigned long long __builtin_vpair_u64_reduce (v256);
     REDUCE_U64_VPAIR reduce_v4di {mma,pair}
