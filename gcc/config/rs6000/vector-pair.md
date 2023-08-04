@@ -87,17 +87,23 @@
 			       (umin  "altivec_register_operand")
 			       (xor   "vsx_register_operand")])
 
-;; Iterator for creating the wrappers for vector pair built-ins
-(define_int_iterator VPAIR_FP_WRAPPER [UNSPEC_VPAIR_V4DF
-				       UNSPEC_VPAIR_V8SF])
+;; Iterator for creating the unspecs for vector pair built-ins
+(define_int_iterator VPAIR_FP [UNSPEC_VPAIR_V4DF
+			       UNSPEC_VPAIR_V8SF])
 
-(define_int_iterator VPAIR_INT_WRAPPER [UNSPEC_VPAIR_V4DI
-					UNSPEC_VPAIR_V8SI
-					UNSPEC_VPAIR_V16HI
-					UNSPEC_VPAIR_V32QI])
+(define_int_iterator VPAIR_INT [UNSPEC_VPAIR_V4DI
+				UNSPEC_VPAIR_V8SI
+				UNSPEC_VPAIR_V16HI
+				UNSPEC_VPAIR_V32QI])
 
-;; Map VPAIR_{INT,FP}_WRAPPER to vector the type of the arguments after they
-;; are split
+(define_int_iterator VPAIR_ALL [UNSPEC_VPAIR_V4DF
+				UNSPEC_VPAIR_V8SF
+				UNSPEC_VPAIR_V4DI
+				UNSPEC_VPAIR_V8SI
+				UNSPEC_VPAIR_V16HI
+				UNSPEC_VPAIR_V32QI])
+
+;; Map VPAIR_{INT,FP,ALL} to vector type of the arguments after they are split
 (define_int_attr VPAIR_VECTOR [(UNSPEC_VPAIR_V4DF  "V2DF")
 			       (UNSPEC_VPAIR_V8SF  "V4SF")
 			       (UNSPEC_VPAIR_V32QI "V16QI")
@@ -105,7 +111,7 @@
 			       (UNSPEC_VPAIR_V8SI  "V4SI")
 			       (UNSPEC_VPAIR_V4DI  "V2DI")])
 
-;; Map VPAIR_{INT,FP}_WRAPPER to a lower case name to identify the vector pair.
+;; Map VPAIR_{INT,FP,ALL} to a lower case name to identify the vector pair.
 (define_int_attr vpair_type [(UNSPEC_VPAIR_V4DF  "v4df")
 			     (UNSPEC_VPAIR_V8SF  "v8sf")
 			     (UNSPEC_VPAIR_V32QI "v32qi")
@@ -113,7 +119,7 @@
 			     (UNSPEC_VPAIR_V8SI  "v8si")
 			     (UNSPEC_VPAIR_V4DI  "v4di")])
 
-;; Map VPAIR_INT_WRAPPER to constraints used for the negate scratch register.
+;; Map VPAIR_INT to constraints used for the negate scratch register.
 (define_int_attr vpair_neg_reg [(UNSPEC_VPAIR_V32QI "&v")
 				(UNSPEC_VPAIR_V16HI "&v")
 				(UNSPEC_VPAIR_V8SI  "X")
@@ -138,13 +144,29 @@
 }
   [(set_attr "length" "8")])
 
+;; Extract one of the two 128-bitvectors from a vector pair.
+(define_insn_and_split "vpair_get_vector_<vpair_type>"
+  [(set (match_operand:<VPAIR_VECTOR> 0 "vsx_register_operand" "=wa")
+	(unspec:<VPAIR_VECTOR>
+	 [(match_operand:OO 1 "vsx_register_operand" "wa")
+	  (match_operand 2 "const_0_to_1_operand" "n")]
+	 VPAIR_ALL))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0) (match_dup 3))]
+{
+  unsigned reg1 = reg_or_subregno (operands[1]);
+  operands[3] = gen_rtx_REG (<VPAIR_VECTOR>mode, reg1 + INTVAL (operands[2]));
+})
+  
 
 ;; Vector pair floating point unary operations
 (define_insn_and_split "vpair_<vpair_op>_<vpair_type>2"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO [(VPAIR_FP_UNARY:OO
 		     (match_operand:OO 1 "vsx_register_operand" "wa"))]
-		   VPAIR_FP_WRAPPER))]
+		   VPAIR_FP))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -169,8 +191,8 @@
 	 [(neg:OO
 	   (unspec:OO
 	    [(abs:OO (match_operand:OO 1 "vsx_register_operand" "ww"))]
-	    VPAIR_FP_WRAPPER))]
-	 VPAIR_FP_WRAPPER))]
+	    VPAIR_FP))]
+	 VPAIR_FP))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -198,7 +220,7 @@
 	(unspec:OO [(VPAIR_FP_BINARY:OO
 		     (match_operand:OO 1 "vsx_register_operand" "wa")
 		     (match_operand:OO 2 "vsx_register_operand" "wa"))]
-		   VPAIR_FP_WRAPPER))]
+		   VPAIR_FP))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -232,7 +254,7 @@
 	   (match_operand:OO 1 "vsx_register_operand" "%wa,wa")
 	   (match_operand:OO 2 "vsx_register_operand" "wa,0")
 	   (match_operand:OO 3 "vsx_register_operand" "0,wa"))]
-	 VPAIR_FP_WRAPPER))]
+	 VPAIR_FP))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -271,8 +293,8 @@
 	   (match_operand:OO 2 "vsx_register_operand" "wa,0")
 	   (unspec:OO
 	    [(neg:OO (match_operand:OO 3 "vsx_register_operand" "0,wa"))]
-	     VPAIR_FP_WRAPPER))]
-	 VPAIR_FP_WRAPPER))]
+	     VPAIR_FP))]
+	 VPAIR_FP))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -312,8 +334,8 @@
 	      (match_operand:OO 1 "vsx_register_operand" "%wa,wa")
 	      (match_operand:OO 2 "vsx_register_operand" "wa,0")
 	      (match_operand:OO 3 "vsx_register_operand" "0,wa"))]
-	    VPAIR_FP_WRAPPER))]
-	 VPAIR_FP_WRAPPER))]
+	    VPAIR_FP))]
+	 VPAIR_FP))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -356,9 +378,9 @@
 	      (match_operand:OO 2 "vsx_register_operand" "wa,0")
 	      (unspec:OO
 	       [(neg:OO (match_operand:OO 3 "vsx_register_operand" "0,wa"))]
-	       VPAIR_FP_WRAPPER))]
-	   VPAIR_FP_WRAPPER))]
-	 VPAIR_FP_WRAPPER))]
+	       VPAIR_FP))]
+	   VPAIR_FP))]
+	 VPAIR_FP))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -456,7 +478,7 @@
   [(set (match_operand:OO 0 "altivec_register_operand" "=v")
 	(unspec:OO [(neg:OO
 		     (match_operand:OO 1 "altivec_register_operand" "v"))]
-		   VPAIR_INT_WRAPPER))
+		   VPAIR_INT))
    (clobber (match_scratch:<VPAIR_VECTOR> 2 "=<vpair_neg_reg>"))]
   "TARGET_MMA"
   "#"
@@ -500,7 +522,7 @@
 (define_insn_and_split "vpair_not_<vpair_type>2"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO [(not:OO (match_operand:OO 1 "vsx_register_operand" "wa"))]
-		   VPAIR_INT_WRAPPER))]
+		   VPAIR_INT))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -525,7 +547,7 @@
 	(unspec:OO [(VPAIR_INT_BINARY:OO
 		     (match_operand:OO 1 "<vpair_ipred>" "<vpair_ireg>")
 		     (match_operand:OO 2 "<vpair_ipred>" "<vpair_ireg>"))]
-		   VPAIR_INT_WRAPPER))]
+		   VPAIR_INT))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -558,9 +580,9 @@
 		     (unspec:OO
 		      [(not:OO
 			(match_operand:OO 1 "vsx_register_operand" "wa"))]
-		     VPAIR_INT_WRAPPER)
+		     VPAIR_INT)
 		     (match_operand:OO 2 "vsx_register_operand" "wa"))]
-		   VPAIR_INT_WRAPPER))]
+		   VPAIR_INT))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -593,9 +615,9 @@
 		     (unspec:OO
 		      [(not:OO
 			(match_operand:OO 1 "vsx_register_operand" "wa"))]
-		     VPAIR_INT_WRAPPER)
+		     VPAIR_INT)
 		     (match_operand:OO 2 "vsx_register_operand" "wa"))]
-		   VPAIR_INT_WRAPPER))]
+		   VPAIR_INT))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -629,8 +651,8 @@
 	   (unspec:OO [(and:OO
 			(match_operand:OO 1 "vsx_register_operand" "wa")
 			(match_operand:OO 2 "vsx_register_operand" "wa"))]
-		      VPAIR_INT_WRAPPER))]
-	 VPAIR_INT_WRAPPER))]
+		      VPAIR_INT))]
+	 VPAIR_INT))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -662,11 +684,11 @@
 	 [(ior:OO
 	   (unspec:OO [(not:OO
 			(match_operand:OO 1 "vsx_register_operand" "wa"))]
-		      VPAIR_INT_WRAPPER)
+		      VPAIR_INT)
 	   (unspec:OO [(not:OO
 			(match_operand:OO 2 "vsx_register_operand" "wa"))]
-		      VPAIR_INT_WRAPPER))]
-	 VPAIR_INT_WRAPPER))]
+		      VPAIR_INT))]
+	 VPAIR_INT))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -700,8 +722,8 @@
 	   (unspec:OO [(ior:OO
 			(match_operand:OO 1 "vsx_register_operand" "wa")
 			(match_operand:OO 2 "vsx_register_operand" "wa"))]
-		      VPAIR_INT_WRAPPER))]
-	 VPAIR_INT_WRAPPER))]
+		      VPAIR_INT))]
+	 VPAIR_INT))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -733,11 +755,11 @@
 	 [(ior:OO
 	   (unspec:OO [(not:OO
 			(match_operand:OO 1 "vsx_register_operand" "wa"))]
-		      VPAIR_INT_WRAPPER)
+		      VPAIR_INT)
 	   (unspec:OO [(not:OO
 			(match_operand:OO 2 "vsx_register_operand" "wa"))]
-		      VPAIR_INT_WRAPPER))]
-	 VPAIR_INT_WRAPPER))]
+		      VPAIR_INT))]
+	 VPAIR_INT))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"

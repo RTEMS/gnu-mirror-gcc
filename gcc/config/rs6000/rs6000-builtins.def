@@ -4122,6 +4122,9 @@
   v256 __builtin_vpair_zero ();
     VPAIR_ZERO vpair_zero {mma}
 
+  vf __builtin_vpair_f32_get_vector (v256, const int);
+    VPAIR_F32_GET_VECTOR vpair_get_vector_v8sf {mma}
+
   v256 __builtin_vpair_f32_abs (v256);
     VPAIR_F32_ABS vpair_abs_v8sf2 {mma}
 
@@ -4149,6 +4152,9 @@
   float __builtin_vpair_f32_add_elements (v256);
     VPAIR_F32_ADD_ELEMENTS vpair_reduc_plus_scale_v8sf {mma}
 
+  vd __builtin_vpair_f64_get_vector (v256, const int);
+    VPAIR_F64_GET_VECTOR vpair_get_vector_v4df {mma}
+
   v256 __builtin_vpair_f64_abs (v256);
     VPAIR_F64_ABS vpair_abs_v4df2 {mma}
 
@@ -4175,6 +4181,12 @@
 
   double __builtin_vpair_f64_add_elements (v256);
     VPAIR_F64_ADD_ELEMENTS vpair_reduc_plus_scale_v4df {mma}
+
+  vuc __builtin_vpair_i8u_get_vector (v256, const int);
+    VPAIR_I8U_GET_VECTOR vpair_get_vector_v32qi {mma}
+
+  vsc __builtin_vpair_i8_get_vector (v256, const int);
+    VPAIR_I8_GET_VECTOR vpair_get_vector_v32qi {mma}
 
   v256 __builtin_vpair_i8_add (v256, v256);
     VPAIR_I8_ADD vpair_add_v32qi3 {mma}
@@ -4209,6 +4221,12 @@
   v256 __builtin_vpair_i8_xor (v256, v256);
     VPAIR_I8_XOR vpair_xor_v32qi3 {mma}
 
+  vus __builtin_vpair_i16u_get_vector (v256, const int);
+    VPAIR_I16U_GET_VECTOR vpair_get_vector_v16hi {mma}
+
+  vss __builtin_vpair_i16_get_vector (v256, const int);
+    VPAIR_I16_GET_VECTOR vpair_get_vector_v16hi {mma}
+
   v256 __builtin_vpair_i16_add (v256, v256);
     VPAIR_I16_ADD vpair_add_v16hi3 {mma}
 
@@ -4242,6 +4260,12 @@
   v256 __builtin_vpair_i16_xor (v256, v256);
     VPAIR_I16_XOR vpair_xor_v16hi3 {mma}
 
+  vui __builtin_vpair_i32u_get_vector (v256, const int);
+    VPAIR_I32U_GET_VECTOR vpair_get_vector_v8si {mma}
+
+  vsi __builtin_vpair_i32_get_vector (v256, const int);
+    VPAIR_I32_GET_VECTOR vpair_get_vector_v8si {mma}
+
   v256 __builtin_vpair_i32_add (v256, v256);
     VPAIR_I32_ADD vpair_add_v8si3 {mma}
 
@@ -4274,6 +4298,12 @@
 
   v256 __builtin_vpair_i32_xor (v256, v256);
     VPAIR_I32_XOR vpair_xor_v8si3 {mma}
+
+  vull __builtin_vpair_i64u_get_vector (v256, const int);
+    VPAIR_I64U_GET_VECTOR vpair_get_vector_v4di {mma}
+
+  vsll __builtin_vpair_i64_get_vector (v256, const int);
+    VPAIR_I64_GET_VECTOR vpair_get_vector_v4di {mma}
 
   v256 __builtin_vpair_i64_add (v256, v256);
     VPAIR_I64_ADD vpair_add_v4di3 {mma}

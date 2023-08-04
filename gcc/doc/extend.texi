@@ -14865,6 +14865,7 @@ instructions, but allow the compiler to schedule those calls.
 * NDS32 Built-in Functions::
 * Nvidia PTX Built-in Functions::
 * Basic PowerPC Built-in Functions::
+* PowerPC Vector Pair Built-in Functions Available on ISA 3.1::
 * PowerPC AltiVec/VSX Built-in Functions::
 * PowerPC Hardware Transactional Memory Built-in Functions::
 * PowerPC Atomic Memory Operation Functions::
@@ -19150,7 +19151,6 @@ The PVIPR documents the following overloaded functions:
 * PowerPC AltiVec Built-in Functions Available on ISA 2.07::
 * PowerPC AltiVec Built-in Functions Available on ISA 3.0::
 * PowerPC AltiVec Built-in Functions Available on ISA 3.1::
-* PowerPC Vector Pair Built-in Functions Available on ISA 3.1::
 @end menu
 
 @node PowerPC AltiVec Built-in Functions on ISA 2.05
@@ -21126,6 +21126,7 @@ The following built-in functions operate on pairs of
 @code{vector float} values:
 
 @smallexample
+vector float __builtin_vpair_f32_get_vector (__vector_pair, int);
 __vector_pair __builtin_vpair_f32_abs (__vector_pair);
 __vector_pair __builtin_vpair_f32_add (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_f32_fma (__vector_pair, __vector_pair, __vector_pair);
@@ -21141,6 +21142,7 @@ The following built-in functions operate on pairs of
 @code{vector double} values:
 
 @smallexample
+vector double __builtin_vpair_f64_get_vector (__vector_pair, int);
 __vector_pair __builtin_vpair_f64_abs (__vector_pair);
 __vector_pair __builtin_vpair_f64_add (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_f64_fma (__vector_pair, __vector_pair, __vector_pair);
@@ -21156,6 +21158,8 @@ The following built-in functions operate on pairs of
 @code{vector long long} or @code{vector unsigned long long} values:
 
 @smallexample
+vector long long __builtin_vpair_i64_get_vector (__vector_pair, int);
+vector unsigned long long __builtin_vpair_i64u_get_vector (__vector_pair, int);
 __vector_pair __builtin_vpair_i64_add (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i64_and (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i64_ior (__vector_pair, __vector_pair);
@@ -21174,6 +21178,8 @@ The following built-in functions operate on pairs of
 @code{vector int} or @code{vector unsigned int} values:
 
 @smallexample
+vector int __builtin_vpair_i32_get_vector (__vector_pair, int);
+vector unsigned int __builtin_vpair_i32u_get_vector (__vector_pair, int);
 __vector_pair __builtin_vpair_i32_add (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i32_and (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i32_ior (__vector_pair, __vector_pair);
@@ -21191,6 +21197,8 @@ The following built-in functions operate on pairs of
 @code{vector short} or @code{vector unsigned short} values:
 
 @smallexample
+vector short __builtin_vpair_i16_get_vector (__vector_pair, int);
+vector unsigned short __builtin_vpair_i16u_get_vector (__vector_pair, int);
 __vector_pair __builtin_vpair_i16_add (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i16_and (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i16_ior (__vector_pair, __vector_pair);
@@ -21208,6 +21216,8 @@ The following built-in functions operate on pairs of
 @code{vector signed char} or @code{vector unsigned char} values:
 
 @smallexample
+vector signed char __builtin_vpair_i8_get_vector (__vector_pair, int);
+vector unsigned char __builtin_vpair_i8u_get_vector (__vector_pair, int);
 __vector_pair __builtin_vpair_i8_add (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i8_and (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i8_ior (__vector_pair, __vector_pair);
