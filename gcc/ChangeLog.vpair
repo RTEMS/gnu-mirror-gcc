@@ -1,3 +1,22 @@
+==================== Branch work130-vpair, patch #21 ====================
+
+Update vector pair documentation; Add get vector built-in.
+
+2023-08-04  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_*_get_vector): Add
+	built-ins.
+	* config/rs6000/vector-pair.md (VPAIR_FP): Rename from VPAIR_FP_WRAPPER.
+	(VPAIR_INT): Rename from VPAIR_INT_WRAPPER.
+	(VPAIR_ALL): New int iterator.
+	(vpair_get_vector_<vpair_type>): New insns.
+	(vpair_*): Rename VPAIR_FP_WRAPPER to VPAIR_FP.  Rename
+	VPAIR_INT_WRAPPER to VPAIR_INT.
+	* doc/extend.texi (PowerPC Built-in Functions): Move where vector pair
+	built-ins are documented.  Document __builtin_vpair_*_get_vector.
+
 ==================== Branch work130-vpair, patch #20 ====================
 
 Add vector pair built-in functions.
