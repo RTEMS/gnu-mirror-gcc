@@ -8,8 +8,9 @@ void g();
 ** test1:
 **	...
 **	str	x30, \[sp\]
+**	...
 **	sub	sp, sp, #4064
-**	str	xzr, \[sp\]
+**	str	xzr, \[sp, #?1024\]
 **	cbnz	w0, .*
 **	bl	g
 **	...
@@ -49,8 +50,9 @@ int test1(int z) {
 ** test2:
 **	...
 **	str	x30, \[sp\]
+**	...
 **	sub	sp, sp, #1040
-**	str	xzr, \[sp\]
+**	str	xzr, \[sp, #?1024\]
 **	cbnz	w0, .*
 **	bl	g
 **	...
@@ -77,6 +79,7 @@ int test2(int z) {
 ** test3:
 **	...
 **	str	x30, \[sp\]
+**	...
 **	sub	sp, sp, #1024
 **	cbnz	w0, .*
 **	bl	g
