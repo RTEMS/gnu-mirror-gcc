@@ -2575,6 +2575,12 @@ rs6000_debug_reg_global (void)
   if (TARGET_DIRECT_MOVE_128)
     fprintf (stderr, DEBUG_FMT_D, "VSX easy 64-bit mfvsrld element",
 	     (int)VECTOR_ELEMENT_MFVSRLD_64BIT);
+
+  if (TARGET_MMA)
+    fprintf (stderr, DEBUG_FMT_ID "%s, %s\n",
+	     "vector_pair",
+	     TARGET_LXVP ? "lxvp" : "no-lxvp",
+	     TARGET_STXVP ? "stxvp" : "no-stxvp");
 }
 
 
@@ -2710,7 +2716,9 @@ rs6000_setup_reg_addr_masks (void)
 	  /* Vector pairs can do both indexed and offset loads if the
 	     instructions are enabled, otherwise they can only do offset loads
 	     since it will be broken into two vector moves.  Vector quads can
-	     only do offset loads.  */
+	     only do offset loads.  If the user restricted generation of either
+	     of the LXVP or STXVP instructions, do not allow indexed mode so
+	     that we can split the load/store.  */
 	  else if ((addr_mask != 0) && TARGET_MMA
 		   && (m2 == OOmode || m2 == XOmode))
 	    {
@@ -2718,7 +2726,7 @@ rs6000_setup_reg_addr_masks (void)
 	      if (rc == RELOAD_REG_FPR || rc == RELOAD_REG_VMX)
 		{
 		  addr_mask |= RELOAD_REG_QUAD_OFFSET;
-		  if (m2 == OOmode)
+		  if (m2 == OOmode && TARGET_LXVP && TARGET_STXVP)
 		    addr_mask |= RELOAD_REG_INDEXED;
 		}
 	    }
