@@ -1,3 +1,22 @@
+==================== Branch work130-vpair, patch #22 ====================
+
+Add -mno-lxvp and -mno-stxvp switches.
+
+2023-08-08  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (movoo): Add support for -mno-lxvp and
+	-mno-stxvp.
+	* config/rs6000/rs6000.md (rs6000_debug_reg_global): Print out whether
+	lxvp and stxvp will be generated.
+	(rs6000_setup_reg_addr_masks): Do not support indexed addresses for
+	OOmode if either lxvp or stxvp is not being generated.
+	* config/rs6000/rs6000.md (isa attribute): Add new attributes for
+	generating lxvp and stxvp.
+	* config/rs6000/rs6000.opt (-mlxvp): New option.
+	(-mstxvp): Likewise.
+
 ==================== Branch work130-vpair, patch #21 ====================
 
 Update vector pair documentation; Add get vector built-in.
