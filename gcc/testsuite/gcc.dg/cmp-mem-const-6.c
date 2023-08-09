@@ -1,6 +1,8 @@
-/* { dg-do compile { target { lp64 } } } */
-/* { dg-options "-O1 -fdump-rtl-combine-details" } */
-/* { dg-final { scan-rtl-dump "narrow comparison from mode DI to SI" "combine" } } */
+/* { dg-do compile { target { lp64 && { ! sparc*-*-* } } } } */
+/* Excluding sparc since there a prior optimization already reduced the
+   constant, i.e., nothing left for us.  */
+/* { dg-options "-O2 -fdump-rtl-combine-details" } */
+/* { dg-final { scan-rtl-dump "narrow comparison from mode .I to SI" "combine" } } */
 
 typedef __UINT64_TYPE__ uint64_t;
 

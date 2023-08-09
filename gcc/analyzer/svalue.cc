@@ -714,8 +714,11 @@ region_svalue::dump_to_pp (pretty_printer *pp, bool simple) const
   else
     {
       pp_string (pp, "region_svalue(");
-      print_quoted_type (pp, get_type ());
-      pp_string (pp, ", ");
+      if (get_type ())
+	{
+	  print_quoted_type (pp, get_type ());
+	  pp_string (pp, ", ");
+	}
       m_reg->dump_to_pp (pp, simple);
       pp_string (pp, ")");
     }
@@ -811,8 +814,11 @@ constant_svalue::dump_to_pp (pretty_printer *pp, bool simple) const
   else
     {
       pp_string (pp, "constant_svalue(");
-      print_quoted_type (pp, get_type ());
-      pp_string (pp, ", ");
+      if (get_type ())
+	{
+	  print_quoted_type (pp, get_type ());
+	  pp_string (pp, ", ");
+	}
       dump_tree (pp, m_cst_expr);
       pp_string (pp, ")");
     }
@@ -1029,8 +1035,11 @@ initial_svalue::dump_to_pp (pretty_printer *pp, bool simple) const
   else
     {
       pp_string (pp, "initial_svalue(");
-      print_quoted_type (pp, get_type ());
-      pp_string (pp, ", ");
+      if (get_type ())
+	{
+	  print_quoted_type (pp, get_type ());
+	  pp_string (pp, ", ");
+	}
       m_reg->dump_to_pp (pp, simple);
       pp_string (pp, ")");
     }
@@ -1910,7 +1919,11 @@ conjured_svalue::dump_to_pp (pretty_printer *pp, bool simple) const
   else
     {
       pp_string (pp, "conjured_svalue (");
-      pp_string (pp, ", ");
+      if (get_type ())
+	{
+	  print_quoted_type (pp, get_type ());
+	  pp_string (pp, ", ");
+	}
       pp_gimple_stmt_1 (pp, m_stmt, 0, (dump_flags_t)0);
       pp_string (pp, ", ");
       m_id_reg->dump_to_pp (pp, simple);
@@ -1925,6 +1938,17 @@ conjured_svalue::accept (visitor *v) const
 {
   m_id_reg->accept (v);
   v->visit_conjured_svalue (this);
+}
+
+/* Return true iff this conjured_svalue is for the LHS of the
+   stmt that conjured it.  */
+
+bool
+conjured_svalue::lhs_value_p () const
+{
+  if (tree decl = m_id_reg->maybe_get_decl ())
+    return decl == gimple_get_lhs (m_stmt);
+  return false;
 }
 
 /* class asm_output_svalue : public svalue.  */

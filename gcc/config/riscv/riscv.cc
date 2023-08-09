@@ -404,6 +404,10 @@ static const struct riscv_tune_info riscv_tune_info_table[] = {
 #include "riscv-cores.def"
 };
 
+/* Global variable to distinguish whether we should save and restore s0/fp for
+   function.  */
+static bool riscv_save_frame_pointer;
+
 void riscv_frame_info::reset(void)
 {
   total_size = 0;
@@ -2504,6 +2508,20 @@ riscv_rtx_costs (rtx x, machine_mode mode, int outer_code, int opno ATTRIBUTE_UN
 	  *total = COSTS_N_INSNS (1);
 	  return true;
 	}
+      else if (TARGET_ZICOND
+	       && outer_code == SET
+	       && ((GET_CODE (XEXP (x, 1)) == REG
+		    && XEXP (x, 2) == CONST0_RTX (GET_MODE (XEXP (x, 1))))
+		   || (GET_CODE (XEXP (x, 2)) == REG
+		       && XEXP (x, 1) == CONST0_RTX (GET_MODE (XEXP (x, 2))))
+		   || (GET_CODE (XEXP (x, 1)) == REG
+		       && rtx_equal_p (XEXP (x, 1), XEXP (XEXP (x, 0), 0)))
+		   || (GET_CODE (XEXP (x, 1)) == REG
+		       && rtx_equal_p (XEXP (x, 2), XEXP (XEXP (x, 0), 0)))))
+	{
+	  *total = COSTS_N_INSNS (1);
+	  return true;
+	}
       else if (LABEL_REF_P (XEXP (x, 1)) && XEXP (x, 2) == pc_rtx)
 	{
 	  if (equality_operator (XEXP (x, 0), mode)
@@ -3481,7 +3499,7 @@ riscv_emit_float_compare (enum rtx_code *code, rtx *op0, rtx *op1)
 /* CODE-compare OP0 and OP1.  Store the result in TARGET.  */
 
 void
-riscv_expand_int_scc (rtx target, enum rtx_code code, rtx op0, rtx op1)
+riscv_expand_int_scc (rtx target, enum rtx_code code, rtx op0, rtx op1, bool *invert_ptr)
 {
   riscv_extend_comparands (code, &op0, &op1);
   op0 = force_reg (word_mode, op0);
@@ -3492,7 +3510,7 @@ riscv_expand_int_scc (rtx target, enum rtx_code code, rtx op0, rtx op1)
       riscv_emit_binary (code, target, zie, const0_rtx);
     }
   else
-    riscv_emit_int_order_test (code, 0, target, op0, op1);
+    riscv_emit_int_order_test (code, invert_ptr, target, op0, op1);
 }
 
 /* Like riscv_expand_int_scc, but for floating-point comparisons.  */
@@ -3548,14 +3566,206 @@ riscv_expand_conditional_move (rtx dest, rtx op, rtx cons, rtx alt)
       riscv_emit_int_compare (&code, &op0, &op1, need_eq_ne_p);
       rtx cond = gen_rtx_fmt_ee (code, GET_MODE (op0), op0, op1);
 
-      /* The expander allows (const_int 0) for CONS for the benefit of
-	 TARGET_XTHEADCONDMOV, but that case isn't supported for
-	 TARGET_SFB_ALU.  So force that operand into a register if
-	 necessary.  */
+      /* The expander is a bit loose in its specification of the true
+	 arm of the conditional move.  That allows us to support more
+	 cases for extensions which are more general than SFB.  But
+	 does mean we need to force CONS into a register at this point.  */
       cons = force_reg (GET_MODE (dest), cons);
       emit_insn (gen_rtx_SET (dest, gen_rtx_IF_THEN_ELSE (GET_MODE (dest),
 							  cond, cons, alt)));
       return true;
+    }
+  else if (TARGET_ZICOND
+	   && GET_MODE_CLASS (mode) == MODE_INT)
+    {
+      /* The comparison must be comparing WORD_MODE objects.   We must
+	 enforce that so that we don't strip away a sign_extension
+	 thinking it is unnecessary.  We might consider using
+	 riscv_extend_operands if they are not already properly extended.  */
+      if ((GET_MODE (op0) != word_mode && GET_MODE (op0) != VOIDmode)
+	  || (GET_MODE (op1) != word_mode && GET_MODE (op1) != VOIDmode))
+	return false;
+
+      /* Canonicalize the comparison.  It must be an equality comparison
+	 against 0.  If it isn't, then emit an SCC instruction so that
+	 we can then use an equality comparison against zero.  */
+      if (!equality_operator (op, VOIDmode) || op1 != CONST0_RTX (mode))
+	{
+	  enum rtx_code new_code = NE;
+	  bool *invert_ptr = 0;
+	  bool invert = false;
+
+	  if (code == LE || code == GE)
+	    invert_ptr = &invert;
+
+	  /* Emit an scc like instruction into a temporary
+	     so that we can use an EQ/NE comparison.  */
+	  rtx tmp = gen_reg_rtx (word_mode);
+
+	  /* We can support both FP and integer conditional moves.  */
+	  if (INTEGRAL_MODE_P (GET_MODE (XEXP (op, 0))))
+	    riscv_expand_int_scc (tmp, code, op0, op1, invert_ptr);
+	  else if (FLOAT_MODE_P (GET_MODE (XEXP (op, 0)))
+		   && fp_scc_comparison (op, GET_MODE (op)))
+	    riscv_expand_float_scc (tmp, code, op0, op1);
+	  else
+	    return false;
+
+	  /* If riscv_expand_int_scc inverts the condition, then it will
+	     flip the value of INVERT.  We need to know where so that
+	     we can adjust it for our needs.  */
+	  if (invert)
+	    new_code = EQ;
+
+	  op = gen_rtx_fmt_ee (new_code, mode, tmp, const0_rtx);
+
+	  /* We've generated a new comparison.  Update the local variables.  */
+	  code = GET_CODE (op);
+	  op0 = XEXP (op, 0);
+	  op1 = XEXP (op, 1);
+	}
+
+      /* 0, reg or 0, imm */
+      if (cons == CONST0_RTX (mode)
+	  && (REG_P (alt)
+	      || (CONST_INT_P (alt) && alt != CONST0_RTX (mode))))
+	{
+	  riscv_emit_int_compare (&code, &op0, &op1, true);
+	  rtx cond = gen_rtx_fmt_ee (code, GET_MODE (op0), op0, op1);
+	  alt = force_reg (mode, alt);
+	  emit_insn (gen_rtx_SET (dest,
+				  gen_rtx_IF_THEN_ELSE (mode, cond,
+							cons, alt)));
+	  return true;
+	}
+      /* imm, imm */
+      else if (CONST_INT_P (cons) && cons != CONST0_RTX (mode)
+	       && CONST_INT_P (alt) && alt != CONST0_RTX (mode))
+	{
+	  riscv_emit_int_compare (&code, &op0, &op1, true);
+	  rtx cond = gen_rtx_fmt_ee (code, GET_MODE (op0), op0, op1);
+	  HOST_WIDE_INT t = INTVAL (alt) - INTVAL (cons);
+	  alt = force_reg (mode, gen_int_mode (t, mode));
+	  emit_insn (gen_rtx_SET (dest,
+				  gen_rtx_IF_THEN_ELSE (mode, cond,
+							CONST0_RTX (mode),
+							alt)));
+	  riscv_emit_binary (PLUS, dest, dest, cons);
+	  return true;
+	}
+      /* imm, reg  */
+      else if (CONST_INT_P (cons) && cons != CONST0_RTX (mode) && REG_P (alt))
+	{
+	  /* Optimize for register value of 0.  */
+	  if (code == NE && rtx_equal_p (op0, alt) && op1 == CONST0_RTX (mode))
+	    {
+	      rtx cond = gen_rtx_fmt_ee (code, GET_MODE (op0), op0, op1);
+	      cons = force_reg (mode, cons);
+	      emit_insn (gen_rtx_SET (dest,
+				      gen_rtx_IF_THEN_ELSE (mode, cond,
+							    cons, alt)));
+	      return true;
+	    }
+
+	  riscv_emit_int_compare (&code, &op0, &op1, true);
+	  rtx cond = gen_rtx_fmt_ee (code, GET_MODE (op0), op0, op1);
+
+	  rtx temp1 = gen_reg_rtx (mode);
+	  rtx temp2 = gen_int_mode (-1 * INTVAL (cons), mode);
+
+	  /* TEMP2 might not fit into a signed 12 bit immediate suitable
+	     for an addi instruction.  If that's the case, force it into
+	     a register.  */
+	  if (!SMALL_OPERAND (INTVAL (temp2)))
+	    temp2 = force_reg (mode, temp2);
+
+	  riscv_emit_binary (PLUS, temp1, alt, temp2);
+	  emit_insn (gen_rtx_SET (dest,
+				  gen_rtx_IF_THEN_ELSE (mode, cond,
+							CONST0_RTX (mode),
+							temp1)));
+	  riscv_emit_binary (PLUS, dest, dest, cons);
+	  return true;
+	}
+      /* reg, 0 or imm, 0  */
+      else if ((REG_P (cons)
+		|| (CONST_INT_P (cons) && cons != CONST0_RTX (mode)))
+	       && alt == CONST0_RTX (mode))
+	{
+	  riscv_emit_int_compare (&code, &op0, &op1, true);
+	  rtx cond = gen_rtx_fmt_ee (code, GET_MODE (op0), op0, op1);
+	  cons = force_reg (mode, cons);
+	  emit_insn (gen_rtx_SET (dest, gen_rtx_IF_THEN_ELSE (mode, cond,
+							      cons, alt)));
+	  return true;
+	}
+      /* reg, imm  */
+      else if (REG_P (cons) && CONST_INT_P (alt) && alt != CONST0_RTX (mode))
+	{
+	  /* Optimize for register value of 0.  */
+	  if (code == EQ && rtx_equal_p (op0, cons) && op1 == CONST0_RTX (mode))
+	    {
+	      rtx cond = gen_rtx_fmt_ee (code, GET_MODE (op0), op0, op1);
+	      alt = force_reg (mode, alt);
+	      emit_insn (gen_rtx_SET (dest,
+				      gen_rtx_IF_THEN_ELSE (mode, cond,
+							    cons, alt)));
+	      return true;
+	    }
+
+	  riscv_emit_int_compare (&code, &op0, &op1, true);
+	  rtx cond = gen_rtx_fmt_ee (code, GET_MODE (op0), op0, op1);
+
+	  rtx temp1 = gen_reg_rtx (mode);
+	  rtx temp2 = gen_int_mode (-1 * INTVAL (alt), mode);
+
+	  /* TEMP2 might not fit into a signed 12 bit immediate suitable
+	     for an addi instruction.  If that's the case, force it into
+	     a register.  */
+	  if (!SMALL_OPERAND (INTVAL (temp2)))
+	    temp2 = force_reg (mode, temp2);
+
+	  riscv_emit_binary (PLUS, temp1, cons, temp2);
+	  emit_insn (gen_rtx_SET (dest,
+				  gen_rtx_IF_THEN_ELSE (mode, cond,
+							temp1,
+							CONST0_RTX (mode))));
+	  riscv_emit_binary (PLUS, dest, dest, alt);
+	  return true;
+	}
+      /* reg, reg  */
+      else if (REG_P (cons) && REG_P (alt))
+	{
+	  if ((code == EQ && rtx_equal_p (cons, op0))
+	       || (code == NE && rtx_equal_p (alt, op0)))
+	    {
+	      rtx cond = gen_rtx_fmt_ee (code, GET_MODE (op0), op0, op1);
+	      if (!rtx_equal_p (cons, op0))
+		std::swap (alt, cons);
+	      alt = force_reg (mode, alt);
+	      emit_insn (gen_rtx_SET (dest,
+				      gen_rtx_IF_THEN_ELSE (mode, cond,
+							    cons, alt)));
+	      return true;
+	    }
+
+	  rtx reg1 = gen_reg_rtx (mode);
+	  rtx reg2 = gen_reg_rtx (mode);
+	  riscv_emit_int_compare (&code, &op0, &op1, true);
+	  rtx cond1 = gen_rtx_fmt_ee (code, GET_MODE (op0), op0, op1);
+	  rtx cond2 = gen_rtx_fmt_ee (code == NE ? EQ : NE,
+				      GET_MODE (op0), op0, op1);
+	  emit_insn (gen_rtx_SET (reg2,
+				  gen_rtx_IF_THEN_ELSE (mode, cond2,
+							CONST0_RTX (mode),
+							cons)));
+	  emit_insn (gen_rtx_SET (reg1,
+				  gen_rtx_IF_THEN_ELSE (mode, cond1,
+							CONST0_RTX (mode),
+							alt)));
+	  riscv_emit_binary (IOR, dest, reg1, reg2);
+	  return true;
+	}
     }
 
   return false;
@@ -4598,7 +4808,7 @@ riscv_memmodel_needs_amo_release (enum memmodel model)
 /* Get REGNO alignment of vector mode.
    The alignment = LMUL when the LMUL >= 1.
    Otherwise, alignment = 1.  */
-static int
+int
 riscv_get_v_regno_alignment (machine_mode mode)
 {
   /* 3.3.2. LMUL = 2,4,8, register numbers should be multiple of 2,4,8.
@@ -5041,7 +5251,11 @@ riscv_save_reg_p (unsigned int regno)
   if (regno == HARD_FRAME_POINTER_REGNUM && frame_pointer_needed)
     return true;
 
-  if (regno == RETURN_ADDR_REGNUM && crtl->calls_eh_return)
+  /* Need not to use ra for leaf when frame pointer is turned off by option
+     whatever the omit-leaf-frame's value.  */
+  bool keep_leaf_ra = frame_pointer_needed && crtl->is_leaf
+    && !TARGET_OMIT_LEAF_FRAME_POINTER;
+  if (regno == RETURN_ADDR_REGNUM && (crtl->calls_eh_return || keep_leaf_ra))
     return true;
 
   /* If this is an interrupt handler, then must save extra registers.  */
@@ -6676,6 +6890,21 @@ riscv_option_override (void)
   if (flag_pic)
     riscv_cmodel = CM_PIC;
 
+  /* We need to save the fp with ra for non-leaf functions with no fp and ra
+     for leaf functions while no-omit-frame-pointer with
+     omit-leaf-frame-pointer.  The x_flag_omit_frame_pointer has the first
+     priority to determine whether the frame pointer is needed.  If we do not
+     override it, the fp and ra will be stored for leaf functions, which is not
+     our wanted.  */
+  riscv_save_frame_pointer = false;
+  if (TARGET_OMIT_LEAF_FRAME_POINTER_P (global_options.x_target_flags))
+    {
+      if (!global_options.x_flag_omit_frame_pointer)
+	riscv_save_frame_pointer = true;
+
+      global_options.x_flag_omit_frame_pointer = 1;
+    }
+
   /* We get better code with explicit relocs for CM_MEDLOW, but
      worse code for the others (for now).  Pick the best default.  */
   if ((target_flags_explicit & MASK_EXPLICIT_RELOCS) == 0)
@@ -8125,6 +8354,12 @@ riscv_preferred_else_value (unsigned, tree, unsigned int nops, tree *ops)
   return nops == 3 ? ops[2] : ops[0];
 }
 
+static bool
+riscv_frame_pointer_required (void)
+{
+  return riscv_save_frame_pointer && !crtl->is_leaf;
+}
+
 /* Initialize the GCC target structure.  */
 #undef TARGET_ASM_ALIGNED_HI_OP
 #define TARGET_ASM_ALIGNED_HI_OP "\t.half\t"
@@ -8428,6 +8663,9 @@ riscv_preferred_else_value (unsigned, tree, unsigned int nops, tree *ops)
 
 #undef TARGET_PREFERRED_ELSE_VALUE
 #define TARGET_PREFERRED_ELSE_VALUE riscv_preferred_else_value
+
+#undef TARGET_FRAME_POINTER_REQUIRED
+#define TARGET_FRAME_POINTER_REQUIRED riscv_frame_pointer_required
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

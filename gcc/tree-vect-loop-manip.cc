@@ -3271,6 +3271,7 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
       adjust_vec_debug_stmts ();
       scev_reset ();
     }
+  basic_block bb_before_epilog = NULL;
 
   if (epilog_peeling)
     {
@@ -3290,6 +3291,7 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
 
       epilog->force_vectorize = false;
       slpeel_update_phi_nodes_for_loops (loop_vinfo, loop, epilog, false);
+      bb_before_epilog = loop_preheader_edge (epilog)->src;
 
       /* Scalar version loop may be preferred.  In this case, add guard
 	 and skip to epilog.  Note this only happens when the number of
@@ -3317,6 +3319,7 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
 
 	  /* Simply propagate profile info from guard_bb to guard_to which is
 	     a merge point of control flow.  */
+	  profile_count old_count = guard_to->count;
 	  guard_to->count = guard_bb->count;
 
 	  /* Restore the counts of the epilog loop if we didn't use the scalar loop. */
@@ -3332,9 +3335,15 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
 	      free (bbs);
 	      free (original_bbs);
 	    }
-	}
+	  else
+	    scale_loop_profile (epilog, guard_to->count.probability_in (old_count), -1);
 
-      basic_block bb_before_epilog = loop_preheader_edge (epilog)->src;
+	  /* Only need to handle basic block before epilog loop if it's not
+	     the guard_bb, which is the case when skip_vector is true.  */
+	  if (guard_bb != bb_before_epilog)
+	    bb_before_epilog->count = single_pred_edge (bb_before_epilog)->count ();
+	  bb_before_epilog = loop_preheader_edge (epilog)->src;
+	}
       /* If loop is peeled for non-zero constant times, now niters refers to
 	 orig_niters - prolog_peeling, it won't overflow even the orig_niters
 	 overflows.  */
@@ -3924,9 +3933,15 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
       te->probability = prob;
       fe->probability = prob.invert ();
       /* We can scale loops counts immediately but have to postpone
-         scaling the scalar loop because we re-use it during peeling.  */
-      scale_loop_frequencies (loop_to_version, te->probability);
-      LOOP_VINFO_SCALAR_LOOP_SCALING (loop_vinfo) = fe->probability;
+	 scaling the scalar loop because we re-use it during peeling.
+
+	 Ifcvt duplicates loop preheader, loop body and produces an basic
+	 block after loop exit.  We need to scale all that.  */
+      basic_block preheader = loop_preheader_edge (loop_to_version)->src;
+      preheader->count = preheader->count.apply_probability (prob * prob2);
+      scale_loop_frequencies (loop_to_version, prob * prob2);
+      single_exit (loop_to_version)->dest->count = preheader->count;
+      LOOP_VINFO_SCALAR_LOOP_SCALING (loop_vinfo) = (prob * prob2).invert ();
 
       nloop = scalar_loop;
       if (dump_enabled_p ())
@@ -4060,6 +4075,8 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
 	  adj.safe_push (son);
       for (auto son : adj)
 	set_immediate_dominator (CDI_DOMINATORS, son, e->src);
+      //debug_bb (condition_bb);
+      //debug_bb (e->src);
     }
 
   if (version_niter)
