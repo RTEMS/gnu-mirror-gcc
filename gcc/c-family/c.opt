@@ -1162,7 +1162,7 @@ C ObjC C++ ObjC++ Var(warn_pointer_arith) Warning LangEnabledBy(C ObjC C++ ObjC+
 Warn about function pointer arithmetic.
 
 Wpointer-sign
-C ObjC Var(warn_pointer_sign) Warning LangEnabledBy(C ObjC,Wall || Wpedantic)
+C ObjC Var(warn_pointer_sign) Warning LangEnabledBy(C ObjC,Wall || Wpedantic || Wextra)
 Warn when a pointer differs in signedness in an assignment.
 
 Wpointer-compare

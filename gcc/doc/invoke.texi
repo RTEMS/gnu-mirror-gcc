@@ -9627,8 +9627,8 @@ itself is likely to take inordinate amounts of time.
 @opindex Wno-pointer-sign
 Warn for pointer argument passing or assignment with different signedness.
 This option is only supported for C and Objective-C@.  It is implied by
-@option{-Wall} and by @option{-Wpedantic}, which can be disabled with
-@option{-Wno-pointer-sign}.
+each of @option{-Wall}, @option{-Wextra}. and @option{-Wpedantic}, in
+which case it can be disabled with @option{-Wno-pointer-sign}.
 
 @item -Wstack-protector
 @opindex Wstack-protector
