@@ -40,7 +40,7 @@
    ])
 
 ;; Iterator doing unary/binary arithmetic on vector pairs
-(define_code_iterator VPAIR_FP_UNARY  [abs neg ])
+(define_code_iterator VPAIR_FP_UNARY  [abs neg])
 (define_code_iterator VPAIR_FP_BINARY [minus mult plus smin smax])
 
 (define_code_iterator VPAIR_INT_BINARY  [and ior minus plus smax smin umax umin xor])
@@ -112,7 +112,7 @@
 			       (UNSPEC_VPAIR_V4DI  "V2DI")])
 
 ;; Map VPAIR_{INT,FP,ALL} to a lower case name to identify the vector pair.
-(define_int_attr vpair_type [(UNSPEC_VPAIR_V4DF  "v4df")
+(define_int_attr vpair_mode [(UNSPEC_VPAIR_V4DF  "v4df")
 			     (UNSPEC_VPAIR_V8SF  "v8sf")
 			     (UNSPEC_VPAIR_V32QI "v32qi")
 			     (UNSPEC_VPAIR_V16HI "v16hi")
@@ -151,7 +151,7 @@
 ;; We cannot update the two output registers atomically, so mark the output as
 ;; an early clobber so we don't accidentally clobber the input operands.  */
 
-(define_insn_and_split "vpair_assemble_<vpair_type>"
+(define_insn_and_split "vpair_assemble_<vpair_mode>"
   [(set (match_operand:OO 0 "vsx_register_operand" "=&wa")
 	(unspec:OO
 	 [(match_operand:<VPAIR_VECTOR> 1 "mma_assemble_input_operand" "mwa")
@@ -171,7 +171,7 @@
   [(set_attr "length" "8")])
 
 ;; Extract one of the two 128-bitvectors from a vector pair.
-(define_insn_and_split "vpair_get_vector_<vpair_type>"
+(define_insn_and_split "vpair_get_vector_<vpair_mode>"
   [(set (match_operand:<VPAIR_VECTOR> 0 "vsx_register_operand" "=wa")
 	(unspec:<VPAIR_VECTOR>
 	 [(match_operand:OO 1 "vsx_register_operand" "wa")
@@ -188,7 +188,7 @@
   
 
 ;; Vector pair floating point unary operations
-(define_insn_and_split "vpair_<vpair_op>_<vpair_type>2"
+(define_insn_and_split "vpair_<vpair_op>_<vpair_mode>2"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO [(VPAIR_FP_UNARY:OO
 		     (match_operand:OO 1 "vsx_register_operand" "wa"))]
@@ -211,7 +211,7 @@
   [(set_attr "length" "8")])
 
 ;; Optimize vector pair negate of absolute value
-(define_insn_and_split "vpair_nabs_<vpair_type>2"
+(define_insn_and_split "vpair_nabs_<vpair_mode>2"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO
 	 [(neg:OO
@@ -241,7 +241,7 @@
   [(set_attr "length" "8")])
 
 ;; Vector pair floating binary operations
-(define_insn_and_split "vpair_<vpair_op>_<vpair_type>3"
+(define_insn_and_split "vpair_<vpair_op>_<vpair_mode>3"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO [(VPAIR_FP_BINARY:OO
 		     (match_operand:OO 1 "vsx_register_operand" "wa")
@@ -273,7 +273,7 @@
   [(set_attr "length" "8")])
 
 ;; Vector pair fused multiply-add floating point operations
-(define_insn_and_split "vpair_fma_<vpair_type>4"
+(define_insn_and_split "vpair_fma_<vpair_mode>4"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
 	(unspec:OO
 	 [(fma:OO
@@ -311,7 +311,7 @@
 }
   [(set_attr "length" "8")])
 
-(define_insn_and_split "vpair_fms_<vpair_type>4"
+(define_insn_and_split "vpair_fms_<vpair_mode>4"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
 	(unspec:OO
 	 [(fma:OO
@@ -351,7 +351,7 @@
 }
   [(set_attr "length" "8")])
 
-(define_insn_and_split "vpair_nfma_<vpair_type>4"
+(define_insn_and_split "vpair_nfma_<vpair_mode>4"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
 	(unspec:OO
 	 [(neg:OO
@@ -394,7 +394,7 @@
 }
   [(set_attr "length" "8")])
 
-(define_insn_and_split "vpair_nfms_<vpair_type>4"
+(define_insn_and_split "vpair_nfms_<vpair_mode>4"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
 	(unspec:OO
 	 [(neg:OO
@@ -500,7 +500,7 @@
 
 
 ;; Vector pair integer negate support.
-(define_insn_and_split "vpair_neg_<vpair_type>2"
+(define_insn_and_split "vpair_neg_<vpair_mode>2"
   [(set (match_operand:OO 0 "altivec_register_operand" "=v")
 	(unspec:OO [(neg:OO
 		     (match_operand:OO 1 "altivec_register_operand" "v"))]
@@ -545,7 +545,7 @@
   [(set_attr "length" "8")])
 
 ;; Vector pair integer not support.
-(define_insn_and_split "vpair_not_<vpair_type>2"
+(define_insn_and_split "vpair_not_<vpair_mode>2"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO [(not:OO (match_operand:OO 1 "vsx_register_operand" "wa"))]
 		   VPAIR_INT))]
@@ -568,7 +568,7 @@
   [(set_attr "length" "8")])
 
 ;; Vector pair integer binary operations.
-(define_insn_and_split "vpair_<vpair_op>_<vpair_type>3"
+(define_insn_and_split "vpair_<vpair_op>_<vpair_mode>3"
   [(set (match_operand:OO 0 "<vpair_ipred>" "=<vpair_ireg>")
 	(unspec:OO [(VPAIR_INT_BINARY:OO
 		     (match_operand:OO 1 "<vpair_ipred>" "<vpair_ireg>")
@@ -600,7 +600,7 @@
   [(set_attr "length" "8")])
 
 ;; Optimize vector pair a & ~b
-(define_insn_and_split "*vpair_andc_<vpair_type>"
+(define_insn_and_split "*vpair_andc_<vpair_mode>"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO [(and:OO
 		     (unspec:OO
@@ -635,7 +635,7 @@
   [(set_attr "length" "8")])
 
 ;; Optimize vector pair a | ~b
-(define_insn_and_split "*vpair_iorc_<vpair_type>"
+(define_insn_and_split "*vpair_iorc_<vpair_mode>"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO [(ior:OO
 		     (unspec:OO
@@ -670,7 +670,7 @@
   [(set_attr "length" "8")])
 
 ;; Optiomize vector pair ~(a & b) or ((~a) | (~b))
-(define_insn_and_split "*vpair_nand_<vpair_type>_1"
+(define_insn_and_split "*vpair_nand_<vpair_mode>_1"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO
 	 [(not:OO
@@ -704,7 +704,7 @@
 }
   [(set_attr "length" "8")])
 
-(define_insn_and_split "*vpair_nand_<vpair_type>_2"
+(define_insn_and_split "*vpair_nand_<vpair_mode>_2"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO
 	 [(ior:OO
@@ -741,7 +741,7 @@
   [(set_attr "length" "8")])
 
 ;; Optiomize vector pair ~(a | b)  or ((~a) & (~b))
-(define_insn_and_split "*vpair_nor_<vpair_type>_1"
+(define_insn_and_split "*vpair_nor_<vpair_mode>_1"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO
 	 [(not:OO
@@ -775,7 +775,7 @@
 }
   [(set_attr "length" "8")])
 
-(define_insn_and_split "*vpair_nor_<vpair_type>_2"
+(define_insn_and_split "*vpair_nor_<vpair_mode>_2"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO
 	 [(ior:OO
