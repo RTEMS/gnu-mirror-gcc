@@ -1,3 +1,30 @@
+==================== Branch work130-vpair, patch #26 ====================
+
+Document vector pair splat
+
+2023-08-10  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* doc/extend.texi (PowerPC built-in functions): Document vector pair
+	splat.
+
+==================== Branch work130-vpair, patch #25 ====================
+
+Add vector pair splat
+
+2023-08-10  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_*_splat): Add splat
+	built-in.
+	* config/rs6000/vector-pair.md (VPAIR_SPLAT): New mode iterator.
+	(vpair_splat_mode): New mode attribute.
+	(VPAIR_SPLAT_VMODE): New mode attribute.
+	(vpair_splat_<vpair_splat_mode>): New insns.
+
+
 ==================== Branch work130-vpair, patch #24 ====================
 
 Change type to mode.
