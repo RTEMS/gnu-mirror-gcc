@@ -90,8 +90,11 @@ sed $E -e '/^[[:space:]]+===/,$d' $OFILE
 echo "Newer log file: $NFILE"
 sed $E -e '/^[[:space:]]+===/,$d' $NFILE
 
+# Escape occurences of / in $header before passing through sed.
+header_pattern=`echo "$header" | sed $E -e 's:/:[/]:g'`
+
 # Create a temporary file from the old file's interesting section.
-sed $E -e "/$header/,/^[[:space:]]+===.*Summary ===/!d" \
+sed $E -e "/$header_pattern/,/^[[:space:]]+===.*Summary ===/!d" \
   -e '/^[A-Z]+:/!d' \
   -e '/^(WARNING|ERROR):/d' \
   -e 's/\r$//' \
@@ -101,7 +104,7 @@ sed $E -e "/$header/,/^[[:space:]]+===.*Summary ===/!d" \
   >$TMPDIR/o$$-$OBASE
 
 # Create a temporary file from the new file's interesting section.
-sed $E -e "/$header/,/^[[:space:]]+===.*Summary ===/!d" \
+sed $E -e "/$header_pattern/,/^[[:space:]]+===.*Summary ===/!d" \
   -e '/^[A-Z]+:/!d' \
   -e '/^(WARNING|ERROR):/d' \
   -e 's/\r$//' \
