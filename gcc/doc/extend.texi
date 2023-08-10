@@ -21127,6 +21127,7 @@ The following built-in functions operate on pairs of
 
 @smallexample
 vector float __builtin_vpair_f32_get_vector (__vector_pair, int);
+__vector_pair __builtin_vpair_f32_assemble (vector float, vector float);
 __vector_pair __builtin_vpair_f32_abs (__vector_pair);
 __vector_pair __builtin_vpair_f32_add (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_f32_fma (__vector_pair, __vector_pair, __vector_pair);
@@ -21143,6 +21144,7 @@ The following built-in functions operate on pairs of
 
 @smallexample
 vector double __builtin_vpair_f64_get_vector (__vector_pair, int);
+__vector_pair __builtin_vpair_f64_assemble (vector double, vector double);
 __vector_pair __builtin_vpair_f64_abs (__vector_pair);
 __vector_pair __builtin_vpair_f64_add (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_f64_fma (__vector_pair, __vector_pair, __vector_pair);
@@ -21160,6 +21162,10 @@ The following built-in functions operate on pairs of
 @smallexample
 vector long long __builtin_vpair_i64_get_vector (__vector_pair, int);
 vector unsigned long long __builtin_vpair_i64u_get_vector (__vector_pair, int);
+__vector_pair __builtin_vpair_i64_assemble (vector long long,
+                                            vector long long);
+__vector_pair __builtin_vpair_i64u_assemble (vector unsigned long long,
+                                             vector unsigned long long);
 __vector_pair __builtin_vpair_i64_add (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i64_and (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i64_ior (__vector_pair, __vector_pair);
@@ -21180,6 +21186,9 @@ The following built-in functions operate on pairs of
 @smallexample
 vector int __builtin_vpair_i32_get_vector (__vector_pair, int);
 vector unsigned int __builtin_vpair_i32u_get_vector (__vector_pair, int);
+__vector_pair __builtin_vpair_i32_assemble (vector int, vector int);
+__vector_pair __builtin_vpair_i32u_assemble (vector unsigned int,
+                                             vector unsigned int);
 __vector_pair __builtin_vpair_i32_add (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i32_and (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i32_ior (__vector_pair, __vector_pair);
@@ -21199,6 +21208,10 @@ The following built-in functions operate on pairs of
 @smallexample
 vector short __builtin_vpair_i16_get_vector (__vector_pair, int);
 vector unsigned short __builtin_vpair_i16u_get_vector (__vector_pair, int);
+__vector_pair __builtin_vpair_i16_assemble (vector short,
+                                            vector short);
+__vector_pair __builtin_vpair_i16u_assemble (vector unsigned short,
+                                             vector unsigned short);
 __vector_pair __builtin_vpair_i16_add (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i16_and (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i16_ior (__vector_pair, __vector_pair);
@@ -21218,6 +21231,10 @@ The following built-in functions operate on pairs of
 @smallexample
 vector signed char __builtin_vpair_i8_get_vector (__vector_pair, int);
 vector unsigned char __builtin_vpair_i8u_get_vector (__vector_pair, int);
+__vector_pair __builtin_vpair_i8_assemble (vector signed char,
+                                           vector signed char);
+__vector_pair __builtin_vpair_i8u_assemble (vector unsigned char,
+                                            vector unsigned char);
 __vector_pair __builtin_vpair_i8_add (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i8_and (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i8_ior (__vector_pair, __vector_pair);

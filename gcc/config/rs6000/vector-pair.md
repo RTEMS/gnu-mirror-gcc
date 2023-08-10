@@ -144,6 +144,32 @@
 }
   [(set_attr "length" "8")])
 
+;; Assemble a vector pair from two vectors.  Unlike
+;; __builtin_mma_assemble_pair, this function produces a vector pair output
+;; directly and it takes all of the vector types.
+;;
+;; We cannot update the two output registers atomically, so mark the output as
+;; an early clobber so we don't accidentally clobber the input operands.  */
+
+(define_insn_and_split "vpair_assemble_<vpair_type>"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=&wa")
+	(unspec:OO
+	 [(match_operand:<VPAIR_VECTOR> 1 "mma_assemble_input_operand" "mwa")
+	  (match_operand:<VPAIR_VECTOR> 2 "mma_assemble_input_operand" "mwa")]
+	 VPAIR_ALL))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  rtx src = gen_rtx_UNSPEC (OOmode,
+			    gen_rtvec (2, operands[1], operands[2]),
+			    UNSPEC_VSX_ASSEMBLE);
+  rs6000_split_multireg_move (operands[0], src);
+  DONE;
+}
+  [(set_attr "length" "8")])
+
 ;; Extract one of the two 128-bitvectors from a vector pair.
 (define_insn_and_split "vpair_get_vector_<vpair_type>"
   [(set (match_operand:<VPAIR_VECTOR> 0 "vsx_register_operand" "=wa")
