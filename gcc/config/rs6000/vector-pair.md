@@ -125,6 +125,25 @@
 				(UNSPEC_VPAIR_V8SI  "X")
 				(UNSPEC_VPAIR_V4DI  "X")])
 
+;; Moddes of the vector element to splat to vector pair
+(define_mode_iterator VPAIR_SPLAT [DF SF DI SI HI QI])
+
+;; MAP VPAIR_SPLAT to the name in the assemble operation
+(define_mode_attr vpair_splat_mode [(DF "v4df")
+				    (SF "v8sf")
+				    (DI "v4di")
+				    (SI "v8si")
+				    (HI "v16hi")
+				    (QI "v32qi")])
+
+;; MAP VPAIR_SPLAT to the mode of the vector containing the element
+(define_mode_attr VPAIR_SPLAT_VMODE [(DF "V2DF")
+				     (SF "V4SF")
+				     (DI "V2DI")
+				     (SI "V4SI")
+				     (HI "V8HI")
+				     (QI "V16QI")])
+
 ;; Initialize a vector pair to 0
 (define_insn_and_split "vpair_zero"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
@@ -185,7 +204,31 @@
   unsigned reg1 = reg_or_subregno (operands[1]);
   operands[3] = gen_rtx_REG (<VPAIR_VECTOR>mode, reg1 + INTVAL (operands[2]));
 })
-  
+
+;; Create a vector pair with a value splat'ed (duplicated) to all of the
+;; elements.
+(define_expand "vpair_splat_<vpair_splat_mode>"
+  [(use (match_operand:OO 0 "vsx_register_operand"))
+   (use (match_operand:VPAIR_SPLAT 1 "vsx_register_operand"))]
+  "TARGET_MMA"
+{
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  machine_mode element_mode = <MODE>mode;
+  machine_mode vector_mode = <VPAIR_SPLAT_VMODE>mode;
+
+  if (op1 == CONST0_RTX (element_mode))
+    {
+      emit_insn (gen_vpair_zero (op0));
+      DONE;
+    }
+
+  rtx vec = gen_reg_rtx (vector_mode);
+  emit_move_insn (vec, gen_rtx_VEC_DUPLICATE (vector_mode, op1));
+  emit_insn (gen_vpair_assemble_<vpair_splat_mode> (op0, vec, vec));
+  DONE;
+})
+
 
 ;; Vector pair floating point unary operations
 (define_insn_and_split "vpair_<vpair_op>_<vpair_mode>2"
