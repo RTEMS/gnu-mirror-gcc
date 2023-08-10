@@ -1,3 +1,19 @@
+==================== Branch work130-vpair, patch #23 ====================
+
+Add __builtin_vpair_*_assemble
+
+2023-08-09  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/predicates.md (mma_assemble_input_operand); Allow all
+	128-bit vector types.
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_*_assemble): New
+	built-ins.
+	* config/rs6000/vector-pair.md (vpair_assemble_<vpair_type>): New insns.
+	* doc/extend.texi (PowerPC built-in functions): Add
+	__builtin_vpair_*_assemble.
+
 ==================== Branch work130-vpair, patch #22 ====================
 
 Add -mno-lxvp and -mno-stxvp switches.
