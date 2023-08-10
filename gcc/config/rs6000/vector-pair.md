@@ -209,7 +209,7 @@
 ;; elements.
 (define_expand "vpair_splat_<vpair_splat_mode>"
   [(use (match_operand:OO 0 "vsx_register_operand"))
-   (use (match_operand:VPAIR_SPLAT 1 "vsx_register_operand"))]
+   (use (match_operand:VPAIR_SPLAT 1 "input_operand"))]
   "TARGET_MMA"
 {
   rtx op0 = operands[0];
@@ -224,7 +224,12 @@
     }
 
   rtx vec = gen_reg_rtx (vector_mode);
-  emit_move_insn (vec, gen_rtx_VEC_DUPLICATE (vector_mode, op1));
+  unsigned num_elements = GET_MODE_NUNITS (vector_mode);
+  rtvec elements = rtvec_alloc (num_elements);
+  for (unsigned i = 0; i < num_elements; i++)
+    RTVEC_ELT (elements, i) = copy_rtx (op1);
+
+  rs6000_expand_vector_init (vec, gen_rtx_PARALLEL (vector_mode, elements));
   emit_insn (gen_vpair_assemble_<vpair_splat_mode> (op0, vec, vec));
   DONE;
 })

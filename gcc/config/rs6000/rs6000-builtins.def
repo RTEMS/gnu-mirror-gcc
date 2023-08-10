@@ -4164,7 +4164,7 @@
   v256 __builtin_vpair_f64_assemble (vd, vd);
     VPAIR_F64_ASSEMBLE vpair_assemble_v4df {mma}
 
-  v256 __builtin_vpair_f64_splat (float);
+  v256 __builtin_vpair_f64_splat (double);
     VPAIR_F64_SPLAT vpair_splat_v4df {mma}
 
   v256 __builtin_vpair_f64_abs (v256);
