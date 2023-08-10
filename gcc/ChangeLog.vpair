@@ -1,3 +1,16 @@
+==================== Branch work130-vpair, patch #27 ====================
+
+Update vector splat code.
+
+2023-08-10  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_f64_splat): Fix
+	argument type.
+	* config/rs6000/vector-pair.md (vpair_splat_<vpair_splat_mode>): Update
+	to use rs6000_expand_vector_init.
+
 ==================== Branch work130-vpair, patch #26 ====================
 
 Document vector pair splat
