@@ -202,7 +202,11 @@
   [(set (match_dup 0) (match_dup 3))]
 {
   unsigned reg1 = reg_or_subregno (operands[1]);
-  operands[3] = gen_rtx_REG (<VPAIR_VECTOR>mode, reg1 + INTVAL (operands[2]));
+  unsigned reg_num = UINTVAL (operands[2]);
+  if (!WORDS_BIG_ENDIAN)
+    reg_num = 1 - reg_num;
+	   
+  operands[3] = gen_rtx_REG (<VPAIR_VECTOR>mode, reg1 + reg_num);
 })
 
 ;; Create a vector pair with a value splat'ed (duplicated) to all of the
