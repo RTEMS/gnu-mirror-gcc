@@ -82,7 +82,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 
 /* Unary operations and their associated IFN_COND_* function.  */
 (define_operator_list UNCOND_UNARY
-  negate)
+  negate bit_not)
 (define_operator_list COND_UNARY
   IFN_COND_NEG IFN_COND_NOT)
 (define_operator_list COND_LEN_UNARY
