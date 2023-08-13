@@ -41,6 +41,7 @@ public:
   const region *get_lhs_region () const { return m_lhs_region; }
 
   bool maybe_set_lhs (const svalue *result) const;
+  void set_any_lhs_with_defaults () const;
 
   unsigned num_args () const;
   bool arg_is_pointer_p (unsigned idx) const
@@ -48,6 +49,10 @@ public:
     return POINTER_TYPE_P (get_arg_type (idx));
   }
   bool arg_is_size_p (unsigned idx) const;
+  bool arg_is_integral_p (unsigned idx) const
+  {
+    return INTEGRAL_TYPE_P (get_arg_type (idx));
+  }
 
   const gcall *get_call_stmt () const { return m_call; }
   location_t get_location () const;
@@ -65,6 +70,8 @@ public:
   const svalue *get_or_create_conjured_svalue (const region *) const;
 
   tree lookup_function_attribute (const char *attr_name) const;
+
+  void check_for_null_terminated_string_arg (unsigned arg_idx) const;
 
 private:
   const gcall *m_call;

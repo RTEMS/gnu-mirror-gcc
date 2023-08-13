@@ -387,9 +387,12 @@ class region_model
 		       region_model_context *ctxt,
 		       rejected_constraint **out);
 
-  const region *
-  get_or_create_region_for_heap_alloc (const svalue *size_in_bytes,
-				       region_model_context *ctxt);
+	const region *
+	get_or_create_region_for_heap_alloc (const svalue *size_in_bytes,
+				region_model_context *ctxt,
+				bool update_state_machine = false,
+				const call_details *cd = nullptr);
+
   const region *create_region_for_alloca (const svalue *size_in_bytes,
 					  region_model_context *ctxt);
   void get_referenced_base_regions (auto_bitmap &out_ids) const;
@@ -476,6 +479,11 @@ class region_model
 			     const svalue *old_ptr_sval,
 			     const svalue *new_ptr_sval);
 
+  /* Implemented in sm-malloc.cc.  */
+  void
+  transition_ptr_sval_non_null (region_model_context *ctxt,
+      const svalue *new_ptr_sval);
+
   /* Implemented in sm-taint.cc.  */
   void mark_as_tainted (const svalue *sval,
 			region_model_context *ctxt);
@@ -493,6 +501,9 @@ class region_model
   void check_region_for_write (const region *dest_reg,
 			       const svalue *sval_hint,
 			       region_model_context *ctxt) const;
+
+  void check_for_null_terminated_string_arg (const call_details &cd,
+					     unsigned idx);
 
 private:
   const region *get_lvalue_1 (path_var pv, region_model_context *ctxt) const;

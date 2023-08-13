@@ -441,29 +441,6 @@ region_model::canonicalize ()
 {
   m_store.canonicalize (m_mgr->get_store_manager ());
   m_constraints->canonicalize ();
-
-  if (!m_dynamic_extents.is_empty ())
-    {
-      /* Purge any dynamic extents for regions that aren't referenced.
-	 Normally these are eliminated when leaks are detected, but we
-	 can also gain stray heap_allocated_regions that aren't seen
-	 by the leak-detection code.  This happens when
-	 region_model::on_call_pre provides a default result for a
-	 function with both attributes "malloc" and "alloc_size" that
-	 also has a known_function implementation.
-	 Purge dynamic extent information for such regions.  */
-      auto_bitmap referenced_base_region_ids;
-      get_referenced_base_regions (referenced_base_region_ids);
-      auto_vec<const region *> purgable_dyn_extents;
-      for (auto iter : m_dynamic_extents)
-	{
-	  const region *reg = iter.first;
-	  if (!bitmap_bit_p (referenced_base_region_ids, reg->get_id ()))
-	    purgable_dyn_extents.safe_push (reg);
-	}
-      for (auto reg : purgable_dyn_extents)
-	m_dynamic_extents.remove (reg);
-    }
 }
 
 /* Return true if this region_model is in canonical form.  */
@@ -1304,51 +1281,6 @@ region_model::check_call_args (const call_details &cd) const
     cd.get_arg_svalue (arg_idx);
 }
 
-/* Return true if CD is known to be a call to a function with
-   __attribute__((const)).  */
-
-static bool
-const_fn_p (const call_details &cd)
-{
-  tree fndecl = cd.get_fndecl_for_call ();
-  if (!fndecl)
-    return false;
-  gcc_assert (DECL_P (fndecl));
-  return TREE_READONLY (fndecl);
-}
-
-/* If this CD is known to be a call to a function with
-   __attribute__((const)), attempt to get a const_fn_result_svalue
-   based on the arguments, or return NULL otherwise.  */
-
-static const svalue *
-maybe_get_const_fn_result (const call_details &cd)
-{
-  if (!const_fn_p (cd))
-    return NULL;
-
-  unsigned num_args = cd.num_args ();
-  if (num_args > const_fn_result_svalue::MAX_INPUTS)
-    /* Too many arguments.  */
-    return NULL;
-
-  auto_vec<const svalue *> inputs (num_args);
-  for (unsigned arg_idx = 0; arg_idx < num_args; arg_idx++)
-    {
-      const svalue *arg_sval = cd.get_arg_svalue (arg_idx);
-      if (!arg_sval->can_have_associated_state_p ())
-	return NULL;
-      inputs.quick_push (arg_sval);
-    }
-
-  region_model_manager *mgr = cd.get_manager ();
-  const svalue *sval
-    = mgr->get_or_create_const_fn_result_svalue (cd.get_lhs_type (),
-						 cd.get_fndecl_for_call (),
-						 inputs);
-  return sval;
-}
-
 /* Update this model for an outcome of a call that returns a specific
    integer constant.
    If UNMERGEABLE, then make the result unmergeable, e.g. to prevent
@@ -1381,7 +1313,9 @@ region_model::update_for_zero_return (const call_details &cd,
   update_for_int_cst_return (cd, 0, unmergeable);
 }
 
-/* Update this model for an outcome of a call that returns non-zero.  */
+/* Update this model for an outcome of a call that returns non-zero.
+   Specifically, assign an svalue to the LHS, and add a constraint that
+   that svalue is non-zero.  */
 
 void
 region_model::update_for_nonzero_return (const call_details &cd)
@@ -1390,6 +1324,7 @@ region_model::update_for_nonzero_return (const call_details &cd)
     return;
   if (TREE_CODE (cd.get_lhs_type ()) != INTEGER_TYPE)
     return;
+  cd.set_any_lhs_with_defaults ();
   const svalue *zero
     = m_mgr->get_or_create_int_cst (cd.get_lhs_type (), 0);
   const svalue *result
@@ -1485,48 +1420,6 @@ region_model::get_known_function (enum internal_fn ifn) const
   return known_fn_mgr->get_internal_fn (ifn);
 }
 
-/* Look for attribute "alloc_size" on the called function and, if found,
-   return a symbolic value of type size_type_node for the allocation size
-   based on the call's parameters.
-   Otherwise, return null.  */
-
-static const svalue *
-get_result_size_in_bytes (const call_details &cd)
-{
-  const tree attr = cd.lookup_function_attribute ("alloc_size");
-  if (!attr)
-    return nullptr;
-
-  const tree atval_1 = TREE_VALUE (attr);
-  if (!atval_1)
-    return nullptr;
-
-  unsigned argidx1 = TREE_INT_CST_LOW (TREE_VALUE (atval_1)) - 1;
-  if (cd.num_args () <= argidx1)
-    return nullptr;
-
-  const svalue *sval_arg1 = cd.get_arg_svalue (argidx1);
-
-  if (const tree atval_2 = TREE_CHAIN (atval_1))
-    {
-      /* Two arguments.  */
-      unsigned argidx2 = TREE_INT_CST_LOW (TREE_VALUE (atval_2)) - 1;
-      if (cd.num_args () <= argidx2)
-	return nullptr;
-      const svalue *sval_arg2 = cd.get_arg_svalue (argidx2);
-      /* TODO: ideally we shouldn't need this cast here;
-	 see PR analyzer/110902.  */
-      return cd.get_manager ()->get_or_create_cast
-	(size_type_node,
-	 cd.get_manager ()->get_or_create_binop (size_type_node,
-						 MULT_EXPR,
-						 sval_arg1, sval_arg2));
-    }
-  else
-    /* Single argument.  */
-    return cd.get_manager ()->get_or_create_cast (size_type_node, sval_arg1);
-}
-
 /* Update this model for the CALL stmt, using CTXT to report any
    diagnostics - the first half.
 
@@ -1562,40 +1455,6 @@ region_model::on_call_pre (const gcall *call, region_model_context *ctxt)
 
   tree callee_fndecl = get_fndecl_for_call (call, ctxt);
 
-  /* Some of the cases below update the lhs of the call based on the
-     return value, but not all.  Provide a default value, which may
-     get overwritten below.  */
-  if (tree lhs = gimple_call_lhs (call))
-    {
-      const region *lhs_region = get_lvalue (lhs, ctxt);
-      const svalue *sval = maybe_get_const_fn_result (cd);
-      if (!sval)
-	{
-	  if (callee_fndecl
-	      && lookup_attribute ("malloc", DECL_ATTRIBUTES (callee_fndecl)))
-	    {
-	      const region *new_reg
-		= get_or_create_region_for_heap_alloc (NULL, ctxt);
-	      mark_region_as_unknown (new_reg, NULL);
-	      sval = m_mgr->get_ptr_svalue (cd.get_lhs_type (), new_reg);
-	    }
-	  else
-	    /* For the common case of functions without __attribute__((const)),
-	       use a conjured value, and purge any prior state involving that
-	       value (in case this is in a loop).  */
-	    sval = m_mgr->get_or_create_conjured_svalue (TREE_TYPE (lhs), call,
-							 lhs_region,
-							 conjured_purge (this,
-									 ctxt));
-	  if (const svalue *size_in_bytes = get_result_size_in_bytes (cd))
-	    {
-	      const region *reg = deref_rvalue (sval, NULL_TREE, ctxt, false);
-	      set_dynamic_extents (reg, size_in_bytes, ctxt);
-	    }
-	}
-      set_value (lhs_region, sval, ctxt);
-    }
-
   if (gimple_call_internal_p (call))
     if (const known_function *kf
 	  = get_known_function (gimple_call_internal_fn (call)))
@@ -1605,13 +1464,18 @@ region_model::on_call_pre (const gcall *call, region_model_context *ctxt)
       }
 
   if (!callee_fndecl)
-    return true; /* Unknown side effects.  */
+    {
+      cd.set_any_lhs_with_defaults ();
+      return true; /* Unknown side effects.  */
+    }
 
   if (const known_function *kf = get_known_function (callee_fndecl, cd))
     {
       kf->impl_call_pre (cd);
       return false; /* No further side effects.  */
     }
+
+  cd.set_any_lhs_with_defaults ();
 
   const int callee_fndecl_flags = flags_from_decl_or_type (callee_fndecl);
   if (callee_fndecl_flags & (ECF_CONST | ECF_PURE))
@@ -3309,6 +3173,169 @@ region_model::set_value (tree lhs, tree rhs, region_model_context *ctxt)
   gcc_assert (lhs_reg);
   gcc_assert (rhs_sval);
   set_value (lhs_reg, rhs_sval, ctxt);
+}
+
+/* Look for the first 0 byte within STRING_CST.
+   If there is one, write its index to *OUT and return true.
+   Otherwise, return false.  */
+
+static bool
+get_strlen (tree string_cst, int *out)
+{
+  gcc_assert (TREE_CODE (string_cst) == STRING_CST);
+
+  if (const void *p = memchr (TREE_STRING_POINTER (string_cst),
+			      0,
+			      TREE_STRING_LENGTH (string_cst)))
+    {
+      *out = (const char *)p - TREE_STRING_POINTER (string_cst);
+      return true;
+    }
+  else
+    return false;
+}
+
+/* A bundle of information about a problematic argument at a callsite
+   for use by pending_diagnostic subclasses for reporting and
+   for deduplication.  */
+
+struct call_arg_details
+{
+public:
+  call_arg_details (const call_details &cd, unsigned arg_idx)
+  : m_call (cd.get_call_stmt ()),
+    m_called_fndecl (cd.get_fndecl_for_call ()),
+    m_arg_idx (arg_idx),
+    m_arg_expr (cd.get_arg_tree (arg_idx))
+  {
+  }
+
+  bool operator== (const call_arg_details &other) const
+  {
+    return (m_call == other.m_call
+	    && m_called_fndecl == other.m_called_fndecl
+	    && m_arg_idx == other.m_arg_idx
+	    && pending_diagnostic::same_tree_p (m_arg_expr, other.m_arg_expr));
+  }
+
+  const gcall *m_call;
+  tree m_called_fndecl;
+  unsigned m_arg_idx; // 0-based
+  tree m_arg_expr;
+};
+
+/* Issue a note specifying that a particular function parameter is expected
+   to be a valid null-terminated string.  */
+
+static void
+inform_about_expected_null_terminated_string_arg (const call_arg_details &ad)
+{
+  // TODO: ideally we'd underline the param here
+  inform (DECL_SOURCE_LOCATION (ad.m_called_fndecl),
+	  "argument %d of %qD must be a pointer to a null-terminated string",
+	  ad.m_arg_idx + 1, ad.m_called_fndecl);
+}
+
+/* A subclass of pending_diagnostic for complaining about uses
+   of unterminated strings (thus accessing beyond the bounds
+   of a buffer).  */
+
+class unterminated_string_arg
+: public pending_diagnostic_subclass<unterminated_string_arg>
+{
+public:
+  unterminated_string_arg (const call_arg_details arg_details)
+  : m_arg_details (arg_details)
+  {
+    gcc_assert (m_arg_details.m_called_fndecl);
+  }
+
+  const char *get_kind () const final override
+  {
+    return "unterminated_string_arg";
+  }
+
+  bool operator== (const unterminated_string_arg &other) const
+  {
+    return m_arg_details == other.m_arg_details;
+  }
+
+  int get_controlling_option () const final override
+  {
+    return OPT_Wanalyzer_unterminated_string;
+  }
+
+  bool emit (rich_location *rich_loc, logger *) final override
+  {
+    auto_diagnostic_group d;
+    bool warned;
+    if (m_arg_details.m_arg_expr)
+      warned = warning_at (rich_loc, get_controlling_option (),
+			   "passing pointer to unterminated string %qE"
+			   " as argument %i of %qE",
+			   m_arg_details.m_arg_expr,
+			   m_arg_details.m_arg_idx + 1,
+			   m_arg_details.m_called_fndecl);
+    else
+      warned = warning_at (rich_loc, get_controlling_option (),
+			   "passing pointer to unterminated string"
+			   " as argument %i of %qE",
+			   m_arg_details.m_arg_idx + 1,
+			   m_arg_details.m_called_fndecl);
+    if (warned)
+      inform_about_expected_null_terminated_string_arg (m_arg_details);
+    return warned;
+  }
+
+  label_text describe_final_event (const evdesc::final_event &ev) final override
+  {
+    return ev.formatted_print
+      ("passing pointer to unterminated buffer as argument %i of %qE"
+       " would lead to read past the end of the buffer",
+       m_arg_details.m_arg_idx + 1,
+       m_arg_details.m_called_fndecl);
+  }
+
+private:
+  const call_arg_details m_arg_details;
+};
+
+/* Check that argument ARG_IDX (0-based) to the call described by CD
+   is a pointer to a valid null-terminated string.
+
+   Complain if the buffer pointed to isn't null-terminated.
+
+   TODO: we should also complain if:
+   - the pointer is NULL (or could be)
+   - the buffer pointed to is uninitalized before any 0-terminator
+   - the 0-terminator is within the bounds of the underlying base region
+
+   We're checking that the called function could validly iterate through
+   the buffer reading it until it finds a 0 byte (such as by calling
+   strlen, or equivalent code).  */
+
+void
+region_model::check_for_null_terminated_string_arg (const call_details &cd,
+						    unsigned arg_idx)
+{
+  region_model_context *ctxt = cd.get_ctxt ();
+
+  const svalue *arg_sval = cd.get_arg_svalue (arg_idx);
+  const region *buf_reg
+    = deref_rvalue (arg_sval, cd.get_arg_tree (arg_idx), ctxt);
+
+  const svalue *contents_sval = get_store_value (buf_reg, ctxt);
+
+  if (tree cst = contents_sval->maybe_get_constant ())
+    if (TREE_CODE (cst) == STRING_CST)
+      {
+	int cst_strlen;
+	if (!get_strlen (cst, &cst_strlen))
+	  {
+	    call_arg_details arg_details (cd, arg_idx);
+	    ctxt->warn (make_unique<unterminated_string_arg> (arg_details));
+	  }
+      }
 }
 
 /* Remove all bindings overlapping REG within the store.  */
@@ -5127,11 +5154,16 @@ region_model::check_dynamic_size_for_floats (const svalue *size_in_bytes,
    Use CTXT to complain about tainted sizes.
 
    Reuse an existing heap_allocated_region if it's not being referenced by
-   this region_model; otherwise create a new one.  */
+   this region_model; otherwise create a new one.
+
+   Optionally (update_state_machine) transitions the pointer pointing to the
+   heap_allocated_region from start to assumed non-null.  */
 
 const region *
 region_model::get_or_create_region_for_heap_alloc (const svalue *size_in_bytes,
-						   region_model_context *ctxt)
+       region_model_context *ctxt,
+       bool update_state_machine,
+       const call_details *cd)
 {
   /* Determine which regions are referenced in this region_model, so that
      we can reuse an existing heap_allocated_region if it's not in use on
@@ -5153,6 +5185,14 @@ region_model::get_or_create_region_for_heap_alloc (const svalue *size_in_bytes,
   if (size_in_bytes)
     if (compat_types_p (size_in_bytes->get_type (), size_type_node))
       set_dynamic_extents (reg, size_in_bytes, ctxt);
+
+	if (update_state_machine && cd)
+		{
+			const svalue *ptr_sval
+			= m_mgr->get_ptr_svalue (cd->get_lhs_type (), reg);
+      transition_ptr_sval_non_null (ctxt, ptr_sval);
+		}
+
   return reg;
 }
 

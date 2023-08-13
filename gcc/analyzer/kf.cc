@@ -40,6 +40,15 @@ along with GCC; see the file COPYING3.  If not see
 
 namespace ana {
 
+/* class pure_known_function_with_default_return : public known_function.  */
+
+void
+pure_known_function_with_default_return::
+impl_call_pre (const call_details &cd) const
+{
+  cd.set_any_lhs_with_defaults ();
+}
+
 /* Implementations of specific functions.  */
 
 /* Handler for "alloca".  */
@@ -405,6 +414,10 @@ kf_error::impl_call_pre (const call_details &cd) const
   if (!model->add_constraint (status, EQ_EXPR, integer_zero_node, ctxt))
     if (ctxt)
       ctxt->terminate_path ();
+
+  /* Check "format" arg.  */
+  const int fmt_arg_idx = (m_min_args == 3) ? 2 : 4;
+  model->check_for_null_terminated_string_arg (cd, fmt_arg_idx);
 }
 
 /* Handler for "free", after sm-handling.
@@ -557,6 +570,8 @@ kf_memset::impl_call_pre (const call_details &cd) const
 				 nullptr,
 				 cd.get_ctxt ());
   model->fill_region (sized_dest_reg, fill_value_u8);
+
+  cd.maybe_set_lhs (dest_sval);
 }
 
 /* A subclass of pending_diagnostic for complaining about 'putenv'
@@ -663,6 +678,7 @@ public:
     gcc_assert (fndecl);
     region_model_context *ctxt = cd.get_ctxt ();
     region_model *model = cd.get_model ();
+    model->check_for_null_terminated_string_arg (cd, 0);
     const svalue *ptr_sval = cd.get_arg_svalue (0);
     const region *reg
       = model->deref_rvalue (ptr_sval, cd.get_arg_tree (0), ctxt);
@@ -683,6 +699,7 @@ public:
 	  ctxt->warn (make_unique<putenv_of_auto_var> (fndecl, reg));
 	break;
       }
+    cd.set_any_lhs_with_defaults ();
   }
 };
 
@@ -937,6 +954,10 @@ public:
   {
     return (cd.num_args () == 2 && cd.arg_is_pointer_p (0));
   }
+  void impl_call_pre (const call_details &cd) const final override
+  {
+    cd.check_for_null_terminated_string_arg (0);
+  }
   void impl_call_post (const call_details &cd) const final override;
 };
 
@@ -1034,12 +1055,13 @@ public:
       = model->deref_rvalue (dst_ptr, cd.get_arg_tree (0), ctxt);
     const svalue *content = cd.get_or_create_conjured_svalue (dst_reg);
     model->set_value (dst_reg, content, ctxt);
+    cd.set_any_lhs_with_defaults ();
   }
 };
 
 /* Handler for "__builtin_stack_restore".  */
 
-class kf_stack_restore : public known_function
+class kf_stack_restore : public pure_known_function_with_default_return
 {
 public:
   bool matches_call_types_p (const call_details &) const final override
@@ -1052,7 +1074,7 @@ public:
 
 /* Handler for "__builtin_stack_save".  */
 
-class kf_stack_save : public known_function
+class kf_stack_save : public pure_known_function_with_default_return
 {
 public:
   bool matches_call_types_p (const call_details &) const final override
@@ -1096,6 +1118,7 @@ kf_strcpy::impl_call_pre (const call_details &cd) const
 					cd.get_ctxt ());
   const svalue *src_contents_sval = model->get_store_value (src_reg,
 							    cd.get_ctxt ());
+  cd.check_for_null_terminated_string_arg (1);
 
   cd.maybe_set_lhs (dest_sval);
 
@@ -1123,6 +1146,7 @@ public:
   {
     region_model *model = cd.get_model ();
     region_model_manager *mgr = cd.get_manager ();
+    cd.check_for_null_terminated_string_arg (0);
     /* Ideally we'd get the size here, and simulate copying the bytes.  */
     const region *new_reg
       = model->get_or_create_region_for_heap_alloc (NULL, cd.get_ctxt ());
@@ -1175,6 +1199,7 @@ kf_strlen::impl_call_pre (const call_details &cd) const
 	}
     }
   /* Otherwise a conjured value.  */
+  cd.set_any_lhs_with_defaults ();
 }
 
 /* Handler for "strndup" and "__builtin_strndup".  */

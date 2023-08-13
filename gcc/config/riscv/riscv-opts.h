@@ -152,6 +152,10 @@ enum riscv_entity
 #define TARGET_ZKSH   ((riscv_zk_subext & MASK_ZKSH) != 0)
 #define TARGET_ZKT    ((riscv_zk_subext & MASK_ZKT) != 0)
 
+#define MASK_ZTSO   (1 << 0)
+
+#define TARGET_ZTSO ((riscv_ztso_subext & MASK_ZTSO) != 0)
+
 #define MASK_VECTOR_ELEN_32    (1 << 0)
 #define MASK_VECTOR_ELEN_64    (1 << 1)
 #define MASK_VECTOR_ELEN_FP_32 (1 << 2)
@@ -296,6 +300,7 @@ enum riscv_entity
 
 /* We only enable VLS modes for VLA vectorization since fixed length VLMAX mode
    is the highest priority choice and should not conflict with VLS modes.  */
-#define TARGET_VECTOR_VLS (riscv_autovec_preference == RVV_SCALABLE)
+#define TARGET_VECTOR_VLS                                                      \
+  (TARGET_VECTOR && riscv_autovec_preference == RVV_SCALABLE)
 
 #endif /* ! GCC_RISCV_OPTS_H */

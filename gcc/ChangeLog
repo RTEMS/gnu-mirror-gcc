@@ -1,3 +1,534 @@
+2023-08-12  Jakub Jelinek  <jakub@redhat.com>
+
+	* Makefile.in (USER_H): Add stdckdint.h.
+	* ginclude/stdckdint.h: New file.
+
+2023-08-12  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/110994
+	* config/riscv/riscv-opts.h (TARGET_VECTOR_VLS): Add TARGET_VETOR.
+
+2023-08-12  Patrick Palka  <ppalka@redhat.com>
+
+	* tree-pretty-print.cc (dump_generic_node) <case TREE_VEC>:
+	Delimit output with braces.
+
+2023-08-12  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/110985
+	* config/riscv/riscv-v.cc (expand_vec_series): Refactor the expander.
+
+2023-08-12  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/autovec.md: Add VLS CONST_VECTOR.
+	* config/riscv/riscv.cc (riscv_const_insns): Ditto.
+	* config/riscv/vector.md: Ditto.
+
+2023-08-11  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/105899
+	* doc/analyzer.texi (__analyzer_get_strlen): New.
+	* doc/invoke.texi: Add -Wanalyzer-unterminated-string.
+
+2023-08-11  Jeff Law  <jlaw@ventanamicro.com>
+
+	* config/rx/rx.md (subdi3): Fix test for borrow.
+
+2023-08-11  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR middle-end/110989
+	* tree-vect-stmts.cc (vectorizable_store): Replace iv_type with sizetype.
+	(vectorizable_load): Ditto.
+
+2023-08-11  Jose E. Marchesi  <jose.marchesi@oracle.com>
+
+	* config/bpf/bpf.md (allocate_stack): Define.
+	* config/bpf/bpf.h (FIRST_PSEUDO_REGISTER): Make room for fake
+	stack pointer register.
+	(FIXED_REGISTERS): Adjust accordingly.
+	(CALL_USED_REGISTERS): Likewise.
+	(REG_CLASS_CONTENTS): Likewise.
+	(REGISTER_NAMES): Likewise.
+	* config/bpf/bpf.cc (bpf_compute_frame_layout): Do not reserve
+	space for callee-saved registers.
+	(bpf_expand_prologue): Do not save callee-saved registers in xbpf.
+	(bpf_expand_epilogue): Do not restore callee-saved registers in
+	xbpf.
+
+2023-08-11  Jose E. Marchesi  <jose.marchesi@oracle.com>
+
+	* config/bpf/bpf.cc (bpf_function_arg_advance): Do not complain
+	about too many arguments if function is always inlined.
+
+2023-08-11  Patrick Palka  <ppalka@redhat.com>
+
+	* tree-pretty-print.cc (dump_generic_node) <case COMPONENT_REF>:
+	Don't call component_ref_field_offset if the RHS isn't a decl.
+
+2023-08-11  John David Anglin  <danglin@gcc.gnu.org>
+
+	PR bootstrap/110646
+	* gensupport.cc(class conlist): Use strtol instead of std::stoi.
+
+2023-08-11  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	* lra-constraints.cc (goal_alt_out_sp_reload_p): New flag.
+	(process_alt_operands): Set the flag.
+	(curr_insn_transform): Modify stack pointer offsets if output
+	stack pointer reload is generated.
+
+2023-08-11  Joseph Myers  <joseph@codesourcery.com>
+
+	* configure: Regenerate.
+
+2023-08-11  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/110979
+	* tree-vect-loop.cc (vectorizable_reduction): For
+	FOLD_LEFT_REDUCTION without target support make sure
+	we don't need to honor signed zeros and sign dependent rounding.
+
+2023-08-11  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-slp.cc (vect_slp_region): Provide opt-info for all SLP
+	subgraph entries.  Dump the used vector size based on the
+	SLP subgraph entry root vector type.
+
+2023-08-11  Pan Li  <pan2.li@intel.com>
+
+	* config/riscv/riscv-vector-builtins-bases.cc
+	(class vfmsub_frm): New class for vfmsub frm.
+	(vfmsub_frm): New declaration.
+	(BASE): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.h: Ditto.
+	* config/riscv/riscv-vector-builtins-functions.def
+	(vfmsub_frm): New function declaration.
+
+2023-08-11  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* doc/md.texi: Add vec_mask_len_{load_lanes,store_lanes} patterns.
+	* internal-fn.cc (expand_partial_load_optab_fn): Ditto.
+	(expand_partial_store_optab_fn): Ditto.
+	* internal-fn.def (MASK_LEN_LOAD_LANES): Ditto.
+	(MASK_LEN_STORE_LANES): Ditto.
+	* optabs.def (OPTAB_CD): Ditto.
+
+2023-08-11  Pan Li  <pan2.li@intel.com>
+
+	* config/riscv/riscv-vector-builtins-bases.cc
+	(class vfnmadd_frm): New class for vfnmadd frm.
+	(vfnmadd_frm): New declaration.
+	(BASE): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.h: Ditto.
+	* config/riscv/riscv-vector-builtins-functions.def
+	(vfnmadd_frm): New function declaration.
+
+2023-08-11  Drew Ross  <drross@redhat.com>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/109938
+	* match.pd (((x ^ y) & z) | x -> (z & y) | x): New simplification.
+
+2023-08-11  Pan Li  <pan2.li@intel.com>
+
+	* config/riscv/riscv-vector-builtins-bases.cc
+	(class vfmadd_frm): New class for vfmadd frm.
+	(vfmadd_frm_obj): New declaration.
+	(BASE): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.h: Ditto.
+	* config/riscv/riscv-vector-builtins-functions.def
+	(vfmadd_frm): New function definition.
+
+2023-08-11  Pan Li  <pan2.li@intel.com>
+
+	* config/riscv/riscv-vector-builtins-bases.cc
+	(class vfnmsac_frm): New class for vfnmsac frm.
+	(vfnmsac_frm_obj): New declaration.
+	(BASE): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.h: Ditto.
+	* config/riscv/riscv-vector-builtins-functions.def
+	(vfnmsac_frm): New function definition.
+
+2023-08-11  Jakub Jelinek  <jakub@redhat.com>
+
+	* doc/extend.texi (Typeof): Document typeof_unqual
+	and __typeof_unqual__.
+
+2023-08-11  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/110954
+	* generic-match-head.cc (bitwise_inverted_equal_p): Add
+	wascmp argument and set it accordingly.
+	* gimple-match-head.cc (bitwise_inverted_equal_p): Add
+	wascmp argument to the macro.
+	(gimple_bitwise_inverted_equal_p): Add
+	wascmp argument and set it accordingly.
+	* match.pd (`a & ~a`, `a ^| ~a`): Update call
+	to bitwise_inverted_equal_p and handle wascmp case.
+	(`(~x | y) & x`, `(~x | y) & x`, `a?~t:t`): Update
+	call to bitwise_inverted_equal_p and check to see
+	if was !wascmp or if precision was 1.
+
+2023-08-11  Martin Uecker  <uecker@tugraz.at>
+
+	PR c/84510
+	* doc/invoke.texi: Update.
+
+2023-08-11  Pan Li  <pan2.li@intel.com>
+
+	* config/riscv/riscv-vector-builtins-bases.cc
+	(class vfmsac_frm): New class for vfmsac frm.
+	(vfmsac_frm_obj): New declaration.
+	(BASE): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.h: Ditto.
+	* config/riscv/riscv-vector-builtins-functions.def
+	(vfmsac_frm): New function definition
+
+2023-08-10  Jan Hubicka  <jh@suse.cz>
+
+	PR middle-end/110923
+	* tree-ssa-loop-split.cc (split_loop): Watch for division by zero.
+
+2023-08-10  Patrick O'Neill  <patrick@rivosinc.com>
+
+	* common/config/riscv/riscv-common.cc: Add Ztso and mark Ztso as
+	dependent on 'a' extension.
+	* config/riscv/riscv-opts.h (MASK_ZTSO): New mask.
+	(TARGET_ZTSO): New target.
+	* config/riscv/riscv.cc (riscv_memmodel_needs_amo_acquire): Add
+	Ztso case.
+	(riscv_memmodel_needs_amo_release): Add Ztso case.
+	(riscv_print_operand): Add Ztso case for LR/SC annotations.
+	* config/riscv/riscv.md: Import sync-rvwmo.md and sync-ztso.md.
+	* config/riscv/riscv.opt: Add Ztso target variable.
+	* config/riscv/sync.md (mem_thread_fence_1): Expand to RVWMO or
+	Ztso specific insn.
+	(atomic_load<mode>): Expand to RVWMO or Ztso specific insn.
+	(atomic_store<mode>): Expand to RVWMO or Ztso specific insn.
+	* config/riscv/sync-rvwmo.md: New file. Seperate out RVWMO
+	specific load/store/fence mappings.
+	* config/riscv/sync-ztso.md: New file. Seperate out Ztso
+	specific load/store/fence mappings.
+
+2023-08-10  Jan Hubicka  <jh@suse.cz>
+
+	* cfgloopmanip.cc (duplicate_loop_body_to_header_edge): Special case loops with
+	0 iteration count.
+
+2023-08-10  Jan Hubicka  <jh@suse.cz>
+
+	* tree-ssa-threadupdate.cc (ssa_fix_duplicate_block_edges): Fix profile update.
+
+2023-08-10  Jan Hubicka  <jh@suse.cz>
+
+	* profile-count.cc (profile_count::differs_from_p): Fix overflow and
+	handling of undefined values.
+
+2023-08-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/102989
+	* tree-ssa-phiopt.cc (single_non_singleton_phi_for_edges): Never
+	return virtual phis and return NULL if there is a virtual phi
+	where the arguments from E0 and E1 edges aren't equal.
+
+2023-08-10  Richard Biener  <rguenther@suse.de>
+
+	* internal-fn.def (VCOND, VCONDU, VCONDEQ, VCOND_MASK,
+	VEC_SET, VEC_EXTRACT): Make ECF_CONST | ECF_NOTHROW.
+
+2023-08-10  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/110962
+	* config/riscv/autovec.md (vec_duplicate<mode>): New pattern.
+
+2023-08-10  Pan Li  <pan2.li@intel.com>
+
+	* config/riscv/riscv-vector-builtins-bases.cc
+	(class vfnmacc_frm): New class for vfnmacc.
+	(vfnmacc_frm_obj): New declaration.
+	(BASE): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.h: Ditto.
+	* config/riscv/riscv-vector-builtins-functions.def
+	(vfnmacc_frm): New function definition.
+
+2023-08-10  Pan Li  <pan2.li@intel.com>
+
+	* config/riscv/riscv-vector-builtins-bases.cc
+	(class vfmacc_frm): New class for vfmacc frm.
+	(vfmacc_frm_obj): New declaration.
+	(BASE): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.h: Ditto.
+	* config/riscv/riscv-vector-builtins-functions.def
+	(vfmacc_frm): New function definition.
+
+2023-08-10  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/110964
+	* config/riscv/riscv-v.cc (expand_cond_len_ternop): Add integer ternary.
+
+2023-08-10  Richard Biener  <rguenther@suse.de>
+
+	* tree-vectorizer.h (vectorizable_live_operation): Remove
+	gimple_stmt_iterator * argument.
+	* tree-vect-loop.cc (vectorizable_live_operation): Likewise.
+	Adjust plumbing around vect_get_loop_mask.
+	(vect_analyze_loop_operations): Adjust.
+	* tree-vect-slp.cc (vect_slp_analyze_node_operations_1): Likewise.
+	(vect_bb_slp_mark_live_stmts): Likewise.
+	(vect_schedule_slp_node): Likewise.
+	* tree-vect-stmts.cc (can_vectorize_live_stmts): Likewise.
+	Remove gimple_stmt_iterator * argument.
+	(vect_transform_stmt): Adjust.
+
+2023-08-10  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/vector-iterators.md: Add missing modes.
+
+2023-08-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/102989
+	* lto-streamer-in.cc (lto_input_tree_1): Assert TYPE_PRECISION
+	is up to WIDE_INT_MAX_PRECISION rather than MAX_BITSIZE_MODE_ANY_INT.
+
+2023-08-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/102989
+	* expr.cc (expand_expr_real_1) <case MEM_REF>: Add an early return for
+	EXPAND_WRITE or EXPAND_MEMORY modifiers to avoid testing it multiple
+	times.
+
+2023-08-10  liuhongt  <hongtao.liu@intel.com>
+
+	PR target/110832
+	* config/i386/mmx.md: (movq_<mode>_to_sse): Also do not
+	sanitize upper part of V4HFmode register with
+	-fno-trapping-math.
+	(<insn>v4hf3): Enable for ix86_partial_vec_fp_math.
+	(<divv4hf3): Ditto.
+	(<insn>v2hf3): Ditto.
+	(divv2hf3): Ditto.
+	(movd_v2hf_to_sse): Do not sanitize upper part of V2HFmode
+	register with -fno-trapping-math.
+
+2023-08-10  Pan Li  <pan2.li@intel.com>
+	    Kito Cheng  <kito.cheng@sifive.com>
+
+	* config/riscv/riscv-protos.h
+	(enum floating_point_rounding_mode): Add NONE, DYN_EXIT and DYN_CALL.
+	(get_frm_mode): New declaration.
+	* config/riscv/riscv-v.cc (get_frm_mode): New function to get frm mode.
+	* config/riscv/riscv-vector-builtins.cc
+	(function_expander::use_ternop_insn): Take care of frm reg.
+	* config/riscv/riscv.cc (riscv_static_frm_mode_p): Migrate to FRM_XXX.
+	(riscv_emit_frm_mode_set): Ditto.
+	(riscv_emit_mode_set): Ditto.
+	(riscv_frm_adjust_mode_after_call): Ditto.
+	(riscv_frm_mode_needed): Ditto.
+	(riscv_frm_mode_after): Ditto.
+	(riscv_mode_entry): Ditto.
+	(riscv_mode_exit): Ditto.
+	* config/riscv/riscv.h (NUM_MODES_FOR_MODE_SWITCHING): Ditto.
+	* config/riscv/vector.md
+	(rne,rtz,rdn,rup,rmm,dyn,dyn_exit,dyn_call,none): Removed
+	(symbol_ref): * config/riscv/vector.md: Set frm_mode attr explicitly.
+
+2023-08-09  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/riscv-vsetvl.cc (anticipatable_occurrence_p): Fix
+	incorrect anticipate info.
+
+2023-08-09  Tsukasa OI  <research_trasio@irq.a4lg.com>
+
+	* common/config/riscv/riscv-common.cc (riscv_ext_version_table):
+	Remove 'Zve32d' from the version list.
+
+2023-08-09  Jin Ma  <jinma@linux.alibaba.com>
+
+	* config/riscv/riscv.cc (riscv_sched_variable_issue): New function.
+	(TARGET_SCHED_VARIABLE_ISSUE): New macro.
+	Co-authored-by: Philipp Tomsich <philipp.tomsich@vrull.eu>
+	Co-authored-by: Jeff Law <jlaw@ventanamicro.com>
+
+2023-08-09  Jivan Hakobyan  <jivanhakobyan9@gmail.com>
+
+	* config/riscv/riscv.cc (riscv_legitimize_address): Handle folding.
+	(mem_shadd_or_shadd_rtx_p): New function.
+
+2023-08-09  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/110937
+	PR tree-optimization/100798
+	* match.pd (`a ? ~b : b`): Handle this
+	case.
+
+2023-08-09  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386.opt (mpartial-vector-fp-math): Add dot.
+
+2023-08-09  Richard Ball  <richard.ball@arm.com>
+
+	* config/aarch64/aarch64-cores.def (AARCH64_CORE): Add Cortex-A520 CPU.
+	* config/aarch64/aarch64-tune.md: Regenerate.
+	* doc/invoke.texi: Document Cortex-A520 CPU.
+
+2023-08-09  Carl Love  <cel@us.ibm.com>
+
+	* config/rs6000/rs6000-builtins.def (vcmpneb, vcmpneh, vcmpnew):
+	Move definitions to Altivec stanza.
+	* config/rs6000/altivec.md (vcmpneb, vcmpneh, vcmpnew): New
+	define_expand.
+
+2023-08-09  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/110950
+	* config/riscv/riscv-v.cc (expand_const_vector): Add NPATTERNS = 1
+	stepped vector support.
+
+2023-08-09  liuhongt  <hongtao.liu@intel.com>
+
+	* common/config/i386/cpuinfo.h (get_available_features):
+	Rename local variable subleaf_level to max_subleaf_level.
+
+2023-08-09  Richard Biener  <rguenther@suse.de>
+
+	PR rtl-optimization/110587
+	* lra-assigns.cc (find_hard_regno_for_1): Re-order checks.
+
+2023-08-09  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR tree-optimization/110248
+	* config/rs6000/rs6000.cc (rs6000_legitimate_address_p): Check if
+	the given code is for ifn LEN_{LOAD,STORE}, if yes then make it not
+	legitimate when outer code is PLUS.
+
+2023-08-09  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR tree-optimization/110248
+	* recog.cc (memory_address_addr_space_p): Add one more argument ch of
+	type code_helper and pass it to targetm.addr_space.legitimate_address_p
+	instead of ERROR_MARK.
+	(offsettable_address_addr_space_p): Update one function pointer with
+	one more argument of type code_helper as its assignees
+	memory_address_addr_space_p and strict_memory_address_addr_space_p
+	have been adjusted, and adjust some call sites with ERROR_MARK.
+	* recog.h (tree.h): New include header file for tree_code ERROR_MARK.
+	(memory_address_addr_space_p): Adjust with one more unnamed argument
+	of type code_helper with default ERROR_MARK.
+	(strict_memory_address_addr_space_p): Likewise.
+	* reload.cc (strict_memory_address_addr_space_p): Add one unnamed
+	argument of type code_helper.
+	* tree-ssa-address.cc (valid_mem_ref_p): Add one more argument ch of
+	type code_helper and pass it to memory_address_addr_space_p.
+	* tree-ssa-address.h (valid_mem_ref_p): Adjust the declaration with
+	one more unnamed argument of type code_helper with default value
+	ERROR_MARK.
+	* tree-ssa-loop-ivopts.cc (get_address_cost): Use ERROR_MARK as code
+	by default, change it with ifn code for USE_PTR_ADDRESS type use, and
+	pass it to all valid_mem_ref_p calls.
+
+2023-08-09  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR tree-optimization/110248
+	* coretypes.h (class code_helper): Add forward declaration.
+	* doc/tm.texi: Regenerate.
+	* lra-constraints.cc (valid_address_p): Call target hook
+	targetm.addr_space.legitimate_address_p with an extra parameter
+	ERROR_MARK as its prototype changes.
+	* recog.cc (memory_address_addr_space_p): Likewise.
+	* reload.cc (strict_memory_address_addr_space_p): Likewise.
+	* target.def (legitimate_address_p, addr_space.legitimate_address_p):
+	Extend with one more argument of type code_helper, update the
+	documentation accordingly.
+	* targhooks.cc (default_legitimate_address_p): Adjust for the
+	new code_helper argument.
+	(default_addr_space_legitimate_address_p): Likewise.
+	* targhooks.h (default_legitimate_address_p): Likewise.
+	(default_addr_space_legitimate_address_p): Likewise.
+	* config/aarch64/aarch64.cc (aarch64_legitimate_address_hook_p): Adjust
+	with extra unnamed code_helper argument with default ERROR_MARK.
+	* config/alpha/alpha.cc (alpha_legitimate_address_p): Likewise.
+	* config/arc/arc.cc (arc_legitimate_address_p): Likewise.
+	* config/arm/arm-protos.h (arm_legitimate_address_p): Likewise.
+	(tree.h): New include for tree_code ERROR_MARK.
+	* config/arm/arm.cc (arm_legitimate_address_p): Adjust with extra
+	unnamed code_helper argument with default ERROR_MARK.
+	* config/avr/avr.cc (avr_addr_space_legitimate_address_p): Likewise.
+	* config/bfin/bfin.cc (bfin_legitimate_address_p): Likewise.
+	* config/bpf/bpf.cc (bpf_legitimate_address_p): Likewise.
+	* config/c6x/c6x.cc (c6x_legitimate_address_p): Likewise.
+	* config/cris/cris-protos.h (cris_legitimate_address_p): Likewise.
+	(tree.h): New include for tree_code ERROR_MARK.
+	* config/cris/cris.cc (cris_legitimate_address_p): Adjust with extra
+	unnamed code_helper argument with default ERROR_MARK.
+	* config/csky/csky.cc (csky_legitimate_address_p): Likewise.
+	* config/epiphany/epiphany.cc (epiphany_legitimate_address_p):
+	Likewise.
+	* config/frv/frv.cc (frv_legitimate_address_p): Likewise.
+	* config/ft32/ft32.cc (ft32_addr_space_legitimate_address_p): Likewise.
+	* config/gcn/gcn.cc (gcn_addr_space_legitimate_address_p): Likewise.
+	* config/h8300/h8300.cc (h8300_legitimate_address_p): Likewise.
+	* config/i386/i386.cc (ix86_legitimate_address_p): Likewise.
+	* config/ia64/ia64.cc (ia64_legitimate_address_p): Likewise.
+	* config/iq2000/iq2000.cc (iq2000_legitimate_address_p): Likewise.
+	* config/lm32/lm32.cc (lm32_legitimate_address_p): Likewise.
+	* config/loongarch/loongarch.cc (loongarch_legitimate_address_p):
+	Likewise.
+	* config/m32c/m32c.cc (m32c_legitimate_address_p): Likewise.
+	(m32c_addr_space_legitimate_address_p): Likewise.
+	* config/m32r/m32r.cc (m32r_legitimate_address_p): Likewise.
+	* config/m68k/m68k.cc (m68k_legitimate_address_p): Likewise.
+	* config/mcore/mcore.cc (mcore_legitimate_address_p): Likewise.
+	* config/microblaze/microblaze-protos.h (tree.h): New include for
+	tree_code ERROR_MARK.
+	(microblaze_legitimate_address_p): Adjust with extra unnamed
+	code_helper argument with default ERROR_MARK.
+	* config/microblaze/microblaze.cc (microblaze_legitimate_address_p):
+	Likewise.
+	* config/mips/mips.cc (mips_legitimate_address_p): Likewise.
+	* config/mmix/mmix.cc (mmix_legitimate_address_p): Likewise.
+	* config/mn10300/mn10300.cc (mn10300_legitimate_address_p): Likewise.
+	* config/moxie/moxie.cc (moxie_legitimate_address_p): Likewise.
+	* config/msp430/msp430.cc (msp430_legitimate_address_p): Likewise.
+	(msp430_addr_space_legitimate_address_p): Adjust with extra code_helper
+	argument with default ERROR_MARK and adjust the call to function
+	msp430_legitimate_address_p.
+	* config/nds32/nds32.cc (nds32_legitimate_address_p): Adjust with extra
+	unnamed code_helper argument with default ERROR_MARK.
+	* config/nios2/nios2.cc (nios2_legitimate_address_p): Likewise.
+	* config/nvptx/nvptx.cc (nvptx_legitimate_address_p): Likewise.
+	* config/or1k/or1k.cc (or1k_legitimate_address_p): Likewise.
+	* config/pa/pa.cc (pa_legitimate_address_p): Likewise.
+	* config/pdp11/pdp11.cc (pdp11_legitimate_address_p): Likewise.
+	* config/pru/pru.cc (pru_addr_space_legitimate_address_p): Likewise.
+	* config/riscv/riscv.cc (riscv_legitimate_address_p): Likewise.
+	* config/rl78/rl78-protos.h (rl78_as_legitimate_address): Likewise.
+	(tree.h): New include for tree_code ERROR_MARK.
+	* config/rl78/rl78.cc (rl78_as_legitimate_address): Adjust with
+	extra unnamed code_helper argument with default ERROR_MARK.
+	* config/rs6000/rs6000.cc (rs6000_legitimate_address_p): Likewise.
+	(rs6000_debug_legitimate_address_p): Adjust with extra code_helper
+	argument and adjust the call to function rs6000_legitimate_address_p.
+	* config/rx/rx.cc (rx_is_legitimate_address): Adjust with extra
+	unnamed code_helper argument with default ERROR_MARK.
+	* config/s390/s390.cc (s390_legitimate_address_p): Likewise.
+	* config/sh/sh.cc (sh_legitimate_address_p): Likewise.
+	* config/sparc/sparc.cc (sparc_legitimate_address_p): Likewise.
+	* config/v850/v850.cc (v850_legitimate_address_p): Likewise.
+	* config/vax/vax.cc (vax_legitimate_address_p): Likewise.
+	* config/visium/visium.cc (visium_legitimate_address_p): Likewise.
+	* config/xtensa/xtensa.cc (xtensa_legitimate_address_p): Likewise.
+	* config/stormy16/stormy16-protos.h (xstormy16_legitimate_address_p):
+	Likewise.
+	(tree.h): New include for tree_code ERROR_MARK.
+	* config/stormy16/stormy16.cc (xstormy16_legitimate_address_p):
+	Adjust with extra unnamed code_helper argument with default
+	ERROR_MARK.
+
+2023-08-09  liuhongt  <hongtao.liu@intel.com>
+
+	* common/config/i386/cpuinfo.h (get_available_features): Check
+	EAX for valid subleaf before use CPUID.
+
 2023-08-08  Jeff Law  <jlaw@ventanamicro.com>
 
 	* config/riscv/riscv.cc (riscv_expand_conditional_move): Use word_mode
