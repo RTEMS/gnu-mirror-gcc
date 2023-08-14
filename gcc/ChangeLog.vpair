@@ -1,3 +1,17 @@
+==================== Branch work130-vpair, patch #30 ====================
+
+Add vector pair FMA combiner patterns
+
+2023-08-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (vpair_fma_fpcontract_<vp_pmode>4): Add
+	combiner insn for FMA instructions.
+	(vpair_fms_fpcontract_<vp_pmode>): Likewise.
+	(vpair_nfma_fpcontract_<vp_pmode>4): Likewise.
+	(vpair_nfms_fpcontract_<vp_pmode>4): Likewise.
+
 ==================== Branch work130-vpair, patch #29 ====================
 
 Rename vector pair iterators and attributes.
