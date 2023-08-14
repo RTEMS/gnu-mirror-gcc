@@ -492,6 +492,130 @@
 }
   [(set_attr "length" "8")])
 
+;; Optimize vector pair (a * b) + c into vector pair fma (a, b, c).
+(define_insn_and_split "*vpair_fma_fpcontract_<vp_pmode>4"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
+	(unspec:OO
+	 [(plus:OO
+	   (unspec:OO
+	    [(mult:OO
+	      (match_operand:OO 1 "vsx_register_operand" "%wa,wa")
+	      (match_operand:OO 2 "vsx_register_operand" "wa,0"))]
+	    VP_FP)
+	   (match_operand:OO 3 "vsx_register_operand" "0,wa"))]
+	 VP_FP))]
+  "TARGET_MMA && flag_fp_contract_mode == FP_CONTRACT_FAST"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(unspec:OO
+	 [(fma:OO
+	   (match_dup 1)
+	   (match_dup 2)
+	   (match_dup 3))]
+	 VP_FP))]
+{
+}
+  [(set_attr "length" "8")])
+
+;; Optimize vector pair (a * b) - c into vector pair fma (a, b, -c)
+(define_insn_and_split "*vpair_fms_fpcontract_<vp_pmode>4"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
+	(unspec:OO
+	 [(minus:OO
+	   (unspec:OO
+	    [(mult:OO
+	      (match_operand:OO 1 "vsx_register_operand" "%wa,wa")
+	      (match_operand:OO 2 "vsx_register_operand" "wa,0"))]
+	    VP_FP)
+	   (match_operand:OO 3 "vsx_register_operand" "0,wa"))]
+	 VP_FP))]
+  "TARGET_MMA && flag_fp_contract_mode == FP_CONTRACT_FAST"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(unspec:OO
+	 [(fma:OO
+	   (match_dup 1)
+	   (match_dup 2)
+	   (unspec:OO
+	    [(neg:OO
+	      (match_dup 3))]
+	    VP_FP))]
+	 VP_FP))]
+{
+}
+  [(set_attr "length" "8")])
+
+
+;; Optimize vector pair -((a * b) + c) into vector pair -fma (a, b, c).
+(define_insn_and_split "*vpair_nfma_fpcontract_<vp_pmode>4"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
+	(unspec:OO
+	 [(neg:OO
+	   (unspec:OO
+	    [(plus:OO
+	      (unspec:OO
+	       [(mult:OO
+		 (match_operand:OO 1 "vsx_register_operand" "%wa,wa")
+		 (match_operand:OO 2 "vsx_register_operand" "wa,0"))]
+	       VP_FP)
+	      (match_operand:OO 3 "vsx_register_operand" "0,wa"))]
+	    VP_FP))]
+	 VP_FP))]
+  "TARGET_MMA && flag_fp_contract_mode == FP_CONTRACT_FAST"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(unspec:OO
+	 [(neg:OO
+	   (unspec:OO
+	    [(fma:OO
+	      (match_dup 1)
+	      (match_dup 2)
+	      (match_dup 3))]
+	    VP_FP))]
+	 VP_FP))]
+{
+}
+  [(set_attr "length" "8")])
+
+;; Optimize vector pair -((a * b) - c) into vector pair -fma (a, b, -c)
+(define_insn_and_split "*vpair_nfms_fpcontract_<vp_pmode>4"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
+	(unspec:OO
+	 [(neg:OO
+	   (unspec:OO
+	    [(minus:OO
+	      (unspec:OO
+	       [(mult:OO
+		 (match_operand:OO 1 "vsx_register_operand" "%wa,wa")
+		 (match_operand:OO 2 "vsx_register_operand" "wa,0"))]
+	       VP_FP)
+	      (match_operand:OO 3 "vsx_register_operand" "0,wa"))]
+	    VP_FP))]
+	 VP_FP))]
+  "TARGET_MMA && flag_fp_contract_mode == FP_CONTRACT_FAST"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(unspec:OO
+	 [(neg:OO
+	   (unspec:OO
+	    [(fma:OO
+	      (match_dup 1)
+	      (match_dup 2)
+	      (unspec:OO
+	       [(neg:OO
+		 (match_dup 3))]
+	       VP_FP))]
+	    VP_FP))]
+	 VP_FP))]
+{
+}
+  [(set_attr "length" "8")])
+
+
 ;; Add all elements in a pair of V4SF vectors.
 (define_insn_and_split "vpair_reduc_plus_scale_v8sf"
   [(set (match_operand:SF 0 "vsx_register_operand" "=wa")
