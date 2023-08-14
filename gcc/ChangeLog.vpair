@@ -1,3 +1,28 @@
+==================== Branch work130-vpair, patch #29 ====================
+
+Rename vector pair iterators and attributes.
+
+2023-08-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (VP_FP_UNARY): Rename from
+	VPAIR_FP_UNARY.  Change all uses.
+	(VP_FP_BINARY): Rename from VPAIR_FP_BINARY.  Change all uses.
+	(VP_INT_BINARY): Rename from VPAIR_INT_BINARY.  Change all uses.
+	(vp_insn): Rename from vpair_op.  Change all uses.
+	(vp_ireg): Rename from vpair_ireg.  Change all uses.
+	(vp_ipredicate): Rename from vpair_ipred.  Change all uses.
+	(VP_FP): Rename from VPAIR_FP.  Change all uses.
+	(VP_INT): Rename from VPAIR_INT.  Change all uses.
+	(VP_ALL): Rename from VPAIR_ALL.  Change all uses.
+	(VP_VEC_MODE): Rename from VPAIR_VECTOR.  Change all uses.
+	(vp_pmode): Rename from vpair_mode.  Change all uses.
+	(vp_neg_reg): Rename from vpair_neg_reg.  Change all uses.
+	(VP_SPLAT): Rename from VPAIR_SPLAT.  Change all uses.
+	(vp_splat_pmode): Rename from vpair_splat_mode.  Change all uses.
+	(VP_SPLAT_VMODE): Rename from VPAIR_SPLAT_VMODE.  Change all uses.
+
 ==================== Branch work130-vpair, patch #28 ====================
 
 Make vpair get_vector reverse words on little endian systems.
