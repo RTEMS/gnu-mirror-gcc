@@ -30,6 +30,12 @@
 ;; Iterator for the 2 64-bit vector types
 (define_mode_iterator VSX_D [V2DF V2DI])
 
+;; Iterator for the 2 64-bit vector types, including vector pairs
+(define_mode_iterator VSX_VP_D [(V4DF "TARGET_MMA && TARGET_VECTOR_PAIR")
+				(V4DI "TARGET_MMA && TARGET_VECTOR_PAIR")
+				V2DF
+				V2DI])
+
 ;; Mode iterator to handle swapping words on little endian for the 128-bit
 ;; types that goes in a single vector register.
 (define_mode_iterator VSX_LE_128 [(KF   "FLOAT128_VECTOR_P (KFmode)")
@@ -207,20 +213,39 @@
 (define_mode_iterator VSX_EXTRACT_I2 [V16QI V8HI])
 (define_mode_iterator VSX_EXTRACT_I4 [V16QI V8HI V4SI V2DI])
 
-(define_mode_attr VSX_EXTRACT_WIDTH [(V16QI "b")
-		  		     (V8HI "h")
-				     (V4SI "w")])
+;; Iterator for vector extraction that includes vector pair vectors
+(define_mode_iterator VSX_EXTRACT_VP [(V32QI "TARGET_VECTOR_PAIR")
+				      (V16HI "TARGET_VECTOR_PAIR")
+				      (V8SI  "TARGET_VECTOR_PAIR")
+				      V16QI
+				      V8HI
+				      V4SI])
+
+(define_mode_attr VSX_EXTRACT_WIDTH [(V32QI "b")
+				     (V16QI "b")
+		  		     (V16HI "h")
+		  		     (V8HI  "h")
+				     (V4SI  "w")
+				     (V8SI  "w")])
 
 ;; Mode attribute to give the correct predicate for ISA 3.0 vector extract and
 ;; insert to validate the operand number.
-(define_mode_attr VSX_EXTRACT_PREDICATE [(V16QI "const_0_to_15_operand")
+(define_mode_attr VSX_EXTRACT_PREDICATE [(V32QI "const_0_to_31_operand")
+					 (V16QI "const_0_to_15_operand")
+					 (V16HI "const_0_to_15_operand")
 					 (V8HI  "const_0_to_7_operand")
-					 (V4SI  "const_0_to_3_operand")])
+					 (V8SI  "const_0_to_7_operand")
+					 (V4SI  "const_0_to_3_operand")
+					 (V4DI  "const_0_to_3_operand")
+					 (V2DI  "const_0_to_1_operand")])
 
 ;; Mode attribute to give the constraint for vector extract and insert
 ;; operations.
-(define_mode_attr VSX_EX [(V16QI "v")
+(define_mode_attr VSX_EX [(V32QI "v")
+			  (V16QI "v")
+			  (V16HI "v")
 			  (V8HI  "v")
+			  (V8SI  "wa")
 			  (V4SI  "wa")])
 
 ;; Mode iterator for binary floating types other than double to
@@ -254,6 +279,10 @@
 ;; Iterator for the move to mask instructions
 (define_mode_iterator VSX_MM [V16QI V8HI V4SI V2DI V1TI])
 (define_mode_iterator VSX_MM4 [V16QI V8HI V4SI V2DI])
+
+;; Iterator for V4SF and V8SF extracts
+(define_mode_iterator V4SF_V8SF [(V4SF "VECTOR_UNIT_VSX_P (V4SFmode)")
+				 (V8SF "TARGET_MMA")])
 
 ;; Longer vec int modes for rotate/mask ops
 ;; and Vector Integer Multiply/Divide/Modulo Instructions
@@ -3421,7 +3450,7 @@
 (define_expand "vsx_extract_<mode>"
   [(set (match_operand:<VEC_base> 0 "gpc_reg_operand")
 	(vec_select:<VEC_base>
-	 (match_operand:VSX_D 1 "gpc_reg_operand")
+	 (match_operand:VSX_VP_D 1 "gpc_reg_operand")
 	 (parallel
 	  [(match_operand:QI 2 "const_0_to_1_operand")])))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
@@ -3430,13 +3459,16 @@
 (define_insn "*vsx_extract_<mode>_0"
   [(set (match_operand:<VEC_base> 0 "gpc_reg_operand" "=wa,wa,wr")
 	(vec_select:<VEC_base>
-	 (match_operand:VSX_D 1 "gpc_reg_operand" "0,wa,wa")
+	 (match_operand:VSX_VP_D 1 "gpc_reg_operand" "0,wa,wa")
 	 (parallel
 	  [(match_operand:QI 2 "const_0_to_1_operand" "n,n,n")])))]
   "VECTOR_MEM_VSX_P (<MODE>mode)
    && INTVAL (operands[2]) == (BYTES_BIG_ENDIAN ? 0 : 1)"
 {
-  if (which_alternative == 0)
+  int ele = INTVAL (operands[2]);
+  (void) rs6000_adjust_for_vector_pair (<MODE>mode, &operands[1], &ele);
+
+  if (REGNO (operands[0]) == REGNO (operands[1]))
     return ASM_COMMENT_START " vec_extract to same register";
 
   if (which_alternative == 2)
@@ -3445,18 +3477,20 @@
   return "xxlor %x0,%x1,%x1";
 }
   [(set_attr "type" "*,veclogical,mfvsr")
-   (set_attr "isa" "*,*,p8v")
-   (set_attr "length" "0,*,*")])
+   (set_attr "isa" "*,*,p8v")])
 
 (define_insn "*vsx_extract_<mode>_1"
   [(set (match_operand:<VEC_base> 0 "gpc_reg_operand" "=wa,wr")
 	(vec_select:<VEC_base>
-	 (match_operand:VSX_D 1 "gpc_reg_operand" "wa,wa")
+	 (match_operand:VSX_VP_D 1 "gpc_reg_operand" "wa,wa")
 	 (parallel
 	  [(match_operand:QI 2 "const_0_to_1_operand" "n,n")])))]
   "VECTOR_MEM_VSX_P (<MODE>mode)
    && INTVAL (operands[2]) == (BYTES_BIG_ENDIAN ? 1 : 0)"
 {
+  int ele = INTVAL (operands[2]);
+  (void) rs6000_adjust_for_vector_pair (<MODE>mode, &operands[1], &ele);
+
   if (which_alternative == 1)
     return "mfvsrld %0,%x1";
 
@@ -3545,24 +3579,27 @@
 }
   [(set_attr "type" "fpload,load")])
 
-;; Extract a SF element from V4SF
-(define_insn_and_split "vsx_extract_v4sf"
+;; Extract a SF element from V4SF or V8SF
+(define_insn_and_split "vsx_extract_<mode>"
   [(set (match_operand:SF 0 "vsx_register_operand" "=wa")
 	(vec_select:SF
-	 (match_operand:V4SF 1 "vsx_register_operand" "wa")
+	 (match_operand:V4SF_V8SF 1 "vsx_register_operand" "wa")
 	 (parallel [(match_operand:QI 2 "u5bit_cint_operand" "n")])))
-   (clobber (match_scratch:V4SF 3 "=0"))]
+   (clobber (match_scratch:V4SF 3 "=wa"))]
   "VECTOR_UNIT_VSX_P (V4SFmode)"
   "#"
-  "&& 1"
+  "&& (<MODE>mode == V4SFmode || reload_completed)"
   [(const_int 0)]
 {
+  /* If this is V8SFmode, select the right vector registers.  */
+  int index = INTVAL (operands[2]);
+  (void) rs6000_adjust_for_vector_pair (<MODE>mode, &operands[1], &index);
+
   rtx op0 = operands[0];
   rtx op1 = operands[1];
-  rtx op2 = operands[2];
   rtx op3 = operands[3];
   rtx tmp;
-  HOST_WIDE_INT ele = BYTES_BIG_ENDIAN ? INTVAL (op2) : 3 - INTVAL (op2);
+  HOST_WIDE_INT ele = BYTES_BIG_ENDIAN ? index : 3 - index;
 
   if (ele == 0)
     tmp = op1;
@@ -3752,9 +3789,9 @@
 (define_expand  "vsx_extract_<mode>"
   [(parallel [(set (match_operand:<VEC_base> 0 "gpc_reg_operand")
 		   (vec_select:<VEC_base>
-		    (match_operand:VSX_EXTRACT_I 1 "gpc_reg_operand")
+		    (match_operand:VSX_EXTRACT_VP 1 "gpc_reg_operand")
 		    (parallel [(match_operand:QI 2 "const_int_operand")])))
-	      (clobber (match_scratch:VSX_EXTRACT_I 3))])]
+	      (clobber (match_scratch:VSX_EXTRACT_VP 3))])]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
 {
   /* If we have ISA 3.0, we can do a xxextractuw/vextractu{b,h}.  */
@@ -3769,7 +3806,7 @@
 (define_insn "vsx_extract_<mode>_p9"
   [(set (match_operand:<VEC_base> 0 "gpc_reg_operand" "=r,<VSX_EX>")
 	(vec_select:<VEC_base>
-	 (match_operand:VSX_EXTRACT_I 1 "gpc_reg_operand" "v,<VSX_EX>")
+	 (match_operand:VSX_EXTRACT_VP 1 "gpc_reg_operand" "v,<VSX_EX>")
 	 (parallel [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>" "n,n")])))
    (clobber (match_scratch:SI 3 "=r,X"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_VEXTRACTUB"
@@ -3779,12 +3816,15 @@
 
   else
     {
-      HOST_WIDE_INT elt = INTVAL (operands[2]);
+      int elt = INTVAL (operands[2]);
+      machine_mode mode
+	=  rs6000_adjust_for_vector_pair (<MODE>mode, &operands[1], &elt);
+      HOST_WIDE_INT nunits = GET_MODE_NUNITS (mode);
       HOST_WIDE_INT elt_adj = (!BYTES_BIG_ENDIAN
-			       ? GET_MODE_NUNITS (<MODE>mode) - 1 - elt
+			       ? nunits - 1 - elt
 			       : elt);
 
-      HOST_WIDE_INT unit_size = GET_MODE_UNIT_SIZE (<MODE>mode);
+      HOST_WIDE_INT unit_size = GET_MODE_UNIT_SIZE (mode);
       HOST_WIDE_INT offset = unit_size * elt_adj;
 
       operands[2] = GEN_INT (offset);
@@ -3800,7 +3840,7 @@
 (define_split
   [(set (match_operand:<VEC_base> 0 "int_reg_operand")
 	(vec_select:<VEC_base>
-	 (match_operand:VSX_EXTRACT_I 1 "altivec_register_operand")
+	 (match_operand:VSX_EXTRACT_VP 1 "altivec_register_operand")
 	 (parallel [(match_operand:QI 2 "const_int_operand")])))
    (clobber (match_operand:SI 3 "int_reg_operand"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_VEXTRACTUB && reload_completed"
@@ -3808,9 +3848,12 @@
 {
   rtx op0_si = gen_rtx_REG (SImode, REGNO (operands[0]));
   rtx op1 = operands[1];
-  rtx op2 = operands[2];
   rtx op3 = operands[3];
-  HOST_WIDE_INT offset = INTVAL (op2) * GET_MODE_UNIT_SIZE (<MODE>mode);
+  int elt = INTVAL (operands[2]);
+  machine_mode mode
+    =  rs6000_adjust_for_vector_pair (<MODE>mode, &operands[1], &elt);
+
+  HOST_WIDE_INT offset = elt * GET_MODE_UNIT_SIZE (mode);
 
   emit_move_insn (op3, GEN_INT (offset));
   if (BYTES_BIG_ENDIAN)
@@ -3825,7 +3868,7 @@
   [(set (match_operand:DI 0 "gpc_reg_operand" "=r,<VSX_EX>")
 	(zero_extend:DI
 	 (vec_select:<VEC_base>
-	  (match_operand:VSX_EXTRACT_I 1 "gpc_reg_operand" "v,<VSX_EX>")
+	  (match_operand:VSX_EXTRACT_VP 1 "gpc_reg_operand" "v,<VSX_EX>")
 	  (parallel [(match_operand:QI 2 "const_int_operand" "n,n")]))))
    (clobber (match_scratch:SI 3 "=r,X"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_VEXTRACTUB"

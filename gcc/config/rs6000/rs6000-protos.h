@@ -138,6 +138,8 @@ extern void rs6000_emit_swsqrt (rtx, rtx, bool);
 extern void output_toc (FILE *, rtx, int, machine_mode);
 extern void rs6000_fatal_bad_address (rtx);
 extern rtx create_TOC_reference (rtx, rtx);
+extern machine_mode vector_pair_to_vector_mode (machine_mode);
+extern machine_mode rs6000_adjust_for_vector_pair (machine_mode, rtx *, int *);
 extern void rs6000_split_multireg_move (rtx, rtx);
 extern void rs6000_emit_le_vsx_permute (rtx, rtx, machine_mode);
 extern void rs6000_emit_le_vsx_move (rtx, rtx, machine_mode);
