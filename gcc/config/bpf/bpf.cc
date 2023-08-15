@@ -752,7 +752,7 @@ bpf_print_register (FILE *file, rtx op, int code)
     fprintf (file, "%s", reg_names[REGNO (op)]);
   else
     {
-      if (code == 'w' && GET_MODE (op) == SImode)
+      if (code == 'w' && GET_MODE_SIZE (GET_MODE (op)) <= 4)
 	{
 	  if (REGNO (op) == BPF_FP)
 	    fprintf (file, "w10");
