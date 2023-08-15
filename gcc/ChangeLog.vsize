@@ -1,3 +1,31 @@
+==================== Branch work131-vsize, patch #60 ====================
+
+Add -mlxvp and -mstxvp.  Allow __vector_pair to be passed and returned.
+
+2023-08-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (movoo): Add support for -m{,no-}lxvp and
+	-m{,no-}stxvp.
+	* config/rs6000/rs6000-call.cc (USE_ALTIVEC_FOR_ARG_P): Allow OOmode to
+	be passed and returned.
+	(rs6000_return_in_memory): Likewise.
+	(rs6000_function_arg): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_debug_reg_global): Document whether we
+	are generating lxvp and stxvp with -mdebug=reg.
+	(rs6000_setup_reg_addr_masks): Do not allow OOmode to use indexed
+	addresses if we are not generating lxvp or stxvp.
+	* config/rs6000/rs6000.md (isa attribute): Add lxvp and stxvp
+	attributes.
+	(enabled attribute): Likewise.
+	(vector-pair.md): Include vector-pair.md.
+	* config/rs6000/rs6000.opt (-mlxvp): New option.
+	(-mstxvp): Likewise.
+	(-mvector-size-32): Likewise.
+	* config/rs6000/t-rs6000 (MD_INCLUDES): Add vector-pair.md.
+	* config/rs6000/vector-pair.md: New file.
+
 ==================== Branch work131-vsize, baseline ====================
 
 2023-08-14   Michael Meissner  <meissner@linux.ibm.com>
