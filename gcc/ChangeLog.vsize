@@ -1,30 +1,86 @@
-==================== Branch work131-vsize, patch #60 ====================
+==================== Branch work131-vsize, patch #61 ====================
 
-Add -mlxvp and -mstxvp.  Allow __vector_pair to be passed and returned.
+Add initial support for __attribute__((vector_size(32)))
 
 2023-08-14  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
-	* config/rs6000/mma.md (movoo): Add support for -m{,no-}lxvp and
-	-m{,no-}stxvp.
+	* config/rs6000/mma.md (movoo): Add support for -mno-lxvp and
+	-mno-stxvp.
+	* config/rs6000/predicates.md (const_0_to_31_operand): New predicate.
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
+	__VECTOR_PAIR__ if -mvector-pair is used.
 	* config/rs6000/rs6000-call.cc (USE_ALTIVEC_FOR_ARG_P): Allow OOmode to
-	be passed and returned.
+	be passed and returned in altivec registers.
 	(rs6000_return_in_memory): Likewise.
 	(rs6000_function_arg): Likewise.
-	* config/rs6000/rs6000.cc (rs6000_debug_reg_global): Document whether we
-	are generating lxvp and stxvp with -mdebug=reg.
-	(rs6000_setup_reg_addr_masks): Do not allow OOmode to use indexed
-	addresses if we are not generating lxvp or stxvp.
-	* config/rs6000/rs6000.md (isa attribute): Add lxvp and stxvp
-	attributes.
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Add
+	-mvector-pair.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000-protos.h (vector_pair_to_vector_mode): New
+	declaration.
+	(rs6000_adjust_for_vector_pair): Likewise.
+	* config/rs6000/rs6000.cc (struct vpair_mode_info): New support for
+	vector pair types.
+	(VPAIR_MODE_INIT): Likewise.
+	(vpair_modes): Likewise.
+	(rs6000_hard_regno_mode_ok_uncached): Add support for vectors that exist
+	in paired vector registers.
+	(rs6000_hard_regno_mode_ok): Likewise.
+	(rs6000_modes_tieable_p): Likewise.
+	(rs6000_debug_reg_global): Print if lxvp and stxvp are being generated
+	in debug output.
+	(rs6000_setup_reg_addr_masks): Add support for -mno-lxvp and
+	-mno-stxvp.
+	(rs6000_init_hard_regno_mode_ok): Set up the vector modes in vector pair
+	registers.
+	(rs6000_option_override_internal): Do not enable -mvector-pair by
+	default.
+	(rs6000_expand_vector_extract): Add support for vectors in paired vector
+	registers.
+	(reg_offset_addressing_ok_p): Likewise.
+	(rs6000_emit_move): Likewise.
+	(rs6000_preferred_reload_class): Likewise.
+	(rs6000_opt_masks): Add support for -mvector-pair.
+	(vector_pair_to_vector_mode): New vector pair support function.
+	(rs6000_adjust_for_vector_pair): Likewise.
+	(rs6000_split_vpair_constant): Likewise.
+	(rs6000_split_multireg_move): Add support for vectors in paired vector
+	registers.
+	* config/rs6000/altivec.md (VECTOR_PAIR_MODE): New macro.
+	* config/rs6000/rs6000.md (isa attribute): Add support for -mno-lxvp and
+	-mno-stxvp.
 	(enabled attribute): Likewise.
-	(vector-pair.md): Include vector-pair.md.
+	(wd attribute): Add paired vector modes.
+	(RELOAD): Build reload handlers for paired vector modes.
+	(toplevel): Include vector-pair.md.
 	* config/rs6000/rs6000.opt (-mlxvp): New option.
 	(-mstxvp): Likewise.
-	(-mvector-size-32): Likewise.
+	(-mvector-pair): Likewise.
 	* config/rs6000/t-rs6000 (MD_INCLUDES): Add vector-pair.md.
 	* config/rs6000/vector-pair.md: New file.
+	* config/rs6000/vsx.md (VSX_VP_D): New mode iterator.
+	(VSX_EXTRACT_VP): Likewise.
+	(VSX_EXTRACT_WIDTH): Add paired vector modes.
+	(VSX_EXTRACT_PREDICATE): Likewise.
+	(VSX_EX): Likewise.
+	(V4SF_V8SF): New mode iterator.
+	(vsx_extract_<mode>, VSX_VP_D iterator): Change iterator from VSX_D to
+	VSX_VP_D to allow extraction from paired vector modes.  Add support to
+	adjust the register and element #.
+	(vsx_extract_<mode>_0): Add support for paired vector modes.
+	(vsx_extract_<mode>_1): Likewise.
+	(vsx_extract_v4sf): Convert to vsx_extract_<mode> to allow extraction of
+	SFmode from V4SFmode and V8SFmode.  Add support to adjust the register
+	and element #.
+	(vsx_extract_<mode>, VSX_EXTRACT_VP_I iterator): Change iterator from
+	VSX_EXTRACT_I to VSX_EXTRACT_DP_I to allow extraction from paired
+	vections.  Add support to adjust the register and element #.
+	(vsx_extract_<mode>_p9, VSX_EXTRACT_VP_I iterator): Likewise.
+	(vsx_extract_<mode> splitter, VSX_EXTRACT_VP_I iterator): Likewise.
+
+==================== Branch work131-vsize, patch #60 was reverted ====================
 
 ==================== Branch work131-vsize, baseline ====================
 
