@@ -1,5 +1,154 @@
 ==================== Branch work131-vpair, baseline ====================
 
+Fix __vector_pair tests.
+
+2023-08-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/pr96506-1.c: Remove tests for passing
+	__vector_pair.  Remove unused external function declarations.
+	* gcc.target/powerpc/pr96506-2.c: Remove tests for returning
+	__vector_pair.  Remove unused external function declarations.
+
+==================== Branch work131-vpair, patch #20 ====================
+
+Implement vector pair support.
+
+2023-08-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (vpair_fma_fpcontract_<vp_pmode>4): Add
+	combiner insn for FMA instructions.
+	(vpair_fms_fpcontract_<vp_pmode>): Likewise.
+	(vpair_nfma_fpcontract_<vp_pmode>4): Likewise.
+	(vpair_nfms_fpcontract_<vp_pmode>4): Likewise.
+
+2023-08-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (VP_FP_UNARY): Rename from
+	VPAIR_FP_UNARY.  Change all uses.
+	(VP_FP_BINARY): Rename from VPAIR_FP_BINARY.  Change all uses.
+	(VP_INT_BINARY): Rename from VPAIR_INT_BINARY.  Change all uses.
+	(vp_insn): Rename from vpair_op.  Change all uses.
+	(vp_ireg): Rename from vpair_ireg.  Change all uses.
+	(vp_ipredicate): Rename from vpair_ipred.  Change all uses.
+	(VP_FP): Rename from VPAIR_FP.  Change all uses.
+	(VP_INT): Rename from VPAIR_INT.  Change all uses.
+	(VP_ALL): Rename from VPAIR_ALL.  Change all uses.
+	(VP_VEC_MODE): Rename from VPAIR_VECTOR.  Change all uses.
+	(vp_pmode): Rename from vpair_mode.  Change all uses.
+	(vp_neg_reg): Rename from vpair_neg_reg.  Change all uses.
+	(VP_SPLAT): Rename from VPAIR_SPLAT.  Change all uses.
+	(vp_splat_pmode): Rename from vpair_splat_mode.  Change all uses.
+	(VP_SPLAT_VMODE): Rename from VPAIR_SPLAT_VMODE.  Change all uses.
+
+2023-08-11  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (vpair_get_vector_<vpair_mode>): Reverse
+	word number on little endian systems.
+
+2023-08-10  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_f64_splat): Fix
+	argument type.
+	* config/rs6000/vector-pair.md (vpair_splat_<vpair_splat_mode>): Update
+	to use rs6000_expand_vector_init.
+
+2023-08-10  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* doc/extend.texi (PowerPC built-in functions): Document vector pair
+	splat.
+
+2023-08-10  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_*_splat): Add splat
+	built-in.
+	* config/rs6000/vector-pair.md (VPAIR_SPLAT): New mode iterator.
+	(vpair_splat_mode): New mode attribute.
+	(VPAIR_SPLAT_VMODE): New mode attribute.
+	(vpair_splat_<vpair_splat_mode>): New insns.
+
+
+2023-08-09  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (VPAIR_FP_UNARY): Remove extra space.
+	(vpair_mode): Rename from vpair_type.  Change all users.
+
+2023-08-09  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/predicates.md (mma_assemble_input_operand); Allow all
+	128-bit vector types.
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_*_assemble): New
+	built-ins.
+	* config/rs6000/vector-pair.md (vpair_assemble_<vpair_type>): New insns.
+	* doc/extend.texi (PowerPC built-in functions): Add
+	__builtin_vpair_*_assemble.
+
+2023-08-08  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (movoo): Add support for -mno-lxvp and
+	-mno-stxvp.
+	* config/rs6000/rs6000.md (rs6000_debug_reg_global): Print out whether
+	lxvp and stxvp will be generated.
+	(rs6000_setup_reg_addr_masks): Do not support indexed addresses for
+	OOmode if either lxvp or stxvp is not being generated.
+	* config/rs6000/rs6000.md (isa attribute): Add new attributes for
+	generating lxvp and stxvp.
+	* config/rs6000/rs6000.opt (-mlxvp): New option.
+	(-mstxvp): Likewise.
+
+2023-08-04  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_*_get_vector): Add
+	built-ins.
+	* config/rs6000/vector-pair.md (VPAIR_FP): Rename from VPAIR_FP_WRAPPER.
+	(VPAIR_INT): Rename from VPAIR_INT_WRAPPER.
+	(VPAIR_ALL): New int iterator.
+	(vpair_get_vector_<vpair_type>): New insns.
+	(vpair_*): Rename VPAIR_FP_WRAPPER to VPAIR_FP.  Rename
+	VPAIR_INT_WRAPPER to VPAIR_INT.
+	* doc/extend.texi (PowerPC Built-in Functions): Move where vector pair
+	built-ins are documented.  Document __builtin_vpair_*_get_vector.
+
+2023-08-03  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair*): New vector pair
+	built-in functions.
+	* config/rs6000/rs6000-call.cc (USE_ALTIVEC_FOR_ARG_P): Allow
+	__vector_pair to be passed and returned.
+	(rs6000_return_in_memory): Likewise.
+	(rs6000_function_arg): Likewise.
+	* config/rs6000/rs6000.md (vector-pair.md): Add new .md file for vector
+	pair built-in support.
+	* config/rs6000/t-rs6000 (MD_INCLUDES): Likewise.
+	* config/rs6000/vector-pair.md: New file.
+	* doc/extend.texi (PowerPC Built-in Functions): Document the vector pair
+	built-in functions.
+
+==================== Branch work131-vpair, baseline ====================
+
 2023-08-14   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
