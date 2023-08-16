@@ -1,4 +1,27 @@
-==================== Branch work131-vpair, baseline ====================
+==================== Branch work131-vpair, patch #21 ====================
+
+Move splitting vector pair to rs6000.cc
+
+2023-08-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-protos.h (split_unary_vector_pair): New
+	declaration.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pair): Likewise.
+	* config/rs6000/rs6000.cc (split_unary_vector_pair): New vector pair
+	splitter.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pair): Likewise.
+	* config/rs6000/rvector-mode.md (vp_insn): Standard name for not is
+	one_cmpl.
+	(vp_vmode): New int attribute.
+	(all insns): Change to use splitter functions in rs6000.cc instead of
+	doing all splits in place.  Fix up integer negate to use subtract for
+	V16QI and V8HI modes.
+
+==================== Branch work131-vpair, patch #21 ====================
 
 Fix __vector_pair tests.
 
