@@ -1,3 +1,15 @@
+==================== Branch work131-vsize, patch #64 ====================
+
+Fix thinko in fma optimization.
+
+2023-08-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000/vector-mode.md (fms<mode>3): Use the correct mode
+	for negate when splitting.
+	(nfms<mode>3): Likewise.
+
 ==================== Branch work131-vsize, patch #63 ====================
 
 Disable -mvector-pair by default.  Fix __vector_pair tests.
