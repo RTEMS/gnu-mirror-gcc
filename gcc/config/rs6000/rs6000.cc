@@ -361,33 +361,6 @@ struct rs6000_reg_addr {
 
 static struct rs6000_reg_addr reg_addr[NUM_MACHINE_MODES];
 
-/* Vector pair modes that are supported with -mvector-pair.  */
-struct vpair_mode_info {
-  machine_mode vp_mode;			/* vector mode to use.  */
-  enum insn_code reload_di_load;	/* reload input handler, 64-bit.  */
-  enum insn_code reload_di_store;	/* reload output handler, 64-bit.  */
-  enum insn_code reload_si_load;	/* reload input handler, 32-bit.  */
-  enum insn_code reload_si_store;	/* reload output handler, 32-bit.  */
-};
-
-#define VPAIR_MODE_INIT(UC_TYPE, LC_TYPE)				\
-  {									\
-    UC_TYPE,								\
-    CODE_FOR_reload_ ## LC_TYPE ## _di_load,				\
-    CODE_FOR_reload_ ## LC_TYPE ## _di_store,				\
-    CODE_FOR_reload_ ## LC_TYPE ## _si_load,				\
-    CODE_FOR_reload_ ## LC_TYPE ## _si_store,				\
-  }
-
-static const struct vpair_mode_info vpair_modes[] = {
-  VPAIR_MODE_INIT (V32QImode, v32qi),
-  VPAIR_MODE_INIT (V16HImode, v16hi),
-  VPAIR_MODE_INIT (V8SImode,  v8si),
-  VPAIR_MODE_INIT (V4DImode,  v4di),
-  VPAIR_MODE_INIT (V8SFmode,  v8sf),
-  VPAIR_MODE_INIT (V4DFmode,  v4df),
-};
-
 /* Helper function to say whether a mode supports PRE_INC or PRE_DEC.  */
 static inline bool
 mode_supports_pre_incdec_p (machine_mode mode)
@@ -2611,10 +2584,11 @@ rs6000_debug_reg_global (void)
 	     (int)VECTOR_ELEMENT_MFVSRLD_64BIT);
 
   if (TARGET_MMA)
-    fprintf (stderr, DEBUG_FMT_ID "%s, %s\n",
+    fprintf (stderr, DEBUG_FMT_ID "%s, %s, %s\n",
 	     "vector_pair",
 	     TARGET_LXVP ? "lxvp" : "no-lxvp",
-	     TARGET_STXVP ? "stxvp" : "no-stxvp");
+	     TARGET_STXVP ? "stxvp" : "no-stxvp",
+	     TARGET_VECTOR_PAIR ? "vector-pair" : "no-vector-pair");
 }
 
 
@@ -2980,13 +2954,29 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 
   if (TARGET_VECTOR_PAIR)
     {
-      for (size_t i = 0; i < ARRAY_SIZE (vpair_modes); i++)
-	{
-	  machine_mode vpair_mode = vpair_modes[i].vp_mode;
-	  rs6000_vector_unit[vpair_mode] = VECTOR_NONE;
-	  rs6000_vector_mem[vpair_mode] = VECTOR_VSX;
-	  rs6000_vector_align[vpair_mode] = 256;
-	}
+      rs6000_vector_unit[V32QImode] = VECTOR_NONE;
+      rs6000_vector_mem[V32QImode] = VECTOR_VSX;
+      rs6000_vector_align[V32QImode] = 256;
+
+      rs6000_vector_unit[V16HImode] = VECTOR_NONE;
+      rs6000_vector_mem[V16HImode] = VECTOR_VSX;
+      rs6000_vector_align[V16HImode] = 256;
+
+      rs6000_vector_unit[V8SImode] = VECTOR_NONE;
+      rs6000_vector_mem[V8SImode] = VECTOR_VSX;
+      rs6000_vector_align[V8SImode] = 256;
+
+      rs6000_vector_unit[V4DImode] = VECTOR_NONE;
+      rs6000_vector_mem[V4DImode] = VECTOR_VSX;
+      rs6000_vector_align[V4DImode] = 256;
+
+      rs6000_vector_unit[V8SFmode] = VECTOR_NONE;
+      rs6000_vector_mem[V8SFmode] = VECTOR_VSX;
+      rs6000_vector_align[V8SFmode] = 256;
+
+      rs6000_vector_unit[V4DFmode] = VECTOR_NONE;
+      rs6000_vector_mem[V4DFmode] = VECTOR_VSX;
+      rs6000_vector_align[V4DFmode] = 256;
     }
 
   /* Register class constraints for the constraints that depend on compile
@@ -3123,14 +3113,18 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 
 	      if (TARGET_VECTOR_PAIR)
 		{
-		  for (size_t i = 0; i < ARRAY_SIZE (vpair_modes); i++)
-		    {
-		      machine_mode vm = vpair_modes[i].vp_mode;
-		      reg_addr[vm].reload_store
-			= vpair_modes[i].reload_di_store;
-		      reg_addr[vm].reload_load
-			= vpair_modes[i].reload_di_load;
-		    }
+		  reg_addr[V32QImode].reload_store = CODE_FOR_reload_v32qi_di_store;
+		  reg_addr[V32QImode].reload_load = CODE_FOR_reload_v32qi_di_load;
+		  reg_addr[V16HImode].reload_store = CODE_FOR_reload_v16hi_di_store;
+		  reg_addr[V16HImode].reload_load = CODE_FOR_reload_v16hi_di_load;
+		  reg_addr[V8SImode].reload_store = CODE_FOR_reload_v8si_di_store;
+		  reg_addr[V8SImode].reload_load = CODE_FOR_reload_v8si_di_load;
+		  reg_addr[V4DImode].reload_store = CODE_FOR_reload_v4di_di_store;
+		  reg_addr[V4DImode].reload_load = CODE_FOR_reload_v4di_di_load;
+		  reg_addr[V8SFmode].reload_store = CODE_FOR_reload_v8sf_di_store;
+		  reg_addr[V8SFmode].reload_load = CODE_FOR_reload_v8sf_di_load;
+		  reg_addr[V4DFmode].reload_store = CODE_FOR_reload_v4df_di_store;
+		  reg_addr[V4DFmode].reload_load = CODE_FOR_reload_v4df_di_load;
 		}
 	    }
 	}
@@ -3192,14 +3186,18 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 
 	  if (TARGET_VECTOR_PAIR)
 	    {
-	      for (size_t i = 0; i < ARRAY_SIZE (vpair_modes); i++)
-		{
-		  machine_mode vm = vpair_modes[i].vp_mode;
-		  reg_addr[vm].reload_store
-		    = vpair_modes[i].reload_si_store;
-		  reg_addr[vm].reload_load
-		    = vpair_modes[i].reload_si_load;
-		}
+	      reg_addr[V32QImode].reload_store = CODE_FOR_reload_v32qi_si_store;
+	      reg_addr[V32QImode].reload_load = CODE_FOR_reload_v32qi_si_load;
+	      reg_addr[V16HImode].reload_store = CODE_FOR_reload_v16hi_si_store;
+	      reg_addr[V16HImode].reload_load = CODE_FOR_reload_v16hi_si_load;
+	      reg_addr[V8SImode].reload_store = CODE_FOR_reload_v8si_si_store;
+	      reg_addr[V8SImode].reload_load = CODE_FOR_reload_v8si_si_load;
+	      reg_addr[V4DImode].reload_store = CODE_FOR_reload_v4di_si_store;
+	      reg_addr[V4DImode].reload_load = CODE_FOR_reload_v4di_si_load;
+	      reg_addr[V8SFmode].reload_store = CODE_FOR_reload_v8sf_si_store;
+	      reg_addr[V8SFmode].reload_load = CODE_FOR_reload_v8sf_si_load;
+	      reg_addr[V4DFmode].reload_store = CODE_FOR_reload_v4df_si_store;
+	      reg_addr[V4DFmode].reload_load = CODE_FOR_reload_v4df_si_load;
 	    }
 	}
 
@@ -4505,10 +4503,21 @@ rs6000_option_override_internal (bool global_init_p)
      Turn off vector pair/mma options on non-power10 systems.  */
   if (!TARGET_MMA && TARGET_VECTOR_PAIR)
     {
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_VECTOR_PAIR) != 0)
+      if (OPTION_SET_P(TARGET_VECTOR_PAIR))
 	error ("%qs requires %qs", "-mvector-pair", "-mmma");
+      TARGET_VECTOR_PAIR = 0;
+    }
 
-      rs6000_isa_flags &= ~OPTION_MASK_VECTOR_PAIR;
+  /* Warn if -mlxvp or -mstxvp are used and MMA is not set.  */
+  if (!TARGET_MMA)
+    {
+      if (TARGET_LXVP && OPTION_SET_P(TARGET_LXVP))
+	warning (0, "%qs should not be used unless you use %qs",
+		 "-mlxvp", "-mmma");
+      if (TARGET_STXVP && OPTION_SET_P(TARGET_STXVP))
+	warning (0, "%qs should not be used unless you use %qs",
+		 "-mstxvp", "-mmma");
+      TARGET_LXVP = TARGET_STXVP = 0;
     }
 
   if (!TARGET_PCREL && TARGET_PCREL_OPT)
@@ -24393,7 +24402,6 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "save-toc-indirect",	OPTION_MASK_SAVE_TOC_INDIRECT,	false, true  },
   { "string",			0,				false, true  },
   { "update",			OPTION_MASK_NO_UPDATE,		true , true  },
-  { "vector-pair",		OPTION_MASK_VECTOR_PAIR,	false, true  },
   { "vsx",			OPTION_MASK_VSX,		false, true  },
 #ifdef OPTION_MASK_64BIT
 #if TARGET_AIX_OS
