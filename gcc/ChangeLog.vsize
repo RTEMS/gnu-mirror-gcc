@@ -1,3 +1,39 @@
+==================== Branch work131-vsize, patch #63 ====================
+
+Disable -mvector-pair by default.  Fix __vector_pair tests.
+
+2023-08-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Move
+	-mvector-pair from here.
+	(rs6000_cpu_cpp_builtins):  Move -mvector-pair here.
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Remove vector
+	pair.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.cc (vpair_mode_info): Delete.
+	(VPAIR_MODE_INIT): Likewise.
+	(vpair_modes): Likewise.
+	(rs6000_debug_reg_global): Print if -mvector-pair is set.
+	(rs6000_init_hard_regno_mode_ok): Change how vector pair types and modes
+	are set up.
+	(rs6000_option_override_internal): -mvector-pair was changed from a mask
+	to a separate variable.  Add warnings if -mlxvp or -mstxvp are used
+	without -mmma.
+	(rs6000_opt_masks): Delete -mvector-pair.
+	* config/rs6000/rs6000.opt (-mlxvp): Add save attribute.
+	(-mstxvp): Likewise.
+	(-mvector-pair): Change from being a mask to being a separate variable.
+	Do not enable -mvector-pair by default.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/pr96506-1.c: Remove tests for passing
+	__vector_pair.  Remove unused external function declarations.
+	* gcc.target/powerpc/pr96506-2.c: Remove tests for returning
+	__vector_pair.  Remove unused external function declarations.
+
 ==================== Branch work131-vsize, patch #62 ====================
 
 Fix endian issue on vector pair extract.
