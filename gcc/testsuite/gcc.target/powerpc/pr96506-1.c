@@ -3,29 +3,14 @@
 /* { dg-require-effective-target power10_ok } */
 /* { dg-options "-mdejagnu-cpu=power10 -O2" } */
 
-extern void bar0();
-extern void bar1();
 extern void bar2();
 extern void bar3();
 
-typedef __vector_pair vpair_t;
 typedef __vector_quad vquad_t;
 
-/* Verify we flag errors on the following.  */
-
-void
-foo0 (void)
-{
-  __vector_pair v;
-  bar0 (v); /* { dg-error "invalid use of MMA operand of type .__vector_pair. as a function parameter" } */
-}
-
-void
-foo1 (void)
-{
-  vpair_t v;
-  bar1 (v); /* { dg-error "invalid use of MMA operand of type .__vector_pair. as a function parameter" } */
-}
+/* Verify we flag errors on the following.  We now allow __vector_pair to be
+   passed or called, so only check if we get a message for __vector_quad is
+   passed as an argument or returned.  */
 
 void
 foo2 (void)
