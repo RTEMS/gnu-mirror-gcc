@@ -32,38 +32,40 @@
 ;; Iterator for the integer vector pair modes
 (define_mode_iterator VPAIR_INT [V32QI V16HI V8SI V4DI])
 
+;; Special iterators for NEG (V4SI and V2DI have vneg{w,d}), while V16QI and
+;; V8HI have to use a subtract from 0.
+(define_mode_iterator VPAIR_NEG_VNEG [V4DI V8SI])
+(define_mode_iterator VPAIR_NEG_SUB [V32QI V16HI])
+
 ;; Iterator for the floating point vector pair modes
 (define_mode_iterator VPAIR_FP [V8SF V4DF])
 
 ;; Iterator doing unary/binary arithmetic on vector pairs.  Split it into
 ;; integer and floating point operations.
-(define_code_iterator VPAIR_INT_UNARY   [neg abs not])
+(define_code_iterator VPAIR_INT_UNARY   [not])
 (define_code_iterator VPAIR_INT_BINARY  [plus minus smin smax])
 (define_code_iterator VPAIR_INT_LOGICAL [and ior xor])
 
-(define_code_iterator VPAIR_FP_UNARY  [neg abs sqrt])
-(define_code_iterator VPAIR_FP_BINARY [plus minus mult div copysign smin smax])
+(define_code_iterator VPAIR_FP_UNARY  [abs neg])
+(define_code_iterator VPAIR_FP_BINARY [plus minus mult smin smax])
 
 ;; Give the insn name from the opertion
 (define_code_attr vpair_op [(abs      "abs")
 			    (and      "and")
-			    (copysign "copysign")
-			    (div      "div")
 			    (fma      "fma")
 			    (ior      "ior")
 			    (minus    "sub")
 			    (mult     "mul")
-			    (not      "not")
+			    (not      "one_cmpl")
 			    (neg      "neg")
 			    (plus     "add")
 			    (smin     "smin")
 			    (smax     "smax")
-			    (sqrt     "sqrt")
 			    (umin     "umin")
 			    (umax     "umax")
 			    (xor      "xor")])
 
-;; Map vector pair to vector
+;; Map vector pair mode to vector mode in upper case
 (define_mode_attr VPAIR_VECT [(V32QI "V16QI")
 			      (V16HI "V8HI")
 			      (V8SI  "V4SI")
@@ -71,6 +73,13 @@
 			      (V8SF  "V4SF")
 			      (V4DF  "V2DF")])
 
+;; Map vector pair to lower case vector mode
+(define_mode_attr vpair_vect [(V32QI "v16qi")
+			      (V16HI "v8hi")
+			      (V8SI  "v4si")
+			      (V4DI  "v2di")
+			      (V8SF  "v4sf")
+			      (V4DF  "v2df")])
 
 ;; Vector pair move support.
 (define_expand "mov<mode>"
@@ -119,44 +128,28 @@
   "TARGET_VECTOR_PAIR"
   "#"
   "&& reload_completed"
-  [(set (match_dup 2) (VPAIR_FP_UNARY:<VPAIR_VECT> (match_dup 3)))
-   (set (match_dup 4) (VPAIR_FP_UNARY:<VPAIR_VECT> (match_dup 5)))]
+  [(const_int 0)]
 {
-  machine_mode vmode = <VPAIR_VECT>mode;
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-
-  operands[2] = gen_rtx_REG (vmode, reg0);
-  operands[3] = gen_rtx_REG (vmode, reg1);
-  operands[4] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[5] = gen_rtx_REG (vmode, reg1 + 1);
+  split_unary_vector_pair (<VPAIR_VECT>mode, operands,
+			   gen_<vpair_op><vpair_vect>2);
+  DONE;
 }
   [(set_attr "length" "8")])
 
 ;; Optimize negative absolute value (both floating point and integer)
 (define_insn_and_split "nabs<mode>2"
-  [(set (match_operand:VPAIR 0 "vsx_register_operand" "=wa")
-	(neg:VPAIR
-	 (abs:VPAIR
-	  (match_operand:VPAIR 1 "vsx_register_operand" "wa"))))]
+  [(set (match_operand:VPAIR_FP 0 "vsx_register_operand" "=wa")
+	(neg:VPAIR_FP
+	 (abs:VPAIR_FP
+	  (match_operand:VPAIR_FP 1 "vsx_register_operand" "wa"))))]
   "TARGET_VECTOR_PAIR"
   "#"
   "&& reload_completed"
-  [(set (match_dup 2)
-	(neg:<VPAIR_VECT>
-	 (abs:<VPAIR_VECT> (match_dup 3))))
-   (set (match_dup 4)
-	(neg:<VPAIR_VECT>
-	 (abs:<VPAIR_VECT> (match_dup 5))))]
+  [(const_int 0)]
 {
-  machine_mode vmode = <VPAIR_VECT>mode;
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-
-  operands[2] = gen_rtx_REG (vmode, reg0);
-  operands[3] = gen_rtx_REG (vmode, reg1);
-  operands[4] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[5] = gen_rtx_REG (vmode, reg1 + 1);
+  split_unary_vector_pair (<VPAIR_VECT>mode, operands,
+			   gen_vsx_nabs<vpair_vect>2);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -169,25 +162,11 @@
   "TARGET_VECTOR_PAIR"
   "#"
   "&& reload_completed"
-  [(set (match_dup 3)
-	(VPAIR_FP_BINARY:<VPAIR_VECT> (match_dup 4)
-				      (match_dup 5)))
-   (set (match_dup 6)
-	(VPAIR_FP_BINARY:<VPAIR_VECT> (match_dup 7)
-				      (match_dup 8)))]
+  [(const_int 0)]
 {
-  machine_mode vmode = <VPAIR_VECT>mode;
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-
-  operands[3] = gen_rtx_REG (vmode, reg0);
-  operands[4] = gen_rtx_REG (vmode, reg1);
-  operands[5] = gen_rtx_REG (vmode, reg2);
-
-  operands[6] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[7] = gen_rtx_REG (vmode, reg1 + 1);
-  operands[8] = gen_rtx_REG (vmode, reg2 + 1);
+  split_binary_vector_pair (<VPAIR_VECT>mode, operands,
+			    gen_<vpair_op><vpair_vect>3);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -201,30 +180,11 @@
   "TARGET_VECTOR_PAIR"
   "#"
   "&& reload_completed"
-  [(set (match_dup 4)
-	(fma:<VPAIR_VECT> (match_dup 5)
-			  (match_dup 6)
-			  (match_dup 7)))
-   (set (match_dup 8)
-	(fma:<VPAIR_VECT> (match_dup 9)
-			  (match_dup 10)
-			  (match_dup 11)))]
+  [(const_int 0)]
 {
-  machine_mode vmode = <VPAIR_VECT>mode;
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-  unsigned reg3 = reg_or_subregno (operands[3]);
-
-  operands[4] = gen_rtx_REG (vmode, reg0);
-  operands[5] = gen_rtx_REG (vmode, reg1);
-  operands[6] = gen_rtx_REG (vmode, reg2);
-  operands[7] = gen_rtx_REG (vmode, reg3);
-
-  operands[8] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[9] = gen_rtx_REG (vmode, reg1 + 1);
-  operands[10] = gen_rtx_REG (vmode, reg2 + 1);
-  operands[11] = gen_rtx_REG (vmode, reg3 + 1);
+  split_fma_vector_pair (<VPAIR_VECT>mode, operands,
+			 gen_fma<vpair_vect>4);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -239,32 +199,11 @@
   "TARGET_VECTOR_PAIR"
   "#"
   "&& reload_completed"
-  [(set (match_dup 4)
-	(fma:<VPAIR_VECT> (match_dup 5)
-			  (match_dup 6)
-			  (neg:<VPAIR_VECT>
-			   (match_dup 7))))
-   (set (match_dup 8)
-	(fma:<VPAIR_VECT> (match_dup 9)
-			  (match_dup 10)
-			  (neg:<VPAIR_VECT>
-			   (match_dup 11))))]
+  [(const_int 0)]
 {
-  machine_mode vmode = <VPAIR_VECT>mode;
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-  unsigned reg3 = reg_or_subregno (operands[3]);
-
-  operands[4] = gen_rtx_REG (vmode, reg0);
-  operands[5] = gen_rtx_REG (vmode, reg1);
-  operands[6] = gen_rtx_REG (vmode, reg2);
-  operands[7] = gen_rtx_REG (vmode, reg3);
-
-  operands[8] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[9] = gen_rtx_REG (vmode, reg1 + 1);
-  operands[10] = gen_rtx_REG (vmode, reg2 + 1);
-  operands[11] = gen_rtx_REG (vmode, reg3 + 1);
+  split_fma_vector_pair (<VPAIR_VECT>mode, operands,
+			 gen_fms<vpair_vect>4);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -279,32 +218,11 @@
   "TARGET_VECTOR_PAIR"
   "#"
   "&& reload_completed"
-  [(set (match_dup 4)
-	(neg:<VPAIR_VECT>
-	 (fma:<VPAIR_VECT> (match_dup 5)
-			   (match_dup 6)
-			   (match_dup 7))))
-   (set (match_dup 8)
-	(neg:<VPAIR_VECT>
-	 (fma:<VPAIR_VECT> (match_dup 9)
-			   (match_dup 10)
-			   (match_dup 11))))]
+  [(const_int 0)]
 {
-  machine_mode vmode = <VPAIR_VECT>mode;
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-  unsigned reg3 = reg_or_subregno (operands[3]);
-
-  operands[4] = gen_rtx_REG (vmode, reg0);
-  operands[5] = gen_rtx_REG (vmode, reg1);
-  operands[6] = gen_rtx_REG (vmode, reg2);
-  operands[7] = gen_rtx_REG (vmode, reg3);
-
-  operands[8] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[9] = gen_rtx_REG (vmode, reg1 + 1);
-  operands[10] = gen_rtx_REG (vmode, reg2 + 1);
-  operands[11] = gen_rtx_REG (vmode, reg3 + 1);
+  split_fma_vector_pair (<VPAIR_VECT>mode, operands,
+			 gen_nfma<vpair_vect>4);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -320,34 +238,11 @@
   "TARGET_VECTOR_PAIR"
   "#"
   "&& reload_completed"
-  [(set (match_dup 4)
-	(neg:<VPAIR_VECT>
-	 (fma:<VPAIR_VECT> (match_dup 5)
-			   (match_dup 6)
-			   (neg:<VPAIR_VECT>
-			    (match_dup 7)))))
-   (set (match_dup 8)
-	(neg:<VPAIR_VECT>
-	 (fma:<VPAIR_VECT> (match_dup 9)
-			   (match_dup 10)
-			   (neg:<VPAIR_VECT>
-			    (match_dup 11)))))]
+  [(const_int 0)]
 {
-  machine_mode vmode = <VPAIR_VECT>mode;
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-  unsigned reg3 = reg_or_subregno (operands[3]);
-
-  operands[4] = gen_rtx_REG (vmode, reg0);
-  operands[5] = gen_rtx_REG (vmode, reg1);
-  operands[6] = gen_rtx_REG (vmode, reg2);
-  operands[7] = gen_rtx_REG (vmode, reg3);
-
-  operands[8] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[9] = gen_rtx_REG (vmode, reg1 + 1);
-  operands[10] = gen_rtx_REG (vmode, reg2 + 1);
-  operands[11] = gen_rtx_REG (vmode, reg3 + 1);
+  split_fma_vector_pair (<VPAIR_VECT>mode, operands,
+			 gen_nfms<vpair_vect>4);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -442,17 +337,56 @@
   "TARGET_VECTOR_PAIR"
   "#"
   "&& reload_completed"
-  [(set (match_dup 2) (VPAIR_INT_UNARY:<VPAIR_VECT> (match_dup 3)))
-   (set (match_dup 4) (VPAIR_INT_UNARY:<VPAIR_VECT> (match_dup 5)))]
+  [(const_int 0)]
 {
-  machine_mode vmode = <VPAIR_VECT>mode;
+  split_unary_vector_pair (<VPAIR_VECT>mode, operands,
+			   gen_<vpair_op><vpair_vect>2);
+  DONE;
+}
+  [(set_attr "length" "8")])
+
+;; Vector pair negate if we have the VNEGx instruction.
+(define_insn_and_split "neg<mode>2"
+  [(set (match_operand:VPAIR_NEG_VNEG 0 "vsx_register_operand" "=v")
+	(neg:VPAIR_NEG_VNEG
+	 (match_operand:VPAIR_NEG_VNEG 1 "vsx_register_operand" "v")))]
+  "TARGET_VECTOR_PAIR"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_unary_vector_pair (<VPAIR_VECT>mode, operands,
+			   gen_neg<vpair_vect>2);
+  DONE;
+}
+  [(set_attr "length" "8")])
+
+;; Vector pair negate if we have to do a subtract from 0
+(define_insn_and_split "neg<mode>2"
+  [(set (match_operand:VPAIR_NEG_SUB 0 "vsx_register_operand" "=v")
+	(neg:VPAIR_NEG_SUB
+	 (match_operand:VPAIR_NEG_SUB 1 "vsx_register_operand" "v")))
+   (clobber (match_scratch:<VPAIR_VECT> 2 "=&v"))]
+  "TARGET_VECTOR_PAIR"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  enum machine_mode mode = <VPAIR_VECT>mode;
+  rtx tmp = operands[2];
   unsigned reg0 = reg_or_subregno (operands[0]);
   unsigned reg1 = reg_or_subregno (operands[1]);
 
-  operands[2] = gen_rtx_REG (vmode, reg0);
-  operands[3] = gen_rtx_REG (vmode, reg1);
-  operands[4] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[5] = gen_rtx_REG (vmode, reg1 + 1);
+  emit_move_insn (tmp, CONST0_RTX (mode));
+  emit_insn (gen_sub<vpair_vect>3 (gen_rtx_REG (mode, reg0),
+				   tmp,
+				   gen_rtx_REG (mode, reg1)));
+
+  emit_insn (gen_sub<vpair_vect>3 (gen_rtx_REG (mode, reg0 + 1),
+				   tmp,
+				   gen_rtx_REG (mode, reg1 + 1)));
+
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -465,25 +399,11 @@
   "TARGET_VECTOR_PAIR"
   "#"
   "&& reload_completed"
-  [(set (match_dup 3)
-	(VPAIR_INT_BINARY:<VPAIR_VECT> (match_dup 4)
-				      (match_dup 5)))
-   (set (match_dup 6)
-	(VPAIR_INT_BINARY:<VPAIR_VECT> (match_dup 7)
-				      (match_dup 8)))]
+  [(const_int 0)]
 {
-  machine_mode vmode = <VPAIR_VECT>mode;
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-
-  operands[3] = gen_rtx_REG (vmode, reg0);
-  operands[4] = gen_rtx_REG (vmode, reg1);
-  operands[5] = gen_rtx_REG (vmode, reg2);
-
-  operands[6] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[7] = gen_rtx_REG (vmode, reg1 + 1);
-  operands[8] = gen_rtx_REG (vmode, reg2 + 1);
+  split_binary_vector_pair (<VPAIR_VECT>mode, operands,
+			   gen_<vpair_op><vpair_vect>3);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -496,24 +416,10 @@
   "TARGET_VECTOR_PAIR"
   "#"
   "&& reload_completed"
-  [(set (match_dup 3)
-	(VPAIR_INT_LOGICAL:<VPAIR_VECT> (match_dup 4)
-					(match_dup 5)))
-   (set (match_dup 6)
-	(VPAIR_INT_LOGICAL:<VPAIR_VECT> (match_dup 7)
-					(match_dup 8)))]
+  [(const_int 0)]
 {
-  machine_mode vmode = <VPAIR_VECT>mode;
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-
-  operands[3] = gen_rtx_REG (vmode, reg0);
-  operands[4] = gen_rtx_REG (vmode, reg1);
-  operands[5] = gen_rtx_REG (vmode, reg2);
-
-  operands[6] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[7] = gen_rtx_REG (vmode, reg1 + 1);
-  operands[8] = gen_rtx_REG (vmode, reg2 + 1);
+  split_binary_vector_pair (<VPAIR_VECT>mode, operands,
+			   gen_<vpair_op><vpair_vect>3);
+  DONE;
 }
   [(set_attr "length" "8")])
