@@ -51,7 +51,7 @@
 			   (ior      "ior")
 			   (minus    "sub")
 			   (mult     "mul")
-			   (not      "not")
+			   (not      "one_cmpl")
 			   (neg      "neg")
 			   (plus     "add")
 			   (smin     "smin")
@@ -119,6 +119,15 @@
 			   (UNSPEC_VPAIR_V16HI "v16hi")
 			   (UNSPEC_VPAIR_V8SI  "v8si")
 			   (UNSPEC_VPAIR_V4DI  "v4di")])
+
+;; Map VP_{INT,FP,ALL} to a lower case name to identify the vector after the
+;; vector pair has been split.
+(define_int_attr vp_vmode [(UNSPEC_VPAIR_V4DF  "v2df")
+			   (UNSPEC_VPAIR_V8SF  "v4sf")
+			   (UNSPEC_VPAIR_V32QI "v16qi")
+			   (UNSPEC_VPAIR_V16HI "v8hi")
+			   (UNSPEC_VPAIR_V8SI  "v4si")
+			   (UNSPEC_VPAIR_V4DI  "v2di")])
 
 ;; Map VP_INT to constraints used for the negate scratch register.  For vectors
 ;; of QI and HI, we need to change -a into 0 - a since we don't have a negate
@@ -251,17 +260,11 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 2) (VP_FP_UNARY:<VP_VEC_MODE> (match_dup 3)))
-   (set (match_dup 4) (VP_FP_UNARY:<VP_VEC_MODE> (match_dup 5)))]
+  [(const_int 0)]
 {
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  machine_mode vmode = <VP_VEC_MODE>mode;
-
-  operands[2] = gen_rtx_REG (vmode, reg0);
-  operands[3] = gen_rtx_REG (vmode, reg1);
-  operands[4] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[5] = gen_rtx_REG (vmode, reg1 + 1);
+  split_unary_vector_pair (<VP_VEC_MODE>mode, operands,
+			   gen_<vp_insn><vp_vmode>2);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -277,19 +280,11 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 2)
-	(neg:<VP_VEC_MODE> (abs:<VP_VEC_MODE> (match_dup 3))))
-   (set (match_dup 4)
-	(neg:<VP_VEC_MODE> (abs:<VP_VEC_MODE> (match_dup 5))))]
+  [(const_int 0)]
 {
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  machine_mode vmode = <VP_VEC_MODE>mode;
-
-  operands[2] = gen_rtx_REG (vmode, reg0);
-  operands[3] = gen_rtx_REG (vmode, reg1);
-  operands[4] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[5] = gen_rtx_REG (vmode, reg1 + 1);
+  split_unary_vector_pair (<VP_VEC_MODE>mode, operands,
+			   gen_vsx_nabs<vp_vmode>2);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -303,25 +298,11 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 3)
-	(VP_FP_BINARY:<VP_VEC_MODE> (match_dup 4)
-				    (match_dup 5)))
-   (set (match_dup 6)
-	(VP_FP_BINARY:<VP_VEC_MODE> (match_dup 7)
-				    (match_dup 8)))]
+  [(const_int 0)]
 {
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-  machine_mode vmode = <VP_VEC_MODE>mode;
-
-  operands[3] = gen_rtx_REG (vmode, reg0);
-  operands[4] = gen_rtx_REG (vmode, reg1);
-  operands[5] = gen_rtx_REG (vmode, reg2);
-
-  operands[6] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[7] = gen_rtx_REG (vmode, reg1 + 1);
-  operands[8] = gen_rtx_REG (vmode, reg2 + 1);
+  split_binary_vector_pair (<VP_VEC_MODE>mode, operands,
+			    gen_<vp_insn><vp_vmode>3);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -337,30 +318,11 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 4)
-	(fma:<VP_VEC_MODE> (match_dup 5)
-			   (match_dup 6)
-			   (match_dup 7)))
-   (set (match_dup 8)
-	(fma:<VP_VEC_MODE> (match_dup 9)
-			   (match_dup 10)
-			   (match_dup 11)))]
+  [(const_int 0)]
 {
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-  unsigned reg3 = reg_or_subregno (operands[3]);
-  machine_mode vmode = <VP_VEC_MODE>mode;
-
-  operands[4] = gen_rtx_REG (vmode, reg0);
-  operands[5] = gen_rtx_REG (vmode, reg1);
-  operands[6] = gen_rtx_REG (vmode, reg2);
-  operands[7] = gen_rtx_REG (vmode, reg3);
-
-  operands[8] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[9] = gen_rtx_REG (vmode, reg1 + 1);
-  operands[10] = gen_rtx_REG (vmode, reg2 + 1);
-  operands[11] = gen_rtx_REG (vmode, reg3 + 1);
+  split_fma_vector_pair (<VP_VEC_MODE>mode, operands,
+			 gen_fma<vp_vmode>4);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -377,30 +339,11 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 4)
-	(fma:<VP_VEC_MODE> (match_dup 5)
-			   (match_dup 6)
-			   (neg:<VP_VEC_MODE> (match_dup 7))))
-   (set (match_dup 8)
-	(fma:<VP_VEC_MODE> (match_dup 9)
-			   (match_dup 10)
-			   (neg:<VP_VEC_MODE> (match_dup 11))))]
+  [(const_int 0)]
 {
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-  unsigned reg3 = reg_or_subregno (operands[3]);
-  machine_mode vmode = <VP_VEC_MODE>mode;
-
-  operands[4] = gen_rtx_REG (vmode, reg0);
-  operands[5] = gen_rtx_REG (vmode, reg1);
-  operands[6] = gen_rtx_REG (vmode, reg2);
-  operands[7] = gen_rtx_REG (vmode, reg3);
-
-  operands[8] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[9] = gen_rtx_REG (vmode, reg1 + 1);
-  operands[10] = gen_rtx_REG (vmode, reg2 + 1);
-  operands[11] = gen_rtx_REG (vmode, reg3 + 1);
+  split_fma_vector_pair (<VP_VEC_MODE>mode, operands,
+			 gen_fms<vp_vmode>4);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -418,32 +361,11 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 4)
-	(neg:<VP_VEC_MODE>
-	 (fma:<VP_VEC_MODE> (match_dup 5)
-			    (match_dup 6)
-			    (match_dup 7))))
-   (set (match_dup 8)
-	(neg:<VP_VEC_MODE>
-	 (fma:<VP_VEC_MODE> (match_dup 9)
-			    (match_dup 10)
-			    (match_dup 11))))]
+  [(const_int 0)]
 {
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-  unsigned reg3 = reg_or_subregno (operands[3]);
-  machine_mode vmode = <VP_VEC_MODE>mode;
-
-  operands[4] = gen_rtx_REG (vmode, reg0);
-  operands[5] = gen_rtx_REG (vmode, reg1);
-  operands[6] = gen_rtx_REG (vmode, reg2);
-  operands[7] = gen_rtx_REG (vmode, reg3);
-
-  operands[8] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[9] = gen_rtx_REG (vmode, reg1 + 1);
-  operands[10] = gen_rtx_REG (vmode, reg2 + 1);
-  operands[11] = gen_rtx_REG (vmode, reg3 + 1);
+  split_fma_vector_pair (<VP_VEC_MODE>mode, operands,
+			 gen_nfma<vp_vmode>4);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -463,32 +385,11 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 4)
-	(neg:<VP_VEC_MODE>
-	 (fma:<VP_VEC_MODE> (match_dup 5)
-			    (match_dup 6)
-			    (neg:<VP_VEC_MODE> (match_dup 7)))))
-   (set (match_dup 8)
-	(neg:<VP_VEC_MODE>
-	 (fma:<VP_VEC_MODE> (match_dup 9)
-			    (match_dup 10)
-			    (neg:<VP_VEC_MODE> (match_dup 11)))))]
+  [(const_int 0)]
 {
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-  unsigned reg3 = reg_or_subregno (operands[3]);
-  machine_mode vmode = <VP_VEC_MODE>mode;
-
-  operands[4] = gen_rtx_REG (vmode, reg0);
-  operands[5] = gen_rtx_REG (vmode, reg1);
-  operands[6] = gen_rtx_REG (vmode, reg2);
-  operands[7] = gen_rtx_REG (vmode, reg3);
-
-  operands[8] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[9] = gen_rtx_REG (vmode, reg1 + 1);
-  operands[10] = gen_rtx_REG (vmode, reg2 + 1);
-  operands[11] = gen_rtx_REG (vmode, reg3 + 1);
+  split_fma_vector_pair (<VP_VEC_MODE>mode, operands,
+			 gen_nfms<vp_vmode>4);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -729,18 +630,11 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 2) (not:<VP_VEC_MODE> (match_dup 3)))
-   (set (match_dup 4) (not:<VP_VEC_MODE> (match_dup 5)))]
+  [(const_int 0)]
 {
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  machine_mode vmode = <VP_VEC_MODE>mode;
-
-  operands[2] = gen_rtx_REG (vmode, reg0);
-  operands[3] = gen_rtx_REG (vmode, reg1);
-
-  operands[4] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[5] = gen_rtx_REG (vmode, reg1 + 1);
+  split_unary_vector_pair (<VP_VEC_MODE>mode, operands,
+			   gen_one_cmpl<vp_vmode>2);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -754,25 +648,11 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 3)
-	(VP_INT_BINARY:<VP_VEC_MODE> (match_dup 4)
-				     (match_dup 5)))
-   (set (match_dup 6)
-	(VP_INT_BINARY:<VP_VEC_MODE> (match_dup 7)
-				     (match_dup 8)))]
+  [(const_int 0)]
 {
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-  machine_mode vmode = <VP_VEC_MODE>mode;
-
-  operands[3] = gen_rtx_REG (vmode, reg0);
-  operands[4] = gen_rtx_REG (vmode, reg1);
-  operands[5] = gen_rtx_REG (vmode, reg2);
-
-  operands[6] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[7] = gen_rtx_REG (vmode, reg1 + 1);
-  operands[8] = gen_rtx_REG (vmode, reg2 + 1);
+  split_binary_vector_pair (<VP_VEC_MODE>mode, operands,
+			    gen_<vp_insn><vp_vmode>3);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -789,25 +669,11 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 3)
-	(and:<VP_VEC_MODE> (not:<VP_VEC_MODE> (match_dup 4))
-			   (match_dup 5)))
-   (set (match_dup 6)
-	(and:<VP_VEC_MODE> (not:<VP_VEC_MODE> (match_dup 7))
-			   (match_dup 8)))]
+  [(const_int 0)]
 {
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-  machine_mode vmode = <VP_VEC_MODE>mode;
-
-  operands[3] = gen_rtx_REG (vmode, reg0);
-  operands[4] = gen_rtx_REG (vmode, reg1);
-  operands[5] = gen_rtx_REG (vmode, reg2);
-
-  operands[6] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[7] = gen_rtx_REG (vmode, reg1 + 1);
-  operands[8] = gen_rtx_REG (vmode, reg2 + 1);
+  split_binary_vector_pair (<VP_VEC_MODE>mode, operands,
+			    gen_andc<vp_vmode>3);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -824,25 +690,11 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 3)
-	(ior:<VP_VEC_MODE> (not:<VP_VEC_MODE> (match_dup 4))
-			   (match_dup 5)))
-   (set (match_dup 6)
-	(ior:<VP_VEC_MODE> (not:<VP_VEC_MODE> (match_dup 7))
-			   (match_dup 8)))]
+  [(const_int 0)]
 {
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-  machine_mode vmode = <VP_VEC_MODE>mode;
-
-  operands[3] = gen_rtx_REG (vmode, reg0);
-  operands[4] = gen_rtx_REG (vmode, reg1);
-  operands[5] = gen_rtx_REG (vmode, reg2);
-
-  operands[6] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[7] = gen_rtx_REG (vmode, reg1 + 1);
-  operands[8] = gen_rtx_REG (vmode, reg2 + 1);
+  split_binary_vector_pair (<VP_VEC_MODE>mode, operands,
+			    gen_orc<vp_vmode>3);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -859,25 +711,11 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 3)
-	(ior:<VP_VEC_MODE> (not:<VP_VEC_MODE> (match_dup 4))
-			   (not:<VP_VEC_MODE> (match_dup 5))))
-   (set (match_dup 6)
-	(ior:<VP_VEC_MODE> (not:<VP_VEC_MODE> (match_dup 7))
-			   (not:<VP_VEC_MODE> (match_dup 8))))]
+  [(const_int 0)]
 {
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-  machine_mode vmode = <VP_VEC_MODE>mode;
-
-  operands[3] = gen_rtx_REG (vmode, reg0);
-  operands[4] = gen_rtx_REG (vmode, reg1);
-  operands[5] = gen_rtx_REG (vmode, reg2);
-
-  operands[6] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[7] = gen_rtx_REG (vmode, reg1 + 1);
-  operands[8] = gen_rtx_REG (vmode, reg2 + 1);
+  split_binary_vector_pair (<VP_VEC_MODE>mode, operands,
+			    gen_nand<vp_vmode>3);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -897,25 +735,11 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 3)
-	(ior:<VP_VEC_MODE> (not:<VP_VEC_MODE> (match_dup 4))
-			   (not:<VP_VEC_MODE> (match_dup 5))))
-   (set (match_dup 6)
-	(ior:<VP_VEC_MODE> (not:<VP_VEC_MODE> (match_dup 7))
-			   (not:<VP_VEC_MODE> (match_dup 8))))]
+  [(const_int 0)]
 {
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-  machine_mode vmode = <VP_VEC_MODE>mode;
-
-  operands[3] = gen_rtx_REG (vmode, reg0);
-  operands[4] = gen_rtx_REG (vmode, reg1);
-  operands[5] = gen_rtx_REG (vmode, reg2);
-
-  operands[6] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[7] = gen_rtx_REG (vmode, reg1 + 1);
-  operands[8] = gen_rtx_REG (vmode, reg2 + 1);
+  split_binary_vector_pair (<VP_VEC_MODE>mode, operands,
+			    gen_nand<vp_vmode>3);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -932,25 +756,11 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 3)
-	(and:<VP_VEC_MODE> (not:<VP_VEC_MODE> (match_dup 4))
-			   (not:<VP_VEC_MODE> (match_dup 5))))
-   (set (match_dup 6)
-	(and:<VP_VEC_MODE> (not:<VP_VEC_MODE> (match_dup 7))
-			   (not:<VP_VEC_MODE> (match_dup 8))))]
+  [(const_int 0)]
 {
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-  machine_mode vmode = <VP_VEC_MODE>mode;
-
-  operands[3] = gen_rtx_REG (vmode, reg0);
-  operands[4] = gen_rtx_REG (vmode, reg1);
-  operands[5] = gen_rtx_REG (vmode, reg2);
-
-  operands[6] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[7] = gen_rtx_REG (vmode, reg1 + 1);
-  operands[8] = gen_rtx_REG (vmode, reg2 + 1);
+  split_binary_vector_pair (<VP_VEC_MODE>mode, operands,
+			    gen_nor<vp_vmode>3);
+  DONE;
 }
   [(set_attr "length" "8")])
 
@@ -968,25 +778,11 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 3)
-	(and:<VP_VEC_MODE> (not:<VP_VEC_MODE> (match_dup 4))
-			   (not:<VP_VEC_MODE> (match_dup 5))))
-   (set (match_dup 6)
-	(and:<VP_VEC_MODE> (not:<VP_VEC_MODE> (match_dup 7))
-			   (not:<VP_VEC_MODE> (match_dup 8))))]
+  [(const_int 0)]
 {
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-  machine_mode vmode = <VP_VEC_MODE>mode;
-
-  operands[3] = gen_rtx_REG (vmode, reg0);
-  operands[4] = gen_rtx_REG (vmode, reg1);
-  operands[5] = gen_rtx_REG (vmode, reg2);
-
-  operands[6] = gen_rtx_REG (vmode, reg0 + 1);
-  operands[7] = gen_rtx_REG (vmode, reg1 + 1);
-  operands[8] = gen_rtx_REG (vmode, reg2 + 1);
+  split_binary_vector_pair (<VP_VEC_MODE>mode, operands,
+			    gen_nor<vp_vmode>3);
+  DONE;
 }
   [(set_attr "length" "8")])
 
