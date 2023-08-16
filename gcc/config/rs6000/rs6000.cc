@@ -27344,13 +27344,17 @@ rs6000_adjust_for_vector_pair (machine_mode orig_mode,
   unsigned regno = reg_or_subregno (*p_reg);
   int element = *p_element;
 
-  /* Choose which register.  */
+  /* Choose which register.  We have to reverse the words for little
+     endian.  */
   int nunits = GET_MODE_NUNITS (vmode);
   if (element >= nunits)
     {
       element -= nunits;
-      regno++;
+      if (WORDS_BIG_ENDIAN)
+	regno++;
     }
+  else if (!WORDS_BIG_ENDIAN)
+    regno++;
 
   /* Adjust elements.  */
   *p_reg = gen_rtx_REG (vmode, regno);
