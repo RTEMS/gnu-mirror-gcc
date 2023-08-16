@@ -242,12 +242,12 @@
   [(set (match_dup 4)
 	(fma:<VPAIR_VECT> (match_dup 5)
 			  (match_dup 6)
-			  (neg:VPAIR_FP
+			  (neg:<VPAIR_VECT>
 			   (match_dup 7))))
    (set (match_dup 8)
 	(fma:<VPAIR_VECT> (match_dup 9)
 			  (match_dup 10)
-			  (neg:VPAIR_FP
+			  (neg:<VPAIR_VECT>
 			   (match_dup 11))))]
 {
   machine_mode vmode = <VPAIR_VECT>mode;
@@ -324,13 +324,13 @@
 	(neg:<VPAIR_VECT>
 	 (fma:<VPAIR_VECT> (match_dup 5)
 			   (match_dup 6)
-			   (neg:VPAIR_FP
+			   (neg:<VPAIR_VECT>
 			    (match_dup 7)))))
    (set (match_dup 8)
 	(neg:<VPAIR_VECT>
 	 (fma:<VPAIR_VECT> (match_dup 9)
 			   (match_dup 10)
-			   (neg:VPAIR_FP
+			   (neg:<VPAIR_VECT>
 			    (match_dup 11)))))]
 {
   machine_mode vmode = <VPAIR_VECT>mode;
