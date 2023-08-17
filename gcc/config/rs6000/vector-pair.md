@@ -423,3 +423,130 @@
   DONE;
 }
   [(set_attr "length" "8")])
+
+;; Optiomize vector pair ~(a | b)  or ((~a) & (~b)) to produce xxlnor
+(define_insn_and_split "*nor<mode>3_1"
+  [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
+	(not:VPAIR_INT
+	 (ior:VPAIR_INT
+	  (match_operand:VPAIR_INT 1 "vsx_register_operand" "wa")
+	  (match_operand:VPAIR_INT 2 "vsx_register_operand" "wa"))))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (<VPAIR_VECT>mode, operands,
+			    gen_nor<vpair_vect>3);
+  DONE;
+}
+  [(set_attr "length" "8")])
+
+(define_insn_and_split "*nor<mode>3_2"
+  [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
+	(and:VPAIR_INT
+	 (not:VPAIR_INT
+	  (match_operand:VPAIR_INT 1 "vsx_register_operand" "wa"))
+	 (not:VPAIR_INT
+	  (match_operand:VPAIR_INT 2 "vsx_register_operand" "wa"))))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (<VPAIR_VECT>mode, operands,
+			    gen_nor<vpair_vect>3);
+  DONE;
+}
+  [(set_attr "length" "8")])
+
+;; Optimize vector pair (~a) & b to use xxlandc
+(define_insn_and_split "*andc<mode>3"
+  [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
+	(and:VPAIR_INT
+	 (not:VPAIR_INT
+	  (match_operand:VPAIR_INT 1 "vsx_register_operand" "wa"))
+	 (match_operand:VPAIR_INT 2 "vsx_register_operand" "wa")))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (<VPAIR_VECT>mode, operands,
+			    gen_andc<vpair_vect>3);
+  DONE;
+}
+  [(set_attr "length" "8")])
+
+;; Optimize vector pair ~(a ^ b) to produce xxleqv
+(define_insn_and_split "*eqv<mode>3"
+  [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
+	(not:VPAIR_INT
+	 (xor:VPAIR_INT
+	  (match_operand:VPAIR_INT 1 "vsx_register_operand" "wa")
+	  (match_operand:VPAIR_INT 2 "vsx_register_operand" "wa"))))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (<VPAIR_VECT>mode, operands,
+			    gen_nor<vpair_vect>3);
+  DONE;
+}
+[(set_attr "length" "8")])
+
+
+;; Optiomize vector pair ~(a & b) or ((~a) | (~b)) to produce xxlnand
+(define_insn_and_split "*nand<mode>3_1"
+  [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
+	(not:VPAIR_INT
+	 (and:VPAIR_INT
+	  (match_operand:VPAIR_INT 1 "vsx_register_operand" "wa")
+	  (match_operand:VPAIR_INT 2 "vsx_register_operand" "wa"))))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (<VPAIR_VECT>mode, operands,
+			    gen_nand<vpair_vect>3);
+  DONE;
+}
+  [(set_attr "length" "8")])
+
+(define_insn_and_split "*nand<mode>3_2"
+  [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
+	(ior:VPAIR_INT
+	 (not:VPAIR_INT
+	  (match_operand:VPAIR_INT 1 "vsx_register_operand" "wa"))
+	 (not:VPAIR_INT
+	  (match_operand:VPAIR_INT 2 "vsx_register_operand" "wa"))))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (<VPAIR_VECT>mode, operands,
+			    gen_nand<vpair_vect>3);
+  DONE;
+}
+  [(set_attr "length" "8")])
+
+;; Optimize vector pair (~a) | b to produce xxlorc
+(define_insn_and_split "*orc<mode>3"
+  [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
+	(ior:VPAIR_INT
+	 (not:VPAIR_INT
+	  (match_operand:VPAIR_INT 1 "vsx_register_operand" "wa"))
+	 (match_operand:VPAIR_INT 2 "vsx_register_operand" "wa")))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (<VPAIR_VECT>mode, operands,
+			    gen_orc<vpair_vect>3);
+  DONE;
+}
+  [(set_attr "length" "8")])
