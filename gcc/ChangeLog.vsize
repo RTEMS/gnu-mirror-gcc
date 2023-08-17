@@ -1,5 +1,22 @@
 ==================== Branch work131-vsize, patch #65 ====================
 
+Add vector logical optimizations.
+
+2023-08-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (nor<mode>3_1): Add combiner patterns for
+	optimization.
+	(nor<mode>3_2): Likewise.
+	(andc<mode>3"): Likewise.
+	(*eqv<mode>3): Likewise.
+	(nand<mode>3_1): Likewise.
+	(nand<mode>3_2): Likewise.
+	(orc<mode>3): Likewise.
+
+==================== Branch work131-vsize, patch #65 ====================
+
 Move splitting vector pair to rs6000.cc
 
 2023-08-15  Michael Meissner  <meissner@linux.ibm.com>
