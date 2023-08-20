@@ -513,8 +513,8 @@ ix86_conditional_register_usage (void)
   if (! (TARGET_80387 || TARGET_FLOAT_RETURNS_IN_80387))
     accessible_reg_set &= ~reg_class_contents[FLOAT_REGS];
 
-  /* If AVX512F is disabled, disable the registers.  */
-  if (! TARGET_AVX512F)
+  /* If AVX512F and AVX10 is disabled, disable the registers.  */
+  if (!TARGET_AVX512F && !TARGET_AVX10_1)
     {
       for (i = FIRST_EXT_REX_SSE_REG; i <= LAST_EXT_REX_SSE_REG; i++)
 	CLEAR_HARD_REG_BIT (accessible_reg_set, i);
@@ -5316,8 +5316,8 @@ standard_sse_constant_opcode (rtx_insn *insn, rtx *operands)
 	case MODE_V4DF:
 	  if (!EXT_REX_SSE_REG_P (operands[0]))
 	    return "vxorpd\t%x0, %x0, %x0";
-	  else if (TARGET_AVX512DQ)
-	    return (TARGET_AVX512VL
+	  else if (TARGET_AVX512DQ || TARGET_AVX10_1)
+	    return ((TARGET_AVX512VL || TARGET_AVX10_1)
 		    ? "vxorpd\t%x0, %x0, %x0"
 		    : "vxorpd\t%g0, %g0, %g0");
 	  else
@@ -5333,8 +5333,8 @@ standard_sse_constant_opcode (rtx_insn *insn, rtx *operands)
 	case MODE_V8SF:
 	  if (!EXT_REX_SSE_REG_P (operands[0]))
 	    return "vxorps\t%x0, %x0, %x0";
-	  else if (TARGET_AVX512DQ)
-	    return (TARGET_AVX512VL
+	  else if (TARGET_AVX512DQ || TARGET_AVX10_1)
+	    return ((TARGET_AVX512VL || TARGET_AVX10_1)
 		    ? "vxorps\t%x0, %x0, %x0"
 		    : "vxorps\t%g0, %g0, %g0");
 	  else
@@ -5490,6 +5490,7 @@ ix86_get_ssemov (rtx *operands, unsigned size,
      we can only use zmm register move without memory operand.  */
   if (evex_reg_p
       && !TARGET_AVX512VL
+      && !TARGET_AVX10_1
       && GET_MODE_SIZE (mode) < 64)
     {
       /* NB: Even though ix86_hard_regno_mode_ok doesn't allow
@@ -19193,7 +19194,7 @@ ix86_vectorize_builtin_scatter (const_tree vectype,
       ? !TARGET_USE_SCATTER_2PARTS
       : (known_eq (TYPE_VECTOR_SUBPARTS (vectype), 4u)
 	 ? !TARGET_USE_SCATTER_4PARTS
-	 : !TARGET_USE_SCATTER))
+	 : !TARGET_USE_SCATTER_8PARTS))
     return NULL_TREE;
 
   if ((TREE_CODE (index_type) != INTEGER_TYPE
@@ -20260,7 +20261,8 @@ ix86_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
 
       return ((TARGET_AVX512F && VALID_MASK_REG_MODE (mode))
 	      || (TARGET_AVX512BW
-		  && VALID_MASK_AVX512BW_MODE (mode)));
+		  && VALID_MASK_AVX512BW_MODE (mode))
+	      || (TARGET_AVX10_1 && VALID_MASK_AVX10_MODE (mode)));
     }
 
   if (GET_MODE_CLASS (mode) == MODE_PARTIAL_INT)
@@ -20293,6 +20295,13 @@ ix86_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
       if (TARGET_AVX512VL
 	  && (VALID_AVX256_REG_OR_OI_MODE (mode)
 	      || VALID_AVX512VL_128_REG_MODE (mode)))
+	return true;
+
+      /* AVX10_1 allows sse regs16+ for 256 bit modes.  */
+      if (TARGET_AVX10_1
+	  && (VALID_AVX256_REG_OR_OI_MODE (mode)
+	      || VALID_AVX512VL_128_REG_MODE (mode)
+	      || VALID_AVX512F_SCALAR_MODE (mode)))
 	return true;
 
       /* xmm16-xmm31 are only available for AVX-512.  */
@@ -21585,7 +21594,8 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
       mask = XEXP (x, 2);
       /* This is masked instruction, assume the same cost,
 	 as nonmasked variant.  */
-      if (TARGET_AVX512F && register_operand (mask, GET_MODE (mask)))
+      if ((TARGET_AVX512F || TARGET_AVX10_1)
+	  && register_operand (mask, GET_MODE (mask)))
 	*total = rtx_cost (XEXP (x, 0), mode, outer_code, opno, speed);
       else
 	*total = cost->sse_op;

@@ -1184,17 +1184,35 @@ second_ratio_invalid_for_first_lmul_p (const vector_insn_info &info1,
 }
 
 static bool
+float_insn_valid_sew_p (const vector_insn_info &info, unsigned int sew)
+{
+  if (info.get_insn () && info.get_insn ()->is_real ()
+      && get_attr_type (info.get_insn ()->rtl ()) == TYPE_VFMOVFV)
+    {
+      if (sew == 16)
+	return TARGET_VECTOR_ELEN_FP_16;
+      else if (sew == 32)
+	return TARGET_VECTOR_ELEN_FP_32;
+      else if (sew == 64)
+	return TARGET_VECTOR_ELEN_FP_64;
+    }
+  return true;
+}
+
+static bool
 second_sew_less_than_first_sew_p (const vector_insn_info &info1,
 				  const vector_insn_info &info2)
 {
-  return info2.get_sew () < info1.get_sew ();
+  return info2.get_sew () < info1.get_sew ()
+	 || !float_insn_valid_sew_p (info1, info2.get_sew ());
 }
 
 static bool
 first_sew_less_than_second_sew_p (const vector_insn_info &info1,
 				  const vector_insn_info &info2)
 {
-  return info1.get_sew () < info2.get_sew ();
+  return info1.get_sew () < info2.get_sew ()
+	 || !float_insn_valid_sew_p (info2, info1.get_sew ());
 }
 
 /* return 0 if LMUL1 == LMUL2.
@@ -3312,6 +3330,23 @@ pass_vsetvl::backward_demand_fusion (void)
 	  else if (block_info.reaching_out.dirty_p ())
 	    {
 	      /* DIRTY -> DIRTY or VALID -> DIRTY.  */
+
+	      /* Forbidden this case fuse because it change the value of a5.
+		   bb 1: vsetvl zero, no_zero_avl
+			 ...
+			 use a5
+			 ...
+		   bb 2: vsetvl a5, zero
+		 =>
+		   bb 1: vsetvl a5, zero
+			 ...
+			 use a5
+			 ...
+		   bb 2:
+	      */
+	      if (block_info.reaching_out.demand_p (DEMAND_NONZERO_AVL)
+		  && vlmax_avl_p (prop.get_avl ()))
+		continue;
 	      vector_insn_info new_info;
 
 	      if (block_info.reaching_out.compatible_p (prop))

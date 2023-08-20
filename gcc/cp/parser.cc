@@ -20017,12 +20017,13 @@ cp_parser_simple_type_specifier (cp_parser* parser,
       /* Otherwise, look for a type-name.  */
       if (!type)
 	{
-	  if (cxx_dialect >= cxx17)
+	  if (cxx_dialect >= cxx17 || flag_concepts)
 	    cp_parser_parse_tentatively (parser);
 
 	  type = cp_parser_type_name (parser, (qualified_p && typename_p));
 
-	  if (cxx_dialect >= cxx17 && !cp_parser_parse_definitely (parser))
+	  if ((cxx_dialect >= cxx17 || flag_concepts)
+	      && !cp_parser_parse_definitely (parser))
 	    type = NULL_TREE;
 	}
 
@@ -45853,6 +45854,7 @@ cp_parser_oacc_cache (cp_parser *parser, cp_token *pragma_tok)
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_COPYIN)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_COPYOUT)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_CREATE)		\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_DEFAULT)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_DETACH)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_DEVICEPTR)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_IF)			\

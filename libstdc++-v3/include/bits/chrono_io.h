@@ -38,7 +38,7 @@
 #include <iomanip> // setw, setfill
 #include <format>
 
-#include <bits/charconv.h>
+#include <bits/streambuf_iterator.h>
 
 namespace std _GLIBCXX_VISIBILITY(default)
 {
@@ -69,34 +69,9 @@ namespace __detail
 #define _GLIBCXX_WIDEN_(C, S) ::std::chrono::__detail::_Widen<C>(S, L##S)
 #define _GLIBCXX_WIDEN(S) _GLIBCXX_WIDEN_(_CharT, S)
 
-
-  // Write an arbitrary duration suffix into the buffer.
-  template<typename _Period>
-    constexpr const char*
-    __units_suffix_misc(char* __buf, size_t /* TODO check length? */) noexcept
-    {
-      namespace __tc = std::__detail;
-      char* __p = __buf;
-      __p[0] = '[';
-      unsigned __nlen = __tc::__to_chars_len((uintmax_t)_Period::num);
-      __tc::__to_chars_10_impl(__p + 1, __nlen, (uintmax_t)_Period::num);
-      __p += 1 + __nlen;
-      if constexpr (_Period::den != 1)
-	{
-	  __p[0] = '/';
-	  unsigned __dlen = __tc::__to_chars_len((uintmax_t)_Period::den);
-	  __tc::__to_chars_10_impl(__p + 1, __dlen, (uintmax_t)_Period::den);
-	  __p += 1 + __dlen;
-	}
-      __p[0] = ']';
-      __p[1] = 's';
-      __p[2] = '\0';
-      return __buf;
-    }
-
   template<typename _Period, typename _CharT>
-    constexpr auto
-    __units_suffix(char* __buf, size_t __n) noexcept
+    constexpr basic_string_view<_CharT>
+    __units_suffix() noexcept
     {
       // The standard say these are all narrow strings, which would need to
       // be widened at run-time when inserted into a wide stream. We use
@@ -134,7 +109,22 @@ namespace __detail
       _GLIBCXX_UNITS_SUFFIX(ratio<3600>,  "h")
       _GLIBCXX_UNITS_SUFFIX(ratio<86400>, "d")
 #undef _GLIBCXX_UNITS_SUFFIX
-      return __detail::__units_suffix_misc<_Period>(__buf, __n);
+	return {};
+    }
+
+  template<typename _Period, typename _CharT, typename _Out>
+    inline _Out
+    __fmt_units_suffix(_Out __out) noexcept
+    {
+      if (auto __s = __detail::__units_suffix<_Period, _CharT>(); __s.size())
+	return __format::__write(std::move(__out), __s);
+      else if constexpr (_Period::den == 1)
+	return std::format_to(std::move(__out), _GLIBCXX_WIDEN("[{}]s"),
+			      (uintmax_t)_Period::num);
+      else
+	return std::format_to(std::move(__out), _GLIBCXX_WIDEN("[{}/{}]s"),
+			      (uintmax_t)_Period::num,
+			      (uintmax_t)_Period::den);
     }
 } // namespace __detail
 /// @endcond
@@ -149,14 +139,14 @@ namespace __detail
     operator<<(std::basic_ostream<_CharT, _Traits>& __os,
 	       const duration<_Rep, _Period>& __d)
     {
+      using _Out = ostreambuf_iterator<_CharT, _Traits>;
       using period = typename _Period::type;
-      char __buf[sizeof("[/]s") + 2 * numeric_limits<intmax_t>::digits10];
       std::basic_ostringstream<_CharT, _Traits> __s;
       __s.flags(__os.flags());
       __s.imbue(__os.getloc());
       __s.precision(__os.precision());
       __s << __d.count();
-      __s << __detail::__units_suffix<period, _CharT>(__buf, sizeof(__buf));
+      __detail::__fmt_units_suffix<period, _CharT>(_Out(__s));
       __os << std::move(__s).str();
       return __os;
     }
@@ -1056,32 +1046,16 @@ namespace __format
       template<typename _Tp, typename _FormatContext>
 	typename _FormatContext::iterator
 	_M_q(const _Tp&, typename _FormatContext::iterator __out,
-	     _FormatContext& __ctx) const
+	     _FormatContext&) const
 	{
 	  // %q The duration's unit suffix
 	  if constexpr (!chrono::__is_duration_v<_Tp>)
 	    __throw_format_error("format error: argument is not a duration");
 	  else
 	    {
+	      namespace __d = chrono::__detail;
 	      using period = typename _Tp::period;
-	      char __buf[sizeof("[/]s") + 2 * numeric_limits<intmax_t>::digits10];
-	      constexpr size_t __n = sizeof(__buf);
-	      auto __s = chrono::__detail::__units_suffix<period, _CharT>(__buf,
-									  __n);
-	      if constexpr (is_same_v<decltype(__s), const _CharT*>)
-		return std::format_to(std::move(__out), _S_empty_spec, __s);
-	      else
-		{
-		  // Suffix was written to __buf as narrow string.
-		  _CharT __wbuf[__n];
-		  size_t __len = __builtin_strlen(__buf);
-		  locale __loc = _M_locale(__ctx);
-		  auto& __ct = use_facet<ctype<_CharT>>(__loc);
-		  __ct.widen(__buf, __len, __wbuf);
-		  __wbuf[__len] = 0;
-		  return std::format_to(std::move(__out), _S_empty_spec,
-					__wbuf);
-		}
+	      return __d::__fmt_units_suffix<period, _CharT>(std::move(__out));
 	    }
 	}
 
@@ -1372,18 +1346,18 @@ namespace __format
 	    {
 	      if (__t._M_abbrev)
 		{
-		  __string_view __wsv;
+		  string_view __sv = *__t._M_abbrev;
 		  if constexpr (is_same_v<_CharT, char>)
-		    __wsv = *__t._M_abbrev;
+		    return __format::__write(std::move(__out), __sv);
 		  else
 		    {
-		      string_view __sv = *__t._M_abbrev;
+		      // TODO use resize_and_overwrite
 		      basic_string<_CharT> __ws(__sv.size(), _CharT());
 		      auto& __ct = use_facet<ctype<_CharT>>(_M_locale(__ctx));
 		      __ct.widen(__sv.begin(), __sv.end(), __ws.data());
-		      __wsv = __ws;
+		      __string_view __wsv = __ws;
+		      return __format::__write(std::move(__out), __wsv);
 		    }
-		  return __format::__write(std::move(__out), __wsv);
 		}
 	    }
 	  else if constexpr (__is_specialization_of<_Tp, __utc_leap_second>)
@@ -2289,8 +2263,7 @@ namespace __detail
     inline basic_ostream<_CharT, _Traits>&
     operator<<(basic_ostream<_CharT, _Traits>& __os, const day& __d)
     {
-      using _Ctx = __conditional_t<is_same_v<_CharT, char>,
-				   format_context, wformat_context>;
+      using _Ctx = __format::__format_context<_CharT>;
       using _Str = basic_string_view<_CharT>;
       _Str __s = _GLIBCXX_WIDEN("{:02d} is not a valid day");
       if (__d.ok())
@@ -2317,8 +2290,7 @@ namespace __detail
     inline basic_ostream<_CharT, _Traits>&
     operator<<(basic_ostream<_CharT, _Traits>& __os, const month& __m)
     {
-      using _Ctx = __conditional_t<is_same_v<_CharT, char>,
-				   format_context, wformat_context>;
+      using _Ctx = __format::__format_context<_CharT>;
       using _Str = basic_string_view<_CharT>;
       _Str __s = _GLIBCXX_WIDEN("{:L%b}{} is not a valid month");
       if (__m.ok())
@@ -2348,8 +2320,7 @@ namespace __detail
     inline basic_ostream<_CharT, _Traits>&
     operator<<(basic_ostream<_CharT, _Traits>& __os, const year& __y)
     {
-      using _Ctx = __conditional_t<is_same_v<_CharT, char>,
-				   format_context, wformat_context>;
+      using _Ctx = __format::__format_context<_CharT>;
       using _Str = basic_string_view<_CharT>;
       _Str __s = _GLIBCXX_WIDEN("-{:04d} is not a valid year");
       if (__y.ok())
@@ -2381,8 +2352,7 @@ namespace __detail
     inline basic_ostream<_CharT, _Traits>&
     operator<<(basic_ostream<_CharT, _Traits>& __os, const weekday& __wd)
     {
-      using _Ctx = __conditional_t<is_same_v<_CharT, char>,
-				   format_context, wformat_context>;
+      using _Ctx = __format::__format_context<_CharT>;
       using _Str = basic_string_view<_CharT>;
       _Str __s = _GLIBCXX_WIDEN("{:L%a}{} is not a valid weekday");
       if (__wd.ok())
@@ -2420,15 +2390,14 @@ namespace __detail
       __os2.imbue(__os.getloc());
       __os2 << __wdi.weekday();
       const auto __i = __wdi.index();
-      if constexpr (is_same_v<_CharT, char>)
-	__os2 << std::format("[{}", __i);
-      else
-	__os2 << std::format(L"[{}", __i);
-      basic_string_view<_CharT> __s = _GLIBCXX_WIDEN(" is not a valid index]");
+      basic_string_view<_CharT> __s
+	= _GLIBCXX_WIDEN("[ is not a valid index]");
+      __os2 << __s[0];
+      __os2 << std::format(_GLIBCXX_WIDEN("{}"), __i);
       if (__i >= 1 && __i <= 5)
 	__os2 << __s.back();
       else
-	__os2 << __s;
+	__os2 << __s.substr(1);
       __os << __os2.view();
       return __os;
     }
@@ -2487,11 +2456,7 @@ namespace __detail
       // As above, just write straight to a stringstream, as if by "{:L}/last"
       basic_stringstream<_CharT> __os2;
       __os2.imbue(__os.getloc());
-      __os2 << __mdl.month();
-      if constexpr (is_same_v<_CharT, char>)
-	__os2 << "/last";
-      else
-	__os2 << L"/last";
+      __os2 << __mdl.month() << _GLIBCXX_WIDEN("/last");
       __os << __os2.view();
       return __os;
     }
@@ -2570,8 +2535,7 @@ namespace __detail
     operator<<(basic_ostream<_CharT, _Traits>& __os,
 	       const year_month_day& __ymd)
     {
-      using _Ctx = __conditional_t<is_same_v<_CharT, char>,
-				   format_context, wformat_context>;
+      using _Ctx = __format::__format_context<_CharT>;
       using _Str = basic_string_view<_CharT>;
       _Str __s = _GLIBCXX_WIDEN("{:%F} is not a valid date");
       __os << std::vformat(__ymd.ok() ? __s.substr(0, 5) : __s,

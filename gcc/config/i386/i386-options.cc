@@ -141,6 +141,11 @@ along with GCC; see the file COPYING3.  If not see
 #define m_ARROWLAKE (HOST_WIDE_INT_1U<<PROCESSOR_ARROWLAKE)
 #define m_CORE_ATOM (m_SIERRAFOREST | m_GRANDRIDGE)
 #define m_INTEL (HOST_WIDE_INT_1U<<PROCESSOR_INTEL)
+/* Gather Data Sampling / CVE-2022-40982 / INTEL-SA-00828.
+   Software mitigation.  */
+#define m_GDS (m_SKYLAKE | m_SKYLAKE_AVX512 | m_CANNONLAKE \
+	       | m_ICELAKE_CLIENT | m_ICELAKE_SERVER | m_CASCADELAKE \
+	       | m_TIGERLAKE | m_COOPERLAKE | m_ROCKETLAKE)
 
 #define m_LUJIAZUI (HOST_WIDE_INT_1U<<PROCESSOR_LUJIAZUI)
 
@@ -243,7 +248,9 @@ static struct ix86_target_opts isa2_opts[] =
   { "-mavxvnniint16",	OPTION_MASK_ISA2_AVXVNNIINT16 },
   { "-msm3",		OPTION_MASK_ISA2_SM3 },
   { "-msha512",		OPTION_MASK_ISA2_SHA512 },
-  { "-msm4",            OPTION_MASK_ISA2_SM4 }
+  { "-msm4",            OPTION_MASK_ISA2_SM4 },
+  { "-mavx10-max-512bit",	OPTION_MASK_ISA2_AVX10_512BIT },
+  { "-mavx10.1",	OPTION_MASK_ISA2_AVX10_1 }
 };
 static struct ix86_target_opts isa_opts[] =
 {
@@ -983,7 +990,7 @@ ix86_valid_target_attribute_inner_p (tree fndecl, tree args, char *p_strings[],
     ix86_opt_ix86_no,
     ix86_opt_str,
     ix86_opt_enum,
-    ix86_opt_isa
+    ix86_opt_isa,
   };
 
   static const struct
@@ -1100,6 +1107,10 @@ ix86_valid_target_attribute_inner_p (tree fndecl, tree args, char *p_strings[],
     IX86_ATTR_ISA ("sm3", OPT_msm3),
     IX86_ATTR_ISA ("sha512", OPT_msha512),
     IX86_ATTR_ISA ("sm4", OPT_msm4),
+    IX86_ATTR_ISA ("avx10-max-512bit", OPT_mavx10_max_512bit),
+    IX86_ATTR_ISA ("avx10.1", OPT_mavx10_1),
+    IX86_ATTR_ISA ("avx10.1-256", OPT_mavx10_1_256),
+    IX86_ATTR_ISA ("avx10.1-512", OPT_mavx10_1_512),
 
     /* enum options */
     IX86_ATTR_ENUM ("fpmath=",	OPT_mfpmath_),
@@ -1731,20 +1742,46 @@ parse_mtune_ctrl_str (struct gcc_options *opts, bool dump)
           curr_feature_string++;
           clear = true;
         }
-      for (i = 0; i < X86_TUNE_LAST; i++)
-        {
-          if (!strcmp (curr_feature_string, ix86_tune_feature_names[i]))
-            {
-              ix86_tune_features[i] = !clear;
-              if (dump)
-                fprintf (stderr, "Explicitly %s feature %s\n",
-                         clear ? "clear" : "set", ix86_tune_feature_names[i]);
-              break;
-            }
-        }
-      if (i == X86_TUNE_LAST)
-	error ("unknown parameter to option %<-mtune-ctrl%>: %s",
-	       clear ? curr_feature_string - 1 : curr_feature_string);
+
+      if (!strcmp (curr_feature_string, "use_gather"))
+	{
+	  ix86_tune_features[X86_TUNE_USE_GATHER_2PARTS] = !clear;
+	  ix86_tune_features[X86_TUNE_USE_GATHER_4PARTS] = !clear;
+	  ix86_tune_features[X86_TUNE_USE_GATHER_8PARTS] = !clear;
+	  if (dump)
+	    fprintf (stderr, "Explicitly %s features use_gather_2parts,"
+		     " use_gather_4parts, use_gather_8parts\n",
+		     clear ? "clear" : "set");
+
+	}
+      else if (!strcmp (curr_feature_string, "use_scatter"))
+	{
+	  ix86_tune_features[X86_TUNE_USE_SCATTER_2PARTS] = !clear;
+	  ix86_tune_features[X86_TUNE_USE_SCATTER_4PARTS] = !clear;
+	  ix86_tune_features[X86_TUNE_USE_SCATTER_8PARTS] = !clear;
+	  if (dump)
+	    fprintf (stderr, "Explicitly %s features use_scatter_2parts,"
+		     " use_scatter_4parts, use_scatter_8parts\n",
+		     clear ? "clear" : "set");
+	}
+      else
+	{
+	  for (i = 0; i < X86_TUNE_LAST; i++)
+	    {
+	      if (!strcmp (curr_feature_string, ix86_tune_feature_names[i]))
+		{
+		  ix86_tune_features[i] = !clear;
+		  if (dump)
+		    fprintf (stderr, "Explicitly %s feature %s\n",
+			     clear ? "clear" : "set", ix86_tune_feature_names[i]);
+		  break;
+		}
+	    }
+
+	  if (i == X86_TUNE_LAST)
+	    error ("unknown parameter to option %<-mtune-ctrl%>: %s",
+		   clear ? curr_feature_string - 1 : curr_feature_string);
+	}
       curr_feature_string = next_feature_string;
     }
   while (curr_feature_string);
@@ -2523,6 +2560,22 @@ ix86_option_override_internal (bool main_args_p,
     opts->x_ix86_isa_flags
       &= ~((OPTION_MASK_ISA_BMI | OPTION_MASK_ISA_BMI2 | OPTION_MASK_ISA_TBM)
 	   & ~opts->x_ix86_isa_flags_explicit);
+
+  /* Enable AVX512{F,VL,BW,DQ,CD,BF16,FP16,VBMI,VBMI2,VNNI,IFMA,BITALG,
+     VPOPCNTDQ} features for AVX10.1/512.  */
+  if (TARGET_AVX10_1_P (opts->x_ix86_isa_flags2)
+      && TARGET_AVX10_512BIT_P (opts->x_ix86_isa_flags2))
+    {
+      opts->x_ix86_isa_flags
+	|= OPTION_MASK_ISA_AVX512F | OPTION_MASK_ISA_AVX512CD
+	    | OPTION_MASK_ISA_AVX512DQ | OPTION_MASK_ISA_AVX512BW
+	    | OPTION_MASK_ISA_AVX512VL | OPTION_MASK_ISA_AVX512IFMA
+	    | OPTION_MASK_ISA_AVX512VBMI | OPTION_MASK_ISA_AVX512VBMI2
+	    | OPTION_MASK_ISA_AVX512VNNI | OPTION_MASK_ISA_AVX512VPOPCNTDQ
+	    | OPTION_MASK_ISA_AVX512BITALG;
+      opts->x_ix86_isa_flags2
+	|= OPTION_MASK_ISA2_AVX512FP16 | OPTION_MASK_ISA2_AVX512BF16;
+    }
 
   /* Validate -mpreferred-stack-boundary= value or default it to
      PREFERRED_STACK_BOUNDARY_DEFAULT.  */

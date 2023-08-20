@@ -345,6 +345,7 @@ Objective-C and Objective-C++ Dialects}.
 -Wcast-align  -Wcast-align=strict  -Wcast-function-type  -Wcast-qual
 -Wchar-subscripts
 -Wclobbered  -Wcomment
+-Wcompare-distinct-pointer-types
 -Wno-complain-wrong-lang
 -Wconversion  -Wno-coverage-mismatch  -Wno-cpp
 -Wdangling-else  -Wdangling-pointer  -Wdangling-pointer=@var{n}
@@ -430,6 +431,7 @@ Objective-C and Objective-C++ Dialects}.
 -fanalyzer-checker=@var{name}
 -fno-analyzer-feasibility
 -fanalyzer-fine-grained
+-fanalyzer-show-events-in-system-headers
 -fno-analyzer-state-merge
 -fno-analyzer-state-purge
 -fno-analyzer-suppress-followups
@@ -1438,6 +1440,7 @@ See RS/6000 and PowerPC Options.
 -mamx-tile  -mamx-int8  -mamx-bf16 -muintr -mhreset -mavxvnni
 -mavx512fp16 -mavxifma -mavxvnniint8 -mavxneconvert -mcmpccxadd -mamx-fp16
 -mprefetchi -mraoint -mamx-complex -mavxvnniint16 -msm3 -msha512 -msm4
+-mavx10.1 -mavx10.1-256 -mavx10.1-512
 -mcldemote  -mms-bitfields  -mno-align-stringops  -minline-all-stringops
 -minline-stringops-dynamically  -mstringop-strategy=@var{alg}
 -mkl -mwidekl
@@ -9104,6 +9107,11 @@ The latter front end diagnoses
 @samp{f951: Warning: command-line option '-fno-rtti' is valid for C++/D/ObjC++ but not for Fortran},
 which may be disabled with @option{-Wno-complain-wrong-lang}.
 
+@opindex Wcompare-distinct-pointer-types
+@item -Wcompare-distinct-pointer-types @r{(C and Objective-C only)}
+Warn if pointers of distinct types are compared without a cast.  This
+warning is enabled by default.
+
 @opindex Wconversion
 @opindex Wno-conversion
 @item -Wconversion
@@ -11216,6 +11224,14 @@ This option is intended for analyzer developers: if multiple diagnostics
 have been detected as being duplicates of each other, it emits a note when
 reporting the best diagnostic, giving the number of additional diagnostics
 that were suppressed by the deduplication logic.
+
+@opindex fanalyzer-show-events-in-system-headers
+@opindex fno-analyzer-show-events-in-system-headers
+@item -fanalyzer-show-events-in-system-headers
+By default the analyzer emits simplified diagnostics paths by hiding
+events fully located within a system header.
+With @option{-fanalyzer-show-events-in-system-headers} such
+events are no longer suppressed.
 
 @opindex fanalyzer-state-merge
 @opindex fno-analyzer-state-merge
@@ -20544,7 +20560,8 @@ performance of the code.  Permissible values for this option are:
 @samp{cortex-a75.cortex-a55}, @samp{cortex-a76.cortex-a55},
 @samp{cortex-r82}, @samp{cortex-x1}, @samp{cortex-x1c}, @samp{cortex-x2},
 @samp{cortex-x3}, @samp{cortex-a510}, @samp{cortex-a520}, @samp{cortex-a710},
-@samp{cortex-a715}, @samp{ampere1}, @samp{ampere1a}, and @samp{native}.
+@samp{cortex-a715}, @samp{cortex-a720}, @samp{ampere1}, @samp{ampere1a},
+and @samp{native}.
 
 The values @samp{cortex-a57.cortex-a53}, @samp{cortex-a72.cortex-a53},
 @samp{cortex-a73.cortex-a35}, @samp{cortex-a73.cortex-a53},
@@ -33684,6 +33701,15 @@ preferred alignment to @option{-mpreferred-stack-boundary=2}.
 @need 200
 @opindex msm4
 @itemx -msm4
+@need 200
+@opindex mavx10.1
+@itemx -mavx10.1
+@need 200
+@opindex mavx10.1-256
+@itemx -mavx10.1-256
+@need 200
+@opindex mavx10.1-512
+@itemx -mavx10.1-512
 These switches enable the use of instructions in the MMX, SSE,
 AVX512ER, AVX512CD, AVX512VL, AVX512BW, AVX512DQ, AVX512IFMA, AVX512VBMI, SHA,
 AES, PCLMUL, CLFLUSHOPT, CLWB, FSGSBASE, PTWRITE, RDRND, F16C, FMA, PCONFIG,
@@ -33694,9 +33720,9 @@ GFNI, VAES, WAITPKG, VPCLMULQDQ, AVX512BITALG, MOVDIRI, MOVDIR64B, AVX512BF16,
 ENQCMD, AVX512VPOPCNTDQ, AVX5124FMAPS, AVX512VNNI, AVX5124VNNIW, SERIALIZE,
 UINTR, HRESET, AMXTILE, AMXINT8, AMXBF16, KL, WIDEKL, AVXVNNI, AVX512-FP16,
 AVXIFMA, AVXVNNIINT8, AVXNECONVERT, CMPCCXADD, AMX-FP16, PREFETCHI, RAOINT,
-AMX-COMPLEX, AVXVNNIINT16, SM3, SHA512, SM4 or CLDEMOTE extended instruction
-sets. Each has a corresponding @option{-mno-} option to disable use of these
-instructions.
+AMX-COMPLEX, AVXVNNIINT16, SM3, SHA512, SM4, AVX10.1 or CLDEMOTE extended
+instruction sets. Each has a corresponding @option{-mno-} option to disable
+use of these instructions.
 
 These extensions are also available as built-in functions: see
 @ref{x86 Built-in Functions}, for details of the functions enabled and

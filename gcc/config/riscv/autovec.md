@@ -284,6 +284,36 @@
 })
 
 ;; =========================================================================
+;; == Array Load/Store
+;; =========================================================================
+
+(define_expand "vec_mask_len_load_lanes<mode><vsingle>"
+  [(match_operand:VT 0 "register_operand")
+   (match_operand:VT 1 "memory_operand")
+   (match_operand:<VM> 2 "vector_mask_operand")
+   (match_operand 3 "autovec_length_operand")
+   (match_operand 4 "const_0_operand")]
+  "TARGET_VECTOR"
+  {
+    riscv_vector::expand_lanes_load_store (operands, true);
+    DONE;
+  }
+)
+
+(define_expand "vec_mask_len_store_lanes<mode><vsingle>"
+  [(match_operand:VT 0 "memory_operand")
+   (match_operand:VT 1 "register_operand")
+   (match_operand:<VM> 2 "vector_mask_operand")
+   (match_operand 3 "autovec_length_operand")
+   (match_operand 4 "const_0_operand")]
+  "TARGET_VECTOR"
+  {
+    riscv_vector::expand_lanes_load_store (operands, false);
+    DONE;
+  }
+)
+
+;; =========================================================================
 ;; == Vector creation
 ;; =========================================================================
 
@@ -2012,5 +2042,71 @@
     riscv_vector::expand_reduction (PLUS, operands,
 				    operands[1],
 				    riscv_vector::reduction_type::MASK_LEN_FOLD_LEFT);
+  DONE;
+})
+
+;; -------------------------------------------------------------------------
+;; ---- [INT] Average.
+;; -------------------------------------------------------------------------
+;; Implements the following "average" patterns:
+;; floor:
+;;  op[0] = (narrow) ((wide) op[1] + (wide) op[2]) >> 1;
+;; ceil:
+;;  op[0] = (narrow) ((wide) op[1] + (wide) op[2] + 1)) >> 1;
+;; -------------------------------------------------------------------------
+
+(define_expand "<u>avg<v_double_trunc>3_floor"
+ [(set (match_operand:<V_DOUBLE_TRUNC> 0 "register_operand")
+   (truncate:<V_DOUBLE_TRUNC>
+    (<ext_to_rshift>:VWEXTI
+     (plus:VWEXTI
+      (any_extend:VWEXTI
+       (match_operand:<V_DOUBLE_TRUNC> 1 "register_operand"))
+      (any_extend:VWEXTI
+       (match_operand:<V_DOUBLE_TRUNC> 2 "register_operand"))))))]
+  "TARGET_VECTOR"
+{
+  /* First emit a widening addition.  */
+  rtx tmp1 = gen_reg_rtx (<MODE>mode);
+  rtx ops1[] = {tmp1, operands[1], operands[2]};
+  insn_code icode = code_for_pred_dual_widen (PLUS, <CODE>, <MODE>mode);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_BINOP, ops1);
+
+  /* Then a narrowing shift.  */
+  rtx ops2[] = {operands[0], tmp1, const1_rtx};
+  icode = code_for_pred_narrow_scalar (<EXT_TO_RSHIFT>, <MODE>mode);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_BINOP, ops2);
+  DONE;
+})
+
+(define_expand "<u>avg<v_double_trunc>3_ceil"
+ [(set (match_operand:<V_DOUBLE_TRUNC> 0 "register_operand")
+   (truncate:<V_DOUBLE_TRUNC>
+    (<ext_to_rshift>:VWEXTI
+     (plus:VWEXTI
+      (plus:VWEXTI
+       (any_extend:VWEXTI
+	(match_operand:<V_DOUBLE_TRUNC> 1 "register_operand"))
+       (any_extend:VWEXTI
+	(match_operand:<V_DOUBLE_TRUNC> 2 "register_operand")))
+      (const_int 1)))))]
+  "TARGET_VECTOR"
+{
+  /* First emit a widening addition.  */
+  rtx tmp1 = gen_reg_rtx (<MODE>mode);
+  rtx ops1[] = {tmp1, operands[1], operands[2]};
+  insn_code icode = code_for_pred_dual_widen (PLUS, <CODE>, <MODE>mode);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_BINOP, ops1);
+
+  /* Then add 1.  */
+  rtx tmp2 = gen_reg_rtx (<MODE>mode);
+  rtx ops2[] = {tmp2, tmp1, const1_rtx};
+  icode = code_for_pred_scalar (PLUS, <MODE>mode);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_BINOP, ops2);
+
+  /* Finally, a narrowing shift.  */
+  rtx ops3[] = {operands[0], tmp2, const1_rtx};
+  icode = code_for_pred_narrow_scalar (<EXT_TO_RSHIFT>, <MODE>mode);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_BINOP, ops3);
   DONE;
 })

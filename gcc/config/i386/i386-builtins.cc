@@ -278,15 +278,16 @@ def_builtin (HOST_WIDE_INT mask, HOST_WIDE_INT mask2,
       if (((mask2 == 0 || (mask2 & ix86_isa_flags2) != 0)
 	   && (mask == 0 || (mask & ix86_isa_flags) != 0))
 	  || ((mask & OPTION_MASK_ISA_MMX) != 0 && TARGET_MMX_WITH_SSE)
-	  /* "Unified" builtin used by either AVXVNNI/AVXIFMA/AES intrinsics
-	     or AVX512VNNIVL/AVX512IFMAVL/VAESVL non-mask intrinsics should be
-	     defined whenever avxvnni/avxifma/aes or avx512vnni/avx512ifma/vaes
-	     && avx512vl exist.  */
+	  /* "Unified" builtin used by either AVXVNNI/AVXIFMA/AES/AVX10.1
+	     intrinsics or AVX512VNNIVL/AVX512IFMAVL/VAESVL/- non-mask
+	     intrinsics should be defined whenever avxvnni/avxifma/aes/avx10.1 or
+	     avx512vnni/avx512ifma/vaes/- && avx512vl exist.  */
 	  || (mask2 == OPTION_MASK_ISA2_AVXVNNI)
 	  || (mask2 == OPTION_MASK_ISA2_AVXIFMA)
 	  || (mask2 == (OPTION_MASK_ISA2_AVXNECONVERT
 			| OPTION_MASK_ISA2_AVX512BF16))
 	  || ((mask2 & OPTION_MASK_ISA2_VAES) != 0)
+	  || ((mask2 & OPTION_MASK_ISA2_AVX10_1) != 0)
 	  || (lang_hooks.builtin_function
 	      == lang_hooks.builtin_function_ext_scope))
 	{
@@ -1657,7 +1658,7 @@ ix86_vectorize_builtin_gather (const_tree mem_vectype,
 	  ? !TARGET_USE_GATHER_2PARTS
 	  : (known_eq (TYPE_VECTOR_SUBPARTS (mem_vectype), 4u)
 	     ? !TARGET_USE_GATHER_4PARTS
-	     : !TARGET_USE_GATHER)))
+	     : !TARGET_USE_GATHER_8PARTS)))
     return NULL_TREE;
 
   if ((TREE_CODE (index_type) != INTEGER_TYPE
