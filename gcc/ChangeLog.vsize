@@ -1,3 +1,31 @@
+==================== Branch work131-vsize, patch #67 ====================
+
+Allow setting -mlxvp/-mno-lxvp and -mstxvp/-mno-stxvp with #pragma GCC target.
+
+2023-08-21  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_opt_vars): Add lxvp and stxvp to allow
+	#pragma GCC target to set or reset these options.
+
+==================== Branch work131-vsize, patch #66 ====================
+
+Add vector logical optimizations.
+
+2023-08-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (nor<mode>3_1): Add combiner patterns for
+	optimization.
+	(nor<mode>3_2): Likewise.
+	(andc<mode>3"): Likewise.
+	(*eqv<mode>3): Likewise.
+	(nand<mode>3_1): Likewise.
+	(nand<mode>3_2): Likewise.
+	(orc<mode>3): Likewise.
+
 ==================== Branch work131-vsize, patch #65 ====================
 
 Add vector logical optimizations.
