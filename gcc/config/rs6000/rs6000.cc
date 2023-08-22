@@ -24473,6 +24473,12 @@ static struct rs6000_opt_var const rs6000_opt_vars[] =
   { "speculate-indirect-jumps",
     offsetof (struct gcc_options, x_rs6000_speculate_indirect_jumps),
     offsetof (struct cl_target_option, x_rs6000_speculate_indirect_jumps), },
+  { "lxvp",
+    offsetof (struct gcc_options, x_TARGET_LXVP),
+    offsetof (struct cl_target_option, x_TARGET_LXVP), },
+  { "stxvp",
+    offsetof (struct gcc_options, x_TARGET_STXVP),
+    offsetof (struct cl_target_option, x_TARGET_STXVP), },
 };
 
 /* Inner function to handle attribute((target("..."))) and #pragma GCC target
