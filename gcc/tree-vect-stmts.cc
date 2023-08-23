@@ -13257,6 +13257,12 @@ vect_analyze_stmt (vec_info *vinfo,
       return opt_result::success ();
     }
 
+  if (param_vect_force_slp && !node)
+    return opt_result::failure_at (stmt_info->stmt,
+				   "not vectorized:"
+				   " not part of SLP but SLP forced: %G",
+				   stmt_info->stmt);
+
   ok = true;
   if (!bb_vinfo
       && (STMT_VINFO_RELEVANT_P (stmt_info)

@@ -16747,6 +16747,10 @@ this parameter.  The default value of this parameter is 50.
 @item vect-induction-float
 Enable loop vectorization of floating point inductions.
 
+@item vect-force-slp
+Fail vectorization when falling back to non-SLP.  This is intended for
+debugging only.
+
 @item vrp-sparse-threshold
 Maximum number of basic blocks before VRP uses a sparse bitmap cache.
 

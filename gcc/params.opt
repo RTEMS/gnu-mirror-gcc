@@ -1198,6 +1198,10 @@ The maximum factor which the loop vectorizer applies to the cost of statements i
 Common Joined UInteger Var(param_vect_induction_float) Init(1) IntegerRange(0, 1) Param Optimization
 Enable loop vectorization of floating point inductions.
 
+-param=vect-force-slp=
+Common Joined UInteger Var(param_vect_force_slp) Init(0) IntegerRange(0, 1) Param Optimization
+Fail vectorization when falling back to non-SLP.
+
 -param=vrp-sparse-threshold=
 Common Joined UInteger Var(param_vrp_sparse_threshold) Init(3000) Optimization Param
 Maximum number of basic blocks before VRP uses a sparse bitmap cache.
