@@ -4704,6 +4704,23 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
   (op (vec_cond:s @0 @1 @2))
   (vec_cond @0 (op! @1) (op! @2))))
 
+/* Sink unary conversions to branches, but only if we do fold both
+   and the target's truth type is the same as we already have.  */
+(simplify
+ (convert (vec_cond:s @0 @1 @2))
+ (if (VECTOR_TYPE_P (type)
+      && types_match (TREE_TYPE (@0), truth_type_for (type)))
+  (vec_cond @0 (convert! @1) (convert! @2))))
+
+/* Likewise for view_convert of nop_conversions. */
+(simplify
+ (view_convert (vec_cond:s @0 @1 @2))
+ (if (VECTOR_TYPE_P (type) && VECTOR_TYPE_P (TREE_TYPE (@1))
+      && known_eq (TYPE_VECTOR_SUBPARTS (type),
+		   TYPE_VECTOR_SUBPARTS (TREE_TYPE (@1)))
+      && tree_nop_conversion_p (TREE_TYPE (type), TREE_TYPE (TREE_TYPE (@1))))
+  (vec_cond @0 (view_convert! @1) (view_convert! @2))))
+
 /* Sink binary operation to branches, but only if we can fold it.  */
 (for op (tcc_comparison plus minus mult bit_and bit_ior bit_xor
 	 lshift rshift rdiv trunc_div ceil_div floor_div round_div
@@ -7989,6 +8006,31 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 		      wi::to_wide (@ipos) + isize))
     (BIT_FIELD_REF @0 @rsize @rpos)))))
 
+/* Simplify vector inserts of other vector extracts to a permute.  */
+(simplify
+ (bit_insert @0 (BIT_FIELD_REF@2 @1 @rsize @rpos) @ipos)
+ (if (VECTOR_TYPE_P (type)
+      && types_match (@0, @1)
+      && types_match (TREE_TYPE (TREE_TYPE (@0)), TREE_TYPE (@2))
+      && TYPE_VECTOR_SUBPARTS (type).is_constant ())
+  (with
+   {
+     unsigned HOST_WIDE_INT elsz
+       = tree_to_uhwi (TYPE_SIZE (TREE_TYPE (TREE_TYPE (@1))));
+     poly_uint64 relt = exact_div (tree_to_poly_uint64 (@rpos), elsz);
+     poly_uint64 ielt = exact_div (tree_to_poly_uint64 (@ipos), elsz);
+     unsigned nunits = TYPE_VECTOR_SUBPARTS (type).to_constant ();
+     vec_perm_builder builder;
+     builder.new_vector (nunits, nunits, 1);
+     for (unsigned i = 0; i < nunits; ++i)
+       builder.quick_push (known_eq (ielt, i) ? nunits + relt : i);
+     vec_perm_indices sel (builder, 2, nunits);
+   }
+   (if (!VECTOR_MODE_P (TYPE_MODE (type))
+	|| can_vec_perm_const_p (TYPE_MODE (type), TYPE_MODE (type), sel, false))
+    (vec_perm @0 @1 { vec_perm_indices_to_tree
+                        (build_vector_type (ssizetype, nunits), sel); })))))
+
 (if (canonicalize_math_after_vectorization_p ())
  (for fmas (FMA)
   (simplify
@@ -9039,6 +9081,18 @@ and,
  (bit_and (negate @0) integer_onep@1)
  (if (!TYPE_OVERFLOW_SANITIZED (type))
   (bit_and @0 @1)))
+
+/* `-a` is just `a` if the type is 1bit wide or when converting
+   to a 1bit type; similar to the above transformation of `(-x)&1`.
+   This is used mostly with the transformation of
+   `a ? ~b : b` into `(-a)^b`.
+   It also can show up with bitfields.  */
+(simplify
+ (convert? (negate @0))
+ (if (INTEGRAL_TYPE_P (type)
+      && TYPE_PRECISION (type) == 1
+      && !TYPE_OVERFLOW_SANITIZED (TREE_TYPE (@0)))
+  (convert @0)))
 
 /* Optimize
    c1 = VEC_PERM_EXPR (a, a, mask)

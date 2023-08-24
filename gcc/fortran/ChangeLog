@@ -1,3 +1,30 @@
+2023-08-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/32986
+	* resolve.cc (is_non_constant_shape_array): Add forward declaration.
+	(resolve_common_vars): Diagnose automatic array object in COMMON.
+	(resolve_symbol): Prevent confusing follow-on error.
+
+2023-08-22  Tobias Burnus  <tobias@codesourcery.com>
+
+	* gfortran.h (enum gfc_omp_defaultmap_category):
+	Add OMP_DEFAULTMAP_CAT_ALL.
+	* openmp.cc (gfc_match_omp_clauses): Parse
+	'all' as category.
+	* trans-openmp.cc (gfc_trans_omp_clauses): Handle it.
+
+2023-08-22  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/49588
+	* data.cc (gfc_advance_section): Derive next index set and next offset
+	into DATA variable also for array references using vector sections.
+	Use auxiliary array to keep track of offsets into indexing vectors.
+	(gfc_get_section_index): Set up initial indices also for DATA variables
+	with array references using vector sections.
+	* data.h (gfc_get_section_index): Adjust prototype.
+	(gfc_advance_section): Likewise.
+	* resolve.cc (check_data_variable): Pass vector offsets.
+
 2023-08-16  Harald Anlauf  <anlauf@gmx.de>
 
 	PR fortran/110360

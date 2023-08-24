@@ -1,3 +1,284 @@
+2023-08-23  Jivan Hakobyan  <jivanhakobyan9@gmail.com>
+
+	* lra-eliminations.cc (eliminate_regs_in_insn): Use equivalences to
+	to help simplify code further.
+
+2023-08-23  Andrew MacLeod  <amacleod@redhat.com>
+
+	* gimple-range-fold.cc (fold_using_range::range_of_phi): Tweak output.
+	* gimple-range-phi.cc (phi_group::phi_group): Remove unused members.
+	Initialize using a range instead of value and edge.
+	(phi_group::calculate_using_modifier): Use initializer value and
+	process for relations after trying for iteration convergence.
+	(phi_group::refine_using_relation): Use initializer range.
+	(phi_group::dump): Rework the dump output.
+	(phi_analyzer::process_phi): Allow multiple constant initilizers.
+	Dump groups immediately as created.
+	(phi_analyzer::dump): Tweak output.
+	* gimple-range-phi.h (phi_group::phi_group): Adjust prototype.
+	(phi_group::initial_value): Delete.
+	(phi_group::refine_using_relation): Adjust prototype.
+	(phi_group::m_initial_value): Delete.
+	(phi_group::m_initial_edge): Delete.
+	(phi_group::m_vr): Use int_range_max.
+	* tree-vrp.cc (execute_ranger_vrp): Don't dump phi groups.
+
+2023-08-23  Andrew MacLeod  <amacleod@redhat.com>
+
+	* gimple-range-phi.cc (phi_analyzer::operator[]): Return NULL if
+	no group was created.
+	(phi_analyzer::process_phi): Do not create groups of one phi node.
+
+2023-08-23  Richard Earnshaw  <rearnsha@arm.com>
+
+	* target.def (gen_ccmp_first, gen_ccmp_next): Use rtx_code for
+	CODE, CMP_CODE and BIT_CODE arguments.
+	* config/aarch64/aarch64.cc (aarch64_gen_ccmp_first): Likewise.
+	(aarch64_gen_ccmp_next): Likewise.
+	* doc/tm.texi: Regenerated.
+
+2023-08-23  Richard Earnshaw  <rearnsha@arm.com>
+
+	* coretypes.h (rtx_code): Add forward declaration.
+	* rtl.h (rtx_code): Make compatible with forward declaration.
+
+2023-08-23  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/111010
+	* config/i386/i386.md (*concat<any_or_plus:mode><dwi>3_3):
+	Merge pattern from *concatditi3_3 and *concatsidi3_3 using
+	DWIH mode iterator.  Disable (=&r,m,m) alternative for
+	32-bit targets.
+	(*concat<any_or_plus:mode><dwi>3_3): Disable (=&r,m,m)
+	alternative for 32-bit targets.
+
+2023-08-23  Zhangjin Liao  <liaozhangjin@eswincomputing.com>
+
+	* config/riscv/bitmanip.md (*<bitmanip_optab>disi2_sext): Add a more
+	appropriate type attribute.
+
+2023-08-23  Lehua Ding  <lehua.ding@rivai.ai>
+
+	* config/riscv/autovec-opt.md (*cond_abs<mode>): New combine pattern.
+	(*copysign<mode>_neg): Ditto.
+	* config/riscv/autovec.md (@vcond_mask_<mode><vm>): Adjust.
+	(<optab><mode>2): Ditto.
+	(cond_<optab><mode>): New.
+	(cond_len_<optab><mode>): Ditto.
+	* config/riscv/riscv-protos.h (enum insn_type): New.
+	(expand_cond_len_unop): New helper func.
+	* config/riscv/riscv-v.cc (shuffle_merge_patterns): Adjust.
+	(expand_cond_len_unop): New helper func.
+
+2023-08-23  Jan Hubicka  <jh@suse.cz>
+
+	* tree-ssa-loop-ch.cc (enum ch_decision): Fix comment.
+	(should_duplicate_loop_header_p): Fix return value for static exits.
+	(ch_base::copy_headers): Improve handling of ch_possible_zero_cost.
+
+2023-08-23  Kewen Lin  <linkw@linux.ibm.com>
+
+	* tree-vect-stmts.cc (vectorizable_store): Move the handlings on
+	VMAT_GATHER_SCATTER in the final loop nest to its own loop,
+	and update the final nest accordingly.
+
+2023-08-23  Kewen Lin  <linkw@linux.ibm.com>
+
+	* tree-vect-stmts.cc (vectorizable_store): Move the handlings on
+	VMAT_LOAD_STORE_LANES in the final loop nest to its own loop,
+	and update the final nest accordingly.
+
+2023-08-23  Kewen Lin  <linkw@linux.ibm.com>
+
+	* tree-vect-stmts.cc (vectorizable_store): Remove vec oprnds,
+	adjust vec result_chain, vec_oprnd with auto_vec, and adjust
+	gvec_oprnds with auto_delete_vec.
+
+2023-08-23  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/riscv-vsetvl.cc
+	(pass_vsetvl::global_eliminate_vsetvl_insn): Fix potential ICE.
+
+2023-08-23  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/riscv-vsetvl.cc (ge_sew_ratio_unavailable_p):
+	Fix fuse rule bug.
+	* config/riscv/riscv-vsetvl.def (DEF_SEW_LMUL_FUSE_RULE): Ditto.
+
+2023-08-23  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/vector.md: Add attribute.
+
+2023-08-22  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/riscv-vsetvl.cc (change_insn): Clang format.
+	(vector_infos_manager::all_same_ratio_p): Ditto.
+	(vector_infos_manager::all_same_avl_p): Ditto.
+	(pass_vsetvl::refine_vsetvls): Ditto.
+	(pass_vsetvl::cleanup_vsetvls): Ditto.
+	(pass_vsetvl::commit_vsetvls): Ditto.
+	(pass_vsetvl::local_eliminate_vsetvl_insn): Ditto.
+	(pass_vsetvl::global_eliminate_vsetvl_insn): Ditto.
+	(pass_vsetvl::compute_probabilities): Ditto.
+
+2023-08-22  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/t-riscv: Add riscv-vsetvl.def
+
+2023-08-22  Vineet Gupta  <vineetg@rivosinc.com>
+
+	* config/riscv/riscv.opt: Add --param names
+	riscv-autovec-preference and riscv-autovec-lmul
+
+2023-08-22  Raphael Moreira Zinsly  <rzinsly@ventanamicro.com>
+
+	* config/riscv/t-linux: Add MULTIARCH_DIRNAME.
+
+2023-08-22  Tobias Burnus  <tobias@codesourcery.com>
+
+	* tree-core.h (enum omp_clause_defaultmap_kind): Add
+	OMP_CLAUSE_DEFAULTMAP_CATEGORY_ALL.
+	* gimplify.cc (gimplify_scan_omp_clauses): Handle it.
+	* tree-pretty-print.cc (dump_omp_clause): Likewise.
+
+2023-08-22  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/106652
+	* doc/extend.texi (_Float<n>): Drop obsolete sentence that the
+	types aren't supported in C++.
+
+2023-08-22  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* doc/md.texi: Add LEN_FOLD_EXTRACT_LAST pattern.
+	* internal-fn.cc (fold_len_extract_direct): Ditto.
+	(expand_fold_len_extract_optab_fn): Ditto.
+	(direct_fold_len_extract_optab_supported_p): Ditto.
+	* internal-fn.def (LEN_FOLD_EXTRACT_LAST): Ditto.
+	* optabs.def (OPTAB_D): Ditto.
+
+2023-08-22  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-stmts.cc (vectorizable_store): Do not bump
+	DR_GROUP_STORE_COUNT here.  Remove early out.
+	(vect_transform_stmt): Only call vectorizable_store on
+	the last element of an interleaving chain.
+
+2023-08-22  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/94864
+	PR tree-optimization/94865
+	PR tree-optimization/93080
+	* match.pd (bit_insert @0 (BIT_FIELD_REF @1 ..) ..): New pattern
+	for vector insertion from vector extraction.
+
+2023-08-22  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+	    Kewen.Lin  <linkw@linux.ibm.com>
+
+	* tree-vect-loop.cc (vect_verify_loop_lens): Add exists check.
+	(vectorizable_live_operation): Add live vectorization for length loop
+	control.
+
+2023-08-22  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/105899
+	* doc/invoke.texi: Remove -Wanalyzer-unterminated-string.
+
+2023-08-22  Pan Li  <pan2.li@intel.com>
+
+	* config/riscv/riscv-vector-builtins-bases.cc
+	(vfwredusum_frm_obj): New declaration.
+	(BASE): Ditto.
+	* config/riscv/riscv-vector-builtins-bases.h: Ditto.
+	* config/riscv/riscv-vector-builtins-functions.def
+	(vfwredusum_frm): New intrinsic function def.
+
+2023-08-21  David Faust  <david.faust@oracle.com>
+
+	* config/bpf/bpf.md (neg): Second operand must be a register.
+
+2023-08-21  Edwin Lu  <ewlu@rivosinc.com>
+
+	* config/riscv/bitmanip.md: Added bitmanip type to insns
+	that are missing types.
+
+2023-08-21  Jeff Law  <jlaw@ventanamicro.com>
+
+	* config/riscv/sync-ztso.md (atomic_load_ztso<mode>): Avoid extraenous
+	newline.
+
+2023-08-21  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* config/aarch64/falkor-tag-collision-avoidance.cc (dump_insn_list):
+	Fix format specifier.
+
+2023-08-21  Aldy Hernandez  <aldyh@redhat.com>
+
+	* value-range.cc (frange::union_nans): Return false if nothing
+	changed.
+	(range_tests_floats): New test.
+
+2023-08-21  Prathamesh Kulkarni  <prathamesh.kulkarni@linaro.org>
+
+	PR tree-optimization/111048
+	* fold-const.cc (valid_mask_for_fold_vec_perm_cst_p): Set arg_npatterns
+	correctly.
+	(fold_vec_perm_cst): Remove workaround and again call
+	valid_mask_fold_vec_perm_cst_p for both VLS and VLA vectors.
+	(test_fold_vec_perm_cst::test_nunits_min_4): Add test-case.
+
+2023-08-21  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/111082
+	* tree-vect-slp.cc (vectorize_slp_instance_root_stmt): Only
+	pun operations that can overflow.
+
+2023-08-21  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* lcm.cc (compute_antinout_edge): Export as global use.
+	(compute_earliest): Ditto.
+	(compute_rev_insert_delete): Ditto.
+	* lcm.h (compute_antinout_edge): Ditto.
+	(compute_earliest): Ditto.
+
+2023-08-21  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/111070
+	* tree-ssa-ifcombine.cc (ifcombine_ifandif): Check we have
+	an SSA name before checking SSA_NAME_OCCURS_IN_ABNORMAL_PHI.
+
+2023-08-21  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/111002
+	* match.pd (view_convert(vec_cond(a,b,c))): New pattern.
+
+2023-08-21  liuhongt  <hongtao.liu@intel.com>
+
+	* common/config/i386/cpuinfo.h (get_intel_cpu): Detect
+	Alderlake-N.
+	* common/config/i386/i386-common.cc (alias_table): Support
+	-march=gracemont as an alias of -march=alderlake.
+
+2023-08-20  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386-expand.cc (ix86_expand_sse_extend): Use ops[1]
+	instead of src in the call to ix86_expand_sse_cmp.
+	* config/i386/sse.md (<any_extend:insn>v8qiv8hi2): Do not
+	force operands[1] to a register.
+	(<any_extend:insn>v4hiv4si2): Ditto.
+	(<any_extend:insn>v2siv2di2): Ditto.
+
+2023-08-20  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/111006
+	PR tree-optimization/110986
+	* match.pd: (op(vec_cond(a,b,c))): Handle convert for op.
+
+2023-08-20  Eric Gallager  <egallager@gcc.gnu.org>
+
+	PR target/90835
+	* Makefile.in: improve error message when /usr/include is
+	missing
+
 2023-08-19  Tobias Burnus  <tobias@codesourcery.com>
 
 	PR middle-end/111017

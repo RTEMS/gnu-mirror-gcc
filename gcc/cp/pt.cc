@@ -4966,19 +4966,21 @@ generic_targs_for (tree tmpl)
 }
 
 /* Return the template arguments corresponding to the template parameters of
-   TMPL's enclosing scope.  When TMPL is a member of a partial specialization,
+   DECL's enclosing scope.  When DECL is a member of a partial specialization,
    this returns the arguments for the partial specialization as opposed to those
    for the primary template, which is the main difference between this function
-   and simply using e.g. the TYPE_TI_ARGS of TMPL's DECL_CONTEXT.  */
+   and simply using e.g. the TYPE_TI_ARGS of DECL's DECL_CONTEXT.  */
 
 tree
-outer_template_args (tree tmpl)
+outer_template_args (const_tree decl)
 {
-  tree ti = get_template_info (DECL_TEMPLATE_RESULT (tmpl));
+  if (TREE_CODE (decl) == TEMPLATE_DECL)
+    decl = DECL_TEMPLATE_RESULT (decl);
+  tree ti = get_template_info (decl);
   if (!ti)
     return NULL_TREE;
   tree args = TI_ARGS (ti);
-  if (!PRIMARY_TEMPLATE_P (tmpl))
+  if (!PRIMARY_TEMPLATE_P (TI_TEMPLATE (ti)))
     return args;
   if (TMPL_ARGS_DEPTH (args) == 1)
     return NULL_TREE;
@@ -11049,14 +11051,21 @@ uses_outer_template_parms (tree decl)
    from its enclosing scope.  */
 
 bool
-uses_outer_template_parms_in_constraints (tree decl)
+uses_outer_template_parms_in_constraints (tree decl, tree ctx/*=NULL_TREE*/)
 {
   tree ci = get_constraints (decl);
   if (ci)
     ci = CI_ASSOCIATED_CONSTRAINTS (ci);
   if (!ci)
     return false;
-  int depth = template_class_depth (CP_DECL_CONTEXT (decl));
+  if (!ctx)
+    {
+      if (tree fc = DECL_FRIEND_CONTEXT (decl))
+	ctx = fc;
+      else
+	ctx = CP_DECL_CONTEXT (decl);
+    }
+  int depth = template_class_depth (ctx);
   if (depth == 0)
     return false;
   return for_each_template_parm (ci, template_parm_outer_level,
@@ -11393,9 +11402,6 @@ tsubst_friend_function (tree decl, tree args)
 	  not_tmpl = DECL_TEMPLATE_RESULT (new_friend);
 	  new_friend_result_template_info = DECL_TEMPLATE_INFO (not_tmpl);
 	}
-      else if (!constraints_satisfied_p (new_friend))
-	/* Only define a constrained hidden friend when satisfied.  */
-	return error_mark_node;
 
       /* Inside pushdecl_namespace_level, we will push into the
 	 current namespace. However, the friend function should go

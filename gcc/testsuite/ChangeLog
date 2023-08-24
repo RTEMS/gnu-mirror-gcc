@@ -1,3 +1,289 @@
+2023-08-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/32986
+	* gfortran.dg/common_28.f90: New test.
+
+2023-08-23  Andrew MacLeod  <amacleod@redhat.com>
+
+	* gcc.dg/pr102983.c: Adjust output expectations.
+	* gcc.dg/pr110918.c: New.
+
+2023-08-23  Lehua Ding  <lehua.ding@rivai.ai>
+
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-3.c: New test.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-4.c: New test.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-5.c: New test.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-6.c: New test.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-7.c: New test.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-8.c: New test.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-3.c: New test.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-4.c: New test.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-5.c: New test.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-6.c: New test.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-7.c: New test.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-8.c: New test.
+
+2023-08-23  Jan Hubicka  <jh@suse.cz>
+
+	* gcc.dg/tree-ssa/copy-headers-9.c: Update template.
+
+2023-08-23  Jan Hubicka  <jh@suse.cz>
+
+	PR middle-end/110940
+	* gcc.c-torture/compile/pr110940.c: New test.
+
+2023-08-23  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_run-12.c:
+	Add vsetvli asm.
+
+2023-08-23  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/autovec/partial/live-1.c: Adapt test.
+
+2023-08-22  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/105899
+	* gcc.dg/analyzer/null-terminated-strings-1.c: Update expected
+	results on symbolic values.
+	* gcc.dg/analyzer/strlen-1.c: New test.
+
+2023-08-22  Jason Merrill  <jason@redhat.com>
+
+	PR c++/109751
+	* g++.dg/cpp2a/concepts-friend11.C: Now works.  Add template.
+	* g++.dg/cpp2a/concepts-friend15.C: New test.
+	* g++.dg/cpp2a/concepts-friend11a.C: New file.
+
+2023-08-22  Tobias Burnus  <tobias@codesourcery.com>
+
+	* gfortran.dg/gomp/defaultmap-1.f90: Update dg-error.
+	* c-c++-common/gomp/defaultmap-5.c: New test.
+	* c-c++-common/gomp/defaultmap-6.c: New test.
+	* gfortran.dg/gomp/defaultmap-10.f90: New test.
+	* gfortran.dg/gomp/defaultmap-9.f90: New test.
+
+2023-08-22  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/94864
+	PR tree-optimization/94865
+	PR tree-optimization/93080
+	* gcc.target/i386/pr94864.c: New testcase.
+	* gcc.target/i386/pr94865.c: Likewise.
+	* gcc.target/i386/avx512fp16-vmovsh-1a.c: XFAIL.
+	* gcc.dg/tree-ssa/forwprop-40.c: Likewise.
+	* gcc.dg/tree-ssa/forwprop-41.c: Likewise.
+
+2023-08-22  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/49588
+	* gfortran.dg/data_vector_section.f90: New test.
+
+2023-08-22  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+	    Kewen.Lin  <linkw@linux.ibm.com>
+
+	* gcc.target/riscv/rvv/autovec/partial/live-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/partial/live_run-1.c: New test.
+
+2023-08-22  liuhongt  <hongtao.liu@intel.com>
+
+	* gcc.target/i386/invariant-ternlog-1.c: Only scan %rdx under
+	TARGET_64BIT.
+
+2023-08-22  Lehua Ding  <lehua.ding@rivai.ai>
+
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms-1.c: Adjust.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms-4.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms-5.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms-6.c: Ditto.
+
+2023-08-22  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/105899
+	* gcc.dg/analyzer/attr-format-1.c: New test.
+	* gcc.dg/analyzer/sprintf-1.c: Update expected results for
+	now-passing tests.
+
+2023-08-22  David Malcolm  <dmalcolm@redhat.com>
+
+	* gcc.dg/analyzer/fopen-1.c: New test.
+
+2023-08-22  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/105899
+	* gcc.dg/analyzer/error-1.c: Update expected results to reflect
+	reimplementation of unterminated string detection.  Add test
+	coverage for uninitialized buffers.
+	* gcc.dg/analyzer/null-terminated-strings-1.c: Likewise.
+	* gcc.dg/analyzer/putenv-1.c: Likewise.
+	* gcc.dg/analyzer/strchr-1.c: Likewise.
+	* gcc.dg/analyzer/strcpy-1.c: Likewise.
+	* gcc.dg/analyzer/strdup-1.c: Likewise.
+
+2023-08-22  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/base/float-point-wredusum.c: New test.
+
+2023-08-21  Thiago Jung Bauermann  <thiago.bauermann@linaro.org>
+
+	* gcc.dg/unroll-7.c: Remove xfail.
+
+2023-08-21  Tsukasa OI  <research_trasio@irq.a4lg.com>
+
+	* gcc.target/riscv/xtheadba.c: Quote unquoted #error message.
+	* gcc.target/riscv/xtheadbb.c: Ditto.
+	* gcc.target/riscv/xtheadbs.c: Ditto.
+	* gcc.target/riscv/xtheadcmo.c: Ditto.
+	* gcc.target/riscv/xtheadcondmov.c: Ditto.
+	* gcc.target/riscv/xtheadfmemidx.c: Ditto.
+	* gcc.target/riscv/xtheadfmv.c: Ditto.
+	* gcc.target/riscv/xtheadint.c: Ditto.
+	* gcc.target/riscv/xtheadmac.c: Ditto.
+	* gcc.target/riscv/xtheadmemidx.c: Ditto.
+	* gcc.target/riscv/xtheadmempair.c: Ditto.
+	* gcc.target/riscv/xtheadsync.c: Ditto.
+	* gcc.target/riscv/zawrs.c: Ditto.
+	* gcc.target/riscv/zvbb.c: Ditto.
+	* gcc.target/riscv/zvbc.c: Ditto.
+	* gcc.target/riscv/zvkg.c: Ditto.
+	* gcc.target/riscv/zvkned.c: Ditto.
+	* gcc.target/riscv/zvknha.c: Ditto.
+	* gcc.target/riscv/zvknhb.c: Ditto.
+	* gcc.target/riscv/zvksed.c: Ditto.
+	* gcc.target/riscv/zvksh.c: Ditto.
+	* gcc.target/riscv/zvkt.c: Ditto.
+
+2023-08-21  Tsukasa OI  <research_trasio@irq.a4lg.com>
+
+	* gcc.target/riscv/zvkn.c: Quote #error messages.
+	* gcc.target/riscv/zvkn-1.c: Ditto.
+	* gcc.target/riscv/zvknc.c: Ditto.
+	* gcc.target/riscv/zvknc-1.c: Ditto.
+	* gcc.target/riscv/zvknc-2.c: Ditto.
+	* gcc.target/riscv/zvkng.c: Ditto.
+	* gcc.target/riscv/zvkng-1.c: Ditto.
+	* gcc.target/riscv/zvkng-2.c: Ditto.
+	* gcc.target/riscv/zvks.c: Ditto.
+	* gcc.target/riscv/zvks-1.c: Ditto.
+	* gcc.target/riscv/zvksc.c: Ditto.
+	* gcc.target/riscv/zvksc-1.c: Ditto.
+	* gcc.target/riscv/zvksc-2.c: Ditto.
+	* gcc.target/riscv/zvksg.c: Ditto.
+	* gcc.target/riscv/zvksg-1.c: Ditto.
+	* gcc.target/riscv/zvksg-2.c: Ditto.
+
+2023-08-21  Richard Biener  <rguenther@suse.de>
+
+	* gcc.target/i386/pr87007-5.c: Update comment, adjust subtest.
+
+2023-08-21  Richard Biener  <rguenther@suse.de>
+
+	* lib/target-supports.exp: Add vect128, vect256 and vect512
+	effective targets.
+	* gcc.dg/vect/bb-slp-subgroups-2.c: Properly handle the
+	vect256 case.
+
+2023-08-21  Prathamesh Kulkarni  <prathamesh.kulkarni@linaro.org>
+
+	* gcc.dg/vect/pr65947-7.c: Add target check aarch64*-*-* and scan vect
+	dump for pattern "optimizing condition reduction with FOLD_EXTRACT_LAST"
+	for targets that support vect_fold_extract_last.
+
+2023-08-21  Richard Biener  <rguenther@suse.de>
+
+	* gcc.dg/vect/bb-slp-46.c: Use division instead of addition
+	to avoid reduction vectorization.
+
+2023-08-21  liuhongt  <hongtao.liu@intel.com>
+
+	* gcc.target/i386/avx512f-pr88464-2.c: Add -mgather to
+	options.
+	* gcc.target/i386/avx512f-pr88464-3.c: Ditto.
+	* gcc.target/i386/avx512f-pr88464-4.c: Ditto.
+	* gcc.target/i386/avx512f-pr88464-6.c: Ditto.
+	* gcc.target/i386/avx512f-pr88464-7.c: Ditto.
+	* gcc.target/i386/avx512f-pr88464-8.c: Ditto.
+	* gcc.target/i386/avx512vl-pr88464-10.c: Ditto.
+	* gcc.target/i386/avx512vl-pr88464-12.c: Ditto.
+	* gcc.target/i386/avx512vl-pr88464-13.c: Ditto.
+	* gcc.target/i386/avx512vl-pr88464-14.c: Ditto.
+	* gcc.target/i386/avx512vl-pr88464-15.c: Ditto.
+	* gcc.target/i386/avx512vl-pr88464-16.c: Ditto.
+	* gcc.target/i386/avx512vl-pr88464-2.c: Ditto.
+	* gcc.target/i386/avx512vl-pr88464-4.c: Ditto.
+	* gcc.target/i386/avx512vl-pr88464-5.c: Ditto.
+	* gcc.target/i386/avx512vl-pr88464-6.c: Ditto.
+	* gcc.target/i386/avx512vl-pr88464-7.c: Ditto.
+	* gcc.target/i386/avx512vl-pr88464-8.c: Ditto.
+
+2023-08-21  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/111082
+	* gcc.dg/pr111082.c: New testcase.
+
+2023-08-21  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/111070
+	* gcc.dg/pr111070.c: New testcase.
+
+2023-08-21  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/111002
+	* gcc.target/aarch64/sve/cond_convert_8.c: New test.
+
+2023-08-21  Francois-Xavier Coudert  <fxcoudert@gmail.com>
+
+	* gcc.dg/lto/20091013-1_2.c: Add -Wno-stringop-overread.
+
+2023-08-20  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* gcc.dg/darwin-minversion-link.c: Account for macOS 13 and 14.
+
+2023-08-20  Thiago Jung Bauermann  <thiago.bauermann@linaro.org>
+
+	PR testsuite/110756
+	* g++.dg/gomp/pr58567.C: Adjust to new compiler error message.
+
+2023-08-20  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* gcc.dg/plugin/taint-CVE-2011-0521-5-fixed.c: Use
+	_FORTIFY_SOURCE=0 on darwin.
+	* gcc.dg/plugin/taint-CVE-2011-0521-5.c: Likewise.
+	* gcc.dg/plugin/taint-CVE-2011-0521-6.c: Likewise.
+
+2023-08-20  Francois-Xavier Coudert  <fxcoudert@gmail.com>
+
+	* gcc.dg/ipa/ipa-icf-38.c: Require alias support.
+
+2023-08-20  Francois-Xavier Coudert  <fxcoudert@gmail.com>
+
+	* gcc.dg/plugin/crash-test-write-though-null-sarif.c: Update
+	expected pattern.
+
+2023-08-20  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	PR analyzer/104042
+	* gcc.dg/analyzer/analyzer.exp: Pass -D_FORTIFY_SOURCE=0 on Darwin.
+	* gcc.dg/analyzer/fd-bind.c: Add missing <string.h> header.
+	* gcc.dg/analyzer/fd-datagram-socket.c: Likewise.
+	* gcc.dg/analyzer/fd-listen.c: Likewise.
+	* gcc.dg/analyzer/fd-socket-misuse.c: Likewise.
+	* gcc.dg/analyzer/fd-stream-socket-active-open.c: Likewise.
+	* gcc.dg/analyzer/fd-stream-socket-passive-open.c: Likewise.
+	* gcc.dg/analyzer/fd-stream-socket.c: Likewise.
+	* gcc.dg/analyzer/fd-symbolic-socket.c: Likewise.
+
+2023-08-20  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/111006
+	* gcc.target/aarch64/sve/cond_convert_7.c: New test.
+
 2023-08-18  Thiago Jung Bauermann  <thiago.bauermann@linaro.org>
 
 	* lib/target-supports.exp (dg-require-python-h): Test
