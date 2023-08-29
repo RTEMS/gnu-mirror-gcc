@@ -1,4 +1,38 @@
+==================== Branch work132-vpair, patch #20 ====================
+
+Add support for vector pair built-in functions.
+
+2023-08-29  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/predicates.md (mma_assemble_input_operand): Allow other
+	16-byte vectors and not just V16QImode.
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_*): Add vector pair
+	built-in functions.
+	* config/rs6000/rs6000-protos.h (split_unary_vector_pair): Add
+	declaration.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pair): Likewise.
+	* config/rs6000/rs6000.cc (split_unary_vector_pair): New helper function
+	for vector pair built-in functions.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pair): Likewise.
+	* config/rs6000/rs6000.md (toplevel): Include vector-pair.md.
+	* config/rs6000/t-rs6000 (MD_INCLUDES): Add vector-pair.md.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document the
+	vector pair built-in functions.
+
 ==================== Branch work132-vpair, baseline ====================
+
+Update REVISION, add ChangeLog.vpair.
+
+2023-08-28  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* REVISION: Add -dmf for branch name.
+	* ChangeLog.vpair: New file.
 
 2023-08-28   Michael Meissner  <meissner@linux.ibm.com>
 
