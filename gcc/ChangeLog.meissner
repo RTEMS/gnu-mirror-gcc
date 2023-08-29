@@ -1,5 +1,24 @@
 ==================== Branch work132, patch #2 ====================
 
+Allow __vector_pair__ to be passed as an argument and returned.
+
+2023-08-29  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-call.cc (USE_ALTIVEC_FOR_ARG_P): Pass OOmode
+	values in Altivec registers.
+	(rs6000_return_in_memory): Don't return OOmode in memory.
+	(rs6000_function_arg): Allow OOmode to be passed as an argument.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/pr96506-1.c: Check that passing and returning
+	__vector_pair__ no longer generates an error message.
+	* gcc.target/powerpc/pr96506-2.c: Likewise.
+
+==================== Branch work132, patch #2 ====================
+
 Add -mno-lxvp and -mno-stxvp.
 
 This patch adds the options -mno-lxvp and -mno-stxvp that control whether GCC
