@@ -15,13 +15,13 @@ typedef __vector_quad vquad_t;
 
 __vector_pair
 foo4 (__vector_pair *src)
-{ /* { dg-error "invalid use of MMA type .__vector_pair. as a function return value" } */
+{ /* originally this was an error, now it is allowed.  */
   return *src;
 }
 
 vpair_t
 foo5 (vpair_t *src)
-{ /* { dg-error "invalid use of MMA type .__vector_pair. as a function return value" } */
+{ /* originally this was an error, now it is allowed.  */
   return *src;
 }
 

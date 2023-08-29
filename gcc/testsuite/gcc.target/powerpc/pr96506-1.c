@@ -17,14 +17,14 @@ void
 foo0 (void)
 {
   __vector_pair v;
-  bar0 (v); /* { dg-error "invalid use of MMA operand of type .__vector_pair. as a function parameter" } */
+  bar0 (v); /* originally this was an error, now it is allowed.  */
 }
 
 void
 foo1 (void)
 {
   vpair_t v;
-  bar1 (v); /* { dg-error "invalid use of MMA operand of type .__vector_pair. as a function parameter" } */
+  bar1 (v); /* originally this was an error, now it is allowed.  */
 }
 
 void
