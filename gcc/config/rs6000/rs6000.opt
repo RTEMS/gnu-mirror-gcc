@@ -605,6 +605,10 @@ mstxvp
 Target Undocumented Var(TARGET_STXVP) Init(1) Save
 Generate (do not generate) the STXVP instruction if -mmma is enabled.
 
+mvector-pair
+Target Undocumented Var(TARGET_VECTOR_PAIR) Init(0) Save
+Generate (do not generate) vector pair instructions for vector_size(32).
+
 mrelative-jumptables
 Target Undocumented Var(rs6000_relative_jumptables) Init(1) Save
 
