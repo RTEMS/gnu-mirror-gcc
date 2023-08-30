@@ -1805,14 +1805,14 @@ proc check_effective_target_riscv_vector_hw { } {
             asm ("vadd.vv v8,v8,v16" : : : "v8");
             return 0;
         }
-    } "-march=rv32gcv -mabi=ilp32d"] || [check_runtime riscv_vector_hw64 {
+    } ""] || [check_runtime riscv_vector_hw64 {
         int main (void)
         {
             asm ("vsetivli zero,8,e16,m1,ta,ma");
             asm ("vadd.vv v8,v8,v16" : : : "v8");
             return 0;
         }
-    } "-march=rv64gcv -mabi=lp64d"]
+    } ""]
 }
 
 # Return 1 if the we can build a Zvfh vector example with proper -march flags
@@ -3760,6 +3760,7 @@ proc check_effective_target_vect_int { } {
 	     || [et-is-effective-target mips_msa]))
 	 || ([istarget s390*-*-*]
 	     && [check_effective_target_s390_vx])
+	 || [istarget riscv*-*-*]
 	}}]
 }
 
@@ -7445,7 +7446,8 @@ proc check_effective_target_vect_widen_sum_hi_to_si { } {
     return [check_cached_effective_target_indexed vect_widen_sum_hi_to_si {
       expr { [check_effective_target_vect_unpack]
              || [istarget powerpc*-*-*]
-	     || [istarget ia64-*-*] }}]
+	     || [istarget ia64-*-*]
+	     || [istarget riscv*-*-*] }}]
 }
 
 # Return 1 if the target plus current options supports a vector
@@ -7459,7 +7461,8 @@ proc check_effective_target_vect_widen_sum_qi_to_hi { } {
     return [check_cached_effective_target_indexed vect_widen_sum_qi_to_hi {
       expr { [check_effective_target_vect_unpack]
 	     || [is-effective-target arm_neon]
-	     || [istarget ia64-*-*] }}]
+	     || [istarget ia64-*-*]
+	     || [istarget riscv*-*-*] }}]
 }
 
 # Return 1 if the target plus current options supports a vector
@@ -7469,7 +7472,8 @@ proc check_effective_target_vect_widen_sum_qi_to_hi { } {
                                                                                                 
 proc check_effective_target_vect_widen_sum_qi_to_si { } {
     return [check_cached_effective_target_indexed vect_widen_sum_qi_to_si {
-      expr { [istarget powerpc*-*-*] }}]
+      expr { [istarget powerpc*-*-*]
+	     || [istarget riscv*-*-*] }}]
 }
 
 # Return 1 if the target plus current options supports a vector
@@ -7758,7 +7762,8 @@ proc check_effective_target_vect_hw_misalign { } {
 	     || [istarget aarch64*-*-*]
 	     || ([istarget mips*-*-*] && [et-is-effective-target mips_msa])
 	     || ([istarget s390*-*-*]
-		 && [check_effective_target_s390_vx]) } {
+		 && [check_effective_target_s390_vx])
+	     || ([istarget riscv*-*-*]) } {
 	  return 1
 	}
 	if { [istarget arm*-*-*]
@@ -7864,7 +7869,8 @@ proc check_effective_target_vect_check_ptrs { } {
 
 proc check_effective_target_vect_fully_masked { } {
     return [expr { [check_effective_target_aarch64_sve]
-	           || [istarget amdgcn*-*-*] }]
+	           || [istarget amdgcn*-*-*]
+		   || [check_effective_target_riscv_vector] }]
 }
 
 # Return true if the target supports the @code{len_load} and
@@ -7872,7 +7878,8 @@ proc check_effective_target_vect_fully_masked { } {
 
 proc check_effective_target_vect_len_load_store { } {
     return [expr { [check_effective_target_has_arch_pwr9]
-      || [check_effective_target_s390_vx] }]
+      || [check_effective_target_s390_vx]
+      || [check_effective_target_riscv_vector] }]
 }
 
 # Return the value of parameter vect-partial-vector-usage specified for
@@ -7933,8 +7940,9 @@ proc check_effective_target_vect_partial_vectors { } {
 # alignment during vectorization.
 
 proc check_effective_target_vect_element_align_preferred { } {
-    return [expr { [check_effective_target_aarch64_sve]
-		   && [check_effective_target_vect_variable_length] }]
+    return [expr { ([check_effective_target_aarch64_sve]
+		   && [check_effective_target_vect_variable_length])
+		   || [check_effective_target_riscv_vector] }]
 }
 
 # Return true if vectorization of v2qi/v4qi/v8qi/v16qi/v2hi store is enabed.
@@ -8339,7 +8347,8 @@ proc check_effective_target_vect_load_lanes { } {
     return [check_cached_effective_target vect_load_lanes {
       expr { ([check_effective_target_arm_little_endian]
 	      && [check_effective_target_arm_neon_ok])
-	     || [istarget aarch64*-*-*] }}]
+	     || [istarget aarch64*-*-*]
+	     || [istarget riscv*-*-*] }}]
 }
 
 # Return 1 if the target supports vector masked loads.
@@ -8353,8 +8362,10 @@ proc check_effective_target_vect_masked_load { } {
 # Return 1 if the target supports vector masked stores.
 
 proc check_effective_target_vect_masked_store { } {
-    return [expr { [check_effective_target_aarch64_sve]
-		   || [istarget amdgcn*-*-*] }]
+    return [expr { [check_avx_available]
+		   || [check_effective_target_aarch64_sve]
+		   || [istarget amdgcn*-*-*]
+		   || [check_effective_target_riscv_vector] }]
 }
 
 # Return 1 if the target supports vector gather loads via internal functions.
@@ -8434,7 +8445,8 @@ proc check_effective_target_vect_short_mult { } {
 		     || [et-is-effective-target mips_loongson_mmi]))
 	     || ([istarget s390*-*-*]
 		 && [check_effective_target_s390_vx])
-	     || [istarget amdgcn-*-*] }}]
+	     || [istarget amdgcn-*-*]
+	     || [istarget riscv*-*-*] }}]
 }
 
 # Return 1 if the target supports vector int multiplication, 0 otherwise.
@@ -8450,7 +8462,8 @@ proc check_effective_target_vect_int_mult { } {
 	     || [check_effective_target_arm32]
 	     || ([istarget s390*-*-*]
 		 && [check_effective_target_s390_vx])
-	     || [istarget amdgcn-*-*] }}]
+	     || [istarget amdgcn-*-*]
+	     || [istarget riscv*-*-*] }}]
 }
 
 # Return 1 if the target supports 64 bit hardware vector
@@ -8531,6 +8544,9 @@ foreach N {2 3 4 8} {
 		      || [istarget aarch64*-*-*]) && N >= 2 && N <= 4 } {
 		    return 1
 		}
+		if { ([istarget riscv*-*-*]) && N >= 2 && N <= 8 } {
+		    return 1
+		}
 		if [check_effective_target_vect_fully_masked] {
 		    return 1
 		}
@@ -8567,6 +8583,11 @@ proc available_vector_sizes { } {
     } elseif { [istarget amdgcn*-*-*] } {
         # 6 different lane counts, and 4 element sizes
 	lappend result 4096 2048 1024 512 256 128 64 32 16 8 4 2
+    } elseif { [istarget riscv*-*-*] } {
+	if { [check_effective_target_riscv_vector] } {
+	    lappend result 0 32
+	}
+	lappend result 128
     } else {
 	# The traditional default asumption.
 	lappend result 128
@@ -10949,6 +10970,17 @@ proc check_vect_support_and_set_flags { } {
         }
     } elseif [istarget amdgcn-*-*] {
         set dg-do-what-default run
+    } elseif [istarget riscv64-*-*] {
+	if [check_effective_target_riscv_vector_hw] {
+	    lappend DEFAULT_VECTCFLAGS "--param" "riscv-autovec-preference=scalable"
+	    lappend DEFAULT_VECTCFLAGS "--param" "riscv-vector-abi"
+	    set dg-do-what-default run
+	} else {
+	    lappend DEFAULT_VECTCFLAGS "-march=rv64gcv_zvfh" "-mabi=lp64d"
+	    lappend DEFAULT_VECTCFLAGS "--param" "riscv-autovec-preference=scalable"
+	    lappend DEFAULT_VECTCFLAGS "--param" "riscv-vector-abi"
+	    set dg-do-what-default compile
+	}
     } else {
         return 0
     }
