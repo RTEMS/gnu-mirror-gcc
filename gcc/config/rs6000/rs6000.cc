@@ -4497,6 +4497,27 @@ rs6000_option_override_internal (bool global_init_p)
       rs6000_isa_flags &= ~OPTION_MASK_MMA;
     }
 
+  /* At present, do not enable -mvector-pair by default if MMA is available.
+     Turn off vector pair/mma options on non-power10 systems.  */
+  if (!TARGET_MMA && TARGET_VECTOR_PAIR)
+    {
+      if (OPTION_SET_P(TARGET_VECTOR_PAIR))
+	error ("%qs requires %qs", "-mvector-pair", "-mmma");
+      TARGET_VECTOR_PAIR = 0;
+    }
+
+  /* Warn if -mlxvp or -mstxvp are used and MMA is not set.  */
+  if (!TARGET_MMA)
+    {
+      if (TARGET_LXVP && OPTION_SET_P(TARGET_LXVP))
+	warning (0, "%qs should not be used unless you use %qs",
+		 "-mlxvp", "-mmma");
+      if (TARGET_STXVP && OPTION_SET_P(TARGET_STXVP))
+	warning (0, "%qs should not be used unless you use %qs",
+		 "-mstxvp", "-mmma");
+      TARGET_LXVP = TARGET_STXVP = 0;
+    }
+
   if (!TARGET_PCREL && TARGET_PCREL_OPT)
     rs6000_isa_flags &= ~OPTION_MASK_PCREL_OPT;
 
