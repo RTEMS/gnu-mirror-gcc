@@ -1,4 +1,64 @@
+==================== Branch work132-vsize, patch #60 ====================
+
+Add support for -mvector-pair.
+
+2023-08-29  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/predicates.md (const_0_to_31_operand): New predicate.
+	* config/rs6000/rs6000-c.cc (rs6000_cpu_cpp_builtins): Define
+	__VECTOR_PAIR__ if -mvector-pair was used.
+	* config/rs6000/rs6000-protos.h (vector_pair_to_vector_mode): New
+	declaration.
+	(rs6000_adjust_for_vector_pair): Likewise.
+	(split_unary_vector_pair): Likewise.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pair): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Add
+	support for 32-byte vector types created with -mvector-pair.
+	(rs6000_modes_tieable_p): Make all 32-byte vectors tie with other
+	32-byte vectors.
+	(rs6000_debug_reg_global): If -mdebug=reg, print whether -mvector-pair
+	was enabled.
+	(rs6000_init_hard_regno_mode_ok): Add support for 32-byte vectors.
+	(rs6000_option_override_internal): Add checking for -mvector-pair,
+	-mlxvp, and -mstxvp.
+	(rs6000_expand_vector_extract): Add support for 32-byte vectors.
+	(reg_offset_addressing_ok_p): Likewise.
+	(rs6000_emit_move): Likewise.
+	(rs6000_preferred_reload_class): Likewise.
+	(vector_pair_to_vector_mode): New vector pair helper function.
+	(rs6000_adjust_for_vector_pair): Likewise.
+	(rs6000_split_vpair_constan): Likewise.
+	(split_unary_vector_pair): Likewise.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pair): Likewise.
+	(rs6000_split_multireg_move): Add support for 32-byte vectors.
+	* config/rs6000/rs6000.h (VECTOR_PAIR_MODE): New macro.
+	* config/rs6000/rs6000.md (wd attribute): Add 32-byte vector modes.
+	(RELOAD): Likewise.
+	(toplevel): Include vector-pair.md.
+	* config/rs6000/rs6000.opt (-mvector-pair): New option.
+	* config/rs6000/t-rs6000 (MD_INCLUDES): Add vector-pair.md.
+	* config/rs6000/vector-pair.md: New file.
+	* config/rs6000/vector.md (VEC_base): Add 32-byte vector modes.
+	* config/rs6000/vsx.md (VSX_EXTRACT_PREDICATE): Likewise.
+	(VSX_EX): Likewise.
+	(VPAIR_V4DI_V4DF): New mode iterator.
+	(VPAIR_VECTOR): New mode attribute.
+	(vpair_vector): Likewise.
+	(vsx_extract_<mode>, VPAIR_V4DF_V4DI iterator): New extract insn for
+	vector pair support.
+	(vsx_extract_v8sf): Likewise.
+	(vsx_extract_<mode>, VPAIR_SMALL_INT iterator): Likewise.
+
 ==================== Branch work132-vsize, baseline ====================
+
+2023-08-28   Michael Meissner  <meissner@linux.ibm.com>
+
+	* REVISION: Update for branch.
+	* ChangeLog.vsize: New file.
 
 2023-08-28   Michael Meissner  <meissner@linux.ibm.com>
 
