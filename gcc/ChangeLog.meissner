@@ -1,4 +1,4 @@
-==================== Branch work132, patch #2 ====================
+==================== Branch work132, patch #3 ====================
 
 Allow __vector_pair__ to be passed as an argument and returned.
 
@@ -35,7 +35,7 @@ user can enable or disable with #pragma target or attribute target.
 
 The default is to generate the vector pair load/store instructions.
 
-2023-08-28  Michael Meissner  <meissner@linux.ibm.com>
+2023-08-29  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -43,6 +43,8 @@ gcc/
 	-mno-stxvp.
 	* config/rs6000/rs6000.cc (rs6000_debug_reg_global): If -mdebug=reg,
 	print out whether we are generating lxvp and/or stxvp instructions.
+	(rs6000_option_override_internal): Warn if -mlxvp or -mstxvp was used
+	without -mmma being set.
 	(rs6000_setup_reg_addr_masks structure): Add support for -mno-lxvp and
 	-mno-stxvp.
 	(rs6000_opt_vars): Add lxvp and stxvp command line options.
