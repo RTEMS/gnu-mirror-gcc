@@ -35,7 +35,7 @@ user can enable or disable with #pragma target or attribute target.
 
 The default is to generate the vector pair load/store instructions.
 
-2023-08-29  Michael Meissner  <meissner@linux.ibm.com>
+2023-08-30  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -53,6 +53,10 @@ gcc/
 	(enabled attribute): Likewise.
 	* config/rs6000/rs6000.opt (-mlxvp): New option.
 	(-mstxvp): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/p10-lxvp-stxvp.c: New test.
 
 ==================== Branch work132, patch #1 ====================
 
