@@ -327,11 +327,6 @@
   (and (match_code "const_int")
        (match_test "IN_RANGE (INTVAL (op), 0, 15)")))
 
-;; Match op = 0..31
-(define_predicate "const_0_to_31_operand"
-  (and (match_code "const_int")
-       (match_test "IN_RANGE (INTVAL (op), 0, 31)")))
-
 ;; Return 1 if op is a 34-bit constant integer.
 (define_predicate "cint34_operand"
   (match_code "const_int")
