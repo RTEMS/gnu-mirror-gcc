@@ -2,7 +2,7 @@
 
 Add support for vector pair built-in functions.
 
-2023-08-29  Michael Meissner  <meissner@linux.ibm.com>
+2023-08-30  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
