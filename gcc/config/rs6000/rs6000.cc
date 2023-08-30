@@ -2576,6 +2576,12 @@ rs6000_debug_reg_global (void)
   if (TARGET_DIRECT_MOVE_128)
     fprintf (stderr, DEBUG_FMT_D, "VSX easy 64-bit mfvsrld element",
 	     (int)VECTOR_ELEMENT_MFVSRLD_64BIT);
+
+  if (TARGET_MMA)
+    fprintf (stderr, DEBUG_FMT_ID "%s, %s\n",
+	     "vector_pair",
+	     TARGET_LXVP ? "lxvp" : "no-lxvp",
+	     TARGET_STXVP ? "stxvp" : "no-stxvp");
 }
 
 
