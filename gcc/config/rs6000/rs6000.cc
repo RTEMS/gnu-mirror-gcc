@@ -2576,6 +2576,12 @@ rs6000_debug_reg_global (void)
   if (TARGET_DIRECT_MOVE_128)
     fprintf (stderr, DEBUG_FMT_D, "VSX easy 64-bit mfvsrld element",
 	     (int)VECTOR_ELEMENT_MFVSRLD_64BIT);
+
+  if (TARGET_MMA)
+    fprintf (stderr, DEBUG_FMT_ID "%s, %s\n",
+	     "vector_pair",
+	     TARGET_LXVP ? "lxvp" : "no-lxvp",
+	     TARGET_STXVP ? "stxvp" : "no-stxvp");
 }
 
 
@@ -2711,7 +2717,9 @@ rs6000_setup_reg_addr_masks (void)
 	  /* Vector pairs can do both indexed and offset loads if the
 	     instructions are enabled, otherwise they can only do offset loads
 	     since it will be broken into two vector moves.  Vector quads can
-	     only do offset loads.  */
+	     only do offset loads.  If the user restricted generation of either
+	     of the LXVP or STXVP instructions, do not allow indexed mode so
+	     that we can split the load/store.  */
 	  else if ((addr_mask != 0) && TARGET_MMA
 		   && (m2 == OOmode || m2 == XOmode))
 	    {
@@ -2719,7 +2727,7 @@ rs6000_setup_reg_addr_masks (void)
 	      if (rc == RELOAD_REG_FPR || rc == RELOAD_REG_VMX)
 		{
 		  addr_mask |= RELOAD_REG_QUAD_OFFSET;
-		  if (m2 == OOmode)
+		  if (m2 == OOmode && TARGET_LXVP && TARGET_STXVP)
 		    addr_mask |= RELOAD_REG_INDEXED;
 		}
 	    }
@@ -4403,6 +4411,18 @@ rs6000_option_override_internal (bool global_init_p)
 	error ("%qs requires %qs", "-mmma", "-mcpu=power10");
 
       rs6000_isa_flags &= ~OPTION_MASK_MMA;
+    }
+
+  /* Warn if -mlxvp or -mstxvp are used and MMA is not set.  */
+  if (!TARGET_MMA)
+    {
+      if (TARGET_LXVP && OPTION_SET_P(TARGET_LXVP))
+	warning (0, "%qs should not be used unless you use %qs",
+		 "-mlxvp", "-mmma");
+
+      if (TARGET_STXVP && OPTION_SET_P(TARGET_STXVP))
+	warning (0, "%qs should not be used unless you use %qs",
+		 "-mstxvp", "-mmma");
     }
 
   /* Enable power10 fusion if we are tuning for power10, even if we aren't
@@ -24324,6 +24344,12 @@ static struct rs6000_opt_var const rs6000_opt_vars[] =
   { "speculate-indirect-jumps",
     offsetof (struct gcc_options, x_rs6000_speculate_indirect_jumps),
     offsetof (struct cl_target_option, x_rs6000_speculate_indirect_jumps), },
+  { "lxvp",
+    offsetof (struct gcc_options, x_TARGET_LXVP),
+    offsetof (struct cl_target_option, x_TARGET_LXVP), },
+  { "stxvp",
+    offsetof (struct gcc_options, x_TARGET_STXVP),
+    offsetof (struct cl_target_option, x_TARGET_STXVP), },
 };
 
 /* Inner function to handle attribute((target("..."))) and #pragma GCC target
