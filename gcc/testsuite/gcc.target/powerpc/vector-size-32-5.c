@@ -119,8 +119,8 @@ test_nor (vectype_t *dest,
 	  vectype_t *a,
 	  vectype_t *b)
 {
-  /* 2 lxvp, 2 xxnor, 1 stxvp.  */
-  *dest = ~(*a & *b);
+  /* 2 lxvp, 2 xxlnor, 1 stxvp.  */
+  *dest = ~(*a | *b);
 }
 
 /* { dg-final { scan-assembler-times {\mlxvp\M}     24 } } */
@@ -129,8 +129,8 @@ test_nor (vectype_t *dest,
 /* { dg-final { scan-assembler-times {\mvsubuhm\M}   4 } } */
 /* { dg-final { scan-assembler-times {\mxxland\M}    2 } } */
 /* { dg-final { scan-assembler-times {\mxxlandc\M}   4 } } */
-/* { dg-final { scan-assembler-times {\mxxlnand\M}   4 } } */
-/* { dg-final { scan-assembler-times {\mxxlnot\M}    2 } } */
+/* { dg-final { scan-assembler-times {\mxxlnand\M}   2 } } */
+/* { dg-final { scan-assembler-times {\mxxlnor\M}    4 } } */
 /* { dg-final { scan-assembler-times {\mxxlor\M}     2 } } */
 /* { dg-final { scan-assembler-times {\mxxlorc\M}    4 } } */
 /* { dg-final { scan-assembler-times {\mxxlxor\M}    2 } } */
