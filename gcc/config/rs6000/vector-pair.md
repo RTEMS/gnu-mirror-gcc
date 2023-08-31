@@ -201,7 +201,7 @@
 }
   [(set_attr "length" "8")])
 
-;; Extract one of the two 128-bitvectors from a vector pair.
+;; Extract one of the two 128-bit vectors from a vector pair.
 (define_insn_and_split "vpair_get_vector_<vp_pmode>"
   [(set (match_operand:<VP_VEC_MODE> 0 "vsx_register_operand" "=wa")
 	(unspec:<VP_VEC_MODE>
@@ -220,6 +220,23 @@
 	   
   operands[3] = gen_rtx_REG (<VP_VEC_MODE>mode, reg1 + reg_num);
 })
+
+;; Optimize extracting an 128-bit vector from a vector pair in memory.
+(define_insn_and_split "*vpair_get_vector_<vp_pmode>_mem"
+  [(set (match_operand:<VP_VEC_MODE> 0 "vsx_register_operand" "=wa")
+	(unspec:<VP_VEC_MODE>
+	 [(match_operand:OO 1 "memory_operand" "o")
+	  (match_operand 2 "const_0_to_1_operand" "n")]
+	 VP_ALL))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0) (match_dup 3))]
+{
+  operands[3] = adjust_address (operands[1], <VP_VEC_MODE>mode,
+				16 * INTVAL (operands[2]));
+}
+  [(set_attr "type" "vecload")])
 
 ;; Create a vector pair with a value splat'ed (duplicated) to all of the
 ;; elements.
