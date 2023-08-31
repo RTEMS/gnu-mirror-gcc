@@ -213,14 +213,20 @@
 
 ;; Mode attribute to give the correct predicate for ISA 3.0 vector extract and
 ;; insert to validate the operand number.
-(define_mode_attr VSX_EXTRACT_PREDICATE [(V16QI "const_0_to_15_operand")
+(define_mode_attr VSX_EXTRACT_PREDICATE [(V32QI "const_0_to_31_operand")
+					 (V16QI "const_0_to_15_operand")
+					 (V16HI "const_0_to_15_operand")
 					 (V8HI  "const_0_to_7_operand")
+					 (V8SI  "const_0_to_7_operand")
 					 (V4SI  "const_0_to_3_operand")])
 
 ;; Mode attribute to give the constraint for vector extract and insert
 ;; operations.
-(define_mode_attr VSX_EX [(V16QI "v")
+(define_mode_attr VSX_EX [(V32QI "v")
+			  (V16QI "v")
+			  (V16HI "v")
 			  (V8HI  "v")
+			  (V8SI  "wa")
 			  (V4SI  "wa")])
 
 ;; Mode iterator for binary floating types other than double to
@@ -258,6 +264,30 @@
 ;; Longer vec int modes for rotate/mask ops
 ;; and Vector Integer Multiply/Divide/Modulo Instructions
 (define_mode_iterator VIlong [V2DI V4SI])
+
+;; Iterator for extraction from vector pair modes with 64-bit elemenents
+(define_mode_iterator VPAIR_V4DI_V4DF [V4DI V4DF])
+
+;; Iterator for the small integer vector pair modes
+(define_mode_iterator VPAIR_SMALL_INT [V32QI V16HI V8SI])
+
+;; Map vector pair mode to vector mode in upper case after the vector pair is
+;; split to two vectors.
+(define_mode_attr VPAIR_VECTOR [(V32QI "V16QI")
+				(V16HI "V8HI")
+				(V8SI  "V4SI")
+				(V4DI  "V2DI")
+				(V8SF  "V4SF")
+				(V4DF  "V2DF")])
+
+;; Map vector pair mode to vector mode in lower case after the vector pair is
+;; split to two vectors.
+(define_mode_attr vpair_vector [(V32QI "v16qi")
+				(V16HI "v8hi")
+				(V8SI  "v4si")
+				(V4DI  "v2di")
+				(V8SF  "v4sf")
+				(V4DF  "v2df")])
 
 ;; Constants for creating unspecs
 (define_c_enum "unspec"
@@ -3545,6 +3575,33 @@
 }
   [(set_attr "type" "fpload,load")])
 
+;; Exctract DF/DI from V4DF/V4DI, convert it into extract from V2DF/V2DI.
+(define_insn_and_split "vsx_extract_<mode>"
+  [(set (match_operand:<VEC_base> 0 "gpc_reg_operand" "=wa,r")
+	(vec_select:<VEC_base>
+	 (match_operand:VPAIR_V4DI_V4DF 1 "gpc_reg_operand" "wa,wa")
+	 (parallel
+	  [(match_operand:QI 2 "const_0_to_3_operand" "n,n")])))]
+  "TARGET_VECTOR_PAIR"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(vec_select:<VEC_base>
+	 (match_dup 3)
+	 (parallel [(match_dup 4)])))]
+{
+  HOST_WIDE_INT element = INTVAL (operands[2]);
+  unsigned reg_num = reg_or_subregno (operands[1]);
+
+  if ((WORDS_BIG_ENDIAN && element >= 2)
+      || (!WORDS_BIG_ENDIAN && element < 2))
+    reg_num++;
+
+  operands[3] = gen_rtx_REG (<VPAIR_VECTOR>mode, reg_num);
+  operands[4] = GEN_INT (element & 1);
+}
+  [(set_attr "type" "mfvsr,vecperm")])
+
 ;; Extract a SF element from V4SF
 (define_insn_and_split "vsx_extract_v4sf"
   [(set (match_operand:SF 0 "vsx_register_operand" "=wa")
@@ -3631,6 +3688,35 @@
 					   operands[3], SFmode);
 }
   [(set_attr "type" "fpload,load")])
+
+;; Extract SF from V8SF, converting it into an extract from V4SF
+(define_insn_and_split "vsx_extract_v8sf"
+  [(set (match_operand:SF 0 "vsx_register_operand" "=wa")
+	(vec_select:SF
+	 (match_operand:V8SF 1 "vsx_register_operand" "wa")
+	 (parallel [(match_operand:QI 2 "const_0_to_7_operand" "n")])))
+   (clobber (match_scratch:V4SF 3 "=0"))]
+  "TARGET_VECTOR_PAIR"
+  "#"
+  "&& reload_completed"
+  [(parallel [(set (match_dup 0)
+		   (vec_select:SF
+		    (match_dup 4)
+		    (parallel [(match_dup 5)])))
+	      (clobber (match_dup 3))])]
+{
+  HOST_WIDE_INT element = INTVAL (operands[2]);
+  unsigned reg_num = reg_or_subregno (operands[1]);
+
+  if ((WORDS_BIG_ENDIAN && element >= 4)
+      || (!WORDS_BIG_ENDIAN && element < 4))
+    reg_num++;
+
+  operands[3] = gen_rtx_REG (V4SFmode, reg_num);
+  operands[4] = GEN_INT (element & 3);
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "fp")])
 
 ;; Expand the builtin form of xxpermdi to canonical rtl.
 (define_expand "vsx_xxpermdi_<mode>"
@@ -4073,6 +4159,36 @@
 					   operands[3], <VEC_base>mode);
 }
   [(set_attr "type" "load")])
+
+;; Extract SI/HI/QI from V8SI/V16HI/V32QI, converting it into an extract from a
+;; single vector.
+(define_insn_and_split "vsx_extract_<mode>"
+  [(set (match_operand:<VEC_base> 0 "gpc_reg_operand" "=r,<VSX_EX>")
+	(vec_select:<VEC_base>
+	 (match_operand:VPAIR_SMALL_INT 1 "gpc_reg_operand" "v,<VSX_EX>")
+	 (parallel [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>" "n,n")])))
+   (clobber (match_scratch:SI 3 "=r,X"))]
+  "TARGET_VECTOR_PAIR"
+  "#"
+  "&& reload_completed"
+  [(parallel [(set (match_dup 0)
+		   (vec_select:<VEC_base>
+		    (match_dup 4)
+		    (parallel [(match_dup 5)])))
+	      (match_dup 3)])]
+{
+  HOST_WIDE_INT element = INTVAL (operands[2]);
+  HOST_WIDE_INT nunits = GET_MODE_NUNITS (<VPAIR_VECTOR>mode);
+  unsigned reg_num = reg_or_subregno (operands[1]);
+
+  if ((WORDS_BIG_ENDIAN && element >= nunits)
+      || (!WORDS_BIG_ENDIAN && element < nunits))
+    reg_num++;
+
+  operands[4] = gen_rtx_REG (<VPAIR_VECTOR>mode, reg_num);
+  operands[5] = GEN_INT (element & (nunits - 1));
+}
+  [(set_attr "type" "vecsimple")])
 
 ;; ISA 3.1 extract
 (define_expand "vextractl<mode>"
