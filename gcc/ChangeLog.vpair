@@ -1,3 +1,21 @@
+==================== Branch work133-vpair, patch #21 ====================
+
+Add vector pair builtin tests; Optimize extract vector from memory.
+
+2023-08-31  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (vpair_get_vector_<vp_pmode>_mem): New
+	insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-01.c: New test.
+	* gcc.target/powerpc/vector-pair-02.c: New test.
+	* gcc.target/powerpc/vector-pair-03.c: New test.
+	* gcc.target/powerpc/vector-pair-03.c: New test.
+
 ==================== Branch work133-vpair, patch #20 ====================
 
 Add support for vector pair built-in functions.
