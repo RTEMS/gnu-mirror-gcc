@@ -1,3 +1,49 @@
+==================== Branch work133-vpair, patch #26 ====================
+
+Add integer vector pair built-in tests.
+
+2023-08-31  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-05.c: New test.
+	* gcc.target/powerpc/vector-pair-06.c: New test.
+	* gcc.target/powerpc/vector-pair-07.c: New test.
+	* gcc.target/powerpc/vector-pair-08.c: New test.
+
+
+==================== Branch work133-vpair, patch #25 ====================
+
+Fix typo.
+
+2023-08-31  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-02.c: Fix typo.
+
+==================== Branch work133-vpair, patch #24 ====================
+
+Fix insn counts.
+
+2023-08-31  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-01.c: Fix insn counts.
+	* gcc.target/powerpc/vector-pair-02.c: Likewise.
+
+==================== Branch work133-vpair, patch #23 ====================
+
+Fix insn counts.
+
+2023-08-31  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-01.c: Fix insn counts.
+	* gcc.target/powerpc/vector-pair-02.c: Likewise.
+
 ==================== Branch work133-vpair, patch #22 ====================
 
 Add more vector pair builtin tests.
