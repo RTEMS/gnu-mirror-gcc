@@ -33,6 +33,24 @@ test_multiply (__vector_pair *dest,
 }
 
 void
+test_min (__vector_pair *dest,
+	  __vector_pair *x,
+	  __vector_pair *y)
+{
+  /* 2 lxvp, 2 xvmindp, 1 stxvp.  */
+  *dest = __builtin_vpair_f64_smin (*x, *y);
+}
+
+void
+test_max (__vector_pair *dest,
+	  __vector_pair *x,
+	  __vector_pair *y)
+{
+  /* 2 lxvp, 2 xvmaxdp, 1 stxvp.  */
+  *dest = __builtin_vpair_f64_smax (*x, *y);
+}
+
+void
 test_negate (__vector_pair *dest,
 	     __vector_pair *x)
 {
@@ -129,18 +147,28 @@ test_get_vector_1 (__vector_pair *x)
   return __builtin_vpair_f64_get_vector (*x, 1);
 }
 
-/* { dg-final { scan-assembler-times {\mlxv\M}          2 } } */
-/* { dg-final { scan-assembler-times {\mlxvp\M}        21 } } */
-/* { dg-final { scan-assembler-times {\mstxvp\M}       12 } } */
-/* { dg-final { scan-assembler-times {\mxvabsdp\M}      2 } } */
-/* { dg-final { scan-assembler-times {\mxvadddp\M}      2 } } */
-/* { dg-final { scan-assembler-times {\mxvmadd.dp\M}    2 } } */
-/* { dg-final { scan-assembler-times {\mxvmsub.dp\M}    2 } } */
-/* { dg-final { scan-assembler-times {\mxvmuldp\M}      2 } } */
-/* { dg-final { scan-assembler-times {\mxvnabsdp\M}     2 } } */
-/* { dg-final { scan-assembler-times {\mxvnegdp\M}      2 } } */
-/* { dg-final { scan-assembler-times {\mxvnmadd.dp\M}   2 } } */
-/* { dg-final { scan-assembler-times {\mxvnmsub.dp\M}   2 } } */
-/* { dg-final { scan-assembler-times {\mxvsubdp\M}      2 } } */
-/* { dg-final { scan-assembler-times {\mxxpermdi\M}     1 } } */
-/* { dg-final { scan-assembler-times {\mxxspltb\M}      2 } } */
+double
+test_add_elements (__vector_pair *x)
+{
+  /* 1 lxvp, 1 xvadddp, 1 xxpermdi, 1 fadd/xsadddp.  */
+  return __builtin_vpair_f64_add_elements (*x);
+}
+
+/* { dg-final { scan-assembler-times {\mfadd\|xsadddp\M} 1 } } */
+/* { dg-final { scan-assembler-times {\mlxv\M}           2 } } */
+/* { dg-final { scan-assembler-times {\mlxvp\M}         26 } } */
+/* { dg-final { scan-assembler-times {\mstxvp\M}        14 } } */
+/* { dg-final { scan-assembler-times {\mxvabsdp\M}       2 } } */
+/* { dg-final { scan-assembler-times {\mxvadddp\M}       3 } } */
+/* { dg-final { scan-assembler-times {\mxvmadd.dp\M}     2 } } */
+/* { dg-final { scan-assembler-times {\mxvmindp\M}       2 } } */
+/* { dg-final { scan-assembler-times {\mxvmaxdp\M}       2 } } */
+/* { dg-final { scan-assembler-times {\mxvmsub.dp\M}     2 } } */
+/* { dg-final { scan-assembler-times {\mxvmuldp\M}       2 } } */
+/* { dg-final { scan-assembler-times {\mxvnabsdp\M}      2 } } */
+/* { dg-final { scan-assembler-times {\mxvnegdp\M}       2 } } */
+/* { dg-final { scan-assembler-times {\mxvnmadd.dp\M}    2 } } */
+/* { dg-final { scan-assembler-times {\mxvnmsub.dp\M}    2 } } */
+/* { dg-final { scan-assembler-times {\mxvsubdp\M}       2 } } */
+/* { dg-final { scan-assembler-times {\mxxpermdi\M}      2 } } */
+/* { dg-final { scan-assembler-times {\mxxspltb\M}       2 } } */
