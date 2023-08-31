@@ -156,7 +156,7 @@ test_add_elements (__vector_pair *x)
 
 /* { dg-final { scan-assembler-times {\mlxv\M}          2 } } */
 /* { dg-final { scan-assembler-times {\mlxvp\M}        26 } } */
-/* { dg-final { scan-assembler-times {\mstxvp\M}       14 } } */
+/* { dg-final { scan-assembler-times {\mstxvp\M       14 } } */
 /* { dg-final { scan-assembler-times {\mvsldoi\M}       2 } } */
 /* { dg-final { scan-assembler-times {\mxscvdpspn\M}    1 } } */
 /* { dg-final { scan-assembler-times {\mxscvspdp\M}     1 } } */
@@ -171,6 +171,6 @@ test_add_elements (__vector_pair *x)
 /* { dg-final { scan-assembler-times {\mxvnegsp\M}      2 } } */
 /* { dg-final { scan-assembler-times {\mxvnmadd.sp\M}   2 } } */
 /* { dg-final { scan-assembler-times {\mxvnmsub.sp\M}   2 } } */
-/* { dg-final { scan-assembler-times {\mxvsubds\M}      2 } } */
-/* { dg-final { scan-assembler-times {\mxxspltb\M}      2 } } */
+/* { dg-final { scan-assembler-times {\mxvsubsp\M}      2 } } */
+/* { dg-final { scan-assembler-times {\mxxspltib\M}     2 } } */
 /* { dg-final { scan-assembler-times {\mxxspltw\M}      1 } } */
