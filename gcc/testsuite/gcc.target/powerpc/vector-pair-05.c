@@ -98,7 +98,7 @@ void
 test_not (__vector_pair *dest,
 	  __vector_pair *x)
 {
-  /* 2 lxvp, 2 xxlnot, 1 stxvp.  */
+  /* 2 lxvp, 2 xxlnor, 1 stxvp.  */
   *dest = __builtin_vpair_i64_not (*x);
 }
 
@@ -186,8 +186,7 @@ test_nor (__vector_pair *dest,
 /* { dg-final { scan-assembler-times {\mxxland\M}   2 } } */
 /* { dg-final { scan-assembler-times {\mxxlandc\M}  4 } } */
 /* { dg-final { scan-assembler-times {\mxxlnand\M}  4 } } */
-/* { dg-final { scan-assembler-times {\mxxlnor\M}   2 } } */
-/* { dg-final { scan-assembler-times {\mxxlnot\M}   2 } } */
+/* { dg-final { scan-assembler-times {\mxxlnor\M}   4 } } */
 /* { dg-final { scan-assembler-times {\mxxlor\M}    2 } } */
 /* { dg-final { scan-assembler-times {\mxxlorc\M}   4 } } */
 /* { dg-final { scan-assembler-times {\mxxlxor\M}   2 } } */
