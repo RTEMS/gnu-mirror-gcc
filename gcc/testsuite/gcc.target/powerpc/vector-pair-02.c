@@ -168,9 +168,9 @@ test_add_elements (__vector_pair *x)
 /* { dg-final { scan-assembler-times {\mxvmsub.sp\M}    2 } } */
 /* { dg-final { scan-assembler-times {\mxvmulsp\M}      2 } } */
 /* { dg-final { scan-assembler-times {\mxvnabssp\M}     2 } } */
-/* { dg-final { scan-assembler-times {\mxvnegdp\M}      2 } } */
+/* { dg-final { scan-assembler-times {\mxvnegsp\M}      2 } } */
 /* { dg-final { scan-assembler-times {\mxvnmadd.sp\M}   2 } } */
 /* { dg-final { scan-assembler-times {\mxvnmsub.sp\M}   2 } } */
-/* { dg-final { scan-assembler-times {\mxvsubdp\M}      2 } } */
+/* { dg-final { scan-assembler-times {\mxvsubds\M}      2 } } */
 /* { dg-final { scan-assembler-times {\mxxspltb\M}      2 } } */
 /* { dg-final { scan-assembler-times {\mxxspltw\M}      1 } } */
