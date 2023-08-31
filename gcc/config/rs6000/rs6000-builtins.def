@@ -4131,3 +4131,287 @@
 
   void __builtin_vsx_stxvp (v256, unsigned long, const v256 *);
     STXVP nothing {mma,pair}
+
+;; Vector pair built-in functions
+
+  v256 __builtin_vpair_zero ();
+    VPAIR_ZERO vpair_zero {mma}
+
+  vf __builtin_vpair_f32_get_vector (v256, const int);
+    VPAIR_F32_GET_VECTOR vpair_get_vector_v8sf {mma}
+
+  v256 __builtin_vpair_f32_assemble (vf, vf);
+    VPAIR_F32_ASSEMBLE vpair_assemble_v8sf {mma}
+
+  v256 __builtin_vpair_f32_splat (float);
+    VPAIR_F32_SPLAT vpair_splat_v8sf {mma}
+
+  v256 __builtin_vpair_f32_abs (v256);
+    VPAIR_F32_ABS vpair_abs_v8sf2 {mma}
+
+  v256 __builtin_vpair_f32_add (v256, v256);
+    VPAIR_F32_ADD vpair_add_v8sf3 {mma}
+
+  v256 __builtin_vpair_f32_fma (v256, v256, v256);
+    VPAIR_F32_FMA vpair_fma_v8sf4 {mma}
+
+  v256 __builtin_vpair_f32_mul (v256, v256);
+    VPAIR_F32_MUL vpair_mul_v8sf3 {mma}
+
+  v256 __builtin_vpair_f32_neg (v256);
+    VPAIR_F32_NEG vpair_neg_v8sf2 {mma}
+
+  v256 __builtin_vpair_f32_smax (v256, v256);
+    VPAIR_F32_SMAX vpair_smax_v8sf3 {mma}
+
+  v256 __builtin_vpair_f32_smin (v256, v256);
+    VPAIR_F32_SMIN vpair_smin_v8sf3 {mma}
+
+  v256 __builtin_vpair_f32_sub (v256, v256);
+    VPAIR_F32_SUB vpair_sub_v8sf3 {mma}
+
+  float __builtin_vpair_f32_add_elements (v256);
+    VPAIR_F32_ADD_ELEMENTS vpair_reduc_plus_scale_v8sf {mma}
+
+  vd __builtin_vpair_f64_get_vector (v256, const int);
+    VPAIR_F64_GET_VECTOR vpair_get_vector_v4df {mma}
+
+  v256 __builtin_vpair_f64_assemble (vd, vd);
+    VPAIR_F64_ASSEMBLE vpair_assemble_v4df {mma}
+
+  v256 __builtin_vpair_f64_splat (double);
+    VPAIR_F64_SPLAT vpair_splat_v4df {mma}
+
+  v256 __builtin_vpair_f64_abs (v256);
+    VPAIR_F64_ABS vpair_abs_v4df2 {mma}
+
+  v256 __builtin_vpair_f64_add (v256, v256);
+    VPAIR_F64_ADD vpair_add_v4df3 {mma}
+
+  v256 __builtin_vpair_f64_fma (v256, v256, v256);
+    VPAIR_F64_FMA vpair_fma_v4df4 {mma}
+
+  v256 __builtin_vpair_f64_mul (v256, v256);
+    VPAIR_F64_MUL vpair_mul_v4df3 {mma}
+
+  v256 __builtin_vpair_f64_neg (v256);
+    VPAIR_F64_NEG vpair_neg_v4df2 {mma}
+
+  v256 __builtin_vpair_f64_smax (v256, v256);
+    VPAIR_F64_SMAX vpair_smax_v4df3 {mma}
+
+  v256 __builtin_vpair_f64_smin (v256, v256);
+    VPAIR_F64_SMIN vpair_smin_v4df3 {mma}
+
+  v256 __builtin_vpair_f64_sub (v256, v256);
+    VPAIR_F64_SUB vpair_sub_v4df3 {mma}
+
+  double __builtin_vpair_f64_add_elements (v256);
+    VPAIR_F64_ADD_ELEMENTS vpair_reduc_plus_scale_v4df {mma}
+
+  vuc __builtin_vpair_i8u_get_vector (v256, const int);
+    VPAIR_I8U_GET_VECTOR vpair_get_vector_v32qi {mma}
+
+  v256 __builtin_vpair_i8u_assemble (vuc, vuc);
+    VPAIR_I8U_ASSEMBLE vpair_assemble_v32qi {mma}
+
+  v256 __builtin_vpair_i8u_splat (unsigned char);
+    VPAIR_I8U_SPLAT vpair_splat_v32qi {mma}
+
+  vsc __builtin_vpair_i8_get_vector (v256, const int);
+    VPAIR_I8_GET_VECTOR vpair_get_vector_v32qi {mma}
+
+  v256 __builtin_vpair_i8_assemble (vsc, vsc);
+    VPAIR_I8_ASSEMBLE vpair_assemble_v32qi {mma}
+
+  v256 __builtin_vpair_i8_splat (signed char);
+    VPAIR_I8_SPLAT vpair_splat_v32qi {mma}
+
+  v256 __builtin_vpair_i8_add (v256, v256);
+    VPAIR_I8_ADD vpair_add_v32qi3 {mma}
+
+  v256 __builtin_vpair_i8_and (v256, v256);
+    VPAIR_I8_AND vpair_and_v32qi3 {mma}
+
+  v256 __builtin_vpair_i8_ior (v256, v256);
+    VPAIR_I8_IOR vpair_ior_v32qi3 {mma}
+
+  v256 __builtin_vpair_i8_neg (v256);
+    VPAIR_I8_NEG vpair_neg_v32qi2 {mma}
+
+  v256 __builtin_vpair_i8_not (v256);
+    VPAIR_I8_NOT vpair_not_v32qi2 {mma}
+
+  v256 __builtin_vpair_i8_smax (v256, v256);
+    VPAIR_I8_SMAX vpair_smax_v32qi3 {mma}
+
+  v256 __builtin_vpair_i8_smin (v256, v256);
+    VPAIR_I8_SMIN vpair_smin_v32qi3 {mma}
+
+  v256 __builtin_vpair_i8_sub (v256, v256);
+    VPAIR_I8_SUB vpair_sub_v32qi3 {mma}
+
+  v256 __builtin_vpair_i8_umax (v256, v256);
+    VPAIR_I8_UMAX vpair_umax_v32qi3 {mma}
+
+  v256 __builtin_vpair_i8_umin (v256, v256);
+    VPAIR_I8_UMIN vpair_umin_v32qi3 {mma}
+
+  v256 __builtin_vpair_i8_xor (v256, v256);
+    VPAIR_I8_XOR vpair_xor_v32qi3 {mma}
+
+  vus __builtin_vpair_i16u_get_vector (v256, const int);
+    VPAIR_I16U_GET_VECTOR vpair_get_vector_v16hi {mma}
+
+  v256 __builtin_vpair_i16u_assemble (vus, vus);
+    VPAIR_I16U_ASSEMBLE vpair_assemble_v16hi {mma}
+
+  v256 __builtin_vpair_i16u_splat (unsigned short);
+    VPAIR_I16U_SPLAT vpair_splat_v16hi {mma}
+
+  vss __builtin_vpair_i16_get_vector (v256, const int);
+    VPAIR_I16_GET_VECTOR vpair_get_vector_v16hi {mma}
+
+  v256 __builtin_vpair_i16_assemble (vss, vss);
+    VPAIR_I16_ASSEMBLE vpair_assemble_v16hi {mma}
+
+  v256 __builtin_vpair_i16_splat (short);
+    VPAIR_I16_SPLAT vpair_splat_v16hi {mma}
+
+  v256 __builtin_vpair_i16_add (v256, v256);
+    VPAIR_I16_ADD vpair_add_v16hi3 {mma}
+
+  v256 __builtin_vpair_i16_and (v256, v256);
+    VPAIR_I16_AND vpair_and_v16hi3 {mma}
+
+  v256 __builtin_vpair_i16_ior (v256, v256);
+    VPAIR_I16_IOR vpair_ior_v16hi3 {mma}
+
+  v256 __builtin_vpair_i16_neg (v256);
+    VPAIR_I16_NEG vpair_neg_v16hi2 {mma}
+
+  v256 __builtin_vpair_i16_not (v256);
+    VPAIR_I16_NOT vpair_not_v16hi2 {mma}
+
+  v256 __builtin_vpair_i16_smax (v256, v256);
+    VPAIR_I16_SMAX vpair_smax_v16hi3 {mma}
+
+  v256 __builtin_vpair_i16_smin (v256, v256);
+    VPAIR_I16_SMIN vpair_smin_v16hi3 {mma}
+
+  v256 __builtin_vpair_i16_sub (v256, v256);
+    VPAIR_I16_SUB vpair_sub_v16hi3 {mma}
+
+  v256 __builtin_vpair_i16_umax (v256, v256);
+    VPAIR_I16_UMAX vpair_umax_v16hi3 {mma}
+
+  v256 __builtin_vpair_i16_umin (v256, v256);
+    VPAIR_I16_UMIN vpair_umin_v16hi3 {mma}
+
+  v256 __builtin_vpair_i16_xor (v256, v256);
+    VPAIR_I16_XOR vpair_xor_v16hi3 {mma}
+
+  vui __builtin_vpair_i32u_get_vector (v256, const int);
+    VPAIR_I32U_GET_VECTOR vpair_get_vector_v8si {mma}
+
+  v256 __builtin_vpair_i32u_assemble (vui, vui);
+    VPAIR_I32U_ASSEMBLE vpair_assemble_v8si {mma}
+
+  v256 __builtin_vpair_i32u_splat (unsigned int);
+    VPAIR_I32U_SPLAT vpair_splat_v8si {mma}
+
+  vsi __builtin_vpair_i32_get_vector (v256, const int);
+    VPAIR_I32_GET_VECTOR vpair_get_vector_v8si {mma}
+
+  v256 __builtin_vpair_i32_assemble (vsi, vsi);
+    VPAIR_I32_ASSEMBLE vpair_assemble_v8si {mma}
+
+  v256 __builtin_vpair_i32_splat (int);
+    VPAIR_I32_SPLAT vpair_splat_v8si {mma}
+
+  v256 __builtin_vpair_i32_add (v256, v256);
+    VPAIR_I32_ADD vpair_add_v8si3 {mma}
+
+  v256 __builtin_vpair_i32_and (v256, v256);
+    VPAIR_I32_AND vpair_and_v8si3 {mma}
+
+  v256 __builtin_vpair_i32_ior (v256, v256);
+    VPAIR_I32_IOR vpair_ior_v8si3 {mma}
+
+  v256 __builtin_vpair_i32_neg (v256);
+    VPAIR_I32_NEG vpair_neg_v8si2 {mma}
+
+  v256 __builtin_vpair_i32_not (v256);
+    VPAIR_I32_NOT vpair_not_v8si2 {mma}
+
+  v256 __builtin_vpair_i32_smax (v256, v256);
+    VPAIR_I32_SMAX vpair_smax_v8si3 {mma}
+
+  v256 __builtin_vpair_i32_smin (v256, v256);
+    VPAIR_I32_SMIN vpair_smin_v8si3 {mma}
+
+  v256 __builtin_vpair_i32_sub (v256, v256);
+    VPAIR_I32_SUB vpair_sub_v8si3 {mma}
+
+  v256 __builtin_vpair_i32_umax (v256, v256);
+    VPAIR_I32_UMAX vpair_umax_v8si3 {mma}
+
+  v256 __builtin_vpair_i32_umin (v256, v256);
+    VPAIR_I32_UMIN vpair_umin_v8si3 {mma}
+
+  v256 __builtin_vpair_i32_xor (v256, v256);
+    VPAIR_I32_XOR vpair_xor_v8si3 {mma}
+
+  vull __builtin_vpair_i64u_get_vector (v256, const int);
+    VPAIR_I64U_GET_VECTOR vpair_get_vector_v4di {mma}
+
+  v256 __builtin_vpair_i64u_assemble (vull, vull);
+    VPAIR_I64U_ASSEMBLE vpair_assemble_v4di {mma}
+
+  v256 __builtin_vpair_i64u_splat (unsigned long long);
+    VPAIR_I64U_SPLAT vpair_splat_v4di {mma}
+
+  vsll __builtin_vpair_i64_get_vector (v256, const int);
+    VPAIR_I64_GET_VECTOR vpair_get_vector_v4di {mma}
+
+  v256 __builtin_vpair_i64_assemble (vsll, vsll);
+    VPAIR_I64_ASSEMBLE vpair_assemble_v4di {mma}
+
+  v256 __builtin_vpair_i64_splat (long long);
+    VPAIR_I64_SPLAT vpair_splat_v4di {mma}
+
+  v256 __builtin_vpair_i64_add (v256, v256);
+    VPAIR_I64_ADD vpair_add_v4di3 {mma}
+
+  v256 __builtin_vpair_i64_and (v256, v256);
+    VPAIR_I64_AND vpair_and_v4di3 {mma}
+
+  v256 __builtin_vpair_i64_ior (v256, v256);
+    VPAIR_I64_IOR vpair_ior_v4di3 {mma}
+
+  v256 __builtin_vpair_i64_neg (v256);
+    VPAIR_I64_NEG vpair_neg_v4di2 {mma}
+
+  v256 __builtin_vpair_i64_not (v256);
+    VPAIR_I64_NOT vpair_not_v4di2 {mma}
+
+  v256 __builtin_vpair_i64_smax (v256, v256);
+    VPAIR_I64_SMAX vpair_smax_v4di3 {mma}
+
+  v256 __builtin_vpair_i64_smin (v256, v256);
+    VPAIR_I64_SMIN vpair_smin_v4di3 {mma}
+
+  v256 __builtin_vpair_i64_sub (v256, v256);
+    VPAIR_I64_SUB vpair_sub_v4di3 {mma}
+
+  v256 __builtin_vpair_i64_umax (v256, v256);
+    VPAIR_I64_UMAX vpair_umax_v4di3 {mma}
+
+  v256 __builtin_vpair_i64_umin (v256, v256);
+    VPAIR_I64_UMIN vpair_umin_v4di3 {mma}
+
+  v256 __builtin_vpair_i64_xor (v256, v256);
+    VPAIR_I64_XOR vpair_xor_v4di3 {mma}
+
+  long long __builtin_vpair_i64_add_elements (v256);
+    VPAIR_I64_ADD_ELEMENTS vpair_reduc_plus_scale_v4di {mma,no32bit}
