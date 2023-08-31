@@ -156,7 +156,7 @@ test_add_elements (__vector_pair *x)
 
 /* { dg-final { scan-assembler-times {\mlxv\M}          2 } } */
 /* { dg-final { scan-assembler-times {\mlxvp\M}        26 } } */
-/* { dg-final { scan-assembler-times {\mstxvp\M       14 } } */
+/* { dg-final { scan-assembler-times {\mstxvp\M}       14 } } */
 /* { dg-final { scan-assembler-times {\mvsldoi\M}       2 } } */
 /* { dg-final { scan-assembler-times {\mxscvdpspn\M}    1 } } */
 /* { dg-final { scan-assembler-times {\mxscvspdp\M}     1 } } */
