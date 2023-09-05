@@ -2629,12 +2629,14 @@ vect_check_store_rhs (vec_info *vinfo, stmt_vec_info stmt_info,
       return false;
     }
 
-  unsigned op_no = 0;
+  int op_no = 0;
   if (gcall *call = dyn_cast <gcall *> (stmt_info->stmt))
     {
       if (gimple_call_internal_p (call)
 	  && internal_store_fn_p (gimple_call_internal_fn (call)))
 	op_no = internal_fn_stored_value_index (gimple_call_internal_fn (call));
+      if (slp_node)
+	op_no = vect_slp_child_index_for_operand (call, op_no);
     }
 
   enum vect_def_type rhs_dt;
@@ -8244,15 +8246,9 @@ vectorizable_store (vec_info *vinfo,
       if (!internal_store_fn_p (ifn))
 	return false;
 
-      if (slp_node != NULL)
-	{
-	  if (dump_enabled_p ())
-	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
-			     "SLP of masked stores not supported.\n");
-	  return false;
-	}
-
       int mask_index = internal_fn_mask_index (ifn);
+      if (mask_index >= 0 && slp_node)
+	mask_index = vect_slp_child_index_for_operand (call, mask_index);
       if (mask_index >= 0
 	  && !vect_check_scalar_mask (vinfo, stmt_info, slp_node, mask_index,
 				      &mask, NULL, &mask_dt, &mask_vectype))
@@ -9093,8 +9089,10 @@ vectorizable_store (vec_info *vinfo,
 	    {
 	      /* Get vectorized arguments for SLP_NODE.  */
 	      vect_get_vec_defs (vinfo, stmt_info, slp_node, 1, op,
-				 &vec_oprnds);
+				 &vec_oprnds, mask, &vec_masks);
 	      vec_oprnd = vec_oprnds[0];
+	      if (mask)
+		vec_mask = vec_masks[0];
 	    }
 	  else
 	    {
@@ -9191,6 +9189,8 @@ vectorizable_store (vec_info *vinfo,
 	    final_mask = vect_get_loop_mask (loop_vinfo, gsi, loop_masks,
 					     vec_num * ncopies, vectype,
 					     vec_num * j + i);
+	  if (slp && vec_mask)
+	    vec_mask = vec_masks[i];
 	  if (vec_mask)
 	    final_mask = prepare_vec_mask (loop_vinfo, mask_vectype, final_mask,
 					   vec_mask, gsi);
@@ -9575,9 +9575,8 @@ vectorizable_load (vec_info *vinfo,
 	return false;
 
       mask_index = internal_fn_mask_index (ifn);
-      /* ??? For SLP the mask operand is always last.  */
       if (mask_index >= 0 && slp_node)
-	mask_index = SLP_TREE_CHILDREN (slp_node).length () - 1;
+	mask_index = vect_slp_child_index_for_operand (call, mask_index);
       if (mask_index >= 0
 	  && !vect_check_scalar_mask (vinfo, stmt_info, slp_node, mask_index,
 				      &mask, NULL, &mask_dt, &mask_vectype))
@@ -11740,8 +11739,17 @@ vectorizable_condition (vec_info *vinfo,
 	  && LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P (loop_vinfo))
 	{
 	  if (reduction_type == EXTRACT_LAST_REDUCTION)
-	    vect_record_loop_mask (loop_vinfo, &LOOP_VINFO_MASKS (loop_vinfo),
-				   ncopies * vec_num, vectype, NULL);
+	    {
+	      if (direct_internal_fn_supported_p (IFN_LEN_FOLD_EXTRACT_LAST,
+						  vectype, OPTIMIZE_FOR_SPEED))
+		vect_record_loop_len (loop_vinfo,
+				      &LOOP_VINFO_LENS (loop_vinfo),
+				      ncopies * vec_num, vectype, 1);
+	      else
+		vect_record_loop_mask (loop_vinfo,
+				       &LOOP_VINFO_MASKS (loop_vinfo),
+				       ncopies * vec_num, vectype, NULL);
+	    }
 	  /* Extra inactive lanes should be safe for vect_nested_cycle.  */
 	  else if (STMT_VINFO_DEF_TYPE (reduc_info) != vect_nested_cycle)
 	    {
@@ -11772,7 +11780,13 @@ vectorizable_condition (vec_info *vinfo,
      mask to the condition, or to its inverse.  */
 
   vec_loop_masks *masks = NULL;
-  if (loop_vinfo && LOOP_VINFO_FULLY_MASKED_P (loop_vinfo))
+  vec_loop_lens *lens = NULL;
+  if (loop_vinfo && LOOP_VINFO_FULLY_WITH_LENGTH_P (loop_vinfo))
+    {
+      if (reduction_type == EXTRACT_LAST_REDUCTION)
+	lens = &LOOP_VINFO_LENS (loop_vinfo);
+    }
+  else if (loop_vinfo && LOOP_VINFO_FULLY_MASKED_P (loop_vinfo))
     {
       if (reduction_type == EXTRACT_LAST_REDUCTION)
 	masks = &LOOP_VINFO_MASKS (loop_vinfo);
@@ -11910,7 +11924,8 @@ vectorizable_condition (vec_info *vinfo,
       /* Force vec_compare to be an SSA_NAME rather than a comparison,
 	 in cases where that's necessary.  */
 
-      if (masks || reduction_type == EXTRACT_LAST_REDUCTION)
+      tree len = NULL_TREE, bias = NULL_TREE;
+      if (masks || lens || reduction_type == EXTRACT_LAST_REDUCTION)
 	{
 	  if (!is_gimple_val (vec_compare))
 	    {
@@ -11931,6 +11946,23 @@ vectorizable_condition (vec_info *vinfo,
 	      vec_compare = vec_compare_name;
 	    }
 
+	  if (direct_internal_fn_supported_p (IFN_LEN_FOLD_EXTRACT_LAST,
+					      vectype, OPTIMIZE_FOR_SPEED))
+	    {
+	      if (lens)
+		{
+		  len = vect_get_loop_len (loop_vinfo, gsi, lens,
+					   vec_num * ncopies, vectype, i, 1);
+		  signed char biasval
+		    = LOOP_VINFO_PARTIAL_LOAD_STORE_BIAS (loop_vinfo);
+		  bias = build_int_cst (intQI_type_node, biasval);
+		}
+	      else
+		{
+		  len = size_int (TYPE_VECTOR_SUBPARTS (vectype));
+		  bias = build_int_cst (intQI_type_node, 0);
+		}
+	    }
 	  if (masks)
 	    {
 	      tree loop_mask
@@ -11950,9 +11982,14 @@ vectorizable_condition (vec_info *vinfo,
 	{
 	  gimple *old_stmt = vect_orig_stmt (stmt_info)->stmt;
 	  tree lhs = gimple_get_lhs (old_stmt);
-	  new_stmt = gimple_build_call_internal
-	      (IFN_FOLD_EXTRACT_LAST, 3, else_clause, vec_compare,
-	       vec_then_clause);
+	  if (len)
+	    new_stmt = gimple_build_call_internal
+	        (IFN_LEN_FOLD_EXTRACT_LAST, 5, else_clause, vec_compare,
+	         vec_then_clause, len, bias);
+	  else
+	    new_stmt = gimple_build_call_internal
+	        (IFN_FOLD_EXTRACT_LAST, 3, else_clause, vec_compare,
+	         vec_then_clause);
 	  gimple_call_set_lhs (new_stmt, lhs);
 	  SSA_NAME_DEF_STMT (lhs) = new_stmt;
 	  if (old_stmt == gsi_stmt (*gsi))

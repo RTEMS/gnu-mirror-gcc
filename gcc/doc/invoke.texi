@@ -474,6 +474,7 @@ Objective-C and Objective-C++ Dialects}.
 -Wno-analyzer-null-argument
 -Wno-analyzer-null-dereference
 -Wno-analyzer-out-of-bounds
+-Wno-analyzer-overlapping-buffers
 -Wno-analyzer-possible-null-argument
 -Wno-analyzer-possible-null-dereference
 -Wno-analyzer-putenv-of-auto-var
@@ -1029,7 +1030,8 @@ Objective-C and Objective-C++ Dialects}.
 
 @emph{LoongArch Options}
 @gccoptlist{-march=@var{cpu-type}  -mtune=@var{cpu-type} -mabi=@var{base-abi-type}
--mfpu=@var{fpu-type} -msoft-float -msingle-float -mdouble-float
+-mfpu=@var{fpu-type} -msimd=@var{simd-type}
+-msoft-float -msingle-float -mdouble-float -mlsx -mno-lsx -mlasx -mno-lasx
 -mbranch-cost=@var{n}  -mcheck-zero-division -mno-check-zero-division
 -mcond-move-int  -mno-cond-move-int
 -mcond-move-float  -mno-cond-move-float
@@ -3016,6 +3018,9 @@ in C++14 and up.
 Version 18, which first appeard in G++ 13, fixes manglings of lambdas
 that have additional context.
 
+Version 19, which first appeard in G++ 14, fixes manglings of structured
+bindings to include ABI tags.
+
 See also @option{-Wabi}.
 
 @opindex fabi-compat-version
@@ -4836,7 +4841,7 @@ Use @var{class-name} as the name of the class to instantiate for each
 literal string specified with the syntax @code{@@"@dots{}"}.  The default
 class name is @code{NXConstantString} if the GNU runtime is being used, and
 @code{NSConstantString} if the NeXT runtime is being used (see below).  On
-Darwin (macOS, MacOS X) platforms, the @option{-fconstant-cfstrings} option, if
+Darwin / macOS platforms, the @option{-fconstant-cfstrings} option, if
 also present, overrides the @option{-fconstant-string-class} setting and cause
 @code{@@"@dots{}"} literals to be laid out as constant CoreFoundation strings.
 Note that @option{-fconstant-cfstrings} is an alias for the target-specific
@@ -4850,7 +4855,7 @@ runtime.  This is the default for most types of systems.
 @opindex fnext-runtime
 @item -fnext-runtime
 Generate output compatible with the NeXT runtime.  This is the default
-for NeXT-based systems, including Darwin and Mac OS X@.  The macro
+for NeXT-based systems, including Darwin / macOS.  The macro
 @code{__NEXT_RUNTIME__} is predefined if (and only if) this option is
 used.
 
@@ -10319,6 +10324,7 @@ Enabling this option effectively enables the following warnings:
 -Wanalyzer-null-argument
 -Wanalyzer-null-dereference
 -Wanalyzer-out-of-bounds
+-Wanalyzer-overlapping-buffers
 -Wanalyzer-possible-null-argument
 -Wanalyzer-possible-null-dereference
 -Wanalyzer-putenv-of-auto-var
@@ -10663,6 +10669,24 @@ apart; which one is before or after in memory, the relative sizes
 involved, the direction of the access (read vs write), and, in some
 cases, the values of data involved.  This diagram can be suppressed
 using @option{-fdiagnostics-text-art-charset=none}.
+
+@opindex Wanalyzer-overlapping-buffers
+@opindex Wno-analyzer-overlapping-buffers
+@item -Wno-analyzer-overlapping-buffers
+This warning requires @option{-fanalyzer}, which enables it; use
+@option{-Wno-analyzer-overlapping-buffers} to disable it.
+
+This diagnostic warns for paths through the code in which overlapping
+buffers are passed to an API for which the behavior on such buffers
+is undefined.
+
+Specifically, the diagnostic occurs on calls to the following functions
+@itemize @bullet
+@item @code{memcpy}
+@item @code{strcat}
+@item @code{strcpy}
+@end itemize
+for cases where the buffers are known to overlap.
 
 @opindex Wanalyzer-possible-null-argument
 @opindex Wno-analyzer-possible-null-argument
@@ -11108,6 +11132,7 @@ and of the following functions:
 @item @code{siglongjmp}
 @item @code{signal}
 @item @code{sigsetjmp}
+@item @code{strcat}
 @item @code{strchr}
 @item @code{strlen}
 @end itemize
@@ -11465,7 +11490,7 @@ possible.
 Produce debugging information in DWARF format (if that is supported).
 The value of @var{version} may be either 2, 3, 4 or 5; the default
 version for most targets is 5 (with the exception of VxWorks, TPF and
-Darwin/Mac OS X, which default to version 2, and AIX, which defaults
+Darwin / macOS, which default to version 2, and AIX, which defaults
 to version 4).
 
 Note that with DWARF Version 2, some ports require and always
@@ -12638,8 +12663,8 @@ Attempt to remove redundant extension instructions.  This is especially
 helpful for the x86-64 architecture, which implicitly zero-extends in 64-bit
 registers after writing to their lower 32-bit half.
 
-Enabled for Alpha, AArch64, PowerPC, RISC-V, SPARC, h83000 and x86 at levels
-@option{-O2}, @option{-O3}, @option{-Os}.
+Enabled for Alpha, AArch64, LoongArch, PowerPC, RISC-V, SPARC, h83000 and x86 at
+levels @option{-O2}, @option{-O3}, @option{-Os}.
 
 @opindex fno-lifetime-dse
 @opindex flifetime-dse
@@ -21578,7 +21603,7 @@ Enable the use of pre/post modify with register displacement.
 
 @opindex mbbit-peephole
 @item -mbbit-peephole
-Enable bbit peephole2.
+Does nothing.  Preserved for backward compatibility.
 
 @opindex mno-brcc
 @item -mno-brcc
@@ -25973,6 +25998,21 @@ operations.
 Prevent the use of hardware floating-point instructions.
 @end table
 
+@opindex msimd
+@item -msimd=@var{simd-type}
+Enable generation of LoongArch SIMD instructions for vectorization
+and via builtin functions.  The value can be one of:
+@table @samp
+@item lasx
+Enable generating instructions from the 256-bit LoongArch Advanced
+SIMD Extension (LASX) and the 128-bit LoongArch SIMD Extension (LSX).
+@item lsx
+Enable generating instructions from the 128-bit LoongArch SIMD
+Extension (LSX).
+@item none
+No LoongArch SIMD instruction may be generated.
+@end table
+
 @opindex msoft-float
 @item -msoft-float
 Force @option{-mfpu=none} and prevents the use of floating-point
@@ -25990,6 +26030,19 @@ ABI.
 Force @option{-mfpu=64} and allow the use of 32/64-bit floating-point
 registers for parameter passing.  This option may change the target
 ABI.
+
+@opindex ml[a]sx
+@item -mlasx
+@itemx -mno-lasx
+@item -mlsx
+@itemx -mno-lsx
+Incrementally adjust the scope of the SIMD extensions (none / LSX / LASX)
+that can be used by the compiler for code generation.  Enabling LASX with
+@option{mlasx} automatically enables LSX, and diabling LSX with @option{mno-lsx}
+automatically disables LASX.  These driver-only options act upon the final
+@option{msimd} configuration state and make incremental chagnes in the order
+they appear on the GCC driver's command line, deriving the final / canonicalized
+@option{msimd} option that is passed to the compiler proper.
 
 @opindex mbranch-cost
 @item -mbranch-cost=@var{n}
@@ -26090,6 +26143,7 @@ kernels, executables linked with @option{-static} or @option{-static-pie}.
 @option{-mdirect-extern-access} is not compatible with @option{-fPIC} or
 @option{-fpic}.
 @end table
+
 
 @node M32C Options
 @subsection M32C Options
@@ -30048,7 +30102,7 @@ the same as @option{-mbig}.
 
 @opindex mdynamic-no-pic
 @item -mdynamic-no-pic
-On Darwin and Mac OS X systems, compile code so that it is not
+On Darwin / macOS systems, compile code so that it is not
 relocatable, but that its external references are relocatable.  The
 resulting code is suitable for applications, but not shared
 libraries.

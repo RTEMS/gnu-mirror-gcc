@@ -1112,7 +1112,9 @@ loongarch_first_stack_step (struct loongarch_frame_info *frame)
 static void
 loongarch_emit_stack_tie (void)
 {
-  emit_insn (gen_stack_tie (Pmode, stack_pointer_rtx, hard_frame_pointer_rtx));
+  emit_insn (gen_stack_tie (Pmode, stack_pointer_rtx,
+			    frame_pointer_needed ? hard_frame_pointer_rtx
+			    : stack_pointer_rtx));
 }
 
 #define PROBE_INTERVAL (1 << STACK_CHECK_PROBE_INTERVAL_EXP)
@@ -2553,7 +2555,7 @@ loongarch_call_tls_get_addr (rtx sym, enum loongarch_symbol_type type, rtx v0)
 
   if (flag_plt)
     {
-      switch (la_opt_cmodel)
+      switch (la_target.cmodel)
 	{
 	case CMODEL_NORMAL:
 	  insn = emit_call_insn (gen_call_value_internal (v0,
@@ -2595,7 +2597,7 @@ loongarch_call_tls_get_addr (rtx sym, enum loongarch_symbol_type type, rtx v0)
     {
       rtx dest = gen_reg_rtx (Pmode);
 
-      switch (la_opt_cmodel)
+      switch (la_target.cmodel)
 	{
 	case CMODEL_NORMAL:
 	case CMODEL_MEDIUM:
@@ -4223,11 +4225,21 @@ loongarch_allocate_fcc (machine_mode mode)
 static void
 loongarch_extend_comparands (rtx_code code, rtx *op0, rtx *op1)
 {
-  /* Comparisons consider all XLEN bits, so extend sub-XLEN values.  */
+  /* Comparisons consider all GRLEN bits, so extend sub-GRLEN values.  */
   if (GET_MODE_SIZE (word_mode) > GET_MODE_SIZE (GET_MODE (*op0)))
     {
-      /* TODO: checkout It is more profitable to zero-extend QImode values.  */
-      if (unsigned_condition (code) == code && GET_MODE (*op0) == QImode)
+      /* It is more profitable to zero-extend QImode values.  But not if the
+	 first operand has already been sign-extended, and the second one is
+	 is a constant or has already been sign-extended also.  */
+      if (unsigned_condition (code) == code
+	  && (GET_MODE (*op0) == QImode
+	      && ! (GET_CODE (*op0) == SUBREG
+		    && SUBREG_PROMOTED_VAR_P (*op0)
+		    && SUBREG_PROMOTED_SIGNED_P (*op0)
+		    && (CONST_INT_P (*op1)
+			|| (GET_CODE (*op1) == SUBREG
+			    && SUBREG_PROMOTED_VAR_P (*op1)
+			    && SUBREG_PROMOTED_SIGNED_P (*op1))))))
 	{
 	  *op0 = gen_rtx_ZERO_EXTEND (word_mode, *op0);
 	  if (CONST_INT_P (*op1))
@@ -4384,14 +4396,30 @@ loongarch_expand_conditional_move (rtx *operands)
   enum rtx_code code = GET_CODE (operands[1]);
   rtx op0 = XEXP (operands[1], 0);
   rtx op1 = XEXP (operands[1], 1);
+  rtx op0_extend = op0;
+  rtx op1_extend = op1;
+
+  /* Record whether operands[2] and operands[3] modes are promoted to word_mode.  */
+  bool promote_p = false;
+  machine_mode mode = GET_MODE (operands[0]);
 
   if (FLOAT_MODE_P (GET_MODE (op1)))
     loongarch_emit_float_compare (&code, &op0, &op1);
   else
     {
+      if ((REGNO (op0) == REGNO (operands[2])
+	   || (REGNO (op1) == REGNO (operands[3]) && (op1 != const0_rtx)))
+	  && (GET_MODE_SIZE (GET_MODE (op0)) < word_mode))
+	{
+	  mode = word_mode;
+	  promote_p = true;
+	}
+
       loongarch_extend_comparands (code, &op0, &op1);
 
       op0 = force_reg (word_mode, op0);
+      op0_extend = op0;
+      op1_extend = force_reg (word_mode, op1);
 
       if (code == EQ || code == NE)
 	{
@@ -4418,23 +4446,52 @@ loongarch_expand_conditional_move (rtx *operands)
       && register_operand (operands[2], VOIDmode)
       && register_operand (operands[3], VOIDmode))
     {
-      machine_mode mode = GET_MODE (operands[0]);
+      rtx op2 = operands[2];
+      rtx op3 = operands[3];
+
+      if (promote_p)
+	{
+	  if (REGNO (XEXP (operands[1], 0)) == REGNO (operands[2]))
+	    op2 = op0_extend;
+	  else
+	    {
+	      loongarch_extend_comparands (code, &op2, &const0_rtx);
+	      op2 = force_reg (mode, op2);
+	    }
+
+	  if (REGNO (XEXP (operands[1], 1)) == REGNO (operands[3]))
+	    op3 = op1_extend;
+	  else
+	    {
+	      loongarch_extend_comparands (code, &op3, &const0_rtx);
+	      op3 = force_reg (mode, op3);
+	    }
+	}
+
       rtx temp = gen_reg_rtx (mode);
       rtx temp2 = gen_reg_rtx (mode);
 
       emit_insn (gen_rtx_SET (temp,
 			      gen_rtx_IF_THEN_ELSE (mode, cond,
-						    operands[2], const0_rtx)));
+						    op2, const0_rtx)));
 
       /* Flip the test for the second operand.  */
       cond = gen_rtx_fmt_ee ((code == EQ) ? NE : EQ, GET_MODE (op0), op0, op1);
 
       emit_insn (gen_rtx_SET (temp2,
 			      gen_rtx_IF_THEN_ELSE (mode, cond,
-						    operands[3], const0_rtx)));
+						    op3, const0_rtx)));
 
       /* Merge the two results, at least one is guaranteed to be zero.  */
-      emit_insn (gen_rtx_SET (operands[0], gen_rtx_IOR (mode, temp, temp2)));
+      if (promote_p)
+	{
+	  rtx temp3 = gen_reg_rtx (mode);
+	  emit_insn (gen_rtx_SET (temp3, gen_rtx_IOR (mode, temp, temp2)));
+	  temp3 = gen_lowpart (GET_MODE (operands[0]), temp3);
+	  loongarch_emit_move (operands[0], temp3);
+	}
+      else
+	emit_insn (gen_rtx_SET (operands[0], gen_rtx_IOR (mode, temp, temp2)));
     }
   else
     emit_insn (gen_rtx_SET (operands[0],
@@ -6007,8 +6064,8 @@ loongarch_adjust_cost (rtx_insn *, int dep_type, rtx_insn *, int cost,
 static int
 loongarch_issue_rate (void)
 {
-  if ((unsigned long) LARCH_ACTUAL_TUNE < N_TUNE_TYPES)
-    return loongarch_cpu_issue_rate[LARCH_ACTUAL_TUNE];
+  if ((unsigned long) la_target.cpu_tune < N_TUNE_TYPES)
+    return loongarch_cpu_issue_rate[la_target.cpu_tune];
   else
     return 1;
 }
@@ -6019,8 +6076,8 @@ loongarch_issue_rate (void)
 static int
 loongarch_multipass_dfa_lookahead (void)
 {
-  if ((unsigned long) LARCH_ACTUAL_TUNE < N_ARCH_TYPES)
-    return loongarch_cpu_multipass_dfa_lookahead[LARCH_ACTUAL_TUNE];
+  if ((unsigned long) la_target.cpu_tune < N_ARCH_TYPES)
+    return loongarch_cpu_multipass_dfa_lookahead[la_target.cpu_tune];
   else
     return 0;
 }
@@ -6197,17 +6254,54 @@ loongarch_init_machine_status (void)
 }
 
 static void
-loongarch_option_override_internal (struct gcc_options *opts)
+loongarch_cpu_option_override (struct loongarch_target *target,
+			       struct gcc_options *opts,
+			       struct gcc_options *opts_set)
+{
+  /* alignments */
+  if (opts->x_flag_align_functions && !opts->x_str_align_functions)
+    opts->x_str_align_functions
+      = loongarch_cpu_align[target->cpu_tune].function;
+
+  if (opts->x_flag_align_labels && !opts->x_str_align_labels)
+    opts->x_str_align_labels = loongarch_cpu_align[target->cpu_tune].label;
+
+  /* Set up parameters to be used in prefetching algorithm.  */
+  int simultaneous_prefetches
+    = loongarch_cpu_cache[target->cpu_tune].simultaneous_prefetches;
+
+  SET_OPTION_IF_UNSET (opts, opts_set, param_simultaneous_prefetches,
+		       simultaneous_prefetches);
+
+  SET_OPTION_IF_UNSET (opts, opts_set, param_l1_cache_line_size,
+		       loongarch_cpu_cache[target->cpu_tune].l1d_line_size);
+
+  SET_OPTION_IF_UNSET (opts, opts_set, param_l1_cache_size,
+		       loongarch_cpu_cache[target->cpu_tune].l1d_size);
+
+  SET_OPTION_IF_UNSET (opts, opts_set, param_l2_cache_size,
+		       loongarch_cpu_cache[target->cpu_tune].l2d_size);
+}
+
+static void
+loongarch_option_override_internal (struct gcc_options *opts,
+				    struct gcc_options *opts_set)
 {
   int i, regno, mode;
 
   if (flag_pic)
     g_switch_value = 0;
 
+  loongarch_init_target (&la_target,
+			 la_opt_cpu_arch, la_opt_cpu_tune, la_opt_fpu,
+			 la_opt_simd, la_opt_abi_base, la_opt_abi_ext,
+			 la_opt_cmodel);
+
   /* Handle target-specific options: compute defaults/conflicts etc.  */
-  loongarch_config_target (&la_target, la_opt_switches,
-			   la_opt_cpu_arch, la_opt_cpu_tune, la_opt_fpu,
-			   la_opt_abi_base, la_opt_abi_ext, la_opt_cmodel, 0);
+  loongarch_config_target (&la_target, NULL, 0);
+
+  loongarch_update_gcc_opt_status (&la_target, opts, opts_set);
+  loongarch_cpu_option_override (&la_target, opts, opts_set);
 
   if (TARGET_ABI_LP64)
     flag_pcc_struct_return = 0;
@@ -6216,32 +6310,12 @@ loongarch_option_override_internal (struct gcc_options *opts)
   if (optimize_size)
     loongarch_cost = &loongarch_rtx_cost_optimize_size;
   else
-    loongarch_cost = &loongarch_cpu_rtx_cost_data[LARCH_ACTUAL_TUNE];
+    loongarch_cost = &loongarch_cpu_rtx_cost_data[la_target.cpu_tune];
 
   /* If the user hasn't specified a branch cost, use the processor's
      default.  */
   if (loongarch_branch_cost == 0)
     loongarch_branch_cost = loongarch_cost->branch_cost;
-
-  /* Set up parameters to be used in prefetching algorithm.  */
-  int simultaneous_prefetches
-    = loongarch_cpu_cache[LARCH_ACTUAL_TUNE].simultaneous_prefetches;
-
-  SET_OPTION_IF_UNSET (opts, &global_options_set,
-		       param_simultaneous_prefetches,
-		       simultaneous_prefetches);
-
-  SET_OPTION_IF_UNSET (opts, &global_options_set,
-		       param_l1_cache_line_size,
-		       loongarch_cpu_cache[LARCH_ACTUAL_TUNE].l1d_line_size);
-
-  SET_OPTION_IF_UNSET (opts, &global_options_set,
-		       param_l1_cache_size,
-		       loongarch_cpu_cache[LARCH_ACTUAL_TUNE].l1d_size);
-
-  SET_OPTION_IF_UNSET (opts, &global_options_set,
-		       param_l2_cache_size,
-		       loongarch_cpu_cache[LARCH_ACTUAL_TUNE].l2d_size);
 
 
   /* Enable sw prefetching at -O3 and higher.  */
@@ -6249,12 +6323,6 @@ loongarch_option_override_internal (struct gcc_options *opts)
       && (opts->x_optimize >= 3 || opts->x_flag_profile_use)
       && !opts->x_optimize_size)
     opts->x_flag_prefetch_loop_arrays = 1;
-
-  if (opts->x_flag_align_functions && !opts->x_str_align_functions)
-    opts->x_str_align_functions = loongarch_cpu_align[LARCH_ACTUAL_TUNE].function;
-
-  if (opts->x_flag_align_labels && !opts->x_str_align_labels)
-    opts->x_str_align_labels = loongarch_cpu_align[LARCH_ACTUAL_TUNE].label;
 
   if (TARGET_DIRECT_EXTERN_ACCESS && flag_shlib)
     error ("%qs cannot be used for compiling a shared library",
@@ -6325,7 +6393,7 @@ loongarch_option_override_internal (struct gcc_options *opts)
 static void
 loongarch_option_override (void)
 {
-  loongarch_option_override_internal (&global_options);
+  loongarch_option_override_internal (&global_options, &global_options_set);
 }
 
 /* Implement TARGET_CONDITIONAL_REGISTER_USAGE.  */

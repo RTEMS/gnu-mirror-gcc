@@ -61,6 +61,7 @@ public:
   tree get_arg_tree (unsigned idx) const;
   tree get_arg_type (unsigned idx) const;
   const svalue *get_arg_svalue (unsigned idx) const;
+  const region *deref_ptr_arg (unsigned idx) const;
   const char *get_arg_string_literal (unsigned idx) const;
 
   tree get_fndecl_for_call () const;
@@ -72,9 +73,17 @@ public:
 
   tree lookup_function_attribute (const char *attr_name) const;
 
+  void
+  check_for_null_terminated_string_arg (unsigned arg_idx) const;
   const svalue *
   check_for_null_terminated_string_arg (unsigned arg_idx,
-					const svalue **out_sval = nullptr) const;
+					bool include_terminator,
+					const svalue **out_sval) const;
+
+  void
+  complain_about_overlap (unsigned arg_idx_a,
+			  unsigned arg_idx_b,
+			  const svalue *num_bytes_read_sval) const;
 
 private:
   const gcall *m_call;
