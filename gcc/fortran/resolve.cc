@@ -16073,7 +16073,8 @@ resolve_symbol (gfc_symbol *sym)
 
       if (((as->type == AS_ASSUMED_SIZE && !as->cp_was_assumed)
 	   || as->type == AS_ASSUMED_SHAPE)
-	  && !sym->attr.dummy && !sym->attr.select_type_temporary)
+	  && !sym->attr.dummy && !sym->attr.select_type_temporary
+	  && !sym->attr.associate_var)
 	{
 	  if (as->type == AS_ASSUMED_SIZE)
 	    gfc_error ("Assumed size array at %L must be a dummy argument",
@@ -17917,7 +17918,10 @@ resolve_types (gfc_namespace *ns)
 
   for (n = ns->contained; n; n = n->sibling)
     {
-      if (gfc_pure (ns->proc_name) && !gfc_pure (n->proc_name))
+      /* Exclude final wrappers with the test for the artificial attribute.  */
+      if (gfc_pure (ns->proc_name)
+	  && !gfc_pure (n->proc_name)
+	  && !n->proc_name->attr.artificial)
 	gfc_error ("Contained procedure %qs at %L of a PURE procedure must "
 		   "also be PURE", n->proc_name->name,
 		   &n->proc_name->declared_at);

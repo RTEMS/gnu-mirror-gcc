@@ -330,7 +330,9 @@ anticipatable_occurrence_p (const bb_info *bb, const vector_insn_info dem)
   if (dem.has_avl_reg ())
     {
       /* rs1 (avl) are not modified in the basic block prior to the VSETVL.  */
-      if (!vlmax_avl_p (dem.get_avl ()))
+      rtx avl
+	= has_vl_op (insn->rtl ()) ? get_vl (insn->rtl ()) : dem.get_avl ();
+      if (!vlmax_avl_p (avl))
 	{
 	  set_info *set = dem.get_avl_source ();
 	  /* If it's undefined, it's not anticipatable conservatively.  */
@@ -616,6 +618,11 @@ static rtx
 gen_vsetvl_pat (enum vsetvl_type insn_type, const vl_vtype_info &info, rtx vl)
 {
   rtx avl = info.get_avl ();
+  /* if optimization == 0 and the instruction is vmv.x.s/vfmv.f.s,
+     set the value of avl to (const_int 0) so that VSETVL PASS will
+     insert vsetvl correctly.*/
+  if (info.has_avl_no_reg ())
+    avl = GEN_INT (0);
   rtx sew = gen_int_mode (info.get_sew (), Pmode);
   rtx vlmul = gen_int_mode (info.get_vlmul (), Pmode);
   rtx ta = gen_int_mode (info.get_ta (), Pmode);
@@ -1180,6 +1187,9 @@ extract_single_source (set_info *set)
   if (!set->insn ()->is_phi ())
     return nullptr;
   hash_set<set_info *> sets = get_all_sets (set, true, false, true);
+
+  if (sets.is_empty ())
+    return nullptr;
 
   insn_info *first_insn = (*sets.begin ())->insn ();
   if (first_insn->is_artificial ())
