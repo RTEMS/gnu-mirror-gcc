@@ -128,8 +128,12 @@
     {
       emit_move_insn (operands[2], gen_int_mode (GET_MODE_NUNITS (<VLS_AVL_REG:MODE>mode),
 						 Pmode));
+      unsigned insn_flags
+        = GET_MODE_CLASS (<VLS_AVL_REG:MODE>mode) == MODE_VECTOR_BOOL
+						     ? riscv_vector::UNARY_MASK_OP
+						     : riscv_vector::UNARY_OP;
       riscv_vector::emit_nonvlmax_insn (code_for_pred_mov (<VLS_AVL_REG:MODE>mode),
-					 riscv_vector::UNARY_OP, operands, operands[2]);
+					insn_flags, operands, operands[2]);
     }
   DONE;
 }
@@ -253,6 +257,28 @@
   DONE;
 }
 [(set_attr "type" "vector")]
+)
+
+;; -------------------------------------------------------------------------
+;; Includes:
+;; - vfsgnj.vv
+;; - vfsgnj.vf
+;; -------------------------------------------------------------------------
+(define_insn_and_split "copysign<mode>3"
+  [(set (match_operand:VLSF 0 "register_operand")
+    (unspec:VLSF
+      [(match_operand:VLSF  1 "register_operand")
+       (match_operand:VLSF  2 "register_operand")] UNSPEC_VCOPYSIGN))]
+  "TARGET_VECTOR && can_create_pseudo_p ()"
+  "#"
+  "&& 1"
+  [(const_int 0)]
+  {
+    riscv_vector::emit_vlmax_insn (code_for_pred (UNSPEC_VCOPYSIGN, <MODE>mode),
+				   riscv_vector::BINARY_OP, operands);
+    DONE;
+  }
+  [(set_attr "type" "vector")]
 )
 
 ;; -------------------------------------------------------------------------------

@@ -370,8 +370,11 @@ class region_model
   void set_value (tree lhs, tree rhs, region_model_context *ctxt);
   void clobber_region (const region *reg);
   void purge_region (const region *reg);
-  void fill_region (const region *reg, const svalue *sval);
-  void zero_fill_region (const region *reg);
+  void fill_region (const region *reg,
+		    const svalue *sval,
+		    region_model_context *ctxt);
+  void zero_fill_region (const region *reg,
+			 region_model_context *ctxt);
   void write_bytes (const region *dest_reg,
 		    const svalue *num_bytes_sval,
 		    const svalue *sval,
@@ -586,6 +589,9 @@ private:
 				      const gswitch *switch_stmt,
 				      region_model_context *ctxt,
 				      rejected_constraint **out);
+  bool apply_constraints_for_ggoto (const cfg_superedge &edge,
+				    const ggoto *goto_stmt,
+				    region_model_context *ctxt);
   bool apply_constraints_for_exception (const gimple *last_stmt,
 					region_model_context *ctxt,
 					rejected_constraint **out);
@@ -790,8 +796,8 @@ class region_model_context
 class noop_region_model_context : public region_model_context
 {
 public:
-  bool warn (std::unique_ptr<pending_diagnostic> d,
-	     const stmt_finder *custom_finder) override { return false; }
+  bool warn (std::unique_ptr<pending_diagnostic>,
+	     const stmt_finder *) override { return false; }
   void add_note (std::unique_ptr<pending_note>) override;
   void add_event (std::unique_ptr<checker_event>) override;
   void on_svalue_leak (const svalue *) override {}
@@ -1197,7 +1203,7 @@ class test_region_model_context : public noop_region_model_context
 {
 public:
   bool warn (std::unique_ptr<pending_diagnostic> d,
-	     const stmt_finder *custom_finder) final override
+	     const stmt_finder *) final override
   {
     m_diagnostics.safe_push (d.release ());
     return true;

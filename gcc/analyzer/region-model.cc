@@ -1204,7 +1204,7 @@ region_model::on_assignment (const gassign *assign, region_model_context *ctxt)
 	    /* Any CONSTRUCTOR that survives to this point is either
 	       just a zero-init of everything, or a vector.  */
 	    if (!CONSTRUCTOR_NO_CLEARING (rhs1))
-	      zero_fill_region (lhs_reg);
+	      zero_fill_region (lhs_reg, ctxt);
 	    unsigned ix;
 	    tree index;
 	    tree val;
@@ -3929,19 +3929,28 @@ region_model::purge_region (const region *reg)
   m_store.purge_region (m_mgr->get_store_manager(), reg);
 }
 
-/* Fill REG with SVAL.  */
+/* Fill REG with SVAL.
+   Use CTXT to report any warnings associated with the write
+   (e.g. out-of-bounds).  */
 
 void
-region_model::fill_region (const region *reg, const svalue *sval)
+region_model::fill_region (const region *reg,
+			   const svalue *sval,
+			   region_model_context *ctxt)
 {
+  check_region_for_write (reg, nullptr, ctxt);
   m_store.fill_region (m_mgr->get_store_manager(), reg, sval);
 }
 
-/* Zero-fill REG.  */
+/* Zero-fill REG.
+   Use CTXT to report any warnings associated with the write
+   (e.g. out-of-bounds).  */
 
 void
-region_model::zero_fill_region (const region *reg)
+region_model::zero_fill_region (const region *reg,
+				region_model_context *ctxt)
 {
+  check_region_for_write (reg, nullptr, ctxt);
   m_store.zero_fill_region (m_mgr->get_store_manager(), reg);
 }
 
@@ -3970,6 +3979,8 @@ region_model::read_bytes (const region *src_reg,
 			  const svalue *num_bytes_sval,
 			  region_model_context *ctxt) const
 {
+  if (num_bytes_sval->get_kind () == SK_UNKNOWN)
+    return m_mgr->get_or_create_unknown_svalue (NULL_TREE);
   const region *sized_src_reg
     = m_mgr->get_sized_region (src_reg, NULL_TREE, num_bytes_sval);
   const svalue *src_contents_sval = get_store_value (sized_src_reg, ctxt);
@@ -4447,6 +4458,10 @@ region_model::add_constraints_from_binop (const svalue *outer_lhs,
 
     case EQ_EXPR:
     case NE_EXPR:
+    case GE_EXPR:
+    case GT_EXPR:
+    case LE_EXPR:
+    case LT_EXPR:
       {
 	/* ...and "(inner_lhs OP inner_rhs) == 0"
 	   then (inner_lhs OP inner_rhs) must have the same
@@ -4986,7 +5001,7 @@ region_model::maybe_update_for_edge (const superedge &edge,
   if (last_stmt == NULL)
     return true;
 
-  /* Apply any constraints for conditionals/switch statements.  */
+  /* Apply any constraints for conditionals/switch/computed-goto statements.  */
 
   if (const gcond *cond_stmt = dyn_cast <const gcond *> (last_stmt))
     {
@@ -5000,6 +5015,12 @@ region_model::maybe_update_for_edge (const superedge &edge,
 	= as_a <const switch_cfg_superedge *> (&edge);
       return apply_constraints_for_gswitch (*switch_sedge, switch_stmt,
 					    ctxt, out);
+    }
+
+  if (const ggoto *goto_stmt = dyn_cast <const ggoto *> (last_stmt))
+    {
+      const cfg_superedge *cfg_sedge = as_a <const cfg_superedge *> (&edge);
+      return apply_constraints_for_ggoto (*cfg_sedge, goto_stmt, ctxt);
     }
 
   /* Apply any constraints due to an exception being thrown.  */
@@ -5254,6 +5275,37 @@ region_model::apply_constraints_for_gswitch (const switch_cfg_superedge &edge,
   if (sat && ctxt && !all_cases_ranges->empty_p ())
     ctxt->on_bounded_ranges (*index_sval, *all_cases_ranges);
   return sat;
+}
+
+/* Given an edge reached by GOTO_STMT, determine appropriate constraints
+   for the edge to be taken.
+
+   If they are feasible, add the constraints and return true.
+
+   Return false if the constraints contradict existing knowledge
+   (and so the edge should not be taken).  */
+
+bool
+region_model::apply_constraints_for_ggoto (const cfg_superedge &edge,
+					   const ggoto *goto_stmt,
+					   region_model_context *ctxt)
+{
+  tree dest = gimple_goto_dest (goto_stmt);
+  const svalue *dest_sval = get_rvalue (dest, ctxt);
+
+  /* If we know we were jumping to a specific label.  */
+  if (tree dst_label = edge.m_dest->get_label ())
+    {
+      const label_region *dst_label_reg
+	= m_mgr->get_region_for_label (dst_label);
+      const svalue *dst_label_ptr
+	= m_mgr->get_ptr_svalue (ptr_type_node, dst_label_reg);
+
+      if (!add_constraint (dest_sval, EQ_EXPR, dst_label_ptr, ctxt))
+	return false;
+    }
+
+  return true;
 }
 
 /* Apply any constraints due to an exception being thrown at LAST_STMT.
