@@ -573,7 +573,7 @@ AC_ARG_ENABLE(build-format-warnings,
 AS_IF([test $enable_build_format_warnings = no],
       [wf_opt=-Wno-format],[wf_opt=])
 ACX_PROG_CXX_WARNING_OPTS(
-	m4_quote(m4_do([-W -Wall -Wnarrowing -Wwrite-strings ],
+	m4_quote(m4_do([-W -Wall -Wno-narrowing -Wwrite-strings ],
 		       [-Wcast-qual $wf_opt])),
 		       [loose_warn])
 ACX_PROG_CC_WARNING_OPTS(
@@ -2241,7 +2241,19 @@ AC_ARG_ENABLE(secureplt,
 [AS_HELP_STRING([--enable-secureplt],
 		[enable -msecure-plt by default for PowerPC ELF])],
 [
-# TODO: reject on unsupported platforms
+# WIP: reject on unsupported platforms
+case $target in
+powerpc*-*-elf | powerpc*-*-linux | powerpc*-*-gnu | rs6000-*-elf | \
+rs6000-*-linux | rs6000-*-gnu)
+# (ok)
+;;
+*)
+# everything else:
+AS_IF([test "x${enable_secureplt}" = "xyes"],[
+  AC_MSG_ERROR([--enable-secureplt is only supported on PowerPC ELF platforms])
+])
+;;
+esac
 ], [])
 
 AC_ARG_ENABLE(mingw-wildcard,
@@ -2249,7 +2261,18 @@ AC_ARG_ENABLE(mingw-wildcard,
 		[Set whether to expand wildcard on command-line.
 		 Default to platform configuration])],
 [
-# TODO: only allow on mingw
+# WIP: only allow on mingw
+case $target in
+*-*-mingw*)
+# (ok)
+;;
+*)
+# everything else:
+AS_IF([test "x${enable_mingw_wildcard}" = "xyes"],[
+  AC_MSG_ERROR([--enable-mingw-wildcard is only supported for mingw])
+])
+;;
+esac
 ],[enable_mingw_wildcard=platform])
 AS_IF([test x"$enable_mingw_wildcard" != xplatform ],
       [AC_DEFINE_UNQUOTED(MINGW_DOWILDCARD,
@@ -2258,7 +2281,21 @@ AS_IF([test x"$enable_mingw_wildcard" != xplatform ],
 
 AC_ARG_ENABLE(large-address-aware,
 [AS_HELP_STRING([--enable-large-address-aware],
-		[Link mingw executables with --large-address-aware])])
+		[Link mingw executables with --large-address-aware])],
+[
+# WIP: only allow on mingw
+case $target in
+*-*-mingw*)
+# (ok)
+;;
+*)
+# everything else:
+AS_IF([test "x${enable_large_address_aware}" = "xyes"],[
+  AC_MSG_ERROR([--enable-large-address-aware is only supported for mingw])
+])
+;;
+esac
+],[])
 AS_IF([test x"$enable_large_address_aware" = xyes],
   [AC_DEFINE([MINGW_DEFAULT_LARGE_ADDR_AWARE], 1,
     [Define if we should link mingw executables with --large-address-aware])])
@@ -2266,19 +2303,35 @@ AS_IF([test x"$enable_large_address_aware" = xyes],
 AC_ARG_ENABLE(leading-mingw64-underscores,
   AS_HELP_STRING([--enable-leading-mingw64-underscores],
                  [enable leading underscores on 64 bit mingw targets]),
-  [],[])
+  [
+# WIP: only allow on mingw
+case $target in
+*-*-mingw64)
+# (ok)
+;;
+*)
+# everything else:
+AS_IF([test "x${enable_leading_mingw64_underscores}" = "xyes"],[
+  AC_MSG_ERROR([--enable-leading-mingw64-underscores is only supported on mingw64])
+])
+;;
+esac
+],[])
 AS_IF([ test x"$enable_leading_mingw64_underscores" = xyes ],
   [AC_DEFINE(USE_MINGW64_LEADING_UNDERSCORES, 1,
     [Define if we should use leading underscore on 64 bit mingw targets])])
 
 AC_ARG_ENABLE(cld,
-[AS_HELP_STRING([--enable-cld], [enable -mcld by default for 32bit x86])], [],
+[AS_HELP_STRING([--enable-cld], [enable -mcld by default for 32bit x86])], [
+# TODO: only allow on 32bit x86
+],
 [enable_cld=no])
 
 AC_ARG_ENABLE(frame-pointer,
 [AS_HELP_STRING([--enable-frame-pointer],
-		[enable -fno-omit-frame-pointer by default for x86])], [],
-[
+		[enable -fno-omit-frame-pointer by default for x86])], [
+# TODO: only allow on x86
+],[
 case $target_os in
 linux* | gnu* | darwin[[8912]]* | cygwin* | mingw*)
   # Enable -fomit-frame-pointer by default for these systems with DWARF2.
