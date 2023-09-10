@@ -31,7 +31,9 @@ AC_CANONICAL_TARGET
 target_alias=${target_alias-$host_alias}
 
 # Handy for debugging:
-#AC_MSG_NOTICE($build / $host / $target / $host_alias / $target_alias); sleep 5
+AS_IF([test "x${DEBUG_CONFIGURE_SCRIPT}" = "xYES"],[
+  AC_MSG_NOTICE($build / $host / $target / $host_alias / $target_alias); sleep 5
+])dnl
 
 if test "$build" != "$host"; then
   # We are being configured with some form of cross compiler.
@@ -71,8 +73,25 @@ fi
 #  -Wall:  turns on all automake warnings...
 #  -Wno-portability:  ...except this one, since GNU make is now required.
 AM_INIT_AUTOMAKE([1.9.3 no-define foreign no-dependencies no-dist -Wall -Wno-portability -Wno-override])
+AC_REQUIRE_AUX_FILE([depcomp])
 AH_TEMPLATE(PACKAGE, [Name of package])
 AH_TEMPLATE(VERSION, [Version number of package])
+
+# Check Make features:
+m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])dnl
+
+dnl########################################################################
+dnl# Port to Automake 1.11.
+dnl# This section can be removed once we assume Automake 1.14 or later.
+: ${AM_DEFAULT_VERBOSITY=1}
+: ${AM_V=${AM_DEFAULT_VERBOSITY}}
+: ${AM_DEFAULT_V=${AM_DEFAULT_VERBOSITY}}
+dnl# now subst:
+AC_SUBST([AM_V])dnl
+AM_SUBST_NOTMAKE([AM_V])dnl
+AC_SUBST([AM_DEFAULT_V])dnl
+AM_SUBST_NOTMAKE([AM_DEFAULT_V])dnl
+AC_SUBST([AM_DEFAULT_VERBOSITY])dnl
 
 # -fno-builtin must be present here so that a non-conflicting form of
 # std::exit can be guessed by AC_PROG_CXX, and used in later tests.
@@ -97,8 +116,9 @@ if test "x${with_newlib}" != "xyes" &&
 fi
 AM_PROG_LIBTOOL
 ACX_LT_HOST_FLAGS
-AC_SUBST(enable_shared)
-AC_SUBST(enable_static)
+LT_PREREQ([2.2.7a])
+AC_SUBST([enable_shared])dnl
+AC_SUBST([enable_static])dnl
 
 if test "$enable_vtable_verify" = yes; then
   predep_objects_CXX="${predep_objects_CXX} ${glibcxx_builddir}/../libgcc/vtv_start.o"

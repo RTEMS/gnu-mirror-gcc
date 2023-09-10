@@ -107,10 +107,10 @@ am__aclocal_m4_deps = $(top_srcdir)/../config/acx.m4 \
 	$(top_srcdir)/../config/stdint.m4 \
 	$(top_srcdir)/../config/toolexeclibdir.m4 \
 	$(top_srcdir)/../config/unwind_ipinfo.m4 \
+	$(top_srcdir)/crossconfig.m4 $(top_srcdir)/linkage.m4 \
 	$(top_srcdir)/../libtool.m4 $(top_srcdir)/../ltoptions.m4 \
 	$(top_srcdir)/../ltsugar.m4 $(top_srcdir)/../ltversion.m4 \
-	$(top_srcdir)/../lt~obsolete.m4 $(top_srcdir)/crossconfig.m4 \
-	$(top_srcdir)/linkage.m4 $(top_srcdir)/acinclude.m4 \
+	$(top_srcdir)/../lt~obsolete.m4 $(top_srcdir)/acinclude.m4 \
 	$(top_srcdir)/../config/gc++filt.m4 \
 	$(top_srcdir)/../config/tls.m4 $(top_srcdir)/../config/gthr.m4 \
 	$(top_srcdir)/../config/cet.m4 $(top_srcdir)/configure.ac
@@ -501,7 +501,7 @@ SUBDIRS = c++98 c++11 c++17 c++20 $(filesystem_dir) $(backtrace_dir)
 @VTV_CYGMIN_TRUE@	-Wl,-u_vtable_map_vars_start,-u_vtable_map_vars_end \
 @VTV_CYGMIN_TRUE@	$(WARN_CXXFLAGS) $(OPTIMIZE_CXXFLAGS) $(CONFIG_CXXFLAGS)
 
-@VTV_CYGMIN_TRUE@libvtv_la_LINK = $(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) \
+@VTV_CYGMIN_TRUE@libvtv_la_LINK = $(LIBTOOL) --tag=CXX $(AM_V_lt) $(AM_LIBTOOLFLAGS) \
 @VTV_CYGMIN_TRUE@	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(libvtv_la_AM_CXXFLAGS) \
 @VTV_CYGMIN_TRUE@	$(CXXFLAGS) $(libvtv_la_LDFLAGS) $(LDFLAGS) -o $@
 
@@ -633,7 +633,7 @@ AM_CXXFLAGS = $(filter-out -fvtable-verify=std,$(AM_CXXFLAGS_PRE))
 # last. (That way, things like -O2 passed down from the toplevel can
 # be overridden by --enable-debug and --enable-cxx-flags.)
 LTCXXCOMPILE = \
-	$(LIBTOOL) --tag CXX \
+	$(LIBTOOL) --tag CXX $(AM_V_lt) \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=compile $(CXX) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) $(EXTRA_CXX_FLAGS)
@@ -647,7 +647,7 @@ LTLDFLAGS = $(shell $(SHELL) $(top_srcdir)/../libtool-ldflags $(LDFLAGS))
 # directory to configure libstdc++-v3 to use gcc as the C++
 # compilation driver.
 CXXLINK = \
-	$(LIBTOOL) --tag CXX \
+	$(LIBTOOL) --tag CXX $(AM_V_lt) \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CXX) \
 	$(VTV_CXXLINKFLAGS) \

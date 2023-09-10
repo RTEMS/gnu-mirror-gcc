@@ -106,10 +106,10 @@ am__aclocal_m4_deps = $(top_srcdir)/../config/acx.m4 \
 	$(top_srcdir)/../config/stdint.m4 \
 	$(top_srcdir)/../config/toolexeclibdir.m4 \
 	$(top_srcdir)/../config/unwind_ipinfo.m4 \
+	$(top_srcdir)/crossconfig.m4 $(top_srcdir)/linkage.m4 \
 	$(top_srcdir)/../libtool.m4 $(top_srcdir)/../ltoptions.m4 \
 	$(top_srcdir)/../ltsugar.m4 $(top_srcdir)/../ltversion.m4 \
-	$(top_srcdir)/../lt~obsolete.m4 $(top_srcdir)/crossconfig.m4 \
-	$(top_srcdir)/linkage.m4 $(top_srcdir)/acinclude.m4 \
+	$(top_srcdir)/../lt~obsolete.m4 $(top_srcdir)/acinclude.m4 \
 	$(top_srcdir)/../config/gc++filt.m4 \
 	$(top_srcdir)/../config/tls.m4 $(top_srcdir)/../config/gthr.m4 \
 	$(top_srcdir)/../config/cet.m4 $(top_srcdir)/configure.ac
@@ -666,7 +666,7 @@ $(check_DEJAGNU_normal_targets): check-DEJAGNUnormal%: normal%/site.exp
 
 # Run the testsuite in normal mode.
 check-DEJAGNU $(check_DEJAGNU_normal_targets): check-DEJAGNU%: site.exp
-	$(if $*,@)AR="$(AR)"; export AR; \
+	$(AM_V_at)$(if $*,@)AR="$(AR)"; export AR; \
 	RANLIB="$(RANLIB)"; export RANLIB; \
 	if [ -z "$*" ] && [ -n "$(filter -j%, $(MFLAGS))" ]; then \
 	  rm -rf normal-parallel || true; \

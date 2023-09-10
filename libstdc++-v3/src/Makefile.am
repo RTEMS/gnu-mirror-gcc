@@ -60,7 +60,7 @@ libvtv_la_AM_CXXFLAGS = \
 	-Wl,-u_vtable_map_vars_start,-u_vtable_map_vars_end \
 	$(WARN_CXXFLAGS) $(OPTIMIZE_CXXFLAGS) $(CONFIG_CXXFLAGS)
 
-libvtv_la_LINK = $(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) \
+libvtv_la_LINK = $(LIBTOOL) --tag=CXX $(AM_V_lt) $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(libvtv_la_AM_CXXFLAGS) \
 	$(CXXFLAGS) $(libvtv_la_LDFLAGS) $(LDFLAGS) -o $@
 endif
@@ -266,7 +266,7 @@ AM_CXXFLAGS = $(filter-out -fvtable-verify=std,$(AM_CXXFLAGS_PRE))
 # last. (That way, things like -O2 passed down from the toplevel can
 # be overridden by --enable-debug and --enable-cxx-flags.)
 LTCXXCOMPILE = \
-	$(LIBTOOL) --tag CXX \
+	$(LIBTOOL) --tag CXX $(AM_V_lt) \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=compile $(CXX) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) $(EXTRA_CXX_FLAGS)
@@ -280,7 +280,7 @@ LTLDFLAGS = $(shell $(SHELL) $(top_srcdir)/../libtool-ldflags $(LDFLAGS))
 # directory to configure libstdc++-v3 to use gcc as the C++
 # compilation driver.
 CXXLINK = \
-	$(LIBTOOL) --tag CXX \
+	$(LIBTOOL) --tag CXX $(AM_V_lt) \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CXX) \
 	$(VTV_CXXLINKFLAGS) \
