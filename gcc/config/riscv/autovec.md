@@ -46,17 +46,6 @@
   DONE;
 })
 
-(define_expand "movmisalign<mode>"
-  [(set (match_operand:V 0 "nonimmediate_operand")
-	(match_operand:V 1 "general_operand"))]
-  "TARGET_VECTOR"
-  {
-    /* Equivalent to a normal move for our purpooses.  */
-    emit_move_insn (operands[0], operands[1]);
-    DONE;
-  }
-)
-
 ;; =========================================================================
 ;; == Gather Load
 ;; =========================================================================
@@ -401,8 +390,8 @@
   "TARGET_VECTOR"
 {
   insn_code icode = code_for_pred_slide (UNSPEC_VSLIDE1UP, <MODE>mode);
-  rtx ops[] = {operands[0], RVV_VUNDEF (<MODE>mode), operands[1], operands[2]};
-  riscv_vector::emit_vlmax_slide_insn (icode, ops);
+  rtx ops[] = {operands[0], operands[1], operands[2]};
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::BINARY_OP, ops);
   DONE;
 })
 
@@ -413,8 +402,8 @@
   "TARGET_VECTOR"
 {
   insn_code icode = code_for_pred_slide (UNSPEC_VFSLIDE1UP, <MODE>mode);
-  rtx ops[] = {operands[0], RVV_VUNDEF (<MODE>mode), operands[1], operands[2]};
-  riscv_vector::emit_vlmax_slide_insn (icode, ops);
+  rtx ops[] = {operands[0], operands[1], operands[2]};
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::BINARY_OP, ops);
   DONE;
 })
 
@@ -430,15 +419,18 @@
 ;; - vadd.vi/vsub.vi/...
 ;; -------------------------------------------------------------------------
 
-(define_expand "<optab><mode>3"
+(define_insn_and_split "<optab><mode>3"
   [(set (match_operand:VI 0 "register_operand")
     (any_int_binop_no_shift:VI
      (match_operand:VI 1 "<binop_rhs1_predicate>")
      (match_operand:VI 2 "<binop_rhs2_predicate>")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && can_create_pseudo_p ()"
+  "#"
+  "&& 1"
+  [(const_int 0)]
 {
   riscv_vector::emit_vlmax_insn (code_for_pred (<CODE>, <MODE>mode),
-				 riscv_vector::RVV_BINOP, operands);
+				 riscv_vector::BINARY_OP, operands);
   DONE;
 })
 
@@ -451,10 +443,10 @@
 ;; -------------------------------------------------------------------------
 
 (define_insn_and_split "<optab><mode>3"
-  [(set (match_operand:V_VLSI 0 "register_operand" "=vr")
+  [(set (match_operand:V_VLSI 0 "register_operand"        "=vr")
     (any_shift:V_VLSI
-     (match_operand:V_VLSI 1 "register_operand"    " vr")
-     (match_operand:<VEL> 2 "csr_operand"      " rK")))]
+     (match_operand:V_VLSI 1 "register_operand"           " vr")
+     (match_operand:<VEL> 2 "vector_scalar_shift_operand" " rK")))]
   "TARGET_VECTOR && can_create_pseudo_p ()"
   "#"
   "&& 1"
@@ -462,7 +454,7 @@
 {
   operands[2] = gen_lowpart (Pmode, operands[2]);
   riscv_vector::emit_vlmax_insn (code_for_pred_scalar (<CODE>, <MODE>mode),
-				 riscv_vector::RVV_BINOP, operands);
+				 riscv_vector::BINARY_OP, operands);
   DONE;
 }
  [(set_attr "type" "vshift")
@@ -486,7 +478,7 @@
   [(const_int 0)]
 {
   riscv_vector::emit_vlmax_insn (code_for_pred (<CODE>, <MODE>mode),
-				 riscv_vector::RVV_BINOP, operands);
+				 riscv_vector::BINARY_OP, operands);
   DONE;
 }
  [(set_attr "type" "vshift")
@@ -511,7 +503,7 @@
   [(const_int 0)]
   {
     insn_code icode = code_for_pred (<CODE>, <MODE>mode);
-    riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_BINOP, operands);
+    riscv_vector::emit_vlmax_insn (icode, riscv_vector::BINARY_MASK_OP, operands);
     DONE;
   }
   [(set_attr "type" "vmalu")
@@ -533,7 +525,7 @@
   [(const_int 0)]
   {
     insn_code icode = code_for_pred_not (<MODE>mode);
-    riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, operands);
+    riscv_vector::emit_vlmax_insn (icode, riscv_vector::UNARY_MASK_OP, operands);
     DONE;
   }
   [(set_attr "type" "vmalu")
@@ -552,17 +544,21 @@
 ;; - vfmerge.vf
 ;; -------------------------------------------------------------------------
 
-(define_expand "@vcond_mask_<mode><vm>"
-  [(match_operand:V 0 "register_operand")
-   (match_operand:<VM> 3 "register_operand")
-   (match_operand:V 1 "nonmemory_operand")
-   (match_operand:V 2 "register_operand")]
-  "TARGET_VECTOR"
+(define_insn_and_split "@vcond_mask_<mode><vm>"
+  [(set (match_operand:V 0 "register_operand")
+        (if_then_else:V
+          (match_operand:<VM> 3 "register_operand")
+          (match_operand:V 1 "nonmemory_operand")
+          (match_operand:V 2 "register_operand")))]
+  "TARGET_VECTOR && can_create_pseudo_p ()"
+  "#"
+  "&& 1"
+  [(const_int 0)]
   {
     /* The order of vcond_mask is opposite to pred_merge.  */
     std::swap (operands[1], operands[2]);
-    riscv_vector::emit_vlmax_merge_insn (code_for_pred_merge (<MODE>mode),
-    			riscv_vector::RVV_MERGE_OP, operands);
+    riscv_vector::emit_vlmax_insn (code_for_pred_merge (<MODE>mode),
+                                   riscv_vector::MERGE_OP, operands);
     DONE;
   }
 )
@@ -634,31 +630,37 @@
   [(const_int 0)]
 {
   insn_code icode = code_for_pred_vf2 (<CODE>, <MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, operands);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::UNARY_OP, operands);
   DONE;
 }
   [(set_attr "type" "vext")
    (set_attr "mode" "<MODE>")])
 
-(define_expand "<optab><v_quad_trunc><mode>2"
+(define_insn_and_split "<optab><v_quad_trunc><mode>2"
   [(set (match_operand:VQEXTI 0 "register_operand")
     (any_extend:VQEXTI
      (match_operand:<V_QUAD_TRUNC> 1 "register_operand")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && can_create_pseudo_p ()"
+  "#"
+  "&& 1"
+  [(const_int 0)]
 {
   insn_code icode = code_for_pred_vf4 (<CODE>, <MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, operands);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::UNARY_OP, operands);
   DONE;
 })
 
-(define_expand "<optab><v_oct_trunc><mode>2"
+(define_insn_and_split "<optab><v_oct_trunc><mode>2"
   [(set (match_operand:VOEXTI 0 "register_operand")
     (any_extend:VOEXTI
      (match_operand:<V_OCT_TRUNC> 1 "register_operand")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && can_create_pseudo_p ()"
+  "#"
+  "&& 1"
+  [(const_int 0)]
 {
   insn_code icode = code_for_pred_vf8 (<CODE>, <MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, operands);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::UNARY_OP, operands);
   DONE;
 })
 
@@ -677,7 +679,7 @@
   [(const_int 0)]
 {
   insn_code icode = code_for_pred_trunc (<MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, operands);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::UNARY_OP, operands);
   DONE;
 }
   [(set_attr "type" "vshift")
@@ -694,13 +696,8 @@
   "TARGET_VECTOR"
 {
   rtx half = gen_reg_rtx (<V_DOUBLE_TRUNC>mode);
-  rtx opshalf[] = {half, operands[1]};
-  insn_code icode = code_for_pred_trunc (<MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, opshalf);
-
-  rtx ops[] = {operands[0], half};
-  icode = code_for_pred_trunc (<V_DOUBLE_TRUNC>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, ops);
+  emit_insn (gen_trunc<mode><v_double_trunc>2 (half, operands[1]));
+  emit_insn (gen_trunc<v_double_trunc><v_quad_trunc>2 (operands[0], half));
   DONE;
 })
 
@@ -714,19 +711,9 @@
      (match_operand:VOEXTI 1 "register_operand")))]
   "TARGET_VECTOR"
 {
-  rtx half = gen_reg_rtx (<V_DOUBLE_TRUNC>mode);
-  rtx opshalf[] = {half, operands[1]};
-  insn_code icode = code_for_pred_trunc (<MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, opshalf);
-
   rtx quarter = gen_reg_rtx (<V_QUAD_TRUNC>mode);
-  rtx opsquarter[] = {quarter, half};
-  icode = code_for_pred_trunc (<V_DOUBLE_TRUNC>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, opsquarter);
-
-  rtx ops[] = {operands[0], quarter};
-  icode = code_for_pred_trunc (<V_QUAD_TRUNC>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, ops);
+  emit_insn (gen_trunc<mode><v_quad_trunc>2 (quarter, operands[1]));
+  emit_insn (gen_trunc<v_quad_trunc><v_oct_trunc>2 (operands[0], quarter));
   DONE;
 })
 
@@ -745,7 +732,7 @@
   [(const_int 0)]
 {
   insn_code icode = code_for_pred_extend (<MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, operands);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::UNARY_OP, operands);
   DONE;
 }
   [(set_attr "type" "vfwcvtftof")
@@ -758,13 +745,8 @@
   "TARGET_VECTOR && (TARGET_ZVFHMIN || TARGET_ZVFH)"
 {
   rtx dblw = gen_reg_rtx (<V_DOUBLE_TRUNC>mode);
-  insn_code icode = code_for_pred_extend (<V_DOUBLE_TRUNC>mode);
-  rtx ops1[] = {dblw, operands[1]};
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, ops1);
-
-  icode = code_for_pred_extend (<MODE>mode);
-  rtx ops2[] = {operands[0], dblw};
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, ops2);
+  emit_insn (gen_extend<v_quad_trunc><v_double_trunc>2 (dblw, operands[1]));
+  emit_insn (gen_extend<v_double_trunc><mode>2 (operands[0], dblw));
   DONE;
 })
 
@@ -783,7 +765,7 @@
   [(const_int 0)]
 {
   insn_code icode = code_for_pred_trunc (<MODE>mode);
-  riscv_vector::emit_vlmax_fp_insn (icode, riscv_vector::RVV_UNOP, operands);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::UNARY_OP_FRM_DYN, operands);
   DONE;
 }
   [(set_attr "type" "vfncvtftof")
@@ -805,11 +787,9 @@
   /* According to the RISC-V V Spec 13.19. we need to use
      vfncvt.rod.f.f.w for all steps but the last.  */
   insn_code icode = code_for_pred_rod_trunc (<MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, opshalf);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::UNARY_OP, opshalf);
 
-  rtx ops[] = {operands[0], half};
-  icode = code_for_pred_trunc (<V_DOUBLE_TRUNC>mode);
-  riscv_vector::emit_vlmax_fp_insn (icode, riscv_vector::RVV_UNOP, ops);
+  emit_insn (gen_trunc<v_double_trunc><v_quad_trunc>2 (operands[0], half));
   DONE;
 })
 
@@ -826,14 +806,17 @@
 ;; - vfcvt.rtz.x.f.v
 ;; -------------------------------------------------------------------------
 
-(define_expand "<optab><mode><vconvert>2"
+(define_insn_and_split "<optab><mode><vconvert>2"
   [(set (match_operand:<VCONVERT> 0 "register_operand")
 	(any_fix:<VCONVERT>
 	  (match_operand:VF 1 "register_operand")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && can_create_pseudo_p ()"
+  "#"
+  "&& 1"
+  [(const_int 0)]
 {
   insn_code icode = code_for_pred (<CODE>, <MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, operands);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::UNARY_OP, operands);
   DONE;
 })
 
@@ -845,14 +828,17 @@
 ;; - vfcvt.f.x.v
 ;; -------------------------------------------------------------------------
 
-(define_expand "<float_cvt><vconvert><mode>2"
+(define_insn_and_split "<float_cvt><vconvert><mode>2"
   [(set (match_operand:VF 0 "register_operand")
 	(any_float:VF
 	  (match_operand:<VCONVERT> 1 "register_operand")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && can_create_pseudo_p ()"
+  "#"
+  "&& 1"
+  [(const_int 0)]
 {
   insn_code icode = code_for_pred (<CODE>, <MODE>mode);
-  riscv_vector::emit_vlmax_fp_insn (icode, riscv_vector::RVV_UNOP, operands);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::UNARY_OP_FRM_DYN, operands);
   DONE;
 })
 
@@ -867,14 +853,17 @@
 ;; - vfwcvt.rtz.xu.f.v
 ;; - vfwcvt.rtz.x.f.v
 ;; -------------------------------------------------------------------------
-(define_expand "<optab><vnconvert><mode>2"
+(define_insn_and_split "<optab><vnconvert><mode>2"
   [(set (match_operand:VWCONVERTI 0 "register_operand")
 	(any_fix:VWCONVERTI
 	  (match_operand:<VNCONVERT> 1 "register_operand")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && can_create_pseudo_p ()"
+  "#"
+  "&& 1"
+  [(const_int 0)]
 {
   insn_code icode = code_for_pred_widen (<CODE>, <MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, operands);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::UNARY_OP, operands);
   DONE;
 })
 
@@ -885,14 +874,17 @@
 ;; - vfwcvt.f.xu.v
 ;; - vfwcvt.f.x.v
 ;; -------------------------------------------------------------------------
-(define_expand "<float_cvt><vnconvert><mode>2"
+(define_insn_and_split "<float_cvt><vnconvert><mode>2"
   [(set (match_operand:VF 0 "register_operand")
 	(any_float:VF
 	  (match_operand:<VNCONVERT> 1 "register_operand")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && can_create_pseudo_p ()"
+  "#"
+  "&& 1"
+  [(const_int 0)]
 {
   insn_code icode = code_for_pred_widen (<CODE>, <MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, operands);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::UNARY_OP, operands);
   DONE;
 })
 
@@ -903,14 +895,17 @@
 ;; - vfncvt.rtz.xu.f.v
 ;; - vfncvt.rtz.x.f.v
 ;; -------------------------------------------------------------------------
-(define_expand "<optab><mode><vnconvert>2"
+(define_insn_and_split "<optab><mode><vnconvert>2"
   [(set (match_operand:<VNCONVERT> 0 "register_operand")
 	(any_fix:<VNCONVERT>
 	  (match_operand:VF 1 "register_operand")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && can_create_pseudo_p ()"
+  "#"
+  "&& 1"
+  [(const_int 0)]
 {
   insn_code icode = code_for_pred_narrow (<CODE>, <MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, operands);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::UNARY_OP, operands);
   DONE;
 })
 
@@ -921,14 +916,17 @@
 ;; - vfncvt.f.xu.w
 ;; - vfncvt.f.x.w
 ;; -------------------------------------------------------------------------
-(define_expand "<float_cvt><mode><vnconvert>2"
+(define_insn_and_split "<float_cvt><mode><vnconvert>2"
   [(set (match_operand:<VNCONVERT> 0 "register_operand")
 	(any_float:<VNCONVERT>
 	  (match_operand:VWCONVERTI 1 "register_operand")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && can_create_pseudo_p ()"
+  "#"
+  "&& 1"
+  [(const_int 0)]
 {
   insn_code icode = code_for_pred_narrow (<CODE>, <MODE>mode);
-  riscv_vector::emit_vlmax_fp_insn (icode, riscv_vector::RVV_UNOP, operands);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::UNARY_OP_FRM_DYN, operands);
   DONE;
 })
 
@@ -942,14 +940,17 @@
 ;; Includes:
 ;; - vneg.v/vnot.v
 ;; -------------------------------------------------------------------------------
-(define_expand "<optab><mode>2"
+(define_insn_and_split "<optab><mode>2"
   [(set (match_operand:VI 0 "register_operand")
     (any_int_unop:VI
      (match_operand:VI 1 "register_operand")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && can_create_pseudo_p ()"
+  "#"
+  "&& 1"
+  [(const_int 0)]
 {
   insn_code icode = code_for_pred (<CODE>, <MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, operands);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::UNARY_OP, operands);
   DONE;
 })
 
@@ -957,10 +958,14 @@
 ;; - [INT] ABS expansion to vmslt and vneg.
 ;; -------------------------------------------------------------------------------
 
-(define_expand "abs<mode>2"
+(define_insn_and_split "abs<mode>2"
   [(set (match_operand:VI 0 "register_operand")
-    (match_operand:VI 1 "register_operand"))]
-  "TARGET_VECTOR"
+     (abs:VI
+       (match_operand:VI 1 "register_operand")))]
+  "TARGET_VECTOR && can_create_pseudo_p ()"
+  "#"
+  "&& 1"
+  [(const_int 0)]
 {
   rtx zero = gen_const_vec_duplicate (<MODE>mode, GEN_INT (0));
   machine_mode mask_mode = riscv_vector::get_mask_mode (<MODE>mode);
@@ -968,8 +973,8 @@
   riscv_vector::expand_vec_cmp (mask, LT, operands[1], zero);
 
   rtx ops[] = {operands[0], mask, operands[1], operands[1]};
-  riscv_vector::emit_vlmax_masked_mu_insn (code_for_pred (NEG, <MODE>mode),
-					   riscv_vector::RVV_UNOP_MU, ops);
+  riscv_vector::emit_vlmax_insn (code_for_pred (NEG, <MODE>mode),
+                                  riscv_vector::UNARY_OP_TAMU, ops);
   DONE;
 })
 
@@ -979,14 +984,17 @@
 ;; Includes:
 ;; - vfneg.v/vfabs.v
 ;; -------------------------------------------------------------------------------
-(define_expand "<optab><mode>2"
+(define_insn_and_split "<optab><mode>2"
   [(set (match_operand:VF 0 "register_operand")
     (any_float_unop_nofrm:VF
      (match_operand:VF 1 "register_operand")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && can_create_pseudo_p ()"
+  "#"
+  "&& 1"
+  [(const_int 0)]
 {
   insn_code icode = code_for_pred (<CODE>, <MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_UNOP, operands);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::UNARY_OP, operands);
   DONE;
 })
 
@@ -996,14 +1004,17 @@
 ;; Includes:
 ;; - vfsqrt.v
 ;; -------------------------------------------------------------------------------
-(define_expand "<optab><mode>2"
+(define_insn_and_split "<optab><mode>2"
   [(set (match_operand:VF 0 "register_operand")
     (any_float_unop:VF
      (match_operand:VF 1 "register_operand")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && can_create_pseudo_p ()"
+  "#"
+  "&& 1"
+  [(const_int 0)]
 {
   insn_code icode = code_for_pred (<CODE>, <MODE>mode);
-  riscv_vector::emit_vlmax_fp_insn (icode, riscv_vector::RVV_UNOP, operands);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::UNARY_OP_FRM_DYN, operands);
   DONE;
 })
 
@@ -1064,8 +1075,8 @@
   {
     riscv_vector::emit_vlmax_vsetvl (<VI:MODE>mode, operands[4]);
     rtx ops[] = {operands[0], operands[1], operands[2], operands[3], operands[0]};
-    riscv_vector::emit_vlmax_ternary_insn (code_for_pred_mul_plus (<VI:MODE>mode),
-					   riscv_vector::RVV_TERNOP, ops, operands[4]);
+    riscv_vector::emit_vlmax_insn_lra (code_for_pred_mul_plus (<VI:MODE>mode),
+					riscv_vector::TERNARY_OP, ops, operands[4]);
     DONE;
   }
   [(set_attr "type" "vimuladd")
@@ -1108,8 +1119,8 @@
   {
     riscv_vector::emit_vlmax_vsetvl (<VI:MODE>mode, operands[4]);
     rtx ops[] = {operands[0], operands[1], operands[2], operands[3], operands[0]};
-    riscv_vector::emit_vlmax_ternary_insn (code_for_pred_minus_mul (<VI:MODE>mode),
-    					   riscv_vector::RVV_TERNOP, ops, operands[4]);
+    riscv_vector::emit_vlmax_insn_lra (code_for_pred_minus_mul (<VI:MODE>mode),
+                                       riscv_vector::TERNARY_OP, ops, operands[4]);
     DONE;
   }
   [(set_attr "type" "vimuladd")
@@ -1126,22 +1137,27 @@
 (define_expand "fma<mode>4"
   [(parallel
     [(set (match_operand:VF 0 "register_operand")
-	  (fma:VF
-	    (match_operand:VF 1 "register_operand")
-	    (match_operand:VF 2 "register_operand")
-	    (match_operand:VF 3 "register_operand")))
+	  (unspec:VF
+	    [(fma:VF
+	      (match_operand:VF 1 "register_operand")
+	      (match_operand:VF 2 "register_operand")
+	      (match_operand:VF 3 "register_operand"))
+	     (reg:SI FRM_REGNUM)] UNSPEC_VFFMA))
      (clobber (match_dup 4))])]
   "TARGET_VECTOR"
   {
     operands[4] = gen_reg_rtx (Pmode);
-  })
+  }
+  [(set (attr "frm_mode") (symbol_ref "riscv_vector::FRM_DYN"))])
 
 (define_insn_and_split "*fma<VF:mode><P:mode>"
   [(set (match_operand:VF 0 "register_operand"   "=vr, vr, ?&vr")
-	(fma:VF
-	  (match_operand:VF 1 "register_operand" " %0, vr,   vr")
-	  (match_operand:VF 2 "register_operand" " vr, vr,   vr")
-	  (match_operand:VF 3 "register_operand" " vr,  0,   vr")))
+	(unspec:VF
+	  [(fma:VF
+	    (match_operand:VF 1 "register_operand" " %0, vr,   vr")
+	    (match_operand:VF 2 "register_operand" " vr, vr,   vr")
+	    (match_operand:VF 3 "register_operand" " vr,  0,   vr"))
+	   (reg:SI FRM_REGNUM)] UNSPEC_VFFMA))
    (clobber (match_operand:P 4 "register_operand" "=r,r,r"))]
   "TARGET_VECTOR"
   "#"
@@ -1150,12 +1166,13 @@
   {
     riscv_vector::emit_vlmax_vsetvl (<VF:MODE>mode, operands[4]);
     rtx ops[] = {operands[0], operands[1], operands[2], operands[3], operands[0]};
-    riscv_vector::emit_vlmax_fp_ternary_insn (code_for_pred_mul (PLUS, <VF:MODE>mode),
-					      riscv_vector::RVV_TERNOP, ops, operands[4]);
+    riscv_vector::emit_vlmax_insn_lra (code_for_pred_mul (PLUS, <VF:MODE>mode),
+					riscv_vector::TERNARY_OP_FRM_DYN, ops, operands[4]);
     DONE;
   }
   [(set_attr "type" "vfmuladd")
-   (set_attr "mode" "<VF:MODE>")])
+   (set_attr "mode" "<VF:MODE>")
+   (set (attr "frm_mode") (symbol_ref "riscv_vector::FRM_DYN"))])
 
 ;; -------------------------------------------------------------------------
 ;; ---- [FP] VFNMSAC and VFNMSUB
@@ -1168,24 +1185,29 @@
 (define_expand "fnma<mode>4"
   [(parallel
     [(set (match_operand:VF 0 "register_operand")
-	  (fma:VF
-	    (neg:VF
-	      (match_operand:VF 1 "register_operand"))
-	    (match_operand:VF 2 "register_operand")
-	    (match_operand:VF 3 "register_operand")))
+	  (unspec:VF
+	    [(fma:VF
+	      (neg:VF
+		(match_operand:VF 1 "register_operand"))
+	      (match_operand:VF 2 "register_operand")
+	      (match_operand:VF 3 "register_operand"))
+	     (reg:SI FRM_REGNUM)] UNSPEC_VFFMA))
      (clobber (match_dup 4))])]
   "TARGET_VECTOR"
   {
     operands[4] = gen_reg_rtx (Pmode);
-  })
+  }
+  [(set (attr "frm_mode") (symbol_ref "riscv_vector::FRM_DYN"))])
 
 (define_insn_and_split "*fnma<VF:mode><P:mode>"
   [(set (match_operand:VF 0 "register_operand"     "=vr, vr, ?&vr")
-	(fma:VF
-	  (neg:VF
-	    (match_operand:VF 1 "register_operand" " %0, vr,   vr"))
-	  (match_operand:VF 2 "register_operand"   " vr, vr,   vr")
-	  (match_operand:VF 3 "register_operand"   " vr,  0,   vr")))
+	(unspec:VF
+	  [(fma:VF
+	    (neg:VF
+	      (match_operand:VF 1 "register_operand" " %0, vr,   vr"))
+	    (match_operand:VF 2 "register_operand"   " vr, vr,   vr")
+	    (match_operand:VF 3 "register_operand"   " vr,  0,   vr"))
+	   (reg:SI FRM_REGNUM)] UNSPEC_VFFMA))
    (clobber (match_operand:P 4 "register_operand" "=r,r,r"))]
   "TARGET_VECTOR"
   "#"
@@ -1194,12 +1216,13 @@
   {
     riscv_vector::emit_vlmax_vsetvl (<VF:MODE>mode, operands[4]);
     rtx ops[] = {operands[0], operands[1], operands[2], operands[3], operands[0]};
-    riscv_vector::emit_vlmax_fp_ternary_insn (code_for_pred_mul_neg (PLUS, <VF:MODE>mode),
-					      riscv_vector::RVV_TERNOP, ops, operands[4]);
+    riscv_vector::emit_vlmax_insn_lra (code_for_pred_mul_neg (PLUS, <VF:MODE>mode),
+					riscv_vector::TERNARY_OP_FRM_DYN, ops, operands[4]);
     DONE;
   }
   [(set_attr "type" "vfmuladd")
-   (set_attr "mode" "<VF:MODE>")])
+   (set_attr "mode" "<VF:MODE>")
+   (set (attr "frm_mode") (symbol_ref "riscv_vector::FRM_DYN"))])
 
 ;; -------------------------------------------------------------------------
 ;; ---- [FP] VFMSAC and VFMSUB
@@ -1212,24 +1235,29 @@
 (define_expand "fms<mode>4"
   [(parallel
     [(set (match_operand:VF 0 "register_operand")
-	  (fma:VF
-	    (match_operand:VF 1 "register_operand")
-	    (match_operand:VF 2 "register_operand")
-	    (neg:VF
-	      (match_operand:VF 3 "register_operand"))))
+	  (unspec:VF
+	    [(fma:VF
+	      (match_operand:VF 1 "register_operand")
+	      (match_operand:VF 2 "register_operand")
+	      (neg:VF
+		(match_operand:VF 3 "register_operand")))
+	     (reg:SI FRM_REGNUM)] UNSPEC_VFFMA))
      (clobber (match_dup 4))])]
   "TARGET_VECTOR"
   {
     operands[4] = gen_reg_rtx (Pmode);
-  })
+  }
+  [(set (attr "frm_mode") (symbol_ref "riscv_vector::FRM_DYN"))])
 
 (define_insn_and_split "*fms<VF:mode><P:mode>"
   [(set (match_operand:VF 0 "register_operand"     "=vr, vr, ?&vr")
-	(fma:VF
-	  (match_operand:VF 1 "register_operand"   " %0, vr,   vr")
-	  (match_operand:VF 2 "register_operand"   " vr, vr,   vr")
-	  (neg:VF
-	    (match_operand:VF 3 "register_operand" " vr,  0,   vr"))))
+	(unspec:VF
+	  [(fma:VF
+	    (match_operand:VF 1 "register_operand"   " %0, vr,   vr")
+	    (match_operand:VF 2 "register_operand"   " vr, vr,   vr")
+	    (neg:VF
+	      (match_operand:VF 3 "register_operand" " vr,  0,   vr")))
+	   (reg:SI FRM_REGNUM)] UNSPEC_VFFMA))
    (clobber (match_operand:P 4 "register_operand" "=r,r,r"))]
   "TARGET_VECTOR"
   "#"
@@ -1238,44 +1266,50 @@
   {
     riscv_vector::emit_vlmax_vsetvl (<VF:MODE>mode, operands[4]);
     rtx ops[] = {operands[0], operands[1], operands[2], operands[3], operands[0]};
-    riscv_vector::emit_vlmax_fp_ternary_insn (code_for_pred_mul (MINUS, <VF:MODE>mode),
-					      riscv_vector::RVV_TERNOP, ops, operands[4]);
+    riscv_vector::emit_vlmax_insn_lra (code_for_pred_mul (MINUS, <VF:MODE>mode),
+					riscv_vector::TERNARY_OP_FRM_DYN, ops, operands[4]);
     DONE;
   }
   [(set_attr "type" "vfmuladd")
-   (set_attr "mode" "<VF:MODE>")])
+   (set_attr "mode" "<VF:MODE>")
+   (set (attr "frm_mode") (symbol_ref "riscv_vector::FRM_DYN"))])
 
 ;; -------------------------------------------------------------------------
-;; ---- [FP] VFMSAC and VFMSUB
+;; ---- [FP] VFNMACC and VFNMADD
 ;; -------------------------------------------------------------------------
 ;; Includes:
-;; - vfmsac
-;; - vfmsub
+;; - vfnmacc
+;; - vfnmadd
 ;; -------------------------------------------------------------------------
 
 (define_expand "fnms<mode>4"
   [(parallel
     [(set (match_operand:VF 0 "register_operand")
-	  (fma:VF
-	    (neg:VF
-	      (match_operand:VF 1 "register_operand"))
-	    (match_operand:VF 2 "register_operand")
-	    (neg:VF
-	      (match_operand:VF 3 "register_operand"))))
+	  (unspec:VF
+	    [(fma:VF
+	      (neg:VF
+		(match_operand:VF 1 "register_operand"))
+	      (match_operand:VF 2 "register_operand")
+	      (neg:VF
+		(match_operand:VF 3 "register_operand")))
+	     (reg:SI FRM_REGNUM)] UNSPEC_VFFMA))
      (clobber (match_dup 4))])]
   "TARGET_VECTOR"
   {
     operands[4] = gen_reg_rtx (Pmode);
-  })
+  }
+  [(set (attr "frm_mode") (symbol_ref "riscv_vector::FRM_DYN"))])
 
 (define_insn_and_split "*fnms<VF:mode><P:mode>"
   [(set (match_operand:VF 0 "register_operand"     "=vr, vr, ?&vr")
-	(fma:VF
-	  (neg:VF
-	    (match_operand:VF 1 "register_operand" " %0, vr,   vr"))
-	  (match_operand:VF 2 "register_operand"   " vr, vr,   vr")
-	  (neg:VF
-	    (match_operand:VF 3 "register_operand" " vr,  0,   vr"))))
+	(unspec:VF
+	  [(fma:VF
+	    (neg:VF
+	      (match_operand:VF 1 "register_operand" " %0, vr,   vr"))
+	    (match_operand:VF 2 "register_operand"   " vr, vr,   vr")
+	    (neg:VF
+	      (match_operand:VF 3 "register_operand" " vr,  0,   vr")))
+	   (reg:SI FRM_REGNUM)] UNSPEC_VFFMA))
    (clobber (match_operand:P 4 "register_operand" "=r,r,r"))]
   "TARGET_VECTOR"
   "#"
@@ -1284,12 +1318,13 @@
   {
     riscv_vector::emit_vlmax_vsetvl (<VF:MODE>mode, operands[4]);
     rtx ops[] = {operands[0], operands[1], operands[2], operands[3], operands[0]};
-    riscv_vector::emit_vlmax_fp_ternary_insn (code_for_pred_mul_neg (MINUS, <VF:MODE>mode),
-					      riscv_vector::RVV_TERNOP, ops, operands[4]);
+    riscv_vector::emit_vlmax_insn_lra (code_for_pred_mul_neg (MINUS, <VF:MODE>mode),
+					riscv_vector::TERNARY_OP_FRM_DYN, ops, operands[4]);
     DONE;
   }
   [(set_attr "type" "vfmuladd")
-   (set_attr "mode" "<VF:MODE>")])
+   (set_attr "mode" "<VF:MODE>")
+   (set (attr "frm_mode") (symbol_ref "riscv_vector::FRM_DYN"))])
 
 ;; =========================================================================
 ;; == SELECT_VL
@@ -1318,10 +1353,9 @@
   /* If we set the first element, emit an v(f)mv.s.[xf].  */
   if (operands[2] == const0_rtx)
     {
-      rtx ops[] = {operands[0], riscv_vector::gen_scalar_move_mask (<VM>mode),
-		   RVV_VUNDEF (<MODE>mode), operands[1]};
-      riscv_vector::emit_scalar_move_insn
-	  (code_for_pred_broadcast (<MODE>mode), ops);
+      rtx ops[] = {operands[0], operands[1]};
+      riscv_vector::emit_nonvlmax_insn (code_for_pred_broadcast (<MODE>mode),
+                                         riscv_vector::SCALAR_MOVE_OP, ops, CONST1_RTX (Pmode));
     }
   else
     {
@@ -1345,14 +1379,14 @@
 	 VL we need for the slide.  */
       rtx tmp = gen_reg_rtx (<MODE>mode);
       rtx ops1[] = {tmp, operands[1]};
-      riscv_vector::emit_nonvlmax_integer_move_insn
-	(code_for_pred_broadcast (<MODE>mode), ops1, length);
+      emit_nonvlmax_insn (code_for_pred_broadcast (<MODE>mode),
+                           riscv_vector::UNARY_OP, ops1, length);
 
       /* Slide exactly one element up leaving the tail elements
 	 unchanged.  */
       rtx ops2[] = {operands[0], operands[0], tmp, operands[2]};
-      riscv_vector::emit_nonvlmax_slide_tu_insn
-	(code_for_pred_slide (UNSPEC_VSLIDEUP, <MODE>mode), ops2, length);
+      riscv_vector::emit_nonvlmax_insn
+	(code_for_pred_slide (UNSPEC_VSLIDEUP, <MODE>mode), riscv_vector::BINARY_OP_TUMA, ops2, length);
     }
   DONE;
 })
@@ -1379,14 +1413,50 @@
       /* Emit the slide down to index 0 in a new vector.  */
       tmp = gen_reg_rtx (<MODE>mode);
       operands[2] = gen_lowpart (Pmode, operands[2]);
-      rtx ops[] = {tmp, RVV_VUNDEF (<MODE>mode), operands[1], operands[2]};
-      riscv_vector::emit_vlmax_slide_insn
-	(code_for_pred_slide (UNSPEC_VSLIDEDOWN, <MODE>mode), ops);
+      rtx ops[] = {tmp, operands[1], operands[2]};
+      riscv_vector::emit_vlmax_insn
+	(code_for_pred_slide (UNSPEC_VSLIDEDOWN, <MODE>mode), riscv_vector::BINARY_OP, ops);
     }
 
   /* Emit v(f)mv.[xf].s.  */
   emit_insn (gen_pred_extract_first (<MODE>mode, operands[0],
 				     tmp ? tmp : operands[1]));
+  DONE;
+})
+
+;; -------------------------------------------------------------------------
+;; This extracts a bit (via QImode) from a bitmask vector.
+;; -------------------------------------------------------------------------
+(define_expand "vec_extract<mode>qi"
+  [(set (match_operand:QI	  0 "register_operand")
+     (vec_select:QI
+       (match_operand:VB	  1 "register_operand")
+       (parallel
+	 [(match_operand	  2 "nonmemory_operand")])))]
+  "TARGET_VECTOR"
+{
+  /* Create an empty byte vector and set it to one under mask.  */
+  machine_mode qimode = riscv_vector::get_vector_mode
+      (QImode, GET_MODE_NUNITS (<MODE>mode)).require ();
+
+  rtx tmp1 = gen_reg_rtx (qimode);
+  emit_move_insn (tmp1, gen_const_vec_duplicate (qimode, GEN_INT (0)));
+  rtx ones = gen_const_vec_duplicate (qimode, GEN_INT (1));
+
+  rtx ops1[] = {tmp1, tmp1, ones, operands[1]};
+  riscv_vector::emit_vlmax_insn (code_for_pred_merge (qimode),
+				 riscv_vector::MERGE_OP, ops1);
+
+  /* Slide down the requested byte element.  */
+  rtx tmp2 = gen_reg_rtx (qimode);
+
+  rtx ops2[] = {tmp2, tmp1, operands[2]};
+  riscv_vector::emit_vlmax_insn
+    (code_for_pred_slide (UNSPEC_VSLIDEDOWN, qimode),
+     riscv_vector::BINARY_OP, ops2);
+
+  /* Extract it.  */
+  emit_insn (gen_pred_extract_first (qimode, operands[0], tmp2));
   DONE;
 })
 
@@ -1397,15 +1467,18 @@
 ;; - vfadd.vv/vfsub.vv/...
 ;; - vfadd.vf/vfsub.vf/...
 ;; -------------------------------------------------------------------------
-(define_expand "<optab><mode>3"
-  [(match_operand:VF 0 "register_operand")
-   (any_float_binop:VF
-    (match_operand:VF 1 "register_operand")
-    (match_operand:VF 2 "register_operand"))]
-  "TARGET_VECTOR"
+(define_insn_and_split "<optab><mode>3"
+  [(set (match_operand:VF 0 "register_operand")
+        (any_float_binop:VF
+          (match_operand:VF 1 "register_operand")
+          (match_operand:VF 2 "register_operand")))]
+  "TARGET_VECTOR && can_create_pseudo_p ()"
+  "#"
+  "&& 1"
+  [(const_int 0)]
 {
-  riscv_vector::emit_vlmax_fp_insn (code_for_pred (<CODE>, <MODE>mode),
-				    riscv_vector::RVV_BINOP, operands);
+  riscv_vector::emit_vlmax_insn (code_for_pred (<CODE>, <MODE>mode),
+				    riscv_vector::BINARY_OP_FRM_DYN, operands);
   DONE;
 })
 
@@ -1414,15 +1487,18 @@
 ;; - vfmin.vv/vfmax.vv
 ;; - vfmin.vf/vfmax.vf
 ;; -------------------------------------------------------------------------
-(define_expand "<optab><mode>3"
-  [(match_operand:VF 0 "register_operand")
-   (any_float_binop_nofrm:VF
-    (match_operand:VF 1 "register_operand")
-    (match_operand:VF 2 "register_operand"))]
-  "TARGET_VECTOR"
+(define_insn_and_split "<optab><mode>3"
+  [(set (match_operand:VF 0 "register_operand")
+        (any_float_binop_nofrm:VF
+          (match_operand:VF 1 "register_operand")
+          (match_operand:VF 2 "register_operand")))]
+  "TARGET_VECTOR && can_create_pseudo_p ()"
+  "#"
+  "&& 1"
+  [(const_int 0)]
 {
   riscv_vector::emit_vlmax_insn (code_for_pred (<CODE>, <MODE>mode),
-				 riscv_vector::RVV_BINOP, operands);
+				  riscv_vector::BINARY_OP, operands);
   DONE;
 })
 
@@ -1447,7 +1523,7 @@
   [(const_int 0)]
 {
   riscv_vector::emit_vlmax_insn (code_for_pred (UNSPEC_VCOPYSIGN, <MODE>mode),
-				 riscv_vector::RVV_BINOP, operands);
+				  riscv_vector::BINARY_OP, operands);
   DONE;
 }
   [(set_attr "type" "vfsgnj")
@@ -1465,7 +1541,7 @@
   "TARGET_VECTOR"
 {
   riscv_vector::emit_vlmax_insn (code_for_pred (UNSPEC_VXORSIGN, <MODE>mode),
-				 riscv_vector::RVV_BINOP, operands);
+				  riscv_vector::BINARY_OP, operands);
   DONE;
 })
 
@@ -1477,25 +1553,109 @@
 ;; - vmulhu.vv
 ;; -------------------------------------------------------------------------
 
-(define_expand "smul<mode>3_highpart"
-  [(match_operand:VFULLI 0 "register_operand")
-   (match_operand:VFULLI 1 "register_operand")
-   (match_operand:VFULLI 2 "register_operand")]
-  "TARGET_VECTOR"
+(define_insn_and_split "smul<mode>3_highpart"
+  [(set (match_operand:VFULLI 0 "register_operand")
+        (smul_highpart:VFULLI
+          (match_operand:VFULLI 1 "register_operand")
+          (match_operand:VFULLI 2 "register_operand")))]
+  "TARGET_VECTOR && can_create_pseudo_p ()"
+  "#"
+  "&& 1"
+  [(const_int 0)]
 {
   insn_code icode = code_for_pred_mulh (UNSPEC_VMULHS, <MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_BINOP, operands);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::BINARY_OP, operands);
   DONE;
 })
 
-(define_expand "umul<mode>3_highpart"
-  [(match_operand:VFULLI 0 "register_operand")
-   (match_operand:VFULLI 1 "register_operand")
-   (match_operand:VFULLI 2 "register_operand")]
-  "TARGET_VECTOR"
+(define_insn_and_split "umul<mode>3_highpart"
+  [(set (match_operand:VFULLI 0 "register_operand")
+        (umul_highpart:VFULLI
+          (match_operand:VFULLI 1 "register_operand")
+          (match_operand:VFULLI 2 "register_operand")))]
+  "TARGET_VECTOR && can_create_pseudo_p ()"
+  "#"
+  "&& 1"
+  [(const_int 0)]
 {
   insn_code icode = code_for_pred_mulh (UNSPEC_VMULHU, <MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_BINOP, operands);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::BINARY_OP, operands);
+  DONE;
+})
+
+;; -------------------------------------------------------------------------
+;; ---- [INT] Conditional unary operations
+;; -------------------------------------------------------------------------
+;; Includes:
+;; - vneg/vnot
+;; -------------------------------------------------------------------------
+
+(define_expand "cond_<optab><mode>"
+  [(match_operand:VI 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (any_int_unop:VI
+     (match_operand:VI 2 "register_operand"))
+   (match_operand:VI 3 "register_operand")]
+  "TARGET_VECTOR"
+{
+  /* Normalize into cond_len_* operations.  */
+  emit_insn (gen_cond_len_<optab><mode> (operands[0], operands[1], operands[2],
+					 operands[3],
+					 gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
+					 const0_rtx));
+  DONE;
+})
+
+(define_expand "cond_len_<optab><mode>"
+  [(match_operand:VI 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (any_int_unop:VI
+     (match_operand:VI 2 "register_operand"))
+   (match_operand:VI 3 "register_operand")
+   (match_operand 4 "autovec_length_operand")
+   (match_operand 5 "const_0_operand")]
+  "TARGET_VECTOR"
+{
+  insn_code icode = code_for_pred (<CODE>, <MODE>mode);
+  riscv_vector::expand_cond_len_unop (icode, operands);
+  DONE;
+})
+
+;; -------------------------------------------------------------------------
+;; ---- [FP] Conditional unary operations
+;; -------------------------------------------------------------------------
+;; Includes:
+;; - vfneg/vfabs
+;; -------------------------------------------------------------------------
+
+(define_expand "cond_<optab><mode>"
+  [(match_operand:VF 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (any_float_unop_nofrm:VF
+     (match_operand:VF 2 "register_operand"))
+   (match_operand:VF 3 "register_operand")]
+  "TARGET_VECTOR"
+{
+  /* Normalize into cond_len_* operations.  */
+  emit_insn (gen_cond_len_<optab><mode> (operands[0], operands[1], operands[2],
+					 operands[3],
+					 gen_int_mode (GET_MODE_NUNITS (<MODE>mode), Pmode),
+					 const0_rtx));
+  DONE;
+})
+
+(define_expand "cond_len_<optab><mode>"
+  [(match_operand:VF 0 "register_operand")
+   (match_operand:<VM> 1 "vector_mask_operand")
+   (any_float_unop_nofrm:VF
+     (match_operand:VF 2 "register_operand"))
+   (match_operand:VF 3 "register_operand")
+   (match_operand 4 "autovec_length_operand")
+   (match_operand 5 "const_0_operand")]
+  "TARGET_VECTOR"
+{
+  insn_code icode = code_for_pred (<CODE>, <MODE>mode);
+  riscv_vector::expand_cond_len_unop (icode, operands);
   DONE;
 })
 
@@ -1534,7 +1694,8 @@
    (match_operand 6 "const_0_operand")]
   "TARGET_VECTOR"
 {
-  riscv_vector::expand_cond_len_binop (<CODE>, operands);
+  insn_code icode = code_for_pred (<CODE>, <MODE>mode);
+  riscv_vector::expand_cond_len_binop (icode, operands);
   DONE;
 })
 
@@ -1574,7 +1735,8 @@
    (match_operand 6 "const_0_operand")]
   "TARGET_VECTOR"
 {
-  riscv_vector::expand_cond_len_binop (<CODE>, operands);
+  insn_code icode = code_for_pred (<CODE>, <MODE>mode);
+  riscv_vector::expand_cond_len_binop (icode, operands);
   DONE;
 })
 
@@ -1614,7 +1776,8 @@
    (match_operand 6 "const_0_operand")]
   "TARGET_VECTOR"
 {
-  riscv_vector::expand_cond_len_binop (<CODE>, operands);
+  insn_code icode = code_for_pred (<CODE>, <MODE>mode);
+  riscv_vector::expand_cond_len_binop (icode, operands);
   DONE;
 })
 
@@ -1652,7 +1815,8 @@
    (match_operand 6 "const_0_operand")]
   "TARGET_VECTOR"
 {
-  riscv_vector::expand_cond_len_binop (<CODE>, operands);
+  insn_code icode = code_for_pred (<CODE>, <MODE>mode);
+  riscv_vector::expand_cond_len_binop (icode, operands);
   DONE;
 })
 
@@ -2046,6 +2210,30 @@
 })
 
 ;; -------------------------------------------------------------------------
+;; ---- [INT,FP] Extract active element
+;; -------------------------------------------------------------------------
+;; Includes:
+;; - vcompress.vm
+;; - vcpop.m
+;; - vslidedown.vx
+;; - vmv.x.s
+;; - vfmv.f.s
+;; -------------------------------------------------------------------------
+
+(define_expand "len_fold_extract_last_<mode>"
+  [(match_operand:<VEL> 0 "register_operand")
+   (match_operand:<VEL> 1 "register_operand")
+   (match_operand:<VM> 2 "register_operand")
+   (match_operand:V 3 "register_operand")
+   (match_operand 4 "autovec_length_operand")
+   (match_operand 5 "const_0_operand")]
+  "TARGET_VECTOR"
+  {
+    riscv_vector::expand_fold_extract_last (operands);
+    DONE;
+  })
+
+;; -------------------------------------------------------------------------
 ;; ---- [INT] Average.
 ;; -------------------------------------------------------------------------
 ;; Implements the following "average" patterns:
@@ -2070,12 +2258,12 @@
   rtx tmp1 = gen_reg_rtx (<MODE>mode);
   rtx ops1[] = {tmp1, operands[1], operands[2]};
   insn_code icode = code_for_pred_dual_widen (PLUS, <CODE>, <MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_BINOP, ops1);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::BINARY_OP, ops1);
 
   /* Then a narrowing shift.  */
   rtx ops2[] = {operands[0], tmp1, const1_rtx};
   icode = code_for_pred_narrow_scalar (<EXT_TO_RSHIFT>, <MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_BINOP, ops2);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::BINARY_OP, ops2);
   DONE;
 })
 
@@ -2096,17 +2284,17 @@
   rtx tmp1 = gen_reg_rtx (<MODE>mode);
   rtx ops1[] = {tmp1, operands[1], operands[2]};
   insn_code icode = code_for_pred_dual_widen (PLUS, <CODE>, <MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_BINOP, ops1);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::BINARY_OP, ops1);
 
   /* Then add 1.  */
   rtx tmp2 = gen_reg_rtx (<MODE>mode);
   rtx ops2[] = {tmp2, tmp1, const1_rtx};
   icode = code_for_pred_scalar (PLUS, <MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_BINOP, ops2);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::BINARY_OP, ops2);
 
   /* Finally, a narrowing shift.  */
   rtx ops3[] = {operands[0], tmp2, const1_rtx};
   icode = code_for_pred_narrow_scalar (<EXT_TO_RSHIFT>, <MODE>mode);
-  riscv_vector::emit_vlmax_insn (icode, riscv_vector::RVV_BINOP, ops3);
+  riscv_vector::emit_vlmax_insn (icode, riscv_vector::BINARY_OP, ops3);
   DONE;
 })

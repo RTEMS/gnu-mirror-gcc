@@ -1290,9 +1290,9 @@
 // from version.def line 1046
 #if !defined(__cpp_lib_ranges)
 # if (__cplusplus >= 202302L) && (__glibcxx_concepts)
-#  define __glibcxx_ranges 202202L
+#  define __glibcxx_ranges 202211L
 #  if defined(__glibcxx_want_all) || defined(__glibcxx_want_ranges)
-#   define __cpp_lib_ranges 202202L
+#   define __cpp_lib_ranges 202211L
 #  endif
 # elif (__cplusplus >= 202002L) && (__glibcxx_concepts)
 #  define __glibcxx_ranges 202110L
@@ -1940,6 +1940,17 @@
 #undef __glibcxx_want_string_resize_and_overwrite
 
 // from version.def line 1586
+#if !defined(__cpp_lib_ratio)
+# if (__cplusplus >  202302L)
+#  define __glibcxx_ratio 202306L
+#  if defined(__glibcxx_want_all) || defined(__glibcxx_want_ratio)
+#   define __cpp_lib_ratio 202306L
+#  endif
+# endif
+#endif /* !defined(__cpp_lib_ratio) && defined(__glibcxx_want_ratio) */
+#undef __glibcxx_want_ratio
+
+// from version.def line 1594
 #if !defined(__cpp_lib_to_string)
 # if (__cplusplus >  202302L) && _GLIBCXX_HOSTED && (__glibcxx_to_chars)
 #  define __glibcxx_to_string 202306L

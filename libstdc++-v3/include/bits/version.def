@@ -1045,7 +1045,7 @@ ftms = {
 ftms = {
   name = ranges;
   values = {
-    v = 202202;
+    v = 202211;
     cxxmin = 23;
     extra_cond = "__glibcxx_concepts";
   };
@@ -1579,6 +1579,14 @@ ftms = {
     v = 202110;
     cxxmin = 23;
     hosted = yes;
+  };
+};
+
+ftms = {
+  name = ratio;
+  values = {
+    v = 202306;
+    cxxmin = 26;
   };
 };
 

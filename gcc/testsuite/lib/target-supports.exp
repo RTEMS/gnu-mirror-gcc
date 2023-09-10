@@ -3584,6 +3584,33 @@ proc check_effective_target_fixed_point { } {
     }]
 }
 
+# Return 1 if the target supports _BitInt(N), 0 otherwise.
+
+proc check_effective_target_bitint { } {
+    return [check_no_compiler_messages bitint object {
+	_BitInt (2) a = 1wb;
+	unsigned _BitInt (__BITINT_MAXWIDTH__) b = 0uwb;
+    } "-std=c2x"]
+}
+
+# Return 1 if the target supports _BitInt(128), 0 otherwise.
+
+proc check_effective_target_bitint128 { } {
+    return [check_no_compiler_messages bitint128 object {
+	_BitInt (2) a = 1wb;
+	unsigned _BitInt (128) b = 0uwb;
+    } "-std=c2x"]
+}
+
+# Return 1 if the target supports _BitInt(575), 0 otherwise.
+
+proc check_effective_target_bitint575 { } {
+    return [check_no_compiler_messages bitint575 object {
+	_BitInt (2) a = 1wb;
+	unsigned _BitInt (575) b = 0uwb;
+    } "-std=c2x"]
+}
+
 # Return 1 if the target supports compiling decimal floating point,
 # 0 otherwise.
 
@@ -8400,7 +8427,8 @@ proc check_effective_target_vect_masked_load { } {
 # Return 1 if the target supports vector masked stores.
 
 proc check_effective_target_vect_masked_store { } {
-    return [expr { [check_effective_target_aarch64_sve]
+    return [expr { [check_avx_available]
+		   || [check_effective_target_aarch64_sve]
 		   || [istarget amdgcn*-*-*] }]
 }
 
@@ -8632,6 +8660,24 @@ proc check_effective_target_vect_multiple_sizes { } {
 
 proc check_effective_target_vect_variable_length { } {
     return [expr { [lindex [available_vector_sizes] 0] == 0 }]
+}
+
+# Return 1 if the target supports vectors of 512 bits.
+
+proc check_effective_target_vect512 { } {
+    return [expr { [lsearch -exact [available_vector_sizes] 512] >= 0 }]
+}
+
+# Return 1 if the target supports vectors of 256 bits.
+
+proc check_effective_target_vect256 { } {
+    return [expr { [lsearch -exact [available_vector_sizes] 256] >= 0 }]
+}
+
+# Return 1 if the target supports vectors of 128 bits.
+
+proc check_effective_target_vect128 { } {
+    return [expr { [lsearch -exact [available_vector_sizes] 128] >= 0 }]
 }
 
 # Return 1 if the target supports vectors of 64 bits.

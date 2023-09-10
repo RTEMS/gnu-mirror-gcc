@@ -1334,6 +1334,7 @@ enum gfc_omp_defaultmap
 enum gfc_omp_defaultmap_category
 {
   OMP_DEFAULTMAP_CAT_UNCATEGORIZED,
+  OMP_DEFAULTMAP_CAT_ALL,
   OMP_DEFAULTMAP_CAT_SCALAR,
   OMP_DEFAULTMAP_CAT_AGGREGATE,
   OMP_DEFAULTMAP_CAT_ALLOCATABLE,
@@ -2236,6 +2237,9 @@ typedef struct gfc_namespace
   /* OpenMP requires. */
   unsigned omp_requires:6;
   unsigned omp_target_seen:1;
+
+  /* Set to 1 if this is an implicit OMP structured block.  */
+  unsigned omp_structured_block:1;
 }
 gfc_namespace;
 
@@ -3506,7 +3510,6 @@ bool gfc_reference_st_label (gfc_st_label *, gfc_sl_type);
 gfc_namespace *gfc_get_namespace (gfc_namespace *, int);
 gfc_symtree *gfc_new_symtree (gfc_symtree **, const char *);
 gfc_symtree *gfc_find_symtree (gfc_symtree *, const char *);
-void gfc_delete_symtree (gfc_symtree **, const char *);
 gfc_symtree *gfc_get_unique_symtree (gfc_namespace *);
 gfc_user_op *gfc_get_uop (const char *);
 gfc_user_op *gfc_find_uop (const char *, gfc_namespace *);
@@ -3824,6 +3827,7 @@ bool gfc_ref_dimen_size (gfc_array_ref *, int dimen, mpz_t *, mpz_t *);
 
 /* interface.cc -- FIXME: some of these should be in symbol.cc */
 void gfc_free_interface (gfc_interface *);
+void gfc_drop_interface_elements_before (gfc_interface **, gfc_interface *);
 bool gfc_compare_derived_types (gfc_symbol *, gfc_symbol *);
 bool gfc_compare_types (gfc_typespec *, gfc_typespec *);
 bool gfc_check_dummy_characteristics (gfc_symbol *, gfc_symbol *,
@@ -3843,7 +3847,7 @@ void gfc_free_formal_arglist (gfc_formal_arglist *);
 bool gfc_extend_assign (gfc_code *, gfc_namespace *);
 bool gfc_check_new_interface (gfc_interface *, gfc_symbol *, locus);
 bool gfc_add_interface (gfc_symbol *);
-gfc_interface *gfc_current_interface_head (void);
+gfc_interface *&gfc_current_interface_head (void);
 void gfc_set_current_interface_head (gfc_interface *);
 gfc_symtree* gfc_find_sym_in_symtree (gfc_symbol*);
 bool gfc_arglist_matches_symbol (gfc_actual_arglist**, gfc_symbol*);
@@ -3906,7 +3910,7 @@ bool gfc_inline_intrinsic_function_p (gfc_expr *);
 /* bbt.cc */
 typedef int (*compare_fn) (void *, void *);
 void gfc_insert_bbt (void *, void *, compare_fn);
-void gfc_delete_bbt (void *, void *, compare_fn);
+void * gfc_delete_bbt (void *, void *, compare_fn);
 
 /* dump-parse-tree.cc */
 void gfc_dump_parse_tree (gfc_namespace *, FILE *);

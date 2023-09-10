@@ -288,6 +288,8 @@ public:
   virtual bool singleton_p (tree *result = NULL) const override;
   bool singleton_p (wide_int &) const;
   bool contains_p (const wide_int &) const;
+  bool nonnegative_p () const;
+  bool nonpositive_p () const;
 
   // In-place operators.
   virtual bool union_ (const vrange &) override;
@@ -1156,7 +1158,7 @@ inline bool
 contains_zero_p (const irange &r)
 {
   if (r.undefined_p ())
-    return true;
+    return false;
 
   wide_int zero = wi::zero (TYPE_PRECISION (r.type ()));
   return r.contains_p (zero);

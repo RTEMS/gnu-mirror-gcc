@@ -95,6 +95,14 @@ typedef double v512df __attribute__ ((vector_size (4096)));
       a[i] = b[i] OP c[i];                                                     \
   }
 
+#define DEF_OP_VX(PREFIX, NUM, TYPE, OP)                                       \
+  void __attribute__ ((noinline, noclone))                                     \
+  PREFIX##_##TYPE##NUM (TYPE *restrict a, TYPE *restrict b, TYPE c)            \
+  {                                                                            \
+    for (int i = 0; i < NUM; ++i)                                              \
+      a[i] = b[i] OP c;                                                        \
+  }
+
 #define DEF_OP_VI_M16(PREFIX, NUM, TYPE, OP)                                   \
   void __attribute__ ((noinline, noclone))                                     \
   PREFIX##_##TYPE##NUM (TYPE *restrict a, TYPE *restrict b, TYPE *restrict c)  \
@@ -135,6 +143,14 @@ typedef double v512df __attribute__ ((vector_size (4096)));
       a[i] = b[i] OP c[i] ? b[i] : c[i];                                       \
   }
 
+#define DEF_MINMAX_VX(PREFIX, NUM, TYPE, OP)                                   \
+  void __attribute__ ((noinline, noclone))                                     \
+  PREFIX##_##TYPE##NUM (TYPE *restrict a, TYPE *restrict b, TYPE c)            \
+  {                                                                            \
+    for (int i = 0; i < NUM; ++i)                                              \
+      a[i] = b[i] OP c ? b[i] : c;                                             \
+  }
+
 #define DEF_OP_VI_7(PREFIX, NUM, TYPE, OP)                                     \
   void __attribute__ ((noinline, noclone))                                     \
   PREFIX##_##TYPE##NUM (TYPE *restrict a, TYPE *restrict b, TYPE *restrict c)  \
@@ -149,6 +165,22 @@ typedef double v512df __attribute__ ((vector_size (4096)));
   {                                                                            \
     for (int i = 0; i < NUM; ++i)                                              \
       a[i] = OP b[i];                                                          \
+  }
+
+#define DEF_CALL_VV(PREFIX, NUM, TYPE, CALL)                                   \
+  void __attribute__ ((noinline, noclone))                                     \
+  PREFIX##_##TYPE##NUM (TYPE *restrict a, TYPE *restrict b, TYPE *restrict c)  \
+  {                                                                            \
+    for (int i = 0; i < NUM; ++i)                                              \
+      a[i] = CALL (b[i], c[i]);                                                \
+  }
+
+#define DEF_CALL_VX(PREFIX, NUM, TYPE, CALL)                                   \
+  void __attribute__ ((noinline, noclone))                                     \
+  PREFIX##_##TYPE##NUM (TYPE *restrict a, TYPE *restrict b, TYPE c)            \
+  {                                                                            \
+    for (int i = 0; i < NUM; ++i)                                              \
+      a[i] = CALL (b[i], c);                                                   \
   }
 
 #define DEF_CONST(TYPE, VAL, NUM)                                              \

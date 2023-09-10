@@ -1,3 +1,230 @@
+2023-09-08  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/99599
+	* pt.cc (check_non_deducible_conversions): Add bool parameter
+	passed down to check_non_deducible_conversion.
+	(fn_type_unification): Call check_non_deducible_conversions
+	an extra time before satisfaction with noninst_only_p=true.
+	(conversion_may_instantiate_p): Define.
+	(check_non_deducible_conversion): Add bool parameter controlling
+	whether to compute only conversions that are guaranteed to
+	not induce template instantiation.
+
+2023-09-07  Sandra Loosemore  <sandra@codesourcery.com>
+
+	PR c++/111274
+	* parser.cc (fixup_blocks_walker): Check for null BIND_EXPR_BLOCK.
+
+2023-09-06  Jason Merrill  <jason@redhat.com>
+
+	* class.cc (check_subobject_offset): Check
+	same_type_ignoring_top_level_qualifiers_p.
+
+2023-09-05  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/91483
+	* constexpr.cc (verify_constant_explain_r): New.
+	(verify_constant): Call it.
+
+2023-09-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/52953
+	* name-lookup.cc (check_local_shadow): Don't punt early for
+	DECL_EXTERNAL decls, instead just disable the shadowing of namespace
+	decls check for those and emit a pedwarn rather than error_at or
+	permerror for those.  Formatting fix.
+
+2023-09-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/52953
+	* name-lookup.h (struct cp_binding_level): Add artificial bit-field.
+	Formatting fixes.
+	* name-lookup.cc (check_local_shadow): Skip artificial bindings when
+	checking if parameter scope is parent scope.  Don't special case
+	FUNCTION_NEEDS_BODY_BLOCK.  Diagnose the in_function_try_handler
+	cases in the b->kind == sk_function_parms test and verify no
+	non-artificial intervening scopes.  Add missing auto_diagnostic_group.
+	* decl.cc (begin_function_body): Set
+	current_binding_level->artificial.
+	* semantics.cc (begin_function_try_block): Likewise.
+
+2023-09-05  Patrick Palka  <ppalka@redhat.com>
+
+	* parser.cc (cp_parser_parenthesized_expression_list_elt): Pass
+	nullptr as non_constant_p to cp_parser_braced_list if our
+	non_constant_p is null.
+	(cp_parser_initializer_list): Likewise to
+	cp_parser_initializer_clause.  Avoid inspecting
+	clause_non_constant_p if it's uninitialized.
+
+2023-09-05  Patrick Palka  <ppalka@redhat.com>
+
+	* call.cc (build_user_type_conversion): Free allocated
+	conversions.
+	(build_converted_constant_expr_internal): Use
+	conversion_obstack_sentinel instead.
+	(perform_dguide_overload_resolution): Likewise.
+	(build_new_function_call): Likewise.
+	(build_operator_new_call): Free allocated conversions.
+	(build_op_call): Use conversion_obstack_sentinel instead.
+	(build_conditional_expr): Use conversion_obstack_sentinel
+	instead, and hoist it out to the outermost scope.
+	(build_new_op): Use conversion_obstack_sentinel instead
+	and set it up before the first goto.  Remove second unneeded goto.
+	(build_op_subscript): Use conversion_obstack_sentinel instead.
+	(ref_conv_binds_to_temporary): Likewise.
+	(build_new_method_call): Likewise.
+	(can_convert_arg): Likewise.
+	(can_convert_arg_bad): Likewise.
+	(perform_implicit_conversion_flags): Likewise.
+	(perform_direct_initialization_if_possible): Likewise.
+	(initialize_reference): Likewise.
+
+2023-09-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/111069
+	* cp-tree.h (determine_local_discriminator): Add NAME argument with
+	NULL_TREE default.
+	(struct cp_decomp): New type.
+	(cp_finish_decl): Add DECOMP argument defaulted to nullptr.
+	(cp_maybe_mangle_decomp): Remove declaration.
+	(cp_finish_decomp): Add cp_decomp * argument, remove tree and unsigned
+	args.
+	(cp_convert_range_for): Likewise.
+	* decl.cc (determine_local_discriminator): Add NAME argument, use it
+	if non-NULL, otherwise compute it the old way.
+	(maybe_commonize_var): Don't return early for structured bindings.
+	(cp_finish_decl): Add DECOMP argument, if non-NULL, call
+	cp_maybe_mangle_decomp.
+	(cp_maybe_mangle_decomp): Make it static with a forward declaration.
+	Call determine_local_discriminator.  Replace FIRST and COUNT arguments
+	with DECOMP argument.
+	(cp_finish_decomp): Replace FIRST and COUNT arguments with DECOMP
+	argument.
+	* mangle.cc (find_decomp_unqualified_name): Remove.
+	(write_unqualified_name): Don't call find_decomp_unqualified_name.
+	(mangle_decomp): Handle mangling of static function/block scope
+	structured bindings.  Don't call decl_mangling_context twice.  Call
+	check_abi_tags, call write_abi_tags for abi version >= 19 and emit
+	-Wabi warnings if needed.
+	(write_guarded_var_name): Handle structured bindings.
+	(mangle_ref_init_variable): Use write_guarded_var_name.
+	* parser.cc (cp_parser_range_for): Adjust do_range_for_auto_deduction
+	and cp_convert_range_for callers.
+	(do_range_for_auto_deduction): Replace DECOMP_FIRST_NAME and
+	DECOMP_CNT arguments with DECOMP.  Adjust cp_finish_decomp caller.
+	(cp_convert_range_for): Replace DECOMP_FIRST_NAME and
+	DECOMP_CNT arguments with DECOMP.  Don't call cp_maybe_mangle_decomp,
+	adjust cp_finish_decl and cp_finish_decomp callers.
+	(cp_parser_decomposition_declaration): Don't call
+	cp_maybe_mangle_decomp, adjust cp_finish_decl and cp_finish_decomp
+	callers.
+	(cp_convert_omp_range_for): Adjust do_range_for_auto_deduction
+	and cp_finish_decomp callers.
+	(cp_finish_omp_range_for): Don't call cp_maybe_mangle_decomp,
+	adjust cp_finish_decl and cp_finish_decomp callers.
+	* pt.cc (tsubst_omp_for_iterator): Adjust tsubst_decomp_names
+	caller.
+	(tsubst_decomp_names): Replace FIRST and CNT arguments with DECOMP.
+	(tsubst_expr): Don't call cp_maybe_mangle_decomp, adjust
+	tsubst_decomp_names, cp_finish_decl, cp_finish_decomp and
+	cp_convert_range_for callers.
+
+2023-08-30  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/91319
+	* parser.cc (cp_parser_initializer_list): Set CONSTRUCTOR_IS_DIRECT_INIT
+	when the designated initializer is of the .x{} form.
+
+2023-08-30  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/111173
+	* decl.cc (grokdeclarator): Disallow constinit on functions.
+
+2023-08-29  Marek Polacek  <polacek@redhat.com>
+
+	* call.cc (convert_like_internal): Show where the conversion function
+	was declared.
+	(maybe_show_nonconverting_candidate): New.
+	* cp-tree.h (maybe_show_nonconverting_candidate): Declare.
+	* typeck.cc (convert_for_assignment): Call it.
+
+2023-08-25  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* cp-tree.h (cp_convert_omp_range_for): Adjust declaration.
+	* parser.cc (struct omp_for_parse_data): New.
+	(cp_parser_postfix_expression): Diagnose calls to OpenMP runtime
+	in intervening code.
+	(check_omp_intervening_code): New.
+	(cp_parser_statement_seq_opt): Special-case nested loops, blocks,
+	and other constructs for OpenMP loops.
+	(cp_parser_iteration_statement): Reject loops in intervening code.
+	(cp_parser_omp_for_loop_init): Expand comments and tweak the
+	interface slightly to better distinguish input/output parameters.
+	(cp_convert_omp_range_for): Likewise.
+	(cp_parser_omp_loop_nest): New, split from cp_parser_omp_for_loop
+	and largely rewritten.  Add more comments.
+	(insert_structured_blocks): New.
+	(find_structured_blocks): New.
+	(struct sit_data, substitute_in_tree_walker, substitute_in_tree):
+	New.
+	(fixup_blocks_walker): New.
+	(cp_parser_omp_for_loop): Rewrite to use recursive descent instead
+	of a loop.  Add logic to reshuffle the bits of code collected
+	during parsing so intervening code gets moved to the loop body.
+	(cp_parser_omp_loop): Remove call to finish_omp_for_block, which
+	is now redundant.
+	(cp_parser_omp_simd): Likewise.
+	(cp_parser_omp_for): Likewise.
+	(cp_parser_omp_distribute): Likewise.
+	(cp_parser_oacc_loop): Likewise.
+	(cp_parser_omp_taskloop): Likewise.
+	(cp_parser_pragma): Reject OpenMP pragmas in intervening code.
+	* parser.h (struct cp_parser): Add omp_for_parse_state field.
+	* pt.cc (tsubst_omp_for_iterator): Adjust call to
+	cp_convert_omp_range_for.
+	* semantics.cc (finish_omp_for): Try harder to preserve location
+	of loop variable init expression for use in diagnostics.
+	(struct fofb_data, finish_omp_for_block_walker): New.
+	(finish_omp_for_block): Allow variables to be bound in a BIND_EXPR
+	nested inside BIND instead of directly in BIND itself.
+
+2023-08-25  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* constexpr.cc (cxx_eval_constant_expression): Handle
+	OMP_STRUCTURED_BLOCK.
+	* pt.cc (tsubst_expr): Likewise.
+
+2023-08-25  Uros Bizjak  <ubizjak@gmail.com>
+
+	* call.cc (build_conditional_expr):
+	Rename TRUE/FALSE to true/false.
+	(build_new_op): Ditto.
+
+2023-08-22  Jason Merrill  <jason@redhat.com>
+
+	* pt.cc (outer_template_args): Handle non-template argument.
+	* constraint.cc (maybe_substitute_reqs_for): Pass decl to it.
+	* cp-tree.h (outer_template_args): Adjust.
+
+2023-08-22  Jason Merrill  <jason@redhat.com>
+
+	PR c++/109751
+	* cp-tree.h (member_like_constrained_friend_p): Declare.
+	* decl.cc (member_like_constrained_friend_p): New.
+	(function_requirements_equivalent_p): Check it.
+	(duplicate_decls): Check it.
+	(grokfndecl): Check friend template constraints.
+	* mangle.cc (decl_mangling_context): Check it.
+	(write_unqualified_name): Check it.
+	* pt.cc (uses_outer_template_parms_in_constraints): Fix for friends.
+	(tsubst_friend_function): Don't check satisfaction.
+
+2023-08-22  Tobias Burnus  <tobias@codesourcery.com>
+
+	* parser.cc (cp_parser_omp_clause_defaultmap): Parse
+	'all' as category.
+
 2023-08-15  Chung-Lin Tang  <cltang@codesourcery.com>
 	    Thomas Schwinge  <thomas@codesourcery.com>
 

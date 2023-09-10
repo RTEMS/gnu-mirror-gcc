@@ -721,6 +721,15 @@ saved_diagnostic::add_note (std::unique_ptr<pending_note> pn)
   m_notes.safe_push (pn.release ());
 }
 
+/* Add EVENT to this diagnostic.  */
+
+void
+saved_diagnostic::add_event (std::unique_ptr<checker_event> event)
+{
+  gcc_assert (event);
+  m_saved_events.safe_push (event.release ());
+}
+
 /* Return a new json::object of the form
    {"sm": optional str,
     "enode": int,
@@ -878,6 +887,88 @@ saved_diagnostic::add_duplicate (saved_diagnostic *other)
   m_duplicates.safe_push (other);
 }
 
+/* Walk up the sedges of each of the two paths.
+   If the two sequences of sedges do not perfectly correspond,
+   then paths are incompatible.
+   If there is at least one sedge that either cannot be paired up
+   or its counterpart is not equal, then the paths are incompatible
+   and this function returns FALSE.
+   Otherwise return TRUE.
+
+   Incompatible paths:
+
+       <cond Y>
+       /      \
+      /        \
+    true      false
+     |          |
+    ...        ...
+     |          |
+    ...       stmt x
+     |
+   stmt x
+
+   Both LHS_PATH and RHS_PATH final enodes should be
+   over the same gimple statement.  */
+
+static bool
+compatible_epath_p (const exploded_path *lhs_path,
+		    const exploded_path *rhs_path)
+{
+  gcc_assert (lhs_path);
+  gcc_assert (rhs_path);
+  gcc_assert (rhs_path->length () > 0);
+  gcc_assert (rhs_path->length () > 0);
+  int lhs_eedge_idx = lhs_path->length () - 1;
+  int rhs_eedge_idx = rhs_path->length () - 1;
+  const exploded_edge *lhs_eedge;
+  const exploded_edge *rhs_eedge;
+
+  while (lhs_eedge_idx >= 0 && rhs_eedge_idx >= 0)
+    {
+      while (lhs_eedge_idx >= 0)
+	{
+	  /* Find LHS_PATH's next superedge.  */
+	  lhs_eedge = lhs_path->m_edges[lhs_eedge_idx];
+	  if (lhs_eedge->m_sedge)
+	    break;
+	  else
+	    lhs_eedge_idx--;
+	}
+      while (rhs_eedge_idx >= 0)
+	{
+	  /* Find RHS_PATH's next superedge.  */
+	  rhs_eedge = rhs_path->m_edges[rhs_eedge_idx];
+	  if (rhs_eedge->m_sedge)
+	    break;
+	  else
+	    rhs_eedge_idx--;
+	}
+
+      if (lhs_eedge->m_sedge && rhs_eedge->m_sedge)
+	{
+	  if (lhs_eedge->m_sedge != rhs_eedge->m_sedge)
+	    /* Both superedges do not match.
+	       Superedges are not dependent on the exploded path, so even
+	       different epaths will have similar sedges if they follow
+	       the same outcome of a conditional node.  */
+	    return false;
+
+	  lhs_eedge_idx--;
+	  rhs_eedge_idx--;
+	  continue;
+	}
+      else if (lhs_eedge->m_sedge == nullptr && rhs_eedge->m_sedge == nullptr)
+	/* Both paths were drained up entirely.
+	   No discriminant was found.  */
+	return true;
+
+      /* A superedge was found for only one of the two paths.  */
+      return false;
+    }
+}
+
+
 /* Return true if this diagnostic supercedes OTHER, and that OTHER should
    therefore not be emitted.  */
 
@@ -887,7 +978,26 @@ saved_diagnostic::supercedes_p (const saved_diagnostic &other) const
   /* They should be at the same stmt.  */
   if (m_stmt != other.m_stmt)
     return false;
-  return m_d->supercedes_p (*other.m_d);
+  /* return early if OTHER won't be superseded anyway.  */
+  if (!m_d->supercedes_p (*other.m_d))
+    return false;
+
+  /* If the two saved_diagnostics' path are not compatible
+     then they cannot supersede one another.  */
+  return compatible_epath_p (m_best_epath.get (), other.m_best_epath.get ());
+}
+
+/* Move any saved checker_events from this saved_diagnostic to
+   the end of DST_PATH.  */
+
+void
+saved_diagnostic::add_any_saved_events (checker_path &dst_path)
+{
+  for (auto &event : m_saved_events)
+    {
+      dst_path.add_event (std::unique_ptr<checker_event> (event));
+      event = nullptr;
+    }
 }
 
 /* Emit any pending notes owned by this diagnostic.  */
@@ -1055,6 +1165,20 @@ diagnostic_manager::add_note (std::unique_ptr<pending_note> pn)
   gcc_assert (m_saved_diagnostics.length () > 0);
   saved_diagnostic *sd = m_saved_diagnostics[m_saved_diagnostics.length () - 1];
   sd->add_note (std::move (pn));
+}
+
+/* Add EVENT to the most recent saved_diagnostic.  */
+
+void
+diagnostic_manager::add_event (std::unique_ptr<checker_event> event)
+{
+  LOG_FUNC (get_logger ());
+  gcc_assert (event);
+
+  /* Get most recent saved_diagnostic.  */
+  gcc_assert (m_saved_diagnostics.length () > 0);
+  saved_diagnostic *sd = m_saved_diagnostics[m_saved_diagnostics.length () - 1];
+  sd->add_event (std::move (event));
 }
 
 /* Return a new json::object of the form
@@ -1308,7 +1432,7 @@ public:
       {
 	saved_diagnostic **slot = m_map.get (key);
 	gcc_assert (*slot);
-	const saved_diagnostic *sd = *slot;
+	saved_diagnostic *sd = *slot;
 	dm->emit_saved_diagnostic (eg, *sd);
       }
   }
@@ -1370,7 +1494,7 @@ diagnostic_manager::emit_saved_diagnostics (const exploded_graph &eg)
 
 void
 diagnostic_manager::emit_saved_diagnostic (const exploded_graph &eg,
-					   const saved_diagnostic &sd)
+					   saved_diagnostic &sd)
 {
   LOG_SCOPE (get_logger ());
   log ("sd[%i]: %qs at SN: %i",
@@ -1394,6 +1518,11 @@ diagnostic_manager::emit_saved_diagnostic (const exploded_graph &eg,
 
   /* Now prune it to just cover the most pertinent events.  */
   prune_path (&emission_path, sd.m_sm, sd.m_sval, sd.m_state);
+
+  /* Add any saved events to the path, giving contextual information
+     about what the analyzer was simulating as the diagnostic was
+     generated.  These don't get pruned, as they are probably pertinent.  */
+  sd.add_any_saved_events (emission_path);
 
   /* Add a final event to the path, covering the diagnostic itself.
      We use the final enode from the epath, which might be different from
