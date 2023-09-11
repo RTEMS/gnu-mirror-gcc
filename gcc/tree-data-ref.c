@@ -1168,7 +1168,7 @@ dr_analyze_indices (struct data_reference *dr, edge nest, loop_p loop)
 	  memoff = wide_int_to_tree (TREE_TYPE (memoff), rem);
 	  /* And finally replace the initial condition.  */
 	  access_fn = chrec_replace_initial_condition
-	      (access_fn, fold_convert (orig_type, off));
+	    (access_fn, fold_convert (noncapability_type (orig_type), off));
 	  /* ???  This is still not a suitable base object for
 	     dr_may_alias_p - the base object needs to be an
 	     access that covers the object as whole.  With
@@ -2096,7 +2096,7 @@ create_waw_or_war_checks (tree *cond_expr,
 
   /* Make sure that we can operate on sizetype without loss of precision.  */
   tree addr_type = TREE_TYPE (DR_BASE_ADDRESS (dr_a.dr));
-  if (TYPE_PRECISION (addr_type) != TYPE_PRECISION (sizetype))
+  if (TYPE_NONCAP_PRECISION (addr_type) != TYPE_PRECISION (sizetype))
     return false;
 
   /* All addresses involved are known to have a common alignment ALIGN.
@@ -2374,8 +2374,12 @@ create_intersect_range_checks (class loop *loop, tree *cond_expr,
 
   *cond_expr
     = fold_build2 (TRUTH_OR_EXPR, boolean_type_node,
-	fold_build2 (cmp_code, boolean_type_node, seg_a_max, seg_b_min),
-	fold_build2 (cmp_code, boolean_type_node, seg_b_max, seg_a_min));
+	fold_build2 (cmp_code, boolean_type_node,
+		     fold_drop_capability (seg_a_max),
+		     fold_drop_capability (seg_b_min)),
+	fold_build2 (cmp_code, boolean_type_node,
+		     fold_drop_capability (seg_b_max),
+		     fold_drop_capability (seg_a_min)));
   if (dump_enabled_p ())
     dump_printf (MSG_NOTE, "using an address-based overlap test\n");
 }

@@ -2024,8 +2024,12 @@ valid_mem_ref_cand_p (slsr_cand_t c)
     return false;
 
   struct mem_address addr
-    = { NULL_TREE, c->base_expr, TREE_OPERAND (c->stride, 0),
+    = { NULL_TREE, NULL_TREE, NULL_TREE, TREE_OPERAND (c->stride, 0),
 	TREE_OPERAND (c->stride, 1), wide_int_to_tree (sizetype, c->index) };
+  if (tree_is_capability_value (c->base_expr))
+    addr.base_cap = c->base_expr;
+  else
+    addr.base = c->base_expr;
 
   return
     valid_mem_ref_p (TYPE_MODE (c->cand_type), TYPE_ADDR_SPACE (c->cand_type),

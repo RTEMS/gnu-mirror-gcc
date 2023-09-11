@@ -683,7 +683,14 @@ chrec_replace_initial_condition (tree chrec,
   if (automatically_generated_chrec_p (chrec))
     return chrec;
 
-  gcc_assert (chrec_type (chrec) == chrec_type (init_cond));
+  /* Allow replacing a capability typed chrec into one of just the offset.
+     The only place that this function is used (dr_analyze_indices) wants to do
+     exactly that -- it finds the evolution of a pointer, then separates the
+     pointer and offsets into a base pointer and an evolution of the offset.
+     */
+  gcc_assert (chrec_type (chrec) == chrec_type (init_cond)
+	      || (noncapability_type (chrec_type (chrec))
+		  == chrec_type (init_cond)));
 
   switch (TREE_CODE (chrec))
     {
@@ -1303,7 +1310,9 @@ convert_affine_scev (class loop *loop, tree type,
   bool enforce_overflow_semantics;
   bool must_check_src_overflow, must_check_rslt_overflow;
   tree new_base, new_step;
-  tree step_type = POINTER_TYPE_P (type) ? sizetype : type;
+  tree step_type = POINTER_TYPE_P (type)
+    ? sizetype
+    : noncapability_type (type);
 
   /* In general,
      (TYPE) (BASE + STEP * i) = (TYPE) BASE + (TYPE -- sign extend) STEP * i,
@@ -1320,7 +1329,7 @@ convert_affine_scev (class loop *loop, tree type,
 	become a wrapping variable with values 125, 126, 127, -128, -127, ...,
 	which would confuse optimizers that assume that this does not
 	happen.  */
-  must_check_src_overflow = TYPE_PRECISION (ct) < TYPE_PRECISION (type);
+  must_check_src_overflow = TYPE_PRECISION (ct) < TYPE_NONCAP_PRECISION (type);
 
   enforce_overflow_semantics = (use_overflow_semantics
 				&& nowrap_type_p (type));
@@ -1344,7 +1353,7 @@ convert_affine_scev (class loop *loop, tree type,
 	    must_check_rslt_overflow = false;
 	}
       else if (TYPE_UNSIGNED (ct) == TYPE_UNSIGNED (type)
-	       && TYPE_PRECISION (ct) == TYPE_PRECISION (type))
+	       && TYPE_PRECISION (ct) == TYPE_NONCAP_PRECISION (type))
 	{
 	  must_check_rslt_overflow = false;
 	  must_check_src_overflow = true;

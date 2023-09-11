@@ -2154,7 +2154,8 @@ get_group_load_store_type (vec_info *vinfo, stmt_vec_info stmt_info,
 	     non-gap element in the same B-sized block.  */
 	  if (overrun_p
 	      && gap < (vect_known_alignment_in_bytes (first_dr_info)
-			/ vect_get_scalar_dr_size (first_dr_info)))
+			/ vect_get_scalar_dr_size (first_dr_info))
+	      && !targetm.capabilities_in_hardware ())
 	    overrun_p = false;
 
 	  /* If the gap splits the vector in half and the target
@@ -2250,7 +2251,8 @@ get_group_load_store_type (vec_info *vinfo, stmt_vec_info stmt_info,
       if (would_overrun_p
 	  && !masked_p
 	  && gap < (vect_known_alignment_in_bytes (first_dr_info)
-		    / vect_get_scalar_dr_size (first_dr_info)))
+		    / vect_get_scalar_dr_size (first_dr_info))
+	  && !targetm.capabilities_in_hardware ())
 	would_overrun_p = false;
 
       if (!STMT_VINFO_STRIDED_P (first_stmt_info)
@@ -6906,7 +6908,7 @@ vectorizable_scan_store (vec_info *vinfo,
   tree vec_oprnd2 = NULL_TREE;
   tree vec_oprnd3 = NULL_TREE;
   tree dataref_ptr = DR_BASE_ADDRESS (dr_info->dr);
-  tree dataref_offset = build_int_cst (ref_type, 0);
+  tree dataref_offset = build_int_cst (noncapability_type (ref_type), 0);
   tree bump = vect_get_data_ptr_increment (vinfo, dr_info,
 					   vectype, VMAT_CONTIGUOUS);
   tree ldataref_ptr = NULL_TREE;
@@ -6934,9 +6936,10 @@ vectorizable_scan_store (vec_info *vinfo,
       if (ldataref_ptr)
 	{
 	  vec_oprnd2 = make_ssa_name (vectype);
+	  tree tmp = fold_convert_for_mem_ref (ref_type, dataref_offset);
 	  tree data_ref = fold_build2 (MEM_REF, vectype,
 				       unshare_expr (ldataref_ptr),
-				       dataref_offset);
+				       tmp);
 	  vect_copy_ref_info (data_ref, DR_REF (load1_dr_info->dr));
 	  gimple *g = gimple_build_assign (vec_oprnd2, data_ref);
 	  vect_finish_stmt_generation (vinfo, stmt_info, g, gsi);
@@ -7021,9 +7024,10 @@ vectorizable_scan_store (vec_info *vinfo,
 
       if (!inscan_var_store)
 	{
+	  tree tmp = fold_convert_for_mem_ref (ref_type, dataref_offset);
 	  tree data_ref = fold_build2 (MEM_REF, vectype,
 				       unshare_expr (dataref_ptr),
-				       dataref_offset);
+				       tmp);
 	  vect_copy_ref_info (data_ref, DR_REF (dr_info->dr));
 	  g = gimple_build_assign (data_ref, new_temp);
 	  vect_finish_stmt_generation (vinfo, stmt_info, g, gsi);
@@ -7036,10 +7040,10 @@ vectorizable_scan_store (vec_info *vinfo,
       {
 	if (j != 0)
 	  dataref_offset = int_const_binop (PLUS_EXPR, dataref_offset, bump);
-
+	tree tmp = fold_convert_for_mem_ref (ref_type, dataref_offset);
 	tree data_ref = fold_build2 (MEM_REF, vectype,
 				     unshare_expr (dataref_ptr),
-				     dataref_offset);
+				     tmp);
 	vect_copy_ref_info (data_ref, DR_REF (dr_info->dr));
 	gimple *g = gimple_build_assign (data_ref, orig);
 	vect_finish_stmt_generation (vinfo, stmt_info, g, gsi);
@@ -7924,7 +7928,7 @@ vectorizable_store (vec_info *vinfo,
 					get_alias_set (TREE_TYPE (ref_type))))
 	    {
 	      dataref_ptr = unshare_expr (DR_BASE_ADDRESS (first_dr_info->dr));
-	      dataref_offset = build_int_cst (ref_type, 0);
+	      dataref_offset = build_zero_cst (noncapability_type (ref_type));
 	    }
 	  else if (STMT_VINFO_GATHER_SCATTER_P (stmt_info))
 	    {
@@ -8159,11 +8163,12 @@ vectorizable_store (vec_info *vinfo,
 		}
 	      else
 		{
+		  tree tmp = dataref_offset
+		    ? fold_convert_for_mem_ref (ref_type, dataref_offset)
+		    : build_int_cst (ref_type, 0);
 		  data_ref = fold_build2 (MEM_REF, vectype,
 					  dataref_ptr,
-					  dataref_offset
-					  ? dataref_offset
-					  : build_int_cst (ref_type, 0));
+					  tmp);
 		  if (aligned_access_p (first_dr_info))
 		    ;
 		  else if (DR_MISALIGNMENT (first_dr_info) == -1)
@@ -9186,7 +9191,7 @@ vectorizable_load (vec_info *vinfo,
 		  || alignment_support_scheme == dr_unaligned_supported))
 	    {
 	      dataref_ptr = unshare_expr (DR_BASE_ADDRESS (first_dr_info->dr));
-	      dataref_offset = build_int_cst (ref_type, 0);
+	      dataref_offset = build_int_cst (noncapability_type (ref_type), 0);
 	    }
 	  else if (diff_first_stmt_info)
 	    {
@@ -9436,7 +9441,12 @@ vectorizable_load (vec_info *vinfo,
 			    && gap != 0
 			    && known_eq (nunits, (group_size - gap) * 2)
 			    && known_eq (nunits, group_size)
-			    && gap >= (vect_align / scalar_dr_size))
+			    && (gap >= (vect_align / scalar_dr_size)
+				/* Without capabilities we're fine to over-read
+				   if we know it won't cross a page boundary.
+				   With capabilities any overrun must be
+				   avoided.  */
+				|| targetm.capabilities_in_hardware ()))
 			  {
 			    tree half_vtype;
 			    new_vtype
@@ -9445,9 +9455,10 @@ vectorizable_load (vec_info *vinfo,
 			    if (new_vtype != NULL_TREE)
 			      ltype = half_vtype;
 			  }
+			tree tmp_type = noncapability_type (ref_type);
 			tree offset
 			  = (dataref_offset ? dataref_offset
-					    : build_int_cst (ref_type, 0));
+					    : build_int_cst (tmp_type, 0));
 			if (ltype != vectype
 			    && memory_access_type == VMAT_CONTIGUOUS_REVERSE)
 			  {
@@ -9456,6 +9467,7 @@ vectorizable_load (vec_info *vinfo,
 			    tree gapcst = build_int_cst (ref_type, gap_offset);
 			    offset = size_binop (PLUS_EXPR, offset, gapcst);
 			  }
+			offset = fold_convert_for_mem_ref (ref_type, offset);
 			data_ref
 			  = fold_build2 (MEM_REF, ltype, dataref_ptr, offset);
 			if (alignment_support_scheme == dr_aligned)

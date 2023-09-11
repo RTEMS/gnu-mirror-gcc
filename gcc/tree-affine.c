@@ -79,6 +79,7 @@ aff_combination_elt (aff_tree *comb, tree type, tree elt)
   aff_combination_zero (comb, type);
 
   comb->n = 1;
+  gcc_assert (capability_type_p (type) || !tree_is_capability_value (elt));
   comb->elts[0].val = elt;
   comb->elts[0].coef = 1;
 }
@@ -169,6 +170,41 @@ aff_combination_add_elt (aff_tree *comb, tree elt, const widest_int &scale_in)
 	  }
 	return;
       }
+
+  if (CHECKING_P && !capability_type_p (comb->type))
+    {
+      gcc_assert (!tree_is_capability_value (elt));
+      for (i = 0; i < comb->n; i++)
+	gcc_assert (!tree_is_capability_value (comb->elts[i].val));
+    }
+  else if (CHECKING_P)
+    {
+      for (i = 1; i < comb->n; i++)
+	gcc_assert (!tree_is_capability_value (comb->elts[i].val));
+    }
+
+  /* We really don't want to be having an affine tree with multiple
+     capabilities to derive provenance from.
+     The fact that all capabilities have a single provenance in the
+     original code should mean that we never end up attempting to add
+     two capabilities into a single affine tree.
+     Whenever an affine combination has a capability element we want it stored
+     in the first `elt`.  */
+  if (capability_type_p (comb->type) && tree_is_capability_value (elt))
+    {
+      gcc_assert (!aff_cap_provenance_p (comb));
+      class aff_comb_elt temp = comb->elts[0];
+      comb->elts[0].val = elt;
+      comb->elts[0].coef = scale;
+      if (comb->n == 0)
+	{
+	  comb->n++;
+	  return;
+	}
+      elt = temp.val;
+      scale = temp.coef;
+    }
+
   if (comb->n < MAX_AFF_ELTS)
     {
       comb->elts[comb->n].coef = scale;
@@ -180,6 +216,8 @@ aff_combination_add_elt (aff_tree *comb, tree elt, const widest_int &scale_in)
   type = comb->type;
   if (POINTER_TYPE_P (type))
     type = sizetype;
+  else if (INTCAP_TYPE_P (type))
+    type = noncapability_type (type);
 
   if (scale == 1)
     elt = fold_convert (type, elt);
@@ -217,6 +255,39 @@ aff_combination_add (aff_tree *comb1, aff_tree *comb2)
     aff_combination_add_elt (comb1, comb2->rest, 1);
 }
 
+/* Drops the provenance-providing capability from an affine tree.  */
+void
+aff_combination_drop_capability (aff_tree *comb1)
+{
+  if (!capability_type_p (comb1->type))
+    return;
+  comb1->type = noncapability_type (comb1->type);
+  if (aff_cap_provenance_p (comb1))
+    comb1->elts[0].val = fold_drop_capability (comb1->elts[0].val);
+}
+
+/* Some affine trees have a logical capability provenance, while others do not.
+   This function extracts the capability from which the provided affine tree
+   takes its provenance and returns it.  If there is no capability in this
+   affine tree return NULL_TREE.  */
+tree
+aff_combination_extract_provenance_cap (aff_tree *comb)
+{
+  if (!aff_cap_provenance_p (comb))
+    return NULL_TREE;
+
+  tree ret = comb->elts[0].val;
+  if (POINTER_TYPE_P (comb->type) && INTCAP_TYPE_P (TREE_TYPE (ret)))
+    ret = fold_convert (comb->type, ret);
+
+  if (comb->elts[0].coef == 1)
+    aff_combination_remove_elt (comb, 0);
+  else
+    comb->elts[0].coef -= 1;
+  aff_combination_drop_capability (comb);
+  return ret;
+}
+
 /* Converts affine combination COMB to TYPE.  */
 
 void
@@ -225,12 +296,8 @@ aff_combination_convert (aff_tree *comb, tree type)
   unsigned i, j;
   tree comb_type = comb->type;
 
-  if (capability_type_p (type) && ! capability_type_p (comb_type))
-    {
-      tree val = aff_combination_to_tree (comb);
-      tree ret = fold_build_replace_address_value (build_int_cst (type, 0), val);
-      return tree_to_aff_combination (ret, type, comb);
-    }
+  /* Should not be converting from non-capability type to capability.  */
+  gcc_assert (!capability_type_p (type) || capability_type_p (comb_type));
 
   if  (TYPE_NONCAP_PRECISION (type) > TYPE_NONCAP_PRECISION (comb_type))
     {
@@ -240,7 +307,7 @@ aff_combination_convert (aff_tree *comb, tree type)
     }
 
   comb->type = type;
-  if (comb->rest && !POINTER_TYPE_P (type))
+  if (comb->rest && !POINTER_TYPE_P (type) && !capability_type_p (type))
     comb->rest = fold_convert (type, comb->rest);
 
   if (TYPE_NONCAP_PRECISION (type) == TYPE_NONCAP_PRECISION (comb_type)
@@ -276,14 +343,6 @@ expr_to_aff_combination (aff_tree *comb, tree_code code, tree type,
 {
   aff_tree tmp;
   poly_int64 bitpos, bitsize, bytepos;
-
-  /* MORELLO TODO (OPTIMISED):
-     Currently we bail out of splitting capabilities because there have been a
-     few difficulties attempting to cast from sizetypes to capabilities etc.
-     This is something to implement in the future.  */
-  /* Bail out of splitting capabilities into affine trees.  */
-  if (capability_type_p (type))
-    return false;
 
   switch (code)
     {
@@ -407,11 +466,6 @@ tree_to_aff_combination (tree expr, tree type, aff_tree *comb)
 
   STRIP_NOPS (expr);
 
-  /* MORELLO TODO (OPTIMISED): Would like to implement this in the future.  */
-  /* Bail out of splitting capabilities into affine trees.  */
-  if (capability_type_p (type))
-    return aff_combination_elt (comb, type, expr);
-
   code = TREE_CODE (expr);
   switch (code)
     {
@@ -467,7 +521,11 @@ tree_to_aff_combination (tree expr, tree type, aff_tree *comb)
 	core = build_fold_addr_expr (code, core);
 
       if (ADDR_EXPR_P (core))
-	aff_combination_add_elt (comb, core, 1);
+	{
+	  if (!capability_type_p (type))
+	    core = fold_drop_capability (core);
+	  aff_combination_add_elt (comb, core, 1);
+	}
       else
 	{
 	  tree_to_aff_combination (core, type, &tmp);
@@ -475,13 +533,17 @@ tree_to_aff_combination (tree expr, tree type, aff_tree *comb)
 	}
       if (toffset)
 	{
-	  tree_to_aff_combination (toffset, type, &tmp);
+	  tree_to_aff_combination (toffset, noncapability_type (type), &tmp);
 	  aff_combination_add (comb, &tmp);
 	}
       return;
 
     default:
       {
+	/* Whenever we know where the capability metadata comes from, we want
+	   that element included as the first element in our affine tree.  */
+	if (code == INTEGER_CST && capability_type_p (type))
+	  return aff_combination_elt (comb, type, expr);
 	if (poly_int_tree_p (expr))
 	  {
 	    aff_combination_const (comb, type, wi::to_poly_widest (expr));
@@ -491,6 +553,8 @@ tree_to_aff_combination (tree expr, tree type, aff_tree *comb)
       }
     }
 
+  if (!capability_type_p (type) && tree_is_capability_value (expr))
+    expr = fold_drop_capability (expr);
   aff_combination_elt (comb, type, expr);
 }
 
@@ -549,15 +613,38 @@ aff_combination_to_tree (aff_tree *comb)
   gcc_assert (comb->n == MAX_AFF_ELTS || comb->rest == NULL_TREE);
 
   i = 0;
-  if (POINTER_TYPE_P (type))
+  if (capability_type_p (type) || POINTER_TYPE_P (type))
     {
-      type = sizetype;
+      tree off_type = POINTER_TYPE_P (type) ? sizetype
+	: noncapability_type (type);
       if (comb->n > 0 && comb->elts[0].coef == 1
 	  && POINTER_TYPE_P (TREE_TYPE (comb->elts[0].val)))
 	{
 	  base = comb->elts[0].val;
 	  ++i;
 	}
+      else if (aff_cap_provenance_p (comb))
+	{
+	  gcc_assert (capability_type_p (type));
+	  base = comb->elts[0].val;
+	  if (comb->elts[0].coef != 1)
+	    expr = add_elt_to_tree (expr, off_type,
+				    fold_drop_capability (comb->elts[0].val),
+				    comb->elts[0].coef-1);
+	  ++i;
+	}
+      else if (capability_type_p (type))
+	base = build_zero_cst (type);
+
+      /* Options are:
+	 - comb->elts[0].val is a capability and we want to its provenance.
+	 - comb->elts[0].val is not a capability, affine tree is a capability,
+	   want NULL provenance.
+	 - affine tree is not a capability, is a pointer, comb->elts[0].val is
+	   a pointer, want to use POINTER_PLUS_EXPR.
+	 - affine tree is not a capability, is a pointer type, do not have
+	   single pointer to use as base.  Want to use sizetype instead.  */
+      type = off_type;
     }
 
   for (; i < comb->n; i++)
@@ -581,9 +668,53 @@ aff_combination_to_tree (aff_tree *comb)
   expr = add_elt_to_tree (expr, type, wide_int_to_tree (type, off), sgn);
 
   if (base)
-    return fold_build_pointer_plus (base, expr);
-  else
-    return fold_convert (comb->type, expr);
+    {
+      /* If the base is of pointer type and the combination was of pointer
+	 type, then may as well generate our TREE expression in the same type
+	 as the base (all pointers have the same range of defined behaviour).
+
+	 If the base is not of pointer type then it must be of INTCAP_TYPE.  In
+	 that case stay with the pointer type of the affine tree.  The pointer
+	 type of the affine tree is more limited than the INTCAP type of the
+	 base, but the code that we represent it with is something that the
+	 rest of the compiler can recognise better.  The restrictions on
+	 overflow are known to not be a problem because this type was what the
+	 ivopts machinery and ivopts have found and used (and did not find any
+	 reason to need to convert the pointer typed affine tree to an intcap).
+
+	 If the affine tree type is an INTCAP_TYPE then we can't use a pointer
+	 type since we can't assume the operations on it are valid for
+	 pointers.  */
+      if (POINTER_TYPE_P (TREE_TYPE (base)))
+	return fold_build_pointer_plus (base, expr);
+      else if (POINTER_TYPE_P (comb->type))
+	{
+	  gcc_assert (INTCAP_TYPE_P (TREE_TYPE (base)));
+	  base = fold_convert (comb->type, base);
+	  expr = fold_build_pointer_plus (base, expr);
+	}
+      else if (INTCAP_TYPE_P (TREE_TYPE (base)))
+	{
+	  /* Currently all affine trees happen to be made from induction
+	     variables, and that means they never have side effects.  I believe
+	     there is no reason that affine trees *must* only be made from
+	     variables without side effects.  If that ever becomes the case
+	     then we can not duplicate the evaluation of `base` without using
+	     something like `SAVE_EXPR` to ensure we avoid duplicating the side
+	     effects.  This assert should alert us when such a problematic case
+	     arises.  */
+	  gcc_assert (!TREE_SIDE_EFFECTS (base));
+	  tree noncap_type = noncapability_type (comb->type);
+	  tree base_value = fold_convert (noncap_type, base);
+	  tree res_value = fold_build2 (PLUS_EXPR, noncap_type,
+					base_value, expr);
+	  expr = fold_build_replace_address_value (base, res_value);
+	}
+      else
+	gcc_unreachable ();
+    }
+
+  return fold_convert (comb->type, expr);
 }
 
 /* Copies the tree elements of COMB to ensure that they are not shared.  */
@@ -678,6 +809,7 @@ aff_combination_mult (aff_tree *c1, aff_tree *c2, aff_tree *r)
 {
   unsigned i;
   gcc_assert (TYPE_PRECISION (c1->type) == TYPE_PRECISION (c2->type));
+  gcc_assert (!aff_cap_provenance_p (c1) || !aff_cap_provenance_p (c2));
 
   aff_combination_zero (r, c1->type);
 
@@ -737,13 +869,14 @@ aff_combination_expand (aff_tree *comb ATTRIBUTE_UNUSED,
 			hash_map<tree, name_expansion *> **cache)
 {
   unsigned i;
-  aff_tree to_add, current, curre;
+  aff_tree to_add, current, curre, to_subtract;
   tree e;
   gimple *def;
   widest_int scale;
   class name_expansion *exp;
 
   aff_combination_zero (&to_add, comb->type);
+  aff_combination_zero (&to_subtract, comb->type);
   for (i = 0; i < comb->n; i++)
     {
       tree type, name;
@@ -838,19 +971,26 @@ aff_combination_expand (aff_tree *comb ATTRIBUTE_UNUSED,
 	  gcc_assert (!exp->in_progress);
 	  current = exp->expansion;
 	}
-      if (!useless_type_conversion_p (comb->type, current.type))
-	aff_combination_convert (&current, comb->type);
+      tree elt_type = (i == 0 && capability_type_p (type))
+	? comb->type : noncapability_type (comb->type);
+      if (!useless_type_conversion_p (elt_type, current.type))
+	aff_combination_convert (&current, elt_type);
 
       /* Accumulate the new terms to TO_ADD, so that we do not modify
-	 COMB while traversing it; include the term -coef * E, to remove
-         it from COMB.  */
+	 COMB while traversing it.  We could include the term -coef * E, to
+	 remove it from COMB, but that would mean that this temporary affine
+	 tree could break capability invariants (that there is a maximum of one
+	 provenance-bearing capability in any affine tree).  Hence we
+	 accumulate these negative coefficients in a separate affine tree
+	 TO_SUBTRACT.  */
       scale = comb->elts[i].coef;
       aff_combination_zero (&curre, comb->type);
       aff_combination_add_elt (&curre, e, -scale);
       aff_combination_scale (&current, scale);
       aff_combination_add (&to_add, &current);
-      aff_combination_add (&to_add, &curre);
+      aff_combination_add (&to_subtract, &curre);
     }
+  aff_combination_add (comb, &to_subtract);
   aff_combination_add (comb, &to_add);
 }
 

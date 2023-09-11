@@ -24,7 +24,16 @@ along with GCC; see the file COPYING3.  If not see
 
 struct mem_address
 {
-  tree symbol, base, index, step, offset;
+  /* When the target architecture is a capability one, one of the following is
+     true:
+       - `!base_cap && tree_is_capability_value (symbol)`
+       - `!symbol && tree_is_capability_value (base_cap)`
+     In all cases, `base`, `index`, `step`, and `offset` are *not* capabilities.
+
+     When the target architecture is not a capability architecture, then
+     base_cap is always NULL_TREE.
+   */
+  tree symbol, base_cap, base, index, step, offset;
 
   bool is_capability () const;
 };

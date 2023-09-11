@@ -1234,15 +1234,6 @@ tail_recurse:
     {
     CASE_CONVERT:
       {
-	/* MORELLO TODO (OPTIMISATION)
-	   If we were casting from a capability, then stop here.
-	   Trying to avoid capabilities since there seems to be a lot of work
-	   to get this analysis working for them.  */
-	if (capability_type_p (type) || tree_is_capability_value (rhs0))
-	  {
-	    *evolution_of_loop = chrec_dont_know;
-	    return t_dont_know;
-	  }
 	/* This assignment is under the form "a_1 = (cast) rhs.  */
 	t_bool res = follow_ssa_edge_expr (loop, at_stmt, rhs0, halting_phi,
 					   evolution_of_loop, limit);
@@ -1344,15 +1335,15 @@ simplify_peeled_chrec (class loop *loop, tree arg, tree init_cond)
   if (!POINTER_TYPE_P (type)
       && !INTEGRAL_TYPE_P (type))
     return chrec_dont_know;
-  /* MORELLO TODO (OPTIMISATION): Would like to re-enable later if we can.  */
-  if (capability_type_p (type))
-    return chrec_dont_know;
 
   /* Try harder to check if they are equal.  */
   tree_to_aff_combination_expand (left, type, &aff1, &peeled_chrec_map);
   tree_to_aff_combination_expand (step_val, type, &aff2, &peeled_chrec_map);
   free_affine_expand_cache (&peeled_chrec_map);
+
   aff_combination_scale (&aff2, -1);
+  aff_combination_drop_capability (&aff1);
+  aff_combination_drop_capability (&aff2);
   aff_combination_add (&aff1, &aff2);
 
   /* Transform (init, {left, right}_LOOP)_LOOP to {init, right}_LOOP
@@ -1566,9 +1557,6 @@ interpret_loop_phi (class loop *loop, gphi *loop_phi_node)
   tree init_cond;
 
   gcc_assert (phi_loop == loop);
-  /* MORELLO TODO (OPTIMISATION): Just disabling for now.  */
-  if (tree_is_capability_value (gimple_phi_result (loop_phi_node)))
-    return chrec_dont_know;
 
   /* Otherwise really interpret the loop phi.  */
   init_cond = analyze_initial_condition (loop_phi_node);
@@ -1638,10 +1626,6 @@ interpret_rhs_expr (class loop *loop, gimple *at_stmt,
 {
   tree res, chrec1, chrec2, ctype;
   gimple *def;
-
-  /* MORELLO TODO (OPTIMISATION): Just disabling for now.  */
-  if (capability_type_p (type))
-    return chrec_dont_know;
 
   if (get_gimple_rhs_class (code) == GIMPLE_SINGLE_RHS)
     {
@@ -3063,7 +3047,7 @@ iv_can_overflow_p (class loop *loop, tree type, tree base, tree step)
     return false;
 
   if (TREE_CODE (base) == INTEGER_CST)
-    base_min = base_max = wi::to_wide (base);
+    base_min = base_max = wi::to_wide (fold_drop_capability (base));
   else if (TREE_CODE (base) == SSA_NAME
 	   && INTEGRAL_TYPE_P (TREE_TYPE (base))
 	   && get_range_info (base, &base_min, &base_max) == VR_RANGE)
@@ -3083,8 +3067,8 @@ iv_can_overflow_p (class loop *loop, tree type, tree base, tree step)
   if (!get_max_loop_iterations (loop, &nit))
     return true;
 
-  type_min = wi::min_value (type);
-  type_max = wi::max_value (type);
+  type_min = wi::min_value (noncapability_type (type));
+  type_max = wi::max_value (noncapability_type (type));
 
   /* Just sanity check that we don't see values out of the range of the type.
      In this case the arithmetics bellow would overflow.  */
@@ -3099,9 +3083,9 @@ iv_can_overflow_p (class loop *loop, tree type, tree base, tree step)
 
   /* NIT is typeless and can exceed the precision of the type.  In this case
      overflow is always possible, because we know STEP is non-zero.  */
-  if (wi::min_precision (nit, UNSIGNED) > TYPE_PRECISION (type))
+  if (wi::min_precision (nit, UNSIGNED) > TYPE_NONCAP_PRECISION (type))
     return true;
-  wide_int nit2 = wide_int::from (nit, TYPE_PRECISION (type), UNSIGNED);
+  wide_int nit2 = wide_int::from (nit, TYPE_NONCAP_PRECISION (type), UNSIGNED);
 
   /* If step can be positive, check that nit*step <= type_max-base.
      This can be done by unsigned arithmetic and we only need to watch overflow
@@ -3234,13 +3218,6 @@ simple_iv_with_niters (class loop *wrto_loop, class loop *use_loop,
       && !INTEGRAL_TYPE_P (type))
     return false;
 
-  /* MORELLO TODO (OPTIMISATION)
-       Currently returning false whenever the base type is a capability.
-       This avoids the entire set of induction variable optimisations for
-       capabilities.  Eventually it would be nice to implement them.  */
-  if (capability_type_p (type))
-    return false;
-
   ev = analyze_scalar_evolution_in_loop (wrto_loop, use_loop, op,
 					 &folded_casts);
   if (chrec_contains_undetermined (ev)
@@ -3250,7 +3227,7 @@ simple_iv_with_niters (class loop *wrto_loop, class loop *use_loop,
   if (tree_does_not_contain_chrecs (ev))
     {
       iv->base = ev;
-      iv->step = build_int_cst (TREE_TYPE (ev), 0);
+      iv->step = build_int_cst (noncapability_type (TREE_TYPE (ev)), 0);
       iv->no_overflow = true;
       return true;
     }

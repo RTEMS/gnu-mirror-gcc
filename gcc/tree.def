@@ -1074,7 +1074,8 @@ DEFTREECODE (REALIGN_LOAD_EXPR, "realign_load", tcc_expression, 3)
    The type of STEP, INDEX and INDEX2 is sizetype.
 
    The type of BASE is a pointer type.  If BASE is not an address of
-   a static or global variable INDEX2 will be NULL.
+   a static or global variable, and is not of capability type, INDEX2 will be
+   NULL.
 
    The type of OFFSET is a pointer type and determines TBAA the same as
    the constant offset operand in MEM_REF.  */

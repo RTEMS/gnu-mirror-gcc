@@ -1627,7 +1627,8 @@ ref_at_iteration (data_reference_p dr, int iter,
   tree addr = fold_build_pointer_plus (DR_BASE_ADDRESS (dr), off);
   addr = force_gimple_operand_1 (unshare_expr (addr), stmts,
 				 is_gimple_mem_ref_addr, NULL_TREE);
-  tree alias_ptr = fold_convert (reference_alias_ptr_type (ref), coff);
+  tree alias_ptr = fold_convert_for_mem_ref (reference_alias_ptr_type (ref),
+					     coff);
   tree type = build_aligned_type (TREE_TYPE (ref),
 				  get_object_alignment (ref));
   ref = build2 (MEM_REF, type, addr, alias_ptr);

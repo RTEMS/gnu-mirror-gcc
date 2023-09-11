@@ -71,6 +71,8 @@ void aff_combination_elt (aff_tree *, tree, tree);
 void aff_combination_scale (aff_tree *, const widest_int &);
 void aff_combination_mult (aff_tree *, aff_tree *, aff_tree *);
 void aff_combination_add (aff_tree *, aff_tree *);
+void aff_combination_drop_capability (aff_tree *);
+tree aff_combination_extract_provenance_cap (aff_tree *);
 void aff_combination_add_elt (aff_tree *, tree, const widest_int &);
 void aff_combination_remove_elt (aff_tree *, unsigned);
 void aff_combination_convert (aff_tree *, tree);
@@ -125,5 +127,12 @@ aff_combination_singleton_var_p (aff_tree *aff)
   return (aff->n == 1
 	  && known_eq (aff->offset, 0)
 	  && (aff->elts[0].coef == 1 || aff->elts[0].coef == -1));
+}
+
+/* Return true iff AFF has capability metadata in it.  */
+inline bool
+aff_cap_provenance_p (aff_tree *aff)
+{
+  return aff->n != 0 && tree_is_capability_value (aff->elts[0].val);
 }
 #endif /* GCC_TREE_AFFINE_H */

@@ -93,24 +93,26 @@ struct GTY (()) mem_addr_template {
 
 static GTY(()) vec<mem_addr_template, va_gc> *mem_addr_template_list;
 
-#define TEMPL_IDX(AS, SYMBOL, BASE, INDEX, STEP, OFFSET) \
-  (((int) (AS) << 5) \
-   | ((SYMBOL != 0) << 4) \
+#define TEMPL_IDX(AS, SYMBOL, BASE_CAP, BASE, INDEX, STEP, OFFSET) \
+  (((int) (AS) << 6) \
+   | ((SYMBOL != 0) << 5) \
+   | ((BASE_CAP != 0) << 4) \
    | ((BASE != 0) << 3) \
    | ((INDEX != 0) << 2) \
    | ((STEP != 0) << 1) \
    | (OFFSET != 0))
 
-/* Stores address for memory reference with parameters SYMBOL, BASE, INDEX,
-   STEP and OFFSET to *ADDR using address mode ADDRESS_MODE.  Stores pointers
-   to where step is placed to *STEP_P and offset to *OFFSET_P.  */
+/* Stores address for memory reference with parameters SYMBOL, BASE_CAP, BASE,
+   INDEX, STEP and OFFSET to *ADDR using address mode ADDRESS_MODE.  Stores
+   pointers to where step is placed to *STEP_P and offset to *OFFSET_P.  */
 
 static void
 gen_addr_rtx (scalar_addr_mode address_mode,
-	      rtx symbol, rtx base, rtx index, rtx step, rtx offset,
-	      rtx *addr, rtx **step_p, rtx **offset_p)
+	      rtx symbol, rtx base_cap, rtx base, rtx index, rtx step,
+	      rtx offset, rtx *addr, rtx **step_p, rtx **offset_p)
 {
   rtx act_elem;
+  gcc_assert (!symbol || !base_cap);
 
   *addr = NULL_RTX;
   if (step_p)
@@ -136,7 +138,7 @@ gen_addr_rtx (scalar_addr_mode address_mode,
   if (base && base != const0_rtx)
     {
       if (*addr)
-	*addr = gen_pointer_plus (address_mode, base, *addr);
+	*addr = gen_pointer_plus (offset_mode (address_mode), base, *addr);
       else
 	*addr = base;
     }
@@ -158,7 +160,23 @@ gen_addr_rtx (scalar_addr_mode address_mode,
 	}
 
       if (*addr)
-	*addr = gen_raw_pointer_plus (address_mode, *addr, act_elem);
+	*addr = gen_raw_pointer_plus (address_mode, act_elem, *addr);
+      else
+	*addr = act_elem;
+    }
+  else if (base_cap)
+    {
+      act_elem = base_cap;
+      if (offset)
+	{
+	  act_elem = gen_raw_pointer_plus (address_mode, act_elem, offset);
+
+	  if (offset_p)
+	    *offset_p = &XEXP (act_elem, 1);
+	}
+
+      if (*addr)
+	*addr = gen_raw_pointer_plus (address_mode, act_elem, *addr);
       else
 	*addr = act_elem;
     }
@@ -195,7 +213,8 @@ addr_for_mem_ref (struct mem_address *addr, addr_space_t as,
   bool is_cap = addr->is_capability ();
   scalar_addr_mode address_mode = targetm.addr_space.address_mode (as, is_cap);
   scalar_addr_mode pointer_mode = targetm.addr_space.pointer_mode (as, is_cap);
-  rtx address, sym, bse, idx, st, off;
+  scalar_addr_mode poff_mode = offset_mode (pointer_mode);
+  rtx address, sym, bcp, bse, idx, st, off;
   struct mem_addr_template *templ;
 
   if (addr->step && !integer_onep (addr->step))
@@ -215,7 +234,8 @@ addr_for_mem_ref (struct mem_address *addr, addr_space_t as,
   if (!really_expand)
     {
       unsigned int templ_index
-	= TEMPL_IDX (as, addr->symbol, addr->base, addr->index, st, off);
+	= TEMPL_IDX (as, addr->symbol, addr->base_cap, addr->base, addr->index,
+		     st, off);
 
       if (templ_index >= vec_safe_length (mem_addr_template_list))
 	vec_safe_grow_cleared (mem_addr_template_list, templ_index + 1);
@@ -227,15 +247,18 @@ addr_for_mem_ref (struct mem_address *addr, addr_space_t as,
 	  sym = (addr->symbol ?
 		 gen_rtx_SYMBOL_REF (pointer_mode, ggc_strdup ("test_symbol"))
 		 : NULL_RTX);
-	  bse = (addr->base ?
+	  bcp = (addr->base_cap ?
 		 gen_raw_REG (pointer_mode, LAST_VIRTUAL_REGISTER + 1)
+		 : NULL_RTX);
+	  bse = (addr->base ?
+		 gen_raw_REG (poff_mode, LAST_VIRTUAL_REGISTER + 2)
 		 : NULL_RTX);
 	  idx = (addr->index ?
 		 gen_raw_REG (offset_mode (pointer_mode),
-			      LAST_VIRTUAL_REGISTER + 2)
+			      LAST_VIRTUAL_REGISTER + 3)
 		 : NULL_RTX);
 
-	  gen_addr_rtx (pointer_mode, sym, bse, idx,
+	  gen_addr_rtx (pointer_mode, sym, bcp, bse, idx,
 			st? const0_rtx : NULL_RTX,
 			off? const0_rtx : NULL_RTX,
 			&templ->ref,
@@ -255,8 +278,11 @@ addr_for_mem_ref (struct mem_address *addr, addr_space_t as,
   sym = (addr->symbol
 	 ? expand_expr (addr->symbol, NULL_RTX, pointer_mode, EXPAND_NORMAL)
 	 : NULL_RTX);
+  bcp = (addr->base_cap
+	 ? expand_expr (addr->base_cap, NULL_RTX, pointer_mode, EXPAND_NORMAL)
+	 : NULL_RTX);
   bse = (addr->base
-	 ? expand_expr (addr->base, NULL_RTX, pointer_mode, EXPAND_NORMAL)
+	 ? expand_expr (addr->base, NULL_RTX, poff_mode, EXPAND_NORMAL)
 	 : NULL_RTX);
   idx = (addr->index
 	 ? expand_expr (addr->index, NULL_RTX,
@@ -271,13 +297,14 @@ addr_for_mem_ref (struct mem_address *addr, addr_space_t as,
   if (bse && GET_CODE (bse) == CONST_INT)
     {
       if (off)
-	off = simplify_gen_binary (PLUS, pointer_mode, bse, off);
+	off = simplify_gen_binary (PLUS, poff_mode, bse, off);
       else
 	off = bse;
       gcc_assert (GET_CODE (off) == CONST_INT);
       bse = NULL_RTX;
     }
-  gen_addr_rtx (pointer_mode, sym, bse, idx, st, off, &address, NULL, NULL);
+  gen_addr_rtx (pointer_mode, sym, bcp, bse, idx,
+		st, off, &address, NULL, NULL);
   if (pointer_mode != address_mode)
     address = convert_memory_address (address_mode, address);
   return address;
@@ -351,6 +378,13 @@ valid_mem_ref_p (machine_mode mode, addr_space_t as,
 {
   rtx address;
 
+  if (CAPABILITY_MODE_P (Pmode))
+    {
+      tree x = addr->symbol ? addr->symbol : addr->base_cap;
+      gcc_assert (x);
+      gcc_assert (!addr->symbol || !addr->base_cap);
+      gcc_assert (tree_is_capability_value (x));
+    }
   address = addr_for_mem_ref (addr, as, false);
   if (!address)
     return false;
@@ -384,6 +418,11 @@ create_mem_ref_raw (tree type, tree alias_ptr_type, struct mem_address *addr,
   if (addr->symbol)
     {
       base = addr->symbol;
+      index2 = addr->base;
+    }
+  else if (addr->base_cap)
+    {
+      base = addr->base_cap;
       index2 = addr->base;
     }
   else if (addr->base
@@ -553,6 +592,7 @@ add_to_parts (struct mem_address *parts, tree elt)
       return;
     }
 
+  gcc_assert (!tree_is_capability_value (elt));
   /* Add ELT to base.  */
   type = TREE_TYPE (parts->base);
   if (POINTER_TYPE_P (type))
@@ -732,6 +772,7 @@ addr_to_parts (tree type, aff_tree *addr, tree iv_cand, tree base_hint,
   unsigned i;
 
   parts->symbol = NULL_TREE;
+  parts->base_cap = NULL_TREE;
   parts->base = NULL_TREE;
   parts->index = NULL_TREE;
   parts->step = NULL_TREE;
@@ -744,21 +785,43 @@ addr_to_parts (tree type, aff_tree *addr, tree iv_cand, tree base_hint,
   /* Try to find a symbol.  */
   move_fixed_address_to_symbol (parts, addr);
 
+  *var_in_base = (base_hint != NULL && parts->symbol == NULL);
+  /* If we have capability metadata, this is always the base_cap.  */
+  if (aff_cap_provenance_p (addr))
+    {
+      /* If there is an `ADDR_EXPR` in the affine tree that would be a
+	 capability, it would be removed in
+	 `move_fixed_address_to_symbol`.  The affine tree capability invariant
+	 means there could have only been one capability element => there
+	 should not be any capability metadata left on the affine tree.  */
+      gcc_assert (!parts->symbol);
+      parts->base_cap = aff_combination_extract_provenance_cap (addr);
+      *var_in_base = false;
+    }
   /* Since at the moment there is no reliable way to know how to
      distinguish between pointer and its offset, we decide if var
      part is the pointer based on guess.  */
-  *var_in_base = (base_hint != NULL && parts->symbol == NULL);
-  if (*var_in_base)
+  else if (*var_in_base)
     *var_in_base = move_hint_to_base (type, parts, base_hint, addr);
   else
     move_variant_to_index (parts, addr, iv_cand);
+
+  /* Capability affine trees have more invariants than non-capability affine
+     trees.  With these extra invariants, we can guarantee that the base must
+     have already been found.  Hence we can drop the capability type on the
+     affine tree, so that other functions do not need to handle that
+     possibility.  */
+  gcc_assert (!capability_type_p (addr->type)
+	      || (!aff_cap_provenance_p (addr)
+		  && (parts->symbol || parts->base_cap)));
+  aff_combination_drop_capability (addr);
 
   /* First move the most expensive feasible multiplication to index.  */
   if (!parts->index)
     most_expensive_mult_to_index (type, parts, addr, speed);
 
   /* Move pointer into base.  */
-  if (!parts->symbol && !parts->base)
+  if (!parts->symbol && !parts->base && !parts->base_cap)
     move_pointer_to_base (parts, addr);
 
   /* Then try to process the remaining elements.  */
@@ -783,6 +846,11 @@ gimplify_mem_ref_parts (gimple_stmt_iterator *gsi, struct mem_address *parts)
     parts->base = force_gimple_operand_gsi_1 (gsi, parts->base,
 					    is_gimple_mem_ref_addr, NULL_TREE,
 					    true, GSI_SAME_STMT);
+  if (parts->base_cap)
+    parts->base_cap = force_gimple_operand_gsi_1 (gsi, parts->base_cap,
+						  is_gimple_mem_ref_addr,
+						  NULL_TREE, true,
+						  GSI_SAME_STMT);
   if (parts->index)
     parts->index = force_gimple_operand_gsi (gsi, parts->index,
 					     true, NULL_TREE,
@@ -818,6 +886,26 @@ add_offset_to_base (gimple_stmt_iterator *gsi, mem_address *parts)
   parts->offset = NULL_TREE;
 }
 
+/* Fold PARTS->base into PARTS->base_cap, so that there is no longer
+   a separate capability and offset.  Emit any new instructions before GSI.
+   We know this is safe since the eventual value that is created must be safe
+   to access, and this is used last after all offsets have been combined into
+   PARTS->base.  */
+
+static void
+add_base_to_base_cap (gimple_stmt_iterator *gsi, mem_address *parts)
+{
+  tree tmp = parts->base;
+  if (parts->base_cap)
+    {
+      tmp = fold_build_pointer_plus (parts->base_cap, tmp);
+      tmp = force_gimple_operand_gsi_1 (gsi, tmp, is_gimple_mem_ref_addr,
+					NULL_TREE, true, GSI_SAME_STMT);
+    }
+  parts->base_cap = tmp;
+  parts->base = NULL_TREE;
+}
+
 /* Creates and returns a TARGET_MEM_REF for address ADDR.  If necessary
    computations are emitted in front of GSI.  TYPE is the mode
    of created memory reference. IV_CAND is the selected iv candidate in ADDR,
@@ -843,15 +931,24 @@ create_mem_ref (gimple_stmt_iterator *gsi, tree type, aff_tree *addr,
   /* Merge symbol into other parts.  */
   if (parts.symbol)
     {
+      gcc_assert (!parts.base_cap);
       tmp = parts.symbol;
       parts.symbol = NULL_TREE;
       gcc_assert (is_gimple_val (tmp));
 
-      if (parts.base)
+      if (tree_is_capability_value (tmp))
+	{
+	  /* Move symbol into base_cap, forcing it to a register.  */
+	  tmp = force_gimple_operand_gsi_1 (gsi, tmp,
+					    is_gimple_mem_ref_addr,
+					    NULL_TREE, true,
+					    GSI_SAME_STMT);
+	  parts.base_cap = tmp;
+	}
+      else if (parts.base)
 	{
 	  gcc_assert (useless_type_conversion_p (sizetype,
 						 TREE_TYPE (parts.base)));
-
 	  if (parts.index)
 	    {
 	      /* Add the symbol to base, eventually forcing it to register.  */
@@ -992,11 +1089,23 @@ create_mem_ref (gimple_stmt_iterator *gsi, tree type, aff_tree *addr,
 	return mem_ref;
     }
 
+  /* Transform [base_cap + base] into:
+       base_cap' = base_cap + base
+       [base_cap'].  */
+  if (parts.base_cap && parts.base)
+    {
+      add_base_to_base_cap (gsi, &parts);
+      mem_ref = create_mem_ref_raw (type, alias_ptr_type, &parts, true);
+      if (mem_ref)
+	return mem_ref;
+    }
+
   /* Verify that the address is in the simplest possible shape
      (only a register).  If we cannot create such a memory reference,
      something is really wrong.  */
   gcc_assert (parts.symbol == NULL_TREE);
   gcc_assert (parts.index == NULL_TREE);
+  gcc_assert (!parts.base_cap || !parts.base);
   gcc_assert (!parts.step || integer_onep (parts.step));
   gcc_assert (!parts.offset || integer_zerop (parts.offset));
   gcc_unreachable ();
@@ -1007,6 +1116,9 @@ create_mem_ref (gimple_stmt_iterator *gsi, tree type, aff_tree *addr,
 void
 get_address_description (tree op, struct mem_address *addr)
 {
+  /* One of the below will be set to something, the other left as NULL.  */
+  addr->base = NULL_TREE;
+  addr->base_cap = NULL_TREE;
   if (ADDR_EXPR_P (TMR_BASE (op)))
     {
       addr->symbol = TMR_BASE (op);
@@ -1015,7 +1127,17 @@ get_address_description (tree op, struct mem_address *addr)
   else
     {
       addr->symbol = NULL_TREE;
-      if (TMR_INDEX2 (op))
+      if (tree_is_capability_value (TMR_BASE (op)))
+	{
+	  /* This is the only time that we can have TMR_BASE as something which
+	     is not an ADDR_EXPR_P of a global or static but we also have
+	     TMR_INDEX2 set.  N.b. this was an explicit invariant before
+	     capabilities, it is documented in tree.def under TARGET_MEM_REF.
+	     */
+	  addr->base_cap = TMR_BASE (op);
+	  addr->base = TMR_INDEX2 (op);
+	}
+      else if (TMR_INDEX2 (op))
 	{
 	  gcc_assert (integer_zerop (TMR_BASE (op)));
 	  addr->base = TMR_INDEX2 (op);
@@ -1098,7 +1220,7 @@ copy_ref_info (tree new_ref, tree old_ref)
    all arguments are cast to an integer type where needed (e.g. when needed
    because the pointer type is a capability and we want to apply integer
    arithmetic to it).  */
-tree
+static tree
 fold_cap_binary_to_constant (enum tree_code code, tree type, tree op0,
 			     tree op1)
 {
@@ -1106,7 +1228,9 @@ fold_cap_binary_to_constant (enum tree_code code, tree type, tree op0,
 			  fold_drop_capability (op0),
 			  fold_drop_capability (op1));
   if (tem)
-    return fold_convert (type, tem);
+    return capability_type_p (type)
+      ? fold_convert_for_mem_ref (type, tem)
+      : tem;
   return NULL_TREE;
 }
 
@@ -1150,8 +1274,11 @@ maybe_fold_tmr (tree ref)
       addr.symbol = build_fold_addr_expr
 		      (get_addr_base_and_unit_offset
 		         (TREE_OPERAND (addr.symbol, 0), &offset));
+      tree off_type = TREE_TYPE (addr.offset);
       addr.offset = int_const_binop (PLUS_EXPR,
-				     addr.offset, size_int (offset));
+				     fold_drop_capability (addr.offset),
+				     size_int (offset));
+      addr.offset = fold_convert_for_mem_ref (off_type, addr.offset);
       changed = true;
     }
 
@@ -1203,7 +1330,10 @@ preferred_mem_scale_factor (tree base, machine_mode mem_mode,
 
   /* Addressing mode "base + index".  */
   parts.index = integer_one_node;
-  parts.base = integer_one_node;
+  if (CAPABILITY_MODE_P (ptr_mode))
+    parts.base_cap = build_int_cst (ptr_type_node, 1);
+  else
+    parts.base = integer_one_node;
   rtx addr = addr_for_mem_ref (&parts, as, false);
   unsigned cost = address_cost (addr, mem_mode, as, speed);
 
@@ -1229,6 +1359,12 @@ dump_mem_address (FILE *file, struct mem_address *parts)
     {
       fprintf (file, "symbol: ");
       print_generic_expr (file, TREE_OPERAND (parts->symbol, 0), TDF_SLIM);
+      fprintf (file, "\n");
+    }
+  if (parts->base_cap)
+    {
+      fprintf (file, "base_cap: ");
+      print_generic_expr (file, parts->base_cap, TDF_SLIM);
       fprintf (file, "\n");
     }
   if (parts->base)
@@ -1265,10 +1401,11 @@ mem_address::is_capability () const
   if (symbol)
     return tree_is_capability_value (symbol);
 
-  if (base && POINTER_TYPE_P (TREE_TYPE (base)))
-    return tree_is_capability_value (base);
+  if (base_cap)
+    return tree_is_capability_value (base_cap);
 
-  return CAPABILITY_MODE_P (ptr_mode);
+  gcc_assert (!CAPABILITY_MODE_P (ptr_mode));
+  return false;
 }
 
 #include "gt-tree-ssa-address.h"

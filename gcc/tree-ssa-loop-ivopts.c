@@ -2333,7 +2333,12 @@ find_interesting_uses_address (struct ivopts_data *data, gimple *stmt,
 	    goto fail;
 
 	  TMR_INDEX2 (base) = civ->base;
-	  step = civ->step;
+	  /* Can only have non-NULL INDEX2 and a TMR_BASE of an SSA_NAME if the
+	     TMR_BASE is a capability.  */
+	  if (tree_is_capability_value (TMR_BASE (base)))
+	    step = fold_build2 (PLUS_EXPR, type, civ->step, step);
+	  else
+	    step = civ->step;
 	}
       if (TMR_INDEX (base)
 	  && TREE_CODE (TMR_INDEX (base)) == SSA_NAME)
@@ -2918,8 +2923,22 @@ strip_offset_1 (tree expr, bool inside_addr, bool top_compref,
       break;
 
     default:
-      if (ptrdiff_tree_p (expr, offset) && maybe_ne (*offset, 0))
-	return build_int_cst (orig_type, 0);
+      if (ptrdiff_tree_p (fold_drop_capability (expr), offset)
+	  && maybe_ne (*offset, 0))
+	{
+	  /* Ensure we maintain metadata information if this was a capability.
+	     There is no way that a constant capability could be *valid*, so
+	     we don't need to worry about taking our capability out of bounds
+	     and losing validity.  */
+	  if (capability_type_p (TREE_TYPE (expr)))
+	    {
+	      tree null = build_zero_cst (noncapability_type (orig_type));
+	      tree cap_meta = fold_build_replace_address_value (expr, null);
+	      return fold_convert (orig_type, cap_meta);
+	    }
+	  else
+	    return build_int_cst (orig_type, 0);
+	}
       return orig_expr;
     }
 
@@ -3133,8 +3152,8 @@ add_candidate_1 (struct ivopts_data *data, tree base, tree step, bool important,
 
       if (operand_equal_p (base, cand->iv->base, 0)
 	  && operand_equal_p (step, cand->iv->step, 0)
-	  && (TYPE_PRECISION (TREE_TYPE (base))
-	      == TYPE_PRECISION (TREE_TYPE (cand->iv->base))))
+	  && (TYPE_NONCAP_PRECISION (TREE_TYPE (base))
+	      == TYPE_NONCAP_PRECISION (TREE_TYPE (cand->iv->base))))
 	break;
     }
 
@@ -3948,7 +3967,8 @@ determine_common_wider_type (tree *a, tree *b)
       suba = TREE_OPERAND (*a, 0);
       wider_type = TREE_TYPE (suba);
       if (! fold_convertible_p (wider_type, *a)
-	  || TYPE_PRECISION (wider_type) < TYPE_PRECISION (atype))
+	  || TYPE_NONCAP_PRECISION (wider_type) < TYPE_NONCAP_PRECISION (atype)
+	  || (INTCAP_TYPE_P (wider_type) && !INTCAP_TYPE_P (atype)))
 	return atype;
     }
   else
@@ -3961,7 +3981,9 @@ determine_common_wider_type (tree *a, tree *b)
 	  || ! fold_convertible_p (wider_type, *b)
 	  || capability_type_p (TREE_TYPE (subb))
 		!= capability_type_p (wider_type)
-	  || TYPE_PRECISION (wider_type) != TYPE_PRECISION (TREE_TYPE (subb)))
+	  || TYPE_NONCAP_PRECISION (wider_type)
+		!= TYPE_NONCAP_PRECISION (TREE_TYPE (subb))
+	  || (INTCAP_TYPE_P (wider_type) && !INTCAP_TYPE_P (TREE_TYPE (subb))))
 	return atype;
     }
   else
@@ -3981,7 +4003,8 @@ determine_common_wider_type (tree *a, tree *b)
 static bool
 get_computation_aff_1 (class loop *loop, gimple *at, struct iv_use *use,
 		       struct iv_cand *cand, class aff_tree *aff_inv,
-		       class aff_tree *aff_var, widest_int *prat = NULL)
+		       class aff_tree *aff_var, widest_int *prat = NULL,
+		       comp_cost *cap_complication = NULL)
 {
   tree ubase = use->iv->base, ustep = use->iv->step;
   tree cbase = cand->iv->base, cstep = cand->iv->step;
@@ -3990,24 +4013,19 @@ get_computation_aff_1 (class loop *loop, gimple *at, struct iv_use *use,
   aff_tree aff_cbase;
   widest_int rat;
 
-  /* We must have a precision to express the values of use (and the conversion
-     must be valid including other things like capabilities).
-     MORELLO TODO (OPTIMISATION) There is a comment in rewrite_use_address
-     below about using unsigned integer types to avoid overflow problems.
-     This means that if an induction variable has a base of a pointer all
-     candidates that we will get will use unsigned int values, which will never
-     match.
-     Handling types other than unsigned integer (maybe using pointers all the
-     time?) would avoid the problem and enable these optimisations for
-     pointers.    */
-  if (! fold_convertible_p (utype, cbase))
+  /* We must have a precision to express the values of use.  */
+  if (TYPE_NONCAP_PRECISION (utype) > TYPE_NONCAP_PRECISION (ctype))
     return false;
 
   var = var_at_stmt (loop, cand, at);
-  uutype = unsigned_type_for (utype);
+  if (capability_type_p (utype))
+    uutype = uintcap_type_node;
+  else
+    uutype = unsigned_type_for (utype);
+
 
   /* If the conversion is not noop, perform it.  */
-  if (TYPE_PRECISION (utype) < TYPE_PRECISION (ctype))
+  if (TYPE_NONCAP_PRECISION (utype) < TYPE_NONCAP_PRECISION (ctype))
     {
       if (cand->orig_iv != NULL && CONVERT_EXPR_P (cbase)
 	  && (CONVERT_EXPR_P (cstep) || poly_int_tree_p (cstep)))
@@ -4025,15 +4043,19 @@ get_computation_aff_1 (class loop *loop, gimple *at, struct iv_use *use,
 	     In this case, it's safe to skip the convertion in candidate.
 	     As an example, (unsigned short)((unsigned long)A) equals to
 	     (unsigned short)A, if A has a type no larger than short.  */
-	  if (TYPE_PRECISION (inner_type) <= TYPE_PRECISION (uutype))
+	  if (TYPE_NONCAP_PRECISION (inner_type)
+	      <= TYPE_NONCAP_PRECISION (uutype))
 	    {
 	      cbase = inner_base;
 	      cstep = inner_step;
 	    }
 	}
-      cbase = fold_convert (uutype, cbase);
-      cstep = fold_convert (uutype, cstep);
-      var = fold_convert (uutype, var);
+      tree newstep_type = capability_type_p (ctype)
+	? uutype
+	: noncapability_type (uutype);
+      cbase = fold_convert (newstep_type, cbase);
+      cstep = fold_convert (newstep_type, cstep);
+      var = fold_convert (newstep_type, var);
     }
 
   /* Ratio is 1 when computing the value of biv cand by itself.
@@ -4060,32 +4082,130 @@ get_computation_aff_1 (class loop *loop, gimple *at, struct iv_use *use,
      overflows, as all the arithmetics will in the end be performed in UUTYPE
      anyway.  */
   common_type = determine_common_wider_type (&ubase, &cbase);
+  bool cbase_offset = capability_type_p (utype)
+	  && !tree_is_capability_value (cbase);
 
   /* use = ubase - ratio * cbase + ratio * var.  */
   tree_to_aff_combination (ubase, common_type, aff_inv);
-  tree_to_aff_combination (cbase, common_type, &aff_cbase);
-  tree_to_aff_combination (var, uutype, aff_var);
+  tree_to_aff_combination (cbase, cbase_offset
+			   ? noncapability_type (common_type)
+			   : common_type, &aff_cbase);
+  tree_to_aff_combination (var, cbase_offset
+		  ? noncapability_type (uutype)
+		  : uutype, aff_var);
 
   /* We need to shift the value if we are after the increment.  */
   if (stmt_after_increment (loop, cand, at))
     {
       aff_tree cstep_aff;
+      tree common_step_type = noncapability_type (common_type);
 
       if (common_type != uutype)
-	cstep_common = fold_convert (common_type, cstep);
+	cstep_common = fold_convert (common_step_type, cstep);
       else
 	cstep_common = cstep;
 
-      tree_to_aff_combination (cstep_common, common_type, &cstep_aff);
+      tree_to_aff_combination (cstep_common, common_step_type, &cstep_aff);
       aff_combination_add (&aff_cbase, &cstep_aff);
+    }
+
+  /* Check for provenance of our capabilities.  */
+  if (aff_cap_provenance_p (aff_inv) && aff_cap_provenance_p (&aff_cbase))
+    {
+      widest_int tmp = aff_inv->elts[0].coef - (rat*aff_cbase.elts[0].coef);
+      bool ops_equal
+	= operand_equal_p (aff_inv->elts[0].val, aff_cbase.elts[0].val, 0);
+
+      if (tmp == 0 && ops_equal)
+	{
+	  /* Metadata in bases cancels out, aff_var has the metadata.
+
+	     The assertions below ensure that assumptions made in
+	     rewrite_use_nonlinear_expr about when metadata needs to be kept
+	     "to the side" in a calculation are valid.
+
+	     Assertions must be true since:
+	       1) aff_cbase has a capability element, and aff_var is the value
+		  of aff_cbase + step at the point that `use` is used.
+	       2) aff_var is the affine expansion of a variable in source code,
+		  hence it can not have more than one capability element.
+	       3) aff_inv and aff_cbase are expansions of bases of induction
+		  variables, hence they must have only one capability element.
+		  This also means that if their capability elements cancel out,
+		  `rat` must be 1.  */
+	  gcc_assert (aff_cap_provenance_p (aff_var));
+	  gcc_assert (aff_var->elts[0].coef == 1);
+	  gcc_assert (rat == 1);
+	}
+      else if (ops_equal)
+	{
+	  /* Ensure that any metadata on aff_var is removed and we're just left
+	     with metadata on the invariant part.  */
+	  aff_combination_drop_capability (aff_var);
+	  if (cap_complication)
+	    *cap_complication += 5;
+	}
+      else
+	{
+	  /* We have to drop the metadata from somewhere in order to make it
+	     clear where metadata is coming from.
+
+	     The capability metadata on these bases could be the same or could
+	     be different.  If it's the same then it doesn't really matter
+	     where we take the metadata from, but having metadata on the use
+	     base seems like a nice mental model.
+
+	     If the metadata is different between these two objects, then we
+	     *must* take the metadata from the use, since that's the metadata
+	     that this use would use.
+
+	     This will not always leave us with a valid capability (the
+	     possible difference in `rat` means that we could have huge
+	     constant offsets leading to invalid capabilities), so everywhere
+	     that this function is used must be careful about handling
+	     temporaries in calculations.  */
+	  aff_combination_drop_capability (&aff_cbase);
+	  aff_combination_drop_capability (aff_var);
+	  if (cap_complication)
+	    *cap_complication += 5;
+	}
+    }
+  else if (aff_cap_provenance_p (aff_inv) && !aff_cap_provenance_p (&aff_cbase))
+    {
+      /* Use has metadata, candidate does not.
+	 Need to maintain metadata on use, that happens naturally.  */
+      if (cap_complication)
+	*cap_complication += 5;
+    }
+  else if (!aff_cap_provenance_p (aff_inv) && aff_cap_provenance_p (&aff_cbase))
+    {
+      /* Use does not have metadata, candidate does.
+	 Metadata is same on aff_cbase and aff_var, but may not appear the same
+	 (e.g. may be stored in different capability SSA_NAME's).  */
+      gcc_assert (aff_cap_provenance_p (aff_var));
+      aff_combination_drop_capability (&aff_cbase);
+      aff_combination_drop_capability (aff_var);
     }
 
   aff_combination_scale (&aff_cbase, -rat);
   aff_combination_add (aff_inv, &aff_cbase);
+  /* The capability type of aff_inv may have been lost after adding aff_cbase
+     (the `tmp == 0 && ops_equal` case in the clause above).
+     In that case we don't want to be attempting to convert it back to a
+     capability.  */
+  if (!capability_type_p (aff_inv->type) && capability_type_p (uutype))
+    uutype = noncapability_type (uutype);
   if (common_type != uutype)
     aff_combination_convert (aff_inv, uutype);
 
   aff_combination_scale (aff_var, rat);
+
+  /* Can not both have metadata (otherwise the resulting variable would need to
+     get metadata from two sources -- i.e. get_computation_aff_1 has split the
+     value into separate parts badly).  However could easily both not have
+     metadata (if the variable is not a capability).  */
+  gcc_assert (!aff_cap_provenance_p (aff_inv)
+	      || ! aff_cap_provenance_p (aff_var));
   return true;
 }
 
@@ -4161,7 +4281,7 @@ get_debug_computation_at (class loop *loop, gimple *at,
   widest_int rat;
 
   /* We must have a precision to express the values of use.  */
-  if (TYPE_PRECISION (utype) >= TYPE_PRECISION (ctype))
+  if (TYPE_NONCAP_PRECISION (utype) >= TYPE_NONCAP_PRECISION (ctype))
     return NULL_TREE;
 
   /* Try to handle the case that get_computation_at doesn't,
@@ -4194,14 +4314,14 @@ get_debug_computation_at (class loop *loop, gimple *at,
   if (bits == -1)
     bits = wi::floor_log2 (rat) + 1;
   if (!cand->iv->no_overflow
-      && TYPE_PRECISION (utype) + bits > TYPE_PRECISION (ctype))
+      && TYPE_NONCAP_PRECISION (utype) + bits > TYPE_NONCAP_PRECISION (ctype))
     return NULL_TREE;
 
   var = var_at_stmt (loop, cand, at);
-
-  if (POINTER_TYPE_P (ctype))
+  if (POINTER_TYPE_P (ctype) || capability_type_p (utype)
+      || capability_type_p (ctype))
     {
-      ctype = unsigned_type_for (ctype);
+      ctype = unsigned_type_for (noncapability_type (ctype));
       cbase = fold_convert (ctype, cbase);
       cstep = fold_convert (ctype, cstep);
       var = fold_convert (ctype, var);
@@ -4220,6 +4340,21 @@ get_debug_computation_at (class loop *loop, gimple *at,
       if (neg_p)
 	var = fold_build1 (NEGATE_EXPR, sizetype, var);
       var = fold_build2 (POINTER_PLUS_EXPR, utype, ubase, var);
+    }
+  else if (capability_type_p (utype))
+    {
+      gcc_assert (INTCAP_TYPE_P (utype));
+      /* `var` can't have side-effects (as evidenced by the two asserts).
+	 If it were to have side-effects in the future then we would need to
+	 avoid the duplication of it while building our replace_address_value.
+	 */
+      gcc_assert (TREE_CODE (var) == SSA_NAME);
+      gcc_assert (!TREE_SIDE_EFFECTS (var));
+      tree tmp_type = noncapability_type (utype);
+      var = fold_convert (tmp_type, var);
+      var = fold_build2 (neg_p ? MINUS_EXPR : PLUS_EXPR, tmp_type,
+			 fold_drop_capability (ubase), var);
+      var = fold_build_replace_address_value (ubase, var);
     }
   else
     {
@@ -4689,8 +4824,12 @@ get_address_cost (struct ivopts_data *data, struct iv_use *use,
   bool simple_inv = true;
   tree comp_inv = NULL_TREE, type = aff_var->type;
   comp_cost var_cost = no_cost, cost = no_cost;
-  struct mem_address parts = {NULL_TREE, integer_one_node,
-			      NULL_TREE, NULL_TREE, NULL_TREE};
+  struct mem_address parts
+    = {NULL_TREE, NULL_TREE, NULL_TREE, NULL_TREE, NULL_TREE, NULL_TREE};
+  if (aff_cap_provenance_p (aff_inv) || aff_cap_provenance_p (aff_var))
+    parts.base_cap = build_int_cst (ptr_type_node, 1);
+  else
+    parts.base = integer_one_node;
   machine_mode addr_mode = TYPE_MODE (type);
   machine_mode mem_mode = TYPE_MODE (use->mem_type);
   addr_space_t as = TYPE_ADDR_SPACE (TREE_TYPE (use->iv->base));
@@ -4727,18 +4866,24 @@ get_address_cost (struct ivopts_data *data, struct iv_use *use,
 	  /* Base is fixed address and is moved to symbol part.  */
 	  if (parts.symbol != NULL_TREE && aff_combination_zero_p (aff_inv))
 	    parts.base = NULL_TREE;
+	  if (parts.symbol != NULL_TREE)
+	    parts.base_cap = NULL_TREE;
 
 	  /* Addressing mode "symbol + base + index [<< scale] [+ offset]".  */
 	  if (parts.symbol != NULL_TREE
 	      && !valid_mem_ref_p (mem_mode, as, &parts))
 	    {
 	      aff_combination_add_elt (aff_inv, parts.symbol, 1);
+	      bool into_base_cap = tree_is_capability_value (parts.symbol);
 	      parts.symbol = NULL_TREE;
 	      /* Reset SIMPLE_INV since symbol address needs to be computed
 		 outside of address expression in this case.  */
 	      simple_inv = false;
 	      /* Symbol part is moved back to base part, it can't be NULL.  */
-	      parts.base = integer_one_node;
+	      if (into_base_cap)
+		parts.base_cap = build_int_cst (ptr_type_node, 1);
+	      else
+		parts.base = integer_one_node;
 	    }
 	}
       else
@@ -4784,9 +4929,12 @@ get_address_cost (struct ivopts_data *data, struct iv_use *use,
   if (comp_inv != NULL_TREE)
     cost = force_var_cost (data, comp_inv, inv_vars);
   if (ratio != 1 && parts.step == NULL_TREE)
-    var_cost += mult_by_coeff_cost (ratio, addr_mode, speed);
+    var_cost += mult_by_coeff_cost (ratio, noncapability_mode (addr_mode),
+				    speed);
   if (comp_inv != NULL_TREE && parts.index == NULL_TREE)
-    var_cost += add_cost (speed, addr_mode);
+    var_cost += CAPABILITY_MODE_P (addr_mode)
+	    ? pointer_add_cost (speed, addr_mode)
+	    : add_cost (speed, addr_mode);
 
   if (comp_inv && inv_expr && !simple_inv)
     {
@@ -4815,6 +4963,8 @@ get_address_cost (struct ivopts_data *data, struct iv_use *use,
   /* Don't increase the complexity of adding a scaled index if it's
      the only kind of index that the target allows.  */
   if (parts.step != NULL_TREE && ok_without_ratio_p)
+    cost.complexity += 1;
+  if (parts.base_cap != NULL_TREE && parts.index != NULL_TREE)
     cost.complexity += 1;
   if (parts.base != NULL_TREE && parts.index != NULL_TREE)
     cost.complexity += 1;
@@ -4854,6 +5004,15 @@ get_scaled_computation_cost_at (ivopts_data *data, gimple *at, comp_cost cost)
   return cost;
 }
 
+static bool
+type_requires_same_base (tree type)
+{
+  /* Can represent a capability use in terms of a non-capability candidate by
+     simply extracting the capability part out and using the "rest" as an
+     addend.  */
+  return !capability_type_p (type) && POINTER_TYPE_P (type);
+}
+
 /* Determines the cost of the computation by that USE is expressed
    from induction variable CAND.  If ADDRESS_P is true, we just need
    to create an address from it, otherwise we want to get it into
@@ -4872,7 +5031,7 @@ get_computation_cost (struct ivopts_data *data, struct iv_use *use,
   tree utype = TREE_TYPE (ubase), ctype = TREE_TYPE (cbase);
   tree comp_inv = NULL_TREE;
   HOST_WIDE_INT ratio, aratio;
-  comp_cost cost;
+  comp_cost cost, cap_transform_cost = no_cost;
   widest_int rat;
   aff_tree aff_inv, aff_var;
   bool speed = optimize_bb_for_speed_p (gimple_bb (at));
@@ -4884,29 +5043,23 @@ get_computation_cost (struct ivopts_data *data, struct iv_use *use,
   if (inv_expr)
     *inv_expr = NULL;
 
-  /* MORELLO TODO
-     Was trying to get these induction variables working for capabilities.
-     This function should eventually be modified to handle them (especially how
-     we should use TYPE_PRECISION here).
-     However, skipping for now (would like to do in the future).  */
-  if (capability_type_p (ctype) || capability_type_p (utype))
-    return infinite_cost;
-
   /* Check if we have enough precision to express the values of use.  */
-  if (TYPE_PRECISION (utype) > TYPE_PRECISION (ctype))
+  if (TYPE_NONCAP_PRECISION (utype) > TYPE_NONCAP_PRECISION (ctype))
     return infinite_cost;
 
   if (address_p
       || (use->iv->base_object
 	  && cand->iv->base_object
-	  && POINTER_TYPE_P (TREE_TYPE (use->iv->base_object))
-	  && POINTER_TYPE_P (TREE_TYPE (cand->iv->base_object))))
+	  && type_requires_same_base (TREE_TYPE (use->iv->base_object))
+	  && type_requires_same_base (TREE_TYPE (cand->iv->base_object))))
     {
       /* Do not try to express address of an object with computation based
 	 on address of a different object.  This may cause problems in rtl
 	 level alias analysis (that does not expect this to be happening,
 	 as this is illegal in C), and would be unlikely to be useful
-	 anyway.  */
+	 anyway.
+	 Similar for intcap typed variables where we're concerned about
+	 provenance of the capability.  */
       if (use->iv->base_object
 	  && cand->iv->base_object
 	  && !operand_equal_p (use->iv->base_object, cand->iv->base_object, 0))
@@ -4914,7 +5067,8 @@ get_computation_cost (struct ivopts_data *data, struct iv_use *use,
     }
 
   if (!get_computation_aff_1 (data->current_loop, at, use,
-			      cand, &aff_inv, &aff_var, &rat)
+			      cand, &aff_inv, &aff_var, &rat,
+			      &cap_transform_cost)
       || !wi::fits_shwi_p (rat))
     return infinite_cost;
 
@@ -4926,12 +5080,18 @@ get_computation_cost (struct ivopts_data *data, struct iv_use *use,
       cost = get_scaled_computation_cost_at (data, at, cost);
       /* For doloop IV cand, add on the extra cost.  */
       cost += cand->doloop_p ? targetm.doloop_cost_for_address : 0;
-      return cost;
+      return cost + cap_transform_cost;
     }
 
   bool simple_inv = (aff_combination_const_p (&aff_inv)
 		     || aff_combination_singleton_var_p (&aff_inv));
-  tree signed_type = signed_type_for (aff_combination_type (&aff_inv));
+  tree signed_type;
+  if (capability_type_p (aff_combination_type (&aff_inv)))
+    signed_type = intcap_type_node;
+  else
+    signed_type = signed_type_for (aff_combination_type (&aff_inv));
+
+
   aff_combination_convert (&aff_inv, signed_type);
   if (!aff_combination_zero_p (&aff_inv))
     comp_inv = aff_combination_to_tree (&aff_inv);
@@ -4954,7 +5114,7 @@ get_computation_cost (struct ivopts_data *data, struct iv_use *use,
     cost = no_cost;
 
   /* Need type narrowing to represent use with cand.  */
-  if (TYPE_PRECISION (utype) < TYPE_PRECISION (ctype))
+  if (TYPE_NONCAP_PRECISION (utype) < TYPE_NONCAP_PRECISION (ctype))
     {
       machine_mode outer_mode = TYPE_MODE (utype);
       machine_mode inner_mode = TYPE_MODE (ctype);
@@ -4968,13 +5128,16 @@ get_computation_cost (struct ivopts_data *data, struct iv_use *use,
     aratio = ratio;
 
   if (ratio != 1)
-    cost += mult_by_coeff_cost (aratio, TYPE_MODE (utype), speed);
+    cost += mult_by_coeff_cost (aratio,
+				noncapability_mode (TYPE_MODE (utype)), speed);
 
   /* TODO: We may also need to check if we can compute  a + i * 4 in one
      instruction.  */
   /* Need to add up the invariant and variant parts.  */
   if (comp_inv && !integer_zerop (comp_inv))
-    cost += add_cost (speed, TYPE_MODE (utype));
+    cost += capability_type_p (utype)
+      ? pointer_add_cost (speed, TYPE_MODE (utype))
+      : add_cost (speed, TYPE_MODE (utype));
 
   cost = get_scaled_computation_cost_at (data, at, cost);
 
@@ -4982,7 +5145,7 @@ get_computation_cost (struct ivopts_data *data, struct iv_use *use,
   if (cand->doloop_p && use->type == USE_NONLINEAR_EXPR)
     cost += targetm.doloop_cost_for_generic;
 
-  return cost;
+  return cost + cap_transform_cost;
 }
 
 /* Determines cost of computing the use in GROUP with CAND in a generic
@@ -7217,6 +7380,46 @@ create_new_ivs (struct ivopts_data *data, class iv_ca *set)
     }
 }
 
+static inline tree
+rewrite_combine_base_and_step (tree comp_op1, tree comp_op2,
+			       poly_widest_int offset)
+{
+  tree comp;
+  if (POINTER_TYPE_P (TREE_TYPE (comp_op2))
+      || capability_type_p (TREE_TYPE (comp_op2)))
+    std::swap (comp_op1, comp_op2);
+
+  if (POINTER_TYPE_P (TREE_TYPE (comp_op1)))
+    {
+      comp = fold_build_pointer_plus (comp_op1,
+				      fold_convert (sizetype, comp_op2));
+      comp = fold_build_pointer_plus (comp,
+				      wide_int_to_tree (sizetype, offset));
+    }
+  else if (INTCAP_TYPE_P (TREE_TYPE (comp_op1)))
+    {
+      /* If this ever did have side effects we would need to avoid its
+	 duplication in the below replace_address_value.  */
+      gcc_assert (!TREE_SIDE_EFFECTS (comp_op1));
+      tree noncap_type = noncapability_type (TREE_TYPE (comp_op1));
+      tree temp_op1 = fold_convert (noncap_type, comp_op1);
+      comp_op2 = fold_convert (noncap_type, comp_op2);
+      comp = fold_build2 (PLUS_EXPR, noncap_type, temp_op1, comp_op2);
+      comp = fold_build2 (PLUS_EXPR, noncap_type, comp,
+			  wide_int_to_tree (noncap_type, offset));
+      comp = fold_build_replace_address_value (comp_op1, comp);
+    }
+  else
+    {
+      comp = fold_build2 (PLUS_EXPR, TREE_TYPE (comp_op1), comp_op1,
+			  fold_convert (TREE_TYPE (comp_op1), comp_op2));
+      comp = fold_build2 (PLUS_EXPR, TREE_TYPE (comp_op1), comp,
+			  wide_int_to_tree (TREE_TYPE (comp_op1), offset));
+    }
+
+  return comp;
+}
+
 /* Rewrites USE (definition of iv used in a nonlinear expression)
    using candidate CAND.  */
 
@@ -7304,6 +7507,36 @@ rewrite_use_nonlinear_expr (struct ivopts_data *data,
   aff_inv.offset = 0;
 
   gimple_seq stmt_list = NULL, seq = NULL;
+  /* Have to do some mangling in order to maintain capability validity.
+     Sometimes we have something like the invariant being 2*&array and aff_var
+     representing -1*&array.  If we were to calculate both values and sum them
+     together the temporaries would be invalid.
+     Similar can happen where we have different SSA_NAME's representing
+     essentially the same metadata.  Hence we check based on whether there is
+     metadata on both the aff_inv and the candidate base rather than on the
+     affine tree directly.
+
+     Another case that can happen is we're representing a capability use in
+     terms of a non-capability candidate.  When this happens the non-capability
+     candidate could leave us with an aff_inv which is essentially "just the
+     metadata" of the use.  That would invalidate the capability due to being
+     far out of bounds.  */
+  tree saved_metadata = NULL_TREE;
+  tree metadata_final_type = NULL_TREE;
+  if (aff_cap_provenance_p (&aff_inv)
+      && (aff_inv.n != 1 || aff_inv.elts[0].coef != 1))
+    {
+      /* N.b. we maintain a separation between the element type and the affine
+	 tree type so that if our element is a pointer and we've generated an
+	 intcap typed induction variable we can avoid using INTCAP typed
+	 operations and the associated indirection via REPLACE_ADDRESS_VALUE.
+
+	 Must do this whenever there is any offset for aff_inv since we can't
+	 tell when we have a very large integral offset in our "candidate" that
+	 was subtracted from the "use" and would take us out of range.  */
+      metadata_final_type = aff_inv.type;
+      saved_metadata = aff_combination_extract_provenance_cap (&aff_inv);
+    }
   tree comp_op1 = aff_combination_to_tree (&aff_inv);
   tree comp_op2 = aff_combination_to_tree (&aff_var);
   gcc_assert (comp_op1 && comp_op2);
@@ -7313,22 +7546,11 @@ rewrite_use_nonlinear_expr (struct ivopts_data *data,
   comp_op2 = force_gimple_operand (comp_op2, &seq, true, NULL);
   gimple_seq_add_seq (&stmt_list, seq);
 
-  if (POINTER_TYPE_P (TREE_TYPE (comp_op2)))
-    std::swap (comp_op1, comp_op2);
-
-  if (POINTER_TYPE_P (TREE_TYPE (comp_op1)))
+  comp = rewrite_combine_base_and_step (comp_op1, comp_op2, offset);
+  if (saved_metadata)
     {
-      comp = fold_build_pointer_plus (comp_op1,
-				      fold_convert (sizetype, comp_op2));
-      comp = fold_build_pointer_plus (comp,
-				      wide_int_to_tree (sizetype, offset));
-    }
-  else
-    {
-      comp = fold_build2 (PLUS_EXPR, TREE_TYPE (comp_op1), comp_op1,
-			  fold_convert (TREE_TYPE (comp_op1), comp_op2));
-      comp = fold_build2 (PLUS_EXPR, TREE_TYPE (comp_op1), comp,
-			  wide_int_to_tree (TREE_TYPE (comp_op1), offset));
+      comp = rewrite_combine_base_and_step (saved_metadata, comp, 0);
+      comp = fold_convert (metadata_final_type, comp);
     }
 
   comp = fold_convert (type, comp);
@@ -7550,15 +7772,20 @@ rewrite_use_compare (struct ivopts_data *data,
     {
       tree var = var_at_stmt (data->current_loop, cand, use->stmt);
       tree var_type = TREE_TYPE (var);
-      gimple_seq stmts;
+      gimple_seq stmts, var_stmts;
 
       if (dump_file && (dump_flags & TDF_DETAILS))
 	{
 	  fprintf (dump_file, "Replacing exit test: ");
 	  print_gimple_stmt (dump_file, use->stmt, 0, TDF_SLIM);
 	}
+      var = force_gimple_operand (fold_drop_capability (var),
+				  &var_stmts, true, NULL_TREE);
+      if (var_stmts)
+	gsi_insert_seq_before (&bsi, var_stmts, GSI_SAME_STMT);
       compare = cp->comp;
-      bound = unshare_expr (fold_convert (var_type, bound));
+      bound = unshare_expr (fold_convert (noncapability_type (var_type),
+					  bound));
       op = force_gimple_operand (bound, &stmts, true, NULL_TREE);
       if (stmts)
 	gsi_insert_seq_on_edge_immediate (

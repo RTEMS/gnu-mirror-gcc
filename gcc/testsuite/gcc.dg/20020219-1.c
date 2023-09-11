@@ -16,6 +16,10 @@
 /* { dg-skip-if "" { aarch64*-*-* && ilp32 } } */
 /* { dg-skip-if "" { "ia64-*-hpux*" } "*" "-mlp64" } */
 /* { dg-skip-if "" { { i?86-*-* x86_64-*-* } && x32 } } */
+/* Fails on capability targets because the value is taken far out of bounds
+   before being brought back into bounds.  That means we end up accessing an
+   invalidated capability.  */
+/* { dg-skip-if "capability taken out of bounds and brought back" { cheri_capability_pure } } */
 
 /* Disable the test entirely for 16-bit targets.  */
 #if __INT_MAX__ > 32767

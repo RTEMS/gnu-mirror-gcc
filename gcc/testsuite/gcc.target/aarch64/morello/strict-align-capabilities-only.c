@@ -1,6 +1,10 @@
 /* { dg-do run } */
 /* { dg-skip-if "" { *-*-* } { "*" } { "-O" "-O1" "-O2" "-O3" } } */
 /* { dg-additional-options "--save-temps" } */
+
+/* Noinline in order to make sure that the `memcpy` in this function does not
+   get copied into `main` and break our scan-assembler-times.  */
+__attribute__ ((noinline))
 __uintcap_t foo (void *p)
 {
   __uintcap_t n;

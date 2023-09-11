@@ -1605,7 +1605,7 @@ get_misalign_in_elems (gimple **seq, loop_vec_info loop_vinfo)
   tree start_addr = vect_create_addr_base_for_vector_ref (loop_vinfo,
 							  stmt_info, seq,
 							  offset);
-  tree type = unsigned_type_for (TREE_TYPE (start_addr));
+  tree type = unsigned_type_for (noncapability_type (TREE_TYPE (start_addr)));
   if (target_align.is_constant (&target_align_c))
     target_align_minus_1 = build_int_cst (type, target_align_c - 1);
   else
@@ -3073,7 +3073,9 @@ vect_create_cond_for_align_checks (loop_vec_info loop_vinfo,
      all zeros followed by all ones.  */
   gcc_assert ((mask != 0) && ((mask & (mask+1)) == 0));
 
-  int_ptrsize_type = signed_type_for (ptr_type_node);
+  /* We want to calculate alignment, this is a property solely of the address
+     value and not of any capability metadata.  */
+  int_ptrsize_type = signed_type_for (noncapability_type (ptr_type_node));
 
   /* Create expression (mask & (dr_1 || ... || dr_n)) where dr_i is the address
      of the first vector of the i'th data reference. */
@@ -3151,8 +3153,8 @@ vect_create_cond_for_unequal_addrs (loop_vec_info loop_vinfo, tree *cond_expr)
   vec_object_pair *pair;
   FOR_EACH_VEC_ELT (pairs, i, pair)
     {
-      tree addr1 = build_fold_addr_expr (pair->first);
-      tree addr2 = build_fold_addr_expr (pair->second);
+      tree addr1 = fold_drop_capability (build_fold_addr_expr (pair->first));
+      tree addr2 = fold_drop_capability (build_fold_addr_expr (pair->second));
       tree part_cond_expr = fold_build2 (NE_EXPR, boolean_type_node,
 					 addr1, addr2);
       chain_cond_expr (cond_expr, part_cond_expr);
