@@ -1126,8 +1126,8 @@ typedef struct
    targeting -mstrict-align, so keep a sensible default in that case.
    Disable this for ccapability-enabled architectures to avoid invalidating a
    capability due to a move_by_pieces operation.   */
-#define MOVE_RATIO(speed) TARGET_MORELLO ? 0 : \
-  (!STRICT_ALIGNMENT ? 2 : (((speed) ? 15 : AARCH64_CALL_RATIO) / 2))
+#define MOVE_RATIO(speed) (TARGET_MORELLO ? 0 : \
+  (!STRICT_ALIGNMENT ? 2 : (((speed) ? 15 : AARCH64_CALL_RATIO) / 2)))
 
 /* For CLEAR_RATIO, when optimizing for size, give a better estimate
    of the length of a memset call, but use the default otherwise.  */
