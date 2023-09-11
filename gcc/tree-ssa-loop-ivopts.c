@@ -5613,8 +5613,8 @@ may_eliminate_iv (struct ivopts_data *data,
     }
 
   cand_value_at (loop, cand, use->stmt, desc->niter, &bnd);
-
-  *bound = fold_convert (TREE_TYPE (cand->iv->base),
+  aff_combination_drop_capability (&bnd);
+  *bound = fold_convert (noncapability_type (TREE_TYPE (cand->iv->base)),
 			 aff_combination_to_tree (&bnd));
   *comp = iv_elimination_compare (data, use);
 
