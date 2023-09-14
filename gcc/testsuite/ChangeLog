@@ -1,3 +1,141 @@
+2023-09-12  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/111340
+	* gcc.target/i386/pr111340.c: New test.
+
+2023-09-12  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/stack-protector-8.c: New test.
+	* gcc.target/aarch64/stack-protector-9.c: Likewise.
+
+2023-09-12  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/sve/pcs/stack_clash_3.c: Avoid redundant probes.
+
+2023-09-12  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/stack-check-prologue-17.c: Expect the probe
+	to be at offset 1024 rather than offset 0.
+	* gcc.target/aarch64/stack-check-prologue-18.c: Likewise.
+	* gcc.target/aarch64/stack-check-prologue-19.c: Likewise.
+
+2023-09-12  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/stack-check-prologue-18.c: New test.
+	* gcc.target/aarch64/stack-check-prologue-19.c: Likewise.
+	* gcc.target/aarch64/stack-check-prologue-20.c: Likewise.
+
+2023-09-12  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/stack-check-prologue-17.c: New test.
+
+2023-09-12  Haochen Gui  <guihaoc@gcc.gnu.org>
+
+	Backported from master:
+	2023-08-31  Haochen Gui  <guihaoc@gcc.gnu.org>
+
+	PR target/96762
+	* gcc.target/powerpc/pr96762.c: New.
+
+2023-09-11  liuhongt  <hongtao.liu@intel.com>
+
+	Backported from master:
+	2023-09-11  liuhongt  <hongtao.liu@intel.com>
+
+	* gcc.target/i386/pr111306.c: New test.
+
+2023-08-30  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-08-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/110914
+	* gcc.c-torture/execute/pr110914.c: New test.
+
+2023-08-30  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-08-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/111015
+	* gcc.dg/pr111015.c: New test.
+
+2023-08-16  liuhongt  <hongtao.liu@intel.com>
+
+	Backported from master:
+	2023-08-16  liuhongt  <hongtao.liu@intel.com>
+
+	* gcc.target/i386/avx2-gather-2.c: Adjust options to keep
+	gather vectorization.
+	* gcc.target/i386/avx2-gather-6.c: Ditto.
+	* gcc.target/i386/avx512f-pr88464-1.c: Ditto.
+	* gcc.target/i386/avx512f-pr88464-5.c: Ditto.
+	* gcc.target/i386/avx512vl-pr88464-1.c: Ditto.
+	* gcc.target/i386/avx512vl-pr88464-11.c: Ditto.
+	* gcc.target/i386/avx512vl-pr88464-3.c: Ditto.
+	* gcc.target/i386/avx512vl-pr88464-9.c: Ditto.
+	* gcc.target/i386/pr88531-1b.c: Ditto.
+	* gcc.target/i386/pr88531-1c.c: Ditto.
+
+2023-08-15  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/110959
+	* gdc.dg/pr110959.d: New test.
+	* gdc.test/runnable/test23010.d: New test.
+
+2023-08-11  Jason Merrill  <jason@redhat.com>
+
+	PR c++/106310
+	* g++.dg/template/template-keyword4.C: New test.
+
+2023-08-11  Jason Merrill  <jason@redhat.com>
+
+	PR c++/106890
+	PR c++/109666
+	* g++.dg/cpp0x/nsdmi-array2.C: New test.
+	* g++.dg/cpp0x/nsdmi-template25.C: New test.
+
+2023-08-11  Jason Merrill  <jason@redhat.com>
+
+	PR c++/108099
+	* g++.dg/ext/int128-7.C: New test.
+	* g++.dg/ext/int128-8.C: New test.
+	* g++.dg/ext/unsigned-typedef2.C: New test.
+	* g++.dg/ext/unsigned-typedef3.C: New test.
+
+2023-08-07  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2023-05-09  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/109761
+	* g++.dg/cpp0x/noexcept78.C: New test.
+
+2023-08-06  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2022-12-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/107397
+	* gfortran.dg/pr107397.f90: Adjust expected diagnostic wording and
+	add space between dg-error string and closing }.
+
+2023-08-06  Steve Kargl  <kargl@gcc.gnu.org>
+
+	Backported from master:
+	2022-12-18  Steve Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/107397
+	* gfortran.dg/pr107397.f90: New test.
+
+2023-08-01  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2023-07-26  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/110741
+	* g++.target/powerpc/pr110741.C: New test.
+
 2023-07-20  Harald Anlauf  <anlauf@gmx.de>
 
 	Backported from master:

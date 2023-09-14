@@ -249,7 +249,7 @@ static cp_token_cache *cp_token_cache_new
 static tree cp_parser_late_noexcept_specifier
   (cp_parser *, tree);
 static void noexcept_override_late_checks
-  (tree, tree);
+  (tree);
 
 static void cp_parser_initial_pragma
   (cp_token *);
@@ -2660,7 +2660,7 @@ static tree cp_parser_objc_struct_declaration
 /* Utility Routines */
 
 static cp_expr cp_parser_lookup_name
-  (cp_parser *, tree, enum tag_types, bool, bool, bool, tree *, location_t);
+  (cp_parser *, tree, enum tag_types, int, bool, bool, tree *, location_t);
 static tree cp_parser_lookup_name_simple
   (cp_parser *, tree, location_t);
 static tree cp_parser_maybe_treat_template_as_class
@@ -18590,7 +18590,7 @@ cp_parser_template_name (cp_parser* parser,
   /* Look up the name.  */
   decl = cp_parser_lookup_name (parser, identifier,
 				tag_type,
-				/*is_template=*/true,
+				/*is_template=*/1 + template_keyword_p,
 				/*is_namespace=*/false,
 				check_dependency_p,
 				/*ambiguous_decls=*/NULL,
@@ -26151,7 +26151,7 @@ cp_parser_class_specifier_1 (cp_parser* parser)
 	  /* The finish_struct call above performed various override checking,
 	     but it skipped unparsed noexcept-specifier operands.  Now that we
 	     have resolved them, check again.  */
-	  noexcept_override_late_checks (type, decl);
+	  noexcept_override_late_checks (decl);
 
 	  /* Remove any member-function parameters from the symbol table.  */
 	  pop_injected_parms ();
@@ -27876,14 +27876,13 @@ cp_parser_late_noexcept_specifier (cp_parser *parser, tree default_arg)
 }
 
 /* Perform late checking of overriding function with respect to their
-   noexcept-specifiers.  TYPE is the class and FNDECL is the function
-   that potentially overrides some virtual function with the same
-   signature.  */
+   noexcept-specifiers.  FNDECL is the member function that potentially
+   overrides some virtual function with the same signature.  */
 
 static void
-noexcept_override_late_checks (tree type, tree fndecl)
+noexcept_override_late_checks (tree fndecl)
 {
-  tree binfo = TYPE_BINFO (type);
+  tree binfo = TYPE_BINFO (DECL_CONTEXT (fndecl));
   tree base_binfo;
 
   if (DECL_STATIC_FUNCTION_P (fndecl))
@@ -30389,7 +30388,7 @@ prefer_type_arg (tag_types tag_type)
    refer to types are ignored.
 
    If IS_TEMPLATE is TRUE, bindings that do not refer to templates are
-   ignored.
+   ignored.  If IS_TEMPLATE IS 2, the 'template' keyword was specified.
 
    If IS_NAMESPACE is TRUE, bindings that do not refer to namespaces
    are ignored.
@@ -30404,7 +30403,7 @@ prefer_type_arg (tag_types tag_type)
 static cp_expr
 cp_parser_lookup_name (cp_parser *parser, tree name,
 		       enum tag_types tag_type,
-		       bool is_template,
+		       int is_template,
 		       bool is_namespace,
 		       bool check_dependency,
 		       tree *ambiguous_decls,
@@ -30589,7 +30588,14 @@ cp_parser_lookup_name (cp_parser *parser, tree name,
       else
 	decl = NULL_TREE;
 
-      if (!decl)
+      /* If we didn't find a member and have dependent bases, the member lookup
+	 is now dependent.  */
+      if (!dep && !decl && any_dependent_bases_p (object_type))
+	dep = true;
+
+      if (dep && is_template == 2)
+	/* The template keyword specifies a dependent template.  */;
+      else if (!decl)
 	/* Look it up in the enclosing context.  DR 141: When looking for a
 	   template-name after -> or ., only consider class templates.  */
 	decl = lookup_name (name, is_namespace ? LOOK_want::NAMESPACE
@@ -30602,8 +30608,7 @@ cp_parser_lookup_name (cp_parser *parser, tree name,
 
       /* If we know we're looking for a type (e.g. A in p->A::x),
 	 mock up a typename.  */
-      if (!decl && object_type && tag_type != none_type
-	  && dependentish_scope_p (object_type))
+      if (!decl && dep && tag_type != none_type)
 	{
 	  tree type = build_typename_type (object_type, name, name,
 					   typename_type);

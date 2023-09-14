@@ -12238,8 +12238,8 @@ output_pic_addr_const (FILE *file, rtx x, int code)
       assemble_name (asm_out_file, buf);
       break;
 
-    case CONST_INT:
-      fprintf (file, HOST_WIDE_INT_PRINT_DEC, INTVAL (x));
+    CASE_CONST_SCALAR_INT:
+      output_addr_const (file, x);
       break;
 
     case CONST:
@@ -18937,7 +18937,7 @@ ix86_vectorize_builtin_scatter (const_tree vectype,
       ? !TARGET_USE_SCATTER_2PARTS
       : (known_eq (TYPE_VECTOR_SUBPARTS (vectype), 4u)
 	 ? !TARGET_USE_SCATTER_4PARTS
-	 : !TARGET_USE_SCATTER))
+	 : !TARGET_USE_SCATTER_8PARTS))
     return NULL_TREE;
 
   if ((TREE_CODE (index_type) != INTEGER_TYPE
