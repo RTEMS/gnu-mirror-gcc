@@ -64,6 +64,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfghooks.h"
 #include "cfgloop.h"
 #include "cfgrtl.h"
+#include "shrink-wrap.h"
 #include "sel-sched.h"
 #include "sched-int.h"
 #include "fold-const.h"
@@ -395,6 +396,7 @@ static const struct riscv_tune_param optimize_size_tune_info = {
   false,					/* use_divmod_expansion */
 };
 
+static bool riscv_avoid_shrink_wrapping_separate ();
 static tree riscv_handle_fndecl_attribute (tree *, tree, tree, int, bool *);
 static tree riscv_handle_type_attribute (tree *, tree, tree, int, bool *);
 static void riscv_legitimize_poly_move (machine_mode, rtx, rtx, rtx);
@@ -5387,7 +5389,7 @@ riscv_print_operand (FILE *file, rtx op, int letter)
 	   1. If the operand is VECTOR REG, we print 'v'(vnsrl.wv).
 	   2. If the operand is CONST_INT/CONST_VECTOR, we print 'i'(vnsrl.wi).
 	   3. If the operand is SCALAR REG, we print 'x'(vnsrl.wx).  */
-	if (riscv_v_ext_vector_mode_p (mode))
+	if (riscv_v_ext_mode_p (mode))
 	  {
 	    if (REG_P (op))
 	      asm_fprintf (file, "v");
@@ -5842,7 +5844,9 @@ riscv_avoid_multi_push (const struct riscv_frame_info *frame)
 {
   if (!TARGET_ZCMP || crtl->calls_eh_return || frame_pointer_needed
       || cfun->machine->interrupt_handler_p || cfun->machine->varargs_size != 0
-      || crtl->args.pretend_args_size != 0 || flag_shrink_wrap_separate
+      || crtl->args.pretend_args_size != 0
+      || (use_shrink_wrapping_separate ()
+	  && !riscv_avoid_shrink_wrapping_separate ())
       || (frame->mask & ~MULTI_PUSH_GPR_MASK))
     return true;
 
@@ -7230,6 +7234,17 @@ riscv_epilogue_uses (unsigned int regno)
   return false;
 }
 
+static bool
+riscv_avoid_shrink_wrapping_separate ()
+{
+  if (riscv_use_save_libcall (&cfun->machine->frame)
+      || cfun->machine->interrupt_handler_p
+      || !cfun->machine->frame.gp_sp_offset.is_constant ())
+    return true;
+
+  return false;
+}
+
 /* Implement TARGET_SHRINK_WRAP_GET_SEPARATE_COMPONENTS.  */
 
 static sbitmap
@@ -7239,9 +7254,7 @@ riscv_get_separate_components (void)
   sbitmap components = sbitmap_alloc (FIRST_PSEUDO_REGISTER);
   bitmap_clear (components);
 
-  if (riscv_use_save_libcall (&cfun->machine->frame)
-      || cfun->machine->interrupt_handler_p
-      || !cfun->machine->frame.gp_sp_offset.is_constant ())
+  if (riscv_avoid_shrink_wrapping_separate ())
     return components;
 
   offset = cfun->machine->frame.gp_sp_offset.to_constant ();
@@ -7708,11 +7721,9 @@ riscv_sched_variable_issue (FILE *, int, rtx_insn *insn, int more)
   if (get_attr_type (insn) == TYPE_GHOST)
     return 0;
 
-#if 0
   /* If we ever encounter an insn with an unknown type, trip
      an assert so we can find and fix this problem.  */
   gcc_assert (get_attr_type (insn) != TYPE_UNKNOWN);
-#endif
 
   return more - 1;
 }
@@ -9162,7 +9173,7 @@ riscv_emit_frm_mode_set (int mode, int prev_mode)
       rtx frm = gen_int_mode (mode, SImode);
 
       if (mode == riscv_vector::FRM_DYN_CALL
-	&& prev_mode != riscv_vector::FRM_DYN)
+	&& prev_mode != riscv_vector::FRM_DYN && STATIC_FRM_P (cfun))
 	/* No need to emit when prev mode is DYN already.  */
 	emit_insn (gen_fsrmsi_restore_volatile (backup_reg));
       else if (mode == riscv_vector::FRM_DYN_EXIT && STATIC_FRM_P (cfun)
@@ -9473,7 +9484,7 @@ riscv_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
 				rtx target, rtx op0, rtx op1,
 				const vec_perm_indices &sel)
 {
-  if (TARGET_VECTOR && riscv_v_ext_vector_mode_p (vmode))
+  if (TARGET_VECTOR && riscv_v_ext_mode_p (vmode))
     return riscv_vector::expand_vec_perm_const (vmode, op_mode, target, op0,
 						op1, sel);
 
