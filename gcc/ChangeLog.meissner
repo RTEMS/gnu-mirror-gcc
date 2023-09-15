@@ -1,4 +1,100 @@
+==================== Branch work134, patch #2 ====================
+
+Add -mno-lxvp and -mno-stxvp.
+
+This patch adds the options -mno-lxvp and -mno-stxvp that control whether GCC
+will generate vector pair load/stores or split the instructions into separate
+vector loads/stores.  These switches are not documented, but are there to allow
+us to look at some places where the paired load/store instructions slow things
+down.
+
+With this patch, GCC will not allow X-form (register + register) vector
+pair loads or stores unless both lxvp and stxvp are being generated.
+
+I also added the lxvp and stxvp command line options to the options that the
+user can enable or disable with #pragma target or attribute target.
+
+The default is to generate the vector pair load/store instructions.
+
+2023-09-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (movoo): Add support for -mno-lxvp and
+	-mno-stxvp.
+	* config/rs6000/rs6000.cc (rs6000_debug_reg_global): If -mdebug=reg,
+	print out whether we are generating lxvp and/or stxvp instructions.
+	(rs6000_option_override_internal): Warn if -mlxvp or -mstxvp was used
+	without -mmma being set.
+	(rs6000_setup_reg_addr_masks structure): Add support for -mno-lxvp and
+	-mno-stxvp.
+	(rs6000_opt_vars): Add lxvp and stxvp command line options.
+	* config/rs6000/rs6000.md (isa attribute): Add lxvp and stxvp isa
+	support.
+	(enabled attribute): Likewise.
+	* config/rs6000/rs6000.opt (-mlxvp): New option.
+	(-mstxvp): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/p10-lxvp-stxvp.c: New test.
+
+==================== Branch work134, patch #1  ====================
+
+Replace UNSPEC_COPYSIGN with copysign RTL
+
+When I first implemented COPYSIGN support in the power7 days, we did not have a
+copysign RTL insn, so I had to use UNSPEC to represent the copysign
+instruction.  This patch removes those UNSPECs, and it uses the native RTL
+copysign insn.
+
+2023-09-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.md (UNSPEC_COPYSIGN): Delete.
+	(copysign<mode>3_fcpsg): Use copysign RTL instead of UNSPEC.
+	(copysign<mode>3_hard): Likewise.
+	(copysign<mode>3_soft): Likewise.
+	* config/rs6000/vector.md (vector_copysign<mode>3): Use copysign RTL
+	instead of UNSPEC.
+	* config/rs6000/vsx.md (vsx_copysign<mode>3): Use copysign RTL instead
+	of UNSPEC.
+
 ==================== Branch work134, baseline ====================
+
+Add ChangeLog.meissner and REVISION.
+
+2023-09-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* REVISION: New file for branch.
+	* ChangeLog.meissner: New file.
+
+gcc/c-family/
+
+	* ChangeLog.meissner: New file.
+
+gcc/c/
+
+	* ChangeLog.meissner: New file.
+
+gcc/cp/
+
+	* ChangeLog.meissner: New file.
+
+gcc/fortran/
+
+	* ChangeLog.meissner: New file.
+
+gcc/testsuite/
+
+	* ChangeLog.meissner: New file.
+
+libgcc/
+
+	* ChangeLog.meissner: New file.
 
 2023-09-15   Michael Meissner  <meissner@linux.ibm.com>
 
