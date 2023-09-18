@@ -558,6 +558,7 @@ enum omp_clause_default_kind {
 
 enum omp_clause_defaultmap_kind {
   OMP_CLAUSE_DEFAULTMAP_CATEGORY_UNSPECIFIED,
+  OMP_CLAUSE_DEFAULTMAP_CATEGORY_ALL,
   OMP_CLAUSE_DEFAULTMAP_CATEGORY_SCALAR,
   OMP_CLAUSE_DEFAULTMAP_CATEGORY_AGGREGATE,
   OMP_CLAUSE_DEFAULTMAP_CATEGORY_ALLOCATABLE,
@@ -1713,6 +1714,8 @@ struct GTY(()) tree_type_common {
   unsigned typeless_storage : 1;
   unsigned empty_flag : 1;
   unsigned indivisible_p : 1;
+  /* TYPE_NO_NAMED_ARGS_STDARG_P for a stdarg function.
+     Or TYPE_INCLUDES_FLEXARRAY for RECORD_TYPE and UNION_TYPE.  */
   unsigned no_named_args_stdarg_p : 1;
   unsigned spare : 1;
 

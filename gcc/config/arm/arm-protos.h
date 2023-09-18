@@ -23,6 +23,7 @@
 #define GCC_ARM_PROTOS_H
 
 #include "sbitmap.h"
+#include "tree.h" /* For ERROR_MARK.  */
 
 rtl_opt_pass *make_pass_insert_bti (gcc::context *ctxt);
 
@@ -83,7 +84,8 @@ extern int arm_split_constant (RTX_CODE, machine_mode, rtx,
 extern int legitimate_pic_operand_p (rtx);
 extern rtx legitimize_pic_address (rtx, machine_mode, rtx, rtx, bool);
 extern rtx legitimize_tls_address (rtx, rtx);
-extern bool arm_legitimate_address_p (machine_mode, rtx, bool);
+extern bool arm_legitimate_address_p (machine_mode, rtx, bool,
+				      code_helper = ERROR_MARK);
 extern int arm_legitimate_address_outer_p (machine_mode, rtx, RTX_CODE, int);
 extern int thumb_legitimate_offset_p (machine_mode, HOST_WIDE_INT);
 extern int thumb1_legitimate_address_p (machine_mode, rtx, int);
@@ -232,6 +234,7 @@ const unsigned int ARM_BUILTIN_CLASS = (1 << ARM_BUILTIN_SHIFT) - 1;
 namespace arm_mve {
   void handle_arm_mve_types_h ();
   void handle_arm_mve_h (bool);
+  tree builtin_decl (unsigned);
   tree resolve_overloaded_builtin (location_t, unsigned int,
 				   vec<tree, va_gc> *);
   bool check_builtin_call (location_t, vec<location_t>, unsigned int,

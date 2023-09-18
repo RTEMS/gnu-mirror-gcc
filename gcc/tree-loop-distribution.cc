@@ -120,6 +120,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "rtl.h"
 #include "memmodel.h"
 #include "optabs.h"
+#include "tree-ssa-loop-niter.h"
 
 
 #define MAX_DATAREFS_NUM \
@@ -1756,11 +1757,12 @@ classify_builtin_st (loop_p loop, partition *partition, data_reference_p dr)
       return;
     }
 
-  poly_uint64 base_offset;
-  unsigned HOST_WIDE_INT const_base_offset;
-  tree base_base = strip_offset (base, &base_offset);
-  if (!base_offset.is_constant (&const_base_offset))
+  tree base_offset;
+  tree base_base;
+  split_constant_offset (base, &base_base, &base_offset);
+  if (!cst_and_fits_in_hwi (base_offset))
     return;
+  unsigned HOST_WIDE_INT const_base_offset = int_cst_value (base_offset);
 
   struct builtin_info *builtin;
   builtin = alloc_builtin (dr, NULL, base, NULL_TREE, size);
@@ -3870,10 +3872,20 @@ loop_distribution::execute (function *fun)
 
 	  bool destroy_p;
 	  int nb_generated_loops, nb_generated_calls;
+	  bool only_patterns = !optimize_loop_for_speed_p (loop)
+			       || !flag_tree_loop_distribution;
+	  /* do not try to distribute loops that are not expected to iterate.  */
+	  if (!only_patterns)
+	    {
+	      HOST_WIDE_INT iterations = estimated_loop_iterations_int (loop);
+	      if (iterations < 0)
+		iterations = likely_max_loop_iterations_int (loop);
+	      if (!iterations)
+		only_patterns = true;
+	    }
 	  nb_generated_loops
 	    = distribute_loop (loop, work_list, cd, &nb_generated_calls,
-			       &destroy_p, (!optimize_loop_for_speed_p (loop)
-					    || !flag_tree_loop_distribution));
+			       &destroy_p, only_patterns);
 	  if (destroy_p)
 	    loops_to_be_destroyed.safe_push (loop);
 

@@ -398,8 +398,11 @@ vect_look_through_possible_promotion (vec_info *vinfo, tree op,
 				      vect_unpromoted_value *unprom,
 				      bool *single_use_p = NULL)
 {
-  tree res = NULL_TREE;
   tree op_type = TREE_TYPE (op);
+  if (!INTEGRAL_TYPE_P (op_type))
+    return NULL_TREE;
+
+  tree res = NULL_TREE;
   unsigned int orig_precision = TYPE_PRECISION (op_type);
   unsigned int min_precision = orig_precision;
   stmt_vec_info caster = NULL;
@@ -780,6 +783,83 @@ vect_split_statement (vec_info *vinfo, stmt_vec_info stmt2_info, tree new_rhs,
 
       return true;
     }
+}
+
+/* Look for the following pattern
+	X = x[i]
+	Y = y[i]
+	DIFF = X - Y
+	DAD = ABS_EXPR<DIFF>
+
+   ABS_STMT should point to a statement of code ABS_EXPR or ABSU_EXPR.
+   HALF_TYPE and UNPROM will be set should the statement be found to
+   be a widened operation.
+   DIFF_STMT will be set to the MINUS_EXPR
+   statement that precedes the ABS_STMT unless vect_widened_op_tree
+   succeeds.
+ */
+static bool
+vect_recog_absolute_difference (vec_info *vinfo, gassign *abs_stmt,
+				tree *half_type,
+				vect_unpromoted_value unprom[2],
+				gassign **diff_stmt)
+{
+  if (!abs_stmt)
+    return false;
+
+  /* FORNOW.  Can continue analyzing the def-use chain when this stmt in a phi
+     inside the loop (in case we are analyzing an outer-loop).  */
+  enum tree_code code = gimple_assign_rhs_code (abs_stmt);
+  if (code != ABS_EXPR && code != ABSU_EXPR)
+    return false;
+
+  tree abs_oprnd = gimple_assign_rhs1 (abs_stmt);
+  tree abs_type = TREE_TYPE (abs_oprnd);
+  if (!abs_oprnd)
+    return false;
+  if (!ANY_INTEGRAL_TYPE_P (abs_type)
+      || TYPE_OVERFLOW_WRAPS (abs_type)
+      || TYPE_UNSIGNED (abs_type))
+    return false;
+
+  /* Peel off conversions from the ABS input.  This can involve sign
+     changes (e.g. from an unsigned subtraction to a signed ABS input)
+     or signed promotion, but it can't include unsigned promotion.
+     (Note that ABS of an unsigned promotion should have been folded
+     away before now anyway.)  */
+  vect_unpromoted_value unprom_diff;
+  abs_oprnd = vect_look_through_possible_promotion (vinfo, abs_oprnd,
+						    &unprom_diff);
+  if (!abs_oprnd)
+    return false;
+  if (TYPE_PRECISION (unprom_diff.type) != TYPE_PRECISION (abs_type)
+      && TYPE_UNSIGNED (unprom_diff.type))
+    return false;
+
+  /* We then detect if the operand of abs_expr is defined by a minus_expr.  */
+  stmt_vec_info diff_stmt_vinfo = vect_get_internal_def (vinfo, abs_oprnd);
+  if (!diff_stmt_vinfo)
+    return false;
+
+  /* FORNOW.  Can continue analyzing the def-use chain when this stmt in a phi
+     inside the loop (in case we are analyzing an outer-loop).  */
+  if (vect_widened_op_tree (vinfo, diff_stmt_vinfo,
+			    MINUS_EXPR, IFN_VEC_WIDEN_MINUS,
+			    false, 2, unprom, half_type))
+    return true;
+
+  /* Failed to find a widen operation so we check for a regular MINUS_EXPR.  */
+  gassign *diff = dyn_cast <gassign *> (STMT_VINFO_STMT (diff_stmt_vinfo));
+  if (diff_stmt && diff
+      && gimple_assign_rhs_code (diff) == MINUS_EXPR
+      && TYPE_OVERFLOW_UNDEFINED (TREE_TYPE (abs_oprnd)))
+    {
+      *diff_stmt = diff;
+      *half_type = NULL_TREE;
+      return true;
+    }
+
+  return false;
 }
 
 /* Convert UNPROM to TYPE and return the result, adding new statements
@@ -1320,41 +1400,41 @@ vect_recog_sad_pattern (vec_info *vinfo,
   /* FORNOW.  Can continue analyzing the def-use chain when this stmt in a phi
      inside the loop (in case we are analyzing an outer-loop).  */
   gassign *abs_stmt = dyn_cast <gassign *> (abs_stmt_vinfo->stmt);
-  if (!abs_stmt
-      || (gimple_assign_rhs_code (abs_stmt) != ABS_EXPR
-	  && gimple_assign_rhs_code (abs_stmt) != ABSU_EXPR))
-    return NULL;
-
-  tree abs_oprnd = gimple_assign_rhs1 (abs_stmt);
-  tree abs_type = TREE_TYPE (abs_oprnd);
-  if (TYPE_UNSIGNED (abs_type))
-    return NULL;
-
-  /* Peel off conversions from the ABS input.  This can involve sign
-     changes (e.g. from an unsigned subtraction to a signed ABS input)
-     or signed promotion, but it can't include unsigned promotion.
-     (Note that ABS of an unsigned promotion should have been folded
-     away before now anyway.)  */
-  vect_unpromoted_value unprom_diff;
-  abs_oprnd = vect_look_through_possible_promotion (vinfo, abs_oprnd,
-						    &unprom_diff);
-  if (!abs_oprnd)
-    return NULL;
-  if (TYPE_PRECISION (unprom_diff.type) != TYPE_PRECISION (abs_type)
-      && TYPE_UNSIGNED (unprom_diff.type))
-    return NULL;
-
-  /* We then detect if the operand of abs_expr is defined by a minus_expr.  */
-  stmt_vec_info diff_stmt_vinfo = vect_get_internal_def (vinfo, abs_oprnd);
-  if (!diff_stmt_vinfo)
-    return NULL;
-
-  /* FORNOW.  Can continue analyzing the def-use chain when this stmt in a phi
-     inside the loop (in case we are analyzing an outer-loop).  */
   vect_unpromoted_value unprom[2];
-  if (!vect_widened_op_tree (vinfo, diff_stmt_vinfo, MINUS_EXPR,
-			     IFN_VEC_WIDEN_MINUS,
-			     false, 2, unprom, &half_type))
+
+  if (!abs_stmt)
+    {
+      gcall *abd_stmt = dyn_cast <gcall *> (abs_stmt_vinfo->stmt);
+      if (!abd_stmt
+	  || !gimple_call_internal_p (abd_stmt)
+	  || gimple_call_num_args (abd_stmt) != 2)
+	return NULL;
+
+      tree abd_oprnd0 = gimple_call_arg (abd_stmt, 0);
+      tree abd_oprnd1 = gimple_call_arg (abd_stmt, 1);
+
+      if (gimple_call_internal_fn (abd_stmt) == IFN_ABD)
+	{
+	  if (!vect_look_through_possible_promotion (vinfo, abd_oprnd0,
+						     &unprom[0])
+	      || !vect_look_through_possible_promotion (vinfo, abd_oprnd1,
+							&unprom[1]))
+	    return NULL;
+	}
+      else if (gimple_call_internal_fn (abd_stmt) == IFN_VEC_WIDEN_ABD)
+	{
+	  unprom[0].op = abd_oprnd0;
+	  unprom[0].type = TREE_TYPE (abd_oprnd0);
+	  unprom[1].op = abd_oprnd1;
+	  unprom[1].type = TREE_TYPE (abd_oprnd1);
+	}
+      else
+	return NULL;
+
+      half_type = unprom[0].type;
+    }
+  else if (!vect_recog_absolute_difference (vinfo, abs_stmt, &half_type,
+					    unprom, NULL))
     return NULL;
 
   vect_pattern_detected ("vect_recog_sad_pattern", last_stmt);
@@ -1374,6 +1454,132 @@ vect_recog_sad_pattern (vec_info *vinfo,
 					      sad_oprnd[1], plus_oprnd1);
 
   return pattern_stmt;
+}
+
+/* Function vect_recog_abd_pattern
+
+   Try to find the following ABsolute Difference (ABD) or
+   widening ABD (WIDEN_ABD) pattern:
+
+   TYPE1 x;
+   TYPE2 y;
+   TYPE3 x_cast = (TYPE3) x;		  // widening or no-op
+   TYPE3 y_cast = (TYPE3) y;		  // widening or no-op
+   TYPE3 diff = x_cast - y_cast;
+   TYPE4 diff_cast = (TYPE4) diff;	  // widening or no-op
+   TYPE5 abs = ABS(U)_EXPR <diff_cast>;
+
+   WIDEN_ABD exists to optimize the case where TYPE4 is at least
+   twice as wide as TYPE3.
+
+   Input:
+
+   * STMT_VINFO: The stmt from which the pattern search begins
+
+   Output:
+
+   * TYPE_OUT: The type of the output of this pattern
+
+   * Return value: A new stmt that will be used to replace the sequence of
+     stmts that constitute the pattern, principally:
+	out = IFN_ABD (x, y)
+	out = IFN_WIDEN_ABD (x, y)
+ */
+
+static gimple *
+vect_recog_abd_pattern (vec_info *vinfo,
+			stmt_vec_info stmt_vinfo, tree *type_out)
+{
+  gassign *last_stmt = dyn_cast <gassign *> (STMT_VINFO_STMT (stmt_vinfo));
+  if (!last_stmt)
+    return NULL;
+
+  tree out_type = TREE_TYPE (gimple_assign_lhs (last_stmt));
+
+  vect_unpromoted_value unprom[2];
+  gassign *diff_stmt;
+  tree half_type;
+  if (!vect_recog_absolute_difference (vinfo, last_stmt, &half_type,
+				       unprom, &diff_stmt))
+    return NULL;
+
+  tree abd_in_type, abd_out_type;
+
+  if (half_type)
+    {
+      abd_in_type = half_type;
+      abd_out_type = abd_in_type;
+    }
+  else
+    {
+      unprom[0].op = gimple_assign_rhs1 (diff_stmt);
+      unprom[1].op = gimple_assign_rhs2 (diff_stmt);
+      abd_in_type = signed_type_for (out_type);
+      abd_out_type = abd_in_type;
+    }
+
+  tree vectype_in = get_vectype_for_scalar_type (vinfo, abd_in_type);
+  if (!vectype_in)
+    return NULL;
+
+  internal_fn ifn = IFN_ABD;
+  tree vectype_out = vectype_in;
+
+  if (TYPE_PRECISION (out_type) >= TYPE_PRECISION (abd_in_type) * 2
+      && stmt_vinfo->min_output_precision >= TYPE_PRECISION (abd_in_type) * 2)
+    {
+      tree mid_type
+	= build_nonstandard_integer_type (TYPE_PRECISION (abd_in_type) * 2,
+					  TYPE_UNSIGNED (abd_in_type));
+      tree mid_vectype = get_vectype_for_scalar_type (vinfo, mid_type);
+
+      code_helper dummy_code;
+      int dummy_int;
+      auto_vec<tree> dummy_vec;
+      if (mid_vectype
+	  && supportable_widening_operation (vinfo, IFN_VEC_WIDEN_ABD,
+					     stmt_vinfo, mid_vectype,
+					     vectype_in,
+					     &dummy_code, &dummy_code,
+					     &dummy_int, &dummy_vec))
+	{
+	  ifn = IFN_VEC_WIDEN_ABD;
+	  abd_out_type = mid_type;
+	  vectype_out = mid_vectype;
+	}
+    }
+
+  if (ifn == IFN_ABD
+      && !direct_internal_fn_supported_p (ifn, vectype_in,
+					  OPTIMIZE_FOR_SPEED))
+    return NULL;
+
+  vect_pattern_detected ("vect_recog_abd_pattern", last_stmt);
+
+  tree abd_oprnds[2];
+  vect_convert_inputs (vinfo, stmt_vinfo, 2, abd_oprnds,
+		       abd_in_type, unprom, vectype_in);
+
+  *type_out = get_vectype_for_scalar_type (vinfo, out_type);
+
+  tree abd_result = vect_recog_temp_ssa_var (abd_out_type, NULL);
+  gcall *abd_stmt = gimple_build_call_internal (ifn, 2,
+						abd_oprnds[0], abd_oprnds[1]);
+  gimple_call_set_lhs (abd_stmt, abd_result);
+  gimple_set_location (abd_stmt, gimple_location (last_stmt));
+
+  gimple *stmt = abd_stmt;
+  if (TYPE_PRECISION (abd_in_type) == TYPE_PRECISION (abd_out_type)
+      && TYPE_PRECISION (abd_out_type) < TYPE_PRECISION (out_type)
+      && !TYPE_UNSIGNED (abd_out_type))
+    {
+      tree unsign = unsigned_type_for (abd_out_type);
+      tree unsign_vectype = get_vectype_for_scalar_type (vinfo, unsign);
+      stmt = vect_convert_output (vinfo, stmt_vinfo, unsign, stmt,
+				  unsign_vectype);
+    }
+
+  return vect_convert_output (vinfo, stmt_vinfo, out_type, stmt, vectype_out);
 }
 
 /* Recognize an operation that performs ORIG_CODE on widened inputs,
@@ -1512,6 +1718,68 @@ vect_recog_widen_minus_pattern (vec_info *vinfo, stmt_vec_info last_stmt_info,
   return vect_recog_widen_op_pattern (vinfo, last_stmt_info, type_out,
 				      MINUS_EXPR, IFN_VEC_WIDEN_MINUS,
 				      false, "vect_recog_widen_minus_pattern");
+}
+
+/* Try to detect abd on widened inputs, converting IFN_ABD
+   to IFN_VEC_WIDEN_ABD.  */
+static gimple *
+vect_recog_widen_abd_pattern (vec_info *vinfo, stmt_vec_info stmt_vinfo,
+			      tree *type_out)
+{
+  gassign *last_stmt = dyn_cast <gassign *> (STMT_VINFO_STMT (stmt_vinfo));
+  if (!last_stmt || !CONVERT_EXPR_CODE_P (gimple_assign_rhs_code (last_stmt)))
+    return NULL;
+
+  tree last_rhs = gimple_assign_rhs1 (last_stmt);
+
+  tree in_type = TREE_TYPE (last_rhs);
+  tree out_type = TREE_TYPE (gimple_assign_lhs (last_stmt));
+  if (!INTEGRAL_TYPE_P (in_type)
+      || !INTEGRAL_TYPE_P (out_type)
+      || TYPE_PRECISION (in_type) * 2 != TYPE_PRECISION (out_type)
+      || !TYPE_UNSIGNED (in_type))
+    return NULL;
+
+  vect_unpromoted_value unprom;
+  tree op = vect_look_through_possible_promotion (vinfo, last_rhs, &unprom);
+  if (!op || TYPE_PRECISION (TREE_TYPE (op)) != TYPE_PRECISION (in_type))
+    return NULL;
+
+  stmt_vec_info abd_pattern_vinfo = vect_get_internal_def (vinfo, op);
+  if (!abd_pattern_vinfo)
+    return NULL;
+
+  abd_pattern_vinfo = vect_stmt_to_vectorize (abd_pattern_vinfo);
+  gcall *abd_stmt = dyn_cast <gcall *> (STMT_VINFO_STMT (abd_pattern_vinfo));
+  if (!abd_stmt
+      || !gimple_call_internal_p (abd_stmt)
+      || gimple_call_internal_fn (abd_stmt) != IFN_ABD)
+    return NULL;
+
+  tree vectype_in = get_vectype_for_scalar_type (vinfo, in_type);
+  tree vectype_out = get_vectype_for_scalar_type (vinfo, out_type);
+
+  code_helper dummy_code;
+  int dummy_int;
+  auto_vec<tree> dummy_vec;
+  if (!supportable_widening_operation (vinfo, IFN_VEC_WIDEN_ABD, stmt_vinfo,
+				       vectype_out, vectype_in,
+				       &dummy_code, &dummy_code,
+				       &dummy_int, &dummy_vec))
+    return NULL;
+
+  vect_pattern_detected ("vect_recog_widen_abd_pattern", last_stmt);
+
+  *type_out = vectype_out;
+
+  tree abd_oprnd0 = gimple_call_arg (abd_stmt, 0);
+  tree abd_oprnd1 = gimple_call_arg (abd_stmt, 1);
+  tree widen_abd_result = vect_recog_temp_ssa_var (out_type, NULL);
+  gcall *widen_abd_stmt = gimple_build_call_internal (IFN_VEC_WIDEN_ABD, 2,
+						      abd_oprnd0, abd_oprnd1);
+  gimple_call_set_lhs (widen_abd_stmt, widen_abd_result);
+  gimple_set_location (widen_abd_stmt, gimple_location (last_stmt));
+  return widen_abd_stmt;
 }
 
 /* Function vect_recog_ctz_ffs_pattern
@@ -2298,7 +2566,7 @@ vect_recog_widen_sum_pattern (vec_info *vinfo,
    Widening with mask first, shift later:
    container = (type_out) container;
    masked = container & (((1 << bitsize) - 1) << bitpos);
-   result = patt2 >> masked;
+   result = masked >> bitpos;
 
    Widening with shift first, mask last:
    container = (type_out) container;
@@ -2309,6 +2577,15 @@ vect_recog_widen_sum_pattern (vec_info *vinfo,
    masked = container & (((1 << bitsize) - 1) << bitpos);
    result = masked >> bitpos;
    result = (type_out) result;
+
+   If the bitfield is signed and it's wider than type_out, we need to
+   keep the result sign-extended:
+   container = (type) container;
+   masked = container << (prec - bitsize - bitpos);
+   result = (type_out) (masked >> (prec - bitsize));
+
+   Here type is the signed variant of the wider of type_out and the type
+   of container.
 
    The shifting is always optional depending on whether bitpos != 0.
 
@@ -2368,14 +2645,22 @@ vect_recog_bitfield_ref_pattern (vec_info *vinfo, stmt_vec_info stmt_info,
   if (BYTES_BIG_ENDIAN)
     shift_n = prec - shift_n - mask_width;
 
+  bool ref_sext = (!TYPE_UNSIGNED (TREE_TYPE (bf_ref)) &&
+		   TYPE_PRECISION (ret_type) > mask_width);
+  bool load_widen = (TYPE_PRECISION (TREE_TYPE (container)) <
+		     TYPE_PRECISION (ret_type));
+
   /* We move the conversion earlier if the loaded type is smaller than the
-     return type to enable the use of widening loads.  */
-  if (TYPE_PRECISION (TREE_TYPE (container)) < TYPE_PRECISION (ret_type)
-      && !useless_type_conversion_p (TREE_TYPE (container), ret_type))
+     return type to enable the use of widening loads.  And if we need a
+     sign extension, we need to convert the loaded value early to a signed
+     type as well.  */
+  if (ref_sext || load_widen)
     {
-      pattern_stmt
-	= gimple_build_assign (vect_recog_temp_ssa_var (ret_type),
-			       NOP_EXPR, container);
+      tree type = load_widen ? ret_type : container_type;
+      if (ref_sext)
+	type = gimple_signed_type (type);
+      pattern_stmt = gimple_build_assign (vect_recog_temp_ssa_var (type),
+					  NOP_EXPR, container);
       container = gimple_get_lhs (pattern_stmt);
       container_type = TREE_TYPE (container);
       prec = tree_to_uhwi (TYPE_SIZE (container_type));
@@ -2403,7 +2688,7 @@ vect_recog_bitfield_ref_pattern (vec_info *vinfo, stmt_vec_info stmt_info,
     shift_first = true;
 
   tree result;
-  if (shift_first)
+  if (shift_first && !ref_sext)
     {
       tree shifted = container;
       if (shift_n)
@@ -2426,14 +2711,27 @@ vect_recog_bitfield_ref_pattern (vec_info *vinfo, stmt_vec_info stmt_info,
     }
   else
     {
-      tree mask = wide_int_to_tree (container_type,
-				    wi::shifted_mask (shift_n, mask_width,
-						      false, prec));
-      pattern_stmt
-	= gimple_build_assign (vect_recog_temp_ssa_var (container_type),
-			       BIT_AND_EXPR, container, mask);
-      tree masked = gimple_assign_lhs (pattern_stmt);
+      tree temp = vect_recog_temp_ssa_var (container_type);
+      if (!ref_sext)
+	{
+	  tree mask = wide_int_to_tree (container_type,
+					wi::shifted_mask (shift_n,
+							  mask_width,
+							  false, prec));
+	  pattern_stmt = gimple_build_assign (temp, BIT_AND_EXPR,
+					      container, mask);
+	}
+      else
+	{
+	  HOST_WIDE_INT shl = prec - shift_n - mask_width;
+	  shift_n += shl;
+	  pattern_stmt = gimple_build_assign (temp, LSHIFT_EXPR,
+					      container,
+					      build_int_cst (sizetype,
+							     shl));
+	}
 
+      tree masked = gimple_assign_lhs (pattern_stmt);
       append_pattern_def_seq (vinfo, stmt_info, pattern_stmt, vectype);
       pattern_stmt
 	= gimple_build_assign (vect_recog_temp_ssa_var (container_type),
@@ -2801,8 +3099,45 @@ vect_recog_over_widening_pattern (vec_info *vinfo,
   tree ops[3] = {};
   for (unsigned int i = 1; i < first_op; ++i)
     ops[i - 1] = gimple_op (last_stmt, i);
+  /* For right shifts limit the shift operand.  */
   vect_convert_inputs (vinfo, last_stmt_info, nops, &ops[first_op - 1],
 		       op_type, &unprom[0], op_vectype);
+
+  /* Limit shift operands.  */
+  if (code == RSHIFT_EXPR)
+    {
+      wide_int min_value, max_value;
+      if (TREE_CODE (ops[1]) == INTEGER_CST)
+	ops[1] = wide_int_to_tree (op_type,
+				   wi::umin (wi::to_wide (ops[1]),
+					     new_precision - 1));
+      else if (!vect_get_range_info (ops[1], &min_value, &max_value)
+	       || wi::ge_p (max_value, new_precision, TYPE_SIGN (op_type)))
+	{
+	  /* ???  Note the following bad for SLP as that only supports
+	     same argument widened shifts and it un-CSEs same arguments.  */
+	  tree new_var = vect_recog_temp_ssa_var (op_type, NULL);
+	  gimple *pattern_stmt
+	    = gimple_build_assign (new_var, MIN_EXPR, ops[1],
+				   build_int_cst (op_type, new_precision - 1));
+	  gimple_set_location (pattern_stmt, gimple_location (last_stmt));
+	  if (ops[1] == unprom[1].op && unprom[1].dt == vect_external_def)
+	    {
+	      if (edge e = vect_get_external_def_edge (vinfo, ops[1]))
+		{
+		  basic_block new_bb
+		    = gsi_insert_on_edge_immediate (e, pattern_stmt);
+		  gcc_assert (!new_bb);
+		}
+	      else
+		return NULL;
+	    }
+	  else
+	    append_pattern_def_seq (vinfo, last_stmt_info, pattern_stmt,
+				    op_vectype);
+	  ops[1] = new_var;
+	}
+    }
 
   /* Use the operation to produce a result of type OP_TYPE.  */
   tree new_var = vect_recog_temp_ssa_var (op_type, NULL);
@@ -3458,8 +3793,8 @@ vect_recog_rotate_pattern (vec_info *vinfo,
     return NULL;
 
   if (TREE_CODE (oprnd0) != SSA_NAME
-      || TYPE_PRECISION (TREE_TYPE (lhs)) != TYPE_PRECISION (type)
-      || !INTEGRAL_TYPE_P (type))
+      || !INTEGRAL_TYPE_P (type)
+      || TYPE_PRECISION (TREE_TYPE (lhs)) != TYPE_PRECISION (type))
     return NULL;
 
   stmt_vec_info def_stmt_info;
@@ -3711,6 +4046,7 @@ vect_recog_vector_vector_shift_pattern (vec_info *vinfo,
   if (TREE_CODE (oprnd0) != SSA_NAME
       || TREE_CODE (oprnd1) != SSA_NAME
       || TYPE_MODE (TREE_TYPE (oprnd0)) == TYPE_MODE (TREE_TYPE (oprnd1))
+      || !INTEGRAL_TYPE_P (TREE_TYPE (oprnd0))
       || !type_has_mode_precision_p (TREE_TYPE (oprnd1))
       || TYPE_PRECISION (TREE_TYPE (lhs))
 	 != TYPE_PRECISION (TREE_TYPE (oprnd0)))
@@ -5806,7 +6142,9 @@ vect_recog_gather_scatter_pattern (vec_info *vinfo,
     mask = vect_convert_mask_for_vectype (mask, gs_vectype, stmt_info,
 					  loop_vinfo);
   else if (gs_info.ifn == IFN_MASK_SCATTER_STORE
-	   || gs_info.ifn == IFN_MASK_GATHER_LOAD)
+	   || gs_info.ifn == IFN_MASK_GATHER_LOAD
+	   || gs_info.ifn == IFN_MASK_LEN_SCATTER_STORE
+	   || gs_info.ifn == IFN_MASK_LEN_GATHER_LOAD)
     mask = build_int_cst (TREE_TYPE (truth_type_for (gs_vectype)), -1);
 
   /* Get the invariant base and non-invariant offset, converting the
@@ -6452,6 +6790,7 @@ struct vect_recog_func
 static vect_recog_func vect_vect_recog_func_ptrs[] = {
   { vect_recog_bitfield_ref_pattern, "bitfield_ref" },
   { vect_recog_bit_insert_pattern, "bit_insert" },
+  { vect_recog_abd_pattern, "abd" },
   { vect_recog_over_widening_pattern, "over_widening" },
   /* Must come after over_widening, which narrows the shift as much as
      possible beforehand.  */
@@ -6480,6 +6819,7 @@ static vect_recog_func vect_vect_recog_func_ptrs[] = {
   { vect_recog_mask_conversion_pattern, "mask_conversion" },
   { vect_recog_widen_plus_pattern, "widen_plus" },
   { vect_recog_widen_minus_pattern, "widen_minus" },
+  { vect_recog_widen_abd_pattern, "widen_abd" },
   /* These must come after the double widening ones.  */
 };
 

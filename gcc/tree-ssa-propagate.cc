@@ -532,6 +532,34 @@ struct prop_stats_d
 
 static struct prop_stats_d prop_stats;
 
+// range_query default methods to drive from a value_of_expr() ranther than
+// range_of_expr.
+
+tree
+substitute_and_fold_engine::value_on_edge (edge, tree expr)
+{
+  return value_of_expr (expr);
+}
+
+tree
+substitute_and_fold_engine::value_of_stmt (gimple *stmt, tree name)
+{
+  if (!name)
+    name = gimple_get_lhs (stmt);
+
+  gcc_checking_assert (!name || name == gimple_get_lhs (stmt));
+
+  if (name)
+    return value_of_expr (name);
+  return NULL_TREE;
+}
+
+bool
+substitute_and_fold_engine::range_of_expr (vrange &, tree, gimple *)
+{
+  return false;
+}
+
 /* Replace USE references in statement STMT with the values stored in
    PROP_VALUE. Return true if at least one reference was replaced.  */
 
@@ -1004,11 +1032,12 @@ substitute_and_fold_engine::substitute_and_fold (basic_block block)
 
 
 /* Return true if we may propagate ORIG into DEST, false otherwise.
-   If DEST_NOT_PHI_ARG_P is true then assume the propagation does
-   not happen into a PHI argument which relaxes some constraints.  */
+   If DEST_NOT_ABNORMAL_PHI_EDGE_P is true then assume the propagation does
+   not happen into a PHI argument which flows in from an abnormal edge
+   which relaxes some constraints.  */
 
 bool
-may_propagate_copy (tree dest, tree orig, bool dest_not_phi_arg_p)
+may_propagate_copy (tree dest, tree orig, bool dest_not_abnormal_phi_edge_p)
 {
   tree type_d = TREE_TYPE (dest);
   tree type_o = TREE_TYPE (orig);
@@ -1028,9 +1057,9 @@ may_propagate_copy (tree dest, tree orig, bool dest_not_phi_arg_p)
 	   && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (orig))
     return false;
   /* Similarly if DEST flows in from an abnormal edge then the copy cannot be
-     propagated.  If we know we do not propagate into a PHI argument this
+     propagated.  If we know we do not propagate into such a PHI argument this
      does not apply.  */
-  else if (!dest_not_phi_arg_p
+  else if (!dest_not_abnormal_phi_edge_p
 	   && TREE_CODE (dest) == SSA_NAME
 	   && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (dest))
     return false;
@@ -1134,8 +1163,13 @@ void
 propagate_value (use_operand_p op_p, tree val)
 {
   if (flag_checking)
-    gcc_assert (may_propagate_copy (USE_FROM_PTR (op_p), val,
-				    !is_a <gphi *> (USE_STMT (op_p))));
+    {
+      bool ab = (is_a <gphi *> (USE_STMT (op_p))
+		 && (gimple_phi_arg_edge (as_a <gphi *> (USE_STMT (op_p)),
+					  PHI_ARG_INDEX_FROM_USE (op_p))
+		     ->flags & EDGE_ABNORMAL));
+      gcc_assert (may_propagate_copy (USE_FROM_PTR (op_p), val, !ab));
+    }
   replace_exp (op_p, val);
 }
 

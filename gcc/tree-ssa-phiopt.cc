@@ -63,7 +63,13 @@ single_non_singleton_phi_for_edges (gimple_seq seq, edge e0, edge e1)
   gimple_stmt_iterator i;
   gphi *phi = NULL;
   if (gimple_seq_singleton_p (seq))
-    return as_a <gphi *> (gsi_stmt (gsi_start (seq)));
+    {
+      phi = as_a <gphi *> (gsi_stmt (gsi_start (seq)));
+      /* Never return virtual phis.  */
+      if (virtual_operand_p (gimple_phi_result (phi)))
+	return NULL;
+      return phi;
+    }
   for (i = gsi_start (seq); !gsi_end_p (i); gsi_next (&i))
     {
       gphi *p = as_a <gphi *> (gsi_stmt (i));
@@ -71,6 +77,10 @@ single_non_singleton_phi_for_edges (gimple_seq seq, edge e0, edge e1)
       if (operand_equal_for_phi_arg_p (gimple_phi_arg_def (p, e0->dest_idx),
 				       gimple_phi_arg_def (p, e1->dest_idx)))
 	continue;
+
+      /* Punt on virtual phis with different arguments from the edges.  */
+      if (virtual_operand_p (gimple_phi_result (p)))
+	return NULL;
 
       /* If we already have a PHI that has the two edge arguments are
 	 different, then return it is not a singleton for these PHIs. */
@@ -486,7 +496,6 @@ gimple_simplify_phiopt (bool early_p, tree type, gimple *comp_stmt,
 			tree arg0, tree arg1,
 			gimple_seq *seq)
 {
-  tree result;
   gimple_seq seq1 = NULL;
   enum tree_code comp_code = gimple_cond_code (comp_stmt);
   location_t loc = gimple_location (comp_stmt);
@@ -516,18 +525,29 @@ gimple_simplify_phiopt (bool early_p, tree type, gimple *comp_stmt,
 
   if (op.resimplify (&seq1, follow_all_ssa_edges))
     {
-      /* Early we want only to allow some generated tree codes. */
-      if (!early_p
-	  || phiopt_early_allow (seq1, op))
+      bool allowed = !early_p || phiopt_early_allow (seq1, op);
+      tree result = maybe_push_res_to_seq (&op, &seq1);
+      if (dump_file && (dump_flags & TDF_FOLDING))
 	{
-	  result = maybe_push_res_to_seq (&op, &seq1);
+	  fprintf (dump_file, "\nphiopt match-simplify back:\n");
+	  if (seq1)
+	    print_gimple_seq (dump_file, seq1, 0, TDF_VOPS|TDF_MEMSYMS);
+	  fprintf (dump_file, "result: ");
 	  if (result)
-	    {
-	      if (loc != UNKNOWN_LOCATION)
-		annotate_all_with_location (seq1, loc);
-	      gimple_seq_add_seq_without_update (seq, seq1);
-	      return result;
-	    }
+	    print_generic_expr (dump_file, result);
+	  else
+	    fprintf (dump_file, " (none)");
+	  fprintf (dump_file, "\n");
+	  if (!allowed)
+	    fprintf (dump_file, "rejected because early\n");
+	}
+      /* Early we want only to allow some generated tree codes. */
+      if (allowed && result)
+	{
+	  if (loc != UNKNOWN_LOCATION)
+	    annotate_all_with_location (seq1, loc);
+	  gimple_seq_add_seq_without_update (seq, seq1);
+	  return result;
 	}
     }
   gimple_seq_discard (seq1);
@@ -559,18 +579,29 @@ gimple_simplify_phiopt (bool early_p, tree type, gimple *comp_stmt,
 
   if (op1.resimplify (&seq1, follow_all_ssa_edges))
     {
-      /* Early we want only to allow some generated tree codes. */
-      if (!early_p
-	  || phiopt_early_allow (seq1, op1))
+      bool allowed = !early_p || phiopt_early_allow (seq1, op1);
+      tree result = maybe_push_res_to_seq (&op1, &seq1);
+      if (dump_file && (dump_flags & TDF_FOLDING))
 	{
-	  result = maybe_push_res_to_seq (&op1, &seq1);
+	  fprintf (dump_file, "\nphiopt match-simplify back:\n");
+	  if (seq1)
+	    print_gimple_seq (dump_file, seq1, 0, TDF_VOPS|TDF_MEMSYMS);
+	  fprintf (dump_file, "result: ");
 	  if (result)
-	    {
-	      if (loc != UNKNOWN_LOCATION)
-		annotate_all_with_location (seq1, loc);
-	      gimple_seq_add_seq_without_update (seq, seq1);
-	      return result;
-	    }
+	    print_generic_expr (dump_file, result);
+	  else
+	    fprintf (dump_file, " (none)");
+	  fprintf (dump_file, "\n");
+	  if (!allowed)
+	    fprintf (dump_file, "rejected because early\n");
+	}
+      /* Early we want only to allow some generated tree codes. */
+      if (allowed && result)
+	{
+	  if (loc != UNKNOWN_LOCATION)
+	    annotate_all_with_location (seq1, loc);
+	  gimple_seq_add_seq_without_update (seq, seq1);
+	  return result;
 	}
     }
   gimple_seq_discard (seq1);
@@ -630,8 +661,11 @@ empty_bb_or_one_feeding_into_p (basic_block bb,
       || gimple_has_side_effects (stmt_to_move))
     return false;
 
-  if (gimple_uses_undefined_value_p (stmt_to_move))
-    return false;
+  ssa_op_iter it;
+  tree use;
+  FOR_EACH_SSA_TREE_OPERAND (use, stmt_to_move, it, SSA_OP_USE)
+    if (ssa_name_maybe_undef_p (use))
+      return false;
 
   /* Allow assignments but allow some builtin/internal calls.
      As const calls don't match any of the above, yet they could
@@ -705,6 +739,45 @@ move_stmt (gimple *stmt, gimple_stmt_iterator *gsi, auto_bitmap &inserted_exprs)
   reset_flow_sensitive_info (name);
 }
 
+/* RAII style class to temporarily remove flow sensitive
+   from ssa names defined by a gimple statement.  */
+class auto_flow_sensitive
+{
+public:
+  auto_flow_sensitive (gimple *s);
+  ~auto_flow_sensitive ();
+private:
+  auto_vec<std::pair<tree, flow_sensitive_info_storage>, 2> stack;
+};
+
+/* Constructor for auto_flow_sensitive. Saves
+   off the ssa names' flow sensitive information
+   that was defined by gimple statement S and
+   resets it to be non-flow based ones. */
+
+auto_flow_sensitive::auto_flow_sensitive (gimple *s)
+{
+  if (!s)
+    return;
+  ssa_op_iter it;
+  tree def;
+  FOR_EACH_SSA_TREE_OPERAND (def, s, it, SSA_OP_DEF)
+    {
+      flow_sensitive_info_storage storage;
+      storage.save_and_clear (def);
+      stack.safe_push (std::make_pair (def, storage));
+    }
+}
+
+/* Deconstructor, restores the flow sensitive information
+   for the SSA names that had been saved off.  */
+
+auto_flow_sensitive::~auto_flow_sensitive ()
+{
+  for (auto p : stack)
+    p.second.restore (p.first);
+}
+
 /*  The function match_simplify_replacement does the main work of doing the
     replacement using match and simplify.  Return true if the replacement is done.
     Otherwise return false.
@@ -725,7 +798,6 @@ match_simplify_replacement (basic_block cond_bb, basic_block middle_bb,
   tree result;
   gimple *stmt_to_move = NULL;
   gimple *stmt_to_move_alt = NULL;
-  auto_bitmap inserted_exprs;
   tree arg_true, arg_false;
 
   /* Special case A ? B : B as this will always simplify to B. */
@@ -782,12 +854,39 @@ match_simplify_replacement (basic_block cond_bb, basic_block middle_bb,
       arg_false = arg0;
     }
 
+  /* Do not make conditional undefs unconditional.  */
+  if ((TREE_CODE (arg_true) == SSA_NAME
+       && ssa_name_maybe_undef_p (arg_true))
+      || (TREE_CODE (arg_false) == SSA_NAME
+	  && ssa_name_maybe_undef_p (arg_false)))
+    return false;
+
   tree type = TREE_TYPE (gimple_phi_result (phi));
-  result = gimple_simplify_phiopt (early_p, type, stmt,
-				   arg_true, arg_false,
-				   &seq);
+  {
+    auto_flow_sensitive s1(stmt_to_move);
+    auto_flow_sensitive s_alt(stmt_to_move_alt);
+
+    result = gimple_simplify_phiopt (early_p, type, stmt,
+				     arg_true, arg_false,
+				    &seq);
+  }
+
   if (!result)
     return false;
+  if (dump_file && (dump_flags & TDF_FOLDING))
+    fprintf (dump_file, "accepted the phiopt match-simplify.\n");
+
+  auto_bitmap exprs_maybe_dce;
+
+  /* Mark the cond statements' lhs/rhs as maybe dce.  */
+  if (TREE_CODE (gimple_cond_lhs (stmt)) == SSA_NAME
+      && !SSA_NAME_IS_DEFAULT_DEF (gimple_cond_lhs (stmt)))
+    bitmap_set_bit (exprs_maybe_dce,
+		    SSA_NAME_VERSION (gimple_cond_lhs (stmt)));
+  if (TREE_CODE (gimple_cond_rhs (stmt)) == SSA_NAME
+      && !SSA_NAME_IS_DEFAULT_DEF (gimple_cond_rhs (stmt)))
+    bitmap_set_bit (exprs_maybe_dce,
+		    SSA_NAME_VERSION (gimple_cond_rhs (stmt)));
 
   gsi = gsi_last_bb (cond_bb);
   /* Insert the sequence generated from gimple_simplify_phiopt.  */
@@ -800,22 +899,17 @@ match_simplify_replacement (basic_block cond_bb, basic_block middle_bb,
 	  gimple *stmt = gsi_stmt (gsi1);
 	  tree name = gimple_get_lhs (stmt);
 	  if (name && TREE_CODE (name) == SSA_NAME)
-	    bitmap_set_bit (inserted_exprs, SSA_NAME_VERSION (name));
-	}
-      if (dump_file && (dump_flags & TDF_FOLDING))
-	{
-	  fprintf (dump_file, "Folded into the sequence:\n");
-	  print_gimple_seq (dump_file, seq, 0, TDF_VOPS|TDF_MEMSYMS);
+	    bitmap_set_bit (exprs_maybe_dce, SSA_NAME_VERSION (name));
 	}
     gsi_insert_seq_before (&gsi, seq, GSI_CONTINUE_LINKING);
   }
 
   /* If there was a statement to move, move it to right before
      the original conditional.  */
-  move_stmt (stmt_to_move, &gsi, inserted_exprs);
-  move_stmt (stmt_to_move_alt, &gsi, inserted_exprs);
+  move_stmt (stmt_to_move, &gsi, exprs_maybe_dce);
+  move_stmt (stmt_to_move_alt, &gsi, exprs_maybe_dce);
 
-  replace_phi_edge_with_variable (cond_bb, e1, phi, result, inserted_exprs);
+  replace_phi_edge_with_variable (cond_bb, e1, phi, result, exprs_maybe_dce);
 
   /* Add Statistic here even though replace_phi_edge_with_variable already
      does it as we want to be able to count when match-simplify happens vs
@@ -1570,10 +1664,6 @@ minmax_replacement (basic_block cond_bb, basic_block middle_bb, basic_block alt_
 
   tree type = TREE_TYPE (PHI_RESULT (phi));
 
-  /* The optimization may be unsafe due to NaNs.  */
-  if (HONOR_NANS (type) || HONOR_SIGNED_ZEROS (type))
-    return false;
-
   gcond *cond = as_a <gcond *> (*gsi_last_bb (cond_bb));
   enum tree_code cmp = gimple_cond_code (cond);
   tree rhs = gimple_cond_rhs (cond);
@@ -1760,6 +1850,9 @@ minmax_replacement (basic_block cond_bb, basic_block middle_bb, basic_block alt_
       else
 	return false;
     }
+  else if (HONOR_NANS (type) || HONOR_SIGNED_ZEROS (type))
+    /* The optimization may be unsafe due to NaNs.  */
+    return false;
   else if (middle_bb != alt_middle_bb && threeway_p)
     {
       /* Recognize the following case:
@@ -1977,7 +2070,7 @@ minmax_replacement (basic_block cond_bb, basic_block middle_bb, basic_block alt_
 
 	      /* We need BOUND <= LARGER.  */
 	      if (!integer_nonzerop (fold_build2 (LE_EXPR, boolean_type_node,
-						  bound, larger)))
+						  bound, arg_false)))
 		return false;
 	    }
 	  else if (operand_equal_for_phi_arg_p (arg_false, smaller)
@@ -2008,7 +2101,7 @@ minmax_replacement (basic_block cond_bb, basic_block middle_bb, basic_block alt_
 
 	      /* We need BOUND >= SMALLER.  */
 	      if (!integer_nonzerop (fold_build2 (GE_EXPR, boolean_type_node,
-						  bound, smaller)))
+						  bound, arg_false)))
 		return false;
 	    }
 	  else
@@ -2048,7 +2141,7 @@ minmax_replacement (basic_block cond_bb, basic_block middle_bb, basic_block alt_
 
 	      /* We need BOUND >= LARGER.  */
 	      if (!integer_nonzerop (fold_build2 (GE_EXPR, boolean_type_node,
-						  bound, larger)))
+						  bound, arg_true)))
 		return false;
 	    }
 	  else if (operand_equal_for_phi_arg_p (arg_true, smaller)
@@ -2075,7 +2168,7 @@ minmax_replacement (basic_block cond_bb, basic_block middle_bb, basic_block alt_
 
 	      /* We need BOUND <= SMALLER.  */
 	      if (!integer_nonzerop (fold_build2 (LE_EXPR, boolean_type_node,
-						  bound, smaller)))
+						  bound, arg_true)))
 		return false;
 	    }
 	  else
@@ -2093,7 +2186,19 @@ minmax_replacement (basic_block cond_bb, basic_block middle_bb, basic_block alt_
   /* Emit the statement to compute min/max.  */
   gimple_seq stmts = NULL;
   tree phi_result = PHI_RESULT (phi);
-  result = gimple_build (&stmts, minmax, TREE_TYPE (phi_result), arg0, arg1);
+
+  /* When we can't use a MIN/MAX_EXPR still make sure the expression
+     stays in a form to be recognized by ISA that map to IEEE x > y ? x : y
+     semantics (that's not IEEE max semantics).  */
+  if (HONOR_NANS (type) || HONOR_SIGNED_ZEROS (type))
+    {
+      result = gimple_build (&stmts, cmp, boolean_type_node,
+			     gimple_cond_lhs (cond), rhs);
+      result = gimple_build (&stmts, COND_EXPR, TREE_TYPE (phi_result),
+			     result, arg_true, arg_false);
+    }
+  else
+    result = gimple_build (&stmts, minmax, TREE_TYPE (phi_result), arg0, arg1);
 
   gsi = gsi_last_bb (cond_bb);
   gsi_insert_seq_before (&gsi, stmts, GSI_NEW_STMT);
@@ -3967,6 +4072,7 @@ pass_phiopt::execute (function *)
   bool cfgchanged = false;
 
   calculate_dominance_info (CDI_DOMINATORS);
+  mark_ssa_maybe_undefs ();
 
   /* Search every basic block for COND_EXPR we may be able to optimize.
 

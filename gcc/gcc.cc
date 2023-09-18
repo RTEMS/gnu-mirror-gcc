@@ -46,7 +46,11 @@ compilation is specified by a string called a "spec".  */
 #include "spellcheck.h"
 #include "opts-jobserver.h"
 #include "common/common-target.h"
+#include "diagnostic-text-art.h"
 
+#ifndef MATH_LIBRARY
+#define MATH_LIBRARY "m"
+#endif
 
 
 /* Manage the manipulation of env vars.
@@ -4117,6 +4121,48 @@ next_item:
     }
 }
 
+/* Forward certain options to offloading compilation.  */
+
+static void
+forward_offload_option (size_t opt_index, const char *arg, bool validated)
+{
+  switch (opt_index)
+    {
+    case OPT_l:
+      /* Use a '_GCC_' prefix and standard name ('-l_GCC_m' irrespective of the
+	 host's 'MATH_LIBRARY', for example), so that the 'mkoffload's can tell
+	 this has been synthesized here, and translate/drop as necessary.  */
+      /* Note that certain libraries ('-lc', '-lgcc', '-lgomp', for example)
+	 are injected by default in offloading compilation, and therefore not
+	 forwarded here.  */
+      /* GCC libraries.  */
+      if (/* '-lgfortran' */ strcmp (arg, "gfortran") == 0 )
+	save_switch (concat ("-foffload-options=-l_GCC_", arg, NULL),
+		     0, NULL, validated, true);
+      /* Other libraries.  */
+      else
+	{
+	  /* The case will need special consideration where on the host
+	     '!need_math', but for offloading compilation still need
+	     '-foffload-options=-l_GCC_m'.  The problem is that we don't get
+	     here anything like '-lm', because it's not synthesized in
+	     'gcc/fortran/gfortranspec.cc:lang_specific_driver', for example.
+	     Generally synthesizing '-foffload-options=-l_GCC_m' etc. in the
+	     language specific drivers is non-trivial, needs very careful
+	     review of their options handling.  However, this issue is not
+	     actually relevant for the current set of supported host/offloading
+	     configurations.  */
+	  int need_math = (MATH_LIBRARY[0] != '\0');
+	  if (/* '-lm' */ (need_math && strcmp (arg, MATH_LIBRARY) == 0))
+	    save_switch ("-foffload-options=-l_GCC_m",
+			 0, NULL, validated, true);
+	}
+      break;
+    default:
+      gcc_unreachable ();
+    }
+}
+
 /* Handle a driver option; arguments and return value as for
    handle_option.  */
 
@@ -4299,6 +4345,11 @@ driver_handle_option (struct gcc_options *opts,
 	  break;
 	}
 
+    case OPT_fdiagnostics_text_art_charset_:
+      diagnostics_text_art_charset_init (dc,
+					 (enum diagnostic_text_art_charset)value);
+      break;
+
     case OPT_Wa_:
       {
 	int prev, j;
@@ -4375,6 +4426,17 @@ driver_handle_option (struct gcc_options *opts,
       /* POSIX allows separation of -l and the lib arg; canonicalize
 	 by concatenating -l with its arg */
       add_infile (concat ("-l", arg, NULL), "*");
+
+      /* Forward to offloading compilation '-l[...]' flags for standard,
+	 well-known libraries.  */
+      /* Doing this processing here means that we don't get to see libraries
+	 injected via specs, such as '-lquadmath' injected via
+	 '[build]/[target]/libgfortran/libgfortran.spec'.  However, this issue
+	 is not actually relevant for the current set of host/offloading
+	 configurations.  */
+      if (ENABLE_OFFLOADING)
+	forward_offload_option (opt_index, arg, validated);
+
       do_save = false;
       break;
 
@@ -5471,7 +5533,7 @@ set_collect_gcc_options (void)
   obstack_grow (&collect_obstack, "COLLECT_GCC_OPTIONS=",
 		sizeof ("COLLECT_GCC_OPTIONS=") - 1);
 
-  first_time = TRUE;
+  first_time = true;
   for (i = 0; (int) i < n_switches; i++)
     {
       const char *const *args;
@@ -5479,7 +5541,7 @@ set_collect_gcc_options (void)
       if (!first_time)
 	obstack_grow (&collect_obstack, " ", 1);
 
-      first_time = FALSE;
+      first_time = false;
 
       /* Ignore elided switches.  */
       if ((switches[i].live_cond
@@ -5517,7 +5579,7 @@ set_collect_gcc_options (void)
     {
       if (!first_time)
 	obstack_grow (&collect_obstack, " ", 1);
-      first_time = FALSE;
+      first_time = false;
 
       obstack_grow (&collect_obstack, "'-dumpdir' '", 12);
       const char *p, *q;
@@ -8270,7 +8332,7 @@ driver::build_multilib_strings () const
     obstack_1grow (&multilib_obstack, 0);
     multilib_reuse = XOBFINISH (&multilib_obstack, const char *);
 
-    need_space = FALSE;
+    need_space = false;
     for (size_t i = 0; i < ARRAY_SIZE (multilib_defaults_raw); i++)
       {
 	if (need_space)
@@ -8278,7 +8340,7 @@ driver::build_multilib_strings () const
 	obstack_grow (&multilib_obstack,
 		      multilib_defaults_raw[i],
 		      strlen (multilib_defaults_raw[i]));
-	need_space = TRUE;
+	need_space = true;
       }
 
     obstack_1grow (&multilib_obstack, 0);
@@ -10114,19 +10176,19 @@ print_multilib_info (void)
 	  /* If there are extra options, print them now.  */
 	  if (multilib_extra && *multilib_extra)
 	    {
-	      int print_at = TRUE;
+	      int print_at = true;
 	      const char *q;
 
 	      for (q = multilib_extra; *q != '\0'; q++)
 		{
 		  if (*q == ' ')
-		    print_at = TRUE;
+		    print_at = true;
 		  else
 		    {
 		      if (print_at)
 			putchar ('@');
 		      putchar (*q);
-		      print_at = FALSE;
+		      print_at = false;
 		    }
 		}
 	    }

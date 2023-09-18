@@ -36,15 +36,16 @@
 --  Preconditions in this unit are meant for analysis only, not for run-time
 --  checking, so that the expected exceptions are raised. This is enforced by
 --  setting the corresponding assertion policy to Ignore. These preconditions
---  protect from Dereference_Error and Update_Error, but not from
---  Storage_Error.
+--  protect from Constraint_Error, Dereference_Error and Update_Error, but not
+--  from Storage_Error.
 
 pragma Assertion_Policy (Pre => Ignore);
 
 package Interfaces.C.Strings with
   SPARK_Mode     => On,
   Abstract_State => (C_Memory),
-  Initializes    => (C_Memory)
+  Initializes    => (C_Memory),
+  Always_Terminates
 is
    pragma Preelaborate;
 
@@ -94,7 +95,7 @@ is
      (Item   : chars_ptr;
       Length : size_t) return char_array
    with
-     Pre    => Item /= Null_Ptr,
+     Pre    => Item /= Null_Ptr and then Length /= 0,
      Global => (Input => C_Memory);
 
    function Value (Item : chars_ptr) return String with
@@ -105,7 +106,7 @@ is
      (Item   : chars_ptr;
       Length : size_t) return String
    with
-     Pre    => Item /= Null_Ptr,
+     Pre    => Item /= Null_Ptr and then Length /= 0,
      Global => (Input => C_Memory);
 
    function Strlen (Item : chars_ptr) return size_t with
@@ -118,16 +119,11 @@ is
       Chars  : char_array;
       Check  : Boolean := True)
    with
-     Pre      =>
+     Pre    =>
        Item /= Null_Ptr
-         and then
-      (if Check then
-         Strlen (Item) <= size_t'Last - Offset
-           and then Strlen (Item) + Offset <= Chars'Length),
-     Global   => (In_Out => C_Memory),
-     Annotate => (GNATprove, Might_Not_Return);
-     --  Update may not return if Check is False and the null terminator
-     --  is overwritten or skipped with Offset.
+         and then Strlen (Item) <= size_t'Last - Offset
+         and then Strlen (Item) + Offset <= Chars'Length,
+     Global => (In_Out => C_Memory);
 
    procedure Update
      (Item   : chars_ptr;
@@ -135,16 +131,11 @@ is
       Str    : String;
       Check  : Boolean := True)
    with
-     Pre      =>
+     Pre    =>
        Item /= Null_Ptr
-         and then
-      (if Check then
-         Strlen (Item) <= size_t'Last - Offset
-           and then Strlen (Item) + Offset <= Str'Length),
-     Global   => (In_Out => C_Memory),
-     Annotate => (GNATprove, Might_Not_Return);
-     --  Update may not return if Check is False and the null terminator
-     --  is overwritten or skipped with Offset.
+         and then Strlen (Item) <= size_t'Last - Offset
+         and then Strlen (Item) + Offset <= Str'Length,
+     Global => (In_Out => C_Memory);
 
    Update_Error : exception;
 

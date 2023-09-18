@@ -181,14 +181,13 @@ package body Exp_Ch5 is
 
    procedure Expand_Iterator_Loop_Over_Container
      (N             : Node_Id;
-      Isc           : Node_Id;
       I_Spec        : Node_Id;
       Container     : Node_Id;
       Container_Typ : Entity_Id);
    --  Expand loop over containers that uses the form "for X of C" with an
-   --  optional subtype mark, or "for Y in C". Isc is the iteration scheme.
-   --  I_Spec is the iterator specification and Container is either the
-   --  Container (for OF) or the iterator (for IN).
+   --  optional subtype mark, or "for Y in C". I_Spec is the iterator
+   --  specification and Container is either the Container (for OF) or the
+   --  iterator (for IN).
 
    procedure Expand_Predicated_Loop (N : Node_Id);
    --  Expand for loop over predicated subtype
@@ -525,7 +524,7 @@ package body Exp_Ch5 is
          R_Type  := Get_Actual_Subtype (Act_Rhs);
          Loop_Required := True;
 
-      --  We require a loop if the left side is possibly bit unaligned
+      --  We require a loop if either side is possibly bit aligned
 
       elsif Possible_Bit_Aligned_Component (Lhs)
               or else
@@ -683,14 +682,10 @@ package body Exp_Ch5 is
          return;
 
       --  If either operand is bit packed, then we need a loop, since we can't
-      --  be sure that the slice is byte aligned. Similarly, if either operand
-      --  is a possibly unaligned slice, then we need a loop (since the back
-      --  end cannot handle unaligned slices).
+      --  be sure that the slice is byte aligned.
 
       elsif Is_Bit_Packed_Array (L_Type)
         or else Is_Bit_Packed_Array (R_Type)
-        or else Is_Possibly_Unaligned_Slice (Lhs)
-        or else Is_Possibly_Unaligned_Slice (Rhs)
       then
          Loop_Required := True;
 
@@ -4836,7 +4831,7 @@ package body Exp_Ch5 is
 
       else
          Expand_Iterator_Loop_Over_Container
-           (N, Isc, I_Spec, Container, Container_Typ);
+           (N, I_Spec, Container, Container_Typ);
       end if;
    end Expand_Iterator_Loop;
 
@@ -5133,7 +5128,6 @@ package body Exp_Ch5 is
 
    procedure Expand_Iterator_Loop_Over_Container
      (N             : Node_Id;
-      Isc           : Node_Id;
       I_Spec        : Node_Id;
       Container     : Node_Id;
       Container_Typ : Entity_Id)
@@ -5606,13 +5600,6 @@ package body Exp_Ch5 is
          Mutate_Ekind (Cursor, Id_Kind);
       end;
 
-      --  If the range of iteration is given by a function call that returns
-      --  a container, the finalization actions have been saved in the
-      --  Condition_Actions of the iterator. Insert them now at the head of
-      --  the loop.
-
-      Insert_List_Before (N, Condition_Actions (Isc));
-
       Rewrite (N, New_Loop);
       Analyze (N);
    end Expand_Iterator_Loop_Over_Container;
@@ -5687,6 +5674,7 @@ package body Exp_Ch5 is
                   New_List (Make_If_Statement (Loc,
                     Condition => Iterator_Filter (LPS),
                     Then_Statements => Stats)));
+               Analyze_List (Statements (N));
             end if;
 
             --  Deal with loop over predicates

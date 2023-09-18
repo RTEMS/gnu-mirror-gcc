@@ -1363,6 +1363,46 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
       if (VAR_P (t))
 	{
 	  struct gimplify_omp_ctx *ctx = gimplify_omp_ctxp;
+	  tree attr;
+
+	  if (flag_openmp
+	      && !is_global_var (t)
+	      && DECL_CONTEXT (t) == current_function_decl
+	      && TREE_USED (t)
+	      && (attr = lookup_attribute ("omp allocate", DECL_ATTRIBUTES (t)))
+		 != NULL_TREE)
+	    {
+	      tree alloc = TREE_PURPOSE (TREE_VALUE (attr));
+	      tree align = TREE_VALUE (TREE_VALUE (attr));
+	      /* Allocate directives that appear in a target region must specify
+		 an allocator clause unless a requires directive with the
+		 dynamic_allocators clause is present in the same compilation
+		 unit.  */
+	      bool missing_dyn_alloc = false;
+	      if (alloc == NULL_TREE
+		  && ((omp_requires_mask & OMP_REQUIRES_DYNAMIC_ALLOCATORS)
+		      == 0))
+		{
+		  /* This comes too early for omp_discover_declare_target...,
+		     but should at least catch the most common cases.  */
+		  missing_dyn_alloc
+		    = cgraph_node::get (current_function_decl)->offloadable;
+		  for (struct gimplify_omp_ctx *ctx2 = ctx;
+		       ctx2 && !missing_dyn_alloc; ctx2 = ctx2->outer_context)
+		    if (ctx2->code == OMP_TARGET)
+		      missing_dyn_alloc = true;
+		}
+	      if (missing_dyn_alloc)
+		error_at (DECL_SOURCE_LOCATION (t),
+			  "%<allocate%> directive for %qD inside a target "
+			  "region must specify an %<allocator%> clause", t);
+	      else if (align != NULL_TREE
+		       || alloc == NULL_TREE
+		       || !integer_onep (alloc))
+	        sorry_at (DECL_SOURCE_LOCATION (t),
+			  "OpenMP %<allocate%> directive, used for %qD, not "
+			  "yet supported", t);
+	    }
 
 	  /* Mark variable as local.  */
 	  if (ctx && ctx->region_type != ORT_NONE && !DECL_EXTERNAL (t))
@@ -3209,6 +3249,9 @@ gimplify_compound_lval (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
     {
       tree t = expr_stack[i];
 
+      if (error_operand_p (TREE_OPERAND (t, 0)))
+	return GS_ERROR;
+
       if (TREE_CODE (t) == ARRAY_REF || TREE_CODE (t) == ARRAY_RANGE_REF)
 	{
 	  /* Deal with the low bound and element type size and put them into
@@ -3660,7 +3703,7 @@ gimplify_call_expr (tree *expr_p, gimple_seq *pre_p, bool want_value)
 
       case BUILT_IN_VA_START:
         {
-	  builtin_va_start_p = TRUE;
+	  builtin_va_start_p = true;
 	  if (call_expr_nargs (*expr_p) < 2)
 	    {
 	      error ("too few arguments to function %<va_start%>");
@@ -5977,6 +6020,7 @@ is_gimple_stmt (tree t)
     case OMP_SCOPE:
     case OMP_SECTIONS:
     case OMP_SECTION:
+    case OMP_STRUCTURED_BLOCK:
     case OMP_SINGLE:
     case OMP_MASTER:
     case OMP_MASKED:
@@ -6935,7 +6979,12 @@ gimplify_asm_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
       stmt = gimple_build_asm_vec (TREE_STRING_POINTER (ASM_STRING (expr)),
 				   inputs, outputs, clobbers, labels);
 
-      gimple_asm_set_volatile (stmt, ASM_VOLATILE_P (expr) || noutputs == 0);
+      /* asm is volatile if it was marked by the user as volatile or
+	 there are no outputs or this is an asm goto.  */
+      gimple_asm_set_volatile (stmt,
+			       ASM_VOLATILE_P (expr)
+			       || noutputs == 0
+			       || labels);
       gimple_asm_set_input (stmt, ASM_INPUT_P (expr));
       gimple_asm_set_inline (stmt, ASM_INLINE_P (expr));
 
@@ -7691,6 +7740,25 @@ omp_default_clause (struct gimplify_omp_ctx *ctx, tree decl,
   return flags;
 }
 
+/* Return string name for types of OpenACC constructs from ORT_* values.  */
+
+static const char *
+oacc_region_type_name (enum omp_region_type region_type)
+{
+  switch (region_type)
+    {
+    case ORT_ACC_DATA:
+      return "data";
+    case ORT_ACC_PARALLEL:
+      return "parallel";
+    case ORT_ACC_KERNELS:
+      return "kernels";
+    case ORT_ACC_SERIAL:
+      return "serial";
+    default:
+      gcc_unreachable ();
+    }
+}
 
 /* Determine outer default flags for DECL mentioned in an OACC region
    but not declared in an enclosing clause.  */
@@ -7698,7 +7766,23 @@ omp_default_clause (struct gimplify_omp_ctx *ctx, tree decl,
 static unsigned
 oacc_default_clause (struct gimplify_omp_ctx *ctx, tree decl, unsigned flags)
 {
-  const char *rkind;
+  struct gimplify_omp_ctx *ctx_default = ctx;
+  /* If no 'default' clause appears on this compute construct...  */
+  if (ctx_default->default_kind == OMP_CLAUSE_DEFAULT_SHARED)
+    {
+      /* ..., see if one appears on a lexically containing 'data'
+	 construct.  */
+      while ((ctx_default = ctx_default->outer_context))
+	{
+	  if (ctx_default->region_type == ORT_ACC_DATA
+	      && ctx_default->default_kind != OMP_CLAUSE_DEFAULT_SHARED)
+	    break;
+	}
+      /* If not, reset.  */
+      if (!ctx_default)
+	ctx_default = ctx;
+    }
+
   bool on_device = false;
   bool is_private = false;
   bool declared = is_oacc_declared (decl);
@@ -7730,14 +7814,12 @@ oacc_default_clause (struct gimplify_omp_ctx *ctx, tree decl, unsigned flags)
   switch (ctx->region_type)
     {
     case ORT_ACC_KERNELS:
-      rkind = "kernels";
-
       if (is_private)
 	flags |= GOVD_FIRSTPRIVATE;
       else if (AGGREGATE_TYPE_P (type))
 	{
 	  /* Aggregates default to 'present_or_copy', or 'present'.  */
-	  if (ctx->default_kind != OMP_CLAUSE_DEFAULT_PRESENT)
+	  if (ctx_default->default_kind != OMP_CLAUSE_DEFAULT_PRESENT)
 	    flags |= GOVD_MAP;
 	  else
 	    flags |= GOVD_MAP | GOVD_MAP_FORCE_PRESENT;
@@ -7750,8 +7832,6 @@ oacc_default_clause (struct gimplify_omp_ctx *ctx, tree decl, unsigned flags)
 
     case ORT_ACC_PARALLEL:
     case ORT_ACC_SERIAL:
-      rkind = ctx->region_type == ORT_ACC_PARALLEL ? "parallel" : "serial";
-
       if (is_private)
 	flags |= GOVD_FIRSTPRIVATE;
       else if (on_device || declared)
@@ -7759,7 +7839,7 @@ oacc_default_clause (struct gimplify_omp_ctx *ctx, tree decl, unsigned flags)
       else if (AGGREGATE_TYPE_P (type))
 	{
 	  /* Aggregates default to 'present_or_copy', or 'present'.  */
-	  if (ctx->default_kind != OMP_CLAUSE_DEFAULT_PRESENT)
+	  if (ctx_default->default_kind != OMP_CLAUSE_DEFAULT_PRESENT)
 	    flags |= GOVD_MAP;
 	  else
 	    flags |= GOVD_MAP | GOVD_MAP_FORCE_PRESENT;
@@ -7777,16 +7857,23 @@ oacc_default_clause (struct gimplify_omp_ctx *ctx, tree decl, unsigned flags)
   if (DECL_ARTIFICIAL (decl))
     ; /* We can get compiler-generated decls, and should not complain
 	 about them.  */
-  else if (ctx->default_kind == OMP_CLAUSE_DEFAULT_NONE)
+  else if (ctx_default->default_kind == OMP_CLAUSE_DEFAULT_NONE)
     {
       error ("%qE not specified in enclosing OpenACC %qs construct",
-	     DECL_NAME (lang_hooks.decls.omp_report_decl (decl)), rkind);
-      inform (ctx->location, "enclosing OpenACC %qs construct", rkind);
+	     DECL_NAME (lang_hooks.decls.omp_report_decl (decl)),
+	     oacc_region_type_name (ctx->region_type));
+      if (ctx_default != ctx)
+	inform (ctx->location, "enclosing OpenACC %qs construct and",
+		oacc_region_type_name (ctx->region_type));
+      inform (ctx_default->location,
+	      "enclosing OpenACC %qs construct with %qs clause",
+	      oacc_region_type_name (ctx_default->region_type),
+	      "default(none)");
     }
-  else if (ctx->default_kind == OMP_CLAUSE_DEFAULT_PRESENT)
+  else if (ctx_default->default_kind == OMP_CLAUSE_DEFAULT_PRESENT)
     ; /* Handled above.  */
   else
-    gcc_checking_assert (ctx->default_kind == OMP_CLAUSE_DEFAULT_SHARED);
+    gcc_checking_assert (ctx_default->default_kind == OMP_CLAUSE_DEFAULT_SHARED);
 
   return flags;
 }
@@ -11991,6 +12078,7 @@ gimplify_scan_omp_clauses (tree *list_p, gimple_seq *pre_p,
 	  switch (OMP_CLAUSE_DEFAULTMAP_CATEGORY (c))
 	    {
 	    case OMP_CLAUSE_DEFAULTMAP_CATEGORY_UNSPECIFIED:
+	    case OMP_CLAUSE_DEFAULTMAP_CATEGORY_ALL:
 	      gdmkmin = GDMK_SCALAR;
 	      gdmkmax = GDMK_POINTER;
 	      break;
@@ -16990,6 +17078,7 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 	  break;
 
 	case OMP_SECTION:
+	case OMP_STRUCTURED_BLOCK:
 	case OMP_MASTER:
 	case OMP_MASKED:
 	case OMP_ORDERED:
@@ -17008,6 +17097,9 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 	      case OMP_SECTION:
 	        g = gimple_build_omp_section (body);
 	        break;
+	      case OMP_STRUCTURED_BLOCK:
+		g = gimple_build_omp_structured_block (body);
+		break;
 	      case OMP_MASTER:
 		g = gimple_build_omp_master (body);
 		break;
@@ -17408,6 +17500,7 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 		  && code != OMP_SCAN
 		  && code != OMP_SECTIONS
 		  && code != OMP_SECTION
+		  && code != OMP_STRUCTURED_BLOCK
 		  && code != OMP_SINGLE
 		  && code != OMP_SCOPE);
     }

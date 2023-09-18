@@ -44,6 +44,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple-fold.h"
 #include "gimple-match.h"
 #include "recog.h"		/* FIXME: for insn_data */
+#include "optabs-libfuncs.h"
 
 
 /* Build a ternary operation and gimplify it.  Emit code before GSI.
@@ -1120,7 +1121,7 @@ expand_vector_condition (gimple_stmt_iterator *gsi, bitmap dce_ssa_names)
 				       comp_width, comp_index);
 	  tree aa2 = tree_vec_extract (gsi, comp_inner_type, a2,
 				       comp_width, comp_index);
-	  aa = gimplify_build2 (gsi, code, cond_type, aa1, aa2);
+	  aa = gimplify_build2 (gsi, code, boolean_type_node, aa1, aa2);
 	}
       else if (a_is_scalar_bitmask)
 	{
@@ -1131,7 +1132,11 @@ expand_vector_condition (gimple_stmt_iterator *gsi, bitmap dce_ssa_names)
 				build_zero_cst (TREE_TYPE (a)));
 	}
       else
-	aa = tree_vec_extract (gsi, cond_type, a, comp_width, comp_index);
+	{
+	  result = tree_vec_extract (gsi, cond_type, a, comp_width, comp_index);
+	  aa = gimplify_build2 (gsi, NE_EXPR, boolean_type_node, result,
+				build_zero_cst (cond_type));
+	}
       result = gimplify_build3 (gsi, COND_EXPR, inner_type, aa, bb, cc);
       if (!CONSTANT_CLASS_P (result))
 	constant_p = false;
@@ -1714,7 +1719,9 @@ get_compute_type (enum tree_code code, optab op, tree type)
       machine_mode compute_mode = TYPE_MODE (compute_type);
       if (VECTOR_MODE_P (compute_mode))
 	{
-	  if (op && optab_handler (op, compute_mode) != CODE_FOR_nothing)
+	  if (op
+	      && (optab_handler (op, compute_mode) != CODE_FOR_nothing
+		  || optab_libfunc (op, compute_mode)))
 	    return compute_type;
 	  if (code == MULT_HIGHPART_EXPR
 	      && can_mult_highpart_p (compute_mode,

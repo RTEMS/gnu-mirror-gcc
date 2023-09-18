@@ -325,6 +325,9 @@ private:
   friend void gt_pch_nx (struct ipa_vr &);
   friend void gt_ggc_mx (struct ipa_vr &);
   friend void gt_pch_nx (struct ipa_vr *, gt_pointer_operator, void *);
+  friend void gt_ggc_mx_ipa_vr (void *);
+  friend void gt_pch_nx_ipa_vr (void*);
+  friend void gt_pch_p_6ipa_vr(void*, void*, gt_pointer_operator, void*);
 
   vrange_storage *m_storage;
   tree m_type;
@@ -347,7 +350,7 @@ struct GTY (()) ipa_jump_func
   /* Information about value range, containing valid data only when vr_known is
      true.  The pointed to structure is shared betweed different jump
      functions.  Use ipa_set_jfunc_vr to set this field.  */
-  value_range *m_vr;
+  ipa_vr *m_vr;
 
   enum jump_func_type type;
   /* Represents a value of a jump function.  pass_through is used only in jump
@@ -921,20 +924,24 @@ ipa_is_param_used_by_polymorphic_call (class ipa_node_params *info, int i)
   return (*info->descriptors)[i].used_by_polymorphic_call;
 }
 
+/* GTY-marked structure used to map DECL_UIDs of APRAMs to their indices in
+   their DECL_ARGUMENTs chain.  */
+struct GTY(()) ipa_uid_to_idx_map_elt
+{
+  /* DECL_UID of the PARAM.  */
+  unsigned uid;
+  /* Its index in the DECL_ARGUMETs chain.  */
+  unsigned index;
+};
+
 /* Structure holding information for the transformation phase of IPA-CP.  */
 
 struct GTY(()) ipcp_transformation
 {
-  /* Known aggregate values.  */
-  vec<ipa_argagg_value, va_gc>  *m_agg_values;
-  /* Known bits information.  */
-  vec<ipa_bits *, va_gc> *bits;
-  /* Value range information.  */
-  vec<ipa_vr, va_gc> *m_vr;
-
   /* Default constructor.  */
   ipcp_transformation ()
-  : m_agg_values (NULL), bits (NULL), m_vr (NULL)
+    : m_agg_values (nullptr), bits (nullptr), m_vr (nullptr),
+    m_uid_to_idx (nullptr)
   { }
 
   /* Default destructor.  */
@@ -944,6 +951,30 @@ struct GTY(()) ipcp_transformation
     vec_free (bits);
     vec_free (m_vr);
   }
+
+  /* Given PARAM which must be a parameter of function FNDECL described by
+     THIS, return its index in the DECL_ARGUMENTS chain, using a pre-computed
+     DECL_UID-sorted vector if available (which is pre-computed only if there
+     are many parameters).  Can return -1 if param is static chain not
+     represented among DECL_ARGUMENTS. */
+
+  int get_param_index (const_tree fndecl, const_tree param) const;
+
+  /* Assuming THIS describes FNDECL and it has sufficiently many parameters to
+     justify the overhead, create a DECL_UID-sorted vector to speed up mapping
+     from parameters to their indices in DECL_ARGUMENTS chain.  */
+
+  void maybe_create_parm_idx_map (tree fndecl);
+
+  /* Known aggregate values.  */
+  vec<ipa_argagg_value, va_gc>  *m_agg_values;
+  /* Known bits information.  */
+  vec<ipa_bits *, va_gc> *bits;
+  /* Value range information.  */
+  vec<ipa_vr, va_gc> *m_vr;
+  /* If there are many parameters, this is a vector sorted by their DECL_UIDs
+     to map them to their indices in the DECL_ARGUMENT chain.  */
+  vec<ipa_uid_to_idx_map_elt, va_gc> *m_uid_to_idx;
 };
 
 inline
@@ -1204,6 +1235,9 @@ void ipa_dump_param (FILE *, class ipa_node_params *info, int i);
 void ipa_release_body_info (struct ipa_func_body_info *);
 tree ipa_get_callee_param_type (struct cgraph_edge *e, int i);
 bool ipcp_get_parm_bits (tree, tree *, widest_int *);
+tree ipcp_get_aggregate_const (struct function *func, tree parm, bool by_ref,
+			       HOST_WIDE_INT bit_offset,
+			       HOST_WIDE_INT bit_size);
 bool unadjusted_ptr_and_unit_offset (tree op, tree *ret,
 				     poly_int64 *offset_ret);
 

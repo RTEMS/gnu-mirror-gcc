@@ -3914,9 +3914,10 @@ package body Sem_Res is
                                                   Obj_Ref       => N,
                                                   Check_Actuals => True)
                   then
+                     Error_Msg_Code := GEC_Volatile_Non_Interfering_Context;
                      Error_Msg_N
-                       ("volatile object cannot appear in this context"
-                        & " (SPARK RM 7.1.3(10))", N);
+                       ("volatile object cannot appear in this context '[[]']",
+                        N);
                   end if;
 
                   return Skip;
@@ -5145,7 +5146,10 @@ package body Sem_Res is
             if Is_EVF_Expression (A)
               and then Extensions_Visible_Status (Nam) =
                        Extensions_Visible_True
-              and then No (Class_Preconditions_Subprogram (Current_Scope))
+              and then not
+               (Is_Subprogram (Current_Scope)
+                  and then
+                Present (Class_Preconditions_Subprogram (Current_Scope)))
             then
                Error_Msg_N
                  ("formal parameter cannot act as actual parameter when "
@@ -6578,6 +6582,9 @@ package body Sem_Res is
       if Is_Entity_Name (Subp)
         and then not In_Spec_Expression
         and then not Is_Expression_Function_Or_Completion (Current_Scope)
+        and then not (Chars (Current_Scope) = Name_uWrapped_Statements
+                       and then Is_Expression_Function_Or_Completion
+                                  (Scope (Current_Scope)))
         and then
           (not Is_Expression_Function_Or_Completion (Entity (Subp))
             or else Expander_Active)
@@ -7299,6 +7306,15 @@ package body Sem_Res is
                   ("cannot inline & (in potentially unevaluated context)?",
                    N, Nam_UA);
 
+            --  Calls are not inlined inside the loop_parameter_specification
+            --  or iterator_specification of the quantified expression, as they
+            --  are only preanalyzed. Calls in the predicate part are handled
+            --  by the previous test on potentially unevaluated expressions.
+
+            elsif In_Quantified_Expression (N) then
+               Cannot_Inline
+                 ("cannot inline & (in quantified expression)?", N, Nam_UA);
+
             --  Inlining should not be performed during preanalysis
 
             elsif Full_Analysis then
@@ -7317,30 +7333,32 @@ package body Sem_Res is
                      or else Is_Invariant_Procedure (Current_Subprogram)
                      or else Is_DIC_Procedure (Current_Subprogram))
                then
-                  if Present (Body_Id)
-                    and then Present (Body_To_Inline (Nam_Decl))
-                  then
+                  declare
+                     Issue_Msg : constant Boolean :=
+                       Present (Body_Id)
+                         and then Present (Body_To_Inline (Nam_Decl));
+                  begin
                      if Is_Predicate_Function (Current_Subprogram) then
                         Cannot_Inline
                           ("cannot inline & (inside predicate)?",
-                           N, Nam_UA);
+                           N, Nam_UA, Suppress_Info => not Issue_Msg);
 
                      elsif Is_Invariant_Procedure (Current_Subprogram) then
                         Cannot_Inline
                           ("cannot inline & (inside invariant)?",
-                           N, Nam_UA);
+                           N, Nam_UA, Suppress_Info => not Issue_Msg);
 
                      elsif Is_DIC_Procedure (Current_Subprogram) then
                         Cannot_Inline
                         ("cannot inline & (inside Default_Initial_Condition)?",
-                         N, Nam_UA);
+                         N, Nam_UA, Suppress_Info => not Issue_Msg);
 
                      else
                         Cannot_Inline
                           ("cannot inline & (inside expression function)?",
-                           N, Nam_UA);
+                           N, Nam_UA, Suppress_Info => not Issue_Msg);
                      end if;
-                  end if;
+                  end;
 
                --  Cannot inline a call inside the definition of a record type,
                --  typically inside the constraints of the type. Calls in
@@ -8103,9 +8121,9 @@ package body Sem_Res is
               and then
                 not Is_OK_Volatile_Context (Par, N, Check_Actuals => False)
             then
+               Error_Msg_Code := GEC_Volatile_Non_Interfering_Context;
                SPARK_Msg_N
-                 ("volatile object cannot appear in this context "
-                  & "(SPARK RM 7.1.3(10))", N);
+                 ("volatile object cannot appear in this context '[[]']", N);
             end if;
 
             --  Parameters of modes OUT or IN OUT of the subprogram shall not
@@ -8116,7 +8134,7 @@ package body Sem_Res is
             --  data from the object.
 
             if Ekind (E) in E_Out_Parameter | E_In_Out_Parameter
-              and then Scope (E) = Current_Scope
+              and then Scope (E) = Current_Scope_No_Loops
               and then Within_Exceptional_Cases_Consequence (N)
               and then not In_Attribute_Old (N)
               and then not (Nkind (Parent (N)) = N_Attribute_Reference
@@ -8124,7 +8142,8 @@ package body Sem_Res is
                             Attribute_Name (Parent (N)) in Name_Constrained
                                                          | Name_First
                                                          | Name_Last
-                                                         | Name_Length)
+                                                         | Name_Length
+                                                         | Name_Range)
               and then not Is_By_Reference_Type (Etype (E))
               and then not Is_Aliased (E)
             then
@@ -9601,17 +9620,6 @@ package body Sem_Res is
       Desig_Typ : Entity_Id;
 
    begin
-      --  In an instance the proper view may not always be correct for
-      --  private types, see e.g. Sem_Type.Covers for similar handling.
-
-      if Is_Private_Type (Etype (P))
-        and then Present (Full_View (Etype (P)))
-        and then Is_Access_Type (Full_View (Etype (P)))
-        and then In_Instance
-      then
-         Set_Etype (P, Full_View (Etype (P)));
-      end if;
-
       if Is_Access_Type (Etype (P)) then
          Desig_Typ := Implicitly_Designated_Type (Etype (P));
          Insert_Explicit_Dereference (P);
@@ -12452,6 +12460,18 @@ package body Sem_Res is
             elsif Orig_T = Base_Type (Standard_Long_Long_Integer) then
                null;
 
+            --  Do not warn on conversion to class-wide type on helpers of
+            --  class-wide preconditions because in this context the warning
+            --  would be spurious (since the class-wide precondition has been
+            --  installed in the return statement of the helper, which has a
+            --  class-wide formal type instead of a regular tagged type).
+
+            elsif Is_Class_Wide_Type (Orig_T)
+              and then Is_Subprogram_Or_Generic_Subprogram (Current_Scope)
+              and then Present (Class_Preconditions_Subprogram (Current_Scope))
+            then
+               null;
+
             --  Here we give the redundant conversion warning. If it is an
             --  entity, give the name of the entity in the message. If not,
             --  just mention the expression.
@@ -12654,6 +12674,7 @@ package body Sem_Res is
       if Warn_On_Suspicious_Modulus_Value
         and then Nkind (N) = N_Op_Minus
         and then Nkind (R) = N_Integer_Literal
+        and then Comes_From_Source (R)
         and then Is_Modular_Integer_Type (B_Typ)
         and then Nkind (Parent (N)) not in N_Qualified_Expression
                                          | N_Type_Conversion

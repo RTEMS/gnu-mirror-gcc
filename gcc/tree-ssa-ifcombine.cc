@@ -128,7 +128,6 @@ bb_no_side_effects_p (basic_block bb)
       gassign *ass;
       enum tree_code rhs_code;
       if (gimple_has_side_effects (stmt)
-	  || gimple_uses_undefined_value_p (stmt)
 	  || gimple_could_trap_p (stmt)
 	  || gimple_vuse (stmt)
 	  /* We need to rewrite stmts with undefined overflow to use
@@ -153,6 +152,12 @@ bb_no_side_effects_p (basic_block bb)
 	     should handle this.  */
 	  || is_gimple_call (stmt))
 	return false;
+
+      ssa_op_iter it;
+      tree use;
+      FOR_EACH_SSA_TREE_OPERAND (use, stmt, it, SSA_OP_USE)
+	if (ssa_name_maybe_undef_p (use))
+	  return false;
     }
 
   return true;
@@ -425,6 +430,10 @@ ifcombine_ifandif (basic_block inner_cond_bb, bool inner_inv,
     {
       tree t, t2;
 
+      if (TREE_CODE (name1) == SSA_NAME
+	  && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (name1))
+	return false;
+
       /* Do it.  */
       gsi = gsi_for_stmt (inner_cond);
       t = fold_build2 (LSHIFT_EXPR, TREE_TYPE (name1),
@@ -480,6 +489,12 @@ ifcombine_ifandif (basic_block inner_cond_bb, bool inner_inv,
     {
       gimple_stmt_iterator gsi;
       tree t;
+
+      if ((TREE_CODE (name1) == SSA_NAME
+	   && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (name1))
+	  || (TREE_CODE (name2) == SSA_NAME
+	      && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (name2)))
+	return false;
 
       /* Find the common name which is bit-tested.  */
       if (name1 == name2)
@@ -836,6 +851,7 @@ pass_tree_ifcombine::execute (function *fun)
 
   bbs = single_pred_before_succ_order ();
   calculate_dominance_info (CDI_DOMINATORS);
+  mark_ssa_maybe_undefs ();
 
   /* Search every basic block for COND_EXPR we may be able to optimize.
 

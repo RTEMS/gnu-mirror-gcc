@@ -1148,7 +1148,7 @@ begin_while_stmt (void)
 
 void
 finish_while_stmt_cond (tree cond, tree while_stmt, bool ivdep,
-			unsigned short unroll)
+			unsigned short unroll, bool novector)
 {
   cond = maybe_convert_cond (cond);
   finish_cond (&WHILE_COND (while_stmt), cond);
@@ -1168,6 +1168,13 @@ finish_while_stmt_cond (tree cond, tree while_stmt, bool ivdep,
 						     annot_expr_unroll_kind),
 				      build_int_cst (integer_type_node,
 						     unroll));
+  if (novector && cond != error_mark_node)
+    WHILE_COND (while_stmt) = build3 (ANNOTATE_EXPR,
+				      TREE_TYPE (WHILE_COND (while_stmt)),
+				      WHILE_COND (while_stmt),
+				      build_int_cst (integer_type_node,
+						     annot_expr_no_vector_kind),
+				      integer_zero_node);
   simplify_loop_decl_cond (&WHILE_COND (while_stmt), WHILE_BODY (while_stmt));
 }
 
@@ -1212,7 +1219,8 @@ finish_do_body (tree do_stmt)
    COND is as indicated.  */
 
 void
-finish_do_stmt (tree cond, tree do_stmt, bool ivdep, unsigned short unroll)
+finish_do_stmt (tree cond, tree do_stmt, bool ivdep, unsigned short unroll,
+		bool novector)
 {
   cond = maybe_convert_cond (cond);
   end_maybe_infinite_loop (cond);
@@ -1229,6 +1237,10 @@ finish_do_stmt (tree cond, tree do_stmt, bool ivdep, unsigned short unroll)
     cond = build3 (ANNOTATE_EXPR, TREE_TYPE (cond), cond,
 		   build_int_cst (integer_type_node, annot_expr_unroll_kind),
 		   build_int_cst (integer_type_node, unroll));
+  if (novector && cond != error_mark_node)
+    cond = build3 (ANNOTATE_EXPR, TREE_TYPE (cond), cond,
+		   build_int_cst (integer_type_node, annot_expr_no_vector_kind),
+		   integer_zero_node);
   DO_COND (do_stmt) = cond;
 }
 
@@ -1240,8 +1252,9 @@ finish_return_stmt (tree expr)
 {
   tree r;
   bool no_warning;
+  bool dangling;
 
-  expr = check_return_expr (expr, &no_warning);
+  expr = check_return_expr (expr, &no_warning, &dangling);
 
   if (error_operand_p (expr)
       || (flag_openmp && !check_omp_return ()))
@@ -1259,6 +1272,7 @@ finish_return_stmt (tree expr)
     }
 
   r = build_stmt (input_location, RETURN_EXPR, expr);
+  RETURN_EXPR_LOCAL_ADDR_P (r) = dangling;
   if (no_warning)
     suppress_warning (r, OPT_Wreturn_type);
   r = maybe_cleanup_point_expr_void (r);
@@ -1325,7 +1339,7 @@ finish_init_stmt (tree for_stmt)
    FOR_STMT.  */
 
 void
-finish_for_cond (tree cond, tree for_stmt, bool ivdep, unsigned short unroll)
+finish_for_cond (tree cond, tree for_stmt, bool ivdep, unsigned short unroll, bool novector)
 {
   cond = maybe_convert_cond (cond);
   finish_cond (&FOR_COND (for_stmt), cond);
@@ -1345,6 +1359,13 @@ finish_for_cond (tree cond, tree for_stmt, bool ivdep, unsigned short unroll)
 						 annot_expr_unroll_kind),
 				  build_int_cst (integer_type_node,
 						 unroll));
+  if (novector && cond != error_mark_node)
+    FOR_COND (for_stmt) = build3 (ANNOTATE_EXPR,
+				  TREE_TYPE (FOR_COND (for_stmt)),
+				  FOR_COND (for_stmt),
+				  build_int_cst (integer_type_node,
+						 annot_expr_no_vector_kind),
+				  integer_zero_node);
   simplify_loop_decl_cond (&FOR_COND (for_stmt), FOR_BODY (for_stmt));
 }
 
@@ -1603,6 +1624,7 @@ begin_function_try_block (tree *compound_stmt)
   /* This outer scope does not exist in the C++ standard, but we need
      a place to put __FUNCTION__ and similar variables.  */
   *compound_stmt = begin_compound_stmt (0);
+  current_binding_level->artificial = 1;
   r = begin_try_block ();
   FN_TRY_BLOCK_P (r) = 1;
   return r;
@@ -10520,6 +10542,7 @@ finish_omp_for (location_t locus, enum tree_code code, tree declv,
   int i;
   int collapse = 1;
   int ordered = 0;
+  auto_vec<location_t> init_locv;
 
   gcc_assert (TREE_VEC_LENGTH (declv) == TREE_VEC_LENGTH (initv));
   gcc_assert (TREE_VEC_LENGTH (declv) == TREE_VEC_LENGTH (condv));
@@ -10548,6 +10571,28 @@ finish_omp_for (location_t locus, enum tree_code code, tree declv,
       incr = TREE_VEC_ELT (incrv, i);
       elocus = locus;
 
+      /* We are going to throw out the init's original MODIFY_EXPR or
+	 MODOP_EXPR below.  Save its location so we can use it when
+	 reconstructing the expression farther down.  Alternatively, if the
+	 initializer is a binding of the iteration variable, save
+	 that location.  Any of these locations in the initialization clause
+	 for the current nested loop are better than using the argument locus,
+	 that points to the "for" of the the outermost loop in the nest.  */
+      if (init && EXPR_HAS_LOCATION (init))
+	elocus = EXPR_LOCATION (init);
+      else if (decl && INDIRECT_REF_P (decl) && EXPR_HAS_LOCATION (decl))
+	/* This can happen for class iterators.  */
+	elocus = EXPR_LOCATION (decl);
+      else if (decl && DECL_P (decl))
+	{
+	  if (DECL_SOURCE_LOCATION (decl) != UNKNOWN_LOCATION)
+	    elocus = DECL_SOURCE_LOCATION (decl);
+	  else if (DECL_INITIAL (decl)
+		   && EXPR_HAS_LOCATION (DECL_INITIAL (decl)))
+	    elocus = EXPR_LOCATION (DECL_INITIAL (decl));
+	}
+      init_locv.safe_push (elocus);
+
       if (decl == NULL)
 	{
 	  if (init != NULL)
@@ -10575,9 +10620,6 @@ finish_omp_for (location_t locus, enum tree_code code, tree declv,
 	      return NULL;
 	    }
 	}
-
-      if (init && EXPR_HAS_LOCATION (init))
-	elocus = EXPR_LOCATION (init);
 
       if (cond == global_namespace)
 	continue;
@@ -10625,8 +10667,8 @@ finish_omp_for (location_t locus, enum tree_code code, tree declv,
 	     again and going through the cp_build_modify_expr path below when
 	     we instantiate the thing.  */
 	  TREE_VEC_ELT (initv, i)
-	    = build2 (MODIFY_EXPR, void_type_node, TREE_VEC_ELT (declv, i),
-		      TREE_VEC_ELT (initv, i));
+	    = build2_loc (init_locv[i], MODIFY_EXPR, void_type_node,
+			  TREE_VEC_ELT (declv, i), TREE_VEC_ELT (initv, i));
 	}
 
       TREE_TYPE (stmt) = void_type_node;
@@ -10655,10 +10697,7 @@ finish_omp_for (location_t locus, enum tree_code code, tree declv,
       incr = TREE_VEC_ELT (incrv, i);
       if (orig_incr)
 	TREE_VEC_ELT (orig_incr, i) = incr;
-      elocus = locus;
-
-      if (init && EXPR_HAS_LOCATION (init))
-	elocus = EXPR_LOCATION (init);
+      elocus = init_locv[i];
 
       if (!DECL_P (decl))
 	{
@@ -10703,7 +10742,7 @@ finish_omp_for (location_t locus, enum tree_code code, tree declv,
 	init = cp_build_modify_expr (elocus, decl, NOP_EXPR, init,
 				     tf_warning_or_error);
       else
-	init = build2 (MODIFY_EXPR, void_type_node, decl, init);
+	init = build2_loc (elocus, MODIFY_EXPR, void_type_node, decl, init);
       if (decl == error_mark_node || init == error_mark_node)
 	return NULL;
 
@@ -10875,47 +10914,71 @@ finish_omp_for (location_t locus, enum tree_code code, tree declv,
   return omp_for;
 }
 
-/* Fix up range for decls.  Those decls were pushed into BIND's BIND_EXPR_VARS
-   and need to be moved into the BIND_EXPR inside of the OMP_FOR's body.  */
+/* Code walker for finish_omp_for_block: extract binding of DP->var
+   from its current block and move it to a new BIND_EXPR DP->b
+   surrounding the body of DP->omp_for.  */
 
+struct fofb_data {
+  tree var;
+  tree b;
+  tree omp_for;
+};
+
+static tree
+finish_omp_for_block_walker (tree *tp, int *walk_subtrees, void *dp)
+{
+  struct fofb_data *fofb = (struct fofb_data *)dp;
+  if (TREE_CODE (*tp) == BIND_EXPR)
+    for (tree *p = &BIND_EXPR_VARS (*tp); *p; p = &DECL_CHAIN (*p))
+      {
+	if (*p == fofb->var)
+	  {
+	    *p = DECL_CHAIN (*p);
+	    if (fofb->b == NULL_TREE)
+	      {
+		fofb->b = make_node (BLOCK);
+		fofb->b = build3 (BIND_EXPR, void_type_node, NULL_TREE,
+			    OMP_FOR_BODY (fofb->omp_for), fofb->b);
+		TREE_SIDE_EFFECTS (fofb->b) = 1;
+		OMP_FOR_BODY (fofb->omp_for) = fofb->b;
+	      }
+	    DECL_CHAIN (fofb->var) = BIND_EXPR_VARS (fofb->b);
+	    BIND_EXPR_VARS (fofb->b) = fofb->var;
+	    BLOCK_VARS (BIND_EXPR_BLOCK (fofb->b)) = fofb->var;
+	    BLOCK_VARS (BIND_EXPR_BLOCK (*tp)) = BIND_EXPR_VARS (*tp);
+	    return *tp;
+	  }
+      }
+  if (TREE_CODE (*tp) != BIND_EXPR && TREE_CODE (*tp) != STATEMENT_LIST)
+    *walk_subtrees = false;
+  return NULL_TREE;
+}
+
+/* Fix up range for decls.  Those decls were pushed into BIND's
+   BIND_EXPR_VARS, or that of a nested BIND_EXPR inside its body,
+   and need to be moved into a new BIND_EXPR surrounding OMP_FOR's body
+   so that processing of combined loop directives can find them.  */
 tree
 finish_omp_for_block (tree bind, tree omp_for)
 {
   if (omp_for == NULL_TREE
       || !OMP_FOR_ORIG_DECLS (omp_for)
-      || bind == NULL_TREE
-      || TREE_CODE (bind) != BIND_EXPR)
+      || bind == NULL_TREE)
     return bind;
-  tree b = NULL_TREE;
+  struct fofb_data fofb;
+  fofb.b = NULL_TREE;
+  fofb.omp_for = omp_for;
   for (int i = 0; i < TREE_VEC_LENGTH (OMP_FOR_INIT (omp_for)); i++)
     if (TREE_CODE (TREE_VEC_ELT (OMP_FOR_ORIG_DECLS (omp_for), i)) == TREE_LIST
 	&& TREE_CHAIN (TREE_VEC_ELT (OMP_FOR_ORIG_DECLS (omp_for), i)))
       {
 	tree v = TREE_CHAIN (TREE_VEC_ELT (OMP_FOR_ORIG_DECLS (omp_for), i));
-	gcc_assert (BIND_EXPR_BLOCK (bind)
-		    && (BIND_EXPR_VARS (bind)
-			== BLOCK_VARS (BIND_EXPR_BLOCK (bind))));
 	for (int j = 2; j < TREE_VEC_LENGTH (v); j++)
-	  for (tree *p = &BIND_EXPR_VARS (bind); *p; p = &DECL_CHAIN (*p))
-	    {
-	      if (*p == TREE_VEC_ELT (v, j))
-		{
-		  tree var = *p;
-		  *p = DECL_CHAIN (*p);
-		  if (b == NULL_TREE)
-		    {
-		      b = make_node (BLOCK);
-		      b = build3 (BIND_EXPR, void_type_node, NULL_TREE,
-				  OMP_FOR_BODY (omp_for), b);
-		      TREE_SIDE_EFFECTS (b) = 1;
-		      OMP_FOR_BODY (omp_for) = b;
-		    }
-		  DECL_CHAIN (var) = BIND_EXPR_VARS (b);
-		  BIND_EXPR_VARS (b) = var;
-		  BLOCK_VARS (BIND_EXPR_BLOCK (b)) = var;
-		}
-	    }
-	BLOCK_VARS (BIND_EXPR_BLOCK (bind)) = BIND_EXPR_VARS (bind);
+	  {
+	    fofb.var = TREE_VEC_ELT (v, j);
+	    cp_walk_tree (&bind, finish_omp_for_block_walker,
+			  (void *)&fofb, NULL);
+	  }
       }
   return bind;
 }

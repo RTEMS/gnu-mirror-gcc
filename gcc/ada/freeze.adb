@@ -6188,7 +6188,20 @@ package body Freeze is
       --  Do not freeze if already frozen since we only need one freeze node
 
       if Is_Frozen (E) then
-         Result := No_List;
+
+         if Is_Itype (E)
+           and then not Is_Base_Type (E)
+           and then not Is_Frozen (Etype (E))
+         then
+            --  If a frozen subtype of an unfrozen type seems impossible
+            --  then see Analyze_Protected_Definition.Undelay_Itypes.
+
+            Result := Freeze_Entity
+                        (Etype (E), N, Do_Freeze_Profile => Do_Freeze_Profile);
+         else
+            Result := No_List;
+         end if;
+
          goto Leave;
 
       --  Do not freeze if we are preanalyzing without freezing
@@ -8009,6 +8022,20 @@ package body Freeze is
          end if;
 
          Adjust_Esize_For_Alignment (Typ);
+      end if;
+
+      --  Reject a very large size on a type with a non-standard representation
+      --  because Expand_Freeze_Enumeration_Type cannot deal with it.
+
+      if Has_Non_Standard_Rep (Typ)
+        and then Known_Esize (Typ)
+        and then Esize (Typ) > System_Max_Integer_Size
+      then
+         Error_Msg_N
+           ("enumeration type with representation clause too large", Typ);
+         Error_Msg_Uint_1 := UI_From_Int (System_Max_Integer_Size);
+         Error_Msg_N
+           ("\the size of such a type cannot exceed ^ bits", Typ);
       end if;
    end Freeze_Enumeration_Type;
 

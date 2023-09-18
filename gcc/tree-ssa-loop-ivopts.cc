@@ -1606,7 +1606,10 @@ record_group_use (struct ivopts_data *data, tree *use_p,
     {
       unsigned int i;
 
-      addr_base = strip_offset (iv->base, &addr_offset);
+      gcc_assert (POINTER_TYPE_P (TREE_TYPE (iv->base)));
+      tree addr_toffset;
+      split_constant_offset (iv->base, &addr_base, &addr_toffset);
+      addr_offset = int_cst_value (addr_toffset);
       for (i = 0; i < data->vgroups.length (); i++)
 	{
 	  struct iv_use *use;
@@ -2438,17 +2441,27 @@ get_mem_type_for_internal_fn (gcall *call, tree *op_p)
     {
     case IFN_MASK_LOAD:
     case IFN_MASK_LOAD_LANES:
+    case IFN_MASK_LEN_LOAD_LANES:
     case IFN_LEN_LOAD:
+    case IFN_MASK_LEN_LOAD:
       if (op_p == gimple_call_arg_ptr (call, 0))
 	return TREE_TYPE (gimple_call_lhs (call));
       return NULL_TREE;
 
     case IFN_MASK_STORE:
     case IFN_MASK_STORE_LANES:
+    case IFN_MASK_LEN_STORE_LANES:
     case IFN_LEN_STORE:
-      if (op_p == gimple_call_arg_ptr (call, 0))
-	return TREE_TYPE (gimple_call_arg (call, 3));
-      return NULL_TREE;
+    case IFN_MASK_LEN_STORE:
+      {
+	if (op_p == gimple_call_arg_ptr (call, 0))
+	  {
+	    internal_fn ifn = gimple_call_internal_fn (call);
+	    int index = internal_fn_stored_value_index (ifn);
+	    return TREE_TYPE (gimple_call_arg (call, index));
+	  }
+	return NULL_TREE;
+      }
 
     default:
       return NULL_TREE;
@@ -2942,7 +2955,7 @@ strip_offset_1 (tree expr, bool inside_addr, bool top_compref,
 
 /* Strips constant offsets from EXPR and stores them to OFFSET.  */
 
-tree
+static tree
 strip_offset (tree expr, poly_uint64_pod *offset)
 {
   poly_int64 off;
@@ -3582,9 +3595,10 @@ add_iv_candidate_for_use (struct ivopts_data *data, struct iv_use *use)
       step = fold_convert (sizetype, step);
       record_common_cand (data, base, step, use);
       /* Also record common candidate with offset stripped.  */
-      base = strip_offset (base, &offset);
-      if (maybe_ne (offset, 0U))
-	record_common_cand (data, base, step, use);
+      tree alt_base, alt_offset;
+      split_constant_offset (base, &alt_base, &alt_offset);
+      if (!integer_zerop (alt_offset))
+	record_common_cand (data, alt_base, step, use);
     }
 
   /* At last, add auto-incremental candidates.  Make such variables
@@ -4692,17 +4706,25 @@ get_address_cost (struct ivopts_data *data, struct iv_use *use,
   /* Only true if ratio != 1.  */
   bool ok_with_ratio_p = false;
   bool ok_without_ratio_p = false;
+  code_helper code = ERROR_MARK;
+
+  if (use->type == USE_PTR_ADDRESS)
+    {
+      gcall *call = as_a<gcall *> (use->stmt);
+      gcc_assert (gimple_call_internal_p (call));
+      code = gimple_call_internal_fn (call);
+    }
 
   if (!aff_combination_const_p (aff_inv))
     {
       parts.index = integer_one_node;
       /* Addressing mode "base + index".  */
-      ok_without_ratio_p = valid_mem_ref_p (mem_mode, as, &parts);
+      ok_without_ratio_p = valid_mem_ref_p (mem_mode, as, &parts, code);
       if (ratio != 1)
 	{
 	  parts.step = wide_int_to_tree (type, ratio);
 	  /* Addressing mode "base + index << scale".  */
-	  ok_with_ratio_p = valid_mem_ref_p (mem_mode, as, &parts);
+	  ok_with_ratio_p = valid_mem_ref_p (mem_mode, as, &parts, code);
 	  if (!ok_with_ratio_p)
 	    parts.step = NULL_TREE;
 	}
@@ -4712,7 +4734,7 @@ get_address_cost (struct ivopts_data *data, struct iv_use *use,
 	    {
 	      parts.offset = wide_int_to_tree (sizetype, aff_inv->offset);
 	      /* Addressing mode "base + index [<< scale] + offset".  */
-	      if (!valid_mem_ref_p (mem_mode, as, &parts))
+	      if (!valid_mem_ref_p (mem_mode, as, &parts, code))
 		parts.offset = NULL_TREE;
 	      else
 		aff_inv->offset = 0;
@@ -4725,7 +4747,7 @@ get_address_cost (struct ivopts_data *data, struct iv_use *use,
 
 	  /* Addressing mode "symbol + base + index [<< scale] [+ offset]".  */
 	  if (parts.symbol != NULL_TREE
-	      && !valid_mem_ref_p (mem_mode, as, &parts))
+	      && !valid_mem_ref_p (mem_mode, as, &parts, code))
 	    {
 	      aff_combination_add_elt (aff_inv, parts.symbol, 1);
 	      parts.symbol = NULL_TREE;
@@ -4763,7 +4785,7 @@ get_address_cost (struct ivopts_data *data, struct iv_use *use,
 	{
 	  parts.offset = wide_int_to_tree (sizetype, aff_inv->offset);
 	  /* Addressing mode "base + offset".  */
-	  if (!valid_mem_ref_p (mem_mode, as, &parts))
+	  if (!valid_mem_ref_p (mem_mode, as, &parts, code))
 	    parts.offset = NULL_TREE;
 	  else
 	    aff_inv->offset = 0;
@@ -7553,8 +7575,12 @@ get_alias_ptr_type_for_ptr_address (iv_use *use)
     case IFN_MASK_STORE:
     case IFN_MASK_LOAD_LANES:
     case IFN_MASK_STORE_LANES:
+    case IFN_MASK_LEN_LOAD_LANES:
+    case IFN_MASK_LEN_STORE_LANES:
     case IFN_LEN_LOAD:
     case IFN_LEN_STORE:
+    case IFN_MASK_LEN_LOAD:
+    case IFN_MASK_LEN_STORE:
       /* The second argument contains the correct alias type.  */
       gcc_assert (use->op_p = gimple_call_arg_ptr (call, 0));
       return TREE_TYPE (gimple_call_arg (call, 1));
@@ -7616,7 +7642,22 @@ rewrite_use_address (struct ivopts_data *data,
 				      true, GSI_SAME_STMT);
     }
   else
-    copy_ref_info (ref, *use->op_p);
+    {
+      /* When we end up confused enough and have no suitable base but
+	 stuffed everything to index2 use a LEA for the address and
+	 create a plain MEM_REF to avoid basing a memory reference
+	 on address zero which create_mem_ref_raw does as fallback.  */
+      if (TREE_CODE (ref) == TARGET_MEM_REF
+	  && TMR_INDEX2 (ref) != NULL_TREE
+	  && integer_zerop (TREE_OPERAND (ref, 0)))
+	{
+	  ref = fold_build1 (ADDR_EXPR, TREE_TYPE (TREE_OPERAND (ref, 0)), ref);
+	  ref = force_gimple_operand_gsi (&bsi, ref, true, NULL_TREE,
+					  true, GSI_SAME_STMT);
+	  ref = build2 (MEM_REF, type, ref, build_zero_cst (alias_ptr_type));
+	}
+      copy_ref_info (ref, *use->op_p);
+    }
 
   *use->op_p = ref;
 }

@@ -136,8 +136,8 @@ M2DEFS = ChanConsts.def  CharClass.def \
          TERMINATION.def  TextIO.def \
          TextUtil.def \
          WholeConv.def  WholeIO.def \
-         WholeStr.def  wrapsock.def \
-         wraptime.def
+         WholeStr.def  wrapclock.def \
+         wrapsock.def wraptime.def
 
 M2MODS = ChanConsts.mod  CharClass.mod \
          ClientSocket.mod  ComplexMath.mod \
@@ -180,7 +180,7 @@ M2MODS = ChanConsts.mod  CharClass.mod \
 
 toolexeclib_LTLIBRARIES = libm2iso.la
 libm2iso_la_SOURCES =  $(M2MODS) \
-                     ErrnoCategory.cc wraptime.cc RTco.cc wrapsock.c
+                     ErrnoCategory.cc RTco.cc wrapclock.cc wraptime.cc wrapsock.c
 #  wrapsock.cc
 
 C_INCLUDES = -I.. -I$(toplevel_srcdir)/libiberty -I$(toplevel_srcdir)/include
@@ -191,7 +191,7 @@ libm2iso_la_CFLAGS = $(C_INCLUDES) -I. -I.. -I$(GM2_SRC)/gm2-libs-iso -I$(GM2_SR
 libm2iso_la_M2FLAGS = \
   -fm2-pathname=m2iso -I. -Ilibm2iso -I$(GM2_SRC)/gm2-libs-iso \
   -fm2-pathname=m2pim -I$(GM2_SRC)/gm2-libs \
-  -fiso -fextended-opaque -fm2-g -g -Wreturn-type -fcase -fm2-prefix=m2iso
+  -fiso -fextended-opaque -fm2-g -g -Wcase-enum -Wreturn-type -fcase -fm2-prefix=m2iso
 if TARGET_DARWIN
 libm2iso_la_link_flags = -Wl,-undefined,dynamic_lookup
 else

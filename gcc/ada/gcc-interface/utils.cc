@@ -87,6 +87,7 @@ tree gnat_raise_decls_ext[(int) LAST_REASON_CODE + 1];
 /* Forward declarations for handlers of attributes.  */
 static tree handle_const_attribute (tree *, tree, tree, int, bool *);
 static tree handle_nothrow_attribute (tree *, tree, tree, int, bool *);
+static tree handle_expected_throw_attribute (tree *, tree, tree, int, bool *);
 static tree handle_pure_attribute (tree *, tree, tree, int, bool *);
 static tree handle_novops_attribute (tree *, tree, tree, int, bool *);
 static tree handle_nonnull_attribute (tree *, tree, tree, int, bool *);
@@ -143,6 +144,8 @@ const struct attribute_spec gnat_internal_attribute_table[] =
     handle_const_attribute, NULL },
   { "nothrow",      0, 0,  true,  false, false, false,
     handle_nothrow_attribute, NULL },
+  { "expected_throw", 0, 0, true,  false, false, false,
+    handle_expected_throw_attribute, NULL },
   { "pure",         0, 0,  true,  false, false, false,
     handle_pure_attribute, NULL },
   { "no vops",      0, 0,  true,  false, false, false,
@@ -2156,7 +2159,7 @@ finish_record_type (tree record_type, tree field_list, int rep_level,
       /* If this is a padding record, we never want to make the size smaller
 	 than what was specified in it, if any.  */
       if (TYPE_IS_PADDING_P (record_type) && had_size)
-	size = TYPE_SIZE (record_type);
+	size = round_up (TYPE_SIZE (record_type), BITS_PER_UNIT);
       else
 	size = round_up (size, BITS_PER_UNIT);
 
@@ -6373,6 +6376,22 @@ handle_nothrow_attribute (tree *node, tree ARG_UNUSED (name),
 {
   if (TREE_CODE (*node) == FUNCTION_DECL)
     TREE_NOTHROW (*node) = 1;
+  else
+    *no_add_attrs = true;
+
+  return NULL_TREE;
+}
+
+/* Handle a "expected_throw" attribute; arguments as in
+   struct attribute_spec.handler.  */
+
+static tree
+handle_expected_throw_attribute (tree *node, tree ARG_UNUSED (name),
+				 tree ARG_UNUSED (args), int ARG_UNUSED (flags),
+				 bool *no_add_attrs)
+{
+  if (TREE_CODE (*node) == FUNCTION_DECL)
+    /* No flag to set here.  */;
   else
     *no_add_attrs = true;
 

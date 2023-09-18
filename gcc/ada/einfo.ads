@@ -1969,7 +1969,7 @@ package Einfo is
 --       is defined for the type.
 
 --    Has_Private_Ancestor
---       Applies to type extensions. True if some ancestor is derived from a
+--       Applies to derived record types. True if an ancestor is derived from a
 --       private type, making some components invisible and aggregates illegal.
 --       This flag is set at the point of derivation. The legality of the
 --       aggregate must be rechecked because it also depends on the visibility
@@ -3832,7 +3832,7 @@ package Einfo is
 
 --    Number_Formals (synthesized)
 --       Applies to subprograms and subprogram types. Yields the number of
---       formals as a value of type Pos.
+--       formals as a value of type Nat.
 
 --    Object_Size_Clause (synthesized)
 --       Applies to entities for types and subtypes. If an object size clause
@@ -4112,7 +4112,7 @@ package Einfo is
 --    Protected_Subprogram
 --       Defined in functions and procedures. Set for the pair of subprograms
 --       which emulate the runtime semantics of a protected subprogram. Denotes
---       the entity of the origial protected subprogram.
+--       the entity of the original protected subprogram.
 
 --    Protection_Object
 --       Applies to protected entries, entry families and subprograms. Denotes

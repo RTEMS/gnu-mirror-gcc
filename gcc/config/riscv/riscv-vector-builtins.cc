@@ -109,10 +109,8 @@ const char *const operand_suffixes[NUM_OP_TYPES] = {
 
 /* Static information about type suffix for each RVV type.  */
 const rvv_builtin_suffixes type_suffixes[NUM_VECTOR_TYPES + 1] = {
-#define DEF_RVV_TYPE(NAME, NCHARS, ABI_NAME, SCALAR_TYPE,                      \
-		     VECTOR_MODE_MIN_VLEN_128, VECTOR_MODE_MIN_VLEN_64,        \
-		     VECTOR_MODE_MIN_VLEN_32, VECTOR_SUFFIX, SCALAR_SUFFIX,    \
-		     VSETVL_SUFFIX)                                            \
+#define DEF_RVV_TYPE(NAME, NCHARS, ABI_NAME, SCALAR_TYPE, VECTOR_MODE,         \
+		     VECTOR_SUFFIX, SCALAR_SUFFIX, VSETVL_SUFFIX)              \
   {#VECTOR_SUFFIX, #SCALAR_SUFFIX, #VSETVL_SUFFIX},
 #define DEF_RVV_TUPLE_TYPE(NAME, NCHARS, ABI_NAME, SUBPART_TYPE, SCALAR_TYPE,  \
 			   NF, VECTOR_SUFFIX)                                  \
@@ -874,6 +872,10 @@ static CONSTEXPR const rvv_arg_type_info ext_x8_vget_args[]
 static CONSTEXPR const rvv_arg_type_info tuple_vset_args[]
   = {rvv_arg_type_info (RVV_BASE_vector), rvv_arg_type_info (RVV_BASE_size),
      rvv_arg_type_info (RVV_BASE_tuple_subpart), rvv_arg_type_info_end};
+
+/* A list of args for vector_type func (vector_type) function.  */
+static CONSTEXPR const rvv_arg_type_info tuple_vcreate_args[]
+  = {rvv_arg_type_info (RVV_BASE_tuple_subpart), rvv_arg_type_info_end};
 
 /* A list of none preds that will be registered for intrinsic functions.  */
 static CONSTEXPR const predication_type_index none_preds[]
@@ -2499,6 +2501,14 @@ static CONSTEXPR const rvv_op_info tuple_v_scalar_const_ptr_size_ptr_ops
      rvv_arg_type_info (RVV_BASE_vector), /* Return type */
      scalar_const_ptr_size_ptr_args /* Args */};
 
+/* A static operand information for vector_type func (vector_type)
+ * function registration. */
+static CONSTEXPR const rvv_op_info all_v_vcreate_tuple_ops
+  = {tuple_ops,				  /* Types */
+     OP_TYPE_v,				  /* Suffix */
+     rvv_arg_type_info (RVV_BASE_vector), /* Return type */
+     tuple_vcreate_args /* Args */};
+
 /* A list of all RVV base function types.  */
 static CONSTEXPR const function_type_info function_types[] = {
 #define DEF_RVV_TYPE_INDEX(                                                    \
@@ -2673,7 +2683,7 @@ sizeless_type_p (const_tree type)
 
 /* If TYPE is an ABI-defined RVV type, return its attribute descriptor,
    otherwise return null.  */
-static tree
+tree
 lookup_vector_type_attribute (const_tree type)
 {
   if (type == error_mark_node)
@@ -2802,12 +2812,9 @@ register_builtin_types ()
   tree int64_type_node = get_typenode_from_name (INT64_TYPE);
 
   machine_mode mode;
-#define DEF_RVV_TYPE(NAME, NCHARS, ABI_NAME, SCALAR_TYPE,                      \
-		     VECTOR_MODE_MIN_VLEN_128, VECTOR_MODE_MIN_VLEN_64,        \
-		     VECTOR_MODE_MIN_VLEN_32, ARGS...)                         \
-  mode = TARGET_MIN_VLEN >= 128	 ? VECTOR_MODE_MIN_VLEN_128##mode              \
-	 : TARGET_MIN_VLEN >= 64 ? VECTOR_MODE_MIN_VLEN_64##mode               \
-				 : VECTOR_MODE_MIN_VLEN_32##mode;              \
+#define DEF_RVV_TYPE(NAME, NCHARS, ABI_NAME, SCALAR_TYPE, VECTOR_MODE,         \
+		     ARGS...)                                                  \
+  mode = VECTOR_MODE##mode;                                                    \
   register_builtin_type (VECTOR_TYPE_##NAME, SCALAR_TYPE##_type_node, mode);
 #define DEF_RVV_TUPLE_TYPE(NAME, NCHARS, ABI_NAME, SUBPART_TYPE, SCALAR_TYPE,  \
 			   NF, VECTOR_SUFFIX)                                  \
@@ -3476,7 +3483,14 @@ function_expander::function_expander (const function_instance &instance,
     exp (exp_in), target (target_in), opno (0)
 {
   if (!function_returns_void_p ())
-    create_output_operand (&m_ops[opno++], target, TYPE_MODE (TREE_TYPE (exp)));
+    {
+      if (target != NULL_RTX && MEM_P (target))
+	/* Since there is no intrinsic where target is a mem operand, it
+	   should be converted to reg if it is a mem operand.  */
+	target = force_reg (GET_MODE (target), target);
+      create_output_operand (&m_ops[opno++], target,
+			     TYPE_MODE (TREE_TYPE (exp)));
+    }
 }
 
 /* Take argument ARGNO from EXP's argument list and convert it into
@@ -3569,11 +3583,10 @@ function_expander::use_exact_insn (insn_code icode)
   if (base->has_rounding_mode_operand_p ())
     add_input_operand (call_expr_nargs (exp) - 2);
 
-  /* TODO: Currently, we don't support intrinsic that is modeling rounding mode.
-     We add default rounding mode for the intrinsics that didn't model rounding
-     mode yet.  */
+  /* The RVV floating-point only support dynamic rounding mode in the
+     FRM register.  */
   if (opno != insn_data[icode].n_generator_args)
-    add_input_operand (Pmode, const0_rtx);
+    add_input_operand (Pmode, gen_int_mode (riscv_vector::FRM_DYN, Pmode));
 
   return generate_insn (icode);
 }
@@ -3636,6 +3649,7 @@ function_expander::use_contiguous_store_insn (insn_code icode)
   for (int argno = arg_offset; argno < call_expr_nargs (exp); argno++)
     add_input_operand (argno);
 
+  add_input_operand (Pmode, get_avl_type_rtx (avl_type::NONVLMAX));
   return generate_insn (icode);
 }
 
@@ -3735,17 +3749,29 @@ function_expander::use_ternop_insn (bool vd_accum_p, insn_code icode)
     }
 
   for (int argno = arg_offset; argno < call_expr_nargs (exp); argno++)
-    add_input_operand (argno);
+    {
+      if (base->has_rounding_mode_operand_p ()
+	  && argno == call_expr_nargs (exp) - 2)
+	{
+	  /* Since the rounding mode argument position is not consistent with
+	     the instruction pattern, we need to skip rounding mode argument
+	     here.  */
+	  continue;
+	}
+      add_input_operand (argno);
+    }
 
   add_input_operand (Pmode, get_tail_policy_for_pred (pred));
   add_input_operand (Pmode, get_mask_policy_for_pred (pred));
   add_input_operand (Pmode, get_avl_type_rtx (avl_type::NONVLMAX));
 
-  /* TODO: Currently, we don't support intrinsic that is modeling rounding mode.
-     We add default rounding mode for the intrinsics that didn't model rounding
-     mode yet.  */
+  if (base->has_rounding_mode_operand_p ())
+    add_input_operand (call_expr_nargs (exp) - 2);
+
+  /* The RVV floating-point only support dynamic rounding mode in the
+     FRM register.  */
   if (opno != insn_data[icode].n_generator_args)
-    add_input_operand (Pmode, const0_rtx);
+    add_input_operand (Pmode, gen_int_mode (riscv_vector::FRM_DYN, Pmode));
 
   return generate_insn (icode);
 }
@@ -3764,17 +3790,29 @@ function_expander::use_widen_ternop_insn (insn_code icode)
     add_all_one_mask_operand (mask_mode ());
 
   for (int argno = arg_offset; argno < call_expr_nargs (exp); argno++)
-    add_input_operand (argno);
+    {
+      if (base->has_rounding_mode_operand_p ()
+	  && argno == call_expr_nargs (exp) - 2)
+	{
+	  /* Since the rounding mode argument position is not consistent with
+	     the instruction pattern, we need to skip rounding mode argument
+	     here.  */
+	  continue;
+	}
+      add_input_operand (argno);
+    }
 
   add_input_operand (Pmode, get_tail_policy_for_pred (pred));
   add_input_operand (Pmode, get_mask_policy_for_pred (pred));
   add_input_operand (Pmode, get_avl_type_rtx (avl_type::NONVLMAX));
 
-  /* TODO: Currently, we don't support intrinsic that is modeling rounding mode.
-     We add default rounding mode for the intrinsics that didn't model rounding
-     mode yet.  */
+  if (base->has_rounding_mode_operand_p ())
+    add_input_operand (call_expr_nargs (exp) - 2);
+
+  /* The RVV floating-point only support dynamic rounding mode in the
+     FRM register.  */
   if (opno != insn_data[icode].n_generator_args)
-    add_input_operand (Pmode, const0_rtx);
+    add_input_operand (Pmode, gen_int_mode (riscv_vector::FRM_DYN, Pmode));
 
   return generate_insn (icode);
 }
@@ -3851,6 +3889,23 @@ function_checker::report_out_of_range (unsigned int argno, HOST_WIDE_INT actual,
 	    actual, argno + 1, fndecl, min, max);
 }
 
+/* Report that LOCATION has a call to FNDECL in which argument ARGNO has
+   the value ACTUAL, whereas the function requires a value in the range
+   [MIN, MAX] or OR_VAL.  ARGNO counts from zero.  */
+void
+function_checker::report_out_of_range_and_not (unsigned int argno,
+					       HOST_WIDE_INT actual,
+					       HOST_WIDE_INT min,
+					       HOST_WIDE_INT max,
+					       HOST_WIDE_INT or_val) const
+{
+  error_at (location,
+	    "passing %wd to argument %d of %qE, which expects"
+	    " a value in the range [%wd, %wd] or %wd",
+	    actual, argno + 1, fndecl, min, max, or_val);
+}
+
+
 /* Check that argument ARGNO is an integer constant expression and
    store its value in VALUE_OUT if so.  The caller should first
    check that argument ARGNO exists.  */
@@ -3892,6 +3947,30 @@ function_checker::require_immediate_range (unsigned int argno,
   return true;
 }
 
+/* Check that argument REL_ARGNO is an integer constant expression in the
+   range [MIN, MAX] or OR_VAL.  REL_ARGNO counts from the end of the
+   predication arguments.  */
+bool
+function_checker::require_immediate_range_or (unsigned int argno,
+					      HOST_WIDE_INT min,
+					      HOST_WIDE_INT max,
+					      HOST_WIDE_INT or_val) const
+{
+  gcc_assert (min >= 0 && min <= max);
+  gcc_assert (argno < m_nargs);
+
+  tree arg = m_args[argno];
+  HOST_WIDE_INT actual = tree_to_uhwi (arg);
+
+  if (!IN_RANGE (actual, min, max) && actual != or_val)
+    {
+      report_out_of_range_and_not (argno, actual, min, max, or_val);
+      return false;
+    }
+
+  return true;
+}
+
 /* Perform semantic checks on the call.  Return true if the call is valid,
    otherwise report a suitable error.  */
 bool
@@ -3923,6 +4002,16 @@ mangle_builtin_type (const_tree type)
     if (tree id = TREE_VALUE (chain_index (0, TREE_VALUE (attr))))
       return IDENTIFIER_POINTER (id);
   return NULL;
+}
+
+/* Return true if TYPE is a built-in RVV type defined by the ABI.  */
+bool
+builtin_type_p (const_tree type)
+{
+  if (!type)
+    return false;
+
+  return lookup_vector_type_attribute (type);
 }
 
 /* Initialize all compiler built-ins related to RVV that should be

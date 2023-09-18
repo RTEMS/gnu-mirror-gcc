@@ -1336,9 +1336,27 @@ cp_genericize_r (tree *stmt_p, int *walk_subtrees, void *data)
       break;
 
     case RETURN_EXPR:
-      if (TREE_OPERAND (stmt, 0) && is_invisiref_parm (TREE_OPERAND (stmt, 0)))
-	/* Don't dereference an invisiref RESULT_DECL inside a RETURN_EXPR.  */
-	*walk_subtrees = 0;
+      if (TREE_OPERAND (stmt, 0))
+	{
+	  if (is_invisiref_parm (TREE_OPERAND (stmt, 0)))
+	    /* Don't dereference an invisiref RESULT_DECL inside a
+	       RETURN_EXPR.  */
+	    *walk_subtrees = 0;
+	  if (RETURN_EXPR_LOCAL_ADDR_P (stmt))
+	    {
+	      /* Don't return the address of a local variable.  */
+	      tree *p = &TREE_OPERAND (stmt, 0);
+	      while (TREE_CODE (*p) == COMPOUND_EXPR)
+		p = &TREE_OPERAND (*p, 0);
+	      if (TREE_CODE (*p) == INIT_EXPR)
+		{
+		  tree op = TREE_OPERAND (*p, 1);
+		  tree new_op = build2 (COMPOUND_EXPR, TREE_TYPE (op), op,
+					build_zero_cst (TREE_TYPE (op)));
+		  TREE_OPERAND (*p, 1) = new_op;
+		}
+	    }
+	}
       break;
 
     case OMP_CLAUSE:
@@ -3079,6 +3097,8 @@ cp_fold (tree x, fold_flags_t flags)
 	    x = build_constructor (TREE_TYPE (x), nelts);
 	    CONSTRUCTOR_PLACEHOLDER_BOUNDARY (x)
 	      = CONSTRUCTOR_PLACEHOLDER_BOUNDARY (org_x);
+	    CONSTRUCTOR_MUTABLE_POISON (x)
+	      = CONSTRUCTOR_MUTABLE_POISON (org_x);
 	  }
 	if (VECTOR_TYPE_P (TREE_TYPE (x)))
 	  x = fold (x);

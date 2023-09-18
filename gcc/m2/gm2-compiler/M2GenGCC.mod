@@ -150,7 +150,7 @@ FROM M2GCCDeclare IMPORT WalkAction,
                          DeclareConstant, TryDeclareConstant,
                          DeclareConstructor, TryDeclareConstructor,
                          StartDeclareScope, EndDeclareScope,
-                         PromoteToString, DeclareLocalVariable,
+                         PromoteToString, PromoteToCString, DeclareLocalVariable,
                          CompletelyResolved,
                          PoisonSymbols, GetTypeMin, GetTypeMax,
                          IsProcedureGccNested, DeclareParameters,
@@ -208,10 +208,11 @@ FROM m2expr IMPORT GetIntegerZero, GetIntegerOne,
                    BuildAddAddress,
                    BuildIfInRangeGoto, BuildIfNotInRangeGoto ;
 
-FROM m2tree IMPORT Tree, debug_tree ;
+FROM m2tree IMPORT Tree, debug_tree, skip_const_decl ;
 FROM m2linemap IMPORT location_t ;
 
-FROM m2decl IMPORT BuildStringConstant, DeclareKnownConstant, GetBitsPerBitset,
+FROM m2decl IMPORT BuildStringConstant, BuildCStringConstant,
+                   DeclareKnownConstant, GetBitsPerBitset,
                    BuildIntegerConstant,
                    BuildModuleCtor, DeclareModuleCtor ;
 
@@ -395,7 +396,7 @@ BEGIN
          THEN
             RETURN FALSE
          END ;
-         scope := GetScope(scope)
+         scope := GetScope (scope)
       END ;
       InternalError ('expecting scope to eventually reach a module or defimp symbol')
    ELSE
@@ -410,7 +411,7 @@ END IsExportedGcc ;
                         the GCC tree structure.
 *)
 
-PROCEDURE ConvertQuadsToTree (Start, End: CARDINAL) ;
+PROCEDURE ConvertQuadsToTree (Scope: CARDINAL; Start, End: CARDINAL) ;
 BEGIN
    REPEAT
       CodeStatement (Start) ;
@@ -530,7 +531,7 @@ BEGIN
    SavePriorityOp     : CodeSavePriority (op1, op2, op3) |
    RestorePriorityOp  : CodeRestorePriority (op1, op2, op3) |
 
-   InlineOp           : CodeInline (location, CurrentQuadToken, op3) |
+   InlineOp           : CodeInline (q) |
    StatementNoteOp    : CodeStatementNote (op3) |
    CodeOnOp           : |           (* the following make no sense with gcc *)
    CodeOffOp          : |
@@ -702,6 +703,8 @@ END FindType ;
 *)
 
 PROCEDURE BuildTreeFromInterface (sym: CARDINAL) : Tree ;
+CONST
+   DebugTokPos = FALSE ;
 VAR
    tok     : CARDINAL ;
    i       : CARDINAL ;
@@ -717,7 +720,7 @@ BEGIN
       i := 1 ;
       REPEAT
          GetRegInterface (sym, i, tok, name, str, obj) ;
-         IF str#NulSym
+         IF str # NulSym
          THEN
             IF IsConstString (str)
             THEN
@@ -726,11 +729,18 @@ BEGIN
                THEN
                   gccName := NIL
                ELSE
-                  gccName := BuildStringConstant (KeyToCharStar (name), LengthKey (name))
+                  gccName := BuildCStringConstant (KeyToCharStar (name), LengthKey (name))
                END ;
-               tree := ChainOnParamValue (tree, gccName, PromoteToString (tok, str), Mod2Gcc (obj))
+               tree := ChainOnParamValue (tree, gccName, PromoteToCString (tok, str),
+                                          skip_const_decl (Mod2Gcc (obj))) ;
+               IF DebugTokPos
+               THEN
+                  WarnStringAt (InitString ('input expression'), tok)
+               END
             ELSE
-               WriteFormat0 ('a constraint to the GNU ASM statement must be a constant string')
+               MetaErrorT1 (tok,
+                            'a constraint to the GNU ASM statement must be a constant string and not a {%1Ed}',
+                            str)
             END
          END ;
          INC(i)
@@ -745,6 +755,8 @@ END BuildTreeFromInterface ;
 *)
 
 PROCEDURE BuildTrashTreeFromInterface (sym: CARDINAL) : Tree ;
+CONST
+   DebugTokPos = FALSE ;
 VAR
    tok : CARDINAL ;
    i   : CARDINAL ;
@@ -763,9 +775,15 @@ BEGIN
          THEN
             IF IsConstString (str)
             THEN
-               tree := AddStringToTreeList (tree, PromoteToString (tok, str))
+               tree := AddStringToTreeList (tree, PromoteToCString (tok, str)) ;
+               IF DebugTokPos
+               THEN
+                  WarnStringAt (InitString ('trash expression'), tok)
+               END
             ELSE
-               WriteFormat0 ('a constraint to the GNU ASM statement must be a constant string')
+               MetaErrorT1 (tok,
+                            'a constraint to the GNU ASM statement must be a constant string and not a {%1Ed}',
+                            str)
             END
          END ;
 (*
@@ -785,33 +803,34 @@ END BuildTrashTreeFromInterface ;
    CodeInline - InlineOp is a quadruple which has the following format:
 
                 InlineOp   NulSym  NulSym  Sym
-
-                The inline asm statement, Sym, is written to standard output.
 *)
 
-PROCEDURE CodeInline (location: location_t; tokenno: CARDINAL; GnuAsm: CARDINAL) ;
+PROCEDURE CodeInline (quad: CARDINAL) ;
 VAR
-   string  : CARDINAL ;
+   overflowChecking: BOOLEAN ;
+   op              : QuadOperator ;
+   op1, op2, GnuAsm: CARDINAL ;
+   op1pos, op2pos,
+   op3pos, asmpos  : CARDINAL ;
+   string          : CARDINAL ;
    inputs,
    outputs,
    trash,
-   labels  : Tree ;
+   labels          : Tree ;
+   location        : location_t ;
 BEGIN
-   (*
-      no need to explicity flush the outstanding instructions as
-      per M2GenDyn486 and M2GenAPU. The GNU ASM statements in GCC
-      can handle the register dependency providing the user
-      specifies VOLATILE and input/output/trash sets correctly.
-   *)
-   inputs  := BuildTreeFromInterface (GetGnuAsmInput(GnuAsm)) ;
-   outputs := BuildTreeFromInterface (GetGnuAsmOutput(GnuAsm)) ;
-   trash   := BuildTrashTreeFromInterface (GetGnuAsmTrash(GnuAsm)) ;
-   labels  := NIL ;  (* at present it makes no sence for Modula-2 to jump to a label,
+   GetQuadOtok (quad, asmpos, op, op1, op2, GnuAsm, overflowChecking,
+                op1pos, op2pos, op3pos) ;
+   location := TokenToLocation (asmpos) ;
+   inputs  := BuildTreeFromInterface (GetGnuAsmInput (GnuAsm)) ;
+   outputs := BuildTreeFromInterface (GetGnuAsmOutput (GnuAsm)) ;
+   trash   := BuildTrashTreeFromInterface (GetGnuAsmTrash (GnuAsm)) ;
+   labels  := NIL ;  (* At present it makes no sence for Modula-2 to jump to a label,
                         given that labels are not allowed in Modula-2.  *)
    string  := GetGnuAsm (GnuAsm) ;
-   DeclareConstant (tokenno, string) ;
    BuildAsm (location,
-             Mod2Gcc (string), IsGnuAsmVolatile (GnuAsm), IsGnuAsmSimple (GnuAsm),
+             PromoteToCString (GetDeclaredMod (string), string),
+             IsGnuAsmVolatile (GnuAsm), IsGnuAsmSimple (GnuAsm),
              inputs, outputs, trash, labels)
 END CodeInline ;
 
@@ -1362,7 +1381,9 @@ BEGIN
    (* now assign  param.Addr := ADR(NewArray) *)
 
    BuildAssignmentStatement (location,
-                             BuildComponentRef (location, Mod2Gcc (param), Mod2Gcc (GetUnboundedAddressOffset (UnboundedType))),
+                             BuildComponentRef (location,
+                                                Mod2Gcc (param),
+                                                Mod2Gcc (GetUnboundedAddressOffset (UnboundedType))),
                              NewArray)
 END MakeCopyUse ;
 
@@ -1842,13 +1863,14 @@ END CodeProcedureScope ;
 PROCEDURE CodeReturnValue (quad: CARDINAL) ;
 VAR
    op                                  : QuadOperator ;
+   overflowChecking                    : BOOLEAN ;
    expr, none, procedure               : CARDINAL ;
    combinedpos,
    returnpos, exprpos, nonepos, procpos: CARDINAL ;
    value, length                       : Tree ;
    location                            : location_t ;
 BEGIN
-   GetQuadOtok (quad, returnpos, op, expr, none, procedure,
+   GetQuadOtok (quad, returnpos, op, expr, none, procedure, overflowChecking,
                 exprpos, nonepos, procpos) ;
    combinedpos := MakeVirtualTok (returnpos, returnpos, exprpos) ;
    location := TokenToLocation (combinedpos) ;
@@ -3079,18 +3101,19 @@ END checkDeclare ;
 
 PROCEDURE CodeBecomes (quad: CARDINAL) ;
 VAR
-   op        : QuadOperator ;
-   op1, op2,
-   op3       : CARDINAL ;
+   overflowChecking: BOOLEAN ;
+   op              : QuadOperator ;
+   op1, op2, op3   : CARDINAL ;
    becomespos,
    op1pos,
    op2pos,
-   op3pos    : CARDINAL ;
+   op3pos          : CARDINAL ;
    length,
-   op3t      : Tree ;
-   location  : location_t ;
+   op3t            : Tree ;
+   location        : location_t ;
 BEGIN
-   GetQuadOtok (quad, becomespos, op, op1, op2, op3, op1pos, op2pos, op3pos) ;
+   GetQuadOtok (quad, becomespos, op, op1, op2, op3, overflowChecking,
+                op1pos, op2pos, op3pos) ;
    Assert (op2pos = UnknownTokenNo) ;
    DeclareConstant (CurrentQuadToken, op3) ;  (* Check to see whether op3 is a constant and declare it.  *)
    DeclareConstructor (CurrentQuadToken, quad, op3) ;
@@ -7177,7 +7200,8 @@ END CodeIndrX ;
 
 PROCEDURE CodeXIndr (quad: CARDINAL) ;
 VAR
-   op      : QuadOperator ;
+   overflowChecking: BOOLEAN ;
+   op              : QuadOperator ;
    tokenno,
    op1,
    type,
@@ -7185,12 +7209,13 @@ VAR
    op1pos,
    op3pos,
    typepos,
-   xindrpos: CARDINAL ;
+   xindrpos        : CARDINAL ;
    length,
-   newstr  : Tree ;
-   location: location_t ;
+   newstr          : Tree ;
+   location        : location_t ;
 BEGIN
-   GetQuadOtok (quad, xindrpos, op, op1, type, op3, op1pos, typepos, op3pos) ;
+   GetQuadOtok (quad, xindrpos, op, op1, type, op3, overflowChecking,
+                op1pos, typepos, op3pos) ;
    tokenno := MakeVirtualTok (xindrpos, op1pos, op3pos) ;
    location := TokenToLocation (tokenno) ;
 

@@ -1334,6 +1334,7 @@ enum gfc_omp_defaultmap
 enum gfc_omp_defaultmap_category
 {
   OMP_DEFAULTMAP_CAT_UNCATEGORIZED,
+  OMP_DEFAULTMAP_CAT_ALL,
   OMP_DEFAULTMAP_CAT_SCALAR,
   OMP_DEFAULTMAP_CAT_AGGREGATE,
   OMP_DEFAULTMAP_CAT_ALLOCATABLE,
@@ -1368,6 +1369,7 @@ typedef struct gfc_omp_namelist
 	  bool old_modifier;
 	} linear;
       struct gfc_common_head *common;
+      struct gfc_symbol *memspace_sym;
       bool lastprivate_conditional;
       bool present_modifier;
     } u;
@@ -1376,6 +1378,7 @@ typedef struct gfc_omp_namelist
       struct gfc_omp_namelist_udr *udr;
       gfc_namespace *ns;
       gfc_expr *allocator;
+      struct gfc_symbol *traits_sym;
     } u2;
   struct gfc_omp_namelist *next;
   locus where;
@@ -1419,6 +1422,7 @@ enum
   OMP_LIST_ALLOCATE,
   OMP_LIST_HAS_DEVICE_ADDR,
   OMP_LIST_ENTER,
+  OMP_LIST_USES_ALLOCATORS,
   OMP_LIST_NUM /* Must be the last.  */
 };
 
@@ -1572,6 +1576,7 @@ typedef struct gfc_omp_clauses
   unsigned order_unconstrained:1, order_reproducible:1, capture:1;
   unsigned grainsize_strict:1, num_tasks_strict:1, compare:1, weak:1;
   unsigned non_rectangular:1, order_concurrent:1;
+  unsigned contains_teams_construct:1, target_first_st_is_teams:1;
   ENUM_BITFIELD (gfc_omp_sched_kind) sched_kind:3;
   ENUM_BITFIELD (gfc_omp_device_type) device_type:2;
   ENUM_BITFIELD (gfc_omp_memorder) memorder:3;
@@ -1939,7 +1944,27 @@ typedef struct gfc_symbol
      according to the Fortran standard.  */
   unsigned pass_as_value:1;
 
+  /* Reference counter, used for memory management.
+
+     Some symbols may be present in more than one namespace, for example
+     function and subroutine symbols are present both in the outer namespace and
+     the procedure body namespace.  Freeing symbols with the namespaces they are
+     in would result in double free for those symbols.  This field counts
+     references and is used to delay the memory release until the last reference
+     to the symbol is removed.
+
+     Not every symbol pointer is accounted for reference counting.  Fields
+     gfc_symtree::n::sym are, and gfc_finalizer::proc_sym as well.  But most of
+     them (dummy arguments, generic list elements, etc) are "weak" pointers;
+     the reference count isn't updated when they are assigned, and they are
+     ignored when the surrounding structure memory is released.  This is not a
+     problem because there is always a namespace as surrounding context and
+     symbols have a name they can be referred with in that context, so the
+     namespace keeps the symbol from being freed, keeping the pointer valid.
+     When the namespace ceases to exist, and the symbols with it, the other
+     structures referencing symbols cease to exist as well.  */
   int refs;
+
   struct gfc_namespace *ns;	/* namespace containing this symbol */
 
   tree backend_decl;
@@ -2232,6 +2257,9 @@ typedef struct gfc_namespace
   /* OpenMP requires. */
   unsigned omp_requires:6;
   unsigned omp_target_seen:1;
+
+  /* Set to 1 if this is an implicit OMP structured block.  */
+  unsigned omp_structured_block:1;
 }
 gfc_namespace;
 
@@ -3178,6 +3206,21 @@ gfc_finalizer;
 
 /************************ Function prototypes *************************/
 
+
+/* Returns true if the type specified in TS is a character type whose length
+   is the constant one.  Otherwise returns false.  */
+
+inline bool
+gfc_length_one_character_type_p (gfc_typespec *ts)
+{
+  return ts->type == BT_CHARACTER
+	 && ts->u.cl
+	 && ts->u.cl->length
+	 && ts->u.cl->length->expr_type == EXPR_CONSTANT
+	 && ts->u.cl->length->ts.type == BT_INTEGER
+	 && mpz_cmp_ui (ts->u.cl->length->value.integer, 1) == 0;
+}
+
 /* decl.cc */
 bool gfc_in_match_data (void);
 match gfc_match_char_spec (gfc_typespec *);
@@ -3487,12 +3530,11 @@ bool gfc_reference_st_label (gfc_st_label *, gfc_sl_type);
 gfc_namespace *gfc_get_namespace (gfc_namespace *, int);
 gfc_symtree *gfc_new_symtree (gfc_symtree **, const char *);
 gfc_symtree *gfc_find_symtree (gfc_symtree *, const char *);
-void gfc_delete_symtree (gfc_symtree **, const char *);
 gfc_symtree *gfc_get_unique_symtree (gfc_namespace *);
 gfc_user_op *gfc_get_uop (const char *);
 gfc_user_op *gfc_find_uop (const char *, gfc_namespace *);
 void gfc_free_symbol (gfc_symbol *&);
-void gfc_release_symbol (gfc_symbol *&);
+bool gfc_release_symbol (gfc_symbol *&);
 gfc_symbol *gfc_new_symbol (const char *, gfc_namespace *);
 gfc_symtree* gfc_find_symtree_in_proc (const char *, gfc_namespace *);
 int gfc_find_symbol (const char *, gfc_namespace *, int, gfc_symbol **);
@@ -3600,7 +3642,7 @@ void gfc_free_iterator (gfc_iterator *, int);
 void gfc_free_forall_iterator (gfc_forall_iterator *);
 void gfc_free_alloc_list (gfc_alloc *);
 void gfc_free_namelist (gfc_namelist *);
-void gfc_free_omp_namelist (gfc_omp_namelist *, bool, bool);
+void gfc_free_omp_namelist (gfc_omp_namelist *, bool, bool, bool);
 void gfc_free_equiv (gfc_equiv *);
 void gfc_free_equiv_until (gfc_equiv *, gfc_equiv *);
 void gfc_free_data (gfc_data *);
@@ -3659,6 +3701,7 @@ bool gfc_is_constant_expr (gfc_expr *);
 bool gfc_simplify_expr (gfc_expr *, int);
 bool gfc_try_simplify_expr (gfc_expr *, int);
 bool gfc_has_vector_index (gfc_expr *);
+bool gfc_is_ptr_fcn (gfc_expr *);
 
 gfc_expr *gfc_get_expr (void);
 gfc_expr *gfc_get_array_expr (bt type, int kind, locus *);
@@ -3726,6 +3769,7 @@ gfc_expr* gfc_find_stat_co (gfc_expr *);
 gfc_expr* gfc_build_intrinsic_call (gfc_namespace *, gfc_isym_id, const char*,
 				    locus, unsigned, ...);
 bool gfc_check_vardef_context (gfc_expr*, bool, bool, bool, const char*);
+gfc_expr* gfc_pdt_find_component_copy_initializer (gfc_symbol *, const char *);
 
 
 /* st.cc */
@@ -3803,6 +3847,7 @@ bool gfc_ref_dimen_size (gfc_array_ref *, int dimen, mpz_t *, mpz_t *);
 
 /* interface.cc -- FIXME: some of these should be in symbol.cc */
 void gfc_free_interface (gfc_interface *);
+void gfc_drop_interface_elements_before (gfc_interface **, gfc_interface *);
 bool gfc_compare_derived_types (gfc_symbol *, gfc_symbol *);
 bool gfc_compare_types (gfc_typespec *, gfc_typespec *);
 bool gfc_check_dummy_characteristics (gfc_symbol *, gfc_symbol *,
@@ -3822,7 +3867,7 @@ void gfc_free_formal_arglist (gfc_formal_arglist *);
 bool gfc_extend_assign (gfc_code *, gfc_namespace *);
 bool gfc_check_new_interface (gfc_interface *, gfc_symbol *, locus);
 bool gfc_add_interface (gfc_symbol *);
-gfc_interface *gfc_current_interface_head (void);
+gfc_interface *&gfc_current_interface_head (void);
 void gfc_set_current_interface_head (gfc_interface *);
 gfc_symtree* gfc_find_sym_in_symtree (gfc_symbol*);
 bool gfc_arglist_matches_symbol (gfc_actual_arglist**, gfc_symbol*);
@@ -3885,7 +3930,7 @@ bool gfc_inline_intrinsic_function_p (gfc_expr *);
 /* bbt.cc */
 typedef int (*compare_fn) (void *, void *);
 void gfc_insert_bbt (void *, void *, compare_fn);
-void gfc_delete_bbt (void *, void *, compare_fn);
+void * gfc_delete_bbt (void *, void *, compare_fn);
 
 /* dump-parse-tree.cc */
 void gfc_dump_parse_tree (gfc_namespace *, FILE *);

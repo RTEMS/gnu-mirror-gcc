@@ -426,7 +426,9 @@ package body Sem_Ch13 is
 
    procedure Adjust_Record_For_Reverse_Bit_Order (R : Entity_Id) is
       Max_Machine_Scalar_Size : constant Uint :=
-                                  UI_From_Int (System_Max_Integer_Size);
+        UI_From_Int (if Reverse_Bit_Order_Threshold >= 0
+                     then Reverse_Bit_Order_Threshold
+                     else System_Max_Integer_Size);
       --  We use this as the maximum machine scalar size
 
       SSU : constant Uint := UI_From_Int (System_Storage_Unit);
@@ -1409,20 +1411,37 @@ package body Sem_Ch13 is
       --    Abstract_State
       --    Always_Terminates
       --    Attach_Handler
+      --    Async_Readers
+      --    Async_Writers
+      --    Constant_After_Elaboration
       --    Contract_Cases
+      --    Convention
+      --    Default_Initial_Condition
+      --    Default_Storage_Pool
       --    Depends
+      --    Effective_Reads
+      --    Effective_Writes
       --    Exceptional_Cases
+      --    Extensions_Visible
       --    Ghost
       --    Global
       --    Initial_Condition
       --    Initializes
+      --    Max_Entry_Queue_Depth
+      --    Max_Entry_Queue_Length
+      --    Max_Queue_Length
+      --    No_Caching
+      --    Part_Of
       --    Post
       --    Pre
       --    Refined_Depends
       --    Refined_Global
+      --    Refined_Post
       --    Refined_State
       --    SPARK_Mode
+      --    Secondary_Stack_Size
       --    Subprogram_Variant
+      --    Volatile_Function
       --    Warnings
       --  Insert pragma Prag such that it mimics the placement of a source
       --  pragma of the same kind. Flag Is_Generic should be set when the
@@ -3064,16 +3083,11 @@ package body Sem_Ch13 is
                          Expression => Relocate_Node (Expr))),
                      Pragma_Name                  => Name_Linker_Section);
 
-                  --  Linker_Section does not need delaying, as its argument
-                  --  must be a static string. Furthermore, if applied to
-                  --  an object with an explicit initialization, the object
-                  --  must be frozen in order to elaborate the initialization
-                  --  code. (This is already done for types with implicit
-                  --  initialization, such as protected types.)
+                  --  No need to delay the processing if the entity is already
+                  --  frozen. This should only happen for subprogram bodies.
 
-                  if Nkind (N) = N_Object_Declaration
-                    and then Has_Init_Expression (N)
-                  then
+                  if Is_Frozen (E) then
+                     pragma Assert (Nkind (N) = N_Subprogram_Body);
                      Delay_Required := False;
                   end if;
 
@@ -4763,9 +4777,7 @@ package body Sem_Ch13 is
             --  For an aspect that applies to a type, indicate whether it
             --  appears on a partial view of the type.
 
-            if Is_Type (E)
-              and then Is_Private_Type (E)
-            then
+            if Is_Type (E) and then Is_Private_Type (E) then
                Set_Aspect_On_Partial_View (Aspect);
             end if;
 
@@ -15557,15 +15569,11 @@ package body Sem_Ch13 is
 
       function Visible_Component (Comp : Name_Id) return Entity_Id is
          E : Entity_Id;
-      begin
-         --  Types with nameable components are record, task, and protected
-         --  types, and discriminated private types.
 
-         if Ekind (T) in E_Record_Type
-                       | E_Task_Type
-                       | E_Protected_Type
-           or else (Is_Private_Type (T) and then Has_Discriminants (T))
-         then
+      begin
+         --  Types with nameable components are record, task, protected types
+
+         if Ekind (T) in E_Record_Type | E_Task_Type | E_Protected_Type then
             --  This is a sequential search, which seems acceptable
             --  efficiency-wise, given the typical size of component
             --  lists, protected operation lists, task item lists, and
@@ -15579,6 +15587,46 @@ package body Sem_Ch13 is
 
                Next_Entity (E);
             end loop;
+
+         --  Private discriminated types may have visible discriminants
+
+         elsif Is_Private_Type (T) and then Has_Discriminants (T) then
+            declare
+               Decl : constant Node_Id := Declaration_Node (T);
+
+               Discr : Node_Id;
+
+            begin
+               --  Loop over the discriminants listed in the discriminant part
+               --  of the private type declaration to find one with a matching
+               --  name; then, if it exists, return the discriminant entity of
+               --  the same name in the type, which is that of its full view.
+
+               if Nkind (Decl) in N_Private_Extension_Declaration
+                                | N_Private_Type_Declaration
+                 and then Present (Discriminant_Specifications (Decl))
+               then
+                  Discr := First (Discriminant_Specifications (Decl));
+
+                  while Present (Discr) loop
+                     if Chars (Defining_Identifier (Discr)) = Comp then
+                        Discr := First_Discriminant (T);
+
+                        while Present (Discr) loop
+                           if Chars (Discr) = Comp then
+                              return Discr;
+                           end if;
+
+                           Next_Discriminant (Discr);
+                        end loop;
+
+                        pragma Assert (False);
+                     end if;
+
+                     Next (Discr);
+                  end loop;
+               end if;
+            end;
          end if;
 
          --  Nothing by that name
@@ -16422,7 +16470,7 @@ package body Sem_Ch13 is
          Op_Name := Chars (First (Choices (Assoc)));
 
          --  When verifying the consistency of aspects between the freeze point
-         --  and the end of declarqtions, we use a copy which is not analyzed
+         --  and the end of declarations, we use a copy which is not analyzed
          --  yet, so do it now.
 
          Subp_Id := Expression (Assoc);
@@ -16496,7 +16544,11 @@ package body Sem_Ch13 is
             It : Interp;
 
             function Is_Property_Function (E : Entity_Id) return Boolean;
-            --  Implements RM 7.3.4 definition of "property function".
+            --  Implements RM 7.3.4 definition of "property function"
+
+            --------------------------
+            -- Is_Property_Function --
+            --------------------------
 
             function Is_Property_Function (E : Entity_Id) return Boolean is
             begin

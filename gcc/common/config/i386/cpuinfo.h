@@ -463,7 +463,6 @@ get_intel_cpu (struct __processor_model *cpu_model,
       cpu_model->__cpu_subtype = INTEL_COREI7_SKYLAKE;
       break;
     case 0xa7:
-    case 0xa8:
       /* Rocket Lake.  */
       cpu = "rocketlake";
       CHECK___builtin_cpu_is ("corei7");
@@ -534,11 +533,15 @@ get_intel_cpu (struct __processor_model *cpu_model,
       cpu_model->__cpu_type = INTEL_COREI7;
       cpu_model->__cpu_subtype = INTEL_COREI7_TIGERLAKE;
       break;
+
+    case 0xbe:
+      /* Alder Lake N, E-core only.  */
     case 0x97:
     case 0x9a:
-    case 0xbf:
       /* Alder Lake.  */
     case 0xb7:
+    case 0xba:
+    case 0xbf:
       /* Raptor Lake.  */
     case 0xaa:
     case 0xac:
@@ -566,7 +569,6 @@ get_intel_cpu (struct __processor_model *cpu_model,
       cpu_model->__cpu_type = INTEL_SIERRAFOREST;
       break;
     case 0xad:
-    case 0xae:
       /* Granite Rapids.  */
       cpu = "graniterapids";
       CHECK___builtin_cpu_is ("corei7");
@@ -574,11 +576,37 @@ get_intel_cpu (struct __processor_model *cpu_model,
       cpu_model->__cpu_type = INTEL_COREI7;
       cpu_model->__cpu_subtype = INTEL_COREI7_GRANITERAPIDS;
       break;
+    case 0xae:
+      /* Granite Rapids D.  */
+      cpu = "graniterapids-d";
+      CHECK___builtin_cpu_is ("corei7");
+      CHECK___builtin_cpu_is ("graniterapids-d");
+      cpu_model->__cpu_type = INTEL_COREI7;
+      cpu_model->__cpu_subtype = INTEL_COREI7_GRANITERAPIDS_D;
+      break;
     case 0xb6:
       /* Grand Ridge.  */
       cpu = "grandridge";
       CHECK___builtin_cpu_is ("grandridge");
       cpu_model->__cpu_type = INTEL_GRANDRIDGE;
+      break;
+    case 0xc5:
+      /* Arrow Lake.  */
+      cpu = "arrowlake";
+      CHECK___builtin_cpu_is ("corei7");
+      CHECK___builtin_cpu_is ("arrowlake");
+      cpu_model->__cpu_type = INTEL_COREI7;
+      cpu_model->__cpu_subtype = INTEL_COREI7_ARROWLAKE;
+      break;
+    case 0xc6:
+      /* Arrow Lake S.  */
+    case 0xbd:
+      /* Lunar Lake.  */
+      cpu = "arrowlake-s";
+      CHECK___builtin_cpu_is ("corei7");
+      CHECK___builtin_cpu_is ("arrowlake-s");
+      cpu_model->__cpu_type = INTEL_COREI7;
+      cpu_model->__cpu_subtype = INTEL_COREI7_ARROWLAKE_S;
       break;
     case 0x17:
     case 0x1d:
@@ -738,7 +766,9 @@ get_available_features (struct __processor_model *cpu_model,
   /* Get Advanced Features at level 7 (eax = 7, ecx = 0/1). */
   if (max_cpuid_level >= 7)
     {
-      __cpuid_count (7, 0, eax, ebx, ecx, edx);
+      unsigned int max_subleaf_level;
+
+      __cpuid_count (7, 0, max_subleaf_level, ebx, ecx, edx);
       if (ebx & bit_BMI)
 	set_feature (FEATURE_BMI);
       if (ebx & bit_SGX)
@@ -850,37 +880,48 @@ get_available_features (struct __processor_model *cpu_model,
 	    set_feature (FEATURE_AVX512FP16);
 	}
 
-      __cpuid_count (7, 1, eax, ebx, ecx, edx);
-      if (eax & bit_HRESET)
-	set_feature (FEATURE_HRESET);
-      if (eax & bit_CMPCCXADD)
-	set_feature(FEATURE_CMPCCXADD);
-      if (edx & bit_PREFETCHI)
-	set_feature (FEATURE_PREFETCHI);
-      if (eax & bit_RAOINT)
-	set_feature (FEATURE_RAOINT);
-      if (avx_usable)
+      if (max_subleaf_level >= 1)
 	{
-	  if (eax & bit_AVXVNNI)
-	    set_feature (FEATURE_AVXVNNI);
-	  if (eax & bit_AVXIFMA)
-	    set_feature (FEATURE_AVXIFMA);
-	  if (edx & bit_AVXVNNIINT8)
-	    set_feature (FEATURE_AVXVNNIINT8);
-	  if (edx & bit_AVXNECONVERT)
-	    set_feature (FEATURE_AVXNECONVERT);
-	}
-      if (avx512_usable)
-	{
-	  if (eax & bit_AVX512BF16)
-	    set_feature (FEATURE_AVX512BF16);
-	}
-      if (amx_usable)
-	{
-	  if (eax & bit_AMX_FP16)
-	    set_feature (FEATURE_AMX_FP16);
-	  if (edx & bit_AMX_COMPLEX)
-	    set_feature (FEATURE_AMX_COMPLEX);
+	  __cpuid_count (7, 1, eax, ebx, ecx, edx);
+	  if (eax & bit_HRESET)
+	    set_feature (FEATURE_HRESET);
+	  if (eax & bit_CMPCCXADD)
+	    set_feature(FEATURE_CMPCCXADD);
+	  if (edx & bit_PREFETCHI)
+	    set_feature (FEATURE_PREFETCHI);
+	  if (eax & bit_RAOINT)
+	    set_feature (FEATURE_RAOINT);
+	  if (avx_usable)
+	    {
+	      if (eax & bit_AVXVNNI)
+		set_feature (FEATURE_AVXVNNI);
+	      if (eax & bit_AVXIFMA)
+		set_feature (FEATURE_AVXIFMA);
+	      if (edx & bit_AVXVNNIINT8)
+		set_feature (FEATURE_AVXVNNIINT8);
+	      if (edx & bit_AVXNECONVERT)
+		set_feature (FEATURE_AVXNECONVERT);
+	      if (edx & bit_AVXVNNIINT16)
+		set_feature (FEATURE_AVXVNNIINT16);
+	      if (eax & bit_SM3)
+		set_feature (FEATURE_SM3);
+	      if (eax & bit_SHA512)
+		set_feature (FEATURE_SHA512);
+	      if (eax & bit_SM4)
+		set_feature (FEATURE_SM4);
+	    }
+	  if (avx512_usable)
+	    {
+	      if (eax & bit_AVX512BF16)
+		set_feature (FEATURE_AVX512BF16);
+	    }
+	  if (amx_usable)
+	    {
+	      if (eax & bit_AMX_FP16)
+		set_feature (FEATURE_AMX_FP16);
+	      if (edx & bit_AMX_COMPLEX)
+		set_feature (FEATURE_AMX_COMPLEX);
+	    }
 	}
     }
 

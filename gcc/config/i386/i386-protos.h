@@ -70,6 +70,9 @@ extern machine_mode ix86_cc_mode (enum rtx_code, rtx, rtx);
 extern int avx_vpermilp_parallel (rtx par, machine_mode mode);
 extern int avx_vperm2f128_parallel (rtx par, machine_mode mode);
 
+extern int vpternlog_redundant_operand_mask (rtx);
+extern void substitute_vpternlog_operands (rtx[]);
+
 extern bool ix86_expand_strlen (rtx, rtx, rtx, rtx);
 extern bool ix86_expand_set_or_cpymem (rtx, rtx, rtx, rtx, rtx, rtx,
 				       rtx, rtx, rtx, rtx, bool);
@@ -152,9 +155,11 @@ extern bool ix86_expand_mask_vec_cmp (rtx, enum rtx_code, rtx, rtx);
 extern bool ix86_expand_int_vec_cmp (rtx[]);
 extern bool ix86_expand_fp_vec_cmp (rtx[]);
 extern void ix86_expand_sse_movcc (rtx, rtx, rtx, rtx);
+extern void ix86_expand_sse_extend (rtx, rtx, bool);
 extern void ix86_expand_sse_unpack (rtx, rtx, bool, bool);
 extern void ix86_expand_fp_spaceship (rtx, rtx, rtx);
 extern bool ix86_expand_int_addcc (rtx[]);
+extern void ix86_expand_carry (rtx arg);
 extern rtx_insn *ix86_expand_call (rtx, rtx, rtx, rtx, rtx, bool);
 extern bool ix86_call_use_plt_p (rtx);
 extern void ix86_split_call_vzeroupper (rtx, rtx);

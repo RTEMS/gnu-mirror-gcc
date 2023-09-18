@@ -3314,6 +3314,8 @@ do_pre_regular_insertion (basic_block block, basic_block dom,
 	  bool by_some = false;
 	  bool cant_insert = false;
 	  bool all_same = true;
+	  unsigned num_inserts = 0;
+	  unsigned num_const = 0;
 	  pre_expr first_s = NULL;
 	  edge pred;
 	  basic_block bprime;
@@ -3370,11 +3372,14 @@ do_pre_regular_insertion (basic_block block, basic_block dom,
 		{
 		  avail[pred->dest_idx] = eprime;
 		  all_same = false;
+		  num_inserts++;
 		}
 	      else
 		{
 		  avail[pred->dest_idx] = edoubleprime;
 		  by_some = true;
+		  if (edoubleprime->kind == CONSTANT)
+		    num_const++;
 		  /* We want to perform insertions to remove a redundancy on
 		     a path in the CFG we want to optimize for speed.  */
 		  if (optimize_edge_for_speed_p (pred))
@@ -3391,6 +3396,12 @@ do_pre_regular_insertion (basic_block block, basic_block dom,
 	     partially redundant.  */
 	  if (!cant_insert && !all_same && by_some)
 	    {
+	      /* If the expression is redundant on all edges and we need
+		 to at most insert one copy from a constant do the PHI
+		 insertion even when not optimizing a path that's to be
+		 optimized for speed.  */
+	      if (num_inserts == 0 && num_const <= 1)
+		do_insertion = true;
 	      if (!do_insertion)
 		{
 		  if (dump_file && (dump_flags & TDF_DETAILS))
@@ -4217,8 +4228,10 @@ compute_avail (function *fun)
 		      /* TBAA behavior is an obvious part so make sure
 		         that the hashtable one covers this as well
 			 by adjusting the ref alias set and its base.  */
-		      if (ref->set == set
-			  || alias_set_subset_of (set, ref->set))
+		      if ((ref->set == set
+			   || alias_set_subset_of (set, ref->set))
+			  && (ref->base_set == base_set
+			      || alias_set_subset_of (base_set, ref->base_set)))
 			;
 		      else if (ref1->opcode != ref2->opcode
 			       || (ref1->opcode != MEM_REF
@@ -4230,21 +4243,25 @@ compute_avail (function *fun)
 			  operands.release ();
 			  continue;
 			}
-		      else if (alias_set_subset_of (ref->set, set))
+		      else if (ref->set == set
+			       || alias_set_subset_of (ref->set, set))
 			{
+			  tree reft = reference_alias_ptr_type (rhs1);
 			  ref->set = set;
+			  ref->base_set = set;
 			  if (ref1->opcode == MEM_REF)
 			    ref1->op0
-			      = wide_int_to_tree (TREE_TYPE (ref2->op0),
+			      = wide_int_to_tree (reft,
 						  wi::to_wide (ref1->op0));
 			  else
 			    ref1->op2
-			      = wide_int_to_tree (TREE_TYPE (ref2->op2),
+			      = wide_int_to_tree (reft,
 						  wi::to_wide (ref1->op2));
 			}
 		      else
 			{
 			  ref->set = 0;
+			  ref->base_set = 0;
 			  if (ref1->opcode == MEM_REF)
 			    ref1->op0
 			      = wide_int_to_tree (ptr_type_node,

@@ -599,10 +599,17 @@
   (and (match_code "const_vector")
        (match_test "aarch64_const_vec_all_same_in_range_p (op,
 				(HOST_WIDE_INT_1U
-				<< (GET_MODE_UNIT_BITSIZE  (mode) / 2)) - 1,
+				<< (GET_MODE_UNIT_BITSIZE (mode) / 2)) - 1,
 				(HOST_WIDE_INT_1U
-				<< (GET_MODE_UNIT_BITSIZE  (mode) / 2)) - 1)")))
+				<< (GET_MODE_UNIT_BITSIZE (mode) / 2)) - 1)")))
 
+(define_predicate "aarch64_simd_umax_quarter_mode"
+  (and (match_code "const_vector")
+       (match_test "aarch64_const_vec_all_same_in_range_p (op,
+				(HOST_WIDE_INT_1U
+				<< (GET_MODE_UNIT_BITSIZE (mode) / 4)) - 1,
+				(HOST_WIDE_INT_1U
+				<< (GET_MODE_UNIT_BITSIZE (mode) / 4)) - 1)")))
 (define_predicate "aarch64_simd_shift_imm_vec_qi"
   (and (match_code "const_vector")
        (match_test "aarch64_const_vec_all_same_in_range_p (op, 1, 8)")))
@@ -619,21 +626,22 @@
   (and (match_code "const_vector")
        (match_test "aarch64_const_vec_all_same_in_range_p (op, 1, 64)")))
 
-(define_predicate "aarch64_simd_rsra_rnd_imm_vec"
+;; A constant or vector of constants that represents an integer rounding
+;; constant added during fixed-point arithmetic calculations
+(define_predicate "aarch64_int_rnd_operand"
   (and (match_code "const_vector,const_int,const_wide_int")
-       (match_test "aarch64_const_vec_rsra_rnd_imm_p (op)")))
-
-(define_predicate "aarch64_simd_rshrn_imm_vec"
-  (and (match_code "const_vector")
-       (match_test "aarch64_const_vec_all_same_in_range_p (op, 1,
-				HOST_WIDE_INT_1U
-				<< (GET_MODE_UNIT_BITSIZE  (mode) - 1))")))
+       (match_test "aarch64_rnd_imm_p (op)")))
 
 (define_predicate "aarch64_simd_raddsubhn_imm_vec"
   (and (match_code "const_vector")
        (match_test "aarch64_const_vec_all_same_in_range_p (op, 1,
 				HOST_WIDE_INT_1U
 				<< (GET_MODE_UNIT_BITSIZE  (mode) / 2 - 1))")))
+
+(define_predicate "aarch64_simd_shll_imm_vec"
+  (and (match_code "const_vector")
+       (match_test "aarch64_const_vec_all_same_in_range_p (op, 0,
+				GET_MODE_UNIT_BITSIZE (mode) / 2)")))
 
 (define_predicate "aarch64_simd_shift_imm_bitsize_qi"
   (and (match_code "const_int")
@@ -723,10 +731,6 @@
 (define_predicate "aarch64_sve_dup_operand"
   (ior (match_operand 0 "register_operand")
        (match_operand 0 "aarch64_sve_ld1r_operand")))
-
-(define_predicate "aarch64_sve_dup_ld1rq_operand"
-  (ior (match_operand 0 "register_operand")
-       (match_operand 0 "aarch64_sve_ld1rq_operand")))
 
 (define_predicate "aarch64_sve_ptrue_svpattern_immediate"
   (and (match_code "const")

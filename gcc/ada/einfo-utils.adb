@@ -2105,8 +2105,8 @@ package body Einfo.Utils is
    -- Number_Formals --
    --------------------
 
-   function Number_Formals (Id : E) return Pos is
-      N      : Int;
+   function Number_Formals (Id : E) return Nat is
+      N      : Nat;
       Formal : Entity_Id;
 
    begin
@@ -2589,7 +2589,7 @@ package body Einfo.Utils is
    -- Scope_Depth --
    -----------------
 
-   function Scope_Depth (Id : E) return Uint is
+   function Scope_Depth (Id : Scope_Kind_Id) return Uint is
       Scop : Entity_Id;
 
    begin
@@ -2601,7 +2601,7 @@ package body Einfo.Utils is
       return Scope_Depth_Value (Scop);
    end Scope_Depth;
 
-   function Scope_Depth_Default_0 (Id : E) return U is
+   function Scope_Depth_Default_0 (Id : Scope_Kind_Id) return U is
    begin
       if Scope_Depth_Set (Id) then
          return Scope_Depth (Id);
@@ -2615,7 +2615,7 @@ package body Einfo.Utils is
    -- Scope_Depth_Set --
    ---------------------
 
-   function Scope_Depth_Set (Id : E) return B is
+   function Scope_Depth_Set (Id : Scope_Kind_Id) return B is
    begin
       return not Is_Record_Type (Id)
         and then not Field_Is_Initial_Zero (Id, F_Scope_Depth_Value);
@@ -3019,7 +3019,7 @@ package body Einfo.Utils is
          --  Otherwise check for the case where we have a derived type or
          --  subtype, and if so get the Underlying_Type of the parent type.
 
-         elsif Etype (Id) /= Id then
+         elsif Present (Etype (Id)) and then Etype (Id) /= Id then
             return Underlying_Type (Etype (Id));
 
          --  Otherwise we have an incomplete or private type that has no full

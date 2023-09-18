@@ -15,20 +15,21 @@ module dmd.parse;
 
 import core.stdc.stdio;
 import core.stdc.string;
+
 import dmd.astenums;
 import dmd.errorsink;
-import dmd.globals;
 import dmd.id;
 import dmd.identifier;
 import dmd.lexer;
 import dmd.location;
-import dmd.errors;
 import dmd.root.filename;
 import dmd.common.outbuffer;
 import dmd.root.rmem;
 import dmd.root.rootobject;
 import dmd.root.string;
 import dmd.tokens;
+
+alias CompileEnv = dmd.lexer.CompileEnv;
 
 /***********************************************************
  */
@@ -45,49 +46,38 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
         Loc endloc; // set to location of last right curly
         int inBrackets; // inside [] of array index or slice
         Loc lookingForElse; // location of lonely if looking for an else
+        bool doUnittests; // parse unittest blocks
     }
+
+    bool transitionIn = false; /// `-transition=in` is active, `in` parameters are listed
 
     /*********************
      * Use this constructor for string mixins.
      * Input:
-     *      loc     location in source file of mixin
+     *      loc = location in source file of mixin
      */
     extern (D) this(const ref Loc loc, AST.Module _module, const(char)[] input, bool doDocComment,
-        ErrorSink errorSink) scope
+        ErrorSink errorSink, const CompileEnv* compileEnv, const bool doUnittests) scope
     {
-        super(_module ? _module.srcfile.toChars() : null, input.ptr, 0, input.length, doDocComment, false,
-                errorSink,
-                global.vendor, global.versionNumber());
-
-        //printf("Parser::Parser()\n");
+        //printf("Parser::Parser()1 %d\n", doUnittests);
+        this(_module, input, doDocComment, errorSink, compileEnv, doUnittests);
         scanloc = loc;
-
-        if (!writeMixin(input, scanloc) && loc.filename)
-        {
-            /* Create a pseudo-filename for the mixin string, as it may not even exist
-             * in the source file.
-             */
-            auto len = strlen(loc.filename) + 7 + (loc.linnum).sizeof * 3 + 1;
-            char* filename = cast(char*)mem.xmalloc(len);
-            snprintf(filename, len, "%s-mixin-%d", loc.filename, cast(int)loc.linnum);
-            scanloc.filename = filename;
-        }
-
-        mod = _module;
-        linkage = LINK.d;
-        //nextToken();              // start up the scanner
     }
 
-    extern (D) this(AST.Module _module, const(char)[] input, bool doDocComment, ErrorSink errorSink) scope
+    /**************************************************
+     * Main Parser constructor.
+     */
+    extern (D) this(AST.Module _module, const(char)[] input, bool doDocComment, ErrorSink errorSink,
+        const CompileEnv* compileEnv, const bool doUnittests) scope
     {
         super(_module ? _module.srcfile.toChars() : null, input.ptr, 0, input.length, doDocComment, false,
               errorSink,
-              global.vendor, global.versionNumber());
+              compileEnv);
 
-        //printf("Parser::Parser()\n");
-        mod = _module;
-        linkage = LINK.d;
-        //nextToken();              // start up the scanner
+        //printf("Parser::Parser()2 %d\n", doUnittests);
+        this.mod = _module;
+        this.linkage = LINK.d;
+        this.doUnittests = doUnittests;
     }
 
     /++
@@ -335,6 +325,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
             linkage = linksave;
 
             Loc startloc;
+            Loc scdLoc;
 
             switch (token.value)
             {
@@ -381,7 +372,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                             nextToken();
                             auto exps = parseArguments();
                             check(TOK.semicolon);
-                            s = new AST.CompileDeclaration(loc, exps);
+                            s = new AST.MixinDeclaration(loc, exps);
                             break;
                         }
                     case TOK.template_:
@@ -497,7 +488,8 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                  * template instantiations in these unittests as candidates for
                  * further codegen culling.
                  */
-                if (mod.isRoot() && (global.params.useUnitTests || global.params.ddoc.doOutput || global.params.dihdr.doOutput))
+                // The isRoot check is here because it can change after parsing begins (see dmodule.d)
+                if (doUnittests && mod.isRoot())
                 {
                     linkage = LINK.d; // unittests have D linkage
                     s = parseUnitTest(pAttrs);
@@ -696,6 +688,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                 }
             Lstc:
                 pAttrs.storageClass = appendStorageClass(pAttrs.storageClass, stc);
+                scdLoc = token.loc;
                 nextToken();
 
             Lautodecl:
@@ -725,13 +718,8 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                      tk.value == TOK.out_ || tk.value == TOK.do_ || tk.value == TOK.goesTo ||
                      tk.value == TOK.identifier && tk.ident == Id._body))
                 {
-                    // @@@DEPRECATED_2.117@@@
-                    // https://github.com/dlang/DIPs/blob/1f5959abe482b1f9094f6484a7d0a3ade77fc2fc/DIPs/accepted/DIP1003.md
-                    // Deprecated in 2.097 - Can be removed from 2.117
-                    // The deprecation period is longer than usual as `body`
-                    // was quite widely used.
                     if (tk.value == TOK.identifier && tk.ident == Id._body)
-                        deprecation("usage of the `body` keyword is deprecated. Use `do` instead.");
+                        usageOfBodyKeyword();
 
                     a = parseDeclarations(true, pAttrs, pAttrs.comment);
                     if (a && a.length)
@@ -748,7 +736,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                 auto stc2 = getStorageClass!AST(pAttrs);
                 if (stc2 != STC.undefined_)
                 {
-                    s = new AST.StorageClassDeclaration(stc2, a);
+                    s = new AST.StorageClassDeclaration(scdLoc, stc2, a);
                 }
                 if (pAttrs.udas)
                 {
@@ -1162,6 +1150,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
 
         case TOK.leftCurly:
             {
+                const lcLoc = token.loc;
                 const lookingForElseSave = lookingForElse;
                 lookingForElse = Loc();
 
@@ -1169,8 +1158,9 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                 a = parseDeclDefs(0, pLastDecl);
                 if (token.value != TOK.rightCurly)
                 {
-                    /* { */
+                    /* left curly brace */
                     error("matching `}` expected, not `%s`", token.toChars());
+                    eSink.errorSupplemental(lcLoc, "unmatched `{`");
                 }
                 else
                     nextToken();
@@ -1219,19 +1209,20 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
             return orig | added;
         }
 
-        const Redundant = (STC.const_ | STC.scope_ |
-                           (global.params.previewIn ? STC.ref_ : 0));
+        const Redundant = (STC.const_ | STC.scope_ | STC.ref_);
         orig |= added;
 
         if ((orig & STC.in_) && (added & Redundant))
         {
             if (added & STC.const_)
                 error("attribute `const` is redundant with previously-applied `in`");
-            else if (global.params.previewIn)
+            else if (compileEnv.previewIn)
             {
                 error("attribute `%s` is redundant with previously-applied `in`",
                       (orig & STC.scope_) ? "scope".ptr : "ref".ptr);
             }
+            else if (added & STC.ref_)
+                deprecation("using `in ref` is deprecated, use `-preview=in` and `in` instead");
             else
                 error("attribute `scope` cannot be applied with `in`, use `-preview=in` instead");
             return orig;
@@ -1241,13 +1232,15 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
         {
             if (orig & STC.const_)
                 error("attribute `in` cannot be added after `const`: remove `const`");
-            else if (global.params.previewIn)
+            else if (compileEnv.previewIn)
             {
                 // Windows `printf` does not support `%1$s`
                 const(char*) stc_str = (orig & STC.scope_) ? "scope".ptr : "ref".ptr;
                 error(token.loc, "attribute `in` cannot be added after `%s`: remove `%s`",
                       stc_str, stc_str);
             }
+            else if (orig & STC.ref_)
+                deprecation("using `ref in` is deprecated, use `-preview=in` and `in` instead");
             else
                 error("attribute `in` cannot be added after `scope`: remove `scope` and use `-preview=in`");
             return orig;
@@ -1302,12 +1295,38 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
             return 0;
         }
 
+        AST.Expression templateArgToExp(RootObject o, const ref Loc loc)
+        {
+            switch (o.dyncast)
+            {
+                case DYNCAST.expression:
+                    return cast(AST.Expression) o;
+                case DYNCAST.type:
+                    return new AST.TypeExp(loc, cast(AST.Type)o);
+                default:
+                    assert(0);
+            }
+        }
+
         if (token.value == TOK.leftParenthesis)
         {
             // Multi-UDAs ( `@( ArgumentList )`) form, concatenate with existing
             if (peekNext() == TOK.rightParenthesis)
                 error("empty attribute list is not allowed");
-            udas = AST.UserAttributeDeclaration.concat(udas, parseArguments());
+
+            if (udas is null)
+                udas = new AST.Expressions();
+            auto args = parseTemplateArgumentList();
+            foreach (arg; *args)
+                udas.push(templateArgToExp(arg, token.loc));
+            return 0;
+        }
+
+        if (auto o = parseTemplateSingleArgument())
+        {
+            if (udas is null)
+                udas = new AST.Expressions();
+            udas.push(templateArgToExp(o, token.loc));
             return 0;
         }
 
@@ -1383,6 +1402,15 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                     break;
                 }
             default:
+                Token* tk;
+                if (skipAttributes(&token, &tk) && tk.ptr != token.ptr ||
+                    token.value == TOK.static_ || token.value == TOK.extern_)
+                {
+                    error("`%s` token is not allowed in postfix position",
+                        Token.toChars(token.value));
+                    nextToken();
+                    continue;
+                }
                 return storageClass;
             }
             storageClass = appendStorageClass(storageClass, stc);
@@ -1472,7 +1500,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
 
         if (token.value != TOK.leftCurly)
         {
-            error("`{` expected after template parameter list, not `%s`", token.toChars());
+            error("`{` expected after template parameter list, not `%s`", token.toChars()); /* } */
             goto Lerr;
         }
         decldefs = parseBlock(null);
@@ -1764,7 +1792,16 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
         else
         {
             // ident!template_argument
-            tiargs = parseTemplateSingleArgument();
+            RootObject o = parseTemplateSingleArgument();
+            if (!o)
+            {
+                error("template argument expected following `!`");
+            }
+            else
+            {
+                tiargs = new AST.Objects();
+                tiargs.push(o);
+            }
         }
         if (token.value == TOK.not)
         {
@@ -1830,11 +1867,11 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
      *      foo!arg
      * Input:
      *      current token is the arg
+     * Returns: An AST.Type, AST.Expression, or `null` on error
      */
-    private AST.Objects* parseTemplateSingleArgument()
+    private RootObject parseTemplateSingleArgument()
     {
         //printf("parseTemplateSingleArgument()\n");
-        auto tiargs = new AST.Objects();
         AST.Type ta;
         switch (token.value)
         {
@@ -1942,9 +1979,8 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
             ta = AST.Type.tdchar;
             goto LabelX;
         LabelX:
-            tiargs.push(ta);
             nextToken();
-            break;
+            return ta;
 
         case TOK.int32Literal:
         case TOK.uns32Literal:
@@ -1974,15 +2010,11 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
         case TOK.this_:
             {
                 // Template argument is an expression
-                AST.Expression ea = parsePrimaryExp();
-                tiargs.push(ea);
-                break;
+                return parsePrimaryExp();
             }
         default:
-            error("template argument expected following `!`");
-            break;
+            return null;
         }
-        return tiargs;
     }
 
     /**********************************
@@ -2687,14 +2719,14 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
 
         nextToken();
 
-        const(char)* begPtr = token.ptr + 1; // skip '{'
+        const(char)* begPtr = token.ptr + 1; // skip left curly brace
         const(char)* endPtr = null;
         AST.Statement sbody = parseStatement(ParseStatementFlags.curly, &endPtr);
 
         /** Extract unittest body as a string. Must be done eagerly since memory
          will be released by the lexer before doc gen. */
         char* docline = null;
-        if (global.params.ddoc.doOutput && endPtr > begPtr)
+        if (compileEnv.ddocOutput && endPtr > begPtr)
         {
             /* Remove trailing whitespaces */
             for (const(char)* p = endPtr - 1; begPtr <= p && (*p == ' ' || *p == '\r' || *p == '\n' || *p == '\t'); --p)
@@ -2849,8 +2881,8 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                         // Don't call nextToken again.
                     }
                 case TOK.in_:
-                    if (global.params.vin)
-                        message(scanloc, "Usage of 'in' on parameter");
+                    if (transitionIn)
+                        eSink.message(scanloc, "Usage of 'in' on parameter");
                     stc = STC.in_;
                     goto L2;
 
@@ -3004,6 +3036,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
         }
 
         e = new AST.EnumDeclaration(loc, id, memtype);
+        // opaque type
         if (token.value == TOK.semicolon && id)
             nextToken();
         else if (token.value == TOK.leftCurly)
@@ -3036,7 +3069,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                     && token.value != TOK.comma
                     && token.value != TOK.assign)
                 {
-                    switch(token.value)
+                    switch (token.value)
                     {
                         case TOK.at:
                             if (StorageClass _stc = parseAttribute(udas))
@@ -3072,12 +3105,23 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                             }
                             else
                             {
-                                goto default;
+                                if (isAnonymousEnum)
+                                    goto default; // maybe `Type identifier`
+
+                                prevTOK = token.value;
+                                nextToken();
+                                error("expected `,` or `=` after identifier, not `%s`", token.toChars());
                             }
                             break;
                         default:
                             if (isAnonymousEnum)
                             {
+                                if (type)
+                                {
+                                    error("expected identifier after type, not `%s`", token.toChars());
+                                    type = null;
+                                    break;
+                                }
                                 type = parseType(&ident, null);
                                 if (type == AST.Type.terror)
                                 {
@@ -3088,6 +3132,11 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                                 else
                                 {
                                     prevTOK = TOK.identifier;
+                                    const tv = token.value;
+                                    if (ident && tv != TOK.assign && tv != TOK.comma && tv != TOK.rightCurly)
+                                    {
+                                        error("expected `,` or `=` after identifier, not `%s`", token.toChars());
+                                    }
                                 }
                             }
                             else
@@ -3129,7 +3178,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                 {
                     value = null;
                     if (type && type != AST.Type.terror && isAnonymousEnum)
-                        error("if type, there must be an initializer");
+                        error("initializer required after `%s` when type is specified", ident.toChars());
                 }
 
                 AST.DeprecatedDeclaration dd;
@@ -3434,6 +3483,11 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
         return decldefs;
     }
 
+    /* Parse a type and optional identifier
+     * Params:
+     *  pident       = set to Identifier if there is one, null if not
+     *  ptpl         = if !null, then set to TemplateParameterList
+     */
     AST.Type parseType(Identifier* pident = null, AST.TemplateParameters** ptpl = null)
     {
         /* Take care of the storage class prefixes that
@@ -4413,13 +4467,8 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                     (tk.value == TOK.leftParenthesis || tk.value == TOK.leftCurly || tk.value == TOK.in_ || tk.value == TOK.out_ || tk.value == TOK.goesTo ||
                      tk.value == TOK.do_ || tk.value == TOK.identifier && tk.ident == Id._body))
                 {
-                    // @@@DEPRECATED_2.117@@@
-                    // https://github.com/dlang/DIPs/blob/1f5959abe482b1f9094f6484a7d0a3ade77fc2fc/DIPs/accepted/DIP1003.md
-                    // Deprecated in 2.097 - Can be removed from 2.117
-                    // The deprecation period is longer than usual as `body`
-                    // was quite widely used.
                     if (tk.value == TOK.identifier && tk.ident == Id._body)
-                        deprecation("usage of the `body` keyword is deprecated. Use `do` instead.");
+                        usageOfBodyKeyword();
 
                     ts = null;
                 }
@@ -4489,10 +4538,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                 }
                 if (_init)
                 {
-                    if (isThis)
-                        error(token.loc, "cannot use syntax `alias this = %s`, use `alias %s this` instead", _init.toChars(), _init.toChars());
-                    else
-                        error("alias cannot have initializer");
+                    error("alias cannot have initializer");
                 }
                 v = new AST.AliasDeclaration(aliasLoc, ident, t);
 
@@ -4535,6 +4581,9 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
             }
             else if (t.ty == Tfunction)
             {
+                if (storage_class & STC.manifest)
+                    error("function cannot have enum storage class");
+
                 AST.Expression constraint = null;
                 //printf("%s funcdecl t = %s, storage_class = x%lx\n", loc.toChars(), t.toChars(), storage_class);
                 auto f = new AST.FuncDeclaration(loc, Loc.initial, ident, storage_class | (disable ? STC.disable : 0), t);
@@ -4610,8 +4659,6 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                 AST.Dsymbol s;
                 if (width)
                 {
-                    if (!global.params.bitfields)
-                        error("use -preview=bitfields for bitfield support");
                     if (_init)
                         error("initializer not allowed for bit-field declaration");
                     if (storage_class)
@@ -4756,23 +4803,20 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
             addComment(s, comment);
             return a;
         }
-        version (none)
+        /* Look for:
+         *  alias this = identifier;
+         */
+        if (token.value == TOK.this_ && peekNext() == TOK.assign && peekNext2() == TOK.identifier)
         {
-            /* Look for:
-             *  alias this = identifier;
-             */
-            if (token.value == TOK.this_ && peekNext() == TOK.assign && peekNext2() == TOK.identifier)
-            {
-                check(TOK.this_);
-                check(TOK.assign);
-                auto s = new AliasThis(loc, token.ident);
-                nextToken();
-                check(TOK.semicolon, "`alias this = Identifier`");
-                auto a = new Dsymbols();
-                a.push(s);
-                addComment(s, comment);
-                return a;
-            }
+            check(TOK.this_);
+            check(TOK.assign);
+            auto s = new AST.AliasThis(loc, token.ident);
+            nextToken();
+            check(TOK.semicolon, "`alias this = Identifier`");
+            auto a = new AST.Dsymbols();
+            a.push(s);
+            addComment(s, comment);
+            return a;
         }
         /* Look for:
          *  alias identifier = type;
@@ -5008,7 +5052,8 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                 stc = STC.ref_;
                 nextToken();
             }
-            if (token.value != TOK.leftParenthesis && token.value != TOK.leftCurly)
+            if (token.value != TOK.leftParenthesis && token.value != TOK.leftCurly &&
+                token.value != TOK.goesTo)
             {
                 // function type (parameters) { statements... }
                 // delegate type (parameters) { statements... }
@@ -5144,7 +5189,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
         case TOK.goesTo:
             if (requireDo)
                 error("missing `do { ... }` after `in` or `out`");
-            if (!global.params.shortenedMethods)
+            if (!compileEnv.shortenedMethods)
                 error("=> shortened method not enabled, compile with compiler switch `-preview=shortenedMethods`");
             const returnloc = token.loc;
             nextToken();
@@ -5156,19 +5201,14 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
         case TOK.leftCurly:
             if (requireDo)
                 error("missing `do { ... }` after `in` or `out`");
-            f.fbody = parseStatement(ParseStatementFlags.semi);
+            f.fbody = parseStatement(0);
             f.endloc = endloc;
             break;
 
         case TOK.identifier:
             if (token.ident == Id._body)
             {
-                // @@@DEPRECATED_2.117@@@
-                // https://github.com/dlang/DIPs/blob/1f5959abe482b1f9094f6484a7d0a3ade77fc2fc/DIPs/accepted/DIP1003.md
-                // Deprecated in 2.097 - Can be removed from 2.117
-                // The deprecation period is longer than usual as `body`
-                // was quite widely used.
-                deprecation("usage of the `body` keyword is deprecated. Use `do` instead.");
+                usageOfBodyKeyword();
                 goto case TOK.do_;
             }
             goto default;
@@ -5307,7 +5347,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                         error("cannot use function constraints for non-template functions. Use `static if` instead");
                 }
                 else
-                    error("semicolon expected following function declaration");
+                    error("semicolon expected following function declaration, not `%s`", token.toChars());
             }
             break;
         }
@@ -5801,7 +5841,11 @@ LagainStc:
                     if (token.value != TOK.semicolon && peek(&token).value == TOK.semicolon)
                         error("found `%s` when expecting `;` following statement", token.toChars());
                     else
-                        check(TOK.semicolon, "statement");
+                    {
+                        if (token.value != TOK.semicolon)
+                            error("found `%s` when expecting `;` following statement `%s` on line %s", token.toChars(), exp.toChars(), exp.loc.toChars());
+                        nextToken();
+                    }
                 }
                 s = new AST.ExpStatement(loc, exp);
                 break;
@@ -5959,7 +6003,7 @@ LagainStc:
                     if (e.op == EXP.mixin_)
                     {
                         AST.MixinExp cpe = cast(AST.MixinExp)e;
-                        s = new AST.CompileStatement(loc, cpe.exps);
+                        s = new AST.MixinStatement(loc, cpe.exps);
                     }
                     else
                     {
@@ -5983,6 +6027,7 @@ LagainStc:
             }
         case TOK.leftCurly:
             {
+                const lcLoc = token.loc;
                 const lookingForElseSave = lookingForElse;
                 lookingForElse = Loc.initial;
 
@@ -5992,7 +6037,7 @@ LagainStc:
                 auto statements = new AST.Statements();
                 while (token.value != TOK.rightCurly && token.value != TOK.endOfFile)
                 {
-                    statements.push(parseStatement(ParseStatementFlags.semi | ParseStatementFlags.curlyScope));
+                    statements.push(parseStatement(ParseStatementFlags.curlyScope | ParseStatementFlags.semiOk));
                 }
                 if (endPtr)
                     *endPtr = token.ptr;
@@ -6005,7 +6050,14 @@ LagainStc:
                 s = new AST.CompoundStatement(loc, statements);
                 if (flags & (ParseStatementFlags.scope_ | ParseStatementFlags.curlyScope))
                     s = new AST.ScopeStatement(loc, s, token.loc);
-                check(TOK.rightCurly, "compound statement");
+                if (token.value != TOK.rightCurly)
+                {
+                    error(token.loc, "matching `}` expected following compound statement, not `%s`",
+                        token.toChars());
+                    eSink.errorSupplemental(lcLoc, "unmatched `{`");
+                }
+                else
+                    nextToken();
                 lookingForElse = lookingForElseSave;
                 break;
             }
@@ -6025,10 +6077,7 @@ LagainStc:
         case TOK.semicolon:
             if (!(flags & ParseStatementFlags.semiOk))
             {
-                if (flags & ParseStatementFlags.semi)
-                    deprecation("use `{ }` for an empty statement, not `;`");
-                else
-                    error("use `{ }` for an empty statement, not `;`");
+                error("use `{ }` for an empty statement, not `;`");
             }
             nextToken();
             s = new AST.ExpStatement(loc, cast(AST.Expression)null);
@@ -6245,7 +6294,7 @@ LagainStc:
                     _body = null;
                 }
                 else
-                    _body = parseStatement(ParseStatementFlags.semi);
+                    _body = parseStatement(0);
                 s = new AST.PragmaStatement(loc, ident, args, _body);
                 break;
             }
@@ -6298,7 +6347,7 @@ LagainStc:
                     auto statements = new AST.Statements();
                     while (token.value != TOK.case_ && token.value != TOK.default_ && token.value != TOK.endOfFile && token.value != TOK.rightCurly)
                     {
-                        auto cur = parseStatement(ParseStatementFlags.semi | ParseStatementFlags.curlyScope);
+                        auto cur = parseStatement(ParseStatementFlags.curlyScope);
                         statements.push(cur);
 
                         // https://issues.dlang.org/show_bug.cgi?id=21739
@@ -6313,7 +6362,7 @@ LagainStc:
                 }
                 else
                 {
-                    s = parseStatement(ParseStatementFlags.semi);
+                    s = parseStatement(0);
                 }
                 s = new AST.ScopeStatement(loc, s, token.loc);
 
@@ -6342,12 +6391,12 @@ LagainStc:
                     auto statements = new AST.Statements();
                     while (token.value != TOK.case_ && token.value != TOK.default_ && token.value != TOK.endOfFile && token.value != TOK.rightCurly)
                     {
-                        statements.push(parseStatement(ParseStatementFlags.semi | ParseStatementFlags.curlyScope));
+                        statements.push(parseStatement(ParseStatementFlags.curlyScope));
                     }
                     s = new AST.CompoundStatement(loc, statements);
                 }
                 else
-                    s = parseStatement(ParseStatementFlags.semi);
+                    s = parseStatement(0);
                 s = new AST.ScopeStatement(loc, s, token.loc);
                 s = new AST.DefaultStatement(loc, s);
                 break;
@@ -6891,6 +6940,15 @@ LagainStc:
 
     /********************
      * Parse inline assembler block.
+     * Enters with token on the `asm`.
+     * https://dlang.org/spec/iasm.html
+     *
+     * AsmStatement:
+     *   asm FunctionAttributes(opt) { AsmInstructionListopt }
+     * AsmInstructionList:
+     *   AsmInstruction ;
+     *   AsmInstruction ; AsmInstruction
+     *
      * Returns:
      *   inline assembler block as a Statement
      */
@@ -6905,7 +6963,7 @@ LagainStc:
         Loc labelloc;
 
         nextToken();
-        StorageClass stc = parsePostfix(STC.undefined_, null);
+        StorageClass stc = parsePostfix(STC.undefined_, null);  // optional FunctionAttributes
         if (stc & (STC.const_ | STC.immutable_ | STC.shared_ | STC.wild))
             error("`const`/`immutable`/`shared`/`inout` attributes are not allowed on `asm` blocks");
 
@@ -7047,7 +7105,7 @@ LagainStc:
 
     private void checkParens(TOK value, AST.Expression e)
     {
-        if (precedence[e.op] == PREC.rel && !e.parens)
+        if (precedence[e.op] == PREC.rel)
             error(e.loc, "`%s` must be surrounded by parentheses when next to operator `%s`", e.toChars(), Token.toChars(value));
     }
 
@@ -7524,12 +7582,7 @@ LagainStc:
             case TOK.identifier:
                 if (t.ident == Id._body)
                 {
-                    // @@@DEPRECATED_2.117@@@
-                    // https://github.com/dlang/DIPs/blob/1f5959abe482b1f9094f6484a7d0a3ade77fc2fc/DIPs/accepted/DIP1003.md
-                    // Deprecated in 2.097 - Can be removed from 2.117
-                    // The deprecation period is longer than usual as `body`
-                    // was quite widely used.
-                    deprecation("usage of the `body` keyword is deprecated. Use `do` instead.");
+                    usageOfBodyKeyword();
                     goto case TOK.do_;
                 }
                 goto default;
@@ -8451,7 +8504,6 @@ LagainStc:
                 // ( expression )
                 nextToken();
                 e = parseExpression();
-                e.parens = true;
                 check(loc, TOK.rightParenthesis);
                 break;
             }
@@ -8759,6 +8811,7 @@ LagainStc:
                             {
                                 // (type) una_exp
                                 nextToken();
+                                // Note: `t` may be an expression that looks like a type
                                 auto t = parseType();
                                 check(TOK.rightParenthesis);
 
@@ -8772,9 +8825,19 @@ LagainStc:
                                         nextToken();
                                         return AST.ErrorExp.get();
                                     }
-                                    e = new AST.TypeExp(loc, t);
-                                    e.parens = true;
-                                    e = parsePostExp(e);
+                                    auto te = new AST.TypeExp(loc, t);
+                                    te.parens = true;
+                                    e = parsePostExp(te);
+                                }
+                                else if (token.value == TOK.leftParenthesis ||
+                                    token.value == TOK.plusPlus || token.value == TOK.minusMinus)
+                                {
+                                    // (type)(expr)
+                                    // (callable)(args)
+                                    // (expr)++
+                                    auto te = new AST.TypeExp(loc, t);
+                                    te.parens = true;
+                                    e = parsePostExp(te);
                                 }
                                 else
                                 {
@@ -9081,14 +9144,18 @@ LagainStc:
     private AST.Expression parseAndExp()
     {
         Loc loc = token.loc;
+        bool parens = token.value == TOK.leftParenthesis;
         auto e = parseCmpExp();
         while (token.value == TOK.and)
         {
-            checkParens(TOK.and, e);
-            nextToken();
+            if (!parens)
+                checkParens(TOK.and, e);
+            parens = nextToken() == TOK.leftParenthesis;
             auto e2 = parseCmpExp();
-            checkParens(TOK.and, e2);
+            if (!parens)
+                checkParens(TOK.and, e2);
             e = new AST.AndExp(loc, e, e2);
+            parens = true;              // don't call checkParens() for And
             loc = token.loc;
         }
         return e;
@@ -9096,32 +9163,42 @@ LagainStc:
 
     private AST.Expression parseXorExp()
     {
-        const loc = token.loc;
+        Loc loc = token.loc;
 
+        bool parens = token.value == TOK.leftParenthesis;
         auto e = parseAndExp();
         while (token.value == TOK.xor)
         {
-            checkParens(TOK.xor, e);
-            nextToken();
+            if (!parens)
+                checkParens(TOK.xor, e);
+            parens = nextToken() == TOK.leftParenthesis;
             auto e2 = parseAndExp();
-            checkParens(TOK.xor, e2);
+            if (!parens)
+                checkParens(TOK.xor, e2);
             e = new AST.XorExp(loc, e, e2);
+            parens = true;
+            loc = token.loc;
         }
         return e;
     }
 
     private AST.Expression parseOrExp()
     {
-        const loc = token.loc;
+        Loc loc = token.loc;
 
+        bool parens = token.value == TOK.leftParenthesis;
         auto e = parseXorExp();
         while (token.value == TOK.or)
         {
-            checkParens(TOK.or, e);
-            nextToken();
+            if (!parens)
+                checkParens(TOK.or, e);
+            parens = nextToken() == TOK.leftParenthesis;
             auto e2 = parseXorExp();
-            checkParens(TOK.or, e2);
+            if (!parens)
+                checkParens(TOK.or, e2);
             e = new AST.OrExp(loc, e, e2);
+            parens = true;
+            loc = token.loc;
         }
         return e;
     }
@@ -9172,6 +9249,7 @@ LagainStc:
 
     AST.Expression parseAssignExp()
     {
+        bool parens = token.value == TOK.leftParenthesis;
         AST.Expression e;
         e = parseCondExp();
         if (e is null)
@@ -9180,8 +9258,8 @@ LagainStc:
         // require parens for e.g. `t ? a = 1 : b = 2`
         void checkRequiredParens()
         {
-            if (e.op == EXP.question && !e.parens)
-                dmd.errors.error(e.loc, "`%s` must be surrounded by parentheses when next to operator `%s`",
+            if (e.op == EXP.question && !parens)
+                eSink.error(e.loc, "`%s` must be surrounded by parentheses when next to operator `%s`",
                     e.toChars(), Token.toChars(token.value));
         }
 
@@ -9464,6 +9542,14 @@ LagainStc:
                 STC.live     |
                 /*STC.future   |*/ // probably should be included
                 STC.disable;
+
+    void usageOfBodyKeyword()
+    {
+        if (compileEnv.obsolete)
+        {
+            eSink.warning(token.loc, "usage of identifer `body` as a keyword is obsolete. Use `do` instead.");
+        }
+    }
 }
 
 enum PREC : int
@@ -9498,7 +9584,6 @@ immutable PREC[EXP.max + 1] precedence =
     EXP.error : PREC.expr,
     EXP.objcClassReference : PREC.expr, // Objective-C class reference, same as EXP.type
 
-    EXP.typeof_ : PREC.primary,
     EXP.mixin_ : PREC.primary,
 
     EXP.import_ : PREC.primary,
@@ -9538,7 +9623,6 @@ immutable PREC[EXP.max + 1] precedence =
     EXP.remove : PREC.primary,
     EXP.tuple : PREC.primary,
     EXP.traits : PREC.primary,
-    EXP.default_ : PREC.primary,
     EXP.overloadSet : PREC.primary,
     EXP.void_ : PREC.primary,
     EXP.vectorArray : PREC.primary,
@@ -9637,7 +9721,6 @@ immutable PREC[EXP.max + 1] precedence =
 
 enum ParseStatementFlags : int
 {
-    semi          = 1,        // empty ';' statements are allowed, but deprecated
     scope_        = 2,        // start a new scope
     curly         = 4,        // { } statement is required
     curlyScope    = 8,        // { } starts a new scope
@@ -9707,53 +9790,4 @@ private StorageClass getStorageClass(AST)(PrefixAttributes!(AST)* pAttrs)
         pAttrs.storageClass = STC.undefined_;
     }
     return stc;
-}
-
-/**************************************
- * dump mixin expansion to file for better debugging
- */
-private bool writeMixin(const(char)[] s, ref Loc loc)
-{
-    if (!global.params.mixinOut.doOutput)
-        return false;
-
-    OutBuffer* ob = global.params.mixinOut.buffer;
-
-    ob.writestring("// expansion at ");
-    ob.writestring(loc.toChars());
-    ob.writenl();
-
-    global.params.mixinOut.bufferLines++;
-
-    loc = Loc(global.params.mixinOut.name.ptr, global.params.mixinOut.bufferLines + 1, loc.charnum);
-
-    // write by line to create consistent line endings
-    size_t lastpos = 0;
-    for (size_t i = 0; i < s.length; ++i)
-    {
-        // detect LF and CRLF
-        const c = s[i];
-        if (c == '\n' || (c == '\r' && i+1 < s.length && s[i+1] == '\n'))
-        {
-            ob.writestring(s[lastpos .. i]);
-            ob.writenl();
-            global.params.mixinOut.bufferLines++;
-            if (c == '\r')
-                ++i;
-            lastpos = i + 1;
-        }
-    }
-
-    if(lastpos < s.length)
-        ob.writestring(s[lastpos .. $]);
-
-    if (s.length == 0 || s[$-1] != '\n')
-    {
-        ob.writenl(); // ensure empty line after expansion
-        global.params.mixinOut.bufferLines++;
-    }
-    ob.writenl();
-    global.params.mixinOut.bufferLines++;
-
-    return true;
 }

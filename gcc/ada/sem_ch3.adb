@@ -1688,6 +1688,31 @@ package body Sem_Ch3 is
    -------------------------------------
 
    procedure Add_Internal_Interface_Entities (Tagged_Type : Entity_Id) is
+
+      function Error_Posted_In_Formals (Subp : Entity_Id) return Boolean;
+      --  Determine if an error has been posted in some formal of Subp.
+
+      -----------------------------
+      -- Error_Posted_In_Formals --
+      -----------------------------
+
+      function Error_Posted_In_Formals (Subp : Entity_Id) return Boolean is
+         Formal : Entity_Id := First_Formal (Subp);
+
+      begin
+         while Present (Formal) loop
+            if Error_Posted (Formal) then
+               return True;
+            end if;
+
+            Next_Formal (Formal);
+         end loop;
+
+         return False;
+      end Error_Posted_In_Formals;
+
+      --  Local variables
+
       Elmt          : Elmt_Id;
       Iface         : Entity_Id;
       Iface_Elmt    : Elmt_Id;
@@ -1740,6 +1765,86 @@ package body Sem_Ch3 is
                end if;
 
                pragma Assert (Present (Prim));
+
+               --  Check subtype conformance; we skip this check if errors have
+               --  been reported in the primitive (or in the formals of the
+               --  primitive) because Find_Primitive_Covering_Interface relies
+               --  on the subprogram Type_Conformant to locate the primitive,
+               --  and reports errors if the formals don't match.
+
+               if not Error_Posted (Prim)
+                 and then not Error_Posted_In_Formals (Prim)
+               then
+                  declare
+                     Alias_Prim : Entity_Id;
+                     Alias_Typ  : Entity_Id;
+                     Err_Loc    : Node_Id := Empty;
+                     Ret_Type   : Entity_Id;
+
+                  begin
+                     --  For inherited primitives, in case of reporting an
+                     --  error, the error must be reported on this primitive
+                     --  (i.e. in the name of its type declaration); otherwise
+                     --  the error would be reported in the formal of the
+                     --  alias primitive defined on its parent type.
+
+                     if Nkind (Parent (Prim)) = N_Full_Type_Declaration then
+                        Err_Loc := Prim;
+                     end if;
+
+                     --  Check subtype conformance of procedures, functions
+                     --  with matching return type, or functions not returning
+                     --  interface types.
+
+                     if Ekind (Prim) = E_Procedure
+                       or else Etype (Iface_Prim) = Etype (Prim)
+                       or else not Is_Interface (Etype (Iface_Prim))
+                     then
+                        Check_Subtype_Conformant
+                          (New_Id  => Prim,
+                           Old_Id  => Iface_Prim,
+                           Err_Loc => Err_Loc,
+                           Skip_Controlling_Formals => True);
+
+                     --  Check subtype conformance of functions returning an
+                     --  interface type; temporarily force both entities to
+                     --  return the same type. Required because subprogram
+                     --  Subtype_Conformant does not handle this case.
+
+                     else
+                        Ret_Type := Etype (Iface_Prim);
+                        Set_Etype (Iface_Prim, Etype (Prim));
+
+                        Check_Subtype_Conformant
+                          (New_Id  => Prim,
+                           Old_Id  => Iface_Prim,
+                           Err_Loc => Err_Loc,
+                           Skip_Controlling_Formals => True);
+
+                        Set_Etype (Iface_Prim, Ret_Type);
+                     end if;
+
+                     --  Complete the error when reported on inherited
+                     --  primitives.
+
+                     if Nkind (Parent (Prim)) = N_Full_Type_Declaration
+                       and then (Error_Posted (Prim)
+                                   or else Error_Posted_In_Formals (Prim))
+                       and then Present (Alias (Prim))
+                     then
+                        Alias_Prim := Ultimate_Alias (Prim);
+                        Alias_Typ  := Find_Dispatching_Type (Alias_Prim);
+
+                        if Alias_Typ /= Tagged_Type
+                          and then Is_Ancestor (Alias_Typ, Tagged_Type)
+                        then
+                           Error_Msg_Sloc := Sloc (Alias_Prim);
+                           Error_Msg_N
+                             ("in primitive inherited from #!", Prim);
+                        end if;
+                     end if;
+                  end;
+               end if;
 
                --  Ada 2012 (AI05-0197): If the name of the covering primitive
                --  differs from the name of the interface primitive then it is
@@ -1868,7 +1973,6 @@ package body Sem_Ch3 is
    -----------------------------------
 
    procedure Analyze_Component_Declaration (N : Node_Id) is
-      Loc : constant Source_Ptr := Sloc (Component_Definition (N));
       Id  : constant Entity_Id  := Defining_Identifier (N);
       E   : constant Node_Id    := Expression (N);
       Typ : constant Node_Id    :=
@@ -2203,23 +2307,6 @@ package body Sem_Ch3 is
             Set_Etype (Id, Any_Type);
             Set_Is_Limited_Composite (Current_Scope, False);
          end if;
-      end if;
-
-      --  When possible, build the default subtype
-
-      if Build_Default_Subtype_OK (T) then
-         declare
-            Act_T : constant Entity_Id := Build_Default_Subtype (T, N);
-
-         begin
-            Set_Etype (Id, Act_T);
-
-            --  Rewrite component definition to use the constrained subtype
-
-            Rewrite (Component_Definition (N),
-              Make_Component_Definition (Loc,
-                Subtype_Indication => New_Occurrence_Of (Act_T, Loc)));
-         end;
       end if;
 
       Set_Original_Record_Component (Id, Id);
@@ -4690,6 +4777,16 @@ package body Sem_Ch3 is
          elsif No (E) and then Is_Null_Record_Type (T) then
             null;
 
+         --  If there is an address clause for this object, do not generate a
+         --  predicate check here. It will be generated later, at the freezng
+         --  point. It would be wrong to generate references to the object
+         --  here, before the address has been determined.
+
+         elsif Has_Aspect (Id, Aspect_Address)
+           or else Present (Following_Address_Clause (N))
+         then
+            null;
+
          --  Do not generate a predicate check if the initialization expression
          --  is a type conversion whose target subtype statically matches the
          --  object's subtype because the conversion has been subjected to the
@@ -4709,7 +4806,6 @@ package body Sem_Ch3 is
             declare
                Check : constant Node_Id :=
                          Make_Predicate_Check (T, New_Occurrence_Of (Id, Loc));
-
             begin
                if No (Next_Decl) then
                   Append_To (List_Containing (N), Check);
@@ -5540,7 +5636,7 @@ package body Sem_Ch3 is
       --  avoided here, when the created subtype declaration is analyzed. (See
       --  Build_Derived_Types)
 
-      --  This also happens when the full view of a private type is derived
+      --  This also happens when the full view of a private type is a derived
       --  type with constraints. In this case the entity has been introduced
       --  in the private declaration.
 
@@ -8669,7 +8765,7 @@ package body Sem_Ch3 is
 
    --  5. FIRST TRANSFORMATION FOR DERIVED RECORDS
    --
-   --  Regardless of whether we dealing with a tagged or untagged type
+   --  Regardless of whether we are dealing with a tagged or untagged type
    --  we will transform all derived type declarations of the form
    --
    --               type T is new R (...) [with ...];
@@ -9037,9 +9133,16 @@ package body Sem_Ch3 is
    --  Start of processing for Build_Derived_Record_Type
 
    begin
+      --  If the parent type is a private extension with discriminants, we
+      --  need to have an unconstrained type on which to apply the inherited
+      --  constraint, so we get to the full view. However, this means that the
+      --  derived type and its implicit base type created below will not point
+      --  to the same view of their respective parent type and, thus, special
+      --  glue code like Exp_Ch7.Convert_View is needed to bridge this gap.
+
       if Ekind (Parent_Type) = E_Record_Type_With_Private
-        and then Present (Full_View (Parent_Type))
         and then Has_Discriminants (Parent_Type)
+        and then Present (Full_View (Parent_Type))
       then
          Parent_Base := Base_Type (Full_View (Parent_Type));
       else
@@ -9054,6 +9157,36 @@ package body Sem_Ch3 is
 
       if Ekind (Parent_Base) = E_Record_Subtype then
          Parent_Base := Base_Type (Parent_Base);
+      end if;
+
+      --  If the parent base is a private type and only its full view has
+      --  discriminants, use the full view's base type.
+
+      --  This can happen when we are deriving from a subtype of a derived type
+      --  of a private type derived from a discriminated type with known
+      --  discriminant:
+      --
+      --  package Pkg;
+      --     type Root_Type(I: Positive) is record
+      --       ...
+      --     end record;
+      --     type Bounded_Root_Type is private;
+      --  private
+      --     type Bounded_Root_Type is new Root_Type(10);
+      --  end Pkg;
+      --
+      --  package Pkg2 is
+      --     type Constrained_Root_Type is new Pkg.Bounded_Root_Type;
+      --  end Pkg2;
+      --  subtype Sub_Base is Pkg2.Constrained_Root_Type;
+      --  type New_Der_Type is new Sub_Base;
+
+      if Is_Private_Type (Parent_Base)
+        and then Present (Full_View (Parent_Base))
+        and then not Has_Discriminants (Parent_Base)
+        and then Has_Discriminants (Full_View (Parent_Base))
+      then
+         Parent_Base := Base_Type (Full_View (Parent_Base));
       end if;
 
       --  AI05-0115: if this is a derivation from a private type in some
@@ -9287,7 +9420,7 @@ package body Sem_Ch3 is
             Is_Completion => False, Derive_Subps => False);
 
          --  ??? This needs re-examination to determine whether the
-         --  above call can simply be replaced by a call to Analyze.
+         --  following call can simply be replaced by a call to Analyze.
 
          Set_Analyzed (New_Decl);
 
@@ -14297,6 +14430,8 @@ package body Sem_Ch3 is
       Set_Is_Constrained    (T_Sub, True);
       Set_First_Entity      (T_Sub, First_Entity (Corr_Rec));
       Set_Last_Entity       (T_Sub, Last_Entity  (Corr_Rec));
+      Set_Direct_Primitive_Operations
+        (T_Sub, Direct_Primitive_Operations (Corr_Rec));
 
       if Has_Discriminants (Prot_Subt) then -- False only if errors.
          Set_Discriminant_Constraint

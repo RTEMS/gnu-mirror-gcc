@@ -1382,7 +1382,7 @@ AC_CHECK_HEADERS(ext/hash_map)
 ZW_CREATE_DEPDIR
 AC_CONFIG_COMMANDS([gccdepdir],[
   ${CONFIG_SHELL-/bin/sh} $ac_aux_dir/mkinstalldirs build/$DEPDIR
-  for lang in $subdirs c-family common analyzer rtl-ssa
+  for lang in $subdirs c-family common analyzer text-art rtl-ssa
   do
       ${CONFIG_SHELL-/bin/sh} $ac_aux_dir/mkinstalldirs $lang/$DEPDIR
   done], [subdirs="$subdirs" ac_aux_dir=$ac_aux_dir DEPDIR=$DEPDIR])
@@ -4325,7 +4325,7 @@ case "$target_os" in
       gcc_cv_as_mmacosx_version_min,
       [-mmacosx-version-min=10.1], [.text],,
       [AC_DEFINE(HAVE_AS_MMACOSX_VERSION_MIN_OPTION, 1,
-	[Define if your Mac OS X assembler supports the -mmacos-version-min option.])])
+	[Define if your macOS assembler supports the -mmacos-version-min option.])])
     ;;
 esac
 
@@ -4762,7 +4762,7 @@ foo:	nop
           gcc_cv_as_mllvm_x86_pad_for_align,
           [-mllvm -x86-pad-for-align=false], [.text],,
           [AC_DEFINE(HAVE_AS_MLLVM_X86_PAD_FOR_ALIGN, 1,
-	    [Define if your Mac OS X assembler supports -mllvm -x86-pad-for-align=false.])])
+	    [Define if your macOS assembler supports -mllvm -x86-pad-for-align=false.])])
        ;;
     esac
 
@@ -6211,6 +6211,7 @@ if test x"$ld64_flag" = x"yes"; then
   # Set defaults for possibly untestable items.
   gcc_cv_ld64_export_dynamic=0
   gcc_cv_ld64_platform_version=0
+  gcc_cv_ld64_demangle=0
 
   if test "$build" = "$host"; then
     darwin_try_test=1
@@ -6232,6 +6233,9 @@ if test x"$ld64_flag" = x"yes"; then
     AC_MSG_CHECKING(ld64 specified version)
     gcc_cv_ld64_major=`echo "$gcc_cv_ld64_version" | sed -e 's/\..*//'`
     AC_MSG_RESULT($gcc_cv_ld64_major)
+    if test "$gcc_cv_ld64_major" -ge 97; then
+      gcc_cv_ld64_demangle=1
+    fi
     if test "$gcc_cv_ld64_major" -ge 236; then
       gcc_cv_ld64_export_dynamic=1
     fi
@@ -6242,9 +6246,17 @@ if test x"$ld64_flag" = x"yes"; then
     # If the version was not specified, try to find it.
     AC_MSG_CHECKING(linker version)
     if test x"${gcc_cv_ld64_version}" = x; then
-      gcc_cv_ld64_version=`$gcc_cv_ld -v 2>&1 | grep ld64 | sed s/.*ld64-// | awk '{print $1}'`
+      gcc_cv_ld64_version=`$gcc_cv_ld -v 2>&1 | $EGREP 'ld64|dyld' \
+      | sed -e 's/.*ld64-//' -e 's/.*dyld-//'| awk '{print $1}'`
     fi
     AC_MSG_RESULT($gcc_cv_ld64_version)
+
+    AC_MSG_CHECKING(linker for -demangle support)
+    gcc_cv_ld64_demangle=1
+    if $gcc_cv_ld -demangle < /dev/null 2>&1 | grep 'unknown option' > /dev/null; then
+      gcc_cv_ld64_demangle=0
+    fi
+    AC_MSG_RESULT($gcc_cv_ld64_demangle)
 
     AC_MSG_CHECKING(linker for -export_dynamic support)
     gcc_cv_ld64_export_dynamic=1
@@ -6265,6 +6277,9 @@ if test x"$ld64_flag" = x"yes"; then
     AC_DEFINE_UNQUOTED(LD64_VERSION, "${gcc_cv_ld64_version}",
       [Define to ld64 version.])
   fi
+
+  AC_DEFINE_UNQUOTED(LD64_HAS_DEMANGLE, $gcc_cv_ld64_demangle,
+  [Define to 1 if ld64 supports '-demangle'.])
 
   AC_DEFINE_UNQUOTED(LD64_HAS_EXPORT_DYNAMIC, $gcc_cv_ld64_export_dynamic,
   [Define to 1 if ld64 supports '-export_dynamic'.])
@@ -7416,11 +7431,20 @@ fi
 # Enable --enable-host-shared
 AC_ARG_ENABLE(host-shared,
 [AS_HELP_STRING([--enable-host-shared],
-		[build host code as shared libraries])],
-[PICFLAG=-fPIC], [PICFLAG=])
+		[build host code as shared libraries])])
 AC_SUBST(enable_host_shared)
-AC_SUBST(PICFLAG)
 
+# Enable --enable-host-pie
+AC_ARG_ENABLE(host-pie,
+[AS_HELP_STRING([--enable-host-pie],
+		[build host code as PIE])])
+AC_SUBST(enable_host_pie)
+
+# Enable --enable-host-bind-now
+AC_ARG_ENABLE(host-bind-now,
+[AS_HELP_STRING([--enable-host-bind-now],
+		[link host code as BIND_NOW])])
+AC_SUBST(enable_host_bind_now)
 
 AC_ARG_ENABLE(libquadmath-support,
 [AS_HELP_STRING([--disable-libquadmath-support],
@@ -7542,10 +7566,6 @@ AC_CACHE_CHECK([for -fno-PIE option],
      [gcc_cv_c_no_fpie=yes],
      [gcc_cv_c_no_fpie=no])
    CXXFLAGS="$saved_CXXFLAGS"])
-if test "$gcc_cv_c_no_fpie" = "yes"; then
-  NO_PIE_CFLAGS="-fno-PIE"
-fi
-AC_SUBST([NO_PIE_CFLAGS])
 
 # Check if -no-pie works.
 AC_CACHE_CHECK([for -no-pie option],
@@ -7556,10 +7576,32 @@ AC_CACHE_CHECK([for -no-pie option],
      [gcc_cv_no_pie=yes],
      [gcc_cv_no_pie=no])
    LDFLAGS="$saved_LDFLAGS"])
-if test "$gcc_cv_no_pie" = "yes"; then
-  NO_PIE_FLAG="-no-pie"
+
+if test x$enable_host_shared = xyes; then
+  PICFLAG=-fPIC
+elif test x$enable_host_pie = xyes; then
+  PICFLAG=-fPIE
+elif test x$gcc_cv_c_no_fpie = xyes; then
+  PICFLAG=-fno-PIE
+else
+  PICFLAG=
 fi
-AC_SUBST([NO_PIE_FLAG])
+
+AC_SUBST([PICFLAG])
+
+if test x$enable_host_pie = xyes; then
+  LD_PICFLAG=-pie
+elif test x$gcc_cv_no_pie = xyes; then
+  LD_PICFLAG=-no-pie
+else
+  LD_PICFLAG=
+fi
+
+if test x$enable_host_bind_now = xyes; then
+  LD_PICFLAG="$LD_PICFLAG -Wl,-z,now"
+fi
+
+AC_SUBST([LD_PICFLAG])
 
 # Enable Intel CET on Intel CET enabled host if jit is enabled.
 GCC_CET_HOST_FLAGS(CET_HOST_FLAGS)

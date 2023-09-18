@@ -128,10 +128,11 @@ CONSTEXPR const type_suffix_info type_suffixes[NUM_TYPE_SUFFIXES + 1] = {
     TYPE_##CLASS == TYPE_signed || TYPE_##CLASS == TYPE_unsigned, \
     TYPE_##CLASS == TYPE_unsigned, \
     TYPE_##CLASS == TYPE_float, \
+    TYPE_##CLASS == TYPE_poly, \
     0, \
     MODE },
 #include "arm-mve-builtins.def"
-  { "", NUM_VECTOR_TYPES, TYPE_bool, 0, 0, false, false, false,
+  { "", NUM_VECTOR_TYPES, TYPE_bool, 0, 0, false, false, false, false,
     0, VOIDmode }
 };
 
@@ -176,6 +177,10 @@ CONSTEXPR const type_suffix_info type_suffixes[NUM_TYPE_SUFFIXES + 1] = {
 /* _s8 _s16 _s32.  */
 #define TYPES_all_signed(S, D) \
   S (s8), S (s16), S (s32)
+
+/* _p8 _p16.  */
+#define TYPES_poly_8_16(S, D) \
+  S (p8), S (p16)
 
 /* _u8 _u16 _u32.  */
 #define TYPES_all_unsigned(S, D) \
@@ -275,6 +280,7 @@ DEF_MVE_TYPES_ARRAY (integer_8);
 DEF_MVE_TYPES_ARRAY (integer_8_16);
 DEF_MVE_TYPES_ARRAY (integer_16_32);
 DEF_MVE_TYPES_ARRAY (integer_32);
+DEF_MVE_TYPES_ARRAY (poly_8_16);
 DEF_MVE_TYPES_ARRAY (signed_16_32);
 DEF_MVE_TYPES_ARRAY (signed_32);
 DEF_MVE_TYPES_ARRAY (reinterpret_integer);
@@ -493,6 +499,16 @@ handle_arm_mve_h (bool preserve_user_namespace)
 				     preserve_user_namespace);
 }
 
+/* Return the function decl with MVE function subcode CODE, or error_mark_node
+   if no such function exists.  */
+tree
+builtin_decl (unsigned int code)
+{
+  if (code >= vec_safe_length (registered_functions))
+    return error_mark_node;
+  return (*registered_functions)[code]->decl;
+}
+
 /* Return true if CANDIDATE is equivalent to MODEL_TYPE for overloading
    purposes.  */
 static bool
@@ -670,6 +686,10 @@ function_instance::has_inactive_argument () const
     return false;
 
   if (mode_suffix_id == MODE_r
+      || base == functions::vcmlaq
+      || base == functions::vcmlaq_rot90
+      || base == functions::vcmlaq_rot180
+      || base == functions::vcmlaq_rot270
       || base == functions::vcmpeqq
       || base == functions::vcmpneq
       || base == functions::vcmpgeq
@@ -849,7 +869,6 @@ function_builder::add_function (const function_instance &instance,
     ? integer_zero_node
     : simulate_builtin_function_decl (input_location, name, fntype,
 				      code, NULL, attrs);
-
   registered_function &rfn = *ggc_alloc <registered_function> ();
   rfn.instance = instance;
   rfn.decl = decl;
@@ -889,15 +908,12 @@ function_builder::add_unique_function (const function_instance &instance,
   gcc_assert (!*rfn_slot);
   *rfn_slot = &rfn;
 
-  /* Also add the non-prefixed non-overloaded function, if the user namespace
-     does not need to be preserved.  */
-  if (!preserve_user_namespace)
-    {
-      char *noprefix_name = get_name (instance, false, false);
-      tree attrs = get_attributes (instance);
-      add_function (instance, noprefix_name, fntype, attrs, requires_float,
-		    false, false);
-    }
+  /* Also add the non-prefixed non-overloaded function, as placeholder
+     if the user namespace does not need to be preserved.  */
+  char *noprefix_name = get_name (instance, false, false);
+  attrs = get_attributes (instance);
+  add_function (instance, noprefix_name, fntype, attrs, requires_float,
+		false, preserve_user_namespace);
 
   /* Also add the function under its overloaded alias, if we want
      a separate decl for each instance of an overloaded function.  */
@@ -905,20 +921,17 @@ function_builder::add_unique_function (const function_instance &instance,
   if (strcmp (name, overload_name) != 0)
     {
       /* Attribute lists shouldn't be shared.  */
-      tree attrs = get_attributes (instance);
+      attrs = get_attributes (instance);
       bool placeholder_p = !(m_direct_overloads || force_direct_overloads);
       add_function (instance, overload_name, fntype, attrs,
 		    requires_float, false, placeholder_p);
 
-      /* Also add the non-prefixed overloaded function, if the user namespace
-	 does not need to be preserved.  */
-      if (!preserve_user_namespace)
-	{
-	  char *noprefix_overload_name = get_name (instance, false, true);
-	  tree attrs = get_attributes (instance);
-	  add_function (instance, noprefix_overload_name, fntype, attrs,
-			requires_float, false, placeholder_p);
-	}
+      /* Also add the non-prefixed overloaded function, as placeholder
+	 if the user namespace does not need to be preserved.  */
+      char *noprefix_overload_name = get_name (instance, false, true);
+      attrs = get_attributes (instance);
+      add_function (instance, noprefix_overload_name, fntype, attrs,
+		    requires_float, false, preserve_user_namespace || placeholder_p);
     }
 
   obstack_free (&m_string_obstack, name);
@@ -948,15 +961,15 @@ function_builder::add_overloaded_function (const function_instance &instance,
 	= add_function (instance, name, m_overload_type, NULL_TREE,
 			requires_float, true, m_direct_overloads);
       m_overload_names.put (name, &rfn);
-      if (!preserve_user_namespace)
-	{
-	  char *noprefix_name = get_name (instance, false, true);
-	  registered_function &noprefix_rfn
-	    = add_function (instance, noprefix_name, m_overload_type,
-			    NULL_TREE, requires_float, true,
-			    m_direct_overloads);
-	  m_overload_names.put (noprefix_name, &noprefix_rfn);
-	}
+
+      /* Also add the non-prefixed function, as placeholder if the
+	 user namespace does not need to be preserved.  */
+      char *noprefix_name = get_name (instance, false, true);
+      registered_function &noprefix_rfn
+	= add_function (instance, noprefix_name, m_overload_type,
+			NULL_TREE, requires_float, true,
+			preserve_user_namespace || m_direct_overloads);
+      m_overload_names.put (noprefix_name, &noprefix_rfn);
     }
 }
 

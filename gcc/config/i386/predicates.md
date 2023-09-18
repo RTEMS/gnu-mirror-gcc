@@ -1192,11 +1192,17 @@
     return false;
 })
 
-/* Return true if operand is a vector constant that is all ones. */
+/* Return true if operand is an integral vector constant that is all ones. */
 (define_predicate "vector_all_ones_operand"
   (and (match_code "const_vector")
        (match_test "INTEGRAL_MODE_P (GET_MODE (op))")
        (match_test "op == CONSTM1_RTX (GET_MODE (op))")))
+
+/* Return true if operand is a vector constant that is all ones. */
+(define_predicate "int_float_vector_all_ones_operand"
+  (ior (match_operand 0 "vector_all_ones_operand")
+       (match_operand 0 "float_vector_all_ones_operand")
+       (match_test "op == constm1_rtx")))
 
 /* Return true if operand is an 128/256bit all ones vector
    that zero-extends to 256/512bit.  */
@@ -1640,6 +1646,18 @@
                              == IX86_FPCMP_ARITH")
                (match_operand 0 "comparison_operator")
                (match_operand 0 "ix86_trivial_fp_comparison_operator")))
+
+;; Return true if we can perform this comparison on TImode operands.
+(define_predicate "ix86_timode_comparison_operator"
+  (if_then_else (match_test "TARGET_64BIT")
+		(match_operand 0 "ordered_comparison_operator")
+		(match_operand 0 "bt_comparison_operator")))
+
+;; Return true if this is a valid second operand for a TImode comparison.
+(define_predicate "ix86_timode_comparison_operand"
+  (if_then_else (match_test "TARGET_64BIT")
+		(match_operand 0 "x86_64_general_operand")
+		(match_operand 0 "nonimmediate_operand")))
 
 ;; Nearly general operand, but accept any const_double, since we wish
 ;; to be able to drop them into memory rather than have them get pulled

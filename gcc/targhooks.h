@@ -20,7 +20,7 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_TARGHOOKS_H
 #define GCC_TARGHOOKS_H
 
-extern bool default_legitimate_address_p (machine_mode, rtx, bool);
+extern bool default_legitimate_address_p (machine_mode, rtx, bool, code_helper);
 
 extern void default_external_libcall (rtx);
 extern rtx default_legitimize_address (rtx, rtx, machine_mode);
@@ -202,8 +202,8 @@ extern scalar_int_mode default_addr_space_pointer_mode (addr_space_t);
 extern scalar_int_mode default_addr_space_address_mode (addr_space_t);
 extern bool default_addr_space_valid_pointer_mode (scalar_int_mode,
 						   addr_space_t);
-extern bool default_addr_space_legitimate_address_p (machine_mode, rtx,
-						     bool, addr_space_t);
+extern bool default_addr_space_legitimate_address_p (machine_mode, rtx, bool,
+						     addr_space_t, code_helper);
 extern rtx default_addr_space_legitimize_address (rtx, rtx, machine_mode,
 						  addr_space_t);
 extern bool default_addr_space_subset_p (addr_space_t, addr_space_t);
@@ -284,6 +284,7 @@ extern unsigned int default_min_arithmetic_precision (void);
 
 extern enum flt_eval_method
 default_excess_precision (enum excess_precision_type ATTRIBUTE_UNUSED);
+extern bool default_bitint_type_info (int, struct bitint_info *);
 extern HOST_WIDE_INT default_stack_clash_protection_alloca_probe_range (void);
 extern void default_select_early_remat_modes (sbitmap);
 extern tree default_preferred_else_value (unsigned, tree, unsigned, tree *);

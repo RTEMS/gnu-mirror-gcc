@@ -171,6 +171,7 @@ static tree fold_builtin_fabs (location_t, tree, tree);
 static tree fold_builtin_abs (location_t, tree, tree);
 static tree fold_builtin_unordered_cmp (location_t, tree, tree, tree, enum tree_code,
 					enum tree_code);
+static tree fold_builtin_iseqsig (location_t, tree, tree);
 static tree fold_builtin_varargs (location_t, tree, tree*, int);
 
 static tree fold_builtin_strpbrk (location_t, tree, tree, tree, tree);
@@ -1875,6 +1876,7 @@ type_to_class (tree type)
 				   ? string_type_class : array_type_class);
     case LANG_TYPE:	   return lang_type_class;
     case OPAQUE_TYPE:      return opaque_type_class;
+    case BITINT_TYPE:	   return bitint_type_class;
     default:		   return no_type_class;
     }
 }
@@ -9422,9 +9424,11 @@ fold_builtin_unordered_cmp (location_t loc, tree fndecl, tree arg0, tree arg1,
     /* Choose the wider of two real types.  */
     cmp_type = TYPE_PRECISION (type0) >= TYPE_PRECISION (type1)
       ? type0 : type1;
-  else if (code0 == REAL_TYPE && code1 == INTEGER_TYPE)
+  else if (code0 == REAL_TYPE
+	   && (code1 == INTEGER_TYPE || code1 == BITINT_TYPE))
     cmp_type = type0;
-  else if (code0 == INTEGER_TYPE && code1 == REAL_TYPE)
+  else if ((code0 == INTEGER_TYPE || code0 == BITINT_TYPE)
+	   && code1 == REAL_TYPE)
     cmp_type = type1;
 
   arg0 = fold_convert_loc (loc, cmp_type, arg0);
@@ -9443,6 +9447,42 @@ fold_builtin_unordered_cmp (location_t loc, tree fndecl, tree arg0, tree arg1,
 	 ? unordered_code : ordered_code;
   return fold_build1_loc (loc, TRUTH_NOT_EXPR, type,
 		      fold_build2_loc (loc, code, type, arg0, arg1));
+}
+
+/* Fold a call to __builtin_iseqsig().  ARG0 and ARG1 are the arguments.
+   After choosing the wider floating-point type for the comparison,
+   the code is folded to:
+     SAVE_EXPR<ARG0> >= SAVE_EXPR<ARG1> && SAVE_EXPR<ARG0> <= SAVE_EXPR<ARG1>  */
+
+static tree
+fold_builtin_iseqsig (location_t loc, tree arg0, tree arg1)
+{
+  tree type0, type1;
+  enum tree_code code0, code1;
+  tree cmp1, cmp2, cmp_type = NULL_TREE;
+
+  type0 = TREE_TYPE (arg0);
+  type1 = TREE_TYPE (arg1);
+
+  code0 = TREE_CODE (type0);
+  code1 = TREE_CODE (type1);
+
+  if (code0 == REAL_TYPE && code1 == REAL_TYPE)
+    /* Choose the wider of two real types.  */
+    cmp_type = TYPE_PRECISION (type0) >= TYPE_PRECISION (type1)
+      ? type0 : type1;
+  else if (code0 == REAL_TYPE && code1 == INTEGER_TYPE)
+    cmp_type = type0;
+  else if (code0 == INTEGER_TYPE && code1 == REAL_TYPE)
+    cmp_type = type1;
+
+  arg0 = builtin_save_expr (fold_convert_loc (loc, cmp_type, arg0));
+  arg1 = builtin_save_expr (fold_convert_loc (loc, cmp_type, arg1));
+
+  cmp1 = fold_build2_loc (loc, GE_EXPR, integer_type_node, arg0, arg1);
+  cmp2 = fold_build2_loc (loc, LE_EXPR, integer_type_node, arg0, arg1);
+
+  return fold_build2_loc (loc, TRUTH_AND_EXPR, integer_type_node, cmp1, cmp2);
 }
 
 /* Fold __builtin_{,s,u}{add,sub,mul}{,l,ll}_overflow, either into normal
@@ -9553,6 +9593,51 @@ fold_builtin_arith_overflow (location_t loc, enum built_in_function fcode,
   tree store
     = fold_build2_loc (loc, MODIFY_EXPR, void_type_node, mem_arg2, intres);
   return build2_loc (loc, COMPOUND_EXPR, boolean_type_node, store, ovfres);
+}
+
+/* Fold __builtin_{add,sub}c{,l,ll} into pair of internal functions
+   that return both result of arithmetics and overflowed boolean
+   flag in a complex integer result.  */
+
+static tree
+fold_builtin_addc_subc (location_t loc, enum built_in_function fcode,
+			tree *args)
+{
+  enum internal_fn ifn;
+
+  switch (fcode)
+    {
+    case BUILT_IN_ADDC:
+    case BUILT_IN_ADDCL:
+    case BUILT_IN_ADDCLL:
+      ifn = IFN_ADD_OVERFLOW;
+      break;
+    case BUILT_IN_SUBC:
+    case BUILT_IN_SUBCL:
+    case BUILT_IN_SUBCLL:
+      ifn = IFN_SUB_OVERFLOW;
+      break;
+    default:
+      gcc_unreachable ();
+    }
+
+  tree type = TREE_TYPE (args[0]);
+  tree ctype = build_complex_type (type);
+  tree call = build_call_expr_internal_loc (loc, ifn, ctype, 2,
+					    args[0], args[1]);
+  tree tgt = save_expr (call);
+  tree intres = build1_loc (loc, REALPART_EXPR, type, tgt);
+  tree ovfres = build1_loc (loc, IMAGPART_EXPR, type, tgt);
+  call = build_call_expr_internal_loc (loc, ifn, ctype, 2,
+				       intres, args[2]);
+  tgt = save_expr (call);
+  intres = build1_loc (loc, REALPART_EXPR, type, tgt);
+  tree ovfres2 = build1_loc (loc, IMAGPART_EXPR, type, tgt);
+  ovfres = build2_loc (loc, BIT_IOR_EXPR, type, ovfres, ovfres2);
+  tree mem_arg3 = build_fold_indirect_ref_loc (loc, args[3]);
+  tree store
+    = fold_build2_loc (loc, MODIFY_EXPR, void_type_node, mem_arg3, ovfres);
+  return build2_loc (loc, COMPOUND_EXPR, type, store, intres);
 }
 
 /* Fold a call to __builtin_FILE to a constant string.  */
@@ -9832,6 +9917,9 @@ fold_builtin_2 (location_t loc, tree expr, tree fndecl, tree arg0, tree arg1)
       return fold_builtin_unordered_cmp (loc, fndecl,
 					 arg0, arg1, UNORDERED_EXPR,
 					 NOP_EXPR);
+
+    case BUILT_IN_ISEQSIG:
+      return fold_builtin_iseqsig (loc, arg0, arg1);
 
       /* We do the folding for va_start in the expander.  */
     case BUILT_IN_VA_START:
@@ -10843,6 +10931,14 @@ fold_builtin_varargs (location_t loc, tree fndecl, tree *args, int nargs)
       ret = fold_builtin_fpclassify (loc, args, nargs);
       break;
 
+    case BUILT_IN_ADDC:
+    case BUILT_IN_ADDCL:
+    case BUILT_IN_ADDCLL:
+    case BUILT_IN_SUBC:
+    case BUILT_IN_SUBCL:
+    case BUILT_IN_SUBCLL:
+      return fold_builtin_addc_subc (loc, fcode, args);
+
     default:
       break;
     }
@@ -11343,6 +11439,7 @@ is_inexpensive_builtin (tree decl)
       case BUILT_IN_ISLESSEQUAL:
       case BUILT_IN_ISLESSGREATER:
       case BUILT_IN_ISUNORDERED:
+      case BUILT_IN_ISEQSIG:
       case BUILT_IN_VA_ARG_PACK:
       case BUILT_IN_VA_ARG_PACK_LEN:
       case BUILT_IN_VA_COPY:

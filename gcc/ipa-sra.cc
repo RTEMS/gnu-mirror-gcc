@@ -898,7 +898,8 @@ isra_track_scalar_value_uses (function *fun, cgraph_node *node, tree name,
 
   FOR_EACH_IMM_USE_STMT (stmt, imm_iter, name)
     {
-      if (is_gimple_debug (stmt))
+      if (is_gimple_debug (stmt)
+	  || gimple_clobber_p (stmt))
 	continue;
 
       /* TODO: We could handle at least const builtin functions like arithmetic
@@ -1056,7 +1057,8 @@ ptr_parm_has_nonarg_uses (cgraph_node *node, function *fun, tree parm,
       unsigned uses_ok = 0;
       use_operand_p use_p;
 
-      if (is_gimple_debug (stmt))
+      if (is_gimple_debug (stmt)
+	  || gimple_clobber_p (stmt))
 	continue;
 
       if (gimple_assign_single_p (stmt))
@@ -2944,7 +2946,7 @@ isra_read_summary_section (struct lto_file_decl_data *file_data,
   unsigned int count;
 
   lto_input_block ib_main ((const char *) data + main_offset,
-			   header->main_size, file_data->mode_table);
+			   header->main_size, file_data);
 
   data_in =
     lto_data_in_create (file_data, (const char *) data + string_offset,
@@ -3074,6 +3076,8 @@ struct caller_issues
   cgraph_node *candidate;
   /* There is a thunk among callers.  */
   bool thunk;
+  /* Set if there is at least one caller that is OK.  */
+  bool there_is_one;
   /* Call site with no available information.  */
   bool unknown_callsite;
   /* Call from outside the candidate's comdat group.  */
@@ -3116,6 +3120,8 @@ check_for_caller_issues (struct cgraph_node *node, void *data)
 
       if (csum->m_bit_aligned_arg)
 	issues->bit_aligned_aggregate_argument = true;
+
+      issues->there_is_one = true;
     }
   return false;
 }
@@ -3169,6 +3175,13 @@ check_all_callers_for_issues (cgraph_node *node)
       unsigned param_count = vec_safe_length (ifs->m_parameters);
       for (unsigned i = 0; i < param_count; i++)
 	(*ifs->m_parameters)[i].split_candidate = false;
+    }
+  if (!issues.there_is_one)
+    {
+      if (dump_file && (dump_flags & TDF_DETAILS))
+	fprintf (dump_file, "There is no call to %s that we can modify.  "
+		 "Disabling all modifications.\n", node->dump_name ());
+      return true;
     }
   return false;
 }

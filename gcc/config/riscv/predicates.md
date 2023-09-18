@@ -49,6 +49,11 @@
   (ior (match_operand 0 "const_csr_operand")
        (match_operand 0 "register_operand")))
 
+;; V has 32-bit unsigned immediates.  This happens to be the same constraint as
+;; the csr_operand, but it's not CSR related.
+(define_predicate "vector_scalar_shift_operand"
+  (match_operand 0 "csr_operand"))
+
 (define_predicate "sle_operand"
   (and (match_code "const_int")
        (match_test "SMALL_OPERAND (INTVAL (op) + 1)")))
@@ -58,12 +63,123 @@
        (match_test "INTVAL (op) + 1 != 0")))
 
 (define_predicate "const_0_operand"
-  (and (match_code "const_int,const_wide_int,const_vector")
+  (and (match_code "const_int,const_wide_int,const_double,const_vector")
        (match_test "op == CONST0_RTX (GET_MODE (op))")))
+
+(define_predicate "const_1_operand"
+  (and (match_code "const_int,const_wide_int,const_vector")
+       (match_test "op == CONST1_RTX (GET_MODE (op))")))
 
 (define_predicate "reg_or_0_operand"
   (ior (match_operand 0 "const_0_operand")
        (match_operand 0 "register_operand")))
+
+;; ZCMP predicates
+(define_predicate "stack_push_up_to_ra_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op) * -1, 1)")))
+
+(define_predicate "stack_push_up_to_s0_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op) * -1, 2)")))
+
+(define_predicate "stack_push_up_to_s1_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op) * -1, 3)")))
+
+(define_predicate "stack_push_up_to_s2_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op) * -1, 4)")))
+
+(define_predicate "stack_push_up_to_s3_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op) * -1, 5)")))
+
+(define_predicate "stack_push_up_to_s4_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op) * -1, 6)")))
+
+(define_predicate "stack_push_up_to_s5_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op) * -1, 7)")))
+
+(define_predicate "stack_push_up_to_s6_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op) * -1, 8)")))
+
+(define_predicate "stack_push_up_to_s7_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op) * -1, 9)")))
+
+(define_predicate "stack_push_up_to_s8_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op) * -1, 10)")))
+
+(define_predicate "stack_push_up_to_s9_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op) * -1, 11)")))
+
+(define_predicate "stack_push_up_to_s11_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op) * -1, 13)")))
+
+(define_predicate "stack_pop_up_to_ra_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op), 1)")))
+
+(define_predicate "stack_pop_up_to_s0_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op), 2)")))
+
+(define_predicate "stack_pop_up_to_s1_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op), 3)")))
+
+(define_predicate "stack_pop_up_to_s2_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op), 4)")))
+
+(define_predicate "stack_pop_up_to_s3_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op), 5)")))
+
+(define_predicate "stack_pop_up_to_s4_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op), 6)")))
+
+(define_predicate "stack_pop_up_to_s5_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op), 7)")))
+
+(define_predicate "stack_pop_up_to_s6_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op), 8)")))
+
+(define_predicate "stack_pop_up_to_s7_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op), 9)")))
+
+(define_predicate "stack_pop_up_to_s8_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op), 10)")))
+
+(define_predicate "stack_pop_up_to_s9_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op), 11)")))
+
+(define_predicate "stack_pop_up_to_s11_operand"
+  (and (match_code "const_int")
+       (match_test "riscv_zcmp_valid_stack_adj_bytes_p (INTVAL (op), 13)")))
+
+(define_predicate "a0a1_reg_operand"
+  (and (match_code "reg")
+       (match_test "IN_RANGE (REGNO (op), A0_REGNUM, A1_REGNUM)")))
+
+(define_predicate "zcmp_mv_sreg_operand"
+  (and (match_code "reg")
+       (match_test "TARGET_RVE ? IN_RANGE (REGNO (op), S0_REGNUM, S1_REGNUM)
+                    : IN_RANGE (REGNO (op), S0_REGNUM, S1_REGNUM)
+                    || IN_RANGE (REGNO (op), S2_REGNUM, S7_REGNUM)")))
 
 ;; Only use branch-on-bit sequences when the mask is not an ANDI immediate.
 (define_predicate "branch_on_bit_operand"
@@ -276,6 +392,10 @@
   (ior (match_operand 0 "pmode_register_operand")
        (match_operand 0 "const_csr_operand")))
 
+(define_special_predicate "autovec_length_operand"
+  (ior (match_operand 0 "pmode_register_operand")
+       (match_code "const_int,const_poly_int")))
+
 (define_predicate "reg_or_mem_operand"
   (ior (match_operand 0 "register_operand")
        (match_operand 0 "memory_operand")))
@@ -283,6 +403,15 @@
 (define_predicate "reg_or_int_operand"
   (ior (match_operand 0 "register_operand")
        (match_operand 0 "const_int_operand")))
+
+(define_predicate "vector_const_0_operand"
+  (and (match_code "const_vector")
+       (match_test "satisfies_constraint_Wc0 (op)")))
+
+(define_predicate "vector_const_int_or_double_0_operand"
+  (and (match_code "const_vector")
+       (match_test "satisfies_constraint_vi (op)
+                    || satisfies_constraint_Wc0 (op)")))
 
 (define_predicate "vector_move_operand"
   (ior (match_operand 0 "nonimmediate_operand")
@@ -334,6 +463,33 @@
   (ior (match_operand 0 "register_operand")
        (match_code "const_vector")))
 
+(define_predicate "vector_gs_scale_operand_16"
+  (and (match_code "const_int")
+       (match_test "INTVAL (op) == 1 || INTVAL (op) == 2")))
+
+(define_predicate "vector_gs_scale_operand_32"
+  (and (match_code "const_int")
+       (match_test "INTVAL (op) == 1 || INTVAL (op) == 4")))
+
+(define_predicate "vector_gs_scale_operand_64"
+  (and (match_code "const_int")
+       (match_test "INTVAL (op) == 1 || (INTVAL (op) == 8 && Pmode == DImode)")))
+
+(define_predicate "vector_gs_extension_operand"
+  (ior (match_operand 0 "const_1_operand")
+       (and (match_operand 0 "const_0_operand")
+            (match_test "Pmode == SImode"))))
+
+(define_predicate "vector_gs_scale_operand_16_rv32"
+  (and (match_code "const_int")
+       (match_test "INTVAL (op) == 1
+		    || (INTVAL (op) == 2 && Pmode == SImode)")))
+
+(define_predicate "vector_gs_scale_operand_32_rv32"
+  (and (match_code "const_int")
+       (match_test "INTVAL (op) == 1
+		    || (INTVAL (op) == 4 && Pmode == SImode)")))
+
 (define_predicate "ltge_operator"
   (match_code "lt,ltu,ge,geu"))
 
@@ -369,7 +525,7 @@
 		|| rtx_equal_p (op, CONST0_RTX (GET_MODE (op))))
 		&& maybe_gt (GET_MODE_BITSIZE (GET_MODE (op)), GET_MODE_BITSIZE (Pmode)))")
     (ior (match_test "rtx_equal_p (op, CONST0_RTX (GET_MODE (op)))")
-         (ior (match_operand 0 "const_int_operand")
+         (ior (match_code "const_int,const_poly_int")
               (ior (match_operand 0 "register_operand")
                    (match_test "satisfies_constraint_Wdm (op)"))))))
 

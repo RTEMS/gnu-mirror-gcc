@@ -7561,7 +7561,8 @@ cp_build_unary_op (enum tree_code code, tree xarg, bool noconvert,
 	/* [depr.volatile.type] "Postfix ++ and -- expressions and
 	   prefix ++ and -- expressions of volatile-qualified arithmetic
 	   and pointer types are deprecated."  */
-	if (TREE_THIS_VOLATILE (arg) || CP_TYPE_VOLATILE_P (TREE_TYPE (arg)))
+	if ((TREE_THIS_VOLATILE (arg) || CP_TYPE_VOLATILE_P (TREE_TYPE (arg)))
+	    && (complain & tf_warning))
 	  warning_at (location, OPT_Wvolatile,
 		      "%qs expression of %<volatile%>-qualified type is "
 		      "deprecated",
@@ -7592,7 +7593,7 @@ cp_build_unary_op (enum tree_code code, tree xarg, bool noconvert,
 		    return error_mark_node;
 		  }
 		/* Otherwise, [depr.incr.bool] says this is deprecated.  */
-		else
+		else if (complain & tf_warning)
 		  warning_at (location, OPT_Wdeprecated,
 			      "use of an operand of type %qT "
 			      "in %<operator++%> is deprecated",
@@ -10261,6 +10262,8 @@ convert_for_assignment (tree type, tree rhs,
 		{
 		  range_label_for_type_mismatch label (rhstype, type);
 		  gcc_rich_location richloc (rhs_loc, has_loc ? &label : NULL);
+		  auto_diagnostic_group d;
+
 		  switch (errtype)
 		    {
 		    case ICR_DEFAULT_ARGUMENT:
@@ -10295,6 +10298,10 @@ convert_for_assignment (tree type, tree rhs,
 		      gcc_unreachable();
 		  }
 		}
+
+	      /* See if we can be more helpful.  */
+	      maybe_show_nonconverting_candidate (type, rhstype, rhs, flags);
+
 	      if (TYPE_PTR_P (rhstype)
 		  && TYPE_PTR_P (type)
 		  && CLASS_TYPE_P (TREE_TYPE (rhstype))
@@ -10919,10 +10926,11 @@ maybe_warn_pessimizing_move (tree expr, tree type, bool return_p)
    change RETVAL into the function return type, and to assign it to
    the DECL_RESULT for the function.  Set *NO_WARNING to true if
    code reaches end of non-void function warning shouldn't be issued
-   on this RETURN_EXPR.  */
+   on this RETURN_EXPR.  Set *DANGLING to true if code returns the
+   address of a local variable.  */
 
 tree
-check_return_expr (tree retval, bool *no_warning)
+check_return_expr (tree retval, bool *no_warning, bool *dangling)
 {
   tree result;
   /* The type actually returned by the function.  */
@@ -10934,6 +10942,7 @@ check_return_expr (tree retval, bool *no_warning)
   location_t loc = cp_expr_loc_or_input_loc (retval);
 
   *no_warning = false;
+  *dangling = false;
 
   /* A `volatile' function is one that isn't supposed to return, ever.
      (This is a G++ extension, used to get better code for functions
@@ -11272,8 +11281,7 @@ check_return_expr (tree retval, bool *no_warning)
       else if (!processing_template_decl
 	       && maybe_warn_about_returning_address_of_local (retval, loc)
 	       && INDIRECT_TYPE_P (valtype))
-	retval = build2 (COMPOUND_EXPR, TREE_TYPE (retval), retval,
-			 build_zero_cst (TREE_TYPE (retval)));
+	*dangling = true;
     }
 
   /* A naive attempt to reduce the number of -Wdangling-reference false

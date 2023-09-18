@@ -1,3 +1,196 @@
+2023-09-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/102989
+	* c-attribs.cc (type_valid_for_vector_size): Reject vector types
+	with BITINT_TYPE elements even if they have mode precision and
+	suitable size.
+
+2023-09-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/102989
+	* c-common.cc (c_common_reswords): Add _BitInt as keyword.
+	(unsafe_conversion_p): Handle BITINT_TYPE like INTEGER_TYPE.
+	(c_common_signed_or_unsigned_type): Handle BITINT_TYPE.
+	(c_common_truthvalue_conversion, c_common_get_alias_set,
+	check_builtin_function_arguments): Handle BITINT_TYPE like
+	INTEGER_TYPE.
+	(sync_resolve_size): Add ORIG_FORMAT argument.  If
+	FETCH && !ORIG_FORMAT, type is BITINT_TYPE, return -1 if size isn't
+	one of 1, 2, 4, 8 or 16 or if it is 16 but TImode is not supported.
+	(atomic_bitint_fetch_using_cas_loop): New function.
+	(resolve_overloaded_builtin): Adjust sync_resolve_size caller.  If
+	-1 is returned, use atomic_bitint_fetch_using_cas_loop to lower it.
+	Formatting fix.
+	(keyword_begins_type_specifier): Handle RID_BITINT.
+	* c-common.h (enum rid): Add RID_BITINT enumerator.
+	* c-cppbuiltin.cc (c_cpp_builtins): For C call
+	targetm.c.bitint_type_info and predefine __BITINT_MAXWIDTH__
+	and for -fbuilding-libgcc also __LIBGCC_BITINT_LIMB_WIDTH__ and
+	__LIBGCC_BITINT_ORDER__ macros if _BitInt is supported.
+	* c-lex.cc (interpret_integer): Handle CPP_N_BITINT.
+	* c-pretty-print.cc (c_pretty_printer::simple_type_specifier,
+	c_pretty_printer::direct_abstract_declarator,
+	c_pretty_printer::direct_declarator, c_pretty_printer::declarator):
+	Handle BITINT_TYPE.
+	(pp_c_integer_constant): Handle printing of large precision wide_ints
+	which would buffer overflow digit_buffer.
+	* c-warn.cc (conversion_warning, warnings_for_convert_and_check,
+	warnings_for_convert_and_check): Handle BITINT_TYPE like
+	INTEGER_TYPE.
+
+2023-09-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/102989
+	* c-ubsan.cc (ubsan_instrument_shift): Use UBSAN_PRINT_FORCE_INT
+	for type0 type descriptor.
+
+2023-09-06  Jakub Jelinek  <jakub@redhat.com>
+
+	* c-lex.cc (interpret_float): For C diagnostics on FN and FNx suffixes
+	append " before C2X" to diagnostics text and follow behavior of
+	pedwarn_c11.
+
+2023-09-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/111069
+	* c-opts.cc (c_common_post_options): Change latest_abi_version to 19.
+
+2023-08-31  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* c.opt: Change spelling to macOS.
+
+2023-08-31  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/111253
+	* c-pretty-print.cc (c_pretty_printer::primary_expression):
+	Only dump gimple_assign_single_p SSA def RHS.
+
+2023-08-25  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* c-common.h (c_omp_check_loop_binding_exprs): Declare.
+	* c-omp.cc: Include tree-iterator.h.
+	(find_binding_in_body): New.
+	(check_loop_binding_expr_r): New.
+	(LOCATION_OR): New.
+	(check_looop_binding_expr): New.
+	(c_omp_check_loop_binding_exprs): New.
+
+2023-08-25  Uros Bizjak  <ubizjak@gmail.com>
+
+	* c-format.cc (read_any_format_width):
+	Rename TRUE/FALSE to true/false.
+
+2023-08-20  Martin Uecker  <uecker@tugraz.at>
+
+	* c-format.cc: Fix identation.
+
+2023-08-20  Tomas Kalibera  <tomas.kalibera@gmail.com>
+
+	PR c/95130
+	* c-format.cc: skip default format for printf symbol if
+	explicitly declared by prototype.
+
+2023-08-17  Jose E. Marchesi  <jose.marchesi@oracle.com>
+
+	PR c/106537
+	* c.opt (Wcompare-distinct-pointer-types): New option.
+
+2023-08-14  Jason Merrill  <jason@redhat.com>
+
+	* c-cppbuiltin.cc (c_cpp_builtins): Adjust __cpp_concepts.
+
+2023-08-11  Jakub Jelinek  <jakub@redhat.com>
+
+	* c-common.cc (c_common_reswords): Add __typeof_unqual
+	and __typeof_unqual__ spellings of typeof_unqual.
+
+2023-08-11  Martin Uecker  <uecker@tugraz.at>
+
+	PR c/84510
+	* c.opt: Enable warning for C and ObjC.
+
+2023-08-05  Martin Uecker  <uecker@tugraz.at>
+
+	PR c/98536
+	* c-warn.cc (warn_parm_array_mismatch): Do not warn if more
+	bounds are specified.
+
+2023-08-04  Tamar Christina  <tamar.christina@arm.com>
+
+	* c-pragma.h (enum pragma_kind): Add PRAGMA_NOVECTOR.
+	* c-pragma.cc (init_pragma): Use it.
+
+2023-08-01  Lewis Hyatt  <lhyatt@gmail.com>
+
+	* c-common.h (c_init_preprocess): Declare new function.
+	* c-opts.cc (c_common_init): Call it.
+	* c-lex.cc (cb_def_pragma): Add a comment.
+	(get_token): New function wrapping cpp_get_token.
+	(c_lex_with_flags): Use the new wrapper function to support
+	obtaining tokens in preprocess_only mode.
+	(lex_string): Likewise.
+	* c-pragma.cc (pragma_diagnostic_lex_normal): Rename to...
+	(pragma_diagnostic_lex): ...this.
+	(pragma_diagnostic_lex_pp): Remove.
+	(handle_pragma_diagnostic_impl): Call pragma_diagnostic_lex () in
+	all modes.
+	(c_pp_invoke_early_pragma_handler): Adapt to support pragma_lex ()
+	usage.
+	* c-pragma.h (pragma_lex_discard_to_eol): Declare.
+
+2023-07-31  Hamza Mahfooz  <someguy@effective-light.com>
+
+	PR c/65213
+	* c.opt (-Wmissing-variable-declarations): New option.
+
+2023-07-20  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	PR middle-end/77928
+	* c-common.cc (check_builtin_function_arguments):
+	Handle BUILT_IN_ISEQSIG.
+
+2023-07-05  Robin Dapp  <rdapp@ventanamicro.com>
+	    Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* c-common.cc (c_common_type_for_mode): Use GET_MODE_PRECISION.
+
+2023-06-29  Qing Zhao  <qing.zhao@oracle.com>
+
+	PR c/77650
+	* c.opt: New option -Wflex-array-member-not-at-end.
+
+2023-06-28  Jason Merrill  <jason@redhat.com>
+
+	PR c++/110344
+	* c-cppbuiltin.cc (c_cpp_builtins): Update __cpp_constexpr.
+
+2023-06-26  Richard Biener  <rguenther@suse.de>
+
+	* c-common.cc (shorten_binary_op): Exit early for VECTOR_TYPE
+	operations.
+
+2023-06-23  Marek Polacek  <polacek@redhat.com>
+
+	* c-common.h (cxx_dialect): Add cxx26 as a dialect.
+	* c-opts.cc (set_std_cxx26): New.
+	(c_common_handle_option): Set options when -std={c,gnu}++2{c,6} is
+	enabled.
+	(c_common_post_options): Adjust comments.
+	* c.opt: Add options for -std=c++26, std=c++2c, -std=gnu++26,
+	and -std=gnu++2c.
+	(std=c++2b): Mark as Undocumented.
+	(std=c++23): No longer Undocumented.
+
+2023-06-21  Alexander Monakov  <amonakov@ispras.ru>
+
+	* c-gimplify.cc (fma_supported_p): New helper.
+	(c_gimplify_expr) [PLUS_EXPR, MINUS_EXPR]: Implement FMA
+	contraction.
+
+2023-06-16  Alex Coplan  <alex.coplan@arm.com>
+
+	* c.opt (Welaborated-enum-base): New.
+
 2023-06-13  David Malcolm  <dmalcolm@redhat.com>
 
 	PR c/84890

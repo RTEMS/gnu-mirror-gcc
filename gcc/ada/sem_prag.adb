@@ -430,7 +430,8 @@ package body Sem_Prag is
    is
       Subp_Decl : constant Node_Id   := Find_Related_Declaration_Or_Body (N);
       Spec_Id   : constant Entity_Id := Unique_Defining_Entity (Subp_Decl);
-      Expr      : constant Node_Id   := Expression (Get_Argument (N, Spec_Id));
+      Arg1      : constant Node_Id   :=
+        First (Pragma_Argument_Associations (N));
 
       Saved_GM  : constant Ghost_Mode_Type := Ghost_Mode;
       Saved_IGR : constant Node_Id         := Ignored_Ghost_Region;
@@ -446,51 +447,52 @@ package body Sem_Prag is
          return;
       end if;
 
-      --  Set the Ghost mode in effect from the pragma. Due to the delayed
-      --  analysis of the pragma, the Ghost mode at point of declaration and
-      --  point of analysis may not necessarily be the same. Use the mode in
-      --  effect at the point of declaration.
+      if Present (Arg1) then
 
-      Set_Ghost_Mode (N);
+         --  Set the Ghost mode in effect from the pragma. Due to the delayed
+         --  analysis of the pragma, the Ghost mode at point of declaration and
+         --  point of analysis may not necessarily be the same. Use the mode in
+         --  effect at the point of declaration.
 
-      --  Ensure that the subprogram and its formals are visible when analyzing
-      --  the expression of the pragma.
+         Set_Ghost_Mode (N);
 
-      if not In_Open_Scopes (Spec_Id) then
-         Restore_Scope := True;
+         --  Ensure that the subprogram and its formals are visible when
+         --  analyzing the expression of the pragma.
 
-         if Is_Generic_Subprogram (Spec_Id) then
-            Push_Scope (Spec_Id);
-            Install_Generic_Formals (Spec_Id);
-         else
-            Push_Scope (Spec_Id);
-            Install_Formals (Spec_Id);
+         if not In_Open_Scopes (Spec_Id) then
+            Restore_Scope := True;
+
+            if Is_Generic_Subprogram (Spec_Id) then
+               Push_Scope (Spec_Id);
+               Install_Generic_Formals (Spec_Id);
+            else
+               Push_Scope (Spec_Id);
+               Install_Formals (Spec_Id);
+            end if;
          end if;
+
+         Errors := Serious_Errors_Detected;
+         Preanalyze_Assert_Expression (Expression (Arg1), Standard_Boolean);
+
+         --  Emit a clarification message when the expression contains at least
+         --  one undefined reference, possibly due to contract freezing.
+
+         if Errors /= Serious_Errors_Detected
+           and then Present (Freeze_Id)
+           and then Has_Undefined_Reference (Expression (Arg1))
+         then
+            Contract_Freeze_Error (Spec_Id, Freeze_Id);
+         end if;
+
+         if Restore_Scope then
+            End_Scope;
+         end if;
+
+         Restore_Ghost_Region (Saved_GM, Saved_IGR);
       end if;
-
-      Errors := Serious_Errors_Detected;
-      Preanalyze_Assert_Expression (Expr, Standard_Boolean);
-
-      --  Emit a clarification message when the expression contains at least
-      --  one undefined reference, possibly due to contract freezing.
-
-      if Errors /= Serious_Errors_Detected
-        and then Present (Freeze_Id)
-        and then Has_Undefined_Reference (Expr)
-      then
-         Contract_Freeze_Error (Spec_Id, Freeze_Id);
-      end if;
-
-      if Restore_Scope then
-         End_Scope;
-      end if;
-
-      --  Currently it is not possible to inline pre/postconditions on a
-      --  subprogram subject to pragma Inline_Always.
 
       Set_Is_Analyzed_Pragma (N);
 
-      Restore_Ghost_Region (Saved_GM, Saved_IGR);
    end Analyze_Always_Terminates_In_Decl_Part;
 
    -----------------------------------------
@@ -13279,7 +13281,7 @@ package body Sem_Prag is
          -- Always_Terminates --
          -----------------------
 
-         --  pragma Always_Terminates (boolean_EXPRESSION);
+         --  pragma Always_Terminates [ (boolean_EXPRESSION) ];
 
          --  Characteristics:
 
@@ -13321,7 +13323,7 @@ package body Sem_Prag is
          begin
             GNAT_Pragma;
             Check_No_Identifiers;
-            Check_Arg_Count (1);
+            Check_At_Most_N_Arguments (1);
 
             --  Ensure the proper placement of the pragma. Exceptional_Cases
             --  must be associated with a subprogram declaration or a body that
@@ -13330,9 +13332,14 @@ package body Sem_Prag is
             Subp_Decl :=
               Find_Related_Declaration_Or_Body (N, Do_Checks => True);
 
-            --  Generic subprogram
+            --  Generic subprogram and package declaration
 
-            if Nkind (Subp_Decl) = N_Generic_Subprogram_Declaration then
+            if Nkind (Subp_Decl) in N_Generic_Declaration then
+               null;
+
+            --  Package declaration
+
+            elsif Nkind (Subp_Decl) = N_Package_Declaration then
                null;
 
             --  Body acts as spec
@@ -13368,11 +13375,40 @@ package body Sem_Prag is
                   return;
                end if;
 
+            --  Entry
+
+            elsif Nkind (Subp_Decl) = N_Entry_Declaration then
+               null;
+
             else
                Pragma_Misplaced;
             end if;
 
             Spec_Id := Unique_Defining_Entity (Subp_Decl);
+
+            --  Pragma Always_Terminates is not allowed on functions
+
+            if Ekind (Spec_Id) = E_Function then
+               Error_Msg_N (Fix_Error
+                 ("pragma % cannot apply to function"), N);
+                  return;
+
+            elsif Ekind (Spec_Id) = E_Generic_Function then
+               Error_Msg_N (Fix_Error
+                 ("pragma % cannot apply to generic function"), N);
+               return;
+            end if;
+
+            --  Pragma Always_Terminates applied to packages doesn't allow any
+            --  expression.
+
+            if Is_Package_Or_Generic_Package (Spec_Id)
+              and then Arg_Count /= 0
+            then
+               Error_Msg_N (Fix_Error
+                 ("pragma % applied to package cannot have arguments"), N);
+               return;
+            end if;
 
             --  A pragma that applies to a Ghost entity becomes Ghost for the
             --  purposes of legality checks and removal of ignored Ghost code.
@@ -14011,7 +14047,7 @@ package body Sem_Prag is
          begin
             GNAT_Pragma;
             Check_No_Identifiers;
-            Check_At_Most_N_Arguments  (1);
+            Check_At_Most_N_Arguments (1);
 
             Obj_Or_Type_Decl := Find_Related_Context (N, Do_Checks => True);
 
@@ -24108,7 +24144,8 @@ package body Sem_Prag is
 
                --  Local variables
 
-               Msg_1 : constant String := "incorrect placement of pragma%";
+               Msg_1 : constant String :=
+                 "incorrect placement of pragma% with value ""On"" '[[]']";
                Msg_2 : Name_Id;
 
             --  Start of processing for Check_Library_Level_Entity
@@ -24125,6 +24162,7 @@ package body Sem_Prag is
                  and then Instantiation_Location (Sloc (N)) = No_Location
                then
                   Error_Msg_Name_1 := Pname;
+                  Error_Msg_Code := GEC_SPARK_Mode_On_Not_Library_Level;
                   Error_Msg_N (Fix_Error (Msg_1), N);
 
                   Name_Len := 0;
@@ -30938,9 +30976,10 @@ package body Sem_Prag is
          --  All other cases require Part_Of
 
          else
+            Error_Msg_Code := GEC_Required_Part_Of;
             Error_Msg_N
-              ("indicator Part_Of is required in this context "
-               & "(SPARK RM 7.2.6(2))", Item_Id);
+              ("indicator Part_Of is required in this context '[[]']",
+               Item_Id);
             Error_Msg_Name_1 := Chars (Pack_Id);
             Error_Msg_N
               ("\& is declared in the private part of package %", Item_Id);

@@ -227,7 +227,7 @@ package Einfo.Utils is
    function Next_Stored_Discriminant (Id : E) return Entity_Id;
    function Number_Dimensions (Id : E) return Pos;
    function Number_Entries (Id : E) return Nat;
-   function Number_Formals (Id : E) return Pos;
+   function Number_Formals (Id : E) return Nat;
    function Object_Size_Clause (Id : E) return Node_Id;
    function Parameter_Mode (Id : E) return Formal_Kind;
    function Partial_Refinement_Constituents (Id : E) return L;
@@ -242,10 +242,10 @@ package Einfo.Utils is
    function Type_Low_Bound (Id : E) return N with Inline;
    function Underlying_Type (Id : E) return Entity_Id;
 
-   function Scope_Depth (Id : E) return U with Inline;
-   function Scope_Depth_Set (Id : E) return B with Inline;
+   function Scope_Depth (Id : Scope_Kind_Id) return U with Inline;
+   function Scope_Depth_Set (Id : Scope_Kind_Id) return B with Inline;
 
-   function Scope_Depth_Default_0 (Id : E) return U;
+   function Scope_Depth_Default_0 (Id : Scope_Kind_Id) return U;
    --  In rare cases, the Scope_Depth_Value (queried by Scope_Depth) is
    --  not correctly set before querying it; this may be used instead of
    --  Scope_Depth in such cases. It returns Uint_0 if the Scope_Depth_Value

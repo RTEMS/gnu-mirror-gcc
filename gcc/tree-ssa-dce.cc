@@ -1481,6 +1481,14 @@ eliminate_unnecessary_stmts (bool aggressive)
 		  case IFN_MUL_OVERFLOW:
 		    maybe_optimize_arith_overflow (&gsi, MULT_EXPR);
 		    break;
+		  case IFN_UADDC:
+		    if (integer_zerop (gimple_call_arg (stmt, 2)))
+		      maybe_optimize_arith_overflow (&gsi, PLUS_EXPR);
+		    break;
+		  case IFN_USUBC:
+		    if (integer_zerop (gimple_call_arg (stmt, 2)))
+		      maybe_optimize_arith_overflow (&gsi, MINUS_EXPR);
+		    break;
 		  default:
 		    break;
 		  }
@@ -1857,12 +1865,15 @@ make_forwarders_with_degenerate_phis (function *fn)
 		    }
 		  free_dominance_info (fn, CDI_DOMINATORS);
 		  basic_block forwarder = split_edge (args[start].first);
+		  profile_count count = profile_count::zero ();
 		  for (unsigned j = start + 1; j < i; ++j)
 		    {
 		      edge e = args[j].first;
 		      redirect_edge_and_branch_force (e, forwarder);
 		      redirect_edge_var_map_clear (e);
+		      count += e->count ();
 		    }
+		  forwarder->count = count;
 		  if (vphi)
 		    {
 		      tree def = copy_ssa_name (vphi_args[0]);

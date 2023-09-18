@@ -351,10 +351,14 @@ gimple_ranger::prefill_name (vrange &r, tree name)
   if (!gimple_range_op_handler::supported_p (stmt) && !is_a<gphi *> (stmt))
     return;
 
-  bool current;
   // If this op has not been processed yet, then push it on the stack
-  if (!m_cache.get_global_range (r, name, current))
-    m_stmt_list.safe_push (name);
+  if (!m_cache.get_global_range (r, name))
+    {
+      bool current;
+      // Set the global cache value and mark as alway_current.
+      m_cache.get_global_range (r, name, current);
+      m_stmt_list.safe_push (name);
+    }
 }
 
 // This routine will seed the global cache with most of the dependencies of
@@ -809,10 +813,8 @@ assume_query::calculate_op (tree op, gimple *s, vrange &lhs, fur_source &src)
   if (m_gori.compute_operand_range (op_range, s, lhs, op, src)
       && !op_range.varying_p ())
     {
-      Value_Range range (TREE_TYPE (op));
-      if (global.get_range (range, op))
-	op_range.intersect (range);
-      global.set_range (op, op_range);
+      // Set the global range, merging if there is already a range.
+      global.merge_range (op, op_range);
       gimple *def_stmt = SSA_NAME_DEF_STMT (op);
       if (def_stmt && gimple_get_lhs (def_stmt) == op)
 	calculate_stmt (def_stmt, op_range, src);

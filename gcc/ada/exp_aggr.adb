@@ -61,6 +61,7 @@ with Sem_Ch13;       use Sem_Ch13;
 with Sem_Eval;       use Sem_Eval;
 with Sem_Mech;       use Sem_Mech;
 with Sem_Res;        use Sem_Res;
+with Sem_Type;       use Sem_Type;
 with Sem_Util;       use Sem_Util;
                      use Sem_Util.Storage_Model_Support;
 with Sinfo;          use Sinfo;
@@ -305,7 +306,7 @@ package body Exp_Aggr is
    --  N is the N_Aggregate node to be expanded.
 
    function Is_Two_Dim_Packed_Array (Typ : Entity_Id) return Boolean;
-   --  For two-dimensional packed aggregates with constant bounds and constant
+   --  For 2D packed array aggregates with constant bounds and constant scalar
    --  components, it is preferable to pack the inner aggregates because the
    --  whole matrix can then be presented to the back-end as a one-dimensional
    --  list of literals. This is much more efficient than expanding into single
@@ -1988,7 +1989,10 @@ package body Exp_Aggr is
 
       --  Skip this if no component associations
 
-      if No (Expressions (N)) then
+      if Is_Null_Aggregate (N) then
+         null;
+
+      elsif No (Expressions (N)) then
 
          --  STEP 1 (a): Sort the discrete choices
 
@@ -2760,19 +2764,21 @@ package body Exp_Aggr is
 
       function Replace_Type (Expr : Node_Id) return Traverse_Result is
       begin
-         --  Note regarding the Root_Type test below: Aggregate components for
+         --  Note about the Is_Ancestor test below: aggregate components for
          --  self-referential types include attribute references to the current
-         --  instance, of the form: Typ'access, etc.. These references are
+         --  instance, of the form: Typ'access, etc. These references are
          --  rewritten as references to the target of the aggregate: the
          --  left-hand side of an assignment, the entity in a declaration,
-         --  or a temporary. Without this test, we would improperly extended
-         --  this rewriting to attribute references whose prefix was not the
+         --  or a temporary. Without this test, we would improperly extend
+         --  this rewriting to attribute references whose prefix is not the
          --  type of the aggregate.
 
          if Nkind (Expr) = N_Attribute_Reference
            and then Is_Entity_Name (Prefix (Expr))
            and then Is_Type (Entity (Prefix (Expr)))
-           and then Root_Type (Etype (N)) = Root_Type (Entity (Prefix (Expr)))
+           and then
+             Is_Ancestor
+               (Entity (Prefix (Expr)), Etype (N), Use_Full_View => True)
          then
             if Is_Entity_Name (Lhs) then
                Rewrite (Prefix (Expr), New_Occurrence_Of (Entity (Lhs), Loc));
@@ -4244,13 +4250,15 @@ package body Exp_Aggr is
       --  done top down from above.
 
       if
-         --  Internal aggregate (transformed when expanding the parent)
-         --  excluding the Container aggregate as these are transformed to
-         --  procedure call later.
+         --  Internal aggregates (transformed when expanding the parent),
+         --  excluding container aggregates as these are transformed into
+         --  subprogram calls later.
 
-         (Parent_Kind in
-            N_Component_Association | N_Aggregate | N_Extension_Aggregate
-            and then not Is_Container_Aggregate (Parent_Node))
+         (Parent_Kind = N_Component_Association
+           and then not Is_Container_Aggregate (Parent (Parent_Node)))
+
+         or else (Parent_Kind in N_Aggregate | N_Extension_Aggregate
+                   and then not Is_Container_Aggregate (Parent_Node))
 
          --  Allocator (see Convert_Aggr_In_Allocator)
 
@@ -6108,7 +6116,8 @@ package body Exp_Aggr is
       --  STEP 3
 
       --  Delay expansion for nested aggregates: it will be taken care of when
-      --  the parent aggregate is expanded.
+      --  the parent aggregate is expanded, excluding container aggregates as
+      --  these are transformed into subprogram calls later.
 
       Parent_Node := Parent (N);
       Parent_Kind := Nkind (Parent_Node);
@@ -6118,9 +6127,10 @@ package body Exp_Aggr is
          Parent_Kind := Nkind (Parent_Node);
       end if;
 
-      if Parent_Kind = N_Aggregate
-        or else Parent_Kind = N_Extension_Aggregate
-        or else Parent_Kind = N_Component_Association
+      if (Parent_Kind = N_Component_Association
+           and then not Is_Container_Aggregate (Parent (Parent_Node)))
+        or else (Parent_Kind in N_Aggregate | N_Extension_Aggregate
+                  and then not Is_Container_Aggregate (Parent_Node))
         or else (Parent_Kind = N_Object_Declaration
                   and then (Needs_Finalization (Typ)
                              or else Is_Special_Return_Object
@@ -6461,6 +6471,7 @@ package body Exp_Aggr is
 
       if Is_Record_Type (T)
         and then not Is_Private_Type (T)
+        and then not Is_Homogeneous_Aggregate (N)
       then
          Expand_Record_Aggregate (N);
 
@@ -6911,6 +6922,10 @@ package body Exp_Aggr is
 
       Siz := Aggregate_Size;
 
+      ---------------------
+      --  Empty function --
+      ---------------------
+
       if Ekind (Entity (Empty_Subp)) = E_Function
         and then Present (First_Formal (Entity (Empty_Subp)))
       then
@@ -6978,7 +6993,7 @@ package body Exp_Aggr is
 
          Append (Init_Stat, Aggr_Code);
 
-         --  Size is dynamic: Create declaration for object, and intitialize
+         --  Size is dynamic: Create declaration for object, and initialize
          --  with a call to the null container, or an assignment to it.
 
       else
@@ -7005,6 +7020,23 @@ package body Exp_Aggr is
          end if;
 
          Append (Init_Stat, Aggr_Code);
+      end if;
+
+      --  Report warning on infinite recursion if an empty container aggregate
+      --  appears in the return statement of its Empty function.
+
+      if Ekind (Entity (Empty_Subp)) = E_Function
+        and then Nkind (Parent (N)) = N_Simple_Return_Statement
+        and then Is_Empty_List (Expressions (N))
+        and then Is_Empty_List (Component_Associations (N))
+        and then Entity (Empty_Subp) = Current_Scope
+      then
+         Error_Msg_Warn := SPARK_Mode /= On;
+         Error_Msg_N
+           ("!empty aggregate returned by the empty function of a container"
+            & " aggregate<<<", Parent (N));
+         Error_Msg_N
+           ("\this will result in infinite recursion??", Parent (N));
       end if;
 
       ---------------------------
@@ -7253,8 +7285,11 @@ package body Exp_Aggr is
                      --  Iterated component association. Discard
                      --  positional insertion procedure.
 
-                     Add_Named_Subp := Assign_Indexed_Subp;
-                     Add_Unnamed_Subp := Empty;
+                     if not Present (Iterator_Specification (Comp)) then
+                        Add_Named_Subp := Assign_Indexed_Subp;
+                        Add_Unnamed_Subp := Empty;
+                     end if;
+
                      Expand_Iterated_Component (Comp);
                   end if;
 
@@ -8554,9 +8589,11 @@ package body Exp_Aggr is
 
    function Is_Two_Dim_Packed_Array (Typ : Entity_Id) return Boolean is
       C : constant Uint := Component_Size (Typ);
+
    begin
       return Number_Dimensions (Typ) = 2
         and then Is_Bit_Packed_Array (Typ)
+        and then Is_Scalar_Type (Component_Type (Typ))
         and then C in Uint_1 | Uint_2 | Uint_4; -- False if No_Uint
    end Is_Two_Dim_Packed_Array;
 

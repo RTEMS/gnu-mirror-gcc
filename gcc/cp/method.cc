@@ -1645,7 +1645,8 @@ build_comparison_op (tree fndecl, bool defining, tsubst_flags_t complain)
 		      add_stmt (idx);
 		      finish_init_stmt (for_stmt);
 		      finish_for_cond (build2 (LE_EXPR, boolean_type_node, idx,
-					       maxval), for_stmt, false, 0);
+					       maxval), for_stmt, false, 0,
+					       false);
 		      finish_for_expr (cp_build_unary_op (PREINCREMENT_EXPR,
 							  TARGET_EXPR_SLOT (idx),
 							  false, complain),
@@ -3294,6 +3295,8 @@ implicitly_declare_fn (special_function_kind kind, tree type,
       /* Copy constexpr from the inherited constructor even if the
 	 inheriting constructor doesn't satisfy the requirements.  */
       constexpr_p = DECL_DECLARED_CONSTEXPR_P (inherited_ctor);
+      /* Also copy any attributes.  */
+      DECL_ATTRIBUTES (fn) = clone_attrs (DECL_ATTRIBUTES (inherited_ctor));
     }
 
   /* Add the "this" parameter.  */

@@ -165,7 +165,7 @@ static edge gimple_try_redirect_by_replacing_jump (edge, basic_block);
 
 /* Various helpers.  */
 static inline bool stmt_starts_bb_p (gimple *, gimple *);
-static int gimple_verify_flow_info (void);
+static bool gimple_verify_flow_info (void);
 static void gimple_make_forwarder_block (edge);
 static gimple *first_non_label_stmt (basic_block);
 static bool verify_gimple_transaction (gtransaction *);
@@ -5654,10 +5654,10 @@ verify_gimple_in_cfg (struct function *fn, bool verify_nothrow, bool ice)
 
 /* Verifies that the flow information is OK.  */
 
-static int
+static bool
 gimple_verify_flow_info (void)
 {
-  int err = 0;
+  bool err = false;
   basic_block bb;
   gimple_stmt_iterator gsi;
   gimple *stmt;
@@ -5668,28 +5668,64 @@ gimple_verify_flow_info (void)
       || ENTRY_BLOCK_PTR_FOR_FN (cfun)->il.gimple.phi_nodes)
     {
       error ("ENTRY_BLOCK has IL associated with it");
-      err = 1;
+      err = true;
     }
 
   if (EXIT_BLOCK_PTR_FOR_FN (cfun)->il.gimple.seq
       || EXIT_BLOCK_PTR_FOR_FN (cfun)->il.gimple.phi_nodes)
     {
       error ("EXIT_BLOCK has IL associated with it");
-      err = 1;
+      err = true;
     }
 
   FOR_EACH_EDGE (e, ei, EXIT_BLOCK_PTR_FOR_FN (cfun)->preds)
     if (e->flags & EDGE_FALLTHRU)
       {
 	error ("fallthru to exit from bb %d", e->src->index);
-	err = 1;
+	err = true;
       }
+  if (cfun->cfg->full_profile
+      && !ENTRY_BLOCK_PTR_FOR_FN (cfun)->count.initialized_p ())
+    {
+      error ("entry block count not initialized");
+      err = true;
+    }
+  if (cfun->cfg->full_profile
+      && !EXIT_BLOCK_PTR_FOR_FN (cfun)->count.initialized_p ())
+    {
+      error ("exit block count not initialized");
+      err = true;
+    }
+  if (cfun->cfg->full_profile
+      && !single_succ_edge
+	      (ENTRY_BLOCK_PTR_FOR_FN (cfun))->probability.initialized_p ())
+    {
+      error ("probability of edge from entry block not initialized");
+      err = true;
+    }
+
 
   FOR_EACH_BB_FN (bb, cfun)
     {
       bool found_ctrl_stmt = false;
 
       stmt = NULL;
+
+      if (cfun->cfg->full_profile)
+        {
+	  if (!bb->count.initialized_p ())
+	    {
+	      error ("count of bb %d not initialized", bb->index);
+	      err = true;
+	    }
+	  FOR_EACH_EDGE (e, ei, bb->succs)
+	    if (!e->probability.initialized_p ())
+	      {
+		error ("probability of edge %d->%d not initialized",
+		       bb->index, e->dest->index);
+		err = true;
+	      }
+        }
 
       /* Skip labels on the start of basic block.  */
       for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
@@ -5707,28 +5743,28 @@ gimple_verify_flow_info (void)
 	    {
 	      error ("nonlocal label %qD is not first in a sequence "
 		     "of labels in bb %d", label, bb->index);
-	      err = 1;
+	      err = true;
 	    }
 
 	  if (prev_stmt && EH_LANDING_PAD_NR (label) != 0)
 	    {
 	      error ("EH landing pad label %qD is not first in a sequence "
 		     "of labels in bb %d", label, bb->index);
-	      err = 1;
+	      err = true;
 	    }
 
 	  if (label_to_block (cfun, label) != bb)
 	    {
 	      error ("label %qD to block does not match in bb %d",
 		     label, bb->index);
-	      err = 1;
+	      err = true;
 	    }
 
 	  if (decl_function_context (label) != current_function_decl)
 	    {
 	      error ("label %qD has incorrect context in bb %d",
 		     label, bb->index);
-	      err = 1;
+	      err = true;
 	    }
 	}
 
@@ -5742,7 +5778,7 @@ gimple_verify_flow_info (void)
 	    {
 	      error ("control flow in the middle of basic block %d",
 		     bb->index);
-	      err = 1;
+	      err = true;
 	    }
 
 	  if (stmt_ends_bb_p (stmt))
@@ -5752,7 +5788,7 @@ gimple_verify_flow_info (void)
 	    {
 	      error ("label %qD in the middle of basic block %d",
 		     gimple_label_label (label_stmt), bb->index);
-	      err = 1;
+	      err = true;
 	    }
 
 	  /* Check that no statements appear between a returns_twice call
@@ -5781,7 +5817,7 @@ gimple_verify_flow_info (void)
 		  error ("returns_twice call is %s in basic block %d",
 			 misplaced, bb->index);
 		  print_gimple_stmt (stderr, stmt, 0, TDF_SLIM);
-		  err = 1;
+		  err = true;
 		}
 	    }
 	  if (!is_gimple_debug (stmt))
@@ -5797,7 +5833,8 @@ gimple_verify_flow_info (void)
       if (gimple_code (stmt) == GIMPLE_LABEL)
 	continue;
 
-      err |= verify_eh_edges (stmt);
+      if (verify_eh_edges (stmt))
+	err = true;
 
       if (is_ctrl_stmt (stmt))
 	{
@@ -5806,7 +5843,7 @@ gimple_verify_flow_info (void)
 	      {
 		error ("fallthru edge after a control statement in bb %d",
 		       bb->index);
-		err = 1;
+		err = true;
 	      }
 	}
 
@@ -5819,7 +5856,7 @@ gimple_verify_flow_info (void)
 	      {
 		error ("true/false edge after a non-GIMPLE_COND in bb %d",
 		       bb->index);
-		err = 1;
+		err = true;
 	      }
 	}
 
@@ -5842,7 +5879,7 @@ gimple_verify_flow_info (void)
 	      {
 		error ("wrong outgoing edge flags at end of bb %d",
 		       bb->index);
-		err = 1;
+		err = true;
 	      }
 	  }
 	  break;
@@ -5851,7 +5888,7 @@ gimple_verify_flow_info (void)
 	  if (simple_goto_p (stmt))
 	    {
 	      error ("explicit goto at end of bb %d", bb->index);
-	      err = 1;
+	      err = true;
 	    }
 	  else
 	    {
@@ -5864,7 +5901,7 @@ gimple_verify_flow_info (void)
 		  {
 		    error ("wrong outgoing edge flags at end of bb %d",
 			   bb->index);
-		    err = 1;
+		    err = true;
 		  }
 	    }
 	  break;
@@ -5880,13 +5917,13 @@ gimple_verify_flow_info (void)
 		     | EDGE_TRUE_VALUE | EDGE_FALSE_VALUE)))
 	    {
 	      error ("wrong outgoing edge flags at end of bb %d", bb->index);
-	      err = 1;
+	      err = true;
 	    }
 	  if (single_succ (bb) != EXIT_BLOCK_PTR_FOR_FN (cfun))
 	    {
 	      error ("return edge does not point to exit in bb %d",
 		     bb->index);
-	      err = 1;
+	      err = true;
 	    }
 	  break;
 
@@ -5916,7 +5953,7 @@ gimple_verify_flow_info (void)
 		  {
 		    error ("found default case not at the start of "
 			   "case vector");
-		    err = 1;
+		    err = true;
 		    continue;
 		  }
 		if (CASE_LOW (prev)
@@ -5927,7 +5964,7 @@ gimple_verify_flow_info (void)
 		    fprintf (stderr," is greater than ");
 		    print_generic_expr (stderr, c);
 		    fprintf (stderr," but comes before it.\n");
-		    err = 1;
+		    err = true;
 		  }
 		prev = c;
 	      }
@@ -5941,7 +5978,7 @@ gimple_verify_flow_info (void)
 		  {
 		    error ("extra outgoing edge %d->%d",
 			   bb->index, e->dest->index);
-		    err = 1;
+		    err = true;
 		  }
 
 		e->dest->aux = (void *)2;
@@ -5950,7 +5987,7 @@ gimple_verify_flow_info (void)
 		  {
 		    error ("wrong outgoing edge flags at end of bb %d",
 			   bb->index);
-		    err = 1;
+		    err = true;
 		  }
 	      }
 
@@ -5963,7 +6000,7 @@ gimple_verify_flow_info (void)
 		if (label_bb->aux != (void *)2)
 		  {
 		    error ("missing edge %i->%i", bb->index, label_bb->index);
-		    err = 1;
+		    err = true;
 		  }
 	      }
 
@@ -5973,7 +6010,8 @@ gimple_verify_flow_info (void)
 	  break;
 
 	case GIMPLE_EH_DISPATCH:
-	  err |= verify_eh_dispatch_edge (as_a <geh_dispatch *> (stmt));
+	  if (verify_eh_dispatch_edge (as_a <geh_dispatch *> (stmt)))
+	    err = true;
 	  break;
 
 	default:
@@ -6658,21 +6696,21 @@ add_phi_args_after_copy (basic_block *region_copy, unsigned n_region,
    blocks are stored to REGION_COPY in the same order as they had in REGION,
    provided that REGION_COPY is not NULL.
    The function returns false if it is unable to copy the region,
-   true otherwise.  */
+   true otherwise.
+
+   It is callers responsibility to update profile.  */
 
 bool
-gimple_duplicate_sese_region (edge entry, edge exit,
-			    basic_block *region, unsigned n_region,
-			    basic_block *region_copy,
-			    bool update_dominance)
+gimple_duplicate_seme_region (edge entry, edge exit,
+			      basic_block *region, unsigned n_region,
+			      basic_block *region_copy,
+			      bool update_dominance)
 {
   unsigned i;
   bool free_region_copy = false, copying_header = false;
   class loop *loop = entry->dest->loop_father;
   edge exit_copy;
   edge redirected;
-  profile_count total_count = profile_count::uninitialized ();
-  profile_count entry_count = profile_count::uninitialized ();
 
   if (!can_copy_bbs_p (region, n_region))
     return false;
@@ -6725,30 +6763,10 @@ gimple_duplicate_sese_region (edge entry, edge exit,
      inside.  */
   auto_vec<basic_block> doms;
   if (update_dominance)
-    {
-      doms = get_dominated_by_region (CDI_DOMINATORS, region, n_region);
-    }
-
-  if (entry->dest->count.initialized_p ())
-    {
-      total_count = entry->dest->count;
-      entry_count = entry->count ();
-      /* Fix up corner cases, to avoid division by zero or creation of negative
-	 frequencies.  */
-      if (entry_count > total_count)
-	entry_count = total_count;
-    }
+    doms = get_dominated_by_region (CDI_DOMINATORS, region, n_region);
 
   copy_bbs (region, n_region, region_copy, &exit, 1, &exit_copy, loop,
 	    split_edge_bb_loc (entry), update_dominance);
-  if (total_count.initialized_p () && entry_count.initialized_p ())
-    {
-      scale_bbs_frequencies_profile_count (region, n_region,
-				           total_count - entry_count,
-				           total_count);
-      scale_bbs_frequencies_profile_count (region_copy, n_region, entry_count,
-				           total_count);
-    }
 
   if (copying_header)
     {
@@ -7721,6 +7739,47 @@ fold_loop_internal_call (gimple *g, tree value)
       FOR_EACH_IMM_USE_ON_STMT (use_p, iter)
 	SET_USE (use_p, value);
       update_stmt (use_stmt);
+      /* If we turn conditional to constant, scale profile counts.
+	 We know that the conditional was created by loop distribution
+	 and all basic blocks dominated by the taken edge are part of
+	 the loop distributed.  */
+      if (gimple_code (use_stmt) == GIMPLE_COND)
+	{
+	  edge true_edge, false_edge;
+	  extract_true_false_edges_from_block (gimple_bb (use_stmt),
+					       &true_edge, &false_edge);
+	  edge taken_edge = NULL, other_edge = NULL;
+	  if (gimple_cond_true_p (as_a <gcond *>(use_stmt)))
+	    {
+	      taken_edge = true_edge;
+	      other_edge = false_edge;
+	    }
+	  else if (gimple_cond_false_p (as_a <gcond *>(use_stmt)))
+	    {
+	      taken_edge = false_edge;
+	      other_edge = true_edge;
+	    }
+	  if (taken_edge
+	      && !(taken_edge->probability == profile_probability::always ()))
+	    {
+	      profile_count old_count = taken_edge->count ();
+	      profile_count new_count = taken_edge->src->count;
+	      taken_edge->probability = profile_probability::always ();
+	      other_edge->probability = profile_probability::never ();
+	      /* If we have multiple predecessors, we can't use the dominance
+		 test.  This should not happen as the guarded code should
+		 start with pre-header.  */
+	      gcc_assert (single_pred_edge (taken_edge->dest));
+	      if (old_count.nonzero_p ())
+		{
+		  taken_edge->dest->count
+		    = taken_edge->dest->count.apply_scale (new_count,
+							   old_count);
+		  scale_strictly_dominated_blocks (taken_edge->dest,
+						   new_count, old_count);
+		}
+	    }
+	}
     }
 }
 
@@ -8497,6 +8556,59 @@ print_loops_bb (FILE *file, basic_block bb, int indent, int verbosity)
     }
 }
 
+/* Print loop information.  */
+
+void
+print_loop_info (FILE *file, const class loop *loop, const char *prefix)
+{
+  if (loop->can_be_parallel)
+    fprintf (file, ", can_be_parallel");
+  if (loop->warned_aggressive_loop_optimizations)
+    fprintf (file, ", warned_aggressive_loop_optimizations");
+  if (loop->dont_vectorize)
+    fprintf (file, ", dont_vectorize");
+  if (loop->force_vectorize)
+    fprintf (file, ", force_vectorize");
+  if (loop->in_oacc_kernels_region)
+    fprintf (file, ", in_oacc_kernels_region");
+  if (loop->finite_p)
+    fprintf (file, ", finite_p");
+  if (loop->unroll)
+    fprintf (file, "\n%sunroll %d", prefix, loop->unroll);
+  if (loop->nb_iterations)
+    {
+      fprintf (file, "\n%sniter ", prefix);
+      print_generic_expr (file, loop->nb_iterations);
+    }
+
+  if (loop->any_upper_bound)
+    {
+      fprintf (file, "\n%supper_bound ", prefix);
+      print_decu (loop->nb_iterations_upper_bound, file);
+    }
+  if (loop->any_likely_upper_bound)
+    {
+      fprintf (file, "\n%slikely_upper_bound ", prefix);
+      print_decu (loop->nb_iterations_likely_upper_bound, file);
+    }
+
+  if (loop->any_estimate)
+    {
+      fprintf (file, "\n%sestimate ", prefix);
+      print_decu (loop->nb_iterations_estimate, file);
+    }
+  bool reliable;
+  sreal iterations;
+  if (loop->num && expected_loop_iterations_by_profile (loop, &iterations, &reliable))
+    {
+      fprintf (file, "\n%siterations by profile: %f (%s%s) entry count:", prefix,
+	       iterations.to_double (), reliable ? "reliable" : "unreliable",
+	       maybe_flat_loop_profile (loop) ? ", maybe flat" : "");
+      loop_count_in (loop).dump (file, cfun);
+    }
+
+}
+
 static void print_loop_and_siblings (FILE *, class loop *, int, int);
 
 /* Pretty print LOOP on FILE, indented INDENT spaces.  Following
@@ -8529,27 +8641,7 @@ print_loop (FILE *file, class loop *loop, int indent, int verbosity)
     fprintf (file, ", latch = %d", loop->latch->index);
   else
     fprintf (file, ", multiple latches");
-  fprintf (file, ", niter = ");
-  print_generic_expr (file, loop->nb_iterations);
-
-  if (loop->any_upper_bound)
-    {
-      fprintf (file, ", upper_bound = ");
-      print_decu (loop->nb_iterations_upper_bound, file);
-    }
-  if (loop->any_likely_upper_bound)
-    {
-      fprintf (file, ", likely_upper_bound = ");
-      print_decu (loop->nb_iterations_likely_upper_bound, file);
-    }
-
-  if (loop->any_estimate)
-    {
-      fprintf (file, ", estimate = ");
-      print_decu (loop->nb_iterations_estimate, file);
-    }
-  if (loop->unroll)
-    fprintf (file, ", unroll = %d", loop->unroll);
+  print_loop_info (file, loop, s_indent);
   fprintf (file, ")\n");
 
   /* Print loop's body.  */

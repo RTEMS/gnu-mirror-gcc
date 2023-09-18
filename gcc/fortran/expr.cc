@@ -812,6 +812,14 @@ gfc_has_vector_index (gfc_expr *e)
 }
 
 
+bool
+gfc_is_ptr_fcn (gfc_expr *e)
+{
+  return e != NULL && e->expr_type == EXPR_FUNCTION
+	      && gfc_expr_attr (e).pointer;
+}
+
+
 /* Copy a shape array.  */
 
 mpz_t *
@@ -1854,6 +1862,13 @@ find_inquiry_ref (gfc_expr *p, gfc_expr **newp)
 	  else if (tmp->expr_type == EXPR_CONSTANT)
 	    *newp = gfc_get_int_expr (gfc_default_integer_kind,
 				      NULL, tmp->value.character.length);
+	  else if (gfc_init_expr_flag
+		   && tmp->ts.u.cl->length->symtree->n.sym->attr.pdt_len)
+	    *newp = gfc_pdt_find_component_copy_initializer (tmp->symtree->n
+							     .sym,
+							     tmp->ts.u.cl
+							     ->length->symtree
+							     ->n.sym->name);
 	  else
 	    goto cleanup;
 
@@ -1894,7 +1909,9 @@ find_inquiry_ref (gfc_expr *p, gfc_expr **newp)
 		    mpc_imagref (tmp->value.complex), GFC_RND_MODE);
 	  break;
 	}
-      tmp = gfc_copy_expr (*newp);
+      // TODO: Fix leaking expr tmp, when simplify is done twice.
+      if (inquiry->next)
+	gfc_replace_expr (tmp, *newp);
     }
 
   if (!(*newp))
@@ -2059,7 +2076,7 @@ static bool
 simplify_ref_chain (gfc_ref *ref, int type, gfc_expr **p)
 {
   int n;
-  gfc_expr *newp;
+  gfc_expr *newp = NULL;
 
   for (; ref; ref = ref->next)
     {
@@ -3221,7 +3238,7 @@ gfc_match_init_expr (gfc_expr **result)
       return m;
     }
 
-  if (gfc_derived_parameter_expr (expr))
+  if (expr->expr_type != EXPR_FUNCTION && gfc_derived_parameter_expr (expr))
     {
       *result = expr;
       gfc_init_expr_flag = false;
@@ -6470,6 +6487,22 @@ gfc_check_vardef_context (gfc_expr* e, bool pointer, bool alloc_obj,
 	    }
 	  return false;
 	}
+      else if (context && gfc_is_ptr_fcn (assoc->target))
+	{
+	  if (!gfc_notify_std (GFC_STD_F2018, "%qs at %L associated to "
+			       "pointer function target being used in a "
+			       "variable definition context (%s)", name,
+			       &e->where, context))
+	    return false;
+	  else if (gfc_has_vector_index (e))
+	    {
+	      gfc_error ("%qs at %L associated to vector-indexed target"
+			 " cannot be used in a variable definition"
+			 " context (%s)",
+			 name, &e->where, context);
+	      return false;
+	    }
+	}
 
       /* Target must be allowed to appear in a variable definition context.  */
       if (!gfc_check_vardef_context (assoc->target, pointer, false, false, NULL))
@@ -6531,4 +6564,20 @@ gfc_check_vardef_context (gfc_expr* e, bool pointer, bool alloc_obj,
 	    }
 
   return true;
+}
+
+gfc_expr*
+gfc_pdt_find_component_copy_initializer (gfc_symbol *sym, const char *name)
+{
+  /* The actual length of a pdt is in its components.  In the
+     initializer of the current ref is only the default value.
+     Therefore traverse the chain of components and pick the correct
+     one's initializer expressions.  */
+  for (gfc_component *comp = sym->ts.u.derived->components; comp != NULL;
+       comp = comp->next)
+    {
+      if (!strcmp (comp->name, name))
+	return gfc_copy_expr (comp->initializer);
+    }
+  return NULL;
 }

@@ -910,6 +910,18 @@
   [(set_attr "type" "neon_abd<q>")]
 )
 
+(define_expand "<su>abd<mode>3"
+  [(match_operand:VDQ_BHSI 0 "register_operand")
+   (USMAX:VDQ_BHSI
+     (match_operand:VDQ_BHSI 1 "register_operand")
+     (match_operand:VDQ_BHSI 2 "register_operand"))]
+  "TARGET_SIMD"
+  {
+    emit_insn (gen_aarch64_<su>abd<mode> (operands[0], operands[1], operands[2]));
+    DONE;
+  }
+)
+
 (define_insn "aarch64_<su>abdl<mode>"
   [(set (match_operand:<VWIDE> 0 "register_operand" "=w")
 	(zero_extend:<VWIDE>
@@ -959,6 +971,66 @@
     rtx hi = aarch64_simd_vect_par_cnst_half (<MODE>mode, <nunits>, true);
     emit_insn (gen_aarch64_<su>abdl2<mode>_insn (operands[0], operands[1],
 						 operands[2], hi));
+    DONE;
+  }
+)
+
+(define_insn "aarch64_<su>abdl<mode>_hi_internal"
+  [(set (match_operand:<VWIDE> 0 "register_operand" "=w")
+	(abs:<VWIDE>
+	  (minus:<VWIDE>
+	    (ANY_EXTEND:<VWIDE>
+	      (vec_select:<VHALF>
+		(match_operand:VQW 1 "register_operand" "w")
+		(match_operand:VQW 3 "vect_par_cnst_hi_half" "")))
+	    (ANY_EXTEND:<VWIDE>
+	      (vec_select:<VHALF>
+		(match_operand:VQW 2 "register_operand" "w")
+		(match_dup 3))))))]
+  "TARGET_SIMD"
+  "<su>abdl2\t%0.<Vwtype>, %1.<Vtype>, %2.<Vtype>"
+  [(set_attr "type" "neon_abd_long")]
+)
+
+(define_insn "aarch64_<su>abdl<mode>_lo_internal"
+  [(set (match_operand:<VWIDE> 0 "register_operand" "=w")
+	(abs:<VWIDE>
+	  (minus:<VWIDE>
+	    (ANY_EXTEND:<VWIDE>
+	      (vec_select:<VHALF>
+		(match_operand:VQW 1 "register_operand" "w")
+		(match_operand:VQW 3 "vect_par_cnst_lo_half" "")))
+	    (ANY_EXTEND:<VWIDE>
+	      (vec_select:<VHALF>
+		(match_operand:VQW 2 "register_operand" "w")
+		(match_dup 3))))))]
+  "TARGET_SIMD"
+  "<su>abdl\t%0.<Vwtype>, %1.<Vhalftype>, %2.<Vhalftype>"
+  [(set_attr "type" "neon_abd_long")]
+)
+
+(define_expand "vec_widen_<su>abd_hi_<mode>"
+  [(match_operand:<VWIDE> 0 "register_operand")
+   (ANY_EXTEND:<VWIDE> (match_operand:VQW 1 "register_operand"))
+   (ANY_EXTEND:<VWIDE> (match_operand:VQW 2 "register_operand"))]
+  "TARGET_SIMD"
+  {
+    rtx p = aarch64_simd_vect_par_cnst_half (<MODE>mode, <nunits>, true);
+    emit_insn (gen_aarch64_<su>abdl<mode>_hi_internal (operands[0], operands[1],
+						       operands[2], p));
+    DONE;
+  }
+)
+
+(define_expand "vec_widen_<su>abd_lo_<mode>"
+  [(match_operand:<VWIDE> 0 "register_operand")
+   (ANY_EXTEND:<VWIDE> (match_operand:VQW 1 "register_operand"))
+   (ANY_EXTEND:<VWIDE> (match_operand:VQW 2 "register_operand"))]
+  "TARGET_SIMD"
+  {
+    rtx p = aarch64_simd_vect_par_cnst_half (<MODE>mode, <nunits>, false);
+    emit_insn (gen_aarch64_<su>abdl<mode>_lo_internal (operands[0], operands[1],
+						       operands[2], p));
     DONE;
   }
 )
@@ -1311,7 +1383,7 @@
 	      (plus:<V2XWIDE>
 		(<SHIFTEXTEND>:<V2XWIDE>
 		  (match_operand:VSDQ_I_DI 2 "register_operand" "w"))
-		(match_operand:<V2XWIDE> 4 "aarch64_simd_rsra_rnd_imm_vec"))
+		(match_operand:<V2XWIDE> 4 "aarch64_int_rnd_operand"))
 	      (match_operand:VSDQ_I_DI 3 "aarch64_simd_shift_imm_<vec_or_offset>_<Vel>")))
 	  (match_operand:VSDQ_I_DI 1 "register_operand" "0")))]
   "TARGET_SIMD
@@ -1884,40 +1956,6 @@
  }
 )
 
-(define_insn "*aarch64_<srn_op>shrn<mode><vczle><vczbe>"
-  [(set (match_operand:<VNARROWQ> 0 "register_operand" "=w")
-        (truncate:<VNARROWQ>
-          (SHIFTRT:VQN (match_operand:VQN 1 "register_operand" "w")
-            (match_operand:VQN 2 "aarch64_simd_shift_imm_vec_<vn_mode>"))))]
-  "TARGET_SIMD"
-  "shrn\\t%0.<Vntype>, %1.<Vtype>, %2"
-  [(set_attr "type" "neon_shift_imm_narrow_q")]
-)
-
-(define_insn "*aarch64_<srn_op>shrn<mode>2_vect_le"
-  [(set (match_operand:<VNARROWQ2> 0 "register_operand" "=w")
-	(vec_concat:<VNARROWQ2>
-	  (match_operand:<VNARROWQ> 1 "register_operand" "0")
-	  (truncate:<VNARROWQ>
-	    (SHIFTRT:VQN (match_operand:VQN 2 "register_operand" "w")
-	      (match_operand:VQN 3 "aarch64_simd_shift_imm_vec_<vn_mode>")))))]
-  "TARGET_SIMD && !BYTES_BIG_ENDIAN"
-  "shrn2\\t%0.<V2ntype>, %2.<Vtype>, %3"
-  [(set_attr "type" "neon_shift_imm_narrow_q")]
-)
-
-(define_insn "*aarch64_<srn_op>shrn<mode>2_vect_be"
-  [(set (match_operand:<VNARROWQ2> 0 "register_operand" "=w")
-	(vec_concat:<VNARROWQ2>
-	  (truncate:<VNARROWQ>
-	    (SHIFTRT:VQN (match_operand:VQN 2 "register_operand" "w")
-	      (match_operand:VQN 3 "aarch64_simd_shift_imm_vec_<vn_mode>")))
-	  (match_operand:<VNARROWQ> 1 "register_operand" "0")))]
-  "TARGET_SIMD && BYTES_BIG_ENDIAN"
-  "shrn2\\t%0.<V2ntype>, %2.<Vtype>, %3"
-  [(set_attr "type" "neon_shift_imm_narrow_q")]
-)
-
 (define_insn "*aarch64_<srn_op>topbits_shuffle<mode>_le"
   [(set (match_operand:<VNARROWQ2> 0 "register_operand" "=w")
 	(vec_concat:<VNARROWQ2>
@@ -1944,173 +1982,6 @@
   "TARGET_SIMD && BYTES_BIG_ENDIAN"
   "uzp2\\t%0.<V2ntype>, %1.<V2ntype>, %3.<V2ntype>"
   [(set_attr "type" "neon_permute<q>")]
-)
-
-(define_expand "aarch64_shrn<mode>"
-  [(set (match_operand:<VNARROWQ> 0 "register_operand")
-	(truncate:<VNARROWQ>
-	  (lshiftrt:VQN (match_operand:VQN 1 "register_operand")
-	    (match_operand:SI 2 "aarch64_simd_shift_imm_offset_<vn_mode>"))))]
-  "TARGET_SIMD"
-  {
-    operands[2] = aarch64_simd_gen_const_vector_dup (<MODE>mode,
-						 INTVAL (operands[2]));
-  }
-)
-
-(define_insn "aarch64_rshrn<mode><vczle><vczbe>_insn"
-  [(set (match_operand:<VNARROWQ> 0 "register_operand" "=w")
-	(truncate:<VNARROWQ>
-	  (lshiftrt:VQN
-	    (plus:VQN (match_operand:VQN 1 "register_operand" "w")
-		      (match_operand:VQN 3 "aarch64_simd_rshrn_imm_vec"))
-	    (match_operand:VQN 2 "aarch64_simd_shift_imm_vec_<vn_mode>"))))]
-  "TARGET_SIMD
-   && INTVAL (CONST_VECTOR_ELT (operands[3], 0))
-      == (HOST_WIDE_INT_1 << (INTVAL (CONST_VECTOR_ELT (operands[2], 0)) - 1))"
-  "rshrn\\t%0.<Vntype>, %1.<Vtype>, %2"
-  [(set_attr "type" "neon_shift_imm_narrow_q")]
-)
-
-(define_expand "aarch64_rshrn<mode>"
-  [(match_operand:<VNARROWQ> 0 "register_operand")
-   (match_operand:VQN 1 "register_operand")
-   (match_operand:SI 2 "aarch64_simd_shift_imm_offset_<vn_mode>")]
-  "TARGET_SIMD"
-  {
-    if (INTVAL (operands[2]) == GET_MODE_UNIT_BITSIZE (<VNARROWQ>mode))
-      {
-	rtx tmp0 = aarch64_gen_shareable_zero (<MODE>mode);
-	emit_insn (gen_aarch64_raddhn<mode> (operands[0], operands[1], tmp0));
-      }
-    else
-      {
-	rtx shft
-	  = aarch64_simd_gen_const_vector_dup (<MODE>mode,
-					       HOST_WIDE_INT_1U
-					        << (INTVAL (operands[2]) - 1));
-	operands[2] = aarch64_simd_gen_const_vector_dup (<MODE>mode,
-						         INTVAL (operands[2]));
-	emit_insn (gen_aarch64_rshrn<mode>_insn (operands[0], operands[1],
-						 operands[2], shft));
-      }
-    DONE;
-  }
-)
-
-(define_insn "aarch64_shrn2<mode>_insn_le"
-  [(set (match_operand:<VNARROWQ2> 0 "register_operand" "=w")
-	(vec_concat:<VNARROWQ2>
-	  (match_operand:<VNARROWQ> 1 "register_operand" "0")
-	  (truncate:<VNARROWQ>
-	    (lshiftrt:VQN (match_operand:VQN 2 "register_operand" "w")
-	      (match_operand:VQN 3 "aarch64_simd_shift_imm_vec_<vn_mode>")))))]
-  "TARGET_SIMD && !BYTES_BIG_ENDIAN"
-  "shrn2\\t%0.<V2ntype>, %2.<Vtype>, %3"
-  [(set_attr "type" "neon_shift_imm_narrow_q")]
-)
-
-(define_insn "aarch64_shrn2<mode>_insn_be"
-  [(set (match_operand:<VNARROWQ2> 0 "register_operand" "=w")
-	(vec_concat:<VNARROWQ2>
-	  (truncate:<VNARROWQ>
-	    (lshiftrt:VQN (match_operand:VQN 2 "register_operand" "w")
-	      (match_operand:VQN 3
-		"aarch64_simd_shift_imm_vec_<vn_mode>")))
-	  (match_operand:<VNARROWQ> 1 "register_operand" "0")))]
-  "TARGET_SIMD && BYTES_BIG_ENDIAN"
-  "shrn2\\t%0.<V2ntype>, %2.<Vtype>, %3"
-  [(set_attr "type" "neon_shift_imm_narrow_q")]
-)
-
-(define_expand "aarch64_shrn2<mode>"
-  [(match_operand:<VNARROWQ2> 0 "register_operand")
-   (match_operand:<VNARROWQ> 1 "register_operand")
-   (match_operand:VQN 2 "register_operand")
-   (match_operand:SI 3 "aarch64_simd_shift_imm_offset_<vn_mode>")]
-  "TARGET_SIMD"
-  {
-    operands[3] = aarch64_simd_gen_const_vector_dup (<MODE>mode,
-						 INTVAL (operands[3]));
-    if (BYTES_BIG_ENDIAN)
-      emit_insn (gen_aarch64_shrn2<mode>_insn_be (operands[0], operands[1],
-						  operands[2], operands[3]));
-    else
-      emit_insn (gen_aarch64_shrn2<mode>_insn_le (operands[0], operands[1],
-						  operands[2], operands[3]));
-    DONE;
-  }
-)
-
-(define_insn "aarch64_rshrn2<mode>_insn_le"
-  [(set (match_operand:<VNARROWQ2> 0 "register_operand" "=w")
-	(vec_concat:<VNARROWQ2>
-	  (match_operand:<VNARROWQ> 1 "register_operand" "0")
-	  (truncate:<VNARROWQ>
-	    (lshiftrt:VQN
-	      (plus:VQN (match_operand:VQN 2 "register_operand" "w")
-			(match_operand:VQN 3 "aarch64_simd_rshrn_imm_vec"))
-	      (match_operand:VQN 4 "aarch64_simd_shift_imm_vec_<vn_mode>")))))]
-  "TARGET_SIMD && !BYTES_BIG_ENDIAN
-   && INTVAL (CONST_VECTOR_ELT (operands[3], 0))
-      == (HOST_WIDE_INT_1 << (INTVAL (CONST_VECTOR_ELT (operands[4], 0)) - 1))"
-  "rshrn2\\t%0.<V2ntype>, %2.<Vtype>, %4"
-  [(set_attr "type" "neon_shift_imm_narrow_q")]
-)
-
-(define_insn "aarch64_rshrn2<mode>_insn_be"
-  [(set (match_operand:<VNARROWQ2> 0 "register_operand" "=w")
-	(vec_concat:<VNARROWQ2>
-	  (truncate:<VNARROWQ>
-	    (lshiftrt:VQN
-	      (plus:VQN (match_operand:VQN 2 "register_operand" "w")
-			(match_operand:VQN 3 "aarch64_simd_rshrn_imm_vec"))
-	      (match_operand:VQN 4 "aarch64_simd_shift_imm_vec_<vn_mode>")))
-	  (match_operand:<VNARROWQ> 1 "register_operand" "0")))]
-  "TARGET_SIMD && BYTES_BIG_ENDIAN
-   && INTVAL (CONST_VECTOR_ELT (operands[3], 0))
-      == (HOST_WIDE_INT_1 << (INTVAL (CONST_VECTOR_ELT (operands[4], 0)) - 1))"
-  "rshrn2\\t%0.<V2ntype>, %2.<Vtype>, %4"
-  [(set_attr "type" "neon_shift_imm_narrow_q")]
-)
-
-(define_expand "aarch64_rshrn2<mode>"
-  [(match_operand:<VNARROWQ2> 0 "register_operand")
-   (match_operand:<VNARROWQ> 1 "register_operand")
-   (match_operand:VQN 2 "register_operand")
-   (match_operand:SI 3 "aarch64_simd_shift_imm_offset_<vn_mode>")]
-  "TARGET_SIMD"
-  {
-    if (INTVAL (operands[3]) == GET_MODE_UNIT_BITSIZE (<VNARROWQ2>mode))
-      {
-	rtx tmp = aarch64_gen_shareable_zero (<MODE>mode);
-	emit_insn (gen_aarch64_raddhn2<mode> (operands[0], operands[1],
-					      operands[2], tmp));
-      }
-    else
-      {
-	rtx shft
-	  = aarch64_simd_gen_const_vector_dup (<MODE>mode,
-					       HOST_WIDE_INT_1U
-					        << (INTVAL (operands[3]) - 1));
-
-	operands[3] = aarch64_simd_gen_const_vector_dup (<MODE>mode,
-							 INTVAL (operands[3]));
-	if (BYTES_BIG_ENDIAN)
-	  emit_insn (gen_aarch64_rshrn2<mode>_insn_be (operands[0],
-						       operands[1],
-						       operands[2],
-						       shft,
-						       operands[3]));
-	else
-	  emit_insn (gen_aarch64_rshrn2<mode>_insn_le (operands[0],
-						       operands[1],
-						       operands[2],
-						       shft,
-						       operands[3]));
-      }
-    DONE;
-  }
 )
 
 ;; Widening operations.
@@ -6516,105 +6387,67 @@
   [(set_attr "type" "neon_sat_shift_reg<q>")]
 )
 
-(define_expand "vec_widen_<sur>shiftl_lo_<mode>"
-  [(set (match_operand:<VWIDE> 0 "register_operand" "=w")
-	(unspec:<VWIDE> [(match_operand:VQW 1 "register_operand" "w")
-			 (match_operand:SI 2
-			   "aarch64_simd_shift_imm_bitsize_<ve_mode>" "i")]
-			 VSHLL))]
-  "TARGET_SIMD"
-  {
-    rtx p = aarch64_simd_vect_par_cnst_half (<MODE>mode, <nunits>, false);
-    emit_insn (gen_aarch64_<sur>shll<mode>_internal (operands[0], operands[1],
-						     p, operands[2]));
-    DONE;
-  }
-)
-
-(define_expand "vec_widen_<sur>shiftl_hi_<mode>"
-   [(set (match_operand:<VWIDE> 0 "register_operand")
-	(unspec:<VWIDE> [(match_operand:VQW 1 "register_operand" "w")
-			 (match_operand:SI 2
-			   "immediate_operand" "i")]
-			  VSHLL))]
-   "TARGET_SIMD"
-   {
-    rtx p = aarch64_simd_vect_par_cnst_half (<MODE>mode, <nunits>, true);
-    emit_insn (gen_aarch64_<sur>shll2<mode>_internal (operands[0], operands[1],
-						      p, operands[2]));
-    DONE;
-   }
-)
-
 ;; vshll_n
 
-(define_insn "aarch64_<sur>shll<mode>_internal"
-  [(set (match_operand:<VWIDE> 0 "register_operand" "=w")
-	(unspec:<VWIDE> [(vec_select:<VHALF>
-			    (match_operand:VQW 1 "register_operand" "w")
-			    (match_operand:VQW 2 "vect_par_cnst_lo_half" ""))
-			 (match_operand:SI 3
-			   "aarch64_simd_shift_imm_bitsize_<ve_mode>" "i")]
-			 VSHLL))]
+(define_insn "aarch64_<su>shll<mode>"
+  [(set (match_operand:<VWIDE> 0 "register_operand")
+	(ashift:<VWIDE> (ANY_EXTEND:<VWIDE>
+			    (match_operand:VD_BHSI 1 "register_operand"))
+			 (match_operand:<VWIDE> 2
+			   "aarch64_simd_shll_imm_vec")))]
   "TARGET_SIMD"
-  {
-    if (INTVAL (operands[3]) == GET_MODE_UNIT_BITSIZE (<MODE>mode))
-      return "shll\\t%0.<Vwtype>, %1.<Vhalftype>, %3";
-    else
-      return "<sur>shll\\t%0.<Vwtype>, %1.<Vhalftype>, %3";
+  {@ [cons: =0, 1, 2]
+     [w, w, D2] shll\t%0.<Vwtype>, %1.<Vtype>, %I2
+     [w, w, DL] <su>shll\t%0.<Vwtype>, %1.<Vtype>, %I2
   }
   [(set_attr "type" "neon_shift_imm_long")]
 )
 
-(define_insn "aarch64_<sur>shll2<mode>_internal"
-  [(set (match_operand:<VWIDE> 0 "register_operand" "=w")
-	(unspec:<VWIDE> [(vec_select:<VHALF>
-			    (match_operand:VQW 1 "register_operand" "w")
-			    (match_operand:VQW 2 "vect_par_cnst_hi_half" ""))
-			 (match_operand:SI 3
-			   "aarch64_simd_shift_imm_bitsize_<ve_mode>" "i")]
-			 VSHLL))]
-  "TARGET_SIMD"
-  {
-    if (INTVAL (operands[3]) == GET_MODE_UNIT_BITSIZE (<MODE>mode))
-      return "shll2\\t%0.<Vwtype>, %1.<Vtype>, %3";
-    else
-      return "<sur>shll2\\t%0.<Vwtype>, %1.<Vtype>, %3";
-  }
-  [(set_attr "type" "neon_shift_imm_long")]
-)
-
-(define_insn "aarch64_<sur>shll_n<mode>"
-  [(set (match_operand:<VWIDE> 0 "register_operand" "=w")
-	(unspec:<VWIDE> [(match_operand:VD_BHSI 1 "register_operand" "w")
+(define_expand "aarch64_<sur>shll_n<mode>"
+  [(set (match_operand:<VWIDE> 0 "register_operand")
+	(unspec:<VWIDE> [(match_operand:VD_BHSI 1 "register_operand")
 			 (match_operand:SI 2
-			   "aarch64_simd_shift_imm_bitsize_<ve_mode>" "i")]
-                         VSHLL))]
+			   "aarch64_simd_shift_imm_bitsize_<ve_mode>")]
+			 VSHLL))]
   "TARGET_SIMD"
   {
-    if (INTVAL (operands[2]) == GET_MODE_UNIT_BITSIZE (<MODE>mode))
-      return "shll\\t%0.<Vwtype>, %1.<Vtype>, %2";
-    else
-      return "<sur>shll\\t%0.<Vwtype>, %1.<Vtype>, %2";
+    rtx shft = gen_const_vec_duplicate (<VWIDE>mode, operands[2]);
+    emit_insn (gen_aarch64_<sur>shll<mode> (operands[0], operands[1], shft));
+    DONE;
   }
-  [(set_attr "type" "neon_shift_imm_long")]
 )
 
 ;; vshll_high_n
 
-(define_insn "aarch64_<sur>shll2_n<mode>"
-  [(set (match_operand:<VWIDE> 0 "register_operand" "=w")
-	(unspec:<VWIDE> [(match_operand:VQW 1 "register_operand" "w")
-			 (match_operand:SI 2 "immediate_operand" "i")]
-                         VSHLL))]
+(define_insn "aarch64_<su>shll2<mode>"
+  [(set (match_operand:<VWIDE> 0 "register_operand")
+	(ashift:<VWIDE> (ANY_EXTEND:<VWIDE>
+			  (vec_select:<VHALF>
+			    (match_operand:VQW 1 "register_operand")
+			    (match_operand:VQW 2 "vect_par_cnst_hi_half")))
+			 (match_operand:<VWIDE> 3
+			   "aarch64_simd_shll_imm_vec")))]
   "TARGET_SIMD"
-  {
-    if (INTVAL (operands[2]) == GET_MODE_UNIT_BITSIZE (<MODE>mode))
-      return "shll2\\t%0.<Vwtype>, %1.<Vtype>, %2";
-    else
-      return "<sur>shll2\\t%0.<Vwtype>, %1.<Vtype>, %2";
+  {@ [cons: =0, 1, 2, 3]
+     [w, w, , D2] shll2\t%0.<Vwtype>, %1.<Vtype>, %I3
+     [w, w, , DL] <su>shll2\t%0.<Vwtype>, %1.<Vtype>, %I3
   }
   [(set_attr "type" "neon_shift_imm_long")]
+)
+
+(define_expand "aarch64_<sur>shll2_n<mode>"
+  [(set (match_operand:<VWIDE> 0 "register_operand")
+	(unspec:<VWIDE> [(match_operand:VQW 1 "register_operand")
+			 (match_operand:SI 2
+			   "aarch64_simd_shift_imm_bitsize_<ve_mode>")]
+			 VSHLL))]
+  "TARGET_SIMD"
+  {
+    rtx shft = gen_const_vec_duplicate (<VWIDE>mode, operands[2]);
+    rtx p = aarch64_simd_vect_par_cnst_half (<MODE>mode, <nunits>, true);
+    emit_insn (gen_aarch64_<sur>shll2<mode> (operands[0], operands[1], p, shft));
+    DONE;
+  }
 )
 
 ;; vrshr_n
@@ -6626,7 +6459,7 @@
 	    (plus:<V2XWIDE>
 	      (<SHIFTEXTEND>:<V2XWIDE>
 		(match_operand:VSDQ_I_DI 1 "register_operand" "w"))
-	      (match_operand:<V2XWIDE> 3 "aarch64_simd_rsra_rnd_imm_vec"))
+	      (match_operand:<V2XWIDE> 3 "aarch64_int_rnd_operand"))
 	    (match_operand:VSDQ_I_DI 2 "aarch64_simd_shift_imm_<vec_or_offset>_<Vel>"))))]
   "TARGET_SIMD
    && aarch64_const_vec_rnd_cst_p (operands[3], operands[2])"
@@ -6704,93 +6537,514 @@
 
 ;; vq(r)shr(u)n_n
 
-(define_insn "aarch64_<sur>q<r>shr<u>n_n<mode>"
+(define_insn "aarch64_<shrn_op>shrn_n<mode>"
   [(set (match_operand:<VNARROWQ> 0 "register_operand" "=w")
-        (unspec:<VNARROWQ> [(match_operand:SD_HSDI 1 "register_operand" "w")
-			    (match_operand:SI 2
-			      "aarch64_simd_shift_imm_offset_<ve_mode>" "i")]
-			   VQSHRN_N))]
+	(SAT_TRUNC:<VNARROWQ>
+	  (<TRUNC_SHIFT>:SD_HSDI
+	    (match_operand:SD_HSDI 1 "register_operand" "w")
+	    (match_operand:SI 2 "aarch64_simd_shift_imm_offset_<ve_mode>"))))]
   "TARGET_SIMD"
-  "<sur>q<r>shr<u>n\\t%<vn2>0<Vmntype>, %<v>1<Vmtype>, %2"
-  [(set_attr "type" "neon_sat_shift_imm_narrow_q")]
-)
-
-(define_insn "aarch64_<sur>q<r>shr<u>n_n<mode>_insn<vczle><vczbe>"
-  [(set (match_operand:<VNARROWQ> 0 "register_operand" "=w")
-	(unspec:<VNARROWQ>
-	  [(match_operand:VQN 1 "register_operand" "w")
-	   (match_operand:VQN 2 "aarch64_simd_shift_imm_vec_<vn_mode>")]
-	   VQSHRN_N))]
-  "TARGET_SIMD"
-  "<sur>q<r>shr<u>n\\t%<vn2>0<Vmntype>, %<v>1<Vmtype>, %2"
+  "<shrn_op>shrn\t%<vn2>0<Vmntype>, %<v>1<Vmtype>, %2"
   [(set_attr "type" "neon_shift_imm_narrow_q")]
 )
 
-(define_expand "aarch64_<sur>q<r>shr<u>n_n<mode>"
+(define_insn "*aarch64_<shrn_op><shrn_s>shrn_n<mode>_insn<vczle><vczbe>"
   [(set (match_operand:<VNARROWQ> 0 "register_operand" "=w")
-        (unspec:<VNARROWQ> [(match_operand:VQN 1 "register_operand")
-			    (match_operand:SI 2
-			      "aarch64_simd_shift_imm_offset_<ve_mode>")]
-			   VQSHRN_N))]
+	(ALL_TRUNC:<VNARROWQ>
+	  (SHIFTRT:VQN
+	    (match_operand:VQN 1 "register_operand" "w")
+	    (match_operand:VQN 2 "aarch64_simd_shift_imm_vec_<vn_mode>"))))]
+  "TARGET_SIMD && AARCH64_VALID_SHRN_OP (<ALL_TRUNC:CODE>, <SHIFTRT:CODE>)"
+  "<shrn_op>shrn\t%<vn2>0<Vmntype>, %<v>1<Vmtype>, %2"
+  [(set_attr "type" "neon_shift_imm_narrow_q")]
+)
+
+(define_expand "aarch64_<shrn_op>shrn_n<mode>"
+  [(set (match_operand:<VNARROWQ> 0 "register_operand")
+	(ALL_TRUNC:<VNARROWQ>
+	  (<TRUNC_SHIFT>:VQN
+	    (match_operand:VQN 1 "register_operand")
+	    (match_operand:SI 2 "aarch64_simd_shift_imm_offset_<ve_mode>"))))]
   "TARGET_SIMD"
   {
     operands[2] = aarch64_simd_gen_const_vector_dup (<MODE>mode,
 						 INTVAL (operands[2]));
-    emit_insn (gen_aarch64_<sur>q<r>shr<u>n_n<mode>_insn (operands[0],
-							  operands[1],
-							  operands[2]));
+  }
+)
+
+(define_insn "*aarch64_<shrn_op>rshrn_n<mode>_insn<vczle><vczbe>"
+  [(set (match_operand:<VNARROWQ> 0 "register_operand" "=w")
+	(ALL_TRUNC:<VNARROWQ>
+	  (<TRUNC_SHIFT>:<V2XWIDE>
+	    (plus:<V2XWIDE>
+	      (<TRUNCEXTEND>:<V2XWIDE>
+	        (match_operand:VQN 1 "register_operand" "w"))
+	      (match_operand:<V2XWIDE> 3 "aarch64_int_rnd_operand"))
+	    (match_operand:VQN 2 "aarch64_simd_shift_imm_vec_<vn_mode>"))))]
+  "TARGET_SIMD
+   && aarch64_const_vec_rnd_cst_p (operands[3], operands[2])"
+  "<shrn_op>rshrn\t%<vn2>0<Vmntype>, %<v>1<Vmtype>, %2"
+  [(set_attr "type" "neon_shift_imm_narrow_q")]
+)
+
+(define_insn "*aarch64_<shrn_op>rshrn_n<mode>_insn"
+  [(set (match_operand:<VNARROWQ> 0 "register_operand" "=w")
+	(SAT_TRUNC:<VNARROWQ>
+	  (<TRUNC_SHIFT>:<DWI>
+	    (plus:<DWI>
+	      (<TRUNCEXTEND>:<DWI>
+	        (match_operand:SD_HSDI 1 "register_operand" "w"))
+	      (match_operand:<DWI> 3 "aarch64_int_rnd_operand"))
+	    (match_operand:SI 2 "aarch64_simd_shift_imm_offset_<ve_mode>"))))]
+  "TARGET_SIMD
+   && aarch64_const_vec_rnd_cst_p (operands[3], operands[2])"
+  "<shrn_op>rshrn\t%<vn2>0<Vmntype>, %<v>1<Vmtype>, %2"
+  [(set_attr "type" "neon_shift_imm_narrow_q")]
+)
+
+(define_expand "aarch64_<shrn_op>rshrn_n<mode>"
+  [(set (match_operand:<VNARROWQ> 0 "register_operand")
+	(SAT_TRUNC:<VNARROWQ>
+	  (<TRUNC_SHIFT>:<V2XWIDE>
+	    (plus:<V2XWIDE>
+	      (<TRUNCEXTEND>:<V2XWIDE>
+	        (match_operand:SD_HSDI 1 "register_operand"))
+	      (match_dup 3))
+	    (match_operand:SI 2 "aarch64_simd_shift_imm_offset_<ve_mode>"))))]
+  "TARGET_SIMD"
+  {
+    /* Use this expander to create the rounding constant vector, which is
+       1 << (shift - 1).  Use wide_int here to ensure that the right TImode
+       RTL is generated when handling the DImode expanders.  */
+    int prec = GET_MODE_UNIT_PRECISION (<V2XWIDE>mode);
+    wide_int rnd_wi = wi::set_bit_in_zero (INTVAL (operands[2]) - 1, prec);
+    operands[3] = immed_wide_int_const (rnd_wi, GET_MODE_INNER (<V2XWIDE>mode));
+  }
+)
+
+(define_expand "aarch64_<shrn_op>rshrn_n<mode>"
+  [(set (match_operand:<VNARROWQ> 0 "register_operand")
+	(ALL_TRUNC:<VNARROWQ>
+	  (<TRUNC_SHIFT>:<V2XWIDE>
+	    (plus:<V2XWIDE>
+	      (<TRUNCEXTEND>:<V2XWIDE>
+	        (match_operand:VQN 1 "register_operand"))
+	      (match_dup 3))
+	    (match_operand:SI 2 "aarch64_simd_shift_imm_offset_<ve_mode>"))))]
+  "TARGET_SIMD"
+  {
+    if (<CODE> == TRUNCATE
+	&& INTVAL (operands[2]) == GET_MODE_UNIT_BITSIZE (<VNARROWQ>mode))
+      {
+	rtx tmp0 = aarch64_gen_shareable_zero (<MODE>mode);
+	emit_insn (gen_aarch64_raddhn<mode> (operands[0], operands[1], tmp0));
+	DONE;
+      }
+    /* Use this expander to create the rounding constant vector, which is
+       1 << (shift - 1).  Use wide_int here to ensure that the right TImode
+       RTL is generated when handling the DImode expanders.  */
+    int prec = GET_MODE_UNIT_PRECISION (<V2XWIDE>mode);
+    wide_int rnd_wi = wi::set_bit_in_zero (INTVAL (operands[2]) - 1, prec);
+    operands[3] = immed_wide_int_const (rnd_wi, GET_MODE_INNER (<V2XWIDE>mode));
+    operands[3] = gen_const_vec_duplicate (<V2XWIDE>mode, operands[3]);
+    operands[2] = gen_const_vec_duplicate (<MODE>mode, operands[2]);
+  }
+)
+
+(define_insn "*aarch64_sqshrun_n<mode>_insn<vczle><vczbe>"
+  [(set (match_operand:<VNARROWQ> 0 "register_operand" "=w")
+	(truncate:<VNARROWQ>
+	  (smin:VQN
+	    (smax:VQN
+	      (ashiftrt:VQN
+		(match_operand:VQN 1 "register_operand" "w")
+		(match_operand:VQN 2 "aarch64_simd_shift_imm_vec_<vn_mode>"))
+	      (match_operand:VQN 3 "aarch64_simd_imm_zero"))
+	    (match_operand:VQN 4 "aarch64_simd_umax_half_mode"))))]
+  "TARGET_SIMD"
+  "sqshrun\t%<vn2>0<Vmntype>, %<v>1<Vmtype>, %2"
+  [(set_attr "type" "neon_shift_imm_narrow_q")]
+)
+
+(define_insn "aarch64_sqshrun_n<mode>_insn"
+  [(set (match_operand:SD_HSDI 0 "register_operand" "=w")
+	(smin:SD_HSDI
+	  (smax:SD_HSDI
+	    (ashiftrt:SD_HSDI
+	      (match_operand:SD_HSDI 1 "register_operand" "w")
+	      (match_operand:SI 2 "aarch64_simd_shift_imm_offset_<ve_mode>"))
+	    (const_int 0))
+	  (const_int <half_mask>)))]
+  "TARGET_SIMD"
+  "sqshrun\t%<vn2>0<Vmntype>, %<v>1<Vmtype>, %2"
+  [(set_attr "type" "neon_shift_imm_narrow_q")]
+)
+
+(define_expand "aarch64_sqshrun_n<mode>"
+  [(match_operand:<VNARROWQ> 0 "register_operand")
+   (match_operand:SD_HSDI 1 "register_operand")
+   (match_operand:SI 2 "aarch64_simd_shift_imm_offset_<ve_mode>")]
+  "TARGET_SIMD"
+  {
+    rtx dst = gen_reg_rtx (<MODE>mode);
+    emit_insn (gen_aarch64_sqshrun_n<mode>_insn (dst, operands[1],
+						 operands[2]));
+    emit_move_insn (operands[0], gen_lowpart (<VNARROWQ>mode, dst));
     DONE;
   }
 )
 
-(define_insn "aarch64_<sur>q<r>shr<u>n2_n<mode>_insn_le"
+(define_expand "aarch64_sqshrun_n<mode>"
+  [(set (match_operand:<VNARROWQ> 0 "register_operand")
+	(truncate:<VNARROWQ>
+	  (smin:VQN
+	    (smax:VQN
+	      (ashiftrt:VQN
+		(match_operand:VQN 1 "register_operand")
+		(match_operand:SI 2 "aarch64_simd_shift_imm_offset_<ve_mode>"))
+	      (match_dup 3))
+	    (match_dup 4))))]
+  "TARGET_SIMD"
+  {
+    operands[2] = aarch64_simd_gen_const_vector_dup (<MODE>mode,
+						 INTVAL (operands[2]));
+    operands[3] = CONST0_RTX (<MODE>mode);
+    operands[4]
+      = aarch64_simd_gen_const_vector_dup (<MODE>mode,
+			GET_MODE_MASK (GET_MODE_INNER (<VNARROWQ>mode)));
+  }
+)
+
+(define_insn "*aarch64_sqrshrun_n<mode>_insn<vczle><vczbe>"
+  [(set (match_operand:<VNARROWQ> 0 "register_operand" "=w")
+	(truncate:<VNARROWQ>
+	  (smin:<V2XWIDE>
+	    (smax:<V2XWIDE>
+	      (ashiftrt:<V2XWIDE>
+		(plus:<V2XWIDE>
+		  (sign_extend:<V2XWIDE>
+		    (match_operand:VQN 1 "register_operand" "w"))
+		  (match_operand:<V2XWIDE> 3 "aarch64_int_rnd_operand"))
+		(match_operand:VQN 2 "aarch64_simd_shift_imm_vec_<vn_mode>"))
+	      (match_operand:<V2XWIDE> 4 "aarch64_simd_imm_zero"))
+	    (match_operand:<V2XWIDE> 5 "aarch64_simd_umax_quarter_mode"))))]
+  "TARGET_SIMD
+   && aarch64_const_vec_rnd_cst_p (operands[3], operands[2])"
+  "sqrshrun\t%<vn2>0<Vmntype>, %<v>1<Vmtype>, %2"
+  [(set_attr "type" "neon_shift_imm_narrow_q")]
+)
+
+(define_insn "aarch64_sqrshrun_n<mode>_insn"
+  [(set (match_operand:<DWI> 0 "register_operand" "=w")
+	(smin:<DWI>
+	  (smax:<DWI>
+	    (ashiftrt:<DWI>
+	      (plus:<DWI>
+		(sign_extend:<DWI>
+		  (match_operand:SD_HSDI 1 "register_operand" "w"))
+		(match_operand:<DWI> 3 "aarch64_int_rnd_operand"))
+	      (match_operand:SI 2 "aarch64_simd_shift_imm_offset_<ve_mode>"))
+	    (const_int 0))
+	  (const_int <half_mask>)))]
+  "TARGET_SIMD
+   && aarch64_const_vec_rnd_cst_p (operands[3], operands[2])"
+  "sqrshrun\t%<vn2>0<Vmntype>, %<v>1<Vmtype>, %2"
+  [(set_attr "type" "neon_shift_imm_narrow_q")]
+)
+
+(define_expand "aarch64_sqrshrun_n<mode>"
+  [(match_operand:<VNARROWQ> 0 "register_operand")
+   (match_operand:SD_HSDI 1 "register_operand")
+   (match_operand:SI 2 "aarch64_simd_shift_imm_offset_<ve_mode>")]
+  "TARGET_SIMD"
+  {
+    int prec = GET_MODE_UNIT_PRECISION (<DWI>mode);
+    wide_int rnd_wi = wi::set_bit_in_zero (INTVAL (operands[2]) - 1, prec);
+    rtx rnd = immed_wide_int_const (rnd_wi, <DWI>mode);
+    rtx dst = gen_reg_rtx (<DWI>mode);
+    emit_insn (gen_aarch64_sqrshrun_n<mode>_insn (dst, operands[1], operands[2], rnd));
+    emit_move_insn (operands[0], gen_lowpart (<VNARROWQ>mode, dst));
+    DONE;
+  }
+)
+
+(define_expand "aarch64_sqrshrun_n<mode>"
+  [(set (match_operand:<VNARROWQ> 0 "register_operand")
+	(truncate:<VNARROWQ>
+	  (smin:<V2XWIDE>
+	    (smax:<V2XWIDE>
+	      (ashiftrt:<V2XWIDE>
+		(plus:<V2XWIDE>
+		  (sign_extend:<V2XWIDE>
+		    (match_operand:VQN 1 "register_operand"))
+		  (match_dup 3))
+		(match_operand:SI 2 "aarch64_simd_shift_imm_offset_<ve_mode>"))
+	      (match_dup 4))
+	    (match_dup 5))))]
+  "TARGET_SIMD"
+  {
+    int prec = GET_MODE_UNIT_PRECISION (<V2XWIDE>mode);
+    wide_int rnd_wi = wi::set_bit_in_zero (INTVAL (operands[2]) - 1, prec);
+    operands[3] = immed_wide_int_const (rnd_wi, GET_MODE_INNER (<V2XWIDE>mode));
+    operands[3] = gen_const_vec_duplicate (<V2XWIDE>mode, operands[3]);
+    operands[2] = gen_const_vec_duplicate (<MODE>mode, operands[2]);
+    operands[4] = CONST0_RTX (<V2XWIDE>mode);
+    operands[5]
+      = gen_int_mode (GET_MODE_MASK (GET_MODE_INNER (<VNARROWQ>mode)), DImode);
+    operands[5] = gen_const_vec_duplicate (<V2XWIDE>mode, operands[5]);
+  }
+)
+
+(define_insn "aarch64_<shrn_op><sra_op>shrn2_n<mode>_insn_le"
   [(set (match_operand:<VNARROWQ2> 0 "register_operand" "=w")
 	(vec_concat:<VNARROWQ2>
 	  (match_operand:<VNARROWQ> 1 "register_operand" "0")
-	  (unspec:<VNARROWQ> [(match_operand:VQN 2 "register_operand" "w")
-			      (match_operand:VQN 3
-				"aarch64_simd_shift_imm_vec_<vn_mode>")]
-			     VQSHRN_N)))]
-  "TARGET_SIMD && !BYTES_BIG_ENDIAN"
-  "<sur>q<r>shr<u>n2\\t%<vn2>0.<V2ntype>, %<v>2.<Vtype>, %3"
-  [(set_attr "type" "neon_sat_shift_imm_narrow_q")]
+	  (ALL_TRUNC:<VNARROWQ>
+	    (SHIFTRT:VQN
+	      (match_operand:VQN 2 "register_operand" "w")
+	      (match_operand:VQN 3 "aarch64_simd_shift_imm_vec_<vn_mode>")))))]
+  "TARGET_SIMD && !BYTES_BIG_ENDIAN
+   && AARCH64_VALID_SHRN_OP (<ALL_TRUNC:CODE>, <SHIFTRT:CODE>)"
+  "<shrn_op>shrn2\t%<vn2>0.<V2ntype>, %<v>2.<Vtype>, %3"
+  [(set_attr "type" "neon_shift_imm_narrow_q")]
 )
 
-(define_insn "aarch64_<sur>q<r>shr<u>n2_n<mode>_insn_be"
+(define_insn "aarch64_<shrn_op><sra_op>shrn2_n<mode>_insn_be"
   [(set (match_operand:<VNARROWQ2> 0 "register_operand" "=w")
 	(vec_concat:<VNARROWQ2>
-          (unspec:<VNARROWQ> [(match_operand:VQN 2 "register_operand" "w")
-			      (match_operand:VQN 3
-				"aarch64_simd_shift_imm_vec_<vn_mode>")]
-			     VQSHRN_N)
+	  (ALL_TRUNC:<VNARROWQ>
+	    (SHIFTRT:VQN
+	      (match_operand:VQN 2 "register_operand" "w")
+	      (match_operand:VQN 3 "aarch64_simd_shift_imm_vec_<vn_mode>")))
 	  (match_operand:<VNARROWQ> 1 "register_operand" "0")))]
-  "TARGET_SIMD && BYTES_BIG_ENDIAN"
-  "<sur>q<r>shr<u>n2\\t%<vn2>0.<V2ntype>, %<v>2.<Vtype>, %3"
-  [(set_attr "type" "neon_sat_shift_imm_narrow_q")]
+  "TARGET_SIMD && BYTES_BIG_ENDIAN
+   && AARCH64_VALID_SHRN_OP (<ALL_TRUNC:CODE>, <SHIFTRT:CODE>)"
+  "<shrn_op>shrn2\t%<vn2>0.<V2ntype>, %<v>2.<Vtype>, %3"
+  [(set_attr "type" "neon_shift_imm_narrow_q")]
 )
 
-(define_expand "aarch64_<sur>q<r>shr<u>n2_n<mode>"
+(define_expand "aarch64_<shrn_op><sra_op>shrn2_n<mode>"
   [(match_operand:<VNARROWQ2> 0 "register_operand")
    (match_operand:<VNARROWQ> 1 "register_operand")
-   (unspec:<VNARROWQ>
-	[(match_operand:VQN 2 "register_operand")
-	 (match_operand:SI 3 "aarch64_simd_shift_imm_offset_<vn_mode>")]
-        VQSHRN_N)]
-  "TARGET_SIMD"
+   (ALL_TRUNC:<VNARROWQ>
+     (SHIFTRT:VQN (match_operand:VQN 2 "register_operand")))
+   (match_operand:SI 3 "aarch64_simd_shift_imm_offset_<vn_mode>")]
+  "TARGET_SIMD && AARCH64_VALID_SHRN_OP (<ALL_TRUNC:CODE>, <SHIFTRT:CODE>)"
   {
     operands[3] = aarch64_simd_gen_const_vector_dup (<MODE>mode,
 						 INTVAL (operands[3]));
 
     if (BYTES_BIG_ENDIAN)
-      emit_insn (gen_aarch64_<sur>q<r>shr<u>n2_n<mode>_insn_be (operands[0],
-				operands[1], operands[2], operands[3]));
+      emit_insn (gen_aarch64_<shrn_op><sra_op>shrn2_n<mode>_insn_be (
+		operands[0], operands[1], operands[2], operands[3]));
     else
-      emit_insn (gen_aarch64_<sur>q<r>shr<u>n2_n<mode>_insn_le (operands[0],
-				operands[1], operands[2], operands[3]));
+      emit_insn (gen_aarch64_<shrn_op><sra_op>shrn2_n<mode>_insn_le (
+		operands[0], operands[1], operands[2], operands[3]));
     DONE;
   }
 )
 
+(define_insn "aarch64_<shrn_op>rshrn2_n<mode>_insn_le"
+  [(set (match_operand:<VNARROWQ2> 0 "register_operand" "=w")
+	(vec_concat:<VNARROWQ2>
+	  (match_operand:<VNARROWQ> 1 "register_operand" "0")
+	  (ALL_TRUNC:<VNARROWQ>
+	    (<TRUNC_SHIFT>:<V2XWIDE>
+	      (plus:<V2XWIDE>
+		(<TRUNCEXTEND>:<V2XWIDE>
+		  (match_operand:VQN 2 "register_operand" "w"))
+		(match_operand:<V2XWIDE> 4 "aarch64_int_rnd_operand"))
+	      (match_operand:VQN 3 "aarch64_simd_shift_imm_vec_<vn_mode>")))))]
+  "TARGET_SIMD && !BYTES_BIG_ENDIAN
+   && aarch64_const_vec_rnd_cst_p (operands[4], operands[3])"
+  "<shrn_op>rshrn2\t%<vn2>0.<V2ntype>, %<v>2.<Vtype>, %3"
+  [(set_attr "type" "neon_shift_imm_narrow_q")]
+)
+
+(define_insn "aarch64_<shrn_op>rshrn2_n<mode>_insn_be"
+  [(set (match_operand:<VNARROWQ2> 0 "register_operand" "=w")
+	(vec_concat:<VNARROWQ2>
+	  (ALL_TRUNC:<VNARROWQ>
+	    (<TRUNC_SHIFT>:<V2XWIDE>
+	      (plus:<V2XWIDE>
+		(<TRUNCEXTEND>:<V2XWIDE>
+		  (match_operand:VQN 2 "register_operand" "w"))
+		(match_operand:<V2XWIDE> 4 "aarch64_int_rnd_operand"))
+	      (match_operand:VQN 3 "aarch64_simd_shift_imm_vec_<vn_mode>")))
+	  (match_operand:<VNARROWQ> 1 "register_operand" "0")))]
+  "TARGET_SIMD && BYTES_BIG_ENDIAN
+   && aarch64_const_vec_rnd_cst_p (operands[4], operands[3])"
+  "<shrn_op>rshrn2\t%<vn2>0.<V2ntype>, %<v>2.<Vtype>, %3"
+  [(set_attr "type" "neon_shift_imm_narrow_q")]
+)
+
+(define_expand "aarch64_<shrn_op>rshrn2_n<mode>"
+  [(match_operand:<VNARROWQ2> 0 "register_operand")
+   (match_operand:<VNARROWQ> 1 "register_operand")
+   (ALL_TRUNC:<VNARROWQ> (match_operand:VQN 2 "register_operand"))
+   (match_operand:SI 3 "aarch64_simd_shift_imm_offset_<vn_mode>")]
+  "TARGET_SIMD"
+  {
+    if (<CODE> == TRUNCATE
+	&& INTVAL (operands[3]) == GET_MODE_UNIT_BITSIZE (<VNARROWQ>mode))
+      {
+	rtx tmp = aarch64_gen_shareable_zero (<MODE>mode);
+	emit_insn (gen_aarch64_raddhn2<mode> (operands[0], operands[1],
+					      operands[2], tmp));
+	DONE;
+      }
+    /* Use this expander to create the rounding constant vector, which is
+       1 << (shift - 1).  Use wide_int here to ensure that the right TImode
+       RTL is generated when handling the DImode expanders.  */
+    int prec = GET_MODE_UNIT_PRECISION (<V2XWIDE>mode);
+    wide_int rnd_wi = wi::set_bit_in_zero (INTVAL (operands[3]) - 1, prec);
+    rtx rnd = immed_wide_int_const (rnd_wi, GET_MODE_INNER (<V2XWIDE>mode));
+    rnd = gen_const_vec_duplicate (<V2XWIDE>mode, rnd);
+    operands[3] = gen_const_vec_duplicate (<MODE>mode, operands[3]);
+    if (BYTES_BIG_ENDIAN)
+      emit_insn (gen_aarch64_<shrn_op>rshrn2_n<mode>_insn_be (operands[0],
+							      operands[1],
+							      operands[2],
+							      operands[3],
+							      rnd));
+    else
+      emit_insn (gen_aarch64_<shrn_op>rshrn2_n<mode>_insn_le (operands[0],
+							      operands[1],
+							      operands[2],
+							      operands[3],
+							      rnd));
+    DONE;
+  }
+)
+
+(define_insn "aarch64_sqshrun2_n<mode>_insn_le"
+  [(set (match_operand:<VNARROWQ2> 0 "register_operand" "=w")
+	(vec_concat:<VNARROWQ2>
+	  (match_operand:<VNARROWQ> 1 "register_operand" "0")
+	  (truncate:<VNARROWQ>
+	    (smin:VQN
+	      (smax:VQN
+		(ashiftrt:VQN
+		  (match_operand:VQN 2 "register_operand" "w")
+		  (match_operand:VQN 3 "aarch64_simd_shift_imm_vec_<vn_mode>"))
+		(match_operand:VQN 4 "aarch64_simd_imm_zero"))
+	      (match_operand:VQN 5 "aarch64_simd_umax_half_mode")))))]
+  "TARGET_SIMD && !BYTES_BIG_ENDIAN"
+  "sqshrun2\t%<vn2>0.<V2ntype>, %<v>2.<Vtype>, %3"
+  [(set_attr "type" "neon_shift_imm_narrow_q")]
+)
+
+(define_insn "aarch64_sqshrun2_n<mode>_insn_be"
+  [(set (match_operand:<VNARROWQ2> 0 "register_operand" "=w")
+	(vec_concat:<VNARROWQ2>
+	  (truncate:<VNARROWQ>
+	    (smin:VQN
+	      (smax:VQN
+		(ashiftrt:VQN
+		  (match_operand:VQN 2 "register_operand" "w")
+		  (match_operand:VQN 3 "aarch64_simd_shift_imm_vec_<vn_mode>"))
+		(match_operand:VQN 4 "aarch64_simd_imm_zero"))
+	      (match_operand:VQN 5 "aarch64_simd_umax_half_mode")))
+	  (match_operand:<VNARROWQ> 1 "register_operand" "0")))]
+  "TARGET_SIMD && BYTES_BIG_ENDIAN"
+  "sqshrun2\t%<vn2>0.<V2ntype>, %<v>2.<Vtype>, %3"
+  [(set_attr "type" "neon_shift_imm_narrow_q")]
+)
+
+(define_expand "aarch64_sqshrun2_n<mode>"
+  [(match_operand:<VNARROWQ2> 0 "register_operand")
+   (match_operand:<VNARROWQ> 1 "register_operand")
+   (match_operand:VQN 2 "register_operand")
+   (match_operand:SI 3 "aarch64_simd_shift_imm_offset_<vn_mode>")]
+  "TARGET_SIMD"
+  {
+    operands[3] = aarch64_simd_gen_const_vector_dup (<MODE>mode,
+						 INTVAL (operands[3]));
+    rtx zeros = CONST0_RTX (<MODE>mode);
+    rtx half_umax
+      = aarch64_simd_gen_const_vector_dup (<MODE>mode,
+			GET_MODE_MASK (GET_MODE_INNER (<VNARROWQ>mode)));
+    if (BYTES_BIG_ENDIAN)
+      emit_insn (gen_aarch64_sqshrun2_n<mode>_insn_be (operands[0],
+				operands[1], operands[2], operands[3],
+				zeros, half_umax));
+    else
+      emit_insn (gen_aarch64_sqshrun2_n<mode>_insn_le (operands[0],
+				operands[1], operands[2], operands[3],
+				zeros, half_umax));
+    DONE;
+  }
+)
+
+(define_insn "aarch64_sqrshrun2_n<mode>_insn_le"
+  [(set (match_operand:<VNARROWQ2> 0 "register_operand" "=w")
+	(vec_concat:<VNARROWQ2>
+	  (match_operand:<VNARROWQ> 1 "register_operand" "0")
+	  (truncate:<VNARROWQ>
+	    (smin:<V2XWIDE>
+	      (smax:<V2XWIDE>
+		(ashiftrt:<V2XWIDE>
+		  (plus:<V2XWIDE>
+		    (sign_extend:<V2XWIDE>
+		      (match_operand:VQN 2 "register_operand" "w"))
+		    (match_operand:<V2XWIDE> 4 "aarch64_int_rnd_operand"))
+		  (match_operand:VQN 3 "aarch64_simd_shift_imm_vec_<vn_mode>"))
+		(match_operand:<V2XWIDE> 5 "aarch64_simd_imm_zero"))
+	      (match_operand:<V2XWIDE> 6 "aarch64_simd_umax_quarter_mode")))))]
+  "TARGET_SIMD && !BYTES_BIG_ENDIAN
+   && aarch64_const_vec_rnd_cst_p (operands[4], operands[3])"
+  "sqrshrun2\t%<vn2>0.<V2ntype>, %<v>2.<Vtype>, %3"
+  [(set_attr "type" "neon_shift_imm_narrow_q")]
+)
+
+(define_insn "aarch64_sqrshrun2_n<mode>_insn_be"
+  [(set (match_operand:<VNARROWQ2> 0 "register_operand" "=w")
+	(vec_concat:<VNARROWQ2>
+	  (truncate:<VNARROWQ>
+	    (smin:<V2XWIDE>
+	      (smax:<V2XWIDE>
+		(ashiftrt:<V2XWIDE>
+		  (plus:<V2XWIDE>
+		    (sign_extend:<V2XWIDE>
+		      (match_operand:VQN 2 "register_operand" "w"))
+		    (match_operand:<V2XWIDE> 4 "aarch64_int_rnd_operand"))
+		  (match_operand:VQN 3 "aarch64_simd_shift_imm_vec_<vn_mode>"))
+		(match_operand:<V2XWIDE> 5 "aarch64_simd_imm_zero"))
+	      (match_operand:<V2XWIDE> 6 "aarch64_simd_umax_quarter_mode")))
+	  (match_operand:<VNARROWQ> 1 "register_operand" "0")))]
+  "TARGET_SIMD && BYTES_BIG_ENDIAN
+   && aarch64_const_vec_rnd_cst_p (operands[4], operands[3])"
+  "sqrshrun2\t%<vn2>0.<V2ntype>, %<v>2.<Vtype>, %3"
+  [(set_attr "type" "neon_shift_imm_narrow_q")]
+)
+
+(define_expand "aarch64_sqrshrun2_n<mode>"
+  [(match_operand:<VNARROWQ2> 0 "register_operand")
+   (match_operand:<VNARROWQ> 1 "register_operand")
+   (match_operand:VQN 2 "register_operand")
+   (match_operand:SI 3 "aarch64_simd_shift_imm_offset_<vn_mode>")]
+  "TARGET_SIMD"
+  {
+    int prec = GET_MODE_UNIT_PRECISION (<V2XWIDE>mode);
+    wide_int rnd_wi = wi::set_bit_in_zero (INTVAL (operands[3]) - 1, prec);
+    rtx rnd = immed_wide_int_const (rnd_wi, GET_MODE_INNER (<V2XWIDE>mode));
+    rnd = gen_const_vec_duplicate (<V2XWIDE>mode, rnd);
+    rtx zero = CONST0_RTX (<V2XWIDE>mode);
+    rtx half_umax
+      = aarch64_simd_gen_const_vector_dup (<V2XWIDE>mode,
+			GET_MODE_MASK (GET_MODE_INNER (<VNARROWQ>mode)));
+    operands[3] = gen_const_vec_duplicate (<MODE>mode, operands[3]);
+    if (BYTES_BIG_ENDIAN)
+      emit_insn (gen_aarch64_sqrshrun2_n<mode>_insn_be (operands[0],
+				operands[1], operands[2], operands[3], rnd,
+				zero, half_umax));
+    else
+      emit_insn (gen_aarch64_sqrshrun2_n<mode>_insn_le (operands[0],
+				operands[1], operands[2], operands[3], rnd,
+				zero, half_umax));
+    DONE;
+  }
+)
 
 ;; cm(eq|ge|gt|lt|le)
 ;; Note, we have constraints for Dz and Z as different expanders
@@ -7093,6 +7347,36 @@
   "TARGET_SIMD && !rtx_equal_p (operands[3], operands[4])"
   "addp\t%<v>0<Vmtype>, %<v>1<Vmtype>, %<v>2<Vmtype>"
   [(set_attr "type" "neon_reduc_add<q>")]
+)
+
+;; A common usecase of 64-bit ADDP is to have both operands come from the same
+;; 128-bit vector and produce the pairwise addition results in the lower half.
+;; Split into the 128-bit ADDP form and extract the low half.
+(define_insn_and_split "*aarch64_addp_same_reg<mode>"
+  [(set (match_operand:<VHALF> 0 "register_operand" "=w")
+	(plus:<VHALF>
+	  (vec_select:<VHALF>
+	    (match_operand:VQ_I 1 "register_operand" "w")
+	    (match_operand:VQ_I 2 "vect_par_cnst_even_or_odd_half"))
+	  (vec_select:<VHALF>
+	    (match_dup 1)
+	    (match_operand:VQ_I 3 "vect_par_cnst_even_or_odd_half"))))]
+  "TARGET_SIMD && !rtx_equal_p (operands[2], operands[3])"
+  "#"
+  "&& 1"
+  [(const_int 0)]
+  {
+    rtx scratch;
+    if (can_create_pseudo_p ())
+      scratch = gen_reg_rtx (<MODE>mode);
+    else
+      scratch = lowpart_subreg (<MODE>mode, operands[0], <VHALF>mode);
+
+    emit_insn (gen_aarch64_addp<mode>_insn (scratch, operands[1], operands[1],
+					    operands[2], operands[3]));
+    emit_move_insn (operands[0], gen_lowpart (<VHALF>mode, scratch));
+    DONE;
+  }
 )
 
 (define_expand "aarch64_addp<mode>"
@@ -8433,8 +8717,8 @@
   "TARGET_SIMD"
 {
   int start = INTVAL (operands[2]);
-  if (start != 0 && start != <nunits> / 2)
-    FAIL;
+  gcc_assert (start == 0 || start == 1);
+  start *= <nunits> / 2;
   rtx sel = aarch64_gen_stepped_int_parallel (<nunits> / 2, start, 1);
   emit_insn (gen_aarch64_get_half<mode> (operands[0], operands[1], sel));
   DONE;

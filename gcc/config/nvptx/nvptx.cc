@@ -2202,7 +2202,7 @@ nvptx_gen_shared_bcast (rtx reg, propagate_mask pm, unsigned rep,
 /* Returns true if X is a valid address for use in a memory reference.  */
 
 static bool
-nvptx_legitimate_address_p (machine_mode, rtx x, bool)
+nvptx_legitimate_address_p (machine_mode, rtx x, bool, code_helper)
 {
   enum rtx_code code = GET_CODE (x);
 
@@ -7632,9 +7632,6 @@ nvptx_asm_output_def_from_decls (FILE *stream, tree name, tree value)
 
 #undef TARGET_ATTRIBUTE_TABLE
 #define TARGET_ATTRIBUTE_TABLE nvptx_attribute_table
-
-#undef TARGET_LRA_P
-#define TARGET_LRA_P hook_bool_void_false
 
 #undef TARGET_LEGITIMATE_ADDRESS_P
 #define TARGET_LEGITIMATE_ADDRESS_P nvptx_legitimate_address_p

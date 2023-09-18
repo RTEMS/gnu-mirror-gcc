@@ -350,37 +350,47 @@ range_op_handler::lhs_op2_relation (const vrange &lhs,
 // Dispatch a call to op1_op2_relation based on the type of LHS.
 
 relation_kind
-range_op_handler::op1_op2_relation (const vrange &lhs) const
+range_op_handler::op1_op2_relation (const vrange &lhs,
+				    const vrange &op1,
+				    const vrange &op2) const
 {
   gcc_checking_assert (m_operator);
-  switch (dispatch_kind (lhs, lhs, lhs))
+  switch (dispatch_kind (lhs, op1, op2))
     {
       case RO_III:
-	return m_operator->op1_op2_relation (as_a <irange> (lhs));
+	return m_operator->op1_op2_relation (as_a <irange> (lhs),
+					     as_a <irange> (op1),
+					     as_a <irange> (op2));
+
+      case RO_IFF:
+	return m_operator->op1_op2_relation (as_a <irange> (lhs),
+					     as_a <frange> (op1),
+					     as_a <frange> (op2));
 
       case RO_FFF:
-	return m_operator->op1_op2_relation (as_a <frange> (lhs));
+	return m_operator->op1_op2_relation (as_a <frange> (lhs),
+					     as_a <frange> (op1),
+					     as_a <frange> (op2));
 
       default:
 	return VREL_VARYING;
     }
 }
 
-
-// Convert irange bitmasks into a VALUE MASK pair suitable for calling CCP.
-
-static void
-irange_to_masked_value (const irange &r, widest_int &value, widest_int &mask)
+bool
+range_op_handler::overflow_free_p (const vrange &lh,
+				   const vrange &rh,
+				   relation_trio rel) const
 {
-  if (r.singleton_p ())
+  gcc_checking_assert (m_operator);
+  switch (dispatch_kind (lh, lh, rh))
     {
-      mask = 0;
-      value = widest_int::from (r.lower_bound (), TYPE_SIGN (r.type ()));
-    }
-  else
-    {
-      mask = widest_int::from (r.get_nonzero_bits (), TYPE_SIGN (r.type ()));
-      value = 0;
+      case RO_III:
+	return m_operator->overflow_free_p(as_a <irange> (lh),
+					   as_a <irange> (rh),
+					   rel);
+      default:
+	return false;
     }
 }
 
@@ -391,25 +401,47 @@ void
 update_known_bitmask (irange &r, tree_code code,
 		      const irange &lh, const irange &rh)
 {
-  if (r.undefined_p () || lh.undefined_p () || rh.undefined_p ())
+  if (r.undefined_p () || lh.undefined_p () || rh.undefined_p ()
+      || r.singleton_p ())
     return;
 
-  widest_int value, mask, lh_mask, rh_mask, lh_value, rh_value;
+  widest_int widest_value, widest_mask;
   tree type = r.type ();
   signop sign = TYPE_SIGN (type);
   int prec = TYPE_PRECISION (type);
-  signop lh_sign = TYPE_SIGN (lh.type ());
-  signop rh_sign = TYPE_SIGN (rh.type ());
-  int lh_prec = TYPE_PRECISION (lh.type ());
-  int rh_prec = TYPE_PRECISION (rh.type ());
+  irange_bitmask lh_bits = lh.get_bitmask ();
+  irange_bitmask rh_bits = rh.get_bitmask ();
 
-  irange_to_masked_value (lh, lh_value, lh_mask);
-  irange_to_masked_value (rh, rh_value, rh_mask);
-  bit_value_binop (code, sign, prec, &value, &mask,
-		   lh_sign, lh_prec, lh_value, lh_mask,
-		   rh_sign, rh_prec, rh_value, rh_mask);
-  wide_int tmp = wide_int::from (value | mask, prec, sign);
-  r.set_nonzero_bits (tmp);
+  switch (get_gimple_rhs_class (code))
+    {
+    case GIMPLE_UNARY_RHS:
+      bit_value_unop (code, sign, prec, &widest_value, &widest_mask,
+		      TYPE_SIGN (lh.type ()),
+		      TYPE_PRECISION (lh.type ()),
+		      widest_int::from (lh_bits.value (), sign),
+		      widest_int::from (lh_bits.mask (), sign));
+      break;
+    case GIMPLE_BINARY_RHS:
+      bit_value_binop (code, sign, prec, &widest_value, &widest_mask,
+		       TYPE_SIGN (lh.type ()),
+		       TYPE_PRECISION (lh.type ()),
+		       widest_int::from (lh_bits.value (), sign),
+		       widest_int::from (lh_bits.mask (), sign),
+		       TYPE_SIGN (rh.type ()),
+		       TYPE_PRECISION (rh.type ()),
+		       widest_int::from (rh_bits.value (), sign),
+		       widest_int::from (rh_bits.mask (), sign));
+      break;
+    default:
+      gcc_unreachable ();
+    }
+
+  wide_int mask = wide_int::from (widest_mask, prec, sign);
+  wide_int value = wide_int::from (widest_value, prec, sign);
+  // Bitmasks must have the unknown value bits cleared.
+  value &= ~mask;
+  irange_bitmask bm (value, mask);
+  r.update_bitmask (bm);
 }
 
 // Return the upper limit for a type.
@@ -671,7 +703,9 @@ range_operator::lhs_op2_relation (const irange &lhs ATTRIBUTE_UNUSED,
 }
 
 relation_kind
-range_operator::op1_op2_relation (const irange &lhs ATTRIBUTE_UNUSED) const
+range_operator::op1_op2_relation (const irange &lhs ATTRIBUTE_UNUSED,
+				  const irange &op1 ATTRIBUTE_UNUSED,
+				  const irange &op2 ATTRIBUTE_UNUSED) const
 {
   return VREL_VARYING;
 }
@@ -684,6 +718,13 @@ range_operator::op1_op2_relation_effect (irange &lhs_range ATTRIBUTE_UNUSED,
 				       const irange &op1_range ATTRIBUTE_UNUSED,
 				       const irange &op2_range ATTRIBUTE_UNUSED,
 				       relation_kind rel ATTRIBUTE_UNUSED) const
+{
+  return false;
+}
+
+bool
+range_operator::overflow_free_p (const irange &, const irange &,
+				 relation_trio) const
 {
   return false;
 }
@@ -863,7 +904,8 @@ operator_equal::update_bitmask (irange &r, const irange &lh,
 // Check if the LHS range indicates a relation between OP1 and OP2.
 
 relation_kind
-operator_equal::op1_op2_relation (const irange &lhs) const
+operator_equal::op1_op2_relation (const irange &lhs, const irange &,
+				  const irange &) const
 {
   if (lhs.undefined_p ())
     return VREL_UNDEFINED;
@@ -873,7 +915,7 @@ operator_equal::op1_op2_relation (const irange &lhs) const
     return VREL_NE;
 
   // TRUE = op1 == op2 indicates EQ_EXPR.
-  if (lhs.undefined_p () || !contains_zero_p (lhs))
+  if (!contains_zero_p (lhs))
     return VREL_EQ;
   return VREL_VARYING;
 }
@@ -964,7 +1006,8 @@ operator_not_equal::update_bitmask (irange &r, const irange &lh,
 // Check if the LHS range indicates a relation between OP1 and OP2.
 
 relation_kind
-operator_not_equal::op1_op2_relation (const irange &lhs) const
+operator_not_equal::op1_op2_relation (const irange &lhs, const irange &,
+				      const irange &) const
 {
   if (lhs.undefined_p ())
     return VREL_UNDEFINED;
@@ -974,7 +1017,7 @@ operator_not_equal::op1_op2_relation (const irange &lhs) const
     return VREL_EQ;
 
   // TRUE = op1 != op2  indicates NE_EXPR.
-  if (lhs.undefined_p () || !contains_zero_p (lhs))
+  if (!contains_zero_p (lhs))
     return VREL_NE;
   return VREL_VARYING;
 }
@@ -1124,7 +1167,8 @@ operator_lt::update_bitmask (irange &r, const irange &lh,
 // Check if the LHS range indicates a relation between OP1 and OP2.
 
 relation_kind
-operator_lt::op1_op2_relation (const irange &lhs) const
+operator_lt::op1_op2_relation (const irange &lhs, const irange &,
+			       const irange &) const
 {
   if (lhs.undefined_p ())
     return VREL_UNDEFINED;
@@ -1134,7 +1178,7 @@ operator_lt::op1_op2_relation (const irange &lhs) const
     return VREL_GE;
 
   // TRUE = op1 < op2 indicates LT_EXPR.
-  if (lhs.undefined_p () || !contains_zero_p (lhs))
+  if (!contains_zero_p (lhs))
     return VREL_LT;
   return VREL_VARYING;
 }
@@ -1224,7 +1268,8 @@ operator_le::update_bitmask (irange &r, const irange &lh,
 // Check if the LHS range indicates a relation between OP1 and OP2.
 
 relation_kind
-operator_le::op1_op2_relation (const irange &lhs) const
+operator_le::op1_op2_relation (const irange &lhs, const irange &,
+			       const irange &) const
 {
   if (lhs.undefined_p ())
     return VREL_UNDEFINED;
@@ -1234,7 +1279,7 @@ operator_le::op1_op2_relation (const irange &lhs) const
     return VREL_GT;
 
   // TRUE = op1 <= op2 indicates LE_EXPR.
-  if (lhs.undefined_p () || !contains_zero_p (lhs))
+  if (!contains_zero_p (lhs))
     return VREL_LE;
   return VREL_VARYING;
 }
@@ -1321,7 +1366,8 @@ operator_gt::update_bitmask (irange &r, const irange &lh,
 // Check if the LHS range indicates a relation between OP1 and OP2.
 
 relation_kind
-operator_gt::op1_op2_relation (const irange &lhs) const
+operator_gt::op1_op2_relation (const irange &lhs, const irange &,
+			       const irange &) const
 {
   if (lhs.undefined_p ())
     return VREL_UNDEFINED;
@@ -1416,7 +1462,8 @@ operator_ge::update_bitmask (irange &r, const irange &lh,
 // Check if the LHS range indicates a relation between OP1 and OP2.
 
 relation_kind
-operator_ge::op1_op2_relation (const irange &lhs) const
+operator_ge::op1_op2_relation (const irange &lhs, const irange &,
+			       const irange &) const
 {
   if (lhs.undefined_p ())
     return VREL_UNDEFINED;
@@ -2389,22 +2436,21 @@ class operator_lshift : public cross_product_operator
   using range_operator::fold_range;
   using range_operator::op1_range;
 public:
-  virtual bool op1_range (irange &r, tree type,
-			  const irange &lhs,
-			  const irange &op2,
-			  relation_trio rel = TRIO_VARYING) const;
-  virtual bool fold_range (irange &r, tree type,
-			   const irange &op1,
-			   const irange &op2,
-			   relation_trio rel = TRIO_VARYING) const;
+  virtual bool op1_range (irange &r, tree type, const irange &lhs,
+			  const irange &op2, relation_trio rel = TRIO_VARYING)
+    const final override;
+  virtual bool fold_range (irange &r, tree type, const irange &op1,
+			   const irange &op2, relation_trio rel = TRIO_VARYING)
+    const final override;
 
   virtual void wi_fold (irange &r, tree type,
 			const wide_int &lh_lb, const wide_int &lh_ub,
-			const wide_int &rh_lb, const wide_int &rh_ub) const;
+			const wide_int &rh_lb,
+			const wide_int &rh_ub) const final override;
   virtual bool wi_op_overflows (wide_int &res,
 				tree type,
 				const wide_int &,
-				const wide_int &) const;
+				const wide_int &) const final override;
   void update_bitmask (irange &r, const irange &lh,
 		       const irange &rh) const final override
     { update_known_bitmask (r, LSHIFT_EXPR, lh, rh); }
@@ -2416,27 +2462,24 @@ class operator_rshift : public cross_product_operator
   using range_operator::op1_range;
   using range_operator::lhs_op1_relation;
 public:
-  virtual bool fold_range (irange &r, tree type,
-			   const irange &op1,
-			   const irange &op2,
-			   relation_trio rel = TRIO_VARYING) const;
+  virtual bool fold_range (irange &r, tree type, const irange &op1,
+			   const irange &op2, relation_trio rel = TRIO_VARYING)
+   const final override;
   virtual void wi_fold (irange &r, tree type,
 			const wide_int &lh_lb,
 			const wide_int &lh_ub,
 			const wide_int &rh_lb,
-			const wide_int &rh_ub) const;
+			const wide_int &rh_ub) const final override;
   virtual bool wi_op_overflows (wide_int &res,
 				tree type,
 				const wide_int &w0,
-				const wide_int &w1) const;
-  virtual bool op1_range (irange &, tree type,
-			  const irange &lhs,
-			  const irange &op2,
-			  relation_trio rel = TRIO_VARYING) const;
-  virtual relation_kind lhs_op1_relation (const irange &lhs,
-					   const irange &op1,
-					   const irange &op2,
-					   relation_kind rel) const;
+				const wide_int &w1) const final override;
+  virtual bool op1_range (irange &, tree type, const irange &lhs,
+			  const irange &op2, relation_trio rel = TRIO_VARYING)
+    const final override;
+  virtual relation_kind lhs_op1_relation (const irange &lhs, const irange &op1,
+					  const irange &op2, relation_kind rel)
+    const final override;
   void update_bitmask (irange &r, const irange &lh,
 		       const irange &rh) const final override
     { update_known_bitmask (r, RSHIFT_EXPR, lh, rh); }
@@ -2876,18 +2919,15 @@ operator_cast::fold_range (irange &r, tree type ATTRIBUTE_UNUSED,
 	return true;
     }
 
-  // Update the nonzero mask.  Truncating casts are problematic unless
-  // the conversion fits in the resulting outer type.
-  wide_int nz = inner.get_nonzero_bits ();
-  if (truncating_cast_p (inner, outer)
-      && wi::rshift (nz, wi::uhwi (TYPE_PRECISION (outer.type ()),
-				   TYPE_PRECISION (inner.type ())),
-		     TYPE_SIGN (inner.type ())) != 0)
-    return true;
-  nz = wide_int::from (nz, TYPE_PRECISION (type), TYPE_SIGN (inner.type ()));
-  r.set_nonzero_bits (nz);
-
+  update_bitmask (r, inner, outer);
   return true;
+}
+
+void
+operator_cast::update_bitmask (irange &r, const irange &lh,
+			       const irange &rh) const
+{
+  update_known_bitmask (r, CONVERT_EXPR, lh, rh);
 }
 
 bool
@@ -2917,7 +2957,7 @@ operator_cast::op1_range (irange &r, tree type,
 	{
 	  // If the LHS is not a pointer nor a singleton, then it is
 	  // either VARYING or non-zero.
-	  if (!contains_zero_p (lhs))
+	  if (!lhs.undefined_p () && !contains_zero_p (lhs))
 	    r.set_nonzero (type);
 	  else
 	    r.set_varying (type);
@@ -3328,10 +3368,10 @@ operator_bitwise_and::wi_fold (irange &r, tree type,
 static void
 set_nonzero_range_from_mask (irange &r, tree type, const irange &lhs)
 {
-  if (!contains_zero_p (lhs))
-    r = range_nonzero (type);
-  else
+  if (lhs.undefined_p () || contains_zero_p (lhs))
     r.set_varying (type);
+  else
+    r.set_nonzero (type);
 }
 
 /* Find out smallest RES where RES > VAL && (RES & MASK) == RES, if any
@@ -3467,6 +3507,14 @@ operator_bitwise_and::op1_range (irange &r, tree type,
     }
   if (r.undefined_p ())
     set_nonzero_range_from_mask (r, type, lhs);
+
+  // For MASK == op1 & MASK, all the bits in MASK must be set in op1.
+  wide_int mask;
+  if (lhs == op2 && lhs.singleton_p (mask))
+    {
+      r.update_bitmask (irange_bitmask (mask, ~mask));
+      return true;
+    }
 
   // For 0 = op1 & MASK, op1 is ~MASK.
   if (lhs.zero_p () && op2.singleton_p ())
@@ -3750,7 +3798,7 @@ operator_bitwise_xor::op1_range (irange &r, tree type,
 	  else if (op2.zero_p ())
 	    r = range_true (type);
 	  // See get_bool_state for the rationale
-	  else if (contains_zero_p (op2))
+	  else if (op2.undefined_p () || contains_zero_p (op2))
 	    r = range_true_and_false (type);
 	  else
 	    r = range_false (type);
@@ -4010,6 +4058,13 @@ operator_bitwise_not::op1_range (irange &r, tree type,
   return fold_range (r, type, lhs, op2);
 }
 
+void
+operator_bitwise_not::update_bitmask (irange &r, const irange &lh,
+				      const irange &rh) const
+{
+  update_known_bitmask (r, BIT_NOT_EXPR, lh, rh);
+}
+
 
 bool
 operator_cst::fold_range (irange &r, tree type ATTRIBUTE_UNUSED,
@@ -4184,6 +4239,12 @@ operator_abs::op1_range (irange &r, tree type,
   return true;
 }
 
+void
+operator_abs::update_bitmask (irange &r, const irange &lh,
+			      const irange &rh) const
+{
+  update_known_bitmask (r, ABS_EXPR, lh, rh);
+}
 
 class operator_absu : public range_operator
 {
@@ -4191,6 +4252,8 @@ class operator_absu : public range_operator
   virtual void wi_fold (irange &r, tree type,
 			const wide_int &lh_lb, const wide_int &lh_ub,
 			const wide_int &rh_lb, const wide_int &rh_ub) const;
+  virtual void update_bitmask (irange &r, const irange &lh,
+			       const irange &rh) const final override;
 } op_absu;
 
 void
@@ -4226,6 +4289,13 @@ operator_absu::wi_fold (irange &r, tree type,
 
   gcc_checking_assert (TYPE_UNSIGNED (type));
   r = int_range<1> (type, new_lb, new_ub);
+}
+
+void
+operator_absu::update_bitmask (irange &r, const irange &lh,
+			      const irange &rh) const
+{
+  update_known_bitmask (r, ABSU_EXPR, lh, rh);
 }
 
 
@@ -4265,10 +4335,10 @@ operator_addr_expr::fold_range (irange &r, tree type,
   // Return a non-null pointer of the LHS type (passed in op2).
   if (lh.zero_p ())
     r = range_zero (type);
-  else if (!contains_zero_p (lh))
-    r = range_nonzero (type);
-  else
+  else if (lh.undefined_p () || contains_zero_p (lh))
     r.set_varying (type);
+  else
+    r.set_nonzero (type);
   return true;
 }
 
@@ -4278,7 +4348,17 @@ operator_addr_expr::op1_range (irange &r, tree type,
 			       const irange &op2,
 			       relation_trio) const
 {
-  return operator_addr_expr::fold_range (r, type, lhs, op2);
+  if (empty_range_varying (r, type, lhs, op2))
+    return true;
+
+  // Return a non-null pointer of the LHS type (passed in op2), but only
+  // if we cant overflow, eitherwise a no-zero offset could wrap to zero.
+  // See PR 111009.
+  if (!lhs.undefined_p () && !contains_zero_p (lhs) && TYPE_OVERFLOW_UNDEFINED (type))
+    r.set_nonzero (type);
+  else
+    r.set_varying (type);
+  return true;
 }
 
 // Initialize any integral operators to the primary table
@@ -4305,6 +4385,107 @@ range_op_table::initialize_integral_ops ()
   set (OP_WIDEN_PLUS_SIGNED, op_widen_plus_signed);
   set (OP_WIDEN_PLUS_UNSIGNED, op_widen_plus_unsigned);
 
+}
+
+bool
+operator_plus::overflow_free_p (const irange &lh, const irange &rh,
+				relation_trio) const
+{
+  if (lh.undefined_p () || rh.undefined_p ())
+    return false;
+
+  tree type = lh.type ();
+  if (TYPE_OVERFLOW_UNDEFINED (type))
+    return true;
+
+  wi::overflow_type ovf;
+  signop sgn = TYPE_SIGN (type);
+  wide_int wmax0 = lh.upper_bound ();
+  wide_int wmax1 = rh.upper_bound ();
+  wi::add (wmax0, wmax1, sgn, &ovf);
+  if (ovf != wi::OVF_NONE)
+    return false;
+
+  if (TYPE_UNSIGNED (type))
+    return true;
+
+  wide_int wmin0 = lh.lower_bound ();
+  wide_int wmin1 = rh.lower_bound ();
+  wi::add (wmin0, wmin1, sgn, &ovf);
+  if (ovf != wi::OVF_NONE)
+    return false;
+
+  return true;
+}
+
+bool
+operator_minus::overflow_free_p (const irange &lh, const irange &rh,
+				 relation_trio) const
+{
+  if (lh.undefined_p () || rh.undefined_p ())
+    return false;
+
+  tree type = lh.type ();
+  if (TYPE_OVERFLOW_UNDEFINED (type))
+    return true;
+
+  wi::overflow_type ovf;
+  signop sgn = TYPE_SIGN (type);
+  wide_int wmin0 = lh.lower_bound ();
+  wide_int wmax1 = rh.upper_bound ();
+  wi::sub (wmin0, wmax1, sgn, &ovf);
+  if (ovf != wi::OVF_NONE)
+    return false;
+
+  if (TYPE_UNSIGNED (type))
+    return true;
+
+  wide_int wmax0 = lh.upper_bound ();
+  wide_int wmin1 = rh.lower_bound ();
+  wi::sub (wmax0, wmin1, sgn, &ovf);
+  if (ovf != wi::OVF_NONE)
+    return false;
+
+  return true;
+}
+
+bool
+operator_mult::overflow_free_p (const irange &lh, const irange &rh,
+				relation_trio) const
+{
+  if (lh.undefined_p () || rh.undefined_p ())
+    return false;
+
+  tree type = lh.type ();
+  if (TYPE_OVERFLOW_UNDEFINED (type))
+    return true;
+
+  wi::overflow_type ovf;
+  signop sgn = TYPE_SIGN (type);
+  wide_int wmax0 = lh.upper_bound ();
+  wide_int wmax1 = rh.upper_bound ();
+  wi::mul (wmax0, wmax1, sgn, &ovf);
+  if (ovf != wi::OVF_NONE)
+    return false;
+
+  if (TYPE_UNSIGNED (type))
+    return true;
+
+  wide_int wmin0 = lh.lower_bound ();
+  wide_int wmin1 = rh.lower_bound ();
+  wi::mul (wmin0, wmin1, sgn, &ovf);
+  if (ovf != wi::OVF_NONE)
+    return false;
+
+  wi::mul (wmin0, wmax1, sgn, &ovf);
+  if (ovf != wi::OVF_NONE)
+    return false;
+
+  wi::mul (wmax0, wmin1, sgn, &ovf);
+  if (ovf != wi::OVF_NONE)
+    return false;
+
+  return true;
 }
 
 #if CHECKING_P

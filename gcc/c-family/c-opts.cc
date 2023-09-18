@@ -111,6 +111,7 @@ static void set_std_cxx14 (int);
 static void set_std_cxx17 (int);
 static void set_std_cxx20 (int);
 static void set_std_cxx23 (int);
+static void set_std_cxx26 (int);
 static void set_std_c89 (int, int);
 static void set_std_c99 (int);
 static void set_std_c11 (int);
@@ -663,6 +664,12 @@ c_common_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
 	set_std_cxx23 (code == OPT_std_c__23 /* ISO */);
       break;
 
+    case OPT_std_c__26:
+    case OPT_std_gnu__26:
+      if (!preprocessing_asm_p)
+	set_std_cxx26 (code == OPT_std_c__26 /* ISO */);
+      break;
+
     case OPT_std_c90:
     case OPT_std_iso9899_199409:
       if (!preprocessing_asm_p)
@@ -967,7 +974,7 @@ c_common_post_options (const char **pfilename)
 
   /* Change flag_abi_version to be the actual current ABI level, for the
      benefit of c_cpp_builtins, and to make comparison simpler.  */
-  const int latest_abi_version = 18;
+  const int latest_abi_version = 19;
   /* Generate compatibility aliases for ABI v13 (8.2) by default.  */
   const int abi_compat_default = 13;
 
@@ -1032,7 +1039,8 @@ c_common_post_options (const char **pfilename)
 	warn_narrowing = 1;
 
       /* Unless -f{,no-}ext-numeric-literals has been used explicitly,
-	 for -std=c++{11,14,17,20,23} default to -fno-ext-numeric-literals.  */
+	 for -std=c++{11,14,17,20,23,26} default to
+	 -fno-ext-numeric-literals.  */
       if (flag_iso && !OPTION_SET_P (flag_ext_numeric_literals))
 	cpp_opts->ext_numeric_literals = 0;
     }
@@ -1224,6 +1232,7 @@ c_common_init (void)
   if (flag_preprocess_only)
     {
       c_finish_options ();
+      c_init_preprocess ();
       preprocess_file (parse_in);
       return false;
     }
@@ -1818,6 +1827,24 @@ set_std_cxx23 (int iso)
   flag_coroutines = true;
   cxx_dialect = cxx23;
   lang_hooks.name = "GNU C++23";
+}
+
+/* Set the C++ 2026 standard (without GNU extensions if ISO).  */
+static void
+set_std_cxx26 (int iso)
+{
+  cpp_set_lang (parse_in, iso ? CLK_CXX26: CLK_GNUCXX26);
+  flag_no_gnu_keywords = iso;
+  flag_no_nonansi_builtin = iso;
+  flag_iso = iso;
+  /* C++26 includes the C11 standard library.  */
+  flag_isoc94 = 1;
+  flag_isoc99 = 1;
+  flag_isoc11 = 1;
+  /* C++26 includes coroutines.  */
+  flag_coroutines = true;
+  cxx_dialect = cxx26;
+  lang_hooks.name = "GNU C++26";
 }
 
 /* Args to -d specify what to dump.  Silently ignore

@@ -55,6 +55,7 @@ MAKEOVERRIDES =
 # -------------------------------
 
 build=@build@
+build_os=@build_os@
 host=@host@
 host_noncanonical=@host_noncanonical@
 host_os=@host_os@
@@ -157,6 +158,9 @@ LDFLAGS = @LDFLAGS@
 
 # Should we build position-independent host code?
 PICFLAG = @PICFLAG@
+
+# The linker flag for the above.
+LD_PICFLAG = @LD_PICFLAG@
 
 # Flags to determine code coverage. When coverage is disabled, this will
 # contain the optimization flags, as you normally want code coverage
@@ -283,19 +287,19 @@ LINKER = $(CC)
 LINKER_FLAGS = $(CFLAGS)
 endif
 
+enable_host_pie = @enable_host_pie@
+
 # Enable Intel CET on Intel CET enabled host if needed.
 CET_HOST_FLAGS = @CET_HOST_FLAGS@
 COMPILER += $(CET_HOST_FLAGS)
 
-NO_PIE_CFLAGS = @NO_PIE_CFLAGS@
-NO_PIE_FLAG = @NO_PIE_FLAG@
 DO_LINK_MUTEX = @DO_LINK_MUTEX@
 
-# We don't want to compile the compilers with -fPIE, it make PCH fail.
-COMPILER += $(NO_PIE_CFLAGS)
+# Maybe compile the compilers with -fPIE or -fPIC.
+COMPILER += $(PICFLAG)
 
-# Link with -no-pie since we compile the compiler with -fno-PIE.
-LINKER += $(NO_PIE_FLAG)
+# Link with -pie, or -no-pie, depending on the above.
+LINKER += $(LD_PICFLAG)
 
 # Like LINKER, but use a mutex for serializing front end links.
 ifeq (@DO_LINK_MUTEX@,true)
@@ -466,6 +470,7 @@ USER_H = $(srcdir)/ginclude/float.h \
 	 $(srcdir)/ginclude/stdnoreturn.h \
 	 $(srcdir)/ginclude/stdalign.h \
 	 $(srcdir)/ginclude/stdatomic.h \
+	 $(srcdir)/ginclude/stdckdint.h \
 	 $(EXTRA_HEADERS)
 
 USER_H_INC_NEXT_PRE = @user_headers_inc_next_pre@
@@ -890,7 +895,8 @@ OPTIONS_C_EXTRA = $(PRETTY_PRINT_H)
 BCONFIG_H = bconfig.h $(build_xm_file_list)
 CONFIG_H  = config.h  $(host_xm_file_list)
 TCONFIG_H = tconfig.h $(xm_file_list)
-TM_P_H    = tm_p.h    $(tm_p_file_list)
+# Some $(target)-protos.h depends on tree.h
+TM_P_H    = tm_p.h    $(tm_p_file_list) $(TREE_H)
 TM_D_H    = tm_d.h    $(tm_d_file_list)
 GTM_H     = tm.h      $(tm_file_list) insn-constants.h
 TM_H      = $(GTM_H) insn-flags.h $(OPTIONS_H)
@@ -973,7 +979,7 @@ READ_MD_H = $(OBSTACK_H) $(HASHTAB_H) read-md.h
 BUILTINS_DEF = builtins.def sync-builtins.def omp-builtins.def \
 	gtm-builtins.def sanitizer.def
 INTERNAL_FN_DEF = internal-fn.def
-INTERNAL_FN_H = internal-fn.h $(INTERNAL_FN_DEF)
+INTERNAL_FN_H = internal-fn.h $(INTERNAL_FN_DEF) insn-opinit.h
 TREE_CORE_H = tree-core.h $(CORETYPES_H) all-tree.def tree.def \
 	c-family/c-common.def $(lang_tree_files) \
 	$(BUILTINS_DEF) $(INPUT_H) statistics.h \
@@ -988,7 +994,7 @@ GIMPLE_H = gimple.h gimple.def gsstruct.def $(VEC_H) \
 	$(GGC_H) $(BASIC_BLOCK_H) $(TREE_H) tree-ssa-operands.h \
 	tree-ssa-alias.h $(INTERNAL_FN_H) $(HASH_TABLE_H) is-a.h
 GCOV_IO_H = gcov-io.h version.h auto-host.h gcov-counter.def
-RECOG_H = recog.h
+RECOG_H = recog.h $(TREE_H)
 EMIT_RTL_H = emit-rtl.h
 FLAGS_H = flags.h flag-types.h $(OPTIONS_H)
 OPTIONS_H = options.h flag-types.h $(OPTIONS_H_EXTRA)
@@ -1067,7 +1073,7 @@ RTL_SSA_H = $(PRETTY_PRINT_H) insn-config.h splay-tree-utils.h \
 # programs built during a bootstrap.
 # autoconf inserts -DCROSS_DIRECTORY_STRUCTURE if we are building a
 # cross compiler which does not use the native headers and libraries.
-INTERNAL_CFLAGS = -DIN_GCC $(PICFLAG) @CROSS@
+INTERNAL_CFLAGS = -DIN_GCC @CROSS@
 
 # This is the variable actually used when we compile. If you change this,
 # you probably want to update BUILD_CFLAGS in configure.ac
@@ -1085,21 +1091,24 @@ ALL_CXXFLAGS = $(T_CFLAGS) $(CFLAGS-$@) $(CXXFLAGS) $(INTERNAL_CFLAGS) \
 ALL_CPPFLAGS = $(INCLUDES) $(CPPFLAGS)
 
 # This is the variable to use when using $(COMPILER).
-ALL_COMPILERFLAGS = $(ALL_CXXFLAGS)
+ALL_COMPILERFLAGS = $(ALL_CXXFLAGS) $(PICFLAG)
 
 # This is the variable to use when using $(LINKER).
-ALL_LINKERFLAGS = $(ALL_CXXFLAGS)
+ALL_LINKERFLAGS = $(ALL_CXXFLAGS) $(LD_PICFLAG)
 
 # Build and host support libraries.
 
-# Use the "pic" build of libiberty if --enable-host-shared, unless we are
-# building for mingw.
+# Use the "pic" build of libiberty if --enable-host-shared or --enable-host-pie,
+# unless we are building for mingw.
 LIBIBERTY_PICDIR=$(if $(findstring mingw,$(target)),,pic)
-ifeq ($(enable_host_shared),yes)
+ifneq ($(enable_host_shared)$(enable_host_pie),)
 LIBIBERTY = ../libiberty/$(LIBIBERTY_PICDIR)/libiberty.a
-BUILD_LIBIBERTY = $(build_libobjdir)/libiberty/$(LIBIBERTY_PICDIR)/libiberty.a
 else
 LIBIBERTY = ../libiberty/libiberty.a
+endif
+ifeq ($(enable_host_shared),yes)
+BUILD_LIBIBERTY = $(build_libobjdir)/libiberty/$(LIBIBERTY_PICDIR)/libiberty.a
+else
 BUILD_LIBIBERTY = $(build_libobjdir)/libiberty/libiberty.a
 endif
 
@@ -1275,6 +1284,7 @@ C_COMMON_OBJS = c-family/c-common.o c-family/c-cppbuiltin.o c-family/c-dump.o \
 
 # Analyzer object files
 ANALYZER_OBJS = \
+	analyzer/access-diagram.o \
 	analyzer/analysis-plan.o \
 	analyzer/analyzer.o \
 	analyzer/analyzer-language.o \
@@ -1303,6 +1313,7 @@ ANALYZER_OBJS = \
 	analyzer/pending-diagnostic.o \
 	analyzer/program-point.o \
 	analyzer/program-state.o \
+	analyzer/ranges.o \
 	analyzer/region.o \
 	analyzer/region-model.o \
 	analyzer/region-model-asm.o \
@@ -1320,6 +1331,7 @@ ANALYZER_OBJS = \
 	analyzer/store.o \
 	analyzer/supergraph.o \
 	analyzer/svalue.o \
+	analyzer/symbol.o \
 	analyzer/trimmed-graph.o \
 	analyzer/varargs.o
 
@@ -1445,6 +1457,7 @@ OBJS = \
 	gimple-loop-jam.o \
 	gimple-loop-versioning.o \
 	gimple-low.o \
+	gimple-lower-bitint.o \
 	gimple-predicate-analysis.o \
 	gimple-pretty-print.o \
 	gimple-range.o \
@@ -1782,7 +1795,16 @@ OBJS-libcommon = diagnostic-spec.o diagnostic.o diagnostic-color.o \
 	json.o \
 	sbitmap.o \
 	vec.o input.o hash-table.o ggc-none.o memory-block.o \
-	selftest.o selftest-diagnostic.o sort.o
+	selftest.o selftest-diagnostic.o sort.o \
+	text-art/box-drawing.o \
+	text-art/canvas.o \
+	text-art/ruler.o \
+	text-art/selftests.o \
+	text-art/style.o \
+	text-art/styled-string.o \
+	text-art/table.o \
+	text-art/theme.o \
+	text-art/widget.o
 
 # Objects in libcommon-target.a, used by drivers and by the core
 # compiler and containing target-dependent code.
@@ -2987,8 +3009,8 @@ build/genhooks.o : genhooks.cc $(TARGET_DEF) $(C_TARGET_DEF)		\
   $(COMMON_TARGET_DEF) $(D_TARGET_DEF) $(BCONFIG_H) $(SYSTEM_H) errors.h
 build/genmddump.o : genmddump.cc $(RTL_BASE_H) $(BCONFIG_H) $(SYSTEM_H)	\
   $(CORETYPES_H) $(GTM_H) errors.h $(READ_MD_H) $(GENSUPPORT_H)
-build/genmatch.o : genmatch.cc $(BCONFIG_H) $(SYSTEM_H) \
-  $(CORETYPES_H) errors.h $(HASH_TABLE_H) hash-map.h $(GGC_H) is-a.h \
+build/genmatch.o : genmatch.cc $(BCONFIG_H) $(SYSTEM_H) $(CORETYPES_H) \
+  errors.h $(HASH_TABLE_H) hash-map.h $(GGC_H) is-a.h ordered-hash-map.h \
   tree.def builtins.def internal-fn.def case-cfn-macros.h $(CPPLIB_H)
 build/gencfn-macros.o : gencfn-macros.cc $(BCONFIG_H) $(SYSTEM_H)	\
   $(CORETYPES_H) errors.h $(HASH_TABLE_H) hash-set.h builtins.def	\
@@ -3314,8 +3336,13 @@ stmp-fixinc: gsyslimits.h macro_list fixinc_list \
 	    multi_dir=`echo $${ml} | sed -e 's/^[^;]*;//'`; \
 	    fix_dir=include-fixed$${multi_dir}; \
 	    if ! $(inhibit_libc) && test ! -d ${BUILD_SYSTEM_HEADER_DIR}; then \
-	      echo The directory that should contain system headers does not exist: >&2 ; \
+	      echo "The directory (BUILD_SYSTEM_HEADER_DIR) that should contain system headers does not exist:" >&2 ; \
 	      echo "  ${BUILD_SYSTEM_HEADER_DIR}" >&2 ; \
+	      case ${build_os} in \
+	        darwin*) \
+	          echo "(on Darwin this usually means you need to pass the --with-sysroot= flag to point to a valid MacOS SDK)" >&2; \
+	          ;; \
+	      esac; \
 	      tooldir_sysinc=`echo "${gcc_tooldir}/sys-include" | sed -e :a -e "s,[^/]*/\.\.\/,," -e ta`; \
 	      if test "x${BUILD_SYSTEM_HEADER_DIR}" = "x$${tooldir_sysinc}"; \
 	      then sleep 1; else exit 1; fi; \
