@@ -221,3 +221,5 @@ FAIL: gcc.target/i386/avx2-vpackssdw-2.c execution test
 FAIL: gcc.target/i386/avx2-vpackusdw-2.c execution test
 FAIL: gcc.target/i386/avx2-vpackuswb-2.c execution test
 FAIL: gcc.target/i386/sse2-packuswb-1.c execution test
+FAIL: gcc.target/i386/pr43644-2.c scan-assembler-times movq 1
+FAIL: gcc.target/i386/pr82580.c scan-assembler-not \\mmovzb
