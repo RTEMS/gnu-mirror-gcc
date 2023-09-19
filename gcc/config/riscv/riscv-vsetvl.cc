@@ -649,6 +649,8 @@ emit_vsetvl_insn (enum vsetvl_type insn_type, enum emit_type emit_type,
     {
       fprintf (dump_file, "\nInsert vsetvl insn PATTERN:\n");
       print_rtl_single (dump_file, pat);
+      fprintf (dump_file, "\nfor insn:\n");
+      print_rtl_single (dump_file, rinsn);
     }
 
   if (emit_type == EMIT_DIRECT)
@@ -1304,6 +1306,14 @@ vlmul_for_first_sew_second_ratio (const vector_insn_info &info1,
 				  const vector_insn_info &info2)
 {
   return calculate_vlmul (info1.get_sew (), info2.get_ratio ());
+}
+
+static vlmul_type
+vlmul_for_greatest_sew_second_ratio (const vector_insn_info &info1,
+				     const vector_insn_info &info2)
+{
+  return calculate_vlmul (MAX (info1.get_sew (), info2.get_sew ()),
+			  info2.get_ratio ());
 }
 
 static unsigned
@@ -3867,7 +3877,7 @@ pass_vsetvl::local_eliminate_vsetvl_insn (const bb_info *bb) const
 	      skip_one = true;
 	    }
 
-	  curr_avl = get_avl (rinsn);
+	  curr_avl = curr_dem.get_avl ();
 
 	  /* Some instrucion like pred_extract_first<mode> don't reqruie avl, so
 	     the avl is null, use vl_placeholder for unify the handling

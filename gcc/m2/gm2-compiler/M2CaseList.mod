@@ -32,18 +32,19 @@ FROM Indexing IMPORT Index, InitIndex, PutIndice, GetIndice, ForeachIndiceInInde
 FROM Lists IMPORT InitList, IncludeItemIntoList, RemoveItemFromList, NoOfItemsInList, GetItemFromList ;
 FROM NameKey IMPORT KeyToCharStar ;
 FROM SymbolConversion IMPORT GccKnowsAbout, Mod2Gcc, AddModGcc ;
-FROM DynamicStrings IMPORT InitString, InitStringCharStar, ConCat, Mark, KillString ;
+FROM DynamicStrings IMPORT InitString, InitStringCharStar, InitStringChar, ConCat, Mark, KillString ;
 FROM m2tree IMPORT Tree ;
 FROM m2block IMPORT RememberType ;
 FROM m2type IMPORT GetMinFrom ;
-FROM m2expr IMPORT GetIntegerOne ;
+FROM m2expr IMPORT GetIntegerOne, CSTIntToString, CSTIntToChar ;
 FROM Storage IMPORT ALLOCATE ;
-FROM M2Base IMPORT IsExpressionCompatible ;
+FROM M2Base IMPORT IsExpressionCompatible, Char ;
 FROM M2Printf IMPORT printf1 ;
 FROM M2LexBuf IMPORT TokenToLocation ;
 
 FROM SymbolTable IMPORT NulSym, IsConst, IsFieldVarient, IsRecord, IsRecordField, GetVarientTag, GetType,
-                        ForeachLocalSymDo, GetSymName, IsEnumeration, SkipType, NoOfElements, GetNth ;
+                        ForeachLocalSymDo, GetSymName, IsEnumeration, SkipType, NoOfElements, GetNth,
+                        IsSubrange ;
 
 TYPE
    RangePair = POINTER TO RECORD
@@ -510,7 +511,7 @@ END OverlappingCaseBounds ;
 
 
 (*
-   NewRanges -
+   NewRanges - return a new range from the freelist or heap.
 *)
 
 PROCEDURE NewRanges () : SetRange ;
@@ -530,7 +531,8 @@ END NewRanges ;
 
 
 (*
-   NewSet -
+   NewSet - returns a new set based on type with the low and high fields assigned
+            to the min and max values for the type.
 *)
 
 PROCEDURE NewSet (type: CARDINAL) : SetRange ;
@@ -548,7 +550,7 @@ END NewSet ;
 
 
 (*
-   DisposeRanges -
+   DisposeRanges - place set and its list onto the free list.
 *)
 
 PROCEDURE DisposeRanges (set: SetRange) : SetRange ;
@@ -736,7 +738,7 @@ VAR
 
 
 (*
-   IncludeElement -
+   IncludeElement - only include enumeration field into errorString if it lies between low..high.
 *)
 
 PROCEDURE IncludeElement (enumList: List; field: CARDINAL; low, high: Tree) ;
@@ -755,7 +757,7 @@ END IncludeElement ;
 
 
 (*
-   IncludeElements -
+   IncludeElements - only include enumeration field values low..high in errorString.
 *)
 
 PROCEDURE IncludeElements (type: CARDINAL; enumList: List; low, high: Tree) ;
@@ -775,7 +777,7 @@ END IncludeElements ;
 
 
 (*
-   ErrorRangeEnum
+   ErrorRangeEnum - include enumeration fields Low to High in errorString.
 *)
 
 PROCEDURE ErrorRangeEnum (type: CARDINAL; set: SetRange; enumList: List) ;
@@ -823,23 +825,32 @@ END ErrorRanges ;
 
 
 (*
-   appendEnum -
+   appendString - appends str to errorString.
+*)
+
+PROCEDURE appendString (str: String) ;
+BEGIN
+   errorString := ConCat (errorString, str)
+END appendString ;
+
+
+(*
+   appendEnum - appends enum to errorString.
 *)
 
 PROCEDURE appendEnum (enum: CARDINAL) ;
 BEGIN
-   errorString := ConCat (errorString,
-                          Mark (InitStringCharStar (KeyToCharStar (GetSymName (enum)))))
+   appendString (Mark (InitStringCharStar (KeyToCharStar (GetSymName (enum)))))
 END appendEnum ;
 
 
 (*
-   appendStr -
+   appendStr - appends str to errorString.
 *)
 
 PROCEDURE appendStr (str: ARRAY OF CHAR) ;
 BEGIN
-   errorString := ConCat (errorString, Mark (InitString (str)))
+   appendString (Mark (InitString (str)))
 END appendStr ;
 
 
@@ -880,6 +891,158 @@ END EnumerateErrors ;
 
 
 (*
+   NoOfSetElements - return the number of set elements.
+*)
+
+PROCEDURE NoOfSetElements (set: SetRange) : Tree ;
+BEGIN
+   PushInt (0) ;
+   WHILE set # NIL DO
+      IF ((set^.low # NIL) AND (set^.high = NIL)) OR
+         ((set^.low = NIL) AND (set^.high # NIL))
+      THEN
+         PushInt (1) ;
+         Addn
+      ELSIF (set^.low # NIL) AND (set^.high # NIL)
+      THEN
+         PushIntegerTree (set^.high) ;
+         PushIntegerTree (set^.low) ;
+         Sub ;
+         PushInt (1) ;
+         Addn ;
+         Addn
+      END ;
+      set := set^.next
+   END ;
+   RETURN PopIntegerTree ()
+END NoOfSetElements ;
+
+
+(*
+   isPrintableChar - a cautious isprint.
+*)
+
+PROCEDURE isPrintableChar (value: Tree) : BOOLEAN ;
+BEGIN
+   CASE CSTIntToChar (value) OF
+
+   'a'..'z':  RETURN TRUE |
+   'A'..'Z':  RETURN TRUE |
+   '0'..'9':  RETURN TRUE |
+   '!', '@':  RETURN TRUE |
+   '#', '$':  RETURN TRUE |
+   '%', '^':  RETURN TRUE |
+   '&', '*':  RETURN TRUE |
+   '(', ')':  RETURN TRUE |
+   '[', ']':  RETURN TRUE |
+   '{', '}':  RETURN TRUE |
+   '-', '+':  RETURN TRUE |
+   '_', '=':  RETURN TRUE |
+   ':', ';':  RETURN TRUE |
+   "'", '"':  RETURN TRUE |
+   ',', '.':  RETURN TRUE |
+   '<', '>':  RETURN TRUE |
+   '/', '?':  RETURN TRUE |
+   '\', '|':  RETURN TRUE |
+   '~', '`':  RETURN TRUE |
+   ' '     :  RETURN TRUE
+
+   ELSE
+      RETURN FALSE
+   END
+END isPrintableChar ;
+
+
+(*
+   appendTree - append tree value to the errorString.  It attempts to pretty print
+                CHAR constants and will fall back to CHR (x) if necessary.
+*)
+
+PROCEDURE appendTree (value: Tree; type: CARDINAL) ;
+BEGIN
+    IF SkipType (GetType (type)) = Char
+    THEN
+       IF isPrintableChar (value)
+       THEN
+          IF CSTIntToChar (value) = "'"
+          THEN
+             appendString (InitStringChar ('"')) ;
+             appendString (InitStringChar (CSTIntToChar (value))) ;
+             appendString (InitStringChar ('"'))
+          ELSE
+             appendString (InitStringChar ("'")) ;
+             appendString (InitStringChar (CSTIntToChar (value))) ;
+             appendString (InitStringChar ("'"))
+          END
+       ELSE
+          appendString (InitStringCharStar ('CHR (')) ;
+          appendString (InitStringCharStar (CSTIntToString (value))) ;
+          appendString (InitStringChar (')'))
+       END
+    ELSE
+       appendString (InitStringCharStar (CSTIntToString (value)))
+    END
+END appendTree ;
+
+
+(*
+   SubrangeErrors - create an errorString containing all set ranges.
+*)
+
+PROCEDURE SubrangeErrors (subrangetype: CARDINAL; set: SetRange) ;
+VAR
+   sr       : SetRange ;
+   rangeNo  : CARDINAL ;
+   nMissing,
+   zero, one: Tree ;
+BEGIN
+   nMissing := NoOfSetElements (set) ;
+   PushInt (0) ;
+   zero := PopIntegerTree () ;
+   IF IsGreater (nMissing, zero)
+   THEN
+      PushInt (1) ;
+      one := PopIntegerTree () ;
+      IF IsGreater (nMissing, one)
+      THEN
+         errorString := InitString ('{%W}there are a total of ')
+      ELSE
+         errorString := InitString ('{%W}there is a total of ')
+      END ;
+      appendString (InitStringCharStar (CSTIntToString (nMissing))) ;
+      appendStr (' missing values in the subrange, the {%kCASE} statement needs labels (or an {%kELSE} statement)') ;
+      appendStr (' for the following values: ') ;
+      sr := set ;
+      rangeNo := 0 ;
+      WHILE sr # NIL DO
+         INC (rangeNo) ;
+         IF rangeNo > 1
+         THEN
+            IF sr^.next = NIL
+            THEN
+               appendStr (' and ')
+            ELSE
+               appendStr (', ')
+            END
+         END ;
+         IF sr^.low = NIL
+         THEN
+            appendTree (sr^.high, subrangetype)
+         ELSIF (sr^.high = NIL) OR IsEqual (sr^.low, sr^.high)
+         THEN
+            appendTree (sr^.low, subrangetype)
+         ELSE
+            appendTree (sr^.low, subrangetype) ;
+            appendStr ('..') ;
+            appendTree (sr^.high, subrangetype)
+         END ;
+         sr := sr^.next
+      END
+   END
+END SubrangeErrors ;
+
+
+(*
    EmitMissingRangeErrors - emits a singular/plural error message for an enumeration type.
 *)
 
@@ -889,6 +1052,9 @@ BEGIN
    IF IsEnumeration (type)
    THEN
       EnumerateErrors (ErrorRanges (type, set))
+   ELSIF IsSubrange (type)
+   THEN
+      SubrangeErrors (type, set)
    END ;
    IF errorString # NIL
    THEN
@@ -958,21 +1124,24 @@ BEGIN
          IF expression # NulSym
          THEN
             type := SkipType (GetType (expression)) ;
-            IF (type # NulSym) AND IsEnumeration (type)
+            IF type # NulSym
             THEN
-               (* A case statement sequence without an else clause but
-                  selecting using an enumeration type.  *)
-               set := NewSet (type) ;
-               set := ExcludeCaseRanges (set, p) ;
-               IF set # NIL
+               IF IsEnumeration (type) OR IsSubrange (type)
                THEN
-                  missing := TRUE ;
-                  MetaErrorT1 (tokenno,
-                               'not all enumeration values in the {%kCASE} statements are specified, hint you either need to specify each value of {%1Wad} or use an {%kELSE} clause',
-                               type) ;
-                  EmitMissingRangeErrors (tokenno, type, set)
-               END ;
-               set := DisposeRanges (set)
+                  (* A case statement sequence without an else clause but
+                     selecting using an enumeration type.  *)
+                  set := NewSet (type) ;
+                  set := ExcludeCaseRanges (set, p) ;
+                  IF set # NIL
+                  THEN
+                     missing := TRUE ;
+                     MetaErrorT1 (tokenno,
+                                  'not all {%1Wd} values in the {%kCASE} statements are specified, hint you either need to specify each value of {%1ad} or use an {%kELSE} clause',
+                                  type) ;
+                     EmitMissingRangeErrors (tokenno, type, set)
+                  END ;
+                  set := DisposeRanges (set)
+               END
             END
          END
       END

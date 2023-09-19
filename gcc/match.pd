@@ -931,8 +931,8 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
        bool overflowed = true;
        value_range vr0, vr1;
        if (INTEGRAL_TYPE_P (type)
-	   && get_global_range_query ()->range_of_expr (vr0, @0)
-	   && get_global_range_query ()->range_of_expr (vr1, @1)
+	   && get_range_query (cfun)->range_of_expr (vr0, @0)
+	   && get_range_query (cfun)->range_of_expr (vr1, @1)
 	   && !vr0.varying_p () && !vr0.undefined_p ()
 	   && !vr1.varying_p () && !vr1.undefined_p ())
 	 {
@@ -2181,6 +2181,25 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
       && (TYPE_UNSIGNED (type)
 	  || TYPE_PRECISION (type) > 1))))
 
+/* (a&1) is always [0,1] too. This is useful again when
+   the range is not known. */
+/* Note this can't be recursive due to VN handling of equivalents,
+   VN and would cause an infinite recursion. */
+(match zero_one_valued_p
+ (bit_and:c@0 @1 integer_onep)
+ (if (INTEGRAL_TYPE_P (type))))
+
+/* A conversion from an zero_one_valued_p is still a [0,1].
+   This is useful when the range of a variable is not known */
+/* Note this matches can't be recursive because of the way VN handles
+   nop conversions being equivalent and then recursive between them. */
+(match zero_one_valued_p
+ (convert@0 @1)
+ (if (INTEGRAL_TYPE_P (TREE_TYPE (@1))
+      && (TYPE_UNSIGNED (TREE_TYPE (@1))
+	  || TYPE_PRECISION (TREE_TYPE (@1)) > 1)
+      && wi::leu_p (tree_nonzero_bits (@1), 1))))
+
 /* Transform { 0 or 1 } * { 0 or 1 } into { 0 or 1 } & { 0 or 1 }.  */
 (simplify
  (mult zero_one_valued_p@0 zero_one_valued_p@1)
@@ -2970,10 +2989,20 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 	    && operand_equal_p (@1, @2)))
     (with
      {
+      bool one_before = false;
+      bool one_after = false;
       int cmp = 0;
       if (TREE_CODE (@1) == INTEGER_CST
 	  && TREE_CODE (@2) == INTEGER_CST)
-	cmp = tree_int_cst_compare (@1, @2);
+	{
+	  cmp = tree_int_cst_compare (@1, @2);
+	  if (cmp < 0
+	      && wi::to_wide (@1) == wi::to_wide (@2) - 1)
+	    one_before = true;
+	  if (cmp > 0
+	      && wi::to_wide (@1) == wi::to_wide (@2) + 1)
+	    one_after = true;
+	}
       bool val;
       switch (code2)
 	 {
@@ -2997,6 +3026,16 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
       (if (code1 == NE_EXPR
            && code2 == LE_EXPR
 	   && cmp == 0)
+       (lt @0 @1))
+      /* (a != (b+1)) & (a > b) -> a > (b+1) */
+      (if (code1 == NE_EXPR
+           && code2 == GT_EXPR
+	   && one_after)
+       (gt @0 @1))
+      /* (a != (b-1)) & (a < b) -> a < (b-1) */
+      (if (code1 == NE_EXPR
+           && code2 == LT_EXPR
+	   && one_before)
        (lt @0 @1))
      )
     )
@@ -3069,10 +3108,20 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 	    && operand_equal_p (@1, @2)))
     (with
      {
+      bool one_before = false;
+      bool one_after = false;
       int cmp = 0;
       if (TREE_CODE (@1) == INTEGER_CST
 	  && TREE_CODE (@2) == INTEGER_CST)
-	cmp = tree_int_cst_compare (@1, @2);
+	{
+	  cmp = tree_int_cst_compare (@1, @2);
+	  if (cmp < 0
+	      && wi::to_wide (@1) == wi::to_wide (@2) - 1)
+	    one_before = true;
+	  if (cmp > 0
+	      && wi::to_wide (@1) == wi::to_wide (@2) + 1)
+	    one_after = true;
+	}
       bool val;
       switch (code2)
 	{
@@ -3096,6 +3145,16 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
       (if (code1 == EQ_EXPR
            && code2 == LT_EXPR
 	   && cmp == 0)
+       (le @0 @1))
+      /* (a == (b-1)) | (a >= b) -> a >= (b-1) */
+      (if (code1 == EQ_EXPR
+           && code2 == GE_EXPR
+	   && one_before)
+       (ge @0 @1))
+      /* (a == (b+1)) | (a <= b) -> a <= (b-1) */
+      (if (code1 == EQ_EXPR
+           && code2 == LE_EXPR
+	   && one_after)
        (le @0 @1))
      )
     )
@@ -4064,9 +4123,13 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
    (if (INTEGRAL_TYPE_P (type))
     (with {
       int width = element_precision (type) - tree_to_uhwi (@1);
-      tree stype = build_nonstandard_integer_type (width, 0);
+      tree stype = NULL_TREE;
+      scalar_int_mode mode = (targetm.scalar_mode_supported_p (TImode)
+			      ? TImode : DImode);
+      if (width <= GET_MODE_PRECISION (mode))
+	stype = build_nonstandard_integer_type (width, 0);
      }
-     (if (width == 1 || type_has_mode_precision_p (stype))
+     (if (stype && (width == 1 || type_has_mode_precision_p (stype)))
       (convert (convert:stype @0))))))))
 
 /* Optimize x >> x into 0 */
@@ -4166,8 +4229,9 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
  /* `(1 >> X) != 0` -> `X == 0` */
  /* `(1 >> X) == 0` -> `X != 0` */
  (simplify
-  (cmp (rshift integer_onep @0) integer_zerop)
-   (icmp @0 { build_zero_cst (TREE_TYPE (@0)); })))
+  (cmp (rshift integer_onep@1 @0) integer_zerop)
+   (if (INTEGRAL_TYPE_P (TREE_TYPE (@1)))
+    (icmp @0 { build_zero_cst (TREE_TYPE (@0)); }))))
 
 /* (CST1 << A) == CST2 -> A == ctz (CST2) - ctz (CST1)
    (CST1 << A) != CST2 -> A != ctz (CST2) - ctz (CST1)
@@ -5041,49 +5105,24 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
     /* a ? -1 : 0 -> -a.  No need to check the TYPE_PRECISION not being 1
        here as the powerof2cst case above will handle that case correctly.  */
     (if (INTEGRAL_TYPE_P (type) && integer_all_onesp (@1))
-     (with {
-       auto prec = TYPE_PRECISION (type);
-       auto unsign = TYPE_UNSIGNED (type);
-       tree inttype = build_nonstandard_integer_type (prec, unsign);
-      }
-      (convert (negate (convert:inttype (convert:boolean_type_node @0))))))))
+     (negate (convert:type (convert:boolean_type_node @0))))))
   (if (integer_zerop (@1))
-   (with {
-      tree booltrue = constant_boolean_node (true, boolean_type_node);
-    }
-    (switch
-     /* a ? 0 : 1 -> !a. */
-     (if (integer_onep (@2))
-      (convert (bit_xor (convert:boolean_type_node @0) { booltrue; } )))
-     /* a ? powerof2cst : 0 -> (!a) << (log2(powerof2cst)) */
-     (if (INTEGRAL_TYPE_P (type) &&  integer_pow2p (@2))
-      (with {
-	tree shift = build_int_cst (integer_type_node, tree_log2 (@2));
-       }
-       (lshift (convert (bit_xor (convert:boolean_type_node @0) { booltrue; } ))
-        { shift; })))
-     /* a ? -1 : 0 -> -(!a).  No need to check the TYPE_PRECISION not being 1
+   (switch
+    /* a ? 0 : 1 -> !a. */
+    (if (integer_onep (@2))
+     (convert (bit_xor (convert:boolean_type_node @0) { boolean_true_node; })))
+    /* a ? powerof2cst : 0 -> (!a) << (log2(powerof2cst)) */
+    (if (INTEGRAL_TYPE_P (type) && integer_pow2p (@2))
+     (with {
+       tree shift = build_int_cst (integer_type_node, tree_log2 (@2));
+      }
+      (lshift (convert (bit_xor (convert:boolean_type_node @0)
+				{ boolean_true_node; })) { shift; })))
+    /* a ? -1 : 0 -> -(!a).  No need to check the TYPE_PRECISION not being 1
        here as the powerof2cst case above will handle that case correctly.  */
-     (if (INTEGRAL_TYPE_P (type) && integer_all_onesp (@2))
-      (with {
-	auto prec = TYPE_PRECISION (type);
-	auto unsign = TYPE_UNSIGNED (type);
-	tree inttype = build_nonstandard_integer_type (prec, unsign);
-       }
-       (convert
-	(negate
-         (convert:inttype
-	  (bit_xor (convert:boolean_type_node @0) { booltrue; } )
-	 )
-	)
-       )
-      )
-     )
-    )
-   )
-  )
- )
-)
+    (if (INTEGRAL_TYPE_P (type) && integer_all_onesp (@2))
+     (negate (convert:type (bit_xor (convert:boolean_type_node @0)
+				    { boolean_true_node; }))))))))
 
 /* (a > 1) ? 0 : (cast)a is the same as (cast)(a == 1)
    for unsigned types. */
@@ -5104,6 +5143,14 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
   (convert (eq @0 @1))
  )
 )
+
+/* `(a == CST) & a` can be simplified to `0` or `(a == CST)` depending
+   on the first bit of the CST.  */
+(simplify
+ (bit_and:c (convert@2 (eq @0 INTEGER_CST@1)) (convert? @0))
+ (if ((wi::to_wide (@1) & 1) != 0)
+  @2
+  { build_zero_cst (type); }))
 
 /* Optimize
    # x_5 in range [cst1, cst2] where cst2 = cst1 + 1

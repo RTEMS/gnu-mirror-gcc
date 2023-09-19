@@ -5640,7 +5640,7 @@ aarch64_internal_mov_immediate (rtx dest, rtx imm, bool generate,
 				machine_mode mode)
 {
   int i;
-  unsigned HOST_WIDE_INT val, val2, mask;
+  unsigned HOST_WIDE_INT val, val2, val3, mask;
   int one_match, zero_match;
   int num_insns;
 
@@ -5722,6 +5722,35 @@ aarch64_internal_mov_immediate (rtx dest, rtx imm, bool generate,
 		}
 	      return 3;
 	    }
+
+      /* Try shifting and inserting the bottom 32-bits into the top bits.  */
+      val2 = val & 0xffffffff;
+      val3 = 0xffffffff;
+      val3 = val2 | (val3 << 32);
+      for (i = 17; i < 48; i++)
+	if ((val2 | (val2 << i)) == val)
+	  {
+	    if (generate)
+	      {
+		emit_insn (gen_rtx_SET (dest, GEN_INT (val2 & 0xffff)));
+		emit_insn (gen_insv_immdi (dest, GEN_INT (16),
+					   GEN_INT (val2 >> 16)));
+		emit_insn (gen_ior_ashldi3 (dest, dest, GEN_INT (i), dest));
+	      }
+	    return 3;
+	  }
+	else if ((val3 & ~(val3 << i)) == val)
+	  {
+	    if (generate)
+	      {
+		emit_insn (gen_rtx_SET (dest, GEN_INT (val3 | 0xffff0000)));
+		emit_insn (gen_insv_immdi (dest, GEN_INT (16),
+					   GEN_INT (val2 >> 16)));
+		emit_insn (gen_and_one_cmpl_ashldi3 (dest, dest, GEN_INT (i),
+						      dest));
+	      }
+	    return 3;
+	  }
     }
 
   /* Generate 2-4 instructions, skipping 16 bits of all zeroes or ones which
@@ -16310,22 +16339,6 @@ aarch64_vector_costs::analyze_loop_vinfo (loop_vec_info loop_vinfo)
   /* Detect whether we're vectorizing for SVE and should apply the unrolling
      heuristic described above m_unrolled_advsimd_niters.  */
   record_potential_advsimd_unrolling (loop_vinfo);
-
-  /* Record the issue information for any SVE WHILE instructions that the
-     loop needs.  */
-  if (!m_ops.is_empty () && !LOOP_VINFO_MASKS (loop_vinfo).is_empty ())
-    {
-      unsigned int num_masks = 0;
-      rgroup_controls *rgm;
-      unsigned int num_vectors_m1;
-      FOR_EACH_VEC_ELT (LOOP_VINFO_MASKS (loop_vinfo).rgc_vec,
-			num_vectors_m1, rgm)
-	if (rgm->type)
-	  num_masks += num_vectors_m1 + 1;
-      for (auto &ops : m_ops)
-	if (auto *issue = ops.sve_issue_info ())
-	  ops.pred_ops += num_masks * issue->while_pred_ops;
-    }
 }
 
 /* Implement targetm.vectorize.builtin_vectorization_cost.  */
@@ -17507,9 +17520,27 @@ adjust_body_cost (loop_vec_info loop_vinfo,
 void
 aarch64_vector_costs::finish_cost (const vector_costs *uncast_scalar_costs)
 {
+  /* Record the issue information for any SVE WHILE instructions that the
+     loop needs.  */
+  loop_vec_info loop_vinfo = dyn_cast<loop_vec_info> (m_vinfo);
+  if (!m_ops.is_empty ()
+      && loop_vinfo
+      && LOOP_VINFO_FULLY_MASKED_P (loop_vinfo))
+    {
+      unsigned int num_masks = 0;
+      rgroup_controls *rgm;
+      unsigned int num_vectors_m1;
+      FOR_EACH_VEC_ELT (LOOP_VINFO_MASKS (loop_vinfo).rgc_vec,
+			num_vectors_m1, rgm)
+	if (rgm->type)
+	  num_masks += num_vectors_m1 + 1;
+      for (auto &ops : m_ops)
+	if (auto *issue = ops.sve_issue_info ())
+	  ops.pred_ops += num_masks * issue->while_pred_ops;
+    }
+
   auto *scalar_costs
     = static_cast<const aarch64_vector_costs *> (uncast_scalar_costs);
-  loop_vec_info loop_vinfo = dyn_cast<loop_vec_info> (m_vinfo);
   if (loop_vinfo
       && m_vec_flags
       && aarch64_use_new_vector_costs_p ())
@@ -25538,8 +25569,6 @@ aarch64_split_dimode_const_store (rtx dst, rtx src)
   rtx lo = gen_lowpart (SImode, src);
   rtx hi = gen_highpart_mode (SImode, DImode, src);
 
-  bool size_p = optimize_function_for_size_p (cfun);
-
   if (!rtx_equal_p (lo, hi))
     return false;
 
@@ -25558,14 +25587,8 @@ aarch64_split_dimode_const_store (rtx dst, rtx src)
      MOV	w1, 49370
      MOVK	w1, 0x140, lsl 16
      STP	w1, w1, [x0]
-   So we want to perform this only when we save two instructions
-   or more.  When optimizing for size, however, accept any code size
-   savings we can.  */
-  if (size_p && orig_cost <= lo_cost)
-    return false;
-
-  if (!size_p
-      && (orig_cost <= lo_cost + 1))
+   So we want to perform this when we save at least one instruction.  */
+  if (orig_cost <= lo_cost)
     return false;
 
   rtx mem_lo = adjust_address (dst, SImode, 0);
@@ -26501,11 +26524,9 @@ aarch64_operands_ok_for_ldpstp (rtx *operands, bool load,
   gcc_assert (known_eq (GET_MODE_SIZE (GET_MODE (mem_1)),
 			GET_MODE_SIZE (GET_MODE (mem_2))));
 
-  /* One of the memory accesses must be a mempair operand.
-     If it is not the first one, they need to be swapped by the
-     peephole.  */
-  if (!aarch64_mem_pair_operand (mem_1, GET_MODE (mem_1))
-       && !aarch64_mem_pair_operand (mem_2, GET_MODE (mem_2)))
+  /* The lower memory access must be a mem-pair operand.  */
+  rtx lower_mem = reversed ? mem_2 : mem_1;
+  if (!aarch64_mem_pair_operand (lower_mem, GET_MODE (lower_mem)))
     return false;
 
   if (REG_P (reg_1) && FP_REGNUM_P (REGNO (reg_1)))

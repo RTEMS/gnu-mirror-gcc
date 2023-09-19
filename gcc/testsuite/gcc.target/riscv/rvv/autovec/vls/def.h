@@ -1,4 +1,5 @@
 #include <stdint-gcc.h>
+#include <math.h>
 
 typedef int8_t v1qi __attribute__ ((vector_size (1)));
 typedef int8_t v2qi __attribute__ ((vector_size (2)));
@@ -210,7 +211,7 @@ typedef double v512df __attribute__ ((vector_size (4096)));
   PREFIX##_##TYPE##NUM (TYPE *restrict a, TYPE *restrict b)                    \
   {                                                                            \
     for (int i = 0; i < NUM; ++i)                                              \
-      a[i] = OP b[i];                                                          \
+      a[i] = OP (b[i]);                                                        \
   }
 
 #define DEF_CALL_VV(PREFIX, NUM, TYPE, CALL)                                   \
@@ -248,4 +249,248 @@ typedef double v512df __attribute__ ((vector_size (4096)));
   extract_##SCALAR##VECTOR (VECTOR v)                                          \
   {                                                                            \
     return v[INDEX];                                                           \
+  }
+
+#define DEF_MASK_LOGIC(PREFIX, NUM, TYPE, OP)                                  \
+  void __attribute__ ((noinline, noclone))                                     \
+  PREFIX##_##TYPE##NUM (TYPE *restrict a, TYPE *restrict b, TYPE *restrict c,  \
+			TYPE *restrict d, TYPE *restrict e)                    \
+  {                                                                            \
+    for (int i = 0; i < NUM; ++i)                                              \
+      a[i] = (b[i] > c[i]) OP (d[i] < e[i]);                                   \
+  }
+
+#define DEF_SGNJX_VV(PREFIX, NUM, TYPE, CALL)                                  \
+  void __attribute__ ((noinline, noclone))                                     \
+  PREFIX##_##TYPE##NUM (TYPE *restrict a, TYPE *restrict b, TYPE *restrict c)  \
+  {                                                                            \
+    for (int i = 0; i < NUM; ++i)                                              \
+      a[i] = b[i] * CALL (1.0, c[i]);                                          \
+  }
+
+#define DEF_REDUC_PLUS(TYPE, NUM)                                              \
+  TYPE __attribute__ ((noinline, noclone))                                     \
+  reduc_plus_##TYPE##NUM (TYPE *__restrict a)                                  \
+  {                                                                            \
+    TYPE r = 0;                                                                \
+    for (int i = 0; i < NUM; ++i)                                              \
+      r += a[i];                                                               \
+    return r;                                                                  \
+  }
+
+#define DEF_REDUC_MAXMIN(TYPE, NAME, CMP_OP, NUM)                              \
+  TYPE __attribute__ ((noinline, noclone))                                     \
+  reduc_##NAME##_##TYPE##_##NUM (TYPE *a)                                      \
+  {                                                                            \
+    TYPE r = 13;                                                               \
+    for (int i = 0; i < NUM; ++i)                                              \
+      r = a[i] CMP_OP r ? a[i] : r;                                            \
+    return r;                                                                  \
+  }
+
+#define DEF_REDUC_BITWISE(TYPE, NAME, BIT_OP, NUM)                             \
+  TYPE __attribute__ ((noinline, noclone))                                     \
+  reduc_##NAME##_##TYPE##_##NUM (TYPE *a)                                      \
+  {                                                                            \
+    TYPE r = 13;                                                               \
+    for (int i = 0; i < NUM; ++i)                                              \
+      r BIT_OP a[i];                                                           \
+    return r;                                                                  \
+  }
+
+#define VARS2(TYPE, NUM1, NUM2) TYPE var##NUM1, TYPE var##NUM2
+#define VARS4(TYPE, NUM1, NUM2, NUM3, NUM4)                                    \
+  VARS2 (TYPE, NUM1, NUM2), VARS2 (TYPE, NUM3, NUM4)
+#define VARS8(TYPE, NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8)            \
+  VARS4 (TYPE, NUM1, NUM2, NUM3, NUM4), VARS4 (TYPE, NUM5, NUM6, NUM7, NUM8)
+#define VARS16(TYPE, NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9,     \
+	       NUM10, NUM11, NUM12, NUM13, NUM14, NUM15, NUM16)                \
+  VARS8 (TYPE, NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8),                \
+    VARS8 (TYPE, NUM9, NUM10, NUM11, NUM12, NUM13, NUM14, NUM15, NUM16)
+#define VARS32(TYPE, NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9,     \
+	       NUM10, NUM11, NUM12, NUM13, NUM14, NUM15, NUM16, NUM17, NUM18,  \
+	       NUM19, NUM20, NUM21, NUM22, NUM23, NUM24, NUM25, NUM26, NUM27,  \
+	       NUM28, NUM29, NUM30, NUM31, NUM32)                              \
+  VARS16 (TYPE, NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9, NUM10,   \
+	  NUM11, NUM12, NUM13, NUM14, NUM15, NUM16),                           \
+    VARS16 (TYPE, NUM17, NUM18, NUM19, NUM20, NUM21, NUM22, NUM23, NUM24,      \
+	    NUM25, NUM26, NUM27, NUM28, NUM29, NUM30, NUM31, NUM32)
+#define VARS64(TYPE, NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9,     \
+	       NUM10, NUM11, NUM12, NUM13, NUM14, NUM15, NUM16, NUM17, NUM18,  \
+	       NUM19, NUM20, NUM21, NUM22, NUM23, NUM24, NUM25, NUM26, NUM27,  \
+	       NUM28, NUM29, NUM30, NUM31, NUM32, NUM33, NUM34, NUM35, NUM36,  \
+	       NUM37, NUM38, NUM39, NUM40, NUM41, NUM42, NUM43, NUM44, NUM45,  \
+	       NUM46, NUM47, NUM48, NUM49, NUM50, NUM51, NUM52, NUM53, NUM54,  \
+	       NUM55, NUM56, NUM57, NUM58, NUM59, NUM60, NUM61, NUM62, NUM63,  \
+	       NUM64)                                                          \
+  VARS32 (TYPE, NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9, NUM10,   \
+	  NUM11, NUM12, NUM13, NUM14, NUM15, NUM16, NUM17, NUM18, NUM19,       \
+	  NUM20, NUM21, NUM22, NUM23, NUM24, NUM25, NUM26, NUM27, NUM28,       \
+	  NUM29, NUM30, NUM31, NUM32),                                         \
+    VARS32 (TYPE, NUM33, NUM34, NUM35, NUM36, NUM37, NUM38, NUM39, NUM40,      \
+	    NUM41, NUM42, NUM43, NUM44, NUM45, NUM46, NUM47, NUM48, NUM49,     \
+	    NUM50, NUM51, NUM52, NUM53, NUM54, NUM55, NUM56, NUM57, NUM58,     \
+	    NUM59, NUM60, NUM61, NUM62, NUM63, NUM64)
+#define VARS128(TYPE, NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9,    \
+		NUM10, NUM11, NUM12, NUM13, NUM14, NUM15, NUM16, NUM17, NUM18, \
+		NUM19, NUM20, NUM21, NUM22, NUM23, NUM24, NUM25, NUM26, NUM27, \
+		NUM28, NUM29, NUM30, NUM31, NUM32, NUM33, NUM34, NUM35, NUM36, \
+		NUM37, NUM38, NUM39, NUM40, NUM41, NUM42, NUM43, NUM44, NUM45, \
+		NUM46, NUM47, NUM48, NUM49, NUM50, NUM51, NUM52, NUM53, NUM54, \
+		NUM55, NUM56, NUM57, NUM58, NUM59, NUM60, NUM61, NUM62, NUM63, \
+		NUM64, NUM65, NUM66, NUM67, NUM68, NUM69, NUM70, NUM71, NUM72, \
+		NUM73, NUM74, NUM75, NUM76, NUM77, NUM78, NUM79, NUM80, NUM81, \
+		NUM82, NUM83, NUM84, NUM85, NUM86, NUM87, NUM88, NUM89, NUM90, \
+		NUM91, NUM92, NUM93, NUM94, NUM95, NUM96, NUM97, NUM98, NUM99, \
+		NUM100, NUM101, NUM102, NUM103, NUM104, NUM105, NUM106,        \
+		NUM107, NUM108, NUM109, NUM110, NUM111, NUM112, NUM113,        \
+		NUM114, NUM115, NUM116, NUM117, NUM118, NUM119, NUM120,        \
+		NUM121, NUM122, NUM123, NUM124, NUM125, NUM126, NUM127,        \
+		NUM128)                                                        \
+  VARS64 (TYPE, NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9, NUM10,   \
+	  NUM11, NUM12, NUM13, NUM14, NUM15, NUM16, NUM17, NUM18, NUM19,       \
+	  NUM20, NUM21, NUM22, NUM23, NUM24, NUM25, NUM26, NUM27, NUM28,       \
+	  NUM29, NUM30, NUM31, NUM32, NUM33, NUM34, NUM35, NUM36, NUM37,       \
+	  NUM38, NUM39, NUM40, NUM41, NUM42, NUM43, NUM44, NUM45, NUM46,       \
+	  NUM47, NUM48, NUM49, NUM50, NUM51, NUM52, NUM53, NUM54, NUM55,       \
+	  NUM56, NUM57, NUM58, NUM59, NUM60, NUM61, NUM62, NUM63, NUM64),      \
+    VARS64 (TYPE, NUM65, NUM66, NUM67, NUM68, NUM69, NUM70, NUM71, NUM72,      \
+	    NUM73, NUM74, NUM75, NUM76, NUM77, NUM78, NUM79, NUM80, NUM81,     \
+	    NUM82, NUM83, NUM84, NUM85, NUM86, NUM87, NUM88, NUM89, NUM90,     \
+	    NUM91, NUM92, NUM93, NUM94, NUM95, NUM96, NUM97, NUM98, NUM99,     \
+	    NUM100, NUM101, NUM102, NUM103, NUM104, NUM105, NUM106, NUM107,    \
+	    NUM108, NUM109, NUM110, NUM111, NUM112, NUM113, NUM114, NUM115,    \
+	    NUM116, NUM117, NUM118, NUM119, NUM120, NUM121, NUM122, NUM123,    \
+	    NUM124, NUM125, NUM126, NUM127, NUM128)
+
+#define INIT2(NUM1, NUM2) var##NUM1, var##NUM2
+#define INIT4(NUM1, NUM2, NUM3, NUM4) INIT2 (NUM1, NUM2), INIT2 (NUM3, NUM4)
+#define INIT8(NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8)                  \
+  INIT4 (NUM1, NUM2, NUM3, NUM4), INIT4 (NUM5, NUM6, NUM7, NUM8)
+#define INIT16(NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9, NUM10,    \
+	       NUM11, NUM12, NUM13, NUM14, NUM15, NUM16)                       \
+  INIT4 (NUM1, NUM2, NUM3, NUM4), INIT4 (NUM5, NUM6, NUM7, NUM8)
+#define INIT32(NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9, NUM10,    \
+	       NUM11, NUM12, NUM13, NUM14, NUM15, NUM16, NUM17, NUM18, NUM19,  \
+	       NUM20, NUM21, NUM22, NUM23, NUM24, NUM25, NUM26, NUM27, NUM28,  \
+	       NUM29, NUM30, NUM31, NUM32)                                     \
+  INIT16 (NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9, NUM10, NUM11,  \
+	  NUM12, NUM13, NUM14, NUM15, NUM16),                                  \
+    INIT16 (NUM17, NUM18, NUM19, NUM20, NUM21, NUM22, NUM23, NUM24, NUM25,     \
+	    NUM26, NUM27, NUM28, NUM29, NUM30, NUM31, NUM32)
+#define INIT64(NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9, NUM10,    \
+	       NUM11, NUM12, NUM13, NUM14, NUM15, NUM16, NUM17, NUM18, NUM19,  \
+	       NUM20, NUM21, NUM22, NUM23, NUM24, NUM25, NUM26, NUM27, NUM28,  \
+	       NUM29, NUM30, NUM31, NUM32, NUM33, NUM34, NUM35, NUM36, NUM37,  \
+	       NUM38, NUM39, NUM40, NUM41, NUM42, NUM43, NUM44, NUM45, NUM46,  \
+	       NUM47, NUM48, NUM49, NUM50, NUM51, NUM52, NUM53, NUM54, NUM55,  \
+	       NUM56, NUM57, NUM58, NUM59, NUM60, NUM61, NUM62, NUM63, NUM64)  \
+  INIT32 (NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9, NUM10, NUM11,  \
+	  NUM12, NUM13, NUM14, NUM15, NUM16, NUM17, NUM18, NUM19, NUM20,       \
+	  NUM21, NUM22, NUM23, NUM24, NUM25, NUM26, NUM27, NUM28, NUM29,       \
+	  NUM30, NUM31, NUM32),                                                \
+    INIT32 (NUM33, NUM34, NUM35, NUM36, NUM37, NUM38, NUM39, NUM40, NUM41,     \
+	    NUM42, NUM43, NUM44, NUM45, NUM46, NUM47, NUM48, NUM49, NUM50,     \
+	    NUM51, NUM52, NUM53, NUM54, NUM55, NUM56, NUM57, NUM58, NUM59,     \
+	    NUM60, NUM61, NUM62, NUM63, NUM64)
+#define INIT128(NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9, NUM10,   \
+		NUM11, NUM12, NUM13, NUM14, NUM15, NUM16, NUM17, NUM18, NUM19, \
+		NUM20, NUM21, NUM22, NUM23, NUM24, NUM25, NUM26, NUM27, NUM28, \
+		NUM29, NUM30, NUM31, NUM32, NUM33, NUM34, NUM35, NUM36, NUM37, \
+		NUM38, NUM39, NUM40, NUM41, NUM42, NUM43, NUM44, NUM45, NUM46, \
+		NUM47, NUM48, NUM49, NUM50, NUM51, NUM52, NUM53, NUM54, NUM55, \
+		NUM56, NUM57, NUM58, NUM59, NUM60, NUM61, NUM62, NUM63, NUM64, \
+		NUM65, NUM66, NUM67, NUM68, NUM69, NUM70, NUM71, NUM72, NUM73, \
+		NUM74, NUM75, NUM76, NUM77, NUM78, NUM79, NUM80, NUM81, NUM82, \
+		NUM83, NUM84, NUM85, NUM86, NUM87, NUM88, NUM89, NUM90, NUM91, \
+		NUM92, NUM93, NUM94, NUM95, NUM96, NUM97, NUM98, NUM99,        \
+		NUM100, NUM101, NUM102, NUM103, NUM104, NUM105, NUM106,        \
+		NUM107, NUM108, NUM109, NUM110, NUM111, NUM112, NUM113,        \
+		NUM114, NUM115, NUM116, NUM117, NUM118, NUM119, NUM120,        \
+		NUM121, NUM122, NUM123, NUM124, NUM125, NUM126, NUM127,        \
+		NUM128)                                                        \
+  INIT64 (NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9, NUM10, NUM11,  \
+	  NUM12, NUM13, NUM14, NUM15, NUM16, NUM17, NUM18, NUM19, NUM20,       \
+	  NUM21, NUM22, NUM23, NUM24, NUM25, NUM26, NUM27, NUM28, NUM29,       \
+	  NUM30, NUM31, NUM32, NUM33, NUM34, NUM35, NUM36, NUM37, NUM38,       \
+	  NUM39, NUM40, NUM41, NUM42, NUM43, NUM44, NUM45, NUM46, NUM47,       \
+	  NUM48, NUM49, NUM50, NUM51, NUM52, NUM53, NUM54, NUM55, NUM56,       \
+	  NUM57, NUM58, NUM59, NUM60, NUM61, NUM62, NUM63, NUM64),             \
+    INIT64 (NUM65, NUM66, NUM67, NUM68, NUM69, NUM70, NUM71, NUM72, NUM73,     \
+	    NUM74, NUM75, NUM76, NUM77, NUM78, NUM79, NUM80, NUM81, NUM82,     \
+	    NUM83, NUM84, NUM85, NUM86, NUM87, NUM88, NUM89, NUM90, NUM91,     \
+	    NUM92, NUM93, NUM94, NUM95, NUM96, NUM97, NUM98, NUM99, NUM100,    \
+	    NUM101, NUM102, NUM103, NUM104, NUM105, NUM106, NUM107, NUM108,    \
+	    NUM109, NUM110, NUM111, NUM112, NUM113, NUM114, NUM115, NUM116,    \
+	    NUM117, NUM118, NUM119, NUM120, NUM121, NUM122, NUM123, NUM124,    \
+	    NUM125, NUM126, NUM127, NUM128)
+
+#define DEF_INIT(TYPE1, TYPE2, NUM, ...)                                       \
+  void init_##TYPE1##_##TYPE2##_##NUM (VARS##NUM (TYPE2, __VA_ARGS__),         \
+				       TYPE2 *__restrict out)                  \
+  {                                                                            \
+    TYPE1 v = {INIT##NUM (__VA_ARGS__)};                                       \
+    *(TYPE1 *) out = v;                                                        \
+  }
+
+#define DEF_REPEAT(TYPE1, TYPE2, NUM, ...)                                     \
+  void init_##TYPE1##_##TYPE2##_##NUM (TYPE2 var0, TYPE2 var1,                 \
+				       TYPE2 *__restrict out)                  \
+  {                                                                            \
+    TYPE1 v = {__VA_ARGS__};                                                   \
+    *(TYPE1 *) out = v;                                                        \
+  }
+
+#define DEF_VEC_SET_IMM_INDEX(PREFIX, VECTOR, TYPE, INDEX)                     \
+  VECTOR __attribute__ ((noinline, noclone))                                   \
+  PREFIX##_##VECTOR##_##INDEX (VECTOR v, TYPE a)                               \
+  {                                                                            \
+    v[INDEX] = a;                                                              \
+                                                                               \
+    return v;                                                                  \
+  }
+
+#define DEF_VEC_SET_SCALAR_INDEX(PREFIX, VECTOR, TYPE)                         \
+  VECTOR __attribute__ ((noinline, noclone))                                   \
+  PREFIX##_##VECTOR##_##TYPE (VECTOR v, TYPE a, unsigned index)                \
+  {                                                                            \
+    v[index] = a;                                                              \
+                                                                               \
+    return v;                                                                  \
+  }
+
+#define DEF_FMA_VV(PREFIX, NUM, TYPE)                                          \
+  void __attribute__ ((noinline, noclone))                                     \
+  PREFIX##_##TYPE##NUM (TYPE *restrict a, TYPE *restrict b, TYPE *restrict c,  \
+			TYPE *restrict d)                                      \
+  {                                                                            \
+    for (int i = 0; i < NUM; ++i)                                              \
+      a[i] = b[i] * c[i] + d[i];                                               \
+  }
+
+#define DEF_FNMA_VV(PREFIX, NUM, TYPE)                                         \
+  void __attribute__ ((noinline, noclone))                                     \
+  PREFIX##_##TYPE##NUM (TYPE *restrict a, TYPE *restrict b, TYPE *restrict c,  \
+			TYPE *restrict d)                                      \
+  {                                                                            \
+    for (int i = 0; i < NUM; ++i)                                              \
+      a[i] = d[i] - b[i] * c[i];                                               \
+  }
+
+#define DEF_FMS_VV(PREFIX, NUM, TYPE)                                          \
+  void __attribute__ ((noinline, noclone))                                     \
+  PREFIX##_##TYPE##NUM (TYPE *restrict a, TYPE *restrict b, TYPE *restrict c,  \
+			TYPE *restrict d)                                      \
+  {                                                                            \
+    for (int i = 0; i < NUM; ++i)                                              \
+      a[i] = b[i] * c[i] - d[i];                                               \
+  }
+
+#define DEF_FNMS_VV(PREFIX, NUM, TYPE)                                         \
+  void __attribute__ ((noinline, noclone))                                     \
+  PREFIX##_##TYPE##NUM (TYPE *restrict a, TYPE *restrict b, TYPE *restrict c,  \
+			TYPE *restrict d)                                      \
+  {                                                                            \
+    for (int i = 0; i < NUM; ++i)                                              \
+      a[i] = -(b[i] * c[i]) - d[i];                                            \
   }
