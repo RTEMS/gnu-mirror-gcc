@@ -1,3 +1,15 @@
+==================== Branch work134-vsubreg, patch #203 ====================
+
+Peter's patch for updating tieable support.
+
+2023-09-21  Peter Bergner  <bergner@linux.ibm.com>
+
+gcc/
+
+	PR target/109116
+	* gcc/config/rs6000/rs6000.cc (rs6000_modes_tieable_p): Make OOmdoe
+	tieable with 128-bit vector modes.
+
 ==================== Branch work134-vsubreg, patch #202 (vpair #300) ====================
 
 Add support for vector pair built-in functions.
