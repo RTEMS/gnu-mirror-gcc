@@ -1,3 +1,40 @@
+==================== Branch work134-vsubreg, patch #202 (vpair #300) ====================
+
+Add support for vector pair built-in functions.
+
+2023-09-21  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/predicates.md (mma_assemble_input_operand): Allow other
+	16-byte vectors and not just V16QImode.
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_*): Add vector pair
+	built-in functions.
+	* config/rs6000/rs6000-protos.h (split_unary_vector_pair): Add
+	declaration.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pair): Likewise.
+	* config/rs6000/rs6000.cc (split_unary_vector_pair): New helper function
+	for vector pair built-in functions.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pair): Likewise.
+	* config/rs6000/rs6000.md (toplevel): Include vector-pair.md.
+	* config/rs6000/t-rs6000 (MD_INCLUDES): Add vector-pair.md.
+	* config/rs6000/vector-pair.md: New file.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document the
+	vector pair built-in functions.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-01.c: New test.
+	* gcc.target/powerpc/vector-pair-02.c: New test.
+	* gcc.target/powerpc/vector-pair-03.c: New test.
+	* gcc.target/powerpc/vector-pair-04.c: New test.
+	* gcc.target/powerpc/vector-pair-05.c: New test.
+	* gcc.target/powerpc/vector-pair-06.c: New test.
+	* gcc.target/powerpc/vector-pair-07.c: New test.
+	* gcc.target/powerpc/vector-pair-08.c: New test.
+
 ==================== Branch work134-vsubreg, patch #201 ====================
 
 Allow OOmode to tie with 128-bit vector modes.
