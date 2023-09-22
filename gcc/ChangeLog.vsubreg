@@ -1,8 +1,24 @@
 ==================== Branch work134-vsubreg, patch #204 ====================
 
+Fix typos.
+
+2023-09-22  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (split_unary_vector_pair): Fix typos and
+	thinkos.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pair): Likewise.
+	* config/rs6000/vector-pair.md (vpair_zero): Likewise.
+	instead of generating hard registers.
+	(vpair_get_vector_<vp_pmode>): Likewise.
+
+==================== Branch work134-vsubreg, patch #204 ====================
+
 Use simplify_gen_subreg instead of generating direct register number.
 
-2023-09-15  Michael Meissner  <meissner@linux.ibm.com>
+2023-09-21  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
