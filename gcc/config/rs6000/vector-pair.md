@@ -167,11 +167,9 @@
    (set (match_dup 2) (match_dup 3))]
 {
   rtx op0 = operands[0];
-  unsigned offset_hi = (WORDS_BIG_ENDIAN) ? 0 : 16;
-  unsigned offset_lo = (WORDS_BIG_ENDIAN) ? 16 : 0;
 
-  operands[1] = simplify_gen_subreg (V2DImode, op0, OOmode, offset_hi);
-  operands[2] = simplify_gen_subreg (V2DImode, op0, OOmode, offset_lo);
+  operands[1] = simplify_gen_subreg (V2DImode, op0, OOmode, 0);
+  operands[2] = simplify_gen_subreg (V2DImode, op0, OOmode, 16);
   operands[3] = CONST0_RTX (V2DImode);
 }
   [(set_attr "length" "8")])

@@ -27197,16 +27197,14 @@ split_unary_vector_pair (machine_mode mode,		/* vector mode.  */
 {
   rtx op0 = operands[0];
   rtx op1 = operands[1];
-  unsigned offset_hi = (WORDS_BIG_ENDIAN) ? 0 : 16;
-  unsigned offset_lo = (WORDS_BIG_ENDIAN) ? 16 : 0;
 
-  rtx reg0_hi = simplify_gen_subreg (mode, op0, OOmode, offset_hi);
-  rtx reg0_lo = simplify_gen_subreg (mode, op0, OOmode, offset_lo);
-  rtx reg1_hi = simplify_gen_subreg (mode, op1, OOmode, offset_hi);
-  rtx reg1_lo = simplify_gen_subreg (mode, op1, OOmode, offset_lo);
+  rtx reg0_vector0 = simplify_gen_subreg (mode, op0, OOmode, 0);
+  rtx reg1_vector0 = simplify_gen_subreg (mode, op1, OOmode, 0);
+  rtx reg0_vector1 = simplify_gen_subreg (mode, op0, OOmode, 16);
+  rtx reg1_vector1 = simplify_gen_subreg (mode, op1, OOmode, 16);
 
-  emit_insn (func (reg0_hi, reg1_hi));
-  emit_insn (func (reg0_lo, reg1_lo));
+  emit_insn (func (reg0_vector0, reg1_vector0));
+  emit_insn (func (reg0_vector1, reg1_vector1));
   return;
 }
 
@@ -27220,18 +27218,16 @@ split_binary_vector_pair (machine_mode mode,		/* vector mode.  */
   rtx op0 = operands[0];
   rtx op1 = operands[1];
   rtx op2 = operands[2];
-  unsigned offset_hi = (WORDS_BIG_ENDIAN) ? 0 : 16;
-  unsigned offset_lo = (WORDS_BIG_ENDIAN) ? 16 : 0;
 
-  rtx reg0_hi = simplify_gen_subreg (mode, op0, OOmode, offset_hi);
-  rtx reg0_lo = simplify_gen_subreg (mode, op0, OOmode, offset_lo);
-  rtx reg1_hi = simplify_gen_subreg (mode, op1, OOmode, offset_hi);
-  rtx reg1_lo = simplify_gen_subreg (mode, op1, OOmode, offset_lo);
-  rtx reg2_hi = simplify_gen_subreg (mode, op2, OOmode, offset_hi);
-  rtx reg2_lo = simplify_gen_subreg (mode, op2, OOmode, offset_lo);
+  rtx reg0_vector0 = simplify_gen_subreg (mode, op0, OOmode, 0);
+  rtx reg1_vector0 = simplify_gen_subreg (mode, op1, OOmode, 0);
+  rtx reg2_vector0 = simplify_gen_subreg (mode, op2, OOmode, 0);
+  rtx reg0_vector1 = simplify_gen_subreg (mode, op0, OOmode, 16);
+  rtx reg1_vector1 = simplify_gen_subreg (mode, op1, OOmode, 16);
+  rtx reg2_vector1 = simplify_gen_subreg (mode, op2, OOmode, 16);
 
-  emit_insn (func (reg0_hi, reg1_hi, reg2_hi));
-  emit_insn (func (reg0_lo, reg1_lo, reg2_lo));
+  emit_insn (func (reg0_vector0, reg1_vector0, reg2_vector0));
+  emit_insn (func (reg0_vector1, reg1_vector1, reg2_vector1));
   return;
 }
 
@@ -27246,21 +27242,20 @@ split_fma_vector_pair (machine_mode mode,		/* vector mode.  */
   rtx op0 = operands[0];
   rtx op1 = operands[1];
   rtx op2 = operands[2];
-  rtx op3 = operands[2];
-  unsigned offset_hi = (WORDS_BIG_ENDIAN) ? 0 : 16;
-  unsigned offset_lo = (WORDS_BIG_ENDIAN) ? 16 : 0;
+  rtx op3 = operands[3];
 
-  rtx reg0_hi = simplify_gen_subreg (mode, op0, OOmode, offset_hi);
-  rtx reg0_lo = simplify_gen_subreg (mode, op0, OOmode, offset_lo);
-  rtx reg1_hi = simplify_gen_subreg (mode, op1, OOmode, offset_hi);
-  rtx reg1_lo = simplify_gen_subreg (mode, op1, OOmode, offset_lo);
-  rtx reg2_hi = simplify_gen_subreg (mode, op2, OOmode, offset_hi);
-  rtx reg2_lo = simplify_gen_subreg (mode, op2, OOmode, offset_lo);
-  rtx reg3_hi = simplify_gen_subreg (mode, op3, OOmode, offset_hi);
-  rtx reg3_lo = simplify_gen_subreg (mode, op2, OOmode, offset_lo);
+  rtx reg0_vector0 = simplify_gen_subreg (mode, op0, OOmode, 0);
+  rtx reg1_vector0 = simplify_gen_subreg (mode, op1, OOmode, 0);
+  rtx reg2_vector0 = simplify_gen_subreg (mode, op2, OOmode, 0);
+  rtx reg3_vector0 = simplify_gen_subreg (mode, op3, OOmode, 0);
 
-  emit_insn (func (reg0_hi, reg1_hi, reg2_hi, reg3_hi));
-  emit_insn (func (reg0_lo, reg1_lo, reg2_lo, reg3_lo));
+  rtx reg0_vector1 = simplify_gen_subreg (mode, op0, OOmode, 16);
+  rtx reg1_vector1 = simplify_gen_subreg (mode, op1, OOmode, 16);
+  rtx reg2_vector1 = simplify_gen_subreg (mode, op2, OOmode, 16);
+  rtx reg3_vector1 = simplify_gen_subreg (mode, op3, OOmode, 16);
+
+  emit_insn (func (reg0_vector0, reg1_vector0, reg2_vector0, reg3_vector0));
+  emit_insn (func (reg0_vector1, reg1_vector1, reg2_vector1, reg3_vector1));
   return;
 }
 
