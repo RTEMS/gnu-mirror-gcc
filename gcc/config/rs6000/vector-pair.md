@@ -166,12 +166,13 @@
   [(set (match_dup 1) (match_dup 3))
    (set (match_dup 2) (match_dup 3))]
 {
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  rtvec vec_zero = gen_rtvec (2, const0_rtx, const0_rtx);
+  rtx op0 = operands[0];
+  unsigned offset_hi = (WORDS_BIG_ENDIAN) ? 0 : 16;
+  unsigned offset_lo = (WORDS_BIG_ENDIAN) ? 16 : 0;
 
-  operands[1] = gen_rtx_REG (V2DImode, reg0);
-  operands[2] = gen_rtx_REG (V2DImode, reg0 + 1);
-  operands[3] = gen_rtx_CONST_VECTOR (V2DImode, vec_zero);
+  operands[1] = simplify_gen_subreg (V2DImode, op0, OOmode, offset_hi);
+  operands[2] = simplify_gen_subreg (V2DImode, op0, OOmode, offset_lo);
+  operands[3] = CONST0_RTX (V2DImode);
 }
   [(set_attr "length" "8")])
 
@@ -213,12 +214,12 @@
   "&& reload_completed"
   [(set (match_dup 0) (match_dup 3))]
 {
-  unsigned reg1 = reg_or_subregno (operands[1]);
+  machine_mode vmode = <VP_VEC_MODE>mode;
   unsigned reg_num = UINTVAL (operands[2]);
   if (!WORDS_BIG_ENDIAN)
     reg_num = 1 - reg_num;
 	   
-  operands[3] = gen_rtx_REG (<VP_VEC_MODE>mode, reg1 + reg_num);
+  operands[3] = simplify_gen_subreg (vmode, operands[0], OOmode, reg_num * 16);
 })
 
 ;; Optimize extracting an 128-bit vector from a vector pair in memory.
