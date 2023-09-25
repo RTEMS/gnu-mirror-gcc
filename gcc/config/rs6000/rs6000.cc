@@ -27404,15 +27404,17 @@ split_unary_vector_pair (machine_mode mode,		/* vector mode.  */
 			 rtx operands[],		/* dest, src.  */
 			 rtx (*func)(rtx, rtx))		/* create insn.  */
 {
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  machine_mode orig_mode = GET_MODE (op0);
 
-  emit_insn (func (gen_rtx_REG (mode, reg0),
-		   gen_rtx_REG (mode, reg1)));
+  rtx reg0_vector0 = simplify_gen_subreg (mode, op0, orig_mode, 0);
+  rtx reg1_vector0 = simplify_gen_subreg (mode, op1, orig_mode, 0);
+  rtx reg0_vector1 = simplify_gen_subreg (mode, op0, orig_mode, 16);
+  rtx reg1_vector1 = simplify_gen_subreg (mode, op1, orig_mode, 16);
 
-  emit_insn (func (gen_rtx_REG (mode, reg0 + 1),
-		   gen_rtx_REG (mode, reg1 + 1)));
-
+  emit_insn (func (reg0_vector0, reg1_vector0));
+  emit_insn (func (reg0_vector1, reg1_vector1));
   return;
 }
 
@@ -27423,18 +27425,20 @@ split_binary_vector_pair (machine_mode mode,		/* vector mode.  */
 			 rtx operands[],		/* dest, src.  */
 			 rtx (*func)(rtx, rtx, rtx))	/* create insn.  */
 {
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  rtx op2 = operands[2];
+  machine_mode orig_mode = GET_MODE (op0);
 
-  emit_insn (func (gen_rtx_REG (mode, reg0),
-		   gen_rtx_REG (mode, reg1),
-		   gen_rtx_REG (mode, reg2)));
+  rtx reg0_vector0 = simplify_gen_subreg (mode, op0, orig_mode, 0);
+  rtx reg1_vector0 = simplify_gen_subreg (mode, op1, orig_mode, 0);
+  rtx reg2_vector0 = simplify_gen_subreg (mode, op2, orig_mode, 0);
+  rtx reg0_vector1 = simplify_gen_subreg (mode, op0, orig_mode, 16);
+  rtx reg1_vector1 = simplify_gen_subreg (mode, op1, orig_mode, 16);
+  rtx reg2_vector1 = simplify_gen_subreg (mode, op2, orig_mode, 16);
 
-  emit_insn (func (gen_rtx_REG (mode, reg0 + 1),
-		   gen_rtx_REG (mode, reg1 + 1),
-		   gen_rtx_REG (mode, reg2 + 1)));
-
+  emit_insn (func (reg0_vector0, reg1_vector0, reg2_vector0));
+  emit_insn (func (reg0_vector1, reg1_vector1, reg2_vector1));
   return;
 }
 
@@ -27446,21 +27450,24 @@ split_fma_vector_pair (machine_mode mode,		/* vector mode.  */
 		       rtx operands[],			/* dest, src.  */
 		       rtx (*func)(rtx, rtx, rtx, rtx))	/* create insn.  */
 {
-  unsigned reg0 = reg_or_subregno (operands[0]);
-  unsigned reg1 = reg_or_subregno (operands[1]);
-  unsigned reg2 = reg_or_subregno (operands[2]);
-  unsigned reg3 = reg_or_subregno (operands[3]);
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  rtx op2 = operands[2];
+  rtx op3 = operands[3];
+  machine_mode orig_mode = GET_MODE (op0);
 
-  emit_insn (func (gen_rtx_REG (mode, reg0),
-		   gen_rtx_REG (mode, reg1),
-		   gen_rtx_REG (mode, reg2),
-		   gen_rtx_REG (mode, reg3)));
+  rtx reg0_vector0 = simplify_gen_subreg (mode, op0, orig_mode, 0);
+  rtx reg1_vector0 = simplify_gen_subreg (mode, op1, orig_mode, 0);
+  rtx reg2_vector0 = simplify_gen_subreg (mode, op2, orig_mode, 0);
+  rtx reg3_vector0 = simplify_gen_subreg (mode, op3, orig_mode, 0);
 
-  emit_insn (func (gen_rtx_REG (mode, reg0 + 1),
-		   gen_rtx_REG (mode, reg1 + 1),
-		   gen_rtx_REG (mode, reg2 + 1),
-		   gen_rtx_REG (mode, reg3 + 1)));
+  rtx reg0_vector1 = simplify_gen_subreg (mode, op0, orig_mode, 16);
+  rtx reg1_vector1 = simplify_gen_subreg (mode, op1, orig_mode, 16);
+  rtx reg2_vector1 = simplify_gen_subreg (mode, op2, orig_mode, 16);
+  rtx reg3_vector1 = simplify_gen_subreg (mode, op3, orig_mode, 16);
 
+  emit_insn (func (reg0_vector0, reg1_vector0, reg2_vector0, reg3_vector0));
+  emit_insn (func (reg0_vector1, reg1_vector1, reg2_vector1, reg3_vector1));
   return;
 }
 
