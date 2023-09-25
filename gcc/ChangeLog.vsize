@@ -1,3 +1,18 @@
+==================== Branch work134-vsize, patch #401 ====================
+
+Adjust vector pair split functions.
+
+2023-09-21  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (split_unary_vector_pair): Add code to allow
+	split to be done before register allocation time.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pair): Likewise.
+	* config/rs6000/vector-pair.md (vpair_get_vector_<vp_pmode>): Add code
+	to allow split to be done before register allocation time.
+
 ==================== Branch work134-vsize, patch #400 ====================
 
 Add support for -mvector-pair.
