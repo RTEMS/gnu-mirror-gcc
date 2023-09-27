@@ -1308,6 +1308,14 @@ vlmul_for_first_sew_second_ratio (const vector_insn_info &info1,
   return calculate_vlmul (info1.get_sew (), info2.get_ratio ());
 }
 
+static vlmul_type
+vlmul_for_greatest_sew_second_ratio (const vector_insn_info &info1,
+				     const vector_insn_info &info2)
+{
+  return calculate_vlmul (MAX (info1.get_sew (), info2.get_sew ()),
+			  info2.get_ratio ());
+}
+
 static unsigned
 ratio_for_second_sew_first_vlmul (const vector_insn_info &info1,
 				  const vector_insn_info &info2)
@@ -1506,7 +1514,6 @@ earliest_pred_can_be_fused_p (const bb_info *earliest_pred,
 			      const vector_insn_info &earliest_info,
 			      const vector_insn_info &expr, rtx *vlmax_vl)
 {
-  rtx vl = NULL_RTX;
   /* Backward VLMAX VL:
        bb 3:
 	 vsetivli zero, 1 ... -> vsetvli t1, zero
@@ -1518,10 +1525,9 @@ earliest_pred_can_be_fused_p (const bb_info *earliest_pred,
        We should forward "t1".  */
   if (!earliest_info.has_avl_reg () && expr.has_avl_reg ())
     {
-      rtx avl = expr.get_avl ();
+      rtx avl_or_vl_reg = expr.get_avl_or_vl_reg ();
+      gcc_assert (avl_or_vl_reg);
       const insn_info *last_insn = earliest_info.get_insn ();
-      if (vlmax_avl_p (avl))
-	vl = get_vl (expr.get_insn ()->rtl ());
       /* To fuse demand on earlest edge, we make sure AVL/VL
 	 didn't change from the consume insn to the predecessor
 	 of the edge.  */
@@ -1530,17 +1536,15 @@ earliest_pred_can_be_fused_p (const bb_info *earliest_pred,
 	   && after_or_same_p (i, last_insn);
 	   i = i->prev_nondebug_insn ())
 	{
-	  if (!vl && find_access (i->defs (), REGNO (avl)))
+	  if (find_access (i->defs (), REGNO (avl_or_vl_reg)))
 	    return false;
-	  if (vl && find_access (i->defs (), REGNO (vl)))
-	    return false;
-	  if (vl && find_access (i->uses (), REGNO (vl)))
+	  if (find_access (i->uses (), REGNO (avl_or_vl_reg)))
 	    return false;
 	}
+      if (vlmax_vl && vlmax_avl_p (expr.get_avl ()))
+	*vlmax_vl = avl_or_vl_reg;
     }
 
-  if (vlmax_vl)
-    *vlmax_vl = vl;
   return true;
 }
 
@@ -1791,10 +1795,11 @@ vector_insn_info::operator== (const vector_insn_info &other) const
     if (m_demands[i] != other.demand_p ((enum demand_type) i))
       return false;
 
-  if (vector_config_insn_p (m_insn->rtl ())
-      || vector_config_insn_p (other.get_insn ()->rtl ()))
-    if (m_insn != other.get_insn ())
-      return false;
+  /* We should consider different INSN demands as different
+     expression.  Otherwise, we will be doing incorrect vsetvl
+     elimination.  */
+  if (m_insn != other.get_insn ())
+    return false;
 
   if (!same_avl_p (other))
     return false;

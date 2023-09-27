@@ -5048,9 +5048,11 @@ package body Sem_Ch3 is
             Apply_Length_Check (E, T);
          end if;
 
-      --  When possible, build the default subtype
+      --  When possible, and not a deferred constant, build the default subtype
 
-      elsif Build_Default_Subtype_OK (T) then
+      elsif Build_Default_Subtype_OK (T)
+        and then (not Constant_Present (N) or else Present (E))
+      then
          if No (E) then
             Act_T := Build_Default_Subtype (T, N);
          else
@@ -9599,9 +9601,15 @@ package body Sem_Ch3 is
 
       --  AI-419: Limitedness is not inherited from an interface parent, so to
       --  be limited in that case the type must be explicitly declared as
-      --  limited. However, task and protected interfaces are always limited.
+      --  limited, or synchronized. While task and protected interfaces are
+      --  always limited, a synchronized private extension might not inherit
+      --  from such interfaces, and so we also need to recognize the
+      --  explicit limitedness implied by a synchronized private extension
+      --  that does not derive from a synchronized interface (see RM-7.3(6/2)).
 
-      if Limited_Present (Type_Def) then
+      if Limited_Present (Type_Def)
+        or else Synchronized_Present (Type_Def)
+      then
          Set_Is_Limited_Record (Derived_Type);
 
       elsif Is_Limited_Record (Parent_Type)

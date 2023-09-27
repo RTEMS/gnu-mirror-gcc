@@ -113,7 +113,6 @@ static rtx expand_builtin_apply_args (void);
 static rtx expand_builtin_apply_args_1 (void);
 static rtx expand_builtin_apply (rtx, rtx, rtx);
 static void expand_builtin_return (rtx);
-static enum type_class type_to_class (tree);
 static rtx expand_builtin_classify_type (tree);
 static rtx expand_builtin_mathfn_3 (tree, rtx, rtx);
 static rtx expand_builtin_mathfn_ternary (tree, rtx, rtx);
@@ -1853,7 +1852,7 @@ expand_builtin_return (rtx result)
 
 /* Used by expand_builtin_classify_type and fold_builtin_classify_type.  */
 
-static enum type_class
+int
 type_to_class (tree type)
 {
   switch (TREE_CODE (type))
@@ -8388,7 +8387,10 @@ expand_builtin (tree exp, rtx target, rtx subtarget, machine_mode mode,
       break;
 
     case BUILT_IN_ATOMIC_TEST_AND_SET:
-      return expand_builtin_atomic_test_and_set (exp, target);
+      target = expand_builtin_atomic_test_and_set (exp, target);
+      if (target)
+	return target;
+      break;
 
     case BUILT_IN_ATOMIC_CLEAR:
       return expand_builtin_atomic_clear (exp);
