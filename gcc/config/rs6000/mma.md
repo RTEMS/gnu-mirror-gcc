@@ -298,19 +298,12 @@
   "TARGET_MMA
    && (gpc_reg_operand (operands[0], OOmode)
        || gpc_reg_operand (operands[1], OOmode))"
-{
-  if (MEM_P (operands[0]))
-    return TARGET_STORE_VECTOR_PAIR ? "stxvp%X0 %x1,%0" : "#";
-
-  if (MEM_P (operands[1]))
-    return TARGET_LOAD_VECTOR_PAIR ? "lxvp%X1 %x0,%1" : "#";
-
-  return "#";
-}
+  "@
+   lxvp%X1 %x0,%1
+   stxvp%X0 %x1,%0
+   #"
   "&& reload_completed
-   && ((MEM_P (operands[0]) && !TARGET_STORE_VECTOR_PAIR)
-       || (MEM_P (operands[1]) && !TARGET_LOAD_VECTOR_PAIR)
-       || (!MEM_P (operands[0]) && !MEM_P (operands[1])))"
+   && (!MEM_P (operands[0]) && !MEM_P (operands[1]))"
   [(const_int 0)]
 {
   rs6000_split_multireg_move (operands[0], operands[1]);
