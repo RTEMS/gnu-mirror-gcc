@@ -605,6 +605,10 @@ menable-store-vector-pair
 Target Undocumented Var(TARGET_STORE_VECTOR_PAIR) Init(1) Save
 Generate (do not generate) store vector pair instructions.
 
+mvector-size-32
+Target Undocumented Var(TARGET_VECTOR_SIZE_32) Init(0) Save
+Generate (do not generate) vector pair instructions for vector_size(32).
+
 mrelative-jumptables
 Target Undocumented Var(rs6000_relative_jumptables) Init(1) Save
 
