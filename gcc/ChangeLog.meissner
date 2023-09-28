@@ -1,4 +1,59 @@
+==================== Branch work135, patch #1 ====================
+
+Replace UNSPEC_COPYSIGN with copysign RTL
+
+When I first implemented COPYSIGN support in the power7 days, we did not have a
+copysign RTL insn, so I had to use UNSPEC to represent the copysign
+instruction.  This patch removes those UNSPECs, and it uses the native RTL
+copysign insn.
+
+2023-09-28  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.md (UNSPEC_COPYSIGN): Delete.
+	(copysign<mode>3_fcpsg): Use copysign RTL instead of UNSPEC.
+	(copysign<mode>3_hard): Likewise.
+	(copysign<mode>3_soft): Likewise.
+	* config/rs6000/vector.md (vector_copysign<mode>3): Use copysign RTL
+	instead of UNSPEC.
+	* config/rs6000/vsx.md (vsx_copysign<mode>3): Use copysign RTL instead
+	of UNSPEC.
+
 ==================== Branch work135, baseline ====================
+
+Add ChangeLog.meissner and REVISION.
+
+2023-09-28  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* REVISION: New file for branch.
+	* ChangeLog.meissner: New file.
+
+gcc/c-family/
+
+	* ChangeLog.meissner: New file.
+
+gcc/c/
+
+	* ChangeLog.meissner: New file.
+
+gcc/cp/
+
+	* ChangeLog.meissner: New file.
+
+gcc/fortran/
+
+	* ChangeLog.meissner: New file.
+
+gcc/testsuite/
+
+	* ChangeLog.meissner: New file.
+
+libgcc/
+
+	* ChangeLog.meissner: New file.
 
 2023-09-28   Michael Meissner  <meissner@linux.ibm.com>
 
