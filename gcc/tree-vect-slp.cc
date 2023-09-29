@@ -3643,6 +3643,7 @@ vect_analyze_slp_instance (vec_info *vinfo,
 opt_result
 vect_analyze_slp (vec_info *vinfo, unsigned max_tree_size)
 {
+  loop_vec_info loop_vinfo = dyn_cast <loop_vec_info> (vinfo);
   unsigned int i;
   stmt_vec_info first_element;
   slp_instance instance;
@@ -3658,6 +3659,31 @@ vect_analyze_slp (vec_info *vinfo, unsigned max_tree_size)
   FOR_EACH_VEC_ELT (vinfo->grouped_stores, i, first_element)
     vect_analyze_slp_instance (vinfo, bst_map, first_element,
 			       slp_inst_kind_store, max_tree_size, &limit);
+  if (loop_vinfo && param_vect_single_lane_slp != 0)
+    {
+      data_reference_p dr;
+      FOR_EACH_VEC_ELT (vinfo->shared->datarefs, i, dr)
+	if (DR_IS_WRITE (dr))
+	  {
+	    stmt_vec_info stmt_info = vinfo->lookup_dr (dr)->stmt;
+	    /* It works a bit to dissolve the group but that's
+	       not really what we want to do.  Instead group analysis
+	       above starts discovery for each lane and pieces them together
+	       to a single store to the whole group.  */
+	    if (STMT_VINFO_GROUPED_ACCESS (stmt_info))
+	      continue;
+	    vec<stmt_vec_info> stmts;
+	    vec<stmt_vec_info> roots = vNULL;
+	    vec<tree> remain = vNULL;
+	    stmts.create (1);
+	    stmts.quick_push (stmt_info);
+	    bool res = vect_build_slp_instance (vinfo, slp_inst_kind_store,
+						stmts, roots, remain,
+						max_tree_size, &limit,
+						bst_map, NULL);
+	    gcc_assert (res);
+	  }
+    }
 
   if (bb_vec_info bb_vinfo = dyn_cast <bb_vec_info> (vinfo))
     {
