@@ -605,6 +605,10 @@ menable-store-vector-pair
 Target Undocumented Mask(STORE_VECTOR_PAIR) Var(rs6000_isa_flags)
 Generate (do not generate) store vector pair instructions.
 
+mvector-size-32
+Target Undocumented Mask(VECTOR_SIZE_32) Var(rs6000_isa_flags)
+Generate (do not generate) vector pair instructions for vector_size(32).
+
 mrelative-jumptables
 Target Undocumented Var(rs6000_relative_jumptables) Init(1) Save
 
