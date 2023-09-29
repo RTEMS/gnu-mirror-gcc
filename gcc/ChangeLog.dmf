@@ -1,4 +1,551 @@
+==================== Branch work137-dmf, patch #107 ====================
+
+Add saturating subtract built-ins.
+
+This patch adds support for a saturating subtract built-in function that may be
+added to a future PowerPC processor.  Note, if it is added, the name of the
+built-in function may change before GCC 13 is released.  If the name changes,
+we will submit a patch changing the name.
+
+I also added support for providing dense math built-in functions, even though
+at present, we have not added any new built-in functions for dense math.  It is
+likely we will want to add new dense math built-in functions as the dense math
+support is fleshed out.
+
+2023-09-29   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_invalid_builtin): Add support
+	for flagging invalid use of future built-in functions.
+	(rs6000_builtin_is_supported): Add support for future built-in
+	functions.
+	* config/rs6000/rs6000-builtins.def (__builtin_saturate_subtract32): New
+	built-in function for -mcpu=future.
+	(__builtin_saturate_subtract64): Likewise.
+	* config/rs6000/rs6000-gen-builtins.cc (enum bif_stanza): Add stanzas
+	for -mcpu=future built-ins.
+	(stanza_map): Likewise.
+	(enable_string): Likewise.
+	(struct attrinfo): Likewise.
+	(parse_bif_attrs): Likewise.
+	(write_decls): Likewise.
+	* config/rs6000/rs6000.md (sat_sub<mode>3): Add saturating subtract
+	built-in insn declarations.
+	(sat_sub<mode>3_dot): Likewise.
+	(sat_sub<mode>3_dot2): Likewise.
+	* doc/extend.texi (Future PowerPC built-ins): New section.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/subfus-1.c: New test.
+	* gcc.target/powerpc/subfus-2.c: Likewise.
+
+==================== Branch work137-dmf, patch #106 ====================
+
+Support load/store vector with right length.
+
+This patch adds support for new instructions that may be added to the PowerPC
+architecture in the future to enhance the load and store vector with length
+instructions.
+
+The current instructions (lxvl, lxvll, stxvl, and stxvll) are inconvient to use
+since the count for the number of bytes must be in the top 8 bits of the GPR
+register, instead of the bottom 8 bits.  This meant that code generating these
+instructions typically had to do a shift left by 56 bits to get the count into
+the right position.  In a future version of the PowerPC architecture, new
+variants of these instructions might be added that expect the count to be in
+the bottom 8 bits of the GPR register.  These patches add this support to GCC
+if the user uses the -mcpu=future option.
+
+I discovered that the code in rs6000-string.cc to generate ISA 3.1 lxvl/stxvl
+future lxvll/stxvll instructions would generate these instructions on 32-bit.
+However the patterns for these instructions is only done on 64-bit systems.  So
+I added a check for 64-bit support before generating the instructions.
+
+2023-09-29   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-string.cc (expand_block_move): Do not generate
+	lxvl and stxvl on 32-bit.
+	* config/rs6000/vsx.md (lxvl): If -mcpu=future, generate the lxvl with
+	the shift count automaticaly used in the insn.
+	(lxvrl): New insn for -mcpu=future.
+	(lxvrll): Likewise.
+	(stxvl): If -mcpu=future, generate the stxvl with the shift count
+	automaticaly used in the insn.
+	(stxvrl): New insn for -mcpu=future.
+	(stxvrll): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/lxvrl.c: New test.
+	* lib/target-supports.exp (check_effective_target_powerpc_future_ok):
+	New effective target.
+
+==================== Branch work137-dmf, patch #105 ====================
+
+PowerPC: Add support for 1,024 bit DMR registers.
+
+This patch is a prelimianry patch to add the full 1,024 bit dense math register
+(DMRs) for -mcpu=future.  The MMA 512-bit accumulators map onto the top of the
+DMR register.
+
+This patch only adds the new 1,024 bit register support.  It does not add
+support for any instructions that need 1,024 bit registers instead of 512 bit
+registers.
+
+I used the new mode 'TDOmode' to be the opaque mode used for 1,204 bit
+registers.  The 'wD' constraint added in previous patches is used for these
+registers.  I added support to do load and store of DMRs via the VSX registers,
+since there are no load/store dense math instructions.  I added the new keyword
+'__dmr' to create 1,024 bit types that can be loaded into DMRs.  At present, I
+don't have aliases for __dmr512 and __dmr1024 that we've discussed internally.
+
+The patches have been tested on the following platforms.  I added the patches
+for PR target/107299 that I submitted on November 2nd before doing the builds so
+that GCC would build on systems using IEEE 128-bit long double.
+    *	https://gcc.gnu.org/pipermail/gcc-patches/2022-November/604834.html
+
+The new __dmr type that is being added as a possible future PowerPC instruction
+set bumps into a structure field size issue.  The size of the __dmr type is 1024 bits.
+The precision field in tree_type_common is currently 10 bits, so if you store
+1,024 into field, you get a 0 back.  When you get 0 in the precision field, the
+ccp pass passes this 0 to sext_hwi in hwint.h.  That function in turn generates
+a shift that is equal to the host wide int bit size, which is undefined as
+machine dependent for shifting in C/C++.
+
+      int shift = HOST_BITS_PER_WIDE_INT - prec;
+      return ((HOST_WIDE_INT) ((unsigned HOST_WIDE_INT) src << shift)) >> shift;
+
+2023-09-29   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (UNSPEC_DM_INSERT512_UPPER): New unspec.
+	(UNSPEC_DM_INSERT512_LOWER): Likewise.
+	(UNSPEC_DM_EXTRACT512): Likewise.
+	(UNSPEC_DMR_RELOAD_FROM_MEMORY): Likewise.
+	(UNSPEC_DMR_RELOAD_TO_MEMORY): Likewise.
+	(movtdo): New define_expand and define_insn_and_split to implement 1,024
+	bit DMR registers.
+	(movtdo_insert512_upper): New insn.
+	(movtdo_insert512_lower): Likewise.
+	(movtdo_extract512): Likewise.
+	(reload_dmr_from_memory): Likewise.
+	(reload_dmr_to_memory): Likewise.
+	* config/rs6000/rs6000-builtin.cc (rs6000_type_string): Add DMR
+	support.
+	(rs6000_init_builtins): Add support for __dmr keyword.
+	* config/rs6000/rs6000-call.cc (rs6000_return_in_memory): Add support
+	for TDOmode.
+	(rs6000_function_arg): Likewise.
+	* config/rs6000/rs6000-modes.def (TDOmode): New mode.
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_nregs_internal): Add
+	support for TDOmode.
+	(rs6000_hard_regno_mode_ok_uncached): Likewise.
+	(rs6000_hard_regno_mode_ok): Likewise.
+	(rs6000_modes_tieable_p): Likewise.
+	(rs6000_debug_reg_global): Likewise.
+	(rs6000_setup_reg_addr_masks): Likewise.
+	(rs6000_init_hard_regno_mode_ok): Add support for TDOmode.  Setup reload
+	hooks for DMR mode.
+	(reg_offset_addressing_ok_p): Add support for TDOmode.
+	(rs6000_emit_move): Likewise.
+	(rs6000_secondary_reload_simple_move): Likewise.
+	(rs6000_secondary_reload_class): Likewise.
+	(rs6000_mangle_type): Add mangling for __dmr type.
+	(rs6000_dmr_register_move_cost): Add support for TDOmode.
+	(rs6000_split_multireg_move): Likewise.
+	(rs6000_invalid_conversion): Likewise.
+	* config/rs6000/rs6000.h (VECTOR_ALIGNMENT_P): Add TDOmode.
+	(enum rs6000_builtin_type_index): Add DMR type nodes.
+	(dmr_type_node): Likewise.
+	(ptr_dmr_type_node): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/dm-1024bit.c: New test.
+
+==================== Branch work137-dmf, patch #104 ====================
+
+PowerPC: Switch to dense math names for all MMA operations.
+
+This patch changes the assembler instruction names for MMA instructions from
+the original name used in power10 to the new name when used with the dense math
+system.  I.e. xvf64gerpp becomes dmxvf64gerpp.  The assembler will emit the
+same bits for either spelling.
+
+The patches have been tested on the following platforms.  I added the patches
+for PR target/107299 that I submitted on November 2nd before doing the builds so
+that GCC would build on systems using IEEE 128-bit long double.
+    *	https://gcc.gnu.org/pipermail/gcc-patches/2022-November/604834.html
+
+2023-09-29   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (vvi4i4i8_dm): New int attribute.
+	(avvi4i4i8_dm): Likewise.
+	(vvi4i4i2_dm): Likewise.
+	(avvi4i4i2_dm): Likewise.
+	(vvi4i4_dm): Likewise.
+	(avvi4i4_dm): Likewise.
+	(pvi4i2_dm): Likewise.
+	(apvi4i2_dm): Likewise.
+	(vvi4i4i4_dm): Likewise.
+	(avvi4i4i4_dm): Likewise.
+	(mma_<vv>): Add support for running on DMF systems, generating the dense
+	math instruction and using the dense math accumulators.
+	(mma_<avv>): Likewise.
+	(mma_<pv>): Likewise.
+	(mma_<apv>): Likewise.
+	(mma_<vvi4i4i8>): Likewise.
+	(mma_<avvi4i4i8>): Likewise.
+	(mma_<vvi4i4i2>): Likewise.
+	(mma_<avvi4i4i2>): Likewise.
+	(mma_<vvi4i4>): Likewise.
+	(mma_<avvi4i4): Likewise.
+	(mma_<pvi4i2>): Likewise.
+	(mma_<apvi4i2): Likewise.
+	(mma_<vvi4i4i4>): Likewise.
+	(mma_<avvi4i4i4>): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/dm-double-test.c: New test.
+	* lib/target-supports.exp (check_effective_target_ppc_dmr_ok): New
+	target test.
+
+==================== Branch work137-dmf, patch #103 ====================
+
+PowerPC: Make MMA insns support DMR registers.
+
+This patch changes the MMA instructions to use either FPR registers
+(-mcpu=power10) or DMRs (-mcpu=future).  In this patch, the existing MMA
+instruction names are used.
+
+A macro (__PPC_DMR__) is defined if the MMA instructions use the DMRs.
+
+The patches have been tested on the following platforms.  I added the patches
+for PR target/107299 that I submitted on November 2nd before doing the builds so
+that GCC would build on systems using IEEE 128-bit long double.
+    *	https://gcc.gnu.org/pipermail/gcc-patches/2022-November/604834.html
+
+2023-09-29   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (mma_<acc>): New define_expand to handle
+	mma_<acc> for dense math and non dense math.
+	(mma_<acc> insn): Restrict to non dense math.
+	(mma_xxsetaccz): Convert to define_expand to handle non dense math and
+	dense math.
+	(mma_xxsetaccz_vsx): Rename from mma_xxsetaccz and restrict usage to non
+	dense math.
+	(mma_xxsetaccz_dm): Dense math version of mma_xxsetaccz.
+	(mma_<vv>): Add support for dense math.
+	(mma_<avv>): Likewise.
+	(mma_<pv>): Likewise.
+	(mma_<apv>): Likewise.
+	(mma_<vvi4i4i8>): Likewise.
+	(mma_<avvi4i4i8>): Likewise.
+	(mma_<vvi4i4i2>): Likewise.
+	(mma_<avvi4i4i2>): Likewise.
+	(mma_<vvi4i4>): Likewise.
+	(mma_<avvi4i4>): Likewise.
+	(mma_<pvi4i2>): Likewise.
+	(mma_<apvi4i2>): Likewise.
+	(mma_<vvi4i4i4>): Likewise.
+	(mma_<avvi4i4i4>): Likewise.
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
+	__PPC_DMR__ if we have dense math instructions.
+	* config/rs6000/rs6000.cc (print_operand): Make %A handle only DMRs if
+	dense math and only FPRs if not dense math.
+	(rs6000_split_multireg_move): Do not generate the xxmtacc instruction to
+	prime the DMR registers or the xxmfacc instruction to de-prime
+	instructions if we have dense math register support.
+
+==================== Branch work137-dmf, patch #102 ====================
+
+PowerPC: Add support for accumulators in DMR registers.
+
+The MMA subsystem added the notion of accumulator registers as an optional
+feature of ISA 3.1.  In ISA 3.1, these accumulators overlapped with the VSX
+vector registers 0..31, but logically the accumulator registers were separate
+from the FPR registers.  In ISA 3.1, it was anticipated that in future systems,
+the accumulator registers may no overlap with the FPR registers.  This patch
+adds the support for dense math registers as separate registers.
+
+These changes are preliminary.  They are expected to change over time.
+
+This particular patch does not change the MMA support to use the accumulators
+within the dense math registers.  This patch just adds the basic support for
+having separate DMRs.  The next patch will switch the MMA support to use the
+accumulators if -mcpu=future is used.
+
+For testing purposes, I added an undocumented option '-mdense-math' to enable
+or disable the dense math support.
+
+This patch adds a new constraint (wD).  If MMA is selected but dense math is
+not selected (i.e. -mcpu=power10), the wD constraint will allow access to
+accumulators that overlap with the VSX vector registers 0..31.  If both MMA and
+dense math are selected (i.e. -mcpu=future), the wD constraint will only allow
+dense math registers.
+
+This patch modifies the existing %A output modifier.  If MMA is selected but
+dense math is not selected, then %A output modifier converts the VSX register
+number to the accumulator number, by dividing it by 4.  If both MMA and dense
+math are selected, then %A will map the separate DMR registers into 0..7.
+
+The intention is that user code using extended asm can be modified to run on
+both MMA without dense math and MMA with dense math:
+
+    1)	If possible, don't use extended asm, but instead use the MMA built-in
+	functions;
+
+    2)	If you do need to write extended asm, change the d constraints
+	targetting accumulators should now use wD;
+
+    3)	Only use the built-in zero, assemble and disassemble functions create
+	move data between vector quad types and dense math accumulators.
+	I.e. do not use the xxmfacc, xxmtacc, and xxsetaccz directly in the
+	extended asm code.  The reason is these instructions assume there is a
+	1-to-1 correspondence between 4 adjacent FPR registers and an
+	accumulator that overlaps with those instructions.  With accumulators
+	now being separate registers, there no longer is a 1-to-1
+	correspondence.
+
+It is possible that the mangling for DMRs and the GDB register numbers may
+change in the future.
+
+2023-09-29   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/constraints.md (wD constraint): New constraint.
+	* config/rs6000/mma.md (UNSPEC_DM_ASSEMBLE_ACC): New unspec.
+	(movxo): Convert into define_expand.
+	(movxo_vsx): Version of movxo where accumulators overlap with VSX vector
+	registers 0..31.
+	(movxo_dm): Verson of movxo that supports separate dense math
+	accumulators.
+	(mma_assemble_acc): Add dense math support to define_expand.
+	(mma_assemble_acc_vsx): Rename from mma_assemble_acc, and restrict it to
+	non dense math systems.
+	(mma_assemble_acc_dm): Dense math version of mma_assemble_acc.
+	(mma_disassemble_acc): Add dense math support to define_expand.
+	(mma_disassemble_acc_vsx): Rename from mma_disassemble_acc, and restrict
+	it to non dense math systems.
+	(mma_disassemble_acc_dm): Dense math version of mma_disassemble_acc.
+	* config/rs6000/predicates.md (dmr_operand): New predicate.
+	(accumulator_operand): Likewise.
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS): Add -mdense-math.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.cc (enum rs6000_reg_type): Add DMR_REG_TYPE.
+	(enum rs6000_reload_reg_type): Add RELOAD_REG_DMR.
+	(LAST_RELOAD_REG_CLASS): Add support for DMR registers and the wD
+	constraint.
+	(reload_reg_map): Likewise.
+	(rs6000_reg_names): Likewise.
+	(alt_reg_names): Likewise.
+	(rs6000_hard_regno_nregs_internal): Likewise.
+	(rs6000_hard_regno_mode_ok_uncached): Likewise.
+	(rs6000_debug_reg_global): Likewise.
+	(rs6000_setup_reg_addr_masks): Likewise.
+	(rs6000_init_hard_regno_mode_ok): Likewise.
+	(rs6000_option_override_internal): Add checking for -mdense-math.
+	(rs6000_secondary_reload_memory): Add support for DMR registers.
+	(rs6000_secondary_reload_simple_move): Likewise.
+	(rs6000_preferred_reload_class): Likewise.
+	(rs6000_secondary_reload_class): Likewise.
+	(print_operand): Make %A handle both FPRs and DMRs.
+	(rs6000_dmr_register_move_cost): New helper function.
+	(rs6000_register_move_cost): Add support for DMR registers.
+	(rs6000_memory_move_cost): Likewise.
+	(rs6000_compute_pressure_classes): Likewise.
+	(rs6000_debugger_regno): Likewise.
+	(rs6000_opt_masks): Add -mdense-math.
+	(rs6000_split_multireg_move): Add support for DMRs.
+	* config/rs6000/rs6000.h (UNITS_PER_DMR_WORD): New macro.
+	(FIRST_PSEUDO_REGISTER): Update for DMRs.
+	(FIXED_REGISTERS): Add DMRs.
+	(CALL_REALLY_USED_REGISTERS): Likewise.
+	(REG_ALLOC_ORDER): Likewise.
+	(enum reg_class): Add DM_REGS.
+	(REG_CLASS_NAMES): Likewise.
+	(REG_CLASS_CONTENTS): Likewise.
+	* config/rs6000/rs6000.md (FIRST_DMR_REGNO): New constant.
+	(LAST_DMR_REGNO): Likewise.
+	(isa attribute): Add 'dm' and 'not_dm' attributes.
+	(enabled attribute): Support 'dm' and 'not_dm' attributes.
+	* config/rs6000/rs6000.opt (-mdense-math): New switch.
+	* doc/md.texi (PowerPC constraints): Document wD constraint.
+
+==================== Branch work137-dmf, patch #101 ====================
+
+PowerPC: Make -mcpu=future enable -mblock-ops-vector-pair.
+
+This patch enables generating load and store vector pair instructions when
+doing certain memory copy operations when -mcpu=future is used.  In doing tests
+on power10, it was determined that using these instructions were problematical
+in a few cases, so we disabled generating them by default.  This patch
+re-enabled generating these instructions if -mcpu=future is used.
+
+The patches have been tested on the following platforms.  I added the patches
+for PR target/107299 that I submitted on November 2nd before doing the builds so
+that GCC would build on systems using IEEE 128-bit long double.
+    *	https://gcc.gnu.org/pipermail/gcc-patches/2022-November/604834.html
+
+2023-09-29   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS): Add
+	-mblock-ops-vector-pair.
+	(POWERPC_MASKS): Likewise.
+
+==================== Branch work137-dmf, patch #100 ====================
+
+PowerPC: Add -mcpu=future.
+
+These patches implement support for potential future PowerPC cpus.  At this
+time, features enabled with -mcpu=future may or may not be in actual PowerPCs
+that will be delivered in the future.
+
+This patch adds support for the -mcpu=future and -mtune=future options.
+If you use -mcpu=future, the macro __ARCH_PWR_FUTURE__ is defined, and the
+assembler .machine directive "future" is used.  Future patches in this
+series will add support for new instructions that may be present in future
+PowerPC processors.
+
+At the moment, we do not have any differences in tuning between power10 and
+future.  It is anticipated that we may change the tuning characteristics for
+-mtune=future at a later time.
+
+The patches have been tested on the following platforms.  I added the patches
+for PR target/107299 that I submitted on November 2nd before doing the builds so
+that GCC would build on systems using IEEE 128-bit long double.
+	* https://gcc.gnu.org/pipermail/gcc-patches/2022-November/604834.html
+
+2023-09-29   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/power10.md (power10-load): Temporarily treat
+	-mcpu=future the same as -mcpu=power10.
+	(power10-fused-load): Likewise.
+	(power10-prefixed-load): Likewise.
+	(power10-prefixed-load): Likewise.
+	(power10-load-update): Likewise.
+	(power10-fpload-double): Likewise.
+	(power10-fpload-double): Likewise.
+	(power10-prefixed-fpload-double): Likewise.
+	(power10-prefixed-fpload-double): Likewise.
+	(power10-fpload-update-double): Likewise.
+	(power10-fpload-single): Likewise.
+	(power10-fpload-update-single): Likewise.
+	(power10-vecload): Likewise.
+	(power10-vecload-pair): Likewise.
+	(power10-store): Likewise.
+	(power10-fused-store): Likewise.
+	(power10-prefixed-store): Likewise.
+	(power10-prefixed-store): Likewise.
+	(power10-store-update): Likewise.
+	(power10-vecstore-pair): Likewise.
+	(power10-larx): Likewise.
+	(power10-lq): Likewise.
+	(power10-stcx): Likewise.
+	(power10-stq): Likewise.
+	(power10-sync): Likewise.
+	(power10-sync): Likewise.
+	(power10-alu): Likewise.
+	(power10-fused_alu): Likewise.
+	(power10-paddi): Likewise.
+	(power10-rot): Likewise.
+	(power10-rot-compare): Likewise.
+	(power10-alu2): Likewise.
+	(power10-cmp): Likewise.
+	(power10-two): Likewise.
+	(power10-three): Likewise.
+	(power10-mul): Likewise.
+	(power10-mul-compare): Likewise.
+	(power10-div): Likewise.
+	(power10-div-compare): Likewise.
+	(power10-crlogical): Likewise.
+	(power10-mfcrf): Likewise.
+	(power10-mfcr): Likewise.
+	(power10-mtcr): Likewise.
+	(power10-mtjmpr): Likewise.
+	(power10-mfjmpr): Likewise.
+	(power10-mfjmpr): Likewise.
+	(power10-fpsimple): Likewise.
+	(power10-fp): Likewise.
+	(power10-fpcompare): Likewise.
+	(power10-sdiv): Likewise.
+	(power10-ddiv): Likewise.
+	(power10-sqrt): Likewise.
+	(power10-dsqrt): Likewise.
+	(power10-vec-2cyc): Likewise.
+	(power10-fused-vec): Likewise.
+	(power10-veccmp): Likewise.
+	(power10-vecsimple): Likewise.
+	(power10-vecnormal): Likewise.
+	(power10-qp): Likewise.
+	(power10-vecperm): Likewise.
+	(power10-vecperm-compare): Likewise.
+	(power10-prefixed-vecperm): Likewise.
+	(power10-veccomplex): Likewise.
+	(power10-vecfdiv): Likewise.
+	(power10-vecdiv): Likewise.
+	(power10-qpdiv): Likewise.
+	(power10-qpmul): Likewise.
+	(power10-mtvsr): Likewise.
+	(power10-mfvsr): Likewise.
+	(power10-mfvsr): Likewise.
+	(power10-branch): Likewise.
+	(power10-fused-branch): Likewise.
+	(power10-crypto): Likewise.
+	(power10-htm): Likewise.
+	(power10-htm): Likewise.
+	(power10-dfp): Likewise.
+	(power10-dfpq): Likewise.
+	(power10-mma): Likewise.
+	(power10-prefixed-mma): Likewise.
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
+	__ARCH_PWR_FUTURE__ if -mcpu=future.
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS): New macro.
+	(POWERPC_MASKS): Add -mcpu=future.
+	* config/rs6000/rs6000-opts.h (enum processor_type): Add
+	PROCESSOR_FUTURE.
+	* config/rs6000/rs6000-tables.opt: Regenerate.
+	* config/rs6000/rs6000.cc (future_costs): Add -mcpu=future support.
+	Make -mtune=future act like -mtune=power10 for now.
+	(rs6000_option_override_internal): 
+	(rs6000_machine_from_flags): Likewise.
+	(rs6000_reassociation_width): Likewise.
+	(rs6000_adjust_cost): Likewise.
+	(rs6000_issue_rate): Likewise.
+	(rs6000_sched_reorder): Likewise.
+	(rs6000_sched_reorder2): Likewise.
+	(rs6000_register_move_cost): Likewise.
+	(rs6000_opt_masks): Add -mfuture.
+	* config/rs6000/rs6000.h (ASM_CPU_SUPPORT): Likewise.
+	* config/rs6000/rs6000.md (cpu attribute): Add -mcpu=future support.
+	* config/rs6000/rs6000.opt (-mfuture): New undocumented debug switch.
+	* doc/invoke.texi (IBM RS/6000 and PowerPC Options): Document -mcpu=future.
+
 ==================== Branch work137-dmf, baseline ====================
+
+Add ChangeLog.dmf and update REVISION.
+
+2023-09-29  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* ChangeLog.dmf: New file for branch.
+	* REVISION: Update.
 
 2023-09-29   Michael Meissner  <meissner@linux.ibm.com>
 
