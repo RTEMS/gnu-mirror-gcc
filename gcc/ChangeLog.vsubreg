@@ -1,4 +1,34 @@
+==================== Branch work137-vsubreg, patch #400 ====================
+
+Peter's patches for subreg support.
+
+2023-09-21  Peter Bergner  <bergner@linux.ibm.com>
+
+gcc/
+
+	PR target/109116
+	* gcc/config/rs6000/rs6000.cc (rs6000_modes_tieable_p): Make OOmdoe
+	tieable with 128-bit vector modes.
+
+2023-09-15  Peter Bergner  <bergner@linux.ibm.com>
+
+gcc/
+
+	PR target/109116
+	* gcc/config/rs6000/mma.md (vsx_disassemble_pair): Use SUBREG's instead
+	of UNSPEC's.
+	(mma_disassemble_acc): Likewise.
+
 ==================== Branch work137-vsubreg, baseline ====================
+
+Add ChangeLog.vsubreg and update REVISION.
+
+2023-09-29  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* ChangeLog.vsubreg: New file for branch.
+	* REVISION: Update.
 
 2023-09-29   Michael Meissner  <meissner@linux.ibm.com>
 
