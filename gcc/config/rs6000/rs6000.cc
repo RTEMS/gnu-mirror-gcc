@@ -27188,6 +27188,80 @@ rs6000_split_logical (rtx operands[3],
   return;
 }
 
+/* Split a unary vector pair insn into two separate vector insns.  */
+
+void
+split_unary_vector_pair (machine_mode mode,		/* vector mode.  */
+			 rtx operands[],		/* dest, src.  */
+			 rtx (*func)(rtx, rtx))		/* create insn.  */
+{
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  machine_mode orig_mode = GET_MODE (op0);
+
+  rtx reg0_vector0 = simplify_gen_subreg (mode, op0, orig_mode, 0);
+  rtx reg1_vector0 = simplify_gen_subreg (mode, op1, orig_mode, 0);
+  rtx reg0_vector1 = simplify_gen_subreg (mode, op0, orig_mode, 16);
+  rtx reg1_vector1 = simplify_gen_subreg (mode, op1, orig_mode, 16);
+
+  emit_insn (func (reg0_vector0, reg1_vector0));
+  emit_insn (func (reg0_vector1, reg1_vector1));
+  return;
+}
+
+/* Split a binary vector pair insn into two separate vector insns.  */
+
+void
+split_binary_vector_pair (machine_mode mode,		/* vector mode.  */
+			 rtx operands[],		/* dest, src.  */
+			 rtx (*func)(rtx, rtx, rtx))	/* create insn.  */
+{
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  rtx op2 = operands[2];
+  machine_mode orig_mode = GET_MODE (op0);
+
+  rtx reg0_vector0 = simplify_gen_subreg (mode, op0, orig_mode, 0);
+  rtx reg1_vector0 = simplify_gen_subreg (mode, op1, orig_mode, 0);
+  rtx reg2_vector0 = simplify_gen_subreg (mode, op2, orig_mode, 0);
+  rtx reg0_vector1 = simplify_gen_subreg (mode, op0, orig_mode, 16);
+  rtx reg1_vector1 = simplify_gen_subreg (mode, op1, orig_mode, 16);
+  rtx reg2_vector1 = simplify_gen_subreg (mode, op2, orig_mode, 16);
+
+  emit_insn (func (reg0_vector0, reg1_vector0, reg2_vector0));
+  emit_insn (func (reg0_vector1, reg1_vector1, reg2_vector1));
+  return;
+}
+
+/* Split a fused multiply-add vector pair insn into two separate vector
+   insns.  */
+
+void
+split_fma_vector_pair (machine_mode mode,		/* vector mode.  */
+		       rtx operands[],			/* dest, src.  */
+		       rtx (*func)(rtx, rtx, rtx, rtx))	/* create insn.  */
+{
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  rtx op2 = operands[2];
+  rtx op3 = operands[3];
+  machine_mode orig_mode = GET_MODE (op0);
+
+  rtx reg0_vector0 = simplify_gen_subreg (mode, op0, orig_mode, 0);
+  rtx reg1_vector0 = simplify_gen_subreg (mode, op1, orig_mode, 0);
+  rtx reg2_vector0 = simplify_gen_subreg (mode, op2, orig_mode, 0);
+  rtx reg3_vector0 = simplify_gen_subreg (mode, op3, orig_mode, 0);
+
+  rtx reg0_vector1 = simplify_gen_subreg (mode, op0, orig_mode, 16);
+  rtx reg1_vector1 = simplify_gen_subreg (mode, op1, orig_mode, 16);
+  rtx reg2_vector1 = simplify_gen_subreg (mode, op2, orig_mode, 16);
+  rtx reg3_vector1 = simplify_gen_subreg (mode, op3, orig_mode, 16);
+
+  emit_insn (func (reg0_vector0, reg1_vector0, reg2_vector0, reg3_vector0));
+  emit_insn (func (reg0_vector1, reg1_vector1, reg2_vector1, reg3_vector1));
+  return;
+}
+
 /* Emit instructions to move SRC to DST.  Called by splitters for
    multi-register moves.  It will emit at most one instruction for
    each register that is accessed; that is, it won't emit li/lis pairs
