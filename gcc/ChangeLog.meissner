@@ -1,4 +1,90 @@
+==================== Branch work137, patch #2 ====================
+
+Add options to disable load and store vector pair.
+
+2023-09-29  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (movoo): Add support for
+	-menable-load-vector-pair and -menable-store-vector-pair.
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Likewise.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.md (rs6000_setup_reg_addr_masks): If load vector
+	pair or store vector pair instructions are not being generated, don't
+	allow lxvpx or stxvpx to be generated.
+	(rs6000_option_override_internal): Add warnings if either
+	-menable-load-vector-pair or -menable-store-vector-pair is used without
+	having MMA instructions.
+	(rs6000_opt_masks): Allow user to override -menable-load-vector-pair or
+	-menable-store-vector-pair.
+	* config/rs6000/rs6000.opt (-menable-load-vector-pair): New option.
+	(-menable-store-vector-pair): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-switch1.c: New test.
+	* gcc.target/powerpc/vector-pair-switch2.c: New test.
+	* gcc.target/powerpc/vector-pair-switch3.c: New test.
+	* gcc.target/powerpc/vector-pair-switch4.c: New test.
+	* gcc.target/powerpc/vector-pair-switch5.c: New test.
+
+==================== Branch work137, patch #1 ====================
+
+Replace UNSPEC_COPYSIGN with copysign RTL
+
+When I first implemented COPYSIGN support in the power7 days, we did not have a
+copysign RTL insn, so I had to use UNSPEC to represent the copysign
+instruction.  This patch removes those UNSPECs, and it uses the native RTL
+copysign insn.
+
+2023-09-29  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.md (UNSPEC_COPYSIGN): Delete.
+	(copysign<mode>3_fcpsg): Use copysign RTL instead of UNSPEC.
+	(copysign<mode>3_hard): Likewise.
+	(copysign<mode>3_soft): Likewise.
+	* config/rs6000/vector.md (vector_copysign<mode>3): Use copysign RTL
+	instead of UNSPEC.
+	* config/rs6000/vsx.md (vsx_copysign<mode>3): Use copysign RTL instead
+	of UNSPEC.
+
 ==================== Branch work137, baseline ====================
+
+Add ChangeLog.meissner and REVISION.
+
+2023-09-29  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* REVISION: New file for branch.
+	* ChangeLog.meissner: New file.
+
+gcc/c-family/
+
+	* ChangeLog.meissner: New file.
+
+gcc/c/
+
+	* ChangeLog.meissner: New file.
+
+gcc/cp/
+
+	* ChangeLog.meissner: New file.
+
+gcc/fortran/
+
+	* ChangeLog.meissner: New file.
+
+gcc/testsuite/
+
+	* ChangeLog.meissner: New file.
+
+libgcc/
+
+	* ChangeLog.meissner: New file.
 
 2023-09-29   Michael Meissner  <meissner@linux.ibm.com>
 
