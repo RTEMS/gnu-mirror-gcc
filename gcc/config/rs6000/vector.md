@@ -71,17 +71,11 @@
 (define_mode_iterator VI [V4SI V8HI V16QI])
 
 ;; Base type from vector mode
-(define_mode_attr VEC_base [(V32QI "QI")
-			    (V16QI "QI")
-			    (V16HI "HI")
+(define_mode_attr VEC_base [(V16QI "QI")
 			    (V8HI  "HI")
-			    (V8SI  "SI")
 			    (V4SI  "SI")
-			    (V4DI  "DI")
 			    (V2DI  "DI")
-			    (V8SF  "SF")
 			    (V4SF  "SF")
-			    (V4DF  "DF")
 			    (V2DF  "DF")
 			    (V1TI  "TI")
 			    (TI    "TI")])

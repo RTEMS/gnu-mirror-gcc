@@ -631,9 +631,6 @@ rs6000_cpu_cpp_builtins (cpp_reader *pfile)
     builtin_define ("__SIZEOF_IBM128__=16");
   if (ieee128_float_type_node)
     builtin_define ("__SIZEOF_IEEE128__=16");
-  if (TARGET_VECTOR_SIZE_32)
-    builtin_define ("__VECTOR_SIZE_32__");
-
 #ifdef TARGET_LIBC_PROVIDES_HWCAP_IN_TCB
   builtin_define ("__BUILTIN_CPU_SUPPORTS__");
 #endif
