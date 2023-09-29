@@ -6083,13 +6083,10 @@ string_cst_read_str (void *data, void *, HOST_WIDE_INT offset,
       size_t l = TREE_STRING_LENGTH (str) - offset;
       memcpy (p, TREE_STRING_POINTER (str) + offset, l);
       memset (p + l, '\0', GET_MODE_SIZE (mode) - l);
-      return c_readstr (p, as_a <scalar_int_mode> (mode), false);
+      return c_readstr (p, mode, false);
     }
 
-  /* The by-pieces infrastructure does not try to pick a vector mode
-     for storing STRING_CST.  */
-  return c_readstr (TREE_STRING_POINTER (str) + offset,
-		    as_a <scalar_int_mode> (mode), false);
+  return c_readstr (TREE_STRING_POINTER (str) + offset, mode, false);
 }
 
 /* Generate code for computing expression EXP,
@@ -11044,17 +11041,11 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 	    scalar_int_mode limb_mode
 	      = as_a <scalar_int_mode> (info.limb_mode);
 	    unsigned int limb_prec = GET_MODE_PRECISION (limb_mode);
-	    if (prec > limb_prec)
+	    if (prec > limb_prec && prec > MAX_FIXED_MODE_SIZE)
 	      {
-		scalar_int_mode arith_mode
-		  = (targetm.scalar_mode_supported_p (TImode)
-		     ? TImode : DImode);
-		if (prec > GET_MODE_PRECISION (arith_mode))
-		  {
-		    /* Emit large/huge _BitInt INTEGER_CSTs into memory.  */
-		    exp = tree_output_constant_def (exp);
-		    return expand_expr (exp, target, VOIDmode, modifier);
-		  }
+		/* Emit large/huge _BitInt INTEGER_CSTs into memory.  */
+		exp = tree_output_constant_def (exp);
+		return expand_expr (exp, target, VOIDmode, modifier);
 	      }
 	  }
 

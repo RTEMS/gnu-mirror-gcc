@@ -1,3 +1,122 @@
+2023-09-28  Tom Tromey  <tromey@adacore.com>
+
+	* python/libstdcxx/v6/printers.py (Printer.add_version)
+	(add_one_template_type_printer)
+	(FilteringTypePrinter.add_one_type_printer): Use Python
+	"not in" operator.
+
+2023-09-28  Tom Tromey  <tromey@adacore.com>
+
+	* python/libstdcxx/v6/printers.py (std_ratio_t_tuple):
+	Remove.
+
+2023-09-28  Tom Tromey  <tromey@adacore.com>
+
+	* python/libstdcxx/v6/printers.py
+	(StdExpOptionalPrinter.__init__, lookup_node_type):
+	Remove unused variables.
+
+2023-09-28  Tom Tromey  <tromey@adacore.com>
+
+	* python/libstdcxx/v6/printers.py: Don't import 'os'.
+	* python/libstdcxx/v6/__init__.py: Don't import 'gdb'.
+
+2023-09-28  Tom Tromey  <tromey@adacore.com>
+
+	* python/libstdcxx/v6/printers.py: Use gdb.ValuePrinter
+	everywhere.  Rename members to start with "_".
+
+2023-09-28  Tom Tromey  <tromey@adacore.com>
+
+	* testsuite/lib/gdb-test.exp (gdb-test): Enable Python
+	stack traces from gdb.
+
+2023-09-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	* python/libstdcxx/v6/xmethods.py (is_specialization_of): Define
+	new function.
+	(ArrayMethodsMatcher, DequeMethodsMatcher)
+	(ForwardListMethodsMatcher, ListMethodsMatcher)
+	(VectorMethodsMatcher, AssociativeContainerMethodsMatcher)
+	(UniquePtrGetWorker, UniquePtrMethodsMatcher)
+	(SharedPtrSubscriptWorker, SharedPtrMethodsMatcher): Use
+	is_specialization_of instead of re.match.
+
+2023-09-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	* python/libstdcxx/v6/printers.py: Break long lines. Use raw
+	strings for regular expressions. Add whitespace around
+	operators.
+	(is_member_of_namespace): Use isinstance to check type.
+	(is_specialization_of): Likewise. Adjust template_name
+	for versioned namespace instead of duplicating the re.match
+	call.
+	(StdExpAnyPrinter._string_types): New static method.
+	(StdExpAnyPrinter.to_string): Use _string_types.
+
+2023-09-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	* python/libstdcxx/v6/printers.py: Format docstrings according
+	to PEP 257.
+	* python/libstdcxx/v6/xmethods.py: Likewise.
+
+2023-09-28  Tim Song  <t.canens.cpp@gmail.com>
+
+	PR libstdc++/111050
+	* include/bits/hashtable_policy.h
+	(_Hash_node_value_base<>::_M_valptr(), _Hash_node_value_base<>::_M_v())
+	Add [[__gnu__::__always_inline__]].
+
+2023-09-27  Jonathan Wakely  <jwakely@redhat.com>
+
+	* python/libstdcxx/v6/printers.py (StdChronoTimeZoneRulePrinter):
+	Fix incorrect number of replacement fields.
+
+2023-09-26  Hans-Peter Nilsson  <hp@axis.com>
+
+	* testsuite/29_atomics/atomic_flag/cons/value_init.cc: Add
+	dg-require-thread-fence.
+
+2023-09-25  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/charconv (__detail::__integer_to_chars_result_type):
+	Remove.
+	(__detail::__to_chars_16): Use to_chars_result as return type.
+	(__detail::__to_chars_10): Likewise.
+	(__detail::__to_chars_8): Likewise.
+	(__detail::__to_chars_2): Likewise.
+	(__detail::__to_chars_i): Likewise.
+	(__detail::__integer_from_chars_result_type): Inline the
+	constraint into ...
+	(from_chars): ... here.  Use __is_standard_integer in the
+	constraint.  Encode constraint as a defaulted non-type template
+	parameter instead of within the return type.
+
+2023-09-25  John David Anglin  <danglin@gcc.gnu.org>
+
+	* config/abi/post/hppa-linux-gnu/baseline_symbols.txt: Update.
+
+2023-09-25  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/111511
+	PR c++/111512
+	* include/std/array (to_array): Cast memcpy arguments to void*.
+	* testsuite/23_containers/array/creation/111512.cc: New test.
+
+2023-09-25  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/move.h (forward_list): Define for C++23.
+	* include/bits/version.def (forward_like): Define.
+	* include/bits/version.h: Regenerate.
+	* include/std/utility (__glibcxx_want_forward_like): Define.
+	* testsuite/20_util/forward_like/1.cc: New test.
+	* testsuite/20_util/forward_like/2_neg.cc: New test.
+	* testsuite/20_util/forward_like/version.cc: New test.
+
+2023-09-19  Marek Polacek  <polacek@redhat.com>
+
+	* testsuite/20_util/allocator/105975.cc: Add dg-error.
+
 2023-09-18  Patrick Palka  <ppalka@redhat.com>
 
 	PR c++/63198

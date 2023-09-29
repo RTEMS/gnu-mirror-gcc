@@ -46,6 +46,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gcc-rich-location.h"
 #include "selftest.h"
 #include "target.h"
+#include "builtins.h"
 
 /* The type of functions taking a tree, and some additional data, and
    returning an int.  */
@@ -3768,6 +3769,13 @@ expand_integer_pack (tree call, tree args, tsubst_flags_t complain,
     {
       if (hi != ohi)
 	{
+	  /* Work around maybe_convert_nontype_argument not doing this for
+	     dependent arguments.  Don't use IMPLICIT_CONV_EXPR_NONTYPE_ARG
+	     because that will make tsubst_copy_and_build ignore it.  */
+	  tree type = tsubst (TREE_TYPE (ohi), args, complain, in_decl);
+	  if (!TREE_TYPE (hi) || !same_type_p (type, TREE_TYPE (hi)))
+	    hi = build1 (IMPLICIT_CONV_EXPR, type, hi);
+
 	  call = copy_node (call);
 	  CALL_EXPR_ARG (call, 0) = hi;
 	}
@@ -3778,8 +3786,6 @@ expand_integer_pack (tree call, tree args, tsubst_flags_t complain,
     }
   else
     {
-      hi = perform_implicit_conversion_flags (integer_type_node, hi, complain,
-					      LOOKUP_IMPLICIT);
       hi = instantiate_non_dependent_expr (hi, complain);
       hi = cxx_constant_value (hi, complain);
       int len = valid_constant_size_p (hi) ? tree_to_shwi (hi) : -1;
@@ -8360,7 +8366,7 @@ canonicalize_expr_argument (tree arg, tsubst_flags_t complain)
    constrained than the parameter.  */
 
 static bool
-is_compatible_template_arg (tree parm, tree arg)
+is_compatible_template_arg (tree parm, tree arg, tree args)
 {
   tree parm_cons = get_constraints (parm);
 
@@ -8381,6 +8387,7 @@ is_compatible_template_arg (tree parm, tree arg)
     {
       tree aparms = DECL_INNERMOST_TEMPLATE_PARMS (arg);
       new_args = template_parms_level_to_args (aparms);
+      new_args = add_to_template_args (args, new_args);
       ++processing_template_decl;
       parm_cons = tsubst_constraint_info (parm_cons, new_args,
 					  tf_none, NULL_TREE);
@@ -8635,7 +8642,7 @@ convert_template_argument (tree parm,
               // Check that the constraints are compatible before allowing the
               // substitution.
               if (val != error_mark_node)
-                if (!is_compatible_template_arg (parm, arg))
+		if (!is_compatible_template_arg (parm, arg, args))
                   {
 		    if (in_decl && (complain & tf_error))
                       {
@@ -14370,7 +14377,7 @@ tsubst_function_decl (tree t, tree args, tsubst_flags_t complain,
 
       /* Calculate the complete set of arguments used to
 	 specialize R.  */
-      if (use_spec_table)
+      if (use_spec_table && !lambda_fntype)
 	{
 	  argvec = tsubst_template_args (DECL_TI_ARGS
 					 (DECL_TEMPLATE_RESULT
@@ -14380,14 +14387,11 @@ tsubst_function_decl (tree t, tree args, tsubst_flags_t complain,
 	    return error_mark_node;
 
 	  /* Check to see if we already have this specialization.  */
-	  if (!lambda_fntype)
-	    {
-	      hash = spec_hasher::hash (gen_tmpl, argvec);
-	      if (tree spec = retrieve_specialization (gen_tmpl, argvec, hash))
-		/* The spec for these args might be a partial instantiation of the
-		   template, but here what we want is the FUNCTION_DECL.  */
-		return STRIP_TEMPLATE (spec);
-	    }
+	  hash = spec_hasher::hash (gen_tmpl, argvec);
+	  if (tree spec = retrieve_specialization (gen_tmpl, argvec, hash))
+	    /* The spec for these args might be a partial instantiation of the
+	       template, but here what we want is the FUNCTION_DECL.  */
+	    return STRIP_TEMPLATE (spec);
 	}
       else
 	argvec = args;
@@ -14704,6 +14708,8 @@ tsubst_template_decl (tree t, tree args, tsubst_flags_t complain,
 	    /* Type partial instantiations are stored as the type by
 	       lookup_template_class_1, not here as the template.  */
 	    spec = CLASSTYPE_TI_TEMPLATE (spec);
+	  else if (TREE_CODE (spec) != TEMPLATE_DECL)
+	    spec = DECL_TI_TEMPLATE (spec);
 	  return spec;
 	}
     }
@@ -14754,7 +14760,7 @@ tsubst_template_decl (tree t, tree args, tsubst_flags_t complain,
 	inner = tsubst_aggr_type (inner, args, complain,
 				  in_decl, /*entering*/1);
       else
-	inner = tsubst (inner, args, complain, in_decl);
+	inner = tsubst_decl (inner, args, complain, /*use_spec_table=*/false);
     }
   --processing_template_decl;
   if (inner == error_mark_node)
@@ -14780,12 +14786,11 @@ tsubst_template_decl (tree t, tree args, tsubst_flags_t complain,
     }
   else
     {
-      if (TREE_CODE (inner) == FUNCTION_DECL)
-	/* Set DECL_TI_ARGS to the full set of template arguments, which
-	   tsubst_function_decl didn't do due to use_spec_table=false.  */
-	DECL_TI_ARGS (inner) = full_args;
-
       DECL_TI_TEMPLATE (inner) = r;
+      /* Set DECL_TI_ARGS to the full set of template arguments,
+	 which tsubst_function_decl / tsubst_decl didn't do due to
+	 use_spec_table=false.  */
+      DECL_TI_ARGS (inner) = full_args;
       DECL_TI_ARGS (r) = DECL_TI_ARGS (inner);
     }
 
@@ -14813,9 +14818,17 @@ tsubst_template_decl (tree t, tree args, tsubst_flags_t complain,
   if (PRIMARY_TEMPLATE_P (t))
     DECL_PRIMARY_TEMPLATE (r) = r;
 
-  if (TREE_CODE (decl) == FUNCTION_DECL && !lambda_fntype)
-    /* Record this non-type partial instantiation.  */
-    register_specialization (r, t, full_args, false, hash);
+  if (!lambda_fntype && !class_p)
+    {
+      /* Record this non-type partial instantiation.  */
+      /* FIXME we'd like to always register the TEMPLATE_DECL, or always
+	 the DECL_TEMPLATE_RESULT, but it seems the modules code relies
+	 on this current behavior.  */
+      if (TREE_CODE (inner) == FUNCTION_DECL)
+	register_specialization (r, t, full_args, false, hash);
+      else
+	register_specialization (inner, t, full_args, false, hash);
+    }
 
   return r;
 }
@@ -19905,13 +19918,6 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 				    templated_operator_saved_lookups (t),
 				    complain));
 
-    case ANNOTATE_EXPR:
-      tmp = RECUR (TREE_OPERAND (t, 0));
-      RETURN (build3_loc (EXPR_LOCATION (t), ANNOTATE_EXPR,
-			  TREE_TYPE (tmp), tmp,
-			  RECUR (TREE_OPERAND (t, 1)),
-			  RECUR (TREE_OPERAND (t, 2))));
-
     case PREDICT_EXPR:
       RETURN (add_stmt (copy_node (t)));
 
@@ -21031,6 +21037,25 @@ tsubst_copy_and_build (tree t,
 					    /*done=*/false,
 					    /*address_p=*/false);
 	  }
+	else if (CALL_EXPR_STATIC_CHAIN (t)
+		 && TREE_CODE (function) == FUNCTION_DECL
+		 && fndecl_built_in_p (function, BUILT_IN_CLASSIFY_TYPE))
+	  {
+	    tree type = tsubst (CALL_EXPR_STATIC_CHAIN (t), args, complain,
+				in_decl);
+	    if (dependent_type_p (type))
+	      {
+		ret = build_vl_exp (CALL_EXPR, 4);
+		CALL_EXPR_FN (ret) = function;
+		CALL_EXPR_STATIC_CHAIN (ret) = type;
+		CALL_EXPR_ARG (ret, 0)
+		  = build_min (SIZEOF_EXPR, size_type_node, type);
+		TREE_TYPE (ret) = integer_type_node;
+	      }
+	    else
+	      ret = build_int_cst (integer_type_node, type_to_class (type));
+	    RETURN (ret);
+	  }
 	else if (koenig_p
 		 && (identifier_p (function)
 		     || (TREE_CODE (function) == TEMPLATE_ID_EXPR
@@ -21840,6 +21865,13 @@ tsubst_copy_and_build (tree t,
 	  }
 	RETURN (op);
       }
+
+    case ANNOTATE_EXPR:
+      op1 = RECUR (TREE_OPERAND (t, 0));
+      RETURN (build3_loc (EXPR_LOCATION (t), ANNOTATE_EXPR,
+			  TREE_TYPE (op1), op1,
+			  RECUR (TREE_OPERAND (t, 1)),
+			  RECUR (TREE_OPERAND (t, 2))));
 
     default:
       /* Handle Objective-C++ constructs, if appropriate.  */

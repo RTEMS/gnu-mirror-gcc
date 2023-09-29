@@ -1753,7 +1753,7 @@ free_constructor (tree t)
 	{
 	  constructor_elt *ce;
 	  for (HOST_WIDE_INT i = 0; vec_safe_iterate (elts, i, &ce); ++i)
-	    if (TREE_CODE (ce->value) == CONSTRUCTOR)
+	    if (ce->value && TREE_CODE (ce->value) == CONSTRUCTOR)
 	      vec_safe_push (ctors, ce->value);
 	  ggc_free (elts);
 	}
@@ -5643,7 +5643,6 @@ cxx_fold_indirect_ref (const constexpr_ctx *ctx, location_t loc, tree type,
 {
   tree sub = op0;
   tree subtype;
-  poly_uint64 const_op01;
 
   /* STRIP_NOPS, but stop if REINTERPRET_CAST_P.  */
   while (CONVERT_EXPR_P (sub) || TREE_CODE (sub) == NON_LVALUE_EXPR

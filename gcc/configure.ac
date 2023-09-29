@@ -2427,6 +2427,17 @@ for f in $tm_d_file; do
   esac
 done
 
+tm_rust_file_list=
+tm_rust_include_list=
+for f in $tm_rust_file; do
+  case $f in
+    * )
+       tm_rust_file_list="${tm_rust_file_list} \$(srcdir)/config/$f"
+       tm_rust_include_list="${tm_rust_include_list} config/$f"
+       ;;
+  esac
+done
+
 xm_file_list=
 xm_include_list=
 for f in $xm_file; do
@@ -3251,10 +3262,25 @@ AC_MSG_RESULT($gcc_cv_ld_ro_rw_mix)
 
 gcc_AC_INITFINI_ARRAY
 
+# Some assemblers (GNU as for LoongArch) generates relocations for
+# leb128 symbol arithmetic for relaxation, we need to disable relaxation
+# probing leb128 support then.
+case $target in
+  loongarch*-*-*)
+    gcc_GAS_CHECK_FEATURE([-mno-relax support],
+      gcc_cv_as_mno_relax,[-mno-relax],[.text],,
+      [check_leb128_asflags=-mno-relax])
+    ;;
+  *)
+    check_leb128_asflags=
+    ;;
+esac
+
 # Check if we have .[us]leb128, and support symbol arithmetic with it.
 # Older versions of GAS and some non-GNU assemblers, have a bugs handling
 # these directives, even when they appear to accept them.
-gcc_GAS_CHECK_FEATURE([.sleb128 and .uleb128], gcc_cv_as_leb128,,
+gcc_GAS_CHECK_FEATURE([.sleb128 and .uleb128], gcc_cv_as_leb128,
+[$check_leb128_asflags],
 [	.data
 	.uleb128 L2 - L1
 L1:
@@ -5370,6 +5396,10 @@ x:
        .cfi_endproc],,
       [AC_DEFINE(HAVE_AS_EH_FRAME_PCREL_ENCODING_SUPPORT, 1,
 	  [Define if your assembler supports eh_frame pcrel encoding.])])
+    gcc_GAS_CHECK_FEATURE([-mrelax option], gcc_cv_as_loongarch_relax,
+      [-mrelax], [.text],,
+      [AC_DEFINE(HAVE_AS_MRELAX_OPTION, 1,
+		[Define if your assembler supports -mrelax option.])])
     ;;
     s390*-*-*)
     gcc_GAS_CHECK_FEATURE([.gnu_attribute support],
@@ -6333,7 +6363,7 @@ if test x"$dsymutil_flag" = x"yes"; then
       dsymutil_kind=LLVM
       dsymutil_vers=`echo $dsymutil_temp | sed 's/.*LLVM\ version\ \([[0-9\.]]*\).*/\1/'`
     else
-      dsymutil_kind=UNKNOWN
+      dsymutil_kind=DET_UNKNOWN
       dsymutil_vers="0.0"
     fi
     dsymutil_major=`expr "$dsymutil_vers" : '\([[0-9]]*\)'`
@@ -7403,6 +7433,8 @@ AC_SUBST(tm_p_file_list)
 AC_SUBST(tm_p_include_list)
 AC_SUBST(tm_d_file_list)
 AC_SUBST(tm_d_include_list)
+AC_SUBST(tm_rust_file_list)
+AC_SUBST(tm_rust_include_list)
 AC_SUBST(xm_file_list)
 AC_SUBST(xm_include_list)
 AC_SUBST(xm_defines)
@@ -7411,6 +7443,7 @@ AC_SUBST(c_target_objs)
 AC_SUBST(cxx_target_objs)
 AC_SUBST(fortran_target_objs)
 AC_SUBST(d_target_objs)
+AC_SUBST(rust_target_objs)
 AC_SUBST(target_cpu_default)
 
 AC_SUBST_FILE(language_hooks)
