@@ -2711,7 +2711,9 @@ rs6000_setup_reg_addr_masks (void)
 	  /* Vector pairs can do both indexed and offset loads if the
 	     instructions are enabled, otherwise they can only do offset loads
 	     since it will be broken into two vector moves.  Vector quads can
-	     only do offset loads.  */
+	     only do offset loads.  If the user restricted generation of either
+	     of the LXVP or STXVP instructions, do not allow indexed mode so
+	     that we can split the load/store.  */
 	  else if ((addr_mask != 0) && TARGET_MMA
 		   && (m2 == OOmode || m2 == XOmode))
 	    {
@@ -2719,7 +2721,9 @@ rs6000_setup_reg_addr_masks (void)
 	      if (rc == RELOAD_REG_FPR || rc == RELOAD_REG_VMX)
 		{
 		  addr_mask |= RELOAD_REG_QUAD_OFFSET;
-		  if (m2 == OOmode)
+		  if (m2 == OOmode
+		      && TARGET_LOAD_VECTOR_PAIR
+		      && TARGET_STORE_VECTOR_PAIR)
 		    addr_mask |= RELOAD_REG_INDEXED;
 		}
 	    }
@@ -4403,6 +4407,26 @@ rs6000_option_override_internal (bool global_init_p)
 	error ("%qs requires %qs", "-mmma", "-mcpu=power10");
 
       rs6000_isa_flags &= ~OPTION_MASK_MMA;
+    }
+
+  /* Warn if -menable-load-vector-pair or -menable-store-vector-pair are used
+     and MMA is not set.  */
+  if (!TARGET_MMA && TARGET_LOAD_VECTOR_PAIR)
+    {
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_LOAD_VECTOR_PAIR) != 0)
+	warning (0, "%qs should not be used unless you use %qs",
+		 "-menable-load-vector-pair", "-mmma");
+
+      rs6000_isa_flags &= ~OPTION_MASK_LOAD_VECTOR_PAIR;
+    }
+
+  if (!TARGET_MMA && TARGET_STORE_VECTOR_PAIR)
+    {
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_STORE_VECTOR_PAIR) != 0)
+	warning (0, "%qs should not be used unless you use %qs",
+		 "-mstore-vector-pair", "-mmma");
+
+      rs6000_isa_flags &= OPTION_MASK_STORE_VECTOR_PAIR;
     }
 
   /* Enable power10 fusion if we are tuning for power10, even if we aren't
@@ -24222,6 +24246,8 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "dlmzb",			OPTION_MASK_DLMZB,		false, true  },
   { "efficient-unaligned-vsx",	OPTION_MASK_EFFICIENT_UNALIGNED_VSX,
 								false, true  },
+  { "enable-load-vector-pair",	OPTION_MASK_LOAD_VECTOR_PAIR,	false, true  },
+  { "enable-store-vector-pair",	OPTION_MASK_STORE_VECTOR_PAIR,	false, true  },
   { "float128",			OPTION_MASK_FLOAT128_KEYWORD,	false, true  },
   { "float128-hardware",	OPTION_MASK_FLOAT128_HW,	false, true  },
   { "fprnd",			OPTION_MASK_FPRND,		false, true  },
