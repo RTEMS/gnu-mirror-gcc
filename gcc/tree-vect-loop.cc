@@ -2855,8 +2855,10 @@ vect_analyze_loop_2 (loop_vec_info loop_vinfo, bool &fatal,
   if (slp)
     {
       /* Check the SLP opportunities in the loop, analyze and build
-	 SLP trees.  */
-      ok = vect_analyze_slp (loop_vinfo, LOOP_VINFO_N_STMTS (loop_vinfo));
+	 SLP trees.  Use the number of stmt_vec_infos as graph limit
+	 since that also includes pattern stmts which LOOP_VINFO_N_STMTS
+	 does not.  */
+      ok = vect_analyze_slp (loop_vinfo, loop_vinfo->stmt_vec_infos.length ());
       if (!ok)
 	return ok;
 
