@@ -2576,14 +2576,6 @@ rs6000_debug_reg_global (void)
   if (TARGET_DIRECT_MOVE_128)
     fprintf (stderr, DEBUG_FMT_D, "VSX easy 64-bit mfvsrld element",
 	     (int)VECTOR_ELEMENT_MFVSRLD_64BIT);
-
-  if (TARGET_MMA)
-    {
-      fprintf (stderr, DEBUG_FMT_S, "load vector pair",
-	       TARGET_LOAD_VECTOR_PAIR ? "yes" : "no");
-      fprintf (stderr, DEBUG_FMT_S, "store vector pair",
-	       TARGET_STORE_VECTOR_PAIR ? "yes" : "no");
-    }
 }
 
 
@@ -2719,9 +2711,7 @@ rs6000_setup_reg_addr_masks (void)
 	  /* Vector pairs can do both indexed and offset loads if the
 	     instructions are enabled, otherwise they can only do offset loads
 	     since it will be broken into two vector moves.  Vector quads can
-	     only do offset loads.  If the user restricted generation of either
-	     of the LXVP or STXVP instructions, do not allow indexed mode so
-	     that we can split the load/store.  */
+	     only do offset loads.  */
 	  else if ((addr_mask != 0) && TARGET_MMA
 		   && (m2 == OOmode || m2 == XOmode))
 	    {
@@ -2729,9 +2719,7 @@ rs6000_setup_reg_addr_masks (void)
 	      if (rc == RELOAD_REG_FPR || rc == RELOAD_REG_VMX)
 		{
 		  addr_mask |= RELOAD_REG_QUAD_OFFSET;
-		  if (m2 == OOmode
-		      && TARGET_LOAD_VECTOR_PAIR
-		      && TARGET_STORE_VECTOR_PAIR)
+		  if (m2 == OOmode)
 		    addr_mask |= RELOAD_REG_INDEXED;
 		}
 	    }
@@ -4415,19 +4403,6 @@ rs6000_option_override_internal (bool global_init_p)
 	error ("%qs requires %qs", "-mmma", "-mcpu=power10");
 
       rs6000_isa_flags &= ~OPTION_MASK_MMA;
-    }
-
-  /* Warn if -menable-load-vector-pair or -menable-store-vector-pair are used
-     and MMA is not set.  */
-  if (!TARGET_MMA)
-    {
-      if (TARGET_LOAD_VECTOR_PAIR && OPTION_SET_P(TARGET_LOAD_VECTOR_PAIR))
-	warning (0, "%qs should not be used unless you use %qs",
-		 "-menable-load-vector-pair", "-mmma");
-
-      if (TARGET_STORE_VECTOR_PAIR && OPTION_SET_P(TARGET_STORE_VECTOR_PAIR))
-	warning (0, "%qs should not be used unless you use %qs",
-		 "-mstore-vector-pair", "-mmma");
     }
 
   /* Enable power10 fusion if we are tuning for power10, even if we aren't
@@ -24351,12 +24326,6 @@ static struct rs6000_opt_var const rs6000_opt_vars[] =
   { "speculate-indirect-jumps",
     offsetof (struct gcc_options, x_rs6000_speculate_indirect_jumps),
     offsetof (struct cl_target_option, x_rs6000_speculate_indirect_jumps), },
-  { "enable-load-vector-pair",
-    offsetof (struct gcc_options, x_TARGET_LOAD_VECTOR_PAIR),
-    offsetof (struct cl_target_option, x_TARGET_LOAD_VECTOR_PAIR), },
-  { "enable-store-vector-pair",
-    offsetof (struct gcc_options, x_TARGET_STORE_VECTOR_PAIR),
-    offsetof (struct cl_target_option, x_TARGET_STORE_VECTOR_PAIR), },
 };
 
 /* Inner function to handle attribute((target("..."))) and #pragma GCC target
