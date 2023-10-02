@@ -105,6 +105,15 @@ jobs:
       fail-fast: false        
     runs-on: ubuntu-22.04
     steps:
+      - run: |
+          echo "Free space before:"
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          echo "Free space after:"
+          df -h
       - run: echo ${{needs.init.outputs.output1}} ${{needs.init.outputs.output2}}
       - run: echo $GITHUB_CONTEXT
         env:
