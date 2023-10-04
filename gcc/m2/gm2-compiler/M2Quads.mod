@@ -693,6 +693,8 @@ BEGIN
                           RETURN( TRUE )
                        END
 
+      ELSE
+         RETURN FALSE
       END ;
       i := GetNextQuad (i)
    END ;
@@ -2578,6 +2580,23 @@ END BuildM2MainFunction ;
 
 
 (*
+   BuildStringAdrParam - push the address of a nul terminated string onto the quad stack.
+*)
+
+PROCEDURE BuildStringAdrParam (tok: CARDINAL; name: Name);
+VAR
+   str, m2strnul: CARDINAL ;
+BEGIN
+   PushTF (Adr, Address) ;
+   str := MakeConstLitString (tok, name) ;
+   m2strnul := MakeConstStringM2nul (tok, str) ;
+   PushTtok (m2strnul, tok) ;
+   PushT (1) ;
+   BuildAdrFunction
+END BuildAdrFunction ;
+
+
+(*
    BuildM2InitFunction -
 *)
 
@@ -2617,22 +2636,9 @@ BEGIN
             (* ConstructModules (module_name, argc, argv, envp);  *)
             PushTtok (constructModules, tok) ;
 
-            PushTF(Adr, Address) ;
-            PushTtok (MakeConstLitString (tok, GetSymName (moduleSym)), tok) ;
-            PushT(1) ;
-            BuildAdrFunction ;
-
-            PushTF(Adr, Address) ;
-            PushTtok (MakeConstLitString (tok, GetLibName (moduleSym)), tok) ;
-            PushT(1) ;
-            BuildAdrFunction ;
-
-            PushTF(Adr, Address) ;
-            PushTtok (MakeConstLitString (tok,
-                                          makekey (GetRuntimeModuleOverride ())),
-                      tok) ;
-            PushT(1) ;
-            BuildAdrFunction ;
+	    BuildStringAdrParam (tok, GetSymName (moduleSym)) ;
+	    BuildStringAdrParam (tok, GetLibName (moduleSym)) ;
+	    BuildStringAdrParam (tok, makekey (GetRuntimeModuleOverride ())) ;
 
             PushTtok (SafeRequestSym (tok, MakeKey ("argc")), tok) ;
             PushTtok (SafeRequestSym (tok, MakeKey ("argv")), tok) ;
@@ -4660,15 +4666,17 @@ END BuildEndFor ;
 
                                                            <- Ptr
                                             +------------+
-                    Empty                   | 0    | 0   |
-                                            |------------|
                                             | 0    | 0   |
                                             |------------|
+                                            | 0    | 0   |
+                    +-------------+         |------------|
+                    | Expr |      |         | Expr |     |
+                    |-------------|         |------------|
 *)
 
 PROCEDURE BuildCaseStart ;
 BEGIN
-   BuildRange (InitCaseBounds (PushCase (NulSym, NulSym))) ;
+   BuildRange (InitCaseBounds (PushCase (NulSym, NulSym, OperandT (1)))) ;
    PushBool (0, 0) ;  (* BackPatch list initialized *)
    PushBool (0, 0)    (* Room for a boolean expression *)
 END BuildCaseStart ;
@@ -10760,142 +10768,12 @@ END LoopAnalysis ;
 
 
 (*
-   CheckUninitializedVariablesAreUsed - checks to see whether uninitialized variables are used.
-*)
-
-PROCEDURE CheckUninitializedVariablesAreUsed (BlockSym: CARDINAL) ;
-VAR
-   i, n,
-   ParamNo   : CARDINAL ;
-   ReadStart,
-   ReadEnd,
-   WriteStart,
-   WriteEnd  : CARDINAL ;
-BEGIN
-   IF IsProcedure(BlockSym)
-   THEN
-      ParamNo := NoOfParam(BlockSym)
-   ELSE
-      ParamNo := 0
-   END ;
-   i := 1 ;
-   REPEAT
-      n := GetNth(BlockSym, i) ;
-      IF (n#NulSym) AND (NOT IsTemporary(n)) AND
-         (IsProcedure(BlockSym) OR (((IsDefImp(BlockSym) AND (GetMainModule()=BlockSym)) OR IsModule(BlockSym)) AND
-                                    (NOT IsExported(BlockSym, n))))
-      THEN
-         GetReadQuads(n, RightValue, ReadStart, ReadEnd) ;
-         GetWriteQuads(n, RightValue, WriteStart, WriteEnd) ;
-         IF i<=ParamNo
-         THEN
-            (* n is a parameter *)
-            IF UnusedParameterChecking
-            THEN
-               IF ReadStart = 0
-               THEN
-                  IF WriteStart = 0
-                  THEN
-                     MetaError2 ('unused parameter {%1WMad} in procedure {%2ad}', n, BlockSym)
-                  ELSE
-                     IF NOT IsVarParam (BlockSym, i)
-                     THEN
-                        (* --fixme-- reconsider this.  *)
-                        (* MetaError2 ('writing to a non var parameter {%1WMad} and never reading from it in procedure {%2ad}',
-                                    n, BlockSym) *)
-                     END
-                  END
-               END
-            END
-         ELSE
-            (* n is a local variable *)
-            IF UnusedVariableChecking
-            THEN
-               IF ReadStart=0
-               THEN
-                  IF WriteStart=0
-                  THEN
-                     MetaError2 ('unused variable {%1WMad} in {%2d} {%2ad}', n, BlockSym)
-                  ELSE
-                     (* --fixme-- reconsider this.  *)
-                     (* MetaError2 ('writing to a variable {%1WMad} and never reading from it in {%2d} {%2ad}', n, BlockSym) *)
-                  END
-               ELSE
-                  IF WriteStart=0
-                  THEN
-                     MetaError2 ('variable {%1WMad} is being used but it is never initialized in {%2d} {%2ad}', n, BlockSym)
-                  END
-               END
-            END
-         END
-      END ;
-      INC(i)
-   UNTIL n=NulSym
-END CheckUninitializedVariablesAreUsed ;
-
-
-(*
-   IsInlineWithinBlock - returns TRUE if an InlineOp is found
-                         within start..end.
-*)
-
-PROCEDURE IsInlineWithinBlock (start, end: CARDINAL) : BOOLEAN ;
-VAR
-   op           : QuadOperator ;
-   op1, op2, op3: CARDINAL ;
-BEGIN
-   WHILE (start#end) AND (start#0) DO
-      GetQuad(start, op, op1, op2, op3) ;
-      IF op=InlineOp
-      THEN
-         RETURN( TRUE )
-      END ;
-      start := GetNextQuad(start)
-   END ;
-   RETURN( FALSE )
-END IsInlineWithinBlock ;
-
-
-(*
-   AsmStatementsInBlock - returns TRUE if an ASM statement is found within a block, BlockSym.
-*)
-
-PROCEDURE AsmStatementsInBlock (BlockSym: CARDINAL) : BOOLEAN ;
-VAR
-   Scope,
-   StartInit,
-   EndInit,
-   StartFinish,
-   EndFinish    : CARDINAL ;
-BEGIN
-   IF IsProcedure(BlockSym)
-   THEN
-      GetProcedureQuads(BlockSym, Scope, StartInit, EndInit) ;
-      RETURN( IsInlineWithinBlock(StartInit, EndInit) )
-   ELSE
-      GetModuleQuads(BlockSym, StartInit, EndInit, StartFinish, EndFinish) ;
-      RETURN( IsInlineWithinBlock(StartInit, EndInit) OR
-              IsInlineWithinBlock(StartFinish, EndFinish) )
-   END
-END AsmStatementsInBlock ;
-
-
-(*
    CheckVariablesInBlock - given a block, BlockSym, check whether all variables are used.
 *)
 
 PROCEDURE CheckVariablesInBlock (BlockSym: CARDINAL) ;
 BEGIN
-   CheckVariablesAndParameterTypesInBlock (BlockSym) ;
-   (*
-   IF UnusedVariableChecking OR UnusedParameterChecking
-   THEN
-      IF (NOT AsmStatementsInBlock (BlockSym))
-      THEN
-         CheckUninitializedVariablesAreUsed (BlockSym)
-      END
-   END
-   *)
+   CheckVariablesAndParameterTypesInBlock (BlockSym)
 END CheckVariablesInBlock ;
 
 
@@ -14434,7 +14312,7 @@ BEGIN
    Assert(IsRecord(r) OR IsFieldVarient(r)) ;
    v := GetRecordOrField() ;
    Assert(IsVarient(v)) ;
-   BuildRange(InitCaseBounds(PushCase(r, v)))
+   BuildRange(InitCaseBounds(PushCase(r, v, NulSym)))
 END BeginVarient ;
 
 
