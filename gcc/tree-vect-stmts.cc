@@ -9951,6 +9951,11 @@ vectorizable_load (vec_info *vinfo,
 
   /* Invalidate assumptions made by dependence analysis when vectorization
      on the unrolled body effectively re-orders stmts.  */
+  /* ???  This fails to trigger with single-lane SLP, gcc.dg/vect/pr60276.c,
+     but simply removing the ncopies > 1 conditional here (and below) will
+     cause FAILs of gcc.dg/vect/no-vfa-vect-depend-3.c and
+     gcc.dg/vect/tsvc/vect-tsvc-s3251.c.  The original fix (for PR60276)
+     needs to be re-thought.  */
   if (ncopies > 1
       && STMT_VINFO_MIN_NEG_DIST (stmt_info) != 0
       && maybe_gt (LOOP_VINFO_VECT_FACTOR (loop_vinfo),
