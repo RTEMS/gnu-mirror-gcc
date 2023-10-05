@@ -10055,7 +10055,8 @@ vect_schedule_slp (vec_info *vinfo, const vec<slp_instance> &slp_instances)
       if (!SLP_INSTANCE_ROOT_STMTS (instance).is_empty ())
 	vectorize_slp_instance_root_stmt (node, instance);
 
-      if (dump_enabled_p ())
+      /* ???  Reduce some testsuite noise because of "more SLP".  */
+      if (SLP_TREE_LANES (node) > 1 && dump_enabled_p ())
 	dump_printf_loc (MSG_NOTE, vect_location,
                          "vectorizing stmts using SLP.\n");
     }
