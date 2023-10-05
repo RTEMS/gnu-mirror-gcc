@@ -1215,7 +1215,13 @@ vect_build_slp_tree_1 (vec_info *vinfo, unsigned char *swap,
 	      if (!directly_supported_p (rhs_code, vectype, optab_vector))
 		{
 		  /* No vector/vector shift, try for a vector/scalar shift.  */
-		  if (!directly_supported_p (rhs_code, vectype, optab_scalar))
+		  if (!directly_supported_p (rhs_code, vectype, optab_scalar)
+		      /* ???  We are using this to guide operand swapping to
+			 eventually make all shift operands the same but we
+			 shouldn't fail in the end - that's be business of
+			 vectorizable_shift.
+			 Avoid spurious ICEs for single-lane discovery.  */
+		      && group_size != 1)
 		    {
 		      if (dump_enabled_p ())
 			dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
