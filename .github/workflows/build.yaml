@@ -41,21 +41,17 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - run: |
-          echo "Free space before:"
-          df -h
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /usr/local/share/boost
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          echo "Free space after:"
-          df -h
       - name: checkout
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
           submodules: recursive
           lfs: true
+
+      - name: Increase available disk space
+        run: |
+          chmod +x .github/scripts/free-disk-space.sh
+          .github/scripts/free-disk-space.sh
 
       - name: Setup Python 3.7
         uses: actions/setup-python@v4

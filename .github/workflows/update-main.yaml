@@ -52,7 +52,13 @@ jobs:
           fetch-depth: 0
           submodules: recursive
           lfs: true
-    
+
+      - name: Increase available disk space
+        run: |
+          chmod +x .github/scripts/free-disk-space.sh
+          .github/scripts/free-disk-space.sh
+
+
       - name: Setup Python 3.7
         uses: actions/setup-python@v4
         with:
@@ -139,6 +145,11 @@ jobs:
           fetch-depth: 0
           submodules: recursive
           lfs: true
+
+      - name: Increase available disk space
+        run: |
+          chmod +x .github/scripts/free-disk-space.sh
+          .github/scripts/free-disk-space.sh
 
       - name: Setup Python 3.7
         uses: actions/setup-python@v4
