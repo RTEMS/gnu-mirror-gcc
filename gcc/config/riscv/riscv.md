@@ -1997,13 +1997,16 @@
 
 ;; Pretend to have the ability to load complex const_int in order to get
 ;; better code generation around them.
-;;
 ;; But avoid constants that are special cased elsewhere.
+;;
+;; Hide it from IRA register equiv recog* () to elide potential undoing of split
+;;
 (define_insn_and_split "*mvconst_internal"
   [(set (match_operand:GPR 0 "register_operand" "=r")
         (match_operand:GPR 1 "splittable_const_int_operand" "i"))]
-  "!(p2m1_shift_operand (operands[1], <MODE>mode)
-     || high_mask_shift_operand (operands[1], <MODE>mode))"
+  "!ira_in_progress
+   && !(p2m1_shift_operand (operands[1], <MODE>mode)
+        || high_mask_shift_operand (operands[1], <MODE>mode))"
   "#"
   "&& 1"
   [(const_int 0)]
@@ -2271,14 +2274,16 @@
   DONE;
 })
 
-(define_expand "cpymemsi"
+(define_expand "cpymem<mode>"
   [(parallel [(set (match_operand:BLK 0 "general_operand")
 		   (match_operand:BLK 1 "general_operand"))
-	      (use (match_operand:SI 2 ""))
+	      (use (match_operand:P 2 ""))
 	      (use (match_operand:SI 3 "const_int_operand"))])]
   ""
 {
-  if (riscv_expand_block_move (operands[0], operands[1], operands[2]))
+  if (riscv_vector::expand_block_move (operands[0], operands[1], operands[2]))
+    DONE;
+  else if (riscv_expand_block_move (operands[0], operands[1], operands[2]))
     DONE;
   else
     FAIL;

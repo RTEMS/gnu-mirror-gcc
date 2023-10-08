@@ -51,6 +51,10 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #define TARGET_MMX_WITH_SSE	(TARGET_64BIT && TARGET_SSE2)
 
+#define TARGET_APX_EGPR (ix86_apx_features & apx_egpr)
+#define TARGET_APX_PUSH2POP2 (ix86_apx_features & apx_push2pop2)
+#define TARGET_APX_NDD (ix86_apx_features & apx_ndd)
+
 #include "config/vxworks-dummy.h"
 
 #include "config/i386/i386-opts.h"
@@ -944,7 +948,11 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 /*xmm24,xmm25,xmm26,xmm27,xmm28,xmm29,xmm30,xmm31*/		\
      0,   0,    0,    0,    0,    0,    0,    0,		\
 /*  k0,  k1, k2, k3, k4, k5, k6, k7*/				\
-     0,  0,   0,  0,  0,  0,  0,  0 }
+     0,  0,   0,  0,  0,  0,  0,  0,				\
+/*  r16,  r17, r18, r19, r20, r21, r22, r23*/			\
+     0,   0,   0,   0,   0,   0,   0,   0,			\
+/*  r24,  r25, r26, r27, r28, r29, r30, r31*/			\
+     0,   0,   0,   0,   0,   0,   0,   0}			\
 
 /* 1 for registers not available across function calls.
    These must include the FIXED_REGISTERS and also any
@@ -981,7 +989,11 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 /*xmm24,xmm25,xmm26,xmm27,xmm28,xmm29,xmm30,xmm31*/		\
      1,    1,     1,    1,    1,    1,    1,    1,		\
  /* k0,  k1,  k2,  k3,  k4,  k5,  k6,  k7*/			\
-     1,   1,   1,   1,   1,   1,   1,   1 }
+     1,   1,   1,   1,   1,   1,   1,   1,			\
+/*  r16,  r17, r18, r19, r20, r21, r22, r23*/			\
+     1,   1,   1,   1,   1,   1,   1,   1,			\
+/*  r24,  r25, r26, r27, r28, r29, r30, r31*/			\
+     1,   1,   1,   1,   1,   1,   1,   1}			\
 
 /* Order in which to allocate registers.  Each register must be
    listed once, even those in FIXED_REGISTERS.  List frame pointer
@@ -997,7 +1009,8 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
   16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,	\
   32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,	\
   48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63,	\
-  64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75 }
+  64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79,	\
+  80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91}
 
 /* ADJUST_REG_ALLOC_ORDER is a macro which permits reg_alloc_order
    to be rearranged based on a particular function.  When using sse math,
@@ -1005,6 +1018,14 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 
 #define ADJUST_REG_ALLOC_ORDER x86_order_regs_for_local_alloc ()
 
+#define INSN_BASE_REG_CLASS(INSN) \
+  ix86_insn_base_reg_class (INSN)
+
+#define REGNO_OK_FOR_INSN_BASE_P(NUM, INSN) \
+  ix86_regno_ok_for_insn_base_p (NUM, INSN)
+
+#define INSN_INDEX_REG_CLASS(INSN) \
+  ix86_insn_index_reg_class (INSN)
 
 #define OVERRIDE_ABI_FORMAT(FNDECL) ix86_call_abi_override (FNDECL)
 
@@ -1199,6 +1220,9 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
 #define FIRST_MASK_REG  MASK0_REG
 #define LAST_MASK_REG   MASK7_REG
 
+#define FIRST_REX2_INT_REG  R16_REG
+#define LAST_REX2_INT_REG   R31_REG
+
 /* Override this in other tm.h files to cope with various OS lossage
    requiring a frame pointer.  */
 #ifndef SUBTARGET_FRAME_POINTER_REQUIRED
@@ -1276,6 +1300,12 @@ enum reg_class
   INDEX_REGS,			/* %eax %ebx %ecx %edx %esi %edi %ebp */
   LEGACY_REGS,			/* %eax %ebx %ecx %edx %esi %edi %ebp %esp */
   GENERAL_REGS,			/* %eax %ebx %ecx %edx %esi %edi %ebp %esp
+				   %r8 %r9 %r10 %r11 %r12 %r13 %r14 %r15
+				   %r16 %r17 %r18 %r19 %r20 %r21 %r22 %r23
+				   %r24 %r25 %r26 %r27 %r28 %r29 %r30 %r31 */
+  GENERAL_GPR16,		/* %eax %ebx %ecx %edx %esi %edi %ebp %esp
+				   %r8 %r9 %r10 %r11 %r12 %r13 %r14 %r15 */
+  INDEX_GPR16,			/* %eax %ebx %ecx %edx %esi %edi %ebp
 				   %r8 %r9 %r10 %r11 %r12 %r13 %r14 %r15 */
   FP_TOP_REG, FP_SECOND_REG,	/* %st(0) %st(1) */
   FLOAT_REGS,
@@ -1339,6 +1369,8 @@ enum reg_class
    "INDEX_REGS",			\
    "LEGACY_REGS",			\
    "GENERAL_REGS",			\
+   "GENERAL_GPR16",			\
+   "INDEX_GPR16",			\
    "FP_TOP_REG", "FP_SECOND_REG",	\
    "FLOAT_REGS",			\
    "SSE_FIRST_REG",			\
@@ -1374,9 +1406,11 @@ enum reg_class
       { 0x0f,        0x0,   0x0 },	/* Q_REGS */			\
    { 0x900f0,        0x0,   0x0 },	/* NON_Q_REGS */		\
       { 0x7e,      0xff0,   0x0 },	/* TLS_GOTBASE_REGS */		\
-      { 0x7f,      0xff0,   0x0 },	/* INDEX_REGS */		\
+      { 0x7f,      0xff0,   0xffff000 },	/* INDEX_REGS */		\
    { 0x900ff,        0x0,   0x0 },	/* LEGACY_REGS */		\
-   { 0x900ff,      0xff0,   0x0 },	/* GENERAL_REGS */		\
+   { 0x900ff,      0xff0,   0xffff000 },	/* GENERAL_REGS */		\
+   { 0x900ff,      0xff0,   0x0 },	/* GENERAL_GPR16 */		\
+   { 0x0007f,      0xff0,   0x0 },	/* INDEX_GPR16 */		\
      { 0x100,        0x0,   0x0 },	/* FP_TOP_REG */		\
      { 0x200,        0x0,   0x0 },	/* FP_SECOND_REG */		\
     { 0xff00,        0x0,   0x0 },	/* FLOAT_REGS */		\
@@ -1386,13 +1420,13 @@ enum reg_class
  { 0xff00000, 0xfffff000,   0xf },	/* ALL_SSE_REGS */		\
 { 0xf0000000,        0xf,   0x0 },	/* MMX_REGS */			\
  { 0xff0ff00, 0xfffff000,   0xf },	/* FLOAT_SSE_REGS */		\
- {   0x9ffff,      0xff0,   0x0 },	/* FLOAT_INT_REGS */		\
- { 0xff900ff, 0xfffffff0,   0xf },	/* INT_SSE_REGS */		\
- { 0xff9ffff, 0xfffffff0,   0xf },	/* FLOAT_INT_SSE_REGS */	\
+ {   0x9ffff,      0xff0,   0xffff000 },	/* FLOAT_INT_REGS */		\
+ { 0xff900ff, 0xfffffff0,   0xffff00f },	/* INT_SSE_REGS */		\
+ { 0xff9ffff, 0xfffffff0,   0xffff00f },	/* FLOAT_INT_SSE_REGS */	\
        { 0x0,        0x0, 0xfe0 },	/* MASK_REGS */			\
        { 0x0,        0x0, 0xff0 },	/* ALL_MASK_REGS */		\
-   { 0x900ff,      0xff0, 0xff0 },	/* INT_MASK_REGS */	\
-{ 0xffffffff, 0xffffffff, 0xfff }	/* ALL_REGS  */			\
+   { 0x900ff,      0xff0, 0xffffff0 },	/* INT_MASK_REGS */	\
+{ 0xffffffff, 0xffffffff, 0xfffffff }	/* ALL_REGS  */			\
 }
 
 /* The same information, inverted:
@@ -1422,13 +1456,20 @@ enum reg_class
 #define REX_INT_REGNO_P(N) \
   IN_RANGE ((N), FIRST_REX_INT_REG, LAST_REX_INT_REG)
 
+#define REX2_INT_REG_P(X) (REG_P (X) && REX2_INT_REGNO_P (REGNO (X)))
+#define REX2_INT_REGNO_P(N) \
+  IN_RANGE ((N), FIRST_REX2_INT_REG, LAST_REX2_INT_REG)
+
 #define GENERAL_REG_P(X) (REG_P (X) && GENERAL_REGNO_P (REGNO (X)))
 #define GENERAL_REGNO_P(N) \
-  (LEGACY_INT_REGNO_P (N) || REX_INT_REGNO_P (N))
+  (LEGACY_INT_REGNO_P (N) || REX_INT_REGNO_P (N) || REX2_INT_REGNO_P (N))
 
 #define INDEX_REG_P(X) (REG_P (X) && INDEX_REGNO_P (REGNO (X)))
 #define INDEX_REGNO_P(N) \
-  (LEGACY_INDEX_REGNO_P (N) || REX_INT_REGNO_P (N))
+  (LEGACY_INDEX_REGNO_P (N) || REX_INT_REGNO_P (N) || REX2_INT_REGNO_P (N))
+
+#define GENERAL_GPR16_REGNO_P(N) \
+  (LEGACY_INT_REGNO_P (N) || REX_INT_REGNO_P (N))
 
 #define ANY_QI_REG_P(X) (REG_P (X) && ANY_QI_REGNO_P (REGNO (X)))
 #define ANY_QI_REGNO_P(N) \
@@ -1986,7 +2027,9 @@ do {							\
  "xmm20", "xmm21", "xmm22", "xmm23",					\
  "xmm24", "xmm25", "xmm26", "xmm27",					\
  "xmm28", "xmm29", "xmm30", "xmm31",					\
- "k0", "k1", "k2", "k3", "k4", "k5", "k6", "k7" }
+ "k0", "k1", "k2", "k3", "k4", "k5", "k6", "k7",			\
+ "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23",		\
+ "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31" }
 
 #define REGISTER_NAMES HI_REGISTER_NAMES
 

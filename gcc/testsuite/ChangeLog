@@ -1,3 +1,1117 @@
+2023-10-07  Lehua Ding  <lehua.ding@rivai.ai>
+
+	Revert:
+	2023-10-07  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/rvv.exp: Add zfa for building.
+	* gcc.target/riscv/rvv/autovec/unop/math-ceil-run-0.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-floor-run-0.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-nearbyint-run-0.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-rint-run-0.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-round-run-0.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-roundeven-run-0.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-roundeven-run-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-roundeven-run-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-trunc-run-0.c: New test.
+
+2023-10-07  Kong Lingling  <lingling.kong@intel.com>
+	    Hongyu Wang  <hongyu.wang@intel.com>
+	    Hongtao Liu  <hongtao.liu@intel.com>
+
+	* gcc.target/i386/apx-legacy-insn-check-norex2.c: Add intrinsic
+	tests.
+
+2023-10-07  Kong Lingling  <lingling.kong@intel.com>
+	    Hongyu Wang  <hongyu.wang@intel.com>
+	    Hongtao Liu  <hongtao.liu@intel.com>
+
+	* gcc.target/i386/apx-legacy-insn-check-norex2.c: Add
+	sse/vex intrinsic tests.
+
+2023-10-07  Kong Lingling  <lingling.kong@intel.com>
+	    Hongyu Wang  <hongyu.wang@intel.com>
+	    Hongtao Liu  <hongtao.liu@intel.com>
+
+	* lib/target-supports.exp: Add apxf check.
+	* gcc.target/i386/apx-legacy-insn-check-norex2.c: New test.
+	* gcc.target/i386/apx-legacy-insn-check-norex2-asm.c: New assembler test.
+
+2023-10-07  Kong Lingling  <lingling.kong@intel.com>
+	    Hongyu Wang  <hongyu.wang@intel.com>
+	    Hongtao Liu  <hongtao.liu@intel.com>
+
+	* gcc.target/i386/apx-inline-gpr-norex2.c: New test.
+
+2023-10-07  Kong Lingling  <lingling.kong@intel.com>
+	    Hongyu Wang  <hongyu.wang@intel.com>
+	    Hongtao Liu  <hongtao.liu@intel.com>
+
+	* gcc.target/i386/apx-egprs-names.c: New test.
+	* gcc.target/i386/apx-spill_to_egprs-1.c: Likewise.
+	* gcc.target/i386/apx-interrupt-1.c: Likewise.
+
+2023-10-07  Kong Lingling  <lingling.kong@intel.com>
+	    Hongyu Wang  <hongyu.wang@intel.com>
+	    Hongtao Liu  <hongtao.liu@intel.com>
+
+	* gcc.target/i386/apx-1.c: New test.
+
+2023-10-07  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/rvv.exp: Add zfa for building.
+	* gcc.target/riscv/rvv/autovec/unop/math-ceil-run-0.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-floor-run-0.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-nearbyint-run-0.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-rint-run-0.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-round-run-0.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-roundeven-run-0.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-roundeven-run-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-roundeven-run-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-trunc-run-0.c: New test.
+
+2023-10-07  Jiufu Guo  <guojiufu@linux.ibm.com>
+
+	PR target/108338
+	* gcc.target/powerpc/pr108338.c: Updated to check mtvsrws for p9.
+
+2023-10-07  Jiufu Guo  <guojiufu@linux.ibm.com>
+
+	PR target/108338
+	* gcc.target/powerpc/pr108338.c: New test.
+
+2023-10-07  xuli  <xuli1@eswincomputing.com>
+
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-25.c: Adjust assembler times.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-26.c: Ditto.
+
+2023-10-06  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* gcc.target/i386/ashldi3-2.c: New 32-bit test case.
+	* gcc.target/i386/ashlti3-3.c: New 64-bit test case.
+
+2023-10-06  Roger Sayle  <roger@nextmovesoftware.com>
+	    Uros Bizjak  <ubizjak@gmail.com>
+
+	* gcc.target/i386/lea-2.c: New test case.
+
+2023-10-06  Andrew Pinski  <pinskia@gmail.com>
+
+	PR middle-end/111699
+	* gcc.c-torture/compile/pr111699-1.c: New test.
+
+2023-10-06  Patrick O'Neill  <patrick@rivosinc.com>
+
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2float-1.h:
+	Replace stdint.h with stdint-gcc.h.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2float-2.h:
+	Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2int-1.h:
+	Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2int-2.h:
+	Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2float-1.h:
+	Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2float-2.h:
+	Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2int-1.h:
+	Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2int-2.h:
+	Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_sqrt-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_sqrt-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-4.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-5.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-6.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-7.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-8.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/partial/slp-8.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/partial/slp-9.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/pr111232.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/unop/cvt-0.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/unop/cvt-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/perm.h: Ditto.
+	* gcc.target/riscv/rvv/base/abi-call-args-4-run.c: Ditto.
+	* gcc.target/riscv/rvv/base/pr110119-2.c: Ditto.
+	* gcc.target/riscv/rvv/vsetvl/pr111255.c: Ditto.
+	* gcc.target/riscv/rvv/vsetvl/wredsum_vlmax.c: Ditto.
+
+2023-10-05  Patrick O'Neill  <patrick@rivosinc.com>
+	    Joern Rennecke  <joern.rennecke@embecosm.com>
+
+	* gcc.dg/pr90263.c: Skip riscv_v targets.
+	* gcc.target/riscv/rvv/base/pr90263.c: New test.
+
+2023-10-05  Sergei Trofimovich  <siarheit@google.com>
+
+	PR ipa/111283
+	PR gcov-profile/111559
+	* gcc.dg/tree-prof/pr111559.c: New test.
+
+2023-10-05  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/111657
+	* gcc.target/i386/pr111657.c: New test.
+
+2023-10-05  Martin Jambor  <mjambor@suse.cz>
+
+	Revert:
+	2023-10-05  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/108007
+	* gcc.dg/ipa/pr108007.c: New test.
+
+2023-10-05  Claudiu Zissulescu  <claziss@gmail.com>
+
+	* gcc.target/arc/enter-dw2-1.c: Remove tests when using linux
+	build.
+	* gcc.target/arc/tls-ld.c: Update test.
+	* gcc.target/arc/tls-le.c: Likewise.
+
+2023-10-05  Claudiu Zissulescu  <claziss@gmail.com>
+
+	* gcc.target/arc/loop-3.c: Update test.
+
+2023-10-05  Claudiu Zissulescu  <claziss@gmail.com>
+
+	* gcc.target/arc/add_n-combine.c: Recognize add2 instruction.
+	* gcc.target/arc/firq-4.c: FP register is a temp reg. Update test.
+	* gcc.target/arc/firq-6.c: Likewise.
+	* gcc.target/arc/mtune-ARC600.c: Remove test.
+	* gcc.target/arc/mtune-ARC601.c: Likewise.
+	* gcc.target/arc/mtune-ARC700-xmac: Likewise.
+	* gcc.target/arc/mtune-ARC700.c: Likewise.
+	* gcc.target/arc/mtune-ARC725D.c: Likewise.
+	* gcc.target/arc/mtune-ARC750D.c: Likewise.
+	* gcc.target/arc/uncached-7.c: Set it to XFAIL.
+
+2023-10-04  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* gcc.target/arc/ashrsi-1.c: New TARGET_BARREL_SHIFTER test case.
+	* gcc.target/arc/ashrsi-2.c: New !TARGET_BARREL_SHIFTER test case.
+	* gcc.target/arc/ashrsi-3.c: Likewise.
+	* gcc.target/arc/ashrsi-4.c: Likewise.
+	* gcc.target/arc/ashrsi-5.c: Likewise.
+	* gcc.target/arc/lshrsi-1.c: New TARGET_BARREL_SHIFTER test case.
+	* gcc.target/arc/lshrsi-2.c: New !TARGET_BARREL_SHIFTER test case.
+	* gcc.target/arc/lshrsi-3.c: Likewise.
+	* gcc.target/arc/lshrsi-4.c: Likewise.
+	* gcc.target/arc/lshrsi-5.c: Likewise.
+	* gcc.target/arc/shlsi-1.c: New TARGET_BARREL_SHIFTER test case.
+	* gcc.target/arc/shlsi-2.c: New !TARGET_BARREL_SHIFTER test case.
+	* gcc.target/arc/shlsi-3.c: Likewise.
+	* gcc.target/arc/shlsi-4.c: Likewise.
+	* gcc.target/arc/shlsi-5.c: Likewise.
+
+2023-10-04  Roger Sayle  <roger@nextmovesoftware.com>
+
+	PR rtl-optimization/110701
+	* gcc.target/i386/pr110701.c: New test case.
+
+2023-10-04  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/37336
+	PR fortran/111674
+	* gfortran.dg/allocate_with_source_25.f90: Final count in tree
+	dump reverts from 4 to original 6.
+	* gfortran.dg/finalize_38.f90: Add test for fix of PR111674.
+
+2023-10-03  David Malcolm  <dmalcolm@redhat.com>
+
+	* g++.dg/diagnostic/static_assert3.C: Add directives for
+	additional source printing.
+	* g++.dg/template/error60.C: New test.
+
+2023-10-03  Patrick O'Neill  <patrick@rivosinc.com>
+
+	* gcc.target/riscv/rvv/fortran/pr111566.f90: Restore escaped
+	characters.
+
+2023-10-03  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/110378
+	* gcc.dg/ipa/ipa-sra-32.c: New test.
+	* gcc.dg/ipa/pr110378-4.c: Likewise.
+	* gcc.dg/ipa/ipa-sra-4.c: Use a return value.
+
+2023-10-03  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/108007
+	* gcc.dg/ipa/pr108007.c: New test.
+
+2023-10-03  Andrew MacLeod  <amacleod@redhat.com>
+
+	* gcc.dg/pr93917.c: Check for ranges in final optimized listing.
+	* gcc.dg/tree-ssa/vrp-unreachable.c: Ditto.
+
+2023-10-03  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* gcc.target/arc/scc-ltu.c: New test case.
+
+2023-10-02  John David Anglin  <danglin@gcc.gnu.org>
+
+	* gfortran.dg/pr95690.f90: Add hppa*-*-* to dg-error targets at line 5.
+
+2023-10-02  John David Anglin  <danglin@gcc.gnu.org>
+
+	* gcc.dg/pr108095.c: Require target lra.
+
+2023-10-02  John David Anglin  <danglin@gcc.gnu.org>
+
+	* gcc.dg/long_branch.c: Increase timeout factor for hppa*-*-*.
+
+2023-10-02  David Malcolm  <dmalcolm@redhat.com>
+
+	* gcc.dg/plugin/diagnostic_group_plugin.c
+	(test_begin_group_cb, test_end_group_cb): Replace with...
+	(class test_output_format): ...this new subclass.
+	(plugin_init): Update.
+
+2023-10-02  David Malcolm  <dmalcolm@redhat.com>
+
+	* gcc.dg/plugin/diagnostic_plugin_show_trees.c: Update for
+	reorganization of source-printing fields of diagnostic_context.
+	* gcc.dg/plugin/diagnostic_plugin_test_inlining.c: Likewise.
+	* gcc.dg/plugin/diagnostic_plugin_test_paths.c: Likewise.
+	* gcc.dg/plugin/diagnostic_plugin_test_show_locus.c: Likewise.
+	* gcc.dg/plugin/diagnostic_plugin_test_string_literals.c: Likewise.
+	* gcc.dg/plugin/diagnostic_plugin_test_tree_expression_range.c:
+	Likewise.
+
+2023-10-02  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	PR target/111235
+	* gcc.dg/rtl/arm/stl-cond.c: Remove test.
+	* gcc.target/arm/atomic_loaddi_7.c: Fix dmb count.
+	* gcc.target/arm/atomic_loaddi_8.c: Likewise.
+	* gcc.target/arm/pr111235.c: Add new test.
+
+2023-10-02  Tamar Christina  <tamar.christina@arm.com>
+
+	* gcc.target/aarch64/xorsign.c:
+
+2023-10-02  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* g++.dg/debug/dwarf2/pr85550.C: Skip for Darwin.
+
+2023-10-02  Joern Rennecke  <joern.rennecke@embecosm.com>
+	    Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/base/cpymem-1.c: New test.
+	* gcc.target/riscv/rvv/base/cpymem-2.c: Likewise.
+
+2023-10-01  Joern Rennecke  <joern.rennecke@embecosm.com>
+
+	* lib/target-supports.exp (add_options_for_riscv_v):
+	Fix typo in first regexp.
+	(add_options_for_riscv_zfh): Likewise.
+	(add_options_for_riscv_d): Likewise.
+
+2023-10-01  Joern Rennecke  <joern.rennecke@embecosm.com>
+	    Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+	    Juzhe-Zhong   <juzhe.zhong@rivai.ai>
+
+	PR target/111566
+	* gcc.target/riscv/rvv/autovec/vls/mov-1.c: Adapt test.
+	* gcc.target/riscv/rvv/autovec/vls/mov-10.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/vls/mov-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/vls/mov-5.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/vls/mov-7.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/vls/mov-8.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/vls/mov-9.c: Ditto.1
+	* gcc.target/riscv/rvv/autovec/vls/mov-2.c: Removed.
+	* gcc.target/riscv/rvv/autovec/vls/mov-4.c: Removed.
+	* gcc.target/riscv/rvv/autovec/vls/mov-6.c: Removed.
+	* gcc.target/riscv/rvv/fortran/pr111566.f90: New test.
+
+2023-09-29  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2/iso/run/pass/m2date.mod (DayName): Reordered.
+
+2023-09-29  Xiao Zeng  <zengxiao@eswincomputing.com>
+
+	* gcc.target/riscv/zicond-primitiveSemantics_compare_imm.c: New test.
+	* gcc.target/riscv/zicond-primitiveSemantics_compare_imm_return_0_imm.c:
+	Likewise.
+	* gcc.target/riscv/zicond-primitiveSemantics_compare_imm_return_imm_imm.c:
+	Likewise.
+	* gcc.target/riscv/zicond-primitiveSemantics_compare_imm_return_imm_reg.c:
+	Likewise.
+	* gcc.target/riscv/zicond-primitiveSemantics_compare_imm_return_reg_reg.c:
+	Likewise.
+	* gcc.target/riscv/zicond-primitiveSemantics_compare_reg.c: Likewise.
+	* gcc.target/riscv/zicond-primitiveSemantics_compare_reg_return_0_imm.c:
+	Likewise.
+	* gcc.target/riscv/zicond-primitiveSemantics_compare_reg_return_imm_imm.c:
+	Likewise.
+	* gcc.target/riscv/zicond-primitiveSemantics_compare_reg_return_imm_reg.c:
+	Likewise.
+	* gcc.target/riscv/zicond-primitiveSemantics_compare_reg_return_reg_reg.c:
+	Likewise.
+	* gcc.target/riscv/zicond-primitiveSemantics.c: Tighten expected regexp.
+	* gcc.target/riscv/zicond-primitiveSemantics_return_0_imm.c: Likewise.
+	* gcc.target/riscv/zicond-primitiveSemantics_return_imm_imm.c: Likewise.
+	* gcc.target/riscv/zicond-primitiveSemantics_return_imm_reg.c: Likewise.
+	* gcc.target/riscv/zicond-primitiveSemantics_return_reg_reg.c: Likewise.
+	* gcc.target/riscv/zicond-xor-01.c: Likewise.
+
+2023-09-29  Patrick O'Neill  <patrick@rivosinc.com>
+
+	* gcc.target/riscv/rvv/vsetvl/wredsum_vlmax.c: Specify -mabi=lp64d.
+
+2023-09-29  Jivan Hakobyan  <jivanhakobyan9@gmail.com>
+
+	* gcc.target/riscv/zbb-andn-orn-01.c: New test.
+	* gcc.target/riscv/zbb-andn-orn-02.c: Likewise.
+
+2023-09-29  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.dg/plugin/poly-int-tests.h (test_num_coeffs_extra): Use
+	poly_int rather than poly_int_pod.
+
+2023-09-29  Francois-Xavier Coudert  <fxcoudert@gmail.com>
+
+	* gcc.dg/debug/dwarf2/inline4.c: Ajdust regexp to match darwin
+	output.
+
+2023-09-29  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/37336
+	* gfortran.dg/coarray/alloc_comp_6.f90: New test.
+	* gfortran.dg/coarray/alloc_comp_7.f90: New test.
+
+2023-09-29  Manos Anagnostakis  <manos.anagnostakis@vrull.eu>
+
+	* gcc.target/aarch64/ldp_aligned.c: Splitted into this and
+	ldp_unaligned.
+	* gcc.target/aarch64/stp_aligned.c: Splitted into this and
+	stp_unaligned.
+	* gcc.target/aarch64/ldp_unaligned.c: New test.
+	* gcc.target/aarch64/stp_unaligned.c: New test.
+
+2023-09-29  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/111583
+	* gcc.dg/tree-ssa/pr111583-1.c: New testcase.
+	* gcc.dg/tree-ssa/pr111583-2.c: Likewise.
+
+2023-09-28  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2/coroutines/pim/run/pass/coroutines-pim-run-pass.exp:
+	Add load_lib timeout-dg.exp and increase timeout to 60
+	seconds.
+	* gm2/pimlib/base/run/pass/pimlib-base-run-pass.exp: Add
+	load_lib timeout-dg.exp and increase timeout to 60 seconds.
+	* gm2/projects/iso/run/pass/halma/projects-iso-run-pass-halma.exp:
+	Increase timeout to 45 seconds.
+	* gm2/switches/whole-program/pass/run/switches-whole-program-pass-run.exp:
+	Add load_lib timeout-dg.exp and increase timeout to 120 seconds.
+	Remove unnecessary compile of mystrlib.mod.
+	* gm2/iso/run/pass/iso-run-pass.exp: Add load_lib
+	timeout-dg.exp and set timeout to 60 seconds.
+
+2023-09-28  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	PR target/111121
+	* gcc.target/aarch64/mops_4.c: Add memmove testcases.
+
+2023-09-28  Pan Li  <pan2.li@intel.com>
+
+	PR target/111506
+	* gcc.target/riscv/rvv/autovec/unop/cvt-0.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/cvt-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/vls/cvt-0.c: New test.
+
+2023-09-28  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/111614
+	* gcc.dg/torture/pr111614.c: New testcase.
+
+2023-09-28  Joern Rennecke  <joern.rennecke@embecosm.com>
+
+	* lib/target-supports.exp (check_effective_target_riscv_vector):
+	Delete.  Changed all users to use *riscv_v instead.
+	* g++.target/riscv/rvv/base/bug-10.C: Use riscv_v target selector.
+	* g++.target/riscv/rvv/base/bug-11.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-13.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-15.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-16.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-17.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-2.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-4.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-5.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-6.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-7.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-9.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-12.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-14.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-18.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-19.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-20.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-21.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-22.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-23.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-3.C: Likewise.
+	* g++.target/riscv/rvv/base/bug-8.C: Likewise.
+	* gcc.dg/vect/pr88598-1.c: Likewise.
+	* gcc.dg/vect/pr88598-2.c: Likewise.
+	* gcc.dg/vect/pr88598-3.c: Likewise.
+	* gcc.dg/vect/slp-26.c: Likewise.
+	* gcc.dg/vect/slp-reduc-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/copysign-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/copysign-zvfh-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/narrow_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/narrow_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/narrow_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/shift-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/shift-scalar-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vadd-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vadd-zvfh-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vand-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vdiv-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vdiv-zvfh-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vmax-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vmax-zvfh-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vmin-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vmin-zvfh-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vmul-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vmul-zvfh-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vor-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vrem-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vsub-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vsub-zvfh-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vxor-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/mulh_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/mulh_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vadd-run-nofm.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vdiv-run-nofm.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vmul-run-nofm.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/binop/vsub-run-nofm.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cmp/vcond_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cmp/vcond_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cmp/vcond_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cmp/vcond_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/conversions/vfcvt-itof-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/conversions/vfcvt-itof-zvfh-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/conversions/vfcvt_rtz-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/conversions/vfcvt_rtz-zvfh-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/conversions/vfncvt-ftoi-zvfh-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/conversions/vfncvt-itof-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/conversions/vfncvt-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/conversions/vfncvt-zvfh-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/conversions/vfwcvt-ftoi-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/conversions/vfwcvt-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/conversions/vfwcvt-zvfh-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/conversions/vncvt-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/conversions/vsext-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/conversions/vzext-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/conversions/vfncvt-ftoi-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/conversions/vfncvt-itof-zvfh-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/conversions/vfwcvt-ftoi-zvfh-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/conversions/vfwcvt-itof-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/conversions/vfwcvt-itof-zvfh-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/multiple_rgroup_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/multiple_rgroup_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/multiple_rgroup_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/multiple_rgroup_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/single_rgroup_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/single_rgroup_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/single_rgroup_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-10.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-11.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-12.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-13.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-14.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-15.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-16.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-17.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-18.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-19.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-8.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-9.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/live_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/partial/live_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/series_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-10.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-11.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-12.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-8.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-9.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-10.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-11.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-12.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-8.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-9.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-10.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-11.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-12.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-8.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-9.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/unop/abs-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/unop/vfsqrt-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/unop/vneg-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/unop/vnot-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/unop/math-ceil-run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/unop/math-ceil-run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/unop/math-floor-run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/unop/math-floor-run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/unop/math-nearbyint-run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/unop/math-nearbyint-run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/unop/math-rint-run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/unop/math-rint-run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/unop/math-round-run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/unop/math-round-run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/unop/math-trunc-run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/unop/math-trunc-run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-10.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-11.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-12.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-13.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-14.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-8.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-9.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/compress_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/compress_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/compress_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/compress_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/compress_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/compress_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/init-repeat-sequence-run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/init-repeat-sequence-run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/init-repeat-sequence-run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/insert_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/insert_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge_run-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/perm_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/perm_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/perm_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/perm_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/perm_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/perm_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/perm_run-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/repeat_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/repeat_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/repeat_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/repeat_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/repeat_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/repeat_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/vec_extract-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/vec_set-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/vec_extract-runu.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vmv-imm-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-10.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-11.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-12.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-8.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-9.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-10.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-11.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-12.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-8.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/vec-avg-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_reduc_order_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_reduc_order_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/widen/widen_reduc_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_run-10.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_run-11.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_run-9.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_run-10.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_run-11.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_run-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_run-8.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_run-9.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_run-10.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_run-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_run-9.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_run-10.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_run-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_run-9.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/strided_load_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/strided_store_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/strided_store_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_run-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_run-8.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_run-8.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_run-8.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_run-12.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/strided_load_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_run-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_run-8.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_run-9.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_strict_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-10.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-11.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-12.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-13.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-14.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-8.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-9.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_strict_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-8.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-9.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fadd_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fadd_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fadd_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fadd_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma_run-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma_run-8.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmul_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmul_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmul_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmul_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift_run-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift_run-8.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift_run-9.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2float_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2float_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2int_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2int_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2float_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2float_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2int_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2int_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_copysign-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_copysign-zvfh-run.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_logical_min_max_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_logical_min_max_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_logical_min_max_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_logical_min_max_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_logical_min_max_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_mulh_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_mulh_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_narrow_shift_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_narrow_shift_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_narrow_shift_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_sqrt_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_sqrt_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-8.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_widen_reduc_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/cond/cond_widen_reduc_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load_run-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store_run-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-10.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-11.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-12.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-13.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-14.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-15.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-16.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-17.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-18.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-7.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-8.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-9.c: Likewise.
+	* gcc.target/riscv/rvv/base/bug-3.c: Likewise.
+	* gcc.target/riscv/rvv/base/bug-4.c: Likewise.
+	* gcc.target/riscv/rvv/base/bug-5.c: Likewise.
+	* gcc.target/riscv/rvv/base/float-point-frm-run-1.c: Likewise.
+	* gcc.target/riscv/rvv/base/float-point-frm-run-2.c: Likewise.
+	* gcc.target/riscv/rvv/base/float-point-frm-run-3.c: Likewise.
+	* gcc.target/riscv/rvv/base/float-point-frm-run-4.c: Likewise.
+	* gcc.target/riscv/rvv/base/float-point-frm-run-5.c: Likewise.
+	* gcc.target/riscv/rvv/base/abi-call-args-1-run.c: Likewise.
+	* gcc.target/riscv/rvv/base/abi-call-args-2-run.c: Likewise.
+	* gcc.target/riscv/rvv/base/abi-call-args-3-run.c: Likewise.
+	* gcc.target/riscv/rvv/base/abi-call-args-4-run.c: Likewise.
+	* gcc.target/riscv/rvv/base/abi-call-return-run.c: Likewise.
+	* gcc.target/riscv/rvv/base/scalar-move-merged-run-1.c: Likewise.
+
+2023-09-28  xuli  <xuli1@eswincomputing.com>
+
+	PR target/111533
+	* gcc.target/riscv/rvv/base/pr111533-1.c: New test.
+	* gcc.target/riscv/rvv/base/pr111533-2.c: New test.
+
+2023-09-27  Manos Anagnostakis  <manos.anagnostakis@vrull.eu>
+	    Philipp Tomsich  <philipp.tomsich@vrull.eu>
+	    Manolis Tsamis  <manolis.tsamis@vrull.eu>
+
+	* gcc.target/aarch64/ampere1-no_ldp_combine.c: Removed.
+	* gcc.target/aarch64/ldp_aligned.c: New test.
+	* gcc.target/aarch64/ldp_always.c: New test.
+	* gcc.target/aarch64/ldp_never.c: New test.
+	* gcc.target/aarch64/stp_aligned.c: New test.
+	* gcc.target/aarch64/stp_always.c: New test.
+	* gcc.target/aarch64/stp_never.c: New test.
+
+2023-09-27  Andre Vieira  <andre.simoesdiasvieira@arm.com>
+
+	* gcc.dg/vect/vect-simd-clone-19.c: New test.
+
+2023-09-27  Richard Biener  <rguenther@suse.de>
+
+	* gcc.dg/fold-abs-6.c: New testcase.
+
+2023-09-27  Joern Rennecke  <joern.rennecke@embecosm.com>
+
+	* gcc.target/riscv/shift-shift-1.c: Avoid spurious pattern matches.
+	* gcc.target/riscv/shift-shift-3.c: Likewise.
+	* gcc.target/riscv/zba-shNadd-01.c: Likewise.
+	* gcc.target/riscv/zba-shNadd-02.c: Likewise.
+	* gcc.target/riscv/zbb-andn-orn-xnor-01.c: Likewise.
+	* gcc.target/riscv/zbb-andn-orn-xnor-02.c: Likewise.
+	* gcc.target/riscv/zbb-min-max.c: Likewise.
+	* gcc.target/riscv/zero-extend-1.c: Likewise.
+	* gcc.target/riscv/zero-extend-2.c: Likewise.
+	* gcc.target/riscv/zero-extend-3.c: Likewise.
+	* gcc.target/riscv/zero-extend-4.c: Likewise.
+	* gcc.target/riscv/zero-extend-5.c: Likewise.
+	* gcc.target/riscv/_Float16-soft-2.c: Likewise.
+	* gcc.target/riscv/_Float16-soft-3.c: Likewise.
+	* gcc.target/riscv/_Float16-zfh-1.c: Likewise.
+	* gcc.target/riscv/_Float16-zfh-2.c: Likewise.
+	* gcc.target/riscv/_Float16-zfh-3.c: Likewise.
+	* gcc.target/riscv/and-extend-1.c: Likewise.
+	* gcc.target/riscv/and-extend-2.c: Likewise.
+	* gcc.target/riscv/pr108987.c: Likewise.
+	* gcc.target/riscv/ret-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/align-1.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/align-2.c: Likewise.
+	* gcc.target/riscv/zba-shNadd-04.c: Likewise.
+	* gcc.target/riscv/zba-shNadd-07.c: Likewise.
+	* gcc.target/riscv/zbb-rol-ror-02.c: Likewise.
+	* gcc.target/riscv/zbbw.c: Likewise.
+	* gcc.target/riscv/zbc32.c: Likewise.
+	* gcc.target/riscv/zbc64.c: Likewise.
+	* gcc.target/riscv/zbkb32.c: Likewise.
+	* gcc.target/riscv/zbkb64.c: Likewise.
+	* gcc.target/riscv/zbkc32.c: Likewise.
+	* gcc.target/riscv/zbkc64.c: Likewise.
+	* gcc.target/riscv/zbkx32.c: Likewise.
+	* gcc.target/riscv/zbkx64.c: Likewise.
+	* gcc.target/riscv/zfa-fleq-fltq.c: Likewise.
+	* gcc.target/riscv/zfa-fli-zfh.c: Likewise.
+	* gcc.target/riscv/zfa-fli.c: Likewise.
+	* gcc.target/riscv/zknd64.c: Likewise.
+	* gcc.target/riscv/zksed32.c: Likewise.
+	* gcc.target/riscv/zksed64.c: Likewise.
+	* gcc.target/riscv/zksh32.c: Likewise.
+	* gcc.target/riscv/zksh64.c: Likewise.
+	* gcc.target/riscv/_Float16-soft-1.c: Likewise.
+	* gcc.target/riscv/_Float16-zfhmin-1.c: Likewise.
+	* gcc.target/riscv/_Float16-zfhmin-2.c: Likewise.
+	* gcc.target/riscv/_Float16-zfhmin-3.c: Likewise.
+	* gcc.target/riscv/_Float16-zhinxmin-1.c: Likewise.
+	* gcc.target/riscv/_Float16-zhinxmin-2.c: Likewise.
+	* gcc.target/riscv/_Float16-zhinxmin-3.c: Likewise.
+	* gcc.target/riscv/fle-ieee.c: Likewise.
+	* gcc.target/riscv/fle-snan.c: Likewise.
+	* gcc.target/riscv/flef-ieee.c: Likewise.
+	* gcc.target/riscv/flef-snan.c: Likewise.
+	* gcc.target/riscv/flt-ieee.c: Likewise.
+	* gcc.target/riscv/flt-snan.c: Likewise.
+	* gcc.target/riscv/fltf-ieee.c: Likewise.
+	* gcc.target/riscv/fltf-snan.c: Likewise.
+	* gcc.target/riscv/interrupt-1.c: Likewise.
+	* gcc.target/riscv/interrupt-mmode.c: Likewise.
+	* gcc.target/riscv/interrupt-smode.c: Likewise.
+	* gcc.target/riscv/interrupt-umode.c: Likewise.
+	* gcc.target/riscv/pr106888.c: Likewise.
+	* gcc.target/riscv/pr89835.c: Likewise.
+	* gcc.target/riscv/shift-and-1.c: Likewise.
+	* gcc.target/riscv/shift-and-2.c: Likewise.
+	* gcc.target/riscv/shift-shift-2.c: Likewise.
+	* gcc.target/riscv/shift-shift-4.c: Likewise.
+	* gcc.target/riscv/shift-shift-5.c: Likewise.
+	* gcc.target/riscv/shorten-memrefs-7.c: Likewise.
+	* gcc.target/riscv/sign-extend.c: Likewise.
+	* gcc.target/riscv/switch-qi.c: Likewise.
+	* gcc.target/riscv/switch-si.c: Likewise.
+	* gcc.target/riscv/xtheadbb-ext-1.c: Likewise.
+	* gcc.target/riscv/xtheadbb-ext.c: Likewise.
+	* gcc.target/riscv/xtheadbb-extu-1.c: Likewise.
+	* gcc.target/riscv/xtheadbb-extu.c: Likewise.
+	* gcc.target/riscv/xtheadbb-strlen.c: Likewise.
+	* gcc.target/riscv/xtheadbs-tst.c: Likewise.
+	* gcc.target/riscv/xtheadfmv-fmv.c: Likewise.
+	* gcc.target/riscv/xventanacondops-primitiveSemantics.c: Likewise.
+	* gcc.target/riscv/zba-adduw.c: Likewise.
+	* gcc.target/riscv/zba-shadd.c: Likewise.
+	* gcc.target/riscv/zba-slliuw.c: Likewise.
+	* gcc.target/riscv/zba-zextw.c: Likewise.
+	* gcc.target/riscv/zbb-min-max-02.c: Likewise.
+	* gcc.target/riscv/zbb-min-max-03.c: Likewise.
+	* gcc.target/riscv/zbb-rol-ror-01.c: Likewise.
+	* gcc.target/riscv/zbb-rol-ror-03.c: Likewise.
+	* gcc.target/riscv/zbb-rol-ror-04.c: Likewise.
+	* gcc.target/riscv/zbb-rol-ror-05.c: Likewise.
+	* gcc.target/riscv/zbb-rol-ror-06.c: Likewise.
+	* gcc.target/riscv/zbb-rol-ror-07.c: Likewise.
+	* gcc.target/riscv/zbb-rol-ror-08.c: Likewise.
+	* gcc.target/riscv/zbb-rol-ror-09.c: Likewise.
+	* gcc.target/riscv/zbb-strlen.c: Likewise.
+	* gcc.target/riscv/zbb_32_bswap-1.c: Likewise.
+	* gcc.target/riscv/zbb_32_bswap-2.c: Likewise.
+	* gcc.target/riscv/zbb_bswap-1.c: Likewise.
+	* gcc.target/riscv/zbb_bswap-2.c: Likewise.
+	* gcc.target/riscv/zbs-bclr.c: Likewise.
+	* gcc.target/riscv/zbs-bext-02.c: Likewise.
+	* gcc.target/riscv/zbs-bext.c: Likewise.
+	* gcc.target/riscv/zbs-binv.c: Likewise.
+	* gcc.target/riscv/zbs-bset.c: Likewise.
+	* gcc.target/riscv/zero-scratch-regs-2.c: Likewise.
+	* gcc.target/riscv/zicond-primitiveSemantics.c: Likewise.
+	* gcc.target/riscv/zicond-primitiveSemantics_return_0_imm.c: Likewise.
+	* gcc.target/riscv/zicond-primitiveSemantics_return_imm_imm.c: Likewise.
+	* gcc.target/riscv/zicond-primitiveSemantics_return_imm_reg.c: Likewise.
+	* gcc.target/riscv/zicond-primitiveSemantics_return_reg_reg.c: Likewise.
+
+2023-09-27  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/autovec/unop/math-roundeven-0.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-roundeven-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-roundeven-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-roundeven-3.c: New test.
+	* gcc.target/riscv/rvv/autovec/vls/math-roundeven-1.c: New test.
+
+2023-09-27  Joern Rennecke  <joern.rennecke@embecosm.com>
+
+	* lib/target-supports.exp (check_effective_target_rv_float_abi_soft):
+	New proc.
+	(check_effective_target_riscv_d): Likewise.
+	(check_effective_target_riscv_v): Likewise.
+	(check_effective_target_riscv_zfh): Likewise.
+	(check_effective_target_riscv_v_ok): likewise.
+	(check_effective_target_riscv_zfh_ok): Likewise.
+	(riscv_get_arch, add_options_for_riscv_v): Likewise.
+	(add_options_for_riscv_zfh): Likewise.
+	(add_options_for_riscv_d): Likewise.
+
+2023-09-27  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/autovec/unop/math-trunc-0.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-trunc-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-trunc-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-trunc-3.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-trunc-run-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-trunc-run-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/vls/math-trunc-1.c: New test.
+
+2023-09-26  Andrew Pinski  <pinskia@gmail.com>
+
+	PR testsuite/111603
+	* gcc.dg/tree-ssa/pr111456-1.c: Use `signed char` instead of plain `char`.
+
+2023-09-26  Xiao Zeng  <zengxiao@eswincomputing.com>
+	    Jeff Law   <jlaw@ventanamicro.com>
+
+	* gcc.target/riscv/zicond-primitiveSemantics_return_0_imm.c: New test.
+	* gcc.target/riscv/zicond-primitiveSemantics_return_imm_imm.c: New test.
+	* gcc.target/riscv/zicond-primitiveSemantics_return_imm_reg.c: New test.
+	* gcc.target/riscv/zicond-primitiveSemantics_return_reg_reg.c: New test.
+
+2023-09-26  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/111599
+	* gcc.dg/pr111599.c: New.
+
+2023-09-26  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/106164
+	PR tree-optimization/111456
+	* gcc.dg/tree-ssa/cmpbit-6.c: New test.
+	* gcc.dg/tree-ssa/cmpbit-7.c: New test.
+	* gcc.dg/tree-ssa/pr111456-1.c: New test.
+
+2023-09-26  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/111469
+	* gcc.c-torture/execute/pr111469-1.c: New test.
+
+2023-09-26  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR tree-optimization/111594
+	PR tree-optimization/110660
+	* gcc.target/riscv/rvv/autovec/cond/cond_reduc-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/cond/pr111594.c: New test.
+
+2023-09-26  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/autovec/unop/math-round-0.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-round-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-round-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-round-3.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-round-run-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-round-run-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/vls/math-round-1.c: New test.
+
+2023-09-26  Maciej W. Rozycki  <macro@embecosm.com>
+
+	* gcc.target/riscv/rvv/autovec/vmv-imm-template.h: Remove
+	<assert.h> inclusion.
+
+2023-09-26  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/autovec/unop/math-rint-0.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-rint-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-rint-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-rint-3.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-rint-run-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-rint-run-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/vls/math-rint-1.c: New test.
+
+2023-09-26  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/autovec/unop/test-math.h: Add helper function.
+	* gcc.target/riscv/rvv/autovec/unop/math-nearbyint-0.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-nearbyint-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-nearbyint-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-nearbyint-3.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-nearbyint-run-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/unop/math-nearbyint-run-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/vls/math-nearbyint-1.c: New test.
+
 2023-09-25  Vladimir N. Makarov  <vmakarov@redhat.com>
 
 	PR middle-end/111497

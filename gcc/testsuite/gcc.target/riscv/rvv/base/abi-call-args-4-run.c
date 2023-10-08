@@ -1,4 +1,4 @@
-/* { dg-do run { target { riscv_vector } } } */
+/* { dg-do run { target { riscv_v } } } */
 /* { dg-options "-O1 --param=riscv-vector-abi -Wno-psabi" } */
 /* { dg-additional-sources abi-call-args-4.c } */
 
@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <stdint.h>
+#include <stdint-gcc.h>
 #include "riscv_vector.h"
 
 vint64m8_t

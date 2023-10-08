@@ -307,8 +307,7 @@ anticipatable_occurrence_p (const bb_info *bb, const vector_insn_info dem)
   if (dem.has_avl_reg ())
     {
       /* rs1 (avl) are not modified in the basic block prior to the VSETVL.  */
-      rtx avl
-	= has_vl_op (insn->rtl ()) ? get_vl (insn->rtl ()) : dem.get_avl ();
+      rtx avl = dem.get_avl_or_vl_reg ();
       if (dem.dirty_p ())
 	{
 	  gcc_assert (!vsetvl_insn_p (insn->rtl ()));
@@ -2418,8 +2417,8 @@ vector_infos_manager::vector_infos_manager ()
   vector_antin = nullptr;
   vector_antout = nullptr;
   vector_earliest = nullptr;
-  vector_insn_infos.safe_grow (get_max_uid ());
-  vector_block_infos.safe_grow (last_basic_block_for_fn (cfun));
+  vector_insn_infos.safe_grow_cleared (get_max_uid ());
+  vector_block_infos.safe_grow_cleared (last_basic_block_for_fn (cfun));
   if (!optimize)
     {
       basic_block cfg_bb;

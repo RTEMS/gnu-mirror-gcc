@@ -300,7 +300,7 @@ get_stack_local_alignment (tree type, machine_mode mode)
 static bool
 try_fit_stack_local (poly_int64 start, poly_int64 length,
 		     poly_int64 size, unsigned int alignment,
-		     poly_int64_pod *poffset)
+		     poly_int64 *poffset)
 {
   poly_int64 this_frame_offset;
   int frame_off, frame_alignment, frame_phase;
@@ -1431,7 +1431,7 @@ static poly_int64 cfa_offset;
    offset indirectly through the pointer.  Otherwise, return 0.  */
 
 static rtx
-instantiate_new_reg (rtx x, poly_int64_pod *poffset)
+instantiate_new_reg (rtx x, poly_int64 *poffset)
 {
   rtx new_rtx;
   poly_int64 offset;
@@ -2429,15 +2429,7 @@ assign_parm_find_data_types (struct assign_parm_data_all *all, tree parm,
 {
   int unsignedp;
 
-#ifndef BROKEN_VALUE_INITIALIZATION
   *data = assign_parm_data_one ();
-#else
-  /* Old versions of GCC used to miscompile the above by only initializing
-     the members with explicit constructors and copying garbage
-     to the other members.  */
-  assign_parm_data_one zero_data = {};
-  *data = zero_data;
-#endif
 
   /* NAMED_ARG is a misnomer.  We really mean 'non-variadic'. */
   if (!cfun->stdarg)

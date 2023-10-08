@@ -6342,6 +6342,18 @@ ix86_split_ashl (rtx *operands, rtx scratch, machine_mode mode)
 	  if (count > half_width)
 	    ix86_expand_ashl_const (high[0], count - half_width, mode);
 	}
+      else if (count == 1)
+	{
+	  if (!rtx_equal_p (operands[0], operands[1]))
+	    emit_move_insn (operands[0], operands[1]);
+	  rtx x3 = gen_rtx_REG (CCCmode, FLAGS_REG);
+	  rtx x4 = gen_rtx_LTU (mode, x3, const0_rtx);
+	  half_mode = mode == DImode ? SImode : DImode;
+	  emit_insn (gen_add3_cc_overflow_1 (half_mode, low[0],
+					     low[0], low[0]));
+	  emit_insn (gen_add3_carry (half_mode, high[0], high[0], high[0],
+				     x3, x4));
+	}
       else
 	{
 	  gen_shld = mode == DImode ? gen_x86_shld : gen_x86_64_shld;
@@ -8320,6 +8332,11 @@ alg_usable_p (enum stringop_alg alg, bool memset, bool have_as)
 {
   if (alg == no_stringop)
     return false;
+  /* It is not possible to use a library call if we have non-default
+     address space.  We can do better than the generic byte-at-a-time
+     loop, used as a fallback.  */
+  if (alg == libcall && have_as)
+    return false;
   if (alg == vector_loop)
     return TARGET_SSE || TARGET_AVX;
   /* Algorithms using the rep prefix want at least edi and ecx;
@@ -8494,8 +8511,12 @@ decide_alg (HOST_WIDE_INT count, HOST_WIDE_INT expected_size,
 	gcc_assert (alg != libcall);
       return alg;
     }
+
+  /* Try to use some reasonable fallback algorithm.  Note that for
+     non-default address spaces we default to a loop instead of
+     a libcall.  */
   return (alg_usable_p (algs->unknown_size, memset, have_as)
-	  ? algs->unknown_size : libcall);
+	  ? algs->unknown_size : have_as ? loop : libcall);
 }
 
 /* Decide on alignment.  We know that the operand is already aligned to ALIGN

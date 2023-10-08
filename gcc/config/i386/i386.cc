@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define INCLUDE_STRING
 #define IN_TARGET_CODE 1
 
 #include "config.h"
@@ -169,7 +170,12 @@ enum reg_class const regclass_map[FIRST_PSEUDO_REGISTER] =
   ALL_SSE_REGS, ALL_SSE_REGS, ALL_SSE_REGS, ALL_SSE_REGS,
   /* Mask registers.  */
   ALL_MASK_REGS, MASK_REGS, MASK_REGS, MASK_REGS,
-  MASK_REGS, MASK_REGS, MASK_REGS, MASK_REGS
+  MASK_REGS, MASK_REGS, MASK_REGS, MASK_REGS,
+  /* REX2 registers */
+  GENERAL_REGS, GENERAL_REGS, GENERAL_REGS, GENERAL_REGS,
+  GENERAL_REGS, GENERAL_REGS, GENERAL_REGS, GENERAL_REGS,
+  GENERAL_REGS, GENERAL_REGS, GENERAL_REGS, GENERAL_REGS,
+  GENERAL_REGS, GENERAL_REGS, GENERAL_REGS, GENERAL_REGS,
 };
 
 /* The "default" register map used in 32bit mode.  */
@@ -227,7 +233,10 @@ int const debugger64_register_map[FIRST_PSEUDO_REGISTER] =
   /* AVX-512 registers 24-31 */
   75, 76, 77, 78, 79, 80, 81, 82,
   /* Mask registers */
-  118, 119, 120, 121, 122, 123, 124, 125
+  118, 119, 120, 121, 122, 123, 124, 125,
+  /* rex2 extend interger registers */
+  130, 131, 132, 133, 134, 135, 136, 137,
+  138, 139, 140, 141, 142, 143, 144, 145
 };
 
 /* Define the register numbers to be used in Dwarf debugging information.
@@ -520,6 +529,13 @@ ix86_conditional_register_usage (void)
 	CLEAR_HARD_REG_BIT (accessible_reg_set, i);
 
       accessible_reg_set &= ~reg_class_contents[ALL_MASK_REGS];
+    }
+
+  /* If APX is disabled, disable the registers.  */
+  if (! (TARGET_APX_EGPR && TARGET_64BIT))
+    {
+      for (i = FIRST_REX2_INT_REG; i <= LAST_REX2_INT_REG; i++)
+	CLEAR_HARD_REG_BIT (accessible_reg_set, i);
     }
 }
 
@@ -5462,6 +5478,12 @@ ix86_get_ssemov (rtx *operands, unsigned size,
   bool evex_reg_p = (size == 64
 		     || EXT_REX_SSE_REG_P (operands[0])
 		     || EXT_REX_SSE_REG_P (operands[1]));
+
+  bool egpr_p = (TARGET_APX_EGPR
+		 && (x86_extended_rex2reg_mentioned_p (operands[0])
+		     || x86_extended_rex2reg_mentioned_p (operands[1])));
+  bool egpr_vl = egpr_p && TARGET_AVX512VL;
+
   machine_mode scalar_mode;
 
   const char *opcode = NULL;
@@ -5534,12 +5556,18 @@ ix86_get_ssemov (rtx *operands, unsigned size,
 	{
 	case E_HFmode:
 	case E_BFmode:
-	  if (evex_reg_p)
+	  if (evex_reg_p || egpr_vl)
 	    opcode = (misaligned_p
 		      ? (TARGET_AVX512BW
 			 ? "vmovdqu16"
 			 : "vmovdqu64")
 		      : "vmovdqa64");
+	  else if (egpr_p)
+	    opcode = (misaligned_p
+		      ? (TARGET_AVX512BW
+			 ? "vmovdqu16"
+			 : "%vmovups")
+		      : "%vmovaps");
 	  else
 	    opcode = (misaligned_p
 		      ? (TARGET_AVX512BW
@@ -5554,8 +5582,10 @@ ix86_get_ssemov (rtx *operands, unsigned size,
 	  opcode = misaligned_p ? "%vmovupd" : "%vmovapd";
 	  break;
 	case E_TFmode:
-	  if (evex_reg_p)
+	  if (evex_reg_p || egpr_vl)
 	    opcode = misaligned_p ? "vmovdqu64" : "vmovdqa64";
+	  else if (egpr_p)
+	    opcode = misaligned_p ? "%vmovups" : "%vmovaps";
 	  else
 	    opcode = misaligned_p ? "%vmovdqu" : "%vmovdqa";
 	  break;
@@ -5568,12 +5598,18 @@ ix86_get_ssemov (rtx *operands, unsigned size,
       switch (scalar_mode)
 	{
 	case E_QImode:
-	  if (evex_reg_p)
+	  if (evex_reg_p || egpr_vl)
 	    opcode = (misaligned_p
 		      ? (TARGET_AVX512BW
 			 ? "vmovdqu8"
 			 : "vmovdqu64")
 		      : "vmovdqa64");
+	  else if (egpr_p)
+	    opcode = (misaligned_p
+		      ? (TARGET_AVX512BW
+			 ? "vmovdqu8"
+			 : "%vmovups")
+		      : "%vmovaps");
 	  else
 	    opcode = (misaligned_p
 		      ? (TARGET_AVX512BW
@@ -5582,12 +5618,18 @@ ix86_get_ssemov (rtx *operands, unsigned size,
 		      : "%vmovdqa");
 	  break;
 	case E_HImode:
-	  if (evex_reg_p)
+	  if (evex_reg_p || egpr_vl)
 	    opcode = (misaligned_p
 		      ? (TARGET_AVX512BW
 			 ? "vmovdqu16"
 			 : "vmovdqu64")
 		      : "vmovdqa64");
+	  else if (egpr_p)
+	    opcode = (misaligned_p
+		      ? (TARGET_AVX512BW
+			 ? "vmovdqu16"
+			 : "%vmovups")
+		      : "%vmovaps");
 	  else
 	    opcode = (misaligned_p
 		      ? (TARGET_AVX512BW
@@ -5596,16 +5638,20 @@ ix86_get_ssemov (rtx *operands, unsigned size,
 		      : "%vmovdqa");
 	  break;
 	case E_SImode:
-	  if (evex_reg_p)
+	  if (evex_reg_p || egpr_vl)
 	    opcode = misaligned_p ? "vmovdqu32" : "vmovdqa32";
+	  else if (egpr_p)
+	    opcode = misaligned_p ? "%vmovups" : "%vmovaps";
 	  else
 	    opcode = misaligned_p ? "%vmovdqu" : "%vmovdqa";
 	  break;
 	case E_DImode:
 	case E_TImode:
 	case E_OImode:
-	  if (evex_reg_p)
+	  if (evex_reg_p || egpr_vl)
 	    opcode = misaligned_p ? "vmovdqu64" : "vmovdqa64";
+	  else if (egpr_p)
+	    opcode = misaligned_p ? "%vmovups" : "%vmovaps";
 	  else
 	    opcode = misaligned_p ? "%vmovdqu" : "%vmovdqa";
 	  break;
@@ -6182,6 +6228,13 @@ ix86_code_end (void)
 				    INVALID_REGNUM, false);
 
   for (regno = FIRST_REX_INT_REG; regno <= LAST_REX_INT_REG; regno++)
+    {
+      if (TEST_HARD_REG_BIT (indirect_thunks_used, regno))
+	output_indirect_thunk_function (indirect_thunk_prefix_none,
+					regno, false);
+    }
+
+  for (regno = FIRST_REX2_INT_REG; regno <= LAST_REX2_INT_REG; regno++)
     {
       if (TEST_HARD_REG_BIT (indirect_thunks_used, regno))
 	output_indirect_thunk_function (indirect_thunk_prefix_none,
@@ -7199,10 +7252,10 @@ choose_baseaddr (HOST_WIDE_INT cfa_offset, unsigned int *align,
 static void
 ix86_emit_save_regs (void)
 {
-  unsigned int regno;
+  int regno;
   rtx_insn *insn;
 
-  for (regno = FIRST_PSEUDO_REGISTER - 1; regno-- > 0; )
+  for (regno = FIRST_PSEUDO_REGISTER - 1; regno >= 0; regno--)
     if (GENERAL_REGNO_P (regno) && ix86_save_reg (regno, true, true))
       {
 	insn = emit_insn (gen_push (gen_rtx_REG (word_mode, regno)));
@@ -11040,6 +11093,95 @@ ix86_validate_address_register (rtx op)
   return NULL_RTX;
 }
 
+/* Return true if insn memory address can use any available reg
+   in BASE_REG_CLASS or INDEX_REG_CLASS, otherwise false.
+   For APX, some instruction can't be encoded with gpr32
+   which is BASE_REG_CLASS or INDEX_REG_CLASS, for that case
+   returns false.  */
+static bool
+ix86_memory_address_use_extended_reg_class_p (rtx_insn* insn)
+{
+  /* LRA will do some initialization with insn == NULL,
+     return the maximum reg class for that.
+     For other cases, real insn will be passed and checked.  */
+  bool ret = true;
+  if (TARGET_APX_EGPR && insn)
+    {
+      if (asm_noperands (PATTERN (insn)) >= 0
+	  || GET_CODE (PATTERN (insn)) == ASM_INPUT)
+	return ix86_apx_inline_asm_use_gpr32;
+
+      if (INSN_CODE (insn) < 0)
+	return false;
+
+      /* Try recog the insn before calling get_attr_gpr32. Save
+	 the current recog_data first.  */
+      /* Also save which_alternative for current recog.  */
+
+      struct recog_data_d recog_data_save = recog_data;
+      int which_alternative_saved = which_alternative;
+
+      /* Update the recog_data for alternative check. */
+      if (recog_data.insn != insn)
+	extract_insn_cached (insn);
+
+      /* If alternative is not set, loop throught each alternative
+	 of insn and get gpr32 attr for all enabled alternatives.
+	 If any enabled alternatives has 0 value for gpr32, disallow
+	 gpr32 for addressing.  */
+      if (which_alternative_saved == -1)
+	{
+	  alternative_mask enabled = get_enabled_alternatives (insn);
+	  bool curr_insn_gpr32 = false;
+	  for (int i = 0; i < recog_data.n_alternatives; i++)
+	    {
+	      if (!TEST_BIT (enabled, i))
+		continue;
+	      which_alternative = i;
+	      curr_insn_gpr32 = get_attr_gpr32 (insn);
+	      if (!curr_insn_gpr32)
+		ret = false;
+	    }
+	}
+      else
+	{
+	  which_alternative = which_alternative_saved;
+	  ret = get_attr_gpr32 (insn);
+	}
+
+      recog_data = recog_data_save;
+      which_alternative = which_alternative_saved;
+    }
+
+  return ret;
+}
+
+/* For APX, some instructions can't be encoded with gpr32.  */
+enum reg_class
+ix86_insn_base_reg_class (rtx_insn* insn)
+{
+  if (ix86_memory_address_use_extended_reg_class_p (insn))
+    return BASE_REG_CLASS;
+  return GENERAL_GPR16;
+}
+
+bool
+ix86_regno_ok_for_insn_base_p (int regno, rtx_insn* insn)
+{
+
+  if (ix86_memory_address_use_extended_reg_class_p (insn))
+    return GENERAL_REGNO_P (regno);
+  return GENERAL_GPR16_REGNO_P (regno);
+}
+
+enum reg_class
+ix86_insn_index_reg_class (rtx_insn* insn)
+{
+  if (ix86_memory_address_use_extended_reg_class_p (insn))
+    return INDEX_REG_CLASS;
+  return INDEX_GPR16;
+}
+
 /* Recognizes RTL expressions that are valid memory addresses for an
    instruction.  The MODE argument is the machine mode for the MEM
    expression that wants to use this address.
@@ -13046,7 +13188,7 @@ print_reg (rtx x, int code, FILE *file)
 
   /* Irritatingly, AMD extended registers use
      different naming convention: "r%d[bwd]"  */
-  if (REX_INT_REGNO_P (regno))
+  if (REX_INT_REGNO_P (regno) || REX2_INT_REGNO_P (regno))
     {
       gcc_assert (TARGET_64BIT);
       switch (msize)
@@ -15543,6 +15685,13 @@ ix86_avoid_lea_for_addr (rtx_insn *insn, rtx operands[])
       && (regno0 == regno1 || regno0 == regno2))
     return true;
 
+  /* Split with -Oz if the encoding requires fewer bytes.  */
+  if (optimize_size > 1
+      && parts.scale > 1
+      && !parts.base
+      && (!parts.disp || parts.disp == const0_rtx)) 
+    return true;
+
   /* Check we need to optimize.  */
   if (!TARGET_AVOID_LEA_FOR_ADDR || optimize_function_for_size_p (cfun))
     return false;
@@ -16260,7 +16409,7 @@ ix86_output_jmp_thunk_or_indirect (const char *thunk_name, const int regno)
 {
   if (thunk_name != NULL)
     {
-      if (REX_INT_REGNO_P (regno)
+      if ((REX_INT_REGNO_P (regno) || REX2_INT_REGNO_P (regno))
 	  && ix86_indirect_branch_cs_prefix)
 	fprintf (asm_out_file, "\tcs\n");
       fprintf (asm_out_file, "\tjmp\t");
@@ -16312,7 +16461,7 @@ ix86_output_indirect_branch_via_reg (rtx call_op, bool sibcall_p)
     {
       if (thunk_name != NULL)
 	{
-	  if (REX_INT_REGNO_P (regno)
+	  if ((REX_INT_REGNO_P (regno) || REX_INT_REGNO_P (regno))
 	      && ix86_indirect_branch_cs_prefix)
 	    fprintf (asm_out_file, "\tcs\n");
 	  fprintf (asm_out_file, "\tcall\t");
@@ -17069,19 +17218,26 @@ ix86_attr_length_vex_default (rtx_insn *insn, bool has_0f_opcode,
   for (i = recog_data.n_operands - 1; i >= 0; --i)
     if (REG_P (recog_data.operand[i]))
       {
-	/* REX.W bit uses 3 byte VEX prefix.  */
+	/* REX.W bit uses 3 byte VEX prefix.
+	   REX2 with vex use extended EVEX prefix length is 4-byte.  */
 	if (GET_MODE (recog_data.operand[i]) == DImode
 	    && GENERAL_REG_P (recog_data.operand[i]))
 	  return 3 + 1;
 
 	/* REX.B bit requires 3-byte VEX. Right here we don't know which
-	   operand will be encoded using VEX.B, so be conservative.  */
+	   operand will be encoded using VEX.B, so be conservative.
+	   REX2 with vex use extended EVEX prefix length is 4-byte.  */
 	if (REX_INT_REGNO_P (recog_data.operand[i])
+	    || REX2_INT_REGNO_P (recog_data.operand[i])
 	    || REX_SSE_REGNO_P (recog_data.operand[i]))
 	  reg_only = 3 + 1;
       }
     else if (MEM_P (recog_data.operand[i]))
       {
+	/* REX2.X or REX2.B bits use 3 byte VEX prefix.  */
+	if (x86_extended_rex2reg_mentioned_p (recog_data.operand[i]))
+	  return 4;
+
 	/* REX.X or REX.B bits use 3 byte VEX prefix.  */
 	if (x86_extended_reg_mentioned_p (recog_data.operand[i]))
 	  return 3 + 1;
@@ -19517,6 +19673,8 @@ ix86_register_priority (int hard_regno)
     return 1;
   /* New x86-64 int registers result in bigger code size.  Discourage them.  */
   if (REX_INT_REGNO_P (hard_regno))
+    return 2;
+  if (REX2_INT_REGNO_P (hard_regno))
     return 2;
   /* New x86-64 SSE registers result in bigger code size.  Discourage them.  */
   if (REX_SSE_REGNO_P (hard_regno))
@@ -22764,9 +22922,38 @@ x86_extended_reg_mentioned_p (rtx insn)
     {
       const_rtx x = *iter;
       if (REG_P (x)
-	  && (REX_INT_REGNO_P (REGNO (x)) || REX_SSE_REGNO_P (REGNO (x))))
+	  && (REX_INT_REGNO_P (REGNO (x)) || REX_SSE_REGNO_P (REGNO (x))
+	      || REX2_INT_REGNO_P (REGNO (x))))
 	return true;
     }
+  return false;
+}
+
+/* Return true when INSN mentions register that must be encoded using REX2
+   prefix.  */
+bool
+x86_extended_rex2reg_mentioned_p (rtx insn)
+{
+  subrtx_iterator::array_type array;
+  FOR_EACH_SUBRTX (iter, array, INSN_P (insn) ? PATTERN (insn) : insn, NONCONST)
+    {
+      const_rtx x = *iter;
+      if (REG_P (x) && REX2_INT_REGNO_P (REGNO (x)))
+	return true;
+    }
+  return false;
+}
+
+/* Return true when rtx operands mentions register that must be encoded using
+   evex prefix.  */
+bool
+x86_evex_reg_mentioned_p (rtx operands[], int nops)
+{
+  int i;
+  for (i = 0; i < nops; i++)
+    if (EXT_REX_SSE_REG_P (operands[i])
+	|| x86_extended_rex2reg_mentioned_p (operands[i]))
+      return true;
   return false;
 }
 
@@ -23025,6 +23212,93 @@ ix86_c_mode_for_suffix (char suffix)
   return VOIDmode;
 }
 
+/* Helper function to map common constraints to non-EGPR ones.
+   All related constraints have h prefix, and h plus Upper letter
+   means the constraint is strictly EGPR enabled, while h plus
+   lower letter indicates the constraint is strictly gpr16 only.
+
+   Specially for "g" constraint, split it to rmi as there is
+   no corresponding general constraint define for backend.
+
+   Here is the full list to map constraints that may involve
+   gpr to h prefixed.
+
+   "g" -> "jrjmi"
+   "r" -> "jr"
+   "m" -> "jm"
+   "<" -> "j<"
+   ">" -> "j>"
+   "o" -> "jo"
+   "V" -> "jV"
+   "p" -> "jp"
+   "Bm" -> "ja"
+*/
+
+static void map_egpr_constraints (vec<const char *> &constraints)
+{
+  for (size_t i = 0; i < constraints.length(); i++)
+    {
+      const char *cur = constraints[i];
+
+      if (startswith (cur, "=@cc"))
+	continue;
+
+      int len = strlen (cur);
+      auto_vec<char> buf;
+
+      for (int j = 0; j < len; j++)
+	{
+	  switch (cur[j])
+	    {
+	    case 'g':
+	      buf.safe_push ('j');
+	      buf.safe_push ('r');
+	      buf.safe_push ('j');
+	      buf.safe_push ('m');
+	      buf.safe_push ('i');
+	      break;
+	    case 'r':
+	    case 'm':
+	    case '<':
+	    case '>':
+	    case 'o':
+	    case 'V':
+	    case 'p':
+	      buf.safe_push ('j');
+	      buf.safe_push (cur[j]);
+	      break;
+	    case 'B':
+	      if (cur[j + 1] == 'm')
+		{
+		  buf.safe_push ('j');
+		  buf.safe_push ('a');
+		  j++;
+		}
+	      else
+		{
+		  buf.safe_push (cur[j]);
+		  buf.safe_push (cur[j + 1]);
+		  j++;
+		}
+	      break;
+	    case 'T':
+	    case 'Y':
+	    case 'W':
+	    case 'j':
+	      buf.safe_push (cur[j]);
+	      buf.safe_push (cur[j + 1]);
+	      j++;
+	      break;
+	    default:
+	      buf.safe_push (cur[j]);
+	      break;
+	    }
+	}
+      buf.safe_push ('\0');
+      constraints[i] = xstrdup (buf.address ());
+    }
+}
+
 /* Worker function for TARGET_MD_ASM_ADJUST.
 
    We implement asm flag outputs, and maintain source compatibility
@@ -23039,6 +23313,10 @@ ix86_md_asm_adjust (vec<rtx> &outputs, vec<rtx> & /*inputs*/,
   bool saw_asm_flag = false;
 
   start_sequence ();
+
+  if (TARGET_APX_EGPR && !ix86_apx_inline_asm_use_gpr32)
+    map_egpr_constraints (constraints);
+
   for (unsigned i = 0, n = outputs.length (); i < n; ++i)
     {
       const char *con = constraints[i];

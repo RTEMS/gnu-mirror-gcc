@@ -336,7 +336,7 @@
 ;; - vadd.vx/vadd.vi
 ;; -------------------------------------------------------------------------
 
-(define_expand "@vec_series<mode>"
+(define_expand "vec_series<mode>"
   [(match_operand:V_VLSI 0 "register_operand")
    (match_operand:<VEL> 1 "reg_or_int_operand")
    (match_operand:<VEL> 2 "reg_or_int_operand")]
@@ -973,6 +973,30 @@
   DONE;
 }
 [(set_attr "type" "vfncvtitof")])
+
+;; This operation can be performed in the loop vectorizer but unfortunately
+;; not applicable for now. We can remove this pattern after loop vectorizer
+;; is able to take care of INT64 to FP16 conversion.
+(define_insn_and_split "<float_cvt><mode><vnnconvert>2"
+  [(set (match_operand:<VNNCONVERT>  0 "register_operand")
+	(any_float:<VNNCONVERT>
+	  (match_operand:VWWCONVERTI 1 "register_operand")))]
+  "TARGET_VECTOR && TARGET_ZVFH && can_create_pseudo_p () && !flag_trapping_math"
+  "#"
+  "&& 1"
+  [(const_int 0)]
+  {
+    rtx single = gen_reg_rtx (<VNCONVERT>mode); /* Get vector SF mode.  */
+
+    /* Step-1, INT64 => FP32.  */
+    emit_insn (gen_<float_cvt><mode><vnconvert>2 (single, operands[1]));
+    /* Step-2, FP32 => FP16.  */
+    emit_insn (gen_trunc<vnconvert><vnnconvert>2 (operands[0], single));
+
+    DONE;
+  }
+  [(set_attr "type" "vfncvtitof")]
+)
 
 ;; =========================================================================
 ;; == Unary arithmetic
@@ -2205,12 +2229,16 @@
 })
 
 ;; -------------------------------------------------------------------------
-;; ---- [FP] Math.h.
+;; ---- [FP] Rounding.
 ;; -------------------------------------------------------------------------
 ;; Includes:
 ;; - ceil/ceilf
 ;; - floor/floorf
 ;; - nearbyint/nearbyintf
+;; - rint/rintf
+;; - round/roundf
+;; - trunc/truncf
+;; - roundeven/roundevenf
 ;; -------------------------------------------------------------------------
 (define_expand "ceil<mode>2"
   [(match_operand:V_VLSF 0 "register_operand")
@@ -2258,6 +2286,26 @@
   "TARGET_VECTOR && !flag_trapping_math && !flag_rounding_math"
   {
     riscv_vector::expand_vec_round (operands[0], operands[1], <MODE>mode, <VCONVERT>mode);
+    DONE;
+  }
+)
+
+(define_expand "btrunc<mode>2"
+  [(match_operand:V_VLSF 0 "register_operand")
+   (match_operand:V_VLSF 1 "register_operand")]
+  "TARGET_VECTOR && !flag_trapping_math && !flag_rounding_math"
+  {
+    riscv_vector::expand_vec_trunc (operands[0], operands[1], <MODE>mode, <VCONVERT>mode);
+    DONE;
+  }
+)
+
+(define_expand "roundeven<mode>2"
+  [(match_operand:V_VLSF 0 "register_operand")
+   (match_operand:V_VLSF 1 "register_operand")]
+  "TARGET_VECTOR && !flag_trapping_math && !flag_rounding_math"
+  {
+    riscv_vector::expand_vec_roundeven (operands[0], operands[1], <MODE>mode, <VCONVERT>mode);
     DONE;
   }
 )

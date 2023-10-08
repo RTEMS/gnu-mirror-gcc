@@ -49,6 +49,7 @@
 #include "tm-constrs.h"
 #include "rtx-vector-builder.h"
 #include "targhooks.h"
+#include "predict.h"
 
 using namespace riscv_vector;
 
@@ -332,6 +333,8 @@ public:
       add_rounding_mode_operand (FRM_RDN);
     else if (m_insn_flags & FRM_RMM_P)
       add_rounding_mode_operand (FRM_RMM);
+    else if (m_insn_flags & FRM_RNE_P)
+      add_rounding_mode_operand (FRM_RNE);
 
     gcc_assert (insn_data[(int) icode].n_operands == m_opno);
     expand (icode, any_mem_p);
@@ -1011,7 +1014,7 @@ expand_const_vector (rtx target, rtx src)
   rtx base, step;
   if (const_vec_series_p (src, &base, &step))
     {
-      emit_insn (gen_vec_series (mode, target, base, step));
+      expand_vec_series (target, base, step);
       return;
     }
 
@@ -1147,8 +1150,9 @@ expand_const_vector (rtx target, rtx src)
 	      for (unsigned int i = 0; i < v.npatterns (); ++i)
 		{
 		  /* Calculate the diff between the target sequence and
-		     vid sequence.  */
-		  HOST_WIDE_INT diff = INTVAL (builder.elt (i)) - i;
+		     vid sequence.  The elt (i) can be either const_int or
+		     const_poly_int. */
+		  poly_int64 diff = rtx_to_poly_int64 (builder.elt (i)) - i;
 		  v.quick_push (gen_int_mode (diff, v.inner_mode ()));
 		}
 	      /* Step 2: Generate result = VID + diff.  */
@@ -1167,7 +1171,7 @@ expand_const_vector (rtx target, rtx src)
 	  rtx step = CONST_VECTOR_ELT (src, 2);
 	  /* Step 1 - { base1, base1 + step, base1 + step * 2, ... }  */
 	  rtx tmp = gen_reg_rtx (mode);
-	  emit_insn (gen_vec_series (mode, tmp, base1, step));
+	  expand_vec_series (tmp, base1, step);
 	  /* Step 2 - { base0, base1, base1 + step, base1 + step * 2, ... }  */
 	  scalar_mode elem_mode = GET_MODE_INNER (mode);
 	  if (!rtx_equal_p (base0, const0_rtx))
@@ -1214,10 +1218,12 @@ get_frm_mode (rtx operand)
 }
 
 /* Expand a pre-RA RVV data move from SRC to DEST.
-   It expands move for RVV fractional vector modes.  */
+   It expands move for RVV fractional vector modes.
+   Return true if the move as already been emitted.  */
 bool
-legitimize_move (rtx dest, rtx src)
+legitimize_move (rtx dest, rtx *srcp)
 {
+  rtx src = *srcp;
   machine_mode mode = GET_MODE (dest);
   if (CONST_VECTOR_P (src))
     {
@@ -1235,7 +1241,7 @@ legitimize_move (rtx dest, rtx src)
 	    {
 	      /* Need to force register if mem <- !reg.  */
 	      if (MEM_P (dest) && !REG_P (src))
-		src = force_reg (mode, src);
+		*srcp = force_reg (mode, src);
 
 	      return false;
 	    }
@@ -1266,7 +1272,7 @@ legitimize_move (rtx dest, rtx src)
 	{
 	  /* Need to force register if mem <- !reg.  */
 	  if (MEM_P (dest) && !REG_P (src))
-	    src = force_reg (mode, src);
+	    *srcp = force_reg (mode, src);
 
 	  return false;
 	}
@@ -1984,6 +1990,206 @@ expand_tuple_move (rtx *ops)
 	    }
 	}
     }
+}
+
+/* Used by cpymemsi in riscv.md .  */
+
+bool
+expand_block_move (rtx dst_in, rtx src_in, rtx length_in)
+{
+  /*
+    memcpy:
+	mv a3, a0                       # Copy destination
+    loop:
+	vsetvli t0, a2, e8, m8, ta, ma  # Vectors of 8b
+	vle8.v v0, (a1)                 # Load bytes
+	add a1, a1, t0                  # Bump pointer
+	sub a2, a2, t0                  # Decrement count
+	vse8.v v0, (a3)                 # Store bytes
+	add a3, a3, t0                  # Bump pointer
+	bnez a2, loop                   # Any more?
+	ret                             # Return
+  */
+  if (!TARGET_VECTOR)
+    return false;
+  HOST_WIDE_INT potential_ew
+    = (MIN (MIN (MEM_ALIGN (src_in), MEM_ALIGN (dst_in)), BITS_PER_WORD)
+       / BITS_PER_UNIT);
+  machine_mode vmode = VOIDmode;
+  bool need_loop = true;
+  bool size_p = optimize_function_for_size_p (cfun);
+  rtx src, dst;
+  rtx end = gen_reg_rtx (Pmode);
+  rtx vec;
+  rtx length_rtx = length_in;
+
+  if (CONST_INT_P (length_in))
+    {
+      HOST_WIDE_INT length = INTVAL (length_in);
+
+    /* By using LMUL=8, we can copy as many bytes in one go as there
+       are bits in a vector register.  If the entire block thus fits,
+       we don't need a loop.  */
+    if (length <= TARGET_MIN_VLEN)
+      {
+	need_loop = false;
+
+	/* If a single scalar load / store pair can do the job, leave it
+	   to the scalar code to do that.  */
+	/* ??? If fast unaligned access is supported, the scalar code could
+	   use suitably sized scalars irrespective of alignemnt.  If that
+	   gets fixed, we have to adjust the test here.  */
+
+	if (pow2p_hwi (length) && length <= potential_ew)
+	  return false;
+      }
+
+      /* Find the vector mode to use.  Using the largest possible element
+	 size is likely to give smaller constants, and thus potentially
+	 reducing code size.  However, if we need a loop, we need to update
+	 the pointers, and that is more complicated with a larger element
+	 size, unless we use an immediate, which prevents us from dynamically
+	 using the targets transfer size that the hart supports.  And then,
+	 unless we know the *exact* vector size of the hart, we'd need
+	 multiple vsetvli / branch statements, so it's not even a size win.
+	 If, in the future, we find an RISCV-V implementation that is slower
+	 for small element widths, we might allow larger element widths for
+	 loops too.  */
+      if (need_loop)
+	potential_ew = 1;
+      for (; potential_ew; potential_ew >>= 1)
+	{
+	  scalar_int_mode elem_mode;
+	  unsigned HOST_WIDE_INT bits = potential_ew * BITS_PER_UNIT;
+	  unsigned HOST_WIDE_INT per_iter;
+	  HOST_WIDE_INT nunits;
+
+	  if (need_loop)
+	    per_iter = TARGET_MIN_VLEN;
+	  else
+	    per_iter = length;
+	  nunits = per_iter / potential_ew;
+
+	  /* Unless we get an implementation that's slow for small element
+	     size / non-word-aligned accesses, we assume that the hardware
+	     handles this well, and we don't want to complicate the code
+	     with shifting word contents around or handling extra bytes at
+	     the start and/or end.  So we want the total transfer size and
+	     alignment to fit with the element size.  */
+	  if (length % potential_ew != 0
+	      || !int_mode_for_size (bits, 0).exists (&elem_mode))
+	    continue;
+	  /* Find the mode to use for the copy inside the loop - or the
+	     sole copy, if there is no loop.  */
+	  if (!need_loop)
+	    {
+	      /* Try if we have an exact mode for the copy.  */
+	      if (get_vector_mode (elem_mode, nunits).exists (&vmode))
+		break;
+	      /* Since we don't have a mode that exactlty matches the transfer
+		 size, we'll need to use pred_store, which is not available
+		 for all vector modes, but only iE_RVV_M* modes, hence trying
+		 to find a vector mode for a merely rounded-up size is
+		 pointless.
+		 Still, by choosing a lower LMUL factor that still allows
+		 an entire transfer, we can reduce register pressure.  */
+	      for (unsigned lmul = 1; lmul <= 4; lmul <<= 1)
+		if (TARGET_MIN_VLEN * lmul <= nunits * BITS_PER_UNIT
+		    /* Avoid loosing the option of using vsetivli .  */
+		    && (nunits <= 31 * lmul || nunits > 31 * 8)
+		    && (get_vector_mode
+			 (elem_mode,
+			  exact_div (BYTES_PER_RISCV_VECTOR * lmul,
+				     potential_ew)
+			  ).exists (&vmode)))
+		  break;
+	    }
+
+	  /* The RVVM8?I modes are notionally 8 * BYTES_PER_RISCV_VECTOR bytes
+	     wide.  BYTES_PER_RISCV_VECTOR can't be eavenly divided by
+	     the sizes of larger element types; the LMUL factor of 8 can at
+	     the moment be divided by the SEW, with SEW of up to 8 bytes,
+	     but there are reserved encodings so there might be larger
+	     SEW in the future.  */
+	  if (get_vector_mode (elem_mode,
+			       exact_div (BYTES_PER_RISCV_VECTOR * 8,
+					  potential_ew)).exists (&vmode))
+	    break;
+
+	  /* We may get here if we tried an element size that's larger than
+	     the hardware supports, but we should at least find a suitable
+	     byte vector mode.  */
+	  gcc_assert (potential_ew > 1);
+	}
+      if (potential_ew > 1)
+	length_rtx = GEN_INT (length / potential_ew);
+    }
+  else
+    {
+      vmode = E_RVVM8QImode;
+    }
+
+  /* A memcpy libcall in the worst case takes 3 instructions to prepare the
+     arguments + 1 for the call.  When RVV should take 7 instructions and
+     we're optimizing for size a libcall may be preferable.  */
+  if (size_p && need_loop)
+    return false;
+
+  /* length_rtx holds the (remaining) length of the required copy.
+     cnt holds the length we copy with the current load/store pair.  */
+  rtx cnt = length_rtx;
+  rtx label = NULL_RTX;
+  rtx dst_addr = copy_addr_to_reg (XEXP (dst_in, 0));
+  rtx src_addr = copy_addr_to_reg (XEXP (src_in, 0));
+
+  if (need_loop)
+    {
+      length_rtx = copy_to_mode_reg (Pmode, length_rtx);
+      cnt = gen_reg_rtx (Pmode);
+      label = gen_label_rtx ();
+
+      emit_label (label);
+      emit_insn (gen_no_side_effects_vsetvl_rtx (vmode, cnt, length_rtx));
+    }
+
+  vec = gen_reg_rtx (vmode);
+  src = change_address (src_in, vmode, src_addr);
+  dst = change_address (dst_in, vmode, dst_addr);
+
+  /* If we don't need a loop and have a suitable mode to describe the size,
+     just do a load / store pair and leave it up to the later lazy code
+     motion pass to insert the appropriate vsetvli.  */
+  if (!need_loop && known_eq (GET_MODE_SIZE (vmode), INTVAL (length_in)))
+    {
+      emit_move_insn (vec, src);
+      emit_move_insn (dst, vec);
+    }
+  else
+    {
+      machine_mode mask_mode = get_vector_mode (BImode, GET_MODE_NUNITS (vmode)).require ();
+      rtx mask =  CONSTM1_RTX (mask_mode);
+      if (!satisfies_constraint_K (cnt))
+	cnt= force_reg (Pmode, cnt);
+      rtx m_ops[] = {vec, mask, src};
+      emit_nonvlmax_insn (code_for_pred_mov (vmode), UNARY_OP_TAMA,
+			  m_ops, cnt);
+      emit_insn (gen_pred_store (vmode, dst, mask, vec, cnt,
+				 get_avl_type_rtx (NONVLMAX)));
+    }
+
+  if (need_loop)
+    {
+      emit_insn (gen_rtx_SET (src_addr, gen_rtx_PLUS (Pmode, src_addr, cnt)));
+      emit_insn (gen_rtx_SET (dst_addr, gen_rtx_PLUS (Pmode, dst_addr, cnt)));
+      emit_insn (gen_rtx_SET (length_rtx, gen_rtx_MINUS (Pmode, length_rtx, cnt)));
+
+      /* Emit the loop condition.  */
+      rtx test = gen_rtx_NE (VOIDmode, end, const0_rtx);
+      emit_jump_insn (gen_cbranch4 (Pmode, test, length_rtx, const0_rtx, label));
+      emit_insn (gen_nop ());
+    }
+
+  return true;
 }
 
 /* Return the vectorization machine mode for RVV according to LMUL.  */
@@ -2814,7 +3020,7 @@ shuffle_decompress_patterns (struct expand_vec_perm_d *d)
   /* Generate { 0, 1, .... } mask.  */
   rtx vid = gen_reg_rtx (sel_mode);
   rtx vid_repeat = gen_reg_rtx (sel_mode);
-  emit_insn (gen_vec_series (sel_mode, vid, const0_rtx, const1_rtx));
+  expand_vec_series (vid, const0_rtx, const1_rtx);
   rtx and_ops[] = {vid_repeat, vid, const1_rtx};
   emit_vlmax_insn (code_for_pred_scalar (AND, sel_mode), BINARY_OP, and_ops);
   rtx const_vec = gen_const_vector_dup (sel_mode, 1);
@@ -3624,6 +3830,16 @@ emit_vec_cvt_f_x (rtx op_dest, rtx op_src, rtx mask,
   emit_vlmax_insn (icode, type, cvt_fp_ops);
 }
 
+static void
+emit_vec_cvt_x_f_rtz (rtx op_dest, rtx op_src, rtx mask,
+		      machine_mode vec_mode)
+{
+  rtx cvt_x_ops[] = {op_dest, mask, op_dest, op_src};
+  insn_code icode = code_for_pred (FIX, vec_mode);
+
+  emit_vlmax_insn (icode, UNARY_OP_TAMU, cvt_x_ops);
+}
+
 void
 expand_vec_ceil (rtx op_0, rtx op_1, machine_mode vec_fp_mode,
 		 machine_mode vec_int_mode)
@@ -3739,6 +3955,50 @@ expand_vec_round (rtx op_0, rtx op_1, machine_mode vec_fp_mode,
 
   /* Step-4: Convert to floating-point on mask for the round result.  */
   emit_vec_cvt_f_x (op_0, tmp, mask, UNARY_OP_TAMU_FRM_RMM, vec_fp_mode);
+
+  /* Step-5: Retrieve the sign bit for -0.0.  */
+  emit_vec_copysign (op_0, op_0, op_1, vec_fp_mode);
+}
+
+void
+expand_vec_trunc (rtx op_0, rtx op_1, machine_mode vec_fp_mode,
+		  machine_mode vec_int_mode)
+{
+  /* Step-1: Get the abs float value for mask generation.  */
+  emit_vec_abs (op_0, op_1, vec_fp_mode);
+
+  /* Step-2: Generate the mask on const fp.  */
+  rtx const_fp = get_fp_rounding_coefficient (GET_MODE_INNER (vec_fp_mode));
+  rtx mask = emit_vec_float_cmp_mask (op_0, LT, const_fp, vec_fp_mode);
+
+  /* Step-3: Convert to integer on mask, rounding to zero (aka truncate).  */
+  rtx tmp = gen_reg_rtx (vec_int_mode);
+  emit_vec_cvt_x_f_rtz (tmp, op_1, mask, vec_fp_mode);
+
+  /* Step-4: Convert to floating-point on mask for the rint result.  */
+  emit_vec_cvt_f_x (op_0, tmp, mask, UNARY_OP_TAMU_FRM_DYN, vec_fp_mode);
+
+  /* Step-5: Retrieve the sign bit for -0.0.  */
+  emit_vec_copysign (op_0, op_0, op_1, vec_fp_mode);
+}
+
+void
+expand_vec_roundeven (rtx op_0, rtx op_1, machine_mode vec_fp_mode,
+		      machine_mode vec_int_mode)
+{
+  /* Step-1: Get the abs float value for mask generation.  */
+  emit_vec_abs (op_0, op_1, vec_fp_mode);
+
+  /* Step-2: Generate the mask on const fp.  */
+  rtx const_fp = get_fp_rounding_coefficient (GET_MODE_INNER (vec_fp_mode));
+  rtx mask = emit_vec_float_cmp_mask (op_0, LT, const_fp, vec_fp_mode);
+
+  /* Step-3: Convert to integer on mask, rounding to nearest, ties to even.  */
+  rtx tmp = gen_reg_rtx (vec_int_mode);
+  emit_vec_cvt_x_f (tmp, op_1, mask, UNARY_OP_TAMU_FRM_RNE, vec_fp_mode);
+
+  /* Step-4: Convert to floating-point on mask for the rint result.  */
+  emit_vec_cvt_f_x (op_0, tmp, mask, UNARY_OP_TAMU_FRM_RNE, vec_fp_mode);
 
   /* Step-5: Retrieve the sign bit for -0.0.  */
   emit_vec_copysign (op_0, op_0, op_1, vec_fp_mode);
