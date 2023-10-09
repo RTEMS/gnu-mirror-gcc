@@ -2711,9 +2711,7 @@ rs6000_setup_reg_addr_masks (void)
 	  /* Vector pairs can do both indexed and offset loads if the
 	     instructions are enabled, otherwise they can only do offset loads
 	     since it will be broken into two vector moves.  Vector quads can
-	     only do offset loads.  If the user restricted generation of either
-	     of the LXVP or STXVP instructions, do not allow indexed mode so
-	     that we can split the load/store.  */
+	     only do offset loads.  */
 	  else if ((addr_mask != 0) && TARGET_MMA
 		   && (m2 == OOmode || m2 == XOmode))
 	    {
@@ -2721,9 +2719,7 @@ rs6000_setup_reg_addr_masks (void)
 	      if (rc == RELOAD_REG_FPR || rc == RELOAD_REG_VMX)
 		{
 		  addr_mask |= RELOAD_REG_QUAD_OFFSET;
-		  if (m2 == OOmode
-		      && TARGET_LOAD_VECTOR_PAIR
-		      && TARGET_STORE_VECTOR_PAIR)
+		  if (m2 == OOmode)
 		    addr_mask |= RELOAD_REG_INDEXED;
 		}
 	    }
@@ -4407,26 +4403,6 @@ rs6000_option_override_internal (bool global_init_p)
 	error ("%qs requires %qs", "-mmma", "-mcpu=power10");
 
       rs6000_isa_flags &= ~OPTION_MASK_MMA;
-    }
-
-  /* Warn if -m-load-vector-pair or -m-store-vector-pair are used and MMA is
-     not set.  */
-  if (!TARGET_MMA && TARGET_LOAD_VECTOR_PAIR)
-    {
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_LOAD_VECTOR_PAIR) != 0)
-	warning (0, "%qs should not be used unless you use %qs",
-		 "-mload-vector-pair", "-mmma");
-
-      rs6000_isa_flags &= ~OPTION_MASK_LOAD_VECTOR_PAIR;
-    }
-
-  if (!TARGET_MMA && TARGET_STORE_VECTOR_PAIR)
-    {
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_STORE_VECTOR_PAIR) != 0)
-	warning (0, "%qs should not be used unless you use %qs",
-		 "-mstore-vector-pair", "-mmma");
-
-      rs6000_isa_flags &= OPTION_MASK_STORE_VECTOR_PAIR;
     }
 
   /* Enable power10 fusion if we are tuning for power10, even if we aren't
@@ -24253,7 +24229,6 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "hard-dfp",			OPTION_MASK_DFP,		false, true  },
   { "htm",			OPTION_MASK_HTM,		false, true  },
   { "isel",			OPTION_MASK_ISEL,		false, true  },
-  { "load-vector-pair",		OPTION_MASK_LOAD_VECTOR_PAIR,	false, true  },
   { "mfcrf",			OPTION_MASK_MFCRF,		false, true  },
   { "mfpgpr",			0,				false, true  },
   { "mma",			OPTION_MASK_MMA,		false, true  },
@@ -24278,7 +24253,6 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "quad-memory-atomic",	OPTION_MASK_QUAD_MEMORY_ATOMIC,	false, true  },
   { "recip-precision",		OPTION_MASK_RECIP_PRECISION,	false, true  },
   { "save-toc-indirect",	OPTION_MASK_SAVE_TOC_INDIRECT,	false, true  },
-  { "store-vector-pair",	OPTION_MASK_STORE_VECTOR_PAIR,	false, true  },
   { "string",			0,				false, true  },
   { "update",			OPTION_MASK_NO_UPDATE,		true , true  },
   { "vsx",			OPTION_MASK_VSX,		false, true  },
