@@ -1,4 +1,85 @@
+==================== Branch work138, patch #2 ====================
+
+Add options to disable load and store vector pair.
+
+2023-10-10  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (UNSPEC_MMA_VECTOR_PAIR_MEMORY): New unspec.
+	(movoo): Add support for -mload-vector-pair and -mstore-vector-pair.
+	(lxvp_internal): New insn.
+	(stxvp_internal): Likewise.
+	(vector_pair_memory_builtin): Likewise.
+	* config/rs6000/rs6000-builtin.cc (rs6000_gimple_fold_mma_builtin): If
+	either -mno-load-vector-pair or -mno-store-vector-pair is used, ensure
+	the lxvp/stxvp built-in function always generates the vector pair
+	instruction.
+	(mma_expand_builtin): Likewise.
+	* config/rs6000/rs6000-builtins.def (__builtin_vsx_lxvp_internal): New
+	builtin function.
+	(__builtin_vsx_stxvp_internal): Likewise.
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Add support for
+	-mload-vector-pair and -mstore-vector-pair.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_setup_reg_addr_masks): If either load
+	vector pair or store vector pair instructions are not being generated,
+	don't allow lxvpx or stxvpx to be generated.
+	(rs6000_option_override_internal): Add warnings if either
+	-mload-vector-pair or -mstore-vector-pair is used without having MMA
+	instructions.
+	(rs6000_opt_masks): Allow user to override -mload-vector-pair or
+	-mstore-vector-pair via #pragma or attribute.
+	* config/rs6000/rs6000.opt (-mload-vector-pair): New option.
+	(-mstore-vector-pair): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-attribute.c: New test.
+	* gcc.target/powerpc/vector-pair-builtin.c: New test.
+	* gcc.target/powerpc/vector-pair-pragma.c: New test.
+	* gcc.target/powerpc/vector-pair-switch1.c: New test.
+	* gcc.target/powerpc/vector-pair-switch2.c: New test.
+	* gcc.target/powerpc/vector-pair-switch3.c: New test.
+	* gcc.target/powerpc/vector-pair-switch4.c: New test.
+
+==================== Branch work138, patch #1 was reverted ====================
+
+
 ==================== Branch work138, baseline ====================
+
+Add ChangeLog.meissner and REVISION.
+
+2023-10-05  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* REVISION: New file for branch.
+	* ChangeLog.meissner: New file.
+
+gcc/c-family/
+
+	* ChangeLog.meissner: New file.
+
+gcc/c/
+
+	* ChangeLog.meissner: New file.
+
+gcc/cp/
+
+	* ChangeLog.meissner: New file.
+
+gcc/fortran/
+
+	* ChangeLog.meissner: New file.
+
+gcc/testsuite/
+
+	* ChangeLog.meissner: New file.
+
+libgcc/
+
+	* ChangeLog.meissner: New file.
 
 2023-10-05   Michael Meissner  <meissner@linux.ibm.com>
 
