@@ -1,3 +1,115 @@
+2023-10-07  Andrew Pinski  <pinskia@gmail.com>
+
+	Backported from master:
+	2023-10-06  Andrew Pinski  <pinskia@gmail.com>
+
+	PR middle-end/111699
+	* match.pd ((c ? a : b) op d, (c ? a : b) op (c ? d : e),
+	(v ? w : 0) ? a : b, c1 ? c2 ? a : b : b): Enable only for GIMPLE.
+
+2023-10-02  Pat Haugen  <pthaugen@linux.ibm.com>
+
+	Backported from master:
+	2023-09-19  Pat Haugen  <pthaugen@linux.ibm.com>
+
+	* config/rs6000/rs6000.cc (rs6000_rtx_costs): Check whether the
+	modulo instruction is disabled.
+	* config/rs6000/rs6000.h (RS6000_DISABLE_SCALAR_MODULO): New.
+	* config/rs6000/rs6000.md (mod<mode>3, *mod<mode>3): Check it.
+	(define_expand umod<mode>3): New.
+	(define_insn umod<mode>3): Rename to *umod<mode>3 and check if the modulo
+	instruction is disabled.
+	(umodti3, modti3): Check if the modulo instruction is disabled.
+
+2023-10-01  Andrew Pinski  <apinski@marvell.com>
+
+	Backported from master:
+	2023-09-10  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/111331
+	* tree-ssa-phiopt.cc (minmax_replacement):
+	Fix the LE/GE comparison for the
+	`(a CMP CST1) ? max<a,CST2> : a` optimization.
+
+2023-10-01  Andrew Pinski  <apinski@marvell.com>
+
+	Backported from master:
+	2023-09-25  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/110386
+	* gimple-ssa-backprop.cc (strip_sign_op_1): Remove ABSU_EXPR.
+
+2023-09-29  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	Backported from master:
+	2023-09-18  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	* config/aarch64/aarch64-cores.def (neoverse-n1): Place before ares.
+	(neoverse-v1): Place before zeus.
+	(neoverse-v2): Place before demeter.
+	* config/aarch64/aarch64-tune.md: Regenerate.
+
+2023-09-29  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	Backported from master:
+	2023-09-28  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	PR target/111121
+	* config/aarch64/aarch64.md (aarch64_movmemdi): Add new expander.
+	(movmemdi): Call aarch64_expand_cpymem_mops for correct expansion.
+	* config/aarch64/aarch64.cc (aarch64_expand_cpymem_mops): Add support
+	for memmove.
+	* config/aarch64/aarch64-protos.h (aarch64_expand_cpymem_mops): Add new
+	function.
+
+2023-09-26  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gimple-range-gori.cc (gori_compute::logical_combine): Add missing
+	return statement in the varying case.
+
+2023-09-26  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/110315
+	* value-range-storage.h (vrange_allocator::alloc_irange): Adjust
+	new params.
+	* value-range.cc (irange::operator=): Resize range.
+	(irange::irange_union): Same.
+	(irange::irange_intersect): Same.
+	(irange::invert): Same.
+	* value-range.h (irange::maybe_resize): New.
+	(~int_range): New.
+	(int_range_max): Default to 3 sub-ranges and resize as needed.
+	(int_range::int_range): Adjust for resizing.
+	(int_range::operator=): Same.
+
+2023-09-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2023-09-15  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/111411
+	* config/aarch64/aarch64.cc (aarch64_operands_ok_for_ldpstp): Require
+	the lower memory access to a mem-pair operand.
+
+2023-09-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2023-08-31  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* config/aarch64/aarch64.md (untyped_call): Emit a call_value
+	rather than a call.  List each possible destination register
+	in the call pattern.
+
+2023-09-18  xuli  <xuli1@eswincomputing.com>
+
+	PR target/111412
+	* config/riscv/riscv-vsetvl.cc (vector_infos_manager::release): Remove.
+	(pass_vsetvl::refine_vsetvls): Ditto.
+	(pass_vsetvl::cleanup_vsetvls): Ditto.
+	(pass_vsetvl::propagate_avl): Ditto.
+	(pass_vsetvl::lazy_vsetvl): Ditto.
+	* config/riscv/riscv-vsetvl.h: Ditto.
+
 2023-09-12  Richard Sandiford  <richard.sandiford@arm.com>
 
 	* config/aarch64/aarch64.cc (aarch64_save_regs_above_locals_p):

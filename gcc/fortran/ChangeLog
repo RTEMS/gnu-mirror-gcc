@@ -1,3 +1,41 @@
+2023-10-04  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2023-10-04  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/37336
+	PR fortran/111674
+	* trans-expr.cc (gfc_trans_scalar_assign): Finalize components
+	on deallocation if derived type is not finalizable.
+
+2023-09-30  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	* trans-array.cc (gfc_trans_deferred_array): Use correct
+	position for statements to add to guarded block.
+
+2023-09-29  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	Backported from master:
+	2023-09-29  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/37336
+	* trans-array.cc (structure_alloc_comps): Deref coarray.
+	(gfc_trans_deferred_array): Add freeing of components after
+	check for allocated coarray.
+
+2023-09-24  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/92586
+	* trans-expr.cc (gfc_trans_arrayfunc_assign): Supply a missing
+	dereference for the call to gfc_deallocate_alloc_comp_no_caf.
+
+2023-09-24  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/68155
+	* decl.cc (fix_initializer_charlen): New function broken out of
+	add_init_expr_to_sym.
+	(add_init_expr_to_sym, build_struct): Call the new function.
+
 2023-08-27  Paul Thomas  <pault@gcc.gnu.org>
 
 	PR fortran/87477
