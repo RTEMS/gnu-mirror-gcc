@@ -12729,3 +12729,51 @@ proc check_effective_target_const_volatile_readonly_section { } {
     }
   return 1
 }
+
+# Return 1 if the CORE-V MAC extension is available.
+proc check_effective_target_cv_mac { } {
+    if { !([istarget riscv*-*-*]) } {
+         return 0
+     }
+    return [check_no_compiler_messages cv_mac object {
+        void foo (void)
+        {
+          asm ("cv.mac t0, t1, t2");
+        }
+    } "-march=rv32i_xcvmac" ]
+}
+
+# Appends necessary Python flags to extra-tool-flags if Python.h is supported.
+# Otherwise, modifies dg-do-what.
+proc dg-require-python-h { args } {
+    upvar dg-extra-tool-flags extra-tool-flags
+
+    verbose "ENTER dg-require-python-h" 2
+
+    set supported 0
+    set result [remote_exec host "python3-config --includes"]
+    set status [lindex $result 0]
+    if { $status == 0 } {
+	# Remove trailing newline from python3-config output.
+	set python_flags [string trim [lindex $result 1]]
+	if [check_no_compiler_messages python_h assembly {
+	    #include <Python.h>
+	    int main (void) { return 0; }
+	} $python_flags] {
+	    set supported 1
+	}
+    }
+
+    if { $supported == 0 } {
+	verbose "Python.h not supported" 2
+	upvar dg-do-what dg-do-what
+	set dg-do-what [list [lindex ${dg-do-what} 0] "N" "P"]
+	return
+    }
+
+    verbose "Python flags are: $python_flags" 2
+
+    verbose "Before appending, extra-tool-flags: ${extra-tool-flags}" 3
+    eval lappend extra-tool-flags $python_flags
+    verbose "After appending, extra-tool-flags: ${extra-tool-flags}" 3
+}
