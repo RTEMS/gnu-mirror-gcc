@@ -10370,6 +10370,7 @@ can_be_built_by_li_lis_and_rldicl (HOST_WIDE_INT c, int *shift,
   /* Leading zeros may be cleaned by rldicl with a mask.  Change leading zeros
      to ones and then recheck it.  */
   int lz = clz_hwi (c);
+<<<<<<< HEAD
 
 <<<<<<< HEAD
   /* If lz == 0, the left shift is undefined.  */
@@ -10385,6 +10386,8 @@ can_be_built_by_li_lis_and_rldicl (HOST_WIDE_INT c, int *shift,
   if (!lz)
     return false;
 
+=======
+>>>>>>> ab63444d033 (Revert patches)
   HOST_WIDE_INT unmask_c
     = c | (HOST_WIDE_INT_M1U << (HOST_BITS_PER_WIDE_INT - lz));
   int n;
