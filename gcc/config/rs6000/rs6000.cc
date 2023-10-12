@@ -10394,32 +10394,11 @@ can_be_built_by_li_lis_and_rldicl (HOST_WIDE_INT c, int *shift,
   /* Leading zeros may be cleaned by rldicl with a mask.  Change leading zeros
      to ones and then recheck it.  */
   int lz = clz_hwi (c);
-<<<<<<< HEAD
-<<<<<<< HEAD
-
-<<<<<<< HEAD
-  /* If lz == 0, the left shift is undefined.  */
-=======
-  /* Different machines interpret num << shift differently if shift is at least
-     the number of bits in num's representation.  It is explicitly undefined
-     behavior in the C/C++ langauges.
-
-     In particular (-1 << 64) on an x86_64 produces -1 and (-1 << 64) on a
-     64-bit PowerPC produces 0.  This difference causes a cross compiler on
-     x86_64 to recurse until it runs out of stack.  */
->>>>>>> 0016f87ad08 (PowerPC: Do not depend on an undefined shift)
-  if (!lz)
-    return false;
-
-=======
->>>>>>> ab63444d033 (Revert patches)
-=======
 
   /* If lz == 0, the left shift is undefined.  */
   if (!lz)
     return false;
 
->>>>>>> 49fb3f85c90 (PowerPC: Do not depend on an undefined shift)
   HOST_WIDE_INT unmask_c
     = c | (HOST_WIDE_INT_M1U << (HOST_BITS_PER_WIDE_INT - lz));
   int n;
