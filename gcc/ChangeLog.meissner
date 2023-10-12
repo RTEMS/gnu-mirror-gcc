@@ -142,6 +142,8 @@ libgcc/
 
 	* ChangeLog.meissner: New file.
 
+==================== Branch work139, baseline ====================
+
 2023-10-11   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
