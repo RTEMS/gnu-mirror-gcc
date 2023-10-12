@@ -91,6 +91,7 @@
    UNSPEC_MMA_XVI8GER4SPP
    UNSPEC_MMA_XXMFACC
    UNSPEC_MMA_XXMTACC
+   UNSPEC_MMA_VECTOR_PAIR_MEMORY
   ])
 
 (define_c_enum "unspecv"
@@ -298,6 +299,49 @@
   "TARGET_MMA
    && (gpc_reg_operand (operands[0], OOmode)
        || gpc_reg_operand (operands[1], OOmode))"
+{
+  if (MEM_P (operands[0]))
+    return TARGET_STORE_VECTOR_PAIR ? "stxvp%X0 %x1,%0" : "#";
+
+  if (MEM_P (operands[1]))
+    return TARGET_LOAD_VECTOR_PAIR ? "lxvp%X1 %x0,%1" : "#";
+
+  return "#";
+}
+  "&& reload_completed
+   && ((MEM_P (operands[0]) && !TARGET_STORE_VECTOR_PAIR)
+       || (MEM_P (operands[1]) && !TARGET_LOAD_VECTOR_PAIR)
+       || (!MEM_P (operands[0]) && !MEM_P (operands[1])))"
+  [(const_int 0)]
+{
+  rs6000_split_multireg_move (operands[0], operands[1]);
+  DONE;
+}
+  [(set_attr "type" "vecload,vecstore,veclogical")
+   (set_attr "size" "256")
+   (set_attr "length" "*,*,8")])
+
+;; Normally __builtin_vsx_lxvp and __builtin_vsx_stxvp are converted to a
+;; direct move insns, but if -mno-load-vector-pair or -mno-store-vector-pair
+;; are used, we use these insns to guarantee that the load vector pair is
+;; generated when the user explicitly uses the built-in function.
+(define_expand "lxvp_internal"
+  [(set (match_operand:OO 0 "gpc_reg_operand")
+	(unspec:OO [(mem:OO (match_operand 1 "address_operand"))]
+		    UNSPEC_MMA_VECTOR_PAIR_MEMORY))]
+  "TARGET_MMA")
+
+(define_expand "stxvp_internal"
+  [(set (mem:OO (match_operand 0 "address_operand"))
+	(unspec:OO [(match_operand:OO 1 "gpc_reg_operand")]
+		    UNSPEC_MMA_VECTOR_PAIR_MEMORY))]
+  "TARGET_MMA")
+
+(define_insn_and_split "*vector_pair_memory_builtin"
+  [(set (match_operand:OO 0 "nonimmediate_operand" "=wa,ZwO,wa")
+	(unspec:OO [(match_operand:OO 1 "input_operand" "ZwO,wa,wa")]
+		   UNSPEC_MMA_VECTOR_PAIR_MEMORY))]
+  "TARGET_MMA"
   "@
    lxvp%X1 %x0,%1
    stxvp%X0 %x1,%0
