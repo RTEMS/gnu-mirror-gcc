@@ -10371,6 +10371,7 @@ can_be_built_by_li_lis_and_rldicl (HOST_WIDE_INT c, int *shift,
      to ones and then recheck it.  */
   int lz = clz_hwi (c);
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 <<<<<<< HEAD
   /* If lz == 0, the left shift is undefined.  */
@@ -10388,6 +10389,13 @@ can_be_built_by_li_lis_and_rldicl (HOST_WIDE_INT c, int *shift,
 
 =======
 >>>>>>> ab63444d033 (Revert patches)
+=======
+
+  /* If lz == 0, the left shift is undefined.  */
+  if (!lz)
+    return false;
+
+>>>>>>> 49fb3f85c90 (PowerPC: Do not depend on an undefined shift)
   HOST_WIDE_INT unmask_c
     = c | (HOST_WIDE_INT_M1U << (HOST_BITS_PER_WIDE_INT - lz));
   int n;
