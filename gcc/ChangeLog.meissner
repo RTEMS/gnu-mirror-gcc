@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 ==================== Branch work139, patch #3 ====================
+=======
+==================== Branch work139, patch #2 ====================
+>>>>>>> c58761b70f6 (Update ChangeLog.meissner)
 
 Power10: Add options to disable load and store vector pair.
 
@@ -12,6 +16,7 @@ option would tell GCC to generate two load vector instructions instead of a
 single load vector pair.  The -mno-store-vector-pair option would tell GCC to
 generate two store vector instructions instead of a single store vector pair.
 
+<<<<<<< HEAD
 If either -mno-load-vector-pair is used, GCC will not generate the indexed
 stxvpx instruction.  Similarly if -mno-store-vector-pair is used, GCC will not
 generate the indexed lxvpx instruction.  The reason for this is to enable
@@ -24,6 +29,17 @@ vector pair are enabled.
 I decided that if the user explicitly used the __builtin_vsx_lxvp or the
 __builtin_vsx_stxvp built-in functions to load or store a vector pair, that
 those functions would always generate a vector pair instruction.
+=======
+| commit 8f1a70a4fbcc6441c70da60d4ef6db1e5635e18a (HEAD)
+| Author: Jiufu Guo <guojiufu@linux.ibm.com>
+| Date:   Tue Jan 10 20:52:33 2023 +0800
+|
+|   rs6000: build constant via li/lis;rldicl/rldicr
+|
+|   If a constant is possible left/right cleaned on a rotated value from
+|   a negative value of "li/lis".  Then, using "li/lis ; rldicl/rldicr"
+|   to build the constant.
+>>>>>>> c58761b70f6 (Update ChangeLog.meissner)
 
 I added code so that the user code modify these settings using either a
 '#pragma GCC target' directive or used __attribute__((__target__(...))) in the
@@ -65,6 +81,8 @@ gcc/testsuite/
 	* gcc.target/powerpc/vector-pair-switch4.c: New test.
 
 ==================== Branch work139, patch #2 applied to trunk ====================
+
+==================== Branch work139, patch #1 was reverted ====================
 
 ==================== Branch work139, baseline ====================
 
