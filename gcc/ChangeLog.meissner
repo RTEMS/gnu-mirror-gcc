@@ -1,4 +1,4 @@
-==================== Branch work139, patch #1 ====================
+==================== Branch work139, patch #2 ====================
 
 PowerPC: Do not depend on an undefined shift
 
@@ -11,15 +11,15 @@ fine.
 
 I traced this down to a change made around October 10th:
 
-commit 8f1a70a4fbcc6441c70da60d4ef6db1e5635e18a (HEAD)
-Author: Jiufu Guo <guojiufu@linux.ibm.com>
-Date:   Tue Jan 10 20:52:33 2023 +0800
-
-    rs6000: build constant via li/lis;rldicl/rldicr
-
-    If a constant is possible left/right cleaned on a rotated value from
-    a negative value of "li/lis".  Then, using "li/lis ; rldicl/rldicr"
-    to build the constant.
+| commit 8f1a70a4fbcc6441c70da60d4ef6db1e5635e18a (HEAD)
+| Author: Jiufu Guo <guojiufu@linux.ibm.com>
+| Date:   Tue Jan 10 20:52:33 2023 +0800
+|
+|   rs6000: build constant via li/lis;rldicl/rldicr
+|
+|   If a constant is possible left/right cleaned on a rotated value from
+|   a negative value of "li/lis".  Then, using "li/lis ; rldicl/rldicr"
+|   to build the constant.
 
 The code was doing a -1 << 64 which is undefined behavior because different
 machines produce different results.  On the x86_64 system, (-1 << 64) produces
@@ -34,8 +34,12 @@ crosss compiler and on a native PowerPC system.
 gcc/
 
 	PR target/111778
-	* config/rs6000/rs6000.cc (can_be_built_by_li_lis_and_rldicl): Do not
-	use a shift left by the number of bits in a host wide int.
+	* config/rs6000/rs6000.cc (can_be_built_by_li_lis_and_rldicl): Protect
+	code from shifts that are undefined.
+	(can_be_built_by_li_lis_and_rldicr): Likewise.
+	(can_be_built_by_li_and_rldic): Likewise.
+
+==================== Branch work139, patch #1 was reverted ====================
 
 ==================== Branch work139, baseline ====================
 
