@@ -4129,5 +4129,11 @@
   v256 __builtin_vsx_lxvp (unsigned long, const v256 *);
     LXVP nothing {mma}
 
+  v256 __builtin_vsx_lxvp_internal (const v256 *);
+    LXVP_INTERNAL lxvp_internal {mma}
+
   void __builtin_vsx_stxvp (v256, unsigned long, const v256 *);
     STXVP nothing {mma,pair}
+
+  void __builtin_vsx_stxvp_internal (v256 *, v256);
+    STXVP_INTERNAL stxvp_internal {mma}

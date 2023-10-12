@@ -1,4 +1,4 @@
-/* Target-specific built-in function support for the Power architecture.
+ /* Target-specific built-in function support for the Power architecture.
    See also rs6000-c.c, rs6000-gen-builtins.c, rs6000-builtins.def, and
    rs6000-overloads.def.
    Note that "normal" builtins (generic math functions, etc.) are handled
@@ -1165,9 +1165,23 @@ rs6000_gimple_fold_mma_builtin (gimple_stmt_iterator *gsi,
       if (TREE_TYPE (TREE_TYPE (ptr)) != vector_pair_type_node)
 	ptr = build1 (NOP_EXPR,
 		      build_pointer_type (vector_pair_type_node), ptr);
-      tree mem = build_simple_mem_ref (build2 (POINTER_PLUS_EXPR,
-					       TREE_TYPE (ptr), ptr, offset));
-      gimplify_assign (lhs, mem, &new_seq);
+      tree addr = build2 (POINTER_PLUS_EXPR, TREE_TYPE (ptr), ptr, offset);
+
+      if (TARGET_LOAD_VECTOR_PAIR)
+	gimplify_assign (lhs, build_simple_mem_ref (addr), &new_seq);
+      else
+	{
+	  tree ptrtype = build_pointer_type (vector_pair_type_node);
+	  tree addrssa = create_tmp_reg_or_ssa_name (ptrtype);
+	  tree lhsssa = create_tmp_reg_or_ssa_name (vector_pair_type_node);
+	  gimplify_assign (addrssa, addr, &new_seq);
+	  new_decl = rs6000_builtin_decls[RS6000_BIF_LXVP_INTERNAL];
+	  new_call = gimple_build_call (new_decl, 1, addrssa);
+	  gimple_call_set_lhs (new_call, lhsssa);
+	  gimple_seq_add_stmt (&new_seq, new_call);
+	  gimplify_assign (lhs, lhsssa, &new_seq);
+	}
+
       pop_gimplify_context (NULL);
       gsi_replace_with_seq (gsi, new_seq, true);
       return true;
@@ -1182,9 +1196,20 @@ rs6000_gimple_fold_mma_builtin (gimple_stmt_iterator *gsi,
       if (TREE_TYPE (TREE_TYPE (ptr)) != vector_pair_type_node)
 	ptr = build1 (NOP_EXPR,
 		      build_pointer_type (vector_pair_type_node), ptr);
-      tree mem = build_simple_mem_ref (build2 (POINTER_PLUS_EXPR,
-					       TREE_TYPE (ptr), ptr, offset));
-      gimplify_assign (mem, src, &new_seq);
+      tree addr = build2 (POINTER_PLUS_EXPR, TREE_TYPE (ptr), ptr, offset);
+
+      if (TARGET_STORE_VECTOR_PAIR)
+	gimplify_assign (build_simple_mem_ref (addr), src, &new_seq);
+      else
+	{
+	  tree ptrtype = build_pointer_type (vector_pair_type_node);
+	  tree addrssa = create_tmp_reg_or_ssa_name (ptrtype);
+	  gimplify_assign (addrssa, ptr, &new_seq);
+	  new_decl = rs6000_builtin_decls[RS6000_BIF_STXVP_INTERNAL];
+	  new_call = gimple_build_call (new_decl, 2, addrssa, src);
+	  gimple_seq_add_stmt (&new_seq, new_call);
+	}
+
       pop_gimplify_context (NULL);
       gsi_replace_with_seq (gsi, new_seq, true);
       return true;
@@ -3002,8 +3027,13 @@ mma_expand_builtin (tree exp, rtx target, insn_code icode,
       rtx opnd;
       const struct insn_operand_data *insn_op;
       insn_op = &insn_data[icode].operand[nopnds];
+      /* The internal built-in functions for lxvp and stxvp must use normal
+	 expansion to allow passing the address of a variable to the
+	 built-in.  */
       if (TREE_CODE (arg) == ADDR_EXPR
-	  && MEM_P (DECL_RTL (TREE_OPERAND (arg, 0))))
+	  && MEM_P (DECL_RTL (TREE_OPERAND (arg, 0)))
+	  && fcode != RS6000_BIF_LXVP_INTERNAL
+	  && fcode != RS6000_BIF_STXVP_INTERNAL)
 	opnd = DECL_RTL (TREE_OPERAND (arg, 0));
       else
 	opnd = expand_normal (arg);
