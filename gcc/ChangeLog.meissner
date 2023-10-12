@@ -1,3 +1,69 @@
+==================== Branch work139, patch #3 ====================
+
+Power10: Add options to disable load and store vector pair.
+
+In working on some future patches that involve utilizing vector pair
+instructions, I wanted to be able to tune my program to enable or disable using
+the vector pair load or store operations while still keeping the other
+operations on the vector pair.
+
+This patch adds two undocumented tuning options.  The -mno-load-vector-pair
+option would tell GCC to generate two load vector instructions instead of a
+single load vector pair.  The -mno-store-vector-pair option would tell GCC to
+generate two store vector instructions instead of a single store vector pair.
+
+If either -mno-load-vector-pair is used, GCC will not generate the indexed
+stxvpx instruction.  Similarly if -mno-store-vector-pair is used, GCC will not
+generate the indexed lxvpx instruction.  The reason for this is to enable
+splitting the {,p}lxvp or {,p}stxvp instructions after reload without needing a
+scratch GPR register.
+
+The current default for -mcpu=power10 is that both load vector pair and store
+vector pair are enabled.
+
+I decided that if the user explicitly used the __builtin_vsx_lxvp or the
+__builtin_vsx_stxvp built-in functions to load or store a vector pair, that
+those functions would always generate a vector pair instruction.
+
+I added code so that the user code modify these settings using either a
+'#pragma GCC target' directive or used __attribute__((__target__(...))) in the
+function declaration.
+
+I added tests for the switches, #pragma, and attribute options.
+
+I have built this on both little endian power10 systems and big endian power9
+systems doing the normal bootstrap and test.  There were no regressions in any
+of the tests, and the new tests passed.  Can I check this patch into the master
+branch?
+
+2023-10-12  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (movoo): Add support for -mload-vector-pair and
+	-mstore-vector-pair.
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Likewise.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.md (rs6000_setup_reg_addr_masks): If either load
+	vector pair or store vector pair instructions are not being generated,
+	don't allow lxvpx or stxvpx to be generated.
+	(rs6000_option_override_internal): Add warnings if either
+	-mload-vector-pair or -mstore-vector-pair is used without having MMA
+	instructions.
+	(rs6000_opt_masks): Allow user to override -mload-vector-pair or
+	-mstore-vector-pair via #pragma or attribute.
+	* config/rs6000/rs6000.opt (-mload-vector-pair): New option.
+	(-mstore-vector-pair): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-attribute.c: New test.
+	* gcc.target/powerpc/vector-pair-pragma.c: New test.
+	* gcc.target/powerpc/vector-pair-switch1.c: New test.
+	* gcc.target/powerpc/vector-pair-switch2.c: New test.
+	* gcc.target/powerpc/vector-pair-switch3.c: New test.
+	* gcc.target/powerpc/vector-pair-switch4.c: New test.
+
 ==================== Branch work139, patch #2 ====================
 
 PowerPC: Do not depend on an undefined shift
