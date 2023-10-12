@@ -1,4 +1,76 @@
+==================== Branch work139, patch #1 ====================
+
+PowerPC: Do not depend on an undefined shift
+
+I was building a cross compiler to PowerPC on my x86_86 workstation with the
+latest version of GCC on October 11th.  I could not build the compiler on the
+x86_64 system as it died in building libgcc.  I looked into it, and I
+discovered the compiler was recursing until it ran out of stack space.  If I
+build a native compiler with the same sources on a PowerPC system, it builds
+fine.
+
+I traced this down to a change made around October 10th:
+
+commit 8f1a70a4fbcc6441c70da60d4ef6db1e5635e18a (HEAD)
+Author: Jiufu Guo <guojiufu@linux.ibm.com>
+Date:   Tue Jan 10 20:52:33 2023 +0800
+
+    rs6000: build constant via li/lis;rldicl/rldicr
+
+    If a constant is possible left/right cleaned on a rotated value from
+    a negative value of "li/lis".  Then, using "li/lis ; rldicl/rldicr"
+    to build the constant.
+
+The code was doing a -1 << 64 which is undefined behavior because different
+machines produce different results.  On the x86_64 system, (-1 << 64) produces
+-1 while on a PowerPC 64-bit system, (-1 << 64) produces 0.  The x86_64 then
+recurses until the stack runs out of space.
+
+If I apply this patch, the compiler builds fine on both x86_64 as a PowerPC
+crosss compiler and on a native PowerPC system.
+
+2023-10-12  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/111778
+	* config/rs6000/rs6000.cc (can_be_built_by_li_lis_and_rldicl): Do not
+	use a shift left by the number of bits in a host wide int.
+
 ==================== Branch work139, baseline ====================
+
+Add ChangeLog.meissner and REVISION.
+
+2023-10-11  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* REVISION: New file for branch.
+	* ChangeLog.meissner: New file.
+
+gcc/c-family/
+
+	* ChangeLog.meissner: New file.
+
+gcc/c/
+
+	* ChangeLog.meissner: New file.
+
+gcc/cp/
+
+	* ChangeLog.meissner: New file.
+
+gcc/fortran/
+
+	* ChangeLog.meissner: New file.
+
+gcc/testsuite/
+
+	* ChangeLog.meissner: New file.
+
+libgcc/
+
+	* ChangeLog.meissner: New file.
 
 2023-10-11   Michael Meissner  <meissner@linux.ibm.com>
 
