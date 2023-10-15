@@ -107,9 +107,13 @@ jobs:
         if: success()
         run: |
           cd ../build
+<<<<<<< HEAD
           if test -x "$(which nproc)"; then echo "nproc says that we can use $(nproc) build jobs"; else echo "error: missing nproc!" >&2 && exit 1; fi
           time (make -j"$(nproc)" | tee build.log)
           if test -e build.log; then stat build.log && wc -l build.log; fi
+=======
+          make bootstrap-lean -j$(nproc)
+>>>>>>> c74844efa04 (Update linux.yaml)
 
       - name: Debug failure
         if: failure()
