@@ -5952,9 +5952,9 @@ vectorizable_assignment (vec_info *vinfo,
 	   && TYPE_UNSIGNED (TREE_TYPE (op))))
     {
       if (dump_enabled_p ())
-        dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
-                         "type conversion to/from bit-precision "
-                         "unsupported.\n");
+	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+			 "type conversion to/from bit-precision "
+			 "unsupported.\n");
       return false;
     }
 
