@@ -115,8 +115,9 @@ jobs:
         if: success()
         run: |
           cd ../build
-          echo "make info" && (time make info) && echo "info done"
-          echo "make dvi" && (time make dvi) && echo "dvi done"
+          echo "make info" && (time make info) && find . -name "*.info" -print
+          echo "make dvi" && (time make dvi) && find . -name "*.dvi" -print
+          echo "make pdf" && (time make pdf) && echo "pdfs done"
 
       - name: Debug failure
         if: failure()
