@@ -69,8 +69,6 @@ jobs:
 
       - name: Download prerequisites
         if: success()
-        env:
-          revision: ${{ github.head_ref }}
         run: |
           ./contrib/download_prerequisites
           ls
