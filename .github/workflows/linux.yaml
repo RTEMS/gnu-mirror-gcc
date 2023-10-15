@@ -115,8 +115,8 @@ jobs:
         if: success()
         run: |
           cd ../build
-          echo "make info" && time make info
-          echo "make dvi" && time make dvi
+          echo "make info" && (time make info) && echo "info done"
+          echo "make dvi" && (time make dvi) && echo "dvi done"
 
       - name: Debug failure
         if: failure()
