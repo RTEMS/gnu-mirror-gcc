@@ -1,4 +1,143 @@
+==================== Branch work139-dmf, patch #100 ====================
+
+PowerPC: Add -mcpu=future.
+
+These patches implement support for potential future PowerPC cpus.  At this
+time, features enabled with -mcpu=future may or may not be in actual PowerPCs
+that will be delivered in the future.
+
+This patch adds support for the -mcpu=future and -mtune=future options.
+If you use -mcpu=future, the macro __ARCH_PWR_FUTURE__ is defined, and the
+assembler .machine directive "future" is used.  Future patches in this
+series will add support for new instructions that may be present in future
+PowerPC processors.
+
+At the moment, we do not have any differences in tuning between power10 and
+future.  It is anticipated that we may change the tuning characteristics for
+-mtune=future at a later time.
+
+The patches have been tested on the following platforms.  I added the patches
+for PR target/107299 that I submitted on November 2nd before doing the builds so
+that GCC would build on systems using IEEE 128-bit long double.
+	* https://gcc.gnu.org/pipermail/gcc-patches/2022-November/604834.html
+
+2023-09-29   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/power10.md (power10-load): Temporarily treat
+	-mcpu=future the same as -mcpu=power10.
+	(power10-fused-load): Likewise.
+	(power10-prefixed-load): Likewise.
+	(power10-prefixed-load): Likewise.
+	(power10-load-update): Likewise.
+	(power10-fpload-double): Likewise.
+	(power10-fpload-double): Likewise.
+	(power10-prefixed-fpload-double): Likewise.
+	(power10-prefixed-fpload-double): Likewise.
+	(power10-fpload-update-double): Likewise.
+	(power10-fpload-single): Likewise.
+	(power10-fpload-update-single): Likewise.
+	(power10-vecload): Likewise.
+	(power10-vecload-pair): Likewise.
+	(power10-store): Likewise.
+	(power10-fused-store): Likewise.
+	(power10-prefixed-store): Likewise.
+	(power10-prefixed-store): Likewise.
+	(power10-store-update): Likewise.
+	(power10-vecstore-pair): Likewise.
+	(power10-larx): Likewise.
+	(power10-lq): Likewise.
+	(power10-stcx): Likewise.
+	(power10-stq): Likewise.
+	(power10-sync): Likewise.
+	(power10-sync): Likewise.
+	(power10-alu): Likewise.
+	(power10-fused_alu): Likewise.
+	(power10-paddi): Likewise.
+	(power10-rot): Likewise.
+	(power10-rot-compare): Likewise.
+	(power10-alu2): Likewise.
+	(power10-cmp): Likewise.
+	(power10-two): Likewise.
+	(power10-three): Likewise.
+	(power10-mul): Likewise.
+	(power10-mul-compare): Likewise.
+	(power10-div): Likewise.
+	(power10-div-compare): Likewise.
+	(power10-crlogical): Likewise.
+	(power10-mfcrf): Likewise.
+	(power10-mfcr): Likewise.
+	(power10-mtcr): Likewise.
+	(power10-mtjmpr): Likewise.
+	(power10-mfjmpr): Likewise.
+	(power10-mfjmpr): Likewise.
+	(power10-fpsimple): Likewise.
+	(power10-fp): Likewise.
+	(power10-fpcompare): Likewise.
+	(power10-sdiv): Likewise.
+	(power10-ddiv): Likewise.
+	(power10-sqrt): Likewise.
+	(power10-dsqrt): Likewise.
+	(power10-vec-2cyc): Likewise.
+	(power10-fused-vec): Likewise.
+	(power10-veccmp): Likewise.
+	(power10-vecsimple): Likewise.
+	(power10-vecnormal): Likewise.
+	(power10-qp): Likewise.
+	(power10-vecperm): Likewise.
+	(power10-vecperm-compare): Likewise.
+	(power10-prefixed-vecperm): Likewise.
+	(power10-veccomplex): Likewise.
+	(power10-vecfdiv): Likewise.
+	(power10-vecdiv): Likewise.
+	(power10-qpdiv): Likewise.
+	(power10-qpmul): Likewise.
+	(power10-mtvsr): Likewise.
+	(power10-mfvsr): Likewise.
+	(power10-mfvsr): Likewise.
+	(power10-branch): Likewise.
+	(power10-fused-branch): Likewise.
+	(power10-crypto): Likewise.
+	(power10-htm): Likewise.
+	(power10-htm): Likewise.
+	(power10-dfp): Likewise.
+	(power10-dfpq): Likewise.
+	(power10-mma): Likewise.
+	(power10-prefixed-mma): Likewise.
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
+	__ARCH_PWR_FUTURE__ if -mcpu=future.
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS): New macro.
+	(POWERPC_MASKS): Add -mcpu=future.
+	* config/rs6000/rs6000-opts.h (enum processor_type): Add
+	PROCESSOR_FUTURE.
+	* config/rs6000/rs6000-tables.opt: Regenerate.
+	* config/rs6000/rs6000.cc (future_costs): Add -mcpu=future support.
+	Make -mtune=future act like -mtune=power10 for now.
+	(rs6000_option_override_internal): 
+	(rs6000_machine_from_flags): Likewise.
+	(rs6000_reassociation_width): Likewise.
+	(rs6000_adjust_cost): Likewise.
+	(rs6000_issue_rate): Likewise.
+	(rs6000_sched_reorder): Likewise.
+	(rs6000_sched_reorder2): Likewise.
+	(rs6000_register_move_cost): Likewise.
+	(rs6000_opt_masks): Add -mfuture.
+	* config/rs6000/rs6000.h (ASM_CPU_SUPPORT): Likewise.
+	* config/rs6000/rs6000.md (cpu attribute): Add -mcpu=future support.
+	* config/rs6000/rs6000.opt (-mfuture): New undocumented debug switch.
+	* doc/invoke.texi (IBM RS/6000 and PowerPC Options): Document -mcpu=future.
+
 ==================== Branch work139-dmf, baseline ====================
+
+Add ChangeLog.dmf and update REVISION.
+
+2023-09-29  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* ChangeLog.dmf: New file for branch.
+	* REVISION: Update.
 
 2023-10-11   Michael Meissner  <meissner@linux.ibm.com>
 
