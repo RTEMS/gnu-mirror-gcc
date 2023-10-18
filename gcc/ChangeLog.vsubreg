@@ -115,7 +115,7 @@ Peter's patches for subreg support.
 gcc/
 
 	PR target/109116
-	* gcc/config/rs6000/rs6000.cc (rs6000_modes_tieable_p): Make OOmdoe
+	* gcc/config/rs6000/rs6000.cc (rs6000_modes_tieable_p): Make OOmode
 	tieable with 128-bit vector modes.
 
 2023-09-15  Peter Bergner  <bergner@linux.ibm.com>
