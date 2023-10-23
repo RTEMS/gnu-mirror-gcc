@@ -1001,8 +1001,31 @@ expand_const_vector (rtx target, rtx src)
 	}
       else
 	{
-	  rtx ops[] = {tmp, elt};
-	  emit_vlmax_insn (code_for_pred_broadcast (mode), UNARY_OP, ops);
+	  /* Emit vec_duplicate<mode> split pattern before RA so that
+	     we could have a better optimization opportunity in LICM
+	     which will hoist vmv.v.x outside the loop and in fwprop && combine
+	     which will transform 'vv' into 'vx' instruction.
+
+	     The reason we don't emit vec_duplicate<mode> split pattern during
+	     RA since the split stage after RA is a too late stage to generate
+	     RVV instruction which need an additional register (We can't
+	     allocate a new register after RA) for VL operand of vsetvl
+	     instruction (vsetvl a5, zero).  */
+	  if (lra_in_progress)
+	    {
+	      rtx ops[] = {tmp, elt};
+	      emit_vlmax_insn (code_for_pred_broadcast (mode), UNARY_OP, ops);
+	    }
+	  else
+	    {
+	      struct expand_operand ops[2];
+	      enum insn_code icode = optab_handler (vec_duplicate_optab, mode);
+	      gcc_assert (icode != CODE_FOR_nothing);
+	      create_output_operand (&ops[0], tmp, mode);
+	      create_input_operand (&ops[1], elt, GET_MODE_INNER (mode));
+	      expand_insn (icode, 2, ops);
+	      tmp = ops[0].value;
+	    }
 	}
 
       if (tmp != target)
@@ -2423,20 +2446,19 @@ autovectorize_vector_modes (vector_modes *modes, bool)
 	    modes->safe_push (mode);
 	}
     }
-  if (TARGET_VECTOR_VLS)
-    {
-      /* Push all VLSmodes according to TARGET_MIN_VLEN.  */
-      unsigned int i = 0;
-      unsigned int base_size = TARGET_MIN_VLEN * lmul / 8;
-      unsigned int size = base_size;
-      machine_mode mode;
-      while (size > 0 && get_vector_mode (QImode, size).exists (&mode))
-	{
+    /* Push all VLSmodes according to TARGET_MIN_VLEN.  */
+    unsigned int i = 0;
+    unsigned int base_size = TARGET_MIN_VLEN * lmul / 8;
+    unsigned int size = base_size;
+    machine_mode mode;
+    while (size > 0 && get_vector_mode (QImode, size).exists (&mode))
+     {
+	if (vls_mode_valid_p (mode))
 	  modes->safe_push (mode);
-	  i++;
-	  size = base_size / (1U << i);
-	}
-    }
+
+	i++;
+	size = base_size / (1U << i);
+     }
   /* Enable LOOP_VINFO comparison in COST model.  */
   return VECT_COMPARE_COSTS;
 }
@@ -3880,6 +3902,95 @@ cmp_lmul_gt_one (machine_mode mode)
   return false;
 }
 
+/* Return true if the VLS mode is legal. There are 2 cases here.
+
+   1. Enable VLS modes for VLA vectorization since fixed length VLMAX mode
+      is the highest priority choice and should not conflict with VLS modes.
+   2. Enable VLS modes for some cases in fixed-vlmax, aka the bitsize of the
+      VLS mode are smaller than the minimal vla.
+
+   Take vlen = 2048 as example for case 2.
+
+   Note: Below table based on vlen = 2048.
+   +----------------------------------------------------+----------------------+
+   | VLS mode                                           | VLA mode             |
+   +----------------------------------------------------+----------------------+
+   | Name       | Precision | Inner Precision | Enabled | Min mode  | Min bits |
+   +------------+-----------+-----------------+---------+-----------+----------+
+   | V1BI       |     1     |              1  | Yes     | RVVMF64BI |    32    |
+   | V2BI       |     2     |              1  | Yes     | RVVMF64BI |    32    |
+   | V4BI       |     4     |              1  | Yes     | RVVMF64BI |    32    |
+   | V8BI       |     8     |              1  | Yes     | RVVMF64BI |    32    |
+   | V16BI      |    16     |              1  | Yes     | RVVMF64BI |    32    |
+   | V32BI      |    32     |              1  | NO      | RVVMF64BI |    32    |
+   | V64BI      |    64     |              1  | NO      | RVVMF64BI |    32    |
+   | ...        |   ...     |            ...  | ...     | RVVMF64BI |    32    |
+   | V4096BI    |  4096     |              1  | NO      | RVVMF64BI |    32    |
+   +------------+-----------+-----------------+---------+-----------+----------+
+   | V1QI       |     8     |              8  | Yes     | RVVMF8QI  |   256    |
+   | V2QI       |    16     |              8  | Yes     | RVVMF8QI  |   256    |
+   | V4QI       |    32     |              8  | Yes     | RVVMF8QI  |   256    |
+   | V8QI       |    64     |              8  | Yes     | RVVMF8QI  |   256    |
+   | V16QI      |   128     |              8  | Yes     | RVVMF8QI  |   256    |
+   | V32QI      |   256     |              8  | NO      | RVVMF8QI  |   256    |
+   | V64QI      |   512     |              8  | NO      | RVVMF8QI  |   256    |
+   | ...        |   ...     |              .. | ...     | RVVMF8QI  |   256    |
+   | V4096QI    | 32768     |              8  | NO      | RVVMF8QI  |   256    |
+   +------------+-----------+-----------------+---------+-----------+----------+
+   | V1HI       |    16     |              16 | Yes     | RVVMF4HI  |   512    |
+   | V2HI       |    32     |              16 | Yes     | RVVMF4HI  |   512    |
+   | V4HI       |    64     |              16 | Yes     | RVVMF4HI  |   512    |
+   | V8HI       |   128     |              16 | Yes     | RVVMF4HI  |   512    |
+   | V16HI      |   256     |              16 | Yes     | RVVMF4HI  |   512    |
+   | V32HI      |   512     |              16 | NO      | RVVMF4HI  |   512    |
+   | V64HI      |  1024     |              16 | NO      | RVVMF4HI  |   512    |
+   | ...        |   ...     |              .. | ...     | RVVMF4HI  |   512    |
+   | V2048HI    | 32768     |              16 | NO      | RVVMF4HI  |   512    |
+   +------------+-----------+-----------------+---------+-----------+----------+
+   | V1SI/SF    |    32     |              32 | Yes     | RVVMF2SI  |  1024    |
+   | V2SI/SF    |    64     |              32 | Yes     | RVVMF2SI  |  1024    |
+   | V4SI/SF    |   128     |              32 | Yes     | RVVMF2SI  |  1024    |
+   | V8SI/SF    |   256     |              32 | Yes     | RVVMF2SI  |  1024    |
+   | V16SI/SF   |   512     |              32 | Yes     | RVVMF2SI  |  1024    |
+   | V32SI/SF   |  1024     |              32 | NO      | RVVMF2SI  |  1024    |
+   | V64SI/SF   |  2048     |              32 | NO      | RVVMF2SI  |  1024    |
+   | ...        |   ...     |              .. | ...     | RVVMF2SI  |  1024    |
+   | V1024SI/SF | 32768     |              32 | NO      | RVVMF2SI  |  1024    |
+   +------------+-----------+-----------------+---------+-----------+----------+
+   | V1DI/DF    |    64     |              64 | Yes     | RVVM1DI   |  2048    |
+   | V2DI/DF    |   128     |              64 | Yes     | RVVM1DI   |  2048    |
+   | V4DI/DF    |   256     |              64 | Yes     | RVVM1DI   |  2048    |
+   | V8DI/DF    |   512     |              64 | Yes     | RVVM1DI   |  2048    |
+   | V16DI/DF   |  1024     |              64 | Yes     | RVVM1DI   |  2048    |
+   | V32DI/DF   |  2048     |              64 | NO      | RVVM1DI   |  2048    |
+   | V64DI/DF   |  4096     |              64 | NO      | RVVM1DI   |  2048    |
+   | ...        |   ...     |              .. | ...     | RVVM1DI   |  2048    |
+   | V512DI/DF  | 32768     |              64 | NO      | RVVM1DI   |  2048    |
+   +------------+-----------+-----------------+---------+-----------+----------+
+
+   Then we can have the condition for VLS mode in fixed-vlmax, aka:
+     PRECISION (VLSmode) < VLEN / (64 / PRECISION(VLS_inner_mode)).  */
+bool
+vls_mode_valid_p (machine_mode vls_mode)
+{
+  if (!TARGET_VECTOR)
+    return false;
+
+  if (riscv_autovec_preference == RVV_SCALABLE)
+    return true;
+
+  if (riscv_autovec_preference == RVV_FIXED_VLMAX)
+    {
+      machine_mode inner_mode = GET_MODE_INNER (vls_mode);
+      int precision = GET_MODE_PRECISION (inner_mode).to_constant ();
+      int min_vlmax_bitsize = TARGET_MIN_VLEN / (64 / precision);
+
+      return GET_MODE_PRECISION (vls_mode).to_constant () < min_vlmax_bitsize;
+    }
+
+  return false;
+}
+
 /* Return true if the gather/scatter offset mode is valid.  */
 bool
 gather_scatter_valid_offset_mode_p (machine_mode mode)
@@ -3997,10 +4108,18 @@ static void
 emit_vec_cvt_x_f (rtx op_dest, rtx op_src, rtx mask,
 		  insn_type type, machine_mode vec_mode)
 {
-  rtx cvt_x_ops[] = {op_dest, mask, op_dest, op_src};
   insn_code icode = code_for_pred_fcvt_x_f (UNSPEC_VFCVT, vec_mode);
 
-  emit_vlmax_insn (icode, type, cvt_x_ops);
+  if (type & USE_VUNDEF_MERGE_P)
+    {
+      rtx cvt_x_ops[] = {op_dest, mask, op_src};
+      emit_vlmax_insn (icode, type, cvt_x_ops);
+    }
+  else
+    {
+      rtx cvt_x_ops[] = {op_dest, mask, op_dest, op_src};
+      emit_vlmax_insn (icode, type, cvt_x_ops);
+    }
 }
 
 static void
@@ -4025,12 +4144,20 @@ emit_vec_cvt_f_x (rtx op_dest, rtx op_src, rtx mask,
 
 static void
 emit_vec_cvt_x_f_rtz (rtx op_dest, rtx op_src, rtx mask,
-		      machine_mode vec_mode)
+		      insn_type type, machine_mode vec_mode)
 {
-  rtx cvt_x_ops[] = {op_dest, mask, op_dest, op_src};
   insn_code icode = code_for_pred (FIX, vec_mode);
 
-  emit_vlmax_insn (icode, UNARY_OP_TAMU, cvt_x_ops);
+  if (type & USE_VUNDEF_MERGE_P)
+    {
+      rtx cvt_x_ops[] = {op_dest, mask, op_src};
+      emit_vlmax_insn (icode, type, cvt_x_ops);
+    }
+  else
+    {
+      rtx cvt_x_ops[] = {op_dest, mask, op_dest, op_src};
+      emit_vlmax_insn (icode, type, cvt_x_ops);
+    }
 }
 
 void
@@ -4046,7 +4173,7 @@ expand_vec_ceil (rtx op_0, rtx op_1, machine_mode vec_fp_mode,
 
   /* Step-3: Convert to integer on mask, with rounding up (aka ceil).  */
   rtx tmp = gen_reg_rtx (vec_int_mode);
-  emit_vec_cvt_x_f (tmp, op_1, mask, UNARY_OP_TAMU_FRM_RUP, vec_fp_mode);
+  emit_vec_cvt_x_f (tmp, op_1, mask, UNARY_OP_TAMA_FRM_RUP, vec_fp_mode);
 
   /* Step-4: Convert to floating-point on mask for the final result.
      To avoid unnecessary frm register access, we use RUP here and it will
@@ -4071,7 +4198,7 @@ expand_vec_floor (rtx op_0, rtx op_1, machine_mode vec_fp_mode,
 
   /* Step-3: Convert to integer on mask, with rounding down (aka floor).  */
   rtx tmp = gen_reg_rtx (vec_int_mode);
-  emit_vec_cvt_x_f (tmp, op_1, mask, UNARY_OP_TAMU_FRM_RDN, vec_fp_mode);
+  emit_vec_cvt_x_f (tmp, op_1, mask, UNARY_OP_TAMA_FRM_RDN, vec_fp_mode);
 
   /* Step-4: Convert to floating-point on mask for the floor result.  */
   emit_vec_cvt_f_x (op_0, tmp, mask, UNARY_OP_TAMU_FRM_RDN, vec_fp_mode);
@@ -4097,7 +4224,7 @@ expand_vec_nearbyint (rtx op_0, rtx op_1, machine_mode vec_fp_mode,
 
   /* Step-4: Convert to integer on mask, with rounding down (aka nearbyint).  */
   rtx tmp = gen_reg_rtx (vec_int_mode);
-  emit_vec_cvt_x_f (tmp, op_1, mask, UNARY_OP_TAMU_FRM_DYN, vec_fp_mode);
+  emit_vec_cvt_x_f (tmp, op_1, mask, UNARY_OP_TAMA_FRM_DYN, vec_fp_mode);
 
   /* Step-5: Convert to floating-point on mask for the nearbyint result.  */
   emit_vec_cvt_f_x (op_0, tmp, mask, UNARY_OP_TAMU_FRM_DYN, vec_fp_mode);
@@ -4122,7 +4249,7 @@ expand_vec_rint (rtx op_0, rtx op_1, machine_mode vec_fp_mode,
 
   /* Step-3: Convert to integer on mask, with dyn rounding (aka rint).  */
   rtx tmp = gen_reg_rtx (vec_int_mode);
-  emit_vec_cvt_x_f (tmp, op_1, mask, UNARY_OP_TAMU_FRM_DYN, vec_fp_mode);
+  emit_vec_cvt_x_f (tmp, op_1, mask, UNARY_OP_TAMA_FRM_DYN, vec_fp_mode);
 
   /* Step-4: Convert to floating-point on mask for the rint result.  */
   emit_vec_cvt_f_x (op_0, tmp, mask, UNARY_OP_TAMU_FRM_DYN, vec_fp_mode);
@@ -4144,7 +4271,7 @@ expand_vec_round (rtx op_0, rtx op_1, machine_mode vec_fp_mode,
 
   /* Step-3: Convert to integer on mask, rounding to nearest (aka round).  */
   rtx tmp = gen_reg_rtx (vec_int_mode);
-  emit_vec_cvt_x_f (tmp, op_1, mask, UNARY_OP_TAMU_FRM_RMM, vec_fp_mode);
+  emit_vec_cvt_x_f (tmp, op_1, mask, UNARY_OP_TAMA_FRM_RMM, vec_fp_mode);
 
   /* Step-4: Convert to floating-point on mask for the round result.  */
   emit_vec_cvt_f_x (op_0, tmp, mask, UNARY_OP_TAMU_FRM_RMM, vec_fp_mode);
@@ -4166,7 +4293,7 @@ expand_vec_trunc (rtx op_0, rtx op_1, machine_mode vec_fp_mode,
 
   /* Step-3: Convert to integer on mask, rounding to zero (aka truncate).  */
   rtx tmp = gen_reg_rtx (vec_int_mode);
-  emit_vec_cvt_x_f_rtz (tmp, op_1, mask, vec_fp_mode);
+  emit_vec_cvt_x_f_rtz (tmp, op_1, mask, UNARY_OP_TAMA, vec_fp_mode);
 
   /* Step-4: Convert to floating-point on mask for the rint result.  */
   emit_vec_cvt_f_x (op_0, tmp, mask, UNARY_OP_TAMU_FRM_DYN, vec_fp_mode);
@@ -4188,7 +4315,7 @@ expand_vec_roundeven (rtx op_0, rtx op_1, machine_mode vec_fp_mode,
 
   /* Step-3: Convert to integer on mask, rounding to nearest, ties to even.  */
   rtx tmp = gen_reg_rtx (vec_int_mode);
-  emit_vec_cvt_x_f (tmp, op_1, mask, UNARY_OP_TAMU_FRM_RNE, vec_fp_mode);
+  emit_vec_cvt_x_f (tmp, op_1, mask, UNARY_OP_TAMA_FRM_RNE, vec_fp_mode);
 
   /* Step-4: Convert to floating-point on mask for the rint result.  */
   emit_vec_cvt_f_x (op_0, tmp, mask, UNARY_OP_TAMU_FRM_RNE, vec_fp_mode);
@@ -4235,6 +4362,77 @@ expand_vec_lfloor (rtx op_0, rtx op_1, machine_mode vec_fp_mode,
 			GET_MODE_SIZE (vec_long_mode)));
 
   emit_vec_cvt_x_f (op_0, op_1, UNARY_OP_FRM_RDN, vec_fp_mode);
+}
+
+/* Vectorize popcount by the Wilkes-Wheeler-Gill algorithm that libgcc uses as
+   well.  */
+void
+expand_popcount (rtx *ops)
+{
+  rtx dst = ops[0];
+  rtx src = ops[1];
+  machine_mode mode = GET_MODE (dst);
+  scalar_mode imode = GET_MODE_INNER (mode);
+  static const uint64_t m5 = 0x5555555555555555ULL;
+  static const uint64_t m3 = 0x3333333333333333ULL;
+  static const uint64_t mf = 0x0F0F0F0F0F0F0F0FULL;
+  static const uint64_t m1 = 0x0101010101010101ULL;
+
+  rtx x1 = gen_reg_rtx (mode);
+  rtx x2 = gen_reg_rtx (mode);
+  rtx x3 = gen_reg_rtx (mode);
+  rtx x4 = gen_reg_rtx (mode);
+
+  /* x1 = src - (src >> 1) & 0x555...);  */
+  rtx shift1 = expand_binop (mode, lshr_optab, src, GEN_INT (1), NULL, true,
+			     OPTAB_DIRECT);
+
+  rtx and1 = gen_reg_rtx (mode);
+  rtx ops1[] = {and1, shift1, gen_int_mode (m5, imode)};
+  emit_vlmax_insn (code_for_pred_scalar (AND, mode), riscv_vector::BINARY_OP,
+		   ops1);
+
+  x1 = expand_binop (mode, sub_optab, src, and1, NULL, true, OPTAB_DIRECT);
+
+  /* x2 = (x1 & 0x3333333333333333ULL) + ((x1 >> 2) & 0x3333333333333333ULL);
+   */
+  rtx and2 = gen_reg_rtx (mode);
+  rtx ops2[] = {and2, x1, gen_int_mode (m3, imode)};
+  emit_vlmax_insn (code_for_pred_scalar (AND, mode), riscv_vector::BINARY_OP,
+		   ops2);
+
+  rtx shift2 = expand_binop (mode, lshr_optab, x1, GEN_INT (2), NULL, true,
+			     OPTAB_DIRECT);
+
+  rtx and22 = gen_reg_rtx (mode);
+  rtx ops22[] = {and22, shift2, gen_int_mode (m3, imode)};
+  emit_vlmax_insn (code_for_pred_scalar (AND, mode), riscv_vector::BINARY_OP,
+		   ops22);
+
+  x2 = expand_binop (mode, add_optab, and2, and22, NULL, true, OPTAB_DIRECT);
+
+  /* x3 = (x2 + (x2 >> 4)) & 0x0f0f0f0f0f0f0f0fULL;  */
+  rtx shift3 = expand_binop (mode, lshr_optab, x2, GEN_INT (4), NULL, true,
+			     OPTAB_DIRECT);
+
+  rtx plus3
+    = expand_binop (mode, add_optab, x2, shift3, NULL, true, OPTAB_DIRECT);
+
+  rtx ops3[] = {x3, plus3, gen_int_mode (mf, imode)};
+  emit_vlmax_insn (code_for_pred_scalar (AND, mode), riscv_vector::BINARY_OP,
+		   ops3);
+
+  /* dest = (x3 * 0x0101010101010101ULL) >> 56;  */
+  rtx mul4 = gen_reg_rtx (mode);
+  rtx ops4[] = {mul4, x3, gen_int_mode (m1, imode)};
+  emit_vlmax_insn (code_for_pred_scalar (MULT, mode), riscv_vector::BINARY_OP,
+		   ops4);
+
+  x4 = expand_binop (mode, lshr_optab, mul4,
+		     GEN_INT (GET_MODE_BITSIZE (imode) - 8), NULL, true,
+		     OPTAB_DIRECT);
+
+  emit_move_insn (dst, x4);
 }
 
 } // namespace riscv_vector

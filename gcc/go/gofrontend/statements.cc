@@ -64,16 +64,6 @@ Statement::traverse_contents(Traverse* traverse)
   return this->do_traverse(traverse);
 }
 
-// Traverse assignments.
-
-bool
-Statement::traverse_assignments(Traverse_assignments* tassign)
-{
-  if (this->classification_ == STATEMENT_ERROR)
-    return false;
-  return this->do_traverse_assignments(tassign);
-}
-
 // Traverse an expression in a statement.  This is a helper function
 // for child classes.
 
@@ -117,9 +107,9 @@ Statement::traverse_type(Traverse* traverse, Type* type)
 // the child class.
 
 void
-Statement::determine_types()
+Statement::determine_types(Gogo* gogo)
 {
-  this->do_determine_types();
+  this->do_determine_types(gogo);
 }
 
 // Read a statement from export data.
@@ -286,17 +276,6 @@ int
 Variable_declaration_statement::do_traverse(Traverse*)
 {
   return TRAVERSE_CONTINUE;
-}
-
-// Traverse the assignments in a variable declaration.  Note that this
-// traversal is different from the usual traversal.
-
-bool
-Variable_declaration_statement::do_traverse_assignments(
-    Traverse_assignments* tassign)
-{
-  tassign->initialize_variable(this->var_);
-  return true;
 }
 
 // Lower the variable's initialization expression.
@@ -510,21 +489,10 @@ Temporary_statement::do_traverse(Traverse* traverse)
     return this->traverse_expression(traverse, &this->init_);
 }
 
-// Traverse assignments.
-
-bool
-Temporary_statement::do_traverse_assignments(Traverse_assignments* tassign)
-{
-  if (this->init_ == NULL)
-    return false;
-  tassign->value(&this->init_, true, true);
-  return true;
-}
-
 // Determine types.
 
 void
-Temporary_statement::do_determine_types()
+Temporary_statement::do_determine_types(Gogo* gogo)
 {
   if (this->type_ != NULL && this->type_->is_abstract())
     this->type_ = this->type_->make_non_abstract_type();
@@ -532,11 +500,11 @@ Temporary_statement::do_determine_types()
   if (this->init_ != NULL)
     {
       if (this->type_ == NULL)
-	this->init_->determine_type_no_context();
+	this->init_->determine_type_no_context(gogo);
       else
 	{
 	  Type_context context(this->type_, false);
-	  this->init_->determine_type(&context);
+	  this->init_->determine_type(gogo, &context);
 	}
     }
 
@@ -889,13 +857,6 @@ Assignment_statement::do_traverse(Traverse* traverse)
   return this->traverse_expression(traverse, &this->rhs_);
 }
 
-bool
-Assignment_statement::do_traverse_assignments(Traverse_assignments* tassign)
-{
-  tassign->assignment(&this->lhs_, &this->rhs_);
-  return true;
-}
-
 // Lower an assignment to a map index expression to a runtime function
 // call.  Mark some slice assignments as not requiring a write barrier.
 
@@ -1046,14 +1007,14 @@ Assignment_statement::do_lower(Gogo* gogo, Named_object*, Block* enclosing,
 // Set types for the assignment.
 
 void
-Assignment_statement::do_determine_types()
+Assignment_statement::do_determine_types(Gogo* gogo)
 {
-  this->lhs_->determine_type_no_context();
+  this->lhs_->determine_type_no_context(gogo);
   Type* rhs_context_type = this->lhs_->type();
   if (rhs_context_type->is_sink_type())
     rhs_context_type = NULL;
   Type_context context(rhs_context_type, false);
-  this->rhs_->determine_type(&context);
+  this->rhs_->determine_type(gogo, &context);
 }
 
 // Check types for an assignment.
@@ -1212,10 +1173,6 @@ class Assignment_operation_statement : public Statement
   int
   do_traverse(Traverse*);
 
-  bool
-  do_traverse_assignments(Traverse_assignments*)
-  { go_unreachable(); }
-
   Statement*
   do_lower(Gogo*, Named_object*, Block*, Statement_inserter*);
 
@@ -1365,10 +1322,6 @@ class Tuple_assignment_statement : public Statement
   int
   do_traverse(Traverse* traverse);
 
-  bool
-  do_traverse_assignments(Traverse_assignments*)
-  { go_unreachable(); }
-
   Statement*
   do_lower(Gogo*, Named_object*, Block*, Statement_inserter*);
 
@@ -1510,10 +1463,6 @@ public:
  protected:
   int
   do_traverse(Traverse* traverse);
-
-  bool
-  do_traverse_assignments(Traverse_assignments*)
-  { go_unreachable(); }
 
   Statement*
   do_lower(Gogo*, Named_object*, Block*, Statement_inserter*);
@@ -1719,10 +1668,6 @@ class Tuple_receive_assignment_statement : public Statement
   int
   do_traverse(Traverse* traverse);
 
-  bool
-  do_traverse_assignments(Traverse_assignments*)
-  { go_unreachable(); }
-
   Statement*
   do_lower(Gogo*, Named_object*, Block*, Statement_inserter*);
 
@@ -1861,10 +1806,6 @@ class Tuple_type_guard_assignment_statement : public Statement
  protected:
   int
   do_traverse(Traverse*);
-
-  bool
-  do_traverse_assignments(Traverse_assignments*)
-  { go_unreachable(); }
 
   Statement*
   do_lower(Gogo*, Named_object*, Block*, Statement_inserter*);
@@ -2080,9 +2021,9 @@ Expression_statement::Expression_statement(Expression* expr, bool is_ignored)
 // Determine types.
 
 void
-Expression_statement::do_determine_types()
+Expression_statement::do_determine_types(Gogo* gogo)
 {
-  this->expr_->determine_type_no_context();
+  this->expr_->determine_type_no_context(gogo);
 }
 
 // Check the types of an expression statement.  The only check we do
@@ -2277,10 +2218,6 @@ class Inc_dec_statement : public Statement
   do_traverse(Traverse* traverse)
   { return this->traverse_expression(traverse, &this->expr_); }
 
-  bool
-  do_traverse_assignments(Traverse_assignments*)
-  { go_unreachable(); }
-
   Statement*
   do_lower(Gogo*, Named_object*, Block*, Statement_inserter*);
 
@@ -2412,24 +2349,12 @@ Thunk_statement::do_traverse(Traverse* traverse)
   return this->traverse_expression(traverse, &this->call_);
 }
 
-// We implement traverse_assignment for a thunk statement because it
-// effectively copies the function call.
-
-bool
-Thunk_statement::do_traverse_assignments(Traverse_assignments* tassign)
-{
-  Expression* fn = this->call_->call_expression()->fn();
-  Expression* fn2 = fn;
-  tassign->value(&fn2, true, false);
-  return true;
-}
-
 // Determine types in a thunk statement.
 
 void
-Thunk_statement::do_determine_types()
+Thunk_statement::do_determine_types(Gogo* gogo)
 {
-  this->call_->determine_type_no_context();
+  this->call_->determine_type_no_context(gogo);
 }
 
 // Check types in a thunk statement.
@@ -2679,7 +2604,7 @@ Thunk_statement::simplify_statement(Gogo* gogo, Named_object* function,
 
   // We already ran the determine_types pass, so we need to run it now
   // for the new statement.
-  s->determine_types();
+  s->determine_types(gogo);
 
   // Sanity check.
   gogo->check_types_in_block(block);
@@ -2833,11 +2758,11 @@ Thunk_statement::build_thunk(Gogo* gogo, const std::string& thunk_name,
       gogo->add_statement(Statement::make_goto_statement(retaddr_label,
 							 location));
       Block* then_block = gogo->finish_block(location);
-      then_block->determine_types();
+      then_block->determine_types(gogo);
 
       Statement* s = Statement::make_if_statement(call, then_block, NULL,
 						  location);
-      s->determine_types();
+      s->determine_types(gogo);
       gogo->add_statement(s);
 
       function->func_value()->set_calls_defer_retaddr();
@@ -2977,7 +2902,7 @@ Thunk_statement::build_thunk(Gogo* gogo, const std::string& thunk_name,
 
   // We already ran the determine_types pass, so we need to run it
   // just for the call statement now.  The other types are known.
-  call_statement->determine_types();
+  call_statement->determine_types(gogo);
 
   gogo->add_conversions_in_block(b);
 
@@ -3148,23 +3073,6 @@ Statement::make_defer_statement(Call_expression* call,
 
 // Class Return_statement.
 
-// Traverse assignments.  We treat each return value as a top level
-// RHS in an expression.
-
-bool
-Return_statement::do_traverse_assignments(Traverse_assignments* tassign)
-{
-  Expression_list* vals = this->vals_;
-  if (vals != NULL)
-    {
-      for (Expression_list::iterator p = vals->begin();
-	   p != vals->end();
-	   ++p)
-	tassign->value(&*p, true, true);
-    }
-  return true;
-}
-
 // Lower a return statement.  If we are returning a function call
 // which returns multiple values which match the current function,
 // split up the call's results.  If the return statement lists
@@ -3173,8 +3081,8 @@ Return_statement::do_traverse_assignments(Traverse_assignments* tassign)
 // return.  This lets panic/recover work correctly.
 
 Statement*
-Return_statement::do_lower(Gogo*, Named_object* function, Block* enclosing,
-			   Statement_inserter*)
+Return_statement::do_lower(Gogo* gogo, Named_object* function,
+			   Block* enclosing, Statement_inserter*)
 {
   if (this->is_lowered_)
     return this;
@@ -3253,7 +3161,7 @@ Return_statement::do_lower(Gogo*, Named_object* function, Block* enclosing,
 
       Type *rvtype = rv->result_var_value()->type();
       Type_context type_context(rvtype, false);
-      e->determine_type(&type_context);
+      e->determine_type(gogo, &type_context);
 
       std::string reason;
       if (Type::are_assignable(rvtype, e->type(), &reason))
@@ -3764,13 +3672,13 @@ If_statement::do_traverse(Traverse* traverse)
 }
 
 void
-If_statement::do_determine_types()
+If_statement::do_determine_types(Gogo* gogo)
 {
   Type_context context(Type::lookup_bool_type(), false);
-  this->cond_->determine_type(&context);
-  this->then_block_->determine_types();
+  this->cond_->determine_type(gogo, &context);
+  this->then_block_->determine_types(gogo);
   if (this->else_block_ != NULL)
-    this->else_block_->determine_types();
+    this->else_block_->determine_types(gogo);
 }
 
 // Check types.
@@ -4082,7 +3990,7 @@ Case_clauses::Case_clause::lower(Block* b, Temporary_statement* val_temp,
 // Determine types.
 
 void
-Case_clauses::Case_clause::determine_types(Type* type)
+Case_clauses::Case_clause::determine_types(Gogo* gogo, Type* type)
 {
   if (this->cases_ != NULL)
     {
@@ -4090,10 +3998,10 @@ Case_clauses::Case_clause::determine_types(Type* type)
       for (Expression_list::iterator p = this->cases_->begin();
 	   p != this->cases_->end();
 	   ++p)
-	(*p)->determine_type(&case_context);
+	(*p)->determine_type(gogo, &case_context);
     }
   if (this->statements_ != NULL)
-    this->statements_->determine_types();
+    this->statements_->determine_types(gogo);
 }
 
 // Check types.  Returns false if there was an error.
@@ -4319,12 +4227,12 @@ Case_clauses::lower(Block* b, Temporary_statement* val_temp,
 // Determine types.
 
 void
-Case_clauses::determine_types(Type* type)
+Case_clauses::determine_types(Gogo* gogo, Type* type)
 {
   for (Clauses::iterator p = this->clauses_.begin();
        p != this->clauses_.end();
        ++p)
-    p->determine_types(type);
+    p->determine_types(gogo, type);
 }
 
 // Check types.  Returns false if there was an error.
@@ -4425,7 +4333,7 @@ class Constant_switch_statement : public Statement
   do_traverse(Traverse*);
 
   void
-  do_determine_types();
+  do_determine_types(Gogo*);
 
   void
   do_check_types(Gogo*);
@@ -4458,10 +4366,10 @@ Constant_switch_statement::do_traverse(Traverse* traverse)
 // Determine types.
 
 void
-Constant_switch_statement::do_determine_types()
+Constant_switch_statement::do_determine_types(Gogo* gogo)
 {
-  this->val_->determine_type_no_context();
-  this->clauses_->determine_types(this->val_->type());
+  this->val_->determine_type_no_context(gogo);
+  this->clauses_->determine_types(gogo, this->val_->type());
 }
 
 // Check types.
@@ -5046,8 +4954,6 @@ Type_switch_statement::do_dump_statement(Ast_dump_context* ast_dump_context)
 {
   ast_dump_context->print_indent();
   ast_dump_context->ostream() << "switch ";
-  if (!this->name_.empty())
-    ast_dump_context->ostream() << this->name_ << " = ";
   ast_dump_context->dump_expression(this->expr_);
   ast_dump_context->ostream() << " .(type)";
   if (ast_dump_context->dump_subblocks())
@@ -5062,10 +4968,9 @@ Type_switch_statement::do_dump_statement(Ast_dump_context* ast_dump_context)
 // Make a type switch statement.
 
 Type_switch_statement*
-Statement::make_type_switch_statement(const std::string& name, Expression* expr,
-				      Location location)
+Statement::make_type_switch_statement(Expression* expr, Location location)
 {
-  return new Type_switch_statement(name, expr, location);
+  return new Type_switch_statement(expr, location);
 }
 
 // Class Send_statement.
@@ -5083,14 +4988,14 @@ Send_statement::do_traverse(Traverse* traverse)
 // Determine types.
 
 void
-Send_statement::do_determine_types()
+Send_statement::do_determine_types(Gogo* gogo)
 {
-  this->channel_->determine_type_no_context();
+  this->channel_->determine_type_no_context(gogo);
   Type* type = this->channel_->type();
   Type_context context;
   if (type->channel_type() != NULL)
     context.type = type->channel_type()->element_type();
-  this->val_->determine_type(&context);
+  this->val_->determine_type(gogo, &context);
 }
 
 // Check types.
@@ -5492,11 +5397,11 @@ Select_clauses::Select_clause::set_case(Block* b,
 // Determine types.
 
 void
-Select_clauses::Select_clause::determine_types()
+Select_clauses::Select_clause::determine_types(Gogo* gogo)
 {
   go_assert(this->is_lowered_);
   if (this->statements_ != NULL)
-    this->statements_->determine_types();
+    this->statements_->determine_types(gogo);
 }
 
 // Check types.
@@ -5676,12 +5581,12 @@ Select_clauses::lower(Gogo* gogo, Named_object* function, Block* b,
 // Determine types.
 
 void
-Select_clauses::determine_types()
+Select_clauses::determine_types(Gogo* gogo)
 {
   for (Clauses::iterator p = this->clauses_.begin();
        p != this->clauses_.end();
        ++p)
-    p->determine_types();
+    p->determine_types(gogo);
 }
 
 // Check types.

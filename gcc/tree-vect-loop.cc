@@ -9222,12 +9222,17 @@ vect_peel_nonlinear_iv_init (gimple_seq* stmts, tree init_expr,
       {
 	tree utype = unsigned_type_for (type);
 	init_expr = gimple_convert (stmts, utype, init_expr);
-	unsigned skipn = TREE_INT_CST_LOW (skip_niters);
+	wide_int skipn = wi::to_wide (skip_niters);
 	wide_int begin = wi::to_wide (step_expr);
-	for (unsigned i = 0; i != skipn - 1; i++)
-	  begin = wi::mul (begin, wi::to_wide (step_expr));
+	auto_mpz base, exp, mod, res;
+	wi::to_mpz (begin, base, TYPE_SIGN (type));
+	wi::to_mpz (skipn, exp, UNSIGNED);
+	mpz_ui_pow_ui (mod, 2, TYPE_PRECISION (type));
+	mpz_powm (res, base, exp, mod);
+	begin = wi::from_mpz (type, res, TYPE_SIGN (type));
 	tree mult_expr = wide_int_to_tree (utype, begin);
-	init_expr = gimple_build (stmts, MULT_EXPR, utype, init_expr, mult_expr);
+	init_expr = gimple_build (stmts, MULT_EXPR, utype,
+				  init_expr, mult_expr);
 	init_expr = gimple_convert (stmts, type, init_expr);
       }
       break;
@@ -11361,9 +11366,12 @@ update_epilogue_loop_vinfo (class loop *epilogue, tree advance)
       /* Data references for gather loads and scatter stores do not use the
 	 updated offset we set using ADVANCE.  Instead we have to make sure the
 	 reference in the data references point to the corresponding copy of
-	 the original in the epilogue.  */
-      if (STMT_VINFO_MEMORY_ACCESS_TYPE (vect_stmt_to_vectorize (stmt_vinfo))
-	  == VMAT_GATHER_SCATTER)
+	 the original in the epilogue.  Make sure to update both
+	 gather/scatters recognized by dataref analysis and also other
+	 refs that get_load_store_type classified as VMAT_GATHER_SCATTER.  */
+      auto vstmt_vinfo = vect_stmt_to_vectorize (stmt_vinfo);
+      if (STMT_VINFO_MEMORY_ACCESS_TYPE (vstmt_vinfo) == VMAT_GATHER_SCATTER
+	  || STMT_VINFO_GATHER_SCATTER_P (vstmt_vinfo))
 	{
 	  DR_REF (dr)
 	    = simplify_replace_tree (DR_REF (dr), NULL_TREE, NULL_TREE,

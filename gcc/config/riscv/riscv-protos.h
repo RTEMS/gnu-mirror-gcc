@@ -306,6 +306,11 @@ enum insn_type : unsigned int
   UNARY_OP_FRM_RMM = UNARY_OP | FRM_RMM_P,
   UNARY_OP_FRM_RUP = UNARY_OP | FRM_RUP_P,
   UNARY_OP_FRM_RDN = UNARY_OP | FRM_RDN_P,
+  UNARY_OP_TAMA_FRM_DYN = UNARY_OP_TAMA | FRM_DYN_P,
+  UNARY_OP_TAMA_FRM_RUP = UNARY_OP_TAMA | FRM_RUP_P,
+  UNARY_OP_TAMA_FRM_RDN = UNARY_OP_TAMA | FRM_RDN_P,
+  UNARY_OP_TAMA_FRM_RMM = UNARY_OP_TAMA | FRM_RMM_P,
+  UNARY_OP_TAMA_FRM_RNE = UNARY_OP_TAMA | FRM_RNE_P,
   UNARY_OP_TAMU_FRM_DYN = UNARY_OP_TAMU | FRM_DYN_P,
   UNARY_OP_TAMU_FRM_RUP = UNARY_OP_TAMU | FRM_RUP_P,
   UNARY_OP_TAMU_FRM_RDN = UNARY_OP_TAMU | FRM_RDN_P,
@@ -516,6 +521,7 @@ void expand_fold_extract_last (rtx *);
 void expand_cond_unop (unsigned, rtx *);
 void expand_cond_binop (unsigned, rtx *);
 void expand_cond_ternop (unsigned, rtx *);
+void expand_popcount (rtx *);
 
 /* Rounding mode bitfield for fixed point VXRM.  */
 enum fixed_point_rounding_mode
@@ -552,6 +558,7 @@ unsigned int autovectorize_vector_modes (vec<machine_mode> *, bool);
 bool cmp_lmul_le_one (machine_mode);
 bool cmp_lmul_gt_one (machine_mode);
 bool gather_scatter_valid_offset_mode_p (machine_mode);
+bool vls_mode_valid_p (machine_mode);
 }
 
 /* We classify builtin types into two classes:

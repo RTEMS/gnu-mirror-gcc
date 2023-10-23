@@ -5481,6 +5481,9 @@ ix86_standard_x87sse_constant_load_p (const rtx_insn *insn, rtx dst)
   if (src == NULL
       || (SSE_REGNO_P (REGNO (dst))
 	  && standard_sse_constant_p (src, GET_MODE (dst)) != 1)
+      || (!TARGET_AVX512VL
+	  && EXT_REX_SSE_REGNO_P (REGNO (dst))
+	  && standard_sse_constant_p (src, GET_MODE (dst)) == 1)
       || (STACK_REGNO_P (REGNO (dst))
 	   && standard_80387_constant_p (src) < 1))
     return false;
@@ -26287,7 +26290,7 @@ ix86_libgcc_floating_mode_supported_p
 #define TARGET_HARD_REGNO_SCRATCH_OK ix86_hard_regno_scratch_ok
 
 #undef TARGET_CUSTOM_FUNCTION_DESCRIPTORS
-#define TARGET_CUSTOM_FUNCTION_DESCRIPTORS 1
+#define TARGET_CUSTOM_FUNCTION_DESCRIPTORS X86_CUSTOM_FUNCTION_TEST
 
 #undef TARGET_ADDR_SPACE_ZERO_ADDRESS_VALID
 #define TARGET_ADDR_SPACE_ZERO_ADDRESS_VALID ix86_addr_space_zero_address_valid
