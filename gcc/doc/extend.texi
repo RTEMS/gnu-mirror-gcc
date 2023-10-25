@@ -21323,7 +21323,7 @@ The following built-in functions operate on pairs of
 @code{vector float} values:
 
 @smallexample
-vector float __builtin_vpair_f32_get_vector (__vector_pair, int);
+vector float __builtin_vpair_f32_extract_vector (__vector_pair, int);
 __vector_pair __builtin_vpair_f32_assemble (vector float, vector float);
 __vector_pair __builtin_vpair_f32_splat (float);
 __vector_pair __builtin_vpair_f32_abs (__vector_pair);
@@ -21341,7 +21341,7 @@ The following built-in functions operate on pairs of
 @code{vector double} values:
 
 @smallexample
-vector double __builtin_vpair_f64_get_vector (__vector_pair, int);
+vector double __builtin_vpair_f64_extract_vector (__vector_pair, int);
 __vector_pair __builtin_vpair_f64_assemble (vector double, vector double);
 __vector_pair __builtin_vpair_f64_splat (double);
 __vector_pair __builtin_vpair_f64_abs (__vector_pair);
@@ -21359,8 +21359,8 @@ The following built-in functions operate on pairs of
 @code{vector long long} or @code{vector unsigned long long} values:
 
 @smallexample
-vector long long __builtin_vpair_i64_get_vector (__vector_pair, int);
-vector unsigned long long __builtin_vpair_i64u_get_vector (__vector_pair, int);
+vector long long __builtin_vpair_i64_extract_vector (__vector_pair, int);
+vector unsigned long long __builtin_vpair_i64u_extract_vector (__vector_pair, int);
 __vector_pair __builtin_vpair_i64_assemble (vector long long,
                                             vector long long);
 __vector_pair __builtin_vpair_i64u_assemble (vector unsigned long long,
@@ -21385,8 +21385,8 @@ The following built-in functions operate on pairs of
 @code{vector int} or @code{vector unsigned int} values:
 
 @smallexample
-vector int __builtin_vpair_i32_get_vector (__vector_pair, int);
-vector unsigned int __builtin_vpair_i32u_get_vector (__vector_pair, int);
+vector int __builtin_vpair_i32_extract_vector (__vector_pair, int);
+vector unsigned int __builtin_vpair_i32u_extract_vector (__vector_pair, int);
 __vector_pair __builtin_vpair_i32_assemble (vector int, vector int);
 __vector_pair __builtin_vpair_i32u_assemble (vector unsigned int,
                                              vector unsigned int);
@@ -21409,8 +21409,8 @@ The following built-in functions operate on pairs of
 @code{vector short} or @code{vector unsigned short} values:
 
 @smallexample
-vector short __builtin_vpair_i16_get_vector (__vector_pair, int);
-vector unsigned short __builtin_vpair_i16u_get_vector (__vector_pair, int);
+vector short __builtin_vpair_i16_extract_vector (__vector_pair, int);
+vector unsigned short __builtin_vpair_i16u_extract_vector (__vector_pair, int);
 __vector_pair __builtin_vpair_i16_assemble (vector short,
                                             vector short);
 __vector_pair __builtin_vpair_i16u_assemble (vector unsigned short,
@@ -21434,8 +21434,8 @@ The following built-in functions operate on pairs of
 @code{vector signed char} or @code{vector unsigned char} values:
 
 @smallexample
-vector signed char __builtin_vpair_i8_get_vector (__vector_pair, int);
-vector unsigned char __builtin_vpair_i8u_get_vector (__vector_pair, int);
+vector signed char __builtin_vpair_i8_extract_vector (__vector_pair, int);
+vector unsigned char __builtin_vpair_i8u_extract_vector (__vector_pair, int);
 __vector_pair __builtin_vpair_i8_assemble (vector signed char,
                                            vector signed char);
 __vector_pair __builtin_vpair_i8u_assemble (vector unsigned char,

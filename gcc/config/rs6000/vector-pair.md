@@ -203,7 +203,7 @@
   [(set_attr "length" "8")])
 
 ;; Extract one of the two 128-bit vectors from a vector pair.
-(define_insn_and_split "vpair_get_vector_<vp_pmode>"
+(define_insn_and_split "vpair_extract_vector_<vp_pmode>"
   [(set (match_operand:<VP_VEC_MODE> 0 "vsx_register_operand" "=wa")
 	(unspec:<VP_VEC_MODE>
 	 [(match_operand:OO 1 "vsx_register_operand" "wa")
@@ -223,7 +223,7 @@
 })
 
 ;; Optimize extracting an 128-bit vector from a vector pair in memory.
-(define_insn_and_split "*vpair_get_vector_<vp_pmode>_mem"
+(define_insn_and_split "*vpair_extract_vector_<vp_pmode>_mem"
   [(set (match_operand:<VP_VEC_MODE> 0 "vsx_register_operand" "=wa")
 	(unspec:<VP_VEC_MODE>
 	 [(match_operand:OO 1 "memory_operand" "o")
