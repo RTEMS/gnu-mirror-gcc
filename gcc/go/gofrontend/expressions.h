@@ -566,6 +566,15 @@ class Expression
   is_constant() const
   { return this->do_is_constant(); }
 
+  // Return whether this expression is untyped.  This isn't quite the
+  // same as is_constant with an abstract type, as 1<<val is untyped
+  // even if val is a variable.  If this returns true, it sets *PTYPE
+  // to an abstract type, which is the type the expression will have
+  // if there is no context.
+  bool
+  is_untyped(Type** ptype) const
+  { return this->do_is_untyped(ptype); }
+
   // Return whether this is the zero value of its type.
   bool
   is_zero_value() const
@@ -589,19 +598,19 @@ class Expression
   // If this is not a numeric constant, return false.  If it is one,
   // return true, and set VAL to hold the value.
   bool
-  numeric_constant_value(Numeric_constant* val) const
+  numeric_constant_value(Numeric_constant* val)
   { return this->do_numeric_constant_value(val); }
 
   // If this is not a constant expression with string type, return
   // false.  If it is one, return true, and set VAL to the value.
   bool
-  string_constant_value(std::string* val) const
+  string_constant_value(std::string* val)
   { return this->do_string_constant_value(val); }
 
   // If this is not a constant expression with boolean type, return
   // false.  If it is one, return true, and set VAL to the value.
   bool
-  boolean_constant_value(bool* val) const
+  boolean_constant_value(bool* val)
   { return this->do_boolean_constant_value(val); }
 
   // If this is a const reference expression, return the named
@@ -1081,7 +1090,7 @@ class Expression
   // interface type.  If FOR_TYPE_GUARD is true this is for a type
   // assertion.
   static Expression*
-  convert_interface_to_interface(Type* lhs_type,
+  convert_interface_to_interface(Gogo*, Type* lhs_type,
                                  Expression* rhs, bool for_type_guard,
                                  Location);
 
@@ -1116,9 +1125,9 @@ class Expression
 
   // Insert bounds checks for an index expression.
   static void
-  check_bounds(Expression* val, Operator, Expression* bound, Runtime::Function,
+  check_bounds(Gogo*, Expression* val, Operator, Expression* bound,
 	       Runtime::Function, Runtime::Function, Runtime::Function,
-	       Statement_inserter*, Location);
+	       Runtime::Function, Statement_inserter*, Location);
 
   // Return an expression for constructing a direct interface type from a
   // pointer.
@@ -1169,6 +1178,11 @@ class Expression
   do_is_constant() const
   { return false; }
 
+  // Return whether this expression is untyped.
+  virtual bool
+  do_is_untyped(Type**) const
+  { return false; }
+
   // Return whether this is the zero value of its type.
   virtual bool
   do_is_zero_value() const
@@ -1183,19 +1197,19 @@ class Expression
   // Return whether this is a constant expression of numeric type, and
   // set the Numeric_constant to the value.
   virtual bool
-  do_numeric_constant_value(Numeric_constant*) const
+  do_numeric_constant_value(Numeric_constant*)
   { return false; }
 
   // Return whether this is a constant expression of string type, and
   // set VAL to the value.
   virtual bool
-  do_string_constant_value(std::string*) const
+  do_string_constant_value(std::string*)
   { return false; }
 
   // Return whether this is a constant expression of boolean type, and
   // set VAL to the value.
   virtual bool
-  do_boolean_constant_value(bool*) const
+  do_boolean_constant_value(bool*)
   { return false; }
 
   // Called by the parser if the value is being discarded.
@@ -1273,6 +1287,12 @@ class Expression
   // For children to call to report an error conveniently.
   void
   report_error(const char*);
+
+  // A convenience function for handling a type in do_is_untyped.  If
+  // TYPE is not abstract, return false.  Otherwise set *PTYPE to TYPE
+  // and return true.
+  static bool
+  is_untyped_type(Type* type, Type** ptype);
 
   // Write a name to export data.
   static void
@@ -1502,6 +1522,9 @@ class Const_expression : public Expression
   { return true; }
 
   bool
+  do_is_untyped(Type**) const;
+
+  bool
   do_is_zero_value() const;
 
   bool
@@ -1509,13 +1532,13 @@ class Const_expression : public Expression
   { return true; }
 
   bool
-  do_numeric_constant_value(Numeric_constant* nc) const;
+  do_numeric_constant_value(Numeric_constant* nc);
 
   bool
-  do_string_constant_value(std::string* val) const;
+  do_string_constant_value(std::string* val);
 
   bool
-  do_boolean_constant_value(bool* val) const;
+  do_boolean_constant_value(bool* val);
 
   Type*
   do_type();
@@ -1831,6 +1854,9 @@ class String_expression : public Expression
   { return true; }
 
   bool
+  do_is_untyped(Type**) const;
+
+  bool
   do_is_zero_value() const
   { return this->val_ == ""; }
 
@@ -1839,7 +1865,7 @@ class String_expression : public Expression
   { return true; }
 
   bool
-  do_string_constant_value(std::string* val) const
+  do_string_constant_value(std::string* val)
   {
     *val = this->val_;
     return true;
@@ -1941,13 +1967,13 @@ class Type_conversion_expression : public Expression
   do_is_static_initializer() const;
 
   bool
-  do_numeric_constant_value(Numeric_constant*) const;
+  do_numeric_constant_value(Numeric_constant*);
 
   bool
-  do_string_constant_value(std::string*) const;
+  do_string_constant_value(std::string*);
 
   bool
-  do_boolean_constant_value(bool*) const;
+  do_boolean_constant_value(bool*);
 
   Type*
   do_type()
@@ -2137,13 +2163,16 @@ class Unary_expression : public Expression
   do_is_constant() const;
 
   bool
+  do_is_untyped(Type**) const;
+
+  bool
   do_is_static_initializer() const;
 
   bool
-  do_numeric_constant_value(Numeric_constant*) const;
+  do_numeric_constant_value(Numeric_constant*);
 
   bool
-  do_boolean_constant_value(bool*) const;
+  do_boolean_constant_value(bool*);
 
   Type*
   do_type();
@@ -2294,13 +2323,16 @@ class Binary_expression : public Expression
   { return this->left_->is_constant() && this->right_->is_constant(); }
 
   bool
+  do_is_untyped(Type**) const;
+
+  bool
   do_is_static_initializer() const;
 
   bool
-  do_numeric_constant_value(Numeric_constant*) const;
+  do_numeric_constant_value(Numeric_constant*);
 
   bool
-  do_boolean_constant_value(bool*) const;
+  do_boolean_constant_value(bool*);
 
   bool
   do_discarding_value();
@@ -2414,6 +2446,9 @@ class String_concat_expression : public Expression
 
   bool
   do_is_constant() const;
+
+  bool
+  do_is_untyped(Type**) const;
 
   bool
   do_is_zero_value() const;
@@ -2768,7 +2803,10 @@ class Builtin_call_expression : public Call_expression
   do_is_constant() const;
 
   bool
-  do_numeric_constant_value(Numeric_constant*) const;
+  do_is_untyped(Type**) const;
+
+  bool
+  do_numeric_constant_value(Numeric_constant*);
 
   bool
   do_discarding_value();

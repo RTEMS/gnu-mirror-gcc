@@ -389,6 +389,9 @@ enum omp_clause_code {
   /* OpenACC/OpenMP clause: if (scalar-expression).  */
   OMP_CLAUSE_IF,
 
+  /* OpenACC clause: self.  */
+  OMP_CLAUSE_SELF,
+
   /* OpenMP clause: num_threads (integer-expression).  */
   OMP_CLAUSE_NUM_THREADS,
 
