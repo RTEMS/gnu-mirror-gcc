@@ -1,3 +1,20 @@
+==================== Branch work141-vpair, patch #303 ====================
+
+Add vector pair built-in tests.
+
+2023-10-25  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-1.c: New test.
+	* gcc.target/powerpc/vector-pair-2.c: New test.
+	* gcc.target/powerpc/vector-pair-3.c: New test.
+	* gcc.target/powerpc/vector-pair-4.c: New test.
+	* gcc.target/powerpc/vector-pair-5.c: New test.
+	* gcc.target/powerpc/vector-pair-6.c: New test.
+	* gcc.target/powerpc/vector-pair-7.c: New test.
+	* gcc.target/powerpc/vector-pair-8.c: New test.
+
 ==================== Branch work141-vpair, patch #302 ====================
 
 Add support for horizontal add of V8SF/V4DI/V8SI vector pairs
