@@ -1,3 +1,35 @@
+==================== Branch work141-ovpair, patch #201 ====================
+
+Replace get_vector with extract_vector
+
+2023-10-25  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def
+	(__builtin_vpair_f32_extract_vector): Rename get_vector to extract
+	vector.  Indicate element number must be 0 or 1.
+	(__builtin_vpair_f64_extract_vector): Likewise.
+	(__builtin_vpair_i8u_extract_vector): Likewise.
+	(__builtin_vpair_i8_extract_vector): Likewise.
+	(__builtin_vpair_i16u_extract_vector): Likewise.
+	(__builtin_vpair_i16_extract_vector): Likewise.
+	(__builtin_vpair_i32u_extract_vector): Likewise.
+	(__builtin_vpair_i32_extract_vector): Likewise.
+	(__builtin_vpair_i64u_extract_vector): Likewise.
+	(__builtin_vpair_i64_extract_vector): Likewise.
+	* config/rs6000/rs6000/vector-pair.md (vpair_extract_vector_<vp_pmode>):
+	Likewise.
+	(vpair_extract_vector_<vp_pmode>_mem): Likewise.
+	* doc/extend.texi ( __builtin_vpair_*_extract_vector): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-01.c: Rename *_get_vector to
+	*_extract_vector.
+	* gcc.target/powerpc/vector-pair-02.c: Likewise.
+
+
 ==================== Branch work141-ovpair, patch #200 ====================
 
 Add support for vector pair built-in functions.
