@@ -1,3 +1,67 @@
+==================== Branch work141-vpair, patch #302 ====================
+
+Add support for horizontal add of V8SF/V4DI/V8SI vector pairs
+
+2023-10-25  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_f32_add_elements):
+	New built-in function.
+	(__builtin_vpair_f64_add_elements): Likewise.
+	(__builtin_vpair_i64_add_elements): Likewise.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_REDUCE_PLUS_F32): New
+	unspec.
+	(UNSPEC_VPAIR_REDUCE_PLUS_F64): Likewise.
+	(UNSPEC_VPAIR_REDUCE_PLUS_I64): Likewise.
+	(vpair_reduc_plus_scale_v8sf): New insn.
+	(vpair_reduc_plus_scale_v4df): Likewise.
+	(vpair_reduc_plus_scale_v4di): Likewise.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document the
+	horizontal add vector pair built-in functions for float, double, and
+	int64.
+
+==================== Branch work141-vpair, patch #300 ====================
+
+Add support for integer vector pair built-in functions.
+
+2023-10-25  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_i8*): Add built-in
+	functions for integer vector pairs.
+	(__builtin_vpair_i16*): Likeise.
+	(__builtin_vpair_i32*): Likeise.
+	(__builtin_vpair_i64*): Likeise.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_V32QI): New unspec.
+	(UNSPEC_VPAIR_V16HI): Likewise.
+	(UNSPEC_VPAIR_V8SI): Likewise.
+	(UNSPEC_VPAIR_V4DI): Likewise.
+	(VP_INT_BINARY): New iterator for integer vector pair.
+	(vp_insn): Add supoort for integer vector pairs.
+	(vp_ireg): New code attribute for integer vector pairs.
+	(vp_ipredicate): Likewise.
+	(VP_INT): New int interator for integer vector pairs.
+	(VP_ALL): Add integer vector pair support.
+	(VP_VEC_MODE): Likewise.
+	(vp_pmode): Likewise.
+	(vp_vmode): Likewise.
+	(vp_neg_reg): New int interator for integer vector pairs.
+	(vp_splat_pmode): Add integer vector pair support.
+	(VP_SPLAT_VMODE): Likewise.
+	(vpair_neg_<vp_pmode>): Add integer vector pair support insns.
+	(vpair_not_<vp_pmode>2): Likewise.
+	(vpair_<vp_insn>_<vp_pmode>3): Likewise.
+	(vpair_andc_<vp_pmode): Likewise.
+	(*vpair_iorc_<vp_pmode>): Likewise.
+	(vpair_nand_<vp_pmode>_1): Likewise.
+	(vpair_nand_<vp_pmode>_2): Likewise.
+	(vpair_nor_<vp_pmode>_1): Likewise.
+	(vpair_nor_<vp_pmode>_2): Likewise.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document the
+	integer vector pair built-in functions.
+
 ==================== Branch work141-vpair, patch #300 ====================
 
 Add support for floating point vector pair built-in functions.
