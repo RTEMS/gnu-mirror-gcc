@@ -21334,6 +21334,7 @@ __vector_pair __builtin_vpair_f32_neg (__vector_pair);
 __vector_pair __builtin_vpair_f32_smax (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_f32_smin (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_f32_sub (__vector_pair, __vector_pair);
+float __builtin_vpair_f32_add_elements (__vector_pair);
 @end smallexample
 
 The following built-in functions operate on pairs of
@@ -21351,6 +21352,7 @@ __vector_pair __builtin_vpair_f64_neg (__vector_pair);
 __vector_pair __builtin_vpair_f64_smax (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_f64_smin (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_f64_sub (__vector_pair, __vector_pair);
+double __builtin_vpair_f64_add_elements (__vector_pair);
 @end smallexample
 
 The following built-in functions operate on pairs of
@@ -21376,6 +21378,7 @@ __vector_pair __builtin_vpair_i64_sub (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i64_umax (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i64_umin (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i64_xor (__vector_pair, __vector_pair);
+long long __builtin_vpair_i64_add_elements (__vector_pair);
 @end smallexample
 
 The following built-in functions operate on pairs of

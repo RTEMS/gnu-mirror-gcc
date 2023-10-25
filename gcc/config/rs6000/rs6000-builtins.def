@@ -4176,6 +4176,9 @@
   v256 __builtin_vpair_f32_sub (v256, v256);
     VPAIR_F32_SUB vpair_sub_v8sf3 {mma,pair}
 
+  float __builtin_vpair_f32_add_elements (v256);
+    VPAIR_F32_ADD_ELEMENTS vpair_reduc_plus_scale_v8sf {mma,pair}
+
   vd __builtin_vpair_f64_extract_vector (v256, const int<1>);
     VPAIR_F64_EXTRACT_VECTOR vpair_extract_vector_v4df {mma,pair}
 
@@ -4208,6 +4211,9 @@
 
   v256 __builtin_vpair_f64_sub (v256, v256);
     VPAIR_F64_SUB vpair_sub_v4df3 {mma,pair}
+
+  double __builtin_vpair_f64_add_elements (v256);
+    VPAIR_F64_ADD_ELEMENTS vpair_reduc_plus_scale_v4df {mma,pair}
 
   vuc __builtin_vpair_i8u_extract_vector (v256, const int<1>);
     VPAIR_I8U_EXTRACT_VECTOR vpair_extract_vector_v32qi {mma,pair}
@@ -4412,3 +4418,6 @@
 
   v256 __builtin_vpair_i64_xor (v256, v256);
     VPAIR_I64_XOR vpair_xor_v4di3 {mma,pair}
+
+  long long __builtin_vpair_i64_add_elements (v256);
+    VPAIR_I64_ADD_ELEMENTS vpair_reduc_plus_scale_v4di {mma,pair,no32bit}

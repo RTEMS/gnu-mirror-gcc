@@ -34,6 +34,9 @@
    UNSPEC_VPAIR_V16HI
    UNSPEC_VPAIR_V8SI
    UNSPEC_VPAIR_V4DI
+   UNSPEC_VPAIR_REDUCE_PLUS_F32
+   UNSPEC_VPAIR_REDUCE_PLUS_F64
+   UNSPEC_VPAIR_REDUCE_PLUS_I64
    ])
 
 ;; Iterator doing unary/binary arithmetic on vector pairs
@@ -532,6 +535,66 @@
   [(set_attr "length" "8")])
 
 
+;; Add all elements in a pair of V4SF vectors.
+(define_insn_and_split "vpair_reduc_plus_scale_v8sf"
+  [(set (match_operand:SF 0 "vsx_register_operand" "=wa")
+	(unspec:SF [(match_operand:OO 1 "vsx_register_operand" "v")]
+		   UNSPEC_VPAIR_REDUCE_PLUS_F32))
+   (clobber (match_scratch:V4SF 2 "=&v"))
+   (clobber (match_scratch:V4SF 3 "=&v"))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(pc)]
+{
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  rtx tmp1 = operands[2];
+  rtx tmp2 = operands[3];
+  unsigned r = reg_or_subregno (op1);
+  rtx op1_hi = gen_rtx_REG (V4SFmode, r);
+  rtx op1_lo = gen_rtx_REG (V4SFmode, r + 1);
+
+  emit_insn (gen_addv4sf3 (tmp1, op1_hi, op1_lo));
+  emit_insn (gen_altivec_vsldoi_v4sf (tmp2, tmp1, tmp1, GEN_INT (8)));
+  emit_insn (gen_addv4sf3 (tmp2, tmp1, tmp2));
+  emit_insn (gen_altivec_vsldoi_v4sf (tmp1, tmp2, tmp2, GEN_INT (4)));
+  emit_insn (gen_addv4sf3 (tmp2, tmp1, tmp2));
+  emit_insn (gen_vsx_xscvspdp_scalar2 (op0, tmp2));
+  DONE;
+}
+  [(set_attr "length" "24")])
+
+;; Add all elements in a pair of V2DF vectors
+(define_insn_and_split "vpair_reduc_plus_scale_v4df"
+  [(set (match_operand:DF 0 "vsx_register_operand" "=&wa")
+	(unspec:DF [(match_operand:OO 1 "vsx_register_operand" "wa")]
+		   UNSPEC_VPAIR_REDUCE_PLUS_F64))
+   (clobber (match_scratch:DF 2 "=&wa"))
+   (clobber (match_scratch:V2DF 3 "=&wa"))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 3)
+	(plus:V2DF (match_dup 4)
+		   (match_dup 5)))
+   (set (match_dup 2)
+	(vec_select:DF (match_dup 3)
+		       (parallel [(match_dup 6)])))
+   (set (match_dup 0)
+	(plus:DF (match_dup 7)
+		 (match_dup 2)))]
+{
+  unsigned reg1 = reg_or_subregno (operands[1]);
+  unsigned reg3 = reg_or_subregno (operands[3]);
+
+  operands[4] = gen_rtx_REG (V2DFmode, reg1);
+  operands[5] = gen_rtx_REG (V2DFmode, reg1 + 1);
+  operands[6] = GEN_INT (BYTES_BIG_ENDIAN ? 1 : 0);
+  operands[7] = gen_rtx_REG (DFmode, reg3);
+})
+
+
 ;; Vector pair integer negate support.
 (define_insn_and_split "vpair_neg_<vp_pmode>2"
   [(set (match_operand:OO 0 "altivec_register_operand" "=v")
@@ -740,3 +803,33 @@
   DONE;
 }
   [(set_attr "length" "8")])
+
+;; Add all elements in a pair of V2DI vectors
+(define_insn_and_split "vpair_reduc_plus_scale_v4di"
+  [(set (match_operand:DI 0 "gpc_reg_operand" "=&r")
+	(unspec:DI [(match_operand:OO 1 "altivec_register_operand" "v")]
+		   UNSPEC_VPAIR_REDUCE_PLUS_I64))
+   (clobber (match_scratch:V2DI 2 "=&v"))
+   (clobber (match_scratch:DI 3 "=&r"))]
+  "TARGET_MMA && TARGET_POWERPC64"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 2)
+	(plus:V2DI (match_dup 4)
+		   (match_dup 5)))
+   (set (match_dup 3)
+	(vec_select:DI (match_dup 2)
+		       (parallel [(const_int 0)])))
+   (set (match_dup 0)
+	(vec_select:DI (match_dup 2)
+		       (parallel [(const_int 1)])))
+   (set (match_dup 0)
+	(plus:DI (match_dup 0)
+		 (match_dup 3)))]
+{
+  unsigned reg1 = reg_or_subregno (operands[1]);
+
+  operands[4] = gen_rtx_REG (V2DImode, reg1);
+  operands[5] = gen_rtx_REG (V2DImode, reg1 + 1);
+}
+  [(set_attr "length" "16")])
