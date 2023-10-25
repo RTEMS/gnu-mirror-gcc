@@ -134,17 +134,17 @@ test_zero (__vector_pair *dest)
 }
 
 vector double
-test_get_vector_0 (__vector_pair *x)
+test_extract_vector_0 (__vector_pair *x)
 {
   /* 1 lxp.  */
-  return __builtin_vpair_f64_get_vector (*x, 0);
+  return __builtin_vpair_f64_extract_vector (*x, 0);
 }
 
 vector double
-test_get_vector_1 (__vector_pair *x)
+test_extract_vector_1 (__vector_pair *x)
 {
   /* 1 lxp.  */
-  return __builtin_vpair_f64_get_vector (*x, 1);
+  return __builtin_vpair_f64_extract_vector (*x, 1);
 }
 
 double
