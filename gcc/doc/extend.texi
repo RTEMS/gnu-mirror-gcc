@@ -14979,6 +14979,7 @@ instructions, but allow the compiler to schedule those calls.
 * NDS32 Built-in Functions::
 * Nvidia PTX Built-in Functions::
 * Basic PowerPC Built-in Functions::
+* PowerPC Vector Pair Built-in Functions Available on ISA 3.1::
 * PowerPC AltiVec/VSX Built-in Functions::
 * PowerPC Hardware Transactional Memory Built-in Functions::
 * PowerPC Atomic Memory Operation Functions::
@@ -21299,6 +21300,58 @@ int vec_any_le (vector signed __int128, vector signed __int128);
 int vec_any_le (vector unsigned __int128, vector unsigned __int128);
 @end smallexample
 
+
+@node PowerPC Vector Pair Built-in Functions Available on ISA 3.1
+@subsection PowerPC Vector Pair Built-in Functions Available on ISA 3.1
+
+GCC provides functions to speed up processing by using
+@code{__vector_pair} to hold two vectors.  The load vector pair and
+store vector pair instructions are used to load the values into
+registers and store the values.  The operation itself is split into
+two separate vector instructions.  To use the vector pair built-in
+functions, you need to have MMA support enabled (@option{-mmma}, which
+is enabled by default with @option{-mcpu=power10}).
+
+The following built-in functions are independent on the type of the
+underlying vector:
+
+@smallexample
+__vector_pair __builtin_vpair_zero ();
+@end smallexample
+
+The following built-in functions operate on pairs of
+@code{vector float} values:
+
+@smallexample
+vector float __builtin_vpair_f32_extract_vector (__vector_pair, int);
+__vector_pair __builtin_vpair_f32_assemble (vector float, vector float);
+__vector_pair __builtin_vpair_f32_splat (float);
+__vector_pair __builtin_vpair_f32_abs (__vector_pair);
+__vector_pair __builtin_vpair_f32_add (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f32_fma (__vector_pair, __vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f32_mul (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f32_neg (__vector_pair);
+__vector_pair __builtin_vpair_f32_smax (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f32_smin (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f32_sub (__vector_pair, __vector_pair);
+@end smallexample
+
+The following built-in functions operate on pairs of
+@code{vector double} values:
+
+@smallexample
+vector double __builtin_vpair_f64_extract_vector (__vector_pair, int);
+__vector_pair __builtin_vpair_f64_assemble (vector double, vector double);
+__vector_pair __builtin_vpair_f64_splat (double);
+__vector_pair __builtin_vpair_f64_abs (__vector_pair);
+__vector_pair __builtin_vpair_f64_add (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f64_fma (__vector_pair, __vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f64_mul (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f64_neg (__vector_pair);
+__vector_pair __builtin_vpair_f64_smax (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f64_smin (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f64_sub (__vector_pair, __vector_pair);
+@end smallexample
 
 @node PowerPC Hardware Transactional Memory Built-in Functions
 @subsection PowerPC Hardware Transactional Memory Built-in Functions
