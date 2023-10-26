@@ -1,3 +1,90 @@
+==================== Branch work141-vpair, patch #312 ====================
+
+Add vector pair built-in tests.
+
+2023-10-26  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-1.c: New test.
+	* gcc.target/powerpc/vector-pair-2.c: New test.
+	* gcc.target/powerpc/vector-pair-3.c: New test.
+	* gcc.target/powerpc/vector-pair-4.c: New test.
+	* gcc.target/powerpc/vector-pair-5.c: New test.
+	* gcc.target/powerpc/vector-pair-6.c: New test.
+	* gcc.target/powerpc/vector-pair-7.c: New test.
+	* gcc.target/powerpc/vector-pair-8.c: New test.
+
+==================== Branch work141-vpair, patch #311 ====================
+
+Add support for integer vector pair built-in functions.
+
+2023-10-26  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_i8*): Add built-in
+	functions for integer vector pairs.
+	(__builtin_vpair_i16*): Likeise.
+	(__builtin_vpair_i32*): Likeise.
+	(__builtin_vpair_i64*): Likeise.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_V32QI): New unspec.
+	(UNSPEC_VPAIR_V16HI): Likewise.
+	(UNSPEC_VPAIR_V8SI): Likewise.
+	(UNSPEC_VPAIR_V4DI): Likewise.
+	(VP_INT_BINARY): New iterator for integer vector pair.
+	(vp_insn): Add supoort for integer vector pairs.
+	(vp_ireg): New code attribute for integer vector pairs.
+	(vp_ipredicate): Likewise.
+	(VP_INT): New int interator for integer vector pairs.
+	(VP_VEC_MODE): Likewise.
+	(vp_pmode): Likewise.
+	(vp_vmode): Likewise.
+	(vp_neg_reg): New int interator for integer vector pairs.
+	(VP_SPLAT): Add integer vector pair support.
+	(VP_SPLAT_VEC): Likewise.
+	(vp_splat_pmode): Likewise.
+	(VP_SPLAT_VMODE): Likewise.
+	(vpair_neg_<vp_pmode>): Add integer vector pair support insns.
+	(vpair_not_<vp_pmode>2): Likewise.
+	(vpair_<vp_insn>_<vp_pmode>3): Likewise.
+	(vpair_andc_<vp_pmode): Likewise.
+	(*vpair_iorc_<vp_pmode>): Likewise.
+	(vpair_nand_<vp_pmode>_1): Likewise.
+	(vpair_nand_<vp_pmode>_2): Likewise.
+	(vpair_nor_<vp_pmode>_1): Likewise.
+	(vpair_nor_<vp_pmode>_2): Likewise.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document the
+	integer vector pair built-in functions.
+
+==================== Branch work141-vpair, patch #310 ====================
+
+Add support for floating point vector pair built-in functions.
+
+2023-10-26  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/predicates.md (mma_assemble_input_operand): Allow other
+	16-byte vectors and not just V16QImode.
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_zero): New
+	built-in to clear vector pair.
+	(__builtin_vpair_f32_*): Add vector pair built-in functions for float.
+	(__builtin_vpair_f64_*): Add vector pair built-in functions for double.
+	* config/rs6000/rs6000-protos.h (split_unary_vector_pair): Add
+	declaration.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pair): Likewise.
+	* config/rs6000/rs6000.cc (split_unary_vector_pair): New helper function
+	for vector pair built-in functions.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pair): Likewise.
+	* config/rs6000/rs6000.md (toplevel): Include vector-pair.md.
+	* config/rs6000/t-rs6000 (MD_INCLUDES): Add vector-pair.md.
+	* config/rs6000/vector-pair.md: New file.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document the
+	floating point and general vector pair built-in functions.
+
 ==================== Branch work141-vpair, patch #303 was reverted ====================
 
 ==================== Branch work141-vpair, patch #302 was reverted ====================
