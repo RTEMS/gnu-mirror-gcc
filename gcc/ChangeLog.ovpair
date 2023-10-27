@@ -1,3 +1,39 @@
+==================== Branch work141-ovpair, patch #203 ====================
+
+Move splat built-in.
+
+2023-10-27  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_i8_splat): Move to
+	be in sorted order.
+
+==================== Branch work141-ovpair, patch #202 ====================
+
+Rename min/max functions.  Sort built-ins.
+
+2023-10-27  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair*): Rename the
+	min/max built-in functions.  Sort the entries alphabetically.  Add
+	comments between the sections.
+	* doc/extend.texi (PowerPC vector pair builtins): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-01.c: Rename min and max built-in
+	functions.
+	* gcc.target/powerpc/vector-pair-02.c: Likewise.
+	* gcc.target/powerpc/vector-pair-03.c: Likewise.
+	* gcc.target/powerpc/vector-pair-04.c: Likewise.
+	* gcc.target/powerpc/vector-pair-05.c: Likewise.
+	* gcc.target/powerpc/vector-pair-06.c: Likewise.
+	* gcc.target/powerpc/vector-pair-07.c: Likewise.
+	* gcc.target/powerpc/vector-pair-08.c: Likewise.
+
 ==================== Branch work141-ovpair, patch #201 ====================
 
 Replace get_vector with extract_vector
