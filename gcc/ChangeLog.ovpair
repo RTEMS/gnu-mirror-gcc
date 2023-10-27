@@ -1,3 +1,14 @@
+==================== Branch work141-ovpair, patch #206 ====================
+
+Sync rs6000-builtins.def with development branch.
+
+2023-10-27  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_i64_assemble): Move
+	so it is sorted correctly.
+
 ==================== Branch work141-ovpair, patch #205 ====================
 
 Sync vector-pair.md with development branch.
