@@ -229,7 +229,7 @@
   if (!WORDS_BIG_ENDIAN)
     reg_num = 1 - reg_num;
 	   
-  operands[3] = simplify_gen_subreg (vmode, operands[0], OOmode, reg_num * 16);
+  operands[3] = simplify_gen_subreg (vmode, operands[1], OOmode, reg_num * 16);
 })
 
 ;; Optimize extracting an 128-bit vector from a vector pair in memory.
