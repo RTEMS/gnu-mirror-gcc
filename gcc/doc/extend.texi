@@ -21386,9 +21386,9 @@ The following built-in functions operate on pairs of
 @code{vector int} or @code{vector unsigned int} values:
 
 @smallexample
-__vector_pair __builtin_vpair_i32_assemble (vector int, vector int);
 __vector_pair __builtin_vpair_i32_add (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i32_and (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i32_assemble (vector int, vector int);
 vector int __builtin_vpair_i32_extract_vector (__vector_pair, int);
 __vector_pair __builtin_vpair_i32_ior (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i32_neg (__vector_pair);
