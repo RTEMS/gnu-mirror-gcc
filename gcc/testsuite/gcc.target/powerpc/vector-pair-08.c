@@ -57,7 +57,7 @@ test_smax (__vector_pair *dest,
 	   __vector_pair *y)
 {
   /* 2 lxvp, 2 vmaxsb, 1 stxvp.  */
-  *dest = __builtin_vpair_i8_smax (*x, *y);
+  *dest = __builtin_vpair_i8_max (*x, *y);
 }
 
 void
@@ -66,7 +66,7 @@ test_smin (__vector_pair *dest,
 	   __vector_pair *y)
 {
   /* 2 lxvp, 2 vminsb, 1 stxvp.  */
-  *dest = __builtin_vpair_i8_smin (*x, *y);
+  *dest = __builtin_vpair_i8_min (*x, *y);
 }
 
 void
@@ -75,7 +75,7 @@ test_umax (__vector_pair *dest,
 	   __vector_pair *y)
 {
   /* 2 lxvp, 2 vmaxub, 1 stxvp.  */
-  *dest = __builtin_vpair_i8_umax (*x, *y);
+  *dest = __builtin_vpair_i8u_max (*x, *y);
 }
 
 void
@@ -84,7 +84,7 @@ test_umin (__vector_pair *dest,
 	   __vector_pair *y)
 {
   /* 2 lxvp, 2 vminub, 1 stxvp.  */
-  *dest = __builtin_vpair_i8_umin (*x, *y);
+  *dest = __builtin_vpair_i8u_min (*x, *y);
 }
 
 void
@@ -176,19 +176,81 @@ test_nor (__vector_pair *dest,
   *dest = __builtin_vpair_i8_not (a);
 }
 
-/* { dg-final { scan-assembler-times {\mlxvp\M}    34 } } */
-/* { dg-final { scan-assembler-times {\mstxvp\M}   18 } } */
-/* { dg-final { scan-assembler-times {\mvaddubm\M}  2 } } */
-/* { dg-final { scan-assembler-times {\mvmaxsb\M}   2 } } */
-/* { dg-final { scan-assembler-times {\mvmaxub\M}   2 } } */
-/* { dg-final { scan-assembler-times {\mvminsb\M}   2 } } */
-/* { dg-final { scan-assembler-times {\mvminub\M}   2 } } */
-/* { dg-final { scan-assembler-times {\mvsububm\M}  4 } } */
-/* { dg-final { scan-assembler-times {\mxxland\M}   2 } } */
-/* { dg-final { scan-assembler-times {\mxxlandc\M}  4 } } */
-/* { dg-final { scan-assembler-times {\mxxlnand\M}  4 } } */
-/* { dg-final { scan-assembler-times {\mxxlnor\M}   4 } } */
-/* { dg-final { scan-assembler-times {\mxxlor\M}    2 } } */
-/* { dg-final { scan-assembler-times {\mxxlorc\M}   4 } } */
-/* { dg-final { scan-assembler-times {\mxxlxor\M}   2 } } */
-/* { dg-final { scan-assembler-times {\mxxspltib\M} 1 } } */
+void
+test_splat_const_1 (__vector_pair *dest)
+{
+  /* 1 xxspltib, 1 xxlor, 1 stxvp.  */
+  *dest = __builtin_vpair_i8_splat (1);
+}
+
+void
+test_splat_const_65 (__vector_pair *dest)
+{
+  /* 1 xxspltib, 1 xxlor, 1 stxvp.  */
+  *dest = __builtin_vpair_i8_splat (65);
+}
+
+void
+test_splat_mem (__vector_pair *dest, signed char *p)
+{
+  /* 1 lxsibzx, 1 vsplth, 1 xxlor, 1 stxvp.  */
+  *dest = __builtin_vpair_i8_splat (*p);
+}
+
+void
+test_splatu_arg (__vector_pair *dest, unsigned char x)
+{
+  /* 1 mtvsrd, 1 vspltb, 1 xxlor, 1 stxvp.  */
+  *dest = __builtin_vpair_i8u_splat (x);
+}
+
+void
+test_splatu_mem (__vector_pair *dest, unsigned char *p)
+{
+  /* 1 lxsibzx, 1 vspltb, 1 xxlor, 1 stxvp.  */
+  *dest = __builtin_vpair_i8u_splat (*p);
+}
+
+void
+test_splatu_const_1 (__vector_pair *dest)
+{
+  /* 1 xxspltib, 1 xxlor, 1 stxvp.  */
+  *dest = __builtin_vpair_i8u_splat (1);
+}
+
+void
+test_splatu_const_65 (__vector_pair *dest)
+{
+  /* 1 xxspltib, 1 xxlor, 1 stxvp.  */
+  *dest = __builtin_vpair_i8u_splat (65);
+}
+
+void
+test_zero (__vector_pair *dest)
+{
+  /* 2 xxspltib, 1 stxvp.  */
+  *dest = __builtin_vpair_zero ();
+}
+
+/* We don't expect an exact count for xxlor, in case the compiler adds some
+   extra vector move instructions.  */
+
+/* { dg-final { scan-assembler-times {\mlxsibzx\M}   2 } } */
+/* { dg-final { scan-assembler-times {\mlxvp\M}     34 } } */
+/* { dg-final { scan-assembler-times {\mmtvsrd\M}    1 } } */
+/* { dg-final { scan-assembler-times {\mstxvp\M}    26 } } */
+/* { dg-final { scan-assembler-times {\mvaddubm\M}   2 } } */
+/* { dg-final { scan-assembler-times {\mvmaxsb\M}    2 } } */
+/* { dg-final { scan-assembler-times {\mvmaxub\M}    2 } } */
+/* { dg-final { scan-assembler-times {\mvminsb\M}    2 } } */
+/* { dg-final { scan-assembler-times {\mvminub\M}    2 } } */
+/* { dg-final { scan-assembler-times {\mvspltb\M}    3 } } */
+/* { dg-final { scan-assembler-times {\mvsububm\M}   4 } } */
+/* { dg-final { scan-assembler-times {\mxxland\M}    2 } } */
+/* { dg-final { scan-assembler-times {\mxxlandc\M}   4 } } */
+/* { dg-final { scan-assembler-times {\mxxlnand\M}   4 } } */
+/* { dg-final { scan-assembler-times {\mxxlnor\M}    4 } } */
+/* { dg-final { scan-assembler       {\mxxlor\M}       } } */
+/* { dg-final { scan-assembler-times {\mxxlorc\M}    4 } } */
+/* { dg-final { scan-assembler-times {\mxxlxor\M}    2 } } */
+/* { dg-final { scan-assembler-times {\mxxspltib\M}  7 } } */
