@@ -1,3 +1,20 @@
+==================== Branch work141-ovpair, patch #205 ====================
+
+Sync vector-pair.md with development branch.
+
+2023-10-27  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_SPLAT): New unspec.
+	(VP_VEC_MODE): Update comments.
+	(vp_pmode): Likewise.
+	(vp_vmode): Likewise.
+	(vp_splat_pmode): Allow vector modes as well as scalar modes.
+	("vpair_splat_<vp_splat_pmode>): Use size_t for iterator.  Allow splat
+	to save a register by using 0 constraint.
+	(vpair_splat_<vp_splat_pmode>_internal): New splat splitter.
+
 ==================== Branch work141-ovpair, patch #204 ====================
 
 Move assemble built-in documentation.
