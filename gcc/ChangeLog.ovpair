@@ -1,3 +1,14 @@
+==================== Branch work141-ovpair, patch #204 ====================
+
+Move assemble built-in documentation.
+
+2023-10-27  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* doc/extend.texi (__builtin_vpair_i32_assemble): Move to be sorted
+	alphebetically.
+
 ==================== Branch work141-ovpair, patch #203 ====================
 
 Move splat built-in.
