@@ -4234,9 +4234,6 @@
   vsc __builtin_vpair_i8_extract_vector (v256, const int<1>);
     VPAIR_I8_EXTRACT_VECTOR vpair_extract_vector_v32qi {mma,pair}
 
-  v256 __builtin_vpair_i8_splat (signed char);
-    VPAIR_I8_SPLAT vpair_splat_v32qi {mma,pair}
-
   v256 __builtin_vpair_i8_ior (v256, v256);
     VPAIR_I8_IOR vpair_ior_v32qi3 {mma,pair}
 
@@ -4251,6 +4248,9 @@
 
   v256 __builtin_vpair_i8_not (v256);
     VPAIR_I8_NOT vpair_not_v32qi2 {mma,pair}
+
+  v256 __builtin_vpair_i8_splat (signed char);
+    VPAIR_I8_SPLAT vpair_splat_v32qi {mma,pair}
 
   v256 __builtin_vpair_i8_sub (v256, v256);
     VPAIR_I8_SUB vpair_sub_v32qi3 {mma,pair}
