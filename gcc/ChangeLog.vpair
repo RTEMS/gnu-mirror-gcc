@@ -1,25 +1,8 @@
-==================== Branch work141-vpair, patch #312 ====================
-
-Add vector pair built-in tests.
-
-2023-10-26  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/testsuite/
-
-	* gcc.target/powerpc/vector-pair-1.c: New test.
-	* gcc.target/powerpc/vector-pair-2.c: New test.
-	* gcc.target/powerpc/vector-pair-3.c: New test.
-	* gcc.target/powerpc/vector-pair-4.c: New test.
-	* gcc.target/powerpc/vector-pair-5.c: New test.
-	* gcc.target/powerpc/vector-pair-6.c: New test.
-	* gcc.target/powerpc/vector-pair-7.c: New test.
-	* gcc.target/powerpc/vector-pair-8.c: New test.
-
-==================== Branch work141-vpair, patch #311 ====================
+==================== Branch work141-vpair, patch #321 ====================
 
 Add support for integer vector pair built-in functions.
 
-2023-10-26  Michael Meissner  <meissner@linux.ibm.com>
+2023-10-27  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -57,7 +40,14 @@ gcc/
 	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document the
 	integer vector pair built-in functions.
 
-==================== Branch work141-vpair, patch #310 ====================
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-5.c: New test.
+	* gcc.target/powerpc/vector-pair-6.c: New test.
+	* gcc.target/powerpc/vector-pair-7.c: New test.
+	* gcc.target/powerpc/vector-pair-8.c: New test.
+
+==================== Branch work141-vpair, patch #320 ====================
 
 Add support for floating point vector pair built-in functions.
 
@@ -84,6 +74,19 @@ gcc/
 	* config/rs6000/vector-pair.md: New file.
 	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document the
 	floating point and general vector pair built-in functions.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-1.c: New test.
+	* gcc.target/powerpc/vector-pair-2.c: New test.
+	* gcc.target/powerpc/vector-pair-3.c: New test.
+	* gcc.target/powerpc/vector-pair-4.c: New test.
+
+==================== Branch work141-vpair, patch #312 was reverted ====================
+
+==================== Branch work141-vpair, patch #311 was reverted ====================
+
+==================== Branch work141-vpair, patch #310 was reverted ====================
 
 ==================== Branch work141-vpair, patch #303 was reverted ====================
 
