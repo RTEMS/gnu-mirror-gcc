@@ -1,3 +1,13 @@
+==================== Branch work141-ovpair, patch #207 ====================
+
+Fix thinko.
+
+2023-10-27  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (vpair_extract_vector_<vp_pmode>): Fix thinko.
+
 ==================== Branch work141-ovpair, patch #206 ====================
 
 Sync rs6000-builtins.def with development branch.
