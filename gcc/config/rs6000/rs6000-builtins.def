@@ -4384,9 +4384,6 @@
 ;; vector pair built-in functions for 4 64-bit unsigned long long or
 ;; signed long long values
 
-  v256 __builtin_vpair_i64_assemble (vsll, vsll);
-    VPAIR_I64_ASSEMBLE vpair_assemble_v4di {mma,pair}
-
   v256 __builtin_vpair_i64_add (v256, v256);
     VPAIR_I64_ADD vpair_add_v4di3 {mma,pair}
 
@@ -4395,6 +4392,9 @@
 
   v256 __builtin_vpair_i64_and (v256, v256);
     VPAIR_I64_AND vpair_and_v4di3 {mma,pair}
+
+  v256 __builtin_vpair_i64_assemble (vsll, vsll);
+    VPAIR_I64_ASSEMBLE vpair_assemble_v4di {mma,pair}
 
   vsll __builtin_vpair_i64_extract_vector (v256, const int<1>);
     VPAIR_I64_EXTRACT_VECTOR vpair_extract_vector_v4di {mma,pair}
