@@ -1,3 +1,21 @@
+==================== Branch work141-ovpair, patch #208 ====================
+
+Sync test files.
+
+2023-10-27  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* /gcc.target/powerpc/vector-pair-1.c: Rename.
+	* /gcc.target/powerpc/vector-pair-2.c: Rename.
+	* /gcc.target/powerpc/vector-pair-3.c: Rename.
+	* /gcc.target/powerpc/vector-pair-4.c: Rename.
+	* /gcc.target/powerpc/vector-pair-5.c: Rename.
+	* /gcc.target/powerpc/vector-pair-6.c: Rename.
+	* /gcc.target/powerpc/vector-pair-7.c: Rename.
+	* /gcc.target/powerpc/vector-pair-8.c: Rename.
+	* /gcc.target/powerpc/vector-pair-9.c: New test.
+
 ==================== Branch work141-ovpair, patch #207 ====================
 
 Fix thinko.
