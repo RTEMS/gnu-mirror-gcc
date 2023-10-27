@@ -28,6 +28,7 @@
 
 (define_c_enum "unspec"
   [UNSPEC_VPAIR_ZERO
+   UNSPEC_VPAIR_SPLAT
    UNSPEC_VPAIR_V4DF
    UNSPEC_VPAIR_V8SF
    UNSPEC_VPAIR_V32QI
@@ -104,7 +105,7 @@
 			     UNSPEC_VPAIR_V16HI
 			     UNSPEC_VPAIR_V32QI])
 
-;; Map VP_{INT,FP,ALL} to vector mode of the arguments after they are split
+;; Map VP_* to vector mode of the arguments after they are split
 (define_int_attr VP_VEC_MODE [(UNSPEC_VPAIR_V4DF  "V2DF")
 			      (UNSPEC_VPAIR_V8SF  "V4SF")
 			      (UNSPEC_VPAIR_V32QI "V16QI")
@@ -112,7 +113,7 @@
 			      (UNSPEC_VPAIR_V8SI  "V4SI")
 			      (UNSPEC_VPAIR_V4DI  "V2DI")])
 
-;; Map VP_{INT,FP,ALL} to a lower case name to identify the vector pair.
+;; Map VP_* to a lower case name to identify the vector pair.
 (define_int_attr vp_pmode [(UNSPEC_VPAIR_V4DF  "v4df")
 			   (UNSPEC_VPAIR_V8SF  "v8sf")
 			   (UNSPEC_VPAIR_V32QI "v32qi")
@@ -120,8 +121,8 @@
 			   (UNSPEC_VPAIR_V8SI  "v8si")
 			   (UNSPEC_VPAIR_V4DI  "v4di")])
 
-;; Map VP_{INT,FP,ALL} to a lower case name to identify the vector after the
-;; vector pair has been split.
+;; Map VP_* to a lower case name to identify the vector after the vector pair
+;; has been split.
 (define_int_attr vp_vmode [(UNSPEC_VPAIR_V4DF  "v2df")
 			   (UNSPEC_VPAIR_V8SF  "v4sf")
 			   (UNSPEC_VPAIR_V32QI "v16qi")
@@ -140,13 +141,22 @@
 ;; Moddes of the vector element to splat to vector pair
 (define_mode_iterator VP_SPLAT [DF SF DI SI HI QI])
 
-;; MAP VP_SPLAT to the mode of the vector pair in the assemble operation
-(define_mode_attr vp_splat_pmode [(DF "v4df")
-				  (SF "v8sf")
-				  (DI "v4di")
-				  (SI "v8si")
-				  (HI "v16hi")
-				  (QI "v32qi")])
+;; Moddes of the vector to splat to vector pair
+(define_mode_iterator VP_SPLAT_VEC [V2DF V4SF V2DI V4SI V8HI V16QI])
+
+;; MAP VP_SPLAT and VP_SPLAT_VEC to the mode of the vector pair operation
+(define_mode_attr vp_splat_pmode [(DF    "v4df")
+				  (V2DF  "v4df")
+				  (SF    "v8sf")
+				  (V4SF  "v8sf")
+				  (DI    "v4di")
+				  (V2DI  "v4di")
+				  (SI    "v8si")
+				  (V4SI  "v8si")
+				  (HI    "v16hi")
+				  (V8HI  "v16hi")
+				  (QI    "v32qi")
+				  (V16QI "v32qi")])
 
 ;; MAP VP_SPLAT to the mode of the vector containing the element
 (define_mode_attr VP_SPLAT_VMODE [(DF "V2DF")
@@ -260,13 +270,49 @@
   rtx vec = gen_reg_rtx (vector_mode);
   unsigned num_elements = GET_MODE_NUNITS (vector_mode);
   rtvec elements = rtvec_alloc (num_elements);
-  for (unsigned i = 0; i < num_elements; i++)
+  for (size_t i = 0; i < num_elements; i++)
     RTVEC_ELT (elements, i) = copy_rtx (op1);
 
   rs6000_expand_vector_init (vec, gen_rtx_PARALLEL (vector_mode, elements));
-  emit_insn (gen_vpair_assemble_<vp_splat_pmode> (op0, vec, vec));
+  emit_insn (gen_vpair_splat_<vp_splat_pmode>_internal (op0, vec));
   DONE;
 })
+
+;; Inner splat support.  Operand1 is the vector splat created above.  Allow
+;; operand 1 to overlap with the output registers to eliminate one move
+;; instruction.
+(define_insn_and_split "vpair_splat_<vp_splat_pmode>_internal"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
+	(unspec:OO
+	 [(match_operand:VP_SPLAT_VEC 1 "vsx_register_operand" "0,wa")]
+	 UNSPEC_VPAIR_SPLAT))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  rtx op0_vector0 = simplify_gen_subreg (<MODE>mode, op0, OOmode, 0);
+  rtx op0_vector1 = simplify_gen_subreg (<MODE>mode, op0, OOmode, 16);
+
+  /* Check if the input is one of the output registers.  */
+  if (rtx_equal_p (op0_vector0, op1))
+    emit_move_insn (op0_vector1, op1);
+
+  else if (rtx_equal_p (op0_vector1, op1))
+    emit_move_insn (op0_vector0, op1);
+
+  else
+    {
+      emit_move_insn (op0_vector0, op1);
+      emit_move_insn (op0_vector1, op1);
+    }
+
+  DONE;
+}
+  [(set_attr "length" "*,8")
+   (set_attr "type" "vecmove")])
 
 
 ;; Vector pair floating point unary operations
