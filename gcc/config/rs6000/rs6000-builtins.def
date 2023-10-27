@@ -4151,6 +4151,12 @@
   v256 __builtin_vpair_f32_add (v256, v256);
     VPAIR_F32_ADD vpair_add_v8sf3 {mma,pair}
 
+  v256 __builtin_vpair_f32_assemble (vf, vf);
+    VPAIR_F32_ASSEMBLE vpair_assemble_v8sf {mma,pair}
+
+  vf __builtin_vpair_f32_extract_vector (v256, const int<1>);
+    VPAIR_F32_EXTRACT_VECTOR vpair_extract_vector_v8sf {mma,pair}
+
   v256 __builtin_vpair_f32_fma (v256, v256, v256);
     VPAIR_F32_FMA vpair_fma_v8sf4 {mma,pair}
 
@@ -4179,6 +4185,12 @@
 
   v256 __builtin_vpair_f64_add (v256, v256);
     VPAIR_F64_ADD vpair_add_v4df3 {mma,pair}
+
+  v256 __builtin_vpair_f64_assemble (vd, vd);
+    VPAIR_F64_ASSEMBLE vpair_assemble_v4df {mma,pair}
+
+  vd __builtin_vpair_f64_extract_vector (v256, const int<1>);
+    VPAIR_F64_EXTRACT_VECTOR vpair_extract_vector_v4df {mma,pair}
 
   v256 __builtin_vpair_f64_fma (v256, v256, v256);
     VPAIR_F64_FMA vpair_fma_v4df4 {mma,pair}
@@ -4210,6 +4222,12 @@
   v256 __builtin_vpair_i8_and (v256, v256);
     VPAIR_I8_AND vpair_and_v32qi3 {mma,pair}
 
+  v256 __builtin_vpair_i8_assemble (vsc, vsc);
+    VPAIR_I8_ASSEMBLE vpair_assemble_v32qi {mma,pair}
+
+  vsc __builtin_vpair_i8_extract_vector (v256, const int<1>);
+    VPAIR_I8_EXTRACT_VECTOR vpair_extract_vector_v32qi {mma,pair}
+
   v256 __builtin_vpair_i8_ior (v256, v256);
     VPAIR_I8_IOR vpair_ior_v32qi3 {mma,pair}
 
@@ -4234,6 +4252,12 @@
   v256 __builtin_vpair_i8_xor (v256, v256);
     VPAIR_I8_XOR vpair_xor_v32qi3 {mma,pair}
 
+  v256 __builtin_vpair_i8u_assemble (vuc, vuc);
+    VPAIR_I8U_ASSEMBLE vpair_assemble_v32qi {mma,pair}
+
+  vuc __builtin_vpair_i8u_extract_vector (v256, const int<1>);
+    VPAIR_I8U_EXTRACT_VECTOR vpair_extract_vector_v32qi {mma,pair}
+
   v256 __builtin_vpair_i8u_max (v256, v256);
     VPAIR_I8U_MAX vpair_umax_v32qi3 {mma,pair}
 
@@ -4251,6 +4275,12 @@
 
   v256 __builtin_vpair_i16_and (v256, v256);
     VPAIR_I16_AND vpair_and_v16hi3 {mma,pair}
+
+  v256 __builtin_vpair_i16_assemble (vss, vss);
+    VPAIR_I16_ASSEMBLE vpair_assemble_v16hi {mma,pair}
+
+  vss __builtin_vpair_i16_extract_vector (v256, const int<1>);
+    VPAIR_I16_EXTRACT_VECTOR vpair_extract_vector_v16hi {mma,pair}
 
   v256 __builtin_vpair_i16_ior (v256, v256);
     VPAIR_I16_IOR vpair_ior_v16hi3 {mma,pair}
@@ -4276,6 +4306,12 @@
   v256 __builtin_vpair_i16_xor (v256, v256);
     VPAIR_I16_XOR vpair_xor_v16hi3 {mma,pair}
 
+  v256 __builtin_vpair_i16u_assemble (vus, vus);
+    VPAIR_I16U_ASSEMBLE vpair_assemble_v16hi {mma,pair}
+
+  vus __builtin_vpair_i16u_extract_vector (v256, const int<1>);
+    VPAIR_I16U_EXTRACT_VECTOR vpair_extract_vector_v16hi {mma,pair}
+
   v256 __builtin_vpair_i16u_max (v256, v256);
     VPAIR_I16U_MAX vpair_umax_v16hi3 {mma,pair}
 
@@ -4293,6 +4329,12 @@
 
   v256 __builtin_vpair_i32_and (v256, v256);
     VPAIR_I32_AND vpair_and_v8si3 {mma,pair}
+
+  v256 __builtin_vpair_i32_assemble (vsi, vsi);
+    VPAIR_I32_ASSEMBLE vpair_assemble_v8si {mma,pair}
+
+  vsi __builtin_vpair_i32_extract_vector (v256, const int<1>);
+    VPAIR_I32_EXTRACT_VECTOR vpair_extract_vector_v8si {mma,pair}
 
   v256 __builtin_vpair_i32_ior (v256, v256);
     VPAIR_I32_IOR vpair_ior_v8si3 {mma,pair}
@@ -4318,6 +4360,12 @@
   v256 __builtin_vpair_i32_xor (v256, v256);
     VPAIR_I32_XOR vpair_xor_v8si3 {mma,pair}
 
+  v256 __builtin_vpair_i32u_assemble (vui, vui);
+    VPAIR_I32U_ASSEMBLE vpair_assemble_v8si {mma,pair}
+
+  vui __builtin_vpair_i32u_extract_vector (v256, const int<1>);
+    VPAIR_I32U_EXTRACT_VECTOR vpair_extract_vector_v8si {mma,pair}
+
   v256 __builtin_vpair_i32u_max (v256, v256);
     VPAIR_I32U_MAX vpair_umax_v8si3 {mma,pair}
 
@@ -4335,6 +4383,12 @@
 
   v256 __builtin_vpair_i64_and (v256, v256);
     VPAIR_I64_AND vpair_and_v4di3 {mma,pair}
+
+  v256 __builtin_vpair_i64_assemble (vsll, vsll);
+    VPAIR_I64_ASSEMBLE vpair_assemble_v4di {mma,pair}
+
+  vsll __builtin_vpair_i64_extract_vector (v256, const int<1>);
+    VPAIR_I64_EXTRACT_VECTOR vpair_extract_vector_v4di {mma,pair}
 
   v256 __builtin_vpair_i64_ior (v256, v256);
     VPAIR_I64_IOR vpair_ior_v4di3 {mma,pair}
@@ -4359,6 +4413,12 @@
 
   v256 __builtin_vpair_i64_xor (v256, v256);
     VPAIR_I64_XOR vpair_xor_v4di3 {mma,pair}
+
+  v256 __builtin_vpair_i64u_assemble (vull, vull);
+    VPAIR_I64U_ASSEMBLE vpair_assemble_v4di {mma,pair}
+
+  vull __builtin_vpair_i64u_extract_vector (v256, const int<1>);
+    VPAIR_I64U_EXTRACT_VECTOR vpair_extract_vector_v4di {mma,pair}
 
   v256 __builtin_vpair_i64u_max (v256, v256);
     VPAIR_I64U_MAX vpair_umax_v4di3 {mma,pair}

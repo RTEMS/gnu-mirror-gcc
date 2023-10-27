@@ -183,6 +183,69 @@
 }
   [(set_attr "length" "8")])
 
+;; Assemble a vector pair from two vectors.  Unlike
+;; __builtin_mma_assemble_pair, this function produces a vector pair output
+;; directly and it takes all of the vector types.
+;;
+;; We cannot update the two output registers atomically, so mark the output as
+;; an early clobber so we don't accidentally clobber the input operands.  */
+
+(define_insn_and_split "vpair_assemble_<vp_pmode>"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=&wa")
+	(unspec:OO
+	 [(match_operand:<VP_VEC_MODE> 1 "mma_assemble_input_operand" "mwa")
+	  (match_operand:<VP_VEC_MODE> 2 "mma_assemble_input_operand" "mwa")]
+	 VP_ALL))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  rtx src = gen_rtx_UNSPEC (OOmode,
+			    gen_rtvec (2, operands[1], operands[2]),
+			    UNSPEC_VSX_ASSEMBLE);
+  rs6000_split_multireg_move (operands[0], src);
+  DONE;
+}
+  [(set_attr "length" "8")])
+
+;; Extract one of the two 128-bit vectors from a vector pair.
+(define_insn_and_split "vpair_extract_vector_<vp_pmode>"
+  [(set (match_operand:<VP_VEC_MODE> 0 "vsx_register_operand" "=wa")
+	(unspec:<VP_VEC_MODE>
+	 [(match_operand:OO 1 "vsx_register_operand" "wa")
+	  (match_operand 2 "const_0_to_1_operand" "n")]
+	 VP_ALL))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0) (match_dup 3))]
+{
+  machine_mode vmode = <VP_VEC_MODE>mode;
+  unsigned reg_num = UINTVAL (operands[2]);
+  if (!WORDS_BIG_ENDIAN)
+    reg_num = 1 - reg_num;
+	   
+  operands[3] = simplify_gen_subreg (vmode, operands[1], OOmode, reg_num * 16);
+})
+
+;; Optimize extracting an 128-bit vector from a vector pair in memory.
+(define_insn_and_split "*vpair_extract_vector_<vp_pmode>_mem"
+  [(set (match_operand:<VP_VEC_MODE> 0 "vsx_register_operand" "=wa")
+	(unspec:<VP_VEC_MODE>
+	 [(match_operand:OO 1 "memory_operand" "o")
+	  (match_operand 2 "const_0_to_1_operand" "n")]
+	 VP_ALL))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0) (match_dup 3))]
+{
+  operands[3] = adjust_address (operands[1], <VP_VEC_MODE>mode,
+				16 * INTVAL (operands[2]));
+}
+  [(set_attr "type" "vecload")])
+
 ;; Create a vector pair with a value splat'ed (duplicated) to all of the
 ;; elements.
 (define_expand "vpair_splat_<vp_splat_pmode>"
