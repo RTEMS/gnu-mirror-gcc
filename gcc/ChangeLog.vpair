@@ -1,3 +1,42 @@
+==================== Branch work141-vpair, patch #322 ====================
+
+Add vector pair assemble/extract built-in functions.
+
+2023-10-27  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_f32_assemble): New
+	built-in.
+	(__builtin_vpair_f32_extract_vector): Likewise.
+	(__builtin_vpair_f64_assemble): Likewise.
+	(__builtin_vpair_f64_extract_vector): Likewise.
+	(__builtin_vpair_i8_assemble): Likewise.
+	(__builtin_vpair_i8_extract_vector): Likewise.
+	(__builtin_vpair_i8u_assemble): Likewise.
+	(__builtin_vpair_i8u_extract_vector): Likewise.
+	(__builtin_vpair_i16_assemble): Likewise.
+	(__builtin_vpair_i16_extract_vector): Likewise.
+	(__builtin_vpair_i16u_assemble): Likewise.
+	(__builtin_vpair_i16u_extract_vector): Likewise.
+	(__builtin_vpair_i32_assemble): Likewise.
+	(__builtin_vpair_i32_extract_vector): Likewise.
+	(__builtin_vpair_i32u_assemble): Likewise.
+	(__builtin_vpair_i32u_extract_vector): Likewise.
+	(__builtin_vpair_i64_assemble): Likewise.
+	(__builtin_vpair_i64_extract_vector): Likewise.
+	(__builtin_vpair_i64u_assemble): Likewise.
+	(__builtin_vpair_i64u_extract_vector): Likewise.
+	* config/rs6000/vector-pair.md ("vpair_assemble_<vp_pmode>): New insn.
+	(vpair_extract_vector_<vp_pmode): Likewise.
+	(vpair_extract_vector_<vp_pmode>_mem): Likewise.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document the
+	assemble and extract vector pair built-in functions.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-9.c: New test.
+
 ==================== Branch work141-vpair, patch #321 ====================
 
 Add support for integer vector pair built-in functions.
