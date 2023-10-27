@@ -1,3 +1,25 @@
+==================== Branch work141-vpair, patch #323 ====================
+
+Add vector pair add elements built-in functions.
+
+2023-10-27  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_f32_add_elements):
+	Add built-in function.
+	(__builtin_vpair_f64_add_elements): Likewise.
+	(__builtin_vpair_i64_add_elements): Likewise.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_REDUCE_PLUS_F32): New
+	unspec.
+	(UNSPEC_VPAIR_REDUCE_PLUS_F64): Likewise.
+	(UNSPEC_VPAIR_REDUCE_PLUS_I64): Likewise.
+	(vpair_reduc_plus_scale_v8sf): New insn.
+	(vpair_reduc_plus_scale_v4df): Likewise.
+	(vpair_reduc_plus_scale_v4di): Likewise.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document the
+	add element vector pair built-in functions.
+
 ==================== Branch work141-vpair, patch #322 ====================
 
 Add vector pair assemble/extract built-in functions.
