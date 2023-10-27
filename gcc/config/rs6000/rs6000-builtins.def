@@ -4151,6 +4151,9 @@
   v256 __builtin_vpair_f32_add (v256, v256);
     VPAIR_F32_ADD vpair_add_v8sf3 {mma,pair}
 
+  float __builtin_vpair_f32_add_elements (v256);
+    VPAIR_F32_ADD_ELEMENTS vpair_reduc_plus_scale_v8sf {mma,pair}
+
   v256 __builtin_vpair_f32_assemble (vf, vf);
     VPAIR_F32_ASSEMBLE vpair_assemble_v8sf {mma,pair}
 
@@ -4185,6 +4188,9 @@
 
   v256 __builtin_vpair_f64_add (v256, v256);
     VPAIR_F64_ADD vpair_add_v4df3 {mma,pair}
+
+  double __builtin_vpair_f64_add_elements (v256);
+    VPAIR_F64_ADD_ELEMENTS vpair_reduc_plus_scale_v4df {mma,pair}
 
   v256 __builtin_vpair_f64_assemble (vd, vd);
     VPAIR_F64_ASSEMBLE vpair_assemble_v4df {mma,pair}
@@ -4380,6 +4386,9 @@
 
   v256 __builtin_vpair_i64_add (v256, v256);
     VPAIR_I64_ADD vpair_add_v4di3 {mma,pair}
+
+  long long __builtin_vpair_i64_add_elements (v256);
+    VPAIR_I64_ADD_ELEMENTS vpair_reduc_plus_scale_v4di {mma,pair,no32bit}
 
   v256 __builtin_vpair_i64_and (v256, v256);
     VPAIR_I64_AND vpair_and_v4di3 {mma,pair}
