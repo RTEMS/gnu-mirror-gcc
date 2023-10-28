@@ -766,6 +766,12 @@ cp_lexer_new_main (void)
 
   maybe_check_all_macros (parse_in);
 
+  /* If we processed any #pragma GCC target directives, we handled them early so
+     any macros they defined would be effective during preprocessing.  Now, we
+     need to reset to the default state to begin compilation, and we will
+     process them again at the correct time as needed.  */
+  c_reset_target_pragmas ();
+
   gcc_assert (!lexer->next_token->purged_p);
   return lexer;
 }
@@ -6206,8 +6212,8 @@ cp_parser_primary_expression (cp_parser *parser,
 	      {
 		const char *msg
 		  = (TREE_CODE (decl) == PARM_DECL
-		     ? _("parameter %qD may not appear in this context")
-		     : _("local variable %qD may not appear in this context"));
+		     ? G_("parameter %qD may not appear in this context")
+		     : G_("local variable %qD may not appear in this context"));
 		error_at (id_expression.get_location (), msg,
 			  decl.get_value ());
 		return error_mark_node;
@@ -8055,54 +8061,12 @@ cp_parser_postfix_expression (cp_parser *parser, bool address_p, bool cast_p,
 					    close_paren_loc);
 	    iloc_sentinel ils (combined_loc);
 
-	    if (TREE_CODE (postfix_expression) == COMPONENT_REF)
-	      {
-		tree instance = TREE_OPERAND (postfix_expression, 0);
-		tree fn = TREE_OPERAND (postfix_expression, 1);
-
-		if (processing_template_decl
-		    && (type_dependent_object_expression_p (instance)
-			|| (!BASELINK_P (fn)
-			    && TREE_CODE (fn) != FIELD_DECL)
-			|| type_dependent_expression_p (fn)
-			|| any_type_dependent_arguments_p (args)))
-		  {
-		    maybe_generic_this_capture (instance, fn);
-		    postfix_expression
-		      = build_min_nt_call_vec (postfix_expression, args);
-		  }
-		else if (BASELINK_P (fn))
-		  {
-		  postfix_expression
-		    = (build_new_method_call
-		       (instance, fn, &args, NULL_TREE,
-			(idk == CP_ID_KIND_QUALIFIED
-			 ? LOOKUP_NORMAL|LOOKUP_NONVIRTUAL
-			 : LOOKUP_NORMAL),
-			/*fn_p=*/NULL,
-			complain));
-		  }
-		else
-		  postfix_expression
-		    = finish_call_expr (postfix_expression, &args,
-					/*disallow_virtual=*/false,
-					/*koenig_p=*/false,
-					complain);
-	      }
-	    else if (TREE_CODE (postfix_expression) == OFFSET_REF
-		     || TREE_CODE (postfix_expression) == MEMBER_REF
-		     || TREE_CODE (postfix_expression) == DOTSTAR_EXPR)
+	    if (TREE_CODE (postfix_expression) == OFFSET_REF
+		|| TREE_CODE (postfix_expression) == MEMBER_REF
+		|| TREE_CODE (postfix_expression) == DOTSTAR_EXPR)
 	      postfix_expression = (build_offset_ref_call_from_tree
 				    (postfix_expression, &args,
 				     complain));
-	    else if (idk == CP_ID_KIND_QUALIFIED)
-	      /* A call to a static class member, or a namespace-scope
-		 function.  */
-	      postfix_expression
-		= finish_call_expr (postfix_expression, &args,
-				    /*disallow_virtual=*/true,
-				    koenig_p,
-				    complain);
 	    else
 	      /* All other function calls.  */
 	      {
@@ -8115,12 +8079,14 @@ cp_parser_postfix_expression (cp_parser *parser, bool address_p, bool cast_p,
 				   "not permitted in intervening code");
 		    parser->omp_for_parse_state->fail = true;
 		  }
+		bool disallow_virtual = (idk == CP_ID_KIND_QUALIFIED);
 		postfix_expression
 		  = finish_call_expr (postfix_expression, &args,
-				      /*disallow_virtual=*/false,
+				      disallow_virtual,
 				      koenig_p,
 				      complain);
 	      }
+
 	    if (close_paren_loc != UNKNOWN_LOCATION)
 	      postfix_expression.set_location (combined_loc);
 
@@ -15669,6 +15635,7 @@ cp_parser_simple_declaration (cp_parser* parser,
 					maybe_range_for_decl,
 					&init_loc,
 					&auto_result);
+      const bool fndecl_p = TREE_CODE (decl) == FUNCTION_DECL;
       /* If an error occurred while parsing tentatively, exit quickly.
 	 (That usually happens when in the body of a function; each
 	 statement is treated as a declaration-statement until proven
@@ -15682,16 +15649,13 @@ cp_parser_simple_declaration (cp_parser* parser,
 	     init-declarator, they shall all form declarations of
 	     variables.  */
 	  if (auto_function_declaration == NULL_TREE)
-	    auto_function_declaration
-	      = TREE_CODE (decl) == FUNCTION_DECL ? decl : error_mark_node;
-	  else if (TREE_CODE (decl) == FUNCTION_DECL
-		   || auto_function_declaration != error_mark_node)
+	    auto_function_declaration = fndecl_p ? decl : error_mark_node;
+	  else if (fndecl_p || auto_function_declaration != error_mark_node)
 	    {
 	      error_at (decl_specifiers.locations[ds_type_spec],
 			"non-variable %qD in declaration with more than one "
 			"declarator with placeholder type",
-			TREE_CODE (decl) == FUNCTION_DECL
-			? decl : auto_function_declaration);
+			fndecl_p ? decl : auto_function_declaration);
 	      auto_function_declaration = error_mark_node;
 	    }
 	}
@@ -15763,7 +15727,9 @@ cp_parser_simple_declaration (cp_parser* parser,
 	  /* If we have already issued an error message we don't need
 	     to issue another one.  */
 	  if ((decl != error_mark_node
-	       && DECL_INITIAL (decl) != error_mark_node)
+	       /* grokfndecl sets DECL_INITIAL to error_mark_node for
+		  functions.  */
+	       && (fndecl_p || DECL_INITIAL (decl) != error_mark_node))
 	      || cp_parser_uncommitted_to_tentative_parse_p (parser))
 	    cp_parser_error (parser, "expected %<,%> or %<;%>");
 	  /* Skip tokens until we reach the end of the statement.  */
@@ -22145,16 +22111,16 @@ cp_parser_using_enum (cp_parser *parser)
      shall have a reachable enum-specifier.  */
   const char *msg = nullptr;
   if (cxx_dialect < cxx20)
-    msg = _("%<using enum%> "
-	    "only available with %<-std=c++20%> or %<-std=gnu++20%>");
+    msg = G_("%<using enum%> "
+	     "only available with %<-std=c++20%> or %<-std=gnu++20%>");
   else if (dependent_type_p (type))
-    msg = _("%<using enum%> of dependent type %qT");
+    msg = G_("%<using enum%> of dependent type %qT");
   else if (TREE_CODE (type) != ENUMERAL_TYPE)
-    msg = _("%<using enum%> of non-enumeration type %q#T");
+    msg = G_("%<using enum%> of non-enumeration type %q#T");
   else if (!COMPLETE_TYPE_P (type))
-    msg = _("%<using enum%> of incomplete type %qT");
+    msg = G_("%<using enum%> of incomplete type %qT");
   else if (OPAQUE_ENUM_P (type))
-    msg = _("%<using enum%> of %qT before its enum-specifier");
+    msg = G_("%<using enum%> of %qT before its enum-specifier");
   if (msg)
     {
       location_t loc = make_location (start, start, end);
@@ -37606,8 +37572,8 @@ cp_parser_omp_clause_name (cp_parser *parser)
 	    result = PRAGMA_OMP_CLAUSE_SCHEDULE;
 	  else if (!strcmp ("sections", p))
 	    result = PRAGMA_OMP_CLAUSE_SECTIONS;
-	  else if (!strcmp ("self", p)) /* "self" is a synonym for "host".  */
-	    result = PRAGMA_OACC_CLAUSE_HOST;
+	  else if (!strcmp ("self", p))
+	    result = PRAGMA_OACC_CLAUSE_SELF;
 	  else if (!strcmp ("seq", p))
 	    result = PRAGMA_OACC_CLAUSE_SEQ;
 	  else if (!strcmp ("shared", p))
@@ -38044,9 +38010,6 @@ cp_parser_oacc_data_clause (cp_parser *parser, pragma_omp_clause c_kind,
     case PRAGMA_OACC_CLAUSE_DEVICE_RESIDENT:
       kind = GOMP_MAP_DEVICE_RESIDENT;
       break;
-    case PRAGMA_OACC_CLAUSE_HOST:
-      kind = GOMP_MAP_FORCE_FROM;
-      break;
     case PRAGMA_OACC_CLAUSE_LINK:
       kind = GOMP_MAP_LINK;
       break;
@@ -38055,6 +38018,11 @@ cp_parser_oacc_data_clause (cp_parser *parser, pragma_omp_clause c_kind,
       break;
     case PRAGMA_OACC_CLAUSE_PRESENT:
       kind = GOMP_MAP_FORCE_PRESENT;
+      break;
+    case PRAGMA_OACC_CLAUSE_SELF:
+      /* "The 'host' clause is a synonym for the 'self' clause."  */
+    case PRAGMA_OACC_CLAUSE_HOST:
+      kind = GOMP_MAP_FORCE_FROM;
       break;
     default:
       gcc_unreachable ();
@@ -41232,6 +41200,44 @@ cp_parser_oacc_clause_async (cp_parser *parser, tree list)
   return list;
 }
 
+/* OpenACC 2.7:
+   self [( expression )] */
+
+static tree
+cp_parser_oacc_compute_clause_self (cp_parser *parser, tree list)
+{
+  tree t;
+  location_t location = cp_lexer_peek_token (parser->lexer)->location;
+  if (cp_lexer_peek_token (parser->lexer)->type == CPP_OPEN_PAREN)
+    {
+      matching_parens parens;
+      parens.consume_open (parser);
+      t = cp_parser_assignment_expression (parser);
+      if (t == error_mark_node
+	  || !parens.require_close (parser))
+	{
+	  cp_parser_skip_to_closing_parenthesis (parser, /*recovering=*/true,
+						 /*or_comma=*/false,
+						 /*consume_paren=*/true);
+	  return list;
+	}
+    }
+  else
+    t = truthvalue_true_node;
+
+  for (tree c = list; c; c = OMP_CLAUSE_CHAIN (c))
+    if (OMP_CLAUSE_CODE (c) == OMP_CLAUSE_SELF)
+      {
+	error_at (location, "too many %<self%> clauses");
+	return list;
+      }
+
+  tree c = build_omp_clause (location, OMP_CLAUSE_SELF);
+  OMP_CLAUSE_SELF_EXPR (c) = t;
+  OMP_CLAUSE_CHAIN (c) = list;
+  return c;
+}
+
 /* Parse all OpenACC clauses.  The set clauses allowed by the directive
    is a bitmask in MASK.  Return the list of clauses found.  */
 
@@ -41391,6 +41397,15 @@ cp_parser_oacc_all_clauses (cp_parser *parser, omp_clause_mask mask,
 	    = cp_parser_omp_clause_reduction (parser, OMP_CLAUSE_REDUCTION,
 					      false, clauses);
 	  c_name = "reduction";
+	  break;
+	case PRAGMA_OACC_CLAUSE_SELF:
+	  if ((mask & (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_HOST)) == 0)
+	    /* OpenACC compute construct */
+	    clauses = cp_parser_oacc_compute_clause_self (parser, clauses);
+	  else
+	    /* OpenACC 'update' directive */
+	    clauses = cp_parser_oacc_data_clause (parser, c_kind, clauses);
+	  c_name = "self";
 	  break;
 	case PRAGMA_OACC_CLAUSE_SEQ:
 	  clauses = cp_parser_oacc_simple_clause (here, OMP_CLAUSE_SEQ,
@@ -46906,6 +46921,7 @@ cp_parser_oacc_loop (cp_parser *parser, cp_token *pragma_tok, char *p_name,
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_NUM_GANGS)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_NUM_WORKERS)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT)		\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_SELF)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_VECTOR_LENGTH)	\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_WAIT) )
 
@@ -46926,6 +46942,7 @@ cp_parser_oacc_loop (cp_parser *parser, cp_token *pragma_tok, char *p_name,
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRIVATE)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_REDUCTION)		\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_SELF)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_VECTOR_LENGTH)       \
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_WAIT) )
 
@@ -46944,6 +46961,7 @@ cp_parser_oacc_loop (cp_parser *parser, cp_token *pragma_tok, char *p_name,
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_FIRSTPRIVATE)	\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_PRESENT)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_REDUCTION)		\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_SELF)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_WAIT) )
 
 static tree
@@ -47008,6 +47026,7 @@ cp_parser_oacc_compute (cp_parser *parser, cp_token *pragma_tok,
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_HOST)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_IF)			\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_IF_PRESENT)		\
+	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_SELF)		\
 	| (OMP_CLAUSE_MASK_1 << PRAGMA_OACC_CLAUSE_WAIT))
 
 static tree

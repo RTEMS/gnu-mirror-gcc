@@ -1052,27 +1052,6 @@ cp_fold_immediate_r (tree *stmt_p, int *walk_subtrees, void *data_)
 
   switch (TREE_CODE (stmt))
     {
-    /* Unfortunately we must handle code like
-	 false ? bar () : 42
-       where we have to check bar too.  The cp_fold call in cp_fold_r could
-       fold the ?: into a constant before we see it here.  */
-    case COND_EXPR:
-      /* If we are called from cp_fold_immediate, we don't need to worry about
-	 cp_fold folding away the COND_EXPR.  */
-      if (data->flags & ff_fold_immediate)
-	break;
-      if (TREE_OPERAND (stmt, 1)
-	  && cp_walk_tree (&TREE_OPERAND (stmt, 1), cp_fold_immediate_r, data,
-			   nullptr))
-	return error_mark_node;
-      if (TREE_OPERAND (stmt, 2)
-	  && cp_walk_tree (&TREE_OPERAND (stmt, 2), cp_fold_immediate_r, data,
-			   nullptr))
-	return error_mark_node;
-      /* We're done here.  Don't clear *walk_subtrees here though: we're called
-	 from cp_fold_r and we must let it recurse on the expression with
-	 cp_fold.  */
-      break;
     case PTRMEM_CST:
       if (TREE_CODE (PTRMEM_CST_MEMBER (stmt)) == FUNCTION_DECL
 	  && DECL_IMMEDIATE_FUNCTION_P (PTRMEM_CST_MEMBER (stmt)))
@@ -1153,7 +1132,14 @@ cp_fold_immediate (tree *tp, mce_value manifestly_const_eval)
    Note:  The folding of non-omp cases is something to move into
      the middle-end.  As for now we have most foldings only on GENERIC
      in fold-const, we need to perform this before transformation to
-     GIMPLE-form.  */
+     GIMPLE-form.
+
+   ??? This is algorithmically weird because walk_tree works in pre-order, so
+   we see outer expressions before inner expressions.  This isn't as much of an
+   issue because cp_fold recurses into subexpressions in many cases, but then
+   walk_tree walks back into those subexpressions again.  We avoid the
+   resulting complexity problem by caching the result of cp_fold, but it's
+   inelegant.  */
 
 static tree
 cp_fold_r (tree *stmt_p, int *walk_subtrees, void *data_)
@@ -1162,8 +1148,34 @@ cp_fold_r (tree *stmt_p, int *walk_subtrees, void *data_)
   tree stmt = *stmt_p;
   enum tree_code code = TREE_CODE (stmt);
 
-  if (cxx_dialect > cxx17)
-    cp_fold_immediate_r (stmt_p, walk_subtrees, data);
+  if (cxx_dialect >= cxx20)
+    {
+      /* Unfortunately we must handle code like
+	   false ? bar () : 42
+	 where we have to check bar too.  The cp_fold call below could
+	 fold the ?: into a constant before we've checked it.  */
+      if (code == COND_EXPR)
+	{
+	  auto then_fn = cp_fold_r, else_fn = cp_fold_r;
+	  /* See if we can figure out if either of the branches is dead.  If it
+	     is, we don't need to do everything that cp_fold_r does.  */
+	  cp_walk_tree (&TREE_OPERAND (stmt, 0), cp_fold_r, data, nullptr);
+	  if (integer_zerop (TREE_OPERAND (stmt, 0)))
+	    then_fn = cp_fold_immediate_r;
+	  else if (integer_nonzerop (TREE_OPERAND (stmt, 0)))
+	    else_fn = cp_fold_immediate_r;
+
+	  if (TREE_OPERAND (stmt, 1))
+	    cp_walk_tree (&TREE_OPERAND (stmt, 1), then_fn, data,
+			  nullptr);
+	  if (TREE_OPERAND (stmt, 2))
+	    cp_walk_tree (&TREE_OPERAND (stmt, 2), else_fn, data,
+			  nullptr);
+	  *walk_subtrees = 0;
+	  /* Don't return yet, still need the cp_fold below.  */
+	}
+      cp_fold_immediate_r (stmt_p, walk_subtrees, data);
+    }
 
   *stmt_p = stmt = cp_fold (*stmt_p, data->flags);
 

@@ -2632,6 +2632,21 @@ AC_PROG_LIBTOOL
 AC_SUBST(objdir)
 AC_SUBST(enable_fast_install)
 
+AM_CONDITIONAL([ENABLE_DARWIN_AT_RPATH], [test x$enable_darwin_at_rpath = xyes])
+DARWIN_DO_EXTRA_RPATH=0
+AC_ARG_WITH(darwin-extra-rpath,
+[AS_HELP_STRING(
+  [[--with-darwin-extra-rpath=[ARG]]],
+   [Specify a runpath directory, additional to those provided by the compiler])],
+[if test x"$withval" != x; then
+   DARWIN_ADD_RPATH="$withval"
+   DARWIN_DO_EXTRA_RPATH=1
+ fi])
+AC_DEFINE_UNQUOTED(DARWIN_DO_EXTRA_RPATH, $DARWIN_DO_EXTRA_RPATH,
+  [Should add an extra runpath directory])
+AC_DEFINE_UNQUOTED(DARWIN_ADD_RPATH, "$DARWIN_ADD_RPATH",
+  [Specify a runpath directory, additional to those provided by the compiler])
+
 # Identify the assembler which will work hand-in-glove with the newly
 # built GCC, so that we can examine its features.  This is the assembler
 # which will be driven by the driver program.
@@ -4374,6 +4389,14 @@ case "$target_os" in
       [-mmacosx-version-min=10.1], [.text],,
       [AC_DEFINE(HAVE_AS_MMACOSX_VERSION_MIN_OPTION, 1,
 	[Define if your macOS assembler supports the -mmacos-version-min option.])])
+    if test x$gcc_cv_as_mmacosx_version_min = "xyes"; then
+       gcc_GAS_CHECK_FEATURE([.build_version],
+           gcc_cv_as_darwin_build_version,
+           [-mmacosx-version-min=10.14],
+           [ .build_version macos, 10, 14 sdk_version 10, 14],,
+      [AC_DEFINE(HAVE_AS_MACOS_BUILD_VERSION, 1,
+	[Define if your macOS assembler supports .build_version directives])])
+    fi
     ;;
 esac
 

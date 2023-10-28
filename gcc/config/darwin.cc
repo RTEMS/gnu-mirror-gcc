@@ -3073,7 +3073,35 @@ darwin_asm_output_dwarf_offset (FILE *file, int size, const char * lab,
 void
 darwin_file_start (void)
 {
-  /* Nothing to do.  */
+#ifdef HAVE_AS_MMACOSX_VERSION_MIN_OPTION
+  /* This should not happen with a well-formed command line, but the user could
+     invoke cc1* directly without it.  */
+  if (!darwin_macosx_version_min)
+    return;
+  /* This assumes that the version passed has been validated in the driver.  */
+  unsigned maj, min, tiny;
+  int count = sscanf (darwin_macosx_version_min, "%u.%u.%u", &maj, &min, &tiny);
+  if (count < 0)
+    return;
+  if (count < 3)
+    tiny = 0;
+  if (count < 2)
+    min = 0;
+  const char *directive;
+#ifdef HAVE_AS_MACOS_BUILD_VERSION
+  /* We only handle macos, so far.  */
+  if (generating_for_darwin_version >= 18)
+    directive = "build_version macos, ";
+  else
+#endif
+    directive = "macosx_version_min ";
+  if (count > 2 && tiny != 0)
+    fprintf (asm_out_file, "\t.%s %u, %u, %u\n", directive, maj, min, tiny);
+  else if (count > 1)
+    fprintf (asm_out_file, "\t.%s %u, %u\n", directive, maj, min);
+  else
+     fprintf (asm_out_file, "\t.%s %u, 0\n", directive, maj);
+#endif
 }
 
 /* Called for the TARGET_ASM_FILE_END hook.
@@ -3295,7 +3323,11 @@ darwin_override_options (void)
   /* Keep track of which (major) version we're generating code for.  */
   if (darwin_macosx_version_min)
     {
-      if (strverscmp (darwin_macosx_version_min, "10.7") >= 0)
+      if (strverscmp (darwin_macosx_version_min, "10.14") >= 0)
+	generating_for_darwin_version = 18;
+      else if (strverscmp (darwin_macosx_version_min, "10.8") >= 0)
+	generating_for_darwin_version = 12;
+      else if (strverscmp (darwin_macosx_version_min, "10.7") >= 0)
 	generating_for_darwin_version = 11;
       else if (strverscmp (darwin_macosx_version_min, "10.6") >= 0)
 	generating_for_darwin_version = 10;
@@ -3465,8 +3497,17 @@ darwin_override_options (void)
       && dwarf_debuginfo_p ())
     flag_var_tracking_uninit = flag_var_tracking;
 
-  /* Final check on PCI options; for Darwin these are not dependent on the PIE
-     ones, although PIE does require PIC to support it.  */
+  if (OPTION_SET_P (flag_pie) && flag_pie)
+    {
+      /* This is a little complicated, to match Xcode tools.
+	 For Darwin, PIE requires PIC codegen, but otherwise is only a link-
+	 time change.  For almost all Darwin, we do not report __PIE__; the
+	 exception is Darwin12-17 and for 32b only.  */
+      flag_pie = generating_for_darwin_version >= 12 && !TARGET_64BIT ? 2 : 0;
+      flag_pic = 2; /* We always set this.  */
+    }
+
+  /* Final check on PIC options.  */
   if (MACHO_DYNAMIC_NO_PIC_P)
     {
       if (flag_pic)

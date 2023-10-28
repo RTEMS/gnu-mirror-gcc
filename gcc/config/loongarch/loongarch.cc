@@ -65,6 +65,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "rtl-iter.h"
 #include "opts.h"
 #include "function-abi.h"
+#include "cfgloop.h"
+#include "tree-vectorizer.h"
 
 /* This file should be included last.  */
 #include "target-def.h"
@@ -1923,6 +1925,40 @@ loongarch_symbolic_constant_p (rtx x, enum loongarch_symbol_type *symbol_type)
   gcc_unreachable ();
 }
 
+/* If -mexplicit-relocs=auto, we use machine operations with reloc hints
+   for cases where the linker is unable to relax so we can schedule the
+   machine operations, otherwise use an assembler pseudo-op so the
+   assembler will generate R_LARCH_RELAX.  */
+
+bool
+loongarch_explicit_relocs_p (enum loongarch_symbol_type type)
+{
+  if (la_opt_explicit_relocs != EXPLICIT_RELOCS_AUTO)
+    return la_opt_explicit_relocs == EXPLICIT_RELOCS_ALWAYS;
+
+  switch (type)
+    {
+      case SYMBOL_TLS_IE:
+      case SYMBOL_TLS_LE:
+      case SYMBOL_TLSGD:
+      case SYMBOL_TLSLDM:
+	/* The linker don't know how to relax TLS accesses.  */
+	return true;
+      case SYMBOL_GOT_DISP:
+	/* If we are performing LTO for a final link, and we have the
+	   linker plugin so we know the resolution of the symbols, then
+	   all GOT references are binding to external symbols or
+	   preemptable symbols.  So the linker cannot relax them.  */
+	return (in_lto_p
+		&& !flag_incremental_link
+		&& HAVE_LTO_PLUGIN == 2
+		&& (!global_options_set.x_flag_use_linker_plugin
+		    || global_options.x_flag_use_linker_plugin));
+      default:
+	return false;
+    }
+}
+
 /* Returns the number of instructions necessary to reference a symbol.  */
 
 static int
@@ -1938,7 +1974,7 @@ loongarch_symbol_insns (enum loongarch_symbol_type type, machine_mode mode)
     case SYMBOL_GOT_DISP:
       /* The constant will have to be loaded from the GOT before it
 	 is used in an address.  */
-      if (!TARGET_EXPLICIT_RELOCS && mode != MAX_MACHINE_MODE)
+      if (!loongarch_explicit_relocs_p (type) && mode != MAX_MACHINE_MODE)
 	return 0;
 
       return 3;
@@ -2728,7 +2764,7 @@ loongarch_call_tls_get_addr (rtx sym, enum loongarch_symbol_type type, rtx v0)
 
   start_sequence ();
 
-  if (TARGET_EXPLICIT_RELOCS)
+  if (la_opt_explicit_relocs != EXPLICIT_RELOCS_NONE)
     {
       /* Split tls symbol to high and low.  */
       rtx high = gen_rtx_HIGH (Pmode, copy_rtx (loc));
@@ -2893,7 +2929,7 @@ loongarch_legitimize_tls_address (rtx loc)
 	  tp = gen_rtx_REG (Pmode, THREAD_POINTER_REGNUM);
 	  tmp1 = gen_reg_rtx (Pmode);
 	  dest = gen_reg_rtx (Pmode);
-	  if (TARGET_EXPLICIT_RELOCS)
+	  if (la_opt_explicit_relocs != EXPLICIT_RELOCS_NONE)
 	    {
 	      tmp2 = loongarch_unspec_address (loc, SYMBOL_TLS_IE);
 	      tmp3 = gen_reg_rtx (Pmode);
@@ -2930,7 +2966,7 @@ loongarch_legitimize_tls_address (rtx loc)
 	  tmp1 = gen_reg_rtx (Pmode);
 	  dest = gen_reg_rtx (Pmode);
 
-	  if (TARGET_EXPLICIT_RELOCS)
+	  if (la_opt_explicit_relocs != EXPLICIT_RELOCS_NONE)
 	    {
 	      tmp2 = loongarch_unspec_address (loc, SYMBOL_TLS_LE);
 	      tmp3 = gen_reg_rtx (Pmode);
@@ -3036,7 +3072,7 @@ loongarch_symbol_extreme_p (enum loongarch_symbol_type type)
    If so, and if LOW_OUT is nonnull, emit the high part and store the
    low part in *LOW_OUT.  Leave *LOW_OUT unchanged otherwise.
 
-   Return false if build with '-mno-explicit-relocs'.
+   Return false if build with '-mexplicit-relocs=none'.
 
    TEMP is as for loongarch_force_temporary and is used to load the high
    part into a register.
@@ -3050,12 +3086,9 @@ loongarch_split_symbol (rtx temp, rtx addr, machine_mode mode, rtx *low_out)
 {
   enum loongarch_symbol_type symbol_type;
 
-  /* If build with '-mno-explicit-relocs', don't split symbol.  */
-  if (!TARGET_EXPLICIT_RELOCS)
-    return false;
-
   if ((GET_CODE (addr) == HIGH && mode == MAX_MACHINE_MODE)
       || !loongarch_symbolic_constant_p (addr, &symbol_type)
+      || !loongarch_explicit_relocs_p (symbol_type)
       || loongarch_symbol_insns (symbol_type, mode) == 0
       || !loongarch_split_symbol_type (symbol_type))
     return false;
@@ -3845,8 +3878,6 @@ loongarch_rtx_costs (rtx x, machine_mode mode, int outer_code,
     }
 }
 
-/* Vectorizer cost model implementation.  */
-
 /* Implement targetm.vectorize.builtin_vectorization_cost.  */
 
 static int
@@ -3865,34 +3896,180 @@ loongarch_builtin_vectorization_cost (enum vect_cost_for_stmt type_of_cost,
       case vector_load:
       case vec_to_scalar:
       case scalar_to_vec:
-      case cond_branch_not_taken:
-      case vec_promote_demote:
       case scalar_store:
       case vector_store:
 	return 1;
 
+      case vec_promote_demote:
       case vec_perm:
 	return LASX_SUPPORTED_MODE_P (mode)
 	  && !LSX_SUPPORTED_MODE_P (mode) ? 2 : 1;
 
       case unaligned_load:
-      case vector_gather_load:
+      case unaligned_store:
 	return 2;
 
-      case unaligned_store:
-      case vector_scatter_store:
-	return 10;
-
       case cond_branch_taken:
-	return 3;
+	return 4;
+
+      case cond_branch_not_taken:
+	return 2;
 
       case vec_construct:
 	elements = TYPE_VECTOR_SUBPARTS (vectype);
-	return elements / 2 + 1;
+	if (ISA_HAS_LASX)
+	  return elements + 1;
+	else
+	  return elements;
 
       default:
 	gcc_unreachable ();
     }
+}
+
+class loongarch_vector_costs : public vector_costs
+{
+public:
+  using vector_costs::vector_costs;
+
+  unsigned int add_stmt_cost (int count, vect_cost_for_stmt kind,
+			      stmt_vec_info stmt_info, slp_tree, tree vectype,
+			      int misalign,
+			      vect_cost_model_location where) override;
+  void finish_cost (const vector_costs *) override;
+
+protected:
+  void count_operations (vect_cost_for_stmt, stmt_vec_info,
+			 vect_cost_model_location, unsigned int);
+  unsigned int determine_suggested_unroll_factor (loop_vec_info);
+  /* The number of vectorized stmts in loop.  */
+  unsigned m_stmts = 0;
+  /* The number of load and store operations in loop.  */
+  unsigned m_loads = 0;
+  unsigned m_stores = 0;
+  /* Reduction factor for suggesting unroll factor.  */
+  unsigned m_reduc_factor = 0;
+  /* True if the loop contains an average operation. */
+  bool m_has_avg =false;
+};
+
+/* Implement TARGET_VECTORIZE_CREATE_COSTS.  */
+static vector_costs *
+loongarch_vectorize_create_costs (vec_info *vinfo, bool costing_for_scalar)
+{
+  return new loongarch_vector_costs (vinfo, costing_for_scalar);
+}
+
+void
+loongarch_vector_costs::count_operations (vect_cost_for_stmt kind,
+					  stmt_vec_info stmt_info,
+					  vect_cost_model_location where,
+					  unsigned int count)
+{
+  if (!m_costing_for_scalar
+      && is_a<loop_vec_info> (m_vinfo)
+      && where == vect_body)
+    {
+      m_stmts += count;
+
+      if (kind == scalar_load
+	  || kind == vector_load
+	  || kind == unaligned_load)
+	m_loads += count;
+      else if (kind == scalar_store
+	       || kind == vector_store
+	       || kind == unaligned_store)
+	m_stores += count;
+      else if ((kind == scalar_stmt
+		|| kind == vector_stmt
+		|| kind == vec_to_scalar)
+	       && stmt_info && vect_is_reduction (stmt_info))
+	{
+	  tree lhs = gimple_get_lhs (stmt_info->stmt);
+	  unsigned int base = FLOAT_TYPE_P (TREE_TYPE (lhs)) ? 2 : 1;
+	  m_reduc_factor = MAX (base * count, m_reduc_factor);
+	}
+    }
+}
+
+unsigned int
+loongarch_vector_costs::determine_suggested_unroll_factor (loop_vec_info loop_vinfo)
+{
+  class loop *loop = LOOP_VINFO_LOOP (loop_vinfo);
+
+  if (m_has_avg)
+    return 1;
+
+  /* Don't unroll if it's specified explicitly not to be unrolled.  */
+  if (loop->unroll == 1
+      || (OPTION_SET_P (flag_unroll_loops) && !flag_unroll_loops)
+      || (OPTION_SET_P (flag_unroll_all_loops) && !flag_unroll_all_loops))
+    return 1;
+
+  unsigned int nstmts_nonldst = m_stmts - m_loads - m_stores;
+  /* Don't unroll if no vector instructions excepting for memory access.  */
+  if (nstmts_nonldst == 0)
+    return 1;
+
+  /* Use this simple hardware resource model that how many non vld/vst
+     vector instructions can be issued per cycle.  */
+  unsigned int issue_info = loongarch_vect_issue_info;
+  unsigned int reduc_factor = m_reduc_factor > 1 ? m_reduc_factor : 1;
+  unsigned int uf = CEIL (reduc_factor * issue_info, nstmts_nonldst);
+  uf = MIN ((unsigned int) loongarch_vect_unroll_limit, uf);
+
+  return 1 << ceil_log2 (uf);
+}
+
+unsigned
+loongarch_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
+				       stmt_vec_info stmt_info, slp_tree,
+				       tree vectype, int misalign,
+				       vect_cost_model_location where)
+{
+  unsigned retval = 0;
+
+  if (flag_vect_cost_model)
+    {
+      int stmt_cost = loongarch_builtin_vectorization_cost (kind, vectype,
+							    misalign);
+      retval = adjust_cost_for_freq (stmt_info, where, count * stmt_cost);
+      m_costs[where] += retval;
+
+      count_operations (kind, stmt_info, where, count);
+    }
+
+  if (stmt_info)
+    {
+      /* Detect the use of an averaging operation.  */
+      gimple *stmt = stmt_info->stmt;
+      if (is_gimple_call (stmt)
+	  && gimple_call_internal_p (stmt))
+	{
+	  switch (gimple_call_internal_fn (stmt))
+	    {
+	    case IFN_AVG_FLOOR:
+	    case IFN_AVG_CEIL:
+	      m_has_avg = true;
+	    default:
+	      break;
+	    }
+	}
+    }
+
+  return retval;
+}
+
+void
+loongarch_vector_costs::finish_cost (const vector_costs *scalar_costs)
+{
+  loop_vec_info loop_vinfo = dyn_cast<loop_vec_info> (m_vinfo);
+  if (loop_vinfo)
+    {
+      m_suggested_unroll_factor = determine_suggested_unroll_factor (loop_vinfo);
+    }
+
+  vector_costs::finish_cost (scalar_costs);
 }
 
 /* Implement TARGET_ADDRESS_COST.  */
@@ -4651,7 +4828,7 @@ loongarch_output_move (rtx dest, rtx src)
 	}
     }
 
-  if (!TARGET_EXPLICIT_RELOCS
+  if (!loongarch_explicit_relocs_p (loongarch_classify_symbol (src))
       && dest_code == REG && symbolic_operand (src, VOIDmode))
     {
       if (loongarch_classify_symbol (src) == SYMBOL_PCREL)
@@ -7241,6 +7418,25 @@ loongarch_option_override_internal (struct gcc_options *opts,
   loongarch_update_gcc_opt_status (&la_target, opts, opts_set);
   loongarch_cpu_option_override (&la_target, opts, opts_set);
 
+  if (la_opt_explicit_relocs != M_OPT_UNSET
+      && la_opt_explicit_relocs_backward != M_OPT_UNSET)
+    error ("do not use %qs (with %qs) and %qs (without %qs) together",
+	   "-mexplicit-relocs=", "=",
+	   la_opt_explicit_relocs_backward ? "-mexplicit-relocs"
+					   : "-mno-explicit-relocs", "=");
+
+  if (la_opt_explicit_relocs_backward != M_OPT_UNSET)
+    la_opt_explicit_relocs = (la_opt_explicit_relocs_backward
+			      ? EXPLICIT_RELOCS_ALWAYS
+			      : EXPLICIT_RELOCS_NONE);
+
+  if (la_opt_explicit_relocs == M_OPT_UNSET)
+    la_opt_explicit_relocs = (HAVE_AS_EXPLICIT_RELOCS
+			      ? (HAVE_AS_MRELAX_OPTION
+				 ? EXPLICIT_RELOCS_AUTO
+				 : EXPLICIT_RELOCS_ALWAYS)
+			      : EXPLICIT_RELOCS_NONE);
+
   if (TARGET_ABI_LP64)
     flag_pcc_struct_return = 0;
 
@@ -7265,16 +7461,13 @@ loongarch_option_override_internal (struct gcc_options *opts,
   if (TARGET_DIRECT_EXTERN_ACCESS && flag_shlib)
     error ("%qs cannot be used for compiling a shared library",
 	   "-mdirect-extern-access");
-  if (loongarch_vector_access_cost == 0)
-    loongarch_vector_access_cost = 5;
-
 
   switch (la_target.cmodel)
     {
       case CMODEL_EXTREME:
 	if (!TARGET_EXPLICIT_RELOCS)
 	  error ("code model %qs needs %s",
-		 "extreme", "-mexplicit-relocs");
+		 "extreme", "-mexplicit-relocs=always");
 
 	if (opts->x_flag_plt)
 	  {
@@ -7578,7 +7771,8 @@ loongarch_handle_model_attribute (tree *node, tree name, tree arg, int,
       if (!TARGET_EXPLICIT_RELOCS)
 	{
 	  error_at (DECL_SOURCE_LOCATION (decl),
-		    "%qE attribute requires %s", name, "-mexplicit-relocs");
+		    "%qE attribute requires %s", name,
+		    "-mexplicit-relocs=always");
 	  *no_add_attrs = true;
 	  return NULL_TREE;
 	}
@@ -8030,6 +8224,143 @@ loongarch_expand_vec_perm_even_odd (struct expand_vec_perm_d *d)
       return false;
 
   return loongarch_expand_vec_perm_even_odd_1 (d, odd);
+}
+
+static void
+loongarch_expand_vec_interleave (rtx target, rtx op0, rtx op1, bool high_p)
+{
+  struct expand_vec_perm_d d;
+  unsigned i, nelt, base;
+  bool ok;
+
+  d.target = target;
+  d.op0 = op0;
+  d.op1 = op1;
+  d.vmode = GET_MODE (target);
+  d.nelt = nelt = GET_MODE_NUNITS (d.vmode);
+  d.one_vector_p = false;
+  d.testing_p = false;
+
+  base = high_p ? nelt / 2 : 0;
+  for (i = 0; i < nelt / 2; ++i)
+    {
+      d.perm[i * 2] = i + base;
+      d.perm[i * 2 + 1] = i + base + nelt;
+    }
+
+  ok = loongarch_expand_vec_perm_interleave (&d);
+  gcc_assert (ok);
+}
+
+/* The loongarch lasx instructions xvmulwev and xvmulwod return the even or odd
+   parts of the double sized result elements in the corresponding elements of
+   the target register. That's NOT what the vec_widen_umult_lo/hi patterns are
+   expected to do. We emulate the widening lo/hi multiplies with the even/odd
+   versions followed by a vector merge.  */
+
+void
+loongarch_expand_vec_widen_hilo (rtx dest, rtx op1, rtx op2,
+				 bool uns_p, bool high_p, const char *optab)
+{
+  machine_mode wmode = GET_MODE (dest);
+  machine_mode mode = GET_MODE (op1);
+  rtx t1, t2, t3;
+
+  t1 = gen_reg_rtx (wmode);
+  t2 = gen_reg_rtx (wmode);
+  t3 = gen_reg_rtx (wmode);
+  switch (mode)
+    {
+    case V16HImode:
+      if (!strcmp (optab, "add"))
+	{
+	  if (!uns_p)
+	    {
+	      emit_insn (gen_lasx_xvaddwev_w_h (t1, op1, op2));
+	      emit_insn (gen_lasx_xvaddwod_w_h (t2, op1, op2));
+	    }
+	  else
+	    {
+	      emit_insn (gen_lasx_xvaddwev_w_hu (t1, op1, op2));
+	      emit_insn (gen_lasx_xvaddwod_w_hu (t2, op1, op2));
+	    }
+	}
+      else if (!strcmp (optab, "mult"))
+	{
+	  if (!uns_p)
+	    {
+	      emit_insn (gen_lasx_xvmulwev_w_h (t1, op1, op2));
+	      emit_insn (gen_lasx_xvmulwod_w_h (t2, op1, op2));
+	    }
+	  else
+	    {
+	      emit_insn (gen_lasx_xvmulwev_w_hu (t1, op1, op2));
+	      emit_insn (gen_lasx_xvmulwod_w_hu (t2, op1, op2));
+	    }
+	}
+      else if (!strcmp (optab, "sub"))
+	{
+	  if (!uns_p)
+	    {
+	      emit_insn (gen_lasx_xvsubwev_w_h (t1, op1, op2));
+	      emit_insn (gen_lasx_xvsubwod_w_h (t2, op1, op2));
+	    }
+	  else
+	    {
+	      emit_insn (gen_lasx_xvsubwev_w_hu (t1, op1, op2));
+	      emit_insn (gen_lasx_xvsubwod_w_hu (t2, op1, op2));
+	    }
+	}
+      break;
+
+    case V32QImode:
+      if (!strcmp (optab, "add"))
+	{
+	  if (!uns_p)
+	    {
+	      emit_insn (gen_lasx_xvaddwev_h_b (t1, op1, op2));
+	      emit_insn (gen_lasx_xvaddwod_h_b (t2, op1, op2));
+	    }
+	  else
+	    {
+	      emit_insn (gen_lasx_xvaddwev_h_bu (t1, op1, op2));
+	      emit_insn (gen_lasx_xvaddwod_h_bu (t2, op1, op2));
+	    }
+	}
+      else if (!strcmp (optab, "mult"))
+	{
+	  if (!uns_p)
+	    {
+	      emit_insn (gen_lasx_xvmulwev_h_b (t1, op1, op2));
+	      emit_insn (gen_lasx_xvmulwod_h_b (t2, op1, op2));
+	    }
+	  else
+	    {
+	      emit_insn (gen_lasx_xvmulwev_h_bu (t1, op1, op2));
+	      emit_insn (gen_lasx_xvmulwod_h_bu (t2, op1, op2));
+	    }
+	}
+      else if (!strcmp (optab, "sub"))
+	{
+	  if (!uns_p)
+	    {
+	      emit_insn (gen_lasx_xvsubwev_h_b (t1, op1, op2));
+	      emit_insn (gen_lasx_xvsubwod_h_b (t2, op1, op2));
+	    }
+	  else
+	    {
+	      emit_insn (gen_lasx_xvsubwev_h_bu (t1, op1, op2));
+	      emit_insn (gen_lasx_xvsubwod_h_bu (t2, op1, op2));
+	    }
+	}
+      break;
+
+    default:
+      gcc_unreachable ();
+    }
+
+  loongarch_expand_vec_interleave (t3, t1, t2, high_p);
+  emit_move_insn (dest, gen_lowpart (wmode, t3));
 }
 
 /* Expand a variable vector permutation for LASX.  */
@@ -10194,7 +10525,8 @@ loongarch_gen_const_int_vector_shuffle (machine_mode mode, int val)
 void
 loongarch_expand_vector_group_init (rtx target, rtx vals)
 {
-  rtx ops[2] = { XVECEXP (vals, 0, 0), XVECEXP (vals, 0, 1) };
+  rtx ops[2] = { force_reg (E_V16QImode, XVECEXP (vals, 0, 0)),
+      force_reg (E_V16QImode, XVECEXP (vals, 0, 1)) };
   emit_insn (gen_rtx_SET (target, gen_rtx_VEC_CONCAT (E_V32QImode, ops[0],
 						      ops[1])));
 }
@@ -11143,6 +11475,8 @@ loongarch_builtin_support_vector_misalignment (machine_mode mode,
 #undef TARGET_VECTORIZE_BUILTIN_VECTORIZATION_COST
 #define TARGET_VECTORIZE_BUILTIN_VECTORIZATION_COST \
   loongarch_builtin_vectorization_cost
+#undef TARGET_VECTORIZE_CREATE_COSTS
+#define TARGET_VECTORIZE_CREATE_COSTS loongarch_vectorize_create_costs
 
 
 #undef TARGET_IN_SMALL_DATA_P

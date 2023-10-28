@@ -1757,16 +1757,16 @@
   }
 )
 
-(define_insn "load_pair_dw_tftf"
-  [(set (match_operand:TF 0 "register_operand" "=w")
-	(match_operand:TF 1 "aarch64_mem_pair_operand" "Ump"))
-   (set (match_operand:TF 2 "register_operand" "=w")
-	(match_operand:TF 3 "memory_operand" "m"))]
+(define_insn "load_pair_dw_<TX:mode><TX2:mode>"
+  [(set (match_operand:TX 0 "register_operand" "=w")
+	(match_operand:TX 1 "aarch64_mem_pair_operand" "Ump"))
+   (set (match_operand:TX2 2 "register_operand" "=w")
+	(match_operand:TX2 3 "memory_operand" "m"))]
    "TARGET_SIMD
     && rtx_equal_p (XEXP (operands[3], 0),
 		    plus_constant (Pmode,
 				   XEXP (operands[1], 0),
-				   GET_MODE_SIZE (TFmode)))"
+				   GET_MODE_SIZE (<TX:MODE>mode)))"
   "ldp\\t%q0, %q2, %z1"
   [(set_attr "type" "neon_ldp_q")
    (set_attr "fp" "yes")]
@@ -1805,11 +1805,11 @@
   }
 )
 
-(define_insn "store_pair_dw_tftf"
-  [(set (match_operand:TF 0 "aarch64_mem_pair_operand" "=Ump")
-	(match_operand:TF 1 "register_operand" "w"))
-   (set (match_operand:TF 2 "memory_operand" "=m")
-	(match_operand:TF 3 "register_operand" "w"))]
+(define_insn "store_pair_dw_<TX:mode><TX2:mode>"
+  [(set (match_operand:TX 0 "aarch64_mem_pair_operand" "=Ump")
+	(match_operand:TX 1 "register_operand" "w"))
+   (set (match_operand:TX2 2 "memory_operand" "=m")
+	(match_operand:TX2 3 "register_operand" "w"))]
    "TARGET_SIMD &&
     rtx_equal_p (XEXP (operands[2], 0),
 		 plus_constant (Pmode,
@@ -4410,6 +4410,53 @@
 	  (const_int 0)))]
   ""
   "cs<neg_not_cs>\\t%w0, wzr, %w2, %M1"
+  [(set_attr "type" "csel")]
+)
+
+;; There are two canonical forms for `cmp ? ~a : a`.
+;; This is the second form and is here to help combine.
+;; Support `-(cmp) ^ a` into `cmp ? ~a : a`
+;; The second pattern is to support the zero extend'ed version.
+
+(define_insn_and_split "*cmov<mode>_insn_insv"
+  [(set (match_operand:GPI 0 "register_operand" "=r")
+        (xor:GPI
+	 (neg:GPI
+	  (match_operator:GPI 1 "aarch64_comparison_operator"
+	   [(match_operand 2 "cc_register" "") (const_int 0)]))
+	 (match_operand:GPI 3 "general_operand" "r")))]
+  ""
+  "#"
+  "&& true"
+  [(set (match_dup 0)
+	(if_then_else:GPI (match_dup 1)
+			  (not:GPI (match_dup 3))
+			  (match_dup 3)))]
+  {
+    /* After reload this will be a nop due to the constraint.  */
+    operands[3] = force_reg (<MODE>mode, operands[3]);
+  }
+  [(set_attr "type" "csel")]
+)
+
+(define_insn_and_split "*cmov_uxtw_insn_insv"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+        (zero_extend:DI
+	 (xor:SI
+	  (neg:SI
+	   (match_operator:SI 1 "aarch64_comparison_operator"
+	    [(match_operand 2 "cc_register" "") (const_int 0)]))
+	  (match_operand:SI 3 "general_operand" "r"))))]
+  "can_create_pseudo_p ()"
+  "#"
+  "&& true"
+  [(set (match_dup 0)
+	(if_then_else:DI (match_dup 1)
+			  (zero_extend:DI (not:SI (match_dup 3)))
+			  (zero_extend:DI (match_dup 3))))]
+  {
+    operands[3] = force_reg (SImode, operands[3]);
+  }
   [(set_attr "type" "csel")]
 )
 
