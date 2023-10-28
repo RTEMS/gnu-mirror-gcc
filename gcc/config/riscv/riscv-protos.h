@@ -156,6 +156,7 @@ extern void riscv_parse_arch_string (const char *, struct gcc_options *, locatio
 extern bool riscv_hard_regno_rename_ok (unsigned, unsigned);
 
 rtl_opt_pass * make_pass_shorten_memrefs (gcc::context *ctxt);
+rtl_opt_pass * make_pass_avlprop (gcc::context *ctxt);
 rtl_opt_pass * make_pass_vsetvl (gcc::context *ctxt);
 
 /* Routines implemented in riscv-string.c.  */
@@ -491,6 +492,7 @@ void expand_vec_lfloor (rtx, rtx, machine_mode, machine_mode);
 bool sew64_scalar_helper (rtx *, rtx *, rtx, machine_mode,
 			  bool, void (*)(rtx *, rtx));
 rtx gen_scalar_move_mask (machine_mode);
+rtx gen_no_side_effects_vsetvl_rtx (machine_mode, rtx, rtx);
 
 /* RVV vector register sizes.
    TODO: Currently, we only add RVV_32/RVV_64/RVV_128, we may need to
@@ -522,6 +524,7 @@ void expand_cond_unop (unsigned, rtx *);
 void expand_cond_binop (unsigned, rtx *);
 void expand_cond_ternop (unsigned, rtx *);
 void expand_popcount (rtx *);
+void expand_rawmemchr (machine_mode, rtx, rtx, rtx);
 
 /* Rounding mode bitfield for fixed point VXRM.  */
 enum fixed_point_rounding_mode

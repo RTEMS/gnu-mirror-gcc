@@ -1,3 +1,263 @@
+2023-10-27  Patrick O'Neill  <patrick@rivosinc.com>
+
+	* gcc.target/riscv/stack_save_restore_2.c: Accept any number
+	after __riscv_save_ and __riscv_restore_.
+
+2023-10-27  Harald Anlauf  <anlauf@gmx.de>
+	    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/104649
+	* gfortran.dg/pr104649.f90: New test.
+
+2023-10-27  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/111929
+	* g++.dg/template/non-dependent28a.C: New test.
+
+2023-10-27  Patrick Palka  <ppalka@redhat.com>
+
+	* g++.dg/template/new14.C: New test.
+
+2023-10-27  Patrick Palka  <ppalka@redhat.com>
+
+	* g++.dg/warn/Wparentheses-13.C: Strengthen by expecting that
+	we issue the -Wparentheses warnings ahead of time.
+	* g++.dg/warn/Wparentheses-23.C: Likewise.
+	* g++.dg/warn/Wparentheses-32.C: Remove xfails.
+
+2023-10-27  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/111530
+	* gm2/pimlib/run/pass/testgetopt.mod: New test.
+
+2023-10-27  Robin Dapp  <rdapp@ventanamicro.com>
+
+	* gcc.dg/tree-prof/peel-2.c: Add
+	-fno-tree-loop-distribute-patterns.
+	* gcc.dg/tree-ssa/ldist-rawmemchr-1.c: Add riscv.
+	* gcc.dg/tree-ssa/ldist-rawmemchr-2.c: Ditto.
+	* gcc.target/riscv/rvv/rvv.exp: Add builtin directory.
+	* gcc.target/riscv/rvv/autovec/builtin/rawmemchr-1.c: New test.
+
+2023-10-27  Robin Dapp  <rdapp@ventanamicro.com>
+
+	* gcc.target/riscv/rvv/autovec/cond/cond_sqrt-1.c: Remove
+	Float16.
+	* gcc.target/riscv/rvv/autovec/cond/cond_sqrt-2.c: Ditto.
+	* lib/target-supports.exp: Add zvfh handling.
+	* gcc.target/riscv/rvv/autovec/cond/cond_sqrt-zvfh-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/cond/cond_sqrt-zvfh-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/cond/cond_sqrt_run-zvfh-1.c: New test.
+	* gcc.target/riscv/rvv/autovec/cond/cond_sqrt_run-zvfh-2.c: New test.
+
+2023-10-27  Paul-Antoine Arras  <pa@codesourcery.com>
+
+	* gfortran.dg/c_ptr_tests_20.f90: Moved to...
+	* gfortran.dg/gomp/c_ptr_tests_20.f90: ...here.
+	* gfortran.dg/c_ptr_tests_21.f90: Moved to...
+	* gfortran.dg/gomp/c_ptr_tests_21.f90: ...here.
+
+2023-10-27  Roger Sayle  <roger@nextmovesoftware.com>
+
+	PR target/110551
+	* gcc.target/i386/pr110551.c: New test case.
+
+2023-10-27  Lewis Hyatt  <lhyatt@gmail.com>
+
+	PR preprocessor/87299
+	* c-c++-common/pragma-target-1.c: New test.
+	* c-c++-common/pragma-target-2.c: New test.
+	* g++.target/i386/pr87299-1.C: New test.
+	* g++.target/i386/pr87299-2.C: New test.
+	* gcc.target/i386/pr87299-1.c: New test.
+	* gcc.target/i386/pr87299-2.c: New test.
+	* gcc.target/s390/target-attribute/tattr-2b.c: New test.
+	* gcc.target/aarch64/pragma_cpp_predefs_1b.c: New test.
+	* gcc.target/arm/pragma_arch_attribute_1b.c: New test.
+	* gcc.target/nios2/custom-fp-2b.c: New test.
+	* gcc.target/powerpc/float128-3b.c: New test.
+
+2023-10-27  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/104625
+	* gfortran.dg/pr104625.f90: New test.
+	* gfortran.dg/associate_55.f90: Change error check.
+
+2023-10-27  Andrew Pinski  <apinski@marvell.com>
+
+	PR tree-optimization/101590
+	PR tree-optimization/94884
+	* gcc.dg/tree-ssa/bitcmp-1.c: New test.
+	* gcc.dg/tree-ssa/bitcmp-2.c: New test.
+	* gcc.dg/tree-ssa/bitcmp-3.c: New test.
+	* gcc.dg/tree-ssa/bitcmp-4.c: New test.
+	* gcc.dg/tree-ssa/bitcmp-5.c: New test.
+	* gcc.dg/tree-ssa/bitcmp-6.c: New test.
+
+2023-10-27  liuhongt  <hongtao.liu@intel.com>
+
+	* g++.target/i386/part-vect-vcondhf.C: New test.
+	* gcc.target/i386/part-vect-vec_cmphf.c: New test.
+
+2023-10-26  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/111318
+	PR target/111888
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul4-5.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul8-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/partial/select_vl-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/pr111318.c: New test.
+	* gcc.target/riscv/rvv/autovec/pr111888.c: New test.
+
+2023-10-26  David Malcolm  <dmalcolm@redhat.com>
+
+	* c-c++-common/analyzer/attr-null_terminated_string_arg-access-read_write.c:
+	New test.
+	* c-c++-common/analyzer/attr-null_terminated_string_arg-access-without-size.c:
+	New test.
+	* c-c++-common/analyzer/attr-null_terminated_string_arg-multiple.c:
+	New test.
+	* c-c++-common/analyzer/attr-null_terminated_string_arg-nonnull-2.c:
+	New test.
+	* c-c++-common/analyzer/attr-null_terminated_string_arg-nonnull-sized.c:
+	New test.
+	* c-c++-common/analyzer/attr-null_terminated_string_arg-nonnull.c:
+	New test.
+	* c-c++-common/analyzer/attr-null_terminated_string_arg-nullable-sized.c:
+	New test.
+	* c-c++-common/analyzer/attr-null_terminated_string_arg-nullable.c:
+	New test.
+	* c-c++-common/attr-null_terminated_string_arg.c: New test.
+
+2023-10-26  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* gcc.target/aarch64/aarch64.exp: Use aarch64-with-arch-dg-options
+	to normaize the options to the tests in aarch64.exp.
+
+2023-10-26  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* lib/target-libpath.exp: Skip DYLD_LIBRARY_PATH for all
+	current OS versions > 10.
+
+2023-10-26  Andrew Pinski  <pinskia@gmail.com>
+
+	PR tree-optimization/111957
+	* gcc.dg/tree-ssa/phi-opt-40.c: New test.
+
+2023-10-26  Paul-Antoine Arras  <pa@codesourcery.com>
+
+	* gfortran.dg/c_ptr_tests_20.f90: Add "fopenmp" effective target.
+	* gfortran.dg/c_ptr_tests_21.f90: Add "fopenmp" effective target.
+
+2023-10-26  Patrick O'Neill  <patrick@rivosinc.com>
+
+	* g++.target/riscv/rvv/rvv.exp: Add -mabi argument to CFLAGS.
+
+2023-10-26  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* lib/target-supports-dg.exp (check-flags): Move default argument
+	handling further up.  Fix a couple of issues in the lappends.
+	Avoid frobbing the compiler flags if the return value is already
+	known to be 1.
+	* lib/dg-pch.exp (dg-flags-pch): Process the dg-skip-if and
+	dg-require-effective-target directives to see whether the
+	assembly test should be skipped.
+	* gcc.dg/pch/valid-1.c: Remove dg-require-effective-target.
+	* gcc.dg/pch/valid-1b.c: Likewise.
+
+2023-10-26  Richard Ball  <richard.ball@arm.com>
+
+	* gcc.target/arm/arm-switchstatement.c: New test.
+
+2023-10-26  Paul-Antoine Arras  <pa@codesourcery.com>
+	    Tobias Burnus  <tobias@codesourcery.com>
+
+	* gfortran.dg/c_ptr_tests_20.f90: New test, checking that INTEGER(8)
+	and TYPE(C_PTR) are recognised as compatible.
+	* gfortran.dg/c_ptr_tests_21.f90: New test, exercising the error
+	detection for C_FUNPTR.
+
+2023-10-26  Roger Sayle  <roger@nextmovesoftware.com>
+	    Richard Biener  <rguenther@suse.de>
+
+	PR rtl-optimization/91865
+	* gcc.target/msp430/pr91865.c: New test case.
+
+2023-10-26  Jiahao Xu  <xujiahao@loongson.cn>
+
+	* gcc.target/loongarch/vector/lasx/lasx-vcond-1.c: New test.
+	* gcc.target/loongarch/vector/lasx/lasx-vcond-2.c: New test.
+	* gcc.target/loongarch/vector/lsx/lsx-vcond-1.c: New test.
+	* gcc.target/loongarch/vector/lsx/lsx-vcond-2.c: New test.
+
+2023-10-26  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	* gcc.misc-tests/godump-1.c: Move _BitInt tests into godump-2.c.
+	* gcc.misc-tests/godump-2.c: New test.
+
+2023-10-26  Alexandre Oliva  <oliva@adacore.com>
+
+	PR tree-optimization/111520
+	* g++.dg/torture/harden-comp-pr111520.cc: New.
+
+2023-10-25  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	* gcc.target/aarch64/imm_choice_comparison.c: Change tests.
+	* gcc.target/aarch64/moveor_imm.c: Add new test.
+	* gcc.target/aarch64/pr106583.c: Change tests.
+
+2023-10-25  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/111698
+	* gcc.target/i386/pr111698.c: New test.
+
+2023-10-25  chenxiaolong  <chenxiaolong@loongson.cn>
+
+	* gcc.target/loongarch/builtin_thread_pointer.c: New test.
+
+2023-10-25  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/99804
+	* g++.dg/template/enum9.C: New test.
+
+2023-10-25  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/111955
+	* gm2/pimlib/run/pass/testnan.mod: New test.
+
+2023-10-25  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* c-c++-common/goacc/self-clause-2.c: Verify
+	'--param=openacc-kernels=decompose'.
+	* gfortran.dg/goacc/kernels-tree.f95: Adjust.
+
+2023-10-25  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* c-c++-common/goacc/if-clause-2.c: Enhance.
+	* c-c++-common/goacc/self-clause-1.c: Likewise.
+	* c-c++-common/goacc/self-clause-2.c: Likewise.
+	* gfortran.dg/goacc/if.f95: Likewise.
+	* gfortran.dg/goacc/kernels-tree.f95: Likewise.
+	* gfortran.dg/goacc/parallel-tree.f95: Likewise.
+	* gfortran.dg/goacc/self.f95: Likewise.
+
+2023-10-25  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* c-c++-common/goacc/if-clause-1.c: Enable for C++
+	* c-c++-common/goacc/self-clause-1.c: Likewise.
+
+2023-10-25  Chung-Lin Tang  <cltang@codesourcery.com>
+
+	* c-c++-common/goacc/self-clause-1.c: New test.
+	* c-c++-common/goacc/self-clause-2.c: New test.
+	* gfortran.dg/goacc/self.f95: New test.
+
+2023-10-25  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/111895
+	* g++.dg/cpp0x/scoped_enum12.C: New test.
+
 2023-10-24  Patrick Palka  <ppalka@redhat.com>
 
 	PR c++/111929
