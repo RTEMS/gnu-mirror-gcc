@@ -231,7 +231,7 @@ in the following sections.
 -fnew-inheriting-ctors
 -fnew-ttp-matching
 -fno-nonansi-builtins  -fnothrow-opt  -fno-operator-names
--fno-optional-diags  -fpermissive
+-fno-optional-diags
 -fno-pretty-templates
 -fno-rtti  -fsized-deallocation
 -ftemplate-backtrace-limit=@var{n}
@@ -323,7 +323,7 @@ Objective-C and Objective-C++ Dialects}.
 @item Warning Options
 @xref{Warning Options,,Options to Request or Suppress Warnings}.
 @gccoptlist{-fsyntax-only  -fmax-errors=@var{n}  -Wpedantic
--pedantic-errors
+-pedantic-errors -fpermissive
 -w  -Wextra  -Wall  -Wabi=@var{n}
 -Waddress  -Wno-address-of-packed-member  -Waggregate-return
 -Walloc-size-larger-than=@var{byte-size}  -Walloc-zero
@@ -543,6 +543,7 @@ Objective-C and Objective-C++ Dialects}.
 -fauto-inc-dec  -fbranch-probabilities
 -fcaller-saves
 -fcombine-stack-adjustments  -fconserve-stack
+-ffold-mem-offsets
 -fcompare-elim  -fcprop-registers  -fcrossjumping
 -fcse-follow-jumps  -fcse-skip-blocks  -fcx-fortran-rules
 -fcx-limited-range
@@ -3500,12 +3501,6 @@ Disable diagnostics that the standard says a compiler does not need to
 issue.  Currently, the only such diagnostic issued by G++ is the one for
 a name having multiple meanings within a class.
 
-@opindex fpermissive
-@item -fpermissive
-Downgrade some diagnostics about nonconformant code from errors to
-warnings.  Thus, using @option{-fpermissive} allows some
-nonconforming code to compile.
-
 @opindex fno-pretty-templates
 @opindex fpretty-templates
 @item -fno-pretty-templates
@@ -5687,7 +5682,8 @@ value further adds the possibility of emoji in the output (such as emitting
 U+26A0 WARNING SIGN followed by U+FE0F VARIATION SELECTOR-16 to select the
 emoji variant of the character).
 
-The default is @samp{emoji}.
+The default is @samp{emoji}, except when the environment variable @env{LANG}
+is set to @samp{C}, in which case the default is @samp{ascii}.
 
 @opindex fdiagnostics-format
 @item -fdiagnostics-format=@var{FORMAT}
@@ -6163,6 +6159,18 @@ errors by @option{-pedantic-errors}.  For instance:
 -Wregister @r{(C++17 or later)}
 -Wvla @r{(C90 or earlier)}
 -Wwrite-strings @r{(C++11 or later)}
+}
+
+@opindex fpermissive
+@item -fpermissive
+Downgrade some required diagnostics about nonconformant code from
+errors to warnings.  Thus, using @option{-fpermissive} allows some
+nonconforming code to compile.  Some C++ diagnostics are controlled
+only by this flag, but it also downgrades some diagnostics that have
+their own flag:
+
+@gccoptlist{
+-Wnarrowing @r{(C++)}
 }
 
 @opindex Wall
@@ -14394,6 +14402,13 @@ This pass only applies to certain targets that cannot explicitly represent
 the comparison operation before register allocation is complete.
 
 Enabled at levels @option{-O1}, @option{-O2}, @option{-O3}, @option{-Os}.
+
+@opindex ffold-mem-offsets
+@item -ffold-mem-offsets
+@itemx -fno-fold-mem-offsets
+Try to eliminate add instructions by folding them in memory loads/stores.
+
+Enabled at levels @option{-O2}, @option{-O3}.
 
 @opindex fcprop-registers
 @item -fcprop-registers
@@ -32847,6 +32862,24 @@ PCONFIG, PKU, VAES, VPCLMULQDQ, SERIALIZE, HRESET, KL, WIDEKL, AVX-VNNI,
 AVXIFMA, AVXVNNIINT8, AVXNECONVERT, CMPCCXADD, AVXVNNIINT16, SHA512, SM3
 and SM4 instruction set support.
 
+@item clearwaterforest
+Intel Clearwater Forest CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2,
+SSE3, SSSE3, SSE4.1, SSE4.2, POPCNT, AES, PREFETCHW, PCLMUL, RDRND, XSAVE,
+XSAVEC, XSAVES, XSAVEOPT, FSGSBASE, PTWRITE, RDPID, SGX, GFNI-SSE, CLWB,
+MOVDIRI, MOVDIR64B, CLDEMOTE, WAITPKG, ADCX, AVX, AVX2, BMI, BMI2, F16C, FMA,
+LZCNT, PCONFIG, PKU, VAES, VPCLMULQDQ, SERIALIZE, HRESET, KL, WIDEKL, AVX-VNNI,
+AVXIFMA, AVXVNNIINT8, AVXNECONVERT, CMPCCXADD, AVXVNNIINT16, SHA512, SM3, SM4,
+USER_MSR and PREFETCHI instruction set support.
+
+@item pantherlake
+Intel Panther Lake CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3,
+SSSE3, SSE4.1, SSE4.2, POPCNT, AES, PREFETCHW, PCLMUL, RDRND, XSAVE, XSAVEC,
+XSAVES, XSAVEOPT, FSGSBASE, PTWRITE, RDPID, SGX, GFNI-SSE, CLWB, MOVDIRI,
+MOVDIR64B, CLDEMOTE, WAITPKG, ADCX, AVX, AVX2, BMI, BMI2, F16C, FMA, LZCNT,
+PCONFIG, PKU, VAES, VPCLMULQDQ, SERIALIZE, HRESET, KL, WIDEKL, AVX-VNNI,
+AVXIFMA, AVXVNNIINT8, AVXNECONVERT, CMPCCXADD, AVXVNNIINT16, SHA512, SM3, SM4
+and PREFETCHI instruction set support.
+
 @item knl
 Intel Knight's Landing CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3,
 SSSE3, SSE4.1, SSE4.2, POPCNT, CX16, SAHF, FXSR, AVX, XSAVE, PCLMUL, FSGSBASE,
@@ -33390,9 +33423,9 @@ the cache line size.  @samp{compat} is the default.
 
 @opindex mlarge-data-threshold
 @item -mlarge-data-threshold=@var{threshold}
-When @option{-mcmodel=medium} is specified, data objects larger than
-@var{threshold} are placed in the large data section.  This value must be the
-same across all objects linked into the binary, and defaults to 65535.
+When @option{-mcmodel=medium} or @option{-mcmodel=large} is specified, data
+objects larger than @var{threshold} are placed in large data sections.  The
+default is 65535.
 
 @opindex mrtd
 @item -mrtd
