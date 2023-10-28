@@ -156,6 +156,7 @@ extern void riscv_parse_arch_string (const char *, struct gcc_options *, locatio
 extern bool riscv_hard_regno_rename_ok (unsigned, unsigned);
 
 rtl_opt_pass * make_pass_shorten_memrefs (gcc::context *ctxt);
+rtl_opt_pass * make_pass_avlprop (gcc::context *ctxt);
 rtl_opt_pass * make_pass_vsetvl (gcc::context *ctxt);
 
 /* Routines implemented in riscv-string.c.  */
@@ -306,6 +307,11 @@ enum insn_type : unsigned int
   UNARY_OP_FRM_RMM = UNARY_OP | FRM_RMM_P,
   UNARY_OP_FRM_RUP = UNARY_OP | FRM_RUP_P,
   UNARY_OP_FRM_RDN = UNARY_OP | FRM_RDN_P,
+  UNARY_OP_TAMA_FRM_DYN = UNARY_OP_TAMA | FRM_DYN_P,
+  UNARY_OP_TAMA_FRM_RUP = UNARY_OP_TAMA | FRM_RUP_P,
+  UNARY_OP_TAMA_FRM_RDN = UNARY_OP_TAMA | FRM_RDN_P,
+  UNARY_OP_TAMA_FRM_RMM = UNARY_OP_TAMA | FRM_RMM_P,
+  UNARY_OP_TAMA_FRM_RNE = UNARY_OP_TAMA | FRM_RNE_P,
   UNARY_OP_TAMU_FRM_DYN = UNARY_OP_TAMU | FRM_DYN_P,
   UNARY_OP_TAMU_FRM_RUP = UNARY_OP_TAMU | FRM_RUP_P,
   UNARY_OP_TAMU_FRM_RDN = UNARY_OP_TAMU | FRM_RDN_P,
@@ -486,6 +492,7 @@ void expand_vec_lfloor (rtx, rtx, machine_mode, machine_mode);
 bool sew64_scalar_helper (rtx *, rtx *, rtx, machine_mode,
 			  bool, void (*)(rtx *, rtx));
 rtx gen_scalar_move_mask (machine_mode);
+rtx gen_no_side_effects_vsetvl_rtx (machine_mode, rtx, rtx);
 
 /* RVV vector register sizes.
    TODO: Currently, we only add RVV_32/RVV_64/RVV_128, we may need to
@@ -516,6 +523,8 @@ void expand_fold_extract_last (rtx *);
 void expand_cond_unop (unsigned, rtx *);
 void expand_cond_binop (unsigned, rtx *);
 void expand_cond_ternop (unsigned, rtx *);
+void expand_popcount (rtx *);
+void expand_rawmemchr (machine_mode, rtx, rtx, rtx);
 
 /* Rounding mode bitfield for fixed point VXRM.  */
 enum fixed_point_rounding_mode
@@ -552,6 +561,16 @@ unsigned int autovectorize_vector_modes (vec<machine_mode> *, bool);
 bool cmp_lmul_le_one (machine_mode);
 bool cmp_lmul_gt_one (machine_mode);
 bool gather_scatter_valid_offset_mode_p (machine_mode);
+bool vls_mode_valid_p (machine_mode);
+bool vlmax_avl_type_p (rtx_insn *);
+bool has_vl_op (rtx_insn *);
+bool tail_agnostic_p (rtx_insn *);
+void validate_change_or_fail (rtx, rtx *, rtx, bool);
+bool nonvlmax_avl_type_p (rtx_insn *);
+bool vlmax_avl_p (rtx);
+uint8_t get_sew (rtx_insn *);
+enum vlmul_type get_vlmul (rtx_insn *);
+int count_regno_occurrences (rtx_insn *, unsigned int);
 }
 
 /* We classify builtin types into two classes:

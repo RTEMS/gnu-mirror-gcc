@@ -1132,7 +1132,14 @@ cp_fold_immediate (tree *tp, mce_value manifestly_const_eval)
    Note:  The folding of non-omp cases is something to move into
      the middle-end.  As for now we have most foldings only on GENERIC
      in fold-const, we need to perform this before transformation to
-     GIMPLE-form.  */
+     GIMPLE-form.
+
+   ??? This is algorithmically weird because walk_tree works in pre-order, so
+   we see outer expressions before inner expressions.  This isn't as much of an
+   issue because cp_fold recurses into subexpressions in many cases, but then
+   walk_tree walks back into those subexpressions again.  We avoid the
+   resulting complexity problem by caching the result of cp_fold, but it's
+   inelegant.  */
 
 static tree
 cp_fold_r (tree *stmt_p, int *walk_subtrees, void *data_)
@@ -1152,13 +1159,12 @@ cp_fold_r (tree *stmt_p, int *walk_subtrees, void *data_)
 	  auto then_fn = cp_fold_r, else_fn = cp_fold_r;
 	  /* See if we can figure out if either of the branches is dead.  If it
 	     is, we don't need to do everything that cp_fold_r does.  */
-	  tree cond = maybe_constant_value (TREE_OPERAND (stmt, 0));
-	  if (integer_zerop (cond))
+	  cp_walk_tree (&TREE_OPERAND (stmt, 0), cp_fold_r, data, nullptr);
+	  if (integer_zerop (TREE_OPERAND (stmt, 0)))
 	    then_fn = cp_fold_immediate_r;
-	  else if (TREE_CODE (cond) == INTEGER_CST)
+	  else if (integer_nonzerop (TREE_OPERAND (stmt, 0)))
 	    else_fn = cp_fold_immediate_r;
 
-	  cp_walk_tree (&TREE_OPERAND (stmt, 0), cp_fold_r, data, nullptr);
 	  if (TREE_OPERAND (stmt, 1))
 	    cp_walk_tree (&TREE_OPERAND (stmt, 1), then_fn, data,
 			  nullptr);

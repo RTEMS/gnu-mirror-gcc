@@ -1,3 +1,97 @@
+2023-10-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/112089
+	* include/std/shared_mutex (shared_lock::unlock): Change errc
+	constant to operation_not_permitted.
+	* testsuite/30_threads/shared_lock/locking/112089.cc: New test.
+
+2023-10-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/20_util/duration/io.cc: Double timeout using
+	dg-timeout-factor.
+	* testsuite/std/time/day/io.cc: Likewise.
+	* testsuite/std/time/format.cc: Likewise.
+	* testsuite/std/time/hh_mm_ss/io.cc: Likewise.
+	* testsuite/std/time/month/io.cc: Likewise.
+	* testsuite/std/time/month_day/io.cc: Likewise.
+	* testsuite/std/time/month_day_last/io.cc: Likewise.
+	* testsuite/std/time/month_weekday/io.cc: Likewise.
+	* testsuite/std/time/month_weekday_last/io.cc: Likewise.
+	* testsuite/std/time/weekday/io.cc: Likewise.
+	* testsuite/std/time/weekday_indexed/io.cc: Likewise.
+	* testsuite/std/time/weekday_last/io.cc: Likewise.
+	* testsuite/std/time/year/io.cc: Likewise.
+	* testsuite/std/time/year_month/io.cc: Likewise.
+	* testsuite/std/time/year_month_day/io.cc: Likewise.
+	* testsuite/std/time/year_month_day_last/io.cc: Likewise.
+	* testsuite/std/time/year_month_weekday/io.cc: Likewise.
+	* testsuite/std/time/year_month_weekday_last/io.cc: Likewise.
+	* testsuite/std/time/zoned_time/io.cc: Likewise.
+
+2023-10-25  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/111936
+	* src/libbacktrace/Makefile.am: Add -prefer-pic to libtool
+	compile commands.
+	* src/libbacktrace/Makefile.in: Regenerate.
+
+2023-10-24  Paul M. Bendixen  <paulbendixen@gmail.com>
+
+	* include/Makefile.am: Move cstdarg, cstdalign and cstdbool to
+	freestanding.
+	* include/Makefile.in: Regenerate.
+
+2023-10-22  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* configure: Regenerate.
+	* configure.ac: Handle Darwin rpaths.
+	* src/Makefile.am: Handle Darwin rpaths.
+	* src/Makefile.in: Regenerate.
+
+2023-10-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/basic_string.h (_M_init_local_buf()): New
+	function.
+	(_M_use_local_data()): Use _M_init_local_buf.
+	(basic_string(), basic_string(const Alloc&))
+	(basic_string(basic_string&&))
+	(basic_string(basic_string&&, const Alloc&)): Use
+	_M_init_local_buf instead of _M_use_local_data().
+	* include/bits/basic_string.tcc (swap(basic_string&))
+	(_M_construct(InIter, InIter, input_iterator_tag))
+	(_M_construct(InIter, InIter, forward_iterator_tag))
+	(_M_construct(size_type, CharT), reserve()): Likewise.
+
+2023-10-21  Benjamin Brock  <brock@cs.berkeley.edu>
+
+	* include/std/ranges (zip_view, adjacent_view): Implement
+	workaround for LLVM-61763.
+
+2023-10-21  Dimitrij Mijoski  <dmjpp@hotmail.com>
+
+	* testsuite/22_locale/codecvt/codecvt_unicode.h: Test length()
+
+2023-10-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/fs_dir.h (operator==(default_sentinel_t)): Fix
+	indentation.
+
+2023-10-20  Marek Polacek  <polacek@redhat.com>
+
+	PR testsuite/111883
+	* include/std/charconv (from_chars): Add explicit casts.
+
+2023-10-19  François Dumont  <fdumont@gcc.gnu.org>
+
+	* include/bits/hashtable_policy.h
+	(_Hash_code_base::_M_hash_code(const _Hash&, const _Hash_node_value<>&)): Remove.
+	(_Hash_code_base::_M_hash_code<_H2>(const _H2&, const _Hash_node_value<>&)): Remove.
+	* include/bits/hashtable.h
+	(_M_src_hash_code<_H2>(const _H2&, const key_type&, const __node_value_type&)): New.
+	(_M_merge_unique<>, _M_merge_multi<>): Use latter.
+	* testsuite/23_containers/unordered_map/modifiers/merge.cc
+	(test04, test05, test06): New test cases.
+
 2023-10-13  Jakub Jelinek  <jakub@redhat.com>
 
 	* testsuite/tr1/8_c_compatibility/cstdio/functions.cc (test01):
