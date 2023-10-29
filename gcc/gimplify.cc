@@ -1426,7 +1426,8 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
 		      DECL_ATTRIBUTES (v)
 			= tree_cons (get_identifier ("omp allocate var"),
 				     build_tree_list (NULL_TREE, t),
-				     DECL_ATTRIBUTES (t));
+				     remove_attribute ("omp allocate",
+						       DECL_ATTRIBUTES (t)));
 		      tmp = build_fold_indirect_ref (v);
 		      TREE_THIS_NOTRAP (tmp) = 1;
 		      SET_DECL_VALUE_EXPR (t, tmp);
@@ -1473,7 +1474,12 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
 			 at the top, unless an allocator or size expression
 			 requires to put it afterward; note that the size is
 			 always later in generated code; for strings, no
-			 size expr but still an expr might be available.  */
+			 size expr but still an expr might be available.
+			 As LTO does not handle a statement list, 'sl' has
+			 to be removed; done so by removing the attribute.  */
+		      DECL_ATTRIBUTES (t)
+			= remove_attribute ("omp allocate",
+					    DECL_ATTRIBUTES (t));
 		      tree sl = TREE_PURPOSE (TREE_CHAIN (TREE_VALUE (attr)));
 		      tree_stmt_iterator e = tsi_start (sl);
 		      tree needle = NULL_TREE;
@@ -1631,16 +1637,14 @@ gimplify_bind_expr (tree *expr_p, gimple_seq *pre_p)
 	  && !is_global_var (t)
 	  && DECL_CONTEXT (t) == current_function_decl)
 	{
-	  tree attr;
 	  if (flag_openmp
 	      && DECL_HAS_VALUE_EXPR_P (t)
 	      && TREE_USED (t)
-	      && ((attr = lookup_attribute ("omp allocate",
-					    DECL_ATTRIBUTES (t))) != NULL_TREE)
-	      && TREE_CHAIN (TREE_VALUE (attr)) == NULL_TREE)
+	      && lookup_attribute ("omp allocate", DECL_ATTRIBUTES (t)))
 	    {
 	      /* For Fortran, TREE_CHAIN (TREE_VALUE (attr)) is set, which
-		 causes that the GOMP_free call is already added above.  */
+		 causes that the GOMP_free call is already added above;
+		 and "omp allocate" is removed from DECL_ATTRIBUTES.  */
 	      tree v = TREE_OPERAND (DECL_VALUE_EXPR (t), 0);
 	      tree tmp = builtin_decl_explicit (BUILT_IN_GOMP_FREE);
 	      tmp = build_call_expr_loc (end_locus, tmp, 2, v,
@@ -12117,6 +12121,7 @@ gimplify_scan_omp_clauses (tree *list_p, gimple_seq *pre_p,
 	    }
 	  /* Fall through.  */
 
+	case OMP_CLAUSE_SELF:
 	case OMP_CLAUSE_FINAL:
 	  OMP_CLAUSE_OPERAND (c, 0)
 	    = gimple_boolify (OMP_CLAUSE_OPERAND (c, 0));
@@ -13338,6 +13343,7 @@ gimplify_adjust_omp_clauses (gimple_seq *pre_p, gimple_seq body, tree *list_p,
 	case OMP_CLAUSE_COPYIN:
 	case OMP_CLAUSE_COPYPRIVATE:
 	case OMP_CLAUSE_IF:
+	case OMP_CLAUSE_SELF:
 	case OMP_CLAUSE_NUM_THREADS:
 	case OMP_CLAUSE_NUM_TEAMS:
 	case OMP_CLAUSE_THREAD_LIMIT:

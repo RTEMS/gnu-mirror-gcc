@@ -47,6 +47,7 @@ typedef Array <Expression *> Expressions;
 
 /* Usage of TREE_LANG_FLAG_?:
    0: METHOD_CALL_EXPR
+   1: CALL_EXPR_WARN_IF_UNUSED (in CALL_EXPR).
 
    Usage of TYPE_LANG_FLAG_?:
    0: TYPE_SHARED
@@ -357,6 +358,11 @@ lang_tree_node
 #define METHOD_CALL_EXPR(NODE) \
   (TREE_LANG_FLAG_0 (NODE))
 
+/* True if the CALL_EXPR is free of side effects, and its return value
+   should not be discarded.  */
+#define CALL_EXPR_WARN_IF_UNUSED(NODE) \
+  (TREE_LANG_FLAG_1 (CALL_EXPR_CHECK (NODE)))
+
 /* True if the type was declared 'shared'.  */
 #define TYPE_SHARED(NODE) \
   (TYPE_LANG_FLAG_0 (NODE))
@@ -438,6 +444,9 @@ enum d_tree_index
   DTI_NULL_ARRAY,
   DTI_BOTTOM_TYPE,
 
+  DTI_BOOL_FALSE,
+  DTI_BOOL_TRUE,
+
   DTI_MAX
 };
 
@@ -474,6 +483,9 @@ extern GTY(()) tree d_global_trees[DTI_MAX];
 #define null_array_node			d_global_trees[DTI_NULL_ARRAY]
 /* The bottom type, referred to as `noreturn` in code.  */
 #define noreturn_type_node		d_global_trees[DTI_BOTTOM_TYPE]
+/* D boolean values are always byte-sized, unlike boolean_type_node.  */
+#define d_bool_false_node		d_global_trees[DTI_BOOL_FALSE]
+#define d_bool_true_node		d_global_trees[DTI_BOOL_TRUE]
 
 /* A prefix for internal variables, which are not user-visible.  */
 #if !defined (NO_DOT_IN_LABEL)
@@ -594,6 +606,7 @@ extern tree build_bounds_slice_condition (SliceExp *, tree, tree, tree);
 extern bool array_bounds_check (void);
 extern bool checkaction_trap_p (void);
 extern TypeFunction *get_function_type (Type *);
+extern bool call_side_effect_free_p (FuncDeclaration *, Type *);
 extern bool call_by_alias_p (FuncDeclaration *, FuncDeclaration *);
 extern tree d_build_call_expr (FuncDeclaration *, tree, Expressions *);
 extern tree d_build_call (TypeFunction *, tree, tree, Expressions *);

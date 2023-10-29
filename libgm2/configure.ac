@@ -92,8 +92,8 @@ AC_HEADER_SYS_WAIT
 AC_CHECK_HEADER([math.h],
 	       [AC_DEFINE([HAVE_MATH_H], [1], [have math.h])])
 
-AC_CHECK_HEADERS(limits.h stddef.h string.h strings.h stdlib.h \
-                 time.h \
+AC_CHECK_HEADERS(getopt.h limits.h stddef.h string.h strings.h \
+                 stdlib.h time.h \
 		 fcntl.h unistd.h sys/file.h sys/time.h sys/mman.h \
 		 sys/resource.h sys/param.h sys/times.h sys/stat.h \
                  sys/socket.h \
@@ -101,7 +101,6 @@ AC_CHECK_HEADERS(limits.h stddef.h string.h strings.h stdlib.h \
 		 pwd.h direct.h dirent.h signal.h malloc.h langinfo.h \
                  pthread.h stdarg.h stdio.h sys/types.h termios.h \
                  netinet/in.h netdb.h sys/uio.h sys/stat.h wchar.h)
-
 
 AC_CANONICAL_HOST
 ACX_NONCANONICAL_HOST
@@ -212,8 +211,12 @@ AC_CHECK_TOOL(RANLIB, ranlib, ranlib-not-found-in-path-error)
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
 
-AC_LIBTOOL_DLOPEN
 AM_PROG_LIBTOOL
+LT_INIT
+AC_LIBTOOL_DLOPEN
+
+AM_CONDITIONAL([ENABLE_DARWIN_AT_RPATH], [test x$enable_darwin_at_rpath = xyes])
+
 AC_SUBST(enable_shared)
 AC_SUBST(enable_static)
 
@@ -292,6 +295,8 @@ GM2_CHECK_LIB([c],[fcntl],[FCNTL])
 GM2_CHECK_LIB([c],[fstat],[FSTAT])
 GM2_CHECK_LIB([c],[getdents],[GETDENTS])
 GM2_CHECK_LIB([c],[getgid],[GETGID])
+GM2_CHECK_LIB([c],[getopt_long],[GETOPT_LONG])
+GM2_CHECK_LIB([c],[getopt_long_only],[GETOPT_LONG_ONLY])
 GM2_CHECK_LIB([c],[getpid],[GETPID])
 GM2_CHECK_LIB([c],[gettimeofday],[GETTIMEOFD])
 GM2_CHECK_LIB([c],[getuid],[GETUID])

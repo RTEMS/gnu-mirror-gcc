@@ -441,6 +441,12 @@ typedef double v512df __attribute__ ((vector_size (4096)));
     *(TYPE1 *) out = v;                                                        \
   }
 
+#define DEF_OP_VV_VA(OP, TYPE1, ...)                                           \
+  TYPE1 test_##OP##_##TYPE1 (TYPE1 a, TYPE1 b)                                 \
+  {                                                                            \
+    return OP (a, b, __VA_ARGS__);                                             \
+  }
+
 #define DEF_REPEAT(TYPE1, TYPE2, NUM, ...)                                     \
   void init_##TYPE1##_##TYPE2##_##NUM (TYPE2 var0, TYPE2 var1,                 \
 				       TYPE2 *__restrict out)                  \
@@ -832,4 +838,10 @@ typedef double v512df __attribute__ ((vector_size (4096)));
     for (int i = 0; i < NUM; i += 1)                                           \
       a[i] = cond[i] ? (TYPE3) (b[i] >> shift) : a[i];                         \
     return a;                                                                  \
+  }
+
+#define DEF_CONSECUTIVE(TYPE, NUM)                                             \
+  TYPE f##TYPE (TYPE a, TYPE b)                                                \
+  {                                                                            \
+    return __builtin_shufflevector (a, b, MASK_##NUM);                         \
   }

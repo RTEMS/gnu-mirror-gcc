@@ -587,6 +587,13 @@ dump_omp_clause (pretty_printer *pp, tree clause, int spc, dump_flags_t flags)
       pp_right_paren (pp);
       break;
 
+    case OMP_CLAUSE_SELF:
+      pp_string (pp, "self(");
+      dump_generic_node (pp, OMP_CLAUSE_SELF_EXPR (clause),
+			 spc, flags, false);
+      pp_right_paren (pp);
+      break;
+
     case OMP_CLAUSE_NUM_THREADS:
       pp_string (pp, "num_threads(");
       dump_generic_node (pp, OMP_CLAUSE_NUM_THREADS_EXPR (clause),
@@ -1453,7 +1460,6 @@ dump_omp_clause (pretty_printer *pp, tree clause, int spc, dump_flags_t flags)
 			 false);
       pp_right_paren (pp);
       break;
-
     default:
       gcc_unreachable ();
     }
@@ -2248,10 +2254,11 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
 	      pp_minus (pp);
 	      val = -val;
 	    }
-	  unsigned int prec = val.get_precision ();
-	  if ((prec + 3) / 4 > sizeof (pp_buffer (pp)->digit_buffer) - 3)
+	  unsigned int len;
+	  print_hex_buf_size (val, &len);
+	  if (UNLIKELY (len > sizeof (pp_buffer (pp)->digit_buffer)))
 	    {
-	      char *buf = XALLOCAVEC (char, (prec + 3) / 4 + 3);
+	      char *buf = XALLOCAVEC (char, len);
 	      print_hex (val, buf);
 	      pp_string (pp, buf);
 	    }

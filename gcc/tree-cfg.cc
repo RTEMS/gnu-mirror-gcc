@@ -878,7 +878,7 @@ make_edges_bb (basic_block bb, struct omp_region **pcur_region, int *pomp_index)
       fallthru = false;
       break;
     case GIMPLE_RESX:
-      make_eh_edges (last);
+      make_eh_edge (last);
       fallthru = false;
       break;
     case GIMPLE_EH_DISPATCH:
@@ -894,7 +894,7 @@ make_edges_bb (basic_block bb, struct omp_region **pcur_region, int *pomp_index)
 
       /* If this statement has reachable exception handlers, then
 	 create abnormal edges to them.  */
-      make_eh_edges (last);
+      make_eh_edge (last);
 
       /* BUILTIN_RETURN is really a return statement.  */
       if (gimple_call_builtin_p (last, BUILT_IN_RETURN))
@@ -911,7 +911,7 @@ make_edges_bb (basic_block bb, struct omp_region **pcur_region, int *pomp_index)
       /* A GIMPLE_ASSIGN may throw internally and thus be considered
 	 control-altering.  */
       if (is_ctrl_altering_stmt (last))
-	make_eh_edges (last);
+	make_eh_edge (last);
       fallthru = true;
       break;
 
@@ -8160,11 +8160,14 @@ move_sese_region_to_fn (struct function *dest_cfun, basic_block entry_bb,
   bb = create_empty_bb (entry_pred[0]);
   if (current_loops)
     add_bb_to_loop (bb, loop);
+  profile_count count = profile_count::zero ();
   for (i = 0; i < num_entry_edges; i++)
     {
       e = make_edge (entry_pred[i], bb, entry_flag[i]);
       e->probability = entry_prob[i];
+      count += e->count ();
     }
+  bb->count = count;
 
   for (i = 0; i < num_exit_edges; i++)
     {

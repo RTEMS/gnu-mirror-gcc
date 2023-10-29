@@ -1115,7 +1115,7 @@ build_array_struct_comparison (tree_code code, StructDeclaration *sd,
 	if (length == 0 || result OP 0) break;  */
   t = build_boolop (EQ_EXPR, length, d_convert (lentype, integer_zero_node));
   t = build_boolop (TRUTH_ORIF_EXPR, t, build_boolop (code, result,
-						      boolean_false_node));
+						      d_bool_false_node));
   t = build1 (EXIT_EXPR, void_type_node, t);
   add_stmt (t);
 
@@ -2100,6 +2100,60 @@ get_function_type (Type *t)
   else if (t->ty == TY::Tdelegate)
     tf = t->isTypeDelegate ()->next->isTypeFunction ();
   return tf;
+}
+
+/* Returns TRUE if calling the function FUNC, or calling a function or delegate
+   object of type TYPE is be free of side effects.  */
+
+bool
+call_side_effect_free_p (FuncDeclaration *func, Type *type)
+{
+  gcc_assert (func != NULL || type != NULL);
+
+  if (func != NULL)
+    {
+      /* Constructor and invariant calls can't be `pure'.  */
+      if (func->isCtorDeclaration () || func->isInvariantDeclaration ())
+	return false;
+
+      /* Must be a `nothrow' function.  */
+      TypeFunction *tf = func->type->toTypeFunction ();
+      if (!tf->isnothrow ())
+	return false;
+
+      /* Return type can't be `void' or `noreturn', as that implies all work is
+	 done via side effects.  */
+      if (tf->next->ty == TY::Tvoid || tf->next->ty == TY::Tnoreturn)
+	return false;
+
+      /* Only consider it as `pure' if it can't modify its arguments.  */
+      if (func->isPure () == PURE::const_)
+	return true;
+    }
+
+  if (type != NULL)
+    {
+      TypeFunction *tf = get_function_type (type);
+
+      /* Must be a `nothrow` function type.  */
+      if (tf == NULL || !tf->isnothrow ())
+	return false;
+
+      /* Return type can't be `void' or `noreturn', as that implies all work is
+	 done via side effects.  */
+      if (tf->next->ty == TY::Tvoid || tf->next->ty == TY::Tnoreturn)
+	return false;
+
+      /* Delegates that can modify its context can't be `pure'.  */
+      if (type->isTypeDelegate () && tf->isMutable ())
+	return false;
+
+      /* Only consider it as `pure' if it can't modify its arguments.  */
+      if (tf->purity == PURE::const_)
+	return true;
+    }
+
+  return false;
 }
 
 /* Returns TRUE if CALLEE is a plain nested function outside the scope of

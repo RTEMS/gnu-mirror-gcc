@@ -1484,6 +1484,20 @@
   DONE;
 })
 
+;; -------------------------------------------------------------------------------
+;; - [INT] POPCOUNT.
+;; -------------------------------------------------------------------------------
+
+(define_expand "popcount<mode>2"
+  [(match_operand:V_VLSI 0 "register_operand")
+   (match_operand:V_VLSI 1 "register_operand")]
+  "TARGET_VECTOR"
+{
+  riscv_vector::expand_popcount (operands);
+  DONE;
+})
+
+
 ;; -------------------------------------------------------------------------
 ;; ---- [INT] Highpart multiplication
 ;; -------------------------------------------------------------------------
@@ -2350,6 +2364,19 @@
   "TARGET_VECTOR && !flag_trapping_math && !flag_rounding_math"
   {
     riscv_vector::expand_vec_lfloor (operands[0], operands[1], <MODE>mode, <V_I_L_LL_CONVERT>mode);
+    DONE;
+  }
+)
+
+;; Implement rawmemchr[qi|si|hi].
+(define_expand "rawmemchr<ANYI:mode>"
+  [(match_operand      0 "register_operand")
+   (match_operand      1 "memory_operand")
+   (match_operand:ANYI 2 "const_int_operand")]
+  "TARGET_VECTOR"
+  {
+    riscv_vector::expand_rawmemchr(<MODE>mode, operands[0], operands[1],
+				   operands[2]);
     DONE;
   }
 )

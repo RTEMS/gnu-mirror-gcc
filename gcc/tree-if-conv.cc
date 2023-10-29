@@ -80,7 +80,6 @@ along with GCC; see the file COPYING3.  If not see
      <L18>:;
 */
 
-#define INCLUDE_ALGORITHM
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -611,7 +610,7 @@ add_to_dst_predicate_list (class loop *loop, edge e,
 /* Return true if one of the successor edges of BB exits LOOP.  */
 
 static bool
-bb_with_exit_edge_p (class loop *loop, basic_block bb)
+bb_with_exit_edge_p (const class loop *loop, basic_block bb)
 {
   edge e;
   edge_iterator ei;
@@ -1107,17 +1106,21 @@ if_convertible_stmt_p (gimple *stmt, vec<data_reference_p> refs)
 
     case GIMPLE_CALL:
       {
+	/* There are some IFN_s that are used to replace builtins but have the
+	   same semantics.  Even if MASK_CALL cannot handle them vectorable_call
+	   will insert the proper selection, so do not block conversion.  */
+	int flags = gimple_call_flags (stmt);
+	if ((flags & ECF_CONST)
+	    && !(flags & ECF_LOOPING_CONST_OR_PURE)
+	    && gimple_call_combined_fn (stmt) != CFN_LAST)
+	  return true;
+
 	tree fndecl = gimple_call_fndecl (stmt);
 	if (fndecl)
 	  {
 	    /* We can vectorize some builtins and functions with SIMD
 	       "inbranch" clones.  */
-	    int flags = gimple_call_flags (stmt);
 	    struct cgraph_node *node = cgraph_node::get (fndecl);
-	    if ((flags & ECF_CONST)
-		&& !(flags & ECF_LOOPING_CONST_OR_PURE)
-		&& fndecl_built_in_p (fndecl))
-	      return true;
 	    if (node && node->simd_clones != NULL)
 	      /* Ensure that at least one clone can be "inbranch".  */
 	      for (struct cgraph_node *n = node->simd_clones; n != NULL;
@@ -1129,6 +1132,7 @@ if_convertible_stmt_p (gimple *stmt, vec<data_reference_p> refs)
 		    return true;
 		  }
 	  }
+
 	return false;
       }
 
@@ -1293,6 +1297,44 @@ get_loop_body_in_if_conv_order (const class loop *loop)
     }
   free (blocks_in_bfs_order);
   BITMAP_FREE (visited);
+
+  /* Go through loop and reject if-conversion or lowering of bitfields if we
+     encounter statements we do not believe the vectorizer will be able to
+     handle.  If adding a new type of statement here, make sure
+     'ifcvt_local_dce' is also able to handle it propertly.  */
+  for (index = 0; index < loop->num_nodes; index++)
+    {
+      basic_block bb = blocks[index];
+      gimple_stmt_iterator gsi;
+
+      bool may_have_nonlocal_labels
+	= bb_with_exit_edge_p (loop, bb) || bb == loop->latch;
+      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+	switch (gimple_code (gsi_stmt (gsi)))
+	  {
+	  case GIMPLE_LABEL:
+	    if (!may_have_nonlocal_labels)
+	      {
+		tree label
+		  = gimple_label_label (as_a <glabel *> (gsi_stmt (gsi)));
+		if (DECL_NONLOCAL (label) || FORCED_LABEL (label))
+		  {
+		    free (blocks);
+		    return NULL;
+		  }
+	      }
+	    /* Fallthru.  */
+	  case GIMPLE_ASSIGN:
+	  case GIMPLE_CALL:
+	  case GIMPLE_DEBUG:
+	  case GIMPLE_COND:
+	    gimple_set_uid (gsi_stmt (gsi), 0);
+	    break;
+	  default:
+	    free (blocks);
+	    return NULL;
+	  }
+    }
   return blocks;
 }
 
@@ -1463,36 +1505,6 @@ if_convertible_loop_p_1 (class loop *loop, vec<data_reference_p> *refs)
 	exit_bb = bb;
     }
 
-  for (i = 0; i < loop->num_nodes; i++)
-    {
-      basic_block bb = ifc_bbs[i];
-      gimple_stmt_iterator gsi;
-
-      bool may_have_nonlocal_labels
-	= bb_with_exit_edge_p (loop, bb) || bb == loop->latch;
-      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
-	switch (gimple_code (gsi_stmt (gsi)))
-	  {
-	  case GIMPLE_LABEL:
-	    if (!may_have_nonlocal_labels)
-	      {
-		tree label
-		  = gimple_label_label (as_a <glabel *> (gsi_stmt (gsi)));
-		if (DECL_NONLOCAL (label) || FORCED_LABEL (label))
-		  return false;
-	      }
-	    /* Fallthru.  */
-	  case GIMPLE_ASSIGN:
-	  case GIMPLE_CALL:
-	  case GIMPLE_DEBUG:
-	  case GIMPLE_COND:
-	    gimple_set_uid (gsi_stmt (gsi), 0);
-	    break;
-	  default:
-	    return false;
-	  }
-    }
-
   data_reference_p dr;
 
   innermost_DR_map
@@ -1601,14 +1613,6 @@ if_convertible_loop_p (class loop *loop, vec<data_reference_p> *refs)
     {
       if (dump_file && (dump_flags & TDF_DETAILS))
 	fprintf (dump_file, "less than 2 basic blocks\n");
-      return false;
-    }
-
-  /* More than one loop exit is too much to handle.  */
-  if (!single_exit (loop))
-    {
-      if (dump_file && (dump_flags & TDF_DETAILS))
-	fprintf (dump_file, "multiple exits\n");
       return false;
     }
 
@@ -1927,11 +1931,32 @@ gen_simplified_condition (tree cond, scalar_cond_masked_set_type &cond_set)
   return cond;
 }
 
+/* Structure used to track meta-data on PHI arguments used to generate
+   most efficient comparison sequence to slatten a PHI node.  */
+
+typedef struct ifcvt_arg_entry
+{
+  /* The PHI node argument value.  */
+  tree arg;
+
+  /* The number of compares required to reach this PHI node from start of the
+     BB being if-converted.  */
+  unsigned num_compares;
+
+  /* The number of times this PHI node argument appears in the current PHI
+     node.  */
+  unsigned occurs;
+
+  /* The indices at which this PHI arg occurs inside the PHI node.  */
+  vec <int> *indexes;
+} ifcvt_arg_entry_t;
+
 /* Produce condition for all occurrences of ARG in PHI node.  Set *INVERT
    as to whether the condition is inverted.  */
 
 static tree
-gen_phi_arg_condition (gphi *phi, vec<int> *occur, gimple_stmt_iterator *gsi,
+gen_phi_arg_condition (gphi *phi, ifcvt_arg_entry_t &arg,
+		       gimple_stmt_iterator *gsi,
 		       scalar_cond_masked_set_type &cond_set, bool *invert)
 {
   int len;
@@ -1941,11 +1966,11 @@ gen_phi_arg_condition (gphi *phi, vec<int> *occur, gimple_stmt_iterator *gsi,
   edge e;
 
   *invert = false;
-  len = occur->length ();
+  len = arg.indexes->length ();
   gcc_assert (len > 0);
   for (i = 0; i < len; i++)
     {
-      e = gimple_phi_arg_edge (phi, (*occur)[i]);
+      e = gimple_phi_arg_edge (phi, (*arg.indexes)[i]);
       c = bb_predicate (e->src);
       if (is_true_predicate (c))
 	{
@@ -2010,22 +2035,21 @@ gen_phi_arg_condition (gphi *phi, vec<int> *occur, gimple_stmt_iterator *gsi,
 static tree
 gen_phi_nest_statement (gphi *phi, gimple_stmt_iterator *gsi,
 			scalar_cond_masked_set_type &cond_set, tree type,
-			hash_map<tree_operand_hash, auto_vec<int>> &phi_arg_map,
-			gimple **res_stmt, tree lhs0, vec<tree> &args,
-			unsigned idx)
+			gimple **res_stmt, tree lhs0,
+			vec<struct ifcvt_arg_entry> &args, unsigned idx)
 {
   if (idx == args.length ())
-    return args[idx - 1];
+    return args[idx - 1].arg;
 
-  vec<int> *indexes = phi_arg_map.get (args[idx - 1]);
   bool invert;
-  tree cond = gen_phi_arg_condition (phi, indexes, gsi, cond_set, &invert);
-  tree arg1 = gen_phi_nest_statement (phi, gsi, cond_set, type, phi_arg_map,
-				      res_stmt, lhs0, args, idx + 1);
+  tree cond = gen_phi_arg_condition (phi, args[idx - 1], gsi, cond_set,
+				     &invert);
+  tree arg1 = gen_phi_nest_statement (phi, gsi, cond_set, type, res_stmt, lhs0,
+				      args, idx + 1);
 
   unsigned prev = idx;
   unsigned curr = prev - 1;
-  tree arg0 = args[curr];
+  tree arg0 = args[curr].arg;
   tree rhs, lhs;
   if (idx > 1)
     lhs = make_temp_ssa_name (type, NULL, "_ifc_");
@@ -2043,6 +2067,36 @@ gen_phi_nest_statement (gphi *phi, gimple_stmt_iterator *gsi,
   update_stmt (new_stmt);
   *res_stmt = new_stmt;
   return lhs;
+}
+
+/* When flattening a PHI node we have a choice of which conditions to test to
+   for all the paths from the start of the dominator block of the BB with the
+   PHI node.  If the PHI node has X arguments we have to only test X - 1
+   conditions as the last one is implicit.  It does matter which conditions we
+   test first.  We should test the shortest condition first (distance here is
+   measures in the number of logical operators in the condition) and the
+   longest one last.  This allows us to skip testing the most expensive
+   condition.  To accomplish this we need to sort the conditions.  P1 and P2
+   are sorted first based on the number of logical operations (num_compares)
+   and then by how often they occur in the PHI node.  */
+
+static int
+cmp_arg_entry (const void *p1, const void *p2, void * /* data.  */)
+{
+  const ifcvt_arg_entry sval1 = *(const ifcvt_arg_entry *)p1;
+  const ifcvt_arg_entry sval2 = *(const ifcvt_arg_entry *)p2;
+
+  if (sval1.num_compares < sval2.num_compares)
+    return -1;
+  else if (sval1.num_compares > sval2.num_compares)
+    return 1;
+
+  if (sval1.occurs < sval2.occurs)
+    return -1;
+  else if (sval1.occurs > sval2.occurs)
+    return 1;
+
+  return 0;
 }
 
 /* Replace a scalar PHI node with a COND_EXPR using COND as condition.
@@ -2170,58 +2224,55 @@ predicate_scalar_phi (gphi *phi, gimple_stmt_iterator *gsi)
   hash_map<tree_operand_hash, auto_vec<int> > phi_arg_map;
   unsigned int num_args = gimple_phi_num_args (phi);
   /* Vector of different PHI argument values.  */
-  auto_vec<tree> args (num_args);
+  auto_vec<ifcvt_arg_entry_t> args;
 
-  /* Compute phi_arg_map.  */
+  /* Compute phi_arg_map, determine the list of unique PHI args and the indices
+     where they are in the PHI node.  The indices will be used to determine
+     the conditions to apply and their complexity.  */
   for (i = 0; i < num_args; i++)
     {
       tree arg;
 
       arg = gimple_phi_arg_def (phi, i);
       if (!phi_arg_map.get (arg))
-	args.quick_push (arg);
+	args.safe_push ({ arg, 0, 0, NULL });
       phi_arg_map.get_or_insert (arg).safe_push (i);
     }
 
-  /* Determine element with max number of occurrences and complexity.  Looking at only
-     number of occurrences as a measure for complexity isn't enough as all usages can
-     be unique but the comparisons to reach the PHI node differ per branch.  */
-  typedef std::pair <tree, std::pair <unsigned, unsigned>> ArgEntry;
-  auto_vec<ArgEntry> argsKV;
-  for (i = 0; i < args.length (); i++)
+  /* Determine element with max number of occurrences and complexity.  Looking
+     at only number of occurrences as a measure for complexity isn't enough as
+     all usages can be unique but the comparisons to reach the PHI node differ
+     per branch.  */
+  for (unsigned i = 0; i < args.length (); i++)
     {
       unsigned int len = 0;
-      for (int index : phi_arg_map.get (args[i]))
+      vec<int> *indices = phi_arg_map.get (args[i].arg);
+      for (int index : *indices)
 	{
 	  edge e = gimple_phi_arg_edge (phi, index);
 	  len += get_bb_num_predicate_stmts (e->src);
 	}
 
-      unsigned occur = phi_arg_map.get (args[i])->length ();
+      unsigned occur = indices->length ();
       if (dump_file && (dump_flags & TDF_DETAILS))
 	fprintf (dump_file, "Ranking %d as len=%d, idx=%d\n", i, len, occur);
-      argsKV.safe_push ({ args[i], { len, occur }});
+      args[i].num_compares = len;
+      args[i].occurs = occur;
+      args[i].indexes = indices;
     }
 
   /* Sort elements based on rankings ARGS.  */
-  std::sort(argsKV.begin(), argsKV.end(), [](const ArgEntry &left,
-					     const ArgEntry &right) {
-    return left.second < right.second;
-  });
-
-  for (i = 0; i < args.length (); i++)
-    args[i] = argsKV[i].first;
+  args.stablesort (cmp_arg_entry, NULL);
 
   /* Handle one special case when number of arguments with different values
      is equal 2 and one argument has the only occurrence.  Such PHI can be
      handled as if would have only 2 arguments.  */
-  if (args.length () == 2 && phi_arg_map.get (args[0])->length () == 1)
+  if (args.length () == 2
+      && args[0].indexes->length () == 1)
     {
-      vec<int> *indexes;
-      indexes = phi_arg_map.get (args[0]);
-      index0 = (*indexes)[0];
-      arg0 = args[0];
-      arg1 = args[1];
+      index0 = (*args[0].indexes)[0];
+      arg0 = args[0].arg;
+      arg1 = args[1].arg;
       e = gimple_phi_arg_edge (phi, index0);
       cond = bb_predicate (e->src);
       if (TREE_CODE (cond) == TRUTH_NOT_EXPR)
@@ -2235,8 +2286,8 @@ predicate_scalar_phi (gphi *phi, gimple_stmt_iterator *gsi)
       if (!(is_cond_scalar_reduction (phi, &reduc, arg0 , arg1,
 				      &op0, &op1, true, &has_nop, &nop_reduc)))
 	rhs = fold_build_cond_expr (TREE_TYPE (res), unshare_expr (cond),
-				    swap? arg1 : arg0,
-				    swap? arg0 : arg1);
+				    swap ? arg1 : arg0,
+				    swap ? arg0 : arg1);
       else
 	{
 	  /* Convert reduction stmt into vectorizable form.  */
@@ -2252,8 +2303,8 @@ predicate_scalar_phi (gphi *phi, gimple_stmt_iterator *gsi)
     {
       /* Common case.  */
       tree type = TREE_TYPE (gimple_phi_result (phi));
-      gen_phi_nest_statement (phi, gsi, cond_set, type, phi_arg_map,
-			      &new_stmt, res, args, 1);
+      gen_phi_nest_statement (phi, gsi, cond_set, type, &new_stmt, res,
+			      args, 1);
     }
 
   if (dump_file && (dump_flags & TDF_DETAILS))
@@ -3444,6 +3495,7 @@ get_bitfield_rep (gassign *stmt, bool write, tree *bitpos,
 			: gimple_assign_rhs1 (stmt);
 
   tree field_decl = TREE_OPERAND (comp_ref, 1);
+  tree ref_offset = component_ref_field_offset (comp_ref);
   tree rep_decl = DECL_BIT_FIELD_REPRESENTATIVE (field_decl);
 
   /* Bail out if the representative is not a suitable type for a scalar
@@ -3457,6 +3509,15 @@ get_bitfield_rep (gassign *stmt, bool write, tree *bitpos,
     = TYPE_PRECISION (TREE_TYPE (gimple_assign_lhs (stmt)));
   if (compare_tree_int (DECL_SIZE (field_decl), bf_prec) != 0)
     return NULL_TREE;
+
+  if (TREE_CODE (DECL_FIELD_OFFSET (rep_decl)) != INTEGER_CST
+      || TREE_CODE (ref_offset) != INTEGER_CST)
+    {
+      if (dump_file && (dump_flags & TDF_DETAILS))
+	fprintf (dump_file, "\t Bitfield NOT OK to lower,"
+			    " offset is non-constant.\n");
+      return NULL_TREE;
+    }
 
   if (struct_expr)
     *struct_expr = TREE_OPERAND (comp_ref, 0);
@@ -3478,7 +3539,7 @@ get_bitfield_rep (gassign *stmt, bool write, tree *bitpos,
 	 the structure and the container from the number of bits from the start
 	 of the structure and the actual bitfield member. */
       tree bf_pos = fold_build2 (MULT_EXPR, bitsizetype,
-				 DECL_FIELD_OFFSET (field_decl),
+				 ref_offset,
 				 build_int_cst (bitsizetype, BITS_PER_UNIT));
       bf_pos = fold_build2 (PLUS_EXPR, bitsizetype, bf_pos,
 			    DECL_FIELD_BIT_OFFSET (field_decl));
@@ -3685,9 +3746,6 @@ tree_if_conversion (class loop *loop, vec<gimple *> *preds)
 	aggressive_if_conv = true;
     }
 
-  if (!single_exit (loop))
-    goto cleanup;
-
   /* If there are more than two BBs in the loop then there is at least one if
      to convert.  */
   if (loop->num_nodes > 2
@@ -3707,15 +3765,25 @@ tree_if_conversion (class loop *loop, vec<gimple *> *preds)
 
   if (loop->num_nodes > 2)
     {
-      need_to_ifcvt = true;
+      /* More than one loop exit is too much to handle.  */
+      if (!single_exit (loop))
+	{
+	  if (dump_file && (dump_flags & TDF_DETAILS))
+	    fprintf (dump_file, "Can not ifcvt due to multiple exits\n");
+	}
+      else
+	{
+	  need_to_ifcvt = true;
 
-      if (!if_convertible_loop_p (loop, &refs) || !dbg_cnt (if_conversion_tree))
-	goto cleanup;
+	  if (!if_convertible_loop_p (loop, &refs)
+	      || !dbg_cnt (if_conversion_tree))
+	    goto cleanup;
 
-      if ((need_to_predicate || any_complicated_phi)
-	  && ((!flag_tree_loop_vectorize && !loop->force_vectorize)
-	      || loop->dont_vectorize))
-	goto cleanup;
+	  if ((need_to_predicate || any_complicated_phi)
+	      && ((!flag_tree_loop_vectorize && !loop->force_vectorize)
+		  || loop->dont_vectorize))
+	    goto cleanup;
+	}
     }
 
   if ((flag_tree_loop_vectorize || loop->force_vectorize)
@@ -3795,6 +3863,13 @@ tree_if_conversion (class loop *loop, vec<gimple *> *preds)
     }
   if (need_to_ifcvt)
     {
+      /* Before we rewrite edges we'll record their original position in the
+	 edge map such that we can map the edges between the ifcvt and the
+	 non-ifcvt loop during peeling.  */
+      uintptr_t idx = 0;
+      for (edge exit : get_loop_exit_edges (loop))
+	exit->aux = (void*)idx++;
+
       /* Now all statements are if-convertible.  Combine all the basic
 	 blocks into one huge basic block doing the if-conversion
 	 on-the-fly.  */
@@ -3806,7 +3881,8 @@ tree_if_conversion (class loop *loop, vec<gimple *> *preds)
      PHIs, those are to be kept in sync with the non-if-converted copy.
      ???  We'll still keep dead stores though.  */
   exit_bbs = BITMAP_ALLOC (NULL);
-  bitmap_set_bit (exit_bbs, single_exit (loop)->dest->index);
+  for (edge exit : get_loop_exit_edges (loop))
+    bitmap_set_bit (exit_bbs, exit->dest->index);
   bitmap_set_bit (exit_bbs, loop->latch->index);
 
   std::pair <tree, tree> *name_pair;

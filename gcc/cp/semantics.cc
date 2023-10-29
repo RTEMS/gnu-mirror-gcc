@@ -840,15 +840,20 @@ finish_goto_stmt (tree destination)
   return add_stmt (build_stmt (input_location, GOTO_EXPR, destination));
 }
 
-/* Returns true if CALL is a (possibly wrapped) CALL_EXPR or AGGR_INIT_EXPR
-   to operator= () that is written as an operator expression. */
+/* Returns true if T corresponds to an assignment operator expression.  */
+
 static bool
-is_assignment_op_expr_p (tree call)
+is_assignment_op_expr_p (tree t)
 {
-  if (call == NULL_TREE)
+  if (t == NULL_TREE)
     return false;
 
-  call = extract_call_expr (call);
+  if (TREE_CODE (t) == MODIFY_EXPR
+      || (TREE_CODE (t) == MODOP_EXPR
+	  && TREE_CODE (TREE_OPERAND (t, 1)) == NOP_EXPR))
+    return true;
+
+  tree call = extract_call_expr (t);
   if (call == NULL_TREE
       || call == error_mark_node
       || !CALL_EXPR_OPERATOR_SYNTAX (call))
@@ -858,6 +863,28 @@ is_assignment_op_expr_p (tree call)
   return fndecl != NULL_TREE
     && DECL_ASSIGNMENT_OPERATOR_P (fndecl)
     && DECL_OVERLOADED_OPERATOR_IS (fndecl, NOP_EXPR);
+}
+
+/* Maybe warn about an unparenthesized 'a = b' (appearing in a
+   boolean context where 'a == b' might have been intended).  */
+
+void
+maybe_warn_unparenthesized_assignment (tree t, tsubst_flags_t complain)
+{
+  if (REFERENCE_REF_P (t))
+    t = TREE_OPERAND (t, 0);
+
+  if ((complain & tf_warning)
+      && warn_parentheses
+      && is_assignment_op_expr_p (t)
+      /* A parenthesized expression would've had this warning
+	 suppressed by finish_parenthesized_expr.  */
+      && !warning_suppressed_p (t, OPT_Wparentheses))
+    {
+      warning_at (cp_expr_loc_or_input_loc (t), OPT_Wparentheses,
+		  "suggest parentheses around assignment used as truth value");
+      suppress_warning (t, OPT_Wparentheses);
+    }
 }
 
 /* COND is the condition-expression for an if, while, etc.,
@@ -878,21 +905,10 @@ maybe_convert_cond (tree cond)
   if (warn_sequence_point && !processing_template_decl)
     verify_sequence_points (cond);
 
+  maybe_warn_unparenthesized_assignment (cond, tf_warning_or_error);
+
   /* Do the conversion.  */
   cond = convert_from_reference (cond);
-
-  tree inner = REFERENCE_REF_P (cond) ? TREE_OPERAND (cond, 0) : cond;
-  if ((TREE_CODE (inner) == MODIFY_EXPR
-       || (TREE_CODE (inner) == MODOP_EXPR
-	   && TREE_CODE (TREE_OPERAND (inner, 1)) == NOP_EXPR)
-       || is_assignment_op_expr_p (inner))
-      && warn_parentheses
-      && !warning_suppressed_p (inner, OPT_Wparentheses)
-      && warning_at (cp_expr_loc_or_input_loc (inner),
-		     OPT_Wparentheses, "suggest parentheses around "
-				       "assignment used as truth value"))
-    suppress_warning (inner, OPT_Wparentheses);
-
   return condition_conversion (cond);
 }
 
@@ -916,8 +932,7 @@ finish_expr_stmt (tree expr)
 	  expr = convert_to_void (expr, ICV_STATEMENT, tf_warning_or_error);
 	}
       else if (!type_dependent_expression_p (expr))
-	convert_to_void (build_non_dependent_expr (expr), ICV_STATEMENT,
-                         tf_warning_or_error);
+	convert_to_void (expr, ICV_STATEMENT, tf_warning_or_error);
 
       if (check_for_bare_parameter_packs (expr))
         expr = error_mark_node;
@@ -1396,8 +1411,7 @@ finish_for_expr (tree expr, tree for_stmt)
                               tf_warning_or_error);
     }
   else if (!type_dependent_expression_p (expr))
-    convert_to_void (build_non_dependent_expr (expr), ICV_THIRD_IN_FOR,
-                     tf_warning_or_error);
+    convert_to_void (expr, ICV_THIRD_IN_FOR, tf_warning_or_error);
   expr = maybe_cleanup_point_expr_void (expr);
   if (check_for_bare_parameter_packs (expr))
     expr = error_mark_node;
@@ -2160,7 +2174,8 @@ finish_parenthesized_expr (cp_expr expr)
 {
   if (EXPR_P (expr))
     {
-      /* This inhibits warnings in c_common_truthvalue_conversion.  */
+      /* This inhibits warnings in maybe_warn_unparenthesized_assignment
+	 and c_common_truthvalue_conversion.  */
       tree inner = REFERENCE_REF_P (expr) ? TREE_OPERAND (expr, 0) : *expr;
       suppress_warning (inner, OPT_Wparentheses);
     }
@@ -2795,18 +2810,19 @@ finish_call_expr (tree fn, vec<tree, va_gc> **args, bool disallow_virtual,
 	     (c++/89780, c++/107363).  This also suppresses the
 	     -Wredundant-move warning.  */
 	  suppress_warning (result, OPT_Wpessimizing_move);
-	  if (is_overloaded_fn (fn))
-	    fn = get_fns (fn);
 
 	  if (cfun)
 	    {
 	      bool abnormal = true;
-	      for (lkp_iterator iter (fn); abnormal && iter; ++iter)
+	      for (lkp_iterator iter (maybe_get_fns (fn)); iter; ++iter)
 		{
 		  tree fndecl = STRIP_TEMPLATE (*iter);
 		  if (TREE_CODE (fndecl) != FUNCTION_DECL
 		      || !TREE_THIS_VOLATILE (fndecl))
-		    abnormal = false;
+		    {
+		      abnormal = false;
+		      break;
+		    }
 		}
 	      /* FIXME: Stop warning about falling off end of non-void
 		 function.   But this is wrong.  Even if we only see
@@ -2816,14 +2832,12 @@ finish_call_expr (tree fn, vec<tree, va_gc> **args, bool disallow_virtual,
 	      if (abnormal)
 		current_function_returns_abnormally = 1;
 	    }
+	  if (TREE_CODE (fn) == COMPONENT_REF)
+	    maybe_generic_this_capture (TREE_OPERAND (fn, 0),
+					TREE_OPERAND (fn, 1));
 	  return result;
 	}
       orig_args = make_tree_vector_copy (*args);
-      if (!BASELINK_P (fn)
-	  && TREE_CODE (fn) != PSEUDO_DTOR_EXPR
-	  && TREE_TYPE (fn) != unknown_type_node)
-	fn = build_non_dependent_expr (fn);
-      make_args_non_dependent (*args);
     }
 
   if (TREE_CODE (fn) == COMPONENT_REF)
@@ -7380,13 +7394,14 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	  goto handle_field_decl;
 
 	case OMP_CLAUSE_IF:
-	  t = OMP_CLAUSE_IF_EXPR (c);
+	case OMP_CLAUSE_SELF:
+	  t = OMP_CLAUSE_OPERAND (c, 0);
 	  t = maybe_convert_cond (t);
 	  if (t == error_mark_node)
 	    remove = true;
 	  else if (!processing_template_decl)
 	    t = fold_build_cleanup_point_expr (TREE_TYPE (t), t);
-	  OMP_CLAUSE_IF_EXPR (c) = t;
+	  OMP_CLAUSE_OPERAND (c, 0) = t;
 	  break;
 
 	case OMP_CLAUSE_FINAL:
@@ -11033,20 +11048,6 @@ finish_omp_atomic (location_t loc, enum tree_code code, enum tree_code opcode,
 	  if (type_dependent_expression_p (OMP_CLAUSE_HINT_EXPR (clauses))
 	      || TREE_CODE (OMP_CLAUSE_HINT_EXPR (clauses)) != INTEGER_CST)
 	    dependent_p = true;
-	}
-      if (!dependent_p)
-	{
-	  lhs = build_non_dependent_expr (lhs);
-	  if (rhs)
-	    rhs = build_non_dependent_expr (rhs);
-	  if (v)
-	    v = build_non_dependent_expr (v);
-	  if (lhs1)
-	    lhs1 = build_non_dependent_expr (lhs1);
-	  if (rhs1)
-	    rhs1 = build_non_dependent_expr (rhs1);
-	  if (r && r != void_list_node)
-	    r = build_non_dependent_expr (r);
 	}
     }
   if (!dependent_p)

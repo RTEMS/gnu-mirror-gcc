@@ -1550,6 +1550,14 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
  (if (INTEGRAL_TYPE_P (TREE_TYPE (@0))
       && wi::bit_and_not (get_nonzero_bits (@0), wi::to_wide (@1)) == 0)
   @0))
+
+/* `a & (x | CST)` -> a if we know that (a & ~CST) == 0   */
+(simplify
+ (bit_and:c SSA_NAME@0 (bit_ior @1 INTEGER_CST@2))
+ (if (INTEGRAL_TYPE_P (TREE_TYPE (@0))
+      && wi::bit_and_not (get_nonzero_bits (@0), wi::to_wide (@2)) == 0)
+  @0))
+
 /* x | C -> C if we know that x & ~C == 0.  */
 (simplify
  (bit_ior SSA_NAME@0 INTEGER_CST@1)
@@ -2698,6 +2706,30 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
   (cmp:c (convert? @0) (convert1? (minus INTEGER_CST@1 (convert2? @0))))
   (if (TREE_INT_CST_LOW (@1) & 1)
    { constant_boolean_node (cmp == NE_EXPR, type); })))
+
+/*
+   U & N <= U  -> true
+   U & N >  U  -> false
+   U needs to be non-negative.
+
+   U | N <  U  -> false
+   U | N >= U  -> true
+   U and N needs to be non-negative
+
+   U | N <  U  -> true
+   U | N >= U  -> false
+   U needs to be non-negative and N needs to be a negative constant.
+   */
+(for cmp   (lt      ge      le      gt     )
+     bitop (bit_ior bit_ior bit_and bit_and)
+ (simplify
+  (cmp:c (bitop:c tree_expr_nonnegative_p@0 @1) @0)
+  (if (INTEGRAL_TYPE_P (TREE_TYPE (@0)))
+   (if (bitop == BIT_AND_EXPR || tree_expr_nonnegative_p (@1))
+    { constant_boolean_node (cmp == GE_EXPR || cmp == LE_EXPR, type); }
+    /* The sign is opposite now so the comparison is swapped around. */
+    (if (TREE_CODE (@1) == INTEGER_CST && wi::neg_p (wi::to_wide (@1)))
+     { constant_boolean_node (cmp == LT_EXPR, type); })))))
 
 /* Arguments on which one can call get_nonzero_bits to get the bits
    possibly set.  */
@@ -5603,6 +5635,16 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
  (if (wi::eq_p (wi::bit_not (wi::to_wide (@1)), wi::to_wide (@2)))
   @3))
 
+/* X != C1 ? abs(X) : C2 simplifies to abs(x) when abs(C1) == C2. */
+(for op (abs absu)
+ (simplify
+  (cond (ne @0 INTEGER_CST@1) (op@3 @0) INTEGER_CST@2)
+  (if (wi::abs (wi::to_wide (@1)) == wi::to_wide (@2))
+   (if (op != ABSU_EXPR && wi::only_sign_bit_p (wi::to_wide (@1)))
+    (with { tree utype = unsigned_type_for (TREE_TYPE (@0)); }
+     (convert (absu:utype @0)))
+    @3))))
+
 /* (X + 1) > Y ? -X : 1 simplifies to X >= Y ? -X : 1 when
    X is unsigned, as when X + 1 overflows, X is -1, so -X == 1.  */
 (simplify
@@ -5642,9 +5684,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
   (cnd (logical_inverted_value truth_valued_p@0) @1 @2)
   (cnd @0 @2 @1)))
 
-/* abs/negative simplifications moved from fold_cond_expr_with_comparison,
-   Need to handle (A - B) case as fold_cond_expr_with_comparison does.
-   Need to handle UN* comparisons.
+/* abs/negative simplifications moved from fold_cond_expr_with_comparison.
 
    None of these transformations work for modes with signed
    zeros.  If A is +/-0, the first two transformations will
@@ -5708,6 +5748,48 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
        }
        (convert (negate (absu:utype @0))))
        (negate (abs @0)))))
+ )
+
+ /* (A - B) == 0 ? (A - B) : (B - A)    same as (B - A) */
+ (for cmp (eq uneq)
+  (simplify
+   (cnd (cmp (minus@0 @1 @2) zerop) @0 (minus@3 @2 @1))
+   (if (!HONOR_SIGNED_ZEROS (type))
+    @3))
+  (simplify
+   (cnd (cmp (minus@0 @1 @2) integer_zerop) integer_zerop (minus@3 @2 @1))
+   @3)
+ )
+ /* (A - B) != 0 ? (A - B) : (B - A)    same as (A - B) */
+ (for cmp (ne ltgt)
+  (simplify
+   (cnd (cmp (minus@0 @1 @2) zerop) @0 (minus @2 @1))
+   (if (!HONOR_SIGNED_ZEROS (type))
+    @0))
+  (simplify
+   (cnd (cmp (minus@0 @1 @2) integer_zerop) @0 integer_zerop)
+   @0)
+ )
+ /* (A - B) >=/> 0 ? (A - B) : (B - A)    same as abs (A - B) */
+ (for cmp (ge gt)
+  (simplify
+   (cnd (cmp (minus@0 @1 @2) zerop) @0 (minus @2 @1))
+   (if (!HONOR_SIGNED_ZEROS (type)
+	&& !TYPE_UNSIGNED (type))
+    (abs @0))))
+ /* (A - B) <=/< 0 ? (A - B) : (B - A)    same as -abs (A - B) */
+ (for cmp (le lt)
+  (simplify
+   (cnd (cmp (minus@0 @1 @2) zerop) @0 (minus @2 @1))
+   (if (!HONOR_SIGNED_ZEROS (type)
+	&& !TYPE_UNSIGNED (type))
+    (if (ANY_INTEGRAL_TYPE_P (type)
+	 && !TYPE_OVERFLOW_WRAPS (type))
+     (with {
+        tree utype = unsigned_type_for (type);
+      }
+      (convert (negate (absu:utype @0))))
+      (negate (abs @0)))))
  )
 )
 
@@ -8552,7 +8634,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 /* popcount(X&Y) + popcount(X|Y) is popcount(x) + popcount(Y).  */
 (simplify
   (plus:c (POPCOUNT:s (bit_and:s @0 @1)) (POPCOUNT:s (bit_ior:cs @0 @1)))
-  (plus (POPCOUNT @0) (POPCOUNT @1)))
+  (plus (POPCOUNT:type @0) (POPCOUNT:type @1)))
 
 /* popcount(X) + popcount(Y) - popcount(X&Y) is popcount(X|Y).  */
 /* popcount(X) + popcount(Y) - popcount(X|Y) is popcount(X&Y).  */
@@ -8961,6 +9043,30 @@ and,
 	|| (FLOAT_TYPE_P (type)
 	    && fold_real_zero_addition_p (type, NULL_TREE, @5, 0)))
     (IFN_COND_LEN_ADD @1 @0 @2 @0 @3 @4)))
+
+/* Detect simplification for vector condition folding where
+
+  c = mask1 ? (masked_op mask2 a b) : b
+
+  into
+
+  c = masked_op (mask1 & mask2) a b
+
+  where the operation can be partially applied to one operand. */
+
+(for cond_op (COND_BINARY)
+ (simplify
+  (vec_cond @0
+   (cond_op:s @1 @2 @3 @4) @3)
+  (cond_op (bit_and @1 @0) @2 @3 @4)))
+
+/* And same for ternary expressions.  */
+
+(for cond_op (COND_TERNARY)
+ (simplify
+  (vec_cond @0
+   (cond_op:s @1 @2 @3 @4 @5) @4)
+  (cond_op (bit_and @1 @0) @2 @3 @4 @5)))
 
 /* For pointers @0 and @2 and nonnegative constant offset @1, look for
    expressions like:
