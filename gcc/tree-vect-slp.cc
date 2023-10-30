@@ -40,6 +40,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-vectorizer.h"
 #include "langhooks.h"
 #include "gimple-walk.h"
+#include "gimple-pretty-print.h"
 #include "dbgcnt.h"
 #include "tree-vector-builder.h"
 #include "vec-perm-indices.h"
@@ -1819,6 +1820,141 @@ vect_slp_build_two_operator_nodes (slp_tree perm, tree vectype,
   SLP_TREE_CHILDREN (perm).quick_push (child2);
 }
 
+enum slp_oprnd_pattern
+{
+  SLP_OPRND_PATTERN_NONE,
+  SLP_OPRND_PATTERN_ABAB,
+  SLP_OPRND_PATTERN_AABB,
+  SLP_OPRND_PATTERN_ABBA
+};
+
+static int
+try_rearrange_oprnd_info (vec<slp_oprnd_info> &oprnds_info, unsigned group_size)
+{
+  unsigned i;
+  slp_oprnd_info oprnd_info;
+
+  /* A more generalized version is WIP but this is generic enough anyway.  */
+  if (oprnds_info.length() != 2 || group_size % 4 != 0)
+    return SLP_OPRND_PATTERN_NONE;
+
+  if (!oprnds_info[0]->def_stmts[0]
+      || !is_a<gassign *> (oprnds_info[0]->def_stmts[0]->stmt))
+    return SLP_OPRND_PATTERN_NONE;
+
+  enum tree_code code
+    = gimple_assign_rhs_code (oprnds_info[0]->def_stmts[0]->stmt);
+  FOR_EACH_VEC_ELT (oprnds_info, i, oprnd_info)
+    for (unsigned int j = 0; j < group_size; j += 1)
+      {
+	if (!oprnd_info->def_stmts[j]
+	    || !is_a<gassign *> (oprnd_info->def_stmts[j]->stmt)
+	    || STMT_VINFO_DATA_REF (oprnd_info->def_stmts[j]))
+	  return SLP_OPRND_PATTERN_NONE;
+	/* Don't mix different operations.  */
+	if (gimple_assign_rhs_code (oprnd_info->def_stmts[j]->stmt) != code)
+	  return SLP_OPRND_PATTERN_NONE;
+      }
+
+  if (gimple_assign_rhs_code (oprnds_info[0]->def_stmts[0]->stmt)
+      != gimple_assign_rhs_code (oprnds_info[1]->def_stmts[0]->stmt))
+    return SLP_OPRND_PATTERN_NONE;
+
+  int pattern = SLP_OPRND_PATTERN_NONE;
+  FOR_EACH_VEC_ELT (oprnds_info, i, oprnd_info)
+    for (unsigned int j = 0; j < group_size; j += 4)
+      {
+	int cur_pattern = SLP_OPRND_PATTERN_NONE;
+	/* Check for an ABAB... pattern.  */
+	if ((oprnd_info->def_stmts[j] == oprnd_info->def_stmts[j + 2])
+	    && (oprnd_info->def_stmts[j + 1] == oprnd_info->def_stmts[j + 3])
+	    && (oprnd_info->def_stmts[j] != oprnd_info->def_stmts[j + 1]))
+	  cur_pattern = SLP_OPRND_PATTERN_ABAB;
+	/* Check for an AABB... pattern.  */
+	else if ((oprnd_info->def_stmts[j] == oprnd_info->def_stmts[j + 1])
+		 && (oprnd_info->def_stmts[j + 2] == oprnd_info->def_stmts[j + 3])
+		 && (oprnd_info->def_stmts[j] != oprnd_info->def_stmts[j + 2]))
+	  cur_pattern = SLP_OPRND_PATTERN_AABB;
+	/* Check for an ABBA... pattern.  */
+	else if ((oprnd_info->def_stmts[j] == oprnd_info->def_stmts[j + 3])
+		 && (oprnd_info->def_stmts[j + 1] == oprnd_info->def_stmts[j + 2])
+		 && (oprnd_info->def_stmts[j] != oprnd_info->def_stmts[j + 1]))
+	  cur_pattern = SLP_OPRND_PATTERN_ABBA;
+	/* Unrecognised pattern.  */
+	else
+	  return SLP_OPRND_PATTERN_NONE;
+
+	if (pattern == SLP_OPRND_PATTERN_NONE)
+	  pattern = cur_pattern;
+	/* Multiple patterns detected.  */
+	else if (cur_pattern != pattern)
+	  return SLP_OPRND_PATTERN_NONE;
+      }
+
+  gcc_checking_assert (pattern != SLP_OPRND_PATTERN_NONE);
+
+  if (dump_enabled_p ())
+    {
+      if (pattern == SLP_OPRND_PATTERN_ABAB)
+	dump_printf (MSG_NOTE, "ABAB");
+      else if (pattern == SLP_OPRND_PATTERN_AABB)
+	dump_printf (MSG_NOTE, "AABB");
+      else if (pattern == SLP_OPRND_PATTERN_ABBA)
+	dump_printf (MSG_NOTE, "ABBA");
+      dump_printf (MSG_NOTE, " pattern detected.\n");
+    }
+
+  if (pattern == SLP_OPRND_PATTERN_ABAB || pattern == SLP_OPRND_PATTERN_ABBA)
+    for (unsigned int j = 0; j < group_size; j += 4)
+      {
+	/* Given oprnd[0] -> A1, B1, A1, B1, A2, B2, A2, B2, ...
+	   Given oprnd[1] -> C1, D1, C1, D1, C2, D2, C2, D2, ...
+	   Create a single node -> A1, B1, C1, D1, A2, B2, C2, D2, ...  */
+	oprnds_info[0]->def_stmts[j+2] = oprnds_info[1]->def_stmts[j];
+	oprnds_info[0]->ops[j+2] = oprnds_info[1]->ops[j];
+	oprnds_info[0]->def_stmts[j+3] = oprnds_info[1]->def_stmts[j+1];
+	oprnds_info[0]->ops[j+3] = oprnds_info[1]->ops[j+1];
+      }
+  else if (pattern == SLP_OPRND_PATTERN_AABB)
+    for (unsigned int j = 0; j < group_size; j += 4)
+      {
+	/* Given oprnd[0] -> A1, A1, B1, B1, A2, A2, B2, B2, ...
+	   Given oprnd[1] -> C1, C1, D1, D1, C2, C2, D2, D2, ...
+	   Create a single node -> A1, C1, B1, D1, A2, C2, B2, D2, ...  */
+
+	/* The ordering here is at least to some extent arbitrary.
+	   A generilized version needs to use some explicit ordering.  */
+	oprnds_info[0]->def_stmts[j+1] = oprnds_info[1]->def_stmts[j];
+	oprnds_info[0]->ops[j+1] = oprnds_info[1]->ops[j];
+	oprnds_info[0]->def_stmts[j+2] = oprnds_info[0]->def_stmts[j+2];
+	oprnds_info[0]->ops[j+2] = oprnds_info[0]->ops[j+2];
+	oprnds_info[0]->def_stmts[j+3] = oprnds_info[1]->def_stmts[j+2];
+	oprnds_info[0]->ops[j+3] = oprnds_info[1]->ops[j+2];
+      }
+
+  if (dump_enabled_p ())
+    {
+      dump_printf (MSG_NOTE, "Recurse with:\n");
+      for (unsigned int j = 0; j < group_size; j++)
+	{
+	  dump_printf (MSG_NOTE, "  ");
+	  print_gimple_stmt (dump_file, oprnds_info[0]->def_stmts[j]->stmt, 0);
+	}
+    }
+
+  /* Since we've merged the two nodes in one, make the second one a copy of the first.
+     An improvement could be to truncate to one just node, but that needs refactoring
+     in vect_build_slp_tree_2 which we can avoid for now. The nodes are going to be
+     cached anyway.  */
+  for (unsigned int j = 0; j < group_size; j++)
+    {
+      oprnds_info[1]->def_stmts[j] = oprnds_info[0]->def_stmts[j];
+      oprnds_info[1]->ops[j] = oprnds_info[0]->ops[j];
+    }
+
+  return pattern;
+}
+
 /* Recursively build an SLP tree starting from NODE.
    Fail (and return a value not equal to zero) if def-stmts are not
    isomorphic, require data permutation or are of unsupported types of
@@ -2380,6 +2516,8 @@ out:
 
   stmt_info = stmts[0];
 
+  int rearrange_pattern = try_rearrange_oprnd_info (oprnds_info, group_size);
+
   /* Create SLP_TREE nodes for the definition node/s.  */
   FOR_EACH_VEC_ELT (oprnds_info, i, oprnd_info)
     {
@@ -2639,6 +2777,98 @@ fail:
 
   *tree_size += this_tree_size + 1;
   *max_nunits = this_max_nunits;
+
+  /* If we applied any rearrangmenets then we need to reconstruct the original
+     elements with an additional permutation layer.  */
+  if (rearrange_pattern != SLP_OPRND_PATTERN_NONE)
+    {
+      slp_tree one =  new _slp_tree;
+      slp_tree two = new _slp_tree;
+      SLP_TREE_DEF_TYPE (one) = vect_internal_def;
+      SLP_TREE_DEF_TYPE (two) = vect_internal_def;
+      SLP_TREE_VECTYPE (one) = vectype;
+      SLP_TREE_VECTYPE (two) = vectype;
+      SLP_TREE_CHILDREN (one).safe_splice (children);
+      SLP_TREE_CHILDREN (two).safe_splice (children);
+
+      SLP_TREE_CODE (one) = VEC_PERM_EXPR;
+      SLP_TREE_CODE (two) = VEC_PERM_EXPR;
+      SLP_TREE_REPRESENTATIVE (one) = stmts[0];
+      SLP_TREE_REPRESENTATIVE (two) = stmts[2];
+
+      if (rearrange_pattern == SLP_OPRND_PATTERN_ABAB)
+	{
+	   /* Given a single node -> A1, B1, C1, D1, A2, B2, C2, D2, ...
+	      Create node "one" -> A1, B1, A1, B1, A2, B2, A2, B2, ...
+	      Create node "two" -> C1, D1, C1, D1, C2, D2, C2, D2, ...  */
+
+	  for (unsigned int j = 0; j < group_size; j += 4)
+	    {
+	      SLP_TREE_LANE_PERMUTATION(one).safe_push (std::make_pair (0, j + 0));
+	      SLP_TREE_LANE_PERMUTATION(one).safe_push (std::make_pair (0, j + 1));
+	      SLP_TREE_LANE_PERMUTATION(one).safe_push (std::make_pair (0, j + 0));
+	      SLP_TREE_LANE_PERMUTATION(one).safe_push (std::make_pair (0, j + 1));
+
+	      SLP_TREE_LANE_PERMUTATION(two).safe_push (std::make_pair (0, j + 2));
+	      SLP_TREE_LANE_PERMUTATION(two).safe_push (std::make_pair (0, j + 3));
+	      SLP_TREE_LANE_PERMUTATION(two).safe_push (std::make_pair (0, j + 2));
+	      SLP_TREE_LANE_PERMUTATION(two).safe_push (std::make_pair (0, j + 3));
+	    }
+	}
+      else if (rearrange_pattern == SLP_OPRND_PATTERN_AABB)
+	{
+	   /* Given a single node -> A1, C1, B1, D1, A2, C2, B2, D2, ...
+	      Create node "one" -> A1, A1, B1, B1, A2, A2, B2, B2, ...
+	      Create node "two" -> C1, C1, D1, D1, C2, C2, D2, D2, ...  */
+
+	  for (unsigned int j = 0; j < group_size; j += 4)
+	    {
+	      SLP_TREE_LANE_PERMUTATION(one).safe_push (std::make_pair (0, j + 0));
+	      SLP_TREE_LANE_PERMUTATION(one).safe_push (std::make_pair (0, j + 0));
+	      SLP_TREE_LANE_PERMUTATION(one).safe_push (std::make_pair (0, j + 2));
+	      SLP_TREE_LANE_PERMUTATION(one).safe_push (std::make_pair (0, j + 2));
+
+	      SLP_TREE_LANE_PERMUTATION(two).safe_push (std::make_pair (0, j + 1));
+	      SLP_TREE_LANE_PERMUTATION(two).safe_push (std::make_pair (0, j + 1));
+	      SLP_TREE_LANE_PERMUTATION(two).safe_push (std::make_pair (0, j + 3));
+	      SLP_TREE_LANE_PERMUTATION(two).safe_push (std::make_pair (0, j + 3));
+	    }
+	}
+      else if (rearrange_pattern == SLP_OPRND_PATTERN_ABBA)
+	{
+	   /* Given a single node -> A1, B1, C1, D1, A2, B2, C2, D2, ...
+	      Create node "one" -> A1, B1, B1, A1, A2, B2, B2, A2, ...
+	      Create node "two" -> C1, D1, D1, C1, C2, D2, D2, C2, ...  */
+
+	  for (unsigned int j = 0; j < group_size; j += 4)
+	    {
+	      SLP_TREE_LANE_PERMUTATION(one).safe_push (std::make_pair (0, j + 0));
+	      SLP_TREE_LANE_PERMUTATION(one).safe_push (std::make_pair (0, j + 1));
+	      SLP_TREE_LANE_PERMUTATION(one).safe_push (std::make_pair (0, j + 1));
+	      SLP_TREE_LANE_PERMUTATION(one).safe_push (std::make_pair (0, j + 0));
+
+	      SLP_TREE_LANE_PERMUTATION(two).safe_push (std::make_pair (0, j + 2));
+	      SLP_TREE_LANE_PERMUTATION(two).safe_push (std::make_pair (0, j + 3));
+	      SLP_TREE_LANE_PERMUTATION(two).safe_push (std::make_pair (0, j + 3));
+	      SLP_TREE_LANE_PERMUTATION(two).safe_push (std::make_pair (0, j + 2));
+	    }
+	}
+
+      slp_tree child;
+      FOR_EACH_VEC_ELT (SLP_TREE_CHILDREN (two), i, child)
+       SLP_TREE_REF_COUNT (child)++;
+
+      node = vect_create_new_slp_node (node, stmts, 2);
+      SLP_TREE_VECTYPE (node) = vectype;
+      SLP_TREE_CHILDREN (node).quick_push (one);
+      SLP_TREE_CHILDREN (node).quick_push (two);
+
+      SLP_TREE_LANES (one) = stmts.length ();
+      SLP_TREE_LANES (two) = stmts.length ();
+
+      children.truncate(0);
+      children.safe_splice(SLP_TREE_CHILDREN (node));
+    }
 
   if (two_operators)
     {
