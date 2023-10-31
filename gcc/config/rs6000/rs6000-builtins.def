@@ -4192,7 +4192,7 @@
   double __builtin_vpair_f64_add_elements (v256);
     VPAIR_F64_ADD_ELEMENTS vpair_reduc_plus_scale_v4df {mma,pair}
 
-  v256 __builtin_vpair_f64_assemble (vd, vd);
+v256 __builtin_vpair_f64_assemble (vd, vd);
     VPAIR_F64_ASSEMBLE vpair_assemble_v4df {mma,pair}
 
   vd __builtin_vpair_f64_extract_vector (v256, const int<1>);
