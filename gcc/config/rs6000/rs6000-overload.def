@@ -6197,25 +6197,3 @@
     VUPKLSW  VUPKLSW_DEPR1
   vbll __builtin_vec_vupklsw (vbi);
     VUPKLSW  VUPKLSW_DEPR2
-
-[VPAIR_ASSEMBLE, vpair_assemble, __builtin_vpair_assemble]
-  v256 __builtin_vpair_assemble (vf, vf);
-    VPAIR_F32_ASSEMBLE
-  v256 __builtin_vpair_assemble (vd, vd);
-    VPAIR_F64_ASSEMBLE
-  v256 __builtin_vpair_assemble (vull, vull);
-    VPAIR_I64U_ASSEMBLE
-  v256 __builtin_vpair_assemble (vsll, vsll);
-    VPAIR_I64_ASSEMBLE
-  v256 __builtin_vpair_assemble (vui, vui);
-    VPAIR_I32U_ASSEMBLE
-  v256 __builtin_vpair_assemble (vsi, vsi);
-    VPAIR_I32_ASSEMBLE
-  v256 __builtin_vpair_assemble (vus, vus);
-    VPAIR_I16U_ASSEMBLE
-  v256 __builtin_vpair_assemble (vss, vss);
-    VPAIR_I16_ASSEMBLE
-  v256 __builtin_vpair_assemble (vuc, vuc);
-    VPAIR_I8U_ASSEMBLE
-  v256 __builtin_vpair_assemble (vsc, vsc);
-    VPAIR_I8_ASSEMBLE
