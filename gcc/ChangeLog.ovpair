@@ -1,3 +1,16 @@
+==================== Branch work141-ovpair, patch #211 ====================
+
+Sync with vpair branch.
+
+2023-11-01  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_i64u_add_elements):
+	New builtin.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_ZERO): Move.
+	(UNSPEC_VPAIR_SPLAT): Likewise.
+
 ==================== Branch work141-ovpair, patch #210 ====================
 
 Add overloads for __builtin_vpair_assemble.
