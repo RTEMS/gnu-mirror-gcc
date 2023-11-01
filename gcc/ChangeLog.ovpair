@@ -1,3 +1,28 @@
+==================== Branch work141-ovpair, patch #212 ====================
+
+Sync tests with vpair branch.
+
+2023-11-01  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-1.c: Sync test.
+	* gcc.target/powerpc/vector-pair-2.c: Likewise.
+	* gcc.target/powerpc/vector-pair-3.c: Likewise.
+	* gcc.target/powerpc/vector-pair-4.c: Likewise.
+	* gcc.target/powerpc/vector-pair-5.c: Likewise.
+	* gcc.target/powerpc/vector-pair-6.c: Likewise.
+	* gcc.target/powerpc/vector-pair-7.c: Likewise.
+	* gcc.target/powerpc/vector-pair-8.c: Likewise.
+	* gcc.target/powerpc/vector-pair-9.c: New test.
+	* gcc.target/powerpc/vector-pair-10.c: Likewise.
+	* gcc.target/powerpc/vector-pair-11.c: Likewise.
+	* gcc.target/powerpc/vector-pair-12.c: Likewise.
+	* gcc.target/powerpc/vector-pair-13.c: Likewise.
+	* gcc.target/powerpc/vector-pair-14.c: Likewise.
+	* gcc.target/powerpc/vector-pair-15.c: Likewise.
+	* gcc.target/powerpc/vector-pair-16.c: Likewise.
+
 ==================== Branch work141-ovpair, patch #211 ====================
 
 Sync with vpair branch.
