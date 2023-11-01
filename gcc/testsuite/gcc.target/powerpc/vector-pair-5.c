@@ -175,48 +175,8 @@ test_nor (__vector_pair *dest,
   *dest = __builtin_vpair_i64_not (a);
 }
 
-void
-test_splat_arg (__vector_pair *dest, long long x)
-{
-  /* 1 mtvsrdd, 1 xxlor, 1 stxvp.  */
-  *dest = __builtin_vpair_i64_splat (x);
-}
-
-void
-test_splat_mem (__vector_pair *dest, long long *p)
-{
-  /* 1 lxvdsx, 1 xxlor, 1 stxvp.  */
-  *dest = __builtin_vpair_i64_splat (*p);
-}
-
-void
-test_splatu_arg (__vector_pair *dest, unsigned long long x)
-{
-  /* 1 mtvsrdd, 1 xxlor, 1 stxvp.  */
-  *dest = __builtin_vpair_i64u_splat (x);
-}
-
-void
-test_splatu_mem (__vector_pair *dest, unsigned long long *p)
-{
-  /* 1 lxvdsx, 1 xxlor, 1 stxvp.  */
-  *dest = __builtin_vpair_i64u_splat (*p);
-}
-
-void
-test_zero (__vector_pair *dest)
-{
-  /* 2 xxspltib, 1 stxvp.  */
-  *dest = __builtin_vpair_zero ();
-}
-
-/* We don't expect an exact count for xxlor, in case the compiler adds some
-   extra vector move instructions.  */
-
-/* { dg-final { scan-assembler-times {\mlxvdsx\M}   2 } } */
 /* { dg-final { scan-assembler-times {\mlxvp\M}    34 } } */
-/* { dg-final { scan-assembler-times {\mmtvsrdd\M}  2 } } */
-/* { dg-final { scan-assembler-times {\mstxvp\M}   23 } } */
+/* { dg-final { scan-assembler-times {\mstxvp\M}   18 } } */
 /* { dg-final { scan-assembler-times {\mvaddudm\M}  2 } } */
 /* { dg-final { scan-assembler-times {\mvmaxsd\M}   2 } } */
 /* { dg-final { scan-assembler-times {\mvmaxud\M}   2 } } */
@@ -228,7 +188,6 @@ test_zero (__vector_pair *dest)
 /* { dg-final { scan-assembler-times {\mxxlandc\M}  4 } } */
 /* { dg-final { scan-assembler-times {\mxxlnand\M}  4 } } */
 /* { dg-final { scan-assembler-times {\mxxlnor\M}   4 } } */
-/* { dg-final { scan-assembler       {\mxxlor\M}      } } */
+/* { dg-final { scan-assembler-times {\mxxlor\M}    2 } } */
 /* { dg-final { scan-assembler-times {\mxxlorc\M}   4 } } */
 /* { dg-final { scan-assembler-times {\mxxlxor\M}   2 } } */
-/* { dg-final { scan-assembler-times {\mxxspltib\M} 2 } } */

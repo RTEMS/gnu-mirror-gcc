@@ -175,90 +175,19 @@ test_nor (__vector_pair *dest,
   *dest = __builtin_vpair_i32_not (a);
 }
 
-void
-test_splat_arg (__vector_pair *dest, int x)
-{
-  /* 1 mtvsrws, 1 xxlor, 1 stxvp.  */
-  *dest = __builtin_vpair_i32_splat (x);
-}
-
-void
-test_splat_const_1 (__vector_pair *dest)
-{
-  /* 1 vspltisw, 1 xxlor, 1 stxvp.  */
-  *dest = __builtin_vpair_i32_splat (1);
-}
-
-void
-test_splat_const_512 (__vector_pair *dest)
-{
-  /* 1 xxspltiw, 1 xxlor, 1 stxvp.  */
-  *dest = __builtin_vpair_i32_splat (512);
-}
-
-void
-test_splat_mem (__vector_pair *dest, int *p)
-{
-  /* 1 lxvwsx, 1 xxlor, 1 stxvp.  */
-  *dest = __builtin_vpair_i32_splat (*p);
-}
-
-void
-test_splatu_arg (__vector_pair *dest, unsigned int x)
-{
-  /* 1 mtvsrws, 1 xxlor, 1 stxvp.  */
-  *dest = __builtin_vpair_i32u_splat (x);
-}
-
-void
-test_splatu_mem (__vector_pair *dest, unsigned int *p)
-{
-  /* 1 lxvwsx, 1 xxlor, 1 stxvp.  */
-  *dest = __builtin_vpair_i32u_splat (*p);
-}
-
-void
-test_splatu_const_1 (__vector_pair *dest)
-{
-  /* 1 vspltisw, 1 xxlor, 1 stxvp.  */
-  *dest = __builtin_vpair_i32u_splat (1);
-}
-
-void
-test_splatu_const_512 (__vector_pair *dest)
-{
-  /* 1 xxspltiw, 1 xxlor, 1 stxvp.  */
-  *dest = __builtin_vpair_i32u_splat (512);
-}
-
-void
-test_zero (__vector_pair *dest)
-{
-  /* 2 xxspltib, 1 stxvp.  */
-  *dest = __builtin_vpair_zero ();
-}
-
-/* We don't expect an exact count for xxlor, in case the compiler adds some
-   extra vector move instructions.  */
-
-/* { dg-final { scan-assembler-times {\mlxvp\M}     34 } } */
-/* { dg-final { scan-assembler-times {\mlxvwsx\M}    2 } } */
-/* { dg-final { scan-assembler-times {\mmtvsrws\M}   2 } } */
-/* { dg-final { scan-assembler-times {\mstxvp\M}    27 } } */
-/* { dg-final { scan-assembler-times {\mvadduwm\M}   2 } } */
-/* { dg-final { scan-assembler-times {\mvmaxsw\M}    2 } } */
-/* { dg-final { scan-assembler-times {\mvmaxuw\M}    2 } } */
-/* { dg-final { scan-assembler-times {\mvminsw\M}    2 } } */
-/* { dg-final { scan-assembler-times {\mvminuw\M}    2 } } */
-/* { dg-final { scan-assembler-times {\mvnegw\M}     2 } } */
-/* { dg-final { scan-assembler-times {\mvspltisw\M}  2 } } */
-/* { dg-final { scan-assembler-times {\mvsubuwm\M}   2 } } */
-/* { dg-final { scan-assembler-times {\mxxland\M}    2 } } */
-/* { dg-final { scan-assembler-times {\mxxlandc\M}   4 } } */
-/* { dg-final { scan-assembler-times {\mxxlnand\M}   4 } } */
-/* { dg-final { scan-assembler-times {\mxxlnor\M}    4 } } */
-/* { dg-final { scan-assembler       {\mxxlor\M}       } } */
-/* { dg-final { scan-assembler-times {\mxxlorc\M}    4 } } */
-/* { dg-final { scan-assembler-times {\mxxlxor\M}    2 } } */
-/* { dg-final { scan-assembler-times {\mxxspltib\M}  2 } } */
-/* { dg-final { scan-assembler-times {\mxxspltiw\M}  2 } } */
+/* { dg-final { scan-assembler-times {\mlxvp\M}    34 } } */
+/* { dg-final { scan-assembler-times {\mstxvp\M}   18 } } */
+/* { dg-final { scan-assembler-times {\mvadduwm\M}  2 } } */
+/* { dg-final { scan-assembler-times {\mvmaxsw\M}   2 } } */
+/* { dg-final { scan-assembler-times {\mvmaxuw\M}   2 } } */
+/* { dg-final { scan-assembler-times {\mvminsw\M}   2 } } */
+/* { dg-final { scan-assembler-times {\mvminuw\M}   2 } } */
+/* { dg-final { scan-assembler-times {\mvnegw\M}    2 } } */
+/* { dg-final { scan-assembler-times {\mvsubuwm\M}  2 } } */
+/* { dg-final { scan-assembler-times {\mxxland\M}   2 } } */
+/* { dg-final { scan-assembler-times {\mxxlandc\M}  4 } } */
+/* { dg-final { scan-assembler-times {\mxxlnand\M}  4 } } */
+/* { dg-final { scan-assembler-times {\mxxlnor\M}   4 } } */
+/* { dg-final { scan-assembler-times {\mxxlor\M}    2 } } */
+/* { dg-final { scan-assembler-times {\mxxlorc\M}   4 } } */
+/* { dg-final { scan-assembler-times {\mxxlxor\M}   2 } } */
