@@ -1,4 +1,4 @@
-==================== Branch work141-vpair, patch #334 was reverted ====================
+==================== Branch work141-vpair, patch #335 ====================
 
 Add support for doing a horizontal add on vector pair elements.
 
@@ -36,7 +36,7 @@ gcc/testsuite/
 
 	* gcc.target/powerpc/vector-pair-16.c: New test.
 
-==================== Branch work141-vpair, patch #333 was reverted ====================
+==================== Branch work141-vpair, patch #334 ====================
 
 Add support for initializing and extracting from vector pairs.
 
@@ -88,6 +88,12 @@ gcc/
 	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document the
 	integer vector pair built-in functions.
 
+==================== Branch work141-vpair, patch #333 ====================
+
+Add tests for previous patch.
+
+2023-11-01  Michael Meissner  <meissner@linux.ibm.com>
+
 gcc/testsuite/
 
 	* gcc.target/powerpc/vector-pair-5.c: New test.
@@ -95,8 +101,7 @@ gcc/testsuite/
 	* gcc.target/powerpc/vector-pair-7.c: New test.
 	* gcc.target/powerpc/vector-pair-8.c: New test.
 
-
-==================== Branch work141-vpair, patch #332 was reverted ====================
+==================== Branch work141-vpair, patch #332 ====================
 
 Add support for integer point vector pair built-in functions.
 
@@ -150,7 +155,7 @@ gcc/testsuite/
 	* gcc.target/powerpc/vector-pair-8.c: New test.
 
 
-==================== Branch work141-vpair, patch #331 was reverted ====================
+==================== Branch work141-vpair, patch #331 ====================
 
 Add support for floating point vector pair built-in functions.
 
