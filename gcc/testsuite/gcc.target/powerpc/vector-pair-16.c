@@ -33,13 +33,13 @@ i64u_add_elements (__vector_pair *p)
   return __builtin_vpair_i64u_add_elements (*p);
 }
 
-/* { dg-final { scan-assembler-times {\mfadd\M\|\mxsadddp\M} 1 } } */
-/* { dg-final { scan-assembler-times {\mlxvp\M}              4 } } */
-/* { dg-final { scan-assembler-times {\mmfvsrd\M}            2 } } */
-/* { dg-final { scan-assembler-times {\mmfvsrld\M}           2 } } */
-/* { dg-final { scan-assembler-times {\mvaddudm\M}           2 } } */
-/* { dg-final { scan-assembler-times {\mvsldoi\M}            2 } } */
-/* { dg-final { scan-assembler-times {\mxscvspdp\M}          1 } } */
-/* { dg-final { scan-assembler-times {\mxvadddp\M}           1 } } */
-/* { dg-final { scan-assembler-times {\mxvaddsp\M}           3 } } */
-/* { dg-final { scan-assembler-times {\mxxpermdi\M}          1 } } */
+/* { dg-final { scan-assembler-times {\mfadd\M|\mxsadddp\M} 1 } } */
+/* { dg-final { scan-assembler-times {\mlxvp\M}             4 } } */
+/* { dg-final { scan-assembler-times {\mmfvsrd\M}           2 } } */
+/* { dg-final { scan-assembler-times {\mmfvsrld\M}          2 } } */
+/* { dg-final { scan-assembler-times {\mvaddudm\M}          2 } } */
+/* { dg-final { scan-assembler-times {\mvsldoi\M}           2 } } */
+/* { dg-final { scan-assembler-times {\mxscvspdp\M}         1 } } */
+/* { dg-final { scan-assembler-times {\mxvadddp\M}          1 } } */
+/* { dg-final { scan-assembler-times {\mxvaddsp\M}          3 } } */
+/* { dg-final { scan-assembler-times {\mxxpermdi\M}         1 } } */
