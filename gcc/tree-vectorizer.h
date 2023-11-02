@@ -1821,7 +1821,7 @@ is_loop_header_bb_p (basic_block bb)
 {
   if (bb == (bb->loop_father)->header)
     return true;
-  gcc_checking_assert (EDGE_COUNT (bb->preds) == 1);
+
   return false;
 }
 
@@ -2212,7 +2212,8 @@ extern bool slpeel_can_duplicate_loop_p (const class loop *, const_edge,
 					 const_edge);
 class loop *slpeel_tree_duplicate_loop_to_edge_cfg (class loop *, edge,
 						    class loop *, edge,
-						    edge, edge *, bool = true);
+						    edge, edge *, bool = true,
+						    vec<basic_block> * = NULL);
 class loop *vect_loop_versioning (loop_vec_info, gimple *);
 extern class loop *vect_do_peeling (loop_vec_info, tree, tree,
 				    tree *, tree *, tree *, int, bool, bool,
@@ -2223,6 +2224,7 @@ extern dump_user_location_t find_loop_location (class loop *);
 extern bool vect_can_advance_ivs_p (loop_vec_info);
 extern void vect_update_inits_of_drs (loop_vec_info, tree, tree_code);
 extern edge vec_init_loop_exit_info (class loop *);
+extern bool vect_is_loop_exit_latch_pred (edge, class loop *);
 
 /* In tree-vect-stmts.cc.  */
 extern tree get_related_vectype_for_scalar_type (machine_mode, tree,
