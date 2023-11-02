@@ -1636,6 +1636,10 @@ Target supports hardware vectors of @code{float} when
 @option{-funsafe-math-optimizations} is not in effect.
 This implies @code{vect_float}.
 
+@item vect_early_break
+Target supports hardware vectorization of loops with early breaks.
+This requires an implementation of the cbranch optab for vectors.
+
 @item vect_int
 Target supports hardware vectors of @code{int}.
 
