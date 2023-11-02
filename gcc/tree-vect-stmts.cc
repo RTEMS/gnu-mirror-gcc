@@ -1774,7 +1774,7 @@ compare_step_with_zero (vec_info *vinfo, stmt_vec_info stmt_info)
 /* If the target supports a permute mask that reverses the elements in
    a vector of type VECTYPE, return that mask, otherwise return null.  */
 
-static tree
+tree
 perm_mask_for_reverse (tree vectype)
 {
   poly_uint64 nunits = TYPE_VECTOR_SUBPARTS (vectype);

@@ -10627,12 +10627,60 @@ vectorizable_live_operation (vec_info *vinfo, stmt_vec_info stmt_info,
 	   lhs' = new_tree;  */
 
       class loop *loop = LOOP_VINFO_LOOP (loop_vinfo);
-      basic_block exit_bb = LOOP_VINFO_IV_EXIT (loop_vinfo)->dest;
+      /* A value can only be live in one exit.  So figure out which one.  */
+      edge exit_e = LOOP_VINFO_IV_EXIT (loop_vinfo);
+      /* Check if we have a loop where the chosen exit is not the main exit,
+	 in these cases for an early break we restart the iteration the vector code
+	 did.  For the live values we want the value at the start of the iteration
+	 rather than at the end.  */
+      bool restart_loop = false;
+      if (LOOP_VINFO_EARLY_BREAKS (loop_vinfo))
+	{
+	  FOR_EACH_IMM_USE_STMT (use_stmt, imm_iter, lhs)
+	    if (!is_gimple_debug (use_stmt)
+		&& !flow_bb_inside_loop_p (loop, gimple_bb (use_stmt)))
+	      {
+		basic_block use_bb = gimple_bb (use_stmt);
+		for (auto edge : get_loop_exit_edges (loop))
+		  {
+		    /* Alternative exits can have an intermediate BB in
+		       between to update the IV.  In those cases we need to
+		       look one block further.  */
+		    if (use_bb == edge->dest
+			|| (single_succ_p (edge->dest)
+			    && use_bb == single_succ (edge->dest)))
+		      {
+			exit_e = edge;
+			goto found;
+		      }
+		  }
+	      }
+found:
+	  /* If the edge isn't a single pred then split the edge so we have a
+	     location to place the live operations.  Perhaps we should always
+	     split during IV updating.  But this way the CFG is cleaner to
+	     follow.  */
+	  restart_loop = !vect_is_loop_exit_latch_pred (exit_e, loop);
+	  if (!single_pred_p (exit_e->dest))
+	    exit_e = single_pred_edge (split_edge (exit_e));
+
+	  /* For early exit where the exit is not in the BB that leads to the
+	     latch then we're restarting the iteration in the scalar loop. So
+	     get the first live value.  */
+	  if (restart_loop)
+	    {
+	      vec_stmt = STMT_VINFO_VEC_STMTS (stmt_info)[0];
+	      vec_lhs = gimple_get_lhs (vec_stmt);
+	      bitstart = build_zero_cst (TREE_TYPE (bitstart));
+	    }
+	}
+
+      basic_block exit_bb = exit_e->dest;
       gcc_assert (single_pred_p (exit_bb));
 
       tree vec_lhs_phi = copy_ssa_name (vec_lhs);
       gimple *phi = create_phi_node (vec_lhs_phi, exit_bb);
-      SET_PHI_ARG_DEF (phi, LOOP_VINFO_IV_EXIT (loop_vinfo)->dest_idx, vec_lhs);
+      SET_PHI_ARG_DEF (phi, exit_e->dest_idx, vec_lhs);
 
       gimple_seq stmts = NULL;
       tree new_tree;
@@ -10663,6 +10711,12 @@ vectorizable_live_operation (vec_info *vinfo, stmt_vec_info stmt_info,
 	  tree last_index = gimple_build (&stmts, PLUS_EXPR, TREE_TYPE (len),
 					  len, bias_minus_one);
 
+	  /* This needs to implement extraction of the first index, but not sure
+	     how the LEN stuff works.  At the moment we shouldn't get here since
+	     there's no LEN support for early breaks.  But guard this so there's
+	     no incorrect codegen.  */
+	  gcc_assert (!LOOP_VINFO_EARLY_BREAKS (loop_vinfo));
+
 	  /* SCALAR_RES = VEC_EXTRACT <VEC_LHS, LEN + BIAS - 1>.  */
 	  tree scalar_res
 	    = gimple_build (&stmts, CFN_VEC_EXTRACT, TREE_TYPE (vectype),
@@ -10687,8 +10741,37 @@ vectorizable_live_operation (vec_info *vinfo, stmt_vec_info stmt_info,
 					  &LOOP_VINFO_MASKS (loop_vinfo),
 					  1, vectype, 0);
 	  gimple_seq_add_seq (&stmts, tem);
-	  tree scalar_res = gimple_build (&stmts, CFN_EXTRACT_LAST, scalar_type,
-					  mask, vec_lhs_phi);
+	  tree scalar_res;
+
+	  /* For an inverted control flow with early breaks we want EXTRACT_FIRST
+	     instead of EXTRACT_LAST.  Emulate by reversing the vector and mask. */
+	  if (restart_loop && LOOP_VINFO_EARLY_BREAKS (loop_vinfo))
+	    {
+	      auto gsi_stmt = gsi_last (stmts);
+
+	       /* First create the permuted mask.  */
+	      tree perm_mask = perm_mask_for_reverse (TREE_TYPE (mask));
+	      tree perm_dest = copy_ssa_name (mask);
+	      gimple *perm_stmt
+		    = gimple_build_assign (perm_dest, VEC_PERM_EXPR, mask,
+					   mask, perm_mask);
+	      vect_finish_stmt_generation (vinfo, stmt_info, perm_stmt,
+					   &gsi_stmt);
+	      mask = perm_dest;
+
+	       /* Then permute the vector contents.  */
+	      tree perm_elem = perm_mask_for_reverse (vectype);
+	      perm_dest = copy_ssa_name (vec_lhs_phi);
+	      perm_stmt
+		    = gimple_build_assign (perm_dest, VEC_PERM_EXPR, vec_lhs_phi,
+					   vec_lhs_phi, perm_elem);
+	      vect_finish_stmt_generation (vinfo, stmt_info, perm_stmt,
+					   &gsi_stmt);
+	      vec_lhs_phi = perm_dest;
+	    }
+
+	  scalar_res = gimple_build (&stmts, CFN_EXTRACT_LAST, scalar_type,
+				     mask, vec_lhs_phi);
 
 	  /* Convert the extracted vector element to the scalar type.  */
 	  new_tree = gimple_convert (&stmts, lhs_type, scalar_res);
@@ -10708,26 +10791,36 @@ vectorizable_live_operation (vec_info *vinfo, stmt_vec_info stmt_info,
       if (stmts)
 	gsi_insert_seq_before (&exit_gsi, stmts, GSI_SAME_STMT);
 
-      /* Remove existing phis that copy from lhs and create copies
-	 from new_tree.  */
-      gimple_stmt_iterator gsi;
-      for (gsi = gsi_start_phis (exit_bb); !gsi_end_p (gsi);)
+      /* There a no further out-of-loop uses of lhs by LC-SSA construction.  */
+      bool single_use = true;
+      FOR_EACH_IMM_USE_STMT (use_stmt, imm_iter, lhs)
 	{
-	  gimple *phi = gsi_stmt (gsi);
-	  if ((gimple_phi_arg_def (phi, 0) == lhs))
+	  if (flow_bb_inside_loop_p (loop, gimple_bb (use_stmt)))
+	    continue;
+
+	  gcc_assert (single_use);
+	  if (is_a <gphi *> (use_stmt)
+	      && gimple_phi_arg_def (as_a <gphi *> (use_stmt), 0) == lhs)
 	    {
+	      /* Remove existing phis that copy from lhs and create copies
+		 from new_tree.  */
+	      gphi *phi = as_a <gphi *> (use_stmt);
+	      auto gsi = gsi_for_phi (phi);
 	      remove_phi_node (&gsi, false);
 	      tree lhs_phi = gimple_phi_result (phi);
 	      gimple *copy = gimple_build_assign (lhs_phi, new_tree);
 	      gsi_insert_before (&exit_gsi, copy, GSI_SAME_STMT);
 	    }
 	  else
-	    gsi_next (&gsi);
+	    {
+	      /* Or just update the use in place if not a phi.  */
+	      use_operand_p use_p;
+	      FOR_EACH_IMM_USE_ON_STMT (use_p, imm_iter)
+		SET_USE (use_p, new_tree);
+	      update_stmt (use_stmt);
+	    }
+	  single_use = false;
 	}
-
-      /* There a no further out-of-loop uses of lhs by LC-SSA construction.  */
-      FOR_EACH_IMM_USE_STMT (use_stmt, imm_iter, lhs)
-	gcc_assert (flow_bb_inside_loop_p (loop, gimple_bb (use_stmt)));
     }
   else
     {

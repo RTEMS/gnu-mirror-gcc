@@ -2246,6 +2246,7 @@ extern bool vect_is_simple_use (vec_info *, stmt_vec_info, slp_tree,
 				enum vect_def_type *,
 				tree *, stmt_vec_info * = NULL);
 extern bool vect_maybe_update_slp_op_vectype (slp_tree, tree);
+extern tree perm_mask_for_reverse (tree);
 extern bool supportable_widening_operation (vec_info*, code_helper,
 					    stmt_vec_info, tree, tree,
 					    code_helper*, code_helper*,
