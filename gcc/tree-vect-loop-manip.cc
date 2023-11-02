@@ -4016,12 +4016,23 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
 	 If loop versioning wasn't done from loop, but scalar_loop instead,
 	 merge_bb will have already just a single successor.  */
 
-      merge_bb = single_exit (loop_to_version)->dest;
+      /* When the loop has multiple exits then we can only version itself.
+	 This is denoted by loop_to_version == loop.  In this case we can
+	 do the versioning by selecting the exit edge the vectorizer is
+	 currently using.  */
+      edge exit_edge;
+      if (loop_to_version == loop)
+	exit_edge = LOOP_VINFO_IV_EXIT (loop_vinfo);
+      else
+	exit_edge = single_exit (loop_to_version);
+
+      gcc_assert (exit_edge);
+      merge_bb = exit_edge->dest;
       if (EDGE_COUNT (merge_bb->preds) >= 2)
 	{
 	  gcc_assert (EDGE_COUNT (merge_bb->preds) >= 2);
-	  new_exit_bb = split_edge (single_exit (loop_to_version));
-	  new_exit_e = single_exit (loop_to_version);
+	  new_exit_bb = split_edge (exit_edge);
+	  new_exit_e = exit_edge;
 	  e = EDGE_SUCC (new_exit_bb, 0);
 
 	  for (gsi = gsi_start_phis (merge_bb); !gsi_end_p (gsi);
