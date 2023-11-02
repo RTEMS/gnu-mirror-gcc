@@ -964,6 +964,7 @@ vec_init_loop_exit_info (class loop *loop)
   if (exits.length () == 1)
     return exits[0];
 
+#if 0
   /* If we have multiple exits we only support counting IV at the moment.  Analyze
      all exits and return one */
   class tree_niter_desc niter_desc;
@@ -982,6 +983,16 @@ vec_init_loop_exit_info (class loop *loop)
     }
 
   return candidate;
+#else
+  basic_block bb = ip_normal_pos (loop);
+  if (!bb)
+    return NULL;
+
+  edge exit = EDGE_SUCC (bb, 0);
+  if (exit->dest == loop->latch)
+    return EDGE_SUCC (bb, 1);
+  return exit;
+#endif
 }
 
 /* Function bb_in_loop_p
