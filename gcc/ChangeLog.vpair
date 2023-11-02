@@ -1,3 +1,13 @@
+==================== Branch work141-vpair, patch #336 ====================
+
+Fix typo in test.
+
+2023-11-01  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-1.c: Fix typo.
+
 ==================== Branch work141-vpair, patch #335 ====================
 
 Add support for doing a horizontal add on vector pair elements.
