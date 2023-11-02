@@ -3321,11 +3321,14 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
       epilog = vect_epilogues ? get_loop_copy (loop) : scalar_loop;
       edge epilog_e = vect_epilogues ? e : scalar_e;
       edge new_epilog_e = NULL;
-      epilog = slpeel_tree_duplicate_loop_to_edge_cfg (loop, e, epilog,
-						       epilog_e, e,
-						       &new_epilog_e);
+      auto_vec<basic_block> doms;
+      epilog
+	= slpeel_tree_duplicate_loop_to_edge_cfg (loop, e, epilog, epilog_e, e,
+						  &new_epilog_e, true, &doms);
+
       LOOP_VINFO_EPILOGUE_IV_EXIT (loop_vinfo) = new_epilog_e;
       gcc_assert (epilog);
+      gcc_assert (new_epilog_e);
       epilog->force_vectorize = false;
       bb_before_epilog = loop_preheader_edge (epilog)->src;
 
@@ -3424,10 +3427,16 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
 					    exit, true);
 	}
 
-      if (skip_epilog)
+      if (skip_epilog || LOOP_VINFO_EARLY_BREAKS (loop_vinfo))
 	{
-	  guard_cond = fold_build2 (EQ_EXPR, boolean_type_node,
+	  /* For the case where a different exit was chosen we must execute
+	     the scalar loop with the remaining iterations.  */
+	  if (inversed_iv)
+	    guard_cond = boolean_false_node;
+	  else
+	    guard_cond = fold_build2 (EQ_EXPR, boolean_type_node,
 				    niters, niters_vector_mult_vf);
+
 	  guard_bb = LOOP_VINFO_IV_EXIT (loop_vinfo)->dest;
 	  edge epilog_e = LOOP_VINFO_EPILOGUE_IV_EXIT (loop_vinfo);
 	  guard_to = epilog_e->dest;
@@ -3435,6 +3444,7 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
 					   skip_vector ? anchor : guard_bb,
 					   prob_epilog.invert (),
 					   irred_flag);
+	  doms.safe_push (guard_to);
 	  if (vect_epilogues)
 	    epilogue_vinfo->skip_this_loop_edge = guard_e;
 	  edge main_iv = LOOP_VINFO_IV_EXIT (loop_vinfo);
@@ -3472,6 +3482,10 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
 	    }
 	  scale_loop_profile (epilog, prob_epilog, -1);
 	}
+
+      /* Recalculate the dominators after adding the guard edge.  */
+      if (LOOP_VINFO_EARLY_BREAKS (loop_vinfo))
+	iterate_fix_dominators (CDI_DOMINATORS, doms, false);
 
       unsigned HOST_WIDE_INT bound;
       if (bound_scalar.is_constant (&bound))
