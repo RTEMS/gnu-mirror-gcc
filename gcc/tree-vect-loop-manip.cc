@@ -448,6 +448,20 @@ vect_adjust_loop_lens_control (tree iv_type, gimple_seq *seq,
     }
 }
 
+/* Stores the standard position for induction variable increment in belonging to
+   LOOP_EXIT (just before the exit condition of the given exit to BSI.
+   INSERT_AFTER is set to true if the increment should be inserted after
+   *BSI.  */
+
+static void
+vect_iv_increment_position (edge loop_exit, gimple_stmt_iterator *bsi,
+			    bool *insert_after)
+{
+  basic_block bb = loop_exit->src;
+  *bsi = gsi_last_bb (bb);
+  *insert_after = false;
+}
+
 /* Helper for vect_set_loop_condition_partial_vectors.  Generate definitions
    for all the rgroup controls in RGC and return a control that is nonzero
    when the loop needs to iterate.  Add any new preheader statements to
@@ -531,7 +545,8 @@ vect_set_loop_controls_directly (class loop *loop, loop_vec_info loop_vinfo,
   tree index_before_incr, index_after_incr;
   gimple_stmt_iterator incr_gsi;
   bool insert_after;
-  standard_iv_increment_position (loop, &incr_gsi, &insert_after);
+  edge exit_e = LOOP_VINFO_IV_EXIT (loop_vinfo);
+  vect_iv_increment_position (exit_e, &incr_gsi, &insert_after);
   if (LOOP_VINFO_USING_DECREMENTING_IV_P (loop_vinfo))
     {
       /* Create an IV that counts down from niters_total and whose step
@@ -1017,7 +1032,7 @@ vect_set_loop_condition_partial_vectors_avx512 (class loop *loop,
   tree index_before_incr, index_after_incr;
   gimple_stmt_iterator incr_gsi;
   bool insert_after;
-  standard_iv_increment_position (loop, &incr_gsi, &insert_after);
+  vect_iv_increment_position (exit_edge, &incr_gsi, &insert_after);
   create_iv (niters_adj, MINUS_EXPR, iv_step, NULL_TREE, loop,
 	     &incr_gsi, insert_after, &index_before_incr,
 	     &index_after_incr);
@@ -1185,7 +1200,7 @@ vect_set_loop_condition_partial_vectors_avx512 (class loop *loop,
    loop handles exactly VF scalars per iteration.  */
 
 static gcond *
-vect_set_loop_condition_normal (loop_vec_info /* loop_vinfo */, edge exit_edge,
+vect_set_loop_condition_normal (loop_vec_info loop_vinfo, edge exit_edge,
 				class loop *loop, tree niters, tree step,
 				tree final_iv, bool niters_maybe_zero,
 				gimple_stmt_iterator loop_cond_gsi)
@@ -1278,7 +1293,7 @@ vect_set_loop_condition_normal (loop_vec_info /* loop_vinfo */, edge exit_edge,
 	}
     }
 
-  standard_iv_increment_position (loop, &incr_gsi, &insert_after);
+  vect_iv_increment_position (exit_edge, &incr_gsi, &insert_after);
   create_iv (init, PLUS_EXPR, step, NULL_TREE, loop,
              &incr_gsi, insert_after, &indx_before_incr, &indx_after_incr);
   indx_after_incr = force_gimple_operand_gsi (&loop_cond_gsi, indx_after_incr,
@@ -1446,7 +1461,7 @@ slpeel_tree_duplicate_loop_for_vectorization (class loop *loop, edge loop_exit,
       redirect_edge_and_branch (exit, dest);
     }
 
-  /* Only fush the main exit, the remaining exits we need to match the order
+  /* Only flush the main exit, the remaining exits we need to match the order
      in the loop->header which with multiple exits may not be the same.  */
   flush_pending_stmts (loop_exit);
 
@@ -1519,7 +1534,9 @@ slpeel_tree_duplicate_loop_for_vectorization (class loop *loop, edge loop_exit,
 		  SET_PHI_ARG_DEF (alt_lcssa_phi, main_e->dest_idx, new_arg);
 		}
 	    new_arg = alt_res; /* Push it down to the new_loop header.  */
-	  } else if (!res) {
+	  }
+	else if (!res)
+	  {
 	    /* For non-early break we need to keep the possibly live values in
 	       the exit block.  For early break these are kept in the merge
 	       block in the code above.  */
