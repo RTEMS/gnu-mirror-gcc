@@ -128,7 +128,7 @@ test_nfms (__vector_pair *dest,
 /* { dg-final { scan-assembler-times {\mxvmindp\M}      2 } } */
 /* { dg-final { scan-assembler-times {\mxvmsub.dp\M}    2 } } */
 /* { dg-final { scan-assembler-times {\mxvmuldp\M}      2 } } */
-/* { dg-final { scan-assembler-times {\mxvnabsdp\M      2 } } */
+/* { dg-final { scan-assembler-times {\mxvnabsdp\M}     2 } } */
 /* { dg-final { scan-assembler-times {\mxvnegdp\M}      2 } } */
 /* { dg-final { scan-assembler-times {\mxvnmadd.dp\M}   2 } } */
 /* { dg-final { scan-assembler-times {\mxvnmsub.dp\M}   2 } } */
