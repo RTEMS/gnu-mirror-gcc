@@ -1200,7 +1200,7 @@ vect_set_loop_condition_partial_vectors_avx512 (class loop *loop,
    loop handles exactly VF scalars per iteration.  */
 
 static gcond *
-vect_set_loop_condition_normal (loop_vec_info loop_vinfo, edge exit_edge,
+vect_set_loop_condition_normal (loop_vec_info /* loop_vinfo */, edge exit_edge,
 				class loop *loop, tree niters, tree step,
 				tree final_iv, bool niters_maybe_zero,
 				gimple_stmt_iterator loop_cond_gsi)
@@ -1412,7 +1412,7 @@ vect_set_loop_condition (class loop *loop, edge loop_e, loop_vec_info loop_vinfo
    When this happens we need to flip the understanding of main and other
    exits by peeling and IV updates.  */
 
-bool inline
+bool
 vect_is_loop_exit_latch_pred (edge loop_exit, class loop *loop)
 {
   return single_pred (loop->latch) == loop_exit->src;
@@ -2142,6 +2142,7 @@ vect_can_advance_ivs_p (loop_vec_info loop_vinfo)
      Input:
      - LOOP - a loop that is going to be vectorized. The last few iterations
               of LOOP were peeled.
+     - VF   - The chosen vectorization factor for LOOP.
      - NITERS - the number of iterations that LOOP executes (before it is
                 vectorized). i.e, the number of times the ivs should be bumped.
      - UPDATE_E - a successor edge of LOOP->exit that is on the (only) path
@@ -2151,6 +2152,9 @@ vect_can_advance_ivs_p (loop_vec_info loop_vinfo)
                   The new definitions of the ivs are placed in LOOP->exit.
                   The phi args associated with the edge UPDATE_E in the bb
                   UPDATE_E->dest are updated accordingly.
+
+     - restart_loop - Indicates whether the scalar loop needs to restart the
+		      iteration count where the vector loop began.
 
      Assumption 1: Like the rest of the vectorizer, this function assumes
      a single loop exit that has a single predecessor.
@@ -2169,18 +2173,22 @@ vect_can_advance_ivs_p (loop_vec_info loop_vinfo)
  */
 
 static void
-vect_update_ivs_after_vectorizer (loop_vec_info loop_vinfo,
-				  tree niters, edge update_e)
+vect_update_ivs_after_vectorizer (loop_vec_info loop_vinfo, poly_uint64 vf,
+				  tree niters, edge update_e, bool restart_loop)
 {
   gphi_iterator gsi, gsi1;
   class loop *loop = LOOP_VINFO_LOOP (loop_vinfo);
   basic_block update_bb = update_e->dest;
-
-  basic_block exit_bb = LOOP_VINFO_IV_EXIT (loop_vinfo)->dest;
-
-  /* Make sure there exists a single-predecessor exit bb:  */
-  gcc_assert (single_pred_p (exit_bb));
-  gcc_assert (single_succ_edge (exit_bb) == update_e);
+  bool inversed_iv
+	= !vect_is_loop_exit_latch_pred (LOOP_VINFO_IV_EXIT (loop_vinfo),
+					 LOOP_VINFO_LOOP (loop_vinfo));
+  bool needs_interm_block = LOOP_VINFO_EARLY_BREAKS (loop_vinfo)
+			    && flow_bb_inside_loop_p (loop, update_e->src);
+  edge loop_e = LOOP_VINFO_IV_EXIT (loop_vinfo);
+  gcond *cond = get_loop_exit_condition (loop_e);
+  basic_block exit_bb = loop_e->dest;
+  basic_block iv_block = NULL;
+  gimple_stmt_iterator last_gsi = gsi_last_bb (exit_bb);
 
   for (gsi = gsi_start_phis (loop->header), gsi1 = gsi_start_phis (update_bb);
        !gsi_end_p (gsi) && !gsi_end_p (gsi1);
@@ -2190,7 +2198,6 @@ vect_update_ivs_after_vectorizer (loop_vec_info loop_vinfo,
       tree step_expr, off;
       tree type;
       tree var, ni, ni_name;
-      gimple_stmt_iterator last_gsi;
 
       gphi *phi = gsi.phi ();
       gphi *phi1 = gsi1.phi ();
@@ -2222,11 +2229,52 @@ vect_update_ivs_after_vectorizer (loop_vec_info loop_vinfo,
       enum vect_induction_op_type induction_type
 	= STMT_VINFO_LOOP_PHI_EVOLUTION_TYPE (phi_info);
 
-      if (induction_type == vect_step_op_add)
+      tree iv_var = PHI_ARG_DEF_FROM_EDGE (phi, loop_latch_edge (loop));
+      /* create_iv always places it on the LHS.  Alternatively we can set a
+	 property during create_iv to identify it.  */
+      bool ivtemp = gimple_cond_lhs (cond) == iv_var;
+      if (restart_loop && ivtemp)
 	{
+	  type = TREE_TYPE (gimple_phi_result (phi));
+	  ni = build_int_cst (type, vf);
+	  if (inversed_iv)
+	    ni = fold_build2 (MINUS_EXPR, type, ni,
+			      fold_convert (type, step_expr));
+	}
+      else if (induction_type == vect_step_op_add)
+	{
+
 	  tree stype = TREE_TYPE (step_expr);
-	  off = fold_build2 (MULT_EXPR, stype,
-			     fold_convert (stype, niters), step_expr);
+
+	  /* Early exits always use last iter value not niters. */
+	  if (restart_loop)
+	    {
+	      /* Live statements in the non-main exit shouldn't be adjusted.  We
+		 normally didn't have this problem with a single exit as live
+		 values would be in the exit block.  However when dealing with
+		 multiple exits all exits are redirected to the merge block
+		 and we restart the iteration.  */
+	      if (STMT_VINFO_LIVE_P (phi_info))
+		continue;
+
+	      /* For early break the final loop IV is:
+		 init + (final - init) * vf which takes into account peeling
+		 values and non-single steps.  The main exit can use niters
+		 since if you exit from the main exit you've done all vector
+		 iterations.  For an early exit we don't know when we exit so we
+		 must re-calculate this on the exit.  */
+	      tree start_expr = gimple_phi_result (phi);
+	      off = fold_build2 (MINUS_EXPR, stype,
+				 fold_convert (stype, start_expr),
+				 fold_convert (stype, init_expr));
+	      /* Now adjust for VF to get the final iteration value.  */
+	      off = fold_build2 (MULT_EXPR, stype, off,
+				 build_int_cst (stype, vf));
+	    }
+	  else
+	    off = fold_build2 (MULT_EXPR, stype,
+			       fold_convert (stype, niters), step_expr);
+
 	  if (POINTER_TYPE_P (type))
 	    ni = fold_build_pointer_plus (init_expr, off);
 	  else
@@ -2238,6 +2286,8 @@ vect_update_ivs_after_vectorizer (loop_vec_info loop_vinfo,
       /* Don't bother call vect_peel_nonlinear_iv_init.  */
       else if (induction_type == vect_step_op_neg)
 	ni = init_expr;
+      else if (restart_loop)
+	continue;
       else
 	ni = vect_peel_nonlinear_iv_init (&stmts, init_expr,
 					  niters, step_expr,
@@ -2245,9 +2295,20 @@ vect_update_ivs_after_vectorizer (loop_vec_info loop_vinfo,
 
       var = create_tmp_var (type, "tmp");
 
-      last_gsi = gsi_last_bb (exit_bb);
       gimple_seq new_stmts = NULL;
       ni_name = force_gimple_operand (ni, &new_stmts, false, var);
+
+      /* For non-main exit create an intermediat edge to get any updated iv
+	 calculations.  */
+      if (needs_interm_block
+	  && !iv_block
+	  && (!gimple_seq_empty_p (stmts) || !gimple_seq_empty_p (new_stmts)))
+	{
+	  iv_block = split_edge (update_e);
+	  update_e = single_succ_edge (update_e->dest);
+	  last_gsi = gsi_last_bb (iv_block);
+	}
+
       /* Exit_bb shouldn't be empty.  */
       if (!gsi_end_p (last_gsi))
 	{
@@ -3342,8 +3403,26 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
 	 niters_vector_mult_vf steps.  */
       gcc_checking_assert (vect_can_advance_ivs_p (loop_vinfo));
       update_e = skip_vector ? e : loop_preheader_edge (epilog);
-      vect_update_ivs_after_vectorizer (loop_vinfo, niters_vector_mult_vf,
-					update_e);
+      if (LOOP_VINFO_EARLY_BREAKS (loop_vinfo))
+	update_e = single_succ_edge (e->dest);
+      bool inversed_iv
+	= !vect_is_loop_exit_latch_pred (LOOP_VINFO_IV_EXIT (loop_vinfo),
+					 LOOP_VINFO_LOOP (loop_vinfo));
+
+      /* Update the main exit first.  */
+      vect_update_ivs_after_vectorizer (loop_vinfo, vf, niters_vector_mult_vf,
+					update_e, inversed_iv);
+
+      /* And then update the early exits.  */
+      for (auto exit : get_loop_exit_edges (loop))
+	{
+	  if (exit == LOOP_VINFO_IV_EXIT (loop_vinfo))
+	    continue;
+
+	  vect_update_ivs_after_vectorizer (loop_vinfo, vf,
+					    niters_vector_mult_vf,
+					    exit, true);
+	}
 
       if (skip_epilog)
 	{
