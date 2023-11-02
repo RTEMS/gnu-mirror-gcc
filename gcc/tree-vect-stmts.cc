@@ -13545,6 +13545,9 @@ vect_is_simple_use (tree operand, vec_info *vinfo, enum vect_def_type *dt,
 	case vect_first_order_recurrence:
 	  dump_printf (MSG_NOTE, "first order recurrence\n");
 	  break;
+       case vect_early_exit_def:
+	  dump_printf (MSG_NOTE, "early exit\n");
+	  break;
 	case vect_unknown_def_type:
 	  dump_printf (MSG_NOTE, "unknown\n");
 	  break;

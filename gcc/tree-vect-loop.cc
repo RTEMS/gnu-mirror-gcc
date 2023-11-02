@@ -1040,6 +1040,7 @@ _loop_vec_info::_loop_vec_info (class loop *loop_in, vec_info_shared *shared)
     partial_load_store_bias (0),
     peeling_for_gaps (false),
     peeling_for_niter (false),
+    early_breaks (false),
     no_data_dependencies (false),
     has_mask_store (false),
     scalar_loop_scaling (profile_probability::uninitialized ()),
@@ -11492,6 +11493,55 @@ update_epilogue_loop_vinfo (class loop *epilogue, tree advance)
   epilogue_vinfo->shared->save_datarefs ();
 }
 
+/*  When vectorizing early break statements instructions that happen before
+    the early break in the current BB need to be moved to after the early
+    break.  This function deals with that and assumes that any validity
+    checks has already been performed.
+
+    While moving the instructions if it encounters a VUSE or VDEF it then
+    corrects the VUSES as it moves the statements along.  GDEST is the location
+    in which to insert the new statements.  */
+
+static void
+move_early_exit_stmts (loop_vec_info loop_vinfo)
+{
+  if (LOOP_VINFO_EARLY_BRK_CONFLICT_STMTS (loop_vinfo).is_empty ())
+    return;
+
+  /* Move all stmts that need moving.  */
+  basic_block dest_bb = LOOP_VINFO_EARLY_BRK_DEST_BB (loop_vinfo);
+  gimple_stmt_iterator dest_gsi = gsi_start_bb (dest_bb);
+
+  for (gimple *stmt : LOOP_VINFO_EARLY_BRK_CONFLICT_STMTS (loop_vinfo))
+    {
+      /* Check to see if statement is still required for vect or has been
+	 elided.  */
+      auto stmt_info = loop_vinfo->lookup_stmt (stmt);
+      if (!stmt_info)
+	continue;
+
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_NOTE, vect_location, "moving stmt %G", stmt);
+
+      gimple_stmt_iterator stmt_gsi = gsi_for_stmt (stmt);
+      gsi_move_before (&stmt_gsi, &dest_gsi);
+      gsi_prev (&dest_gsi);
+      update_stmt (stmt);
+    }
+
+  /* Update all the stmts with their new reaching VUSES.  */
+  tree vuse = gimple_vuse (LOOP_VINFO_EARLY_BRK_CONFLICT_STMTS (loop_vinfo).last ());
+  for (auto p : LOOP_VINFO_EARLY_BRK_VUSES (loop_vinfo))
+    {
+      if (dump_enabled_p ())
+	  dump_printf_loc (MSG_NOTE, vect_location,
+			   "updating vuse to %T for stmt %G", vuse, p);
+      unlink_stmt_vdef (p);
+      gimple_set_vuse (p, vuse);
+      update_stmt (p);
+    }
+}
+
 /* Function vect_transform_loop.
 
    The analysis phase has determined that the loop is vectorizable.
@@ -11640,6 +11690,11 @@ vect_transform_loop (loop_vec_info loop_vinfo, gimple *loop_vectorized_call)
       DUMP_VECT_SCOPE ("scheduling SLP instances");
       vect_schedule_slp (loop_vinfo, LOOP_VINFO_SLP_INSTANCES (loop_vinfo));
     }
+
+  /* Handle any code motion that we need to for early-break vectorization after
+     we've done peeling but just before we start vectorizing.  */
+  if (LOOP_VINFO_EARLY_BREAKS (loop_vinfo))
+    move_early_exit_stmts (loop_vinfo);
 
   /* FORNOW: the vectorizer supports only loops which body consist
      of one basic block (header + empty latch). When the vectorizer will

@@ -66,6 +66,7 @@ enum vect_def_type {
   vect_double_reduction_def,
   vect_nested_cycle,
   vect_first_order_recurrence,
+  vect_early_exit_def,
   vect_unknown_def_type
 };
 
@@ -888,6 +889,10 @@ public:
      we need to peel off iterations at the end to form an epilogue loop.  */
   bool peeling_for_niter;
 
+  /* When the loop has early breaks that we can vectorize we need to peel
+     the loop for the break finding loop.  */
+  bool early_breaks;
+
   /* List of loop additional IV conditionals found in the loop.  */
   auto_vec<gcond *> conds;
 
@@ -942,6 +947,20 @@ public:
   /* The controlling loop IV for the scalar loop being vectorized.  This IV
      controls the natural exits of the loop.  */
   edge scalar_loop_iv_exit;
+
+  /* Used to store the list of statements needing to be moved if doing early
+     break vectorization as they would violate the scalar loop semantics if
+     vectorized in their current location.  These are stored in order that they need
+     to be moved.  */
+  auto_vec<gimple *> early_break_conflict;
+
+  /* The final basic block where to move statements to.  In the case of
+     multiple exits this could be pretty far away.  */
+  basic_block early_break_dest_bb;
+
+  /* Statements whose VUSES need updating if early break vectorization is to
+     happen.  */
+  auto_vec<gimple*> early_break_vuses;
 } *loop_vec_info;
 
 /* Access Functions.  */
@@ -996,6 +1015,10 @@ public:
 #define LOOP_VINFO_REDUCTION_CHAINS(L)     (L)->reduction_chains
 #define LOOP_VINFO_PEELING_FOR_GAPS(L)     (L)->peeling_for_gaps
 #define LOOP_VINFO_PEELING_FOR_NITER(L)    (L)->peeling_for_niter
+#define LOOP_VINFO_EARLY_BREAKS(L)         (L)->early_breaks
+#define LOOP_VINFO_EARLY_BRK_CONFLICT_STMTS(L) (L)->early_break_conflict
+#define LOOP_VINFO_EARLY_BRK_DEST_BB(L)    (L)->early_break_dest_bb
+#define LOOP_VINFO_EARLY_BRK_VUSES(L)      (L)->early_break_vuses
 #define LOOP_VINFO_LOOP_CONDS(L)           (L)->conds
 #define LOOP_VINFO_LOOP_IV_COND(L)         (L)->loop_iv_cond
 #define LOOP_VINFO_NO_DATA_DEPENDENCIES(L) (L)->no_data_dependencies

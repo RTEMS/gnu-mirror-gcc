@@ -613,6 +613,331 @@ vect_analyze_data_ref_dependence (struct data_dependence_relation *ddr,
   return opt_result::success ();
 }
 
+/* This function tries to validate whether an early break vectorization
+   is possible for the current instruction sequence. Returns True i
+   possible, otherwise False.
+
+   Requirements:
+     - Any memory access must be to a fixed size buffer.
+     - There must not be any loads and stores to the same object.
+     - Multiple loads are allowed as long as they don't alias.
+
+   NOTE:
+     This implemementation is very conservative. Any overlappig loads/stores
+     that take place before the early break statement gets rejected aside from
+     WAR dependencies.
+
+     i.e.:
+
+	a[i] = 8
+	c = a[i]
+	if (b[i])
+	  ...
+
+	is not allowed, but
+
+	c = a[i]
+	a[i] = 8
+	if (b[i])
+	  ...
+
+	is which is the common case.
+
+   Arguments:
+     - LOOP_VINFO: loop information for the current loop.
+     - CHAIN: Currently detected sequence of instructions that need to be moved
+	      if we are to vectorize this early break.
+     - FIXED: Sequences of SSA_NAMEs that must not be moved, they are reachable from
+	      one or more cond conditions.  If this set overlaps with CHAIN then FIXED
+	      takes precedence.  This deals with non-single use cases.
+     - LOADS: List of all loads found during traversal.
+     - BASES: List of all load data references found during traversal.
+     - GSTMT: Current position to inspect for validity.  The sequence
+	      will be moved upwards from this point.
+     - REACHING_VUSE: The dominating VUSE found so far.  */
+
+static bool
+validate_early_exit_stmts (loop_vec_info loop_vinfo, hash_set<tree> *chain,
+			   hash_set<tree> *fixed, vec<tree> *loads,
+			   vec<data_reference *> *bases, tree *reaching_vuse,
+			   gimple_stmt_iterator *gstmt)
+{
+  if (gsi_end_p (*gstmt))
+    return true;
+
+  gimple *stmt = gsi_stmt (*gstmt);
+  /* ?? Do I need to move debug statements? not quite sure..  */
+  if (gimple_has_ops (stmt)
+      && !is_gimple_debug (stmt))
+    {
+      tree dest = NULL_TREE;
+      /* Try to find the SSA_NAME being defined.  For Statements with an LHS
+	 use the LHS, if not, assume that the first argument of a call is the
+	 value being defined.  e.g. MASKED_LOAD etc.  */
+      if (gimple_has_lhs (stmt))
+	dest = gimple_get_lhs (stmt);
+      else if (const gcall *call = dyn_cast <const gcall *> (stmt))
+	dest = gimple_arg (call, 0);
+      else if (const gcond *cond = dyn_cast <const gcond *> (stmt))
+	{
+	  /* Operands of conds are ones we can't move.  */
+	  fixed->add (gimple_cond_lhs (cond));
+	  fixed->add (gimple_cond_rhs (cond));
+	}
+
+      bool move = false;
+
+      stmt_vec_info stmt_vinfo = loop_vinfo->lookup_stmt (stmt);
+      if (!stmt_vinfo)
+	{
+	   if (dump_enabled_p ())
+	     dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+			      "early breaks not supported. Unknown"
+			      " statement: %G", stmt);
+	   return false;
+	}
+
+      auto dr_ref = STMT_VINFO_DATA_REF (stmt_vinfo);
+      if (dr_ref)
+	{
+	   /* We currently only support statically allocated objects due to
+	      not having first-faulting loads support or peeling for alignment
+	      support.  Compute the size of the referenced object (it could be
+	      dynamically allocated).  */
+	   tree obj = DR_BASE_ADDRESS (dr_ref);
+	   if (!obj || TREE_CODE (obj) != ADDR_EXPR)
+	     {
+	       if (dump_enabled_p ())
+		 dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+				  "early breaks only supported on statically"
+				  " allocated objects.\n");
+	       return false;
+	     }
+
+	   tree refop = TREE_OPERAND (obj, 0);
+	   tree refbase = get_base_address (refop);
+	   if (!refbase || !DECL_P (refbase) || !DECL_SIZE (refbase)
+	       || TREE_CODE (DECL_SIZE (refbase)) != INTEGER_CST)
+	     {
+	       if (dump_enabled_p ())
+		 dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+				  "early breaks only supported on statically"
+				  " allocated objects.\n");
+	       return false;
+	     }
+
+	   if (DR_IS_READ (dr_ref))
+	     {
+		loads->safe_push (dest);
+		bases->safe_push (dr_ref);
+	     }
+	   else if (DR_IS_WRITE (dr_ref))
+	     {
+		for (auto dr : bases)
+		  if (same_data_refs_base_objects (dr, dr_ref))
+		    {
+		      if (dump_enabled_p ())
+			  dump_printf_loc (MSG_MISSED_OPTIMIZATION,
+					   vect_location,
+					   "early breaks only supported,"
+					   " overlapping loads and stores found"
+					   " before the break statement.\n");
+		      return false;
+		    }
+		/* Any writes starts a new chain. */
+		move = true;
+	     }
+	}
+
+      /* If a statement is live and escapes the loop through usage in the loop
+	 epilogue then we can't move it since we need to maintain its
+	 reachability through all exits.  */
+      bool skip = false;
+      if (STMT_VINFO_LIVE_P (stmt_vinfo)
+	  && !(dr_ref && DR_IS_WRITE (dr_ref)))
+	{
+	  imm_use_iterator imm_iter;
+	  use_operand_p use_p;
+	  FOR_EACH_IMM_USE_FAST (use_p, imm_iter, dest)
+	    {
+	      basic_block bb = gimple_bb (USE_STMT (use_p));
+	      skip = bb == LOOP_VINFO_IV_EXIT (loop_vinfo)->dest;
+	      if (skip)
+		break;
+	    }
+	}
+
+      /* If we found the defining statement of a something that's part of the
+	 chain then expand the chain with the new SSA_VARs being used.  */
+      if (!skip && (chain->contains (dest) || move))
+	{
+	  move = true;
+	  for (unsigned x = 0; x < gimple_num_args (stmt); x++)
+	    {
+	      tree var = gimple_arg (stmt, x);
+	      if (TREE_CODE (var) == SSA_NAME)
+		{
+		  if (fixed->contains (dest))
+		    {
+		      move = false;
+		      fixed->add (var);
+		    }
+		  else
+		    chain->add (var);
+		}
+	      else
+		{
+		  use_operand_p use_p;
+		  ssa_op_iter iter;
+		  FOR_EACH_SSA_USE_OPERAND (use_p, stmt, iter, SSA_OP_USE)
+		    {
+		      tree op = USE_FROM_PTR (use_p);
+		      gcc_assert (TREE_CODE (op) == SSA_NAME);
+		      if (fixed->contains (dest))
+			{
+			  move = false;
+			  fixed->add (op);
+			}
+		      else
+			chain->add (op);
+		    }
+		}
+	    }
+
+	  if (dump_enabled_p ())
+	    {
+	      if (move)
+		dump_printf_loc (MSG_NOTE, vect_location,
+				"found chain %G", stmt);
+	      else
+		dump_printf_loc (MSG_NOTE, vect_location,
+				"ignored chain %G, not single use", stmt);
+	    }
+	}
+
+      if (move)
+	{
+	  if (dump_enabled_p ())
+	    dump_printf_loc (MSG_NOTE, vect_location,
+			     "==> recording stmt %G", stmt);
+
+	  for (tree ref : loads)
+	    if (stmt_may_clobber_ref_p (stmt, ref, true))
+	      {
+	        if (dump_enabled_p ())
+		  dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+				   "early breaks not supported as memory used"
+				   " may alias.\n");
+	        return false;
+	      }
+
+	  /* If we've moved a VDEF, extract the defining MEM and update
+	     usages of it.   */
+	  tree vdef;
+	  if ((vdef = gimple_vdef (stmt)))
+	    {
+	      /* This statement is to be moved.  */
+	      LOOP_VINFO_EARLY_BRK_CONFLICT_STMTS (loop_vinfo).safe_push (stmt);
+	      *reaching_vuse = gimple_vuse (stmt);
+	    }
+	}
+    }
+
+  gsi_prev (gstmt);
+
+  if (!validate_early_exit_stmts (loop_vinfo, chain, fixed, loads, bases,
+				  reaching_vuse, gstmt))
+    return false;
+
+  if (gimple_vuse (stmt) && !gimple_vdef (stmt))
+    {
+      LOOP_VINFO_EARLY_BRK_VUSES (loop_vinfo).safe_push (stmt);
+      if (dump_enabled_p ())
+	  dump_printf_loc (MSG_NOTE, vect_location,
+			   "marked statement for vUSE update: %G", stmt);
+    }
+
+  return true;
+}
+
+/* Funcion vect_analyze_early_break_dependences.
+
+   Examime all the data references in the loop and make sure that if we have
+   mulitple exits that we are able to safely move stores such that they become
+   safe for vectorization.  The function also calculates the place where to move
+   the instructions to and computes what the new vUSE chain should be.
+
+   This works in tandem with the CFG that will be produced by
+   slpeel_tree_duplicate_loop_to_edge_cfg later on.  */
+
+static opt_result
+vect_analyze_early_break_dependences (loop_vec_info loop_vinfo)
+{
+  DUMP_VECT_SCOPE ("vect_analyze_early_break_dependences");
+
+  hash_set<tree> chain, fixed;
+  auto_vec<tree> loads;
+  auto_vec<data_reference *> bases;
+  basic_block dest_bb = NULL;
+  tree vuse = NULL;
+
+  if (dump_enabled_p ())
+    dump_printf_loc (MSG_NOTE, vect_location,
+		     "loop contains multiple exits, analyzing"
+		     " statement dependencies.\n");
+
+  for (gcond *c : LOOP_VINFO_LOOP_CONDS (loop_vinfo))
+    {
+      stmt_vec_info loop_cond_info = loop_vinfo->lookup_stmt (c);
+      if (STMT_VINFO_TYPE (loop_cond_info) != loop_exit_ctrl_vec_info_type)
+	continue;
+
+      gimple *stmt = STMT_VINFO_STMT (loop_cond_info);
+      gimple_stmt_iterator gsi = gsi_for_stmt (stmt);
+
+      /* Initiaze the vuse chain with the one at the early break.  */
+      if (!vuse)
+	vuse = gimple_vuse (c);
+
+      if (!validate_early_exit_stmts (loop_vinfo, &chain, &fixed, &loads,
+				     &bases, &vuse, &gsi))
+	return opt_result::failure_at (stmt,
+				       "can't safely apply code motion to "
+				       "dependencies of %G to vectorize "
+				       "the early exit.\n", stmt);
+
+      /* Save destination as we go, BB are visited in order and the last one
+	is where statements should be moved to.  */
+      if (!dest_bb)
+	dest_bb = gimple_bb (c);
+      else
+	{
+	  basic_block curr_bb = gimple_bb (c);
+	  if (dominated_by_p (CDI_DOMINATORS, curr_bb, dest_bb))
+	    dest_bb = curr_bb;
+	}
+    }
+
+  dest_bb = FALLTHRU_EDGE (dest_bb)->dest;
+  gcc_assert (dest_bb);
+  LOOP_VINFO_EARLY_BRK_DEST_BB (loop_vinfo) = dest_bb;
+
+  for (auto g : LOOP_VINFO_EARLY_BRK_VUSES (loop_vinfo))
+    {
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_NOTE, vect_location,
+			 "updated use: %T, mem_ref: %G",
+			 vuse, g);
+    }
+
+  if (dump_enabled_p ())
+    dump_printf_loc (MSG_NOTE, vect_location,
+		     "recorded statements to be moved to BB %d\n",
+		     LOOP_VINFO_EARLY_BRK_DEST_BB (loop_vinfo)->index);
+
+  return opt_result::success ();
+}
+
 /* Function vect_analyze_data_ref_dependences.
 
    Examine all the data references in the loop, and make sure there do not
@@ -656,6 +981,11 @@ vect_analyze_data_ref_dependences (loop_vec_info loop_vinfo,
 	if (!res)
 	  return res;
       }
+
+  /* If we have early break statements in the loop, check to see if they
+     are of a form we can vectorizer.  */
+  if (LOOP_VINFO_EARLY_BREAKS (loop_vinfo))
+    return vect_analyze_early_break_dependences (loop_vinfo);
 
   return opt_result::success ();
 }
