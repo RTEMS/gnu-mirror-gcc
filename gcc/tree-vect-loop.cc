@@ -1700,12 +1700,12 @@ vect_compute_single_scalar_iteration_cost (loop_vec_info loop_vinfo)
   loop_vinfo->scalar_costs->finish_cost (nullptr);
 }
 
-
 /* Function vect_analyze_loop_form.
 
    Verify that certain CFG restrictions hold, including:
    - the loop has a pre-header
-   - the loop has a single entry and exit
+   - the loop has a single entry
+   - nested loops can have only a single exit.
    - the loop exit condition is simple enough
    - the number of iterations can be analyzed, i.e, a countable loop.  The
      niter could be analyzed under some assumptions.  */
@@ -1841,10 +1841,14 @@ vect_analyze_loop_form (class loop *loop, vect_loop_form_info *info)
 				   "not vectorized: latch block not empty.\n");
 
   /* Make sure the exit is not abnormal.  */
-  if (exit_e->flags & EDGE_ABNORMAL)
-    return opt_result::failure_at (vect_location,
-				   "not vectorized:"
-				   " abnormal loop exit edge.\n");
+  auto_vec<edge> exits = get_loop_exit_edges (loop);
+  for (edge e : exits)
+    {
+      if (e->flags & EDGE_ABNORMAL)
+	return opt_result::failure_at (vect_location,
+				       "not vectorized:"
+				       " abnormal loop exit edge.\n");
+    }
 
   info->conds
     = vect_get_loop_niters (loop, exit_e, &info->assumptions,
@@ -1919,6 +1923,10 @@ vect_create_loop_vinfo (class loop *loop, vec_info_shared *shared,
   LOOP_VINFO_LOOP_IV_COND (loop_vinfo) = info->conds[0];
 
   LOOP_VINFO_IV_EXIT (loop_vinfo) = info->loop_exit;
+
+  /* Check to see if we're vectorizing multiple exits.  */
+  LOOP_VINFO_EARLY_BREAKS (loop_vinfo)
+    = !LOOP_VINFO_LOOP_CONDS (loop_vinfo).is_empty ();
 
   if (info->inner_loop_cond)
     {
@@ -11691,7 +11699,7 @@ vect_transform_loop (loop_vec_info loop_vinfo, gimple *loop_vectorized_call)
   /* Make sure there exists a single-predecessor exit bb.  Do this before 
      versioning.   */
   edge e = LOOP_VINFO_IV_EXIT (loop_vinfo);
-  if (! single_pred_p (e->dest))
+  if (! single_pred_p (e->dest) && !LOOP_VINFO_EARLY_BREAKS (loop_vinfo))
     {
       split_loop_exit_edge (e, true);
       if (dump_enabled_p ())
