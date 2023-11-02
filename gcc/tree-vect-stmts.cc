@@ -359,9 +359,14 @@ vect_stmt_relevant_p (stmt_vec_info stmt_info, loop_vec_info loop_vinfo,
   *live_p = false;
 
   /* cond stmt other than loop exit cond.  */
-  if (is_ctrl_stmt (stmt_info->stmt)
-      && STMT_VINFO_TYPE (stmt_info) != loop_exit_ctrl_vec_info_type)
-    *relevant = vect_used_in_scope;
+  gimple *stmt = STMT_VINFO_STMT (stmt_info);
+  if (is_ctrl_stmt (stmt) && is_a <gcond *> (stmt))
+    {
+      gcond *cond = as_a <gcond *> (stmt);
+      if (LOOP_VINFO_LOOP_CONDS (loop_vinfo).contains (cond)
+	  && LOOP_VINFO_LOOP_IV_COND (loop_vinfo) != cond)
+	*relevant = vect_used_in_scope;
+    }
 
   /* changing memory.  */
   if (gimple_code (stmt_info->stmt) != GIMPLE_PHI)
@@ -373,6 +378,11 @@ vect_stmt_relevant_p (stmt_vec_info stmt_info, loop_vec_info loop_vinfo,
                            "vec_stmt_relevant_p: stmt has vdefs.\n");
 	*relevant = vect_used_in_scope;
       }
+
+  auto_vec<edge> exits = get_loop_exit_edges (loop);
+  auto_bitmap exit_bbs;
+  for (edge exit : exits)
+    bitmap_set_bit (exit_bbs, exit->dest->index);
 
   /* uses outside the loop.  */
   FOR_EACH_PHI_OR_STMT_DEF (def_p, stmt_info->stmt, op_iter, SSA_OP_DEF)
@@ -392,7 +402,6 @@ vect_stmt_relevant_p (stmt_vec_info stmt_info, loop_vec_info loop_vinfo,
 	      /* We expect all such uses to be in the loop exit phis
 		 (because of loop closed form)   */
 	      gcc_assert (gimple_code (USE_STMT (use_p)) == GIMPLE_PHI);
-	      gcc_assert (bb == single_exit (loop)->dest);
 
               *live_p = true;
 	    }
@@ -793,6 +802,20 @@ vect_mark_stmts_to_be_vectorized (loop_vec_info loop_vinfo, bool *fatal)
 			return res;
 		    }
                  }
+	    }
+	  else if (gcond *cond = dyn_cast <gcond *> (stmt_vinfo->stmt))
+	    {
+	      enum tree_code rhs_code = gimple_cond_code (cond);
+	      gcc_assert (TREE_CODE_CLASS (rhs_code) == tcc_comparison);
+	      opt_result res
+		= process_use (stmt_vinfo, gimple_cond_lhs (cond),
+			       loop_vinfo, relevant, &worklist, false);
+	      if (!res)
+		return res;
+	      res = process_use (stmt_vinfo, gimple_cond_rhs (cond),
+				loop_vinfo, relevant, &worklist, false);
+	      if (!res)
+		return res;
             }
 	  else if (gcall *call = dyn_cast <gcall *> (stmt_vinfo->stmt))
 	    {
@@ -13058,11 +13081,15 @@ vect_analyze_stmt (vec_info *vinfo,
 			     node_instance, cost_vec);
       if (!res)
 	return res;
-   }
+    }
+
+  if (is_ctrl_stmt (stmt_info->stmt))
+    STMT_VINFO_DEF_TYPE (stmt_info) = vect_early_exit_def;
 
   switch (STMT_VINFO_DEF_TYPE (stmt_info))
     {
       case vect_internal_def:
+      case vect_early_exit_def:
         break;
 
       case vect_reduction_def:
@@ -13095,6 +13122,7 @@ vect_analyze_stmt (vec_info *vinfo,
     {
       gcall *call = dyn_cast <gcall *> (stmt_info->stmt);
       gcc_assert (STMT_VINFO_VECTYPE (stmt_info)
+		  || gimple_code (stmt_info->stmt) == GIMPLE_COND
 		  || (call && gimple_call_lhs (call) == NULL_TREE));
       *need_to_vectorize = true;
     }
@@ -13869,6 +13897,14 @@ vect_is_simple_use (vec_info *vinfo, stmt_vec_info stmt, slp_tree slp_node,
 	  else
 	    *op = gimple_op (ass, operand + 1);
 	}
+      else if (gcond *cond = dyn_cast <gcond *> (stmt->stmt))
+	{
+	  gimple_match_op m_op;
+	  if (!gimple_extract_op (cond, &m_op))
+	    return false;
+	  gcc_assert (m_op.code.is_tree_code ());
+	  *op = m_op.ops[operand];
+	}
       else if (gcall *call = dyn_cast <gcall *> (stmt->stmt))
 	*op = gimple_call_arg (call, operand);
       else
@@ -14479,6 +14515,8 @@ vect_get_vector_types_for_stmt (vec_info *vinfo, stmt_vec_info stmt_info,
   *nunits_vectype_out = NULL_TREE;
 
   if (gimple_get_lhs (stmt) == NULL_TREE
+      /* Allow vector conditionals through here.  */
+      && !is_ctrl_stmt (stmt)
       /* MASK_STORE has no lhs, but is ok.  */
       && !gimple_call_internal_p (stmt, IFN_MASK_STORE))
     {
@@ -14495,7 +14533,7 @@ vect_get_vector_types_for_stmt (vec_info *vinfo, stmt_vec_info stmt_info,
 	}
 
       return opt_result::failure_at (stmt,
-				     "not vectorized: irregular stmt.%G", stmt);
+				     "not vectorized: irregular stmt: %G", stmt);
     }
 
   tree vectype;
@@ -14524,6 +14562,14 @@ vect_get_vector_types_for_stmt (vec_info *vinfo, stmt_vec_info stmt_info,
 	scalar_type = TREE_TYPE (DR_REF (dr));
       else if (gimple_call_internal_p (stmt, IFN_MASK_STORE))
 	scalar_type = TREE_TYPE (gimple_call_arg (stmt, 3));
+      else if (is_ctrl_stmt (stmt))
+	{
+	  gcond *cond = dyn_cast <gcond *> (stmt);
+	  if (!cond)
+	    return opt_result::failure_at (stmt, "not vectorized: unsupported"
+					   " control flow statement.\n");
+	  scalar_type = TREE_TYPE (gimple_cond_rhs (stmt));
+	}
       else
 	scalar_type = TREE_TYPE (gimple_get_lhs (stmt));
 
