@@ -1886,12 +1886,10 @@ slpeel_can_duplicate_loop_p (const class loop *loop, const_edge exit_e,
   edge entry_e = loop_preheader_edge (loop);
   gcond *orig_cond = get_loop_exit_condition (exit_e);
   gimple_stmt_iterator loop_exit_gsi = gsi_last_bb (exit_e->src);
-  unsigned int num_bb = loop->inner? 5 : 2;
 
   /* All loops have an outer scope; the only case loop->outer is NULL is for
      the function itself.  */
   if (!loop_outer (loop)
-      || loop->num_nodes != num_bb
       || !empty_block_p (loop->latch)
       || !exit_e
       /* Verify that new loop exit condition can be trivially modified.  */

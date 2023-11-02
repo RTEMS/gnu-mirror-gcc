@@ -1727,6 +1727,17 @@ vect_analyze_loop_form (class loop *loop, vect_loop_form_info *info)
 		       "using as main loop exit: %d -> %d [AUX: %p]\n",
 		       exit_e->src->index, exit_e->dest->index, exit_e->aux);
 
+  /* Check if we have any control flow that doesn't leave the loop.  */
+  class loop *v_loop = loop->inner ? loop->inner : loop;
+  basic_block *bbs= get_loop_body (v_loop);
+  for (unsigned i = 0; i < v_loop->num_nodes; i++)
+    if (EDGE_COUNT (bbs[i]->succs) != 1
+	&& (EDGE_COUNT (bbs[i]->succs) != 2
+	    || !loop_exits_from_bb_p (bbs[i]->loop_father, bbs[i])))
+      return opt_result::failure_at (vect_location,
+				     "not vectorized:"
+				     " unsupported control flow in loop.\n");
+
   /* Different restrictions apply when we are considering an inner-most loop,
      vs. an outer (nested) loop.
      (FORNOW. May want to relax some of these restrictions in the future).  */
@@ -1745,11 +1756,6 @@ vect_analyze_loop_form (class loop *loop, vect_loop_form_info *info)
                            | +--> latch --+
                            |
                         (exit-bb)  */
-
-      if (loop->num_nodes != 2)
-	return opt_result::failure_at (vect_location,
-				       "not vectorized:"
-				       " control flow in loop.\n");
 
       if (empty_block_p (loop->header))
 	return opt_result::failure_at (vect_location,
@@ -1781,11 +1787,6 @@ vect_analyze_loop_form (class loop *loop, vect_loop_form_info *info)
 	return opt_result::failure_at (vect_location,
 				       "not vectorized:"
 				       " multiple nested loops.\n");
-
-      if (loop->num_nodes != 5)
-	return opt_result::failure_at (vect_location,
-				       "not vectorized:"
-				       " control flow in loop.\n");
 
       entryedge = loop_preheader_edge (innerloop);
       if (entryedge->src != loop->header
@@ -1823,9 +1824,6 @@ vect_analyze_loop_form (class loop *loop, vect_loop_form_info *info)
       info->inner_loop_cond = inner.conds[0];
     }
 
-  if (!single_exit (loop))
-    return opt_result::failure_at (vect_location,
-				   "not vectorized: multiple exits.\n");
   if (EDGE_COUNT (loop->header->preds) != 2)
     return opt_result::failure_at (vect_location,
 				   "not vectorized:"
