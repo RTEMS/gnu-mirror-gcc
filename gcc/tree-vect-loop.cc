@@ -1236,6 +1236,14 @@ vect_need_peeling_or_partial_vectors_p (loop_vec_info loop_vinfo)
     th = LOOP_VINFO_COST_MODEL_THRESHOLD (LOOP_VINFO_ORIG_LOOP_INFO
 					  (loop_vinfo));
 
+  /* When we have multiple exits and VF is unknown, we must require partial
+     vectors because the loop bounds is not a minimum but a maximum.  That is to
+     say we cannot unpredicate the main loop unless we peel or use partial
+     vectors in the epilogue.  */
+  if (LOOP_VINFO_EARLY_BREAKS (loop_vinfo)
+      && !LOOP_VINFO_VECT_FACTOR (loop_vinfo).is_constant ())
+    return true;
+
   if (LOOP_VINFO_NITERS_KNOWN_P (loop_vinfo)
       && LOOP_VINFO_PEELING_FOR_ALIGNMENT (loop_vinfo) >= 0)
     {
@@ -3151,7 +3159,8 @@ start_over:
 
   /* If an epilogue loop is required make sure we can create one.  */
   if (LOOP_VINFO_PEELING_FOR_GAPS (loop_vinfo)
-      || LOOP_VINFO_PEELING_FOR_NITER (loop_vinfo))
+      || LOOP_VINFO_PEELING_FOR_NITER (loop_vinfo)
+      || LOOP_VINFO_EARLY_BREAKS (loop_vinfo))
     {
       if (dump_enabled_p ())
         dump_printf_loc (MSG_NOTE, vect_location, "epilog loop required\n");

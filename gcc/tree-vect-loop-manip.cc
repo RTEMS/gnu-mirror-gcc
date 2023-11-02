@@ -1200,7 +1200,7 @@ vect_set_loop_condition_partial_vectors_avx512 (class loop *loop,
    loop handles exactly VF scalars per iteration.  */
 
 static gcond *
-vect_set_loop_condition_normal (loop_vec_info /* loop_vinfo */, edge exit_edge,
+vect_set_loop_condition_normal (loop_vec_info loop_vinfo, edge exit_edge,
 				class loop *loop, tree niters, tree step,
 				tree final_iv, bool niters_maybe_zero,
 				gimple_stmt_iterator loop_cond_gsi)
@@ -1308,7 +1308,8 @@ vect_set_loop_condition_normal (loop_vec_info /* loop_vinfo */, edge exit_edge,
   gsi_insert_before (&loop_cond_gsi, cond_stmt, GSI_SAME_STMT);
 
   /* Record the number of latch iterations.  */
-  if (limit == niters)
+  if (limit == niters
+      || LOOP_VINFO_EARLY_BREAKS (loop_vinfo))
     /* Case A: the loop iterates NITERS times.  Subtract one to get the
        latch count.  */
     loop->nb_iterations = fold_build2 (MINUS_EXPR, niters_type, niters,
@@ -3051,6 +3052,16 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
     bound_epilog += vf - 1;
   if (LOOP_VINFO_PEELING_FOR_GAPS (loop_vinfo))
     bound_epilog += 1;
+
+  /* For early breaks the scalar loop needs to execute at most VF times
+     to find the element that caused the break.  */
+  if (LOOP_VINFO_EARLY_BREAKS (loop_vinfo))
+    {
+      bound_epilog = vf;
+      /* Force a scalar epilogue as we can't vectorize the index finding.  */
+      vect_epilogues = false;
+    }
+
   bool epilog_peeling = maybe_ne (bound_epilog, 0U);
   poly_uint64 bound_scalar = bound_epilog;
 
@@ -3185,14 +3196,23 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
 				  bound_prolog + bound_epilog)
 		      : (!LOOP_REQUIRES_VERSIONING (loop_vinfo)
 			 || vect_epilogues));
+
+  /* We only support early break vectorization on known bounds at this time.
+     This means that if the vector loop can't be entered then we won't generate
+     it at all.  So for now force skip_vector off because the additional control
+     flow messes with the BB exits and we've already analyzed them.  */
+ skip_vector = skip_vector && !LOOP_VINFO_EARLY_BREAKS (loop_vinfo);
+
   /* Epilog loop must be executed if the number of iterations for epilog
      loop is known at compile time, otherwise we need to add a check at
      the end of vector loop and skip to the end of epilog loop.  */
   bool skip_epilog = (prolog_peeling < 0
 		      || !LOOP_VINFO_NITERS_KNOWN_P (loop_vinfo)
 		      || !vf.is_constant ());
-  /* PEELING_FOR_GAPS is special because epilog loop must be executed.  */
-  if (LOOP_VINFO_PEELING_FOR_GAPS (loop_vinfo))
+  /* PEELING_FOR_GAPS and peeling for early breaks are special because epilog
+     loop must be executed.  */
+  if (LOOP_VINFO_PEELING_FOR_GAPS (loop_vinfo)
+      || LOOP_VINFO_EARLY_BREAKS (loop_vinfo))
     skip_epilog = false;
 
   class loop *scalar_loop = LOOP_VINFO_SCALAR_LOOP (loop_vinfo);
