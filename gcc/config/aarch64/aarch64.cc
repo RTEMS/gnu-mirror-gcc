@@ -25960,6 +25960,80 @@ aarch64_evpc_ins (struct expand_vec_perm_d *d)
   return true;
 }
 
+/* Recognize patterns suitable for the an INS + UZP.
+   This addresses limited permute optimizations before a more generic search
+   algorithm for two operator sequences is implemented.  */
+static bool
+aarch64_evpc_ins_uzp (struct expand_vec_perm_d *d)
+{
+  machine_mode mode = d->vmode;
+
+  if (d->vec_flags != VEC_ADVSIMD || BYTES_BIG_ENDIAN)
+    return false;
+
+  unsigned HOST_WIDE_INT nelt = d->perm.length ().to_constant ();
+
+  if (nelt != 4
+      || !d->perm[0].is_constant()
+      || !d->perm[1].is_constant()
+      || !d->perm.series_p (0, 2, d->perm[0], 0)
+      || !d->perm.series_p (1, 2, d->perm[1], 0))
+    return false;
+
+  /* We have a {A, B, A, B} permutation.  */
+  unsigned HOST_WIDE_INT A = d->perm[0].to_constant ();
+  unsigned HOST_WIDE_INT B = d->perm[1].to_constant ();
+
+  if (A >= nelt || B < nelt || d->op0 == d->op1)
+    return false;
+
+  rtx insv;
+  rtx extractv;
+  unsigned HOST_WIDE_INT idx, extractindex;
+
+  /* If A is the first element or B is the second element of a UZP1/2 then we
+     can emit this permute as INS + UZP .  */
+  if (A == 0 || A == 1)
+    {
+      insv = d->op0;
+      extractv = d->op1;
+      idx = A == 0 ? 2 : 3;
+      extractindex = B;
+    }
+  else if (B == nelt + 2 || B == nelt + 3)
+    {
+      insv = d->op1;
+      extractv = d->op0;
+      idx = B == nelt + 2 ? 0 : 1;
+      extractindex = A;
+    }
+  else
+    return false;
+
+  if (d->testing_p)
+    return true;
+
+  if (extractindex >= nelt)
+    extractindex -= nelt;
+  gcc_assert (extractindex < nelt);
+
+  /* Emit INS.  */
+  insn_code icode = code_for_aarch64_simd_vec_copy_lane (mode);
+  expand_operand ops[5];
+  create_output_operand (&ops[0], d->target, mode);
+  create_input_operand (&ops[1], insv, mode);
+  create_integer_operand (&ops[2], 1 << idx);
+  create_input_operand (&ops[3], extractv, mode);
+  create_integer_operand (&ops[4], extractindex);
+  expand_insn (icode, 5, ops);
+
+  /* Emit UZP.  */
+  emit_set_insn (d->target, gen_rtx_UNSPEC (mode, gen_rtvec (2, d->target, d->target),
+				      idx & 1 ? UNSPEC_UZP2 : UNSPEC_UZP1));
+
+  return true;
+}
+
 static bool
 aarch64_expand_vec_perm_const_1 (struct expand_vec_perm_d *d)
 {
@@ -26000,6 +26074,8 @@ aarch64_expand_vec_perm_const_1 (struct expand_vec_perm_d *d)
 	  else if (aarch64_evpc_sel (d))
 	    return true;
 	  else if (aarch64_evpc_ins (d))
+	    return true;
+	  else if (aarch64_evpc_ins_uzp (d))
 	    return true;
 	  else if (aarch64_evpc_reencode (d))
 	    return true;
