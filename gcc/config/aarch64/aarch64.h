@@ -223,6 +223,7 @@ enum class aarch64_feature : unsigned char {
 #define AARCH64_ISA_MOPS	   (aarch64_isa_flags & AARCH64_FL_MOPS)
 #define AARCH64_ISA_LS64	   (aarch64_isa_flags & AARCH64_FL_LS64)
 #define AARCH64_ISA_CSSC	   (aarch64_isa_flags & AARCH64_FL_CSSC)
+#define AARCH64_ISA_GCS		   (aarch64_isa_flags & AARCH64_FL_GCS)
 
 /* Crypto is an optional extension to AdvSIMD.  */
 #define TARGET_CRYPTO (AARCH64_ISA_CRYPTO)
@@ -369,6 +370,10 @@ enum class aarch64_feature : unsigned char {
 
 /* Armv9.4-A features.  */
 #define TARGET_ARMV9_4 (AARCH64_ISA_V9_4A)
+
+/*  Armv9.4-A Guarded Control Stack extension system registers are
+    enabled through +gcs.  */
+#define TARGET_GCS (AARCH64_ISA_GCS)
 
 /* Standard register usage.  */
 
