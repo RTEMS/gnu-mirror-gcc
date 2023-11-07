@@ -1,3 +1,28 @@
+==================== Branch work141-vsubreg, patch #408 (vsize #500) ====================
+
+Add tests for -mvector-size-32.
+
+2023-11-07  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-size-32-1.c: New test.
+	* gcc.target/powerpc/vector-size-32-2.c: New test.
+	* gcc.target/powerpc/vector-size-32-3.c: New test.
+	* gcc.target/powerpc/vector-size-32-4.c: New test.
+	* gcc.target/powerpc/vector-size-32-5.c: New test.
+	* gcc.target/powerpc/vector-size-32-6.c: New test.
+
+==================== Branch work141-vsubreg, patch #407 (vpair #346) ====================
+
+Update vector pair documentation.
+
+2023-11-07  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/doc/extend.texi (PowerPC built-ins): Update documentation.
+
 ==================== Branch work141-vsubreg, patch #406 (vsize #500) ====================
 
 Add support for -mvector-size-32.
@@ -55,16 +80,6 @@ gcc/
 	vector pair support.
 	(vsx_extract_v8sf): Likewise.
 	(vsx_extract_<mode>, VPAIR_SMALL_INT iterator): Likewise.
-
-gcc/testsuite/
-
-	* gcc.target/powerpc/vector-size-32-1.c: New test.
-	* gcc.target/powerpc/vector-size-32-2.c: New test.
-	* gcc.target/powerpc/vector-size-32-3.c: New test.
-	* gcc.target/powerpc/vector-size-32-4.c: New test.
-	* gcc.target/powerpc/vector-size-32-5.c: New test.
-	* gcc.target/powerpc/vector-size-32-6.c: New test.
-
 
 ==================== Branch work141-vsubreg, patch #405 (vpair #345) ====================
 
