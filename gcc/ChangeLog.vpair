@@ -1,3 +1,13 @@
+==================== Branch work141-vpair, patch #346 ====================
+
+Update vector pair documentation.
+
+2023-11-07  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/doc/extend.texi (PowerPC built-ins): Update documentation.
+
 ==================== Branch work141-vpair, patch #345 ====================
 
 Add overloads for __builtin_vpair_assemble.
