@@ -1,3 +1,13 @@
+==================== Branch work141-ovpair, patch #215 ====================
+
+Update vector pair documentation.
+
+2023-11-07  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/doc/extend.texi (PowerPC built-ins): Update documentation.
+
 ==================== Branch work141-ovpair, patch #214 ====================
 
 Fix typo in test.
