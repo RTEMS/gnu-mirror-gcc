@@ -1,4 +1,4 @@
-==================== Branch work142, baseline ====================
+==================== Branch work142, patch #2 ====================
 
 Power10: Add options to disable load and store vector pair.
 
@@ -36,33 +36,40 @@ systems doing the normal bootstrap and test.  There were no regressions in any
 of the tests, and the new tests passed.  Can I check this patch into the master
 branch?
 
-2023-11-07  Michael Meissner  <meissner@linux.ibm.com>
+2023-11-08  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
-	* config/rs6000/mma.md (movoo): Add support for -mload-vector-pair and
-	-mstore-vector-pair.
-	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Likewise.
+	* config/rs6000/mma.md (UNSPEC_VECTOR_PAIR_MEMORY): New unspec.
+	(movoo): Add support for -mload-vector-pair and -mstore-vector-pair.
+	(lxvp_internal): New expander.
+	(stxvp_internal): Likewise.
+	(vector_pair_memory_builtin): New insn.
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Add support for
+	-mload-vector-pair and -mstore-vector-pair.
 	(POWERPC_MASKS): Likewise.
-	* config/rs6000/rs6000.md (rs6000_setup_reg_addr_masks): If either load
-	vector pair or store vector pair instructions are not being generated,
-	don't allow lxvpx or stxvpx to be generated.
-	(rs6000_option_override_internal): Add warnings if either
-	-mload-vector-pair or -mstore-vector-pair is used without having MMA
-	instructions.
-	(rs6000_opt_masks): Allow user to override -mload-vector-pair or
-	-mstore-vector-pair via #pragma or attribute.
+	* config/rs6000/rs6000.cc (rs6000_setup_reg_addr_masks): Only allow
+	indexed mode for OOmode if we are generating both load vector pair and
+	store vector pair instructions.
+	(rs6000_option_override_internal): Add support for -mload-vector-pair
+	and -mstore-vector-pair.
+	(rs6000_opt_masks): Likewise.
+	* config/rs6000/rs6000.md (isa attribute): Add lxvp and stxvp.
+	(enabled attribute): Likewise.
 	* config/rs6000/rs6000.opt (-mload-vector-pair): New option.
 	(-mstore-vector-pair): Likewise.
 
 gcc/testsuite/
 
 	* gcc.target/powerpc/vector-pair-attribute.c: New test.
+	* gcc.target/powerpc/vector-pair-builtin.c: New test.
 	* gcc.target/powerpc/vector-pair-pragma.c: New test.
 	* gcc.target/powerpc/vector-pair-switch1.c: New test.
 	* gcc.target/powerpc/vector-pair-switch2.c: New test.
 	* gcc.target/powerpc/vector-pair-switch3.c: New test.
 	* gcc.target/powerpc/vector-pair-switch4.c: New test.
+
+==================== Branch work142, patch #1 was reverted ====================
 
 ==================== Branch work142, baseline ====================
 
