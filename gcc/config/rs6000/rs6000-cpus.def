@@ -77,12 +77,10 @@
 /* Flags that need to be turned off if -mno-power10.  */
 /* We comment out PCREL_OPT here to disable it by default because SPEC2017
    performance was degraded by it.  */
-#define OTHER_POWER10_MASKS	(OPTION_MASK_LOAD_VECTOR_PAIR		\
-				 | OPTION_MASK_MMA			\
+#define OTHER_POWER10_MASKS	(OPTION_MASK_MMA			\
 				 | OPTION_MASK_PCREL			\
 				 /* | OPTION_MASK_PCREL_OPT */		\
-				 | OPTION_MASK_PREFIXED			\
-				 | OPTION_MASK_STORE_VECTOR_PAIR)
+				 | OPTION_MASK_PREFIXED)
 
 #define ISA_3_1_MASKS_SERVER	(ISA_3_0_MASKS_SERVER			\
 				 | OPTION_MASK_POWER10			\
@@ -136,7 +134,6 @@
 				 | OPTION_MASK_P10_FUSION		\
 				 | OPTION_MASK_HTM			\
 				 | OPTION_MASK_ISEL			\
-				 | OPTION_MASK_LOAD_VECTOR_PAIR		\
 				 | OPTION_MASK_MFCRF			\
 				 | OPTION_MASK_MMA			\
 				 | OPTION_MASK_MODULO			\
@@ -159,7 +156,6 @@
 				 | OPTION_MASK_QUAD_MEMORY_ATOMIC	\
 				 | OPTION_MASK_RECIP_PRECISION		\
 				 | OPTION_MASK_SOFT_FLOAT		\
-				 | OPTION_MASK_STORE_VECTOR_PAIR	\
 				 | OPTION_MASK_STRICT_ALIGN_OPTIONAL	\
 				 | OPTION_MASK_VSX)
 
