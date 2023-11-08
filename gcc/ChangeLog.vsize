@@ -1,5 +1,25 @@
 ==================== Branch work143-vsize, patch #500 ====================
 
+Add missing support fro patch #500 and fix -mno-store-vector-pair.
+
+2023-11-08  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md: Add missing file.  Fix issue with
+	-mno-store-vector-pair and -mno-load-vector-pair.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-size-32-1.c: New test.
+	* gcc.target/powerpc/vector-size-32-2.c: New test.
+	* gcc.target/powerpc/vector-size-32-3.c: New test.
+	* gcc.target/powerpc/vector-size-32-4.c: New test.
+	* gcc.target/powerpc/vector-size-32-5.c: New test.
+	* gcc.target/powerpc/vector-size-32-6.c: New test.
+
+==================== Branch work143-vsize, patch #500 ====================
+
 Add support for -mvector-size-32.
 
 2023-11-08  Michael Meissner  <meissner@linux.ibm.com>
