@@ -4137,3 +4137,55 @@
 
   void __builtin_vsx_stxvp_internal (v256 *, v256);
     STXVP_INTERNAL stxvp_internal {mma}
+
+;; vector pair built-in functions for 8 32-bit float values
+
+  v256 __builtin_vpair_f32_abs (v256);
+    VPAIR_F32_ABS vpair_abs_v8sf2 {mma,pair}
+
+  v256 __builtin_vpair_f32_add (v256, v256);
+    VPAIR_F32_ADD vpair_add_v8sf3 {mma,pair}
+
+  v256 __builtin_vpair_f32_fma (v256, v256, v256);
+    VPAIR_F32_FMA vpair_fma_v8sf4 {mma,pair}
+
+  v256 __builtin_vpair_f32_max (v256, v256);
+    VPAIR_F32_MAX vpair_smax_v8sf3 {mma,pair}
+
+  v256 __builtin_vpair_f32_min (v256, v256);
+    VPAIR_F32_MIN vpair_smin_v8sf3 {mma,pair}
+
+  v256 __builtin_vpair_f32_mul (v256, v256);
+    VPAIR_F32_MUL vpair_mul_v8sf3 {mma,pair}
+
+  v256 __builtin_vpair_f32_neg (v256);
+    VPAIR_F32_NEG vpair_neg_v8sf2 {mma,pair}
+
+  v256 __builtin_vpair_f32_sub (v256, v256);
+    VPAIR_F32_SUB vpair_sub_v8sf3 {mma,pair}
+
+;; vector pair built-in functions for 4 64-bit double values
+
+  v256 __builtin_vpair_f64_abs (v256);
+    VPAIR_F64_ABS vpair_abs_v4df2 {mma,pair}
+
+  v256 __builtin_vpair_f64_add (v256, v256);
+    VPAIR_F64_ADD vpair_add_v4df3 {mma,pair}
+
+  v256 __builtin_vpair_f64_fma (v256, v256, v256);
+    VPAIR_F64_FMA vpair_fma_v4df4 {mma,pair}
+
+  v256 __builtin_vpair_f64_max (v256, v256);
+    VPAIR_F64_MAX vpair_smax_v4df3 {mma,pair}
+
+  v256 __builtin_vpair_f64_min (v256, v256);
+    VPAIR_F64_MIN vpair_smin_v4df3 {mma,pair}
+
+  v256 __builtin_vpair_f64_mul (v256, v256);
+    VPAIR_F64_MUL vpair_mul_v4df3 {mma,pair}
+
+  v256 __builtin_vpair_f64_neg (v256);
+    VPAIR_F64_NEG vpair_neg_v4df2 {mma,pair}
+
+  v256 __builtin_vpair_f64_sub (v256, v256);
+    VPAIR_F64_SUB vpair_sub_v4df3 {mma,pair}
