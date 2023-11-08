@@ -139,17 +139,6 @@ rs6000_invalid_builtin (enum rs6000_gen_builtins fncode)
     case ENB_MMA:
       error ("%qs requires the %qs option", name, "-mmma");
       break;
-    case ENB_FUTURE:
-      error ("%qs requires the %qs option", name, "-mcpu=future");
-      break;
-    case ENB_FUTURE_64:
-      error ("%qs requires the %qs option and either the %qs or %qs option",
-	     name, "-mcpu=future", "-m64", "-mpowerpc64");
-      break;
-    case ENB_DM:
-      error ("%qs requires the %qs or %qs options", name, "-mcpu=future",
-	     "-mdense-math");
-      break;
     default:
     case ENB_ALWAYS:
       gcc_unreachable ();
@@ -205,12 +194,6 @@ rs6000_builtin_is_supported (enum rs6000_gen_builtins fncode)
       return TARGET_HTM;
     case ENB_MMA:
       return TARGET_MMA;
-    case ENB_FUTURE:
-      return TARGET_FUTURE;
-    case ENB_FUTURE_64:
-      return TARGET_FUTURE && TARGET_POWERPC64;
-    case ENB_DM:
-      return TARGET_DENSE_MATH;
     default:
       gcc_unreachable ();
     }
@@ -512,8 +495,6 @@ const char *rs6000_type_string (tree type_node)
     return "__vector_pair";
   else if (type_node == vector_quad_type_node)
     return "__vector_quad";
-  else if (type_node == dmr_type_node)
-    return "__dmr";
 
   return "unknown";
 }
@@ -799,17 +780,6 @@ rs6000_init_builtins (void)
 					  "__vector_quad");
   t = build_qualified_type (vector_quad_type_node, TYPE_QUAL_CONST);
   ptr_vector_quad_type_node = build_pointer_type (t);
-
-  dmr_type_node = make_node (OPAQUE_TYPE);
-  SET_TYPE_MODE (dmr_type_node, TDOmode);
-  TYPE_SIZE (dmr_type_node) = bitsize_int (GET_MODE_BITSIZE (TDOmode));
-  TYPE_PRECISION (dmr_type_node) = GET_MODE_BITSIZE (TDOmode);
-  TYPE_SIZE_UNIT (dmr_type_node) = size_int (GET_MODE_SIZE (TDOmode));
-  SET_TYPE_ALIGN (dmr_type_node, 512);
-  TYPE_USER_ALIGN (dmr_type_node) = 0;
-  lang_hooks.types.register_builtin_type (dmr_type_node, "__dmr");
-  t = build_qualified_type (dmr_type_node, TYPE_QUAL_CONST);
-  ptr_dmr_type_node = build_pointer_type (t);
 
   tdecl = add_builtin_type ("__bool char", bool_char_type_node);
   TYPE_NAME (bool_char_type_node) = tdecl;
