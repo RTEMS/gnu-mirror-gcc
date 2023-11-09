@@ -4183,3 +4183,147 @@
 
   v256 __builtin_vpair_f64_sub (v256, v256);
     VPAIR_F64_SUB vpair_sub_v4df3 {mma,pair}
+
+;; vector pair built-in functions for 32 8-bit unsigned char or
+;; signed char values
+
+  v256 __builtin_vpair_i8_add (v256, v256);
+    VPAIR_I8_ADD vpair_add_v32qi3 {mma,pair}
+
+  v256 __builtin_vpair_i8_and (v256, v256);
+    VPAIR_I8_AND vpair_and_v32qi3 {mma,pair}
+
+  v256 __builtin_vpair_i8_ior (v256, v256);
+    VPAIR_I8_IOR vpair_ior_v32qi3 {mma,pair}
+
+  v256 __builtin_vpair_i8_max (v256, v256);
+    VPAIR_I8_MAX vpair_smax_v32qi3 {mma,pair}
+
+  v256 __builtin_vpair_i8_min (v256, v256);
+    VPAIR_I8_MIN vpair_smin_v32qi3 {mma,pair}
+
+  v256 __builtin_vpair_i8_neg (v256);
+    VPAIR_I8_NEG vpair_neg_v32qi2 {mma,pair}
+
+  v256 __builtin_vpair_i8_not (v256);
+    VPAIR_I8_NOT vpair_not_v32qi2 {mma,pair}
+
+  v256 __builtin_vpair_i8_sub (v256, v256);
+    VPAIR_I8_SUB vpair_sub_v32qi3 {mma,pair}
+
+  v256 __builtin_vpair_i8_xor (v256, v256);
+    VPAIR_I8_XOR vpair_xor_v32qi3 {mma,pair}
+
+  v256 __builtin_vpair_i8u_max (v256, v256);
+    VPAIR_I8U_MAX vpair_umax_v32qi3 {mma,pair}
+
+  v256 __builtin_vpair_i8u_min (v256, v256);
+    VPAIR_I8U_MIN vpair_umin_v32qi3 {mma,pair}
+
+;; vector pair built-in functions for 16 16-bit unsigned short or
+;; signed short values
+
+  v256 __builtin_vpair_i16_add (v256, v256);
+    VPAIR_I16_ADD vpair_add_v16hi3 {mma,pair}
+
+  v256 __builtin_vpair_i16_and (v256, v256);
+    VPAIR_I16_AND vpair_and_v16hi3 {mma,pair}
+
+  v256 __builtin_vpair_i16_ior (v256, v256);
+    VPAIR_I16_IOR vpair_ior_v16hi3 {mma,pair}
+
+  v256 __builtin_vpair_i16_max (v256, v256);
+    VPAIR_I16_MAX vpair_smax_v16hi3 {mma,pair}
+
+  v256 __builtin_vpair_i16_min (v256, v256);
+    VPAIR_I16_MIN vpair_smin_v16hi3 {mma,pair}
+
+  v256 __builtin_vpair_i16_neg (v256);
+    VPAIR_I16_NEG vpair_neg_v16hi2 {mma,pair}
+
+  v256 __builtin_vpair_i16_not (v256);
+    VPAIR_I16_NOT vpair_not_v16hi2 {mma,pair}
+
+  v256 __builtin_vpair_i16_sub (v256, v256);
+    VPAIR_I16_SUB vpair_sub_v16hi3 {mma,pair}
+
+  v256 __builtin_vpair_i16_xor (v256, v256);
+    VPAIR_I16_XOR vpair_xor_v16hi3 {mma,pair}
+
+  v256 __builtin_vpair_i16u_max (v256, v256);
+    VPAIR_I16U_MAX vpair_umax_v16hi3 {mma,pair}
+
+  v256 __builtin_vpair_i16u_min (v256, v256);
+    VPAIR_I16U_MIN vpair_umin_v16hi3 {mma,pair}
+
+;; vector pair built-in functions for 8 32-bit unsigned int or
+;; signed int values
+
+  v256 __builtin_vpair_i32_add (v256, v256);
+    VPAIR_I32_ADD vpair_add_v8si3 {mma,pair}
+
+  v256 __builtin_vpair_i32_and (v256, v256);
+    VPAIR_I32_AND vpair_and_v8si3 {mma,pair}
+
+  v256 __builtin_vpair_i32_ior (v256, v256);
+    VPAIR_I32_IOR vpair_ior_v8si3 {mma,pair}
+
+  v256 __builtin_vpair_i32_max (v256, v256);
+    VPAIR_I32_MAX vpair_smax_v8si3 {mma,pair}
+
+  v256 __builtin_vpair_i32_min (v256, v256);
+    VPAIR_I32_MIN vpair_smin_v8si3 {mma,pair}
+
+  v256 __builtin_vpair_i32_neg (v256);
+    VPAIR_I32_NEG vpair_neg_v8si2 {mma,pair}
+
+  v256 __builtin_vpair_i32_not (v256);
+    VPAIR_I32_NOT vpair_not_v8si2 {mma,pair}
+
+  v256 __builtin_vpair_i32_sub (v256, v256);
+    VPAIR_I32_SUB vpair_sub_v8si3 {mma,pair}
+
+  v256 __builtin_vpair_i32_xor (v256, v256);
+    VPAIR_I32_XOR vpair_xor_v8si3 {mma,pair}
+
+  v256 __builtin_vpair_i32u_max (v256, v256);
+    VPAIR_I32U_MAX vpair_umax_v8si3 {mma,pair}
+
+  v256 __builtin_vpair_i32u_min (v256, v256);
+    VPAIR_I32U_MIN vpair_umin_v8si3 {mma,pair}
+
+;; vector pair built-in functions for 4 64-bit unsigned long long or
+;; signed long long values
+
+  v256 __builtin_vpair_i64_add (v256, v256);
+    VPAIR_I64_ADD vpair_add_v4di3 {mma,pair}
+
+  v256 __builtin_vpair_i64_and (v256, v256);
+    VPAIR_I64_AND vpair_and_v4di3 {mma,pair}
+
+  v256 __builtin_vpair_i64_ior (v256, v256);
+    VPAIR_I64_IOR vpair_ior_v4di3 {mma,pair}
+
+  v256 __builtin_vpair_i64_max (v256, v256);
+    VPAIR_I64_MAX vpair_smax_v4di3 {mma,pair}
+
+  v256 __builtin_vpair_i64_min (v256, v256);
+    VPAIR_I64_MIN vpair_smin_v4di3 {mma,pair}
+
+  v256 __builtin_vpair_i64_neg (v256);
+    VPAIR_I64_NEG vpair_neg_v4di2 {mma,pair}
+
+  v256 __builtin_vpair_i64_not (v256);
+    VPAIR_I64_NOT vpair_not_v4di2 {mma,pair}
+
+  v256 __builtin_vpair_i64_sub (v256, v256);
+    VPAIR_I64_SUB vpair_sub_v4di3 {mma,pair}
+
+  v256 __builtin_vpair_i64_xor (v256, v256);
+    VPAIR_I64_XOR vpair_xor_v4di3 {mma,pair}
+
+  v256 __builtin_vpair_i64u_max (v256, v256);
+    VPAIR_I64U_MAX vpair_umax_v4di3 {mma,pair}
+
+  v256 __builtin_vpair_i64u_min (v256, v256);
+    VPAIR_I64U_MIN vpair_umin_v4di3 {mma,pair}
