@@ -33,6 +33,8 @@
    UNSPEC_VPAIR_V16HI
    UNSPEC_VPAIR_V8SI
    UNSPEC_VPAIR_V4DI
+   UNSPEC_VPAIR_ZERO
+   UNSPEC_VPAIR_SPLAT
    ])
 
 ;; Iterator doing unary/binary arithmetic on vector pairs
@@ -93,6 +95,13 @@
 			     UNSPEC_VPAIR_V16HI
 			     UNSPEC_VPAIR_V32QI])
 
+(define_int_iterator VP_ALL [UNSPEC_VPAIR_V4DF
+			     UNSPEC_VPAIR_V8SF
+			     UNSPEC_VPAIR_V4DI
+			     UNSPEC_VPAIR_V8SI
+			     UNSPEC_VPAIR_V16HI
+			     UNSPEC_VPAIR_V32QI])
+
 ;; Map VP_* to vector mode of the arguments after they are split
 (define_int_attr VP_VEC_MODE [(UNSPEC_VPAIR_V4DF  "V2DF")
 			      (UNSPEC_VPAIR_V8SF  "V4SF")
@@ -125,6 +134,182 @@
 			     (UNSPEC_VPAIR_V16HI "&v")
 			     (UNSPEC_VPAIR_V8SI  "X")
 			     (UNSPEC_VPAIR_V4DI  "X")])
+
+;; Moddes of the vector element to splat to vector pair
+(define_mode_iterator VP_SPLAT [DF SF DI SI HI QI])
+
+;; Moddes of the vector to splat to vector pair
+(define_mode_iterator VP_SPLAT_VEC [V2DF V4SF V2DI V4SI V8HI V16QI])
+
+;; MAP VP_SPLAT and VP_SPLAT_VEC to the mode of the vector pair operation
+(define_mode_attr vp_splat_pmode [(DF    "v4df")
+				  (V2DF  "v4df")
+				  (SF    "v8sf")
+				  (V4SF  "v8sf")
+				  (DI    "v4di")
+				  (V2DI  "v4di")
+				  (SI    "v8si")
+				  (V4SI  "v8si")
+				  (HI    "v16hi")
+				  (V8HI  "v16hi")
+				  (QI    "v32qi")
+				  (V16QI "v32qi")])
+
+;; MAP VP_SPLAT to the mode of the vector containing the element
+(define_mode_attr VP_SPLAT_VMODE [(DF "V2DF")
+				  (SF "V4SF")
+				  (DI "V2DI")
+				  (SI "V4SI")
+				  (HI "V8HI")
+				  (QI "V16QI")])
+
+;; Initialize a vector pair to 0
+(define_insn_and_split "vpair_zero"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
+	(unspec:OO [(const_int 0)] UNSPEC_VPAIR_ZERO))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 1) (match_dup 3))
+   (set (match_dup 2) (match_dup 3))]
+{
+  rtx op0 = operands[0];
+  unsigned offset_hi = (WORDS_BIG_ENDIAN) ? 0 : 16;
+  unsigned offset_lo = (WORDS_BIG_ENDIAN) ? 16 : 0;
+
+  operands[1] = simplify_gen_subreg (V2DImode, op0, OOmode, offset_hi);
+  operands[2] = simplify_gen_subreg (V2DImode, op0, OOmode, offset_lo);
+  operands[3] = CONST0_RTX (V2DImode);
+}
+  [(set_attr "length" "8")])
+
+;; Assemble a vector pair from two vectors.  Unlike
+;; __builtin_mma_assemble_pair, this function produces a vector pair output
+;; directly and it takes all of the vector types.
+;;
+;; We cannot update the two output registers atomically, so mark the output as
+;; an early clobber so we don't accidentally clobber the input operands.  */
+
+(define_insn_and_split "vpair_assemble_<vp_pmode>"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=&wa")
+	(unspec:OO
+	 [(match_operand:<VP_VEC_MODE> 1 "mma_assemble_input_operand" "mwa")
+	  (match_operand:<VP_VEC_MODE> 2 "mma_assemble_input_operand" "mwa")]
+	 VP_ALL))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  rtx src = gen_rtx_UNSPEC (OOmode,
+			    gen_rtvec (2, operands[1], operands[2]),
+			    UNSPEC_VSX_ASSEMBLE);
+  rs6000_split_multireg_move (operands[0], src);
+  DONE;
+}
+  [(set_attr "length" "8")])
+
+;; Extract one of the two 128-bit vectors from a vector pair.
+(define_insn_and_split "vpair_extract_vector_<vp_pmode>"
+  [(set (match_operand:<VP_VEC_MODE> 0 "vsx_register_operand" "=wa")
+	(unspec:<VP_VEC_MODE>
+	 [(match_operand:OO 1 "vsx_register_operand" "wa")
+	  (match_operand 2 "const_0_to_1_operand" "n")]
+	 VP_ALL))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0) (match_dup 3))]
+{
+  machine_mode vmode = <VP_VEC_MODE>mode;
+  unsigned reg_num = UINTVAL (operands[2]);
+  if (!WORDS_BIG_ENDIAN)
+    reg_num = 1 - reg_num;
+	   
+  operands[3] = simplify_gen_subreg (vmode, operands[1], OOmode, reg_num * 16);
+})
+
+;; Optimize extracting an 128-bit vector from a vector pair in memory.
+(define_insn_and_split "*vpair_extract_vector_<vp_pmode>_mem"
+  [(set (match_operand:<VP_VEC_MODE> 0 "vsx_register_operand" "=wa")
+	(unspec:<VP_VEC_MODE>
+	 [(match_operand:OO 1 "memory_operand" "o")
+	  (match_operand 2 "const_0_to_1_operand" "n")]
+	 VP_ALL))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0) (match_dup 3))]
+{
+  operands[3] = adjust_address (operands[1], <VP_VEC_MODE>mode,
+				16 * INTVAL (operands[2]));
+}
+  [(set_attr "type" "vecload")])
+
+;; Create a vector pair with a value splat'ed (duplicated) to all of the
+;; elements.
+(define_expand "vpair_splat_<vp_splat_pmode>"
+  [(use (match_operand:OO 0 "vsx_register_operand"))
+   (use (match_operand:VP_SPLAT 1 "input_operand"))]
+  "TARGET_MMA"
+{
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  machine_mode element_mode = <MODE>mode;
+  machine_mode vector_mode = <VP_SPLAT_VMODE>mode;
+
+  if (op1 == CONST0_RTX (element_mode))
+    {
+      emit_insn (gen_vpair_zero (op0));
+      DONE;
+    }
+
+  rtx vec = gen_reg_rtx (vector_mode);
+  unsigned num_elements = GET_MODE_NUNITS (vector_mode);
+  rtvec elements = rtvec_alloc (num_elements);
+  for (size_t i = 0; i < num_elements; i++)
+    RTVEC_ELT (elements, i) = copy_rtx (op1);
+
+  rs6000_expand_vector_init (vec, gen_rtx_PARALLEL (vector_mode, elements));
+  emit_insn (gen_vpair_splat_<vp_splat_pmode>_internal (op0, vec));
+  DONE;
+})
+
+;; Inner splat support.  Operand1 is the vector splat created above.  Allow
+;; operand 1 to overlap with the output registers to eliminate one move
+;; instruction.
+(define_insn_and_split "vpair_splat_<vp_splat_pmode>_internal"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
+	(unspec:OO
+	 [(match_operand:VP_SPLAT_VEC 1 "vsx_register_operand" "0,wa")]
+	 UNSPEC_VPAIR_SPLAT))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  rtx op0_vector0 = simplify_gen_subreg (<MODE>mode, op0, OOmode, 0);
+  rtx op0_vector1 = simplify_gen_subreg (<MODE>mode, op0, OOmode, 16);
+
+  /* Check if the input is one of the output registers.  */
+  if (rtx_equal_p (op0_vector0, op1))
+    emit_move_insn (op0_vector1, op1);
+
+  else if (rtx_equal_p (op0_vector1, op1))
+    emit_move_insn (op0_vector0, op1);
+
+  else
+    {
+      emit_move_insn (op0_vector0, op1);
+      emit_move_insn (op0_vector1, op1);
+    }
+
+  DONE;
+}
+  [(set_attr "length" "*,8")
+   (set_attr "type" "vecmove")])
 
 
 ;; Vector pair floating point unary operations
