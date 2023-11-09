@@ -932,20 +932,17 @@
 })
 
 (define_insn_and_split "*mov<mode>"
-  [(set (match_operand:VPAIR 0 "nonimmediate_operand" "=wa,m,wa,wa,wa")
-	(match_operand:VPAIR 1 "input_operand" "m,wa,wa,j,eP"))]
-  "TARGET_MMA && TARGET_VECTOR_SIZE_32
+  [(set (match_operand:VPAIR 0 "nonimmediate_operand" "=wa,wa,ZwO,QwO,wa")
+	(match_operand:VPAIR 1 "input_operand" "ZwO,QwO,wa,wa,wa"))]
+  "TARGET_MMA
    && (gpc_reg_operand (operands[0], <MODE>mode)
        || gpc_reg_operand (operands[1], <MODE>mode))"
-{
-  if (MEM_P (operands[0]))
-    return TARGET_STORE_VECTOR_PAIR ? "stxvp%X0 %x1,%0" : "#";
-
-  if (MEM_P (operands[1]))
-    return TARGET_LOAD_VECTOR_PAIR ? "lxvp%X1 %x0,%1" : "#";
-
-  return "#";
-}
+  "@
+   lxvp%X1 %x0,%1
+   #
+   stxvp%X0 %x1,%0
+   #
+   #"
   "&& reload_completed
    && ((MEM_P (operands[0]) && !TARGET_STORE_VECTOR_PAIR)
        || (MEM_P (operands[1]) && !TARGET_LOAD_VECTOR_PAIR)
@@ -955,9 +952,10 @@
   rs6000_split_multireg_move (operands[0], operands[1]);
   DONE;
 }
-  [(set_attr "type" "vecload,vecstore,veclogical,vecperm,vecperm")
+  [(set_attr "type" "vecload,vecload,vecstore,vecstore,veclogical")
    (set_attr "size" "256")
-   (set_attr "length" "*,*,8,8,40")])
+   (set_attr "length" "*,8,*,8,8")
+   (set_attr "isa" "lxvp,*,stxvp,*,*")])
 
 
 ;; Vector pair floating point arithmetic unary operations
