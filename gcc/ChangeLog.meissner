@@ -1,6 +1,109 @@
-==================== Branch work144-paddis, baseline ====================
+==================== Branch work144, patch #1 ====================
+
+Power10: Add options to disable load and store vector pair.
+
+In working on some future patches that involve utilizing vector pair
+instructions, I wanted to be able to tune my program to enable or disable using
+the vector pair load or store operations while still keeping the other
+operations on the vector pair.
+
+This patch adds two undocumented tuning options.  The -mno-load-vector-pair
+option would tell GCC to generate two load vector instructions instead of a
+single load vector pair.  The -mno-store-vector-pair option would tell GCC to
+generate two store vector instructions instead of a single store vector pair.
+
+If either -mno-load-vector-pair is used, GCC will not generate the indexed
+stxvpx instruction.  Similarly if -mno-store-vector-pair is used, GCC will not
+generate the indexed lxvpx instruction.  The reason for this is to enable
+splitting the {,p}lxvp or {,p}stxvp instructions after reload without needing a
+scratch GPR register.
+
+The default for -mcpu=power10 is that both load vector pair and store vector
+pair are enabled.
+
+I decided that if the user explicitly used the __builtin_vsx_lxvp or the
+__builtin_vsx_stxvp built-in functions to load or store a vector pair, that
+those functions would always generate a vector pair instruction.
+
+I added code so that the user code can modify these settings using either a
+'#pragma GCC target' directive or used __attribute__((__target__(...))) in the
+function declaration.
+
+I added tests for the switches, #pragma, and attribute options.
+
+I have built this on both little endian power10 systems and big endian power9
+systems doing the normal bootstrap and test.  There were no regressions in any
+of the tests, and the new tests passed.  Can I check this patch into the master
+branch?
+
+2023-11-08  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (UNSPEC_VECTOR_PAIR_MEMORY): New unspec.
+	(movoo): Add support for -mload-vector-pair and -mstore-vector-pair.
+	(lxvp_internal): New expander.
+	(stxvp_internal): Likewise.
+	(vector_pair_memory_builtin): New insn.
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Add support for
+	-mload-vector-pair and -mstore-vector-pair.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_setup_reg_addr_masks): Only allow
+	indexed mode for OOmode if we are generating both load vector pair and
+	store vector pair instructions.
+	(rs6000_option_override_internal): Add support for -mload-vector-pair
+	and -mstore-vector-pair.
+	(rs6000_opt_masks): Likewise.
+	* config/rs6000/rs6000.md (isa attribute): Add lxvp and stxvp.
+	(enabled attribute): Likewise.
+	* config/rs6000/rs6000.opt (-mload-vector-pair): New option.
+	(-mstore-vector-pair): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-attribute.c: New test.
+	* gcc.target/powerpc/vector-pair-builtin.c: New test.
+	* gcc.target/powerpc/vector-pair-pragma.c: New test.
+	* gcc.target/powerpc/vector-pair-switch1.c: New test.
+	* gcc.target/powerpc/vector-pair-switch2.c: New test.
+	* gcc.target/powerpc/vector-pair-switch3.c: New test.
+	* gcc.target/powerpc/vector-pair-switch4.c: New test.
+
+==================== Branch work144, baseline ====================
+
+Add ChangeLog.meissner and REVISION.
+
+2023-11-08  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* REVISION: New file for branch.
+	* ChangeLog.meissner: New file.
+
+gcc/c-family/
+
+	* ChangeLog.meissner: New file.
+
+gcc/c/
+
+	* ChangeLog.meissner: New file.
+
+gcc/cp/
+
+	* ChangeLog.meissner: New file.
+
+gcc/fortran/
+
+	* ChangeLog.meissner: New file.
+
+gcc/testsuite/
+
+	* ChangeLog.meissner: New file.
+
+libgcc/
+
+	* ChangeLog.meissner: New file.
 
 2023-11-09   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-
