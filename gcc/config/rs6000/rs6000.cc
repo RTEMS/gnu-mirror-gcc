@@ -1964,9 +1964,12 @@ rs6000_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
 static bool
 rs6000_modes_tieable_p (machine_mode mode1, machine_mode mode2)
 {
-  if (mode1 == PTImode || mode1 == OOmode || mode1 == XOmode
-      || mode2 == PTImode || mode2 == OOmode || mode2 == XOmode)
-    return mode1 == mode2;
+   if (mode1 == PTImode || mode1 == OOmode || mode1 == XOmode
+       || mode2 == PTImode || mode2 == XOmode)
+     return mode1 == mode2;
+ 
+  if (mode2 == OOmode)
+    return ALTIVEC_OR_VSX_VECTOR_MODE (mode1);
 
   if (ALTIVEC_OR_VSX_VECTOR_MODE (mode1))
     return ALTIVEC_OR_VSX_VECTOR_MODE (mode2);
